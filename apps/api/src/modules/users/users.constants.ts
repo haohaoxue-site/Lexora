@@ -1,0 +1,4 @@
+export const BIND_EMAIL_CODE_TTL_SECONDS = 10 * 60
+export const BIND_EMAIL_CODE_RESEND_INTERVAL_MS = 60 * 1000
+export const MAX_BIND_EMAIL_CODE_ATTEMPTS = 5
+export const AVATAR_BUCKET = 'avatar'

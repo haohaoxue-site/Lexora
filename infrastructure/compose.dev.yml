@@ -1,0 +1,58 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: samepage-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: samepage_docs
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - '5432:5432'
+    volumes:
+      - samepage-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres -d samepage_docs']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
+
+  redis:
+    image: redis:7-alpine
+    container_name: samepage-redis
+    restart: unless-stopped
+    command: ['redis-server', '--appendonly', 'yes']
+    ports:
+      - '6379:6379'
+    volumes:
+      - samepage-redis-data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
+
+  rustfs:
+    image: rustfs/rustfs:latest
+    container_name: samepage-rustfs
+    restart: unless-stopped
+    environment:
+      RUSTFS_ACCESS_KEY: admin
+      RUSTFS_SECRET_KEY: password123
+      RUSTFS_REGION: auto
+      RUSTFS_CONSOLE_ENABLE: 'true'
+      RUSTFS_VOLUMES: /data
+    ports:
+      - '9000:9000'
+      - '9001:9001'
+    volumes:
+      - samepage-rustfs-data:/data
+      - samepage-rustfs-logs:/logs
+
+volumes:
+  samepage-postgres-data:
+  samepage-redis-data:
+  samepage-rustfs-data:
+  samepage-rustfs-logs:

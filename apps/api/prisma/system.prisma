@@ -1,0 +1,57 @@
+enum SystemEmailProvider {
+  TENCENT_EXMAIL
+  GOOGLE_WORKSPACE
+}
+
+model SystemAuthConfig {
+  id                        String    @id @default("default")
+  allowPasswordRegistration Boolean   @default(true)
+  allowGithubRegistration   Boolean   @default(true)
+  allowLinuxDoRegistration  Boolean   @default(true)
+  systemAdminUserId         String?   @unique
+  systemAdminEmail          String    @unique
+  systemAdminUser           User?     @relation("SystemAuthConfigSystemAdmin", fields: [systemAdminUserId], references: [id], onDelete: SetNull)
+  createdAt                 DateTime  @default(now())
+  updatedAt                 DateTime  @updatedAt
+  updatedBy                 String?
+  updatedByUser             User?     @relation("SystemAuthConfigUpdater", fields: [updatedBy], references: [id], onDelete: SetNull)
+  deletedAt                 DateTime?
+
+  @@index([updatedBy])
+}
+
+model SystemEmailConfig {
+  id                    String              @id @default("default")
+  provider              SystemEmailProvider @default(TENCENT_EXMAIL)
+  enabled               Boolean             @default(false)
+  smtpHost              String
+  smtpPort              Int
+  smtpSecure            Boolean             @default(true)
+  smtpUsername          String
+  smtpPasswordEncrypted String?
+  fromName              String
+  fromEmail             String
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+  updatedBy             String?
+  updatedByUser         User?               @relation("SystemEmailConfigUpdater", fields: [updatedBy], references: [id], onDelete: SetNull)
+  deletedAt             DateTime?
+
+  @@index([updatedBy])
+}
+
+model AdminAuditLog {
+  id          String    @id @default(uuid())
+  actorUserId String
+  action      String
+  targetType  String
+  targetId    String?
+  metadata    Json?
+  actorUser   User      @relation("AdminAuditLogActor", fields: [actorUserId], references: [id], onDelete: Cascade)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+
+  @@index([actorUserId, createdAt])
+  @@index([targetType, targetId])
+}

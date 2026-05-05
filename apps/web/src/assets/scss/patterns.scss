@@ -1,0 +1,23 @@
+.ui-panel {
+  border: 1px solid color-mix(in srgb, var(--brand-border-base) 80%, transparent);
+  box-shadow: 0 1px 2px 0 color-mix(in srgb, var(--brand-text-primary) 5%, transparent);
+  border-radius: 1.75rem;
+
+  .ui-panel__body {
+    padding: 1.5rem;
+  }
+
+  .ui-panel__title {
+    color: var(--brand-text-primary);
+    font-size: 1.125rem;
+    font-weight: 600;
+    line-height: 1.75rem;
+  }
+
+  .ui-panel__meta {
+    margin-top: 0.25rem;
+    color: var(--brand-text-secondary);
+    font-size: 0.75rem;
+    line-height: 1.625;
+  }
+}

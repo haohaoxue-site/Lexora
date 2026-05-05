@@ -1,0 +1,29 @@
+{
+  "name": "@haohaoxue/samepage",
+  "type": "module",
+  "version": "1.0.0",
+  "private": "true",
+  "scripts": {
+    "dev": "pnpm -r --parallel --if-present dev",
+    "dev:infra": "docker compose -f infrastructure/compose.dev.yml up -d",
+    "dev:infra:down": "docker compose -f infrastructure/compose.dev.yml down",
+    "dev:db:push": "pnpm --filter @haohaoxue/samepage-api exec prisma db push",
+    "dev:db:reset": "pnpm --filter @haohaoxue/samepage-api exec prisma db push --force-reset",
+    "dev:web": "pnpm --filter @haohaoxue/samepage-web dev",
+    "dev:api": "pnpm --filter @haohaoxue/samepage-api dev",
+    "dev:agent": "pnpm --filter @haohaoxue/samepage-agent dev",
+    "dev:collab": "pnpm --filter @haohaoxue/samepage-collab dev",
+    "build": "pnpm -r --if-present build",
+    "test": "pnpm -r test",
+    "test:watch": "pnpm -r --parallel --if-present test:watch",
+    "lint": "eslint apps packages",
+    "lint:fix": "pnpm -r lint:fix",
+    "type-check": "pnpm -r type-check"
+  },
+  "devDependencies": {
+    "@antfu/eslint-config": "^8.2.0",
+    "eslint": "^10.2.1",
+    "typescript": "catalog:",
+    "vitest": "^4.1.5"
+  }
+}

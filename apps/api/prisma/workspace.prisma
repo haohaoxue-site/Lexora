@@ -1,0 +1,77 @@
+enum WorkspaceType {
+  PERSONAL
+  TEAM
+}
+
+enum WorkspaceMemberRole {
+  OWNER
+  ADMIN
+  MEMBER
+}
+
+enum WorkspaceMemberStatus {
+  ACTIVE
+  LEFT
+  REMOVED
+}
+
+enum WorkspaceInviteStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+  CANCELED
+}
+
+model Workspace {
+  id             String            @id @default(uuid())
+  type           WorkspaceType
+  name           String
+  description    String?
+  slug           String            @unique
+  iconUrl        String?
+  iconStorageKey String?
+  members        WorkspaceMember[]
+  invites        WorkspaceInvite[]
+  documents      Document[]
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  deletedAt      DateTime?
+
+  @@index([type, createdAt])
+}
+
+model WorkspaceMember {
+  workspaceId String
+  userId      String
+  role        WorkspaceMemberRole
+  status      WorkspaceMemberStatus @default(ACTIVE)
+  joinedAt    DateTime?
+  workspace   Workspace             @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user        User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt   DateTime              @default(now())
+  updatedAt   DateTime              @updatedAt
+  deletedAt   DateTime?
+
+  @@id([workspaceId, userId])
+  @@index([userId, status])
+  @@index([workspaceId, status, role])
+}
+
+model WorkspaceInvite {
+  id            String                @id @default(uuid())
+  workspaceId   String
+  inviteeUserId String
+  status        WorkspaceInviteStatus @default(PENDING)
+  workspace     Workspace             @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  inviteeUser   User                  @relation("WorkspaceInviteInvitee", fields: [inviteeUserId], references: [id], onDelete: Cascade)
+  createdAt     DateTime              @default(now())
+  createdBy     String?
+  createdByUser User?                 @relation("WorkspaceInviteCreator", fields: [createdBy], references: [id], onDelete: SetNull)
+  updatedAt     DateTime              @updatedAt
+  updatedBy     String?
+  updatedByUser User?                 @relation("WorkspaceInviteUpdater", fields: [updatedBy], references: [id], onDelete: SetNull)
+  deletedAt     DateTime?
+
+  @@index([workspaceId, status, updatedAt])
+  @@index([inviteeUserId, status, updatedAt])
+}

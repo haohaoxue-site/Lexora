@@ -1,0 +1,137 @@
+enum AuthProvider {
+  GITHUB
+  LINUX_DO
+}
+
+enum AuthEmailVerificationPurpose {
+  REGISTER_VERIFY
+}
+
+enum UserEmailVerificationPurpose {
+  BIND_EMAIL
+}
+
+enum AuthOauthPurpose {
+  LOGIN
+  BIND
+}
+
+model OauthAccount {
+  id                    String       @id @default(uuid())
+  userId                String
+  provider              AuthProvider
+  providerUserId        String
+  providerUsername      String?
+  providerEmail         String?
+  providerEmailVerified Boolean?
+  rawProfile            Json?
+  user                  User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt             DateTime     @default(now())
+  updatedAt             DateTime     @updatedAt
+  deletedAt             DateTime?
+
+  @@unique([provider, providerUserId])
+  @@index([userId])
+}
+
+model AuthOauthState {
+  id              String           @id @default(uuid())
+  provider        AuthProvider
+  purpose         AuthOauthPurpose @default(LOGIN)
+  initiatorUserId String?
+  state           String           @unique
+  codeVerifier    String
+  redirectUri     String
+  expiresAt       DateTime
+  consumedAt      DateTime?
+  initiatorUser   User?            @relation("AuthOauthStateInitiator", fields: [initiatorUserId], references: [id], onDelete: SetNull)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  deletedAt       DateTime?
+
+  @@index([provider, expiresAt])
+  @@index([initiatorUserId, purpose])
+}
+
+model AuthRefreshToken {
+  id           String             @id @default(uuid())
+  userId       String
+  tokenHash    String             @unique
+  familyId     String
+  replacedById String?
+  expiresAt    DateTime
+  revokedAt    DateTime?
+  createdIp    String?
+  userAgent    String?
+  user         User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  replacedBy   AuthRefreshToken?  @relation("RefreshTokenRotation", fields: [replacedById], references: [id])
+  rotatedFrom  AuthRefreshToken[] @relation("RefreshTokenRotation")
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+  deletedAt    DateTime?
+
+  @@index([userId])
+  @@index([familyId])
+  @@index([expiresAt])
+}
+
+model AuthLoginCode {
+  id          String    @id @default(uuid())
+  userId      String
+  codeHash    String    @unique
+  redirectUri String
+  expiresAt   DateTime
+  consumedAt  DateTime?
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+
+  @@index([userId, expiresAt])
+}
+
+model LocalCredential {
+  userId             String    @id
+  passwordHash       String
+  mustChangePassword Boolean   @default(false)
+  emailVerifiedAt    DateTime?
+  passwordUpdatedAt  DateTime?
+  user               User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+  deletedAt          DateTime?
+}
+
+model AuthEmailVerificationToken {
+  id         String                       @id @default(uuid())
+  email      String
+  tokenHash  String                       @unique
+  purpose    AuthEmailVerificationPurpose
+  expiresAt  DateTime
+  consumedAt DateTime?
+  createdAt  DateTime                     @default(now())
+  updatedAt  DateTime                     @updatedAt
+  deletedAt  DateTime?
+
+  @@index([email, purpose, expiresAt])
+}
+
+model UserEmailVerificationCode {
+  id           String                       @id @default(uuid())
+  userId       String
+  email        String
+  purpose      UserEmailVerificationPurpose
+  codeHash     String                       @unique
+  expiresAt    DateTime
+  consumedAt   DateTime?
+  sendCount    Int                          @default(1)
+  attemptCount Int                          @default(0)
+  lastSentAt   DateTime                     @default(now())
+  user         User                         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt    DateTime                     @default(now())
+  updatedAt    DateTime                     @updatedAt
+  deletedAt    DateTime?
+
+  @@index([userId, purpose, expiresAt])
+  @@index([email, purpose, expiresAt])
+}

@@ -1,0 +1,213 @@
+enum AiModelServiceScope {
+  SYSTEM
+  USER
+}
+
+enum AiModelEndpointMode {
+  FIXED
+  CUSTOM
+}
+
+enum AiModelAuthMode {
+  API_KEY
+  BEARER
+  NONE
+}
+
+enum AiModelServiceVisibility {
+  ALL_USERS
+}
+
+enum AiModelType {
+  CHAT
+  EMBEDDING
+  RERANK
+  IMAGE
+}
+
+enum AiModelCapability {
+  STREAMING
+  VISION
+  TOOL_CALL
+  REASONING
+  JSON_MODE
+}
+
+enum AiAnchorKind {
+  BLOCK_INSERT
+  TEXT_SELECTION
+}
+
+enum AiSessionStatus {
+  PENDING
+  RUNNING
+  READY
+  ACCEPTED
+  REJECTED
+  FAILED
+}
+
+enum AiRunStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+}
+
+enum AiCandidateStatus {
+  COMPLETED
+  ACCEPTED
+  REJECTED
+}
+
+model AiModelServiceConfig {
+  id              String                   @id @default(uuid())
+  scope           AiModelServiceScope
+  ownerUserId     String?
+  providerKey     String
+  providerName    String
+  adapterKey      String
+  endpointMode    AiModelEndpointMode
+  endpoint        String?
+  authMode        AiModelAuthMode
+  apiKeyEncrypted String?
+  enabled         Boolean                  @default(false)
+  visibility      AiModelServiceVisibility @default(ALL_USERS)
+  ownerUser       User?                    @relation("AiModelServiceConfigOwner", fields: [ownerUserId], references: [id], onDelete: Cascade)
+  models          AiModelItem[]
+  defaultPolicies AiDefaultModelPolicy[]
+  createdAt       DateTime                 @default(now())
+  updatedAt       DateTime                 @updatedAt
+  updatedBy       String?
+  updatedByUser   User?                    @relation("AiModelServiceConfigUpdater", fields: [updatedBy], references: [id], onDelete: SetNull)
+  deletedAt       DateTime?
+
+  @@index([scope, enabled])
+  @@index([ownerUserId, enabled])
+  @@index([providerKey])
+  @@index([updatedBy])
+}
+
+model AiModelItem {
+  id              String               @id @default(uuid())
+  serviceConfigId String
+  modelId         String
+  modelName       String
+  modelType       AiModelType
+  capabilities    AiModelCapability[]
+  contextWindow   Int?
+  maxOutputTokens Int?
+  enabled         Boolean              @default(true)
+  serviceConfig   AiModelServiceConfig @relation(fields: [serviceConfigId], references: [id], onDelete: Cascade)
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+  updatedBy       String?
+  updatedByUser   User?                @relation("AiModelItemUpdater", fields: [updatedBy], references: [id], onDelete: SetNull)
+  deletedAt       DateTime?
+
+  @@unique([serviceConfigId, modelId])
+  @@index([serviceConfigId, enabled])
+  @@index([modelType])
+  @@index([updatedBy])
+}
+
+model AiDefaultModelPolicy {
+  id              String               @id @default(uuid())
+  userId          String
+  intentKey       String
+  serviceConfigId String
+  modelId         String
+  user            User                 @relation("AiDefaultModelPolicyUser", fields: [userId], references: [id], onDelete: Cascade)
+  serviceConfig   AiModelServiceConfig @relation(fields: [serviceConfigId], references: [id], onDelete: Cascade)
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+  updatedBy       String?
+  updatedByUser   User?                @relation("AiDefaultModelPolicyUpdater", fields: [updatedBy], references: [id], onDelete: SetNull)
+  deletedAt       DateTime?
+
+  @@unique([userId, intentKey])
+  @@index([serviceConfigId])
+  @@index([updatedBy])
+}
+
+model AiSession {
+  id                     String          @id @default(uuid())
+  documentId             String
+  workflowKey            String
+  prompt                 String
+  anchorKind             AiAnchorKind
+  anchor                 Json
+  baseProjectionRevision Int
+  status                 AiSessionStatus @default(PENDING)
+  currentRunId           String?
+  acceptedCandidateId    String?
+  document               Document        @relation("AiSessionDocument", fields: [documentId], references: [id], onDelete: Cascade)
+  runs                   AiRun[]         @relation("AiRunSession")
+  candidates             AiCandidate[]   @relation("AiCandidateSession")
+  currentRun             AiRun?          @relation("AiSessionCurrentRun", fields: [currentRunId], references: [id], onDelete: SetNull)
+  acceptedCandidate      AiCandidate?    @relation("AiSessionAcceptedCandidate", fields: [acceptedCandidateId], references: [id], onDelete: SetNull)
+  createdAt              DateTime        @default(now())
+  createdBy              String
+  createdByUser          User            @relation("AiSessionCreator", fields: [createdBy], references: [id], onDelete: Cascade)
+  updatedAt              DateTime        @updatedAt
+  updatedBy              String?
+  updatedByUser          User?           @relation("AiSessionUpdater", fields: [updatedBy], references: [id], onDelete: SetNull)
+  deletedAt              DateTime?
+
+  @@index([documentId, createdAt])
+  @@index([createdBy, createdAt])
+  @@index([status])
+  @@index([currentRunId])
+  @@index([acceptedCandidateId])
+  @@index([updatedBy])
+}
+
+model AiRun {
+  id                  String        @id @default(uuid())
+  sessionId           String
+  agentRunId          String        @unique
+  workflowKey         String
+  modelTargetSnapshot Json?
+  status              AiRunStatus   @default(PENDING)
+  session             AiSession     @relation("AiRunSession", fields: [sessionId], references: [id], onDelete: Cascade)
+  currentForSessions  AiSession[]   @relation("AiSessionCurrentRun")
+  candidates          AiCandidate[] @relation("AiCandidateRun")
+  createdAt           DateTime      @default(now())
+  createdBy           String
+  createdByUser       User          @relation("AiRunCreator", fields: [createdBy], references: [id], onDelete: Cascade)
+  updatedAt           DateTime      @updatedAt
+  updatedBy           String?
+  updatedByUser       User?         @relation("AiRunUpdater", fields: [updatedBy], references: [id], onDelete: SetNull)
+  deletedAt           DateTime?
+
+  @@index([sessionId, createdAt])
+  @@index([workflowKey, status])
+  @@index([createdBy, createdAt])
+  @@index([updatedBy])
+}
+
+model AiCandidate {
+  id                  String            @id @default(uuid())
+  sessionId           String
+  runId               String
+  contentText         String
+  plainText           String?
+  status              AiCandidateStatus @default(COMPLETED)
+  acceptedAt          DateTime?
+  session             AiSession         @relation("AiCandidateSession", fields: [sessionId], references: [id], onDelete: Cascade)
+  run                 AiRun             @relation("AiCandidateRun", fields: [runId], references: [id], onDelete: Cascade)
+  acceptedForSessions AiSession[]       @relation("AiSessionAcceptedCandidate")
+  createdAt           DateTime          @default(now())
+  createdBy           String
+  createdByUser       User              @relation("AiCandidateCreator", fields: [createdBy], references: [id], onDelete: Cascade)
+  updatedAt           DateTime          @updatedAt
+  updatedBy           String?
+  updatedByUser       User?             @relation("AiCandidateUpdater", fields: [updatedBy], references: [id], onDelete: SetNull)
+  deletedAt           DateTime?
+
+  @@index([sessionId, createdAt])
+  @@index([runId])
+  @@index([status])
+  @@index([createdBy, createdAt])
+  @@index([updatedBy])
+}

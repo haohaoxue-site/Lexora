@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg">
+  <symbol id="ai-spark" viewBox="0 0 24 24">
+    <defs>
+        <linearGradient id="icon-ai-spark-main" x1="6" y1="4" x2="17" y2="17" gradientUnits="userSpaceOnUse">
+          <stop stop-color="#FFBF77" />
+          <stop offset="0.5" stop-color="#FF8C8A" />
+          <stop offset="1" stop-color="#7B90FF" />
+        </linearGradient>
+      </defs>
+    
+      <path d="M12 3.5L13.95 8.05L18.5 10L13.95 11.95L12 16.5L10.05 11.95L5.5 10L10.05 8.05L12 3.5Z" fill="url(#icon-ai-spark-main)" />
+      <circle cx="18.5" cy="6" r="2" fill="#8FDEFF" />
+      <circle cx="18.75" cy="18.25" r="1.75" fill="#FF8EAA" />
+  </symbol>
+</svg>

@@ -1,0 +1,18 @@
+export type {
+  CreateCollabTicketResponse,
+  CreateDocumentRequest,
+  CreateDocumentResponse,
+  CreateDocumentVersionSnapshotRequest,
+  CreateDocumentVersionSnapshotResponse,
+  DocumentAsset,
+  DocumentCurrent,
+  DocumentRecent,
+  DocumentTrashItem,
+  DocumentTreeGroup,
+  DocumentVersionSnapshot,
+  PatchDocumentMetaRequest,
+  ResolveDocumentAssetsRequest,
+  ResolveDocumentAssetsResponse,
+  RestoreDocumentVersionSnapshotRequest,
+  RestoreDocumentVersionSnapshotResponse,
+} from '@haohaoxue/samepage-contracts'

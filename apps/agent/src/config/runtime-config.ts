@@ -1,0 +1,49 @@
+import process from 'node:process'
+import { validateAgentEnv } from './env.schema'
+
+const DEFAULT_AGENT_HOST = '0.0.0.0'
+const DEFAULT_AGENT_PORT = 4200
+const DEFAULT_AGENT_RUN_TIMEOUT_MS = 60_000
+const DEFAULT_AGENT_MAX_CONCURRENT_RUNS = 8
+
+/** apps/agent 运行配置。 */
+export interface AgentConfig {
+  host: string
+  port: number
+  logger: AgentLoggerConfig
+  apiInternalUrl: string
+  redisUrl: string
+  runTimeoutMs: number
+  maxConcurrentRuns: number
+}
+
+/** apps/agent 日志配置。 */
+export interface AgentLoggerConfig {
+  level: string
+  pretty: boolean
+}
+
+type EnvSource = Record<string, string | undefined>
+
+export function loadAgentConfig(env: EnvSource = process.env): AgentConfig {
+  const agentEnv = validateAgentEnv(env)
+
+  return {
+    host: DEFAULT_AGENT_HOST,
+    port: DEFAULT_AGENT_PORT,
+    logger: readLoggerConfig(env),
+    apiInternalUrl: agentEnv.API_INTERNAL_URL,
+    redisUrl: agentEnv.REDIS_URL,
+    runTimeoutMs: DEFAULT_AGENT_RUN_TIMEOUT_MS,
+    maxConcurrentRuns: DEFAULT_AGENT_MAX_CONCURRENT_RUNS,
+  }
+}
+
+function readLoggerConfig(env: EnvSource): AgentLoggerConfig {
+  const isProduction = env.NODE_ENV === 'production'
+
+  return {
+    level: isProduction ? 'info' : 'debug',
+    pretty: !isProduction,
+  }
+}

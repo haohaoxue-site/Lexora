@@ -1,0 +1,76 @@
+import type {
+  AiModelCapability,
+  AiModelIntentKey,
+  AiModelRef,
+  AiModelType,
+} from '@haohaoxue/samepage-contracts'
+import { AI_MODEL_INTENT_KEY, AI_MODEL_TYPE } from '@haohaoxue/samepage-contracts'
+
+interface AiModelCapabilityTarget {
+  modelType: AiModelType
+  capabilities: AiModelCapability[]
+}
+
+interface AiModelLabelTarget {
+  providerName: string
+  modelName: string
+  modelId: string
+}
+
+interface AiModelIntentRequirement {
+  modelType: AiModelType
+  requiredCapabilities: AiModelCapability[]
+}
+
+const AI_MODEL_INTENT_REQUIREMENTS = {
+  [AI_MODEL_INTENT_KEY.CHAT_DEFAULT]: {
+    modelType: AI_MODEL_TYPE.CHAT,
+    requiredCapabilities: [],
+  },
+  [AI_MODEL_INTENT_KEY.DOCUMENT_GENERATE_DEFAULT]: {
+    modelType: AI_MODEL_TYPE.CHAT,
+    requiredCapabilities: [],
+  },
+  [AI_MODEL_INTENT_KEY.DOCUMENT_REWRITE_DEFAULT]: {
+    modelType: AI_MODEL_TYPE.CHAT,
+    requiredCapabilities: [],
+  },
+} as const satisfies Record<AiModelIntentKey, AiModelIntentRequirement>
+
+const TRAILING_SLASHES_RE = /\/+$/
+
+export function compareAiModelRef(left: AiModelRef | null | undefined, right: AiModelRef | null | undefined) {
+  if (!left || !right) {
+    return false
+  }
+
+  return left.configId === right.configId && left.modelId === right.modelId
+}
+
+export function getAiModelIntentRequirement(intentKey: AiModelIntentKey): AiModelIntentRequirement {
+  return {
+    ...AI_MODEL_INTENT_REQUIREMENTS[intentKey],
+    requiredCapabilities: [...AI_MODEL_INTENT_REQUIREMENTS[intentKey].requiredCapabilities],
+  }
+}
+
+export function isAiModelCapabilitySatisfied(model: AiModelCapabilityTarget, intentKey: AiModelIntentKey) {
+  const requirement = AI_MODEL_INTENT_REQUIREMENTS[intentKey]
+
+  if (model.modelType !== requirement.modelType) {
+    return false
+  }
+
+  return requirement.requiredCapabilities.every(capability => model.capabilities.includes(capability))
+}
+
+export function formatAiModelOptionLabel(option: AiModelLabelTarget) {
+  const providerName = option.providerName.trim()
+  const modelName = option.modelName.trim() || option.modelId.trim()
+
+  return providerName ? `${providerName} / ${modelName}` : modelName
+}
+
+export function normalizeAiEndpoint(endpoint: string) {
+  return endpoint.trim().replace(TRAILING_SLASHES_RE, '')
+}

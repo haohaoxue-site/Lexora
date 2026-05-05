@@ -1,0 +1,65 @@
+<script setup lang="ts">
+import type { DocsDocumentEditorEmits, DocsDocumentEditorProps } from '../typing'
+import { DocumentContentSurface } from '@/components/tiptap-editor'
+import { useDocumentEditor } from '../composables/useDocumentEditor'
+
+const props = defineProps<DocsDocumentEditorProps>()
+const emits = defineEmits<DocsDocumentEditorEmits>()
+const { isHistoryMode, isEditable } = useDocumentEditor(props)
+</script>
+
+<template>
+  <section class="docs-document-editor" :class="{ 'is-history-mode': isHistoryMode }">
+    <DocumentContentSurface
+      class="docs-document-editor__surface"
+      :document-id="props.document.id"
+      :title="props.document.title"
+      :body="props.document.body"
+      :editable="isEditable"
+      :title-collaboration="props.collaboration?.title ?? null"
+      :body-collaboration="props.collaboration?.body ?? null"
+      :active-block-id="props.activeBlockId"
+      :show-outline="isEditable"
+      @update-title="emits('updateTitle', $event)"
+      @update-content="emits('updateContent', $event)"
+      @content-error="emits('contentError', $event)"
+      @request-comment="emits('requestComment', $event)"
+    />
+  </section>
+</template>
+
+<style scoped lang="scss">
+.docs-document-editor {
+  display: flex;
+  flex: 1 1 0%;
+  flex-direction: column;
+  min-height: 0;
+
+  &.is-history-mode {
+    :deep(.document-content-surface) {
+      background:
+        linear-gradient(
+          180deg,
+          color-mix(in srgb, var(--brand-primary) 3%, white 97%) 0%,
+          var(--brand-bg-surface) 24%
+        );
+    }
+
+    :deep(.document-content-surface__title) {
+      padding-bottom: 0.875rem;
+      border-bottom-color: color-mix(in srgb, var(--brand-border-base) 62%, transparent);
+    }
+
+    :deep(.document-content-surface__body-frame) {
+      padding-top: 0.875rem;
+      background:
+        linear-gradient(
+          180deg,
+          transparent 0%,
+          transparent calc(100% - 5rem),
+          color-mix(in srgb, var(--brand-bg-surface) 95%, var(--brand-fill-lighter)) 100%
+        );
+    }
+  }
+}
+</style>

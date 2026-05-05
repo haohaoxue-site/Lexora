@@ -1,0 +1,9 @@
+export const REFRESH_TOKEN_COOKIE_NAME = 'sp_refresh_token'
+export const OAUTH_STATE_TTL_SECONDS = 10 * 60
+export const LOGIN_CODE_TTL_SECONDS = 2 * 60
+export const REGISTRATION_EMAIL_VERIFICATION_TTL_SECONDS = 10 * 60
+export const REGISTRATION_EMAIL_VERIFICATION_RESEND_INTERVAL_MS = 60 * 1000
+export const OAUTH_FETCH_RETRY_DELAYS_MS = [300, 900] as const
+export const RETRYABLE_OAUTH_FETCH_ERROR_RE = /fetch failed|timeout/i
+export const OAUTH_STATE_VERSION = 1
+export const OAUTH_LOGIN_REDIRECT_PATH = '/auth/callback'
