@@ -1,17 +1,10 @@
 import { randomUUID } from 'node:crypto'
 import { Module, RequestMethod } from '@nestjs/common'
-import { ConfigModule, ConfigService } from '@nestjs/config'
+import { ConfigService } from '@nestjs/config'
 import { APP_GUARD } from '@nestjs/core'
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler'
 import { LoggerModule } from 'nestjs-pino'
-import { bootstrapConfig, cryptoConfig, jwtConfig, oauthConfig } from './config/auth.config'
-import { collabConfig } from './config/collab.config'
-import { databaseConfig } from './config/database.config'
-import { validateEnv } from './config/env.schema'
-import { loggerConfig } from './config/logger.config'
-import { redisConfig } from './config/redis.config'
-import { serverConfig } from './config/server.config'
-import { storageConfig } from './config/storage.config'
+import { AppConfigModule } from './config/app-config.module'
 import { PrismaModule } from './database/prisma.module'
 import { AccessTokenGuard } from './guards/access-token.guard'
 import { PermissionsGuard } from './guards/permissions.guard'
@@ -29,11 +22,7 @@ import { WorkspacesModule } from './modules/workspaces/workspaces.module'
 
 @Module({
   imports: [
-    ConfigModule.forRoot({
-      isGlobal: true,
-      load: [serverConfig, loggerConfig, databaseConfig, jwtConfig, oauthConfig, bootstrapConfig, cryptoConfig, storageConfig, collabConfig, redisConfig],
-      validate: validateEnv,
-    }),
+    AppConfigModule,
     ThrottlerModule.forRoot([
       {
         name: 'default',

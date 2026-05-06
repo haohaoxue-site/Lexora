@@ -12,6 +12,8 @@
     "dev:prod": "node dist/main.js",
     "prebuild": "prisma generate",
     "build": "tsdown",
+    "system-admin:reset-password": "node dist/cli/reset-system-admin-password.mjs",
+    "system-admin:reset-password:dev": "node --import dotenv/config --import @swc-node/register/esm-register src/cli/reset-system-admin-password.ts",
     "lint:fix": "eslint . --fix",
     "prisma:generate": "prisma generate",
     "prisma:db:push": "prisma db push",

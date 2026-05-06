@@ -1,0 +1,183 @@
+name: samepage-docs
+
+x-logging: &default-logging
+  driver: local
+  options:
+    max-size: '10m'
+    max-file: '5'
+
+services:
+  postgres:
+    container_name: samepage-docs-postgres
+    image: postgres:16-alpine
+    restart: unless-stopped
+    logging: *default-logging
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - samepage-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"']
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+
+  redis:
+    container_name: samepage-docs-redis
+    image: redis:7-alpine
+    restart: unless-stopped
+    logging: *default-logging
+    command: ['redis-server', '--appendonly', 'yes']
+    volumes:
+      - samepage-redis-data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 5s
+
+  rustfs:
+    container_name: samepage-docs-rustfs
+    image: rustfs/rustfs:latest
+    restart: unless-stopped
+    logging: *default-logging
+    environment:
+      RUSTFS_ACCESS_KEY: ${STORAGE_ACCESS_KEY}
+      RUSTFS_SECRET_KEY: ${STORAGE_SECRET_KEY}
+      RUSTFS_REGION: auto
+      RUSTFS_CONSOLE_ENABLE: 'false'
+      RUSTFS_VOLUMES: /data
+    volumes:
+      - samepage-rustfs-data:/data
+
+  migrate:
+    container_name: samepage-docs-migrate
+    image: haohaoxue/samepage-api:latest
+    restart: 'no'
+    logging: *default-logging
+    working_dir: /app/apps/api
+    command: ['node_modules/.bin/prisma', 'migrate', 'deploy']
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  api:
+    container_name: samepage-docs-api
+    image: haohaoxue/samepage-api:latest
+    restart: unless-stopped
+    logging: *default-logging
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: ${REDIS_URL}
+      APP_SECRET: ${APP_SECRET}
+      SYSTEM_ADMIN: ${SYSTEM_ADMIN}
+      STORAGE_ENDPOINT: ${STORAGE_ENDPOINT}
+      STORAGE_ACCESS_KEY: ${STORAGE_ACCESS_KEY}
+      STORAGE_SECRET_KEY: ${STORAGE_SECRET_KEY}
+      GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID}
+      GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET}
+      LINUX_DO_CLIENT_ID: ${LINUX_DO_CLIENT_ID}
+      LINUX_DO_CLIENT_SECRET: ${LINUX_DO_CLIENT_SECRET}
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rustfs:
+        condition: service_started
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://127.0.0.1:3000/health').then(response=>process.exit(response.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+
+  collab:
+    container_name: samepage-docs-collab
+    image: haohaoxue/samepage-collab:latest
+    restart: unless-stopped
+    logging: *default-logging
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: ${REDIS_URL}
+      API_INTERNAL_URL: http://api:3000/api
+    depends_on:
+      api:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://127.0.0.1:4100/healthz').then(response=>process.exit(response.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 15s
+
+  agent:
+    container_name: samepage-docs-agent
+    image: haohaoxue/samepage-agent:latest
+    restart: unless-stopped
+    logging: *default-logging
+    environment:
+      NODE_ENV: production
+      REDIS_URL: ${REDIS_URL}
+      API_INTERNAL_URL: http://api:3000/api
+    depends_on:
+      api:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://127.0.0.1:4200/healthz').then(response=>process.exit(response.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 15s
+
+  web:
+    container_name: samepage-docs-web
+    image: haohaoxue/samepage-web:latest
+    restart: unless-stopped
+    logging: *default-logging
+    depends_on:
+      api:
+        condition: service_healthy
+      collab:
+        condition: service_healthy
+    ports:
+      - '80:80'
+
+volumes:
+  samepage-postgres-data:
+  samepage-redis-data:
+  samepage-rustfs-data:

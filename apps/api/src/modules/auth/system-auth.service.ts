@@ -1,8 +1,7 @@
 import type { AuthMethodName } from '@haohaoxue/samepage-contracts'
 import type { LocalCredential, SystemAuthConfig, User } from '@prisma/client'
 import type { BootstrapConfig } from '../../config/auth.config'
-import { randomBytes } from 'node:crypto'
-import { AUTH_METHOD, AUTH_PASSWORD_MAX_LENGTH } from '@haohaoxue/samepage-contracts'
+import { AUTH_METHOD } from '@haohaoxue/samepage-contracts'
 import { BadRequestException, Injectable, Logger, OnModuleInit } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { PrismaService } from '../../database/prisma.service'
@@ -11,9 +10,9 @@ import { SystemEmailService } from '../system-email/system-email.service'
 import { resolveUniqueUserCode } from '../users/users.utils'
 import { PersonalWorkspacesService } from '../workspaces/personal-workspaces.service'
 import { hashPassword } from './password.utils'
+import { generateSystemAdminInitialPassword } from './system-admin-password.utils'
 
 const SYSTEM_AUTH_CONFIG_ID = 'default'
-const SYSTEM_ADMIN_INITIAL_PASSWORD_PREFIX = 'Aa1'
 
 export interface RegistrationOptions {
   allowPasswordRegistration: boolean
@@ -226,7 +225,7 @@ export class SystemAuthService implements OnModuleInit {
       return { createdInitialPassword: false }
     }
 
-    const initialPassword = this.generateSystemAdminInitialPassword()
+    const initialPassword = generateSystemAdminInitialPassword()
     const passwordHash = await hashPassword(initialPassword)
 
     await this.prisma.localCredential.create({
@@ -243,10 +242,6 @@ export class SystemAuthService implements OnModuleInit {
       createdInitialPassword: true,
       initialPassword,
     }
-  }
-
-  private generateSystemAdminInitialPassword(): string {
-    return `${SYSTEM_ADMIN_INITIAL_PASSWORD_PREFIX}${randomBytes(AUTH_PASSWORD_MAX_LENGTH).toString('base64url').slice(0, AUTH_PASSWORD_MAX_LENGTH - SYSTEM_ADMIN_INITIAL_PASSWORD_PREFIX.length)}`
   }
 
   private async getOrCreateConfig(): Promise<SystemAuthConfig> {

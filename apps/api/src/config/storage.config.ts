@@ -1,7 +1,6 @@
 import { registerAs } from '@nestjs/config'
 import { getEnv } from './env.schema'
 
-const STORAGE_ENDPOINT = 'http://127.0.0.1:9000'
 const STORAGE_REGION = 'auto'
 const STORAGE_FORCE_PATH_STYLE = true
 
@@ -17,7 +16,7 @@ export interface StorageConfig {
 }
 
 export const storageConfig = registerAs('storage', (): StorageConfig => ({
-  endpoint: STORAGE_ENDPOINT,
+  endpoint: getEnv().STORAGE_ENDPOINT,
   region: STORAGE_REGION,
   accessKey: getEnv().STORAGE_ACCESS_KEY,
   secretKey: getEnv().STORAGE_SECRET_KEY,

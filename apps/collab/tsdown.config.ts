@@ -6,7 +6,7 @@ export default defineConfig({
   clean: true,
   sourcemap: true,
   deps: {
-    neverBundle: [/node_modules/],
+    alwaysBundle: ['@haohaoxue/samepage-contracts', '@haohaoxue/samepage-shared'],
   },
   unbundle: true,
 })

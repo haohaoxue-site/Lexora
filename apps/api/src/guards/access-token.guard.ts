@@ -81,11 +81,20 @@ export class AccessTokenGuard implements CanActivate {
       select: {
         id: true,
         status: true,
+        localCredential: {
+          select: {
+            passwordUpdatedAt: true,
+          },
+        },
       },
     })
 
     if (!user || user.status !== UserStatus.ACTIVE) {
       throw authUnauthorized(AUTH_ERROR_CODE.SESSION_USER_INACTIVE, '当前账号不可用')
+    }
+
+    if (isAccessTokenStale(payload, user.localCredential?.passwordUpdatedAt)) {
+      throw authUnauthorized(AUTH_ERROR_CODE.ACCESS_TOKEN_INVALID, '登录状态已失效')
     }
 
     await this.rbacService.syncBootstrapRolesForUser(user.id)
@@ -118,4 +127,19 @@ export class AccessTokenGuard implements CanActivate {
       throw authUnauthorized(AUTH_ERROR_CODE.ACCESS_TOKEN_INVALID, '访问凭证校验失败')
     }
   }
+}
+
+function isAccessTokenStale(
+  payload: AccessTokenPayload,
+  passwordUpdatedAt: Date | null | undefined,
+): boolean {
+  if (!passwordUpdatedAt) {
+    return false
+  }
+
+  if (typeof payload.iat !== 'number') {
+    return true
+  }
+
+  return payload.iat < Math.floor(passwordUpdatedAt.getTime() / 1000)
 }

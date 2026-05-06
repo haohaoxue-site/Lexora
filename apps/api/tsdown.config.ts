@@ -1,10 +1,12 @@
 import { defineConfig } from 'tsdown'
 
 export default defineConfig({
-  entry: ['src/main.ts'],
+  entry: ['src/main.ts', 'src/cli/reset-system-admin-password.ts'],
   format: 'esm',
   clean: true,
   sourcemap: true,
-  external: [/node_modules/],
+  deps: {
+    alwaysBundle: ['@haohaoxue/samepage-contracts', '@haohaoxue/samepage-shared'],
+  },
   unbundle: true,
 })

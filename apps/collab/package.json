@@ -24,6 +24,7 @@
     "ioredis": "catalog:",
     "pg": "^8.20.0",
     "pino": "catalog:",
+    "prisma": "^7.8.0",
     "yjs": "^13.6.30",
     "zod": "catalog:"
   },
