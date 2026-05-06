@@ -4,6 +4,8 @@ import { useTemplateRef } from 'vue'
 import AuthEntryShell from '../components/AuthEntryShell.vue'
 import { useLogin } from './composables/useLogin'
 
+const betaTooltipContent = '当前为 Beta 开发阶段，平台数据可能随版本迭代清空，请勿存放重要资料。'
+const repositoryUrl = 'https://github.com/haohaoxue-site/SamePage-Docs'
 const passwordFormRef = useTemplateRef<FormInstance>('passwordFormRef')
 const oauthInviteFormRef = useTemplateRef<FormInstance>('oauthInviteFormRef')
 const {
@@ -35,6 +37,30 @@ const {
     title="欢迎回来"
     description="使用邮箱或第三方账号继续。"
   >
+    <template #actions>
+      <a
+        :href="repositoryUrl"
+        target="_blank"
+        rel="noopener noreferrer"
+        class="login-view__source-link"
+        aria-label="打开 SamePage Docs GitHub 项目地址"
+      >
+        <ElTooltip
+          :content="betaTooltipContent"
+          placement="top"
+          effect="light"
+          :show-after="120"
+        >
+          <span class="login-view__source-status">
+            BETA
+          </span>
+        </ElTooltip>
+        <span class="login-view__source-divider" />
+        <SvgIcon category="ui" icon="brand-github" size="1.125rem" class="login-view__source-icon" />
+        <span class="login-view__source-text">GitHub</span>
+      </a>
+    </template>
+
     <ElAlert
       v-if="loadErrorMessage"
       type="warning"
@@ -168,6 +194,54 @@ const {
 
 <style scoped lang="scss">
 .login-view {
+  &__source-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-height: 2.375rem;
+    border: 1px solid color-mix(in srgb, var(--brand-warning) 38%, var(--brand-border-base));
+    border-radius: 8px;
+    padding: 0.375rem 0.625rem 0.375rem 0.5rem;
+    background: color-mix(in srgb, var(--brand-warning) 9%, var(--brand-bg-surface));
+    box-shadow: 0 14px 24px -22px color-mix(in srgb, var(--brand-warning) 65%, transparent);
+    color: color-mix(in srgb, var(--brand-warning) 64%, var(--brand-text-primary));
+    font-size: 0.8125rem;
+    font-weight: 700;
+    line-height: 1;
+    text-decoration: none;
+    transition: transform 0.2s ease, border-color 0.2s ease, background-color 0.2s ease, box-shadow 0.2s ease;
+
+    &:hover {
+      border-color: color-mix(in srgb, var(--brand-warning) 62%, var(--brand-border-base));
+      background: color-mix(in srgb, var(--brand-warning) 13%, var(--brand-bg-surface));
+      box-shadow: 0 18px 30px -22px color-mix(in srgb, var(--brand-warning) 75%, transparent);
+      transform: translateY(-1px);
+    }
+  }
+
+  &__source-status {
+    display: inline-flex;
+    align-items: center;
+    height: 1.625rem;
+    border-radius: 0.5625rem;
+    padding: 0 0.5rem;
+    background: color-mix(in srgb, var(--brand-warning) 16%, transparent);
+    color: color-mix(in srgb, var(--brand-warning) 76%, var(--brand-text-primary));
+    font-size: 0.6875rem;
+    font-weight: 800;
+  }
+
+  &__source-divider {
+    width: 1px;
+    height: 1.125rem;
+    background: color-mix(in srgb, var(--brand-warning) 35%, var(--brand-border-base));
+  }
+
+  &__source-icon,
+  &__source-text {
+    flex-shrink: 0;
+  }
+
   &__alert {
     margin-bottom: 1rem;
   }
@@ -326,6 +400,25 @@ const {
 
 @media (max-width: 420px) {
   .login-view {
+    &__source-link {
+      gap: 0.375rem;
+      min-height: 2.25rem;
+      padding: 0.3125rem 0.5rem;
+    }
+
+    &__source-status {
+      height: 1.5rem;
+      padding: 0 0.4375rem;
+    }
+
+    &__source-divider {
+      display: none;
+    }
+
+    &__source-text {
+      display: none;
+    }
+
     &__providers {
       grid-template-columns: minmax(0, 1fr);
     }

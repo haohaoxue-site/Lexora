@@ -1,10 +1,18 @@
 <script setup lang="ts">
+import type { VNode } from 'vue'
+
 interface AuthEntryShellProps {
   title: string
   description?: string
 }
 
 const props = defineProps<AuthEntryShellProps>()
+
+defineSlots<{
+  default: () => VNode[]
+  actions?: () => VNode[]
+  footer?: () => VNode[]
+}>()
 </script>
 
 <template>
@@ -13,7 +21,14 @@ const props = defineProps<AuthEntryShellProps>()
     <div class="auth-entry-shell__backdrop auth-entry-shell__backdrop--bottom" aria-hidden="true" />
 
     <ElCard shadow="never" body-class="!p-0" class="auth-entry-shell__card">
-      <section class="auth-entry-shell__panel">
+      <section
+        class="auth-entry-shell__panel"
+        :class="{ 'auth-entry-shell__panel--with-actions': $slots.actions }"
+      >
+        <div v-if="$slots.actions" class="auth-entry-shell__actions">
+          <slot name="actions" />
+        </div>
+
         <div class="auth-entry-shell__brand">
           <div class="auth-entry-shell__brand-mark">
             <SvgIcon category="nav" icon="workspace" size="2.25rem" />
@@ -90,7 +105,8 @@ const props = defineProps<AuthEntryShellProps>()
 
   &__card {
     position: relative;
-    width: min(100%, 34rem);
+    width: 34rem;
+    max-width: 100%;
     overflow: hidden;
     border-color: color-mix(in srgb, var(--brand-border-base) 72%, transparent);
     border-radius: 1.75rem;
@@ -133,6 +149,17 @@ const props = defineProps<AuthEntryShellProps>()
     backdrop-filter: blur(8px);
   }
 
+  &__panel--with-actions &__brand {
+    padding-right: 11rem;
+  }
+
+  &__actions {
+    position: absolute;
+    top: clamp(1.25rem, 4vw, 2.5rem);
+    right: clamp(1.25rem, 4vw, 2.5rem);
+    z-index: 1;
+  }
+
   &__brand {
     display: flex;
     align-items: center;
@@ -158,6 +185,7 @@ const props = defineProps<AuthEntryShellProps>()
     color: var(--brand-text-primary);
     font-size: 1.125rem;
     font-weight: 700;
+    white-space: nowrap;
   }
 
   &__brand-tagline {
@@ -205,6 +233,14 @@ const props = defineProps<AuthEntryShellProps>()
 
     &:empty {
       display: none;
+    }
+  }
+}
+
+@media (max-width: 420px) {
+  .auth-entry-shell {
+    &__panel--with-actions &__brand {
+      padding-right: 7rem;
     }
   }
 }
