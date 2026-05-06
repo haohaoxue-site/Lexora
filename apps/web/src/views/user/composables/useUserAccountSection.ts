@@ -80,6 +80,7 @@ export function useUserAccountSection(options: {
       connected: options.props.account.github.connected,
       username: options.props.account.github.username,
       canDisconnect: options.props.canDisconnectGithub,
+      canStartBinding: options.props.canStartGithubBinding,
     },
     {
       provider: AUTH_PROVIDER.LINUX_DO,
@@ -87,6 +88,7 @@ export function useUserAccountSection(options: {
       connected: options.props.account.linuxDo.connected,
       username: options.props.account.linuxDo.username,
       canDisconnect: options.props.canDisconnectLinuxDo,
+      canStartBinding: options.props.canStartLinuxDoBinding,
     },
   ])
 
@@ -123,6 +125,12 @@ export function useUserAccountSection(options: {
   }
 
   function handleStartOauthBinding(provider: AuthProviderName) {
+    const row = oauthRows.value.find(item => item.provider === provider)
+
+    if (!row?.canStartBinding) {
+      return
+    }
+
     options.onStartOauthBinding(provider)
   }
 

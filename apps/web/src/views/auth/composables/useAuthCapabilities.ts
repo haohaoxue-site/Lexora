@@ -8,6 +8,9 @@ export function useAuthCapabilities() {
   const loadErrorMessage = shallowRef('')
   const isLoadingCapabilities = shallowRef(true)
   const passwordRegistrationEnabled = computed(() => authCapabilities.value?.passwordRegistrationEnabled ?? false)
+  const passwordRegistrationInviteCodeRequired = computed(() =>
+    authCapabilities.value?.passwordRegistrationInviteCodeRequired ?? false,
+  )
 
   async function loadCapabilities() {
     isLoadingCapabilities.value = true
@@ -29,6 +32,7 @@ export function useAuthCapabilities() {
     isLoadingCapabilities,
     loadCapabilities,
     loadErrorMessage,
+    passwordRegistrationInviteCodeRequired,
     passwordRegistrationEnabled,
   }
 }

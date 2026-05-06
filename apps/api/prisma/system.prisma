@@ -4,18 +4,25 @@ enum SystemEmailProvider {
 }
 
 model SystemAuthConfig {
-  id                        String    @id @default("default")
-  allowPasswordRegistration Boolean   @default(true)
-  allowGithubRegistration   Boolean   @default(true)
-  allowLinuxDoRegistration  Boolean   @default(true)
-  systemAdminUserId         String?   @unique
-  systemAdminEmail          String    @unique
-  systemAdminUser           User?     @relation("SystemAuthConfigSystemAdmin", fields: [systemAdminUserId], references: [id], onDelete: SetNull)
-  createdAt                 DateTime  @default(now())
-  updatedAt                 DateTime  @updatedAt
-  updatedBy                 String?
-  updatedByUser             User?     @relation("SystemAuthConfigUpdater", fields: [updatedBy], references: [id], onDelete: SetNull)
-  deletedAt                 DateTime?
+  id                         String    @id @default("default")
+  allowGithubLogin           Boolean   @default(true)
+  allowLinuxDoLogin          Boolean   @default(true)
+  allowPasswordRegistration  Boolean   @default(true)
+  allowGithubRegistration    Boolean   @default(true)
+  allowLinuxDoRegistration   Boolean   @default(true)
+  requirePasswordInviteCode  Boolean   @default(false)
+  requireGithubInviteCode    Boolean   @default(false)
+  requireLinuxDoInviteCode   Boolean   @default(false)
+  registrationInviteCodeHash      String?
+  registrationInviteCodeEncrypted String?
+  systemAdminUserId               String?   @unique
+  systemAdminEmail                String    @unique
+  systemAdminUser                 User?     @relation("SystemAuthConfigSystemAdmin", fields: [systemAdminUserId], references: [id], onDelete: SetNull)
+  createdAt                       DateTime  @default(now())
+  updatedAt                       DateTime  @updatedAt
+  updatedBy                       String?
+  updatedByUser                   User?     @relation("SystemAuthConfigUpdater", fields: [updatedBy], references: [id], onDelete: SetNull)
+  deletedAt                       DateTime?
 
   @@index([updatedBy])
 }

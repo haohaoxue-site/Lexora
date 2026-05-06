@@ -23,9 +23,16 @@ export interface SystemAdminUserItemRecord {
 }
 
 export interface SystemAuthGovernanceRecord {
+  allowGithubLogin: boolean
+  allowLinuxDoLogin: boolean
   allowPasswordRegistration: boolean
   allowGithubRegistration: boolean
   allowLinuxDoRegistration: boolean
+  requirePasswordInviteCode: boolean
+  requireGithubInviteCode: boolean
+  requireLinuxDoInviteCode: boolean
+  hasRegistrationInviteCode: boolean
+  registrationInviteCode: string | null
   emailServiceEnabled: boolean
   systemAdminEmail: string
   systemAdminDisplayName: string | null
@@ -65,9 +72,16 @@ export function toSystemAdminUserItem(record: SystemAdminUserItemRecord): System
 
 export function toSystemAuthGovernance(record: SystemAuthGovernanceRecord): SystemAuthGovernance {
   return {
+    allowGithubLogin: record.allowGithubLogin,
+    allowLinuxDoLogin: record.allowLinuxDoLogin,
     allowPasswordRegistration: record.allowPasswordRegistration,
     allowGithubRegistration: record.allowGithubRegistration,
     allowLinuxDoRegistration: record.allowLinuxDoRegistration,
+    requirePasswordInviteCode: record.requirePasswordInviteCode,
+    requireGithubInviteCode: record.requireGithubInviteCode,
+    requireLinuxDoInviteCode: record.requireLinuxDoInviteCode,
+    hasRegistrationInviteCode: record.hasRegistrationInviteCode,
+    registrationInviteCode: record.registrationInviteCode,
     emailServiceEnabled: record.emailServiceEnabled,
     systemAdminEmail: record.systemAdminEmail,
     systemAdminDisplayName: record.systemAdminDisplayName,

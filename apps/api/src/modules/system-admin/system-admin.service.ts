@@ -13,6 +13,7 @@ import type {
   TestSystemEmailConfigResponse,
   UpdateSystemAdminUserResponse,
   UpdateSystemAuthGovernanceRequest,
+  UpdateSystemAuthInviteCodeRequest,
   UpdateSystemEmailConfigRequest,
   UpdateSystemEmailServiceStatusRequest,
 } from '@haohaoxue/samepage-contracts'
@@ -199,9 +200,16 @@ export class SystemAdminService {
     ])
 
     return toSystemAuthGovernance({
+      allowGithubLogin: snapshot.config.allowGithubLogin,
+      allowLinuxDoLogin: snapshot.config.allowLinuxDoLogin,
       allowPasswordRegistration: snapshot.config.allowPasswordRegistration,
       allowGithubRegistration: snapshot.config.allowGithubRegistration,
       allowLinuxDoRegistration: snapshot.config.allowLinuxDoRegistration,
+      requirePasswordInviteCode: snapshot.config.requirePasswordInviteCode,
+      requireGithubInviteCode: snapshot.config.requireGithubInviteCode,
+      requireLinuxDoInviteCode: snapshot.config.requireLinuxDoInviteCode,
+      hasRegistrationInviteCode: Boolean(snapshot.config.registrationInviteCodeHash),
+      registrationInviteCode: snapshot.registrationInviteCode,
       emailServiceEnabled,
       systemAdminEmail: snapshot.config.systemAdminEmail,
       systemAdminDisplayName: snapshot.systemAdminUser?.displayName ?? null,
@@ -217,14 +225,19 @@ export class SystemAdminService {
   ): Promise<SystemAuthGovernance> {
     const nextRegistrationOptions = Object.fromEntries(
       Object.entries({
+        allowGithubLogin: payload.allowGithubLogin,
+        allowLinuxDoLogin: payload.allowLinuxDoLogin,
         allowPasswordRegistration: payload.allowPasswordRegistration,
         allowGithubRegistration: payload.allowGithubRegistration,
         allowLinuxDoRegistration: payload.allowLinuxDoRegistration,
+        requirePasswordInviteCode: payload.requirePasswordInviteCode,
+        requireGithubInviteCode: payload.requireGithubInviteCode,
+        requireLinuxDoInviteCode: payload.requireLinuxDoInviteCode,
       }).filter(([, value]) => value !== undefined),
     ) as UpdateSystemAuthGovernanceRequest
 
     if (Object.keys(nextRegistrationOptions).length === 0) {
-      throw new BadRequestException('至少更新一项注册配置')
+      throw new BadRequestException('至少更新一项认证注册配置')
     }
 
     await this.systemAuthService.updateRegistrationOptions(actorUserId, nextRegistrationOptions)
@@ -234,6 +247,25 @@ export class SystemAdminService {
       targetType: 'system_auth_config',
       targetId: 'default',
       metadata: nextRegistrationOptions as unknown as Prisma.InputJsonValue,
+    })
+
+    return this.getAuthGovernance()
+  }
+
+  async updateAuthInviteCode(
+    actorUserId: string,
+    payload: UpdateSystemAuthInviteCodeRequest,
+  ): Promise<SystemAuthGovernance> {
+    await this.systemAuthService.updateRegistrationInviteCode(actorUserId, payload.inviteCode)
+    const isClearing = payload.inviteCode.trim().length === 0
+
+    await this.createAuditLog(actorUserId, {
+      action: isClearing
+        ? 'system_auth_governance.invite_code.cleared'
+        : 'system_auth_governance.invite_code.updated',
+      targetType: 'system_auth_config',
+      targetId: 'default',
+      metadata: isClearing ? { cleared: true } : { updated: true },
     })
 
     return this.getAuthGovernance()

@@ -1,11 +1,15 @@
 export type {
   ChangePasswordRequest,
+  CreateRegistrationInviteGrantRequest,
   ExchangeCodeRequest,
   LogoutResponse,
   PasswordLoginRequest,
   PasswordRegisterRequest,
+  RegistrationInviteGrantResponse,
   RequestEmailVerificationRequest,
   RequestEmailVerificationResponse,
   SessionUser,
+  StartOAuthLoginRequest,
+  StartOAuthLoginResponse,
   TokenExchangeResponse,
 } from '@haohaoxue/samepage-contracts'

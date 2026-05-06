@@ -5,6 +5,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useFormSubmit } from '@/composables/useFormSubmit'
 import { useAuthStore } from '@/stores/auth'
 import { completeAuthNavigation } from '../../utils/navigation'
+import { clearPasswordRegistrationInviteGrant, consumePasswordRegistrationInviteGrant } from '../../utils/registration-invite'
 import {
   createConfirmPasswordRules,
   createDisplayNameRules,
@@ -78,10 +79,19 @@ export function useRegisterVerify(options: { registerFormRef: ShallowRef<FormIns
     action: async () => {
       form.displayName = form.displayName.trim()
       form.code = form.code.trim()
-      await authStore.passwordRegister(form.email, form.code, form.displayName, form.password)
+      await authStore.passwordRegister(
+        form.email,
+        form.code,
+        form.displayName,
+        form.password,
+        consumePasswordRegistrationInviteGrant(form.email),
+      )
     },
     fallbackError: '注册失败',
-    onSuccess: () => completeAuthNavigation(router, authStore),
+    onSuccess: () => {
+      clearPasswordRegistrationInviteGrant()
+      return completeAuthNavigation(router, authStore)
+    },
   })
 
   onMounted(() => {

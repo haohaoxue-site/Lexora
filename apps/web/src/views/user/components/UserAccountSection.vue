@@ -161,7 +161,7 @@ defineExpose({
               {{ row.title }}
             </div>
             <div class="user-account-section__oauth-meta">
-              {{ row.connected ? `已绑定 ${row.username || '已授权账号'}` : '未绑定' }}
+              {{ row.connected ? `已绑定 ${row.username || '已授权账号'}` : row.canStartBinding ? '未绑定' : '系统已关闭绑定入口' }}
             </div>
           </div>
         </div>
@@ -170,9 +170,10 @@ defineExpose({
           <ElButton
             v-if="!row.connected"
             :loading="props.bindingProvider === row.provider"
+            :disabled="!row.canStartBinding"
             @click="handleStartOauthBinding(row.provider)"
           >
-            立即绑定
+            {{ row.canStartBinding ? '立即绑定' : '已关闭' }}
           </ElButton>
           <ElButton
             v-else

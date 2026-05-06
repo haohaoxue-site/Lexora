@@ -35,22 +35,25 @@ model OauthAccount {
 }
 
 model AuthOauthState {
-  id              String           @id @default(uuid())
-  provider        AuthProvider
-  purpose         AuthOauthPurpose @default(LOGIN)
-  initiatorUserId String?
-  state           String           @unique
-  codeVerifier    String
-  redirectUri     String
-  expiresAt       DateTime
-  consumedAt      DateTime?
-  initiatorUser   User?            @relation("AuthOauthStateInitiator", fields: [initiatorUserId], references: [id], onDelete: SetNull)
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
-  deletedAt       DateTime?
+  id                        String                   @id @default(uuid())
+  provider                  AuthProvider
+  purpose                   AuthOauthPurpose         @default(LOGIN)
+  initiatorUserId           String?
+  registrationInviteGrantId String?
+  state                     String                   @unique
+  codeVerifier              String
+  redirectUri               String
+  expiresAt                 DateTime
+  consumedAt                DateTime?
+  initiatorUser             User?                    @relation("AuthOauthStateInitiator", fields: [initiatorUserId], references: [id], onDelete: SetNull)
+  registrationInviteGrant   RegistrationInviteGrant? @relation(fields: [registrationInviteGrantId], references: [id], onDelete: SetNull)
+  createdAt                 DateTime                 @default(now())
+  updatedAt                 DateTime                 @updatedAt
+  deletedAt                 DateTime?
 
   @@index([provider, expiresAt])
   @@index([initiatorUserId, purpose])
+  @@index([registrationInviteGrantId])
 }
 
 model AuthRefreshToken {
@@ -114,6 +117,24 @@ model AuthEmailVerificationToken {
   deletedAt  DateTime?
 
   @@index([email, purpose, expiresAt])
+}
+
+model RegistrationInviteGrant {
+  id              String           @id @default(uuid())
+  tokenHash       String           @unique
+  method          String
+  normalizedEmail String?
+  provider        AuthProvider?
+  expiresAt       DateTime
+  consumedAt      DateTime?
+  oauthStates     AuthOauthState[]
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  deletedAt       DateTime?
+
+  @@index([method, expiresAt])
+  @@index([normalizedEmail, method, expiresAt])
+  @@index([provider, expiresAt])
 }
 
 model UserEmailVerificationCode {

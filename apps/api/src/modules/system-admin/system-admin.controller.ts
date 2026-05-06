@@ -36,6 +36,7 @@ import {
   GetSystemAdminUsersQueryDto,
   UpdateSystemAdminUserStatusDto,
   UpdateSystemAuthGovernanceDto,
+  UpdateSystemAuthInviteCodeDto,
 } from './system-admin.dto'
 import { SystemAdminService } from './system-admin.service'
 
@@ -84,6 +85,15 @@ export class SystemAdminController {
     @Body() payload: UpdateSystemAuthGovernanceDto,
   ): Promise<SystemAuthGovernance> {
     return this.systemAdminService.updateAuthGovernance(authUser.id, payload)
+  }
+
+  @RequirePermissions(PERMISSIONS.SYSTEM_ADMIN_AUTH_GOVERNANCE_UPDATE)
+  @Put('auth-governance/invite-code')
+  async updateAuthInviteCode(
+    @CurrentUser() authUser: AuthUserContext,
+    @Body() payload: UpdateSystemAuthInviteCodeDto,
+  ): Promise<SystemAuthGovernance> {
+    return this.systemAdminService.updateAuthInviteCode(authUser.id, payload)
   }
 
   @RequirePermissions(PERMISSIONS.SYSTEM_ADMIN_EMAIL_CONFIG_READ)

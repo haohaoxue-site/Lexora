@@ -55,6 +55,7 @@ export const OAUTH_REDIRECT_BIND_STATUS = {
 
 export const OAUTH_REDIRECT_ERROR_CODE = {
   CALLBACK_FAILED: 'OAUTH_CALLBACK_FAILED',
+  REGISTRATION_INVITE_REQUIRED: 'OAUTH_REGISTRATION_INVITE_REQUIRED',
 } as const
 
 export const AuthProviderSchema = z.enum(AUTH_PROVIDER_VALUES)
@@ -62,6 +63,9 @@ export const AuthMethodSchema = z.enum(AUTH_METHOD_VALUES)
 
 const AuthTokenSchema = z.string().trim().min(1)
 const EmailVerificationCodeSchema = z.string().trim().regex(/^\d{6}$/)
+const RegistrationInviteCodeSchema = z.string().trim().min(4).max(120)
+const RegistrationInviteGrantTokenSchema = z.string().trim().min(32)
+const IsoDateTimeStringSchema = z.string().datetime()
 
 export const SessionUserSchema = UserAccountIdentitySchema.extend({
   roles: z.array(RoleSchema),
@@ -91,6 +95,7 @@ export const PasswordLoginRequestSchema = z.object({
 
 export const RequestEmailVerificationRequestSchema = z.object({
   email: UserEmailSchema,
+  registrationInviteGrantToken: RegistrationInviteGrantTokenSchema.optional(),
 }).strict()
 
 export const RequestEmailVerificationResponseSchema = z.object({
@@ -102,6 +107,7 @@ export const PasswordRegisterRequestSchema = z.object({
   code: EmailVerificationCodeSchema,
   displayName: UserDisplayNameSchema,
   password: AuthPasswordSchema,
+  registrationInviteGrantToken: RegistrationInviteGrantTokenSchema.optional(),
 }).strict()
 
 export const ChangePasswordRequestSchema = z.object({
@@ -112,15 +118,36 @@ export const ChangePasswordRequestSchema = z.object({
 export const AuthProviderCapabilitySchema = z.object({
   enabled: z.boolean(),
   allowRegistration: z.boolean(),
+  inviteCodeRequired: z.boolean(),
 }).strict()
 
 export const AuthCapabilitiesSchema = z.object({
   emailBindingEnabled: z.boolean(),
   passwordRegistrationEnabled: z.boolean(),
+  passwordRegistrationInviteCodeRequired: z.boolean(),
   providers: z.object({
     [AUTH_PROVIDER.GITHUB]: AuthProviderCapabilitySchema,
     [AUTH_PROVIDER.LINUX_DO]: AuthProviderCapabilitySchema,
   }).strict(),
+}).strict()
+
+export const CreateRegistrationInviteGrantRequestSchema = z.object({
+  method: AuthMethodSchema,
+  email: UserEmailSchema.optional(),
+  inviteCode: RegistrationInviteCodeSchema,
+}).strict()
+
+export const RegistrationInviteGrantResponseSchema = z.object({
+  grantToken: RegistrationInviteGrantTokenSchema,
+  expiresAt: IsoDateTimeStringSchema,
+}).strict()
+
+export const StartOAuthLoginRequestSchema = z.object({
+  registrationInviteGrantToken: RegistrationInviteGrantTokenSchema.optional(),
+}).strict()
+
+export const StartOAuthLoginResponseSchema = z.object({
+  authorizeUrl: z.string().trim().url(),
 }).strict()
 
 export type AuthProviderName = z.infer<typeof AuthProviderSchema>
@@ -160,3 +187,11 @@ export type AuthProviderCapability = z.infer<typeof AuthProviderCapabilitySchema
  * 认证能力配置。
  */
 export type AuthCapabilities = z.infer<typeof AuthCapabilitiesSchema>
+
+export type CreateRegistrationInviteGrantRequest = z.infer<typeof CreateRegistrationInviteGrantRequestSchema>
+
+export type RegistrationInviteGrantResponse = z.infer<typeof RegistrationInviteGrantResponseSchema>
+
+export type StartOAuthLoginRequest = z.infer<typeof StartOAuthLoginRequestSchema>
+
+export type StartOAuthLoginResponse = z.infer<typeof StartOAuthLoginResponseSchema>

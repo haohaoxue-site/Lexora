@@ -61,8 +61,20 @@ export const useAuthStore = defineStore('auth', () => {
     return result
   }
 
-  async function passwordRegister(email: string, code: string, displayName: string, password: string) {
-    const result = await registerWithPassword({ email, code, displayName, password })
+  async function passwordRegister(
+    email: string,
+    code: string,
+    displayName: string,
+    password: string,
+    registrationInviteGrantToken?: string,
+  ) {
+    const result = await registerWithPassword({
+      email,
+      code,
+      displayName,
+      password,
+      registrationInviteGrantToken,
+    })
     await applyAuthSession(result, {
       syncSettings: true,
     })

@@ -7,6 +7,7 @@ const SOFT_DELETE_MODEL_NAMES = new Set([
   'AuthLoginCode',
   'LocalCredential',
   'AuthEmailVerificationToken',
+  'RegistrationInviteGrant',
   'UserEmailVerificationCode',
   'Role',
   'Permission',

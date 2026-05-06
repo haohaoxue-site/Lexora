@@ -29,14 +29,17 @@ import { getRequestErrorDisplayMessage } from '@/utils/request-error'
 const DEFAULT_AUTH_CAPABILITIES: AuthCapabilities = {
   emailBindingEnabled: false,
   passwordRegistrationEnabled: false,
+  passwordRegistrationInviteCodeRequired: false,
   providers: {
     [AUTH_PROVIDER.GITHUB]: {
       enabled: false,
       allowRegistration: false,
+      inviteCodeRequired: false,
     },
     [AUTH_PROVIDER.LINUX_DO]: {
       enabled: false,
       allowRegistration: false,
+      inviteCodeRequired: false,
     },
   },
 }
@@ -163,6 +166,8 @@ export function useUser(options: {
     bindingProvider: accountState.bindingProvider,
     canDisconnectGithub: accountState.canDisconnectGithub,
     canDisconnectLinuxDo: accountState.canDisconnectLinuxDo,
+    canStartGithubBinding: accountState.canStartGithubBinding,
+    canStartLinuxDoBinding: accountState.canStartLinuxDoBinding,
     canEditDisplayName,
     connectOauth: accountState.connectOauth,
     deleteAccount,
@@ -272,6 +277,8 @@ function useUserAccountState(options: { authCapabilities: ShallowRef<AuthCapabil
   const settings = computed(() => userStore.settings)
   const account = computed<UserSettings['account']>(() => settings.value?.account ?? createDefaultAccount())
   const emailBindingEnabled = computed(() => options.authCapabilities.value.emailBindingEnabled)
+  const canStartGithubBinding = computed(() => options.authCapabilities.value.providers[AUTH_PROVIDER.GITHUB].enabled)
+  const canStartLinuxDoBinding = computed(() => options.authCapabilities.value.providers[AUTH_PROVIDER.LINUX_DO].enabled)
   const canDisconnectGithub = computed(() =>
     account.value.github.connected && (account.value.hasPasswordAuth || account.value.linuxDo.connected),
   )
@@ -395,6 +402,8 @@ function useUserAccountState(options: { authCapabilities: ShallowRef<AuthCapabil
     bindingProvider,
     canDisconnectGithub,
     canDisconnectLinuxDo,
+    canStartGithubBinding,
+    canStartLinuxDoBinding,
     connectOauth,
     consumeRouteFeedback,
     disconnectOauth,

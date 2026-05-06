@@ -149,9 +149,16 @@ export const UpdateSystemAdminUserResponseSchema = SystemAdminUserItemSchema.pic
 })
 
 export const SystemAuthGovernanceSchema = z.object({
+  allowGithubLogin: z.boolean(),
+  allowLinuxDoLogin: z.boolean(),
   allowPasswordRegistration: z.boolean(),
   allowGithubRegistration: z.boolean(),
   allowLinuxDoRegistration: z.boolean(),
+  requirePasswordInviteCode: z.boolean(),
+  requireGithubInviteCode: z.boolean(),
+  requireLinuxDoInviteCode: z.boolean(),
+  hasRegistrationInviteCode: z.boolean(),
+  registrationInviteCode: z.string().trim().min(4).max(120).nullable(),
   emailServiceEnabled: z.boolean(),
   systemAdminEmail: z.string().trim().email(),
   systemAdminDisplayName: z.string().trim().min(1).nullable(),
@@ -161,9 +168,21 @@ export const SystemAuthGovernanceSchema = z.object({
 }).strict()
 
 export const UpdateSystemAuthGovernanceRequestSchema = z.object({
+  allowGithubLogin: z.boolean().optional(),
+  allowLinuxDoLogin: z.boolean().optional(),
   allowPasswordRegistration: z.boolean().optional(),
   allowGithubRegistration: z.boolean().optional(),
   allowLinuxDoRegistration: z.boolean().optional(),
+  requirePasswordInviteCode: z.boolean().optional(),
+  requireGithubInviteCode: z.boolean().optional(),
+  requireLinuxDoInviteCode: z.boolean().optional(),
+}).strict()
+
+export const UpdateSystemAuthInviteCodeRequestSchema = z.object({
+  inviteCode: z.string().trim().max(120).refine(
+    value => value.length === 0 || value.length >= 4,
+    '邀请码至少 4 位',
+  ),
 }).strict()
 
 export const SystemEmailLastTestSchema = z.object({
@@ -235,6 +254,7 @@ export type UpdateSystemAdminUserStatusRequest = z.infer<typeof UpdateSystemAdmi
 export type UpdateSystemAdminUserResponse = z.infer<typeof UpdateSystemAdminUserResponseSchema>
 export type SystemAuthGovernance = z.infer<typeof SystemAuthGovernanceSchema>
 export type UpdateSystemAuthGovernanceRequest = z.infer<typeof UpdateSystemAuthGovernanceRequestSchema>
+export type UpdateSystemAuthInviteCodeRequest = z.infer<typeof UpdateSystemAuthInviteCodeRequestSchema>
 export type SystemEmailLastTest = z.infer<typeof SystemEmailLastTestSchema>
 export type SystemEmailConfig = z.infer<typeof SystemEmailConfigSchema>
 export type SystemEmailServiceStatus = z.infer<typeof SystemEmailServiceStatusSchema>

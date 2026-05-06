@@ -12,6 +12,7 @@ import type {
   UpdateSystemAdminUserResponse,
   UpdateSystemAdminUserStatusRequest,
   UpdateSystemAuthGovernanceRequest,
+  UpdateSystemAuthInviteCodeRequest,
   UpdateSystemEmailConfigRequest,
   UpdateSystemEmailServiceStatusRequest,
 } from './typing'
@@ -58,6 +59,16 @@ export function updateSystemAuthGovernance(
   return axios.request({
     method: 'put',
     url: '/system-admin/auth-governance',
+    data,
+  })
+}
+
+export function updateSystemAuthInviteCode(
+  data: UpdateSystemAuthInviteCodeRequest,
+): Promise<SystemAuthGovernance> {
+  return axios.request({
+    method: 'put',
+    url: '/system-admin/auth-governance/invite-code',
     data,
   })
 }

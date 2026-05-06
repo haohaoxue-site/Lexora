@@ -32,6 +32,7 @@ export interface BuildOAuthAuthorizationUrlOptions {
   purpose?: 'login' | 'bind'
   initiatorUserId?: string
   redirectPath?: string
+  registrationInviteGrantToken?: string
 }
 
 /**

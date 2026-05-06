@@ -20,20 +20,26 @@ export class CapabilitiesService {
       this.systemEmailService.isEnabled(),
     ])
     const oauthConfig = this.configService.getOrThrow<OAuthConfig>('oauth')
-    const githubEnabled = isOAuthProviderEnabled(oauthConfig.github)
-    const linuxDoEnabled = isOAuthProviderEnabled(oauthConfig.linuxDo)
+    const githubEnabled = isOAuthProviderEnabled(oauthConfig.github) && registrationOptions.allowGithubLogin
+    const linuxDoEnabled = isOAuthProviderEnabled(oauthConfig.linuxDo) && registrationOptions.allowLinuxDoLogin
+    const passwordRegistrationEnabled = emailBindingEnabled && registrationOptions.allowPasswordRegistration
+    const githubRegistrationEnabled = githubEnabled && registrationOptions.allowGithubRegistration
+    const linuxDoRegistrationEnabled = linuxDoEnabled && registrationOptions.allowLinuxDoRegistration
 
     return {
       emailBindingEnabled,
-      passwordRegistrationEnabled: emailBindingEnabled && registrationOptions.allowPasswordRegistration,
+      passwordRegistrationEnabled,
+      passwordRegistrationInviteCodeRequired: passwordRegistrationEnabled && registrationOptions.requirePasswordInviteCode,
       providers: {
         [AUTH_PROVIDER.GITHUB]: {
           enabled: githubEnabled,
-          allowRegistration: githubEnabled && registrationOptions.allowGithubRegistration,
+          allowRegistration: githubRegistrationEnabled,
+          inviteCodeRequired: githubRegistrationEnabled && registrationOptions.requireGithubInviteCode,
         },
         [AUTH_PROVIDER.LINUX_DO]: {
           enabled: linuxDoEnabled,
-          allowRegistration: linuxDoEnabled && registrationOptions.allowLinuxDoRegistration,
+          allowRegistration: linuxDoRegistrationEnabled,
+          inviteCodeRequired: linuxDoRegistrationEnabled && registrationOptions.requireLinuxDoInviteCode,
         },
       },
     }

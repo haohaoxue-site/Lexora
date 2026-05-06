@@ -1,21 +1,41 @@
 import type { AuthProviderName } from '@haohaoxue/samepage-contracts'
 import type {
   ChangePasswordRequest,
+  CreateRegistrationInviteGrantRequest,
   ExchangeCodeRequest,
   LogoutResponse,
   PasswordLoginRequest,
   PasswordRegisterRequest,
+  RegistrationInviteGrantResponse,
   RequestEmailVerificationRequest,
   RequestEmailVerificationResponse,
+  StartOAuthLoginRequest,
+  StartOAuthLoginResponse,
   TokenExchangeResponse,
 } from './typing'
-import { SERVER_PATH } from '@haohaoxue/samepage-contracts'
 import { axios } from '@/utils/axios'
 
 export * from './typing'
 
-export function buildOAuthStartUrl(provider: AuthProviderName) {
-  return `${SERVER_PATH}/auth/oauth/${provider}/start`
+export function createRegistrationInviteGrant(
+  data: CreateRegistrationInviteGrantRequest,
+): Promise<RegistrationInviteGrantResponse> {
+  return axios.request({
+    method: 'post',
+    url: '/auth/registration-invite/grants',
+    data,
+  })
+}
+
+export function startOAuthLogin(
+  provider: AuthProviderName,
+  data: StartOAuthLoginRequest = {},
+): Promise<StartOAuthLoginResponse> {
+  return axios.request({
+    method: 'post',
+    url: `/auth/oauth/${provider}/start`,
+    data,
+  })
 }
 
 export function exchangeAuthCode(data: ExchangeCodeRequest): Promise<TokenExchangeResponse> {

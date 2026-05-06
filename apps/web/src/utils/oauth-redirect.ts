@@ -28,5 +28,13 @@ export function resolveOAuthRedirectErrorMessage(
     return '第三方登录失败，请稍后重试'
   }
 
+  if (normalizedErrorCode === OAUTH_REDIRECT_ERROR_CODE.REGISTRATION_INVITE_REQUIRED) {
+    if (options.purpose === 'bind') {
+      return `${options.providerLabel ?? '第三方账号'} 账号绑定失败，请稍后重试`
+    }
+
+    return '请先验证邀请码后再创建新账号。'
+  }
+
   return fallbackMessage
 }

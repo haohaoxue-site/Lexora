@@ -6,6 +6,7 @@ import type {
   SystemAdminUserStatus,
   UpdateSystemAdminUserStatusRequest,
   UpdateSystemAuthGovernanceRequest,
+  UpdateSystemAuthInviteCodeRequest,
 } from '@haohaoxue/samepage-contracts'
 import {
   SYSTEM_ADMIN_AUDIT_TARGET_TYPE_VALUES,
@@ -17,6 +18,7 @@ import {
   IsEnum,
   IsIn,
   IsOptional,
+  IsString,
   MaxLength,
 } from 'class-validator'
 import { RequestPageParamsDto } from '../../dto/request-page-params.dto'
@@ -49,6 +51,14 @@ export class UpdateSystemAdminUserStatusDto implements UpdateSystemAdminUserStat
 export class UpdateSystemAuthGovernanceDto implements UpdateSystemAuthGovernanceRequest {
   @IsOptional()
   @IsBoolean()
+  allowGithubLogin?: boolean
+
+  @IsOptional()
+  @IsBoolean()
+  allowLinuxDoLogin?: boolean
+
+  @IsOptional()
+  @IsBoolean()
   allowPasswordRegistration?: boolean
 
   @IsOptional()
@@ -58,4 +68,22 @@ export class UpdateSystemAuthGovernanceDto implements UpdateSystemAuthGovernance
   @IsOptional()
   @IsBoolean()
   allowLinuxDoRegistration?: boolean
+
+  @IsOptional()
+  @IsBoolean()
+  requirePasswordInviteCode?: boolean
+
+  @IsOptional()
+  @IsBoolean()
+  requireGithubInviteCode?: boolean
+
+  @IsOptional()
+  @IsBoolean()
+  requireLinuxDoInviteCode?: boolean
+}
+
+export class UpdateSystemAuthInviteCodeDto implements UpdateSystemAuthInviteCodeRequest {
+  @IsString()
+  @MaxLength(120)
+  inviteCode!: string
 }

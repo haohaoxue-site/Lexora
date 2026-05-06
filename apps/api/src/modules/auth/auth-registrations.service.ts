@@ -19,6 +19,7 @@ import {
   REGISTRATION_EMAIL_VERIFICATION_TTL_SECONDS,
 } from './auth.constants'
 import { hashPassword } from './password.utils'
+import { RegistrationInviteGrantsService } from './registration-invite-grants.service'
 import { SystemAuthService } from './system-auth.service'
 
 @Injectable()
@@ -29,9 +30,10 @@ export class AuthRegistrationsService {
     private readonly authMailerService: AuthMailerService,
     private readonly personalWorkspacesService: PersonalWorkspacesService,
     private readonly authSessionsService: AuthSessionsService,
+    private readonly registrationInviteGrantsService: RegistrationInviteGrantsService,
   ) {}
 
-  async requestEmailVerification(email: string): Promise<void> {
+  async requestEmailVerification(email: string, registrationInviteGrantToken?: string): Promise<void> {
     await this.systemAuthService.assertRegistrationAllowed(AUTH_METHOD.PASSWORD)
 
     const normalizedEmail = normalizeEmail(email)
@@ -43,6 +45,12 @@ export class AuthRegistrationsService {
     if (existingUser) {
       throw new BadRequestException('该邮箱已存在账号，请直接登录')
     }
+
+    await this.registrationInviteGrantsService.assertGrantReady({
+      method: AUTH_METHOD.PASSWORD,
+      email: normalizedEmail,
+      grantToken: registrationInviteGrantToken,
+    })
 
     const latestVerification = await this.prisma.authEmailVerificationToken.findFirst({
       where: {
@@ -96,6 +104,7 @@ export class AuthRegistrationsService {
     displayName: string,
     password: string,
     request: FastifyRequest,
+    registrationInviteGrantToken?: string,
   ): Promise<TokenExchangeResult> {
     const normalizedDisplayName = displayName.trim()
 
@@ -116,6 +125,12 @@ export class AuthRegistrationsService {
       if (existingUser) {
         throw new BadRequestException('该邮箱已存在账号，请直接登录')
       }
+
+      await this.registrationInviteGrantsService.consumeGrantByToken({
+        method: AUTH_METHOD.PASSWORD,
+        email: verifiedEmail,
+        grantToken: registrationInviteGrantToken,
+      }, tx)
 
       const userCode = await resolveUniqueUserCode({
         isUserCodeTaken: async candidate =>

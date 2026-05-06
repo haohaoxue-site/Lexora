@@ -1,17 +1,22 @@
 import type {
   ChangePasswordRequest,
+  CreateRegistrationInviteGrantRequest,
   ExchangeCodeRequest,
   PasswordLoginRequest,
   PasswordRegisterRequest,
   RequestEmailVerificationRequest,
+  StartOAuthLoginRequest,
 } from '@haohaoxue/samepage-contracts'
 import {
+  AUTH_METHOD_VALUES,
   AUTH_PASSWORD_MAX_LENGTH,
   AUTH_PASSWORD_MIN_LENGTH,
   AUTH_PASSWORD_REQUIRED_PATTERN,
 } from '@haohaoxue/samepage-contracts'
 import {
   IsEmail,
+  IsIn,
+  IsOptional,
   IsString,
   Matches,
   MaxLength,
@@ -38,6 +43,12 @@ export class PasswordLoginDto implements PasswordLoginRequest {
 export class RequestEmailVerificationDto implements RequestEmailVerificationRequest {
   @IsEmail()
   email!: string
+
+  @IsOptional()
+  @IsString()
+  @MinLength(32)
+  @MaxLength(256)
+  registrationInviteGrantToken?: string
 }
 
 export class PasswordRegisterDto implements PasswordRegisterRequest {
@@ -59,6 +70,34 @@ export class PasswordRegisterDto implements PasswordRegisterRequest {
   @MaxLength(AUTH_PASSWORD_MAX_LENGTH)
   @Matches(AUTH_PASSWORD_REQUIRED_PATTERN)
   password!: string
+
+  @IsOptional()
+  @IsString()
+  @MinLength(32)
+  @MaxLength(256)
+  registrationInviteGrantToken?: string
+}
+
+export class CreateRegistrationInviteGrantDto implements CreateRegistrationInviteGrantRequest {
+  @IsIn(AUTH_METHOD_VALUES)
+  method!: CreateRegistrationInviteGrantRequest['method']
+
+  @IsOptional()
+  @IsEmail()
+  email?: string
+
+  @IsString()
+  @MinLength(4)
+  @MaxLength(120)
+  inviteCode!: string
+}
+
+export class StartOAuthLoginDto implements StartOAuthLoginRequest {
+  @IsOptional()
+  @IsString()
+  @MinLength(32)
+  @MaxLength(256)
+  registrationInviteGrantToken?: string
 }
 
 export class ChangePasswordDto implements ChangePasswordRequest {

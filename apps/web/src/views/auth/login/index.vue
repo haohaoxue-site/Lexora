@@ -5,18 +5,27 @@ import AuthEntryShell from '../components/AuthEntryShell.vue'
 import { useLogin } from './composables/useLogin'
 
 const passwordFormRef = useTemplateRef<FormInstance>('passwordFormRef')
+const oauthInviteFormRef = useTemplateRef<FormInstance>('oauthInviteFormRef')
 const {
+  continueOauthAsExistingAccount,
+  continueOauthWithInviteCode,
   handleSubmitPasswordLogin,
+  handleStartLogin,
   hasOauthProviders,
+  isOauthInviteDialogVisible,
   isLoadingCapabilities,
   isPasswordSubmitting,
   loadErrorMessage,
+  oauthInviteForm,
+  oauthInviteFormRules,
   passwordRegistrationEnabled,
   passwordForm,
   passwordFormRules,
   providers,
-  startLogin,
+  selectedOauthProviderMeta,
+  startingOauthProvider,
 } = useLogin({
+  oauthInviteFormRef,
   passwordFormRef,
 })
 </script>
@@ -80,7 +89,8 @@ const {
           v-for="item in providers"
           :key="item.provider"
           class="login-provider-btn justify-between"
-          @click="startLogin(item.provider)"
+          :loading="startingOauthProvider === item.provider"
+          @click="handleStartLogin(item.provider)"
         >
           <span class="login-provider-btn__leading">
             <span class="login-provider-btn__icon-wrap">
@@ -112,6 +122,48 @@ const {
       </template>
     </template>
   </AuthEntryShell>
+
+  <ElDialog
+    v-model="isOauthInviteDialogVisible"
+    :title="`使用 ${selectedOauthProviderMeta?.title ?? '第三方账号'} 继续`"
+    width="28rem"
+    align-center
+    destroy-on-close
+  >
+    <ElForm
+      ref="oauthInviteFormRef"
+      :model="oauthInviteForm"
+      :rules="oauthInviteFormRules"
+      label-position="top"
+      @submit.prevent="continueOauthWithInviteCode"
+    >
+      <ElFormItem label="邀请码" prop="inviteCode">
+        <ElInput
+          v-model="oauthInviteForm.inviteCode"
+          autocomplete="off"
+          placeholder="新用户请输入邀请码"
+        />
+      </ElFormItem>
+    </ElForm>
+
+    <template #footer>
+      <div class="login-view__oauth-dialog-footer">
+        <ElButton
+          :loading="Boolean(startingOauthProvider)"
+          @click="continueOauthAsExistingAccount"
+        >
+          已有账号继续登录
+        </ElButton>
+        <ElButton
+          type="primary"
+          :loading="Boolean(startingOauthProvider)"
+          @click="continueOauthWithInviteCode"
+        >
+          验证邀请码并继续
+        </ElButton>
+      </div>
+    </template>
+  </ElDialog>
 </template>
 
 <style scoped lang="scss">
@@ -168,6 +220,12 @@ const {
   &__providers {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.75rem;
+  }
+
+  &__oauth-dialog-footer {
+    display: flex;
+    justify-content: flex-end;
     gap: 0.75rem;
   }
 }

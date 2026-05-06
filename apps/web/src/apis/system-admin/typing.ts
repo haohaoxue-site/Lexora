@@ -20,6 +20,7 @@ export type {
   UpdateSystemAdminUserResponse,
   UpdateSystemAdminUserStatusRequest,
   UpdateSystemAuthGovernanceRequest,
+  UpdateSystemAuthInviteCodeRequest,
   UpdateSystemEmailConfigRequest,
   UpdateSystemEmailServiceStatusRequest,
 } from '@haohaoxue/samepage-contracts'

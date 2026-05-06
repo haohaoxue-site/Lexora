@@ -41,6 +41,7 @@ import {
 import { buildOauthAccountData } from './auth.utils'
 import { hashPassword, verifyPassword } from './password.utils'
 import { OAuthProviderService } from './providers/oauth-provider.service'
+import { RegistrationInviteGrantsService } from './registration-invite-grants.service'
 import { SystemAuthService } from './system-auth.service'
 
 type OAuthRedirectErrorCode = (typeof OAUTH_REDIRECT_ERROR_CODE)[keyof typeof OAUTH_REDIRECT_ERROR_CODE]
@@ -53,6 +54,7 @@ export class AuthService {
     private readonly systemAuthService: SystemAuthService,
     private readonly personalWorkspacesService: PersonalWorkspacesService,
     private readonly authSessionsService: AuthSessionsService,
+    private readonly registrationInviteGrantsService: RegistrationInviteGrantsService,
   ) {}
 
   async loginWithPassword(
@@ -220,10 +222,21 @@ export class AuthService {
     options: BuildOAuthAuthorizationUrlOptions = {},
   ): Promise<string> {
     const runtimeProvider = await this.oauthProviderService.getProvider(provider)
+    const authMethod = resolveAuthMethod(runtimeProvider.dbProvider)
     const webOrigin = this.resolveCurrentUrl(request).origin
     const callbackUrl = this.oauthProviderService.resolveApiCallbackUrl(provider, webOrigin)
     const purpose = options.purpose ?? 'login'
     const redirectPath = options.redirectPath ?? OAUTH_LOGIN_REDIRECT_PATH
+
+    await this.systemAuthService.assertOauthProviderLoginAllowed(authMethod)
+
+    const registrationInviteGrant = options.registrationInviteGrantToken
+      ? await this.registrationInviteGrantsService.assertGrantReady({
+          method: authMethod,
+          provider: runtimeProvider.dbProvider,
+          grantToken: options.registrationInviteGrantToken,
+        })
+      : null
 
     const state = this.createOAuthState({
       webOrigin,
@@ -238,6 +251,7 @@ export class AuthService {
         provider: runtimeProvider.dbProvider,
         purpose: purpose === 'bind' ? 'BIND' : 'LOGIN',
         initiatorUserId: purpose === 'bind' ? options.initiatorUserId ?? null : null,
+        registrationInviteGrantId: registrationInviteGrant?.id ?? null,
         state,
         codeVerifier,
         redirectUri: callbackUrl,
@@ -259,8 +273,11 @@ export class AuthService {
 
   async handleOAuthCallback(provider: AuthProviderName, request: FastifyRequest): Promise<string> {
     const runtimeProvider = await this.oauthProviderService.getProvider(provider)
+    const authMethod = resolveAuthMethod(runtimeProvider.dbProvider)
     const currentUrl = this.resolveCurrentUrl(request)
     const state = currentUrl.searchParams.get('state')
+
+    await this.systemAuthService.assertOauthProviderLoginAllowed(authMethod)
 
     if (!state) {
       throw new UnauthorizedException('Missing OAuth state')
@@ -320,6 +337,7 @@ export class AuthService {
     const user = await this.upsertUserByOAuth(
       runtimeProvider.dbProvider,
       profile,
+      oauthState.registrationInviteGrantId,
     )
 
     const webCallbackUrl = new URL(statePayload.redirectPath, statePayload.webOrigin).toString()
@@ -394,7 +412,11 @@ export class AuthService {
     }
   }
 
-  private async upsertUserByOAuth(provider: AuthProvider, profile: OAuthProfile): Promise<User> {
+  private async upsertUserByOAuth(
+    provider: AuthProvider,
+    profile: OAuthProfile,
+    registrationInviteGrantId: string | null,
+  ): Promise<User> {
     const existingAccount = await this.prisma.$bypass.oauthAccount.findUnique({
       where: {
         provider_providerUserId: {
@@ -441,6 +463,12 @@ export class AuthService {
     await this.systemAuthService.assertRegistrationAllowed(resolveAuthMethod(provider))
 
     return this.prisma.$transaction(async (tx) => {
+      await this.registrationInviteGrantsService.consumeGrantById({
+        method: resolveAuthMethod(provider),
+        provider,
+        grantId: registrationInviteGrantId,
+      }, tx)
+
       const userCode = await resolveUniqueUserCode({
         isUserCodeTaken: async candidate =>
           Boolean(await tx.user.findUnique({

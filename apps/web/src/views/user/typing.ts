@@ -25,6 +25,8 @@ export interface UserAccountSectionProps {
   disconnectingProvider: AuthProviderName | null
   canDisconnectGithub: boolean
   canDisconnectLinuxDo: boolean
+  canStartGithubBinding: boolean
+  canStartLinuxDoBinding: boolean
 }
 
 export interface UserAccountSectionEmits {

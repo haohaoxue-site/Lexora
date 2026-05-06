@@ -1,7 +1,9 @@
 import type {
   AuthProviderName,
   LogoutResponse,
+  RegistrationInviteGrantResponse,
   RequestEmailVerificationResponse,
+  StartOAuthLoginResponse,
   TokenExchangeResponse,
 } from '@haohaoxue/samepage-contracts'
 import type { FastifyReply, FastifyRequest } from 'fastify'
@@ -28,12 +30,18 @@ import { AuthRegistrationsService } from './auth-registrations.service'
 import { AuthSessionsService } from './auth-sessions.service'
 import {
   ChangePasswordDto,
+  CreateRegistrationInviteGrantDto,
   ExchangeCodeDto,
   PasswordLoginDto,
   PasswordRegisterDto,
   RequestEmailVerificationDto,
+  StartOAuthLoginDto,
 } from './auth.dto'
 import { AuthService } from './auth.service'
+import {
+  RegistrationInviteGrantsService,
+  RegistrationInviteRequiredException,
+} from './registration-invite-grants.service'
 
 @Controller('auth')
 @Throttle({ default: { limit: 20, ttl: 60_000 } })
@@ -42,19 +50,37 @@ export class AuthController {
     private readonly authService: AuthService,
     private readonly authSessionsService: AuthSessionsService,
     private readonly authRegistrationsService: AuthRegistrationsService,
+    private readonly registrationInviteGrantsService: RegistrationInviteGrantsService,
   ) {}
 
   @Public()
-  @Get('oauth/:provider/start')
-  async startOAuth(
-    @Param('provider') provider: string,
-    @Req() request: FastifyRequest,
-    @Res() response: FastifyReply,
-  ): Promise<FastifyReply> {
-    const normalizedProvider = this.parseProvider(provider)
-    const authorizeUrl = await this.authService.buildOAuthAuthorizationUrl(normalizedProvider, request)
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  @Post('registration-invite/grants')
+  async createRegistrationInviteGrant(
+    @Body() payload: CreateRegistrationInviteGrantDto,
+  ): Promise<RegistrationInviteGrantResponse> {
+    const result = await this.registrationInviteGrantsService.createGrant(payload)
 
-    return response.redirect(authorizeUrl, 302)
+    return {
+      grantToken: result.grantToken,
+      expiresAt: result.expiresAt.toISOString(),
+    }
+  }
+
+  @Public()
+  @Post('oauth/:provider/start')
+  async startOAuthLogin(
+    @Param('provider') provider: string,
+    @Body() payload: StartOAuthLoginDto,
+    @Req() request: FastifyRequest,
+  ): Promise<StartOAuthLoginResponse> {
+    const normalizedProvider = this.parseProvider(provider)
+
+    return {
+      authorizeUrl: await this.authService.buildOAuthAuthorizationUrl(normalizedProvider, request, {
+        registrationInviteGrantToken: payload.registrationInviteGrantToken,
+      }),
+    }
   }
 
   @Public()
@@ -70,11 +96,11 @@ export class AuthController {
     try {
       redirectUrl = await this.authService.handleOAuthCallback(normalizedProvider, request)
     }
-    catch {
+    catch (error) {
       redirectUrl = this.authService.buildOAuthFailureRedirect(
         normalizedProvider,
         request,
-        OAUTH_REDIRECT_ERROR_CODE.CALLBACK_FAILED,
+        this.resolveOAuthRedirectErrorCode(error),
       )
     }
 
@@ -108,7 +134,10 @@ export class AuthController {
   async requestEmailVerification(
     @Body() payload: RequestEmailVerificationDto,
   ): Promise<RequestEmailVerificationResponse> {
-    await this.authRegistrationsService.requestEmailVerification(payload.email)
+    await this.authRegistrationsService.requestEmailVerification(
+      payload.email,
+      payload.registrationInviteGrantToken,
+    )
 
     return {
       requested: true,
@@ -128,6 +157,7 @@ export class AuthController {
       payload.displayName,
       payload.password,
       request,
+      payload.registrationInviteGrantToken,
     )
     return this.applyTokenExchange(response, result)
   }
@@ -201,5 +231,15 @@ export class AuthController {
     }
 
     throw new BadRequestException(`Unsupported provider: ${provider}`)
+  }
+
+  private resolveOAuthRedirectErrorCode(
+    error: unknown,
+  ): (typeof OAUTH_REDIRECT_ERROR_CODE)[keyof typeof OAUTH_REDIRECT_ERROR_CODE] {
+    if (error instanceof RegistrationInviteRequiredException) {
+      return error.oauthRedirectErrorCode
+    }
+
+    return OAUTH_REDIRECT_ERROR_CODE.CALLBACK_FAILED
   }
 }

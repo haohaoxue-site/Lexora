@@ -15,6 +15,8 @@ const {
   bindingProvider,
   canDisconnectGithub,
   canDisconnectLinuxDo,
+  canStartGithubBinding,
+  canStartLinuxDoBinding,
   deleteAccount,
   deleteAccountConfirmationMode,
   deleteAccountConfirmationPhrase,
@@ -96,6 +98,8 @@ const {
           :disconnecting-provider="disconnectingProvider"
           :can-disconnect-github="canDisconnectGithub"
           :can-disconnect-linux-do="canDisconnectLinuxDo"
+          :can-start-github-binding="canStartGithubBinding"
+          :can-start-linux-do-binding="canStartLinuxDoBinding"
           @send-code="sendEmailCode"
           @confirm-email="handleConfirmEmail"
           @start-oauth-binding="connectOauth"

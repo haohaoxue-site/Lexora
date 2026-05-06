@@ -14,6 +14,7 @@ const {
   isLoadingCapabilities,
   isSubmitting,
   loadErrorMessage,
+  passwordRegistrationInviteCodeRequired,
   passwordRegistrationEnabled,
 } = useRegister({
   registerRequestFormRef,
@@ -21,7 +22,17 @@ const {
 
 const isRegistrationClosed = computed(() => !isLoadingCapabilities && !passwordRegistrationEnabled)
 const pageTitle = computed(() => isRegistrationClosed.value ? '邮箱注册暂未开放' : '创建账号')
-const pageDescription = computed(() => isRegistrationClosed.value ? '当前仅支持已有账号登录。' : '输入邮箱，我们会发送验证码。')
+const pageDescription = computed(() => {
+  if (isRegistrationClosed.value) {
+    return '当前仅支持已有账号登录。'
+  }
+
+  if (passwordRegistrationInviteCodeRequired.value) {
+    return '输入邮箱和邀请码，我们会发送验证码。'
+  }
+
+  return '输入邮箱，我们会发送验证码。'
+})
 
 function goToLogin() {
   void router.push({ name: 'login' })
@@ -72,6 +83,14 @@ function goToLogin() {
               v-model="form.email"
               autocomplete="email"
               placeholder="输入邮箱地址"
+              :disabled="isSubmitting"
+            />
+          </ElFormItem>
+          <ElFormItem v-if="passwordRegistrationInviteCodeRequired" label="邀请码" prop="inviteCode">
+            <ElInput
+              v-model="form.inviteCode"
+              autocomplete="off"
+              placeholder="输入邀请码"
               :disabled="isSubmitting"
             />
           </ElFormItem>

@@ -16,37 +16,102 @@ import {
   getSystemAuthGovernance,
   updateSystemAdminUserStatus,
   updateSystemAuthGovernance,
+  updateSystemAuthInviteCode,
 } from '@/apis/system-admin'
 import { formatDateTime } from '@/utils/dayjs'
 import { getRequestErrorDisplayMessage } from '@/utils/request-error'
 
 export type RegistrationGovernanceField = keyof UpdateSystemAuthGovernanceRequest
 
+interface AuthGovernanceSwitchOption {
+  key: RegistrationGovernanceField
+  label: string
+  description: string
+}
+
+export interface AuthGovernanceEntryCard {
+  key: 'password' | 'github' | 'linuxDo'
+  title: string
+  description: string
+  switches: readonly AuthGovernanceSwitchOption[]
+}
+
 const governanceFieldLabels: Record<RegistrationGovernanceField, string> = {
+  allowGithubLogin: 'GitHub 登录',
+  allowLinuxDoLogin: 'LinuxDo 登录',
   allowPasswordRegistration: '邮箱密码注册',
   allowGithubRegistration: 'GitHub 注册',
   allowLinuxDoRegistration: 'LinuxDo 注册',
+  requirePasswordInviteCode: '邮箱注册邀请码',
+  requireGithubInviteCode: 'GitHub 注册邀请码',
+  requireLinuxDoInviteCode: 'LinuxDo 注册邀请码',
 }
 
-const registrationSwitches = [
+const authGovernanceCards = [
   {
-    key: 'allowPasswordRegistration',
-    label: '邮箱密码注册',
-    description: '是否允许新邮箱账号注册。',
+    key: 'password',
+    title: '邮箱密码',
+    description: '邮箱注册依赖发件服务，只影响新邮箱账号创建。',
+    switches: [
+      {
+        key: 'allowPasswordRegistration',
+        label: '注册',
+        description: '允许新邮箱账号注册。',
+      },
+      {
+        key: 'requirePasswordInviteCode',
+        label: '邀请码',
+        description: '邮箱密码注册时必须先验证邀请码。',
+      },
+    ],
   },
   {
-    key: 'allowGithubRegistration',
-    label: 'GitHub 注册',
-    description: '是否允许新 GitHub 账号注册。',
+    key: 'github',
+    title: 'GitHub',
+    description: '登录控制入口和绑定，注册只影响新账号创建。',
+    switches: [
+      {
+        key: 'allowGithubLogin',
+        label: '登录',
+        description: '允许使用 GitHub 登录或新增绑定。',
+      },
+      {
+        key: 'allowGithubRegistration',
+        label: '注册',
+        description: '允许新 GitHub 账号注册。',
+      },
+      {
+        key: 'requireGithubInviteCode',
+        label: '邀请码',
+        description: '首次创建账号时必须先验证邀请码。',
+      },
+    ],
   },
   {
-    key: 'allowLinuxDoRegistration',
-    label: 'LinuxDo 注册',
-    description: '是否允许新 LinuxDo 账号注册。',
+    key: 'linuxDo',
+    title: 'LinuxDo',
+    description: '登录控制入口和绑定，注册只影响新账号创建。',
+    switches: [
+      {
+        key: 'allowLinuxDoLogin',
+        label: '登录',
+        description: '允许使用 LinuxDo 登录或新增绑定。',
+      },
+      {
+        key: 'allowLinuxDoRegistration',
+        label: '注册',
+        description: '允许新 LinuxDo 账号注册。',
+      },
+      {
+        key: 'requireLinuxDoInviteCode',
+        label: '邀请码',
+        description: '首次创建账号时必须先验证邀请码。',
+      },
+    ],
   },
-] as const
+] as const satisfies readonly AuthGovernanceEntryCard[]
 
-type RegistrationSwitchKey = (typeof registrationSwitches)[number]['key']
+type RegistrationSwitchKey = RegistrationGovernanceField
 
 export function useUsers() {
   let userListRequestId = 0
@@ -57,7 +122,12 @@ export function useUsers() {
   const isLoadingUsers = shallowRef(false)
   const keywordInput = shallowRef('')
   const updatingUserId = shallowRef<string | null>(null)
+  const isInviteCodeDialogVisible = shallowRef(false)
+  const isSavingInviteCode = shallowRef(false)
   const totalUsers = shallowRef(0)
+  const inviteCodeForm = reactive({
+    inviteCode: '',
+  })
   const userQuery = reactive<GetSystemAdminUsersQuery>({
     pageNo: 1,
     pageSize: 20,
@@ -66,14 +136,26 @@ export function useUsers() {
     role: undefined,
   })
   const savingGovernanceFields = reactive<Record<RegistrationGovernanceField, boolean>>({
+    allowGithubLogin: false,
+    allowLinuxDoLogin: false,
     allowPasswordRegistration: false,
     allowGithubRegistration: false,
     allowLinuxDoRegistration: false,
+    requirePasswordInviteCode: false,
+    requireGithubInviteCode: false,
+    requireLinuxDoInviteCode: false,
   })
   const governance = reactive<SystemAuthGovernance>({
+    allowGithubLogin: false,
+    allowLinuxDoLogin: false,
     allowPasswordRegistration: false,
     allowGithubRegistration: false,
     allowLinuxDoRegistration: false,
+    requirePasswordInviteCode: false,
+    requireGithubInviteCode: false,
+    requireLinuxDoInviteCode: false,
+    hasRegistrationInviteCode: false,
+    registrationInviteCode: null,
     emailServiceEnabled: false,
     systemAdminEmail: '',
     systemAdminDisplayName: null,
@@ -82,6 +164,14 @@ export function useUsers() {
     systemAdminPasswordUpdatedAt: null,
   })
   const systemAdminStatusText = computed(() => governance.systemAdminMustChangePassword ? '首次密码待修改' : '已完成首次改密')
+  const shouldShowMissingInviteCodeWarning = computed(() =>
+    !governance.hasRegistrationInviteCode
+    && (
+      governance.requirePasswordInviteCode
+      || governance.requireGithubInviteCode
+      || governance.requireLinuxDoInviteCode
+    ),
+  )
 
   async function loadData() {
     isLoading.value = true
@@ -229,6 +319,36 @@ export function useUsers() {
     void updateGovernanceOption(key, value)
   }
 
+  function openInviteCodeDialog() {
+    inviteCodeForm.inviteCode = governance.registrationInviteCode ?? ''
+    isInviteCodeDialogVisible.value = true
+  }
+
+  async function updateInviteCode() {
+    const inviteCode = inviteCodeForm.inviteCode.trim()
+
+    if (inviteCode && inviteCode.length < 4) {
+      ElMessage.error('邀请码至少 4 位')
+      return
+    }
+
+    isSavingInviteCode.value = true
+
+    try {
+      const nextGovernance = await updateSystemAuthInviteCode({ inviteCode })
+      applyGovernance(nextGovernance)
+      isInviteCodeDialogVisible.value = false
+      inviteCodeForm.inviteCode = ''
+      ElMessage.success(inviteCode ? '邀请码已更新' : '邀请码已清空')
+    }
+    catch (error) {
+      ElMessage.error(getRequestErrorDisplayMessage(error, '更新邀请码失败'))
+    }
+    finally {
+      isSavingInviteCode.value = false
+    }
+  }
+
   function formatDate(value: string | null) {
     if (!value) {
       return '暂无'
@@ -278,17 +398,22 @@ export function useUsers() {
   return {
     errorMessage,
     formatDate,
+    authGovernanceCards,
     governance,
     getGovernanceSwitchValue,
     handleGovernanceSwitchChange,
+    inviteCodeForm,
+    isInviteCodeDialogVisible,
     isLoading,
     isLoadingUsers,
     isGovernanceSwitchDisabled,
+    isSavingInviteCode,
     keywordInput,
     loadData,
     loadUsers,
-    registrationSwitches,
+    openInviteCodeDialog,
     savingGovernanceFields,
+    shouldShowMissingInviteCodeWarning,
     shouldShowEmailServiceHint,
     submitSearch,
     systemAdminStatusText,
@@ -299,6 +424,7 @@ export function useUsers() {
     updatePageNo,
     updatePageSize,
     updateGovernanceOption,
+    updateInviteCode,
     updatingUserId,
     userQuery,
     users,
