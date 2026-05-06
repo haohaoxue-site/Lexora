@@ -95,14 +95,6 @@ export class OAuthProviderService {
     providerConfig: OAuthProviderConfig,
   ): Promise<client.Configuration> {
     try {
-      if (providerConfig.discoveryIssuer) {
-        return await client.discovery(
-          new URL(providerConfig.discoveryIssuer),
-          providerConfig.clientId!,
-          providerConfig.clientSecret!,
-        )
-      }
-
       if (
         !providerConfig.authorizationEndpoint
         || !providerConfig.tokenEndpoint
@@ -117,6 +109,7 @@ export class OAuthProviderService {
         authorization_endpoint: providerConfig.authorizationEndpoint,
         token_endpoint: providerConfig.tokenEndpoint,
         userinfo_endpoint: providerConfig.userinfoEndpoint,
+        jwks_uri: providerConfig.jwksEndpoint,
       }
 
       return new client.Configuration(

@@ -175,10 +175,26 @@ services:
         condition: service_healthy
       collab:
         condition: service_healthy
-    ports:
-      - '80:80'
+    networks:
+      - default
+      - traefik
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=traefik"
+      - "traefik.http.routers.samepage-docs.entrypoints=web"
+      - "traefik.http.routers.samepage-docs.rule=Host(`docs.haohaoxue.site`)"
+      - "traefik.http.routers.samepage-docs.middlewares=https-redirect@file"
+      - "traefik.http.routers.samepage-docs.service=samepage-docs"
+      - "traefik.http.routers.samepage-docs-secure.entrypoints=websecure"
+      - "traefik.http.routers.samepage-docs-secure.rule=Host(`docs.haohaoxue.site`)"
+      - "traefik.http.routers.samepage-docs-secure.service=samepage-docs"
+      - "traefik.http.services.samepage-docs.loadbalancer.server.port=80"
 
 volumes:
   samepage-postgres-data:
   samepage-redis-data:
   samepage-rustfs-data:
+
+networks:
+  traefik:
+    external: true

@@ -9,21 +9,12 @@ const JWT_DEFAULTS = {
   refreshTtlSeconds: 60 * 60 * 24 * 30,
 } satisfies Omit<JwtConfig, 'accessSecret'>
 
-const GITHUB_OAUTH_DEFAULTS = {
-  issuer: 'https://github.com/login/oauth',
-  authorizationEndpoint: 'https://github.com/login/oauth/authorize',
-  tokenEndpoint: 'https://github.com/login/oauth/access_token',
-  userinfoEndpoint: 'https://api.github.com/user',
-  scopes: 'read:user',
-} satisfies Omit<OAuthProviderConfig, 'clientId' | 'clientSecret'>
+const GITHUB_OAUTH_DEFAULT_URL = 'https://github.com/login/oauth'
+const GITHUB_OAUTH_ISSUER = 'https://github.com/login/oauth'
+const GITHUB_USERINFO_DEFAULT_ENDPOINT = 'https://api.github.com/user'
 
-const LINUX_DO_OAUTH_DEFAULTS = {
-  discoveryIssuer: 'https://connect.linux.do/',
-  authorizationEndpoint: 'https://connect.linux.do/oauth2/authorize',
-  tokenEndpoint: 'https://connect.linux.do/oauth2/token',
-  userinfoEndpoint: 'https://connect.linux.do/api/user',
-  scopes: 'openid profile',
-} satisfies Omit<OAuthProviderConfig, 'clientId' | 'clientSecret'>
+const LINUX_DO_OAUTH_DEFAULT_URL = 'https://connect.linux.do'
+const LINUX_DO_OAUTH_ISSUER = 'https://connect.linux.do/'
 
 /**
  * JWT 签发与校验配置
@@ -43,10 +34,10 @@ export interface OAuthProviderConfig {
   clientId?: string
   clientSecret?: string
   issuer?: string
-  discoveryIssuer?: string
   authorizationEndpoint?: string
   tokenEndpoint?: string
   userinfoEndpoint?: string
+  jwksEndpoint?: string
   scopes: string
 }
 
@@ -64,17 +55,67 @@ export const jwtConfig = registerAs('jwt', (): JwtConfig => ({
 }))
 
 export const oauthConfig = registerAs('oauth', (): OAuthConfig => ({
-  github: {
-    ...GITHUB_OAUTH_DEFAULTS,
-    clientId: getEnv().GITHUB_CLIENT_ID,
-    clientSecret: getEnv().GITHUB_CLIENT_SECRET,
-  },
-  linuxDo: {
-    ...LINUX_DO_OAUTH_DEFAULTS,
-    clientId: getEnv().LINUX_DO_CLIENT_ID,
-    clientSecret: getEnv().LINUX_DO_CLIENT_SECRET,
-  },
+  github: createGithubOAuthConfig(),
+  linuxDo: createLinuxDoOAuthConfig(),
 }))
+
+function createGithubOAuthConfig(): OAuthProviderConfig {
+  const env = getEnv()
+  const oauthUrl = normalizeOAuthUrl(env.OAUTH_PROXY_URL ?? GITHUB_OAUTH_DEFAULT_URL)
+  const useDefaultUserinfoEndpoint = oauthUrl === GITHUB_OAUTH_DEFAULT_URL
+
+  return {
+    issuer: GITHUB_OAUTH_ISSUER,
+    authorizationEndpoint: appendOAuthUrlPath(oauthUrl, 'github', 'authorize'),
+    tokenEndpoint: appendOAuthUrlPath(oauthUrl, 'github', 'access_token'),
+    userinfoEndpoint: useDefaultUserinfoEndpoint
+      ? GITHUB_USERINFO_DEFAULT_ENDPOINT
+      : appendOAuthUrlPath(oauthUrl, 'github', 'user'),
+    scopes: 'read:user',
+    clientId: env.GITHUB_CLIENT_ID,
+    clientSecret: env.GITHUB_CLIENT_SECRET,
+  }
+}
+
+function createLinuxDoOAuthConfig(): OAuthProviderConfig {
+  const env = getEnv()
+  const oauthUrl = normalizeOAuthUrl(env.OAUTH_PROXY_URL ?? LINUX_DO_OAUTH_DEFAULT_URL)
+
+  return {
+    issuer: LINUX_DO_OAUTH_ISSUER,
+    authorizationEndpoint: appendOAuthUrlPath(oauthUrl, 'linux-do', 'oauth2/authorize'),
+    tokenEndpoint: appendOAuthUrlPath(oauthUrl, 'linux-do', 'oauth2/token'),
+    userinfoEndpoint: appendOAuthUrlPath(oauthUrl, 'linux-do', 'api/user'),
+    jwksEndpoint: appendOAuthUrlPath(oauthUrl, 'linux-do', '.well-known/jwks.json'),
+    scopes: 'openid profile',
+    clientId: env.LINUX_DO_CLIENT_ID,
+    clientSecret: env.LINUX_DO_CLIENT_SECRET,
+  }
+}
+
+function normalizeOAuthUrl(rawUrl: string): string {
+  const url = new URL(rawUrl.trim())
+  url.pathname = url.pathname.replace(/\/+$/g, '')
+  url.search = ''
+  url.hash = ''
+  return url.toString().replace(/\/+$/g, '')
+}
+
+function appendOAuthUrlPath(baseUrl: string, proxyProviderPath: string, defaultProviderPath: string): string {
+  const providerPath = baseUrl === GITHUB_OAUTH_DEFAULT_URL || baseUrl === LINUX_DO_OAUTH_DEFAULT_URL
+    ? defaultProviderPath
+    : `${proxyProviderPath}/${defaultProviderPath}`
+
+  return appendUrlPath(baseUrl, providerPath)
+}
+
+function appendUrlPath(baseUrl: string, path: string): string {
+  const url = new URL(baseUrl)
+  const basePath = url.pathname.replace(/\/+$/g, '')
+  const nextPath = path.replace(/^\/+/g, '')
+  url.pathname = `${basePath}/${nextPath}`
+  return url.toString()
+}
 
 export interface CryptoConfig {
   encryptionKey: string
