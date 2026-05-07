@@ -28,28 +28,9 @@ function resolveDocumentTreeStateKey(workspaceId: string | null) {
   return workspaceId?.trim() || DOCUMENT_TREE_FALLBACK_KEY
 }
 
-function normalizeUiStringList(values: readonly string[]) {
-  const normalizedValues: string[] = []
-  const seenValues = new Set<string>()
-
-  for (const value of values) {
-    const normalizedValue = value.trim()
-
-    if (!normalizedValue || seenValues.has(normalizedValue)) {
-      continue
-    }
-
-    seenValues.add(normalizedValue)
-    normalizedValues.push(normalizedValue)
-  }
-
-  return normalizedValues
-}
-
 export const useUiStore = defineStore('ui', () => {
   const workspaceSidebarCollapsed = shallowRef(false)
   const _documentTreeStateByWorkspaceId = shallowRef<Record<string, DocumentTreeUiState>>({})
-  const _homeVisibleWidgetIds = shallowRef<string[] | null>(null)
   const documentTreeStateByWorkspaceId = computed(() =>
     Object.fromEntries(
       Object.entries(_documentTreeStateByWorkspaceId.value).map(([workspaceId, state]) => [
@@ -57,9 +38,6 @@ export const useUiStore = defineStore('ui', () => {
         cloneDocumentTreeUiState(state),
       ]),
     ),
-  )
-  const homeVisibleWidgetIds = computed(() =>
-    _homeVisibleWidgetIds.value ? [..._homeVisibleWidgetIds.value] : null,
   )
 
   function setWorkspaceSidebarCollapsed(value: boolean) {
@@ -106,19 +84,12 @@ export const useUiStore = defineStore('ui', () => {
     _documentTreeStateByWorkspaceId.value = {}
   }
 
-  function setHomeVisibleWidgetIds(widgetIds: string[]) {
-    _homeVisibleWidgetIds.value = normalizeUiStringList(widgetIds)
-  }
-
   return {
     _documentTreeStateByWorkspaceId,
-    _homeVisibleWidgetIds,
     clearDocumentTreeState,
     documentTreeStateByWorkspaceId,
     getDocumentTreeState,
-    homeVisibleWidgetIds,
     setExpandedDocumentIds,
-    setHomeVisibleWidgetIds,
     setLastOpenedDocumentId,
     setWorkspaceSidebarCollapsed,
     workspaceSidebarCollapsed,
@@ -129,7 +100,6 @@ export const useUiStore = defineStore('ui', () => {
     pick: [
       'workspaceSidebarCollapsed',
       '_documentTreeStateByWorkspaceId',
-      '_homeVisibleWidgetIds',
     ],
   },
 })

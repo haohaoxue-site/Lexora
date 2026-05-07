@@ -1,6 +1,7 @@
 import type { FormInstance } from 'element-plus'
 import type { Ref } from 'vue'
 import type { UserProfileSectionProps } from '../typing'
+import { ElMessage } from 'element-plus'
 import { computed, reactive } from 'vue'
 import { createDisplayNameRules } from '@/views/auth/utils/rules'
 
@@ -53,9 +54,20 @@ export function useUserProfileSection(options: {
     options.onSaveDisplayName()
   }
 
+  async function handleCopyUserCode() {
+    if (typeof navigator === 'undefined' || typeof navigator.clipboard?.writeText !== 'function') {
+      ElMessage.error('当前环境不支持复制')
+      return
+    }
+
+    await navigator.clipboard.writeText(options.props.userCode)
+    ElMessage.success('协作码已复制')
+  }
+
   return {
     displayNameRules,
     form,
+    handleCopyUserCode,
     handleFileChange,
     handlePickAvatar,
     handleSaveDisplayName,

@@ -13,13 +13,11 @@ const newPasswordModel = defineModel<string>('newPassword', { required: true })
 const confirmPasswordModel = defineModel<string>('confirmPassword', { required: true })
 const emailFormRef = useTemplateRef<FormInstance>('emailFormRef')
 const {
-  collabCodeDescription,
   clearEmailValidation,
   emailButtonText,
   emailFormRules,
   form,
   handleConfirmEmail,
-  handleCopyUserCode,
   handleDisconnect,
   handleSendCode,
   handleStartOauthBinding,
@@ -54,31 +52,19 @@ defineExpose({
       :description="sectionDescription"
     />
 
-    <div class="user-account-section__status-grid">
-      <div v-if="showEmailStatus" class="user-account-section__status-card">
+    <div v-if="showEmailStatus" class="user-account-section__status-grid">
+      <div class="user-account-section__status-card">
         <span class="user-account-section__status-label">当前邮箱</span>
         <strong class="user-account-section__status-value">{{ props.account.email || '未绑定' }}</strong>
         <span class="user-account-section__status-hint">
           {{ props.account.emailVerified ? '邮箱已验证，可用于密码登录。' : '绑定邮箱后将通过验证码完成验证。' }}
         </span>
       </div>
-      <div v-if="showEmailStatus" class="user-account-section__status-card">
+      <div class="user-account-section__status-card">
         <span class="user-account-section__status-label">密码登录</span>
         <strong class="user-account-section__status-value">{{ props.account.hasPasswordAuth ? '已启用' : '未启用' }}</strong>
         <span class="user-account-section__status-hint">
           {{ props.account.hasPasswordAuth ? '邮箱登录方式可继续使用。' : '完成设置后即可使用邮箱登录。' }}
-        </span>
-      </div>
-      <div class="user-account-section__status-card">
-        <span class="user-account-section__status-label">协作码</span>
-        <div class="user-account-section__user-code-row">
-          <strong class="user-account-section__status-value">{{ props.account.userCode }}</strong>
-          <ElButton text type="primary" @click="handleCopyUserCode">
-            复制
-          </ElButton>
-        </div>
-        <span class="user-account-section__status-hint">
-          {{ collabCodeDescription }}
         </span>
       </div>
     </div>
@@ -224,13 +210,6 @@ defineExpose({
   &__status-value {
     color: var(--brand-text-primary);
     font-size: 1rem;
-  }
-
-  &__user-code-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.75rem;
   }
 
   &__status-hint {

@@ -77,6 +77,7 @@ const {
         <UserProfileSection
           v-model:display-name="profileForm.displayName"
           :avatar-url="avatarUrl"
+          :user-code="account.userCode"
           :can-edit-display-name="canEditDisplayName"
           :is-saving-display-name="isSavingDisplayName"
           :is-uploading="isUploadingAvatar"

@@ -38,11 +38,15 @@ function getToggleGlyphClass() {
     ? 'sidebar-open'
     : 'sidebar-close'
 }
+
+function getToggleLabel() {
+  return props.isCollapsed ? '展开导航' : '收起导航'
+}
 </script>
 
 <template>
   <aside class="workspace-sidebar" :class="getSidebarStateClass()">
-    <div class="flex h-full flex-col py-4">
+    <div class="flex h-full flex-col">
       <div class="workspace-sidebar__brand-wrap" :class="getSidebarStateClass()">
         <RouterLink
           to="/home"
@@ -53,15 +57,13 @@ function getToggleGlyphClass() {
           <div class="workspace-sidebar__brand-mark">
             <SvgIcon category="nav" icon="workspace" size="2.75rem" class="workspace-sidebar__brand-mark-image" />
           </div>
-          <div v-if="!props.isCollapsed" class="min-w-0">
-            <div class="truncate text-sm font-bold tracking-tight">
-              SamePage
-            </div>
+          <div class="workspace-sidebar__brand-label truncate text-base font-bold">
+            SamePage
           </div>
         </RouterLink>
       </div>
 
-      <ElScrollbar class="min-h-0 flex-1 pt-2">
+      <ElScrollbar class="min-h-0 flex-1">
         <nav class="workspace-sidebar__nav" :class="getSidebarStateClass()">
           <RouterLink
             v-for="item in props.navigationItems"
@@ -75,15 +77,13 @@ function getToggleGlyphClass() {
               <SvgIcon
                 :category="item.iconCategory"
                 :icon="getItemIconSrc(item)"
-                size="2rem"
+                size="2.75rem"
                 class="workspace-sidebar__nav-icon-image"
               />
             </div>
 
-            <div v-if="!props.isCollapsed" class="min-w-0">
-              <div class="truncate text-sm font-semibold">
-                {{ item.label }}
-              </div>
+            <div class="workspace-sidebar__nav-label truncate text-sm font-medium">
+              {{ item.label }}
             </div>
           </RouterLink>
         </nav>
@@ -94,16 +94,12 @@ function getToggleGlyphClass() {
           type="button"
           class="workspace-sidebar__toggle"
           :class="getSidebarStateClass()"
-          :title="props.isCollapsed ? '展开导航' : '收起导航'"
+          :aria-label="getToggleLabel()"
+          :title="getToggleLabel()"
           @click="$emit('toggle')"
         >
-          <span class="flex items-center gap-3">
-            <span class="workspace-sidebar__toggle-icon">
-              <SvgIcon category="ui" :icon="getToggleGlyphClass()" size="1rem" />
-            </span>
-            <span v-if="!props.isCollapsed" class="text-sm font-medium">
-              收起侧栏
-            </span>
+          <span class="workspace-sidebar__toggle-icon">
+            <SvgIcon category="ui" :icon="getToggleGlyphClass()" size="1.25rem" />
           </span>
         </button>
       </div>
@@ -113,48 +109,52 @@ function getToggleGlyphClass() {
 
 <style scoped lang="scss">
 .workspace-sidebar {
+  --workspace-sidebar-brand-height: 5.75rem;
+  --workspace-sidebar-expanded-width: 13rem;
+  --workspace-sidebar-rail-width: 5rem;
+  --workspace-sidebar-row-height: 3.25rem;
+  --workspace-sidebar-row-transition: 0.18s ease-out;
+
   flex-shrink: 0;
   height: 100vh;
+  overflow: hidden;
   border-right: 1px solid color-mix(in srgb, var(--brand-border-base) 80%, transparent);
   background: var(--brand-bg-sidebar);
   transition:
     width 0.3s ease-out,
-    padding 0.3s ease-out,
     border-color 0.3s ease-out;
 
   &.expanded {
-    width: 16.5rem;
-    padding-inline: 1rem;
+    width: var(--workspace-sidebar-expanded-width);
   }
 
   &.collapsed {
-    width: 6rem;
-    padding-inline: 0.75rem;
+    width: var(--workspace-sidebar-rail-width);
   }
 
   .workspace-sidebar__brand-wrap {
-    &.expanded {
-      padding: 0 0.5rem 1rem;
-    }
-
-    &.collapsed {
-      padding: 0 0.25rem 1.25rem;
-    }
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+    height: var(--workspace-sidebar-brand-height);
+    border-bottom: 1px solid color-mix(in srgb, var(--brand-border-base) 76%, transparent);
   }
 
   .workspace-sidebar__brand-link {
-    display: flex;
+    display: grid;
+    grid-template-columns: var(--workspace-sidebar-rail-width) minmax(0, 1fr);
     align-items: center;
-    gap: 0.75rem;
+    width: 100%;
+    height: 100%;
     min-width: 0;
     color: var(--brand-text-primary);
     text-decoration: none;
 
     &.collapsed {
-      justify-content: center;
-      width: 3rem;
-      height: 3rem;
-      margin-inline: auto;
+      .workspace-sidebar__brand-label {
+        opacity: 0;
+        transform: translateX(-0.25rem);
+      }
     }
   }
 
@@ -165,69 +165,126 @@ function getToggleGlyphClass() {
     flex-shrink: 0;
     width: 2.75rem;
     height: 2.75rem;
+    justify-self: center;
   }
 
   .workspace-sidebar__brand-mark-image {
     display: block;
   }
 
-  .workspace-sidebar__nav {
-    &.expanded {
-      padding-right: 0.25rem;
+  .workspace-sidebar__brand-label,
+  .workspace-sidebar__nav-label {
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    opacity: 1;
+    transform: translateX(0);
+    transition:
+      opacity var(--workspace-sidebar-row-transition),
+      transform 0.22s ease-out;
+  }
 
-      > * + * {
-        margin-top: 0.5rem;
-      }
-    }
-
-    &.collapsed {
-      padding-inline: 0.25rem;
-
-      > * + * {
-        margin-top: 0.75rem;
-      }
+  &.collapsed {
+    .workspace-sidebar__brand-label,
+    .workspace-sidebar__nav-label {
+      opacity: 0;
+      transform: translateX(-0.25rem);
     }
   }
 
+  .workspace-sidebar__nav {
+    display: flex;
+    flex-direction: column;
+    gap: 0.375rem;
+  }
+
   .workspace-sidebar__nav-item {
-    border: 1px solid transparent;
-    border-radius: 1rem;
+    --workspace-sidebar-row-bg: transparent;
+    --workspace-sidebar-row-bg-opacity: 0;
+    --workspace-sidebar-indicator-opacity: 0;
+    --workspace-sidebar-indicator-scale: 0.62;
+
+    position: relative;
+    isolation: isolate;
+    display: grid;
+    grid-template-columns: var(--workspace-sidebar-rail-width) minmax(0, 1fr);
+    align-items: center;
+    width: 100%;
+    height: var(--workspace-sidebar-row-height);
+    overflow: hidden;
+    border: 0;
+    border-radius: 0;
     color: var(--brand-text-secondary);
     text-decoration: none;
     transition:
-      border-color 0.2s ease,
-      background-color 0.2s ease,
-      color 0.2s ease,
-      box-shadow 0.2s ease;
+      color 0.2s ease;
+
+    &::before,
+    &::after {
+      position: absolute;
+      content: '';
+      pointer-events: none;
+    }
+
+    &::before {
+      top: 0.6875rem;
+      bottom: 0.6875rem;
+      left: 0;
+      z-index: 2;
+      width: 3px;
+      background: var(--brand-primary);
+      opacity: var(--workspace-sidebar-indicator-opacity);
+      transform: scaleY(var(--workspace-sidebar-indicator-scale));
+      transform-origin: center;
+      transition:
+        opacity var(--workspace-sidebar-row-transition),
+        transform var(--workspace-sidebar-row-transition);
+    }
+
+    &::after {
+      inset: 0;
+      z-index: 0;
+      background: var(--workspace-sidebar-row-bg);
+      opacity: var(--workspace-sidebar-row-bg-opacity);
+      transition: opacity var(--workspace-sidebar-row-transition);
+    }
+
+    &:focus-visible {
+      outline: 2px solid color-mix(in srgb, var(--brand-primary) 22%, transparent);
+      outline-offset: -2px;
+    }
 
     &.expanded {
-      display: flex;
-      align-items: center;
-      gap: 0.75rem;
-      padding: 0.75rem;
+      &.active {
+        --workspace-sidebar-row-bg: color-mix(in srgb, var(--brand-primary) 4%, transparent);
+        --workspace-sidebar-row-bg-opacity: 1;
+      }
+
+      &.idle {
+        &:hover {
+          --workspace-sidebar-row-bg: color-mix(in srgb, var(--brand-bg-surface) 72%, transparent);
+          --workspace-sidebar-row-bg-opacity: 1;
+        }
+      }
     }
 
     &.collapsed {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      width: 100%;
-      height: 3.5rem;
-      padding-inline: 0;
+      .workspace-sidebar__nav-label {
+        opacity: 0;
+        transform: translateX(-0.25rem);
+      }
     }
 
     &.active {
-      border-color: color-mix(in srgb, var(--brand-primary) 10%, transparent);
+      --workspace-sidebar-indicator-opacity: 1;
+      --workspace-sidebar-indicator-scale: 1;
+
       color: var(--brand-primary);
-      background: var(--brand-bg-surface);
-      box-shadow: 0 1px 2px 0 color-mix(in srgb, var(--brand-text-primary) 5%, transparent);
     }
 
     &.idle {
       &:hover {
-        border-color: color-mix(in srgb, var(--brand-border-base) 80%, transparent);
         color: var(--brand-text-primary);
-        background: var(--brand-bg-surface-raised);
       }
     }
   }
@@ -239,58 +296,37 @@ function getToggleGlyphClass() {
     flex-shrink: 0;
     width: 2.75rem;
     height: 2.75rem;
-    border-radius: 1rem;
-    transition:
-      color 0.2s ease,
-      background-color 0.2s ease,
-      transform 0.2s ease;
-
-    &.active {
-      background: color-mix(in srgb, var(--brand-primary) 6%, transparent);
-      transform: translateY(-1px);
-    }
-
-    &.idle {
-      background: color-mix(in srgb, var(--brand-bg-surface) 88%, white);
-    }
+    justify-self: center;
+    z-index: 1;
+    transition: color 0.2s ease;
   }
 
   .workspace-sidebar__nav-icon-image {
     display: block;
   }
 
-  .workspace-sidebar__nav-item.idle:hover {
-    .workspace-sidebar__nav-icon.idle {
-      transform: translateY(-1px);
-    }
+  .workspace-sidebar__nav-label {
+    z-index: 1;
   }
 
   .workspace-sidebar__footer {
     margin-top: 1rem;
-    padding: 0.75rem 0.25rem 0;
+    padding: 0.75rem 0 1rem;
     border-top: 1px solid color-mix(in srgb, var(--brand-border-base) 60%, transparent);
-
-    &.expanded {
-      margin-inline: 0.5rem;
-    }
-
-    &.collapsed {
-      margin-inline: 0.25rem;
-    }
   }
 
   .workspace-sidebar__toggle {
-    display: flex;
+    cursor: pointer;
+    display: grid;
     align-items: center;
     width: 100%;
     height: 3rem;
     border: none;
-    border-radius: 1rem;
+    border-radius: 0;
     color: var(--brand-text-secondary);
     background: transparent;
     transition:
-      color 0.2s ease,
-      background-color 0.2s ease;
+      color 0.2s ease;
 
     &:focus-visible {
       outline: none;
@@ -298,21 +334,14 @@ function getToggleGlyphClass() {
     }
 
     &.expanded {
-      padding-inline: 0.75rem;
-
       &:hover {
         color: var(--brand-text-primary);
-        background: var(--brand-bg-surface);
       }
     }
 
     &.collapsed {
-      justify-content: center;
-      padding: 0;
-
       &:hover {
         color: var(--brand-primary);
-        background: var(--brand-bg-surface);
       }
     }
   }
@@ -321,12 +350,8 @@ function getToggleGlyphClass() {
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 2.25rem;
-    height: 2.25rem;
-    border: 1px solid color-mix(in srgb, var(--brand-border-base) 50%, transparent);
-    border-radius: 0.75rem;
-    font-size: 15px;
-    background: var(--brand-bg-surface-raised);
+    justify-self: center;
+    font-size: 20px;
   }
 }
 </style>

@@ -63,7 +63,7 @@ function getItemStateClass(item: AdminNavigationItem) {
 .admin-sidebar {
   display: flex;
   flex-direction: column;
-  width: 15rem;
+  width: 14rem;
   height: 100vh;
   border-right: 1px solid color-mix(in srgb, var(--brand-border-base) 80%, transparent);
   background: var(--brand-bg-sidebar);

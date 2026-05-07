@@ -8,6 +8,7 @@ export function useDocumentItem(
     onDeleteDocument: (documentId: string) => void
     onMoveDocumentToTeam: (documentId: string) => void
     onOpen: (documentId: string) => void
+    onOpenHistory: (documentId: string) => void
     onShareDocument: (documentId: string) => void
     onToggle: (documentId: string) => void
   },
@@ -46,11 +47,20 @@ export function useDocumentItem(
     options.onMoveDocumentToTeam(props.item.id)
   }
 
+  function openHistory() {
+    options.onOpenHistory(props.item.id)
+  }
+
   function deleteDocument() {
     options.onDeleteDocument(props.item.id)
   }
 
   function handleMenuCommand(command: unknown) {
+    if (command === 'history') {
+      openHistory()
+      return
+    }
+
     if (command === 'share') {
       if (!canShareDocument.value) {
         return
@@ -61,11 +71,19 @@ export function useDocumentItem(
     }
 
     if (command === 'move-to-team') {
+      if (!canMoveToTeam.value) {
+        return
+      }
+
       moveDocumentToTeam()
       return
     }
 
     if (command === 'delete') {
+      if (!canManageDocument.value) {
+        return
+      }
+
       deleteDocument()
     }
   }
@@ -91,9 +109,7 @@ export function useDocumentItem(
     getItemStateClass,
     handleMenuCommand,
     isExpanded,
-    moveDocumentToTeam,
     openDocument,
-    shareDocument,
     toggleItem,
   }
 }

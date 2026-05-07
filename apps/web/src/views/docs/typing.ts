@@ -119,23 +119,6 @@ export interface DocsDocumentEditorEmits {
 }
 
 /**
- * 文档上下文操作属性。
- */
-export interface DocumentContextActionsProps {
-  canDeleteDocument: boolean
-  canMoveToTeam: boolean
-}
-
-/**
- * 文档上下文操作事件。
- */
-export interface DocumentContextActionsEmits {
-  openHistory: []
-  moveDocumentToTeam: []
-  deleteDocument: []
-}
-
-/**
  * 文档编辑回退态属性。
  */
 export interface DocsDocumentEditorFallbackProps {
@@ -243,6 +226,7 @@ export interface DocumentSectionPanelEmits {
   toggleCollapse: [collectionId: DocumentTreeCollectionId]
   createRoot: [collectionId: DocumentTreeCollectionId]
   createChild: [documentId: string]
+  openHistory: [documentId: string]
   moveDocumentToTeam: [documentId: string]
   shareDocument: [documentId: string]
   deleteDocument: [documentId: string]
@@ -269,6 +253,7 @@ export interface DocumentItemEmits {
   open: [documentId: string]
   toggle: [documentId: string]
   createChild: [documentId: string]
+  openHistory: [documentId: string]
   moveDocumentToTeam: [documentId: string]
   shareDocument: [documentId: string]
   deleteDocument: [documentId: string]

@@ -5,12 +5,12 @@ import { ElMessage } from 'element-plus'
 import {
   computed,
   shallowRef,
+  watch,
 } from 'vue'
 import {
   useRoute,
   useRouter,
 } from 'vue-router'
-import { useUserStore } from '@/stores/user'
 import { useWorkspaceStore } from '@/stores/workspace'
 import { resolveDocumentBlockIdFromHash } from '@/utils/documentBlockAnchor'
 import { useActiveDocument } from './useActiveDocument'
@@ -31,14 +31,13 @@ interface NavigateToDocumentOptions {
 export function useDocs() {
   const route = useRoute()
   const router = useRouter()
-  const userStore = useUserStore()
   const workspaceStore = useWorkspaceStore()
   const activeDocumentId = computed(() => typeof route.params.id === 'string' ? route.params.id : null)
   const activeBlockId = computed(() => resolveDocumentBlockIdFromHash(route.hash))
   const currentWorkspaceId = computed(() => workspaceStore.currentWorkspace?.id ?? null)
   const currentWorkspaceType = computed(() => workspaceStore.currentWorkspaceType)
-  const currentUserId = computed(() => userStore.currentUser?.id ?? null)
   const isSelectingInitialDocument = shallowRef(false)
+  const pendingHistoryDocumentId = shallowRef<string | null>(null)
   let confirmPendingNavigation = async () => true
 
   const tree = useDocumentTree({
@@ -87,7 +86,6 @@ export function useDocs() {
   })
   const pageActions = useDocsPageActions({
     activeDocumentId,
-    currentUserId,
     currentWorkspaceId,
     currentWorkspaceType,
     isSelectingInitialDocument,
@@ -105,6 +103,18 @@ export function useDocs() {
     && !activeDocument.isCollaborationInitialSyncing.value,
   )
 
+  watch(
+    [
+      pendingHistoryDocumentId,
+      activeDocumentId,
+      () => activeDocument.currentDocument.value?.id ?? null,
+      activeDocument.isDocumentItemLoading,
+    ],
+    () => {
+      void openPendingDocumentHistory()
+    },
+  )
+
   return {
     treeGroups: surfaceState.visibleTreeGroups,
     activeCollectionId: surfaceState.visibleActiveCollectionId,
@@ -119,8 +129,6 @@ export function useDocs() {
     docsDocumentEditorMode,
     docsDocumentEditorCollaboration: activeDocument.collaboration,
     isDocsDocumentEditable,
-    canDeleteCurrentDocument: pageActions.canDeleteCurrentDocument,
-    canMoveCurrentDocumentToTeam: pageActions.canMoveCurrentDocumentToTeam,
     expandedDocumentIdSet: tree.expandedDocumentIdSet,
     isDocumentLoading: tree.isDocumentLoading,
     isDocumentItemLoading: activeDocument.isDocumentItemLoading,
@@ -140,7 +148,7 @@ export function useDocs() {
     documentCollaborationStatusHint: activeDocument.collaborationStatusHint,
     canReconnectDocumentCollaboration: activeDocument.canReconnectCollaboration,
     collapsedGroupIdSet: surfaceState.collapsedGroupIdSet,
-    openHistoryMode: historyState.openHistoryMode,
+    openDocumentHistory,
     closeHistoryMode: historyState.closeHistoryMode,
     openDocument: pageActions.openDocument,
     openDefaultDocument: pageActions.openDefaultDocument,
@@ -154,12 +162,58 @@ export function useDocs() {
     createRootDocument: pageActions.createRootDocument,
     createChildDocument: tree.createChildDocument,
     deleteDocument: tree.deleteDocument,
-    deleteCurrentDocument: pageActions.deleteCurrentDocument,
-    moveCurrentDocumentToTeam: pageActions.moveCurrentDocumentToTeam,
     moveDocumentToTeam: pageActions.moveDocumentToTeam,
     updateDocumentTitle: activeDocument.updateDocumentTitle,
     updateDocumentContent: activeDocument.updateDocumentContent,
     handleRequestComment,
+  }
+
+  async function openDocumentHistory(documentId: string) {
+    if (
+      activeDocument.currentDocument.value?.id === documentId
+      && !activeDocument.isDocumentItemLoading.value
+    ) {
+      await historyState.openHistoryMode()
+      return
+    }
+
+    const isCurrentRouteDocument = activeDocumentId.value === documentId
+    const didNavigate = isCurrentRouteDocument || await navigateToDocument(documentId)
+
+    if (!didNavigate) {
+      pendingHistoryDocumentId.value = null
+      return
+    }
+
+    pendingHistoryDocumentId.value = documentId
+    await openPendingDocumentHistory()
+  }
+
+  async function openPendingDocumentHistory() {
+    const pendingDocumentId = pendingHistoryDocumentId.value
+
+    if (!pendingDocumentId) {
+      return
+    }
+
+    if (
+      activeDocumentId.value
+      && activeDocumentId.value !== pendingDocumentId
+      && !activeDocument.isDocumentItemLoading.value
+    ) {
+      pendingHistoryDocumentId.value = null
+      return
+    }
+
+    if (
+      activeDocument.isDocumentItemLoading.value
+      || activeDocument.currentDocument.value?.id !== pendingDocumentId
+    ) {
+      return
+    }
+
+    pendingHistoryDocumentId.value = null
+    await historyState.openHistoryMode()
   }
 
   async function navigateToDocument(

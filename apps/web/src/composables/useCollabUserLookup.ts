@@ -14,20 +14,29 @@ export function useCollabUserLookup(options: UseCollabUserLookupOptions = {}) {
   const matchedUser = shallowRef<UserCollabIdentity | null>(null)
   const lookupErrorMessage = shallowRef('')
   const isLookingUpUser = shallowRef(false)
+  let lookupRequestId = 0
 
   function resetLookupState() {
+    lookupRequestId += 1
     matchedUser.value = null
     lookupErrorMessage.value = ''
+    isLookingUpUser.value = false
   }
 
   async function lookupUserByCode(userCode: string) {
+    const requestId = ++lookupRequestId
     const normalizedUserCode = normalizeUserCodeQuery(userCode)
 
     matchedUser.value = null
     lookupErrorMessage.value = ''
+    isLookingUpUser.value = false
+
+    if (!normalizedUserCode) {
+      return null
+    }
 
     if (!isExactUserCodeQuery(normalizedUserCode)) {
-      lookupErrorMessage.value = '未找到用户'
+      lookupErrorMessage.value = '请输入完整协作码'
       return null
     }
 
@@ -35,6 +44,10 @@ export function useCollabUserLookup(options: UseCollabUserLookupOptions = {}) {
 
     try {
       const user = await findUserByCode(normalizedUserCode)
+
+      if (requestId !== lookupRequestId) {
+        return null
+      }
 
       if (userStore.currentUser?.id === user.id) {
         lookupErrorMessage.value = options.selfTargetMessage ?? '不能选择自己'
@@ -45,11 +58,17 @@ export function useCollabUserLookup(options: UseCollabUserLookupOptions = {}) {
       return user
     }
     catch (error) {
+      if (requestId !== lookupRequestId) {
+        return null
+      }
+
       lookupErrorMessage.value = getRequestErrorDisplayMessage(error, '未找到用户')
       return null
     }
     finally {
-      isLookingUpUser.value = false
+      if (requestId === lookupRequestId) {
+        isLookingUpUser.value = false
+      }
     }
   }
 

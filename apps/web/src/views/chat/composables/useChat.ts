@@ -199,23 +199,6 @@ function useChatProviderSettingsState(options: {
 
     return manualModelRef.value?.modelId ?? '未选择模型'
   })
-  const currentProviderLabel = computed(() => {
-    if (isLoadingRuntimeConfig.value && !requestModelRef.value) {
-      return '正在加载 AI 服务状态'
-    }
-
-    if (manualModelRef.value) {
-      return '当前使用此会话选择的模型'
-    }
-
-    if (!runtimeConfig.value.ready && !isConfigured.value) {
-      return '请选择模型后开始聊天'
-    }
-
-    return runtimeConfig.value.defaultModel
-      ? formatModelOptionLabel(runtimeConfig.value.defaultModel.providerName, runtimeConfig.value.defaultModel.modelName)
-      : 'AI 服务已就绪'
-  })
   const inputPlaceholder = computed(() => {
     if (isLoadingRuntimeConfig.value && !requestModelRef.value) {
       return '正在加载 AI 服务状态'
@@ -351,7 +334,6 @@ function useChatProviderSettingsState(options: {
 
   return {
     currentModelLabel,
-    currentProviderLabel,
     dialogVisible,
     draft,
     inputPlaceholder,

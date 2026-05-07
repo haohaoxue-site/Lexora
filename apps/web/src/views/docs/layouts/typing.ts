@@ -39,10 +39,6 @@ export interface DocsContextBarLayoutProps {
   documentShare: DocumentShareProjection | null
   /** 是否允许打开分享弹窗 */
   canOpenShareDialog: boolean
-  /** 是否允许删除当前文档 */
-  canDeleteDocument: boolean
-  /** 是否允许移动到团队 */
-  canMoveToTeam: boolean
 }
 
 /**
@@ -51,9 +47,6 @@ export interface DocsContextBarLayoutProps {
 export interface DocsContextBarLayoutEmits {
   reconnectCollaboration: []
   openShare: [documentId: string]
-  openHistory: []
-  moveDocumentToTeam: []
-  deleteDocument: []
 }
 
 /**
@@ -93,6 +86,7 @@ export interface DocsSidebarLayoutEmits {
   toggleGroupCollapse: [collectionId: DocumentTreeCollectionId]
   createRootDocument: [collectionId: DocumentTreeCollectionId]
   createChildDocument: [documentId: string]
+  openHistory: [documentId: string]
   moveDocumentToTeam: [documentId: string]
   shareDocument: [documentId: string]
   deleteDocument: [documentId: string]
@@ -134,6 +128,7 @@ export interface DocsActiveSurfaceLayoutEmits {
   toggleGroupCollapse: [collectionId: DocumentTreeCollectionId]
   createRootDocument: [collectionId: DocumentTreeCollectionId]
   createChildDocument: [documentId: string]
+  openHistory: [documentId: string]
   moveDocumentToTeam: [documentId: string]
   deleteDocument: [documentId: string]
   openPendingShares: []

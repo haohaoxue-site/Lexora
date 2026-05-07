@@ -25,8 +25,6 @@ const {
   docsDocumentEditorMode,
   docsDocumentEditorCollaboration,
   isDocsDocumentEditable,
-  canDeleteCurrentDocument,
-  canMoveCurrentDocumentToTeam,
   expandedDocumentIdSet,
   isDocumentLoading,
   isDocumentItemLoading,
@@ -46,7 +44,7 @@ const {
   documentCollaborationStatusHint,
   canReconnectDocumentCollaboration,
   collapsedGroupIdSet,
-  openHistoryMode,
+  openDocumentHistory,
   closeHistoryMode,
   openDocument,
   openDefaultDocument,
@@ -60,8 +58,6 @@ const {
   createRootDocument,
   createChildDocument,
   deleteDocument,
-  deleteCurrentDocument,
-  moveCurrentDocumentToTeam,
   moveDocumentToTeam,
   updateDocumentTitle,
   updateDocumentContent,
@@ -151,13 +147,8 @@ function openTrashPage() {
         :document-id="currentDocument?.id ?? ''"
         :document-share="currentDocument?.share ?? null"
         :can-open-share-dialog="canOpenShareDialog"
-        :can-delete-document="canDeleteCurrentDocument"
-        :can-move-to-team="canMoveCurrentDocumentToTeam"
         @reconnect-collaboration="reconnectDocumentCollaboration"
         @open-share="openDocumentShareDialog"
-        @open-history="openHistoryMode"
-        @move-document-to-team="moveCurrentDocumentToTeam"
-        @delete-document="deleteCurrentDocument"
       />
     </template>
 
@@ -214,6 +205,7 @@ function openTrashPage() {
       @toggle-group-collapse="toggleGroupCollapse"
       @create-root-document="createRootDocument"
       @create-child-document="createChildDocument"
+      @open-history="openDocumentHistory"
       @move-document-to-team="moveDocumentToTeam"
       @delete-document="deleteDocument"
       @open-pending-shares="openPendingShares"

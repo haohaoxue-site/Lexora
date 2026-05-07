@@ -4,7 +4,6 @@ import type {
   WorkspaceInviteSummary,
   WorkspaceMemberSummary,
 } from '@haohaoxue/samepage-contracts'
-import type { FormInstance, FormRules } from 'element-plus'
 import type { Ref } from 'vue'
 import { WORKSPACE_MEMBER_ROLE } from '@haohaoxue/samepage-contracts'
 import dayjs from 'dayjs'
@@ -49,11 +48,6 @@ interface UseTeamSettingsDialogOptions {
    * @description 始终只管理当前选中的团队。
    */
   workspace: Ref<Readonly<TeamWorkspaceSummary> | null>
-  /**
-   * 邀请表单实例
-   * @description 用于触发表单校验与重置。
-   */
-  inviteFormRef: Ref<FormInstance | null>
 }
 
 const WORKSPACE_MEMBER_ROLE_LABELS = {
@@ -86,19 +80,6 @@ export function useTeamSettingsDialog(options: UseTeamSettingsDialogOptions) {
     : '团队设置')
   const currentUserId = computed(() => userStore.currentUser?.id ?? '')
   const isOwner = computed(() => options.workspace.value?.role === WORKSPACE_MEMBER_ROLE.OWNER)
-  const roleSummaryLabel = computed(() => {
-    const role = options.workspace.value?.role
-
-    if (role === WORKSPACE_MEMBER_ROLE.OWNER) {
-      return '你是当前团队的所有者'
-    }
-
-    if (role === WORKSPACE_MEMBER_ROLE.ADMIN) {
-      return '你是当前团队的管理员'
-    }
-
-    return '你是当前团队成员'
-  })
   const memberItems = computed<TeamSettingsMemberItem[]>(() =>
     [...members.value]
       .sort((left, right) => {
@@ -134,34 +115,6 @@ export function useTeamSettingsDialog(options: UseTeamSettingsDialogOptions) {
       })),
   )
   const memberCountLabel = computed(() => `${memberItems.value.length} 名成员`)
-  const pendingInviteCountLabel = computed(() => `${pendingInviteItems.value.length} 个待处理邀请`)
-  const inviteRules = computed<FormRules>(() => ({
-    userCode: [
-      {
-        required: true,
-        message: '请输入完整协作码',
-        trigger: 'blur',
-      },
-      {
-        validator: (_rule, value, callback) => {
-          const normalizedValue = typeof value === 'string' ? value.trim() : ''
-
-          if (!normalizedValue) {
-            callback()
-            return
-          }
-
-          if (!selectedInvitee.value) {
-            callback(new Error('请先查找并确认要邀请的成员'))
-            return
-          }
-
-          callback()
-        },
-        trigger: ['change', 'blur'],
-      },
-    ],
-  }))
 
   watch(
     [options.visible, options.workspace],
@@ -301,36 +254,21 @@ export function useTeamSettingsDialog(options: UseTeamSettingsDialogOptions) {
 
   function handleInviteResolved(user: UserCollabIdentity) {
     selectedInvitee.value = user
-    void options.inviteFormRef.value?.validateField('userCode').catch(() => false)
   }
 
   function handleInviteCleared() {
     selectedInvitee.value = null
-
-    if (!inviteForm.userCode.trim()) {
-      options.inviteFormRef.value?.clearValidate('userCode')
-      return
-    }
-
-    void options.inviteFormRef.value?.validateField('userCode').catch(() => false)
   }
 
   function resetInviteForm() {
     inviteForm.userCode = ''
     selectedInvitee.value = null
-    options.inviteFormRef.value?.clearValidate()
   }
 
   async function submitInvite() {
     const workspaceId = options.workspace.value?.id
 
-    if (!workspaceId || !isOwner.value || isCreatingInvite.value) {
-      return
-    }
-
-    const isValid = await options.inviteFormRef.value?.validate().catch(() => false)
-
-    if (isValid === false || !selectedInvitee.value) {
+    if (!workspaceId || !isOwner.value || isCreatingInvite.value || !selectedInvitee.value) {
       return
     }
 
@@ -417,7 +355,6 @@ export function useTeamSettingsDialog(options: UseTeamSettingsDialogOptions) {
     deleteCurrentWorkspace,
     dialogTitle,
     inviteForm,
-    inviteRules,
     isCreatingInvite,
     isDeletingWorkspace,
     isLoadingMembers,
@@ -427,10 +364,8 @@ export function useTeamSettingsDialog(options: UseTeamSettingsDialogOptions) {
     memberCountLabel,
     memberItems,
     loadPendingInvites,
-    pendingInviteCountLabel,
     pendingInviteErrorMessage,
     pendingInviteItems,
-    roleSummaryLabel,
     loadMembers,
     handleInviteCleared,
     handleInviteResolved,

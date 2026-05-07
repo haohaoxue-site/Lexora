@@ -3,7 +3,7 @@ import type {
   CollabUserLookupFieldEmits,
   CollabUserLookupFieldProps,
 } from './typing'
-import { watch } from 'vue'
+import { computed, watch } from 'vue'
 import { useCollabUserLookup } from '@/composables/useCollabUserLookup'
 import CollabIdentityItem from './CollabIdentityItem.vue'
 
@@ -17,6 +17,7 @@ const emits = defineEmits<CollabUserLookupFieldEmits>()
 const code = defineModel<string>('code', {
   default: '',
 })
+const hasLookupCode = computed(() => code.value.trim().length > 0)
 
 const {
   isLookingUpUser,
@@ -33,7 +34,7 @@ watch(code, (nextCode, previousCode) => {
     return
   }
 
-  if (!matchedUser.value && !lookupErrorMessage.value) {
+  if (!matchedUser.value && !lookupErrorMessage.value && !isLookingUpUser.value) {
     return
   }
 
@@ -43,6 +44,12 @@ watch(code, (nextCode, previousCode) => {
 
 async function handleLookup() {
   if (props.disabled) {
+    return
+  }
+
+  if (!hasLookupCode.value) {
+    resetLookupState()
+    emits('cleared')
     return
   }
 
@@ -69,7 +76,7 @@ async function handleLookup() {
 
       <ElButton
         type="primary"
-        :disabled="props.disabled"
+        :disabled="props.disabled || !hasLookupCode"
         :loading="isLookingUpUser"
         @click="handleLookup"
       >
@@ -81,12 +88,14 @@ async function handleLookup() {
       {{ lookupErrorMessage }}
     </p>
 
-    <CollabIdentityItem
-      v-else-if="matchedUser"
-      :identity="matchedUser"
-      :avatar-size="36"
-      class="collab-user-lookup-field__matched-user"
-    />
+    <div v-else-if="matchedUser" class="collab-user-lookup-field__matched-user">
+      <CollabIdentityItem
+        :identity="matchedUser"
+        :avatar-size="36"
+        class="collab-user-lookup-field__matched-identity"
+      />
+      <slot name="matched-action" />
+    </div>
   </div>
 </template>
 
@@ -95,11 +104,22 @@ async function handleLookup() {
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
+  width: 100%;
 
   &__controls {
     display: flex;
     align-items: flex-start;
     gap: 0.75rem;
+    width: 100%;
+  }
+
+  :deep(.el-input) {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  :deep(.el-button) {
+    flex: 0 0 auto;
   }
 
   &__error {
@@ -110,11 +130,37 @@ async function handleLookup() {
   }
 
   &__matched-user {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
     min-width: 0;
     padding: 0.625rem 0.75rem;
     border: 1px solid color-mix(in srgb, var(--brand-border-base) 76%, transparent);
     border-radius: 0.875rem;
     background: color-mix(in srgb, var(--brand-fill-lighter) 84%, transparent);
+  }
+
+  &__matched-identity {
+    min-width: 0;
+  }
+}
+
+@media (max-width: 520px) {
+  .collab-user-lookup-field {
+    &__controls {
+      flex-direction: column;
+      align-items: stretch;
+    }
+
+    :deep(.el-button) {
+      width: 100%;
+    }
+
+    &__matched-user {
+      flex-direction: column;
+      align-items: stretch;
+    }
   }
 }
 </style>

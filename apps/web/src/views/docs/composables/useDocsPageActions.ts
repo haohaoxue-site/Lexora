@@ -10,7 +10,7 @@ import {
   WORKSPACE_TYPE,
 } from '@haohaoxue/samepage-contracts'
 import { ElMessage } from 'element-plus'
-import { computed, watch } from 'vue'
+import { watch } from 'vue'
 import { onBeforeRouteLeave, onBeforeRouteUpdate } from 'vue-router'
 import { patchDocumentMeta as patchDocumentMetaRequest } from '@/apis/document'
 
@@ -19,17 +19,16 @@ import { patchDocumentMeta as patchDocumentMetaRequest } from '@/apis/document'
  */
 interface UseDocsPageActionsOptions {
   activeDocumentId: ComputedRef<string | null>
-  currentUserId: ComputedRef<string | null>
   currentWorkspaceId: ComputedRef<string | null>
   currentWorkspaceType: ComputedRef<WorkspaceType>
   isSelectingInitialDocument: ShallowRef<boolean>
   tree: Pick<
     ReturnType<typeof useDocumentTree>,
-    'activeCollectionId' | 'createRootDocument' | 'deleteDocument' | 'loadTree'
+    'activeCollectionId' | 'createRootDocument' | 'loadTree'
   >
   activeDocument: Pick<
     ReturnType<typeof useActiveDocument>,
-    'confirmNavigation' | 'currentDocument' | 'documentErrorState' | 'isDocumentItemLoading' | 'reloadCurrentDocument'
+    'confirmNavigation' | 'currentDocument' | 'isDocumentItemLoading' | 'reloadCurrentDocument'
   >
   surfaceState: Pick<
     ReturnType<typeof useDocsSurfaceState>,
@@ -46,16 +45,6 @@ interface UseDocsPageActionsOptions {
 
 export function useDocsPageActions(options: UseDocsPageActionsOptions) {
   let lastInaccessibleRedirectDocumentId: string | null = null
-  const canDeleteCurrentDocument = computed(() =>
-    Boolean(options.surfaceState.visibleActiveCollectionId.value)
-    && options.surfaceState.visibleActiveCollectionId.value !== DOCUMENT_COLLECTION.COLLABORATION,
-  )
-  const canMoveCurrentDocumentToTeam = computed(() =>
-    options.currentWorkspaceType.value === WORKSPACE_TYPE.TEAM
-    && options.activeDocument.currentDocument.value?.visibility === DOCUMENT_VISIBILITY.PRIVATE
-    && options.activeDocument.currentDocument.value.parentId === null
-    && options.activeDocument.currentDocument.value.createdBy === options.currentUserId.value,
-  )
 
   watch(
     options.currentWorkspaceId,
@@ -167,13 +156,9 @@ export function useDocsPageActions(options: UseDocsPageActionsOptions) {
   void loadInitialTree()
 
   return {
-    canDeleteCurrentDocument,
-    canMoveCurrentDocumentToTeam,
     openDocument,
     openDefaultDocument,
     createRootDocument,
-    deleteCurrentDocument,
-    moveCurrentDocumentToTeam,
     moveDocumentToTeam,
   }
 
@@ -204,22 +189,6 @@ export function useDocsPageActions(options: UseDocsPageActionsOptions) {
 
     lastInaccessibleRedirectDocumentId = null
     await options.tree.createRootDocument(collectionId)
-  }
-
-  async function deleteCurrentDocument() {
-    if (!options.activeDocument.currentDocument.value) {
-      return
-    }
-
-    await options.tree.deleteDocument(options.activeDocument.currentDocument.value.id)
-  }
-
-  async function moveCurrentDocumentToTeam() {
-    if (!options.activeDocument.currentDocument.value) {
-      return
-    }
-
-    await moveDocumentToTeam(options.activeDocument.currentDocument.value.id)
   }
 
   async function moveDocumentToTeam(documentId: string) {

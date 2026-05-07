@@ -6,6 +6,7 @@ import type {
 
 export interface UserProfileSectionProps {
   avatarUrl: string | null
+  userCode: string
   canEditDisplayName: boolean
   isSavingDisplayName: boolean
   isUploading: boolean
@@ -38,7 +39,7 @@ export interface UserAccountSectionEmits {
 
 export interface UserSettingsSectionHeaderProps {
   title: string
-  description: string
+  description?: string
 }
 
 export interface UserPreferenceSectionProps {

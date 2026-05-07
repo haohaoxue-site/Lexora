@@ -11,7 +11,6 @@ const {
   activeSessionId,
   createSession,
   currentModelLabel,
-  currentProviderLabel,
   deleteSession,
   dialogVisible,
   draft,
@@ -34,9 +33,6 @@ const {
         <div class="chat-view-context__copy">
           <div class="chat-view-context__title">
             聊天助手
-          </div>
-          <div class="chat-view-context__meta">
-            {{ currentProviderLabel }}
           </div>
         </div>
 
@@ -107,12 +103,6 @@ const {
     font-weight: 600;
     letter-spacing: -0.025em;
     line-height: 2rem;
-  }
-
-  .chat-view-context__meta {
-    margin-top: 0.25rem;
-    color: var(--brand-text-secondary);
-    font-size: 0.875rem;
   }
 
   .chat-view-context__actions {

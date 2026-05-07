@@ -80,6 +80,7 @@ const { chevronIconName, displayLabel, toggleSection } = useDocumentSectionPanel
         @open="emit('open', $event)"
         @toggle="emit('toggle', $event)"
         @create-child="emit('createChild', $event)"
+        @open-history="emit('openHistory', $event)"
         @move-document-to-team="emit('moveDocumentToTeam', $event)"
         @share-document="emit('shareDocument', $event)"
         @delete-document="emit('deleteDocument', $event)"

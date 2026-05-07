@@ -4,7 +4,6 @@ import type {
   DocsContextBarLayoutProps,
 } from './typing'
 import { computed } from 'vue'
-import DocumentContextActions from '../components/DocumentContextActions.vue'
 import DocumentShareStatusEntry from '../components/DocumentShareStatusEntry.vue'
 
 const props = defineProps<DocsContextBarLayoutProps>()
@@ -102,14 +101,6 @@ const isSingleLine = computed(() => !props.isDocumentSurface && !surfaceContext.
         :share="props.documentShare"
         :can-open="props.canOpenShareDialog"
         @open-share="emits('openShare', $event)"
-      />
-
-      <DocumentContextActions
-        :can-delete-document="props.canDeleteDocument"
-        :can-move-to-team="props.canMoveToTeam"
-        @open-history="emits('openHistory')"
-        @move-document-to-team="emits('moveDocumentToTeam')"
-        @delete-document="emits('deleteDocument')"
       />
     </div>
   </div>

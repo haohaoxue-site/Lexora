@@ -97,6 +97,7 @@ const footerGridStyle = computed(() => ({
           @toggle-collapse="emits('toggleGroupCollapse', $event)"
           @create-root="emits('createRootDocument', $event)"
           @create-child="emits('createChildDocument', $event)"
+          @open-history="emits('openHistory', $event)"
           @move-document-to-team="emits('moveDocumentToTeam', $event)"
           @share-document="emits('shareDocument', $event)"
           @delete-document="emits('deleteDocument', $event)"

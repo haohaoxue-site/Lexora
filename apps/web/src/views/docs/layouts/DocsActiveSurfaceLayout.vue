@@ -28,6 +28,7 @@ const emits = defineEmits<DocsActiveSurfaceLayoutEmits>()
       @toggle-group-collapse="emits('toggleGroupCollapse', $event)"
       @create-root-document="emits('createRootDocument', $event)"
       @create-child-document="emits('createChildDocument', $event)"
+      @open-history="emits('openHistory', $event)"
       @move-document-to-team="emits('moveDocumentToTeam', $event)"
       @share-document="emits('openShare', $event)"
       @delete-document="emits('deleteDocument', $event)"

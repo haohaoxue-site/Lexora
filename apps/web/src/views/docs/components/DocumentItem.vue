@@ -19,6 +19,7 @@ const {
   onDeleteDocument: documentId => emits('deleteDocument', documentId),
   onMoveDocumentToTeam: documentId => emits('moveDocumentToTeam', documentId),
   onOpen: documentId => emits('open', documentId),
+  onOpenHistory: documentId => emits('openHistory', documentId),
   onShareDocument: documentId => emits('shareDocument', documentId),
   onToggle: documentId => emits('toggle', documentId),
 })
@@ -62,12 +63,12 @@ const {
       </button>
 
       <div
-        v-if="canManageDocument"
         class="document-tree-item__actions"
         :class="getActionsStateClass()"
         @click.stop
       >
         <ElButton
+          v-if="canManageDocument"
           text
           class="document-tree-item__icon-button"
           :class="getItemStateClass()"
@@ -94,6 +95,13 @@ const {
           <template #dropdown>
             <ElDropdownMenu class="document-tree-item__menu">
               <ElDropdownItem
+                command="history"
+                class="document-tree-item__menu-item document-tree-item__menu-item--history"
+              >
+                历史记录
+              </ElDropdownItem>
+
+              <ElDropdownItem
                 v-if="canMoveToTeam"
                 command="move-to-team"
                 class="document-tree-item__menu-item document-tree-item__menu-item--move-to-team"
@@ -110,6 +118,7 @@ const {
               </ElDropdownItem>
 
               <ElDropdownItem
+                v-if="canManageDocument"
                 command="delete"
                 class="document-tree-item__menu-item document-tree-item__menu-item--delete !text-danger"
               >
@@ -136,6 +145,7 @@ const {
         @open="emits('open', $event)"
         @toggle="emits('toggle', $event)"
         @create-child="emits('createChild', $event)"
+        @open-history="emits('openHistory', $event)"
         @move-document-to-team="emits('moveDocumentToTeam', $event)"
         @share-document="emits('shareDocument', $event)"
         @delete-document="emits('deleteDocument', $event)"

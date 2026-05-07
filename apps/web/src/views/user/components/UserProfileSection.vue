@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { FormInstance } from 'element-plus'
 import type { UserProfileSectionEmits, UserProfileSectionProps } from '../typing'
+import { CopyDocument } from '@element-plus/icons-vue'
 import { useTemplateRef } from 'vue'
 import EntityAvatar from '@/components/entity-avatar/EntityAvatar.vue'
 import { useUserProfileSection } from '../composables/useUserProfileSection'
@@ -14,6 +15,7 @@ const fileInputRef = useTemplateRef<HTMLInputElement>('fileInputRef')
 const {
   displayNameRules,
   form,
+  handleCopyUserCode,
   handleFileChange,
   handlePickAvatar,
   handleSaveDisplayName,
@@ -33,7 +35,26 @@ const {
     <UserSettingsSectionHeader
       title="个人资料"
       :description="sectionDescription"
-    />
+    >
+      <template #aside>
+        <div class="user-profile-section__collab-code">
+          <span class="user-profile-section__collab-code-copy">
+            <span class="user-profile-section__collab-code-label">协作码</span>
+            <strong class="user-profile-section__collab-code-value">{{ props.userCode }}</strong>
+          </span>
+          <ElTooltip content="复制协作码" placement="top">
+            <ElButton
+              text
+              circle
+              type="primary"
+              :icon="CopyDocument"
+              aria-label="复制协作码"
+              @click="handleCopyUserCode"
+            />
+          </ElTooltip>
+        </div>
+      </template>
+    </UserSettingsSectionHeader>
 
     <div class="user-profile-section__hero">
       <EntityAvatar
@@ -98,6 +119,41 @@ const {
 .user-profile-section {
   border-color: color-mix(in srgb, var(--brand-border-base) 85%, transparent);
 
+  &__collab-code {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 0.5rem;
+    min-width: 11.25rem;
+    padding: 0.3125rem 0.5rem 0.3125rem 0.625rem;
+    border: 1px solid color-mix(in srgb, var(--brand-border-base) 78%, transparent);
+    border-radius: 0.5rem;
+    background: color-mix(in srgb, var(--brand-fill-lighter) 72%, transparent);
+  }
+
+  &__collab-code-copy {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 0.125rem;
+  }
+
+  &__collab-code-label {
+    color: var(--brand-text-secondary);
+    font-size: 0.625rem;
+    line-height: 1;
+  }
+
+  &__collab-code-value {
+    overflow: hidden;
+    color: var(--brand-text-primary);
+    font-size: 0.75rem;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+    line-height: 1.1;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
   &__hero {
     display: flex;
     flex-wrap: wrap;
@@ -142,6 +198,13 @@ const {
 
     :deep(.el-button) {
       flex-shrink: 0;
+    }
+  }
+
+  @media (max-width: 640px) {
+    &__collab-code {
+      width: 100%;
+      min-width: 0;
     }
   }
 }

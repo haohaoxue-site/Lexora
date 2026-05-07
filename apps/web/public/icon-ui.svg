@@ -55,34 +55,6 @@
       <circle cx="15.5" cy="12" r="3" fill="url(#icon-settings-cool)" stroke="#FFFFFF" stroke-width="1.15" filter="url(#icon-settings-knob-shadow)" />
       <circle cx="10.75" cy="17.25" r="3" fill="url(#icon-settings-mint)" stroke="#FFFFFF" stroke-width="1.15" filter="url(#icon-settings-knob-shadow)" />
   </symbol>
-  <symbol id="widget-settings" viewBox="0 0 24 24">
-    <defs>
-        <linearGradient id="icon-widget-settings-peach" x1="4" y1="5" x2="10.5" y2="11.5" gradientUnits="userSpaceOnUse">
-          <stop stop-color="#FFBD82" />
-          <stop offset="1" stop-color="#FF8694" />
-        </linearGradient>
-        <linearGradient id="icon-widget-settings-sky" x1="12" y1="5" x2="18.5" y2="11.5" gradientUnits="userSpaceOnUse">
-          <stop stop-color="#8FDEFF" />
-          <stop offset="1" stop-color="#6C8FFF" />
-        </linearGradient>
-        <linearGradient id="icon-widget-settings-mint" x1="4" y1="13" x2="10.5" y2="19.5" gradientUnits="userSpaceOnUse">
-          <stop stop-color="#86E3C5" />
-          <stop offset="1" stop-color="#5FCFAE" />
-        </linearGradient>
-        <linearGradient id="icon-widget-settings-violet" x1="12" y1="13" x2="18.5" y2="19.5" gradientUnits="userSpaceOnUse">
-          <stop stop-color="#A692FF" />
-          <stop offset="1" stop-color="#FF92BA" />
-        </linearGradient>
-      </defs>
-
-      <rect x="3.75" y="5" width="6.25" height="6.25" rx="2.25" fill="url(#icon-widget-settings-peach)" />
-      <rect x="12" y="5" width="6.25" height="6.25" rx="2.25" fill="url(#icon-widget-settings-sky)" />
-      <rect x="3.75" y="13.25" width="6.25" height="6.25" rx="2.25" fill="url(#icon-widget-settings-mint)" />
-      <rect x="12" y="13.25" width="6.25" height="6.25" rx="2.25" fill="url(#icon-widget-settings-violet)" />
-      <circle cx="18.25" cy="5.25" r="2" fill="#FFD86E" />
-      <path d="M18.25 4.15V6.35" stroke="white" stroke-width="1.1" stroke-linecap="round" />
-      <path d="M17.15 5.25H19.35" stroke="white" stroke-width="1.1" stroke-linecap="round" />
-  </symbol>
   <symbol id="activity" viewBox="0 0 24 24">
     <path d="M4 12H7L9.5 8L12.5 16L15 11L16.5 13H20" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" />
   </symbol>
@@ -186,12 +158,6 @@
       <circle cx="12" cy="12" r="1.4" fill="currentColor" />
       <circle cx="17" cy="12" r="1.4" fill="currentColor" />
   </symbol>
-  <symbol id="more-diamond" viewBox="0 0 48 48">
-    <rect x="17" y="11" width="10" height="9.99975" transform="rotate(-45 17 11)" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" />
-      <rect x="30" y="24" width="10" height="9.99975" transform="rotate(-45 30 24)" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" />
-      <rect x="4" y="24" width="10" height="9.99975" transform="rotate(-45 4 24)" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" />
-      <rect x="17" y="37" width="10" height="9.99975" transform="rotate(-45 17 37)" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" />
-  </symbol>
   <symbol id="plus" viewBox="0 0 24 24">
     <path d="M12 6V18" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" />
       <path d="M6 12H18" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" />
@@ -271,11 +237,6 @@
   <symbol id="time" viewBox="0 0 24 24">
     <circle cx="12" cy="12" r="7" fill="none" stroke="currentColor" stroke-width="1.8" />
       <path d="M12 8V12L14.75 13.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
-  </symbol>
-  <symbol id="history" viewBox="0 0 48 48">
-    <path d="M5.81836 6.72729V14H13.0911" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" />
-      <path d="M4 24C4 35.0457 12.9543 44 24 44C35.0457 44 44 35.0457 44 24C44 12.9543 35.0457 4 24 4C16.598 4 10.1351 8.02111 6.67677 13.9981" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" />
-      <path d="M24.005 12L24.0038 24.0088L32.4832 32.4882" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" />
   </symbol>
   <symbol id="trash" viewBox="0 0 24 24">
     <path d="M6.5 7.5H17.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />

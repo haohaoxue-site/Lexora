@@ -3,7 +3,6 @@ import type { FormInstance } from 'element-plus'
 import type { Ref } from 'vue'
 import type { UserAccountSectionProps } from '../typing'
 import { AUTH_PROVIDER } from '@haohaoxue/samepage-contracts'
-import { ElMessage } from 'element-plus'
 import { computed, reactive } from 'vue'
 import { AUTH_PROVIDER_UI_META } from '@/views/auth/utils/provider-ui'
 import {
@@ -38,9 +37,6 @@ export function useUserAccountSection(options: {
   const requiresPasswordSetup = computed(() => !options.props.account.hasPasswordAuth)
   const hasEmailAccountInfo = computed(() => Boolean(options.props.account.email) || options.props.account.hasPasswordAuth)
   const showEmailStatus = computed(() => options.props.emailBindingEnabled || hasEmailAccountInfo.value)
-  const collabCodeDescription = computed(() => options.props.account.email
-    ? '用于多人协作时精确识别你，邀请与分享场景会优先使用它。'
-    : '用于多人协作时精确识别你，即使只绑定了第三方登录也会一直保留。')
   const normalizedEmail = computed(() => form.email.trim())
   const normalizedCode = computed(() => form.code.trim())
   const sectionDescription = computed(() => {
@@ -146,28 +142,16 @@ export function useUserAccountSection(options: {
     options.onDisconnectOauthBinding(provider)
   }
 
-  async function handleCopyUserCode() {
-    if (typeof navigator === 'undefined' || typeof navigator.clipboard?.writeText !== 'function') {
-      ElMessage.error('当前环境不支持复制')
-      return
-    }
-
-    await navigator.clipboard.writeText(options.props.account.userCode)
-    ElMessage.success('协作码已复制')
-  }
-
   function clearEmailValidation() {
     options.emailFormRef.value?.clearValidate()
   }
 
   return {
-    collabCodeDescription,
     clearEmailValidation,
     emailButtonText,
     emailFormRules,
     form,
     handleConfirmEmail,
-    handleCopyUserCode,
     handleDisconnect,
     handleSendCode,
     handleStartOauthBinding,

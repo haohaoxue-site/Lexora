@@ -117,7 +117,7 @@ function handleFilterChange(filters: UserTableFilterMap) {
       <ElInput
         :model-value="props.keyword"
         clearable
-        placeholder="搜索名字、邮箱或编号"
+        placeholder="搜索名称、邮箱或协作码"
         class="min-w-0 max-w-96"
         @update:model-value="emits('updateKeyword', $event)"
         @keyup.enter="emits('search')"
@@ -135,7 +135,7 @@ function handleFilterChange(filters: UserTableFilterMap) {
       class="admin-table user-table"
       @filter-change="handleFilterChange"
     >
-      <ElTableColumn label="用户信息" min-width="240">
+      <ElTableColumn label="用户信息" min-width="180" fixed>
         <template #default="{ row }">
           <UserIdentityCell :user="row" />
         </template>
@@ -143,7 +143,7 @@ function handleFilterChange(filters: UserTableFilterMap) {
 
       <ElTableColumn
         label="账号状态"
-        width="120"
+        width="120" fixed
         column-key="status"
         :filters="statusColumnFilters"
         :filter-multiple="false"
@@ -156,6 +156,25 @@ function handleFilterChange(filters: UserTableFilterMap) {
               {{ row.status === USER_STATUS.ACTIVE ? '正常' : '已禁用' }}
             </span>
           </div>
+        </template>
+      </ElTableColumn>
+
+      <ElTableColumn label="邮箱" min-width="220">
+        <template #default="{ row }">
+          <span v-if="row.email" class="text-xs text-secondary">
+            {{ row.email }}
+          </span>
+          <span v-else class="text-xs text-placeholder">
+            未绑定
+          </span>
+        </template>
+      </ElTableColumn>
+
+      <ElTableColumn label="协作码" width="150">
+        <template #default="{ row }">
+          <span class="font-mono text-xs font-medium text-secondary">
+            {{ row.userCode }}
+          </span>
         </template>
       </ElTableColumn>
 

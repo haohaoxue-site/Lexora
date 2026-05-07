@@ -1,26 +1,6 @@
 import type { DocumentRecent } from '@haohaoxue/samepage-contracts'
 import type { SvgIconCategory } from '@/components/svg-icon/typing'
 
-export type HomeWidgetId = 'welcome' | 'recent-documents' | 'schedule'
-
-export interface HomeWidgetDefinition {
-  /**
-   * 标识
-   * @description 首页模块稳定 ID。
-   */
-  id: HomeWidgetId
-  /**
-   * 标题
-   * @description 模块名称。
-   */
-  title: string
-  /**
-   * 描述
-   * @description 模块用途说明。
-   */
-  description: string
-}
-
 export interface HomeQuickActionItem {
   /**
    * 标识
@@ -123,15 +103,6 @@ export interface HomeRecentActivityPanelProps {
 
 export interface HomeSchedulePanelProps {
   schedules: HomeScheduleItem[]
-}
-
-export interface HomeWidgetSettingsPopoverProps {
-  widgets: HomeWidgetDefinition[]
-  visibleWidgetSet: Set<HomeWidgetId>
-}
-
-export interface HomeWidgetSettingsPopoverEmits {
-  toggle: [widgetId: HomeWidgetId]
 }
 
 export interface RecentDocumentListProps {
