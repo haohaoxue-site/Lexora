@@ -1,8 +1,7 @@
-import type { MaybeRefOrGetter } from 'vue'
+import type { ShallowRef } from 'vue'
 import type { ChatModelItem, ChatModelSelection, ChatRuntimeConfig, ChatSessionDetail, ChatSessionSummary } from '@/apis/chat'
-import { ElButton, ElMessage, ElNotification } from 'element-plus'
-import { computed, h, onMounted, reactive, shallowRef, toValue } from 'vue'
-import { useRouter } from 'vue-router'
+import { ElMessage } from 'element-plus'
+import { computed, onMounted, reactive, shallowRef } from 'vue'
 import {
   createChatSession,
   deleteChatSession,
@@ -11,8 +10,8 @@ import {
   getChatSession,
   getChatSessions,
   streamChatCompletion,
+  updateChatSessionModel,
 } from '@/apis/chat'
-import { useUiStore } from '@/stores/ui'
 import { getRequestErrorDisplayMessage } from '@/utils/request-error'
 import { formatModelOptionLabel } from '@/views/provider/utils/aiModel'
 
@@ -28,7 +27,7 @@ export interface ActiveChatSession extends ChatSessionDetail {}
 
 function createModelSelection(modelRef: ChatModelSelection['modelRef'] | null = null): ChatModelSelection {
   return {
-    modelRef: modelRef ?? undefined,
+    modelRef: modelRef ?? null,
   }
 }
 
@@ -60,7 +59,7 @@ function normalizeModelSelection(value: ChatModelSelection): ChatModelSelection 
           configId: value.modelRef.configId.trim(),
           modelId: value.modelRef.modelId.trim(),
         }
-      : undefined,
+      : null,
   }
 }
 
@@ -75,7 +74,7 @@ function toDraft(value: ChatModelSelection): ChatModelSelection {
   return {
     modelRef: value.modelRef
       ? { ...value.modelRef }
-      : undefined,
+      : null,
   }
 }
 
@@ -104,7 +103,7 @@ export function resolveSelectedChatModel(
 
   if (normalizedModelRef) {
     const matchedModel = findMatchingModelOption(modelOptions, normalizedModelRef)
-    if (matchedModel) {
+    if (matchedModel?.selectable) {
       return matchedModel
     }
 
@@ -115,12 +114,28 @@ export function resolveSelectedChatModel(
     ) {
       return runtimeDefaultModel
     }
+
+    return null
   }
 
   return runtimeDefaultModel ?? null
 }
 
 export function resolveChatRequestModelRef(
+  modelRef: ChatModelSelection['modelRef'] | null | undefined,
+  _modelOptions: ChatModelItem[],
+  runtimeDefaultModel: ChatModelItem | null,
+): ChatModelSelection['modelRef'] | null {
+  const normalizedModelRef = normalizeNullableModelRef(modelRef)
+
+  if (normalizedModelRef) {
+    return normalizedModelRef
+  }
+
+  return toModelRef(runtimeDefaultModel)
+}
+
+export function resolveLoadedChatModelRef(
   modelRef: ChatModelSelection['modelRef'] | null | undefined,
   modelOptions: ChatModelItem[],
   runtimeDefaultModel: ChatModelItem | null,
@@ -129,16 +144,8 @@ export function resolveChatRequestModelRef(
 
   if (normalizedModelRef) {
     const matchedModel = findMatchingModelOption(modelOptions, normalizedModelRef)
-    if (matchedModel) {
+    if (matchedModel?.selectable) {
       return toModelRef(matchedModel)
-    }
-
-    if (
-      runtimeDefaultModel
-      && runtimeDefaultModel.configId === normalizedModelRef.configId
-      && runtimeDefaultModel.modelId === normalizedModelRef.modelId
-    ) {
-      return toModelRef(runtimeDefaultModel)
     }
   }
 
@@ -146,8 +153,12 @@ export function resolveChatRequestModelRef(
 }
 
 export function useChat() {
-  const providerSettings = useChatProviderSettingsState()
-  const workspace = useChatWorkspaceState(providerSettings.requestModelRef)
+  const workspace = useChatWorkspaceState()
+  const providerSettings = useChatProviderSettingsState({
+    activeSession: workspace.activeSession,
+    ensureActiveSession: workspace.ensureActiveSession,
+    replaceActiveSession: workspace.replaceActiveSession,
+  })
   const modelBadgeStateClass = computed(() => providerSettings.isConfigured.value ? 'configured' : 'idle')
 
   return {
@@ -157,42 +168,48 @@ export function useChat() {
   }
 }
 
-function useChatProviderSettingsState() {
-  const uiStore = useUiStore()
-  const router = useRouter()
+function useChatProviderSettingsState(options: {
+  activeSession: ShallowRef<ActiveChatSession | null>
+  ensureActiveSession: () => Promise<ActiveChatSession | null>
+  replaceActiveSession: (session: ActiveChatSession) => void
+}) {
   const dialogVisible = shallowRef(false)
   const isLoadingRuntimeConfig = shallowRef(true)
   const isLoadingModels = shallowRef(false)
-  const hasShownDefaultModelNotification = shallowRef(false)
   const runtimeConfig = shallowRef<ChatRuntimeConfig>(createEmptyRuntimeConfig())
   const modelOptions = shallowRef<ChatModelItem[]>([])
-  const draft = reactive<ChatModelSelection>(toDraft(createModelSelection(uiStore.chatSelectedModelRef)))
-  const selectedModelRef = computed(() => uiStore.chatSelectedModelRef)
+  const draft = reactive<ChatModelSelection>(toDraft(createModelSelection()))
+  const sessionModelRef = computed(() => options.activeSession.value?.modelRef ?? null)
+  const manualModelRef = computed(() => normalizeNullableModelRef(sessionModelRef.value))
   const selectedModel = computed(() => resolveSelectedChatModel(
-    selectedModelRef.value,
+    sessionModelRef.value,
     modelOptions.value,
     runtimeConfig.value.defaultModel,
   ))
   const requestModelRef = computed(() => resolveChatRequestModelRef(
-    selectedModelRef.value,
+    sessionModelRef.value,
     modelOptions.value,
     runtimeConfig.value.defaultModel,
   ))
   const isConfigured = computed(() => Boolean(requestModelRef.value))
-  const currentModelLabel = computed(() => selectedModel.value
-    ? formatModelOptionLabel(selectedModel.value.providerName, selectedModel.value.modelName)
-    : '未选择模型')
+  const currentModelLabel = computed(() => {
+    if (selectedModel.value) {
+      return formatModelOptionLabel(selectedModel.value.providerName, selectedModel.value.modelName)
+    }
+
+    return manualModelRef.value?.modelId ?? '未选择模型'
+  })
   const currentProviderLabel = computed(() => {
     if (isLoadingRuntimeConfig.value && !requestModelRef.value) {
       return '正在加载 AI 服务状态'
     }
 
-    if (!runtimeConfig.value.ready && !isConfigured.value) {
-      return runtimeConfig.value.notReadyReason || '请先配置默认模型'
+    if (manualModelRef.value) {
+      return '当前使用此会话选择的模型'
     }
 
-    if (!runtimeConfig.value.ready && isConfigured.value) {
-      return '默认模型未配置，当前使用手动选择的模型'
+    if (!runtimeConfig.value.ready && !isConfigured.value) {
+      return '请选择模型后开始聊天'
     }
 
     return runtimeConfig.value.defaultModel
@@ -205,7 +222,7 @@ function useChatProviderSettingsState() {
     }
 
     if (!isConfigured.value) {
-      return runtimeConfig.value.notReadyReason || '请先选择模型'
+      return '请先选择模型'
     }
 
     return '输入消息...'
@@ -234,7 +251,6 @@ function useChatProviderSettingsState() {
 
     try {
       runtimeConfig.value = await getChatRuntimeConfig()
-      notifyDefaultModelMissingIfNeeded(runtimeConfig.value, silent)
       return true
     }
     catch (error) {
@@ -250,12 +266,13 @@ function useChatProviderSettingsState() {
   }
 
   async function openDialog() {
-    Object.assign(draft, toDraft(createModelSelection(uiStore.chatSelectedModelRef ?? runtimeConfig.value.defaultModel ?? null)))
+    const session = await options.ensureActiveSession()
+    if (!session) {
+      return
+    }
+
+    Object.assign(draft, toDraft(createModelSelection(session.modelRef ?? runtimeConfig.value.defaultModel ?? null)))
     dialogVisible.value = true
-    await refreshModels({
-      silent: false,
-      showSuccessMessage: false,
-    })
   }
 
   async function refreshModels(options: { silent?: boolean, showSuccessMessage?: boolean, skipRuntimeConfigReload?: boolean } = {}) {
@@ -279,7 +296,7 @@ function useChatProviderSettingsState() {
       const result = await getChatModels()
       modelOptions.value = result.models
 
-      const nextDraftModelRef = resolveChatRequestModelRef(
+      const nextDraftModelRef = resolveLoadedChatModelRef(
         draft.modelRef ?? null,
         result.models,
         runtimeConfig.value.defaultModel,
@@ -289,11 +306,7 @@ function useChatProviderSettingsState() {
         draft.modelRef = { ...nextDraftModelRef }
       }
       else {
-        draft.modelRef = undefined
-      }
-
-      if (!runtimeConfig.value.ready && !silent) {
-        ElMessage.warning(runtimeConfig.value.notReadyReason || '默认模型尚未配置，可先手动选择模型')
+        draft.modelRef = null
       }
 
       if (showSuccessMessage) {
@@ -312,12 +325,28 @@ function useChatProviderSettingsState() {
     }
   }
 
-  function saveSettings() {
+  async function saveSettings() {
+    const session = await options.ensureActiveSession()
+    if (!session) {
+      return false
+    }
+
     const nextModelRef = resolveSavedChatModelRef(draft)
-    uiStore.setChatSelectedModelRef(nextModelRef)
-    dialogVisible.value = false
-    ElMessage.success(nextModelRef ? '聊天模型已保存' : '已恢复默认模型')
-    return true
+
+    try {
+      const updatedSession = await updateChatSessionModel(session.id, {
+        modelRef: nextModelRef,
+      })
+      options.replaceActiveSession(updatedSession)
+      Object.assign(draft, toDraft(createModelSelection(updatedSession.modelRef)))
+      dialogVisible.value = false
+      ElMessage.success(nextModelRef ? '聊天模型已保存' : '已恢复默认模型')
+      return true
+    }
+    catch (error) {
+      ElMessage.error(getRequestErrorDisplayMessage(error, '保存聊天模型失败'))
+      return false
+    }
   }
 
   return {
@@ -334,34 +363,11 @@ function useChatProviderSettingsState() {
     requestModelRef,
     refreshModels,
     saveSettings,
-    selectedModel: requestModelRef,
-  }
-
-  function notifyDefaultModelMissingIfNeeded(config: ChatRuntimeConfig, silent: boolean) {
-    if (silent || config.ready || hasShownDefaultModelNotification.value) {
-      return
-    }
-
-    hasShownDefaultModelNotification.value = true
-    ElNotification({
-      title: '默认模型未配置',
-      duration: 0,
-      showClose: true,
-      message: h('div', { class: 'flex flex-col gap-2' }, [
-        h('span', config.notReadyReason || '请先为聊天助手配置默认模型。'),
-        h(ElButton, {
-          type: 'primary',
-          size: 'small',
-          onClick: () => {
-            void router.push('/provider/usage')
-          },
-        }, () => '前往配置'),
-      ]),
-    })
+    selectedModel,
   }
 }
 
-function useChatWorkspaceState(modelRef: MaybeRefOrGetter<ChatModelSelection['modelRef'] | null>) {
+function useChatWorkspaceState() {
   const sessions = shallowRef<ChatSession[]>([])
   const activeSessionId = shallowRef<string | null>(null)
   const activeSession = shallowRef<ActiveChatSession | null>(null)
@@ -419,6 +425,29 @@ function useChatWorkspaceState(modelRef: MaybeRefOrGetter<ChatModelSelection['mo
     }
   }
 
+  async function ensureActiveSession() {
+    if (activeSession.value) {
+      return activeSession.value
+    }
+
+    if (activeSessionId.value) {
+      await selectSession(activeSessionId.value)
+      return activeSession.value
+    }
+
+    return createSession()
+  }
+
+  function replaceActiveSession(session: ActiveChatSession) {
+    activeSessionId.value = session.id
+    activeSession.value = session
+    patchSessionSummary(session.id, {
+      modelRef: session.modelRef,
+      title: session.title,
+      updatedAt: session.updatedAt,
+    })
+  }
+
   async function selectSession(id: string) {
     const isCurrentSession = activeSession.value?.id === id
     activeSessionId.value = id
@@ -460,12 +489,6 @@ function useChatWorkspaceState(modelRef: MaybeRefOrGetter<ChatModelSelection['mo
 
   async function sendMessage(content: string) {
     if (!content.trim() || isStreaming.value) {
-      return
-    }
-
-    const selectedModelRef = toValue(modelRef)
-    if (!selectedModelRef) {
-      ElMessage.warning('请先选择可用模型')
       return
     }
 
@@ -512,7 +535,6 @@ function useChatWorkspaceState(modelRef: MaybeRefOrGetter<ChatModelSelection['mo
     try {
       await streamChatCompletion(
         session.id,
-        selectedModelRef,
         normalizedContent,
         (chunk) => {
           streamingContent.value += chunk
@@ -563,7 +585,7 @@ function useChatWorkspaceState(modelRef: MaybeRefOrGetter<ChatModelSelection['mo
 
   function patchSessionSummary(
     sessionId: string,
-    input: Partial<Pick<ChatSessionSummary, 'title'>>,
+    input: Partial<Pick<ChatSessionSummary, 'modelRef' | 'title' | 'updatedAt'>>,
   ) {
     const targetSession = sessions.value.find(session => session.id === sessionId)
 
@@ -614,8 +636,10 @@ function useChatWorkspaceState(modelRef: MaybeRefOrGetter<ChatModelSelection['mo
     activeSessionId,
     createSession,
     deleteSession,
+    ensureActiveSession,
     isLoadingSessions,
     isStreaming,
+    replaceActiveSession,
     selectSession,
     sendMessage,
     sessions,

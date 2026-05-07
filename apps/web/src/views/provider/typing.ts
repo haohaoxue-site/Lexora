@@ -36,4 +36,20 @@ export interface ProviderModelIntentOption {
   label: string
   /** 场景说明 */
   description: string
+  /** 父级默认模型场景 */
+  parentKey?: AiModelIntentKey
+}
+
+/**
+ * 默认模型大类。
+ */
+export interface ProviderModelIntentGroup {
+  /** 大类键 */
+  key: AiModelIntentKey
+  /** 大类名称 */
+  label: string
+  /** 大类说明 */
+  description: string
+  /** 子场景配置项 */
+  children: ProviderModelIntentOption[]
 }

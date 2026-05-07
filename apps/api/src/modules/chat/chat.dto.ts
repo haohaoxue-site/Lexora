@@ -1,4 +1,7 @@
-import type { CreateChatCompletionRequest } from '@haohaoxue/samepage-contracts'
+import type {
+  CreateChatCompletionRequest,
+  UpdateChatSessionModelRequest,
+} from '@haohaoxue/samepage-contracts'
 import { Type } from 'class-transformer'
 import {
   IsOptional,
@@ -22,9 +25,11 @@ export class CreateChatCompletionRequestDto implements CreateChatCompletionReque
   @IsString()
   @MaxLength(40_000)
   content!: string
+}
 
+export class UpdateChatSessionModelRequestDto implements UpdateChatSessionModelRequest {
   @IsOptional()
   @Type(() => ChatModelRefDto)
   @ValidateNested()
-  modelRef?: ChatModelRefDto
+  modelRef!: ChatModelRefDto | null
 }

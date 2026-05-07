@@ -64,15 +64,43 @@ export const AI_MODEL_CAPABILITY_VALUES = [
 
 export const AI_MODEL_INTENT_KEY = {
   CHAT_DEFAULT: 'chat.default',
+  CHAT_ASSISTANT_DEFAULT: 'chat.assistant.default',
+  DOCUMENT_DEFAULT: 'document.default',
   DOCUMENT_GENERATE_DEFAULT: 'document.generate.default',
   DOCUMENT_REWRITE_DEFAULT: 'document.rewrite.default',
 } as const
 
 export const AI_MODEL_INTENT_KEY_VALUES = [
   AI_MODEL_INTENT_KEY.CHAT_DEFAULT,
+  AI_MODEL_INTENT_KEY.CHAT_ASSISTANT_DEFAULT,
+  AI_MODEL_INTENT_KEY.DOCUMENT_DEFAULT,
   AI_MODEL_INTENT_KEY.DOCUMENT_GENERATE_DEFAULT,
   AI_MODEL_INTENT_KEY.DOCUMENT_REWRITE_DEFAULT,
 ] as const
+
+type AiModelIntentKeyValue = typeof AI_MODEL_INTENT_KEY_VALUES[number]
+
+interface AiModelIntentDefinition {
+  parentKey: AiModelIntentKeyValue | null
+}
+
+export const AI_MODEL_INTENT_DEFINITIONS = {
+  [AI_MODEL_INTENT_KEY.CHAT_DEFAULT]: {
+    parentKey: null,
+  },
+  [AI_MODEL_INTENT_KEY.CHAT_ASSISTANT_DEFAULT]: {
+    parentKey: AI_MODEL_INTENT_KEY.CHAT_DEFAULT,
+  },
+  [AI_MODEL_INTENT_KEY.DOCUMENT_DEFAULT]: {
+    parentKey: null,
+  },
+  [AI_MODEL_INTENT_KEY.DOCUMENT_GENERATE_DEFAULT]: {
+    parentKey: AI_MODEL_INTENT_KEY.DOCUMENT_DEFAULT,
+  },
+  [AI_MODEL_INTENT_KEY.DOCUMENT_REWRITE_DEFAULT]: {
+    parentKey: AI_MODEL_INTENT_KEY.DOCUMENT_DEFAULT,
+  },
+} as const satisfies Record<AiModelIntentKeyValue, AiModelIntentDefinition>
 
 export const AI_EDITOR_WORKFLOW_KEY = {
   GENERATE: 'editor.generate',
@@ -316,8 +344,10 @@ export const AiDefaultModelPolicyItemSchema = z.object({
 }).strict()
 
 export const UpdateAiDefaultModelPolicyRequestSchema = z.object({
-  configId: NonEmptyStringSchema,
-  modelId: NonEmptyStringSchema,
+  modelRef: AiModelRefSchema.pick({
+    configId: true,
+    modelId: true,
+  }).nullable(),
 }).strict()
 
 export const AiSessionSchema = z.object({

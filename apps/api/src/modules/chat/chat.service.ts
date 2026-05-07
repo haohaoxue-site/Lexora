@@ -25,7 +25,12 @@ interface RequestChatCompletionParams {
   userId: string
   sessionId: string
   content: string
-  modelRef?: Pick<AiModelRef, 'configId' | 'modelId'> | null
+}
+
+interface UpdateChatSessionModelParams {
+  userId: string
+  sessionId: string
+  modelRef: Pick<AiModelRef, 'configId' | 'modelId'> | null
 }
 
 interface ChatReplyCommandContext {
@@ -54,7 +59,7 @@ export class ChatService {
     try {
       const target = await this.modelResolverService.resolveModelTarget({
         actorUserId: userId,
-        intentKey: AI_MODEL_INTENT_KEY.CHAT_DEFAULT,
+        intentKey: AI_MODEL_INTENT_KEY.CHAT_ASSISTANT_DEFAULT,
       })
 
       return {
@@ -87,20 +92,33 @@ export class ChatService {
 
   async getModels(userId: string): Promise<ChatModelItem[]> {
     this.logger.log(`chat model list requested: user=${userId}`)
-    return this.defaultModelsService.getAvailableModels(userId, AI_MODEL_INTENT_KEY.CHAT_DEFAULT)
+    return this.defaultModelsService.getAvailableModels(userId, AI_MODEL_INTENT_KEY.CHAT_ASSISTANT_DEFAULT)
+  }
+
+  async updateSessionModel(params: UpdateChatSessionModelParams) {
+    if (params.modelRef) {
+      await this.modelResolverService.resolveModelTarget({
+        actorUserId: params.userId,
+        intentKey: AI_MODEL_INTENT_KEY.CHAT_ASSISTANT_DEFAULT,
+        requestedModelRef: params.modelRef,
+      })
+    }
+
+    return this.chatSessionsService.updateSessionModel(params)
   }
 
   async prepareChatReplyCommand(params: RequestChatCompletionParams): Promise<ChatReplyCommandContext> {
     const normalizedContent = params.content.trim()
+    const sessionModelRef = await this.chatSessionsService.getSessionModelRef(params.userId, params.sessionId)
+    const target = await this.modelResolverService.resolveModelTarget({
+      actorUserId: params.userId,
+      intentKey: AI_MODEL_INTENT_KEY.CHAT_ASSISTANT_DEFAULT,
+      requestedModelRef: sessionModelRef,
+    })
     const session = await this.chatSessionsService.prepareCompletionSession({
       userId: params.userId,
       sessionId: params.sessionId,
       content: normalizedContent,
-    })
-    const target = await this.modelResolverService.resolveModelTarget({
-      actorUserId: params.userId,
-      intentKey: AI_MODEL_INTENT_KEY.CHAT_DEFAULT,
-      requestedModelRef: params.modelRef,
     })
     const context: AgentChatReplyContext = AgentChatReplyContextSchema.parse({
       chatSessionId: session.sessionId,

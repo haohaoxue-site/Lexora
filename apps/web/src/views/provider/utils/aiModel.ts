@@ -1,4 +1,4 @@
-import type { ProviderModelIntentOption } from '../typing'
+import type { ProviderModelIntentGroup, ProviderModelIntentOption } from '../typing'
 import type {
   AiModelCapability,
   AiModelType,
@@ -20,21 +20,42 @@ export const AI_MODEL_CAPABILITY_LABELS: Record<AiModelCapability, string> = {
   [AI_MODEL_CAPABILITY.JSON_MODE]: 'JSON',
 }
 
-export const AI_MODEL_INTENT_OPTIONS: ProviderModelIntentOption[] = [
+const CHAT_ASSISTANT_INTENT_OPTION: ProviderModelIntentOption = {
+  key: AI_MODEL_INTENT_KEY.CHAT_ASSISTANT_DEFAULT,
+  label: '聊天助手',
+  description: '聊天助手使用。',
+  parentKey: AI_MODEL_INTENT_KEY.CHAT_DEFAULT,
+}
+
+const DOCUMENT_GENERATE_INTENT_OPTION: ProviderModelIntentOption = {
+  key: AI_MODEL_INTENT_KEY.DOCUMENT_GENERATE_DEFAULT,
+  label: '新内容生成、段落扩写',
+  description: '空段落生成、续写和扩写类入口使用。',
+  parentKey: AI_MODEL_INTENT_KEY.DOCUMENT_DEFAULT,
+}
+
+const DOCUMENT_REWRITE_INTENT_OPTION: ProviderModelIntentOption = {
+  key: AI_MODEL_INTENT_KEY.DOCUMENT_REWRITE_DEFAULT,
+  label: '润色、改写',
+  description: '选中文本后的润色、改写和风格调整入口使用。',
+  parentKey: AI_MODEL_INTENT_KEY.DOCUMENT_DEFAULT,
+}
+
+export const AI_MODEL_INTENT_GROUPS: ProviderModelIntentGroup[] = [
   {
     key: AI_MODEL_INTENT_KEY.CHAT_DEFAULT,
     label: '对话默认模型',
-    description: '聊天助手未显式选择模型时使用。',
+    description: '对话类能力兜底',
+    children: [CHAT_ASSISTANT_INTENT_OPTION],
   },
   {
-    key: AI_MODEL_INTENT_KEY.DOCUMENT_GENERATE_DEFAULT,
-    label: '文档生成默认模型',
-    description: '新内容生成、段落扩写等写作入口使用。',
-  },
-  {
-    key: AI_MODEL_INTENT_KEY.DOCUMENT_REWRITE_DEFAULT,
-    label: '文档改写默认模型',
-    description: '润色、改写、风格转换等编辑入口使用。',
+    key: AI_MODEL_INTENT_KEY.DOCUMENT_DEFAULT,
+    label: '文档默认模型',
+    description: '文档编辑能力兜底',
+    children: [
+      DOCUMENT_GENERATE_INTENT_OPTION,
+      DOCUMENT_REWRITE_INTENT_OPTION,
+    ],
   },
 ]
 

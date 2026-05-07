@@ -4,7 +4,7 @@ import type {
   AiModelRef,
   AiModelType,
 } from '@haohaoxue/samepage-contracts'
-import { AI_MODEL_INTENT_KEY, AI_MODEL_TYPE } from '@haohaoxue/samepage-contracts'
+import { AI_MODEL_INTENT_DEFINITIONS, AI_MODEL_INTENT_KEY, AI_MODEL_TYPE } from '@haohaoxue/samepage-contracts'
 
 interface AiModelCapabilityTarget {
   modelType: AiModelType
@@ -24,6 +24,14 @@ interface AiModelIntentRequirement {
 
 const AI_MODEL_INTENT_REQUIREMENTS = {
   [AI_MODEL_INTENT_KEY.CHAT_DEFAULT]: {
+    modelType: AI_MODEL_TYPE.CHAT,
+    requiredCapabilities: [],
+  },
+  [AI_MODEL_INTENT_KEY.CHAT_ASSISTANT_DEFAULT]: {
+    modelType: AI_MODEL_TYPE.CHAT,
+    requiredCapabilities: [],
+  },
+  [AI_MODEL_INTENT_KEY.DOCUMENT_DEFAULT]: {
     modelType: AI_MODEL_TYPE.CHAT,
     requiredCapabilities: [],
   },
@@ -52,6 +60,28 @@ export function getAiModelIntentRequirement(intentKey: AiModelIntentKey): AiMode
     ...AI_MODEL_INTENT_REQUIREMENTS[intentKey],
     requiredCapabilities: [...AI_MODEL_INTENT_REQUIREMENTS[intentKey].requiredCapabilities],
   }
+}
+
+export function getAiModelIntentParentKey(intentKey: AiModelIntentKey): AiModelIntentKey | null {
+  return AI_MODEL_INTENT_DEFINITIONS[intentKey].parentKey
+}
+
+export function getAiModelIntentFallbackChain(intentKey: AiModelIntentKey): AiModelIntentKey[] {
+  const chain: AiModelIntentKey[] = []
+  const visited = new Set<AiModelIntentKey>()
+  let currentIntentKey: AiModelIntentKey | null = intentKey
+
+  while (currentIntentKey) {
+    if (visited.has(currentIntentKey)) {
+      throw new Error(`AI model intent fallback cycle detected: ${currentIntentKey}`)
+    }
+
+    visited.add(currentIntentKey)
+    chain.push(currentIntentKey)
+    currentIntentKey = getAiModelIntentParentKey(currentIntentKey)
+  }
+
+  return chain
 }
 
 export function isAiModelCapabilitySatisfied(model: AiModelCapabilityTarget, intentKey: AiModelIntentKey) {

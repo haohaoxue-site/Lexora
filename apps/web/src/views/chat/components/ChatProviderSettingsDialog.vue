@@ -26,7 +26,7 @@ const selectedModelRef = computed<ModelCascaderModelRef | null>({
           configId: value.configId,
           modelId: value.modelId,
         }
-      : undefined
+      : null
   },
 })
 </script>
@@ -39,15 +39,11 @@ const selectedModelRef = computed<ModelCascaderModelRef | null>({
     align-center
   >
     <div class="chat-provider-settings">
-      <p class="chat-provider-settings__description">
-        从系统或个人模型服务中选择本次聊天使用的模型。
-      </p>
-
       <ElForm ref="providerFormRef" :model="form" :rules="formRules" label-position="top" class="chat-provider-settings__form">
         <ElFormItem prop="modelRef">
           <ModelCascader
             v-model="selectedModelRef"
-            :intent-key="AI_MODEL_INTENT_KEY.CHAT_DEFAULT"
+            :intent-key="AI_MODEL_INTENT_KEY.CHAT_ASSISTANT_DEFAULT"
             class="chat-provider-settings__model-select w-full"
             filterable
             placeholder="请选择模型"

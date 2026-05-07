@@ -13,13 +13,17 @@ import {
   Get,
   Logger,
   Param,
+  Patch,
   Post,
   Res,
 } from '@nestjs/common'
 import { CurrentUser } from '../../decorators/current-user.decorator'
 import { AgentRunEventsService } from '../agent/agent-events.service'
 import { ChatSessionsService } from './chat-sessions.service'
-import { CreateChatCompletionRequestDto } from './chat.dto'
+import {
+  CreateChatCompletionRequestDto,
+  UpdateChatSessionModelRequestDto,
+} from './chat.dto'
 import { ChatService } from './chat.service'
 
 @Controller('chat')
@@ -63,6 +67,19 @@ export class ChatController {
     return null
   }
 
+  @Patch('sessions/:id/model')
+  async updateSessionModel(
+    @CurrentUser() authUser: AuthUserContext,
+    @Param('id') sessionId: string,
+    @Body() payload: UpdateChatSessionModelRequestDto,
+  ): Promise<ChatSessionDetail> {
+    return this.chatService.updateSessionModel({
+      userId: authUser.id,
+      sessionId,
+      modelRef: payload.modelRef ?? null,
+    })
+  }
+
   @Get('config')
   async getRuntimeConfig(
     @CurrentUser() authUser: AuthUserContext,
@@ -95,7 +112,6 @@ export class ChatController {
       userId: authUser.id,
       sessionId: payload.sessionId,
       content: payload.content,
-      modelRef: payload.modelRef,
     })
 
     reply.raw.writeHead(200, {

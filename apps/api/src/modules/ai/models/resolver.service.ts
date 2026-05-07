@@ -1,6 +1,6 @@
 import type { AiModelIntentKey, AiModelRef } from '@haohaoxue/samepage-contracts'
 import { AiModelIntentKeySchema } from '@haohaoxue/samepage-contracts'
-import { isAiModelCapabilitySatisfied, normalizeAiEndpoint } from '@haohaoxue/samepage-shared'
+import { getAiModelIntentFallbackChain, isAiModelCapabilitySatisfied, normalizeAiEndpoint } from '@haohaoxue/samepage-shared'
 import { BadRequestException, Injectable } from '@nestjs/common'
 import { PrismaService } from '../../../database/prisma.service'
 import {
@@ -107,22 +107,30 @@ export class AiModelResolverService {
       return requestedModelRef
     }
 
-    const policy = await this.prisma.aiDefaultModelPolicy.findUnique({
+    return this.resolveDefaultModelRef(actorUserId, intentKey)
+  }
+
+  private async resolveDefaultModelRef(actorUserId: string, intentKey: AiModelIntentKey) {
+    const intentFallbackChain = getAiModelIntentFallbackChain(intentKey)
+    const policies = await this.prisma.aiDefaultModelPolicy.findMany({
       where: {
-        userId_intentKey: {
-          userId: actorUserId,
-          intentKey,
-        },
+        userId: actorUserId,
+        intentKey: { in: intentFallbackChain },
       },
     })
+    const policyByIntentKey = new Map(policies.map(policy => [policy.intentKey, policy]))
 
-    if (!policy) {
-      throw new BadRequestException('请先配置默认模型')
+    for (const currentIntentKey of intentFallbackChain) {
+      const policy = policyByIntentKey.get(currentIntentKey)
+
+      if (policy) {
+        return {
+          configId: policy.serviceConfigId,
+          modelId: policy.modelId,
+        }
+      }
     }
 
-    return {
-      configId: policy.serviceConfigId,
-      modelId: policy.modelId,
-    }
+    throw new BadRequestException('请先配置默认模型')
   }
 }

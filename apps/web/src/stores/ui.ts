@@ -10,11 +10,6 @@ interface DocumentTreeUiState {
   lastOpenedDocumentId: string | null
 }
 
-interface ChatSelectedModelRef {
-  configId: string
-  modelId: string
-}
-
 function cloneDocumentTreeUiState(state: DocumentTreeUiState): DocumentTreeUiState {
   return {
     expandedDocumentIds: [...state.expandedDocumentIds],
@@ -31,22 +26,6 @@ function createDocumentTreeUiState(): DocumentTreeUiState {
 
 function resolveDocumentTreeStateKey(workspaceId: string | null) {
   return workspaceId?.trim() || DOCUMENT_TREE_FALLBACK_KEY
-}
-
-function normalizeUiString(value: string | null | undefined) {
-  const normalizedValue = value?.trim() ?? ''
-  return normalizedValue || null
-}
-
-function normalizeChatSelectedModelRef(value: ChatSelectedModelRef | null | undefined): ChatSelectedModelRef | null {
-  const configId = normalizeUiString(value?.configId)
-  const modelId = normalizeUiString(value?.modelId)
-
-  if (!configId || !modelId) {
-    return null
-  }
-
-  return { configId, modelId }
 }
 
 function normalizeUiStringList(values: readonly string[]) {
@@ -71,7 +50,6 @@ export const useUiStore = defineStore('ui', () => {
   const workspaceSidebarCollapsed = shallowRef(false)
   const _documentTreeStateByWorkspaceId = shallowRef<Record<string, DocumentTreeUiState>>({})
   const _homeVisibleWidgetIds = shallowRef<string[] | null>(null)
-  const _chatSelectedModelRef = shallowRef<ChatSelectedModelRef | null>(null)
   const documentTreeStateByWorkspaceId = computed(() =>
     Object.fromEntries(
       Object.entries(_documentTreeStateByWorkspaceId.value).map(([workspaceId, state]) => [
@@ -83,7 +61,6 @@ export const useUiStore = defineStore('ui', () => {
   const homeVisibleWidgetIds = computed(() =>
     _homeVisibleWidgetIds.value ? [..._homeVisibleWidgetIds.value] : null,
   )
-  const chatSelectedModelRef = computed(() => normalizeChatSelectedModelRef(_chatSelectedModelRef.value))
 
   function setWorkspaceSidebarCollapsed(value: boolean) {
     workspaceSidebarCollapsed.value = value
@@ -133,20 +110,13 @@ export const useUiStore = defineStore('ui', () => {
     _homeVisibleWidgetIds.value = normalizeUiStringList(widgetIds)
   }
 
-  function setChatSelectedModelRef(modelRef: ChatSelectedModelRef | null) {
-    _chatSelectedModelRef.value = normalizeChatSelectedModelRef(modelRef)
-  }
-
   return {
-    _chatSelectedModelRef,
     _documentTreeStateByWorkspaceId,
     _homeVisibleWidgetIds,
-    chatSelectedModelRef,
     clearDocumentTreeState,
     documentTreeStateByWorkspaceId,
     getDocumentTreeState,
     homeVisibleWidgetIds,
-    setChatSelectedModelRef,
     setExpandedDocumentIds,
     setHomeVisibleWidgetIds,
     setLastOpenedDocumentId,
@@ -160,7 +130,6 @@ export const useUiStore = defineStore('ui', () => {
       'workspaceSidebarCollapsed',
       '_documentTreeStateByWorkspaceId',
       '_homeVisibleWidgetIds',
-      '_chatSelectedModelRef',
     ],
   },
 })

@@ -2,8 +2,16 @@ import type { Editor } from '@tiptap/core'
 import type { ShallowRef } from 'vue'
 import type { EditorAiAnchorRect, EditorAiComposerDraft, EditorAiComposerMode, EditorAiComposerStatus, EditorAiSessionRuntime } from './typing'
 import { AI_EDITOR_STREAM_EVENT_TYPE } from '@haohaoxue/samepage-contracts'
+import { ElMessage } from 'element-plus'
 import { computed, onBeforeUnmount, shallowRef, watch } from 'vue'
-import { acceptAiEditorCandidate, rejectAiEditorCandidate } from '@/apis/ai'
+import { useRouter } from 'vue-router'
+import { acceptAiEditorCandidate, getAiDefaultModels, rejectAiEditorCandidate } from '@/apis/ai'
+import { showAiDefaultModelMissingDialog } from '@/composables/useAiDefaultModelDialog'
+import {
+  buildAiDefaultModelPolicyRecord,
+  isAiDefaultModelPolicyReady,
+  resolveEffectiveAiDefaultModelPolicy,
+} from '@/utils/ai-default-model'
 import { getRequestErrorDisplayMessage } from '@/utils/request-error'
 import {
   EDITOR_AI_ACCEPT_ERROR_FALLBACK,
@@ -15,6 +23,7 @@ import {
   EDITOR_AI_COMPOSER_VIEWPORT_PADDING,
   EDITOR_AI_COMPOSER_WIDTH,
   EDITOR_AI_GENERATE_TRIGGER_KEY,
+  EDITOR_AI_MODEL_INTENT_KEY_BY_COMPOSER_MODE,
   EDITOR_AI_PREVIEW_STATUS,
   EDITOR_AI_REJECT_ERROR_FALLBACK,
   EDITOR_AI_STALE_ANCHOR_MESSAGE,
@@ -32,11 +41,13 @@ export interface UseEditorAiComposerOptions {
 }
 
 export function useEditorAiComposer(options: UseEditorAiComposerOptions) {
+  const router = useRouter()
   const activeDraft = shallowRef<EditorAiComposerDraft | null>(null)
   const status = shallowRef<EditorAiComposerStatus>(EDITOR_AI_COMPOSER_STATUS.IDLE)
   const prompt = shallowRef('')
   const previewText = shallowRef('')
   const errorMessage = shallowRef('')
+  const isCheckingDefaultModel = shallowRef(false)
   const runtime = shallowRef<EditorAiSessionRuntime>({
     session: null,
     run: null,
@@ -94,7 +105,7 @@ export function useEditorAiComposer(options: UseEditorAiComposerOptions) {
     }
 
     event.preventDefault()
-    openDraft(draft)
+    void openDraftWithModelCheck(draft)
     return true
   }
 
@@ -108,7 +119,7 @@ export function useEditorAiComposer(options: UseEditorAiComposerOptions) {
       return false
     }
 
-    openDraft(draft)
+    void openDraftWithModelCheck(draft)
     return true
   }
 
@@ -363,11 +374,63 @@ export function useEditorAiComposer(options: UseEditorAiComposerOptions) {
     status.value = EDITOR_AI_COMPOSER_STATUS.COMPOSING
   }
 
+  async function openDraftWithModelCheck(draft: EditorAiComposerDraft): Promise<void> {
+    if (isCheckingDefaultModel.value) {
+      return
+    }
+
+    isCheckingDefaultModel.value = true
+
+    try {
+      if (await ensureDefaultModelReady(draft.mode)) {
+        openDraft(draft)
+      }
+    }
+    finally {
+      isCheckingDefaultModel.value = false
+    }
+  }
+
+  async function ensureDefaultModelReady(mode: EditorAiComposerMode): Promise<boolean> {
+    const intentKey = EDITOR_AI_MODEL_INTENT_KEY_BY_COMPOSER_MODE[mode]
+
+    try {
+      const policies = await getAiDefaultModels()
+      const effectivePolicy = resolveEffectiveAiDefaultModelPolicy(
+        buildAiDefaultModelPolicyRecord(policies),
+        intentKey,
+      )
+
+      if (isAiDefaultModelPolicyReady(effectivePolicy)) {
+        return true
+      }
+
+      showAiDefaultModelMissingDialog({
+        router,
+        title: '文档 AI 默认模型未配置',
+        message: effectivePolicy.invalidReason || getDefaultModelMissingMessage(mode),
+      })
+      return false
+    }
+    catch (error) {
+      ElMessage.error(getRequestErrorDisplayMessage(error, '检查文档 AI 默认模型失败'))
+      return false
+    }
+  }
+
   function isActiveEditorAiRun(controller: AbortController, draft: EditorAiComposerDraft): boolean {
     return abortController.value === controller
       && activeDraft.value === draft
       && !controller.signal.aborted
   }
+}
+
+function getDefaultModelMissingMessage(mode: EditorAiComposerMode): string {
+  if (mode === EDITOR_AI_COMPOSER_MODE.GENERATE) {
+    return '请先配置文档默认模型，或为新内容生成、段落扩写单独配置模型。'
+  }
+
+  return '请先配置文档默认模型，或为润色、改写单独配置模型。'
 }
 
 function resolveCandidateContentText(candidate: EditorAiSessionRuntime['candidate']): string {

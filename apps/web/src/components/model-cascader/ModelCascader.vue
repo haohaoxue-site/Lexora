@@ -186,6 +186,10 @@ async function loadSelectedModelRefOptions() {
 
   try {
     await ensureAvailableModels(modelRef.configId)
+
+    if (!resolveModelRef(modelRef)) {
+      emits('update:modelValue', null)
+    }
   }
   catch (error) {
     ElMessage.error(getRequestErrorDisplayMessage(error, '加载模型列表失败'))
@@ -281,7 +285,7 @@ function resolveModelRef(modelRef: ModelCascaderModelRef): AiModelRef | null {
     }
   }
 
-  const matchedModel = availableModelsByConfigId.value[modelRef.configId]?.find(item => item.modelId === modelRef.modelId)
+  const matchedModel = availableModelsByConfigId.value[modelRef.configId]?.find(item => item.modelId === modelRef.modelId && item.selectable)
 
   return matchedModel
     ? {

@@ -7,6 +7,10 @@ const IsoDateTimeStringSchema = z.string().datetime()
 const ChatSessionSummaryBaseSchema = z.object({
   id: z.string().trim().min(1),
   title: z.string(),
+  modelRef: AiModelRefSchema.pick({
+    configId: true,
+    modelId: true,
+  }).nullable(),
   createdAt: IsoDateTimeStringSchema,
   updatedAt: IsoDateTimeStringSchema,
 }).strict()
@@ -38,17 +42,21 @@ export const ChatRuntimeConfigSchema = z.object({
 export const CreateChatCompletionRequestSchema = z.object({
   sessionId: z.string().trim().min(1),
   content: z.string().max(40_000),
+}).strict()
+
+export const UpdateChatSessionModelRequestSchema = z.object({
   modelRef: AiModelRefSchema.pick({
     configId: true,
     modelId: true,
-  }).optional(),
+  }).nullable(),
 }).strict()
 
 export type ChatMessage = z.infer<typeof ChatMessageSchema>
 export type ChatSessionSummary = z.infer<typeof ChatSessionSummarySchema>
 export type ChatSessionDetail = z.infer<typeof ChatSessionDetailSchema>
-export type ChatModelSelection = Pick<CreateChatCompletionRequest, 'modelRef'>
 export type ChatModelItem = z.infer<typeof ChatModelItemSchema>
 export type ChatModelListResponse = z.infer<typeof ChatModelListResponseSchema>
 export type ChatRuntimeConfig = z.infer<typeof ChatRuntimeConfigSchema>
 export type CreateChatCompletionRequest = z.infer<typeof CreateChatCompletionRequestSchema>
+export type UpdateChatSessionModelRequest = z.infer<typeof UpdateChatSessionModelRequestSchema>
+export type ChatModelSelection = UpdateChatSessionModelRequest

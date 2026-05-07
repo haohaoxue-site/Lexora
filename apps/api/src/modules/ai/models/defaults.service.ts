@@ -43,9 +43,13 @@ export class AiDefaultModelsService {
     payload: UpdateAiDefaultModelPolicyRequest,
   ): Promise<AiDefaultModelPolicyItem> {
     const parsedIntentKey = AiModelIntentKeySchema.parse(intentKey)
+    if (!payload.modelRef) {
+      return this.clearDefaultModelPolicy(userId, parsedIntentKey)
+    }
+
     const service = await this.prisma.aiModelServiceConfig.findFirst({
       where: {
-        id: payload.configId,
+        id: payload.modelRef.configId,
         enabled: true,
         OR: [
           { scope: 'SYSTEM', visibility: 'ALL_USERS' },
@@ -60,8 +64,8 @@ export class AiDefaultModelsService {
 
     const model = await this.prisma.aiModelItem.findFirst({
       where: {
-        serviceConfigId: payload.configId,
-        modelId: payload.modelId,
+        serviceConfigId: payload.modelRef.configId,
+        modelId: payload.modelRef.modelId,
         enabled: true,
       },
     })
@@ -87,14 +91,14 @@ export class AiDefaultModelsService {
       create: {
         userId,
         intentKey: parsedIntentKey,
-        serviceConfigId: payload.configId,
-        modelId: payload.modelId,
+        serviceConfigId: payload.modelRef.configId,
+        modelId: payload.modelRef.modelId,
         updatedBy: userId,
         deletedAt: null,
       },
       update: {
-        serviceConfigId: payload.configId,
-        modelId: payload.modelId,
+        serviceConfigId: payload.modelRef.configId,
+        modelId: payload.modelRef.modelId,
         updatedBy: userId,
         deletedAt: null,
       },
@@ -112,6 +116,30 @@ export class AiDefaultModelsService {
       invalidReason: null,
       updatedAt: policy.updatedAt,
     })
+  }
+
+  private async clearDefaultModelPolicy(userId: string, intentKey: AiModelIntentKey): Promise<AiDefaultModelPolicyItem> {
+    const policy = await this.prisma.aiDefaultModelPolicy.findUnique({
+      where: {
+        userId_intentKey: {
+          userId,
+          intentKey,
+        },
+      },
+    })
+
+    if (policy) {
+      await this.prisma.aiDefaultModelPolicy.delete({
+        where: {
+          userId_intentKey: {
+            userId,
+            intentKey,
+          },
+        },
+      })
+    }
+
+    return this.getDefaultModelItem(userId, intentKey)
   }
 
   async getAvailableModels(userId: string, intentKey: AiModelIntentKey): Promise<AiAvailableModelOption[]> {
@@ -190,7 +218,7 @@ export class AiDefaultModelsService {
     })
 
     if (!service) {
-      throw new BadRequestException('模型服务不可用')
+      return []
     }
 
     return service.models.map(model => this.toAvailableModelOptionForIntent(service, model, parsedIntentKey))

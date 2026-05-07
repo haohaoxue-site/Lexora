@@ -42,6 +42,17 @@ export function deleteChatSession(sessionId: string): Promise<null> {
   })
 }
 
+export function updateChatSessionModel(
+  sessionId: string,
+  data: ChatModelSelection,
+): Promise<ChatSessionDetail> {
+  return axios.request({
+    method: 'patch',
+    url: `/chat/sessions/${sessionId}/model`,
+    data,
+  })
+}
+
 export function getChatRuntimeConfig(): Promise<ChatRuntimeConfig> {
   return axios.request({
     method: 'get',
@@ -58,7 +69,6 @@ export function getChatModels(): Promise<ChatModelListResponse> {
 
 export async function streamChatCompletion(
   sessionId: string,
-  modelRef: ChatModelSelection['modelRef'] | null | undefined,
   content: string,
   onChunk: (content: string) => void,
 ): Promise<void> {
@@ -73,7 +83,6 @@ export async function streamChatCompletion(
     body: JSON.stringify({
       sessionId,
       content,
-      modelRef: modelRef ?? undefined,
     }),
   })
 

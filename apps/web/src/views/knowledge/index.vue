@@ -46,9 +46,7 @@ const pageTitle = '知识库'
   padding: 3rem 1.5rem;
 
   .knowledge-view__empty-icon {
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    margin: 0 auto;
     width: 5.5rem;
     height: 5.5rem;
     border: 1px solid color-mix(in srgb, var(--brand-primary) 16%, transparent);

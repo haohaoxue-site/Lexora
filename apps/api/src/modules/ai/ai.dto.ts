@@ -9,7 +9,7 @@ import {
   AI_MODEL_CAPABILITY_VALUES,
   AI_MODEL_TYPE_VALUES,
 } from '@haohaoxue/samepage-contracts'
-import { Transform } from 'class-transformer'
+import { Transform, Type } from 'class-transformer'
 import {
   IsArray,
   IsBoolean,
@@ -20,6 +20,7 @@ import {
   IsUrl,
   MaxLength,
   Min,
+  ValidateNested,
 } from 'class-validator'
 
 export class CreateAiModelServiceDto {
@@ -132,7 +133,7 @@ export class UpdateAiModelItemDto {
   enabled?: boolean
 }
 
-export class UpdateDefaultModelDto implements UpdateAiDefaultModelPolicyRequest {
+class DefaultModelRefDto {
   @IsString()
   @MaxLength(80)
   configId!: string
@@ -140,6 +141,13 @@ export class UpdateDefaultModelDto implements UpdateAiDefaultModelPolicyRequest 
   @IsString()
   @MaxLength(160)
   modelId!: string
+}
+
+export class UpdateDefaultModelDto implements UpdateAiDefaultModelPolicyRequest {
+  @IsOptional()
+  @Type(() => DefaultModelRefDto)
+  @ValidateNested()
+  modelRef!: DefaultModelRefDto | null
 }
 
 export class TestAiProviderCredentialDto {

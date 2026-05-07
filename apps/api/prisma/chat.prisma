@@ -4,17 +4,20 @@ enum ChatSessionMessageRole {
 }
 
 model ChatSession {
-  id             String               @id @default(uuid())
-  userId         String
-  title          String
-  historyVersion Int                  @default(0)
-  user           User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
-  messages       ChatSessionMessage[]
-  createdAt      DateTime             @default(now())
-  updatedAt      DateTime             @updatedAt
-  deletedAt      DateTime?
+  id                           String               @id @default(uuid())
+  userId                       String
+  title                        String
+  selectedModelServiceConfigId String?
+  selectedModelId              String?
+  historyVersion               Int                  @default(0)
+  user                         User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages                     ChatSessionMessage[]
+  createdAt                    DateTime             @default(now())
+  updatedAt                    DateTime             @updatedAt
+  deletedAt                    DateTime?
 
   @@index([userId, updatedAt])
+  @@index([selectedModelServiceConfigId])
 }
 
 model ChatSessionMessage {

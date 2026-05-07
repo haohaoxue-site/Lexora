@@ -1,5 +1,6 @@
 import type {
   AgentGetChatSessionContextResponse,
+  AiModelRef,
   ChatSessionDetail,
   ChatSessionSummary,
 } from '@haohaoxue/samepage-contracts'
@@ -16,6 +17,7 @@ import { PrismaService } from '../../database/prisma.service'
 import {
   toChatMessageRole,
   toChatSessionDetail,
+  toChatSessionModelRef,
   toChatSessionSummary,
 } from './chat.utils'
 
@@ -24,6 +26,8 @@ const DEFAULT_CHAT_SESSION_TITLE = '新对话'
 const chatSessionSummarySelect = {
   id: true,
   title: true,
+  selectedModelServiceConfigId: true,
+  selectedModelId: true,
   createdAt: true,
   updatedAt: true,
 } satisfies Prisma.ChatSessionSelect
@@ -53,6 +57,15 @@ type PersistedChatSessionDetail = Prisma.ChatSessionGetPayload<{
 
 type PersistedChatSessionRunDetail = Prisma.ChatSessionGetPayload<{
   select: typeof chatSessionRunDetailSelect
+}>
+
+const chatSessionModelRefSelect = {
+  selectedModelServiceConfigId: true,
+  selectedModelId: true,
+} satisfies Prisma.ChatSessionSelect
+
+type PersistedChatSessionModelRef = Prisma.ChatSessionGetPayload<{
+  select: typeof chatSessionModelRefSelect
 }>
 
 export interface ChatCompletionSessionContext {
@@ -97,6 +110,38 @@ export class ChatSessionsService {
 
   async getSession(userId: string, sessionId: string): Promise<ChatSessionDetail> {
     return toChatSessionDetail(await this.findOwnedSessionDetailOrThrow(userId, sessionId))
+  }
+
+  async getSessionModelRef(
+    userId: string,
+    sessionId: string,
+  ): Promise<Pick<AiModelRef, 'configId' | 'modelId'> | null> {
+    const session = await this.findOwnedSessionModelRefOrThrow(userId, sessionId)
+    return toChatSessionModelRef(session)
+  }
+
+  async updateSessionModel(input: {
+    userId: string
+    sessionId: string
+    modelRef: Pick<AiModelRef, 'configId' | 'modelId'> | null
+  }): Promise<ChatSessionDetail> {
+    const result = await this.prisma.chatSession.updateMany({
+      where: {
+        id: input.sessionId,
+        userId: input.userId,
+      },
+      data: {
+        selectedModelServiceConfigId: input.modelRef?.configId ?? null,
+        selectedModelId: input.modelRef?.modelId ?? null,
+        updatedAt: new Date(),
+      },
+    })
+
+    if (result.count === 0) {
+      throw new NotFoundException('聊天会话不存在')
+    }
+
+    return this.getSession(input.userId, input.sessionId)
   }
 
   async deleteSession(userId: string, sessionId: string): Promise<void> {
@@ -261,6 +306,25 @@ export class ChatSessionsService {
         userId,
       },
       select: chatSessionRunDetailSelect,
+    })
+
+    if (!session) {
+      throw new NotFoundException('聊天会话不存在')
+    }
+
+    return session
+  }
+
+  private async findOwnedSessionModelRefOrThrow(
+    userId: string,
+    sessionId: string,
+  ): Promise<PersistedChatSessionModelRef> {
+    const session = await this.prisma.chatSession.findFirst({
+      where: {
+        id: sessionId,
+        userId,
+      },
+      select: chatSessionModelRefSelect,
     })
 
     if (!session) {

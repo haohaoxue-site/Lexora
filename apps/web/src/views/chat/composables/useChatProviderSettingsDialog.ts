@@ -5,7 +5,7 @@ import type { ChatModelSelection } from '@/apis/chat'
 export function useChatProviderSettingsDialog(options: {
   form: Ref<ChatModelSelection>
   providerFormRef: Ref<FormInstance | null>
-  onSave: () => void
+  onSave: () => Promise<boolean | void> | boolean | void
 }) {
   const formRules: FormRules<ChatModelSelection> = {}
 
@@ -18,7 +18,7 @@ export function useChatProviderSettingsDialog(options: {
       return
     }
 
-    options.onSave()
+    await options.onSave()
   }
 
   return {
