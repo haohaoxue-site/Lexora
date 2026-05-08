@@ -16,9 +16,11 @@ const DocsDocumentSurfaceView = () => import('@/views/docs/pages/DocsDocumentSur
 const DocsPendingSharesPageView = () => import('@/views/docs/pages/DocsPendingSharesPage.vue')
 const DocsPermissionsPageView = () => import('@/views/docs/pages/DocsPermissionsPage.vue')
 const DocsTrashPageView = () => import('@/views/docs/pages/DocsTrashPage.vue')
+const AgentView = () => import('@/views/agent/index.vue')
 const HomeView = () => import('@/views/home/index.vue')
 const KnowledgeView = () => import('@/views/knowledge/index.vue')
 const ProviderView = () => import('@/views/provider/index.vue')
+const ScheduleView = () => import('@/views/schedule/index.vue')
 const SettingsView = () => import('@/views/settings/index.vue')
 const SettingsDefaultModelsPageView = () => import('@/views/settings/pages/SettingsDefaultModelsPage.vue')
 const SettingsPreferencePageView = () => import('@/views/settings/pages/SettingsPreferencePage.vue')
@@ -115,6 +117,17 @@ const workspaceRouteChildren = [
     ],
   },
   {
+    path: 'schedule',
+    name: 'schedule',
+    component: ScheduleView,
+    meta: {
+      navLabel: '日程',
+      navIconCategory: SvgIconCategory.NAV,
+      navIcon: 'schedule',
+      navActiveIcon: 'schedule-active',
+    },
+  },
+  {
     path: 'knowledge',
     name: 'knowledge',
     component: KnowledgeView,
@@ -123,6 +136,17 @@ const workspaceRouteChildren = [
       navIconCategory: SvgIconCategory.NAV,
       navIcon: 'knowledge',
       navActiveIcon: 'knowledge-active',
+    },
+  },
+  {
+    path: 'agent',
+    name: 'agent',
+    component: AgentView,
+    meta: {
+      navLabel: '智能体',
+      navIconCategory: SvgIconCategory.NAV,
+      navIcon: 'model-service',
+      navActiveIcon: 'model-service-active',
     },
   },
   {

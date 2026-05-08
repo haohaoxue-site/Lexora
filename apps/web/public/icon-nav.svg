@@ -152,6 +152,48 @@
       <path d="M29 31.5H35.5" fill="none" stroke="#57A9E6" stroke-width="3" stroke-linecap="round" />
       <path d="M33 34.5L34.3 37.1L36.9 38.4L34.3 39.7L33 42.3L31.7 39.7L29.1 38.4L31.7 37.1L33 34.5Z" fill="#4FD4B0" />
   </symbol>
+  <symbol id="schedule-active" viewBox="0 0 64 64">
+    <defs>
+        <linearGradient id="nav-schedule-active-bg" x1="12" y1="10" x2="53" y2="54" gradientUnits="userSpaceOnUse">
+          <stop stop-color="#FFC36E" />
+          <stop offset="0.56" stop-color="#FF9070" />
+          <stop offset="1" stop-color="#67C8FF" />
+        </linearGradient>
+      </defs>
+
+      <rect x="8" y="8" width="48" height="48" rx="16" fill="url(#nav-schedule-active-bg)" />
+      <circle cx="46" cy="19" r="4.5" fill="white" fill-opacity="0.28" />
+      <path d="M46 16.9V21.1" fill="none" stroke="white" stroke-width="1.6" stroke-linecap="round" stroke-opacity="0.84" />
+      <path d="M43.9 19H48.1" fill="none" stroke="white" stroke-width="1.6" stroke-linecap="round" stroke-opacity="0.84" />
+      <rect x="21" y="21.5" width="22" height="22" rx="5.5" fill="none" stroke="white" stroke-width="3.25" />
+      <path d="M21 29H43" fill="none" stroke="white" stroke-width="3.25" stroke-linecap="round" stroke-opacity="0.9" />
+      <path d="M27 18.5V24" fill="none" stroke="white" stroke-width="3.25" stroke-linecap="round" />
+      <path d="M37 18.5V24" fill="none" stroke="white" stroke-width="3.25" stroke-linecap="round" />
+      <path d="M27.5 35L31 38.5L37.5 32" fill="none" stroke="white" stroke-width="3.25" stroke-linecap="round" stroke-linejoin="round" />
+  </symbol>
+  <symbol id="schedule" viewBox="0 0 64 64">
+    <defs>
+        <linearGradient id="nav-schedule-line" x1="21" y1="18" x2="44" y2="44" gradientUnits="userSpaceOnUse">
+          <stop stop-color="#FFB15F" />
+          <stop offset="0.54" stop-color="#FF7F70" />
+          <stop offset="1" stop-color="#4DBFFF" />
+        </linearGradient>
+        <linearGradient id="nav-schedule-check" x1="27" y1="32" x2="38" y2="39" gradientUnits="userSpaceOnUse">
+          <stop stop-color="#54C8FF" />
+          <stop offset="1" stop-color="#6B89FF" />
+        </linearGradient>
+      </defs>
+
+      <rect x="8" y="8" width="48" height="48" rx="16" fill="#FFF7ED" />
+      <circle cx="45.5" cy="19.5" r="4.5" fill="#8AD6FF" />
+      <path d="M45.5 16.7V22.3" fill="none" stroke="white" stroke-width="1.8" stroke-linecap="round" />
+      <path d="M42.7 19.5H48.3" fill="none" stroke="white" stroke-width="1.8" stroke-linecap="round" />
+      <rect x="21" y="21.5" width="22" height="22" rx="5.5" fill="none" stroke="url(#nav-schedule-line)" stroke-width="3.25" />
+      <path d="M21 29H43" fill="none" stroke="#FF9B6C" stroke-width="3.25" stroke-linecap="round" />
+      <path d="M27 18.5V24" fill="none" stroke="#FFAD63" stroke-width="3.25" stroke-linecap="round" />
+      <path d="M37 18.5V24" fill="none" stroke="#59BFFF" stroke-width="3.25" stroke-linecap="round" />
+      <path d="M27.5 35L31 38.5L37.5 32" fill="none" stroke="url(#nav-schedule-check)" stroke-width="3.25" stroke-linecap="round" stroke-linejoin="round" />
+  </symbol>
   <symbol id="model-service-active" viewBox="0 0 64 64">
     <defs>
         <linearGradient id="nav-model-service-active-bg" x1="12" y1="10" x2="53" y2="54" gradientUnits="userSpaceOnUse">
