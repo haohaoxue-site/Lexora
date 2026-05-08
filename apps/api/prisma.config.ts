@@ -5,6 +5,6 @@ import 'dotenv/config'
 export default defineConfig({
   schema: 'prisma',
   datasource: {
-    url: process.env.DATABASE_URL ?? 'postgresql://postgres:postgres@localhost:5432/samepage_docs',
+    url: process.env.DATABASE_URL ?? 'postgresql://postgres:postgres@localhost:5432/samepage_ai',
   },
 })

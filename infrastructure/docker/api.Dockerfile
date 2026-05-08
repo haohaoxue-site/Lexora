@@ -2,6 +2,7 @@ FROM node:24-slim AS build
 
 ENV PNPM_HOME=/pnpm
 ENV PATH="${PNPM_HOME}:${PATH}"
+ENV COREPACK_NPM_REGISTRY=https://registry.npmmirror.com
 
 RUN corepack enable \
   && corepack prepare pnpm@10.33.0 --activate \
@@ -11,7 +12,7 @@ RUN corepack enable \
 
 WORKDIR /workspace
 
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
 COPY apps/api/package.json apps/api/package.json
 COPY apps/api/prisma apps/api/prisma
 COPY apps/api/prisma.config.ts apps/api/prisma.config.ts
@@ -31,6 +32,7 @@ FROM node:24-slim
 ENV PNPM_HOME=/pnpm
 ENV NODE_ENV=production
 ENV PRISMA_HIDE_UPDATE_MESSAGE=1
+ENV COREPACK_NPM_REGISTRY=https://registry.npmmirror.com
 
 RUN corepack enable \
   && corepack prepare pnpm@10.33.0 --activate \
@@ -44,7 +46,7 @@ ENV PATH="/app/apps/api/node_modules/.bin:/app/node_modules/.bin:${PNPM_HOME}:${
 
 WORKDIR /app
 
-COPY --chown=node:node package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY --chown=node:node package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
 COPY --chown=node:node apps/api/package.json apps/api/package.json
 COPY --chown=node:node apps/api/prisma apps/api/prisma
 COPY --chown=node:node apps/api/prisma.config.ts apps/api/prisma.config.ts

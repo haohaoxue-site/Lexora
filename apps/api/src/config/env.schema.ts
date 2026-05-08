@@ -8,7 +8,7 @@ const optionalString = z
   .transform(value => value?.length ? value : undefined)
 
 const envSchema = z.object({
-  DATABASE_URL: z.string().trim().default('postgresql://postgres:postgres@localhost:5432/samepage_docs'),
+  DATABASE_URL: z.string().trim().default('postgresql://postgres:postgres@localhost:5432/samepage_ai'),
   APP_SECRET: z.string().trim().min(32, 'APP_SECRET 至少需要 32 个字符'),
   REDIS_URL: z.string().trim().default('redis://127.0.0.1:6379'),
   OAUTH_PROXY_URL: optionalString,

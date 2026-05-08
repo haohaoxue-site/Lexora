@@ -1,3 +1,3 @@
-# SamePage Docs
+# SamePage AI
 
-同页文档，一个协作的在线文档。
+同页AI，一个AI对话、文档、协作平台。

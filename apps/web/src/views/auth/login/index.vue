@@ -5,7 +5,7 @@ import AuthEntryShell from '../components/AuthEntryShell.vue'
 import { useLogin } from './composables/useLogin'
 
 const betaTooltipContent = '当前为 Beta 开发阶段，平台数据可能随版本迭代清空，请勿存放重要资料。'
-const repositoryUrl = 'https://github.com/haohaoxue-site/SamePage-Docs'
+const repositoryUrl = 'https://github.com/haohaoxue-site/SamePage-AI'
 const passwordFormRef = useTemplateRef<FormInstance>('passwordFormRef')
 const oauthInviteFormRef = useTemplateRef<FormInstance>('oauthInviteFormRef')
 const {
@@ -43,7 +43,7 @@ const {
         target="_blank"
         rel="noopener noreferrer"
         class="login-view__source-link"
-        aria-label="打开 SamePage Docs GitHub 项目地址"
+        aria-label="打开 SamePage AI GitHub 项目地址"
       >
         <ElTooltip
           :content="betaTooltipContent"

@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-const DEFAULT_DATABASE_URL = 'postgresql://postgres:postgres@localhost:5432/samepage_docs'
+const DEFAULT_DATABASE_URL = 'postgresql://postgres:postgres@localhost:5432/samepage_ai'
 const DEFAULT_API_INTERNAL_URL = 'http://127.0.0.1:3000/api'
 const DEFAULT_REDIS_URL = 'redis://127.0.0.1:6379'
 

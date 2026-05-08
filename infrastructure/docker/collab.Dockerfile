@@ -2,6 +2,7 @@ FROM node:24-slim AS build
 
 ENV PNPM_HOME=/pnpm
 ENV PATH="${PNPM_HOME}:${PATH}"
+ENV COREPACK_NPM_REGISTRY=https://registry.npmmirror.com
 
 RUN corepack enable \
   && corepack prepare pnpm@10.33.0 --activate \
@@ -11,7 +12,7 @@ RUN corepack enable \
 
 WORKDIR /workspace
 
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
 COPY apps/collab/package.json apps/collab/package.json
 COPY packages/contracts/package.json packages/contracts/package.json
 COPY packages/shared/package.json packages/shared/package.json
@@ -29,6 +30,7 @@ FROM node:24-slim AS production-deps
 ENV PNPM_HOME=/pnpm
 ENV NODE_ENV=production
 ENV PATH="/app/apps/collab/node_modules/.bin:/app/node_modules/.bin:${PNPM_HOME}:${PATH}"
+ENV COREPACK_NPM_REGISTRY=https://registry.npmmirror.com
 
 RUN corepack enable \
   && corepack prepare pnpm@10.33.0 --activate \
@@ -40,7 +42,7 @@ RUN corepack enable \
 
 WORKDIR /app
 
-COPY --chown=node:node package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY --chown=node:node package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
 COPY --chown=node:node apps/collab/package.json apps/collab/package.json
 COPY --chown=node:node apps/api/prisma apps/collab/prisma
 

@@ -35,7 +35,7 @@ defineSlots<{
           </div>
           <div class="auth-entry-shell__brand-copy">
             <div class="auth-entry-shell__brand-name">
-              SamePage Docs
+              SamePage AI
             </div>
             <div class="auth-entry-shell__brand-tagline">
               在线协作文档

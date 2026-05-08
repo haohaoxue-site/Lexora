@@ -1,4 +1,4 @@
-name: samepage-docs
+name: samepage-ai
 
 x-logging: &default-logging
   driver: local
@@ -8,7 +8,7 @@ x-logging: &default-logging
 
 services:
   postgres:
-    container_name: samepage-docs-postgres
+    container_name: samepage-ai-postgres
     image: postgres:16-alpine
     restart: unless-stopped
     logging: *default-logging
@@ -26,7 +26,7 @@ services:
       start_period: 10s
 
   redis:
-    container_name: samepage-docs-redis
+    container_name: samepage-ai-redis
     image: redis:7-alpine
     restart: unless-stopped
     logging: *default-logging
@@ -41,7 +41,7 @@ services:
       start_period: 5s
 
   rustfs:
-    container_name: samepage-docs-rustfs
+    container_name: samepage-ai-rustfs
     image: rustfs/rustfs:latest
     restart: unless-stopped
     logging: *default-logging
@@ -55,7 +55,7 @@ services:
       - samepage-rustfs-data:/data
 
   migrate:
-    container_name: samepage-docs-migrate
+    container_name: samepage-ai-migrate
     image: haohaoxue/samepage-api:latest
     restart: 'no'
     logging: *default-logging
@@ -68,7 +68,7 @@ services:
         condition: service_healthy
 
   api:
-    container_name: samepage-docs-api
+    container_name: samepage-ai-api
     image: haohaoxue/samepage-api:latest
     restart: unless-stopped
     logging: *default-logging
@@ -109,7 +109,7 @@ services:
       start_period: 20s
 
   collab:
-    container_name: samepage-docs-collab
+    container_name: samepage-ai-collab
     image: haohaoxue/samepage-collab:latest
     restart: unless-stopped
     logging: *default-logging
@@ -139,7 +139,7 @@ services:
       start_period: 15s
 
   agent:
-    container_name: samepage-docs-agent
+    container_name: samepage-ai-agent
     image: haohaoxue/samepage-agent:latest
     restart: unless-stopped
     logging: *default-logging
@@ -166,7 +166,7 @@ services:
       start_period: 15s
 
   web:
-    container_name: samepage-docs-web
+    container_name: samepage-ai-web
     image: haohaoxue/samepage-web:latest
     restart: unless-stopped
     logging: *default-logging
