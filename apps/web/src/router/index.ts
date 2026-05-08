@@ -4,18 +4,19 @@ import { rememberWorkspaceEntryPath } from '@/layouts/utils/workspace-entry'
 import { useAuthStore } from '@/stores/auth'
 import { useUserStore } from '@/stores/user'
 
+import { ADMIN_ROUTE_NAME, isAdminRoutePath } from './constants'
 import { adminRoute, protectedRoutes, publicRoutes } from './routes'
 
 export function loadAdminRoutes(router: Router) {
-  if (router.hasRoute('admin'))
+  if (router.hasRoute(ADMIN_ROUTE_NAME))
     return
   router.addRoute(adminRoute)
 }
 
 export function resetAdminRoutes(router: Router) {
-  if (!router.hasRoute('admin'))
+  if (!router.hasRoute(ADMIN_ROUTE_NAME))
     return
-  router.removeRoute('admin')
+  router.removeRoute(ADMIN_ROUTE_NAME)
 }
 
 export function createAppRouter(history: RouterHistory = createWebHistory()) {
@@ -31,6 +32,7 @@ export function createAppRouter(history: RouterHistory = createWebHistory()) {
   router.beforeEach((to) => {
     const authStore = useAuthStore()
     const userStore = useUserStore()
+    const isAdminRouteRequest = to.meta.requiresSystemAdmin || isAdminRoutePath(to.path)
 
     if (to.meta.public) {
       if (authStore.isAuthenticated) {
@@ -54,11 +56,11 @@ export function createAppRouter(history: RouterHistory = createWebHistory()) {
       return { name: 'change-password' }
     }
 
-    if (to.path.startsWith('/admin') && !userStore.isSystemAdmin) {
+    if (isAdminRouteRequest && !userStore.isSystemAdmin) {
       return { name: 'home' }
     }
 
-    if (userStore.isSystemAdmin && !router.hasRoute('admin')) {
+    if (userStore.isSystemAdmin && isAdminRouteRequest && !router.hasRoute(ADMIN_ROUTE_NAME)) {
       loadAdminRoutes(router)
       return to.fullPath
     }
@@ -71,7 +73,8 @@ export function createAppRouter(history: RouterHistory = createWebHistory()) {
       to.meta.public
       || to.meta.allowAnonymous
       || to.meta.allowWhenPasswordChangeRequired
-      || to.path.startsWith('/admin')
+      || to.meta.requiresSystemAdmin
+      || isAdminRoutePath(to.path)
     ) {
       return
     }

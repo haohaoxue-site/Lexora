@@ -8,12 +8,6 @@ import DocumentShareStatusEntry from '../components/DocumentShareStatusEntry.vue
 
 const props = defineProps<DocsContextBarLayoutProps>()
 const emits = defineEmits<DocsContextBarLayoutEmits>()
-const contextStatusParts = computed(() =>
-  [props.saveStateLabel, props.collaborationStatusLabel].filter(Boolean) as string[],
-)
-const hasStatusHint = computed(() =>
-  props.isDocumentSurface && Boolean(props.collaborationStatusHint),
-)
 
 const surfaceContext = computed(() => {
   if (props.currentSurface === 'pending-shares') {
@@ -42,14 +36,20 @@ const surfaceContext = computed(() => {
     description: '',
   }
 })
-const isSingleLine = computed(() => !props.isDocumentSurface && !surfaceContext.value.description)
+const isSingleLine = computed(() => props.isDocumentSurface || !surfaceContext.value.description)
+const connectionStatusClass = computed(() =>
+  props.collaborationStatusTone ? `is-${props.collaborationStatusTone}` : null,
+)
+const connectionStatusTitle = computed(() =>
+  props.collaborationStatusHint || props.collaborationStatusLabel || undefined,
+)
 </script>
 
 <template>
   <div class="docs-view-context w-full">
     <div
       class="docs-view-context__content"
-      :class="{ 'is-single-line': isSingleLine, 'has-status-hint': hasStatusHint }"
+      :class="{ 'is-single-line': isSingleLine }"
     >
       <template v-if="props.isDocumentSurface">
         <div class="docs-view-context__breadcrumb-shell">
@@ -61,27 +61,27 @@ const isSingleLine = computed(() => !props.isDocumentSurface && !surfaceContext.
               <span class="truncate text-sm text-secondary">{{ label }}</span>
             </ElBreadcrumbItem>
           </ElBreadcrumb>
-        </div>
-
-        <div class="docs-view-context__save-state">
-          <template v-for="(part, index) in contextStatusParts" :key="`${part}:${index}`">
-            <span>{{ part }}</span>
-            <span v-if="index < contextStatusParts.length - 1" class="docs-view-context__save-state-separator">·</span>
-          </template>
 
           <button
-            v-if="props.canReconnectCollaboration"
+            v-if="props.collaborationStatusLabel && props.canReconnectCollaboration"
             type="button"
-            class="docs-view-context__reconnect-button"
+            class="docs-view-context__connection-status is-actionable"
+            :class="connectionStatusClass"
+            :title="connectionStatusTitle"
             @click="emits('reconnectCollaboration')"
           >
-            重新连接
+            <span class="docs-view-context__connection-dot" aria-hidden="true" />
           </button>
-        </div>
 
-        <p v-if="props.collaborationStatusHint" class="docs-view-context__status-hint">
-          {{ props.collaborationStatusHint }}
-        </p>
+          <span
+            v-else-if="props.collaborationStatusLabel"
+            class="docs-view-context__connection-status"
+            :class="connectionStatusClass"
+            :title="connectionStatusTitle"
+          >
+            <span class="docs-view-context__connection-dot" aria-hidden="true" />
+          </span>
+        </div>
       </template>
 
       <template v-else>
@@ -129,14 +129,10 @@ const isSingleLine = computed(() => !props.isDocumentSurface && !surfaceContext.
     height: 1.25rem;
   }
 
-  .docs-view-context__content.has-status-hint {
-    grid-template-rows: 1.25rem 1.25rem auto;
-    height: auto;
-  }
-
   .docs-view-context__breadcrumb-shell {
     display: flex;
     align-items: center;
+    gap: 0.45rem;
     min-width: 0;
   }
 
@@ -144,46 +140,42 @@ const isSingleLine = computed(() => !props.isDocumentSurface && !surfaceContext.
     min-width: 0;
   }
 
-  .docs-view-context__save-state {
-    display: flex;
+  .docs-view-context__connection-status {
+    --docs-view-context-connection-color: var(--brand-text-secondary);
+
+    display: inline-flex;
     align-items: center;
-    gap: 0.35rem;
-    max-width: 100%;
-    overflow: hidden;
-    color: color-mix(in srgb, var(--brand-text-secondary) 75%, transparent);
-    font-size: 12px;
-    line-height: 1.25rem;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .docs-view-context__save-state-separator {
-    color: color-mix(in srgb, var(--brand-text-secondary) 55%, transparent);
-  }
-
-  .docs-view-context__reconnect-button {
+    justify-content: center;
+    flex-shrink: 0;
+    width: 1rem;
+    height: 1rem;
     padding: 0;
-    border: none;
+    border: 0;
     background: transparent;
-    color: var(--brand-primary);
-    font-size: 12px;
-    line-height: 1.25rem;
-    cursor: pointer;
+
+    &.is-connected {
+      --docs-view-context-connection-color: var(--brand-success);
+    }
+
+    &.is-connecting {
+      --docs-view-context-connection-color: var(--brand-warning);
+    }
+
+    &.is-danger {
+      --docs-view-context-connection-color: var(--brand-error);
+    }
+
+    &.is-actionable {
+      cursor: pointer;
+    }
   }
 
-  .docs-view-context__reconnect-button:hover {
-    color: color-mix(in srgb, var(--brand-primary) 82%, black);
-  }
-
-  .docs-view-context__status-hint {
-    margin: 0;
-    max-width: 100%;
-    overflow: hidden;
-    color: color-mix(in srgb, var(--brand-text-secondary) 78%, transparent);
-    font-size: 12px;
-    line-height: 1rem;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+  .docs-view-context__connection-dot {
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: 9999px;
+    background: var(--docs-view-context-connection-color);
+    box-shadow: 0 0 0 0.2rem color-mix(in srgb, var(--docs-view-context-connection-color) 14%, transparent);
   }
 
   .docs-view-context__surface-title {

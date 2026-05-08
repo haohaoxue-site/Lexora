@@ -1,11 +1,23 @@
 <script setup lang="ts">
 import type { DocsDocumentEditorEmits, DocsDocumentEditorProps } from '../typing'
+import { computed } from 'vue'
 import { DocumentContentSurface } from '@/components/tiptap-editor'
+import dayjs, { formatDateTime } from '@/utils/dayjs'
 import { useDocumentEditor } from '../composables/useDocumentEditor'
 
 const props = defineProps<DocsDocumentEditorProps>()
 const emits = defineEmits<DocsDocumentEditorEmits>()
 const { isHistoryMode, isEditable } = useDocumentEditor(props)
+const footerMetaItems = computed(() => [
+  {
+    label: '创建时间',
+    value: formatDateTime(props.document.createdAt),
+  },
+  {
+    label: '更新时间',
+    value: dayjs(props.document.updatedAt).fromNow(),
+  },
+])
 </script>
 
 <template>
@@ -16,6 +28,7 @@ const { isHistoryMode, isEditable } = useDocumentEditor(props)
       :title="props.document.title"
       :body="props.document.body"
       :editable="isEditable"
+      :footer-meta-items="footerMetaItems"
       :title-collaboration="props.collaboration?.title ?? null"
       :body-collaboration="props.collaboration?.body ?? null"
       :active-block-id="props.activeBlockId"
@@ -50,7 +63,7 @@ const { isHistoryMode, isEditable } = useDocumentEditor(props)
       border-bottom-color: color-mix(in srgb, var(--brand-border-base) 62%, transparent);
     }
 
-    :deep(.document-content-surface__body-frame) {
+    :deep(.document-content-surface__body) {
       padding-top: 0.875rem;
       background:
         linear-gradient(

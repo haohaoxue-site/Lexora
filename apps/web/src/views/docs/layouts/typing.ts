@@ -9,6 +9,7 @@ import type {
 } from '@haohaoxue/samepage-contracts'
 import type {
   ActiveDocumentDetail,
+  DocsDocumentCollaborationStatusTone,
   DocsDocumentEditorCollaborationBindings,
   DocsDocumentEditorMode,
   DocsSurfaceView,
@@ -25,10 +26,10 @@ export interface DocsContextBarLayoutProps {
   currentSurface: DocsSurfaceView
   /** 当前文档面包屑 */
   visibleBreadcrumbLabels: string[]
-  /** 保存状态文案 */
-  saveStateLabel: string
   /** 协作状态文案 */
   collaborationStatusLabel?: string | null
+  /** 协作状态视觉类型 */
+  collaborationStatusTone?: DocsDocumentCollaborationStatusTone | null
   /** 协作状态提示 */
   collaborationStatusHint?: string | null
   /** 是否允许手动重连协作 */

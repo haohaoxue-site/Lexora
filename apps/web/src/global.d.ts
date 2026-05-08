@@ -1,5 +1,5 @@
+import type { SvgIconCategory } from '@/components/svg-icon/typing'
 import type { TurnIntoBlockType } from '@/components/tiptap-editor'
-import type { WorkspaceNavigationMeta } from '@/router/typing'
 import 'axios'
 import '@tiptap/core'
 import 'vue-router'
@@ -21,8 +21,16 @@ declare module 'vue-router' {
     public?: boolean
     /** 密码强制修改期间仍允许访问 */
     allowWhenPasswordChangeRequired?: boolean
-    /** 工作区侧栏导航元数据 */
-    workspaceNav?: WorkspaceNavigationMeta
+    /** 需要系统管理员权限 */
+    requiresSystemAdmin?: boolean
+    /** 侧栏导航标题 */
+    navLabel?: string
+    /** 侧栏导航图标分类 */
+    navIconCategory?: SvgIconCategory
+    /** 侧栏导航图标 */
+    navIcon?: string
+    /** 侧栏导航激活图标 */
+    navActiveIcon?: string
   }
 }
 

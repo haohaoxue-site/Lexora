@@ -37,7 +37,6 @@ const {
   handleAppearanceSelect,
   handleWorkspaceCreate,
   switchContext,
-  openUserSettings,
   handleLogout,
   handleWorkspaceSelect,
   getLogoutIconName,
@@ -215,19 +214,6 @@ const {
           @select="handleAppearanceSelect"
         />
       </div>
-
-      <div class="session-user-divider" />
-
-      <ElButton
-        text
-        class="session-user-menu-item session-menu-button-fill"
-        @click="openUserSettings"
-      >
-        <span class="session-user-menu-item__content">
-          <SvgIcon category="ui" icon="settings-gear" size="14px" class="session-user-menu-item__icon" />
-          <span class="leading-none">个人设置</span>
-        </span>
-      </ElButton>
 
       <div class="session-user-divider" />
 

@@ -13,6 +13,7 @@ import {
   logoutAuthSession,
   registerWithPassword,
 } from '@/apis/auth'
+import { ADMIN_ROUTE_NAME } from '@/router/constants'
 import { createRequestErrorFromResponseEnvelope, toRequestError } from '@/utils/request-error'
 import { useUiStore } from './ui'
 import { useUserStore } from './user'
@@ -297,11 +298,11 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   function resetAdminRoute() {
-    if (!sessionRouter?.hasRoute('admin')) {
+    if (!sessionRouter?.hasRoute(ADMIN_ROUTE_NAME)) {
       return
     }
 
-    sessionRouter.removeRoute('admin')
+    sessionRouter.removeRoute(ADMIN_ROUTE_NAME)
   }
 
   return {

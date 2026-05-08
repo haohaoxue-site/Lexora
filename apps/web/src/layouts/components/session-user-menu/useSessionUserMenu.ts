@@ -12,7 +12,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { SvgIconCategory } from '@/components/svg-icon/typing'
 import { useAuthSession } from '@/layouts/composables/useAuthSession'
 import { getWorkspaceEntryPath } from '@/layouts/utils/workspace-entry'
-import { DEFAULT_ADMIN_NAVIGATION_ITEM } from '@/router/navigation'
+import { ADMIN_ROUTE_NAME } from '@/router/constants'
 import { useUserStore } from '@/stores/user'
 import { useWorkspaceStore } from '@/stores/workspace'
 import { getRequestErrorDisplayMessage } from '@/utils/request-error'
@@ -52,7 +52,7 @@ export function useSessionUserMenu(options: UseSessionUserMenuOptions) {
       avatarUrl: user.avatarUrl,
     }
   })
-  const isAdminRoute = computed(() => route.path.startsWith('/admin'))
+  const isAdminRoute = computed(() => Boolean(route.meta.requiresSystemAdmin))
   const contextSwitchAction = computed<SessionContextSwitchAction | null>(() => {
     if (!options.showContextSwitch) {
       return null
@@ -128,7 +128,6 @@ export function useSessionUserMenu(options: UseSessionUserMenuOptions) {
     handleAppearanceSelect,
     handleWorkspaceCreate,
     switchContext,
-    openUserSettings,
     handleLogout,
     handleWorkspaceSelect,
     getLogoutIconName,
@@ -229,14 +228,7 @@ export function useSessionUserMenu(options: UseSessionUserMenuOptions) {
       return
     }
 
-    await router.push(DEFAULT_ADMIN_NAVIGATION_ITEM.path)
-  }
-
-  async function openUserSettings() {
-    appearanceMenuVisible.value = false
-    workspaceMenuVisible.value = false
-    menuVisible.value = false
-    await router.push('/user')
+    await router.push({ name: ADMIN_ROUTE_NAME })
   }
 
   async function handleLogout() {

@@ -34,6 +34,11 @@ export interface ActiveDocumentDetail extends Omit<DocumentRecord, 'currentProje
 export type DocsDocumentEditorMode = 'default' | 'history'
 
 /**
+ * 文档协作连接状态视觉类型。
+ */
+export type DocsDocumentCollaborationStatusTone = 'neutral' | 'connecting' | 'connected' | 'danger'
+
+/**
  * 文档页主区视图。
  */
 export type DocsSurfaceView = 'document' | 'permissions' | 'trash' | 'pending-shares'

@@ -240,35 +240,173 @@
       <path d="M22.5 42C24.2781 37.6298 27.4448 35.4447 32 35.4447C36.5552 35.4447 39.7219 37.6298 41.5 42" fill="none" stroke="url(#nav-user-settings-line)" stroke-width="3.25" stroke-linecap="round" />
       <path d="M42 31.5L43.3 34.1L45.9 35.4L43.3 36.7L42 39.3L40.7 36.7L38.1 35.4L40.7 34.1L42 31.5Z" fill="url(#nav-user-settings-spark)" />
   </symbol>
-  <symbol id="admin-overview" viewBox="0 0 24 24">
-    <path d="M4.75 18.25H19.25" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
-    <path d="M6.25 15.25V11.75" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
-    <path d="M12 15.25V8.25" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
-    <path d="M17.75 15.25V5.75" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
-    <circle cx="6.25" cy="9.5" r="1.25" fill="currentColor" fill-opacity="0.2" stroke="currentColor" stroke-width="1.4" />
-    <circle cx="12" cy="6.25" r="1.25" fill="currentColor" fill-opacity="0.2" stroke="currentColor" stroke-width="1.4" />
-    <circle cx="17.75" cy="3.75" r="1.25" fill="currentColor" fill-opacity="0.2" stroke="currentColor" stroke-width="1.4" />
+  <symbol id="overview-active" viewBox="0 0 64 64">
+    <defs>
+      <linearGradient id="nav-overview-active-bg" x1="12" y1="10" x2="52" y2="54" gradientUnits="userSpaceOnUse">
+        <stop stop-color="#FFC16E" />
+        <stop offset="0.56" stop-color="#FF7D8B" />
+        <stop offset="1" stop-color="#6BC8FF" />
+      </linearGradient>
+    </defs>
+
+    <rect x="8" y="8" width="48" height="48" rx="16" fill="url(#nav-overview-active-bg)" />
+    <circle cx="45.5" cy="19" r="4.5" fill="white" fill-opacity="0.28" />
+    <path d="M21 41.5H43" fill="none" stroke="white" stroke-width="3.2" stroke-linecap="round" />
+    <path d="M24 36V30" fill="none" stroke="white" stroke-width="3.2" stroke-linecap="round" />
+    <path d="M32 36V24" fill="none" stroke="white" stroke-width="3.2" stroke-linecap="round" />
+    <path d="M40 36V28" fill="none" stroke="white" stroke-width="3.2" stroke-linecap="round" />
+    <path d="M22.5 25.5L29 22L35 25L42 19.5" fill="none" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
   </symbol>
-  <symbol id="admin-users" viewBox="0 0 24 24">
-    <circle cx="9" cy="8.25" r="2.75" fill="none" stroke="currentColor" stroke-width="1.8" />
-    <path d="M4.75 18.25C5.34086 15.6517 6.91762 14.3525 9.48029 14.3525C12.043 14.3525 13.6197 15.6517 14.2106 18.25" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
-    <circle cx="16.5" cy="9.25" r="2.1" fill="none" stroke="currentColor" stroke-width="1.8" opacity="0.72" />
-    <path d="M14.85 17.5C15.2662 16.0652 16.2719 15.3478 17.8673 15.3478C18.3899 15.3478 18.8542 15.4249 19.2603 15.5792" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" opacity="0.72" />
+  <symbol id="overview" viewBox="0 0 64 64">
+    <defs>
+      <linearGradient id="nav-overview-line" x1="20" y1="19" x2="44" y2="43" gradientUnits="userSpaceOnUse">
+        <stop stop-color="#FFAC69" />
+        <stop offset="0.58" stop-color="#FF728C" />
+        <stop offset="1" stop-color="#5DBFFF" />
+      </linearGradient>
+    </defs>
+
+    <rect x="8" y="8" width="48" height="48" rx="16" fill="#FFF6F0" />
+    <circle cx="45.5" cy="19" r="4.5" fill="#8BD9FF" />
+    <path d="M45.5 16.5V21.5" fill="none" stroke="white" stroke-width="1.7" stroke-linecap="round" />
+    <path d="M43 19H48" fill="none" stroke="white" stroke-width="1.7" stroke-linecap="round" />
+    <path d="M21 41.5H43" fill="none" stroke="#FF9E70" stroke-width="3.2" stroke-linecap="round" />
+    <path d="M24 36V30" fill="none" stroke="url(#nav-overview-line)" stroke-width="3.2" stroke-linecap="round" />
+    <path d="M32 36V24" fill="none" stroke="url(#nav-overview-line)" stroke-width="3.2" stroke-linecap="round" />
+    <path d="M40 36V28" fill="none" stroke="url(#nav-overview-line)" stroke-width="3.2" stroke-linecap="round" />
+    <path d="M22.5 25.5L29 22L35 25L42 19.5" fill="none" stroke="url(#nav-overview-line)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
   </symbol>
-  <symbol id="admin-email" viewBox="0 0 24 24">
-    <rect x="4" y="6" width="16" height="12" rx="3" fill="none" stroke="currentColor" stroke-width="1.8" />
-    <path d="M6.25 8.25L11.1201 12.0389C11.6325 12.4374 12.3675 12.4374 12.8799 12.0389L17.75 8.25" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
-    <path d="M7.25 16.5H10.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" opacity="0.72" />
+  <symbol id="users-active" viewBox="0 0 64 64">
+    <defs>
+      <linearGradient id="nav-users-active-bg" x1="12" y1="10" x2="52" y2="54" gradientUnits="userSpaceOnUse">
+        <stop stop-color="#8FE0C9" />
+        <stop offset="0.55" stop-color="#5ABFE4" />
+        <stop offset="1" stop-color="#8C83FF" />
+      </linearGradient>
+    </defs>
+
+    <rect x="8" y="8" width="48" height="48" rx="16" fill="url(#nav-users-active-bg)" />
+    <circle cx="45.5" cy="19" r="4.5" fill="white" fill-opacity="0.24" />
+    <circle cx="29" cy="26.5" r="6" fill="none" stroke="white" stroke-width="3.25" />
+    <path d="M19.5 43C21 38.7 24.1667 36.55 29 36.55C33.8333 36.55 37 38.7 38.5 43" fill="none" stroke="white" stroke-width="3.25" stroke-linecap="round" />
+    <circle cx="40.5" cy="28" r="4.25" fill="none" stroke="white" stroke-width="3" stroke-opacity="0.76" />
+    <path d="M38 39.5C39.15 38.3 40.8833 37.7 43.2 37.7C44.2263 37.7 45.1263 37.8083 45.9 38.025" fill="none" stroke="white" stroke-width="3" stroke-linecap="round" stroke-opacity="0.76" />
   </symbol>
-  <symbol id="admin-model-providers" viewBox="0 0 24 24">
-    <rect x="4.5" y="5" width="6" height="6" rx="1.75" fill="none" stroke="currentColor" stroke-width="1.8" />
-    <rect x="13.5" y="5" width="6" height="6" rx="1.75" fill="none" stroke="currentColor" stroke-width="1.8" opacity="0.72" />
-    <rect x="9" y="13" width="6" height="6" rx="1.75" fill="none" stroke="currentColor" stroke-width="1.8" />
-    <path d="M10.5 8H13.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
-    <path d="M12 11V13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
+  <symbol id="users" viewBox="0 0 64 64">
+    <defs>
+      <linearGradient id="nav-users-line" x1="19" y1="20" x2="45" y2="44" gradientUnits="userSpaceOnUse">
+        <stop stop-color="#37C99D" />
+        <stop offset="0.56" stop-color="#4EB8F2" />
+        <stop offset="1" stop-color="#897DFF" />
+      </linearGradient>
+    </defs>
+
+    <rect x="8" y="8" width="48" height="48" rx="16" fill="#F1FBF7" />
+    <circle cx="45.5" cy="19" r="4.5" fill="#FFE07A" />
+    <circle cx="29" cy="26.5" r="6" fill="none" stroke="url(#nav-users-line)" stroke-width="3.25" />
+    <path d="M19.5 43C21 38.7 24.1667 36.55 29 36.55C33.8333 36.55 37 38.7 38.5 43" fill="none" stroke="url(#nav-users-line)" stroke-width="3.25" stroke-linecap="round" />
+    <circle cx="40.5" cy="28" r="4.25" fill="none" stroke="#69B2F7" stroke-width="3" />
+    <path d="M38 39.5C39.15 38.3 40.8833 37.7 43.2 37.7C44.2263 37.7 45.1263 37.8083 45.9 38.025" fill="none" stroke="#897DFF" stroke-width="3" stroke-linecap="round" />
   </symbol>
-  <symbol id="admin-audit" viewBox="0 0 24 24">
-    <path d="M12 4.75L18 7.25V11.75C18 15.3936 15.75 18.4142 12 19.75C8.25 18.4142 6 15.3936 6 11.75V7.25L12 4.75Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" />
-    <path d="M12 8.5V12.25L14.5 13.75" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+  <symbol id="email-active" viewBox="0 0 64 64">
+    <defs>
+      <linearGradient id="nav-email-active-bg" x1="12" y1="10" x2="52" y2="54" gradientUnits="userSpaceOnUse">
+        <stop stop-color="#74D4FF" />
+        <stop offset="0.54" stop-color="#6B95FF" />
+        <stop offset="1" stop-color="#FF9F75" />
+      </linearGradient>
+    </defs>
+
+    <rect x="8" y="8" width="48" height="48" rx="16" fill="url(#nav-email-active-bg)" />
+    <circle cx="45.5" cy="19" r="4.5" fill="white" fill-opacity="0.26" />
+    <rect x="19.5" y="23" width="25" height="18.5" rx="5" fill="none" stroke="white" stroke-width="3.25" />
+    <path d="M22.5 26.5L30.1 32.3C31.2148 33.1508 32.7852 33.1508 33.9 32.3L41.5 26.5" fill="none" stroke="white" stroke-width="3.25" stroke-linecap="round" stroke-linejoin="round" />
+    <path d="M24 38H31" fill="none" stroke="white" stroke-width="3" stroke-linecap="round" stroke-opacity="0.88" />
+  </symbol>
+  <symbol id="email" viewBox="0 0 64 64">
+    <defs>
+      <linearGradient id="nav-email-line" x1="19" y1="23" x2="45" y2="42" gradientUnits="userSpaceOnUse">
+        <stop stop-color="#55C9FF" />
+        <stop offset="0.58" stop-color="#6D8FFF" />
+        <stop offset="1" stop-color="#FF9871" />
+      </linearGradient>
+    </defs>
+
+    <rect x="8" y="8" width="48" height="48" rx="16" fill="#F2FAFF" />
+    <circle cx="45.5" cy="19" r="4.5" fill="#FFE07A" />
+    <path d="M45.5 16.7V22.3" fill="none" stroke="white" stroke-width="1.8" stroke-linecap="round" />
+    <path d="M42.7 19.5H48.3" fill="none" stroke="white" stroke-width="1.8" stroke-linecap="round" />
+    <rect x="19.5" y="23" width="25" height="18.5" rx="5" fill="none" stroke="url(#nav-email-line)" stroke-width="3.25" />
+    <path d="M22.5 26.5L30.1 32.3C31.2148 33.1508 32.7852 33.1508 33.9 32.3L41.5 26.5" fill="none" stroke="url(#nav-email-line)" stroke-width="3.25" stroke-linecap="round" stroke-linejoin="round" />
+    <path d="M24 38H31" fill="none" stroke="#67B3FF" stroke-width="3" stroke-linecap="round" />
+  </symbol>
+  <symbol id="model-providers-active" viewBox="0 0 64 64">
+    <defs>
+      <linearGradient id="nav-model-providers-active-bg" x1="12" y1="10" x2="52" y2="54" gradientUnits="userSpaceOnUse">
+        <stop stop-color="#7BD8FF" />
+        <stop offset="0.48" stop-color="#778EFF" />
+        <stop offset="1" stop-color="#FF8ABA" />
+      </linearGradient>
+    </defs>
+
+    <rect x="8" y="8" width="48" height="48" rx="16" fill="url(#nav-model-providers-active-bg)" />
+    <circle cx="45.5" cy="19" r="4.5" fill="#FFE07A" fill-opacity="0.32" />
+    <path d="M22 27H42L39 21H25L22 27Z" fill="none" stroke="white" stroke-width="3.25" stroke-linecap="round" stroke-linejoin="round" />
+    <path d="M22.5 27.5C23.25 30.4 26.75 30.4 27.5 27.5C28.25 30.4 31.75 30.4 32.5 27.5C33.25 30.4 36.75 30.4 37.5 27.5C38.25 30.4 41.75 30.4 42.5 27.5" fill="none" stroke="white" stroke-width="3" stroke-linecap="round" />
+    <path d="M25 33.5V43H39V33.5" fill="none" stroke="white" stroke-width="3.25" stroke-linecap="round" stroke-linejoin="round" />
+    <path d="M32 32.5L33.45 35.45L36.4 36.9L33.45 38.35L32 41.3L30.55 38.35L27.6 36.9L30.55 35.45L32 32.5Z" fill="white" />
+  </symbol>
+  <symbol id="model-providers" viewBox="0 0 64 64">
+    <defs>
+      <linearGradient id="nav-model-providers-line" x1="19" y1="20" x2="45" y2="46" gradientUnits="userSpaceOnUse">
+        <stop stop-color="#52C8FF" />
+        <stop offset="0.52" stop-color="#7E8BFF" />
+        <stop offset="1" stop-color="#FF7FAC" />
+      </linearGradient>
+      <linearGradient id="nav-model-providers-spark" x1="27" y1="32" x2="37" y2="42" gradientUnits="userSpaceOnUse">
+        <stop stop-color="#58C8FF" />
+        <stop offset="0.55" stop-color="#8588FF" />
+        <stop offset="1" stop-color="#FF84B2" />
+      </linearGradient>
+    </defs>
+
+    <rect x="8" y="8" width="48" height="48" rx="16" fill="#F3F7FF" />
+    <circle cx="45.5" cy="19.5" r="4.5" fill="#FFE07A" />
+    <path d="M45.5 16.8V22.2" fill="none" stroke="white" stroke-width="1.8" stroke-linecap="round" />
+    <path d="M42.8 19.5H48.2" fill="none" stroke="white" stroke-width="1.8" stroke-linecap="round" />
+    <path d="M22 27H42L39 21H25L22 27Z" fill="none" stroke="url(#nav-model-providers-line)" stroke-width="3.25" stroke-linecap="round" stroke-linejoin="round" />
+    <path d="M22.5 27.5C23.25 30.4 26.75 30.4 27.5 27.5C28.25 30.4 31.75 30.4 32.5 27.5C33.25 30.4 36.75 30.4 37.5 27.5C38.25 30.4 41.75 30.4 42.5 27.5" fill="none" stroke="url(#nav-model-providers-line)" stroke-width="3" stroke-linecap="round" />
+    <path d="M25 33.5V43H39V33.5" fill="none" stroke="url(#nav-model-providers-line)" stroke-width="3.25" stroke-linecap="round" stroke-linejoin="round" />
+    <path d="M32 32.5L33.45 35.45L36.4 36.9L33.45 38.35L32 41.3L30.55 38.35L27.6 36.9L30.55 35.45L32 32.5Z" fill="url(#nav-model-providers-spark)" />
+  </symbol>
+  <symbol id="audit-active" viewBox="0 0 64 64">
+    <defs>
+      <linearGradient id="nav-audit-active-bg" x1="12" y1="10" x2="52" y2="54" gradientUnits="userSpaceOnUse">
+        <stop stop-color="#8FE0C9" />
+        <stop offset="0.54" stop-color="#5DB9F3" />
+        <stop offset="1" stop-color="#6576FF" />
+      </linearGradient>
+    </defs>
+
+    <rect x="8" y="8" width="48" height="48" rx="16" fill="url(#nav-audit-active-bg)" />
+    <circle cx="45.5" cy="19" r="4.5" fill="white" fill-opacity="0.24" />
+    <path d="M32 18.5L43 23V31.5C43 38.05 39.1 43 32 45.5C24.9 43 21 38.05 21 31.5V23L32 18.5Z" fill="none" stroke="white" stroke-width="3.25" stroke-linejoin="round" />
+    <path d="M27 32L30.5 35.5L38 27.5" fill="none" stroke="white" stroke-width="3.25" stroke-linecap="round" stroke-linejoin="round" />
+  </symbol>
+  <symbol id="audit" viewBox="0 0 64 64">
+    <defs>
+      <linearGradient id="nav-audit-line" x1="21" y1="19" x2="43" y2="46" gradientUnits="userSpaceOnUse">
+        <stop stop-color="#3EC7A5" />
+        <stop offset="0.56" stop-color="#58B6F5" />
+        <stop offset="1" stop-color="#6475FF" />
+      </linearGradient>
+    </defs>
+
+    <rect x="8" y="8" width="48" height="48" rx="16" fill="#F1FAFF" />
+    <circle cx="45.5" cy="19" r="4.5" fill="#FFE07A" />
+    <path d="M45.5 16.7V21.3" fill="none" stroke="white" stroke-width="1.7" stroke-linecap="round" />
+    <path d="M43.2 19H47.8" fill="none" stroke="white" stroke-width="1.7" stroke-linecap="round" />
+    <path d="M32 18.5L43 23V31.5C43 38.05 39.1 43 32 45.5C24.9 43 21 38.05 21 31.5V23L32 18.5Z" fill="none" stroke="url(#nav-audit-line)" stroke-width="3.25" stroke-linejoin="round" />
+    <path d="M27 32L30.5 35.5L38 27.5" fill="none" stroke="url(#nav-audit-line)" stroke-width="3.25" stroke-linecap="round" stroke-linejoin="round" />
   </symbol>
 </svg>

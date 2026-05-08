@@ -14,6 +14,7 @@ const props = withDefaults(defineProps<DocumentContentSurfaceProps>(), {
   bodyCollaboration: null,
   activeBlockId: null,
   showOutline: true,
+  footerMetaItems: () => [],
 })
 const emits = defineEmits<DocumentContentSurfaceEmits>()
 
@@ -69,7 +70,7 @@ function resolveObjectKey(value: object | null) {
       />
     </div>
 
-    <div class="document-content-surface__body-frame">
+    <div class="document-content-surface__body">
       <DocumentBodyEditor
         :key="bodyEditorKey"
         class="document-content-surface__body-editor"
@@ -84,6 +85,19 @@ function resolveObjectKey(value: object | null) {
         @request-comment="emits('requestComment', $event)"
       />
     </div>
+
+    <footer v-if="props.footerMetaItems.length" class="document-content-surface__footer">
+      <div class="document-content-surface__footer-content">
+        <div
+          v-for="item in props.footerMetaItems"
+          :key="item.label"
+          class="document-content-surface__footer-meta"
+        >
+          <span class="document-content-surface__footer-label">{{ item.label }}：</span>
+          <span class="document-content-surface__footer-value">{{ item.value }}</span>
+        </div>
+      </div>
+    </footer>
   </section>
 </template>
 
@@ -170,7 +184,7 @@ function resolveObjectKey(value: object | null) {
     }
   }
 
-  .document-content-surface__body-frame {
+  .document-content-surface__body {
     position: relative;
     display: flex;
     flex: 1 1 0%;
@@ -200,6 +214,47 @@ function resolveObjectKey(value: object | null) {
       min-height: 0;
       margin-inline-end: auto;
     }
+  }
+
+  .document-content-surface__footer {
+    flex-shrink: 0;
+    padding:
+      0.75rem
+      var(--document-content-surface-inline-end)
+      0.75rem
+      var(--document-content-surface-inline-start);
+    border-top: 1px solid color-mix(in srgb, var(--brand-border-base) 78%, transparent);
+    background: inherit;
+    color: color-mix(in srgb, var(--brand-text-secondary) 82%, transparent);
+    font-size: 12px;
+    line-height: 1.25rem;
+  }
+
+  .document-content-surface__footer-content {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem 1rem;
+    width: var(--document-content-surface-inline-size);
+    max-width: 100%;
+    margin-inline-end: auto;
+  }
+
+  .document-content-surface__footer-meta {
+    display: inline-flex;
+    align-items: center;
+    min-width: 0;
+    white-space: nowrap;
+  }
+
+  .document-content-surface__footer-label {
+    color: color-mix(in srgb, var(--brand-text-primary) 72%, transparent);
+    font-weight: 600;
+  }
+
+  .document-content-surface__footer-value {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 }
 </style>

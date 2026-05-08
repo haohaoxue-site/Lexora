@@ -39,8 +39,8 @@ const {
   visibleBreadcrumbLabels,
   currentSurface,
   isDocumentSurface,
-  saveStateLabel,
   documentCollaborationStatusLabel,
+  documentCollaborationStatusTone,
   documentCollaborationStatusHint,
   canReconnectDocumentCollaboration,
   collapsedGroupIdSet,
@@ -84,14 +84,6 @@ const canOpenShareDialog = computed(() => {
     workspaceMemberRole: currentWorkspace.role,
   })
 })
-const contextSaveStateLabel = computed(() => {
-  if (isDocumentItemLoading.value && activeDocumentId.value) {
-    return '正在加载文档...'
-  }
-
-  return saveStateLabel.value
-})
-
 function openDocumentShareDialog(documentId: string) {
   if (!canOpenShareDialog.value) {
     ElMessage.warning('仅 MAINTAINER 可以管理分享设置')
@@ -140,8 +132,8 @@ function openTrashPage() {
         :is-document-surface="isDocumentSurface"
         :current-surface="currentSurface"
         :visible-breadcrumb-labels="visibleBreadcrumbLabels"
-        :save-state-label="contextSaveStateLabel"
         :collaboration-status-label="documentCollaborationStatusLabel"
+        :collaboration-status-tone="documentCollaborationStatusTone"
         :collaboration-status-hint="documentCollaborationStatusHint"
         :can-reconnect-collaboration="canReconnectDocumentCollaboration"
         :document-id="currentDocument?.id ?? ''"

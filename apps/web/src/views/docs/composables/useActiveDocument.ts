@@ -7,7 +7,10 @@ import type {
   TiptapJsonContent,
 } from '@haohaoxue/samepage-contracts'
 import type { ComputedRef } from 'vue'
-import type { ActiveDocumentDetail } from '../typing'
+import type {
+  ActiveDocumentDetail,
+  DocsDocumentCollaborationStatusTone,
+} from '../typing'
 import type {
   DocumentCurrent,
   RestoreDocumentVersionSnapshotResponse,
@@ -109,6 +112,11 @@ export function useActiveDocument({
     && !isCollaborationReadonly.value,
   )
   const collaborationStatusLabel = computed(() => resolveEditableCollaborationStatusLabel({
+    hasDocument: Boolean(state.currentDocument.value),
+    isReadonlyFallback: isCollaborationReadonly.value,
+    status: collaboration.connectionStatus.value,
+  }))
+  const collaborationStatusTone = computed(() => resolveEditableCollaborationStatusTone({
     hasDocument: Boolean(state.currentDocument.value),
     isReadonlyFallback: isCollaborationReadonly.value,
     status: collaboration.connectionStatus.value,
@@ -371,6 +379,7 @@ export function useActiveDocument({
     isCollaborationInitialSyncing,
     collaborationConnectionStatus: collaboration.connectionStatus,
     collaborationStatusLabel,
+    collaborationStatusTone,
     collaborationStatusHint,
     canReconnectCollaboration,
     confirmNavigation,
@@ -716,6 +725,32 @@ function resolveEditableCollaborationStatusLabel(input: {
       return '协作连接失败'
     default:
       return null
+  }
+}
+
+function resolveEditableCollaborationStatusTone(input: {
+  hasDocument: boolean
+  isReadonlyFallback: boolean
+  status: ReturnType<typeof useDocsDocumentCollabRuntime>['connectionStatus']['value']
+}): DocsDocumentCollaborationStatusTone | null {
+  if (!input.hasDocument) {
+    return null
+  }
+
+  if (input.isReadonlyFallback) {
+    return 'danger'
+  }
+
+  switch (input.status) {
+    case 'connecting':
+      return 'connecting'
+    case 'connected':
+      return 'connected'
+    case 'disconnected':
+    case 'error':
+      return 'danger'
+    default:
+      return 'neutral'
   }
 }
 

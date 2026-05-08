@@ -22,8 +22,8 @@ export const AI_MODEL_CAPABILITY_LABELS: Record<AiModelCapability, string> = {
 
 const CHAT_ASSISTANT_INTENT_OPTION: ProviderModelIntentOption = {
   key: AI_MODEL_INTENT_KEY.CHAT_ASSISTANT_DEFAULT,
-  label: '聊天助手',
-  description: '聊天助手使用。',
+  label: '对话',
+  description: '对话使用。',
   parentKey: AI_MODEL_INTENT_KEY.CHAT_DEFAULT,
 }
 

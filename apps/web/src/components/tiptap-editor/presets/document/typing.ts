@@ -5,6 +5,16 @@ import type {
 } from '../../core/typing'
 
 /**
+ * 文档内容面页脚元信息。
+ */
+export interface DocumentContentSurfaceFooterMetaItem {
+  /** 元信息名称 */
+  label: string
+  /** 元信息展示值 */
+  value: string
+}
+
+/**
  * 文档内容面属性。
  */
 export interface DocumentContentSurfaceProps {
@@ -24,6 +34,8 @@ export interface DocumentContentSurfaceProps {
   activeBlockId?: string | null
   /** 是否展示大纲 */
   showOutline?: boolean
+  /** 页脚元信息 */
+  footerMetaItems?: DocumentContentSurfaceFooterMetaItem[]
 }
 
 /**

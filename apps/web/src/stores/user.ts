@@ -21,7 +21,6 @@ import {
   updateCurrentUserProfile,
   updateUserPreferences,
 } from '@/apis/user'
-import { DEFAULT_ADMIN_NAVIGATION_ITEM } from '@/router/navigation'
 
 export const USER_PERSIST_KEY = 'samepage_user'
 
@@ -107,7 +106,7 @@ export const useUserStore = defineStore('user', () => {
       return 'change-password'
     }
 
-    return isSystemAdmin.value ? DEFAULT_ADMIN_NAVIGATION_ITEM.routeName : 'home'
+    return 'home'
   })
 
   watch(resolvedAppearance, (value) => {

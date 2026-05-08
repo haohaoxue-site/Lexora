@@ -49,7 +49,5 @@ const { contentError, handleContentError, handleRetryLoad, shouldShowEditor } = 
   flex: 1 1 0%;
   flex-direction: column;
   min-height: 0;
-  padding-bottom: clamp(1.5rem, 3vw, 2rem);
-  box-sizing: border-box;
 }
 </style>

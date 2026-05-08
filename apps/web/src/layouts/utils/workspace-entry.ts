@@ -1,8 +1,10 @@
+import { isAdminRoutePath } from '@/router/constants'
+
 const WORKSPACE_ENTRY_STORAGE_KEY = 'samepage_workspace_entry'
 const WORKSPACE_HOME_PATH = '/home'
 
 export function rememberWorkspaceEntryPath(path: string) {
-  if (typeof window === 'undefined' || !path || path.startsWith('/admin')) {
+  if (typeof window === 'undefined' || !path || isAdminRoutePath(path)) {
     return
   }
 

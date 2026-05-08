@@ -1,8 +1,8 @@
 import type { RouteRecordRaw } from 'vue-router'
-import type { AdminRouteName, WorkspaceNavigationItem, WorkspaceNavigationMeta } from './typing'
+import type { SidebarPanelItem } from '@/layouts/panels/typing'
 import { AUTH_CALLBACK_PATH, DOCUMENT_SHARE_ROUTE_PREFIX } from '@haohaoxue/samepage-contracts'
 import { SvgIconCategory } from '@/components/svg-icon/typing'
-import { adminNavigationItems } from './navigation'
+import { ADMIN_ROUTE_NAME, ADMIN_ROUTE_PATH } from './constants'
 
 const AdminShellContainer = () => import('@/layouts/containers/admin-shell.vue')
 const WorkspaceContainer = () => import('@/layouts/containers/workspace.vue')
@@ -25,13 +25,7 @@ const ProviderModelServicesPageView = () => import('@/views/provider/pages/Provi
 const SharedDocsView = () => import('@/views/shared-docs/index.vue')
 const UserSettingsView = () => import('@/views/user/index.vue')
 
-const adminRouteComponents = {
-  'admin-overview': () => import('@/views/system-admin/overview/index.vue'),
-  'admin-users': () => import('@/views/system-admin/users/index.vue'),
-  'admin-email': () => import('@/views/system-admin/email/index.vue'),
-  'admin-model-providers': () => import('@/views/system-admin/model-providers/index.vue'),
-  'admin-audit': () => import('@/views/system-admin/audit/index.vue'),
-} satisfies Record<AdminRouteName, RouteRecordRaw['component']>
+const ADMIN_ROUTE_ENTRY_NAME = 'admin-overview'
 
 export const publicRoutes: RouteRecordRaw[] = [
   {
@@ -70,12 +64,10 @@ const workspaceRouteChildren = [
     name: 'home',
     component: HomeView,
     meta: {
-      workspaceNav: defineWorkspaceNavigationMeta({
-        label: '主页',
-        iconCategory: SvgIconCategory.NAV,
-        icon: 'home',
-        activeIcon: 'home-active',
-      }),
+      navLabel: '主页',
+      navIconCategory: SvgIconCategory.NAV,
+      navIcon: 'home',
+      navActiveIcon: 'home-active',
     },
   },
   {
@@ -83,12 +75,10 @@ const workspaceRouteChildren = [
     name: 'chat',
     component: ChatView,
     meta: {
-      workspaceNav: defineWorkspaceNavigationMeta({
-        label: '聊天助手',
-        iconCategory: SvgIconCategory.NAV,
-        icon: 'chat',
-        activeIcon: 'chat-active',
-      }),
+      navLabel: '对话',
+      navIconCategory: SvgIconCategory.NAV,
+      navIcon: 'chat',
+      navActiveIcon: 'chat-active',
     },
   },
   {
@@ -96,12 +86,10 @@ const workspaceRouteChildren = [
     name: 'docs-nav',
     component: DocsView,
     meta: {
-      workspaceNav: defineWorkspaceNavigationMeta({
-        label: '文档',
-        iconCategory: SvgIconCategory.NAV,
-        icon: 'docs',
-        activeIcon: 'docs-active',
-      }),
+      navLabel: '文档',
+      navIconCategory: SvgIconCategory.NAV,
+      navIcon: 'docs',
+      navActiveIcon: 'docs-active',
     },
     children: [
       {
@@ -131,12 +119,10 @@ const workspaceRouteChildren = [
     name: 'knowledge',
     component: KnowledgeView,
     meta: {
-      workspaceNav: defineWorkspaceNavigationMeta({
-        label: '知识库',
-        iconCategory: SvgIconCategory.NAV,
-        icon: 'knowledge',
-        activeIcon: 'knowledge-active',
-      }),
+      navLabel: '知识库',
+      navIconCategory: SvgIconCategory.NAV,
+      navIcon: 'knowledge',
+      navActiveIcon: 'knowledge-active',
     },
   },
   {
@@ -145,12 +131,10 @@ const workspaceRouteChildren = [
     component: ProviderView,
     redirect: '/provider/models',
     meta: {
-      workspaceNav: defineWorkspaceNavigationMeta({
-        label: '模型服务',
-        iconCategory: SvgIconCategory.NAV,
-        icon: 'model-service',
-        activeIcon: 'model-service-active',
-      }),
+      navLabel: '服务商',
+      navIconCategory: SvgIconCategory.NAV,
+      navIcon: 'model-providers',
+      navActiveIcon: 'model-providers-active',
     },
     children: [
       {
@@ -170,32 +154,75 @@ const workspaceRouteChildren = [
     name: 'user',
     component: UserSettingsView,
     meta: {
-      workspaceNav: defineWorkspaceNavigationMeta({
-        label: '个人设置',
-        iconCategory: SvgIconCategory.NAV,
-        icon: 'user-settings',
-        activeIcon: 'user-settings-active',
-      }),
+      navLabel: '设置',
+      navIconCategory: SvgIconCategory.NAV,
+      navIcon: 'user-settings',
+      navActiveIcon: 'user-settings-active',
     },
   },
 ] satisfies RouteRecordRaw[]
 
-export const workspaceNavigationItems: WorkspaceNavigationItem[] = workspaceRouteChildren.flatMap((route) => {
-  const workspaceNav = route.meta?.workspaceNav
+const adminRouteChildren = [
+  {
+    path: 'overview',
+    name: ADMIN_ROUTE_ENTRY_NAME,
+    component: () => import('@/views/system-admin/overview/index.vue'),
+    meta: {
+      navLabel: '概览',
+      navIconCategory: SvgIconCategory.NAV,
+      navIcon: 'overview',
+      navActiveIcon: 'overview-active',
+    },
+  },
+  {
+    path: 'users',
+    name: 'admin-users',
+    component: () => import('@/views/system-admin/users/index.vue'),
+    meta: {
+      navLabel: '用户',
+      navIconCategory: SvgIconCategory.NAV,
+      navIcon: 'users',
+      navActiveIcon: 'users-active',
+    },
+  },
+  {
+    path: 'email',
+    name: 'admin-email',
+    component: () => import('@/views/system-admin/email/index.vue'),
+    meta: {
+      navLabel: '邮件',
+      navIconCategory: SvgIconCategory.NAV,
+      navIcon: 'email',
+      navActiveIcon: 'email-active',
+    },
+  },
+  {
+    path: 'model-providers',
+    name: 'admin-model-providers',
+    component: () => import('@/views/system-admin/model-providers/index.vue'),
+    meta: {
+      navLabel: '服务商',
+      navIconCategory: SvgIconCategory.NAV,
+      navIcon: 'model-providers',
+      navActiveIcon: 'model-providers-active',
+    },
+  },
+  {
+    path: 'audit',
+    name: 'admin-audit',
+    component: () => import('@/views/system-admin/audit/index.vue'),
+    meta: {
+      navLabel: '审计',
+      navIconCategory: SvgIconCategory.NAV,
+      navIcon: 'audit',
+      navActiveIcon: 'audit-active',
+    },
+  },
+] satisfies RouteRecordRaw[]
 
-  if (!workspaceNav || !route.name) {
-    return []
-  }
+export const adminNavigationItems: SidebarPanelItem[] = createNavigationItems(adminRouteChildren)
 
-  return [{
-    id: String(route.name),
-    label: workspaceNav.label,
-    iconCategory: workspaceNav.iconCategory,
-    icon: workspaceNav.icon,
-    activeIcon: workspaceNav.activeIcon,
-    to: normalizeWorkspaceNavigationPath(route.path),
-  }]
-})
+export const workspaceNavigationItems: SidebarPanelItem[] = createNavigationItems(workspaceRouteChildren)
 
 export const protectedRoutes: RouteRecordRaw[] = [
   {
@@ -224,28 +251,29 @@ export const protectedRoutes: RouteRecordRaw[] = [
 ]
 
 export const adminRoute: RouteRecordRaw = {
-  path: '/admin',
-  name: 'admin',
+  path: ADMIN_ROUTE_PATH,
+  name: ADMIN_ROUTE_NAME,
   component: AdminShellContainer,
-  redirect: '/admin/overview',
-  children: [
-    ...adminNavigationItems.map(item => ({
-      path: item.path.replace('/admin/', ''),
-      name: item.routeName,
-      component: adminRouteComponents[item.routeName],
-    })),
-  ],
+  redirect: { name: ADMIN_ROUTE_ENTRY_NAME },
+  meta: { requiresSystemAdmin: true },
+  children: adminRouteChildren,
 }
 
-function normalizeWorkspaceNavigationPath(path: string) {
-  const [staticPath] = path.split('/:')
-  const normalizedPath = staticPath || ''
+function createNavigationItems(routes: RouteRecordRaw[]): SidebarPanelItem[] {
+  return routes.flatMap((route) => {
+    const routeMeta = route.meta
 
-  return normalizedPath.startsWith('/')
-    ? normalizedPath || '/'
-    : `/${normalizedPath}`
-}
+    if (!route.name || !routeMeta?.navLabel || !routeMeta.navIconCategory || !routeMeta.navIcon) {
+      return []
+    }
 
-function defineWorkspaceNavigationMeta(meta: WorkspaceNavigationMeta) {
-  return meta
+    return [{
+      name: route.name,
+      to: { name: route.name },
+      label: routeMeta.navLabel,
+      iconCategory: routeMeta.navIconCategory,
+      icon: routeMeta.navIcon,
+      activeIcon: routeMeta.navActiveIcon,
+    }]
+  })
 }

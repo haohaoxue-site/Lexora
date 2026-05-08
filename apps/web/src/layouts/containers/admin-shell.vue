@@ -3,8 +3,9 @@ import { RouterView } from 'vue-router'
 import SessionUserMenu from '@/layouts/components/SessionUserMenu.vue'
 import { useAdminShell } from '@/layouts/composables/useAdminShell'
 import AdminSidebarPanel from '@/layouts/panels/AdminSidebarPanel.vue'
+import { ADMIN_ROUTE_NAME } from '@/router/constants'
 
-const { currentNavigationItem, navigationItems } = useAdminShell()
+const { currentNavigationLabel, navigationItems } = useAdminShell()
 </script>
 
 <template>
@@ -14,11 +15,11 @@ const { currentNavigationItem, navigationItems } = useAdminShell()
     <main class="admin-shell__main">
       <header class="admin-shell__header">
         <ElBreadcrumb separator="/" class="admin-shell__breadcrumb">
-          <ElBreadcrumbItem :to="{ name: 'admin' }">
+          <ElBreadcrumbItem :to="{ name: ADMIN_ROUTE_NAME }">
             系统后台
           </ElBreadcrumbItem>
-          <ElBreadcrumbItem>
-            {{ currentNavigationItem.label }}
+          <ElBreadcrumbItem v-if="currentNavigationLabel">
+            {{ currentNavigationLabel }}
           </ElBreadcrumbItem>
         </ElBreadcrumb>
 

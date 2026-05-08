@@ -32,7 +32,7 @@ const {
       <div class="chat-view-context">
         <div class="chat-view-context__copy">
           <div class="chat-view-context__title">
-            聊天助手
+            对话
           </div>
         </div>
 

@@ -52,13 +52,8 @@ const {
   <WorkspacePage>
     <template #context>
       <div class="user-settings-context">
-        <div>
-          <div class="user-settings-context__title">
-            个人设置
-          </div>
-          <p class="user-settings-context__description">
-            在这里管理资料、登录方式与个人偏好。
-          </p>
+        <div class="user-settings-context__title">
+          设置
         </div>
       </div>
     </template>
@@ -138,12 +133,6 @@ const {
     font-weight: 600;
     letter-spacing: -0.025em;
     line-height: 2rem;
-  }
-
-  &__description {
-    margin: 0.375rem 0 0;
-    color: var(--brand-text-secondary);
-    font-size: 0.875rem;
   }
 }
 
