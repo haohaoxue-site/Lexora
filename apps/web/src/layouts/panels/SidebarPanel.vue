@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import type { SidebarPanelBrand, SidebarPanelItem } from './typing'
 import { computed } from 'vue'
+import SessionNotificationBell from '@/layouts/components/session-notification-bell/SessionNotificationBell.vue'
+import SessionUserMenu from '@/layouts/components/SessionUserMenu.vue'
 
 const props = withDefaults(defineProps<{
   brand: SidebarPanelBrand
@@ -111,20 +113,29 @@ function getToggleGlyphClass() {
           </RouterLink>
         </nav>
       </ElScrollbar>
+
+      <div class="sidebar-panel__footer" :class="sidebarStateClass">
+        <div class="sidebar-panel__session" :class="sidebarStateClass">
+          <SessionUserMenu
+            trigger-variant="sidebar"
+            :is-collapsed="props.isCollapsed"
+          />
+          <SessionNotificationBell
+            trigger-variant="sidebar"
+            :is-collapsed="props.isCollapsed"
+          />
+        </div>
+      </div>
     </div>
   </aside>
 </template>
 
 <style scoped lang="scss">
 .sidebar-panel {
-  --sidebar-panel-brand-height: 5.75rem;
-  --sidebar-panel-expanded-width: 13rem;
-  --sidebar-panel-rail-width: 5rem;
-  --sidebar-panel-row-height: 3.25rem;
   --sidebar-panel-row-transition: 0.18s ease-out;
 
   flex-shrink: 0;
-  height: 100vh;
+  height: var(--app-shell-height);
   overflow: hidden;
   border-right: 1px solid color-mix(in srgb, var(--brand-border-base) 80%, transparent);
   background: var(--brand-bg-sidebar);
@@ -377,6 +388,26 @@ function getToggleGlyphClass() {
     justify-content: center;
     justify-self: center;
     font-size: 20px;
+  }
+
+  .sidebar-panel__footer {
+    flex-shrink: 0;
+    border-top: 1px solid color-mix(in srgb, var(--brand-border-base) 76%, transparent);
+  }
+
+  .sidebar-panel__session {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 2.5rem;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem;
+
+    &.collapsed {
+      grid-template-columns: 1fr;
+      justify-items: center;
+      gap: 0.625rem;
+      padding-inline: 0;
+    }
   }
 }
 </style>

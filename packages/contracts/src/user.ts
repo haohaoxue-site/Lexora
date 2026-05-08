@@ -124,6 +124,10 @@ export const UpdateUserPreferencesRequestSchema = z.object({
   appearance: AppearancePreferenceSchema.optional(),
 }).strict()
 
+export const StartOauthBindingRequestSchema = z.object({
+  redirectPath: z.string().trim().min(1).max(1024).regex(/^\/(?!\/)/),
+}).strict()
+
 export const StartOauthBindingResponseSchema = z.object({
   authorizeUrl: z.string().trim().url(),
 }).strict()
@@ -158,6 +162,7 @@ export type ConfirmBindEmailRequest = z.infer<typeof ConfirmBindEmailRequestSche
 export type DeleteCurrentUserRequest = z.infer<typeof DeleteCurrentUserRequestSchema>
 export type DeleteCurrentUserResponse = z.infer<typeof DeleteCurrentUserResponseSchema>
 export type UpdateUserPreferencesRequest = z.infer<typeof UpdateUserPreferencesRequestSchema>
+export type StartOauthBindingRequest = z.infer<typeof StartOauthBindingRequestSchema>
 export type StartOauthBindingResponse = z.infer<typeof StartOauthBindingResponseSchema>
 export type UserPermissionList = z.infer<typeof UserPermissionListSchema>
 

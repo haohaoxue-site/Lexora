@@ -1,8 +1,11 @@
 import type {
+  AiModelIntentKey,
   AuthProviderName,
   DeleteCurrentUserRequest,
   UserSettings,
 } from '@haohaoxue/samepage-contracts'
+
+export type SettingsTabName = 'user' | 'preference' | 'models-default'
 
 export interface UserProfileSectionProps {
   avatarUrl: string | null
@@ -56,4 +59,32 @@ export interface UserDeleteSectionProps {
 
 export interface UserDeleteSectionEmits {
   deleteAccount: [payload: DeleteCurrentUserRequest]
+}
+
+/**
+ * 默认模型场景选项。
+ */
+export interface SettingsModelIntentOption {
+  /** 场景键 */
+  key: AiModelIntentKey
+  /** 展示名称 */
+  label: string
+  /** 场景说明 */
+  description: string
+  /** 父级默认模型场景 */
+  parentKey?: AiModelIntentKey
+}
+
+/**
+ * 默认模型大类。
+ */
+export interface SettingsModelIntentGroup {
+  /** 大类键 */
+  key: AiModelIntentKey
+  /** 大类名称 */
+  label: string
+  /** 大类说明 */
+  description: string
+  /** 子场景配置项 */
+  children: SettingsModelIntentOption[]
 }

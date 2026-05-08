@@ -4,7 +4,7 @@ import { canManageDocumentShare } from '@haohaoxue/samepage-shared'
 import { ElMessage } from 'element-plus'
 import { computed, shallowRef } from 'vue'
 import { useRouter } from 'vue-router'
-import WorkspacePage from '@/layouts/components/WorkspacePage.vue'
+import PagePanel from '@/layouts/panels/PagePanel.vue'
 import { useWorkspaceStore } from '@/stores/workspace'
 import DocumentShareDialog from './components/DocumentShareDialog.vue'
 import { useDocs } from './composables/useDocs'
@@ -126,8 +126,8 @@ function openTrashPage() {
 </script>
 
 <template>
-  <WorkspacePage :show-context-bar="!isHistoryMode">
-    <template v-if="!isHistoryMode" #context>
+  <PagePanel :show-header="!isHistoryMode">
+    <template v-if="!isHistoryMode" #header>
       <DocsContextBarLayout
         :is-document-surface="isDocumentSurface"
         :current-surface="currentSurface"
@@ -219,5 +219,5 @@ function openTrashPage() {
       @share-changed="applyDocumentShareChanged"
       @update:model-value="handleShareDialogVisibleChange"
     />
-  </WorkspacePage>
+  </PagePanel>
 </template>

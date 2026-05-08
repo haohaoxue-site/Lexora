@@ -19,6 +19,7 @@
   --brand-fill-base: #e5e8eb;
   --brand-fill-light: #f5f7fa;
   --brand-fill-lighter: #f9f9f9;
+
   --brand-bg-body: #ffffff;
   --brand-bg-sidebar: #f9f9f9;
   --brand-bg-surface: #ffffff;
@@ -59,12 +60,13 @@
   --el-bg-color: var(--brand-bg-body);
   --el-bg-color-overlay: var(--brand-bg-body);
   --el-bg-color-page: var(--brand-bg-sidebar);
+
   --el-fill-color: var(--brand-fill-base);
   --el-fill-color-light: var(--brand-fill-light);
   --el-fill-color-lighter: var(--brand-fill-lighter);
   --el-fill-color-extra-light: color-mix(in srgb, var(--brand-fill-lighter), white 45%);
   --el-fill-color-blank: var(--brand-bg-surface);
-  
+
   --el-border-color: var(--brand-border-base);
   --el-border-color-light: var(--brand-border-light);
   --el-border-color-lighter: var(--brand-border-lighter);
@@ -121,6 +123,7 @@ html.dark {
   --brand-fill-base: #2a313a;
   --brand-fill-light: #202833;
   --brand-fill-lighter: #171e26;
+
   --brand-bg-body: #0e1116;
   --brand-bg-sidebar: #10151d;
   --brand-bg-surface: #161c24;

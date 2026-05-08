@@ -14,6 +14,55 @@ const elementPlusResolver = ElementPlusResolver({
   importStyle: false,
 })
 
+const editorDependencyDedupe = [
+  '@hocuspocus/provider',
+  '@tiptap/core',
+  '@tiptap/extension-collaboration',
+  '@tiptap/extension-collaboration-cursor',
+  '@tiptap/pm',
+  '@tiptap/starter-kit',
+  '@tiptap/vue-3',
+  '@tiptap/y-tiptap',
+  'prosemirror-model',
+  'prosemirror-state',
+  'prosemirror-transform',
+  'prosemirror-view',
+  'y-protocols',
+  'yjs',
+]
+
+const editorOptimizedDependencies = [
+  '@hocuspocus/provider',
+  '@tiptap/core',
+  '@tiptap/extension-collaboration',
+  '@tiptap/extension-collaboration-cursor',
+  '@tiptap/extension-color',
+  '@tiptap/extension-highlight',
+  '@tiptap/extension-image',
+  '@tiptap/extension-placeholder',
+  '@tiptap/extension-table',
+  '@tiptap/extension-table-cell',
+  '@tiptap/extension-table-header',
+  '@tiptap/extension-table-row',
+  '@tiptap/extension-task-item',
+  '@tiptap/extension-task-list',
+  '@tiptap/extension-text-style',
+  '@tiptap/pm/model',
+  '@tiptap/pm/state',
+  '@tiptap/pm/view',
+  '@tiptap/starter-kit',
+  '@tiptap/vue-3',
+  '@tiptap/vue-3/menus',
+  '@tiptap/y-tiptap',
+  'prosemirror-model',
+  'prosemirror-state',
+  'prosemirror-transform',
+  'prosemirror-view',
+  'y-protocols/awareness',
+  'yjs',
+  'element-plus/es',
+]
+
 function createManualChunk(id: string) {
   if (id.includes('/element-plus/') || id.includes('/@element-plus/')) {
     return 'element-plus'
@@ -50,6 +99,10 @@ export default defineConfig(({ mode }) => {
       alias: {
         '@': fileURLToPath(new URL('./src', import.meta.url)),
       },
+      dedupe: editorDependencyDedupe,
+    },
+    optimizeDeps: {
+      include: editorOptimizedDependencies,
     },
     server: {
       proxy: {

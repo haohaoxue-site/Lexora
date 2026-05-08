@@ -52,7 +52,7 @@ export function useSessionUserMenu(options: UseSessionUserMenuOptions) {
       avatarUrl: user.avatarUrl,
     }
   })
-  const isAdminRoute = computed(() => Boolean(route.meta.requiresSystemAdmin))
+  const isAdminRoute = computed(() => Boolean(route.meta?.requiresSystemAdmin))
   const contextSwitchAction = computed<SessionContextSwitchAction | null>(() => {
     if (!options.showContextSwitch) {
       return null

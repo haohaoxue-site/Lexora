@@ -4,6 +4,7 @@ import type {
   DeleteCurrentUserRequest as DeleteCurrentUserPayload,
   LanguagePreference,
   RequestBindEmailCodeRequest,
+  StartOauthBindingRequest,
   UpdateCurrentUserProfileRequest,
   UpdateUserPreferencesRequest,
 } from '@haohaoxue/samepage-contracts'
@@ -63,6 +64,14 @@ export class DeleteCurrentUserDto implements DeleteCurrentUserPayload {
   @IsString()
   @Equals(ACCOUNT_DELETION_CONFIRMATION_PHRASE)
   confirmationPhrase!: DeleteCurrentUserPayload['confirmationPhrase']
+}
+
+export class StartOauthBindingDto implements StartOauthBindingRequest {
+  @IsString()
+  @MinLength(1)
+  @MaxLength(1024)
+  @Matches(/^\/(?!\/)/)
+  redirectPath!: string
 }
 
 export class UpdateUserPreferencesDto implements UpdateUserPreferencesRequest {

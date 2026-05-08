@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import EntityAvatar from '@/components/entity-avatar/EntityAvatar.vue'
 import SessionAppearancePanel from './session-user-menu/SessionAppearancePanel.vue'
 import SessionWorkspacePanel from './session-user-menu/SessionWorkspacePanel.vue'
@@ -8,9 +9,16 @@ import WorkspaceCreateDialog from './workspace-create-dialog/WorkspaceCreateDial
 
 const props = withDefaults(defineProps<{
   showContextSwitch?: boolean
+  triggerVariant?: 'avatar' | 'sidebar'
+  isCollapsed?: boolean
 }>(), {
   showContextSwitch: true,
+  triggerVariant: 'avatar',
+  isCollapsed: false,
 })
+
+const isSidebarTrigger = computed(() => props.triggerVariant === 'sidebar')
+const popoverPlacement = computed(() => isSidebarTrigger.value ? 'right-end' : 'bottom-end')
 
 const {
   menuVisible,
@@ -49,7 +57,7 @@ const {
   <ElPopover
     v-model:visible="menuVisible"
     trigger="click"
-    placement="bottom-end"
+    :placement="popoverPlacement"
     :width="256"
     :offset="12"
     :show-arrow="false"
@@ -57,6 +65,30 @@ const {
   >
     <template #reference>
       <ElButton
+        v-if="isSidebarTrigger"
+        class="session-user-sidebar-trigger"
+        :class="{ 'is-collapsed': props.isCollapsed }"
+      >
+        <EntityAvatar
+          :name="currentUser.displayName"
+          :src="currentUser.avatarUrl"
+          :alt="`${currentUser.displayName} 的头像`"
+          :size="36"
+          shape="circle"
+          kind="user"
+          class="session-user-sidebar-trigger__avatar"
+        />
+
+        <span
+          v-if="!props.isCollapsed"
+          class="session-user-sidebar-trigger__name"
+        >
+          {{ currentUser.displayName }}
+        </span>
+      </ElButton>
+
+      <ElButton
+        v-else
         circle
         class="session-user-avatar-trigger"
       >
@@ -484,5 +516,76 @@ const {
       height: 100%;
     }
   }
+}
+
+.session-user-sidebar-trigger {
+  overflow: hidden;
+  width: 100%;
+  min-width: 0;
+  height: 2.75rem;
+  justify-content: flex-start;
+  border: 0;
+  border-radius: 0.75rem;
+  padding: 0.25rem 0.5rem;
+  color: var(--brand-text-primary);
+  background: transparent;
+  box-shadow: none;
+  transition:
+    color 0.2s ease,
+    background 0.2s ease;
+
+  &:hover {
+    color: var(--brand-text-primary);
+    background: color-mix(in srgb, var(--brand-primary) 8%, transparent);
+  }
+
+  &:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--brand-primary) 20%, transparent);
+  }
+
+  &.is-collapsed {
+    width: 2.75rem;
+    min-width: 2.75rem;
+    padding: 0;
+    background: transparent;
+
+    &:hover {
+      background: color-mix(in srgb, var(--brand-primary) 6%, transparent);
+    }
+  }
+
+  > :deep(span) {
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+    width: 100%;
+    min-width: 0;
+    height: 100%;
+  }
+
+  &.is-collapsed > :deep(span) {
+    justify-content: center;
+    gap: 0;
+  }
+}
+
+.session-user-sidebar-trigger__avatar {
+  flex-shrink: 0;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 9999px;
+}
+
+.session-user-sidebar-trigger__name {
+  flex: 1 1 0%;
+  min-width: 0;
+  overflow: hidden;
+  font-size: 0.875rem;
+  font-weight: 600;
+  line-height: 1;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 </style>

@@ -7,6 +7,7 @@ export type {
   RequestBindEmailCodeRequest,
   RequestBindEmailCodeResponse,
   SessionUser,
+  StartOauthBindingRequest,
   StartOauthBindingResponse,
   UpdateCurrentUserAvatarResponse,
   UpdateCurrentUserProfileRequest,

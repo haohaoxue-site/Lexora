@@ -160,11 +160,12 @@ export class AuthService {
     userId: string,
     provider: AuthProviderName,
     request: FastifyRequest,
+    redirectPath: string,
   ): Promise<string> {
     return this.buildOAuthAuthorizationUrl(provider, request, {
       purpose: 'bind',
       initiatorUserId: userId,
-      redirectPath: '/user',
+      redirectPath,
     })
   }
 

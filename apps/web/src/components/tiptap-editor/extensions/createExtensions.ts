@@ -16,7 +16,6 @@ import TableRow from '@tiptap/extension-table-row'
 import TaskItem from '@tiptap/extension-task-item'
 import TaskList from '@tiptap/extension-task-list'
 import { TextStyle } from '@tiptap/extension-text-style'
-import { PluginKey } from '@tiptap/pm/state'
 import StarterKit from '@tiptap/starter-kit'
 import { EditorAiPreview } from '../ai/EditorAiPreview'
 import {
@@ -150,9 +149,6 @@ function createCollaborationExtensions(
       document: collaboration.document,
       field: collaboration.field,
       provider: collaboration.provider ?? null,
-      yUndoOptions: {
-        trackedOrigins: [PluginKey],
-      },
     }),
   ]
 

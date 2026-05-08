@@ -25,7 +25,7 @@ export function showAiDefaultModelMissingDialog(
     cancelButtonText: '稍后再说',
   })
     .then(() => {
-      void options.router.push('/provider/usage')
+      void options.router.push('/settings/models-default')
     })
     .catch(() => undefined)
     .finally(() => {

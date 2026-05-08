@@ -41,6 +41,7 @@ import {
   DeleteCurrentUserDto,
   FindUserByCodeQueryDto,
   RequestBindEmailCodeDto,
+  StartOauthBindingDto,
   UpdateCurrentUserProfileDto,
   UpdateUserPreferencesDto,
 } from './users.dto'
@@ -142,6 +143,7 @@ export class UsersController {
   async startOauthBinding(
     @CurrentUser() authUser: AuthUserContext,
     @Param('provider') provider: string,
+    @Body() payload: StartOauthBindingDto,
     @Req() request: FastifyRequest,
   ): Promise<StartOauthBindingResponse> {
     return {
@@ -149,6 +151,7 @@ export class UsersController {
         authUser.id,
         this.parseProvider(provider),
         request,
+        payload.redirectPath,
       ),
     }
   }

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import WorkspacePage from '@/layouts/components/WorkspacePage.vue'
+import PagePanel from '@/layouts/panels/PagePanel.vue'
 import HomeSchedulePanel from './components/HomeSchedulePanel.vue'
 import HomeWelcomePanel from './components/HomeWelcomePanel.vue'
 import RecentDocumentList from './components/RecentDocumentList.vue'
@@ -13,8 +13,8 @@ const {
 </script>
 
 <template>
-  <WorkspacePage>
-    <template #context>
+  <PagePanel>
+    <template #header>
       <h1 class="home-view-context">
         主页
       </h1>
@@ -37,7 +37,7 @@ const {
         </div>
       </div>
     </div>
-  </WorkspacePage>
+  </PagePanel>
 </template>
 
 <style scoped lang="scss">

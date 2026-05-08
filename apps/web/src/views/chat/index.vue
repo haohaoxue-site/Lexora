@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import WorkspacePage from '@/layouts/components/WorkspacePage.vue'
+import PagePanel from '@/layouts/panels/PagePanel.vue'
 import ChatInputBox from './components/ChatInputBox.vue'
 import ChatMessageList from './components/ChatMessageList.vue'
 import ChatProviderSettingsDialog from './components/ChatProviderSettingsDialog.vue'
@@ -27,8 +27,8 @@ const {
 </script>
 
 <template>
-  <WorkspacePage>
-    <template #context>
+  <PagePanel>
+    <template #header>
       <div class="chat-view-context">
         <div class="chat-view-context__copy">
           <div class="chat-view-context__title">
@@ -82,7 +82,7 @@ const {
       v-model:form="draft"
       @save="saveSettings"
     />
-  </WorkspacePage>
+  </PagePanel>
 </template>
 
 <style scoped lang="scss">

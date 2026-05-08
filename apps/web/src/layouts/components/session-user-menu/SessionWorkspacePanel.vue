@@ -108,7 +108,7 @@ function getWorkspaceAvatarProps(workspace: SessionWorkspacePanelProps['workspac
 .session-subpanel {
   position: absolute;
   top: 50%;
-  right: calc(100% + 14px);
+  left: calc(100% + 14px);
   z-index: 5;
   transform: translateY(-50%);
   padding: 10px;

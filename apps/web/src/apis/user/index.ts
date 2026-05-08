@@ -6,6 +6,7 @@ import type {
   RequestBindEmailCodeRequest,
   RequestBindEmailCodeResponse,
   SessionUser,
+  StartOauthBindingRequest,
   StartOauthBindingResponse,
   UpdateCurrentUserAvatarResponse,
   UpdateCurrentUserProfileRequest,
@@ -79,10 +80,14 @@ export function confirmBindEmail(data: ConfirmBindEmailRequest): Promise<Session
   })
 }
 
-export function startOauthBinding(provider: AuthProviderName): Promise<StartOauthBindingResponse> {
+export function startOauthBinding(
+  provider: AuthProviderName,
+  data: StartOauthBindingRequest,
+): Promise<StartOauthBindingResponse> {
   return axios.request({
     method: 'post',
     url: `/users/me/oauth/${provider}/start-bind`,
+    data,
   })
 }
 

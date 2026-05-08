@@ -53,7 +53,7 @@ const emits = defineEmits<{
 .session-subpanel {
   position: absolute;
   top: 50%;
-  right: calc(100% + 14px);
+  left: calc(100% + 14px);
   z-index: 5;
   width: 220px;
   transform: translateY(-50%);

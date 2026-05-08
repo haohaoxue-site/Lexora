@@ -1,5 +1,17 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import { useSessionNotificationBell } from './useSessionNotificationBell'
+
+const props = withDefaults(defineProps<{
+  triggerVariant?: 'header' | 'sidebar'
+  isCollapsed?: boolean
+}>(), {
+  triggerVariant: 'header',
+  isCollapsed: false,
+})
+
+const isSidebarTrigger = computed(() => props.triggerVariant === 'sidebar')
+const popoverPlacement = computed(() => isSidebarTrigger.value ? 'right-end' : 'bottom-end')
 
 const {
   acceptInvite,
@@ -21,7 +33,7 @@ const {
   <ElPopover
     v-model:visible="popoverVisible"
     trigger="click"
-    placement="bottom-end"
+    :placement="popoverPlacement"
     :width="360"
     :offset="12"
     :show-arrow="false"
@@ -38,6 +50,10 @@ const {
         <ElButton
           circle
           class="session-notification-bell__trigger"
+          :class="{
+            'is-sidebar': isSidebarTrigger,
+            'is-collapsed': props.isCollapsed,
+          }"
         >
           <SvgIcon category="ui" icon="notification-bell" size="18px" class="session-notification-bell__icon" />
         </ElButton>
@@ -136,6 +152,22 @@ const {
       color: var(--brand-primary);
       border-color: color-mix(in srgb, var(--brand-primary) 24%, transparent);
       background: color-mix(in srgb, var(--brand-primary) 8%, white);
+    }
+
+    &.is-sidebar {
+      box-shadow: none;
+      border-color: transparent;
+      background: transparent;
+
+      &:hover {
+        background: color-mix(in srgb, var(--brand-primary) 8%, transparent);
+      }
+    }
+
+    &.is-collapsed {
+      width: 2.75rem;
+      height: 2.75rem;
+      background: transparent;
     }
   }
 

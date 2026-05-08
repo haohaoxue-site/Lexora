@@ -3,7 +3,9 @@ import type { FormInstance } from 'element-plus'
 import type { SystemEmailProvider } from '@/apis/system-admin'
 import { Promotion } from '@element-plus/icons-vue'
 import { computed, useTemplateRef } from 'vue'
+import PagePanel from '@/layouts/panels/PagePanel.vue'
 import { formatDateTime } from '@/utils/dayjs'
+import SystemAdminPageHeader from '../components/SystemAdminPageHeader.vue'
 import { useEmail } from './composables/useEmail'
 
 const emailConfigFormRef = useTemplateRef<FormInstance>('emailConfigFormRef')
@@ -118,186 +120,192 @@ function handleProviderChange(value: string | number | boolean | undefined) {
 </script>
 
 <template>
-  <div v-loading="isLoading" class="admin-email">
-    <ElAlert v-if="errorMessage" :title="errorMessage" type="error" show-icon :closable="false" class="rounded-xl" />
+  <PagePanel>
+    <template #header>
+      <SystemAdminPageHeader title="邮件" />
+    </template>
 
-    <template v-else>
-      <div class="admin-email__columns">
-        <ElCard shadow="never" class="admin-email__main-card">
-          <div class="admin-email__section">
-            <h2 class="admin-email__section-title">
-              SMTP 配置
-            </h2>
+    <div v-loading="isLoading" class="admin-email min-h-full bg-fill-lighter p-4 lg:p-6">
+      <ElAlert v-if="errorMessage" :title="errorMessage" type="error" show-icon :closable="false" class="rounded-xl" />
 
-            <ElRadioGroup
-              v-model="form.provider"
-              class="admin-email__provider-group mt-4"
-              @change="handleProviderChange"
-            >
-              <ElRadio
-                v-for="provider in providerCards"
-                :key="provider.provider"
-                :label="provider.provider"
-                :value="provider.provider"
-                :disabled="provider.disabled"
-                border
-                class="admin-email__provider-option"
-              >
-                <span class="admin-email__provider-title">
-                  {{ provider.title }}
-                </span>
-                <span class="admin-email__provider-meta">
-                  Host: {{ provider.defaults.smtpHost }} / Port: {{ provider.defaults.smtpPort }}
-                </span>
-              </ElRadio>
-            </ElRadioGroup>
-          </div>
-
-          <div class="admin-email__section">
-            <ElForm
-              ref="emailConfigFormRef"
-              :model="form"
-              :rules="formRules"
-              label-position="top"
-              @submit.prevent="handleSaveConfig"
-            >
-              <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-                <ElFormItem label="SMTP Host" prop="smtpHost">
-                  <ElInput v-model="form.smtpHost" placeholder="smtp.exmail.qq.com" />
-                </ElFormItem>
-                <ElFormItem label="端口" prop="smtpPort">
-                  <ElInputNumber v-model="form.smtpPort" :min="1" :max="65535" controls-position="right" class="w-full" />
-                </ElFormItem>
-                <ElFormItem label="发件账号" prop="smtpUsername">
-                  <ElInput v-model="form.smtpUsername" autocomplete="username" />
-                </ElFormItem>
-                <ElFormItem label="发件密码" prop="smtpPassword">
-                  <ElButton v-if="hasSavedPassword && !isEditingPassword" plain type="primary" class="w-full" @click="handleStartPasswordEdit">
-                    更换密码
-                  </ElButton>
-                  <div v-else class="flex w-full items-start gap-3">
-                    <ElInput
-                      v-model="form.smtpPassword"
-                      class="min-w-0 flex-1"
-                      type="password"
-                      show-password
-                      autocomplete="new-password"
-                      :placeholder="hasSavedPassword ? '输入新的发件密码' : '请输入发件密码'"
-                    />
-                    <ElButton
-                      v-if="hasSavedPassword && isEditingPassword"
-                      link
-                      class="shrink-0 self-center"
-                      @click="handleKeepSavedPassword"
-                    >
-                      取消更换
-                    </ElButton>
-                  </div>
-                </ElFormItem>
-                <ElFormItem label="发件人名称" prop="fromName">
-                  <ElInput v-model="form.fromName" />
-                </ElFormItem>
-                <ElFormItem label="发件邮箱" prop="fromEmail">
-                  <ElInput v-model="form.fromEmail" autocomplete="email" />
-                </ElFormItem>
-              </div>
-
-              <ElFormItem prop="smtpSecure">
-                <ElCheckbox v-model="form.smtpSecure">
-                  使用 SSL / TLS 加密连接
-                </ElCheckbox>
-              </ElFormItem>
-
-              <div class="admin-email__form-actions">
-                <ElButton type="primary" :loading="isSaving" native-type="submit">
-                  {{ isSaving ? '保存中...' : '保存发件配置' }}
-                </ElButton>
-              </div>
-            </ElForm>
-          </div>
-        </ElCard>
-
-        <ElCard shadow="never" class="admin-email__side-card" body-class="admin-email__side-card-body">
-          <div class="admin-email__side-header">
-            <div class="min-w-0">
+      <template v-else>
+        <div class="admin-email__columns">
+          <ElCard shadow="never" class="admin-email__main-card">
+            <div class="admin-email__section">
               <h2 class="admin-email__section-title">
-                邮件服务
+                SMTP 配置
               </h2>
-              <p class="admin-email__section-description mt-1.5">
-                当前发件身份：{{ senderIdentityText }}
+
+              <ElRadioGroup
+                v-model="form.provider"
+                class="admin-email__provider-group mt-4"
+                @change="handleProviderChange"
+              >
+                <ElRadio
+                  v-for="provider in providerCards"
+                  :key="provider.provider"
+                  :label="provider.provider"
+                  :value="provider.provider"
+                  :disabled="provider.disabled"
+                  border
+                  class="admin-email__provider-option"
+                >
+                  <span class="admin-email__provider-title">
+                    {{ provider.title }}
+                  </span>
+                  <span class="admin-email__provider-meta">
+                    Host: {{ provider.defaults.smtpHost }} / Port: {{ provider.defaults.smtpPort }}
+                  </span>
+                </ElRadio>
+              </ElRadioGroup>
+            </div>
+
+            <div class="admin-email__section">
+              <ElForm
+                ref="emailConfigFormRef"
+                :model="form"
+                :rules="formRules"
+                label-position="top"
+                @submit.prevent="handleSaveConfig"
+              >
+                <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  <ElFormItem label="SMTP Host" prop="smtpHost">
+                    <ElInput v-model="form.smtpHost" placeholder="smtp.exmail.qq.com" />
+                  </ElFormItem>
+                  <ElFormItem label="端口" prop="smtpPort">
+                    <ElInputNumber v-model="form.smtpPort" :min="1" :max="65535" controls-position="right" class="w-full" />
+                  </ElFormItem>
+                  <ElFormItem label="发件账号" prop="smtpUsername">
+                    <ElInput v-model="form.smtpUsername" autocomplete="username" />
+                  </ElFormItem>
+                  <ElFormItem label="发件密码" prop="smtpPassword">
+                    <ElButton v-if="hasSavedPassword && !isEditingPassword" plain type="primary" class="w-full" @click="handleStartPasswordEdit">
+                      更换密码
+                    </ElButton>
+                    <div v-else class="flex w-full items-start gap-3">
+                      <ElInput
+                        v-model="form.smtpPassword"
+                        class="min-w-0 flex-1"
+                        type="password"
+                        show-password
+                        autocomplete="new-password"
+                        :placeholder="hasSavedPassword ? '输入新的发件密码' : '请输入发件密码'"
+                      />
+                      <ElButton
+                        v-if="hasSavedPassword && isEditingPassword"
+                        link
+                        class="shrink-0 self-center"
+                        @click="handleKeepSavedPassword"
+                      >
+                        取消更换
+                      </ElButton>
+                    </div>
+                  </ElFormItem>
+                  <ElFormItem label="发件人名称" prop="fromName">
+                    <ElInput v-model="form.fromName" />
+                  </ElFormItem>
+                  <ElFormItem label="发件邮箱" prop="fromEmail">
+                    <ElInput v-model="form.fromEmail" autocomplete="email" />
+                  </ElFormItem>
+                </div>
+
+                <ElFormItem prop="smtpSecure">
+                  <ElCheckbox v-model="form.smtpSecure">
+                    使用 SSL / TLS 加密连接
+                  </ElCheckbox>
+                </ElFormItem>
+
+                <div class="admin-email__form-actions">
+                  <ElButton type="primary" :loading="isSaving" native-type="submit">
+                    {{ isSaving ? '保存中...' : '保存发件配置' }}
+                  </ElButton>
+                </div>
+              </ElForm>
+            </div>
+          </ElCard>
+
+          <ElCard shadow="never" class="admin-email__side-card" body-class="admin-email__side-card-body">
+            <div class="admin-email__side-header">
+              <div class="min-w-0">
+                <h2 class="admin-email__section-title">
+                  邮件服务
+                </h2>
+                <p class="admin-email__section-description mt-1.5">
+                  当前发件身份：{{ senderIdentityText }}
+                </p>
+              </div>
+              <div class="admin-email__status-actions">
+                <ElTooltip :content="testEmailTooltip" placement="top" effect="light">
+                  <span class="inline-flex">
+                    <ElButton
+                      circle
+                      plain
+                      size="small"
+                      class="admin-email__test-trigger"
+                      :icon="Promotion"
+                      :disabled="!canSendTestEmail"
+                      @click="openTestDialog"
+                    />
+                  </span>
+                </ElTooltip>
+                <ElSwitch
+                  :model-value="currentServiceStatus?.enabled ?? false"
+                  :loading="isUpdatingServiceStatus"
+                  :disabled="isUpdatingServiceStatus"
+                  @change="handleServiceStatusChange"
+                />
+              </div>
+            </div>
+
+            <ElDivider class="admin-email__side-divider" />
+
+            <div class="admin-email__side-block">
+              <span class="admin-email__side-label">最近一次测试</span>
+              <span class="admin-email__last-test-primary">{{ lastTestPrimaryText }}</span>
+              <p v-if="lastTestSecondaryText" class="admin-email__last-test-secondary">
+                {{ lastTestSecondaryText }}
               </p>
             </div>
-            <div class="admin-email__status-actions">
-              <ElTooltip :content="testEmailTooltip" placement="top" effect="light">
-                <span class="inline-flex">
-                  <ElButton
-                    circle
-                    plain
-                    size="small"
-                    class="admin-email__test-trigger"
-                    :icon="Promotion"
-                    :disabled="!canSendTestEmail"
-                    @click="openTestDialog"
-                  />
-                </span>
-              </ElTooltip>
-              <ElSwitch
-                :model-value="currentServiceStatus?.enabled ?? false"
-                :loading="isUpdatingServiceStatus"
-                :disabled="isUpdatingServiceStatus"
-                @change="handleServiceStatusChange"
-              />
-            </div>
-          </div>
+          </ElCard>
+        </div>
 
-          <ElDivider class="admin-email__side-divider" />
-
-          <div class="admin-email__side-block">
-            <span class="admin-email__side-label">最近一次测试</span>
-            <span class="admin-email__last-test-primary">{{ lastTestPrimaryText }}</span>
-            <p v-if="lastTestSecondaryText" class="admin-email__last-test-secondary">
-              {{ lastTestSecondaryText }}
-            </p>
-          </div>
-        </ElCard>
-      </div>
-
-      <ElDialog
-        v-model="isTestDialogVisible"
-        title="发送测试邮件"
-        width="32rem"
-        destroy-on-close
-        @close="closeTestDialog"
-      >
-        <ElForm
-          ref="testEmailFormRef"
-          :model="testEmailForm"
-          :rules="testEmailFormRules"
-          label-position="top"
-          @submit.prevent="handleSendTestEmail"
+        <ElDialog
+          v-model="isTestDialogVisible"
+          title="发送测试邮件"
+          width="32rem"
+          destroy-on-close
+          @close="closeTestDialog"
         >
-          <ElFormItem label="收件邮箱" prop="email">
-            <ElInput
-              v-model="testEmailForm.email"
-              autocomplete="email"
-              placeholder="请输入收件邮箱"
-            />
-          </ElFormItem>
-        </ElForm>
+          <ElForm
+            ref="testEmailFormRef"
+            :model="testEmailForm"
+            :rules="testEmailFormRules"
+            label-position="top"
+            @submit.prevent="handleSendTestEmail"
+          >
+            <ElFormItem label="收件邮箱" prop="email">
+              <ElInput
+                v-model="testEmailForm.email"
+                autocomplete="email"
+                placeholder="请输入收件邮箱"
+              />
+            </ElFormItem>
+          </ElForm>
 
-        <template #footer>
-          <div class="flex justify-end gap-3">
-            <ElButton @click="closeTestDialog">
-              取消
-            </ElButton>
-            <ElButton type="primary" :loading="isTesting" @click="handleSendTestEmail">
-              {{ isTesting ? '发送中...' : '发送' }}
-            </ElButton>
-          </div>
-        </template>
-      </ElDialog>
-    </template>
-  </div>
+          <template #footer>
+            <div class="flex justify-end gap-3">
+              <ElButton @click="closeTestDialog">
+                取消
+              </ElButton>
+              <ElButton type="primary" :loading="isTesting" @click="handleSendTestEmail">
+                {{ isTesting ? '发送中...' : '发送' }}
+              </ElButton>
+            </div>
+          </template>
+        </ElDialog>
+      </template>
+    </div>
+  </PagePanel>
 </template>
 
 <style scoped lang="scss">

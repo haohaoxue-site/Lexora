@@ -4,8 +4,7 @@ import { AUTH_CALLBACK_PATH, DOCUMENT_SHARE_ROUTE_PREFIX } from '@haohaoxue/same
 import { SvgIconCategory } from '@/components/svg-icon/typing'
 import { ADMIN_ROUTE_NAME, ADMIN_ROUTE_PATH } from './constants'
 
-const AdminShellContainer = () => import('@/layouts/containers/admin-shell.vue')
-const WorkspaceContainer = () => import('@/layouts/containers/workspace.vue')
+const WorkspaceContainer = () => import('@/layouts/containers/WorkspaceContainer.vue')
 const AuthCallbackView = () => import('@/views/auth/callback/index.vue')
 const ChangePasswordView = () => import('@/views/auth/change-password/index.vue')
 const LoginView = () => import('@/views/auth/login/index.vue')
@@ -20,10 +19,11 @@ const DocsTrashPageView = () => import('@/views/docs/pages/DocsTrashPage.vue')
 const HomeView = () => import('@/views/home/index.vue')
 const KnowledgeView = () => import('@/views/knowledge/index.vue')
 const ProviderView = () => import('@/views/provider/index.vue')
-const ProviderDefaultModelsPageView = () => import('@/views/provider/pages/ProviderDefaultModelsPage.vue')
-const ProviderModelServicesPageView = () => import('@/views/provider/pages/ProviderModelServicesPage.vue')
+const SettingsView = () => import('@/views/settings/index.vue')
+const SettingsDefaultModelsPageView = () => import('@/views/settings/pages/SettingsDefaultModelsPage.vue')
+const SettingsPreferencePageView = () => import('@/views/settings/pages/SettingsPreferencePage.vue')
+const SettingsUserPageView = () => import('@/views/settings/pages/SettingsUserPage.vue')
 const SharedDocsView = () => import('@/views/shared-docs/index.vue')
-const UserSettingsView = () => import('@/views/user/index.vue')
 
 const ADMIN_ROUTE_ENTRY_NAME = 'admin-overview'
 
@@ -129,36 +129,41 @@ const workspaceRouteChildren = [
     path: 'provider',
     name: 'provider',
     component: ProviderView,
-    redirect: '/provider/models',
     meta: {
       navLabel: '服务商',
       navIconCategory: SvgIconCategory.NAV,
       navIcon: 'model-providers',
       navActiveIcon: 'model-providers-active',
     },
-    children: [
-      {
-        path: 'models',
-        name: 'provider-models',
-        component: ProviderModelServicesPageView,
-      },
-      {
-        path: 'usage',
-        name: 'provider-usage',
-        component: ProviderDefaultModelsPageView,
-      },
-    ],
   },
   {
-    path: 'user',
-    name: 'user',
-    component: UserSettingsView,
+    path: 'settings',
+    name: 'settings',
+    component: SettingsView,
+    redirect: { name: 'settings-user' },
     meta: {
       navLabel: '设置',
       navIconCategory: SvgIconCategory.NAV,
       navIcon: 'user-settings',
       navActiveIcon: 'user-settings-active',
     },
+    children: [
+      {
+        path: 'user',
+        name: 'settings-user',
+        component: SettingsUserPageView,
+      },
+      {
+        path: 'preference',
+        name: 'settings-preference',
+        component: SettingsPreferencePageView,
+      },
+      {
+        path: 'models-default',
+        name: 'settings-models-default',
+        component: SettingsDefaultModelsPageView,
+      },
+    ],
   },
 ] satisfies RouteRecordRaw[]
 
@@ -197,9 +202,9 @@ const adminRouteChildren = [
     },
   },
   {
-    path: 'model-providers',
-    name: 'admin-model-providers',
-    component: () => import('@/views/system-admin/model-providers/index.vue'),
+    path: 'providers',
+    name: 'admin-providers',
+    component: () => import('@/views/system-admin/providers/index.vue'),
     meta: {
       navLabel: '服务商',
       navIconCategory: SvgIconCategory.NAV,
@@ -253,7 +258,7 @@ export const protectedRoutes: RouteRecordRaw[] = [
 export const adminRoute: RouteRecordRaw = {
   path: ADMIN_ROUTE_PATH,
   name: ADMIN_ROUTE_NAME,
-  component: AdminShellContainer,
+  component: WorkspaceContainer,
   redirect: { name: ADMIN_ROUTE_ENTRY_NAME },
   meta: { requiresSystemAdmin: true },
   children: adminRouteChildren,

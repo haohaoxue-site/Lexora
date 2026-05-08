@@ -1,30 +1,26 @@
 <script setup lang="ts">
-import { RouterView } from 'vue-router'
-import WorkspacePage from '@/layouts/components/WorkspacePage.vue'
-import { useProviderRouteTabs } from './composables/useProviderRouteTabs'
-import ProviderContextBarLayout from './layouts/ProviderContextBarLayout.vue'
-
-const { activeTab } = useProviderRouteTabs()
+import PagePanel from '@/layouts/panels/PagePanel.vue'
+import ModelServiceConsole from './components/ModelServiceConsole.vue'
 </script>
 
 <template>
-  <WorkspacePage class="provider-shell">
-    <template #context>
-      <ProviderContextBarLayout v-model="activeTab" />
+  <PagePanel>
+    <template #header>
+      <h1 class="provider-view__title">
+        模型服务
+      </h1>
     </template>
 
-    <RouterView />
-  </WorkspacePage>
+    <ModelServiceConsole mode="user" />
+  </PagePanel>
 </template>
 
 <style scoped lang="scss">
-.provider-shell {
-  :deep(.workspace-context-bar) {
-    --workspace-context-bar-height: 6.5rem;
-  }
-
-  :deep(.workspace-context-bar__slot) {
-    align-items: stretch;
-  }
+.provider-view__title {
+  margin: 0;
+  color: var(--brand-text-primary);
+  font-size: 1.5rem;
+  font-weight: 600;
+  line-height: 2rem;
 }
 </style>

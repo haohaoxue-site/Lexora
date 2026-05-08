@@ -1,12 +1,12 @@
 <script setup lang="ts">
-import WorkspacePage from '@/layouts/components/WorkspacePage.vue'
+import PagePanel from '@/layouts/panels/PagePanel.vue'
 
 const pageTitle = '知识库'
 </script>
 
 <template>
-  <WorkspacePage>
-    <template #context>
+  <PagePanel>
+    <template #header>
       <div class="knowledge-view-context">
         <div class="knowledge-view-context__title">
           {{ pageTitle }}
@@ -23,7 +23,7 @@ const pageTitle = '知识库'
         </template>
       </ElEmpty>
     </section>
-  </WorkspacePage>
+  </PagePanel>
 </template>
 
 <style scoped lang="scss">

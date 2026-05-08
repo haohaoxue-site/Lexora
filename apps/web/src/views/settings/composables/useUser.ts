@@ -1,8 +1,6 @@
 import type {
-  AppearancePreference,
   AuthProviderName,
   DeleteCurrentUserRequest,
-  LanguagePreference,
   UserSettings,
 } from '@haohaoxue/samepage-contracts'
 import type { Ref, ShallowRef } from 'vue'
@@ -76,7 +74,6 @@ export function useUser(options: {
   const accountState = useUserAccountState({
     authCapabilities,
   })
-  const preferenceState = useUserPreferenceState()
   const currentUser = computed(() => userStore.currentUser)
   const canEditDisplayName = computed(() => !userStore.isSystemAdmin)
   const deleteAccountConfirmationMode = computed<'email' | 'displayName'>(() =>
@@ -161,7 +158,6 @@ export function useUser(options: {
 
   return {
     account: accountState.account,
-    appearancePreference: preferenceState.appearancePreference,
     avatarUrl: profileState.avatarUrl,
     bindingProvider: accountState.bindingProvider,
     canDisconnectGithub: accountState.canDisconnectGithub,
@@ -183,12 +179,9 @@ export function useUser(options: {
     isBindingEmail: accountState.isBindingEmail,
     isDeletingAccount,
     isLoading,
-    isSavingAppearance: preferenceState.isSavingAppearance,
     isSavingDisplayName: profileState.isSavingDisplayName,
-    isSavingLanguage: preferenceState.isSavingLanguage,
     isSendingEmailCode: accountState.isSendingEmailCode,
     isUploadingAvatar: profileState.isUploadingAvatar,
-    languagePreference: preferenceState.languagePreference,
     profileForm: profileState.profileForm,
     saveDisplayName: profileState.saveDisplayName,
     sendEmailCode: accountState.sendEmailCode,
@@ -344,7 +337,9 @@ function useUserAccountState(options: { authCapabilities: ShallowRef<AuthCapabil
     bindingProvider.value = provider
 
     try {
-      const result = await startOauthBinding(provider)
+      const result = await startOauthBinding(provider, {
+        redirectPath: route.fullPath,
+      })
       window.location.assign(result.authorizeUrl)
     }
     catch (error) {
@@ -414,49 +409,6 @@ function useUserAccountState(options: { authCapabilities: ShallowRef<AuthCapabil
     isSendingEmailCode,
     sendEmailCode,
     syncEmailForm,
-  }
-}
-
-function useUserPreferenceState() {
-  const userStore = useUserStore()
-  const isSavingLanguage = computed(() => userStore.isSavingLanguage)
-  const isSavingAppearance = computed(() => userStore.isSavingAppearance)
-  const languagePreference = computed<LanguagePreference>({
-    get: () => userStore.preferences.language,
-    set: (value) => {
-      void saveLanguagePreference(value)
-    },
-  })
-  const appearancePreference = computed<AppearancePreference>({
-    get: () => userStore.preferences.appearance,
-    set: (value) => {
-      void saveAppearancePreference(value)
-    },
-  })
-
-  async function saveLanguagePreference(value: LanguagePreference) {
-    try {
-      await userStore.updateLanguagePreference(value)
-    }
-    catch (error) {
-      ElMessage.error(getRequestErrorDisplayMessage(error, '保存语言偏好失败'))
-    }
-  }
-
-  async function saveAppearancePreference(value: AppearancePreference) {
-    try {
-      await userStore.updateAppearancePreference(value)
-    }
-    catch (error) {
-      ElMessage.error(getRequestErrorDisplayMessage(error, '保存外观偏好失败'))
-    }
-  }
-
-  return {
-    appearancePreference,
-    isSavingAppearance,
-    isSavingLanguage,
-    languagePreference,
   }
 }
 
