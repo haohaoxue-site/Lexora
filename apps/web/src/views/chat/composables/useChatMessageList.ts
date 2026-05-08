@@ -16,8 +16,8 @@ export function useChatMessageList(
         icon: 'chat-active',
       }
     : {
-        category: SvgIconCategory.UI,
-        icon: 'settings',
+        category: SvgIconCategory.AI,
+        icon: 'ai-spark',
       })
 
   onUpdated(() => {

@@ -81,7 +81,7 @@ const {
           </span>
         </button>
 
-        <div class="workspace-create-dialog__header-copy">
+        <div class="workspace-create-dialog__header-content">
           <p class="workspace-create-dialog__title">
             团队图标
           </p>
@@ -255,7 +255,7 @@ const {
     line-height: 1;
   }
 
-  &__header-copy {
+  &__header-content {
     min-width: 0;
     flex: 1 1 0%;
   }

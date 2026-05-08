@@ -99,7 +99,7 @@ const {
                 <span class="model-service-console__provider-avatar">
                   {{ getProviderInitial(row) }}
                 </span>
-                <span class="model-service-console__provider-copy">
+                <span class="model-service-console__provider-info">
                   <span class="model-service-console__provider-title">
                     {{ row.title }}
                   </span>
@@ -134,7 +134,7 @@ const {
               <span class="model-service-console__provider-avatar">
                 {{ getProviderInitial(row) }}
               </span>
-              <span class="model-service-console__provider-copy">
+              <span class="model-service-console__provider-info">
                 <span class="model-service-console__provider-title">
                   {{ row.title }}
                 </span>
@@ -465,7 +465,7 @@ const {
     }
   }
 
-  .model-service-console__provider-copy {
+  .model-service-console__provider-info {
     min-width: 0;
     flex: 1 1 0%;
     text-align: left;

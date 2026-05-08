@@ -7,7 +7,7 @@ defineProps<ConsoleMetricCardProps>()
 <template>
   <ElCard shadow="hover" body-class="console-metric-card__body" class="console-metric-card">
     <div class="console-metric-card__header">
-      <div class="console-metric-card__copy">
+      <div class="console-metric-card__content">
         <p class="console-metric-card__label">
           {{ label }}
         </p>
@@ -44,7 +44,7 @@ defineProps<ConsoleMetricCardProps>()
     justify-content: space-between;
   }
 
-  .console-metric-card__copy {
+  .console-metric-card__content {
     > * + * {
       margin-top: 0.25rem;
     }

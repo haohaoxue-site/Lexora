@@ -48,7 +48,7 @@ function getWorkspaceAvatarProps(workspace: SessionWorkspacePanelProps['workspac
           />
         </span>
 
-        <span class="session-workspace-create__copy">
+        <span class="session-workspace-create__text">
           <span class="session-workspace-create__title">
             创建团队
           </span>
@@ -76,7 +76,7 @@ function getWorkspaceAvatarProps(workspace: SessionWorkspacePanelProps['workspac
             class="session-workspace-option__avatar"
           />
 
-          <span class="session-workspace-option__copy">
+          <span class="session-workspace-option__text">
             <span class="session-workspace-option__title">
               {{ workspace.label }}
             </span>
@@ -181,8 +181,8 @@ function getWorkspaceAvatarProps(workspace: SessionWorkspacePanelProps['workspac
   color: color-mix(in srgb, var(--brand-text-primary) 76%, var(--brand-primary) 24%);
 }
 
-.session-workspace-create__copy,
-.session-workspace-option__copy {
+.session-workspace-create__text,
+.session-workspace-option__text {
   display: flex;
   min-width: 0;
   flex: 1 1 0%;

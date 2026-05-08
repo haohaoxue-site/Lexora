@@ -30,7 +30,7 @@ const { formatDocumentLocation, formatDocumentUpdatedAt } = useRecentDocumentLis
           <SvgIcon category="ui" icon="doc-card" size="1.5rem" class="recent-document-list__icon" />
         </div>
 
-        <div class="recent-document-list__copy">
+        <div class="recent-document-list__content">
           <div class="recent-document-list__item-header">
             <h4 class="recent-document-list__item-title">
               {{ document.title }}
@@ -119,7 +119,7 @@ const { formatDocumentLocation, formatDocumentUpdatedAt } = useRecentDocumentLis
     display: block;
   }
 
-  .recent-document-list__copy {
+  .recent-document-list__content {
     flex: 1 1 0%;
     min-width: 0;
   }

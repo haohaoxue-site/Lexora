@@ -35,7 +35,7 @@ const { emitAction, fallbackState } = useDocumentEditorFallback({
             {{ fallbackState.title }}
           </div>
 
-          <div class="docs-document-editor-fallback__copy">
+          <div class="docs-document-editor-fallback__text">
             {{ fallbackState.description }}
           </div>
         </div>
@@ -91,7 +91,7 @@ const { emitAction, fallbackState } = useDocumentEditorFallback({
     font-weight: 600;
   }
 
-  .docs-document-editor-fallback__copy {
+  .docs-document-editor-fallback__text {
     font-size: 0.875rem;
     line-height: 1.6;
   }

@@ -23,6 +23,7 @@ import { ChatSessionsService } from './chat-sessions.service'
 import {
   CreateChatCompletionRequestDto,
   UpdateChatSessionModelRequestDto,
+  UpdateChatSessionTitleRequestDto,
 } from './chat.dto'
 import { ChatService } from './chat.service'
 
@@ -77,6 +78,19 @@ export class ChatController {
       userId: authUser.id,
       sessionId,
       modelRef: payload.modelRef ?? null,
+    })
+  }
+
+  @Patch('sessions/:id/title')
+  async updateSessionTitle(
+    @CurrentUser() authUser: AuthUserContext,
+    @Param('id') sessionId: string,
+    @Body() payload: UpdateChatSessionTitleRequestDto,
+  ): Promise<ChatSessionDetail> {
+    return this.chatSessionsService.updateSessionTitle({
+      userId: authUser.id,
+      sessionId,
+      title: payload.title,
     })
   }
 

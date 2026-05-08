@@ -109,7 +109,7 @@ function goToLogin() {
 
     <template #footer>
       <template v-if="loadErrorMessage || isLoadingCapabilities || passwordRegistrationEnabled">
-        <span class="password-register-view__footer-copy">已有账号？</span>
+        <span class="password-register-view__footer-text">已有账号？</span>
         <RouterLink :to="{ name: 'login' }" class="password-register-view__footer-link">
           返回登录
         </RouterLink>
@@ -137,7 +137,7 @@ function goToLogin() {
     min-height: 2.875rem;
   }
 
-  &__footer-copy {
+  &__footer-text {
     color: var(--brand-text-secondary);
   }
 

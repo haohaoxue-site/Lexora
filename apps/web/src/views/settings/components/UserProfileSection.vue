@@ -38,7 +38,7 @@ const {
     >
       <template #aside>
         <div class="user-profile-section__collab-code">
-          <span class="user-profile-section__collab-code-copy">
+          <span class="user-profile-section__collab-code-text">
             <span class="user-profile-section__collab-code-label">协作码</span>
             <strong class="user-profile-section__collab-code-value">{{ props.userCode }}</strong>
           </span>
@@ -131,7 +131,7 @@ const {
     background: color-mix(in srgb, var(--brand-fill-lighter) 72%, transparent);
   }
 
-  &__collab-code-copy {
+  &__collab-code-text {
     display: flex;
     min-width: 0;
     flex-direction: column;

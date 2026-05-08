@@ -1,17 +1,11 @@
 <script setup lang="ts">
-import { computed } from 'vue'
 import { useSessionNotificationBell } from './useSessionNotificationBell'
 
 const props = withDefaults(defineProps<{
-  triggerVariant?: 'header' | 'sidebar'
   isCollapsed?: boolean
 }>(), {
-  triggerVariant: 'header',
   isCollapsed: false,
 })
-
-const isSidebarTrigger = computed(() => props.triggerVariant === 'sidebar')
-const popoverPlacement = computed(() => isSidebarTrigger.value ? 'right-end' : 'bottom-end')
 
 const {
   acceptInvite,
@@ -33,7 +27,7 @@ const {
   <ElPopover
     v-model:visible="popoverVisible"
     trigger="click"
-    :placement="popoverPlacement"
+    placement="right-end"
     :width="360"
     :offset="12"
     :show-arrow="false"
@@ -50,10 +44,7 @@ const {
         <ElButton
           circle
           class="session-notification-bell__trigger"
-          :class="{
-            'is-sidebar': isSidebarTrigger,
-            'is-collapsed': props.isCollapsed,
-          }"
+          :class="{ 'is-collapsed': props.isCollapsed }"
         >
           <SvgIcon category="ui" icon="notification-bell" size="18px" class="session-notification-bell__icon" />
         </ElButton>
@@ -62,7 +53,7 @@ const {
 
     <div class="session-notification-bell">
       <div class="session-notification-bell__header">
-        <div class="session-notification-bell__header-copy">
+        <div class="session-notification-bell__header-main">
           <h3 class="session-notification-bell__title">
             消息提醒
           </h3>
@@ -144,24 +135,14 @@ const {
     width: 2.5rem;
     height: 2.5rem;
     color: var(--brand-text-secondary);
-    border: 1px solid color-mix(in srgb, var(--brand-border-base) 78%, transparent);
-    background: color-mix(in srgb, var(--brand-bg-surface) 88%, transparent);
-    box-shadow: 0 14px 30px -24px color-mix(in srgb, var(--brand-primary) 42%, transparent);
+    border: 1px solid transparent;
+    background: transparent;
+    box-shadow: none;
 
     &:hover {
       color: var(--brand-primary);
-      border-color: color-mix(in srgb, var(--brand-primary) 24%, transparent);
-      background: color-mix(in srgb, var(--brand-primary) 8%, white);
-    }
-
-    &.is-sidebar {
-      box-shadow: none;
       border-color: transparent;
-      background: transparent;
-
-      &:hover {
-        background: color-mix(in srgb, var(--brand-primary) 8%, transparent);
-      }
+      background: color-mix(in srgb, var(--brand-primary) 8%, transparent);
     }
 
     &.is-collapsed {
@@ -179,7 +160,7 @@ const {
     margin-bottom: 0.875rem;
   }
 
-  &__header-copy {
+  &__header-main {
     min-width: 0;
   }
 

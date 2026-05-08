@@ -4,7 +4,9 @@ import type {
   ChatSessionDetail,
   ChatSessionSummary,
 } from '@haohaoxue/samepage-contracts'
+import { CHAT_SESSION_DEFAULT_TITLE } from '@haohaoxue/samepage-contracts'
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   NotFoundException,
@@ -20,8 +22,6 @@ import {
   toChatSessionModelRef,
   toChatSessionSummary,
 } from './chat.utils'
-
-const DEFAULT_CHAT_SESSION_TITLE = '新对话'
 
 const chatSessionSummarySelect = {
   id: true,
@@ -100,7 +100,7 @@ export class ChatSessionsService {
     const session = await this.prisma.chatSession.create({
       data: {
         userId,
-        title: DEFAULT_CHAT_SESSION_TITLE,
+        title: CHAT_SESSION_DEFAULT_TITLE,
       },
       select: chatSessionDetailSelect,
     })
@@ -144,6 +144,35 @@ export class ChatSessionsService {
     return this.getSession(input.userId, input.sessionId)
   }
 
+  async updateSessionTitle(input: {
+    userId: string
+    sessionId: string
+    title: string
+  }): Promise<ChatSessionDetail> {
+    const title = input.title.trim()
+
+    if (!title) {
+      throw new BadRequestException('对话名称不能为空')
+    }
+
+    const result = await this.prisma.chatSession.updateMany({
+      where: {
+        id: input.sessionId,
+        userId: input.userId,
+      },
+      data: {
+        title,
+        updatedAt: new Date(),
+      },
+    })
+
+    if (result.count === 0) {
+      throw new NotFoundException('聊天会话不存在')
+    }
+
+    return this.getSession(input.userId, input.sessionId)
+  }
+
   async deleteSession(userId: string, sessionId: string): Promise<void> {
     const result = await this.prisma.chatSession.deleteMany({
       where: {
@@ -167,7 +196,7 @@ export class ChatSessionsService {
     const triggerMessageOrder = (session.messages.at(-1)?.order ?? -1) + 1
     const nextAssistantOrder = triggerMessageOrder + 1
     const expectedHistoryVersion = session.historyVersion + 1
-    const nextTitle = session.messages.length === 0
+    const nextTitle = session.messages.length === 0 && session.title === CHAT_SESSION_DEFAULT_TITLE
       ? buildChatSessionTitle(normalizedContent)
       : session.title
 

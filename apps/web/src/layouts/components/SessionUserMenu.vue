@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { computed } from 'vue'
 import EntityAvatar from '@/components/entity-avatar/EntityAvatar.vue'
 import SessionAppearancePanel from './session-user-menu/SessionAppearancePanel.vue'
 import SessionWorkspacePanel from './session-user-menu/SessionWorkspacePanel.vue'
@@ -9,16 +8,11 @@ import WorkspaceCreateDialog from './workspace-create-dialog/WorkspaceCreateDial
 
 const props = withDefaults(defineProps<{
   showContextSwitch?: boolean
-  triggerVariant?: 'avatar' | 'sidebar'
   isCollapsed?: boolean
 }>(), {
   showContextSwitch: true,
-  triggerVariant: 'avatar',
   isCollapsed: false,
 })
-
-const isSidebarTrigger = computed(() => props.triggerVariant === 'sidebar')
-const popoverPlacement = computed(() => isSidebarTrigger.value ? 'right-end' : 'bottom-end')
 
 const {
   menuVisible,
@@ -57,7 +51,7 @@ const {
   <ElPopover
     v-model:visible="menuVisible"
     trigger="click"
-    :placement="popoverPlacement"
+    placement="right-end"
     :width="256"
     :offset="12"
     :show-arrow="false"
@@ -65,7 +59,6 @@ const {
   >
     <template #reference>
       <ElButton
-        v-if="isSidebarTrigger"
         class="session-user-sidebar-trigger"
         :class="{ 'is-collapsed': props.isCollapsed }"
       >
@@ -85,22 +78,6 @@ const {
         >
           {{ currentUser.displayName }}
         </span>
-      </ElButton>
-
-      <ElButton
-        v-else
-        circle
-        class="session-user-avatar-trigger"
-      >
-        <EntityAvatar
-          :name="currentUser.displayName"
-          :src="currentUser.avatarUrl"
-          :alt="`${currentUser.displayName} 的头像`"
-          :size="40"
-          shape="circle"
-          kind="user"
-          class="session-user-avatar-trigger__avatar"
-        />
       </ElButton>
     </template>
 
@@ -494,28 +471,6 @@ const {
 
 .session-user-logout .session-user-menu-item__icon {
   color: currentColor;
-}
-
-.session-user-avatar {
-  &-trigger {
-    overflow: hidden;
-    width: 2.5rem;
-    min-width: 2.5rem;
-    height: 2.5rem;
-    padding: 0;
-    border-color: var(--brand-border-base);
-    background: var(--brand-bg-surface);
-
-    &:hover {
-      border-color: color-mix(in srgb, var(--brand-primary) 20%, var(--brand-border-base));
-      background: var(--brand-bg-surface);
-    }
-
-    &__avatar {
-      width: 100%;
-      height: 100%;
-    }
-  }
 }
 
 .session-user-sidebar-trigger {

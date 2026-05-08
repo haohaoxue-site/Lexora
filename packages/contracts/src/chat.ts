@@ -2,11 +2,14 @@ import { z } from 'zod'
 import { AiAvailableModelOptionSchema, AiModelRefSchema } from './ai'
 
 export const ChatMessageRoleSchema = z.enum(['user', 'assistant'])
+export const CHAT_SESSION_DEFAULT_TITLE = '新对话'
+export const CHAT_SESSION_TITLE_MAX_LENGTH = 120
 
 const IsoDateTimeStringSchema = z.string().datetime()
+const ChatSessionTitleSchema = z.string().trim().min(1).max(CHAT_SESSION_TITLE_MAX_LENGTH)
 const ChatSessionSummaryBaseSchema = z.object({
   id: z.string().trim().min(1),
-  title: z.string(),
+  title: ChatSessionTitleSchema,
   modelRef: AiModelRefSchema.pick({
     configId: true,
     modelId: true,
@@ -51,6 +54,10 @@ export const UpdateChatSessionModelRequestSchema = z.object({
   }).nullable(),
 }).strict()
 
+export const UpdateChatSessionTitleRequestSchema = z.object({
+  title: ChatSessionTitleSchema,
+}).strict()
+
 export type ChatMessage = z.infer<typeof ChatMessageSchema>
 export type ChatSessionSummary = z.infer<typeof ChatSessionSummarySchema>
 export type ChatSessionDetail = z.infer<typeof ChatSessionDetailSchema>
@@ -59,4 +66,5 @@ export type ChatModelListResponse = z.infer<typeof ChatModelListResponseSchema>
 export type ChatRuntimeConfig = z.infer<typeof ChatRuntimeConfigSchema>
 export type CreateChatCompletionRequest = z.infer<typeof CreateChatCompletionRequestSchema>
 export type UpdateChatSessionModelRequest = z.infer<typeof UpdateChatSessionModelRequestSchema>
+export type UpdateChatSessionTitleRequest = z.infer<typeof UpdateChatSessionTitleRequestSchema>
 export type ChatModelSelection = UpdateChatSessionModelRequest

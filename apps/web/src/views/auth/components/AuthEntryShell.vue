@@ -33,7 +33,7 @@ defineSlots<{
           <div class="auth-entry-shell__brand-mark">
             <SvgIcon category="nav" icon="workspace" size="2.25rem" />
           </div>
-          <div class="auth-entry-shell__brand-copy">
+          <div class="auth-entry-shell__brand-text">
             <div class="auth-entry-shell__brand-name">
               SamePage AI
             </div>
@@ -177,7 +177,7 @@ defineSlots<{
     background: color-mix(in srgb, var(--brand-primary) 10%, transparent);
   }
 
-  &__brand-copy {
+  &__brand-text {
     min-width: 0;
   }
 

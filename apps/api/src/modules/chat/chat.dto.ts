@@ -1,12 +1,15 @@
 import type {
   CreateChatCompletionRequest,
   UpdateChatSessionModelRequest,
+  UpdateChatSessionTitleRequest,
 } from '@haohaoxue/samepage-contracts'
-import { Type } from 'class-transformer'
+import { CHAT_SESSION_TITLE_MAX_LENGTH } from '@haohaoxue/samepage-contracts'
+import { Transform, Type } from 'class-transformer'
 import {
   IsOptional,
   IsString,
   MaxLength,
+  MinLength,
   ValidateNested,
 } from 'class-validator'
 
@@ -32,4 +35,12 @@ export class UpdateChatSessionModelRequestDto implements UpdateChatSessionModelR
   @Type(() => ChatModelRefDto)
   @ValidateNested()
   modelRef!: ChatModelRefDto | null
+}
+
+export class UpdateChatSessionTitleRequestDto implements UpdateChatSessionTitleRequest {
+  @Transform(({ value }) => typeof value === 'string' ? value.trim() : value)
+  @IsString()
+  @MinLength(1)
+  @MaxLength(CHAT_SESSION_TITLE_MAX_LENGTH)
+  title!: string
 }

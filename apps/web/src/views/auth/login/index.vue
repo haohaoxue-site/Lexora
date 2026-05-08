@@ -141,7 +141,7 @@ const {
 
     <template #footer>
       <template v-if="passwordRegistrationEnabled && !isLoadingCapabilities">
-        <span class="login-view__footer-copy">还没有账号？</span>
+        <span class="login-view__footer-text">还没有账号？</span>
         <RouterLink :to="{ name: 'register' }" class="login-view__footer-link">
           创建邮箱账号
         </RouterLink>
@@ -280,7 +280,7 @@ const {
     font-weight: 600;
   }
 
-  &__footer-copy {
+  &__footer-text {
     color: var(--brand-text-secondary);
   }
 

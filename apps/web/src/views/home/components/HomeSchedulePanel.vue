@@ -21,7 +21,7 @@ defineProps<HomeSchedulePanelProps>()
         <div class="home-schedule-panel__time">
           {{ item.timeLabel }}
         </div>
-        <div class="home-schedule-panel__copy">
+        <div class="home-schedule-panel__details">
           <div class="home-schedule-panel__item-title">
             {{ item.title }}
           </div>
@@ -80,7 +80,7 @@ defineProps<HomeSchedulePanelProps>()
     background: color-mix(in srgb, var(--brand-primary) 10%, transparent);
   }
 
-  .home-schedule-panel__copy {
+  .home-schedule-panel__details {
     flex: 1 1 0%;
     min-width: 0;
   }

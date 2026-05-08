@@ -120,7 +120,7 @@ const {
               <ElDropdownItem
                 v-if="canManageDocument"
                 command="delete"
-                class="document-tree-item__menu-item document-tree-item__menu-item--delete !text-danger"
+                class="document-tree-item__menu-item document-tree-item__menu-item--delete"
               >
                 移到回收站
               </ElDropdownItem>
@@ -297,5 +297,15 @@ const {
       opacity: 1;
     }
   }
+}
+
+:global(.el-dropdown-menu__item.document-tree-item__menu-item--delete) {
+  color: var(--brand-error);
+}
+
+:global(.el-dropdown-menu__item.document-tree-item__menu-item--delete:not(.is-disabled):hover),
+:global(.el-dropdown-menu__item.document-tree-item__menu-item--delete:not(.is-disabled):focus) {
+  background: var(--el-color-danger-light-9);
+  color: var(--brand-error);
 }
 </style>

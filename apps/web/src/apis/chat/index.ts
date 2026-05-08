@@ -4,6 +4,7 @@ import type {
   ChatRuntimeConfig,
   ChatSessionDetail,
   ChatSessionSummary,
+  UpdateChatSessionTitleRequest,
 } from './typing'
 import { SERVER_PATH } from '@haohaoxue/samepage-contracts'
 import { useAuthStore } from '@/stores/auth'
@@ -49,6 +50,17 @@ export function updateChatSessionModel(
   return axios.request({
     method: 'patch',
     url: `/chat/sessions/${sessionId}/model`,
+    data,
+  })
+}
+
+export function updateChatSessionTitle(
+  sessionId: string,
+  data: UpdateChatSessionTitleRequest,
+): Promise<ChatSessionDetail> {
+  return axios.request({
+    method: 'patch',
+    url: `/chat/sessions/${sessionId}/title`,
     data,
   })
 }

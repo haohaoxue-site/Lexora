@@ -1,7 +1,7 @@
 import type { ChatSession } from './composables/useChat'
 import type { ChatMessage } from '@/apis/chat'
 
-export interface ChatProviderSettingsDialogEmits {
+export interface ChatModelSettingsDialogEmits {
   save: []
 }
 
@@ -13,8 +13,11 @@ export interface ChatSessionSidebarProps {
 export interface ChatSessionSidebarEmits {
   create: []
   select: [id: string]
+  rename: [id: string, title: string]
   delete: [id: string]
 }
+
+export type ChatSessionSidebarActionCommand = 'rename' | 'delete'
 
 export interface ChatInputBoxProps {
   disabled: boolean

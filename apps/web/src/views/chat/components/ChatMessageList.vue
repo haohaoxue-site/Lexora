@@ -25,8 +25,15 @@ const { emptyIcon, emptyIconStateClass, getMessageRoleClass } = useChatMessageLi
         <div class="text-lg text-secondary">
           {{ props.isConfigured ? '有什么可以帮助你的？' : '还不能开始对话' }}
         </div>
-        <div class="mt-1 text-sm text-secondary-a60">
-          {{ props.isConfigured ? '输入消息开始对话' : '请先选择模型，或等待 AI 服务准备完成' }}
+        <div v-if="props.isConfigured" class="mt-1 text-sm text-secondary-a60">
+          输入消息开始对话
+        </div>
+        <div v-else class="mt-1 text-sm text-secondary-a60">
+          请先
+          <RouterLink to="/settings/models-default" class="chat-message-list__default-model-link">
+            选择模型
+          </RouterLink>
+          ，或等待 AI 服务准备完成
         </div>
       </div>
     </div>
@@ -76,6 +83,16 @@ const { emptyIcon, emptyIconStateClass, getMessageRoleClass } = useChatMessageLi
 
   .chat-message-list__empty-icon-image {
     display: block;
+  }
+
+  .chat-message-list__default-model-link {
+    color: currentColor;
+    text-decoration-line: underline;
+    text-underline-offset: 0.18em;
+
+    &:hover {
+      color: var(--brand-primary);
+    }
   }
 
   .chat-message-list__row {

@@ -56,7 +56,7 @@ function getToggleGlyphClass() {
               class="sidebar-panel__brand-mark-image"
             />
           </div>
-          <div class="sidebar-panel__brand-copy">
+          <div class="sidebar-panel__brand-text">
             <div class="sidebar-panel__brand-label truncate text-base font-bold">
               {{ props.brand.label }}
             </div>
@@ -117,11 +117,9 @@ function getToggleGlyphClass() {
       <div class="sidebar-panel__footer" :class="sidebarStateClass">
         <div class="sidebar-panel__session" :class="sidebarStateClass">
           <SessionUserMenu
-            trigger-variant="sidebar"
             :is-collapsed="props.isCollapsed"
           />
           <SessionNotificationBell
-            trigger-variant="sidebar"
             :is-collapsed="props.isCollapsed"
           />
         </div>
@@ -196,7 +194,7 @@ function getToggleGlyphClass() {
     display: block;
   }
 
-  .sidebar-panel__brand-copy {
+  .sidebar-panel__brand-text {
     min-width: 0;
   }
 

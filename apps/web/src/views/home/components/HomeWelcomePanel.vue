@@ -11,7 +11,7 @@ defineProps<HomeWelcomePanelProps>()
     class="home-welcome-panel"
   >
     <div class="home-welcome-panel__layout">
-      <div class="home-welcome-panel__copy">
+      <div class="home-welcome-panel__content">
         <h1 class="home-welcome-panel__title">
           {{ overview.title }}
         </h1>
@@ -58,7 +58,7 @@ defineProps<HomeWelcomePanelProps>()
     color: var(--brand-text-primary);
   }
 
-  .home-welcome-panel__copy {
+  .home-welcome-panel__content {
     max-width: 42rem;
   }
 

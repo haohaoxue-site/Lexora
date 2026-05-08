@@ -1,7 +1,10 @@
 import type { ShallowRef } from 'vue'
 import type { ChatModelItem, ChatModelSelection, ChatRuntimeConfig, ChatSessionDetail, ChatSessionSummary } from '@/apis/chat'
+import { AI_MODEL_INTENT_KEY, CHAT_SESSION_DEFAULT_TITLE } from '@haohaoxue/samepage-contracts'
 import { ElMessage } from 'element-plus'
 import { computed, onMounted, reactive, shallowRef } from 'vue'
+import { useRouter } from 'vue-router'
+import { getAiDefaultModels } from '@/apis/ai'
 import {
   createChatSession,
   deleteChatSession,
@@ -11,7 +14,14 @@ import {
   getChatSessions,
   streamChatCompletion,
   updateChatSessionModel,
+  updateChatSessionTitle,
 } from '@/apis/chat'
+import { showAiDefaultModelMissingDialog } from '@/composables/useAiDefaultModelDialog'
+import {
+  buildAiDefaultModelPolicyRecord,
+  isAiDefaultModelPolicyReady,
+  resolveEffectiveAiDefaultModelPolicy,
+} from '@/utils/ai-default-model'
 import { getRequestErrorDisplayMessage } from '@/utils/request-error'
 import { formatModelOptionLabel } from '@/views/provider/utils/aiModel'
 
@@ -154,31 +164,33 @@ export function resolveLoadedChatModelRef(
 
 export function useChat() {
   const workspace = useChatWorkspaceState()
-  const providerSettings = useChatProviderSettingsState({
+  const modelSettings = useChatModelSettingsState({
     activeSession: workspace.activeSession,
     ensureActiveSession: workspace.ensureActiveSession,
     replaceActiveSession: workspace.replaceActiveSession,
   })
-  const modelBadgeStateClass = computed(() => providerSettings.isConfigured.value ? 'configured' : 'idle')
+  const modelBadgeStateClass = computed(() => modelSettings.isConfigured.value ? 'configured' : 'idle')
 
   return {
-    ...providerSettings,
+    ...modelSettings,
     ...workspace,
     modelBadgeStateClass,
   }
 }
 
-function useChatProviderSettingsState(options: {
+function useChatModelSettingsState(options: {
   activeSession: ShallowRef<ActiveChatSession | null>
   ensureActiveSession: () => Promise<ActiveChatSession | null>
   replaceActiveSession: (session: ActiveChatSession) => void
 }) {
-  const dialogVisible = shallowRef(false)
+  const router = useRouter()
+  const modelSettingsDialogVisible = shallowRef(false)
   const isLoadingRuntimeConfig = shallowRef(true)
   const isLoadingModels = shallowRef(false)
+  const isCheckingDefaultModel = shallowRef(false)
   const runtimeConfig = shallowRef<ChatRuntimeConfig>(createEmptyRuntimeConfig())
   const modelOptions = shallowRef<ChatModelItem[]>([])
-  const draft = reactive<ChatModelSelection>(toDraft(createModelSelection()))
+  const modelSettingsDraft = reactive<ChatModelSelection>(toDraft(createModelSelection()))
   const sessionModelRef = computed(() => options.activeSession.value?.modelRef ?? null)
   const manualModelRef = computed(() => normalizeNullableModelRef(sessionModelRef.value))
   const selectedModel = computed(() => resolveSelectedChatModel(
@@ -248,14 +260,54 @@ function useChatProviderSettingsState(options: {
     }
   }
 
-  async function openDialog() {
-    const session = await options.ensureActiveSession()
-    if (!session) {
+  async function openModelSettingsDialog() {
+    if (isCheckingDefaultModel.value) {
       return
     }
 
-    Object.assign(draft, toDraft(createModelSelection(session.modelRef ?? runtimeConfig.value.defaultModel ?? null)))
-    dialogVisible.value = true
+    isCheckingDefaultModel.value = true
+
+    try {
+      if (!await ensureChatDefaultModelReady()) {
+        return
+      }
+
+      const session = await options.ensureActiveSession()
+      if (!session) {
+        return
+      }
+
+      Object.assign(modelSettingsDraft, toDraft(createModelSelection(session.modelRef ?? runtimeConfig.value.defaultModel ?? null)))
+      modelSettingsDialogVisible.value = true
+    }
+    finally {
+      isCheckingDefaultModel.value = false
+    }
+  }
+
+  async function ensureChatDefaultModelReady(): Promise<boolean> {
+    try {
+      const policies = await getAiDefaultModels()
+      const effectivePolicy = resolveEffectiveAiDefaultModelPolicy(
+        buildAiDefaultModelPolicyRecord(policies),
+        AI_MODEL_INTENT_KEY.CHAT_ASSISTANT_DEFAULT,
+      )
+
+      if (isAiDefaultModelPolicyReady(effectivePolicy)) {
+        return true
+      }
+
+      showAiDefaultModelMissingDialog({
+        router,
+        title: '对话默认模型未配置',
+        message: effectivePolicy.invalidReason || '请先配置对话默认模型，或为对话入口单独配置默认模型。',
+      })
+      return false
+    }
+    catch (error) {
+      ElMessage.error(getRequestErrorDisplayMessage(error, '检查对话默认模型失败'))
+      return false
+    }
   }
 
   async function refreshModels(options: { silent?: boolean, showSuccessMessage?: boolean, skipRuntimeConfigReload?: boolean } = {}) {
@@ -280,16 +332,16 @@ function useChatProviderSettingsState(options: {
       modelOptions.value = result.models
 
       const nextDraftModelRef = resolveLoadedChatModelRef(
-        draft.modelRef ?? null,
+        modelSettingsDraft.modelRef ?? null,
         result.models,
         runtimeConfig.value.defaultModel,
       )
 
       if (nextDraftModelRef) {
-        draft.modelRef = { ...nextDraftModelRef }
+        modelSettingsDraft.modelRef = { ...nextDraftModelRef }
       }
       else {
-        draft.modelRef = null
+        modelSettingsDraft.modelRef = null
       }
 
       if (showSuccessMessage) {
@@ -308,22 +360,26 @@ function useChatProviderSettingsState(options: {
     }
   }
 
-  async function saveSettings() {
+  async function saveModelSettings() {
     const session = await options.ensureActiveSession()
     if (!session) {
       return false
     }
 
-    const nextModelRef = resolveSavedChatModelRef(draft)
+    const nextModelRef = resolveSavedChatModelRef(modelSettingsDraft)
+    if (!nextModelRef) {
+      ElMessage.warning('请选择聊天模型')
+      return false
+    }
 
     try {
       const updatedSession = await updateChatSessionModel(session.id, {
         modelRef: nextModelRef,
       })
       options.replaceActiveSession(updatedSession)
-      Object.assign(draft, toDraft(createModelSelection(updatedSession.modelRef)))
-      dialogVisible.value = false
-      ElMessage.success(nextModelRef ? '聊天模型已保存' : '已恢复默认模型')
+      Object.assign(modelSettingsDraft, toDraft(createModelSelection(updatedSession.modelRef)))
+      modelSettingsDialogVisible.value = false
+      ElMessage.success('聊天模型已保存')
       return true
     }
     catch (error) {
@@ -334,17 +390,17 @@ function useChatProviderSettingsState(options: {
 
   return {
     currentModelLabel,
-    dialogVisible,
-    draft,
     inputPlaceholder,
     isConfigured,
     isLoadingModels,
     isLoadingRuntimeConfig,
+    modelSettingsDialogVisible,
+    modelSettingsDraft,
     modelOptions,
-    openDialog,
+    openModelSettingsDialog,
     requestModelRef,
     refreshModels,
-    saveSettings,
+    saveModelSettings,
     selectedModel,
   }
 }
@@ -469,6 +525,38 @@ function useChatWorkspaceState() {
     }
   }
 
+  async function renameSession(id: string, title: string) {
+    const nextTitle = title.trim()
+
+    if (!nextTitle) {
+      ElMessage.warning('请输入对话名称')
+      return false
+    }
+
+    try {
+      const updatedSession = await updateChatSessionTitle(id, {
+        title: nextTitle,
+      })
+
+      if (activeSessionId.value === id) {
+        replaceActiveSession(updatedSession)
+      }
+      else {
+        patchSessionSummary(id, {
+          title: updatedSession.title,
+          updatedAt: updatedSession.updatedAt,
+        })
+      }
+
+      ElMessage.success('对话已重命名')
+      return true
+    }
+    catch (error) {
+      ElMessage.error(getRequestErrorDisplayMessage(error, '重命名聊天会话失败'))
+      return false
+    }
+  }
+
   async function sendMessage(content: string) {
     if (!content.trim() || isStreaming.value) {
       return
@@ -494,7 +582,7 @@ function useChatWorkspaceState() {
     }
 
     const normalizedContent = content.trim()
-    const nextTitle = session.messages.length === 0
+    const nextTitle = session.messages.length === 0 && session.title === CHAT_SESSION_DEFAULT_TITLE
       ? buildSessionTitle(normalizedContent)
       : session.title
 
@@ -622,6 +710,7 @@ function useChatWorkspaceState() {
     isLoadingSessions,
     isStreaming,
     replaceActiveSession,
+    renameSession,
     selectSession,
     sendMessage,
     sessions,

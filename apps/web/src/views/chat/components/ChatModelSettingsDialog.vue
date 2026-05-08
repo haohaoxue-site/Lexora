@@ -1,20 +1,20 @@
 <script setup lang="ts">
 import type { FormInstance } from 'element-plus'
-import type { ChatProviderSettingsDialogEmits } from '../typing'
+import type { ChatModelSettingsDialogEmits } from '../typing'
 import type { ChatModelSelection } from '@/apis/chat'
 import type { ModelCascaderModelRef } from '@/components/model-cascader/typing'
 import { AI_MODEL_INTENT_KEY } from '@haohaoxue/samepage-contracts'
 import { computed, useTemplateRef } from 'vue'
 import { ModelCascader } from '@/components/model-cascader'
-import { useChatProviderSettingsDialog } from '../composables/useChatProviderSettingsDialog'
+import { useChatModelSettingsDialog } from '../composables/useChatModelSettingsDialog'
 
-const emits = defineEmits<ChatProviderSettingsDialogEmits>()
+const emits = defineEmits<ChatModelSettingsDialogEmits>()
 const visible = defineModel<boolean>({ required: true })
 const form = defineModel<ChatModelSelection>('form', { required: true })
-const providerFormRef = useTemplateRef<FormInstance>('providerFormRef')
-const { formRules, handleSave } = useChatProviderSettingsDialog({
+const modelFormRef = useTemplateRef<FormInstance>('modelFormRef')
+const { formRules, handleSave } = useChatModelSettingsDialog({
   form,
-  providerFormRef,
+  modelFormRef,
   onSave: () => emits('save'),
 })
 
@@ -38,13 +38,14 @@ const selectedModelRef = computed<ModelCascaderModelRef | null>({
     width="520"
     align-center
   >
-    <div class="chat-provider-settings">
-      <ElForm ref="providerFormRef" :model="form" :rules="formRules" label-position="top" class="chat-provider-settings__form">
+    <div class="chat-model-settings">
+      <ElForm ref="modelFormRef" :model="form" :rules="formRules" label-position="top" class="chat-model-settings__form">
         <ElFormItem prop="modelRef">
           <ModelCascader
             v-model="selectedModelRef"
             :intent-key="AI_MODEL_INTENT_KEY.CHAT_ASSISTANT_DEFAULT"
-            class="chat-provider-settings__model-select w-full"
+            :clearable="false"
+            class="chat-model-settings__model-select w-full"
             filterable
             placeholder="请选择模型"
           />
@@ -53,7 +54,7 @@ const selectedModelRef = computed<ModelCascaderModelRef | null>({
     </div>
 
     <template #footer>
-      <div class="chat-provider-settings__footer">
+      <div class="chat-model-settings__footer">
         <ElButton @click="visible = false">
           取消
         </ElButton>
@@ -66,29 +67,22 @@ const selectedModelRef = computed<ModelCascaderModelRef | null>({
 </template>
 
 <style scoped lang="scss">
-.chat-provider-settings {
+.chat-model-settings {
   > * + * {
     margin-top: 1.25rem;
   }
 
-  .chat-provider-settings__description {
-    margin: 0;
-    color: var(--brand-text-secondary);
-    font-size: 0.75rem;
-    line-height: 1.25rem;
-  }
-
-  .chat-provider-settings__form {
+  .chat-model-settings__form {
     > * + * {
       margin-top: 1rem;
     }
   }
 
-  .chat-provider-settings__model-select {
+  .chat-model-settings__model-select {
     width: 100%;
   }
 
-  .chat-provider-settings__footer {
+  .chat-model-settings__footer {
     display: flex;
     align-items: center;
     justify-content: flex-end;

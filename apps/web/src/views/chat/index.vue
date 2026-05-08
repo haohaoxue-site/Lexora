@@ -2,7 +2,7 @@
 import PagePanel from '@/layouts/panels/PagePanel.vue'
 import ChatInputBox from './components/ChatInputBox.vue'
 import ChatMessageList from './components/ChatMessageList.vue'
-import ChatProviderSettingsDialog from './components/ChatProviderSettingsDialog.vue'
+import ChatModelSettingsDialog from './components/ChatModelSettingsDialog.vue'
 import ChatSessionSidebar from './components/ChatSessionSidebar.vue'
 import { useChat } from './composables/useChat'
 
@@ -12,14 +12,15 @@ const {
   createSession,
   currentModelLabel,
   deleteSession,
-  dialogVisible,
-  draft,
   inputPlaceholder,
   isConfigured,
   isStreaming,
+  modelSettingsDialogVisible,
+  modelSettingsDraft,
   modelBadgeStateClass,
-  openDialog,
-  saveSettings,
+  openModelSettingsDialog,
+  renameSession,
+  saveModelSettings,
   sessions,
   selectSession,
   sendMessage,
@@ -30,25 +31,16 @@ const {
   <PagePanel>
     <template #header>
       <div class="chat-view-context">
-        <div class="chat-view-context__copy">
-          <div class="chat-view-context__title">
-            对话
-          </div>
-        </div>
-
         <div class="chat-view-context__actions">
-          <div class="chat-view-context__model-badge" :class="modelBadgeStateClass">
+          <button
+            type="button"
+            class="chat-view-context__model-badge"
+            :class="modelBadgeStateClass"
+            @click="openModelSettingsDialog"
+          >
             <SvgIcon category="ai" icon="ai-spark" size="1rem" class="chat-view-context__model-icon" />
             <span class="max-w-52 truncate">{{ currentModelLabel }}</span>
-          </div>
-
-          <ElButton
-            circle
-            class="chat-view-context__settings-trigger"
-            @click="openDialog"
-          >
-            <SvgIcon category="ui" icon="settings" size="1.125rem" class="chat-view-context__settings-icon" />
-          </ElButton>
+          </button>
         </div>
       </div>
     </template>
@@ -59,6 +51,7 @@ const {
         :active-session-id="activeSessionId"
         @create="createSession"
         @select="selectSession"
+        @rename="renameSession"
         @delete="deleteSession"
       />
 
@@ -77,10 +70,10 @@ const {
       </div>
     </div>
 
-    <ChatProviderSettingsDialog
-      v-model="dialogVisible"
-      v-model:form="draft"
-      @save="saveSettings"
+    <ChatModelSettingsDialog
+      v-model="modelSettingsDialogVisible"
+      v-model:form="modelSettingsDraft"
+      @save="saveModelSettings"
     />
   </PagePanel>
 </template>
@@ -90,20 +83,8 @@ const {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   gap: 1rem;
-
-  .chat-view-context__copy {
-    min-width: 0;
-  }
-
-  .chat-view-context__title {
-    color: var(--brand-text-primary);
-    font-size: 1.5rem;
-    font-weight: 600;
-    letter-spacing: -0.025em;
-    line-height: 2rem;
-  }
 
   .chat-view-context__actions {
     display: flex;
@@ -118,7 +99,14 @@ const {
     padding: 0.375rem 0.75rem;
     border: 1px solid transparent;
     border-radius: 9999px;
+    appearance: none;
+    cursor: pointer;
+    font-family: inherit;
     font-size: 0.75rem;
+    transition:
+      border-color 0.2s ease,
+      background-color 0.2s ease,
+      color 0.2s ease;
 
     &.configured {
       border-color: color-mix(in srgb, var(--brand-primary) 20%, transparent);
@@ -131,18 +119,6 @@ const {
       color: var(--brand-text-secondary);
       background: var(--brand-bg-surface-raised);
     }
-  }
-
-  .chat-view-context__model-icon {
-    display: block;
-  }
-
-  .chat-view-context__settings-trigger {
-    border-color: color-mix(in srgb, var(--brand-border-base) 80%, transparent);
-    color: var(--brand-text-secondary);
-    background: var(--brand-bg-surface-raised);
-    width: 2.5rem;
-    height: 2.5rem;
 
     &:hover {
       border-color: color-mix(in srgb, var(--brand-primary) 20%, transparent);
@@ -151,7 +127,7 @@ const {
     }
   }
 
-  .chat-view-context__settings-icon {
+  .chat-view-context__model-icon {
     display: block;
   }
 }

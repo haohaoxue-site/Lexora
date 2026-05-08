@@ -94,7 +94,7 @@ const {
     </div>
 
     <template #footer>
-      <span class="password-register-verify-view__footer-copy">已有账号？</span>
+      <span class="password-register-verify-view__footer-text">已有账号？</span>
       <RouterLink :to="{ name: 'login' }" class="password-register-verify-view__footer-link">
         返回登录
       </RouterLink>
@@ -121,7 +121,7 @@ const {
     min-height: 2.875rem;
   }
 
-  &__footer-copy {
+  &__footer-text {
     color: var(--brand-text-secondary);
   }
 

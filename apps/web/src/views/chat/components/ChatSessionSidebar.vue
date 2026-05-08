@@ -7,10 +7,10 @@ import { useChatSessionSidebar } from '../composables/useChatSessionSidebar'
 
 const props = defineProps<ChatSessionSidebarProps>()
 const emits = defineEmits<ChatSessionSidebarEmits>()
-const { confirmDelete, getSessionItemStateClass } = useChatSessionSidebar(
-  props,
-  sessionId => emits('delete', sessionId),
-)
+const { getSessionItemStateClass, handleSessionAction } = useChatSessionSidebar(props, {
+  onDelete: sessionId => emits('delete', sessionId),
+  onRename: (sessionId, title) => emits('rename', sessionId, title),
+})
 </script>
 
 <template>
@@ -43,15 +43,35 @@ const { confirmDelete, getSessionItemStateClass } = useChatSessionSidebar(
             <span class="min-w-0 flex-1 truncate">{{ session.title }}</span>
           </button>
 
-          <ElButton
-            text
-            circle
-            size="small"
-            class="chat-session-sidebar__delete-btn"
-            @click="confirmDelete(session)"
+          <ElDropdown
+            trigger="click"
+            placement="bottom-end"
+            @command="command => handleSessionAction(session, command)"
           >
-            <SvgIcon category="ui" icon="trash" size="0.875rem" />
-          </ElButton>
+            <ElButton
+              text
+              circle
+              size="small"
+              class="chat-session-sidebar__actions-btn"
+            >
+              <SvgIcon category="ui" icon="more" size="0.875rem" />
+            </ElButton>
+
+            <template #dropdown>
+              <ElDropdownMenu>
+                <ElDropdownItem command="rename">
+                  重命名
+                </ElDropdownItem>
+                <ElDropdownItem
+                  command="delete"
+                  divided
+                  class="chat-session-sidebar__menu-item chat-session-sidebar__menu-item--delete"
+                >
+                  删除
+                </ElDropdownItem>
+              </ElDropdownMenu>
+            </template>
+          </ElDropdown>
         </li>
       </ul>
     </div>
@@ -142,22 +162,28 @@ const { confirmDelete, getSessionItemStateClass } = useChatSessionSidebar(
     color: var(--brand-primary);
   }
 
-  .chat-session-sidebar__delete-btn {
+  .chat-session-sidebar__actions-btn {
     width: 1.25rem;
     height: 1.25rem;
     margin-right: 0.5rem;
     opacity: 0;
     transition: opacity 0.2s ease, color 0.2s ease;
-
-    &:hover {
-      color: var(--brand-error);
-    }
   }
 
-  .chat-session-sidebar__item:hover .chat-session-sidebar__delete-btn,
-  .chat-session-sidebar__item:focus-within .chat-session-sidebar__delete-btn,
-  .chat-session-sidebar__delete-btn:focus {
+  .chat-session-sidebar__item:hover .chat-session-sidebar__actions-btn,
+  .chat-session-sidebar__item:focus-within .chat-session-sidebar__actions-btn,
+  .chat-session-sidebar__actions-btn:focus {
     opacity: 1;
   }
+}
+
+:global(.el-dropdown-menu__item.chat-session-sidebar__menu-item--delete) {
+  color: var(--brand-error);
+}
+
+:global(.el-dropdown-menu__item.chat-session-sidebar__menu-item--delete:not(.is-disabled):hover),
+:global(.el-dropdown-menu__item.chat-session-sidebar__menu-item--delete:not(.is-disabled):focus) {
+  background: var(--el-color-danger-light-9);
+  color: var(--brand-error);
 }
 </style>

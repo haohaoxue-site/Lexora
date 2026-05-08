@@ -22,7 +22,7 @@ defineProps<HomeQuickActionsPanelProps>()
         <div class="home-quick-actions__icon-shell">
           <SvgIcon :category="action.iconCategory" :icon="action.icon" size="1.25rem" />
         </div>
-        <div class="home-quick-actions__copy">
+        <div class="home-quick-actions__item-content">
           <div class="home-quick-actions__item-title">
             {{ action.title }}
           </div>
@@ -102,7 +102,7 @@ defineProps<HomeQuickActionsPanelProps>()
     box-shadow: 0 1px 2px 0 color-mix(in srgb, var(--brand-text-primary) 5%, transparent);
   }
 
-  .home-quick-actions__copy {
+  .home-quick-actions__item-content {
     flex: 1 1 0%;
     min-width: 0;
   }

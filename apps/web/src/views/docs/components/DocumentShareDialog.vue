@@ -299,7 +299,7 @@ function isShareModeCommand(command: string | number | boolean): command is Docu
                   />
                 </span>
 
-                <span class="document-share-panel__mode-copy">
+                <span class="document-share-panel__mode-text">
                   <span class="document-share-panel__mode-title">
                     {{ currentShareModeOption.label }}
                   </span>
@@ -365,7 +365,7 @@ function isShareModeCommand(command: string | number | boolean): command is Docu
                 />
               </span>
 
-              <span class="document-share-panel__mode-copy">
+              <span class="document-share-panel__mode-text">
                 <span class="document-share-panel__mode-title">
                   {{ currentShareModeOption.label }}
                 </span>
@@ -625,16 +625,16 @@ function isShareModeCommand(command: string | number | boolean): command is Docu
   }
 
   .document-share-panel__mode-dropdown,
-  .document-share-panel__mode-copy {
+  .document-share-panel__mode-text {
     min-width: 0;
   }
 
-  .document-share-panel__mode-copy {
+  .document-share-panel__mode-text {
     display: grid;
     align-content: start;
   }
 
-  .document-share-panel__mode-copy {
+  .document-share-panel__mode-text {
     gap: 0.14rem;
   }
 

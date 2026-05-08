@@ -49,7 +49,7 @@ const {
       destroy-on-close
       @closed="resetForm"
     >
-      <div class="user-delete-section__dialog-copy">
+      <div class="user-delete-section__dialog-content">
         <p class="user-delete-section__dialog-text">
           输入 {{ accountLabel }} 与确认短语后，才会永久删除当前账号。
         </p>
@@ -118,7 +118,7 @@ const {
     color: var(--brand-text-primary);
   }
 
-  &__dialog-copy {
+  &__dialog-content {
     margin-bottom: 1rem;
   }
 
