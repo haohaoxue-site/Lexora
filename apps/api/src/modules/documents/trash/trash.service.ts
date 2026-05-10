@@ -126,20 +126,32 @@ export class DocumentTrashService {
   }
 
   async permanentlyDeleteDocument(userId: string, id: string): Promise<void> {
-    const document = await this.documentAccessService.assertCanManageTrashedDocument(userId, id)
-    const context = await this.loadWorkspaceTrashContext({
-      workspaceId: document.workspaceId,
-    })
+    const targetDocumentIds = await this.resolvePermanentlyRemovableDocumentIds(userId, id)
 
-    assertTrashRootDocument(context, id)
-
-    await this.prisma.$bypass.document.deleteMany({
-      where: {
-        id: {
-          in: collectTrashedSubtreeDocumentIds(context, id),
+    await this.prisma.$bypass.$transaction(async (tx) => {
+      await tx.documentRecentVisit.deleteMany({
+        where: {
+          documentId: {
+            in: targetDocumentIds,
+          },
         },
-      },
+      })
+
+      await tx.document.deleteMany({
+        where: {
+          id: {
+            in: targetDocumentIds,
+          },
+        },
+      })
     })
+
+    await this.collabPermissionInvalidationPublisher.publishPermissionInvalidations(
+      targetDocumentIds.map(documentId => ({
+        reason: 'document-trashed' as const,
+        documentId,
+      })),
+    )
   }
 
   private async loadWorkspaceDocumentContext(input: {
@@ -215,6 +227,36 @@ export class DocumentTrashService {
         createdBy: document.createdBy,
       })
     }))
+  }
+
+  private async resolvePermanentlyRemovableDocumentIds(userId: string, documentId: string): Promise<string[]> {
+    try {
+      const trashedDocument = await this.documentAccessService.assertCanManageTrashedDocument(userId, documentId)
+      const trashContext = await this.loadWorkspaceTrashContext({
+        workspaceId: trashedDocument.workspaceId,
+      })
+
+      assertTrashRootDocument(trashContext, documentId)
+
+      return collectTrashedSubtreeDocumentIds(trashContext, documentId)
+    }
+    catch (error) {
+      if (!(error instanceof NotFoundException)) {
+        throw error
+      }
+    }
+
+    const activeDocument = await this.documentAccessService.assertCanEditDocument(userId, documentId)
+    const workspaceContext = await this.loadWorkspaceTrashContext({
+      workspaceId: activeDocument.workspaceId,
+      userId,
+      workspaceType: activeDocument.workspaceType,
+    })
+    const documentIds = new Set<string>()
+
+    collectDescendantDocumentIds(documentId, workspaceContext, documentIds)
+
+    return Array.from(documentIds)
   }
 }
 

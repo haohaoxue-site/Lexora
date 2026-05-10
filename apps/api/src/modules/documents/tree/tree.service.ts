@@ -16,6 +16,7 @@ import type { PersistedDocument, WorkspaceDocumentContext } from '../core/docume
 import {
   COLLAB_PERMISSION_INVALIDATION_REASON,
   DOCUMENT_COLLECTION,
+  DOCUMENT_DEFAULT_TITLE,
   DOCUMENT_VERSION_SNAPSHOT_SOURCE,
   DOCUMENT_VISIBILITY,
   TIPTAP_SCHEMA_VERSION,
@@ -111,7 +112,7 @@ export class DocumentsService {
       },
     })
 
-    const title = createDocumentTitleContent(payload.title)
+    const title = createDocumentTitleContent(payload.title.trim() || DOCUMENT_DEFAULT_TITLE)
     const body: TiptapJsonContent = []
 
     const document = await this.prisma.$transaction(async (tx) => {

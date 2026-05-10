@@ -6,14 +6,16 @@ import type {
   WorkspaceType,
 } from '@haohaoxue/samepage-contracts'
 import type { ComputedRef } from 'vue'
-import { DOCUMENT_COLLECTION } from '@haohaoxue/samepage-contracts'
+import type { DocumentDeleteAction } from '../typing'
+import { DOCUMENT_COLLECTION, DOCUMENT_DEFAULT_TITLE } from '@haohaoxue/samepage-contracts'
 import { formatDocumentCollectionLabel, resolveRootDocumentVisibility } from '@haohaoxue/samepage-shared'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage } from 'element-plus'
 import { computed, shallowRef } from 'vue'
 import {
   createDocument as createDocumentRequest,
   deleteDocument as deleteDocumentRequest,
   getDocuments,
+  permanentlyDeleteDocument as permanentlyDeleteDocumentRequest,
 } from '@/apis/document'
 import { useUiStore } from '@/stores/ui'
 import {
@@ -30,6 +32,7 @@ import {
 interface NavigateToDocumentOptions {
   replace?: boolean
   skipConfirm?: boolean
+  focusTitle?: boolean
 }
 
 /**
@@ -59,6 +62,13 @@ interface UseDocumentTreeStateOptions {
   currentWorkspaceId: ComputedRef<string | null>
 }
 
+interface PendingDeleteDocumentTarget {
+  documentId: string
+  documentTitle: string
+  deletedDocumentIds: Set<string>
+  nextDocumentId: string | null
+}
+
 export function useDocumentTree({
   activeDocumentId,
   currentWorkspaceId,
@@ -68,14 +78,18 @@ export function useDocumentTree({
 }: UseDocumentTreeOptions) {
   const isDocumentLoading = shallowRef(false)
   const isCreating = shallowRef(false)
-  const isDeleting = shallowRef(false)
+  const deleteDialogTarget = shallowRef<PendingDeleteDocumentTarget | null>(null)
+  const deleteActionKind = shallowRef<DocumentDeleteAction | null>(null)
   let treeRequestId = 0
   const state = useDocumentTreeState({
     activeDocumentId,
     currentWorkspaceId,
   })
 
+  const isDeleting = computed(() => deleteActionKind.value !== null)
   const isMutatingTree = computed(() => isCreating.value || isDeleting.value)
+  const isDeleteDialogOpen = computed(() => Boolean(deleteDialogTarget.value))
+  const deleteDialogDocumentTitle = computed(() => deleteDialogTarget.value?.documentTitle ?? '')
 
   async function loadTree(options: LoadDocumentTreeOptions = {}) {
     const workspaceId = currentWorkspaceId.value
@@ -127,54 +141,69 @@ export function useDocumentTree({
   }
 
   async function deleteDocument(documentId: string) {
-    const targetPath = findDocumentPath(state.treeGroups.value, documentId)
-    const targetDocument = targetPath?.nodes.at(-1)
-
-    if (!targetPath || !targetDocument || !isOwnedDocumentCollection(targetPath.collectionId)) {
+    if (deleteActionKind.value) {
       return
     }
 
-    const confirmed = await ElMessageBox.confirm(
-      `将把「${targetDocument.title}」及其所有子文档移到回收站，你可以稍后在回收站恢复。`,
-      '移到回收站',
-      {
-        type: 'warning',
-        confirmButtonText: '移到回收站',
-        cancelButtonText: '取消',
-      },
-    ).then(() => true).catch(() => false)
+    const target = resolveDeleteTarget(documentId)
 
-    if (!confirmed) {
+    if (!target) {
       return
     }
 
-    const deletedDocumentIds = collectDocumentItemIds([targetDocument])
-    const nextDocumentId = resolveNextDocumentIdAfterDelete(
-      state.treeGroups.value,
-      documentId,
-      activeDocumentId.value,
-    )
+    deleteDialogTarget.value = target
+  }
 
-    isDeleting.value = true
+  async function confirmDeleteDocument() {
+    await executeDeleteDocument('trash')
+  }
+
+  async function confirmPermanentlyDeleteDocument() {
+    await executeDeleteDocument('permanent')
+  }
+
+  function closeDeleteDialog() {
+    if (deleteActionKind.value) {
+      return
+    }
+
+    deleteDialogTarget.value = null
+  }
+
+  async function executeDeleteDocument(action: DocumentDeleteAction) {
+    const target = deleteDialogTarget.value
+
+    if (!target || deleteActionKind.value) {
+      return
+    }
+
+    deleteActionKind.value = action
 
     try {
-      await deleteDocumentRequest(documentId)
-      state.pruneExpandedDocumentIds(deletedDocumentIds)
+      await (action === 'trash'
+        ? deleteDocumentRequest(target.documentId)
+        : permanentlyDeleteDocumentRequest(target.documentId))
+      state.pruneExpandedDocumentIds(target.deletedDocumentIds)
+      deleteDialogTarget.value = null
       await loadTree()
 
-      if (activeDocumentId.value && deletedDocumentIds.has(activeDocumentId.value)) {
-        await navigateToDocument(nextDocumentId, {
+      if (activeDocumentId.value && target.deletedDocumentIds.has(activeDocumentId.value)) {
+        await navigateToDocument(target.nextDocumentId, {
           skipConfirm: true,
         })
       }
 
-      ElMessage.success('文档已移到回收站')
+      ElMessage.success(action === 'trash' ? '文档已删除' : '已彻底删除文档')
     }
     catch (error) {
-      ElMessage.error(error instanceof Error ? error.message : '移到回收站失败')
+      ElMessage.error(error instanceof Error
+        ? error.message
+        : action === 'trash'
+          ? '删除文档失败'
+          : '彻底删除文档失败')
     }
     finally {
-      isDeleting.value = false
+      deleteActionKind.value = null
     }
   }
 
@@ -195,7 +224,7 @@ export function useDocumentTree({
 
     try {
       const createdDocument = await createDocumentRequest({
-        title: '未命名',
+        title: DOCUMENT_DEFAULT_TITLE,
         workspaceId,
         parentId,
         ...(parentId
@@ -209,6 +238,7 @@ export function useDocumentTree({
       })
       await loadTree()
       await navigateToDocument(createdDocument.id, {
+        focusTitle: true,
         skipConfirm: true,
       })
     }
@@ -225,6 +255,9 @@ export function useDocumentTree({
     isDocumentLoading,
     isCreating,
     isMutatingTree,
+    isDeleteDialogOpen,
+    deleteActionKind,
+    deleteDialogDocumentTitle,
     defaultDocumentId: state.defaultDocumentId,
     hasFallbackDocument: state.hasFallbackDocument,
     loadTree,
@@ -234,11 +267,34 @@ export function useDocumentTree({
     rememberLastOpenedDocument: state.rememberLastOpenedDocument,
     createRootDocument: createRootDocumentIn,
     createChildDocument,
+    closeDeleteDialog,
+    confirmDeleteDocument,
+    confirmPermanentlyDeleteDocument,
     deleteDocument,
   }
 
   function isActiveTreeRequest(requestId: number, workspaceId: string | null) {
     return requestId === treeRequestId && currentWorkspaceId.value === workspaceId
+  }
+
+  function resolveDeleteTarget(documentId: string): PendingDeleteDocumentTarget | null {
+    const targetPath = findDocumentPath(state.treeGroups.value, documentId)
+    const targetDocument = targetPath?.nodes.at(-1)
+
+    if (!targetPath || !targetDocument || !isOwnedDocumentCollection(targetPath.collectionId)) {
+      return null
+    }
+
+    return {
+      documentId,
+      documentTitle: targetDocument.title,
+      deletedDocumentIds: collectDocumentItemIds([targetDocument]),
+      nextDocumentId: resolveNextDocumentIdAfterDelete(
+        state.treeGroups.value,
+        documentId,
+        activeDocumentId.value,
+      ),
+    }
   }
 }
 

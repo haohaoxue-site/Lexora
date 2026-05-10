@@ -1,7 +1,8 @@
 <script setup lang="ts">
+import type { Editor } from '@tiptap/core'
 import type { TiptapEditorContent, TiptapEditorHandleKeyDown } from '../../core/typing'
 import type { DocumentTitleEditorEmits, DocumentTitleEditorProps } from './typing'
-import { computed } from 'vue'
+import { computed, nextTick, shallowRef, watch } from 'vue'
 import TiptapEditor from '../../core/TiptapEditor.vue'
 import { fromTiptapDocumentTitleEditorContent, toTiptapDocumentTitleEditorContent } from '../../core/utils'
 import { createTitleExtensions } from '../../extensions/createExtensions'
@@ -14,10 +15,52 @@ const titleEditorExtensions = createTitleExtensions({
   collaboration: props.collaboration,
 })
 const handleTitleEditorKeyDown: TiptapEditorHandleKeyDown = (_, event) => event.key === 'Enter'
+const titleEditor = shallowRef<Editor | null>(null)
+const hasAppliedAutofocus = shallowRef(false)
 
 function handleUpdateTitle(content: TiptapEditorContent) {
   emits('update:title', fromTiptapDocumentTitleEditorContent(content))
 }
+
+function handleEditorChange(editor: Editor | null) {
+  titleEditor.value = editor
+}
+
+watch(
+  [
+    () => props.autofocus,
+    () => props.editable !== false,
+    titleEditor,
+  ],
+  async ([autofocus, editable, editor]) => {
+    if (!autofocus) {
+      hasAppliedAutofocus.value = false
+      return
+    }
+
+    if (!editable || !editor || hasAppliedAutofocus.value) {
+      return
+    }
+
+    await nextTick()
+
+    if (!props.autofocus || props.editable === false || editor.isDestroyed) {
+      return
+    }
+
+    const didFocus = editor.commands.focus('end')
+
+    if (!didFocus) {
+      return
+    }
+
+    hasAppliedAutofocus.value = true
+    emits('autofocusApplied')
+  },
+  {
+    flush: 'post',
+  },
+)
 </script>
 
 <template>
@@ -29,5 +72,6 @@ function handleUpdateTitle(content: TiptapEditorContent) {
     :editable="props.editable"
     :handle-key-down="handleTitleEditorKeyDown"
     @update:content="handleUpdateTitle"
+    @editor-change="handleEditorChange"
   />
 </template>

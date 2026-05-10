@@ -26,6 +26,8 @@ export interface DocumentContentSurfaceProps {
   body: TiptapJsonContent
   /** 是否可编辑 */
   editable?: boolean
+  /** 是否应自动聚焦标题 */
+  autofocusTitle?: boolean
   /** 标题协作绑定 */
   titleCollaboration?: TiptapEditorCollaborationBinding | null
   /** 正文协作绑定 */
@@ -46,4 +48,5 @@ export interface DocumentContentSurfaceEmits {
   updateContent: [content: TiptapJsonContent]
   contentError: [error: Error]
   requestComment: [request: TiptapEditorCommentRequest]
+  titleAutofocusApplied: []
 }

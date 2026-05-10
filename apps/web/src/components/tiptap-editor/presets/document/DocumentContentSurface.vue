@@ -64,9 +64,11 @@ function resolveObjectKey(value: object | null) {
         :key="titleEditorKey"
         class="document-content-surface__title-editor"
         :title="props.title"
+        :autofocus="props.autofocusTitle"
         :collaboration="props.titleCollaboration"
         :editable="props.editable"
         @update:title="emits('updateTitle', $event)"
+        @autofocus-applied="emits('titleAutofocusApplied')"
       />
     </div>
 

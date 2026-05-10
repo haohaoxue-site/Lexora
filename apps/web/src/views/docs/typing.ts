@@ -47,6 +47,7 @@ export type DocsSurfaceView = 'document' | 'permissions' | 'trash' | 'pending-sh
  * 分享收件箱模式。
  */
 export type DocumentShareInboxMode = 'pending' | 'active'
+export type DocumentDeleteAction = 'trash' | 'permanent'
 
 /**
  * 文档分享变更事件。
@@ -78,6 +79,8 @@ export interface DocsDocumentEditorPaneProps {
   mode: DocsDocumentEditorMode
   /** 是否允许编辑 */
   editable?: boolean
+  /** 是否应自动聚焦标题 */
+  autofocusTitle?: boolean
   /** 协作绑定 */
   collaboration?: DocsDocumentEditorCollaborationBindings | null
   /** 当前 URL 对应的块 ID */
@@ -94,6 +97,7 @@ export interface DocsDocumentEditorPaneEmits {
   updateTitle: [title: TiptapJsonContent]
   updateContent: [content: TiptapJsonContent]
   requestComment: [request: TiptapEditorCommentRequest]
+  titleAutofocusApplied: []
   createDocument: []
   openFallbackDocument: []
   retryLoad: []
@@ -107,6 +111,8 @@ export interface DocsDocumentEditorProps {
   mode: DocsDocumentEditorMode
   /** 是否允许编辑 */
   editable?: boolean
+  /** 是否应自动聚焦标题 */
+  autofocusTitle?: boolean
   /** 协作绑定 */
   collaboration?: DocsDocumentEditorCollaborationBindings | null
   /** 当前 URL 对应的块 ID */
@@ -121,6 +127,7 @@ export interface DocsDocumentEditorEmits {
   updateContent: [content: TiptapJsonContent]
   contentError: [error: Error]
   requestComment: [request: TiptapEditorCommentRequest]
+  titleAutofocusApplied: []
 }
 
 /**
@@ -262,6 +269,24 @@ export interface DocumentItemEmits {
   moveDocumentToTeam: [documentId: string]
   shareDocument: [documentId: string]
   deleteDocument: [documentId: string]
+}
+
+/**
+ * 文档删除弹窗属性。
+ */
+export interface DocumentDeleteDialogProps {
+  modelValue: boolean
+  documentTitle: string
+  actionKind: DocumentDeleteAction | null
+}
+
+/**
+ * 文档删除弹窗事件。
+ */
+export interface DocumentDeleteDialogEmits {
+  'update:modelValue': [value: boolean]
+  'delete': []
+  'permanentlyDelete': []
 }
 
 /**

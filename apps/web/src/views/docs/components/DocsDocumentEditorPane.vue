@@ -22,12 +22,14 @@ const { contentError, handleContentError, handleRetryLoad, shouldShowEditor } = 
       :document="props.document"
       :mode="props.mode"
       :editable="props.editable"
+      :autofocus-title="props.autofocusTitle"
       :collaboration="props.collaboration ?? null"
       :active-block-id="props.activeBlockId"
       @update-title="emits('updateTitle', $event)"
       @update-content="emits('updateContent', $event)"
       @content-error="handleContentError"
       @request-comment="emits('requestComment', $event)"
+      @title-autofocus-applied="emits('titleAutofocusApplied')"
     />
 
     <DocsDocumentEditorFallback

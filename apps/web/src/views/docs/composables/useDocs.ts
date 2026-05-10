@@ -26,6 +26,7 @@ import { useDocumentTree } from './useDocumentTree'
 interface NavigateToDocumentOptions {
   replace?: boolean
   skipConfirm?: boolean
+  focusTitle?: boolean
 }
 
 export function useDocs() {
@@ -38,6 +39,7 @@ export function useDocs() {
   const currentWorkspaceType = computed(() => workspaceStore.currentWorkspaceType)
   const isSelectingInitialDocument = shallowRef(false)
   const pendingHistoryDocumentId = shallowRef<string | null>(null)
+  const pendingTitleFocusDocumentId = shallowRef<string | null>(null)
   let confirmPendingNavigation = async () => true
 
   const tree = useDocumentTree({
@@ -102,6 +104,11 @@ export function useDocs() {
     && !activeDocument.isCollaborationReadonly.value
     && !activeDocument.isCollaborationInitialSyncing.value,
   )
+  const shouldAutofocusTitle = computed(() =>
+    docsDocumentEditorMode.value === 'default'
+    && surfaceState.isDocumentSurface.value
+    && activeDocument.currentDocument.value?.id === pendingTitleFocusDocumentId.value,
+  )
 
   watch(
     [
@@ -112,6 +119,27 @@ export function useDocs() {
     ],
     () => {
       void openPendingDocumentHistory()
+    },
+  )
+
+  watch(
+    activeDocumentId,
+    (nextDocumentId) => {
+      if (
+        pendingTitleFocusDocumentId.value
+        && nextDocumentId !== pendingTitleFocusDocumentId.value
+      ) {
+        pendingTitleFocusDocumentId.value = null
+      }
+    },
+  )
+
+  watch(
+    surfaceState.currentSurface,
+    (nextSurface) => {
+      if (nextSurface !== 'document') {
+        pendingTitleFocusDocumentId.value = null
+      }
     },
   )
 
@@ -134,8 +162,12 @@ export function useDocs() {
     isDocumentItemLoading: activeDocument.isDocumentItemLoading,
     isSnapshotsLoading: activeDocument.isSnapshotsLoading,
     isMutatingTree: tree.isMutatingTree,
+    isDeleteDialogOpen: tree.isDeleteDialogOpen,
+    deleteActionKind: tree.deleteActionKind,
+    deleteDialogDocumentTitle: tree.deleteDialogDocumentTitle,
     isRestoringSnapshot: activeDocument.isRestoringSnapshot,
     isHistoryMode: historyState.isHistoryMode,
+    shouldAutofocusTitle,
     selectedHistorySnapshotId: historyState.selectedHistorySnapshotId,
     canRestoreSelectedSnapshot: historyState.canRestoreSelectedSnapshot,
     documentPaneState: surfaceState.documentPaneState,
@@ -152,6 +184,10 @@ export function useDocs() {
     closeHistoryMode: historyState.closeHistoryMode,
     openDocument: pageActions.openDocument,
     openDefaultDocument: pageActions.openDefaultDocument,
+    markTitleAutofocusApplied,
+    closeDeleteDialog: tree.closeDeleteDialog,
+    confirmDeleteDocument: tree.confirmDeleteDocument,
+    confirmPermanentlyDeleteDocument: tree.confirmPermanentlyDeleteDocument,
     reloadCurrentDocument: activeDocument.reloadCurrentDocument,
     reconnectDocumentCollaboration: activeDocument.reconnectCollaboration,
     applyDocumentShareChanged,
@@ -221,6 +257,10 @@ export function useDocs() {
     options: NavigateToDocumentOptions = {},
   ) {
     if (documentId === activeDocumentId.value) {
+      if (options.focusTitle && documentId) {
+        pendingTitleFocusDocumentId.value = documentId
+      }
+
       return true
     }
 
@@ -230,6 +270,10 @@ export function useDocs() {
       if (!canNavigate) {
         return false
       }
+    }
+
+    if (options.focusTitle && documentId) {
+      pendingTitleFocusDocumentId.value = documentId
     }
 
     await router[options.replace ? 'replace' : 'push']({
@@ -244,6 +288,14 @@ export function useDocs() {
   function handleRequestComment(request: TiptapEditorCommentRequest) {
     void request
     ElMessage.info('评论能力稍后接入')
+  }
+
+  function markTitleAutofocusApplied() {
+    if (activeDocument.currentDocument.value?.id !== pendingTitleFocusDocumentId.value) {
+      return
+    }
+
+    pendingTitleFocusDocumentId.value = null
   }
 
   function applyDocumentShareChanged(payload: DocumentShareChangedPayload) {

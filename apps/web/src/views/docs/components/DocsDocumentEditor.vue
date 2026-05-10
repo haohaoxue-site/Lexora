@@ -28,6 +28,7 @@ const footerMetaItems = computed(() => [
       :title="props.document.title"
       :body="props.document.body"
       :editable="isEditable"
+      :autofocus-title="props.autofocusTitle"
       :footer-meta-items="footerMetaItems"
       :title-collaboration="props.collaboration?.title ?? null"
       :body-collaboration="props.collaboration?.body ?? null"
@@ -37,6 +38,7 @@ const footerMetaItems = computed(() => [
       @update-content="emits('updateContent', $event)"
       @content-error="emits('contentError', $event)"
       @request-comment="emits('requestComment', $event)"
+      @title-autofocus-applied="emits('titleAutofocusApplied')"
     />
   </section>
 </template>

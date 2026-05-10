@@ -122,7 +122,7 @@ const {
                 command="delete"
                 class="document-tree-item__menu-item document-tree-item__menu-item--delete"
               >
-                移到回收站
+                删除
               </ElDropdownItem>
             </ElDropdownMenu>
           </template>

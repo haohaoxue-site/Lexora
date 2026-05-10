@@ -31,6 +31,7 @@ export const DOCUMENT_COLLECTION_LABELS = {
 } as const satisfies Record<(typeof DOCUMENT_COLLECTION_VALUES)[number], string>
 
 export const DOCUMENT_TITLE_MAX_LENGTH = 120
+export const DOCUMENT_DEFAULT_TITLE = '新文档'
 
 export const DOCUMENT_SAVE_STATE = {
   IDLE: 'idle',
@@ -217,7 +218,7 @@ export const DocumentAssetSchema = z.object({
 }).strict()
 
 export const CreateDocumentSchema = z.object({
-  title: z.string().trim().min(1).max(DOCUMENT_TITLE_MAX_LENGTH),
+  title: z.string().trim().min(1).max(DOCUMENT_TITLE_MAX_LENGTH).default(DOCUMENT_DEFAULT_TITLE),
   workspaceId: z.string().trim().min(1),
   visibility: DocumentVisibilitySchema.optional(),
   parentId: z.string().trim().nullable().optional(),

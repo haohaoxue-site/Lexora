@@ -104,6 +104,8 @@ export interface DocsActiveSurfaceLayoutProps extends DocsSidebarLayoutProps {
   isDocumentSurface: boolean
   /** 当前预览文档 */
   previewDocument: ActiveDocumentDetail | null
+  /** 是否应自动聚焦标题 */
+  autofocusTitle?: boolean
   /** 当前协作绑定 */
   docsDocumentEditorCollaboration?: DocsDocumentEditorCollaborationBindings | null
   /** 文档编辑模式 */
@@ -139,6 +141,7 @@ export interface DocsActiveSurfaceLayoutEmits {
   updateTitle: [title: TiptapJsonContent]
   updateContent: [content: TiptapJsonContent]
   requestComment: [request: TiptapEditorCommentRequest]
+  titleAutofocusApplied: []
   createDocument: []
   openFallbackDocument: []
   retryLoad: []

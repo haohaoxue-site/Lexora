@@ -8,6 +8,11 @@ export interface DocumentTitleEditorProps {
    */
   title: TiptapJsonContent
   /**
+   * 是否自动聚焦
+   * @description 新建文档后一次性把光标放到标题上
+   */
+  autofocus?: boolean
+  /**
    * 协作绑定
    * @description 接入同一个 Y.Doc 的 title field
    */
@@ -21,4 +26,5 @@ export interface DocumentTitleEditorProps {
 
 export interface DocumentTitleEditorEmits {
   'update:title': [title: TiptapJsonContent]
+  'autofocusApplied': []
 }

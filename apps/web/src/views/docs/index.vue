@@ -6,6 +6,7 @@ import { computed, shallowRef } from 'vue'
 import { useRouter } from 'vue-router'
 import PagePanel from '@/layouts/panels/PagePanel.vue'
 import { useWorkspaceStore } from '@/stores/workspace'
+import DocumentDeleteDialog from './components/DocumentDeleteDialog.vue'
 import DocumentShareDialog from './components/DocumentShareDialog.vue'
 import { useDocs } from './composables/useDocs'
 import DocsActiveSurfaceLayout from './layouts/DocsActiveSurfaceLayout.vue'
@@ -30,8 +31,12 @@ const {
   isDocumentItemLoading,
   isSnapshotsLoading,
   isMutatingTree,
+  isDeleteDialogOpen,
+  deleteActionKind,
+  deleteDialogDocumentTitle,
   isRestoringSnapshot,
   isHistoryMode,
+  shouldAutofocusTitle,
   selectedHistorySnapshotId,
   canRestoreSelectedSnapshot,
   documentPaneState,
@@ -48,6 +53,10 @@ const {
   closeHistoryMode,
   openDocument,
   openDefaultDocument,
+  markTitleAutofocusApplied,
+  closeDeleteDialog,
+  confirmDeleteDocument,
+  confirmPermanentlyDeleteDocument,
   reloadCurrentDocument,
   reconnectDocumentCollaboration,
   applyDocumentShareChanged,
@@ -185,6 +194,7 @@ function openTrashPage() {
       :can-open-share-dialog="canOpenShareDialog"
       :is-document-surface="isDocumentSurface"
       :preview-document="previewDocument"
+      :autofocus-title="shouldAutofocusTitle"
       :docs-document-editor-collaboration="docsDocumentEditorCollaboration"
       :docs-document-editor-mode="docsDocumentEditorMode"
       :is-docs-document-editable="isDocsDocumentEditable"
@@ -207,6 +217,7 @@ function openTrashPage() {
       @update-title="updateDocumentTitle"
       @update-content="updateDocumentContent"
       @request-comment="handleRequestComment"
+      @title-autofocus-applied="markTitleAutofocusApplied"
       @create-document="createRootDocument"
       @open-fallback-document="openDefaultDocument"
       @retry-load="reloadCurrentDocument"
@@ -218,6 +229,15 @@ function openTrashPage() {
       :document-id="shareDialogDocumentId"
       @share-changed="applyDocumentShareChanged"
       @update:model-value="handleShareDialogVisibleChange"
+    />
+
+    <DocumentDeleteDialog
+      :model-value="isDeleteDialogOpen"
+      :document-title="deleteDialogDocumentTitle"
+      :action-kind="deleteActionKind"
+      @update:model-value="value => !value && closeDeleteDialog()"
+      @delete="confirmDeleteDocument"
+      @permanently-delete="confirmPermanentlyDeleteDocument"
     />
   </PagePanel>
 </template>
