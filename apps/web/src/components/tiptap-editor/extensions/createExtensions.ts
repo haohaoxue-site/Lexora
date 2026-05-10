@@ -1,4 +1,5 @@
 import type { Editor, Extensions } from '@tiptap/core'
+import type { CollaborationOptions } from '@tiptap/extension-collaboration'
 import type { Node as ProseMirrorNode } from '@tiptap/pm/model'
 import type {
   TiptapEditorUploadedFile,
@@ -17,6 +18,7 @@ import TaskItem from '@tiptap/extension-task-item'
 import TaskList from '@tiptap/extension-task-list'
 import { TextStyle } from '@tiptap/extension-text-style'
 import StarterKit from '@tiptap/starter-kit'
+import { ySyncPluginKey } from '@tiptap/y-tiptap'
 import { EditorAiPreview } from '../ai/EditorAiPreview'
 import {
   createTiptapCollaborationCursorUser,
@@ -34,6 +36,9 @@ import { TextColorClass } from '../extensions/TextColorClass'
 const BODY_PLACEHOLDER = '输入 / 唤起命令，或者直接开始写作。'
 const BODY_EMPTY_LINE_PLACEHOLDER = '按 space（空格）以启用 AI，或按“/”启用命令'
 const TITLE_PLACEHOLDER = '输入文档标题'
+const COLLABORATION_Y_UNDO_OPTIONS: CollaborationOptions['yUndoOptions'] = {
+  trackedOrigins: [ySyncPluginKey.constructor],
+}
 
 export function createBodyExtensions(options: {
   uploadImage?: (file: File) => Promise<TiptapEditorUploadedImage>
@@ -149,6 +154,7 @@ function createCollaborationExtensions(
       document: collaboration.document,
       field: collaboration.field,
       provider: collaboration.provider ?? null,
+      yUndoOptions: COLLABORATION_Y_UNDO_OPTIONS,
     }),
   ]
 
