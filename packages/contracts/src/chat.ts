@@ -11,7 +11,7 @@ const ChatSessionSummaryBaseSchema = z.object({
   id: z.string().trim().min(1),
   title: ChatSessionTitleSchema,
   modelRef: AiModelRefSchema.pick({
-    configId: true,
+    providerId: true,
     modelId: true,
   }).nullable(),
   createdAt: IsoDateTimeStringSchema,
@@ -49,7 +49,7 @@ export const CreateChatCompletionRequestSchema = z.object({
 
 export const UpdateChatSessionModelRequestSchema = z.object({
   modelRef: AiModelRefSchema.pick({
-    configId: true,
+    providerId: true,
     modelId: true,
   }).nullable(),
 }).strict()

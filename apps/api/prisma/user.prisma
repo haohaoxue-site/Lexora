@@ -47,9 +47,9 @@ model User {
   updatedWorkspaceInvites         WorkspaceInvite[]           @relation("WorkspaceInviteUpdater")
   chatSessions                    ChatSession[]
   adminAuditLogs                  AdminAuditLog[]             @relation("AdminAuditLogActor")
-  ownedAiModelServices            AiModelServiceConfig[]      @relation("AiModelServiceConfigOwner")
-  updatedAiModelServices          AiModelServiceConfig[]      @relation("AiModelServiceConfigUpdater")
-  updatedAiModelItems             AiModelItem[]               @relation("AiModelItemUpdater")
+  ownedAiProviders                AiProvider[]                @relation("AiProviderOwner")
+  updatedAiProviders              AiProvider[]                @relation("AiProviderUpdater")
+  updatedAiProviderModels         AiProviderModel[]           @relation("AiProviderModelUpdater")
   aiDefaultModelPolicies          AiDefaultModelPolicy[]      @relation("AiDefaultModelPolicyUser")
   updatedDefaultModelPolicies     AiDefaultModelPolicy[]      @relation("AiDefaultModelPolicyUpdater")
   createdAiSessions               AiSession[]                 @relation("AiSessionCreator")

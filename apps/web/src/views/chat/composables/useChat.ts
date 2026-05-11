@@ -23,7 +23,7 @@ import {
   resolveEffectiveAiDefaultModelPolicy,
 } from '@/utils/ai-default-model'
 import { getRequestErrorDisplayMessage } from '@/utils/request-error'
-import { formatModelOptionLabel } from '@/views/provider/utils/aiModel'
+import { formatModelOptionLabel } from '@/views/provider/utils/modelDisplay'
 
 /**
  * 聊天会话摘要模型。
@@ -51,13 +51,13 @@ function normalizeNullableModelRef(
   return normalizeModelSelection({ modelRef: value }).modelRef ?? null
 }
 
-function toModelRef(value: Pick<ChatModelItem, 'configId' | 'modelId'> | null | undefined): ChatModelSelection['modelRef'] | null {
+function toModelRef(value: Pick<ChatModelItem, 'providerId' | 'modelId'> | null | undefined): ChatModelSelection['modelRef'] | null {
   if (!value) {
     return null
   }
 
   return {
-    configId: value.configId.trim(),
+    providerId: value.providerId.trim(),
     modelId: value.modelId.trim(),
   }
 }
@@ -66,7 +66,7 @@ function normalizeModelSelection(value: ChatModelSelection): ChatModelSelection 
   return {
     modelRef: value.modelRef
       ? {
-          configId: value.modelRef.configId.trim(),
+          providerId: value.modelRef.providerId.trim(),
           modelId: value.modelRef.modelId.trim(),
         }
       : null,
@@ -101,7 +101,7 @@ function findMatchingModelOption(
   modelOptions: ChatModelItem[],
   modelRef: NonNullable<ChatModelSelection['modelRef']>,
 ): ChatModelItem | null {
-  return modelOptions.find(model => model.configId === modelRef.configId && model.modelId === modelRef.modelId) ?? null
+  return modelOptions.find(model => model.providerId === modelRef.providerId && model.modelId === modelRef.modelId) ?? null
 }
 
 export function resolveSelectedChatModel(
@@ -119,7 +119,7 @@ export function resolveSelectedChatModel(
 
     if (
       runtimeDefaultModel
-      && runtimeDefaultModel.configId === normalizedModelRef.configId
+      && runtimeDefaultModel.providerId === normalizedModelRef.providerId
       && runtimeDefaultModel.modelId === normalizedModelRef.modelId
     ) {
       return runtimeDefaultModel

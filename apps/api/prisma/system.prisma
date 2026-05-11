@@ -4,15 +4,15 @@ enum SystemEmailProvider {
 }
 
 model SystemAuthConfig {
-  id                         String    @id @default("default")
-  allowGithubLogin           Boolean   @default(true)
-  allowLinuxDoLogin          Boolean   @default(true)
-  allowPasswordRegistration  Boolean   @default(true)
-  allowGithubRegistration    Boolean   @default(true)
-  allowLinuxDoRegistration   Boolean   @default(true)
-  requirePasswordInviteCode  Boolean   @default(false)
-  requireGithubInviteCode    Boolean   @default(false)
-  requireLinuxDoInviteCode   Boolean   @default(false)
+  id                              String    @id @default("default")
+  allowGithubLogin                Boolean   @default(true)
+  allowLinuxDoLogin               Boolean   @default(true)
+  allowPasswordRegistration       Boolean   @default(true)
+  allowGithubRegistration         Boolean   @default(true)
+  allowLinuxDoRegistration        Boolean   @default(true)
+  requirePasswordInviteCode       Boolean   @default(false)
+  requireGithubInviteCode         Boolean   @default(false)
+  requireLinuxDoInviteCode        Boolean   @default(false)
   registrationInviteCodeHash      String?
   registrationInviteCodeEncrypted String?
   systemAdminUserId               String?   @unique

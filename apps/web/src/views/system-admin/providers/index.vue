@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import PagePanel from '@/layouts/panels/PagePanel.vue'
-import ModelServiceConsole from '@/views/provider/components/ModelServiceConsole.vue'
+import AiProviderConsole from '@/views/provider/components/AiProviderConsole.vue'
 import SystemAdminPageHeader from '../components/SystemAdminPageHeader.vue'
 </script>
 
@@ -11,7 +11,7 @@ import SystemAdminPageHeader from '../components/SystemAdminPageHeader.vue'
     </template>
 
     <div class="admin-providers-page h-full min-h-0 bg-fill-lighter p-4 lg:p-6">
-      <ModelServiceConsole class="admin-providers h-full min-h-0" mode="system" />
+      <AiProviderConsole class="admin-providers h-full min-h-0" mode="system" />
     </div>
   </PagePanel>
 </template>

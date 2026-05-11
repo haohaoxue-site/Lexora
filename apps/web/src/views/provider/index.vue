@@ -1,17 +1,17 @@
 <script setup lang="ts">
 import PagePanel from '@/layouts/panels/PagePanel.vue'
-import ModelServiceConsole from './components/ModelServiceConsole.vue'
+import AiProviderConsole from './components/AiProviderConsole.vue'
 </script>
 
 <template>
   <PagePanel>
     <template #header>
       <h1 class="provider-view__title">
-        模型服务
+        模型服务商
       </h1>
     </template>
 
-    <ModelServiceConsole mode="user" />
+    <AiProviderConsole mode="user" />
   </PagePanel>
 </template>
 

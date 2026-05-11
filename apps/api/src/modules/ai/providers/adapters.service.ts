@@ -1,5 +1,5 @@
 import type { AiModelType } from '@haohaoxue/samepage-contracts'
-import type { AiModelServiceConfig } from '@prisma/client'
+import type { AiProvider } from '@prisma/client'
 import type { CryptoConfig } from '../../../config/auth.config'
 import { AI_MODEL_TYPE } from '@haohaoxue/samepage-contracts'
 import { BadRequestException, Injectable } from '@nestjs/common'
@@ -41,14 +41,14 @@ export class AiProviderAdaptersService {
     return decryptAes256Gcm(apiKeyEncrypted, this.encryptionKey)
   }
 
-  async fetchProviderModels(service: AiModelServiceConfig): Promise<ProviderModelRecord[]> {
-    const endpoint = service.endpoint?.trim()
+  async fetchProviderModels(provider: AiProvider): Promise<ProviderModelRecord[]> {
+    const endpoint = provider.endpoint?.trim()
     if (!endpoint) {
       throw new BadRequestException('请先配置 API 地址')
     }
 
-    const apiKey = this.decryptApiKey(service.apiKeyEncrypted)
-    if (service.authMode !== 'NONE' && !apiKey) {
+    const apiKey = this.decryptApiKey(provider.apiKeyEncrypted)
+    if (provider.authMode !== 'NONE' && !apiKey) {
       throw new BadRequestException('请先配置 API Key')
     }
 
@@ -58,12 +58,12 @@ export class AiProviderAdaptersService {
     try {
       const response = await fetch(`${endpoint.replace(TRAILING_SLASHES_RE, '')}/models`, {
         method: 'GET',
-        headers: this.buildModelListHeaders(service.authMode, apiKey),
+        headers: this.buildModelListHeaders(provider.authMode, apiKey),
         signal: controller.signal,
       })
 
       if (!response.ok) {
-        throw new BadRequestException(`同步模型列表失败：HTTP ${response.status}`)
+        throw new BadRequestException(`获取模型列表失败：HTTP ${response.status}`)
       }
 
       const payload = await response.json().catch(() => null)
@@ -79,14 +79,14 @@ export class AiProviderAdaptersService {
         throw error
       }
 
-      throw new BadRequestException('同步模型列表失败，请检查 API 地址和密钥')
+      throw new BadRequestException('获取模型列表失败，请检查 API 地址和密钥')
     }
     finally {
       clearTimeout(timeout)
     }
   }
 
-  private buildModelListHeaders(authMode: AiModelServiceConfig['authMode'], apiKey: string | null) {
+  private buildModelListHeaders(authMode: AiProvider['authMode'], apiKey: string | null) {
     const headers: Record<string, string> = {
       accept: 'application/json',
     }
@@ -155,7 +155,7 @@ export class AiProviderAdaptersService {
     return {
       modelId,
       modelName: label,
-      modelType: inferModelType(modelId),
+      modelType: inferProviderModelType(modelId),
       contextWindow: getNumber(properties.context_size) ?? getNumber(record.context_window) ?? null,
       maxOutputTokens: getNumber(properties.max_output_tokens) ?? getNumber(record.max_output_tokens) ?? null,
     }
@@ -185,7 +185,7 @@ function getLocalizedLabel(value: unknown): string | null {
   return getString(value.zh_Hans) ?? getString(value.en_US)
 }
 
-function inferModelType(modelId: string): AiModelType {
+export function inferProviderModelType(modelId: string): AiModelType {
   const normalizedModelId = modelId.toLowerCase()
   if (normalizedModelId.includes('embedding') || normalizedModelId.includes('embed')) {
     return AI_MODEL_TYPE.EMBEDDING

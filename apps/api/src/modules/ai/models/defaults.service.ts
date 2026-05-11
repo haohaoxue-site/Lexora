@@ -1,20 +1,20 @@
 import type {
   AiAvailableModelOption,
-  AiAvailableModelServiceOption,
+  AiAvailableProviderOption,
   AiDefaultModelPolicyItem,
   AiModelIntentKey,
-  AiModelServiceScope,
+  AiProviderScope,
   UpdateAiDefaultModelPolicyRequest,
 } from '@haohaoxue/samepage-contracts'
 import type {
-  AiModelItem,
-  AiModelServiceConfig,
+  AiProvider,
+  AiProviderModel,
 } from '@prisma/client'
 import {
   AI_DEFAULT_MODEL_STATUS,
   AI_MODEL_INTENT_KEY_VALUES,
   AiModelIntentKeySchema,
-  AiModelServiceScopeSchema,
+  AiProviderScopeSchema,
 } from '@haohaoxue/samepage-contracts'
 import { isAiModelCapabilitySatisfied } from '@haohaoxue/samepage-shared'
 import { BadRequestException, Injectable } from '@nestjs/common'
@@ -22,7 +22,7 @@ import { PrismaService } from '../../../database/prisma.service'
 import {
   buildAiModelRef,
   toAvailableModelOption,
-  toAvailableModelServiceOption,
+  toAvailableProviderOption,
   toDefaultModelPolicyItem,
   toDomainCapability,
   toDomainModelType,
@@ -47,9 +47,9 @@ export class AiDefaultModelsService {
       return this.clearDefaultModelPolicy(userId, parsedIntentKey)
     }
 
-    const service = await this.prisma.aiModelServiceConfig.findFirst({
+    const provider = await this.prisma.aiProvider.findFirst({
       where: {
-        id: payload.modelRef.configId,
+        id: payload.modelRef.providerId,
         enabled: true,
         OR: [
           { scope: 'SYSTEM', visibility: 'ALL_USERS' },
@@ -58,13 +58,13 @@ export class AiDefaultModelsService {
       },
     })
 
-    if (!service) {
-      throw new BadRequestException('模型服务不可用')
+    if (!provider) {
+      throw new BadRequestException('服务商不可用')
     }
 
-    const model = await this.prisma.aiModelItem.findFirst({
+    const model = await this.prisma.aiProviderModel.findFirst({
       where: {
-        serviceConfigId: payload.modelRef.configId,
+        providerId: payload.modelRef.providerId,
         modelId: payload.modelRef.modelId,
         enabled: true,
       },
@@ -91,13 +91,13 @@ export class AiDefaultModelsService {
       create: {
         userId,
         intentKey: parsedIntentKey,
-        serviceConfigId: payload.modelRef.configId,
+        providerId: payload.modelRef.providerId,
         modelId: payload.modelRef.modelId,
         updatedBy: userId,
         deletedAt: null,
       },
       update: {
-        serviceConfigId: payload.modelRef.configId,
+        providerId: payload.modelRef.providerId,
         modelId: payload.modelRef.modelId,
         updatedBy: userId,
         deletedAt: null,
@@ -107,9 +107,9 @@ export class AiDefaultModelsService {
     return toDefaultModelPolicyItem({
       intentKey: parsedIntentKey,
       modelRef: buildAiModelRef({
-        configId: service.id,
-        scope: service.scope,
-        providerKey: service.providerKey,
+        providerId: provider.id,
+        scope: provider.scope,
+        providerKey: provider.providerKey,
         modelId: policy.modelId,
       }),
       status: AI_DEFAULT_MODEL_STATUS.READY,
@@ -144,7 +144,7 @@ export class AiDefaultModelsService {
 
   async getAvailableModels(userId: string, intentKey: AiModelIntentKey): Promise<AiAvailableModelOption[]> {
     const parsedIntentKey = AiModelIntentKeySchema.parse(intentKey)
-    const services = await this.prisma.aiModelServiceConfig.findMany({
+    const providers = await this.prisma.aiProvider.findMany({
       where: {
         enabled: true,
         OR: [
@@ -164,19 +164,19 @@ export class AiDefaultModelsService {
       ],
     })
 
-    return services.flatMap(service =>
-      service.models.map(model => this.toAvailableModelOptionForIntent(service, model, parsedIntentKey)),
+    return providers.flatMap(provider =>
+      provider.models.map(model => this.toAvailableModelOptionForIntent(provider, model, parsedIntentKey)),
     )
   }
 
-  async getAvailableModelServices(
+  async getAvailableProviders(
     userId: string,
     intentKey: AiModelIntentKey,
-    scope: AiModelServiceScope,
-  ): Promise<AiAvailableModelServiceOption[]> {
+    scope: AiProviderScope,
+  ): Promise<AiAvailableProviderOption[]> {
     AiModelIntentKeySchema.parse(intentKey)
-    const parsedScope = AiModelServiceScopeSchema.parse(scope)
-    const services = await this.prisma.aiModelServiceConfig.findMany({
+    const parsedScope = AiProviderScopeSchema.parse(scope)
+    const providers = await this.prisma.aiProvider.findMany({
       where: {
         enabled: true,
         scope: toPrismaScope(parsedScope),
@@ -191,18 +191,18 @@ export class AiDefaultModelsService {
       orderBy: { providerName: 'asc' },
     })
 
-    return services.map(toAvailableModelServiceOption)
+    return providers.map(toAvailableProviderOption)
   }
 
-  async getAvailableServiceModels(
+  async getAvailableProviderModels(
     userId: string,
     intentKey: AiModelIntentKey,
-    configId: string,
+    providerId: string,
   ): Promise<AiAvailableModelOption[]> {
     const parsedIntentKey = AiModelIntentKeySchema.parse(intentKey)
-    const service = await this.prisma.aiModelServiceConfig.findFirst({
+    const provider = await this.prisma.aiProvider.findFirst({
       where: {
-        id: configId,
+        id: providerId,
         enabled: true,
         OR: [
           { scope: 'SYSTEM', visibility: 'ALL_USERS' },
@@ -217,11 +217,11 @@ export class AiDefaultModelsService {
       },
     })
 
-    if (!service) {
+    if (!provider) {
       return []
     }
 
-    return service.models.map(model => this.toAvailableModelOptionForIntent(service, model, parsedIntentKey))
+    return provider.models.map(model => this.toAvailableModelOptionForIntent(provider, model, parsedIntentKey))
   }
 
   private async getDefaultModelItem(userId: string, intentKey: AiModelIntentKey): Promise<AiDefaultModelPolicyItem> {
@@ -244,9 +244,9 @@ export class AiDefaultModelsService {
       })
     }
 
-    const service = await this.prisma.aiModelServiceConfig.findFirst({
+    const provider = await this.prisma.aiProvider.findFirst({
       where: {
-        id: policy.serviceConfigId,
+        id: policy.providerId,
         enabled: true,
         OR: [
           { scope: 'SYSTEM', visibility: 'ALL_USERS' },
@@ -255,13 +255,13 @@ export class AiDefaultModelsService {
       },
     })
 
-    if (!service) {
-      return this.invalidPolicy(intentKey, policy.updatedAt, '模型服务不可用')
+    if (!provider) {
+      return this.invalidPolicy(intentKey, policy.updatedAt, '服务商不可用')
     }
 
-    const model = await this.prisma.aiModelItem.findFirst({
+    const model = await this.prisma.aiProviderModel.findFirst({
       where: {
-        serviceConfigId: policy.serviceConfigId,
+        providerId: policy.providerId,
         modelId: policy.modelId,
         enabled: true,
       },
@@ -281,9 +281,9 @@ export class AiDefaultModelsService {
     return toDefaultModelPolicyItem({
       intentKey,
       modelRef: buildAiModelRef({
-        configId: service.id,
-        scope: service.scope,
-        providerKey: service.providerKey,
+        providerId: provider.id,
+        scope: provider.scope,
+        providerKey: provider.providerKey,
         modelId: policy.modelId,
       }),
       status: AI_DEFAULT_MODEL_STATUS.READY,
@@ -303,8 +303,8 @@ export class AiDefaultModelsService {
   }
 
   private toAvailableModelOptionForIntent(
-    service: AiModelServiceConfig,
-    model: AiModelItem,
+    provider: AiProvider,
+    model: AiProviderModel,
     intentKey: AiModelIntentKey,
   ): AiAvailableModelOption {
     const selectable = isAiModelCapabilitySatisfied({
@@ -313,7 +313,7 @@ export class AiDefaultModelsService {
     }, intentKey)
 
     return toAvailableModelOption({
-      service,
+      provider,
       model,
       selectable,
       unavailableReason: selectable ? null : '模型不满足当前场景要求',

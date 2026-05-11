@@ -14,11 +14,11 @@ import { AiProviderAdaptersService } from '../providers/adapters.service'
 export interface ResolveAiModelTargetParams {
   actorUserId: string
   intentKey: AiModelIntentKey
-  requestedModelRef?: Pick<AiModelRef, 'configId' | 'modelId'> | null
+  requestedModelRef?: Pick<AiModelRef, 'providerId' | 'modelId'> | null
 }
 
 export interface ResolvedAiModelTarget {
-  configId: string
+  providerId: string
   scope: 'system' | 'user'
   providerKey: string
   providerName: string
@@ -40,9 +40,9 @@ export class AiModelResolverService {
   async resolveModelTarget(params: ResolveAiModelTargetParams): Promise<ResolvedAiModelTarget> {
     const intentKey = AiModelIntentKeySchema.parse(params.intentKey)
     const modelRef = await this.resolveRequestedModelRef(params.actorUserId, intentKey, params.requestedModelRef)
-    const service = await this.prisma.aiModelServiceConfig.findFirst({
+    const provider = await this.prisma.aiProvider.findFirst({
       where: {
-        id: modelRef.configId,
+        id: modelRef.providerId,
         enabled: true,
         OR: [
           { scope: 'SYSTEM', visibility: 'ALL_USERS' },
@@ -51,13 +51,13 @@ export class AiModelResolverService {
       },
     })
 
-    if (!service) {
-      throw new BadRequestException('模型服务不可用')
+    if (!provider) {
+      throw new BadRequestException('服务商不可用')
     }
 
-    const model = await this.prisma.aiModelItem.findFirst({
+    const model = await this.prisma.aiProviderModel.findFirst({
       where: {
-        serviceConfigId: modelRef.configId,
+        providerId: modelRef.providerId,
         modelId: modelRef.modelId,
         enabled: true,
       },
@@ -74,25 +74,25 @@ export class AiModelResolverService {
       throw new BadRequestException('模型不满足当前场景要求')
     }
 
-    const endpoint = service.endpoint?.trim()
+    const endpoint = provider.endpoint?.trim()
     if (!endpoint) {
-      throw new BadRequestException('模型服务未配置 API 地址')
+      throw new BadRequestException('服务商未配置 API 地址')
     }
 
-    const apiKey = this.adaptersService.decryptApiKey(service.apiKeyEncrypted)
-    if (service.authMode !== 'NONE' && !apiKey) {
-      throw new BadRequestException('模型服务未配置 API Key')
+    const apiKey = this.adaptersService.decryptApiKey(provider.apiKeyEncrypted)
+    if (provider.authMode !== 'NONE' && !apiKey) {
+      throw new BadRequestException('服务商未配置 API Key')
     }
 
     return {
-      configId: service.id,
-      scope: toDomainScope(service.scope),
-      providerKey: service.providerKey,
-      providerName: service.providerName,
-      adapterKey: service.adapterKey,
+      providerId: provider.id,
+      scope: toDomainScope(provider.scope),
+      providerKey: provider.providerKey,
+      providerName: provider.providerName,
+      adapterKey: provider.adapterKey,
       endpoint: normalizeAiEndpoint(endpoint),
       apiKey,
-      authMode: toDomainAuthMode(service.authMode),
+      authMode: toDomainAuthMode(provider.authMode),
       modelId: model.modelId,
       modelName: model.modelName,
     }
@@ -101,7 +101,7 @@ export class AiModelResolverService {
   private async resolveRequestedModelRef(
     actorUserId: string,
     intentKey: AiModelIntentKey,
-    requestedModelRef: Pick<AiModelRef, 'configId' | 'modelId'> | null | undefined,
+    requestedModelRef: Pick<AiModelRef, 'providerId' | 'modelId'> | null | undefined,
   ) {
     if (requestedModelRef) {
       return requestedModelRef
@@ -125,7 +125,7 @@ export class AiModelResolverService {
 
       if (policy) {
         return {
-          configId: policy.serviceConfigId,
+          providerId: policy.providerId,
           modelId: policy.modelId,
         }
       }

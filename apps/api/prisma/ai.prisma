@@ -1,21 +1,26 @@
-enum AiModelServiceScope {
+enum AiProviderScope {
   SYSTEM
   USER
 }
 
-enum AiModelEndpointMode {
+enum AiProviderEndpointMode {
   FIXED
   CUSTOM
 }
 
-enum AiModelAuthMode {
+enum AiProviderAuthMode {
   API_KEY
   BEARER
   NONE
 }
 
-enum AiModelServiceVisibility {
+enum AiProviderVisibility {
   ALL_USERS
+}
+
+enum AiProviderSource {
+  PRESET
+  COMPATIBLE
 }
 
 enum AiModelType {
@@ -60,73 +65,78 @@ enum AiCandidateStatus {
   REJECTED
 }
 
-model AiModelServiceConfig {
-  id              String                   @id @default(uuid())
-  scope           AiModelServiceScope
+model AiProvider {
+  id              String                 @id @default(uuid())
+  scope           AiProviderScope
   ownerUserId     String?
+  ownerKey        String
+  identityKey     String
+  source          AiProviderSource
   providerKey     String
   providerName    String
   adapterKey      String
-  endpointMode    AiModelEndpointMode
+  endpointMode    AiProviderEndpointMode
   endpoint        String?
-  authMode        AiModelAuthMode
+  authMode        AiProviderAuthMode
   apiKeyEncrypted String?
-  enabled         Boolean                  @default(false)
-  visibility      AiModelServiceVisibility @default(ALL_USERS)
-  ownerUser       User?                    @relation("AiModelServiceConfigOwner", fields: [ownerUserId], references: [id], onDelete: Cascade)
-  models          AiModelItem[]
+  enabled         Boolean                @default(false)
+  visibility      AiProviderVisibility   @default(ALL_USERS)
+  ownerUser       User?                  @relation("AiProviderOwner", fields: [ownerUserId], references: [id], onDelete: Cascade)
+  models          AiProviderModel[]
   defaultPolicies AiDefaultModelPolicy[]
-  createdAt       DateTime                 @default(now())
-  updatedAt       DateTime                 @updatedAt
+  createdAt       DateTime               @default(now())
+  updatedAt       DateTime               @updatedAt
   updatedBy       String?
-  updatedByUser   User?                    @relation("AiModelServiceConfigUpdater", fields: [updatedBy], references: [id], onDelete: SetNull)
+  updatedByUser   User?                  @relation("AiProviderUpdater", fields: [updatedBy], references: [id], onDelete: SetNull)
   deletedAt       DateTime?
 
+  @@unique([ownerKey, identityKey])
   @@index([scope, enabled])
   @@index([ownerUserId, enabled])
+  @@index([ownerKey, providerKey])
   @@index([providerKey])
   @@index([updatedBy])
 }
 
-model AiModelItem {
-  id              String               @id @default(uuid())
-  serviceConfigId String
+model AiProviderModel {
+  id              String              @id @default(uuid())
+  providerId      String
   modelId         String
   modelName       String
   modelType       AiModelType
   capabilities    AiModelCapability[]
   contextWindow   Int?
   maxOutputTokens Int?
-  enabled         Boolean              @default(true)
-  serviceConfig   AiModelServiceConfig @relation(fields: [serviceConfigId], references: [id], onDelete: Cascade)
-  createdAt       DateTime             @default(now())
-  updatedAt       DateTime             @updatedAt
+  enabled         Boolean             @default(true)
+  provider        AiProvider          @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
   updatedBy       String?
-  updatedByUser   User?                @relation("AiModelItemUpdater", fields: [updatedBy], references: [id], onDelete: SetNull)
+  updatedByUser   User?               @relation("AiProviderModelUpdater", fields: [updatedBy], references: [id], onDelete: SetNull)
   deletedAt       DateTime?
 
-  @@unique([serviceConfigId, modelId])
-  @@index([serviceConfigId, enabled])
+  @@unique([providerId, modelId])
+  @@index([providerId, enabled])
   @@index([modelType])
   @@index([updatedBy])
 }
 
 model AiDefaultModelPolicy {
-  id              String               @id @default(uuid())
-  userId          String
-  intentKey       String
-  serviceConfigId String
-  modelId         String
-  user            User                 @relation("AiDefaultModelPolicyUser", fields: [userId], references: [id], onDelete: Cascade)
-  serviceConfig   AiModelServiceConfig @relation(fields: [serviceConfigId], references: [id], onDelete: Cascade)
-  createdAt       DateTime             @default(now())
-  updatedAt       DateTime             @updatedAt
-  updatedBy       String?
-  updatedByUser   User?                @relation("AiDefaultModelPolicyUpdater", fields: [updatedBy], references: [id], onDelete: SetNull)
-  deletedAt       DateTime?
+  id            String     @id @default(uuid())
+  userId        String
+  intentKey     String
+  providerId    String
+  modelId       String
+  user          User       @relation("AiDefaultModelPolicyUser", fields: [userId], references: [id], onDelete: Cascade)
+  provider      AiProvider @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+  updatedBy     String?
+  updatedByUser User?      @relation("AiDefaultModelPolicyUpdater", fields: [updatedBy], references: [id], onDelete: SetNull)
+  deletedAt     DateTime?
 
   @@unique([userId, intentKey])
-  @@index([serviceConfigId])
+  @@index([providerId])
   @@index([updatedBy])
 }
 

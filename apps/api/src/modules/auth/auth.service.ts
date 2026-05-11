@@ -463,7 +463,7 @@ export class AuthService {
 
     await this.systemAuthService.assertRegistrationAllowed(resolveAuthMethod(provider))
 
-    return this.prisma.$transaction(async (tx) => {
+    const user = await this.prisma.$transaction(async (tx) => {
       await this.registrationInviteGrantsService.consumeGrantById({
         method: resolveAuthMethod(provider),
         provider,
@@ -505,6 +505,8 @@ export class AuthService {
 
       return targetUser
     })
+
+    return user
   }
 
   private async bindOAuthToUser(

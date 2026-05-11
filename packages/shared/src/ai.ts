@@ -52,7 +52,7 @@ export function compareAiModelRef(left: AiModelRef | null | undefined, right: Ai
     return false
   }
 
-  return left.configId === right.configId && left.modelId === right.modelId
+  return left.providerId === right.providerId && left.modelId === right.modelId
 }
 
 export function getAiModelIntentRequirement(intentKey: AiModelIntentKey): AiModelIntentRequirement {

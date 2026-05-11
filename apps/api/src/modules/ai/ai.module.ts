@@ -9,31 +9,31 @@ import { AiEditorSessionsService } from './editor/sessions.service'
 
 // models
 import { AiDefaultModelsService } from './models/defaults.service'
-import { AiModelItemsService } from './models/items.service'
+import { AiProviderModelsService } from './models/provider-models.service'
+import { AiProvidersService } from './models/providers.service'
 import { AiModelResolverService } from './models/resolver.service'
-import { AiModelServicesService } from './models/services.service'
 import { AiSystemAdminController } from './models/system-admin.controller'
 import { AiUserController } from './models/user.controller'
 
 // providers
 import { AiProviderAdaptersService } from './providers/adapters.service'
-import { AiTemplateController } from './providers/templates.controller'
-import { AiProviderTemplatesService } from './providers/templates.service'
+import { AiProviderPresetsController } from './providers/presets.controller'
+import { AiProviderPresetsService } from './providers/presets.service'
 
 @Module({
   imports: [AgentModule, DocumentsModule],
   controllers: [
-    AiTemplateController,
+    AiProviderPresetsController,
     AiSystemAdminController,
     AiUserController,
     AiEditorController,
     AiEditorAgentInternalController,
   ],
   providers: [
-    AiProviderTemplatesService,
+    AiProviderPresetsService,
     AiProviderAdaptersService,
-    AiModelServicesService,
-    AiModelItemsService,
+    AiProvidersService,
+    AiProviderModelsService,
     AiDefaultModelsService,
     AiModelResolverService,
     AiEditorSessionsService,
@@ -41,6 +41,7 @@ import { AiProviderTemplatesService } from './providers/templates.service'
   exports: [
     AiDefaultModelsService,
     AiProviderAdaptersService,
+    AiProvidersService,
     AiModelResolverService,
     AiEditorSessionsService,
   ],

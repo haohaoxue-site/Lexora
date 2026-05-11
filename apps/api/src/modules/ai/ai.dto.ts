@@ -1,13 +1,13 @@
 import type {
-  AiModelAuthMode,
   AiModelCapability,
   AiModelType,
+  AiProviderAuthMode,
   UpdateAiDefaultModelPolicyRequest,
 } from '@haohaoxue/samepage-contracts'
 import {
-  AI_MODEL_AUTH_MODE_VALUES,
   AI_MODEL_CAPABILITY_VALUES,
   AI_MODEL_TYPE_VALUES,
+  AI_PROVIDER_AUTH_MODE_VALUES,
 } from '@haohaoxue/samepage-contracts'
 import { Transform, Type } from 'class-transformer'
 import {
@@ -23,7 +23,7 @@ import {
   ValidateNested,
 } from 'class-validator'
 
-export class CreateAiModelServiceDto {
+export class CreateAiProviderDto {
   @IsString()
   @MaxLength(80)
   providerKey!: string
@@ -45,7 +45,7 @@ export class CreateAiModelServiceDto {
   apiKey?: string
 }
 
-export class UpdateAiModelServiceDto {
+export class UpdateAiProviderDto {
   @IsOptional()
   @IsString()
   @MaxLength(80)
@@ -76,7 +76,7 @@ export class UpdateAiModelServiceDto {
   enabled?: boolean
 }
 
-export class CreateAiModelItemDto {
+export class UpsertAiProviderModelDto {
   @IsString()
   @MaxLength(160)
   modelId!: string
@@ -84,30 +84,6 @@ export class CreateAiModelItemDto {
   @IsString()
   @MaxLength(160)
   modelName!: string
-
-  @IsEnum(AI_MODEL_TYPE_VALUES)
-  modelType!: AiModelType
-
-  @IsArray()
-  @IsEnum(AI_MODEL_CAPABILITY_VALUES, { each: true })
-  capabilities!: AiModelCapability[]
-
-  @IsOptional()
-  @IsInt()
-  @Min(1)
-  contextWindow?: number
-
-  @IsOptional()
-  @IsInt()
-  @Min(1)
-  maxOutputTokens?: number
-}
-
-export class UpdateAiModelItemDto {
-  @IsOptional()
-  @IsString()
-  @MaxLength(160)
-  modelName?: string
 
   @IsOptional()
   @IsEnum(AI_MODEL_TYPE_VALUES)
@@ -133,10 +109,17 @@ export class UpdateAiModelItemDto {
   enabled?: boolean
 }
 
+export class UpsertAiProviderModelsDto {
+  @IsArray()
+  @Type(() => UpsertAiProviderModelDto)
+  @ValidateNested({ each: true })
+  models!: UpsertAiProviderModelDto[]
+}
+
 class DefaultModelRefDto {
   @IsString()
   @MaxLength(80)
-  configId!: string
+  providerId!: string
 
   @IsString()
   @MaxLength(160)
@@ -152,6 +135,6 @@ export class UpdateDefaultModelDto implements UpdateAiDefaultModelPolicyRequest 
 
 export class TestAiProviderCredentialDto {
   @IsOptional()
-  @IsEnum(AI_MODEL_AUTH_MODE_VALUES)
-  authMode?: AiModelAuthMode
+  @IsEnum(AI_PROVIDER_AUTH_MODE_VALUES)
+  authMode?: AiProviderAuthMode
 }

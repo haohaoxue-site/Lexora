@@ -23,7 +23,7 @@ const selectedModelRef = computed<ModelCascaderModelRef | null>({
   set: (value) => {
     form.value.modelRef = value
       ? {
-          configId: value.configId,
+          providerId: value.providerId,
           modelId: value.modelId,
         }
       : null

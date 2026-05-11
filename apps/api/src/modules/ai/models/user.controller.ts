@@ -1,10 +1,11 @@
 import type {
   AiAvailableModelOption,
-  AiAvailableModelServiceOption,
+  AiAvailableProviderOption,
   AiDefaultModelPolicyItem,
-  AiModelItem,
-  AiModelServiceConfigSummary,
-  AiModelSyncResult,
+  AiProvider,
+  AiProviderCredential,
+  AiProviderModelItem,
+  AiProviderModels,
 } from '@haohaoxue/samepage-contracts'
 import type { AuthUserContext } from '../../auth/auth.interface'
 import {
@@ -20,96 +21,94 @@ import {
 } from '@nestjs/common'
 import { CurrentUser } from '../../../decorators/current-user.decorator'
 import {
-  CreateAiModelItemDto,
-  CreateAiModelServiceDto,
-  UpdateAiModelItemDto,
-  UpdateAiModelServiceDto,
+  CreateAiProviderDto,
+  UpdateAiProviderDto,
   UpdateDefaultModelDto,
+  UpsertAiProviderModelDto,
+  UpsertAiProviderModelsDto,
 } from '../ai.dto'
 import { AiDefaultModelsService } from './defaults.service'
-import { AiModelItemsService } from './items.service'
-import { AiModelServicesService } from './services.service'
+import { AiProviderModelsService } from './provider-models.service'
+import { AiProvidersService } from './providers.service'
 
 @Controller('users/me/ai')
 export class AiUserController {
   constructor(
-    private readonly modelServicesService: AiModelServicesService,
-    private readonly modelItemsService: AiModelItemsService,
+    private readonly providersService: AiProvidersService,
+    private readonly providerModelsService: AiProviderModelsService,
     private readonly defaultModelsService: AiDefaultModelsService,
   ) {}
 
-  @Get('model-services')
-  getModelServices(@CurrentUser() authUser: AuthUserContext): Promise<AiModelServiceConfigSummary[]> {
-    return this.modelServicesService.getUserServices(authUser.id)
+  @Get('providers')
+  getProviders(@CurrentUser() authUser: AuthUserContext): Promise<AiProvider[]> {
+    return this.providersService.getUserProviders(authUser.id)
   }
 
-  @Post('model-services')
-  createModelService(
+  @Post('providers')
+  createProvider(
     @CurrentUser() authUser: AuthUserContext,
-    @Body() payload: CreateAiModelServiceDto,
-  ): Promise<AiModelServiceConfigSummary> {
-    return this.modelServicesService.createUserService(authUser.id, payload)
+    @Body() payload: CreateAiProviderDto,
+  ): Promise<AiProvider> {
+    return this.providersService.createUserProvider(authUser.id, payload)
   }
 
-  @Patch('model-services/:configId')
-  updateModelService(
+  @Patch('providers/:providerId')
+  updateProvider(
     @CurrentUser() authUser: AuthUserContext,
-    @Param('configId') configId: string,
-    @Body() payload: UpdateAiModelServiceDto,
-  ): Promise<AiModelServiceConfigSummary> {
-    return this.modelServicesService.updateUserService(authUser.id, configId, payload)
+    @Param('providerId') providerId: string,
+    @Body() payload: UpdateAiProviderDto,
+  ): Promise<AiProvider> {
+    return this.providersService.updateUserProvider(authUser.id, providerId, payload)
   }
 
-  @Delete('model-services/:configId')
-  async deleteModelService(
+  @Get('providers/:providerId/credential')
+  getProviderCredential(
     @CurrentUser() authUser: AuthUserContext,
-    @Param('configId') configId: string,
+    @Param('providerId') providerId: string,
+  ): Promise<AiProviderCredential> {
+    return this.providersService.getUserProviderCredential(authUser.id, providerId)
+  }
+
+  @Delete('providers/:providerId')
+  async deleteProvider(
+    @CurrentUser() authUser: AuthUserContext,
+    @Param('providerId') providerId: string,
   ): Promise<void> {
-    await this.modelServicesService.deleteUserService(authUser.id, configId)
+    await this.providersService.deleteUserProvider(authUser.id, providerId)
   }
 
-  @Get('model-services/:configId/models')
+  @Get('providers/:providerId/models')
   getModels(
     @CurrentUser() authUser: AuthUserContext,
-    @Param('configId') configId: string,
-  ): Promise<AiModelItem[]> {
-    return this.modelItemsService.getUserModels(authUser.id, configId)
+    @Param('providerId') providerId: string,
+  ): Promise<AiProviderModels> {
+    return this.providerModelsService.getUserModels(authUser.id, providerId)
   }
 
-  @Post('model-services/:configId/models/sync')
-  syncModels(
+  @Post('providers/:providerId/models/discover')
+  discoverModels(
     @CurrentUser() authUser: AuthUserContext,
-    @Param('configId') configId: string,
-  ): Promise<AiModelSyncResult> {
-    return this.modelItemsService.syncUserProviderModels(authUser.id, configId)
+    @Param('providerId') providerId: string,
+  ): Promise<AiProviderModels> {
+    return this.providerModelsService.discoverUserProviderModels(authUser.id, providerId)
   }
 
-  @Post('model-services/:configId/models')
-  createModel(
+  @Post('providers/:providerId/models')
+  upsertModel(
     @CurrentUser() authUser: AuthUserContext,
-    @Param('configId') configId: string,
-    @Body() payload: CreateAiModelItemDto,
-  ): Promise<AiModelItem> {
-    return this.modelItemsService.createUserModel(authUser.id, configId, payload)
+    @Param('providerId') providerId: string,
+    @Body() payload: UpsertAiProviderModelDto,
+  ): Promise<AiProviderModelItem> {
+    return this.providerModelsService.upsertUserModel(authUser.id, providerId, payload)
   }
 
-  @Patch('model-services/:configId/models/:modelItemId')
-  updateModel(
+  @Put('providers/:providerId/models')
+  upsertModels(
     @CurrentUser() authUser: AuthUserContext,
-    @Param('configId') configId: string,
-    @Param('modelItemId') modelItemId: string,
-    @Body() payload: UpdateAiModelItemDto,
-  ): Promise<AiModelItem> {
-    return this.modelItemsService.updateUserModel(authUser.id, configId, modelItemId, payload)
-  }
-
-  @Delete('model-services/:configId/models/:modelItemId')
-  async deleteModel(
-    @CurrentUser() authUser: AuthUserContext,
-    @Param('configId') configId: string,
-    @Param('modelItemId') modelItemId: string,
-  ): Promise<void> {
-    await this.modelItemsService.deleteUserModel(authUser.id, configId, modelItemId)
+    @Param('providerId') providerId: string,
+    @Body() payload: UpsertAiProviderModelsDto,
+  ): Promise<AiProviderModels> {
+    return this.providerModelsService.upsertUserModels(authUser.id, providerId, payload)
   }
 
   @Get('models/available')
@@ -120,22 +119,22 @@ export class AiUserController {
     return this.defaultModelsService.getAvailableModels(authUser.id, intentKey as never)
   }
 
-  @Get('models/available/services')
-  getAvailableModelServices(
+  @Get('models/available/providers')
+  getAvailableProviders(
     @CurrentUser() authUser: AuthUserContext,
     @Query('intentKey') intentKey: string,
     @Query('scope') scope: string,
-  ): Promise<AiAvailableModelServiceOption[]> {
-    return this.defaultModelsService.getAvailableModelServices(authUser.id, intentKey as never, scope as never)
+  ): Promise<AiAvailableProviderOption[]> {
+    return this.defaultModelsService.getAvailableProviders(authUser.id, intentKey as never, scope as never)
   }
 
-  @Get('models/available/services/:configId/models')
-  getAvailableServiceModels(
+  @Get('models/available/providers/:providerId/models')
+  getAvailableProviderModels(
     @CurrentUser() authUser: AuthUserContext,
-    @Param('configId') configId: string,
+    @Param('providerId') providerId: string,
     @Query('intentKey') intentKey: string,
   ): Promise<AiAvailableModelOption[]> {
-    return this.defaultModelsService.getAvailableServiceModels(authUser.id, intentKey as never, configId)
+    return this.defaultModelsService.getAvailableProviderModels(authUser.id, intentKey as never, providerId)
   }
 
   @Get('default-models')

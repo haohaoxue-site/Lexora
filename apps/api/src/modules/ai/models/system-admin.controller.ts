@@ -1,4 +1,4 @@
-import type { AiModelItem, AiModelServiceConfigSummary, AiModelSyncResult } from '@haohaoxue/samepage-contracts'
+import type { AiProvider, AiProviderCredential, AiProviderModelItem, AiProviderModels } from '@haohaoxue/samepage-contracts'
 import type { AuthUserContext } from '../../auth/auth.interface'
 import { PERMISSIONS } from '@haohaoxue/samepage-contracts'
 import {
@@ -9,93 +9,90 @@ import {
   Param,
   Patch,
   Post,
+  Put,
 } from '@nestjs/common'
 import { CurrentUser } from '../../../decorators/current-user.decorator'
 import { RequirePermissions } from '../../../decorators/require-permissions.decorator'
 import {
-  CreateAiModelItemDto,
-  CreateAiModelServiceDto,
-  UpdateAiModelItemDto,
-  UpdateAiModelServiceDto,
+  CreateAiProviderDto,
+  UpdateAiProviderDto,
+  UpsertAiProviderModelDto,
+  UpsertAiProviderModelsDto,
 } from '../ai.dto'
-import { AiModelItemsService } from './items.service'
-import { AiModelServicesService } from './services.service'
+import { AiProviderModelsService } from './provider-models.service'
+import { AiProvidersService } from './providers.service'
 
 @Controller('system-admin/ai')
 export class AiSystemAdminController {
   constructor(
-    private readonly modelServicesService: AiModelServicesService,
-    private readonly modelItemsService: AiModelItemsService,
+    private readonly providersService: AiProvidersService,
+    private readonly providerModelsService: AiProviderModelsService,
   ) {}
 
   @RequirePermissions(PERMISSIONS.SYSTEM_ADMIN_AI_CONFIG_READ)
-  @Get('model-services')
-  getModelServices(): Promise<AiModelServiceConfigSummary[]> {
-    return this.modelServicesService.getSystemServices()
+  @Get('providers')
+  getProviders(): Promise<AiProvider[]> {
+    return this.providersService.getSystemProviders()
   }
 
   @RequirePermissions(PERMISSIONS.SYSTEM_ADMIN_AI_CONFIG_UPDATE)
-  @Post('model-services')
-  createModelService(
+  @Post('providers')
+  createProvider(
     @CurrentUser() authUser: AuthUserContext,
-    @Body() payload: CreateAiModelServiceDto,
-  ): Promise<AiModelServiceConfigSummary> {
-    return this.modelServicesService.createSystemService(authUser.id, payload)
+    @Body() payload: CreateAiProviderDto,
+  ): Promise<AiProvider> {
+    return this.providersService.createSystemProvider(authUser.id, payload)
   }
 
   @RequirePermissions(PERMISSIONS.SYSTEM_ADMIN_AI_CONFIG_UPDATE)
-  @Patch('model-services/:configId')
-  updateModelService(
+  @Patch('providers/:providerId')
+  updateProvider(
     @CurrentUser() authUser: AuthUserContext,
-    @Param('configId') configId: string,
-    @Body() payload: UpdateAiModelServiceDto,
-  ): Promise<AiModelServiceConfigSummary> {
-    return this.modelServicesService.updateSystemService(authUser.id, configId, payload)
+    @Param('providerId') providerId: string,
+    @Body() payload: UpdateAiProviderDto,
+  ): Promise<AiProvider> {
+    return this.providersService.updateSystemProvider(authUser.id, providerId, payload)
   }
 
   @RequirePermissions(PERMISSIONS.SYSTEM_ADMIN_AI_CONFIG_UPDATE)
-  @Delete('model-services/:configId')
-  async deleteModelService(@Param('configId') configId: string): Promise<void> {
-    await this.modelServicesService.deleteSystemService(configId)
+  @Get('providers/:providerId/credential')
+  getProviderCredential(@Param('providerId') providerId: string): Promise<AiProviderCredential> {
+    return this.providersService.getSystemProviderCredential(providerId)
+  }
+
+  @RequirePermissions(PERMISSIONS.SYSTEM_ADMIN_AI_CONFIG_UPDATE)
+  @Delete('providers/:providerId')
+  async deleteProvider(@Param('providerId') providerId: string): Promise<void> {
+    await this.providersService.deleteSystemProvider(providerId)
   }
 
   @RequirePermissions(PERMISSIONS.SYSTEM_ADMIN_AI_CONFIG_READ)
-  @Get('model-services/:configId/models')
-  getModels(@Param('configId') configId: string): Promise<AiModelItem[]> {
-    return this.modelItemsService.getSystemModels(configId)
+  @Get('providers/:providerId/models')
+  getModels(@Param('providerId') providerId: string): Promise<AiProviderModels> {
+    return this.providerModelsService.getSystemModels(providerId)
   }
 
   @RequirePermissions(PERMISSIONS.SYSTEM_ADMIN_AI_CONFIG_UPDATE)
-  @Post('model-services/:configId/models/sync')
-  syncModels(@Param('configId') configId: string): Promise<AiModelSyncResult> {
-    return this.modelItemsService.syncSystemProviderModels(configId)
+  @Post('providers/:providerId/models/discover')
+  discoverModels(@Param('providerId') providerId: string): Promise<AiProviderModels> {
+    return this.providerModelsService.discoverSystemProviderModels(providerId)
   }
 
   @RequirePermissions(PERMISSIONS.SYSTEM_ADMIN_AI_CONFIG_UPDATE)
-  @Post('model-services/:configId/models')
-  createModel(
-    @Param('configId') configId: string,
-    @Body() payload: CreateAiModelItemDto,
-  ): Promise<AiModelItem> {
-    return this.modelItemsService.createSystemModel(configId, payload)
+  @Post('providers/:providerId/models')
+  upsertModel(
+    @Param('providerId') providerId: string,
+    @Body() payload: UpsertAiProviderModelDto,
+  ): Promise<AiProviderModelItem> {
+    return this.providerModelsService.upsertSystemModel(providerId, payload)
   }
 
   @RequirePermissions(PERMISSIONS.SYSTEM_ADMIN_AI_CONFIG_UPDATE)
-  @Patch('model-services/:configId/models/:modelItemId')
-  updateModel(
-    @Param('configId') configId: string,
-    @Param('modelItemId') modelItemId: string,
-    @Body() payload: UpdateAiModelItemDto,
-  ): Promise<AiModelItem> {
-    return this.modelItemsService.updateSystemModel(configId, modelItemId, payload)
-  }
-
-  @RequirePermissions(PERMISSIONS.SYSTEM_ADMIN_AI_CONFIG_UPDATE)
-  @Delete('model-services/:configId/models/:modelItemId')
-  async deleteModel(
-    @Param('configId') configId: string,
-    @Param('modelItemId') modelItemId: string,
-  ): Promise<void> {
-    await this.modelItemsService.deleteSystemModel(configId, modelItemId)
+  @Put('providers/:providerId/models')
+  upsertModels(
+    @Param('providerId') providerId: string,
+    @Body() payload: UpsertAiProviderModelsDto,
+  ): Promise<AiProviderModels> {
+    return this.providerModelsService.upsertSystemModels(providerId, payload)
   }
 }

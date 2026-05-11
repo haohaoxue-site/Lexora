@@ -1,20 +1,21 @@
 import type {
   AiAvailableModelOption,
-  AiAvailableModelServiceOption,
+  AiAvailableProviderOption,
   AiDefaultModelPolicyItem,
   AiModelIntentKey,
-  AiModelItem,
-  AiModelProviderTemplate,
-  AiModelServiceConfigSummary,
-  AiModelServiceScope,
-  AiModelSyncResult,
+  AiProvider,
+  AiProviderCredential,
+  AiProviderModelItem,
+  AiProviderModels,
+  AiProviderPreset,
+  AiProviderScope,
   CreateAiEditorSessionRequest,
-  CreateAiModelItemRequest,
-  CreateAiModelServiceRequest,
+  CreateAiProviderRequest,
   ResolveAiEditorCandidateResponse,
   UpdateAiDefaultModelPolicyRequest,
-  UpdateAiModelItemRequest,
-  UpdateAiModelServiceRequest,
+  UpdateAiProviderRequest,
+  UpsertAiProviderModelRequest,
+  UpsertAiProviderModelsRequest,
 } from './typing'
 import { SERVER_PATH } from '@haohaoxue/samepage-contracts'
 import { useAuthStore } from '@/stores/auth'
@@ -24,171 +25,162 @@ export * from './typing'
 
 const API_BASE_URL = SERVER_PATH
 
-export function getAiModelProviderTemplates(): Promise<AiModelProviderTemplate[]> {
+export function getAiCompatibleProviderPresets(): Promise<AiProviderPreset[]> {
   return axios.request({
     method: 'get',
-    url: '/ai/model-provider-templates',
+    url: '/ai/provider-presets/compatible',
   })
 }
 
-export function getAiCompatibleProviderTemplates(): Promise<AiModelProviderTemplate[]> {
+export function getSystemAiProviders(): Promise<AiProvider[]> {
   return axios.request({
     method: 'get',
-    url: '/ai/model-provider-templates/compatible',
+    url: '/system-admin/ai/providers',
   })
 }
 
-export function getSystemAiModelServices(): Promise<AiModelServiceConfigSummary[]> {
-  return axios.request({
-    method: 'get',
-    url: '/system-admin/ai/model-services',
-  })
-}
-
-export function createSystemAiModelService(data: CreateAiModelServiceRequest): Promise<AiModelServiceConfigSummary> {
+export function createSystemAiProvider(data: CreateAiProviderRequest): Promise<AiProvider> {
   return axios.request({
     method: 'post',
-    url: '/system-admin/ai/model-services',
+    url: '/system-admin/ai/providers',
     data,
   })
 }
 
-export function updateSystemAiModelService(
-  configId: string,
-  data: UpdateAiModelServiceRequest,
-): Promise<AiModelServiceConfigSummary> {
+export function updateSystemAiProvider(
+  providerId: string,
+  data: UpdateAiProviderRequest,
+): Promise<AiProvider> {
   return axios.request({
     method: 'patch',
-    url: `/system-admin/ai/model-services/${configId}`,
+    url: `/system-admin/ai/providers/${providerId}`,
     data,
   })
 }
 
-export function deleteSystemAiModelService(configId: string): Promise<void> {
-  return axios.request({
-    method: 'delete',
-    url: `/system-admin/ai/model-services/${configId}`,
-  })
-}
-
-export function getSystemAiModelItems(configId: string): Promise<AiModelItem[]> {
+export function getSystemAiProviderCredential(providerId: string): Promise<AiProviderCredential> {
   return axios.request({
     method: 'get',
-    url: `/system-admin/ai/model-services/${configId}/models`,
+    url: `/system-admin/ai/providers/${providerId}/credential`,
   })
 }
 
-export function syncSystemAiModelItems(configId: string): Promise<AiModelSyncResult> {
-  return axios.request({
-    method: 'post',
-    url: `/system-admin/ai/model-services/${configId}/models/sync`,
-  })
-}
-
-export function createSystemAiModelItem(
-  configId: string,
-  data: CreateAiModelItemRequest,
-): Promise<AiModelItem> {
-  return axios.request({
-    method: 'post',
-    url: `/system-admin/ai/model-services/${configId}/models`,
-    data,
-  })
-}
-
-export function updateSystemAiModelItem(
-  configId: string,
-  modelItemId: string,
-  data: UpdateAiModelItemRequest,
-): Promise<AiModelItem> {
-  return axios.request({
-    method: 'patch',
-    url: `/system-admin/ai/model-services/${configId}/models/${modelItemId}`,
-    data,
-  })
-}
-
-export function deleteSystemAiModelItem(configId: string, modelItemId: string): Promise<void> {
+export function deleteSystemAiProvider(providerId: string): Promise<void> {
   return axios.request({
     method: 'delete',
-    url: `/system-admin/ai/model-services/${configId}/models/${modelItemId}`,
+    url: `/system-admin/ai/providers/${providerId}`,
   })
 }
 
-export function getUserAiModelServices(): Promise<AiModelServiceConfigSummary[]> {
+export function getSystemAiProviderModels(providerId: string): Promise<AiProviderModels> {
   return axios.request({
     method: 'get',
-    url: '/users/me/ai/model-services',
+    url: `/system-admin/ai/providers/${providerId}/models`,
   })
 }
 
-export function createUserAiModelService(data: CreateAiModelServiceRequest): Promise<AiModelServiceConfigSummary> {
+export function discoverSystemAiProviderModels(providerId: string): Promise<AiProviderModels> {
   return axios.request({
     method: 'post',
-    url: '/users/me/ai/model-services',
+    url: `/system-admin/ai/providers/${providerId}/models/discover`,
+  })
+}
+
+export function upsertSystemAiProviderModel(
+  providerId: string,
+  data: UpsertAiProviderModelRequest,
+): Promise<AiProviderModelItem> {
+  return axios.request({
+    method: 'post',
+    url: `/system-admin/ai/providers/${providerId}/models`,
     data,
   })
 }
 
-export function updateUserAiModelService(
-  configId: string,
-  data: UpdateAiModelServiceRequest,
-): Promise<AiModelServiceConfigSummary> {
+export function upsertSystemAiProviderModels(
+  providerId: string,
+  data: UpsertAiProviderModelsRequest,
+): Promise<AiProviderModels> {
   return axios.request({
-    method: 'patch',
-    url: `/users/me/ai/model-services/${configId}`,
+    method: 'put',
+    url: `/system-admin/ai/providers/${providerId}/models`,
     data,
   })
 }
 
-export function deleteUserAiModelService(configId: string): Promise<void> {
-  return axios.request({
-    method: 'delete',
-    url: `/users/me/ai/model-services/${configId}`,
-  })
-}
-
-export function getUserAiModelItems(configId: string): Promise<AiModelItem[]> {
+export function getUserAiProviders(): Promise<AiProvider[]> {
   return axios.request({
     method: 'get',
-    url: `/users/me/ai/model-services/${configId}/models`,
+    url: '/users/me/ai/providers',
   })
 }
 
-export function syncUserAiModelItems(configId: string): Promise<AiModelSyncResult> {
+export function createUserAiProvider(data: CreateAiProviderRequest): Promise<AiProvider> {
   return axios.request({
     method: 'post',
-    url: `/users/me/ai/model-services/${configId}/models/sync`,
-  })
-}
-
-export function createUserAiModelItem(
-  configId: string,
-  data: CreateAiModelItemRequest,
-): Promise<AiModelItem> {
-  return axios.request({
-    method: 'post',
-    url: `/users/me/ai/model-services/${configId}/models`,
+    url: '/users/me/ai/providers',
     data,
   })
 }
 
-export function updateUserAiModelItem(
-  configId: string,
-  modelItemId: string,
-  data: UpdateAiModelItemRequest,
-): Promise<AiModelItem> {
+export function updateUserAiProvider(
+  providerId: string,
+  data: UpdateAiProviderRequest,
+): Promise<AiProvider> {
   return axios.request({
     method: 'patch',
-    url: `/users/me/ai/model-services/${configId}/models/${modelItemId}`,
+    url: `/users/me/ai/providers/${providerId}`,
     data,
   })
 }
 
-export function deleteUserAiModelItem(configId: string, modelItemId: string): Promise<void> {
+export function getUserAiProviderCredential(providerId: string): Promise<AiProviderCredential> {
+  return axios.request({
+    method: 'get',
+    url: `/users/me/ai/providers/${providerId}/credential`,
+  })
+}
+
+export function deleteUserAiProvider(providerId: string): Promise<void> {
   return axios.request({
     method: 'delete',
-    url: `/users/me/ai/model-services/${configId}/models/${modelItemId}`,
+    url: `/users/me/ai/providers/${providerId}`,
+  })
+}
+
+export function getUserAiProviderModels(providerId: string): Promise<AiProviderModels> {
+  return axios.request({
+    method: 'get',
+    url: `/users/me/ai/providers/${providerId}/models`,
+  })
+}
+
+export function discoverUserAiProviderModels(providerId: string): Promise<AiProviderModels> {
+  return axios.request({
+    method: 'post',
+    url: `/users/me/ai/providers/${providerId}/models/discover`,
+  })
+}
+
+export function upsertUserAiProviderModel(
+  providerId: string,
+  data: UpsertAiProviderModelRequest,
+): Promise<AiProviderModelItem> {
+  return axios.request({
+    method: 'post',
+    url: `/users/me/ai/providers/${providerId}/models`,
+    data,
+  })
+}
+
+export function upsertUserAiProviderModels(
+  providerId: string,
+  data: UpsertAiProviderModelsRequest,
+): Promise<AiProviderModels> {
+  return axios.request({
+    method: 'put',
+    url: `/users/me/ai/providers/${providerId}/models`,
+    data,
   })
 }
 
@@ -200,24 +192,24 @@ export function getAvailableAiModels(intentKey: AiModelIntentKey): Promise<AiAva
   })
 }
 
-export function getAvailableAiModelServices(
+export function getAvailableAiProviders(
   intentKey: AiModelIntentKey,
-  scope: AiModelServiceScope,
-): Promise<AiAvailableModelServiceOption[]> {
+  scope: AiProviderScope,
+): Promise<AiAvailableProviderOption[]> {
   return axios.request({
     method: 'get',
-    url: '/users/me/ai/models/available/services',
+    url: '/users/me/ai/models/available/providers',
     params: { intentKey, scope },
   })
 }
 
-export function getAvailableAiModelServiceModels(
+export function getAvailableAiProviderModels(
   intentKey: AiModelIntentKey,
-  configId: string,
+  providerId: string,
 ): Promise<AiAvailableModelOption[]> {
   return axios.request({
     method: 'get',
-    url: `/users/me/ai/models/available/services/${configId}/models`,
+    url: `/users/me/ai/models/available/providers/${providerId}/models`,
     params: { intentKey },
   })
 }

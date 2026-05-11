@@ -9,7 +9,7 @@ import { ChatService } from './chat.service'
 function createChatServiceFixture() {
   const chatSessionsService = {
     getSessionModelRef: vi.fn().mockResolvedValue({
-      configId: 'session-config',
+      providerId: 'session-provider',
       modelId: 'qwen-plus',
     }),
     prepareCompletionSession: vi.fn().mockResolvedValue({
@@ -23,7 +23,7 @@ function createChatServiceFixture() {
       id: 'session-1',
       title: '新对话',
       modelRef: {
-        configId: 'session-config',
+        providerId: 'session-provider',
         modelId: 'qwen-plus',
       },
       messages: [],
@@ -33,10 +33,10 @@ function createChatServiceFixture() {
   }
   const modelResolverService = {
     resolveModelTarget: vi.fn().mockResolvedValue({
-      configId: 'session-config',
+      providerId: 'session-provider',
       scope: 'user',
       providerKey: 'openai-compatible',
-      providerName: '个人模型服务',
+      providerName: '个人服务商',
       adapterKey: 'openai-chat-completions',
       endpoint: 'https://example.com/v1',
       apiKey: 'sk-test',
@@ -85,7 +85,7 @@ describe('chatService', () => {
       actorUserId: 'user-1',
       intentKey: AI_MODEL_INTENT_KEY.CHAT_ASSISTANT_DEFAULT,
       requestedModelRef: {
-        configId: 'session-config',
+        providerId: 'session-provider',
         modelId: 'qwen-plus',
       },
     })
@@ -95,7 +95,7 @@ describe('chatService', () => {
       content: '你好',
     })
     expect(result.command.modelTarget).toMatchObject({
-      configId: 'session-config',
+      providerId: 'session-provider',
       modelId: 'qwen-plus',
     })
   })
@@ -111,7 +111,7 @@ describe('chatService', () => {
       userId: 'user-1',
       sessionId: 'session-1',
       modelRef: {
-        configId: 'session-config',
+        providerId: 'session-provider',
         modelId: 'qwen-plus',
       },
     })
@@ -120,7 +120,7 @@ describe('chatService', () => {
       actorUserId: 'user-1',
       intentKey: AI_MODEL_INTENT_KEY.CHAT_ASSISTANT_DEFAULT,
       requestedModelRef: {
-        configId: 'session-config',
+        providerId: 'session-provider',
         modelId: 'qwen-plus',
       },
     })
@@ -128,7 +128,7 @@ describe('chatService', () => {
       userId: 'user-1',
       sessionId: 'session-1',
       modelRef: {
-        configId: 'session-config',
+        providerId: 'session-provider',
         modelId: 'qwen-plus',
       },
     })

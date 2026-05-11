@@ -26,7 +26,7 @@ import {
 const chatSessionSummarySelect = {
   id: true,
   title: true,
-  selectedModelServiceConfigId: true,
+  selectedProviderId: true,
   selectedModelId: true,
   createdAt: true,
   updatedAt: true,
@@ -60,7 +60,7 @@ type PersistedChatSessionRunDetail = Prisma.ChatSessionGetPayload<{
 }>
 
 const chatSessionModelRefSelect = {
-  selectedModelServiceConfigId: true,
+  selectedProviderId: true,
   selectedModelId: true,
 } satisfies Prisma.ChatSessionSelect
 
@@ -115,7 +115,7 @@ export class ChatSessionsService {
   async getSessionModelRef(
     userId: string,
     sessionId: string,
-  ): Promise<Pick<AiModelRef, 'configId' | 'modelId'> | null> {
+  ): Promise<Pick<AiModelRef, 'providerId' | 'modelId'> | null> {
     const session = await this.findOwnedSessionModelRefOrThrow(userId, sessionId)
     return toChatSessionModelRef(session)
   }
@@ -123,7 +123,7 @@ export class ChatSessionsService {
   async updateSessionModel(input: {
     userId: string
     sessionId: string
-    modelRef: Pick<AiModelRef, 'configId' | 'modelId'> | null
+    modelRef: Pick<AiModelRef, 'providerId' | 'modelId'> | null
   }): Promise<ChatSessionDetail> {
     const result = await this.prisma.chatSession.updateMany({
       where: {
@@ -131,7 +131,7 @@ export class ChatSessionsService {
         userId: input.userId,
       },
       data: {
-        selectedModelServiceConfigId: input.modelRef?.configId ?? null,
+        selectedProviderId: input.modelRef?.providerId ?? null,
         selectedModelId: input.modelRef?.modelId ?? null,
         updatedAt: new Date(),
       },

@@ -2,19 +2,19 @@ import type { CascaderOption } from 'element-plus'
 import type {
   AiModelIntentKey,
   AiModelRef,
-  AiModelServiceScope,
+  AiProviderScope,
 } from '@/apis/ai'
 
 /**
  * 模型级联选择值。
  */
 export interface ModelCascaderModelRef {
-  /** 模型服务 ID */
-  configId: string
+  /** 服务商 ID */
+  providerId: string
   /** 模型 ID */
   modelId: string
-  /** 模型服务归属 */
-  scope?: AiModelServiceScope
+  /** 服务商归属 */
+  scope?: AiProviderScope
   /** 服务商键 */
   providerKey?: string
 }
@@ -52,10 +52,10 @@ export interface ModelCascaderEmits {
 export interface ModelCascaderOption extends CascaderOption {
   /** 选项层级类型 */
   nodeKind: 'scope' | 'provider' | 'model'
-  /** 模型服务归属 */
-  scope?: AiModelServiceScope
-  /** 模型服务 ID */
-  configId?: string
+  /** 服务商归属 */
+  scope?: AiProviderScope
+  /** 服务商 ID */
+  providerId?: string
   /** 服务商键 */
   providerKey?: string
   /** 模型 ID */

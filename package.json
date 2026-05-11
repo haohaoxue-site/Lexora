@@ -8,7 +8,7 @@
     "dev": "pnpm -r --parallel --if-present dev",
     "dev:infra": "docker compose -f infrastructure/compose.dev.yml up -d",
     "dev:infra:down": "docker compose -f infrastructure/compose.dev.yml down",
-    "dev:db:push": "pnpm --filter @haohaoxue/samepage-api exec prisma db push",
+    "dev:db:sync": "pnpm --filter @haohaoxue/samepage-api prisma:sync",
     "dev:db:reset": "pnpm --filter @haohaoxue/samepage-api exec prisma db push --force-reset",
     "dev:web": "pnpm --filter @haohaoxue/samepage-web dev",
     "dev:api": "pnpm --filter @haohaoxue/samepage-api dev",

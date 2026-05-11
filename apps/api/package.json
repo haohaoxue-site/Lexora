@@ -17,7 +17,7 @@
     "lint:fix": "eslint . --fix",
     "prisma:generate": "prisma generate",
     "prisma:db:push": "prisma db push",
-    "prisma:sync": "prisma db push && prisma generate",
+    "prisma:sync": "prisma migrate deploy && prisma generate",
     "type-check": "tsc --noEmit -p tsconfig.json --pretty false && tsc --noEmit -p tsconfig.spec.json --pretty false",
     "test": "vitest run --passWithNoTests",
     "test:watch": "vitest --passWithNoTests"

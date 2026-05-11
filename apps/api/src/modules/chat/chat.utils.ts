@@ -9,7 +9,7 @@ import { ChatSessionMessageRole } from '@prisma/client'
 export interface ChatSessionSummaryRecord {
   id: string
   title: string
-  selectedModelServiceConfigId: string | null
+  selectedProviderId: string | null
   selectedModelId: string | null
   createdAt: Date
   updatedAt: Date
@@ -49,14 +49,14 @@ export function toChatMessageRole(role: ChatSessionMessageRole): ChatMessage['ro
 }
 
 export function toChatSessionModelRef(
-  session: Pick<ChatSessionSummaryRecord, 'selectedModelServiceConfigId' | 'selectedModelId'>,
-): Pick<AiModelRef, 'configId' | 'modelId'> | null {
-  if (!session.selectedModelServiceConfigId || !session.selectedModelId) {
+  session: Pick<ChatSessionSummaryRecord, 'selectedProviderId' | 'selectedModelId'>,
+): Pick<AiModelRef, 'providerId' | 'modelId'> | null {
+  if (!session.selectedProviderId || !session.selectedModelId) {
     return null
   }
 
   return {
-    configId: session.selectedModelServiceConfigId,
+    providerId: session.selectedProviderId,
     modelId: session.selectedModelId,
   }
 }

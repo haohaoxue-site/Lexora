@@ -1,6 +1,6 @@
 import type { BaseMessage, MessageContent } from '@langchain/core/messages'
 import type { AgentRunModelTarget } from '../../runtime/typing'
-import { AI_MODEL_AUTH_MODE } from '@haohaoxue/samepage-contracts'
+import { AI_PROVIDER_AUTH_MODE } from '@haohaoxue/samepage-contracts'
 import { ChatAnthropic } from '@langchain/anthropic'
 import { ChatOpenAI } from '@langchain/openai'
 
@@ -52,7 +52,7 @@ export function createChatModelFactory(): AgentChatModelFactory {
 }
 
 function ensureCredentialReady(target: AgentRunModelTarget): void {
-  if (target.authMode !== AI_MODEL_AUTH_MODE.NONE && !target.apiKey) {
-    throw new Error('模型服务未提供 API Key')
+  if (target.authMode !== AI_PROVIDER_AUTH_MODE.NONE && !target.apiKey) {
+    throw new Error('服务商未提供 API Key')
   }
 }

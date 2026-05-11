@@ -1,8 +1,8 @@
 import { z } from 'zod'
 import {
   AI_EDITOR_WORKFLOW_KEY,
-  AiModelAuthModeSchema,
-  AiModelServiceScopeSchema,
+  AiProviderAuthModeSchema,
+  AiProviderScopeSchema,
 } from '../ai'
 
 export const AGENT_QUEUE_NAME = {
@@ -58,13 +58,13 @@ const NonEmptyStringSchema = z.string().trim().min(1)
 const AgentRunContextSchema = z.record(z.string(), z.unknown())
 
 export const AgentRunModelTargetSchema = z.object({
-  configId: NonEmptyStringSchema,
-  scope: AiModelServiceScopeSchema,
+  providerId: NonEmptyStringSchema,
+  scope: AiProviderScopeSchema,
   providerKey: NonEmptyStringSchema,
   adapterKey: NonEmptyStringSchema,
   endpoint: NonEmptyStringSchema,
   apiKey: NonEmptyStringSchema.nullable(),
-  authMode: AiModelAuthModeSchema,
+  authMode: AiProviderAuthModeSchema,
   modelId: NonEmptyStringSchema,
 }).strict()
 

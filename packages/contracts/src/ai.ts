@@ -1,35 +1,35 @@
 import { z } from 'zod'
 
-export const AI_MODEL_SERVICE_SCOPE = {
+export const AI_PROVIDER_SCOPE = {
   SYSTEM: 'system',
   USER: 'user',
 } as const
 
-export const AI_MODEL_SERVICE_SCOPE_VALUES = [
-  AI_MODEL_SERVICE_SCOPE.SYSTEM,
-  AI_MODEL_SERVICE_SCOPE.USER,
+export const AI_PROVIDER_SCOPE_VALUES = [
+  AI_PROVIDER_SCOPE.SYSTEM,
+  AI_PROVIDER_SCOPE.USER,
 ] as const
 
-export const AI_MODEL_ENDPOINT_MODE = {
+export const AI_PROVIDER_ENDPOINT_MODE = {
   FIXED: 'fixed',
   CUSTOM: 'custom',
 } as const
 
-export const AI_MODEL_ENDPOINT_MODE_VALUES = [
-  AI_MODEL_ENDPOINT_MODE.FIXED,
-  AI_MODEL_ENDPOINT_MODE.CUSTOM,
+export const AI_PROVIDER_ENDPOINT_MODE_VALUES = [
+  AI_PROVIDER_ENDPOINT_MODE.FIXED,
+  AI_PROVIDER_ENDPOINT_MODE.CUSTOM,
 ] as const
 
-export const AI_MODEL_AUTH_MODE = {
+export const AI_PROVIDER_AUTH_MODE = {
   API_KEY: 'api-key',
   BEARER: 'bearer',
   NONE: 'none',
 } as const
 
-export const AI_MODEL_AUTH_MODE_VALUES = [
-  AI_MODEL_AUTH_MODE.API_KEY,
-  AI_MODEL_AUTH_MODE.BEARER,
-  AI_MODEL_AUTH_MODE.NONE,
+export const AI_PROVIDER_AUTH_MODE_VALUES = [
+  AI_PROVIDER_AUTH_MODE.API_KEY,
+  AI_PROVIDER_AUTH_MODE.BEARER,
+  AI_PROVIDER_AUTH_MODE.NONE,
 ] as const
 
 export const AI_MODEL_TYPE = {
@@ -188,14 +188,24 @@ export const AI_EDITOR_STREAM_EVENT_TYPE_VALUES = [
   AI_EDITOR_STREAM_EVENT_TYPE.ERROR,
 ] as const
 
-export const AI_MODEL_SERVICE_STATUS = {
+export const AI_PROVIDER_CREDENTIAL_STATUS = {
   MISSING: 'missing',
   CONFIGURED: 'configured',
 } as const
 
-export const AI_MODEL_SERVICE_STATUS_VALUES = [
-  AI_MODEL_SERVICE_STATUS.MISSING,
-  AI_MODEL_SERVICE_STATUS.CONFIGURED,
+export const AI_PROVIDER_CREDENTIAL_STATUS_VALUES = [
+  AI_PROVIDER_CREDENTIAL_STATUS.MISSING,
+  AI_PROVIDER_CREDENTIAL_STATUS.CONFIGURED,
+] as const
+
+export const AI_PROVIDER_SOURCE = {
+  PRESET: 'preset',
+  COMPATIBLE: 'compatible',
+} as const
+
+export const AI_PROVIDER_SOURCE_VALUES = [
+  AI_PROVIDER_SOURCE.PRESET,
+  AI_PROVIDER_SOURCE.COMPATIBLE,
 ] as const
 
 export const AI_DEFAULT_MODEL_STATUS = {
@@ -210,9 +220,10 @@ export const AI_DEFAULT_MODEL_STATUS_VALUES = [
   AI_DEFAULT_MODEL_STATUS.INVALID,
 ] as const
 
-export const AiModelServiceScopeSchema = z.enum(AI_MODEL_SERVICE_SCOPE_VALUES)
-export const AiModelEndpointModeSchema = z.enum(AI_MODEL_ENDPOINT_MODE_VALUES)
-export const AiModelAuthModeSchema = z.enum(AI_MODEL_AUTH_MODE_VALUES)
+export const AiProviderScopeSchema = z.enum(AI_PROVIDER_SCOPE_VALUES)
+export const AiProviderEndpointModeSchema = z.enum(AI_PROVIDER_ENDPOINT_MODE_VALUES)
+export const AiProviderAuthModeSchema = z.enum(AI_PROVIDER_AUTH_MODE_VALUES)
+export const AiProviderSourceSchema = z.enum(AI_PROVIDER_SOURCE_VALUES)
 export const AiModelTypeSchema = z.enum(AI_MODEL_TYPE_VALUES)
 export const AiModelCapabilitySchema = z.enum(AI_MODEL_CAPABILITY_VALUES)
 export const AiModelIntentKeySchema = z.enum(AI_MODEL_INTENT_KEY_VALUES)
@@ -223,7 +234,7 @@ export const AiSessionStatusSchema = z.enum(AI_SESSION_STATUS_VALUES)
 export const AiRunStatusSchema = z.enum(AI_RUN_STATUS_VALUES)
 export const AiCandidateStatusSchema = z.enum(AI_CANDIDATE_STATUS_VALUES)
 export const AiEditorStreamEventTypeSchema = z.enum(AI_EDITOR_STREAM_EVENT_TYPE_VALUES)
-export const AiModelCredentialStatusSchema = z.enum(AI_MODEL_SERVICE_STATUS_VALUES)
+export const AiProviderCredentialStatusSchema = z.enum(AI_PROVIDER_CREDENTIAL_STATUS_VALUES)
 export const AiDefaultModelStatusSchema = z.enum(AI_DEFAULT_MODEL_STATUS_VALUES)
 
 const IsoDateTimeStringSchema = z.string().datetime()
@@ -262,62 +273,69 @@ export const AiAnchorSchema = z.discriminatedUnion('kind', [
 ])
 
 export const AiModelRefSchema = z.object({
-  configId: NonEmptyStringSchema,
-  scope: AiModelServiceScopeSchema,
+  providerId: NonEmptyStringSchema,
+  scope: AiProviderScopeSchema,
   providerKey: NonEmptyStringSchema,
   modelId: NonEmptyStringSchema,
 }).strict()
 
-export const AiModelProviderTemplateSchema = z.object({
+export const AiProviderPresetSchema = z.object({
   providerKey: NonEmptyStringSchema,
   providerName: NonEmptyStringSchema,
   adapterKey: NonEmptyStringSchema,
-  endpointMode: AiModelEndpointModeSchema,
-  authMode: AiModelAuthModeSchema,
+  endpointMode: AiProviderEndpointModeSchema,
+  authMode: AiProviderAuthModeSchema,
   supportedModelTypes: z.array(AiModelTypeSchema),
   fixedEndpoint: z.string().trim().url().nullable().optional(),
 }).strict()
 
-export const AiModelProviderTemplatesResponseSchema = z.object({
-  templates: z.array(AiModelProviderTemplateSchema),
+export const AiProviderPresetsResponseSchema = z.object({
+  presets: z.array(AiProviderPresetSchema),
 }).strict()
 
-export const AiModelServiceConfigSummarySchema = z.object({
-  configId: NonEmptyStringSchema,
-  scope: AiModelServiceScopeSchema,
+export const AiProviderSchema = z.object({
+  providerId: NonEmptyStringSchema,
+  scope: AiProviderScopeSchema,
+  source: AiProviderSourceSchema,
   providerKey: NonEmptyStringSchema,
   providerName: NonEmptyStringSchema,
   adapterKey: NonEmptyStringSchema,
-  endpointMode: AiModelEndpointModeSchema,
+  endpointMode: AiProviderEndpointModeSchema,
+  authMode: AiProviderAuthModeSchema,
   endpointEditable: z.boolean(),
+  nameEditable: z.boolean(),
+  deletable: z.boolean(),
   endpoint: z.string().trim().min(1).nullable(),
-  credentialStatus: AiModelCredentialStatusSchema,
+  credentialStatus: AiProviderCredentialStatusSchema,
   enabled: z.boolean(),
   modelCount: z.number().int().nonnegative(),
   createdAt: IsoDateTimeStringSchema,
   updatedAt: IsoDateTimeStringSchema,
 }).strict()
 
-export const AiModelItemSchema = z.object({
-  modelItemId: NonEmptyStringSchema,
-  configId: NonEmptyStringSchema,
+export const AiProviderCredentialSchema = z.object({
+  apiKey: z.string().nullable(),
+}).strict()
+
+export const AiProviderModelItemSchema = z.object({
+  providerId: NonEmptyStringSchema,
   modelId: NonEmptyStringSchema,
   modelName: NonEmptyStringSchema,
   modelType: AiModelTypeSchema,
   capabilities: z.array(AiModelCapabilitySchema),
   contextWindow: OptionalLimitSchema,
   maxOutputTokens: OptionalLimitSchema,
-  enabled: z.boolean(),
-  updatedAt: IsoDateTimeStringSchema,
+  enabled: z.boolean().optional(),
+  updatedAt: IsoDateTimeStringSchema.optional(),
 }).strict()
 
-export const AiModelSyncResultSchema = z.object({
-  models: z.array(AiModelItemSchema),
+export const AiProviderModelsSchema = z.object({
+  models: z.array(AiProviderModelItemSchema),
 }).strict()
 
 export const AiAvailableModelOptionSchema = z.object({
-  configId: NonEmptyStringSchema,
-  scope: AiModelServiceScopeSchema,
+  providerId: NonEmptyStringSchema,
+  scope: AiProviderScopeSchema,
   providerKey: NonEmptyStringSchema,
   providerName: NonEmptyStringSchema,
   modelId: NonEmptyStringSchema,
@@ -328,9 +346,9 @@ export const AiAvailableModelOptionSchema = z.object({
   unavailableReason: z.string().trim().min(1).nullable(),
 }).strict()
 
-export const AiAvailableModelServiceOptionSchema = z.object({
-  configId: NonEmptyStringSchema,
-  scope: AiModelServiceScopeSchema,
+export const AiAvailableProviderOptionSchema = z.object({
+  providerId: NonEmptyStringSchema,
+  scope: AiProviderScopeSchema,
   providerKey: NonEmptyStringSchema,
   providerName: NonEmptyStringSchema,
 }).strict()
@@ -345,7 +363,7 @@ export const AiDefaultModelPolicyItemSchema = z.object({
 
 export const UpdateAiDefaultModelPolicyRequestSchema = z.object({
   modelRef: AiModelRefSchema.pick({
-    configId: true,
+    providerId: true,
     modelId: true,
   }).nullable(),
 }).strict()
@@ -392,7 +410,7 @@ export const CreateAiEditorSessionRequestSchema = z.object({
   anchor: AiAnchorSchema,
   prompt: NonEmptyStringSchema,
   requestedModelRef: AiModelRefSchema.pick({
-    configId: true,
+    providerId: true,
     modelId: true,
   }).nullable().optional(),
 }).strict().superRefine((request, context) => {
@@ -451,9 +469,10 @@ export const AiEditorStreamEventSchema = z.discriminatedUnion('type', [
   AiEditorErrorStreamEventSchema,
 ])
 
-export type AiModelServiceScope = z.infer<typeof AiModelServiceScopeSchema>
-export type AiModelEndpointMode = z.infer<typeof AiModelEndpointModeSchema>
-export type AiModelAuthMode = z.infer<typeof AiModelAuthModeSchema>
+export type AiProviderScope = z.infer<typeof AiProviderScopeSchema>
+export type AiProviderEndpointMode = z.infer<typeof AiProviderEndpointModeSchema>
+export type AiProviderAuthMode = z.infer<typeof AiProviderAuthModeSchema>
+export type AiProviderSource = z.infer<typeof AiProviderSourceSchema>
 export type AiModelType = z.infer<typeof AiModelTypeSchema>
 export type AiModelCapability = z.infer<typeof AiModelCapabilitySchema>
 export type AiModelIntentKey = z.infer<typeof AiModelIntentKeySchema>
@@ -469,12 +488,13 @@ export type AiBlockInsertAnchor = z.infer<typeof AiBlockInsertAnchorSchema>
 export type AiTextSelectionAnchor = z.infer<typeof AiTextSelectionAnchorSchema>
 export type AiAnchor = z.infer<typeof AiAnchorSchema>
 export type AiModelRef = z.infer<typeof AiModelRefSchema>
-export type AiModelProviderTemplate = z.infer<typeof AiModelProviderTemplateSchema>
-export type AiModelServiceConfigSummary = z.infer<typeof AiModelServiceConfigSummarySchema>
-export type AiModelItem = z.infer<typeof AiModelItemSchema>
-export type AiModelSyncResult = z.infer<typeof AiModelSyncResultSchema>
+export type AiProviderPreset = z.infer<typeof AiProviderPresetSchema>
+export type AiProvider = z.infer<typeof AiProviderSchema>
+export type AiProviderCredential = z.infer<typeof AiProviderCredentialSchema>
+export type AiProviderModelItem = z.infer<typeof AiProviderModelItemSchema>
+export type AiProviderModels = z.infer<typeof AiProviderModelsSchema>
 export type AiAvailableModelOption = z.infer<typeof AiAvailableModelOptionSchema>
-export type AiAvailableModelServiceOption = z.infer<typeof AiAvailableModelServiceOptionSchema>
+export type AiAvailableProviderOption = z.infer<typeof AiAvailableProviderOptionSchema>
 export type AiDefaultModelPolicyItem = z.infer<typeof AiDefaultModelPolicyItemSchema>
 export type UpdateAiDefaultModelPolicyRequest = z.infer<typeof UpdateAiDefaultModelPolicyRequestSchema>
 export type AiSession = z.infer<typeof AiSessionSchema>

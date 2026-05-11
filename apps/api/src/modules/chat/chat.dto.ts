@@ -15,7 +15,7 @@ import {
 
 class ChatModelRefDto {
   @IsString()
-  configId!: string
+  providerId!: string
 
   @IsString()
   modelId!: string

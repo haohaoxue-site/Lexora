@@ -202,7 +202,7 @@ export class AiEditorSessionsService {
         workflowKey: request.workflowKey,
         actorId: input.userId,
         modelTarget: {
-          configId: target.configId,
+          providerId: target.providerId,
           scope: target.scope,
           providerKey: target.providerKey,
           adapterKey: target.adapterKey,
@@ -599,7 +599,7 @@ function resolveEditorIntentKey(workflowKey: AiEditorWorkflowKey): AiModelIntent
 }
 
 function toModelTargetSnapshot(target: {
-  configId: string
+  providerId: string
   scope: string
   providerKey: string
   providerName: string
@@ -610,7 +610,7 @@ function toModelTargetSnapshot(target: {
   modelName: string
 }) {
   return {
-    configId: target.configId,
+    providerId: target.providerId,
     scope: target.scope,
     providerKey: target.providerKey,
     providerName: target.providerName,

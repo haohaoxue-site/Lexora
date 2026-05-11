@@ -30,7 +30,7 @@ interface RequestChatCompletionParams {
 interface UpdateChatSessionModelParams {
   userId: string
   sessionId: string
-  modelRef: Pick<AiModelRef, 'configId' | 'modelId'> | null
+  modelRef: Pick<AiModelRef, 'providerId' | 'modelId'> | null
 }
 
 interface ChatReplyCommandContext {
@@ -66,7 +66,7 @@ export class ChatService {
         enabled: true,
         ready: true,
         defaultModel: {
-          configId: target.configId,
+          providerId: target.providerId,
           scope: target.scope,
           providerKey: target.providerKey,
           providerName: target.providerName,
@@ -141,7 +141,7 @@ export class ChatService {
         workflowKey: AGENT_WORKFLOW_KEY.CHAT_REPLY,
         actorId: params.userId,
         modelTarget: {
-          configId: target.configId,
+          providerId: target.providerId,
           scope: target.scope,
           providerKey: target.providerKey,
           adapterKey: target.adapterKey,

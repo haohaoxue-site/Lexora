@@ -6,21 +6,22 @@ import type {
 export type {
   AiAnchor,
   AiAvailableModelOption,
-  AiAvailableModelServiceOption,
+  AiAvailableProviderOption,
   AiCandidate,
   AiDefaultModelPolicyItem,
   AiEditorStreamEvent,
   AiEditorWorkflowKey,
   AiModelCapability,
-  AiModelEndpointMode,
   AiModelIntentKey,
-  AiModelItem,
-  AiModelProviderTemplate,
   AiModelRef,
-  AiModelServiceConfigSummary,
-  AiModelServiceScope,
-  AiModelSyncResult,
   AiModelType,
+  AiProvider,
+  AiProviderCredential,
+  AiProviderEndpointMode,
+  AiProviderModelItem,
+  AiProviderModels,
+  AiProviderPreset,
+  AiProviderScope,
   AiRun,
   AiSession,
   CreateAiEditorSessionRequest,
@@ -30,9 +31,9 @@ export type {
 } from '@haohaoxue/samepage-contracts'
 
 /**
- * 创建模型服务请求。
+ * 创建服务商请求。
  */
-export interface CreateAiModelServiceRequest {
+export interface CreateAiProviderRequest {
   /** 服务商键 */
   providerKey: string
   /** 服务商名称 */
@@ -44,9 +45,9 @@ export interface CreateAiModelServiceRequest {
 }
 
 /**
- * 更新模型服务请求。
+ * 更新服务商请求。
  */
-export interface UpdateAiModelServiceRequest {
+export interface UpdateAiProviderRequest {
   /** 服务商键 */
   providerKey?: string
   /** 服务商名称 */
@@ -64,27 +65,11 @@ export interface UpdateAiModelServiceRequest {
 /**
  * 创建模型项请求。
  */
-export interface CreateAiModelItemRequest {
+export interface UpsertAiProviderModelRequest {
   /** 模型 ID */
   modelId: string
   /** 模型名称 */
   modelName: string
-  /** 模型类型 */
-  modelType: AiModelType
-  /** 模型能力 */
-  capabilities: AiModelCapability[]
-  /** 上下文窗口 */
-  contextWindow?: number
-  /** 最大输出 token */
-  maxOutputTokens?: number
-}
-
-/**
- * 更新模型项请求。
- */
-export interface UpdateAiModelItemRequest {
-  /** 模型名称 */
-  modelName?: string
   /** 模型类型 */
   modelType?: AiModelType
   /** 模型能力 */
@@ -95,4 +80,9 @@ export interface UpdateAiModelItemRequest {
   maxOutputTokens?: number
   /** 是否启用 */
   enabled?: boolean
+}
+
+export interface UpsertAiProviderModelsRequest {
+  /** 模型列表 */
+  models: UpsertAiProviderModelRequest[]
 }

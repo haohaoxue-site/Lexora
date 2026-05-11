@@ -1,33 +1,36 @@
 import type {
   AiAvailableModelOption,
-  AiAvailableModelServiceOption,
+  AiAvailableProviderOption,
   AiDefaultModelPolicyItem,
-  AiModelAuthMode,
   AiModelCapability,
-  AiModelEndpointMode,
   AiModelIntentKey,
-  AiModelItem,
   AiModelRef,
-  AiModelServiceConfigSummary,
-  AiModelServiceScope,
   AiModelType,
+  AiProvider,
+  AiProviderAuthMode,
+  AiProviderEndpointMode,
+  AiProviderModelItem,
+  AiProviderScope,
+  AiProviderSource,
 } from '@haohaoxue/samepage-contracts'
 import type {
-  AiModelAuthMode as PrismaAiModelAuthMode,
   AiModelCapability as PrismaAiModelCapability,
-  AiModelEndpointMode as PrismaAiModelEndpointMode,
-  AiModelItem as PrismaAiModelItem,
-  AiModelServiceConfig as PrismaAiModelServiceConfig,
-  AiModelServiceScope as PrismaAiModelServiceScope,
   AiModelType as PrismaAiModelType,
+  AiProvider as PrismaAiProvider,
+  AiProviderAuthMode as PrismaAiProviderAuthMode,
+  AiProviderEndpointMode as PrismaAiProviderEndpointMode,
+  AiProviderModel as PrismaAiProviderModel,
+  AiProviderScope as PrismaAiProviderScope,
+  AiProviderSource as PrismaAiProviderSource,
 } from '@prisma/client'
 import {
-  AI_MODEL_AUTH_MODE,
   AI_MODEL_CAPABILITY,
-  AI_MODEL_ENDPOINT_MODE,
-  AI_MODEL_SERVICE_SCOPE,
-  AI_MODEL_SERVICE_STATUS,
   AI_MODEL_TYPE,
+  AI_PROVIDER_AUTH_MODE,
+  AI_PROVIDER_CREDENTIAL_STATUS,
+  AI_PROVIDER_ENDPOINT_MODE,
+  AI_PROVIDER_SCOPE,
+  AI_PROVIDER_SOURCE,
 } from '@haohaoxue/samepage-contracts'
 
 interface ModelCountProjection {
@@ -36,37 +39,45 @@ interface ModelCountProjection {
   }
 }
 
-export function toDomainScope(scope: PrismaAiModelServiceScope): AiModelServiceScope {
-  return scope === 'SYSTEM' ? AI_MODEL_SERVICE_SCOPE.SYSTEM : AI_MODEL_SERVICE_SCOPE.USER
+export function toDomainScope(scope: PrismaAiProviderScope): AiProviderScope {
+  return scope === 'SYSTEM' ? AI_PROVIDER_SCOPE.SYSTEM : AI_PROVIDER_SCOPE.USER
 }
 
-export function toPrismaScope(scope: AiModelServiceScope): PrismaAiModelServiceScope {
-  return scope === AI_MODEL_SERVICE_SCOPE.SYSTEM ? 'SYSTEM' : 'USER'
+export function toPrismaScope(scope: AiProviderScope): PrismaAiProviderScope {
+  return scope === AI_PROVIDER_SCOPE.SYSTEM ? 'SYSTEM' : 'USER'
 }
 
-export function toDomainEndpointMode(mode: PrismaAiModelEndpointMode): AiModelEndpointMode {
-  return mode === 'FIXED' ? AI_MODEL_ENDPOINT_MODE.FIXED : AI_MODEL_ENDPOINT_MODE.CUSTOM
+export function toDomainProviderSource(source: PrismaAiProviderSource): AiProviderSource {
+  return source === 'PRESET' ? AI_PROVIDER_SOURCE.PRESET : AI_PROVIDER_SOURCE.COMPATIBLE
 }
 
-export function toPrismaEndpointMode(mode: AiModelEndpointMode): PrismaAiModelEndpointMode {
-  return mode === AI_MODEL_ENDPOINT_MODE.FIXED ? 'FIXED' : 'CUSTOM'
+export function toPrismaProviderSource(source: AiProviderSource): PrismaAiProviderSource {
+  return source === AI_PROVIDER_SOURCE.PRESET ? 'PRESET' : 'COMPATIBLE'
 }
 
-export function toDomainAuthMode(mode: PrismaAiModelAuthMode): AiModelAuthMode {
+export function toDomainEndpointMode(mode: PrismaAiProviderEndpointMode): AiProviderEndpointMode {
+  return mode === 'FIXED' ? AI_PROVIDER_ENDPOINT_MODE.FIXED : AI_PROVIDER_ENDPOINT_MODE.CUSTOM
+}
+
+export function toPrismaEndpointMode(mode: AiProviderEndpointMode): PrismaAiProviderEndpointMode {
+  return mode === AI_PROVIDER_ENDPOINT_MODE.FIXED ? 'FIXED' : 'CUSTOM'
+}
+
+export function toDomainAuthMode(mode: PrismaAiProviderAuthMode): AiProviderAuthMode {
   if (mode === 'API_KEY') {
-    return AI_MODEL_AUTH_MODE.API_KEY
+    return AI_PROVIDER_AUTH_MODE.API_KEY
   }
   if (mode === 'BEARER') {
-    return AI_MODEL_AUTH_MODE.BEARER
+    return AI_PROVIDER_AUTH_MODE.BEARER
   }
-  return AI_MODEL_AUTH_MODE.NONE
+  return AI_PROVIDER_AUTH_MODE.NONE
 }
 
-export function toPrismaAuthMode(mode: AiModelAuthMode): PrismaAiModelAuthMode {
-  if (mode === AI_MODEL_AUTH_MODE.API_KEY) {
+export function toPrismaAuthMode(mode: AiProviderAuthMode): PrismaAiProviderAuthMode {
+  if (mode === AI_PROVIDER_AUTH_MODE.API_KEY) {
     return 'API_KEY'
   }
-  if (mode === AI_MODEL_AUTH_MODE.BEARER) {
+  if (mode === AI_PROVIDER_AUTH_MODE.BEARER) {
     return 'BEARER'
   }
   return 'NONE'
@@ -130,34 +141,38 @@ export function toPrismaCapability(capability: AiModelCapability): PrismaAiModel
   return 'STREAMING'
 }
 
-export function toModelServiceSummary(
-  service: PrismaAiModelServiceConfig & ModelCountProjection,
-): AiModelServiceConfigSummary {
-  const endpointMode = toDomainEndpointMode(service.endpointMode)
+export function toProvider(
+  provider: PrismaAiProvider & ModelCountProjection,
+): AiProvider {
+  const endpointMode = toDomainEndpointMode(provider.endpointMode)
+  const source = toDomainProviderSource(provider.source)
 
   return {
-    configId: service.id,
-    scope: toDomainScope(service.scope),
-    providerKey: service.providerKey,
-    providerName: service.providerName,
-    adapterKey: service.adapterKey,
+    providerId: provider.id,
+    scope: toDomainScope(provider.scope),
+    source,
+    providerKey: provider.providerKey,
+    providerName: provider.providerName,
+    adapterKey: provider.adapterKey,
     endpointMode,
-    endpointEditable: endpointMode === AI_MODEL_ENDPOINT_MODE.CUSTOM,
-    endpoint: service.endpoint,
-    credentialStatus: service.authMode === 'NONE' || service.apiKeyEncrypted
-      ? AI_MODEL_SERVICE_STATUS.CONFIGURED
-      : AI_MODEL_SERVICE_STATUS.MISSING,
-    enabled: service.enabled,
-    modelCount: service._count?.models ?? 0,
-    createdAt: service.createdAt.toISOString(),
-    updatedAt: service.updatedAt.toISOString(),
+    authMode: toDomainAuthMode(provider.authMode),
+    endpointEditable: source === AI_PROVIDER_SOURCE.COMPATIBLE && endpointMode === AI_PROVIDER_ENDPOINT_MODE.CUSTOM,
+    nameEditable: source === AI_PROVIDER_SOURCE.COMPATIBLE,
+    deletable: source === AI_PROVIDER_SOURCE.COMPATIBLE,
+    endpoint: provider.endpoint,
+    credentialStatus: provider.authMode === 'NONE' || provider.apiKeyEncrypted
+      ? AI_PROVIDER_CREDENTIAL_STATUS.CONFIGURED
+      : AI_PROVIDER_CREDENTIAL_STATUS.MISSING,
+    enabled: provider.enabled,
+    modelCount: provider._count?.models ?? 0,
+    createdAt: provider.createdAt.toISOString(),
+    updatedAt: provider.updatedAt.toISOString(),
   }
 }
 
-export function toModelItem(item: PrismaAiModelItem): AiModelItem {
+export function toProviderModelItem(item: PrismaAiProviderModel): AiProviderModelItem {
   return {
-    modelItemId: item.id,
-    configId: item.serviceConfigId,
+    providerId: item.providerId,
     modelId: item.modelId,
     modelName: item.modelName,
     modelType: toDomainModelType(item.modelType),
@@ -170,13 +185,13 @@ export function toModelItem(item: PrismaAiModelItem): AiModelItem {
 }
 
 export function buildAiModelRef(params: {
-  configId: string
-  scope: PrismaAiModelServiceScope
+  providerId: string
+  scope: PrismaAiProviderScope
   providerKey: string
   modelId: string
 }): AiModelRef {
   return {
-    configId: params.configId,
+    providerId: params.providerId,
     scope: toDomainScope(params.scope),
     providerKey: params.providerKey,
     modelId: params.modelId,
@@ -200,16 +215,16 @@ export function toDefaultModelPolicyItem(params: {
 }
 
 export function toAvailableModelOption(params: {
-  service: PrismaAiModelServiceConfig
-  model: PrismaAiModelItem
+  provider: PrismaAiProvider
+  model: PrismaAiProviderModel
   selectable: boolean
   unavailableReason: string | null
 }): AiAvailableModelOption {
   return {
-    configId: params.service.id,
-    scope: toDomainScope(params.service.scope),
-    providerKey: params.service.providerKey,
-    providerName: params.service.providerName,
+    providerId: params.provider.id,
+    scope: toDomainScope(params.provider.scope),
+    providerKey: params.provider.providerKey,
+    providerName: params.provider.providerName,
     modelId: params.model.modelId,
     modelName: params.model.modelName,
     modelType: toDomainModelType(params.model.modelType),
@@ -219,13 +234,13 @@ export function toAvailableModelOption(params: {
   }
 }
 
-export function toAvailableModelServiceOption(
-  service: PrismaAiModelServiceConfig,
-): AiAvailableModelServiceOption {
+export function toAvailableProviderOption(
+  provider: PrismaAiProvider,
+): AiAvailableProviderOption {
   return {
-    configId: service.id,
-    scope: toDomainScope(service.scope),
-    providerKey: service.providerKey,
-    providerName: service.providerName,
+    providerId: provider.id,
+    scope: toDomainScope(provider.scope),
+    providerKey: provider.providerKey,
+    providerName: provider.providerName,
   }
 }

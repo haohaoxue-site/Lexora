@@ -57,7 +57,7 @@ async function handleIntentModelChange(item: Pick<SettingsModelIntentOption, 'ke
     const nextPolicy = await updateAiDefaultModel(item.key, {
       modelRef: modelRef
         ? {
-            configId: modelRef.configId,
+            providerId: modelRef.providerId,
             modelId: modelRef.modelId,
           }
         : null,

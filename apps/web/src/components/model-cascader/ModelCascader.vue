@@ -13,16 +13,16 @@ import type {
 } from './typing'
 import type {
   AiAvailableModelOption,
-  AiAvailableModelServiceOption,
+  AiAvailableProviderOption,
   AiModelRef,
-  AiModelServiceScope,
+  AiProviderScope,
 } from '@/apis/ai'
-import { AI_MODEL_SERVICE_SCOPE } from '@haohaoxue/samepage-contracts'
+import { AI_PROVIDER_SCOPE } from '@haohaoxue/samepage-contracts'
 import { ElMessage } from 'element-plus'
 import { computed, shallowRef, watch } from 'vue'
 import {
-  getAvailableAiModelServiceModels,
-  getAvailableAiModelServices,
+  getAvailableAiProviderModels,
+  getAvailableAiProviders,
 } from '@/apis/ai'
 import { getRequestErrorDisplayMessage } from '@/utils/request-error'
 
@@ -37,12 +37,12 @@ const componentProps = withDefaults(defineProps<ModelCascaderProps>(), {
 const emits = defineEmits<ModelCascaderEmits>()
 const VALUE_SEPARATOR = ':'
 const SCOPE_VALUE_PREFIX = 'scope'
-const SERVICE_VALUE_PREFIX = 'service'
+const PROVIDER_VALUE_PREFIX = 'provider'
 const MODEL_VALUE_PREFIX = 'model'
 
-const availableServicesByScope = shallowRef<Partial<Record<AiModelServiceScope, AiAvailableModelServiceOption[]>>>({})
-const serviceLoadingPromises = shallowRef<Partial<Record<AiModelServiceScope, Promise<AiAvailableModelServiceOption[]>>>>({})
-const availableModelsByConfigId = shallowRef<Record<string, AiAvailableModelOption[]>>({})
+const availableProvidersByScope = shallowRef<Partial<Record<AiProviderScope, AiAvailableProviderOption[]>>>({})
+const providerLoadingPromises = shallowRef<Partial<Record<AiProviderScope, Promise<AiAvailableProviderOption[]>>>>({})
+const availableModelsByProviderId = shallowRef<Record<string, AiAvailableModelOption[]>>({})
 const modelLoadingPromises = shallowRef<Record<string, Promise<AiAvailableModelOption[]>>>({})
 
 const cascaderProps: CascaderProps = {
@@ -89,13 +89,13 @@ async function loadNode(
 
     if (node.level === 1) {
       const scope = parseScopeValue(nodeValue)
-      resolve(scope ? buildProviderOptions(await ensureAvailableServices(scope)) : [])
+      resolve(scope ? buildProviderOptions(await ensureAvailableProviders(scope)) : [])
       return
     }
 
     if (node.level === 2) {
-      const configId = parseServiceValue(nodeValue)
-      resolve(configId ? buildModelOptions(await ensureAvailableModels(configId)) : [])
+      const providerId = parseProviderValue(nodeValue)
+      resolve(providerId ? buildModelOptions(await ensureAvailableModels(providerId)) : [])
       return
     }
 
@@ -107,71 +107,71 @@ async function loadNode(
   }
 }
 
-async function ensureAvailableServices(scope: AiModelServiceScope) {
-  const cachedServices = availableServicesByScope.value[scope]
+async function ensureAvailableProviders(scope: AiProviderScope) {
+  const cachedProviders = availableProvidersByScope.value[scope]
 
-  if (cachedServices) {
-    return cachedServices
+  if (cachedProviders) {
+    return cachedProviders
   }
 
-  const loadingPromise = serviceLoadingPromises.value[scope]
+  const loadingPromise = providerLoadingPromises.value[scope]
 
   if (loadingPromise) {
     return loadingPromise
   }
 
-  const promise = getAvailableAiModelServices(componentProps.intentKey, scope)
-    .then((services) => {
-      availableServicesByScope.value = {
-        ...availableServicesByScope.value,
-        [scope]: services,
+  const promise = getAvailableAiProviders(componentProps.intentKey, scope)
+    .then((providers) => {
+      availableProvidersByScope.value = {
+        ...availableProvidersByScope.value,
+        [scope]: providers,
       }
-      return services
+      return providers
     })
     .finally(() => {
-      const nextPromises = { ...serviceLoadingPromises.value }
+      const nextPromises = { ...providerLoadingPromises.value }
       delete nextPromises[scope]
-      serviceLoadingPromises.value = nextPromises
+      providerLoadingPromises.value = nextPromises
     })
 
-  serviceLoadingPromises.value = {
-    ...serviceLoadingPromises.value,
+  providerLoadingPromises.value = {
+    ...providerLoadingPromises.value,
     [scope]: promise,
   }
 
   return promise
 }
 
-async function ensureAvailableModels(configId: string) {
-  const cachedModels = availableModelsByConfigId.value[configId]
+async function ensureAvailableModels(providerId: string) {
+  const cachedModels = availableModelsByProviderId.value[providerId]
 
   if (cachedModels) {
     return cachedModels
   }
 
-  const loadingPromise = modelLoadingPromises.value[configId]
+  const loadingPromise = modelLoadingPromises.value[providerId]
 
   if (loadingPromise) {
     return loadingPromise
   }
 
-  const promise = getAvailableAiModelServiceModels(componentProps.intentKey, configId)
+  const promise = getAvailableAiProviderModels(componentProps.intentKey, providerId)
     .then((models) => {
-      availableModelsByConfigId.value = {
-        ...availableModelsByConfigId.value,
-        [configId]: models,
+      availableModelsByProviderId.value = {
+        ...availableModelsByProviderId.value,
+        [providerId]: models,
       }
       return models
     })
     .finally(() => {
       const nextPromises = { ...modelLoadingPromises.value }
-      delete nextPromises[configId]
+      delete nextPromises[providerId]
       modelLoadingPromises.value = nextPromises
     })
 
   modelLoadingPromises.value = {
     ...modelLoadingPromises.value,
-    [configId]: promise,
+    [providerId]: promise,
   }
 
   return promise
@@ -185,7 +185,7 @@ async function loadSelectedModelRefOptions() {
   }
 
   try {
-    await ensureAvailableModels(modelRef.configId)
+    await ensureAvailableModels(modelRef.providerId)
 
     if (!resolveModelRef(modelRef)) {
       emits('update:modelValue', null)
@@ -201,40 +201,40 @@ function shouldLoadModelRefOptions(modelRef: ModelCascaderModelRef | null): mode
 }
 
 function resetAvailableModels() {
-  availableServicesByScope.value = {}
-  serviceLoadingPromises.value = {}
-  availableModelsByConfigId.value = {}
+  availableProvidersByScope.value = {}
+  providerLoadingPromises.value = {}
+  availableModelsByProviderId.value = {}
   modelLoadingPromises.value = {}
 }
 
 function buildRootOptions(): ModelCascaderOption[] {
   return [
     {
-      value: buildScopeValue(AI_MODEL_SERVICE_SCOPE.SYSTEM),
+      value: buildScopeValue(AI_PROVIDER_SCOPE.SYSTEM),
       label: '系统',
       leaf: false,
       nodeKind: 'scope',
-      scope: AI_MODEL_SERVICE_SCOPE.SYSTEM,
+      scope: AI_PROVIDER_SCOPE.SYSTEM,
     },
     {
-      value: buildScopeValue(AI_MODEL_SERVICE_SCOPE.USER),
+      value: buildScopeValue(AI_PROVIDER_SCOPE.USER),
       label: '个人',
       leaf: false,
       nodeKind: 'scope',
-      scope: AI_MODEL_SERVICE_SCOPE.USER,
+      scope: AI_PROVIDER_SCOPE.USER,
     },
   ]
 }
 
-function buildProviderOptions(services: AiAvailableModelServiceOption[]) {
-  return services.map<ModelCascaderOption>(service => ({
-    value: buildServiceValue(service.configId),
-    label: service.providerName,
+function buildProviderOptions(providers: AiAvailableProviderOption[]) {
+  return providers.map<ModelCascaderOption>(provider => ({
+    value: buildProviderValue(provider.providerId),
+    label: provider.providerName,
     leaf: false,
     nodeKind: 'provider',
-    scope: service.scope,
-    configId: service.configId,
-    providerKey: service.providerKey,
+    scope: provider.scope,
+    providerId: provider.providerId,
+    providerKey: provider.providerKey,
   }))
 }
 
@@ -246,7 +246,7 @@ function buildModelOptions(models: AiAvailableModelOption[]) {
     leaf: true,
     nodeKind: 'model',
     scope: item.scope,
-    configId: item.configId,
+    providerId: item.providerId,
     providerKey: item.providerKey,
     modelId: item.modelId,
     unavailableReason: item.unavailableReason,
@@ -256,7 +256,7 @@ function buildModelOptions(models: AiAvailableModelOption[]) {
 function buildModelPath(modelRef: AiModelRef) {
   return [
     buildScopeValue(modelRef.scope),
-    buildServiceValue(modelRef.configId),
+    buildProviderValue(modelRef.providerId),
     buildModelValue(modelRef),
   ]
 }
@@ -278,18 +278,18 @@ function parseModelPath(value: CascaderValue | null | undefined): AiModelRef | n
 function resolveModelRef(modelRef: ModelCascaderModelRef): AiModelRef | null {
   if (modelRef.scope && modelRef.providerKey) {
     return {
-      configId: modelRef.configId,
+      providerId: modelRef.providerId,
       scope: modelRef.scope,
       providerKey: modelRef.providerKey,
       modelId: modelRef.modelId,
     }
   }
 
-  const matchedModel = availableModelsByConfigId.value[modelRef.configId]?.find(item => item.modelId === modelRef.modelId && item.selectable)
+  const matchedModel = availableModelsByProviderId.value[modelRef.providerId]?.find(item => item.modelId === modelRef.modelId && item.selectable)
 
   return matchedModel
     ? {
-        configId: matchedModel.configId,
+        providerId: matchedModel.providerId,
         scope: matchedModel.scope,
         providerKey: matchedModel.providerKey,
         modelId: matchedModel.modelId,
@@ -297,29 +297,29 @@ function resolveModelRef(modelRef: ModelCascaderModelRef): AiModelRef | null {
     : null
 }
 
-function buildScopeValue(scope: AiModelServiceScope) {
+function buildScopeValue(scope: AiProviderScope) {
   return [SCOPE_VALUE_PREFIX, scope].join(VALUE_SEPARATOR)
 }
 
-function parseScopeValue(value: string): AiModelServiceScope | null {
+function parseScopeValue(value: string): AiProviderScope | null {
   const parts = parsePrefixedValue(value, SCOPE_VALUE_PREFIX, 1)
   const scope = parts?.[0]
 
-  return isAiModelServiceScope(scope) ? scope : null
+  return isAiProviderScope(scope) ? scope : null
 }
 
-function buildServiceValue(configId: string) {
-  return [SERVICE_VALUE_PREFIX, encodeValuePart(configId)].join(VALUE_SEPARATOR)
+function buildProviderValue(providerId: string) {
+  return [PROVIDER_VALUE_PREFIX, encodeValuePart(providerId)].join(VALUE_SEPARATOR)
 }
 
-function parseServiceValue(value: string) {
-  return parsePrefixedValue(value, SERVICE_VALUE_PREFIX, 1)?.[0] ?? null
+function parseProviderValue(value: string) {
+  return parsePrefixedValue(value, PROVIDER_VALUE_PREFIX, 1)?.[0] ?? null
 }
 
-function buildModelValue(modelRef: Pick<AiModelRef, 'configId' | 'scope' | 'providerKey' | 'modelId'>) {
+function buildModelValue(modelRef: Pick<AiModelRef, 'providerId' | 'scope' | 'providerKey' | 'modelId'>) {
   return [
     MODEL_VALUE_PREFIX,
-    encodeValuePart(modelRef.configId),
+    encodeValuePart(modelRef.providerId),
     modelRef.scope,
     encodeValuePart(modelRef.providerKey),
     encodeValuePart(modelRef.modelId),
@@ -333,14 +333,14 @@ function parseModelValue(value: string): AiModelRef | null {
     return null
   }
 
-  const [configId, scope, providerKey, modelId] = parts
+  const [providerId, scope, providerKey, modelId] = parts
 
-  if (!configId || !isAiModelServiceScope(scope) || !providerKey || !modelId) {
+  if (!providerId || !isAiProviderScope(scope) || !providerKey || !modelId) {
     return null
   }
 
   return {
-    configId,
+    providerId,
     scope,
     providerKey,
     modelId,
@@ -366,8 +366,8 @@ function encodeValuePart(value: string) {
   return encodeURIComponent(value)
 }
 
-function isAiModelServiceScope(value: string | undefined): value is AiModelServiceScope {
-  return value === AI_MODEL_SERVICE_SCOPE.SYSTEM || value === AI_MODEL_SERVICE_SCOPE.USER
+function isAiProviderScope(value: string | undefined): value is AiProviderScope {
+  return value === AI_PROVIDER_SCOPE.SYSTEM || value === AI_PROVIDER_SCOPE.USER
 }
 
 function getNodeValue(node: CascaderNode) {
