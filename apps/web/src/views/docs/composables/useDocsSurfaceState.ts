@@ -4,55 +4,30 @@ import type {
   DocumentTreeCollectionId,
   DocumentTreeGroup,
 } from '@haohaoxue/samepage-contracts'
-import type { ComputedRef, ShallowRef } from 'vue'
-import type { ActiveDocumentDetail, DocsSurfaceView } from '../typing'
+import type { DocsSurfaceView } from '../typing'
 import {
   DOCUMENT_COLLECTION,
   DOCUMENT_PANE_STATE,
   WORKSPACE_TYPE,
 } from '@haohaoxue/samepage-contracts'
+import { createSharedComposable } from '@vueuse/core'
 import { computed, ref, watch } from 'vue'
 import { resolvePreferredDocumentId } from '../utils/documentTree'
+import { useActiveDocument } from './useActiveDocument'
+import { useDocsContext } from './useDocsContext'
+import { useDocumentTree } from './useDocumentTree'
 
-/**
- * 文档树 owner 状态。
- */
-interface DocsTreeSurfaceState {
-  treeGroups: ShallowRef<DocumentTreeGroup[]>
-  defaultDocumentId: ComputedRef<string | null>
-  breadcrumbLabels: ComputedRef<string[]>
-  isDocumentLoading: ShallowRef<boolean>
-}
+export const useDocsSurfaceState = createSharedComposable(() => {
+  const {
+    activeDocumentId,
+    currentWorkspaceType,
+    isSelectingInitialDocument,
+    pendingTitleFocusDocumentId,
+    routeName,
+  } = useDocsContext()
+  const tree = useDocumentTree()
+  const activeDocument = useActiveDocument()
 
-/**
- * 当前文档 owner 状态。
- */
-interface DocsActiveDocumentSurfaceState {
-  currentDocument: ShallowRef<ActiveDocumentDetail | null>
-  isDocumentItemLoading: ShallowRef<boolean>
-  documentErrorState: ShallowRef<DocumentPaneState | null>
-}
-
-/**
- * 文档 surface 组合参数。
- */
-interface UseDocsSurfaceStateOptions {
-  routeName: ComputedRef<string | symbol | null | undefined>
-  activeDocumentId: ComputedRef<string | null>
-  currentWorkspaceType: ComputedRef<string>
-  isSelectingInitialDocument: ShallowRef<boolean>
-  tree: DocsTreeSurfaceState
-  activeDocument: DocsActiveDocumentSurfaceState
-}
-
-export function useDocsSurfaceState({
-  routeName,
-  activeDocumentId,
-  currentWorkspaceType,
-  isSelectingInitialDocument,
-  tree,
-  activeDocument,
-}: UseDocsSurfaceStateOptions) {
   const collapsedGroupIds = ref<DocumentTreeCollectionId[]>([
     DOCUMENT_COLLECTION.COLLABORATION,
   ])
@@ -108,7 +83,11 @@ export function useDocsSurfaceState({
       return DOCUMENT_PANE_STATE.READY
     }
 
-    if (activeDocument.isDocumentItemLoading.value || tree.isDocumentLoading.value || isSelectingInitialDocument.value) {
+    if (
+      activeDocument.isDocumentItemLoading.value
+      || tree.isDocumentLoading.value
+      || isSelectingInitialDocument.value
+    ) {
       return DOCUMENT_PANE_STATE.LOADING
     }
 
@@ -134,25 +113,34 @@ export function useDocsSurfaceState({
     },
   )
 
-  return {
+  watch(
     currentSurface,
-    isDocumentSurface,
-    visibleTreeGroups,
-    visibleDefaultDocumentId,
-    hasVisibleFallbackDocument,
-    visibleActiveCollectionId,
-    collapsedGroupIdSet,
-    visibleBreadcrumbLabels,
-    documentPaneState,
-    toggleGroupCollapse,
-  }
+    (nextSurface) => {
+      if (nextSurface !== 'document') {
+        pendingTitleFocusDocumentId.value = null
+      }
+    },
+  )
 
   function toggleGroupCollapse(collectionId: DocumentTreeCollectionId) {
     collapsedGroupIds.value = collapsedGroupIdSet.value.has(collectionId)
       ? collapsedGroupIds.value.filter(id => id !== collectionId)
       : [...collapsedGroupIds.value, collectionId]
   }
-}
+
+  return {
+    collapsedGroupIdSet,
+    currentSurface,
+    documentPaneState,
+    hasVisibleFallbackDocument,
+    isDocumentSurface,
+    toggleGroupCollapse,
+    visibleActiveCollectionId,
+    visibleBreadcrumbLabels,
+    visibleDefaultDocumentId,
+    visibleTreeGroups,
+  }
+})
 
 function containsDocument(item: DocumentItem, targetDocumentId: string): boolean {
   if (item.id === targetDocumentId) {

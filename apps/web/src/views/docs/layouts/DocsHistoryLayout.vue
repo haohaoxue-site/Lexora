@@ -1,13 +1,31 @@
 <script setup lang="ts">
-import type {
-  DocsHistoryLayoutEmits,
-  DocsHistoryLayoutProps,
-} from './typing'
 import DocsDocumentEditorPane from '../components/DocsDocumentEditorPane.vue'
+import { useActiveDocument } from '../composables/useActiveDocument'
+import { useDocsContext } from '../composables/useDocsContext'
+import { useDocsHistoryState } from '../composables/useDocsHistoryState'
+import { useDocsPageActions } from '../composables/useDocsPageActions'
+import { useDocsSurfaceState } from '../composables/useDocsSurfaceState'
 import DocsHistoryPanel from './DocsHistoryPanel.vue'
 
-const props = defineProps<DocsHistoryLayoutProps>()
-const emits = defineEmits<DocsHistoryLayoutEmits>()
+const { activeBlockId, handleRequestComment } = useDocsContext()
+const {
+  isDocumentItemLoading,
+  isRestoringSnapshot,
+  isSnapshotsLoading,
+  reloadCurrentDocument,
+  updateDocumentContent,
+  updateDocumentTitle,
+} = useActiveDocument()
+const {
+  canRestoreSelectedSnapshot,
+  closeHistoryMode,
+  docsDocumentEditorMode,
+  isDocsDocumentEditable,
+  previewDocument,
+  restoreSelectedSnapshot,
+} = useDocsHistoryState()
+const { documentPaneState, hasVisibleFallbackDocument: hasFallbackDocument } = useDocsSurfaceState()
+const { createRootDocument, openDefaultDocument } = useDocsPageActions()
 </script>
 
 <template>
@@ -16,7 +34,7 @@ const emits = defineEmits<DocsHistoryLayoutEmits>()
       <ElButton
         text
         class="docs-history-view__back"
-        @click="emits('closeHistoryMode')"
+        @click="closeHistoryMode"
       >
         <span class="docs-history-view__back-content">
           <SvgIcon category="ui" icon="arrow-left" size="14px" />
@@ -27,9 +45,9 @@ const emits = defineEmits<DocsHistoryLayoutEmits>()
       <ElButton
         type="primary"
         class="docs-history-view__restore"
-        :disabled="!props.canRestoreSelectedSnapshot"
-        :loading="props.isRestoringSnapshot"
-        @click="emits('restoreSelectedSnapshot')"
+        :disabled="!canRestoreSelectedSnapshot"
+        :loading="isRestoringSnapshot"
+        @click="restoreSelectedSnapshot"
       >
         还原此历史记录
       </ElButton>
@@ -39,28 +57,22 @@ const emits = defineEmits<DocsHistoryLayoutEmits>()
 
     <div class="docs-history-view__content">
       <DocsDocumentEditorPane
-        :document="props.previewDocument"
-        :mode="props.docsDocumentEditorMode"
-        :editable="props.isDocsDocumentEditable"
-        :active-block-id="props.activeBlockId"
-        :is-loading="props.isDocumentItemLoading"
-        :pane-state="props.documentPaneState"
-        :has-fallback-document="props.hasFallbackDocument"
-        @update-title="emits('updateTitle', $event)"
-        @update-content="emits('updateContent', $event)"
-        @request-comment="emits('requestComment', $event)"
-        @create-document="emits('createDocument')"
-        @open-fallback-document="emits('openFallbackDocument')"
-        @retry-load="emits('retryLoad')"
+        :document="previewDocument"
+        :mode="docsDocumentEditorMode"
+        :editable="isDocsDocumentEditable"
+        :active-block-id="activeBlockId"
+        :is-loading="isDocumentItemLoading"
+        :pane-state="documentPaneState"
+        :has-fallback-document="hasFallbackDocument"
+        @update-title="updateDocumentTitle"
+        @update-content="updateDocumentContent"
+        @request-comment="handleRequestComment"
+        @create-document="createRootDocument()"
+        @open-fallback-document="openDefaultDocument()"
+        @retry-load="reloadCurrentDocument"
       />
 
-      <DocsHistoryPanel
-        :document="props.currentDocument"
-        :snapshots="props.snapshots"
-        :selected-snapshot-id="props.selectedSnapshotId"
-        :is-loading="props.isSnapshotsLoading"
-        @select="emits('selectHistorySnapshot', $event)"
-      />
+      <DocsHistoryPanel :is-loading="isSnapshotsLoading" />
     </div>
   </section>
 </template>

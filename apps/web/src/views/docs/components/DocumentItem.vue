@@ -1,27 +1,31 @@
 <script setup lang="ts">
-import type { DocumentItemEmits, DocumentItemProps } from '../typing'
+import type { DocumentItem, DocumentTreeCollectionId } from '@haohaoxue/samepage-contracts'
 import { useDocumentItem } from '../composables/useDocumentItem'
 
+interface DocumentItemProps {
+  item: DocumentItem
+  collectionId: DocumentTreeCollectionId
+  depth: number
+}
+
 const props = defineProps<DocumentItemProps>()
-const emits = defineEmits<DocumentItemEmits>()
 const {
   canManageDocument,
-  canShareDocument,
   canMoveToTeam,
+  canShareDocument,
+  createChild,
   getActionsStateClass,
   getExpandIconName,
   getItemStateClass,
   handleMenuCommand,
+  isActionPending,
+  isActive,
   isExpanded,
   openDocument,
   toggleItem,
-} = useDocumentItem(props, {
-  onDeleteDocument: documentId => emits('deleteDocument', documentId),
-  onMoveDocumentToTeam: documentId => emits('moveDocumentToTeam', documentId),
-  onOpen: documentId => emits('open', documentId),
-  onOpenHistory: documentId => emits('openHistory', documentId),
-  onShareDocument: documentId => emits('shareDocument', documentId),
-  onToggle: documentId => emits('toggle', documentId),
+} = useDocumentItem({
+  collectionId: () => props.collectionId,
+  item: () => props.item,
 })
 </script>
 
@@ -32,7 +36,7 @@ const {
     role="treeitem"
     :aria-level="props.depth + 1"
     :aria-expanded="props.item.hasChildren ? isExpanded : undefined"
-    :aria-current="props.activeDocumentId === props.item.id ? 'page' : undefined"
+    :aria-current="isActive ? 'page' : undefined"
   >
     <div
       class="document-tree-item-surface"
@@ -72,9 +76,9 @@ const {
           text
           class="document-tree-item__icon-button"
           :class="getItemStateClass()"
-          :disabled="props.isActionPending"
+          :disabled="isActionPending"
           title="新建子文档"
-          @click.stop="emits('createChild', props.item.id)"
+          @click.stop="createChild"
         >
           <SvgIcon category="ui" icon="plus" size="14px" />
         </ElButton>
@@ -85,7 +89,7 @@ const {
             class="document-tree-item__icon-button"
             data-testid="document-tree-item-menu-trigger"
             :class="getItemStateClass()"
-            :disabled="props.isActionPending"
+            :disabled="isActionPending"
             title="更多操作"
             @click.stop
           >
@@ -136,19 +140,7 @@ const {
         :key="child.id"
         :item="child"
         :collection-id="props.collectionId"
-        :current-workspace-type="props.currentWorkspaceType"
         :depth="props.depth + 1"
-        :active-document-id="props.activeDocumentId"
-        :expanded-document-ids="props.expandedDocumentIds"
-        :is-action-pending="props.isActionPending"
-        :can-share-document="props.canShareDocument"
-        @open="emits('open', $event)"
-        @toggle="emits('toggle', $event)"
-        @create-child="emits('createChild', $event)"
-        @open-history="emits('openHistory', $event)"
-        @move-document-to-team="emits('moveDocumentToTeam', $event)"
-        @share-document="emits('shareDocument', $event)"
-        @delete-document="emits('deleteDocument', $event)"
       />
     </div>
   </div>

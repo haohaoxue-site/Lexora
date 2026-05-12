@@ -1,22 +1,24 @@
 <script setup lang="ts">
-import type {
-  DocumentSectionPanelEmits,
-  DocumentSectionPanelProps,
-} from '../typing'
+import type { DocumentTreeGroup } from '@haohaoxue/samepage-contracts'
 import { DOCUMENT_COLLECTION } from '@haohaoxue/samepage-contracts'
+import { computed } from 'vue'
 import { useDocumentSectionPanel } from '../composables/useDocumentSectionPanel'
 import DocumentItem from './DocumentItem.vue'
 import DocumentToolbar from './DocumentToolbar.vue'
 
+interface DocumentSectionPanelProps {
+  group: DocumentTreeGroup
+}
+
 const props = defineProps<DocumentSectionPanelProps>()
-const emit = defineEmits<DocumentSectionPanelEmits>()
 defineSlots<{
-  headerAction?: (props: { group: DocumentSectionPanelProps['group'] }) => unknown
+  headerAction?: (props: { group: DocumentTreeGroup }) => unknown
 }>()
-const { chevronIconName, displayLabel, toggleSection } = useDocumentSectionPanel(
-  props,
-  collectionId => emit('toggleCollapse', collectionId),
-)
+
+const { chevronIconName, displayLabel, isCollapsed, toggleSection } = useDocumentSectionPanel({
+  group: () => props.group,
+})
+const canCreateRoot = computed(() => props.group.id !== DOCUMENT_COLLECTION.COLLABORATION)
 </script>
 
 <template>
@@ -25,7 +27,7 @@ const { chevronIconName, displayLabel, toggleSection } = useDocumentSectionPanel
       <button
         type="button"
         class="document-tree-section__header-button"
-        :aria-expanded="!props.isCollapsed"
+        :aria-expanded="!isCollapsed"
         :aria-controls="`document-tree-section-group-${props.group.id}`"
         @click="toggleSection"
       >
@@ -39,7 +41,7 @@ const { chevronIconName, displayLabel, toggleSection } = useDocumentSectionPanel
       </button>
 
       <div
-        v-if="$slots.headerAction || (props.group.id !== DOCUMENT_COLLECTION.COLLABORATION && props.canCreateRoot !== false)"
+        v-if="$slots.headerAction || canCreateRoot"
         class="document-tree-section__header-actions"
       >
         <div v-if="$slots.headerAction" class="document-tree-section__header-extra" @click.stop>
@@ -47,21 +49,17 @@ const { chevronIconName, displayLabel, toggleSection } = useDocumentSectionPanel
         </div>
 
         <div
-          v-if="props.group.id !== DOCUMENT_COLLECTION.COLLABORATION && props.canCreateRoot !== false"
+          v-if="canCreateRoot"
           class="document-tree-section__toolbar"
           @click.stop
         >
-          <DocumentToolbar
-            :collection-id="props.group.id"
-            :is-busy="props.isActionPending"
-            @create-root="emit('createRoot', $event)"
-          />
+          <DocumentToolbar :collection-id="props.group.id" />
         </div>
       </div>
     </div>
 
     <div
-      v-if="!props.isCollapsed && props.group.nodes.length"
+      v-if="!isCollapsed && props.group.nodes.length"
       :id="`document-tree-section-group-${props.group.id}`"
       role="group"
       class="space-y-0.5"
@@ -71,24 +69,12 @@ const { chevronIconName, displayLabel, toggleSection } = useDocumentSectionPanel
         :key="document.id"
         :item="document"
         :collection-id="props.group.id"
-        :current-workspace-type="props.currentWorkspaceType"
         :depth="0"
-        :active-document-id="props.activeDocumentId"
-        :expanded-document-ids="props.expandedDocumentIds"
-        :is-action-pending="props.isActionPending"
-        :can-share-document="props.canShareDocument"
-        @open="emit('open', $event)"
-        @toggle="emit('toggle', $event)"
-        @create-child="emit('createChild', $event)"
-        @open-history="emit('openHistory', $event)"
-        @move-document-to-team="emit('moveDocumentToTeam', $event)"
-        @share-document="emit('shareDocument', $event)"
-        @delete-document="emit('deleteDocument', $event)"
       />
     </div>
 
     <ElEmpty
-      v-else-if="!props.isCollapsed"
+      v-else-if="!isCollapsed"
       :image-size="48"
       :description="props.group.id === DOCUMENT_COLLECTION.COLLABORATION ? '还没有别人共享给你的文档' : '暂无文档'"
     />

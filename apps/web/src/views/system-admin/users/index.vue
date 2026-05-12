@@ -1,39 +1,45 @@
 <script setup lang="ts">
+import { computed, onMounted, shallowRef } from 'vue'
 import PagePanel from '@/layouts/panels/PagePanel.vue'
+import { getRequestErrorDisplayMessage } from '@/utils/request-error'
 import SystemAdminPageHeader from '../components/SystemAdminPageHeader.vue'
 import AuthGovernancePanel from './components/AuthGovernancePanel.vue'
 import UserTable from './components/UserTable.vue'
-import { useUsers } from './composables/useUsers'
+import { useSystemAuthGovernance } from './composables/useSystemAuthGovernance'
+import { useSystemUsers } from './composables/useSystemUsers'
 
-const {
-  authGovernanceCards,
-  errorMessage,
-  getGovernanceSwitchValue,
-  governance,
-  handleGovernanceSwitchChange,
-  inviteCodeForm,
-  isInviteCodeDialogVisible,
-  isLoading,
-  isLoadingUsers,
-  isGovernanceSwitchDisabled,
-  isSavingInviteCode,
-  keywordInput,
-  openInviteCodeDialog,
-  savingGovernanceFields,
-  shouldShowMissingInviteCodeWarning,
-  shouldShowEmailServiceHint,
-  submitSearch,
-  totalUsers,
-  toggleUserStatus,
-  updateFilters,
-  updateKeyword,
-  updatePageNo,
-  updatePageSize,
-  updateInviteCode,
-  updatingUserId,
-  userQuery,
-  users,
-} = useUsers()
+const { errorMessage: usersErrorMessage, loadUsers } = useSystemUsers()
+const { errorMessage: governanceErrorMessage, loadGovernance } = useSystemAuthGovernance()
+
+const isLoading = shallowRef(false)
+const pageErrorMessage = shallowRef('')
+const errorMessage = computed(() =>
+  pageErrorMessage.value
+  || usersErrorMessage.value
+  || governanceErrorMessage.value,
+)
+
+onMounted(loadData)
+
+async function loadData() {
+  isLoading.value = true
+  pageErrorMessage.value = ''
+  usersErrorMessage.value = ''
+  governanceErrorMessage.value = ''
+
+  try {
+    await Promise.all([
+      loadUsers(),
+      loadGovernance(),
+    ])
+  }
+  catch (error) {
+    pageErrorMessage.value = getRequestErrorDisplayMessage(error, '加载用户管理数据失败')
+  }
+  finally {
+    isLoading.value = false
+  }
+}
 </script>
 
 <template>
@@ -45,39 +51,8 @@ const {
     <div v-loading="isLoading" class="admin-users min-h-full flex flex-col gap-6 bg-fill-lighter p-4 lg:p-6">
       <ElAlert v-if="errorMessage" :title="errorMessage" type="error" show-icon :closable="false" class="rounded-xl" />
 
-      <AuthGovernancePanel
-        v-model:invite-code-dialog-visible="isInviteCodeDialogVisible"
-        v-model:invite-code="inviteCodeForm.inviteCode"
-        :auth-governance-cards="authGovernanceCards"
-        :governance="governance"
-        :saving-governance-fields="savingGovernanceFields"
-        :should-show-missing-invite-code-warning="shouldShowMissingInviteCodeWarning"
-        :is-saving-invite-code="isSavingInviteCode"
-        :get-governance-switch-value="getGovernanceSwitchValue"
-        :is-governance-switch-disabled="isGovernanceSwitchDisabled"
-        :should-show-email-service-hint="shouldShowEmailServiceHint"
-        @update-governance-switch="handleGovernanceSwitchChange"
-        @open-invite-code-dialog="openInviteCodeDialog"
-        @update-invite-code="updateInviteCode"
-      />
-
-      <UserTable
-        :keyword="keywordInput"
-        :loading="isLoadingUsers"
-        :page-no="userQuery.pageNo"
-        :page-size="userQuery.pageSize ?? 20"
-        :role-filter="userQuery.role ?? null"
-        :status-filter="userQuery.status ?? null"
-        :total="totalUsers"
-        :updating-user-id="updatingUserId"
-        :users="users"
-        @search="submitSearch"
-        @update-filters="updateFilters"
-        @update-keyword="updateKeyword"
-        @update-page-no="updatePageNo"
-        @update-page-size="updatePageSize"
-        @toggle-status="toggleUserStatus"
-      />
+      <AuthGovernancePanel />
+      <UserTable />
     </div>
   </PagePanel>
 </template>

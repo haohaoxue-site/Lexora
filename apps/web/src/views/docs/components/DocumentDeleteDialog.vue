@@ -1,30 +1,27 @@
 <script setup lang="ts">
-import type { DocumentDeleteDialogEmits, DocumentDeleteDialogProps } from '../typing'
 import { computed } from 'vue'
+import { useDocumentTree } from '../composables/useDocumentTree'
 
-const props = defineProps<DocumentDeleteDialogProps>()
-const emits = defineEmits<DocumentDeleteDialogEmits>()
+const {
+  closeDeleteDialog,
+  confirmDeleteDocument,
+  confirmPermanentlyDeleteDocument,
+  deleteActionKind,
+  deleteDialogDocumentTitle,
+  isDeleteDialogOpen,
+} = useDocumentTree()
 
-const isSubmitting = computed(() => props.actionKind !== null)
-const isDeletingToTrash = computed(() => props.actionKind === 'trash')
-const isPermanentlyDeleting = computed(() => props.actionKind === 'permanent')
-const dialogTitle = computed(() => `是否删除：${props.documentTitle || '该文档'}？`)
-
-function closeDialog() {
-  if (isSubmitting.value) {
-    return
-  }
-
-  emits('update:modelValue', false)
-}
+const isSubmitting = computed(() => deleteActionKind.value !== null)
+const isDeletingToTrash = computed(() => deleteActionKind.value === 'trash')
+const isPermanentlyDeleting = computed(() => deleteActionKind.value === 'permanent')
+const dialogTitle = computed(() => `是否删除：${deleteDialogDocumentTitle.value || '该文档'}？`)
 
 function handleDialogVisibleChange(value: boolean) {
-  if (value) {
-    emits('update:modelValue', true)
+  if (value || isSubmitting.value) {
     return
   }
 
-  closeDialog()
+  closeDeleteDialog()
 }
 
 function handleDelete() {
@@ -32,7 +29,7 @@ function handleDelete() {
     return
   }
 
-  emits('delete')
+  void confirmDeleteDocument()
 }
 
 function handlePermanentlyDelete() {
@@ -40,13 +37,13 @@ function handlePermanentlyDelete() {
     return
   }
 
-  emits('permanentlyDelete')
+  void confirmPermanentlyDeleteDocument()
 }
 </script>
 
 <template>
   <ElDialog
-    :model-value="props.modelValue"
+    :model-value="isDeleteDialogOpen"
     :title="dialogTitle"
     width="30rem"
     align-center
@@ -74,7 +71,7 @@ function handlePermanentlyDelete() {
         </ElButton>
 
         <div class="document-delete-dialog__footer-actions">
-          <ElButton :disabled="isSubmitting" @click="closeDialog">
+          <ElButton :disabled="isSubmitting" @click="closeDeleteDialog">
             取消
           </ElButton>
           <ElButton

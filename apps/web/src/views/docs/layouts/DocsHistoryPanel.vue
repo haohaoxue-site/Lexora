@@ -1,26 +1,20 @@
 <script setup lang="ts">
-import type {
-  DocumentHistoryPanelEmits,
-  DocumentHistoryPanelProps,
-} from '../typing'
 import { useDocumentHistoryPanel } from '../composables/useDocumentHistoryPanel'
 
-const props = defineProps<DocumentHistoryPanelProps>()
-const emits = defineEmits<DocumentHistoryPanelEmits>()
+interface DocumentHistoryPanelProps {
+  isLoading: boolean
+}
+
+defineProps<DocumentHistoryPanelProps>()
 const {
   hasDocument,
   historySections,
+  isEntrySelected,
   isGroupExpanded,
+  resolveEntryDetail,
   selectEntry,
   toggleGroup,
-  isEntrySelected,
-  resolveEntryDetail,
-} = useDocumentHistoryPanel({
-  document: () => props.document,
-  snapshots: () => props.snapshots,
-  selectedSnapshotId: () => props.selectedSnapshotId,
-  onSelect: snapshotId => emits('select', snapshotId),
-})
+} = useDocumentHistoryPanel()
 </script>
 
 <template>
@@ -35,7 +29,7 @@ const {
       选择文档后可查看历史记录
     </div>
 
-    <div v-else-if="props.isLoading" class="document-history-panel__empty">
+    <div v-else-if="isLoading" class="document-history-panel__empty">
       正在加载历史记录...
     </div>
 

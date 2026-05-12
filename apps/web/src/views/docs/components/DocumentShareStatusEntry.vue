@@ -1,34 +1,15 @@
 <script setup lang="ts">
-import type { DocumentShareProjection } from '@haohaoxue/samepage-contracts'
 import { useDocumentShareStatusEntry } from '../composables/useDocumentShareStatusEntry'
 
-const props = defineProps<{
-  documentId: string
-  share: DocumentShareProjection | null
-  canOpen: boolean
-}>()
-const emits = defineEmits<{
-  openShare: [documentId: string]
-}>()
-
 const {
+  documentId,
+  handleOpenShareDialog,
   iconName,
+  isDisabled,
   isInherited,
   isShared,
   statusLabel,
-  targetDocumentId,
-} = useDocumentShareStatusEntry({
-  documentId: () => props.documentId,
-  share: () => props.share,
-})
-
-function openShareDialog() {
-  if (!targetDocumentId.value) {
-    return
-  }
-
-  emits('openShare', targetDocumentId.value)
-}
+} = useDocumentShareStatusEntry()
 </script>
 
 <template>
@@ -36,8 +17,8 @@ function openShareDialog() {
     text
     class="document-share-status-entry"
     :class="{ 'is-shared': isShared, 'is-inherited': isInherited }"
-    :disabled="!props.documentId || !props.canOpen"
-    @click="openShareDialog"
+    :disabled="isDisabled"
+    @click="handleOpenShareDialog"
   >
     <span class="document-share-status-entry__content">
       <span class="document-share-status-entry__icon-shell">
@@ -48,7 +29,7 @@ function openShareDialog() {
         />
       </span>
 
-      <span class="document-share-status-entry__label">
+      <span v-if="documentId" class="document-share-status-entry__label">
         {{ statusLabel }}
       </span>
     </span>

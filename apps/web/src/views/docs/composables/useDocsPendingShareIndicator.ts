@@ -1,25 +1,18 @@
-import type { WorkspaceType } from '@haohaoxue/samepage-contracts'
-import type { ComputedRef } from 'vue'
 import { WORKSPACE_TYPE } from '@haohaoxue/samepage-contracts'
+import { createSharedComposable } from '@vueuse/core'
 import { computed, shallowRef, watch } from 'vue'
 import { getPendingDocumentShareRecipients } from '@/apis/document-share'
+import { useDocsContext } from './useDocsContext'
 
-/**
- * 待接收分享提示参数。
- */
-interface UseDocsPendingShareIndicatorOptions {
-  routeKey: ComputedRef<string>
-  currentWorkspaceType: ComputedRef<WorkspaceType>
-}
-
-export function useDocsPendingShareIndicator(options: UseDocsPendingShareIndicatorOptions) {
+export const useDocsPendingShareIndicator = createSharedComposable(() => {
+  const { routeKey, currentWorkspaceType } = useDocsContext()
   const pendingShareCount = shallowRef(0)
   const isLoading = shallowRef(false)
   const hasPendingShares = computed(() => pendingShareCount.value > 0)
   let requestId = 0
 
   watch(
-    [options.routeKey, options.currentWorkspaceType],
+    [routeKey, currentWorkspaceType],
     async ([, workspaceType]) => {
       if (workspaceType !== WORKSPACE_TYPE.PERSONAL) {
         pendingShareCount.value = 0
@@ -59,8 +52,8 @@ export function useDocsPendingShareIndicator(options: UseDocsPendingShareIndicat
   )
 
   return {
-    pendingShareCount,
     hasPendingShares,
     isLoading,
+    pendingShareCount,
   }
-}
+})

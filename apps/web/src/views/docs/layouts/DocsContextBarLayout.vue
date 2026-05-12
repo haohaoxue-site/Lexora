@@ -1,30 +1,35 @@
 <script setup lang="ts">
-import type {
-  DocsContextBarLayoutEmits,
-  DocsContextBarLayoutProps,
-} from './typing'
 import { computed } from 'vue'
 import DocumentShareStatusEntry from '../components/DocumentShareStatusEntry.vue'
+import { useActiveDocument } from '../composables/useActiveDocument'
+import { useDocsSurfaceState } from '../composables/useDocsSurfaceState'
 
-const props = defineProps<DocsContextBarLayoutProps>()
-const emits = defineEmits<DocsContextBarLayoutEmits>()
+const {
+  canReconnectCollaboration,
+  collaborationStatusHint,
+  collaborationStatusLabel,
+  collaborationStatusTone,
+  currentDocument,
+  reconnectCollaboration,
+} = useActiveDocument()
+const { currentSurface, isDocumentSurface, visibleBreadcrumbLabels } = useDocsSurfaceState()
 
 const surfaceContext = computed(() => {
-  if (props.currentSurface === 'pending-shares') {
+  if (currentSurface.value === 'pending-shares') {
     return {
       title: '待接收分享',
       description: '查看还未确认接收的分享',
     }
   }
 
-  if (props.currentSurface === 'permissions') {
+  if (currentSurface.value === 'permissions') {
     return {
       title: '权限管理',
       description: '查看当前空间内已开启分享的文档',
     }
   }
 
-  if (props.currentSurface === 'trash') {
+  if (currentSurface.value === 'trash') {
     return {
       title: '回收站',
       description: '',
@@ -36,12 +41,12 @@ const surfaceContext = computed(() => {
     description: '',
   }
 })
-const isSingleLine = computed(() => props.isDocumentSurface || !surfaceContext.value.description)
+const isSingleLine = computed(() => isDocumentSurface.value || !surfaceContext.value.description)
 const connectionStatusClass = computed(() =>
-  props.collaborationStatusTone ? `is-${props.collaborationStatusTone}` : null,
+  collaborationStatusTone.value ? `is-${collaborationStatusTone.value}` : null,
 )
 const connectionStatusTitle = computed(() =>
-  props.collaborationStatusHint || props.collaborationStatusLabel || undefined,
+  collaborationStatusHint.value || collaborationStatusLabel.value || undefined,
 )
 </script>
 
@@ -51,11 +56,11 @@ const connectionStatusTitle = computed(() =>
       class="docs-view-context__content"
       :class="{ 'is-single-line': isSingleLine }"
     >
-      <template v-if="props.isDocumentSurface">
+      <template v-if="isDocumentSurface">
         <div class="docs-view-context__breadcrumb-shell">
-          <ElBreadcrumb v-if="props.visibleBreadcrumbLabels.length" separator="/" class="docs-view-context__breadcrumb">
+          <ElBreadcrumb v-if="visibleBreadcrumbLabels.length" separator="/" class="docs-view-context__breadcrumb">
             <ElBreadcrumbItem
-              v-for="label in props.visibleBreadcrumbLabels"
+              v-for="label in visibleBreadcrumbLabels"
               :key="label"
             >
               <span class="truncate text-sm text-secondary">{{ label }}</span>
@@ -63,18 +68,18 @@ const connectionStatusTitle = computed(() =>
           </ElBreadcrumb>
 
           <button
-            v-if="props.collaborationStatusLabel && props.canReconnectCollaboration"
+            v-if="collaborationStatusLabel && canReconnectCollaboration"
             type="button"
             class="docs-view-context__connection-status is-actionable"
             :class="connectionStatusClass"
             :title="connectionStatusTitle"
-            @click="emits('reconnectCollaboration')"
+            @click="reconnectCollaboration"
           >
             <span class="docs-view-context__connection-dot" aria-hidden="true" />
           </button>
 
           <span
-            v-else-if="props.collaborationStatusLabel"
+            v-else-if="collaborationStatusLabel"
             class="docs-view-context__connection-status"
             :class="connectionStatusClass"
             :title="connectionStatusTitle"
@@ -95,13 +100,8 @@ const connectionStatusTitle = computed(() =>
       </template>
     </div>
 
-    <div v-if="props.isDocumentSurface && props.documentId" class="docs-view-context__actions">
-      <DocumentShareStatusEntry
-        :document-id="props.documentId"
-        :share="props.documentShare"
-        :can-open="props.canOpenShareDialog"
-        @open-share="emits('openShare', $event)"
-      />
+    <div v-if="isDocumentSurface && currentDocument?.id" class="docs-view-context__actions">
+      <DocumentShareStatusEntry />
     </div>
   </div>
 </template>

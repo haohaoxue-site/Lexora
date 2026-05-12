@@ -1,58 +1,70 @@
-import type { DocumentItemProps } from '../typing'
+import type { DocumentItem, DocumentTreeCollectionId } from '@haohaoxue/samepage-contracts'
 import { DOCUMENT_COLLECTION, WORKSPACE_TYPE } from '@haohaoxue/samepage-contracts'
 import { computed } from 'vue'
+import { useDocsContext } from './useDocsContext'
+import { useDocsHistoryState } from './useDocsHistoryState'
+import { useDocsPageActions } from './useDocsPageActions'
+import { useDocsShareDialog } from './useDocsShareDialog'
+import { useDocumentTree } from './useDocumentTree'
 
-export function useDocumentItem(
-  props: DocumentItemProps,
-  options: {
-    onDeleteDocument: (documentId: string) => void
-    onMoveDocumentToTeam: (documentId: string) => void
-    onOpen: (documentId: string) => void
-    onOpenHistory: (documentId: string) => void
-    onShareDocument: (documentId: string) => void
-    onToggle: (documentId: string) => void
-  },
-) {
-  const isActive = computed(() => props.activeDocumentId === props.item.id)
-  const isExpanded = computed(() => props.expandedDocumentIds.has(props.item.id))
+export interface UseDocumentItemOptions {
+  item: () => DocumentItem
+  collectionId: () => DocumentTreeCollectionId
+}
+
+export function useDocumentItem(options: UseDocumentItemOptions) {
+  const { activeDocumentId, currentWorkspaceType } = useDocsContext()
+  const tree = useDocumentTree()
+  const pageActions = useDocsPageActions()
+  const history = useDocsHistoryState()
+  const { canOpenShareDialog, openDocumentShareDialog } = useDocsShareDialog()
+
+  const item = computed(options.item)
+  const collectionId = computed(options.collectionId)
+  const isActive = computed(() => activeDocumentId.value === item.value.id)
+  const isExpanded = computed(() => tree.expandedDocumentIdSet.value.has(item.value.id))
   const canManageDocument = computed(() =>
-    props.collectionId !== DOCUMENT_COLLECTION.COLLABORATION,
+    collectionId.value !== DOCUMENT_COLLECTION.COLLABORATION,
   )
   const canMoveToTeam = computed(() =>
-    props.currentWorkspaceType === WORKSPACE_TYPE.TEAM
-    && props.collectionId === DOCUMENT_COLLECTION.PERSONAL
-    && props.item.parentId === null,
+    currentWorkspaceType.value === WORKSPACE_TYPE.TEAM
+    && collectionId.value === DOCUMENT_COLLECTION.PERSONAL
+    && item.value.parentId === null,
   )
   const canShareDocument = computed(() =>
-    canManageDocument.value && props.canShareDocument,
+    canManageDocument.value && canOpenShareDialog.value,
   )
 
   function openDocument() {
-    options.onOpen(props.item.id)
+    void pageActions.openDocument(item.value.id)
   }
 
   function toggleItem() {
-    if (!props.item.hasChildren) {
+    if (!item.value.hasChildren) {
       return
     }
 
-    options.onToggle(props.item.id)
+    tree.toggleDocument(item.value.id)
+  }
+
+  function createChild() {
+    void tree.createChildDocument(item.value.id)
   }
 
   function shareDocument() {
-    options.onShareDocument(props.item.id)
+    openDocumentShareDialog(item.value.id)
   }
 
   function moveDocumentToTeam() {
-    options.onMoveDocumentToTeam(props.item.id)
+    void pageActions.moveDocumentToTeam(item.value.id)
   }
 
   function openHistory() {
-    options.onOpenHistory(props.item.id)
+    void history.openDocumentHistory(item.value.id)
   }
 
   function deleteDocument() {
-    options.onDeleteDocument(props.item.id)
+    void tree.deleteDocument(item.value.id)
   }
 
   function handleMenuCommand(command: unknown) {
@@ -102,12 +114,16 @@ export function useDocumentItem(
 
   return {
     canManageDocument,
-    canShareDocument,
     canMoveToTeam,
+    canShareDocument,
+    createChild,
+    deleteDocument,
     getActionsStateClass,
     getExpandIconName,
     getItemStateClass,
     handleMenuCommand,
+    isActionPending: tree.isMutatingTree,
+    isActive,
     isExpanded,
     openDocument,
     toggleItem,

@@ -6,10 +6,10 @@ import type {
   DocumentVersionSnapshot,
   TiptapJsonContent,
 } from '@haohaoxue/samepage-contracts'
-import type { ComputedRef } from 'vue'
 import type {
   ActiveDocumentDetail,
   DocsDocumentCollaborationStatusTone,
+  DocumentShareChangedPayload,
 } from '../typing'
 import type {
   DocumentCurrent,
@@ -29,6 +29,7 @@ import {
   hasDocumentContent,
   hydrateDocumentAssetAttributes,
 } from '@haohaoxue/samepage-shared'
+import { createSharedComposable } from '@vueuse/core'
 import { ElMessage } from 'element-plus'
 import {
   computed,
@@ -44,7 +45,9 @@ import {
 } from '@/apis/document'
 import { useUserStore } from '@/stores/user'
 import dayjs from '@/utils/dayjs'
+import { useDocsContext } from './useDocsContext'
 import { useDocsDocumentCollabRuntime } from './useDocsDocumentCollabRuntime'
+import { useDocumentTree } from './useDocumentTree'
 
 const UNSUPPORTED_SCHEMA_VERSION_ERROR_CODE = 'DOCUMENT_UNSUPPORTED_SCHEMA_VERSION'
 
@@ -54,44 +57,22 @@ type UnsupportedSchemaVersionError = Error & {
   schemaVersion: unknown
 }
 
-/**
- * 当前文档组合参数。
- */
-interface UseActiveDocumentOptions {
-  activeDocumentId: ComputedRef<string | null>
-  ensureExpandedPath: (documentId: string | null) => void
-  patchDocumentItem: (documentId: string, input: Partial<DocumentItem>) => void
-  rememberLastOpenedDocument: (documentId: string) => void
-}
-
-/**
- * 当前文档状态组合参数。
- */
 interface UseActiveDocumentStateOptions {
   patchDocumentItem: (documentId: string, input: Partial<DocumentItem>) => void
 }
 
-/**
- * 当前文档保存态组合参数。
- */
 interface UseActiveDocumentSaveStateOptions {
   currentDocument: ReturnType<typeof shallowRef<ActiveDocumentDetail | null>>
 }
 
-/**
- * 恢复历史版本后的状态应用参数。
- */
 interface ApplyRestoredSnapshotOptions {
   documentAtRestoreStart: ActiveDocumentDetail
   restoreResponse: RestoreDocumentVersionSnapshotResponse
 }
 
-export function useActiveDocument({
-  activeDocumentId,
-  ensureExpandedPath,
-  patchDocumentItem,
-  rememberLastOpenedDocument,
-}: UseActiveDocumentOptions) {
+export const useActiveDocument = createSharedComposable(() => {
+  const { activeDocumentId, pendingTitleFocusDocumentId } = useDocsContext()
+  const { ensureExpandedPath, loadTree, patchDocumentItem, rememberLastOpenedDocument } = useDocumentTree()
   const userStore = useUserStore()
   const isDocumentItemLoading = shallowRef(false)
   const isSnapshotsLoading = shallowRef(false)
@@ -130,6 +111,7 @@ export function useActiveDocument({
     Boolean(state.currentDocument.value)
     && (collaboration.connectionStatus.value === 'disconnected' || collaboration.connectionStatus.value === 'error'),
   )
+
   function updateDocumentTitle(title: TiptapJsonContent) {
     state.updateDocumentTitle(title)
   }
@@ -331,12 +313,42 @@ export function useActiveDocument({
     return requestId === snapshotRequestId && activeDocumentId.value === documentId
   }
 
+  function markTitleAutofocusApplied() {
+    if (state.currentDocument.value?.id !== pendingTitleFocusDocumentId.value) {
+      return
+    }
+
+    pendingTitleFocusDocumentId.value = null
+  }
+
+  function applyDocumentShareChanged(payload: DocumentShareChangedPayload) {
+    patchDocumentItem(payload.documentId, {
+      share: payload.share,
+    })
+    state.patchDocumentShare(payload.documentId, payload.share)
+    void loadTree({
+      silent: true,
+    })
+  }
+
   watch(
     activeDocumentId,
     async (nextDocumentId) => {
       await loadCurrentDocument(nextDocumentId)
     },
     { immediate: true },
+  )
+
+  watch(
+    activeDocumentId,
+    (nextDocumentId) => {
+      if (
+        pendingTitleFocusDocumentId.value
+        && nextDocumentId !== pendingTitleFocusDocumentId.value
+      ) {
+        pendingTitleFocusDocumentId.value = null
+      }
+    },
   )
 
   watch(
@@ -366,33 +378,35 @@ export function useActiveDocument({
   )
 
   return {
-    currentDocument: state.currentDocument,
-    snapshots: state.snapshots,
-    isDocumentItemLoading,
-    isSnapshotsLoading,
-    isSaving: state.isSaving,
-    isRestoringSnapshot: state.isRestoringSnapshot,
-    saveState: state.saveState,
-    saveStateLabel: state.saveStateLabel,
-    documentErrorState: state.documentErrorState,
-    isCollaborationReadonly,
-    isCollaborationInitialSyncing,
+    applyDocumentShareChanged,
+    canReconnectCollaboration,
+    collaboration: collaboration.bindings,
     collaborationConnectionStatus: collaboration.connectionStatus,
+    collaborationStatusHint,
     collaborationStatusLabel,
     collaborationStatusTone,
-    collaborationStatusHint,
-    canReconnectCollaboration,
     confirmNavigation,
+    currentDocument: state.currentDocument,
+    documentErrorState: state.documentErrorState,
     ensureSnapshotsLoaded,
-    reloadCurrentDocument,
-    reconnectCollaboration,
+    isCollaborationInitialSyncing,
+    isCollaborationReadonly,
+    isDocumentItemLoading,
+    isRestoringSnapshot: state.isRestoringSnapshot,
+    isSaving: state.isSaving,
+    isSnapshotsLoading,
+    markTitleAutofocusApplied,
     patchDocumentShare: state.patchDocumentShare,
-    collaboration: collaboration.bindings,
+    reconnectCollaboration,
+    reloadCurrentDocument,
     restoreSnapshot,
-    updateDocumentTitle,
+    saveState: state.saveState,
+    saveStateLabel: state.saveStateLabel,
+    snapshots: state.snapshots,
     updateDocumentContent,
+    updateDocumentTitle,
   }
-}
+})
 
 export function useActiveDocumentState({
   patchDocumentItem,
@@ -535,29 +549,29 @@ export function useActiveDocumentState({
   }
 
   return {
-    currentDocument,
-    snapshots,
-    isSaving,
-    isRestoringSnapshot,
-    loadedSnapshotsDocumentId,
-    saveState: save.saveState,
-    saveStateLabel: save.saveStateLabel,
-    documentErrorState,
-    updateDocumentTitle,
-    updateDocumentContent,
-    syncRuntimeProjection,
     applyLoadedDocument,
     applyLoadedSnapshots,
-    patchDocumentShare,
-    startRestore,
-    finishRestore,
     applyRestoredSnapshot,
+    currentDocument,
+    documentErrorState,
+    finishRestore,
+    isRestoringSnapshot,
+    isSaving,
+    loadedSnapshotsDocumentId,
+    patchDocumentShare,
     resetCurrentDocument,
+    saveState: save.saveState,
+    saveStateLabel: save.saveStateLabel,
     setDocumentErrorState,
+    snapshots,
+    startRestore,
+    syncRuntimeProjection,
+    updateDocumentContent,
+    updateDocumentTitle,
   }
 }
 
-export function useActiveDocumentSaveState({
+function useActiveDocumentSaveState({
   currentDocument,
 }: UseActiveDocumentSaveStateOptions) {
   const saveState = shallowRef<DocumentSaveState>(DOCUMENT_SAVE_STATE.IDLE)
@@ -587,11 +601,11 @@ export function useActiveDocumentSaveState({
   }
 
   return {
-    saveState,
-    saveStateLabel,
     captureLoadedDocument,
     markSaved,
     reset,
+    saveState,
+    saveStateLabel,
   }
 }
 

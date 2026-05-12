@@ -1,16 +1,12 @@
 import type {
-  DocumentItem,
   DocumentPaneState,
   DocumentRecord,
   DocumentRevision,
   DocumentShareProjection,
   DocumentShareRecipientSummary,
-  DocumentTreeCollectionId,
-  DocumentTreeGroup,
   DocumentVersionSnapshot,
   TiptapJsonContent,
   TiptapSchemaVersion,
-  WorkspaceType,
 } from '@haohaoxue/samepage-contracts'
 import type {
   TiptapEditorCollaborationBinding,
@@ -150,23 +146,6 @@ export interface DocsDocumentEditorFallbackEmits {
 }
 
 /**
- * 文档历史面板属性。
- */
-export interface DocumentHistoryPanelProps {
-  document: ActiveDocumentDetail | null
-  snapshots: DocumentVersionSnapshot[]
-  selectedSnapshotId: string | null
-  isLoading: boolean
-}
-
-/**
- * 文档历史面板事件。
- */
-export interface DocumentHistoryPanelEmits {
-  select: [snapshotId: string]
-}
-
-/**
  * 文档历史条目。
  */
 export interface DocumentHistoryEntry {
@@ -198,95 +177,6 @@ export interface DocumentHistorySection {
   id: string
   label: string
   groups: DocumentHistoryGroup[]
-}
-
-/**
- * 文档树工具栏属性。
- */
-export interface DocumentToolbarProps {
-  isBusy: boolean
-  collectionId: DocumentTreeCollectionId
-}
-
-/**
- * 文档树工具栏事件。
- */
-export interface DocumentToolbarEmits {
-  createRoot: [collectionId: DocumentTreeCollectionId]
-}
-
-/**
- * 文档分组面板属性。
- */
-export interface DocumentSectionPanelProps {
-  group: DocumentTreeGroup
-  currentWorkspaceType: WorkspaceType
-  activeDocumentId: string | null
-  expandedDocumentIds: Set<string>
-  isCollapsed: boolean
-  isActionPending: boolean
-  canShareDocument: boolean
-  canCreateRoot?: boolean
-}
-
-/**
- * 文档分组面板事件。
- */
-export interface DocumentSectionPanelEmits {
-  open: [documentId: string]
-  toggle: [documentId: string]
-  toggleCollapse: [collectionId: DocumentTreeCollectionId]
-  createRoot: [collectionId: DocumentTreeCollectionId]
-  createChild: [documentId: string]
-  openHistory: [documentId: string]
-  moveDocumentToTeam: [documentId: string]
-  shareDocument: [documentId: string]
-  deleteDocument: [documentId: string]
-}
-
-/**
- * 文档树条目属性。
- */
-export interface DocumentItemProps {
-  item: DocumentItem
-  collectionId: DocumentTreeCollectionId
-  currentWorkspaceType: WorkspaceType
-  depth: number
-  activeDocumentId: string | null
-  expandedDocumentIds: Set<string>
-  isActionPending: boolean
-  canShareDocument: boolean
-}
-
-/**
- * 文档树条目事件。
- */
-export interface DocumentItemEmits {
-  open: [documentId: string]
-  toggle: [documentId: string]
-  createChild: [documentId: string]
-  openHistory: [documentId: string]
-  moveDocumentToTeam: [documentId: string]
-  shareDocument: [documentId: string]
-  deleteDocument: [documentId: string]
-}
-
-/**
- * 文档删除弹窗属性。
- */
-export interface DocumentDeleteDialogProps {
-  modelValue: boolean
-  documentTitle: string
-  actionKind: DocumentDeleteAction | null
-}
-
-/**
- * 文档删除弹窗事件。
- */
-export interface DocumentDeleteDialogEmits {
-  'update:modelValue': [value: boolean]
-  'delete': []
-  'permanentlyDelete': []
 }
 
 /**

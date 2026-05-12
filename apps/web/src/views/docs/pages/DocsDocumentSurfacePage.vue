@@ -1,28 +1,55 @@
 <script setup lang="ts">
-import type { DocsDocumentSurfacePageEmits, DocsDocumentSurfacePageProps } from './typing'
+import { computed } from 'vue'
 import DocsDocumentEditorPane from '../components/DocsDocumentEditorPane.vue'
+import { useActiveDocument } from '../composables/useActiveDocument'
+import { useDocsContext } from '../composables/useDocsContext'
+import { useDocsHistoryState } from '../composables/useDocsHistoryState'
+import { useDocsPageActions } from '../composables/useDocsPageActions'
 
-const props = defineProps<DocsDocumentSurfacePageProps>()
-const emits = defineEmits<DocsDocumentSurfacePageEmits>()
+import { useDocsSurfaceState } from '../composables/useDocsSurfaceState'
+
+const { activeBlockId, handleRequestComment, pendingTitleFocusDocumentId } = useDocsContext()
+const {
+  collaboration,
+  currentDocument,
+  isDocumentItemLoading,
+  markTitleAutofocusApplied,
+  reloadCurrentDocument,
+  updateDocumentContent,
+  updateDocumentTitle,
+} = useActiveDocument()
+const { docsDocumentEditorMode, isDocsDocumentEditable } = useDocsHistoryState()
+const {
+  documentPaneState,
+  hasVisibleFallbackDocument: hasFallbackDocument,
+  isDocumentSurface,
+} = useDocsSurfaceState()
+const { createRootDocument, openDefaultDocument } = useDocsPageActions()
+
+const shouldAutofocusTitle = computed(() =>
+  docsDocumentEditorMode.value === 'default'
+  && isDocumentSurface.value
+  && currentDocument.value?.id === pendingTitleFocusDocumentId.value,
+)
 </script>
 
 <template>
   <DocsDocumentEditorPane
-    :document="props.document"
-    :mode="props.mode"
-    :editable="props.editable"
-    :autofocus-title="props.autofocusTitle"
-    :collaboration="props.collaboration ?? null"
-    :active-block-id="props.activeBlockId"
-    :is-loading="props.isLoading"
-    :pane-state="props.paneState"
-    :has-fallback-document="props.hasFallbackDocument"
-    @update-title="emits('updateTitle', $event)"
-    @update-content="emits('updateContent', $event)"
-    @request-comment="emits('requestComment', $event)"
-    @title-autofocus-applied="emits('titleAutofocusApplied')"
-    @create-document="emits('createDocument')"
-    @open-fallback-document="emits('openFallbackDocument')"
-    @retry-load="emits('retryLoad')"
+    :document="currentDocument"
+    :mode="docsDocumentEditorMode"
+    :editable="isDocsDocumentEditable"
+    :autofocus-title="shouldAutofocusTitle"
+    :collaboration="collaboration"
+    :active-block-id="activeBlockId"
+    :is-loading="isDocumentItemLoading"
+    :pane-state="documentPaneState"
+    :has-fallback-document="hasFallbackDocument"
+    @update-title="updateDocumentTitle"
+    @update-content="updateDocumentContent"
+    @request-comment="handleRequestComment"
+    @title-autofocus-applied="markTitleAutofocusApplied"
+    @create-document="createRootDocument()"
+    @open-fallback-document="openDefaultDocument()"
+    @retry-load="reloadCurrentDocument"
   />
 </template>

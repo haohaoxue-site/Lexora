@@ -1,10 +1,5 @@
-import type { DocumentVersionSnapshot } from '@haohaoxue/samepage-contracts'
+import type { ComputedRef, ShallowRef } from 'vue'
 import type {
-  ComputedRef,
-  MaybeRefOrGetter,
-} from 'vue'
-import type {
-  ActiveDocumentDetail,
   DocumentHistoryEntry,
   DocumentHistoryGroup,
   DocumentHistorySection,
@@ -12,65 +7,51 @@ import type {
 import {
   computed,
   shallowRef,
-  toValue,
   watch,
 } from 'vue'
 import {
   buildDocumentHistorySections,
   getDocumentHistoryEntryDetail,
 } from '../utils/documentHistory'
+import { useActiveDocument } from './useActiveDocument'
+import { useDocsHistoryState } from './useDocsHistoryState'
 
-/**
- * 文档历史面板组合参数。
- */
-interface UseDocumentHistoryPanelOptions {
-  document: MaybeRefOrGetter<ActiveDocumentDetail | null>
-  snapshots: MaybeRefOrGetter<DocumentVersionSnapshot[]>
-  selectedSnapshotId: MaybeRefOrGetter<string | null>
-  onSelect: (snapshotId: string) => void
-}
-
-/**
- * 文档历史分组展开态组合参数。
- */
 interface UseDocumentHistoryGroupStateOptions {
   historySections: ComputedRef<DocumentHistorySection[]>
-  selectedSnapshotId: MaybeRefOrGetter<string | null>
+  selectedSnapshotId: ShallowRef<string | null>
 }
 
-export function useDocumentHistoryPanel({
-  document,
-  snapshots,
-  selectedSnapshotId,
-  onSelect,
-}: UseDocumentHistoryPanelOptions) {
-  const hasDocument = computed(() => Boolean(toValue(document)))
+export function useDocumentHistoryPanel() {
+  const { currentDocument, snapshots } = useActiveDocument()
+  const { selectedHistorySnapshotId, selectHistorySnapshot } = useDocsHistoryState()
+
+  const hasDocument = computed(() => Boolean(currentDocument.value))
   const historySections = computed(() => buildDocumentHistorySections({
-    document: toValue(document),
-    snapshots: toValue(snapshots),
+    document: currentDocument.value,
+    snapshots: snapshots.value,
   }))
   const groups = useDocumentHistoryGroupState({
     historySections,
-    selectedSnapshotId,
+    selectedSnapshotId: selectedHistorySnapshotId,
   })
 
   function selectEntry(snapshotId: string) {
-    onSelect(snapshotId)
+    selectHistorySnapshot(snapshotId)
     groups.expandGroupBySnapshotId(snapshotId)
   }
 
   function isEntrySelected(entry: DocumentHistoryEntry) {
-    return toValue(selectedSnapshotId) === entry.snapshotId
+    return selectedHistorySnapshotId.value === entry.snapshotId
   }
 
   return {
     hasDocument,
     historySections,
+    isEntrySelected,
     isGroupExpanded: groups.isGroupExpanded,
+    resolveEntryDetail,
     selectEntry,
     toggleGroup: groups.toggleGroup,
-    isEntrySelected,
-    resolveEntryDetail,
   }
 }
 
@@ -81,7 +62,7 @@ function useDocumentHistoryGroupState({
   const expandedGroupState = shallowRef<Record<string, boolean>>({})
 
   watch(
-    [historySections, () => toValue(selectedSnapshotId)],
+    [historySections, selectedSnapshotId],
     ([nextSections, nextSelectedSnapshotId]) => {
       const nextExpandedState = buildExpandedGroupState(nextSections, expandedGroupState.value)
 
@@ -123,9 +104,9 @@ function useDocumentHistoryGroupState({
   }
 
   return {
-    toggleGroup,
     expandGroupBySnapshotId,
     isGroupExpanded,
+    toggleGroup,
   }
 }
 

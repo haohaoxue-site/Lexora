@@ -1,55 +1,47 @@
-import type {
-  DocumentVersionSnapshot,
-} from '@haohaoxue/samepage-contracts'
-import type { ComputedRef, ShallowRef } from 'vue'
-import type { ActiveDocumentDetail } from '../typing'
+import type { DocumentVersionSnapshot } from '@haohaoxue/samepage-contracts'
 import { isSameDocumentVersionSnapshotContent } from '@haohaoxue/samepage-shared'
+import { createSharedComposable } from '@vueuse/core'
 import { computed, shallowRef, watch } from 'vue'
 import {
   buildHistoryPreviewDocument,
   resolveDefaultHistorySnapshotId,
 } from '../utils/documentEditor'
+import { useActiveDocument } from './useActiveDocument'
+import { useDocsContext } from './useDocsContext'
 
-/**
- * 文档历史态组合参数。
- */
-interface UseDocsHistoryStateOptions {
-  activeDocumentId: ComputedRef<string | null>
-  currentDocument: ShallowRef<ActiveDocumentDetail | null>
-  snapshots: ShallowRef<DocumentVersionSnapshot[]>
-  isRestoringSnapshot: ShallowRef<boolean>
-  ensureSnapshotsLoaded: () => Promise<void>
-  restoreSnapshot: (snapshotId: string) => Promise<void>
-}
+export const useDocsHistoryState = createSharedComposable(() => {
+  const { activeDocumentId, pendingHistoryDocumentId, navigateToDocument } = useDocsContext()
+  const activeDocument = useActiveDocument()
 
-export function useDocsHistoryState({
-  activeDocumentId,
-  currentDocument,
-  snapshots,
-  isRestoringSnapshot,
-  ensureSnapshotsLoaded,
-  restoreSnapshot,
-}: UseDocsHistoryStateOptions) {
   const isHistoryMode = shallowRef(false)
   const selectedHistorySnapshotId = shallowRef<string | null>(null)
+
   const currentLatestSnapshot = computed(() =>
-    resolveSnapshotById(snapshots.value, currentDocument.value?.latestVersionSnapshotId ?? null),
+    resolveSnapshotById(
+      activeDocument.snapshots.value,
+      activeDocument.currentDocument.value?.latestVersionSnapshotId ?? null,
+    ),
   )
   const selectedHistorySnapshot = computed(() =>
-    resolveSnapshotById(snapshots.value, selectedHistorySnapshotId.value),
+    resolveSnapshotById(activeDocument.snapshots.value, selectedHistorySnapshotId.value),
   )
   const previewDocument = computed(() => buildHistoryPreviewDocument({
-    document: currentDocument.value,
+    document: activeDocument.currentDocument.value,
     snapshot: isHistoryMode.value ? selectedHistorySnapshot.value : null,
   }))
   const docsDocumentEditorMode = computed(() => isHistoryMode.value ? 'history' : 'default')
+  const isDocsDocumentEditable = computed(() =>
+    docsDocumentEditorMode.value === 'default'
+    && !activeDocument.isCollaborationReadonly.value
+    && !activeDocument.isCollaborationInitialSyncing.value,
+  )
   const isSelectedSnapshotCurrentContent = computed(() => {
     if (!selectedHistorySnapshot.value) {
       return false
     }
 
     if (!currentLatestSnapshot.value) {
-      return currentDocument.value?.latestVersionSnapshotId === selectedHistorySnapshot.value.id
+      return activeDocument.currentDocument.value?.latestVersionSnapshotId === selectedHistorySnapshot.value.id
     }
 
     return isSameDocumentVersionSnapshotContent(currentLatestSnapshot.value, selectedHistorySnapshot.value)
@@ -57,11 +49,11 @@ export function useDocsHistoryState({
   const canRestoreSelectedSnapshot = computed(() =>
     Boolean(selectedHistorySnapshot.value)
     && !isSelectedSnapshotCurrentContent.value
-    && !isRestoringSnapshot.value,
+    && !activeDocument.isRestoringSnapshot.value,
   )
 
   watch(
-    [currentDocument, snapshots],
+    [() => activeDocument.currentDocument.value, () => activeDocument.snapshots.value],
     ([nextDocument, nextSnapshots]) => {
       selectedHistorySnapshotId.value = resolveDefaultHistorySnapshotId({
         document: nextDocument,
@@ -83,28 +75,28 @@ export function useDocsHistoryState({
     },
   )
 
-  return {
-    previewDocument,
-    docsDocumentEditorMode,
-    isHistoryMode,
-    selectedHistorySnapshotId,
-    canRestoreSelectedSnapshot,
-    openHistoryMode,
-    closeHistoryMode,
-    selectHistorySnapshot,
-    restoreSelectedSnapshot,
-  }
+  watch(
+    [
+      pendingHistoryDocumentId,
+      activeDocumentId,
+      () => activeDocument.currentDocument.value?.id ?? null,
+      activeDocument.isDocumentItemLoading,
+    ],
+    () => {
+      void openPendingDocumentHistory()
+    },
+  )
 
   async function openHistoryMode() {
-    if (!currentDocument.value) {
+    if (!activeDocument.currentDocument.value) {
       return
     }
 
     isHistoryMode.value = true
-    await ensureSnapshotsLoaded()
+    await activeDocument.ensureSnapshotsLoaded()
     selectedHistorySnapshotId.value = resolveDefaultHistorySnapshotId({
-      document: currentDocument.value,
-      snapshots: snapshots.value,
+      document: activeDocument.currentDocument.value,
+      snapshots: activeDocument.snapshots.value,
       currentSelectedSnapshotId: selectedHistorySnapshotId.value,
     })
   }
@@ -122,14 +114,76 @@ export function useDocsHistoryState({
       return
     }
 
-    await restoreSnapshot(selectedHistorySnapshotId.value)
+    await activeDocument.restoreSnapshot(selectedHistorySnapshotId.value)
     selectedHistorySnapshotId.value = resolveDefaultHistorySnapshotId({
-      document: currentDocument.value,
-      snapshots: snapshots.value,
-      currentSelectedSnapshotId: currentDocument.value?.latestVersionSnapshotId ?? null,
+      document: activeDocument.currentDocument.value,
+      snapshots: activeDocument.snapshots.value,
+      currentSelectedSnapshotId: activeDocument.currentDocument.value?.latestVersionSnapshotId ?? null,
     })
   }
-}
+
+  async function openDocumentHistory(documentId: string) {
+    if (
+      activeDocument.currentDocument.value?.id === documentId
+      && !activeDocument.isDocumentItemLoading.value
+    ) {
+      await openHistoryMode()
+      return
+    }
+
+    const isCurrentRouteDocument = activeDocumentId.value === documentId
+    const didNavigate = isCurrentRouteDocument || await navigateToDocument(documentId)
+
+    if (!didNavigate) {
+      pendingHistoryDocumentId.value = null
+      return
+    }
+
+    pendingHistoryDocumentId.value = documentId
+    await openPendingDocumentHistory()
+  }
+
+  async function openPendingDocumentHistory() {
+    const pendingDocumentId = pendingHistoryDocumentId.value
+
+    if (!pendingDocumentId) {
+      return
+    }
+
+    if (
+      activeDocumentId.value
+      && activeDocumentId.value !== pendingDocumentId
+      && !activeDocument.isDocumentItemLoading.value
+    ) {
+      pendingHistoryDocumentId.value = null
+      return
+    }
+
+    if (
+      activeDocument.isDocumentItemLoading.value
+      || activeDocument.currentDocument.value?.id !== pendingDocumentId
+    ) {
+      return
+    }
+
+    pendingHistoryDocumentId.value = null
+    await openHistoryMode()
+  }
+
+  return {
+    canRestoreSelectedSnapshot,
+    closeHistoryMode,
+    docsDocumentEditorMode,
+    isDocsDocumentEditable,
+    isHistoryMode,
+    openDocumentHistory,
+    openHistoryMode,
+    previewDocument,
+    restoreSelectedSnapshot,
+    selectedHistorySnapshotId,
+    selectHistorySnapshot,
+  }
+})
 
 function resolveSnapshotById(snapshots: DocumentVersionSnapshot[], snapshotId: string | null) {
   if (!snapshotId) {

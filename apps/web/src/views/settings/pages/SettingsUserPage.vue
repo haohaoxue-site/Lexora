@@ -1,45 +1,94 @@
 <script setup lang="ts">
-import { useTemplateRef } from 'vue'
+import { nextTick, onMounted, shallowRef, useTemplateRef } from 'vue'
+import { useUserStore } from '@/stores/user'
+import { getRequestErrorDisplayMessage } from '@/utils/request-error'
 import UserAccountSection from '../components/UserAccountSection.vue'
 import UserDeleteSection from '../components/UserDeleteSection.vue'
 import UserProfileSection from '../components/UserProfileSection.vue'
-import { useUser } from '../composables/useUser'
+import { useSettingsAuthCapabilities } from '../composables/useSettingsAuthCapabilities'
+import { useSettingsUserAccount } from '../composables/useSettingsUserAccount'
+import { useSettingsUserDelete } from '../composables/useSettingsUserDelete'
+import { useSettingsUserProfile } from '../composables/useSettingsUserProfile'
 
+const userStore = useUserStore()
 const userAccountSectionRef = useTemplateRef<{ clearEmailValidation: () => void }>('userAccountSectionRef')
+
+const { loadAuthCapabilities } = useSettingsAuthCapabilities()
+const {
+  avatarUrl,
+  canEditDisplayName,
+  isSavingDisplayName,
+  isUploadingAvatar,
+  profileForm,
+  saveDisplayName,
+  syncProfileForm,
+  uploadAvatar,
+} = useSettingsUserProfile()
 const {
   account,
-  avatarUrl,
+  bindEmail,
   bindingProvider,
   canDisconnectGithub,
   canDisconnectLinuxDo,
   canStartGithubBinding,
   canStartLinuxDoBinding,
+  connectOauth,
+  consumeRouteFeedback,
+  disconnectOauth,
+  disconnectingProvider,
+  emailBindingEnabled,
+  emailForm,
+  isBindingEmail,
+  isSendingEmailCode,
+  sendEmailCode,
+  syncEmailForm,
+} = useSettingsUserAccount()
+const {
   deleteAccount,
   deleteAccountConfirmationMode,
   deleteAccountConfirmationPhrase,
   deleteAccountConfirmationTarget,
-  disconnectingProvider,
-  emailBindingEnabled,
-  emailForm,
-  errorMessage,
-  isBindingEmail,
   isDeletingAccount,
-  isLoading,
-  isSavingDisplayName,
-  isSendingEmailCode,
-  isUploadingAvatar,
-  profileForm,
-  handleConfirmEmail,
-  saveDisplayName,
-  sendEmailCode,
   shouldShowDeleteAccountSection,
-  canEditDisplayName,
-  connectOauth,
-  disconnectOauth,
-  uploadAvatar,
-} = useUser({
-  userAccountSectionRef,
-})
+} = useSettingsUserDelete()
+
+const isLoading = shallowRef(false)
+const errorMessage = shallowRef('')
+
+onMounted(loadView)
+
+async function loadView() {
+  isLoading.value = true
+  errorMessage.value = ''
+
+  try {
+    await Promise.all([
+      userStore.refreshContext(),
+      loadAuthCapabilities(),
+    ])
+
+    syncProfileForm()
+    syncEmailForm()
+    await consumeRouteFeedback()
+  }
+  catch (error) {
+    errorMessage.value = getRequestErrorDisplayMessage(error, '加载用户设置失败')
+  }
+  finally {
+    isLoading.value = false
+  }
+}
+
+async function handleConfirmEmail() {
+  const isSuccess = await bindEmail()
+
+  if (!isSuccess) {
+    return
+  }
+
+  await nextTick()
+  userAccountSectionRef.value?.clearEmailValidation()
+}
 </script>
 
 <template>

@@ -12,42 +12,25 @@ import {
 import { formatAuthMethod } from '@haohaoxue/samepage-shared'
 import { computed } from 'vue'
 import { formatDateTime } from '@/utils/dayjs'
+import { useSystemUsers } from '../composables/useSystemUsers'
 import UserIdentityCell from './UserIdentityCell.vue'
-
-/**
- * 用户表格属性。
- */
-interface UserTableProps {
-  users: SystemAdminUserItem[]
-  total: number
-  pageNo: number
-  pageSize: number
-  loading: boolean
-  keyword: string
-  statusFilter: SystemAdminUserStatus | null
-  roleFilter: SystemAdminUserRoleFilter | null
-  updatingUserId: string | null
-}
-
-/**
- * 用户表格事件。
- */
-interface UserTableEmits {
-  updateKeyword: [keyword: string]
-  search: []
-  updateFilters: [filters: {
-    status: SystemAdminUserStatus | null
-    role: SystemAdminUserRoleFilter | null
-  }]
-  updatePageNo: [pageNo: number]
-  updatePageSize: [pageSize: number]
-  toggleStatus: [user: SystemAdminUserItem, nextStatus: SystemAdminUserStatus]
-}
 
 type UserTableFilterMap = Partial<Record<'status' | 'role', Array<string | number | boolean>>>
 
-const props = defineProps<UserTableProps>()
-const emits = defineEmits<UserTableEmits>()
+const {
+  isLoadingUsers,
+  keywordInput,
+  submitSearch,
+  toggleUserStatus,
+  totalUsers,
+  updateFilters,
+  updateKeyword,
+  updatePageNo,
+  updatePageSize,
+  updatingUserId,
+  userQuery,
+  users,
+} = useSystemUsers()
 
 const statusColumnFilters = [
   {
@@ -71,8 +54,8 @@ const roleColumnFilters = [
   },
 ] satisfies Array<{ text: string, value: SystemAdminUserRoleFilter }>
 
-const filteredStatusValues = computed(() => props.statusFilter ? [props.statusFilter] : [])
-const filteredRoleValues = computed(() => props.roleFilter ? [props.roleFilter] : [])
+const filteredStatusValues = computed(() => userQuery.status ? [userQuery.status] : [])
+const filteredRoleValues = computed(() => userQuery.role ? [userQuery.role] : [])
 
 function formatDate(value: string | null) {
   if (!value) {
@@ -104,10 +87,14 @@ function handleFilterChange(filters: UserTableFilterMap) {
     ? filters.role[0] as SystemAdminUserRoleFilter
     : null
 
-  emits('updateFilters', {
+  updateFilters({
     status: nextStatus,
     role: nextRole,
   })
+}
+
+function handleToggleStatus(user: SystemAdminUserItem) {
+  void toggleUserStatus(user, resolveNextStatus(user.status))
 }
 </script>
 
@@ -115,22 +102,22 @@ function handleFilterChange(filters: UserTableFilterMap) {
   <div class="user-table__surface overflow-hidden border border-border-a80 bg-surface">
     <div class="user-table__toolbar flex items-center justify-between gap-3 border-b border-border-a80 px-5 py-4">
       <ElInput
-        :model-value="props.keyword"
+        :model-value="keywordInput"
         clearable
         placeholder="搜索名称、邮箱或协作码"
         class="min-w-0 max-w-96"
-        @update:model-value="emits('updateKeyword', $event)"
-        @keyup.enter="emits('search')"
+        @update:model-value="updateKeyword"
+        @keyup.enter="submitSearch"
       />
 
-      <ElButton type="primary" :loading="props.loading" @click="emits('search')">
+      <ElButton type="primary" :loading="isLoadingUsers" @click="submitSearch">
         查询
       </ElButton>
     </div>
 
     <ElTable
-      v-loading="props.loading"
-      :data="props.users"
+      v-loading="isLoadingUsers"
+      :data="users"
       row-key="id" stripe border
       class="admin-table user-table"
       @filter-change="handleFilterChange"
@@ -231,8 +218,8 @@ function handleFilterChange(filters: UserTableFilterMap) {
               v-if="!row.isSystemAdmin"
               link
               :type="row.status === USER_STATUS.ACTIVE ? 'danger' : 'success'"
-              :disabled="props.updatingUserId === row.id"
-              @click="emits('toggleStatus', row, resolveNextStatus(row.status))"
+              :disabled="updatingUserId === row.id"
+              @click="handleToggleStatus(row)"
             >
               {{ row.status === USER_STATUS.ACTIVE ? '禁用' : '激活' }}
             </ElButton>
@@ -243,14 +230,14 @@ function handleFilterChange(filters: UserTableFilterMap) {
 
     <div class="user-table__pagination flex justify-end border-t border-border-a80 bg-fill-lighter/55 px-5 py-4">
       <ElPagination
-        :current-page="props.pageNo"
-        :page-size="props.pageSize"
+        :current-page="userQuery.pageNo"
+        :page-size="userQuery.pageSize ?? 20"
         :page-sizes="[10, 20, 50, 100]"
-        :total="props.total"
+        :total="totalUsers"
         background
         layout="total, sizes, prev, pager, next"
-        @current-change="emits('updatePageNo', $event)"
-        @size-change="emits('updatePageSize', $event)"
+        @current-change="updatePageNo"
+        @size-change="updatePageSize"
       />
     </div>
   </div>

@@ -1,69 +1,55 @@
-import type { DocumentTreeCollectionId, WorkspaceType } from '@haohaoxue/samepage-contracts'
-import type { ComputedRef, ShallowRef } from 'vue'
-import type { useActiveDocument } from './useActiveDocument'
-import type { useDocsSurfaceState } from './useDocsSurfaceState'
-import type { useDocumentTree } from './useDocumentTree'
+import type { DocumentTreeCollectionId } from '@haohaoxue/samepage-contracts'
 import {
   DOCUMENT_COLLECTION,
   DOCUMENT_PANE_STATE,
   DOCUMENT_VISIBILITY,
   WORKSPACE_TYPE,
 } from '@haohaoxue/samepage-contracts'
+import { createSharedComposable } from '@vueuse/core'
 import { ElMessage } from 'element-plus'
 import { watch } from 'vue'
-import { onBeforeRouteLeave, onBeforeRouteUpdate } from 'vue-router'
+import { useRouter } from 'vue-router'
 import { patchDocumentMeta as patchDocumentMetaRequest } from '@/apis/document'
+import { useActiveDocument } from './useActiveDocument'
+import { useDocsContext } from './useDocsContext'
+import { useDocsShareDialog } from './useDocsShareDialog'
+import { useDocsSurfaceState } from './useDocsSurfaceState'
+import { useDocumentTree } from './useDocumentTree'
 
-/**
- * 文档页动作组合参数。
- */
-interface UseDocsPageActionsOptions {
-  activeDocumentId: ComputedRef<string | null>
-  currentWorkspaceId: ComputedRef<string | null>
-  currentWorkspaceType: ComputedRef<WorkspaceType>
-  isSelectingInitialDocument: ShallowRef<boolean>
-  tree: Pick<
-    ReturnType<typeof useDocumentTree>,
-    'activeCollectionId' | 'createRootDocument' | 'loadTree'
-  >
-  activeDocument: Pick<
-    ReturnType<typeof useActiveDocument>,
-    'confirmNavigation' | 'currentDocument' | 'isDocumentItemLoading' | 'reloadCurrentDocument'
-  >
-  surfaceState: Pick<
-    ReturnType<typeof useDocsSurfaceState>,
-    'documentPaneState' | 'isDocumentSurface' | 'visibleActiveCollectionId' | 'visibleDefaultDocumentId'
-  >
-  navigateToDocument: (
-    documentId: string | null,
-    options?: {
-      replace?: boolean
-      skipConfirm?: boolean
-    },
-  ) => Promise<boolean>
-}
+export const useDocsPageActions = createSharedComposable(() => {
+  const router = useRouter()
+  const {
+    activeDocumentId,
+    currentWorkspaceId,
+    currentWorkspaceType,
+    isSelectingInitialDocument,
+    navigateToDocument,
+  } = useDocsContext()
+  const tree = useDocumentTree()
+  const activeDocument = useActiveDocument()
+  const surfaceState = useDocsSurfaceState()
+  const { canOpenShareDialog } = useDocsShareDialog()
 
-export function useDocsPageActions(options: UseDocsPageActionsOptions) {
   let lastInaccessibleRedirectDocumentId: string | null = null
 
   watch(
-    options.currentWorkspaceId,
+    currentWorkspaceId,
     async (nextWorkspaceId, previousWorkspaceId) => {
       if (nextWorkspaceId === previousWorkspaceId) {
         return
       }
 
-      await options.tree.loadTree()
+      await tree.loadTree()
 
       if (
-        !options.surfaceState.isDocumentSurface.value
+        !surfaceState.isDocumentSurface.value
         || !nextWorkspaceId
-        || options.activeDocumentId.value === options.surfaceState.visibleDefaultDocumentId.value
+        || activeDocumentId.value === surfaceState.visibleDefaultDocumentId.value
       ) {
         return
       }
 
-      await options.navigateToDocument(options.surfaceState.visibleDefaultDocumentId.value, {
+      await navigateToDocument(surfaceState.visibleDefaultDocumentId.value, {
         replace: true,
         skipConfirm: true,
       })
@@ -71,7 +57,7 @@ export function useDocsPageActions(options: UseDocsPageActionsOptions) {
   )
 
   watch(
-    [options.currentWorkspaceId, options.tree.activeCollectionId],
+    [currentWorkspaceId, tree.activeCollectionId],
     async ([, nextActiveCollectionId], previousState) => {
       const [, previousActiveCollectionId] = previousState ?? []
       const isInitialRun = previousState === undefined
@@ -82,19 +68,19 @@ export function useDocsPageActions(options: UseDocsPageActionsOptions) {
         return
       }
 
-      if (!options.surfaceState.isDocumentSurface.value) {
+      if (!surfaceState.isDocumentSurface.value) {
         return
       }
 
       if (
-        !options.activeDocumentId.value
+        !activeDocumentId.value
         || !nextActiveCollectionId
-        || options.surfaceState.visibleActiveCollectionId.value
+        || surfaceState.visibleActiveCollectionId.value
       ) {
         return
       }
 
-      await options.navigateToDocument(options.surfaceState.visibleDefaultDocumentId.value, {
+      await navigateToDocument(surfaceState.visibleDefaultDocumentId.value, {
         replace: true,
         skipConfirm: true,
       })
@@ -104,12 +90,12 @@ export function useDocsPageActions(options: UseDocsPageActionsOptions) {
 
   watch(
     [
-      options.activeDocumentId,
-      options.currentWorkspaceId,
-      options.surfaceState.documentPaneState,
-      options.surfaceState.visibleDefaultDocumentId,
-      options.surfaceState.isDocumentSurface,
-      options.activeDocument.isDocumentItemLoading,
+      activeDocumentId,
+      currentWorkspaceId,
+      surfaceState.documentPaneState,
+      surfaceState.visibleDefaultDocumentId,
+      surfaceState.isDocumentSurface,
+      activeDocument.isDocumentItemLoading,
     ],
     async ([nextDocumentId, nextWorkspaceId, nextPaneState, nextDefaultDocumentId, isDocumentSurface, isDocumentItemLoading]) => {
       if (!isDocumentSurface || !nextWorkspaceId || !nextDocumentId || isDocumentItemLoading) {
@@ -137,47 +123,29 @@ export function useDocsPageActions(options: UseDocsPageActionsOptions) {
         hasFallbackDocument: Boolean(targetDocumentId),
       }))
 
-      await options.navigateToDocument(targetDocumentId, {
+      await navigateToDocument(targetDocumentId, {
         replace: true,
         skipConfirm: true,
       })
     },
   )
 
-  onBeforeRouteUpdate(async (to, from) => {
-    if (to.params.id === from.params.id) {
-      return true
-    }
-
-    return await options.activeDocument.confirmNavigation()
-  })
-
-  onBeforeRouteLeave(options.activeDocument.confirmNavigation)
-  void loadInitialTree()
-
-  return {
-    openDocument,
-    openDefaultDocument,
-    createRootDocument,
-    moveDocumentToTeam,
-  }
-
   async function openDocument(documentId: string) {
     lastInaccessibleRedirectDocumentId = null
-    await options.navigateToDocument(documentId)
+    await navigateToDocument(documentId)
   }
 
   async function openDefaultDocument(input: { replace?: boolean } = {}) {
-    if (!options.surfaceState.visibleDefaultDocumentId.value) {
+    if (!surfaceState.visibleDefaultDocumentId.value) {
       return
     }
 
     lastInaccessibleRedirectDocumentId = null
-    await options.navigateToDocument(options.surfaceState.visibleDefaultDocumentId.value, input)
+    await navigateToDocument(surfaceState.visibleDefaultDocumentId.value, input)
   }
 
   function resolveDefaultRootCollectionId() {
-    return options.currentWorkspaceType.value === WORKSPACE_TYPE.TEAM
+    return currentWorkspaceType.value === WORKSPACE_TYPE.TEAM
       ? DOCUMENT_COLLECTION.TEAM
       : DOCUMENT_COLLECTION.PERSONAL
   }
@@ -188,14 +156,14 @@ export function useDocsPageActions(options: UseDocsPageActionsOptions) {
     }
 
     lastInaccessibleRedirectDocumentId = null
-    await options.tree.createRootDocument(collectionId)
+    await tree.createRootDocument(collectionId)
   }
 
   async function moveDocumentToTeam(documentId: string) {
-    const isCurrentDocument = options.activeDocument.currentDocument.value?.id === documentId
+    const isCurrentDocument = activeDocument.currentDocument.value?.id === documentId
 
     if (isCurrentDocument) {
-      const canContinue = await options.activeDocument.confirmNavigation()
+      const canContinue = await activeDocument.confirmNavigation()
 
       if (!canContinue) {
         return
@@ -206,10 +174,10 @@ export function useDocsPageActions(options: UseDocsPageActionsOptions) {
       await patchDocumentMetaRequest(documentId, {
         visibility: DOCUMENT_VISIBILITY.WORKSPACE,
       })
-      await options.tree.loadTree()
+      await tree.loadTree()
 
       if (isCurrentDocument) {
-        await options.activeDocument.reloadCurrentDocument()
+        await activeDocument.reloadCurrentDocument()
       }
 
       ElMessage.success('文档已移到团队')
@@ -220,29 +188,63 @@ export function useDocsPageActions(options: UseDocsPageActionsOptions) {
   }
 
   async function loadInitialTree() {
-    await options.tree.loadTree()
+    await tree.loadTree()
 
     if (
-      !options.surfaceState.isDocumentSurface.value
-      || options.activeDocumentId.value
-      || !options.surfaceState.visibleDefaultDocumentId.value
+      !surfaceState.isDocumentSurface.value
+      || activeDocumentId.value
+      || !surfaceState.visibleDefaultDocumentId.value
     ) {
       return
     }
 
-    options.isSelectingInitialDocument.value = true
+    isSelectingInitialDocument.value = true
 
     try {
-      await options.navigateToDocument(options.surfaceState.visibleDefaultDocumentId.value, {
+      await navigateToDocument(surfaceState.visibleDefaultDocumentId.value, {
         replace: true,
         skipConfirm: true,
       })
     }
     finally {
-      options.isSelectingInitialDocument.value = false
+      isSelectingInitialDocument.value = false
     }
   }
-}
+
+  function openPermissionsOverview() {
+    if (!canOpenShareDialog.value) {
+      ElMessage.warning('仅 MAINTAINER 可以查看分享管理')
+      return
+    }
+
+    void router.push({
+      name: 'docs-permissions',
+    })
+  }
+
+  function openPendingShares() {
+    void router.push({
+      name: 'docs-pending-shares',
+    })
+  }
+
+  function openTrashPage() {
+    void router.push({
+      name: 'docs-trash',
+    })
+  }
+
+  return {
+    createRootDocument,
+    loadInitialTree,
+    moveDocumentToTeam,
+    openDefaultDocument,
+    openDocument,
+    openPendingShares,
+    openPermissionsOverview,
+    openTrashPage,
+  }
+})
 
 function resolveInaccessibleDocumentRedirectMessage(input: {
   paneState: string

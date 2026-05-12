@@ -1,7 +1,5 @@
 <script setup lang="ts">
 import type {
-  DocsPermissionsPageEmits,
-  DocsPermissionsPageProps,
   DocumentShareProjection,
   DocumentTreeGroup,
   PermissionOverviewItem,
@@ -13,22 +11,17 @@ import {
 } from '@haohaoxue/samepage-shared'
 import { computed } from 'vue'
 import { formatMonthDayTime } from '@/utils/dayjs'
+import { useDocsShareDialog } from '../composables/useDocsShareDialog'
+import { useDocumentTree } from '../composables/useDocumentTree'
 
-const props = withDefaults(defineProps<DocsPermissionsPageProps>(), {
-  treeGroups: () => [],
-  isLoading: false,
-})
-const emits = defineEmits<DocsPermissionsPageEmits>()
+const { isDocumentLoading, treeGroups } = useDocumentTree()
+const { openDocumentShareDialog } = useDocsShareDialog()
 
 const items = computed<PermissionOverviewItem[]>(() =>
-  props.treeGroups
+  treeGroups.value
     .filter(group => group.id !== DOCUMENT_COLLECTION.COLLABORATION)
     .flatMap(group => collectPermissionItems(group, [], formatDocumentCollectionLabel(group.id))),
 )
-
-function openDocumentShareDialog(documentId: string) {
-  emits('openShare', documentId)
-}
 
 function resolveModeTagType(share: DocumentShareProjection) {
   if (share.localPolicy?.mode === DOCUMENT_SHARE_MODE.PUBLIC) {
@@ -102,7 +95,7 @@ function formatUpdatedAt(_row: PermissionOverviewItem, _column: unknown, value: 
 </script>
 
 <template>
-  <section v-loading="props.isLoading" class="docs-permissions-page">
+  <section v-loading="isDocumentLoading" class="docs-permissions-page">
     <ElTable
       class="w-full docs-permissions-table"
       stripe border row-key="documentId"

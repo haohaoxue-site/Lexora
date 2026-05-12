@@ -1,44 +1,35 @@
 <script setup lang="ts">
 import type { FormInstance, FormRules } from 'element-plus'
-import type {
-  AuthGovernanceEntryCard,
-  RegistrationGovernanceField,
-} from '../composables/useUsers'
-import type { SystemAuthGovernance } from '@/apis/system-admin'
+import type { RegistrationGovernanceField } from '../composables/useSystemAuthGovernance'
 import { reactive, useTemplateRef } from 'vue'
-
-interface AuthGovernancePanelProps {
-  governance: SystemAuthGovernance
-  authGovernanceCards: readonly AuthGovernanceEntryCard[]
-  savingGovernanceFields: Record<RegistrationGovernanceField, boolean>
-  shouldShowMissingInviteCodeWarning: boolean
-  isSavingInviteCode: boolean
-  getGovernanceSwitchValue: (key: RegistrationGovernanceField) => boolean
-  isGovernanceSwitchDisabled: (key: RegistrationGovernanceField) => boolean
-  shouldShowEmailServiceHint: (key: RegistrationGovernanceField) => boolean
-}
-
-interface AuthGovernancePanelEmits {
-  updateGovernanceSwitch: [key: RegistrationGovernanceField, value: string | number | boolean]
-  openInviteCodeDialog: []
-  updateInviteCode: []
-}
+import { useSystemAuthGovernance } from '../composables/useSystemAuthGovernance'
 
 interface InviteCodeFormModel {
   inviteCode: string
 }
 
-const props = defineProps<AuthGovernancePanelProps>()
-const emit = defineEmits<AuthGovernancePanelEmits>()
-const inviteCodeDialogVisible = defineModel<boolean>('inviteCodeDialogVisible', { required: true })
-const inviteCode = defineModel<string>('inviteCode', { required: true })
+const {
+  authGovernanceCards,
+  getGovernanceSwitchValue,
+  handleGovernanceSwitchChange,
+  inviteCodeForm,
+  isGovernanceSwitchDisabled,
+  isInviteCodeDialogVisible,
+  isSavingInviteCode,
+  openInviteCodeDialog,
+  savingGovernanceFields,
+  shouldShowEmailServiceHint,
+  shouldShowMissingInviteCodeWarning,
+  updateInviteCode,
+} = useSystemAuthGovernance()
+
 const inviteCodeFormRef = useTemplateRef<FormInstance>('inviteCodeFormRef')
 const inviteCodeFormModel = reactive<InviteCodeFormModel>({
   get inviteCode() {
-    return inviteCode.value
+    return inviteCodeForm.inviteCode
   },
   set inviteCode(value: string) {
-    inviteCode.value = value
+    inviteCodeForm.inviteCode = value
   },
 })
 const inviteCodeFormRules: FormRules<InviteCodeFormModel> = {
@@ -72,7 +63,11 @@ async function submitInviteCode() {
     return
   }
 
-  emit('updateInviteCode')
+  void updateInviteCode()
+}
+
+function handleSwitchChange(key: RegistrationGovernanceField, value: string | number | boolean) {
+  handleGovernanceSwitchChange(key, value)
 }
 </script>
 
@@ -83,13 +78,13 @@ async function submitInviteCode() {
         <h2 class="m-0 text-base font-bold text-main">
           认证注册
         </h2>
-        <ElButton @click="emit('openInviteCodeDialog')">
+        <ElButton @click="openInviteCodeDialog">
           设置/更换邀请码
         </ElButton>
       </header>
 
       <ElAlert
-        v-if="props.shouldShowMissingInviteCodeWarning"
+        v-if="shouldShowMissingInviteCodeWarning"
         title="已启用邀请码要求，但当前还没有设置邀请码。对应入口的新用户注册会被后端拒绝。"
         type="warning"
         show-icon
@@ -98,7 +93,7 @@ async function submitInviteCode() {
 
       <div class="auth-governance-panel__entry-grid">
         <section
-          v-for="card in props.authGovernanceCards"
+          v-for="card in authGovernanceCards"
           :key="card.key"
           class="auth-governance-panel__entry-card"
         >
@@ -123,7 +118,7 @@ async function submitInviteCode() {
               </span>
               <span class="flex shrink-0 items-center gap-2.5">
                 <ElTooltip
-                  v-if="props.shouldShowEmailServiceHint(item.key)"
+                  v-if="shouldShowEmailServiceHint(item.key)"
                   placement="top"
                   effect="light"
                   :show-after="150"
@@ -148,10 +143,10 @@ async function submitInviteCode() {
                   </button>
                 </ElTooltip>
                 <ElSwitch
-                  :model-value="props.getGovernanceSwitchValue(item.key)"
-                  :disabled="props.isGovernanceSwitchDisabled(item.key)"
-                  :loading="props.savingGovernanceFields[item.key]"
-                  @change="emit('updateGovernanceSwitch', item.key, $event)"
+                  :model-value="getGovernanceSwitchValue(item.key)"
+                  :disabled="isGovernanceSwitchDisabled(item.key)"
+                  :loading="savingGovernanceFields[item.key]"
+                  @change="(value: string | number | boolean) => handleSwitchChange(item.key, value)"
                 />
               </span>
             </label>
@@ -162,7 +157,7 @@ async function submitInviteCode() {
   </ElCard>
 
   <ElDialog
-    v-model="inviteCodeDialogVisible"
+    v-model="isInviteCodeDialogVisible"
     title="设置/更换邀请码"
     width="28rem"
     align-center
@@ -188,10 +183,10 @@ async function submitInviteCode() {
     </ElForm>
 
     <template #footer>
-      <ElButton :disabled="props.isSavingInviteCode" @click="inviteCodeDialogVisible = false">
+      <ElButton :disabled="isSavingInviteCode" @click="isInviteCodeDialogVisible = false">
         取消
       </ElButton>
-      <ElButton type="primary" :loading="props.isSavingInviteCode" @click="submitInviteCode">
+      <ElButton type="primary" :loading="isSavingInviteCode" @click="submitInviteCode">
         保存
       </ElButton>
     </template>

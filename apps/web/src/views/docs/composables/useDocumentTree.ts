@@ -3,12 +3,12 @@ import type {
   DocumentTreeCollectionId,
   DocumentTreeGroup,
   OwnedDocumentCollectionId,
-  WorkspaceType,
 } from '@haohaoxue/samepage-contracts'
 import type { ComputedRef } from 'vue'
 import type { DocumentDeleteAction } from '../typing'
 import { DOCUMENT_COLLECTION, DOCUMENT_DEFAULT_TITLE } from '@haohaoxue/samepage-contracts'
 import { formatDocumentCollectionLabel, resolveRootDocumentVisibility } from '@haohaoxue/samepage-shared'
+import { createSharedComposable } from '@vueuse/core'
 import { ElMessage } from 'element-plus'
 import { computed, shallowRef } from 'vue'
 import {
@@ -25,41 +25,10 @@ import {
   resolvePreferredDocumentId,
   updateDocumentBranch,
 } from '../utils/documentTree'
+import { useDocsContext } from './useDocsContext'
 
-/**
- * 文档跳转选项。
- */
-interface NavigateToDocumentOptions {
-  replace?: boolean
-  skipConfirm?: boolean
-  focusTitle?: boolean
-}
-
-/**
- * 文档树组合参数。
- */
-interface UseDocumentTreeOptions {
-  activeDocumentId: ComputedRef<string | null>
-  currentWorkspaceId: ComputedRef<string | null>
-  currentWorkspaceType: ComputedRef<WorkspaceType>
-  confirmNavigation: () => Promise<boolean>
-  navigateToDocument: (documentId: string | null, options?: NavigateToDocumentOptions) => Promise<boolean>
-}
-
-/**
- * 文档树加载选项。
- */
 interface LoadDocumentTreeOptions {
-  /** 是否静默加载 */
   silent?: boolean
-}
-
-/**
- * 文档树状态组合参数。
- */
-interface UseDocumentTreeStateOptions {
-  activeDocumentId: ComputedRef<string | null>
-  currentWorkspaceId: ComputedRef<string | null>
 }
 
 interface PendingDeleteDocumentTarget {
@@ -69,22 +38,24 @@ interface PendingDeleteDocumentTarget {
   nextDocumentId: string | null
 }
 
-export function useDocumentTree({
-  activeDocumentId,
-  currentWorkspaceId,
-  currentWorkspaceType,
-  confirmNavigation,
-  navigateToDocument,
-}: UseDocumentTreeOptions) {
+export const useDocumentTree = createSharedComposable(() => {
+  const {
+    activeDocumentId,
+    confirmNavigation,
+    currentWorkspaceId,
+    currentWorkspaceType,
+    navigateToDocument,
+  } = useDocsContext()
+  const state = useDocumentTreeState({
+    activeDocumentId,
+    currentWorkspaceId,
+  })
+
   const isDocumentLoading = shallowRef(false)
   const isCreating = shallowRef(false)
   const deleteDialogTarget = shallowRef<PendingDeleteDocumentTarget | null>(null)
   const deleteActionKind = shallowRef<DocumentDeleteAction | null>(null)
   let treeRequestId = 0
-  const state = useDocumentTreeState({
-    activeDocumentId,
-    currentWorkspaceId,
-  })
 
   const isDeleting = computed(() => deleteActionKind.value !== null)
   const isMutatingTree = computed(() => isCreating.value || isDeleting.value)
@@ -247,32 +218,6 @@ export function useDocumentTree({
     }
   }
 
-  return {
-    treeGroups: state.treeGroups,
-    activeCollectionId: state.activeCollectionId,
-    breadcrumbLabels: state.breadcrumbLabels,
-    expandedDocumentIdSet: state.expandedDocumentIdSet,
-    isDocumentLoading,
-    isCreating,
-    isMutatingTree,
-    isDeleteDialogOpen,
-    deleteActionKind,
-    deleteDialogDocumentTitle,
-    defaultDocumentId: state.defaultDocumentId,
-    hasFallbackDocument: state.hasFallbackDocument,
-    loadTree,
-    toggleDocument: state.toggleDocument,
-    ensureExpandedPath: state.ensureExpandedPath,
-    patchDocumentItem: state.patchDocumentItem,
-    rememberLastOpenedDocument: state.rememberLastOpenedDocument,
-    createRootDocument: createRootDocumentIn,
-    createChildDocument,
-    closeDeleteDialog,
-    confirmDeleteDocument,
-    confirmPermanentlyDeleteDocument,
-    deleteDocument,
-  }
-
   function isActiveTreeRequest(requestId: number, workspaceId: string | null) {
     return requestId === treeRequestId && currentWorkspaceId.value === workspaceId
   }
@@ -296,6 +241,37 @@ export function useDocumentTree({
       ),
     }
   }
+
+  return {
+    activeCollectionId: state.activeCollectionId,
+    breadcrumbLabels: state.breadcrumbLabels,
+    closeDeleteDialog,
+    confirmDeleteDocument,
+    confirmPermanentlyDeleteDocument,
+    createChildDocument,
+    createRootDocument: createRootDocumentIn,
+    defaultDocumentId: state.defaultDocumentId,
+    deleteActionKind,
+    deleteDialogDocumentTitle,
+    deleteDocument,
+    ensureExpandedPath: state.ensureExpandedPath,
+    expandedDocumentIdSet: state.expandedDocumentIdSet,
+    hasFallbackDocument: state.hasFallbackDocument,
+    isCreating,
+    isDeleteDialogOpen,
+    isDocumentLoading,
+    isMutatingTree,
+    loadTree,
+    patchDocumentItem: state.patchDocumentItem,
+    rememberLastOpenedDocument: state.rememberLastOpenedDocument,
+    toggleDocument: state.toggleDocument,
+    treeGroups: state.treeGroups,
+  }
+})
+
+interface UseDocumentTreeStateOptions {
+  activeDocumentId: ComputedRef<string | null>
+  currentWorkspaceId: ComputedRef<string | null>
 }
 
 export function useDocumentTreeState({
@@ -312,7 +288,9 @@ export function useDocumentTreeState({
   )
 
   const expandedDocumentIdSet = computed(() => new Set(expandedDocumentIds.value))
-  const activePath = computed(() => activeDocumentId.value ? findDocumentPath(treeGroups.value, activeDocumentId.value) : null)
+  const activePath = computed(() =>
+    activeDocumentId.value ? findDocumentPath(treeGroups.value, activeDocumentId.value) : null,
+  )
   const activeCollectionId = computed(() => activePath.value?.collectionId ?? null)
   const defaultDocumentId = computed(() => resolvePreferredDocumentId(
     treeGroups.value,
@@ -401,18 +379,18 @@ export function useDocumentTreeState({
   }
 
   return {
-    treeGroups,
     activeCollectionId,
-    breadcrumbLabels,
-    expandedDocumentIdSet,
-    defaultDocumentId,
-    hasFallbackDocument,
     applyLoadedTree,
-    toggleDocument,
+    breadcrumbLabels,
+    defaultDocumentId,
     ensureExpandedPath,
-    pruneExpandedDocumentIds,
+    expandedDocumentIdSet,
+    hasFallbackDocument,
     patchDocumentItem,
+    pruneExpandedDocumentIds,
     rememberLastOpenedDocument,
+    toggleDocument,
+    treeGroups,
   }
 }
 

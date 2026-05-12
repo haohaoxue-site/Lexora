@@ -1,23 +1,31 @@
 <script setup lang="ts">
-import type {
-  DocumentToolbarEmits,
-  DocumentToolbarProps,
-} from '../typing'
+import type { DocumentTreeCollectionId } from '@haohaoxue/samepage-contracts'
+import { useDocsPageActions } from '../composables/useDocsPageActions'
+import { useDocumentTree } from '../composables/useDocumentTree'
+
+interface DocumentToolbarProps {
+  collectionId: DocumentTreeCollectionId
+}
 
 const props = defineProps<DocumentToolbarProps>()
 
-defineEmits<DocumentToolbarEmits>()
+const { isMutatingTree: isBusy } = useDocumentTree()
+const { createRootDocument } = useDocsPageActions()
+
+function handleCreateRoot() {
+  void createRootDocument(props.collectionId)
+}
 </script>
 
 <template>
   <ElButton
     text
     class="document-tree-toolbar document-tree-toolbar__button"
-    :disabled="props.isBusy"
+    :disabled="isBusy"
     title="新建文档"
-    @click="$emit('createRoot', props.collectionId)"
+    @click="handleCreateRoot"
   >
-    <SvgIcon category="ui" :icon="props.isBusy ? 'spinner-orbit' : 'plus'" size="1rem" :class="{ 'animate-spin': props.isBusy }" />
+    <SvgIcon category="ui" :icon="isBusy ? 'spinner-orbit' : 'plus'" size="1rem" :class="{ 'animate-spin': isBusy }" />
   </ElButton>
 </template>
 

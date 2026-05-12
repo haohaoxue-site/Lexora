@@ -1,24 +1,15 @@
 import type {
-  GetSystemAdminUsersQuery,
-  SystemAdminUserItem,
-  SystemAdminUserRoleFilter,
-  SystemAdminUserStatus,
   SystemAuthGovernance,
   UpdateSystemAuthGovernanceRequest,
 } from '@/apis/system-admin'
-import {
-  USER_STATUS,
-} from '@haohaoxue/samepage-contracts'
+import { createSharedComposable } from '@vueuse/core'
 import { ElMessage } from 'element-plus'
-import { computed, onMounted, reactive, shallowRef } from 'vue'
+import { computed, reactive, shallowRef } from 'vue'
 import {
-  getSystemAdminUsers,
   getSystemAuthGovernance,
-  updateSystemAdminUserStatus,
   updateSystemAuthGovernance,
   updateSystemAuthInviteCode,
 } from '@/apis/system-admin'
-import { formatDateTime } from '@/utils/dayjs'
 import { getRequestErrorDisplayMessage } from '@/utils/request-error'
 
 export type RegistrationGovernanceField = keyof UpdateSystemAuthGovernanceRequest
@@ -111,29 +102,12 @@ const authGovernanceCards = [
   },
 ] as const satisfies readonly AuthGovernanceEntryCard[]
 
-type RegistrationSwitchKey = RegistrationGovernanceField
-
-export function useUsers() {
-  let userListRequestId = 0
-
-  const users = shallowRef<SystemAdminUserItem[]>([])
+export const useSystemAuthGovernance = createSharedComposable(() => {
   const errorMessage = shallowRef('')
-  const isLoading = shallowRef(false)
-  const isLoadingUsers = shallowRef(false)
-  const keywordInput = shallowRef('')
-  const updatingUserId = shallowRef<string | null>(null)
   const isInviteCodeDialogVisible = shallowRef(false)
   const isSavingInviteCode = shallowRef(false)
-  const totalUsers = shallowRef(0)
   const inviteCodeForm = reactive({
     inviteCode: '',
-  })
-  const userQuery = reactive<GetSystemAdminUsersQuery>({
-    pageNo: 1,
-    pageSize: 20,
-    keyword: undefined,
-    status: undefined,
-    role: undefined,
   })
   const savingGovernanceFields = reactive<Record<RegistrationGovernanceField, boolean>>({
     allowGithubLogin: false,
@@ -163,7 +137,6 @@ export function useUsers() {
     systemAdminLastLoginAt: null,
     systemAdminPasswordUpdatedAt: null,
   })
-  const systemAdminStatusText = computed(() => governance.systemAdminMustChangePassword ? '首次密码待修改' : '已完成首次改密')
   const shouldShowMissingInviteCodeWarning = computed(() =>
     !governance.hasRegistrationInviteCode
     && (
@@ -173,93 +146,18 @@ export function useUsers() {
     ),
   )
 
-  async function loadData() {
-    isLoading.value = true
-    errorMessage.value = ''
-
-    try {
-      await Promise.all([
-        loadUsers(),
-        loadGovernance(),
-      ])
-    }
-    catch (error) {
-      errorMessage.value = getRequestErrorDisplayMessage(error, '加载用户管理数据失败')
-    }
-    finally {
-      isLoading.value = false
-    }
+  function applyGovernance(nextGovernance: SystemAuthGovernance) {
+    Object.assign(governance, nextGovernance)
   }
 
   async function loadGovernance() {
-    const nextGovernance = await getSystemAuthGovernance()
-    applyGovernance(nextGovernance)
-  }
-
-  async function loadUsers() {
-    const requestId = ++userListRequestId
-    isLoadingUsers.value = true
-
     try {
-      const response = await getSystemAdminUsers(userQuery)
-
-      if (requestId !== userListRequestId) {
-        return
-      }
-
-      const maxPageNo = response.total > 0
-        ? Math.ceil(response.total / userQuery.pageSize)
-        : 1
-
-      if (response.items.length === 0 && userQuery.pageNo > maxPageNo) {
-        userQuery.pageNo = maxPageNo
-        await loadUsers()
-        return
-      }
-
-      users.value = response.items
-      totalUsers.value = response.total
+      const nextGovernance = await getSystemAuthGovernance()
+      applyGovernance(nextGovernance)
     }
     catch (error) {
-      if (requestId === userListRequestId) {
-        errorMessage.value = getRequestErrorDisplayMessage(error, '加载用户列表失败')
-      }
+      errorMessage.value = getRequestErrorDisplayMessage(error, '加载注册配置失败')
       throw error
-    }
-    finally {
-      if (requestId === userListRequestId) {
-        isLoadingUsers.value = false
-      }
-    }
-  }
-
-  async function toggleUserStatus(
-    user: SystemAdminUserItem,
-    nextStatus: SystemAdminUserStatus,
-  ) {
-    updatingUserId.value = user.id
-
-    try {
-      const updated = await updateSystemAdminUserStatus(user.id, {
-        status: nextStatus,
-      })
-      ElMessage.success(nextStatus === USER_STATUS.ACTIVE ? '用户已恢复' : '用户已禁用')
-      await loadUsers().catch(() => {
-        users.value = users.value.map(item =>
-          item.id === user.id
-            ? {
-                ...item,
-                status: updated.status,
-              }
-            : item,
-        )
-      })
-    }
-    catch (error) {
-      ElMessage.error(getRequestErrorDisplayMessage(error, '更新用户状态失败'))
-    }
-    finally {
-      updatingUserId.value = null
     }
   }
 
@@ -288,11 +186,11 @@ export function useUsers() {
     }
   }
 
-  function shouldShowEmailServiceHint(key: RegistrationSwitchKey) {
+  function shouldShowEmailServiceHint(key: RegistrationGovernanceField) {
     return key === 'allowPasswordRegistration' && !governance.emailServiceEnabled
   }
 
-  function getGovernanceSwitchValue(key: RegistrationSwitchKey) {
+  function getGovernanceSwitchValue(key: RegistrationGovernanceField) {
     if (key === 'allowPasswordRegistration' && !governance.emailServiceEnabled) {
       return false
     }
@@ -300,7 +198,7 @@ export function useUsers() {
     return governance[key]
   }
 
-  function isGovernanceSwitchDisabled(key: RegistrationSwitchKey) {
+  function isGovernanceSwitchDisabled(key: RegistrationGovernanceField) {
     if (key === 'allowPasswordRegistration' && !governance.emailServiceEnabled) {
       return true
     }
@@ -309,7 +207,7 @@ export function useUsers() {
   }
 
   function handleGovernanceSwitchChange(
-    key: RegistrationSwitchKey,
+    key: RegistrationGovernanceField,
     value: string | number | boolean,
   ) {
     if (typeof value !== 'boolean') {
@@ -349,88 +247,22 @@ export function useUsers() {
     }
   }
 
-  function formatDate(value: string | null) {
-    if (!value) {
-      return '暂无'
-    }
-
-    return formatDateTime(value)
-  }
-
-  function updateFilters(filters: {
-    status: SystemAdminUserStatus | null
-    role: SystemAdminUserRoleFilter | null
-  }) {
-    userQuery.status = filters.status ?? undefined
-    userQuery.role = filters.role ?? undefined
-    userQuery.pageNo = 1
-    errorMessage.value = ''
-    void loadUsers().catch(() => {})
-  }
-
-  function updatePageNo(pageNo: number) {
-    userQuery.pageNo = pageNo
-    errorMessage.value = ''
-    void loadUsers().catch(() => {})
-  }
-
-  function updatePageSize(pageSize: number) {
-    userQuery.pageSize = pageSize
-    userQuery.pageNo = 1
-    errorMessage.value = ''
-    void loadUsers().catch(() => {})
-  }
-
-  function updateKeyword(keyword: string) {
-    keywordInput.value = keyword
-  }
-
-  function submitSearch() {
-    const nextKeyword = keywordInput.value.trim()
-    userQuery.keyword = nextKeyword || undefined
-    userQuery.pageNo = 1
-    errorMessage.value = ''
-    void loadUsers().catch(() => {})
-  }
-
-  onMounted(loadData)
-
   return {
-    errorMessage,
-    formatDate,
     authGovernanceCards,
-    governance,
+    errorMessage,
     getGovernanceSwitchValue,
+    governance,
     handleGovernanceSwitchChange,
     inviteCodeForm,
-    isInviteCodeDialogVisible,
-    isLoading,
-    isLoadingUsers,
     isGovernanceSwitchDisabled,
+    isInviteCodeDialogVisible,
     isSavingInviteCode,
-    keywordInput,
-    loadData,
-    loadUsers,
+    loadGovernance,
     openInviteCodeDialog,
     savingGovernanceFields,
-    shouldShowMissingInviteCodeWarning,
     shouldShowEmailServiceHint,
-    submitSearch,
-    systemAdminStatusText,
-    totalUsers,
-    toggleUserStatus,
-    updateKeyword,
-    updateFilters,
-    updatePageNo,
-    updatePageSize,
+    shouldShowMissingInviteCodeWarning,
     updateGovernanceOption,
     updateInviteCode,
-    updatingUserId,
-    userQuery,
-    users,
   }
-
-  function applyGovernance(nextGovernance: SystemAuthGovernance) {
-    Object.assign(governance, nextGovernance)
-  }
-}
+})

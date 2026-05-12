@@ -1,21 +1,28 @@
-import type { DocumentSectionPanelProps } from '../typing'
+import type { DocumentTreeGroup } from '@haohaoxue/samepage-contracts'
 import { formatDocumentCollectionLabel } from '@haohaoxue/samepage-shared'
 import { computed } from 'vue'
+import { useDocsSurfaceState } from './useDocsSurfaceState'
 
-export function useDocumentSectionPanel(
-  props: DocumentSectionPanelProps,
-  onToggleCollapse: (collectionId: DocumentSectionPanelProps['group']['id']) => void,
-) {
-  const displayLabel = computed(() => formatDocumentCollectionLabel(props.group.id))
-  const chevronIconName = computed(() => props.isCollapsed ? 'chevron-right' : 'chevron-down')
+export interface UseDocumentSectionPanelOptions {
+  group: () => DocumentTreeGroup
+}
+
+export function useDocumentSectionPanel(options: UseDocumentSectionPanelOptions) {
+  const { collapsedGroupIdSet, toggleGroupCollapse } = useDocsSurfaceState()
+  const group = computed(options.group)
+
+  const displayLabel = computed(() => formatDocumentCollectionLabel(group.value.id))
+  const isCollapsed = computed(() => collapsedGroupIdSet.value.has(group.value.id))
+  const chevronIconName = computed(() => isCollapsed.value ? 'chevron-right' : 'chevron-down')
 
   function toggleSection() {
-    onToggleCollapse(props.group.id)
+    toggleGroupCollapse(group.value.id)
   }
 
   return {
     chevronIconName,
     displayLabel,
+    isCollapsed,
     toggleSection,
   }
 }

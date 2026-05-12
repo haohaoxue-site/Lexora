@@ -1,15 +1,14 @@
 <script setup lang="tsx">
 import type { VNodeChild } from 'vue'
-import type {
-  DocsSidebarLayoutEmits,
-  DocsSidebarLayoutProps,
-} from './typing'
-import {
-  DOCUMENT_COLLECTION,
-} from '@haohaoxue/samepage-contracts'
+import { DOCUMENT_COLLECTION } from '@haohaoxue/samepage-contracts'
 import { computed } from 'vue'
 import { SvgIcon } from '@/components/svg-icon'
 import DocumentSectionPanel from '../components/DocumentSectionPanel.vue'
+import { useDocsPageActions } from '../composables/useDocsPageActions'
+import { useDocsPendingShareIndicator } from '../composables/useDocsPendingShareIndicator'
+import { useDocsShareDialog } from '../composables/useDocsShareDialog'
+import { useDocsSurfaceState } from '../composables/useDocsSurfaceState'
+import { useDocumentTree } from '../composables/useDocumentTree'
 
 interface DocsSidebarFooterAction {
   /** 动作唯一标识 */
@@ -24,46 +23,49 @@ interface DocsSidebarFooterAction {
   onClick: () => void
 }
 
-const props = defineProps<DocsSidebarLayoutProps>()
-const emits = defineEmits<DocsSidebarLayoutEmits>()
+const { isDocumentLoading } = useDocumentTree()
+const { currentSurface, visibleTreeGroups } = useDocsSurfaceState()
+const { hasPendingShares, pendingShareCount } = useDocsPendingShareIndicator()
+const { canOpenShareDialog } = useDocsShareDialog()
+const { openPendingShares, openPermissionsOverview, openTrashPage } = useDocsPageActions()
 
-const treeSections = computed(() => props.treeGroups.map(group => ({
+const treeSections = computed(() => visibleTreeGroups.value.map(group => ({
   group,
   canCreateRoot: group.id !== DOCUMENT_COLLECTION.COLLABORATION,
 })))
 const footerActions = computed<DocsSidebarFooterAction[]>(() => {
   const actions: DocsSidebarFooterAction[] = []
 
-  if (props.hasPendingShares) {
+  if (hasPendingShares.value) {
     actions.push({
       id: 'pending-shares',
       label: '待接收分享',
-      isActive: props.currentSurface === 'pending-shares',
+      isActive: currentSurface.value === 'pending-shares',
       icon: () => (
-        <ElBadge value={props.pendingShareCount} max={9}>
+        <ElBadge value={pendingShareCount.value} max={9}>
           <SvgIcon category="ui" icon="notification-bell" size="0.95rem" />
         </ElBadge>
       ),
-      onClick: () => emits('openPendingShares'),
+      onClick: () => openPendingShares(),
     })
   }
 
-  if (props.canOpenShareDialog) {
+  if (canOpenShareDialog.value) {
     actions.push({
       id: 'permissions',
       label: '权限管理',
-      isActive: props.currentSurface === 'permissions',
+      isActive: currentSurface.value === 'permissions',
       icon: () => <SvgIcon category="ui" icon="lock" size="0.95rem" />,
-      onClick: () => emits('openPermissionsOverview'),
+      onClick: () => openPermissionsOverview(),
     })
   }
 
   actions.push({
     id: 'trash',
     label: '回收站',
-    isActive: props.currentSurface === 'trash',
+    isActive: currentSurface.value === 'trash',
     icon: () => <SvgIcon category="ui" icon="trash-can" size="0.95rem" />,
-    onClick: () => emits('openTrashPage'),
+    onClick: () => openTrashPage(),
   })
 
   return actions
@@ -76,7 +78,7 @@ const footerGridStyle = computed(() => ({
 <template>
   <aside class="docs-view__sidebar">
     <div class="docs-view__sidebar-scroll">
-      <div v-if="props.isDocumentLoading" class="docs-view__tree-loading">
+      <div v-if="isDocumentLoading" class="docs-view__tree-loading">
         正在加载文档树...
       </div>
 
@@ -85,22 +87,6 @@ const footerGridStyle = computed(() => ({
           v-for="section in treeSections"
           :key="section.group.id"
           :group="section.group"
-          :current-workspace-type="props.currentWorkspaceType"
-          :active-document-id="props.activeDocumentId"
-          :expanded-document-ids="props.expandedDocumentIds"
-          :is-collapsed="props.collapsedGroupIds.has(section.group.id)"
-          :is-action-pending="props.isMutatingTree"
-          :can-share-document="props.canOpenShareDialog"
-          :can-create-root="section.canCreateRoot"
-          @open="emits('openDocument', $event)"
-          @toggle="emits('toggleDocument', $event)"
-          @toggle-collapse="emits('toggleGroupCollapse', $event)"
-          @create-root="emits('createRootDocument', $event)"
-          @create-child="emits('createChildDocument', $event)"
-          @open-history="emits('openHistory', $event)"
-          @move-document-to-team="emits('moveDocumentToTeam', $event)"
-          @share-document="emits('shareDocument', $event)"
-          @delete-document="emits('deleteDocument', $event)"
         />
       </div>
     </div>

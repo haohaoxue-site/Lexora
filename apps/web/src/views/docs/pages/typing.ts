@@ -1,26 +1,7 @@
-import type {
-  DocumentShareProjection,
-  DocumentTreeGroup,
-} from '@haohaoxue/samepage-contracts'
-import type {
-  DocsDocumentEditorPaneEmits,
-  DocsDocumentEditorPaneProps,
-} from '../typing'
+import type { DocumentShareProjection } from '@haohaoxue/samepage-contracts'
 
-export type {
-  DocumentShareProjection,
-  DocumentTreeGroup,
-}
-
-/**
- * 文档主编辑页属性。
- */
-export type DocsDocumentSurfacePageProps = DocsDocumentEditorPaneProps
-
-/**
- * 文档主编辑页事件。
- */
-export type DocsDocumentSurfacePageEmits = DocsDocumentEditorPaneEmits
+export type { DocumentShareProjection }
+export type { DocumentTreeGroup } from '@haohaoxue/samepage-contracts'
 
 /**
  * 待接收分享页属性。
@@ -31,23 +12,6 @@ export type DocsPendingSharesPageProps = Record<string, never>
  * 待接收分享页事件。
  */
 export type DocsPendingSharesPageEmits = Record<string, never>
-
-/**
- * 权限管理页属性。
- */
-export interface DocsPermissionsPageProps {
-  /** 文档树分组 */
-  treeGroups?: DocumentTreeGroup[]
-  /** 是否正在加载 */
-  isLoading?: boolean
-}
-
-/**
- * 权限管理页事件。
- */
-export interface DocsPermissionsPageEmits {
-  openShare: [documentId: string]
-}
 
 /**
  * 权限总览条目。
