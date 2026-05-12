@@ -1,35 +1,32 @@
 <script setup lang="ts">
-import type {
-  ChatSessionSidebarEmits,
-  ChatSessionSidebarProps,
-} from '../typing'
+import { useChatSessions } from '../composables/useChatSessions'
 import { useChatSessionSidebar } from '../composables/useChatSessionSidebar'
 
-const props = defineProps<ChatSessionSidebarProps>()
-const emits = defineEmits<ChatSessionSidebarEmits>()
-const { getSessionItemStateClass, handleSessionAction } = useChatSessionSidebar(props, {
-  onDelete: sessionId => emits('delete', sessionId),
-  onRename: (sessionId, title) => emits('rename', sessionId, title),
-})
+const { createSession, sessions } = useChatSessions()
+const {
+  getSessionItemStateClass,
+  handleSessionAction,
+  selectSession,
+} = useChatSessionSidebar()
 </script>
 
 <template>
   <aside class="chat-session-sidebar">
     <div class="chat-session-sidebar__header">
       <span class="chat-session-sidebar__header-title">对话列表</span>
-      <ElButton text circle size="small" class="chat-session-sidebar__create-btn" @click="emits('create')">
+      <ElButton text circle size="small" class="chat-session-sidebar__create-btn" @click="createSession">
         <SvgIcon category="ui" icon="plus" size="1rem" />
       </ElButton>
     </div>
 
     <div class="overflow-y-auto p-2">
-      <div v-if="props.sessions.length === 0" class="chat-session-sidebar__empty">
+      <div v-if="sessions.length === 0" class="chat-session-sidebar__empty">
         暂无对话
       </div>
 
       <ul v-else class="chat-session-sidebar__list">
         <li
-          v-for="session in props.sessions"
+          v-for="session in sessions"
           :key="session.id"
           class="chat-session-sidebar__item"
           :class="getSessionItemStateClass(session.id)"
@@ -37,7 +34,7 @@ const { getSessionItemStateClass, handleSessionAction } = useChatSessionSidebar(
           <button
             type="button"
             class="chat-session-sidebar__item-main"
-            @click="emits('select', session.id)"
+            @click="selectSession(session.id)"
           >
             <SvgIcon category="ui" icon="chat" size="1rem" class="shrink-0" />
             <span class="min-w-0 flex-1 truncate">{{ session.title }}</span>

@@ -1,11 +1,11 @@
 import type { AgentCommandQueue } from './typing'
 import type { AgentWorkflowRuntime } from './workflow'
-import { AgentRunCommandSchema } from '@haohaoxue/samepage-contracts'
+import { AGENT_RUN_CONTROL_TYPE, AgentRunCommandSchema } from '@haohaoxue/samepage-contracts'
 
 export interface AgentIdempotencyStore {
-  markStarted: (idempotencyKey: string) => boolean
-  has: (idempotencyKey: string) => boolean
-  clear: (idempotencyKey: string) => void
+  markStarted: (idempotencyKey: string) => boolean | Promise<boolean>
+  has: (idempotencyKey: string) => boolean | Promise<boolean>
+  clear: (idempotencyKey: string) => void | Promise<void>
 }
 
 export interface CreateAgentCommandWorkerOptions {
@@ -22,6 +22,7 @@ export interface AgentCommandWorker {
 export function createAgentCommandWorker(options: CreateAgentCommandWorkerOptions): AgentCommandWorker {
   const idempotency = options.idempotency ?? createMemoryAgentIdempotencyStore()
   let unsubscribe: (() => void) | null = null
+  let unsubscribeControl: (() => void) | null = null
 
   return {
     async start() {
@@ -33,17 +34,24 @@ export function createAgentCommandWorker(options: CreateAgentCommandWorkerOption
       unsubscribe = options.queue.subscribe(async (rawCommand) => {
         const command = AgentRunCommandSchema.parse(rawCommand)
 
-        if (!idempotency.markStarted(command.idempotencyKey)) {
+        if (!await idempotency.markStarted(command.idempotencyKey)) {
           return
         }
 
         await options.workflowRuntime.submit(command)
       })
+      unsubscribeControl = options.queue.subscribeControl?.((control) => {
+        if (control.type === AGENT_RUN_CONTROL_TYPE.CANCEL_RUN) {
+          options.workflowRuntime.cancel(control.runId)
+        }
+      }) ?? null
     },
 
     async stop() {
       unsubscribe?.()
       unsubscribe = null
+      unsubscribeControl?.()
+      unsubscribeControl = null
       await options.queue.close?.()
     },
   }

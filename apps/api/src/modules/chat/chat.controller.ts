@@ -1,7 +1,9 @@
 import type {
   ChatModelListResponse,
+  ChatMutationResponse,
   ChatRuntimeConfig,
   ChatSessionDetail,
+  ChatSessionEvent,
   ChatSessionSummary,
 } from '@haohaoxue/samepage-contracts'
 import type { FastifyReply } from 'fastify'
@@ -14,24 +16,29 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   Res,
 } from '@nestjs/common'
 import { CurrentUser } from '../../decorators/current-user.decorator'
-import { ChatRunProjectorService } from './chat-run-projector.service'
+import { ChatSessionEventsService } from './chat-session-events.service'
 import { ChatSessionsService } from './chat-sessions.service'
 import {
-  CreateChatCompletionRequestDto,
+  CreateChatSessionMessageRequestDto,
+  EditAndSendChatMessageRequestDto,
+  SwitchChatActiveMessageRequestDto,
   UpdateChatSessionModelRequestDto,
   UpdateChatSessionTitleRequestDto,
 } from './chat.dto'
 import { ChatService } from './chat.service'
+
+const SESSION_EVENT_POLL_INTERVAL_MS = 1000
 
 @Controller('chat')
 export class ChatController {
   constructor(
     private readonly chatService: ChatService,
     private readonly chatSessionsService: ChatSessionsService,
-    private readonly chatRunProjectorService: ChatRunProjectorService,
+    private readonly chatSessionEvents: ChatSessionEventsService,
   ) {}
 
   @Get('sessions')
@@ -91,6 +98,121 @@ export class ChatController {
     })
   }
 
+  @Post('sessions/:id/messages')
+  async sendMessage(
+    @CurrentUser() authUser: AuthUserContext,
+    @Param('id') sessionId: string,
+    @Body() payload: CreateChatSessionMessageRequestDto,
+  ): Promise<ChatMutationResponse> {
+    return this.chatService.sendMessage({
+      userId: authUser.id,
+      sessionId,
+      content: payload.content,
+    })
+  }
+
+  @Post('sessions/:id/messages/:messageId/edit-and-send')
+  async editAndSendMessage(
+    @CurrentUser() authUser: AuthUserContext,
+    @Param('id') sessionId: string,
+    @Param('messageId') messageId: string,
+    @Body() payload: EditAndSendChatMessageRequestDto,
+  ): Promise<ChatMutationResponse> {
+    return this.chatService.editAndSendMessage({
+      userId: authUser.id,
+      sessionId,
+      messageId,
+      content: payload.content,
+    })
+  }
+
+  @Post('sessions/:id/messages/:messageId/retry')
+  async retryAssistantMessage(
+    @CurrentUser() authUser: AuthUserContext,
+    @Param('id') sessionId: string,
+    @Param('messageId') messageId: string,
+  ): Promise<ChatMutationResponse> {
+    return this.chatService.retryAssistantMessage({
+      userId: authUser.id,
+      sessionId,
+      messageId,
+    })
+  }
+
+  @Patch('sessions/:id/active-message')
+  async switchActiveMessage(
+    @CurrentUser() authUser: AuthUserContext,
+    @Param('id') sessionId: string,
+    @Body() payload: SwitchChatActiveMessageRequestDto,
+  ): Promise<ChatMutationResponse> {
+    return this.chatService.switchActiveMessage({
+      userId: authUser.id,
+      sessionId,
+      messageId: payload.messageId,
+    })
+  }
+
+  @Post('runs/:runId/cancel')
+  async cancelRun(
+    @CurrentUser() authUser: AuthUserContext,
+    @Param('runId') runId: string,
+  ): Promise<ChatMutationResponse> {
+    return this.chatService.cancelRun({
+      userId: authUser.id,
+      runId,
+    })
+  }
+
+  @Get('sessions/:id/events')
+  async streamSessionEvents(
+    @CurrentUser() authUser: AuthUserContext,
+    @Param('id') sessionId: string,
+    @Query('afterSequence') afterSequence: string | undefined,
+    @Res() reply: FastifyReply,
+  ): Promise<void> {
+    await this.chatSessionsService.getSession(authUser.id, sessionId)
+
+    reply.raw.writeHead(200, {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      'Connection': 'keep-alive',
+    })
+
+    let cursor = parseAfterSequence(afterSequence)
+    const minimumSequence = await this.chatSessionEvents.getMinimumSequence(sessionId)
+    const latestSequence = await this.chatSessionEvents.getLatestSequence(sessionId)
+
+    if (cursor === null || (minimumSequence !== null && cursor < minimumSequence - 1)) {
+      writeSessionEvent(reply, this.chatSessionEvents.createSnapshotRequiredEvent({
+        sessionId,
+        latestSequence,
+      }))
+      cursor = latestSequence
+    }
+
+    try {
+      while (isReplyWritable(reply)) {
+        const events = await this.chatSessionEvents.getEventsAfter(sessionId, cursor)
+
+        for (const event of events) {
+          if (!isReplyWritable(reply)) {
+            return
+          }
+
+          writeSessionEvent(reply, event)
+          cursor = event.sequence
+        }
+
+        await sleep(SESSION_EVENT_POLL_INTERVAL_MS)
+      }
+    }
+    finally {
+      if (isReplyWritable(reply)) {
+        reply.raw.end()
+      }
+    }
+  }
+
   @Get('config')
   async getRuntimeConfig(
     @CurrentUser() authUser: AuthUserContext,
@@ -106,55 +228,25 @@ export class ChatController {
       models: await this.chatService.getModels(authUser.id),
     }
   }
+}
 
-  @Post('completions')
-  async createCompletion(
-    @CurrentUser() authUser: AuthUserContext,
-    @Body() payload: CreateChatCompletionRequestDto,
-    @Res() reply: FastifyReply,
-  ): Promise<void> {
-    const {
-      command,
-      expectedHistoryVersion,
-      nextAssistantOrder,
-      sessionId,
-    } = await this.chatService.prepareChatReplyCommand({
-      userId: authUser.id,
-      sessionId: payload.sessionId,
-      content: payload.content,
-    })
-    const assistantMessage = await this.chatSessionsService.createAssistantPlaceholderMessage({
-      sessionId,
-      order: nextAssistantOrder,
-      agentRunId: command.runId,
-    })
-
-    reply.raw.writeHead(200, {
-      'Content-Type': 'text/event-stream',
-      'Cache-Control': 'no-cache',
-      'Connection': 'keep-alive',
-    })
-
-    try {
-      await this.chatRunProjectorService.projectRunToReply({
-        reply,
-        command,
-        sessionId,
-        messageId: assistantMessage.id,
-        expectedHistoryVersion,
-        start: async () => {
-          await this.chatService.publishChatReplyCommand({
-            userId: authUser.id,
-            sessionId,
-            command,
-          })
-        },
-      })
-    }
-    finally {
-      if (!reply.raw.destroyed && !reply.raw.writableEnded) {
-        reply.raw.end()
-      }
-    }
+function parseAfterSequence(value: string | undefined): number | null {
+  if (typeof value !== 'string' || !value.trim()) {
+    return null
   }
+
+  const sequence = Number(value)
+  return Number.isInteger(sequence) && sequence >= 0 ? sequence : null
+}
+
+function writeSessionEvent(reply: FastifyReply, event: ChatSessionEvent): void {
+  reply.raw.write(`data: ${JSON.stringify(event)}\n\n`)
+}
+
+function isReplyWritable(reply: FastifyReply): boolean {
+  return !reply.raw.destroyed && !reply.raw.writableEnded
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms))
 }

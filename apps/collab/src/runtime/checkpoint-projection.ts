@@ -1,8 +1,8 @@
 import type {
   DocumentYdocCheckpointMetadata,
 } from '@haohaoxue/samepage-contracts'
+import type { DocumentYdocCurrentProjectionClient } from '../clients/documents'
 import type { CollabMetricsCollector } from '../observability/metrics'
-import type { DocumentYdocCurrentProjectionClient } from './ports'
 import type { CollabHocuspocusDocumentState } from './update-persistence-queue'
 import type { DocumentYdocRuntimeStore } from './ydoc-runtime-store'
 import { COLLAB_ERROR_CODE, TIPTAP_SCHEMA_VERSION } from '@haohaoxue/samepage-contracts'

@@ -1,15 +1,17 @@
 <script setup lang="ts">
-import type { ChatInputBoxEmits, ChatInputBoxProps } from '../typing'
+import { CloseBold } from '@element-plus/icons-vue'
 import { useChatInputBox } from '../composables/useChatInputBox'
 
-const props = withDefaults(defineProps<ChatInputBoxProps>(), {
-  placeholder: '输入消息...',
-})
-const emits = defineEmits<ChatInputBoxEmits>()
-const { handleKeydown, handleSend, inputText, isSendDisabled } = useChatInputBox(
-  props,
-  content => emits('send', content),
-)
+const {
+  cancelActiveRun,
+  cancelRunId,
+  handleKeydown,
+  handleSend,
+  inputPlaceholder,
+  inputText,
+  isDisabled,
+  isSendDisabled,
+} = useChatInputBox()
 </script>
 
 <template>
@@ -20,12 +22,23 @@ const { handleKeydown, handleSend, inputText, isSendDisabled } = useChatInputBox
           v-model="inputText"
           type="textarea"
           :autosize="{ minRows: 2, maxRows: 6 }"
-          :placeholder="props.placeholder"
-          :disabled="props.disabled"
+          :placeholder="inputPlaceholder"
+          :disabled="isDisabled"
           class="chat-input-box__field"
           @keydown="handleKeydown"
         />
         <ElButton
+          v-if="cancelRunId"
+          type="danger"
+          circle
+          plain
+          class="chat-input-box__send"
+          @click="cancelActiveRun"
+        >
+          <ElIcon><CloseBold /></ElIcon>
+        </ElButton>
+        <ElButton
+          v-else
           type="primary"
           circle
           :disabled="isSendDisabled"

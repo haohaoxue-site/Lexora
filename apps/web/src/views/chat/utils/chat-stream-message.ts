@@ -1,323 +1,234 @@
-import type { ChatMessage, ChatStreamEvent } from '@/apis/chat'
+import type { ChatMessage, ChatSessionEvent } from '@/apis/chat'
 import {
   CHAT_MESSAGE_FAILURE_REASON,
   CHAT_MESSAGE_PART_TYPE,
   CHAT_MESSAGE_STATUS,
-  CHAT_STREAM_EVENT_TYPE,
+  CHAT_SESSION_EVENT_TYPE,
 } from '@haohaoxue/samepage-contracts'
-import { nanoid } from 'nanoid'
 import dayjs from '@/utils/dayjs'
 
 type ChatMessagePart = ChatMessage['parts'][number]
-type AppendablePartType
-  = | typeof CHAT_MESSAGE_PART_TYPE.REASONING
-    | typeof CHAT_MESSAGE_PART_TYPE.TEXT
 
-export function createLocalChatMessage(input: {
-  role: ChatMessage['role']
-  status: ChatMessage['status']
-  content: string
-  order: number
-}): ChatMessage {
-  const now = dayjs().toISOString()
-  const id = createLocalMessageId(input.role)
-
-  return {
-    id,
-    role: input.role,
-    status: input.status,
-    content: input.content,
-    order: input.order,
-    parts: input.content
-      ? [createLocalTextPart(id, input.role, input.content, now)]
-      : [],
-    metadata: null,
-    createdAt: now,
-    updatedAt: now,
-    completedAt: input.status === CHAT_MESSAGE_STATUS.COMPLETED ? now : null,
-  }
-}
-
-export function applyChatStreamEventToMessages(
+export function applyChatSessionEventToMessages(
   messages: ChatMessage[],
-  event: ChatStreamEvent,
+  event: ChatSessionEvent,
 ): ChatMessage[] {
   switch (event.type) {
-    case CHAT_STREAM_EVENT_TYPE.MESSAGE_STARTED:
-      return applyMessageStarted(messages, event)
-    case CHAT_STREAM_EVENT_TYPE.REASONING_DELTA:
-      return appendAssistantPartDelta(messages, event.messageId, CHAT_MESSAGE_PART_TYPE.REASONING, event.text)
-    case CHAT_STREAM_EVENT_TYPE.TEXT_DELTA:
-      return appendAssistantPartDelta(messages, event.messageId, CHAT_MESSAGE_PART_TYPE.TEXT, event.text)
-    case CHAT_STREAM_EVENT_TYPE.MESSAGE_COMPLETED:
-      return applyMessageCompleted(messages, event.messageId, event.content)
-    case CHAT_STREAM_EVENT_TYPE.ERROR:
-      return applyMessageFailed(messages, event.message)
-    case CHAT_STREAM_EVENT_TYPE.RUN_COMPLETED:
-    case CHAT_STREAM_EVENT_TYPE.TOOL_CALL_STARTED:
-    case CHAT_STREAM_EVENT_TYPE.TOOL_CALL_ARGS_DELTA:
-    case CHAT_STREAM_EVENT_TYPE.TOOL_CALL_COMPLETED:
-    case CHAT_STREAM_EVENT_TYPE.TOOL_RESULT:
+    case CHAT_SESSION_EVENT_TYPE.MESSAGE_PART_DELTA:
+      return appendMessagePartDelta(messages, event.messageId, event.payload.partType, event.payload.delta)
+    case CHAT_SESSION_EVENT_TYPE.MESSAGE_STATUS_CHANGED:
+      return updateMessageStatus(messages, event.messageId, event.payload.status)
+    case CHAT_SESSION_EVENT_TYPE.MESSAGE_COMPLETED:
+      return completeMessage(messages, event.messageId, getPayloadString(event.payload, 'content') ?? '')
+    case CHAT_SESSION_EVENT_TYPE.MESSAGE_FAILED:
+      return failMessage(
+        messages,
+        event.messageId,
+        getPayloadString(event.payload, 'failureMessage') ?? getPayloadString(event.payload, 'message') ?? '生成失败',
+      )
+    case CHAT_SESSION_EVENT_TYPE.MESSAGE_CANCELLED:
+      return updateMessageStatus(messages, event.messageId, CHAT_MESSAGE_STATUS.CANCELLED, {
+        completedAt: dayjs().toISOString(),
+      })
+    case CHAT_SESSION_EVENT_TYPE.MESSAGE_CREATED:
+    case CHAT_SESSION_EVENT_TYPE.RUN_STARTED:
+    case CHAT_SESSION_EVENT_TYPE.RUN_COMPLETED:
+    case CHAT_SESSION_EVENT_TYPE.RUN_FAILED:
+    case CHAT_SESSION_EVENT_TYPE.RUN_CANCELLED:
+    case CHAT_SESSION_EVENT_TYPE.BRANCH_SWITCHED:
+    case CHAT_SESSION_EVENT_TYPE.TITLE_UPDATED:
+    case CHAT_SESSION_EVENT_TYPE.SNAPSHOT_REQUIRED:
       return messages
   }
 }
 
-function applyMessageStarted(
-  messages: ChatMessage[],
-  event: Extract<ChatStreamEvent, { type: typeof CHAT_STREAM_EVENT_TYPE.MESSAGE_STARTED }>,
-) {
-  const now = dayjs().toISOString()
-  const existingIndex = messages.findIndex(message => message.id === event.messageId)
-  if (existingIndex >= 0) {
-    return updateMessage(messages, existingIndex, {
-      ...messages[existingIndex],
-      status: CHAT_MESSAGE_STATUS.STREAMING,
-      updatedAt: now,
-    })
-  }
-
-  const placeholderIndex = findLatestAssistantIndex(messages, {
-    preferStreaming: true,
-    preferLocal: true,
-  })
-
-  if (placeholderIndex < 0) {
-    return [
-      ...messages,
-      createAssistantMessage({
-        id: event.messageId,
-        status: CHAT_MESSAGE_STATUS.STREAMING,
-        order: nextMessageOrder(messages),
-        now,
-      }),
-    ]
-  }
-
-  const placeholder = messages[placeholderIndex]
-  return updateMessage(messages, placeholderIndex, {
-    ...placeholder,
-    id: event.messageId,
-    status: CHAT_MESSAGE_STATUS.STREAMING,
-    parts: placeholder.parts.map(part => normalizeLocalPartMessageId(part, placeholder.id, event.messageId)),
-    updatedAt: now,
-  })
-}
-
-function appendAssistantPartDelta(
+function appendMessagePartDelta(
   messages: ChatMessage[],
   messageId: string,
-  partType: AppendablePartType,
+  partType: ChatMessagePart['type'],
   delta: string,
-) {
+): ChatMessage[] {
   if (!delta) {
     return messages
   }
 
-  const target = resolveAssistantTarget(messages, messageId)
-  const now = dayjs().toISOString()
-  const nextMessage = target.message ?? createAssistantMessage({
-    id: messageId,
-    status: CHAT_MESSAGE_STATUS.STREAMING,
-    order: nextMessageOrder(messages),
-    now,
-  })
-  const nextParts = upsertAppendablePart(nextMessage, partType, delta, now, 'append')
-  const nextContent = partType === CHAT_MESSAGE_PART_TYPE.TEXT
-    ? getPartText(nextParts, CHAT_MESSAGE_PART_TYPE.TEXT)
-    : nextMessage.content
-  const updatedMessage: ChatMessage = {
-    ...nextMessage,
-    status: nextMessage.status === CHAT_MESSAGE_STATUS.COMPLETED
-      ? nextMessage.status
-      : CHAT_MESSAGE_STATUS.STREAMING,
-    content: nextContent,
-    parts: nextParts,
-    updatedAt: now,
-  }
-
-  return target.index >= 0
-    ? updateMessage(messages, target.index, updatedMessage)
-    : [...messages, updatedMessage]
-}
-
-function applyMessageCompleted(
-  messages: ChatMessage[],
-  messageId: string,
-  content: string,
-) {
-  const target = resolveAssistantTarget(messages, messageId)
-  const now = dayjs().toISOString()
-  const nextMessage = target.message ?? createAssistantMessage({
-    id: messageId,
-    status: CHAT_MESSAGE_STATUS.COMPLETED,
-    order: nextMessageOrder(messages),
-    now,
-  })
-  const hasTextPart = nextMessage.parts.some(part => part.type === CHAT_MESSAGE_PART_TYPE.TEXT)
-  const nextParts = content || hasTextPart
-    ? upsertAppendablePart(nextMessage, CHAT_MESSAGE_PART_TYPE.TEXT, content, now, 'replace')
-    : nextMessage.parts
-  const updatedMessage: ChatMessage = {
-    ...nextMessage,
-    status: CHAT_MESSAGE_STATUS.COMPLETED,
-    content,
-    parts: nextParts,
-    updatedAt: now,
-    completedAt: now,
-  }
-
-  return target.index >= 0
-    ? updateMessage(messages, target.index, updatedMessage)
-    : [...messages, updatedMessage]
-}
-
-function applyMessageFailed(messages: ChatMessage[], message: string) {
-  const targetIndex = findLatestStreamingAssistantIndex(messages)
-
-  if (targetIndex < 0) {
+  const index = messages.findIndex(message => message.id === messageId)
+  if (index < 0) {
     return messages
   }
 
   const now = dayjs().toISOString()
-  const target = messages[targetIndex]
+  const message = messages[index]
+  const parts = upsertPart(message, partType, delta, now)
+  const content = partType === CHAT_MESSAGE_PART_TYPE.TEXT
+    ? getPartText(parts, CHAT_MESSAGE_PART_TYPE.TEXT)
+    : message.content
 
-  return updateMessage(messages, targetIndex, {
-    ...target,
-    status: CHAT_MESSAGE_STATUS.FAILED,
-    metadata: {
-      ...(target.metadata ?? {}),
-      failureReason: CHAT_MESSAGE_FAILURE_REASON.FAILED,
-      failureMessage: message,
-    },
+  return updateMessage(messages, index, {
+    ...message,
+    status: message.status === CHAT_MESSAGE_STATUS.COMPLETED
+      ? message.status
+      : CHAT_MESSAGE_STATUS.STREAMING,
+    content,
+    parts,
     updatedAt: now,
   })
 }
 
-function resolveAssistantTarget(messages: ChatMessage[], messageId: string) {
-  const messageIndex = messages.findIndex(message => message.id === messageId)
-  if (messageIndex >= 0) {
-    return {
-      index: messageIndex,
-      message: messages[messageIndex],
-    }
+function updateMessageStatus(
+  messages: ChatMessage[],
+  messageId: string,
+  status: ChatMessage['status'],
+  patch: Partial<Pick<ChatMessage, 'completedAt'>> = {},
+): ChatMessage[] {
+  const index = messages.findIndex(message => message.id === messageId)
+  if (index < 0) {
+    return messages
   }
 
-  const placeholderIndex = findLatestAssistantIndex(messages, {
-    preferStreaming: true,
-    preferLocal: true,
+  return updateMessage(messages, index, {
+    ...messages[index],
+    status,
+    updatedAt: dayjs().toISOString(),
+    ...patch,
   })
-
-  if (placeholderIndex >= 0) {
-    const placeholder = messages[placeholderIndex]
-    return {
-      index: placeholderIndex,
-      message: {
-        ...placeholder,
-        id: messageId,
-        parts: placeholder.parts.map(part => normalizeLocalPartMessageId(part, placeholder.id, messageId)),
-      },
-    }
-  }
-
-  return {
-    index: -1,
-    message: null,
-  }
 }
 
-function upsertAppendablePart(
-  message: ChatMessage,
-  partType: AppendablePartType,
-  text: string,
-  now: string,
-  mode: 'append' | 'replace',
-) {
-  const parts = [...message.parts]
-  const partIndex = parts.findIndex(part => part.type === partType)
-
-  if (partIndex >= 0) {
-    const currentPart = parts[partIndex]
-    parts[partIndex] = {
-      ...currentPart,
-      text: mode === 'append' ? currentPart.text + text : text,
-      updatedAt: now,
-    }
-    return sortMessageParts(parts)
+function completeMessage(
+  messages: ChatMessage[],
+  messageId: string,
+  content: string,
+): ChatMessage[] {
+  const index = messages.findIndex(message => message.id === messageId)
+  if (index < 0) {
+    return messages
   }
 
-  return sortMessageParts([
+  const now = dayjs().toISOString()
+  const message = messages[index]
+  const parts = content
+    ? replaceTextPart(message, content, now)
+    : message.parts
+
+  return updateMessage(messages, index, {
+    ...message,
+    status: CHAT_MESSAGE_STATUS.COMPLETED,
+    content,
+    parts,
+    updatedAt: now,
+    completedAt: now,
+  })
+}
+
+function failMessage(
+  messages: ChatMessage[],
+  messageId: string,
+  failureMessage: string,
+): ChatMessage[] {
+  const index = messages.findIndex(message => message.id === messageId)
+  if (index < 0) {
+    return messages
+  }
+
+  const now = dayjs().toISOString()
+  const message = messages[index]
+
+  return updateMessage(messages, index, {
+    ...message,
+    status: CHAT_MESSAGE_STATUS.FAILED,
+    metadata: {
+      ...(message.metadata ?? {}),
+      failureReason: CHAT_MESSAGE_FAILURE_REASON.FAILED,
+      failureMessage,
+    },
+    updatedAt: now,
+    completedAt: now,
+  })
+}
+
+function upsertPart(
+  message: ChatMessage,
+  partType: ChatMessagePart['type'],
+  delta: string,
+  now: string,
+): ChatMessagePart[] {
+  const parts = [...message.parts]
+  const index = parts.findIndex(part => part.type === partType)
+
+  if (index >= 0) {
+    const part = parts[index]
+    parts[index] = {
+      ...part,
+      text: part.text + delta,
+      updatedAt: now,
+    }
+    return sortParts(parts)
+  }
+
+  return sortParts([
     ...parts,
-    createLocalPart(message.id, partType, text, now),
+    createTransientPart(message.id, partType, delta, now),
   ])
 }
 
-function getPartText(parts: ChatMessagePart[], partType: AppendablePartType) {
-  return parts.find(part => part.type === partType)?.text ?? ''
-}
+function replaceTextPart(
+  message: ChatMessage,
+  content: string,
+  now: string,
+): ChatMessagePart[] {
+  const parts = [...message.parts]
+  const index = parts.findIndex(part => part.type === CHAT_MESSAGE_PART_TYPE.TEXT)
 
-function createAssistantMessage(input: {
-  id: string
-  status: ChatMessage['status']
-  order: number
-  now: string
-}): ChatMessage {
-  return {
-    id: input.id,
-    role: 'assistant',
-    status: input.status,
-    content: '',
-    order: input.order,
-    parts: [],
-    metadata: null,
-    createdAt: input.now,
-    updatedAt: input.now,
-    completedAt: input.status === CHAT_MESSAGE_STATUS.COMPLETED ? input.now : null,
+  if (index >= 0) {
+    const part = parts[index]
+    parts[index] = {
+      ...part,
+      text: content,
+      updatedAt: now,
+    }
+    return sortParts(parts)
   }
+
+  return sortParts([
+    ...parts,
+    createTransientPart(message.id, CHAT_MESSAGE_PART_TYPE.TEXT, content, now),
+  ])
 }
 
-function createLocalTextPart(
+function createTransientPart(
   messageId: string,
-  role: ChatMessage['role'],
+  type: ChatMessagePart['type'],
   text: string,
   now: string,
-) {
-  return createLocalPart(messageId, CHAT_MESSAGE_PART_TYPE.TEXT, text, now, role === 'assistant' ? 1 : 0)
-}
-
-function createLocalPart(
-  messageId: string,
-  type: AppendablePartType,
-  text: string,
-  now: string,
-  order = type === CHAT_MESSAGE_PART_TYPE.REASONING ? 0 : 1,
 ): ChatMessagePart {
   return {
-    id: createLocalPartId(messageId, type),
+    id: `${messageId}:${type}`,
     type,
     text,
-    order,
+    order: getPartOrder(type),
     metadata: null,
     createdAt: now,
     updatedAt: now,
   }
 }
 
-function normalizeLocalPartMessageId(part: ChatMessagePart, previousMessageId: string, nextMessageId: string) {
-  if (!part.id.startsWith(`${previousMessageId}:`)) {
-    return part
-  }
-
-  return {
-    ...part,
-    id: createLocalPartId(nextMessageId, part.type),
-  }
+function getPartText(parts: ChatMessagePart[], partType: ChatMessagePart['type']) {
+  return parts.find(part => part.type === partType)?.text ?? ''
 }
 
-function createLocalPartId(messageId: string, type: ChatMessagePart['type']) {
-  return `${messageId}:${type}`
+function getPartOrder(partType: ChatMessagePart['type']) {
+  if (partType === CHAT_MESSAGE_PART_TYPE.REASONING) {
+    return 0
+  }
+
+  if (partType === CHAT_MESSAGE_PART_TYPE.TEXT) {
+    return 1
+  }
+
+  return 10
 }
 
-function sortMessageParts(parts: ChatMessagePart[]) {
+function sortParts(parts: ChatMessagePart[]) {
   return [...parts].sort((first, second) => first.order - second.order)
 }
 
@@ -327,53 +238,7 @@ function updateMessage(messages: ChatMessage[], index: number, nextMessage: Chat
   return nextMessages
 }
 
-function findLatestAssistantIndex(
-  messages: ChatMessage[],
-  options: {
-    preferStreaming: boolean
-    preferLocal: boolean
-  },
-) {
-  if (options.preferStreaming) {
-    const streamingIndex = findLatestStreamingAssistantIndex(messages)
-    if (streamingIndex >= 0) {
-      return streamingIndex
-    }
-  }
-
-  if (options.preferLocal) {
-    for (let index = messages.length - 1; index >= 0; index -= 1) {
-      const message = messages[index]
-      if (message.role === 'assistant' && message.id.startsWith('local:')) {
-        return index
-      }
-    }
-  }
-
-  for (let index = messages.length - 1; index >= 0; index -= 1) {
-    if (messages[index].role === 'assistant') {
-      return index
-    }
-  }
-
-  return -1
-}
-
-function findLatestStreamingAssistantIndex(messages: ChatMessage[]) {
-  for (let index = messages.length - 1; index >= 0; index -= 1) {
-    const message = messages[index]
-    if (message.role === 'assistant' && message.status === CHAT_MESSAGE_STATUS.STREAMING) {
-      return index
-    }
-  }
-
-  return -1
-}
-
-function nextMessageOrder(messages: ChatMessage[]) {
-  return (messages.at(-1)?.order ?? -1) + 1
-}
-
-function createLocalMessageId(role: ChatMessage['role']): string {
-  return `local:${role}:${nanoid()}`
+function getPayloadString(payload: Record<string, unknown>, key: string): string | null {
+  const value = payload[key]
+  return typeof value === 'string' && value.trim() ? value : null
 }

@@ -3,15 +3,19 @@ import { AiAvailableModelOptionSchema, AiModelRefSchema } from './ai'
 
 export const ChatMessageRoleSchema = z.enum(['user', 'assistant'])
 export const CHAT_MESSAGE_STATUS = {
+  PENDING: 'pending',
   STREAMING: 'streaming',
   COMPLETED: 'completed',
   FAILED: 'failed',
+  CANCELLED: 'cancelled',
 } as const
 
 export const CHAT_MESSAGE_STATUS_VALUES = [
+  CHAT_MESSAGE_STATUS.PENDING,
   CHAT_MESSAGE_STATUS.STREAMING,
   CHAT_MESSAGE_STATUS.COMPLETED,
   CHAT_MESSAGE_STATUS.FAILED,
+  CHAT_MESSAGE_STATUS.CANCELLED,
 ] as const
 
 export const CHAT_MESSAGE_PART_TYPE = {
@@ -44,18 +48,53 @@ export const CHAT_MESSAGE_FAILURE_REASON_VALUES = [
   CHAT_MESSAGE_FAILURE_REASON.TIMED_OUT,
 ] as const
 
-export const CHAT_STREAM_EVENT_TYPE = {
-  MESSAGE_STARTED: 'message.started',
-  REASONING_DELTA: 'reasoning.delta',
-  TEXT_DELTA: 'text.delta',
-  MESSAGE_COMPLETED: 'message.completed',
-  RUN_COMPLETED: 'run.completed',
-  ERROR: 'error',
-  TOOL_CALL_STARTED: 'tool.call.started',
-  TOOL_CALL_ARGS_DELTA: 'tool.call.args.delta',
-  TOOL_CALL_COMPLETED: 'tool.call.completed',
-  TOOL_RESULT: 'tool.result',
+export const CHAT_RUN_STATUS = {
+  PENDING: 'pending',
+  RUNNING: 'running',
+  COMPLETED: 'completed',
+  FAILED: 'failed',
+  CANCELLED: 'cancelled',
 } as const
+
+export const CHAT_RUN_STATUS_VALUES = [
+  CHAT_RUN_STATUS.PENDING,
+  CHAT_RUN_STATUS.RUNNING,
+  CHAT_RUN_STATUS.COMPLETED,
+  CHAT_RUN_STATUS.FAILED,
+  CHAT_RUN_STATUS.CANCELLED,
+] as const
+
+export const CHAT_SESSION_EVENT_TYPE = {
+  MESSAGE_CREATED: 'chat.message.created',
+  MESSAGE_STATUS_CHANGED: 'chat.message.status.changed',
+  MESSAGE_PART_DELTA: 'chat.message.part.delta',
+  MESSAGE_COMPLETED: 'chat.message.completed',
+  MESSAGE_FAILED: 'chat.message.failed',
+  MESSAGE_CANCELLED: 'chat.message.cancelled',
+  RUN_STARTED: 'chat.run.started',
+  RUN_COMPLETED: 'chat.run.completed',
+  RUN_FAILED: 'chat.run.failed',
+  RUN_CANCELLED: 'chat.run.cancelled',
+  BRANCH_SWITCHED: 'chat.branch.switched',
+  TITLE_UPDATED: 'chat.title.updated',
+  SNAPSHOT_REQUIRED: 'chat.snapshot.required',
+} as const
+
+export const CHAT_SESSION_EVENT_TYPE_VALUES = [
+  CHAT_SESSION_EVENT_TYPE.MESSAGE_CREATED,
+  CHAT_SESSION_EVENT_TYPE.MESSAGE_STATUS_CHANGED,
+  CHAT_SESSION_EVENT_TYPE.MESSAGE_PART_DELTA,
+  CHAT_SESSION_EVENT_TYPE.MESSAGE_COMPLETED,
+  CHAT_SESSION_EVENT_TYPE.MESSAGE_FAILED,
+  CHAT_SESSION_EVENT_TYPE.MESSAGE_CANCELLED,
+  CHAT_SESSION_EVENT_TYPE.RUN_STARTED,
+  CHAT_SESSION_EVENT_TYPE.RUN_COMPLETED,
+  CHAT_SESSION_EVENT_TYPE.RUN_FAILED,
+  CHAT_SESSION_EVENT_TYPE.RUN_CANCELLED,
+  CHAT_SESSION_EVENT_TYPE.BRANCH_SWITCHED,
+  CHAT_SESSION_EVENT_TYPE.TITLE_UPDATED,
+  CHAT_SESSION_EVENT_TYPE.SNAPSHOT_REQUIRED,
+] as const
 
 export const CHAT_SESSION_DEFAULT_TITLE = '新对话'
 export const CHAT_SESSION_TITLE_MAX_LENGTH = 120
@@ -77,6 +116,15 @@ const ChatSessionSummaryBaseSchema = z.object({
 export const ChatMessageStatusSchema = z.enum(CHAT_MESSAGE_STATUS_VALUES)
 export const ChatMessagePartTypeSchema = z.enum(CHAT_MESSAGE_PART_TYPE_VALUES)
 export const ChatMessageFailureReasonSchema = z.enum(CHAT_MESSAGE_FAILURE_REASON_VALUES)
+export const ChatRunStatusSchema = z.enum(CHAT_RUN_STATUS_VALUES)
+export const ChatSessionEventTypeSchema = z.enum(CHAT_SESSION_EVENT_TYPE_VALUES)
+
+export const ChatMessageBranchSchema = z.object({
+  index: z.number().int().positive(),
+  count: z.number().int().positive(),
+  previousMessageId: NonEmptyStringSchema.nullable(),
+  nextMessageId: NonEmptyStringSchema.nullable(),
+}).strict()
 
 export const ChatMessageMetadataSchema = z.object({
   failureReason: ChatMessageFailureReasonSchema.optional(),
@@ -109,7 +157,7 @@ export const ChatMessageSchema = z.object({
   role: ChatMessageRoleSchema,
   status: ChatMessageStatusSchema,
   content: z.string(),
-  order: z.number().int().nonnegative(),
+  branch: ChatMessageBranchSchema,
   parts: z.array(ChatMessagePartSchema),
   metadata: ChatMessageMetadataSchema.nullable(),
   createdAt: IsoDateTimeStringSchema,
@@ -119,8 +167,20 @@ export const ChatMessageSchema = z.object({
 
 export const ChatSessionSummarySchema = ChatSessionSummaryBaseSchema
 
+export const ChatRunSummarySchema = z.object({
+  runId: NonEmptyStringSchema,
+  status: ChatRunStatusSchema,
+  assistantMessageId: NonEmptyStringSchema,
+  triggerUserMessageId: NonEmptyStringSchema,
+  createdAt: IsoDateTimeStringSchema,
+  startedAt: IsoDateTimeStringSchema.nullable(),
+  completedAt: IsoDateTimeStringSchema.nullable(),
+}).strict()
+
 export const ChatSessionDetailSchema = ChatSessionSummarySchema.extend({
+  latestSequence: z.number().int().nonnegative(),
   messages: z.array(ChatMessageSchema),
+  activeRun: ChatRunSummarySchema.nullable().optional(),
 }).strict()
 
 export const ChatModelItemSchema = AiAvailableModelOptionSchema
@@ -136,10 +196,21 @@ export const ChatRuntimeConfigSchema = z.object({
   notReadyReason: z.string().trim().min(1).nullable(),
 }).strict()
 
-export const CreateChatCompletionRequestSchema = z.object({
-  sessionId: z.string().trim().min(1),
-  content: z.string().max(40_000),
+export const CreateChatSessionMessageRequestSchema = z.object({
+  content: z.string().trim().min(1).max(40_000),
 }).strict()
+
+export const EditAndSendChatMessageRequestSchema = z.object({
+  content: z.string().trim().min(1).max(40_000),
+}).strict()
+
+export const RetryChatAssistantMessageRequestSchema = z.object({}).strict()
+
+export const SwitchChatActiveMessageRequestSchema = z.object({
+  messageId: NonEmptyStringSchema,
+}).strict()
+
+export const CancelChatRunRequestSchema = z.object({}).strict()
 
 export const UpdateChatSessionModelRequestSchema = z.object({
   modelRef: AiModelRefSchema.pick({
@@ -152,93 +223,138 @@ export const UpdateChatSessionTitleRequestSchema = z.object({
   title: ChatSessionTitleSchema,
 }).strict()
 
-const ChatStreamMessageStartedEventSchema = z.object({
-  type: z.literal(CHAT_STREAM_EVENT_TYPE.MESSAGE_STARTED),
-  runId: NonEmptyStringSchema,
+export const ChatMutationResponseSchema = z.object({
+  session: ChatSessionDetailSchema,
+  latestSequence: z.number().int().nonnegative(),
+  run: ChatRunSummarySchema.optional(),
+}).strict()
+
+const ChatSessionEventBaseSchema = z.object({
+  sequence: z.number().int().positive(),
+  sessionId: NonEmptyStringSchema,
+  messageId: NonEmptyStringSchema.nullable(),
+  runId: NonEmptyStringSchema.nullable(),
+  sourceEventId: NonEmptyStringSchema.nullable(),
+  createdAt: IsoDateTimeStringSchema,
+})
+
+const ChatSessionEventPayloadSchema = z.record(z.string(), z.unknown())
+
+const ChatSessionMessagePartDeltaEventSchema = ChatSessionEventBaseSchema.extend({
+  type: z.literal(CHAT_SESSION_EVENT_TYPE.MESSAGE_PART_DELTA),
   messageId: NonEmptyStringSchema,
-  role: z.literal('assistant'),
+  runId: NonEmptyStringSchema,
+  sourceEventId: NonEmptyStringSchema,
+  payload: z.object({
+    partType: ChatMessagePartTypeSchema,
+    delta: z.string(),
+  }).strict(),
 }).strict()
 
-const ChatStreamReasoningDeltaEventSchema = z.object({
-  type: z.literal(CHAT_STREAM_EVENT_TYPE.REASONING_DELTA),
-  runId: NonEmptyStringSchema,
+const ChatSessionSnapshotRequiredEventSchema = ChatSessionEventBaseSchema.extend({
+  type: z.literal(CHAT_SESSION_EVENT_TYPE.SNAPSHOT_REQUIRED),
+  messageId: z.null(),
+  runId: z.null(),
+  sourceEventId: z.null(),
+  payload: z.object({
+    reason: z.literal('cursor_expired'),
+    latestSequence: z.number().int().nonnegative(),
+  }).strict(),
+}).strict()
+
+const ChatSessionMessageCreatedEventSchema = ChatSessionEventBaseSchema.extend({
+  type: z.literal(CHAT_SESSION_EVENT_TYPE.MESSAGE_CREATED),
   messageId: NonEmptyStringSchema,
-  text: z.string(),
+  payload: ChatSessionEventPayloadSchema,
 }).strict()
 
-const ChatStreamTextDeltaEventSchema = z.object({
-  type: z.literal(CHAT_STREAM_EVENT_TYPE.TEXT_DELTA),
-  runId: NonEmptyStringSchema,
+const ChatSessionMessageStatusChangedEventSchema = ChatSessionEventBaseSchema.extend({
+  type: z.literal(CHAT_SESSION_EVENT_TYPE.MESSAGE_STATUS_CHANGED),
   messageId: NonEmptyStringSchema,
-  text: z.string(),
+  payload: z.object({
+    status: ChatMessageStatusSchema,
+  }).strict(),
 }).strict()
 
-const ChatStreamMessageCompletedEventSchema = z.object({
-  type: z.literal(CHAT_STREAM_EVENT_TYPE.MESSAGE_COMPLETED),
-  runId: NonEmptyStringSchema,
+const ChatSessionMessageCompletedEventSchema = ChatSessionEventBaseSchema.extend({
+  type: z.literal(CHAT_SESSION_EVENT_TYPE.MESSAGE_COMPLETED),
   messageId: NonEmptyStringSchema,
-  content: z.string(),
-}).strict()
-
-const ChatStreamRunCompletedEventSchema = z.object({
-  type: z.literal(CHAT_STREAM_EVENT_TYPE.RUN_COMPLETED),
   runId: NonEmptyStringSchema,
+  payload: ChatSessionEventPayloadSchema,
 }).strict()
 
-const ChatStreamErrorEventSchema = z.object({
-  type: z.literal(CHAT_STREAM_EVENT_TYPE.ERROR),
-  runId: NonEmptyStringSchema.optional(),
-  message: NonEmptyStringSchema,
-  code: NonEmptyStringSchema.optional(),
-}).strict()
-
-const ChatStreamToolCallStartedEventSchema = z.object({
-  type: z.literal(CHAT_STREAM_EVENT_TYPE.TOOL_CALL_STARTED),
-  runId: NonEmptyStringSchema,
+const ChatSessionMessageFailedEventSchema = ChatSessionEventBaseSchema.extend({
+  type: z.literal(CHAT_SESSION_EVENT_TYPE.MESSAGE_FAILED),
   messageId: NonEmptyStringSchema,
-  toolCallId: NonEmptyStringSchema,
-  toolName: NonEmptyStringSchema,
-}).strict()
-
-const ChatStreamToolCallArgsDeltaEventSchema = z.object({
-  type: z.literal(CHAT_STREAM_EVENT_TYPE.TOOL_CALL_ARGS_DELTA),
   runId: NonEmptyStringSchema,
-  messageId: NonEmptyStringSchema,
-  toolCallId: NonEmptyStringSchema,
-  text: z.string(),
+  payload: ChatSessionEventPayloadSchema,
 }).strict()
 
-const ChatStreamToolCallCompletedEventSchema = z.object({
-  type: z.literal(CHAT_STREAM_EVENT_TYPE.TOOL_CALL_COMPLETED),
+const ChatSessionMessageCancelledEventSchema = ChatSessionEventBaseSchema.extend({
+  type: z.literal(CHAT_SESSION_EVENT_TYPE.MESSAGE_CANCELLED),
+  messageId: NonEmptyStringSchema,
   runId: NonEmptyStringSchema,
-  messageId: NonEmptyStringSchema,
-  toolCallId: NonEmptyStringSchema,
+  payload: ChatSessionEventPayloadSchema,
 }).strict()
 
-const ChatStreamToolResultEventSchema = z.object({
-  type: z.literal(CHAT_STREAM_EVENT_TYPE.TOOL_RESULT),
+const ChatSessionRunStartedEventSchema = ChatSessionEventBaseSchema.extend({
+  type: z.literal(CHAT_SESSION_EVENT_TYPE.RUN_STARTED),
   runId: NonEmptyStringSchema,
-  messageId: NonEmptyStringSchema,
-  toolCallId: NonEmptyStringSchema,
-  content: z.string(),
+  payload: ChatSessionEventPayloadSchema,
 }).strict()
 
-export const ChatStreamEventSchema = z.discriminatedUnion('type', [
-  ChatStreamMessageStartedEventSchema,
-  ChatStreamReasoningDeltaEventSchema,
-  ChatStreamTextDeltaEventSchema,
-  ChatStreamMessageCompletedEventSchema,
-  ChatStreamRunCompletedEventSchema,
-  ChatStreamErrorEventSchema,
-  ChatStreamToolCallStartedEventSchema,
-  ChatStreamToolCallArgsDeltaEventSchema,
-  ChatStreamToolCallCompletedEventSchema,
-  ChatStreamToolResultEventSchema,
+const ChatSessionRunCompletedEventSchema = ChatSessionEventBaseSchema.extend({
+  type: z.literal(CHAT_SESSION_EVENT_TYPE.RUN_COMPLETED),
+  runId: NonEmptyStringSchema,
+  payload: ChatSessionEventPayloadSchema,
+}).strict()
+
+const ChatSessionRunFailedEventSchema = ChatSessionEventBaseSchema.extend({
+  type: z.literal(CHAT_SESSION_EVENT_TYPE.RUN_FAILED),
+  runId: NonEmptyStringSchema,
+  payload: ChatSessionEventPayloadSchema,
+}).strict()
+
+const ChatSessionRunCancelledEventSchema = ChatSessionEventBaseSchema.extend({
+  type: z.literal(CHAT_SESSION_EVENT_TYPE.RUN_CANCELLED),
+  runId: NonEmptyStringSchema,
+  payload: ChatSessionEventPayloadSchema,
+}).strict()
+
+const ChatSessionBranchSwitchedEventSchema = ChatSessionEventBaseSchema.extend({
+  type: z.literal(CHAT_SESSION_EVENT_TYPE.BRANCH_SWITCHED),
+  payload: ChatSessionEventPayloadSchema,
+}).strict()
+
+const ChatSessionTitleUpdatedEventSchema = ChatSessionEventBaseSchema.extend({
+  type: z.literal(CHAT_SESSION_EVENT_TYPE.TITLE_UPDATED),
+  payload: z.object({
+    title: ChatSessionTitleSchema,
+  }).strict(),
+}).strict()
+
+export const ChatSessionEventSchema = z.discriminatedUnion('type', [
+  ChatSessionMessageCreatedEventSchema,
+  ChatSessionMessageStatusChangedEventSchema,
+  ChatSessionMessagePartDeltaEventSchema,
+  ChatSessionMessageCompletedEventSchema,
+  ChatSessionMessageFailedEventSchema,
+  ChatSessionMessageCancelledEventSchema,
+  ChatSessionRunStartedEventSchema,
+  ChatSessionRunCompletedEventSchema,
+  ChatSessionRunFailedEventSchema,
+  ChatSessionRunCancelledEventSchema,
+  ChatSessionBranchSwitchedEventSchema,
+  ChatSessionTitleUpdatedEventSchema,
+  ChatSessionSnapshotRequiredEventSchema,
 ])
 
 export type ChatMessageStatus = z.infer<typeof ChatMessageStatusSchema>
 export type ChatMessagePartType = z.infer<typeof ChatMessagePartTypeSchema>
 export type ChatMessageFailureReason = z.infer<typeof ChatMessageFailureReasonSchema>
+export type ChatRunStatus = z.infer<typeof ChatRunStatusSchema>
+export type ChatSessionEventType = z.infer<typeof ChatSessionEventTypeSchema>
+export type ChatMessageBranch = z.infer<typeof ChatMessageBranchSchema>
 export type ChatMessageMetadata = z.infer<typeof ChatMessageMetadataSchema>
 export type ChatMessagePartMetadata = z.infer<typeof ChatMessagePartMetadataSchema>
 export type ChatMessagePart = z.infer<typeof ChatMessagePartSchema>
@@ -248,8 +364,14 @@ export type ChatSessionDetail = z.infer<typeof ChatSessionDetailSchema>
 export type ChatModelItem = z.infer<typeof ChatModelItemSchema>
 export type ChatModelListResponse = z.infer<typeof ChatModelListResponseSchema>
 export type ChatRuntimeConfig = z.infer<typeof ChatRuntimeConfigSchema>
-export type CreateChatCompletionRequest = z.infer<typeof CreateChatCompletionRequestSchema>
+export type ChatRunSummary = z.infer<typeof ChatRunSummarySchema>
+export type CreateChatSessionMessageRequest = z.infer<typeof CreateChatSessionMessageRequestSchema>
+export type EditAndSendChatMessageRequest = z.infer<typeof EditAndSendChatMessageRequestSchema>
+export type RetryChatAssistantMessageRequest = z.infer<typeof RetryChatAssistantMessageRequestSchema>
+export type SwitchChatActiveMessageRequest = z.infer<typeof SwitchChatActiveMessageRequestSchema>
+export type CancelChatRunRequest = z.infer<typeof CancelChatRunRequestSchema>
+export type ChatMutationResponse = z.infer<typeof ChatMutationResponseSchema>
 export type UpdateChatSessionModelRequest = z.infer<typeof UpdateChatSessionModelRequestSchema>
 export type UpdateChatSessionTitleRequest = z.infer<typeof UpdateChatSessionTitleRequestSchema>
 export type ChatModelSelection = UpdateChatSessionModelRequest
-export type ChatStreamEvent = z.infer<typeof ChatStreamEventSchema>
+export type ChatSessionEvent = z.infer<typeof ChatSessionEventSchema>

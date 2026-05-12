@@ -9,7 +9,6 @@ import {
   MaterializeDocumentYdocCurrentProjectionSchema,
 } from '@haohaoxue/samepage-contracts'
 import { Body, Controller, Param, Post, UnauthorizedException } from '@nestjs/common'
-import { SkipThrottle } from '@nestjs/throttler'
 import { Public } from '../../../decorators/public.decorator'
 import { ZodValidationPipe } from '../../../pipes/zod-validation.pipe'
 import { DocumentContentService } from '../content/content.service'
@@ -26,7 +25,6 @@ export class DocumentCollabInternalController {
   ) {}
 
   @Public()
-  @SkipThrottle()
   @Post(':id/ydoc-current-projections')
   async materializeDocumentYdocCurrentProjection(
     @Param('id') id: string,
@@ -36,7 +34,6 @@ export class DocumentCollabInternalController {
   }
 
   @Public()
-  @SkipThrottle()
   @Post(':id/collab-ticket-consumptions')
   async consumeDocumentCollabTicket(
     @Param('id') id: string,

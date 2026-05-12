@@ -4,7 +4,11 @@ import { createAgentEditorApiClient } from './clients/editor'
 import { loadAgentConfig } from './config/runtime-config'
 import { createChatModelFactory } from './integrations/model-providers/chat-model'
 import { createAgentRedisClient } from './integrations/redis-client'
-import { createRedisStreamsAgentEventPublisher, createRedisStreamsAgentQueue } from './integrations/redis-streams'
+import {
+  createRedisAgentIdempotencyStore,
+  createRedisStreamsAgentEventPublisher,
+  createRedisStreamsAgentQueue,
+} from './integrations/redis-streams'
 import { createAgentRuntime } from './runtime'
 import { createAgentServer } from './server/app'
 import { createChatReplyWorkflow } from './workflows/chat-reply'
@@ -18,6 +22,9 @@ const commandRedis = createAgentRedisClient(config.redisUrl)
 const eventRedis = createAgentRedisClient(config.redisUrl)
 
 const agentRuntime = createAgentRuntime({
+  idempotency: createRedisAgentIdempotencyStore({
+    redis: commandRedis,
+  }),
   queue: createRedisStreamsAgentQueue({
     redis: commandRedis,
   }),

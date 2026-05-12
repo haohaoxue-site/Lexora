@@ -1,7 +1,21 @@
-import type { AgentCommandHandler, AgentCommandQueue, AgentEventPublisher, AgentRunCommand, AgentRunEvent } from '../runtime/typing'
+import type { AgentIdempotencyStore } from '../runtime/command'
+import type {
+  AgentCommandHandler,
+  AgentCommandQueue,
+  AgentControlHandler,
+  AgentEventPublisher,
+  AgentRunCommand,
+  AgentRunControlCommand,
+  AgentRunEvent,
+} from '../runtime/typing'
 import type { AgentRedisClient, RedisCommandArgument, RedisStreamReadResult } from './redis-client'
 import process from 'node:process'
-import { AGENT_QUEUE_NAME, AgentRunCommandSchema, AgentRunEventSchema } from '@haohaoxue/samepage-contracts'
+import {
+  AGENT_QUEUE_NAME,
+  AgentRunCommandSchema,
+  AgentRunControlCommandSchema,
+  AgentRunEventSchema,
+} from '@haohaoxue/samepage-contracts'
 
 const DEFAULT_GROUP_NAME = 'samepage-agent'
 const DEFAULT_CONSUMER_NAME = `agent-${process.pid}`
@@ -9,7 +23,10 @@ const DEFAULT_READ_COUNT = 10
 const DEFAULT_READ_BLOCK_MS = 1000
 const DEFAULT_MAX_ATTEMPTS = 3
 const COMMAND_FIELD = 'command'
+const CONTROL_FIELD = 'control'
 const EVENT_FIELD = 'event'
+const DEFAULT_IDEMPOTENCY_KEY_PREFIX = 'samepage:agent:idempotency:'
+const DEFAULT_IDEMPOTENCY_TTL_SECONDS = 24 * 60 * 60
 
 export interface CreateRedisStreamsAgentQueueOptions {
   /** Redis 客户端 */
@@ -21,6 +38,44 @@ export interface CreateRedisStreamsAgentEventPublisherOptions {
   redis: AgentRedisClient
 }
 
+export interface CreateRedisAgentIdempotencyStoreOptions {
+  /** Redis 客户端 */
+  redis: AgentRedisClient
+  /** 幂等键前缀 */
+  keyPrefix?: string
+  /** 幂等键保留时长，覆盖 API 侧 lease 重发窗口即可 */
+  ttlSeconds?: number
+}
+
+export function createRedisAgentIdempotencyStore(
+  options: CreateRedisAgentIdempotencyStoreOptions,
+): AgentIdempotencyStore {
+  const keyPrefix = options.keyPrefix ?? DEFAULT_IDEMPOTENCY_KEY_PREFIX
+  const ttlSeconds = options.ttlSeconds ?? DEFAULT_IDEMPOTENCY_TTL_SECONDS
+
+  return {
+    async markStarted(idempotencyKey) {
+      const result = await options.redis.set(
+        `${keyPrefix}${idempotencyKey}`,
+        '1',
+        'EX',
+        ttlSeconds,
+        'NX',
+      )
+
+      return result === 'OK'
+    },
+
+    async has(idempotencyKey) {
+      return await options.redis.get(`${keyPrefix}${idempotencyKey}`) !== null
+    },
+
+    async clear(idempotencyKey) {
+      await options.redis.del(`${keyPrefix}${idempotencyKey}`)
+    },
+  }
+}
+
 export function createRedisStreamsAgentQueue(options: CreateRedisStreamsAgentQueueOptions): AgentCommandQueue {
   const redis = options.redis
   const groupName = DEFAULT_GROUP_NAME
@@ -29,11 +84,14 @@ export function createRedisStreamsAgentQueue(options: CreateRedisStreamsAgentQue
   const readBlockMs = DEFAULT_READ_BLOCK_MS
   const maxAttempts = DEFAULT_MAX_ATTEMPTS
   let handler: AgentCommandHandler | null = null
+  let controlHandler: AgentControlHandler | null = null
   let running = false
+  let controlRunning = false
   let closed = false
 
   async function ready(): Promise<void> {
-    await ensureConsumerGroup(redis, groupName)
+    await ensureConsumerGroup(redis, groupName, AGENT_QUEUE_NAME.COMMANDS)
+    await ensureConsumerGroup(redis, groupName, AGENT_QUEUE_NAME.CONTROLS)
   }
 
   function subscribe(nextHandler: AgentCommandHandler): () => void {
@@ -50,8 +108,23 @@ export function createRedisStreamsAgentQueue(options: CreateRedisStreamsAgentQue
     }
   }
 
+  function subscribeControl(nextHandler: AgentControlHandler): () => void {
+    controlHandler = nextHandler
+
+    if (!controlRunning) {
+      controlRunning = true
+      void consumeControlLoop()
+    }
+
+    return () => {
+      controlHandler = null
+      controlRunning = false
+    }
+  }
+
   async function close(): Promise<void> {
     running = false
+    controlRunning = false
     closed = true
     await redis.quit()
   }
@@ -118,6 +191,68 @@ export function createRedisStreamsAgentQueue(options: CreateRedisStreamsAgentQue
     return handledMessage
   }
 
+  async function consumeControlLoop(): Promise<void> {
+    await ready()
+
+    while (true) {
+      if (closed || !controlRunning) {
+        return
+      }
+
+      try {
+        const handledPending = await readControlBatch('0', false)
+
+        if (handledPending) {
+          continue
+        }
+
+        const handledNew = await readControlBatch('>', true)
+
+        if (!handledNew) {
+          await sleep(readBlockMs)
+        }
+      }
+      catch {
+        if (closed || !controlRunning) {
+          return
+        }
+
+        await sleep(readBlockMs)
+      }
+    }
+  }
+
+  async function readControlBatch(streamId: string, block: boolean): Promise<boolean> {
+    const result = await readAgentControlBatch(redis, {
+      groupName,
+      consumerName,
+      readCount,
+      readBlockMs,
+      streamId,
+      block,
+    })
+
+    if (!result?.length) {
+      return false
+    }
+
+    const currentHandler = controlHandler
+    if (!currentHandler) {
+      return false
+    }
+
+    let handledMessage = false
+
+    for (const [, messages] of result) {
+      for (const [messageId, fields] of messages) {
+        handledMessage = true
+        await handleControlMessage(messageId, fields, currentHandler)
+      }
+    }
+
+    return handledMessage
+  }
+
   async function handleMessage(
     messageId: string,
     fields: string[],
@@ -170,11 +305,37 @@ export function createRedisStreamsAgentQueue(options: CreateRedisStreamsAgentQue
     await redis.xack(AGENT_QUEUE_NAME.COMMANDS, groupName, messageId)
   }
 
+  async function handleControlMessage(
+    messageId: string,
+    fields: string[],
+    currentHandler: AgentControlHandler,
+  ): Promise<void> {
+    const rawControl = getStreamField(fields, CONTROL_FIELD)
+
+    if (!rawControl) {
+      await redis.xack(AGENT_QUEUE_NAME.CONTROLS, groupName, messageId)
+      return
+    }
+
+    const control = parseControl(rawControl)
+    if (!control.ok) {
+      await redis.xack(AGENT_QUEUE_NAME.CONTROLS, groupName, messageId)
+      return
+    }
+
+    await currentHandler(control.value)
+    await redis.xack(AGENT_QUEUE_NAME.CONTROLS, groupName, messageId)
+  }
+
   return {
     async publish(command) {
       await publishCommand(redis, command)
     },
+    async publishControl(control) {
+      await publishControl(redis, control)
+    },
     subscribe,
+    subscribeControl,
     ready,
     close,
   }
@@ -196,15 +357,50 @@ export function createRedisStreamsAgentEventPublisher(
   }
 }
 
-async function ensureConsumerGroup(redis: AgentRedisClient, groupName: string): Promise<void> {
+async function ensureConsumerGroup(
+  redis: AgentRedisClient,
+  groupName: string,
+  streamName: string,
+): Promise<void> {
   try {
-    await redis.xgroup('CREATE', AGENT_QUEUE_NAME.COMMANDS, groupName, '0', 'MKSTREAM')
+    await redis.xgroup('CREATE', streamName, groupName, '0', 'MKSTREAM')
   }
   catch (error) {
     if (!isBusyGroupError(error)) {
       throw error
     }
   }
+}
+
+function readAgentControlBatch(
+  redis: AgentRedisClient,
+  options: {
+    groupName: string
+    consumerName: string
+    readCount: number
+    readBlockMs: number
+    streamId: string
+    block: boolean
+  },
+): Promise<RedisStreamReadResult | null> {
+  const baseArgs: RedisCommandArgument[] = [
+    'GROUP',
+    options.groupName,
+    options.consumerName,
+    'COUNT',
+    options.readCount,
+  ]
+
+  if (options.block) {
+    baseArgs.push('BLOCK', options.readBlockMs)
+  }
+
+  return redis.xreadgroup(
+    ...baseArgs,
+    'STREAMS',
+    AGENT_QUEUE_NAME.CONTROLS,
+    options.streamId,
+  )
 }
 
 function readCommandBatch(
@@ -244,6 +440,17 @@ function publishCommand(redis: AgentRedisClient, command: AgentRunCommand): Prom
     '*',
     COMMAND_FIELD,
     JSON.stringify(command),
+  )
+}
+
+function publishControl(redis: AgentRedisClient, control: AgentRunControlCommand): Promise<string> {
+  const normalizedControl = AgentRunControlCommandSchema.parse(control)
+
+  return redis.xadd(
+    AGENT_QUEUE_NAME.CONTROLS,
+    '*',
+    CONTROL_FIELD,
+    JSON.stringify(normalizedControl),
   )
 }
 
@@ -296,6 +503,21 @@ function parseCommand(rawCommand: string): { ok: true, value: AgentRunCommand } 
     return {
       ok: true,
       value: AgentRunCommandSchema.parse(JSON.parse(rawCommand)),
+    }
+  }
+  catch (error) {
+    return {
+      ok: false,
+      errorMessage: getErrorMessage(error),
+    }
+  }
+}
+
+function parseControl(rawControl: string): { ok: true, value: AgentRunControlCommand } | { ok: false, errorMessage: string } {
+  try {
+    return {
+      ok: true,
+      value: AgentRunControlCommandSchema.parse(JSON.parse(rawControl)),
     }
   }
   catch (error) {

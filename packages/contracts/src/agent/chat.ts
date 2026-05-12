@@ -5,20 +5,19 @@ const NonEmptyStringSchema = z.string().trim().min(1)
 
 export const AgentChatReplyContextSchema = z.object({
   chatSessionId: NonEmptyStringSchema,
-  triggerMessageOrder: z.number().int().min(0),
-  nextAssistantOrder: z.number().int().min(0),
+  triggerUserMessageId: NonEmptyStringSchema,
+  assistantMessageId: NonEmptyStringSchema,
   expectedHistoryVersion: z.number().int().min(0),
 }).strict()
 
 export const AgentChatContextMessageSchema = z.object({
   role: ChatMessageRoleSchema,
   content: z.string(),
-  order: z.number().int().min(0),
 }).strict()
 
 export const AgentGetChatSessionContextRequestSchema = z.object({
   actorId: NonEmptyStringSchema,
-  triggerMessageOrder: z.number().int().min(0),
+  triggerUserMessageId: NonEmptyStringSchema,
 }).strict()
 
 export const AgentGetChatSessionContextResponseSchema = z.object({

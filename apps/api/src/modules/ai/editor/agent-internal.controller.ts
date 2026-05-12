@@ -11,7 +11,6 @@ import {
   Param,
   Post,
 } from '@nestjs/common'
-import { SkipThrottle } from '@nestjs/throttler'
 import { Public } from '../../../decorators/public.decorator'
 import { ZodValidationPipe } from '../../../pipes/zod-validation.pipe'
 import { AiEditorSessionsService } from './sessions.service'
@@ -21,7 +20,6 @@ export class AiEditorAgentInternalController {
   constructor(private readonly editorSessionsService: AiEditorSessionsService) {}
 
   @Public()
-  @SkipThrottle()
   @HttpCode(HttpStatus.OK)
   @Post('sessions/:id/context')
   async getEditorAiContext(

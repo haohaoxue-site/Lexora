@@ -22,7 +22,7 @@ export interface ConsumeAgentRunEventsInput {
   timeoutMs?: number
   signal?: AbortSignal
   messages?: AgentRunEventConsumerMessages
-  onEvent: (event: AgentRunEvent) => void | Promise<void>
+  onEvent: (event: AgentRunEvent, sourceEventId: string) => void | Promise<void>
 }
 
 export interface AgentRunEventConsumerMessages {
@@ -99,7 +99,7 @@ export class AgentRunEventsService {
             continue
           }
 
-          await input.onEvent(event)
+          await input.onEvent(event, messageId)
 
           if (event.type === AGENT_RUN_EVENT_TYPE.RUN_COMPLETED) {
             return

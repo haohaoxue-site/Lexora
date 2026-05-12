@@ -4,9 +4,11 @@ enum ChatSessionMessageRole {
 }
 
 enum ChatSessionMessageStatus {
+  PENDING
   STREAMING
   COMPLETED
   FAILED
+  CANCELLED
 }
 
 enum ChatSessionMessagePartType {
@@ -18,40 +20,89 @@ enum ChatSessionMessagePartType {
   CITATION
 }
 
+enum ChatSessionRunStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+enum ChatSessionEventType {
+  MESSAGE_CREATED
+  MESSAGE_STATUS_CHANGED
+  MESSAGE_PART_DELTA
+  MESSAGE_COMPLETED
+  MESSAGE_FAILED
+  MESSAGE_CANCELLED
+  RUN_STARTED
+  RUN_COMPLETED
+  RUN_FAILED
+  RUN_CANCELLED
+  BRANCH_SWITCHED
+  TITLE_UPDATED
+  SNAPSHOT_REQUIRED
+}
+
 model ChatSession {
-  id                 String               @id @default(uuid())
-  userId             String
-  title              String
-  selectedProviderId String?
-  selectedModelId    String?
-  historyVersion     Int                  @default(0)
-  user               User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
-  messages           ChatSessionMessage[]
-  createdAt          DateTime             @default(now())
-  updatedAt          DateTime             @updatedAt
-  deletedAt          DateTime?
+  id                  String               @id @default(uuid())
+  userId              String
+  title               String
+  selectedProviderId  String?
+  selectedModelId     String?
+  historyVersion      Int                  @default(0)
+  activeRootMessageId String?
+  activeLeafMessageId String?
+  nextEventSequence   Int                  @default(1)
+  user                User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  activeRootMessage   ChatSessionMessage?  @relation("ChatSessionActiveRootMessage", fields: [activeRootMessageId], references: [id], onDelete: SetNull)
+  activeLeafMessage   ChatSessionMessage?  @relation("ChatSessionActiveLeafMessage", fields: [activeLeafMessageId], references: [id], onDelete: SetNull)
+  messages            ChatSessionMessage[] @relation("ChatSessionMessages")
+  runs                ChatSessionRun[]
+  events              ChatSessionEvent[]
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  deletedAt           DateTime?
 
   @@index([userId, updatedAt])
   @@index([selectedProviderId])
+  @@index([activeRootMessageId])
+  @@index([activeLeafMessageId])
 }
 
 model ChatSessionMessage {
-  id          String                   @id @default(uuid())
-  sessionId   String
-  role        ChatSessionMessageRole
-  status      ChatSessionMessageStatus @default(COMPLETED)
-  content     String
-  order       Int
-  agentRunId  String?
-  metadata    Json?
-  completedAt DateTime?
-  session     ChatSession              @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  parts       ChatSessionMessagePart[]
-  createdAt   DateTime                 @default(now())
-  updatedAt   DateTime                 @updatedAt
-  deletedAt   DateTime?
+  id                     String                   @id @default(uuid())
+  sessionId              String
+  role                   ChatSessionMessageRole
+  status                 ChatSessionMessageStatus @default(COMPLETED)
+  content                String
+  parentMessageId        String?
+  selectedChildMessageId String?
+  branchOrder            Int
+  sourceMessageId        String?
+  agentRunId             String?
+  metadata               Json?
+  completedAt            DateTime?
+  session                ChatSession              @relation("ChatSessionMessages", fields: [sessionId], references: [id], onDelete: Cascade)
+  parentMessage          ChatSessionMessage?      @relation("ChatMessageChildren", fields: [parentMessageId], references: [id], onDelete: SetNull)
+  children               ChatSessionMessage[]     @relation("ChatMessageChildren")
+  selectedChildMessage   ChatSessionMessage?      @relation("ChatMessageSelectedChild", fields: [selectedChildMessageId], references: [id], onDelete: SetNull)
+  selectedByMessages     ChatSessionMessage[]     @relation("ChatMessageSelectedChild")
+  sourceMessage          ChatSessionMessage?      @relation("ChatMessageSource", fields: [sourceMessageId], references: [id], onDelete: SetNull)
+  derivedMessages        ChatSessionMessage[]     @relation("ChatMessageSource")
+  activeRootForSessions  ChatSession[]            @relation("ChatSessionActiveRootMessage")
+  activeLeafForSessions  ChatSession[]            @relation("ChatSessionActiveLeafMessage")
+  runs                   ChatSessionRun[]
+  events                 ChatSessionEvent[]
+  parts                  ChatSessionMessagePart[]
+  createdAt              DateTime                 @default(now())
+  updatedAt              DateTime                 @updatedAt
+  deletedAt              DateTime?
 
-  @@unique([sessionId, order])
+  @@unique([sessionId, parentMessageId, role, branchOrder])
+  @@index([sessionId, parentMessageId, role])
+  @@index([selectedChildMessageId])
+  @@index([sourceMessageId])
   @@index([agentRunId])
   @@index([sessionId, createdAt])
 }
@@ -63,11 +114,59 @@ model ChatSessionMessagePart {
   text      String                     @default("")
   order     Int
   metadata  Json?
-  message   ChatSessionMessage        @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  message   ChatSessionMessage         @relation(fields: [messageId], references: [id], onDelete: Cascade)
   createdAt DateTime                   @default(now())
   updatedAt DateTime                   @updatedAt
   deletedAt DateTime?
 
   @@unique([messageId, order])
   @@index([messageId, type])
+}
+
+model ChatSessionRun {
+  id                     String               @id @default(uuid())
+  runId                  String               @unique
+  sessionId              String
+  assistantMessageId     String               @unique
+  triggerUserMessageId   String
+  actorUserId            String
+  workflowKey            String
+  modelTargetSnapshot    Json?
+  commandContext         Json
+  status                 ChatSessionRunStatus @default(PENDING)
+  startedAt              DateTime?
+  commandPublishedAt     DateTime?
+  dispatchLeaseExpiresAt DateTime?
+  completedAt            DateTime?
+  session                ChatSession          @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  assistantMessage       ChatSessionMessage   @relation(fields: [assistantMessageId], references: [id], onDelete: Cascade)
+  events                 ChatSessionEvent[]
+  createdAt              DateTime             @default(now())
+  updatedAt              DateTime             @updatedAt
+  deletedAt              DateTime?
+
+  @@index([sessionId, status])
+  @@index([status, commandPublishedAt, dispatchLeaseExpiresAt])
+  @@index([triggerUserMessageId])
+  @@index([actorUserId, createdAt])
+}
+
+model ChatSessionEvent {
+  id            String               @id @default(uuid())
+  sessionId     String
+  sequence      Int
+  type          ChatSessionEventType
+  messageId     String?
+  runId         String?
+  payload       Json
+  sourceEventId String?
+  session       ChatSession          @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  message       ChatSessionMessage?  @relation(fields: [messageId], references: [id], onDelete: SetNull)
+  run           ChatSessionRun?      @relation(fields: [runId], references: [runId], onDelete: SetNull)
+  createdAt     DateTime             @default(now())
+
+  @@unique([sessionId, sequence])
+  @@index([sessionId, createdAt])
+  @@index([runId])
+  @@index([messageId])
 }

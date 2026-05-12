@@ -39,11 +39,10 @@ export function createChatReplyWorkflow(inputs: CreateChatReplyWorkflowInput): A
       const sessionContext = await inputs.chatApi.getSessionContext({
         actorId: options.actorId,
         sessionId: context.chatSessionId,
-        triggerMessageOrder: context.triggerMessageOrder,
+        triggerUserMessageId: context.triggerUserMessageId,
       })
-      const triggerMessage = sessionContext.messages.find(message => message.order === context.triggerMessageOrder)
 
-      if (!triggerMessage) {
+      if (sessionContext.messages.length === 0) {
         throw new Error('聊天触发消息不存在')
       }
 

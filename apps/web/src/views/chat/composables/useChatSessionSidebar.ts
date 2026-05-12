@@ -1,14 +1,17 @@
-import type { ChatSessionSidebarActionCommand, ChatSessionSidebarProps } from '../typing'
+import type { ChatSessionSidebarActionCommand } from '../typing'
+import type { ChatSession } from './useChatSessions'
 import { ElMessageBox } from 'element-plus'
+import { computed } from 'vue'
+import { useChatSessions } from './useChatSessions'
 
-export function useChatSessionSidebar(
-  props: ChatSessionSidebarProps,
-  options: {
-    onDelete: (sessionId: string) => void
-    onRename: (sessionId: string, title: string) => void
-  },
-) {
-  async function promptRename(session: ChatSessionSidebarProps['sessions'][number]) {
+export function useChatSessionSidebar() {
+  const { activeSessionId, deleteSession, renameSession, selectSession } = useChatSessions()
+
+  function getSessionItemStateClass(sessionId: string) {
+    return sessionId === activeSessionId.value ? 'active' : 'idle'
+  }
+
+  async function promptRename(session: ChatSession) {
     const sessionTitle = formatSessionTitle(session.title)
     const nextTitle = await ElMessageBox.prompt(
       '请输入新的对话名称',
@@ -26,10 +29,10 @@ export function useChatSessionSidebar(
       return
     }
 
-    options.onRename(session.id, nextTitle)
+    void renameSession(session.id, nextTitle)
   }
 
-  async function confirmDelete(session: ChatSessionSidebarProps['sessions'][number]) {
+  async function confirmDelete(session: ChatSession) {
     const sessionTitle = formatSessionTitle(session.title)
     const confirmed = await ElMessageBox.confirm(
       `确认删除「${sessionTitle}」吗？此操作不可恢复。`,
@@ -45,11 +48,11 @@ export function useChatSessionSidebar(
       return
     }
 
-    options.onDelete(session.id)
+    void deleteSession(session.id)
   }
 
   function handleSessionAction(
-    session: ChatSessionSidebarProps['sessions'][number],
+    session: ChatSession,
     command: ChatSessionSidebarActionCommand | string | number | object,
   ) {
     if (command === 'rename') {
@@ -62,13 +65,11 @@ export function useChatSessionSidebar(
     }
   }
 
-  function getSessionItemStateClass(sessionId: string) {
-    return sessionId === props.activeSessionId ? 'active' : 'idle'
-  }
-
   return {
+    activeSessionId: computed(() => activeSessionId.value),
     getSessionItemStateClass,
     handleSessionAction,
+    selectSession,
   }
 }
 

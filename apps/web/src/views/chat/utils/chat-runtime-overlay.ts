@@ -1,0 +1,381 @@
+import type {
+  ChatMessage,
+  ChatRunSummary,
+  ChatSessionDetail,
+  ChatSessionEvent,
+} from '@/apis/chat'
+import {
+  CHAT_MESSAGE_STATUS,
+  CHAT_RUN_STATUS,
+  CHAT_SESSION_EVENT_TYPE,
+} from '@haohaoxue/samepage-contracts'
+import { applyChatSessionEventToMessages } from './chat-stream-message'
+
+export interface ChatRuntimeOverlayState {
+  cursorBySessionId: Map<string, number>
+  currentRunBySessionId: Map<string, ChatRunSummary | null>
+  messageEventsBySessionId: Map<string, ChatSessionEvent[]>
+  terminalRunIdsBySessionId: Map<string, Set<string>>
+  terminalMessageIdsBySessionId: Map<string, Set<string>>
+  assistantMessageIdByRunId: Map<string, string>
+  pausedSessionIds: Set<string>
+}
+
+export function createChatRuntimeOverlayState(): ChatRuntimeOverlayState {
+  return {
+    cursorBySessionId: new Map(),
+    currentRunBySessionId: new Map(),
+    messageEventsBySessionId: new Map(),
+    terminalRunIdsBySessionId: new Map(),
+    terminalMessageIdsBySessionId: new Map(),
+    assistantMessageIdByRunId: new Map(),
+    pausedSessionIds: new Set(),
+  }
+}
+
+export function seedChatRuntimeOverlayFromSnapshot(
+  state: ChatRuntimeOverlayState,
+  session: ChatSessionDetail,
+): boolean {
+  const currentCursor = state.cursorBySessionId.get(session.id)
+  if (currentCursor !== undefined && session.latestSequence < currentCursor) {
+    return false
+  }
+
+  state.cursorBySessionId.set(session.id, Math.max(currentCursor ?? 0, session.latestSequence))
+  state.pausedSessionIds.delete(session.id)
+  state.messageEventsBySessionId.set(
+    session.id,
+    getSessionMessageEvents(state, session.id).filter(event => event.sequence > session.latestSequence),
+  )
+
+  if (session.activeRun && !isTerminalRunId(state, session.id, session.activeRun.runId)) {
+    state.currentRunBySessionId.set(session.id, session.activeRun)
+    state.assistantMessageIdByRunId.set(session.activeRun.runId, session.activeRun.assistantMessageId)
+  }
+  else {
+    state.currentRunBySessionId.set(session.id, null)
+  }
+
+  return true
+}
+
+export function seedChatRuntimeOverlayFromMutationResponse(
+  state: ChatRuntimeOverlayState,
+  input: {
+    session: ChatSessionDetail
+    latestSequence: number
+    run?: ChatRunSummary
+  },
+): void {
+  seedChatRuntimeOverlayFromSnapshot(state, {
+    ...input.session,
+    latestSequence: Math.max(input.session.latestSequence, input.latestSequence),
+  })
+  state.cursorBySessionId.set(input.session.id, input.latestSequence)
+
+  if (input.run && !isTerminalRunId(state, input.session.id, input.run.runId)) {
+    state.currentRunBySessionId.set(input.session.id, input.run)
+    state.assistantMessageIdByRunId.set(input.run.runId, input.run.assistantMessageId)
+  }
+}
+
+export function applyChatRuntimeOverlayEvent(
+  state: ChatRuntimeOverlayState,
+  event: ChatSessionEvent,
+): boolean {
+  const currentCursor = state.cursorBySessionId.get(event.sessionId) ?? 0
+  if (event.sequence <= currentCursor && event.type !== CHAT_SESSION_EVENT_TYPE.SNAPSHOT_REQUIRED) {
+    return false
+  }
+
+  if (event.type === CHAT_SESSION_EVENT_TYPE.SNAPSHOT_REQUIRED) {
+    state.cursorBySessionId.set(event.sessionId, event.payload.latestSequence)
+    state.pausedSessionIds.add(event.sessionId)
+    return true
+  }
+
+  state.cursorBySessionId.set(event.sessionId, event.sequence)
+
+  if (event.runId && event.messageId) {
+    state.assistantMessageIdByRunId.set(event.runId, event.messageId)
+  }
+
+  if (event.type === CHAT_SESSION_EVENT_TYPE.MESSAGE_PART_DELTA && shouldDropDelta(state, event)) {
+    return true
+  }
+
+  if (event.type === CHAT_SESSION_EVENT_TYPE.RUN_STARTED) {
+    updateCurrentRun(state, event, CHAT_RUN_STATUS.RUNNING)
+    return true
+  }
+
+  if (isTerminalRunEvent(event)) {
+    markTerminalRun(state, event)
+    const terminalMessageEvent = createMessageTerminalEventFromRunEvent(state, event)
+    if (terminalMessageEvent) {
+      appendMessageEvent(state, terminalMessageEvent)
+    }
+    return true
+  }
+
+  if (isMessagePatchEvent(event)) {
+    appendMessageEvent(state, event)
+  }
+
+  if (isTerminalMessageEvent(event)) {
+    markTerminalMessage(state, event)
+  }
+
+  return true
+}
+
+export function mergeChatRenderSession(
+  session: ChatSessionDetail,
+  state: ChatRuntimeOverlayState,
+): ChatSessionDetail {
+  const events = getSessionMessageEvents(state, session.id)
+    .filter(event => event.sequence > session.latestSequence)
+    .sort((first, second) => first.sequence - second.sequence)
+  const messages = events.reduce<ChatMessage[]>(
+    (currentMessages, event) => applyChatSessionEventToMessages(currentMessages, event),
+    session.messages,
+  )
+  const currentRun = getChatRuntimeOverlayCurrentRun(state, session.id)
+  const cursor = getChatRuntimeOverlayCursor(state, session.id)
+
+  return {
+    ...session,
+    latestSequence: Math.max(session.latestSequence, cursor ?? 0),
+    activeRun: currentRun,
+    messages,
+  }
+}
+
+export function getChatRuntimeOverlayCursor(
+  state: ChatRuntimeOverlayState,
+  sessionId: string,
+): number | null {
+  return state.cursorBySessionId.get(sessionId) ?? null
+}
+
+export function getChatRuntimeOverlayCurrentRun(
+  state: ChatRuntimeOverlayState,
+  sessionId: string,
+): ChatRunSummary | null {
+  return state.currentRunBySessionId.get(sessionId) ?? null
+}
+
+export function getChatRuntimeOverlayCancelRunId(
+  state: ChatRuntimeOverlayState,
+  sessionId: string | null,
+): string | null {
+  if (!sessionId) {
+    return null
+  }
+
+  const currentRun = getChatRuntimeOverlayCurrentRun(state, sessionId)
+  return isActiveRun(currentRun) ? currentRun.runId : null
+}
+
+export function getChatRuntimeOverlayIsStreaming(
+  state: ChatRuntimeOverlayState,
+  sessionId: string | null,
+): boolean {
+  if (!sessionId) {
+    return false
+  }
+
+  return isActiveRun(getChatRuntimeOverlayCurrentRun(state, sessionId))
+}
+
+export function clearChatRuntimeOverlaySession(
+  state: ChatRuntimeOverlayState,
+  sessionId: string,
+): void {
+  state.cursorBySessionId.delete(sessionId)
+  state.currentRunBySessionId.delete(sessionId)
+  state.messageEventsBySessionId.delete(sessionId)
+  state.terminalRunIdsBySessionId.delete(sessionId)
+  state.terminalMessageIdsBySessionId.delete(sessionId)
+  state.pausedSessionIds.delete(sessionId)
+}
+
+function isActiveRun(run: ChatRunSummary | null): run is ChatRunSummary {
+  return run?.status === CHAT_RUN_STATUS.PENDING || run?.status === CHAT_RUN_STATUS.RUNNING
+}
+
+function updateCurrentRun(
+  state: ChatRuntimeOverlayState,
+  event: ChatSessionEvent,
+  status: ChatRunSummary['status'],
+): void {
+  if (!event.runId) {
+    return
+  }
+
+  const currentRun = getChatRuntimeOverlayCurrentRun(state, event.sessionId)
+  if (!currentRun || currentRun.runId !== event.runId) {
+    return
+  }
+
+  state.currentRunBySessionId.set(event.sessionId, {
+    ...currentRun,
+    status,
+    startedAt: currentRun.startedAt ?? event.createdAt,
+  })
+}
+
+function appendMessageEvent(state: ChatRuntimeOverlayState, event: ChatSessionEvent): void {
+  state.messageEventsBySessionId.set(event.sessionId, [
+    ...getSessionMessageEvents(state, event.sessionId),
+    event,
+  ])
+}
+
+function getSessionMessageEvents(
+  state: ChatRuntimeOverlayState,
+  sessionId: string,
+): ChatSessionEvent[] {
+  return state.messageEventsBySessionId.get(sessionId) ?? []
+}
+
+function shouldDropDelta(
+  state: ChatRuntimeOverlayState,
+  event: Extract<ChatSessionEvent, { type: typeof CHAT_SESSION_EVENT_TYPE.MESSAGE_PART_DELTA }>,
+): boolean {
+  return isTerminalRunId(state, event.sessionId, event.runId)
+    || isTerminalMessageId(state, event.sessionId, event.messageId)
+}
+
+function markTerminalRun(state: ChatRuntimeOverlayState, event: ChatSessionEvent): void {
+  if (!event.runId) {
+    return
+  }
+
+  addTerminalRunId(state, event.sessionId, event.runId)
+
+  const currentRun = getChatRuntimeOverlayCurrentRun(state, event.sessionId)
+  if (currentRun?.runId === event.runId) {
+    state.currentRunBySessionId.set(event.sessionId, null)
+  }
+}
+
+function markTerminalMessage(state: ChatRuntimeOverlayState, event: ChatSessionEvent): void {
+  if (!event.messageId) {
+    return
+  }
+
+  addTerminalMessageId(state, event.sessionId, event.messageId)
+
+  if (event.runId) {
+    addTerminalRunId(state, event.sessionId, event.runId)
+  }
+
+  const currentRun = getChatRuntimeOverlayCurrentRun(state, event.sessionId)
+  if (event.runId && currentRun?.runId === event.runId) {
+    state.currentRunBySessionId.set(event.sessionId, null)
+  }
+}
+
+function createMessageTerminalEventFromRunEvent(
+  state: ChatRuntimeOverlayState,
+  event: ChatSessionEvent,
+): ChatSessionEvent | null {
+  if (!event.runId) {
+    return null
+  }
+
+  const messageId = state.assistantMessageIdByRunId.get(event.runId)
+  if (!messageId) {
+    return null
+  }
+
+  const status = getRunTerminalMessageStatus(event.type)
+  if (!status) {
+    return null
+  }
+
+  addTerminalMessageId(state, event.sessionId, messageId)
+
+  return {
+    ...event,
+    type: CHAT_SESSION_EVENT_TYPE.MESSAGE_STATUS_CHANGED,
+    messageId,
+    payload: {
+      status,
+    },
+  } as ChatSessionEvent
+}
+
+function getRunTerminalMessageStatus(eventType: ChatSessionEvent['type']) {
+  if (eventType === CHAT_SESSION_EVENT_TYPE.RUN_COMPLETED) {
+    return CHAT_MESSAGE_STATUS.COMPLETED
+  }
+
+  if (eventType === CHAT_SESSION_EVENT_TYPE.RUN_FAILED) {
+    return CHAT_MESSAGE_STATUS.FAILED
+  }
+
+  if (eventType === CHAT_SESSION_EVENT_TYPE.RUN_CANCELLED) {
+    return CHAT_MESSAGE_STATUS.CANCELLED
+  }
+
+  return null
+}
+
+function isMessagePatchEvent(event: ChatSessionEvent): boolean {
+  return event.type === CHAT_SESSION_EVENT_TYPE.MESSAGE_PART_DELTA
+    || event.type === CHAT_SESSION_EVENT_TYPE.MESSAGE_STATUS_CHANGED
+    || event.type === CHAT_SESSION_EVENT_TYPE.MESSAGE_COMPLETED
+    || event.type === CHAT_SESSION_EVENT_TYPE.MESSAGE_FAILED
+    || event.type === CHAT_SESSION_EVENT_TYPE.MESSAGE_CANCELLED
+}
+
+function isTerminalMessageEvent(event: ChatSessionEvent): boolean {
+  return event.type === CHAT_SESSION_EVENT_TYPE.MESSAGE_COMPLETED
+    || event.type === CHAT_SESSION_EVENT_TYPE.MESSAGE_FAILED
+    || event.type === CHAT_SESSION_EVENT_TYPE.MESSAGE_CANCELLED
+}
+
+function isTerminalRunEvent(event: ChatSessionEvent): boolean {
+  return event.type === CHAT_SESSION_EVENT_TYPE.RUN_COMPLETED
+    || event.type === CHAT_SESSION_EVENT_TYPE.RUN_FAILED
+    || event.type === CHAT_SESSION_EVENT_TYPE.RUN_CANCELLED
+}
+
+function addTerminalRunId(
+  state: ChatRuntimeOverlayState,
+  sessionId: string,
+  runId: string,
+): void {
+  const terminalRunIds = state.terminalRunIdsBySessionId.get(sessionId) ?? new Set<string>()
+  terminalRunIds.add(runId)
+  state.terminalRunIdsBySessionId.set(sessionId, terminalRunIds)
+}
+
+function addTerminalMessageId(
+  state: ChatRuntimeOverlayState,
+  sessionId: string,
+  messageId: string,
+): void {
+  const terminalMessageIds = state.terminalMessageIdsBySessionId.get(sessionId) ?? new Set<string>()
+  terminalMessageIds.add(messageId)
+  state.terminalMessageIdsBySessionId.set(sessionId, terminalMessageIds)
+}
+
+function isTerminalRunId(
+  state: ChatRuntimeOverlayState,
+  sessionId: string,
+  runId: string,
+): boolean {
+  return state.terminalRunIdsBySessionId.get(sessionId)?.has(runId) ?? false
+}
+
+function isTerminalMessageId(
+  state: ChatRuntimeOverlayState,
+  sessionId: string,
+  messageId: string,
+): boolean {
+  return state.terminalMessageIdsBySessionId.get(sessionId)?.has(messageId) ?? false
+}

@@ -70,10 +70,21 @@ export const COLLAB_REDIS_CHANNEL = {
   PERMISSION_INVALIDATION: 'samepage:collab:permission-invalidation',
 } as const
 
+export const DOCUMENT_COLLAB_STATELESS_MESSAGE_TYPE = {
+  SAVE_REQUEST: 'document.save.request',
+  SAVE_RESULT: 'document.save.result',
+} as const
+
+export const DOCUMENT_COLLAB_STATELESS_MESSAGE_TYPE_VALUES = [
+  DOCUMENT_COLLAB_STATELESS_MESSAGE_TYPE.SAVE_REQUEST,
+  DOCUMENT_COLLAB_STATELESS_MESSAGE_TYPE.SAVE_RESULT,
+] as const
+
 export const CollabErrorCodeSchema = z.enum(COLLAB_ERROR_CODE_VALUES)
 export const CollabPermissionInvalidationReasonSchema = z.enum(COLLAB_PERMISSION_INVALIDATION_REASON_VALUES)
 export const CollabPubSubMessageTypeSchema = z.enum(COLLAB_PUBSUB_MESSAGE_TYPE_VALUES)
 export const CollabRuntimeRoleSchema = z.enum(COLLAB_RUNTIME_ROLE_VALUES)
+export const DocumentCollabStatelessMessageTypeSchema = z.enum(DOCUMENT_COLLAB_STATELESS_MESSAGE_TYPE_VALUES)
 
 export const CollabAwarenessUserSchema = UserAccountIdentitySchema.pick({
   id: true,
@@ -141,6 +152,24 @@ export const CollabPubSubMessageSchema = z.discriminatedUnion('type', [
   CollabPermissionInvalidationPubSubMessageSchema,
 ])
 
+export const DocumentCollabStatelessSaveRequestPayloadSchema = z.object({
+  type: z.literal(DOCUMENT_COLLAB_STATELESS_MESSAGE_TYPE.SAVE_REQUEST),
+  requestId: z.string().trim().min(1),
+}).strict()
+
+export const DocumentCollabStatelessSaveResultPayloadSchema = z.object({
+  type: z.literal(DOCUMENT_COLLAB_STATELESS_MESSAGE_TYPE.SAVE_RESULT),
+  requestId: z.string().trim().min(1),
+  ok: z.boolean(),
+  savedAt: z.string().datetime().nullable(),
+  error: z.string().trim().min(1).nullable(),
+}).strict()
+
+export const DocumentCollabStatelessMessagePayloadSchema = z.discriminatedUnion('type', [
+  DocumentCollabStatelessSaveRequestPayloadSchema,
+  DocumentCollabStatelessSaveResultPayloadSchema,
+])
+
 export type CollabAwarenessUser = z.infer<typeof CollabAwarenessUserSchema>
 export type CollabAwarenessState = z.infer<typeof CollabAwarenessStateSchema>
 export type CollabErrorCode = z.infer<typeof CollabErrorCodeSchema>
@@ -155,3 +184,7 @@ export type CollabTicketPayload = z.infer<typeof CollabTicketPayloadSchema>
 export type ConsumeCollabTicketRequest = z.infer<typeof ConsumeCollabTicketRequestSchema>
 export type ConsumeCollabTicketResponse = z.infer<typeof ConsumeCollabTicketResponseSchema>
 export type CreateCollabTicketResponse = z.infer<typeof CreateCollabTicketResponseSchema>
+export type DocumentCollabStatelessMessagePayload = z.infer<typeof DocumentCollabStatelessMessagePayloadSchema>
+export type DocumentCollabStatelessMessageType = z.infer<typeof DocumentCollabStatelessMessageTypeSchema>
+export type DocumentCollabStatelessSaveRequestPayload = z.infer<typeof DocumentCollabStatelessSaveRequestPayloadSchema>
+export type DocumentCollabStatelessSaveResultPayload = z.infer<typeof DocumentCollabStatelessSaveResultPayloadSchema>

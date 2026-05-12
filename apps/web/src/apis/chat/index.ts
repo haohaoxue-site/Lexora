@@ -1,13 +1,17 @@
 import type {
   ChatModelListResponse,
   ChatModelSelection,
+  ChatMutationResponse,
   ChatRuntimeConfig,
   ChatSessionDetail,
+  ChatSessionEvent,
   ChatSessionSummary,
-  ChatStreamEvent,
+  CreateChatSessionMessageRequest,
+  EditAndSendChatMessageRequest,
+  SwitchChatActiveMessageRequest,
   UpdateChatSessionTitleRequest,
 } from './typing'
-import { CHAT_STREAM_EVENT_TYPE, ChatStreamEventSchema, SERVER_PATH, STREAM_DONE_PAYLOAD } from '@haohaoxue/samepage-contracts'
+import { ChatSessionEventSchema, SERVER_PATH } from '@haohaoxue/samepage-contracts'
 import { useAuthStore } from '@/stores/auth'
 import { axios } from '@/utils/axios'
 import { createRequestError, createRequestErrorFromHttpResponse, toRequestError } from '@/utils/request-error'
@@ -66,6 +70,57 @@ export function updateChatSessionTitle(
   })
 }
 
+export function sendChatSessionMessage(
+  sessionId: string,
+  data: CreateChatSessionMessageRequest,
+): Promise<ChatMutationResponse> {
+  return axios.request({
+    method: 'post',
+    url: `/chat/sessions/${sessionId}/messages`,
+    data,
+  })
+}
+
+export function editAndSendChatMessage(
+  sessionId: string,
+  messageId: string,
+  data: EditAndSendChatMessageRequest,
+): Promise<ChatMutationResponse> {
+  return axios.request({
+    method: 'post',
+    url: `/chat/sessions/${sessionId}/messages/${messageId}/edit-and-send`,
+    data,
+  })
+}
+
+export function retryChatAssistantMessage(
+  sessionId: string,
+  messageId: string,
+): Promise<ChatMutationResponse> {
+  return axios.request({
+    method: 'post',
+    url: `/chat/sessions/${sessionId}/messages/${messageId}/retry`,
+  })
+}
+
+export function switchChatActiveMessage(
+  sessionId: string,
+  data: SwitchChatActiveMessageRequest,
+): Promise<ChatMutationResponse> {
+  return axios.request({
+    method: 'patch',
+    url: `/chat/sessions/${sessionId}/active-message`,
+    data,
+  })
+}
+
+export function cancelChatRun(runId: string): Promise<ChatMutationResponse> {
+  return axios.request({
+    method: 'post',
+    url: `/chat/runs/${runId}/cancel`,
+  })
+}
+
 export function getChatRuntimeConfig(): Promise<ChatRuntimeConfig> {
   return axios.request({
     method: 'get',
@@ -80,23 +135,25 @@ export function getChatModels(): Promise<ChatModelListResponse> {
   })
 }
 
-export async function streamChatCompletion(
+export async function streamChatSessionEvents(
   sessionId: string,
-  content: string,
-  onEvent: (event: ChatStreamEvent) => void,
+  afterSequence: number | null,
+  onEvent: (event: ChatSessionEvent) => void | Promise<void>,
+  options: {
+    signal?: AbortSignal
+  } = {},
 ): Promise<void> {
   const authStore = useAuthStore()
+  const query = afterSequence !== null
+    ? `?afterSequence=${encodeURIComponent(String(afterSequence))}`
+    : ''
 
-  const response = await fetch(`${API_BASE_URL}/chat/completions`, {
-    method: 'POST',
+  const response = await fetch(`${API_BASE_URL}/chat/sessions/${sessionId}/events${query}`, {
+    method: 'GET',
     headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${authStore.accessToken}`,
+      Authorization: `Bearer ${authStore.accessToken}`,
     },
-    body: JSON.stringify({
-      sessionId,
-      content,
-    }),
+    signal: options.signal,
   })
 
   if (!response.ok) {
@@ -117,8 +174,9 @@ export async function streamChatCompletion(
   try {
     while (true) {
       const { done, value } = await reader.read()
-      if (done)
+      if (done) {
         break
+      }
 
       buffer += decoder.decode(value, { stream: true })
 
@@ -127,44 +185,36 @@ export async function streamChatCompletion(
 
       for (const line of lines) {
         const trimmed = line.trim()
-        if (!trimmed || !trimmed.startsWith('data: '))
+        if (!trimmed || !trimmed.startsWith('data: ')) {
           continue
-
-        const data = trimmed.slice(6)
-        if (data === STREAM_DONE_PAYLOAD) {
-          return
         }
 
         let payload: unknown = null
         try {
-          payload = JSON.parse(data)
+          payload = JSON.parse(trimmed.slice(6))
         }
         catch {
           continue
         }
 
-        const parsedEvent = ChatStreamEventSchema.safeParse(payload)
-        if (!parsedEvent.success) {
-          continue
-        }
-
-        onEvent(parsedEvent.data)
-
-        if (parsedEvent.data.type === CHAT_STREAM_EVENT_TYPE.ERROR) {
-          throw createRequestError({
-            source: 'stream',
-            data: {
-              message: parsedEvent.data.message,
-            },
-          })
+        const parsedEvent = ChatSessionEventSchema.safeParse(payload)
+        if (parsedEvent.success) {
+          await onEvent(parsedEvent.data)
         }
       }
     }
   }
   catch (error) {
+    if (options.signal?.aborted) {
+      throw error
+    }
+
     throw toRequestError(error, {
       source: 'stream',
     })
+  }
+  finally {
+    reader.releaseLock()
   }
 }
 

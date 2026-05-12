@@ -1,27 +1,25 @@
 <script setup lang="ts">
 import type { FormInstance } from 'element-plus'
-import type { ChatModelSettingsDialogEmits } from '../typing'
-import type { ChatModelSelection } from '@/apis/chat'
 import type { ModelCascaderModelRef } from '@/components/model-cascader/typing'
 import { AI_MODEL_INTENT_KEY } from '@haohaoxue/samepage-contracts'
 import { computed, useTemplateRef } from 'vue'
 import { ModelCascader } from '@/components/model-cascader'
 import { useChatModelSettingsDialog } from '../composables/useChatModelSettingsDialog'
 
-const emits = defineEmits<ChatModelSettingsDialogEmits>()
-const visible = defineModel<boolean>({ required: true })
-const form = defineModel<ChatModelSelection>('form', { required: true })
 const modelFormRef = useTemplateRef<FormInstance>('modelFormRef')
-const { formRules, handleSave } = useChatModelSettingsDialog({
-  form,
+const {
+  formRules,
+  handleSave,
+  modelSettingsDialogVisible,
+  modelSettingsDraft,
+} = useChatModelSettingsDialog({
   modelFormRef,
-  onSave: () => emits('save'),
 })
 
 const selectedModelRef = computed<ModelCascaderModelRef | null>({
-  get: () => form.value.modelRef ?? null,
+  get: () => modelSettingsDraft.modelRef ?? null,
   set: (value) => {
-    form.value.modelRef = value
+    modelSettingsDraft.modelRef = value
       ? {
           providerId: value.providerId,
           modelId: value.modelId,
@@ -33,13 +31,13 @@ const selectedModelRef = computed<ModelCascaderModelRef | null>({
 
 <template>
   <ElDialog
-    v-model="visible"
+    v-model="modelSettingsDialogVisible"
     title="选择模型"
     width="520"
     align-center
   >
     <div class="chat-model-settings">
-      <ElForm ref="modelFormRef" :model="form" :rules="formRules" label-position="top" class="chat-model-settings__form">
+      <ElForm ref="modelFormRef" :model="modelSettingsDraft" :rules="formRules" label-position="top" class="chat-model-settings__form">
         <ElFormItem prop="modelRef">
           <ModelCascader
             v-model="selectedModelRef"
@@ -55,7 +53,7 @@ const selectedModelRef = computed<ModelCascaderModelRef | null>({
 
     <template #footer>
       <div class="chat-model-settings__footer">
-        <ElButton @click="visible = false">
+        <ElButton @click="modelSettingsDialogVisible = false">
           取消
         </ElButton>
         <ElButton type="primary" @click="handleSave">

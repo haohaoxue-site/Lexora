@@ -1,7 +1,7 @@
 import type { ChatSessionDetail, ChatSessionSummary } from '@/apis/chat'
 import { createSharedComposable } from '@vueuse/core'
 import { ElMessage } from 'element-plus'
-import { shallowRef } from 'vue'
+import { shallowReactive, shallowRef, toRef } from 'vue'
 import {
   createChatSession,
   deleteChatSession,
@@ -10,14 +10,22 @@ import {
   updateChatSessionTitle,
 } from '@/apis/chat'
 import { getRequestErrorDisplayMessage } from '@/utils/request-error'
+import {
+  acceptChatSessionSnapshot,
+  beginChatSessionSnapshotRequest,
+  clearActiveChatSessionSnapshot,
+  createChatSessionSnapshotState,
+  setActiveChatSessionSnapshot,
+} from '../utils/chat-session-snapshot'
 
 export interface ChatSession extends ChatSessionSummary {}
 export interface ActiveChatSession extends ChatSessionDetail {}
 
 export const useChatSessions = createSharedComposable(() => {
+  const snapshotState = shallowReactive(createChatSessionSnapshotState())
   const sessions = shallowRef<ChatSession[]>([])
-  const activeSessionId = shallowRef<string | null>(null)
-  const activeSession = shallowRef<ActiveChatSession | null>(null)
+  const activeSessionId = toRef(snapshotState, 'activeSessionId')
+  const activeSession = toRef(snapshotState, 'activeSession')
   const isLoadingSessions = shallowRef(false)
 
   async function loadSessions(options: { preserveActiveSessionId?: boolean } = {}) {
@@ -29,8 +37,7 @@ export const useChatSessions = createSharedComposable(() => {
       sessions.value = nextSessions
 
       if (nextSessions.length === 0) {
-        activeSessionId.value = null
-        activeSession.value = null
+        clearActiveChatSessionSnapshot(snapshotState)
         return
       }
 
@@ -39,8 +46,7 @@ export const useChatSessions = createSharedComposable(() => {
         : nextSessions[0].id
 
       if (!nextActiveSessionId) {
-        activeSessionId.value = null
-        activeSession.value = null
+        clearActiveChatSessionSnapshot(snapshotState)
         return
       }
 
@@ -58,8 +64,7 @@ export const useChatSessions = createSharedComposable(() => {
     try {
       const session = await createChatSession()
       prependSessionSummary(session)
-      activeSessionId.value = session.id
-      activeSession.value = session
+      setActiveChatSessionSnapshot(snapshotState, session)
       return session
     }
     catch (error) {
@@ -82,25 +87,35 @@ export const useChatSessions = createSharedComposable(() => {
   }
 
   function replaceActiveSession(session: ActiveChatSession) {
-    activeSessionId.value = session.id
-    activeSession.value = session
+    const accepted = acceptChatSessionSnapshot(snapshotState, {
+      session,
+    })
+    if (!accepted) {
+      return false
+    }
+
     patchSessionSummary(session.id, {
       modelRef: session.modelRef,
       title: session.title,
       updatedAt: session.updatedAt,
     })
+    return true
   }
 
   async function selectSession(id: string) {
     const isCurrentSession = activeSession.value?.id === id
-    activeSessionId.value = id
 
     if (isCurrentSession) {
       return
     }
 
+    const requestEpoch = beginChatSessionSnapshotRequest(snapshotState, id)
+
     try {
-      activeSession.value = await getChatSession(id)
+      acceptChatSessionSnapshot(snapshotState, {
+        session: await getChatSession(id),
+        requestEpoch,
+      })
     }
     catch (error) {
       ElMessage.error(getRequestErrorDisplayMessage(error, '加载聊天会话失败'))
@@ -118,8 +133,7 @@ export const useChatSessions = createSharedComposable(() => {
 
       const nextSession = sessions.value[0]
       if (!nextSession) {
-        activeSessionId.value = null
-        activeSession.value = null
+        clearActiveChatSessionSnapshot(snapshotState)
         return
       }
 
@@ -163,10 +177,16 @@ export const useChatSessions = createSharedComposable(() => {
   }
 
   async function refreshActiveSession(sessionId: string) {
+    const requestEpoch = beginChatSessionSnapshotRequest(snapshotState, sessionId)
+
     try {
       const session = await getChatSession(sessionId)
-      replaceActiveSession(session)
-      return session
+      return acceptChatSessionSnapshot(snapshotState, {
+        session,
+        requestEpoch,
+      })
+        ? session
+        : null
     }
     catch (error) {
       ElMessage.error(getRequestErrorDisplayMessage(error, '刷新聊天详情失败'))

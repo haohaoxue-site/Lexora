@@ -7,6 +7,7 @@ import {
 
 export const AGENT_QUEUE_NAME = {
   COMMANDS: 'samepage:agent:commands',
+  CONTROLS: 'samepage:agent:controls',
   EVENTS: 'samepage:agent:events',
   DEAD_LETTER: 'samepage:agent:commands:dead-letter',
 } as const
@@ -39,6 +40,14 @@ export const AGENT_RUN_EVENT_TYPE = {
   RUN_TIMED_OUT: 'run.timed_out',
 } as const
 
+export const AGENT_RUN_CONTROL_TYPE = {
+  CANCEL_RUN: 'run.cancel',
+} as const
+
+export const AGENT_RUN_CONTROL_TYPE_VALUES = [
+  AGENT_RUN_CONTROL_TYPE.CANCEL_RUN,
+] as const
+
 export const AGENT_RUN_EVENT_TYPE_VALUES = [
   AGENT_RUN_EVENT_TYPE.RUN_STARTED,
   AGENT_RUN_EVENT_TYPE.TEXT_DELTA,
@@ -56,6 +65,7 @@ export const AGENT_RUN_EVENT_TYPE_VALUES = [
 ] as const
 
 export const AgentRunEventTypeSchema = z.enum(AGENT_RUN_EVENT_TYPE_VALUES)
+export const AgentRunControlTypeSchema = z.enum(AGENT_RUN_CONTROL_TYPE_VALUES)
 export const AgentWorkflowKeySchema = z.enum(AGENT_WORKFLOW_KEY_VALUES)
 
 const NonEmptyStringSchema = z.string().trim().min(1)
@@ -91,6 +101,13 @@ export const AgentRunCommandSchema = z.object({
   context: AgentRunContextSchema.default({}),
   idempotencyKey: NonEmptyStringSchema,
   payload: z.unknown().optional(),
+}).strict()
+
+export const AgentRunControlCommandSchema = z.object({
+  controlId: NonEmptyStringSchema,
+  type: AgentRunControlTypeSchema,
+  runId: NonEmptyStringSchema,
+  reason: z.string().trim().min(1).optional(),
 }).strict()
 
 export const AgentRunEventSchema = z.discriminatedUnion('type', [
@@ -165,4 +182,6 @@ export type AgentRunEventType = z.infer<typeof AgentRunEventTypeSchema>
 export type AgentWorkflowKey = z.infer<typeof AgentWorkflowKeySchema>
 export type AgentRunModelTarget = z.infer<typeof AgentRunModelTargetSchema>
 export type AgentRunCommand = z.infer<typeof AgentRunCommandSchema>
+export type AgentRunControlCommand = z.infer<typeof AgentRunControlCommandSchema>
+export type AgentRunControlType = z.infer<typeof AgentRunControlTypeSchema>
 export type AgentRunEvent = z.infer<typeof AgentRunEventSchema>

@@ -1,12 +1,13 @@
 import type { FormInstance, FormRules } from 'element-plus'
 import type { Ref } from 'vue'
 import type { ChatModelSelection } from '@/apis/chat'
+import { useChatModelSettings } from './useChatModelSettings'
 
 export function useChatModelSettingsDialog(options: {
-  form: Ref<ChatModelSelection>
   modelFormRef: Ref<FormInstance | null>
-  onSave: () => Promise<boolean | void> | boolean | void
 }) {
+  const { modelSettingsDialogVisible, modelSettingsDraft, saveModelSettings } = useChatModelSettings()
+
   const formRules: FormRules<ChatModelSelection> = {
     modelRef: [
       {
@@ -26,11 +27,13 @@ export function useChatModelSettingsDialog(options: {
       return
     }
 
-    await options.onSave()
+    await saveModelSettings()
   }
 
   return {
     formRules,
     handleSave,
+    modelSettingsDialogVisible,
+    modelSettingsDraft,
   }
 }

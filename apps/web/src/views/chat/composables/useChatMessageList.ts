@@ -1,6 +1,7 @@
 import type { Ref } from 'vue'
-import type { ChatMessageListProps } from '../typing'
-import { computed, nextTick, onUpdated } from 'vue'
+import type { ChatMessage } from '@/apis/chat'
+import { ElMessage } from 'element-plus'
+import { computed, nextTick, onUpdated, shallowRef } from 'vue'
 import { SvgIconCategory } from '@/components/svg-icon/typing'
 import {
   getAssistantFailureMessage,
@@ -8,17 +9,30 @@ import {
   getReasoningElapsedMs,
   getReasoningText,
   isAssistantStreamingMessage,
+  shouldShowAssistantCancelled,
   shouldShowAssistantPending,
 } from '../utils/chat-message-display'
+import { useChatModelSettings } from './useChatModelSettings'
+import { useChatRuntimeOverlay } from './useChatRuntimeOverlay'
+import { useChatStream } from './useChatStream'
 
-export function useChatMessageList(
-  props: ChatMessageListProps,
-  options: {
-    scrollContainerRef: Ref<HTMLElement | null>
-  },
-) {
-  const emptyIconStateClass = computed(() => props.isConfigured ? 'configured' : 'idle')
-  const emptyIcon = computed(() => props.isConfigured
+export function useChatMessageList(options: {
+  scrollContainerRef: Ref<HTMLElement | null>
+}) {
+  const { isConfigured } = useChatModelSettings()
+  const { renderSession } = useChatRuntimeOverlay()
+  const {
+    editAndSendMessage,
+    isStreaming,
+    retryMessage,
+    switchBranch,
+  } = useChatStream()
+  const editingMessageId = shallowRef<string | null>(null)
+  const editingContent = shallowRef('')
+
+  const messages = computed<ChatMessage[]>(() => renderSession.value?.messages ?? [])
+  const emptyIconStateClass = computed(() => isConfigured.value ? 'configured' : 'idle')
+  const emptyIcon = computed(() => isConfigured.value
     ? {
         category: SvgIconCategory.NAV,
         icon: 'chat-active',
@@ -38,11 +52,74 @@ export function useChatMessageList(
     }
   }
 
-  function getMessageRoleClass(role: ChatMessageListProps['messages'][number]['role']) {
+  function getMessageRoleClass(role: ChatMessage['role']) {
     return role === 'user' ? 'user' : 'assistant'
   }
 
+  async function copyMessage(message: ChatMessage) {
+    const text = getMessageText(message)
+    if (!text) {
+      ElMessage.warning('没有可复制的内容')
+      return
+    }
+
+    try {
+      await navigator.clipboard.writeText(text)
+      ElMessage.success('已复制')
+    }
+    catch {
+      ElMessage.error('复制失败')
+    }
+  }
+
+  function startEditMessage(message: ChatMessage) {
+    if (message.role !== 'user' || isStreaming.value) {
+      return
+    }
+
+    editingMessageId.value = message.id
+    editingContent.value = getMessageText(message)
+  }
+
+  function cancelEditMessage() {
+    editingMessageId.value = null
+    editingContent.value = ''
+  }
+
+  async function submitEditMessage(message: ChatMessage) {
+    if (message.role !== 'user' || !editingContent.value.trim()) {
+      return
+    }
+
+    if (await editAndSendMessage(message.id, editingContent.value)) {
+      cancelEditMessage()
+    }
+  }
+
+  async function retryAssistantMessage(message: ChatMessage) {
+    if (message.role !== 'assistant' || isStreaming.value) {
+      return
+    }
+
+    await retryMessage(message.id)
+  }
+
+  async function switchToBranch(messageId: string | null) {
+    if (!messageId || isStreaming.value) {
+      return
+    }
+
+    await switchBranch(messageId)
+  }
+
+  function isEditingMessage(message: ChatMessage) {
+    return editingMessageId.value === message.id
+  }
+
   return {
+    cancelEditMessage,
+    copyMessage,
+    editingContent,
     emptyIcon,
     emptyIconStateClass,
     getAssistantFailureMessage,
@@ -50,7 +127,16 @@ export function useChatMessageList(
     getMessageText,
     getReasoningElapsedMs,
     getReasoningText,
+    isEditingMessage,
     isAssistantStreamingMessage,
+    isConfigured,
+    isStreaming,
+    messages,
+    retryAssistantMessage,
+    shouldShowAssistantCancelled,
     shouldShowAssistantPending,
+    startEditMessage,
+    submitEditMessage,
+    switchToBranch,
   }
 }

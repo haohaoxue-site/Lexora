@@ -1,15 +1,14 @@
 import type {
-  AgentChatReplyContext,
-  AgentRunCommand,
+  AgentRunModelTarget,
   AiModelRef,
   ChatModelItem,
+  ChatMutationResponse,
   ChatRuntimeConfig,
 } from '@haohaoxue/samepage-contracts'
 import { randomUUID } from 'node:crypto'
 import {
-  AGENT_WORKFLOW_KEY,
-  AgentChatReplyContextSchema,
-  AgentRunCommandSchema,
+  AGENT_RUN_CONTROL_TYPE,
+  AgentRunModelTargetSchema,
   AI_MODEL_INTENT_KEY,
 } from '@haohaoxue/samepage-contracts'
 import {
@@ -19,29 +18,39 @@ import {
 import { AgentRunCommandPublisherService } from '../agent/agent-command-publisher.service'
 import { AiDefaultModelsService } from '../ai/models/defaults.service'
 import { AiModelResolverService } from '../ai/models/resolver.service'
+import { ChatRunDispatcherService } from './chat-run-dispatcher.service'
 import { ChatSessionsService } from './chat-sessions.service'
 
-interface RequestChatCompletionParams {
+interface ChatMessageMutationParams {
   userId: string
   sessionId: string
+}
+
+interface SendChatMessageParams extends ChatMessageMutationParams {
   content: string
+}
+
+interface EditAndSendChatMessageParams extends SendChatMessageParams {
+  messageId: string
+}
+
+interface RetryChatAssistantMessageParams extends ChatMessageMutationParams {
+  messageId: string
+}
+
+interface SwitchChatActiveMessageParams extends ChatMessageMutationParams {
+  messageId: string
+}
+
+interface CancelChatRunParams {
+  userId: string
+  runId: string
 }
 
 interface UpdateChatSessionModelParams {
   userId: string
   sessionId: string
   modelRef: Pick<AiModelRef, 'providerId' | 'modelId'> | null
-}
-
-interface ChatReplyCommandContext {
-  /** agent 执行命令 */
-  command: AgentRunCommand
-  /** 聊天会话 ID */
-  sessionId: string
-  /** assistant 消息顺序 */
-  nextAssistantOrder: number
-  /** 写入 user 消息后的历史版本 */
-  expectedHistoryVersion: number
 }
 
 @Injectable()
@@ -52,6 +61,7 @@ export class ChatService {
     private readonly chatSessionsService: ChatSessionsService,
     private readonly modelResolverService: AiModelResolverService,
     private readonly defaultModelsService: AiDefaultModelsService,
+    private readonly chatRunDispatcher: ChatRunDispatcherService,
     private readonly agentRunCommandPublisher: AgentRunCommandPublisherService,
   ) {}
 
@@ -107,75 +117,88 @@ export class ChatService {
     return this.chatSessionsService.updateSessionModel(params)
   }
 
-  async prepareChatReplyCommand(params: RequestChatCompletionParams): Promise<ChatReplyCommandContext> {
-    const normalizedContent = params.content.trim()
+  async sendMessage(params: SendChatMessageParams): Promise<ChatMutationResponse> {
+    const runId = randomUUID()
+    const modelTarget = await this.resolveChatModelTarget(params)
+    const result = await this.chatSessionsService.sendMessage({
+      ...params,
+      runId,
+      modelTarget,
+    })
+
+    this.dispatchRun(runId, params.sessionId)
+    return result
+  }
+
+  async editAndSendMessage(params: EditAndSendChatMessageParams): Promise<ChatMutationResponse> {
+    const runId = randomUUID()
+    const modelTarget = await this.resolveChatModelTarget(params)
+    const result = await this.chatSessionsService.editAndSendMessage({
+      ...params,
+      runId,
+      modelTarget,
+    })
+
+    this.dispatchRun(runId, params.sessionId)
+    return result
+  }
+
+  async retryAssistantMessage(params: RetryChatAssistantMessageParams): Promise<ChatMutationResponse> {
+    const runId = randomUUID()
+    const modelTarget = await this.resolveChatModelTarget(params)
+    const result = await this.chatSessionsService.retryAssistantMessage({
+      ...params,
+      runId,
+      modelTarget,
+    })
+
+    this.dispatchRun(runId, params.sessionId)
+    return result
+  }
+
+  async switchActiveMessage(params: SwitchChatActiveMessageParams): Promise<ChatMutationResponse> {
+    return this.chatSessionsService.switchActiveMessage(params)
+  }
+
+  async cancelRun(params: CancelChatRunParams): Promise<ChatMutationResponse> {
+    const result = await this.chatSessionsService.cancelRun(params)
+
+    await this.agentRunCommandPublisher.publishRunControl({
+      controlId: randomUUID(),
+      type: AGENT_RUN_CONTROL_TYPE.CANCEL_RUN,
+      runId: params.runId,
+      reason: 'user_cancelled',
+    }).catch(error => this.logger.warn(
+      error instanceof Error ? error.message : `publish chat run cancel failed: run=${params.runId}`,
+    ))
+
+    return result
+  }
+
+  private async resolveChatModelTarget(params: ChatMessageMutationParams): Promise<AgentRunModelTarget> {
     const sessionModelRef = await this.chatSessionsService.getSessionModelRef(params.userId, params.sessionId)
     const target = await this.modelResolverService.resolveModelTarget({
       actorUserId: params.userId,
       intentKey: AI_MODEL_INTENT_KEY.CHAT_ASSISTANT_DEFAULT,
       requestedModelRef: sessionModelRef,
     })
-    const session = await this.chatSessionsService.prepareCompletionSession({
-      userId: params.userId,
-      sessionId: params.sessionId,
-      content: normalizedContent,
-    })
-    const context: AgentChatReplyContext = AgentChatReplyContextSchema.parse({
-      chatSessionId: session.sessionId,
-      triggerMessageOrder: session.triggerMessageOrder,
-      nextAssistantOrder: session.nextAssistantOrder,
-      expectedHistoryVersion: session.expectedHistoryVersion,
-    })
 
-    this.logger.log(
-      `chat reply command prepared: user=${params.userId} session=${session.sessionId} model=${target.modelId} provider=${target.providerKey} triggerOrder=${session.triggerMessageOrder} historyVersion=${session.expectedHistoryVersion}`,
-    )
-
-    return {
-      sessionId: session.sessionId,
-      nextAssistantOrder: session.nextAssistantOrder,
-      expectedHistoryVersion: session.expectedHistoryVersion,
-      command: AgentRunCommandSchema.parse({
-        commandId: randomUUID(),
-        runId: randomUUID(),
-        workflowKey: AGENT_WORKFLOW_KEY.CHAT_REPLY,
-        actorId: params.userId,
-        modelTarget: {
-          providerId: target.providerId,
-          scope: target.scope,
-          providerKey: target.providerKey,
-          adapterKey: target.adapterKey,
-          endpoint: target.endpoint,
-          apiKey: target.apiKey,
-          authMode: target.authMode,
-          modelId: target.modelId,
-        },
-        context,
-        idempotencyKey: `${AGENT_WORKFLOW_KEY.CHAT_REPLY}:${session.sessionId}:${session.nextAssistantOrder}`,
-      }),
-    }
+    return AgentRunModelTargetSchema.parse({
+      providerId: target.providerId,
+      scope: target.scope,
+      providerKey: target.providerKey,
+      adapterKey: target.adapterKey,
+      endpoint: target.endpoint,
+      apiKey: target.apiKey,
+      authMode: target.authMode,
+      modelId: target.modelId,
+    })
   }
 
-  async submitChatReplyCommand(params: RequestChatCompletionParams): Promise<ChatReplyCommandContext> {
-    const result = await this.prepareChatReplyCommand(params)
-
-    await this.publishChatReplyCommand({
-      userId: params.userId,
-      sessionId: result.sessionId,
-      command: result.command,
-    })
-
-    return result
-  }
-
-  async publishChatReplyCommand(input: {
-    userId: string
-    sessionId: string
-    command: AgentRunCommand
-  }): Promise<void> {
-    await this.agentRunCommandPublisher.publishRunCommand(input.command)
-    this.logger.log(
-      `chat reply command published: user=${input.userId} session=${input.sessionId} run=${input.command.runId}`,
-    )
+  private dispatchRun(runId: string, sessionId: string): void {
+    void this.chatRunDispatcher.dispatchRun(runId).catch(error => this.logger.error(
+      error instanceof Error ? error.message : `dispatch chat run failed: session=${sessionId} run=${runId}`,
+      error instanceof Error ? error.stack : undefined,
+    ))
   }
 }

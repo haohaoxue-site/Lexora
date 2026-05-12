@@ -33,7 +33,10 @@ async function bootstrap() {
     credentials: true,
   })
   app.setGlobalPrefix(apiPrefix, {
-    exclude: [{ path: 'health', method: RequestMethod.GET }],
+    exclude: [
+      { path: 'health', method: RequestMethod.GET },
+      { path: 'internal/{*path}', method: RequestMethod.ALL },
+    ],
   })
 
   app.useGlobalPipes(

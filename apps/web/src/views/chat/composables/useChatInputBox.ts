@@ -1,24 +1,27 @@
-import type {
-  ChatInputBoxProps,
-} from '../typing'
 import { computed, shallowRef } from 'vue'
+import { useChatModelSettings } from './useChatModelSettings'
+import { useChatRuntimeOverlay } from './useChatRuntimeOverlay'
+import { useChatStream } from './useChatStream'
 
-export function useChatInputBox(
-  props: ChatInputBoxProps,
-  onSend: (content: string) => void,
-) {
+export function useChatInputBox() {
+  const { inputPlaceholder, isConfigured } = useChatModelSettings()
+  const { cancelRunId, isStreaming } = useChatRuntimeOverlay()
+  const { cancelActiveRun, sendMessage } = useChatStream()
+
   const inputText = shallowRef('')
-  const isSendDisabled = computed(() => !inputText.value.trim() || props.disabled)
+  const isDisabled = computed(() => isStreaming.value || !isConfigured.value)
+  const isSendDisabled = computed(() => !inputText.value.trim() || isDisabled.value)
 
-  function handleSend() {
+  async function handleSend() {
     const text = inputText.value.trim()
 
     if (!text) {
       return
     }
 
-    onSend(text)
-    inputText.value = ''
+    if (await sendMessage(text)) {
+      inputText.value = ''
+    }
   }
 
   function handleKeydown(event: Event | KeyboardEvent) {
@@ -28,14 +31,19 @@ export function useChatInputBox(
 
     if (event.key === 'Enter' && !event.shiftKey) {
       event.preventDefault()
-      handleSend()
+      void handleSend()
     }
   }
 
   return {
+    cancelActiveRun,
     handleKeydown,
     handleSend,
+    inputPlaceholder,
     inputText,
+    cancelRunId,
+    isDisabled,
     isSendDisabled,
+    isStreaming,
   }
 }

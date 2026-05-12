@@ -1,11 +1,13 @@
 import type {
   AiModelRef,
   ChatMessage,
+  ChatMessageBranch,
   ChatMessageMetadata,
   ChatMessagePart,
   ChatMessagePartMetadata,
   ChatMessagePartType,
   ChatMessageStatus,
+  ChatRunSummary,
   ChatSessionDetail,
   ChatSessionSummary,
 } from '@haohaoxue/samepage-contracts'
@@ -33,7 +35,7 @@ export interface ChatSessionMessageRecord {
   role: ChatSessionMessageRole
   status: PrismaChatSessionMessageStatus
   content: string
-  order: number
+  branch: ChatMessageBranch
   parts: ChatSessionMessagePartRecord[]
   metadata: unknown
   createdAt: Date
@@ -52,6 +54,8 @@ export interface ChatSessionMessagePartRecord {
 }
 
 export interface ChatSessionDetailRecord extends ChatSessionSummaryRecord {
+  activeRun?: ChatRunSummary | null
+  latestSequence: number
   messages: ChatSessionMessageRecord[]
 }
 
@@ -66,14 +70,15 @@ export function toChatSessionSummary(session: ChatSessionSummaryRecord): ChatSes
 }
 
 export function toChatSessionDetail(session: ChatSessionDetailRecord): ChatSessionDetail {
-  return {
+  const detail: ChatSessionDetail = {
     ...toChatSessionSummary(session),
+    latestSequence: session.latestSequence,
     messages: session.messages.map(message => ({
       id: message.id,
       role: toChatMessageRole(message.role),
       status: toChatMessageStatus(message.status),
-      content: message.content,
-      order: message.order,
+      content: getChatMessageContentSnapshot(message),
+      branch: message.branch,
       parts: message.parts.map(toChatMessagePart),
       metadata: toChatMessageMetadata(message.metadata),
       createdAt: message.createdAt.toISOString(),
@@ -81,6 +86,18 @@ export function toChatSessionDetail(session: ChatSessionDetailRecord): ChatSessi
       completedAt: message.completedAt?.toISOString() ?? null,
     })),
   }
+
+  if (session.activeRun) {
+    detail.activeRun = session.activeRun
+  }
+
+  return detail
+}
+
+export function getChatMessageContentSnapshot(
+  message: Pick<ChatSessionMessageRecord, 'content' | 'parts'>,
+): string {
+  return message.parts.find(part => part.type === PrismaChatSessionMessagePartType.TEXT)?.text ?? message.content
 }
 
 export function toChatMessageRole(role: ChatSessionMessageRole): ChatMessage['role'] {
@@ -88,11 +105,17 @@ export function toChatMessageRole(role: ChatSessionMessageRole): ChatMessage['ro
 }
 
 export function toChatMessageStatus(status: PrismaChatSessionMessageStatus): ChatMessageStatus {
+  if (status === PrismaChatSessionMessageStatus.PENDING) {
+    return CHAT_MESSAGE_STATUS.PENDING
+  }
   if (status === PrismaChatSessionMessageStatus.STREAMING) {
     return CHAT_MESSAGE_STATUS.STREAMING
   }
   if (status === PrismaChatSessionMessageStatus.FAILED) {
     return CHAT_MESSAGE_STATUS.FAILED
+  }
+  if (status === PrismaChatSessionMessageStatus.CANCELLED) {
+    return CHAT_MESSAGE_STATUS.CANCELLED
   }
 
   return CHAT_MESSAGE_STATUS.COMPLETED

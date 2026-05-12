@@ -58,8 +58,13 @@ export function isAssistantStreamingMessage(message: ChatMessage) {
 
 export function shouldShowAssistantPending(message: ChatMessage) {
   return (
-    isAssistantStreamingMessage(message)
+    message.role === 'assistant'
+    && (isAssistantStreamingMessage(message) || message.status === CHAT_MESSAGE_STATUS.PENDING)
     && !getReasoningText(message)
     && !getMessageText(message)
   )
+}
+
+export function shouldShowAssistantCancelled(message: ChatMessage) {
+  return message.role === 'assistant' && message.status === CHAT_MESSAGE_STATUS.CANCELLED
 }

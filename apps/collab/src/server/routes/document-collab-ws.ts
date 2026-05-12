@@ -1,16 +1,16 @@
 import type { CollabTicketPayload } from '@haohaoxue/samepage-contracts'
 import type { FastifyInstance } from 'fastify'
+import type { CollabTicketClient } from '../../clients/documents'
 import type { CollabActiveConnectionRegistry } from '../../gateway/active-connections'
 import type { ConnectionGate, FixedWindowRateLimiter } from '../../gateway/limits'
-import type { CollabTicketClient } from '../../integrations/collab-ticket-client'
 import type { CollabMetricsCollector } from '../../observability/metrics'
 import type { CollabHocuspocusRuntime } from '../../runtime/ports'
 import type { DocumentYdocRuntimeStore } from '../../runtime/ydoc-runtime-store'
 import { Buffer } from 'node:buffer'
 import { randomUUID } from 'node:crypto'
 import { COLLAB_ERROR_CODE } from '@haohaoxue/samepage-contracts'
+import { CollabTicketClientError } from '../../clients/documents'
 import { toSafeCollabTicketLogContext } from '../../gateway/ticket-log-context'
-import { CollabTicketClientError } from '../../integrations/collab-ticket-client'
 import {
   createHocuspocusWebRequest,
   getTicketFromRequest,

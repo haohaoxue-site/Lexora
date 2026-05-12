@@ -1,7 +1,6 @@
 import process from 'node:process'
+import { createCollabTicketClient, createDocumentYdocCurrentProjectionClient } from './clients/documents'
 import { loadCollabConfig } from './config/runtime-config'
-import { createCollabTicketClient } from './integrations/collab-ticket-client'
-import { createDocumentYdocCurrentProjectionClient } from './integrations/current-projection-client'
 import { createRedisCollabPubSub } from './integrations/pubsub'
 import { createPrismaDocumentYdocRuntimeStore } from './runtime/prisma-ydoc-runtime-store'
 import { createCollabServer } from './server/app'

@@ -115,6 +115,18 @@ export function createAgentWorkflowRuntime(options: CreateAgentWorkflowRuntimeOp
         return result
       }
       catch (error) {
+        if (abortController.signal.aborted) {
+          await events.publish(createAgentRunEvent({
+            type: AGENT_RUN_EVENT_TYPE.RUN_CANCELLED,
+            runId: command.runId,
+            workflowKey: command.workflowKey,
+            payload: {
+              message: 'Agent run cancelled',
+            },
+          }))
+          return undefined
+        }
+
         await events.publish(createAgentRunEvent({
           type: AGENT_RUN_EVENT_TYPE.RUN_FAILED,
           runId: command.runId,

@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-const DEFAULT_API_INTERNAL_URL = 'http://127.0.0.1:3000/api'
+const DEFAULT_API_INTERNAL_URL = 'http://127.0.0.1:3000'
 const DEFAULT_REDIS_URL = 'redis://127.0.0.1:6379'
 
 const agentEnvSchema = z.object({

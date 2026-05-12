@@ -23,7 +23,7 @@ export function createAgentChatApiClient(apiInternalUrl: string): AgentChatApiCl
     async getSessionContext(options) {
       const payload = AgentGetChatSessionContextRequestSchema.parse({
         actorId: options.actorId,
-        triggerMessageOrder: options.triggerMessageOrder,
+        triggerUserMessageId: options.triggerUserMessageId,
       })
 
       return AgentGetChatSessionContextResponseSchema.parse(await postApiInternalJson({

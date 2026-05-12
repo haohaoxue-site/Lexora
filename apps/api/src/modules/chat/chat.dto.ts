@@ -1,5 +1,7 @@
 import type {
-  CreateChatCompletionRequest,
+  CreateChatSessionMessageRequest,
+  EditAndSendChatMessageRequest,
+  SwitchChatActiveMessageRequest,
   UpdateChatSessionModelRequest,
   UpdateChatSessionTitleRequest,
 } from '@haohaoxue/samepage-contracts'
@@ -21,13 +23,26 @@ class ChatModelRefDto {
   modelId!: string
 }
 
-export class CreateChatCompletionRequestDto implements CreateChatCompletionRequest {
+export class CreateChatSessionMessageRequestDto implements CreateChatSessionMessageRequest {
+  @Transform(({ value }) => typeof value === 'string' ? value.trim() : value)
   @IsString()
-  sessionId!: string
-
-  @IsString()
+  @MinLength(1)
   @MaxLength(40_000)
   content!: string
+}
+
+export class EditAndSendChatMessageRequestDto implements EditAndSendChatMessageRequest {
+  @Transform(({ value }) => typeof value === 'string' ? value.trim() : value)
+  @IsString()
+  @MinLength(1)
+  @MaxLength(40_000)
+  content!: string
+}
+
+export class SwitchChatActiveMessageRequestDto implements SwitchChatActiveMessageRequest {
+  @IsString()
+  @MinLength(1)
+  messageId!: string
 }
 
 export class UpdateChatSessionModelRequestDto implements UpdateChatSessionModelRequest {

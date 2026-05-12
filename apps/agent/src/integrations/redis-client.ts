@@ -6,6 +6,9 @@ export type RedisStreamReadResult = Array<[string, RedisStreamMessage[]]>
 
 /** agent Redis client 最小能力。 */
 export interface AgentRedisClient {
+  del: (key: string) => Promise<number>
+  get: (key: string) => Promise<string | null>
+  set: (...args: RedisCommandArgument[]) => Promise<'OK' | null>
   xgroup: (...args: RedisCommandArgument[]) => Promise<unknown>
   xreadgroup: (...args: RedisCommandArgument[]) => Promise<RedisStreamReadResult | null>
   xack: (streamName: string, groupName: string, messageId: string) => Promise<number>
