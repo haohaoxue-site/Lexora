@@ -3,6 +3,21 @@ enum ChatSessionMessageRole {
   ASSISTANT
 }
 
+enum ChatSessionMessageStatus {
+  STREAMING
+  COMPLETED
+  FAILED
+}
+
+enum ChatSessionMessagePartType {
+  REASONING
+  TEXT
+  TOOL_CALL
+  TOOL_RESULT
+  SOURCE
+  CITATION
+}
+
 model ChatSession {
   id                 String               @id @default(uuid())
   userId             String
@@ -21,16 +36,38 @@ model ChatSession {
 }
 
 model ChatSessionMessage {
-  id        String                 @id @default(uuid())
-  sessionId String
-  role      ChatSessionMessageRole
-  content   String
-  order     Int
-  session   ChatSession            @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  createdAt DateTime               @default(now())
-  updatedAt DateTime               @updatedAt
-  deletedAt DateTime?
+  id          String                   @id @default(uuid())
+  sessionId   String
+  role        ChatSessionMessageRole
+  status      ChatSessionMessageStatus @default(COMPLETED)
+  content     String
+  order       Int
+  agentRunId  String?
+  metadata    Json?
+  completedAt DateTime?
+  session     ChatSession              @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  parts       ChatSessionMessagePart[]
+  createdAt   DateTime                 @default(now())
+  updatedAt   DateTime                 @updatedAt
+  deletedAt   DateTime?
 
   @@unique([sessionId, order])
+  @@index([agentRunId])
   @@index([sessionId, createdAt])
+}
+
+model ChatSessionMessagePart {
+  id        String                     @id @default(uuid())
+  messageId String
+  type      ChatSessionMessagePartType
+  text      String                     @default("")
+  order     Int
+  metadata  Json?
+  message   ChatSessionMessage        @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  createdAt DateTime                   @default(now())
+  updatedAt DateTime                   @updatedAt
+  deletedAt DateTime?
+
+  @@unique([messageId, order])
+  @@index([messageId, type])
 }

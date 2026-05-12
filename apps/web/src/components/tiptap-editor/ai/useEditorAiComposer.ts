@@ -28,7 +28,7 @@ import {
   EDITOR_AI_REJECT_ERROR_FALLBACK,
   EDITOR_AI_STALE_ANCHOR_MESSAGE,
   EDITOR_AI_WORKFLOW_KEY_BY_COMPOSER_MODE,
-} from './contracts'
+} from './constants'
 import { resolveEditorAiGenerateAnchor, resolveEditorAiRewriteAnchor } from './editorAiAnchor'
 import { clearEditorAiPreview, setEditorAiPreview } from './EditorAiPreview'
 import { streamEditorAiSession } from './editorAiSessionStream'

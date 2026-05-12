@@ -25,7 +25,7 @@ export function createLlmCallNode(options: CreateLlmCallNodeOptions): GraphNode<
 
     return {
       responseText: await consumeChatModelTextStream(stream, {
-        onTextDelta: config.context?.onTextDelta,
+        onStreamPart: config.context?.onStreamPart,
       }),
     }
   }

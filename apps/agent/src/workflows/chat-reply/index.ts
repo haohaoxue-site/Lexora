@@ -1,5 +1,6 @@
 import type { AgentChatApiClient } from '../../clients/chat'
 import type { AgentChatModelFactory } from '../../integrations/model-providers/chat-model'
+import type { AgentModelStreamPart } from '../../integrations/model-providers/stream-text'
 import type { AgentWorkflow } from '../../runtime/typing'
 import {
   AGENT_RUN_EVENT_TYPE,
@@ -7,6 +8,7 @@ import {
   AgentChatReplyContextSchema,
 } from '@haohaoxue/samepage-contracts'
 import { createAgentRunEvent } from '../../runtime/workflow'
+import { emitAgentModelStreamPart } from '../_stream-parts'
 import { createChatReplyGraph } from './graph'
 
 export interface CreateChatReplyWorkflowInput {
@@ -51,16 +53,7 @@ export function createChatReplyWorkflow(inputs: CreateChatReplyWorkflowInput): A
         signal: options.signal,
         context: {
           modelTarget: options.modelTarget,
-          onTextDelta: async (text: string) => {
-            await options.emit(createAgentRunEvent({
-              type: AGENT_RUN_EVENT_TYPE.TEXT_DELTA,
-              runId: options.runId,
-              workflowKey: options.workflowKey,
-              payload: {
-                text,
-              },
-            }))
-          },
+          onStreamPart: async (part: AgentModelStreamPart) => await emitAgentModelStreamPart(part, options),
         },
       })
 

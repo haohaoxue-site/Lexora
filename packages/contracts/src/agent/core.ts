@@ -29,7 +29,9 @@ export const AGENT_RUN_EVENT_TYPE = {
   REASONING_DELTA: 'reasoning.delta',
   PROGRESS: 'progress',
   TOOL_CALL_STARTED: 'tool.call.started',
+  TOOL_CALL_ARGS_DELTA: 'tool.call.args.delta',
   TOOL_CALL_COMPLETED: 'tool.call.completed',
+  TOOL_RESULT: 'tool.result',
   CANDIDATE_COMPLETED: 'candidate.completed',
   RUN_COMPLETED: 'run.completed',
   RUN_FAILED: 'run.failed',
@@ -43,7 +45,9 @@ export const AGENT_RUN_EVENT_TYPE_VALUES = [
   AGENT_RUN_EVENT_TYPE.REASONING_DELTA,
   AGENT_RUN_EVENT_TYPE.PROGRESS,
   AGENT_RUN_EVENT_TYPE.TOOL_CALL_STARTED,
+  AGENT_RUN_EVENT_TYPE.TOOL_CALL_ARGS_DELTA,
   AGENT_RUN_EVENT_TYPE.TOOL_CALL_COMPLETED,
+  AGENT_RUN_EVENT_TYPE.TOOL_RESULT,
   AGENT_RUN_EVENT_TYPE.CANDIDATE_COMPLETED,
   AGENT_RUN_EVENT_TYPE.RUN_COMPLETED,
   AGENT_RUN_EVENT_TYPE.RUN_FAILED,
@@ -56,6 +60,16 @@ export const AgentWorkflowKeySchema = z.enum(AGENT_WORKFLOW_KEY_VALUES)
 
 const NonEmptyStringSchema = z.string().trim().min(1)
 const AgentRunContextSchema = z.record(z.string(), z.unknown())
+const AgentRunEventBaseSchema = z.object({
+  runId: NonEmptyStringSchema,
+  workflowKey: AgentWorkflowKeySchema,
+})
+const AgentRunTextDeltaPayloadSchema = z.object({
+  text: z.string(),
+}).strict()
+const AgentRunFailurePayloadSchema = z.object({
+  message: z.string().trim().min(1).optional(),
+}).strict()
 
 export const AgentRunModelTargetSchema = z.object({
   providerId: NonEmptyStringSchema,
@@ -79,12 +93,73 @@ export const AgentRunCommandSchema = z.object({
   payload: z.unknown().optional(),
 }).strict()
 
-export const AgentRunEventSchema = z.object({
-  type: AgentRunEventTypeSchema,
-  runId: NonEmptyStringSchema,
-  workflowKey: AgentWorkflowKeySchema,
-  payload: z.unknown().optional(),
-}).strict()
+export const AgentRunEventSchema = z.discriminatedUnion('type', [
+  AgentRunEventBaseSchema.extend({
+    type: z.literal(AGENT_RUN_EVENT_TYPE.RUN_STARTED),
+    payload: z.unknown().optional(),
+  }).strict(),
+  AgentRunEventBaseSchema.extend({
+    type: z.literal(AGENT_RUN_EVENT_TYPE.REASONING_DELTA),
+    payload: AgentRunTextDeltaPayloadSchema,
+  }).strict(),
+  AgentRunEventBaseSchema.extend({
+    type: z.literal(AGENT_RUN_EVENT_TYPE.TEXT_DELTA),
+    payload: AgentRunTextDeltaPayloadSchema,
+  }).strict(),
+  AgentRunEventBaseSchema.extend({
+    type: z.literal(AGENT_RUN_EVENT_TYPE.PROGRESS),
+    payload: z.unknown().optional(),
+  }).strict(),
+  AgentRunEventBaseSchema.extend({
+    type: z.literal(AGENT_RUN_EVENT_TYPE.TOOL_CALL_STARTED),
+    payload: z.object({
+      toolCallId: NonEmptyStringSchema,
+      toolName: NonEmptyStringSchema,
+    }).strict(),
+  }).strict(),
+  AgentRunEventBaseSchema.extend({
+    type: z.literal(AGENT_RUN_EVENT_TYPE.TOOL_CALL_ARGS_DELTA),
+    payload: z.object({
+      toolCallId: NonEmptyStringSchema,
+      text: z.string(),
+    }).strict(),
+  }).strict(),
+  AgentRunEventBaseSchema.extend({
+    type: z.literal(AGENT_RUN_EVENT_TYPE.TOOL_CALL_COMPLETED),
+    payload: z.object({
+      toolCallId: NonEmptyStringSchema,
+    }).strict(),
+  }).strict(),
+  AgentRunEventBaseSchema.extend({
+    type: z.literal(AGENT_RUN_EVENT_TYPE.TOOL_RESULT),
+    payload: z.object({
+      toolCallId: NonEmptyStringSchema,
+      content: z.string(),
+    }).strict(),
+  }).strict(),
+  AgentRunEventBaseSchema.extend({
+    type: z.literal(AGENT_RUN_EVENT_TYPE.CANDIDATE_COMPLETED),
+    payload: z.unknown().optional(),
+  }).strict(),
+  AgentRunEventBaseSchema.extend({
+    type: z.literal(AGENT_RUN_EVENT_TYPE.RUN_COMPLETED),
+    payload: z.object({
+      durationMs: z.number().int().nonnegative().optional(),
+    }).strict().optional(),
+  }).strict(),
+  AgentRunEventBaseSchema.extend({
+    type: z.literal(AGENT_RUN_EVENT_TYPE.RUN_FAILED),
+    payload: AgentRunFailurePayloadSchema.optional(),
+  }).strict(),
+  AgentRunEventBaseSchema.extend({
+    type: z.literal(AGENT_RUN_EVENT_TYPE.RUN_CANCELLED),
+    payload: AgentRunFailurePayloadSchema.optional(),
+  }).strict(),
+  AgentRunEventBaseSchema.extend({
+    type: z.literal(AGENT_RUN_EVENT_TYPE.RUN_TIMED_OUT),
+    payload: AgentRunFailurePayloadSchema.optional(),
+  }).strict(),
+])
 
 export type AgentRunEventType = z.infer<typeof AgentRunEventTypeSchema>
 export type AgentWorkflowKey = z.infer<typeof AgentWorkflowKeySchema>

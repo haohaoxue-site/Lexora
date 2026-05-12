@@ -6,5 +6,6 @@ export type {
   ChatRuntimeConfig,
   ChatSessionDetail,
   ChatSessionSummary,
+  ChatStreamEvent,
   UpdateChatSessionTitleRequest,
 } from '@haohaoxue/samepage-contracts'

@@ -11,14 +11,13 @@ import {
   Controller,
   Delete,
   Get,
-  Logger,
   Param,
   Patch,
   Post,
   Res,
 } from '@nestjs/common'
 import { CurrentUser } from '../../decorators/current-user.decorator'
-import { AgentRunEventsService } from '../agent/agent-events.service'
+import { ChatRunProjectorService } from './chat-run-projector.service'
 import { ChatSessionsService } from './chat-sessions.service'
 import {
   CreateChatCompletionRequestDto,
@@ -29,12 +28,10 @@ import { ChatService } from './chat.service'
 
 @Controller('chat')
 export class ChatController {
-  private readonly logger = new Logger(ChatController.name)
-
   constructor(
     private readonly chatService: ChatService,
     private readonly chatSessionsService: ChatSessionsService,
-    private readonly agentEventsService: AgentRunEventsService,
+    private readonly chatRunProjectorService: ChatRunProjectorService,
   ) {}
 
   @Get('sessions')
@@ -116,16 +113,20 @@ export class ChatController {
     @Body() payload: CreateChatCompletionRequestDto,
     @Res() reply: FastifyReply,
   ): Promise<void> {
-    const eventStreamStartId = await this.agentEventsService.getLatestEventStreamId()
     const {
       command,
       expectedHistoryVersion,
       nextAssistantOrder,
       sessionId,
-    } = await this.chatService.submitChatReplyCommand({
+    } = await this.chatService.prepareChatReplyCommand({
       userId: authUser.id,
       sessionId: payload.sessionId,
       content: payload.content,
+    })
+    const assistantMessage = await this.chatSessionsService.createAssistantPlaceholderMessage({
+      sessionId,
+      order: nextAssistantOrder,
+      agentRunId: command.runId,
     })
 
     reply.raw.writeHead(200, {
@@ -134,46 +135,26 @@ export class ChatController {
       'Connection': 'keep-alive',
     })
 
-    let assistantContent = ''
-
     try {
-      await this.agentEventsService.consumeRunEvents({
-        runId: command.runId,
-        workflowKey: command.workflowKey,
-        afterId: eventStreamStartId,
-        messages: {
-          aborted: '聊天请求已取消',
-          cancelled: '聊天运行已取消',
-          timedOut: '等待聊天运行结果超时',
-          failed: '聊天运行失败',
-        },
-        onTextDelta: (chunk) => {
-          assistantContent += chunk
-          reply.raw.write(`data: ${JSON.stringify({ content: chunk })}\n\n`)
-        },
-      })
-
-      await this.chatSessionsService.persistAssistantMessage({
+      await this.chatRunProjectorService.projectRunToReply({
+        reply,
+        command,
         sessionId,
-        assistantContent,
-        order: nextAssistantOrder,
+        messageId: assistantMessage.id,
         expectedHistoryVersion,
+        start: async () => {
+          await this.chatService.publishChatReplyCommand({
+            userId: authUser.id,
+            sessionId,
+            command,
+          })
+        },
       })
-      reply.raw.write('data: [DONE]\n\n')
-    }
-    catch (error) {
-      const message = error instanceof Error && error.message
-        ? error.message
-        : '聊天流式响应失败'
-
-      this.logger.error(
-        error instanceof Error ? error.message : 'chat completion stream failed',
-        error instanceof Error ? error.stack : undefined,
-      )
-      reply.raw.write(`data: ${JSON.stringify({ error: message })}\n\n`)
     }
     finally {
-      reply.raw.end()
+      if (!reply.raw.destroyed && !reply.raw.writableEnded) {
+        reply.raw.end()
+      }
     }
   }
 }

@@ -1,11 +1,7 @@
 import type { AgentRunEvent, AgentWorkflowKey } from '@haohaoxue/samepage-contracts'
 import type Redis from 'ioredis'
 import { AGENT_QUEUE_NAME, AGENT_RUN_EVENT_TYPE, AgentRunEventSchema } from '@haohaoxue/samepage-contracts'
-import {
-  BadGatewayException,
-  GatewayTimeoutException,
-  Injectable,
-} from '@nestjs/common'
+import { Injectable } from '@nestjs/common'
 import { RedisService } from '../../infrastructure/redis/redis.service'
 
 const EVENT_FIELD = 'event'
@@ -13,6 +9,8 @@ const DEFAULT_READ_COUNT = 20
 const DEFAULT_READ_BLOCK_MS = 1000
 const DEFAULT_RUN_TIMEOUT_MS = 10 * 60_000
 const EMPTY_STREAM_ID = '0-0'
+
+export type AgentRunEventFailureReason = 'failed' | 'cancelled' | 'timed_out'
 
 type RedisStreamMessage = [string, string[]]
 type RedisStreamReadResult = Array<[string, RedisStreamMessage[]]>
@@ -24,7 +22,7 @@ export interface ConsumeAgentRunEventsInput {
   timeoutMs?: number
   signal?: AbortSignal
   messages?: AgentRunEventConsumerMessages
-  onTextDelta: (chunk: string) => void | Promise<void>
+  onEvent: (event: AgentRunEvent) => void | Promise<void>
 }
 
 export interface AgentRunEventConsumerMessages {
@@ -32,6 +30,16 @@ export interface AgentRunEventConsumerMessages {
   cancelled?: string
   timedOut?: string
   failed?: string
+}
+
+export class AgentRunEventsConsumerError extends Error {
+  constructor(
+    message: string,
+    readonly reason: AgentRunEventFailureReason,
+  ) {
+    super(message)
+    this.name = 'AgentRunEventsConsumerError'
+  }
 }
 
 @Injectable()
@@ -72,7 +80,7 @@ export class AgentRunEventsService {
 
     while (Date.now() < deadlineAt) {
       if (input.signal?.aborted) {
-        throw new BadGatewayException(messages.aborted)
+        throw new AgentRunEventsConsumerError(messages.aborted, 'cancelled')
       }
 
       const remainingMs = Math.max(1, deadlineAt - Date.now())
@@ -91,34 +99,28 @@ export class AgentRunEventsService {
             continue
           }
 
-          if (event.type === AGENT_RUN_EVENT_TYPE.TEXT_DELTA) {
-            const text = getTextDelta(event)
-            if (text) {
-              await input.onTextDelta(text)
-            }
-            continue
-          }
+          await input.onEvent(event)
 
           if (event.type === AGENT_RUN_EVENT_TYPE.RUN_COMPLETED) {
             return
           }
 
           if (event.type === AGENT_RUN_EVENT_TYPE.RUN_FAILED) {
-            throw new BadGatewayException(getFailureMessage(event, messages.failed))
+            throw new AgentRunEventsConsumerError(getFailureMessage(event, messages.failed), 'failed')
           }
 
           if (event.type === AGENT_RUN_EVENT_TYPE.RUN_CANCELLED) {
-            throw new BadGatewayException(messages.cancelled)
+            throw new AgentRunEventsConsumerError(getFailureMessage(event, messages.cancelled), 'cancelled')
           }
 
           if (event.type === AGENT_RUN_EVENT_TYPE.RUN_TIMED_OUT) {
-            throw new GatewayTimeoutException(messages.timedOut)
+            throw new AgentRunEventsConsumerError(getFailureMessage(event, messages.timedOut), 'timed_out')
           }
         }
       }
     }
 
-    throw new GatewayTimeoutException(messages.timedOut)
+    throw new AgentRunEventsConsumerError(messages.timedOut, 'timed_out')
   }
 }
 
@@ -162,7 +164,7 @@ function getStreamField(fields: string[], fieldName: string): string | null {
   return null
 }
 
-function getTextDelta(event: AgentRunEvent): string | null {
+export function getAgentRunEventText(event: AgentRunEvent): string | null {
   if (!event.payload || typeof event.payload !== 'object') {
     return null
   }

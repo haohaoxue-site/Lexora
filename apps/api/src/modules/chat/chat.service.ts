@@ -159,11 +159,23 @@ export class ChatService {
   async submitChatReplyCommand(params: RequestChatCompletionParams): Promise<ChatReplyCommandContext> {
     const result = await this.prepareChatReplyCommand(params)
 
-    await this.agentRunCommandPublisher.publishRunCommand(result.command)
-    this.logger.log(
-      `chat reply command published: user=${params.userId} session=${result.sessionId} run=${result.command.runId}`,
-    )
+    await this.publishChatReplyCommand({
+      userId: params.userId,
+      sessionId: result.sessionId,
+      command: result.command,
+    })
 
     return result
+  }
+
+  async publishChatReplyCommand(input: {
+    userId: string
+    sessionId: string
+    command: AgentRunCommand
+  }): Promise<void> {
+    await this.agentRunCommandPublisher.publishRunCommand(input.command)
+    this.logger.log(
+      `chat reply command published: user=${input.userId} session=${input.sessionId} run=${input.command.runId}`,
+    )
   }
 }

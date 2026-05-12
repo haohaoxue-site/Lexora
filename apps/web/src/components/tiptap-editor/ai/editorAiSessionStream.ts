@@ -1,8 +1,8 @@
 import type { AiEditorStreamEvent, CreateAiEditorSessionRequest } from '@/apis/ai'
-import { AI_EDITOR_STREAM_EVENT_TYPE, AiEditorStreamEventSchema } from '@haohaoxue/samepage-contracts'
+import { AI_EDITOR_STREAM_EVENT_TYPE, AiEditorStreamEventSchema, STREAM_DONE_PAYLOAD } from '@haohaoxue/samepage-contracts'
 import { createAiEditorSession } from '@/apis/ai'
 import { createRequestError, createRequestErrorFromHttpResponse, toRequestError } from '@/utils/request-error'
-import { EDITOR_AI_STREAM_DONE_PAYLOAD, EDITOR_AI_STREAM_ERROR_MESSAGE } from './contracts'
+import { EDITOR_AI_STREAM_ERROR_MESSAGE } from './constants'
 
 export async function streamEditorAiSession(
   data: CreateAiEditorSessionRequest,
@@ -53,7 +53,7 @@ export async function streamEditorAiSession(
         }
 
         const payload = trimmed.slice(6)
-        if (payload === EDITOR_AI_STREAM_DONE_PAYLOAD) {
+        if (payload === STREAM_DONE_PAYLOAD) {
           assertCompletedEditorAiStream(completed)
           return
         }

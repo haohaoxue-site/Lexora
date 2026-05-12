@@ -9,7 +9,7 @@ import {
   EDITOR_AI_COMPOSER_STATUS,
   EDITOR_AI_COMPOSER_SUBMIT_LABEL_BY_MODE,
   EDITOR_AI_COMPOSER_SUBMIT_LABEL_BY_STATUS,
-} from './contracts'
+} from './constants'
 
 interface EditorAiComposerProps {
   visible: boolean

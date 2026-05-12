@@ -2,10 +2,21 @@
 import type { ChatMessageListProps } from '../typing'
 import { useTemplateRef } from 'vue'
 import { useChatMessageList } from '../composables/useChatMessageList'
+import ChatReasoningBlock from './ChatReasoningBlock.vue'
 
 const props = defineProps<ChatMessageListProps>()
 const scrollContainerRef = useTemplateRef<HTMLElement>('scrollContainerRef')
-const { emptyIcon, emptyIconStateClass, getMessageRoleClass } = useChatMessageList(props, {
+const {
+  emptyIcon,
+  emptyIconStateClass,
+  getAssistantFailureMessage,
+  getMessageRoleClass,
+  getMessageText,
+  getReasoningElapsedMs,
+  getReasoningText,
+  isAssistantStreamingMessage,
+  shouldShowAssistantPending,
+} = useChatMessageList(props, {
   scrollContainerRef,
 })
 </script>
@@ -40,8 +51,8 @@ const { emptyIcon, emptyIconStateClass, getMessageRoleClass } = useChatMessageLi
 
     <div v-else class="mx-auto max-w-3xl space-y-4">
       <div
-        v-for="(msg, idx) in props.messages"
-        :key="idx"
+        v-for="msg in props.messages"
+        :key="msg.id"
         class="chat-message-list__row"
         :class="getMessageRoleClass(msg.role)"
       >
@@ -49,12 +60,35 @@ const { emptyIcon, emptyIconStateClass, getMessageRoleClass } = useChatMessageLi
           <SvgIcon category="ai" icon="ai-spark" size="1rem" class="chat-message-list__assistant-avatar-icon" />
         </div>
 
-        <div class="chat-message-list__bubble" :class="getMessageRoleClass(msg.role)">
-          {{ msg.content }}
-          <span
-            v-if="msg.role === 'assistant' && props.isStreaming && idx === props.messages.length - 1 && msg.content"
-            class="chat-message-list__stream-cursor"
+        <div v-if="msg.role === 'assistant'" class="chat-message-list__assistant-content">
+          <ChatReasoningBlock
+            v-if="getReasoningText(msg)"
+            :text="getReasoningText(msg)"
+            :status="msg.status"
+            :elapsed-ms="getReasoningElapsedMs(msg)"
+            :default-expanded="isAssistantStreamingMessage(msg)"
           />
+
+          <div v-if="getMessageText(msg)" class="chat-message-list__bubble assistant">
+            {{ getMessageText(msg) }}
+            <span
+              v-if="isAssistantStreamingMessage(msg)"
+              class="chat-message-list__stream-cursor"
+            />
+          </div>
+
+          <div v-else-if="shouldShowAssistantPending(msg)" class="chat-message-list__pending">
+            正在生成
+            <span class="chat-message-list__stream-cursor" />
+          </div>
+
+          <div v-if="getAssistantFailureMessage(msg)" class="chat-message-list__error">
+            {{ getAssistantFailureMessage(msg) }}
+          </div>
+        </div>
+
+        <div v-else class="chat-message-list__bubble user">
+          {{ getMessageText(msg) }}
         </div>
       </div>
     </div>
@@ -124,15 +158,23 @@ const { emptyIcon, emptyIconStateClass, getMessageRoleClass } = useChatMessageLi
     display: block;
   }
 
-  .chat-message-list__bubble {
+  .chat-message-list__assistant-content {
+    display: flex;
+    flex-direction: column;
+    gap: 0.625rem;
     max-width: 80%;
+  }
+
+  .chat-message-list__bubble {
     padding: 0.625rem 1rem;
     border-radius: 0.75rem;
     white-space: pre-wrap;
+    overflow-wrap: anywhere;
     font-size: 0.875rem;
     line-height: 1.625;
 
     &.user {
+      max-width: 80%;
       color: #fff;
       background: var(--brand-primary);
     }
@@ -142,6 +184,20 @@ const { emptyIcon, emptyIconStateClass, getMessageRoleClass } = useChatMessageLi
       background: var(--brand-bg-surface-raised);
       border: 1px solid color-mix(in srgb, var(--brand-border-base) 70%, transparent);
     }
+  }
+
+  .chat-message-list__pending,
+  .chat-message-list__error {
+    font-size: 0.8125rem;
+    line-height: 1.5;
+  }
+
+  .chat-message-list__pending {
+    color: var(--brand-text-secondary);
+  }
+
+  .chat-message-list__error {
+    color: var(--el-color-danger);
   }
 
   .chat-message-list__stream-cursor {

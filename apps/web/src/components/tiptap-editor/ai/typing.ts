@@ -10,7 +10,7 @@ import type {
   EDITOR_AI_PREVIEW_EMPTY_TEXT_BY_STATUS,
   EDITOR_AI_PREVIEW_STATUS,
   EDITOR_AI_WORKFLOW_KEY_BY_COMPOSER_MODE,
-} from './contracts'
+} from './constants'
 
 export type EditorAiComposerMode = typeof EDITOR_AI_COMPOSER_MODE[keyof typeof EDITOR_AI_COMPOSER_MODE]
 export type EditorAiComposerStatus = typeof EDITOR_AI_COMPOSER_STATUS[keyof typeof EDITOR_AI_COMPOSER_STATUS]

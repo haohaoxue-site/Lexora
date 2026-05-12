@@ -12,7 +12,7 @@ import {
   EDITOR_AI_PREVIEW_EMPTY_TEXT_BY_STATUS,
   EDITOR_AI_PREVIEW_PLUGIN_KEY_NAME,
   EDITOR_AI_PREVIEW_SELECTION_CLASS,
-} from './contracts'
+} from './constants'
 
 interface EditorAiPreviewPluginState {
   anchor: EditorAiPreviewAnchor

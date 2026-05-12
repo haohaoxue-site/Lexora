@@ -98,8 +98,6 @@ export const EDITOR_AI_PREVIEW_EMPTY_TEXT_BY_STATUS = Object.freeze({
   [EDITOR_AI_PREVIEW_STATUS.FAILED]: 'AI 生成失败',
 })
 
-export const EDITOR_AI_STREAM_DONE_PAYLOAD = '[DONE]'
-
 export const EDITOR_AI_STREAM_ERROR_MESSAGE = Object.freeze({
   NO_RESPONSE_BODY: 'no response body',
   INCOMPLETE: 'incomplete editor ai stream',

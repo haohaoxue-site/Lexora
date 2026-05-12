@@ -2,8 +2,10 @@ import type { CreateAiEditorSessionRequest } from '@haohaoxue/samepage-contracts
 import type { FastifyReply } from 'fastify'
 import type { AuthUserContext } from '../../auth/auth.interface'
 import {
+  AGENT_RUN_EVENT_TYPE,
   AI_EDITOR_STREAM_EVENT_TYPE,
   CreateAiEditorSessionRequestSchema,
+  STREAM_DONE_PAYLOAD,
 } from '@haohaoxue/samepage-contracts'
 import {
   Body,
@@ -17,7 +19,7 @@ import {
 } from '@nestjs/common'
 import { CurrentUser } from '../../../decorators/current-user.decorator'
 import { ZodValidationPipe } from '../../../pipes/zod-validation.pipe'
-import { AgentRunEventsService } from '../../agent/agent-events.service'
+import { AgentRunEventsService, getAgentRunEventText } from '../../agent/agent-events.service'
 import { AiEditorSessionsService } from './sessions.service'
 
 @Controller('ai')
@@ -70,7 +72,16 @@ export class AiEditorController {
           timedOut: '等待编辑器 AI 运行结果超时',
           failed: '编辑器 AI 运行失败',
         },
-        onTextDelta: (chunk) => {
+        onEvent: (event) => {
+          if (event.type !== AGENT_RUN_EVENT_TYPE.TEXT_DELTA) {
+            return
+          }
+
+          const chunk = getAgentRunEventText(event)
+          if (!chunk) {
+            return
+          }
+
           contentText += chunk
           reply.raw.write(`data: ${JSON.stringify({
             type: AI_EDITOR_STREAM_EVENT_TYPE.TEXT_DELTA,
@@ -90,7 +101,7 @@ export class AiEditorController {
         type: AI_EDITOR_STREAM_EVENT_TYPE.CANDIDATE_COMPLETED,
         candidate,
       })}\n\n`)
-      reply.raw.write('data: [DONE]\n\n')
+      reply.raw.write(`data: ${STREAM_DONE_PAYLOAD}\n\n`)
     }
     catch (error) {
       const message = error instanceof Error && error.message

@@ -6,7 +6,7 @@ import type {
   AgentWorkflow,
   AgentWorkflowKey,
 } from './typing'
-import { AGENT_RUN_EVENT_TYPE } from '@haohaoxue/samepage-contracts'
+import { AGENT_RUN_EVENT_TYPE, AgentRunEventSchema } from '@haohaoxue/samepage-contracts'
 
 export interface CreateAgentWorkflowRuntimeOptions {
   workflows?: AgentWorkflow[]
@@ -166,12 +166,12 @@ export function createAgentWorkflowRegistry(workflows: AgentWorkflow[] = []): Ag
 }
 
 export function createAgentRunEvent(options: CreateAgentRunEventOptions): AgentRunEvent {
-  return {
+  return AgentRunEventSchema.parse({
     type: options.type,
     runId: options.runId,
     workflowKey: options.workflowKey,
     payload: options.payload,
-  }
+  })
 }
 
 export function createAgentConcurrencyGate(options: CreateAgentConcurrencyGateOptions): AgentConcurrencyGate {

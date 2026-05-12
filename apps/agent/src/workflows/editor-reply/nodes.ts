@@ -25,7 +25,7 @@ export function createEditorReplyLlmCallNode(
 
     return {
       responseText: await consumeChatModelTextStream(stream, {
-        onTextDelta: config.context?.onTextDelta,
+        onStreamPart: config.context?.onStreamPart,
       }),
     }
   }

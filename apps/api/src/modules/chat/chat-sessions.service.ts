@@ -1,10 +1,16 @@
 import type {
   AgentGetChatSessionContextResponse,
   AiModelRef,
+  ChatMessageFailureReason,
+  ChatMessageMetadata,
+  ChatMessagePartType,
   ChatSessionDetail,
   ChatSessionSummary,
 } from '@haohaoxue/samepage-contracts'
-import { CHAT_SESSION_DEFAULT_TITLE } from '@haohaoxue/samepage-contracts'
+import {
+  CHAT_MESSAGE_PART_TYPE,
+  CHAT_SESSION_DEFAULT_TITLE,
+} from '@haohaoxue/samepage-contracts'
 import {
   BadRequestException,
   ConflictException,
@@ -12,7 +18,9 @@ import {
   NotFoundException,
 } from '@nestjs/common'
 import {
+  ChatSessionMessagePartType,
   ChatSessionMessageRole,
+  ChatSessionMessageStatus,
   Prisma,
 } from '@prisma/client'
 import { PrismaService } from '../../database/prisma.service'
@@ -21,6 +29,7 @@ import {
   toChatSessionDetail,
   toChatSessionModelRef,
   toChatSessionSummary,
+  toPrismaChatMessagePartType,
 } from './chat.utils'
 
 const chatSessionSummarySelect = {
@@ -36,9 +45,29 @@ const chatSessionDetailSelect = {
   ...chatSessionSummarySelect,
   messages: {
     select: {
+      id: true,
       role: true,
+      status: true,
       content: true,
       order: true,
+      metadata: true,
+      createdAt: true,
+      updatedAt: true,
+      completedAt: true,
+      parts: {
+        select: {
+          id: true,
+          type: true,
+          text: true,
+          order: true,
+          metadata: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+        orderBy: {
+          order: 'asc',
+        },
+      },
     },
     orderBy: {
       order: 'asc',
@@ -199,6 +228,7 @@ export class ChatSessionsService {
     const nextTitle = session.messages.length === 0 && session.title === CHAT_SESSION_DEFAULT_TITLE
       ? buildChatSessionTitle(normalizedContent)
       : session.title
+    const now = new Date()
 
     await this.prisma.$transaction([
       this.prisma.chatSession.update({
@@ -215,8 +245,17 @@ export class ChatSessionsService {
         data: {
           sessionId: session.id,
           role: ChatSessionMessageRole.USER,
+          status: ChatSessionMessageStatus.COMPLETED,
           content: normalizedContent,
           order: triggerMessageOrder,
+          completedAt: now,
+          parts: {
+            create: {
+              type: ChatSessionMessagePartType.TEXT,
+              text: normalizedContent,
+              order: 0,
+            },
+          },
         },
       }),
     ])
@@ -250,6 +289,7 @@ export class ChatSessionsService {
       historyVersion: session.historyVersion,
       messages: session.messages
         .filter(message => message.order <= input.triggerMessageOrder)
+        .filter(message => message.role === ChatSessionMessageRole.USER || message.status === ChatSessionMessageStatus.COMPLETED)
         .map(message => ({
           role: toChatMessageRole(message.role),
           content: message.content,
@@ -258,20 +298,63 @@ export class ChatSessionsService {
     }
   }
 
-  async persistAssistantMessage(
-    input: {
-      sessionId: string
-      assistantContent: string
-      order: number
-      expectedHistoryVersion: number
-    },
-  ): Promise<void> {
-    const normalizedContent = input.assistantContent.trim()
-    if (!normalizedContent) {
-      return
-    }
+  async createAssistantPlaceholderMessage(input: {
+    sessionId: string
+    order: number
+    agentRunId: string
+  }): Promise<{ id: string }> {
+    return this.prisma.chatSessionMessage.create({
+      data: {
+        sessionId: input.sessionId,
+        role: ChatSessionMessageRole.ASSISTANT,
+        status: ChatSessionMessageStatus.STREAMING,
+        content: '',
+        order: input.order,
+        agentRunId: input.agentRunId,
+      },
+      select: {
+        id: true,
+      },
+    })
+  }
 
-    const persisted = await this.prisma.$transaction(async (tx) => {
+  async upsertMessagePartText(input: {
+    messageId: string
+    type: Extract<ChatMessagePartType, 'reasoning' | 'text'>
+    text: string
+  }): Promise<void> {
+    const order = getSinglePartOrder(input.type)
+    const type = toPrismaChatMessagePartType(input.type)
+
+    await this.prisma.chatSessionMessagePart.upsert({
+      where: {
+        messageId_order: {
+          messageId: input.messageId,
+          order,
+        },
+      },
+      create: {
+        messageId: input.messageId,
+        type,
+        text: input.text,
+        order,
+      },
+      update: {
+        text: input.text,
+        type,
+      },
+    })
+  }
+
+  async completeAssistantMessage(input: {
+    sessionId: string
+    messageId: string
+    content: string
+    expectedHistoryVersion: number
+    metadata?: ChatMessageMetadata
+  }): Promise<void> {
+    const completedAt = new Date()
+    await this.prisma.$transaction(async (tx) => {
       const sessionUpdate = await tx.chatSession.updateMany({
         where: {
           id: input.sessionId,
@@ -281,29 +364,52 @@ export class ChatSessionsService {
           historyVersion: {
             increment: 1,
           },
-          updatedAt: new Date(),
+          updatedAt: completedAt,
         },
       })
 
       if (sessionUpdate.count === 0) {
-        return false
+        throw new ConflictException('聊天历史已变化，请重新发送')
       }
 
-      await tx.chatSessionMessage.create({
-        data: {
+      const messageUpdate = await tx.chatSessionMessage.updateMany({
+        where: {
+          id: input.messageId,
           sessionId: input.sessionId,
           role: ChatSessionMessageRole.ASSISTANT,
-          content: normalizedContent,
-          order: input.order,
+        },
+        data: {
+          status: ChatSessionMessageStatus.COMPLETED,
+          content: input.content,
+          metadata: toJsonObject(input.metadata),
+          completedAt,
         },
       })
 
-      return true
+      if (messageUpdate.count === 0) {
+        throw new ConflictException('聊天助手消息不存在或已结束')
+      }
     })
+  }
 
-    if (!persisted) {
-      throw new ConflictException('聊天历史已变化，请重新发送')
-    }
+  async failAssistantMessage(input: {
+    messageId: string
+    failureReason: ChatMessageFailureReason
+    failureMessage: string
+  }): Promise<void> {
+    await this.prisma.chatSessionMessage.update({
+      where: {
+        id: input.messageId,
+      },
+      data: {
+        status: ChatSessionMessageStatus.FAILED,
+        content: '',
+        metadata: toJsonObject({
+          failureReason: input.failureReason,
+          failureMessage: input.failureMessage,
+        }),
+      },
+    })
   }
 
   private async findOwnedSessionDetailOrThrow(
@@ -366,4 +472,18 @@ export class ChatSessionsService {
 
 function buildChatSessionTitle(content: string) {
   return content.slice(0, 30) + (content.length > 30 ? '...' : '')
+}
+
+function getSinglePartOrder(type: Extract<ChatMessagePartType, 'reasoning' | 'text'>): number {
+  return type === CHAT_MESSAGE_PART_TYPE.REASONING ? 0 : 1
+}
+
+function toJsonObject<T extends Record<string, unknown>>(value: T | undefined): Prisma.InputJsonObject | undefined {
+  if (!value) {
+    return undefined
+  }
+
+  return Object.fromEntries(
+    Object.entries(value).filter(([, item]) => item !== undefined),
+  ) as Prisma.InputJsonObject
 }

@@ -1,6 +1,11 @@
 import type { ShallowRef } from 'vue'
-import type { ChatModelItem, ChatModelSelection, ChatRuntimeConfig, ChatSessionDetail, ChatSessionSummary } from '@/apis/chat'
-import { AI_MODEL_INTENT_KEY, CHAT_SESSION_DEFAULT_TITLE } from '@haohaoxue/samepage-contracts'
+import type { ChatModelItem, ChatModelSelection, ChatRuntimeConfig, ChatSessionDetail, ChatSessionSummary, ChatStreamEvent } from '@/apis/chat'
+import {
+  AI_MODEL_INTENT_KEY,
+  CHAT_MESSAGE_STATUS,
+  CHAT_SESSION_DEFAULT_TITLE,
+  CHAT_STREAM_EVENT_TYPE,
+} from '@haohaoxue/samepage-contracts'
 import { ElMessage } from 'element-plus'
 import { computed, onMounted, reactive, shallowRef } from 'vue'
 import { useRouter } from 'vue-router'
@@ -24,6 +29,7 @@ import {
 } from '@/utils/ai-default-model'
 import { getRequestErrorDisplayMessage } from '@/utils/request-error'
 import { formatModelOptionLabel } from '@/views/provider/utils/modelDisplay'
+import { applyChatStreamEventToMessages, createLocalChatMessage } from '../utils/chat-stream-message'
 
 /**
  * 聊天会话摘要模型。
@@ -411,7 +417,6 @@ function useChatWorkspaceState() {
   const activeSession = shallowRef<ActiveChatSession | null>(null)
   const isLoadingSessions = shallowRef(false)
   const isStreaming = shallowRef(false)
-  const streamingContent = shallowRef('')
 
   void loadSessions()
 
@@ -585,14 +590,25 @@ function useChatWorkspaceState() {
     const nextTitle = session.messages.length === 0 && session.title === CHAT_SESSION_DEFAULT_TITLE
       ? buildSessionTitle(normalizedContent)
       : session.title
+    const nextUserOrder = (session.messages.at(-1)?.order ?? -1) + 1
 
     activeSession.value = {
       ...session,
       title: nextTitle,
       messages: [
         ...session.messages,
-        { role: 'user', content: normalizedContent },
-        { role: 'assistant', content: '' },
+        createLocalChatMessage({
+          role: 'user',
+          status: CHAT_MESSAGE_STATUS.COMPLETED,
+          content: normalizedContent,
+          order: nextUserOrder,
+        }),
+        createLocalChatMessage({
+          role: 'assistant',
+          status: CHAT_MESSAGE_STATUS.STREAMING,
+          content: '',
+          order: nextUserOrder + 1,
+        }),
       ],
     }
 
@@ -601,29 +617,24 @@ function useChatWorkspaceState() {
     })
 
     isStreaming.value = true
-    streamingContent.value = ''
     try {
       await streamChatCompletion(
         session.id,
         normalizedContent,
-        (chunk) => {
-          streamingContent.value += chunk
-          updateActiveAssistantMessage(streamingContent.value)
-        },
+        applyChatStreamEventToActiveSession,
       )
 
       await refreshActiveSession(session.id)
       await refreshSessionList()
     }
     catch (error) {
-      updateActiveAssistantMessage(
-        getRequestErrorDisplayMessage(error, '抱歉，请求失败，请稍后重试。'),
-        { onlyWhenEmpty: true },
-      )
+      applyChatStreamEventToActiveSession({
+        type: CHAT_STREAM_EVENT_TYPE.ERROR,
+        message: getRequestErrorDisplayMessage(error, '抱歉，请求失败，请稍后重试。'),
+      })
     }
     finally {
       isStreaming.value = false
-      streamingContent.value = ''
     }
   }
 
@@ -672,32 +683,14 @@ function useChatWorkspaceState() {
     ]
   }
 
-  function updateActiveAssistantMessage(
-    content: string,
-    options: { onlyWhenEmpty?: boolean } = {},
-  ) {
+  function applyChatStreamEventToActiveSession(event: ChatStreamEvent) {
     if (!activeSession.value) {
       return
     }
 
-    const lastMessage = activeSession.value.messages.at(-1)
-    if (lastMessage?.role !== 'assistant') {
-      return
-    }
-
-    if (options.onlyWhenEmpty && lastMessage.content) {
-      return
-    }
-
-    const nextMessages = [...activeSession.value.messages]
-    nextMessages[nextMessages.length - 1] = {
-      role: 'assistant',
-      content,
-    }
-
     activeSession.value = {
       ...activeSession.value,
-      messages: nextMessages,
+      messages: applyChatStreamEventToMessages(activeSession.value.messages, event),
     }
   }
 

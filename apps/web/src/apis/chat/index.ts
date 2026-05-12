@@ -4,9 +4,10 @@ import type {
   ChatRuntimeConfig,
   ChatSessionDetail,
   ChatSessionSummary,
+  ChatStreamEvent,
   UpdateChatSessionTitleRequest,
 } from './typing'
-import { SERVER_PATH } from '@haohaoxue/samepage-contracts'
+import { CHAT_STREAM_EVENT_TYPE, ChatStreamEventSchema, SERVER_PATH, STREAM_DONE_PAYLOAD } from '@haohaoxue/samepage-contracts'
 import { useAuthStore } from '@/stores/auth'
 import { axios } from '@/utils/axios'
 import { createRequestError, createRequestErrorFromHttpResponse, toRequestError } from '@/utils/request-error'
@@ -82,7 +83,7 @@ export function getChatModels(): Promise<ChatModelListResponse> {
 export async function streamChatCompletion(
   sessionId: string,
   content: string,
-  onChunk: (content: string) => void,
+  onEvent: (event: ChatStreamEvent) => void,
 ): Promise<void> {
   const authStore = useAuthStore()
 
@@ -130,29 +131,32 @@ export async function streamChatCompletion(
           continue
 
         const data = trimmed.slice(6)
-        if (data === '[DONE]') {
+        if (data === STREAM_DONE_PAYLOAD) {
           return
         }
 
-        let parsed: { content?: string, error?: string } | null = null
+        let payload: unknown = null
         try {
-          parsed = JSON.parse(data) as { content?: string, error?: string }
+          payload = JSON.parse(data)
         }
         catch {
           continue
         }
 
-        if (parsed.error) {
+        const parsedEvent = ChatStreamEventSchema.safeParse(payload)
+        if (!parsedEvent.success) {
+          continue
+        }
+
+        onEvent(parsedEvent.data)
+
+        if (parsedEvent.data.type === CHAT_STREAM_EVENT_TYPE.ERROR) {
           throw createRequestError({
             source: 'stream',
             data: {
-              message: parsed.error,
+              message: parsedEvent.data.message,
             },
           })
-        }
-
-        if (parsed.content) {
-          onChunk(parsed.content)
         }
       }
     }

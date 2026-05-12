@@ -2,6 +2,14 @@ import type { Ref } from 'vue'
 import type { ChatMessageListProps } from '../typing'
 import { computed, nextTick, onUpdated } from 'vue'
 import { SvgIconCategory } from '@/components/svg-icon/typing'
+import {
+  getAssistantFailureMessage,
+  getMessageText,
+  getReasoningElapsedMs,
+  getReasoningText,
+  isAssistantStreamingMessage,
+  shouldShowAssistantPending,
+} from '../utils/chat-message-display'
 
 export function useChatMessageList(
   props: ChatMessageListProps,
@@ -37,6 +45,12 @@ export function useChatMessageList(
   return {
     emptyIcon,
     emptyIconStateClass,
+    getAssistantFailureMessage,
     getMessageRoleClass,
+    getMessageText,
+    getReasoningElapsedMs,
+    getReasoningText,
+    isAssistantStreamingMessage,
+    shouldShowAssistantPending,
   }
 }
