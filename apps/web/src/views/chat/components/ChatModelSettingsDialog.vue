@@ -1,8 +1,7 @@
 <script setup lang="ts">
 import type { FormInstance } from 'element-plus'
-import type { ModelCascaderModelRef } from '@/components/model-cascader/typing'
 import { AI_MODEL_INTENT_KEY } from '@haohaoxue/samepage-contracts'
-import { computed, useTemplateRef } from 'vue'
+import { useTemplateRef } from 'vue'
 import { ModelCascader } from '@/components/model-cascader'
 import { useChatModelSettingsDialog } from '../composables/useChatModelSettingsDialog'
 
@@ -14,18 +13,6 @@ const {
   modelSettingsDraft,
 } = useChatModelSettingsDialog({
   modelFormRef,
-})
-
-const selectedModelRef = computed<ModelCascaderModelRef | null>({
-  get: () => modelSettingsDraft.modelRef ?? null,
-  set: (value) => {
-    modelSettingsDraft.modelRef = value
-      ? {
-          providerId: value.providerId,
-          modelId: value.modelId,
-        }
-      : null
-  },
 })
 </script>
 
@@ -40,7 +27,7 @@ const selectedModelRef = computed<ModelCascaderModelRef | null>({
       <ElForm ref="modelFormRef" :model="modelSettingsDraft" :rules="formRules" label-position="top" class="chat-model-settings__form">
         <ElFormItem prop="modelRef">
           <ModelCascader
-            v-model="selectedModelRef"
+            v-model="modelSettingsDraft.modelRef"
             :intent-key="AI_MODEL_INTENT_KEY.CHAT_ASSISTANT_DEFAULT"
             :clearable="false"
             class="chat-model-settings__model-select w-full"

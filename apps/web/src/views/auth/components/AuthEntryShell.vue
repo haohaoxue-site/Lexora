@@ -37,9 +37,6 @@ defineSlots<{
             <div class="auth-entry-shell__brand-name">
               SamePage AI
             </div>
-            <div class="auth-entry-shell__brand-tagline">
-              在线协作文档
-            </div>
           </div>
         </div>
 
@@ -186,12 +183,6 @@ defineSlots<{
     font-size: 1.125rem;
     font-weight: 700;
     white-space: nowrap;
-  }
-
-  &__brand-tagline {
-    margin-top: 0.25rem;
-    color: var(--brand-text-secondary);
-    font-size: 0.75rem;
   }
 
   &__header {

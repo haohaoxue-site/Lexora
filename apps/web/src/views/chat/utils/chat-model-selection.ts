@@ -1,8 +1,13 @@
+import type { AiModelRef } from '@/apis/ai'
 import type { ChatModelItem, ChatModelSelection, ChatRuntimeConfig } from '@/apis/chat'
 
-export function createModelSelection(modelRef: ChatModelSelection['modelRef'] | null = null): ChatModelSelection {
+export interface ChatModelSettingsDraft {
+  modelRef: AiModelRef | null
+}
+
+export function createModelSettingsDraft(modelRef: AiModelRef | null = null): ChatModelSettingsDraft {
   return {
-    modelRef: modelRef ?? null,
+    modelRef: modelRef ? { ...modelRef } : null,
   }
 }
 
@@ -28,7 +33,7 @@ export function normalizeNullableModelRef(
 }
 
 export function toModelRef(
-  value: Pick<ChatModelItem, 'providerId' | 'modelId'> | null | undefined,
+  value: Pick<AiModelRef, 'providerId' | 'modelId'> | null | undefined,
 ): ChatModelSelection['modelRef'] | null {
   if (!value) {
     return null
@@ -40,11 +45,32 @@ export function toModelRef(
   }
 }
 
-export function toDraft(value: ChatModelSelection): ChatModelSelection {
+export function isSameNullableModelRef(
+  left: Pick<AiModelRef, 'providerId' | 'modelId'> | null | undefined,
+  right: Pick<AiModelRef, 'providerId' | 'modelId'> | null | undefined,
+) {
+  const leftModelRef = toModelRef(left)
+  const rightModelRef = toModelRef(right)
+
+  if (!leftModelRef || !rightModelRef) {
+    return !leftModelRef && !rightModelRef
+  }
+
+  return isSameModelRef(leftModelRef, rightModelRef)
+}
+
+export function toFullModelRef(
+  value: Pick<AiModelRef, 'providerId' | 'scope' | 'providerKey' | 'modelId'> | null | undefined,
+): AiModelRef | null {
+  if (!value) {
+    return null
+  }
+
   return {
-    modelRef: value.modelRef
-      ? { ...value.modelRef }
-      : null,
+    providerId: value.providerId.trim(),
+    scope: value.scope,
+    providerKey: value.providerKey.trim(),
+    modelId: value.modelId.trim(),
   }
 }
 
@@ -64,11 +90,21 @@ export function findMatchingModelOption(
   return modelOptions.find(model => model.providerId === modelRef.providerId && model.modelId === modelRef.modelId) ?? null
 }
 
-export function resolveSavedChatModelRef(
-  value: ChatModelSelection,
+export function resolveSavedChatModelOverrideRef(
+  value: ChatModelSettingsDraft,
+  runtimeDefaultModel: ChatModelItem | null,
 ): NonNullable<ChatModelSelection['modelRef']> | null {
-  const modelRef = normalizeModelSelection(value).modelRef
-  return modelRef ?? null
+  const modelRef = toModelRef(value.modelRef)
+  if (!modelRef) {
+    return null
+  }
+
+  const defaultModelRef = toModelRef(runtimeDefaultModel)
+  if (defaultModelRef && isSameModelRef(modelRef, defaultModelRef)) {
+    return null
+  }
+
+  return modelRef
 }
 
 export function resolveSelectedChatModel(
@@ -116,15 +152,28 @@ export function resolveLoadedChatModelRef(
   modelRef: ChatModelSelection['modelRef'] | null | undefined,
   modelOptions: ChatModelItem[],
   runtimeDefaultModel: ChatModelItem | null,
-): ChatModelSelection['modelRef'] | null {
+): AiModelRef | null {
   const normalizedModelRef = normalizeNullableModelRef(modelRef)
 
   if (normalizedModelRef) {
     const matchedModel = findMatchingModelOption(modelOptions, normalizedModelRef)
     if (matchedModel?.selectable) {
-      return toModelRef(matchedModel)
+      return toFullModelRef(matchedModel)
     }
+
+    if (runtimeDefaultModel && isSameModelRef(normalizedModelRef, runtimeDefaultModel)) {
+      return toFullModelRef(runtimeDefaultModel)
+    }
+
+    return null
   }
 
-  return toModelRef(runtimeDefaultModel)
+  return toFullModelRef(runtimeDefaultModel)
+}
+
+function isSameModelRef(
+  left: Pick<AiModelRef, 'providerId' | 'modelId'>,
+  right: Pick<AiModelRef, 'providerId' | 'modelId'>,
+) {
+  return left.providerId === right.providerId && left.modelId === right.modelId
 }

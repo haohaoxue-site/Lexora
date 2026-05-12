@@ -1,4 +1,4 @@
-import type { ChatModelSelection } from '@/apis/chat'
+import type { ChatModelSettingsDraft } from '../utils/chat-model-selection'
 import { AI_MODEL_INTENT_KEY } from '@haohaoxue/samepage-contracts'
 import { createSharedComposable } from '@vueuse/core'
 import { ElMessage } from 'element-plus'
@@ -15,12 +15,13 @@ import {
 import { getRequestErrorDisplayMessage } from '@/utils/request-error'
 import { formatModelOptionLabel } from '@/views/provider/utils/modelDisplay'
 import {
-  createModelSelection,
+  createModelSettingsDraft,
+  isSameNullableModelRef,
   normalizeNullableModelRef,
   resolveChatRequestModelRef,
-  resolveSavedChatModelRef,
+  resolveLoadedChatModelRef,
+  resolveSavedChatModelOverrideRef,
   resolveSelectedChatModel,
-  toDraft,
 } from '../utils/chat-model-selection'
 import { useChatModels } from './useChatModels'
 import { useChatRuntimeConfig } from './useChatRuntimeConfig'
@@ -28,13 +29,13 @@ import { useChatSessions } from './useChatSessions'
 
 export const useChatModelSettings = createSharedComposable(() => {
   const router = useRouter()
-  const { runtimeConfig, isLoadingRuntimeConfig } = useChatRuntimeConfig()
+  const { runtimeConfig, isLoadingRuntimeConfig, loadRuntimeConfig } = useChatRuntimeConfig()
   const { modelOptions, refreshModels } = useChatModels()
   const { activeSession, ensureActiveSession, replaceActiveSession } = useChatSessions()
 
   const modelSettingsDialogVisible = shallowRef(false)
   const isCheckingDefaultModel = shallowRef(false)
-  const modelSettingsDraft = reactive<ChatModelSelection>(toDraft(createModelSelection()))
+  const modelSettingsDraft = reactive<ChatModelSettingsDraft>(createModelSettingsDraft())
 
   const sessionModelRef = computed(() => activeSession.value?.modelRef ?? null)
   const manualModelRef = computed(() => normalizeNullableModelRef(sessionModelRef.value))
@@ -108,26 +109,30 @@ export const useChatModelSettings = createSharedComposable(() => {
         return
       }
 
+      if (!await loadRuntimeConfig()) {
+        return
+      }
+
       const session = await ensureActiveSession()
       if (!session) {
         return
       }
 
-      Object.assign(
-        modelSettingsDraft,
-        toDraft(createModelSelection(session.modelRef ?? runtimeConfig.value.defaultModel ?? null)),
-      )
-      modelSettingsDialogVisible.value = true
-
       await refreshModels({
         silent: true,
         showSuccessMessage: false,
         skipRuntimeConfigReload: true,
-        draftModelRef: modelSettingsDraft.modelRef ?? null,
-        onDraftModelRefResolved: (nextDraftModelRef) => {
-          modelSettingsDraft.modelRef = nextDraftModelRef ? { ...nextDraftModelRef } : null
-        },
       })
+
+      Object.assign(
+        modelSettingsDraft,
+        createModelSettingsDraft(resolveLoadedChatModelRef(
+          session.modelRef,
+          modelOptions.value,
+          runtimeConfig.value.defaultModel,
+        )),
+      )
+      modelSettingsDialogVisible.value = true
     }
     finally {
       isCheckingDefaultModel.value = false
@@ -140,10 +145,16 @@ export const useChatModelSettings = createSharedComposable(() => {
       return false
     }
 
-    const nextModelRef = resolveSavedChatModelRef(modelSettingsDraft)
-    if (!nextModelRef) {
+    if (!modelSettingsDraft.modelRef) {
       ElMessage.warning('请选择聊天模型')
       return false
+    }
+
+    const nextModelRef = resolveSavedChatModelOverrideRef(modelSettingsDraft, runtimeConfig.value.defaultModel)
+    if (isSameNullableModelRef(nextModelRef, session.modelRef)) {
+      modelSettingsDialogVisible.value = false
+      ElMessage.success('聊天模型已保存')
+      return true
     }
 
     try {
@@ -151,7 +162,14 @@ export const useChatModelSettings = createSharedComposable(() => {
         modelRef: nextModelRef,
       })
       replaceActiveSession(updatedSession)
-      Object.assign(modelSettingsDraft, toDraft(createModelSelection(updatedSession.modelRef)))
+      Object.assign(
+        modelSettingsDraft,
+        createModelSettingsDraft(resolveLoadedChatModelRef(
+          updatedSession.modelRef,
+          modelOptions.value,
+          runtimeConfig.value.defaultModel,
+        )),
+      )
       modelSettingsDialogVisible.value = false
       ElMessage.success('聊天模型已保存')
       return true

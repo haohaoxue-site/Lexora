@@ -1,6 +1,6 @@
 import type { FormInstance, FormRules } from 'element-plus'
 import type { Ref } from 'vue'
-import type { ChatModelSelection } from '@/apis/chat'
+import type { ChatModelSettingsDraft } from '../utils/chat-model-selection'
 import { useChatModelSettings } from './useChatModelSettings'
 
 export function useChatModelSettingsDialog(options: {
@@ -8,7 +8,7 @@ export function useChatModelSettingsDialog(options: {
 }) {
   const { modelSettingsDialogVisible, modelSettingsDraft, saveModelSettings } = useChatModelSettings()
 
-  const formRules: FormRules<ChatModelSelection> = {
+  const formRules: FormRules<ChatModelSettingsDraft> = {
     modelRef: [
       {
         required: true,
