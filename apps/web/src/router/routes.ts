@@ -11,6 +11,7 @@ const LoginView = () => import('@/views/auth/login/index.vue')
 const PasswordRegisterVerifyView = () => import('@/views/auth/register-verify/index.vue')
 const PasswordRegisterRequestView = () => import('@/views/auth/register/index.vue')
 const ChatView = () => import('@/views/chat/index.vue')
+const CodeView = () => import('@/views/code/index.vue')
 const DocsView = () => import('@/views/docs/index.vue')
 const DocsDocumentSurfaceView = () => import('@/views/docs/pages/DocsDocumentSurfacePage.vue')
 const DocsPendingSharesPageView = () => import('@/views/docs/pages/DocsPendingSharesPage.vue')
@@ -20,7 +21,7 @@ const AgentView = () => import('@/views/agent/index.vue')
 const HomeView = () => import('@/views/home/index.vue')
 const KnowledgeView = () => import('@/views/knowledge/index.vue')
 const ProviderView = () => import('@/views/provider/index.vue')
-const ScheduleView = () => import('@/views/schedule/index.vue')
+// const ScheduleView = () => import('@/views/schedule/index.vue') // TODO
 const SettingsView = () => import('@/views/settings/index.vue')
 const SettingsDefaultModelsPageView = () => import('@/views/settings/pages/SettingsDefaultModelsPage.vue')
 const SettingsPreferencePageView = () => import('@/views/settings/pages/SettingsPreferencePage.vue')
@@ -117,16 +118,27 @@ const workspaceRouteChildren = [
     ],
   },
   {
-    path: 'schedule',
-    name: 'schedule',
-    component: ScheduleView,
+    path: 'code',
+    name: 'code',
+    component: CodeView,
     meta: {
-      navLabel: '日程',
+      navLabel: '代码',
       navIconCategory: SvgIconCategory.NAV,
-      navIcon: 'schedule',
-      navActiveIcon: 'schedule-active',
+      navIcon: 'code',
+      navActiveIcon: 'code-active',
     },
   },
+  // {
+  //   path: 'schedule',
+  //   name: 'schedule',
+  //   component: ScheduleView,
+  //   meta: {
+  //     navLabel: '日程',
+  //     navIconCategory: SvgIconCategory.NAV,
+  //     navIcon: 'schedule',
+  //     navActiveIcon: 'schedule-active',
+  //   },
+  // },
   {
     path: 'knowledge',
     name: 'knowledge',

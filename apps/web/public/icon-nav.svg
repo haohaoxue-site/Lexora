@@ -84,6 +84,42 @@
       <path d="M28 32H36.5" fill="none" stroke="#A16BFF" stroke-width="3" stroke-linecap="round" />
       <path d="M28 37H34" fill="none" stroke="#E67AA8" stroke-width="3" stroke-linecap="round" />
   </symbol>
+  <symbol id="code-active" viewBox="0 0 64 64">
+    <defs>
+        <linearGradient id="nav-code-active-bg" x1="12" y1="10" x2="53" y2="54" gradientUnits="userSpaceOnUse">
+          <stop stop-color="#67D4FF" />
+          <stop offset="0.52" stop-color="#7E8BFF" />
+          <stop offset="1" stop-color="#FF86B6" />
+        </linearGradient>
+      </defs>
+
+      <rect x="8" y="8" width="48" height="48" rx="16" fill="url(#nav-code-active-bg)" />
+      <rect x="19.5" y="21" width="25" height="22" rx="5.5" fill="none" stroke="white" stroke-width="2.75" />
+      <path d="M19.5 28H44.5" fill="none" stroke="white" stroke-width="2.75" stroke-linecap="round" stroke-opacity="0.88" />
+      <path d="M28 33L24 36.5L28 40" fill="none" stroke="white" stroke-width="2.15" stroke-linecap="round" stroke-linejoin="round" />
+      <path d="M36 33L40 36.5L36 40" fill="none" stroke="white" stroke-width="2.15" stroke-linecap="round" stroke-linejoin="round" />
+      <path d="M33.5 32.5L30.5 40.5" fill="none" stroke="white" stroke-width="1.95" stroke-linecap="round" />
+  </symbol>
+  <symbol id="code" viewBox="0 0 64 64">
+    <defs>
+        <linearGradient id="nav-code-line" x1="19" y1="20" x2="45" y2="44" gradientUnits="userSpaceOnUse">
+          <stop stop-color="#55C9FF" />
+          <stop offset="0.52" stop-color="#7E8BFF" />
+          <stop offset="1" stop-color="#FF82B2" />
+        </linearGradient>
+        <linearGradient id="nav-code-slash" x1="30" y1="32" x2="34" y2="41" gradientUnits="userSpaceOnUse">
+          <stop stop-color="#FFB36E" />
+          <stop offset="1" stop-color="#FF78AD" />
+        </linearGradient>
+      </defs>
+
+      <rect x="8" y="8" width="48" height="48" rx="16" fill="#F2FAFF" />
+      <rect x="19.5" y="21" width="25" height="22" rx="5.5" fill="none" stroke="url(#nav-code-line)" stroke-width="2.75" />
+      <path d="M19.5 28H44.5" fill="none" stroke="#70BFFF" stroke-width="2.75" stroke-linecap="round" />
+      <path d="M28 33L24 36.5L28 40" fill="none" stroke="#6B95FF" stroke-width="2.15" stroke-linecap="round" stroke-linejoin="round" />
+      <path d="M36 33L40 36.5L36 40" fill="none" stroke="#FF82B2" stroke-width="2.15" stroke-linecap="round" stroke-linejoin="round" />
+      <path d="M33.5 32.5L30.5 40.5" fill="none" stroke="url(#nav-code-slash)" stroke-width="1.95" stroke-linecap="round" />
+  </symbol>
   <symbol id="home-active" viewBox="0 0 64 64">
     <defs>
         <linearGradient id="nav-home-active-bg" x1="12" y1="10" x2="52" y2="54" gradientUnits="userSpaceOnUse">
