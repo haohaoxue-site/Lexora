@@ -8,7 +8,6 @@ export function createUploadedImageInsertContent(uploadedImage: TiptapEditorUplo
       attrs: {
         assetId: uploadedImage.id,
         alt: uploadedImage.fileName,
-        src: uploadedImage.contentUrl,
         width: uploadedImage.width,
         height: uploadedImage.height,
       },
@@ -28,7 +27,6 @@ export function createUploadedFileInsertContent(uploadedFile: TiptapEditorUpload
         fileName: uploadedFile.fileName,
         mimeType: uploadedFile.mimeType,
         size: uploadedFile.size,
-        contentUrl: uploadedFile.contentUrl,
       },
     },
     {

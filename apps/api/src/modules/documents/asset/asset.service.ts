@@ -12,6 +12,7 @@ import {
 } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { DocumentAssetKind, DocumentAssetStatus, Prisma } from '@prisma/client'
+import { parse, serialize } from 'cookie'
 import { jwtVerify, SignJWT } from 'jose'
 import { PrismaService } from '../../../database/prisma.service'
 import { StorageService } from '../../../infrastructure/storage/storage.service'
@@ -23,10 +24,13 @@ const DOCUMENT_ASSET_BUCKET = 'document-asset'
 const DOCUMENT_IMAGE_MAX_SIZE_BYTES = 15 * 1024 * 1024
 const DOCUMENT_FILE_MAX_SIZE_BYTES = 50 * 1024 * 1024
 const DOCUMENT_ASSET_CONTENT_AUDIENCE = 'samepage-document-asset'
-const DOCUMENT_ASSET_CONTENT_TOKEN_TYPE = 'document-asset-content'
-const DOCUMENT_SHARED_ASSET_CONTENT_TOKEN_TYPE = 'document-share-asset-content'
-const DOCUMENT_SHARED_RECIPIENT_ASSET_CONTENT_TOKEN_TYPE = 'document-share-recipient-asset-content'
-const DOCUMENT_ASSET_CONTENT_URL_TTL_SECONDS = 60 * 5
+const DOCUMENT_ASSET_ACCESS_TOKEN_TYPE = 'document-asset-access'
+const DOCUMENT_ASSET_ACCESS_COOKIE_TTL_SECONDS = 60 * 5
+const DOCUMENT_ASSET_ACCESS_COOKIE_NAMES = {
+  document: 'samepage_document_asset_access',
+  share: 'samepage_document_share_asset_access',
+  recipient: 'samepage_document_share_recipient_asset_access',
+} as const
 const DOCUMENT_FILE_EXTENSION_PREFIX = /^\./
 const DOCUMENT_FILE_EXTENSION_PATTERN = /^[a-z0-9]{1,16}$/
 
@@ -43,37 +47,27 @@ type PersistedDocumentAsset = Prisma.DocumentAssetGetPayload<{
   select: typeof documentAssetSelect
 }>
 
-/**
- * 文档资源内容令牌载荷。
- */
-interface DocumentAssetContentTokenPayload {
-  documentId: string
-  assetId: string
-  tokenType: typeof DOCUMENT_ASSET_CONTENT_TOKEN_TYPE
-  [key: string]: unknown
-}
+type DocumentAssetAccessKind = 'document' | 'share' | 'recipient'
 
-interface SharedDocumentAssetContentTokenPayload {
-  shareId: string
+interface DocumentAssetAccessTokenPayload {
   documentId: string
-  assetId: string
-  tokenType: typeof DOCUMENT_SHARED_ASSET_CONTENT_TOKEN_TYPE
-  [key: string]: unknown
-}
-
-interface SharedDocumentRecipientAssetContentTokenPayload {
-  recipientId: string
-  documentId: string
-  assetId: string
-  tokenType: typeof DOCUMENT_SHARED_RECIPIENT_ASSET_CONTENT_TOKEN_TYPE
+  kind: DocumentAssetAccessKind
+  tokenType: typeof DOCUMENT_ASSET_ACCESS_TOKEN_TYPE
+  actorId?: string | null
+  shareId?: string
+  recipientId?: string
   [key: string]: unknown
 }
 
 interface DocumentAssetAccessScope {
   documentId: string
-  kind: 'document' | 'share' | 'recipient'
+  kind: DocumentAssetAccessKind
   shareId?: string
   recipientId?: string
+}
+
+interface DocumentAssetAccessGrantScope extends DocumentAssetAccessScope {
+  actorId?: string | null
 }
 
 const documentAssetSelect = {
@@ -95,6 +89,7 @@ const documentAssetSelect = {
 export class DocumentAssetsService {
   private readonly secretKey
   private readonly jwtConfig
+  private readonly isProduction
 
   constructor(
     private readonly prisma: PrismaService,
@@ -105,6 +100,7 @@ export class DocumentAssetsService {
   ) {
     this.jwtConfig = configService.getOrThrow<JwtConfig>('jwt')
     this.secretKey = createSecretKey(Buffer.from(this.jwtConfig.accessSecret, 'utf8'))
+    this.isProduction = configService.getOrThrow<boolean>('server.isProduction')
   }
 
   async uploadImage(input: {
@@ -268,88 +264,98 @@ export class DocumentAssetsService {
   async getAssetContent(input: {
     documentId: string
     assetId: string
-    token: string
+    cookieHeader?: string
   }): Promise<StorageObject> {
-    const payload = await this.verifyContentToken(input.token)
-
-    if (payload.documentId !== input.documentId || payload.assetId !== input.assetId) {
-      throw new NotFoundException('资源不存在')
-    }
-
-    const asset = await this.prisma.documentAsset.findFirst({
-      where: {
-        id: input.assetId,
+    const payload = await this.verifyAccessCookie({
+      expectedScope: {
+        kind: 'document',
         documentId: input.documentId,
-        document: {
-          trashedAt: null,
-        },
-        deletedAt: null,
-        status: DocumentAssetStatus.READY,
       },
-      select: documentAssetSelect,
+      cookieHeader: input.cookieHeader,
     })
 
-    if (!asset) {
+    if (!payload.actorId) {
       throw new NotFoundException('资源不存在')
     }
 
-    return this.storageService.getObject({
-      bucket: asset.bucket,
-      key: asset.objectKey,
-    })
+    await this.documentAccessService.assertCanReadDocument(payload.actorId, input.documentId)
+    return this.loadAssetStorageObject(input.documentId, input.assetId)
   }
 
   async getSharedAssetContent(input: {
     shareId: string
     documentId: string
     assetId: string
-    token: string
+    cookieHeader?: string
   }): Promise<StorageObject> {
-    const payload = await this.verifySharedContentToken(input.token)
-
-    if (payload.shareId !== input.shareId || payload.documentId !== input.documentId || payload.assetId !== input.assetId) {
-      throw new NotFoundException('资源不存在')
-    }
-
-    const asset = await this.prisma.documentAsset.findFirst({
-      where: {
-        id: input.assetId,
-        documentId: payload.documentId,
-        document: {
-          trashedAt: null,
-        },
-        deletedAt: null,
-        status: DocumentAssetStatus.READY,
+    const payload = await this.verifyAccessCookie({
+      expectedScope: {
+        kind: 'share',
+        shareId: input.shareId,
+        documentId: input.documentId,
       },
-      select: documentAssetSelect,
+      cookieHeader: input.cookieHeader,
     })
 
-    if (!asset) {
-      throw new NotFoundException('资源不存在')
-    }
-
-    return this.storageService.getObject({
-      bucket: asset.bucket,
-      key: asset.objectKey,
-    })
+    await this.documentShareRecipientsService.assertCanReadSharedDocument(
+      payload.actorId ?? null,
+      input.shareId,
+      input.documentId,
+    )
+    return this.loadAssetStorageObject(input.documentId, input.assetId)
   }
 
   async getSharedRecipientAssetContent(input: {
     recipientId: string
     documentId: string
     assetId: string
-    token: string
+    cookieHeader?: string
   }): Promise<StorageObject> {
-    const payload = await this.verifySharedRecipientContentToken(input.token)
+    const payload = await this.verifyAccessCookie({
+      expectedScope: {
+        kind: 'recipient',
+        recipientId: input.recipientId,
+        documentId: input.documentId,
+      },
+      cookieHeader: input.cookieHeader,
+    })
 
-    if (payload.recipientId !== input.recipientId || payload.documentId !== input.documentId || payload.assetId !== input.assetId) {
+    if (!payload.actorId) {
       throw new NotFoundException('资源不存在')
     }
 
+    await this.documentShareRecipientsService.assertCanReadSharedRecipientDocument(
+      payload.actorId,
+      input.recipientId,
+      input.documentId,
+    )
+    return this.loadAssetStorageObject(input.documentId, input.assetId)
+  }
+
+  async buildAssetAccessCookie(scope: DocumentAssetAccessGrantScope): Promise<string> {
+    const token = await this.createAccessToken({
+      kind: scope.kind,
+      documentId: scope.documentId,
+      actorId: scope.actorId ?? null,
+      shareId: scope.shareId,
+      recipientId: scope.recipientId,
+      tokenType: DOCUMENT_ASSET_ACCESS_TOKEN_TYPE,
+    })
+
+    return serialize(DOCUMENT_ASSET_ACCESS_COOKIE_NAMES[scope.kind], token, {
+      path: resolveAssetAccessCookiePath(scope),
+      httpOnly: true,
+      sameSite: 'lax',
+      secure: this.isProduction,
+      maxAge: DOCUMENT_ASSET_ACCESS_COOKIE_TTL_SECONDS,
+    })
+  }
+
+  private async loadAssetStorageObject(documentId: string, assetId: string): Promise<StorageObject> {
     const asset = await this.prisma.documentAsset.findFirst({
       where: {
-        id: input.assetId,
-        documentId: payload.documentId,
+        id: assetId,
+        documentId,
         document: {
           trashedAt: null,
         },
@@ -464,71 +470,38 @@ export class DocumentAssetsService {
 
   private async createContentUrl(scope: DocumentAssetAccessScope, assetId: string): Promise<string> {
     if (scope.kind === 'share') {
-      const token = await this.createSharedContentToken({
-        shareId: scope.shareId!,
-        documentId: scope.documentId,
-        assetId,
-        tokenType: DOCUMENT_SHARED_ASSET_CONTENT_TOKEN_TYPE,
-      })
-
-      return `${SERVER_PATH}/document-shares/${scope.shareId}/documents/${scope.documentId}/assets/${assetId}/content?token=${encodeURIComponent(token)}`
+      return `${SERVER_PATH}/document-shares/${scope.shareId}/documents/${scope.documentId}/assets/${assetId}/content`
     }
 
     if (scope.kind === 'recipient') {
-      const token = await this.createSharedRecipientContentToken({
-        recipientId: scope.recipientId!,
-        documentId: scope.documentId,
-        assetId,
-        tokenType: DOCUMENT_SHARED_RECIPIENT_ASSET_CONTENT_TOKEN_TYPE,
-      })
-
-      return `${SERVER_PATH}/document-share-recipients/${scope.recipientId}/documents/${scope.documentId}/assets/${assetId}/content?token=${encodeURIComponent(token)}`
+      return `${SERVER_PATH}/document-share-recipients/${scope.recipientId}/documents/${scope.documentId}/assets/${assetId}/content`
     }
 
-    const token = await this.createContentToken({
-      documentId: scope.documentId,
-      assetId,
-      tokenType: DOCUMENT_ASSET_CONTENT_TOKEN_TYPE,
-    })
-
-    return `${SERVER_PATH}/documents/${scope.documentId}/assets/${assetId}/content?token=${encodeURIComponent(token)}`
+    return `${SERVER_PATH}/documents/${scope.documentId}/assets/${assetId}/content`
   }
 
-  private async createContentToken(payload: DocumentAssetContentTokenPayload): Promise<string> {
+  private async createAccessToken(payload: DocumentAssetAccessTokenPayload): Promise<string> {
     return await new SignJWT(payload)
       .setProtectedHeader({ alg: 'HS256' })
       .setIssuer(this.jwtConfig.issuer)
       .setAudience(DOCUMENT_ASSET_CONTENT_AUDIENCE)
       .setIssuedAt()
-      .setExpirationTime(`${DOCUMENT_ASSET_CONTENT_URL_TTL_SECONDS}s`)
+      .setExpirationTime(`${DOCUMENT_ASSET_ACCESS_COOKIE_TTL_SECONDS}s`)
       .sign(this.secretKey)
   }
 
-  private async createSharedContentToken(payload: SharedDocumentAssetContentTokenPayload): Promise<string> {
-    return await new SignJWT(payload)
-      .setProtectedHeader({ alg: 'HS256' })
-      .setIssuer(this.jwtConfig.issuer)
-      .setAudience(DOCUMENT_ASSET_CONTENT_AUDIENCE)
-      .setIssuedAt()
-      .setExpirationTime(`${DOCUMENT_ASSET_CONTENT_URL_TTL_SECONDS}s`)
-      .sign(this.secretKey)
-  }
+  private async verifyAccessCookie(input: {
+    expectedScope: DocumentAssetAccessScope
+    cookieHeader?: string
+  }): Promise<DocumentAssetAccessTokenPayload> {
+    const token = parse(input.cookieHeader ?? '')[DOCUMENT_ASSET_ACCESS_COOKIE_NAMES[input.expectedScope.kind]]
 
-  private async createSharedRecipientContentToken(
-    payload: SharedDocumentRecipientAssetContentTokenPayload,
-  ): Promise<string> {
-    return await new SignJWT(payload)
-      .setProtectedHeader({ alg: 'HS256' })
-      .setIssuer(this.jwtConfig.issuer)
-      .setAudience(DOCUMENT_ASSET_CONTENT_AUDIENCE)
-      .setIssuedAt()
-      .setExpirationTime(`${DOCUMENT_ASSET_CONTENT_URL_TTL_SECONDS}s`)
-      .sign(this.secretKey)
-  }
+    if (!token) {
+      throw new NotFoundException('资源不存在')
+    }
 
-  private async verifyContentToken(token: string): Promise<DocumentAssetContentTokenPayload> {
     try {
-      const { payload } = await jwtVerify<DocumentAssetContentTokenPayload>(
+      const { payload } = await jwtVerify<DocumentAssetAccessTokenPayload>(
         token,
         this.secretKey,
         {
@@ -537,11 +510,7 @@ export class DocumentAssetsService {
         },
       )
 
-      if (
-        payload.tokenType !== DOCUMENT_ASSET_CONTENT_TOKEN_TYPE
-        || typeof payload.documentId !== 'string'
-        || typeof payload.assetId !== 'string'
-      ) {
+      if (!isAssetAccessTokenPayloadForScope(payload, input.expectedScope)) {
         throw new NotFoundException('资源不存在')
       }
 
@@ -551,62 +520,43 @@ export class DocumentAssetsService {
       throw new NotFoundException('资源不存在')
     }
   }
+}
 
-  private async verifySharedContentToken(token: string): Promise<SharedDocumentAssetContentTokenPayload> {
-    try {
-      const { payload } = await jwtVerify<SharedDocumentAssetContentTokenPayload>(
-        token,
-        this.secretKey,
-        {
-          issuer: this.jwtConfig.issuer,
-          audience: DOCUMENT_ASSET_CONTENT_AUDIENCE,
-        },
-      )
-
-      if (
-        payload.tokenType !== DOCUMENT_SHARED_ASSET_CONTENT_TOKEN_TYPE
-        || typeof payload.shareId !== 'string'
-        || typeof payload.documentId !== 'string'
-        || typeof payload.assetId !== 'string'
-      ) {
-        throw new NotFoundException('资源不存在')
-      }
-
-      return payload
-    }
-    catch {
-      throw new NotFoundException('资源不存在')
-    }
+function isAssetAccessTokenPayloadForScope(
+  payload: DocumentAssetAccessTokenPayload,
+  scope: DocumentAssetAccessScope,
+) {
+  if (
+    payload.tokenType !== DOCUMENT_ASSET_ACCESS_TOKEN_TYPE
+    || payload.kind !== scope.kind
+    || typeof payload.documentId !== 'string'
+    || payload.documentId !== scope.documentId
+    || (payload.actorId !== undefined && payload.actorId !== null && typeof payload.actorId !== 'string')
+  ) {
+    return false
   }
 
-  private async verifySharedRecipientContentToken(
-    token: string,
-  ): Promise<SharedDocumentRecipientAssetContentTokenPayload> {
-    try {
-      const { payload } = await jwtVerify<SharedDocumentRecipientAssetContentTokenPayload>(
-        token,
-        this.secretKey,
-        {
-          issuer: this.jwtConfig.issuer,
-          audience: DOCUMENT_ASSET_CONTENT_AUDIENCE,
-        },
-      )
-
-      if (
-        payload.tokenType !== DOCUMENT_SHARED_RECIPIENT_ASSET_CONTENT_TOKEN_TYPE
-        || typeof payload.recipientId !== 'string'
-        || typeof payload.documentId !== 'string'
-        || typeof payload.assetId !== 'string'
-      ) {
-        throw new NotFoundException('资源不存在')
-      }
-
-      return payload
-    }
-    catch {
-      throw new NotFoundException('资源不存在')
-    }
+  if (scope.kind === 'share') {
+    return typeof payload.shareId === 'string' && payload.shareId === scope.shareId
   }
+
+  if (scope.kind === 'recipient') {
+    return typeof payload.recipientId === 'string' && payload.recipientId === scope.recipientId
+  }
+
+  return true
+}
+
+function resolveAssetAccessCookiePath(scope: DocumentAssetAccessScope) {
+  if (scope.kind === 'share') {
+    return `${SERVER_PATH}/document-shares/${scope.shareId}/documents/${scope.documentId}/assets`
+  }
+
+  if (scope.kind === 'recipient') {
+    return `${SERVER_PATH}/document-share-recipients/${scope.recipientId}/documents/${scope.documentId}/assets`
+  }
+
+  return `${SERVER_PATH}/documents/${scope.documentId}/assets`
 }
 
 function assertDocumentImageMimeType(mimeType: string): DocumentImageMimeType {

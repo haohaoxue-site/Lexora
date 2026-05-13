@@ -1,8 +1,9 @@
 import type {
   DocumentCurrent,
   DocumentShareAccess,
+  ResolveDocumentAssetsResponse,
 } from '@haohaoxue/samepage-contracts'
-import type { FastifyReply } from 'fastify'
+import type { FastifyReply, FastifyRequest } from 'fastify'
 import type { AuthUserContext } from '../../auth/auth.interface'
 import { ResolveDocumentAssetsSchema } from '@haohaoxue/samepage-contracts'
 import {
@@ -11,7 +12,7 @@ import {
   Get,
   Param,
   Post,
-  Query,
+  Req,
   Res,
   UnauthorizedException,
 } from '@nestjs/common'
@@ -72,13 +73,21 @@ export class DocumentSharesController {
     @Param('shareId') shareId: string,
     @Param('documentId') documentId: string,
     @Body(new ZodValidationPipe(ResolveDocumentAssetsSchema)) payload: { assetIds: string[] },
-  ) {
-    return this.documentAssetsService.resolveSharedAssets({
+    @Res({ passthrough: true }) response: FastifyReply,
+  ): Promise<ResolveDocumentAssetsResponse> {
+    const result = await this.documentAssetsService.resolveSharedAssets({
       actorId: authUser?.id ?? null,
       shareId,
       documentId,
       assetIds: payload.assetIds,
     })
+    response.header('set-cookie', await this.documentAssetsService.buildAssetAccessCookie({
+      kind: 'share',
+      shareId,
+      documentId,
+      actorId: authUser?.id ?? null,
+    }))
+    return result
   }
 
   @Public()
@@ -87,14 +96,14 @@ export class DocumentSharesController {
     @Param('shareId') shareId: string,
     @Param('documentId') documentId: string,
     @Param('assetId') assetId: string,
-    @Query('token') token: string,
+    @Req() request: FastifyRequest,
     @Res() response: FastifyReply,
   ): Promise<FastifyReply> {
     const asset = await this.documentAssetsService.getSharedAssetContent({
       shareId,
       documentId,
       assetId,
-      token,
+      cookieHeader: request.headers.cookie,
     })
 
     response.header('cache-control', 'private, max-age=300')

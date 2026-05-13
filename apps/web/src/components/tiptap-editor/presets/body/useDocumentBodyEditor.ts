@@ -14,6 +14,7 @@ import {
   watch,
 } from 'vue'
 import {
+  resolveDocumentAssets as resolveDocumentAssetsRequest,
   uploadDocumentFile,
   uploadDocumentImage,
 } from '@/apis/document'
@@ -31,6 +32,7 @@ export function useDocumentBodyEditor(options: {
   const bodyEditorExtensions = createBodyExtensions({
     uploadImage: handleUploadImage,
     uploadFile: handleUploadFile,
+    resolveImageSrc: resolveDocumentImageSrc,
     collaboration: options.props.collaboration,
   })
   const bodyEditor = computed(() => options.bodyEditor.value)
@@ -41,6 +43,7 @@ export function useDocumentBodyEditor(options: {
   })
   const pendingActiveBlockId = shallowRef<string | null>(null)
   const isResolvingActiveBlock = shallowRef(false)
+  const imageSrcCache = new Map<string, Promise<string | null>>()
 
   watch(
     [
@@ -143,7 +146,13 @@ export function useDocumentBodyEditor(options: {
       throw new Error('当前文档未初始化，无法上传图片')
     }
 
-    return uploadDocumentImage(options.props.documentId, file)
+    const asset = await uploadDocumentImage(options.props.documentId, file)
+
+    if (asset.contentUrl) {
+      imageSrcCache.set(`${options.props.documentId}:${asset.id}`, Promise.resolve(asset.contentUrl))
+    }
+
+    return asset
   }
 
   async function handleUploadFile(file: File) {
@@ -152,6 +161,34 @@ export function useDocumentBodyEditor(options: {
     }
 
     return uploadDocumentFile(options.props.documentId, file)
+  }
+
+  async function resolveDocumentImageSrc(assetId: string) {
+    const documentId = options.props.documentId
+
+    if (!documentId) {
+      return null
+    }
+
+    const cacheKey = `${documentId}:${assetId}`
+    const cachedSrc = imageSrcCache.get(cacheKey)
+
+    if (cachedSrc) {
+      return cachedSrc
+    }
+
+    const pendingSrc = resolveDocumentAssetsRequest(documentId, {
+      assetIds: [assetId],
+    }).then((response) => {
+      const asset = response.assets.find(item => item.id === assetId)
+      return asset?.contentUrl ?? null
+    }).catch((error) => {
+      imageSrcCache.delete(cacheKey)
+      throw error
+    })
+
+    imageSrcCache.set(cacheKey, pendingSrc)
+    return pendingSrc
   }
 
   async function scrollToPendingActiveBlock(editor: Editor) {

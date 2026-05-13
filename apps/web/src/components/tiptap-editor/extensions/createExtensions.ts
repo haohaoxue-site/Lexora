@@ -2,6 +2,7 @@ import type { Editor, Extensions } from '@tiptap/core'
 import type { CollaborationOptions } from '@tiptap/extension-collaboration'
 import type { Node as ProseMirrorNode } from '@tiptap/pm/model'
 import type {
+  TiptapEditorResolveImageSrc,
   TiptapEditorUploadedFile,
   TiptapEditorUploadedImage,
 } from '../content/typing'
@@ -45,6 +46,7 @@ const COLLABORATION_Y_UNDO_OPTIONS: CollaborationOptions['yUndoOptions'] = {
 export function createBodyExtensions(options: {
   uploadImage?: (file: File) => Promise<TiptapEditorUploadedImage>
   uploadFile?: (file: File) => Promise<TiptapEditorUploadedFile>
+  resolveImageSrc?: TiptapEditorResolveImageSrc
   collaboration?: TiptapEditorCollaborationBinding | null
 } = {}): Extensions {
   return [
@@ -82,6 +84,7 @@ export function createBodyExtensions(options: {
     TableCell,
     DocumentImage.configure({
       inline: false,
+      resolveImageSrc: options.resolveImageSrc,
     }),
     DocumentFile,
     BlockCommands,

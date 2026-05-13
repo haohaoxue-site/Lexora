@@ -7,7 +7,7 @@ import type {
 import type { FastifyReply, FastifyRequest } from 'fastify'
 import type { AuthUserContext } from '../../auth/auth.interface'
 import { ResolveDocumentAssetsSchema } from '@haohaoxue/samepage-contracts'
-import { BadRequestException, Body, Controller, Get, Param, Post, Query, Req, Res } from '@nestjs/common'
+import { BadRequestException, Body, Controller, Get, Param, Post, Req, Res } from '@nestjs/common'
 import { CurrentUser } from '../../../decorators/current-user.decorator'
 import { Public } from '../../../decorators/public.decorator'
 import { ZodValidationPipe } from '../../../pipes/zod-validation.pipe'
@@ -35,6 +35,7 @@ export class DocumentAssetController {
     @CurrentUser() authUser: AuthUserContext,
     @Param('id') id: string,
     @Req() request: FastifyRequest,
+    @Res({ passthrough: true }) response: FastifyReply,
   ): Promise<DocumentAsset> {
     const file = await getRequestFile(request)
 
@@ -42,13 +43,19 @@ export class DocumentAssetController {
       throw new BadRequestException('请选择图片文件')
     }
 
-    return this.documentAssetsService.uploadImage({
+    const asset = await this.documentAssetsService.uploadImage({
       actorId: authUser.id,
       documentId: id,
       fileName: file.filename,
       mimeType: file.mimetype,
       buffer: await file.toBuffer(),
     })
+    response.header('set-cookie', await this.documentAssetsService.buildAssetAccessCookie({
+      kind: 'document',
+      documentId: id,
+      actorId: authUser.id,
+    }))
+    return asset
   }
 
   @Post(':id/assets/files')
@@ -56,6 +63,7 @@ export class DocumentAssetController {
     @CurrentUser() authUser: AuthUserContext,
     @Param('id') id: string,
     @Req() request: FastifyRequest,
+    @Res({ passthrough: true }) response: FastifyReply,
   ): Promise<DocumentAsset> {
     const file = await getRequestFile(request)
 
@@ -63,13 +71,19 @@ export class DocumentAssetController {
       throw new BadRequestException('请选择附件文件')
     }
 
-    return this.documentAssetsService.uploadFile({
+    const asset = await this.documentAssetsService.uploadFile({
       actorId: authUser.id,
       documentId: id,
       fileName: file.filename,
       mimeType: file.mimetype,
       buffer: await file.toBuffer(),
     })
+    response.header('set-cookie', await this.documentAssetsService.buildAssetAccessCookie({
+      kind: 'document',
+      documentId: id,
+      actorId: authUser.id,
+    }))
+    return asset
   }
 
   @Post(':id/assets/resolve')
@@ -77,12 +91,19 @@ export class DocumentAssetController {
     @CurrentUser() authUser: AuthUserContext,
     @Param('id') id: string,
     @Body(new ZodValidationPipe(ResolveDocumentAssetsSchema)) payload: ResolveDocumentAssetsRequest,
+    @Res({ passthrough: true }) response: FastifyReply,
   ): Promise<ResolveDocumentAssetsResponse> {
-    return this.documentAssetsService.resolveAssets({
+    const result = await this.documentAssetsService.resolveAssets({
       actorId: authUser.id,
       documentId: id,
       assetIds: payload.assetIds,
     })
+    response.header('set-cookie', await this.documentAssetsService.buildAssetAccessCookie({
+      kind: 'document',
+      documentId: id,
+      actorId: authUser.id,
+    }))
+    return result
   }
 
   @Public()
@@ -90,13 +111,13 @@ export class DocumentAssetController {
   async getDocumentAssetContent(
     @Param('id') id: string,
     @Param('assetId') assetId: string,
-    @Query('token') token: string,
+    @Req() request: FastifyRequest,
     @Res() response: FastifyReply,
   ): Promise<FastifyReply> {
     const asset = await this.documentAssetsService.getAssetContent({
       documentId: id,
       assetId,
-      token,
+      cookieHeader: request.headers.cookie,
     })
 
     response.header('cache-control', 'private, max-age=300')

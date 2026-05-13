@@ -2,8 +2,9 @@ import type {
   DocumentCurrent,
   DocumentShareAccess,
   DocumentShareRecipientSummary,
+  ResolveDocumentAssetsResponse,
 } from '@haohaoxue/samepage-contracts'
-import type { FastifyReply } from 'fastify'
+import type { FastifyReply, FastifyRequest } from 'fastify'
 import type { AuthUserContext } from '../../auth/auth.interface'
 import { ResolveDocumentAssetsSchema } from '@haohaoxue/samepage-contracts'
 import {
@@ -12,7 +13,7 @@ import {
   Get,
   Param,
   Post,
-  Query,
+  Req,
   Res,
 } from '@nestjs/common'
 import { CurrentUser } from '../../../decorators/current-user.decorator'
@@ -89,13 +90,21 @@ export class DocumentShareRecipientsController {
     @Param('recipientId') recipientId: string,
     @Param('documentId') documentId: string,
     @Body(new ZodValidationPipe(ResolveDocumentAssetsSchema)) payload: { assetIds: string[] },
-  ) {
-    return this.documentAssetsService.resolveSharedRecipientAssets({
+    @Res({ passthrough: true }) response: FastifyReply,
+  ): Promise<ResolveDocumentAssetsResponse> {
+    const result = await this.documentAssetsService.resolveSharedRecipientAssets({
       actorId: authUser.id,
       recipientId,
       documentId,
       assetIds: payload.assetIds,
     })
+    response.header('set-cookie', await this.documentAssetsService.buildAssetAccessCookie({
+      kind: 'recipient',
+      recipientId,
+      documentId,
+      actorId: authUser.id,
+    }))
+    return result
   }
 
   @Public()
@@ -104,14 +113,14 @@ export class DocumentShareRecipientsController {
     @Param('recipientId') recipientId: string,
     @Param('documentId') documentId: string,
     @Param('assetId') assetId: string,
-    @Query('token') token: string,
+    @Req() request: FastifyRequest,
     @Res() response: FastifyReply,
   ): Promise<FastifyReply> {
     const asset = await this.documentAssetsService.getSharedRecipientAssetContent({
       recipientId,
       documentId,
       assetId,
-      token,
+      cookieHeader: request.headers.cookie,
     })
 
     response.header('cache-control', 'private, max-age=300')

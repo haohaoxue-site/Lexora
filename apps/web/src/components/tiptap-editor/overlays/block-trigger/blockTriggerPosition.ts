@@ -2,6 +2,9 @@ import type { Editor } from '@tiptap/core'
 import { getCurrentBlock } from '../../commands/currentBlock'
 import { resolveCurrentBlockElement } from './blockTriggerDom'
 
+const LIST_BLOCK_NODE_TYPES = new Set(['listItem', 'taskItem'])
+const LIST_MARKER_SAFE_OFFSET = 18
+
 export function resolveBlockTriggerAnchorRect(editor: Editor): DOMRect {
   const currentBlock = getCurrentBlock(editor.state.selection)
 
@@ -18,15 +21,17 @@ export function resolveBlockTriggerAnchorRect(editor: Editor): DOMRect {
   }
 
   const cursorRect = editor.view.coordsAtPos(editor.state.selection.from)
-  const blockRect = resolveCurrentBlockElement(editor, currentBlock).getBoundingClientRect()
+  const blockElement = resolveCurrentBlockElement(editor, currentBlock)
+  const blockRect = blockElement.getBoundingClientRect()
+  const anchorLeft = resolveBlockTriggerAnchorLeft(currentBlock.node.type.name, blockElement, blockRect.left)
   const data = {
     top: cursorRect.top,
     bottom: cursorRect.bottom,
-    left: blockRect.left,
-    right: blockRect.left,
+    left: anchorLeft,
+    right: anchorLeft,
     width: 0,
     height: Math.max(cursorRect.bottom - cursorRect.top, 0),
-    x: blockRect.left,
+    x: anchorLeft,
     y: cursorRect.top,
   }
 
@@ -34,4 +39,19 @@ export function resolveBlockTriggerAnchorRect(editor: Editor): DOMRect {
     ...data,
     toJSON: () => data,
   } satisfies DOMRect
+}
+
+function resolveBlockTriggerAnchorLeft(nodeTypeName: string, blockElement: HTMLElement, fallbackLeft: number) {
+  if (!LIST_BLOCK_NODE_TYPES.has(nodeTypeName)) {
+    return fallbackLeft
+  }
+
+  const listElement = blockElement.closest<HTMLElement>('ul, ol')
+
+  if (!listElement) {
+    return fallbackLeft
+  }
+
+  const listLeft = listElement.getBoundingClientRect().left
+  return Math.min(Math.max(listLeft, fallbackLeft - LIST_MARKER_SAFE_OFFSET), fallbackLeft)
 }

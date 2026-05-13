@@ -29,3 +29,5 @@ export interface TiptapEditorUploadedFile {
   /** 资源地址 */
   contentUrl: string | null
 }
+
+export type TiptapEditorResolveImageSrc = (assetId: string) => string | null | Promise<string | null>

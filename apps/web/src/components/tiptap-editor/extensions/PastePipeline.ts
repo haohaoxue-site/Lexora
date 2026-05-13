@@ -5,6 +5,10 @@ import { Plugin, PluginKey } from '@tiptap/pm/state'
 import { ElMessage } from 'element-plus'
 import { getRequestErrorDisplayMessage } from '@/utils/request-error'
 import {
+  createAnimatedGifPasteFile,
+  hasAnimatedGifPasteSource,
+} from '../content/animatedGifPaste'
+import {
   parseStructuredClipboardContent,
   SAMEPAGE_BLOCK_CLIPBOARD_TYPE,
 } from '../content/blockClipboard'
@@ -43,10 +47,11 @@ function handleEditorPaste(editor: Editor, event: ClipboardEvent, options: Paste
   }
 
   const files = Array.from(event.clipboardData.files ?? [])
+  const html = event.clipboardData.getData('text/html').trim()
 
   if (files.length) {
     event.preventDefault()
-    void handleFilePaste(editor, files, options)
+    void handleFilePaste(editor, files, options, html)
     return true
   }
 
@@ -70,9 +75,13 @@ function handleEditorPaste(editor: Editor, event: ClipboardEvent, options: Paste
     return editor.chain().focus().insertContent(structuredContent).run()
   }
 
-  const html = event.clipboardData.getData('text/html').trim()
-
   if (html.length) {
+    if (options.uploadImage && hasAnimatedGifPasteSource(html)) {
+      event.preventDefault()
+      void handleAnimatedGifPaste(editor, html, options)
+      return true
+    }
+
     return editor.chain().focus().insertContent(html).run()
   }
 
@@ -91,9 +100,15 @@ function isSelectionInsideCodeBlock(editor: Editor) {
   return $from.parent.type.name === 'codeBlock' && $to.parent.type.name === 'codeBlock'
 }
 
-async function handleFilePaste(editor: Editor, files: readonly File[], options: PastePipelineOptions) {
+async function handleFilePaste(
+  editor: Editor,
+  files: readonly File[],
+  options: PastePipelineOptions,
+  html: string,
+) {
   try {
-    const content = await createFilePasteContent(files, {
+    const uploadFiles = await mergeAnimatedGifIntoFiles(files, options, html)
+    const content = await createFilePasteContent(uploadFiles, {
       uploadImage: options.uploadImage,
       uploadFile: options.uploadFile,
     })
@@ -106,5 +121,61 @@ async function handleFilePaste(editor: Editor, files: readonly File[], options: 
   }
   catch (error) {
     ElMessage.error(getRequestErrorDisplayMessage(error, '资源上传失败'))
+  }
+}
+
+async function handleAnimatedGifPaste(
+  editor: Editor,
+  html: string,
+  options: PastePipelineOptions,
+) {
+  try {
+    const animatedGifFile = await createAnimatedGifPasteFile(html)
+
+    if (!animatedGifFile) {
+      editor.chain().focus().insertContent(html).run()
+      return
+    }
+
+    const content = await createFilePasteContent([animatedGifFile], {
+      uploadImage: options.uploadImage,
+      uploadFile: options.uploadFile,
+    })
+
+    if (!content.length) {
+      return
+    }
+
+    editor.chain().focus().insertContent(content).run()
+  }
+  catch (error) {
+    ElMessage.error(getRequestErrorDisplayMessage(error, '资源上传失败'))
+  }
+}
+
+async function mergeAnimatedGifIntoFiles(
+  files: readonly File[],
+  options: PastePipelineOptions,
+  html: string,
+): Promise<readonly File[]> {
+  if (!options.uploadImage || !html || !hasAnimatedGifPasteSource(html)) {
+    return files
+  }
+
+  try {
+    const animatedGifFile = await createAnimatedGifPasteFile(html)
+
+    if (!animatedGifFile) {
+      return files
+    }
+
+    return [
+      animatedGifFile,
+      ...files.filter(file => !file.type.startsWith('image/')),
+    ]
+  }
+  catch {
+    // Clipboard files are still a valid paste result; GIF replacement is best-effort.
+    return files
   }
 }
