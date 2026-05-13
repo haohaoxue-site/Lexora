@@ -1,5 +1,7 @@
 export const TIPTAP_BODY_BLOCK_ID_PREFIX = 'block_' as const
 export const TIPTAP_BODY_BLOCK_ID_ATTRIBUTE = 'id' as const
+export const TIPTAP_CODE_BLOCK_DEFAULT_TAB_SIZE = 2 as const
+export const TIPTAP_CODE_BLOCK_TAB_SIZES = [2, 4, 8] as const
 export const TIPTAP_BODY_BLOCK_ID_NODE_TYPES = [
   'paragraph',
   'heading',
@@ -11,6 +13,7 @@ export const TIPTAP_BODY_BLOCK_ID_NODE_TYPES = [
   'blockquote',
   'codeBlock',
   'horizontalRule',
+  'blockMath',
   'image',
   'file',
 ] as const

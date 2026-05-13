@@ -13,6 +13,10 @@
   --tiptap-file-node-background: color-mix(in srgb, var(--brand-fill-lighter) 70%, var(--brand-bg-surface));
   --tiptap-file-node-title-color: var(--brand-text-primary);
   --tiptap-file-node-meta-color: var(--brand-text-secondary);
+  --tiptap-code-block-background: color-mix(in srgb, var(--brand-fill-lighter) 74%, var(--brand-bg-surface));
+  --tiptap-code-block-border: color-mix(in srgb, var(--brand-border-base) 76%, transparent);
+  --tiptap-code-block-toolbar-background: color-mix(in srgb, var(--brand-bg-surface-raised) 92%, transparent);
+  --tiptap-code-block-line-number-color: var(--brand-text-placeholder);
   display: flex;
   flex: 1 1 0%;
   flex-direction: column;
@@ -340,6 +344,487 @@
     color: inherit;
     font-size: inherit;
     line-height: inherit;
+  }
+
+  .tiptap-code-block {
+    position: relative;
+    box-sizing: border-box;
+    width: 100%;
+    margin: 1.25em 0;
+    border: 1px solid var(--tiptap-code-block-border);
+    border-radius: 8px;
+    background: var(--tiptap-code-block-background);
+    overflow: hidden;
+  }
+
+  .tiptap-code-block__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    min-height: 42px;
+    padding: 0.35rem 0.55rem;
+    border-bottom: 1px solid color-mix(in srgb, var(--tiptap-code-block-border) 70%, transparent);
+  }
+
+  .tiptap-code-block__title-area {
+    display: flex;
+    flex: 1 1 auto;
+    align-items: center;
+    min-width: 0;
+  }
+
+  .tiptap-code-block__collapse-btn {
+    display: inline-flex;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border: none;
+    border-radius: 5px;
+    background: transparent;
+    color: var(--brand-text-secondary);
+    cursor: pointer;
+
+    &:hover {
+      color: var(--brand-text-primary);
+      background: color-mix(in srgb, var(--brand-fill-light) 70%, transparent);
+    }
+
+    svg {
+      width: 1rem;
+      height: 1rem;
+    }
+  }
+
+  .tiptap-code-block__title-btn,
+  .tiptap-code-block__title-input {
+    box-sizing: border-box;
+    flex: 1 1 auto;
+    min-width: 0;
+    height: 28px;
+    border: 1px solid transparent;
+    border-radius: 5px;
+    background: transparent;
+    color: var(--brand-text-primary);
+    font: inherit;
+    font-size: 0.875rem;
+    font-weight: 500;
+    line-height: 26px;
+  }
+
+  .tiptap-code-block__title-btn {
+    overflow: hidden;
+    padding: 0 0.3rem;
+    text-align: left;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    cursor: text;
+
+    &:hover {
+      background: color-mix(in srgb, var(--brand-fill-light) 58%, transparent);
+    }
+
+    &.is-placeholder {
+      color: var(--brand-text-placeholder);
+      font-weight: 500;
+    }
+  }
+
+  .tiptap-code-block__title-input {
+    padding: 0 0.4rem;
+    border-color: color-mix(in srgb, var(--brand-primary) 42%, transparent);
+    background: var(--brand-bg-surface);
+    outline: none;
+
+    &::placeholder {
+      color: var(--brand-text-placeholder);
+    }
+  }
+
+  .tiptap-code-block__toolbar {
+    display: inline-flex;
+    flex: 0 0 auto;
+    align-items: center;
+    height: 30px;
+    border: 1px solid var(--tiptap-code-block-border);
+    border-radius: 7px;
+    background: var(--tiptap-code-block-toolbar-background);
+    box-shadow: 0 8px 18px color-mix(in srgb, #111827 7%, transparent);
+    backdrop-filter: blur(10px);
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(-4px) scale(0.985);
+    transform-origin: top right;
+    transition:
+      opacity 160ms ease,
+      transform 180ms cubic-bezier(0.2, 0.8, 0.2, 1),
+      box-shadow 180ms ease;
+    will-change: opacity, transform;
+  }
+
+  .tiptap-code-block:hover,
+  .tiptap-code-block:focus-within,
+  .tiptap-code-block--toolbar-active {
+    .tiptap-code-block__toolbar {
+      opacity: 1;
+      pointer-events: auto;
+      transform: translateY(0) scale(1);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .tiptap-code-block__toolbar {
+      transition: opacity 80ms ease;
+      transform: none;
+    }
+  }
+
+  .tiptap-code-block__language-btn,
+  .tiptap-code-block__icon-btn,
+  .tiptap-code-block__language-label {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    border: none;
+    background: transparent;
+    color: var(--brand-text-secondary);
+  }
+
+  .tiptap-code-block__language-btn,
+  .tiptap-code-block__language-label {
+    gap: 0.35rem;
+    max-width: 160px;
+    padding: 0 0.55rem;
+    font-size: 0.8125rem;
+    line-height: 1;
+
+    > span {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+  }
+
+  .tiptap-code-block__language-btn {
+    cursor: pointer;
+
+    &:hover {
+      color: var(--brand-text-primary);
+      background: color-mix(in srgb, var(--brand-fill-light) 70%, transparent);
+    }
+  }
+
+  .tiptap-code-block__language-label {
+    cursor: default;
+  }
+
+  .tiptap-code-block__icon-btn {
+    width: 30px;
+    font-size: 1rem;
+    cursor: pointer;
+
+    &:hover {
+      color: var(--brand-primary);
+      background: color-mix(in srgb, var(--brand-primary) 9%, transparent);
+    }
+  }
+
+  .tiptap-code-block__chevron {
+    width: 0.8rem;
+    height: 0.8rem;
+  }
+
+  .tiptap-code-block__divider {
+    width: 1px;
+    height: 16px;
+    background: var(--tiptap-code-block-border);
+  }
+
+  .tiptap-code-block__body {
+    display: flex;
+    overflow-x: auto;
+  }
+
+  .tiptap-code-block__line-numbers {
+    display: flex;
+    flex: 0 0 auto;
+    flex-direction: column;
+    min-width: 3.25rem;
+    padding: 0.5rem 0.8rem 0.5rem 1rem;
+    border-right: 1px solid color-mix(in srgb, var(--tiptap-code-block-border) 70%, transparent);
+    color: var(--tiptap-code-block-line-number-color);
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    font-size: 0.875rem;
+    line-height: 1.65;
+    text-align: right;
+    user-select: none;
+  }
+
+  .tiptap-code-block__pre {
+    flex: 1 1 auto;
+    min-width: 0;
+    margin: 0;
+    padding: 0.5rem 1rem;
+    overflow: visible;
+    border: none;
+    border-radius: 0;
+    background: transparent;
+  }
+
+  .tiptap-code-block__code {
+    display: block;
+    min-width: max-content;
+    color: var(--brand-text-primary);
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    font-size: 0.875rem;
+    line-height: 1.65;
+    tab-size: var(--tiptap-code-block-tab-size, 2);
+    white-space: pre !important;
+  }
+
+  .tiptap-code-block--wrap {
+    .tiptap-code-block__body {
+      overflow-x: hidden;
+    }
+
+    .tiptap-code-block__code {
+      min-width: 0;
+      overflow-wrap: anywhere;
+      white-space: pre-wrap !important;
+    }
+  }
+
+  .tiptap-code-block--collapsed {
+    .tiptap-code-block__header {
+      border-bottom: none;
+    }
+  }
+
+  .hljs-comment,
+  .hljs-quote {
+    color: #7c8a9a;
+    font-style: italic;
+  }
+
+  .hljs-keyword,
+  .hljs-selector-tag,
+  .hljs-subst {
+    color: #7c3aed;
+  }
+
+  .hljs-string,
+  .hljs-doctag,
+  .hljs-regexp {
+    color: #0f766e;
+  }
+
+  .hljs-number,
+  .hljs-literal,
+  .hljs-variable,
+  .hljs-template-variable {
+    color: #c2410c;
+  }
+
+  .hljs-title,
+  .hljs-section,
+  .hljs-name,
+  .hljs-selector-id,
+  .hljs-selector-class {
+    color: #1d4ed8;
+  }
+
+  .hljs-attribute,
+  .hljs-attr,
+  .hljs-property,
+  .hljs-built_in,
+  .hljs-type {
+    color: #be123c;
+  }
+
+  .hljs-symbol,
+  .hljs-bullet,
+  .hljs-link,
+  .hljs-meta {
+    color: #9333ea;
+  }
+
+  .hljs-addition {
+    color: #047857;
+  }
+
+  .hljs-deletion {
+    color: #b91c1c;
+  }
+
+  .tiptap-math-inline {
+    display: inline-flex;
+    vertical-align: baseline;
+  }
+
+  .tiptap-math-inline__render {
+    border: 1px solid color-mix(in srgb, var(--brand-border-base) 70%, transparent);
+    border-radius: 6px;
+    background: color-mix(in srgb, var(--brand-fill-lighter) 76%, transparent);
+    color: var(--brand-text-primary);
+    font: inherit;
+    display: inline-flex;
+    align-items: center;
+    min-height: 1.8em;
+    padding: 0.05em 0.35em;
+    cursor: text;
+  }
+
+  .tiptap-math-inline__placeholder {
+    color: var(--brand-text-placeholder);
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    font-size: 0.9em;
+  }
+
+  .tiptap-math-inline.is-invalid .tiptap-math-inline__render,
+  .tiptap-math-block.is-invalid .tiptap-math-block__render {
+    border-color: color-mix(in srgb, var(--el-color-danger) 56%, transparent);
+    background: color-mix(in srgb, var(--el-color-danger-light-9) 70%, transparent);
+    color: var(--el-color-danger);
+  }
+
+  .tiptap-math-inline.ProseMirror-selectednode .tiptap-math-inline__render,
+  .tiptap-math-block.ProseMirror-selectednode .tiptap-math-block__render {
+    border-color: color-mix(in srgb, var(--brand-primary) 46%, transparent);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--brand-primary) 12%, transparent);
+  }
+
+  .tiptap-math-block {
+    box-sizing: border-box;
+    width: 100%;
+    margin: 1.25em 0;
+  }
+
+  .tiptap-math-block__render {
+    display: flex;
+    box-sizing: border-box;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    min-height: 88px;
+    padding: 1.25rem;
+    border: 1px solid var(--brand-border-base);
+    border-radius: 8px;
+    background: color-mix(in srgb, var(--brand-bg-surface) 82%, var(--brand-fill-lighter));
+    color: var(--brand-text-primary);
+    cursor: text;
+  }
+
+  .tiptap-math-block__placeholder {
+    color: var(--brand-text-placeholder);
+    font-size: 0.875rem;
+  }
+
+  .tiptap-math-block__katex {
+    max-width: 100%;
+    overflow-x: auto;
+  }
+
+  .katex-display {
+    margin: 0;
+  }
+}
+
+.tiptap-code-block-language-popper,
+.tiptap-code-block-more-popper {
+  padding: 0 !important;
+  border-radius: 8px !important;
+}
+
+.tiptap-code-block-language-panel {
+  padding: 0.75rem 0.75rem 0.5rem;
+
+  &__list {
+    margin-top: 0.5rem;
+  }
+
+  &__item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    min-height: 34px;
+    padding: 0 0.7rem;
+    border: none;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--brand-text-primary);
+    font-size: 0.875rem;
+    text-align: left;
+    cursor: pointer;
+
+    &:hover,
+    &.is-active {
+      background: var(--brand-fill-lighter);
+    }
+  }
+
+  &__check {
+    width: 0.9rem;
+    height: 0.9rem;
+    color: var(--brand-primary);
+  }
+}
+
+.tiptap-code-block-more-panel {
+  padding: 0.35rem;
+
+  &__item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    min-height: 34px;
+    padding: 0 0.65rem;
+    border: none;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--brand-text-primary);
+    font-size: 0.875rem;
+    text-align: left;
+    cursor: pointer;
+
+    &:hover {
+      background: var(--brand-fill-lighter);
+    }
+
+    &:focus-visible {
+      outline: 2px solid color-mix(in srgb, var(--brand-primary) 48%, transparent);
+      outline-offset: 1px;
+    }
+
+    svg {
+      width: 0.9rem;
+      height: 0.9rem;
+      color: var(--brand-primary);
+    }
+  }
+
+  &__item--switch {
+    cursor: pointer;
+  }
+
+  &__item--select {
+    cursor: default;
+  }
+
+  &__select {
+    width: 3rem;
+
+    .el-select__wrapper {
+      min-height: 26px;
+      padding: 0 0.5rem;
+      border-radius: 6px;
+      box-shadow: 0 0 0 1px var(--brand-border-muted) inset;
+      font-size: 0.8125rem;
+    }
   }
 }
 
@@ -1096,6 +1581,34 @@ html.dark {
   &__url-input {
     min-width: 14rem;
     flex: 1;
+  }
+
+  &__actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.375rem;
+  }
+}
+
+.tiptap-math-panel {
+  display: flex;
+  width: min(34rem, calc(100vw - 2rem));
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  border: 1px solid var(--brand-border-base);
+  border-radius: 10px;
+  background: var(--brand-bg-surface-raised);
+  box-shadow: var(--brand-shadow-floating);
+
+  &__input {
+    width: 100%;
+
+    .el-input__inner,
+    .el-textarea__inner {
+      font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    }
   }
 
   &__actions {

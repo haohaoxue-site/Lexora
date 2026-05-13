@@ -3,6 +3,7 @@ import type { ShallowRef, TemplateRef } from 'vue'
 import type {
   TiptapEditorCommentRequest,
   TiptapEditorHandleKeyDown,
+  TiptapEditorHandleTextInput,
 } from '../../core/typing'
 import type { BlockTriggerMenuExposed } from '../../overlays/block-trigger/typing'
 import type { DocumentBodyEditorProps } from './typing'
@@ -93,14 +94,17 @@ export function useDocumentBodyEditor(options: {
       return false
     }
 
-    const opened = options.blockTriggerMenuRef.value?.openMenu() ?? false
+    return openBlockTriggerMenu(() => event.preventDefault())
+  }
 
-    if (!opened) {
+  const handleBodyEditorTextInput: TiptapEditorHandleTextInput = (_, __, ___, text) => {
+    const editor = bodyEditor.value
+
+    if (!options.props.editable || !editor || text !== '/' || !isTriggerMenuSelection(editor)) {
       return false
     }
 
-    event.preventDefault()
-    return true
+    return openBlockTriggerMenu()
   }
 
   function handleCommentRequest(request: TiptapEditorCommentRequest) {
@@ -117,9 +121,21 @@ export function useDocumentBodyEditor(options: {
     editorAiComposer,
     handleBodyEditorChange,
     handleBodyEditorKeyDown,
+    handleBodyEditorTextInput,
     handleCommentRequest,
     handleUploadFile,
     handleUploadImage,
+  }
+
+  function openBlockTriggerMenu(onOpened?: () => void) {
+    const opened = options.blockTriggerMenuRef.value?.openMenu() ?? false
+
+    if (!opened) {
+      return false
+    }
+
+    onOpened?.()
+    return true
   }
 
   async function handleUploadImage(file: File) {

@@ -12,6 +12,7 @@ import {
   getDocumentTitlePlainText,
   isDocumentLinkShareMode,
 } from '@haohaoxue/samepage-shared'
+import { useClipboard } from '@vueuse/core'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { computed, shallowRef, toValue, watch } from 'vue'
 import { useRoute } from 'vue-router'
@@ -65,6 +66,22 @@ export function useDocsPermissionsPage(options: UseDocsPermissionsPageOptions = 
   const isSubmitting = shallowRef(false)
   const isCreatingDirectShare = shallowRef(false)
   const directShareActionRecipientId = shallowRef('')
+  const copiedDirectShareRecipientId = shallowRef('')
+  const {
+    copy: copyPublicShareText,
+    copied: copiedPublicShareLink,
+    isSupported: isClipboardSupported,
+  } = useClipboard({
+    copiedDuring: 1400,
+    legacy: true,
+  })
+  const {
+    copy: copyDirectShareText,
+    copied: copiedDirectShareLink,
+  } = useClipboard({
+    copiedDuring: 1400,
+    legacy: true,
+  })
   const documentShareProjection = computed(() => currentDocumentCurrent.value?.document.share ?? null)
   const isRootDocument = computed(() => currentDocumentCurrent.value?.document.parentId === null)
   const localPolicy = computed(() => documentShareProjection.value?.localPolicy ?? null)
@@ -104,6 +121,7 @@ export function useDocsPermissionsPage(options: UseDocsPermissionsPageOptions = 
       selectedDirectShareUser.value = null
       selectedShareMode.value = DOCUMENT_SHARE_MODE.DIRECT_USER
       directShareActionRecipientId.value = ''
+      copiedDirectShareRecipientId.value = ''
       isLoading.value = false
       isLoadingDirectShares.value = false
 
@@ -129,6 +147,12 @@ export function useDocsPermissionsPage(options: UseDocsPermissionsPageOptions = 
       immediate: true,
     },
   )
+
+  watch(copiedDirectShareLink, (copied) => {
+    if (!copied) {
+      copiedDirectShareRecipientId.value = ''
+    }
+  })
 
   return {
     currentDocumentId,
@@ -158,10 +182,12 @@ export function useDocsPermissionsPage(options: UseDocsPermissionsPageOptions = 
     setNoShare,
     restoreInheritance,
     copyPublicShareLink,
+    copiedPublicShareLink,
     handleDirectShareResolved,
     handleDirectShareCleared,
     createDirectShare,
     copyDirectShareLink,
+    isDirectShareLinkCopied,
     revokeDirectShare,
   }
 
@@ -299,8 +325,13 @@ export function useDocsPermissionsPage(options: UseDocsPermissionsPageOptions = 
       return
     }
 
+    if (!isClipboardSupported.value) {
+      ElMessage.error('当前环境不支持复制')
+      return
+    }
+
     try {
-      await navigator.clipboard.writeText(fullShareLink.value)
+      await copyPublicShareText(fullShareLink.value)
       ElMessage.success('分享链接已复制')
     }
     catch {
@@ -365,13 +396,23 @@ export function useDocsPermissionsPage(options: UseDocsPermissionsPageOptions = 
       return
     }
 
+    if (!isClipboardSupported.value) {
+      ElMessage.error('当前环境不支持复制')
+      return
+    }
+
     try {
-      await navigator.clipboard.writeText(fullLink)
+      await copyDirectShareText(fullLink)
+      copiedDirectShareRecipientId.value = item.recipient.id
       ElMessage.success('分享链接已复制')
     }
     catch {
       ElMessage.error('复制链接失败，请手动复制')
     }
+  }
+
+  function isDirectShareLinkCopied(item: DocumentShareRecipientSummary) {
+    return copiedDirectShareLink.value && copiedDirectShareRecipientId.value === item.recipient.id
   }
 
   async function revokeDirectShare(item: DocumentShareRecipientSummary) {

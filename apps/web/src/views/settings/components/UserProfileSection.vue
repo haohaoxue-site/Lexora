@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import type { FormInstance } from 'element-plus'
 import type { UserProfileSectionEmits, UserProfileSectionProps } from '../typing'
-import { CopyDocument } from '@element-plus/icons-vue'
 import { useTemplateRef } from 'vue'
+import CopyStateIcon from '@/components/copy-state-icon/CopyStateIcon.vue'
 import EntityAvatar from '@/components/entity-avatar/EntityAvatar.vue'
 import { useUserProfileSection } from '../composables/useUserProfileSection'
 import UserSettingsSectionHeader from './UserSettingsSectionHeader.vue'
@@ -13,6 +13,7 @@ const displayNameModel = defineModel<string>('displayName', { required: true })
 const profileFormRef = useTemplateRef<FormInstance>('profileFormRef')
 const fileInputRef = useTemplateRef<HTMLInputElement>('fileInputRef')
 const {
+  copiedUserCode,
   displayNameRules,
   form,
   handleCopyUserCode,
@@ -46,11 +47,13 @@ const {
             <ElButton
               text
               circle
-              type="primary"
-              :icon="CopyDocument"
-              aria-label="复制协作码"
+              :type="copiedUserCode ? 'success' : 'primary'"
+              class="user-profile-section__copy-button"
+              :aria-label="copiedUserCode ? '协作码已复制' : '复制协作码'"
               @click="handleCopyUserCode"
-            />
+            >
+              <CopyStateIcon :copied="copiedUserCode" />
+            </ElButton>
           </ElTooltip>
         </div>
       </template>
@@ -152,6 +155,17 @@ const {
     line-height: 1.1;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  &__copy-button {
+    transition:
+      color 0.16s ease,
+      background-color 0.16s ease,
+      transform 0.16s ease;
+
+    &.el-button--success {
+      transform: translateY(-0.0625rem);
+    }
   }
 
   &__hero {

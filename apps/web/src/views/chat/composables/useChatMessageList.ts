@@ -1,7 +1,8 @@
 import type { Ref } from 'vue'
 import type { ChatMessage } from '@/apis/chat'
+import { useClipboard } from '@vueuse/core'
 import { ElMessage } from 'element-plus'
-import { computed, nextTick, onUpdated, shallowRef } from 'vue'
+import { computed, nextTick, onUpdated, shallowRef, watch } from 'vue'
 import { SvgIconCategory } from '@/components/svg-icon/typing'
 import {
   getAssistantFailureMessage,
@@ -29,6 +30,15 @@ export function useChatMessageList(options: {
   } = useChatStream()
   const editingMessageId = shallowRef<string | null>(null)
   const editingContent = shallowRef('')
+  const copiedMessageId = shallowRef<string | null>(null)
+  const {
+    copy: copyText,
+    copied: copiedMessage,
+    isSupported: isClipboardSupported,
+  } = useClipboard({
+    copiedDuring: 1400,
+    legacy: true,
+  })
 
   const messages = computed<ChatMessage[]>(() => renderSession.value?.messages ?? [])
   const emptyIconStateClass = computed(() => isConfigured.value ? 'configured' : 'idle')
@@ -44,6 +54,12 @@ export function useChatMessageList(options: {
 
   onUpdated(() => {
     void nextTick(scrollToBottom)
+  })
+
+  watch(copiedMessage, (copied) => {
+    if (!copied) {
+      copiedMessageId.value = null
+    }
   })
 
   function scrollToBottom() {
@@ -63,13 +79,22 @@ export function useChatMessageList(options: {
       return
     }
 
+    if (!isClipboardSupported.value) {
+      ElMessage.error('当前环境不支持复制')
+      return
+    }
+
     try {
-      await navigator.clipboard.writeText(text)
-      ElMessage.success('已复制')
+      await copyText(text)
+      copiedMessageId.value = message.id
     }
     catch {
       ElMessage.error('复制失败')
     }
+  }
+
+  function isMessageCopied(message: ChatMessage) {
+    return copiedMessage.value && copiedMessageId.value === message.id
   }
 
   function startEditMessage(message: ChatMessage) {
@@ -128,6 +153,7 @@ export function useChatMessageList(options: {
     getReasoningElapsedMs,
     getReasoningText,
     isEditingMessage,
+    isMessageCopied,
     isAssistantStreamingMessage,
     isConfigured,
     isStreaming,

@@ -83,6 +83,7 @@ export function createMenuActionExecutors(
 
   const quickInsertExecutors: Record<InsertQuickAction, () => Promise<void> | void> = {
     'insert-link': effects.openEmptyBlockLinkPanel,
+    'insert-inline-math': () => effects.runAndCloseMenu(() => insertInlineMath(editor)),
     'insert-image': effects.pickImage,
     'insert-file': effects.pickFile,
   }
@@ -154,4 +155,20 @@ export function createMenuActionExecutors(
   function applyBackgroundColor(color: string, range?: EditorSelectionRange) {
     effects.runAndCloseMenu(() => applyEditorHighlightColor(editor, color, range))
   }
+}
+
+function insertInlineMath(editor: Editor) {
+  const position = editor.state.selection.from
+
+  editor
+    .chain()
+    .focus()
+    .insertContent({
+      type: 'inlineMath',
+      attrs: {
+        latex: '',
+      },
+    })
+    .setNodeSelection(position)
+    .run()
 }

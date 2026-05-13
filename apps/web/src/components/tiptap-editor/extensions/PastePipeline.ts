@@ -50,6 +50,18 @@ function handleEditorPaste(editor: Editor, event: ClipboardEvent, options: Paste
     return true
   }
 
+  if (isSelectionInsideCodeBlock(editor)) {
+    const text = event.clipboardData.getData('text/plain')
+
+    if (!text.length) {
+      return false
+    }
+
+    event.preventDefault()
+    editor.view.dispatch(editor.state.tr.insertText(text).scrollIntoView())
+    return true
+  }
+
   const structuredContent = parseStructuredClipboardContent(
     event.clipboardData.getData(SAMEPAGE_BLOCK_CLIPBOARD_TYPE),
   )
@@ -71,6 +83,12 @@ function handleEditorPaste(editor: Editor, event: ClipboardEvent, options: Paste
   }
 
   return editor.chain().focus().insertContent(createPlainTextPasteContent(text)).run()
+}
+
+function isSelectionInsideCodeBlock(editor: Editor) {
+  const { $from, $to } = editor.state.selection
+
+  return $from.parent.type.name === 'codeBlock' && $to.parent.type.name === 'codeBlock'
 }
 
 async function handleFilePaste(editor: Editor, files: readonly File[], options: PastePipelineOptions) {

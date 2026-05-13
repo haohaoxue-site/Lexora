@@ -54,6 +54,7 @@ export function useBlockTriggerActions(options: {
       'insert-link': () => {
         options.openLinkPanel()
       },
+      'insert-inline-math': () => actionRegistry.quickInsert.execute('insert-inline-math'),
       'insert-image': () => actionRegistry.quickInsert.execute('insert-image'),
       'insert-file': () => actionRegistry.quickInsert.execute('insert-file'),
     } as const satisfies Record<Exclude<BlockMenuQuickItem['kind'], 'turn-into'>, () => void | Promise<void>>

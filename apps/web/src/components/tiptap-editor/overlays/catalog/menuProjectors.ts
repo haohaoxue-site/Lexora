@@ -138,6 +138,8 @@ function resolveCurrentBlockTarget(currentBlock: ReturnType<typeof getCurrentBlo
       return 'blockquote'
     case 'codeBlock':
       return 'codeBlock'
+    case 'blockMath':
+      return 'blockMath'
     case 'horizontalRule':
       return 'divider'
     default:

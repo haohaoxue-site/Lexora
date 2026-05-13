@@ -68,6 +68,17 @@
     <path d="M19 14L11 24L19 34" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" />
       <path d="M29 14L37 24L29 34" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" />
   </symbol>
+  <symbol id="math-block" viewBox="0 0 48 48">
+    <rect x="10" y="9" width="28" height="30" rx="4" fill="none" stroke="currentColor" stroke-width="3.6" stroke-linejoin="round" />
+    <path d="M18 15H31" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" />
+    <path d="M30 33H17.5L25 24L17.5 15H30" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round" />
+  </symbol>
+  <symbol id="inline-math" viewBox="0 0 48 48">
+    <path d="M5 26L13 26L17.5 38L27 10" fill="none" stroke="currentColor" stroke-width="3.8" stroke-linecap="round" stroke-linejoin="round" />
+    <path d="M24 10H43" fill="none" stroke="currentColor" stroke-width="3.8" stroke-linecap="round" />
+    <path d="M31 23L40 34" fill="none" stroke="currentColor" stroke-width="3.8" stroke-linecap="round" />
+    <path d="M40 23L31 34" fill="none" stroke="currentColor" stroke-width="3.8" stroke-linecap="round" />
+  </symbol>
   <symbol id="image" viewBox="0 0 48 48">
     <rect x="9" y="11" width="30" height="26" rx="5" fill="none" stroke="currentColor" stroke-width="4" />
       <circle cx="18" cy="20" r="2.8" fill="currentColor" />

@@ -2,7 +2,7 @@ import type { CommandProps, Editor } from '@tiptap/core'
 import type { CurrentBlockSelection } from '../commands/currentBlock'
 import type { TurnIntoBlockType } from '../commands/turnInto'
 import { Extension } from '@tiptap/core'
-import { Selection } from '@tiptap/pm/state'
+import { NodeSelection, Selection } from '@tiptap/pm/state'
 import { findBlockById, getCurrentBlock } from '../commands/currentBlock'
 
 type HeadingTurnIntoBlockType = Extract<TurnIntoBlockType, 'heading-1' | 'heading-2' | 'heading-3' | 'heading-4' | 'heading-5'>
@@ -16,6 +16,7 @@ const SPLIT_MERGE_EXCLUDED_NODE_NAMES = new Set([
   'listItem',
   'taskItem',
   'codeBlock',
+  'blockMath',
 ])
 
 const HEADING_LEVEL_BY_TARGET: Record<HeadingTurnIntoBlockType, 1 | 2 | 3 | 4 | 5> = {
@@ -48,6 +49,8 @@ export const BlockCommands = Extension.create({
             return turnIntoOrderedList(props)
           case 'codeBlock':
             return turnIntoCodeBlock(props)
+          case 'blockMath':
+            return turnIntoBlockMath(props)
           case 'blockquote':
             return turnIntoBlockquote(props)
           case 'divider':
@@ -114,6 +117,8 @@ export function isTurnIntoBlockActive(editor: Editor, target: TurnIntoBlockType)
       return editor.isActive('orderedList')
     case 'codeBlock':
       return editor.isActive('codeBlock')
+    case 'blockMath':
+      return editor.isActive('blockMath')
     case 'blockquote':
       return editor.isActive('blockquote')
     case 'divider':
@@ -167,6 +172,31 @@ function turnIntoCodeBlock(props: BlockCommandContext) {
   return props.commands.toggleCodeBlock()
 }
 
+function turnIntoBlockMath(props: BlockCommandContext) {
+  if (props.editor.isActive('blockMath')) {
+    return true
+  }
+
+  const currentBlock = getCurrentBlock(props.editor.state.selection)
+
+  if (!currentBlock) {
+    return props.commands.insertBlockMath({ latex: '' })
+  }
+
+  return props.editor.commands.command(({ state, tr }) => {
+    const blockMathType = state.schema.nodes.blockMath
+
+    if (!blockMathType) {
+      return false
+    }
+
+    tr.replaceWith(currentBlock.from, currentBlock.to, blockMathType.create({ latex: '' }))
+    tr.setSelection(NodeSelection.create(tr.doc, currentBlock.from))
+
+    return true
+  })
+}
+
 function turnIntoBlockquote(props: BlockCommandContext) {
   if (props.editor.isActive('blockquote')) {
     return true
@@ -209,6 +239,7 @@ function isPlainParagraphActive(editor: Editor) {
     && !editor.isActive('orderedList')
     && !editor.isActive('taskList')
     && !editor.isActive('codeBlock')
+    && !editor.isActive('blockMath')
     && !editor.isActive('blockquote')
 }
 

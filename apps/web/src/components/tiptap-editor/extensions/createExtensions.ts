@@ -27,13 +27,15 @@ import {
 } from '../collaboration/cursor'
 import { BlockCommands } from '../extensions/BlockCommands'
 import { BlockId } from '../extensions/BlockId'
+import { CodeBlock } from '../extensions/CodeBlock'
 import { DocumentFile } from '../extensions/DocumentFile'
 import { DocumentImage } from '../extensions/DocumentImage'
+import { BlockMathematics, InlineMathematics } from '../extensions/Mathematics'
 import { PastePipeline } from '../extensions/PastePipeline'
 import { TextAlign } from '../extensions/TextAlign'
 import { TextColorClass } from '../extensions/TextColorClass'
 
-const BODY_PLACEHOLDER = '输入 / 唤起命令，或者直接开始写作。'
+const BODY_PLACEHOLDER = '输入 / 唤起命令，按 space（空格）启用 AI，或者直接开始写作。'
 const BODY_EMPTY_LINE_PLACEHOLDER = '按 space（空格）以启用 AI，或按“/”启用命令'
 const TITLE_PLACEHOLDER = '输入文档标题'
 const COLLABORATION_Y_UNDO_OPTIONS: CollaborationOptions['yUndoOptions'] = {
@@ -54,6 +56,7 @@ export function createBodyExtensions(options: {
       link: {
         openOnClick: false,
       },
+      codeBlock: false,
       undoRedo: options.collaboration ? false : undefined,
     }),
     ...createCollaborationExtensions(options.collaboration),
@@ -63,6 +66,9 @@ export function createBodyExtensions(options: {
     TextStyle,
     TextColorClass,
     TextAlign,
+    CodeBlock,
+    InlineMathematics,
+    BlockMathematics,
     EditorAiPreview,
     TaskList,
     TaskItem.configure({

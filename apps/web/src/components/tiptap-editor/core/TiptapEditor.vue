@@ -24,6 +24,7 @@ const editor = useEditor({
       class: 'tiptap-editor__prosemirror',
     },
     handleKeyDown: props.handleKeyDown,
+    handleTextInput: props.handleTextInput,
   },
   onContentError: handleContentError,
   onUpdate: handleEditorUpdate,

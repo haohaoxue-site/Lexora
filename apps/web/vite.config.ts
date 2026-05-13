@@ -75,6 +75,14 @@ function createManualChunk(id: string) {
   if (id.includes('/@vueuse/')) {
     return 'vueuse'
   }
+
+  if (id.includes('/katex/')) {
+    return 'tiptap-katex'
+  }
+
+  if (id.includes('/highlight.js/') || id.includes('/lowlight/')) {
+    return 'tiptap-highlight'
+  }
 }
 
 export default defineConfig(({ mode }) => {

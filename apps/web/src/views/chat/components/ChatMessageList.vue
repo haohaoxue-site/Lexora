@@ -2,11 +2,11 @@
 import {
   ArrowLeft,
   ArrowRight,
-  CopyDocument,
   EditPen,
   RefreshRight,
 } from '@element-plus/icons-vue'
 import { useTemplateRef } from 'vue'
+import CopyStateIcon from '@/components/copy-state-icon/CopyStateIcon.vue'
 import { useChatMessageList } from '../composables/useChatMessageList'
 import ChatReasoningBlock from './ChatReasoningBlock.vue'
 
@@ -23,6 +23,7 @@ const {
   getReasoningElapsedMs,
   getReasoningText,
   isEditingMessage,
+  isMessageCopied,
   isAssistantStreamingMessage,
   isConfigured,
   isStreaming,
@@ -111,10 +112,14 @@ const {
             <ElTooltip content="复制回复" placement="bottom">
               <ElButton
                 text
-                :icon="CopyDocument"
+                class="chat-message-list__copy-action"
+                :class="{ 'is-copied': isMessageCopied(msg) }"
                 :disabled="!getMessageText(msg)"
+                :aria-label="isMessageCopied(msg) ? '回复已复制' : '复制回复'"
                 @click="copyMessage(msg)"
-              />
+              >
+                <CopyStateIcon :copied="isMessageCopied(msg)" />
+              </ElButton>
             </ElTooltip>
             <ElTooltip content="重试" placement="bottom">
               <ElButton
@@ -178,9 +183,13 @@ const {
               <ElTooltip content="复制消息" placement="bottom">
                 <ElButton
                   text
-                  :icon="CopyDocument"
+                  class="chat-message-list__copy-action"
+                  :class="{ 'is-copied': isMessageCopied(msg) }"
+                  :aria-label="isMessageCopied(msg) ? '消息已复制' : '复制消息'"
                   @click="copyMessage(msg)"
-                />
+                >
+                  <CopyStateIcon :copied="isMessageCopied(msg)" />
+                </ElButton>
               </ElTooltip>
               <ElTooltip content="编辑" placement="bottom">
                 <ElButton
@@ -381,6 +390,17 @@ const {
 
     :deep(.el-button.is-text:not(.is-disabled):active) {
       background-color: color-mix(in srgb, var(--brand-fill-light) 92%, transparent);
+    }
+  }
+
+  .chat-message-list__copy-action {
+    transition:
+      color 0.16s ease,
+      transform 0.16s ease;
+
+    &.is-copied {
+      color: var(--brand-success);
+      transform: translateY(-0.0625rem);
     }
   }
 

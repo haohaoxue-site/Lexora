@@ -208,6 +208,7 @@ export const TURN_INTO_ITEM_CATALOG = {
   'bulletList': { label: '无序列表', icon: 'list-ul' },
   'orderedList': { label: '有序列表', icon: 'list-ol' },
   'codeBlock': { label: '代码块', icon: 'code' },
+  'blockMath': { label: '公式块', icon: 'math-block' },
   'blockquote': { label: '引用', icon: 'quote' },
   'divider': { label: '分割线', icon: 'divider' },
   'taskList': { label: '任务列表', icon: 'task' },
@@ -246,6 +247,7 @@ export const BLOCK_TRIGGER_TURN_INTO_ROW_REGISTRY = [
   ],
   [
     'codeBlock',
+    'blockMath',
     'blockquote',
   ],
 ] as const satisfies readonly (readonly TurnIntoBlockType[])[]
@@ -272,6 +274,7 @@ export const TURN_INTO_SCOPE_REGISTRY = {
     'orderedList',
     'taskList',
     'codeBlock',
+    'blockMath',
     'blockquote',
     'divider',
   ],
@@ -282,6 +285,7 @@ export const BLOCK_MENU_VARIANT_REGISTRY = {
     quickItems: [
       { kind: 'turn-into-scope', scope: 'block-empty' },
       { kind: 'insert', label: '链接', icon: 'link', action: 'insert-link' },
+      { kind: 'insert', label: '行内公式', icon: 'inline-math', action: 'insert-inline-math' },
       { kind: 'insert', label: '图片', icon: 'image', action: 'insert-image' },
       { kind: 'insert', label: '视频或文件', icon: 'file', action: 'insert-file' },
     ],

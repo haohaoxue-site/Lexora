@@ -6,6 +6,7 @@ const CURRENT_BLOCK_NODE_TYPES = new Set([
   'heading',
   'blockquote',
   'codeBlock',
+  'blockMath',
   'horizontalRule',
   'listItem',
   'taskItem',

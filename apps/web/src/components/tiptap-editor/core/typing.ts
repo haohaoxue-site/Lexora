@@ -8,6 +8,7 @@ import type { EditorProps } from '@tiptap/pm/view'
 import type { Doc } from 'yjs'
 
 export type TiptapEditorHandleKeyDown = NonNullable<EditorProps['handleKeyDown']>
+export type TiptapEditorHandleTextInput = NonNullable<EditorProps['handleTextInput']>
 export type TiptapEditorContent = TiptapJsonContent
 export type TiptapEditorContentSource = 'props' | 'collaboration'
 
@@ -48,6 +49,11 @@ export interface TiptapEditorProps {
    * @description 自定义键盘事件处理器
    */
   handleKeyDown?: TiptapEditorHandleKeyDown
+  /**
+   * 文本输入处理
+   * @description 处理 IME 或特殊键盘布局绕过 keydown 的文本输入
+   */
+  handleTextInput?: TiptapEditorHandleTextInput
 }
 
 export interface TiptapEditorEmits {

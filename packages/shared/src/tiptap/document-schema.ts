@@ -2,6 +2,8 @@ import type { Extensions } from '@tiptap/core'
 import {
   TIPTAP_BODY_BLOCK_ID_ATTRIBUTE,
   TIPTAP_BODY_BLOCK_ID_NODE_TYPES,
+  TIPTAP_CODE_BLOCK_DEFAULT_TAB_SIZE,
+  TIPTAP_CODE_BLOCK_TAB_SIZES,
   TIPTAP_DOCUMENT_FILE_NODE_PART,
   TIPTAP_DOCUMENT_FILE_NODE_TYPE,
 } from '@haohaoxue/samepage-contracts'
@@ -53,6 +55,7 @@ export function createTiptapDocumentTitleSchemaExtensions(): Extensions {
 export function createTiptapDocumentBodySchemaExtensions(): Extensions {
   return [
     createBlockIdSchemaExtension(),
+    createCodeBlockSchemaExtension(),
     StarterKit.configure({
       heading: {
         levels: [1, 2, 3, 4, 5],
@@ -74,10 +77,116 @@ export function createTiptapDocumentBodySchemaExtensions(): Extensions {
     TableRow,
     TableHeader,
     TableCell,
+    ...createMathSchemaExtensions(),
     createDocumentImageSchemaExtension().configure({
       inline: false,
     }),
     createDocumentFileSchemaExtension(),
+  ]
+}
+
+function createCodeBlockSchemaExtension() {
+  return Extension.create({
+    name: 'codeBlockMetadata',
+
+    addGlobalAttributes() {
+      return [
+        {
+          types: ['codeBlock'],
+          attributes: {
+            name: {
+              default: undefined,
+              parseHTML: element => normalizeCodeBlockName(element.getAttribute('data-name')),
+              renderHTML: (attributes) => {
+                const name = normalizeCodeBlockName(attributes.name)
+
+                return name ? { 'data-name': name } : {}
+              },
+            },
+            collapsed: {
+              default: undefined,
+              parseHTML: element => element.getAttribute('data-collapsed') === 'true' ? true : undefined,
+              renderHTML: attributes => attributes.collapsed === true
+                ? { 'data-collapsed': 'true' }
+                : {},
+            },
+            tabSize: {
+              default: undefined,
+              parseHTML: element => normalizeCodeBlockTabSizeAttribute(element.getAttribute('data-tab-size')),
+              renderHTML: (attributes) => {
+                const tabSize = normalizeCodeBlockTabSizeAttribute(attributes.tabSize)
+
+                return tabSize === undefined ? {} : { 'data-tab-size': String(tabSize) }
+              },
+            },
+          },
+        },
+      ]
+    },
+  })
+}
+
+function createMathSchemaExtensions() {
+  return [
+    Node.create({
+      name: 'inlineMath',
+      group: 'inline',
+      inline: true,
+      atom: true,
+
+      addAttributes() {
+        return {
+          latex: {
+            default: '',
+            parseHTML: element => element.getAttribute('data-latex') ?? '',
+            renderHTML: attributes => ({
+              'data-latex': attributes.latex,
+            }),
+          },
+        }
+      },
+
+      parseHTML() {
+        return [
+          {
+            tag: 'span[data-type="inline-math"]',
+          },
+        ]
+      },
+
+      renderHTML({ HTMLAttributes }) {
+        return ['span', mergeAttributes(HTMLAttributes, { 'data-type': 'inline-math' })]
+      },
+    }),
+    Node.create({
+      name: 'blockMath',
+      group: 'block',
+      atom: true,
+
+      addAttributes() {
+        return {
+          latex: {
+            default: '',
+            parseHTML: element => element.getAttribute('data-latex') ?? '',
+            renderHTML: attributes => ({
+              'data-latex': attributes.latex,
+            }),
+          },
+        }
+      },
+
+      parseHTML() {
+        return [
+          {
+            tag: 'div[data-type="block-math"]',
+          },
+        ]
+      },
+
+      renderHTML({ HTMLAttributes }) {
+        return ['div', mergeAttributes(HTMLAttributes, { 'data-type': 'block-math' })]
+      },
+    }),
   ]
 }
 
@@ -406,6 +515,34 @@ function formatFileSize(size: number): string {
 
 function isTextAlignValue(value: unknown): value is 'left' | 'center' | 'right' {
   return value === 'left' || value === 'center' || value === 'right'
+}
+
+function normalizeCodeBlockName(value: unknown) {
+  if (typeof value !== 'string') {
+    return undefined
+  }
+
+  const normalized = value.replace(/\s+/g, ' ').trim()
+
+  return normalized || undefined
+}
+
+function normalizeCodeBlockTabSizeAttribute(value: unknown) {
+  const tabSize = normalizeCodeBlockTabSize(value)
+
+  return tabSize === TIPTAP_CODE_BLOCK_DEFAULT_TAB_SIZE ? undefined : tabSize
+}
+
+function normalizeCodeBlockTabSize(value: unknown) {
+  const numberValue = typeof value === 'number'
+    ? value
+    : typeof value === 'string'
+      ? Number.parseInt(value, 10)
+      : TIPTAP_CODE_BLOCK_DEFAULT_TAB_SIZE
+
+  return TIPTAP_CODE_BLOCK_TAB_SIZES.includes(numberValue as typeof TIPTAP_CODE_BLOCK_TAB_SIZES[number])
+    ? numberValue
+    : TIPTAP_CODE_BLOCK_DEFAULT_TAB_SIZE
 }
 
 function findMatchingClassName(element: HtmlElementLike, pattern: RegExp) {

@@ -191,6 +191,8 @@ function getBlockPreviewFallback(currentBlock: NonNullable<ReturnType<typeof get
       return '引用'
     case 'codeBlock':
       return '代码块'
+    case 'blockMath':
+      return '公式块'
     case 'horizontalRule':
       return '分割线'
     case 'taskItem':

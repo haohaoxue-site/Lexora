@@ -7,6 +7,7 @@ import EditorAiComposer from '../../ai/EditorAiComposer.vue'
 import TiptapEditor from '../../core/TiptapEditor.vue'
 import BlockTriggerMenu from '../../overlays/block-trigger/BlockTriggerMenu.vue'
 import BubbleToolbar from '../../overlays/bubble-toolbar/BubbleToolbar.vue'
+import MathPanelBubble from '../../overlays/math-panel/MathPanelBubble.vue'
 import EditorOutline from '../../overlays/outline/EditorOutline.vue'
 import { useDocumentBodyEditor } from './useDocumentBodyEditor'
 
@@ -24,6 +25,7 @@ const {
   bodyEditorExtensions,
   handleBodyEditorChange,
   handleBodyEditorKeyDown,
+  handleBodyEditorTextInput,
   handleCommentRequest,
   handleUploadFile,
   handleUploadImage,
@@ -44,6 +46,11 @@ const {
       @request-ai-rewrite="editorAiComposer.openRewrite"
     />
 
+    <MathPanelBubble
+      v-if="bodyEditor && props.editable"
+      :editor="bodyEditor"
+    />
+
     <TiptapEditor
       class="document-body-editor__surface"
       :content="props.content"
@@ -51,6 +58,7 @@ const {
       :initial-extensions="bodyEditorExtensions"
       :editable="props.editable"
       :handle-key-down="handleBodyEditorKeyDown"
+      :handle-text-input="handleBodyEditorTextInput"
       @update:content="emits('update:content', $event)"
       @content-error="emits('contentError', $event)"
       @editor-change="handleBodyEditorChange"

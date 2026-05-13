@@ -20,6 +20,7 @@ import { canManageDocumentShare, getDocumentShareModeLabel } from '@haohaoxue/sa
 import { computed, shallowRef, watch } from 'vue'
 import CollabIdentityItem from '@/components/collab-identity/CollabIdentityItem.vue'
 import CollabUserLookupField from '@/components/collab-identity/CollabUserLookupField.vue'
+import CopyStateIcon from '@/components/copy-state-icon/CopyStateIcon.vue'
 import { SvgIcon } from '@/components/svg-icon'
 import { useWorkspaceStore } from '@/stores/workspace'
 import { useDocsPermissionsPage } from '../composables/useDocsPermissionsPage'
@@ -92,10 +93,12 @@ const {
   setNoShare,
   restoreInheritance,
   copyPublicShareLink,
+  copiedPublicShareLink,
   handleDirectShareResolved,
   handleDirectShareCleared,
   createDirectShare,
   copyDirectShareLink,
+  isDirectShareLinkCopied,
   revokeDirectShare,
 } = useDocsPermissionsPage({
   documentId: normalizedDocumentId,
@@ -478,10 +481,16 @@ function isShareModeCommand(command: string | number | boolean): command is Docu
               <ElTableColumn width="220" align="right">
                 <template #default="{ row }">
                   <ElButton
+                    class="document-share-panel__row-copy-button"
+                    :type="isDirectShareLinkCopied(row) ? 'success' : undefined"
                     :disabled="directShareActionRecipientId === row.recipient.id"
                     @click="copyDirectShareLink(row)"
                   >
-                    复制链接
+                    <CopyStateIcon
+                      class="document-share-panel__copy-icon"
+                      :copied="isDirectShareLinkCopied(row)"
+                    />
+                    {{ isDirectShareLinkCopied(row) ? '已复制' : '复制链接' }}
                   </ElButton>
 
                   <ElButton
@@ -501,15 +510,15 @@ function isShareModeCommand(command: string | number | boolean): command is Docu
         <section v-if="canManagePublicSharePolicy" class="document-share-panel__copy-strip">
           <ElButton
             class="document-share-panel__copy-button"
+            :class="{ 'is-copied': copiedPublicShareLink }"
             :disabled="!hasUsablePublicShareLink"
             @click="copyPublicShareLink"
           >
-            <SvgIcon
-              category="ui"
-              icon="global-link-outlined"
+            <CopyStateIcon
               class="document-share-panel__copy-icon"
+              :copied="copiedPublicShareLink"
             />
-            复制链接
+            {{ copiedPublicShareLink ? '已复制' : '复制链接' }}
           </ElButton>
         </section>
       </div>
@@ -703,16 +712,24 @@ function isShareModeCommand(command: string | number | boolean): command is Docu
   }
 
   .document-share-panel__copy-button {
+    gap: 0.35rem;
     border-radius: 999px;
     background: white;
+
+    &.is-copied {
+      color: var(--brand-success);
+      transform: translateY(-0.0625rem);
+    }
+  }
+
+  .document-share-panel__row-copy-button {
+    gap: 0.35rem;
   }
 
   .document-share-panel__copy-icon {
     display: inline-flex;
     flex: 0 0 auto;
-    width: 1rem;
-    height: 1rem;
-    margin-right: 0.35rem;
+    font-size: 1rem;
   }
 
   .document-share-panel__direct-form {

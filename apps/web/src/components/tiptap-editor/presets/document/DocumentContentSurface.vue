@@ -105,14 +105,9 @@ function resolveObjectKey(value: object | null) {
 
 <style scoped lang="scss">
 .document-content-surface {
-  --document-content-surface-max-width: 52rem;
-  --document-content-surface-trailing-reserved-width: 3.75rem;
   --document-content-surface-inline-start: 2.75rem;
   --document-content-surface-inline-end: 1.25rem;
-  --document-content-surface-inline-size: min(
-    var(--document-content-surface-max-width),
-    calc(100% - var(--document-content-surface-trailing-reserved-width))
-  );
+  --document-content-surface-inline-size: 100%;
   display: flex;
   flex: 1 1 0%;
   flex-direction: column;

@@ -8,6 +8,7 @@ export const TURN_INTO_BLOCK_TYPES = [
   'bulletList',
   'orderedList',
   'codeBlock',
+  'blockMath',
   'blockquote',
   'divider',
   'taskList',

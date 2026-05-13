@@ -1,6 +1,7 @@
 import type { FormInstance } from 'element-plus'
 import type { Ref } from 'vue'
 import type { UserProfileSectionProps } from '../typing'
+import { useClipboard } from '@vueuse/core'
 import { ElMessage } from 'element-plus'
 import { computed, reactive } from 'vue'
 import { createDisplayNameRules } from '@/views/auth/utils/rules'
@@ -24,6 +25,14 @@ export function useUserProfileSection(options: {
       ? '更换头像后会立即生效，显示名称保存后会同步更新。'
       : '更换头像后会立即生效，当前账号的显示名称不可修改。',
   )
+  const {
+    copy: copyUserCode,
+    copied: copiedUserCode,
+    isSupported: isClipboardSupported,
+  } = useClipboard({
+    copiedDuring: 1400,
+    legacy: true,
+  })
 
   function handlePickAvatar() {
     options.fileInputRef.value?.click()
@@ -55,16 +64,22 @@ export function useUserProfileSection(options: {
   }
 
   async function handleCopyUserCode() {
-    if (typeof navigator === 'undefined' || typeof navigator.clipboard?.writeText !== 'function') {
+    if (!isClipboardSupported.value) {
       ElMessage.error('当前环境不支持复制')
       return
     }
 
-    await navigator.clipboard.writeText(options.props.userCode)
-    ElMessage.success('协作码已复制')
+    try {
+      await copyUserCode(options.props.userCode)
+      ElMessage.success('协作码已复制')
+    }
+    catch {
+      ElMessage.error('复制失败')
+    }
   }
 
   return {
+    copiedUserCode,
     displayNameRules,
     form,
     handleCopyUserCode,

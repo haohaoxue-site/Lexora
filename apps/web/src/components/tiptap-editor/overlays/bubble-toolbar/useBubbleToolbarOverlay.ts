@@ -3,6 +3,7 @@ import type { ComputedRef } from 'vue'
 import type { LinkPanelController } from '../shared/useLinkPanel'
 import { computed } from 'vue'
 import { isImageSelection } from '../../commands/editorActions'
+import { isMathNodeSelection } from '../../extensions/mathematics/mathNodeSelection'
 import { useEditorSnapshot } from '../shared/useEditorSnapshot'
 import { useLinkPanel } from '../shared/useLinkPanel'
 import { useLinkPanelMountGuard } from '../shared/useLinkPanelMountGuard'
@@ -51,6 +52,10 @@ export function useBubbleToolbarOverlay(editor: Editor): BubbleToolbarOverlayCon
   }
 
   function shouldShowToolbar({ from, to }: BubbleToolbarShouldShowContext): boolean {
+    if (isMathNodeSelection(editor.state)) {
+      return false
+    }
+
     return isImageSelection(editor) || editor.isActive('link') || from !== to
   }
 

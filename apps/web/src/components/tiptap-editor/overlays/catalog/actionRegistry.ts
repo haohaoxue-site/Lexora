@@ -21,7 +21,7 @@ export type TextAlignAction = 'align-left' | 'align-center' | 'align-right'
 export type IndentAction = 'indent' | 'outdent'
 export type BlockMenuAlignAction = TextAlignAction | IndentAction
 export type BubbleToolbarAction = BlockMenuAlignAction | InlineMarkAction | 'link' | 'comment' | 'ai-rewrite' | 'edit-image-alt'
-export type BlockMenuQuickAction = 'turn-into' | 'insert-link' | 'insert-image' | 'insert-file'
+export type BlockMenuQuickAction = 'turn-into' | 'insert-link' | 'insert-inline-math' | 'insert-image' | 'insert-file'
 export type BlockMenuLeafAction = 'comment' | 'cut' | 'copy' | 'delete'
 export type InsertQuickAction = Exclude<BlockMenuQuickAction, 'turn-into'>
 
