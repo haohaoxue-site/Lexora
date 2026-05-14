@@ -262,6 +262,10 @@ export function createPrismaDocumentYdocRuntimeStore(
             })
           }
 
+          if (input.checkpointUpdateSeq <= ydoc.checkpointUpdateSeq) {
+            return toDocumentYdocCheckpointMetadata(ydoc)
+          }
+
           const nextYdoc = await tx.documentYdoc.update({
             where: {
               documentId: input.documentId,

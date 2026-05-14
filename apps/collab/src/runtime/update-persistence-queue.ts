@@ -19,6 +19,7 @@ export interface CollabHocuspocusDocumentState {
   persistenceFailed: boolean
   persistenceFailureCode: CollabErrorCode | null
   persistenceQueue: Promise<void>
+  projectionQueue: Promise<void>
 }
 
 export function createDocumentState(input: {
@@ -34,6 +35,7 @@ export function createDocumentState(input: {
     persistenceFailed: false,
     persistenceFailureCode: null,
     persistenceQueue: Promise.resolve(),
+    projectionQueue: Promise.resolve(),
   }
 }
 

@@ -204,6 +204,10 @@ export class DocumentYdocsService {
         throw new ConflictException('checkpoint 水位不能超过已持久化 update 水位')
       }
 
+      if (input.checkpointUpdateSeq <= ydoc.checkpointUpdateSeq) {
+        return toDocumentYdocCheckpointMetadata(ydoc)
+      }
+
       const nextYdoc = await tx.documentYdoc.update({
         where: {
           documentId: input.documentId,

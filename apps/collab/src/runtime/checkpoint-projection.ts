@@ -41,8 +41,6 @@ export async function storeDocumentCheckpoint(input: {
     return
   }
 
-  await documentState.persistenceQueue
-
   if (documentState.persistenceFailed) {
     return
   }
@@ -53,90 +51,156 @@ export async function storeDocumentCheckpoint(input: {
     return
   }
 
+  const checkpointState = new Uint8Array(Y.encodeStateAsUpdate(input.document))
+  const checkpointTask = documentState.persistenceQueue
+    .then(async (): Promise<DocumentYdocCheckpointMetadata | null> => {
+      if (documentState.persistenceFailed || checkpointUpdateSeq <= documentState.checkpointUpdateSeq) {
+        return null
+      }
+
+      return await persistDocumentCheckpoint({
+        ...input,
+        checkpointState,
+        checkpointUpdateSeq,
+        documentState,
+      })
+    })
+    .catch((error: unknown): null => {
+      const code = isDocumentYdocRuntimeStoreError(error)
+        ? error.code
+        : COLLAB_ERROR_CODE.PERSISTENCE_FAILED
+      documentState.persistenceFailed = true
+      documentState.persistenceFailureCode = code
+      input.logger?.error({
+        code,
+        documentId: input.documentName,
+        roomId: input.documentName,
+        runtimeEpoch: documentState.runtimeEpoch,
+        checkpointUpdateSeq,
+        err: error instanceof Error ? error : undefined,
+        errorName: error instanceof Error ? error.name : 'UnknownCheckpointError',
+        errorMessage: error instanceof Error ? error.message : COLLAB_ERROR_CODE.PERSISTENCE_FAILED,
+      }, 'Collab document checkpoint persistence failed')
+      input.metrics?.recordUpdatePersistenceFailure({
+        documentId: input.documentName,
+        roomId: input.documentName,
+        code,
+        runtimeEpoch: documentState.runtimeEpoch,
+        checkpointUpdateSeq,
+        retryable: isDocumentYdocRuntimeStoreError(error) ? error.retryable : undefined,
+        errorName: error instanceof Error ? error.name : 'UnknownCheckpointError',
+        errorMessage: error instanceof Error ? error.message : COLLAB_ERROR_CODE.PERSISTENCE_FAILED,
+      })
+      input.onFatalPersistenceFailure?.({
+        documentId: input.documentName,
+        code,
+      })
+
+      return null
+    })
+  documentState.persistenceQueue = checkpointTask.then(() => undefined)
+
+  const checkpointMetadata = await checkpointTask
+
+  const currentProjectionClient = input.currentProjectionClient
+
+  if (!checkpointMetadata || !currentProjectionClient) {
+    return
+  }
+
+  documentState.projectionQueue = documentState.projectionQueue
+    .then(async () => {
+      await materializeCheckpointProjection({
+        checkpointMetadata,
+        checkpointState,
+        currentProjectionClient,
+        documentName: input.documentName,
+        documentState,
+      })
+    })
+    .catch((error: unknown) => {
+      input.logger?.error({
+        code: 'current-projection-failed',
+        documentId: input.documentName,
+        roomId: input.documentName,
+        runtimeEpoch: checkpointMetadata.runtimeEpoch,
+        checkpointUpdateSeq: checkpointMetadata.checkpointUpdateSeq,
+        err: error instanceof Error ? error : undefined,
+        errorName: error instanceof Error ? error.name : 'UnknownProjectionError',
+        errorMessage: error instanceof Error ? error.message : 'current-projection-failed',
+      }, 'Collab document current projection failed')
+      input.metrics?.recordCurrentProjectionFailure({
+        documentId: input.documentName,
+        roomId: input.documentName,
+        code: 'current-projection-failed',
+      })
+    })
+
+  await documentState.projectionQueue
+}
+
+async function persistDocumentCheckpoint(input: {
+  documentName: string
+  documentState: CollabHocuspocusDocumentState
+  checkpointState: Uint8Array
+  checkpointUpdateSeq: number
+  ydocRuntimeStore: DocumentYdocRuntimeStore
+  metrics?: CollabMetricsCollector
+}): Promise<DocumentYdocCheckpointMetadata> {
+  const checkpointStartedAt = Date.now()
+  const checkpointMetadata = await input.ydocRuntimeStore.replaceDocumentYdocCheckpoint({
+    documentId: input.documentName,
+    runtimeEpoch: input.documentState.runtimeEpoch,
+    checkpointState: input.checkpointState,
+    checkpointUpdateSeq: input.checkpointUpdateSeq,
+    lastProjectedProjectionId: input.documentState.lastProjectedProjectionId,
+    lastProjectedProjectionRevision: input.documentState.lastProjectedProjectionRevision,
+  })
+  input.metrics?.recordCheckpointDuration({
+    documentId: input.documentName,
+    roomId: input.documentName,
+    durationMs: Date.now() - checkpointStartedAt,
+  })
+
+  input.documentState.runtimeEpoch = checkpointMetadata.runtimeEpoch
+  input.documentState.nextUpdateSeq = Math.max(input.documentState.nextUpdateSeq, checkpointMetadata.updateSeq + 1)
+  input.documentState.checkpointUpdateSeq = checkpointMetadata.checkpointUpdateSeq
+  input.documentState.lastProjectedProjectionId = checkpointMetadata.lastProjectedProjectionId
+  input.documentState.lastProjectedProjectionRevision = checkpointMetadata.lastProjectedProjectionRevision
+
+  return checkpointMetadata
+}
+
+async function materializeCheckpointProjection(input: {
+  documentName: string
+  documentState: CollabHocuspocusDocumentState
+  checkpointState: Uint8Array
+  checkpointMetadata: DocumentYdocCheckpointMetadata
+  currentProjectionClient: DocumentYdocCurrentProjectionClient
+}): Promise<void> {
+  const checkpointDocument = createCheckpointDocument(input.checkpointState)
+
   try {
-    const checkpointStartedAt = Date.now()
-    const checkpointMetadata = await input.ydocRuntimeStore.replaceDocumentYdocCheckpoint({
+    const projection = await materializeDocumentCurrentAfterCheckpoint({
       documentId: input.documentName,
-      runtimeEpoch: documentState.runtimeEpoch,
-      checkpointState: new Uint8Array(Y.encodeStateAsUpdate(input.document)),
-      checkpointUpdateSeq,
-      lastProjectedProjectionId: documentState.lastProjectedProjectionId,
-      lastProjectedProjectionRevision: documentState.lastProjectedProjectionRevision,
-    })
-    input.metrics?.recordCheckpointDuration({
-      documentId: input.documentName,
-      roomId: input.documentName,
-      durationMs: Date.now() - checkpointStartedAt,
+      document: checkpointDocument,
+      checkpointMetadata: input.checkpointMetadata,
+      currentProjectionClient: input.currentProjectionClient,
     })
 
-    documentState.runtimeEpoch = checkpointMetadata.runtimeEpoch
-    documentState.nextUpdateSeq = checkpointMetadata.updateSeq + 1
-    documentState.checkpointUpdateSeq = checkpointMetadata.checkpointUpdateSeq
-    documentState.lastProjectedProjectionId = checkpointMetadata.lastProjectedProjectionId
-    documentState.lastProjectedProjectionRevision = checkpointMetadata.lastProjectedProjectionRevision
-
-    if (input.currentProjectionClient) {
-      try {
-        const projection = await materializeDocumentCurrentAfterCheckpoint({
-          documentId: input.documentName,
-          document: input.document,
-          checkpointMetadata,
-          currentProjectionClient: input.currentProjectionClient,
-        })
-
-        documentState.lastProjectedProjectionId = projection.lastProjectedProjectionId
-        documentState.lastProjectedProjectionRevision = projection.lastProjectedProjectionRevision
-      }
-      catch (error) {
-        input.logger?.error({
-          code: 'current-projection-failed',
-          documentId: input.documentName,
-          roomId: input.documentName,
-          runtimeEpoch: checkpointMetadata.runtimeEpoch,
-          checkpointUpdateSeq: checkpointMetadata.checkpointUpdateSeq,
-          err: error instanceof Error ? error : undefined,
-          errorName: error instanceof Error ? error.name : 'UnknownProjectionError',
-          errorMessage: error instanceof Error ? error.message : 'current-projection-failed',
-        }, 'Collab document current projection failed')
-        input.metrics?.recordCurrentProjectionFailure({
-          documentId: input.documentName,
-          roomId: input.documentName,
-          code: 'current-projection-failed',
-        })
-      }
-    }
+    input.documentState.lastProjectedProjectionId = projection.lastProjectedProjectionId
+    input.documentState.lastProjectedProjectionRevision = projection.lastProjectedProjectionRevision
   }
-  catch (error) {
-    const code = isDocumentYdocRuntimeStoreError(error)
-      ? error.code
-      : COLLAB_ERROR_CODE.PERSISTENCE_FAILED
-    documentState.persistenceFailed = true
-    documentState.persistenceFailureCode = code
-    input.logger?.error({
-      code,
-      documentId: input.documentName,
-      roomId: input.documentName,
-      runtimeEpoch: documentState.runtimeEpoch,
-      checkpointUpdateSeq,
-      err: error instanceof Error ? error : undefined,
-      errorName: error instanceof Error ? error.name : 'UnknownCheckpointError',
-      errorMessage: error instanceof Error ? error.message : COLLAB_ERROR_CODE.PERSISTENCE_FAILED,
-    }, 'Collab document checkpoint persistence failed')
-    input.metrics?.recordUpdatePersistenceFailure({
-      documentId: input.documentName,
-      roomId: input.documentName,
-      code,
-      runtimeEpoch: documentState.runtimeEpoch,
-      checkpointUpdateSeq,
-      retryable: isDocumentYdocRuntimeStoreError(error) ? error.retryable : undefined,
-      errorName: error instanceof Error ? error.name : 'UnknownCheckpointError',
-      errorMessage: error instanceof Error ? error.message : COLLAB_ERROR_CODE.PERSISTENCE_FAILED,
-    })
-    input.onFatalPersistenceFailure?.({
-      documentId: input.documentName,
-      code,
-    })
+  finally {
+    checkpointDocument.destroy()
   }
+}
+
+function createCheckpointDocument(checkpointState: Uint8Array): Y.Doc {
+  const document = new Y.Doc()
+  Y.applyUpdate(document, checkpointState)
+
+  return document
 }
 
 export async function materializeDocumentCurrentAfterCheckpoint(
