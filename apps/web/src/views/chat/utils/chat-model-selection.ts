@@ -165,7 +165,7 @@ export function resolveLoadedChatModelRef(
       return toFullModelRef(runtimeDefaultModel)
     }
 
-    return null
+    return toFullModelRef(runtimeDefaultModel)
   }
 
   return toFullModelRef(runtimeDefaultModel)

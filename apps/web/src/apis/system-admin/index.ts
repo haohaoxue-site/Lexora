@@ -3,6 +3,7 @@ import type {
   GetSystemAdminUsersQuery,
   SystemAdminAuditLogListResponse,
   SystemAdminOverview,
+  SystemAdminUserDetail,
   SystemAdminUserListResponse,
   SystemAuthGovernance,
   SystemEmailConfig,
@@ -32,6 +33,13 @@ export function getSystemAdminUsers(params: GetSystemAdminUsersQuery): Promise<S
     method: 'get',
     url: '/system-admin/users',
     params,
+  })
+}
+
+export function getSystemAdminUserDetail(id: string): Promise<SystemAdminUserDetail> {
+  return axios.request({
+    method: 'get',
+    url: `/system-admin/users/${id}/detail`,
   })
 }
 

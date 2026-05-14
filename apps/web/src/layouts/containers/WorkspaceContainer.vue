@@ -7,7 +7,6 @@ const {
   brand,
   navigationItems,
   isSidebarCollapsed,
-  showSidebarToggle,
   toggleSidebar,
 } = useWorkspaceContainer()
 </script>
@@ -18,7 +17,6 @@ const {
       :brand="brand"
       :items="navigationItems"
       :is-collapsed="isSidebarCollapsed"
-      :show-toggle="showSidebarToggle"
       @toggle="toggleSidebar"
     />
 

@@ -153,7 +153,7 @@ function getWorkspaceAvatarProps(workspace: SessionWorkspacePanelProps['workspac
   }
 
   &:hover:not(:disabled) {
-    background: var(--brand-fill-light);
+    background: var(--brand-fill-lighter);
   }
 
   &:focus-visible {
@@ -234,12 +234,17 @@ function getWorkspaceAvatarProps(workspace: SessionWorkspacePanelProps['workspac
     color 0.2s ease;
 
   &:hover {
-    background: var(--brand-fill-light);
+    background: var(--brand-fill-lighter);
   }
 }
 
 .session-workspace-option.is-active .session-workspace-option__button {
-  background: color-mix(in srgb, var(--brand-fill-light) 86%, white 14%);
+  color: var(--brand-primary);
+  background: color-mix(in srgb, var(--brand-primary) 10%, transparent);
+
+  .session-workspace-option__title {
+    color: var(--brand-primary);
+  }
 }
 
 .session-workspace-option__button:focus-visible {

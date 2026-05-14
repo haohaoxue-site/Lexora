@@ -8,18 +8,16 @@ const props = withDefaults(defineProps<{
   brand: SidebarPanelBrand
   items: SidebarPanelItem[]
   isCollapsed?: boolean
-  showToggle?: boolean
 }>(), {
   isCollapsed: false,
-  showToggle: false,
 })
 
-defineEmits<{
+const emit = defineEmits<{
   toggle: []
 }>()
 
 const sidebarStateClass = computed(() => props.isCollapsed ? 'collapsed' : 'expanded')
-const shouldShowBrand = computed(() => !props.isCollapsed || !props.showToggle)
+const shouldShowBrand = computed(() => !props.isCollapsed)
 
 function getItemStateClass(isActive: boolean) {
   return isActive ? 'active' : 'idle'
@@ -34,14 +32,18 @@ function getToggleGlyphClass() {
     ? 'sidebar-open'
     : 'sidebar-close'
 }
+
+function handleToggle() {
+  emit('toggle')
+}
 </script>
 
 <template>
   <aside class="sidebar-panel" :class="sidebarStateClass">
     <div class="flex h-full flex-col">
       <div
-        class="sidebar-panel__brand-wrap"
-        :class="[sidebarStateClass, { 'has-toggle': props.showToggle }]"
+        class="sidebar-panel__brand-wrap has-toggle"
+        :class="[sidebarStateClass]"
       >
         <RouterLink
           v-if="shouldShowBrand"
@@ -57,7 +59,7 @@ function getToggleGlyphClass() {
             />
           </div>
           <div class="sidebar-panel__brand-text">
-            <div class="sidebar-panel__brand-label truncate text-base font-bold">
+            <div class="sidebar-panel__brand-label truncate text-base">
               {{ props.brand.label }}
             </div>
             <div
@@ -70,11 +72,10 @@ function getToggleGlyphClass() {
         </RouterLink>
 
         <button
-          v-if="props.showToggle"
           type="button"
           class="sidebar-panel__toggle"
           :class="sidebarStateClass"
-          @click="$emit('toggle')"
+          @click="handleToggle"
         >
           <span class="sidebar-panel__toggle-icon">
             <SvgIcon category="ui" :icon="getToggleGlyphClass()" size="1.25rem" />

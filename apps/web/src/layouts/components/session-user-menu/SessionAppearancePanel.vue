@@ -99,7 +99,7 @@ const emits = defineEmits<{
   }
 
   &:hover:not(:disabled) {
-    background: var(--brand-fill-light);
+    background: color-mix(in srgb, var(--brand-fill-lighter) 76%, var(--brand-text-primary) 6%);
   }
 
   &:disabled {
@@ -109,7 +109,12 @@ const emits = defineEmits<{
 }
 
 .session-appearance-option.is-active .session-appearance-option__button {
-  background: color-mix(in srgb, var(--brand-fill-light) 86%, white 14%);
+  color: var(--brand-primary);
+  background: color-mix(in srgb, var(--brand-primary) 10%, transparent);
+
+  :deep(.text-main) {
+    color: var(--brand-primary);
+  }
 }
 
 .session-appearance-option__content {

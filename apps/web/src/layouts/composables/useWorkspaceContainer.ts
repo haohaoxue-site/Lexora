@@ -25,20 +25,13 @@ export function useWorkspaceContainer() {
   const uiStore = useUiStore()
 
   const isAdminContainer = computed(() => isAdminRoutePath(route.path))
-  const showSidebarToggle = computed(() => !isAdminContainer.value)
-  const isSidebarCollapsed = computed(() => {
-    return showSidebarToggle.value ? uiStore.workspaceSidebarCollapsed : false
-  })
+  const isSidebarCollapsed = computed(() => uiStore.workspaceSidebarCollapsed)
   const brand = computed(() => isAdminContainer.value ? adminBrand : workspaceBrand)
   const navigationItems = computed(() => {
     return isAdminContainer.value ? adminNavigationItems : workspaceNavigationItems
   })
 
   function toggleSidebar() {
-    if (!showSidebarToggle.value) {
-      return
-    }
-
     uiStore.setWorkspaceSidebarCollapsed(!uiStore.workspaceSidebarCollapsed)
   }
 
@@ -46,7 +39,6 @@ export function useWorkspaceContainer() {
     brand,
     navigationItems,
     isSidebarCollapsed,
-    showSidebarToggle,
     toggleSidebar,
   }
 }

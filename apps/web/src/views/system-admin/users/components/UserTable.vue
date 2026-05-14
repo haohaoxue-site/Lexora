@@ -13,13 +13,18 @@ import { formatAuthMethod } from '@haohaoxue/samepage-shared'
 import { computed } from 'vue'
 import { formatDateTime } from '@/utils/dayjs'
 import { useSystemUsers } from '../composables/useSystemUsers'
+import UserDataExpansion from './UserDataExpansion.vue'
 import UserIdentityCell from './UserIdentityCell.vue'
 
 type UserTableFilterMap = Partial<Record<'status' | 'role', Array<string | number | boolean>>>
 
 const {
+  getUserDetail,
+  getUserDetailErrorMessage,
   isLoadingUsers,
+  isLoadingUserDetail,
   keywordInput,
+  loadUserDetail,
   submitSearch,
   toggleUserStatus,
   totalUsers,
@@ -96,6 +101,12 @@ function handleFilterChange(filters: UserTableFilterMap) {
 function handleToggleStatus(user: SystemAdminUserItem) {
   void toggleUserStatus(user, resolveNextStatus(user.status))
 }
+
+function handleExpandChange(user: SystemAdminUserItem, expandedUsers: SystemAdminUserItem[]) {
+  if (expandedUsers.some(item => item.id === user.id)) {
+    void loadUserDetail(user.id)
+  }
+}
 </script>
 
 <template>
@@ -120,8 +131,19 @@ function handleToggleStatus(user: SystemAdminUserItem) {
       :data="users"
       row-key="id" stripe border
       class="admin-table user-table"
+      @expand-change="handleExpandChange"
       @filter-change="handleFilterChange"
     >
+      <ElTableColumn type="expand" width="52" fixed>
+        <template #default="{ row }">
+          <UserDataExpansion
+            :detail="getUserDetail(row.id)"
+            :loading="isLoadingUserDetail(row.id)"
+            :error-message="getUserDetailErrorMessage(row.id)"
+          />
+        </template>
+      </ElTableColumn>
+
       <ElTableColumn label="用户信息" min-width="180" fixed>
         <template #default="{ row }">
           <UserIdentityCell :user="row" />
@@ -165,18 +187,15 @@ function handleToggleStatus(user: SystemAdminUserItem) {
         </template>
       </ElTableColumn>
 
-      <ElTableColumn label="文档数据" width="180">
+      <ElTableColumn label="创建时间" width="180">
         <template #default="{ row }">
-          <div class="flex flex-col gap-0.5">
-            <span class="text-xs text-main">拥有 {{ row.ownedDocumentCount }} 篇</span>
-            <span class="text-xs text-secondary">注册于 {{ formatDate(row.createdAt) }}</span>
-          </div>
+          <span class="text-xs text-secondary">{{ formatDate(row.createdAt) }}</span>
         </template>
       </ElTableColumn>
 
-      <ElTableColumn label="最近活跃" width="180">
+      <ElTableColumn label="更新时间" width="180">
         <template #default="{ row }">
-          <span class="text-xs text-secondary">{{ formatDate(row.lastLoginAt) }}</span>
+          <span class="text-xs text-secondary">{{ formatDate(row.updatedAt) }}</span>
         </template>
       </ElTableColumn>
 

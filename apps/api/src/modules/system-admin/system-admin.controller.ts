@@ -1,6 +1,7 @@
 import type {
   SystemAdminAuditLogListResponse,
   SystemAdminOverview,
+  SystemAdminUserDetail,
   SystemAdminUserListResponse,
   SystemAuthGovernance,
   SystemEmailConfig,
@@ -60,6 +61,12 @@ export class SystemAdminController {
       ...page,
       ...query,
     })
+  }
+
+  @RequirePermissions(PERMISSIONS.SYSTEM_ADMIN_USER_LIST)
+  @Get('users/:id/detail')
+  async getUserDetail(@Param('id') userId: string): Promise<SystemAdminUserDetail> {
+    return this.systemAdminService.getUserDetail(userId)
   }
 
   @RequirePermissions(PERMISSIONS.SYSTEM_ADMIN_USER_UPDATE_STATUS)

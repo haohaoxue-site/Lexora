@@ -2,6 +2,9 @@ import type {
   AuthMethodName,
   SystemAdminAuditLogItem,
   SystemAdminAuditTargetType,
+  SystemAdminUserChatSessionItem,
+  SystemAdminUserDetail,
+  SystemAdminUserDocumentItem,
   SystemAdminUserItem,
   SystemAdminUserStatus,
   SystemAuthGovernance,
@@ -16,10 +19,22 @@ export interface SystemAdminUserItemRecord {
   status: SystemAdminUserStatus
   isSystemAdmin: boolean
   authMethods: AuthMethodName[]
-  ownedDocumentCount: number
-  sharedDocumentCount: number
   createdAt: Date
-  lastLoginAt: Date | null
+  updatedAt: Date
+}
+
+export interface SystemAdminUserDocumentItemRecord {
+  id: string
+  title: string
+  createdAt: Date
+  updatedAt: Date
+}
+
+export interface SystemAdminUserChatSessionItemRecord {
+  id: string
+  title: string
+  createdAt: Date
+  updatedAt: Date
 }
 
 export interface SystemAuthGovernanceRecord {
@@ -63,10 +78,40 @@ export function toSystemAdminUserItem(record: SystemAdminUserItemRecord): System
     status: record.status,
     isSystemAdmin: record.isSystemAdmin,
     authMethods: record.authMethods,
-    ownedDocumentCount: record.ownedDocumentCount,
-    sharedDocumentCount: record.sharedDocumentCount,
     createdAt: record.createdAt.toISOString(),
-    lastLoginAt: toIsoDateTimeString(record.lastLoginAt),
+    updatedAt: record.updatedAt.toISOString(),
+  }
+}
+
+export function toSystemAdminUserDetail(record: {
+  documentTotal: number
+  chatSessionTotal: number
+  documents: SystemAdminUserDocumentItemRecord[]
+  chatSessions: SystemAdminUserChatSessionItemRecord[]
+}): SystemAdminUserDetail {
+  return {
+    documentTotal: record.documentTotal,
+    chatSessionTotal: record.chatSessionTotal,
+    documents: record.documents.map(toSystemAdminUserDocumentItem),
+    chatSessions: record.chatSessions.map(toSystemAdminUserChatSessionItem),
+  }
+}
+
+function toSystemAdminUserDocumentItem(record: SystemAdminUserDocumentItemRecord): SystemAdminUserDocumentItem {
+  return {
+    id: record.id,
+    title: record.title,
+    createdAt: record.createdAt.toISOString(),
+    updatedAt: record.updatedAt.toISOString(),
+  }
+}
+
+function toSystemAdminUserChatSessionItem(record: SystemAdminUserChatSessionItemRecord): SystemAdminUserChatSessionItem {
+  return {
+    id: record.id,
+    title: record.title,
+    createdAt: record.createdAt.toISOString(),
+    updatedAt: record.updatedAt.toISOString(),
   }
 }
 

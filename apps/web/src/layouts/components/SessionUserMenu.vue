@@ -52,7 +52,7 @@ const {
     v-model:visible="menuVisible"
     trigger="click"
     placement="right-end"
-    :width="256"
+    :width="230"
     :offset="12"
     :show-arrow="false"
     popper-class="session-user-menu-popper"
@@ -267,9 +267,7 @@ const {
   border-radius: 0.75rem;
   padding-inline: 0.5rem;
   padding-block: 0;
-  font-size: 0.78125rem;
   line-height: 1;
-  --el-button-text-color: #{$text-color};
 }
 
 .session-user-menu {
@@ -283,10 +281,10 @@ const {
   overflow: visible;
   padding: 10px;
   border: 1px solid color-mix(in srgb, var(--brand-border-base) 92%, transparent);
-  border-radius: 20px;
+  border-radius: 8px;
   background: color-mix(in srgb, var(--brand-bg-surface-raised) 96%, transparent);
   box-shadow: var(--brand-shadow-floating);
-  backdrop-filter: blur(16px);
+  backdrop-filter: blur(8px);
 }
 
 .session-user-profile {
@@ -379,9 +377,7 @@ const {
   flex: 1 1 0%;
   min-width: 0;
   overflow: hidden;
-  color: var(--brand-text-primary);
-  font-size: 12.5px;
-  font-weight: 600;
+  font-size: 14px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -397,14 +393,19 @@ const {
 
 .session-user-menu-entry:hover,
 .session-user-menu-item:hover {
-  --el-fill-color-light: var(--brand-fill-light);
+  --el-fill-color-light: color-mix(in srgb, var(--brand-fill-lighter) 76%, var(--brand-text-primary) 6%);
   --el-button-text-color: var(--brand-text-primary);
 }
 
 .session-user-menu-entry.is-active {
-  --el-fill-color-light: var(--brand-fill-light);
-  --el-button-text-color: var(--brand-text-primary);
-  background: var(--brand-fill-light);
+  --el-fill-color-light: color-mix(in srgb, var(--brand-primary) 10%, transparent);
+  --el-button-text-color: var(--brand-primary);
+  color: var(--brand-primary);
+  background: color-mix(in srgb, var(--brand-primary) 10%, transparent);
+
+  .session-user-menu-entry__icon {
+    color: var(--brand-primary);
+  }
 }
 
 .session-user-menu-entry__content,
@@ -431,9 +432,7 @@ const {
 
 .session-user-menu-entry__title {
   overflow: hidden;
-  color: var(--brand-text-primary);
-  font-size: 12.5px;
-  font-weight: 600;
+  font-size: 14px;
   line-height: 1;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -491,7 +490,7 @@ const {
 
   &:hover {
     color: var(--brand-text-primary);
-    background: color-mix(in srgb, var(--brand-primary) 8%, transparent);
+    background: color-mix(in srgb, var(--brand-fill-lighter) 76%, var(--brand-text-primary) 6%);
   }
 
   &:focus-visible {
@@ -506,7 +505,7 @@ const {
     background: transparent;
 
     &:hover {
-      background: color-mix(in srgb, var(--brand-primary) 6%, transparent);
+      background: color-mix(in srgb, var(--brand-fill-lighter) 76%, var(--brand-text-primary) 6%);
     }
   }
 
@@ -536,8 +535,7 @@ const {
   flex: 1 1 0%;
   min-width: 0;
   overflow: hidden;
-  font-size: 0.875rem;
-  font-weight: 600;
+  font-size: 14px;
   line-height: 1;
   text-align: left;
   text-overflow: ellipsis;

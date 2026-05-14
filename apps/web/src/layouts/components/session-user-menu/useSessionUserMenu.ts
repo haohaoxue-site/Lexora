@@ -24,27 +24,30 @@ interface UseSessionUserMenuOptions {
   showContextSwitch: boolean
 }
 
+type SessionSubmenu = 'appearance' | 'workspace' | null
+
 export function useSessionUserMenu(options: UseSessionUserMenuOptions) {
   const route = useRoute()
   const router = useRouter()
   const userStore = useUserStore()
   const workspaceStore = useWorkspaceStore()
   const menuVisible = shallowRef(false)
-  const appearanceMenuVisible = shallowRef(false)
-  const workspaceMenuVisible = shallowRef(false)
+  const activeSubmenu = shallowRef<SessionSubmenu>(null)
   const teamSettingsDialogVisible = shallowRef(false)
   const workspaceCreateDialogVisible = shallowRef(false)
   const isCreatingWorkspace = shallowRef(false)
   const { currentUser: sessionUser, isLoggingOut, logout } = useAuthSession()
-  const sessionUserSnapshot = shallowRef(sessionUser.value)
+  // 登出过程中 sessionUser 会短暂为 null，保留上一份用于继续渲染头像/昵称。
+  const lastKnownUser = shallowRef(sessionUser.value)
 
   const appearanceOptions = APPEARANCE_PREFERENCE_VALUES.map(value => ({
     label: APPEARANCE_PREFERENCE_LABELS[value],
     value,
   }))
-  const resolvedSessionUser = computed(() => sessionUser.value ?? sessionUserSnapshot.value!)
+  const appearanceMenuVisible = computed(() => activeSubmenu.value === 'appearance')
+  const workspaceMenuVisible = computed(() => activeSubmenu.value === 'workspace')
   const currentUser = computed<SessionMenuUser>(() => {
-    const user = resolvedSessionUser.value
+    const user = sessionUser.value ?? lastKnownUser.value!
 
     return {
       displayName: user.displayName,
@@ -90,16 +93,13 @@ export function useSessionUserMenu(options: UseSessionUserMenuOptions) {
 
   watch(sessionUser, (user) => {
     if (user) {
-      sessionUserSnapshot.value = user
+      lastKnownUser.value = user
     }
-  }, {
-    immediate: true,
   })
 
   watch(menuVisible, (visible) => {
     if (!visible) {
-      appearanceMenuVisible.value = false
-      workspaceMenuVisible.value = false
+      activeSubmenu.value = null
     }
   })
 
@@ -138,20 +138,25 @@ export function useSessionUserMenu(options: UseSessionUserMenuOptions) {
       return
     }
 
-    workspaceMenuVisible.value = false
-    appearanceMenuVisible.value = !appearanceMenuVisible.value
+    toggleSubmenu('appearance')
   }
 
   function toggleWorkspaceMenu() {
-    appearanceMenuVisible.value = false
-    workspaceMenuVisible.value = !workspaceMenuVisible.value
+    toggleSubmenu('workspace')
+  }
+
+  function toggleSubmenu(target: NonNullable<SessionSubmenu>) {
+    activeSubmenu.value = activeSubmenu.value === target ? null : target
+  }
+
+  function closeMenu() {
+    activeSubmenu.value = null
+    menuVisible.value = false
   }
 
   function openWorkspaceCreateDialog() {
     workspaceCreateDialogVisible.value = true
-    appearanceMenuVisible.value = false
-    workspaceMenuVisible.value = false
-    menuVisible.value = false
+    closeMenu()
   }
 
   function openTeamSettingsDialog() {
@@ -159,10 +164,8 @@ export function useSessionUserMenu(options: UseSessionUserMenuOptions) {
       return
     }
 
-    appearanceMenuVisible.value = false
-    workspaceMenuVisible.value = false
     teamSettingsDialogVisible.value = true
-    menuVisible.value = false
+    closeMenu()
   }
 
   async function handleAppearanceSelect(mode: AppearancePreference) {
@@ -219,9 +222,7 @@ export function useSessionUserMenu(options: UseSessionUserMenuOptions) {
   }
 
   async function switchContext() {
-    appearanceMenuVisible.value = false
-    workspaceMenuVisible.value = false
-    menuVisible.value = false
+    closeMenu()
 
     if (isAdminRoute.value) {
       await router.push(getWorkspaceEntryPath())
@@ -232,17 +233,13 @@ export function useSessionUserMenu(options: UseSessionUserMenuOptions) {
   }
 
   async function handleLogout() {
-    appearanceMenuVisible.value = false
-    workspaceMenuVisible.value = false
-    menuVisible.value = false
+    closeMenu()
     await logout()
   }
 
   function handleWorkspaceSelect(workspaceId: string) {
     workspaceStore.selectWorkspace(workspaceId)
-    appearanceMenuVisible.value = false
-    workspaceMenuVisible.value = false
-    menuVisible.value = false
+    closeMenu()
   }
 
   function getLogoutIconName() {

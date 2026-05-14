@@ -1,5 +1,6 @@
 import type {
   GetSystemAdminUsersQuery,
+  SystemAdminUserDetail,
   SystemAdminUserItem,
   SystemAdminUserRoleFilter,
   SystemAdminUserStatus,
@@ -9,6 +10,7 @@ import { createSharedComposable } from '@vueuse/core'
 import { ElMessage } from 'element-plus'
 import { reactive, shallowRef } from 'vue'
 import {
+  getSystemAdminUserDetail,
   getSystemAdminUsers,
   updateSystemAdminUserStatus,
 } from '@/apis/system-admin'
@@ -16,8 +18,12 @@ import { getRequestErrorDisplayMessage } from '@/utils/request-error'
 
 export const useSystemUsers = createSharedComposable(() => {
   let userListRequestId = 0
+  const userDetailRequestIds = new Map<string, number>()
 
   const users = shallowRef<SystemAdminUserItem[]>([])
+  const userDetails = shallowRef<Record<string, SystemAdminUserDetail>>({})
+  const loadingUserDetailIds = shallowRef<string[]>([])
+  const userDetailErrorMessages = shallowRef<Record<string, string>>({})
   const errorMessage = shallowRef('')
   const isLoadingUsers = shallowRef(false)
   const keywordInput = shallowRef('')
@@ -98,6 +104,41 @@ export const useSystemUsers = createSharedComposable(() => {
     }
   }
 
+  async function loadUserDetail(userId: string) {
+    if (userDetails.value[userId] || loadingUserDetailIds.value.includes(userId)) {
+      return
+    }
+
+    const requestId = (userDetailRequestIds.get(userId) ?? 0) + 1
+
+    userDetailRequestIds.set(userId, requestId)
+    setUserDetailLoading(userId, true)
+    setUserDetailErrorMessage(userId, '')
+
+    try {
+      const detail = await getSystemAdminUserDetail(userId)
+
+      if (userDetailRequestIds.get(userId) !== requestId) {
+        return
+      }
+
+      userDetails.value = {
+        ...userDetails.value,
+        [userId]: detail,
+      }
+    }
+    catch (error) {
+      if (userDetailRequestIds.get(userId) === requestId) {
+        setUserDetailErrorMessage(userId, getRequestErrorDisplayMessage(error, '加载用户数据失败'))
+      }
+    }
+    finally {
+      if (userDetailRequestIds.get(userId) === requestId) {
+        setUserDetailLoading(userId, false)
+      }
+    }
+  }
+
   function updateFilters(filters: {
     status: SystemAdminUserStatus | null
     role: SystemAdminUserRoleFilter | null
@@ -134,10 +175,39 @@ export const useSystemUsers = createSharedComposable(() => {
     void loadUsers().catch(() => {})
   }
 
+  function getUserDetail(userId: string) {
+    return userDetails.value[userId] ?? null
+  }
+
+  function getUserDetailErrorMessage(userId: string) {
+    return userDetailErrorMessages.value[userId] ?? ''
+  }
+
+  function isLoadingUserDetail(userId: string) {
+    return loadingUserDetailIds.value.includes(userId)
+  }
+
+  function setUserDetailLoading(userId: string, isLoading: boolean) {
+    loadingUserDetailIds.value = isLoading
+      ? Array.from(new Set([...loadingUserDetailIds.value, userId]))
+      : loadingUserDetailIds.value.filter(id => id !== userId)
+  }
+
+  function setUserDetailErrorMessage(userId: string, message: string) {
+    userDetailErrorMessages.value = {
+      ...userDetailErrorMessages.value,
+      [userId]: message,
+    }
+  }
+
   return {
     errorMessage,
+    getUserDetail,
+    getUserDetailErrorMessage,
     isLoadingUsers,
+    isLoadingUserDetail,
     keywordInput,
+    loadUserDetail,
     loadUsers,
     submitSearch,
     toggleUserStatus,

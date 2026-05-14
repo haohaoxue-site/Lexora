@@ -4,6 +4,7 @@ import type {
   SystemAdminAuditLogListResponse,
   SystemAdminAuditTargetType,
   SystemAdminOverview,
+  SystemAdminUserDetail,
   SystemAdminUserListResponse,
   SystemAdminUserStatus,
   SystemAuthGovernance,
@@ -19,9 +20,8 @@ import type {
 } from '@haohaoxue/samepage-contracts'
 import {
   SYSTEM_ADMIN_AUDIT_TARGET_TYPE,
+  SYSTEM_ADMIN_USER_DETAIL_LIMIT,
   SYSTEM_ADMIN_USER_ROLE_FILTER,
-  WORKSPACE_MEMBER_STATUS,
-  WORKSPACE_TYPE,
 } from '@haohaoxue/samepage-contracts'
 import {
   BadRequestException,
@@ -39,6 +39,7 @@ import { SystemAuthService } from '../auth/system-auth.service'
 import { SystemEmailService } from '../system-email/system-email.service'
 import {
   toSystemAdminAuditLogItem,
+  toSystemAdminUserDetail,
   toSystemAdminUserItem,
   toSystemAuthGovernance,
 } from './system-admin.utils'
@@ -94,7 +95,7 @@ export class SystemAdminService {
         avatarUrl: true,
         status: true,
         createdAt: true,
-        lastLoginAt: true,
+        updatedAt: true,
         localCredential: {
           select: {
             userId: true,
@@ -106,26 +107,6 @@ export class SystemAdminService {
           },
           select: {
             provider: true,
-          },
-        },
-        workspaceMemberships: {
-          where: {
-            status: WORKSPACE_MEMBER_STATUS.ACTIVE,
-            workspace: {
-              type: WORKSPACE_TYPE.PERSONAL,
-            },
-          },
-          take: 1,
-          select: {
-            workspace: {
-              select: {
-                _count: {
-                  select: {
-                    documents: true,
-                  },
-                },
-              },
-            },
           },
         },
       },
@@ -142,12 +123,68 @@ export class SystemAdminService {
         status: user.status,
         isSystemAdmin: user.id === systemAdminUserId,
         authMethods: resolveAuthMethods(Boolean(user.localCredential), user.oauthAccounts),
-        ownedDocumentCount: user.workspaceMemberships[0]?.workspace._count.documents ?? 0,
-        sharedDocumentCount: 0,
         createdAt: user.createdAt,
-        lastLoginAt: user.lastLoginAt,
+        updatedAt: user.updatedAt,
       })),
     }
+  }
+
+  async getUserDetail(userId: string): Promise<SystemAdminUserDetail> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true },
+    })
+
+    if (!user) {
+      throw new NotFoundException(`User "${userId}" not found`)
+    }
+
+    const documentWhere = {
+      createdBy: userId,
+      trashedAt: null,
+    } satisfies Prisma.DocumentWhereInput
+    const chatSessionWhere = {
+      userId,
+      deletedAt: null,
+    } satisfies Prisma.ChatSessionWhereInput
+    const [
+      documentTotal,
+      chatSessionTotal,
+      documents,
+      chatSessions,
+    ] = await Promise.all([
+      this.prisma.document.count({ where: documentWhere }),
+      this.prisma.chatSession.count({ where: chatSessionWhere }),
+      this.prisma.document.findMany({
+        where: documentWhere,
+        orderBy: { updatedAt: 'desc' },
+        take: SYSTEM_ADMIN_USER_DETAIL_LIMIT,
+        select: {
+          id: true,
+          title: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      }),
+      this.prisma.chatSession.findMany({
+        where: chatSessionWhere,
+        orderBy: { updatedAt: 'desc' },
+        take: SYSTEM_ADMIN_USER_DETAIL_LIMIT,
+        select: {
+          id: true,
+          title: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      }),
+    ])
+
+    return toSystemAdminUserDetail({
+      documentTotal,
+      chatSessionTotal,
+      documents,
+      chatSessions,
+    })
   }
 
   async updateUserStatus(

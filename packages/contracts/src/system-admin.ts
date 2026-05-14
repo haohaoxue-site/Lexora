@@ -97,10 +97,8 @@ export const SystemAdminUserItemSchema = UserAccountIdentitySchema.extend({
   status: UserStatusSchema,
   isSystemAdmin: z.boolean(),
   authMethods: z.array(AuthMethodSchema),
-  ownedDocumentCount: CountSchema,
-  sharedDocumentCount: CountSchema,
   createdAt: IsoDateTimeStringSchema,
-  lastLoginAt: IsoDateTimeStringSchema.nullable(),
+  updatedAt: IsoDateTimeStringSchema,
 }).strict()
 
 export const GetSystemAdminUsersFiltersSchema = z.object({
@@ -114,6 +112,29 @@ export const GetSystemAdminUsersQuerySchema = RequestPageParamsSchema.extend(
 )
 
 export const SystemAdminUserListResponseSchema = createPageDataSchema(SystemAdminUserItemSchema)
+
+export const SYSTEM_ADMIN_USER_DETAIL_LIMIT = 8
+
+export const SystemAdminUserDocumentItemSchema = z.object({
+  id: z.string().trim().min(1),
+  title: z.string(),
+  createdAt: IsoDateTimeStringSchema,
+  updatedAt: IsoDateTimeStringSchema,
+}).strict()
+
+export const SystemAdminUserChatSessionItemSchema = z.object({
+  id: z.string().trim().min(1),
+  title: z.string().trim().min(1),
+  createdAt: IsoDateTimeStringSchema,
+  updatedAt: IsoDateTimeStringSchema,
+}).strict()
+
+export const SystemAdminUserDetailSchema = z.object({
+  documentTotal: CountSchema,
+  chatSessionTotal: CountSchema,
+  documents: z.array(SystemAdminUserDocumentItemSchema),
+  chatSessions: z.array(SystemAdminUserChatSessionItemSchema),
+}).strict()
 
 export const SYSTEM_ADMIN_AUDIT_TARGET_TYPE = {
   USER: 'user',
@@ -245,6 +266,9 @@ export type SystemAdminUserStatus = UserStatus
 export type SystemEmailProvider = z.infer<typeof SystemEmailProviderSchema>
 export type SystemAdminOverview = z.infer<typeof SystemAdminOverviewSchema>
 export type SystemAdminUserItem = z.infer<typeof SystemAdminUserItemSchema>
+export type SystemAdminUserDocumentItem = z.infer<typeof SystemAdminUserDocumentItemSchema>
+export type SystemAdminUserChatSessionItem = z.infer<typeof SystemAdminUserChatSessionItemSchema>
+export type SystemAdminUserDetail = z.infer<typeof SystemAdminUserDetailSchema>
 export type SystemAdminUserRoleFilter = z.infer<typeof SystemAdminUserRoleFilterSchema>
 export type SystemAdminAuditTargetType = z.infer<typeof SystemAdminAuditTargetTypeSchema>
 export type GetSystemAdminUsersFilters = z.infer<typeof GetSystemAdminUsersFiltersSchema>
