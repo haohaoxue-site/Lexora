@@ -3,11 +3,13 @@ import type {
 } from '@haohaoxue/samepage-contracts'
 import type { DocumentYdocCurrentProjectionClient } from '../clients/documents'
 import type { CollabMetricsCollector } from '../observability/metrics'
+import type { CollabFatalPersistenceFailure, CollabRuntimeLogger } from './ports'
 import type { CollabHocuspocusDocumentState } from './update-persistence-queue'
 import type { DocumentYdocRuntimeStore } from './ydoc-runtime-store'
 import { COLLAB_ERROR_CODE, TIPTAP_SCHEMA_VERSION } from '@haohaoxue/samepage-contracts'
 import { projectTiptapDocumentCollaborationYdoc, stripDocumentAssetRuntimeAttributes } from '@haohaoxue/samepage-shared'
 import * as Y from 'yjs'
+import { isDocumentYdocRuntimeStoreError } from './ydoc-runtime-store'
 
 /** checkpoint 后物化当前读模型的输入。 */
 export interface MaterializeDocumentCurrentAfterCheckpointInput {
@@ -30,6 +32,8 @@ export async function storeDocumentCheckpoint(input: {
   ydocRuntimeStore: DocumentYdocRuntimeStore
   currentProjectionClient?: DocumentYdocCurrentProjectionClient
   metrics?: CollabMetricsCollector
+  logger?: CollabRuntimeLogger
+  onFatalPersistenceFailure?: (failure: CollabFatalPersistenceFailure) => void
 }): Promise<void> {
   const documentState = input.documentStates.get(input.documentName)
 
@@ -83,7 +87,17 @@ export async function storeDocumentCheckpoint(input: {
         documentState.lastProjectedProjectionId = projection.lastProjectedProjectionId
         documentState.lastProjectedProjectionRevision = projection.lastProjectedProjectionRevision
       }
-      catch {
+      catch (error) {
+        input.logger?.error({
+          code: 'current-projection-failed',
+          documentId: input.documentName,
+          roomId: input.documentName,
+          runtimeEpoch: checkpointMetadata.runtimeEpoch,
+          checkpointUpdateSeq: checkpointMetadata.checkpointUpdateSeq,
+          err: error instanceof Error ? error : undefined,
+          errorName: error instanceof Error ? error.name : 'UnknownProjectionError',
+          errorMessage: error instanceof Error ? error.message : 'current-projection-failed',
+        }, 'Collab document current projection failed')
         input.metrics?.recordCurrentProjectionFailure({
           documentId: input.documentName,
           roomId: input.documentName,
@@ -92,12 +106,35 @@ export async function storeDocumentCheckpoint(input: {
       }
     }
   }
-  catch {
+  catch (error) {
+    const code = isDocumentYdocRuntimeStoreError(error)
+      ? error.code
+      : COLLAB_ERROR_CODE.PERSISTENCE_FAILED
     documentState.persistenceFailed = true
+    documentState.persistenceFailureCode = code
+    input.logger?.error({
+      code,
+      documentId: input.documentName,
+      roomId: input.documentName,
+      runtimeEpoch: documentState.runtimeEpoch,
+      checkpointUpdateSeq,
+      err: error instanceof Error ? error : undefined,
+      errorName: error instanceof Error ? error.name : 'UnknownCheckpointError',
+      errorMessage: error instanceof Error ? error.message : COLLAB_ERROR_CODE.PERSISTENCE_FAILED,
+    }, 'Collab document checkpoint persistence failed')
     input.metrics?.recordUpdatePersistenceFailure({
       documentId: input.documentName,
       roomId: input.documentName,
-      code: COLLAB_ERROR_CODE.PERSISTENCE_FAILED,
+      code,
+      runtimeEpoch: documentState.runtimeEpoch,
+      checkpointUpdateSeq,
+      retryable: isDocumentYdocRuntimeStoreError(error) ? error.retryable : undefined,
+      errorName: error instanceof Error ? error.name : 'UnknownCheckpointError',
+      errorMessage: error instanceof Error ? error.message : COLLAB_ERROR_CODE.PERSISTENCE_FAILED,
+    })
+    input.onFatalPersistenceFailure?.({
+      documentId: input.documentName,
+      code,
     })
   }
 }

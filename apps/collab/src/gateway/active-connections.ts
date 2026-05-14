@@ -1,10 +1,16 @@
-import type { CollabPermissionInvalidationRequest, CollabTicketPayload } from '@haohaoxue/samepage-contracts'
+import type { CollabErrorCode, CollabPermissionInvalidationRequest, CollabTicketPayload } from '@haohaoxue/samepage-contracts'
 import { COLLAB_ERROR_CODE, COLLAB_PERMISSION_INVALIDATION_REASON } from '@haohaoxue/samepage-contracts'
+
+const COLLAB_SOCKET_CLOSE_CODE = {
+  PERMISSION_INVALIDATED: 4003,
+  PERSISTENCE_FAILED: 4004,
+} as const
 
 /** 活跃协作连接注册表。 */
 export interface CollabActiveConnectionRegistry {
   add: (input: AddCollabActiveConnectionInput) => () => void
   invalidate: (input: CollabPermissionInvalidationRequest) => CollabPermissionInvalidationResult
+  disconnectDocument: (input: DisconnectCollabDocumentConnectionsInput) => CollabPermissionInvalidationResult
 }
 
 /** 注册活跃协作连接输入。 */
@@ -17,6 +23,12 @@ export interface AddCollabActiveConnectionInput {
 /** 权限失效处理结果。 */
 export interface CollabPermissionInvalidationResult {
   disconnected: number
+}
+
+/** 断开文档协作连接输入。 */
+export interface DisconnectCollabDocumentConnectionsInput {
+  documentId: string
+  code: CollabErrorCode
 }
 
 interface ActiveConnectionEntry {
@@ -59,7 +71,30 @@ export function createCollabActiveConnectionRegistry(): CollabActiveConnectionRe
 
         disconnected += 1
         entry.release()
-        closeCollabSocket(entry.socket)
+        closeCollabSocket(entry.socket, {
+          code: COLLAB_ERROR_CODE.PERMISSION_INVALIDATED,
+          closeCode: COLLAB_SOCKET_CLOSE_CODE.PERMISSION_INVALIDATED,
+        })
+      }
+
+      return {
+        disconnected,
+      }
+    },
+    disconnectDocument(input) {
+      let disconnected = 0
+
+      for (const entry of Array.from(entries)) {
+        if (entry.ticket.documentId !== input.documentId) {
+          continue
+        }
+
+        disconnected += 1
+        entry.release()
+        closeCollabSocket(entry.socket, {
+          code: input.code,
+          closeCode: COLLAB_SOCKET_CLOSE_CODE.PERSISTENCE_FAILED,
+        })
       }
 
       return {
@@ -69,11 +104,17 @@ export function createCollabActiveConnectionRegistry(): CollabActiveConnectionRe
   }
 }
 
-function closeCollabSocket(socket: unknown): void {
+function closeCollabSocket(
+  socket: unknown,
+  input: {
+    code: CollabErrorCode
+    closeCode: number
+  },
+): void {
   const target = resolveSocketCloseTarget(socket)
 
   if (typeof target?.close === 'function') {
-    target.close(4003, COLLAB_ERROR_CODE.PERMISSION_INVALIDATED)
+    target.close(input.closeCode, input.code)
     return
   }
 

@@ -93,6 +93,7 @@ export const useActiveDocument = createSharedComposable(() => {
     && !isCollaborationReadonly.value,
   )
   const collaborationStatusLabel = computed(() => resolveEditableCollaborationStatusLabel({
+    connectionError: collaboration.connectionError.value,
     hasDocument: Boolean(state.currentDocument.value),
     isReadonlyFallback: isCollaborationReadonly.value,
     status: collaboration.connectionStatus.value,
@@ -103,6 +104,7 @@ export const useActiveDocument = createSharedComposable(() => {
     status: collaboration.connectionStatus.value,
   }))
   const collaborationStatusHint = computed(() => resolveEditableCollaborationStatusHint({
+    connectionError: collaboration.connectionError.value,
     hasDocument: Boolean(state.currentDocument.value),
     isReadonlyFallback: isCollaborationReadonly.value,
     status: collaboration.connectionStatus.value,
@@ -714,6 +716,7 @@ function createUnsupportedSchemaVersionError(schemaVersion: unknown): Unsupporte
 }
 
 function resolveEditableCollaborationStatusLabel(input: {
+  connectionError: string | null
   hasDocument: boolean
   isReadonlyFallback: boolean
   status: ReturnType<typeof useDocsDocumentCollabRuntime>['connectionStatus']['value']
@@ -723,6 +726,10 @@ function resolveEditableCollaborationStatusLabel(input: {
   }
 
   if (input.isReadonlyFallback) {
+    if (input.connectionError) {
+      return '协作已暂停，当前只读保护'
+    }
+
     return input.status === 'error'
       ? '协作不可用，当前只读保护'
       : '协作已中断，当前只读保护'
@@ -769,6 +776,7 @@ function resolveEditableCollaborationStatusTone(input: {
 }
 
 function resolveEditableCollaborationStatusHint(input: {
+  connectionError: string | null
   hasDocument: boolean
   isReadonlyFallback: boolean
   status: ReturnType<typeof useDocsDocumentCollabRuntime>['connectionStatus']['value']
@@ -778,9 +786,17 @@ function resolveEditableCollaborationStatusHint(input: {
   }
 
   if (input.isReadonlyFallback) {
+    if (input.connectionError) {
+      return `${input.connectionError} 当前内容已进入只读保护，重新连接后才能继续编辑。`
+    }
+
     return input.status === 'error'
       ? '当前内容已进入只读保护，点击重新连接后再尝试继续编辑。'
       : '当前内容已进入只读保护，重新连接后才能继续编辑。'
+  }
+
+  if (input.status === 'error' && input.connectionError) {
+    return input.connectionError
   }
 
   if (input.status === 'disconnected') {

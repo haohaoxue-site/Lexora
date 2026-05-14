@@ -6,6 +6,7 @@ type CollabMetricEventType
     | 'room-unloaded'
     | 'current-projection-failed'
     | 'update-persistence-failed'
+    | 'update-persistence-retry'
 
 /** 协作指标事件上下文。 */
 export interface CollabMetricEventContext {
@@ -14,6 +15,15 @@ export interface CollabMetricEventContext {
   documentId?: string
   roomId?: string
   code?: string
+  runtimeEpoch?: number
+  seq?: number
+  checkpointUpdateSeq?: number
+  idempotencyKey?: string
+  attempt?: number
+  maxAttempts?: number
+  retryable?: boolean
+  errorName?: string
+  errorMessage?: string
 }
 
 /** 协作指标事件。 */
@@ -27,6 +37,7 @@ export interface CollabMetricsSnapshot {
   activeConnections: number
   documentRooms: number
   updatePersistenceFailures: number
+  updatePersistenceRetries: number
   currentProjectionFailures: number
   checkpointDurationMs: {
     count: number
@@ -42,7 +53,8 @@ export interface CollabMetricsCollector {
   recordConnectionClosed: (context: Required<Pick<CollabMetricEventContext, 'connectionId' | 'documentId'>> & Pick<CollabMetricEventContext, 'requestId'>) => void
   recordRoomLoaded: (context: Required<Pick<CollabMetricEventContext, 'documentId' | 'roomId'>>) => void
   recordRoomUnloaded: (context: Required<Pick<CollabMetricEventContext, 'documentId' | 'roomId'>>) => void
-  recordUpdatePersistenceFailure: (context: Required<Pick<CollabMetricEventContext, 'code' | 'documentId' | 'roomId'>> & Pick<CollabMetricEventContext, 'connectionId' | 'requestId'>) => void
+  recordUpdatePersistenceFailure: (context: Required<Pick<CollabMetricEventContext, 'code' | 'documentId' | 'roomId'>> & CollabMetricEventContext) => void
+  recordUpdatePersistenceRetry: (context: Required<Pick<CollabMetricEventContext, 'attempt' | 'code' | 'documentId' | 'maxAttempts' | 'roomId'>> & CollabMetricEventContext) => void
   recordCurrentProjectionFailure: (context: Required<Pick<CollabMetricEventContext, 'code' | 'documentId' | 'roomId'>> & Pick<CollabMetricEventContext, 'connectionId' | 'requestId'>) => void
   recordCheckpointDuration: (context: Required<Pick<CollabMetricEventContext, 'documentId' | 'roomId'>> & { durationMs: number }) => void
   getSnapshot: () => CollabMetricsSnapshot
@@ -55,6 +67,7 @@ export function createCollabMetricsCollector(): CollabMetricsCollector {
   const documentRooms = new Set<string>()
   const events: CollabMetricEvent[] = []
   let updatePersistenceFailures = 0
+  let updatePersistenceRetries = 0
   let currentProjectionFailures = 0
   let checkpointDurationCount = 0
   let checkpointDurationTotal = 0
@@ -101,6 +114,14 @@ export function createCollabMetricsCollector(): CollabMetricsCollector {
       })
     },
 
+    recordUpdatePersistenceRetry(context) {
+      updatePersistenceRetries += 1
+      pushEvent(events, {
+        type: 'update-persistence-retry',
+        ...sanitizeContext(context),
+      })
+    },
+
     recordCurrentProjectionFailure(context) {
       currentProjectionFailures += 1
       pushEvent(events, {
@@ -125,6 +146,7 @@ export function createCollabMetricsCollector(): CollabMetricsCollector {
         activeConnections: activeConnections.size,
         documentRooms: documentRooms.size,
         updatePersistenceFailures,
+        updatePersistenceRetries,
         currentProjectionFailures,
         checkpointDurationMs: {
           count: checkpointDurationCount,
@@ -152,5 +174,14 @@ function sanitizeContext(context: CollabMetricEventContext): CollabMetricEventCo
     documentId: context.documentId,
     roomId: context.roomId,
     code: context.code,
+    runtimeEpoch: context.runtimeEpoch,
+    seq: context.seq,
+    checkpointUpdateSeq: context.checkpointUpdateSeq,
+    idempotencyKey: context.idempotencyKey,
+    attempt: context.attempt,
+    maxAttempts: context.maxAttempts,
+    retryable: context.retryable,
+    errorName: context.errorName,
+    errorMessage: context.errorMessage,
   }
 }

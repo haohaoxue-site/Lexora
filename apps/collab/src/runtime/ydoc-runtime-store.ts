@@ -1,4 +1,5 @@
 import type {
+  CollabErrorCode,
   DocumentYdocCheckpointMetadata,
   DocumentYdocRuntimeState,
   PersistDocumentYdocUpdateRequest,
@@ -20,6 +21,29 @@ export interface DocumentYdocRuntimeStore {
     lastProjectedProjectionRevision: number
   }) => Promise<DocumentYdocCheckpointMetadata>
   close?: () => Promise<void>
+}
+
+export class DocumentYdocRuntimeStoreError extends Error {
+  readonly code: CollabErrorCode
+  readonly retryable: boolean
+
+  constructor(input: {
+    code: CollabErrorCode
+    message: string
+    retryable: boolean
+    cause?: unknown
+  }) {
+    super(input.message, {
+      cause: input.cause,
+    })
+    this.name = 'DocumentYdocRuntimeStoreError'
+    this.code = input.code
+    this.retryable = input.retryable
+  }
+}
+
+export function isDocumentYdocRuntimeStoreError(error: unknown): error is DocumentYdocRuntimeStoreError {
+  return error instanceof DocumentYdocRuntimeStoreError
 }
 
 export function createEmptyDocumentYdocRuntimeStore(): DocumentYdocRuntimeStore {

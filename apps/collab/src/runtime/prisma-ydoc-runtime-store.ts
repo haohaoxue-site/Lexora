@@ -2,7 +2,6 @@ import type {
   DocumentYdocRuntimeState,
   PersistDocumentYdocUpdateRequest,
 } from '@haohaoxue/samepage-contracts'
-import type { Prisma } from '@prisma/client'
 import type { DocumentYdocRuntimeStore } from './ydoc-runtime-store'
 import { COLLAB_ERROR_CODE } from '@haohaoxue/samepage-contracts'
 import {
@@ -14,8 +13,12 @@ import {
   toDocumentYdocUpdateRecord,
 } from '@haohaoxue/samepage-shared'
 import { PrismaPg } from '@prisma/adapter-pg'
-import { PrismaClient } from '@prisma/client'
+import { Prisma, PrismaClient } from '@prisma/client'
 import * as Y from 'yjs'
+import {
+  DocumentYdocRuntimeStoreError,
+  isDocumentYdocRuntimeStoreError,
+} from './ydoc-runtime-store'
 
 const documentYdocSelect = {
   documentId: true,
@@ -42,6 +45,22 @@ const documentYdocUpdateSelect = {
   createdBy: true,
   createdAt: true,
 } satisfies Prisma.DocumentYdocUpdateSelect
+
+const RETRYABLE_PRISMA_ERROR_CODES = new Set([
+  'P1001',
+  'P1002',
+  'P1008',
+  'P1017',
+  'P2024',
+  'P2034',
+])
+
+const RETRYABLE_NODE_ERROR_CODES = new Set([
+  'ECONNRESET',
+  'ECONNREFUSED',
+  'ETIMEDOUT',
+  'EPIPE',
+])
 
 type PersistedDocumentYdoc = Prisma.DocumentYdocGetPayload<{
   select: typeof documentYdocSelect
@@ -145,20 +164,7 @@ export function createPrismaDocumentYdocRuntimeStore(
     },
 
     async persistDocumentYdocUpdate(input) {
-      const duplicateUpdate = await prisma.documentYdocUpdate.findUnique({
-        where: {
-          documentId_runtimeEpoch_idempotencyKey: {
-            documentId: input.documentId,
-            runtimeEpoch: input.runtimeEpoch,
-            idempotencyKey: input.idempotencyKey,
-          },
-        },
-        select: {
-          documentId: true,
-          runtimeEpoch: true,
-          seq: true,
-        },
-      })
+      const duplicateUpdate = await findDuplicateDocumentYdocUpdate(prisma, input)
 
       if (duplicateUpdate) {
         return {
@@ -169,97 +175,128 @@ export function createPrismaDocumentYdocRuntimeStore(
         }
       }
 
-      return await prisma.$transaction(async (tx) => {
-        const ydoc = await loadOrCreateDocumentYdoc(tx, input)
+      try {
+        return await prisma.$transaction(async (tx) => {
+          const ydoc = await loadOrCreateDocumentYdoc(tx, input)
 
-        assertRuntimeEpoch(ydoc.runtimeEpoch, input.runtimeEpoch)
-        assertUpdateSeq({
-          inputSeq: input.seq,
-          checkpointUpdateSeq: ydoc.checkpointUpdateSeq,
-          updateSeq: ydoc.updateSeq,
+          assertRuntimeEpoch(ydoc.runtimeEpoch, input.runtimeEpoch)
+          assertUpdateSeq({
+            inputSeq: input.seq,
+            checkpointUpdateSeq: ydoc.checkpointUpdateSeq,
+            updateSeq: ydoc.updateSeq,
+          })
+
+          const update = await tx.documentYdocUpdate.create({
+            data: {
+              documentId: input.documentId,
+              runtimeEpoch: input.runtimeEpoch,
+              seq: input.seq,
+              idempotencyKey: input.idempotencyKey,
+              clientId: input.clientId,
+              update: toPrismaBytes(input.update),
+              createdBy: input.createdBy,
+            },
+            select: documentYdocUpdateSelect,
+          })
+
+          await tx.documentYdoc.update({
+            where: {
+              documentId: input.documentId,
+            },
+            data: {
+              updateSeq: input.seq,
+            },
+          })
+
+          return {
+            documentId: update.documentId,
+            runtimeEpoch: update.runtimeEpoch,
+            seq: update.seq,
+            duplicate: false,
+          }
         })
+      }
+      catch (error) {
+        if (isUniqueConstraintError(error, ['documentId', 'runtimeEpoch', 'idempotencyKey'])) {
+          const duplicateUpdateAfterConflict = await findDuplicateDocumentYdocUpdate(prisma, input)
 
-        const update = await tx.documentYdocUpdate.create({
-          data: {
-            documentId: input.documentId,
-            runtimeEpoch: input.runtimeEpoch,
-            seq: input.seq,
-            idempotencyKey: input.idempotencyKey,
-            clientId: input.clientId,
-            update: toPrismaBytes(input.update),
-            createdBy: input.createdBy,
-          },
-          select: documentYdocUpdateSelect,
-        })
-
-        await tx.documentYdoc.update({
-          where: {
-            documentId: input.documentId,
-          },
-          data: {
-            updateSeq: input.seq,
-          },
-        })
-
-        return {
-          documentId: update.documentId,
-          runtimeEpoch: update.runtimeEpoch,
-          seq: update.seq,
-          duplicate: false,
+          if (duplicateUpdateAfterConflict) {
+            return {
+              documentId: duplicateUpdateAfterConflict.documentId,
+              runtimeEpoch: duplicateUpdateAfterConflict.runtimeEpoch,
+              seq: duplicateUpdateAfterConflict.seq,
+              duplicate: true,
+            }
+          }
         }
-      })
+
+        throw normalizeDocumentYdocRuntimeStoreError(error)
+      }
     },
 
     async replaceDocumentYdocCheckpoint(input) {
-      return await prisma.$transaction(async (tx) => {
-        const ydoc = await tx.documentYdoc.findUnique({
-          where: {
-            documentId: input.documentId,
-          },
-          select: documentYdocSelect,
-        })
-
-        if (!ydoc) {
-          throw new Error(`DocumentYdoc "${input.documentId}" not found`)
-        }
-
-        assertRuntimeEpoch(ydoc.runtimeEpoch, input.runtimeEpoch)
-
-        if (input.checkpointUpdateSeq > ydoc.updateSeq) {
-          throw new Error('checkpoint 水位不能超过已持久化 update 水位')
-        }
-
-        const nextYdoc = await tx.documentYdoc.update({
-          where: {
-            documentId: input.documentId,
-          },
-          data: {
-            checkpointState: toPrismaBytes(input.checkpointState),
-            checkpointSeq: {
-              increment: 1,
+      try {
+        return await prisma.$transaction(async (tx) => {
+          const ydoc = await tx.documentYdoc.findUnique({
+            where: {
+              documentId: input.documentId,
             },
-            checkpointUpdateSeq: input.checkpointUpdateSeq,
-            lastProjectedProjectionId: input.lastProjectedProjectionId,
-            lastProjectedProjectionRevision: input.lastProjectedProjectionRevision,
-          },
-          select: documentYdocSelect,
-        })
+            select: documentYdocSelect,
+          })
 
-        await tx.documentYdocUpdate.updateMany({
-          where: {
-            documentId: input.documentId,
-            runtimeEpoch: input.runtimeEpoch,
-            seq: {
-              lte: input.checkpointUpdateSeq,
+          if (!ydoc) {
+            throw new DocumentYdocRuntimeStoreError({
+              code: COLLAB_ERROR_CODE.PERSISTENCE_FAILED,
+              message: `DocumentYdoc "${input.documentId}" not found`,
+              retryable: false,
+            })
+          }
+
+          assertRuntimeEpoch(ydoc.runtimeEpoch, input.runtimeEpoch)
+
+          if (input.checkpointUpdateSeq > ydoc.updateSeq) {
+            throw new DocumentYdocRuntimeStoreError({
+              code: COLLAB_ERROR_CODE.CHECKPOINT_EXPIRED,
+              message: 'checkpoint 水位不能超过已持久化 update 水位',
+              retryable: false,
+            })
+          }
+
+          const nextYdoc = await tx.documentYdoc.update({
+            where: {
+              documentId: input.documentId,
             },
-          },
-          data: {
-            deletedAt: new Date(),
-          },
-        })
+            data: {
+              checkpointState: toPrismaBytes(input.checkpointState),
+              checkpointSeq: {
+                increment: 1,
+              },
+              checkpointUpdateSeq: input.checkpointUpdateSeq,
+              lastProjectedProjectionId: input.lastProjectedProjectionId,
+              lastProjectedProjectionRevision: input.lastProjectedProjectionRevision,
+            },
+            select: documentYdocSelect,
+          })
 
-        return toDocumentYdocCheckpointMetadata(nextYdoc)
-      })
+          await tx.documentYdocUpdate.updateMany({
+            where: {
+              documentId: input.documentId,
+              runtimeEpoch: input.runtimeEpoch,
+              seq: {
+                lte: input.checkpointUpdateSeq,
+              },
+            },
+            data: {
+              deletedAt: new Date(),
+            },
+          })
+
+          return toDocumentYdocCheckpointMetadata(nextYdoc)
+        })
+      }
+      catch (error) {
+        throw normalizeDocumentYdocRuntimeStoreError(error)
+      }
     },
 
     async close() {
@@ -321,7 +358,11 @@ async function loadOrCreateDocumentYdoc(
   }
 
   if (input.seq !== 1) {
-    throw new Error('协作 update 序号不连续，请重新同步')
+    throw new DocumentYdocRuntimeStoreError({
+      code: COLLAB_ERROR_CODE.UPDATE_SEQUENCE_GAP,
+      message: '协作 update 序号不连续，请重新同步',
+      retryable: false,
+    })
   }
 
   return await tx.documentYdoc.create({
@@ -336,7 +377,11 @@ async function loadOrCreateDocumentYdoc(
 
 function assertRuntimeEpoch(currentEpoch: number, inputEpoch: number): void {
   if (resolveYdocRuntimeEpochError({ currentEpoch, inputEpoch })) {
-    throw new Error('协作运行时已失效，请重新连接')
+    throw new DocumentYdocRuntimeStoreError({
+      code: COLLAB_ERROR_CODE.RUNTIME_EPOCH_EXPIRED,
+      message: '协作运行时已失效，请重新连接',
+      retryable: false,
+    })
   }
 }
 
@@ -352,14 +397,110 @@ function assertUpdateSeq(input: {
   }
 
   if (error === COLLAB_ERROR_CODE.UPDATE_CHECKPOINTED) {
-    throw new Error('协作 update 已被 checkpoint 覆盖，请重新同步')
+    throw new DocumentYdocRuntimeStoreError({
+      code: COLLAB_ERROR_CODE.UPDATE_CHECKPOINTED,
+      message: '协作 update 已被 checkpoint 覆盖，请重新同步',
+      retryable: false,
+    })
   }
 
   if (error === COLLAB_ERROR_CODE.UPDATE_SEQUENCE_GAP) {
-    throw new Error('协作 update 序号不连续，请重新同步')
+    throw new DocumentYdocRuntimeStoreError({
+      code: COLLAB_ERROR_CODE.UPDATE_SEQUENCE_GAP,
+      message: '协作 update 序号不连续，请重新同步',
+      retryable: false,
+    })
   }
 }
 
 function toPrismaBytes(payload: Uint8Array): Uint8Array<ArrayBuffer> {
   return new Uint8Array(payload)
+}
+
+async function findDuplicateDocumentYdocUpdate(
+  prisma: YdocRuntimePrismaClient,
+  input: PersistDocumentYdocUpdateRequest,
+) {
+  return await prisma.documentYdocUpdate.findUnique({
+    where: {
+      documentId_runtimeEpoch_idempotencyKey: {
+        documentId: input.documentId,
+        runtimeEpoch: input.runtimeEpoch,
+        idempotencyKey: input.idempotencyKey,
+      },
+    },
+    select: {
+      documentId: true,
+      runtimeEpoch: true,
+      seq: true,
+    },
+  })
+}
+
+function normalizeDocumentYdocRuntimeStoreError(error: unknown): DocumentYdocRuntimeStoreError {
+  if (isDocumentYdocRuntimeStoreError(error)) {
+    return error
+  }
+
+  if (isUniqueConstraintError(error, ['documentId', 'runtimeEpoch', 'seq'])) {
+    return new DocumentYdocRuntimeStoreError({
+      code: COLLAB_ERROR_CODE.UPDATE_SEQUENCE_GAP,
+      message: '协作 update 序号已被占用，请重新同步',
+      retryable: false,
+      cause: error,
+    })
+  }
+
+  return new DocumentYdocRuntimeStoreError({
+    code: COLLAB_ERROR_CODE.PERSISTENCE_FAILED,
+    message: resolvePersistenceErrorMessage(error),
+    retryable: isRetryablePersistenceError(error),
+    cause: error,
+  })
+}
+
+function isUniqueConstraintError(error: unknown, target: readonly string[]): boolean {
+  if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== 'P2002') {
+    return false
+  }
+
+  return isSamePrismaTarget(error.meta?.target, target)
+}
+
+function isSamePrismaTarget(actual: unknown, expected: readonly string[]): boolean {
+  if (Array.isArray(actual)) {
+    return expected.every(field => actual.includes(field))
+  }
+
+  if (typeof actual === 'string') {
+    return expected.every(field => actual.includes(field))
+  }
+
+  return false
+}
+
+function isRetryablePersistenceError(error: unknown): boolean {
+  if (error instanceof Prisma.PrismaClientKnownRequestError) {
+    return RETRYABLE_PRISMA_ERROR_CODES.has(error.code)
+  }
+
+  const code = readObjectString(error, 'code')
+  return code ? RETRYABLE_NODE_ERROR_CODES.has(code) : true
+}
+
+function resolvePersistenceErrorMessage(error: unknown): string {
+  if (error instanceof Error && error.message) {
+    return error.message
+  }
+
+  return '协作持久化失败'
+}
+
+function readObjectString(input: unknown, key: string): string | null {
+  if (!input || typeof input !== 'object' || !(key in input)) {
+    return null
+  }
+
+  const value = (input as Record<string, unknown>)[key]
+  return typeof value === 'string' && value.length > 0 ? value : null
 }

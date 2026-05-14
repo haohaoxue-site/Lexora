@@ -1,10 +1,12 @@
 import type {
   CollabAwarenessState,
+  CollabErrorCode,
   CreateCollabTicketResponse,
   TiptapJsonContent,
 } from '@haohaoxue/samepage-contracts'
 import type { HocuspocusProvider } from '@hocuspocus/provider'
 import type { DocsDocumentEditorCollaborationBindings } from '../typing'
+import { COLLAB_ERROR_CODE } from '@haohaoxue/samepage-contracts'
 import { stripDocumentAssetRuntimeAttributes } from '@haohaoxue/samepage-shared'
 import { HocuspocusProvider as HocuspocusRuntimeProvider } from '@hocuspocus/provider'
 import { computed, onScopeDispose, shallowRef, watch } from 'vue'
@@ -16,6 +18,24 @@ import {
 
 const TRAILING_SLASH_PATTERN = /\/+$/
 const COLLABORATION_RECONNECT_GRACE_PERIOD = 5000
+const DOCUMENT_COLLABORATION_PERSISTENCE_CLOSE_CODE = 4004
+const COLLABORATION_CLOSE_MESSAGE_BY_REASON = {
+  [COLLAB_ERROR_CODE.TICKET_INVALID]: '协作票据无效，请重新连接后继续编辑。',
+  [COLLAB_ERROR_CODE.TICKET_EXPIRED]: '协作票据已失效，请重新连接后继续编辑。',
+  [COLLAB_ERROR_CODE.TICKET_REPLAYED]: '协作票据已被使用，请重新连接后继续编辑。',
+  [COLLAB_ERROR_CODE.RATE_LIMITED]: '协作连接过于频繁，请稍后再试。',
+  [COLLAB_ERROR_CODE.CONNECTION_LIMIT_EXCEEDED]: '协作连接数已达上限，请稍后再试。',
+  [COLLAB_ERROR_CODE.DOCUMENT_MISMATCH]: '协作文档不匹配，请刷新后重试。',
+  [COLLAB_ERROR_CODE.ENTRY_MISMATCH]: '协作入口不匹配，请刷新后重试。',
+  [COLLAB_ERROR_CODE.RUNTIME_EPOCH_EXPIRED]: '文档运行时已更新，请重新连接后继续编辑。',
+  [COLLAB_ERROR_CODE.PERMISSION_INVALIDATED]: '文档权限状态已变化，请重新连接后继续编辑。',
+  [COLLAB_ERROR_CODE.READONLY_WRITE_REJECTED]: '当前协作会话没有写入权限，请重新连接后继续编辑。',
+  [COLLAB_ERROR_CODE.UPDATE_TOO_LARGE]: '本次协作更新过大，已暂停编辑，请拆分内容后重试。',
+  [COLLAB_ERROR_CODE.UPDATE_SEQUENCE_GAP]: '协作保存水位异常，已暂停编辑，请重新加载文档后再继续。',
+  [COLLAB_ERROR_CODE.UPDATE_CHECKPOINTED]: '协作保存水位已过期，已暂停编辑，请重新加载文档后再继续。',
+  [COLLAB_ERROR_CODE.CHECKPOINT_EXPIRED]: '协作保存 checkpoint 已过期，已暂停编辑，请重新加载文档后再继续。',
+  [COLLAB_ERROR_CODE.PERSISTENCE_FAILED]: '协作保存失败，已暂停编辑以避免内容丢失。',
+} satisfies Record<CollabErrorCode, string>
 
 /**
  * 协作投影结果。
@@ -50,6 +70,7 @@ export function useDocsDocumentCollabRuntime() {
   const awarenessState = shallowRef<CollabAwarenessState | null>(null)
   const connectionStatus = shallowRef<DocsDocumentCollabConnectionStatus>('idle')
   const connectionError = shallowRef<string | null>(null)
+  const hasTerminalConnectionError = shallowRef(false)
   const isReadonlyFallback = shallowRef(false)
   const isRemoteSynced = shallowRef(false)
   const currentRuntimeEpoch = shallowRef<number | null>(null)
@@ -114,6 +135,7 @@ export function useDocsDocumentCollabRuntime() {
 
     awarenessState.value = input.awarenessState ?? null
     connectionError.value = null
+    hasTerminalConnectionError.value = false
     isRemoteSynced.value = false
     clearProviderReconnectTimer()
     applyConnectionStatus('connecting')
@@ -151,7 +173,24 @@ export function useDocsDocumentCollabRuntime() {
           }
 
           applyConnectionStatus('error')
-          connectionError.value = reason || '协作鉴权失败'
+          hasTerminalConnectionError.value = true
+          connectionError.value = resolveDocumentCollaborationCloseState({ reason }).message
+            ?? reason
+            ?? '协作鉴权失败'
+        },
+        onClose: ({ event }) => {
+          if (!isActiveConnectRequest(requestId, document)) {
+            return
+          }
+
+          const closeState = resolveDocumentCollaborationCloseState(event)
+
+          if (!closeState.message) {
+            return
+          }
+
+          connectionError.value = closeState.message
+          hasTerminalConnectionError.value = closeState.terminal
         },
         onStatus: ({ status }) => {
           if (!isActiveConnectRequest(requestId, document)) {
@@ -199,6 +238,7 @@ export function useDocsDocumentCollabRuntime() {
       }
 
       applyConnectionStatus('error')
+      hasTerminalConnectionError.value = true
       connectionError.value = resolveDocumentCollaborationError(error)
       replaceProvider(null)
       return false
@@ -209,6 +249,7 @@ export function useDocsDocumentCollabRuntime() {
     connectRequestId += 1
     clearProviderReconnectTimer()
     connectionError.value = null
+    hasTerminalConnectionError.value = false
     applyConnectionStatus('idle')
     replaceProvider(null)
   }
@@ -288,7 +329,14 @@ export function useDocsDocumentCollabRuntime() {
     }
 
     if (!wasRemoteSynced) {
-      connectionError.value = '协作连接在同步前断开'
+      connectionError.value ??= '协作连接在同步前断开'
+      hasTerminalConnectionError.value = true
+      replaceProvider(null)
+      applyConnectionStatus('error')
+      return
+    }
+
+    if (hasTerminalConnectionError.value) {
       replaceProvider(null)
       applyConnectionStatus('error')
       return
@@ -402,6 +450,49 @@ function resolveDocumentCollaborationError(error: unknown): string {
   }
 
   return '暂时无法建立协作连接'
+}
+
+interface DocumentCollaborationCloseEventLike {
+  code?: number
+  reason?: string
+}
+
+function resolveDocumentCollaborationCloseState(event: DocumentCollaborationCloseEventLike): {
+  message: string | null
+  terminal: boolean
+} {
+  const reason = resolveDocumentCollaborationCloseReason(event.reason)
+
+  if (reason) {
+    return {
+      message: COLLABORATION_CLOSE_MESSAGE_BY_REASON[reason],
+      terminal: true,
+    }
+  }
+
+  if (event.code === DOCUMENT_COLLABORATION_PERSISTENCE_CLOSE_CODE) {
+    return {
+      message: COLLABORATION_CLOSE_MESSAGE_BY_REASON[COLLAB_ERROR_CODE.PERSISTENCE_FAILED],
+      terminal: true,
+    }
+  }
+
+  return {
+    message: null,
+    terminal: false,
+  }
+}
+
+function resolveDocumentCollaborationCloseReason(reason: string | undefined): CollabErrorCode | null {
+  if (!reason) {
+    return null
+  }
+
+  const closeReason = reason.trim()
+
+  return Object.values(COLLAB_ERROR_CODE).includes(closeReason as CollabErrorCode)
+    ? closeReason as CollabErrorCode
+    : null
 }
 
 function resolveDocumentCollaborationWebsocketUrl(publicWsUrl: string, documentId: string, ticket: string): string {

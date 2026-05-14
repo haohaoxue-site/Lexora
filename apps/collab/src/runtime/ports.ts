@@ -1,3 +1,4 @@
+import type { CollabErrorCode } from '@haohaoxue/samepage-contracts'
 import type { Hocuspocus } from '@hocuspocus/server'
 import type { DocumentYdocCurrentProjectionClient } from '../clients/documents'
 import type { CollabMetricsCollector } from '../observability/metrics'
@@ -13,6 +14,18 @@ export interface CollabHocuspocusContext {
   ticketJti?: string
 }
 
+/** 协作 runtime 结构化日志。 */
+export interface CollabRuntimeLogger {
+  warn: (context: Record<string, unknown>, message: string) => void
+  error: (context: Record<string, unknown>, message: string) => void
+}
+
+/** 协作运行时不可恢复持久化失败。 */
+export interface CollabFatalPersistenceFailure {
+  documentId: string
+  code: CollabErrorCode
+}
+
 /** 协作 WebSocket runtime。 */
 export interface CollabHocuspocusRuntime {
   handleConnection: Hocuspocus['handleConnection']
@@ -25,5 +38,7 @@ export interface CreateHocuspocusRuntimeInput {
   ydocRuntimeStore?: DocumentYdocRuntimeStore
   currentProjectionClient?: DocumentYdocCurrentProjectionClient
   metrics?: CollabMetricsCollector
+  logger?: CollabRuntimeLogger
+  onFatalPersistenceFailure?: (failure: CollabFatalPersistenceFailure) => void
   maxUpdateBytes?: number
 }

@@ -58,7 +58,7 @@ export function createHocuspocusRuntime(input: CreateHocuspocusRuntimeInput = {}
       })
 
       if (data.context.canWrite && documentStates.get(data.documentName)?.persistenceFailed) {
-        throw new Error(COLLAB_ERROR_CODE.PERSISTENCE_FAILED)
+        throw new Error(documentStates.get(data.documentName)?.persistenceFailureCode ?? COLLAB_ERROR_CODE.PERSISTENCE_FAILED)
       }
     },
     async onChange(data) {
@@ -70,6 +70,8 @@ export function createHocuspocusRuntime(input: CreateHocuspocusRuntimeInput = {}
         documentStates,
         ydocRuntimeStore,
         metrics: input.metrics,
+        logger: input.logger,
+        onFatalPersistenceFailure: input.onFatalPersistenceFailure,
       })
     },
     async onStoreDocument(data) {
@@ -80,6 +82,8 @@ export function createHocuspocusRuntime(input: CreateHocuspocusRuntimeInput = {}
         ydocRuntimeStore,
         currentProjectionClient: input.currentProjectionClient,
         metrics: input.metrics,
+        logger: input.logger,
+        onFatalPersistenceFailure: input.onFatalPersistenceFailure,
       })
     },
     async afterUnloadDocument(data) {

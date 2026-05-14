@@ -43,12 +43,6 @@ export function createCollabServer(input: CreateCollabServerInput): FastifyInsta
     maxRequests: input.config.handshakeRateLimitMax,
     windowMs: input.config.handshakeRateLimitWindowMs,
   })
-  const hocuspocus = input.hocuspocus ?? createHocuspocusRuntime({
-    ydocRuntimeStore,
-    currentProjectionClient: input.currentProjectionClient,
-    metrics,
-    maxUpdateBytes: input.config.maxUpdateBytes,
-  })
   const activeConnections = createCollabActiveConnectionRegistry()
   const unsubscribePubSub = input.pubSub?.subscribe(async (message) => {
     if (message.type !== 'permission-invalidation') {
@@ -63,6 +57,20 @@ export function createCollabServer(input: CreateCollabServerInput): FastifyInsta
     logger: createCollabFastifyLoggerOptions(input.config.logger),
     requestIdHeader: 'x-request-id',
     trustProxy: true,
+  })
+  const hocuspocus = input.hocuspocus ?? createHocuspocusRuntime({
+    ydocRuntimeStore,
+    currentProjectionClient: input.currentProjectionClient,
+    metrics,
+    logger: app.log,
+    onFatalPersistenceFailure(failure) {
+      const result = activeConnections.disconnectDocument(failure)
+      app.log.error({
+        ...failure,
+        disconnected: result.disconnected,
+      }, 'Collab document connections closed after fatal persistence failure')
+    },
+    maxUpdateBytes: input.config.maxUpdateBytes,
   })
 
   app.register(websocket)
