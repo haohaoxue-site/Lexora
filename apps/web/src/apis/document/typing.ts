@@ -10,6 +10,7 @@ export type {
   DocumentTrashItem,
   DocumentTreeGroup,
   DocumentVersionSnapshot,
+  PatchDocumentLayoutRequest,
   PatchDocumentMetaRequest,
   ResolveDocumentAssetsRequest,
   ResolveDocumentAssetsResponse,

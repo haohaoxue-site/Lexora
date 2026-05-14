@@ -85,6 +85,7 @@ const documentCurrentSelect = {
   summary: true,
   status: true,
   order: true,
+  pageWidthMode: true,
   createdAt: true,
   updatedAt: true,
   currentProjection: {
@@ -494,6 +495,7 @@ function toDocumentRecord(
     latestVersionSnapshotId: document.latestVersionSnapshotId,
     order: document.order,
     status: document.status,
+    pageWidthMode: document.pageWidthMode,
     share,
   }
 }

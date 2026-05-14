@@ -1,4 +1,4 @@
-import type { TiptapJsonContent } from '@haohaoxue/samepage-contracts'
+import type { DocumentPageWidthMode, TiptapJsonContent } from '@haohaoxue/samepage-contracts'
 import type {
   TiptapEditorCollaborationBinding,
   TiptapEditorCommentRequest,
@@ -34,6 +34,8 @@ export interface DocumentContentSurfaceProps {
   bodyCollaboration?: TiptapEditorCollaborationBinding | null
   /** 当前 URL 对应的块 ID */
   activeBlockId?: string | null
+  /** 页面宽度模式 */
+  pageWidthMode?: DocumentPageWidthMode
   /** 是否展示大纲 */
   showOutline?: boolean
   /** 页脚元信息 */

@@ -51,6 +51,24 @@ export const DOCUMENT_VISIBILITY_VALUES = [
   DOCUMENT_VISIBILITY.WORKSPACE,
 ] as const
 
+export const DOCUMENT_PAGE_WIDTH_MODE = {
+  NARROW: 'NARROW',
+  DEFAULT: 'DEFAULT',
+  FULL: 'FULL',
+} as const
+
+export const DOCUMENT_PAGE_WIDTH_MODE_VALUES = [
+  DOCUMENT_PAGE_WIDTH_MODE.NARROW,
+  DOCUMENT_PAGE_WIDTH_MODE.DEFAULT,
+  DOCUMENT_PAGE_WIDTH_MODE.FULL,
+] as const
+
+export const DOCUMENT_PAGE_WIDTH_MODE_LABELS = {
+  [DOCUMENT_PAGE_WIDTH_MODE.NARROW]: '较窄',
+  [DOCUMENT_PAGE_WIDTH_MODE.DEFAULT]: '默认',
+  [DOCUMENT_PAGE_WIDTH_MODE.FULL]: '全宽',
+} as const satisfies Record<(typeof DOCUMENT_PAGE_WIDTH_MODE_VALUES)[number], string>
+
 export const DOCUMENT_PANE_STATE = {
   READY: 'ready',
   LOADING: 'loading',
@@ -64,6 +82,7 @@ export const DOCUMENT_PANE_STATE = {
 
 export const DocumentStatusSchema = z.enum(['ACTIVE', 'LOCKED'])
 export const DocumentVisibilitySchema = z.enum(DOCUMENT_VISIBILITY_VALUES)
+export const DocumentPageWidthModeSchema = z.enum(DOCUMENT_PAGE_WIDTH_MODE_VALUES)
 
 export const DocumentCollectionIdSchema = z.enum(DOCUMENT_COLLECTION_VALUES)
 export const DocumentTreeCollectionIdSchema = z.enum(DOCUMENT_TREE_COLLECTION_VALUES)
@@ -164,6 +183,7 @@ export const DocumentRecordSchema = DocumentBaseSchema.omit({
   latestVersionSnapshotId: z.string().nullable(),
   order: z.number().int(),
   status: DocumentStatusSchema,
+  pageWidthMode: DocumentPageWidthModeSchema,
   share: DocumentShareProjectionSchema.nullable(),
 }).strict()
 
@@ -267,8 +287,13 @@ export const PatchDocumentMetaSchema = z.object({
   },
 )
 
+export const PatchDocumentLayoutSchema = z.object({
+  pageWidthMode: DocumentPageWidthModeSchema,
+}).strict()
+
 export type DocumentStatus = z.infer<typeof DocumentStatusSchema>
 export type DocumentVisibility = z.infer<typeof DocumentVisibilitySchema>
+export type DocumentPageWidthMode = z.infer<typeof DocumentPageWidthModeSchema>
 export type DocumentAssetKind = z.infer<typeof DocumentAssetKindSchema>
 export type DocumentAssetStatus = z.infer<typeof DocumentAssetStatusSchema>
 export type DocumentCollectionId = z.infer<typeof DocumentCollectionIdSchema>
@@ -330,5 +355,6 @@ export type CreateDocumentVersionSnapshotResponse = z.infer<typeof CreateDocumen
 export type RestoreDocumentVersionSnapshotRequest = z.infer<typeof RestoreDocumentVersionSnapshotSchema>
 export type RestoreDocumentVersionSnapshotResponse = z.infer<typeof RestoreDocumentVersionSnapshotResponseSchema>
 export type PatchDocumentMetaRequest = z.infer<typeof PatchDocumentMetaSchema>
+export type PatchDocumentLayoutRequest = z.infer<typeof PatchDocumentLayoutSchema>
 export type ResolveDocumentAssetsRequest = z.infer<typeof ResolveDocumentAssetsSchema>
 export type ResolveDocumentAssetsResponse = z.infer<typeof ResolveDocumentAssetsResponseSchema>

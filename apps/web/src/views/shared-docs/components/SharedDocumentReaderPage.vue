@@ -45,6 +45,7 @@ const acceptLabel = computed(() =>
         :document-id="props.document.id"
         :title="props.document.title"
         :body="props.document.body"
+        :page-width-mode="props.document.pageWidthMode"
         :editable="false"
         :active-block-id="props.activeBlockId"
         :show-outline="false"

@@ -10,6 +10,7 @@ import type {
   DocumentTrashItem,
   DocumentTreeGroup,
   DocumentVersionSnapshot,
+  PatchDocumentLayoutRequest,
   PatchDocumentMetaRequest,
   ResolveDocumentAssetsRequest,
   ResolveDocumentAssetsResponse,
@@ -111,6 +112,14 @@ export function patchDocumentMeta(id: string, data: PatchDocumentMetaRequest): P
   return axios.request({
     method: 'patch',
     url: `/documents/${id}/meta`,
+    data,
+  })
+}
+
+export function patchDocumentLayout(id: string, data: PatchDocumentLayoutRequest): Promise<DocumentCurrent> {
+  return axios.request({
+    method: 'patch',
+    url: `/documents/${id}/layout`,
     data,
   })
 }

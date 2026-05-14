@@ -3,6 +3,7 @@ import type {
   DocumentContentSurfaceEmits,
   DocumentContentSurfaceProps,
 } from './typing'
+import { DOCUMENT_PAGE_WIDTH_MODE } from '@haohaoxue/samepage-contracts'
 import { computed } from 'vue'
 import DocumentBodyEditor from '../body/DocumentBodyEditor.vue'
 import DocumentTitleEditor from '../title/DocumentTitleEditor.vue'
@@ -13,6 +14,7 @@ const props = withDefaults(defineProps<DocumentContentSurfaceProps>(), {
   titleCollaboration: null,
   bodyCollaboration: null,
   activeBlockId: null,
+  pageWidthMode: DOCUMENT_PAGE_WIDTH_MODE.DEFAULT,
   showOutline: true,
   footerMetaItems: () => [],
 })
@@ -27,6 +29,11 @@ const titleEditorKey = computed(() =>
 const bodyEditorKey = computed(() =>
   `${props.documentId ?? 'document'}:body:${resolveBindingKey(props.bodyCollaboration)}`,
 )
+const pageWidthClass = computed(() => ({
+  [DOCUMENT_PAGE_WIDTH_MODE.NARROW]: 'is-page-width-narrow',
+  [DOCUMENT_PAGE_WIDTH_MODE.DEFAULT]: 'is-page-width-default',
+  [DOCUMENT_PAGE_WIDTH_MODE.FULL]: 'is-page-width-full',
+})[props.pageWidthMode])
 
 function resolveBindingKey(binding: DocumentContentSurfaceProps['titleCollaboration']) {
   if (!binding) {
@@ -58,7 +65,7 @@ function resolveObjectKey(value: object | null) {
 </script>
 
 <template>
-  <section class="document-content-surface">
+  <section class="document-content-surface" :class="pageWidthClass">
     <div class="document-content-surface__title">
       <DocumentTitleEditor
         :key="titleEditorKey"
@@ -105,7 +112,7 @@ function resolveObjectKey(value: object | null) {
 
 <style scoped lang="scss">
 .document-content-surface {
-  --document-content-surface-inline-start: 2.75rem;
+  --document-content-surface-inline-start: 1.25rem;
   --document-content-surface-inline-end: 1.25rem;
   --document-content-surface-inline-size: 100%;
   display: flex;
@@ -113,6 +120,18 @@ function resolveObjectKey(value: object | null) {
   flex-direction: column;
   min-height: 0;
   background: var(--brand-bg-surface);
+
+  &.is-page-width-narrow {
+    --document-content-surface-inline-size: min(100%, 42rem);
+  }
+
+  &.is-page-width-default {
+    --document-content-surface-inline-size: min(100%, 64rem);
+  }
+
+  &.is-page-width-full {
+    --document-content-surface-inline-size: 100%;
+  }
 
   .document-content-surface__title {
     padding:
@@ -141,7 +160,7 @@ function resolveObjectKey(value: object | null) {
     max-width: 100%;
     min-height: auto;
     height: var(--document-content-surface-title-height);
-    margin-inline-end: auto;
+    margin-inline: auto;
     overflow: hidden;
 
     :deep(.tiptap-editor) {
@@ -209,7 +228,7 @@ function resolveObjectKey(value: object | null) {
       max-width: 100%;
       min-width: 0;
       min-height: 0;
-      margin-inline-end: auto;
+      margin-inline: auto;
     }
   }
 
@@ -231,9 +250,8 @@ function resolveObjectKey(value: object | null) {
     display: flex;
     flex-wrap: wrap;
     gap: 0.5rem 1rem;
-    width: var(--document-content-surface-inline-size);
+    width: 100%;
     max-width: 100%;
-    margin-inline-end: auto;
   }
 
   .document-content-surface__footer-meta {

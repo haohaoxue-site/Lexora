@@ -160,6 +160,7 @@ export const sharedDocumentCurrentSelect = {
   summary: true,
   status: true,
   order: true,
+  pageWidthMode: true,
   createdAt: true,
   updatedAt: true,
   currentProjection: {
@@ -321,6 +322,7 @@ export function toDocumentCurrent(
       latestVersionSnapshotId: document.latestVersionSnapshotId,
       order: document.order,
       status: document.status,
+      pageWidthMode: document.pageWidthMode,
       share,
     },
     currentProjection: toDocumentCurrentProjection(document.currentProjection),

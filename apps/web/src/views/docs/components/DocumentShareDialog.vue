@@ -275,7 +275,7 @@ function isShareModeCommand(command: string | number | boolean): command is Docu
   <ElDialog
     :model-value="props.modelValue"
     title="分享"
-    width="880px"
+    width="720px"
     destroy-on-close
     append-to-body
     class="document-share-dialog"
@@ -337,9 +337,9 @@ function isShareModeCommand(command: string | number | boolean): command is Docu
                     v-for="(option, idx) in shareModeOptions"
                     :key="option.value"
                     :command="option.value"
-                    :divided="idx !== 0"
+                    :divided="idx === 1"
                   >
-                    <span class="document-share-panel__mode-option min-w-30 flex items-center gap-2 py-0.5 text-sm font-medium">
+                    <span class="document-share-panel__mode-option min-w-30 flex items-center gap-2 py-0.5 text-sm">
                       <span class="document-share-panel__mode-option-icon inline-flex h-4 w-4 flex-none items-center justify-center" aria-hidden="true">
                         <SvgIcon
                           category="ui"
@@ -530,31 +530,30 @@ function isShareModeCommand(command: string | number | boolean): command is Docu
 .document-share-dialog {
   :deep(.el-dialog) {
     overflow: hidden;
-    width: min(880px, calc(100vw - 2rem)) !important;
-    border-radius: 1.4rem;
+    width: min(720px, calc(100vw - 2rem)) !important;
+    border-radius: 0.875rem;
     border: 1px solid color-mix(in srgb, var(--brand-border-base) 72%, transparent);
     background: color-mix(in srgb, white 98%, var(--brand-bg-base));
-    box-shadow: 0 32px 72px -44px rgba(31, 35, 41, 0.4);
+    box-shadow: 0 24px 56px -38px rgba(31, 35, 41, 0.34);
   }
 
   :deep(.el-dialog__header) {
     margin: 0;
-    padding: 1.1rem 1.35rem 0.35rem;
+    padding: 1rem 1.25rem 0.25rem;
   }
 
   :deep(.el-dialog__title) {
     color: var(--brand-text-primary);
-    font-size: 1.15rem;
-    font-weight: 700;
+    font-size: 1.125rem;
   }
 
   :deep(.el-dialog__body) {
-    padding: 0 0 1.35rem;
+    padding: 0 0 1rem;
   }
 
   :deep(.el-dialog__headerbtn) {
-    top: 1rem;
-    right: 1rem;
+    top: 0.875rem;
+    right: 0.875rem;
   }
 }
 
@@ -581,7 +580,7 @@ function isShareModeCommand(command: string | number | boolean): command is Docu
   }
   .document-share-panel__content {
     display: grid;
-    gap: 1.1rem;
+    gap: 0.75rem;
     width: min(100%, 66rem);
     margin: 0 auto;
   }
@@ -594,14 +593,14 @@ function isShareModeCommand(command: string | number | boolean): command is Docu
   }
 
   .document-share-panel__card {
-    padding: 0 clamp(1.35rem, 3vw, 1.75rem);
+    padding: 0 clamp(1.25rem, 3vw, 1.5rem);
     display: grid;
-    gap: 0.9rem;
+    gap: 0.75rem;
     overflow: hidden;
   }
 
   .document-share-panel__summary {
-    padding: clamp(0.65rem, 1.5vw, 1rem) clamp(1.35rem, 3vw, 1.75rem) 0;
+    padding: 0.625rem clamp(1.25rem, 3vw, 1.5rem) 0;
   }
 
   .document-share-panel__summary-row {
@@ -627,9 +626,9 @@ function isShareModeCommand(command: string | number | boolean): command is Docu
   }
 
   .document-share-panel__mode-trigger {
-    gap: 0.85rem;
+    gap: 0.65rem;
     max-width: 100%;
-    padding: 0.55rem 0;
+    padding: 0.375rem 0;
     text-align: left;
   }
 
@@ -644,13 +643,12 @@ function isShareModeCommand(command: string | number | boolean): command is Docu
   }
 
   .document-share-panel__mode-text {
-    gap: 0.14rem;
+    gap: 0.1rem;
   }
 
   .document-share-panel__mode-title {
-    color: var(--brand-text-primary);
-    font-size: 0.95rem;
-    font-weight: 650;
+    color: color-mix(in srgb, var(--brand-text-primary) 88%, var(--brand-text-secondary));
+    font-size: 0.875rem;
     line-height: 1.3;
   }
 
@@ -658,7 +656,7 @@ function isShareModeCommand(command: string | number | boolean): command is Docu
   .document-share-panel__list-state {
     margin: 0;
     color: var(--brand-text-secondary);
-    font-size: 0.82rem;
+    font-size: 0.75rem;
     line-height: 1.45;
   }
 
@@ -666,10 +664,10 @@ function isShareModeCommand(command: string | number | boolean): command is Docu
     display: inline-grid;
     flex: 0 0 auto;
     place-items: center;
-    width: 2.15rem;
-    height: 2.15rem;
-    border-radius: 999px;
-    background: color-mix(in srgb, var(--brand-fill-light) 62%, white);
+    width: 1.875rem;
+    height: 1.875rem;
+    border-radius: 6px;
+    background: color-mix(in srgb, var(--brand-fill-light) 90%, white);
   }
 
   .document-share-panel__mode-option-icon {
@@ -681,11 +679,10 @@ function isShareModeCommand(command: string | number | boolean): command is Docu
   }
 
   .document-share-panel__permission-trigger {
-    gap: 0.45rem;
-    padding: 0.55rem 0;
+    gap: 0.35rem;
+    padding: 0.375rem 0;
     white-space: nowrap;
-    font-size: 0.95rem;
-    font-weight: 650;
+    font-size: 0.875rem;
   }
 
   .document-share-panel__permission-item {
@@ -706,15 +703,16 @@ function isShareModeCommand(command: string | number | boolean): command is Docu
   .document-share-panel__copy-strip {
     display: flex;
     align-items: center;
-    min-height: 4.3rem;
-    padding: 0.8rem clamp(1.35rem, 3vw, 1.75rem);
-    background: color-mix(in srgb, var(--brand-fill-light) 36%, white);
+    min-height: 3.5rem;
+    padding: 0.65rem clamp(1.25rem, 3vw, 1.5rem);
+    background: color-mix(in srgb, var(--brand-fill-light) 28%, white);
   }
 
   .document-share-panel__copy-button {
     gap: 0.35rem;
-    border-radius: 999px;
+    border-radius: 0.5rem;
     background: white;
+    font-size: 0.8125rem;
 
     &.is-copied {
       color: var(--brand-success);
@@ -735,7 +733,7 @@ function isShareModeCommand(command: string | number | boolean): command is Docu
   .document-share-panel__direct-form {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
-    gap: 0.875rem;
+    gap: 0.75rem;
     align-items: start;
   }
 }

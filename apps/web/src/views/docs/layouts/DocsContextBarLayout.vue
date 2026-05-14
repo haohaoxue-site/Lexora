@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import DocumentShareStatusEntry from '../components/DocumentShareStatusEntry.vue'
+import DocumentHeaderActions from '../components/DocumentHeaderActions.vue'
 import { useActiveDocument } from '../composables/useActiveDocument'
 import { useDocsSurfaceState } from '../composables/useDocsSurfaceState'
 
@@ -101,7 +101,7 @@ const connectionStatusTitle = computed(() =>
     </div>
 
     <div v-if="isDocumentSurface && currentDocument?.id" class="docs-view-context__actions">
-      <DocumentShareStatusEntry />
+      <DocumentHeaderActions />
     </div>
   </div>
 </template>

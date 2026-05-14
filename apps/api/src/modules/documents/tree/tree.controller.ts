@@ -4,10 +4,11 @@ import type {
   DocumentCurrent,
   DocumentRecent,
   DocumentTreeGroup,
+  PatchDocumentLayoutRequest,
   PatchDocumentMetaRequest,
 } from '@haohaoxue/samepage-contracts'
 import type { AuthUserContext } from '../../auth/auth.interface'
-import { CreateDocumentSchema, PatchDocumentMetaSchema } from '@haohaoxue/samepage-contracts'
+import { CreateDocumentSchema, PatchDocumentLayoutSchema, PatchDocumentMetaSchema } from '@haohaoxue/samepage-contracts'
 import { BadRequestException, Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common'
 import { CurrentUser } from '../../../decorators/current-user.decorator'
 import { ZodValidationPipe } from '../../../pipes/zod-validation.pipe'
@@ -49,5 +50,14 @@ export class DocumentTreeController {
     @Body(new ZodValidationPipe(PatchDocumentMetaSchema)) payload: PatchDocumentMetaRequest,
   ): Promise<DocumentCurrent> {
     return this.documentsService.patchDocumentMeta(authUser.id, id, payload)
+  }
+
+  @Patch(':id/layout')
+  async patchDocumentLayout(
+    @CurrentUser() authUser: AuthUserContext,
+    @Param('id') id: string,
+    @Body(new ZodValidationPipe(PatchDocumentLayoutSchema)) payload: PatchDocumentLayoutRequest,
+  ): Promise<DocumentCurrent> {
+    return this.documentsService.patchDocumentLayout(authUser.id, id, payload)
   }
 }

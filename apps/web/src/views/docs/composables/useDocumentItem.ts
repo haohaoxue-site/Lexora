@@ -2,7 +2,6 @@ import type { DocumentItem, DocumentTreeCollectionId } from '@haohaoxue/samepage
 import { DOCUMENT_COLLECTION, WORKSPACE_TYPE } from '@haohaoxue/samepage-contracts'
 import { computed } from 'vue'
 import { useDocsContext } from './useDocsContext'
-import { useDocsHistoryState } from './useDocsHistoryState'
 import { useDocsPageActions } from './useDocsPageActions'
 import { useDocsShareDialog } from './useDocsShareDialog'
 import { useDocumentTree } from './useDocumentTree'
@@ -16,7 +15,6 @@ export function useDocumentItem(options: UseDocumentItemOptions) {
   const { activeDocumentId, currentWorkspaceType } = useDocsContext()
   const tree = useDocumentTree()
   const pageActions = useDocsPageActions()
-  const history = useDocsHistoryState()
   const { canOpenShareDialog, openDocumentShareDialog } = useDocsShareDialog()
 
   const item = computed(options.item)
@@ -59,20 +57,11 @@ export function useDocumentItem(options: UseDocumentItemOptions) {
     void pageActions.moveDocumentToTeam(item.value.id)
   }
 
-  function openHistory() {
-    void history.openDocumentHistory(item.value.id)
-  }
-
   function deleteDocument() {
     void tree.deleteDocument(item.value.id)
   }
 
   function handleMenuCommand(command: unknown) {
-    if (command === 'history') {
-      openHistory()
-      return
-    }
-
     if (command === 'share') {
       if (!canShareDocument.value) {
         return

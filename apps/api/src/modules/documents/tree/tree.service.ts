@@ -9,6 +9,7 @@ import type {
   DocumentTreeGroup,
   DocumentVisibility,
   OwnedDocumentCollectionId,
+  PatchDocumentLayoutRequest,
   PatchDocumentMetaRequest,
   TiptapJsonContent,
 } from '@haohaoxue/samepage-contracts'
@@ -464,6 +465,22 @@ export class DocumentsService {
         })),
       )
     }
+
+    return await this.documentContentService.getDocumentCurrent(userId, id)
+  }
+
+  async patchDocumentLayout(
+    userId: string,
+    id: string,
+    payload: PatchDocumentLayoutRequest,
+  ): Promise<DocumentCurrent> {
+    await this.documentAccessService.assertCanEditDocument(userId, id)
+    await this.prisma.document.update({
+      where: { id },
+      data: {
+        pageWidthMode: payload.pageWidthMode,
+      },
+    })
 
     return await this.documentContentService.getDocumentCurrent(userId, id)
   }

@@ -16,6 +16,7 @@ export function toSharedDocumentReaderDocument(documentCurrent: DocumentCurrent)
     id: documentCurrent.document.id,
     title: documentCurrent.currentProjection.title,
     body: documentCurrent.currentProjection.body,
+    pageWidthMode: documentCurrent.document.pageWidthMode,
   }
 }
 

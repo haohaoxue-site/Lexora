@@ -27,6 +27,7 @@ const footerMetaItems = computed(() => [
       :document-id="props.document.id"
       :title="props.document.title"
       :body="props.document.body"
+      :page-width-mode="props.document.pageWidthMode"
       :editable="isEditable"
       :autofocus-title="props.autofocusTitle"
       :footer-meta-items="footerMetaItems"

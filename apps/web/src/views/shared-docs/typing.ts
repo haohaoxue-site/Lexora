@@ -1,4 +1,4 @@
-import type { DocumentShareAccess, TiptapJsonContent } from '@haohaoxue/samepage-contracts'
+import type { DocumentPageWidthMode, DocumentShareAccess, TiptapJsonContent } from '@haohaoxue/samepage-contracts'
 
 /**
  * 分享阅读页主区状态。
@@ -15,6 +15,8 @@ export interface SharedDocumentReaderDocument {
   title: TiptapJsonContent
   /** 文档正文 */
   body: TiptapJsonContent
+  /** 页面宽度模式 */
+  pageWidthMode: DocumentPageWidthMode
 }
 
 /**

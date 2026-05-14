@@ -8,6 +8,12 @@ enum DocumentVisibility {
   WORKSPACE
 }
 
+enum DocumentPageWidthMode {
+  NARROW
+  DEFAULT
+  FULL
+}
+
 enum DocumentAssetKind {
   IMAGE
   FILE
@@ -66,6 +72,7 @@ model Document {
   summary                   String                      @default("")
   status                    DocumentStatus              @default(ACTIVE)
   order                     Int                         @default(0)
+  pageWidthMode             DocumentPageWidthMode       @default(DEFAULT)
   workspace                 Workspace                   @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   parent                    Document?                   @relation("DocumentTree", fields: [parentId], references: [id], onDelete: SetNull)
   children                  Document[]                  @relation("DocumentTree")

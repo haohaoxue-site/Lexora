@@ -99,13 +99,6 @@ const {
           <template #dropdown>
             <ElDropdownMenu class="document-tree-item__menu">
               <ElDropdownItem
-                command="history"
-                class="document-tree-item__menu-item document-tree-item__menu-item--history"
-              >
-                历史记录
-              </ElDropdownItem>
-
-              <ElDropdownItem
                 v-if="canMoveToTeam"
                 command="move-to-team"
                 class="document-tree-item__menu-item document-tree-item__menu-item--move-to-team"

@@ -1,5 +1,6 @@
 import type {
   DocumentItem,
+  DocumentPageWidthMode,
   DocumentPaneState,
   DocumentSaveState,
   DocumentShareProjection,
@@ -398,6 +399,7 @@ export const useActiveDocument = createSharedComposable(() => {
     isSaving: state.isSaving,
     isSnapshotsLoading,
     markTitleAutofocusApplied,
+    patchDocumentPageWidthMode: state.patchDocumentPageWidthMode,
     patchDocumentShare: state.patchDocumentShare,
     reconnectCollaboration,
     reloadCurrentDocument,
@@ -503,6 +505,17 @@ export function useActiveDocumentState({
     }
   }
 
+  function patchDocumentPageWidthMode(documentId: string, pageWidthMode: DocumentPageWidthMode) {
+    if (currentDocument.value?.id !== documentId) {
+      return
+    }
+
+    currentDocument.value = {
+      ...currentDocument.value,
+      pageWidthMode,
+    }
+  }
+
   function startRestore() {
     isRestoringSnapshot.value = true
   }
@@ -560,6 +573,7 @@ export function useActiveDocumentState({
     isRestoringSnapshot,
     isSaving,
     loadedSnapshotsDocumentId,
+    patchDocumentPageWidthMode,
     patchDocumentShare,
     resetCurrentDocument,
     saveState: save.saveState,
