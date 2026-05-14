@@ -6,7 +6,7 @@
   --tiptap-prosemirror-color: var(--el-text-color-primary);
   --tiptap-prosemirror-font-size: 15px;
   --tiptap-prosemirror-font-weight: 400;
-  --tiptap-prosemirror-line-height: 1.75;
+  --tiptap-prosemirror-line-height: 1.6;
   --tiptap-prosemirror-letter-spacing: normal;
   --tiptap-placeholder-color: var(--el-text-color-placeholder);
   --tiptap-file-node-border: color-mix(in srgb, var(--brand-border-base) 82%, transparent);
@@ -17,6 +17,8 @@
   --tiptap-code-block-border: color-mix(in srgb, var(--brand-border-base) 76%, transparent);
   --tiptap-code-block-toolbar-background: color-mix(in srgb, var(--brand-bg-surface-raised) 92%, transparent);
   --tiptap-code-block-line-number-color: var(--brand-text-placeholder);
+  --tiptap-blockquote-border: color-mix(in srgb, var(--brand-border-dark) 80%, var(--brand-text-placeholder) 20%);
+  --tiptap-blockquote-color: color-mix(in srgb, var(--brand-text-regular) 82%, var(--brand-text-secondary));
   display: flex;
   flex: 1 1 0%;
   flex-direction: column;
@@ -94,7 +96,7 @@
   }
 
   p {
-    margin: 0 0 1em;
+    margin: 0 0 0.55em;
   }
 
   ul {
@@ -135,14 +137,20 @@
   }
 
   blockquote {
-    margin: 1.5em 0;
-    padding: 1rem 1.25rem;
-    padding-left: 1rem;
-    border-left: 4px solid var(--el-color-primary);
-    border-radius: 16px;
-    background: color-mix(in srgb, var(--brand-bg-surface) 72%, transparent);
-    color: var(--el-text-color-secondary);
-    font-style: italic;
+    margin: 0.85em 0 0.95em;
+    padding: 0.1em 0 0.1em 0.95em;
+    border-left: 3px solid var(--tiptap-blockquote-border);
+    border-radius: 0;
+    color: var(--tiptap-blockquote-color);
+    font-style: normal;
+  }
+
+  blockquote > :first-child {
+    margin-top: 0;
+  }
+
+  blockquote > :last-child {
+    margin-bottom: 0;
   }
 
   p.is-empty[data-placeholder]:not([data-placeholder=''])::before,
@@ -325,14 +333,17 @@
     font-family: 'JetBrains Mono', 'Fira Code', monospace;
   }
 
-  :where(p, li, blockquote, td, th, h1, h2, h3, a) code {
-    padding: 0.15em 0.4em;
+  .inline-code {
+    margin-inline: 3px;
+    padding-block: 1px;
+    padding-inline: 2px;
     border: 1px solid color-mix(in srgb, var(--brand-border-base) 82%, transparent);
-    border-radius: 8px;
+    border-radius: 4px;
     background: color-mix(in srgb, var(--brand-fill-lighter) 86%, var(--brand-bg-surface));
     color: color-mix(in srgb, var(--brand-primary) 76%, var(--el-text-color-primary));
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
     font-size: 0.9em;
-    line-height: 1.4;
+    line-height: 1.35;
     box-decoration-break: clone;
     -webkit-box-decoration-break: clone;
   }

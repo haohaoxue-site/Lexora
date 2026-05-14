@@ -31,6 +31,7 @@ import { BlockId } from '../extensions/BlockId'
 import { CodeBlock } from '../extensions/CodeBlock'
 import { DocumentFile } from '../extensions/DocumentFile'
 import { DocumentImage } from '../extensions/DocumentImage'
+import { InlineCode } from '../extensions/InlineCode'
 import { BlockMathematics, InlineMathematics } from '../extensions/Mathematics'
 import { PastePipeline } from '../extensions/PastePipeline'
 import { TextAlign } from '../extensions/TextAlign'
@@ -58,6 +59,7 @@ export function createBodyExtensions(options: {
       link: {
         openOnClick: false,
       },
+      code: false,
       codeBlock: false,
       undoRedo: options.collaboration ? false : undefined,
     }),
@@ -68,6 +70,7 @@ export function createBodyExtensions(options: {
     TextStyle,
     TextColorClass,
     TextAlign,
+    InlineCode,
     CodeBlock,
     InlineMathematics,
     BlockMathematics,

@@ -17,6 +17,20 @@ const SPLIT_MERGE_EXCLUDED_NODE_NAMES = new Set([
   'taskItem',
   'codeBlock',
   'blockMath',
+  'table',
+  'tableRow',
+  'tableCell',
+  'tableHeader',
+])
+
+const STRUCTURAL_MERGE_BOUNDARY_NODE_NAMES = new Set([
+  'blockquote',
+  'bulletList',
+  'orderedList',
+  'taskList',
+  'codeBlock',
+  'blockMath',
+  'table',
 ])
 
 const HEADING_LEVEL_BY_TARGET: Record<HeadingTurnIntoBlockType, 1 | 2 | 3 | 4 | 5> = {
@@ -290,16 +304,63 @@ function splitCurrentBlock(props: BlockCommandContext) {
   return true
 }
 
-function mergeBlockBackward(props: BlockCommandContext) {
+function mergeBlockBackward(props: CommandProps) {
   if (!canMergeCurrentBlock(props.editor)) {
     return false
   }
 
   return props.commands.first(({ commands }) => [
     () => commands.undoInputRule(),
+    () => resetEmptyHeadingBeforeMerge(props),
+    () => selectPreviousStructuralMergeBoundary(props),
     () => commands.joinBackward(),
     () => commands.selectNodeBackward(),
   ])
+}
+
+function resetEmptyHeadingBeforeMerge(props: BlockCommandContext) {
+  const { selection } = props.editor.state
+  const currentNode = selection.$from.parent
+
+  if (!selection.empty || selection.$from.parentOffset !== 0) {
+    return false
+  }
+
+  if (currentNode.type.name !== 'heading' || currentNode.content.size > 0) {
+    return false
+  }
+
+  return props.commands.setNode('paragraph')
+}
+
+function selectPreviousStructuralMergeBoundary(props: CommandProps) {
+  const boundary = resolvePreviousStructuralMergeBoundary(props)
+
+  if (!boundary) {
+    return false
+  }
+
+  props.tr.setSelection(NodeSelection.create(props.tr.doc, boundary.from))
+
+  return true
+}
+
+function resolvePreviousStructuralMergeBoundary(props: CommandProps) {
+  const currentBlock = getCurrentBlock(props.tr.selection)
+
+  if (!currentBlock || currentBlock.index <= 0) {
+    return null
+  }
+
+  const previousNode = currentBlock.parent.child(currentBlock.index - 1)
+
+  if (!STRUCTURAL_MERGE_BOUNDARY_NODE_NAMES.has(previousNode.type.name)) {
+    return null
+  }
+
+  return {
+    from: currentBlock.from - previousNode.nodeSize,
+  }
 }
 
 function duplicateCurrentBlock(props: CommandProps) {
