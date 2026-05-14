@@ -1,17 +1,23 @@
 import type {
   CreateCollabTicketResponse,
+  CreateDocumentDuplicateOperationResponse,
+  CreateDocumentMoveOperationResponse,
   CreateDocumentRequest,
   CreateDocumentResponse,
   CreateDocumentVersionSnapshotRequest,
   CreateDocumentVersionSnapshotResponse,
   DocumentAsset,
   DocumentCurrent,
+  DocumentHistory,
+  DocumentOperationJob,
   DocumentRecent,
   DocumentTrashItem,
   DocumentTreeGroup,
   DocumentVersionSnapshot,
+  MoveDocumentTreeOperationRequest,
   PatchDocumentLayoutRequest,
   PatchDocumentMetaRequest,
+  PatchDocumentTitleRequest,
   ResolveDocumentAssetsRequest,
   ResolveDocumentAssetsResponse,
   RestoreDocumentVersionSnapshotRequest,
@@ -36,6 +42,33 @@ export function createDocument(data: CreateDocumentRequest): Promise<CreateDocum
     method: 'post',
     url: '/documents',
     data,
+  })
+}
+
+export function createDocumentDuplicateOperation(
+  id: string,
+): Promise<CreateDocumentDuplicateOperationResponse> {
+  return axios.request({
+    method: 'post',
+    url: `/documents/${id}/operation-jobs/duplicate`,
+  })
+}
+
+export function createDocumentMoveOperation(
+  id: string,
+  data: MoveDocumentTreeOperationRequest,
+): Promise<CreateDocumentMoveOperationResponse> {
+  return axios.request({
+    method: 'post',
+    url: `/documents/${id}/operation-jobs/move`,
+    data,
+  })
+}
+
+export function getDocumentOperationJob(id: string): Promise<DocumentOperationJob> {
+  return axios.request({
+    method: 'get',
+    url: `/document-operation-jobs/${id}`,
   })
 }
 
@@ -97,6 +130,13 @@ export function getDocumentVersionSnapshots(id: string): Promise<DocumentVersion
   })
 }
 
+export function getDocumentHistory(id: string): Promise<DocumentHistory> {
+  return axios.request({
+    method: 'get',
+    url: `/documents/${id}/history`,
+  })
+}
+
 export function restoreDocumentVersionSnapshot(
   id: string,
   data: RestoreDocumentVersionSnapshotRequest,
@@ -112,6 +152,14 @@ export function patchDocumentMeta(id: string, data: PatchDocumentMetaRequest): P
   return axios.request({
     method: 'patch',
     url: `/documents/${id}/meta`,
+    data,
+  })
+}
+
+export function patchDocumentTitle(id: string, data: PatchDocumentTitleRequest): Promise<DocumentCurrent> {
+  return axios.request({
+    method: 'patch',
+    url: `/documents/${id}/title`,
     data,
   })
 }

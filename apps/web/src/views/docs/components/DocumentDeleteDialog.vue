@@ -113,5 +113,6 @@ function handlePermanentlyDelete() {
   display: inline-flex;
   align-items: center;
   justify-content: flex-end;
+  gap: 0.75rem;
 }
 </style>

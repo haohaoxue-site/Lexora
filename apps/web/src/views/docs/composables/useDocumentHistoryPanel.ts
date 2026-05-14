@@ -9,6 +9,7 @@ import {
   shallowRef,
   watch,
 } from 'vue'
+import dayjs from '@/utils/dayjs'
 import {
   buildDocumentHistorySections,
   getDocumentHistoryEntryDetail,
@@ -23,9 +24,16 @@ interface UseDocumentHistoryGroupStateOptions {
 
 export function useDocumentHistoryPanel() {
   const { currentDocument, snapshots } = useActiveDocument()
-  const { selectedHistorySnapshotId, selectHistorySnapshot } = useDocsHistoryState()
+  const {
+    selectedHistorySnapshotId,
+    selectCurrentHistoryContent,
+    selectHistorySnapshot,
+  } = useDocsHistoryState()
 
   const hasDocument = computed(() => Boolean(currentDocument.value))
+  const currentEntryTimeLabel = computed(() =>
+    currentDocument.value ? `更新于 ${dayjs(currentDocument.value.updatedAt).format('M月D日 HH:mm')}` : null,
+  )
   const historySections = computed(() => buildDocumentHistorySections({
     document: currentDocument.value,
     snapshots: snapshots.value,
@@ -44,12 +52,19 @@ export function useDocumentHistoryPanel() {
     return selectedHistorySnapshotId.value === entry.snapshotId
   }
 
+  function isCurrentEntrySelected() {
+    return selectedHistorySnapshotId.value === null
+  }
+
   return {
     hasDocument,
+    currentEntryTimeLabel,
     historySections,
+    isCurrentEntrySelected,
     isEntrySelected,
     isGroupExpanded: groups.isGroupExpanded,
     resolveEntryDetail,
+    selectCurrentEntry: selectCurrentHistoryContent,
     selectEntry,
     toggleGroup: groups.toggleGroup,
   }

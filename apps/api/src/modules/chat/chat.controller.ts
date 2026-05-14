@@ -8,6 +8,7 @@ import type {
 } from '@haohaoxue/samepage-contracts'
 import type { FastifyReply } from 'fastify'
 import type { AuthUserContext } from '../auth/auth.interface'
+import { sleep } from '@haohaoxue/samepage-shared'
 import {
   Body,
   Controller,
@@ -245,8 +246,4 @@ function writeSessionEvent(reply: FastifyReply, event: ChatSessionEvent): void {
 
 function isReplyWritable(reply: FastifyReply): boolean {
   return !reply.raw.destroyed && !reply.raw.writableEnded
-}
-
-function sleep(ms: number): Promise<void> {
-  return new Promise(resolve => setTimeout(resolve, ms))
 }

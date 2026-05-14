@@ -34,7 +34,15 @@ export function resolveDefaultHistorySnapshotId(options: {
     return options.currentSelectedSnapshotId
   }
 
-  return options.document?.latestVersionSnapshotId
-    ?? options.snapshots[0]?.id
-    ?? null
+  if (!options.document) {
+    return null
+  }
+
+  const document = options.document
+  const currentSnapshot = options.snapshots.find(snapshot =>
+    snapshot.id === document.latestVersionSnapshotId
+    && snapshot.basedOnProjectionRevision === document.currentProjectionRevision,
+  )
+
+  return currentSnapshot?.id ?? null
 }

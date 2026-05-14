@@ -8,6 +8,7 @@ import type {
 import { COLLAB_ERROR_CODE } from '@haohaoxue/samepage-contracts'
 import {
   createTiptapDocumentCollaborationCheckpointState,
+  createTiptapDocumentCollaborationTitlePatchCheckpoint,
   resolveYdocRuntimeEpochError,
   resolveYdocUpdateSequenceError,
   toDocumentYdocCheckpointMetadata,
@@ -66,6 +67,23 @@ interface ResetDocumentYdocRuntimeFromVersionSnapshotInput {
   documentId: string
   title: TiptapJsonContent
   body: TiptapJsonContent
+}
+
+/** 用当前 Ydoc 状态替换标题并重置 runtime 的输入。 */
+interface ResetDocumentYdocRuntimeWithTitleInput {
+  documentId: string
+  title: TiptapJsonContent
+  /** 没有 Ydoc checkpoint 时用于重建完整基线，不作为重命名目标。 */
+  bodyWhenYdocMissing: TiptapJsonContent
+}
+
+/** 用当前 Ydoc 状态替换标题并重置 runtime 的结果。 */
+interface ResetDocumentYdocRuntimeWithTitleResult {
+  metadata: DocumentYdocCheckpointMetadata
+  projection: {
+    title: TiptapJsonContent
+    body: TiptapJsonContent
+  }
 }
 
 /** 记录 DocumentYdoc 到当前读模型投影结果的输入。 */
@@ -308,6 +326,103 @@ export class DocumentYdocsService {
     })
 
     return toDocumentYdocCheckpointMetadata(nextYdoc)
+  }
+
+  async resetDocumentYdocRuntimeWithTitle(
+    tx: Prisma.TransactionClient,
+    input: ResetDocumentYdocRuntimeWithTitleInput,
+  ): Promise<ResetDocumentYdocRuntimeWithTitleResult> {
+    const now = new Date()
+    const existingYdoc = await tx.documentYdoc.findUnique({
+      where: {
+        documentId: input.documentId,
+      },
+      select: documentYdocSelect,
+    })
+    let updates: Uint8Array[] = []
+
+    if (existingYdoc) {
+      const persistedUpdates = await tx.documentYdocUpdate.findMany({
+        where: {
+          documentId: input.documentId,
+          runtimeEpoch: existingYdoc.runtimeEpoch,
+          seq: {
+            gt: existingYdoc.checkpointUpdateSeq,
+          },
+          deletedAt: null,
+        },
+        orderBy: {
+          seq: 'asc',
+        },
+        select: documentYdocUpdateSelect,
+      })
+      updates = persistedUpdates.map(update => update.update)
+    }
+
+    const { checkpointState, projection } = createTiptapDocumentCollaborationTitlePatchCheckpoint({
+      checkpointState: existingYdoc?.checkpointState ?? null,
+      updates,
+      title: input.title,
+      bodyWhenYdocMissing: input.bodyWhenYdocMissing,
+    })
+
+    await tx.documentYdocUpdate.updateMany({
+      where: {
+        documentId: input.documentId,
+        deletedAt: null,
+      },
+      data: {
+        deletedAt: now,
+      },
+    })
+
+    if (existingYdoc) {
+      const nextYdoc = await tx.documentYdoc.update({
+        where: {
+          documentId: input.documentId,
+        },
+        data: {
+          runtimeEpoch: {
+            increment: 1,
+          },
+          checkpointState: toPrismaBytes(checkpointState),
+          checkpointSeq: {
+            increment: 1,
+          },
+          checkpointUpdateSeq: 0,
+          updateSeq: 0,
+          lastProjectedProjectionId: null,
+          lastProjectedProjectionRevision: 0,
+          lastProjectedAt: now,
+          deletedAt: null,
+        },
+        select: documentYdocSelect,
+      })
+
+      return {
+        metadata: toDocumentYdocCheckpointMetadata(nextYdoc),
+        projection,
+      }
+    }
+
+    const nextYdoc = await tx.documentYdoc.create({
+      data: {
+        documentId: input.documentId,
+        checkpointState: toPrismaBytes(checkpointState),
+        checkpointSeq: 1,
+        checkpointUpdateSeq: 0,
+        updateSeq: 0,
+        lastProjectedProjectionId: null,
+        lastProjectedProjectionRevision: 0,
+        lastProjectedAt: now,
+      },
+      select: documentYdocSelect,
+    })
+
+    return {
+      metadata: toDocumentYdocCheckpointMetadata(nextYdoc),
+      projection,
+    }
   }
 
   async recordDocumentYdocCurrentProjection(

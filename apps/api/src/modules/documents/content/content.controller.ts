@@ -2,16 +2,19 @@ import type {
   CreateDocumentVersionSnapshotRequest,
   CreateDocumentVersionSnapshotResponse,
   DocumentCurrent,
+  DocumentHistory,
   DocumentVersionSnapshot,
+  PatchDocumentTitleRequest,
   RestoreDocumentVersionSnapshotRequest,
   RestoreDocumentVersionSnapshotResponse,
 } from '@haohaoxue/samepage-contracts'
 import type { AuthUserContext } from '../../auth/auth.interface'
 import {
   CreateDocumentVersionSnapshotSchema,
+  PatchDocumentTitleSchema,
   RestoreDocumentVersionSnapshotSchema,
 } from '@haohaoxue/samepage-contracts'
-import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common'
+import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common'
 import { CurrentUser } from '../../../decorators/current-user.decorator'
 import { ZodValidationPipe } from '../../../pipes/zod-validation.pipe'
 import { DocumentContentService } from './content.service'
@@ -31,6 +34,15 @@ export class DocumentContentController {
     })
   }
 
+  @Patch(':id/title')
+  async patchDocumentTitle(
+    @CurrentUser() authUser: AuthUserContext,
+    @Param('id') id: string,
+    @Body(new ZodValidationPipe(PatchDocumentTitleSchema)) payload: PatchDocumentTitleRequest,
+  ): Promise<DocumentCurrent> {
+    return this.documentContentService.patchDocumentTitle(authUser.id, id, payload)
+  }
+
   @Post(':id/version-snapshots')
   async createDocumentVersionSnapshot(
     @CurrentUser() authUser: AuthUserContext,
@@ -46,6 +58,14 @@ export class DocumentContentController {
     @Param('id') id: string,
   ): Promise<DocumentVersionSnapshot[]> {
     return this.documentContentService.getDocumentVersionSnapshots(authUser.id, id)
+  }
+
+  @Get(':id/history')
+  async getDocumentHistory(
+    @CurrentUser() authUser: AuthUserContext,
+    @Param('id') id: string,
+  ): Promise<DocumentHistory> {
+    return this.documentContentService.getDocumentHistory(authUser.id, id)
   }
 
   @Post(':id/restore-version')

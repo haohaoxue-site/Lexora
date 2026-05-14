@@ -59,6 +59,57 @@ export function hydrateTiptapDocumentCollaborationYdoc(
   }, 'samepage-tiptap-document-collaboration-bootstrap')
 }
 
+export function replaceTiptapDocumentCollaborationYdocTitle(
+  document: Y.Doc,
+  title: TiptapJsonContent,
+): void {
+  document.transact(() => {
+    writeFragmentContent({
+      document,
+      field: TIPTAP_DOCUMENT_COLLABORATION_FIELD.TITLE,
+      content: wrapTiptapContent(toTiptapDocumentTitleEditorContent(title)),
+      schema: titleSchema,
+    })
+  }, 'samepage-tiptap-document-title-rename')
+}
+
+export function createTiptapDocumentCollaborationTitlePatchCheckpoint(input: {
+  checkpointState: Uint8Array | null
+  updates: Uint8Array[]
+  title: TiptapJsonContent
+  bodyWhenYdocMissing: TiptapJsonContent
+}): {
+  checkpointState: Uint8Array
+  projection: TiptapDocumentCollaborationContentProjection
+} {
+  const document = new Y.Doc()
+
+  if (input.checkpointState) {
+    Y.applyUpdate(document, input.checkpointState)
+  }
+  else {
+    hydrateTiptapDocumentCollaborationYdoc(document, {
+      title: input.title,
+      body: input.bodyWhenYdocMissing,
+    })
+  }
+
+  for (const update of input.updates) {
+    Y.applyUpdate(document, update)
+  }
+
+  replaceTiptapDocumentCollaborationYdocTitle(document, input.title)
+
+  const projection = projectTiptapDocumentCollaborationYdoc(document)
+  const checkpointState = new Uint8Array(Y.encodeStateAsUpdate(document))
+  document.destroy()
+
+  return {
+    checkpointState,
+    projection,
+  }
+}
+
 export function projectTiptapDocumentCollaborationYdoc(
   document: Y.Doc,
 ): TiptapDocumentCollaborationContentProjection {

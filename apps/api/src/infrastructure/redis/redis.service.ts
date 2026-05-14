@@ -28,6 +28,14 @@ export class RedisService implements OnModuleDestroy {
     })
   }
 
+  createBullMqClient(): Redis {
+    const config = this.configService.getOrThrow<RedisConfig>('redis')
+    return new Redis(config.url, {
+      lazyConnect: true,
+      maxRetriesPerRequest: null,
+    })
+  }
+
   async onModuleDestroy(): Promise<void> {
     if (!this.client) {
       return

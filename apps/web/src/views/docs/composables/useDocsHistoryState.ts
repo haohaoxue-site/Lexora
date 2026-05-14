@@ -16,12 +16,6 @@ export const useDocsHistoryState = createSharedComposable(() => {
   const isHistoryMode = shallowRef(false)
   const selectedHistorySnapshotId = shallowRef<string | null>(null)
 
-  const currentLatestSnapshot = computed(() =>
-    resolveSnapshotById(
-      activeDocument.snapshots.value,
-      activeDocument.currentDocument.value?.latestVersionSnapshotId ?? null,
-    ),
-  )
   const selectedHistorySnapshot = computed(() =>
     resolveSnapshotById(activeDocument.snapshots.value, selectedHistorySnapshotId.value),
   )
@@ -40,11 +34,15 @@ export const useDocsHistoryState = createSharedComposable(() => {
       return false
     }
 
-    if (!currentLatestSnapshot.value) {
-      return activeDocument.currentDocument.value?.latestVersionSnapshotId === selectedHistorySnapshot.value.id
+    if (!activeDocument.currentDocument.value) {
+      return false
     }
 
-    return isSameDocumentVersionSnapshotContent(currentLatestSnapshot.value, selectedHistorySnapshot.value)
+    return isSameDocumentVersionSnapshotContent({
+      schemaVersion: activeDocument.currentDocument.value.schemaVersion,
+      title: activeDocument.currentDocument.value.title,
+      body: activeDocument.currentDocument.value.body,
+    }, selectedHistorySnapshot.value)
   })
   const canRestoreSelectedSnapshot = computed(() =>
     Boolean(selectedHistorySnapshot.value)
@@ -107,6 +105,10 @@ export const useDocsHistoryState = createSharedComposable(() => {
 
   function selectHistorySnapshot(snapshotId: string) {
     selectedHistorySnapshotId.value = snapshotId
+  }
+
+  function selectCurrentHistoryContent() {
+    selectedHistorySnapshotId.value = null
   }
 
   async function restoreSelectedSnapshot() {
@@ -181,6 +183,7 @@ export const useDocsHistoryState = createSharedComposable(() => {
     previewDocument,
     restoreSelectedSnapshot,
     selectedHistorySnapshotId,
+    selectCurrentHistoryContent,
     selectHistorySnapshot,
   }
 })

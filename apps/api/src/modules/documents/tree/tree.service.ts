@@ -157,8 +157,12 @@ export class DocumentsService {
         data: {
           documentId: createdDocument.id,
           version: 1,
+          basedOnProjectionId: currentProjection.id,
           basedOnProjectionRevision: 1,
           runtimeEpoch: 1,
+          projectedUpdateSeq: 0,
+          checkpointSeq: 1,
+          checkpointUpdateSeq: 0,
           schemaVersion: TIPTAP_SCHEMA_VERSION,
           title: toPrismaJsonValue(title),
           body: toPrismaJsonValue(body),
@@ -191,6 +195,7 @@ export class DocumentsService {
           currentProjectionId: currentProjection.id,
           currentProjectionRevision: 1,
           latestVersionSnapshotId: versionSnapshot.id,
+          versionSnapshotSeq: 1,
         },
       })
 

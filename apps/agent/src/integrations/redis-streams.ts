@@ -16,6 +16,7 @@ import {
   AgentRunControlCommandSchema,
   AgentRunEventSchema,
 } from '@haohaoxue/samepage-contracts'
+import { sleepUnref } from '@haohaoxue/samepage-shared'
 
 const DEFAULT_GROUP_NAME = 'samepage-agent'
 const DEFAULT_CONSUMER_NAME = `agent-${process.pid}`
@@ -147,7 +148,7 @@ export function createRedisStreamsAgentQueue(options: CreateRedisStreamsAgentQue
         const handledNew = await readBatch('>', true)
 
         if (!handledNew) {
-          await sleep(readBlockMs)
+          await sleepUnref(readBlockMs)
         }
       }
       catch {
@@ -155,7 +156,7 @@ export function createRedisStreamsAgentQueue(options: CreateRedisStreamsAgentQue
           return
         }
 
-        await sleep(readBlockMs)
+        await sleepUnref(readBlockMs)
       }
     }
   }
@@ -209,7 +210,7 @@ export function createRedisStreamsAgentQueue(options: CreateRedisStreamsAgentQue
         const handledNew = await readControlBatch('>', true)
 
         if (!handledNew) {
-          await sleep(readBlockMs)
+          await sleepUnref(readBlockMs)
         }
       }
       catch {
@@ -217,7 +218,7 @@ export function createRedisStreamsAgentQueue(options: CreateRedisStreamsAgentQue
           return
         }
 
-        await sleep(readBlockMs)
+        await sleepUnref(readBlockMs)
       }
     }
   }
@@ -534,11 +535,4 @@ function getErrorMessage(error: unknown): string {
 
 function isBusyGroupError(error: unknown): boolean {
   return error instanceof Error && error.message.includes('BUSYGROUP')
-}
-
-async function sleep(durationMs: number): Promise<void> {
-  await new Promise<void>((resolve) => {
-    const timeout = setTimeout(resolve, durationMs)
-    timeout.unref?.()
-  })
 }

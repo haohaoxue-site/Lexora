@@ -160,6 +160,13 @@ export function stripDocumentAssetRuntimeAttributes(content: TiptapJsonContent):
   return content.map(node => stripNodeAssetRuntimeAttributes(node))
 }
 
+export function rewriteDocumentAssetIds(
+  content: TiptapJsonContent,
+  assetIdBySourceId: Readonly<Record<string, string>>,
+): TiptapJsonContent {
+  return content.map(node => rewriteNodeAssetIds(node, assetIdBySourceId))
+}
+
 export function hydrateDocumentAssetAttributes(
   content: TiptapJsonContent,
   assetsById: Record<string, DocumentAsset>,
@@ -324,6 +331,37 @@ function stripNodeAssetRuntimeAttributes(node: TiptapJsonNode): TiptapJsonNode {
     nextNode.content = node.content
       .filter(isTiptapJsonNode)
       .map(child => stripNodeAssetRuntimeAttributes(child))
+  }
+
+  return nextNode
+}
+
+function rewriteNodeAssetIds(
+  node: TiptapJsonNode,
+  assetIdBySourceId: Readonly<Record<string, string>>,
+): TiptapJsonNode {
+  const nextNode: TiptapJsonNode = {
+    ...node,
+  }
+
+  if (node.attrs && typeof node.attrs === 'object') {
+    const nextAttrs = {
+      ...node.attrs,
+    }
+    const assetId = readAssetId(node)
+    const nextAssetId = assetId ? assetIdBySourceId[assetId] : undefined
+
+    if (nextAssetId) {
+      nextAttrs.assetId = nextAssetId
+    }
+
+    nextNode.attrs = nextAttrs
+  }
+
+  if (Array.isArray(node.content)) {
+    nextNode.content = node.content
+      .filter(isTiptapJsonNode)
+      .map(child => rewriteNodeAssetIds(child, assetIdBySourceId))
   }
 
   return nextNode

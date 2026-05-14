@@ -3,6 +3,8 @@ import { onMounted } from 'vue'
 import { onBeforeRouteLeave, onBeforeRouteUpdate } from 'vue-router'
 import PagePanel from '@/layouts/panels/PagePanel.vue'
 import DocumentDeleteDialog from './components/DocumentDeleteDialog.vue'
+import DocumentMoveDialog from './components/DocumentMoveDialog.vue'
+import DocumentRenameDialog from './components/DocumentRenameDialog.vue'
 import DocumentShareDialog from './components/DocumentShareDialog.vue'
 import { useActiveDocument } from './composables/useActiveDocument'
 import { useDocsHistoryState } from './composables/useDocsHistoryState'
@@ -54,5 +56,7 @@ onBeforeRouteLeave(confirmNavigation)
     />
 
     <DocumentDeleteDialog />
+    <DocumentMoveDialog />
+    <DocumentRenameDialog />
   </PagePanel>
 </template>

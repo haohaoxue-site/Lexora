@@ -23,6 +23,11 @@ export const DOCUMENT_TREE_COLLECTION_VALUES = [
   DOCUMENT_COLLECTION.TEAM,
 ] as const
 
+export const DOCUMENT_OWNED_COLLECTION_VALUES = [
+  DOCUMENT_COLLECTION.PERSONAL,
+  DOCUMENT_COLLECTION.TEAM,
+] as const
+
 export const DOCUMENT_COLLECTION_LABELS = {
   [DOCUMENT_COLLECTION.PERSONAL]: '私有',
   [DOCUMENT_COLLECTION.COLLABORATION]: '共享给我',
@@ -80,12 +85,39 @@ export const DOCUMENT_PANE_STATE = {
   ERROR: 'error',
 } as const
 
+export const DOCUMENT_OPERATION_JOB_TYPE = {
+  DUPLICATE_TREE: 'DUPLICATE_TREE',
+  MOVE_TREE: 'MOVE_TREE',
+} as const
+
+export const DOCUMENT_OPERATION_JOB_TYPE_VALUES = [
+  DOCUMENT_OPERATION_JOB_TYPE.DUPLICATE_TREE,
+  DOCUMENT_OPERATION_JOB_TYPE.MOVE_TREE,
+] as const
+
+export const DOCUMENT_OPERATION_JOB_STATUS = {
+  PENDING: 'PENDING',
+  RUNNING: 'RUNNING',
+  SUCCEEDED: 'SUCCEEDED',
+  FAILED: 'FAILED',
+} as const
+
+export const DOCUMENT_OPERATION_JOB_STATUS_VALUES = [
+  DOCUMENT_OPERATION_JOB_STATUS.PENDING,
+  DOCUMENT_OPERATION_JOB_STATUS.RUNNING,
+  DOCUMENT_OPERATION_JOB_STATUS.SUCCEEDED,
+  DOCUMENT_OPERATION_JOB_STATUS.FAILED,
+] as const
+
 export const DocumentStatusSchema = z.enum(['ACTIVE', 'LOCKED'])
 export const DocumentVisibilitySchema = z.enum(DOCUMENT_VISIBILITY_VALUES)
 export const DocumentPageWidthModeSchema = z.enum(DOCUMENT_PAGE_WIDTH_MODE_VALUES)
 
 export const DocumentCollectionIdSchema = z.enum(DOCUMENT_COLLECTION_VALUES)
 export const DocumentTreeCollectionIdSchema = z.enum(DOCUMENT_TREE_COLLECTION_VALUES)
+export const DocumentOwnedCollectionIdSchema = z.enum(DOCUMENT_OWNED_COLLECTION_VALUES)
+export const DocumentOperationJobTypeSchema = z.enum(DOCUMENT_OPERATION_JOB_TYPE_VALUES)
+export const DocumentOperationJobStatusSchema = z.enum(DOCUMENT_OPERATION_JOB_STATUS_VALUES)
 
 export const DocumentShareLocalPolicySchema = z.object({
   mode: DocumentShareModeSchema,
@@ -156,12 +188,14 @@ export const DocumentRevisionSchema = z.number().int().min(0)
 export const DOCUMENT_VERSION_SNAPSHOT_SOURCE = {
   INITIAL: 'initial',
   USER: 'user',
+  AUTO: 'auto',
   RESTORE: 'restore',
 } as const
 
 export const DOCUMENT_VERSION_SNAPSHOT_SOURCE_VALUES = [
   DOCUMENT_VERSION_SNAPSHOT_SOURCE.INITIAL,
   DOCUMENT_VERSION_SNAPSHOT_SOURCE.USER,
+  DOCUMENT_VERSION_SNAPSHOT_SOURCE.AUTO,
   DOCUMENT_VERSION_SNAPSHOT_SOURCE.RESTORE,
 ] as const
 
@@ -206,13 +240,19 @@ export const DocumentVersionSnapshotSchema = z.object({
   id: z.string(),
   documentId: z.string(),
   version: DocumentRevisionSchema,
+  basedOnProjectionId: z.string().nullable(),
   basedOnProjectionRevision: DocumentRevisionSchema,
   runtimeEpoch: z.number().int().min(1),
+  projectedUpdateSeq: z.number().int().min(0),
+  checkpointSeq: z.number().int().min(0),
+  checkpointUpdateSeq: z.number().int().min(0),
   schemaVersion: TiptapSchemaVersionSchema,
   title: TiptapJsonContentPayloadSchema,
   body: TiptapJsonContentPayloadSchema,
   source: DocumentVersionSnapshotSourceSchema,
   restoredFromVersionSnapshotId: z.string().nullable(),
+  idempotencyKey: z.string().nullable(),
+  label: z.string().nullable(),
   createdAt: z.string(),
   createdBy: z.string().nullable(),
   createdByUser: AuditUserSummarySchema.nullable(),
@@ -221,6 +261,39 @@ export const DocumentVersionSnapshotSchema = z.object({
 export const DocumentCurrentSchema = z.object({
   document: DocumentRecordSchema,
   currentProjection: DocumentCurrentProjectionSchema,
+}).strict()
+
+export const DocumentHistoryCurrentSchema = z.object({
+  projectionRevision: DocumentRevisionSchema,
+  runtimeEpoch: z.number().int().min(1),
+  updatedAt: z.string(),
+  matchedVersionSnapshotId: z.string().nullable(),
+  hasUnversionedChanges: z.boolean(),
+}).strict()
+
+export const DocumentHistorySchema = z.object({
+  current: DocumentHistoryCurrentSchema,
+  snapshots: DocumentVersionSnapshotSchema.array(),
+}).strict()
+
+export const DocumentOperationJobSchema = z.object({
+  id: z.string(),
+  type: DocumentOperationJobTypeSchema,
+  status: DocumentOperationJobStatusSchema,
+  sourceDocumentId: z.string().nullable(),
+  targetWorkspaceId: z.string().nullable(),
+  targetParentId: z.string().nullable(),
+  targetVisibility: DocumentVisibilitySchema.nullable(),
+  documentsTotal: z.number().int().nonnegative(),
+  documentsDone: z.number().int().nonnegative(),
+  assetsTotal: z.number().int().nonnegative(),
+  assetsDone: z.number().int().nonnegative(),
+  resultDocumentId: z.string().nullable(),
+  errorMessage: z.string().nullable(),
+  startedAt: z.string().nullable(),
+  finishedAt: z.string().nullable(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
 }).strict()
 
 export const DocumentAssetSchema = z.object({
@@ -251,6 +324,8 @@ export const CreateDocumentResponseSchema = z.object({
 export const CreateDocumentVersionSnapshotSchema = z.object({
   basedOnProjectionRevision: DocumentRevisionSchema,
   source: DocumentVersionSnapshotSourceSchema.default(DOCUMENT_VERSION_SNAPSHOT_SOURCE.USER),
+  idempotencyKey: z.string().trim().min(1).optional(),
+  label: z.string().trim().min(1).max(120).optional(),
 }).strict()
 
 export const CreateDocumentVersionSnapshotResponseSchema = z.object({
@@ -277,6 +352,20 @@ export const RestoreDocumentVersionSnapshotResponseSchema = z.object({
   snapshot: DocumentVersionSnapshotSchema,
 }).strict()
 
+export const CreateDocumentDuplicateOperationResponseSchema = z.object({
+  job: DocumentOperationJobSchema,
+}).strict()
+
+export const MoveDocumentTreeOperationSchema = z.object({
+  targetWorkspaceId: z.string().trim().min(1),
+  targetParentId: z.string().trim().nullable(),
+  targetCollectionId: DocumentOwnedCollectionIdSchema,
+}).strict()
+
+export const CreateDocumentMoveOperationResponseSchema = z.object({
+  job: DocumentOperationJobSchema,
+}).strict()
+
 export const PatchDocumentMetaSchema = z.object({
   parentId: z.string().trim().nullable().optional(),
   visibility: DocumentVisibilitySchema.optional(),
@@ -286,6 +375,10 @@ export const PatchDocumentMetaSchema = z.object({
     message: '至少更新一个元数据字段',
   },
 )
+
+export const PatchDocumentTitleSchema = z.object({
+  title: z.string().trim().min(1).max(DOCUMENT_TITLE_MAX_LENGTH),
+}).strict()
 
 export const PatchDocumentLayoutSchema = z.object({
   pageWidthMode: DocumentPageWidthModeSchema,
@@ -299,6 +392,8 @@ export type DocumentAssetStatus = z.infer<typeof DocumentAssetStatusSchema>
 export type DocumentCollectionId = z.infer<typeof DocumentCollectionIdSchema>
 export type DocumentTreeCollectionId = z.infer<typeof DocumentTreeCollectionIdSchema>
 export type OwnedDocumentCollectionId = Exclude<DocumentTreeCollectionId, 'collaboration'>
+export type DocumentOperationJobType = z.infer<typeof DocumentOperationJobTypeSchema>
+export type DocumentOperationJobStatus = z.infer<typeof DocumentOperationJobStatusSchema>
 export type DocumentPaneState = (typeof DOCUMENT_PANE_STATE)[keyof typeof DOCUMENT_PANE_STATE]
 export type DocumentSaveState = (typeof DOCUMENT_SAVE_STATE)[keyof typeof DOCUMENT_SAVE_STATE]
 export type DocumentShareLocalPolicy = z.infer<typeof DocumentShareLocalPolicySchema>
@@ -315,6 +410,9 @@ export type DocumentRecord = z.infer<typeof DocumentRecordSchema>
 export type DocumentCurrentProjection = z.infer<typeof DocumentCurrentProjectionSchema>
 export type DocumentVersionSnapshot = z.infer<typeof DocumentVersionSnapshotSchema>
 export type DocumentCurrent = z.infer<typeof DocumentCurrentSchema>
+export type DocumentHistoryCurrent = z.infer<typeof DocumentHistoryCurrentSchema>
+export type DocumentHistory = z.infer<typeof DocumentHistorySchema>
+export type DocumentOperationJob = z.infer<typeof DocumentOperationJobSchema>
 export type DocumentAsset = z.infer<typeof DocumentAssetSchema>
 export type DocumentBlockHeadingLevel = 1 | 2 | 3 | 4 | 5
 
@@ -354,7 +452,11 @@ export type CreateDocumentVersionSnapshotRequest = z.infer<typeof CreateDocument
 export type CreateDocumentVersionSnapshotResponse = z.infer<typeof CreateDocumentVersionSnapshotResponseSchema>
 export type RestoreDocumentVersionSnapshotRequest = z.infer<typeof RestoreDocumentVersionSnapshotSchema>
 export type RestoreDocumentVersionSnapshotResponse = z.infer<typeof RestoreDocumentVersionSnapshotResponseSchema>
+export type CreateDocumentDuplicateOperationResponse = z.infer<typeof CreateDocumentDuplicateOperationResponseSchema>
+export type MoveDocumentTreeOperationRequest = z.infer<typeof MoveDocumentTreeOperationSchema>
+export type CreateDocumentMoveOperationResponse = z.infer<typeof CreateDocumentMoveOperationResponseSchema>
 export type PatchDocumentMetaRequest = z.infer<typeof PatchDocumentMetaSchema>
+export type PatchDocumentTitleRequest = z.infer<typeof PatchDocumentTitleSchema>
 export type PatchDocumentLayoutRequest = z.infer<typeof PatchDocumentLayoutSchema>
 export type ResolveDocumentAssetsRequest = z.infer<typeof ResolveDocumentAssetsSchema>
 export type ResolveDocumentAssetsResponse = z.infer<typeof ResolveDocumentAssetsResponseSchema>

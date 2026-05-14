@@ -60,6 +60,25 @@ enum DocumentRecentVisitRouteKind {
   SHARE_RECIPIENT
 }
 
+enum DocumentVersionSnapshotSource {
+  initial
+  user
+  auto
+  restore
+}
+
+enum DocumentOperationJobType {
+  DUPLICATE_TREE
+  MOVE_TREE
+}
+
+enum DocumentOperationJobStatus {
+  PENDING
+  RUNNING
+  SUCCEEDED
+  FAILED
+}
+
 model Document {
   id                        String                      @id @default(uuid())
   workspaceId               String
@@ -69,6 +88,7 @@ model Document {
   currentProjectionId       String?                     @unique
   currentProjectionRevision Int                         @default(0)
   latestVersionSnapshotId   String?                     @unique
+  versionSnapshotSeq        Int                         @default(0)
   summary                   String                      @default("")
   status                    DocumentStatus              @default(ACTIVE)
   order                     Int                         @default(0)
@@ -84,6 +104,8 @@ model Document {
   shares                    DocumentShare[]
   collabTickets             DocumentCollabTicket[]
   recentVisits              DocumentRecentVisit[]
+  operationJobsAsSource     DocumentOperationJob[]      @relation("DocumentOperationJobSource")
+  operationJobsAsResult     DocumentOperationJob[]      @relation("DocumentOperationJobResult")
   ydoc                      DocumentYdoc?
   aiSessions                AiSession[]                 @relation("AiSessionDocument")
   createdAt                 DateTime                    @default(now())
@@ -116,6 +138,7 @@ model DocumentCurrentProjection {
   document            Document       @relation("DocumentCurrentProjections", fields: [documentId], references: [id], onDelete: Cascade)
   currentForDocument  Document?      @relation("DocumentCurrentProjectionPointer")
   lastProjectedYdocs  DocumentYdoc[] @relation("DocumentYdocLastProjectedProjection")
+  versionSnapshots    DocumentVersionSnapshot[] @relation("DocumentVersionSnapshotProjection")
   createdAt           DateTime       @default(now())
   updatedAt           DateTime       @updatedAt
   deletedAt           DateTime?
@@ -129,14 +152,21 @@ model DocumentVersionSnapshot {
   id                            String    @id @default(uuid())
   documentId                    String
   version                       Int
+  basedOnProjectionId           String?
   basedOnProjectionRevision     Int
   runtimeEpoch                  Int
+  projectedUpdateSeq            Int       @default(0)
+  checkpointSeq                 Int       @default(0)
+  checkpointUpdateSeq           Int       @default(0)
   schemaVersion                 Int
   title                         Json
   body                          Json
-  source                        String
+  source                        DocumentVersionSnapshotSource
   restoredFromVersionSnapshotId String?
+  idempotencyKey                String?
+  label                         String?
   document                      Document  @relation("DocumentVersionSnapshots", fields: [documentId], references: [id], onDelete: Cascade)
+  basedOnProjection             DocumentCurrentProjection? @relation("DocumentVersionSnapshotProjection", fields: [basedOnProjectionId], references: [id], onDelete: SetNull)
   latestForDocument             Document? @relation("DocumentLatestVersionSnapshot")
   createdAt                     DateTime  @default(now())
   createdBy                     String?
@@ -144,8 +174,11 @@ model DocumentVersionSnapshot {
   deletedAt                     DateTime?
 
   @@unique([documentId, version])
+  @@unique([documentId, idempotencyKey])
   @@index([documentId, createdAt])
   @@index([documentId, basedOnProjectionRevision])
+  @@index([basedOnProjectionId])
+  @@index([documentId, runtimeEpoch, checkpointUpdateSeq])
 }
 
 model DocumentYdoc {
@@ -267,6 +300,35 @@ model DocumentRecentVisit {
 
   @@id([documentId, userId])
   @@index([userId, visitedAt])
+}
+
+model DocumentOperationJob {
+  id                String                     @id @default(uuid())
+  type              DocumentOperationJobType
+  status            DocumentOperationJobStatus @default(PENDING)
+  sourceDocumentId  String?
+  targetWorkspaceId String?
+  targetParentId    String?
+  targetVisibility  DocumentVisibility?
+  documentsTotal    Int                        @default(0)
+  documentsDone     Int                        @default(0)
+  assetsTotal       Int                        @default(0)
+  assetsDone        Int                        @default(0)
+  resultDocumentId  String?
+  errorMessage      String?
+  startedAt         DateTime?
+  finishedAt        DateTime?
+  sourceDocument    Document?                  @relation("DocumentOperationJobSource", fields: [sourceDocumentId], references: [id], onDelete: SetNull)
+  resultDocument    Document?                  @relation("DocumentOperationJobResult", fields: [resultDocumentId], references: [id], onDelete: SetNull)
+  createdAt         DateTime                   @default(now())
+  createdBy         String
+  createdByUser     User                       @relation("DocumentOperationJobCreator", fields: [createdBy], references: [id], onDelete: Cascade)
+  updatedAt         DateTime                   @updatedAt
+  deletedAt         DateTime?
+
+  @@index([createdBy, status, updatedAt])
+  @@index([sourceDocumentId, status])
+  @@index([resultDocumentId])
 }
 
 model DocumentCollabTicket {

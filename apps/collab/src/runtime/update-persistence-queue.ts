@@ -4,6 +4,7 @@ import type { CollabFatalPersistenceFailure, CollabHocuspocusContext, CollabRunt
 import type { DocumentYdocRuntimeStore } from './ydoc-runtime-store'
 import { randomUUID } from 'node:crypto'
 import { COLLAB_ERROR_CODE } from '@haohaoxue/samepage-contracts'
+import { sleep } from '@haohaoxue/samepage-shared'
 import { isDocumentYdocRuntimeStoreError } from './ydoc-runtime-store'
 
 const DEFAULT_UPDATE_PERSISTENCE_MAX_ATTEMPTS = 3
@@ -338,14 +339,6 @@ function toPersistenceFailureMetricContext(input: {
     errorName: input.failure.name,
     errorMessage: input.failure.message,
   }
-}
-
-async function sleep(delayMs: number): Promise<void> {
-  if (delayMs <= 0) {
-    return
-  }
-
-  await new Promise(resolve => setTimeout(resolve, delayMs))
 }
 
 function toArrayBufferUint8Array(payload: Uint8Array): Uint8Array<ArrayBuffer> {

@@ -7,11 +7,14 @@ interface DocumentHistoryPanelProps {
 
 defineProps<DocumentHistoryPanelProps>()
 const {
+  currentEntryTimeLabel,
   hasDocument,
   historySections,
+  isCurrentEntrySelected,
   isEntrySelected,
   isGroupExpanded,
   resolveEntryDetail,
+  selectCurrentEntry,
   selectEntry,
   toggleGroup,
 } = useDocumentHistoryPanel()
@@ -33,11 +36,35 @@ const {
       正在加载历史记录...
     </div>
 
-    <div v-else-if="!historySections.length" class="document-history-panel__empty">
-      暂无历史记录
-    </div>
-
     <div v-else class="document-history-panel__content">
+      <article
+        class="document-history-panel__item document-history-panel__item--current"
+        :class="{ 'is-selected': isCurrentEntrySelected() }"
+      >
+        <button
+          type="button"
+          class="document-history-panel__item-button"
+          @click="selectCurrentEntry"
+        >
+          <div class="document-history-panel__item-top">
+            <div class="document-history-panel__item-time">
+              当前内容
+            </div>
+            <span class="document-history-panel__item-status">
+              正在编辑
+            </span>
+          </div>
+
+          <div v-if="currentEntryTimeLabel" class="document-history-panel__item-detail">
+            {{ currentEntryTimeLabel }}
+          </div>
+        </button>
+      </article>
+
+      <div v-if="!historySections.length" class="document-history-panel__empty document-history-panel__empty--inline">
+        尚无历史版本
+      </div>
+
       <section
         v-for="section in historySections"
         :key="section.id"
@@ -151,6 +178,11 @@ const {
     line-height: 1.6;
   }
 
+  .document-history-panel__empty--inline {
+    padding: 0.25rem 0.75rem 0;
+    font-size: 12px;
+  }
+
   .document-history-panel__content {
     flex: 1 1 0%;
     overflow-y: auto;
@@ -242,6 +274,10 @@ const {
     &.is-selected::before {
       background: color-mix(in srgb, var(--brand-primary) 82%, transparent);
     }
+  }
+
+  .document-history-panel__item--current {
+    margin-bottom: 0.875rem;
   }
 
   .document-history-panel__item-button {

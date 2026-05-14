@@ -10,6 +10,7 @@
       "@haohaoxue/samepage-contracts": ["../contracts/src/index.ts"]
     },
     "resolveJsonModule": true,
+    "types": ["node"],
     "ignoreDeprecations": "6.0",
     "strict": true,
     "declaration": true,

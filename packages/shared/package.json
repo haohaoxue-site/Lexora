@@ -29,6 +29,7 @@
     "yjs": "^13.6.30"
   },
   "devDependencies": {
+    "@types/node": "catalog:",
     "typescript": "catalog:"
   }
 }

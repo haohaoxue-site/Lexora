@@ -35,10 +35,15 @@ export function buildDocumentHistorySections(options: {
   }
 
   const now = options.now ?? dayjs()
-  const currentSnapshot = options.snapshots.find(snapshot => snapshot.id === options.document?.latestVersionSnapshotId) ?? null
+  const currentContent = {
+    schemaVersion: options.document.schemaVersion,
+    title: options.document.title,
+    body: options.document.body,
+  }
   const snapshotById = new Map(options.snapshots.map(snapshot => [snapshot.id, snapshot]))
   const minuteEntries = collapseSnapshotsByMinute({
-    currentSnapshot,
+    currentContent,
+    currentProjectionRevision: options.document.currentProjectionRevision,
     snapshots: options.snapshots,
     snapshotById,
   })
@@ -124,7 +129,8 @@ export function buildDocumentHistorySections(options: {
 }
 
 function collapseSnapshotsByMinute(options: {
-  currentSnapshot: DocumentVersionSnapshot | null
+  currentContent: Pick<DocumentVersionSnapshot, 'schemaVersion' | 'title' | 'body'>
+  currentProjectionRevision: number
   snapshots: DocumentVersionSnapshot[]
   snapshotById: Map<string, DocumentVersionSnapshot>
 }): DocumentHistoryEntry[] {
@@ -153,10 +159,8 @@ function collapseSnapshotsByMinute(options: {
       summary: resolveHistoryEntrySummary(snapshot, previousSnapshot, options.snapshotById),
       userDisplayName: snapshot.createdByUser?.displayName ?? '未知用户',
       changeCount: group.length,
-      isCurrentSnapshot: options.currentSnapshot?.id === snapshot.id,
-      isCurrentContent: options.currentSnapshot
-        ? isSameDocumentVersionSnapshotContent(options.currentSnapshot, snapshot)
-        : false,
+      isCurrentSnapshot: snapshot.basedOnProjectionRevision === options.currentProjectionRevision,
+      isCurrentContent: isSameDocumentVersionSnapshotContent(options.currentContent, snapshot),
     }
   })
 }

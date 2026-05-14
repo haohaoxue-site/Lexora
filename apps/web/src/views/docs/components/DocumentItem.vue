@@ -11,7 +11,6 @@ interface DocumentItemProps {
 const props = defineProps<DocumentItemProps>()
 const {
   canManageDocument,
-  canMoveToTeam,
   canShareDocument,
   createChild,
   getActionsStateClass,
@@ -83,7 +82,11 @@ const {
           <SvgIcon category="ui" icon="plus" size="14px" />
         </ElButton>
 
-        <ElDropdown trigger="click" @command="handleMenuCommand">
+        <ElDropdown
+          trigger="click"
+          popper-class="document-tree-item__menu-popper"
+          @command="handleMenuCommand"
+        >
           <ElButton
             text
             class="document-tree-item__icon-button"
@@ -97,28 +100,84 @@ const {
           </ElButton>
 
           <template #dropdown>
-            <ElDropdownMenu class="document-tree-item__menu">
+            <ElDropdownMenu>
               <ElDropdownItem
-                v-if="canMoveToTeam"
-                command="move-to-team"
-                class="document-tree-item__menu-item document-tree-item__menu-item--move-to-team"
+                command="open-new-tab"
+                class="document-tree-item__menu-item"
               >
-                移到团队
+                <template #icon>
+                  <SvgIcon category="ui" icon="document-menu-open-new" />
+                </template>
+                在新标签页打开
               </ElDropdownItem>
 
               <ElDropdownItem
                 v-if="canShareDocument"
                 command="share"
+                divided
                 class="document-tree-item__menu-item document-tree-item__menu-item--share"
               >
+                <template #icon>
+                  <SvgIcon category="ui" icon="document-menu-share" />
+                </template>
                 分享
+              </ElDropdownItem>
+
+              <ElDropdownItem
+                command="copy-link"
+                :divided="!canShareDocument"
+                class="document-tree-item__menu-item"
+              >
+                <template #icon>
+                  <SvgIcon category="ui" icon="document-menu-link" />
+                </template>
+                复制链接
+              </ElDropdownItem>
+
+              <ElDropdownItem
+                v-if="canManageDocument"
+                command="duplicate"
+                divided
+                class="document-tree-item__menu-item"
+              >
+                <template #icon>
+                  <SvgIcon category="ui" icon="document-menu-copy" />
+                </template>
+                创建副本
+              </ElDropdownItem>
+
+              <ElDropdownItem
+                v-if="canManageDocument"
+                command="move"
+                class="document-tree-item__menu-item"
+              >
+                <template #icon>
+                  <SvgIcon category="ui" icon="document-menu-move" />
+                </template>
+                移动到
+              </ElDropdownItem>
+
+              <ElDropdownItem
+                v-if="canManageDocument"
+                command="rename"
+                divided
+                class="document-tree-item__menu-item"
+              >
+                <template #icon>
+                  <SvgIcon category="ui" icon="document-menu-rename" />
+                </template>
+                重命名
               </ElDropdownItem>
 
               <ElDropdownItem
                 v-if="canManageDocument"
                 command="delete"
+                divided
                 class="document-tree-item__menu-item document-tree-item__menu-item--delete"
               >
+                <template #icon>
+                  <SvgIcon category="ui" icon="document-menu-delete" />
+                </template>
                 删除
               </ElDropdownItem>
             </ElDropdownMenu>
@@ -284,13 +343,60 @@ const {
   }
 }
 
-:global(.el-dropdown-menu__item.document-tree-item__menu-item--delete) {
+:global(.document-tree-item__menu-popper) {
+  --el-dropdown-menuItem-hover-color: var(--brand-text-primary);
+  --el-dropdown-menuItem-hover-fill: color-mix(in srgb, var(--brand-fill-lighter) 76%, var(--brand-text-primary) 6%);
+}
+
+:global(.document-tree-item__menu-popper .el-dropdown-menu) {
+  box-sizing: border-box;
+  width: 9.75rem;
+  min-width: 0;
+  padding: 0.3125rem;
+}
+
+:global(.document-tree-item__menu-popper .el-dropdown-menu__item.document-tree-item__menu-item) {
+  gap: 0.35rem;
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 1.825rem;
+  padding: 0 0.25rem;
+  border-radius: 4px;
+  font-size: 14px;
+}
+
+:global(.document-tree-item__menu-popper .el-dropdown-menu__item.document-tree-item__menu-item .el-icon) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 1.25rem;
+  width: 1.25rem;
+  height: 1.25rem;
+  margin-right: 0;
+  color: color-mix(in srgb, var(--brand-text-secondary) 86%, transparent);
+}
+
+:global(.document-tree-item__menu-popper .el-dropdown-menu__item--divided) {
+  margin: 0.375rem 0;
+  border-top-color: color-mix(in srgb, var(--brand-border-base) 72%, transparent);
+}
+
+:global(.document-tree-item__menu-popper .el-dropdown-menu__item:not(.is-disabled):focus:not(:focus-visible):not(:hover)) {
+  background-color: transparent;
+  color: var(--brand-text-primary);
+}
+
+:global(.document-tree-item__menu-popper .el-dropdown-menu__item.document-tree-item__menu-item--delete) {
   color: var(--brand-error);
 }
 
-:global(.el-dropdown-menu__item.document-tree-item__menu-item--delete:not(.is-disabled):hover),
-:global(.el-dropdown-menu__item.document-tree-item__menu-item--delete:not(.is-disabled):focus) {
-  background: var(--el-color-danger-light-9);
+:global(.document-tree-item__menu-popper .el-dropdown-menu__item.document-tree-item__menu-item--delete .el-icon) {
+  color: color-mix(in srgb, var(--brand-error) 80%, var(--brand-text-secondary));
+}
+
+:global(.document-tree-item__menu-popper .el-dropdown-menu__item.document-tree-item__menu-item--delete:not(.is-disabled):hover),
+:global(.document-tree-item__menu-popper .el-dropdown-menu__item.document-tree-item__menu-item--delete:not(.is-disabled):focus) {
+  background: color-mix(in srgb, var(--brand-error) 9%, white);
   color: var(--brand-error);
 }
 </style>

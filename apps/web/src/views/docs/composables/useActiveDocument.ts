@@ -196,7 +196,7 @@ export const useActiveDocument = createSharedComposable(() => {
   }
 
   async function restoreSnapshot(snapshotId: string) {
-    if (!state.currentDocument.value || state.currentDocument.value.latestVersionSnapshotId === snapshotId) {
+    if (!state.currentDocument.value) {
       return
     }
 
@@ -334,6 +334,21 @@ export const useActiveDocument = createSharedComposable(() => {
     })
   }
 
+  function applyDocumentTitleChanged(documentCurrent: DocumentCurrent) {
+    if (!state.patchDocumentTitle(documentCurrent)) {
+      return
+    }
+
+    const documentId = documentCurrent.document.id
+    collaboration.reset()
+    collaboration.prepareRemoteDocument()
+    void collaboration.connect({
+      documentId,
+      createTicket: () => createDocumentCollabTicketRequest(documentId),
+      awarenessState: collaborationAwarenessState.value,
+    })
+  }
+
   watch(
     activeDocumentId,
     async (nextDocumentId) => {
@@ -382,6 +397,7 @@ export const useActiveDocument = createSharedComposable(() => {
 
   return {
     applyDocumentShareChanged,
+    applyDocumentTitleChanged,
     canReconnectCollaboration,
     collaboration: collaboration.bindings,
     collaborationConnectionStatus: collaboration.connectionStatus,
@@ -516,6 +532,31 @@ export function useActiveDocumentState({
     }
   }
 
+  function patchDocumentTitle(documentCurrent: DocumentCurrent) {
+    if (currentDocument.value?.id !== documentCurrent.document.id) {
+      return false
+    }
+
+    currentDocument.value = {
+      ...currentDocument.value,
+      currentProjectionId: documentCurrent.currentProjection.id,
+      currentProjectionRevision: documentCurrent.currentProjection.projectionRevision,
+      latestVersionSnapshotId: documentCurrent.document.latestVersionSnapshotId,
+      summary: documentCurrent.document.summary,
+      title: documentCurrent.currentProjection.title,
+      updatedAt: documentCurrent.document.updatedAt,
+    }
+
+    patchDocumentItem(documentCurrent.document.id, {
+      hasContent: documentCurrent.document.summary.length > 0,
+      summary: documentCurrent.document.summary,
+      title: getDocumentTitlePlainText(documentCurrent.currentProjection.title),
+      updatedAt: documentCurrent.document.updatedAt,
+    })
+    save.markSaved(documentCurrent.currentProjection.updatedAt)
+    return true
+  }
+
   function startRestore() {
     isRestoringSnapshot.value = true
   }
@@ -575,6 +616,7 @@ export function useActiveDocumentState({
     loadedSnapshotsDocumentId,
     patchDocumentPageWidthMode,
     patchDocumentShare,
+    patchDocumentTitle,
     resetCurrentDocument,
     saveState: save.saveState,
     saveStateLabel: save.saveStateLabel,

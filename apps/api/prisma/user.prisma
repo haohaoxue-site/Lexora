@@ -36,6 +36,7 @@ model User {
   createdDocumentAssets           DocumentAsset[]             @relation("DocumentAssetCreator")
   createdDocumentShares           DocumentShare[]             @relation("DocumentShareCreator")
   updatedDocumentShares           DocumentShare[]             @relation("DocumentShareUpdater")
+  createdDocumentOperationJobs    DocumentOperationJob[]      @relation("DocumentOperationJobCreator")
   documentShareRecipients         DocumentShareRecipient[]    @relation("DocumentShareRecipientUser")
   createdDocumentShareRecipients  DocumentShareRecipient[]    @relation("DocumentShareRecipientCreator")
   updatedDocumentShareRecipients  DocumentShareRecipient[]    @relation("DocumentShareRecipientUpdater")

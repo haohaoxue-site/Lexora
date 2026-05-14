@@ -1,4 +1,5 @@
 import type {
+  DocumentCurrent,
   DocumentItem,
   DocumentTreeCollectionId,
   DocumentTreeGroup,
@@ -7,7 +8,7 @@ import type {
 import type { ComputedRef } from 'vue'
 import type { DocumentDeleteAction } from '../typing'
 import { DOCUMENT_COLLECTION, DOCUMENT_DEFAULT_TITLE } from '@haohaoxue/samepage-contracts'
-import { formatDocumentCollectionLabel, resolveRootDocumentVisibility } from '@haohaoxue/samepage-shared'
+import { formatDocumentCollectionLabel, getDocumentTitlePlainText, resolveRootDocumentVisibility } from '@haohaoxue/samepage-shared'
 import { createSharedComposable } from '@vueuse/core'
 import { ElMessage } from 'element-plus'
 import { computed, shallowRef } from 'vue'
@@ -15,6 +16,7 @@ import {
   createDocument as createDocumentRequest,
   deleteDocument as deleteDocumentRequest,
   getDocuments,
+  patchDocumentTitle as patchDocumentTitleRequest,
   permanentlyDeleteDocument as permanentlyDeleteDocumentRequest,
 } from '@/apis/document'
 import { useUiStore } from '@/stores/ui'
@@ -38,6 +40,17 @@ interface PendingDeleteDocumentTarget {
   nextDocumentId: string | null
 }
 
+interface PendingMoveDocumentTarget {
+  documentId: string
+  documentTitle: string
+  movingDocumentIds: Set<string>
+}
+
+interface PendingRenameDocumentTarget {
+  documentId: string
+  documentTitle: string
+}
+
 export const useDocumentTree = createSharedComposable(() => {
   const {
     activeDocumentId,
@@ -55,12 +68,17 @@ export const useDocumentTree = createSharedComposable(() => {
   const isCreating = shallowRef(false)
   const deleteDialogTarget = shallowRef<PendingDeleteDocumentTarget | null>(null)
   const deleteActionKind = shallowRef<DocumentDeleteAction | null>(null)
+  const moveDialogTarget = shallowRef<PendingMoveDocumentTarget | null>(null)
+  const renameDialogTarget = shallowRef<PendingRenameDocumentTarget | null>(null)
+  const isRenaming = shallowRef(false)
   let treeRequestId = 0
 
   const isDeleting = computed(() => deleteActionKind.value !== null)
-  const isMutatingTree = computed(() => isCreating.value || isDeleting.value)
+  const isMutatingTree = computed(() => isCreating.value || isDeleting.value || isRenaming.value)
   const isDeleteDialogOpen = computed(() => Boolean(deleteDialogTarget.value))
   const deleteDialogDocumentTitle = computed(() => deleteDialogTarget.value?.documentTitle ?? '')
+  const isMoveDialogOpen = computed(() => Boolean(moveDialogTarget.value))
+  const isRenameDialogOpen = computed(() => Boolean(renameDialogTarget.value))
 
   async function loadTree(options: LoadDocumentTreeOptions = {}) {
     const workspaceId = currentWorkspaceId.value
@@ -123,6 +141,81 @@ export const useDocumentTree = createSharedComposable(() => {
     }
 
     deleteDialogTarget.value = target
+  }
+
+  function openMoveDialog(documentId: string) {
+    const targetPath = findDocumentPath(state.treeGroups.value, documentId)
+    const targetDocument = targetPath?.nodes.at(-1)
+
+    if (!targetPath || !targetDocument || !isOwnedDocumentCollection(targetPath.collectionId)) {
+      return
+    }
+
+    moveDialogTarget.value = {
+      documentId,
+      documentTitle: targetDocument.title,
+      movingDocumentIds: collectDocumentItemIds([targetDocument]),
+    }
+  }
+
+  function closeMoveDialog() {
+    moveDialogTarget.value = null
+  }
+
+  function openRenameDialog(documentId: string) {
+    const targetPath = findDocumentPath(state.treeGroups.value, documentId)
+    const targetDocument = targetPath?.nodes.at(-1)
+
+    if (!targetPath || !targetDocument || !isOwnedDocumentCollection(targetPath.collectionId)) {
+      return
+    }
+
+    renameDialogTarget.value = {
+      documentId,
+      documentTitle: targetDocument.title,
+    }
+  }
+
+  function closeRenameDialog() {
+    if (isRenaming.value) {
+      return
+    }
+
+    renameDialogTarget.value = null
+  }
+
+  async function confirmRenameDocument(title: string): Promise<DocumentCurrent | null> {
+    const target = renameDialogTarget.value
+    const normalizedTitle = title.trim()
+
+    if (!target || isRenaming.value || !normalizedTitle) {
+      return null
+    }
+
+    if (normalizedTitle === target.documentTitle) {
+      renameDialogTarget.value = null
+      return null
+    }
+
+    isRenaming.value = true
+
+    try {
+      const current = await patchDocumentTitleRequest(target.documentId, {
+        title: normalizedTitle,
+      })
+
+      state.patchDocumentItem(target.documentId, {
+        hasContent: current.document.summary.length > 0,
+        summary: current.document.summary,
+        title: getDocumentTitlePlainText(current.currentProjection.title),
+        updatedAt: current.document.updatedAt,
+      })
+      renameDialogTarget.value = null
+      return current
+    }
+    finally {
+      isRenaming.value = false
+    }
   }
 
   async function confirmDeleteDocument() {
@@ -246,23 +339,34 @@ export const useDocumentTree = createSharedComposable(() => {
     activeCollectionId: state.activeCollectionId,
     breadcrumbLabels: state.breadcrumbLabels,
     closeDeleteDialog,
+    closeMoveDialog,
+    closeRenameDialog,
     confirmDeleteDocument,
     confirmPermanentlyDeleteDocument,
+    confirmRenameDocument,
     createChildDocument,
     createRootDocument: createRootDocumentIn,
     defaultDocumentId: state.defaultDocumentId,
     deleteActionKind,
     deleteDialogDocumentTitle,
     deleteDocument,
+    expandDocument: state.expandDocument,
     ensureExpandedPath: state.ensureExpandedPath,
     expandedDocumentIdSet: state.expandedDocumentIdSet,
     hasFallbackDocument: state.hasFallbackDocument,
     isCreating,
     isDeleteDialogOpen,
     isDocumentLoading,
+    isMoveDialogOpen,
     isMutatingTree,
+    isRenameDialogOpen,
+    isRenaming,
     loadTree,
+    moveDialogTarget,
+    openMoveDialog,
+    openRenameDialog,
     patchDocumentItem: state.patchDocumentItem,
+    renameDialogTarget,
     rememberLastOpenedDocument: state.rememberLastOpenedDocument,
     toggleDocument: state.toggleDocument,
     treeGroups: state.treeGroups,
@@ -326,6 +430,12 @@ export function useDocumentTreeState({
     uiStore.setExpandedDocumentIds(currentWorkspaceId.value, Array.from(nextExpandedIds))
   }
 
+  function expandDocument(documentId: string) {
+    const nextExpandedIds = new Set(expandedDocumentIds.value)
+    nextExpandedIds.add(documentId)
+    uiStore.setExpandedDocumentIds(currentWorkspaceId.value, Array.from(nextExpandedIds))
+  }
+
   function ensureExpandedPath(documentId: string | null) {
     if (!documentId) {
       return
@@ -383,6 +493,7 @@ export function useDocumentTreeState({
     applyLoadedTree,
     breadcrumbLabels,
     defaultDocumentId,
+    expandDocument,
     ensureExpandedPath,
     expandedDocumentIdSet,
     hasFallbackDocument,
