@@ -9,6 +9,7 @@
   --tiptap-prosemirror-line-height: 1.6;
   --tiptap-prosemirror-letter-spacing: normal;
   --tiptap-placeholder-color: var(--el-text-color-placeholder);
+  --tiptap-code-font-family: ui-monospace, 'Menlo', 'Monaco', 'Consolas', 'Liberation Mono', 'SFMono-Regular', 'Cascadia Mono', 'Cascadia Code', 'Noto Sans Mono', 'DejaVu Sans Mono', monospace;
   --tiptap-file-node-border: color-mix(in srgb, var(--brand-border-base) 82%, transparent);
   --tiptap-file-node-background: color-mix(in srgb, var(--brand-fill-lighter) 70%, var(--brand-bg-surface));
   --tiptap-file-node-title-color: var(--brand-text-primary);
@@ -330,7 +331,7 @@
   }
 
   code {
-    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    font-family: var(--tiptap-code-font-family);
   }
 
   .inline-code {
@@ -341,7 +342,7 @@
     border-radius: 4px;
     background: color-mix(in srgb, var(--brand-fill-lighter) 86%, var(--brand-bg-surface));
     color: color-mix(in srgb, var(--brand-primary) 76%, var(--el-text-color-primary));
-    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    font-family: var(--tiptap-code-font-family);
     font-size: 0.9em;
     line-height: 1.35;
     box-decoration-break: clone;
@@ -567,7 +568,7 @@
     padding: 0.5rem 0.8rem 0.5rem 1rem;
     border-right: 1px solid color-mix(in srgb, var(--tiptap-code-block-border) 70%, transparent);
     color: var(--tiptap-code-block-line-number-color);
-    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    font-family: var(--tiptap-code-font-family);
     font-size: 0.875rem;
     line-height: 1.65;
     text-align: right;
@@ -589,8 +590,10 @@
     display: block;
     min-width: max-content;
     color: var(--brand-text-primary);
-    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    font-family: var(--tiptap-code-font-family);
     font-size: 0.875rem;
+    font-variant-ligatures: none;
+    font-feature-settings: 'liga' 0, 'calt' 0;
     line-height: 1.65;
     tab-size: var(--tiptap-code-block-tab-size, 2);
     white-space: pre !important;
@@ -690,7 +693,7 @@
 
   .tiptap-math-inline__placeholder {
     color: var(--brand-text-placeholder);
-    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    font-family: var(--tiptap-code-font-family);
     font-size: 0.9em;
   }
 
@@ -1618,7 +1621,7 @@ html.dark {
 
     .el-input__inner,
     .el-textarea__inner {
-      font-family: 'JetBrains Mono', 'Fira Code', monospace;
+      font-family: var(--tiptap-code-font-family);
     }
   }
 
