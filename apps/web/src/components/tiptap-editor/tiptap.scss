@@ -575,6 +575,11 @@
     user-select: none;
   }
 
+  .tiptap-code-block__line-numbers span {
+    display: block;
+    flex: 0 0 auto;
+  }
+
   .tiptap-code-block__pre {
     flex: 1 1 auto;
     min-width: 0;

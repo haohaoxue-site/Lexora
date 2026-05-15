@@ -15,6 +15,7 @@ import {
   resolveCodeBlockLanguage,
 } from './languages'
 import { ensureCodeBlockLanguageAndRefresh } from './lowlight'
+import { useCodeBlockLineNumbers } from './useCodeBlockLineNumbers'
 
 const props = defineProps(nodeViewProps)
 
@@ -26,6 +27,7 @@ const CODE_BLOCK_TAB_SIZE_OPTIONS = TIPTAP_CODE_BLOCK_TAB_SIZES.map(size => ({
 }))
 
 const titleInputRef = useTemplateRef<HTMLInputElement>('titleInput')
+const bodyRef = useTemplateRef<HTMLElement>('codeBlockBody')
 const isTitleEditing = shallowRef(false)
 const titleDraft = shallowRef('')
 const languageQuery = shallowRef('')
@@ -62,10 +64,14 @@ const isToolbarActive = computed(() => languagePopoverVisible.value || morePopov
 const codeBlockStyle = computed(() => ({
   '--tiptap-code-block-tab-size': String(tabSize.value),
 }))
-const lineNumbers = computed(() => {
-  const lineCount = Math.max(1, props.node.textContent.split('\n').length)
-
-  return Array.from({ length: lineCount }, (_, index) => index + 1)
+const codeText = computed(() => props.node.textContent)
+const { lineNumberRows } = useCodeBlockLineNumbers({
+  bodyRef,
+  codeText,
+  isCollapsed,
+  showLineNumbers,
+  tabSize,
+  wrapLines,
 })
 const filteredLanguages = computed(() => {
   const keyword = languageQuery.value.trim().toLowerCase()
@@ -451,9 +457,15 @@ function showFormatPlaceholder() {
       </div>
     </div>
 
-    <div v-show="!isCollapsed" class="tiptap-code-block__body">
+    <div v-show="!isCollapsed" ref="codeBlockBody" class="tiptap-code-block__body">
       <div v-if="showLineNumbers" class="tiptap-code-block__line-numbers" contenteditable="false">
-        <span v-for="lineNumber in lineNumbers" :key="lineNumber">{{ lineNumber }}</span>
+        <span
+          v-for="lineNumberRow in lineNumberRows"
+          :key="lineNumberRow.number"
+          :style="lineNumberRow.style"
+        >
+          {{ lineNumberRow.number }}
+        </span>
       </div>
       <pre class="tiptap-code-block__pre"><NodeViewContent as="code" class="tiptap-code-block__code" /></pre>
     </div>
