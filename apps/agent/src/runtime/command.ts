@@ -1,4 +1,4 @@
-import type { AgentCommandQueue } from './typing'
+import type { AgentCommandQueue, AgentControlHandler } from './typing'
 import type { AgentWorkflowRuntime } from './workflow'
 import { AGENT_RUN_CONTROL_TYPE, AgentRunCommandSchema } from '@haohaoxue/samepage-contracts'
 
@@ -12,6 +12,7 @@ export interface CreateAgentCommandWorkerOptions {
   queue: AgentCommandQueue
   workflowRuntime: AgentWorkflowRuntime
   idempotency?: AgentIdempotencyStore
+  onControl?: AgentControlHandler
 }
 
 export interface AgentCommandWorker {
@@ -38,12 +39,21 @@ export function createAgentCommandWorker(options: CreateAgentCommandWorkerOption
           return
         }
 
-        await options.workflowRuntime.submit(command)
+        try {
+          await options.workflowRuntime.submit(command)
+        }
+        catch (error) {
+          await idempotency.clear(command.idempotencyKey)
+          throw error
+        }
       })
       unsubscribeControl = options.queue.subscribeControl?.((control) => {
         if (control.type === AGENT_RUN_CONTROL_TYPE.CANCEL_RUN) {
           options.workflowRuntime.cancel(control.runId)
+          return
         }
+
+        return options.onControl?.(control)
       }) ?? null
     },
 

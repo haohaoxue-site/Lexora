@@ -3,6 +3,8 @@ import { ChatMessageRoleSchema } from '../chat'
 
 const NonEmptyStringSchema = z.string().trim().min(1)
 
+export const AGENT_CHAT_THREAD_PREFIX = 'chat:'
+
 export const AgentChatReplyContextSchema = z.object({
   chatSessionId: NonEmptyStringSchema,
   triggerUserMessageId: NonEmptyStringSchema,
@@ -20,13 +22,21 @@ export const AgentGetChatSessionContextRequestSchema = z.object({
   triggerUserMessageId: NonEmptyStringSchema,
 }).strict()
 
-export const AgentGetChatSessionContextResponseSchema = z.object({
+export const AgentChatRuntimeContextSchema = z.object({
   sessionId: NonEmptyStringSchema,
-  historyVersion: z.number().int().min(0),
+  threadId: NonEmptyStringSchema,
+  sessionHistoryVersion: z.number().int().min(0),
+  activePathKey: NonEmptyStringSchema,
+  triggerUserMessageId: NonEmptyStringSchema,
+  triggerParentMessageId: NonEmptyStringSchema.nullable(),
+  assistantMessageId: NonEmptyStringSchema,
   messages: z.array(AgentChatContextMessageSchema),
 }).strict()
 
+export const AgentGetChatSessionContextResponseSchema = AgentChatRuntimeContextSchema
+
 export type AgentChatReplyContext = z.infer<typeof AgentChatReplyContextSchema>
 export type AgentChatContextMessage = z.infer<typeof AgentChatContextMessageSchema>
+export type AgentChatRuntimeContext = z.infer<typeof AgentChatRuntimeContextSchema>
 export type AgentGetChatSessionContextRequest = z.infer<typeof AgentGetChatSessionContextRequestSchema>
 export type AgentGetChatSessionContextResponse = z.infer<typeof AgentGetChatSessionContextResponseSchema>

@@ -16,6 +16,7 @@ import {
   Logger,
 } from '@nestjs/common'
 import { AgentRunCommandPublisherService } from '../agent/agent-command-publisher.service'
+import { AgentRuntimeCleanupTasksService } from '../agent/agent-runtime-cleanup-tasks.service'
 import { AiDefaultModelsService } from '../ai/models/defaults.service'
 import { AiModelResolverService } from '../ai/models/resolver.service'
 import { ChatRunDispatcherService } from './chat-run-dispatcher.service'
@@ -63,6 +64,7 @@ export class ChatService {
     private readonly defaultModelsService: AiDefaultModelsService,
     private readonly chatRunDispatcher: ChatRunDispatcherService,
     private readonly agentRunCommandPublisher: AgentRunCommandPublisherService,
+    private readonly agentRuntimeCleanupTasks: AgentRuntimeCleanupTasksService,
   ) {}
 
   async getRuntimeConfig(userId: string): Promise<ChatRuntimeConfig> {
@@ -158,6 +160,23 @@ export class ChatService {
 
   async switchActiveMessage(params: SwitchChatActiveMessageParams): Promise<ChatMutationResponse> {
     return this.chatSessionsService.switchActiveMessage(params)
+  }
+
+  async deleteSession(params: ChatMessageMutationParams): Promise<void> {
+    const result = await this.chatSessionsService.deleteSession(params.userId, params.sessionId)
+
+    await Promise.all(result.activeRunIds.map(runId => this.agentRunCommandPublisher.publishRunControl({
+      controlId: randomUUID(),
+      type: AGENT_RUN_CONTROL_TYPE.CANCEL_RUN,
+      runId,
+      reason: 'chat_session_deleted',
+    }).catch(error => this.logger.warn(
+      error instanceof Error ? error.message : `publish deleted chat run cancel failed: run=${runId}`,
+    ))))
+
+    await this.agentRuntimeCleanupTasks.enqueueChatSessionCheckpointCleanup({
+      sessionId: params.sessionId,
+    })
   }
 
   async cancelRun(params: CancelChatRunParams): Promise<ChatMutationResponse> {

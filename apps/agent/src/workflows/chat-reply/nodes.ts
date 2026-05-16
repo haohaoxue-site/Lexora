@@ -3,8 +3,10 @@ import type { GraphNode } from '@langchain/langgraph'
 import type { AgentChatModelFactory } from '../../integrations/model-providers/chat-model'
 import type { ChatReplyGraphContext, ChatReplyState } from './state'
 import { AIMessage, HumanMessage, SystemMessage } from '@langchain/core/messages'
+import { Overwrite } from '@langchain/langgraph'
 import { consumeChatModelTextStream } from '../../integrations/model-providers/stream-text'
-import { CHAT_REPLY_SYSTEM_PROMPT } from './prompts'
+import { trimChatReplyMessageContext } from './policy'
+import { createChatReplySystemPrompt } from './prompts'
 
 export interface CreateLlmCallNodeOptions {
   chatModelFactory: AgentChatModelFactory
@@ -19,21 +21,45 @@ export function createLlmCallNode(options: CreateLlmCallNodeOptions): GraphNode<
     }
 
     const model = options.chatModelFactory.createChatModel(modelTarget)
-    const stream = await model.stream(toLangChainMessages(state.messages), {
+    const langChainMessages = toLangChainMessages(state.messages, state.olderMessagesExcerpt)
+
+    const stream = await model.stream(langChainMessages, {
       signal: config.signal,
     })
 
+    const responseText = await consumeChatModelTextStream(stream, {
+      onStreamPart: config.context?.onStreamPart,
+    })
+
     return {
-      responseText: await consumeChatModelTextStream(stream, {
-        onStreamPart: config.context?.onStreamPart,
-      }),
+      responseText,
+      messages: [
+        {
+          role: 'assistant',
+          content: responseText,
+        },
+      ],
     }
   }
 }
 
-function toLangChainMessages(messages: AgentChatContextMessage[]) {
+export function createPrepareChatReplyContextNode(): GraphNode<typeof ChatReplyState, ChatReplyGraphContext> {
+  return async (state) => {
+    const trimmedContext = trimChatReplyMessageContext({
+      olderMessagesExcerpt: state.olderMessagesExcerpt,
+      messages: state.messages,
+    })
+
+    return {
+      olderMessagesExcerpt: trimmedContext.olderMessagesExcerpt,
+      messages: new Overwrite(trimmedContext.messages),
+    }
+  }
+}
+
+function toLangChainMessages(messages: AgentChatContextMessage[], olderMessagesExcerpt: string) {
   return [
-    new SystemMessage(CHAT_REPLY_SYSTEM_PROMPT),
+    new SystemMessage(createChatReplySystemPrompt(olderMessagesExcerpt)),
     ...messages.map((message) => {
       if (message.role === 'assistant') {
         return new AIMessage(message.content)

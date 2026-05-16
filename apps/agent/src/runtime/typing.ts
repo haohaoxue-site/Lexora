@@ -1,6 +1,7 @@
 import type {
   AgentRunCommand,
   AgentRunControlCommand,
+  AgentRunControlResult,
   AgentRunEvent,
   AgentRunEventType,
   AgentRunModelTarget,
@@ -10,6 +11,7 @@ import type {
 export type {
   AgentRunCommand,
   AgentRunControlCommand,
+  AgentRunControlResult,
   AgentRunEvent,
   AgentRunEventType,
   AgentRunModelTarget,
@@ -30,6 +32,11 @@ export interface AgentCommandQueue {
 
 export interface AgentEventPublisher {
   publish: (event: AgentRunEvent) => Promise<void>
+  close?: () => Promise<void>
+}
+
+export interface AgentControlResultPublisher {
+  publish: (result: AgentRunControlResult) => Promise<void>
   close?: () => Promise<void>
 }
 

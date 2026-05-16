@@ -1,0 +1,29 @@
+enum AgentRuntimeCleanupTaskStatus {
+  PENDING
+  DISPATCHED
+  COMPLETED
+  FAILED
+}
+
+model AgentRuntimeCleanupTask {
+  id                    String                        @id @default(uuid())
+  scope                 String
+  resourceId            String
+  threadId              String
+  status                AgentRuntimeCleanupTaskStatus @default(PENDING)
+  attempts              Int                           @default(0)
+  controlId             String?
+  lastError             String?
+  nextAttemptAt         DateTime                      @default(now())
+  controlPublishedAt    DateTime?
+  controlLeaseExpiresAt DateTime?
+  completedAt           DateTime?
+  createdAt             DateTime                      @default(now())
+  updatedAt             DateTime                      @updatedAt
+
+  @@unique([scope, resourceId, threadId])
+  @@index([status, nextAttemptAt])
+  @@index([status, controlLeaseExpiresAt])
+  @@index([controlId])
+  @@index([threadId])
+}

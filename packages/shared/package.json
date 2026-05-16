@@ -4,7 +4,8 @@
   "version": "1.0.0",
   "private": true,
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./zod": "./src/zod.ts"
   },
   "scripts": {
     "lint:fix": "eslint . --fix",
@@ -26,7 +27,8 @@
     "@tiptap/starter-kit": "^3.22.5",
     "@tiptap/y-tiptap": "^3.0.3",
     "jose": "^6.2.3",
-    "yjs": "^13.6.30"
+    "yjs": "^13.6.30",
+    "zod": "catalog:"
   },
   "devDependencies": {
     "@types/node": "catalog:",

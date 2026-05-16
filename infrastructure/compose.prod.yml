@@ -146,6 +146,7 @@ services:
     environment:
       NODE_ENV: production
       REDIS_URL: ${REDIS_URL}
+      AGENT_CHECKPOINTER_DATABASE_URL: ${DATABASE_URL}
       API_INTERNAL_URL: http://api:3000
     depends_on:
       api:

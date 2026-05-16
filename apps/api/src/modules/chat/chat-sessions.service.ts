@@ -17,6 +17,7 @@ import {
   CHAT_SESSION_EVENT_TYPE,
   ChatMutationResponseSchema,
 } from '@haohaoxue/samepage-contracts'
+import { buildAgentChatThreadId } from '@haohaoxue/samepage-shared'
 import {
   BadRequestException,
   ConflictException,
@@ -256,16 +257,44 @@ export class ChatSessionsService {
     return this.getSession(input.userId, input.sessionId)
   }
 
-  async deleteSession(userId: string, sessionId: string): Promise<void> {
-    const result = await this.prisma.chatSession.deleteMany({
-      where: {
-        id: sessionId,
-        userId,
-      },
+  async deleteSession(userId: string, sessionId: string): Promise<{ activeRunIds: string[] }> {
+    const result = await this.prisma.$transaction(async (tx) => {
+      const activeRuns = await tx.chatSessionRun.findMany({
+        where: {
+          sessionId,
+          session: {
+            userId,
+          },
+          status: {
+            in: [
+              ChatSessionRunStatus.PENDING,
+              ChatSessionRunStatus.RUNNING,
+            ],
+          },
+        },
+        select: {
+          runId: true,
+        },
+      })
+      const deleteResult = await tx.chatSession.deleteMany({
+        where: {
+          id: sessionId,
+          userId,
+        },
+      })
+
+      return {
+        count: deleteResult.count,
+        activeRunIds: activeRuns.map(run => run.runId),
+      }
     })
 
     if (result.count === 0) {
       throw new NotFoundException('聊天会话不存在')
+    }
+
+    return {
+      activeRunIds: result.activeRunIds,
     }
   }
 
@@ -436,10 +465,24 @@ export class ChatSessionsService {
       throw new NotFoundException('聊天触发消息不存在')
     }
 
+    const activePath = resolveActivePath(session.messages, session.activeRootMessageId)
+    const assistantMessage = activePath.find(message =>
+      message.parentMessageId === triggerMessage.id && message.role === ChatSessionMessageRole.ASSISTANT,
+    )
+
+    if (!assistantMessage) {
+      throw new ConflictException('聊天触发消息缺少助手响应')
+    }
+
     return {
       sessionId: session.id,
-      historyVersion: session.historyVersion,
-      messages: path
+      threadId: buildAgentChatThreadId(session.id),
+      sessionHistoryVersion: session.historyVersion,
+      activePathKey: createChatActivePathKey(activePath),
+      triggerUserMessageId: triggerMessage.id,
+      triggerParentMessageId: triggerMessage.parentMessageId,
+      assistantMessageId: assistantMessage.id,
+      messages: activePath
         .filter(message => message.role === ChatSessionMessageRole.USER || message.status === ChatSessionMessageStatus.COMPLETED)
         .map(message => ({
           role: toChatMessageRole(message.role),
@@ -1249,6 +1292,10 @@ function resolvePathToMessage(
   }
 
   return path.reverse()
+}
+
+function createChatActivePathKey(messages: PersistedChatSessionMessage[]): string {
+  return messages.map(message => message.id).join('>')
 }
 
 function resolveActivePathWithOverride(

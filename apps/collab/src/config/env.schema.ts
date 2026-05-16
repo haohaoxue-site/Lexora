@@ -1,3 +1,4 @@
+import { stringWithDefault } from '@haohaoxue/samepage-shared/zod'
 import { z } from 'zod'
 
 const DEFAULT_DATABASE_URL = 'postgresql://postgres:postgres@localhost:5432/samepage_ai'
@@ -14,12 +15,4 @@ export type CollabEnv = z.infer<typeof collabEnvSchema>
 
 export function validateCollabEnv(config: Record<string, unknown>): CollabEnv {
   return collabEnvSchema.parse(config)
-}
-
-function stringWithDefault(fallback: string) {
-  return z
-    .string()
-    .trim()
-    .optional()
-    .transform(value => value?.length ? value : fallback)
 }

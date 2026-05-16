@@ -3,7 +3,15 @@ import type { AgentModelStreamPart } from '../../integrations/model-providers/st
 import { Annotation } from '@langchain/langgraph'
 
 export const ChatReplyState = Annotation.Root({
-  messages: Annotation<AgentChatContextMessage[]>(),
+  sessionId: Annotation<string>(),
+  sessionHistoryVersion: Annotation<number>(),
+  activePathKey: Annotation<string>(),
+  activePathTailMessageId: Annotation<string>(),
+  olderMessagesExcerpt: Annotation<string>(),
+  messages: Annotation<AgentChatContextMessage[], AgentChatContextMessage[]>({
+    reducer: (current, update) => current.concat(update),
+    default: () => [],
+  }),
   responseText: Annotation<string>(),
 })
 

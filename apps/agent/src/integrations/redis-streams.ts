@@ -3,9 +3,11 @@ import type {
   AgentCommandHandler,
   AgentCommandQueue,
   AgentControlHandler,
+  AgentControlResultPublisher,
   AgentEventPublisher,
   AgentRunCommand,
   AgentRunControlCommand,
+  AgentRunControlResult,
   AgentRunEvent,
 } from '../runtime/typing'
 import type { AgentRedisClient, RedisCommandArgument, RedisStreamReadResult } from './redis-client'
@@ -14,6 +16,7 @@ import {
   AGENT_QUEUE_NAME,
   AgentRunCommandSchema,
   AgentRunControlCommandSchema,
+  AgentRunControlResultSchema,
   AgentRunEventSchema,
 } from '@haohaoxue/samepage-contracts'
 import { sleepUnref } from '@haohaoxue/samepage-shared'
@@ -25,6 +28,7 @@ const DEFAULT_READ_BLOCK_MS = 1000
 const DEFAULT_MAX_ATTEMPTS = 3
 const COMMAND_FIELD = 'command'
 const CONTROL_FIELD = 'control'
+const CONTROL_RESULT_FIELD = 'result'
 const EVENT_FIELD = 'event'
 const DEFAULT_IDEMPOTENCY_KEY_PREFIX = 'samepage:agent:idempotency:'
 const DEFAULT_IDEMPOTENCY_TTL_SECONDS = 24 * 60 * 60
@@ -35,6 +39,11 @@ export interface CreateRedisStreamsAgentQueueOptions {
 }
 
 export interface CreateRedisStreamsAgentEventPublisherOptions {
+  /** Redis 客户端 */
+  redis: AgentRedisClient
+}
+
+export interface CreateRedisStreamsAgentControlResultPublisherOptions {
   /** Redis 客户端 */
   redis: AgentRedisClient
 }
@@ -358,6 +367,18 @@ export function createRedisStreamsAgentEventPublisher(
   }
 }
 
+export function createRedisStreamsAgentControlResultPublisher(
+  options: CreateRedisStreamsAgentControlResultPublisherOptions,
+): AgentControlResultPublisher {
+  const redis = options.redis
+
+  return {
+    async publish(result) {
+      await publishControlResult(redis, result)
+    },
+  }
+}
+
 async function ensureConsumerGroup(
   redis: AgentRedisClient,
   groupName: string,
@@ -452,6 +473,17 @@ function publishControl(redis: AgentRedisClient, control: AgentRunControlCommand
     '*',
     CONTROL_FIELD,
     JSON.stringify(normalizedControl),
+  )
+}
+
+function publishControlResult(redis: AgentRedisClient, result: AgentRunControlResult): Promise<string> {
+  const normalizedResult = AgentRunControlResultSchema.parse(result)
+
+  return redis.xadd(
+    AGENT_QUEUE_NAME.CONTROL_RESULTS,
+    '*',
+    CONTROL_RESULT_FIELD,
+    JSON.stringify(normalizedResult),
   )
 }
 

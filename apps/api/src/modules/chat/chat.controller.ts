@@ -69,7 +69,10 @@ export class ChatController {
     @CurrentUser() authUser: AuthUserContext,
     @Param('id') sessionId: string,
   ): Promise<null> {
-    await this.chatSessionsService.deleteSession(authUser.id, sessionId)
+    await this.chatService.deleteSession({
+      userId: authUser.id,
+      sessionId,
+    })
     return null
   }
 

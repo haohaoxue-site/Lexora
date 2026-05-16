@@ -8,6 +8,7 @@ import {
 export const AGENT_QUEUE_NAME = {
   COMMANDS: 'samepage:agent:commands',
   CONTROLS: 'samepage:agent:controls',
+  CONTROL_RESULTS: 'samepage:agent:control-results',
   EVENTS: 'samepage:agent:events',
   DEAD_LETTER: 'samepage:agent:commands:dead-letter',
 } as const
@@ -42,10 +43,22 @@ export const AGENT_RUN_EVENT_TYPE = {
 
 export const AGENT_RUN_CONTROL_TYPE = {
   CANCEL_RUN: 'run.cancel',
+  DELETE_CHECKPOINT_THREAD: 'checkpoint.thread.delete',
 } as const
 
 export const AGENT_RUN_CONTROL_TYPE_VALUES = [
   AGENT_RUN_CONTROL_TYPE.CANCEL_RUN,
+  AGENT_RUN_CONTROL_TYPE.DELETE_CHECKPOINT_THREAD,
+] as const
+
+export const AGENT_RUN_CONTROL_RESULT_TYPE = {
+  CHECKPOINT_THREAD_DELETE_COMPLETED: 'checkpoint.thread.delete.completed',
+  CHECKPOINT_THREAD_DELETE_FAILED: 'checkpoint.thread.delete.failed',
+} as const
+
+export const AGENT_RUN_CONTROL_RESULT_TYPE_VALUES = [
+  AGENT_RUN_CONTROL_RESULT_TYPE.CHECKPOINT_THREAD_DELETE_COMPLETED,
+  AGENT_RUN_CONTROL_RESULT_TYPE.CHECKPOINT_THREAD_DELETE_FAILED,
 ] as const
 
 export const AGENT_RUN_EVENT_TYPE_VALUES = [
@@ -66,6 +79,7 @@ export const AGENT_RUN_EVENT_TYPE_VALUES = [
 
 export const AgentRunEventTypeSchema = z.enum(AGENT_RUN_EVENT_TYPE_VALUES)
 export const AgentRunControlTypeSchema = z.enum(AGENT_RUN_CONTROL_TYPE_VALUES)
+export const AgentRunControlResultTypeSchema = z.enum(AGENT_RUN_CONTROL_RESULT_TYPE_VALUES)
 export const AgentWorkflowKeySchema = z.enum(AGENT_WORKFLOW_KEY_VALUES)
 
 const NonEmptyStringSchema = z.string().trim().min(1)
@@ -103,12 +117,45 @@ export const AgentRunCommandSchema = z.object({
   payload: z.unknown().optional(),
 }).strict()
 
-export const AgentRunControlCommandSchema = z.object({
+const AgentRunCancelControlCommandSchema = z.object({
   controlId: NonEmptyStringSchema,
-  type: AgentRunControlTypeSchema,
+  type: z.literal(AGENT_RUN_CONTROL_TYPE.CANCEL_RUN),
   runId: NonEmptyStringSchema,
   reason: z.string().trim().min(1).optional(),
 }).strict()
+
+const AgentCheckpointThreadDeleteControlCommandSchema = z.object({
+  controlId: NonEmptyStringSchema,
+  type: z.literal(AGENT_RUN_CONTROL_TYPE.DELETE_CHECKPOINT_THREAD),
+  cleanupTaskId: NonEmptyStringSchema.optional(),
+  threadId: NonEmptyStringSchema,
+  reason: z.string().trim().min(1).optional(),
+}).strict()
+
+export const AgentRunControlCommandSchema = z.discriminatedUnion('type', [
+  AgentRunCancelControlCommandSchema,
+  AgentCheckpointThreadDeleteControlCommandSchema,
+])
+
+const AgentCheckpointThreadDeleteCompletedControlResultSchema = z.object({
+  controlId: NonEmptyStringSchema,
+  type: z.literal(AGENT_RUN_CONTROL_RESULT_TYPE.CHECKPOINT_THREAD_DELETE_COMPLETED),
+  cleanupTaskId: NonEmptyStringSchema,
+  threadId: NonEmptyStringSchema,
+}).strict()
+
+const AgentCheckpointThreadDeleteFailedControlResultSchema = z.object({
+  controlId: NonEmptyStringSchema,
+  type: z.literal(AGENT_RUN_CONTROL_RESULT_TYPE.CHECKPOINT_THREAD_DELETE_FAILED),
+  cleanupTaskId: NonEmptyStringSchema,
+  threadId: NonEmptyStringSchema,
+  errorMessage: z.string().trim().min(1),
+}).strict()
+
+export const AgentRunControlResultSchema = z.discriminatedUnion('type', [
+  AgentCheckpointThreadDeleteCompletedControlResultSchema,
+  AgentCheckpointThreadDeleteFailedControlResultSchema,
+])
 
 export const AgentRunEventSchema = z.discriminatedUnion('type', [
   AgentRunEventBaseSchema.extend({
@@ -183,5 +230,7 @@ export type AgentWorkflowKey = z.infer<typeof AgentWorkflowKeySchema>
 export type AgentRunModelTarget = z.infer<typeof AgentRunModelTargetSchema>
 export type AgentRunCommand = z.infer<typeof AgentRunCommandSchema>
 export type AgentRunControlCommand = z.infer<typeof AgentRunControlCommandSchema>
+export type AgentRunControlResult = z.infer<typeof AgentRunControlResultSchema>
 export type AgentRunControlType = z.infer<typeof AgentRunControlTypeSchema>
+export type AgentRunControlResultType = z.infer<typeof AgentRunControlResultTypeSchema>
 export type AgentRunEvent = z.infer<typeof AgentRunEventSchema>

@@ -4,12 +4,16 @@ import { createAgentEditorApiClient } from './clients/editor'
 import { loadAgentConfig } from './config/runtime-config'
 import { createChatModelFactory } from './integrations/model-providers/chat-model'
 import { createAgentRedisClient } from './integrations/redis-client'
+import { createRedisAgentRuntimeTryLock } from './integrations/redis-lock'
 import {
   createRedisAgentIdempotencyStore,
+  createRedisStreamsAgentControlResultPublisher,
   createRedisStreamsAgentEventPublisher,
   createRedisStreamsAgentQueue,
 } from './integrations/redis-streams'
 import { createAgentRuntime } from './runtime'
+import { createCheckpointRetentionManager } from './runtime/checkpoint-retention'
+import { closeAgentCheckpointer, createAgentCheckpointer } from './runtime/checkpointer'
 import { createAgentServer } from './server/app'
 import { createChatReplyWorkflow } from './workflows/chat-reply'
 import { createEditorGenerateWorkflow, createEditorRewriteWorkflow } from './workflows/editor-reply'
@@ -18,34 +22,72 @@ const config = loadAgentConfig()
 const chatApi = createAgentChatApiClient(config.apiInternalUrl)
 const editorApi = createAgentEditorApiClient(config.apiInternalUrl)
 const chatModelFactory = createChatModelFactory()
-const commandRedis = createAgentRedisClient(config.redisUrl)
+const queueRedis = createAgentRedisClient(config.redisUrl)
+const runtimeRedis = createAgentRedisClient(config.redisUrl)
 const eventRedis = createAgentRedisClient(config.redisUrl)
-
-const agentRuntime = createAgentRuntime({
-  idempotency: createRedisAgentIdempotencyStore({
-    redis: commandRedis,
-  }),
-  queue: createRedisStreamsAgentQueue({
-    redis: commandRedis,
-  }),
-  events: createRedisStreamsAgentEventPublisher({
-    redis: eventRedis,
-  }),
-  workflows: [
-    createChatReplyWorkflow({ chatApi, chatModelFactory }),
-    createEditorGenerateWorkflow({ editorApi, chatModelFactory }),
-    createEditorRewriteWorkflow({ editorApi, chatModelFactory }),
-  ],
-})
+let agentRuntime: ReturnType<typeof createAgentRuntime> | null = null
+let agentCheckpointer: Awaited<ReturnType<typeof createAgentCheckpointer>> | null = null
+let checkpointRetentionManager: ReturnType<typeof createCheckpointRetentionManager> | null = null
 
 const app = createAgentServer({
   config,
   lifecycle: {
-    flushBeforeClose: () => agentRuntime.stop(),
+    flushBeforeClose: async () => {
+      await checkpointRetentionManager?.stop()
+      await agentRuntime?.stop()
+      await Promise.allSettled([
+        runtimeRedis.quit(),
+        queueRedis.quit(),
+        eventRedis.quit(),
+      ])
+      await closeAgentCheckpointer(agentCheckpointer)
+    },
   },
 })
 
 async function start(): Promise<void> {
+  agentCheckpointer = await createAgentCheckpointer(config.checkpointer)
+  const threadRunTryLock = createRedisAgentRuntimeTryLock({
+    redis: runtimeRedis,
+    keyPrefix: 'samepage:agent:thread-lock:',
+  })
+  checkpointRetentionManager = createCheckpointRetentionManager({
+    checkpointer: agentCheckpointer,
+    retentionDays: config.checkpointer.retentionDays,
+    lock: createRedisAgentRuntimeTryLock({
+      redis: runtimeRedis,
+      keyPrefix: 'samepage:agent:lock:',
+    }),
+    threadLock: threadRunTryLock,
+    controlResults: createRedisStreamsAgentControlResultPublisher({
+      redis: eventRedis,
+    }),
+    logger: app.log,
+  })
+  agentRuntime = createAgentRuntime({
+    idempotency: createRedisAgentIdempotencyStore({
+      redis: runtimeRedis,
+    }),
+    queue: createRedisStreamsAgentQueue({
+      redis: queueRedis,
+    }),
+    events: createRedisStreamsAgentEventPublisher({
+      redis: eventRedis,
+    }),
+    onControl: async control => await checkpointRetentionManager?.handleControl(control),
+    workflows: [
+      createChatReplyWorkflow({
+        chatApi,
+        chatModelFactory,
+        checkpointer: agentCheckpointer,
+        threadRunTryLock,
+      }),
+      createEditorGenerateWorkflow({ editorApi, chatModelFactory }),
+      createEditorRewriteWorkflow({ editorApi, chatModelFactory }),
+    ],
+  })
+
+  checkpointRetentionManager.start()
   await agentRuntime.start()
   const appUrl = await app.listen({
     host: config.host,
