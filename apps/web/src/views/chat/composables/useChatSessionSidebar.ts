@@ -1,16 +1,61 @@
 import type { ChatSessionSidebarActionCommand } from '../typing'
 import type { ChatSession } from './useChatSessions'
-import { ElMessageBox } from 'element-plus'
-import { computed } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { computed, shallowRef } from 'vue'
 import { useChatRouteState } from './useChatRouteState'
 import { useChatSessions } from './useChatSessions'
 
 export function useChatSessionSidebar() {
-  const { activeSessionId, deleteSession, renameSession, selectSession } = useChatSessions()
+  const { activeSessionId, batchDeleteSessions, deleteSession, renameSession, selectSession } = useChatSessions()
   const { navigateToNewChat, navigateToSession } = useChatRouteState()
+  const isSelectionMode = shallowRef(false)
+  const selectedSessionIds = shallowRef<Set<string>>(new Set())
+  const isBatchDeleting = shallowRef(false)
+  const selectedCount = computed(() => selectedSessionIds.value.size)
+  const hasSelectedSessions = computed(() => selectedCount.value > 0)
 
   function getSessionItemStateClass(sessionId: string) {
+    if (isSelectionMode.value && selectedSessionIds.value.has(sessionId)) {
+      return 'selected'
+    }
+
     return sessionId === activeSessionId.value ? 'active' : 'idle'
+  }
+
+  function isSessionSelected(sessionId: string) {
+    return selectedSessionIds.value.has(sessionId)
+  }
+
+  function enterSelectionMode() {
+    isSelectionMode.value = true
+    selectedSessionIds.value = new Set()
+  }
+
+  function exitSelectionMode() {
+    isSelectionMode.value = false
+    selectedSessionIds.value = new Set()
+  }
+
+  function toggleSessionSelected(sessionId: string) {
+    const nextSelectedSessionIds = new Set(selectedSessionIds.value)
+
+    if (nextSelectedSessionIds.has(sessionId)) {
+      nextSelectedSessionIds.delete(sessionId)
+    }
+    else {
+      nextSelectedSessionIds.add(sessionId)
+    }
+
+    selectedSessionIds.value = nextSelectedSessionIds
+  }
+
+  async function handleSessionClick(sessionId: string) {
+    if (isSelectionMode.value) {
+      toggleSessionSelected(sessionId)
+      return
+    }
+
+    await selectSessionRoute(sessionId)
   }
 
   async function promptRename(session: ChatSession) {
@@ -64,13 +109,56 @@ export function useChatSessionSidebar() {
     await navigateToNewChat()
   }
 
-  async function createNewChat() {
-    await navigateToNewChat()
-  }
-
   async function selectSessionRoute(sessionId: string) {
     await selectSession(sessionId)
     await navigateToSession(sessionId)
+  }
+
+  async function confirmBatchDelete() {
+    if (selectedCount.value === 0) {
+      ElMessage.warning('请选择要删除的对话')
+      return
+    }
+
+    const deletingActiveSession = Boolean(activeSessionId.value && selectedSessionIds.value.has(activeSessionId.value))
+    const confirmed = await ElMessageBox.confirm(
+      `确认删除选中的 ${selectedCount.value} 个对话吗？此操作不可恢复。`,
+      '批量删除对话',
+      {
+        type: 'warning',
+        confirmButtonText: '删除',
+        cancelButtonText: '取消',
+      },
+    ).then(() => true).catch(() => false)
+
+    if (!confirmed) {
+      return
+    }
+
+    isBatchDeleting.value = true
+
+    try {
+      const result = await batchDeleteSessions([...selectedSessionIds.value])
+      if (result.deletedSessionIds.length === 0) {
+        return
+      }
+
+      exitSelectionMode()
+
+      if (!deletingActiveSession) {
+        return
+      }
+
+      if (result.nextActiveSessionId) {
+        await navigateToSession(result.nextActiveSessionId, { replace: true })
+        return
+      }
+
+      await navigateToNewChat()
+    }
+    finally {
+      isBatchDeleting.value = false
+    }
   }
 
   function handleSessionAction(
@@ -89,10 +177,17 @@ export function useChatSessionSidebar() {
 
   return {
     activeSessionId: computed(() => activeSessionId.value),
-    createNewChat,
+    confirmBatchDelete,
+    enterSelectionMode,
+    exitSelectionMode,
     getSessionItemStateClass,
     handleSessionAction,
-    selectSession: selectSessionRoute,
+    handleSessionClick,
+    hasSelectedSessions,
+    isBatchDeleting,
+    isSelectionMode,
+    isSessionSelected,
+    selectedCount,
   }
 }
 

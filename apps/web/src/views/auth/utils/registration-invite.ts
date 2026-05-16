@@ -1,4 +1,4 @@
-const REGISTRATION_INVITE_GRANT_KEY = 'samepage_registration_invite_grant'
+import { getSessionStorage, STORAGE_KEY } from '@/utils/storage'
 
 interface StoredRegistrationInviteGrant {
   email: string
@@ -6,25 +6,12 @@ interface StoredRegistrationInviteGrant {
 }
 
 export function savePasswordRegistrationInviteGrant(input: StoredRegistrationInviteGrant): void {
-  if (typeof window === 'undefined') {
-    return
-  }
-
-  window.sessionStorage.setItem(REGISTRATION_INVITE_GRANT_KEY, JSON.stringify(input))
+  getSessionStorage().setItem(STORAGE_KEY.registrationInviteGrant, JSON.stringify(input))
 }
 
 export function consumePasswordRegistrationInviteGrant(email: string): string | undefined {
-  if (typeof window === 'undefined') {
-    return undefined
-  }
-
-  const rawValue = window.sessionStorage.getItem(REGISTRATION_INVITE_GRANT_KEY)
-
-  if (!rawValue) {
-    return undefined
-  }
-
-  const grant = parseStoredRegistrationInviteGrant(rawValue)
+  const rawValue = getSessionStorage().getItem(STORAGE_KEY.registrationInviteGrant)
+  const grant = rawValue ? parseStoredRegistrationInviteGrant(rawValue) : null
 
   if (!grant || grant.email !== email) {
     return undefined
@@ -34,11 +21,7 @@ export function consumePasswordRegistrationInviteGrant(email: string): string | 
 }
 
 export function clearPasswordRegistrationInviteGrant(): void {
-  if (typeof window === 'undefined') {
-    return
-  }
-
-  window.sessionStorage.removeItem(REGISTRATION_INVITE_GRANT_KEY)
+  getSessionStorage().removeItem(STORAGE_KEY.registrationInviteGrant)
 }
 
 function parseStoredRegistrationInviteGrant(value: string): StoredRegistrationInviteGrant | null {

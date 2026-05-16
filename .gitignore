@@ -151,8 +151,9 @@ components.d.ts
 .codex
 .playwright
 .playwright-cli
-todos/
-__tests__
 AGENTS.md
 CLAUDE.md
 skills-lock.json
+todos/
+__tests__
+infrastructure/scripts

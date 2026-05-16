@@ -25,9 +25,9 @@ const {
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
-  padding: 0.375rem 0.75rem;
+  padding: 0.375rem 0.5rem;
   border: 1px solid transparent;
-  border-radius: 9999px;
+  border-radius: 8px;
   appearance: none;
   cursor: pointer;
   font-family: inherit;

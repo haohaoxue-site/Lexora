@@ -58,15 +58,11 @@ export function useDocumentItem(options: UseDocumentItemOptions) {
   }
 
   function openDocumentInNewTab() {
-    if (typeof window === 'undefined') {
-      return
-    }
-
     window.open(buildDocumentPath(item.value.id), '_blank', 'noopener,noreferrer')
   }
 
   async function copyDocumentLink() {
-    if (!isClipboardSupported.value || typeof window === 'undefined') {
+    if (!isClipboardSupported.value) {
       ElMessage.error('当前环境不支持复制')
       return
     }

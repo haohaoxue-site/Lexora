@@ -15,12 +15,13 @@ import {
 } from '@/apis/auth'
 import { ADMIN_ROUTE_NAME } from '@/router/constants'
 import { createRequestErrorFromResponseEnvelope, toRequestError } from '@/utils/request-error'
+import { STORAGE_KEY } from '@/utils/storage'
 import { useUiStore } from './ui'
 import { useUserStore } from './user'
 import { useWorkspaceStore } from './workspace'
 
-export const AUTH_PERSIST_KEY = 'samepage_auth'
-export const AUTH_REDIRECT_KEY = 'samepage_auth_redirect'
+export const AUTH_PERSIST_KEY = STORAGE_KEY.auth
+export const AUTH_REDIRECT_KEY = STORAGE_KEY.authRedirect
 
 const SESSION_REFRESH_LEEWAY_MS = 60_000
 const SESSION_REFRESH_MIN_DELAY_MS = 5_000

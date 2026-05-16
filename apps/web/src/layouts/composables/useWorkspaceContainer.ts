@@ -28,7 +28,23 @@ export function useWorkspaceContainer() {
   const isSidebarCollapsed = computed(() => uiStore.workspaceSidebarCollapsed)
   const brand = computed(() => isAdminContainer.value ? adminBrand : workspaceBrand)
   const navigationItems = computed(() => {
-    return isAdminContainer.value ? adminNavigationItems : workspaceNavigationItems
+    if (isAdminContainer.value) {
+      return adminNavigationItems
+    }
+
+    return workspaceNavigationItems.map(item => item.name === 'home'
+      ? {
+          ...item,
+          to: uiStore.lastActiveChatSessionId
+            ? {
+                name: 'chat',
+                params: {
+                  sessionId: uiStore.lastActiveChatSessionId,
+                },
+              }
+            : item.to,
+        }
+      : item)
   })
 
   function toggleSidebar() {

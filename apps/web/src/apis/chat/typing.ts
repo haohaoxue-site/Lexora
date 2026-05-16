@@ -1,4 +1,6 @@
 export type {
+  BatchDeleteChatSessionsRequest,
+  BatchDeleteChatSessionsResponse,
   ChatMessage,
   ChatModelItem,
   ChatModelListResponse,

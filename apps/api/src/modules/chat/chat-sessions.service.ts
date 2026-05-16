@@ -298,6 +298,70 @@ export class ChatSessionsService {
     }
   }
 
+  async batchDeleteSessions(userId: string, sessionIds: string[]): Promise<{
+    activeRunIds: string[]
+    deletedSessionIds: string[]
+  }> {
+    const uniqueSessionIds = [...new Set(sessionIds.map(id => id.trim()).filter(Boolean))]
+
+    if (uniqueSessionIds.length === 0) {
+      throw new BadRequestException('请选择要删除的聊天会话')
+    }
+
+    const result = await this.prisma.$transaction(async (tx) => {
+      const ownedSessions = await tx.chatSession.findMany({
+        where: {
+          id: { in: uniqueSessionIds },
+          userId,
+        },
+        select: {
+          id: true,
+        },
+      })
+      const deletedSessionIds = ownedSessions.map(session => session.id)
+
+      if (deletedSessionIds.length === 0) {
+        return {
+          activeRunIds: [],
+          deletedSessionIds,
+        }
+      }
+
+      const activeRuns = await tx.chatSessionRun.findMany({
+        where: {
+          sessionId: { in: deletedSessionIds },
+          status: {
+            in: [
+              ChatSessionRunStatus.PENDING,
+              ChatSessionRunStatus.RUNNING,
+            ],
+          },
+        },
+        select: {
+          runId: true,
+        },
+      })
+
+      await tx.chatSession.deleteMany({
+        where: {
+          id: { in: deletedSessionIds },
+          userId,
+        },
+      })
+
+      return {
+        activeRunIds: activeRuns.map(run => run.runId),
+        deletedSessionIds,
+      }
+    })
+
+    if (result.deletedSessionIds.length === 0) {
+      throw new NotFoundException('聊天会话不存在')
+    }
+
+    return result
+  }
+
   async sendMessage(input: CreateRunInput & { content: string }): Promise<ChatMutationResponse> {
     const result = await this.createRunFromUserMessage(input)
     return this.toMutationResponse(input.userId, result.sessionId, result.latestSequence, result.runId)

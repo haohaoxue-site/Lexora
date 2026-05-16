@@ -96,7 +96,7 @@ export function useDocsPermissionsPage(options: UseDocsPermissionsPageOptions = 
   const fullShareLink = computed(() => {
     const link = publicShareInfo.value?.share?.link
 
-    if (!link || typeof window === 'undefined') {
+    if (!link) {
       return ''
     }
 
@@ -525,7 +525,7 @@ export function useDocsPermissionsPage(options: UseDocsPermissionsPageOptions = 
   }
 
   function resolveFullShareLink(link: string) {
-    if (!link || typeof window === 'undefined') {
+    if (!link) {
       return ''
     }
 

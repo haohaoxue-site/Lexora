@@ -12,10 +12,6 @@ export function buildDocumentBlockUrl(blockId: string, currentHref: string) {
 }
 
 export function replaceCurrentDocumentBlockHash(blockId: string) {
-  if (typeof window === 'undefined') {
-    return null
-  }
-
   const nextHref = buildDocumentBlockUrl(blockId, window.location.href)
 
   window.history.replaceState(window.history.state, '', nextHref)

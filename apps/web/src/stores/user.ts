@@ -21,8 +21,9 @@ import {
   updateCurrentUserProfile,
   updateUserPreferences,
 } from '@/apis/user'
+import { STORAGE_KEY } from '@/utils/storage'
 
-export const USER_PERSIST_KEY = 'samepage_user'
+export const USER_PERSIST_KEY = STORAGE_KEY.user
 
 function createDefaultPreferences(): UserSettings['preferences'] {
   return {

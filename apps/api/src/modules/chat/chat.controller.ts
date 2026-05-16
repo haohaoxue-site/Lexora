@@ -1,4 +1,6 @@
 import type {
+  BatchDeleteChatSessionsRequest,
+  BatchDeleteChatSessionsResponse,
   ChatModelListResponse,
   ChatMutationResponse,
   ChatRuntimeConfig,
@@ -8,6 +10,7 @@ import type {
 } from '@haohaoxue/samepage-contracts'
 import type { FastifyReply } from 'fastify'
 import type { AuthUserContext } from '../auth/auth.interface'
+import { BatchDeleteChatSessionsRequestSchema } from '@haohaoxue/samepage-contracts'
 import { sleep } from '@haohaoxue/samepage-shared'
 import {
   Body,
@@ -21,6 +24,7 @@ import {
   Res,
 } from '@nestjs/common'
 import { CurrentUser } from '../../decorators/current-user.decorator'
+import { ZodValidationPipe } from '../../pipes/zod-validation.pipe'
 import { ChatSessionEventsService } from './chat-session-events.service'
 import { ChatSessionsService } from './chat-sessions.service'
 import {
@@ -74,6 +78,17 @@ export class ChatController {
       sessionId,
     })
     return null
+  }
+
+  @Post('sessions/batch-delete')
+  async batchDeleteSessions(
+    @CurrentUser() authUser: AuthUserContext,
+    @Body(new ZodValidationPipe(BatchDeleteChatSessionsRequestSchema)) payload: BatchDeleteChatSessionsRequest,
+  ): Promise<BatchDeleteChatSessionsResponse> {
+    return this.chatService.batchDeleteSessions({
+      userId: authUser.id,
+      sessionIds: payload.sessionIds,
+    })
   }
 
   @Patch('sessions/:id/model')

@@ -1,7 +1,8 @@
 import { defineStore } from 'pinia'
 import { computed, shallowRef } from 'vue'
+import { STORAGE_KEY } from '@/utils/storage'
 
-export const UI_PERSIST_KEY = 'samepage_ui'
+export const UI_PERSIST_KEY = STORAGE_KEY.ui
 
 const DOCUMENT_TREE_FALLBACK_KEY = '__workspace_pending__'
 
@@ -30,6 +31,8 @@ function resolveDocumentTreeStateKey(workspaceId: string | null) {
 
 export const useUiStore = defineStore('ui', () => {
   const workspaceSidebarCollapsed = shallowRef(false)
+  const lastActiveChatSessionId = shallowRef<string | null>(null)
+  const chatSessionSidebarPinned = shallowRef<boolean | null>(null)
   const _documentTreeStateByWorkspaceId = shallowRef<Record<string, DocumentTreeUiState>>({})
   const documentTreeStateByWorkspaceId = computed(() =>
     Object.fromEntries(
@@ -42,6 +45,23 @@ export const useUiStore = defineStore('ui', () => {
 
   function setWorkspaceSidebarCollapsed(value: boolean) {
     workspaceSidebarCollapsed.value = value
+  }
+
+  function setLastActiveChatSessionId(sessionId: string | null) {
+    const nextSessionId = sessionId?.trim() || null
+    lastActiveChatSessionId.value = nextSessionId
+  }
+
+  function clearLastActiveChatSessionId(sessionId?: string | null) {
+    if (sessionId && lastActiveChatSessionId.value !== sessionId) {
+      return
+    }
+
+    lastActiveChatSessionId.value = null
+  }
+
+  function setChatSessionSidebarPinned(value: boolean | null) {
+    chatSessionSidebarPinned.value = value
   }
 
   function getDocumentTreeState(workspaceId: string | null): DocumentTreeUiState {
@@ -86,10 +106,15 @@ export const useUiStore = defineStore('ui', () => {
 
   return {
     _documentTreeStateByWorkspaceId,
+    chatSessionSidebarPinned,
     clearDocumentTreeState,
+    clearLastActiveChatSessionId,
     documentTreeStateByWorkspaceId,
     getDocumentTreeState,
+    lastActiveChatSessionId,
+    setChatSessionSidebarPinned,
     setExpandedDocumentIds,
+    setLastActiveChatSessionId,
     setLastOpenedDocumentId,
     setWorkspaceSidebarCollapsed,
     workspaceSidebarCollapsed,
@@ -99,6 +124,8 @@ export const useUiStore = defineStore('ui', () => {
     key: UI_PERSIST_KEY,
     pick: [
       'workspaceSidebarCollapsed',
+      'lastActiveChatSessionId',
+      'chatSessionSidebarPinned',
       '_documentTreeStateByWorkspaceId',
     ],
   },

@@ -1,4 +1,6 @@
 import type {
+  BatchDeleteChatSessionsRequest,
+  BatchDeleteChatSessionsResponse,
   ChatModelListResponse,
   ChatModelSelection,
   ChatMutationResponse,
@@ -45,6 +47,16 @@ export function deleteChatSession(sessionId: string): Promise<null> {
   return axios.request({
     method: 'delete',
     url: `/chat/sessions/${sessionId}`,
+  })
+}
+
+export function batchDeleteChatSessions(
+  data: BatchDeleteChatSessionsRequest,
+): Promise<BatchDeleteChatSessionsResponse> {
+  return axios.request({
+    method: 'post',
+    url: '/chat/sessions/batch-delete',
+    data,
   })
 }
 

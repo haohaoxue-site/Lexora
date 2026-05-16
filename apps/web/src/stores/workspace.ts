@@ -14,8 +14,9 @@ import {
   getVisibleTeamWorkspaces,
   updateTeamWorkspaceIcon,
 } from '@/apis/workspace'
+import { STORAGE_KEY } from '@/utils/storage'
 
-export const WORKSPACE_PERSIST_KEY = 'samepage_workspace'
+export const WORKSPACE_PERSIST_KEY = STORAGE_KEY.workspace
 
 /**
  * 空间切换列表项。

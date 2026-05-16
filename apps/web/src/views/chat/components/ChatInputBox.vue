@@ -82,7 +82,7 @@ const {
     gap: 0.75rem;
     padding: 0.75rem 1rem;
     border: 1px solid color-mix(in srgb, var(--brand-border-base) 80%, transparent);
-    border-radius: 22px;
+    border-radius: 8px;
     background: var(--brand-bg-surface-raised);
     transition: border-color 0.2s ease;
     box-shadow: var(--brand-shadow-floating);

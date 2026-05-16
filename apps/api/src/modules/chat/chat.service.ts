@@ -27,6 +27,11 @@ interface ChatMessageMutationParams {
   sessionId: string
 }
 
+interface BatchDeleteChatSessionsParams {
+  userId: string
+  sessionIds: string[]
+}
+
 interface SendChatMessageParams extends ChatMessageMutationParams {
   content: string
 }
@@ -165,18 +170,23 @@ export class ChatService {
   async deleteSession(params: ChatMessageMutationParams): Promise<void> {
     const result = await this.chatSessionsService.deleteSession(params.userId, params.sessionId)
 
-    await Promise.all(result.activeRunIds.map(runId => this.agentRunCommandPublisher.publishRunControl({
-      controlId: randomUUID(),
-      type: AGENT_RUN_CONTROL_TYPE.CANCEL_RUN,
-      runId,
-      reason: 'chat_session_deleted',
-    }).catch(error => this.logger.warn(
-      error instanceof Error ? error.message : `publish deleted chat run cancel failed: run=${runId}`,
-    ))))
-
-    await this.agentRuntimeCleanupTasks.enqueueChatSessionCheckpointCleanup({
-      sessionId: params.sessionId,
+    await this.cleanupDeletedChatSessions({
+      activeRunIds: result.activeRunIds,
+      sessionIds: [params.sessionId],
     })
+  }
+
+  async batchDeleteSessions(params: BatchDeleteChatSessionsParams): Promise<{ deletedSessionIds: string[] }> {
+    const result = await this.chatSessionsService.batchDeleteSessions(params.userId, params.sessionIds)
+
+    await this.cleanupDeletedChatSessions({
+      activeRunIds: result.activeRunIds,
+      sessionIds: result.deletedSessionIds,
+    })
+
+    return {
+      deletedSessionIds: result.deletedSessionIds,
+    }
   }
 
   async cancelRun(params: CancelChatRunParams): Promise<ChatMutationResponse> {
@@ -212,6 +222,24 @@ export class ChatService {
       authMode: target.authMode,
       modelId: target.modelId,
     })
+  }
+
+  private async cleanupDeletedChatSessions(input: {
+    activeRunIds: string[]
+    sessionIds: string[]
+  }): Promise<void> {
+    await Promise.all(input.activeRunIds.map(runId => this.agentRunCommandPublisher.publishRunControl({
+      controlId: randomUUID(),
+      type: AGENT_RUN_CONTROL_TYPE.CANCEL_RUN,
+      runId,
+      reason: 'chat_session_deleted',
+    }).catch(error => this.logger.warn(
+      error instanceof Error ? error.message : `publish deleted chat run cancel failed: run=${runId}`,
+    ))))
+
+    await Promise.all(input.sessionIds.map(sessionId =>
+      this.agentRuntimeCleanupTasks.enqueueChatSessionCheckpointCleanup({ sessionId }),
+    ))
   }
 
   private dispatchRun(runId: string, sessionId: string): void {

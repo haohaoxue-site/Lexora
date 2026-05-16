@@ -223,6 +223,14 @@ export const UpdateChatSessionTitleRequestSchema = z.object({
   title: ChatSessionTitleSchema,
 }).strict()
 
+export const BatchDeleteChatSessionsRequestSchema = z.object({
+  sessionIds: z.array(NonEmptyStringSchema).min(1).max(100),
+}).strict()
+
+export const BatchDeleteChatSessionsResponseSchema = z.object({
+  deletedSessionIds: z.array(NonEmptyStringSchema),
+}).strict()
+
 export const ChatMutationResponseSchema = z.object({
   session: ChatSessionDetailSchema,
   latestSequence: z.number().int().nonnegative(),
@@ -373,5 +381,7 @@ export type CancelChatRunRequest = z.infer<typeof CancelChatRunRequestSchema>
 export type ChatMutationResponse = z.infer<typeof ChatMutationResponseSchema>
 export type UpdateChatSessionModelRequest = z.infer<typeof UpdateChatSessionModelRequestSchema>
 export type UpdateChatSessionTitleRequest = z.infer<typeof UpdateChatSessionTitleRequestSchema>
+export type BatchDeleteChatSessionsRequest = z.infer<typeof BatchDeleteChatSessionsRequestSchema>
+export type BatchDeleteChatSessionsResponse = z.infer<typeof BatchDeleteChatSessionsResponseSchema>
 export type ChatModelSelection = UpdateChatSessionModelRequest
 export type ChatSessionEvent = z.infer<typeof ChatSessionEventSchema>

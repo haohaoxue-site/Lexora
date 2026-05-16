@@ -41,7 +41,7 @@ export function useDocumentHeaderActions() {
     return buildSharedDocumentPath(policy.shareId)
   })
   const fullShareLink = computed(() => {
-    if (!shareLinkPath.value || typeof window === 'undefined') {
+    if (!shareLinkPath.value) {
       return ''
     }
 

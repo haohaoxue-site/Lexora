@@ -3,12 +3,14 @@ import { createSharedComposable } from '@vueuse/core'
 import { ElMessage } from 'element-plus'
 import { shallowReactive, shallowRef, toRef } from 'vue'
 import {
+  batchDeleteChatSessions,
   createChatSession,
   deleteChatSession,
   getChatSession,
   getChatSessions,
   updateChatSessionTitle,
 } from '@/apis/chat'
+import { useUiStore } from '@/stores/ui'
 import { getRequestErrorDisplayMessage } from '@/utils/request-error'
 import {
   acceptChatSessionSnapshot,
@@ -22,6 +24,7 @@ export interface ChatSession extends ChatSessionSummary {}
 export interface ActiveChatSession extends ChatSessionDetail {}
 
 export const useChatSessions = createSharedComposable(() => {
+  const uiStore = useUiStore()
   const snapshotState = shallowReactive(createChatSessionSnapshotState())
   const sessions = shallowRef<ChatSession[]>([])
   const activeSessionId = toRef(snapshotState, 'activeSessionId')
@@ -113,6 +116,7 @@ export const useChatSessions = createSharedComposable(() => {
       title: session.title,
       updatedAt: session.updatedAt,
     })
+    uiStore.setLastActiveChatSessionId(session.id)
     return true
   }
 
@@ -120,19 +124,27 @@ export const useChatSessions = createSharedComposable(() => {
     const isCurrentSession = activeSession.value?.id === id
 
     if (isCurrentSession) {
+      uiStore.setLastActiveChatSessionId(id)
       return true
     }
 
     const requestEpoch = beginChatSessionSnapshotRequest(snapshotState, id)
 
     try {
-      return acceptChatSessionSnapshot(snapshotState, {
+      const accepted = acceptChatSessionSnapshot(snapshotState, {
         session: await getChatSession(id),
         requestEpoch,
       })
+
+      if (accepted) {
+        uiStore.setLastActiveChatSessionId(id)
+      }
+
+      return accepted
     }
     catch (error) {
       clearActiveChatSessionSnapshot(snapshotState)
+      uiStore.clearLastActiveChatSessionId(id)
       ElMessage.error(getRequestErrorDisplayMessage(error, '加载聊天会话失败'))
       return false
     }
@@ -142,6 +154,7 @@ export const useChatSessions = createSharedComposable(() => {
     try {
       await deleteChatSession(id)
       sessions.value = sessions.value.filter(session => session.id !== id)
+      uiStore.clearLastActiveChatSessionId(id)
 
       if (activeSessionId.value !== id) {
         return activeSessionId.value
@@ -158,6 +171,55 @@ export const useChatSessions = createSharedComposable(() => {
     catch (error) {
       ElMessage.error(getRequestErrorDisplayMessage(error, '删除聊天会话失败'))
       return activeSessionId.value
+    }
+  }
+
+  async function batchDeleteSessions(ids: string[]) {
+    const sessionIds = [...new Set(ids.map(id => id.trim()).filter(Boolean))]
+
+    if (sessionIds.length === 0) {
+      return {
+        nextActiveSessionId: activeSessionId.value,
+        deletedSessionIds: [],
+      }
+    }
+
+    try {
+      const { deletedSessionIds } = await batchDeleteChatSessions({ sessionIds })
+      const deletedSessionIdSet = new Set(deletedSessionIds)
+      sessions.value = sessions.value.filter(session => !deletedSessionIdSet.has(session.id))
+
+      if (deletedSessionIds.includes(uiStore.lastActiveChatSessionId ?? '')) {
+        uiStore.clearLastActiveChatSessionId()
+      }
+
+      if (!activeSessionId.value || !deletedSessionIdSet.has(activeSessionId.value)) {
+        return {
+          nextActiveSessionId: activeSessionId.value,
+          deletedSessionIds,
+        }
+      }
+
+      const nextSession = sessions.value[0]
+      if (!nextSession) {
+        clearActiveChatSessionSnapshot(snapshotState)
+        return {
+          nextActiveSessionId: null,
+          deletedSessionIds,
+        }
+      }
+
+      return {
+        nextActiveSessionId: await selectSession(nextSession.id) ? nextSession.id : null,
+        deletedSessionIds,
+      }
+    }
+    catch (error) {
+      ElMessage.error(getRequestErrorDisplayMessage(error, '批量删除聊天会话失败'))
+      return {
+        nextActiveSessionId: activeSessionId.value,
+        deletedSessionIds: [],
+      }
     }
   }
 
@@ -249,6 +311,7 @@ export const useChatSessions = createSharedComposable(() => {
   return {
     activeSession,
     activeSessionId,
+    batchDeleteSessions,
     clearActiveSession,
     createSession,
     deleteSession,

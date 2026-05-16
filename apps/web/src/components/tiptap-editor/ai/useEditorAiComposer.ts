@@ -442,8 +442,8 @@ function resolveCandidateContentText(candidate: EditorAiSessionRuntime['candidat
 }
 
 function resolveAnchorStyle(rect: EditorAiAnchorRect): Record<string, string> {
-  const viewportWidth = typeof window === 'undefined' ? EDITOR_AI_COMPOSER_WIDTH : window.innerWidth
-  const viewportHeight = typeof window === 'undefined' ? 0 : window.innerHeight
+  const viewportWidth = window.innerWidth
+  const viewportHeight = window.innerHeight
   const left = Math.max(
     EDITOR_AI_COMPOSER_VIEWPORT_PADDING,
     Math.min(
