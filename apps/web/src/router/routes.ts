@@ -11,7 +11,7 @@ const LoginView = () => import('@/views/auth/login/index.vue')
 const PasswordRegisterVerifyView = () => import('@/views/auth/register-verify/index.vue')
 const PasswordRegisterRequestView = () => import('@/views/auth/register/index.vue')
 const ChatView = () => import('@/views/chat/index.vue')
-const CodeView = () => import('@/views/code/index.vue')
+// const CodeView = () => import('@/views/code/index.vue') // TODO
 const DocsView = () => import('@/views/docs/index.vue')
 const DocsDocumentSurfaceView = () => import('@/views/docs/pages/DocsDocumentSurfacePage.vue')
 const DocsPendingSharesPageView = () => import('@/views/docs/pages/DocsPendingSharesPage.vue')
@@ -19,7 +19,7 @@ const DocsPermissionsPageView = () => import('@/views/docs/pages/DocsPermissions
 const DocsTrashPageView = () => import('@/views/docs/pages/DocsTrashPage.vue')
 const AgentView = () => import('@/views/agent/index.vue')
 const HomeView = () => import('@/views/home/index.vue')
-const KnowledgeView = () => import('@/views/knowledge/index.vue')
+// const KnowledgeView = () => import('@/views/knowledge/index.vue') // TODO
 const ProviderView = () => import('@/views/provider/index.vue')
 // const ScheduleView = () => import('@/views/schedule/index.vue') // TODO
 const SettingsView = () => import('@/views/settings/index.vue')
@@ -117,17 +117,17 @@ const workspaceRouteChildren = [
       },
     ],
   },
-  {
-    path: 'code',
-    name: 'code',
-    component: CodeView,
-    meta: {
-      navLabel: '代码',
-      navIconCategory: SvgIconCategory.NAV,
-      navIcon: 'code',
-      navActiveIcon: 'code-active',
-    },
-  },
+  // {
+  //   path: 'code',
+  //   name: 'code',
+  //   component: CodeView,
+  //   meta: {
+  //     navLabel: '代码',
+  //     navIconCategory: SvgIconCategory.NAV,
+  //     navIcon: 'code',
+  //     navActiveIcon: 'code-active',
+  //   },
+  // },
   // {
   //   path: 'schedule',
   //   name: 'schedule',
@@ -139,17 +139,17 @@ const workspaceRouteChildren = [
   //     navActiveIcon: 'schedule-active',
   //   },
   // },
-  {
-    path: 'knowledge',
-    name: 'knowledge',
-    component: KnowledgeView,
-    meta: {
-      navLabel: '知识库',
-      navIconCategory: SvgIconCategory.NAV,
-      navIcon: 'knowledge',
-      navActiveIcon: 'knowledge-active',
-    },
-  },
+  // {
+  //   path: 'knowledge',
+  //   name: 'knowledge',
+  //   component: KnowledgeView,
+  //   meta: {
+  //     navLabel: '知识库',
+  //     navIconCategory: SvgIconCategory.NAV,
+  //     navIcon: 'knowledge',
+  //     navActiveIcon: 'knowledge-active',
+  //   },
+  // },
   {
     path: 'agent',
     name: 'agent',
