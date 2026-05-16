@@ -1,4 +1,4 @@
-import { optionalNonEmptyString, positiveIntegerWithDefault, stringWithDefault } from '@haohaoxue/samepage-shared/zod'
+import { optionalNonEmptyString, positiveIntegerWithDefault, stringWithDefault } from '@haohaoxue/samepage-shared'
 import { z } from 'zod'
 
 const DEFAULT_API_INTERNAL_URL = 'http://127.0.0.1:3000'

@@ -1,5 +1,5 @@
 import process from 'node:process'
-import { optionalNonEmptyString, stringWithDefault } from '@haohaoxue/samepage-shared/zod'
+import { optionalNonEmptyString, stringWithDefault } from '@haohaoxue/samepage-shared'
 import { z } from 'zod'
 
 const DEFAULT_DATABASE_URL = 'postgresql://postgres:postgres@localhost:5432/samepage_ai'
