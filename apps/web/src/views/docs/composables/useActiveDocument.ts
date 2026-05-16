@@ -30,7 +30,7 @@ import {
   hasDocumentContent,
   hydrateDocumentAssetAttributes,
 } from '@haohaoxue/samepage-shared'
-import { createSharedComposable } from '@vueuse/core'
+import { createSharedComposable, useOnline } from '@vueuse/core'
 import { ElMessage } from 'element-plus'
 import {
   computed,
@@ -77,6 +77,8 @@ export const useActiveDocument = createSharedComposable(() => {
   const userStore = useUserStore()
   const isDocumentItemLoading = shallowRef(false)
   const isSnapshotsLoading = shallowRef(false)
+  const isReconnectingCollaboration = shallowRef(false)
+  const isOnline = useOnline()
   let loadRequestId = 0
   let snapshotRequestId = 0
 
@@ -112,6 +114,7 @@ export const useActiveDocument = createSharedComposable(() => {
   }))
   const canReconnectCollaboration = computed(() =>
     Boolean(state.currentDocument.value)
+    && !isReconnectingCollaboration.value
     && (collaboration.connectionStatus.value === 'disconnected' || collaboration.connectionStatus.value === 'error'),
   )
 
@@ -297,15 +300,22 @@ export const useActiveDocument = createSharedComposable(() => {
   async function reconnectCollaboration() {
     const documentId = state.currentDocument.value?.id
 
-    if (!documentId) {
+    if (!documentId || isReconnectingCollaboration.value) {
       return false
     }
 
-    return await collaboration.connect({
-      documentId,
-      createTicket: () => createDocumentCollabTicketRequest(documentId),
-      awarenessState: collaborationAwarenessState.value,
-    })
+    isReconnectingCollaboration.value = true
+
+    try {
+      return await collaboration.connect({
+        documentId,
+        createTicket: () => createDocumentCollabTicketRequest(documentId),
+        awarenessState: collaborationAwarenessState.value,
+      })
+    }
+    finally {
+      isReconnectingCollaboration.value = false
+    }
   }
 
   function isActiveLoadRequest(requestId: number, documentId: string | null) {
@@ -368,6 +378,18 @@ export const useActiveDocument = createSharedComposable(() => {
       }
     },
   )
+
+  watch(isOnline, (nextOnline, previousOnline) => {
+    if (
+      !nextOnline
+      || previousOnline !== false
+      || collaboration.connectionStatus.value !== 'disconnected'
+    ) {
+      return
+    }
+
+    void reconnectCollaboration()
+  })
 
   watch(
     [
