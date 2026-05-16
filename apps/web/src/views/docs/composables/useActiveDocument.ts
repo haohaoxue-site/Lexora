@@ -142,7 +142,7 @@ export const useActiveDocument = createSharedComposable(() => {
     state.resetCurrentDocument()
 
     try {
-      const documentCurrent = await getDocumentCurrentRequest(id, { recordVisit: true })
+      const documentCurrent = await getDocumentCurrentRequest(id)
 
       if (!isActiveLoadRequest(requestId, id)) {
         return

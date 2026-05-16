@@ -84,14 +84,6 @@ export class DocumentTrashService {
           trashedBy: userId,
         },
       })
-
-      await tx.documentRecentVisit.deleteMany({
-        where: {
-          documentId: {
-            in: targetDocumentIds,
-          },
-        },
-      })
     })
 
     await this.collabPermissionInvalidationPublisher.publishPermissionInvalidations(
@@ -129,14 +121,6 @@ export class DocumentTrashService {
     const targetDocumentIds = await this.resolvePermanentlyRemovableDocumentIds(userId, id)
 
     await this.prisma.$bypass.$transaction(async (tx) => {
-      await tx.documentRecentVisit.deleteMany({
-        where: {
-          documentId: {
-            in: targetDocumentIds,
-          },
-        },
-      })
-
       await tx.document.deleteMany({
         where: {
           id: {

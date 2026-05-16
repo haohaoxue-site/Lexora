@@ -10,7 +10,6 @@ import type {
   DocumentCurrent,
   DocumentHistory,
   DocumentOperationJob,
-  DocumentRecent,
   DocumentTrashItem,
   DocumentTreeGroup,
   DocumentVersionSnapshot,
@@ -72,13 +71,6 @@ export function getDocumentOperationJob(id: string): Promise<DocumentOperationJo
   })
 }
 
-export function getRecentDocuments(): Promise<DocumentRecent[]> {
-  return axios.request({
-    method: 'get',
-    url: '/documents/recent',
-  })
-}
-
 export function getTrashDocuments(workspaceId: string): Promise<DocumentTrashItem[]> {
   return axios.request({
     method: 'get',
@@ -89,19 +81,10 @@ export function getTrashDocuments(workspaceId: string): Promise<DocumentTrashIte
   })
 }
 
-interface GetDocumentCurrentOptions {
-  recordVisit?: boolean
-}
-
-export function getDocumentCurrent(id: string, options: GetDocumentCurrentOptions = {}): Promise<DocumentCurrent> {
+export function getDocumentCurrent(id: string): Promise<DocumentCurrent> {
   return axios.request({
     method: 'get',
     url: `/documents/${id}`,
-    params: options.recordVisit
-      ? {
-          recordVisit: true,
-        }
-      : undefined,
   })
 }
 

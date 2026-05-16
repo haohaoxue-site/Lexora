@@ -2,10 +2,12 @@ import type { ChatSessionSidebarActionCommand } from '../typing'
 import type { ChatSession } from './useChatSessions'
 import { ElMessageBox } from 'element-plus'
 import { computed } from 'vue'
+import { useChatRouteState } from './useChatRouteState'
 import { useChatSessions } from './useChatSessions'
 
 export function useChatSessionSidebar() {
   const { activeSessionId, deleteSession, renameSession, selectSession } = useChatSessions()
+  const { navigateToNewChat, navigateToSession } = useChatRouteState()
 
   function getSessionItemStateClass(sessionId: string) {
     return sessionId === activeSessionId.value ? 'active' : 'idle'
@@ -34,6 +36,7 @@ export function useChatSessionSidebar() {
 
   async function confirmDelete(session: ChatSession) {
     const sessionTitle = formatSessionTitle(session.title)
+    const deletingActiveSession = activeSessionId.value === session.id
     const confirmed = await ElMessageBox.confirm(
       `确认删除「${sessionTitle}」吗？此操作不可恢复。`,
       '删除对话',
@@ -48,7 +51,26 @@ export function useChatSessionSidebar() {
       return
     }
 
-    void deleteSession(session.id)
+    const nextSessionId = await deleteSession(session.id)
+    if (!deletingActiveSession) {
+      return
+    }
+
+    if (nextSessionId) {
+      await navigateToSession(nextSessionId, { replace: true })
+      return
+    }
+
+    await navigateToNewChat()
+  }
+
+  async function createNewChat() {
+    await navigateToNewChat()
+  }
+
+  async function selectSessionRoute(sessionId: string) {
+    await selectSession(sessionId)
+    await navigateToSession(sessionId)
   }
 
   function handleSessionAction(
@@ -67,9 +89,10 @@ export function useChatSessionSidebar() {
 
   return {
     activeSessionId: computed(() => activeSessionId.value),
+    createNewChat,
     getSessionItemStateClass,
     handleSessionAction,
-    selectSession,
+    selectSession: selectSessionRoute,
   }
 }
 

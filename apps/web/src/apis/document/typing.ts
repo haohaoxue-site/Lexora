@@ -10,7 +10,6 @@ export type {
   DocumentCurrent,
   DocumentHistory,
   DocumentOperationJob,
-  DocumentRecent,
   DocumentTrashItem,
   DocumentTreeGroup,
   DocumentVersionSnapshot,

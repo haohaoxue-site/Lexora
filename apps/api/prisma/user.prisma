@@ -41,7 +41,6 @@ model User {
   createdDocumentShareRecipients  DocumentShareRecipient[]    @relation("DocumentShareRecipientCreator")
   updatedDocumentShareRecipients  DocumentShareRecipient[]    @relation("DocumentShareRecipientUpdater")
   documentCollabTickets           DocumentCollabTicket[]
-  documentRecentVisits            DocumentRecentVisit[]
   workspaceMemberships            WorkspaceMember[]
   receivedWorkspaceInvites        WorkspaceInvite[]           @relation("WorkspaceInviteInvitee")
   createdWorkspaceInvites         WorkspaceInvite[]           @relation("WorkspaceInviteCreator")

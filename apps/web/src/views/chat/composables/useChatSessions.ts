@@ -28,8 +28,14 @@ export const useChatSessions = createSharedComposable(() => {
   const activeSession = toRef(snapshotState, 'activeSession')
   const isLoadingSessions = shallowRef(false)
 
-  async function loadSessions(options: { preserveActiveSessionId?: boolean } = {}) {
-    const { preserveActiveSessionId = true } = options
+  async function loadSessions(options: {
+    preserveActiveSessionId?: boolean
+    selectFallbackSession?: boolean
+  } = {}) {
+    const {
+      preserveActiveSessionId = true,
+      selectFallbackSession = true,
+    } = options
     isLoadingSessions.value = true
 
     try {
@@ -38,6 +44,10 @@ export const useChatSessions = createSharedComposable(() => {
 
       if (nextSessions.length === 0) {
         clearActiveChatSessionSnapshot(snapshotState)
+        return
+      }
+
+      if (!selectFallbackSession) {
         return
       }
 
@@ -86,6 +96,10 @@ export const useChatSessions = createSharedComposable(() => {
     return createSession()
   }
 
+  function clearActiveSession() {
+    clearActiveChatSessionSnapshot(snapshotState)
+  }
+
   function replaceActiveSession(session: ActiveChatSession) {
     const accepted = acceptChatSessionSnapshot(snapshotState, {
       session,
@@ -106,19 +120,21 @@ export const useChatSessions = createSharedComposable(() => {
     const isCurrentSession = activeSession.value?.id === id
 
     if (isCurrentSession) {
-      return
+      return true
     }
 
     const requestEpoch = beginChatSessionSnapshotRequest(snapshotState, id)
 
     try {
-      acceptChatSessionSnapshot(snapshotState, {
+      return acceptChatSessionSnapshot(snapshotState, {
         session: await getChatSession(id),
         requestEpoch,
       })
     }
     catch (error) {
+      clearActiveChatSessionSnapshot(snapshotState)
       ElMessage.error(getRequestErrorDisplayMessage(error, '加载聊天会话失败'))
+      return false
     }
   }
 
@@ -128,19 +144,20 @@ export const useChatSessions = createSharedComposable(() => {
       sessions.value = sessions.value.filter(session => session.id !== id)
 
       if (activeSessionId.value !== id) {
-        return
+        return activeSessionId.value
       }
 
       const nextSession = sessions.value[0]
       if (!nextSession) {
         clearActiveChatSessionSnapshot(snapshotState)
-        return
+        return null
       }
 
-      await selectSession(nextSession.id)
+      return await selectSession(nextSession.id) ? nextSession.id : null
     }
     catch (error) {
       ElMessage.error(getRequestErrorDisplayMessage(error, '删除聊天会话失败'))
+      return activeSessionId.value
     }
   }
 
@@ -232,6 +249,7 @@ export const useChatSessions = createSharedComposable(() => {
   return {
     activeSession,
     activeSessionId,
+    clearActiveSession,
     createSession,
     deleteSession,
     ensureActiveSession,

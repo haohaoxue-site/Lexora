@@ -7,15 +7,19 @@ import ChatModelBadge from './components/ChatModelBadge.vue'
 import ChatModelSettingsDialog from './components/ChatModelSettingsDialog.vue'
 import ChatSessionSidebar from './components/ChatSessionSidebar.vue'
 import { useChatModels } from './composables/useChatModels'
+import { useChatRouteState } from './composables/useChatRouteState'
 import { useChatRuntimeConfig } from './composables/useChatRuntimeConfig'
 import { useChatSessions } from './composables/useChatSessions'
 
 const { loadRuntimeConfig } = useChatRuntimeConfig()
 const { refreshModels } = useChatModels()
 const { loadSessions } = useChatSessions()
+const { isNewChatRoute } = useChatRouteState()
 
 onMounted(async () => {
-  void loadSessions()
+  void loadSessions({
+    selectFallbackSession: false,
+  })
   if (await loadRuntimeConfig()) {
     await refreshModels({
       silent: true,
@@ -40,8 +44,19 @@ onMounted(async () => {
       <ChatSessionSidebar />
 
       <div class="chat-view__conversation">
-        <ChatMessageList />
-        <ChatInputBox />
+        <section v-if="isNewChatRoute" class="chat-view-new">
+          <div class="chat-view-new__content">
+            <h1 class="chat-view-new__title">
+              有什么可以帮助你的？
+            </h1>
+            <ChatInputBox variant="hero" />
+          </div>
+        </section>
+
+        <template v-else>
+          <ChatMessageList />
+          <ChatInputBox />
+        </template>
       </div>
     </div>
 
@@ -61,6 +76,30 @@ onMounted(async () => {
     display: flex;
     align-items: center;
     gap: 0.75rem;
+  }
+}
+
+.chat-view-new {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1 1 0%;
+  height: 100%;
+  min-height: 0;
+  padding: 2rem;
+
+  .chat-view-new__content {
+    width: min(48rem, 100%);
+    transform: translateY(-8vh);
+  }
+
+  .chat-view-new__title {
+    margin: 0 0 1.5rem;
+    color: var(--brand-text-primary);
+    font-size: 1.5rem;
+    font-weight: 600;
+    line-height: 2rem;
+    text-align: center;
   }
 }
 

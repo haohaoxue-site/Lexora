@@ -54,12 +54,6 @@ enum DocumentCollabRuntimeRole {
   EDITOR
 }
 
-enum DocumentRecentVisitRouteKind {
-  DOCUMENT
-  SHARE
-  SHARE_RECIPIENT
-}
-
 enum DocumentVersionSnapshotSource {
   initial
   user
@@ -103,7 +97,6 @@ model Document {
   assets                    DocumentAsset[]
   shares                    DocumentShare[]
   collabTickets             DocumentCollabTicket[]
-  recentVisits              DocumentRecentVisit[]
   operationJobsAsSource     DocumentOperationJob[]      @relation("DocumentOperationJobSource")
   operationJobsAsResult     DocumentOperationJob[]      @relation("DocumentOperationJobResult")
   ydoc                      DocumentYdoc?
@@ -287,19 +280,6 @@ model DocumentShareRecipient {
 
   @@unique([documentShareId, recipientUserId])
   @@index([recipientUserId, status, updatedAt])
-}
-
-model DocumentRecentVisit {
-  documentId   String
-  userId       String
-  routeKind    DocumentRecentVisitRouteKind
-  routeEntryId String?
-  visitedAt    DateTime                     @default(now())
-  document     Document                     @relation(fields: [documentId], references: [id], onDelete: Cascade)
-  user         User                         @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@id([documentId, userId])
-  @@index([userId, visitedAt])
 }
 
 model DocumentOperationJob {

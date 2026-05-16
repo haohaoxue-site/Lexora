@@ -27,7 +27,6 @@ import {
 import { Prisma } from '@prisma/client'
 import { PrismaService } from '../../../database/prisma.service'
 import { DocumentAccessService } from '../core/access.service'
-import { RECENT_DOCUMENT_ROUTE_KIND, upsertRecentDocumentVisit } from '../core/recent-visit'
 import { DocumentShareAccessService } from './share-access.service'
 import {
   buildSharedDocumentCurrent,
@@ -469,15 +468,6 @@ export class DocumentShareRecipientsService {
       action: 'read',
     })
 
-    if (userId) {
-      await upsertRecentDocumentVisit(this.prisma, {
-        documentId: access.document.id,
-        userId,
-        routeKind: RECENT_DOCUMENT_ROUTE_KIND.SHARE,
-        routeEntryId: shareId,
-      })
-    }
-
     return this.loadSharedDocumentCurrentByDocumentId(access.document.id)
   }
 
@@ -491,12 +481,6 @@ export class DocumentShareRecipientsService {
       recipientId,
       documentId,
       action: 'read',
-    })
-    await upsertRecentDocumentVisit(this.prisma, {
-      documentId: access.document.id,
-      userId,
-      routeKind: RECENT_DOCUMENT_ROUTE_KIND.SHARE_RECIPIENT,
-      routeEntryId: recipientId,
     })
     return this.loadSharedDocumentCurrentByDocumentId(access.document.id)
   }

@@ -18,7 +18,6 @@ const DocsPendingSharesPageView = () => import('@/views/docs/pages/DocsPendingSh
 const DocsPermissionsPageView = () => import('@/views/docs/pages/DocsPermissionsPage.vue')
 const DocsTrashPageView = () => import('@/views/docs/pages/DocsTrashPage.vue')
 const AgentView = () => import('@/views/agent/index.vue')
-const HomeView = () => import('@/views/home/index.vue')
 // const KnowledgeView = () => import('@/views/knowledge/index.vue') // TODO
 const ProviderView = () => import('@/views/provider/index.vue')
 // const ScheduleView = () => import('@/views/schedule/index.vue') // TODO
@@ -60,22 +59,7 @@ export const publicRoutes: RouteRecordRaw[] = [
 const workspaceRouteChildren = [
   {
     path: '',
-    redirect: '/home',
-  },
-  {
-    path: 'home',
     name: 'home',
-    component: HomeView,
-    meta: {
-      navLabel: '主页',
-      navIconCategory: SvgIconCategory.NAV,
-      navIcon: 'home',
-      navActiveIcon: 'home-active',
-    },
-  },
-  {
-    path: 'chat',
-    name: 'chat',
     component: ChatView,
     meta: {
       navLabel: '对话',
@@ -83,6 +67,11 @@ const workspaceRouteChildren = [
       navIcon: 'chat',
       navActiveIcon: 'chat-active',
     },
+  },
+  {
+    path: 'chat/:sessionId',
+    name: 'chat',
+    component: ChatView,
   },
   {
     path: 'docs',
@@ -200,6 +189,10 @@ const workspaceRouteChildren = [
         component: SettingsDefaultModelsPageView,
       },
     ],
+  },
+  {
+    path: ':pathMatch(.*)*',
+    redirect: '/',
   },
 ] satisfies RouteRecordRaw[]
 

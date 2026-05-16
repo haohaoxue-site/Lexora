@@ -14,6 +14,7 @@ import {
   switchChatActiveMessage,
 } from '@/apis/chat'
 import { getRequestErrorDisplayMessage } from '@/utils/request-error'
+import { useChatRouteState } from './useChatRouteState'
 import { useChatRuntimeOverlay } from './useChatRuntimeOverlay'
 import { useChatSessionEvents } from './useChatSessionEvents'
 import { useChatSessions } from './useChatSessions'
@@ -40,6 +41,7 @@ export const useChatStream = createSharedComposable(() => {
     startSessionEventStream,
     stopSessionEventStream,
   } = useChatSessionEvents()
+  const { navigateToSession } = useChatRouteState()
 
   watch(activeSessionId, (sessionId, previousSessionId) => {
     if (previousSessionId && previousSessionId !== sessionId) {
@@ -202,6 +204,9 @@ export const useChatStream = createSharedComposable(() => {
     if (!sessionId) {
       const createdSession = await createSession()
       sessionId = createdSession?.id ?? null
+      if (sessionId) {
+        await navigateToSession(sessionId)
+      }
     }
 
     if (!sessionId) {

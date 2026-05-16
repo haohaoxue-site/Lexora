@@ -14,7 +14,7 @@ import {
   PatchDocumentTitleSchema,
   RestoreDocumentVersionSnapshotSchema,
 } from '@haohaoxue/samepage-contracts'
-import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common'
+import { Body, Controller, Get, Param, Patch, Post } from '@nestjs/common'
 import { CurrentUser } from '../../../decorators/current-user.decorator'
 import { ZodValidationPipe } from '../../../pipes/zod-validation.pipe'
 import { DocumentContentService } from './content.service'
@@ -27,11 +27,8 @@ export class DocumentContentController {
   async getDocumentCurrent(
     @CurrentUser() authUser: AuthUserContext,
     @Param('id') id: string,
-    @Query('recordVisit') recordVisit: string | undefined,
   ): Promise<DocumentCurrent> {
-    return this.documentContentService.getDocumentCurrent(authUser.id, id, {
-      recordVisit: recordVisit === '1' || recordVisit === 'true',
-    })
+    return this.documentContentService.getDocumentCurrent(authUser.id, id)
   }
 
   @Patch(':id/title')

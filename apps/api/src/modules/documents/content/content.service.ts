@@ -39,7 +39,6 @@ import { CollabPermissionInvalidationPublisherService } from '../../../infrastru
 import { auditUserSummarySelect, toAuditUserSummary } from '../../users/audit-user-summary'
 import { DocumentAssetsService } from '../asset/asset.service'
 import { DocumentAccessService } from '../core/access.service'
-import { RECENT_DOCUMENT_ROUTE_KIND, upsertRecentDocumentVisit } from '../core/recent-visit'
 import { DocumentSharesService } from '../share/shares.service'
 import { DocumentYdocsService } from './ydocs.service'
 
@@ -128,11 +127,6 @@ interface CreateVersionSnapshotFromProjectionInput {
   createdAt?: Date
 }
 
-/** 读取当前文档选项。 */
-interface GetDocumentCurrentOptions {
-  recordVisit?: boolean
-}
-
 @Injectable()
 export class DocumentContentService {
   constructor(
@@ -147,16 +141,9 @@ export class DocumentContentService {
   async getDocumentCurrent(
     userId: string,
     id: string,
-    options: GetDocumentCurrentOptions = {},
   ): Promise<DocumentCurrent> {
     const document = await this.loadReadableDocumentCurrent(userId, id)
-    const current = await this.buildDocumentCurrent(document)
-
-    if (options.recordVisit) {
-      await this.recordDocumentVisit(userId, id)
-    }
-
-    return current
+    return this.buildDocumentCurrent(document)
   }
 
   async patchDocumentTitle(
@@ -521,15 +508,6 @@ export class DocumentContentService {
   private async buildDocumentCurrent(document: PersistedDocumentCurrent): Promise<DocumentCurrent> {
     const shareProjection = await this.documentSharesService.resolveDocumentShareProjectionForDocument(document)
     return toDocumentCurrent(document, shareProjection)
-  }
-
-  private async recordDocumentVisit(userId: string, documentId: string): Promise<void> {
-    await upsertRecentDocumentVisit(this.prisma, {
-      documentId,
-      userId,
-      routeKind: RECENT_DOCUMENT_ROUTE_KIND.DOCUMENT,
-      routeEntryId: null,
-    })
   }
 
   private async loadDocumentVersionSnapshots(documentId: string): Promise<PersistedDocumentVersionSnapshot[]> {

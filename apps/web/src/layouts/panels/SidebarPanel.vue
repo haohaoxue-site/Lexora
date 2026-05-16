@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { SidebarPanelBrand, SidebarPanelItem } from './typing'
 import { computed } from 'vue'
+import { useRoute } from 'vue-router'
 import SessionNotificationBell from '@/layouts/components/session-notification-bell/SessionNotificationBell.vue'
 import SessionUserMenu from '@/layouts/components/SessionUserMenu.vue'
 
@@ -16,11 +17,19 @@ const emit = defineEmits<{
   toggle: []
 }>()
 
+const route = useRoute()
 const sidebarStateClass = computed(() => props.isCollapsed ? 'collapsed' : 'expanded')
 const shouldShowBrand = computed(() => !props.isCollapsed)
 
 function getItemStateClass(isActive: boolean) {
   return isActive ? 'active' : 'idle'
+}
+
+function isNavigationItemActive(item: SidebarPanelItem) {
+  const routeName = route.name ?? ''
+  return routeName === item.name
+    || route.matched.some(matchedRoute => matchedRoute.name === item.name)
+    || (item.name === 'home' && routeName === 'chat')
 }
 
 function getItemIconSrc(item: SidebarPanelItem, isActive: boolean) {
@@ -88,20 +97,20 @@ function handleToggle() {
           <RouterLink
             v-for="item in props.items"
             :key="item.name"
-            v-slot="{ href, navigate, isActive }"
+            v-slot="{ href, navigate }"
             :to="item.to"
             custom
           >
             <a
               :href="href"
               class="sidebar-panel__nav-item"
-              :class="[sidebarStateClass, getItemStateClass(isActive)]"
+              :class="[sidebarStateClass, getItemStateClass(isNavigationItemActive(item))]"
               @click="navigate"
             >
-              <div class="sidebar-panel__nav-icon" :class="getItemStateClass(isActive)">
+              <div class="sidebar-panel__nav-icon" :class="getItemStateClass(isNavigationItemActive(item))">
                 <SvgIcon
                   :category="item.iconCategory"
-                  :icon="getItemIconSrc(item, isActive)"
+                  :icon="getItemIconSrc(item, isNavigationItemActive(item))"
                   size="2.75rem"
                   class="sidebar-panel__nav-icon-image"
                 />

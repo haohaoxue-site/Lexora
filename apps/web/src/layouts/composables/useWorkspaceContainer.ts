@@ -7,7 +7,7 @@ import { useUiStore } from '@/stores/ui'
 
 const workspaceBrand = {
   label: '同页',
-  to: '/home',
+  to: '/',
   iconCategory: SvgIconCategory.NAV,
   icon: 'workspace',
 }

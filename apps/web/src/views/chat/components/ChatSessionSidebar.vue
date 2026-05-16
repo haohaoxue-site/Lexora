@@ -2,8 +2,9 @@
 import { useChatSessions } from '../composables/useChatSessions'
 import { useChatSessionSidebar } from '../composables/useChatSessionSidebar'
 
-const { createSession, sessions } = useChatSessions()
+const { sessions } = useChatSessions()
 const {
+  createNewChat,
   getSessionItemStateClass,
   handleSessionAction,
   selectSession,
@@ -14,12 +15,12 @@ const {
   <aside class="chat-session-sidebar">
     <div class="chat-session-sidebar__header">
       <span class="chat-session-sidebar__header-title">对话列表</span>
-      <ElButton text circle size="small" class="chat-session-sidebar__create-btn" @click="createSession">
+      <ElButton text circle size="small" class="chat-session-sidebar__create-btn" @click="createNewChat">
         <SvgIcon category="ui" icon="plus" size="1rem" />
       </ElButton>
     </div>
 
-    <div class="overflow-y-auto p-2">
+    <div class="chat-session-sidebar__scroller">
       <div v-if="sessions.length === 0" class="chat-session-sidebar__empty">
         暂无对话
       </div>
@@ -77,8 +78,11 @@ const {
 
 <style scoped lang="scss">
 .chat-session-sidebar {
+  display: flex;
+  flex-direction: column;
   flex-shrink: 0;
   width: 16rem;
+  min-height: 0;
   border-right: 1px solid color-mix(in srgb, var(--brand-border-base) 80%, transparent);
   background: var(--brand-bg-sidebar);
 
@@ -94,6 +98,14 @@ const {
     color: var(--brand-text-primary);
     font-size: 0.875rem;
     font-weight: 500;
+  }
+
+  .chat-session-sidebar__scroller {
+    flex: 1 1 0%;
+    min-height: 0;
+    padding: 0.5rem;
+    overflow-x: hidden;
+    overflow-y: auto;
   }
 
   .chat-session-sidebar__empty {
@@ -115,6 +127,7 @@ const {
     display: flex;
     align-items: center;
     gap: 0.5rem;
+    min-width: 0;
     border: 1px solid transparent;
     border-radius: 0.75rem;
     font-size: 0.875rem;
@@ -143,7 +156,7 @@ const {
 
   .chat-session-sidebar__item-main {
     display: flex;
-    flex: 1 1 auto;
+    flex: 1 1 0%;
     align-items: center;
     gap: 0.5rem;
     min-width: 0;
@@ -160,6 +173,7 @@ const {
   }
 
   .chat-session-sidebar__actions-btn {
+    flex-shrink: 0;
     width: 1.25rem;
     height: 1.25rem;
     margin-right: 0.5rem;

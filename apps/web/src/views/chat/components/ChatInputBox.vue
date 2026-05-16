@@ -2,6 +2,12 @@
 import { CloseBold } from '@element-plus/icons-vue'
 import { useChatInputBox } from '../composables/useChatInputBox'
 
+const props = withDefaults(defineProps<{
+  variant?: 'dock' | 'hero'
+}>(), {
+  variant: 'dock',
+})
+
 const {
   cancelActiveRun,
   cancelRunId,
@@ -15,7 +21,7 @@ const {
 </script>
 
 <template>
-  <div class="chat-input-box">
+  <div class="chat-input-box" :class="`chat-input-box--${props.variant}`">
     <div class="chat-input-box__inner">
       <div class="chat-input-box__surface">
         <ElInput
@@ -48,7 +54,7 @@ const {
           <SvgIcon category="ui" icon="send-light" size="1rem" class="chat-input-box__send-icon" />
         </ElButton>
       </div>
-      <div class="chat-input-box__hint">
+      <div v-if="props.variant === 'dock'" class="chat-input-box__hint">
         AI 回答仅供参考，请注意核实重要信息
       </div>
     </div>
@@ -116,6 +122,16 @@ const {
     color: color-mix(in srgb, var(--brand-text-secondary) 50%, transparent);
     font-size: 0.75rem;
     text-align: center;
+  }
+
+  &.chat-input-box--hero {
+    padding: 0;
+    border-top: 0;
+    background-image: none;
+
+    .chat-input-box__inner {
+      max-width: none;
+    }
   }
 }
 </style>

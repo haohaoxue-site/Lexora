@@ -149,17 +149,6 @@ export const DocumentBaseSchema = z.object({
   updatedAt: z.string(),
 })
 
-export const DocumentRecentSchema = z.object({
-  id: z.string(),
-  title: z.string(),
-  collection: DocumentCollectionIdSchema,
-  ancestorTitles: z.string().array(),
-  link: z.string(),
-  share: DocumentShareProjectionSchema.nullable(),
-  createdAt: z.string(),
-  updatedAt: z.string(),
-})
-
 export const DocumentTrashItemSchema = z.object({
   id: z.string(),
   title: z.string(),
@@ -399,7 +388,6 @@ export type DocumentSaveState = (typeof DOCUMENT_SAVE_STATE)[keyof typeof DOCUME
 export type DocumentShareLocalPolicy = z.infer<typeof DocumentShareLocalPolicySchema>
 export type DocumentShareEffectivePolicy = z.infer<typeof DocumentShareEffectivePolicySchema>
 export type DocumentBase = z.infer<typeof DocumentBaseSchema>
-export type DocumentRecent = z.infer<typeof DocumentRecentSchema>
 export type DocumentTrashItem = z.infer<typeof DocumentTrashItemSchema>
 export type DocumentItem = z.infer<typeof DocumentItemSchema>
 export type DocumentTreeGroup = z.infer<typeof DocumentTreeGroupSchema>

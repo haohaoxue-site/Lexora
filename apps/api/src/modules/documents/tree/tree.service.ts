@@ -4,7 +4,6 @@ import type {
   DocumentBase,
   DocumentCurrent,
   DocumentItem,
-  DocumentRecent,
   DocumentShareProjection,
   DocumentTreeGroup,
   DocumentVisibility,
@@ -24,9 +23,6 @@ import {
   WORKSPACE_TYPE,
 } from '@haohaoxue/samepage-contracts'
 import {
-  buildDocumentPath,
-  buildSharedDocumentPath,
-  buildSharedDocumentRecipientPath,
   createDocumentTitleContent,
   createTiptapDocumentCollaborationCheckpointState,
   getDocumentTitlePlainText,
@@ -46,37 +42,17 @@ import { DocumentAccessService } from '../core/access.service'
 import {
   buildWorkspaceDocumentContext,
   canUserAccessWorkspaceDocument,
-  collectAncestorTitles,
   collectDescendantDocumentIds,
   documentSelect,
 
 } from '../core/documents.utils'
-import { RECENT_DOCUMENT_ROUTE_KIND } from '../core/recent-visit'
-import { DocumentShareRecipientsService } from '../share/share-recipients.service'
 import { DocumentSharesService } from '../share/shares.service'
-
-const RECENT_DOCUMENT_LIMIT = 8
-
-const documentRecentVisitSelect = {
-  documentId: true,
-  routeKind: true,
-  routeEntryId: true,
-  visitedAt: true,
-  document: {
-    select: documentSelect,
-  },
-} satisfies Prisma.DocumentRecentVisitSelect
-
-type PersistedDocumentRecentVisit = Prisma.DocumentRecentVisitGetPayload<{
-  select: typeof documentRecentVisitSelect
-}>
 
 @Injectable()
 export class DocumentsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly documentAccessService: DocumentAccessService,
-    private readonly documentShareRecipientsService: DocumentShareRecipientsService,
     private readonly documentSharesService: DocumentSharesService,
     private readonly collabPermissionInvalidationPublisher: CollabPermissionInvalidationPublisherService,
     private readonly documentContentService: DocumentContentService,
@@ -250,134 +226,6 @@ export class DocumentsService {
         ),
       },
     ]
-  }
-
-  async getRecentDocuments(userId: string): Promise<DocumentRecent[]> {
-    const recentVisits = await this.prisma.documentRecentVisit.findMany({
-      where: {
-        userId,
-      },
-      orderBy: {
-        visitedAt: 'desc',
-      },
-      take: RECENT_DOCUMENT_LIMIT * 3,
-      select: documentRecentVisitSelect,
-    })
-
-    if (!recentVisits.length) {
-      return []
-    }
-
-    const recentShareIds = recentVisits
-      .filter((visit) => {
-        return (
-          visit.routeKind === RECENT_DOCUMENT_ROUTE_KIND.SHARE
-          && typeof visit.routeEntryId === 'string'
-          && visit.routeEntryId.trim().length > 0
-        )
-      })
-      .map(visit => visit.routeEntryId!.trim())
-    const recentShareRecipientIds = recentVisits
-      .filter((visit) => {
-        return (
-          visit.routeKind === RECENT_DOCUMENT_ROUTE_KIND.SHARE_RECIPIENT
-          && typeof visit.routeEntryId === 'string'
-          && visit.routeEntryId.trim().length > 0
-        )
-      })
-      .map(visit => visit.routeEntryId!.trim())
-    const [workspaces, activeRecentShareIds, activeRecentShareRecipientIds] = await Promise.all([
-      this.documentAccessService.listAccessibleWorkspaces(userId),
-      this.documentShareRecipientsService.resolveActiveShareIds(userId, recentShareIds),
-      this.documentShareRecipientsService.resolveActiveShareRecipientIds(userId, recentShareRecipientIds),
-    ])
-
-    const workspaceIds = workspaces.map(workspace => workspace.id)
-    const workspaceTypeById = new Map(
-      workspaces.map(workspace => [workspace.id, workspace.type]),
-    )
-    const documents = await this.prisma.document.findMany({
-      where: {
-        workspaceId: {
-          in: workspaceIds,
-        },
-        status: {
-          in: [DocumentStatus.ACTIVE, DocumentStatus.LOCKED],
-        },
-        trashedAt: null,
-      },
-      select: documentSelect,
-    })
-    const context = buildWorkspaceDocumentContext(documents)
-    const shareProjectionByDocumentId = await this.documentSharesService.buildDocumentShareProjectionMap(context.documents)
-
-    return recentVisits
-      .map((visit) => {
-        if (visit.document.trashedAt) {
-          return null
-        }
-
-        if (visit.routeKind === RECENT_DOCUMENT_ROUTE_KIND.SHARE) {
-          const shareId = visit.routeEntryId?.trim()
-
-          if (!shareId || !activeRecentShareIds.has(shareId)) {
-            return null
-          }
-
-          if (!visit.document.title.trim() && !visit.document.summary.trim()) {
-            return null
-          }
-
-          return toShareDocumentRecent(visit.document, buildSharedDocumentPath(shareId))
-        }
-
-        if (visit.routeKind === RECENT_DOCUMENT_ROUTE_KIND.SHARE_RECIPIENT) {
-          const recipientId = visit.routeEntryId?.trim()
-
-          if (!recipientId || !activeRecentShareRecipientIds.has(recipientId)) {
-            return null
-          }
-
-          if (!visit.document.title.trim() && !visit.document.summary.trim()) {
-            return null
-          }
-
-          return toShareDocumentRecent(visit.document, buildSharedDocumentRecipientPath(recipientId))
-        }
-
-        const document = context.documentsById.get(visit.documentId)
-
-        if (!document) {
-          return null
-        }
-
-        const workspaceType = workspaceTypeById.get(document.workspaceId)
-
-        if (!canUserAccessWorkspaceDocument({
-          userId,
-          workspaceType,
-          visibility: document.visibility,
-          createdBy: document.createdBy,
-        })) {
-          return null
-        }
-
-        if (!document.title.trim() && !document.summary.trim()) {
-          return null
-        }
-
-        return toDocumentRecent(
-          document,
-          context,
-          workspaceTypeById,
-          shareProjectionByDocumentId.get(document.id) ?? null,
-          buildDocumentPath(document.id),
-        )
-      })
-      .filter((document): document is DocumentRecent =>
-        document !== null && document.collection !== DOCUMENT_COLLECTION.TEAM,
-      )
-      .slice(0, RECENT_DOCUMENT_LIMIT)
   }
 
   async patchDocumentMeta(
@@ -597,46 +445,6 @@ function toDocumentBase(document: PersistedDocument): DocumentBase {
     id: document.id,
     title: document.title,
     summary: document.summary,
-    createdAt: document.createdAt.toISOString(),
-    updatedAt: document.updatedAt.toISOString(),
-  }
-}
-
-function toDocumentRecent(
-  document: PersistedDocument,
-  context: WorkspaceDocumentContext,
-  workspaceTypeById: ReadonlyMap<string, string>,
-  share: DocumentShareProjection | null,
-  link: string,
-): DocumentRecent {
-  const workspaceType = workspaceTypeById.get(document.workspaceId)
-
-  return {
-    id: document.id,
-    title: document.title,
-    collection: resolveOwnedDocumentCollectionId({
-      workspaceType,
-      visibility: document.visibility,
-    }),
-    ancestorTitles: collectAncestorTitles(document, context),
-    link,
-    share,
-    createdAt: document.createdAt.toISOString(),
-    updatedAt: document.updatedAt.toISOString(),
-  }
-}
-
-function toShareDocumentRecent(
-  document: PersistedDocumentRecentVisit['document'],
-  link: string,
-): DocumentRecent {
-  return {
-    id: document.id,
-    title: document.title,
-    collection: DOCUMENT_COLLECTION.SHARE,
-    ancestorTitles: [],
-    link,
-    share: null,
     createdAt: document.createdAt.toISOString(),
     updatedAt: document.updatedAt.toISOString(),
   }

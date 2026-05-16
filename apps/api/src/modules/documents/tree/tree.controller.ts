@@ -2,7 +2,6 @@ import type {
   CreateDocumentRequest,
   CreateDocumentResponse,
   DocumentCurrent,
-  DocumentRecent,
   DocumentTreeGroup,
   PatchDocumentLayoutRequest,
   PatchDocumentMetaRequest,
@@ -36,11 +35,6 @@ export class DocumentTreeController {
     }
 
     return this.documentsService.getDocumentTree(authUser.id, workspaceId.trim())
-  }
-
-  @Get('recent')
-  async getRecentDocuments(@CurrentUser() authUser: AuthUserContext): Promise<DocumentRecent[]> {
-    return this.documentsService.getRecentDocuments(authUser.id)
   }
 
   @Patch(':id/meta')
