@@ -2,7 +2,8 @@
 import type { DocumentTreeGroup, DocumentItem as DocumentTreeItemModel } from '@haohaoxue/samepage-contracts'
 import type { CheckedInfo, TreeNode, TreeNodeData, TreeV2Instance } from 'element-plus'
 import { DOCUMENT_COLLECTION } from '@haohaoxue/samepage-contracts'
-import { computed, nextTick, shallowRef, watch } from 'vue'
+import { useElementSize } from '@vueuse/core'
+import { computed, nextTick, shallowRef, useTemplateRef, watch } from 'vue'
 import { useDocsContext } from '../composables/useDocsContext'
 import { useDocumentSectionPanel } from '../composables/useDocumentSectionPanel'
 import { countDocumentItems, findDocumentItemPath, isOwnedDocumentCollection } from '../utils/documentTree'
@@ -22,6 +23,7 @@ const DOCUMENT_TREE_MAX_HEIGHT = 420
 
 interface DocumentSectionPanelProps {
   group: DocumentTreeGroup
+  fillHeight?: boolean
   selectionMode?: boolean
 }
 
@@ -30,6 +32,8 @@ const { chevronIconName, displayLabel, isCollapsed, toggleSection } = useDocumen
 })
 const { activeDocumentId } = useDocsContext()
 const treeRef = shallowRef<TreeV2Instance>()
+const treeBodyRef = useTemplateRef<HTMLElement>('treeBody')
+const { height: treeBodyHeight } = useElementSize(treeBodyRef)
 const isOwnedCollection = computed(() => isOwnedDocumentCollection(props.group.id))
 const canCreateRoot = computed(() => isOwnedCollection.value && !props.selectionMode)
 const treeProps = {
@@ -38,10 +42,12 @@ const treeProps = {
   children: 'children',
 }
 const treeHeight = computed(() =>
-  Math.min(
-    Math.max(countDocumentItems(props.group.nodes) * DOCUMENT_TREE_ITEM_SIZE, DOCUMENT_TREE_ITEM_SIZE),
-    DOCUMENT_TREE_MAX_HEIGHT,
-  ),
+  props.fillHeight
+    ? Math.max(Math.floor(treeBodyHeight.value), DOCUMENT_TREE_ITEM_SIZE)
+    : Math.min(
+        Math.max(countDocumentItems(props.group.nodes) * DOCUMENT_TREE_ITEM_SIZE, DOCUMENT_TREE_ITEM_SIZE),
+        DOCUMENT_TREE_MAX_HEIGHT,
+      ),
 )
 const canSelectDocuments = computed(() => Boolean(props.selectionMode && isOwnedCollection.value))
 const activeDocumentAncestorIds = computed(() => {
@@ -117,7 +123,10 @@ function expandActiveDocumentAncestors() {
 </script>
 
 <template>
-  <section class="document-tree-section">
+  <section
+    class="document-tree-section"
+    :class="{ 'document-tree-section--fill': props.fillHeight }"
+  >
     <div class="document-tree-section__header">
       <button
         type="button"
@@ -156,6 +165,7 @@ function expandActiveDocumentAncestors() {
     <div
       v-if="!isCollapsed && props.group.nodes.length"
       :id="`document-tree-section-group-${props.group.id}`"
+      ref="treeBody"
       role="group"
       class="document-tree-section__body"
     >
@@ -168,6 +178,7 @@ function expandActiveDocumentAncestors() {
         :height="treeHeight"
         :item-size="DOCUMENT_TREE_ITEM_SIZE"
         :indent="18"
+        :scrollbar-always-on="true"
         :show-checkbox="canSelectDocuments"
         :check-on-click-node="canSelectDocuments"
         :check-on-click-leaf="canSelectDocuments"
@@ -191,6 +202,7 @@ function expandActiveDocumentAncestors() {
 
     <ElEmpty
       v-else-if="!isCollapsed"
+      class="document-tree-section__empty"
       :image-size="48"
       :description="props.group.id === DOCUMENT_COLLECTION.COLLABORATION ? '还没有别人共享给你的文档' : '暂无文档'"
     />
@@ -199,6 +211,15 @@ function expandActiveDocumentAncestors() {
 
 <style scoped lang="scss">
 .document-tree-section {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+
+  &--fill {
+    flex: 1 1 0%;
+    min-height: 0;
+  }
+
   > .document-tree-section__header {
     display: flex;
     align-items: center;
@@ -274,6 +295,19 @@ function expandActiveDocumentAncestors() {
 
   .document-tree-section__body {
     min-width: 0;
+  }
+
+  &--fill .document-tree-section__body {
+    flex: 1 1 0%;
+    min-height: 0;
+  }
+
+  &--fill .document-tree-section__empty {
+    display: flex;
+    flex: 1 1 0%;
+    min-height: 0;
+    flex-direction: column;
+    justify-content: center;
   }
 
   .document-tree-section__tree {

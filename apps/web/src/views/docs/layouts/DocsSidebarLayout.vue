@@ -41,6 +41,7 @@ const {
   replaceSectionSelection,
   selectedCount,
 } = useDocsSidebarSelection()
+const isSingleTreeGroup = computed(() => visibleTreeGroups.value.length === 1)
 const footerActions = computed<DocsSidebarFooterAction[]>(() => {
   const actions: DocsSidebarFooterAction[] = []
 
@@ -147,22 +148,29 @@ function collapseDocumentLibrary() {
       </template>
     </div>
 
-    <div class="docs-view__sidebar-scroll">
+    <ElScrollbar class="docs-view__sidebar-scroll" always>
       <div v-if="isDocumentLoading" class="docs-view__tree-loading">
         正在加载文档树...
       </div>
 
-      <div v-else class="docs-view__tree-sections" role="tree" aria-label="文档树">
+      <div
+        v-else
+        class="docs-view__tree-sections"
+        :class="{ 'is-single-group': isSingleTreeGroup }"
+        role="tree"
+        aria-label="文档树"
+      >
         <DocumentSectionPanel
           v-for="group in visibleTreeGroups"
           :key="group.id"
           :group="group"
+          :fill-height="isSingleTreeGroup"
           :selection-mode="isSelectionMode"
           @checked-change="documentIds => replaceSectionSelection(group, documentIds)"
           @open="handleDocumentOpen"
         />
       </div>
-    </div>
+    </ElScrollbar>
 
     <div class="docs-view__sidebar-footer" :style="footerGridStyle">
       <div
@@ -253,8 +261,12 @@ function collapseDocumentLibrary() {
 .docs-view__sidebar-scroll {
   flex: 1 1 0%;
   min-height: 0;
-  overflow-y: auto;
-  padding: 0.5rem 0.75rem 1rem 0.75rem;
+
+  :deep(.el-scrollbar__view) {
+    display: flex;
+    min-height: 100%;
+    padding: 0.5rem 0.75rem 1rem 0.75rem;
+  }
 }
 
 .docs-view__tree-loading {
@@ -264,10 +276,19 @@ function collapseDocumentLibrary() {
 }
 
 .docs-view__tree-sections {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
   padding-bottom: 5rem;
 
   > * + * {
     margin-top: 1.5rem;
+  }
+
+  &.is-single-group {
+    flex: 1 1 0%;
+    padding-bottom: 0;
   }
 }
 
