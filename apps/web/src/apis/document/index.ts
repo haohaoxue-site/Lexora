@@ -1,4 +1,6 @@
 import type {
+  BatchDeleteDocumentsRequest,
+  BatchDeleteDocumentsResponse,
   CreateCollabTicketResponse,
   CreateDocumentDuplicateOperationResponse,
   CreateDocumentMoveOperationResponse,
@@ -159,6 +161,14 @@ export function deleteDocument(id: string): Promise<null> {
   return axios.request({
     method: 'delete',
     url: `/documents/${id}`,
+  })
+}
+
+export function batchDeleteDocuments(data: BatchDeleteDocumentsRequest): Promise<BatchDeleteDocumentsResponse> {
+  return axios.request({
+    method: 'post',
+    url: '/documents/batch-delete',
+    data,
   })
 }
 

@@ -2,7 +2,19 @@ import type {
   DocumentItem,
   DocumentTreeCollectionId,
   DocumentTreeGroup,
+  OwnedDocumentCollectionId,
 } from '@haohaoxue/samepage-contracts'
+import { DOCUMENT_COLLECTION } from '@haohaoxue/samepage-contracts'
+
+export interface DocumentDeletePlan {
+  rootDocumentIds: string[]
+  affectedDocumentIds: Set<string>
+  nextDocumentId: string | null
+}
+
+export function isOwnedDocumentCollection(collectionId: DocumentTreeCollectionId): collectionId is OwnedDocumentCollectionId {
+  return collectionId !== DOCUMENT_COLLECTION.COLLABORATION
+}
 
 export function collectDocumentItemIds(items: DocumentItem[]): Set<string> {
   const documentIds = new Set<string>()
@@ -61,7 +73,7 @@ export function findDocumentPath(
   nodes: DocumentItem[]
 } | null {
   for (const group of groups) {
-    const items = findDocumentItems(group.nodes, targetDocumentId)
+    const items = findDocumentItemPath(group.nodes, targetDocumentId)
 
     if (items) {
       return {
@@ -74,31 +86,103 @@ export function findDocumentPath(
   return null
 }
 
-export function resolveNextDocumentIdAfterDelete(
+export function findDocumentItemPath(
+  items: DocumentItem[],
+  targetDocumentId: string,
+): DocumentItem[] | null {
+  for (const item of items) {
+    if (item.id === targetDocumentId) {
+      return [item]
+    }
+
+    const nestedItems = findDocumentItemPath(item.children, targetDocumentId)
+
+    if (nestedItems) {
+      return [item, ...nestedItems]
+    }
+  }
+
+  return null
+}
+
+export function resolveDocumentDeletePlan(
   groups: DocumentTreeGroup[],
-  deletedDocumentId: string,
+  documentIds: string[],
+  currentActiveDocumentId: string | null,
+): DocumentDeletePlan | null {
+  const rootDocumentIds: string[] = []
+  const affectedDocumentIds = new Set<string>()
+  const normalizedDocumentIds = [...new Set(documentIds.map(id => id.trim()).filter(Boolean))]
+  const selectedDocumentIds = new Set(normalizedDocumentIds)
+
+  for (const documentId of normalizedDocumentIds) {
+    const targetPath = findDocumentPath(groups, documentId)
+    const targetDocument = targetPath?.nodes.at(-1)
+
+    if (!targetPath || !targetDocument || !isOwnedDocumentCollection(targetPath.collectionId)) {
+      continue
+    }
+
+    if (targetPath.nodes.slice(0, -1).some(document => selectedDocumentIds.has(document.id))) {
+      continue
+    }
+
+    rootDocumentIds.push(documentId)
+
+    for (const affectedDocumentId of collectDocumentItemIds([targetDocument])) {
+      affectedDocumentIds.add(affectedDocumentId)
+    }
+  }
+
+  if (!rootDocumentIds.length) {
+    return null
+  }
+
+  return {
+    rootDocumentIds,
+    affectedDocumentIds,
+    nextDocumentId: resolveNextDocumentIdAfterDeletePlan(
+      groups,
+      affectedDocumentIds,
+      currentActiveDocumentId,
+    ),
+  }
+}
+
+export function countDocumentItems(items: DocumentItem[]): number {
+  let total = 0
+
+  for (const item of items) {
+    total += 1 + countDocumentItems(item.children)
+  }
+
+  return total
+}
+
+function resolveNextDocumentIdAfterDeletePlan(
+  groups: DocumentTreeGroup[],
+  affectedDocumentIds: Set<string>,
   currentActiveDocumentId: string | null,
 ): string | null {
-  const targetPath = findDocumentPath(groups, deletedDocumentId)
-  const targetDocument = targetPath?.nodes.at(-1)
-
-  if (!targetDocument) {
+  if (!currentActiveDocumentId || !affectedDocumentIds.has(currentActiveDocumentId)) {
     return currentActiveDocumentId
   }
 
-  const deletedDocumentIds = collectDocumentItemIds([targetDocument])
+  const activePath = findDocumentPath(groups, currentActiveDocumentId)
 
-  if (!currentActiveDocumentId || !deletedDocumentIds.has(currentActiveDocumentId)) {
-    return currentActiveDocumentId
-  }
+  if (activePath) {
+    for (let index = activePath.nodes.length - 1; index >= 0; index -= 1) {
+      const document = activePath.nodes[index]
 
-  if (targetDocument.parentId) {
-    return targetDocument.parentId
+      if (!affectedDocumentIds.has(document.id)) {
+        return document.id
+      }
+    }
   }
 
   return findFirstAvailableDocumentId(
     groups.flatMap(group => group.nodes),
-    deletedDocumentIds,
+    affectedDocumentIds,
   )
 }
 
@@ -129,22 +213,6 @@ function findFirstAvailableDocumentId(
 
     if (childDocumentId) {
       return childDocumentId
-    }
-  }
-
-  return null
-}
-
-function findDocumentItems(items: DocumentItem[], targetDocumentId: string): DocumentItem[] | null {
-  for (const item of items) {
-    if (item.id === targetDocumentId) {
-      return [item]
-    }
-
-    const nestedItems = findDocumentItems(item.children, targetDocumentId)
-
-    if (nestedItems) {
-      return [item, ...nestedItems]
     }
   }
 

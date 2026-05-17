@@ -1,9 +1,9 @@
 import type { DocumentItem, DocumentTreeCollectionId } from '@haohaoxue/samepage-contracts'
-import { DOCUMENT_COLLECTION } from '@haohaoxue/samepage-contracts'
 import { buildDocumentPath } from '@haohaoxue/samepage-shared'
 import { useClipboard } from '@vueuse/core'
 import { ElMessage } from 'element-plus'
 import { computed } from 'vue'
+import { isOwnedDocumentCollection } from '../utils/documentTree'
 import { useDocsContext } from './useDocsContext'
 import { useDocsPageActions } from './useDocsPageActions'
 import { useDocsShareDialog } from './useDocsShareDialog'
@@ -12,6 +12,33 @@ import { useDocumentTree } from './useDocumentTree'
 export interface UseDocumentItemOptions {
   item: () => DocumentItem
   collectionId: () => DocumentTreeCollectionId
+}
+
+type DocumentTreeItemMenuCommand
+  = | 'copy-link'
+    | 'delete'
+    | 'duplicate'
+    | 'move'
+    | 'open-new-tab'
+    | 'rename'
+    | 'share'
+
+const DOCUMENT_TREE_ITEM_MENU_COMMANDS: readonly DocumentTreeItemMenuCommand[] = [
+  'copy-link',
+  'delete',
+  'duplicate',
+  'move',
+  'open-new-tab',
+  'rename',
+  'share',
+]
+
+interface DocumentTreeItemMenuItem {
+  command: DocumentTreeItemMenuCommand
+  label: string
+  icon: string
+  divided?: boolean
+  danger?: boolean
 }
 
 export function useDocumentItem(options: UseDocumentItemOptions) {
@@ -26,9 +53,8 @@ export function useDocumentItem(options: UseDocumentItemOptions) {
   const item = computed(options.item)
   const collectionId = computed(options.collectionId)
   const isActive = computed(() => activeDocumentId.value === item.value.id)
-  const isExpanded = computed(() => tree.expandedDocumentIdSet.value.has(item.value.id))
   const canManageDocument = computed(() =>
-    collectionId.value !== DOCUMENT_COLLECTION.COLLABORATION,
+    isOwnedDocumentCollection(collectionId.value),
   )
   const canShareDocument = computed(() =>
     canManageDocument.value && canOpenShareDialog.value,
@@ -36,18 +62,6 @@ export function useDocumentItem(options: UseDocumentItemOptions) {
   const isActionPending = computed(() =>
     tree.isMutatingTree.value || pageActions.isDocumentOperationRunning.value,
   )
-
-  function openDocument() {
-    void pageActions.openDocument(item.value.id)
-  }
-
-  function toggleItem() {
-    if (!item.value.hasChildren) {
-      return
-    }
-
-    tree.toggleDocument(item.value.id)
-  }
 
   function createChild() {
     void tree.createChildDocument(item.value.id)
@@ -92,87 +106,95 @@ export function useDocumentItem(options: UseDocumentItemOptions) {
     void tree.deleteDocument(item.value.id)
   }
 
+  const itemStateClass = computed(() => isActive.value ? 'active' : 'idle')
+  const actionsStateClass = computed(() => isActive.value ? 'visible' : 'hidden')
+  const menuItems = computed<DocumentTreeItemMenuItem[]>(() => {
+    const items: DocumentTreeItemMenuItem[] = [{
+      command: 'open-new-tab',
+      label: '在新标签页打开',
+      icon: 'document-menu-open-new',
+    }]
+
+    if (canShareDocument.value) {
+      items.push({
+        command: 'share',
+        label: '分享',
+        icon: 'document-menu-share',
+        divided: true,
+      })
+    }
+
+    items.push({
+      command: 'copy-link',
+      label: '复制链接',
+      icon: 'document-menu-link',
+      divided: !canShareDocument.value,
+    })
+
+    if (canManageDocument.value) {
+      items.push(
+        {
+          command: 'duplicate',
+          label: '创建副本',
+          icon: 'document-menu-copy',
+          divided: true,
+        },
+        {
+          command: 'move',
+          label: '移动到',
+          icon: 'document-menu-move',
+        },
+        {
+          command: 'rename',
+          label: '重命名',
+          icon: 'document-menu-rename',
+          divided: true,
+        },
+        {
+          command: 'delete',
+          label: '删除',
+          icon: 'document-menu-delete',
+          divided: true,
+          danger: true,
+        },
+      )
+    }
+
+    return items
+  })
+  const menuCommandHandlers: Record<DocumentTreeItemMenuCommand, () => void> = {
+    'copy-link': () => void copyDocumentLink(),
+    'delete': () => canManageDocument.value && deleteDocument(),
+    'duplicate': () => canManageDocument.value && duplicateDocument(),
+    'move': () => canManageDocument.value && moveDocument(),
+    'open-new-tab': openDocumentInNewTab,
+    'rename': () => canManageDocument.value && renameDocument(),
+    'share': () => canShareDocument.value && shareDocument(),
+  }
+
   function handleMenuCommand(command: unknown) {
-    if (command === 'open-new-tab') {
-      openDocumentInNewTab()
+    if (typeof command !== 'string') {
       return
     }
 
-    if (command === 'share') {
-      if (!canShareDocument.value) {
-        return
-      }
-
-      shareDocument()
-      return
+    if (isDocumentTreeItemMenuCommand(command)) {
+      menuCommandHandlers[command]()
     }
-
-    if (command === 'copy-link') {
-      void copyDocumentLink()
-      return
-    }
-
-    if (command === 'duplicate') {
-      if (!canManageDocument.value) {
-        return
-      }
-
-      duplicateDocument()
-      return
-    }
-
-    if (command === 'move') {
-      if (!canManageDocument.value) {
-        return
-      }
-
-      moveDocument()
-      return
-    }
-
-    if (command === 'rename') {
-      if (!canManageDocument.value) {
-        return
-      }
-
-      renameDocument()
-      return
-    }
-
-    if (command === 'delete') {
-      if (!canManageDocument.value) {
-        return
-      }
-
-      deleteDocument()
-    }
-  }
-
-  function getItemStateClass() {
-    return isActive.value ? 'active' : 'idle'
-  }
-
-  function getActionsStateClass() {
-    return isActive.value ? 'visible' : 'hidden'
-  }
-
-  function getExpandIconName() {
-    return isExpanded.value ? 'chevron-down' : 'chevron-right'
   }
 
   return {
+    actionsStateClass,
     canManageDocument,
     canShareDocument,
     createChild,
     deleteDocument,
-    getActionsStateClass,
-    getExpandIconName,
-    getItemStateClass,
     handleMenuCommand,
     isActionPending,
-    isActive,
-    isExpanded,
-    openDocument,
-    toggleItem,
+    itemStateClass,
+    menuItems,
   }
+}
+
+function isDocumentTreeItemMenuCommand(command: string): command is DocumentTreeItemMenuCommand {
+  return DOCUMENT_TREE_ITEM_MENU_COMMANDS.includes(command as DocumentTreeItemMenuCommand)
 }

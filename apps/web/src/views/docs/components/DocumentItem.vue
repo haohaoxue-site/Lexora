@@ -1,80 +1,75 @@
 <script setup lang="ts">
 import type { DocumentItem, DocumentTreeCollectionId } from '@haohaoxue/samepage-contracts'
+import { computed } from 'vue'
 import { useDocumentItem } from '../composables/useDocumentItem'
 
 interface DocumentItemProps {
   item: DocumentItem
   collectionId: DocumentTreeCollectionId
-  depth: number
+  selectionMode?: boolean
+  checked?: boolean
+  expanded?: boolean
 }
 
 const props = defineProps<DocumentItemProps>()
 const {
+  actionsStateClass,
   canManageDocument,
-  canShareDocument,
   createChild,
-  getActionsStateClass,
-  getExpandIconName,
-  getItemStateClass,
   handleMenuCommand,
   isActionPending,
-  isActive,
-  isExpanded,
-  openDocument,
-  toggleItem,
+  itemStateClass,
+  menuItems,
 } = useDocumentItem({
   collectionId: () => props.collectionId,
   item: () => props.item,
 })
+
+const treeIconName = computed(() => {
+  if (props.item.hasChildren) {
+    return props.expanded ? 'document-tree-folder-open' : 'document-tree-folder'
+  }
+
+  return props.item.hasContent ? 'document-tree-file' : 'document-tree-file-empty'
+})
 </script>
 
 <template>
-  <div
-    class="document-tree-item"
-    :style="{ paddingLeft: `${props.depth * 18}px` }"
-    role="treeitem"
-    :aria-level="props.depth + 1"
-    :aria-expanded="props.item.hasChildren ? isExpanded : undefined"
-    :aria-current="isActive ? 'page' : undefined"
-  >
+  <div class="document-tree-item">
     <div
       class="document-tree-item-surface"
-      :class="[getItemStateClass(), { 'is-expandable': props.item.hasChildren }]"
+      :class="[
+        itemStateClass,
+        {
+          'is-expandable': props.item.hasChildren,
+          'is-selection-mode': props.selectionMode,
+          'selected': props.checked,
+        },
+      ]"
     >
-      <ElButton
-        v-if="props.item.hasChildren"
-        text
-        class="document-tree-item__icon-button"
-        :class="getItemStateClass()"
-        :aria-expanded="isExpanded"
-        @click.stop="toggleItem"
-      >
-        <SvgIcon category="ui" :icon="getExpandIconName()" size="13px" />
-      </ElButton>
-
-      <div v-else class="h-5 w-5 shrink-0" />
-
-      <button
-        type="button"
-        class="document-tree-item__open-button"
-        :class="getItemStateClass()"
-        @click="openDocument"
-      >
-        <span class="document-tree-item__title" :class="getItemStateClass()">
+      <div class="document-tree-item__open-button">
+        <SvgIcon
+          v-if="!props.selectionMode"
+          category="ui"
+          :icon="treeIconName"
+          class="document-tree-item__node-icon"
+        />
+        <span class="document-tree-item__title">
           {{ props.item.title }}
         </span>
-      </button>
+      </div>
 
       <div
+        v-if="!props.selectionMode"
         class="document-tree-item__actions"
-        :class="getActionsStateClass()"
+        :class="actionsStateClass"
         @click.stop
       >
         <ElButton
           v-if="canManageDocument"
           text
           class="document-tree-item__icon-button"
-          :class="getItemStateClass()"
+          :class="itemStateClass"
           :disabled="isActionPending"
           title="新建子文档"
           @click.stop="createChild"
@@ -91,7 +86,7 @@ const {
             text
             class="document-tree-item__icon-button"
             data-testid="document-tree-item-menu-trigger"
-            :class="getItemStateClass()"
+            :class="itemStateClass"
             :disabled="isActionPending"
             title="更多操作"
             @click.stop
@@ -102,130 +97,50 @@ const {
           <template #dropdown>
             <ElDropdownMenu>
               <ElDropdownItem
-                command="open-new-tab"
+                v-for="menuItem in menuItems"
+                :key="menuItem.command"
+                :command="menuItem.command"
+                :divided="menuItem.divided"
                 class="document-tree-item__menu-item"
+                :class="{ 'document-tree-item__menu-item--delete': menuItem.danger }"
               >
                 <template #icon>
-                  <SvgIcon category="ui" icon="document-menu-open-new" />
+                  <SvgIcon category="ui" :icon="menuItem.icon" />
                 </template>
-                在新标签页打开
-              </ElDropdownItem>
-
-              <ElDropdownItem
-                v-if="canShareDocument"
-                command="share"
-                divided
-                class="document-tree-item__menu-item document-tree-item__menu-item--share"
-              >
-                <template #icon>
-                  <SvgIcon category="ui" icon="document-menu-share" />
-                </template>
-                分享
-              </ElDropdownItem>
-
-              <ElDropdownItem
-                command="copy-link"
-                :divided="!canShareDocument"
-                class="document-tree-item__menu-item"
-              >
-                <template #icon>
-                  <SvgIcon category="ui" icon="document-menu-link" />
-                </template>
-                复制链接
-              </ElDropdownItem>
-
-              <ElDropdownItem
-                v-if="canManageDocument"
-                command="duplicate"
-                divided
-                class="document-tree-item__menu-item"
-              >
-                <template #icon>
-                  <SvgIcon category="ui" icon="document-menu-copy" />
-                </template>
-                创建副本
-              </ElDropdownItem>
-
-              <ElDropdownItem
-                v-if="canManageDocument"
-                command="move"
-                class="document-tree-item__menu-item"
-              >
-                <template #icon>
-                  <SvgIcon category="ui" icon="document-menu-move" />
-                </template>
-                移动到
-              </ElDropdownItem>
-
-              <ElDropdownItem
-                v-if="canManageDocument"
-                command="rename"
-                divided
-                class="document-tree-item__menu-item"
-              >
-                <template #icon>
-                  <SvgIcon category="ui" icon="document-menu-rename" />
-                </template>
-                重命名
-              </ElDropdownItem>
-
-              <ElDropdownItem
-                v-if="canManageDocument"
-                command="delete"
-                divided
-                class="document-tree-item__menu-item document-tree-item__menu-item--delete"
-              >
-                <template #icon>
-                  <SvgIcon category="ui" icon="document-menu-delete" />
-                </template>
-                删除
+                {{ menuItem.label }}
               </ElDropdownItem>
             </ElDropdownMenu>
           </template>
         </ElDropdown>
       </div>
     </div>
-
-    <div v-if="props.item.hasChildren && isExpanded" role="group" class="mt-1 space-y-0.5">
-      <DocumentItem
-        v-for="child in props.item.children"
-        :key="child.id"
-        :item="child"
-        :collection-id="props.collectionId"
-        :depth="props.depth + 1"
-      />
-    </div>
   </div>
 </template>
 
 <style scoped lang="scss">
 .document-tree-item {
+  width: 100%;
+  min-width: 0;
+
   .document-tree-item-surface {
     position: relative;
     display: flex;
     align-items: center;
     gap: 0.25rem;
-    padding: 0.25rem 0.375rem;
-    border: 1px solid transparent;
-    border-radius: 0.5rem;
+    height: 100%;
+    width: 100%;
+    min-width: 0;
+    padding: 0;
     transition:
-      border-color 0.2s ease,
-      background-color 0.2s ease,
       color 0.2s ease,
-      box-shadow 0.2s ease;
-
-    &:focus-within {
-      border-color: color-mix(in srgb, var(--brand-primary) 20%, transparent);
-      background: var(--brand-fill-lighter);
-    }
+      opacity 0.2s ease;
 
     &.active {
       color: var(--brand-primary);
-      border-color: color-mix(in srgb, var(--brand-primary) 20%, transparent);
-      background: color-mix(in srgb, var(--brand-primary) 10%, transparent);
-      box-shadow:
-        0 1px 2px 0 color-mix(in srgb, var(--brand-primary) 6%, transparent),
-        0 1px 2px 0 color-mix(in srgb, var(--brand-text-primary) 5%, transparent);
+
+      .document-tree-item__title {
+        font-weight: 500;
+      }
 
       :deep(.el-button) {
         --el-button-border-color: transparent;
@@ -242,7 +157,7 @@ const {
 
     &.idle {
       &:hover {
-        background: var(--brand-fill-lighter);
+        color: var(--brand-text-primary);
       }
     }
 
@@ -285,17 +200,22 @@ const {
     .document-tree-item__open-button {
       display: flex;
       align-items: center;
+      gap: 0.375rem;
       flex: 1 1 0%;
       min-width: 0;
       padding: 0;
       border: none;
       background: transparent;
       text-align: left;
-      cursor: pointer;
+      color: inherit;
 
       &:focus-visible {
         outline: none;
       }
+    }
+
+    .document-tree-item__node-icon {
+      flex-shrink: 0;
     }
 
     .document-tree-item__title {
@@ -307,15 +227,6 @@ const {
       line-height: 1.25rem;
       text-overflow: ellipsis;
       white-space: nowrap;
-
-      &.active {
-        color: var(--brand-primary);
-        font-weight: 500;
-      }
-
-      &.idle {
-        color: var(--brand-text-secondary);
-      }
     }
 
     .document-tree-item__actions {

@@ -73,7 +73,7 @@ interface ApplyRestoredSnapshotOptions {
 
 export const useActiveDocument = createSharedComposable(() => {
   const { activeDocumentId, pendingTitleFocusDocumentId } = useDocsContext()
-  const { ensureExpandedPath, loadTree, patchDocumentItem, rememberLastOpenedDocument } = useDocumentTree()
+  const { loadTree, patchDocumentItem, rememberLastOpenedDocument } = useDocumentTree()
   const userStore = useUserStore()
   const isDocumentItemLoading = shallowRef(false)
   const isSnapshotsLoading = shallowRef(false)
@@ -176,7 +176,6 @@ export const useActiveDocument = createSharedComposable(() => {
         awarenessState: collaborationAwarenessState.value,
       })
       rememberLastOpenedDocument(id)
-      ensureExpandedPath(id)
     }
     catch (error) {
       if (!isActiveLoadRequest(requestId, id)) {

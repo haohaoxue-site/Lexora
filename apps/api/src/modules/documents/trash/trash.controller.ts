@@ -1,7 +1,13 @@
-import type { DocumentTrashItem } from '@haohaoxue/samepage-contracts'
+import type {
+  BatchDeleteDocumentsRequest,
+  BatchDeleteDocumentsResponse,
+  DocumentTrashItem,
+} from '@haohaoxue/samepage-contracts'
 import type { AuthUserContext } from '../../auth/auth.interface'
-import { BadRequestException, Controller, Delete, Get, Param, Post, Query } from '@nestjs/common'
+import { BatchDeleteDocumentsRequestSchema } from '@haohaoxue/samepage-contracts'
+import { BadRequestException, Body, Controller, Delete, Get, Param, Post, Query } from '@nestjs/common'
 import { CurrentUser } from '../../../decorators/current-user.decorator'
+import { ZodValidationPipe } from '../../../pipes/zod-validation.pipe'
 import { DocumentTrashService } from './trash.service'
 
 @Controller('documents')
@@ -27,6 +33,16 @@ export class DocumentTrashController {
   ): Promise<null> {
     await this.documentTrashService.deleteDocument(authUser.id, id)
     return null
+  }
+
+  @Post('batch-delete')
+  async batchDeleteDocuments(
+    @CurrentUser() authUser: AuthUserContext,
+    @Body(new ZodValidationPipe(BatchDeleteDocumentsRequestSchema)) payload: BatchDeleteDocumentsRequest,
+  ): Promise<BatchDeleteDocumentsResponse> {
+    return {
+      deletedDocumentIds: await this.documentTrashService.batchDeleteDocuments(authUser.id, payload.workspaceId, payload.documentIds),
+    }
   }
 
   @Post(':id/restore-from-trash')

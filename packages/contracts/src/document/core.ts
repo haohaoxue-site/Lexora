@@ -310,6 +310,15 @@ export const CreateDocumentResponseSchema = z.object({
   id: z.string().trim().min(1),
 }).strict()
 
+export const BatchDeleteDocumentsRequestSchema = z.object({
+  workspaceId: z.string().trim().min(1),
+  documentIds: z.string().trim().min(1).array().min(1),
+}).strict()
+
+export const BatchDeleteDocumentsResponseSchema = z.object({
+  deletedDocumentIds: z.string().array(),
+}).strict()
+
 export const CreateDocumentVersionSnapshotSchema = z.object({
   basedOnProjectionRevision: DocumentRevisionSchema,
   source: DocumentVersionSnapshotSourceSchema.default(DOCUMENT_VERSION_SNAPSHOT_SOURCE.USER),
@@ -436,6 +445,8 @@ export interface DocumentOutlineItem {
 
 export type CreateDocumentRequest = z.infer<typeof CreateDocumentSchema>
 export type CreateDocumentResponse = z.infer<typeof CreateDocumentResponseSchema>
+export type BatchDeleteDocumentsRequest = z.infer<typeof BatchDeleteDocumentsRequestSchema>
+export type BatchDeleteDocumentsResponse = z.infer<typeof BatchDeleteDocumentsResponseSchema>
 export type CreateDocumentVersionSnapshotRequest = z.infer<typeof CreateDocumentVersionSnapshotSchema>
 export type CreateDocumentVersionSnapshotResponse = z.infer<typeof CreateDocumentVersionSnapshotResponseSchema>
 export type RestoreDocumentVersionSnapshotRequest = z.infer<typeof RestoreDocumentVersionSnapshotSchema>

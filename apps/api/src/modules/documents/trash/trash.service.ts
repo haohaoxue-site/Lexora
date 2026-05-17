@@ -1,4 +1,5 @@
 import type { DocumentTrashItem } from '@haohaoxue/samepage-contracts'
+import type { AccessibleDocument } from '../core/access.service'
 import type { PersistedDocument, WorkspaceDocumentContext } from '../core/documents.utils'
 import {
   DOCUMENT_VISIBILITY,
@@ -62,36 +63,47 @@ export class DocumentTrashService {
 
   async deleteDocument(userId: string, id: string): Promise<void> {
     const document = await this.documentAccessService.assertCanEditDocument(userId, id)
+
+    await this.batchDeleteEditableDocuments(userId, document.workspaceId, document.workspaceType, [document])
+  }
+
+  async batchDeleteDocuments(userId: string, workspaceId: string, ids: string[]): Promise<string[]> {
+    const workspace = await this.documentAccessService.assertAccessibleWorkspace(userId, workspaceId)
+    const rootDocumentIds = [...new Set(ids.map(id => id.trim()).filter(Boolean))]
+    const documents = await Promise.all(rootDocumentIds.map(id =>
+      this.documentAccessService.assertCanEditDocument(userId, id),
+    ))
+
+    for (const document of documents) {
+      if (document.workspaceId !== workspace.id) {
+        throw new BadRequestException('只能批量删除当前工作区内的文档')
+      }
+    }
+
+    return this.batchDeleteEditableDocuments(userId, workspace.id, workspace.type, documents)
+  }
+
+  private async batchDeleteEditableDocuments(
+    userId: string,
+    workspaceId: string,
+    workspaceType: string,
+    documents: AccessibleDocument[],
+  ): Promise<string[]> {
+    const targetDocumentIds = new Set<string>()
     const context = await this.loadWorkspaceDocumentContext({
-      workspaceId: document.workspaceId,
+      workspaceId,
       userId,
-      workspaceType: document.workspaceType,
-    })
-    const removableDocumentIds = new Set<string>()
-
-    collectDescendantDocumentIds(id, context, removableDocumentIds)
-    const targetDocumentIds = Array.from(removableDocumentIds)
-
-    await this.prisma.$bypass.$transaction(async (tx) => {
-      await tx.document.updateMany({
-        where: {
-          id: {
-            in: targetDocumentIds,
-          },
-        },
-        data: {
-          trashedAt: new Date(),
-          trashedBy: userId,
-        },
-      })
+      workspaceType,
     })
 
-    await this.collabPermissionInvalidationPublisher.publishPermissionInvalidations(
-      targetDocumentIds.map(documentId => ({
-        reason: 'document-trashed' as const,
-        documentId,
-      })),
-    )
+    for (const document of documents) {
+      collectDescendantDocumentIds(document.id, context, targetDocumentIds)
+    }
+
+    const deletedDocumentIds = Array.from(targetDocumentIds)
+    await this.trashDocuments(userId, deletedDocumentIds)
+
+    return deletedDocumentIds
   }
 
   async restoreDocumentFromTrash(userId: string, id: string): Promise<void> {
@@ -132,6 +144,33 @@ export class DocumentTrashService {
 
     await this.collabPermissionInvalidationPublisher.publishPermissionInvalidations(
       targetDocumentIds.map(documentId => ({
+        reason: 'document-trashed' as const,
+        documentId,
+      })),
+    )
+  }
+
+  private async trashDocuments(userId: string, documentIds: string[]): Promise<void> {
+    if (!documentIds.length) {
+      return
+    }
+
+    await this.prisma.$bypass.$transaction(async (tx) => {
+      await tx.document.updateMany({
+        where: {
+          id: {
+            in: documentIds,
+          },
+        },
+        data: {
+          trashedAt: new Date(),
+          trashedBy: userId,
+        },
+      })
+    })
+
+    await this.collabPermissionInvalidationPublisher.publishPermissionInvalidations(
+      documentIds.map(documentId => ({
         reason: 'document-trashed' as const,
         documentId,
       })),

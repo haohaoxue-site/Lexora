@@ -1,29 +1,10 @@
 import { defineStore } from 'pinia'
-import { computed, shallowRef } from 'vue'
+import { shallowRef } from 'vue'
 import { STORAGE_KEY } from '@/utils/storage'
 
 export const UI_PERSIST_KEY = STORAGE_KEY.ui
 
 const DOCUMENT_TREE_FALLBACK_KEY = '__workspace_pending__'
-
-interface DocumentTreeUiState {
-  expandedDocumentIds: string[]
-  lastOpenedDocumentId: string | null
-}
-
-function cloneDocumentTreeUiState(state: DocumentTreeUiState): DocumentTreeUiState {
-  return {
-    expandedDocumentIds: [...state.expandedDocumentIds],
-    lastOpenedDocumentId: state.lastOpenedDocumentId,
-  }
-}
-
-function createDocumentTreeUiState(): DocumentTreeUiState {
-  return {
-    expandedDocumentIds: [],
-    lastOpenedDocumentId: null,
-  }
-}
 
 function resolveDocumentTreeStateKey(workspaceId: string | null) {
   return workspaceId?.trim() || DOCUMENT_TREE_FALLBACK_KEY
@@ -33,15 +14,8 @@ export const useUiStore = defineStore('ui', () => {
   const workspaceSidebarCollapsed = shallowRef(false)
   const lastActiveChatSessionId = shallowRef<string | null>(null)
   const chatSessionSidebarPinned = shallowRef<boolean | null>(null)
-  const _documentTreeStateByWorkspaceId = shallowRef<Record<string, DocumentTreeUiState>>({})
-  const documentTreeStateByWorkspaceId = computed(() =>
-    Object.fromEntries(
-      Object.entries(_documentTreeStateByWorkspaceId.value).map(([workspaceId, state]) => [
-        workspaceId,
-        cloneDocumentTreeUiState(state),
-      ]),
-    ),
-  )
+  const documentLibrarySidebarCollapsed = shallowRef(false)
+  const _lastOpenedDocumentIdByWorkspaceId = shallowRef<Record<string, string | null>>({})
 
   function setWorkspaceSidebarCollapsed(value: boolean) {
     workspaceSidebarCollapsed.value = value
@@ -64,56 +38,35 @@ export const useUiStore = defineStore('ui', () => {
     chatSessionSidebarPinned.value = value
   }
 
-  function getDocumentTreeState(workspaceId: string | null): DocumentTreeUiState {
-    return cloneDocumentTreeUiState(
-      _documentTreeStateByWorkspaceId.value[resolveDocumentTreeStateKey(workspaceId)] ?? createDocumentTreeUiState(),
-    )
+  function setDocumentLibrarySidebarCollapsed(value: boolean) {
+    documentLibrarySidebarCollapsed.value = value
   }
 
-  function patchDocumentTreeState(
-    workspaceId: string | null,
-    partial: Partial<DocumentTreeUiState>,
-  ) {
-    const stateKey = resolveDocumentTreeStateKey(workspaceId)
-    const currentState = _documentTreeStateByWorkspaceId.value[stateKey] ?? createDocumentTreeUiState()
-
-    _documentTreeStateByWorkspaceId.value = {
-      ..._documentTreeStateByWorkspaceId.value,
-      [stateKey]: {
-        expandedDocumentIds: partial.expandedDocumentIds
-          ? [...partial.expandedDocumentIds]
-          : [...currentState.expandedDocumentIds],
-        lastOpenedDocumentId: partial.lastOpenedDocumentId ?? currentState.lastOpenedDocumentId,
-      },
-    }
-  }
-
-  function setExpandedDocumentIds(workspaceId: string | null, documentIds: string[]) {
-    patchDocumentTreeState(workspaceId, {
-      expandedDocumentIds: documentIds,
-    })
+  function getLastOpenedDocumentId(workspaceId: string | null) {
+    return _lastOpenedDocumentIdByWorkspaceId.value[resolveDocumentTreeStateKey(workspaceId)] ?? null
   }
 
   function setLastOpenedDocumentId(workspaceId: string | null, documentId: string | null) {
-    patchDocumentTreeState(workspaceId, {
-      lastOpenedDocumentId: documentId,
-    })
+    _lastOpenedDocumentIdByWorkspaceId.value = {
+      ..._lastOpenedDocumentIdByWorkspaceId.value,
+      [resolveDocumentTreeStateKey(workspaceId)]: documentId,
+    }
   }
 
-  function clearDocumentTreeState() {
-    _documentTreeStateByWorkspaceId.value = {}
+  function clearLastOpenedDocumentIds() {
+    _lastOpenedDocumentIdByWorkspaceId.value = {}
   }
 
   return {
-    _documentTreeStateByWorkspaceId,
+    _lastOpenedDocumentIdByWorkspaceId,
     chatSessionSidebarPinned,
-    clearDocumentTreeState,
+    clearLastOpenedDocumentIds,
     clearLastActiveChatSessionId,
-    documentTreeStateByWorkspaceId,
-    getDocumentTreeState,
+    documentLibrarySidebarCollapsed,
+    getLastOpenedDocumentId,
     lastActiveChatSessionId,
     setChatSessionSidebarPinned,
-    setExpandedDocumentIds,
+    setDocumentLibrarySidebarCollapsed,
     setLastActiveChatSessionId,
     setLastOpenedDocumentId,
     setWorkspaceSidebarCollapsed,
@@ -126,7 +79,8 @@ export const useUiStore = defineStore('ui', () => {
       'workspaceSidebarCollapsed',
       'lastActiveChatSessionId',
       'chatSessionSidebarPinned',
-      '_documentTreeStateByWorkspaceId',
+      'documentLibrarySidebarCollapsed',
+      '_lastOpenedDocumentIdByWorkspaceId',
     ],
   },
 })

@@ -123,7 +123,7 @@ export const useAuthStore = defineStore('auth', () => {
     accessToken.value = ''
     accessTokenExpiresAt.value = 0
     pendingRedirect.value = ''
-    uiStore.clearDocumentTreeState()
+    uiStore.clearLastOpenedDocumentIds()
     workspaceStore.clear()
     userStore.clear()
   }

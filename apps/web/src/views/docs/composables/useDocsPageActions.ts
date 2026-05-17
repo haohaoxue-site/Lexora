@@ -198,7 +198,6 @@ export const useDocsPageActions = createSharedComposable(() => {
       await tree.loadTree()
 
       if (job.resultDocumentId) {
-        tree.expandDocument(job.resultDocumentId)
         await navigateToDocument(job.resultDocumentId, {
           skipConfirm: true,
         })

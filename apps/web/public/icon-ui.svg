@@ -132,6 +132,23 @@
           <circle cx="12" cy="14" r="1.4" fill="none" stroke="currentColor" stroke-width="1.8" />
     </g>
   </symbol>
+  <symbol id="document-tree-file-empty" viewBox="0 0 48 48">
+    <path d="M14 6H28L38 16V38C38 40.2091 36.2091 42 34 42H14C11.7909 42 10 40.2091 10 38V10C10 7.79086 11.7909 6 14 6Z" fill="none" stroke="currentColor" stroke-width="4" stroke-linejoin="round" />
+    <path d="M28 6V14C28 15.1046 28.8954 16 30 16H38" fill="none" stroke="currentColor" stroke-width="4" stroke-linejoin="round" />
+  </symbol>
+  <symbol id="document-tree-file" viewBox="0 0 48 48">
+    <path d="M14 6H28L38 16V38C38 40.2091 36.2091 42 34 42H14C11.7909 42 10 40.2091 10 38V10C10 7.79086 11.7909 6 14 6Z" fill="none" stroke="currentColor" stroke-width="4" stroke-linejoin="round" />
+    <path d="M28 6V14C28 15.1046 28.8954 16 30 16H38" fill="none" stroke="currentColor" stroke-width="4" stroke-linejoin="round" />
+    <path d="M17 27H31" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" />
+    <path d="M17 34H27" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" />
+  </symbol>
+  <symbol id="document-tree-folder" viewBox="0 0 48 48">
+    <path d="M6 14C6 11.7909 7.79086 10 10 10H18.2C19.2609 10 20.2783 10.4214 21.0284 11.1716L24.8284 14.9716C25.5786 15.7217 26.5959 16.1431 27.6569 16.1431H38C40.2091 16.1431 42 17.9339 42 20.1431V36C42 38.2091 40.2091 40 38 40H10C7.79086 40 6 38.2091 6 36V14Z" fill="none" stroke="currentColor" stroke-width="4" stroke-linejoin="round" />
+  </symbol>
+  <symbol id="document-tree-folder-open" viewBox="0 0 48 48">
+    <path d="M6 16C6 13.7909 7.79086 12 10 12H18.2C19.2609 12 20.2783 12.4214 21.0284 13.1716L23.8284 15.9716C24.5786 16.7217 25.5959 17.1431 26.6569 17.1431H38C40.2091 17.1431 42 18.9339 42 21.1431V22H12.9848C11.1812 22 9.60184 23.2079 9.1299 24.9484L6 36.5V16Z" fill="none" stroke="currentColor" stroke-width="4" stroke-linejoin="round" />
+    <path d="M9.1299 24.9484C9.60184 23.2079 11.1812 22 12.9848 22H41.4558C42.7691 22 43.7274 23.2439 43.3913 24.5135L39.9788 37.4089C39.5129 39.1695 37.9199 40.3956 36.0986 40.3956H8.53891C7.22831 40.3956 6.27047 39.1565 6.60175 37.8884L9.1299 24.9484Z" fill="none" stroke="currentColor" stroke-width="4" stroke-linejoin="round" />
+  </symbol>
     <symbol id="error" viewBox="0 0 48 48">
     <g transform="scale(2)">
         <circle cx="12" cy="12" r="7" fill="none" stroke="currentColor" stroke-width="1.8" />

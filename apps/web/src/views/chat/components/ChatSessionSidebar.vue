@@ -30,7 +30,8 @@ const {
           <ElButton
             text
             size="small"
-            class="chat-session-sidebar__header-text-btn chat-session-sidebar__header-text-btn--delete"
+            class="chat-session-sidebar__header-text-btn"
+            :class="{ 'chat-session-sidebar__header-text-btn--delete': hasSelectedSessions }"
             :disabled="!hasSelectedSessions"
             :loading="isBatchDeleting"
             @click="confirmBatchDelete"
@@ -198,11 +199,6 @@ const {
     padding: 0 0.35rem;
     color: var(--brand-text-secondary);
     font-size: 0.8125rem;
-
-    &:hover,
-    &:focus-visible {
-      color: var(--brand-primary);
-    }
 
     &--delete {
       color: var(--brand-error);

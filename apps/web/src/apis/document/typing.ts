@@ -1,4 +1,6 @@
 export type {
+  BatchDeleteDocumentsRequest,
+  BatchDeleteDocumentsResponse,
   CreateCollabTicketResponse,
   CreateDocumentDuplicateOperationResponse,
   CreateDocumentMoveOperationResponse,

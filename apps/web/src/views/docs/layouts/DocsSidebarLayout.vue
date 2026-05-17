@@ -1,12 +1,13 @@
 <script setup lang="tsx">
 import type { VNodeChild } from 'vue'
-import { DOCUMENT_COLLECTION } from '@haohaoxue/samepage-contracts'
 import { computed } from 'vue'
 import { SvgIcon } from '@/components/svg-icon'
+import { useUiStore } from '@/stores/ui'
 import DocumentSectionPanel from '../components/DocumentSectionPanel.vue'
 import { useDocsPageActions } from '../composables/useDocsPageActions'
 import { useDocsPendingShareIndicator } from '../composables/useDocsPendingShareIndicator'
 import { useDocsShareDialog } from '../composables/useDocsShareDialog'
+import { useDocsSidebarSelection } from '../composables/useDocsSidebarSelection'
 import { useDocsSurfaceState } from '../composables/useDocsSurfaceState'
 import { useDocumentTree } from '../composables/useDocumentTree'
 
@@ -23,16 +24,23 @@ interface DocsSidebarFooterAction {
   onClick: () => void
 }
 
-const { isDocumentLoading } = useDocumentTree()
+const tree = useDocumentTree()
+const { isDocumentLoading } = tree
+const uiStore = useUiStore()
 const { currentSurface, visibleTreeGroups } = useDocsSurfaceState()
 const { hasPendingShares, pendingShareCount } = useDocsPendingShareIndicator()
 const { canOpenShareDialog } = useDocsShareDialog()
-const { openPendingShares, openPermissionsOverview, openTrashPage } = useDocsPageActions()
-
-const treeSections = computed(() => visibleTreeGroups.value.map(group => ({
-  group,
-  canCreateRoot: group.id !== DOCUMENT_COLLECTION.COLLABORATION,
-})))
+const { openDocument, openPendingShares, openPermissionsOverview, openTrashPage } = useDocsPageActions()
+const {
+  confirmBatchDelete,
+  enterSelectionMode,
+  exitSelectionMode,
+  hasSelectedDocuments,
+  isBatchDeleting,
+  isSelectionMode,
+  replaceSectionSelection,
+  selectedCount,
+} = useDocsSidebarSelection()
 const footerActions = computed<DocsSidebarFooterAction[]>(() => {
   const actions: DocsSidebarFooterAction[] = []
 
@@ -73,10 +81,72 @@ const footerActions = computed<DocsSidebarFooterAction[]>(() => {
 const footerGridStyle = computed(() => ({
   gridTemplateColumns: `repeat(${footerActions.value.length}, minmax(0, 1fr))`,
 }))
+
+function handleDocumentOpen(documentId: string) {
+  void openDocument(documentId)
+}
+
+function collapseDocumentLibrary() {
+  uiStore.setDocumentLibrarySidebarCollapsed(true)
+}
 </script>
 
 <template>
   <aside class="docs-view__sidebar">
+    <div class="docs-view__sidebar-header">
+      <template v-if="isSelectionMode">
+        <span class="docs-view__sidebar-selection-count">已选 {{ selectedCount }} 项</span>
+        <div class="docs-view__sidebar-header-actions">
+          <ElButton
+            text
+            size="small"
+            class="docs-view__sidebar-header-text-btn"
+            :class="{ 'docs-view__sidebar-header-text-btn--delete': hasSelectedDocuments }"
+            :disabled="!hasSelectedDocuments"
+            :loading="isBatchDeleting"
+            @click="confirmBatchDelete"
+          >
+            删除
+          </ElButton>
+          <ElButton
+            text
+            size="small"
+            class="docs-view__sidebar-header-text-btn"
+            :disabled="isBatchDeleting"
+            @click="exitSelectionMode"
+          >
+            取消
+          </ElButton>
+        </div>
+      </template>
+
+      <template v-else>
+        <span class="docs-view__sidebar-header-title">文档库</span>
+        <div class="docs-view__sidebar-header-actions">
+          <ElButton
+            text
+            circle
+            size="small"
+            class="docs-view__sidebar-header-icon-btn"
+            title="多选"
+            @click="enterSelectionMode"
+          >
+            <SvgIcon category="ui" icon="select-multiple" size="0.95rem" />
+          </ElButton>
+          <ElButton
+            text
+            circle
+            size="small"
+            class="docs-view__sidebar-header-icon-btn"
+            title="收起文档库"
+            @click="collapseDocumentLibrary"
+          >
+            <SvgIcon category="ui" icon="pin-off" size="0.95rem" />
+          </ElButton>
+        </div>
+      </template>
+    </div>
+
     <div class="docs-view__sidebar-scroll">
       <div v-if="isDocumentLoading" class="docs-view__tree-loading">
         正在加载文档树...
@@ -84,9 +154,12 @@ const footerGridStyle = computed(() => ({
 
       <div v-else class="docs-view__tree-sections" role="tree" aria-label="文档树">
         <DocumentSectionPanel
-          v-for="section in treeSections"
-          :key="section.group.id"
-          :group="section.group"
+          v-for="group in visibleTreeGroups"
+          :key="group.id"
+          :group="group"
+          :selection-mode="isSelectionMode"
+          @checked-change="documentIds => replaceSectionSelection(group, documentIds)"
+          @open="handleDocumentOpen"
         />
       </div>
     </div>
@@ -125,11 +198,63 @@ const footerGridStyle = computed(() => ({
   background: var(--brand-bg-sidebar);
 }
 
+.docs-view__sidebar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 3rem;
+  padding: 0.5rem 0.75rem 0.5rem 0.9rem;
+  border-bottom: 1px solid color-mix(in srgb, var(--brand-border-base) 60%, transparent);
+}
+
+.docs-view__sidebar-header-title,
+.docs-view__sidebar-selection-count {
+  min-width: 0;
+  color: var(--brand-text-primary);
+  font-size: 0.875rem;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.docs-view__sidebar-header-actions {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.docs-view__sidebar-header-icon-btn {
+  width: 1.75rem;
+  height: 1.75rem;
+  color: var(--brand-text-secondary);
+
+  &:hover,
+  &:focus-visible {
+    background: color-mix(in srgb, var(--brand-primary) 7%, transparent);
+    color: var(--brand-primary);
+  }
+}
+
+.docs-view__sidebar-header-text-btn {
+  padding: 0 0.35rem;
+  color: var(--brand-text-secondary);
+  font-size: 0.8125rem;
+
+  &--delete {
+    color: var(--brand-error);
+
+    &:hover,
+    &:focus-visible {
+      color: var(--brand-error);
+    }
+  }
+}
+
 .docs-view__sidebar-scroll {
   flex: 1 1 0%;
   min-height: 0;
   overflow-y: auto;
-  padding: 1rem 0.75rem;
+  padding: 0.5rem 0.75rem 1rem 0.75rem;
 }
 
 .docs-view__tree-loading {
