@@ -52,7 +52,7 @@ export class AiDefaultModelsService {
         id: payload.modelRef.providerId,
         enabled: true,
         OR: [
-          { scope: 'SYSTEM', visibility: 'ALL_USERS' },
+          { scope: 'PLATFORM', visibility: 'ALL_USERS' },
           { scope: 'USER', ownerUserId: userId },
         ],
       },
@@ -148,7 +148,7 @@ export class AiDefaultModelsService {
       where: {
         enabled: true,
         OR: [
-          { scope: 'SYSTEM', visibility: 'ALL_USERS' },
+          { scope: 'PLATFORM', visibility: 'ALL_USERS' },
           { scope: 'USER', ownerUserId: userId },
         ],
       },
@@ -181,7 +181,7 @@ export class AiDefaultModelsService {
         enabled: true,
         scope: toPrismaScope(parsedScope),
         OR: [
-          { scope: 'SYSTEM', visibility: 'ALL_USERS' },
+          { scope: 'PLATFORM', visibility: 'ALL_USERS' },
           { scope: 'USER', ownerUserId: userId },
         ],
         models: {
@@ -205,7 +205,7 @@ export class AiDefaultModelsService {
         id: providerId,
         enabled: true,
         OR: [
-          { scope: 'SYSTEM', visibility: 'ALL_USERS' },
+          { scope: 'PLATFORM', visibility: 'ALL_USERS' },
           { scope: 'USER', ownerUserId: userId },
         ],
       },
@@ -249,7 +249,7 @@ export class AiDefaultModelsService {
         id: policy.providerId,
         enabled: true,
         OR: [
-          { scope: 'SYSTEM', visibility: 'ALL_USERS' },
+          { scope: 'PLATFORM', visibility: 'ALL_USERS' },
           { scope: 'USER', ownerUserId: userId },
         ],
       },

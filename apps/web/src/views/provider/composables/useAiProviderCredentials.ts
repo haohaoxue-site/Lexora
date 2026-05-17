@@ -5,9 +5,9 @@ import { AI_PROVIDER_AUTH_MODE } from '@haohaoxue/samepage-contracts'
 import { ElMessage } from 'element-plus'
 import { computed, reactive, shallowRef, toValue } from 'vue'
 import {
-  getSystemAiProviderCredential,
+  getPlatformAiProviderCredential,
   getUserAiProviderCredential,
-  updateSystemAiProvider,
+  updatePlatformAiProvider,
   updateUserAiProvider,
 } from '@/apis/ai'
 import { getRequestErrorDisplayMessage } from '@/utils/request-error'
@@ -66,8 +66,8 @@ export function useAiProviderCredentials(options: UseAiProviderCredentialsOption
     isLoadingApiKey.value = true
 
     try {
-      const credential = currentMode() === 'system'
-        ? await getSystemAiProviderCredential(provider.providerId)
+      const credential = currentMode() === 'platform'
+        ? await getPlatformAiProviderCredential(provider.providerId)
         : await getUserAiProviderCredential(provider.providerId)
 
       if (apiKeyRequestId === requestId && options.selectedProvider.value?.providerId === provider.providerId) {
@@ -97,8 +97,8 @@ export function useAiProviderCredentials(options: UseAiProviderCredentialsOption
     const apiKey = apiKeyForm.apiKey.trim()
 
     try {
-      const nextProvider = currentMode() === 'system'
-        ? await updateSystemAiProvider(provider.providerId, apiKey ? { apiKey } : { clearApiKey: true })
+      const nextProvider = currentMode() === 'platform'
+        ? await updatePlatformAiProvider(provider.providerId, apiKey ? { apiKey } : { clearApiKey: true })
         : await updateUserAiProvider(provider.providerId, apiKey ? { apiKey } : { clearApiKey: true })
 
       options.patchProvider(nextProvider)
@@ -138,8 +138,8 @@ export function useAiProviderCredentials(options: UseAiProviderCredentialsOption
     isSavingEndpoint.value = true
 
     try {
-      const nextProvider = currentMode() === 'system'
-        ? await updateSystemAiProvider(provider.providerId, { endpoint })
+      const nextProvider = currentMode() === 'platform'
+        ? await updatePlatformAiProvider(provider.providerId, { endpoint })
         : await updateUserAiProvider(provider.providerId, { endpoint })
 
       options.patchProvider(nextProvider)

@@ -9,12 +9,12 @@ import type {
 import { ElMessage } from 'element-plus'
 import { computed, nextTick, reactive, shallowRef, toValue } from 'vue'
 import {
-  discoverSystemAiProviderModels,
+  discoverPlatformAiProviderModels,
   discoverUserAiProviderModels,
-  getSystemAiProviderModels,
+  getPlatformAiProviderModels,
   getUserAiProviderModels,
-  upsertSystemAiProviderModel,
-  upsertSystemAiProviderModels,
+  upsertPlatformAiProviderModel,
+  upsertPlatformAiProviderModels,
   upsertUserAiProviderModel,
   upsertUserAiProviderModels,
 } from '@/apis/ai'
@@ -98,8 +98,8 @@ export function useAiProviderModels(options: UseAiProviderModelsOptions) {
     isLoadingModels.value = true
 
     try {
-      const result = currentMode() === 'system'
-        ? await getSystemAiProviderModels(providerId)
+      const result = currentMode() === 'platform'
+        ? await getPlatformAiProviderModels(providerId)
         : await getUserAiProviderModels(providerId)
 
       models.value = sortModels(result.models)
@@ -146,8 +146,8 @@ export function useAiProviderModels(options: UseAiProviderModelsOptions) {
     isDiscoveringModels.value = true
 
     try {
-      const result = currentMode() === 'system'
-        ? await discoverSystemAiProviderModels(provider.providerId)
+      const result = currentMode() === 'platform'
+        ? await discoverPlatformAiProviderModels(provider.providerId)
         : await discoverUserAiProviderModels(provider.providerId)
 
       discoveredModels.value = result.models
@@ -173,8 +173,8 @@ export function useAiProviderModels(options: UseAiProviderModelsOptions) {
     isAddingDiscoveredModels.value = true
 
     try {
-      const result = currentMode() === 'system'
-        ? await upsertSystemAiProviderModels(provider.providerId, {
+      const result = currentMode() === 'platform'
+        ? await upsertPlatformAiProviderModels(provider.providerId, {
             models: targetModels.map(model => buildUpsertModelPayload(model, true)),
           })
         : await upsertUserAiProviderModels(provider.providerId, {
@@ -211,8 +211,8 @@ export function useAiProviderModels(options: UseAiProviderModelsOptions) {
     updatingModelIds.value = nextUpdatingIds
 
     try {
-      const item = currentMode() === 'system'
-        ? await upsertSystemAiProviderModel(provider.providerId, buildUpsertModelPayload(model, enabled))
+      const item = currentMode() === 'platform'
+        ? await upsertPlatformAiProviderModel(provider.providerId, buildUpsertModelPayload(model, enabled))
         : await upsertUserAiProviderModel(provider.providerId, buildUpsertModelPayload(model, enabled))
 
       patchSavedModel(item)
@@ -261,8 +261,8 @@ export function useAiProviderModels(options: UseAiProviderModelsOptions) {
     isCreatingModel.value = true
 
     try {
-      const item = currentMode() === 'system'
-        ? await upsertSystemAiProviderModel(provider.providerId, {
+      const item = currentMode() === 'platform'
+        ? await upsertPlatformAiProviderModel(provider.providerId, {
             modelId: createModelForm.modelId.trim(),
             modelName: createModelForm.modelName.trim(),
             enabled: true,

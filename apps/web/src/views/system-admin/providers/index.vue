@@ -11,7 +11,7 @@ import SystemAdminPageHeader from '../components/SystemAdminPageHeader.vue'
     </template>
 
     <div class="admin-providers-page h-full min-h-0 bg-fill-lighter p-4 lg:p-6">
-      <AiProviderConsole class="admin-providers h-full min-h-0" mode="system" />
+      <AiProviderConsole class="admin-providers h-full min-h-0" mode="platform" />
     </div>
   </PagePanel>
 </template>

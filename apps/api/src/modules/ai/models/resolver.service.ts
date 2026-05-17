@@ -19,7 +19,7 @@ export interface ResolveAiModelTargetParams {
 
 export interface ResolvedAiModelTarget {
   providerId: string
-  scope: 'system' | 'user'
+  scope: 'platform' | 'user'
   providerKey: string
   providerName: string
   adapterKey: string
@@ -45,7 +45,7 @@ export class AiModelResolverService {
         id: modelRef.providerId,
         enabled: true,
         OR: [
-          { scope: 'SYSTEM', visibility: 'ALL_USERS' },
+          { scope: 'PLATFORM', visibility: 'ALL_USERS' },
           { scope: 'USER', ownerUserId: params.actorUserId },
         ],
       },

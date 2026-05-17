@@ -1,5 +1,5 @@
 enum AiProviderScope {
-  SYSTEM
+  PLATFORM
   USER
 }
 

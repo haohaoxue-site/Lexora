@@ -210,11 +210,11 @@ function resetAvailableModels() {
 function buildRootOptions(): ModelCascaderOption[] {
   return [
     {
-      value: buildScopeValue(AI_PROVIDER_SCOPE.SYSTEM),
-      label: '系统',
+      value: buildScopeValue(AI_PROVIDER_SCOPE.PLATFORM),
+      label: '平台',
       leaf: false,
       nodeKind: 'scope',
-      scope: AI_PROVIDER_SCOPE.SYSTEM,
+      scope: AI_PROVIDER_SCOPE.PLATFORM,
     },
     {
       value: buildScopeValue(AI_PROVIDER_SCOPE.USER),
@@ -367,7 +367,7 @@ function encodeValuePart(value: string) {
 }
 
 function isAiProviderScope(value: string | undefined): value is AiProviderScope {
-  return value === AI_PROVIDER_SCOPE.SYSTEM || value === AI_PROVIDER_SCOPE.USER
+  return value === AI_PROVIDER_SCOPE.PLATFORM || value === AI_PROVIDER_SCOPE.USER
 }
 
 function getNodeValue(node: CascaderNode) {

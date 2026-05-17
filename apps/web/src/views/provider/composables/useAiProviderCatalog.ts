@@ -4,7 +4,7 @@ import type { AiProvider, AiProviderPreset } from '@/apis/ai'
 import { computed, shallowRef, toValue } from 'vue'
 import {
   getAiCompatibleProviderPresets,
-  getSystemAiProviders,
+  getPlatformAiProviders,
   getUserAiProviders,
 } from '@/apis/ai'
 
@@ -69,8 +69,8 @@ export function useAiProviderCatalog(options: UseAiProviderCatalogOptions) {
   }
 
   function loadProviders() {
-    return currentMode() === 'system'
-      ? getSystemAiProviders()
+    return currentMode() === 'platform'
+      ? getPlatformAiProviders()
       : getUserAiProviders()
   }
 

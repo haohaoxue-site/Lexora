@@ -60,11 +60,11 @@ export const DEFAULT_RBAC_SEED = {
     },
     {
       code: PERMISSIONS.SYSTEM_ADMIN_AI_CONFIG_READ,
-      description: '读取系统 AI 配置',
+      description: '读取平台 AI 配置',
     },
     {
       code: PERMISSIONS.SYSTEM_ADMIN_AI_CONFIG_UPDATE,
-      description: '更新系统 AI 配置',
+      description: '更新平台 AI 配置',
     },
     {
       code: PERMISSIONS.SYSTEM_ADMIN_AUDIT_LOG_LIST,

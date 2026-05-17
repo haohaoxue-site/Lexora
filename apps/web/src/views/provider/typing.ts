@@ -4,7 +4,7 @@ export const COMPATIBLE_PROVIDER_KEYS = ['openai-compatible', 'anthropic-compati
 
 export type CompatibleProviderKey = typeof COMPATIBLE_PROVIDER_KEYS[number]
 
-export type AiProviderConsoleMode = 'system' | 'user'
+export type AiProviderConsoleMode = 'platform' | 'user'
 
 /**
  * AI 服务商列表行。

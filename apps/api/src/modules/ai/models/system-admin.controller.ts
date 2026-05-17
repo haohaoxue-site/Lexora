@@ -32,7 +32,7 @@ export class AiSystemAdminController {
   @RequirePermissions(PERMISSIONS.SYSTEM_ADMIN_AI_CONFIG_READ)
   @Get('providers')
   getProviders(): Promise<AiProvider[]> {
-    return this.providersService.getSystemProviders()
+    return this.providersService.getPlatformProviders()
   }
 
   @RequirePermissions(PERMISSIONS.SYSTEM_ADMIN_AI_CONFIG_UPDATE)
@@ -41,7 +41,7 @@ export class AiSystemAdminController {
     @CurrentUser() authUser: AuthUserContext,
     @Body() payload: CreateAiProviderDto,
   ): Promise<AiProvider> {
-    return this.providersService.createSystemProvider(authUser.id, payload)
+    return this.providersService.createPlatformProvider(authUser.id, payload)
   }
 
   @RequirePermissions(PERMISSIONS.SYSTEM_ADMIN_AI_CONFIG_UPDATE)
@@ -51,31 +51,31 @@ export class AiSystemAdminController {
     @Param('providerId') providerId: string,
     @Body() payload: UpdateAiProviderDto,
   ): Promise<AiProvider> {
-    return this.providersService.updateSystemProvider(authUser.id, providerId, payload)
+    return this.providersService.updatePlatformProvider(authUser.id, providerId, payload)
   }
 
   @RequirePermissions(PERMISSIONS.SYSTEM_ADMIN_AI_CONFIG_UPDATE)
   @Get('providers/:providerId/credential')
   getProviderCredential(@Param('providerId') providerId: string): Promise<AiProviderCredential> {
-    return this.providersService.getSystemProviderCredential(providerId)
+    return this.providersService.getPlatformProviderCredential(providerId)
   }
 
   @RequirePermissions(PERMISSIONS.SYSTEM_ADMIN_AI_CONFIG_UPDATE)
   @Delete('providers/:providerId')
   async deleteProvider(@Param('providerId') providerId: string): Promise<void> {
-    await this.providersService.deleteSystemProvider(providerId)
+    await this.providersService.deletePlatformProvider(providerId)
   }
 
   @RequirePermissions(PERMISSIONS.SYSTEM_ADMIN_AI_CONFIG_READ)
   @Get('providers/:providerId/models')
   getModels(@Param('providerId') providerId: string): Promise<AiProviderModels> {
-    return this.providerModelsService.getSystemModels(providerId)
+    return this.providerModelsService.getPlatformModels(providerId)
   }
 
   @RequirePermissions(PERMISSIONS.SYSTEM_ADMIN_AI_CONFIG_UPDATE)
   @Post('providers/:providerId/models/discover')
   discoverModels(@Param('providerId') providerId: string): Promise<AiProviderModels> {
-    return this.providerModelsService.discoverSystemProviderModels(providerId)
+    return this.providerModelsService.discoverPlatformProviderModels(providerId)
   }
 
   @RequirePermissions(PERMISSIONS.SYSTEM_ADMIN_AI_CONFIG_UPDATE)
@@ -84,7 +84,7 @@ export class AiSystemAdminController {
     @Param('providerId') providerId: string,
     @Body() payload: UpsertAiProviderModelDto,
   ): Promise<AiProviderModelItem> {
-    return this.providerModelsService.upsertSystemModel(providerId, payload)
+    return this.providerModelsService.upsertPlatformModel(providerId, payload)
   }
 
   @RequirePermissions(PERMISSIONS.SYSTEM_ADMIN_AI_CONFIG_UPDATE)
@@ -93,6 +93,6 @@ export class AiSystemAdminController {
     @Param('providerId') providerId: string,
     @Body() payload: UpsertAiProviderModelsDto,
   ): Promise<AiProviderModels> {
-    return this.providerModelsService.upsertSystemModels(providerId, payload)
+    return this.providerModelsService.upsertPlatformModels(providerId, payload)
   }
 }

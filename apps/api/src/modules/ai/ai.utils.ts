@@ -40,11 +40,11 @@ interface ModelCountProjection {
 }
 
 export function toDomainScope(scope: PrismaAiProviderScope): AiProviderScope {
-  return scope === 'SYSTEM' ? AI_PROVIDER_SCOPE.SYSTEM : AI_PROVIDER_SCOPE.USER
+  return scope === 'PLATFORM' ? AI_PROVIDER_SCOPE.PLATFORM : AI_PROVIDER_SCOPE.USER
 }
 
 export function toPrismaScope(scope: AiProviderScope): PrismaAiProviderScope {
-  return scope === AI_PROVIDER_SCOPE.SYSTEM ? 'SYSTEM' : 'USER'
+  return scope === AI_PROVIDER_SCOPE.PLATFORM ? 'PLATFORM' : 'USER'
 }
 
 export function toDomainProviderSource(source: PrismaAiProviderSource): AiProviderSource {

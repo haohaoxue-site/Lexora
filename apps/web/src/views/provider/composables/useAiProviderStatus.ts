@@ -3,7 +3,7 @@ import type { AiProviderConsoleMode } from '../typing'
 import type { AiProvider } from '@/apis/ai'
 import { ElMessage } from 'element-plus'
 import { shallowRef, toValue } from 'vue'
-import { updateSystemAiProvider, updateUserAiProvider } from '@/apis/ai'
+import { updatePlatformAiProvider, updateUserAiProvider } from '@/apis/ai'
 import { getRequestErrorDisplayMessage } from '@/utils/request-error'
 
 /**
@@ -38,8 +38,8 @@ export function useAiProviderStatus(options: UseAiProviderStatusOptions) {
     isUpdatingProviderStatus.value = true
 
     try {
-      const nextProvider = currentMode() === 'system'
-        ? await updateSystemAiProvider(provider.providerId, { enabled })
+      const nextProvider = currentMode() === 'platform'
+        ? await updatePlatformAiProvider(provider.providerId, { enabled })
         : await updateUserAiProvider(provider.providerId, { enabled })
 
       options.patchProvider(nextProvider)

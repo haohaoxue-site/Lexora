@@ -24,8 +24,8 @@ export class AiProviderModelsService {
     private readonly adaptersService: AiProviderAdaptersService,
   ) {}
 
-  async getSystemModels(providerId: string): Promise<AiProviderModels> {
-    await this.assertSystemProvider(providerId)
+  async getPlatformModels(providerId: string): Promise<AiProviderModels> {
+    await this.assertPlatformProvider(providerId)
     return {
       models: await this.getModels(providerId),
     }
@@ -38,8 +38,8 @@ export class AiProviderModelsService {
     }
   }
 
-  async discoverSystemProviderModels(providerId: string): Promise<AiProviderModels> {
-    const provider = await this.assertSystemProvider(providerId)
+  async discoverPlatformProviderModels(providerId: string): Promise<AiProviderModels> {
+    const provider = await this.assertPlatformProvider(providerId)
     return this.discoverProviderModels(provider)
   }
 
@@ -48,8 +48,8 @@ export class AiProviderModelsService {
     return this.discoverProviderModels(provider)
   }
 
-  async upsertSystemModel(providerId: string, payload: UpsertAiProviderModelDto): Promise<AiProviderModelItem> {
-    await this.assertSystemProvider(providerId)
+  async upsertPlatformModel(providerId: string, payload: UpsertAiProviderModelDto): Promise<AiProviderModelItem> {
+    await this.assertPlatformProvider(providerId)
     return this.upsertModel(providerId, payload)
   }
 
@@ -58,8 +58,8 @@ export class AiProviderModelsService {
     return this.upsertModel(providerId, payload)
   }
 
-  async upsertSystemModels(providerId: string, payload: UpsertAiProviderModelsDto): Promise<AiProviderModels> {
-    await this.assertSystemProvider(providerId)
+  async upsertPlatformModels(providerId: string, payload: UpsertAiProviderModelsDto): Promise<AiProviderModels> {
+    await this.assertPlatformProvider(providerId)
     return this.upsertModels(providerId, payload)
   }
 
@@ -190,11 +190,11 @@ export class AiProviderModelsService {
     })
   }
 
-  private async assertSystemProvider(providerId: string) {
+  private async assertPlatformProvider(providerId: string) {
     const provider = await this.prisma.aiProvider.findFirst({
       where: {
         id: providerId,
-        scope: 'SYSTEM',
+        scope: 'PLATFORM',
       },
     })
 

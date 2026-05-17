@@ -16,7 +16,7 @@ import { AiProviderAdaptersService } from '../providers/adapters.service'
 import { AiProviderPresetsService } from '../providers/presets.service'
 
 const TRAILING_SLASHES_RE = /\/+$/
-const SYSTEM_PROVIDER_OWNER_KEY = 'system'
+const PLATFORM_PROVIDER_OWNER_KEY = 'platform'
 
 @Injectable()
 export class AiProvidersService {
@@ -26,10 +26,10 @@ export class AiProvidersService {
     private readonly adaptersService: AiProviderAdaptersService,
   ) {}
 
-  async getSystemProviders(): Promise<AiProvider[]> {
-    await this.ensureSystemPresetProviders()
+  async getPlatformProviders(): Promise<AiProvider[]> {
+    await this.ensurePlatformPresetProviders()
     return this.getProviders({
-      scope: 'SYSTEM',
+      scope: 'PLATFORM',
     })
   }
 
@@ -41,9 +41,9 @@ export class AiProvidersService {
     })
   }
 
-  createSystemProvider(actorUserId: string, payload: CreateAiProviderDto): Promise<AiProvider> {
+  createPlatformProvider(actorUserId: string, payload: CreateAiProviderDto): Promise<AiProvider> {
     return this.createCompatibleProvider({
-      scope: 'system',
+      scope: 'platform',
       actorUserId,
       ownerUserId: null,
       payload,
@@ -59,13 +59,13 @@ export class AiProvidersService {
     })
   }
 
-  updateSystemProvider(actorUserId: string, providerId: string, payload: UpdateAiProviderDto): Promise<AiProvider> {
+  updatePlatformProvider(actorUserId: string, providerId: string, payload: UpdateAiProviderDto): Promise<AiProvider> {
     return this.updateProvider({
       actorUserId,
       providerId,
       where: {
         id: providerId,
-        scope: 'SYSTEM',
+        scope: 'PLATFORM',
       },
       payload,
     })
@@ -84,10 +84,10 @@ export class AiProvidersService {
     })
   }
 
-  getSystemProviderCredential(providerId: string): Promise<AiProviderCredential> {
+  getPlatformProviderCredential(providerId: string): Promise<AiProviderCredential> {
     return this.getProviderCredential({
       id: providerId,
-      scope: 'SYSTEM',
+      scope: 'PLATFORM',
     })
   }
 
@@ -99,10 +99,10 @@ export class AiProvidersService {
     })
   }
 
-  async deleteSystemProvider(providerId: string): Promise<void> {
+  async deletePlatformProvider(providerId: string): Promise<void> {
     await this.deleteProvider({
       id: providerId,
-      scope: 'SYSTEM',
+      scope: 'PLATFORM',
     })
   }
 
@@ -114,9 +114,9 @@ export class AiProvidersService {
     })
   }
 
-  ensureSystemPresetProviders(): Promise<void> {
+  ensurePlatformPresetProviders(): Promise<void> {
     return this.ensurePresetProviders({
-      scope: 'system',
+      scope: 'platform',
       ownerUserId: null,
     })
   }
@@ -130,7 +130,7 @@ export class AiProvidersService {
 
   private async ensurePresetProvidersForUser(userId: string): Promise<void> {
     await Promise.all([
-      this.ensureSystemPresetProviders(),
+      this.ensurePlatformPresetProviders(),
       this.ensureUserPresetProviders(userId),
     ])
   }
@@ -170,7 +170,7 @@ export class AiProvidersService {
   }
 
   private async ensurePresetProviders(params: {
-    scope: 'system' | 'user'
+    scope: 'platform' | 'user'
     ownerUserId: string | null
   }) {
     const ownerKey = this.buildOwnerKey(params.scope, params.ownerUserId)
@@ -211,7 +211,7 @@ export class AiProvidersService {
   }
 
   private async createCompatibleProvider(params: {
-    scope: 'system' | 'user'
+    scope: 'platform' | 'user'
     actorUserId: string
     ownerUserId: string | null
     payload: CreateAiProviderDto
@@ -403,9 +403,9 @@ export class AiProvidersService {
     return preset
   }
 
-  private buildOwnerKey(scope: 'system' | 'user', ownerUserId: string | null) {
-    if (scope === 'system') {
-      return SYSTEM_PROVIDER_OWNER_KEY
+  private buildOwnerKey(scope: 'platform' | 'user', ownerUserId: string | null) {
+    if (scope === 'platform') {
+      return PLATFORM_PROVIDER_OWNER_KEY
     }
     if (!ownerUserId) {
       throw new BadRequestException('用户服务商缺少 owner')

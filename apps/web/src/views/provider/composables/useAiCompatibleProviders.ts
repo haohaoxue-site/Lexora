@@ -5,11 +5,11 @@ import type { AiProvider, AiProviderPreset } from '@/apis/ai'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { reactive, shallowRef, toValue } from 'vue'
 import {
-  createSystemAiProvider,
+  createPlatformAiProvider,
   createUserAiProvider,
-  deleteSystemAiProvider,
+  deletePlatformAiProvider,
   deleteUserAiProvider,
-  updateSystemAiProvider,
+  updatePlatformAiProvider,
   updateUserAiProvider,
 } from '@/apis/ai'
 import { getRequestErrorDisplayMessage } from '@/utils/request-error'
@@ -99,8 +99,8 @@ export function useAiCompatibleProviders(options: UseAiCompatibleProvidersOption
     isCreatingCompatibleProvider.value = true
 
     try {
-      const provider = currentMode() === 'system'
-        ? await createSystemAiProvider({
+      const provider = currentMode() === 'platform'
+        ? await createPlatformAiProvider({
             providerKey: compatibleProviderCreateForm.providerKey,
             providerName: compatibleProviderCreateForm.providerName.trim(),
           })
@@ -165,8 +165,8 @@ export function useAiCompatibleProviders(options: UseAiCompatibleProvidersOption
     isUpdatingCompatibleProvider.value = true
 
     try {
-      const provider = currentMode() === 'system'
-        ? await updateSystemAiProvider(compatibleProviderEditForm.providerId, {
+      const provider = currentMode() === 'platform'
+        ? await updatePlatformAiProvider(compatibleProviderEditForm.providerId, {
             providerKey: compatibleProviderEditForm.providerKey,
             providerName: compatibleProviderEditForm.providerName.trim(),
           })
@@ -209,8 +209,8 @@ export function useAiCompatibleProviders(options: UseAiCompatibleProvidersOption
     )
 
     try {
-      if (currentMode() === 'system') {
-        await deleteSystemAiProvider(row.provider.providerId)
+      if (currentMode() === 'platform') {
+        await deletePlatformAiProvider(row.provider.providerId)
       }
       else {
         await deleteUserAiProvider(row.provider.providerId)

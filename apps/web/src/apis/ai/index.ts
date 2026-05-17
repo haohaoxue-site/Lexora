@@ -32,14 +32,14 @@ export function getAiCompatibleProviderPresets(): Promise<AiProviderPreset[]> {
   })
 }
 
-export function getSystemAiProviders(): Promise<AiProvider[]> {
+export function getPlatformAiProviders(): Promise<AiProvider[]> {
   return axios.request({
     method: 'get',
     url: '/system-admin/ai/providers',
   })
 }
 
-export function createSystemAiProvider(data: CreateAiProviderRequest): Promise<AiProvider> {
+export function createPlatformAiProvider(data: CreateAiProviderRequest): Promise<AiProvider> {
   return axios.request({
     method: 'post',
     url: '/system-admin/ai/providers',
@@ -47,7 +47,7 @@ export function createSystemAiProvider(data: CreateAiProviderRequest): Promise<A
   })
 }
 
-export function updateSystemAiProvider(
+export function updatePlatformAiProvider(
   providerId: string,
   data: UpdateAiProviderRequest,
 ): Promise<AiProvider> {
@@ -58,35 +58,35 @@ export function updateSystemAiProvider(
   })
 }
 
-export function getSystemAiProviderCredential(providerId: string): Promise<AiProviderCredential> {
+export function getPlatformAiProviderCredential(providerId: string): Promise<AiProviderCredential> {
   return axios.request({
     method: 'get',
     url: `/system-admin/ai/providers/${providerId}/credential`,
   })
 }
 
-export function deleteSystemAiProvider(providerId: string): Promise<void> {
+export function deletePlatformAiProvider(providerId: string): Promise<void> {
   return axios.request({
     method: 'delete',
     url: `/system-admin/ai/providers/${providerId}`,
   })
 }
 
-export function getSystemAiProviderModels(providerId: string): Promise<AiProviderModels> {
+export function getPlatformAiProviderModels(providerId: string): Promise<AiProviderModels> {
   return axios.request({
     method: 'get',
     url: `/system-admin/ai/providers/${providerId}/models`,
   })
 }
 
-export function discoverSystemAiProviderModels(providerId: string): Promise<AiProviderModels> {
+export function discoverPlatformAiProviderModels(providerId: string): Promise<AiProviderModels> {
   return axios.request({
     method: 'post',
     url: `/system-admin/ai/providers/${providerId}/models/discover`,
   })
 }
 
-export function upsertSystemAiProviderModel(
+export function upsertPlatformAiProviderModel(
   providerId: string,
   data: UpsertAiProviderModelRequest,
 ): Promise<AiProviderModelItem> {
@@ -97,7 +97,7 @@ export function upsertSystemAiProviderModel(
   })
 }
 
-export function upsertSystemAiProviderModels(
+export function upsertPlatformAiProviderModels(
   providerId: string,
   data: UpsertAiProviderModelsRequest,
 ): Promise<AiProviderModels> {

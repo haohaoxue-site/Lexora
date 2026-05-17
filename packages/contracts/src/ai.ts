@@ -1,12 +1,12 @@
 import { z } from 'zod'
 
 export const AI_PROVIDER_SCOPE = {
-  SYSTEM: 'system',
+  PLATFORM: 'platform',
   USER: 'user',
 } as const
 
 export const AI_PROVIDER_SCOPE_VALUES = [
-  AI_PROVIDER_SCOPE.SYSTEM,
+  AI_PROVIDER_SCOPE.PLATFORM,
   AI_PROVIDER_SCOPE.USER,
 ] as const
 
