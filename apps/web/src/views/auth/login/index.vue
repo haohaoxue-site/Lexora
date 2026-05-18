@@ -110,7 +110,10 @@ const {
         <span class="login-view__divider-text">其他登录方式</span>
       </div>
 
-      <div class="login-view__providers">
+      <div
+        class="login-view__providers"
+        :style="{ gridTemplateColumns: `repeat(${providers.length}, 7.8rem)` }"
+      >
         <ElButton
           v-for="item in providers"
           :key="item.provider"
@@ -118,22 +121,14 @@ const {
           :loading="startingOauthProvider === item.provider"
           @click="handleStartLogin(item.provider)"
         >
-          <span class="login-provider-btn__leading">
-            <span class="login-provider-btn__icon-wrap">
-              <SvgIcon category="ui" :icon="item.icon" size="1.125rem" class="login-provider-btn__icon" />
-            </span>
-            <span class="login-provider-btn__content">
-              <span class="login-provider-btn__label">使用 {{ item.title }}</span>
-              <span
-                class="login-provider-btn__description"
-                :class="{ 'login-provider-btn__description--warning': !item.acceptingNewUsers }"
-              >
-                {{ item.description }}
-              </span>
-            </span>
+          <span class="login-provider-btn__icon-wrap">
+            <SvgIcon category="ui" :icon="item.icon" size="1.125rem" class="login-provider-btn__icon" />
           </span>
-          <span class="login-provider-btn__meta">
-            <SvgIcon category="ui" icon="arrow-right" size="1rem" class="login-provider-btn__arrow" />
+          <span class="login-provider-btn__content">
+            <span class="login-provider-btn__label">{{ item.title }}</span>
+            <span class="login-provider-btn__arrow-wrap">
+              <SvgIcon category="ui" icon="arrow-right" size="1rem" class="login-provider-btn__arrow" />
+            </span>
           </span>
         </ElButton>
       </div>
@@ -223,7 +218,7 @@ const {
     display: inline-flex;
     align-items: center;
     height: 1.625rem;
-    border-radius: 0.5625rem;
+    border-radius: 4px;
     padding: 0 0.5rem;
     background: color-mix(in srgb, var(--brand-warning) 16%, transparent);
     color: color-mix(in srgb, var(--brand-warning) 76%, var(--brand-text-primary));
@@ -293,8 +288,8 @@ const {
 
   &__providers {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 0.75rem;
+    justify-content: start;
+    gap: 0.625rem;
   }
 
   &__oauth-dialog-footer {
@@ -309,8 +304,8 @@ const {
   min-height: 3.5rem;
   margin-left: 0;
   border-color: color-mix(in srgb, var(--brand-border-base) 82%, transparent);
-  border-radius: 1rem;
-  padding: 0.75rem 0.875rem;
+  border-radius: 8px;
+  padding: 6px 0.75rem;
   background:
     linear-gradient(180deg, color-mix(in srgb, var(--brand-bg-surface) 95%, white 5%), var(--brand-bg-surface));
   transition: transform 0.22s ease, border-color 0.22s ease, background-color 0.22s ease, box-shadow 0.22s ease;
@@ -322,40 +317,32 @@ const {
     transform: translateY(-1px);
   }
 
+  &:hover &__arrow-wrap {
+    color: var(--brand-primary);
+  }
+
   &:hover &__arrow {
     color: var(--brand-primary);
-    transform: translateX(0.25rem);
+    transform: translateX(0.125rem);
   }
 
   :deep(> span) {
     width: 100%;
-  }
-
-  &__leading {
-    display: flex;
-    flex: 1;
+    height: 2.25rem;
+    display: grid;
+    grid-template-columns: 2.125rem minmax(0, 1fr);
     align-items: center;
-    gap: 0.625rem;
-    min-width: 0;
-  }
-
-  &__content {
-    display: flex;
-    flex: 1;
-    flex-direction: column;
-    gap: 0.125rem;
-    min-width: 0;
+    gap: 0.75rem;
   }
 
   &__icon-wrap {
     display: flex;
-    flex-shrink: 0;
     align-items: center;
     justify-content: center;
-    width: 2rem;
-    height: 2rem;
+    width: 2.125rem;
+    height: 2.125rem;
     border: 1px solid color-mix(in srgb, var(--brand-border-base) 72%, transparent);
-    border-radius: 0.75rem;
+    border-radius: 8px;
     background: color-mix(in srgb, var(--brand-primary) 5%, var(--brand-bg-surface));
   }
 
@@ -364,32 +351,32 @@ const {
   }
 
   &__label {
+    align-self: end;
     min-width: 0;
-    color: var(--brand-text-primary);
     font-size: 0.875rem;
     font-weight: 600;
-    text-align: left;
-    line-height: 1.3;
+    text-align: right;
+    white-space: nowrap;
   }
 
-  &__description {
+  &__content {
+    display: grid;
     min-width: 0;
-    color: var(--brand-text-secondary);
-    font-size: 0.75rem;
-    text-align: left;
-    line-height: 1.4;
+    min-height: 2.125rem;
+    grid-template-rows: 1fr 1fr;
+    align-items: stretch;
+    justify-items: end;
   }
 
-  &__description--warning {
-    color: var(--brand-warning);
-  }
-
-  &__meta {
+  &__arrow-wrap {
     display: flex;
+    align-self: start;
     align-items: center;
-    justify-content: flex-end;
-    margin-left: auto;
-    min-width: auto;
+    justify-content: center;
+    width: 1rem;
+    height: 1.125rem;
+    color: var(--brand-text-secondary);
+    transition: color 0.2s ease;
   }
 
   &__arrow {
@@ -421,6 +408,14 @@ const {
 
     &__providers {
       grid-template-columns: minmax(0, 1fr);
+    }
+  }
+}
+
+@media (min-width: 421px) and (max-width: 680px) {
+  .login-view {
+    &__providers {
+      grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
     }
   }
 }

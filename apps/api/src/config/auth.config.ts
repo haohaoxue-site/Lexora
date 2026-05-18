@@ -16,6 +16,12 @@ const GITHUB_USERINFO_DEFAULT_ENDPOINT = 'https://api.github.com/user'
 const LINUX_DO_OAUTH_DEFAULT_URL = 'https://connect.linux.do'
 const LINUX_DO_OAUTH_ISSUER = 'https://connect.linux.do/'
 
+const GOOGLE_OAUTH_DEFAULT_URL = 'https://accounts.google.com'
+const GOOGLE_OAUTH_ISSUER = 'https://accounts.google.com'
+const GOOGLE_TOKEN_ENDPOINT = 'https://oauth2.googleapis.com/token'
+const GOOGLE_USERINFO_ENDPOINT = 'https://openidconnect.googleapis.com/v1/userinfo'
+const GOOGLE_JWKS_ENDPOINT = 'https://www.googleapis.com/oauth2/v3/certs'
+
 /**
  * JWT 签发与校验配置
  */
@@ -45,6 +51,7 @@ export interface OAuthProviderConfig {
  * OAuth 配置
  */
 export interface OAuthConfig {
+  google: OAuthProviderConfig
   github: OAuthProviderConfig
   linuxDo: OAuthProviderConfig
 }
@@ -55,6 +62,7 @@ export const jwtConfig = registerAs('jwt', (): JwtConfig => ({
 }))
 
 export const oauthConfig = registerAs('oauth', (): OAuthConfig => ({
+  google: createGoogleOAuthConfig(),
   github: createGithubOAuthConfig(),
   linuxDo: createLinuxDoOAuthConfig(),
 }))
@@ -93,6 +101,31 @@ function createLinuxDoOAuthConfig(): OAuthProviderConfig {
   }
 }
 
+function createGoogleOAuthConfig(): OAuthProviderConfig {
+  const env = getEnv()
+  const oauthUrl = normalizeOAuthUrl(env.OAUTH_PROXY_URL ?? GOOGLE_OAUTH_DEFAULT_URL)
+  const useDefaultEndpoint = oauthUrl === GOOGLE_OAUTH_DEFAULT_URL
+
+  return {
+    issuer: GOOGLE_OAUTH_ISSUER,
+    authorizationEndpoint: useDefaultEndpoint
+      ? appendUrlPath(oauthUrl, 'o/oauth2/v2/auth')
+      : appendOAuthUrlPath(oauthUrl, 'google', 'o/oauth2/v2/auth'),
+    tokenEndpoint: useDefaultEndpoint
+      ? GOOGLE_TOKEN_ENDPOINT
+      : appendOAuthUrlPath(oauthUrl, 'google', 'token'),
+    userinfoEndpoint: useDefaultEndpoint
+      ? GOOGLE_USERINFO_ENDPOINT
+      : appendOAuthUrlPath(oauthUrl, 'google', 'userinfo'),
+    jwksEndpoint: useDefaultEndpoint
+      ? GOOGLE_JWKS_ENDPOINT
+      : appendOAuthUrlPath(oauthUrl, 'google', 'certs'),
+    scopes: 'openid profile email',
+    clientId: env.GOOGLE_CLIENT_ID,
+    clientSecret: env.GOOGLE_CLIENT_SECRET,
+  }
+}
+
 function normalizeOAuthUrl(rawUrl: string): string {
   const url = new URL(rawUrl.trim())
   url.pathname = url.pathname.replace(/\/+$/g, '')
@@ -102,7 +135,7 @@ function normalizeOAuthUrl(rawUrl: string): string {
 }
 
 function appendOAuthUrlPath(baseUrl: string, proxyProviderPath: string, defaultProviderPath: string): string {
-  const providerPath = baseUrl === GITHUB_OAUTH_DEFAULT_URL || baseUrl === LINUX_DO_OAUTH_DEFAULT_URL
+  const providerPath = baseUrl === GITHUB_OAUTH_DEFAULT_URL || baseUrl === LINUX_DO_OAUTH_DEFAULT_URL || baseUrl === GOOGLE_OAUTH_DEFAULT_URL
     ? defaultProviderPath
     : `${proxyProviderPath}/${defaultProviderPath}`
 

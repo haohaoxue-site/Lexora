@@ -1,5 +1,5 @@
 import type { AuthCapabilities } from '@/apis/capabilities'
-import { AUTH_PROVIDER } from '@haohaoxue/samepage-contracts'
+import { AUTH_PROVIDER_VALUES } from '@haohaoxue/samepage-contracts'
 import { createSharedComposable } from '@vueuse/core'
 import { shallowRef } from 'vue'
 import { getAuthCapabilities } from '@/apis/capabilities'
@@ -8,18 +8,11 @@ export const DEFAULT_AUTH_CAPABILITIES: AuthCapabilities = {
   emailBindingEnabled: false,
   passwordRegistrationEnabled: false,
   passwordRegistrationInviteCodeRequired: false,
-  providers: {
-    [AUTH_PROVIDER.GITHUB]: {
-      enabled: false,
-      allowRegistration: false,
-      inviteCodeRequired: false,
-    },
-    [AUTH_PROVIDER.LINUX_DO]: {
-      enabled: false,
-      allowRegistration: false,
-      inviteCodeRequired: false,
-    },
-  },
+  providers: Object.fromEntries(AUTH_PROVIDER_VALUES.map(provider => [provider, {
+    enabled: false,
+    allowRegistration: false,
+    inviteCodeRequired: false,
+  }])) as AuthCapabilities['providers'],
 }
 
 export const useSettingsAuthCapabilities = createSharedComposable(() => {

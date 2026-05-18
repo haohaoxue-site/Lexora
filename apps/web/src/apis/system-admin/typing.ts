@@ -15,6 +15,7 @@ export type {
   SystemAdminUserRoleFilter,
   SystemAdminUserStatus,
   SystemAuthGovernance,
+  SystemAuthProviderGovernance,
   SystemEmailConfig,
   SystemEmailProvider,
   SystemEmailServiceStatus,

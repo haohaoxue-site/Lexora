@@ -1,6 +1,7 @@
 enum AuthProvider {
   GITHUB
   LINUX_DO
+  GOOGLE
 }
 
 enum AuthEmailVerificationPurpose {

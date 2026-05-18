@@ -1,6 +1,6 @@
 import type { AuthProviderName, UserSettings } from '@haohaoxue/samepage-contracts'
 import {
-  AUTH_PROVIDER,
+  AUTH_PROVIDER_VALUES,
   OAUTH_REDIRECT_BIND_STATUS,
   OAUTH_REDIRECT_QUERY,
 } from '@haohaoxue/samepage-contracts'
@@ -21,14 +21,10 @@ function createDefaultAccount(): UserSettings['account'] {
     userCode: '',
     hasPasswordAuth: false,
     emailVerified: false,
-    github: {
+    oauthProviders: Object.fromEntries(AUTH_PROVIDER_VALUES.map(provider => [provider, {
       connected: false,
       username: null,
-    },
-    linuxDo: {
-      connected: false,
-      username: null,
-    },
+    }])) as UserSettings['account']['oauthProviders'],
   }
 }
 
@@ -61,14 +57,15 @@ export const useSettingsUserAccount = createSharedComposable(() => {
   const settings = computed(() => userStore.settings)
   const account = computed<UserSettings['account']>(() => settings.value?.account ?? createDefaultAccount())
   const emailBindingEnabled = computed(() => authCapabilities.value.emailBindingEnabled)
-  const canStartGithubBinding = computed(() => authCapabilities.value.providers[AUTH_PROVIDER.GITHUB].enabled)
-  const canStartLinuxDoBinding = computed(() => authCapabilities.value.providers[AUTH_PROVIDER.LINUX_DO].enabled)
-  const canDisconnectGithub = computed(() =>
-    account.value.github.connected && (account.value.hasPasswordAuth || account.value.linuxDo.connected),
-  )
-  const canDisconnectLinuxDo = computed(() =>
-    account.value.linuxDo.connected && (account.value.hasPasswordAuth || account.value.github.connected),
-  )
+  const oauthProviderBindingState = computed(() => Object.fromEntries(AUTH_PROVIDER_VALUES.map((provider) => {
+    const connectedOauthCount = AUTH_PROVIDER_VALUES.filter(item => account.value.oauthProviders[item].connected).length
+
+    return [provider, {
+      canStartBinding: authCapabilities.value.providers[provider].enabled,
+      canDisconnect: account.value.oauthProviders[provider].connected
+        && (account.value.hasPasswordAuth || connectedOauthCount > 1),
+    }]
+  })) as Record<AuthProviderName, { canStartBinding: boolean, canDisconnect: boolean }>)
 
   function syncEmailForm() {
     const nextSettings = userStore.settings
@@ -186,10 +183,6 @@ export const useSettingsUserAccount = createSharedComposable(() => {
     account,
     bindEmail,
     bindingProvider,
-    canDisconnectGithub,
-    canDisconnectLinuxDo,
-    canStartGithubBinding,
-    canStartLinuxDoBinding,
     connectOauth,
     consumeRouteFeedback,
     disconnectOauth,
@@ -198,6 +191,7 @@ export const useSettingsUserAccount = createSharedComposable(() => {
     emailForm,
     isBindingEmail,
     isSendingEmailCode,
+    oauthProviderBindingState,
     sendEmailCode,
     syncEmailForm,
   }

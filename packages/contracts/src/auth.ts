@@ -8,11 +8,13 @@ import {
 import { PermissionListSchema, RoleSchema } from './rbac'
 
 export const AUTH_PROVIDER = {
+  GOOGLE: 'google',
   GITHUB: 'github',
   LINUX_DO: 'linux-do',
 } as const
 
 export const AUTH_PROVIDER_VALUES = [
+  AUTH_PROVIDER.GOOGLE,
   AUTH_PROVIDER.GITHUB,
   AUTH_PROVIDER.LINUX_DO,
 ] as const
@@ -29,11 +31,13 @@ export const AUTH_METHOD_VALUES = [
 
 export const AUTH_METHOD_LABELS = {
   [AUTH_METHOD.PASSWORD]: '邮箱密码',
+  [AUTH_METHOD.GOOGLE]: 'Google',
   [AUTH_METHOD.GITHUB]: 'GitHub',
   [AUTH_METHOD.LINUX_DO]: 'LinuxDo',
 } as const satisfies Record<(typeof AUTH_METHOD_VALUES)[number], string>
 
 export const AUTH_PROVIDER_ALIAS_MAP = {
+  google: AUTH_PROVIDER.GOOGLE,
   github: AUTH_PROVIDER.GITHUB,
   linuxdo: AUTH_PROVIDER.LINUX_DO,
 } as const satisfies Record<string, (typeof AUTH_PROVIDER_VALUES)[number]>
@@ -126,6 +130,7 @@ export const AuthCapabilitiesSchema = z.object({
   passwordRegistrationEnabled: z.boolean(),
   passwordRegistrationInviteCodeRequired: z.boolean(),
   providers: z.object({
+    [AUTH_PROVIDER.GOOGLE]: AuthProviderCapabilitySchema,
     [AUTH_PROVIDER.GITHUB]: AuthProviderCapabilitySchema,
     [AUTH_PROVIDER.LINUX_DO]: AuthProviderCapabilitySchema,
   }).strict(),

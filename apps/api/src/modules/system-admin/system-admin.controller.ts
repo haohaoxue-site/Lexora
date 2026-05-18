@@ -8,10 +8,12 @@ import type {
   SystemEmailServiceStatus,
   TestSystemEmailConfigResponse,
   UpdateSystemAdminUserResponse,
+  UpdateSystemAuthGovernanceRequest,
 } from '@haohaoxue/samepage-contracts'
 import type { AuthUserContext } from '../auth/auth.interface'
 import {
   PERMISSIONS,
+  UpdateSystemAuthGovernanceRequestSchema,
 } from '@haohaoxue/samepage-contracts'
 import {
   Body,
@@ -27,6 +29,7 @@ import { CurrentUser } from '../../decorators/current-user.decorator'
 import { PageQuery } from '../../decorators/page-query.decorator'
 import { RequirePermissions } from '../../decorators/require-permissions.decorator'
 import { RequestPageParamsDto } from '../../dto/request-page-params.dto'
+import { ZodValidationPipe } from '../../pipes/zod-validation.pipe'
 import {
   TestSystemEmailConfigDto,
   UpdateSystemEmailConfigDto,
@@ -36,7 +39,6 @@ import {
   GetSystemAdminAuditLogsQueryDto,
   GetSystemAdminUsersQueryDto,
   UpdateSystemAdminUserStatusDto,
-  UpdateSystemAuthGovernanceDto,
   UpdateSystemAuthInviteCodeDto,
 } from './system-admin.dto'
 import { SystemAdminService } from './system-admin.service'
@@ -89,7 +91,7 @@ export class SystemAdminController {
   @Put('auth-governance')
   async updateAuthGovernance(
     @CurrentUser() authUser: AuthUserContext,
-    @Body() payload: UpdateSystemAuthGovernanceDto,
+    @Body(new ZodValidationPipe(UpdateSystemAuthGovernanceRequestSchema)) payload: UpdateSystemAuthGovernanceRequest,
   ): Promise<SystemAuthGovernance> {
     return this.systemAdminService.updateAuthGovernance(authUser.id, payload)
   }

@@ -28,10 +28,6 @@ const {
   account,
   bindEmail,
   bindingProvider,
-  canDisconnectGithub,
-  canDisconnectLinuxDo,
-  canStartGithubBinding,
-  canStartLinuxDoBinding,
   connectOauth,
   consumeRouteFeedback,
   disconnectOauth,
@@ -40,6 +36,7 @@ const {
   emailForm,
   isBindingEmail,
   isSendingEmailCode,
+  oauthProviderBindingState,
   sendEmailCode,
   syncEmailForm,
 } = useSettingsUserAccount()
@@ -126,10 +123,7 @@ async function handleConfirmEmail() {
         :is-binding-email="isBindingEmail"
         :binding-provider="bindingProvider"
         :disconnecting-provider="disconnectingProvider"
-        :can-disconnect-github="canDisconnectGithub"
-        :can-disconnect-linux-do="canDisconnectLinuxDo"
-        :can-start-github-binding="canStartGithubBinding"
-        :can-start-linux-do-binding="canStartLinuxDoBinding"
+        :oauth-provider-binding-state="oauthProviderBindingState"
         @send-code="sendEmailCode"
         @confirm-email="handleConfirmEmail"
         @start-oauth-binding="connectOauth"

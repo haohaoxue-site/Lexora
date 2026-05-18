@@ -1,7 +1,9 @@
+import type { AuthProviderName, SystemAuthProviderGovernance } from '@haohaoxue/samepage-contracts'
 import type {
   SystemAuthGovernance,
   UpdateSystemAuthGovernanceRequest,
 } from '@/apis/system-admin'
+import { AUTH_PROVIDER_VALUES } from '@haohaoxue/samepage-contracts'
 import { createSharedComposable } from '@vueuse/core'
 import { ElMessage } from 'element-plus'
 import { computed, reactive, shallowRef } from 'vue'
@@ -11,8 +13,9 @@ import {
   updateSystemAuthInviteCode,
 } from '@/apis/system-admin'
 import { getRequestErrorDisplayMessage } from '@/utils/request-error'
+import { AUTH_PROVIDER_UI_META } from '@/views/auth/utils/provider-ui'
 
-export type RegistrationGovernanceField = keyof UpdateSystemAuthGovernanceRequest
+export type RegistrationGovernanceField = 'allowPasswordRegistration' | 'requirePasswordInviteCode' | `oauth:${AuthProviderName}:${'allowLogin' | 'allowRegistration' | 'requireInviteCode'}`
 
 interface AuthGovernanceSwitchOption {
   key: RegistrationGovernanceField
@@ -21,21 +24,24 @@ interface AuthGovernanceSwitchOption {
 }
 
 export interface AuthGovernanceEntryCard {
-  key: 'password' | 'github' | 'linuxDo'
+  key: 'password' | AuthProviderName
   title: string
   description: string
   switches: readonly AuthGovernanceSwitchOption[]
 }
 
-const governanceFieldLabels: Record<RegistrationGovernanceField, string> = {
-  allowGithubLogin: 'GitHub 登录',
-  allowLinuxDoLogin: 'LinuxDo 登录',
+const governanceFieldLabels: Record<string, string> = {
   allowPasswordRegistration: '邮箱密码注册',
-  allowGithubRegistration: 'GitHub 注册',
-  allowLinuxDoRegistration: 'LinuxDo 注册',
   requirePasswordInviteCode: '邮箱注册邀请码',
-  requireGithubInviteCode: 'GitHub 注册邀请码',
-  requireLinuxDoInviteCode: 'LinuxDo 注册邀请码',
+  ...Object.fromEntries(AUTH_PROVIDER_VALUES.flatMap((provider) => {
+    const title = AUTH_PROVIDER_UI_META[provider].title
+
+    return [
+      [`oauth:${provider}:allowLogin`, `${title} 登录`],
+      [`oauth:${provider}:allowRegistration`, `${title} 注册`],
+      [`oauth:${provider}:requireInviteCode`, `${title} 注册邀请码`],
+    ]
+  })),
 }
 
 const authGovernanceCards = [
@@ -56,51 +62,94 @@ const authGovernanceCards = [
       },
     ],
   },
-  {
-    key: 'github',
-    title: 'GitHub',
-    description: '登录控制入口和绑定，注册只影响新账号创建。',
-    switches: [
-      {
-        key: 'allowGithubLogin',
-        label: '登录',
-        description: '允许使用 GitHub 登录或新增绑定。',
-      },
-      {
-        key: 'allowGithubRegistration',
-        label: '注册',
-        description: '允许新 GitHub 账号注册。',
-      },
-      {
-        key: 'requireGithubInviteCode',
-        label: '邀请码',
-        description: '首次创建账号时必须先验证邀请码。',
-      },
-    ],
-  },
-  {
-    key: 'linuxDo',
-    title: 'LinuxDo',
-    description: '登录控制入口和绑定，注册只影响新账号创建。',
-    switches: [
-      {
-        key: 'allowLinuxDoLogin',
-        label: '登录',
-        description: '允许使用 LinuxDo 登录或新增绑定。',
-      },
-      {
-        key: 'allowLinuxDoRegistration',
-        label: '注册',
-        description: '允许新 LinuxDo 账号注册。',
-      },
-      {
-        key: 'requireLinuxDoInviteCode',
-        label: '邀请码',
-        description: '首次创建账号时必须先验证邀请码。',
-      },
-    ],
-  },
+  ...createOAuthGovernanceCards(),
 ] as const satisfies readonly AuthGovernanceEntryCard[]
+
+function createOAuthGovernanceCards(): AuthGovernanceEntryCard[] {
+  return AUTH_PROVIDER_VALUES.map((provider) => {
+    const title = AUTH_PROVIDER_UI_META[provider].title
+
+    return {
+      key: provider,
+      title,
+      description: '登录控制入口和绑定，注册只影响新账号创建。',
+      switches: [
+        {
+          key: `oauth:${provider}:allowLogin` as RegistrationGovernanceField,
+          label: '登录',
+          description: `允许使用 ${title} 登录或新增绑定。`,
+        },
+        {
+          key: `oauth:${provider}:allowRegistration` as RegistrationGovernanceField,
+          label: '注册',
+          description: `允许新 ${title} 账号注册。`,
+        },
+        {
+          key: `oauth:${provider}:requireInviteCode` as RegistrationGovernanceField,
+          label: '邀请码',
+          description: '首次创建账号时必须先验证邀请码。',
+        },
+      ],
+    }
+  })
+}
+
+function createDefaultOAuthProviderGovernance(): Record<AuthProviderName, SystemAuthProviderGovernance> {
+  return Object.fromEntries(AUTH_PROVIDER_VALUES.map(provider => [provider, {
+    allowLogin: false,
+    allowRegistration: false,
+    requireInviteCode: false,
+  }])) as Record<AuthProviderName, SystemAuthProviderGovernance>
+}
+
+function parseOAuthGovernanceField(field: RegistrationGovernanceField): {
+  provider: AuthProviderName
+  option: keyof SystemAuthProviderGovernance
+} {
+  const [, provider, option] = field.split(':') as [
+    'oauth',
+    AuthProviderName,
+    keyof SystemAuthProviderGovernance,
+  ]
+
+  return {
+    provider,
+    option,
+  }
+}
+
+function buildGovernanceUpdatePayload(
+  field: RegistrationGovernanceField,
+  value: boolean,
+): UpdateSystemAuthGovernanceRequest {
+  if (field === 'allowPasswordRegistration' || field === 'requirePasswordInviteCode') {
+    return { [field]: value }
+  }
+
+  const { provider, option } = parseOAuthGovernanceField(field)
+
+  return {
+    oauthProviders: {
+      [provider]: {
+        [option]: value,
+      },
+    },
+  }
+}
+
+function setGovernanceSwitchValue(
+  governance: SystemAuthGovernance,
+  field: RegistrationGovernanceField,
+  value: boolean,
+) {
+  if (field === 'allowPasswordRegistration' || field === 'requirePasswordInviteCode') {
+    governance[field] = value
+    return
+  }
+
+  const { provider, option } = parseOAuthGovernanceField(field)
+  governance.oauthProviders[provider][option] = value
+}
 
 export const useSystemAuthGovernance = createSharedComposable(() => {
   const errorMessage = shallowRef('')
@@ -109,25 +158,19 @@ export const useSystemAuthGovernance = createSharedComposable(() => {
   const inviteCodeForm = reactive({
     inviteCode: '',
   })
-  const savingGovernanceFields = reactive<Record<RegistrationGovernanceField, boolean>>({
-    allowGithubLogin: false,
-    allowLinuxDoLogin: false,
+  const savingGovernanceFields = reactive<Record<string, boolean>>({
     allowPasswordRegistration: false,
-    allowGithubRegistration: false,
-    allowLinuxDoRegistration: false,
     requirePasswordInviteCode: false,
-    requireGithubInviteCode: false,
-    requireLinuxDoInviteCode: false,
+    ...Object.fromEntries(AUTH_PROVIDER_VALUES.flatMap(provider => [
+      [`oauth:${provider}:allowLogin`, false],
+      [`oauth:${provider}:allowRegistration`, false],
+      [`oauth:${provider}:requireInviteCode`, false],
+    ])),
   })
   const governance = reactive<SystemAuthGovernance>({
-    allowGithubLogin: false,
-    allowLinuxDoLogin: false,
     allowPasswordRegistration: false,
-    allowGithubRegistration: false,
-    allowLinuxDoRegistration: false,
     requirePasswordInviteCode: false,
-    requireGithubInviteCode: false,
-    requireLinuxDoInviteCode: false,
+    oauthProviders: createDefaultOAuthProviderGovernance(),
     hasRegistrationInviteCode: false,
     registrationInviteCode: null,
     emailServiceEnabled: false,
@@ -141,8 +184,7 @@ export const useSystemAuthGovernance = createSharedComposable(() => {
     !governance.hasRegistrationInviteCode
     && (
       governance.requirePasswordInviteCode
-      || governance.requireGithubInviteCode
-      || governance.requireLinuxDoInviteCode
+      || AUTH_PROVIDER_VALUES.some(provider => governance.oauthProviders[provider].requireInviteCode)
     ),
   )
 
@@ -165,20 +207,18 @@ export const useSystemAuthGovernance = createSharedComposable(() => {
     field: RegistrationGovernanceField,
     nextValue: boolean,
   ) {
-    const previousValue = governance[field]
-    governance[field] = nextValue
+    const previousValue = getGovernanceSwitchValue(field)
+    setGovernanceSwitchValue(governance, field, nextValue)
     savingGovernanceFields[field] = true
 
     try {
-      const nextGovernance = await updateSystemAuthGovernance({
-        [field]: nextValue,
-      })
+      const nextGovernance = await updateSystemAuthGovernance(buildGovernanceUpdatePayload(field, nextValue))
 
       applyGovernance(nextGovernance)
       ElMessage.success(`${governanceFieldLabels[field]}已更新`)
     }
     catch (error) {
-      governance[field] = previousValue
+      setGovernanceSwitchValue(governance, field, previousValue)
       ElMessage.error(getRequestErrorDisplayMessage(error, `更新${governanceFieldLabels[field]}失败`))
     }
     finally {
@@ -195,7 +235,12 @@ export const useSystemAuthGovernance = createSharedComposable(() => {
       return false
     }
 
-    return governance[key]
+    if (key === 'allowPasswordRegistration' || key === 'requirePasswordInviteCode') {
+      return governance[key]
+    }
+
+    const field = parseOAuthGovernanceField(key)
+    return governance.oauthProviders[field.provider][field.option]
   }
 
   function isGovernanceSwitchDisabled(key: RegistrationGovernanceField) {

@@ -1,9 +1,11 @@
-import type { AuthMethodName } from '@haohaoxue/samepage-contracts'
+import type { AuthMethodName, AuthProviderName } from '@haohaoxue/samepage-contracts'
 import type { LocalCredential, SystemAuthConfig, User } from '@prisma/client'
 import type { BootstrapConfig, CryptoConfig } from '../../config/auth.config'
-import { AUTH_METHOD } from '@haohaoxue/samepage-contracts'
+import { AUTH_METHOD, AUTH_PROVIDER, AUTH_PROVIDER_VALUES } from '@haohaoxue/samepage-contracts'
+import { formatAuthMethod } from '@haohaoxue/samepage-shared'
 import { BadRequestException, Injectable, Logger, OnModuleInit } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
+import { Prisma } from '@prisma/client'
 import { PrismaService } from '../../database/prisma.service'
 import { decryptAes256Gcm, encryptAes256Gcm } from '../../utils/crypto'
 import { RbacService } from '../rbac/rbac.service'
@@ -16,16 +18,29 @@ import { generateSystemAdminInitialPassword } from './system-admin-password.util
 const SYSTEM_AUTH_CONFIG_ID = 'default'
 
 export interface RegistrationOptions {
-  allowGithubLogin: boolean
-  allowLinuxDoLogin: boolean
   allowPasswordRegistration: boolean
-  allowGithubRegistration: boolean
-  allowLinuxDoRegistration: boolean
   requirePasswordInviteCode: boolean
-  requireGithubInviteCode: boolean
-  requireLinuxDoInviteCode: boolean
+  oauthProviders: Record<AuthProviderName, OAuthProviderRegistrationOptions>
   registrationInviteCodeHash: string | null
 }
+
+export interface OAuthProviderRegistrationOptions {
+  allowLogin: boolean
+  allowRegistration: boolean
+  requireInviteCode: boolean
+}
+
+export type RegistrationOptionsUpdate
+  = & Partial<Pick<RegistrationOptions, 'allowPasswordRegistration' | 'requirePasswordInviteCode'>>
+    & {
+      oauthProviders?: Partial<Record<AuthProviderName, Partial<OAuthProviderRegistrationOptions>>>
+    }
+
+const DEFAULT_OAUTH_PROVIDER_REGISTRATION_OPTIONS = {
+  allowLogin: true,
+  allowRegistration: true,
+  requireInviteCode: false,
+} as const satisfies OAuthProviderRegistrationOptions
 
 @Injectable()
 export class SystemAuthService implements OnModuleInit {
@@ -80,20 +95,16 @@ export class SystemAuthService implements OnModuleInit {
     const config = await this.getOrCreateConfig()
 
     return {
-      allowGithubLogin: config.allowGithubLogin,
-      allowLinuxDoLogin: config.allowLinuxDoLogin,
       allowPasswordRegistration: config.allowPasswordRegistration,
-      allowGithubRegistration: config.allowGithubRegistration,
-      allowLinuxDoRegistration: config.allowLinuxDoRegistration,
       requirePasswordInviteCode: config.requirePasswordInviteCode,
-      requireGithubInviteCode: config.requireGithubInviteCode,
-      requireLinuxDoInviteCode: config.requireLinuxDoInviteCode,
+      oauthProviders: resolveOAuthProviderRegistrationOptions(config.oauthProviderOptions),
       registrationInviteCodeHash: config.registrationInviteCodeHash,
     }
   }
 
   async getGovernanceSnapshot(): Promise<{
     config: SystemAuthConfig
+    registrationOptions: RegistrationOptions
     registrationInviteCode: string | null
     systemAdminUser: Pick<User, 'id' | 'email' | 'displayName' | 'lastLoginAt'> | null
     localCredential: Pick<LocalCredential, 'mustChangePassword' | 'passwordUpdatedAt'> | null
@@ -123,6 +134,12 @@ export class SystemAuthService implements OnModuleInit {
 
     return {
       config,
+      registrationOptions: {
+        allowPasswordRegistration: config.allowPasswordRegistration,
+        requirePasswordInviteCode: config.requirePasswordInviteCode,
+        oauthProviders: resolveOAuthProviderRegistrationOptions(config.oauthProviderOptions),
+        registrationInviteCodeHash: config.registrationInviteCodeHash,
+      },
       registrationInviteCode: this.decryptRegistrationInviteCode(config.registrationInviteCodeEncrypted),
       systemAdminUser,
       localCredential,
@@ -131,14 +148,21 @@ export class SystemAuthService implements OnModuleInit {
 
   async updateRegistrationOptions(
     updatedBy: string,
-    payload: Partial<RegistrationOptions>,
+    payload: RegistrationOptionsUpdate,
   ): Promise<SystemAuthConfig> {
-    await this.getOrCreateConfig()
+    const config = await this.getOrCreateConfig()
+    const { oauthProviders, ...restPayload } = payload
+    const nextOauthProviderOptions = oauthProviders
+      ? mergeOAuthProviderRegistrationOptions(config.oauthProviderOptions, oauthProviders)
+      : undefined
 
     return this.prisma.systemAuthConfig.update({
       where: { id: SYSTEM_AUTH_CONFIG_ID },
       data: {
-        ...payload,
+        ...restPayload,
+        ...(nextOauthProviderOptions
+          ? { oauthProviderOptions: nextOauthProviderOptions as unknown as Prisma.InputJsonValue }
+          : {}),
         updatedBy,
       },
     })
@@ -178,13 +202,10 @@ export class SystemAuthService implements OnModuleInit {
 
   async assertOauthProviderLoginAllowed(method: AuthMethodName): Promise<void> {
     const options = await this.getRegistrationOptions()
+    const provider = resolveProviderFromAuthMethod(method)
 
-    if (method === AUTH_METHOD.GITHUB && !options.allowGithubLogin) {
-      throw new BadRequestException('当前未开放 GitHub 登录')
-    }
-
-    if (method === AUTH_METHOD.LINUX_DO && !options.allowLinuxDoLogin) {
-      throw new BadRequestException('当前未开放 LinuxDo 登录')
+    if (provider && !options.oauthProviders[provider].allowLogin) {
+      throw new BadRequestException(`当前未开放 ${formatAuthMethod(method)} 登录`)
     }
   }
 
@@ -199,12 +220,10 @@ export class SystemAuthService implements OnModuleInit {
       return
     }
 
-    if (method === AUTH_METHOD.GITHUB && !options.allowGithubRegistration) {
-      throw new BadRequestException('当前未开放 GitHub 注册')
-    }
+    const provider = resolveProviderFromAuthMethod(method)
 
-    if (method === AUTH_METHOD.LINUX_DO && !options.allowLinuxDoRegistration) {
-      throw new BadRequestException('当前未开放 LinuxDo 注册')
+    if (provider && !options.oauthProviders[provider].allowRegistration) {
+      throw new BadRequestException(`当前未开放 ${formatAuthMethod(method)} 注册`)
     }
   }
 
@@ -367,17 +386,70 @@ function isRegistrationInviteCodeRequired(
     return options.requirePasswordInviteCode
   }
 
-  if (method === AUTH_METHOD.GITHUB) {
-    return options.requireGithubInviteCode
-  }
-
-  if (method === AUTH_METHOD.LINUX_DO) {
-    return options.requireLinuxDoInviteCode
-  }
-
-  return false
+  const provider = resolveProviderFromAuthMethod(method)
+  return provider ? options.oauthProviders[provider].requireInviteCode : false
 }
 
 function normalizeRegistrationInviteCode(inviteCode: string): string {
   return inviteCode.trim()
+}
+
+function resolveProviderFromAuthMethod(method: AuthMethodName): AuthProviderName | null {
+  if (method === AUTH_METHOD.GOOGLE) {
+    return AUTH_PROVIDER.GOOGLE
+  }
+
+  if (method === AUTH_METHOD.GITHUB) {
+    return AUTH_PROVIDER.GITHUB
+  }
+
+  if (method === AUTH_METHOD.LINUX_DO) {
+    return AUTH_PROVIDER.LINUX_DO
+  }
+
+  return null
+}
+
+function resolveOAuthProviderRegistrationOptions(
+  value: Prisma.JsonValue,
+): Record<AuthProviderName, OAuthProviderRegistrationOptions> {
+  const record = isPlainRecord(value) ? value : {}
+
+  return Object.fromEntries(AUTH_PROVIDER_VALUES.map((provider) => {
+    const options = isPlainRecord(record[provider]) ? record[provider] : {}
+
+    return [provider, {
+      allowLogin: typeof options.allowLogin === 'boolean'
+        ? options.allowLogin
+        : DEFAULT_OAUTH_PROVIDER_REGISTRATION_OPTIONS.allowLogin,
+      allowRegistration: typeof options.allowRegistration === 'boolean'
+        ? options.allowRegistration
+        : DEFAULT_OAUTH_PROVIDER_REGISTRATION_OPTIONS.allowRegistration,
+      requireInviteCode: typeof options.requireInviteCode === 'boolean'
+        ? options.requireInviteCode
+        : DEFAULT_OAUTH_PROVIDER_REGISTRATION_OPTIONS.requireInviteCode,
+    }]
+  })) as Record<AuthProviderName, OAuthProviderRegistrationOptions>
+}
+
+function mergeOAuthProviderRegistrationOptions(
+  currentValue: Prisma.JsonValue,
+  patch: Partial<Record<AuthProviderName, Partial<OAuthProviderRegistrationOptions>>>,
+): Record<AuthProviderName, OAuthProviderRegistrationOptions> {
+  const current = resolveOAuthProviderRegistrationOptions(currentValue)
+
+  return Object.fromEntries(AUTH_PROVIDER_VALUES.map((provider) => {
+    const nextPatch = patch[provider]
+
+    return [provider, {
+      ...current[provider],
+      ...(nextPatch?.allowLogin !== undefined ? { allowLogin: nextPatch.allowLogin } : {}),
+      ...(nextPatch?.allowRegistration !== undefined ? { allowRegistration: nextPatch.allowRegistration } : {}),
+      ...(nextPatch?.requireInviteCode !== undefined ? { requireInviteCode: nextPatch.requireInviteCode } : {}),
+    }]
+  })) as Record<AuthProviderName, OAuthProviderRegistrationOptions>
+}
+
+function isPlainRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value)
 }

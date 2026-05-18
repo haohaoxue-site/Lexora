@@ -69,7 +69,7 @@ defineSlots<{
   justify-content: center;
   min-height: 100vh;
   min-height: 100dvh;
-  padding: clamp(1.25rem, 4vw, 2rem);
+  padding: 20px;
   overflow: hidden;
   background:
     radial-gradient(circle at top left, color-mix(in srgb, var(--brand-primary) 14%, transparent), transparent 34%),
@@ -102,37 +102,12 @@ defineSlots<{
 
   &__card {
     position: relative;
-    width: 34rem;
+    width: min(100%, 32rem);
     max-width: 100%;
     overflow: hidden;
     border-color: color-mix(in srgb, var(--brand-border-base) 72%, transparent);
-    border-radius: 1.75rem;
+    border-radius: 8px;
     box-shadow: 0 32px 88px -56px color-mix(in srgb, var(--brand-primary) 28%, transparent);
-
-    &::before,
-    &::after {
-      position: absolute;
-      inset: auto;
-      border-radius: 9999px;
-      content: '';
-      pointer-events: none;
-    }
-
-    &::before {
-      top: -3.5rem;
-      right: -2rem;
-      width: 10rem;
-      height: 10rem;
-      background: radial-gradient(circle, color-mix(in srgb, var(--brand-primary) 16%, white), transparent 68%);
-    }
-
-    &::after {
-      right: 1.5rem;
-      bottom: -4rem;
-      width: 8rem;
-      height: 8rem;
-      background: radial-gradient(circle, color-mix(in srgb, var(--brand-warning) 16%, white), transparent 70%);
-    }
   }
 
   &__panel {
@@ -140,7 +115,7 @@ defineSlots<{
     display: flex;
     flex-direction: column;
     gap: 1.5rem;
-    padding: clamp(1.5rem, 4vw, 2.5rem);
+    padding: 28px;
     background:
       linear-gradient(180deg, color-mix(in srgb, var(--brand-bg-surface) 96%, white 4%), var(--brand-bg-surface));
     backdrop-filter: blur(8px);
@@ -224,14 +199,6 @@ defineSlots<{
 
     &:empty {
       display: none;
-    }
-  }
-}
-
-@media (max-width: 420px) {
-  .auth-entry-shell {
-    &__panel--with-actions &__brand {
-      padding-right: 7rem;
     }
   }
 }

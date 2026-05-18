@@ -2,7 +2,7 @@ import type { AuthProviderName } from '@haohaoxue/samepage-contracts'
 import type { FormInstance } from 'element-plus'
 import type { Ref } from 'vue'
 import type { UserAccountSectionProps } from '../typing'
-import { AUTH_PROVIDER } from '@haohaoxue/samepage-contracts'
+import { AUTH_PROVIDER_VALUES } from '@haohaoxue/samepage-contracts'
 import { computed, reactive } from 'vue'
 import { AUTH_PROVIDER_UI_META } from '@/views/auth/utils/provider-ui'
 import {
@@ -41,14 +41,14 @@ export function useUserAccountSection(options: {
   const normalizedCode = computed(() => form.code.trim())
   const sectionDescription = computed(() => {
     if (options.props.emailBindingEnabled) {
-      return '管理邮箱、GitHub 与 LinuxDo 登录方式。解绑第三方账号前，系统会校验是否仍保留可用登录方式。'
+      return '管理邮箱与第三方登录方式。解绑第三方账号前，系统会校验是否仍保留可用登录方式。'
     }
 
     if (hasEmailAccountInfo.value) {
-      return '查看邮箱与密码登录状态，并管理 GitHub 与 LinuxDo 登录方式。解绑第三方账号前，系统会校验是否仍保留可用登录方式。'
+      return '查看邮箱与密码登录状态，并管理第三方登录方式。解绑第三方账号前，系统会校验是否仍保留可用登录方式。'
     }
 
-    return '管理 GitHub 与 LinuxDo 登录方式。解绑第三方账号前，系统会校验是否仍保留可用登录方式。'
+    return '管理第三方登录方式。解绑第三方账号前，系统会校验是否仍保留可用登录方式。'
   })
 
   const emailFormRules = computed(() => ({
@@ -69,24 +69,19 @@ export function useUserAccountSection(options: {
       : [],
   }))
 
-  const oauthRows = computed(() => [
-    {
-      provider: AUTH_PROVIDER.GITHUB,
-      ...AUTH_PROVIDER_UI_META[AUTH_PROVIDER.GITHUB],
-      connected: options.props.account.github.connected,
-      username: options.props.account.github.username,
-      canDisconnect: options.props.canDisconnectGithub,
-      canStartBinding: options.props.canStartGithubBinding,
-    },
-    {
-      provider: AUTH_PROVIDER.LINUX_DO,
-      ...AUTH_PROVIDER_UI_META[AUTH_PROVIDER.LINUX_DO],
-      connected: options.props.account.linuxDo.connected,
-      username: options.props.account.linuxDo.username,
-      canDisconnect: options.props.canDisconnectLinuxDo,
-      canStartBinding: options.props.canStartLinuxDoBinding,
-    },
-  ])
+  const oauthRows = computed(() => AUTH_PROVIDER_VALUES.map((provider) => {
+    const account = options.props.account.oauthProviders[provider]
+    const bindingState = options.props.oauthProviderBindingState[provider]
+
+    return {
+      provider,
+      ...AUTH_PROVIDER_UI_META[provider],
+      connected: account.connected,
+      username: account.username,
+      canDisconnect: bindingState.canDisconnect,
+      canStartBinding: bindingState.canStartBinding,
+    }
+  }))
 
   const emailButtonText = computed(() => {
     if (requiresPasswordSetup.value) {

@@ -5,7 +5,6 @@ import type {
   SystemAdminUserRoleFilter,
   SystemAdminUserStatus,
   UpdateSystemAdminUserStatusRequest,
-  UpdateSystemAuthGovernanceRequest,
   UpdateSystemAuthInviteCodeRequest,
 } from '@haohaoxue/samepage-contracts'
 import {
@@ -14,7 +13,6 @@ import {
 } from '@haohaoxue/samepage-contracts'
 import { UserStatus } from '@prisma/client'
 import {
-  IsBoolean,
   IsEnum,
   IsIn,
   IsOptional,
@@ -46,40 +44,6 @@ export class GetSystemAdminAuditLogsQueryDto extends RequestPageParamsDto implem
 export class UpdateSystemAdminUserStatusDto implements UpdateSystemAdminUserStatusRequest {
   @IsEnum(UserStatus)
   status!: SystemAdminUserStatus
-}
-
-export class UpdateSystemAuthGovernanceDto implements UpdateSystemAuthGovernanceRequest {
-  @IsOptional()
-  @IsBoolean()
-  allowGithubLogin?: boolean
-
-  @IsOptional()
-  @IsBoolean()
-  allowLinuxDoLogin?: boolean
-
-  @IsOptional()
-  @IsBoolean()
-  allowPasswordRegistration?: boolean
-
-  @IsOptional()
-  @IsBoolean()
-  allowGithubRegistration?: boolean
-
-  @IsOptional()
-  @IsBoolean()
-  allowLinuxDoRegistration?: boolean
-
-  @IsOptional()
-  @IsBoolean()
-  requirePasswordInviteCode?: boolean
-
-  @IsOptional()
-  @IsBoolean()
-  requireGithubInviteCode?: boolean
-
-  @IsOptional()
-  @IsBoolean()
-  requireLinuxDoInviteCode?: boolean
 }
 
 export class UpdateSystemAuthInviteCodeDto implements UpdateSystemAuthInviteCodeRequest {

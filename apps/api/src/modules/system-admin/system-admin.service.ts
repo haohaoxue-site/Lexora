@@ -237,14 +237,9 @@ export class SystemAdminService {
     ])
 
     return toSystemAuthGovernance({
-      allowGithubLogin: snapshot.config.allowGithubLogin,
-      allowLinuxDoLogin: snapshot.config.allowLinuxDoLogin,
       allowPasswordRegistration: snapshot.config.allowPasswordRegistration,
-      allowGithubRegistration: snapshot.config.allowGithubRegistration,
-      allowLinuxDoRegistration: snapshot.config.allowLinuxDoRegistration,
       requirePasswordInviteCode: snapshot.config.requirePasswordInviteCode,
-      requireGithubInviteCode: snapshot.config.requireGithubInviteCode,
-      requireLinuxDoInviteCode: snapshot.config.requireLinuxDoInviteCode,
+      oauthProviders: snapshot.registrationOptions.oauthProviders,
       hasRegistrationInviteCode: Boolean(snapshot.config.registrationInviteCodeHash),
       registrationInviteCode: snapshot.registrationInviteCode,
       emailServiceEnabled,
@@ -262,14 +257,9 @@ export class SystemAdminService {
   ): Promise<SystemAuthGovernance> {
     const nextRegistrationOptions = Object.fromEntries(
       Object.entries({
-        allowGithubLogin: payload.allowGithubLogin,
-        allowLinuxDoLogin: payload.allowLinuxDoLogin,
         allowPasswordRegistration: payload.allowPasswordRegistration,
-        allowGithubRegistration: payload.allowGithubRegistration,
-        allowLinuxDoRegistration: payload.allowLinuxDoRegistration,
         requirePasswordInviteCode: payload.requirePasswordInviteCode,
-        requireGithubInviteCode: payload.requireGithubInviteCode,
-        requireLinuxDoInviteCode: payload.requireLinuxDoInviteCode,
+        oauthProviders: payload.oauthProviders,
       }).filter(([, value]) => value !== undefined),
     ) as UpdateSystemAuthGovernanceRequest
 

@@ -1,5 +1,6 @@
 import type {
   AuthMethodName,
+  AuthProviderName,
   SystemAdminAuditLogItem,
   SystemAdminAuditTargetType,
   SystemAdminUserChatSessionItem,
@@ -8,6 +9,7 @@ import type {
   SystemAdminUserItem,
   SystemAdminUserStatus,
   SystemAuthGovernance,
+  SystemAuthProviderGovernance,
 } from '@haohaoxue/samepage-contracts'
 
 export interface SystemAdminUserItemRecord {
@@ -38,14 +40,9 @@ export interface SystemAdminUserChatSessionItemRecord {
 }
 
 export interface SystemAuthGovernanceRecord {
-  allowGithubLogin: boolean
-  allowLinuxDoLogin: boolean
   allowPasswordRegistration: boolean
-  allowGithubRegistration: boolean
-  allowLinuxDoRegistration: boolean
   requirePasswordInviteCode: boolean
-  requireGithubInviteCode: boolean
-  requireLinuxDoInviteCode: boolean
+  oauthProviders: Record<AuthProviderName, SystemAuthProviderGovernance>
   hasRegistrationInviteCode: boolean
   registrationInviteCode: string | null
   emailServiceEnabled: boolean
@@ -117,14 +114,9 @@ function toSystemAdminUserChatSessionItem(record: SystemAdminUserChatSessionItem
 
 export function toSystemAuthGovernance(record: SystemAuthGovernanceRecord): SystemAuthGovernance {
   return {
-    allowGithubLogin: record.allowGithubLogin,
-    allowLinuxDoLogin: record.allowLinuxDoLogin,
     allowPasswordRegistration: record.allowPasswordRegistration,
-    allowGithubRegistration: record.allowGithubRegistration,
-    allowLinuxDoRegistration: record.allowLinuxDoRegistration,
     requirePasswordInviteCode: record.requirePasswordInviteCode,
-    requireGithubInviteCode: record.requireGithubInviteCode,
-    requireLinuxDoInviteCode: record.requireLinuxDoInviteCode,
+    oauthProviders: record.oauthProviders,
     hasRegistrationInviteCode: record.hasRegistrationInviteCode,
     registrationInviteCode: record.registrationInviteCode,
     emailServiceEnabled: record.emailServiceEnabled,

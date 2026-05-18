@@ -7,7 +7,7 @@ import type {
   UserSettings,
 } from '@haohaoxue/samepage-contracts'
 import type { AuthUserContext } from '../auth/auth.interface'
-import { ROLES } from '@haohaoxue/samepage-contracts'
+import { AUTH_PROVIDER, AUTH_PROVIDER_VALUES, ROLES } from '@haohaoxue/samepage-contracts'
 import {
   BadRequestException,
   Injectable,
@@ -119,9 +119,6 @@ export class UsersService {
       throw new NotFoundException(`User "${userId}" not found`)
     }
 
-    const githubAccount = user.oauthAccounts.find(item => item.provider === AuthProvider.GITHUB)
-    const linuxDoAccount = user.oauthAccounts.find(item => item.provider === AuthProvider.LINUX_DO)
-
     return {
       profile: {
         displayName: user.displayName,
@@ -132,14 +129,7 @@ export class UsersService {
         userCode: user.userCode,
         hasPasswordAuth: Boolean(user.localCredential),
         emailVerified: Boolean(user.localCredential?.emailVerifiedAt),
-        github: {
-          connected: Boolean(githubAccount),
-          username: githubAccount?.providerUsername ?? null,
-        },
-        linuxDo: {
-          connected: Boolean(linuxDoAccount),
-          username: linuxDoAccount?.providerUsername ?? null,
-        },
+        oauthProviders: buildUserOauthBindings(user.oauthAccounts),
       },
       preferences: {
         language: mapLanguagePreference(user.preference?.languagePreference),
@@ -298,4 +288,35 @@ export class UsersService {
       appearance: nextAppearance,
     }
   }
+}
+
+function buildUserOauthBindings(
+  accounts: Array<{ provider: AuthProvider, providerUsername: string | null }>,
+): UserSettings['account']['oauthProviders'] {
+  const accountsByProvider = new Map(accounts.map(account => [account.provider, account]))
+
+  return Object.fromEntries(AUTH_PROVIDER_VALUES.map((provider) => {
+    const account = accountsByProvider.get(resolveDbAuthProvider(provider))
+
+    return [provider, {
+      connected: Boolean(account),
+      username: account?.providerUsername ?? null,
+    }]
+  })) as UserSettings['account']['oauthProviders']
+}
+
+function resolveDbAuthProvider(provider: (typeof AUTH_PROVIDER_VALUES)[number]): AuthProvider {
+  if (provider === AUTH_PROVIDER.GOOGLE) {
+    return AuthProvider.GOOGLE
+  }
+
+  if (provider === AUTH_PROVIDER.GITHUB) {
+    return AuthProvider.GITHUB
+  }
+
+  if (provider === AUTH_PROVIDER.LINUX_DO) {
+    return AuthProvider.LINUX_DO
+  }
+
+  return AuthProvider.GOOGLE
 }

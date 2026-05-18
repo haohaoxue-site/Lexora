@@ -18,11 +18,13 @@ export interface OAuthRuntimeProvider {
 }
 
 const OAUTH_PROVIDER_CONFIG_KEY = {
+  [AUTH_PROVIDER.GOOGLE]: 'google',
   [AUTH_PROVIDER.GITHUB]: 'github',
   [AUTH_PROVIDER.LINUX_DO]: 'linuxDo',
-} as const satisfies Record<AuthProviderName, keyof Pick<OAuthConfig, 'github' | 'linuxDo'>>
+} as const satisfies Record<AuthProviderName, keyof Pick<OAuthConfig, 'github' | 'linuxDo' | 'google'>>
 
 const OAUTH_PROVIDER_DB_PROVIDER = {
+  [AUTH_PROVIDER.GOOGLE]: AuthProvider.GOOGLE,
   [AUTH_PROVIDER.GITHUB]: AuthProvider.GITHUB,
   [AUTH_PROVIDER.LINUX_DO]: AuthProvider.LINUX_DO,
 } as const satisfies Record<AuthProviderName, AuthProvider>

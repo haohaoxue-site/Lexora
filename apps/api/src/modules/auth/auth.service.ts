@@ -173,9 +173,7 @@ export class AuthService {
     userId: string,
     provider: AuthProviderName,
   ): Promise<void> {
-    const dbProvider = provider === AUTH_PROVIDER.GITHUB
-      ? AuthProvider.GITHUB
-      : AuthProvider.LINUX_DO
+    const dbProvider = resolveDbAuthProvider(provider)
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
       select: {
@@ -601,6 +599,10 @@ export class AuthService {
     accessToken: string,
     userinfoEndpoint: string,
   ): Promise<OAuthProfile> {
+    if (provider === AUTH_PROVIDER.GOOGLE) {
+      return this.fetchGoogleProfile(accessToken, userinfoEndpoint)
+    }
+
     if (provider === AUTH_PROVIDER.GITHUB) {
       return this.fetchGithubProfile(accessToken, userinfoEndpoint)
     }
@@ -679,6 +681,34 @@ export class AuthService {
     }
   }
 
+  private async fetchGoogleProfile(accessToken: string, userinfoEndpoint: string): Promise<OAuthProfile> {
+    const response = await this.fetchOAuthResource(userinfoEndpoint, {
+      Authorization: `Bearer ${accessToken}`,
+      Accept: 'application/json',
+    })
+
+    if (!response.ok) {
+      throw new UnauthorizedException('Failed to fetch Google user profile')
+    }
+
+    const profile = await response.json() as Record<string, unknown>
+    const providerUserId = typeof profile.sub === 'string' ? profile.sub : null
+
+    if (!providerUserId) {
+      throw new UnauthorizedException('Google user id is missing')
+    }
+
+    return {
+      providerUserId,
+      username: typeof profile.email === 'string' ? profile.email : undefined,
+      displayName: typeof profile.name === 'string' ? profile.name : undefined,
+      email: undefined,
+      emailVerified: false,
+      avatarUrl: typeof profile.picture === 'string' ? profile.picture : undefined,
+      rawProfile: profile,
+    }
+  }
+
   private async fetchOAuthResource(url: string, headers: Record<string, string>): Promise<Response> {
     let lastError: unknown
 
@@ -735,4 +765,20 @@ export class AuthService {
 
     return new URL(request.url, `${protocol}://${host}`)
   }
+}
+
+function resolveDbAuthProvider(provider: AuthProviderName): AuthProvider {
+  if (provider === AUTH_PROVIDER.GOOGLE) {
+    return AuthProvider.GOOGLE
+  }
+
+  if (provider === AUTH_PROVIDER.GITHUB) {
+    return AuthProvider.GITHUB
+  }
+
+  if (provider === AUTH_PROVIDER.LINUX_DO) {
+    return AuthProvider.LINUX_DO
+  }
+
+  return AuthProvider.GOOGLE
 }

@@ -4,6 +4,7 @@ import type {
   UserCollabIdentitySchema,
 } from './identity'
 import { z } from 'zod'
+import { AuthProviderSchema } from './auth'
 import {
   AuthPasswordSchema,
   UserAccountIdentitySchema,
@@ -68,6 +69,8 @@ export const UserOauthBindingSchema = z.object({
   username: z.string().trim().min(1).nullable(),
 }).strict()
 
+export const UserOauthBindingsSchema = z.record(AuthProviderSchema, UserOauthBindingSchema)
+
 export const UserSettingsSchema = z.object({
   profile: UserAccountIdentitySchema.pick({
     displayName: true,
@@ -79,8 +82,7 @@ export const UserSettingsSchema = z.object({
   }).extend({
     hasPasswordAuth: z.boolean(),
     emailVerified: z.boolean(),
-    github: UserOauthBindingSchema,
-    linuxDo: UserOauthBindingSchema,
+    oauthProviders: UserOauthBindingsSchema,
   }).strict(),
   preferences: z.object({
     language: LanguagePreferenceSchema,
@@ -146,6 +148,7 @@ export type SessionUser = z.infer<typeof SessionUserSchema>
  * 第三方账号绑定状态。
  */
 export type UserOauthBinding = z.infer<typeof UserOauthBindingSchema>
+export type UserOauthBindings = z.infer<typeof UserOauthBindingsSchema>
 
 /**
  * 当前用户设置。

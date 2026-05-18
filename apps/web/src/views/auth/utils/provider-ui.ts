@@ -10,6 +10,10 @@ export interface AuthProviderUiMeta {
 }
 
 export const AUTH_PROVIDER_UI_META: Record<AuthProviderName, AuthProviderUiMeta> = {
+  [AUTH_PROVIDER.GOOGLE]: {
+    title: 'Google',
+    icon: 'brand-google',
+  },
   [AUTH_PROVIDER.GITHUB]: {
     title: 'GitHub',
     icon: 'brand-github',

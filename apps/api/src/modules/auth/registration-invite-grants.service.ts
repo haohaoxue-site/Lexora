@@ -216,5 +216,9 @@ function resolveGrantProvider(method: AuthMethodName): AuthProvider | null {
     return AuthProvider.LINUX_DO
   }
 
+  if (method === AUTH_METHOD.GOOGLE) {
+    return AuthProvider.GOOGLE
+  }
+
   return null
 }

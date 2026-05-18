@@ -65,14 +65,7 @@ function cloneUserSettings(settings: UserSettings): UserSettings {
       userCode: settings.account.userCode,
       hasPasswordAuth: settings.account.hasPasswordAuth,
       emailVerified: settings.account.emailVerified,
-      github: {
-        connected: settings.account.github.connected,
-        username: settings.account.github.username,
-      },
-      linuxDo: {
-        connected: settings.account.linuxDo.connected,
-        username: settings.account.linuxDo.username,
-      },
+      oauthProviders: structuredClone(settings.account.oauthProviders),
     },
     preferences: clonePreferences(settings.preferences),
   }

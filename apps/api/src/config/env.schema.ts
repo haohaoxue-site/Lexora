@@ -15,6 +15,8 @@ const envSchema = z.object({
   GITHUB_CLIENT_SECRET: optionalNonEmptyString(),
   LINUX_DO_CLIENT_ID: optionalNonEmptyString(),
   LINUX_DO_CLIENT_SECRET: optionalNonEmptyString(),
+  GOOGLE_CLIENT_ID: optionalNonEmptyString(),
+  GOOGLE_CLIENT_SECRET: optionalNonEmptyString(),
   STORAGE_ENDPOINT: stringWithDefault(DEFAULT_STORAGE_ENDPOINT),
   STORAGE_ACCESS_KEY: z.string().trim().min(3, 'STORAGE_ACCESS_KEY 至少需要 3 个字符'),
   STORAGE_SECRET_KEY: z.string().trim().min(8, 'STORAGE_SECRET_KEY 至少需要 8 个字符'),

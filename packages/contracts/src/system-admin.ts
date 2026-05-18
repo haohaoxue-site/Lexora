@@ -1,7 +1,7 @@
 import type { PageData, RequestPageParams } from './common'
 import type { UserStatus } from './user'
 import { z } from 'zod'
-import { AuthMethodSchema } from './auth'
+import { AuthMethodSchema, AuthProviderSchema } from './auth'
 import {
   CountSchema,
   createPageDataSchema,
@@ -169,15 +169,21 @@ export const UpdateSystemAdminUserResponseSchema = SystemAdminUserItemSchema.pic
   isSystemAdmin: true,
 })
 
+export const SystemAuthProviderGovernanceSchema = z.object({
+  allowLogin: z.boolean(),
+  allowRegistration: z.boolean(),
+  requireInviteCode: z.boolean(),
+}).strict()
+
+export const UpdateSystemAuthProviderGovernanceSchema = SystemAuthProviderGovernanceSchema.partial().strict()
+
+export const SystemAuthProviderGovernanceMapSchema = z.record(AuthProviderSchema, SystemAuthProviderGovernanceSchema)
+export const UpdateSystemAuthProviderGovernanceMapSchema = z.partialRecord(AuthProviderSchema, UpdateSystemAuthProviderGovernanceSchema)
+
 export const SystemAuthGovernanceSchema = z.object({
-  allowGithubLogin: z.boolean(),
-  allowLinuxDoLogin: z.boolean(),
   allowPasswordRegistration: z.boolean(),
-  allowGithubRegistration: z.boolean(),
-  allowLinuxDoRegistration: z.boolean(),
   requirePasswordInviteCode: z.boolean(),
-  requireGithubInviteCode: z.boolean(),
-  requireLinuxDoInviteCode: z.boolean(),
+  oauthProviders: SystemAuthProviderGovernanceMapSchema,
   hasRegistrationInviteCode: z.boolean(),
   registrationInviteCode: z.string().trim().min(4).max(120).nullable(),
   emailServiceEnabled: z.boolean(),
@@ -189,14 +195,9 @@ export const SystemAuthGovernanceSchema = z.object({
 }).strict()
 
 export const UpdateSystemAuthGovernanceRequestSchema = z.object({
-  allowGithubLogin: z.boolean().optional(),
-  allowLinuxDoLogin: z.boolean().optional(),
   allowPasswordRegistration: z.boolean().optional(),
-  allowGithubRegistration: z.boolean().optional(),
-  allowLinuxDoRegistration: z.boolean().optional(),
   requirePasswordInviteCode: z.boolean().optional(),
-  requireGithubInviteCode: z.boolean().optional(),
-  requireLinuxDoInviteCode: z.boolean().optional(),
+  oauthProviders: UpdateSystemAuthProviderGovernanceMapSchema.optional(),
 }).strict()
 
 export const UpdateSystemAuthInviteCodeRequestSchema = z.object({
@@ -276,6 +277,7 @@ export interface GetSystemAdminUsersQuery extends RequestPageParams, GetSystemAd
 export interface SystemAdminUserListResponse extends PageData<SystemAdminUserItem> {}
 export type UpdateSystemAdminUserStatusRequest = z.infer<typeof UpdateSystemAdminUserStatusRequestSchema>
 export type UpdateSystemAdminUserResponse = z.infer<typeof UpdateSystemAdminUserResponseSchema>
+export type SystemAuthProviderGovernance = z.infer<typeof SystemAuthProviderGovernanceSchema>
 export type SystemAuthGovernance = z.infer<typeof SystemAuthGovernanceSchema>
 export type UpdateSystemAuthGovernanceRequest = z.infer<typeof UpdateSystemAuthGovernanceRequestSchema>
 export type UpdateSystemAuthInviteCodeRequest = z.infer<typeof UpdateSystemAuthInviteCodeRequestSchema>

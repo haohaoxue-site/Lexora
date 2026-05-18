@@ -2,7 +2,7 @@ import type { AuthProviderName } from '@haohaoxue/samepage-contracts'
 import type { FormInstance, FormRules } from 'element-plus'
 import type { ShallowRef } from 'vue'
 import { AUTH_PROVIDER_VALUES } from '@haohaoxue/samepage-contracts'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { computed, onMounted, reactive, shallowRef } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { createRegistrationInviteGrant, startOAuthLogin } from '@/apis/auth'
@@ -66,7 +66,6 @@ export function useLogin(options: {
         provider,
         acceptingNewUsers,
         inviteCodeRequired,
-        description: resolveProviderDescription(providerMeta.title, acceptingNewUsers, inviteCodeRequired),
         ...providerMeta,
       }
     }))
@@ -102,8 +101,32 @@ export function useLogin(options: {
     }
   }
 
-  function handleStartLogin(provider: AuthProviderName) {
+  async function handleStartLogin(provider: AuthProviderName) {
     const targetProvider = providers.value.find(item => item.provider === provider)
+
+    if (!targetProvider) {
+      return
+    }
+
+    if (!targetProvider.acceptingNewUsers) {
+      const isConfirmed = await ElMessageBox.confirm(
+        `当前仅允许已绑定 ${targetProvider.title} 的账号登录。未绑定账号无法创建新账号。`,
+        `使用 ${targetProvider.title} 登录`,
+        {
+          confirmButtonText: '继续登录',
+          cancelButtonText: '取消',
+          type: 'info',
+          autofocus: false,
+        },
+      ).then(() => true).catch(() => false)
+
+      if (!isConfirmed) {
+        return
+      }
+
+      void startLogin(provider)
+      return
+    }
 
     if (targetProvider?.acceptingNewUsers && targetProvider.inviteCodeRequired) {
       selectedOauthProvider.value = provider
@@ -112,7 +135,6 @@ export function useLogin(options: {
       isOauthInviteDialogVisible.value = true
       return
     }
-
     void startLogin(provider)
   }
 
@@ -186,16 +208,4 @@ export function useLogin(options: {
     startingOauthProvider,
     submitPasswordLogin,
   }
-}
-
-function resolveProviderDescription(title: string, acceptingNewUsers: boolean, inviteCodeRequired: boolean) {
-  if (!acceptingNewUsers) {
-    return `仅限已绑定 ${title} 的账号`
-  }
-
-  if (inviteCodeRequired) {
-    return '新用户需邀请码'
-  }
-
-  return '支持首次登录'
 }

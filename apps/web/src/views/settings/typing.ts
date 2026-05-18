@@ -27,10 +27,10 @@ export interface UserAccountSectionProps {
   isBindingEmail: boolean
   bindingProvider: AuthProviderName | null
   disconnectingProvider: AuthProviderName | null
-  canDisconnectGithub: boolean
-  canDisconnectLinuxDo: boolean
-  canStartGithubBinding: boolean
-  canStartLinuxDoBinding: boolean
+  oauthProviderBindingState: Record<AuthProviderName, {
+    canDisconnect: boolean
+    canStartBinding: boolean
+  }>
 }
 
 export interface UserAccountSectionEmits {
