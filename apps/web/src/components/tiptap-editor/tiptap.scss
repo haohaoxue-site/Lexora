@@ -629,8 +629,7 @@
   }
 
   .hljs-keyword,
-  .hljs-selector-tag,
-  .hljs-subst {
+  .hljs-selector-tag {
     color: #7c3aed;
   }
 
@@ -638,6 +637,10 @@
   .hljs-doctag,
   .hljs-regexp {
     color: #0f766e;
+  }
+
+  .hljs-subst {
+    color: #7c3aed;
   }
 
   .hljs-number,
