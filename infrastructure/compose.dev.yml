@@ -5,8 +5,8 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_DB: samepage_ai
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_USER: samepage_ai_pg
+      POSTGRES_PASSWORD: samepage_ai_pg
     ports:
       - '5432:5432'
     volumes:

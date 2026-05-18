@@ -1,5 +1,9 @@
 import { z } from 'zod'
 
+export function requiredEnvString(name: string) {
+  return z.string().trim().min(1, `${name} 是必填配置`)
+}
+
 export function stringWithDefault(fallback: string) {
   return z
     .string()

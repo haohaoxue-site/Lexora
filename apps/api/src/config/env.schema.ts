@@ -1,15 +1,11 @@
 import process from 'node:process'
-import { optionalNonEmptyString, stringWithDefault } from '@haohaoxue/samepage-shared'
+import { optionalNonEmptyString, requiredEnvString } from '@haohaoxue/samepage-shared'
 import { z } from 'zod'
 
-const DEFAULT_DATABASE_URL = 'postgresql://postgres:postgres@localhost:5432/samepage_ai'
-const DEFAULT_REDIS_URL = 'redis://127.0.0.1:6379'
-const DEFAULT_STORAGE_ENDPOINT = 'http://127.0.0.1:9000'
-
 const envSchema = z.object({
-  DATABASE_URL: stringWithDefault(DEFAULT_DATABASE_URL),
+  DATABASE_URL: requiredEnvString('DATABASE_URL'),
   APP_SECRET: z.string().trim().min(32, 'APP_SECRET 至少需要 32 个字符'),
-  REDIS_URL: stringWithDefault(DEFAULT_REDIS_URL),
+  REDIS_URL: requiredEnvString('REDIS_URL'),
   OAUTH_PROXY_URL: optionalNonEmptyString(),
   GITHUB_CLIENT_ID: optionalNonEmptyString(),
   GITHUB_CLIENT_SECRET: optionalNonEmptyString(),
@@ -17,7 +13,7 @@ const envSchema = z.object({
   LINUX_DO_CLIENT_SECRET: optionalNonEmptyString(),
   GOOGLE_CLIENT_ID: optionalNonEmptyString(),
   GOOGLE_CLIENT_SECRET: optionalNonEmptyString(),
-  STORAGE_ENDPOINT: stringWithDefault(DEFAULT_STORAGE_ENDPOINT),
+  STORAGE_ENDPOINT: requiredEnvString('STORAGE_ENDPOINT'),
   STORAGE_ACCESS_KEY: z.string().trim().min(3, 'STORAGE_ACCESS_KEY 至少需要 3 个字符'),
   STORAGE_SECRET_KEY: z.string().trim().min(8, 'STORAGE_SECRET_KEY 至少需要 8 个字符'),
   SYSTEM_ADMIN: z

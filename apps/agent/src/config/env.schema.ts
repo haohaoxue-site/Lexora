@@ -1,13 +1,10 @@
-import { optionalNonEmptyString, positiveIntegerWithDefault, stringWithDefault } from '@haohaoxue/samepage-shared'
+import { positiveIntegerWithDefault, requiredEnvString } from '@haohaoxue/samepage-shared'
 import { z } from 'zod'
 
-const DEFAULT_API_INTERNAL_URL = 'http://127.0.0.1:3000'
-const DEFAULT_REDIS_URL = 'redis://127.0.0.1:6379'
-
 const agentEnvSchema = z.object({
-  API_INTERNAL_URL: stringWithDefault(DEFAULT_API_INTERNAL_URL),
-  REDIS_URL: stringWithDefault(DEFAULT_REDIS_URL),
-  AGENT_CHECKPOINTER_DATABASE_URL: optionalNonEmptyString(),
+  API_INTERNAL_URL: requiredEnvString('API_INTERNAL_URL'),
+  REDIS_URL: requiredEnvString('REDIS_URL'),
+  AGENT_CHECKPOINTER_DATABASE_URL: requiredEnvString('AGENT_CHECKPOINTER_DATABASE_URL'),
   AGENT_CHECKPOINT_RETENTION_DAYS: positiveIntegerWithDefault(7),
 })
 

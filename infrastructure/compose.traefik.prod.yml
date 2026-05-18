@@ -86,6 +86,8 @@ services:
       GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET}
       LINUX_DO_CLIENT_ID: ${LINUX_DO_CLIENT_ID}
       LINUX_DO_CLIENT_SECRET: ${LINUX_DO_CLIENT_SECRET}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
     depends_on:
       migrate:
         condition: service_completed_successfully

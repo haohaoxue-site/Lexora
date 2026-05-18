@@ -1,14 +1,10 @@
-import { stringWithDefault } from '@haohaoxue/samepage-shared'
+import { requiredEnvString } from '@haohaoxue/samepage-shared'
 import { z } from 'zod'
 
-const DEFAULT_DATABASE_URL = 'postgresql://postgres:postgres@localhost:5432/samepage_ai'
-const DEFAULT_API_INTERNAL_URL = 'http://127.0.0.1:3000'
-const DEFAULT_REDIS_URL = 'redis://127.0.0.1:6379'
-
 const collabEnvSchema = z.object({
-  DATABASE_URL: stringWithDefault(DEFAULT_DATABASE_URL),
-  API_INTERNAL_URL: stringWithDefault(DEFAULT_API_INTERNAL_URL),
-  REDIS_URL: stringWithDefault(DEFAULT_REDIS_URL),
+  DATABASE_URL: requiredEnvString('DATABASE_URL'),
+  API_INTERNAL_URL: requiredEnvString('API_INTERNAL_URL'),
+  REDIS_URL: requiredEnvString('REDIS_URL'),
 })
 
 export type CollabEnv = z.infer<typeof collabEnvSchema>

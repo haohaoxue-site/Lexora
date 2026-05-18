@@ -118,7 +118,9 @@ const {
           v-for="item in providers"
           :key="item.provider"
           class="login-provider-btn justify-between"
-          :loading="startingOauthProvider === item.provider"
+          :class="{ 'is-loading': startingOauthProvider === item.provider }"
+          :disabled="startingOauthProvider === item.provider"
+          :aria-busy="startingOauthProvider === item.provider"
           @click="handleStartLogin(item.provider)"
         >
           <span class="login-provider-btn__icon-wrap">
@@ -127,7 +129,14 @@ const {
           <span class="login-provider-btn__content">
             <span class="login-provider-btn__label">{{ item.title }}</span>
             <span class="login-provider-btn__arrow-wrap">
-              <SvgIcon category="ui" icon="arrow-right" size="1rem" class="login-provider-btn__arrow" />
+              <SvgIcon
+                v-if="startingOauthProvider === item.provider"
+                category="ui"
+                icon="spinner-orbit"
+                size="1rem"
+                class="login-provider-btn__loading animate-spin"
+              />
+              <SvgIcon v-else category="ui" icon="arrow-right" size="1rem" class="login-provider-btn__arrow" />
             </span>
           </span>
         </ElButton>
@@ -326,6 +335,23 @@ const {
     transform: translateX(0.125rem);
   }
 
+  &.is-loading,
+  &.is-disabled,
+  &.is-disabled:hover {
+    border-color: color-mix(in srgb, var(--brand-primary) 34%, var(--brand-border-base));
+    background:
+      linear-gradient(180deg, color-mix(in srgb, var(--brand-primary) 6%, white 94%), var(--brand-bg-surface));
+    box-shadow: 0 18px 28px -24px color-mix(in srgb, var(--brand-primary) 45%, transparent);
+    color: var(--brand-text-primary);
+    cursor: default;
+    opacity: 1;
+    transform: none;
+  }
+
+  &.is-loading &__arrow-wrap {
+    color: var(--brand-primary);
+  }
+
   :deep(> span) {
     width: 100%;
     height: 2.25rem;
@@ -382,6 +408,10 @@ const {
   &__arrow {
     color: var(--brand-text-secondary);
     transition: transform 0.2s ease, color 0.2s ease;
+  }
+
+  &__loading {
+    color: var(--brand-primary);
   }
 }
 
