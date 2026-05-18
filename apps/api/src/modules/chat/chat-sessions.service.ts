@@ -497,6 +497,12 @@ export class ChatSessionsService {
           completedAt,
         },
       })
+      await tx.chatSession.update({
+        where: { id: run.sessionId },
+        data: {
+          updatedAt: completedAt,
+        },
+      })
 
       return this.chatSessionEvents.appendEvents(tx, run.sessionId, [
         {

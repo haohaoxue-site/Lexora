@@ -24,8 +24,8 @@ export const useChatStream = createSharedComposable(() => {
     activeSession,
     activeSessionId,
     createSession,
+    patchSessionSummary,
     refreshActiveSession,
-    refreshSessionList,
     replaceActiveSession,
     selectSession,
   } = useChatSessions()
@@ -163,8 +163,6 @@ export const useChatStream = createSharedComposable(() => {
     if (response.run) {
       startSessionEventStream(response.session.id, response.latestSequence, handleSessionEvent)
     }
-
-    void refreshSessionList()
   }
 
   async function handleSessionEvent(event: ChatSessionEvent): Promise<void> {
@@ -195,7 +193,9 @@ export const useChatStream = createSharedComposable(() => {
         stopSessionEventStream(event.sessionId)
       }
 
-      await refreshSessionList()
+      patchSessionSummary(event.sessionId, {
+        updatedAt: event.createdAt,
+      })
     }
   }
 

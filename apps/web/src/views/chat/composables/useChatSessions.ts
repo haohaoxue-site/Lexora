@@ -1,3 +1,4 @@
+import type { ChatSessionSummaryPatch } from '../utils/chat-session-summary'
 import type { ChatSessionDetail, ChatSessionSummary } from '@/apis/chat'
 import { createSharedComposable } from '@vueuse/core'
 import { ElMessage } from 'element-plus'
@@ -19,6 +20,12 @@ import {
   createChatSessionSnapshotState,
   setActiveChatSessionSnapshot,
 } from '../utils/chat-session-snapshot'
+import {
+  patchChatSessionSummary,
+  reconcileLoadedChatSessionSummaries,
+  replaceChatSessionSummary,
+  upsertChatSessionSummary,
+} from '../utils/chat-session-summary'
 
 export interface ChatSession extends ChatSessionSummary {}
 export interface ActiveChatSession extends ChatSessionDetail {}
@@ -43,7 +50,7 @@ export const useChatSessions = createSharedComposable(() => {
 
     try {
       const nextSessions = await getChatSessions()
-      sessions.value = nextSessions
+      setLoadedSessionSummaries(nextSessions)
 
       if (nextSessions.length === 0) {
         clearActiveChatSessionSnapshot(snapshotState)
@@ -76,7 +83,7 @@ export const useChatSessions = createSharedComposable(() => {
   async function createSession() {
     try {
       const session = await createChatSession()
-      prependSessionSummary(session)
+      upsertSessionSummary(session)
       setActiveChatSessionSnapshot(snapshotState, session)
       return session
     }
@@ -131,12 +138,14 @@ export const useChatSessions = createSharedComposable(() => {
     const requestEpoch = beginChatSessionSnapshotRequest(snapshotState, id)
 
     try {
+      const session = await getChatSession(id)
       const accepted = acceptChatSessionSnapshot(snapshotState, {
-        session: await getChatSession(id),
+        session,
         requestEpoch,
       })
 
       if (accepted) {
+        syncSessionSummary(session)
         uiStore.setLastActiveChatSessionId(id)
       }
 
@@ -260,12 +269,16 @@ export const useChatSessions = createSharedComposable(() => {
 
     try {
       const session = await getChatSession(sessionId)
-      return acceptChatSessionSnapshot(snapshotState, {
+      const accepted = acceptChatSessionSnapshot(snapshotState, {
         session,
         requestEpoch,
       })
-        ? session
-        : null
+      if (!accepted) {
+        return null
+      }
+
+      syncSessionSummary(session)
+      return session
     }
     catch (error) {
       ElMessage.error(getRequestErrorDisplayMessage(error, '刷新聊天详情失败'))
@@ -273,39 +286,35 @@ export const useChatSessions = createSharedComposable(() => {
     }
   }
 
-  async function refreshSessionList() {
-    try {
-      sessions.value = await getChatSessions()
-    }
-    catch (error) {
-      ElMessage.error(getRequestErrorDisplayMessage(error, '刷新聊天列表失败'))
-    }
+  function setLoadedSessionSummaries(nextSessions: ChatSessionSummary[]) {
+    sessions.value = reconcileLoadedChatSessionSummaries(nextSessions, activeSession.value)
   }
 
-  function prependSessionSummary(session: ChatSessionSummary) {
-    sessions.value = [
-      session,
-      ...sessions.value.filter(item => item.id !== session.id),
-    ]
+  function upsertSessionSummary(session: ChatSessionSummary) {
+    sessions.value = upsertChatSessionSummary(sessions.value, session)
+  }
+
+  function syncSessionSummary(session: ChatSessionSummary) {
+    const currentSummary = sessions.value.find(item => item.id === session.id)
+    if (!currentSummary) {
+      return
+    }
+
+    sessions.value = session.updatedAt > currentSummary.updatedAt
+      ? upsertChatSessionSummary(sessions.value, session)
+      : replaceChatSessionSummary(sessions.value, session)
   }
 
   function patchSessionSummary(
     sessionId: string,
-    input: Partial<Pick<ChatSessionSummary, 'modelRef' | 'title' | 'updatedAt'>>,
+    input: ChatSessionSummaryPatch,
   ) {
-    const targetSession = sessions.value.find(session => session.id === sessionId)
-
-    if (!targetSession) {
-      return
-    }
-
-    sessions.value = [
-      {
-        ...targetSession,
-        ...input,
-      },
-      ...sessions.value.filter(session => session.id !== sessionId),
-    ]
+    sessions.value = patchChatSessionSummary(
+      sessions.value,
+      sessionId,
+      input,
+      activeSession.value,
+    )
   }
 
   return {
@@ -320,7 +329,6 @@ export const useChatSessions = createSharedComposable(() => {
     loadSessions,
     patchSessionSummary,
     refreshActiveSession,
-    refreshSessionList,
     renameSession,
     replaceActiveSession,
     selectSession,

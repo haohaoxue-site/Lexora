@@ -435,6 +435,12 @@ export class ChatRunProjectorService implements OnModuleInit, OnModuleDestroy {
           dispatchLeaseExpiresAt: null,
         },
       })
+      await tx.chatSession.update({
+        where: { id: input.sessionId },
+        data: {
+          updatedAt: completedAt,
+        },
+      })
       await this.chatSessionEvents.appendEvents(tx, input.sessionId, [
         {
           type: CHAT_SESSION_EVENT_TYPE.MESSAGE_FAILED,
@@ -489,6 +495,12 @@ export class ChatRunProjectorService implements OnModuleInit, OnModuleDestroy {
           status: ChatSessionRunStatus.CANCELLED,
           completedAt,
           dispatchLeaseExpiresAt: null,
+        },
+      })
+      await tx.chatSession.update({
+        where: { id: input.sessionId },
+        data: {
+          updatedAt: completedAt,
         },
       })
       await this.chatSessionEvents.appendEvents(tx, input.sessionId, [
