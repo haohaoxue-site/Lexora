@@ -1,6 +1,10 @@
 const GITHUB_OAUTH_UPSTREAM_URL = 'https://github.com/login/oauth'
 const GITHUB_USERINFO_UPSTREAM_URL = 'https://api.github.com/user'
 const LINUX_DO_UPSTREAM_URL = 'https://connect.linux.do'
+const GOOGLE_OAUTH_UPSTREAM_URL = 'https://accounts.google.com'
+const GOOGLE_TOKEN_UPSTREAM_URL = 'https://oauth2.googleapis.com/token'
+const GOOGLE_USERINFO_UPSTREAM_URL = 'https://openidconnect.googleapis.com/v1/userinfo'
+const GOOGLE_JWKS_UPSTREAM_URL = 'https://www.googleapis.com/oauth2/v3/certs'
 
 const PROXY_HEADER_NAMES = new Set([
   'accept',
@@ -115,6 +119,44 @@ function resolveRoute(url) {
       type: 'proxy',
       methods: ['GET'],
       target: createTargetUrl(GITHUB_USERINFO_UPSTREAM_URL, '', url),
+    }
+  }
+
+  if (githubPath) {
+    return null
+  }
+
+  const googlePath = stripPrefix(url.pathname, '/google')
+
+  if (googlePath === '/o/oauth2/v2/auth') {
+    return {
+      type: 'redirect',
+      methods: ['GET'],
+      target: createTargetUrl(GOOGLE_OAUTH_UPSTREAM_URL, '/o/oauth2/v2/auth', url),
+    }
+  }
+
+  if (googlePath === '/token') {
+    return {
+      type: 'proxy',
+      methods: ['POST'],
+      target: createTargetUrl(GOOGLE_TOKEN_UPSTREAM_URL, '', url),
+    }
+  }
+
+  if (googlePath === '/userinfo') {
+    return {
+      type: 'proxy',
+      methods: ['GET'],
+      target: createTargetUrl(GOOGLE_USERINFO_UPSTREAM_URL, '', url),
+    }
+  }
+
+  if (googlePath === '/certs') {
+    return {
+      type: 'proxy',
+      methods: ['GET'],
+      target: createTargetUrl(GOOGLE_JWKS_UPSTREAM_URL, '', url),
     }
   }
 
