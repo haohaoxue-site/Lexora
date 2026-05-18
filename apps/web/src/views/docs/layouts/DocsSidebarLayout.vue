@@ -52,7 +52,7 @@ const footerActions = computed<DocsSidebarFooterAction[]>(() => {
       isActive: currentSurface.value === 'pending-shares',
       icon: () => (
         <ElBadge value={pendingShareCount.value} max={9}>
-          <SvgIcon category="ui" icon="notification-bell" size="0.95rem" />
+          <SvgIcon category="ui" icon="bell" />
         </ElBadge>
       ),
       onClick: () => openPendingShares(),
@@ -64,7 +64,7 @@ const footerActions = computed<DocsSidebarFooterAction[]>(() => {
       id: 'permissions',
       label: '权限管理',
       isActive: currentSurface.value === 'permissions',
-      icon: () => <SvgIcon category="ui" icon="lock" size="0.95rem" />,
+      icon: () => <SvgIcon category="ui" icon="lock" />,
       onClick: () => openPermissionsOverview(),
     })
   }
@@ -73,7 +73,7 @@ const footerActions = computed<DocsSidebarFooterAction[]>(() => {
     id: 'trash',
     label: '回收站',
     isActive: currentSurface.value === 'trash',
-    icon: () => <SvgIcon category="ui" icon="trash-can" size="0.95rem" />,
+    icon: () => <SvgIcon category="ui" icon="trash-can" />,
     onClick: () => openTrashPage(),
   })
 
@@ -295,14 +295,18 @@ function collapseDocumentLibrary() {
 .docs-view__sidebar-footer {
   display: grid;
   align-items: center;
+  flex: 0 0 var(--default-footer-height);
+  height: var(--default-footer-height);
   border-top: 1px solid color-mix(in srgb, var(--brand-border-base) 74%, transparent);
-  padding: 0.45rem 0.625rem 0.5rem;
+  box-sizing: border-box;
 }
 
 .docs-view__sidebar-footer-item {
   position: relative;
   display: flex;
+  align-items: center;
   justify-content: center;
+  height: 100%;
   min-width: 0;
 
   &.has-divider::before {
@@ -337,6 +341,7 @@ function collapseDocumentLibrary() {
   border-radius: 0.625rem;
   background: transparent;
   padding: 0;
+  font-size: 18px;
   color: color-mix(in srgb, var(--brand-text-secondary) 88%, transparent);
   line-height: 0;
   transition:

@@ -46,7 +46,7 @@ const { statusLabel, errorMessage, pageDescription } = useCallback()
     margin-bottom: 1.5rem;
     width: 3rem;
     height: 3rem;
-    border-radius: 9999px;
+    border-radius: 50%;
     border: 3px solid color-mix(in srgb, var(--brand-primary) 20%, transparent);
     border-top-color: var(--brand-primary);
     animation: auth-callback-spin 1s linear infinite;
@@ -59,7 +59,7 @@ const { statusLabel, errorMessage, pageDescription } = useCallback()
     width: 3rem;
     height: 3rem;
     margin-bottom: 1.5rem;
-    border-radius: 9999px;
+    border-radius: 50%;
     color: var(--brand-error);
     font-size: 1.5rem;
     background: color-mix(in srgb, var(--brand-error) 10%, transparent);

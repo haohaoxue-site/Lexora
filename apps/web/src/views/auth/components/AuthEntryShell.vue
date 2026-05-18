@@ -78,7 +78,7 @@ defineSlots<{
 
   &__backdrop {
     position: absolute;
-    border-radius: 9999px;
+    border-radius: 50%;
     pointer-events: none;
     filter: blur(72px);
     opacity: 0.55;

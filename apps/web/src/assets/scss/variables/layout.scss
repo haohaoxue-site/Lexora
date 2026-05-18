@@ -2,15 +2,15 @@
   --app-shell-height: 100dvh;
   --spacing: .25rem;
 
-  --shell-header-height: 5.75rem;
   --shell-header-padding-block: 1rem;
   --shell-header-padding-inline: 1.5rem;
 
-  --page-panel-header-height: 3.5rem;
+  --default-header-height: 3.5rem;
+  --default-footer-height: 2.625rem;
   --page-panel-header-padding-block: 0;
   --page-panel-header-padding-inline: calc(var(--spacing) * 4);
 
-  --sidebar-panel-brand-height: var(--shell-header-height);
+  --sidebar-panel-brand-height: var(--default-header-height);
   --sidebar-panel-expanded-width: 13rem;
   --sidebar-panel-rail-width: 5rem;
   --sidebar-panel-row-height: 3.25rem;

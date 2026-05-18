@@ -298,7 +298,7 @@ const {
   flex-shrink: 0;
   width: 2.5rem;
   height: 2.5rem;
-  border-radius: 9999px;
+  border-radius: 50%;
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--brand-border-base) 70%, transparent);
 }
 
@@ -479,7 +479,7 @@ const {
   height: 2.75rem;
   justify-content: flex-start;
   border: 0;
-  border-radius: 0.75rem;
+  border-radius: 4px;
   padding: 0.25rem 0.5rem;
   color: var(--brand-text-primary);
   background: transparent;
@@ -528,7 +528,7 @@ const {
   flex-shrink: 0;
   width: 2.25rem;
   height: 2.25rem;
-  border-radius: 9999px;
+  border-radius: 50%;
 }
 
 .session-user-sidebar-trigger__name {

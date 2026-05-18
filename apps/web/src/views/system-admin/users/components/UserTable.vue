@@ -292,7 +292,7 @@ function handleExpandChange(user: SystemAdminUserItem, expandedUsers: SystemAdmi
   &__status-dot {
     width: 0.375rem;
     height: 0.375rem;
-    border-radius: 9999px;
+    border-radius: 50%;
 
     &.active {
       background: var(--brand-success);

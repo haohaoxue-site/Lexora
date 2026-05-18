@@ -56,7 +56,7 @@ const {
   user-select: none;
 
   &--circle {
-    border-radius: 9999px;
+    border-radius: 50%;
   }
 
   &--rounded {

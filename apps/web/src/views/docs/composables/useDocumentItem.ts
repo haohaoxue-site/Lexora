@@ -127,7 +127,7 @@ export function useDocumentItem(options: UseDocumentItemOptions) {
     items.push({
       command: 'copy-link',
       label: '复制链接',
-      icon: 'document-menu-link',
+      icon: 'link',
       divided: !canShareDocument.value,
     })
 
@@ -153,7 +153,7 @@ export function useDocumentItem(options: UseDocumentItemOptions) {
         {
           command: 'delete',
           label: '删除',
-          icon: 'document-menu-delete',
+          icon: 'trash-can',
           divided: true,
           danger: true,
         },

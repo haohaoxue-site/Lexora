@@ -25,8 +25,8 @@ withDefaults(defineProps<{
   position: sticky;
   top: 0;
   z-index: 20;
-  flex: 0 0 var(--page-panel-header-height);
-  height: var(--page-panel-header-height);
+  flex: 0 0 var(--default-header-height);
+  height: var(--default-header-height);
   padding: var(--page-panel-header-padding-block) var(--page-panel-header-padding-inline);
   border-bottom: 1px solid color-mix(in srgb, var(--brand-border-base) 80%, transparent);
   backdrop-filter: blur(24px);

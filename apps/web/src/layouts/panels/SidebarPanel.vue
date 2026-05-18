@@ -49,92 +49,88 @@ function handleToggle() {
 
 <template>
   <aside class="sidebar-panel" :class="sidebarStateClass">
-    <div class="flex h-full flex-col">
-      <div
-        class="sidebar-panel__brand-wrap has-toggle"
-        :class="[sidebarStateClass]"
+    <div
+      class="sidebar-panel__brand-wrap has-toggle"
+      :class="[sidebarStateClass]"
+    >
+      <RouterLink
+        v-if="shouldShowBrand"
+        :to="props.brand.to"
+        class="sidebar-panel__brand-link"
       >
-        <RouterLink
-          v-if="shouldShowBrand"
-          :to="props.brand.to"
-          class="sidebar-panel__brand-link"
-        >
-          <div class="sidebar-panel__brand-mark">
-            <SvgIcon
-              :category="props.brand.iconCategory"
-              :icon="props.brand.icon"
-              size="2.75rem"
-              class="sidebar-panel__brand-mark-image"
-            />
-          </div>
-          <div class="sidebar-panel__brand-text">
-            <div class="sidebar-panel__brand-label truncate text-base">
-              {{ props.brand.label }}
-            </div>
-            <div
-              v-if="props.brand.meta"
-              class="sidebar-panel__brand-meta truncate text-xs font-medium"
-            >
-              {{ props.brand.meta }}
-            </div>
-          </div>
-        </RouterLink>
-
-        <button
-          type="button"
-          class="sidebar-panel__toggle"
-          :class="sidebarStateClass"
-          @click="handleToggle"
-        >
-          <span class="sidebar-panel__toggle-icon">
-            <SvgIcon category="ui" :icon="getToggleGlyphClass()" size="1.25rem" />
-          </span>
-        </button>
-      </div>
-
-      <ElScrollbar class="min-h-0 flex-1">
-        <nav class="sidebar-panel__nav" :class="sidebarStateClass">
-          <RouterLink
-            v-for="item in props.items"
-            :key="item.name"
-            v-slot="{ href, navigate }"
-            :to="item.to"
-            custom
-          >
-            <a
-              :href="href"
-              class="sidebar-panel__nav-item"
-              :class="[sidebarStateClass, getItemStateClass(isNavigationItemActive(item))]"
-              @click="navigate"
-            >
-              <div class="sidebar-panel__nav-icon" :class="getItemStateClass(isNavigationItemActive(item))">
-                <SvgIcon
-                  :category="item.iconCategory"
-                  :icon="getItemIconSrc(item, isNavigationItemActive(item))"
-                  size="2.75rem"
-                  class="sidebar-panel__nav-icon-image"
-                />
-              </div>
-
-              <div class="sidebar-panel__nav-label truncate text-sm font-medium">
-                {{ item.label }}
-              </div>
-            </a>
-          </RouterLink>
-        </nav>
-      </ElScrollbar>
-
-      <div class="sidebar-panel__footer" :class="sidebarStateClass">
-        <div class="sidebar-panel__session" :class="sidebarStateClass">
-          <SessionUserMenu
-            :is-collapsed="props.isCollapsed"
-          />
-          <SessionNotificationBell
-            :is-collapsed="props.isCollapsed"
+        <div class="sidebar-panel__brand-mark">
+          <SvgIcon
+            :category="props.brand.iconCategory"
+            :icon="props.brand.icon"
+            size="2.75rem"
+            class="sidebar-panel__brand-mark-image"
           />
         </div>
-      </div>
+        <div class="sidebar-panel__brand-text">
+          <div class="sidebar-panel__brand-label truncate text-base">
+            {{ props.brand.label }}
+          </div>
+          <div
+            v-if="props.brand.meta"
+            class="sidebar-panel__brand-meta truncate text-xs font-medium"
+          >
+            {{ props.brand.meta }}
+          </div>
+        </div>
+      </RouterLink>
+
+      <button
+        type="button"
+        class="sidebar-panel__toggle"
+        :class="sidebarStateClass"
+        @click="handleToggle"
+      >
+        <span class="sidebar-panel__toggle-icon">
+          <SvgIcon category="ui" :icon="getToggleGlyphClass()" size="1.25rem" />
+        </span>
+      </button>
     </div>
+
+    <ElScrollbar class="min-h-0 flex-1">
+      <nav class="sidebar-panel__nav" :class="sidebarStateClass">
+        <RouterLink
+          v-for="item in props.items"
+          :key="item.name"
+          v-slot="{ href, navigate }"
+          :to="item.to"
+          custom
+        >
+          <a
+            :href="href"
+            class="sidebar-panel__nav-item"
+            :class="[sidebarStateClass, getItemStateClass(isNavigationItemActive(item))]"
+            @click="navigate"
+          >
+            <div class="sidebar-panel__nav-icon" :class="getItemStateClass(isNavigationItemActive(item))">
+              <SvgIcon
+                :category="item.iconCategory"
+                :icon="getItemIconSrc(item, isNavigationItemActive(item))"
+                size="2.75rem"
+                class="sidebar-panel__nav-icon-image"
+              />
+            </div>
+
+            <div class="sidebar-panel__nav-label truncate text-sm font-medium">
+              {{ item.label }}
+            </div>
+          </a>
+        </RouterLink>
+      </nav>
+    </ElScrollbar>
+
+    <footer class="sidebar-panel__footer" :class="sidebarStateClass">
+      <SessionUserMenu
+        :is-collapsed="props.isCollapsed"
+      />
+      <SessionNotificationBell
+        :is-collapsed="props.isCollapsed"
+      />
+    </footer>
   </aside>
 </template>
 
@@ -142,6 +138,8 @@ function handleToggle() {
 .sidebar-panel {
   --sidebar-panel-row-transition: 0.18s ease-out;
 
+  display: flex;
+  flex-direction: column;
   flex-shrink: 0;
   height: var(--app-shell-height);
   overflow: hidden;
@@ -399,22 +397,29 @@ function handleToggle() {
   }
 
   .sidebar-panel__footer {
-    flex-shrink: 0;
-    border-top: 1px solid color-mix(in srgb, var(--brand-border-base) 76%, transparent);
-  }
-
-  .sidebar-panel__session {
     display: grid;
     grid-template-columns: minmax(0, 1fr) 2.5rem;
     align-items: center;
     gap: 0.5rem;
-    padding: 0.75rem;
+    flex-shrink: 0;
+    border-top: 1px solid color-mix(in srgb, var(--brand-border-base) 76%, transparent);
+    box-sizing: border-box;
+
+    &.expanded {
+      flex-basis: var(--default-footer-height);
+      height: var(--default-footer-height);
+
+      :deep(.session-user-sidebar-trigger) {
+        height: 2.5rem;
+        padding-block: 0.125rem;
+      }
+    }
 
     &.collapsed {
       grid-template-columns: 1fr;
       justify-items: center;
       gap: 0.625rem;
-      padding-inline: 0;
+      padding-block: 0.75rem;
     }
   }
 }

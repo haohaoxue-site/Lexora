@@ -67,7 +67,7 @@ const {
         title="复制分享链接"
         @click="copyShareLink"
       >
-        <SvgIcon category="ui" icon="global-link-outlined" />
+        <SvgIcon category="ui" icon="link" />
       </ElButton>
     </ElTooltip>
 
@@ -102,7 +102,7 @@ const {
                 tabindex="0"
               >
                 <span class="document-header-actions__menu-icon">
-                  <SvgIcon category="ui" icon="docs-header-page-width" size="1rem" />
+                  <SvgIcon category="ui" icon="page-width" size="1rem" />
                 </span>
                 <span class="document-header-actions__menu-label">页宽设置</span>
                 <span class="document-header-actions__menu-caret">
@@ -148,7 +148,7 @@ const {
             divided
           >
             <template #icon>
-              <SvgIcon category="ui" icon="docs-header-info" size="1rem" />
+              <SvgIcon category="ui" icon="info" size="1rem" />
             </template>
             文档信息
           </ElDropdownItem>
@@ -157,7 +157,7 @@ const {
             command="history"
           >
             <template #icon>
-              <SvgIcon category="ui" icon="docs-header-history" size="1rem" />
+              <SvgIcon category="ui" icon="history" size="1rem" />
             </template>
             历史记录
           </ElDropdownItem>

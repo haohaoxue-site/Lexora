@@ -239,7 +239,7 @@ const {
     justify-content: center;
     width: 2rem;
     height: 2rem;
-    border-radius: 9999px;
+    border-radius: 50%;
     background: color-mix(in srgb, var(--brand-fill-light) 72%, var(--brand-bg-surface-raised));
     color: color-mix(in srgb, var(--brand-text-primary) 72%, var(--brand-primary) 28%);
   }

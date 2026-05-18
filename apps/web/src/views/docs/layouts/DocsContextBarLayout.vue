@@ -173,7 +173,7 @@ const connectionStatusTitle = computed(() =>
   .docs-view-context__connection-dot {
     width: 0.5rem;
     height: 0.5rem;
-    border-radius: 9999px;
+    border-radius: 50%;
     background: var(--docs-view-context-connection-color);
     box-shadow: 0 0 0 0.2rem color-mix(in srgb, var(--docs-view-context-connection-color) 14%, transparent);
   }

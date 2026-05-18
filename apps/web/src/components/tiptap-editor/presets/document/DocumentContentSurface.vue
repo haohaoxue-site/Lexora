@@ -96,15 +96,13 @@ function resolveObjectKey(value: object | null) {
     </div>
 
     <footer v-if="props.footerMetaItems.length" class="document-content-surface__footer">
-      <div class="document-content-surface__footer-content">
-        <div
-          v-for="item in props.footerMetaItems"
-          :key="item.label"
-          class="document-content-surface__footer-meta"
-        >
-          <span class="document-content-surface__footer-label">{{ item.label }}：</span>
-          <span class="document-content-surface__footer-value">{{ item.value }}</span>
-        </div>
+      <div
+        v-for="item in props.footerMetaItems"
+        :key="item.label"
+        class="document-content-surface__footer-meta"
+      >
+        <span class="document-content-surface__footer-label">{{ item.label }}：</span>
+        <span class="document-content-surface__footer-value">{{ item.value }}</span>
       </div>
     </footer>
   </section>
@@ -233,25 +231,20 @@ function resolveObjectKey(value: object | null) {
   }
 
   .document-content-surface__footer {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem 1rem;
     flex-shrink: 0;
-    padding:
-      0.75rem
-      var(--document-content-surface-inline-end)
-      0.75rem
-      var(--document-content-surface-inline-start);
+    flex-basis: var(--default-footer-height);
+    height: var(--default-footer-height);
+    overflow: hidden;
+    padding-inline: var(--document-content-surface-inline-start) var(--document-content-surface-inline-end);
     border-top: 1px solid color-mix(in srgb, var(--brand-border-base) 78%, transparent);
+    box-sizing: border-box;
     background: inherit;
     color: color-mix(in srgb, var(--brand-text-secondary) 82%, transparent);
     font-size: 12px;
     line-height: 1.25rem;
-  }
-
-  .document-content-surface__footer-content {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.5rem 1rem;
-    width: 100%;
-    max-width: 100%;
   }
 
   .document-content-surface__footer-meta {

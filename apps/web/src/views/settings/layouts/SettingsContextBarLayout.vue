@@ -49,7 +49,7 @@ const activeTab = defineModel<SettingsTabName>({ required: true })
     color: var(--brand-text-secondary);
     font-size: 1rem;
     font-weight: 600;
-    line-height: var(--page-panel-header-height);
+    line-height: var(--default-header-height);
   }
 
   :deep(.el-tabs__item:first-child) {

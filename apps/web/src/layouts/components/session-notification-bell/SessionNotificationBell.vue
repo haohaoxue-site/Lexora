@@ -46,7 +46,7 @@ const {
           class="session-notification-bell__trigger"
           :class="{ 'is-collapsed': props.isCollapsed }"
         >
-          <SvgIcon category="ui" icon="notification-bell" size="18px" class="session-notification-bell__icon" />
+          <SvgIcon category="ui" icon="bell" size="18px" class="session-notification-bell__icon" />
         </ElButton>
       </ElBadge>
     </template>

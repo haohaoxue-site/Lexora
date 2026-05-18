@@ -277,7 +277,7 @@ const {
     width: 1.75rem;
     height: 1.75rem;
     margin-top: 0.25rem;
-    border-radius: 9999px;
+    border-radius: 50%;
     background: color-mix(in srgb, var(--brand-primary) 10%, transparent);
   }
 
