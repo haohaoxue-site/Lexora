@@ -151,7 +151,7 @@ export const useDocumentTree = createSharedComposable(() => {
               }),
             }),
       })
-      await treeData.loadTree()
+      await treeData.loadTree({ silent: true })
       await navigateToDocument(createdDocument.id, {
         focusTitle: true,
         skipConfirm: true,
