@@ -312,7 +312,7 @@ function mergeBlockBackward(props: CommandProps) {
   return props.commands.first(({ commands }) => [
     () => commands.undoInputRule(),
     () => resetEmptyHeadingBeforeMerge(props),
-    () => stopEmptyBlockBeforeStructuralMergeBoundary(props),
+    () => moveCursorIntoPreviousStructuralMergeBoundary(props),
     () => selectPreviousStructuralMergeBoundary(props),
     () => commands.joinBackward(),
     () => commands.selectNodeBackward(),
@@ -334,14 +334,28 @@ function resetEmptyHeadingBeforeMerge(props: BlockCommandContext) {
   return props.commands.setNode('paragraph')
 }
 
-function stopEmptyBlockBeforeStructuralMergeBoundary(props: CommandProps) {
+function moveCursorIntoPreviousStructuralMergeBoundary(props: CommandProps) {
   const currentBlock = getCurrentBlock(props.tr.selection)
 
   if (!currentBlock || currentBlock.node.content.size > 0) {
     return false
   }
 
-  return Boolean(resolvePreviousStructuralMergeBoundary(props))
+  if (!resolvePreviousStructuralMergeBoundary(props)) {
+    return false
+  }
+
+  const previousTextSelection = Selection.findFrom(
+    props.tr.doc.resolve(currentBlock.from),
+    -1,
+    true,
+  )
+
+  if (previousTextSelection) {
+    props.tr.setSelection(previousTextSelection)
+  }
+
+  return true
 }
 
 function selectPreviousStructuralMergeBoundary(props: CommandProps) {
