@@ -12,7 +12,7 @@ import {
   parseStructuredClipboardContent,
   SAMEPAGE_BLOCK_CLIPBOARD_TYPE,
 } from '../content/blockClipboard'
-import { createFilePasteContent, createPlainTextPasteContent } from '../content/pasteContent'
+import { createFilePasteContent } from '../content/pasteContent'
 
 export interface PastePipelineOptions {
   uploadImage?: (file: File) => Promise<TiptapEditorUploadedImage>
@@ -48,6 +48,8 @@ function handleEditorPaste(editor: Editor, event: ClipboardEvent, options: Paste
 
   const files = Array.from(event.clipboardData.files ?? [])
   const html = event.clipboardData.getData('text/html').trim()
+  const text = event.clipboardData.getData('text/plain')
+  const preferPlain = isPreferPlainPaste(editor)
 
   if (files.length) {
     event.preventDefault()
@@ -56,42 +58,76 @@ function handleEditorPaste(editor: Editor, event: ClipboardEvent, options: Paste
   }
 
   if (isSelectionInsideCodeBlock(editor)) {
-    const text = event.clipboardData.getData('text/plain')
-
     if (!text.length) {
       return false
     }
 
     event.preventDefault()
-    editor.view.dispatch(editor.state.tr.insertText(text).scrollIntoView())
+    dispatchPlainTextPaste(editor, text)
     return true
   }
 
-  const structuredContent = parseStructuredClipboardContent(
-    event.clipboardData.getData(SAMEPAGE_BLOCK_CLIPBOARD_TYPE),
-  )
+  if (!preferPlain) {
+    const structuredContent = parseStructuredClipboardContent(
+      event.clipboardData.getData(SAMEPAGE_BLOCK_CLIPBOARD_TYPE),
+    )
 
-  if (structuredContent?.length) {
-    return editor.chain().focus().insertContent(structuredContent).run()
+    if (structuredContent?.length) {
+      return editor.chain().focus().insertContent(structuredContent).run()
+    }
   }
 
-  if (html.length) {
+  if (shouldInsertPlainTextInline(editor, text, html, preferPlain)) {
+    dispatchPlainTextPaste(editor, text)
+    return true
+  }
+
+  if (!preferPlain && html.length) {
     if (options.uploadImage && hasAnimatedGifPasteSource(html)) {
       event.preventDefault()
       void handleAnimatedGifPaste(editor, html, options)
       return true
     }
-
-    return editor.chain().focus().insertContent(html).run()
   }
 
-  const text = event.clipboardData.getData('text/plain')
+  return false
+}
 
-  if (!text.length) {
+function dispatchPlainTextPaste(editor: Editor, text: string) {
+  editor.view.dispatch(
+    editor.state.tr
+      .insertText(text)
+      .scrollIntoView()
+      .setMeta('paste', true)
+      .setMeta('uiEvent', 'paste'),
+  )
+}
+
+function shouldInsertPlainTextInline(editor: Editor, text: string, html: string, preferPlain: boolean) {
+  if (!text.length || /[\r\n]/.test(text)) {
     return false
   }
 
-  return editor.chain().focus().insertContent(createPlainTextPasteContent(text)).run()
+  if (html.length && !preferPlain) {
+    return false
+  }
+
+  const { $from, $to } = editor.state.selection
+
+  return $from.sameParent($to)
+    && $from.parent.isTextblock
+    && !($from.parent.type.spec.code)
+}
+
+function isPreferPlainPaste(editor: Editor) {
+  const viewInput = editor.view as unknown as {
+    input?: {
+      lastKeyCode?: number
+      shiftKey?: boolean
+    }
+  }
+
+  return Boolean(viewInput.input?.shiftKey && viewInput.input.lastKeyCode !== 45)
 }
 
 function isSelectionInsideCodeBlock(editor: Editor) {

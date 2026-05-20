@@ -312,6 +312,7 @@ function mergeBlockBackward(props: CommandProps) {
   return props.commands.first(({ commands }) => [
     () => commands.undoInputRule(),
     () => resetEmptyHeadingBeforeMerge(props),
+    () => stopEmptyBlockBeforeStructuralMergeBoundary(props),
     () => selectPreviousStructuralMergeBoundary(props),
     () => commands.joinBackward(),
     () => commands.selectNodeBackward(),
@@ -331,6 +332,16 @@ function resetEmptyHeadingBeforeMerge(props: BlockCommandContext) {
   }
 
   return props.commands.setNode('paragraph')
+}
+
+function stopEmptyBlockBeforeStructuralMergeBoundary(props: CommandProps) {
+  const currentBlock = getCurrentBlock(props.tr.selection)
+
+  if (!currentBlock || currentBlock.node.content.size > 0) {
+    return false
+  }
+
+  return Boolean(resolvePreviousStructuralMergeBoundary(props))
 }
 
 function selectPreviousStructuralMergeBoundary(props: CommandProps) {
