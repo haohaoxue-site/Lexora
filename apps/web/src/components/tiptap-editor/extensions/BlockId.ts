@@ -9,8 +9,11 @@ import {
   BODY_BLOCK_ID_NODE_TYPES,
 
   createBlockId,
+  isAddressableBodyBlock,
   isBlockId,
+  isBodyBlockIdNodeTypeName,
 } from '../content/blockId'
+import { DOCUMENT_RUNTIME_NORMALIZER_TRANSACTION_META } from './DocumentRuntimeNormalizer'
 
 const BLOCK_ID_TRANSACTION_META = 'samepageBlockIdTransaction'
 
@@ -68,7 +71,9 @@ export const BlockId = Extension.create<BlockIdOptions>({
         key: new PluginKey(this.name),
         appendTransaction: (transactions, _, newState) => {
           const changedTransactions = transactions.filter(transaction =>
-            transaction.docChanged && !transaction.getMeta(BLOCK_ID_TRANSACTION_META),
+            transaction.docChanged
+            && !transaction.getMeta(BLOCK_ID_TRANSACTION_META)
+            && !transaction.getMeta(DOCUMENT_RUNTIME_NORMALIZER_TRANSACTION_META),
           )
 
           if (changedTransactions.length === 0) {
@@ -76,23 +81,21 @@ export const BlockId = Extension.create<BlockIdOptions>({
           }
 
           if (changedTransactions.every(isChangeOrigin)) {
-            return createSyntheticEmptyParagraphCleanupTransaction(
-              newState,
-              this.options.attributeName,
-            ) ?? undefined
+            return
           }
 
-          return createBlockIdTransaction(newState, this.options) ?? undefined
+          return createBlockIdTransaction(newState, this.options, {
+            addToHistory: shouldAddBlockIdTransactionToHistory(changedTransactions),
+          }) ?? undefined
         },
       }),
     ]
   },
 
   onCreate() {
-    const transaction = createSyntheticEmptyParagraphCleanupTransaction(
-      this.editor.state,
-      this.options.attributeName,
-    ) ?? createBlockIdTransaction(this.editor.state, this.options)
+    const transaction = createBlockIdTransaction(this.editor.state, this.options, {
+      addToHistory: false,
+    })
 
     if (!transaction) {
       return
@@ -105,17 +108,38 @@ export const BlockId = Extension.create<BlockIdOptions>({
 function createBlockIdTransaction(
   state: EditorState,
   options: BlockIdOptions,
+  transactionOptions: {
+    addToHistory: boolean
+  },
 ): Transaction | null {
   const seenIds = new Set<string>()
   let transaction = state.tr
   let changed = false
 
-  state.doc.descendants((node, pos) => {
-    if (!shouldAssignBlockId(node, options.types)) {
+  state.doc.descendants((node, pos, parent) => {
+    if (!isConfigurableBlockIdNode(node, options.types)) {
       return
     }
 
     const blockId = readBlockId(node, options.attributeName)
+
+    if (!isAddressableBodyBlock(node, parent)) {
+      if (!blockId) {
+        return
+      }
+
+      transaction = transaction.setNodeMarkup(
+        pos,
+        undefined,
+        {
+          ...node.attrs,
+          [options.attributeName]: null,
+        },
+        node.marks,
+      )
+      changed = true
+      return
+    }
 
     if (blockId && !seenIds.has(blockId)) {
       seenIds.add(blockId)
@@ -141,64 +165,24 @@ function createBlockIdTransaction(
     return null
   }
 
-  return transaction.setMeta(BLOCK_ID_TRANSACTION_META, true)
+  transaction = transaction.setMeta(BLOCK_ID_TRANSACTION_META, true)
+
+  if (!transactionOptions.addToHistory) {
+    transaction = transaction.setMeta('addToHistory', false)
+  }
+
+  return transaction
 }
 
-function createSyntheticEmptyParagraphCleanupTransaction(
-  state: EditorState,
-  attributeName: string,
-): Transaction | null {
-  const { doc } = state
-
-  if (doc.childCount <= 1) {
-    return null
-  }
-
-  let hasStableBlockId = false
-
-  for (let index = 0; index < doc.childCount; index += 1) {
-    if (readBlockId(doc.child(index), attributeName)) {
-      hasStableBlockId = true
-      break
-    }
-  }
-
-  if (!hasStableBlockId) {
-    return null
-  }
-
-  let transaction = state.tr
-  let changed = false
-  let position = 0
-
-  for (let index = 0; index < doc.childCount; index += 1) {
-    const node = doc.child(index)
-    const nodeSize = node.nodeSize
-
-    if (shouldRemoveSyntheticParagraph(node, attributeName)) {
-      transaction = transaction.delete(position, position + nodeSize)
-      changed = true
-      continue
-    }
-
-    position += nodeSize
-  }
-
-  if (!changed) {
-    return null
-  }
-
-  return transaction.setMeta(BLOCK_ID_TRANSACTION_META, true)
+function shouldAddBlockIdTransactionToHistory(transactions: readonly Transaction[]) {
+  return transactions.some(transaction => transaction.getMeta('addToHistory') !== false)
 }
 
-function shouldRemoveSyntheticParagraph(node: ProseMirrorNode, attributeName: string) {
-  return node.type.name === 'paragraph'
-    && node.textContent.length === 0
-    && !readBlockId(node, attributeName)
-}
-
-function shouldAssignBlockId(node: ProseMirrorNode, types: string[]): node is ProseMirrorNode & { type: { name: BodyBlockIdNodeType } } {
-  return node.type.name !== 'doc' && node.isBlock && types.includes(node.type.name)
+function isConfigurableBlockIdNode(node: ProseMirrorNode, types: string[]): node is ProseMirrorNode & { type: { name: BodyBlockIdNodeType } } {
+  return node.type.name !== 'doc'
+    && node.isBlock
+    && types.includes(node.type.name)
+    && isBodyBlockIdNodeTypeName(node.type.name)
 }
 
 function readBlockId(node: ProseMirrorNode, attributeName: string) {

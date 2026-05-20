@@ -1,22 +1,7 @@
 import type { Node as ProseMirrorNode } from '@tiptap/pm/model'
 import type { Selection } from '@tiptap/pm/state'
-
-const CURRENT_BLOCK_NODE_TYPES = new Set([
-  'paragraph',
-  'heading',
-  'blockquote',
-  'codeBlock',
-  'blockMath',
-  'horizontalRule',
-  'listItem',
-  'taskItem',
-])
-
-const PARAGRAPH_PARENT_NODE_TYPES = new Set([
-  'blockquote',
-  'listItem',
-  'taskItem',
-])
+import { NodeSelection } from '@tiptap/pm/state'
+import { isAddressableBodyBlock } from '../content/blockId'
 
 export interface CurrentBlockSelection {
   node: ProseMirrorNode
@@ -29,16 +14,31 @@ export interface CurrentBlockSelection {
 export function getCurrentBlock(selection: Selection): CurrentBlockSelection | null {
   const { $from } = selection
 
+  if (selection instanceof NodeSelection) {
+    const parent = $from.parent
+
+    if (isAddressableBodyBlock(selection.node, parent)) {
+      return {
+        node: selection.node,
+        parent,
+        index: $from.index(),
+        from: selection.from,
+        to: selection.to,
+      }
+    }
+  }
+
   for (let depth = $from.depth; depth > 0; depth -= 1) {
     const node = $from.node(depth)
+    const parent = $from.node(depth - 1)
 
-    if (!shouldUseCurrentBlock(node, depth, selection)) {
+    if (!isAddressableBodyBlock(node, parent)) {
       continue
     }
 
     return {
       node,
-      parent: $from.node(depth - 1),
+      parent,
       index: $from.index(depth - 1),
       from: $from.before(depth),
       to: $from.after(depth),
@@ -70,24 +70,12 @@ export function findBlockById(doc: ProseMirrorNode, blockId: string): CurrentBlo
   return matchedBlock
 }
 
-function shouldUseCurrentBlock(node: ProseMirrorNode, depth: number, selection: Selection) {
-  if (!CURRENT_BLOCK_NODE_TYPES.has(node.type.name)) {
-    return false
-  }
-
-  if (node.type.name !== 'paragraph') {
-    return true
-  }
-
-  return !PARAGRAPH_PARENT_NODE_TYPES.has(selection.$from.node(depth - 1)?.type.name)
-}
-
 function shouldUseMatchedBlock(
   node: ProseMirrorNode,
   blockId: string,
   parent: ProseMirrorNode | null,
 ) {
-  if (!parent || !CURRENT_BLOCK_NODE_TYPES.has(node.type.name)) {
+  if (!parent || !isAddressableBodyBlock(node, parent)) {
     return false
   }
 

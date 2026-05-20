@@ -5,15 +5,13 @@ export const TIPTAP_CODE_BLOCK_TAB_SIZES = [2, 4, 8] as const
 export const TIPTAP_BODY_BLOCK_ID_NODE_TYPES = [
   'paragraph',
   'heading',
-  'bulletList',
-  'orderedList',
   'listItem',
-  'taskList',
   'taskItem',
   'blockquote',
   'codeBlock',
   'horizontalRule',
   'blockMath',
+  'table',
   'image',
   'file',
 ] as const

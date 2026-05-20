@@ -48,6 +48,7 @@ declare module '@tiptap/core' {
       duplicateBlock: () => ReturnType
       splitCurrentBlock: () => ReturnType
       mergeBlockBackward: () => ReturnType
+      deleteForward: () => ReturnType
     }
   }
 }

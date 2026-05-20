@@ -2,36 +2,18 @@ import type { CommandProps, Editor } from '@tiptap/core'
 import type { CurrentBlockSelection } from '../commands/currentBlock'
 import type { TurnIntoBlockType } from '../commands/turnInto'
 import { Extension } from '@tiptap/core'
-import { NodeSelection, Selection } from '@tiptap/pm/state'
+import { NodeSelection, Selection, TextSelection } from '@tiptap/pm/state'
+import { CellSelection } from '@tiptap/pm/tables'
+import { runSamePageBackspacePolicy } from '../commands/block-context/backspace'
 import { findBlockById, getCurrentBlock } from '../commands/currentBlock'
+import { recordHistorySelectionDeletedText } from '../commands/historySelection'
+import { TIPTAP_SPLIT_MERGE_EXCLUDED_ANCESTOR_NODE_NAMES } from '../content/blockTaxonomy'
 
 type HeadingTurnIntoBlockType = Extract<TurnIntoBlockType, 'heading-1' | 'heading-2' | 'heading-3' | 'heading-4' | 'heading-5'>
 type BlockCommandContext = Pick<CommandProps, 'commands' | 'editor'>
+type DeletionDirection = 'backward' | 'forward'
 const EMPTY_STORED_MARKS: [] = []
-const SPLIT_MERGE_EXCLUDED_NODE_NAMES = new Set([
-  'blockquote',
-  'bulletList',
-  'orderedList',
-  'taskList',
-  'listItem',
-  'taskItem',
-  'codeBlock',
-  'blockMath',
-  'table',
-  'tableRow',
-  'tableCell',
-  'tableHeader',
-])
-
-const STRUCTURAL_MERGE_BOUNDARY_NODE_NAMES = new Set([
-  'blockquote',
-  'bulletList',
-  'orderedList',
-  'taskList',
-  'codeBlock',
-  'blockMath',
-  'table',
-])
+const SPLIT_MERGE_EXCLUDED_NODE_NAMES = new Set<string>(TIPTAP_SPLIT_MERGE_EXCLUDED_ANCESTOR_NODE_NAMES)
 
 const HEADING_LEVEL_BY_TARGET: Record<HeadingTurnIntoBlockType, 1 | 2 | 3 | 4 | 5> = {
   'heading-1': 1,
@@ -100,6 +82,7 @@ export const BlockCommands = Extension.create({
       duplicateBlock: () => (props: CommandProps) => duplicateCurrentBlock(props),
       splitCurrentBlock: () => (props: CommandProps) => splitCurrentBlock(props),
       mergeBlockBackward: () => (props: CommandProps) => mergeBlockBackward(props),
+      deleteForward: () => (props: CommandProps) => deleteForward(props),
     }
   },
 
@@ -107,6 +90,7 @@ export const BlockCommands = Extension.create({
     return {
       'Enter': () => this.editor.commands.splitCurrentBlock(),
       'Backspace': () => this.editor.commands.mergeBlockBackward(),
+      'Delete': () => this.editor.commands.deleteForward(),
       'Alt-Shift-ArrowUp': () => this.editor.commands.moveBlockUp(),
       'Alt-Shift-ArrowDown': () => this.editor.commands.moveBlockDown(),
     }
@@ -305,86 +289,207 @@ function splitCurrentBlock(props: BlockCommandContext) {
 }
 
 function mergeBlockBackward(props: CommandProps) {
+  if (deleteSelectedTable(props, 'backward')) {
+    return true
+  }
+
+  if (!props.editor.state.selection.empty) {
+    recordHistorySelectionDeletedText(
+      props.tr,
+      props.editor.state.doc,
+      props.editor.state.selection.from,
+      props.editor.state.selection.to,
+    )
+    props.tr.deleteSelection()
+    return true
+  }
+
   if (!canMergeCurrentBlock(props.editor)) {
-    return false
+    return props.commands.first(({ commands }) => [
+      () => commands.undoInputRule(),
+      () => deleteTextBeforeCaret(props),
+    ])
   }
 
   return props.commands.first(({ commands }) => [
     () => commands.undoInputRule(),
-    () => resetEmptyHeadingBeforeMerge(props),
-    () => moveCursorIntoPreviousStructuralMergeBoundary(props),
-    () => selectPreviousStructuralMergeBoundary(props),
+    () => runSamePageBackspacePolicy(props),
     () => commands.joinBackward(),
     () => commands.selectNodeBackward(),
   ])
 }
 
-function resetEmptyHeadingBeforeMerge(props: BlockCommandContext) {
-  const { selection } = props.editor.state
-  const currentNode = selection.$from.parent
+function deleteForward(props: CommandProps) {
+  if (deleteSelectedTable(props, 'forward')) {
+    return true
+  }
 
-  if (!selection.empty || selection.$from.parentOffset !== 0) {
+  if (!props.editor.state.selection.empty) {
+    recordHistorySelectionDeletedText(
+      props.tr,
+      props.editor.state.doc,
+      props.editor.state.selection.from,
+      props.editor.state.selection.to,
+    )
+    props.tr.deleteSelection()
+    return true
+  }
+
+  const range = resolveDeleteForwardTextRange(props.editor.state.selection)
+
+  if (!range) {
     return false
   }
 
-  if (currentNode.type.name !== 'heading' || currentNode.content.size > 0) {
-    return false
-  }
-
-  return props.commands.setNode('paragraph')
-}
-
-function moveCursorIntoPreviousStructuralMergeBoundary(props: CommandProps) {
-  const currentBlock = getCurrentBlock(props.tr.selection)
-
-  if (!currentBlock || currentBlock.node.content.size > 0) {
-    return false
-  }
-
-  if (!resolvePreviousStructuralMergeBoundary(props)) {
-    return false
-  }
-
-  const previousTextSelection = Selection.findFrom(
-    props.tr.doc.resolve(currentBlock.from),
-    -1,
-    true,
+  recordHistorySelectionDeletedText(
+    props.tr,
+    props.editor.state.doc,
+    range.from,
+    range.to,
+    'start',
   )
-
-  if (previousTextSelection) {
-    props.tr.setSelection(previousTextSelection)
-  }
-
+  props.tr.delete(range.from, range.to)
   return true
 }
 
-function selectPreviousStructuralMergeBoundary(props: CommandProps) {
-  const boundary = resolvePreviousStructuralMergeBoundary(props)
+function deleteTextBeforeCaret(props: CommandProps) {
+  const range = resolveDeleteBackwardTextRange(props.editor.state.selection)
 
-  if (!boundary) {
+  if (!range) {
     return false
   }
 
-  props.tr.setSelection(NodeSelection.create(props.tr.doc, boundary.from))
-
+  recordHistorySelectionDeletedText(
+    props.tr,
+    props.editor.state.doc,
+    range.from,
+    range.to,
+  )
+  props.tr.delete(range.from, range.to)
   return true
 }
 
-function resolvePreviousStructuralMergeBoundary(props: CommandProps) {
-  const currentBlock = getCurrentBlock(props.tr.selection)
-
-  if (!currentBlock || currentBlock.index <= 0) {
+function resolveDeleteForwardTextRange(selection: Selection) {
+  if (
+    !(selection instanceof TextSelection)
+    || !selection.empty
+    || !selection.$from.parent.isTextblock
+    || selection.$from.parentOffset >= selection.$from.parent.content.size
+    || !selection.$from.nodeAfter?.isText
+    || !selection.$from.nodeAfter.text
+  ) {
     return null
   }
 
-  const previousNode = currentBlock.parent.child(currentBlock.index - 1)
+  const deletedText = Array.from(selection.$from.nodeAfter.text).at(0)
 
-  if (!STRUCTURAL_MERGE_BOUNDARY_NODE_NAMES.has(previousNode.type.name)) {
+  if (!deletedText) {
     return null
   }
 
   return {
-    from: currentBlock.from - previousNode.nodeSize,
+    from: selection.from,
+    to: selection.from + deletedText.length,
+  }
+}
+
+function deleteSelectedTable(props: CommandProps, direction: DeletionDirection) {
+  const { selection } = props.editor.state
+
+  if (selection instanceof NodeSelection && selection.node.type.name === 'table') {
+    deleteRangeAndSetLandingSelection(props, selection.from, selection.to, direction)
+    return true
+  }
+
+  if (!(selection instanceof CellSelection)) {
+    return false
+  }
+
+  const currentBlock = getCurrentBlock(selection)
+
+  if (!currentBlock || currentBlock.node.type.name !== 'table') {
+    return false
+  }
+
+  let cellCount = 0
+
+  currentBlock.node.descendants((node) => {
+    if (node.type.name === 'table') {
+      return false
+    }
+
+    if (node.type.name === 'tableCell' || node.type.name === 'tableHeader') {
+      cellCount += 1
+    }
+  })
+
+  if (cellCount !== selection.ranges.length) {
+    return false
+  }
+
+  deleteRangeAndSetLandingSelection(props, currentBlock.from, currentBlock.to, direction)
+  return true
+}
+
+function deleteRangeAndSetLandingSelection(
+  props: CommandProps,
+  from: number,
+  to: number,
+  direction: DeletionDirection,
+) {
+  const landingSelection = resolveDeletionLandingSelection(
+    props.editor.state.doc,
+    from,
+    to,
+    direction,
+  )
+
+  props.tr.delete(from, to)
+
+  if (!landingSelection) {
+    return
+  }
+
+  props.tr.setSelection(landingSelection.map(props.tr.doc, props.tr.mapping))
+}
+
+function resolveDeletionLandingSelection(
+  doc: CommandProps['editor']['state']['doc'],
+  from: number,
+  to: number,
+  direction: DeletionDirection,
+) {
+  const previousSelection = Selection.findFrom(doc.resolve(from), -1, true)
+  const nextSelection = Selection.findFrom(doc.resolve(to), 1, true)
+
+  if (direction === 'backward') {
+    return previousSelection ?? nextSelection
+  }
+
+  return nextSelection ?? previousSelection
+}
+
+function resolveDeleteBackwardTextRange(selection: Selection) {
+  if (
+    !(selection instanceof TextSelection)
+    || !selection.empty
+    || !selection.$from.parent.isTextblock
+    || selection.$from.parentOffset <= 0
+    || !selection.$from.nodeBefore?.isText
+    || !selection.$from.nodeBefore.text
+  ) {
+    return null
+  }
+
+  const deletedText = Array.from(selection.$from.nodeBefore.text).at(-1)
+
+  if (!deletedText) {
+    return null
+  }
+
+  return {
+    from: selection.from - deletedText.length,
+    to: selection.from,
   }
 }
 

@@ -1,11 +1,12 @@
 import type { TiptapJsonContent, TiptapJsonNode } from '@haohaoxue/samepage-contracts'
+import { TIPTAP_BODY_BLOCK_ID_ATTRIBUTE } from '@haohaoxue/samepage-contracts'
 
 export function unwrapTiptapContent(content: TiptapJsonNode): TiptapJsonContent {
   if (!Array.isArray(content.content) || !content.content.length) {
     return []
   }
 
-  const normalizedContent = JSON.parse(JSON.stringify(content.content)) as TiptapJsonContent
+  const normalizedContent = content.content.map(normalizeTiptapJsonNode)
 
   return isEmptyParagraphContent(normalizedContent) ? [] : normalizedContent
 }
@@ -41,4 +42,59 @@ function isEmptyParagraphNode(node: TiptapJsonNode | undefined) {
   return node.content.every(child =>
     child?.type === 'text' && typeof child.text === 'string' && child.text.length === 0,
   )
+}
+
+function normalizeTiptapJsonNode(node: TiptapJsonNode): TiptapJsonNode {
+  const normalizedNode = normalizeDefinedObject(node) as TiptapJsonNode
+
+  if (node.attrs) {
+    const attrs = Object.fromEntries(
+      Object.entries(node.attrs).filter(([key, value]) =>
+        value !== undefined
+        && !(key === TIPTAP_BODY_BLOCK_ID_ATTRIBUTE && value === null),
+      ),
+    )
+
+    if (Object.keys(attrs).length) {
+      normalizedNode.attrs = attrs
+    }
+    else {
+      delete normalizedNode.attrs
+    }
+  }
+
+  if (Array.isArray(node.content)) {
+    normalizedNode.content = node.content.map(normalizeTiptapJsonNode)
+  }
+
+  if (Array.isArray(node.marks)) {
+    normalizedNode.marks = node.marks.map((mark) => {
+      const normalizedMark = normalizeDefinedObject(mark)
+
+      if (!mark.attrs) {
+        return normalizedMark
+      }
+
+      const attrs = Object.fromEntries(
+        Object.entries(mark.attrs).filter(([, value]) => value !== undefined),
+      )
+
+      if (Object.keys(attrs).length) {
+        normalizedMark.attrs = attrs
+      }
+      else {
+        delete normalizedMark.attrs
+      }
+
+      return normalizedMark
+    })
+  }
+
+  return normalizedNode
+}
+
+function normalizeDefinedObject<T extends Record<string, unknown>>(value: T): T {
+  return Object.fromEntries(
+    Object.entries(value).filter(([, entryValue]) => entryValue !== undefined),
+  ) as T
 }

@@ -31,6 +31,8 @@ import { BlockId } from '../extensions/BlockId'
 import { CodeBlock } from '../extensions/CodeBlock'
 import { DocumentFile } from '../extensions/DocumentFile'
 import { DocumentImage } from '../extensions/DocumentImage'
+import { DocumentRuntimeNormalizer } from '../extensions/DocumentRuntimeNormalizer'
+import { HistorySelection } from '../extensions/HistorySelection'
 import { InlineCode } from '../extensions/InlineCode'
 import { BlockMathematics, InlineMathematics } from '../extensions/Mathematics'
 import { PastePipeline } from '../extensions/PastePipeline'
@@ -41,9 +43,9 @@ const BODY_PLACEHOLDER = '输入 / 唤起命令，按 space（空格）启用 AI
 const BODY_EMPTY_LINE_PLACEHOLDER = '按 space（空格）以启用 AI，或按“/”启用命令'
 const TITLE_PLACEHOLDER = '输入文档标题'
 const COLLABORATION_Y_UNDO_OPTIONS: CollaborationOptions['yUndoOptions'] = {
+  // pnpm 下 ySyncPluginKey 可能出现实例不一致，constructor 匹配能让 yUndo 捕获本地编辑事务。
   trackedOrigins: [ySyncPluginKey.constructor],
 }
-
 export function createBodyExtensions(options: {
   uploadImage?: (file: File) => Promise<TiptapEditorUploadedImage>
   uploadFile?: (file: File) => Promise<TiptapEditorUploadedFile>
@@ -51,6 +53,7 @@ export function createBodyExtensions(options: {
   collaboration?: TiptapEditorCollaborationBinding | null
 } = {}): Extensions {
   return [
+    DocumentRuntimeNormalizer,
     BlockId,
     StarterKit.configure({
       heading: {
@@ -64,6 +67,7 @@ export function createBodyExtensions(options: {
       undoRedo: options.collaboration ? false : undefined,
     }),
     ...createCollaborationExtensions(options.collaboration),
+    HistorySelection,
     Placeholder.configure({
       placeholder: ({ editor, node }) => resolveBodyPlaceholder(editor, node),
     }),
@@ -148,6 +152,7 @@ export function createTitleExtensions(options: {
       undoRedo: options.collaboration ? false : undefined,
     }),
     ...createCollaborationExtensions(options.collaboration),
+    HistorySelection,
     Placeholder.configure({
       placeholder: TITLE_PLACEHOLDER,
     }),
