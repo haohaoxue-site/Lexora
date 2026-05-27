@@ -20,6 +20,7 @@ const emit = defineEmits<{
 const route = useRoute()
 const sidebarStateClass = computed(() => props.isCollapsed ? 'collapsed' : 'expanded')
 const shouldShowBrand = computed(() => !props.isCollapsed)
+const repositoryUrl = 'https://github.com/haohaoxue-site/SamePage-AI'
 
 function getItemStateClass(isActive: boolean) {
   return isActive ? 'active' : 'idle'
@@ -122,6 +123,27 @@ function handleToggle() {
         </RouterLink>
       </nav>
     </ElScrollbar>
+
+    <nav class="sidebar-panel__external-nav" aria-label="项目链接">
+      <a
+        :href="repositoryUrl"
+        target="_blank"
+        rel="noopener noreferrer"
+        class="sidebar-panel__external-link"
+        :class="sidebarStateClass"
+        aria-label="打开 SamePage AI GitHub 项目地址"
+      >
+        <span class="sidebar-panel__external-icon">
+          <SvgIcon category="ui" icon="brand-github" size="18px" />
+        </span>
+        <span
+          v-if="!props.isCollapsed"
+          class="sidebar-panel__external-label truncate text-sm font-medium"
+        >
+          GitHub
+        </span>
+      </a>
+    </nav>
 
     <footer class="sidebar-panel__footer" :class="sidebarStateClass">
       <SessionUserMenu
@@ -349,6 +371,66 @@ function handleToggle() {
 
   .sidebar-panel__nav-label {
     z-index: 1;
+  }
+
+  .sidebar-panel__external-nav {
+    flex-shrink: 0;
+    padding-block: 0.5rem;
+    border-top: 1px solid color-mix(in srgb, var(--brand-border-base) 76%, transparent);
+  }
+
+  .sidebar-panel__external-link {
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+    width: 100%;
+    height: 2.5rem;
+    overflow: hidden;
+    border-radius: 4px;
+    padding: 0.25rem 0.5rem;
+    color: var(--brand-text-primary);
+    text-decoration: none;
+    transition:
+      color 0.2s ease,
+      background 0.2s ease;
+
+    &:hover {
+      color: var(--brand-text-primary);
+      background: color-mix(in srgb, var(--brand-fill-lighter) 76%, var(--brand-text-primary) 6%);
+    }
+
+    &:focus-visible {
+      outline: none;
+      box-shadow: 0 0 0 2px color-mix(in srgb, var(--brand-primary) 20%, transparent);
+    }
+
+    &.collapsed {
+      justify-content: center;
+      width: 2.75rem;
+      height: 2.75rem;
+      margin-inline: auto;
+      padding: 0;
+
+      &:hover {
+        background: color-mix(in srgb, var(--brand-fill-lighter) 76%, var(--brand-text-primary) 6%);
+      }
+    }
+  }
+
+  .sidebar-panel__external-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 2.25rem;
+    height: 2.25rem;
+  }
+
+  .sidebar-panel__external-label {
+    flex: 1 1 0%;
+    min-width: 0;
+    line-height: 1;
+    text-align: left;
   }
 
   .sidebar-panel__toggle {
