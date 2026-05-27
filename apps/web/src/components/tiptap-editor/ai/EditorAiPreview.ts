@@ -1,10 +1,11 @@
-import type { Editor } from '@tiptap/core'
+import type { Editor, JSONContent } from '@tiptap/core'
 import type { Node as ProseMirrorNode } from '@tiptap/pm/model'
 import type { EditorAiPreviewAnchor, EditorAiPreviewStatus } from './typing'
 import { Extension } from '@tiptap/core'
 import { Plugin, PluginKey } from '@tiptap/pm/state'
 import { Decoration, DecorationSet } from '@tiptap/pm/view'
 import { splitPlainTextParagraphLines } from '../content/pasteContent'
+import { createTextInsertContent } from '../content/textInsertContent'
 import {
   EDITOR_AI_PREVIEW_ANCHOR_BLOCK_CLASS,
   EDITOR_AI_PREVIEW_CLASS,
@@ -171,24 +172,61 @@ function createEditorAiPreviewBlockElement(preview: EditorAiPreviewPluginState, 
   element.className = `${EDITOR_AI_PREVIEW_CLASS} ${EDITOR_AI_PREVIEW_CLASS}--block is-${preview.status}`
   element.contentEditable = 'false'
 
+  if (preview.anchor.kind === 'block-insert') {
+    for (const node of createTextInsertContent(displayText, { markdownBlocks: true })) {
+      element.append(createEditorAiPreviewBlockNodeElement(node))
+    }
+
+    return element
+  }
+
   for (const line of splitPlainTextParagraphLines(displayText)) {
-    const paragraph = document.createElement('p')
-    paragraph.className = `${EDITOR_AI_PREVIEW_CLASS}__paragraph`
-
-    if (line) {
-      const text = document.createElement('span')
-      text.className = `${EDITOR_AI_PREVIEW_CLASS}__text`
-      text.textContent = line
-      paragraph.append(text)
-    }
-    else {
-      paragraph.append(document.createElement('br'))
-    }
-
-    element.append(paragraph)
+    element.append(createEditorAiPreviewParagraphElement(line))
   }
 
   return element
+}
+
+function createEditorAiPreviewBlockNodeElement(node: JSONContent) {
+  if (node.type === 'codeBlock') {
+    return createEditorAiPreviewCodeBlockElement(node)
+  }
+
+  return createEditorAiPreviewParagraphElement(resolveJsonContentText(node))
+}
+
+function createEditorAiPreviewParagraphElement(line: string) {
+  const paragraph = document.createElement('p')
+  paragraph.className = `${EDITOR_AI_PREVIEW_CLASS}__paragraph`
+
+  if (line) {
+    const text = document.createElement('span')
+    text.className = `${EDITOR_AI_PREVIEW_CLASS}__text`
+    text.textContent = line
+    paragraph.append(text)
+  }
+  else {
+    paragraph.append(document.createElement('br'))
+  }
+
+  return paragraph
+}
+
+function createEditorAiPreviewCodeBlockElement(node: JSONContent) {
+  const codeBlock = document.createElement('pre')
+  codeBlock.className = `${EDITOR_AI_PREVIEW_CLASS}__code-block`
+  codeBlock.dataset.language = String(node.attrs?.language ?? '')
+
+  const code = document.createElement('code')
+  code.className = `${EDITOR_AI_PREVIEW_CLASS}__code-text`
+  code.textContent = resolveJsonContentText(node)
+  codeBlock.append(code)
+
+  return codeBlock
+}
+
+function resolveJsonContentText(node: JSONContent): string {
+  return node.content?.map(child => child.text ?? resolveJsonContentText(child)).join('') ?? ''
 }
 
 function resolveWidgetPosition(

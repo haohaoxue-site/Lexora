@@ -4,25 +4,12 @@ import {
   createUploadedFileInsertContent,
   createUploadedImageInsertContent,
 } from './documentAsset'
+import { createTextInsertContent } from './textInsertContent'
+
+export { splitPlainTextParagraphLines } from './textInsertContent'
 
 export function createPlainTextPasteContent(text: string): JSONContent[] {
-  return splitPlainTextParagraphLines(text).map(line =>
-    line.length
-      ? {
-          type: 'paragraph',
-          content: [{ type: 'text', text: line }],
-        }
-      : {
-          type: 'paragraph',
-        },
-  )
-}
-
-export function splitPlainTextParagraphLines(text: string): string[] {
-  return text
-    .replaceAll('\r\n', '\n')
-    .replaceAll('\r', '\n')
-    .split('\n')
+  return createTextInsertContent(text)
 }
 
 export async function createFilePasteContent(

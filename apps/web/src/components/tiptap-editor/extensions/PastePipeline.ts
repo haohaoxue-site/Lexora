@@ -13,6 +13,10 @@ import {
   SAMEPAGE_BLOCK_CLIPBOARD_TYPE,
 } from '../content/blockClipboard'
 import { createFilePasteContent } from '../content/pasteContent'
+import {
+  createTextInsertContent,
+  hasTextInsertMarkdownBlockContent,
+} from '../content/textInsertContent'
 
 export interface PastePipelineOptions {
   uploadImage?: (file: File) => Promise<TiptapEditorUploadedImage>
@@ -82,6 +86,15 @@ function handleEditorPaste(editor: Editor, event: ClipboardEvent, options: Paste
     return true
   }
 
+  if (shouldInsertMarkdownTextBlocks(text, html, preferPlain)) {
+    event.preventDefault()
+    return editor
+      .chain()
+      .focus()
+      .insertContent(createTextInsertContent(text, { markdownBlocks: true }))
+      .run()
+  }
+
   if (!preferPlain && html.length) {
     if (options.uploadImage && hasAnimatedGifPasteSource(html)) {
       event.preventDefault()
@@ -117,6 +130,18 @@ function shouldInsertPlainTextInline(editor: Editor, text: string, html: string,
   return $from.sameParent($to)
     && $from.parent.isTextblock
     && !($from.parent.type.spec.code)
+}
+
+function shouldInsertMarkdownTextBlocks(text: string, html: string, preferPlain: boolean) {
+  return !preferPlain
+    && text.length > 0
+    && hasTextInsertMarkdownBlockContent(text)
+    && !hasSemanticCodeBlockHtml(html)
+}
+
+function hasSemanticCodeBlockHtml(html: string) {
+  return /<pre\b[\s\S]*<code\b/i.test(html)
+    || /<code\b[\s\S]*<\/code>/i.test(html)
 }
 
 function isPreferPlainPaste(editor: Editor) {

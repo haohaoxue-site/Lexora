@@ -1,8 +1,8 @@
 import type { AiAnchor } from '@haohaoxue/samepage-contracts'
 import type { Editor, JSONContent } from '@tiptap/core'
-import { AI_ANCHOR_KIND, TIPTAP_BODY_BLOCK_ID_ATTRIBUTE } from '@haohaoxue/samepage-contracts'
+import { AI_ANCHOR_KIND } from '@haohaoxue/samepage-contracts'
 import { findBlockById } from '../commands/currentBlock'
-import { createPlainTextPasteContent } from '../content/pasteContent'
+import { createTextInsertContent } from '../content/textInsertContent'
 
 export interface EditorAiCandidateWriteback {
   anchor: AiAnchor
@@ -73,7 +73,10 @@ function resolveBlockInsertWriteback(
   return {
     from: block.from,
     to: block.to,
-    content: createCandidateParagraphContent(contentText, anchor.blockId),
+    content: createTextInsertContent(contentText, {
+      firstBlockId: anchor.blockId,
+      markdownBlocks: true,
+    }),
   }
 }
 
@@ -102,26 +105,7 @@ function resolveTextSelectionWriteback(
     from,
     to,
     content: contentText.includes('\n')
-      ? createCandidateParagraphContent(contentText)
+      ? createTextInsertContent(contentText)
       : contentText,
   }
-}
-
-function createCandidateParagraphContent(contentText: string, firstBlockId?: string): JSONContent[] {
-  const content = createPlainTextPasteContent(contentText)
-
-  if (!firstBlockId || !content[0]) {
-    return content
-  }
-
-  return [
-    {
-      ...content[0],
-      attrs: {
-        ...(content[0].attrs ?? {}),
-        [TIPTAP_BODY_BLOCK_ID_ATTRIBUTE]: firstBlockId,
-      },
-    },
-    ...content.slice(1),
-  ]
 }

@@ -953,8 +953,26 @@ html.dark {
     display: block;
   }
 
+  &__code-block {
+    margin: 0.25rem 0;
+    padding: 0.5rem 0.625rem;
+    border: 1px solid var(--brand-border-base);
+    border-radius: 6px;
+    background: var(--brand-bg-page);
+    color: var(--brand-text-primary);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
+    font-size: 0.875rem;
+    line-height: 1.6;
+    white-space: pre-wrap;
+  }
+
+  &__code-text {
+    display: block;
+  }
+
   &.is-streaming.tiptap-ai-preview--inline::after,
-  &.is-streaming &__paragraph:last-child > &__text::after {
+  &.is-streaming &__paragraph:last-child > &__text::after,
+  &.is-streaming &__code-block:last-child > &__code-text::after {
     width: 0.45rem;
     margin-left: 0.2rem;
     color: var(--brand-primary);
