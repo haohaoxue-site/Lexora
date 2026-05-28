@@ -2,6 +2,7 @@
 import type { DocumentItem, DocumentTreeCollectionId } from '@haohaoxue/samepage-contracts'
 import { computed } from 'vue'
 import { useDocumentItem } from '../composables/useDocumentItem'
+import { resolveDocumentTreeItemIcon } from '../utils/documentTree'
 
 interface DocumentItemProps {
   item: DocumentItem
@@ -26,11 +27,7 @@ const {
 })
 
 const treeIconName = computed(() => {
-  if (props.item.hasChildren) {
-    return props.expanded ? 'document-tree-folder-open' : 'document-tree-folder'
-  }
-
-  return props.item.hasContent ? 'document-tree-file' : 'document-tree-file-empty'
+  return resolveDocumentTreeItemIcon(props.item, Boolean(props.expanded))
 })
 </script>
 

@@ -16,10 +16,13 @@ import { getDocuments } from '@/apis/document'
 import { useWorkspaceStore } from '@/stores/workspace'
 import { useDocsPageActions } from '../composables/useDocsPageActions'
 import { useDocumentTree } from '../composables/useDocumentTree'
+import { resolveDocumentTreeItemIcon } from '../utils/documentTree'
 
 interface MoveTreeNode {
   id: string
   title: string
+  hasChildren: boolean
+  hasContent: boolean
   disabled: boolean
   children: MoveTreeNode[]
 }
@@ -132,9 +135,15 @@ function toTreeNodes(items: DocumentItem[]): MoveTreeNode[] {
   return items.map(item => ({
     id: item.id,
     title: item.title,
+    hasChildren: item.hasChildren,
+    hasContent: item.hasContent,
     disabled: excludedIds.has(item.id),
     children: toTreeNodes(item.children),
   }))
+}
+
+function getMoveTreeNodeIcon(node: MoveTreeNode, expanded: boolean) {
+  return resolveDocumentTreeItemIcon(node, expanded)
 }
 
 function isGroupRootSelected(group: DocumentTreeGroup) {
@@ -239,9 +248,9 @@ function isOwnedCollection(collectionId: DocumentTreeCollectionId): collectionId
             class="document-move-dialog__el-tree"
             @node-click="(node: MoveTreeNode) => selectDocumentNode(group, node)"
           >
-            <template #default="{ data }">
+            <template #default="{ node, data }">
               <span class="document-move-dialog__node">
-                <SvgIcon category="ui" icon="document-view" size="1rem" />
+                <SvgIcon category="ui" :icon="getMoveTreeNodeIcon(data, Boolean(node.expanded))" size="1rem" />
                 <span class="document-move-dialog__node-title">{{ data.title }}</span>
               </span>
             </template>
@@ -262,6 +271,7 @@ function isOwnedCollection(collectionId: DocumentTreeCollectionId): collectionId
         取消
       </ElButton>
       <ElButton
+        class="ml-10px!"
         type="primary"
         :loading="isMoving"
         :disabled="!canConfirm"

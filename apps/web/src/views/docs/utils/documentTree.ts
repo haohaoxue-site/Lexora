@@ -12,8 +12,25 @@ export interface DocumentDeletePlan {
   nextDocumentId: string | null
 }
 
+export type DocumentTreeItemIconName
+  = | 'document-tree-file'
+    | 'document-tree-file-empty'
+    | 'document-tree-folder'
+    | 'document-tree-folder-open'
+
 export function isOwnedDocumentCollection(collectionId: DocumentTreeCollectionId): collectionId is OwnedDocumentCollectionId {
   return collectionId !== DOCUMENT_COLLECTION.COLLABORATION
+}
+
+export function resolveDocumentTreeItemIcon(
+  item: Pick<DocumentItem, 'hasChildren' | 'hasContent'>,
+  expanded: boolean,
+): DocumentTreeItemIconName {
+  if (item.hasChildren) {
+    return expanded ? 'document-tree-folder-open' : 'document-tree-folder'
+  }
+
+  return item.hasContent ? 'document-tree-file' : 'document-tree-file-empty'
 }
 
 export function collectDocumentItemIds(items: DocumentItem[]): Set<string> {
