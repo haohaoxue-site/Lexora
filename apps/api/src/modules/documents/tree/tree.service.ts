@@ -10,6 +10,9 @@ import type {
   OwnedDocumentCollectionId,
   PatchDocumentLayoutRequest,
   PatchDocumentMetaRequest,
+  ReadableDocumentSearchResult,
+  SearchReadableDocumentsQuery,
+  SearchReadableDocumentsResponse,
   TiptapJsonContent,
 } from '@haohaoxue/samepage-contracts'
 import type { PersistedDocument, WorkspaceDocumentContext } from '../core/documents.utils'
@@ -20,6 +23,7 @@ import {
   DOCUMENT_VERSION_SNAPSHOT_SOURCE,
   DOCUMENT_VISIBILITY,
   TIPTAP_SCHEMA_VERSION,
+  WORKSPACE_MEMBER_STATUS,
   WORKSPACE_TYPE,
 } from '@haohaoxue/samepage-contracts'
 import {
@@ -226,6 +230,80 @@ export class DocumentsService {
         ),
       },
     ]
+  }
+
+  async searchReadableDocumentsForChat(
+    userId: string,
+    query: SearchReadableDocumentsQuery,
+  ): Promise<SearchReadableDocumentsResponse> {
+    const normalizedQuery = query.query.trim()
+    if (!normalizedQuery) {
+      return { documents: [] }
+    }
+
+    const documents = await this.prisma.document.findMany({
+      where: {
+        title: {
+          contains: normalizedQuery,
+          mode: 'insensitive',
+        },
+        status: {
+          in: [DocumentStatus.ACTIVE, DocumentStatus.LOCKED],
+        },
+        trashedAt: null,
+        workspace: {
+          members: {
+            some: {
+              userId,
+              status: WORKSPACE_MEMBER_STATUS.ACTIVE,
+            },
+          },
+        },
+        OR: [
+          {
+            workspace: {
+              type: {
+                not: WORKSPACE_TYPE.TEAM,
+              },
+            },
+          },
+          {
+            visibility: DOCUMENT_VISIBILITY.WORKSPACE,
+          },
+          {
+            createdBy: userId,
+          },
+        ],
+      },
+      select: {
+        id: true,
+        title: true,
+        workspaceId: true,
+        workspace: {
+          select: {
+            type: true,
+          },
+        },
+        visibility: true,
+        createdBy: true,
+      },
+      orderBy: [
+        { updatedAt: 'desc' },
+        { id: 'asc' },
+      ],
+      take: query.limit,
+    })
+
+    return {
+      documents: documents
+        .filter(document => canUserAccessWorkspaceDocument({
+          userId,
+          workspaceType: document.workspace.type,
+          visibility: document.visibility,
+          createdBy: document.createdBy,
+        }))
+        .map(toReadableDocumentSearchResult),
+    }
   }
 
   async patchDocumentMeta(
@@ -447,6 +525,22 @@ function toDocumentBase(document: PersistedDocument): DocumentBase {
     summary: document.summary,
     createdAt: document.createdAt.toISOString(),
     updatedAt: document.updatedAt.toISOString(),
+  }
+}
+
+function toReadableDocumentSearchResult(document: {
+  id: string
+  title: string
+  workspaceId: string
+  workspace: {
+    type: string
+  }
+}): ReadableDocumentSearchResult {
+  return {
+    id: document.id,
+    title: document.title,
+    workspaceId: document.workspaceId,
+    workspaceType: document.workspace.type as ReadableDocumentSearchResult['workspaceType'],
   }
 }
 

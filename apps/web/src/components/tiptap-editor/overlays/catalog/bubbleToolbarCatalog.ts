@@ -19,7 +19,7 @@ type BubbleToolbarActionContent
 type BubbleToolbarGroupItem
   = BubbleToolbarComponentItem | BubbleToolbarActionItem
 
-type BubbleToolbarComponent = 'turn-into' | 'color' | 'align'
+type BubbleToolbarComponent = 'turn-into' | 'color' | 'align' | 'ai'
 
 export type BubbleToolbarVariant = 'text' | 'image'
 export type BubbleToolbarTextStyle = 'mark-strong' | 'mark-italic' | 'mark-underline' | 'mark-strike' | 'label'
@@ -154,15 +154,9 @@ const TEXT_BUBBLE_TOOLBAR_GROUPS = [
     key: 'ai',
     items: [
       {
-        kind: 'action',
-        action: 'ai-rewrite',
-        description: 'AI 改写',
-        content: {
-          kind: 'text',
-          value: 'AI',
-          style: 'label',
-        },
-        buttonVariant: 'wide',
+        kind: 'component',
+        component: 'ai',
+        description: 'AI',
       },
     ],
   },

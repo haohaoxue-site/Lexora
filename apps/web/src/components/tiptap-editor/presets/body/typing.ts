@@ -2,6 +2,7 @@ import type {
   TiptapEditorCollaborationBinding,
   TiptapEditorCommentRequest,
   TiptapEditorContent,
+  TiptapEditorSelectionContextRequest,
 } from '../../core/typing'
 
 export interface DocumentBodyEditorProps {
@@ -41,4 +42,5 @@ export interface DocumentBodyEditorEmits {
   'update:content': [content: TiptapEditorContent]
   'contentError': [error: Error]
   'requestComment': [request: TiptapEditorCommentRequest]
+  'requestAddSelectionContext': [request: TiptapEditorSelectionContextRequest]
 }

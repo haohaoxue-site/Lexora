@@ -19,8 +19,10 @@ export type {
   PatchDocumentLayoutRequest,
   PatchDocumentMetaRequest,
   PatchDocumentTitleRequest,
+  ReadableDocumentSearchResult,
   ResolveDocumentAssetsRequest,
   ResolveDocumentAssetsResponse,
   RestoreDocumentVersionSnapshotRequest,
   RestoreDocumentVersionSnapshotResponse,
+  SearchReadableDocumentsResponse,
 } from '@haohaoxue/samepage-contracts'

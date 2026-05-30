@@ -7,13 +7,14 @@ import type {
   ChatRuntimeConfig,
   ChatSessionDetail,
   ChatSessionEvent,
+  ChatSessionOrigin,
   ChatSessionSummary,
   CreateChatSessionMessageRequest,
   EditAndSendChatMessageRequest,
   SwitchChatActiveMessageRequest,
   UpdateChatSessionTitleRequest,
 } from './typing'
-import { ChatSessionEventSchema, SERVER_PATH } from '@haohaoxue/samepage-contracts'
+import { CHAT_SESSION_ORIGIN, ChatSessionEventSchema, SERVER_PATH } from '@haohaoxue/samepage-contracts'
 import { useAuthStore } from '@/stores/auth'
 import { axios } from '@/utils/axios'
 import { createRequestError, createRequestErrorFromHttpResponse, toRequestError } from '@/utils/request-error'
@@ -21,41 +22,54 @@ import { createRequestError, createRequestErrorFromHttpResponse, toRequestError 
 export * from './typing'
 
 const API_BASE_URL = SERVER_PATH
+const DEFAULT_CHAT_SESSION_ORIGIN = CHAT_SESSION_ORIGIN.GLOBAL
 
-export function getChatSessions(): Promise<ChatSessionSummary[]> {
+interface ChatSessionOriginOptions {
+  origin?: ChatSessionOrigin
+}
+
+export function getChatSessions(options: ChatSessionOriginOptions = {}): Promise<ChatSessionSummary[]> {
   return axios.request({
     method: 'get',
     url: '/chat/sessions',
+    params: createChatSessionOriginParams(options),
   })
 }
 
-export function createChatSession(): Promise<ChatSessionDetail> {
+export function createChatSession(options: ChatSessionOriginOptions = {}): Promise<ChatSessionDetail> {
   return axios.request({
     method: 'post',
     url: '/chat/sessions',
+    data: {
+      origin: resolveChatSessionOrigin(options),
+    },
   })
 }
 
-export function getChatSession(sessionId: string): Promise<ChatSessionDetail> {
+export function getChatSession(sessionId: string, options: ChatSessionOriginOptions = {}): Promise<ChatSessionDetail> {
   return axios.request({
     method: 'get',
     url: `/chat/sessions/${sessionId}`,
+    params: createChatSessionOriginParams(options),
   })
 }
 
-export function deleteChatSession(sessionId: string): Promise<null> {
+export function deleteChatSession(sessionId: string, options: ChatSessionOriginOptions = {}): Promise<null> {
   return axios.request({
     method: 'delete',
     url: `/chat/sessions/${sessionId}`,
+    params: createChatSessionOriginParams(options),
   })
 }
 
 export function batchDeleteChatSessions(
   data: BatchDeleteChatSessionsRequest,
+  options: ChatSessionOriginOptions = {},
 ): Promise<BatchDeleteChatSessionsResponse> {
   return axios.request({
     method: 'post',
     url: '/chat/sessions/batch-delete',
+    params: createChatSessionOriginParams(options),
     data,
   })
 }
@@ -63,10 +77,12 @@ export function batchDeleteChatSessions(
 export function updateChatSessionModel(
   sessionId: string,
   data: ChatModelSelection,
+  options: ChatSessionOriginOptions = {},
 ): Promise<ChatSessionDetail> {
   return axios.request({
     method: 'patch',
     url: `/chat/sessions/${sessionId}/model`,
+    params: createChatSessionOriginParams(options),
     data,
   })
 }
@@ -74,10 +90,12 @@ export function updateChatSessionModel(
 export function updateChatSessionTitle(
   sessionId: string,
   data: UpdateChatSessionTitleRequest,
+  options: ChatSessionOriginOptions = {},
 ): Promise<ChatSessionDetail> {
   return axios.request({
     method: 'patch',
     url: `/chat/sessions/${sessionId}/title`,
+    params: createChatSessionOriginParams(options),
     data,
   })
 }
@@ -85,10 +103,12 @@ export function updateChatSessionTitle(
 export function sendChatSessionMessage(
   sessionId: string,
   data: CreateChatSessionMessageRequest,
+  options: ChatSessionOriginOptions = {},
 ): Promise<ChatMutationResponse> {
   return axios.request({
     method: 'post',
     url: `/chat/sessions/${sessionId}/messages`,
+    params: createChatSessionOriginParams(options),
     data,
   })
 }
@@ -97,10 +117,12 @@ export function editAndSendChatMessage(
   sessionId: string,
   messageId: string,
   data: EditAndSendChatMessageRequest,
+  options: ChatSessionOriginOptions = {},
 ): Promise<ChatMutationResponse> {
   return axios.request({
     method: 'post',
     url: `/chat/sessions/${sessionId}/messages/${messageId}/edit-and-send`,
+    params: createChatSessionOriginParams(options),
     data,
   })
 }
@@ -108,28 +130,33 @@ export function editAndSendChatMessage(
 export function retryChatAssistantMessage(
   sessionId: string,
   messageId: string,
+  options: ChatSessionOriginOptions = {},
 ): Promise<ChatMutationResponse> {
   return axios.request({
     method: 'post',
     url: `/chat/sessions/${sessionId}/messages/${messageId}/retry`,
+    params: createChatSessionOriginParams(options),
   })
 }
 
 export function switchChatActiveMessage(
   sessionId: string,
   data: SwitchChatActiveMessageRequest,
+  options: ChatSessionOriginOptions = {},
 ): Promise<ChatMutationResponse> {
   return axios.request({
     method: 'patch',
     url: `/chat/sessions/${sessionId}/active-message`,
+    params: createChatSessionOriginParams(options),
     data,
   })
 }
 
-export function cancelChatRun(runId: string): Promise<ChatMutationResponse> {
+export function cancelChatRun(runId: string, options: ChatSessionOriginOptions = {}): Promise<ChatMutationResponse> {
   return axios.request({
     method: 'post',
     url: `/chat/runs/${runId}/cancel`,
+    params: createChatSessionOriginParams(options),
   })
 }
 
@@ -152,13 +179,15 @@ export async function streamChatSessionEvents(
   afterSequence: number | null,
   onEvent: (event: ChatSessionEvent) => void | Promise<void>,
   options: {
+    origin?: ChatSessionOrigin
     signal?: AbortSignal
   } = {},
 ): Promise<void> {
   const authStore = useAuthStore()
-  const query = afterSequence !== null
-    ? `?afterSequence=${encodeURIComponent(String(afterSequence))}`
-    : ''
+  const query = createChatSessionEventQuery({
+    afterSequence,
+    origin: options.origin,
+  })
 
   const response = await fetch(`${API_BASE_URL}/chat/sessions/${sessionId}/events${query}`, {
     method: 'GET',
@@ -234,4 +263,28 @@ async function readApiError(response: Response) {
   return createRequestErrorFromHttpResponse(response, {
     source: 'stream',
   })
+}
+
+function createChatSessionOriginParams(options: ChatSessionOriginOptions): { origin: ChatSessionOrigin } {
+  return {
+    origin: resolveChatSessionOrigin(options),
+  }
+}
+
+function resolveChatSessionOrigin(options: ChatSessionOriginOptions): ChatSessionOrigin {
+  return options.origin ?? DEFAULT_CHAT_SESSION_ORIGIN
+}
+
+function createChatSessionEventQuery(input: {
+  afterSequence: number | null
+  origin?: ChatSessionOrigin
+}): string {
+  const params = new URLSearchParams()
+  if (input.afterSequence !== null) {
+    params.set('afterSequence', String(input.afterSequence))
+  }
+  params.set('origin', input.origin ?? DEFAULT_CHAT_SESSION_ORIGIN)
+
+  const query = params.toString()
+  return query ? `?${query}` : ''
 }

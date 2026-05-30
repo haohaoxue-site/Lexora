@@ -1,16 +1,6 @@
 import type { AiModelRef } from '@/apis/ai'
 import type { ChatModelItem, ChatModelSelection, ChatRuntimeConfig } from '@/apis/chat'
 
-export interface ChatModelSettingsDraft {
-  modelRef: AiModelRef | null
-}
-
-export function createModelSettingsDraft(modelRef: AiModelRef | null = null): ChatModelSettingsDraft {
-  return {
-    modelRef: modelRef ? { ...modelRef } : null,
-  }
-}
-
 export function normalizeModelSelection(value: ChatModelSelection): ChatModelSelection {
   return {
     modelRef: value.modelRef
@@ -59,21 +49,6 @@ export function isSameNullableModelRef(
   return isSameModelRef(leftModelRef, rightModelRef)
 }
 
-export function toFullModelRef(
-  value: Pick<AiModelRef, 'providerId' | 'scope' | 'providerKey' | 'modelId'> | null | undefined,
-): AiModelRef | null {
-  if (!value) {
-    return null
-  }
-
-  return {
-    providerId: value.providerId.trim(),
-    scope: value.scope,
-    providerKey: value.providerKey.trim(),
-    modelId: value.modelId.trim(),
-  }
-}
-
 export function createEmptyRuntimeConfig(): ChatRuntimeConfig {
   return {
     enabled: false,
@@ -88,23 +63,6 @@ export function findMatchingModelOption(
   modelRef: NonNullable<ChatModelSelection['modelRef']>,
 ): ChatModelItem | null {
   return modelOptions.find(model => model.providerId === modelRef.providerId && model.modelId === modelRef.modelId) ?? null
-}
-
-export function resolveSavedChatModelOverrideRef(
-  value: ChatModelSettingsDraft,
-  runtimeDefaultModel: ChatModelItem | null,
-): NonNullable<ChatModelSelection['modelRef']> | null {
-  const modelRef = toModelRef(value.modelRef)
-  if (!modelRef) {
-    return null
-  }
-
-  const defaultModelRef = toModelRef(runtimeDefaultModel)
-  if (defaultModelRef && isSameModelRef(modelRef, defaultModelRef)) {
-    return null
-  }
-
-  return modelRef
 }
 
 export function resolveSelectedChatModel(
@@ -146,29 +104,6 @@ export function resolveChatRequestModelRef(
   }
 
   return toModelRef(runtimeDefaultModel)
-}
-
-export function resolveLoadedChatModelRef(
-  modelRef: ChatModelSelection['modelRef'] | null | undefined,
-  modelOptions: ChatModelItem[],
-  runtimeDefaultModel: ChatModelItem | null,
-): AiModelRef | null {
-  const normalizedModelRef = normalizeNullableModelRef(modelRef)
-
-  if (normalizedModelRef) {
-    const matchedModel = findMatchingModelOption(modelOptions, normalizedModelRef)
-    if (matchedModel?.selectable) {
-      return toFullModelRef(matchedModel)
-    }
-
-    if (runtimeDefaultModel && isSameModelRef(normalizedModelRef, runtimeDefaultModel)) {
-      return toFullModelRef(runtimeDefaultModel)
-    }
-
-    return toFullModelRef(runtimeDefaultModel)
-  }
-
-  return toFullModelRef(runtimeDefaultModel)
 }
 
 function isSameModelRef(

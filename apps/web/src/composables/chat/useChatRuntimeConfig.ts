@@ -4,7 +4,7 @@ import { ElMessage } from 'element-plus'
 import { shallowRef } from 'vue'
 import { getChatRuntimeConfig } from '@/apis/chat'
 import { getRequestErrorDisplayMessage } from '@/utils/request-error'
-import { createEmptyRuntimeConfig } from '../utils/chat-model-selection'
+import { createEmptyRuntimeConfig } from './utils/chat-model-selection'
 
 export const useChatRuntimeConfig = createSharedComposable(() => {
   const runtimeConfig = shallowRef<ChatRuntimeConfig>(createEmptyRuntimeConfig())

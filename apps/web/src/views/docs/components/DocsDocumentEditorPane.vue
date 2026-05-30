@@ -29,6 +29,7 @@ const { contentError, handleContentError, handleRetryLoad, shouldShowEditor } = 
       @update-content="emits('updateContent', $event)"
       @content-error="handleContentError"
       @request-comment="emits('requestComment', $event)"
+      @request-add-selection-context="emits('requestAddSelectionContext', $event)"
       @title-autofocus-applied="emits('titleAutofocusApplied')"
     />
 

@@ -11,10 +11,12 @@ import {
 } from '@haohaoxue/samepage-contracts'
 import { applyChatSessionEventToMessages } from './chat-stream-message'
 
+export type ChatSessionRuntimeStatus = 'idle' | 'streaming' | 'reconnecting'
+
 export interface ChatRuntimeOverlayState {
   cursorBySessionId: Map<string, number>
   currentRunBySessionId: Map<string, ChatRunSummary | null>
-  messageEventsBySessionId: Map<string, ChatSessionEvent[]>
+  mergedMessagesBySessionId: Map<string, ChatMessage[]>
   terminalRunIdsBySessionId: Map<string, Set<string>>
   terminalMessageIdsBySessionId: Map<string, Set<string>>
   assistantMessageIdByRunId: Map<string, string>
@@ -25,7 +27,7 @@ export function createChatRuntimeOverlayState(): ChatRuntimeOverlayState {
   return {
     cursorBySessionId: new Map(),
     currentRunBySessionId: new Map(),
-    messageEventsBySessionId: new Map(),
+    mergedMessagesBySessionId: new Map(),
     terminalRunIdsBySessionId: new Map(),
     terminalMessageIdsBySessionId: new Map(),
     assistantMessageIdByRunId: new Map(),
@@ -44,10 +46,7 @@ export function seedChatRuntimeOverlayFromSnapshot(
 
   state.cursorBySessionId.set(session.id, Math.max(currentCursor ?? 0, session.latestSequence))
   state.pausedSessionIds.delete(session.id)
-  state.messageEventsBySessionId.set(
-    session.id,
-    getSessionMessageEvents(state, session.id).filter(event => event.sequence > session.latestSequence),
-  )
+  state.mergedMessagesBySessionId.set(session.id, session.messages)
 
   if (session.activeRun && !isTerminalRunId(state, session.id, session.activeRun.runId)) {
     state.currentRunBySessionId.set(session.id, session.activeRun)
@@ -114,13 +113,13 @@ export function applyChatRuntimeOverlayEvent(
     markTerminalRun(state, event)
     const terminalMessageEvent = createMessageTerminalEventFromRunEvent(state, event)
     if (terminalMessageEvent) {
-      appendMessageEvent(state, terminalMessageEvent)
+      applyMergedMessages(state, terminalMessageEvent)
     }
     return true
   }
 
   if (isMessagePatchEvent(event)) {
-    appendMessageEvent(state, event)
+    applyMergedMessages(state, event)
   }
 
   if (isTerminalMessageEvent(event)) {
@@ -134,13 +133,6 @@ export function mergeChatRenderSession(
   session: ChatSessionDetail,
   state: ChatRuntimeOverlayState,
 ): ChatSessionDetail {
-  const events = getSessionMessageEvents(state, session.id)
-    .filter(event => event.sequence > session.latestSequence)
-    .sort((first, second) => first.sequence - second.sequence)
-  const messages = events.reduce<ChatMessage[]>(
-    (currentMessages, event) => applyChatSessionEventToMessages(currentMessages, event),
-    session.messages,
-  )
   const currentRun = getChatRuntimeOverlayCurrentRun(state, session.id)
   const cursor = getChatRuntimeOverlayCursor(state, session.id)
 
@@ -148,7 +140,7 @@ export function mergeChatRenderSession(
     ...session,
     latestSequence: Math.max(session.latestSequence, cursor ?? 0),
     activeRun: currentRun,
-    messages,
+    messages: state.mergedMessagesBySessionId.get(session.id) ?? session.messages,
   }
 }
 
@@ -189,13 +181,28 @@ export function getChatRuntimeOverlayIsStreaming(
   return isActiveRun(getChatRuntimeOverlayCurrentRun(state, sessionId))
 }
 
+export function getChatRuntimeOverlayStatus(
+  state: ChatRuntimeOverlayState,
+  sessionId: string | null,
+): ChatSessionRuntimeStatus {
+  if (!sessionId) {
+    return 'idle'
+  }
+
+  if (state.pausedSessionIds.has(sessionId)) {
+    return 'reconnecting'
+  }
+
+  return isActiveRun(getChatRuntimeOverlayCurrentRun(state, sessionId)) ? 'streaming' : 'idle'
+}
+
 export function clearChatRuntimeOverlaySession(
   state: ChatRuntimeOverlayState,
   sessionId: string,
 ): void {
   state.cursorBySessionId.delete(sessionId)
   state.currentRunBySessionId.delete(sessionId)
-  state.messageEventsBySessionId.delete(sessionId)
+  state.mergedMessagesBySessionId.delete(sessionId)
   state.terminalRunIdsBySessionId.delete(sessionId)
   state.terminalMessageIdsBySessionId.delete(sessionId)
   state.pausedSessionIds.delete(sessionId)
@@ -226,18 +233,9 @@ function updateCurrentRun(
   })
 }
 
-function appendMessageEvent(state: ChatRuntimeOverlayState, event: ChatSessionEvent): void {
-  state.messageEventsBySessionId.set(event.sessionId, [
-    ...getSessionMessageEvents(state, event.sessionId),
-    event,
-  ])
-}
-
-function getSessionMessageEvents(
-  state: ChatRuntimeOverlayState,
-  sessionId: string,
-): ChatSessionEvent[] {
-  return state.messageEventsBySessionId.get(sessionId) ?? []
+function applyMergedMessages(state: ChatRuntimeOverlayState, event: ChatSessionEvent): void {
+  const current = state.mergedMessagesBySessionId.get(event.sessionId) ?? []
+  state.mergedMessagesBySessionId.set(event.sessionId, applyChatSessionEventToMessages(current, event))
 }
 
 function shouldDropDelta(

@@ -2,6 +2,7 @@ import type { DocumentPageWidthMode, TiptapJsonContent } from '@haohaoxue/samepa
 import type {
   TiptapEditorCollaborationBinding,
   TiptapEditorCommentRequest,
+  TiptapEditorSelectionContextRequest,
 } from '../../core/typing'
 
 /**
@@ -50,5 +51,6 @@ export interface DocumentContentSurfaceEmits {
   updateContent: [content: TiptapJsonContent]
   contentError: [error: Error]
   requestComment: [request: TiptapEditorCommentRequest]
+  requestAddSelectionContext: [request: TiptapEditorSelectionContextRequest]
   titleAutofocusApplied: []
 }

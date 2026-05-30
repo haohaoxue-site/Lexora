@@ -58,26 +58,14 @@ function handleToggle() {
         v-if="shouldShowBrand"
         :to="props.brand.to"
         class="sidebar-panel__brand-link"
+        aria-label="打开同页入口"
       >
-        <div class="sidebar-panel__brand-mark">
-          <SvgIcon
-            :category="props.brand.iconCategory"
-            :icon="props.brand.icon"
-            size="2.75rem"
-            class="sidebar-panel__brand-mark-image"
-          />
-        </div>
-        <div class="sidebar-panel__brand-text">
-          <div class="sidebar-panel__brand-label truncate text-base">
-            {{ props.brand.label }}
-          </div>
-          <div
-            v-if="props.brand.meta"
-            class="sidebar-panel__brand-meta truncate text-xs font-medium"
-          >
-            {{ props.brand.meta }}
-          </div>
-        </div>
+        <img
+          :src="props.brand.iconSrc"
+          alt=""
+          aria-hidden="true"
+          class="sidebar-panel__brand-image"
+        >
       </RouterLink>
 
       <button
@@ -202,33 +190,27 @@ function handleToggle() {
   .sidebar-panel__brand-link {
     display: flex;
     align-items: center;
-    gap: 0.625rem;
-    width: 100%;
-    height: 100%;
-    min-width: 0;
-    padding-left: 1.125rem;
-    color: var(--brand-text-primary);
-    text-decoration: none;
-  }
-
-  .sidebar-panel__brand-mark {
-    display: flex;
-    align-items: center;
     justify-content: center;
-    flex-shrink: 0;
     width: 2.75rem;
     height: 2.75rem;
+    margin-left: 1.125rem;
+    border-radius: 0.875rem;
+    text-decoration: none;
+
+    &:focus-visible {
+      outline: none;
+      box-shadow: 0 0 0 2px color-mix(in srgb, var(--brand-primary) 20%, transparent);
+    }
   }
 
-  .sidebar-panel__brand-mark-image {
+  .sidebar-panel__brand-image {
     display: block;
+    width: 100%;
+    height: 100%;
+    border-radius: 0.875rem;
+    object-fit: cover;
   }
 
-  .sidebar-panel__brand-text {
-    min-width: 0;
-  }
-
-  .sidebar-panel__brand-label,
   .sidebar-panel__nav-label {
     min-width: 0;
     overflow: hidden;
@@ -240,16 +222,7 @@ function handleToggle() {
       transform 0.22s ease-out;
   }
 
-  .sidebar-panel__brand-meta {
-    min-width: 0;
-    margin-top: 0.125rem;
-    overflow: hidden;
-    color: var(--brand-text-secondary);
-    white-space: nowrap;
-  }
-
   &.collapsed {
-    .sidebar-panel__brand-label,
     .sidebar-panel__nav-label {
       opacity: 0;
       transform: translateX(-0.25rem);

@@ -1,6 +1,7 @@
 export * from './agent'
 export * from './ai'
 export * from './auth'
+export * from './chat'
 export * from './collab'
 export * from './document'
 export * from './system-email'

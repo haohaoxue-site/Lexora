@@ -2,11 +2,8 @@ import type { RouteLocationRaw } from 'vue-router'
 import type { SvgIconCategory, SvgIconCategoryValue } from '@/components/svg-icon/typing'
 
 export interface SidebarPanelBrand {
-  label: string
-  meta?: string
   to: RouteLocationRaw
-  iconCategory: SvgIconCategory | SvgIconCategoryValue
-  icon: string
+  iconSrc: string
 }
 
 export interface SidebarPanelItem {

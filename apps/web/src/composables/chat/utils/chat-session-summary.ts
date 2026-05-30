@@ -5,6 +5,7 @@ export type ChatSessionSummaryPatch = Partial<Pick<ChatSessionSummary, 'modelRef
 export function toChatSessionSummary(session: ChatSessionSummary | ChatSessionDetail): ChatSessionSummary {
   return {
     id: session.id,
+    origin: session.origin,
     title: session.title,
     modelRef: session.modelRef,
     createdAt: session.createdAt,

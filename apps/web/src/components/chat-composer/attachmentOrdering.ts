@@ -1,0 +1,76 @@
+import type {
+  ChatComposerAttachment,
+  ChatComposerContentJSON,
+  ChatComposerDocumentScope,
+} from './typing'
+import {
+  CHAT_MESSAGE_ATTACHMENT_PLACEMENT,
+  CHAT_MESSAGE_ATTACHMENT_TYPE,
+} from '@haohaoxue/samepage-contracts'
+import { serializeChatComposerContent } from './serialization'
+
+export function orderChatComposerAttachments(
+  attachments: ChatComposerAttachment[],
+  contentJSON: ChatComposerContentJSON,
+): ChatComposerAttachment[] {
+  const panelAttachments = attachments.filter(attachment =>
+    attachment.placement === CHAT_MESSAGE_ATTACHMENT_PLACEMENT.PANEL,
+  )
+  const attachmentsById = new Map(attachments.map(attachment => [attachment.id, attachment]))
+  const orderedInlineAttachments = serializeChatComposerContent(contentJSON)
+    .inlineAttachmentIds
+    .flatMap((attachmentId) => {
+      const attachment = attachmentsById.get(attachmentId)
+      return attachment?.placement === CHAT_MESSAGE_ATTACHMENT_PLACEMENT.INLINE ? [attachment] : []
+    })
+
+  return [
+    ...panelAttachments,
+    ...orderedInlineAttachments,
+  ]
+}
+
+export function getPanelAttachments(attachments: ChatComposerAttachment[]): ChatComposerAttachment[] {
+  return attachments.filter(attachment => attachment.placement === CHAT_MESSAGE_ATTACHMENT_PLACEMENT.PANEL)
+}
+
+export function findDuplicatePanelAttachment(
+  attachments: ChatComposerAttachment[],
+  candidate: Pick<ChatComposerAttachment, 'type' | 'placement' | 'documentId' | 'scope'>,
+): ChatComposerAttachment | null {
+  return attachments.find(attachment =>
+    attachment.type === candidate.type
+    && attachment.placement === CHAT_MESSAGE_ATTACHMENT_PLACEMENT.PANEL
+    && candidate.placement === CHAT_MESSAGE_ATTACHMENT_PLACEMENT.PANEL
+    && attachment.documentId === candidate.documentId
+    && isSameDocumentScope(attachment.scope, candidate.scope),
+  ) ?? null
+}
+
+export function getAttachmentDisplayLabel(attachment: ChatComposerAttachment): string {
+  if (attachment.type !== CHAT_MESSAGE_ATTACHMENT_TYPE.DOCUMENT) {
+    return attachment.title
+  }
+
+  return attachment.scope.kind === 'selection'
+    ? `当前选区 · ${attachment.title}`
+    : attachment.title
+}
+
+export function isSameDocumentScope(left: ChatComposerDocumentScope, right: ChatComposerDocumentScope): boolean {
+  if (left.kind !== right.kind) {
+    return false
+  }
+
+  if (left.kind === 'full' || right.kind === 'full') {
+    return left.kind === right.kind
+  }
+
+  return left.field === right.field
+    && left.from.blockId === right.from.blockId
+    && left.from.offset === right.from.offset
+    && left.to.blockId === right.to.blockId
+    && left.to.offset === right.to.offset
+    && left.blockIds.length === right.blockIds.length
+    && left.blockIds.every((blockId, index) => blockId === right.blockIds[index])
+}

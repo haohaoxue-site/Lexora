@@ -6,13 +6,25 @@ import type {
   ChatRuntimeConfig,
   ChatSessionDetail,
   ChatSessionEvent,
+  ChatSessionOrigin,
   ChatSessionSummary,
+  CreateChatSessionMessageRequest,
+  CreateChatSessionRequest,
+  EditAndSendChatMessageRequest,
 } from '@haohaoxue/samepage-contracts'
 import type { FastifyReply } from 'fastify'
 import type { AuthUserContext } from '../auth/auth.interface'
-import { BatchDeleteChatSessionsRequestSchema } from '@haohaoxue/samepage-contracts'
+import {
+  BatchDeleteChatSessionsRequestSchema,
+  CHAT_SESSION_ORIGIN,
+  ChatSessionOriginSchema,
+  CreateChatSessionMessageRequestSchema,
+  CreateChatSessionRequestSchema,
+  EditAndSendChatMessageRequestSchema,
+} from '@haohaoxue/samepage-contracts'
 import { sleep } from '@haohaoxue/samepage-shared'
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -28,8 +40,6 @@ import { ZodValidationPipe } from '../../pipes/zod-validation.pipe'
 import { ChatSessionEventsService } from './chat-session-events.service'
 import { ChatSessionsService } from './chat-sessions.service'
 import {
-  CreateChatSessionMessageRequestDto,
-  EditAndSendChatMessageRequestDto,
   SwitchChatActiveMessageRequestDto,
   UpdateChatSessionModelRequestDto,
   UpdateChatSessionTitleRequestDto,
@@ -49,33 +59,38 @@ export class ChatController {
   @Get('sessions')
   async getSessions(
     @CurrentUser() authUser: AuthUserContext,
+    @Query('origin') origin: string | undefined,
   ): Promise<ChatSessionSummary[]> {
-    return this.chatSessionsService.getSessions(authUser.id)
+    return this.chatSessionsService.getSessions(authUser.id, parseChatSessionOrigin(origin))
   }
 
   @Post('sessions')
   async createSession(
     @CurrentUser() authUser: AuthUserContext,
+    @Body(new ZodValidationPipe(CreateChatSessionRequestSchema.optional())) payload: CreateChatSessionRequest | undefined,
   ): Promise<ChatSessionDetail> {
-    return this.chatSessionsService.createSession(authUser.id)
+    return this.chatSessionsService.createSession(authUser.id, payload?.origin ?? CHAT_SESSION_ORIGIN.GLOBAL)
   }
 
   @Get('sessions/:id')
   async getSession(
     @CurrentUser() authUser: AuthUserContext,
     @Param('id') sessionId: string,
+    @Query('origin') origin: string | undefined,
   ): Promise<ChatSessionDetail> {
-    return this.chatSessionsService.getSession(authUser.id, sessionId)
+    return this.chatSessionsService.getSession(authUser.id, sessionId, parseChatSessionOrigin(origin))
   }
 
   @Delete('sessions/:id')
   async deleteSession(
     @CurrentUser() authUser: AuthUserContext,
     @Param('id') sessionId: string,
+    @Query('origin') origin: string | undefined,
   ): Promise<null> {
     await this.chatService.deleteSession({
       userId: authUser.id,
       sessionId,
+      origin: parseChatSessionOrigin(origin),
     })
     return null
   }
@@ -84,10 +99,12 @@ export class ChatController {
   async batchDeleteSessions(
     @CurrentUser() authUser: AuthUserContext,
     @Body(new ZodValidationPipe(BatchDeleteChatSessionsRequestSchema)) payload: BatchDeleteChatSessionsRequest,
+    @Query('origin') origin: string | undefined,
   ): Promise<BatchDeleteChatSessionsResponse> {
     return this.chatService.batchDeleteSessions({
       userId: authUser.id,
       sessionIds: payload.sessionIds,
+      origin: parseChatSessionOrigin(origin),
     })
   }
 
@@ -95,11 +112,13 @@ export class ChatController {
   async updateSessionModel(
     @CurrentUser() authUser: AuthUserContext,
     @Param('id') sessionId: string,
+    @Query('origin') origin: string | undefined,
     @Body() payload: UpdateChatSessionModelRequestDto,
   ): Promise<ChatSessionDetail> {
     return this.chatService.updateSessionModel({
       userId: authUser.id,
       sessionId,
+      origin: parseChatSessionOrigin(origin),
       modelRef: payload.modelRef ?? null,
     })
   }
@@ -108,11 +127,13 @@ export class ChatController {
   async updateSessionTitle(
     @CurrentUser() authUser: AuthUserContext,
     @Param('id') sessionId: string,
+    @Query('origin') origin: string | undefined,
     @Body() payload: UpdateChatSessionTitleRequestDto,
   ): Promise<ChatSessionDetail> {
     return this.chatSessionsService.updateSessionTitle({
       userId: authUser.id,
       sessionId,
+      origin: parseChatSessionOrigin(origin),
       title: payload.title,
     })
   }
@@ -121,12 +142,16 @@ export class ChatController {
   async sendMessage(
     @CurrentUser() authUser: AuthUserContext,
     @Param('id') sessionId: string,
-    @Body() payload: CreateChatSessionMessageRequestDto,
+    @Query('origin') origin: string | undefined,
+    @Body(new ZodValidationPipe(CreateChatSessionMessageRequestSchema)) payload: CreateChatSessionMessageRequest,
   ): Promise<ChatMutationResponse> {
     return this.chatService.sendMessage({
       userId: authUser.id,
       sessionId,
+      origin: parseChatSessionOrigin(origin),
       content: payload.content,
+      contentJSON: payload.contentJSON,
+      attachments: payload.attachments,
     })
   }
 
@@ -135,13 +160,17 @@ export class ChatController {
     @CurrentUser() authUser: AuthUserContext,
     @Param('id') sessionId: string,
     @Param('messageId') messageId: string,
-    @Body() payload: EditAndSendChatMessageRequestDto,
+    @Query('origin') origin: string | undefined,
+    @Body(new ZodValidationPipe(EditAndSendChatMessageRequestSchema)) payload: EditAndSendChatMessageRequest,
   ): Promise<ChatMutationResponse> {
     return this.chatService.editAndSendMessage({
       userId: authUser.id,
       sessionId,
       messageId,
+      origin: parseChatSessionOrigin(origin),
       content: payload.content,
+      contentJSON: payload.contentJSON,
+      attachments: payload.attachments,
     })
   }
 
@@ -150,11 +179,13 @@ export class ChatController {
     @CurrentUser() authUser: AuthUserContext,
     @Param('id') sessionId: string,
     @Param('messageId') messageId: string,
+    @Query('origin') origin: string | undefined,
   ): Promise<ChatMutationResponse> {
     return this.chatService.retryAssistantMessage({
       userId: authUser.id,
       sessionId,
       messageId,
+      origin: parseChatSessionOrigin(origin),
     })
   }
 
@@ -162,12 +193,14 @@ export class ChatController {
   async switchActiveMessage(
     @CurrentUser() authUser: AuthUserContext,
     @Param('id') sessionId: string,
+    @Query('origin') origin: string | undefined,
     @Body() payload: SwitchChatActiveMessageRequestDto,
   ): Promise<ChatMutationResponse> {
     return this.chatService.switchActiveMessage({
       userId: authUser.id,
       sessionId,
       messageId: payload.messageId,
+      origin: parseChatSessionOrigin(origin),
     })
   }
 
@@ -175,10 +208,12 @@ export class ChatController {
   async cancelRun(
     @CurrentUser() authUser: AuthUserContext,
     @Param('runId') runId: string,
+    @Query('origin') origin: string | undefined,
   ): Promise<ChatMutationResponse> {
     return this.chatService.cancelRun({
       userId: authUser.id,
       runId,
+      origin: parseChatSessionOrigin(origin),
     })
   }
 
@@ -187,9 +222,10 @@ export class ChatController {
     @CurrentUser() authUser: AuthUserContext,
     @Param('id') sessionId: string,
     @Query('afterSequence') afterSequence: string | undefined,
+    @Query('origin') origin: string | undefined,
     @Res() reply: FastifyReply,
   ): Promise<void> {
-    await this.chatSessionsService.getSession(authUser.id, sessionId)
+    await this.chatSessionsService.getSession(authUser.id, sessionId, parseChatSessionOrigin(origin))
 
     reply.raw.writeHead(200, {
       'Content-Type': 'text/event-stream',
@@ -256,6 +292,15 @@ function parseAfterSequence(value: string | undefined): number | null {
 
   const sequence = Number(value)
   return Number.isInteger(sequence) && sequence >= 0 ? sequence : null
+}
+
+function parseChatSessionOrigin(value: string | undefined): ChatSessionOrigin {
+  const parsed = ChatSessionOriginSchema.optional().safeParse(value)
+  if (!parsed.success) {
+    throw new BadRequestException('origin 参数无效')
+  }
+
+  return parsed.data ?? CHAT_SESSION_ORIGIN.GLOBAL
 }
 
 function writeSessionEvent(reply: FastifyReply, event: ChatSessionEvent): void {

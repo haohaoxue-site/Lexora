@@ -5,6 +5,7 @@ import type { ChatReplyGraphContext, ChatReplyState } from './state'
 import { AIMessage, HumanMessage, SystemMessage } from '@langchain/core/messages'
 import { Overwrite } from '@langchain/langgraph'
 import { consumeChatModelTextStream } from '../../integrations/model-providers/stream-text'
+import { applyChatReplyContextSnapshotsToMessages } from './chat-message-context'
 import { trimChatReplyMessageContext } from './policy'
 import { createChatReplySystemPrompt } from './prompts'
 
@@ -21,7 +22,11 @@ export function createLlmCallNode(options: CreateLlmCallNodeOptions): GraphNode<
     }
 
     const model = options.chatModelFactory.createChatModel(modelTarget)
-    const langChainMessages = toLangChainMessages(state.messages, state.olderMessagesExcerpt)
+    const modelMessages = applyChatReplyContextSnapshotsToMessages(state.messages, {
+      triggerUserMessageId: config.context?.triggerUserMessageId,
+      contextSnapshots: config.context?.contextSnapshots,
+    })
+    const langChainMessages = toLangChainMessages(modelMessages, state.olderMessagesExcerpt)
 
     const stream = await model.stream(langChainMessages, {
       signal: config.signal,
@@ -35,6 +40,7 @@ export function createLlmCallNode(options: CreateLlmCallNodeOptions): GraphNode<
       responseText,
       messages: [
         {
+          id: state.activePathTailMessageId,
           role: 'assistant',
           content: responseText,
         },

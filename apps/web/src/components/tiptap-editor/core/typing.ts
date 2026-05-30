@@ -74,3 +74,9 @@ export interface TiptapEditorCommentRequest {
   /** 触发来源 */
   source: TiptapEditorCommentTriggerSource
 }
+
+export interface TiptapEditorSelectionContextRequest {
+  editor: Editor
+  from: number
+  to: number
+}

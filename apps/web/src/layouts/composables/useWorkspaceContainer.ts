@@ -1,23 +1,17 @@
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
-import { SvgIconCategory } from '@/components/svg-icon/typing'
 import { ADMIN_ROUTE_PATH, isAdminRoutePath } from '@/router/constants'
 import { adminNavigationItems, workspaceNavigationItems } from '@/router/routes'
 import { useUiStore } from '@/stores/ui'
 
 const workspaceBrand = {
-  label: '同页',
   to: '/',
-  iconCategory: SvgIconCategory.NAV,
-  icon: 'workspace',
+  iconSrc: '/app-icon.png',
 }
 
 const adminBrand = {
-  label: '同页',
-  meta: '系统后台',
   to: ADMIN_ROUTE_PATH,
-  iconCategory: SvgIconCategory.NAV,
-  icon: 'workspace',
+  iconSrc: '/app-icon.png',
 }
 
 export function useWorkspaceContainer() {

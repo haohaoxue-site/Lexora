@@ -198,6 +198,7 @@ export const AgentRunEventSchema = z.discriminatedUnion('type', [
     type: z.literal(AGENT_RUN_EVENT_TYPE.TOOL_RESULT),
     payload: z.object({
       toolCallId: NonEmptyStringSchema,
+      toolName: NonEmptyStringSchema,
       content: z.string(),
     }).strict(),
   }).strict(),

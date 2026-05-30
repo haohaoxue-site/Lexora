@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { AuditUserSummarySchema } from '../identity'
 import { TiptapJsonContentPayloadSchema, TiptapSchemaVersionSchema } from '../tiptap/core'
+import { WorkspaceTypeSchema } from '../workspace'
 import { DocumentShareModeSchema } from './share'
 
 export const DOCUMENT_COLLECTION = {
@@ -37,6 +38,8 @@ export const DOCUMENT_COLLECTION_LABELS = {
 
 export const DOCUMENT_TITLE_MAX_LENGTH = 120
 export const DOCUMENT_DEFAULT_TITLE = '新文档'
+export const DOCUMENT_CHAT_SEARCH_LIMIT = 20
+export const DOCUMENT_CHAT_SEARCH_QUERY_MAX_LENGTH = 80
 
 export const DOCUMENT_SAVE_STATE = {
   IDLE: 'idle',
@@ -382,6 +385,22 @@ export const PatchDocumentLayoutSchema = z.object({
   pageWidthMode: DocumentPageWidthModeSchema,
 }).strict()
 
+export const SearchReadableDocumentsQuerySchema = z.object({
+  query: z.string().trim().max(DOCUMENT_CHAT_SEARCH_QUERY_MAX_LENGTH).default(''),
+  limit: z.coerce.number().int().min(1).max(DOCUMENT_CHAT_SEARCH_LIMIT).default(DOCUMENT_CHAT_SEARCH_LIMIT),
+}).strict()
+
+export const ReadableDocumentSearchResultSchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  workspaceId: z.string(),
+  workspaceType: WorkspaceTypeSchema,
+}).strict()
+
+export const SearchReadableDocumentsResponseSchema = z.object({
+  documents: z.array(ReadableDocumentSearchResultSchema),
+}).strict()
+
 export type DocumentStatus = z.infer<typeof DocumentStatusSchema>
 export type DocumentVisibility = z.infer<typeof DocumentVisibilitySchema>
 export type DocumentPageWidthMode = z.infer<typeof DocumentPageWidthModeSchema>
@@ -457,5 +476,8 @@ export type CreateDocumentMoveOperationResponse = z.infer<typeof CreateDocumentM
 export type PatchDocumentMetaRequest = z.infer<typeof PatchDocumentMetaSchema>
 export type PatchDocumentTitleRequest = z.infer<typeof PatchDocumentTitleSchema>
 export type PatchDocumentLayoutRequest = z.infer<typeof PatchDocumentLayoutSchema>
+export type SearchReadableDocumentsQuery = z.infer<typeof SearchReadableDocumentsQuerySchema>
+export type ReadableDocumentSearchResult = z.infer<typeof ReadableDocumentSearchResultSchema>
+export type SearchReadableDocumentsResponse = z.infer<typeof SearchReadableDocumentsResponseSchema>
 export type ResolveDocumentAssetsRequest = z.infer<typeof ResolveDocumentAssetsSchema>
 export type ResolveDocumentAssetsResponse = z.infer<typeof ResolveDocumentAssetsResponseSchema>

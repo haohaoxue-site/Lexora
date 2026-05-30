@@ -30,15 +30,34 @@ const {
   currentPageWidthMode,
   handleMenuCommand,
   handlePageWidthOptionClick,
+  isDocsChatPanelOpen,
   isShareButtonDisabled,
   isShareLinkCopied,
   openShareDialog,
   shouldShowShareLink,
+  toggleDocsChatPanel,
 } = useDocumentHeaderActions()
 </script>
 
 <template>
   <div class="document-header-actions">
+    <ElTooltip
+      content="AI 对话"
+      effect="dark"
+      placement="bottom"
+      :show-after="120"
+    >
+      <ElButton
+        text
+        class="document-header-actions__icon-button"
+        :class="{ 'is-active': isDocsChatPanelOpen }"
+        title="AI 对话"
+        @click="toggleDocsChatPanel"
+      >
+        <SvgIcon category="ui" icon="chat" />
+      </ElButton>
+    </ElTooltip>
+
     <ElButton
       text
       class="document-header-actions__share-button font-normal"
@@ -229,6 +248,11 @@ const {
 
     &.is-copied {
       color: var(--brand-success);
+    }
+
+    &.is-active {
+      background: color-mix(in srgb, var(--brand-primary) 8%, transparent);
+      color: var(--brand-primary);
     }
   }
 }

@@ -98,12 +98,45 @@ export const CHAT_SESSION_EVENT_TYPE_VALUES = [
 
 export const CHAT_SESSION_DEFAULT_TITLE = '新对话'
 export const CHAT_SESSION_TITLE_MAX_LENGTH = 120
+export const CHAT_MESSAGE_CONTENT_MAX_LENGTH = 40_000
+export const CHAT_MESSAGE_CONTENT_JSON_MAX_LENGTH = 120_000
+export const CHAT_MESSAGE_CONTENT_JSON_MAX_NODES = 2_000
+export const CHAT_MESSAGE_ATTACHMENT_MAX_COUNT = 20
+
+export const CHAT_SESSION_ORIGIN = {
+  GLOBAL: 'global',
+  DOCS: 'docs',
+} as const
+
+export const CHAT_SESSION_ORIGIN_VALUES = [
+  CHAT_SESSION_ORIGIN.GLOBAL,
+  CHAT_SESSION_ORIGIN.DOCS,
+] as const
+
+export const CHAT_MESSAGE_ATTACHMENT_TYPE = {
+  DOCUMENT: 'document',
+} as const
+
+export const CHAT_MESSAGE_ATTACHMENT_TYPE_VALUES = [
+  CHAT_MESSAGE_ATTACHMENT_TYPE.DOCUMENT,
+] as const
+
+export const CHAT_MESSAGE_ATTACHMENT_PLACEMENT = {
+  PANEL: 'panel',
+  INLINE: 'inline',
+} as const
+
+export const CHAT_MESSAGE_ATTACHMENT_PLACEMENT_VALUES = [
+  CHAT_MESSAGE_ATTACHMENT_PLACEMENT.PANEL,
+  CHAT_MESSAGE_ATTACHMENT_PLACEMENT.INLINE,
+] as const
 
 const IsoDateTimeStringSchema = z.string().datetime()
 const NonEmptyStringSchema = z.string().trim().min(1)
 const ChatSessionTitleSchema = z.string().trim().min(1).max(CHAT_SESSION_TITLE_MAX_LENGTH)
 const ChatSessionSummaryBaseSchema = z.object({
   id: NonEmptyStringSchema,
+  origin: z.enum(CHAT_SESSION_ORIGIN_VALUES),
   title: ChatSessionTitleSchema,
   modelRef: AiModelRefSchema.pick({
     providerId: true,
@@ -118,6 +151,9 @@ export const ChatMessagePartTypeSchema = z.enum(CHAT_MESSAGE_PART_TYPE_VALUES)
 export const ChatMessageFailureReasonSchema = z.enum(CHAT_MESSAGE_FAILURE_REASON_VALUES)
 export const ChatRunStatusSchema = z.enum(CHAT_RUN_STATUS_VALUES)
 export const ChatSessionEventTypeSchema = z.enum(CHAT_SESSION_EVENT_TYPE_VALUES)
+export const ChatSessionOriginSchema = z.enum(CHAT_SESSION_ORIGIN_VALUES)
+export const ChatMessageAttachmentTypeSchema = z.enum(CHAT_MESSAGE_ATTACHMENT_TYPE_VALUES)
+export const ChatMessageAttachmentPlacementSchema = z.enum(CHAT_MESSAGE_ATTACHMENT_PLACEMENT_VALUES)
 
 export const ChatMessageBranchSchema = z.object({
   index: z.number().int().positive(),
@@ -126,12 +162,122 @@ export const ChatMessageBranchSchema = z.object({
   nextMessageId: NonEmptyStringSchema.nullable(),
 }).strict()
 
-export const ChatMessageMetadataSchema = z.object({
+export const ChatDocumentSelectionBoundarySchema = z.object({
+  blockId: NonEmptyStringSchema,
+  offset: z.number().int().nonnegative(),
+}).strict()
+
+export const ChatDocumentScopeSchema = z.discriminatedUnion('kind', [
+  z.object({
+    kind: z.literal('full'),
+  }).strict(),
+  z.object({
+    kind: z.literal('selection'),
+    field: z.literal('body'),
+    blockIds: z.array(NonEmptyStringSchema).min(1),
+    from: ChatDocumentSelectionBoundarySchema,
+    to: ChatDocumentSelectionBoundarySchema,
+  }).strict(),
+])
+
+const ChatMessageAttachmentBaseSchema = z.object({
+  id: NonEmptyStringSchema,
+  type: ChatMessageAttachmentTypeSchema,
+  placement: ChatMessageAttachmentPlacementSchema,
+  documentId: NonEmptyStringSchema,
+  title: NonEmptyStringSchema,
+  scope: ChatDocumentScopeSchema,
+  size: z.number().int().nonnegative(),
+}).strict()
+
+export const ChatMessageAttachmentInputSchema = ChatMessageAttachmentBaseSchema.extend({
+  snapshot: z.string().optional(),
+}).strict()
+
+export const ChatPersistedMessageAttachmentSchema = ChatMessageAttachmentBaseSchema
+export const PersistedChatMessageAttachmentSchema = ChatPersistedMessageAttachmentSchema
+
+export const ChatMessageContextSnapshotMetaSchema = z.object({
+  id: NonEmptyStringSchema,
+  type: ChatMessageAttachmentTypeSchema,
+  documentId: NonEmptyStringSchema,
+  title: NonEmptyStringSchema,
+  scope: ChatDocumentScopeSchema,
+  size: z.number().int().nonnegative(),
+  sourceAttachmentIds: z.array(NonEmptyStringSchema).min(1),
+  capturedAt: IsoDateTimeStringSchema,
+}).strict()
+
+const ChatMessageContentTextNodeSchema = z.object({
+  type: z.literal('text'),
+  text: z.string(),
+}).strict()
+
+const ChatMessageContentHardBreakNodeSchema = z.object({
+  type: z.literal('hardBreak'),
+}).strict()
+
+export const ChatMessageContentReferenceNodeSchema = z.object({
+  type: z.literal('chatReference'),
+  attrs: z.object({
+    id: NonEmptyStringSchema,
+    attachmentId: NonEmptyStringSchema,
+    label: NonEmptyStringSchema,
+  }).strict(),
+}).strict()
+
+const ChatMessageInlineContentNodeSchema = z.discriminatedUnion('type', [
+  ChatMessageContentTextNodeSchema,
+  ChatMessageContentHardBreakNodeSchema,
+  ChatMessageContentReferenceNodeSchema,
+])
+
+const ChatMessageParagraphContentNodeSchema = z.object({
+  type: z.literal('paragraph'),
+  content: z.array(ChatMessageInlineContentNodeSchema).optional(),
+}).strict()
+
+export const ChatMessageContentJSONSchema = z.object({
+  type: z.literal('doc'),
+  content: z.array(ChatMessageParagraphContentNodeSchema).optional(),
+}).strict().superRefine((value, ctx) => {
+  const serialized = JSON.stringify(value)
+  if (serialized.length > CHAT_MESSAGE_CONTENT_JSON_MAX_LENGTH) {
+    ctx.addIssue({
+      code: 'too_big',
+      maximum: CHAT_MESSAGE_CONTENT_JSON_MAX_LENGTH,
+      origin: 'string',
+      inclusive: true,
+      message: 'contentJSON is too large',
+    })
+  }
+
+  const nodeCount = countContentJSONNodes(value)
+  if (nodeCount > CHAT_MESSAGE_CONTENT_JSON_MAX_NODES) {
+    ctx.addIssue({
+      code: 'too_big',
+      maximum: CHAT_MESSAGE_CONTENT_JSON_MAX_NODES,
+      origin: 'array',
+      inclusive: true,
+      message: 'contentJSON has too many nodes',
+    })
+  }
+})
+
+export const ChatAssistantMessageMetadataSchema = z.object({
   failureReason: ChatMessageFailureReasonSchema.optional(),
   failureMessage: z.string().trim().min(1).optional(),
   elapsedMs: z.number().int().nonnegative().optional(),
   reasoningElapsedMs: z.number().int().nonnegative().optional(),
   finishReason: z.string().trim().min(1).optional(),
+}).strict()
+
+export const ChatMessageMetadataSchema = ChatAssistantMessageMetadataSchema
+
+export const ChatUserMessageMetadataSchema = z.object({
+  contentJSON: ChatMessageContentJSONSchema,
+  attachments: z.array(ChatPersistedMessageAttachmentSchema).max(CHAT_MESSAGE_ATTACHMENT_MAX_COUNT),
+  contextSnapshotMetas: z.array(ChatMessageContextSnapshotMetaSchema).max(CHAT_MESSAGE_ATTACHMENT_MAX_COUNT),
 }).strict()
 
 export const ChatMessagePartMetadataSchema = z.object({
@@ -152,18 +298,31 @@ export const ChatMessagePartSchema = z.object({
   updatedAt: IsoDateTimeStringSchema,
 }).strict()
 
-export const ChatMessageSchema = z.object({
+const ChatMessageBaseSchema = z.object({
   id: NonEmptyStringSchema,
-  role: ChatMessageRoleSchema,
   status: ChatMessageStatusSchema,
   content: z.string(),
   branch: ChatMessageBranchSchema,
   parts: z.array(ChatMessagePartSchema),
-  metadata: ChatMessageMetadataSchema.nullable(),
   createdAt: IsoDateTimeStringSchema,
   updatedAt: IsoDateTimeStringSchema,
   completedAt: IsoDateTimeStringSchema.nullable(),
 }).strict()
+
+export const ChatUserMessageSchema = ChatMessageBaseSchema.extend({
+  role: z.literal('user'),
+  metadata: ChatUserMessageMetadataSchema,
+}).strict()
+
+export const ChatAssistantMessageSchema = ChatMessageBaseSchema.extend({
+  role: z.literal('assistant'),
+  metadata: ChatAssistantMessageMetadataSchema.nullable(),
+}).strict()
+
+export const ChatMessageSchema = z.discriminatedUnion('role', [
+  ChatUserMessageSchema,
+  ChatAssistantMessageSchema,
+])
 
 export const ChatSessionSummarySchema = ChatSessionSummaryBaseSchema
 
@@ -196,13 +355,38 @@ export const ChatRuntimeConfigSchema = z.object({
   notReadyReason: z.string().trim().min(1).nullable(),
 }).strict()
 
-export const CreateChatSessionMessageRequestSchema = z.object({
-  content: z.string().trim().min(1).max(40_000),
+export const CreateChatSessionRequestSchema = z.object({
+  origin: ChatSessionOriginSchema.optional(),
 }).strict()
 
-export const EditAndSendChatMessageRequestSchema = z.object({
-  content: z.string().trim().min(1).max(40_000),
+export const ChatSessionOriginQuerySchema = z.object({
+  origin: ChatSessionOriginSchema.optional(),
 }).strict()
+
+export const GetChatSessionsQuerySchema = ChatSessionOriginQuerySchema
+
+const ChatSessionMessageRequestBaseSchema = z.object({
+  content: z.string().trim().min(1).max(CHAT_MESSAGE_CONTENT_MAX_LENGTH),
+  contentJSON: ChatMessageContentJSONSchema,
+  attachments: z.array(ChatMessageAttachmentInputSchema).max(CHAT_MESSAGE_ATTACHMENT_MAX_COUNT).optional().nullable(),
+}).strict().superRefine((value, ctx) => {
+  const attachmentIds = new Set((value.attachments ?? []).map(attachment => attachment.id))
+  for (const attachmentId of collectChatReferenceAttachmentIds(value.contentJSON)) {
+    if (attachmentIds.has(attachmentId)) {
+      continue
+    }
+
+    ctx.addIssue({
+      code: 'custom',
+      path: ['contentJSON'],
+      message: 'chatReference attachmentId must exist in attachments',
+    })
+  }
+})
+
+export const CreateChatSessionMessageRequestSchema = ChatSessionMessageRequestBaseSchema
+
+export const EditAndSendChatMessageRequestSchema = ChatSessionMessageRequestBaseSchema
 
 export const RetryChatAssistantMessageRequestSchema = z.object({}).strict()
 
@@ -254,8 +438,11 @@ const ChatSessionMessagePartDeltaEventSchema = ChatSessionEventBaseSchema.extend
   runId: NonEmptyStringSchema,
   sourceEventId: NonEmptyStringSchema,
   payload: z.object({
+    partId: NonEmptyStringSchema,
     partType: ChatMessagePartTypeSchema,
+    order: z.number().int().nonnegative(),
     delta: z.string(),
+    metadata: ChatMessagePartMetadataSchema.nullable().optional(),
   }).strict(),
 }).strict()
 
@@ -357,15 +544,78 @@ export const ChatSessionEventSchema = z.discriminatedUnion('type', [
   ChatSessionSnapshotRequiredEventSchema,
 ])
 
+function countContentJSONNodes(value: unknown): number {
+  let count = 0
+  const pending: unknown[] = [value]
+
+  while (pending.length > 0) {
+    const current = pending.pop()
+    if (!isRecord(current)) {
+      continue
+    }
+
+    if (typeof current.type === 'string') {
+      count += 1
+    }
+
+    if (Array.isArray(current.content)) {
+      pending.push(...current.content)
+    }
+  }
+
+  return count
+}
+
+function collectChatReferenceAttachmentIds(value: unknown): string[] {
+  const attachmentIds: string[] = []
+  collectChatReferenceAttachmentIdsInto(value, attachmentIds)
+  return attachmentIds
+}
+
+function collectChatReferenceAttachmentIdsInto(node: unknown, attachmentIds: string[]): void {
+  if (!isRecord(node)) {
+    return
+  }
+
+  if (node.type === 'chatReference' && isRecord(node.attrs) && typeof node.attrs.attachmentId === 'string') {
+    attachmentIds.push(node.attrs.attachmentId)
+  }
+
+  if (Array.isArray(node.content)) {
+    for (const child of node.content) {
+      collectChatReferenceAttachmentIdsInto(child, attachmentIds)
+    }
+  }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
 export type ChatMessageStatus = z.infer<typeof ChatMessageStatusSchema>
 export type ChatMessagePartType = z.infer<typeof ChatMessagePartTypeSchema>
 export type ChatMessageFailureReason = z.infer<typeof ChatMessageFailureReasonSchema>
 export type ChatRunStatus = z.infer<typeof ChatRunStatusSchema>
 export type ChatSessionEventType = z.infer<typeof ChatSessionEventTypeSchema>
+export type ChatSessionOrigin = z.infer<typeof ChatSessionOriginSchema>
+export type ChatMessageAttachmentType = z.infer<typeof ChatMessageAttachmentTypeSchema>
+export type ChatMessageAttachmentPlacement = z.infer<typeof ChatMessageAttachmentPlacementSchema>
+export type ChatDocumentSelectionBoundary = z.infer<typeof ChatDocumentSelectionBoundarySchema>
+export type ChatDocumentScope = z.infer<typeof ChatDocumentScopeSchema>
+export type ChatMessageAttachmentInput = z.infer<typeof ChatMessageAttachmentInputSchema>
+export type ChatPersistedMessageAttachment = z.infer<typeof ChatPersistedMessageAttachmentSchema>
+export type PersistedChatMessageAttachment = z.infer<typeof PersistedChatMessageAttachmentSchema>
+export type ChatMessageContextSnapshotMeta = z.infer<typeof ChatMessageContextSnapshotMetaSchema>
+export type ChatMessageContentReferenceNode = z.infer<typeof ChatMessageContentReferenceNodeSchema>
+export type ChatMessageContentJSON = z.infer<typeof ChatMessageContentJSONSchema>
 export type ChatMessageBranch = z.infer<typeof ChatMessageBranchSchema>
 export type ChatMessageMetadata = z.infer<typeof ChatMessageMetadataSchema>
+export type ChatAssistantMessageMetadata = z.infer<typeof ChatAssistantMessageMetadataSchema>
+export type ChatUserMessageMetadata = z.infer<typeof ChatUserMessageMetadataSchema>
 export type ChatMessagePartMetadata = z.infer<typeof ChatMessagePartMetadataSchema>
 export type ChatMessagePart = z.infer<typeof ChatMessagePartSchema>
+export type ChatUserMessage = z.infer<typeof ChatUserMessageSchema>
+export type ChatAssistantMessage = z.infer<typeof ChatAssistantMessageSchema>
 export type ChatMessage = z.infer<typeof ChatMessageSchema>
 export type ChatSessionSummary = z.infer<typeof ChatSessionSummarySchema>
 export type ChatSessionDetail = z.infer<typeof ChatSessionDetailSchema>
@@ -373,6 +623,9 @@ export type ChatModelItem = z.infer<typeof ChatModelItemSchema>
 export type ChatModelListResponse = z.infer<typeof ChatModelListResponseSchema>
 export type ChatRuntimeConfig = z.infer<typeof ChatRuntimeConfigSchema>
 export type ChatRunSummary = z.infer<typeof ChatRunSummarySchema>
+export type CreateChatSessionRequest = z.infer<typeof CreateChatSessionRequestSchema>
+export type ChatSessionOriginQuery = z.infer<typeof ChatSessionOriginQuerySchema>
+export type GetChatSessionsQuery = z.infer<typeof GetChatSessionsQuerySchema>
 export type CreateChatSessionMessageRequest = z.infer<typeof CreateChatSessionMessageRequestSchema>
 export type EditAndSendChatMessageRequest = z.infer<typeof EditAndSendChatMessageRequestSchema>
 export type RetryChatAssistantMessageRequest = z.infer<typeof RetryChatAssistantMessageRequestSchema>

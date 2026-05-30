@@ -1109,6 +1109,7 @@ html.dark {
 .tiptap-bubble-turn-into-popover,
 .tiptap-bubble-align-popover,
 .tiptap-bubble-color-picker-popover,
+.tiptap-bubble-ai-popover,
 .tiptap-block-trigger-popover {
   overflow: hidden !important;
   padding: 8px !important;
@@ -1116,6 +1117,41 @@ html.dark {
   border-radius: 10px !important;
   background: var(--brand-bg-surface-raised) !important;
   box-shadow: var(--brand-shadow-floating) !important;
+}
+
+.tiptap-bubble-ai-trigger {
+  width: auto;
+  min-width: 1rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.tiptap-bubble-ai-menu {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+
+  &__item {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    min-height: 30px;
+    padding: 0 10px;
+    border: none;
+    border-radius: 7px;
+    background: transparent;
+    color: var(--brand-text-primary);
+    font-size: 0.8125rem;
+    line-height: 1.4;
+    text-align: left;
+    cursor: pointer;
+    transition: background-color 0.15s ease, color 0.15s ease;
+
+    &:hover {
+      background: var(--el-fill-color-light);
+      color: var(--brand-primary);
+    }
+  }
 }
 
 .tiptap-block-trigger-popover {

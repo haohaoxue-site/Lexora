@@ -19,10 +19,12 @@ import type {
   PatchDocumentLayoutRequest,
   PatchDocumentMetaRequest,
   PatchDocumentTitleRequest,
+  ReadableDocumentSearchResult,
   ResolveDocumentAssetsRequest,
   ResolveDocumentAssetsResponse,
   RestoreDocumentVersionSnapshotRequest,
   RestoreDocumentVersionSnapshotResponse,
+  SearchReadableDocumentsResponse,
 } from './typing'
 import { axios } from '@/utils/axios'
 
@@ -36,6 +38,18 @@ export function getDocuments(workspaceId: string): Promise<DocumentTreeGroup[]> 
       workspaceId,
     },
   })
+}
+
+export async function searchReadableDocumentsForChat(query: string): Promise<ReadableDocumentSearchResult[]> {
+  const response: SearchReadableDocumentsResponse = await axios.request({
+    method: 'get',
+    url: '/documents/search',
+    params: {
+      query,
+    },
+  })
+
+  return response.documents
 }
 
 export function createDocument(data: CreateDocumentRequest): Promise<CreateDocumentResponse> {

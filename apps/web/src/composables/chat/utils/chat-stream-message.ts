@@ -8,6 +8,7 @@ import {
 import dayjs from '@/utils/dayjs'
 
 type ChatMessagePart = ChatMessage['parts'][number]
+type AssistantChatMessage = Extract<ChatMessage, { role: 'assistant' }>
 
 export function applyChatSessionEventToMessages(
   messages: ChatMessage[],
@@ -15,7 +16,13 @@ export function applyChatSessionEventToMessages(
 ): ChatMessage[] {
   switch (event.type) {
     case CHAT_SESSION_EVENT_TYPE.MESSAGE_PART_DELTA:
-      return appendMessagePartDelta(messages, event.messageId, event.payload.partType, event.payload.delta)
+      return appendMessagePartDelta(messages, event.messageId, {
+        partId: event.payload.partId,
+        partType: event.payload.partType,
+        order: event.payload.order,
+        delta: event.payload.delta,
+        metadata: event.payload.metadata ?? null,
+      })
     case CHAT_SESSION_EVENT_TYPE.MESSAGE_STATUS_CHANGED:
       return updateMessageStatus(messages, event.messageId, event.payload.status)
     case CHAT_SESSION_EVENT_TYPE.MESSAGE_COMPLETED:
@@ -45,10 +52,15 @@ export function applyChatSessionEventToMessages(
 function appendMessagePartDelta(
   messages: ChatMessage[],
   messageId: string,
-  partType: ChatMessagePart['type'],
-  delta: string,
+  input: {
+    partId: string
+    partType: ChatMessagePart['type']
+    order: number
+    delta: string
+    metadata: ChatMessagePart['metadata']
+  },
 ): ChatMessage[] {
-  if (!delta) {
+  if (!input.delta) {
     return messages
   }
 
@@ -59,8 +71,8 @@ function appendMessagePartDelta(
 
   const now = dayjs().toISOString()
   const message = messages[index]
-  const parts = upsertPart(message, partType, delta, now)
-  const content = partType === CHAT_MESSAGE_PART_TYPE.TEXT
+  const parts = upsertPart(message, input, now)
+  const content = input.partType === CHAT_MESSAGE_PART_TYPE.TEXT
     ? getPartText(parts, CHAT_MESSAGE_PART_TYPE.TEXT)
     : message.content
 
@@ -132,12 +144,16 @@ function failMessage(
 
   const now = dayjs().toISOString()
   const message = messages[index]
+  const assistantMessage = toAssistantChatMessage(message)
+  if (!assistantMessage) {
+    return messages
+  }
 
   return updateMessage(messages, index, {
-    ...message,
+    ...assistantMessage,
     status: CHAT_MESSAGE_STATUS.FAILED,
     metadata: {
-      ...(message.metadata ?? {}),
+      ...(assistantMessage.metadata ?? {}),
       failureReason: CHAT_MESSAGE_FAILURE_REASON.FAILED,
       failureMessage,
     },
@@ -148,18 +164,24 @@ function failMessage(
 
 function upsertPart(
   message: ChatMessage,
-  partType: ChatMessagePart['type'],
-  delta: string,
+  input: {
+    partId: string
+    partType: ChatMessagePart['type']
+    order: number
+    delta: string
+    metadata: ChatMessagePart['metadata']
+  },
   now: string,
 ): ChatMessagePart[] {
   const parts = [...message.parts]
-  const index = parts.findIndex(part => part.type === partType)
+  const index = parts.findIndex(part => part.id === input.partId)
 
   if (index >= 0) {
     const part = parts[index]
     parts[index] = {
       ...part,
-      text: part.text + delta,
+      text: part.text + input.delta,
+      metadata: input.metadata,
       updatedAt: now,
     }
     return sortParts(parts)
@@ -167,7 +189,14 @@ function upsertPart(
 
   return sortParts([
     ...parts,
-    createTransientPart(message.id, partType, delta, now),
+    createTransientPart({
+      id: input.partId,
+      type: input.partType,
+      text: input.delta,
+      order: input.order,
+      metadata: input.metadata,
+      now,
+    }),
   ])
 }
 
@@ -191,24 +220,33 @@ function replaceTextPart(
 
   return sortParts([
     ...parts,
-    createTransientPart(message.id, CHAT_MESSAGE_PART_TYPE.TEXT, content, now),
+    createTransientPart({
+      id: `${message.id}:${CHAT_MESSAGE_PART_TYPE.TEXT}`,
+      type: CHAT_MESSAGE_PART_TYPE.TEXT,
+      text: content,
+      order: getPartOrder(CHAT_MESSAGE_PART_TYPE.TEXT),
+      metadata: null,
+      now,
+    }),
   ])
 }
 
-function createTransientPart(
-  messageId: string,
-  type: ChatMessagePart['type'],
-  text: string,
-  now: string,
-): ChatMessagePart {
+function createTransientPart(input: {
+  id: string
+  type: ChatMessagePart['type']
+  text: string
+  order: number
+  metadata: ChatMessagePart['metadata']
+  now: string
+}): ChatMessagePart {
   return {
-    id: `${messageId}:${type}`,
-    type,
-    text,
-    order: getPartOrder(type),
-    metadata: null,
-    createdAt: now,
-    updatedAt: now,
+    id: input.id,
+    type: input.type,
+    text: input.text,
+    order: input.order,
+    metadata: input.metadata,
+    createdAt: input.now,
+    updatedAt: input.now,
   }
 }
 
@@ -236,6 +274,10 @@ function updateMessage(messages: ChatMessage[], index: number, nextMessage: Chat
   const nextMessages = [...messages]
   nextMessages[index] = nextMessage
   return nextMessages
+}
+
+function toAssistantChatMessage(message: ChatMessage): AssistantChatMessage | null {
+  return message.role === 'assistant' ? message as AssistantChatMessage : null
 }
 
 function getPayloadString(payload: Record<string, unknown>, key: string): string | null {

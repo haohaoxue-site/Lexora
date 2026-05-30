@@ -132,9 +132,11 @@ export function trimChatReplyMessageContext(input: ChatReplyMessageContext): Cha
 }
 
 function readTriggerUserMessage(runtimeContext: AgentChatRuntimeContext): AgentChatContextMessage {
-  const triggerUserMessage = runtimeContext.messages.at(-1)
+  const triggerUserMessage = runtimeContext.messages.find(message =>
+    message.id === runtimeContext.triggerUserMessageId && message.role === 'user',
+  )
 
-  if (!triggerUserMessage || triggerUserMessage.role !== 'user') {
+  if (!triggerUserMessage) {
     throw new Error('聊天上下文缺少触发用户消息')
   }
 

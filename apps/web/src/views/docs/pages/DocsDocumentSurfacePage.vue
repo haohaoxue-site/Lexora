@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import DocsDocumentEditorPane from '../components/DocsDocumentEditorPane.vue'
 import { useActiveDocument } from '../composables/useActiveDocument'
+import { useDocsChatContextBridge } from '../composables/useDocsChatContextBridge'
 import { useDocsContext } from '../composables/useDocsContext'
 import { useDocsHistoryState } from '../composables/useDocsHistoryState'
 import { useDocsPageActions } from '../composables/useDocsPageActions'
@@ -19,6 +20,7 @@ const {
   updateDocumentTitle,
 } = useActiveDocument()
 const { docsDocumentEditorMode, isDocsDocumentEditable } = useDocsHistoryState()
+const { handleAddSelectionContext } = useDocsChatContextBridge()
 const {
   documentPaneState,
   hasVisibleFallbackDocument: hasFallbackDocument,
@@ -47,6 +49,7 @@ const shouldAutofocusTitle = computed(() =>
     @update-title="updateDocumentTitle"
     @update-content="updateDocumentContent"
     @request-comment="handleRequestComment"
+    @request-add-selection-context="handleAddSelectionContext"
     @title-autofocus-applied="markTitleAutofocusApplied"
     @create-document="createRootDocument()"
     @open-fallback-document="openDefaultDocument()"

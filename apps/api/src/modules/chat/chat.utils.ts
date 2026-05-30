@@ -2,27 +2,36 @@ import type {
   AiModelRef,
   ChatMessage,
   ChatMessageBranch,
+  ChatMessageContentJSON,
+  ChatMessageContextSnapshotMeta,
   ChatMessageMetadata,
   ChatMessagePart,
   ChatMessagePartMetadata,
   ChatMessagePartType,
   ChatMessageStatus,
+  ChatPersistedMessageAttachment,
   ChatRunSummary,
   ChatSessionDetail,
   ChatSessionSummary,
+  ChatUserMessageMetadata,
+  ChatSessionOrigin as ContractChatSessionOrigin,
 } from '@haohaoxue/samepage-contracts'
 import {
+  CHAT_MESSAGE_ATTACHMENT_TYPE,
   CHAT_MESSAGE_PART_TYPE,
   CHAT_MESSAGE_STATUS,
+  CHAT_SESSION_ORIGIN,
 } from '@haohaoxue/samepage-contracts'
 import {
   ChatSessionMessageRole,
   ChatSessionMessagePartType as PrismaChatSessionMessagePartType,
   ChatSessionMessageStatus as PrismaChatSessionMessageStatus,
+  ChatSessionOrigin as PrismaChatSessionOrigin,
 } from '@prisma/client'
 
 export interface ChatSessionSummaryRecord {
   id: string
+  origin: PrismaChatSessionOrigin
   title: string
   selectedProviderId: string | null
   selectedModelId: string | null
@@ -37,6 +46,7 @@ export interface ChatSessionMessageRecord {
   content: string
   branch: ChatMessageBranch
   parts: ChatSessionMessagePartRecord[]
+  contextSnapshots: ChatMessageContextSnapshotRecord[]
   metadata: unknown
   createdAt: Date
   updatedAt: Date
@@ -53,6 +63,18 @@ export interface ChatSessionMessagePartRecord {
   updatedAt: Date
 }
 
+export interface ChatMessageContextSnapshotRecord {
+  id: string
+  type: string
+  documentId: string
+  title: string
+  scope: unknown
+  size: number
+  sourceAttachmentIds: unknown
+  content?: string
+  capturedAt: Date
+}
+
 export interface ChatSessionDetailRecord extends ChatSessionSummaryRecord {
   activeRun?: ChatRunSummary | null
   latestSequence: number
@@ -62,6 +84,7 @@ export interface ChatSessionDetailRecord extends ChatSessionSummaryRecord {
 export function toChatSessionSummary(session: ChatSessionSummaryRecord): ChatSessionSummary {
   return {
     id: session.id,
+    origin: toChatSessionOrigin(session.origin),
     title: session.title,
     modelRef: toChatSessionModelRef(session),
     createdAt: session.createdAt.toISOString(),
@@ -73,18 +96,7 @@ export function toChatSessionDetail(session: ChatSessionDetailRecord): ChatSessi
   const detail: ChatSessionDetail = {
     ...toChatSessionSummary(session),
     latestSequence: session.latestSequence,
-    messages: session.messages.map(message => ({
-      id: message.id,
-      role: toChatMessageRole(message.role),
-      status: toChatMessageStatus(message.status),
-      content: getChatMessageContentSnapshot(message),
-      branch: message.branch,
-      parts: message.parts.map(toChatMessagePart),
-      metadata: toChatMessageMetadata(message.metadata),
-      createdAt: message.createdAt.toISOString(),
-      updatedAt: message.updatedAt.toISOString(),
-      completedAt: message.completedAt?.toISOString() ?? null,
-    })),
+    messages: session.messages.map(toChatMessage),
   }
 
   if (session.activeRun) {
@@ -102,6 +114,14 @@ export function getChatMessageContentSnapshot(
 
 export function toChatMessageRole(role: ChatSessionMessageRole): ChatMessage['role'] {
   return role === ChatSessionMessageRole.USER ? 'user' : 'assistant'
+}
+
+export function toChatSessionOrigin(origin: PrismaChatSessionOrigin): ChatSessionSummary['origin'] {
+  return origin === PrismaChatSessionOrigin.DOCS ? CHAT_SESSION_ORIGIN.DOCS : CHAT_SESSION_ORIGIN.GLOBAL
+}
+
+export function toPrismaChatSessionOrigin(origin: ContractChatSessionOrigin): PrismaChatSessionOrigin {
+  return origin === CHAT_SESSION_ORIGIN.DOCS ? PrismaChatSessionOrigin.DOCS : PrismaChatSessionOrigin.GLOBAL
 }
 
 export function toChatMessageStatus(status: PrismaChatSessionMessageStatus): ChatMessageStatus {
@@ -173,8 +193,66 @@ function toChatMessagePartType(type: PrismaChatSessionMessagePartType): ChatMess
   return CHAT_MESSAGE_PART_TYPE.TEXT
 }
 
+function toChatMessage(message: ChatSessionMessageRecord): ChatMessage {
+  const common = {
+    id: message.id,
+    status: toChatMessageStatus(message.status),
+    content: getChatMessageContentSnapshot(message),
+    branch: message.branch,
+    parts: message.parts.map(toChatMessagePart),
+    createdAt: message.createdAt.toISOString(),
+    updatedAt: message.updatedAt.toISOString(),
+    completedAt: message.completedAt?.toISOString() ?? null,
+  }
+
+  if (message.role === ChatSessionMessageRole.USER) {
+    return {
+      ...common,
+      role: 'user',
+      metadata: toChatUserMessageMetadata(message),
+    }
+  }
+
+  return {
+    ...common,
+    role: 'assistant',
+    metadata: toChatMessageMetadata(message.metadata),
+  }
+}
+
 function toChatMessageMetadata(metadata: unknown): ChatMessageMetadata | null {
   return isRecord(metadata) ? metadata as ChatMessageMetadata : null
+}
+
+function toChatUserMessageMetadata(message: ChatSessionMessageRecord): ChatUserMessageMetadata {
+  const metadata = isRecord(message.metadata) ? message.metadata : {}
+  const contentJSON = isRecord(metadata.contentJSON)
+    ? metadata.contentJSON as ChatMessageContentJSON
+    : toPlainTextContentJSON(message.content)
+  const attachments = Array.isArray(metadata.attachments)
+    ? metadata.attachments as ChatPersistedMessageAttachment[]
+    : []
+
+  return {
+    contentJSON,
+    attachments,
+    contextSnapshotMetas: message.contextSnapshots.map(toChatMessageContextSnapshotMeta),
+  }
+}
+
+export function toChatMessageContextSnapshotMeta(
+  snapshot: ChatMessageContextSnapshotRecord,
+): ChatMessageContextSnapshotMeta {
+  return {
+    id: snapshot.id,
+    type: CHAT_MESSAGE_ATTACHMENT_TYPE.DOCUMENT,
+    documentId: snapshot.documentId,
+    title: snapshot.title,
+    scope: snapshot.scope as ChatMessageContextSnapshotMeta['scope'],
+    size: snapshot.size,
+    sourceAttachmentIds: toStringArray(snapshot.sourceAttachmentIds),
+    capturedAt: snapshot.capturedAt.toISOString(),
+  }
 }
 
 function toChatMessagePartMetadata(metadata: unknown): ChatMessagePartMetadata | null {
@@ -196,4 +274,29 @@ export function toChatSessionModelRef(
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+function toStringArray(value: unknown): string[] {
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : []
+}
+
+function toPlainTextContentJSON(content: string): ChatMessageContentJSON {
+  return {
+    type: 'doc',
+    content: content.split('\n').map((line) => {
+      if (!line) {
+        return { type: 'paragraph' }
+      }
+
+      return {
+        type: 'paragraph',
+        content: [
+          {
+            type: 'text',
+            text: line,
+          },
+        ],
+      }
+    }),
+  }
 }

@@ -125,6 +125,10 @@ export function createMenuActionExecutors(
       return effects.requestAiRewrite()
     }
 
+    if (action === 'add-selection-context') {
+      return effects.requestAddSelectionContext()
+    }
+
     return leafExecutors.comment()
   }
 

@@ -77,6 +77,8 @@ export function createChatReplyWorkflow(inputs: CreateChatReplyWorkflowInput): A
           },
           context: {
             modelTarget: options.modelTarget,
+            triggerUserMessageId: sessionContext.triggerUserMessageId,
+            contextSnapshots: sessionContext.contextSnapshots,
             onStreamPart: async (part: AgentModelStreamPart) => await emitAgentModelStreamPart(part, options),
           },
         })

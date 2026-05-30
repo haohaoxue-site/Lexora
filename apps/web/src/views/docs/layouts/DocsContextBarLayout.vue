@@ -9,7 +9,6 @@ const {
   collaborationStatusHint,
   collaborationStatusLabel,
   collaborationStatusTone,
-  currentDocument,
   reconnectCollaboration,
 } = useActiveDocument()
 const { currentSurface, isDocumentSurface, visibleBreadcrumbLabels } = useDocsSurfaceState()
@@ -100,7 +99,7 @@ const connectionStatusTitle = computed(() =>
       </template>
     </div>
 
-    <div v-if="isDocumentSurface && currentDocument?.id" class="docs-view-context__actions">
+    <div v-if="isDocumentSurface" class="docs-view-context__actions">
       <DocumentHeaderActions />
     </div>
   </div>

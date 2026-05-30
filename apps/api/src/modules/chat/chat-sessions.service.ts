@@ -2,13 +2,18 @@ import type {
   AgentGetChatSessionContextResponse,
   AgentRunModelTarget,
   AiModelRef,
+  ChatMessageAttachmentInput,
+  ChatMessageContentJSON,
   ChatMessageFailureReason,
   ChatMessageMetadata,
   ChatMutationResponse,
+  ChatPersistedMessageAttachment,
   ChatRunSummary,
   ChatSessionDetail,
+  ChatSessionOrigin,
   ChatSessionSummary,
 } from '@haohaoxue/samepage-contracts'
+import type { ChatContextSnapshotCreateData } from './chat-context-snapshots.service'
 import { randomUUID } from 'node:crypto'
 import {
   AGENT_WORKFLOW_KEY,
@@ -32,16 +37,19 @@ import {
   Prisma,
 } from '@prisma/client'
 import { PrismaService } from '../../database/prisma.service'
+import { ChatContextSnapshotsService } from './chat-context-snapshots.service'
 import { ChatSessionEventsService } from './chat-session-events.service'
 import {
   ChatSessionDetailRecord,
   ChatSessionMessageRecord,
   getChatMessageContentSnapshot,
+  toChatMessageContextSnapshotMeta,
   toChatMessageRole,
   toChatMessageStatus,
   toChatSessionDetail,
   toChatSessionModelRef,
   toChatSessionSummary,
+  toPrismaChatSessionOrigin,
 } from './chat.utils'
 
 const continuableAssistantStatuses = new Set<ChatSessionMessageStatus>([
@@ -52,6 +60,7 @@ const continuableAssistantStatuses = new Set<ChatSessionMessageStatus>([
 
 const chatSessionSummarySelect = {
   id: true,
+  origin: true,
   title: true,
   selectedProviderId: true,
   selectedModelId: true,
@@ -59,41 +68,84 @@ const chatSessionSummarySelect = {
   updatedAt: true,
 } satisfies Prisma.ChatSessionSelect
 
+const chatMessagePartSelect = {
+  id: true,
+  type: true,
+  text: true,
+  order: true,
+  metadata: true,
+  createdAt: true,
+  updatedAt: true,
+} satisfies Prisma.ChatSessionMessagePartSelect
+
+const chatContextSnapshotMetaSelect = {
+  id: true,
+  type: true,
+  documentId: true,
+  title: true,
+  scope: true,
+  size: true,
+  sourceAttachmentIds: true,
+  capturedAt: true,
+  createdAt: true,
+} satisfies Prisma.ChatMessageContextSnapshotSelect
+
+const chatContextSnapshotContentSelect = {
+  ...chatContextSnapshotMetaSelect,
+  content: true,
+} satisfies Prisma.ChatMessageContextSnapshotSelect
+
+const chatSessionMessageBaseSelect = {
+  id: true,
+  role: true,
+  status: true,
+  content: true,
+  parentMessageId: true,
+  selectedChildMessageId: true,
+  branchOrder: true,
+  sourceMessageId: true,
+  agentRunId: true,
+  metadata: true,
+  createdAt: true,
+  updatedAt: true,
+  completedAt: true,
+  parts: {
+    select: chatMessagePartSelect,
+    orderBy: {
+      order: 'asc',
+    },
+  },
+} satisfies Prisma.ChatSessionMessageSelect
+
+const chatSessionMessageMetaSelect = {
+  ...chatSessionMessageBaseSelect,
+  contextSnapshots: {
+    select: chatContextSnapshotMetaSelect,
+    orderBy: [
+      { createdAt: 'asc' },
+      { id: 'asc' },
+    ],
+  },
+} satisfies Prisma.ChatSessionMessageSelect
+
+const chatSessionMessageContentSelect = {
+  ...chatSessionMessageBaseSelect,
+  contextSnapshots: {
+    select: chatContextSnapshotContentSelect,
+    orderBy: [
+      { createdAt: 'asc' },
+      { id: 'asc' },
+    ],
+  },
+} satisfies Prisma.ChatSessionMessageSelect
+
 const chatSessionDetailSelect = {
   ...chatSessionSummarySelect,
   activeRootMessageId: true,
   activeLeafMessageId: true,
   nextEventSequence: true,
   messages: {
-    select: {
-      id: true,
-      role: true,
-      status: true,
-      content: true,
-      parentMessageId: true,
-      selectedChildMessageId: true,
-      branchOrder: true,
-      sourceMessageId: true,
-      agentRunId: true,
-      metadata: true,
-      createdAt: true,
-      updatedAt: true,
-      completedAt: true,
-      parts: {
-        select: {
-          id: true,
-          type: true,
-          text: true,
-          order: true,
-          metadata: true,
-          createdAt: true,
-          updatedAt: true,
-        },
-        orderBy: {
-          order: 'asc',
-        },
-      },
-    },
+    select: chatSessionMessageMetaSelect,
     orderBy: [
       { createdAt: 'asc' },
       { id: 'asc' },
@@ -102,8 +154,18 @@ const chatSessionDetailSelect = {
 } satisfies Prisma.ChatSessionSelect
 
 const chatSessionRunDetailSelect = {
-  ...chatSessionDetailSelect,
+  ...chatSessionSummarySelect,
+  activeRootMessageId: true,
+  activeLeafMessageId: true,
+  nextEventSequence: true,
   historyVersion: true,
+  messages: {
+    select: chatSessionMessageContentSelect,
+    orderBy: [
+      { createdAt: 'asc' },
+      { id: 'asc' },
+    ],
+  },
 } satisfies Prisma.ChatSessionSelect
 
 type PersistedChatSessionDetail = Prisma.ChatSessionGetPayload<{
@@ -114,10 +176,12 @@ type PersistedChatSessionRunDetail = Prisma.ChatSessionGetPayload<{
   select: typeof chatSessionRunDetailSelect
 }>
 
-type PersistedChatSessionMessage = PersistedChatSessionRunDetail['messages'][number]
+type PersistedChatSessionDetailMessage = PersistedChatSessionDetail['messages'][number]
+type PersistedChatSessionRunDetailMessage = PersistedChatSessionRunDetail['messages'][number]
+type PersistedChatSessionMessage = PersistedChatSessionDetailMessage | PersistedChatSessionRunDetailMessage
 
-interface ActivePathState {
-  path: PersistedChatSessionMessage[]
+interface ActivePathState<T extends PersistedChatSessionMessage = PersistedChatSessionMessage> {
+  path: T[]
   activeRootMessageId: string | null
   activeLeafMessageId: string | null
   selectedChildUpdates: Array<{
@@ -138,7 +202,10 @@ type PersistedChatSessionModelRef = Prisma.ChatSessionGetPayload<{
 interface CreateRunInput {
   userId: string
   sessionId: string
+  origin: ChatSessionOrigin
   content?: string
+  contentJSON?: ChatMessageContentJSON
+  attachments?: ChatMessageAttachmentInput[] | null
   sourceMessageId?: string
   targetMessageId?: string
   runId: string
@@ -159,11 +226,15 @@ export class ChatSessionsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly chatSessionEvents: ChatSessionEventsService,
+    private readonly chatContextSnapshots: ChatContextSnapshotsService,
   ) {}
 
-  async getSessions(userId: string): Promise<ChatSessionSummary[]> {
+  async getSessions(userId: string, origin: ChatSessionOrigin): Promise<ChatSessionSummary[]> {
     const sessions = await this.prisma.chatSession.findMany({
-      where: { userId },
+      where: {
+        userId,
+        origin: toPrismaChatSessionOrigin(origin),
+      },
       select: chatSessionSummarySelect,
       orderBy: [
         { updatedAt: 'desc' },
@@ -174,10 +245,11 @@ export class ChatSessionsService {
     return sessions.map(toChatSessionSummary)
   }
 
-  async createSession(userId: string): Promise<ChatSessionDetail> {
+  async createSession(userId: string, origin: ChatSessionOrigin): Promise<ChatSessionDetail> {
     const session = await this.prisma.chatSession.create({
       data: {
         userId,
+        origin: toPrismaChatSessionOrigin(origin),
         title: CHAT_SESSION_DEFAULT_TITLE,
       },
       select: chatSessionDetailSelect,
@@ -186,8 +258,8 @@ export class ChatSessionsService {
     return toChatSessionDetail(toChatSessionDetailRecord(session))
   }
 
-  async getSession(userId: string, sessionId: string): Promise<ChatSessionDetail> {
-    const session = await this.findOwnedSessionDetailOrThrow(userId, sessionId)
+  async getSession(userId: string, sessionId: string, origin: ChatSessionOrigin): Promise<ChatSessionDetail> {
+    const session = await this.findOwnedSessionDetailOrThrow(userId, sessionId, origin)
     await this.repairActivePathSelection(session)
 
     return toChatSessionDetail(toChatSessionDetailRecord(
@@ -199,20 +271,23 @@ export class ChatSessionsService {
   async getSessionModelRef(
     userId: string,
     sessionId: string,
+    origin: ChatSessionOrigin,
   ): Promise<Pick<AiModelRef, 'providerId' | 'modelId'> | null> {
-    const session = await this.findOwnedSessionModelRefOrThrow(userId, sessionId)
+    const session = await this.findOwnedSessionModelRefOrThrow(userId, sessionId, origin)
     return toChatSessionModelRef(session)
   }
 
   async updateSessionModel(input: {
     userId: string
     sessionId: string
+    origin: ChatSessionOrigin
     modelRef: Pick<AiModelRef, 'providerId' | 'modelId'> | null
   }): Promise<ChatSessionDetail> {
     const result = await this.prisma.chatSession.updateMany({
       where: {
         id: input.sessionId,
         userId: input.userId,
+        origin: toPrismaChatSessionOrigin(input.origin),
       },
       data: {
         selectedProviderId: input.modelRef?.providerId ?? null,
@@ -225,12 +300,13 @@ export class ChatSessionsService {
       throw new NotFoundException('聊天会话不存在')
     }
 
-    return this.getSession(input.userId, input.sessionId)
+    return this.getSession(input.userId, input.sessionId, input.origin)
   }
 
   async updateSessionTitle(input: {
     userId: string
     sessionId: string
+    origin: ChatSessionOrigin
     title: string
   }): Promise<ChatSessionDetail> {
     const title = input.title.trim()
@@ -243,6 +319,7 @@ export class ChatSessionsService {
       where: {
         id: input.sessionId,
         userId: input.userId,
+        origin: toPrismaChatSessionOrigin(input.origin),
       },
       data: {
         title,
@@ -254,16 +331,18 @@ export class ChatSessionsService {
       throw new NotFoundException('聊天会话不存在')
     }
 
-    return this.getSession(input.userId, input.sessionId)
+    return this.getSession(input.userId, input.sessionId, input.origin)
   }
 
-  async deleteSession(userId: string, sessionId: string): Promise<{ activeRunIds: string[] }> {
+  async deleteSession(userId: string, sessionId: string, origin: ChatSessionOrigin): Promise<{ activeRunIds: string[] }> {
+    const prismaOrigin = toPrismaChatSessionOrigin(origin)
     const result = await this.prisma.$transaction(async (tx) => {
       const activeRuns = await tx.chatSessionRun.findMany({
         where: {
           sessionId,
           session: {
             userId,
+            origin: prismaOrigin,
           },
           status: {
             in: [
@@ -280,6 +359,7 @@ export class ChatSessionsService {
         where: {
           id: sessionId,
           userId,
+          origin: prismaOrigin,
         },
       })
 
@@ -298,7 +378,7 @@ export class ChatSessionsService {
     }
   }
 
-  async batchDeleteSessions(userId: string, sessionIds: string[]): Promise<{
+  async batchDeleteSessions(userId: string, sessionIds: string[], origin: ChatSessionOrigin): Promise<{
     activeRunIds: string[]
     deletedSessionIds: string[]
   }> {
@@ -308,11 +388,13 @@ export class ChatSessionsService {
       throw new BadRequestException('请选择要删除的聊天会话')
     }
 
+    const prismaOrigin = toPrismaChatSessionOrigin(origin)
     const result = await this.prisma.$transaction(async (tx) => {
       const ownedSessions = await tx.chatSession.findMany({
         where: {
           id: { in: uniqueSessionIds },
           userId,
+          origin: prismaOrigin,
         },
         select: {
           id: true,
@@ -346,6 +428,7 @@ export class ChatSessionsService {
         where: {
           id: { in: deletedSessionIds },
           userId,
+          origin: prismaOrigin,
         },
       })
 
@@ -362,32 +445,39 @@ export class ChatSessionsService {
     return result
   }
 
-  async sendMessage(input: CreateRunInput & { content: string }): Promise<ChatMutationResponse> {
+  async sendMessage(input: CreateRunInput & {
+    content: string
+    contentJSON: ChatMessageContentJSON
+    attachments?: ChatMessageAttachmentInput[] | null
+  }): Promise<ChatMutationResponse> {
     const result = await this.createRunFromUserMessage(input)
-    return this.toMutationResponse(input.userId, result.sessionId, result.latestSequence, result.runId)
+    return this.toMutationResponse(input.userId, input.origin, result.sessionId, result.latestSequence, result.runId)
   }
 
   async editAndSendMessage(input: CreateRunInput & {
     messageId: string
     content: string
+    contentJSON: ChatMessageContentJSON
+    attachments?: ChatMessageAttachmentInput[] | null
   }): Promise<ChatMutationResponse> {
     const result = await this.createRunFromEditedUserMessage(input)
-    return this.toMutationResponse(input.userId, result.sessionId, result.latestSequence, result.runId)
+    return this.toMutationResponse(input.userId, input.origin, result.sessionId, result.latestSequence, result.runId)
   }
 
   async retryAssistantMessage(input: CreateRunInput & {
     messageId: string
   }): Promise<ChatMutationResponse> {
     const result = await this.createRunFromRetriedAssistantMessage(input)
-    return this.toMutationResponse(input.userId, result.sessionId, result.latestSequence, result.runId)
+    return this.toMutationResponse(input.userId, input.origin, result.sessionId, result.latestSequence, result.runId)
   }
 
   async switchActiveMessage(input: {
     userId: string
     sessionId: string
+    origin: ChatSessionOrigin
     messageId: string
   }): Promise<ChatMutationResponse> {
-    const session = await this.findOwnedSessionRunDetailOrThrow(input.userId, input.sessionId)
+    const session = await this.findOwnedSessionRunDetailOrThrow(input.userId, input.sessionId, input.origin)
     await this.assertNoActiveRun(input.sessionId)
 
     const targetMessage = session.messages.find(message => message.id === input.messageId)
@@ -449,17 +539,21 @@ export class ChatSessionsService {
       ])
     })
 
-    return this.toMutationResponse(input.userId, input.sessionId, latestSequence)
+    return this.toMutationResponse(input.userId, input.origin, input.sessionId, latestSequence)
   }
 
   async cancelRun(input: {
     userId: string
     runId: string
+    origin: ChatSessionOrigin
   }): Promise<ChatMutationResponse> {
     const run = await this.prisma.chatSessionRun.findFirst({
       where: {
         runId: input.runId,
         actorUserId: input.userId,
+        session: {
+          origin: toPrismaChatSessionOrigin(input.origin),
+        },
       },
       select: {
         runId: true,
@@ -477,7 +571,7 @@ export class ChatSessionsService {
       run.status !== ChatSessionRunStatus.PENDING
       && run.status !== ChatSessionRunStatus.RUNNING
     ) {
-      return this.toMutationResponse(input.userId, run.sessionId, await this.chatSessionEvents.getLatestSequence(run.sessionId), run.runId)
+      return this.toMutationResponse(input.userId, input.origin, run.sessionId, await this.chatSessionEvents.getLatestSequence(run.sessionId), run.runId)
     }
 
     const completedAt = new Date()
@@ -519,7 +613,7 @@ export class ChatSessionsService {
       ])
     })
 
-    return this.toMutationResponse(input.userId, run.sessionId, latestSequence, run.runId)
+    return this.toMutationResponse(input.userId, input.origin, run.sessionId, latestSequence, run.runId)
   }
 
   async getAgentSessionContext(input: {
@@ -555,9 +649,15 @@ export class ChatSessionsService {
       messages: activePath
         .filter(message => message.role === ChatSessionMessageRole.USER || message.status === ChatSessionMessageStatus.COMPLETED)
         .map(message => ({
+          id: message.id,
           role: toChatMessageRole(message.role),
           content: getChatMessageContentSnapshot(message),
         })),
+      contextSnapshots: triggerMessage.contextSnapshots.map((snapshot, order) => ({
+        ...toChatMessageContextSnapshotMeta(snapshot),
+        order,
+        content: snapshot.content,
+      })),
     }
   }
 
@@ -682,14 +782,20 @@ export class ChatSessionsService {
     ])
   }
 
-  private async createRunFromUserMessage(input: CreateRunInput & { content: string }): Promise<CreatedRunResult> {
-    const session = await this.findOwnedSessionRunDetailOrThrow(input.userId, input.sessionId)
+  private async createRunFromUserMessage(input: CreateRunInput & {
+    content: string
+    contentJSON: ChatMessageContentJSON
+    attachments?: ChatMessageAttachmentInput[] | null
+  }): Promise<CreatedRunResult> {
+    const session = await this.findOwnedSessionRunDetailOrThrow(input.userId, input.sessionId, input.origin)
     await this.assertNoActiveRun(session.id)
 
-    const normalizedContent = input.content.trim()
-    if (!normalizedContent) {
-      throw new BadRequestException('消息内容不能为空')
-    }
+    const resolvedContext = await this.chatContextSnapshots.resolveForUserMessage({
+      userId: input.userId,
+      contentJSON: input.contentJSON,
+      attachments: input.attachments,
+    })
+    const normalizedContent = resolvedContext.content
 
     const activePath = resolveActivePath(session.messages, session.activeRootMessageId)
     const activeLeaf = activePath.at(-1) ?? null
@@ -720,6 +826,8 @@ export class ChatSessionsService {
         id: triggerUserMessageId,
         sessionId: session.id,
         content: normalizedContent,
+        metadata: resolvedContext.metadata,
+        contextSnapshots: resolvedContext.snapshots,
         parentMessageId: userParentMessageId,
         branchOrder: userBranchOrder,
         sourceMessageId: null,
@@ -786,8 +894,10 @@ export class ChatSessionsService {
   private async createRunFromEditedUserMessage(input: CreateRunInput & {
     messageId: string
     content: string
+    contentJSON: ChatMessageContentJSON
+    attachments?: ChatMessageAttachmentInput[] | null
   }): Promise<CreatedRunResult> {
-    const session = await this.findOwnedSessionRunDetailOrThrow(input.userId, input.sessionId)
+    const session = await this.findOwnedSessionRunDetailOrThrow(input.userId, input.sessionId, input.origin)
     await this.assertNoActiveRun(session.id)
 
     const sourceMessage = session.messages.find(message => message.id === input.messageId)
@@ -795,10 +905,12 @@ export class ChatSessionsService {
       throw new NotFoundException('可编辑的用户消息不存在')
     }
 
-    const normalizedContent = input.content.trim()
-    if (!normalizedContent) {
-      throw new BadRequestException('消息内容不能为空')
-    }
+    const resolvedContext = await this.chatContextSnapshots.resolveForUserMessage({
+      userId: input.userId,
+      contentJSON: input.contentJSON,
+      attachments: input.attachments,
+    })
+    const normalizedContent = resolvedContext.content
 
     const now = new Date()
     const triggerUserMessageId = randomUUID()
@@ -818,6 +930,8 @@ export class ChatSessionsService {
         id: triggerUserMessageId,
         sessionId: session.id,
         content: normalizedContent,
+        metadata: resolvedContext.metadata,
+        contextSnapshots: resolvedContext.snapshots,
         parentMessageId: sourceMessage.parentMessageId,
         branchOrder: userBranchOrder,
         sourceMessageId: sourceMessage.id,
@@ -882,7 +996,7 @@ export class ChatSessionsService {
   private async createRunFromRetriedAssistantMessage(input: CreateRunInput & {
     messageId: string
   }): Promise<CreatedRunResult> {
-    const session = await this.findOwnedSessionRunDetailOrThrow(input.userId, input.sessionId)
+    const session = await this.findOwnedSessionRunDetailOrThrow(input.userId, input.sessionId, input.origin)
     await this.assertNoActiveRun(session.id)
 
     const sourceMessage = session.messages.find(message => message.id === input.messageId)
@@ -995,6 +1109,11 @@ export class ChatSessionsService {
       id: string
       sessionId: string
       content: string
+      metadata: {
+        contentJSON: ChatMessageContentJSON
+        attachments: ChatPersistedMessageAttachment[]
+      }
+      contextSnapshots: ChatContextSnapshotCreateData[]
       parentMessageId: string | null
       branchOrder: number
       sourceMessageId: string | null
@@ -1008,10 +1127,25 @@ export class ChatSessionsService {
         role: ChatSessionMessageRole.USER,
         status: ChatSessionMessageStatus.COMPLETED,
         content: input.content,
+        metadata: toJsonObject(input.metadata),
         parentMessageId: input.parentMessageId,
         branchOrder: input.branchOrder,
         sourceMessageId: input.sourceMessageId,
         completedAt: input.completedAt,
+        contextSnapshots: input.contextSnapshots.length > 0
+          ? {
+              create: input.contextSnapshots.map(snapshot => ({
+                type: snapshot.type,
+                documentId: snapshot.documentId,
+                title: snapshot.title,
+                scope: toJsonValue(snapshot.scope),
+                size: snapshot.size,
+                sourceAttachmentIds: toJsonValue(snapshot.sourceAttachmentIds),
+                content: snapshot.content,
+                capturedAt: snapshot.capturedAt,
+              })),
+            }
+          : undefined,
         parts: {
           create: {
             type: ChatSessionMessagePartType.TEXT,
@@ -1080,12 +1214,13 @@ export class ChatSessionsService {
 
   private async toMutationResponse(
     userId: string,
+    origin: ChatSessionOrigin,
     sessionId: string,
     latestSequence: number,
     runId?: string,
   ): Promise<ChatMutationResponse> {
     const [session, run] = await Promise.all([
-      this.getSession(userId, sessionId),
+      this.getSession(userId, sessionId, origin),
       runId ? this.getRunSummary(runId) : Promise.resolve(undefined),
     ])
 
@@ -1177,11 +1312,13 @@ export class ChatSessionsService {
   private async findOwnedSessionDetailOrThrow(
     userId: string,
     sessionId: string,
+    origin?: ChatSessionOrigin,
   ): Promise<PersistedChatSessionDetail> {
     const session = await this.prisma.chatSession.findFirst({
       where: {
         id: sessionId,
         userId,
+        ...(origin ? { origin: toPrismaChatSessionOrigin(origin) } : {}),
       },
       select: chatSessionDetailSelect,
     })
@@ -1196,11 +1333,13 @@ export class ChatSessionsService {
   private async findOwnedSessionRunDetailOrThrow(
     userId: string,
     sessionId: string,
+    origin?: ChatSessionOrigin,
   ): Promise<PersistedChatSessionRunDetail> {
     const session = await this.prisma.chatSession.findFirst({
       where: {
         id: sessionId,
         userId,
+        ...(origin ? { origin: toPrismaChatSessionOrigin(origin) } : {}),
       },
       select: chatSessionRunDetailSelect,
     })
@@ -1215,11 +1354,13 @@ export class ChatSessionsService {
   private async findOwnedSessionModelRefOrThrow(
     userId: string,
     sessionId: string,
+    origin: ChatSessionOrigin,
   ): Promise<PersistedChatSessionModelRef> {
     const session = await this.prisma.chatSession.findFirst({
       where: {
         id: sessionId,
         userId,
+        origin: toPrismaChatSessionOrigin(origin),
       },
       select: chatSessionModelRefSelect,
     })
@@ -1240,6 +1381,7 @@ function toChatSessionDetailRecord(
 
   return {
     id: session.id,
+    origin: session.origin,
     title: session.title,
     selectedProviderId: session.selectedProviderId,
     selectedModelId: session.selectedModelId,
@@ -1252,8 +1394,8 @@ function toChatSessionDetailRecord(
 }
 
 function toChatSessionMessageRecord(
-  message: PersistedChatSessionMessage,
-  messages: PersistedChatSessionMessage[],
+  message: PersistedChatSessionDetailMessage,
+  messages: PersistedChatSessionDetailMessage[],
 ): ChatSessionMessageRecord {
   return {
     id: message.id,
@@ -1262,6 +1404,7 @@ function toChatSessionMessageRecord(
     content: message.content,
     branch: getMessageBranch(message, messages),
     parts: message.parts,
+    contextSnapshots: message.contextSnapshots,
     metadata: message.metadata,
     createdAt: message.createdAt,
     updatedAt: message.updatedAt,
@@ -1270,16 +1413,24 @@ function toChatSessionMessageRecord(
 }
 
 function resolveActivePath(
-  messages: PersistedChatSessionMessage[],
+  messages: PersistedChatSessionRunDetailMessage[],
   activeRootMessageId: string | null,
-): PersistedChatSessionMessage[] {
+): PersistedChatSessionRunDetailMessage[]
+function resolveActivePath(
+  messages: PersistedChatSessionDetailMessage[],
+  activeRootMessageId: string | null,
+): PersistedChatSessionDetailMessage[]
+function resolveActivePath<T extends PersistedChatSessionMessage>(
+  messages: T[],
+  activeRootMessageId: string | null,
+): T[] {
   return resolveActivePathState(messages, activeRootMessageId).path
 }
 
-function resolveActivePathState(
-  messages: PersistedChatSessionMessage[],
+function resolveActivePathState<T extends PersistedChatSessionMessage>(
+  messages: T[],
   activeRootMessageId: string | null,
-): ActivePathState {
+): ActivePathState<T> {
   const rootMessages = sortBranchMessages(messages.filter(message =>
     message.parentMessageId === null && message.role === ChatSessionMessageRole.USER,
   ))
@@ -1296,10 +1447,10 @@ function resolveActivePathState(
     }
   }
 
-  const path: PersistedChatSessionMessage[] = []
-  const selectedChildUpdates: ActivePathState['selectedChildUpdates'] = []
+  const path: T[] = []
+  const selectedChildUpdates: ActivePathState<T>['selectedChildUpdates'] = []
   const visited = new Set<string>()
-  let currentMessage: PersistedChatSessionMessage | null = rootMessage
+  let currentMessage: T | null = rootMessage
 
   while (currentMessage && !visited.has(currentMessage.id)) {
     path.push(currentMessage)
@@ -1345,11 +1496,19 @@ function resolveActivePathState(
 }
 
 function resolvePathToMessage(
-  messages: PersistedChatSessionMessage[],
+  messages: PersistedChatSessionRunDetailMessage[],
   messageId: string,
-): PersistedChatSessionMessage[] {
+): PersistedChatSessionRunDetailMessage[]
+function resolvePathToMessage(
+  messages: PersistedChatSessionDetailMessage[],
+  messageId: string,
+): PersistedChatSessionDetailMessage[]
+function resolvePathToMessage<T extends PersistedChatSessionMessage>(
+  messages: T[],
+  messageId: string,
+): T[] {
   const messageById = new Map(messages.map(message => [message.id, message]))
-  const path: PersistedChatSessionMessage[] = []
+  const path: T[] = []
   const visited = new Set<string>()
   let currentMessage = messageById.get(messageId) ?? null
 
@@ -1364,16 +1523,16 @@ function resolvePathToMessage(
   return path.reverse()
 }
 
-function createChatActivePathKey(messages: PersistedChatSessionMessage[]): string {
+function createChatActivePathKey(messages: Array<Pick<PersistedChatSessionMessage, 'id'>>): string {
   return messages.map(message => message.id).join('>')
 }
 
 function resolveActivePathWithOverride(
-  messages: PersistedChatSessionMessage[],
+  messages: PersistedChatSessionRunDetailMessage[],
   activeRootMessageId: string | null,
-  targetMessage: PersistedChatSessionMessage,
-): PersistedChatSessionMessage[] {
-  const nextMessages = messages.map((message) => {
+  targetMessage: PersistedChatSessionRunDetailMessage,
+): PersistedChatSessionRunDetailMessage[] {
+  const nextMessages: PersistedChatSessionRunDetailMessage[] = messages.map((message) => {
     if (targetMessage.parentMessageId && message.id === targetMessage.parentMessageId) {
       return {
         ...message,
@@ -1388,8 +1547,8 @@ function resolveActivePathWithOverride(
 }
 
 function getMessageBranch(
-  message: PersistedChatSessionMessage,
-  messages: PersistedChatSessionMessage[],
+  message: PersistedChatSessionDetailMessage,
+  messages: PersistedChatSessionDetailMessage[],
 ): ChatSessionMessageRecord['branch'] {
   const siblings = sortBranchMessages(messages.filter(item =>
     item.parentMessageId === message.parentMessageId && item.role === message.role,
@@ -1532,4 +1691,8 @@ function toJsonObject(value: object | undefined): Prisma.InputJsonObject | undef
   return Object.fromEntries(
     Object.entries(value).filter(([, item]) => item !== undefined),
   ) as Prisma.InputJsonObject
+}
+
+function toJsonValue(value: unknown): Prisma.InputJsonValue {
+  return value as Prisma.InputJsonValue
 }

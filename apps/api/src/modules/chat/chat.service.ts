@@ -4,6 +4,9 @@ import type {
   ChatModelItem,
   ChatMutationResponse,
   ChatRuntimeConfig,
+  ChatSessionOrigin,
+  CreateChatSessionMessageRequest,
+  EditAndSendChatMessageRequest,
 } from '@haohaoxue/samepage-contracts'
 import { randomUUID } from 'node:crypto'
 import {
@@ -25,18 +28,18 @@ import { ChatSessionsService } from './chat-sessions.service'
 interface ChatMessageMutationParams {
   userId: string
   sessionId: string
+  origin: ChatSessionOrigin
 }
 
 interface BatchDeleteChatSessionsParams {
   userId: string
   sessionIds: string[]
+  origin: ChatSessionOrigin
 }
 
-interface SendChatMessageParams extends ChatMessageMutationParams {
-  content: string
-}
+interface SendChatMessageParams extends ChatMessageMutationParams, CreateChatSessionMessageRequest {}
 
-interface EditAndSendChatMessageParams extends SendChatMessageParams {
+interface EditAndSendChatMessageParams extends ChatMessageMutationParams, EditAndSendChatMessageRequest {
   messageId: string
 }
 
@@ -51,11 +54,13 @@ interface SwitchChatActiveMessageParams extends ChatMessageMutationParams {
 interface CancelChatRunParams {
   userId: string
   runId: string
+  origin: ChatSessionOrigin
 }
 
 interface UpdateChatSessionModelParams {
   userId: string
   sessionId: string
+  origin: ChatSessionOrigin
   modelRef: Pick<AiModelRef, 'providerId' | 'modelId'> | null
 }
 
@@ -168,7 +173,7 @@ export class ChatService {
   }
 
   async deleteSession(params: ChatMessageMutationParams): Promise<void> {
-    const result = await this.chatSessionsService.deleteSession(params.userId, params.sessionId)
+    const result = await this.chatSessionsService.deleteSession(params.userId, params.sessionId, params.origin)
 
     await this.cleanupDeletedChatSessions({
       activeRunIds: result.activeRunIds,
@@ -177,7 +182,7 @@ export class ChatService {
   }
 
   async batchDeleteSessions(params: BatchDeleteChatSessionsParams): Promise<{ deletedSessionIds: string[] }> {
-    const result = await this.chatSessionsService.batchDeleteSessions(params.userId, params.sessionIds)
+    const result = await this.chatSessionsService.batchDeleteSessions(params.userId, params.sessionIds, params.origin)
 
     await this.cleanupDeletedChatSessions({
       activeRunIds: result.activeRunIds,
@@ -205,7 +210,7 @@ export class ChatService {
   }
 
   private async resolveChatModelTarget(params: ChatMessageMutationParams): Promise<AgentRunModelTarget> {
-    const sessionModelRef = await this.chatSessionsService.getSessionModelRef(params.userId, params.sessionId)
+    const sessionModelRef = await this.chatSessionsService.getSessionModelRef(params.userId, params.sessionId, params.origin)
     const target = await this.modelResolverService.resolveModelTarget({
       actorUserId: params.userId,
       intentKey: AI_MODEL_INTENT_KEY.CHAT_ASSISTANT_DEFAULT,

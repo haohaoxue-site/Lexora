@@ -5,9 +5,16 @@ import type {
   DocumentTreeGroup,
   PatchDocumentLayoutRequest,
   PatchDocumentMetaRequest,
+  SearchReadableDocumentsQuery,
+  SearchReadableDocumentsResponse,
 } from '@haohaoxue/samepage-contracts'
 import type { AuthUserContext } from '../../auth/auth.interface'
-import { CreateDocumentSchema, PatchDocumentLayoutSchema, PatchDocumentMetaSchema } from '@haohaoxue/samepage-contracts'
+import {
+  CreateDocumentSchema,
+  PatchDocumentLayoutSchema,
+  PatchDocumentMetaSchema,
+  SearchReadableDocumentsQuerySchema,
+} from '@haohaoxue/samepage-contracts'
 import { BadRequestException, Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common'
 import { CurrentUser } from '../../../decorators/current-user.decorator'
 import { ZodValidationPipe } from '../../../pipes/zod-validation.pipe'
@@ -35,6 +42,14 @@ export class DocumentTreeController {
     }
 
     return this.documentsService.getDocumentTree(authUser.id, workspaceId.trim())
+  }
+
+  @Get('search')
+  async searchReadableDocumentsForChat(
+    @CurrentUser() authUser: AuthUserContext,
+    @Query(new ZodValidationPipe(SearchReadableDocumentsQuerySchema)) query: SearchReadableDocumentsQuery,
+  ): Promise<SearchReadableDocumentsResponse> {
+    return this.documentsService.searchReadableDocumentsForChat(authUser.id, query)
   }
 
   @Patch(':id/meta')

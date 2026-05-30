@@ -2,12 +2,23 @@ import type { ChatMessage } from '@/apis/chat'
 import { CHAT_MESSAGE_PART_TYPE, CHAT_MESSAGE_STATUS } from '@haohaoxue/samepage-contracts'
 import dayjs from '@/utils/dayjs'
 
+type AssistantChatMessage = Extract<ChatMessage, { role: 'assistant' }>
+type ChatMessagePart = ChatMessage['parts'][number]
+
 export function getMessageText(message: ChatMessage) {
   if (message.role === 'user') {
     return message.content
   }
 
   return message.parts.find(part => part.type === CHAT_MESSAGE_PART_TYPE.TEXT)?.text ?? message.content
+}
+
+export function getMessageTextPartId(message: ChatMessage) {
+  if (message.role !== 'assistant') {
+    return `${message.id}:content`
+  }
+
+  return message.parts.find(part => part.type === CHAT_MESSAGE_PART_TYPE.TEXT)?.id ?? `${message.id}:content`
 }
 
 export function getReasoningText(message: ChatMessage) {
@@ -18,13 +29,26 @@ export function getReasoningText(message: ChatMessage) {
   return message.parts.find(part => part.type === CHAT_MESSAGE_PART_TYPE.REASONING)?.text ?? ''
 }
 
+export function getToolResultParts(message: ChatMessage): ChatMessagePart[] {
+  if (message.role !== 'assistant') {
+    return []
+  }
+
+  return message.parts.filter(part => part.type === CHAT_MESSAGE_PART_TYPE.TOOL_RESULT)
+}
+
 export function getReasoningElapsedMs(message: ChatMessage) {
-  const messageElapsedMs = message.metadata?.reasoningElapsedMs
+  const assistantMessage = toAssistantChatMessage(message)
+  if (!assistantMessage) {
+    return null
+  }
+
+  const messageElapsedMs = assistantMessage.metadata?.reasoningElapsedMs
   if (typeof messageElapsedMs === 'number') {
     return messageElapsedMs
   }
 
-  const reasoningPart = message.parts.find(part => part.type === CHAT_MESSAGE_PART_TYPE.REASONING)
+  const reasoningPart = assistantMessage.parts.find(part => part.type === CHAT_MESSAGE_PART_TYPE.REASONING)
   const partElapsedMs = reasoningPart?.metadata?.elapsedMs
   if (typeof partElapsedMs === 'number') {
     return partElapsedMs
@@ -45,11 +69,12 @@ export function getReasoningElapsedMs(message: ChatMessage) {
 }
 
 export function getAssistantFailureMessage(message: ChatMessage) {
-  if (message.role !== 'assistant' || message.status !== CHAT_MESSAGE_STATUS.FAILED) {
+  const assistantMessage = toAssistantChatMessage(message)
+  if (!assistantMessage || assistantMessage.status !== CHAT_MESSAGE_STATUS.FAILED) {
     return ''
   }
 
-  return message.metadata?.failureMessage ?? '生成失败，请稍后重试。'
+  return assistantMessage.metadata?.failureMessage ?? '生成失败，请稍后重试。'
 }
 
 export function isAssistantStreamingMessage(message: ChatMessage) {
@@ -67,4 +92,8 @@ export function shouldShowAssistantPending(message: ChatMessage) {
 
 export function shouldShowAssistantCancelled(message: ChatMessage) {
   return message.role === 'assistant' && message.status === CHAT_MESSAGE_STATUS.CANCELLED
+}
+
+function toAssistantChatMessage(message: ChatMessage): AssistantChatMessage | null {
+  return message.role === 'assistant' ? message as AssistantChatMessage : null
 }

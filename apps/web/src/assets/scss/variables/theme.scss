@@ -30,6 +30,7 @@
   --brand-scrollbar-thumb-hover: #c1c7d0;
   --brand-shadow-elevated: 0 20px 60px rgba(31, 35, 41, 0.06);
   --brand-shadow-floating: 0 14px 28px rgba(15, 23, 42, 0.08);
+  --brand-shadow-hairline: 0 1px 2px rgba(15, 23, 42, 0.05);
 
   --el-color-primary: var(--brand-primary);
   --el-color-success: var(--brand-success);
@@ -135,6 +136,7 @@ html.dark {
   --brand-scrollbar-thumb-hover: #4c5766;
   --brand-shadow-elevated: 0 24px 56px rgba(0, 0, 0, 0.32);
   --brand-shadow-floating: 0 16px 32px rgba(0, 0, 0, 0.36);
+  --brand-shadow-hairline: 0 1px 2px rgba(0, 0, 0, 0.3);
 
   --el-bg-color: var(--brand-bg-surface);
   --el-bg-color-overlay: var(--brand-bg-surface-raised);

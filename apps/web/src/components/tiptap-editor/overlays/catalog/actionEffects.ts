@@ -23,6 +23,7 @@ export interface MenuActionEffectsOptions {
   onRequestComment?: (request: TiptapEditorCommentRequest) => void
   /** 请求 AI 改写 */
   onRequestAiRewrite?: () => void
+  onRequestAddSelectionContext?: () => void
   /** 评论来源 */
   commentSource?: TiptapEditorCommentTriggerSource
   /** 图片选择输入框 */
@@ -45,6 +46,7 @@ export interface MenuActionEffects {
   requestComment: () => void
   /** 请求 AI 改写 */
   requestAiRewrite: () => void
+  requestAddSelectionContext: () => void
   /** 编辑图片描述 */
   editImageAlt: () => Promise<void>
   /** 切换链接面板 */
@@ -65,6 +67,7 @@ export function createMenuActionEffects(options: MenuActionEffectsOptions): Menu
     runClipboardAction,
     requestComment,
     requestAiRewrite,
+    requestAddSelectionContext,
     editImageAlt,
     toggleLinkPanel,
     openEmptyBlockLinkPanel,
@@ -103,6 +106,11 @@ export function createMenuActionEffects(options: MenuActionEffectsOptions): Menu
 
   function requestAiRewrite() {
     options.onRequestAiRewrite?.()
+    options.closeMenu?.()
+  }
+
+  function requestAddSelectionContext() {
+    options.onRequestAddSelectionContext?.()
     options.closeMenu?.()
   }
 

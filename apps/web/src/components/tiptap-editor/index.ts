@@ -14,6 +14,7 @@ export type {
   TiptapEditorCommentRequest,
   TiptapEditorContent,
   TiptapEditorContentSource,
+  TiptapEditorSelectionContextRequest,
 } from './core/typing'
 export {
   DocumentBodyEditor,

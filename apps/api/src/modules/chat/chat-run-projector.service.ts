@@ -2,6 +2,7 @@ import type {
   AgentRunEvent,
   ChatMessageFailureReason,
   ChatMessageMetadata,
+  ChatMessagePartMetadata,
 } from '@haohaoxue/samepage-contracts'
 import {
   AGENT_RUN_EVENT_TYPE,
@@ -29,6 +30,7 @@ import {
   getAgentRunEventText,
 } from '../agent/agent-events.service'
 import { ChatSessionEventsService } from './chat-session-events.service'
+import { toPrismaChatMessagePartType } from './chat.utils'
 
 const PROJECT_RUNNING_INTERVAL_MS = 2000
 const PROJECT_RUNNING_BATCH_SIZE = 5
@@ -174,6 +176,26 @@ export class ChatRunProjectorService implements OnModuleInit, OnModuleDestroy {
               return
             }
 
+            if (event.type === AGENT_RUN_EVENT_TYPE.TOOL_RESULT) {
+              const payload = readToolResultPayload(event)
+              if (!payload || await this.chatSessionEvents.hasSourceEvent(run.runId, sourceEventId)) {
+                return
+              }
+
+              await this.appendToolResultDelta({
+                runId: run.runId,
+                sessionId: run.sessionId,
+                messageId: run.assistantMessageId,
+                sourceEventId,
+                text: payload.content,
+                metadata: {
+                  toolCallId: payload.toolCallId,
+                  toolName: payload.toolName,
+                },
+              })
+              return
+            }
+
             if (event.type === AGENT_RUN_EVENT_TYPE.RUN_COMPLETED) {
               await this.completeRun({
                 runId: run.runId,
@@ -287,22 +309,27 @@ export class ChatRunProjectorService implements OnModuleInit, OnModuleDestroy {
         return
       }
 
-      await tx.chatSessionMessagePart.upsert({
+      const order = getSinglePartOrder(input.type)
+      const part = await tx.chatSessionMessagePart.upsert({
         where: {
           messageId_order: {
             messageId: input.messageId,
-            order: getSinglePartOrder(input.type),
+            order,
           },
         },
         create: {
           messageId: input.messageId,
-          type: toPrismaPartType(input.type),
+          type: toPrismaChatMessagePartType(input.type),
           text: input.snapshotText,
-          order: getSinglePartOrder(input.type),
+          order,
         },
         update: {
-          type: toPrismaPartType(input.type),
+          type: toPrismaChatMessagePartType(input.type),
           text: input.snapshotText,
+        },
+        select: {
+          id: true,
+          order: true,
         },
       })
       await tx.chatSessionMessage.update({
@@ -318,8 +345,79 @@ export class ChatRunProjectorService implements OnModuleInit, OnModuleDestroy {
           runId: input.runId,
           sourceEventId: input.sourceEventId,
           payload: {
+            partId: part.id,
             partType: input.type,
+            order: part.order,
             delta: input.text,
+            metadata: null,
+          },
+        },
+      ])
+    }))
+  }
+
+  private async appendToolResultDelta(input: {
+    runId: string
+    sessionId: string
+    messageId: string
+    sourceEventId: string
+    text: string
+    metadata: ChatMessagePartMetadata
+  }): Promise<void> {
+    await ignoreUniqueConstraint(async () => this.prisma.$transaction(async (tx) => {
+      if (!await isRunStatus(tx, input.runId, ChatSessionRunStatus.RUNNING)) {
+        return
+      }
+
+      const latestPart = await tx.chatSessionMessagePart.findFirst({
+        where: {
+          messageId: input.messageId,
+        },
+        select: {
+          order: true,
+        },
+        orderBy: {
+          order: 'desc',
+        },
+      })
+      const order = Math.max(2, (latestPart?.order ?? 1) + 1)
+      const part = await tx.chatSessionMessagePart.upsert({
+        where: {
+          messageId_order: {
+            messageId: input.messageId,
+            order,
+          },
+        },
+        create: {
+          messageId: input.messageId,
+          type: toPrismaChatMessagePartType(CHAT_MESSAGE_PART_TYPE.TOOL_RESULT),
+          text: input.text,
+          order,
+          metadata: toJsonObject(input.metadata),
+        },
+        update: {
+          type: toPrismaChatMessagePartType(CHAT_MESSAGE_PART_TYPE.TOOL_RESULT),
+          text: input.text,
+          metadata: toJsonObject(input.metadata),
+        },
+        select: {
+          id: true,
+          order: true,
+        },
+      })
+
+      await this.chatSessionEvents.appendEvents(tx, input.sessionId, [
+        {
+          type: CHAT_SESSION_EVENT_TYPE.MESSAGE_PART_DELTA,
+          messageId: input.messageId,
+          runId: input.runId,
+          sourceEventId: input.sourceEventId,
+          payload: {
+            partId: part.id,
+            partType: CHAT_MESSAGE_PART_TYPE.TOOL_RESULT,
+            order: part.order,
+            delta: input.text,
+            metadata: input.metadata,
           },
         },
       ])
@@ -568,12 +666,6 @@ function getSinglePartOrder(type: typeof CHAT_MESSAGE_PART_TYPE.REASONING | type
   return type === CHAT_MESSAGE_PART_TYPE.REASONING ? 0 : 1
 }
 
-function toPrismaPartType(type: typeof CHAT_MESSAGE_PART_TYPE.REASONING | typeof CHAT_MESSAGE_PART_TYPE.TEXT): ChatSessionMessagePartType {
-  return type === CHAT_MESSAGE_PART_TYPE.REASONING
-    ? ChatSessionMessagePartType.REASONING
-    : ChatSessionMessagePartType.TEXT
-}
-
 function getExpectedHistoryVersion(value: unknown): number {
   if (!value || typeof value !== 'object') {
     throw new Error('聊天运行上下文无效')
@@ -638,6 +730,38 @@ function getFailureMessageFromEvent(event: AgentRunEvent, fallback: string): str
   }
 
   return fallback
+}
+
+function readToolResultPayload(event: AgentRunEvent): {
+  toolCallId: string
+  toolName: string
+  content: string
+} | null {
+  if (!event.payload || typeof event.payload !== 'object') {
+    return null
+  }
+
+  const payload = event.payload as {
+    toolCallId?: unknown
+    toolName?: unknown
+    content?: unknown
+  }
+  if (
+    typeof payload.toolCallId !== 'string'
+    || !payload.toolCallId.trim()
+    || typeof payload.toolName !== 'string'
+    || !payload.toolName.trim()
+    || typeof payload.content !== 'string'
+    || !payload.content
+  ) {
+    return null
+  }
+
+  return {
+    toolCallId: payload.toolCallId,
+    toolName: payload.toolName,
+    content: payload.content,
+  }
 }
 
 function toJsonObject(value: object): Prisma.InputJsonObject {

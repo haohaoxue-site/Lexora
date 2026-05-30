@@ -2,9 +2,14 @@
 import { computed } from 'vue'
 import { SvgIcon } from '@/components/svg-icon'
 import { useUiStore } from '@/stores/ui'
+import DocsChatPanel from '../components/DocsChatPanel.vue'
+import { useDocsChatPanel } from '../composables/useDocsChatPanel'
+import { useDocsSurfaceState } from '../composables/useDocsSurfaceState'
 import DocsSidebarLayout from './DocsSidebarLayout.vue'
 
 const uiStore = useUiStore()
+const { isDocumentSurface } = useDocsSurfaceState()
+const { isOpen: isDocsChatPanelOpen } = useDocsChatPanel()
 const isDocumentLibraryVisible = computed(() => !uiStore.documentLibrarySidebarCollapsed)
 
 function showDocumentLibrary() {
@@ -34,7 +39,11 @@ function showDocumentLibrary() {
       </ElButton>
     </ElTooltip>
 
-    <RouterView />
+    <main class="docs-view__surface">
+      <RouterView />
+    </main>
+
+    <DocsChatPanel v-show="isDocumentSurface && isDocsChatPanelOpen" />
   </div>
 </template>
 
@@ -43,6 +52,13 @@ function showDocumentLibrary() {
   position: relative;
   display: flex;
   height: 100%;
+  min-height: 0;
+}
+
+.docs-view__surface {
+  display: flex;
+  flex: 1 1 0%;
+  min-width: 0;
   min-height: 0;
 }
 

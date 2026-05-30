@@ -43,6 +43,7 @@ const {
       v-if="bodyEditor && props.editable"
       :editor="bodyEditor"
       @request-comment="handleCommentRequest"
+      @request-add-selection-context="emits('requestAddSelectionContext', $event)"
       @request-ai-rewrite="editorAiComposer.openRewrite"
     />
 

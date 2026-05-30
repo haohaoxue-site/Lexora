@@ -1,15 +1,13 @@
 <script setup lang="ts">
 import { computed, onMounted } from 'vue'
+import { useChatModels } from '@/composables/chat/useChatModels'
+import { useChatRuntimeConfig } from '@/composables/chat/useChatRuntimeConfig'
 import PagePanel from '@/layouts/panels/PagePanel.vue'
 import { useUiStore } from '@/stores/ui'
 import ChatInputBox from './components/ChatInputBox.vue'
 import ChatMessageList from './components/ChatMessageList.vue'
-import ChatModelBadge from './components/ChatModelBadge.vue'
-import ChatModelSettingsDialog from './components/ChatModelSettingsDialog.vue'
 import ChatSessionSidebar from './components/ChatSessionSidebar.vue'
-import { useChatModels } from './composables/useChatModels'
 import { useChatRouteState } from './composables/useChatRouteState'
-import { useChatRuntimeConfig } from './composables/useChatRuntimeConfig'
 import { useChatSessions } from './composables/useChatSessions'
 
 const { loadRuntimeConfig } = useChatRuntimeConfig()
@@ -42,8 +40,6 @@ onMounted(async () => {
   <PagePanel>
     <template #header>
       <div class="chat-view-context">
-        <ChatModelBadge />
-
         <div class="chat-view-context__actions">
           <ElButton class="chat-view-context__new-chat-btn" @click="navigateToNewChat">
             <span class="chat-view-context__new-chat-content">
@@ -59,6 +55,8 @@ onMounted(async () => {
       <ChatSessionSidebar v-if="!isChatSidebarCollapsed" @collapse="setChatSidebarPinned(false)" />
 
       <div class="chat-view__conversation">
+        <div class="chat-view__picker-layer" />
+
         <ElButton
           v-if="isChatSidebarCollapsed"
           text
@@ -76,6 +74,9 @@ onMounted(async () => {
             <h1 class="chat-view-new__title">
               有什么可以帮助你的？
             </h1>
+            <p class="chat-view-new__subtitle">
+              问我任何问题，随时开始
+            </p>
             <ChatInputBox variant="hero" />
           </div>
         </section>
@@ -86,8 +87,6 @@ onMounted(async () => {
         </template>
       </div>
     </div>
-
-    <ChatModelSettingsDialog />
   </PagePanel>
 </template>
 
@@ -96,7 +95,7 @@ onMounted(async () => {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   gap: 1rem;
   width: 100%;
 
@@ -150,11 +149,19 @@ onMounted(async () => {
   }
 
   .chat-view-new__title {
-    margin: 0 0 1.5rem;
+    margin: 0 0 0.5rem;
     color: var(--brand-text-primary);
     font-size: 1.5rem;
     font-weight: 600;
     line-height: 2rem;
+    text-align: center;
+  }
+
+  .chat-view-new__subtitle {
+    margin: 0 0 1.75rem;
+    color: var(--brand-text-secondary);
+    font-size: 0.9375rem;
+    line-height: 1.5;
     text-align: center;
   }
 }
@@ -170,6 +177,13 @@ onMounted(async () => {
     flex: 1 1 0%;
     flex-direction: column;
     min-height: 0;
+  }
+
+  .chat-view__picker-layer {
+    position: absolute;
+    inset: 0;
+    z-index: 8;
+    pointer-events: none;
   }
 
   .chat-view__pin-sidebar-btn {

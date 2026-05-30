@@ -12,6 +12,7 @@ import { DocumentCollabTicketsService } from './asset/collab-ticket.service'
 // content
 import { DocumentContentController } from './content/content.controller'
 import { DocumentContentService } from './content/content.service'
+import { DocumentChatSnapshotService } from './content/document-chat-snapshot.service'
 import { DocumentYdocsService } from './content/ydocs.service'
 
 // core (cross-subdomain)
@@ -59,6 +60,7 @@ import { DocumentsService } from './tree/tree.service'
     DocumentAccessService,
     DocumentsService,
     DocumentContentService,
+    DocumentChatSnapshotService,
     DocumentYdocsService,
     DocumentAssetsService,
     DocumentCollabTicketsService,
@@ -72,7 +74,9 @@ import { DocumentsService } from './tree/tree.service'
   ],
   exports: [
     DocumentAccessService,
+    DocumentChatSnapshotService,
     DocumentContentService,
+    DocumentsService,
     DocumentShareAccessService,
     DocumentShareRecipientsService,
     DocumentSharesService,

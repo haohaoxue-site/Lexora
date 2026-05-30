@@ -9,11 +9,16 @@ import { ElMessage } from 'element-plus'
 import { computed, shallowRef } from 'vue'
 import { patchDocumentLayout } from '@/apis/document'
 import { useActiveDocument } from './useActiveDocument'
+import { useDocsChatPanel } from './useDocsChatPanel'
 import { useDocsHistoryState } from './useDocsHistoryState'
 import { useDocsShareDialog } from './useDocsShareDialog'
 
 export function useDocumentHeaderActions() {
   const { currentDocument, patchDocumentPageWidthMode } = useActiveDocument()
+  const {
+    isOpen: isDocsChatPanelOpen,
+    togglePanel: toggleDocsChatPanel,
+  } = useDocsChatPanel()
   const { openHistoryMode } = useDocsHistoryState()
   const { canOpenShareDialog, openDocumentShareDialog } = useDocsShareDialog()
   const isPageWidthUpdating = shallowRef(false)
@@ -116,10 +121,12 @@ export function useDocumentHeaderActions() {
     currentPageWidthMode,
     handleMenuCommand,
     handlePageWidthOptionClick,
+    isDocsChatPanelOpen,
     isShareButtonDisabled,
     isShareLinkCopied,
     openShareDialog,
     shouldShowShareLink,
+    toggleDocsChatPanel,
     copyShareLink,
   }
 }

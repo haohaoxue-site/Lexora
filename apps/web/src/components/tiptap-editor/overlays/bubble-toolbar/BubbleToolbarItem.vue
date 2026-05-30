@@ -7,6 +7,7 @@ import type {
 } from '../catalog/bubbleToolbarCatalog'
 import TiptapIcon from '../../icons/TiptapIcon.vue'
 import AlignDropdown from './AlignDropdown.vue'
+import BubbleAiDropdown from './BubbleAiDropdown.vue'
 import BubbleToolbarButton from './BubbleToolbarButton.vue'
 import ColorPickerDropdown from './ColorPickerDropdown.vue'
 import TurnIntoDropdown from './TurnIntoDropdown.vue'
@@ -55,6 +56,11 @@ const BUBBLE_TOOLBAR_TEXT_STYLE_CLASS_MAP: Record<BubbleToolbarTextStyle, string
     v-else-if="item.kind === 'component' && item.component === 'color'"
     :editor="editor"
     :description="item.description"
+  />
+  <BubbleAiDropdown
+    v-else-if="item.kind === 'component' && item.component === 'ai'"
+    :description="item.description"
+    @action-click="emits('actionClick', $event)"
   />
   <BubbleToolbarButton
     v-else-if="item.kind === 'action'"

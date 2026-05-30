@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { CloseBold } from '@element-plus/icons-vue'
+import ChatComposer from '@/components/chat-composer/ChatComposer.vue'
 import { useChatInputBox } from '../composables/useChatInputBox'
 
 const props = withDefaults(defineProps<{
@@ -9,51 +9,38 @@ const props = withDefaults(defineProps<{
 })
 
 const {
+  attachments,
   cancelActiveRun,
-  cancelRunId,
-  handleKeydown,
+  composerSelectedModelRef,
+  contentJSON,
+  handlePlaceholderCommand,
+  handlePlaceholderUpload,
   handleSend,
-  inputPlaceholder,
-  inputText,
-  isDisabled,
-  isSendDisabled,
+  highlightAttachment,
+  highlightAttachmentId,
+  isStreaming,
+  selectComposerModel,
 } = useChatInputBox()
 </script>
 
 <template>
   <div class="chat-input-box" :class="`chat-input-box--${props.variant}`">
     <div class="chat-input-box__inner">
-      <div class="chat-input-box__surface">
-        <ElInput
-          v-model="inputText"
-          type="textarea"
-          :autosize="{ minRows: 2, maxRows: 6 }"
-          :placeholder="inputPlaceholder"
-          :disabled="isDisabled"
-          class="chat-input-box__field"
-          @keydown="handleKeydown"
-        />
-        <ElButton
-          v-if="cancelRunId"
-          type="danger"
-          circle
-          plain
-          class="chat-input-box__send"
-          @click="cancelActiveRun"
-        >
-          <ElIcon><CloseBold /></ElIcon>
-        </ElButton>
-        <ElButton
-          v-else
-          type="primary"
-          circle
-          :disabled="isSendDisabled"
-          class="chat-input-box__send"
-          @click="handleSend"
-        >
-          <SvgIcon category="ui" icon="send-light" size="1rem" class="chat-input-box__send-icon" />
-        </ElButton>
-      </div>
+      <ChatComposer
+        v-model:attachments="attachments"
+        :content-j-s-o-n="contentJSON"
+        :selected-model-ref="composerSelectedModelRef"
+        :is-streaming="isStreaming"
+        :highlight-attachment-id="highlightAttachmentId"
+        document-picker-teleport-to=".chat-view__picker-layer"
+        @update:content-j-s-o-n="contentJSON = $event"
+        @send="handleSend"
+        @stop="cancelActiveRun"
+        @select-model="selectComposerModel"
+        @placeholder-upload="handlePlaceholderUpload"
+        @placeholder-command="handlePlaceholderCommand"
+        @highlight-attachment="highlightAttachment"
+      />
       <div v-if="props.variant === 'dock'" class="chat-input-box__hint">
         AI 回答仅供参考，请注意核实重要信息
       </div>
@@ -74,47 +61,6 @@ const {
   .chat-input-box__inner {
     max-width: 48rem;
     margin-inline: auto;
-  }
-
-  .chat-input-box__surface {
-    display: flex;
-    align-items: flex-end;
-    gap: 0.75rem;
-    padding: 0.75rem 1rem;
-    border: 1px solid color-mix(in srgb, var(--brand-border-base) 80%, transparent);
-    border-radius: 8px;
-    background: var(--brand-bg-surface-raised);
-    transition: border-color 0.2s ease;
-    box-shadow: var(--brand-shadow-floating);
-
-    &:focus-within {
-      border-color: color-mix(in srgb, var(--brand-primary) 30%, transparent);
-    }
-  }
-
-  .chat-input-box__field {
-    :deep(.el-textarea__inner) {
-      padding: 0;
-      background: transparent;
-      box-shadow: none;
-      resize: none;
-      border: none;
-      font-size: 14px;
-      line-height: 1.6;
-      color: var(--brand-text-primary);
-    }
-
-    :deep(.el-textarea__inner::placeholder) {
-      color: var(--brand-text-placeholder);
-    }
-  }
-
-  .chat-input-box__send {
-    margin-bottom: 0.125rem;
-  }
-
-  .chat-input-box__send-icon {
-    display: block;
   }
 
   .chat-input-box__hint {

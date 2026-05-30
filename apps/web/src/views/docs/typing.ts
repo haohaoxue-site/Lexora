@@ -11,6 +11,7 @@ import type {
 import type {
   TiptapEditorCollaborationBinding,
   TiptapEditorCommentRequest,
+  TiptapEditorSelectionContextRequest,
 } from '@/components/tiptap-editor'
 
 /**
@@ -93,6 +94,7 @@ export interface DocsDocumentEditorPaneEmits {
   updateTitle: [title: TiptapJsonContent]
   updateContent: [content: TiptapJsonContent]
   requestComment: [request: TiptapEditorCommentRequest]
+  requestAddSelectionContext: [request: TiptapEditorSelectionContextRequest]
   titleAutofocusApplied: []
   createDocument: []
   openFallbackDocument: []
@@ -123,6 +125,7 @@ export interface DocsDocumentEditorEmits {
   updateContent: [content: TiptapJsonContent]
   contentError: [error: Error]
   requestComment: [request: TiptapEditorCommentRequest]
+  requestAddSelectionContext: [request: TiptapEditorSelectionContextRequest]
   titleAutofocusApplied: []
 }
 

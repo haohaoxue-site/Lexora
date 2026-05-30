@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import type { Editor } from '@tiptap/core'
-import type { TiptapEditorCommentRequest } from '../../core/typing'
+import type {
+  TiptapEditorCommentRequest,
+  TiptapEditorSelectionContextRequest,
+} from '../../core/typing'
 import { BubbleMenu } from '@tiptap/vue-3/menus'
 import LinkPanel from '../shared/LinkPanel.vue'
 import BubbleToolbarGroup from './BubbleToolbarGroup.vue'
@@ -19,6 +22,7 @@ interface BubbleToolbarProps {
  */
 interface BubbleToolbarEmits {
   requestComment: [request: TiptapEditorCommentRequest]
+  requestAddSelectionContext: [request: TiptapEditorSelectionContextRequest]
   requestAiRewrite: []
 }
 
@@ -30,6 +34,11 @@ const controller = useBubbleToolbar(editor, {
     source: 'bubble-toolbar',
   }),
   onRequestAiRewrite: () => emits('requestAiRewrite'),
+  onRequestAddSelectionContext: () => emits('requestAddSelectionContext', {
+    editor,
+    from: editor.state.selection.from,
+    to: editor.state.selection.to,
+  }),
 })
 </script>
 

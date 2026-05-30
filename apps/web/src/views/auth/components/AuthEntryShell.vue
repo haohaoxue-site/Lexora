@@ -31,7 +31,12 @@ defineSlots<{
 
         <div class="auth-entry-shell__brand">
           <div class="auth-entry-shell__brand-mark">
-            <SvgIcon category="nav" icon="workspace" size="2.25rem" />
+            <img
+              src="/app-icon.png"
+              alt=""
+              aria-hidden="true"
+              class="auth-entry-shell__brand-mark-image"
+            >
           </div>
           <div class="auth-entry-shell__brand-text">
             <div class="auth-entry-shell__brand-name">
@@ -146,7 +151,14 @@ defineSlots<{
     width: 3rem;
     height: 3rem;
     border-radius: 1rem;
-    background: color-mix(in srgb, var(--brand-primary) 10%, transparent);
+  }
+
+  &__brand-mark-image {
+    display: block;
+    width: 2.75rem;
+    height: 2.75rem;
+    border-radius: 0.875rem;
+    object-fit: cover;
   }
 
   &__brand-text {

@@ -29,6 +29,7 @@ export interface BubbleToolbarController {
 export function useBubbleToolbar(editor: Editor, options: {
   onRequestComment: () => void
   onRequestAiRewrite?: () => void
+  onRequestAddSelectionContext?: () => void
 }): BubbleToolbarController {
   const editorSnapshot = useEditorSnapshot(editor, {
     ignoreCollaborationOrigin: true,
@@ -39,6 +40,7 @@ export function useBubbleToolbar(editor: Editor, options: {
     linkPanel: overlay.linkPanel,
     onRequestComment: () => options.onRequestComment(),
     onRequestAiRewrite: () => options.onRequestAiRewrite?.(),
+    onRequestAddSelectionContext: () => options.onRequestAddSelectionContext?.(),
     commentSource: 'bubble-toolbar',
   })
 

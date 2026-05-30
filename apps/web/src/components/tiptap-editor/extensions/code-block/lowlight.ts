@@ -6,7 +6,7 @@ export const codeBlockLowlight = createLowlight()
 
 type LanguageLoader = () => Promise<{ default: LanguageFn }>
 
-const LANGUAGE_LOADERS: Record<string, LanguageLoader> = {
+export const CODE_BLOCK_LANGUAGE_LOADERS: Record<string, LanguageLoader> = {
   bash: () => import('highlight.js/lib/languages/bash'),
   c: () => import('highlight.js/lib/languages/c'),
   cpp: () => import('highlight.js/lib/languages/cpp'),
@@ -40,7 +40,7 @@ const LANGUAGE_LOADERS: Record<string, LanguageLoader> = {
   yaml: () => import('highlight.js/lib/languages/yaml'),
 }
 
-const LANGUAGE_ALIASES: Record<string, readonly string[]> = {
+export const CODE_BLOCK_LANGUAGE_ALIASES: Record<string, readonly string[]> = {
   bash: ['sh'],
   csharp: ['cs'],
   cpp: ['c++'],
@@ -57,7 +57,7 @@ const LANGUAGE_ALIASES: Record<string, readonly string[]> = {
 const pendingLoads = new Map<string, Promise<boolean>>()
 
 export async function ensureCodeBlockLanguage(name: string): Promise<boolean> {
-  const loader = LANGUAGE_LOADERS[name]
+  const loader = CODE_BLOCK_LANGUAGE_LOADERS[name]
 
   if (!loader || codeBlockLowlight.registered(name)) {
     return false
@@ -73,7 +73,7 @@ export async function ensureCodeBlockLanguage(name: string): Promise<boolean> {
     const mod = await loader()
     codeBlockLowlight.register(name, mod.default)
 
-    const aliases = LANGUAGE_ALIASES[name]
+    const aliases = CODE_BLOCK_LANGUAGE_ALIASES[name]
 
     if (aliases?.length) {
       codeBlockLowlight.registerAlias(name, [...aliases])

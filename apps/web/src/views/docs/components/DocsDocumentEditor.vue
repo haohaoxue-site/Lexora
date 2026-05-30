@@ -39,6 +39,7 @@ const footerMetaItems = computed(() => [
       @update-content="emits('updateContent', $event)"
       @content-error="emits('contentError', $event)"
       @request-comment="emits('requestComment', $event)"
+      @request-add-selection-context="emits('requestAddSelectionContext', $event)"
       @title-autofocus-applied="emits('titleAutofocusApplied')"
     />
   </section>

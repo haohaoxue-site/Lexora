@@ -20,7 +20,14 @@ export type InlineMarkAction = 'bold' | 'italic' | 'underline' | 'strike' | 'cod
 export type TextAlignAction = 'align-left' | 'align-center' | 'align-right'
 export type IndentAction = 'indent' | 'outdent'
 export type BlockMenuAlignAction = TextAlignAction | IndentAction
-export type BubbleToolbarAction = BlockMenuAlignAction | InlineMarkAction | 'link' | 'comment' | 'ai-rewrite' | 'edit-image-alt'
+export type BubbleToolbarAction
+  = | BlockMenuAlignAction
+    | InlineMarkAction
+    | 'link'
+    | 'comment'
+    | 'add-selection-context'
+    | 'ai-rewrite'
+    | 'edit-image-alt'
 export type BlockMenuQuickAction = 'turn-into' | 'insert-link' | 'insert-inline-math' | 'insert-image' | 'insert-file'
 export type BlockMenuLeafAction = 'comment' | 'cut' | 'copy' | 'delete'
 export type InsertQuickAction = Exclude<BlockMenuQuickAction, 'turn-into'>
@@ -37,6 +44,7 @@ export interface MenuActionRegistryOptions {
   onRequestComment?: (request: TiptapEditorCommentRequest) => void
   /** 请求 AI 改写 */
   onRequestAiRewrite?: () => void
+  onRequestAddSelectionContext?: () => void
   /** 评论来源 */
   commentSource?: TiptapEditorCommentTriggerSource
   /** 图片选择输入框 */

@@ -41,10 +41,12 @@
     "@vueuse/core": "^14.2.1",
     "axios": "^1.15.2",
     "dayjs": "^1.11.20",
+    "dompurify": "^3.4.7",
     "element-plus": "^2.13.7",
     "highlight.js": "~11.11.1",
     "katex": "^0.16.45",
     "lowlight": "^3.3.0",
+    "markdown-it": "^14.2.0",
     "nanoid": "^5.1.9",
     "pinia": "^3.0.4",
     "pinia-plugin-persistedstate": "^4.7.1",
@@ -59,6 +61,7 @@
     "yjs": "^13.6.30"
   },
   "devDependencies": {
+    "@types/markdown-it": "^14.1.2",
     "@types/node": "^25.6.0",
     "@vitejs/plugin-vue": "^6.0.6",
     "@vitejs/plugin-vue-jsx": "^5.1.5",

@@ -1,26 +1,30 @@
 import type { Ref } from 'vue'
 import type { ChatMessage } from '@/apis/chat'
+import type {
+  ChatComposerAttachment,
+  ChatComposerContentJSON,
+  ChatComposerSubmitPayload,
+} from '@/components/chat-composer/typing'
 import { useClipboard } from '@vueuse/core'
 import { ElMessage } from 'element-plus'
 import { computed, nextTick, onUpdated, shallowRef, watch } from 'vue'
+import { createEmptyChatComposerContentJSON } from '@/components/chat-composer/serialization'
 import { SvgIconCategory } from '@/components/svg-icon/typing'
-import {
-  getAssistantFailureMessage,
-  getMessageText,
-  getReasoningElapsedMs,
-  getReasoningText,
-  isAssistantStreamingMessage,
-  shouldShowAssistantCancelled,
-  shouldShowAssistantPending,
-} from '../utils/chat-message-display'
+import { getMessageText } from '@/composables/chat/utils/chat-message-display'
 import { useChatModelSettings } from './useChatModelSettings'
 import { useChatRuntimeOverlay } from './useChatRuntimeOverlay'
 import { useChatStream } from './useChatStream'
 
+const EDIT_HIGHLIGHT_DURATION_MS = 1400
+
 export function useChatMessageList(options: {
   scrollContainerRef: Ref<HTMLElement | null>
 }) {
-  const { isConfigured } = useChatModelSettings()
+  const {
+    composerSelectedModelRef,
+    isConfigured,
+    selectComposerModel,
+  } = useChatModelSettings()
   const { renderSession } = useChatRuntimeOverlay()
   const {
     editAndSendMessage,
@@ -29,8 +33,11 @@ export function useChatMessageList(options: {
     switchBranch,
   } = useChatStream()
   const editingMessageId = shallowRef<string | null>(null)
-  const editingContent = shallowRef('')
+  const editingContentJSON = shallowRef<ChatComposerContentJSON>(createEmptyChatComposerContentJSON())
+  const editingAttachments = shallowRef<ChatComposerAttachment[]>([])
+  const editingHighlightAttachmentId = shallowRef<string | null>(null)
   const copiedMessageId = shallowRef<string | null>(null)
+  let editingHighlightTimer: ReturnType<typeof setTimeout> | null = null
   const {
     copy: copyText,
     copied: copiedMessage,
@@ -103,22 +110,46 @@ export function useChatMessageList(options: {
     }
 
     editingMessageId.value = message.id
-    editingContent.value = getMessageText(message)
+    editingContentJSON.value = cloneContentJSON(message.metadata.contentJSON)
+    editingAttachments.value = message.metadata.attachments.map(attachment => ({ ...attachment }))
+    editingHighlightAttachmentId.value = null
   }
 
   function cancelEditMessage() {
     editingMessageId.value = null
-    editingContent.value = ''
+    editingContentJSON.value = createEmptyChatComposerContentJSON()
+    editingAttachments.value = []
+    editingHighlightAttachmentId.value = null
   }
 
-  async function submitEditMessage(message: ChatMessage) {
-    if (message.role !== 'user' || !editingContent.value.trim()) {
+  async function submitEditMessage(message: ChatMessage, payload: ChatComposerSubmitPayload) {
+    if (message.role !== 'user') {
       return
     }
 
-    if (await editAndSendMessage(message.id, editingContent.value)) {
+    if (await editAndSendMessage(message.id, payload)) {
       cancelEditMessage()
     }
+  }
+
+  function highlightEditingAttachment(attachmentId: string) {
+    editingHighlightAttachmentId.value = attachmentId
+    if (editingHighlightTimer) {
+      clearTimeout(editingHighlightTimer)
+    }
+    editingHighlightTimer = setTimeout(() => {
+      if (editingHighlightAttachmentId.value === attachmentId) {
+        editingHighlightAttachmentId.value = null
+      }
+    }, EDIT_HIGHLIGHT_DURATION_MS)
+  }
+
+  function handleEditPlaceholderUpload() {
+    ElMessage.info('文件上传入口待接入')
+  }
+
+  function handleEditPlaceholderCommand() {
+    ElMessage.info('命令入口待接入')
   }
 
   async function retryAssistantMessage(message: ChatMessage) {
@@ -143,26 +174,31 @@ export function useChatMessageList(options: {
 
   return {
     cancelEditMessage,
+    composerSelectedModelRef,
     copyMessage,
-    editingContent,
+    editingAttachments,
+    editingContentJSON,
+    editingHighlightAttachmentId,
     emptyIcon,
     emptyIconStateClass,
-    getAssistantFailureMessage,
     getMessageRoleClass,
     getMessageText,
-    getReasoningElapsedMs,
-    getReasoningText,
+    handleEditPlaceholderCommand,
+    handleEditPlaceholderUpload,
+    highlightEditingAttachment,
     isEditingMessage,
     isMessageCopied,
-    isAssistantStreamingMessage,
     isConfigured,
     isStreaming,
     messages,
     retryAssistantMessage,
-    shouldShowAssistantCancelled,
-    shouldShowAssistantPending,
+    selectComposerModel,
     startEditMessage,
     submitEditMessage,
     switchToBranch,
   }
+}
+
+function cloneContentJSON(contentJSON: ChatComposerContentJSON): ChatComposerContentJSON {
+  return JSON.parse(JSON.stringify(contentJSON)) as ChatComposerContentJSON
 }

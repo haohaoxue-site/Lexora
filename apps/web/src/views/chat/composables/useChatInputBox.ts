@@ -1,49 +1,29 @@
-import { computed, shallowRef } from 'vue'
+import { createChatComposerHostState } from '@/composables/chat/createChatComposerHostState'
 import { useChatModelSettings } from './useChatModelSettings'
 import { useChatRuntimeOverlay } from './useChatRuntimeOverlay'
 import { useChatStream } from './useChatStream'
 
 export function useChatInputBox() {
-  const { inputPlaceholder, isConfigured } = useChatModelSettings()
+  const model = useChatModelSettings()
   const { cancelRunId, isStreaming } = useChatRuntimeOverlay()
   const { cancelActiveRun, sendMessage } = useChatStream()
-
-  const inputText = shallowRef('')
-  const isDisabled = computed(() => isStreaming.value || !isConfigured.value)
-  const isSendDisabled = computed(() => !inputText.value.trim() || isDisabled.value)
-
-  async function handleSend() {
-    const text = inputText.value.trim()
-
-    if (!text) {
-      return
-    }
-
-    if (await sendMessage(text)) {
-      inputText.value = ''
-    }
-  }
-
-  function handleKeydown(event: Event | KeyboardEvent) {
-    if (!(event instanceof KeyboardEvent)) {
-      return
-    }
-
-    if (event.key === 'Enter' && !event.shiftKey) {
-      event.preventDefault()
-      void handleSend()
-    }
-  }
+  const host = createChatComposerHostState({
+    model,
+    sendMessage,
+  })
 
   return {
+    attachments: host.attachments,
     cancelActiveRun,
-    handleKeydown,
-    handleSend,
-    inputPlaceholder,
-    inputText,
     cancelRunId,
-    isDisabled,
-    isSendDisabled,
+    composerSelectedModelRef: model.composerSelectedModelRef,
+    contentJSON: host.contentJSON,
+    handlePlaceholderCommand: host.handlePlaceholderCommand,
+    handlePlaceholderUpload: host.handlePlaceholderUpload,
+    handleSend: host.handleSend,
+    highlightAttachment: host.highlightAttachment,
+    highlightAttachmentId: host.highlightAttachmentId,
     isStreaming,
+    selectComposerModel: model.selectComposerModel,
   }
 }

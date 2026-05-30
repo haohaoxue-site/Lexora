@@ -6,31 +6,32 @@ import {
   RefreshRight,
 } from '@element-plus/icons-vue'
 import { useTemplateRef } from 'vue'
+import ChatUserMessageContent from '@/components/chat-message/ChatUserMessageContent.vue'
 import CopyStateIcon from '@/components/copy-state-icon/CopyStateIcon.vue'
 import { useChatMessageList } from '../composables/useChatMessageList'
-import ChatReasoningBlock from './ChatReasoningBlock.vue'
 
 const scrollContainerRef = useTemplateRef<HTMLElement>('scrollContainerRef')
 const {
   cancelEditMessage,
+  composerSelectedModelRef,
   copyMessage,
-  editingContent,
+  editingAttachments,
+  editingContentJSON,
+  editingHighlightAttachmentId,
   emptyIcon,
   emptyIconStateClass,
-  getAssistantFailureMessage,
   getMessageRoleClass,
   getMessageText,
-  getReasoningElapsedMs,
-  getReasoningText,
+  handleEditPlaceholderCommand,
+  handleEditPlaceholderUpload,
+  highlightEditingAttachment,
   isEditingMessage,
   isMessageCopied,
-  isAssistantStreamingMessage,
   isConfigured,
   isStreaming,
   messages,
   retryAssistantMessage,
-  shouldShowAssistantCancelled,
-  shouldShowAssistantPending,
+  selectComposerModel,
   startEditMessage,
   submitEditMessage,
   switchToBranch,
@@ -79,34 +80,7 @@ const {
         </div>
 
         <div v-if="msg.role === 'assistant'" class="chat-message-list__assistant-content">
-          <ChatReasoningBlock
-            v-if="getReasoningText(msg)"
-            :text="getReasoningText(msg)"
-            :status="msg.status"
-            :elapsed-ms="getReasoningElapsedMs(msg)"
-            :default-expanded="isAssistantStreamingMessage(msg)"
-          />
-
-          <div v-if="getMessageText(msg)" class="chat-message-list__bubble assistant">
-            {{ getMessageText(msg) }}
-            <span
-              v-if="isAssistantStreamingMessage(msg)"
-              class="chat-message-list__stream-cursor"
-            />
-          </div>
-
-          <div v-else-if="shouldShowAssistantPending(msg)" class="chat-message-list__pending">
-            正在生成
-            <span class="chat-message-list__stream-cursor" />
-          </div>
-
-          <div v-if="getAssistantFailureMessage(msg)" class="chat-message-list__error">
-            {{ getAssistantFailureMessage(msg) }}
-          </div>
-
-          <div v-if="shouldShowAssistantCancelled(msg)" class="chat-message-list__cancelled">
-            已停止
-          </div>
+          <ChatAssistantMessage :message="msg" variant="global" />
 
           <div class="chat-message-list__actions assistant">
             <ElTooltip content="复制回复" placement="bottom">
@@ -153,31 +127,31 @@ const {
           :class="{ 'is-editing': isEditingMessage(msg) }"
         >
           <div v-if="isEditingMessage(msg)" class="chat-message-list__edit-box">
-            <ElInput
-              v-model="editingContent"
-              type="textarea"
-              :autosize="{ minRows: 3, maxRows: 8 }"
+            <ChatComposer
+              :content-j-s-o-n="editingContentJSON"
+              :attachments="editingAttachments"
+              :selected-model-ref="composerSelectedModelRef"
               :disabled="isStreaming"
-              class="chat-message-list__edit-input"
+              :highlight-attachment-id="editingHighlightAttachmentId"
+              document-picker-teleport-to=".chat-view__picker-layer"
+              @update:content-j-s-o-n="editingContentJSON = $event"
+              @update:attachments="editingAttachments = $event"
+              @send="submitEditMessage(msg, $event)"
+              @select-model="selectComposerModel"
+              @highlight-attachment="highlightEditingAttachment"
+              @placeholder-upload="handleEditPlaceholderUpload"
+              @placeholder-command="handleEditPlaceholderCommand"
             />
             <div class="chat-message-list__edit-actions">
               <ElButton round @click="cancelEditMessage">
                 取消
-              </ElButton>
-              <ElButton
-                type="primary"
-                round
-                :disabled="isStreaming || !editingContent.trim()"
-                @click="submitEditMessage(msg)"
-              >
-                发送
               </ElButton>
             </div>
           </div>
 
           <template v-else>
             <div class="chat-message-list__bubble user">
-              {{ getMessageText(msg) }}
+              <ChatUserMessageContent :message="msg" />
             </div>
             <div class="chat-message-list__actions user">
               <ElTooltip content="复制消息" placement="bottom">
@@ -310,48 +284,16 @@ const {
   .chat-message-list__bubble {
     padding: 0.625rem 1rem;
     border-radius: 0.75rem;
-    white-space: pre-wrap;
     overflow-wrap: break-word;
     font-size: 0.875rem;
     line-height: 1.625;
 
     &.user {
       max-width: 100%;
+      white-space: pre-wrap;
       color: #fff;
       background: var(--brand-primary);
     }
-
-    &.assistant {
-      color: var(--brand-text-primary);
-      background: var(--brand-bg-surface-raised);
-      border: 1px solid color-mix(in srgb, var(--brand-border-base) 70%, transparent);
-    }
-  }
-
-  .chat-message-list__pending,
-  .chat-message-list__error,
-  .chat-message-list__cancelled {
-    font-size: 0.8125rem;
-    line-height: 1.5;
-  }
-
-  .chat-message-list__pending,
-  .chat-message-list__cancelled {
-    color: var(--brand-text-secondary);
-  }
-
-  .chat-message-list__error {
-    color: var(--el-color-danger);
-  }
-
-  .chat-message-list__stream-cursor {
-    display: inline-block;
-    width: 0.125rem;
-    height: 1rem;
-    margin-left: 0.125rem;
-    vertical-align: text-bottom;
-    background: currentColor;
-    animation: chat-message-list-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
   }
 
   .chat-message-list__actions {
@@ -439,27 +381,6 @@ const {
 
   .chat-message-list__edit-box {
     width: 100%;
-    padding: 0.875rem;
-    border-radius: 1.125rem;
-    background: color-mix(in srgb, var(--brand-fill-light) 72%, var(--brand-bg-surface));
-    border: 1px solid color-mix(in srgb, var(--brand-border-base) 65%, transparent);
-
-    :deep(.el-textarea__inner) {
-      min-height: 6rem !important;
-      padding: 0.125rem 0.25rem;
-      border: 0;
-      border-radius: 0;
-      background: transparent;
-      box-shadow: none;
-      color: var(--brand-text-primary);
-      font-size: 0.875rem;
-      line-height: 1.6;
-      resize: none;
-
-      &:focus {
-        box-shadow: none;
-      }
-    }
   }
 
   .chat-message-list__edit-actions {
@@ -485,17 +406,6 @@ const {
     .chat-message-list__actions {
       transition: none;
     }
-  }
-}
-
-@keyframes chat-message-list-pulse {
-  0%,
-  100% {
-    opacity: 1;
-  }
-
-  50% {
-    opacity: 0.5;
   }
 }
 </style>
