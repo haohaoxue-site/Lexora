@@ -24,11 +24,25 @@ import {
   updateChatSessionTitle,
 } from '@/apis/chat'
 
-export function createChatApi(origin: ChatSessionOrigin) {
+export interface CreateChatApiOptions {
+  getWorkspaceId: () => string | null | undefined
+}
+
+export function createChatApi(origin: ChatSessionOrigin, options: CreateChatApiOptions) {
+  function getWorkspaceId() {
+    const workspaceId = options.getWorkspaceId()?.trim()
+
+    if (!workspaceId) {
+      throw new Error('未找到个人空间')
+    }
+
+    return workspaceId
+  }
+
   return {
     origin,
-    getSessions: () => getChatSessions({ origin }),
-    createSession: () => createChatSession({ origin }),
+    getSessions: () => getChatSessions({ origin, workspaceId: getWorkspaceId() }),
+    createSession: () => createChatSession({ origin, workspaceId: getWorkspaceId() }),
     getSession: (sessionId: string) => getChatSession(sessionId, { origin }),
     deleteSession: (sessionId: string) => deleteChatSession(sessionId, { origin }),
     batchDeleteSessions: (data: BatchDeleteChatSessionsRequest) => batchDeleteChatSessions(data, { origin }),

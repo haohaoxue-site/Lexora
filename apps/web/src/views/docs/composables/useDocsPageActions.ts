@@ -7,7 +7,6 @@ import {
   DOCUMENT_COLLECTION,
   DOCUMENT_OPERATION_JOB_STATUS,
   DOCUMENT_PANE_STATE,
-  WORKSPACE_TYPE,
 } from '@haohaoxue/samepage-contracts'
 import { sleep } from '@haohaoxue/samepage-shared'
 import { createSharedComposable } from '@vueuse/core'
@@ -37,7 +36,6 @@ export const useDocsPageActions = createSharedComposable(() => {
   const {
     activeDocumentId,
     currentWorkspaceId,
-    currentWorkspaceType,
     isSelectingInitialDocument,
     navigateToDocument,
   } = useDocsContext()
@@ -161,13 +159,7 @@ export const useDocsPageActions = createSharedComposable(() => {
     await navigateToDocument(surfaceState.visibleDefaultDocumentId.value, input)
   }
 
-  function resolveDefaultRootCollectionId() {
-    return currentWorkspaceType.value === WORKSPACE_TYPE.TEAM
-      ? DOCUMENT_COLLECTION.TEAM
-      : DOCUMENT_COLLECTION.PERSONAL
-  }
-
-  async function createRootDocument(collectionId: DocumentTreeCollectionId = resolveDefaultRootCollectionId()) {
+  async function createRootDocument(collectionId: DocumentTreeCollectionId = DOCUMENT_COLLECTION.PERSONAL) {
     if (collectionId === DOCUMENT_COLLECTION.COLLABORATION) {
       return
     }

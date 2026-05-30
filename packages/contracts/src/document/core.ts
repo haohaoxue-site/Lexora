@@ -386,6 +386,7 @@ export const PatchDocumentLayoutSchema = z.object({
 }).strict()
 
 export const SearchReadableDocumentsQuerySchema = z.object({
+  workspaceId: z.string().trim().min(1),
   query: z.string().trim().max(DOCUMENT_CHAT_SEARCH_QUERY_MAX_LENGTH).default(''),
   limit: z.coerce.number().int().min(1).max(DOCUMENT_CHAT_SEARCH_LIMIT).default(DOCUMENT_CHAT_SEARCH_LIMIT),
 }).strict()

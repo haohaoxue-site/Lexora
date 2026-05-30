@@ -32,6 +32,10 @@ class ChatModelRefDto {
 }
 
 export class CreateChatSessionRequestDto implements CreateChatSessionRequest {
+  @IsString()
+  @MinLength(1)
+  workspaceId!: string
+
   @IsOptional()
   @IsIn(CHAT_SESSION_ORIGIN_VALUES)
   origin?: CreateChatSessionRequest['origin']

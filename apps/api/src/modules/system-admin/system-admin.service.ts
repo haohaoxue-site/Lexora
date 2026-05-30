@@ -144,7 +144,7 @@ export class SystemAdminService {
       trashedAt: null,
     } satisfies Prisma.DocumentWhereInput
     const chatSessionWhere = {
-      userId,
+      createdBy: userId,
       deletedAt: null,
     } satisfies Prisma.ChatSessionWhereInput
     const [

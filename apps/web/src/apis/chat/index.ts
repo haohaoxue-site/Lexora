@@ -28,19 +28,24 @@ interface ChatSessionOriginOptions {
   origin?: ChatSessionOrigin
 }
 
-export function getChatSessions(options: ChatSessionOriginOptions = {}): Promise<ChatSessionSummary[]> {
+interface ChatSessionWorkspaceOptions extends ChatSessionOriginOptions {
+  workspaceId: string
+}
+
+export function getChatSessions(options: ChatSessionWorkspaceOptions): Promise<ChatSessionSummary[]> {
   return axios.request({
     method: 'get',
     url: '/chat/sessions',
-    params: createChatSessionOriginParams(options),
+    params: createChatSessionWorkspaceParams(options),
   })
 }
 
-export function createChatSession(options: ChatSessionOriginOptions = {}): Promise<ChatSessionDetail> {
+export function createChatSession(options: ChatSessionWorkspaceOptions): Promise<ChatSessionDetail> {
   return axios.request({
     method: 'post',
     url: '/chat/sessions',
     data: {
+      workspaceId: options.workspaceId,
       origin: resolveChatSessionOrigin(options),
     },
   })
@@ -268,6 +273,13 @@ async function readApiError(response: Response) {
 function createChatSessionOriginParams(options: ChatSessionOriginOptions): { origin: ChatSessionOrigin } {
   return {
     origin: resolveChatSessionOrigin(options),
+  }
+}
+
+function createChatSessionWorkspaceParams(options: ChatSessionWorkspaceOptions): { origin: ChatSessionOrigin, workspaceId: string } {
+  return {
+    ...createChatSessionOriginParams(options),
+    workspaceId: options.workspaceId,
   }
 }
 

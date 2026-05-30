@@ -2,14 +2,16 @@ import type { ReadableDocumentSearchResult } from '@/apis/document'
 import { useDebounceFn } from '@vueuse/core'
 import { computed, shallowRef } from 'vue'
 import { searchReadableDocumentsForChat } from '@/apis/document'
+import { useWorkspaceStore } from '@/stores/workspace'
 import { getRequestErrorDisplayMessage } from '@/utils/request-error'
 
 export interface UseChatDocumentSearchOptions {
   debounceMs?: number
-  search?: (query: string) => Promise<ReadableDocumentSearchResult[]>
+  search?: (workspaceId: string, query: string) => Promise<ReadableDocumentSearchResult[]>
 }
 
 export function useChatDocumentSearch(options: UseChatDocumentSearchOptions = {}) {
+  const workspaceStore = useWorkspaceStore()
   const search = options.search ?? searchReadableDocumentsForChat
   const query = shallowRef('')
   const documents = shallowRef<ReadableDocumentSearchResult[]>([])
@@ -49,7 +51,8 @@ export function useChatDocumentSearch(options: UseChatDocumentSearchOptions = {}
     isLoading.value = true
 
     try {
-      const result = await search(normalizedQuery)
+      const workspace = await workspaceStore.ensurePersonalWorkspace()
+      const result = await search(workspace.id, normalizedQuery)
       if (currentRequestId !== requestId) {
         return
       }

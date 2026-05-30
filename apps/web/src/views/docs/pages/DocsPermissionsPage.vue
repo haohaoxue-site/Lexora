@@ -133,7 +133,7 @@ function formatUpdatedAt(_row: PermissionOverviewItem, _column: unknown, value: 
       </ElTableColumn>
 
       <template #empty>
-        <ElEmpty description="当前空间还没有已开启分享的文档。" />
+        <ElEmpty description="还没有已开启分享的文档。" />
       </template>
     </ElTable>
   </section>

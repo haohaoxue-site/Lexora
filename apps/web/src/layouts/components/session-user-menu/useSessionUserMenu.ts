@@ -1,10 +1,8 @@
 import type { AppearancePreference } from '@haohaoxue/samepage-contracts'
-import type { WorkspaceCreateDialogSubmitPayload } from '../workspace-create-dialog/typing'
 import type { SessionContextSwitchAction, SessionMenuUser } from './typing'
 import {
   APPEARANCE_PREFERENCE_LABELS,
   APPEARANCE_PREFERENCE_VALUES,
-  WORKSPACE_TYPE,
 } from '@haohaoxue/samepage-contracts'
 import { ElMessage } from 'element-plus'
 import { computed, shallowRef, watch } from 'vue'
@@ -14,7 +12,6 @@ import { useAuthSession } from '@/layouts/composables/useAuthSession'
 import { getWorkspaceEntryPath } from '@/layouts/utils/workspace-entry'
 import { ADMIN_ROUTE_NAME } from '@/router/constants'
 import { useUserStore } from '@/stores/user'
-import { useWorkspaceStore } from '@/stores/workspace'
 import { getRequestErrorDisplayMessage } from '@/utils/request-error'
 
 /**
@@ -24,18 +21,14 @@ interface UseSessionUserMenuOptions {
   showContextSwitch: boolean
 }
 
-type SessionSubmenu = 'appearance' | 'workspace' | null
+type SessionSubmenu = 'appearance' | null
 
 export function useSessionUserMenu(options: UseSessionUserMenuOptions) {
   const route = useRoute()
   const router = useRouter()
   const userStore = useUserStore()
-  const workspaceStore = useWorkspaceStore()
   const menuVisible = shallowRef(false)
   const activeSubmenu = shallowRef<SessionSubmenu>(null)
-  const teamSettingsDialogVisible = shallowRef(false)
-  const workspaceCreateDialogVisible = shallowRef(false)
-  const isCreatingWorkspace = shallowRef(false)
   const { currentUser: sessionUser, isLoggingOut, logout } = useAuthSession()
   // 登出过程中 sessionUser 会短暂为 null，保留上一份用于继续渲染头像/昵称。
   const lastKnownUser = shallowRef(sessionUser.value)
@@ -45,7 +38,6 @@ export function useSessionUserMenu(options: UseSessionUserMenuOptions) {
     value,
   }))
   const appearanceMenuVisible = computed(() => activeSubmenu.value === 'appearance')
-  const workspaceMenuVisible = computed(() => activeSubmenu.value === 'workspace')
   const currentUser = computed<SessionMenuUser>(() => {
     const user = sessionUser.value ?? lastKnownUser.value!
 
@@ -82,14 +74,6 @@ export function useSessionUserMenu(options: UseSessionUserMenuOptions) {
   const currentAppearance = computed(() => userStore.preferences.appearance)
   const currentAppearanceLabel = computed(() => APPEARANCE_PREFERENCE_LABELS[currentAppearance.value])
   const isSavingAppearance = computed(() => userStore.isSavingAppearance)
-  const currentWorkspaceLabel = computed(() => workspaceStore.currentWorkspaceLabel)
-  const currentWorkspaceId = computed(() => workspaceStore.currentWorkspace?.id ?? '')
-  const currentTeamWorkspace = computed(() =>
-    workspaceStore.currentWorkspace?.type === WORKSPACE_TYPE.TEAM
-      ? workspaceStore.currentWorkspace
-      : null,
-  )
-  const switchableWorkspaces = computed(() => workspaceStore.switchableWorkspaces)
 
   watch(sessionUser, (user) => {
     if (user) {
@@ -106,10 +90,6 @@ export function useSessionUserMenu(options: UseSessionUserMenuOptions) {
   return {
     menuVisible,
     appearanceMenuVisible,
-    workspaceMenuVisible,
-    teamSettingsDialogVisible,
-    workspaceCreateDialogVisible,
-    isCreatingWorkspace,
     isLoggingOut,
     appearanceOptions,
     currentUser,
@@ -117,19 +97,10 @@ export function useSessionUserMenu(options: UseSessionUserMenuOptions) {
     currentAppearance,
     currentAppearanceLabel,
     isSavingAppearance,
-    currentWorkspaceLabel,
-    currentWorkspaceId,
-    currentTeamWorkspace,
-    switchableWorkspaces,
     toggleAppearanceMenu,
-    toggleWorkspaceMenu,
-    openWorkspaceCreateDialog,
-    openTeamSettingsDialog,
     handleAppearanceSelect,
-    handleWorkspaceCreate,
     switchContext,
     handleLogout,
-    handleWorkspaceSelect,
     getLogoutIconName,
   }
 
@@ -141,10 +112,6 @@ export function useSessionUserMenu(options: UseSessionUserMenuOptions) {
     toggleSubmenu('appearance')
   }
 
-  function toggleWorkspaceMenu() {
-    toggleSubmenu('workspace')
-  }
-
   function toggleSubmenu(target: NonNullable<SessionSubmenu>) {
     activeSubmenu.value = activeSubmenu.value === target ? null : target
   }
@@ -152,20 +119,6 @@ export function useSessionUserMenu(options: UseSessionUserMenuOptions) {
   function closeMenu() {
     activeSubmenu.value = null
     menuVisible.value = false
-  }
-
-  function openWorkspaceCreateDialog() {
-    workspaceCreateDialogVisible.value = true
-    closeMenu()
-  }
-
-  function openTeamSettingsDialog() {
-    if (!currentTeamWorkspace.value) {
-      return
-    }
-
-    teamSettingsDialogVisible.value = true
-    closeMenu()
   }
 
   async function handleAppearanceSelect(mode: AppearancePreference) {
@@ -178,46 +131,6 @@ export function useSessionUserMenu(options: UseSessionUserMenuOptions) {
     }
     catch (error) {
       ElMessage.error(getRequestErrorDisplayMessage(error, '保存外观偏好失败'))
-    }
-  }
-
-  async function handleWorkspaceCreate(payload: WorkspaceCreateDialogSubmitPayload) {
-    if (isCreatingWorkspace.value) {
-      return
-    }
-
-    isCreatingWorkspace.value = true
-
-    try {
-      const createdWorkspace = await workspaceStore.createWorkspace({
-        name: payload.name,
-        description: payload.description,
-      })
-      let selectedWorkspace = createdWorkspace
-      let iconUploadError: unknown = null
-
-      if (payload.iconFile) {
-        try {
-          selectedWorkspace = await workspaceStore.uploadWorkspaceIcon(createdWorkspace.id, payload.iconFile)
-        }
-        catch (error) {
-          iconUploadError = error
-        }
-      }
-
-      workspaceStore.selectWorkspace(selectedWorkspace.id)
-      workspaceCreateDialogVisible.value = false
-      ElMessage.success('团队创建成功')
-
-      if (iconUploadError) {
-        ElMessage.warning(getRequestErrorDisplayMessage(iconUploadError, '团队已创建，但空间图标上传失败'))
-      }
-    }
-    catch (error) {
-      ElMessage.error(getRequestErrorDisplayMessage(error, '创建团队失败'))
-    }
-    finally {
-      isCreatingWorkspace.value = false
     }
   }
 
@@ -235,11 +148,6 @@ export function useSessionUserMenu(options: UseSessionUserMenuOptions) {
   async function handleLogout() {
     closeMenu()
     await logout()
-  }
-
-  function handleWorkspaceSelect(workspaceId: string) {
-    workspaceStore.selectWorkspace(workspaceId)
-    closeMenu()
   }
 
   function getLogoutIconName() {

@@ -136,6 +136,7 @@ const NonEmptyStringSchema = z.string().trim().min(1)
 const ChatSessionTitleSchema = z.string().trim().min(1).max(CHAT_SESSION_TITLE_MAX_LENGTH)
 const ChatSessionSummaryBaseSchema = z.object({
   id: NonEmptyStringSchema,
+  workspaceId: NonEmptyStringSchema,
   origin: z.enum(CHAT_SESSION_ORIGIN_VALUES),
   title: ChatSessionTitleSchema,
   modelRef: AiModelRefSchema.pick({
@@ -356,6 +357,7 @@ export const ChatRuntimeConfigSchema = z.object({
 }).strict()
 
 export const CreateChatSessionRequestSchema = z.object({
+  workspaceId: NonEmptyStringSchema,
   origin: ChatSessionOriginSchema.optional(),
 }).strict()
 
@@ -363,7 +365,9 @@ export const ChatSessionOriginQuerySchema = z.object({
   origin: ChatSessionOriginSchema.optional(),
 }).strict()
 
-export const GetChatSessionsQuerySchema = ChatSessionOriginQuerySchema
+export const GetChatSessionsQuerySchema = ChatSessionOriginQuerySchema.extend({
+  workspaceId: NonEmptyStringSchema,
+}).strict()
 
 const ChatSessionMessageRequestBaseSchema = z.object({
   content: z.string().trim().min(1).max(CHAT_MESSAGE_CONTENT_MAX_LENGTH),

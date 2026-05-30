@@ -47,7 +47,7 @@ const recipientStatusLabel = computed(() => {
 
       <ElDescriptions :column="1" direction="vertical" size="small" class="shared-document-access-page__meta">
         <ElDescriptionsItem label="来源">
-          {{ props.access.workspaceType === 'TEAM' ? '团队空间' : '我的空间' }} · {{ props.access.workspaceName }}
+          {{ props.access.workspaceName }}
         </ElDescriptionsItem>
         <ElDescriptionsItem label="发起人">
           <template v-if="props.access.sharedByUser">

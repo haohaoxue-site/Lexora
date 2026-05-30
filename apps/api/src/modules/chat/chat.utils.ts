@@ -31,6 +31,7 @@ import {
 
 export interface ChatSessionSummaryRecord {
   id: string
+  workspaceId: string
   origin: PrismaChatSessionOrigin
   title: string
   selectedProviderId: string | null
@@ -84,6 +85,7 @@ export interface ChatSessionDetailRecord extends ChatSessionSummaryRecord {
 export function toChatSessionSummary(session: ChatSessionSummaryRecord): ChatSessionSummary {
   return {
     id: session.id,
+    workspaceId: session.workspaceId,
     origin: toChatSessionOrigin(session.origin),
     title: session.title,
     modelRef: toChatSessionModelRef(session),

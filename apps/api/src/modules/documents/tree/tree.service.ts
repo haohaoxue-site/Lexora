@@ -236,6 +236,8 @@ export class DocumentsService {
     userId: string,
     query: SearchReadableDocumentsQuery,
   ): Promise<SearchReadableDocumentsResponse> {
+    await this.documentAccessService.assertAccessibleWorkspace(userId, query.workspaceId)
+
     const normalizedQuery = query.query.trim()
     if (!normalizedQuery) {
       return { documents: [] }
@@ -243,6 +245,7 @@ export class DocumentsService {
 
     const documents = await this.prisma.document.findMany({
       where: {
+        workspaceId: query.workspaceId,
         title: {
           contains: normalizedQuery,
           mode: 'insensitive',

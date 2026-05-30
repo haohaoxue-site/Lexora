@@ -2,6 +2,7 @@
 import { onMounted } from 'vue'
 import { onBeforeRouteLeave, onBeforeRouteUpdate } from 'vue-router'
 import PagePanel from '@/layouts/panels/PagePanel.vue'
+import { useWorkspaceStore } from '@/stores/workspace'
 import DocumentDeleteDialog from './components/DocumentDeleteDialog.vue'
 import DocumentMoveDialog from './components/DocumentMoveDialog.vue'
 import DocumentRenameDialog from './components/DocumentRenameDialog.vue'
@@ -17,14 +18,16 @@ import DocsHistoryLayout from './layouts/DocsHistoryLayout.vue'
 const { applyDocumentShareChanged, confirmNavigation } = useActiveDocument()
 const { isHistoryMode } = useDocsHistoryState()
 const { loadInitialTree } = useDocsPageActions()
+const workspaceStore = useWorkspaceStore()
 const {
   handleShareDialogVisibleChange,
   isShareDialogOpen,
   shareDialogDocumentId,
 } = useDocsShareDialog()
 
-onMounted(() => {
-  void loadInitialTree()
+onMounted(async () => {
+  await workspaceStore.ensurePersonalWorkspace()
+  await loadInitialTree()
 })
 
 onBeforeRouteUpdate(async (to, from) => {

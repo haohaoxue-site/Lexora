@@ -45,7 +45,7 @@ model User {
   receivedWorkspaceInvites        WorkspaceInvite[]           @relation("WorkspaceInviteInvitee")
   createdWorkspaceInvites         WorkspaceInvite[]           @relation("WorkspaceInviteCreator")
   updatedWorkspaceInvites         WorkspaceInvite[]           @relation("WorkspaceInviteUpdater")
-  chatSessions                    ChatSession[]
+  createdChatSessions             ChatSession[]               @relation("ChatSessionCreator")
   adminAuditLogs                  AdminAuditLog[]             @relation("AdminAuditLogActor")
   ownedAiProviders                AiProvider[]                @relation("AiProviderOwner")
   updatedAiProviders              AiProvider[]                @relation("AiProviderUpdater")

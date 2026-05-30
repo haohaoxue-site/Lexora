@@ -2,7 +2,6 @@
 import type { SidebarPanelBrand, SidebarPanelItem } from './typing'
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
-import SessionNotificationBell from '@/layouts/components/session-notification-bell/SessionNotificationBell.vue'
 import SessionUserMenu from '@/layouts/components/SessionUserMenu.vue'
 
 const props = withDefaults(defineProps<{
@@ -135,9 +134,6 @@ function handleToggle() {
 
     <footer class="sidebar-panel__footer" :class="sidebarStateClass">
       <SessionUserMenu
-        :is-collapsed="props.isCollapsed"
-      />
-      <SessionNotificationBell
         :is-collapsed="props.isCollapsed"
       />
     </footer>

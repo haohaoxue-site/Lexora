@@ -5,11 +5,9 @@ import type {
   DocumentTreeGroup,
   OwnedDocumentCollectionId,
 } from '@haohaoxue/samepage-contracts'
-import type { WorkspaceSwitcherItem } from '@/stores/workspace'
 import {
   DOCUMENT_COLLECTION,
   DOCUMENT_COLLECTION_LABELS,
-  WORKSPACE_TYPE,
 } from '@haohaoxue/samepage-contracts'
 import { computed, shallowRef, watch } from 'vue'
 import { getDocuments } from '@/apis/document'
@@ -47,30 +45,26 @@ let loadRequestId = 0
 
 const target = computed(() => tree.moveDialogTarget.value)
 const isOpen = computed(() => tree.isMoveDialogOpen.value)
-const workspaces = computed(() => workspaceStore.switchableWorkspaces)
-const selectedWorkspace = computed(() =>
-  workspaces.value.find(workspace => workspace.id === selectedWorkspaceId.value) ?? null,
-)
 const visibleGroups = computed(() =>
   targetGroups.value.filter(group => group.id !== DOCUMENT_COLLECTION.COLLABORATION),
 )
 const canConfirm = computed(() => Boolean(target.value && selectedTarget.value) && !isMoving.value)
 
-watch(isOpen, (open) => {
+watch(isOpen, async (open) => {
   if (!open) {
     selectedTarget.value = null
     targetGroups.value = []
     return
   }
 
-  selectedWorkspaceId.value = workspaceStore.currentWorkspace?.id
-    ?? workspaces.value[0]?.id
-    ?? ''
-})
+  const workspace = await workspaceStore.ensurePersonalWorkspace()
+  if (!isOpen.value) {
+    return
+  }
 
-watch(selectedWorkspaceId, async (workspaceId) => {
+  selectedWorkspaceId.value = workspace.id
   selectedTarget.value = null
-  await loadTargetTree(workspaceId)
+  await loadTargetTree(workspace.id)
 })
 
 async function loadTargetTree(workspaceId: string) {
@@ -99,33 +93,29 @@ async function loadTargetTree(workspaceId: string) {
   }
 }
 
-function selectWorkspace(workspace: WorkspaceSwitcherItem) {
-  selectedWorkspaceId.value = workspace.id
-}
-
 function selectGroupRoot(group: DocumentTreeGroup) {
-  if (!isOwnedCollection(group.id) || !selectedWorkspace.value) {
+  if (!isOwnedCollection(group.id) || !selectedWorkspaceId.value) {
     return
   }
 
   selectedTarget.value = {
-    workspaceId: selectedWorkspace.value.id,
+    workspaceId: selectedWorkspaceId.value,
     collectionId: group.id,
     parentId: null,
-    label: `${selectedWorkspace.value.label} / ${DOCUMENT_COLLECTION_LABELS[group.id]}`,
+    label: DOCUMENT_COLLECTION_LABELS[group.id],
   }
 }
 
 function selectDocumentNode(group: DocumentTreeGroup, node: MoveTreeNode) {
-  if (!isOwnedCollection(group.id) || node.disabled || !selectedWorkspace.value) {
+  if (!isOwnedCollection(group.id) || node.disabled || !selectedWorkspaceId.value) {
     return
   }
 
   selectedTarget.value = {
-    workspaceId: selectedWorkspace.value.id,
+    workspaceId: selectedWorkspaceId.value,
     collectionId: group.id,
     parentId: node.id,
-    label: `${selectedWorkspace.value.label} / ${node.title}`,
+    label: node.title,
   }
 }
 
@@ -196,26 +186,6 @@ function isOwnedCollection(collectionId: DocumentTreeCollectionId): collectionId
     @update:model-value="closeDialog"
   >
     <div class="document-move-dialog__body">
-      <aside class="document-move-dialog__spaces" aria-label="空间">
-        <button
-          v-for="workspace in workspaces"
-          :key="workspace.id"
-          type="button"
-          class="document-move-dialog__space"
-          :class="{ 'is-active': workspace.id === selectedWorkspaceId }"
-          @click="selectWorkspace(workspace)"
-        >
-          <span class="document-move-dialog__space-icon">
-            <SvgIcon
-              category="ui"
-              :icon="workspace.type === WORKSPACE_TYPE.TEAM ? 'folder-chip' : 'doc-card'"
-              size="1rem"
-            />
-          </span>
-          <span class="document-move-dialog__space-label">{{ workspace.label }}</span>
-        </button>
-      </aside>
-
       <section
         v-loading="isLoading"
         class="document-move-dialog__tree"
@@ -285,8 +255,6 @@ function isOwnedCollection(collectionId: DocumentTreeCollectionId): collectionId
 
 <style scoped lang="scss">
 .document-move-dialog__body {
-  display: grid;
-  grid-template-columns: 13rem minmax(0, 1fr);
   min-height: 26rem;
   max-height: 30rem;
   border: 1px solid var(--brand-border-base);
@@ -294,13 +262,6 @@ function isOwnedCollection(collectionId: DocumentTreeCollectionId): collectionId
   overflow: hidden;
 }
 
-.document-move-dialog__spaces {
-  padding: 0.75rem;
-  border-right: 1px solid var(--brand-border-base);
-  background: var(--brand-bg-sidebar);
-}
-
-.document-move-dialog__space,
 .document-move-dialog__group-root {
   display: flex;
   align-items: center;
@@ -313,27 +274,6 @@ function isOwnedCollection(collectionId: DocumentTreeCollectionId): collectionId
   color: var(--brand-text-primary);
   text-align: left;
   cursor: pointer;
-}
-
-.document-move-dialog__space {
-  padding: 0.5rem 0.625rem;
-
-  &.is-active {
-    background: color-mix(in srgb, var(--brand-primary) 12%, transparent);
-    color: var(--brand-primary);
-  }
-}
-
-.document-move-dialog__space-icon {
-  display: inline-flex;
-  flex-shrink: 0;
-}
-
-.document-move-dialog__space-label {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .document-move-dialog__tree {

@@ -14,15 +14,13 @@ import {
   DOCUMENT_SHARE_MODE_OPTIONS,
   DOCUMENT_SHARE_PERMISSION,
   DOCUMENT_SHARE_PERMISSION_LABELS,
-  WORKSPACE_TYPE,
 } from '@haohaoxue/samepage-contracts'
-import { canManageDocumentShare, getDocumentShareModeLabel } from '@haohaoxue/samepage-shared'
+import { getDocumentShareModeLabel } from '@haohaoxue/samepage-shared'
 import { computed, shallowRef, watch } from 'vue'
 import CollabIdentityItem from '@/components/collab-identity/CollabIdentityItem.vue'
 import CollabUserLookupField from '@/components/collab-identity/CollabUserLookupField.vue'
 import CopyStateIcon from '@/components/copy-state-icon/CopyStateIcon.vue'
 import { SvgIcon } from '@/components/svg-icon'
-import { useWorkspaceStore } from '@/stores/workspace'
 import { useDocsPermissionsPage } from '../composables/useDocsPermissionsPage'
 
 const props = withDefaults(defineProps<{
@@ -39,7 +37,6 @@ const emits = defineEmits<{
 
 const baseShareModeOptions: DocumentShareModeOption[] = [...DOCUMENT_SHARE_MODE_OPTIONS]
 const directShareModeOption = baseShareModeOptions.find(option => option.value === DOCUMENT_SHARE_MODE.DIRECT_USER) ?? baseShareModeOptions[0]
-const workspaceStore = useWorkspaceStore()
 
 const sharePermissionOptions: DocumentSharePermissionOption[] = [
   {
@@ -54,22 +51,7 @@ const sharePermissionOptions: DocumentSharePermissionOption[] = [
 ]
 
 const normalizedDocumentId = computed(() => props.documentId?.trim() ?? '')
-const canManagePublicSharePolicy = computed(() => {
-  const currentWorkspace = workspaceStore.currentWorkspace
-
-  if (!currentWorkspace) {
-    return workspaceStore.currentWorkspaceType !== WORKSPACE_TYPE.TEAM
-  }
-
-  if (currentWorkspace.type === WORKSPACE_TYPE.PERSONAL) {
-    return true
-  }
-
-  return canManageDocumentShare({
-    workspaceType: currentWorkspace.type,
-    workspaceMemberRole: currentWorkspace.role,
-  })
-})
+const canManagePublicSharePolicy = computed(() => true)
 const {
   currentDocumentId,
   publicShareInfo,
@@ -469,7 +451,7 @@ function isShareModeCommand(command: string | number | boolean): command is Docu
               <ElTableColumn min-width="240">
                 <template #default="{ row }">
                   <div>
-                    来源：{{ row.workspaceType === 'TEAM' ? '团队空间' : '我的空间' }} · {{ row.workspaceName }}
+                    来源：{{ row.workspaceName }}
                   </div>
 
                   <div>

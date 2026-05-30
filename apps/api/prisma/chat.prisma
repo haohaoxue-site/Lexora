@@ -51,7 +51,7 @@ enum ChatSessionOrigin {
 
 model ChatSession {
   id                  String               @id @default(uuid())
-  userId              String
+  workspaceId         String
   origin              ChatSessionOrigin    @default(GLOBAL)
   title               String
   selectedProviderId  String?
@@ -60,18 +60,21 @@ model ChatSession {
   activeRootMessageId String?
   activeLeafMessageId String?
   nextEventSequence   Int                  @default(1)
-  user                User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspace           Workspace            @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   activeRootMessage   ChatSessionMessage?  @relation("ChatSessionActiveRootMessage", fields: [activeRootMessageId], references: [id], onDelete: SetNull)
   activeLeafMessage   ChatSessionMessage?  @relation("ChatSessionActiveLeafMessage", fields: [activeLeafMessageId], references: [id], onDelete: SetNull)
   messages            ChatSessionMessage[] @relation("ChatSessionMessages")
   runs                ChatSessionRun[]
   events              ChatSessionEvent[]
+  createdBy           String?
+  createdByUser       User?                @relation("ChatSessionCreator", fields: [createdBy], references: [id], onDelete: SetNull)
   createdAt           DateTime             @default(now())
   updatedAt           DateTime             @updatedAt
   deletedAt           DateTime?
 
-  @@index([userId, updatedAt])
-  @@index([userId, origin, updatedAt])
+  @@index([workspaceId, updatedAt])
+  @@index([workspaceId, origin, updatedAt])
+  @@index([createdBy, updatedAt])
   @@index([selectedProviderId])
   @@index([activeRootMessageId])
   @@index([activeLeafMessageId])

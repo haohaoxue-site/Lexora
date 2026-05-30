@@ -21,6 +21,7 @@ import {
   CHAT_SESSION_DEFAULT_TITLE,
   CHAT_SESSION_EVENT_TYPE,
   ChatMutationResponseSchema,
+  WORKSPACE_MEMBER_STATUS,
 } from '@haohaoxue/samepage-contracts'
 import { buildAgentChatThreadId } from '@haohaoxue/samepage-shared'
 import {
@@ -60,6 +61,7 @@ const continuableAssistantStatuses = new Set<ChatSessionMessageStatus>([
 
 const chatSessionSummarySelect = {
   id: true,
+  workspaceId: true,
   origin: true,
   title: true,
   selectedProviderId: true,
@@ -229,10 +231,12 @@ export class ChatSessionsService {
     private readonly chatContextSnapshots: ChatContextSnapshotsService,
   ) {}
 
-  async getSessions(userId: string, origin: ChatSessionOrigin): Promise<ChatSessionSummary[]> {
+  async getSessions(userId: string, workspaceId: string, origin: ChatSessionOrigin): Promise<ChatSessionSummary[]> {
+    await this.assertWorkspaceAccess(userId, workspaceId)
+
     const sessions = await this.prisma.chatSession.findMany({
       where: {
-        userId,
+        workspaceId,
         origin: toPrismaChatSessionOrigin(origin),
       },
       select: chatSessionSummarySelect,
@@ -245,10 +249,13 @@ export class ChatSessionsService {
     return sessions.map(toChatSessionSummary)
   }
 
-  async createSession(userId: string, origin: ChatSessionOrigin): Promise<ChatSessionDetail> {
+  async createSession(userId: string, workspaceId: string, origin: ChatSessionOrigin): Promise<ChatSessionDetail> {
+    await this.assertWorkspaceAccess(userId, workspaceId)
+
     const session = await this.prisma.chatSession.create({
       data: {
-        userId,
+        workspaceId,
+        createdBy: userId,
         origin: toPrismaChatSessionOrigin(origin),
         title: CHAT_SESSION_DEFAULT_TITLE,
       },
@@ -259,7 +266,7 @@ export class ChatSessionsService {
   }
 
   async getSession(userId: string, sessionId: string, origin: ChatSessionOrigin): Promise<ChatSessionDetail> {
-    const session = await this.findOwnedSessionDetailOrThrow(userId, sessionId, origin)
+    const session = await this.findAccessibleSessionDetailOrThrow(userId, sessionId, origin)
     await this.repairActivePathSelection(session)
 
     return toChatSessionDetail(toChatSessionDetailRecord(
@@ -273,7 +280,7 @@ export class ChatSessionsService {
     sessionId: string,
     origin: ChatSessionOrigin,
   ): Promise<Pick<AiModelRef, 'providerId' | 'modelId'> | null> {
-    const session = await this.findOwnedSessionModelRefOrThrow(userId, sessionId, origin)
+    const session = await this.findAccessibleSessionModelRefOrThrow(userId, sessionId, origin)
     return toChatSessionModelRef(session)
   }
 
@@ -284,11 +291,7 @@ export class ChatSessionsService {
     modelRef: Pick<AiModelRef, 'providerId' | 'modelId'> | null
   }): Promise<ChatSessionDetail> {
     const result = await this.prisma.chatSession.updateMany({
-      where: {
-        id: input.sessionId,
-        userId: input.userId,
-        origin: toPrismaChatSessionOrigin(input.origin),
-      },
+      where: this.createAccessibleSessionWhere(input.userId, input.sessionId, input.origin),
       data: {
         selectedProviderId: input.modelRef?.providerId ?? null,
         selectedModelId: input.modelRef?.modelId ?? null,
@@ -316,11 +319,7 @@ export class ChatSessionsService {
     }
 
     const result = await this.prisma.chatSession.updateMany({
-      where: {
-        id: input.sessionId,
-        userId: input.userId,
-        origin: toPrismaChatSessionOrigin(input.origin),
-      },
+      where: this.createAccessibleSessionWhere(input.userId, input.sessionId, input.origin),
       data: {
         title,
         updatedAt: new Date(),
@@ -335,15 +334,11 @@ export class ChatSessionsService {
   }
 
   async deleteSession(userId: string, sessionId: string, origin: ChatSessionOrigin): Promise<{ activeRunIds: string[] }> {
-    const prismaOrigin = toPrismaChatSessionOrigin(origin)
     const result = await this.prisma.$transaction(async (tx) => {
       const activeRuns = await tx.chatSessionRun.findMany({
         where: {
           sessionId,
-          session: {
-            userId,
-            origin: prismaOrigin,
-          },
+          session: this.createAccessibleSessionWhere(userId, sessionId, origin),
           status: {
             in: [
               ChatSessionRunStatus.PENDING,
@@ -356,11 +351,7 @@ export class ChatSessionsService {
         },
       })
       const deleteResult = await tx.chatSession.deleteMany({
-        where: {
-          id: sessionId,
-          userId,
-          origin: prismaOrigin,
-        },
+        where: this.createAccessibleSessionWhere(userId, sessionId, origin),
       })
 
       return {
@@ -393,8 +384,8 @@ export class ChatSessionsService {
       const ownedSessions = await tx.chatSession.findMany({
         where: {
           id: { in: uniqueSessionIds },
-          userId,
           origin: prismaOrigin,
+          workspace: this.createWorkspaceAccessWhere(userId),
         },
         select: {
           id: true,
@@ -427,8 +418,8 @@ export class ChatSessionsService {
       await tx.chatSession.deleteMany({
         where: {
           id: { in: deletedSessionIds },
-          userId,
           origin: prismaOrigin,
+          workspace: this.createWorkspaceAccessWhere(userId),
         },
       })
 
@@ -477,7 +468,7 @@ export class ChatSessionsService {
     origin: ChatSessionOrigin
     messageId: string
   }): Promise<ChatMutationResponse> {
-    const session = await this.findOwnedSessionRunDetailOrThrow(input.userId, input.sessionId, input.origin)
+    const session = await this.findAccessibleSessionRunDetailOrThrow(input.userId, input.sessionId, input.origin)
     await this.assertNoActiveRun(input.sessionId)
 
     const targetMessage = session.messages.find(message => message.id === input.messageId)
@@ -553,6 +544,7 @@ export class ChatSessionsService {
         actorUserId: input.userId,
         session: {
           origin: toPrismaChatSessionOrigin(input.origin),
+          workspace: this.createWorkspaceAccessWhere(input.userId),
         },
       },
       select: {
@@ -621,7 +613,7 @@ export class ChatSessionsService {
     sessionId: string
     triggerUserMessageId: string
   }): Promise<AgentGetChatSessionContextResponse> {
-    const session = await this.findOwnedSessionRunDetailOrThrow(input.actorId, input.sessionId)
+    const session = await this.findAccessibleSessionRunDetailOrThrow(input.actorId, input.sessionId)
     const path = resolvePathToMessage(session.messages, input.triggerUserMessageId)
     const triggerMessage = path.at(-1) ?? null
 
@@ -787,7 +779,7 @@ export class ChatSessionsService {
     contentJSON: ChatMessageContentJSON
     attachments?: ChatMessageAttachmentInput[] | null
   }): Promise<CreatedRunResult> {
-    const session = await this.findOwnedSessionRunDetailOrThrow(input.userId, input.sessionId, input.origin)
+    const session = await this.findAccessibleSessionRunDetailOrThrow(input.userId, input.sessionId, input.origin)
     await this.assertNoActiveRun(session.id)
 
     const resolvedContext = await this.chatContextSnapshots.resolveForUserMessage({
@@ -897,7 +889,7 @@ export class ChatSessionsService {
     contentJSON: ChatMessageContentJSON
     attachments?: ChatMessageAttachmentInput[] | null
   }): Promise<CreatedRunResult> {
-    const session = await this.findOwnedSessionRunDetailOrThrow(input.userId, input.sessionId, input.origin)
+    const session = await this.findAccessibleSessionRunDetailOrThrow(input.userId, input.sessionId, input.origin)
     await this.assertNoActiveRun(session.id)
 
     const sourceMessage = session.messages.find(message => message.id === input.messageId)
@@ -996,7 +988,7 @@ export class ChatSessionsService {
   private async createRunFromRetriedAssistantMessage(input: CreateRunInput & {
     messageId: string
   }): Promise<CreatedRunResult> {
-    const session = await this.findOwnedSessionRunDetailOrThrow(input.userId, input.sessionId, input.origin)
+    const session = await this.findAccessibleSessionRunDetailOrThrow(input.userId, input.sessionId, input.origin)
     await this.assertNoActiveRun(session.id)
 
     const sourceMessage = session.messages.find(message => message.id === input.messageId)
@@ -1309,17 +1301,53 @@ export class ChatSessionsService {
     })
   }
 
-  private async findOwnedSessionDetailOrThrow(
+  private async assertWorkspaceAccess(userId: string, workspaceId: string): Promise<void> {
+    const membership = await this.prisma.workspaceMember.findFirst({
+      where: {
+        workspaceId,
+        userId,
+        status: WORKSPACE_MEMBER_STATUS.ACTIVE,
+      },
+      select: {
+        userId: true,
+      },
+    })
+
+    if (!membership) {
+      throw new NotFoundException('聊天空间不存在')
+    }
+  }
+
+  private createWorkspaceAccessWhere(userId: string): Prisma.WorkspaceWhereInput {
+    return {
+      members: {
+        some: {
+          userId,
+          status: WORKSPACE_MEMBER_STATUS.ACTIVE,
+        },
+      },
+    }
+  }
+
+  private createAccessibleSessionWhere(
+    userId: string,
+    sessionId: string,
+    origin?: ChatSessionOrigin,
+  ): Prisma.ChatSessionWhereInput {
+    return {
+      id: sessionId,
+      ...(origin ? { origin: toPrismaChatSessionOrigin(origin) } : {}),
+      workspace: this.createWorkspaceAccessWhere(userId),
+    }
+  }
+
+  private async findAccessibleSessionDetailOrThrow(
     userId: string,
     sessionId: string,
     origin?: ChatSessionOrigin,
   ): Promise<PersistedChatSessionDetail> {
     const session = await this.prisma.chatSession.findFirst({
-      where: {
-        id: sessionId,
-        userId,
-        ...(origin ? { origin: toPrismaChatSessionOrigin(origin) } : {}),
-      },
+      where: this.createAccessibleSessionWhere(userId, sessionId, origin),
       select: chatSessionDetailSelect,
     })
 
@@ -1330,17 +1358,13 @@ export class ChatSessionsService {
     return session
   }
 
-  private async findOwnedSessionRunDetailOrThrow(
+  private async findAccessibleSessionRunDetailOrThrow(
     userId: string,
     sessionId: string,
     origin?: ChatSessionOrigin,
   ): Promise<PersistedChatSessionRunDetail> {
     const session = await this.prisma.chatSession.findFirst({
-      where: {
-        id: sessionId,
-        userId,
-        ...(origin ? { origin: toPrismaChatSessionOrigin(origin) } : {}),
-      },
+      where: this.createAccessibleSessionWhere(userId, sessionId, origin),
       select: chatSessionRunDetailSelect,
     })
 
@@ -1351,17 +1375,13 @@ export class ChatSessionsService {
     return session
   }
 
-  private async findOwnedSessionModelRefOrThrow(
+  private async findAccessibleSessionModelRefOrThrow(
     userId: string,
     sessionId: string,
     origin: ChatSessionOrigin,
   ): Promise<PersistedChatSessionModelRef> {
     const session = await this.prisma.chatSession.findFirst({
-      where: {
-        id: sessionId,
-        userId,
-        origin: toPrismaChatSessionOrigin(origin),
-      },
+      where: this.createAccessibleSessionWhere(userId, sessionId, origin),
       select: chatSessionModelRefSelect,
     })
 
@@ -1381,6 +1401,7 @@ function toChatSessionDetailRecord(
 
   return {
     id: session.id,
+    workspaceId: session.workspaceId,
     origin: session.origin,
     title: session.title,
     selectedProviderId: session.selectedProviderId,

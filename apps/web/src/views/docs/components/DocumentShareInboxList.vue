@@ -45,7 +45,7 @@ const emits = defineEmits<DocumentShareInboxListEmits>()
 
           <div class="document-share-inbox-list__meta">
             <div class="document-share-inbox-list__meta-line">
-              来源：{{ item.workspaceType === 'TEAM' ? '团队空间' : '我的空间' }} · {{ item.workspaceName }}
+              来源：{{ item.workspaceName }}
             </div>
 
             <div class="document-share-inbox-list__meta-line">

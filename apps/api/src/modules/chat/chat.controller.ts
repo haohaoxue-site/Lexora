@@ -11,6 +11,7 @@ import type {
   CreateChatSessionMessageRequest,
   CreateChatSessionRequest,
   EditAndSendChatMessageRequest,
+  GetChatSessionsQuery,
 } from '@haohaoxue/samepage-contracts'
 import type { FastifyReply } from 'fastify'
 import type { AuthUserContext } from '../auth/auth.interface'
@@ -21,6 +22,7 @@ import {
   CreateChatSessionMessageRequestSchema,
   CreateChatSessionRequestSchema,
   EditAndSendChatMessageRequestSchema,
+  GetChatSessionsQuerySchema,
 } from '@haohaoxue/samepage-contracts'
 import { sleep } from '@haohaoxue/samepage-shared'
 import {
@@ -59,17 +61,25 @@ export class ChatController {
   @Get('sessions')
   async getSessions(
     @CurrentUser() authUser: AuthUserContext,
-    @Query('origin') origin: string | undefined,
+    @Query(new ZodValidationPipe(GetChatSessionsQuerySchema)) query: GetChatSessionsQuery,
   ): Promise<ChatSessionSummary[]> {
-    return this.chatSessionsService.getSessions(authUser.id, parseChatSessionOrigin(origin))
+    return this.chatSessionsService.getSessions(
+      authUser.id,
+      query.workspaceId,
+      query.origin ?? CHAT_SESSION_ORIGIN.GLOBAL,
+    )
   }
 
   @Post('sessions')
   async createSession(
     @CurrentUser() authUser: AuthUserContext,
-    @Body(new ZodValidationPipe(CreateChatSessionRequestSchema.optional())) payload: CreateChatSessionRequest | undefined,
+    @Body(new ZodValidationPipe(CreateChatSessionRequestSchema)) payload: CreateChatSessionRequest,
   ): Promise<ChatSessionDetail> {
-    return this.chatSessionsService.createSession(authUser.id, payload?.origin ?? CHAT_SESSION_ORIGIN.GLOBAL)
+    return this.chatSessionsService.createSession(
+      authUser.id,
+      payload.workspaceId,
+      payload.origin ?? CHAT_SESSION_ORIGIN.GLOBAL,
+    )
   }
 
   @Get('sessions/:id')

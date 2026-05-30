@@ -24,7 +24,7 @@ const surfaceContext = computed(() => {
   if (currentSurface.value === 'permissions') {
     return {
       title: '权限管理',
-      description: '查看当前空间内已开启分享的文档',
+      description: '查看已开启分享的文档',
     }
   }
 

@@ -9,12 +9,15 @@ import { createChatSessionEvents } from './createChatSessionEvents'
 import { createChatStreamController } from './createChatStreamController'
 
 export interface ChatEngineOptions {
+  getWorkspaceId: () => string | null | undefined
   onSessionCreated?: ChatStreamControllerOptions['onSessionCreated']
   persistence?: ChatSessionPersistence
 }
 
-export function createChatEngine(origin: ChatSessionOrigin, options: ChatEngineOptions = {}) {
-  const api = createChatApi(origin)
+export function createChatEngine(origin: ChatSessionOrigin, options: ChatEngineOptions) {
+  const api = createChatApi(origin, {
+    getWorkspaceId: options.getWorkspaceId,
+  })
   const sessions = createChatSessionController(api, { persistence: options.persistence })
   const events = createChatSessionEvents(api)
   const overlay = createChatRuntimeOverlay(sessions)

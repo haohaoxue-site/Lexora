@@ -40,11 +40,15 @@ export function getDocuments(workspaceId: string): Promise<DocumentTreeGroup[]> 
   })
 }
 
-export async function searchReadableDocumentsForChat(query: string): Promise<ReadableDocumentSearchResult[]> {
+export async function searchReadableDocumentsForChat(
+  workspaceId: string,
+  query: string,
+): Promise<ReadableDocumentSearchResult[]> {
   const response: SearchReadableDocumentsResponse = await axios.request({
     method: 'get',
     url: '/documents/search',
     params: {
+      workspaceId,
       query,
     },
   })

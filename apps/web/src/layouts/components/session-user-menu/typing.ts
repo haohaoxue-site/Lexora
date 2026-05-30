@@ -1,6 +1,5 @@
 import type { AppearancePreference } from '@haohaoxue/samepage-contracts'
 import type { SvgIconProps } from '@/components/svg-icon/typing'
-import type { WorkspaceSwitcherItem } from '@/stores/workspace'
 
 /**
  * 会话菜单中的用户摘要。
@@ -26,16 +25,6 @@ export interface SessionAppearancePanelProps {
   currentAppearance: AppearancePreference
   isSaving: boolean
   options: SessionAppearanceOption[]
-}
-
-/**
- * 空间子面板参数。
- */
-export interface SessionWorkspacePanelProps {
-  currentUser: SessionMenuUser
-  currentWorkspaceId: string
-  isCreatingWorkspace: boolean
-  workspaces: ReadonlyArray<WorkspaceSwitcherItem>
 }
 
 /**

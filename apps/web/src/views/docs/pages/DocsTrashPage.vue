@@ -37,7 +37,7 @@ function isItemActing(documentId: string) {
       element-loading-text="正在加载回收站"
     >
       <template #empty>
-        <ElEmpty :description="errorMessage || '当前空间暂无已删除文档。'">
+        <ElEmpty :description="errorMessage || '暂无已删除文档。'">
           <ElButton v-if="errorMessage" type="primary" @click="loadItems">
             重新加载
           </ElButton>

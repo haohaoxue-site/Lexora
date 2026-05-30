@@ -4,6 +4,7 @@ import { useChatModels } from '@/composables/chat/useChatModels'
 import { useChatRuntimeConfig } from '@/composables/chat/useChatRuntimeConfig'
 import PagePanel from '@/layouts/panels/PagePanel.vue'
 import { useUiStore } from '@/stores/ui'
+import { useWorkspaceStore } from '@/stores/workspace'
 import ChatInputBox from './components/ChatInputBox.vue'
 import ChatMessageList from './components/ChatMessageList.vue'
 import ChatSessionSidebar from './components/ChatSessionSidebar.vue'
@@ -15,6 +16,7 @@ const { refreshModels } = useChatModels()
 const { loadSessions } = useChatSessions()
 const { isNewChatRoute, navigateToNewChat } = useChatRouteState()
 const uiStore = useUiStore()
+const workspaceStore = useWorkspaceStore()
 const shouldShowChatSidebar = computed(() => uiStore.chatSessionSidebarPinned ?? !isNewChatRoute.value)
 const isChatSidebarCollapsed = computed(() => !shouldShowChatSidebar.value)
 
@@ -23,6 +25,7 @@ function setChatSidebarPinned(value: boolean) {
 }
 
 onMounted(async () => {
+  await workspaceStore.ensurePersonalWorkspace()
   void loadSessions({
     selectFallbackSession: false,
   })

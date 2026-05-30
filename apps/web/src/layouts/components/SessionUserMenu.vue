@@ -1,10 +1,7 @@
 <script setup lang="ts">
 import EntityAvatar from '@/components/entity-avatar/EntityAvatar.vue'
 import SessionAppearancePanel from './session-user-menu/SessionAppearancePanel.vue'
-import SessionWorkspacePanel from './session-user-menu/SessionWorkspacePanel.vue'
 import { useSessionUserMenu } from './session-user-menu/useSessionUserMenu'
-import TeamSettingsDialog from './team-settings-dialog/TeamSettingsDialog.vue'
-import WorkspaceCreateDialog from './workspace-create-dialog/WorkspaceCreateDialog.vue'
 
 const props = withDefaults(defineProps<{
   showContextSwitch?: boolean
@@ -17,10 +14,6 @@ const props = withDefaults(defineProps<{
 const {
   menuVisible,
   appearanceMenuVisible,
-  workspaceMenuVisible,
-  teamSettingsDialogVisible,
-  workspaceCreateDialogVisible,
-  isCreatingWorkspace,
   isLoggingOut,
   appearanceOptions,
   currentUser,
@@ -28,19 +21,10 @@ const {
   currentAppearance,
   currentAppearanceLabel,
   isSavingAppearance,
-  currentWorkspaceLabel,
-  currentWorkspaceId,
-  currentTeamWorkspace,
-  switchableWorkspaces,
   toggleAppearanceMenu,
-  toggleWorkspaceMenu,
-  openWorkspaceCreateDialog,
-  openTeamSettingsDialog,
   handleAppearanceSelect,
-  handleWorkspaceCreate,
   switchContext,
   handleLogout,
-  handleWorkspaceSelect,
   getLogoutIconName,
 } = useSessionUserMenu({
   showContextSwitch: props.showContextSwitch,
@@ -128,66 +112,6 @@ const {
         <ElButton
           text
           class="session-user-menu-item session-user-menu-entry session-menu-button-fill"
-          :class="{ 'is-active': workspaceMenuVisible }"
-          @click.stop="toggleWorkspaceMenu"
-        >
-          <span class="session-user-menu-entry__content">
-            <SvgIcon
-              category="ui"
-              icon="workspace-node"
-              size="14px"
-              class="session-user-menu-entry__icon"
-            />
-
-            <span class="session-user-menu-entry__summary">
-              <span class="session-user-menu-entry__title">
-                切换空间
-              </span>
-
-              <span class="session-user-menu-entry__current">
-                {{ currentWorkspaceLabel }}
-              </span>
-            </span>
-
-            <SvgIcon
-              category="ui"
-              icon="chevron-right"
-              size="14px"
-              class="session-user-menu-entry__chevron"
-              :class="workspaceMenuVisible ? 'translate-x-0.5 text-primary' : ''"
-            />
-          </span>
-        </ElButton>
-
-        <SessionWorkspacePanel
-          v-if="workspaceMenuVisible"
-          :current-user="currentUser"
-          :current-workspace-id="currentWorkspaceId"
-          :is-creating-workspace="isCreatingWorkspace"
-          :workspaces="switchableWorkspaces"
-          @create="openWorkspaceCreateDialog"
-          @select="handleWorkspaceSelect"
-        />
-      </div>
-
-      <ElButton
-        v-if="currentTeamWorkspace"
-        text
-        class="session-user-menu-item session-menu-button-fill"
-        @click="openTeamSettingsDialog"
-      >
-        <span class="session-user-menu-item__content">
-          <SvgIcon category="ui" icon="user-group" size="14px" class="session-user-menu-item__icon" />
-          <span class="leading-none">团队设置</span>
-        </span>
-      </ElButton>
-
-      <div class="session-user-divider" />
-
-      <div class="session-menu-subpanel-anchor">
-        <ElButton
-          text
-          class="session-user-menu-item session-user-menu-entry session-menu-button-fill"
           :class="{ 'is-active': appearanceMenuVisible }"
           :disabled="isSavingAppearance"
           @click.stop="toggleAppearanceMenu"
@@ -245,17 +169,6 @@ const {
       </ElButton>
     </div>
   </ElPopover>
-
-  <WorkspaceCreateDialog
-    v-model="workspaceCreateDialogVisible"
-    :is-submitting="isCreatingWorkspace"
-    @submit="handleWorkspaceCreate"
-  />
-
-  <TeamSettingsDialog
-    v-model="teamSettingsDialogVisible"
-    :workspace="currentTeamWorkspace"
-  />
 </template>
 
 <style scoped lang="scss">

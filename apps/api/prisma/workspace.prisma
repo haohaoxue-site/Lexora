@@ -33,6 +33,7 @@ model Workspace {
   members        WorkspaceMember[]
   invites        WorkspaceInvite[]
   documents      Document[]
+  chatSessions   ChatSession[]
   createdAt      DateTime          @default(now())
   updatedAt      DateTime          @updatedAt
   deletedAt      DateTime?
