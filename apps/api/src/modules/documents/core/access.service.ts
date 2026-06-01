@@ -1,14 +1,25 @@
-import type { DocumentVisibility, WorkspaceMemberRole, WorkspaceType } from '@haohaoxue/samepage-contracts'
+import type {
+  DocumentCollaborationAccess,
+  DocumentCollaborationPermission,
+  DocumentCollaborationScope,
+  DocumentVisibility,
+  WorkspaceMemberRole,
+  WorkspaceType,
+} from '@haohaoxue/samepage-contracts'
 import {
+  DOCUMENT_COLLABORATION_ACCESS_SOURCE,
+  DOCUMENT_COLLABORATION_GRANT_STATUS,
+  DOCUMENT_COLLABORATION_PERMISSION,
+  DOCUMENT_COLLABORATION_SCOPE,
   DOCUMENT_VISIBILITY,
   WORKSPACE_MEMBER_ROLE,
   WORKSPACE_MEMBER_STATUS,
   WORKSPACE_TYPE,
 } from '@haohaoxue/samepage-contracts'
 import {
-  canManageDocumentShare,
+  canManageDocumentCollaborators,
   getDocumentCollaborationCapabilities,
-  resolveWorkspaceDocumentCollaborationRole,
+  getWorkspaceDocumentCollaborationCapabilities,
 } from '@haohaoxue/samepage-shared'
 import { Injectable, NotFoundException } from '@nestjs/common'
 import { Prisma } from '@prisma/client'
@@ -31,6 +42,7 @@ export interface AccessibleDocument {
   createdBy: string
   workspaceType: string
   workspaceMemberRole?: WorkspaceMemberRole | null
+  access: DocumentCollaborationAccess
 }
 
 const accessibleWorkspaceMembershipSelect = {
@@ -126,7 +138,7 @@ export class DocumentAccessService {
     return Boolean(membership)
   }
 
-  async hasWorkspaceShareManagementAccess(userId: string, workspaceId: string): Promise<boolean> {
+  async hasWorkspaceCollaborationManagementAccess(userId: string, workspaceId: string): Promise<boolean> {
     const membership = await this.prisma.workspaceMember.findFirst({
       where: {
         workspaceId,
@@ -147,7 +159,7 @@ export class DocumentAccessService {
       return false
     }
 
-    return canManageDocumentShare({
+    return canManageDocumentCollaborators({
       workspaceType: membership.workspace.type,
       workspaceMemberRole: membership.role,
     })
@@ -184,7 +196,7 @@ export class DocumentAccessService {
   ): Promise<AccessibleDocument> {
     const document = await this.loadDocumentAccessRecord(userId, documentId)
 
-    if (!document || !document.workspace.members.length) {
+    if (!document) {
       throw new NotFoundException(`Document "${documentId}" not found`)
     }
 
@@ -192,18 +204,24 @@ export class DocumentAccessService {
       throw new NotFoundException(`Document "${documentId}" not found`)
     }
 
-    if (!canUserAccessDocument({
+    const workspaceAccess = resolveWorkspaceAccess({
       userId,
-      access: options.access,
       workspaceType: document.workspace.type,
       workspaceMemberRole: document.workspace.members[0]?.role,
       visibility: document.visibility,
       createdBy: document.createdBy,
-    })) {
+    })
+    const access = workspaceAccess ?? await this.resolveCollaborationGrantAccess(userId, document)
+
+    if (!access) {
       throw new NotFoundException(`Document "${documentId}" not found`)
     }
 
-    return toAccessibleDocument(document)
+    if (options.access === 'edit' && !access.capabilities.canEdit) {
+      throw new NotFoundException(`Document "${documentId}" not found`)
+    }
+
+    return toAccessibleDocument(document, access)
   }
 
   private async loadDocumentAccessRecord(userId: string, documentId: string): Promise<PersistedDocumentAccessRecord | null> {
@@ -230,58 +248,162 @@ export class DocumentAccessService {
       },
     })
   }
+
+  private async resolveCollaborationGrantAccess(
+    userId: string,
+    document: PersistedDocumentAccessRecord,
+  ): Promise<DocumentCollaborationAccess | null> {
+    const documentPath = await this.loadDocumentPath(document)
+    const pathIndexByDocumentId = new Map(documentPath.map((node, index) => [node.id, index]))
+    const grants = await this.prisma.documentCollaborationGrant.findMany({
+      where: {
+        userId,
+        status: DOCUMENT_COLLABORATION_GRANT_STATUS.ACTIVE,
+        rootDocumentId: {
+          in: documentPath.map(node => node.id),
+        },
+        rootDocument: {
+          trashedAt: null,
+        },
+      },
+      select: {
+        id: true,
+        rootDocumentId: true,
+        permission: true,
+        scope: true,
+        sourceType: true,
+      },
+    })
+    const grant = grants
+      .filter((candidate) => {
+        if (candidate.rootDocumentId === document.id) {
+          return true
+        }
+
+        return candidate.scope === DOCUMENT_COLLABORATION_SCOPE.DESCENDANTS
+      })
+      .sort((left, right) => {
+        const leftPathIndex = pathIndexByDocumentId.get(left.rootDocumentId) ?? Number.MAX_SAFE_INTEGER
+        const rightPathIndex = pathIndexByDocumentId.get(right.rootDocumentId) ?? Number.MAX_SAFE_INTEGER
+
+        if (leftPathIndex !== rightPathIndex) {
+          return leftPathIndex - rightPathIndex
+        }
+
+        return getPermissionRank(right.permission as DocumentCollaborationPermission)
+          - getPermissionRank(left.permission as DocumentCollaborationPermission)
+      })[0]
+
+    if (!grant) {
+      return null
+    }
+
+    return toCollaborationAccess({
+      source: DOCUMENT_COLLABORATION_ACCESS_SOURCE.GRANT,
+      permission: grant.permission,
+      scope: grant.scope,
+      rootDocumentId: grant.rootDocumentId,
+      grantId: grant.id,
+    })
+  }
+
+  private async loadDocumentPath(document: PersistedDocumentAccessRecord): Promise<Array<{ id: string, parentId: string | null }>> {
+    const path = [{ id: document.id, parentId: document.parentId }]
+    let parentId = document.parentId
+
+    while (parentId) {
+      const parent = await this.prisma.document.findUnique({
+        where: { id: parentId },
+        select: {
+          id: true,
+          parentId: true,
+        },
+      })
+
+      if (!parent) {
+        break
+      }
+
+      path.push(parent)
+      parentId = parent.parentId
+    }
+
+    return path
+  }
 }
 
-function canUserAccessDocument(input: {
+function resolveWorkspaceAccess(input: {
   userId: string
-  access: 'read' | 'edit'
   workspaceType: WorkspaceType
   workspaceMemberRole?: WorkspaceMemberRole | null
   visibility: string
   createdBy: string
-}) {
+}): DocumentCollaborationAccess | null {
   if (input.workspaceType === WORKSPACE_TYPE.PERSONAL) {
-    const role = resolveWorkspaceDocumentCollaborationRole({
+    const capabilities = getWorkspaceDocumentCollaborationCapabilities({
       workspaceType: input.workspaceType,
       workspaceMemberRole: input.workspaceMemberRole ?? null,
     })
 
-    if (!role) {
-      return false
+    if (!capabilities) {
+      return null
     }
 
-    const capabilities = getDocumentCollaborationCapabilities(role)
-
-    return input.access === 'read'
-      ? capabilities.canRead
-      : capabilities.canWrite
+    return toWorkspaceAccess({
+      source: DOCUMENT_COLLABORATION_ACCESS_SOURCE.OWNER,
+      scope: DOCUMENT_COLLABORATION_SCOPE.DESCENDANTS,
+      rootDocumentId: '',
+      grantId: null,
+      capabilities,
+    })
   }
 
   if (input.workspaceType !== WORKSPACE_TYPE.TEAM) {
-    return false
+    return null
   }
 
   if (input.visibility === DOCUMENT_VISIBILITY.PRIVATE) {
-    return input.createdBy === input.userId
+    if (input.createdBy !== input.userId) {
+      return null
+    }
+
+    return toWorkspaceAccess({
+      source: DOCUMENT_COLLABORATION_ACCESS_SOURCE.OWNER,
+      scope: DOCUMENT_COLLABORATION_SCOPE.DESCENDANTS,
+      rootDocumentId: '',
+      grantId: null,
+      capabilities: {
+        canRead: true,
+        canEdit: true,
+        canCreateChild: true,
+        canManageCollaboration: true,
+        canPublish: true,
+        canMove: true,
+        canTrash: true,
+        canRestore: true,
+      },
+    })
   }
 
-  const role = resolveWorkspaceDocumentCollaborationRole({
+  const capabilities = getWorkspaceDocumentCollaborationCapabilities({
     workspaceType: input.workspaceType,
     workspaceMemberRole: input.workspaceMemberRole ?? null,
   })
 
-  if (!role) {
-    return false
+  if (!capabilities) {
+    return null
   }
 
-  const capabilities = getDocumentCollaborationCapabilities(role)
-
-  return input.access === 'read'
-    ? capabilities.canRead
-    : capabilities.canWrite
+  return toWorkspaceAccess({
+    source: DOCUMENT_COLLABORATION_ACCESS_SOURCE.WORKSPACE,
+    scope: DOCUMENT_COLLABORATION_SCOPE.DESCENDANTS,
+    rootDocumentId: '',
+    grantId: null,
+    capabilities,
+  })
 }
 
-function toAccessibleDocument(document: PersistedDocumentAccessRecord) {
+function toAccessibleDocument(document: PersistedDocumentAccessRecord, access: DocumentCollaborationAccess) {
   return {
     id: document.id,
     workspaceId: document.workspaceId,
@@ -290,5 +412,55 @@ function toAccessibleDocument(document: PersistedDocumentAccessRecord) {
     createdBy: document.createdBy,
     workspaceType: document.workspace.type,
     workspaceMemberRole: document.workspace.members[0]?.role ?? null,
+    access: {
+      ...access,
+      rootDocumentId: access.rootDocumentId || document.id,
+    },
   }
+}
+
+function toCollaborationAccess(input: {
+  source: string
+  permission: string
+  scope: string
+  rootDocumentId: string
+  grantId: string | null
+}): DocumentCollaborationAccess {
+  const permission = input.permission as DocumentCollaborationPermission
+  const scope = input.scope as DocumentCollaborationScope
+  const capabilities = getDocumentCollaborationCapabilities({ permission, scope })
+
+  return {
+    source: input.source as DocumentCollaborationAccess['source'],
+    permission,
+    scope,
+    rootDocumentId: input.rootDocumentId,
+    grantId: input.grantId,
+    capabilities,
+  }
+}
+
+function toWorkspaceAccess(input: {
+  source: string
+  scope: string
+  rootDocumentId: string
+  grantId: string | null
+  capabilities: DocumentCollaborationAccess['capabilities']
+}): DocumentCollaborationAccess {
+  return {
+    source: input.source as DocumentCollaborationAccess['source'],
+    permission: DOCUMENT_COLLABORATION_PERMISSION.EDIT,
+    scope: input.scope as DocumentCollaborationScope,
+    rootDocumentId: input.rootDocumentId,
+    grantId: input.grantId,
+    capabilities: input.capabilities,
+  }
+}
+
+function getPermissionRank(permission: DocumentCollaborationPermission): number {
+  if (permission === DOCUMENT_COLLABORATION_PERMISSION.EDIT) {
+    return 2
+  }
+
+  return 1
 }

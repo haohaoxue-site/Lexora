@@ -47,7 +47,7 @@ export const COLLAB_ERROR_CODE_VALUES = [
 export const COLLAB_PERMISSION_INVALIDATION_REASON = {
   DOCUMENT_TRASHED: 'document-trashed',
   DOCUMENT_MOVED: 'document-moved',
-  SHARE_REVOKED: 'share-revoked',
+  COLLABORATION_REVOKED: 'collaboration-revoked',
   MEMBER_REMOVED: 'member-removed',
   RUNTIME_EPOCH_EXPIRED: 'runtime-epoch-expired',
 } as const
@@ -55,7 +55,7 @@ export const COLLAB_PERMISSION_INVALIDATION_REASON = {
 export const COLLAB_PERMISSION_INVALIDATION_REASON_VALUES = [
   COLLAB_PERMISSION_INVALIDATION_REASON.DOCUMENT_TRASHED,
   COLLAB_PERMISSION_INVALIDATION_REASON.DOCUMENT_MOVED,
-  COLLAB_PERMISSION_INVALIDATION_REASON.SHARE_REVOKED,
+  COLLAB_PERMISSION_INVALIDATION_REASON.COLLABORATION_REVOKED,
   COLLAB_PERMISSION_INVALIDATION_REASON.MEMBER_REMOVED,
   COLLAB_PERMISSION_INVALIDATION_REASON.RUNTIME_EPOCH_EXPIRED,
 ] as const
@@ -127,15 +127,11 @@ export const CollabPermissionInvalidationRequestSchema = z.object({
   documentId: z.string().trim().min(1).optional(),
   workspaceId: z.string().trim().min(1).optional(),
   userId: z.string().trim().min(1).optional(),
-  entryShareId: z.string().trim().min(1).nullable().optional(),
-  entryRecipientId: z.string().trim().min(1).nullable().optional(),
   runtimeEpoch: YdocRuntimeEpochSchema.optional(),
 }).strict().refine(input => Boolean(
   input.documentId
   || input.workspaceId
   || input.userId
-  || input.entryShareId
-  || input.entryRecipientId
   || input.runtimeEpoch,
 ), {
   message: '至少需要一个权限失效匹配条件',

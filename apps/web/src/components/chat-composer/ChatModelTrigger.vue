@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { ChatComposerModelRef } from './typing'
 import { AI_MODEL_INTENT_KEY } from '@haohaoxue/samepage-contracts'
-import ModelCascader from '@/components/model-cascader/ModelCascader.vue'
+import ModelCascader from '@/components/model-cascader'
 
 const props = defineProps<{
   selectedModelRef?: ChatComposerModelRef | null

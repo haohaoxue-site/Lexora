@@ -410,6 +410,7 @@
     }
   }
 
+  .tiptap-code-block__title-text,
   .tiptap-code-block__title-btn,
   .tiptap-code-block__title-input {
     box-sizing: border-box;
@@ -441,6 +442,17 @@
     &.is-placeholder {
       color: var(--brand-text-placeholder);
       font-weight: 500;
+    }
+  }
+
+  .tiptap-code-block__title-text {
+    overflow: hidden;
+    padding: 0 0.3rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+
+    &.is-placeholder {
+      color: var(--brand-text-placeholder);
     }
   }
 

@@ -1,0 +1,505 @@
+<script setup lang="ts">
+import {
+  DOCUMENT_COLLABORATION_PERMISSION_LABELS,
+  DOCUMENT_COLLABORATION_SCOPE_LABELS,
+} from '@haohaoxue/samepage-contracts'
+import CopyStateIcon from '@/components/copy-state-icon/CopyStateIcon.vue'
+import EntityAvatar from '@/components/entity-avatar'
+import SessionAppearancePanel from './appearance-panel'
+import SessionNotificationPanel from './notification-panel'
+import { useSessionUserMenu } from './useSessionUserMenu'
+
+const props = withDefaults(defineProps<{
+  showContextSwitch?: boolean
+}>(), {
+  showContextSwitch: true,
+})
+
+const {
+  menuVisible,
+  appearanceMenuVisible,
+  notificationPanelVisible,
+  isLoggingOut,
+  appearanceOptions,
+  currentUser,
+  contextSwitchAction,
+  currentAppearance,
+  currentAppearanceLabel,
+  isSavingAppearance,
+  hasLoadedNotifications,
+  isLoadingNotifications,
+  loadNotificationError,
+  invitationItems,
+  hasPendingInvitations,
+  pendingInvitationCount,
+  actingInvitationId,
+  actingInvitationAction,
+  selectedInvitation,
+  isDetailDialogOpen,
+  copiedUserCode,
+  toggleAppearanceMenu,
+  toggleNotificationPanel,
+  refreshNotifications,
+  handleCopyUserCode,
+  handleViewInvitation,
+  handleAcceptInvitation,
+  handleDeclineInvitation,
+  closeInvitationDetail,
+  handleAppearanceSelect,
+  switchContext,
+  handleLogout,
+  getLogoutIconName,
+} = useSessionUserMenu({
+  showContextSwitch: props.showContextSwitch,
+})
+
+function getPermissionLabel(permission: keyof typeof DOCUMENT_COLLABORATION_PERMISSION_LABELS) {
+  return DOCUMENT_COLLABORATION_PERMISSION_LABELS[permission]
+}
+
+function getScopeLabel(scope: keyof typeof DOCUMENT_COLLABORATION_SCOPE_LABELS) {
+  return DOCUMENT_COLLABORATION_SCOPE_LABELS[scope]
+}
+</script>
+
+<template>
+  <div class="session-user-menu-entry">
+    <ElPopover
+      v-model:visible="menuVisible"
+      trigger="click"
+      placement="right-start"
+      :width="236"
+      :offset="14"
+      :show-arrow="false"
+      teleported
+      popper-class="session-user-menu-popper"
+    >
+      <template #reference>
+        <ElBadge
+          :value="pendingInvitationCount"
+          :max="99"
+          :hidden="!hasPendingInvitations"
+          class="session-user-menu-trigger-badge"
+        >
+          <ElButton
+            class="session-user-sidebar-trigger !h-11 !w-11 !min-w-11 !justify-center overflow-hidden !rounded-xl border-none bg-transparent !p-0 text-main shadow-none"
+            aria-label="打开用户菜单"
+          >
+            <EntityAvatar
+              :name="currentUser.displayName"
+              :src="currentUser.avatarUrl"
+              :alt="`${currentUser.displayName} 的头像`"
+              :size="30"
+              shape="circle"
+              kind="user"
+              class="session-user-sidebar-trigger__avatar"
+            />
+          </ElButton>
+        </ElBadge>
+      </template>
+
+      <div class="session-user-menu flex flex-col gap-1">
+        <div class="session-user-profile flex items-start gap-2 px-1 py-0.5">
+          <EntityAvatar
+            :name="currentUser.displayName"
+            :src="currentUser.avatarUrl"
+            :alt="`${currentUser.displayName} 的头像`"
+            :size="34"
+            shape="circle"
+            kind="user"
+            class="session-user-profile__avatar"
+          />
+
+          <div class="min-w-0 flex-1">
+            <div class="flex items-start gap-2">
+              <div class="min-w-0 flex-1">
+                <p class="m-0 truncate text-[13px] font-semibold leading-[1.125rem] text-main">
+                  {{ currentUser.displayName }}
+                </p>
+                <p class="m-0 mt-0.5 truncate text-[11px] leading-4 text-secondary">
+                  {{ currentUser.email }}
+                </p>
+              </div>
+
+              <ElTooltip v-if="contextSwitchAction" :content="contextSwitchAction.label" placement="top">
+                <ElButton
+                  text
+                  class="session-user-profile__context-trigger !ml-0 !h-[1.625rem] !w-[1.625rem] !min-w-[1.625rem] !rounded-lg border-none !p-0"
+                  :aria-label="contextSwitchAction.label"
+                  @click="switchContext"
+                >
+                  <SvgIcon
+                    :category="contextSwitchAction.iconCategory"
+                    :icon="contextSwitchAction.icon"
+                    size="14px"
+                    class="session-user-profile__context-icon"
+                  />
+                </ElButton>
+              </ElTooltip>
+            </div>
+          </div>
+        </div>
+
+        <ElButton
+          text
+          class="session-user-menu-row session-user-menu-row--code session-menu-button-fill !ml-0 !min-h-[2.625rem] !w-full !justify-start !rounded-[0.625rem] !px-2.5 !py-0"
+          @click="handleCopyUserCode"
+        >
+          <span class="session-user-menu-row__content flex h-full w-full items-center gap-2.5 text-left">
+            <span class="session-user-menu-row__summary min-w-0 flex-1">
+              <span class="session-user-menu-row__title block text-[11px] leading-4 text-secondary">协作码</span>
+              <strong class="block truncate pt-0.5 text-[12px] leading-4.5 text-main font-medium">{{ currentUser.userCode }}</strong>
+            </span>
+
+            <span class="session-user-menu-row__copy-indicator flex h-[1.625rem] w-[1.625rem] shrink-0 items-center justify-center rounded-lg text-[13px]">
+              <CopyStateIcon :copied="copiedUserCode" />
+            </span>
+          </span>
+        </ElButton>
+
+        <div class="session-user-divider" />
+
+        <div class="session-menu-subpanel-anchor relative">
+          <ElButton
+            text
+            class="session-user-menu-row session-menu-button-fill !ml-0 !h-[2.375rem] !w-full !justify-start !rounded-[0.625rem] !px-2.5 !py-0 !leading-none"
+            :class="{ 'is-active': appearanceMenuVisible }"
+            :disabled="isSavingAppearance"
+            @click.stop="toggleAppearanceMenu"
+          >
+            <span class="session-user-menu-row__content flex h-full w-full items-center gap-2.5 text-left">
+              <SvgIcon category="ui" icon="contrast" size="14px" class="session-user-menu-row__icon flex h-4 w-4 shrink-0 items-center justify-center text-[14px]" />
+
+              <span class="session-user-menu-row__summary flex min-w-0 flex-1 items-center justify-between gap-2.5">
+                <span class="session-user-menu-row__title overflow-hidden text-ellipsis whitespace-nowrap text-[13px] leading-none text-main">
+                  主题
+                </span>
+
+                <span class="session-user-menu-row__current shrink-0 text-[12px] leading-none">
+                  {{ currentAppearanceLabel }}
+                </span>
+              </span>
+
+              <SvgIcon
+                category="ui"
+                icon="chevron-right"
+                size="14px"
+                class="session-user-menu-row__chevron shrink-0 text-[14px]"
+                :class="appearanceMenuVisible ? 'translate-x-0.5 text-primary' : ''"
+              />
+            </span>
+          </ElButton>
+
+          <SessionAppearancePanel
+            v-if="appearanceMenuVisible"
+            :current-appearance="currentAppearance"
+            :is-saving="isSavingAppearance"
+            :options="appearanceOptions"
+            @select="handleAppearanceSelect"
+          />
+        </div>
+
+        <div class="session-menu-subpanel-anchor relative">
+          <ElButton
+            text
+            class="session-user-menu-row session-menu-button-fill !ml-0 !h-[2.375rem] !w-full !justify-start !rounded-[0.625rem] !px-2.5 !py-0 !leading-none"
+            :class="{ 'is-active': notificationPanelVisible }"
+            @click.stop="toggleNotificationPanel"
+          >
+            <span class="session-user-menu-row__content flex h-full w-full items-center gap-2.5 text-left">
+              <SvgIcon category="ui" icon="bell" size="14px" class="session-user-menu-row__icon flex h-4 w-4 shrink-0 items-center justify-center text-[14px]" />
+
+              <span class="session-user-menu-row__summary flex min-w-0 flex-1 items-center justify-between gap-2.5">
+                <span class="session-user-menu-row__title overflow-hidden text-ellipsis whitespace-nowrap text-[13px] leading-none text-main">
+                  站内信
+                </span>
+
+                <span
+                  v-if="hasPendingInvitations"
+                  class="session-user-menu-row__badge shrink-0"
+                >
+                  {{ pendingInvitationCount > 99 ? '99+' : pendingInvitationCount }}
+                </span>
+                <span v-else class="session-user-menu-row__current shrink-0 text-[12px] leading-none">
+                  0
+                </span>
+              </span>
+
+              <SvgIcon
+                category="ui"
+                icon="chevron-right"
+                size="14px"
+                class="session-user-menu-row__chevron shrink-0 text-[14px]"
+                :class="notificationPanelVisible ? 'translate-x-0.5 text-primary' : ''"
+              />
+            </span>
+          </ElButton>
+
+          <SessionNotificationPanel
+            v-if="notificationPanelVisible"
+            :has-loaded="hasLoadedNotifications"
+            :is-loading="isLoadingNotifications"
+            :load-error-message="loadNotificationError"
+            :invitation-items="invitationItems"
+            :acting-invitation-id="actingInvitationId"
+            :acting-invitation-action="actingInvitationAction"
+            @refresh="refreshNotifications"
+            @view="handleViewInvitation"
+            @accept="handleAcceptInvitation"
+            @decline="handleDeclineInvitation"
+          />
+        </div>
+
+        <div class="session-user-divider" />
+
+        <ElButton
+          text
+          class="session-user-menu-row session-user-logout session-menu-button-fill !ml-0 !h-[2.375rem] !w-full !justify-start !rounded-[0.625rem] !px-2.5 !py-0 !leading-none"
+          :disabled="isLoggingOut"
+          @click="handleLogout"
+        >
+          <span class="session-user-menu-row__content flex h-full w-full items-center gap-2.5 text-left">
+            <SvgIcon
+              category="ui"
+              :icon="getLogoutIconName()"
+              size="14px"
+              class="session-user-menu-row__icon flex h-4 w-4 shrink-0 items-center justify-center text-[14px]"
+              :class="{ 'animate-spin': isLoggingOut }"
+            />
+            <span class="text-sm leading-none">{{ isLoggingOut ? '退出中...' : '退出登录' }}</span>
+          </span>
+        </ElButton>
+      </div>
+    </ElPopover>
+
+    <ElDialog
+      :model-value="isDetailDialogOpen"
+      title="协作邀请"
+      width="420px"
+      append-to-body
+      @update:model-value="(visible: boolean) => !visible && closeInvitationDetail()"
+    >
+      <div v-if="selectedInvitation" class="session-user-invitation-detail space-y-4">
+        <div>
+          <h3 class="m-0 text-lg font-semibold leading-7 text-main">
+            {{ selectedInvitation.documentTitle }}
+          </h3>
+          <p class="m-0 mt-1 text-sm leading-6 text-secondary">
+            {{ selectedInvitation.inviterLabel }} 邀请你协作文档
+          </p>
+        </div>
+
+        <ElDescriptions :column="1" border>
+          <ElDescriptionsItem label="权限">
+            {{ getPermissionLabel(selectedInvitation.permission) }}
+          </ElDescriptionsItem>
+          <ElDescriptionsItem label="范围">
+            {{ getScopeLabel(selectedInvitation.scope) }}
+          </ElDescriptionsItem>
+          <ElDescriptionsItem label="发送时间">
+            {{ selectedInvitation.receivedLabel }}
+          </ElDescriptionsItem>
+        </ElDescriptions>
+      </div>
+
+      <template #footer>
+        <ElButton :disabled="Boolean(actingInvitationId)" @click="closeInvitationDetail">
+          稍后处理
+        </ElButton>
+        <ElButton
+          v-if="selectedInvitation"
+          plain
+          :disabled="Boolean(actingInvitationId)"
+          :loading="actingInvitationId === selectedInvitation.id && actingInvitationAction === 'decline'"
+          @click="handleDeclineInvitation(selectedInvitation)"
+        >
+          拒绝
+        </ElButton>
+        <ElButton
+          v-if="selectedInvitation"
+          type="primary"
+          :disabled="Boolean(actingInvitationId)"
+          :loading="actingInvitationId === selectedInvitation.id && actingInvitationAction === 'accept'"
+          @click="handleAcceptInvitation(selectedInvitation)"
+        >
+          接受并打开
+        </ElButton>
+      </template>
+    </ElDialog>
+  </div>
+</template>
+
+<style scoped lang="scss">
+:global(.session-user-menu-popper.el-popover) {
+  position: relative;
+  overflow: visible;
+  padding: 9px;
+  border: 1px solid color-mix(in srgb, var(--brand-border-base) 94%, transparent);
+  border-radius: 11px;
+  background: var(--brand-bg-surface-raised);
+  box-shadow:
+    0 14px 30px color-mix(in srgb, var(--brand-text-primary) 8%, transparent),
+    0 4px 9px color-mix(in srgb, var(--brand-text-primary) 5%, transparent);
+}
+
+.session-user-menu-entry {
+  display: inline-flex;
+}
+
+.session-user-menu-trigger-badge {
+  display: inline-flex;
+
+  :deep(.el-badge__content.is-fixed) {
+    min-width: 1.125rem;
+    height: 1.125rem;
+    border: 2px solid var(--brand-bg-sidebar);
+    border-radius: 999px;
+    box-shadow: none;
+    transform: translate(12%, 8%);
+  }
+}
+
+.session-user-profile__avatar {
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--brand-border-base) 70%, transparent);
+}
+
+.session-user-profile__avatar {
+  background: color-mix(in srgb, var(--brand-fill-light) 66%, var(--brand-bg-surface));
+}
+
+.session-user-divider {
+  height: 1px;
+  background: color-mix(in srgb, var(--brand-border-base) 78%, transparent);
+}
+
+.session-menu-button-fill > :deep(span) {
+  display: flex;
+  width: 100%;
+  height: 100%;
+}
+
+.session-user-profile {
+  border-radius: 0.625rem;
+}
+
+.session-user-profile__context-trigger {
+  --el-button-text-color: var(--brand-text-secondary);
+  --el-fill-color-light: color-mix(in srgb, var(--brand-fill-lighter) 76%, var(--brand-text-primary) 5%);
+
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--brand-border-base) 78%, transparent);
+  transition: color 0.18s ease, background-color 0.18s ease, box-shadow 0.18s ease;
+
+  &:hover {
+    --el-button-text-color: var(--brand-primary);
+    --el-fill-color-light: color-mix(in srgb, var(--brand-primary) 8%, transparent);
+
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--brand-primary) 18%, transparent);
+  }
+}
+
+.session-user-profile__context-icon {
+  color: currentColor;
+}
+
+.session-user-menu-row {
+  --el-button-text-color: var(--brand-text-primary);
+  --el-fill-color-light: transparent;
+
+  transition: background-color 0.18s ease, color 0.18s ease;
+
+  &:hover:not(.is-disabled) {
+    --el-fill-color-light: color-mix(in srgb, var(--brand-fill-lighter) 78%, var(--brand-text-primary) 5%);
+  }
+
+  &.is-active {
+    --el-button-text-color: var(--brand-primary);
+    --el-fill-color-light: color-mix(in srgb, var(--brand-primary) 9%, transparent);
+    color: var(--brand-primary);
+
+    .session-user-menu-row__icon,
+    .session-user-menu-row__current {
+      color: var(--brand-primary);
+    }
+  }
+
+  &.is-disabled {
+    opacity: 1;
+
+    .session-user-menu-row__icon,
+    .session-user-menu-row__current,
+    .session-user-menu-row__title {
+      color: var(--brand-text-tertiary);
+    }
+  }
+}
+
+.session-user-menu-row__icon,
+.session-user-menu-row__current,
+.session-user-menu-row__chevron {
+  color: var(--brand-text-secondary);
+}
+
+.session-user-menu-row__chevron {
+  transition: transform 0.18s ease, color 0.18s ease;
+}
+
+.session-user-menu-row__badge {
+  min-width: 1.125rem;
+  height: 1.125rem;
+  padding-inline: 0.3125rem;
+  border-radius: 999px;
+  background: var(--brand-error);
+  color: white;
+  font-size: 0.6875rem;
+  line-height: 1.125rem;
+  text-align: center;
+  font-weight: 600;
+}
+
+.session-user-menu-row--code {
+  border: 1px solid color-mix(in srgb, var(--brand-border-base) 78%, transparent);
+  background: color-mix(in srgb, var(--brand-fill-lighter) 72%, transparent);
+
+  &:hover {
+    border-color: color-mix(in srgb, var(--brand-primary) 20%, transparent);
+  }
+}
+
+.session-user-menu-row__copy-indicator {
+  color: var(--brand-text-secondary);
+  background: color-mix(in srgb, var(--brand-bg-surface) 82%, transparent);
+  transition: background-color 0.18s ease, color 0.18s ease;
+}
+
+.session-user-menu-row--code:hover .session-user-menu-row__copy-indicator {
+  color: var(--brand-primary);
+  background: color-mix(in srgb, var(--brand-primary) 8%, transparent);
+}
+
+.session-user-logout:hover {
+  --el-fill-color-light: var(--el-color-danger-light-9);
+  --el-button-text-color: var(--brand-error);
+}
+
+.session-user-sidebar-trigger {
+  color: var(--brand-text-primary);
+  transition: background-color 0.18s ease;
+
+  &:hover {
+    background: color-mix(in srgb, var(--brand-fill-lighter) 78%, var(--brand-text-primary) 5%);
+  }
+
+  &:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--brand-primary) 18%, transparent);
+  }
+
+  > :deep(span) {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+  }
+}
+</style>

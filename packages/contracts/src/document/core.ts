@@ -2,19 +2,17 @@ import { z } from 'zod'
 import { AuditUserSummarySchema } from '../identity'
 import { TiptapJsonContentPayloadSchema, TiptapSchemaVersionSchema } from '../tiptap/core'
 import { WorkspaceTypeSchema } from '../workspace'
-import { DocumentShareModeSchema } from './share'
+import { DocumentCollaborationAccessSchema } from './collaboration'
 
 export const DOCUMENT_COLLECTION = {
   PERSONAL: 'personal',
   COLLABORATION: 'collaboration',
-  SHARE: 'share',
   TEAM: 'team',
 } as const
 
 export const DOCUMENT_COLLECTION_VALUES = [
   DOCUMENT_COLLECTION.PERSONAL,
   DOCUMENT_COLLECTION.COLLABORATION,
-  DOCUMENT_COLLECTION.SHARE,
   DOCUMENT_COLLECTION.TEAM,
 ] as const
 
@@ -31,8 +29,7 @@ export const DOCUMENT_OWNED_COLLECTION_VALUES = [
 
 export const DOCUMENT_COLLECTION_LABELS = {
   [DOCUMENT_COLLECTION.PERSONAL]: '私有',
-  [DOCUMENT_COLLECTION.COLLABORATION]: '共享给我',
-  [DOCUMENT_COLLECTION.SHARE]: '分享给我',
+  [DOCUMENT_COLLECTION.COLLABORATION]: '协作',
   [DOCUMENT_COLLECTION.TEAM]: '团队',
 } as const satisfies Record<(typeof DOCUMENT_COLLECTION_VALUES)[number], string>
 
@@ -122,28 +119,6 @@ export const DocumentOwnedCollectionIdSchema = z.enum(DOCUMENT_OWNED_COLLECTION_
 export const DocumentOperationJobTypeSchema = z.enum(DOCUMENT_OPERATION_JOB_TYPE_VALUES)
 export const DocumentOperationJobStatusSchema = z.enum(DOCUMENT_OPERATION_JOB_STATUS_VALUES)
 
-export const DocumentShareLocalPolicySchema = z.object({
-  mode: DocumentShareModeSchema,
-  shareId: z.string(),
-  directUserCount: z.number().int().nonnegative(),
-  updatedAt: z.string(),
-  updatedBy: z.string().nullable(),
-}).strict()
-
-export const DocumentShareEffectivePolicySchema = z.object({
-  mode: DocumentShareModeSchema,
-  shareId: z.string(),
-  rootDocumentId: z.string(),
-  rootDocumentTitle: z.string(),
-  updatedAt: z.string(),
-  updatedBy: z.string().nullable(),
-}).strict()
-
-export const DocumentShareProjectionSchema = z.object({
-  localPolicy: DocumentShareLocalPolicySchema.nullable(),
-  effectivePolicy: DocumentShareEffectivePolicySchema.nullable(),
-}).strict()
-
 export const DocumentBaseSchema = z.object({
   id: z.string(),
   title: z.string(),
@@ -162,7 +137,6 @@ export const DocumentTrashItemSchema = z.object({
 
 export const DocumentItemSchema = DocumentBaseSchema.extend({
   parentId: z.string().nullable(),
-  share: DocumentShareProjectionSchema.nullable(),
   hasChildren: z.boolean(),
   hasContent: z.boolean(),
   get children() {
@@ -210,7 +184,7 @@ export const DocumentRecordSchema = DocumentBaseSchema.omit({
   order: z.number().int(),
   status: DocumentStatusSchema,
   pageWidthMode: DocumentPageWidthModeSchema,
-  share: DocumentShareProjectionSchema.nullable(),
+  access: DocumentCollaborationAccessSchema,
 }).strict()
 
 export const DocumentCurrentProjectionSchema = z.object({
@@ -414,14 +388,11 @@ export type DocumentOperationJobType = z.infer<typeof DocumentOperationJobTypeSc
 export type DocumentOperationJobStatus = z.infer<typeof DocumentOperationJobStatusSchema>
 export type DocumentPaneState = (typeof DOCUMENT_PANE_STATE)[keyof typeof DOCUMENT_PANE_STATE]
 export type DocumentSaveState = (typeof DOCUMENT_SAVE_STATE)[keyof typeof DOCUMENT_SAVE_STATE]
-export type DocumentShareLocalPolicy = z.infer<typeof DocumentShareLocalPolicySchema>
-export type DocumentShareEffectivePolicy = z.infer<typeof DocumentShareEffectivePolicySchema>
 export type DocumentBase = z.infer<typeof DocumentBaseSchema>
 export type DocumentTrashItem = z.infer<typeof DocumentTrashItemSchema>
 export type DocumentItem = z.infer<typeof DocumentItemSchema>
 export type DocumentTreeGroup = z.infer<typeof DocumentTreeGroupSchema>
 export type DocumentRevision = z.infer<typeof DocumentRevisionSchema>
-export type DocumentShareProjection = z.infer<typeof DocumentShareProjectionSchema>
 export type DocumentVersionSnapshotSource = z.infer<typeof DocumentVersionSnapshotSourceSchema>
 export type DocumentRecord = z.infer<typeof DocumentRecordSchema>
 export type DocumentCurrentProjection = z.infer<typeof DocumentCurrentProjectionSchema>

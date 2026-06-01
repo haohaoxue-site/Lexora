@@ -25,33 +25,93 @@ enum DocumentAssetStatus {
   DELETED
 }
 
-enum DocumentShareMode {
-  NONE
-  DIRECT_USER
-  LOGGED_IN
-  PUBLIC
-}
-
-enum DocumentShareStatus {
-  ACTIVE
-  REMOVED
-}
-
-enum DocumentSharePermission {
-  VIEW
-  COMMENT
-}
-
-enum DocumentShareRecipientStatus {
-  PENDING
-  ACTIVE
-  DECLINED
-  EXITED
-  REMOVED
-}
-
 enum DocumentCollabRuntimeRole {
   EDITOR
+}
+
+enum DocumentCollaborationPermission {
+  READ
+  EDIT
+}
+
+enum DocumentCollaborationScope {
+  SELF
+  DESCENDANTS
+}
+
+enum DocumentCollaborationGrantSourceType {
+  USER_INVITE
+  LINK_INVITE
+  MANUAL
+}
+
+enum DocumentCollaborationGrantStatus {
+  ACTIVE
+  REMOVED
+}
+
+enum DocumentCollaborationUserInviteStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+  CANCELED
+}
+
+enum CollaborationResolverEntryType {
+  DOCUMENT_USER_INVITE
+  DOCUMENT_LINK_INVITE
+}
+
+enum CollaborationResolverEntryStatus {
+  ACTIVE
+  REVOKED
+}
+
+enum DocumentSinglePublicationState {
+  INHERIT
+  ENABLED
+  DISABLED
+}
+
+enum DocumentPublicationSiteStatus {
+  ACTIVE
+  REMOVED
+}
+
+enum DocumentPublicationEntryStatus {
+  ACTIVE
+  HIDDEN
+  REMOVED
+}
+
+enum DocumentPublicationSiteTheme {
+  DEFAULT
+}
+
+enum DocumentPublicationSiteHomeMode {
+  LANDING
+  DOCUMENT
+}
+
+enum DocumentPublicationPageScope {
+  PAGE
+  DESCENDANTS
+}
+
+enum DocumentPublicationNavItemType {
+  INTERNAL
+  EXTERNAL
+}
+
+enum DocumentPublicationNavItemInternalTarget {
+  HOME
+  SECTION
+  PAGE
+}
+
+enum DocumentPublicationNavItemExternalTarget {
+  SELF
+  BLANK
 }
 
 enum DocumentVersionSnapshotSource {
@@ -74,40 +134,45 @@ enum DocumentOperationJobStatus {
 }
 
 model Document {
-  id                        String                      @id @default(uuid())
+  id                        String                            @id @default(uuid())
   workspaceId               String
-  visibility                DocumentVisibility          @default(PRIVATE)
+  visibility                DocumentVisibility                @default(PRIVATE)
   parentId                  String?
   title                     String
-  currentProjectionId       String?                     @unique
-  currentProjectionRevision Int                         @default(0)
-  latestVersionSnapshotId   String?                     @unique
-  versionSnapshotSeq        Int                         @default(0)
-  summary                   String                      @default("")
-  status                    DocumentStatus              @default(ACTIVE)
-  order                     Int                         @default(0)
-  pageWidthMode             DocumentPageWidthMode       @default(DEFAULT)
-  workspace                 Workspace                   @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  parent                    Document?                   @relation("DocumentTree", fields: [parentId], references: [id], onDelete: SetNull)
-  children                  Document[]                  @relation("DocumentTree")
-  currentProjection         DocumentCurrentProjection?  @relation("DocumentCurrentProjectionPointer", fields: [currentProjectionId], references: [id], onDelete: SetNull)
-  currentProjections        DocumentCurrentProjection[] @relation("DocumentCurrentProjections")
-  latestVersionSnapshot     DocumentVersionSnapshot?    @relation("DocumentLatestVersionSnapshot", fields: [latestVersionSnapshotId], references: [id], onDelete: SetNull)
-  versionSnapshots          DocumentVersionSnapshot[]   @relation("DocumentVersionSnapshots")
+  currentProjectionId       String?                           @unique
+  currentProjectionRevision Int                               @default(0)
+  latestVersionSnapshotId   String?                           @unique
+  versionSnapshotSeq        Int                               @default(0)
+  summary                   String                            @default("")
+  status                    DocumentStatus                    @default(ACTIVE)
+  order                     Int                               @default(0)
+  pageWidthMode             DocumentPageWidthMode             @default(DEFAULT)
+  workspace                 Workspace                         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  parent                    Document?                         @relation("DocumentTree", fields: [parentId], references: [id], onDelete: SetNull)
+  children                  Document[]                        @relation("DocumentTree")
+  currentProjection         DocumentCurrentProjection?        @relation("DocumentCurrentProjectionPointer", fields: [currentProjectionId], references: [id], onDelete: SetNull)
+  currentProjections        DocumentCurrentProjection[]       @relation("DocumentCurrentProjections")
+  latestVersionSnapshot     DocumentVersionSnapshot?          @relation("DocumentLatestVersionSnapshot", fields: [latestVersionSnapshotId], references: [id], onDelete: SetNull)
+  versionSnapshots          DocumentVersionSnapshot[]         @relation("DocumentVersionSnapshots")
   assets                    DocumentAsset[]
-  shares                    DocumentShare[]
+  collaborationGrants       DocumentCollaborationGrant[]      @relation("DocumentCollaborationGrantRoot")
+  collaborationUserInvites  DocumentCollaborationUserInvite[] @relation("DocumentCollaborationUserInviteRoot")
+  collaborationLinkInvite   DocumentCollaborationLinkInvite?  @relation("DocumentCollaborationLinkInviteRoot")
+  singlePublicationSetting  DocumentSinglePublicationSetting?
+  publicationSiteHomeFor    DocumentPublicationSite[]         @relation("DocumentPublicationSiteHomeDocument")
+  publicationPages          DocumentPublicationPage[]
   collabTickets             DocumentCollabTicket[]
-  operationJobsAsSource     DocumentOperationJob[]      @relation("DocumentOperationJobSource")
-  operationJobsAsResult     DocumentOperationJob[]      @relation("DocumentOperationJobResult")
+  operationJobsAsSource     DocumentOperationJob[]            @relation("DocumentOperationJobSource")
+  operationJobsAsResult     DocumentOperationJob[]            @relation("DocumentOperationJobResult")
   ydoc                      DocumentYdoc?
-  aiSessions                AiSession[]                 @relation("AiSessionDocument")
-  createdAt                 DateTime                    @default(now())
+  aiSessions                AiSession[]                       @relation("AiSessionDocument")
+  createdAt                 DateTime                          @default(now())
   createdBy                 String
-  createdByUser             User                        @relation("DocumentCreator", fields: [createdBy], references: [id], onDelete: Cascade)
-  updatedAt                 DateTime                    @updatedAt
+  createdByUser             User                              @relation("DocumentCreator", fields: [createdBy], references: [id], onDelete: Cascade)
+  updatedAt                 DateTime                          @updatedAt
   trashedAt                 DateTime?
   trashedBy                 String?
-  trashedByUser             User?                       @relation("DocumentTrasher", fields: [trashedBy], references: [id], onDelete: SetNull)
+  trashedByUser             User?                             @relation("DocumentTrasher", fields: [trashedBy], references: [id], onDelete: SetNull)
 
   @@index([workspaceId])
   @@index([workspaceId, parentId, order])
@@ -118,7 +183,7 @@ model Document {
 }
 
 model DocumentCurrentProjection {
-  id                  String         @id @default(uuid())
+  id                  String                    @id @default(uuid())
   documentId          String
   projectionRevision  Int
   runtimeEpoch        Int
@@ -128,12 +193,12 @@ model DocumentCurrentProjection {
   schemaVersion       Int
   title               Json
   body                Json
-  document            Document       @relation("DocumentCurrentProjections", fields: [documentId], references: [id], onDelete: Cascade)
-  currentForDocument  Document?      @relation("DocumentCurrentProjectionPointer")
-  lastProjectedYdocs  DocumentYdoc[] @relation("DocumentYdocLastProjectedProjection")
+  document            Document                  @relation("DocumentCurrentProjections", fields: [documentId], references: [id], onDelete: Cascade)
+  currentForDocument  Document?                 @relation("DocumentCurrentProjectionPointer")
+  lastProjectedYdocs  DocumentYdoc[]            @relation("DocumentYdocLastProjectedProjection")
   versionSnapshots    DocumentVersionSnapshot[] @relation("DocumentVersionSnapshotProjection")
-  createdAt           DateTime       @default(now())
-  updatedAt           DateTime       @updatedAt
+  createdAt           DateTime                  @default(now())
+  updatedAt           DateTime                  @updatedAt
   deletedAt           DateTime?
 
   @@unique([documentId, projectionRevision])
@@ -142,15 +207,15 @@ model DocumentCurrentProjection {
 }
 
 model DocumentVersionSnapshot {
-  id                            String    @id @default(uuid())
+  id                            String                        @id @default(uuid())
   documentId                    String
   version                       Int
   basedOnProjectionId           String?
   basedOnProjectionRevision     Int
   runtimeEpoch                  Int
-  projectedUpdateSeq            Int       @default(0)
-  checkpointSeq                 Int       @default(0)
-  checkpointUpdateSeq           Int       @default(0)
+  projectedUpdateSeq            Int                           @default(0)
+  checkpointSeq                 Int                           @default(0)
+  checkpointUpdateSeq           Int                           @default(0)
   schemaVersion                 Int
   title                         Json
   body                          Json
@@ -158,12 +223,12 @@ model DocumentVersionSnapshot {
   restoredFromVersionSnapshotId String?
   idempotencyKey                String?
   label                         String?
-  document                      Document  @relation("DocumentVersionSnapshots", fields: [documentId], references: [id], onDelete: Cascade)
-  basedOnProjection             DocumentCurrentProjection? @relation("DocumentVersionSnapshotProjection", fields: [basedOnProjectionId], references: [id], onDelete: SetNull)
-  latestForDocument             Document? @relation("DocumentLatestVersionSnapshot")
-  createdAt                     DateTime  @default(now())
+  document                      Document                      @relation("DocumentVersionSnapshots", fields: [documentId], references: [id], onDelete: Cascade)
+  basedOnProjection             DocumentCurrentProjection?    @relation("DocumentVersionSnapshotProjection", fields: [basedOnProjectionId], references: [id], onDelete: SetNull)
+  latestForDocument             Document?                     @relation("DocumentLatestVersionSnapshot")
+  createdAt                     DateTime                      @default(now())
   createdBy                     String?
-  createdByUser                 User?     @relation("DocumentVersionSnapshotCreator", fields: [createdBy], references: [id], onDelete: SetNull)
+  createdByUser                 User?                         @relation("DocumentVersionSnapshotCreator", fields: [createdBy], references: [id], onDelete: SetNull)
   deletedAt                     DateTime?
 
   @@unique([documentId, version])
@@ -242,46 +307,6 @@ model DocumentAsset {
   @@index([sha256])
 }
 
-model DocumentShare {
-  id            String                   @id @default(uuid())
-  documentId    String
-  mode          DocumentShareMode
-  permission    DocumentSharePermission  @default(VIEW)
-  status        DocumentShareStatus      @default(ACTIVE)
-  document      Document                 @relation(fields: [documentId], references: [id], onDelete: Cascade)
-  recipients    DocumentShareRecipient[]
-  createdAt     DateTime                 @default(now())
-  createdBy     String?
-  createdByUser User?                    @relation("DocumentShareCreator", fields: [createdBy], references: [id], onDelete: SetNull)
-  updatedAt     DateTime                 @updatedAt
-  updatedBy     String?
-  updatedByUser User?                    @relation("DocumentShareUpdater", fields: [updatedBy], references: [id], onDelete: SetNull)
-  deletedAt     DateTime?
-
-  @@index([documentId, status, mode])
-  @@index([documentId, status, updatedAt])
-}
-
-model DocumentShareRecipient {
-  id              String                       @id @default(uuid())
-  documentShareId String
-  recipientUserId String
-  permission      DocumentSharePermission      @default(VIEW)
-  status          DocumentShareRecipientStatus @default(PENDING)
-  documentShare   DocumentShare                @relation(fields: [documentShareId], references: [id], onDelete: Cascade)
-  recipientUser   User                         @relation("DocumentShareRecipientUser", fields: [recipientUserId], references: [id], onDelete: Cascade)
-  createdAt       DateTime                     @default(now())
-  createdBy       String?
-  createdByUser   User?                        @relation("DocumentShareRecipientCreator", fields: [createdBy], references: [id], onDelete: SetNull)
-  updatedAt       DateTime                     @updatedAt
-  updatedBy       String?
-  updatedByUser   User?                        @relation("DocumentShareRecipientUpdater", fields: [updatedBy], references: [id], onDelete: SetNull)
-  deletedAt       DateTime?
-
-  @@unique([documentShareId, recipientUserId])
-  @@index([recipientUserId, status, updatedAt])
-}
-
 model DocumentOperationJob {
   id                String                     @id @default(uuid())
   type              DocumentOperationJobType
@@ -309,6 +334,201 @@ model DocumentOperationJob {
   @@index([createdBy, status, updatedAt])
   @@index([sourceDocumentId, status])
   @@index([resultDocumentId])
+}
+
+model DocumentCollaborationGrant {
+  id                 String                               @id @default(uuid())
+  rootDocumentId     String
+  userId             String
+  permission         DocumentCollaborationPermission
+  scope              DocumentCollaborationScope
+  sourceType         DocumentCollaborationGrantSourceType
+  sourceId           String?
+  status             DocumentCollaborationGrantStatus     @default(ACTIVE)
+  rootDocument       Document                             @relation("DocumentCollaborationGrantRoot", fields: [rootDocumentId], references: [id], onDelete: Cascade)
+  user               User                                 @relation("DocumentCollaborationGrantUser", fields: [userId], references: [id], onDelete: Cascade)
+  acceptedUserInvite DocumentCollaborationUserInvite?     @relation("DocumentCollaborationUserInviteAcceptedGrant")
+  createdAt          DateTime                             @default(now())
+  createdBy          String?
+  createdByUser      User?                                @relation("DocumentCollaborationGrantCreator", fields: [createdBy], references: [id], onDelete: SetNull)
+  updatedAt          DateTime                             @updatedAt
+  updatedBy          String?
+  updatedByUser      User?                                @relation("DocumentCollaborationGrantUpdater", fields: [updatedBy], references: [id], onDelete: SetNull)
+  deletedAt          DateTime?
+
+  @@unique([rootDocumentId, userId])
+  @@index([userId, status, updatedAt])
+  @@index([rootDocumentId, status])
+  @@index([sourceType, sourceId])
+}
+
+model DocumentCollaborationUserInvite {
+  id              String                                @id @default(uuid())
+  rootDocumentId  String
+  inviteeUserId   String
+  permission      DocumentCollaborationPermission
+  scope           DocumentCollaborationScope
+  status          DocumentCollaborationUserInviteStatus @default(PENDING)
+  acceptedGrantId String?                               @unique
+  rootDocument    Document                              @relation("DocumentCollaborationUserInviteRoot", fields: [rootDocumentId], references: [id], onDelete: Cascade)
+  inviteeUser     User                                  @relation("DocumentCollaborationUserInviteInvitee", fields: [inviteeUserId], references: [id], onDelete: Cascade)
+  acceptedGrant   DocumentCollaborationGrant?           @relation("DocumentCollaborationUserInviteAcceptedGrant", fields: [acceptedGrantId], references: [id], onDelete: SetNull)
+  createdAt       DateTime                              @default(now())
+  createdBy       String?
+  createdByUser   User?                                 @relation("DocumentCollaborationUserInviteCreator", fields: [createdBy], references: [id], onDelete: SetNull)
+  updatedAt       DateTime                              @updatedAt
+  updatedBy       String?
+  updatedByUser   User?                                 @relation("DocumentCollaborationUserInviteUpdater", fields: [updatedBy], references: [id], onDelete: SetNull)
+  deletedAt       DateTime?
+
+  @@unique([rootDocumentId, inviteeUserId])
+  @@index([inviteeUserId, status, updatedAt])
+  @@index([rootDocumentId, status])
+}
+
+model DocumentCollaborationLinkInvite {
+  id             String                          @id @default(uuid())
+  rootDocumentId String                          @unique
+  permission     DocumentCollaborationPermission
+  scope          DocumentCollaborationScope
+  enabled        Boolean                         @default(true)
+  passwordEnabled Boolean                        @default(false)
+  passwordHash   String?
+  passwordCode   String?
+  rootDocument   Document                        @relation("DocumentCollaborationLinkInviteRoot", fields: [rootDocumentId], references: [id], onDelete: Cascade)
+  createdAt      DateTime                        @default(now())
+  createdBy      String?
+  createdByUser  User?                           @relation("DocumentCollaborationLinkInviteCreator", fields: [createdBy], references: [id], onDelete: SetNull)
+  updatedAt      DateTime                        @updatedAt
+  updatedBy      String?
+  updatedByUser  User?                           @relation("DocumentCollaborationLinkInviteUpdater", fields: [updatedBy], references: [id], onDelete: SetNull)
+  deletedAt      DateTime?
+
+  @@index([rootDocumentId, enabled])
+}
+
+model CollaborationResolverEntry {
+  id        String                           @id @default(uuid())
+  code      String                           @unique
+  type      CollaborationResolverEntryType
+  targetId  String
+  status    CollaborationResolverEntryStatus @default(ACTIVE)
+  expiresAt DateTime?
+  createdAt DateTime                         @default(now())
+  updatedAt DateTime                         @updatedAt
+
+  @@index([type, targetId, status])
+  @@index([status, updatedAt])
+}
+
+model DocumentSinglePublicationSetting {
+  id            String                         @id @default(uuid())
+  documentId    String                         @unique
+  state         DocumentSinglePublicationState @default(INHERIT)
+  scope         DocumentPublicationPageScope   @default(PAGE)
+  document      Document                       @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  createdAt     DateTime                       @default(now())
+  createdBy     String?
+  createdByUser User?                          @relation("DocumentSinglePublicationSettingCreator", fields: [createdBy], references: [id], onDelete: SetNull)
+  updatedAt     DateTime                       @updatedAt
+  updatedBy     String?
+  updatedByUser User?                          @relation("DocumentSinglePublicationSettingUpdater", fields: [updatedBy], references: [id], onDelete: SetNull)
+
+  @@index([state, updatedAt])
+}
+
+model DocumentPublicationSite {
+  id             String                          @id @default(uuid())
+  workspaceId    String                          @unique
+  title          String
+  description    String?
+  logoUrl        String?
+  theme          DocumentPublicationSiteTheme    @default(DEFAULT)
+  homeMode       DocumentPublicationSiteHomeMode @default(LANDING)
+  homeDocumentId String?
+  homeConfig     Json?
+  allowIndexing  Boolean                         @default(false)
+  status         DocumentPublicationSiteStatus   @default(ACTIVE)
+  workspace      Workspace                       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  homeDocument   Document?                       @relation("DocumentPublicationSiteHomeDocument", fields: [homeDocumentId], references: [id], onDelete: SetNull)
+  sections       DocumentPublicationSection[]
+  pages          DocumentPublicationPage[]
+  navItems       DocumentPublicationNavItem[]
+  createdAt      DateTime                        @default(now())
+  createdBy      String?
+  createdByUser  User?                           @relation("DocumentPublicationSiteCreator", fields: [createdBy], references: [id], onDelete: SetNull)
+  updatedAt      DateTime                        @updatedAt
+  updatedBy      String?
+  updatedByUser  User?                           @relation("DocumentPublicationSiteUpdater", fields: [updatedBy], references: [id], onDelete: SetNull)
+
+  @@index([homeDocumentId])
+  @@index([status, updatedAt])
+}
+
+model DocumentPublicationSection {
+  id            String                         @id @default(uuid())
+  siteId        String
+  title         String
+  order         Int                            @default(0)
+  collapsed     Boolean                        @default(false)
+  status        DocumentPublicationEntryStatus @default(ACTIVE)
+  site          DocumentPublicationSite        @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  pages         DocumentPublicationPage[]
+  createdAt     DateTime                       @default(now())
+  createdBy     String?
+  createdByUser User?                          @relation("DocumentPublicationSectionCreator", fields: [createdBy], references: [id], onDelete: SetNull)
+  updatedAt     DateTime                       @updatedAt
+  updatedBy     String?
+  updatedByUser User?                          @relation("DocumentPublicationSectionUpdater", fields: [updatedBy], references: [id], onDelete: SetNull)
+
+  @@index([siteId, status, order])
+}
+
+model DocumentPublicationPage {
+  id            String                         @id @default(uuid())
+  siteId        String
+  sectionId     String
+  documentId    String
+  title         String
+  scope         DocumentPublicationPageScope
+  order         Int                            @default(0)
+  status        DocumentPublicationEntryStatus @default(ACTIVE)
+  site          DocumentPublicationSite        @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  section       DocumentPublicationSection     @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  document      Document                       @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  createdAt     DateTime                       @default(now())
+  createdBy     String?
+  createdByUser User?                          @relation("DocumentPublicationPageCreator", fields: [createdBy], references: [id], onDelete: SetNull)
+  updatedAt     DateTime                       @updatedAt
+  updatedBy     String?
+  updatedByUser User?                          @relation("DocumentPublicationPageUpdater", fields: [updatedBy], references: [id], onDelete: SetNull)
+
+  @@unique([siteId, documentId])
+  @@index([sectionId, status, order])
+  @@index([documentId, status])
+}
+
+model DocumentPublicationNavItem {
+  id            String                                    @id @default(uuid())
+  siteId        String
+  type          DocumentPublicationNavItemType
+  label         String
+  target        DocumentPublicationNavItemInternalTarget?
+  targetId      String?
+  url           String?
+  openTarget    DocumentPublicationNavItemExternalTarget?
+  order         Int                                       @default(0)
+  status        DocumentPublicationEntryStatus            @default(ACTIVE)
+  site          DocumentPublicationSite                   @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  createdAt     DateTime                                  @default(now())
+  createdBy     String?
+  createdByUser User?                                     @relation("DocumentPublicationNavItemCreator", fields: [createdBy], references: [id], onDelete: SetNull)
+  updatedAt     DateTime                                  @updatedAt
+  updatedBy     String?
+  updatedByUser User?                                     @relation("DocumentPublicationNavItemUpdater", fields: [updatedBy], references: [id], onDelete: SetNull)
+
+  @@index([siteId, status, order])
+  @@index([type, target, targetId])
 }
 
 model DocumentCollabTicket {

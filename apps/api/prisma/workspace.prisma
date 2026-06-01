@@ -23,20 +23,21 @@ enum WorkspaceInviteStatus {
 }
 
 model Workspace {
-  id             String            @id @default(uuid())
-  type           WorkspaceType
-  name           String
-  description    String?
-  slug           String            @unique
-  iconUrl        String?
-  iconStorageKey String?
-  members        WorkspaceMember[]
-  invites        WorkspaceInvite[]
-  documents      Document[]
-  chatSessions   ChatSession[]
-  createdAt      DateTime          @default(now())
-  updatedAt      DateTime          @updatedAt
-  deletedAt      DateTime?
+  id              String                   @id @default(uuid())
+  type            WorkspaceType
+  name            String
+  description     String?
+  slug            String                   @unique
+  iconUrl         String?
+  iconStorageKey  String?
+  members         WorkspaceMember[]
+  invites         WorkspaceInvite[]
+  documents       Document[]
+  publicationSite DocumentPublicationSite?
+  chatSessions    ChatSession[]
+  createdAt       DateTime                 @default(now())
+  updatedAt       DateTime                 @updatedAt
+  deletedAt       DateTime?
 
   @@index([type, createdAt])
 }

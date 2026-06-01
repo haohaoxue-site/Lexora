@@ -81,10 +81,10 @@ model ChatSession {
 }
 
 model ChatSessionMessage {
-  id                     String                   @id @default(uuid())
+  id                     String                       @id @default(uuid())
   sessionId              String
   role                   ChatSessionMessageRole
-  status                 ChatSessionMessageStatus @default(COMPLETED)
+  status                 ChatSessionMessageStatus     @default(COMPLETED)
   content                String
   parentMessageId        String?
   selectedChildMessageId String?
@@ -93,21 +93,21 @@ model ChatSessionMessage {
   agentRunId             String?
   metadata               Json?
   completedAt            DateTime?
-  session                ChatSession              @relation("ChatSessionMessages", fields: [sessionId], references: [id], onDelete: Cascade)
-  parentMessage          ChatSessionMessage?      @relation("ChatMessageChildren", fields: [parentMessageId], references: [id], onDelete: SetNull)
-  children               ChatSessionMessage[]     @relation("ChatMessageChildren")
-  selectedChildMessage   ChatSessionMessage?      @relation("ChatMessageSelectedChild", fields: [selectedChildMessageId], references: [id], onDelete: SetNull)
-  selectedByMessages     ChatSessionMessage[]     @relation("ChatMessageSelectedChild")
-  sourceMessage          ChatSessionMessage?      @relation("ChatMessageSource", fields: [sourceMessageId], references: [id], onDelete: SetNull)
-  derivedMessages        ChatSessionMessage[]     @relation("ChatMessageSource")
-  activeRootForSessions  ChatSession[]            @relation("ChatSessionActiveRootMessage")
-  activeLeafForSessions  ChatSession[]            @relation("ChatSessionActiveLeafMessage")
+  session                ChatSession                  @relation("ChatSessionMessages", fields: [sessionId], references: [id], onDelete: Cascade)
+  parentMessage          ChatSessionMessage?          @relation("ChatMessageChildren", fields: [parentMessageId], references: [id], onDelete: SetNull)
+  children               ChatSessionMessage[]         @relation("ChatMessageChildren")
+  selectedChildMessage   ChatSessionMessage?          @relation("ChatMessageSelectedChild", fields: [selectedChildMessageId], references: [id], onDelete: SetNull)
+  selectedByMessages     ChatSessionMessage[]         @relation("ChatMessageSelectedChild")
+  sourceMessage          ChatSessionMessage?          @relation("ChatMessageSource", fields: [sourceMessageId], references: [id], onDelete: SetNull)
+  derivedMessages        ChatSessionMessage[]         @relation("ChatMessageSource")
+  activeRootForSessions  ChatSession[]                @relation("ChatSessionActiveRootMessage")
+  activeLeafForSessions  ChatSession[]                @relation("ChatSessionActiveLeafMessage")
   runs                   ChatSessionRun[]
   events                 ChatSessionEvent[]
   parts                  ChatSessionMessagePart[]
   contextSnapshots       ChatMessageContextSnapshot[]
-  createdAt              DateTime                 @default(now())
-  updatedAt              DateTime                 @updatedAt
+  createdAt              DateTime                     @default(now())
+  updatedAt              DateTime                     @updatedAt
   deletedAt              DateTime?
 
   @@unique([sessionId, parentMessageId, role, branchOrder])

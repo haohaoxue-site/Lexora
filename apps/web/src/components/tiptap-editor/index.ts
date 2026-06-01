@@ -21,6 +21,7 @@ export {
   DocumentContentSurface,
   DocumentTitleEditor,
 } from './presets'
+export type { DocumentBodyEditorOutlineOptions } from './presets/body/typing'
 export type {
   DocumentContentSurfaceEmits,
   DocumentContentSurfaceProps,

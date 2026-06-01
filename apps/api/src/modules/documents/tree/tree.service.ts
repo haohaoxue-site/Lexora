@@ -4,7 +4,6 @@ import type {
   DocumentBase,
   DocumentCurrent,
   DocumentItem,
-  DocumentShareProjection,
   DocumentTreeGroup,
   DocumentVisibility,
   OwnedDocumentCollectionId,
@@ -18,6 +17,8 @@ import type {
 import type { PersistedDocument, WorkspaceDocumentContext } from '../core/documents.utils'
 import {
   COLLAB_PERMISSION_INVALIDATION_REASON,
+  DOCUMENT_COLLABORATION_GRANT_STATUS,
+  DOCUMENT_COLLABORATION_SCOPE,
   DOCUMENT_COLLECTION,
   DOCUMENT_DEFAULT_TITLE,
   DOCUMENT_VERSION_SNAPSHOT_SOURCE,
@@ -50,14 +51,12 @@ import {
   documentSelect,
 
 } from '../core/documents.utils'
-import { DocumentSharesService } from '../share/shares.service'
 
 @Injectable()
 export class DocumentsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly documentAccessService: DocumentAccessService,
-    private readonly documentSharesService: DocumentSharesService,
     private readonly collabPermissionInvalidationPublisher: CollabPermissionInvalidationPublisherService,
     private readonly documentContentService: DocumentContentService,
   ) {}
@@ -75,6 +74,10 @@ export class DocumentsService {
 
       if (parentDocument.workspaceId !== workspace.id) {
         throw new BadRequestException('父文档与目标空间不一致')
+      }
+
+      if (!parentDocument.access.capabilities.canCreateChild) {
+        throw new ForbiddenException('无权在此文档下创建子页面')
       }
 
       nextVisibility = parentDocument.visibility
@@ -194,15 +197,12 @@ export class DocumentsService {
       workspaceType: workspace.type,
       userId,
     })
-    const shareProjectionByDocumentId = await this.documentSharesService.buildDocumentShareProjectionMap(context.documents)
-
     if (workspace.type === WORKSPACE_TYPE.TEAM) {
       return [
         {
           id: DOCUMENT_COLLECTION.PERSONAL,
           nodes: this.buildWorkspaceGroup(
             context,
-            shareProjectionByDocumentId,
             DOCUMENT_COLLECTION.PERSONAL,
             workspace.type,
           ),
@@ -211,7 +211,6 @@ export class DocumentsService {
           id: DOCUMENT_COLLECTION.TEAM,
           nodes: this.buildWorkspaceGroup(
             context,
-            shareProjectionByDocumentId,
             DOCUMENT_COLLECTION.TEAM,
             workspace.type,
           ),
@@ -219,15 +218,20 @@ export class DocumentsService {
       ]
     }
 
+    const collaborationNodes = await this.loadCollaborationTree(userId)
+
     return [
       {
         id: DOCUMENT_COLLECTION.PERSONAL,
         nodes: this.buildWorkspaceGroup(
           context,
-          shareProjectionByDocumentId,
           DOCUMENT_COLLECTION.PERSONAL,
           workspace.type,
         ),
+      },
+      {
+        id: DOCUMENT_COLLECTION.COLLABORATION,
+        nodes: collaborationNodes,
       },
     ]
   }
@@ -319,6 +323,10 @@ export class DocumentsService {
     let nextVisibility = document.visibility
 
     if (payload.parentId !== undefined) {
+      if (!document.access.capabilities.canMove) {
+        throw new ForbiddenException('无权移动此文档')
+      }
+
       if (payload.parentId === id) {
         throw new BadRequestException('文档不能移动到自身下方')
       }
@@ -463,7 +471,6 @@ export class DocumentsService {
 
   private buildWorkspaceGroup(
     context: WorkspaceDocumentContext,
-    shareProjectionByDocumentId: ReadonlyMap<string, DocumentShareProjection>,
     collectionId: OwnedDocumentCollectionId,
     workspaceType: string,
   ): DocumentItem[] {
@@ -478,7 +485,6 @@ export class DocumentsService {
         this.buildWorkspaceBranch(
           document,
           context,
-          shareProjectionByDocumentId,
           workspaceType,
         ),
       )
@@ -487,7 +493,6 @@ export class DocumentsService {
   private buildWorkspaceBranch(
     document: PersistedDocument,
     context: WorkspaceDocumentContext,
-    shareProjectionByDocumentId: ReadonlyMap<string, DocumentShareProjection>,
     workspaceType: string,
   ): DocumentItem {
     const collectionId = resolveOwnedDocumentCollectionId({
@@ -505,7 +510,6 @@ export class DocumentsService {
         this.buildWorkspaceBranch(
           child,
           context,
-          shareProjectionByDocumentId,
           workspaceType,
         ),
       )
@@ -513,7 +517,89 @@ export class DocumentsService {
     return {
       ...toDocumentBase(document),
       parentId: document.parentId,
-      share: shareProjectionByDocumentId.get(document.id) ?? null,
+      hasChildren: children.length > 0,
+      hasContent: Boolean(document.currentProjectionId) && document.summary.length > 0,
+      children,
+    }
+  }
+
+  private async loadCollaborationTree(userId: string): Promise<DocumentItem[]> {
+    const grants = await this.prisma.documentCollaborationGrant.findMany({
+      where: {
+        userId,
+        status: DOCUMENT_COLLABORATION_GRANT_STATUS.ACTIVE,
+        rootDocument: {
+          trashedAt: null,
+          status: {
+            in: [DocumentStatus.ACTIVE, DocumentStatus.LOCKED],
+          },
+        },
+      },
+      select: {
+        rootDocumentId: true,
+        scope: true,
+        rootDocument: {
+          select: {
+            workspaceId: true,
+          },
+        },
+      },
+      orderBy: [
+        { updatedAt: 'desc' },
+        { id: 'asc' },
+      ],
+    })
+
+    if (!grants.length) {
+      return []
+    }
+
+    const workspaceIds = Array.from(new Set(grants.map(grant => grant.rootDocument.workspaceId)))
+    const documents = await this.prisma.document.findMany({
+      where: {
+        workspaceId: {
+          in: workspaceIds,
+        },
+        status: {
+          in: [DocumentStatus.ACTIVE, DocumentStatus.LOCKED],
+        },
+        trashedAt: null,
+      },
+      select: documentSelect,
+      orderBy: [
+        { order: 'asc' },
+        { updatedAt: 'desc' },
+      ],
+    })
+    const allContext = buildWorkspaceDocumentContext(documents)
+    const authorizedDocumentIds = new Set<string>()
+
+    for (const grant of grants) {
+      if (grant.scope === DOCUMENT_COLLABORATION_SCOPE.DESCENDANTS) {
+        collectDescendantDocumentIds(grant.rootDocumentId, allContext, authorizedDocumentIds)
+      }
+      else {
+        authorizedDocumentIds.add(grant.rootDocumentId)
+      }
+    }
+
+    const context = buildWorkspaceDocumentContext(documents.filter(document => authorizedDocumentIds.has(document.id)))
+
+    return context.documents
+      .filter(document => !document.parentId || !authorizedDocumentIds.has(document.parentId))
+      .map(document => this.buildCollaborationBranch(document, context))
+  }
+
+  private buildCollaborationBranch(
+    document: PersistedDocument,
+    context: WorkspaceDocumentContext,
+  ): DocumentItem {
+    const children = (context.childrenByParent.get(document.id) ?? [])
+      .map(child => this.buildCollaborationBranch(child, context))
+
+    return {
+      ...toDocumentBase(document),
+      parentId: document.parentId,
       hasChildren: children.length > 0,
       hasContent: Boolean(document.currentProjectionId) && document.summary.length > 0,
       children,

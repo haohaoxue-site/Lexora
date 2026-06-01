@@ -2,8 +2,6 @@ import type {
   DocumentPaneState,
   DocumentRecord,
   DocumentRevision,
-  DocumentShareProjection,
-  DocumentShareRecipientSummary,
   DocumentVersionSnapshot,
   TiptapJsonContent,
   TiptapSchemaVersion,
@@ -38,23 +36,8 @@ export type DocsDocumentCollaborationStatusTone = 'neutral' | 'connecting' | 'co
 /**
  * 文档页主区视图。
  */
-export type DocsSurfaceView = 'document' | 'permissions' | 'trash' | 'pending-shares'
-
-/**
- * 分享收件箱模式。
- */
-export type DocumentShareInboxMode = 'pending' | 'active'
+export type DocsSurfaceView = 'document' | 'collaborations' | 'publication-settings' | 'trash'
 export type DocumentDeleteAction = 'trash' | 'permanent'
-
-/**
- * 文档分享变更事件。
- */
-export interface DocumentShareChangedPayload {
-  /** 文档 ID */
-  documentId: string
-  /** 最新分享投影 */
-  share: DocumentShareProjection | null
-}
 
 /**
  * 文档协作绑定。
@@ -180,26 +163,4 @@ export interface DocumentHistorySection {
   id: string
   label: string
   groups: DocumentHistoryGroup[]
-}
-
-/**
- * 分享收件箱列表属性。
- */
-export interface DocumentShareInboxListProps {
-  mode: DocumentShareInboxMode
-  items: DocumentShareRecipientSummary[]
-  isLoading: boolean
-  errorMessage: string
-  actionRecipientId: string
-}
-
-/**
- * 分享收件箱列表事件。
- */
-export interface DocumentShareInboxListEmits {
-  reload: []
-  open: [recipientId: string]
-  accept: [recipientId: string]
-  decline: [recipientId: string]
-  exit: [recipientId: string]
 }

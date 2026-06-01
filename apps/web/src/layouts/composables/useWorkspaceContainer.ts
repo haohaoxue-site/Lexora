@@ -19,7 +19,6 @@ export function useWorkspaceContainer() {
   const uiStore = useUiStore()
 
   const isAdminContainer = computed(() => isAdminRoutePath(route.path))
-  const isSidebarCollapsed = computed(() => uiStore.workspaceSidebarCollapsed)
   const brand = computed(() => isAdminContainer.value ? adminBrand : workspaceBrand)
   const navigationItems = computed(() => {
     if (isAdminContainer.value) {
@@ -41,14 +40,8 @@ export function useWorkspaceContainer() {
       : item)
   })
 
-  function toggleSidebar() {
-    uiStore.setWorkspaceSidebarCollapsed(!uiStore.workspaceSidebarCollapsed)
-  }
-
   return {
     brand,
     navigationItems,
-    isSidebarCollapsed,
-    toggleSidebar,
   }
 }

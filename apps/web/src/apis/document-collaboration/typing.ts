@@ -1,0 +1,17 @@
+export type {
+  ConfirmDocumentCollaborationResolverEntryRequest,
+  CreateDocumentCollaborationUserInviteRequest,
+  DocumentCollaborationConsoleItem,
+  DocumentCollaborationConsoleListResponse,
+  DocumentCollaborationGrant,
+  DocumentCollaborationJoinResponse,
+  DocumentCollaborationLinkInvite,
+  DocumentCollaborationOverview,
+  DocumentCollaborationResolverPreview,
+  DocumentCollaborationUserInvite,
+  SetDocumentCollaborationUserGrantRequest,
+  UpdateDocumentCollaborationGrantRequest,
+  UpsertDocumentCollaborationLinkInviteRequest,
+  UpsertDocumentCollaborationLinkInviteResponse,
+  UserCollabIdentity,
+} from '@haohaoxue/samepage-contracts'

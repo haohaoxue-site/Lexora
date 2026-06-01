@@ -4,9 +4,9 @@ import { useClipboard } from '@vueuse/core'
 import { ElMessage } from 'element-plus'
 import { computed } from 'vue'
 import { isOwnedDocumentCollection } from '../utils/documentTree'
+import { useDocsCollaborationDialog } from './useDocsCollaborationDialog'
 import { useDocsContext } from './useDocsContext'
 import { useDocsPageActions } from './useDocsPageActions'
-import { useDocsShareDialog } from './useDocsShareDialog'
 import { useDocumentTree } from './useDocumentTree'
 
 export interface UseDocumentItemOptions {
@@ -21,7 +21,7 @@ type DocumentTreeItemMenuCommand
     | 'move'
     | 'open-new-tab'
     | 'rename'
-    | 'share'
+    | 'collaboration'
 
 const DOCUMENT_TREE_ITEM_MENU_COMMANDS: readonly DocumentTreeItemMenuCommand[] = [
   'copy-link',
@@ -30,7 +30,7 @@ const DOCUMENT_TREE_ITEM_MENU_COMMANDS: readonly DocumentTreeItemMenuCommand[] =
   'move',
   'open-new-tab',
   'rename',
-  'share',
+  'collaboration',
 ]
 
 interface DocumentTreeItemMenuItem {
@@ -45,7 +45,7 @@ export function useDocumentItem(options: UseDocumentItemOptions) {
   const { activeDocumentId } = useDocsContext()
   const tree = useDocumentTree()
   const pageActions = useDocsPageActions()
-  const { canOpenShareDialog, openDocumentShareDialog } = useDocsShareDialog()
+  const { openDocumentCollaborationDialog } = useDocsCollaborationDialog()
   const { copy, isSupported: isClipboardSupported } = useClipboard({
     legacy: true,
   })
@@ -56,8 +56,8 @@ export function useDocumentItem(options: UseDocumentItemOptions) {
   const canManageDocument = computed(() =>
     isOwnedDocumentCollection(collectionId.value),
   )
-  const canShareDocument = computed(() =>
-    canManageDocument.value && canOpenShareDialog.value,
+  const canManageCollaboration = computed(() =>
+    canManageDocument.value,
   )
   const isActionPending = computed(() =>
     tree.isMutatingTree.value || pageActions.isDocumentOperationRunning.value,
@@ -67,8 +67,8 @@ export function useDocumentItem(options: UseDocumentItemOptions) {
     void tree.createChildDocument(item.value.id)
   }
 
-  function shareDocument() {
-    openDocumentShareDialog(item.value.id)
+  function manageCollaboration() {
+    openDocumentCollaborationDialog(item.value.id)
   }
 
   function openDocumentInNewTab() {
@@ -115,10 +115,10 @@ export function useDocumentItem(options: UseDocumentItemOptions) {
       icon: 'document-menu-open-new',
     }]
 
-    if (canShareDocument.value) {
+    if (canManageCollaboration.value) {
       items.push({
-        command: 'share',
-        label: '分享',
+        command: 'collaboration',
+        label: '协作',
         icon: 'document-menu-share',
         divided: true,
       })
@@ -128,7 +128,7 @@ export function useDocumentItem(options: UseDocumentItemOptions) {
       command: 'copy-link',
       label: '复制链接',
       icon: 'link',
-      divided: !canShareDocument.value,
+      divided: !canManageCollaboration.value,
     })
 
     if (canManageDocument.value) {
@@ -169,7 +169,7 @@ export function useDocumentItem(options: UseDocumentItemOptions) {
     'move': () => canManageDocument.value && moveDocument(),
     'open-new-tab': openDocumentInNewTab,
     'rename': () => canManageDocument.value && renameDocument(),
-    'share': () => canShareDocument.value && shareDocument(),
+    'collaboration': () => canManageCollaboration.value && manageCollaboration(),
   }
 
   function handleMenuCommand(command: unknown) {
@@ -184,8 +184,8 @@ export function useDocumentItem(options: UseDocumentItemOptions) {
 
   return {
     actionsStateClass,
+    canManageCollaboration,
     canManageDocument,
-    canShareDocument,
     createChild,
     deleteDocument,
     handleMenuCommand,

@@ -12,11 +12,9 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
-  Optional,
 } from '@nestjs/common'
 import { Prisma } from '@prisma/client'
 import { PrismaService } from '../../database/prisma.service'
-import { DocumentShareRecipientsService } from '../documents/share/share-recipients.service'
 import { TeamWorkspaceMembersService } from './team-workspace-members.service'
 
 const workspaceInviteSelect = {
@@ -50,7 +48,6 @@ export class TeamWorkspaceInvitesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly teamWorkspaceMembersService: TeamWorkspaceMembersService,
-    @Optional() private readonly documentShareRecipientsService?: DocumentShareRecipientsService,
   ) {}
 
   async listPendingWorkspaceInvites(userId: string, workspaceId: string): Promise<WorkspaceInviteSummary[]> {
@@ -203,15 +200,6 @@ export class TeamWorkspaceInvitesService {
         userId,
         tx,
       )
-
-      if (!this.documentShareRecipientsService) {
-        throw new Error('DocumentShareRecipientsService is required')
-      }
-
-      await this.documentShareRecipientsService.removeWorkspaceShareRecipientsForJoinedMember({
-        workspaceId: invite.workspace.id,
-        userId,
-      }, tx)
 
       return mapWorkspaceInvite(await tx.workspaceInvite.update({
         where: { id: inviteId },

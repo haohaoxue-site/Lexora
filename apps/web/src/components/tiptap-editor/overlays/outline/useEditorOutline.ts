@@ -31,10 +31,11 @@ import {
 } from './outline'
 
 export function useEditorOutline(options: {
+  defaultExpanded?: boolean
   editor: Editor
   getContent: () => TiptapEditorContent
 }) {
-  const isExpanded = shallowRef(false)
+  const isExpanded = shallowRef(Boolean(options.defaultExpanded))
   const searchQuery = shallowRef('')
   const selectedSearchIndex = shallowRef(-1)
   const editorSnapshot = useEditorSnapshot(options.editor)

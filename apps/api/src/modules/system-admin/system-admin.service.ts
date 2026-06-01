@@ -434,14 +434,16 @@ export class SystemAdminService {
   }
 
   private async getDocumentStats() {
-    const [totalDocuments, lockedDocuments] = await Promise.all([
+    const [totalDocuments, singlePublishedDocuments, sitePublishedPages, lockedDocuments] = await Promise.all([
       this.prisma.document.count(),
+      this.prisma.documentSinglePublicationSetting.count({ where: { state: 'ENABLED' } }),
+      this.prisma.documentPublicationPage.count({ where: { status: 'ACTIVE' } }),
       this.prisma.document.count({ where: { status: DocumentStatus.LOCKED } }),
     ])
 
     return {
       totalDocuments,
-      sharedDocuments: 0,
+      publishedDocuments: singlePublishedDocuments + sitePublishedPages,
       lockedDocuments,
     }
   }

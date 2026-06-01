@@ -1,0 +1,583 @@
+import { z } from 'zod'
+import { AuditUserSummarySchema } from '../identity'
+import { TiptapJsonContentPayloadSchema } from '../tiptap/core'
+
+export const DOCUMENT_SINGLE_PUBLICATION_STATE = {
+  INHERIT: 'INHERIT',
+  ENABLED: 'ENABLED',
+  DISABLED: 'DISABLED',
+} as const
+
+export const DOCUMENT_SINGLE_PUBLICATION_STATE_VALUES = [
+  DOCUMENT_SINGLE_PUBLICATION_STATE.INHERIT,
+  DOCUMENT_SINGLE_PUBLICATION_STATE.ENABLED,
+  DOCUMENT_SINGLE_PUBLICATION_STATE.DISABLED,
+] as const
+
+export const DOCUMENT_SINGLE_PUBLICATION_EFFECTIVE_STATE = {
+  ENABLED: 'ENABLED',
+  INHERITED_ENABLED: 'INHERITED_ENABLED',
+  DISABLED: 'DISABLED',
+  UNPUBLISHED: 'UNPUBLISHED',
+} as const
+
+export const DOCUMENT_SINGLE_PUBLICATION_EFFECTIVE_STATE_VALUES = [
+  DOCUMENT_SINGLE_PUBLICATION_EFFECTIVE_STATE.ENABLED,
+  DOCUMENT_SINGLE_PUBLICATION_EFFECTIVE_STATE.INHERITED_ENABLED,
+  DOCUMENT_SINGLE_PUBLICATION_EFFECTIVE_STATE.DISABLED,
+  DOCUMENT_SINGLE_PUBLICATION_EFFECTIVE_STATE.UNPUBLISHED,
+] as const
+
+export const DOCUMENT_SINGLE_PUBLICATION_EFFECTIVE_STATE_LABELS = {
+  [DOCUMENT_SINGLE_PUBLICATION_EFFECTIVE_STATE.ENABLED]: '公开',
+  [DOCUMENT_SINGLE_PUBLICATION_EFFECTIVE_STATE.INHERITED_ENABLED]: '继承公开',
+  [DOCUMENT_SINGLE_PUBLICATION_EFFECTIVE_STATE.DISABLED]: '已关闭',
+  [DOCUMENT_SINGLE_PUBLICATION_EFFECTIVE_STATE.UNPUBLISHED]: '未公开',
+} as const satisfies Record<(typeof DOCUMENT_SINGLE_PUBLICATION_EFFECTIVE_STATE_VALUES)[number], string>
+
+export const DOCUMENT_PUBLICATION_SITE_STATUS = {
+  ACTIVE: 'ACTIVE',
+  REMOVED: 'REMOVED',
+} as const
+
+export const DOCUMENT_PUBLICATION_SITE_STATUS_VALUES = [
+  DOCUMENT_PUBLICATION_SITE_STATUS.ACTIVE,
+  DOCUMENT_PUBLICATION_SITE_STATUS.REMOVED,
+] as const
+
+export const DOCUMENT_PUBLICATION_ENTRY_STATUS = {
+  ACTIVE: 'ACTIVE',
+  HIDDEN: 'HIDDEN',
+  REMOVED: 'REMOVED',
+} as const
+
+export const DOCUMENT_PUBLICATION_ENTRY_STATUS_VALUES = [
+  DOCUMENT_PUBLICATION_ENTRY_STATUS.ACTIVE,
+  DOCUMENT_PUBLICATION_ENTRY_STATUS.HIDDEN,
+  DOCUMENT_PUBLICATION_ENTRY_STATUS.REMOVED,
+] as const
+
+export const DOCUMENT_PUBLICATION_SITE_THEME = {
+  DEFAULT: 'DEFAULT',
+} as const
+
+export const DOCUMENT_PUBLICATION_SITE_THEME_VALUES = [
+  DOCUMENT_PUBLICATION_SITE_THEME.DEFAULT,
+] as const
+
+export const DOCUMENT_PUBLICATION_SITE_HOME_MODE = {
+  LANDING: 'LANDING',
+  DOCUMENT: 'DOCUMENT',
+} as const
+
+export const DOCUMENT_PUBLICATION_SITE_HOME_MODE_VALUES = [
+  DOCUMENT_PUBLICATION_SITE_HOME_MODE.LANDING,
+  DOCUMENT_PUBLICATION_SITE_HOME_MODE.DOCUMENT,
+] as const
+
+export const DOCUMENT_SITE_PUBLICATION_PAGE_SCOPE = {
+  PAGE: 'PAGE',
+  DESCENDANTS: 'DESCENDANTS',
+} as const
+
+export const DOCUMENT_SITE_PUBLICATION_PAGE_SCOPE_VALUES = [
+  DOCUMENT_SITE_PUBLICATION_PAGE_SCOPE.PAGE,
+  DOCUMENT_SITE_PUBLICATION_PAGE_SCOPE.DESCENDANTS,
+] as const
+
+export const DOCUMENT_SITE_PUBLICATION_PAGE_SCOPE_LABELS = {
+  [DOCUMENT_SITE_PUBLICATION_PAGE_SCOPE.PAGE]: '仅当前页面',
+  [DOCUMENT_SITE_PUBLICATION_PAGE_SCOPE.DESCENDANTS]: '当前页面及子页面',
+} as const satisfies Record<(typeof DOCUMENT_SITE_PUBLICATION_PAGE_SCOPE_VALUES)[number], string>
+
+export const DOCUMENT_SINGLE_PUBLICATION_SCOPE = {
+  PAGE: DOCUMENT_SITE_PUBLICATION_PAGE_SCOPE.PAGE,
+  DESCENDANTS: DOCUMENT_SITE_PUBLICATION_PAGE_SCOPE.DESCENDANTS,
+} as const
+
+export const DOCUMENT_SINGLE_PUBLICATION_SCOPE_VALUES = [
+  DOCUMENT_SINGLE_PUBLICATION_SCOPE.PAGE,
+  DOCUMENT_SINGLE_PUBLICATION_SCOPE.DESCENDANTS,
+] as const
+
+export const DOCUMENT_SINGLE_PUBLICATION_SCOPE_LABELS = {
+  [DOCUMENT_SINGLE_PUBLICATION_SCOPE.PAGE]: '仅当前页面',
+  [DOCUMENT_SINGLE_PUBLICATION_SCOPE.DESCENDANTS]: '当前页面及子页面',
+} as const satisfies Record<(typeof DOCUMENT_SINGLE_PUBLICATION_SCOPE_VALUES)[number], string>
+
+export const DOCUMENT_PUBLICATION_NAV_ITEM_TYPE = {
+  INTERNAL: 'INTERNAL',
+  EXTERNAL: 'EXTERNAL',
+} as const
+
+export const DOCUMENT_PUBLICATION_NAV_ITEM_TYPE_VALUES = [
+  DOCUMENT_PUBLICATION_NAV_ITEM_TYPE.INTERNAL,
+  DOCUMENT_PUBLICATION_NAV_ITEM_TYPE.EXTERNAL,
+] as const
+
+export const DOCUMENT_PUBLICATION_NAV_ITEM_INTERNAL_TARGET = {
+  HOME: 'HOME',
+  SECTION: 'SECTION',
+  PAGE: 'PAGE',
+} as const
+
+export const DOCUMENT_PUBLICATION_NAV_ITEM_INTERNAL_TARGET_VALUES = [
+  DOCUMENT_PUBLICATION_NAV_ITEM_INTERNAL_TARGET.HOME,
+  DOCUMENT_PUBLICATION_NAV_ITEM_INTERNAL_TARGET.SECTION,
+  DOCUMENT_PUBLICATION_NAV_ITEM_INTERNAL_TARGET.PAGE,
+] as const
+
+export const DOCUMENT_PUBLICATION_NAV_ITEM_EXTERNAL_TARGET = {
+  SELF: 'SELF',
+  BLANK: 'BLANK',
+} as const
+
+export const DOCUMENT_PUBLICATION_NAV_ITEM_EXTERNAL_TARGET_VALUES = [
+  DOCUMENT_PUBLICATION_NAV_ITEM_EXTERNAL_TARGET.SELF,
+  DOCUMENT_PUBLICATION_NAV_ITEM_EXTERNAL_TARGET.BLANK,
+] as const
+
+export const DOCUMENT_SINGLE_PUBLICATION_ROUTE_PREFIX = '/p'
+export const DOCUMENT_SITE_PUBLICATION_ROUTE_PREFIX = '/s'
+
+export const DOCUMENT_PUBLICATION_DEFAULT_SITE_HOME_CONFIG = {
+  hero: {
+    name: 'SamePage',
+    text: '协作文档与 AI Copilot',
+    tagline: null,
+    imageUrl: null,
+  },
+  actions: [],
+  features: [],
+  footer: {
+    message: null,
+    copyright: null,
+  },
+} as const
+
+export const DocumentSinglePublicationStateSchema = z.enum(DOCUMENT_SINGLE_PUBLICATION_STATE_VALUES)
+export const DocumentSinglePublicationEffectiveStateSchema = z.enum(DOCUMENT_SINGLE_PUBLICATION_EFFECTIVE_STATE_VALUES)
+export const DocumentSinglePublicationScopeSchema = z.enum(DOCUMENT_SINGLE_PUBLICATION_SCOPE_VALUES)
+export const PublicationSiteStatusSchema = z.enum(DOCUMENT_PUBLICATION_SITE_STATUS_VALUES)
+export const PublicationEntryStatusSchema = z.enum(DOCUMENT_PUBLICATION_ENTRY_STATUS_VALUES)
+export const PublicationSiteThemeSchema = z.enum(DOCUMENT_PUBLICATION_SITE_THEME_VALUES)
+export const PublicationSiteHomeModeSchema = z.enum(DOCUMENT_PUBLICATION_SITE_HOME_MODE_VALUES)
+export const PublicationSitePageScopeSchema = z.enum(DOCUMENT_SITE_PUBLICATION_PAGE_SCOPE_VALUES)
+export const PublicationNavItemTypeSchema = z.enum(DOCUMENT_PUBLICATION_NAV_ITEM_TYPE_VALUES)
+export const PublicationNavItemInternalTargetSchema = z.enum(DOCUMENT_PUBLICATION_NAV_ITEM_INTERNAL_TARGET_VALUES)
+export const PublicationNavItemExternalTargetSchema = z.enum(DOCUMENT_PUBLICATION_NAV_ITEM_EXTERNAL_TARGET_VALUES)
+
+const PublicationAuditFieldsSchema = {
+  createdAt: z.string(),
+  createdBy: z.string().nullable(),
+  updatedAt: z.string(),
+  updatedBy: z.string().nullable(),
+}
+
+function PublicationSafeHrefSchema(maxLength: number) {
+  return z.string()
+    .trim()
+    .min(1)
+    .max(maxLength)
+    .refine(isSafePublicationHrefValue, '仅支持 http(s) 链接或站内绝对路径')
+}
+
+const PublicationSiteHomeActionSchema = z.object({
+  label: z.string().trim().min(1).max(40),
+  href: PublicationSafeHrefSchema(240),
+  theme: z.enum(['brand', 'alt']).default('brand'),
+}).strict()
+
+const PublicationSiteHomeFeatureSchema = z.object({
+  title: z.string().trim().min(1).max(80),
+  details: z.string().trim().max(240).nullable(),
+  icon: z.string().trim().max(40).nullable(),
+}).strict()
+
+export const PublicationSiteHomeConfigSchema = z.object({
+  hero: z.object({
+    name: z.string().trim().min(1).max(80),
+    text: z.string().trim().min(1).max(120),
+    tagline: z.string().trim().max(240).nullable(),
+    imageUrl: z.string().trim().max(500).nullable(),
+  }).strict(),
+  actions: z.array(PublicationSiteHomeActionSchema).max(3),
+  features: z.array(PublicationSiteHomeFeatureSchema).max(8),
+  footer: z.object({
+    message: z.string().trim().max(160).nullable(),
+    copyright: z.string().trim().max(160).nullable(),
+  }).strict(),
+}).strict()
+
+export const UpsertPublicationSiteSettingsSchema = z.object({
+  workspaceId: z.string().trim().min(1),
+  title: z.string().trim().min(1).max(120).optional(),
+  description: z.string().trim().max(240).nullable().optional(),
+  logoUrl: z.string().trim().max(500).nullable().optional(),
+  theme: PublicationSiteThemeSchema.optional(),
+  homeMode: PublicationSiteHomeModeSchema.optional(),
+  homeDocumentId: z.string().trim().nullable().optional(),
+  homeConfig: PublicationSiteHomeConfigSchema.optional(),
+  allowIndexing: z.boolean().optional(),
+}).strict()
+
+export const DocumentSinglePublicationSettingSchema = z.object({
+  id: z.string(),
+  documentId: z.string(),
+  state: DocumentSinglePublicationStateSchema,
+  scope: DocumentSinglePublicationScopeSchema,
+  ...PublicationAuditFieldsSchema,
+}).strict()
+
+export const UpdateDocumentSinglePublicationSettingSchema = z.object({
+  state: DocumentSinglePublicationStateSchema,
+  scope: DocumentSinglePublicationScopeSchema.optional(),
+}).strict()
+
+export const DocumentSinglePublicationInfoSchema = z.object({
+  documentId: z.string(),
+  setting: DocumentSinglePublicationSettingSchema.nullable(),
+  singlePublicationState: DocumentSinglePublicationStateSchema,
+  singlePublicationScope: DocumentSinglePublicationScopeSchema,
+  effectivePublicationState: DocumentSinglePublicationEffectiveStateSchema,
+  inheritedFromDocumentId: z.string().nullable(),
+}).strict()
+
+export interface DocumentSinglePublicationTreeItem {
+  id: string
+  title: string
+  parentId: string | null
+  hasChildren: boolean
+  hasContent: boolean
+  singlePublicationState: DocumentSinglePublicationState
+  singlePublicationScope: DocumentSinglePublicationScope
+  effectivePublicationState: DocumentSinglePublicationEffectiveState
+  inheritedFromDocumentId: string | null
+  children: DocumentSinglePublicationTreeItem[]
+}
+
+export const DocumentSinglePublicationTreeItemSchema: z.ZodType<DocumentSinglePublicationTreeItem> = z.lazy(() =>
+  z.object({
+    id: z.string(),
+    title: z.string(),
+    parentId: z.string().nullable(),
+    hasChildren: z.boolean(),
+    hasContent: z.boolean(),
+    singlePublicationState: DocumentSinglePublicationStateSchema,
+    singlePublicationScope: DocumentSinglePublicationScopeSchema,
+    effectivePublicationState: DocumentSinglePublicationEffectiveStateSchema,
+    inheritedFromDocumentId: z.string().nullable(),
+    children: z.array(DocumentSinglePublicationTreeItemSchema),
+  }).strict(),
+)
+
+export const ListDocumentSinglePublicationsQuerySchema = z.object({
+  workspaceId: z.string().trim().min(1),
+}).strict()
+
+export const ListDocumentSinglePublicationsResponseSchema = z.object({
+  tree: z.array(DocumentSinglePublicationTreeItemSchema),
+}).strict()
+
+export const PublicationSiteSchema = z.object({
+  id: z.string(),
+  workspaceId: z.string(),
+  title: z.string().trim().min(1).max(120),
+  description: z.string().trim().max(240).nullable(),
+  logoUrl: z.string().trim().max(500).nullable(),
+  theme: PublicationSiteThemeSchema,
+  homeMode: PublicationSiteHomeModeSchema,
+  homeDocumentId: z.string().nullable(),
+  homeConfig: PublicationSiteHomeConfigSchema,
+  allowIndexing: z.boolean(),
+  status: PublicationSiteStatusSchema,
+  ...PublicationAuditFieldsSchema,
+}).strict()
+
+export const CreatePublicationSectionSchema = z.object({
+  workspaceId: z.string().trim().min(1),
+  title: z.string().trim().min(1).max(80),
+  order: z.number().int().min(0).optional(),
+}).strict()
+
+export const UpdatePublicationSectionSchema = z.object({
+  workspaceId: z.string().trim().min(1),
+  title: z.string().trim().min(1).max(80).optional(),
+  order: z.number().int().min(0).optional(),
+  collapsed: z.boolean().optional(),
+  status: PublicationEntryStatusSchema.optional(),
+}).strict()
+
+export const CreatePublicationPageSchema = z.object({
+  workspaceId: z.string().trim().min(1),
+  sectionId: z.string().trim().min(1),
+  documentId: z.string().trim().min(1),
+  title: z.string().trim().min(1).max(120).optional(),
+  scope: PublicationSitePageScopeSchema,
+  order: z.number().int().min(0).optional(),
+}).strict()
+
+export const UpdatePublicationPageSchema = z.object({
+  workspaceId: z.string().trim().min(1),
+  sectionId: z.string().trim().min(1).optional(),
+  title: z.string().trim().min(1).max(120).optional(),
+  scope: PublicationSitePageScopeSchema.optional(),
+  order: z.number().int().min(0).optional(),
+  status: PublicationEntryStatusSchema.optional(),
+}).strict()
+
+const PublicationNavItemInputBaseSchema = z.object({
+  id: z.string().trim().min(1).optional(),
+  label: z.string().trim().min(1).max(40),
+  order: z.number().int().min(0),
+  status: PublicationEntryStatusSchema.default(DOCUMENT_PUBLICATION_ENTRY_STATUS.ACTIVE),
+}).strict()
+
+export const PublicationInternalNavItemInputSchema = PublicationNavItemInputBaseSchema.extend({
+  type: z.literal(DOCUMENT_PUBLICATION_NAV_ITEM_TYPE.INTERNAL),
+  target: PublicationNavItemInternalTargetSchema,
+  targetId: z.string().trim().nullable(),
+  url: z.null().optional(),
+  openTarget: z.null().optional(),
+}).strict().superRefine((item, ctx) => {
+  if (item.target === DOCUMENT_PUBLICATION_NAV_ITEM_INTERNAL_TARGET.HOME) {
+    if (item.targetId !== null) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: '首页导航不能携带目标 ID',
+        path: ['targetId'],
+      })
+    }
+
+    return
+  }
+
+  if (!item.targetId) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: '内部导航目标不能为空',
+      path: ['targetId'],
+    })
+  }
+})
+
+export const PublicationExternalNavItemInputSchema = PublicationNavItemInputBaseSchema.extend({
+  type: z.literal(DOCUMENT_PUBLICATION_NAV_ITEM_TYPE.EXTERNAL),
+  target: z.null().optional(),
+  targetId: z.null().optional(),
+  url: PublicationSafeHrefSchema(500),
+  openTarget: PublicationNavItemExternalTargetSchema,
+}).strict()
+
+export const PublicationNavItemInputSchema = z.discriminatedUnion('type', [
+  PublicationInternalNavItemInputSchema,
+  PublicationExternalNavItemInputSchema,
+])
+
+export const ReplacePublicationNavItemsSchema = z.object({
+  workspaceId: z.string().trim().min(1),
+  items: z.array(PublicationNavItemInputSchema).max(12),
+}).strict()
+
+export const PublicationSectionSchema = z.object({
+  id: z.string(),
+  siteId: z.string(),
+  title: z.string().trim().min(1).max(80),
+  order: z.number().int().min(0),
+  collapsed: z.boolean(),
+  status: PublicationEntryStatusSchema,
+  ...PublicationAuditFieldsSchema,
+}).strict()
+
+export const PublicationPageSchema = z.object({
+  id: z.string(),
+  siteId: z.string(),
+  sectionId: z.string(),
+  documentId: z.string(),
+  title: z.string().trim().min(1).max(120),
+  scope: PublicationSitePageScopeSchema,
+  order: z.number().int().min(0),
+  status: PublicationEntryStatusSchema,
+  ...PublicationAuditFieldsSchema,
+}).strict()
+
+export const PublicationInternalNavItemSchema = z.object({
+  id: z.string(),
+  siteId: z.string(),
+  type: z.literal(DOCUMENT_PUBLICATION_NAV_ITEM_TYPE.INTERNAL),
+  label: z.string().trim().min(1).max(40),
+  target: PublicationNavItemInternalTargetSchema,
+  targetId: z.string().nullable(),
+  url: z.null(),
+  openTarget: z.null(),
+  order: z.number().int().min(0),
+  status: PublicationEntryStatusSchema,
+  ...PublicationAuditFieldsSchema,
+}).strict()
+
+export const PublicationExternalNavItemSchema = z.object({
+  id: z.string(),
+  siteId: z.string(),
+  type: z.literal(DOCUMENT_PUBLICATION_NAV_ITEM_TYPE.EXTERNAL),
+  label: z.string().trim().min(1).max(40),
+  target: z.null(),
+  targetId: z.null(),
+  url: PublicationSafeHrefSchema(500),
+  openTarget: PublicationNavItemExternalTargetSchema,
+  order: z.number().int().min(0),
+  status: PublicationEntryStatusSchema,
+  ...PublicationAuditFieldsSchema,
+}).strict()
+
+export const PublicationNavItemSchema = z.discriminatedUnion('type', [
+  PublicationInternalNavItemSchema,
+  PublicationExternalNavItemSchema,
+])
+
+export const PublicationSiteManagementResponseSchema = z.object({
+  site: PublicationSiteSchema.nullable(),
+  sections: z.array(PublicationSectionSchema),
+  pages: z.array(PublicationPageSchema),
+  navItems: z.array(PublicationNavItemSchema),
+}).strict()
+
+export const PublicationRenderedDocumentSchema = z.object({
+  documentId: z.string(),
+  title: z.string(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+  owner: AuditUserSummarySchema.nullable(),
+  body: TiptapJsonContentPayloadSchema,
+}).strict()
+
+export const PublicationInternalLinkResolutionSchema = z.object({
+  targetDocumentId: z.string(),
+  label: z.string(),
+  href: z.string().nullable(),
+  published: z.boolean(),
+  disabledReason: z.string().nullable(),
+}).strict()
+
+export const PublicationSiteMetaSchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  description: z.string().nullable(),
+  logoUrl: z.string().nullable(),
+  theme: PublicationSiteThemeSchema,
+  allowIndexing: z.boolean(),
+}).strict()
+
+export interface PublicationSidebarPage {
+  id: string
+  documentId: string
+  title: string
+  href: string
+  children: PublicationSidebarPage[]
+}
+
+export const PublicationSidebarPageSchema: z.ZodType<PublicationSidebarPage> = z.lazy(() =>
+  z.object({
+    id: z.string(),
+    documentId: z.string(),
+    title: z.string(),
+    href: z.string(),
+    children: z.array(PublicationSidebarPageSchema),
+  }).strict(),
+)
+
+export const PublicationSidebarGroupSchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  collapsed: z.boolean(),
+  pages: z.array(PublicationSidebarPageSchema),
+}).strict()
+
+export interface PublicationPageOutlineItem {
+  id: string
+  level: number
+  title: string
+  children: PublicationPageOutlineItem[]
+}
+
+export const PublicationPageOutlineItemSchema: z.ZodType<PublicationPageOutlineItem> = z.lazy(() =>
+  z.object({
+    id: z.string(),
+    level: z.number().int().min(2).max(4),
+    title: z.string(),
+    children: z.array(PublicationPageOutlineItemSchema),
+  }).strict(),
+)
+
+export const PublicationSiteRenderResponseSchema = z.object({
+  site: PublicationSiteMetaSchema,
+  home: PublicationSiteHomeConfigSchema,
+  navItems: z.array(PublicationNavItemSchema),
+  sidebarGroups: z.array(PublicationSidebarGroupSchema),
+  currentPage: PublicationRenderedDocumentSchema.nullable(),
+  outline: z.array(PublicationPageOutlineItemSchema),
+  internalLinks: z.array(PublicationInternalLinkResolutionSchema),
+}).strict()
+
+export const PublicationSingleDocumentResponseSchema = z.object({
+  document: PublicationRenderedDocumentSchema,
+  outline: z.array(PublicationPageOutlineItemSchema),
+  assetIds: z.array(z.string()),
+  internalLinks: z.array(PublicationInternalLinkResolutionSchema),
+}).strict()
+
+export type DocumentSinglePublicationState = z.infer<typeof DocumentSinglePublicationStateSchema>
+export type DocumentSinglePublicationEffectiveState = z.infer<typeof DocumentSinglePublicationEffectiveStateSchema>
+export type DocumentSinglePublicationScope = z.infer<typeof DocumentSinglePublicationScopeSchema>
+export type PublicationSiteStatus = z.infer<typeof PublicationSiteStatusSchema>
+export type PublicationEntryStatus = z.infer<typeof PublicationEntryStatusSchema>
+export type PublicationSiteTheme = z.infer<typeof PublicationSiteThemeSchema>
+export type PublicationSiteHomeMode = z.infer<typeof PublicationSiteHomeModeSchema>
+export type PublicationSitePageScope = z.infer<typeof PublicationSitePageScopeSchema>
+export type PublicationNavItemType = z.infer<typeof PublicationNavItemTypeSchema>
+export type PublicationNavItemInternalTarget = z.infer<typeof PublicationNavItemInternalTargetSchema>
+export type PublicationNavItemExternalTarget = z.infer<typeof PublicationNavItemExternalTargetSchema>
+export type PublicationSiteHomeConfig = z.infer<typeof PublicationSiteHomeConfigSchema>
+export type UpsertPublicationSiteSettingsRequest = z.infer<typeof UpsertPublicationSiteSettingsSchema>
+export type DocumentSinglePublicationSetting = z.infer<typeof DocumentSinglePublicationSettingSchema>
+export type UpdateDocumentSinglePublicationSettingRequest = z.infer<typeof UpdateDocumentSinglePublicationSettingSchema>
+export type DocumentSinglePublicationInfo = z.infer<typeof DocumentSinglePublicationInfoSchema>
+export type ListDocumentSinglePublicationsQuery = z.infer<typeof ListDocumentSinglePublicationsQuerySchema>
+export type ListDocumentSinglePublicationsResponse = z.infer<typeof ListDocumentSinglePublicationsResponseSchema>
+export type PublicationSite = z.infer<typeof PublicationSiteSchema>
+export type PublicationSiteManagementResponse = z.infer<typeof PublicationSiteManagementResponseSchema>
+export type PublicationSection = z.infer<typeof PublicationSectionSchema>
+export type PublicationPage = z.infer<typeof PublicationPageSchema>
+export type PublicationInternalNavItem = z.infer<typeof PublicationInternalNavItemSchema>
+export type PublicationExternalNavItem = z.infer<typeof PublicationExternalNavItemSchema>
+export type PublicationNavItem = z.infer<typeof PublicationNavItemSchema>
+export type CreatePublicationSectionRequest = z.infer<typeof CreatePublicationSectionSchema>
+export type UpdatePublicationSectionRequest = z.infer<typeof UpdatePublicationSectionSchema>
+export type CreatePublicationPageRequest = z.infer<typeof CreatePublicationPageSchema>
+export type UpdatePublicationPageRequest = z.infer<typeof UpdatePublicationPageSchema>
+export type PublicationInternalNavItemInput = z.infer<typeof PublicationInternalNavItemInputSchema>
+export type PublicationExternalNavItemInput = z.infer<typeof PublicationExternalNavItemInputSchema>
+export type PublicationNavItemInput = z.infer<typeof PublicationNavItemInputSchema>
+export type ReplacePublicationNavItemsRequest = z.infer<typeof ReplacePublicationNavItemsSchema>
+export type PublicationRenderedDocument = z.infer<typeof PublicationRenderedDocumentSchema>
+export type PublicationInternalLinkResolution = z.infer<typeof PublicationInternalLinkResolutionSchema>
+export type PublicationSiteMeta = z.infer<typeof PublicationSiteMetaSchema>
+export type PublicationSidebarGroup = z.infer<typeof PublicationSidebarGroupSchema>
+export type PublicationSiteRenderResponse = z.infer<typeof PublicationSiteRenderResponseSchema>
+export type PublicationSingleDocumentResponse = z.infer<typeof PublicationSingleDocumentResponseSchema>
+
+function isSafePublicationHrefValue(value: string): boolean {
+  const href = value.trim()
+
+  if (/^https?:\/\//i.test(href)) {
+    try {
+      const url = new URL(href)
+
+      return url.protocol === 'http:' || url.protocol === 'https:'
+    }
+    catch {
+      return false
+    }
+  }
+
+  return href.startsWith('/') && !href.startsWith('//') && !href.startsWith('/\\')
+}

@@ -6,6 +6,8 @@ export const UI_PERSIST_KEY = STORAGE_KEY.ui
 
 const DOCUMENT_TREE_FALLBACK_KEY = '__workspace_pending__'
 
+export type DocsControlCenterRouteName = 'docs-collaborations' | 'docs-publications' | 'docs-trash'
+
 function resolveDocumentTreeStateKey(workspaceId: string | null) {
   return workspaceId?.trim() || DOCUMENT_TREE_FALLBACK_KEY
 }
@@ -15,6 +17,7 @@ export const useUiStore = defineStore('ui', () => {
   const lastActiveChatSessionId = shallowRef<string | null>(null)
   const chatSessionSidebarPinned = shallowRef<boolean | null>(null)
   const documentLibrarySidebarCollapsed = shallowRef(false)
+  const lastDocsControlCenterRouteName = shallowRef<DocsControlCenterRouteName>('docs-collaborations')
   const _lastOpenedDocumentIdByWorkspaceId = shallowRef<Record<string, string | null>>({})
 
   function setWorkspaceSidebarCollapsed(value: boolean) {
@@ -42,6 +45,10 @@ export const useUiStore = defineStore('ui', () => {
     documentLibrarySidebarCollapsed.value = value
   }
 
+  function setLastDocsControlCenterRouteName(value: DocsControlCenterRouteName) {
+    lastDocsControlCenterRouteName.value = value
+  }
+
   function getLastOpenedDocumentId(workspaceId: string | null) {
     return _lastOpenedDocumentIdByWorkspaceId.value[resolveDocumentTreeStateKey(workspaceId)] ?? null
   }
@@ -63,10 +70,12 @@ export const useUiStore = defineStore('ui', () => {
     clearLastOpenedDocumentIds,
     clearLastActiveChatSessionId,
     documentLibrarySidebarCollapsed,
+    lastDocsControlCenterRouteName,
     getLastOpenedDocumentId,
     lastActiveChatSessionId,
     setChatSessionSidebarPinned,
     setDocumentLibrarySidebarCollapsed,
+    setLastDocsControlCenterRouteName,
     setLastActiveChatSessionId,
     setLastOpenedDocumentId,
     setWorkspaceSidebarCollapsed,
@@ -80,6 +89,7 @@ export const useUiStore = defineStore('ui', () => {
       'lastActiveChatSessionId',
       'chatSessionSidebarPinned',
       'documentLibrarySidebarCollapsed',
+      'lastDocsControlCenterRouteName',
       '_lastOpenedDocumentIdByWorkspaceId',
     ],
   },

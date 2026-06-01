@@ -24,6 +24,7 @@ import {
 } from '@haohaoxue/samepage-shared'
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common'
@@ -135,11 +136,6 @@ interface CopiedAssetRecord {
   data: Prisma.DocumentAssetCreateManyInput
 }
 
-interface ShareInvalidationTargetIds {
-  shareIds: string[]
-  recipientIds: string[]
-}
-
 interface MoveTarget {
   workspaceId: string
   workspaceType: string
@@ -200,6 +196,9 @@ export class DocumentOperationsService {
     payload: MoveDocumentTreeOperationRequest,
   ): Promise<DocumentOperationJob> {
     const sourceDocument = await this.documentAccessService.assertCanEditDocument(userId, documentId)
+
+    assertCanMoveDocument(sourceDocument)
+
     const [targetWorkspace, documents] = await Promise.all([
       this.documentAccessService.assertAccessibleWorkspace(userId, payload.targetWorkspaceId),
       this.loadDocumentSubtree(sourceDocument.workspaceId, documentId, {
@@ -450,6 +449,9 @@ export class DocumentOperationsService {
     }
 
     const sourceDocument = await this.documentAccessService.assertCanEditDocument(job.createdBy, job.sourceDocumentId)
+
+    assertCanMoveDocument(sourceDocument)
+
     const [targetWorkspace, sourceDocuments] = await Promise.all([
       this.documentAccessService.assertAccessibleWorkspace(job.createdBy, job.targetWorkspaceId),
       this.loadDocumentSubtree(sourceDocument.workspaceId, job.sourceDocumentId, {
@@ -495,15 +497,13 @@ export class DocumentOperationsService {
     const isSameContainer = !isCrossWorkspaceMove
       && rootDocument.parentId === target.parentId
       && rootDocument.visibility === target.visibility
-    let shareInvalidationTargets = createShareInvalidationTargetIds()
-
     await this.prisma.$transaction(async (tx) => {
       const nextOrder = isSameContainer
         ? rootDocument.order
         : await this.resolveAppendOrder(tx, target)
 
       if (isCrossWorkspaceMove) {
-        shareInvalidationTargets = await this.clearDocumentTreeShares(tx, {
+        await this.clearDocumentTreeExternalAccess(tx, {
           documentIds: subtreeIds,
           userId: job.createdBy,
         })
@@ -541,7 +541,6 @@ export class DocumentOperationsService {
     await this.publishMoveInvalidations({
       documentIds: subtreeIds,
       shouldInvalidateDocumentConnections: isCrossWorkspaceMove || rootDocument.visibility !== target.visibility,
-      shareInvalidationTargets,
     })
 
     return {
@@ -818,6 +817,10 @@ export class DocumentOperationsService {
         throw new BadRequestException('目标父文档与目标空间不一致')
       }
 
+      if (!parentDocument.access.capabilities.canCreateChild) {
+        throw new ForbiddenException('无权移动到此父文档下')
+      }
+
       visibility = parentDocument.visibility as PrismaDocumentVisibility
     }
 
@@ -881,48 +884,70 @@ export class DocumentOperationsService {
     })
   }
 
-  private async clearDocumentTreeShares(
+  private async clearDocumentTreeExternalAccess(
     tx: Prisma.TransactionClient,
     input: {
       documentIds: string[]
       userId: string
     },
-  ): Promise<ShareInvalidationTargetIds> {
-    const shares = await tx.documentShare.findMany({
+  ): Promise<void> {
+    await tx.documentCollaborationGrant.updateMany({
+      where: {
+        rootDocumentId: {
+          in: input.documentIds,
+        },
+        status: 'ACTIVE',
+      },
+      data: {
+        status: 'REMOVED',
+        updatedBy: input.userId,
+      },
+    })
+
+    await tx.documentCollaborationUserInvite.updateMany({
+      where: {
+        rootDocumentId: {
+          in: input.documentIds,
+        },
+        status: 'PENDING',
+      },
+      data: {
+        status: 'CANCELED',
+        updatedBy: input.userId,
+      },
+    })
+
+    await tx.documentCollaborationLinkInvite.updateMany({
+      where: {
+        rootDocumentId: {
+          in: input.documentIds,
+        },
+        enabled: true,
+      },
+      data: {
+        enabled: false,
+        updatedBy: input.userId,
+      },
+    })
+
+    await tx.documentSinglePublicationSetting.updateMany({
       where: {
         documentId: {
           in: input.documentIds,
         },
-        status: {
-          not: 'REMOVED',
-        },
       },
-      select: {
-        id: true,
-        recipients: {
-          where: {
-            status: {
-              not: 'REMOVED',
-            },
-          },
-          select: {
-            id: true,
-          },
-        },
+      data: {
+        state: 'DISABLED',
+        updatedBy: input.userId,
       },
     })
-    const shareIds = shares.map(share => share.id)
-    const recipientIds = shares.flatMap(share => share.recipients.map(recipient => recipient.id))
 
-    if (shareIds.length === 0) {
-      return createShareInvalidationTargetIds()
-    }
-
-    await tx.documentShare.updateMany({
+    await tx.documentPublicationPage.updateMany({
       where: {
-        id: {
-          in: shareIds,
+        documentId: {
+          in: input.documentIds,
         },
+        status: 'ACTIVE',
       },
       data: {
         status: 'REMOVED',
@@ -930,31 +955,22 @@ export class DocumentOperationsService {
       },
     })
 
-    await tx.documentShareRecipient.updateMany({
+    await tx.documentPublicationSite.updateMany({
       where: {
-        documentShareId: {
-          in: shareIds,
-        },
-        status: {
-          not: 'REMOVED',
+        homeDocumentId: {
+          in: input.documentIds,
         },
       },
       data: {
-        status: 'REMOVED',
+        homeDocumentId: null,
         updatedBy: input.userId,
       },
     })
-
-    return {
-      shareIds,
-      recipientIds,
-    }
   }
 
   private async publishMoveInvalidations(input: {
     documentIds: string[]
     shouldInvalidateDocumentConnections: boolean
-    shareInvalidationTargets: ShareInvalidationTargetIds
   }): Promise<void> {
     await this.collabPermissionInvalidationPublisher.publishPermissionInvalidations([
       ...(input.shouldInvalidateDocumentConnections
@@ -963,14 +979,6 @@ export class DocumentOperationsService {
             documentId,
           }))
         : []),
-      ...input.shareInvalidationTargets.shareIds.map(entryShareId => ({
-        reason: COLLAB_PERMISSION_INVALIDATION_REASON.SHARE_REVOKED,
-        entryShareId,
-      })),
-      ...input.shareInvalidationTargets.recipientIds.map(entryRecipientId => ({
-        reason: COLLAB_PERMISSION_INVALIDATION_REASON.SHARE_REVOKED,
-        entryRecipientId,
-      })),
     ])
   }
 
@@ -1077,19 +1085,18 @@ function resolveAssetObjectKeyExtension(objectKey: string): string {
   return 'bin'
 }
 
-function createShareInvalidationTargetIds(): ShareInvalidationTargetIds {
-  return {
-    shareIds: [],
-    recipientIds: [],
-  }
-}
-
 function asTiptapJsonContent(value: Prisma.JsonValue | undefined): TiptapJsonContent {
   return (Array.isArray(value) ? value : []) as unknown as TiptapJsonContent
 }
 
 function toPrismaJsonValue(value: unknown): Prisma.InputJsonValue {
   return value as Prisma.InputJsonValue
+}
+
+function assertCanMoveDocument(document: Awaited<ReturnType<DocumentAccessService['assertCanEditDocument']>>) {
+  if (!document.access.capabilities.canMove) {
+    throw new ForbiddenException('无权移动此文档')
+  }
 }
 
 function toDocumentOperationJob(job: PersistedDocumentOperationJob): DocumentOperationJob {

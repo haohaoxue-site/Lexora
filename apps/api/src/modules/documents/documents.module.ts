@@ -9,12 +9,16 @@ import { DocumentAssetsService } from './asset/asset.service'
 import { DocumentCollabInternalController } from './asset/collab-internal.controller'
 import { DocumentCollabTicketsService } from './asset/collab-ticket.service'
 
+// collaboration
+import { DocumentCollaborationResolverController, DocumentCollaborationsController } from './collaboration/collaborations.controller'
+import { DocumentCollaborationsService } from './collaboration/collaborations.service'
 // content
 import { DocumentContentController } from './content/content.controller'
 import { DocumentContentService } from './content/content.service'
-import { DocumentChatSnapshotService } from './content/document-chat-snapshot.service'
-import { DocumentYdocsService } from './content/ydocs.service'
 
+import { DocumentChatSnapshotService } from './content/document-chat-snapshot.service'
+
+import { DocumentYdocsService } from './content/ydocs.service'
 // core (cross-subdomain)
 import { DocumentAccessService } from './core/access.service'
 
@@ -24,13 +28,10 @@ import { DocumentOperationProcessor } from './operations/operation.processor'
 import { DocumentOperationsController } from './operations/operations.controller'
 import { DocumentOperationsService } from './operations/operations.service'
 
-// share
-import { DocumentShareAccessService } from './share/share-access.service'
-import { DocumentShareManagementController } from './share/share-management.controller'
-import { DocumentShareRecipientsController } from './share/share-recipients.controller'
-import { DocumentShareRecipientsService } from './share/share-recipients.service'
-import { DocumentSharesController } from './share/shares.controller'
-import { DocumentSharesService } from './share/shares.service'
+// publication
+import { DocumentPublicationAccessService } from './publication/publication-access.service'
+import { DocumentPublicationsController } from './publication/publications.controller'
+import { DocumentPublicationsService } from './publication/publications.service'
 
 // trash
 import { DocumentTrashController } from './trash/trash.controller'
@@ -48,11 +49,10 @@ import { DocumentsService } from './tree/tree.service'
     DocumentContentController,
     DocumentTrashController,
     DocumentAssetController,
-    DocumentShareManagementController,
+    DocumentCollaborationsController,
+    DocumentCollaborationResolverController,
+    DocumentPublicationsController,
     DocumentOperationsController,
-    // 入站：分享接收侧
-    DocumentSharesController,
-    DocumentShareRecipientsController,
     // 入站：内部 collab 服务调用
     DocumentCollabInternalController,
   ],
@@ -64,9 +64,9 @@ import { DocumentsService } from './tree/tree.service'
     DocumentYdocsService,
     DocumentAssetsService,
     DocumentCollabTicketsService,
-    DocumentSharesService,
-    DocumentShareAccessService,
-    DocumentShareRecipientsService,
+    DocumentCollaborationsService,
+    DocumentPublicationAccessService,
+    DocumentPublicationsService,
     DocumentTrashService,
     DocumentOperationQueueService,
     DocumentOperationsService,
@@ -77,9 +77,9 @@ import { DocumentsService } from './tree/tree.service'
     DocumentChatSnapshotService,
     DocumentContentService,
     DocumentsService,
-    DocumentShareAccessService,
-    DocumentShareRecipientsService,
-    DocumentSharesService,
+    DocumentCollaborationsService,
+    DocumentPublicationAccessService,
+    DocumentPublicationsService,
   ],
 })
 export class DocumentsModule {}

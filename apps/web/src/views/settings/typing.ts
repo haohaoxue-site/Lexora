@@ -5,7 +5,7 @@ import type {
   UserSettings,
 } from '@haohaoxue/samepage-contracts'
 
-export type SettingsTabName = 'user' | 'preference' | 'models-default'
+export type SettingsTabName = 'user' | 'preference' | 'providers' | 'models-default'
 
 export interface UserProfileSectionProps {
   avatarUrl: string | null

@@ -3,14 +3,12 @@ import type {
   DocumentPageWidthMode,
   DocumentPaneState,
   DocumentSaveState,
-  DocumentShareProjection,
   DocumentVersionSnapshot,
   TiptapJsonContent,
 } from '@haohaoxue/samepage-contracts'
 import type {
   ActiveDocumentDetail,
   DocsDocumentCollaborationStatusTone,
-  DocumentShareChangedPayload,
 } from '../typing'
 import type {
   DocumentCurrent,
@@ -73,7 +71,7 @@ interface ApplyRestoredSnapshotOptions {
 
 export const useActiveDocument = createSharedComposable(() => {
   const { activeDocumentId, pendingTitleFocusDocumentId } = useDocsContext()
-  const { loadTree, patchDocumentItem, rememberLastOpenedDocument } = useDocumentTree()
+  const { patchDocumentItem, rememberLastOpenedDocument } = useDocumentTree()
   const userStore = useUserStore()
   const isDocumentItemLoading = shallowRef(false)
   const isSnapshotsLoading = shallowRef(false)
@@ -114,6 +112,7 @@ export const useActiveDocument = createSharedComposable(() => {
   }))
   const canReconnectCollaboration = computed(() =>
     Boolean(state.currentDocument.value)
+    && Boolean(state.currentDocument.value?.access.capabilities.canEdit)
     && !isReconnectingCollaboration.value
     && (collaboration.connectionStatus.value === 'disconnected' || collaboration.connectionStatus.value === 'error'),
   )
@@ -169,12 +168,19 @@ export const useActiveDocument = createSharedComposable(() => {
       }
 
       state.applyLoadedDocument(loadedDocument, [])
-      collaboration.prepareRemoteDocument()
-      void collaboration.connect({
-        documentId: id,
-        createTicket: () => createDocumentCollabTicketRequest(id),
-        awarenessState: collaborationAwarenessState.value,
-      })
+
+      if (loadedDocument.access.capabilities.canEdit) {
+        collaboration.prepareRemoteDocument()
+        void collaboration.connect({
+          documentId: id,
+          createTicket: () => createDocumentCollabTicketRequest(id),
+          awarenessState: collaborationAwarenessState.value,
+        })
+      }
+      else {
+        collaboration.reset()
+      }
+
       rememberLastOpenedDocument(id)
     }
     catch (error) {
@@ -229,13 +235,7 @@ export const useActiveDocument = createSharedComposable(() => {
         documentAtRestoreStart,
         restoreResponse: hydratedRestoredDocument,
       })
-      collaboration.reset()
-      collaboration.prepareRemoteDocument()
-      void collaboration.connect({
-        documentId: nextDocument.id,
-        createTicket: () => createDocumentCollabTicketRequest(nextDocument.id),
-        awarenessState: collaborationAwarenessState.value,
-      })
+      reconnectDocumentIfWritable(nextDocument)
 
       if (isNoopRestore) {
         ElMessage.info('该历史记录已是当前内容')
@@ -299,7 +299,7 @@ export const useActiveDocument = createSharedComposable(() => {
   async function reconnectCollaboration() {
     const documentId = state.currentDocument.value?.id
 
-    if (!documentId || isReconnectingCollaboration.value) {
+    if (!documentId || !state.currentDocument.value?.access.capabilities.canEdit || isReconnectingCollaboration.value) {
       return false
     }
 
@@ -333,27 +333,27 @@ export const useActiveDocument = createSharedComposable(() => {
     pendingTitleFocusDocumentId.value = null
   }
 
-  function applyDocumentShareChanged(payload: DocumentShareChangedPayload) {
-    patchDocumentItem(payload.documentId, {
-      share: payload.share,
-    })
-    state.patchDocumentShare(payload.documentId, payload.share)
-    void loadTree({
-      silent: true,
-    })
-  }
-
   function applyDocumentTitleChanged(documentCurrent: DocumentCurrent) {
     if (!state.patchDocumentTitle(documentCurrent)) {
       return
     }
 
-    const documentId = documentCurrent.document.id
+    if (state.currentDocument.value) {
+      reconnectDocumentIfWritable(state.currentDocument.value)
+    }
+  }
+
+  function reconnectDocumentIfWritable(document: ActiveDocumentDetail) {
     collaboration.reset()
+
+    if (!document.access.capabilities.canEdit) {
+      return
+    }
+
     collaboration.prepareRemoteDocument()
     void collaboration.connect({
-      documentId,
-      createTicket: () => createDocumentCollabTicketRequest(documentId),
+      documentId: document.id,
+      createTicket: () => createDocumentCollabTicketRequest(document.id),
       awarenessState: collaborationAwarenessState.value,
     })
   }
@@ -417,7 +417,6 @@ export const useActiveDocument = createSharedComposable(() => {
   )
 
   return {
-    applyDocumentShareChanged,
     applyDocumentTitleChanged,
     canReconnectCollaboration,
     collaboration: collaboration.bindings,
@@ -437,7 +436,6 @@ export const useActiveDocument = createSharedComposable(() => {
     isSnapshotsLoading,
     markTitleAutofocusApplied,
     patchDocumentPageWidthMode: state.patchDocumentPageWidthMode,
-    patchDocumentShare: state.patchDocumentShare,
     reconnectCollaboration,
     reloadCurrentDocument,
     restoreSnapshot,
@@ -529,17 +527,6 @@ export function useActiveDocumentState({
 
     snapshots.value = loadedSnapshots
     loadedSnapshotsDocumentId.value = documentId
-  }
-
-  function patchDocumentShare(documentId: string, share: DocumentShareProjection | null) {
-    if (currentDocument.value?.id !== documentId) {
-      return
-    }
-
-    currentDocument.value = {
-      ...currentDocument.value,
-      share,
-    }
   }
 
   function patchDocumentPageWidthMode(documentId: string, pageWidthMode: DocumentPageWidthMode) {
@@ -636,7 +623,6 @@ export function useActiveDocumentState({
     isSaving,
     loadedSnapshotsDocumentId,
     patchDocumentPageWidthMode,
-    patchDocumentShare,
     patchDocumentTitle,
     resetCurrentDocument,
     saveState: save.saveState,

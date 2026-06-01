@@ -1,29 +1,36 @@
 <script setup lang="ts">
 import { onMounted } from 'vue'
 import { onBeforeRouteLeave, onBeforeRouteUpdate } from 'vue-router'
-import PagePanel from '@/layouts/panels/PagePanel.vue'
+import PagePanel from '@/layouts/panels/page-panel'
 import { useWorkspaceStore } from '@/stores/workspace'
-import DocumentDeleteDialog from './components/DocumentDeleteDialog.vue'
-import DocumentMoveDialog from './components/DocumentMoveDialog.vue'
-import DocumentRenameDialog from './components/DocumentRenameDialog.vue'
-import DocumentShareDialog from './components/DocumentShareDialog.vue'
 import { useActiveDocument } from './composables/useActiveDocument'
+import { useDocsCollaborationDialog } from './composables/useDocsCollaborationDialog'
 import { useDocsHistoryState } from './composables/useDocsHistoryState'
 import { useDocsPageActions } from './composables/useDocsPageActions'
-import { useDocsShareDialog } from './composables/useDocsShareDialog'
-import DocsActiveSurfaceLayout from './layouts/DocsActiveSurfaceLayout.vue'
-import DocsContextBarLayout from './layouts/DocsContextBarLayout.vue'
-import DocsHistoryLayout from './layouts/DocsHistoryLayout.vue'
+import { useDocsPublicationDialog } from './composables/useDocsPublicationDialog'
+import DocsActiveSurfaceLayout from './layouts/active-surface'
+import DocsContextBarLayout from './layouts/context-bar'
+import DocsHistoryLayout from './layouts/history'
+import DocumentCollaborationDialog from './widgets/document-collaboration-dialog'
+import DocumentDeleteDialog from './widgets/document-delete-dialog'
+import DocumentMoveDialog from './widgets/document-move-dialog'
+import DocumentPublicationDialog from './widgets/document-publication-dialog'
+import DocumentRenameDialog from './widgets/document-rename-dialog'
 
-const { applyDocumentShareChanged, confirmNavigation } = useActiveDocument()
+const { confirmNavigation } = useActiveDocument()
 const { isHistoryMode } = useDocsHistoryState()
 const { loadInitialTree } = useDocsPageActions()
 const workspaceStore = useWorkspaceStore()
 const {
-  handleShareDialogVisibleChange,
-  isShareDialogOpen,
-  shareDialogDocumentId,
-} = useDocsShareDialog()
+  collaborationDialogDocumentId,
+  handleCollaborationDialogVisibleChange,
+  isCollaborationDialogOpen,
+} = useDocsCollaborationDialog()
+const {
+  handlePublicationDialogVisibleChange,
+  isPublicationDialogOpen,
+  publicationDialogDocumentId,
+} = useDocsPublicationDialog()
 
 onMounted(async () => {
   await workspaceStore.ensurePersonalWorkspace()
@@ -50,12 +57,18 @@ onBeforeRouteLeave(confirmNavigation)
     <DocsHistoryLayout v-if="isHistoryMode" />
     <DocsActiveSurfaceLayout v-else />
 
-    <DocumentShareDialog
-      v-if="isShareDialogOpen"
-      :model-value="isShareDialogOpen"
-      :document-id="shareDialogDocumentId"
-      @share-changed="applyDocumentShareChanged"
-      @update:model-value="handleShareDialogVisibleChange"
+    <DocumentCollaborationDialog
+      v-if="isCollaborationDialogOpen"
+      :model-value="isCollaborationDialogOpen"
+      :document-id="collaborationDialogDocumentId"
+      @update:model-value="handleCollaborationDialogVisibleChange"
+    />
+
+    <DocumentPublicationDialog
+      v-if="isPublicationDialogOpen"
+      :model-value="isPublicationDialogOpen"
+      :document-id="publicationDialogDocumentId"
+      @update:model-value="handlePublicationDialogVisibleChange"
     />
 
     <DocumentDeleteDialog />

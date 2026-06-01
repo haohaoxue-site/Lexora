@@ -4,7 +4,6 @@ import type {
   DocumentCurrent,
   DocumentCurrentProjection,
   DocumentHistory,
-  DocumentShareProjection,
   DocumentVersionSnapshot,
   DocumentVersionSnapshotSource,
   MaterializeDocumentYdocCurrentProjectionRequest,
@@ -39,7 +38,6 @@ import { CollabPermissionInvalidationPublisherService } from '../../../infrastru
 import { auditUserSummarySelect, toAuditUserSummary } from '../../users/audit-user-summary'
 import { DocumentAssetsService } from '../asset/asset.service'
 import { DocumentAccessService } from '../core/access.service'
-import { DocumentSharesService } from '../share/shares.service'
 import { DocumentYdocsService } from './ydocs.service'
 
 const AUTO_VERSION_SNAPSHOT_INTERVAL_MS = 5 * 60 * 1000
@@ -133,7 +131,6 @@ export class DocumentContentService {
     private readonly prisma: PrismaService,
     private readonly documentAssetsService: DocumentAssetsService,
     private readonly documentAccessService: DocumentAccessService,
-    private readonly documentSharesService: DocumentSharesService,
     private readonly documentYdocsService?: DocumentYdocsService,
     private readonly collabPermissionInvalidationPublisher?: CollabPermissionInvalidationPublisherService,
   ) {}
@@ -142,8 +139,9 @@ export class DocumentContentService {
     userId: string,
     id: string,
   ): Promise<DocumentCurrent> {
-    const document = await this.loadReadableDocumentCurrent(userId, id)
-    return this.buildDocumentCurrent(document)
+    const accessibleDocument = await this.documentAccessService.assertCanReadDocument(userId, id)
+    const document = await this.loadDocumentCurrentRecord(id)
+    return toDocumentCurrent(document, accessibleDocument.access)
   }
 
   async patchDocumentTitle(
@@ -151,7 +149,7 @@ export class DocumentContentService {
     id: string,
     payload: PatchDocumentTitleRequest,
   ): Promise<DocumentCurrent> {
-    await this.documentAccessService.assertCanEditDocument(userId, id)
+    const accessibleDocument = await this.documentAccessService.assertCanEditDocument(userId, id)
 
     if (!this.documentYdocsService) {
       throw new ConflictException('协作运行时持久化服务未初始化')
@@ -216,14 +214,12 @@ export class DocumentContentService {
         currentProjection: projection,
       }
     })
-    const shareProjection = await this.documentSharesService.resolveDocumentShareProjectionForDocument(result)
-
     await this.collabPermissionInvalidationPublisher?.publishPermissionInvalidations([{
       reason: COLLAB_PERMISSION_INVALIDATION_REASON.RUNTIME_EPOCH_EXPIRED,
       documentId: id,
     }])
 
-    return toDocumentCurrent(result, shareProjection)
+    return toDocumentCurrent(result, accessibleDocument.access)
   }
 
   async materializeDocumentYdocCurrentProjection(
@@ -311,7 +307,8 @@ export class DocumentContentService {
   }
 
   async getDocumentHistory(userId: string, id: string): Promise<DocumentHistory> {
-    const document = await this.loadReadableDocumentCurrent(userId, id)
+    await this.documentAccessService.assertCanReadDocument(userId, id)
+    const document = await this.loadDocumentCurrentRecord(id)
     const snapshots = await this.loadDocumentVersionSnapshots(id)
     const currentProjection = document.currentProjection
 
@@ -380,7 +377,7 @@ export class DocumentContentService {
     id: string,
     payload: RestoreDocumentVersionSnapshotRequest,
   ): Promise<RestoreDocumentVersionSnapshotResponse> {
-    await this.documentAccessService.assertCanEditDocument(userId, id)
+    const accessibleDocument = await this.documentAccessService.assertCanEditDocument(userId, id)
 
     if (!this.documentYdocsService) {
       throw new ConflictException('协作运行时持久化服务未初始化')
@@ -463,8 +460,6 @@ export class DocumentContentService {
         lastProjectedProjectionRevision: nextProjectionRevision,
       })
 
-      const shareProjection = await this.documentSharesService.resolveDocumentShareProjectionForDocument(currentDocument)
-
       return {
         current: toDocumentCurrent({
           ...currentDocument,
@@ -474,7 +469,7 @@ export class DocumentContentService {
           currentProjectionRevision: nextProjectionRevision,
           latestVersionSnapshotId: restoreSnapshot.id,
           currentProjection: projection,
-        }, shareProjection),
+        }, accessibleDocument.access),
         snapshot: toDocumentVersionSnapshot(restoreSnapshot),
       }
     })
@@ -485,11 +480,6 @@ export class DocumentContentService {
     }])
 
     return result
-  }
-
-  private async loadReadableDocumentCurrent(userId: string, documentId: string): Promise<PersistedDocumentCurrent> {
-    await this.documentAccessService.assertCanReadDocument(userId, documentId)
-    return this.loadDocumentCurrentRecord(documentId)
   }
 
   private async loadDocumentCurrentRecord(documentId: string): Promise<PersistedDocumentCurrent> {
@@ -503,11 +493,6 @@ export class DocumentContentService {
     }
 
     return document
-  }
-
-  private async buildDocumentCurrent(document: PersistedDocumentCurrent): Promise<DocumentCurrent> {
-    const shareProjection = await this.documentSharesService.resolveDocumentShareProjectionForDocument(document)
-    return toDocumentCurrent(document, shareProjection)
   }
 
   private async loadDocumentVersionSnapshots(documentId: string): Promise<PersistedDocumentVersionSnapshot[]> {
@@ -666,14 +651,14 @@ export class DocumentContentService {
 
 function toDocumentCurrent(
   document: PersistedDocumentCurrent,
-  share: DocumentShareProjection | null,
+  access: Awaited<ReturnType<DocumentAccessService['assertCanReadDocument']>>['access'],
 ): DocumentCurrent {
   if (!document.currentProjection) {
     throw new NotFoundException(`Document "${document.id}" current projection not found`)
   }
 
   return {
-    document: toDocumentRecord(document, share),
+    document: toDocumentRecord(document, access),
     currentProjection: toDocumentCurrentProjection(document.currentProjection),
   }
 }
@@ -689,7 +674,7 @@ function toDocumentBase(document: PersistedDocumentCurrent) {
 
 function toDocumentRecord(
   document: PersistedDocumentCurrent,
-  share: DocumentShareProjection | null,
+  access: Awaited<ReturnType<DocumentAccessService['assertCanReadDocument']>>['access'],
 ) {
   return {
     ...toDocumentBase(document),
@@ -703,7 +688,7 @@ function toDocumentRecord(
     order: document.order,
     status: document.status,
     pageWidthMode: document.pageWidthMode,
-    share,
+    access,
   }
 }
 

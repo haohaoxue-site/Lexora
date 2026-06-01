@@ -54,8 +54,6 @@ function dedupeCollabPermissionInvalidations(
       documentId: input.documentId ?? null,
       workspaceId: input.workspaceId ?? null,
       userId: input.userId ?? null,
-      entryShareId: input.entryShareId ?? null,
-      entryRecipientId: input.entryRecipientId ?? null,
       runtimeEpoch: input.runtimeEpoch ?? null,
     })
 

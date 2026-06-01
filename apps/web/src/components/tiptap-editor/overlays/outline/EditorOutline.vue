@@ -1,12 +1,25 @@
 <script setup lang="ts">
 import type { Editor } from '@tiptap/core'
 import type { TiptapEditorContent } from '../../core/typing'
+import { computed } from 'vue'
+import { SvgIcon } from '@/components/svg-icon'
 import { useEditorOutline } from './useEditorOutline'
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   editor: Editor
   content: TiptapEditorContent
-}>()
+  defaultExpanded?: boolean
+  mode?: 'hover' | 'manual'
+  placement?: 'left' | 'right'
+  showSearch?: boolean
+  surface?: 'card' | 'transparent'
+}>(), {
+  defaultExpanded: false,
+  mode: 'hover',
+  placement: 'left',
+  showSearch: true,
+  surface: 'card',
+})
 const {
   getBlockHref,
   getSearchResultText,
@@ -25,20 +38,53 @@ const {
   setExpanded,
   updateSearchQuery,
 } = useEditorOutline({
+  defaultExpanded: props.defaultExpanded,
   editor: props.editor,
   getContent: () => props.content,
 })
+
+const isManualMode = computed(() => props.mode === 'manual')
+const rootClass = computed(() => [
+  `editor-outline--${props.placement}`,
+  `editor-outline--${props.mode}`,
+  `editor-outline--surface-${props.surface}`,
+  {
+    'is-expanded': isExpanded.value,
+  },
+])
+
+function handleMouseEnter() {
+  if (props.mode === 'hover') {
+    setExpanded(true)
+  }
+}
+
+function handleMouseLeave() {
+  if (props.mode === 'hover') {
+    setExpanded(false)
+  }
+}
+
+function toggleExpanded() {
+  setExpanded(!isExpanded.value)
+}
 </script>
 
 <template>
   <aside
     v-if="outline.length"
     class="editor-outline"
-    @mouseenter="setExpanded(true)"
-    @mouseleave="setExpanded(false)"
+    :class="rootClass"
+    @mouseenter="handleMouseEnter"
+    @mouseleave="handleMouseLeave"
   >
     <section v-if="isExpanded" class="editor-outline__panel">
+      <div v-if="!props.showSearch || isManualMode" class="editor-outline__panel-header">
+        <span>大纲</span>
+      </div>
+
       <ElInput
+        v-if="props.showSearch"
         class="editor-outline__search-input"
         :model-value="searchQuery"
         clearable
@@ -47,7 +93,7 @@ const {
         @keydown="handleSearchKeydown"
       />
 
-      <section v-if="searchQuery.trim()" class="editor-outline__section">
+      <section v-if="props.showSearch && searchQuery.trim()" class="editor-outline__section">
         <div class="editor-outline__section-title">
           搜索结果
         </div>
@@ -80,7 +126,7 @@ const {
       </section>
 
       <section class="editor-outline__section">
-        <div class="editor-outline__section-title">
+        <div v-if="props.showSearch" class="editor-outline__section-title">
           大纲
         </div>
 
@@ -110,7 +156,17 @@ const {
       </section>
     </section>
 
-    <ol class="editor-outline__rail">
+    <button
+      v-if="isManualMode && !isExpanded"
+      type="button"
+      class="editor-outline__manual-toggle"
+      aria-label="展开目录"
+      @click="toggleExpanded"
+    >
+      <SvgIcon category="ui" icon="sidebar-open" size="1rem" />
+    </button>
+
+    <ol v-if="!isManualMode || !isExpanded" class="editor-outline__rail">
       <li
         v-for="item in outline"
         :key="item.blockId"
@@ -146,6 +202,56 @@ const {
   gap: 0.5rem;
   pointer-events: auto;
 
+  &--right {
+    justify-self: end;
+  }
+
+  &--manual {
+    top: 1.25rem;
+  }
+
+  &--manual.editor-outline--right {
+    width: 100%;
+    justify-self: stretch;
+  }
+
+  &__panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.125rem 0.25rem;
+    color: var(--brand-text-primary);
+    font-size: 13px;
+    font-weight: 700;
+    line-height: 1.5;
+  }
+
+  &__manual-toggle {
+    display: inline-grid;
+    width: 1.7rem;
+    height: 1.7rem;
+    place-items: center;
+    padding: 0;
+    border: 0;
+    border-radius: 0.45rem;
+    background: transparent;
+    color: var(--brand-text-tertiary);
+    cursor: pointer;
+
+    &:hover,
+    &:focus-visible {
+      background: color-mix(in srgb, var(--brand-primary) 8%, transparent);
+      color: var(--brand-primary);
+    }
+  }
+
+  &__manual-toggle {
+    border: 1px solid color-mix(in srgb, var(--brand-border-base) 72%, transparent);
+    background: color-mix(in srgb, white 94%, var(--brand-bg-surface) 6%);
+    box-shadow: 0 10px 24px color-mix(in srgb, var(--brand-text-primary) 7%, transparent);
+  }
+
   &__rail {
     display: flex;
     flex-direction: column;
@@ -173,8 +279,8 @@ const {
     display: grid;
     gap: 0.25rem;
     min-width: 9rem;
-    max-width: 15rem;
     width: max-content;
+    max-width: 15rem;
     padding: 0.75rem;
     border: 1px solid color-mix(in srgb, var(--brand-border-base) 72%, transparent);
     border-radius: 1rem;
@@ -301,6 +407,63 @@ const {
     opacity: 1;
     transform: translateX(0);
     pointer-events: auto;
+  }
+
+  &--manual &__panel {
+    width: 100%;
+    min-width: 12rem;
+    max-width: 15rem;
+  }
+
+  &--surface-transparent {
+    .editor-outline__panel {
+      gap: 0.65rem;
+      width: 100%;
+      min-width: 12rem;
+      max-width: 15rem;
+      padding: 0.125rem 0;
+      border: 0;
+      border-radius: 0;
+      background: transparent;
+      box-shadow: none;
+    }
+
+    .editor-outline__panel-header {
+      padding: 0;
+      color: var(--brand-text-secondary);
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    .editor-outline__outline-list {
+      gap: 0.15rem;
+    }
+
+    .editor-outline__item {
+      border-radius: 0.4rem;
+      color: color-mix(in srgb, var(--brand-text-secondary) 86%, transparent);
+    }
+
+    .editor-outline__item-link {
+      padding: 0.36rem 0.25rem;
+      padding-inline-start: calc(0.25rem + var(--editor-outline-indent));
+
+      &:hover,
+      &:focus-visible {
+        background: transparent;
+        color: var(--brand-text-primary);
+      }
+    }
+
+    .editor-outline__item-text {
+      font-size: 14px;
+      line-height: 1.45;
+    }
+
+    .editor-outline__item.is-active {
+      background: color-mix(in srgb, var(--brand-primary) 9%, transparent);
+      color: var(--brand-text-primary);
+    }
   }
 }
 </style>

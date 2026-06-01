@@ -30,16 +30,16 @@ export const useDocsSurfaceState = createSharedComposable(() => {
     DOCUMENT_COLLECTION.COLLABORATION,
   ])
   const currentSurface = computed<DocsSurfaceView>(() => {
-    if (routeName.value === 'docs-pending-shares') {
-      return 'pending-shares'
-    }
-
-    if (routeName.value === 'docs-permissions') {
-      return 'permissions'
+    if (routeName.value === 'docs-collaborations') {
+      return 'collaborations'
     }
 
     if (routeName.value === 'docs-trash') {
       return 'trash'
+    }
+
+    if (routeName.value === 'docs-publications') {
+      return 'publication-settings'
     }
 
     return 'document'
@@ -146,6 +146,15 @@ function containsDocument(item: DocumentItem, targetDocumentId: string): boolean
 }
 
 function buildVisibleTreeGroups(groups: DocumentTreeGroup[]): DocumentTreeGroup[] {
+  const teamGroup = findTreeGroup(groups, DOCUMENT_COLLECTION.TEAM)
+
+  if (teamGroup) {
+    return [
+      findTreeGroup(groups, DOCUMENT_COLLECTION.PERSONAL) ?? createEmptyTreeGroup(DOCUMENT_COLLECTION.PERSONAL),
+      teamGroup,
+    ]
+  }
+
   return [
     findTreeGroup(groups, DOCUMENT_COLLECTION.PERSONAL) ?? createEmptyTreeGroup(DOCUMENT_COLLECTION.PERSONAL),
     findTreeGroup(groups, DOCUMENT_COLLECTION.COLLABORATION) ?? createEmptyTreeGroup(DOCUMENT_COLLECTION.COLLABORATION),

@@ -409,6 +409,7 @@ export function useEditorAiComposer(options: UseEditorAiComposerOptions) {
         router,
         title: '文档 AI 默认模型未配置',
         message: effectivePolicy.invalidReason || getDefaultModelMissingMessage(mode),
+        targetRouteName: getDefaultModelMissingTargetRouteName(effectivePolicy.invalidReason),
       })
       return false
     }
@@ -431,6 +432,10 @@ function getDefaultModelMissingMessage(mode: EditorAiComposerMode): string {
   }
 
   return '请先配置文档默认模型，或为润色、改写单独配置模型。'
+}
+
+function getDefaultModelMissingTargetRouteName(invalidReason: string | null) {
+  return invalidReason?.includes('服务商') ? 'settings-providers' : 'settings-models-default'
 }
 
 function resolveCandidateContentText(candidate: EditorAiSessionRuntime['candidate']): string {

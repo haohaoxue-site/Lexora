@@ -15,6 +15,7 @@ const props = withDefaults(defineProps<DocumentBodyEditorProps>(), {
   editable: true,
   activeBlockId: null,
   documentId: null,
+  outlineOptions: () => ({}),
   showOutline: true,
 })
 const emits = defineEmits<DocumentBodyEditorEmits>()
@@ -38,7 +39,10 @@ const {
 </script>
 
 <template>
-  <section class="document-body-editor">
+  <section
+    class="document-body-editor"
+    :class="`document-body-editor--outline-${props.outlineOptions.layout ?? 'overlay'}`"
+  >
     <BubbleToolbar
       v-if="bodyEditor && props.editable"
       :editor="bodyEditor"
@@ -69,6 +73,11 @@ const {
       v-if="bodyEditor && props.showOutline"
       :editor="bodyEditor"
       :content="props.content"
+      :default-expanded="props.outlineOptions.defaultExpanded"
+      :mode="props.outlineOptions.mode"
+      :placement="props.outlineOptions.placement"
+      :show-search="props.outlineOptions.showSearch"
+      :surface="props.outlineOptions.surface"
     />
 
     <BlockTriggerMenu

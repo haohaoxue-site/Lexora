@@ -11,14 +11,18 @@ import {
   NotFoundException,
 } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
-import { DocumentAssetKind, DocumentAssetStatus, Prisma } from '@prisma/client'
+import {
+  DocumentAssetKind,
+  DocumentAssetStatus,
+  Prisma,
+} from '@prisma/client'
 import { parse, serialize } from 'cookie'
 import { jwtVerify, SignJWT } from 'jose'
 import { PrismaService } from '../../../database/prisma.service'
 import { StorageService } from '../../../infrastructure/storage/storage.service'
 import { sha256Hex } from '../../../utils/hash'
 import { DocumentAccessService } from '../core/access.service'
-import { DocumentShareRecipientsService } from '../share/share-recipients.service'
+import { DocumentPublicationAccessService } from '../publication/publication-access.service'
 
 const DOCUMENT_ASSET_BUCKET = 'document-asset'
 const DOCUMENT_IMAGE_MAX_SIZE_BYTES = 15 * 1024 * 1024
@@ -28,9 +32,9 @@ const DOCUMENT_ASSET_ACCESS_TOKEN_TYPE = 'document-asset-access'
 const DOCUMENT_ASSET_ACCESS_COOKIE_TTL_SECONDS = 60 * 5
 const DOCUMENT_ASSET_ACCESS_COOKIE_NAMES = {
   document: 'samepage_document_asset_access',
-  share: 'samepage_document_share_asset_access',
-  recipient: 'samepage_document_share_recipient_asset_access',
+  publication: 'samepage_publication_asset_access',
 } as const
+const SINGLE_PUBLICATION_ASSET_SCOPE_PREFIX = 'single:'
 const DOCUMENT_FILE_EXTENSION_PREFIX = /^\./
 const DOCUMENT_FILE_EXTENSION_PATTERN = /^[a-z0-9]{1,16}$/
 
@@ -47,26 +51,29 @@ type PersistedDocumentAsset = Prisma.DocumentAssetGetPayload<{
   select: typeof documentAssetSelect
 }>
 
-type DocumentAssetAccessKind = 'document' | 'share' | 'recipient'
+type DocumentAssetAccessKind = 'document' | 'publication'
 
 interface DocumentAssetAccessTokenPayload {
   documentId: string
   kind: DocumentAssetAccessKind
   tokenType: typeof DOCUMENT_ASSET_ACCESS_TOKEN_TYPE
   actorId?: string | null
-  shareId?: string
-  recipientId?: string
+  publicationId?: string | null
   [key: string]: unknown
 }
 
-interface DocumentAssetAccessScope {
-  documentId: string
-  kind: DocumentAssetAccessKind
-  shareId?: string
-  recipientId?: string
-}
+type DocumentAssetAccessScope
+  = | {
+    documentId: string
+    kind: 'document'
+  }
+  | {
+    documentId: string
+    kind: 'publication'
+    publicationId: string
+  }
 
-interface DocumentAssetAccessGrantScope extends DocumentAssetAccessScope {
+type DocumentAssetAccessGrantScope = DocumentAssetAccessScope & {
   actorId?: string | null
 }
 
@@ -95,7 +102,7 @@ export class DocumentAssetsService {
     private readonly prisma: PrismaService,
     private readonly storageService: StorageService,
     private readonly documentAccessService: DocumentAccessService,
-    private readonly documentShareRecipientsService: DocumentShareRecipientsService,
+    private readonly publicationAccessService: DocumentPublicationAccessService,
     configService: ConfigService,
   ) {
     this.jwtConfig = configService.getOrThrow<JwtConfig>('jwt')
@@ -225,39 +232,28 @@ export class DocumentAssetsService {
     }, input.assetIds)
   }
 
-  async resolveSharedAssets(input: {
-    actorId: string | null
-    shareId: string
+  async resolvePublicationAssets(input: {
+    publicationId: string
     documentId: string
     assetIds: string[]
   }): Promise<ResolveDocumentAssetsResponse> {
-    const share = await this.documentShareRecipientsService.assertCanReadSharedDocument(
-      input.actorId,
-      input.shareId,
-      input.documentId,
-    )
+    await this.assertPublicationDocumentAccess(input.publicationId, input.documentId)
     return await this.resolveAssetsForScope({
-      documentId: share.documentId,
-      kind: 'share',
-      shareId: input.shareId,
+      documentId: input.documentId,
+      kind: 'publication',
+      publicationId: input.publicationId,
     }, input.assetIds)
   }
 
-  async resolveSharedRecipientAssets(input: {
-    actorId: string
-    recipientId: string
+  async resolveSinglePublicationAssets(input: {
     documentId: string
     assetIds: string[]
   }): Promise<ResolveDocumentAssetsResponse> {
-    const recipient = await this.documentShareRecipientsService.assertCanReadSharedRecipientDocument(
-      input.actorId,
-      input.recipientId,
-      input.documentId,
-    )
+    await this.publicationAccessService.assertSinglePublicationDocumentAccess(input.documentId)
     return await this.resolveAssetsForScope({
-      documentId: recipient.documentId,
-      kind: 'recipient',
-      recipientId: input.recipientId,
+      documentId: input.documentId,
+      kind: 'publication',
+      publicationId: createSinglePublicationAssetScopeId(input.documentId),
     }, input.assetIds)
   }
 
@@ -282,54 +278,48 @@ export class DocumentAssetsService {
     return this.loadAssetStorageObject(input.documentId, input.assetId)
   }
 
-  async getSharedAssetContent(input: {
-    shareId: string
+  async getPublicationAssetContent(input: {
+    publicationId: string
     documentId: string
     assetId: string
     cookieHeader?: string
   }): Promise<StorageObject> {
-    const payload = await this.verifyAccessCookie({
+    await this.verifyAccessCookie({
       expectedScope: {
-        kind: 'share',
-        shareId: input.shareId,
+        kind: 'publication',
         documentId: input.documentId,
+        publicationId: input.publicationId,
       },
       cookieHeader: input.cookieHeader,
     })
-
-    await this.documentShareRecipientsService.assertCanReadSharedDocument(
-      payload.actorId ?? null,
-      input.shareId,
-      input.documentId,
-    )
+    await this.assertPublicationDocumentAccess(input.publicationId, input.documentId)
     return this.loadAssetStorageObject(input.documentId, input.assetId)
   }
 
-  async getSharedRecipientAssetContent(input: {
-    recipientId: string
+  async getSinglePublicationAssetContent(input: {
     documentId: string
     assetId: string
     cookieHeader?: string
   }): Promise<StorageObject> {
-    const payload = await this.verifyAccessCookie({
+    await this.verifyAccessCookie({
       expectedScope: {
-        kind: 'recipient',
-        recipientId: input.recipientId,
+        kind: 'publication',
         documentId: input.documentId,
+        publicationId: createSinglePublicationAssetScopeId(input.documentId),
       },
       cookieHeader: input.cookieHeader,
     })
-
-    if (!payload.actorId) {
-      throw new NotFoundException('资源不存在')
-    }
-
-    await this.documentShareRecipientsService.assertCanReadSharedRecipientDocument(
-      payload.actorId,
-      input.recipientId,
-      input.documentId,
-    )
+    await this.publicationAccessService.assertSinglePublicationDocumentAccess(input.documentId)
     return this.loadAssetStorageObject(input.documentId, input.assetId)
+  }
+
+  async buildSinglePublicationAssetAccessCookie(documentId: string): Promise<string> {
+    return await this.buildAssetAccessCookie({
+      kind: 'publication',
+      documentId,
+      publicationId: createSinglePublicationAssetScopeId(documentId),
+      actorId: null,
+    })
   }
 
   async buildAssetAccessCookie(scope: DocumentAssetAccessGrantScope): Promise<string> {
@@ -337,8 +327,7 @@ export class DocumentAssetsService {
       kind: scope.kind,
       documentId: scope.documentId,
       actorId: scope.actorId ?? null,
-      shareId: scope.shareId,
-      recipientId: scope.recipientId,
+      publicationId: scope.kind === 'publication' ? scope.publicationId : null,
       tokenType: DOCUMENT_ASSET_ACCESS_TOKEN_TYPE,
     })
 
@@ -469,12 +458,12 @@ export class DocumentAssetsService {
   }
 
   private async createContentUrl(scope: DocumentAssetAccessScope, assetId: string): Promise<string> {
-    if (scope.kind === 'share') {
-      return `${SERVER_PATH}/document-shares/${scope.shareId}/documents/${scope.documentId}/assets/${assetId}/content`
-    }
+    if (scope.kind === 'publication') {
+      if (isSinglePublicationAssetScopeId(scope.publicationId)) {
+        return `${SERVER_PATH}/p/${scope.documentId}/assets/${assetId}/content`
+      }
 
-    if (scope.kind === 'recipient') {
-      return `${SERVER_PATH}/document-share-recipients/${scope.recipientId}/documents/${scope.documentId}/assets/${assetId}/content`
+      return `${SERVER_PATH}/publications/${scope.publicationId}/documents/${scope.documentId}/assets/${assetId}/content`
     }
 
     return `${SERVER_PATH}/documents/${scope.documentId}/assets/${assetId}/content`
@@ -520,6 +509,20 @@ export class DocumentAssetsService {
       throw new NotFoundException('资源不存在')
     }
   }
+
+  private async assertPublicationDocumentAccess(publicationId: string, documentId: string): Promise<void> {
+    const singlePublicationDocumentId = parseSinglePublicationAssetScopeId(publicationId)
+    if (singlePublicationDocumentId) {
+      if (singlePublicationDocumentId !== documentId) {
+        throw new NotFoundException('资源不存在')
+      }
+
+      await this.publicationAccessService.assertSinglePublicationDocumentAccess(documentId)
+      return
+    }
+
+    await this.publicationAccessService.assertSitePublicationDocumentAccess(publicationId, documentId)
+  }
 }
 
 function isAssetAccessTokenPayloadForScope(
@@ -536,27 +539,39 @@ function isAssetAccessTokenPayloadForScope(
     return false
   }
 
-  if (scope.kind === 'share') {
-    return typeof payload.shareId === 'string' && payload.shareId === scope.shareId
-  }
-
-  if (scope.kind === 'recipient') {
-    return typeof payload.recipientId === 'string' && payload.recipientId === scope.recipientId
+  if (scope.kind === 'publication') {
+    return payload.publicationId === scope.publicationId
   }
 
   return true
 }
 
 function resolveAssetAccessCookiePath(scope: DocumentAssetAccessScope) {
-  if (scope.kind === 'share') {
-    return `${SERVER_PATH}/document-shares/${scope.shareId}/documents/${scope.documentId}/assets`
-  }
+  if (scope.kind === 'publication') {
+    if (isSinglePublicationAssetScopeId(scope.publicationId)) {
+      return `${SERVER_PATH}/p/${scope.documentId}/assets`
+    }
 
-  if (scope.kind === 'recipient') {
-    return `${SERVER_PATH}/document-share-recipients/${scope.recipientId}/documents/${scope.documentId}/assets`
+    return `${SERVER_PATH}/publications/${scope.publicationId}/documents/${scope.documentId}/assets`
   }
 
   return `${SERVER_PATH}/documents/${scope.documentId}/assets`
+}
+
+function createSinglePublicationAssetScopeId(documentId: string): string {
+  return `${SINGLE_PUBLICATION_ASSET_SCOPE_PREFIX}${documentId}`
+}
+
+function parseSinglePublicationAssetScopeId(publicationId: string): string | null {
+  if (!isSinglePublicationAssetScopeId(publicationId)) {
+    return null
+  }
+
+  return publicationId.slice(SINGLE_PUBLICATION_ASSET_SCOPE_PREFIX.length) || null
+}
+
+function isSinglePublicationAssetScopeId(publicationId: string): boolean {
+  return publicationId.startsWith(SINGLE_PUBLICATION_ASSET_SCOPE_PREFIX)
 }
 
 function assertDocumentImageMimeType(mimeType: string): DocumentImageMimeType {

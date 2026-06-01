@@ -8,6 +8,7 @@ import {
 import { resolveOwnedDocumentCollectionId } from '@haohaoxue/samepage-shared'
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common'
@@ -89,6 +90,10 @@ export class DocumentTrashService {
     workspaceType: string,
     documents: AccessibleDocument[],
   ): Promise<string[]> {
+    for (const document of documents) {
+      assertCanTrashDocument(document)
+    }
+
     const targetDocumentIds = new Set<string>()
     const context = await this.loadWorkspaceDocumentContext({
       workspaceId,
@@ -108,6 +113,11 @@ export class DocumentTrashService {
 
   async restoreDocumentFromTrash(userId: string, id: string): Promise<void> {
     const document = await this.documentAccessService.assertCanManageTrashedDocument(userId, id)
+
+    if (!document.access.capabilities.canRestore) {
+      throw new ForbiddenException('无权恢复此文档')
+    }
+
     const context = await this.loadWorkspaceTrashContext({
       workspaceId: document.workspaceId,
     })
@@ -255,6 +265,9 @@ export class DocumentTrashService {
   private async resolvePermanentlyRemovableDocumentIds(userId: string, documentId: string): Promise<string[]> {
     try {
       const trashedDocument = await this.documentAccessService.assertCanManageTrashedDocument(userId, documentId)
+
+      assertCanTrashDocument(trashedDocument)
+
       const trashContext = await this.loadWorkspaceTrashContext({
         workspaceId: trashedDocument.workspaceId,
       })
@@ -270,6 +283,9 @@ export class DocumentTrashService {
     }
 
     const activeDocument = await this.documentAccessService.assertCanEditDocument(userId, documentId)
+
+    assertCanTrashDocument(activeDocument)
+
     const workspaceContext = await this.loadWorkspaceTrashContext({
       workspaceId: activeDocument.workspaceId,
       userId,
@@ -280,6 +296,12 @@ export class DocumentTrashService {
     collectDescendantDocumentIds(documentId, workspaceContext, documentIds)
 
     return Array.from(documentIds)
+  }
+}
+
+function assertCanTrashDocument(document: AccessibleDocument) {
+  if (!document.access.capabilities.canTrash) {
+    throw new ForbiddenException('无权删除此文档')
   }
 }
 

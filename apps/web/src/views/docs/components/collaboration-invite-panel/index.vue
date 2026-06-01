@@ -1,0 +1,182 @@
+<script setup lang="ts">
+import type {
+  DocumentCollaborationPermission,
+  DocumentCollaborationScope,
+} from '@haohaoxue/samepage-contracts'
+import type {
+  CollaborationInvitePanelEmits,
+  CollaborationInvitePanelProps,
+} from './typing'
+import {
+  formatCollaborationIdentity,
+  formatCollaborationPermission,
+  formatCollaborationScope,
+  formatCollaborationSource,
+  getCollaborationAvatarText,
+} from '../../utils/documentCollaboration'
+import CollaborationAvatarStack from '../collaboration-avatar-stack'
+
+const props = defineProps<CollaborationInvitePanelProps>()
+const emits = defineEmits<CollaborationInvitePanelEmits>()
+const userCode = defineModel<string>('userCode', { required: true })
+const permission = defineModel<DocumentCollaborationPermission>('permission', { required: true })
+const scope = defineModel<DocumentCollaborationScope>('scope', { required: true })
+
+function setPermission(command: string | number | object) {
+  permission.value = String(command) as DocumentCollaborationPermission
+}
+
+function setScope(command: string | number | object) {
+  scope.value = String(command) as DocumentCollaborationScope
+}
+</script>
+
+<template>
+  <section class="collaboration-invite-panel grid gap-[0.85rem]">
+    <div class="flex items-center justify-between gap-4 max-[720px]:grid">
+      <h3 class="m-0 text-[0.95rem] leading-[1.4]">
+        邀请协作者
+      </h3>
+      <CollaborationAvatarStack
+        :owner="props.owner"
+        :collaborators="props.collaborators"
+        :can-open="props.canOpenCollaborators"
+        @open="emits('openCollaborators')"
+      />
+    </div>
+
+    <ElInput
+      v-model="userCode"
+      class="collaboration-invite-panel__input"
+      size="large"
+      placeholder="输入完整协作码邀请用户"
+      clearable
+    >
+      <template #append>
+        <ElButton
+          class="m-0 h-full w-full rounded-none"
+          :loading="props.isCreatingInvitation || props.isResolvingInvitee"
+          :disabled="!props.canSubmitInvitation"
+          @click="emits('submit')"
+        >
+          <SvgIcon category="ui" icon="plus" size="1rem" />
+        </ElButton>
+      </template>
+    </ElInput>
+
+    <div
+      v-if="props.isResolvingInvitee || props.resolvedInvitee || props.inviteeResolveError"
+      class="collaboration-invite-panel__invitee-card rounded-lg p-3"
+    >
+      <p v-if="props.isResolvingInvitee" class="m-0 text-xs leading-[1.5] text-secondary">
+        正在查找用户
+      </p>
+      <p v-else-if="props.inviteeResolveError && !props.resolvedInvitee" class="m-0 text-xs leading-[1.5] text-danger">
+        {{ props.inviteeResolveError }}
+      </p>
+      <template v-else-if="props.resolvedInvitee">
+        <div class="flex min-w-0 items-center gap-3">
+          <ElAvatar
+            :size="36"
+            :src="props.resolvedInvitee.avatarUrl ?? undefined"
+          >
+            {{ getCollaborationAvatarText(props.resolvedInvitee) }}
+          </ElAvatar>
+          <div class="min-w-0 flex-1">
+            <div class="overflow-hidden text-sm font-medium leading-[1.4] text-main text-ellipsis whitespace-nowrap">
+              {{ formatCollaborationIdentity(props.resolvedInvitee) }}
+            </div>
+            <div class="overflow-hidden text-xs leading-[1.4] text-secondary text-ellipsis whitespace-nowrap">
+              <template v-if="props.isResolvedOwner">
+                文档所有者无需邀请
+              </template>
+              <template v-else-if="props.resolvedCollaborator">
+                已是协作者，{{ formatCollaborationSource(props.resolvedCollaborator) }}，{{ formatCollaborationPermission(props.resolvedCollaborator.effectivePermission) }}
+              </template>
+              <template v-else-if="props.hasResolvedInvitation">
+                已有邀请，本次提交会更新权限和范围
+              </template>
+              <template v-else>
+                将发送站内协作邀请
+              </template>
+            </div>
+          </div>
+
+          <div
+            v-if="props.canSubmitInvitation"
+            class="flex flex-[0_0_auto] flex-wrap justify-end gap-[0.45rem] max-[720px]:w-full max-[720px]:justify-start"
+          >
+            <ElDropdown trigger="click" @command="setPermission">
+              <ElButton class="min-w-[6.2rem] justify-between gap-[0.45rem]">
+                {{ formatCollaborationPermission(permission) }}
+                <SvgIcon category="ui" icon="chevron-down" size="0.82rem" />
+              </ElButton>
+
+              <template #dropdown>
+                <ElDropdownMenu>
+                  <ElDropdownItem
+                    v-for="option in props.permissionOptions"
+                    :key="option.value"
+                    :command="option.value"
+                    :disabled="option.value === permission"
+                  >
+                    {{ option.label }}
+                  </ElDropdownItem>
+                </ElDropdownMenu>
+              </template>
+            </ElDropdown>
+
+            <ElDropdown trigger="click" @command="setScope">
+              <ElButton class="min-w-[9.8rem] justify-between gap-[0.45rem]">
+                {{ formatCollaborationScope(scope) }}
+                <SvgIcon category="ui" icon="chevron-down" size="0.82rem" />
+              </ElButton>
+
+              <template #dropdown>
+                <ElDropdownMenu>
+                  <ElDropdownItem
+                    v-for="option in props.scopeOptions"
+                    :key="option.value"
+                    :command="option.value"
+                    :disabled="option.value === scope"
+                  >
+                    {{ option.label }}
+                  </ElDropdownItem>
+                </ElDropdownMenu>
+              </template>
+            </ElDropdown>
+
+            <ElButton
+              type="primary"
+              :loading="props.isCreatingInvitation"
+              @click="emits('submit')"
+            >
+              {{ props.invitationSubmitLabel }}
+            </ElButton>
+          </div>
+
+          <ElButton
+            v-else-if="props.resolvedCollaborator"
+            @click="emits('openCollaborators')"
+          >
+            查看协作者
+          </ElButton>
+        </div>
+      </template>
+    </div>
+  </section>
+</template>
+
+<style scoped lang="scss">
+.collaboration-invite-panel__input {
+  :deep(.el-input-group__append) {
+    width: 3.25rem;
+    padding: 0;
+  }
+}
+
+.collaboration-invite-panel__invitee-card {
+  border: 1px solid color-mix(in srgb, var(--brand-border-base) 72%, transparent);
+  background: color-mix(in srgb, var(--brand-bg-surface-raised) 88%, var(--brand-bg-surface));
+}
+</style>

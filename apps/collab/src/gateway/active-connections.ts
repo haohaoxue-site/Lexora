@@ -1,5 +1,5 @@
 import type { CollabErrorCode, CollabPermissionInvalidationRequest, CollabTicketPayload } from '@haohaoxue/samepage-contracts'
-import { COLLAB_ERROR_CODE, COLLAB_PERMISSION_INVALIDATION_REASON } from '@haohaoxue/samepage-contracts'
+import { COLLAB_ERROR_CODE } from '@haohaoxue/samepage-contracts'
 
 const COLLAB_SOCKET_CLOSE_CODE = {
   PERMISSION_INVALIDATED: 4003,
@@ -147,10 +147,6 @@ function matchesCollabPermissionInvalidation(
   input: CollabPermissionInvalidationRequest,
   ticket: CollabTicketPayload,
 ): boolean {
-  if (input.reason === COLLAB_PERMISSION_INVALIDATION_REASON.SHARE_REVOKED) {
-    return false
-  }
-
   if (input.documentId && input.documentId !== ticket.documentId) {
     return false
   }

@@ -1,12 +1,12 @@
 import type {
-  DocumentCollaborationRole,
-  DocumentShareMode,
+  DocumentCollaborationPermission,
+  DocumentCollaborationScope,
   WorkspaceMemberRole,
   WorkspaceType,
 } from '@haohaoxue/samepage-contracts'
 import {
-  DOCUMENT_COLLABORATION_ROLE,
-  DOCUMENT_SHARE_MODE,
+  DOCUMENT_COLLABORATION_PERMISSION,
+  DOCUMENT_COLLABORATION_SCOPE,
   WORKSPACE_MEMBER_ROLE,
   WORKSPACE_TYPE,
 } from '@haohaoxue/samepage-contracts'
@@ -17,58 +17,72 @@ import {
 export interface DocumentCollaborationCapabilities {
   /** 是否可读 */
   canRead: boolean
-  /** 是否可评论 */
-  canComment: boolean
   /** 是否可编辑正文 */
-  canWrite: boolean
-  /** 是否可管理分享 */
-  canManageShare: boolean
+  canEdit: boolean
+  /** 是否可创建子页面 */
+  canCreateChild: boolean
   /** 是否可管理协作者 */
-  canManageCollaborators: boolean
+  canManageCollaboration: boolean
+  /** 是否可发布外部站点 */
+  canPublish: boolean
+  /** 是否可移动文档 */
+  canMove: boolean
+  /** 是否可移入回收站 */
+  canTrash: boolean
+  /** 是否可从回收站恢复 */
+  canRestore: boolean
 }
 
-const DOCUMENT_COLLABORATION_CAPABILITIES: Record<DocumentCollaborationRole, DocumentCollaborationCapabilities> = {
-  [DOCUMENT_COLLABORATION_ROLE.MAINTAINER]: {
+const DOCUMENT_COLLABORATION_PERMISSION_CAPABILITIES: Record<DocumentCollaborationPermission, Omit<DocumentCollaborationCapabilities, 'canCreateChild'>> = {
+  [DOCUMENT_COLLABORATION_PERMISSION.READ]: {
     canRead: true,
-    canComment: true,
-    canWrite: true,
-    canManageShare: true,
-    canManageCollaborators: true,
+    canEdit: false,
+    canManageCollaboration: false,
+    canPublish: false,
+    canMove: false,
+    canTrash: false,
+    canRestore: false,
   },
-  [DOCUMENT_COLLABORATION_ROLE.EDITOR]: {
+  [DOCUMENT_COLLABORATION_PERMISSION.EDIT]: {
     canRead: true,
-    canComment: true,
-    canWrite: true,
-    canManageShare: false,
-    canManageCollaborators: false,
-  },
-  [DOCUMENT_COLLABORATION_ROLE.COMMENTER]: {
-    canRead: true,
-    canComment: true,
-    canWrite: false,
-    canManageShare: false,
-    canManageCollaborators: false,
+    canEdit: true,
+    canManageCollaboration: false,
+    canPublish: false,
+    canMove: false,
+    canTrash: false,
+    canRestore: false,
   },
 }
 
 export function getDocumentCollaborationCapabilities(
-  role: DocumentCollaborationRole,
+  input: {
+    permission: DocumentCollaborationPermission
+    scope: DocumentCollaborationScope
+  },
 ): DocumentCollaborationCapabilities {
-  return DOCUMENT_COLLABORATION_CAPABILITIES[role]
+  const capabilities = DOCUMENT_COLLABORATION_PERMISSION_CAPABILITIES[input.permission]
+
+  return {
+    ...capabilities,
+    canCreateChild: input.permission === DOCUMENT_COLLABORATION_PERMISSION.EDIT
+      && input.scope === DOCUMENT_COLLABORATION_SCOPE.DESCENDANTS,
+  }
 }
 
-export function resolveWorkspaceDocumentCollaborationRole(input: {
+export function getWorkspaceDocumentCollaborationCapabilities(input: {
   workspaceType: WorkspaceType
   workspaceMemberRole?: WorkspaceMemberRole | null
-}): DocumentCollaborationRole | null {
+}): DocumentCollaborationCapabilities | null {
   if (!input.workspaceMemberRole) {
     return null
   }
 
   if (input.workspaceType === WORKSPACE_TYPE.PERSONAL) {
-    return input.workspaceMemberRole === WORKSPACE_MEMBER_ROLE.OWNER
-      ? DOCUMENT_COLLABORATION_ROLE.MAINTAINER
-      : null
+    if (input.workspaceMemberRole !== WORKSPACE_MEMBER_ROLE.OWNER) {
+      return null
+    }
+
+    return createMaintainerCapabilities()
   }
 
   if (input.workspaceType !== WORKSPACE_TYPE.TEAM) {
@@ -79,27 +93,31 @@ export function resolveWorkspaceDocumentCollaborationRole(input: {
     input.workspaceMemberRole === WORKSPACE_MEMBER_ROLE.OWNER
     || input.workspaceMemberRole === WORKSPACE_MEMBER_ROLE.ADMIN
   ) {
-    return DOCUMENT_COLLABORATION_ROLE.MAINTAINER
+    return createMaintainerCapabilities()
   }
 
-  return DOCUMENT_COLLABORATION_ROLE.EDITOR
+  return {
+    ...DOCUMENT_COLLABORATION_PERMISSION_CAPABILITIES[DOCUMENT_COLLABORATION_PERMISSION.EDIT],
+    canCreateChild: true,
+  }
 }
 
-export function canManageDocumentShare(input: {
+export function canManageDocumentCollaborators(input: {
   workspaceType: WorkspaceType
   workspaceMemberRole?: WorkspaceMemberRole | null
 }): boolean {
-  const role = resolveWorkspaceDocumentCollaborationRole(input)
-
-  if (!role) {
-    return false
-  }
-
-  return getDocumentCollaborationCapabilities(role).canManageShare
+  return getWorkspaceDocumentCollaborationCapabilities(input)?.canManageCollaboration ?? false
 }
 
-export function isDocumentLinkShareMode(
-  mode: DocumentShareMode | null | undefined,
-): mode is Extract<DocumentShareMode, 'LOGGED_IN' | 'PUBLIC'> {
-  return mode === DOCUMENT_SHARE_MODE.LOGGED_IN || mode === DOCUMENT_SHARE_MODE.PUBLIC
+function createMaintainerCapabilities(): DocumentCollaborationCapabilities {
+  return {
+    canRead: true,
+    canEdit: true,
+    canCreateChild: true,
+    canManageCollaboration: true,
+    canPublish: true,
+    canMove: true,
+    canTrash: true,
+    canRestore: true,
+  }
 }

@@ -33,6 +33,7 @@ const titleDraft = shallowRef('')
 const languageQuery = shallowRef('')
 const languagePopoverVisible = shallowRef(false)
 const morePopoverVisible = shallowRef(false)
+const readonlyCollapsed = shallowRef<boolean | null>(null)
 const showLineNumbers = shallowRef(true)
 const wrapLines = shallowRef(false)
 const {
@@ -45,6 +46,7 @@ const {
 })
 
 const selectedLanguage = computed(() => resolveCodeBlockLanguage(props.node.attrs.language))
+const isEditable = computed(() => props.editor.isEditable)
 
 watch(
   () => selectedLanguage.value.highlightLanguage,
@@ -57,7 +59,7 @@ watch(
 )
 const codeBlockName = computed(() => normalizeCodeBlockName(props.node.attrs.name))
 const displayTitle = computed(() => codeBlockName.value ?? CODE_BLOCK_DEFAULT_TITLE)
-const isCollapsed = computed(() => props.node.attrs.collapsed === true)
+const isCollapsed = computed(() => readonlyCollapsed.value ?? props.node.attrs.collapsed === true)
 const collapseIcon = computed(() => isCollapsed.value ? 'chevron-right' : 'chevron-down')
 const tabSize = computed(() => normalizeCodeBlockTabSize(props.node.attrs.tabSize))
 const isToolbarActive = computed(() => languagePopoverVisible.value || morePopoverVisible.value)
@@ -116,6 +118,10 @@ function normalizeCodeBlockTabSize(value: unknown) {
 }
 
 function startTitleEditing() {
+  if (!isEditable.value) {
+    return
+  }
+
   titleDraft.value = codeBlockName.value ?? ''
   isTitleEditing.value = true
 
@@ -135,6 +141,10 @@ function commitTitle() {
   titleDraft.value = ''
 
   if (name === codeBlockName.value) {
+    return
+  }
+
+  if (!isEditable.value) {
     return
   }
 
@@ -191,6 +201,10 @@ function handleTitlePaste(event: ClipboardEvent) {
 }
 
 function selectLanguage(language: CodeBlockLanguage) {
+  if (!isEditable.value) {
+    return
+  }
+
   props.updateAttributes({
     language: language.id,
   })
@@ -214,6 +228,11 @@ async function copyCode() {
 
 function toggleCollapsed() {
   const collapsed = !isCollapsed.value
+
+  if (!isEditable.value) {
+    readonlyCollapsed.value = collapsed
+    return
+  }
 
   props.updateAttributes({
     collapsed: collapsed ? true : undefined,
@@ -242,6 +261,10 @@ function setWrapLines(value: string | number | boolean) {
 }
 
 function updateTabSize(value: string | number | boolean | undefined) {
+  if (!isEditable.value) {
+    return
+  }
+
   const nextTabSize = normalizeCodeBlockTabSize(value)
 
   props.updateAttributes({
@@ -264,6 +287,7 @@ function showFormatPlaceholder() {
       'tiptap-code-block--line-numbers': showLineNumbers,
       'tiptap-code-block--wrap': wrapLines,
       'tiptap-code-block--collapsed': isCollapsed,
+      'tiptap-code-block--readonly': !isEditable,
       'tiptap-code-block--toolbar-active': isToolbarActive,
     }"
   >
@@ -294,7 +318,7 @@ function showFormatPlaceholder() {
         >
 
         <button
-          v-else
+          v-else-if="isEditable"
           class="tiptap-code-block__title-btn"
           :class="{ 'is-placeholder': !codeBlockName }"
           type="button"
@@ -303,10 +327,18 @@ function showFormatPlaceholder() {
         >
           {{ displayTitle }}
         </button>
+
+        <span
+          v-else
+          class="tiptap-code-block__title-text"
+          :class="{ 'is-placeholder': !codeBlockName }"
+        >
+          {{ displayTitle }}
+        </span>
       </div>
 
       <div class="tiptap-code-block__toolbar">
-        <template v-if="isCollapsed">
+        <template v-if="isCollapsed || !isEditable">
           <span class="tiptap-code-block__language-label">
             {{ selectedLanguage.label }}
           </span>

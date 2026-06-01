@@ -1,31 +1,33 @@
 import type { RouteRecordRaw } from 'vue-router'
 import type { SidebarPanelItem } from '@/layouts/panels/typing'
-import { AUTH_CALLBACK_PATH, DOCUMENT_SHARE_ROUTE_PREFIX } from '@haohaoxue/samepage-contracts'
+import { AUTH_CALLBACK_PATH, DOCUMENT_SINGLE_PUBLICATION_ROUTE_PREFIX, DOCUMENT_SITE_PUBLICATION_ROUTE_PREFIX } from '@haohaoxue/samepage-contracts'
 import { SvgIconCategory } from '@/components/svg-icon/typing'
 import { ADMIN_ROUTE_NAME, ADMIN_ROUTE_PATH } from './constants'
 
-const WorkspaceContainer = () => import('@/layouts/containers/WorkspaceContainer.vue')
-const AuthCallbackView = () => import('@/views/auth/callback/index.vue')
-const ChangePasswordView = () => import('@/views/auth/change-password/index.vue')
-const LoginView = () => import('@/views/auth/login/index.vue')
-const PasswordRegisterVerifyView = () => import('@/views/auth/register-verify/index.vue')
-const PasswordRegisterRequestView = () => import('@/views/auth/register/index.vue')
+const WorkspaceContainer = () => import('@/layouts/containers/workspace-container')
+const AdminView = () => import('@/views/admin')
+const AuthCallbackView = () => import('@/views/auth/pages/callback')
+const ChangePasswordView = () => import('@/views/auth/pages/change-password')
+const CollaborationResolverPageView = () => import('@/views/collaboration')
+const LoginView = () => import('@/views/auth/pages/login')
+const PasswordRegisterVerifyView = () => import('@/views/auth/pages/register-verify')
+const PasswordRegisterRequestView = () => import('@/views/auth/pages/register')
 const ChatView = () => import('@/views/chat/index.vue')
 // const CodeView = () => import('@/views/code/index.vue') // TODO
 const DocsView = () => import('@/views/docs/index.vue')
-const DocsDocumentSurfaceView = () => import('@/views/docs/pages/DocsDocumentSurfacePage.vue')
-const DocsPendingSharesPageView = () => import('@/views/docs/pages/DocsPendingSharesPage.vue')
-const DocsPermissionsPageView = () => import('@/views/docs/pages/DocsPermissionsPage.vue')
-const DocsTrashPageView = () => import('@/views/docs/pages/DocsTrashPage.vue')
+const DocsCollaborationsPageView = () => import('@/views/docs/pages/collaborations')
+const DocsDocumentSurfaceView = () => import('@/views/docs/pages/document-surface')
+const DocsPublicationSettingsPageView = () => import('@/views/docs/pages/publication-settings')
+const DocsTrashPageView = () => import('@/views/docs/pages/trash')
 const AgentView = () => import('@/views/agent/index.vue')
 // const KnowledgeView = () => import('@/views/knowledge/index.vue') // TODO
-const ProviderView = () => import('@/views/provider/index.vue')
 // const ScheduleView = () => import('@/views/schedule/index.vue') // TODO
 const SettingsView = () => import('@/views/settings/index.vue')
-const SettingsDefaultModelsPageView = () => import('@/views/settings/pages/SettingsDefaultModelsPage.vue')
-const SettingsPreferencePageView = () => import('@/views/settings/pages/SettingsPreferencePage.vue')
-const SettingsUserPageView = () => import('@/views/settings/pages/SettingsUserPage.vue')
-const SharedDocsView = () => import('@/views/shared-docs/index.vue')
+const SettingsDefaultModelsPageView = () => import('@/views/settings/pages/default-models')
+const SettingsPreferencePageView = () => import('@/views/settings/pages/preference')
+const SettingsProvidersPageView = () => import('@/views/settings/pages/providers')
+const SettingsUserPageView = () => import('@/views/settings/pages/user')
+const PublicationView = () => import('@/views/publications/index.vue')
 
 const ADMIN_ROUTE_ENTRY_NAME = 'admin-overview'
 
@@ -74,6 +76,11 @@ const workspaceRouteChildren = [
     component: ChatView,
   },
   {
+    path: 'r/:code',
+    name: 'collaboration-resolver',
+    component: CollaborationResolverPageView,
+  },
+  {
     path: 'docs',
     name: 'docs-nav',
     component: DocsView,
@@ -85,19 +92,19 @@ const workspaceRouteChildren = [
     },
     children: [
       {
-        path: 'pending-shares',
-        name: 'docs-pending-shares',
-        component: DocsPendingSharesPageView,
-      },
-      {
-        path: 'permissions',
-        name: 'docs-permissions',
-        component: DocsPermissionsPageView,
+        path: 'collaborations',
+        name: 'docs-collaborations',
+        component: DocsCollaborationsPageView,
       },
       {
         path: 'trash',
         name: 'docs-trash',
         component: DocsTrashPageView,
+      },
+      {
+        path: 'publications',
+        name: 'docs-publications',
+        component: DocsPublicationSettingsPageView,
       },
       {
         path: ':id?',
@@ -151,17 +158,6 @@ const workspaceRouteChildren = [
     },
   },
   {
-    path: 'provider',
-    name: 'provider',
-    component: ProviderView,
-    meta: {
-      navLabel: '服务商',
-      navIconCategory: SvgIconCategory.NAV,
-      navIcon: 'model-providers',
-      navActiveIcon: 'model-providers-active',
-    },
-  },
-  {
     path: 'settings',
     name: 'settings',
     component: SettingsView,
@@ -184,6 +180,11 @@ const workspaceRouteChildren = [
         component: SettingsPreferencePageView,
       },
       {
+        path: 'providers',
+        name: 'settings-providers',
+        component: SettingsProvidersPageView,
+      },
+      {
         path: 'models-default',
         name: 'settings-models-default',
         component: SettingsDefaultModelsPageView,
@@ -200,7 +201,7 @@ const adminRouteChildren = [
   {
     path: 'overview',
     name: ADMIN_ROUTE_ENTRY_NAME,
-    component: () => import('@/views/system-admin/overview/index.vue'),
+    component: () => import('@/views/admin/pages/overview'),
     meta: {
       navLabel: '概览',
       navIconCategory: SvgIconCategory.NAV,
@@ -211,7 +212,7 @@ const adminRouteChildren = [
   {
     path: 'users',
     name: 'admin-users',
-    component: () => import('@/views/system-admin/users/index.vue'),
+    component: () => import('@/views/admin/pages/users'),
     meta: {
       navLabel: '用户',
       navIconCategory: SvgIconCategory.NAV,
@@ -222,7 +223,7 @@ const adminRouteChildren = [
   {
     path: 'email',
     name: 'admin-email',
-    component: () => import('@/views/system-admin/email/index.vue'),
+    component: () => import('@/views/admin/pages/email'),
     meta: {
       navLabel: '邮件',
       navIconCategory: SvgIconCategory.NAV,
@@ -233,7 +234,7 @@ const adminRouteChildren = [
   {
     path: 'providers',
     name: 'admin-providers',
-    component: () => import('@/views/system-admin/providers/index.vue'),
+    component: () => import('@/views/admin/pages/providers'),
     meta: {
       navLabel: '服务商',
       navIconCategory: SvgIconCategory.NAV,
@@ -244,7 +245,7 @@ const adminRouteChildren = [
   {
     path: 'audit',
     name: 'admin-audit',
-    component: () => import('@/views/system-admin/audit/index.vue'),
+    component: () => import('@/views/admin/pages/audit'),
     meta: {
       navLabel: '审计',
       navIconCategory: SvgIconCategory.NAV,
@@ -260,15 +261,21 @@ export const workspaceNavigationItems: SidebarPanelItem[] = createNavigationItem
 
 export const protectedRoutes: RouteRecordRaw[] = [
   {
-    path: `${DOCUMENT_SHARE_ROUTE_PREFIX}/recipients/:recipientId`,
-    name: 'shared-doc-recipient',
-    component: SharedDocsView,
+    path: `${DOCUMENT_SINGLE_PUBLICATION_ROUTE_PREFIX}/:documentId`,
+    name: 'publication-single',
+    component: PublicationView,
     meta: { allowAnonymous: true },
   },
   {
-    path: `${DOCUMENT_SHARE_ROUTE_PREFIX}/:shareId`,
-    name: 'shared-docs',
-    component: SharedDocsView,
+    path: `${DOCUMENT_SITE_PUBLICATION_ROUTE_PREFIX}/:siteId/:documentId`,
+    name: 'publication-site-document',
+    component: PublicationView,
+    meta: { allowAnonymous: true },
+  },
+  {
+    path: `${DOCUMENT_SITE_PUBLICATION_ROUTE_PREFIX}/:siteId`,
+    name: 'publication-site',
+    component: PublicationView,
     meta: { allowAnonymous: true },
   },
   {
@@ -287,7 +294,7 @@ export const protectedRoutes: RouteRecordRaw[] = [
 export const adminRoute: RouteRecordRaw = {
   path: ADMIN_ROUTE_PATH,
   name: ADMIN_ROUTE_NAME,
-  component: WorkspaceContainer,
+  component: AdminView,
   redirect: { name: ADMIN_ROUTE_ENTRY_NAME },
   meta: { requiresSystemAdmin: true },
   children: adminRouteChildren,

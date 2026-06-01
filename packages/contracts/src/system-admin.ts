@@ -72,7 +72,7 @@ export const SystemAdminOverviewSchema = z.object({
   disabledUsers: CountSchema,
   systemAdminCount: CountSchema,
   totalDocuments: CountSchema,
-  sharedDocuments: CountSchema,
+  publishedDocuments: CountSchema,
   lockedDocuments: CountSchema,
 }).strict()
 

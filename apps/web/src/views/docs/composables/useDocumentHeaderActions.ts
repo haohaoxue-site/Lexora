@@ -1,17 +1,13 @@
 import type { DocumentPageWidthMode } from '@haohaoxue/samepage-contracts'
 import { DOCUMENT_PAGE_WIDTH_MODE } from '@haohaoxue/samepage-contracts'
-import {
-  buildSharedDocumentPath,
-  isDocumentLinkShareMode,
-} from '@haohaoxue/samepage-shared'
-import { useClipboard } from '@vueuse/core'
 import { ElMessage } from 'element-plus'
 import { computed, shallowRef } from 'vue'
 import { patchDocumentLayout } from '@/apis/document'
 import { useActiveDocument } from './useActiveDocument'
 import { useDocsChatPanel } from './useDocsChatPanel'
+import { useDocsCollaborationDialog } from './useDocsCollaborationDialog'
 import { useDocsHistoryState } from './useDocsHistoryState'
-import { useDocsShareDialog } from './useDocsShareDialog'
+import { useDocsPublicationDialog } from './useDocsPublicationDialog'
 
 export function useDocumentHeaderActions() {
   const { currentDocument, patchDocumentPageWidthMode } = useActiveDocument()
@@ -20,66 +16,35 @@ export function useDocumentHeaderActions() {
     togglePanel: toggleDocsChatPanel,
   } = useDocsChatPanel()
   const { openHistoryMode } = useDocsHistoryState()
-  const { canOpenShareDialog, openDocumentShareDialog } = useDocsShareDialog()
+  const { openDocumentCollaborationDialog } = useDocsCollaborationDialog()
+  const { openDocumentPublicationDialog } = useDocsPublicationDialog()
   const isPageWidthUpdating = shallowRef(false)
-  const {
-    copied: isShareLinkCopied,
-    copy: copyShareLinkText,
-    isSupported: isClipboardSupported,
-  } = useClipboard({
-    copiedDuring: 1400,
-    legacy: true,
-  })
 
   const documentId = computed(() => currentDocument.value?.id ?? '')
   const currentPageWidthMode = computed<DocumentPageWidthMode>(() =>
     currentDocument.value?.pageWidthMode ?? DOCUMENT_PAGE_WIDTH_MODE.DEFAULT,
   )
-  const effectivePolicy = computed(() => currentDocument.value?.share?.effectivePolicy ?? null)
-  const shareLinkPath = computed(() => {
-    const policy = effectivePolicy.value
+  const canShowCollaborationButton = computed(() =>
+    Boolean(documentId.value && currentDocument.value?.access.capabilities.canManageCollaboration),
+  )
+  const canShowPublicationButton = computed(() =>
+    Boolean(documentId.value && currentDocument.value?.access.capabilities.canPublish),
+  )
 
-    if (!policy || !isDocumentLinkShareMode(policy.mode)) {
-      return ''
-    }
-
-    return buildSharedDocumentPath(policy.shareId)
-  })
-  const fullShareLink = computed(() => {
-    if (!shareLinkPath.value) {
-      return ''
-    }
-
-    return new URL(shareLinkPath.value, window.location.origin).toString()
-  })
-  const shouldShowShareLink = computed(() => Boolean(fullShareLink.value))
-  const isShareButtonDisabled = computed(() => !documentId.value || !canOpenShareDialog.value)
-
-  function openShareDialog() {
+  function openCollaborationDialog() {
     if (!documentId.value) {
       return
     }
 
-    openDocumentShareDialog(documentId.value)
+    openDocumentCollaborationDialog(documentId.value)
   }
 
-  async function copyShareLink() {
-    if (!fullShareLink.value) {
+  function openPublicationDialog() {
+    if (!documentId.value) {
       return
     }
 
-    if (!isClipboardSupported.value) {
-      ElMessage.error('当前环境不支持复制')
-      return
-    }
-
-    try {
-      await copyShareLinkText(fullShareLink.value)
-      ElMessage.success('分享链接已复制')
-    }
-    catch {
-      ElMessage.error('复制链接失败，请手动复制')
-    }
+    openDocumentPublicationDialog(documentId.value)
   }
 
   async function handlePageWidthOptionClick(pageWidthMode: DocumentPageWidthMode) {
@@ -122,11 +87,10 @@ export function useDocumentHeaderActions() {
     handleMenuCommand,
     handlePageWidthOptionClick,
     isDocsChatPanelOpen,
-    isShareButtonDisabled,
-    isShareLinkCopied,
-    openShareDialog,
-    shouldShowShareLink,
+    canShowCollaborationButton,
+    canShowPublicationButton,
+    openCollaborationDialog,
+    openPublicationDialog,
     toggleDocsChatPanel,
-    copyShareLink,
   }
 }

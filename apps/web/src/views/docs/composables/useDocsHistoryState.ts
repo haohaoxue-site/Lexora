@@ -26,6 +26,7 @@ export const useDocsHistoryState = createSharedComposable(() => {
   const docsDocumentEditorMode = computed(() => isHistoryMode.value ? 'history' : 'default')
   const isDocsDocumentEditable = computed(() =>
     docsDocumentEditorMode.value === 'default'
+    && Boolean(activeDocument.currentDocument.value?.access.capabilities.canEdit)
     && !activeDocument.isCollaborationReadonly.value
     && !activeDocument.isCollaborationInitialSyncing.value,
   )

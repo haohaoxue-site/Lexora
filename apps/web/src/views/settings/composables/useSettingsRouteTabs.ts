@@ -5,6 +5,7 @@ import { useRoute, useRouter } from 'vue-router'
 const settingsRouteNameByTab = {
   'user': 'settings-user',
   'preference': 'settings-preference',
+  'providers': 'settings-providers',
   'models-default': 'settings-models-default',
 } as const satisfies Record<SettingsTabName, string>
 
@@ -16,6 +17,10 @@ export function useSettingsRouteTabs() {
     get() {
       if (route.name === settingsRouteNameByTab.preference) {
         return 'preference'
+      }
+
+      if (route.name === settingsRouteNameByTab.providers) {
+        return 'providers'
       }
 
       if (route.name === settingsRouteNameByTab['models-default']) {

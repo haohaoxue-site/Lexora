@@ -5,6 +5,15 @@ import type {
   TiptapEditorSelectionContextRequest,
 } from '../../core/typing'
 
+export interface DocumentBodyEditorOutlineOptions {
+  defaultExpanded?: boolean
+  layout?: 'overlay' | 'side'
+  mode?: 'hover' | 'manual'
+  placement?: 'left' | 'right'
+  showSearch?: boolean
+  surface?: 'card' | 'transparent'
+}
+
 export interface DocumentBodyEditorProps {
   /**
    * 文档 ID
@@ -33,9 +42,14 @@ export interface DocumentBodyEditorProps {
   editable?: boolean
   /**
    * 是否展示大纲浮层
-   * @description 分享阅读页会关闭编辑器专属浮层
+   * @description 可按阅读或编辑场景配置展开方式
    */
   showOutline?: boolean
+  /**
+   * 大纲展示参数
+   * @description 普通编辑器默认悬停展开；公开阅读页可配置为右侧常驻大纲
+   */
+  outlineOptions?: DocumentBodyEditorOutlineOptions
 }
 
 export interface DocumentBodyEditorEmits {

@@ -18,10 +18,10 @@ import {
   createDocumentMoveOperation,
   getDocumentOperationJob,
 } from '@/apis/document'
+import { useUiStore } from '@/stores/ui'
 import { useWorkspaceStore } from '@/stores/workspace'
 import { useActiveDocument } from './useActiveDocument'
 import { useDocsContext } from './useDocsContext'
-import { useDocsShareDialog } from './useDocsShareDialog'
 import { useDocsSurfaceState } from './useDocsSurfaceState'
 import { useDocumentTree } from './useDocumentTree'
 
@@ -32,6 +32,7 @@ const DOCUMENT_OPERATION_LONG_RUNNING_ASSETS_THRESHOLD = 3
 
 export const useDocsPageActions = createSharedComposable(() => {
   const router = useRouter()
+  const uiStore = useUiStore()
   const workspaceStore = useWorkspaceStore()
   const {
     activeDocumentId,
@@ -42,7 +43,6 @@ export const useDocsPageActions = createSharedComposable(() => {
   const tree = useDocumentTree()
   const activeDocument = useActiveDocument()
   const surfaceState = useDocsSurfaceState()
-  const { canOpenShareDialog } = useDocsShareDialog()
   const isDocumentOperationRunning = shallowRef(false)
 
   let lastInaccessibleRedirectDocumentId: string | null = null
@@ -277,26 +277,23 @@ export const useDocsPageActions = createSharedComposable(() => {
     }
   }
 
-  function openPermissionsOverview() {
-    if (!canOpenShareDialog.value) {
-      ElMessage.warning('仅 MAINTAINER 可以查看分享管理')
-      return
-    }
-
-    void router.push({
-      name: 'docs-permissions',
-    })
-  }
-
-  function openPendingShares() {
-    void router.push({
-      name: 'docs-pending-shares',
-    })
-  }
-
   function openTrashPage() {
+    uiStore.setLastDocsControlCenterRouteName('docs-trash')
     void router.push({
       name: 'docs-trash',
+    })
+  }
+
+  function openPublicationSettingsPage() {
+    uiStore.setLastDocsControlCenterRouteName('docs-publications')
+    void router.push({
+      name: 'docs-publications',
+    })
+  }
+
+  function openDocsControlCenterPage() {
+    void router.push({
+      name: uiStore.lastDocsControlCenterRouteName,
     })
   }
 
@@ -306,10 +303,10 @@ export const useDocsPageActions = createSharedComposable(() => {
     isDocumentOperationRunning,
     loadInitialTree,
     moveDocumentTree,
+    openDocsControlCenterPage,
     openDefaultDocument,
     openDocument,
-    openPendingShares,
-    openPermissionsOverview,
+    openPublicationSettingsPage,
     openTrashPage,
   }
 })

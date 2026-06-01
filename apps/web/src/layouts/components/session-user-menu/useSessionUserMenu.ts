@@ -4,10 +4,12 @@ import {
   APPEARANCE_PREFERENCE_LABELS,
   APPEARANCE_PREFERENCE_VALUES,
 } from '@haohaoxue/samepage-contracts'
+import { useClipboard } from '@vueuse/core'
 import { ElMessage } from 'element-plus'
 import { computed, shallowRef, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { SvgIconCategory } from '@/components/svg-icon/typing'
+import { useSessionNotificationBell } from '@/layouts/components/session-notification-bell/useSessionNotificationBell'
 import { useAuthSession } from '@/layouts/composables/useAuthSession'
 import { getWorkspaceEntryPath } from '@/layouts/utils/workspace-entry'
 import { ADMIN_ROUTE_NAME } from '@/router/constants'
@@ -21,23 +23,48 @@ interface UseSessionUserMenuOptions {
   showContextSwitch: boolean
 }
 
-type SessionSubmenu = 'appearance' | null
+type SessionMenuPanel = 'appearance' | 'notifications' | null
 
 export function useSessionUserMenu(options: UseSessionUserMenuOptions) {
   const route = useRoute()
   const router = useRouter()
   const userStore = useUserStore()
   const menuVisible = shallowRef(false)
-  const activeSubmenu = shallowRef<SessionSubmenu>(null)
+  const activeSubmenu = shallowRef<SessionMenuPanel>(null)
   const { currentUser: sessionUser, isLoggingOut, logout } = useAuthSession()
-  // 登出过程中 sessionUser 会短暂为 null，保留上一份用于继续渲染头像/昵称。
+  const {
+    acceptInvitation,
+    actingInvitationAction,
+    actingInvitationId,
+    closeInvitationDetail,
+    declineInvitation,
+    hasLoaded,
+    hasPendingInvitations,
+    invitationItems,
+    isDetailDialogOpen,
+    isLoading,
+    loadErrorMessage,
+    loadSummary,
+    pendingInvitationCount,
+    selectedInvitation,
+    viewInvitation,
+  } = useSessionNotificationBell()
   const lastKnownUser = shallowRef(sessionUser.value)
+  const {
+    copy,
+    copied: copiedUserCode,
+    isSupported: isClipboardSupported,
+  } = useClipboard({
+    copiedDuring: 1400,
+    legacy: true,
+  })
 
   const appearanceOptions = APPEARANCE_PREFERENCE_VALUES.map(value => ({
     label: APPEARANCE_PREFERENCE_LABELS[value],
     value,
   }))
   const appearanceMenuVisible = computed(() => activeSubmenu.value === 'appearance')
+  const notificationPanelVisible = computed(() => activeSubmenu.value === 'notifications')
   const currentUser = computed<SessionMenuUser>(() => {
     const user = sessionUser.value ?? lastKnownUser.value!
 
@@ -45,6 +72,7 @@ export function useSessionUserMenu(options: UseSessionUserMenuOptions) {
       displayName: user.displayName,
       email: user.email ?? '',
       avatarUrl: user.avatarUrl,
+      userCode: user.userCode,
     }
   })
   const isAdminRoute = computed(() => Boolean(route.meta?.requiresSystemAdmin))
@@ -98,6 +126,25 @@ export function useSessionUserMenu(options: UseSessionUserMenuOptions) {
     currentAppearanceLabel,
     isSavingAppearance,
     toggleAppearanceMenu,
+    notificationPanelVisible,
+    hasLoadedNotifications: hasLoaded,
+    isLoadingNotifications: isLoading,
+    loadNotificationError: loadErrorMessage,
+    hasPendingInvitations,
+    invitationItems,
+    pendingInvitationCount,
+    actingInvitationId,
+    actingInvitationAction,
+    selectedInvitation,
+    isDetailDialogOpen,
+    copiedUserCode,
+    toggleNotificationPanel,
+    refreshNotifications,
+    handleCopyUserCode,
+    handleViewInvitation,
+    handleAcceptInvitation,
+    handleDeclineInvitation,
+    closeInvitationDetail,
     handleAppearanceSelect,
     switchContext,
     handleLogout,
@@ -112,7 +159,16 @@ export function useSessionUserMenu(options: UseSessionUserMenuOptions) {
     toggleSubmenu('appearance')
   }
 
-  function toggleSubmenu(target: NonNullable<SessionSubmenu>) {
+  async function toggleNotificationPanel() {
+    const nextVisible = activeSubmenu.value !== 'notifications'
+    toggleSubmenu('notifications')
+
+    if (nextVisible) {
+      await loadSummary()
+    }
+  }
+
+  function toggleSubmenu(target: NonNullable<SessionMenuPanel>) {
     activeSubmenu.value = activeSubmenu.value === target ? null : target
   }
 
@@ -148,6 +204,38 @@ export function useSessionUserMenu(options: UseSessionUserMenuOptions) {
   async function handleLogout() {
     closeMenu()
     await logout()
+  }
+
+  async function refreshNotifications() {
+    await loadSummary()
+  }
+
+  async function handleCopyUserCode() {
+    if (!isClipboardSupported.value) {
+      ElMessage.error('当前环境不支持复制')
+      return
+    }
+
+    try {
+      await copy(currentUser.value.userCode)
+      ElMessage.success('协作码已复制')
+    }
+    catch {
+      ElMessage.error('复制失败')
+    }
+  }
+
+  function handleViewInvitation(...args: Parameters<typeof viewInvitation>) {
+    viewInvitation(...args)
+  }
+
+  async function handleAcceptInvitation(...args: Parameters<typeof acceptInvitation>) {
+    await acceptInvitation(...args)
+    closeMenu()
+  }
+
+  async function handleDeclineInvitation(...args: Parameters<typeof declineInvitation>) {
+    await declineInvitation(...args)
   }
 
   function getLogoutIconName() {

@@ -5,6 +5,7 @@ interface ShowAiDefaultModelMissingDialogOptions {
   router: Router
   title: string
   message: string
+  targetRouteName?: 'settings-models-default' | 'settings-providers'
 }
 
 let defaultModelDialogPromise: Promise<unknown> | null = null
@@ -25,7 +26,9 @@ export function showAiDefaultModelMissingDialog(
     cancelButtonText: '稍后再说',
   })
     .then(() => {
-      void options.router.push('/settings/models-default')
+      void options.router.push({
+        name: options.targetRouteName ?? 'settings-models-default',
+      })
     })
     .catch(() => undefined)
     .finally(() => {

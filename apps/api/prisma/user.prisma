@@ -16,57 +16,70 @@ enum UserAppearancePreference {
 }
 
 model User {
-  id                              String                      @id @default(uuid())
-  email                           String?                     @unique
-  displayName                     String
-  userCode                        String                      @unique
-  avatarUrl                       String?
-  avatarStorageKey                String?
-  status                          UserStatus                  @default(ACTIVE)
-  lastLoginAt                     DateTime?
-  oauthAccounts                   OauthAccount[]
-  refreshTokens                   AuthRefreshToken[]
-  loginCodes                      AuthLoginCode[]
-  userRoles                       UserRole[]
-  localCredential                 LocalCredential?
-  createdDocuments                Document[]                  @relation("DocumentCreator")
-  trashedDocuments                Document[]                  @relation("DocumentTrasher")
-  createdDocumentVersionSnapshots DocumentVersionSnapshot[]   @relation("DocumentVersionSnapshotCreator")
-  createdDocumentYdocUpdates      DocumentYdocUpdate[]        @relation("DocumentYdocUpdateCreator")
-  createdDocumentAssets           DocumentAsset[]             @relation("DocumentAssetCreator")
-  createdDocumentShares           DocumentShare[]             @relation("DocumentShareCreator")
-  updatedDocumentShares           DocumentShare[]             @relation("DocumentShareUpdater")
-  createdDocumentOperationJobs    DocumentOperationJob[]      @relation("DocumentOperationJobCreator")
-  documentShareRecipients         DocumentShareRecipient[]    @relation("DocumentShareRecipientUser")
-  createdDocumentShareRecipients  DocumentShareRecipient[]    @relation("DocumentShareRecipientCreator")
-  updatedDocumentShareRecipients  DocumentShareRecipient[]    @relation("DocumentShareRecipientUpdater")
-  documentCollabTickets           DocumentCollabTicket[]
-  workspaceMemberships            WorkspaceMember[]
-  receivedWorkspaceInvites        WorkspaceInvite[]           @relation("WorkspaceInviteInvitee")
-  createdWorkspaceInvites         WorkspaceInvite[]           @relation("WorkspaceInviteCreator")
-  updatedWorkspaceInvites         WorkspaceInvite[]           @relation("WorkspaceInviteUpdater")
-  createdChatSessions             ChatSession[]               @relation("ChatSessionCreator")
-  adminAuditLogs                  AdminAuditLog[]             @relation("AdminAuditLogActor")
-  ownedAiProviders                AiProvider[]                @relation("AiProviderOwner")
-  updatedAiProviders              AiProvider[]                @relation("AiProviderUpdater")
-  updatedAiProviderModels         AiProviderModel[]           @relation("AiProviderModelUpdater")
-  aiDefaultModelPolicies          AiDefaultModelPolicy[]      @relation("AiDefaultModelPolicyUser")
-  updatedDefaultModelPolicies     AiDefaultModelPolicy[]      @relation("AiDefaultModelPolicyUpdater")
-  createdAiSessions               AiSession[]                 @relation("AiSessionCreator")
-  updatedAiSessions               AiSession[]                 @relation("AiSessionUpdater")
-  createdAiRuns                   AiRun[]                     @relation("AiRunCreator")
-  updatedAiRuns                   AiRun[]                     @relation("AiRunUpdater")
-  createdAiCandidates             AiCandidate[]               @relation("AiCandidateCreator")
-  updatedAiCandidates             AiCandidate[]               @relation("AiCandidateUpdater")
-  systemAdminConfig               SystemAuthConfig?           @relation("SystemAuthConfigSystemAdmin")
-  updatedAuthConfigs              SystemAuthConfig[]          @relation("SystemAuthConfigUpdater")
-  preference                      UserPreference?
-  emailVerificationCodes          UserEmailVerificationCode[]
-  initiatedOauthStates            AuthOauthState[]            @relation("AuthOauthStateInitiator")
-  updatedEmailConfigs             SystemEmailConfig[]         @relation("SystemEmailConfigUpdater")
-  createdAt                       DateTime                    @default(now())
-  updatedAt                       DateTime                    @updatedAt
-  deletedAt                       DateTime?
+  id                                       String                             @id @default(uuid())
+  email                                    String?                            @unique
+  displayName                              String
+  userCode                                 String                             @unique
+  avatarUrl                                String?
+  avatarStorageKey                         String?
+  status                                   UserStatus                         @default(ACTIVE)
+  lastLoginAt                              DateTime?
+  oauthAccounts                            OauthAccount[]
+  refreshTokens                            AuthRefreshToken[]
+  loginCodes                               AuthLoginCode[]
+  userRoles                                UserRole[]
+  localCredential                          LocalCredential?
+  createdDocuments                         Document[]                         @relation("DocumentCreator")
+  trashedDocuments                         Document[]                         @relation("DocumentTrasher")
+  createdDocumentVersionSnapshots          DocumentVersionSnapshot[]          @relation("DocumentVersionSnapshotCreator")
+  createdDocumentYdocUpdates               DocumentYdocUpdate[]               @relation("DocumentYdocUpdateCreator")
+  createdDocumentAssets                    DocumentAsset[]                    @relation("DocumentAssetCreator")
+  createdDocumentOperationJobs             DocumentOperationJob[]             @relation("DocumentOperationJobCreator")
+  documentCollaborationGrants              DocumentCollaborationGrant[]       @relation("DocumentCollaborationGrantUser")
+  createdDocumentCollaborationGrants       DocumentCollaborationGrant[]       @relation("DocumentCollaborationGrantCreator")
+  updatedDocumentCollaborationGrants       DocumentCollaborationGrant[]       @relation("DocumentCollaborationGrantUpdater")
+  documentCollaborationUserInvites         DocumentCollaborationUserInvite[]  @relation("DocumentCollaborationUserInviteInvitee")
+  createdDocumentCollaborationUserInvites  DocumentCollaborationUserInvite[]  @relation("DocumentCollaborationUserInviteCreator")
+  updatedDocumentCollaborationUserInvites  DocumentCollaborationUserInvite[]  @relation("DocumentCollaborationUserInviteUpdater")
+  createdDocumentCollaborationLinkInvites  DocumentCollaborationLinkInvite[]  @relation("DocumentCollaborationLinkInviteCreator")
+  updatedDocumentCollaborationLinkInvites  DocumentCollaborationLinkInvite[]  @relation("DocumentCollaborationLinkInviteUpdater")
+  createdDocumentSinglePublicationSettings DocumentSinglePublicationSetting[] @relation("DocumentSinglePublicationSettingCreator")
+  updatedDocumentSinglePublicationSettings DocumentSinglePublicationSetting[] @relation("DocumentSinglePublicationSettingUpdater")
+  createdDocumentPublicationSites          DocumentPublicationSite[]          @relation("DocumentPublicationSiteCreator")
+  updatedDocumentPublicationSites          DocumentPublicationSite[]          @relation("DocumentPublicationSiteUpdater")
+  createdDocumentPublicationSections       DocumentPublicationSection[]       @relation("DocumentPublicationSectionCreator")
+  updatedDocumentPublicationSections       DocumentPublicationSection[]       @relation("DocumentPublicationSectionUpdater")
+  createdDocumentPublicationPages          DocumentPublicationPage[]          @relation("DocumentPublicationPageCreator")
+  updatedDocumentPublicationPages          DocumentPublicationPage[]          @relation("DocumentPublicationPageUpdater")
+  createdDocumentPublicationNavItems       DocumentPublicationNavItem[]       @relation("DocumentPublicationNavItemCreator")
+  updatedDocumentPublicationNavItems       DocumentPublicationNavItem[]       @relation("DocumentPublicationNavItemUpdater")
+  documentCollabTickets                    DocumentCollabTicket[]
+  workspaceMemberships                     WorkspaceMember[]
+  receivedWorkspaceInvites                 WorkspaceInvite[]                  @relation("WorkspaceInviteInvitee")
+  createdWorkspaceInvites                  WorkspaceInvite[]                  @relation("WorkspaceInviteCreator")
+  updatedWorkspaceInvites                  WorkspaceInvite[]                  @relation("WorkspaceInviteUpdater")
+  createdChatSessions                      ChatSession[]                      @relation("ChatSessionCreator")
+  adminAuditLogs                           AdminAuditLog[]                    @relation("AdminAuditLogActor")
+  ownedAiProviders                         AiProvider[]                       @relation("AiProviderOwner")
+  updatedAiProviders                       AiProvider[]                       @relation("AiProviderUpdater")
+  updatedAiProviderModels                  AiProviderModel[]                  @relation("AiProviderModelUpdater")
+  aiDefaultModelPolicies                   AiDefaultModelPolicy[]             @relation("AiDefaultModelPolicyUser")
+  updatedDefaultModelPolicies              AiDefaultModelPolicy[]             @relation("AiDefaultModelPolicyUpdater")
+  createdAiSessions                        AiSession[]                        @relation("AiSessionCreator")
+  updatedAiSessions                        AiSession[]                        @relation("AiSessionUpdater")
+  createdAiRuns                            AiRun[]                            @relation("AiRunCreator")
+  updatedAiRuns                            AiRun[]                            @relation("AiRunUpdater")
+  createdAiCandidates                      AiCandidate[]                      @relation("AiCandidateCreator")
+  updatedAiCandidates                      AiCandidate[]                      @relation("AiCandidateUpdater")
+  systemAdminConfig                        SystemAuthConfig?                  @relation("SystemAuthConfigSystemAdmin")
+  updatedAuthConfigs                       SystemAuthConfig[]                 @relation("SystemAuthConfigUpdater")
+  preference                               UserPreference?
+  emailVerificationCodes                   UserEmailVerificationCode[]
+  initiatedOauthStates                     AuthOauthState[]                   @relation("AuthOauthStateInitiator")
+  updatedEmailConfigs                      SystemEmailConfig[]                @relation("SystemEmailConfigUpdater")
+  createdAt                                DateTime                           @default(now())
+  updatedAt                                DateTime                           @updatedAt
+  deletedAt                                DateTime?
 }
 
 model UserPreference {
