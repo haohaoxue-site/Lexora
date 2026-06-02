@@ -90,7 +90,7 @@ async function handleConfirmEmail() {
 </script>
 
 <template>
-  <div v-loading="isLoading" class="settings-user-page mx-auto max-w-6xl p-6">
+  <div v-loading="isLoading" class="settings-user-page mx-auto w-full max-w-[var(--page-mode-form-max-width)] px-6 py-6">
     <ElAlert
       v-if="errorMessage"
       :title="errorMessage"

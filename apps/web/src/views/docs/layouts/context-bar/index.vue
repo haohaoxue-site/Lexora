@@ -45,7 +45,7 @@ const connectionStatusTitle = computed(() =>
       :class="{ 'is-single-line': isSingleLine }"
     >
       <template v-if="isDocumentSurface">
-        <div class="docs-view-context__breadcrumb-shell flex min-w-0 items-center gap-[0.45rem]">
+        <div class="docs-view-context__breadcrumb-shell flex min-w-0 items-center gap-2">
           <ElBreadcrumb v-if="visibleBreadcrumbLabels.length" separator="/" class="min-w-0">
             <ElBreadcrumbItem
               v-for="label in visibleBreadcrumbLabels"

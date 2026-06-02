@@ -122,10 +122,10 @@ async function updateSinglePublicationState(
       ...(scope ? { scope } : {}),
     })
     await reloadSinglePublications()
-    ElMessage.success('单页公开状态已更新')
+    ElMessage.success('公开状态已更新')
   }
   catch (error) {
-    ElMessage.error(error instanceof Error ? error.message : '更新单页公开状态失败')
+    ElMessage.error(error instanceof Error ? error.message : '更新公开状态失败')
   }
   finally {
     updatingSingleDocumentId.value = null
@@ -257,16 +257,7 @@ async function runSiteMutation(action: () => Promise<void>, errorText: string) {
 
 <template>
   <section class="docs-publication-settings-page flex min-h-0 min-w-0 flex-1 flex-col gap-4 overflow-auto p-[clamp(1.25rem,2vw,1.75rem)]">
-    <header class="flex items-start justify-between gap-4 max-[760px]:flex-col max-[760px]:items-stretch">
-      <div>
-        <h1 class="m-0 text-xl font-bold text-main">
-          发布
-        </h1>
-        <p class="m-0 mt-1 text-sm leading-5 text-secondary">
-          单页公开和站点发布相互独立；协作权限不会自动进入发布配置。
-        </p>
-      </div>
-
+    <header class="flex justify-end">
       <div class="inline-flex shrink-0 gap-2 max-[760px]:flex-col">
         <ElButton :disabled="!siteUrl" @click="copySiteUrl">
           复制站点链接
@@ -292,13 +283,14 @@ async function runSiteMutation(action: () => Promise<void>, errorText: string) {
     </ElAlert>
 
     <ElTabs v-model="activeTab" class="docs-publication-settings-page__tabs">
-      <ElTabPane label="单页公开" name="single">
+      <ElTabPane label="公开" name="single">
         <SinglePublicationPanel
           :tree="singleTree"
           :site-pages="pages"
           :loading="isLoading"
           :updating-document-id="updatingSingleDocumentId"
           @refresh="reloadSinglePublications"
+          @remove-site-page="deletePage"
           @update-state="updateSinglePublicationState"
         />
       </ElTabPane>

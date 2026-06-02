@@ -22,15 +22,15 @@ const outlineOptions: DocumentBodyEditorOutlineOptions = {
 
 <template>
   <section class="publication-single-document-page flex h-screen min-h-0 flex-col overflow-hidden">
-    <header class="publication-single-document-page__topbar flex min-h-[3.65rem] flex-[0_0_auto] items-center justify-between gap-5 px-[clamp(1rem,2vw,1.75rem)] py-[0.55rem] max-[560px]:flex-col max-[560px]:items-start max-[560px]:gap-1">
-      <div class="publication-single-document-page__titlebar grid min-w-0 gap-[0.12rem]">
+    <header class="publication-single-document-page__topbar flex min-h-14 flex-[0_0_auto] items-center justify-between gap-5 px-[clamp(1rem,2vw,1.75rem)] py-2 max-[560px]:flex-col max-[560px]:items-start max-[560px]:gap-1">
+      <div class="publication-single-document-page__titlebar grid min-w-0 gap-px">
         <div class="publication-single-document-page__breadcrumb flex min-w-0 items-center text-[13px] leading-[1.35] text-secondary">
           <span class="publication-single-document-page__owner">{{ ownerName }}</span>
-          <SvgIcon category="ui" icon="chevron-right" size="0.82rem" />
+          <SvgIcon category="ui" icon="chevron-right" size="12px" />
           <strong class="publication-single-document-page__title font-bold text-main">{{ documentTitle }}</strong>
         </div>
 
-        <p class="publication-single-document-page__time m-0 whitespace-nowrap text-[11px] leading-[1.4] text-[color-mix(in_srgb,var(--brand-text-tertiary)_68%,transparent)] max-[560px]:whitespace-normal">
+        <p class="publication-single-document-page__time m-0 whitespace-nowrap text-xs leading-[1.4] text-[color-mix(in_srgb,var(--brand-text-tertiary)_68%,transparent)] max-[560px]:whitespace-normal">
           最近修改：{{ updatedAtText }}
         </p>
       </div>

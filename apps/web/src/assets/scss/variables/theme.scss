@@ -1,36 +1,41 @@
 :root {
-  --brand-primary: #3370ff;
-  --brand-success: #00b42a;
-  --brand-warning: #ff7d00;
-  --brand-error: #f53f3f;
-  --brand-info: #86909c;
+  --brand-primary: #0b7a75;
+  --brand-success: #1f8a5b;
+  --brand-warning: #b7791f;
+  --brand-error: #d92d20;
+  --brand-info: #7b8580;
 
-  --brand-text-primary: #1f2329;
-  --brand-text-regular: #646a73;
-  --brand-text-secondary: #8f959e;
-  --brand-text-placeholder: #bbbfc4;
-  --brand-text-disabled: #bdc1c5;
+  --brand-text-primary: #202421;
+  --brand-text-regular: #59645f;
+  --brand-text-secondary: #7b8580;
+  --brand-text-tertiary: #909892;
+  --brand-text-placeholder: #a7afa9;
+  --brand-text-disabled: #b4bcb6;
 
-  --brand-border-base: #eff1f3;
-  --brand-border-light: #f2f3f5;
-  --brand-border-lighter: #f5f6f7;
-  --brand-border-dark: #dee0e3;
+  --brand-border-base: #e2e7e1;
+  --brand-border-light: #edf1ec;
+  --brand-border-lighter: #f4f6f4;
+  --brand-border-dark: #d2dad2;
+  --brand-border-muted: #c8d1cb;
 
-  --brand-fill-base: #e5e8eb;
-  --brand-fill-light: #f5f7fa;
-  --brand-fill-lighter: #f9f9f9;
+  --brand-fill-base: #dde5df;
+  --brand-fill-light: #f0f3ef;
+  --brand-fill-lighter: #f7f8f5;
+  --brand-fill-blank: #fbfcfa;
 
-  --brand-bg-body: #ffffff;
-  --brand-bg-sidebar: #f9f9f9;
+  --brand-bg-body: #f6f7f3;
+  --brand-bg-sidebar: #f0f3ef;
+  --brand-bg-base: #f4f6f2;
+  --brand-bg-page: #f4f6f2;
   --brand-bg-surface: #ffffff;
-  --brand-bg-surface-raised: #fcfcfd;
-  --brand-bg-overlay: rgba(255, 255, 255, 0.92);
+  --brand-bg-surface-raised: #ffffff;
+  --brand-bg-overlay: rgba(255, 255, 255, 0.88);
 
-  --brand-scrollbar-thumb: #dfe1e6;
-  --brand-scrollbar-thumb-hover: #c1c7d0;
-  --brand-shadow-elevated: 0 20px 60px rgba(31, 35, 41, 0.06);
-  --brand-shadow-floating: 0 14px 28px rgba(15, 23, 42, 0.08);
-  --brand-shadow-hairline: 0 1px 2px rgba(15, 23, 42, 0.05);
+  --brand-scrollbar-thumb: #d6ddd7;
+  --brand-scrollbar-thumb-hover: #bbc4be;
+  --brand-shadow-elevated: 0 16px 38px rgba(19, 29, 23, 0.06);
+  --brand-shadow-floating: 0 18px 40px rgba(15, 24, 19, 0.1);
+  --brand-shadow-hairline: 0 1px 2px rgba(15, 24, 19, 0.04);
 
   --el-color-primary: var(--brand-primary);
   --el-color-success: var(--brand-success);
@@ -58,14 +63,14 @@
   --el-color-danger-light-5: color-mix(in srgb, var(--brand-error), white 50%);
   --el-color-danger-light-9: color-mix(in srgb, var(--brand-error), white 90%);
 
-  --el-bg-color: var(--brand-bg-body);
-  --el-bg-color-overlay: var(--brand-bg-body);
-  --el-bg-color-page: var(--brand-bg-sidebar);
+  --el-bg-color: var(--brand-bg-surface);
+  --el-bg-color-overlay: var(--brand-bg-surface-raised);
+  --el-bg-color-page: var(--brand-bg-base);
 
   --el-fill-color: var(--brand-fill-base);
   --el-fill-color-light: var(--brand-fill-light);
   --el-fill-color-lighter: var(--brand-fill-lighter);
-  --el-fill-color-extra-light: color-mix(in srgb, var(--brand-fill-lighter), white 45%);
+  --el-fill-color-extra-light: color-mix(in srgb, var(--brand-fill-lighter), white 40%);
   --el-fill-color-blank: var(--brand-bg-surface);
 
   --el-border-color: var(--brand-border-base);
@@ -96,7 +101,6 @@
   --el-border-radius-small: 4px;
   --el-border-radius-round: 20px;
 
-  // --el-font-family: 'LXGW WenKai Lite', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'PingFang SC', 'Microsoft YaHei', 'Noto Sans CJK SC', 'Source Han Sans SC', 'Noto Sans', sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
   --el-font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'PingFang SC', 'Microsoft YaHei', 'Noto Sans CJK SC', 'Source Han Sans SC', 'Noto Sans', sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
 
   color: var(--brand-text-primary);
@@ -111,37 +115,48 @@
 html.dark {
   color-scheme: dark;
 
-  --brand-text-primary: #f3f5f7;
-  --brand-text-regular: #d7dde5;
-  --brand-text-secondary: #aab3be;
-  --brand-text-placeholder: #7f8894;
-  --brand-text-disabled: #67717d;
+  --brand-primary: #65c8c1;
+  --brand-success: #45b97c;
+  --brand-warning: #d0a04f;
+  --brand-error: #ef6d62;
+  --brand-info: #97a29d;
 
-  --brand-border-base: #2b3340;
-  --brand-border-light: #242b35;
-  --brand-border-lighter: #1a2029;
-  --brand-border-dark: #3f4b5c;
+  --brand-text-primary: #edf1ed;
+  --brand-text-regular: #c4cdc7;
+  --brand-text-secondary: #9aa59f;
+  --brand-text-tertiary: #7f8a84;
+  --brand-text-placeholder: #69756f;
+  --brand-text-disabled: #56615b;
 
-  --brand-fill-base: #2a313a;
-  --brand-fill-light: #202833;
-  --brand-fill-lighter: #171e26;
+  --brand-border-base: #2a3530;
+  --brand-border-light: #24302a;
+  --brand-border-lighter: #1a241f;
+  --brand-border-dark: #3c4b43;
+  --brand-border-muted: #46564d;
 
-  --brand-bg-body: #0e1116;
-  --brand-bg-sidebar: #10151d;
-  --brand-bg-surface: #161c24;
-  --brand-bg-surface-raised: #1d2530;
-  --brand-bg-overlay: rgba(17, 22, 30, 0.92);
+  --brand-fill-base: #243029;
+  --brand-fill-light: #1a2520;
+  --brand-fill-lighter: #131c18;
+  --brand-fill-blank: #1b2420;
 
-  --brand-scrollbar-thumb: #38414d;
-  --brand-scrollbar-thumb-hover: #4c5766;
-  --brand-shadow-elevated: 0 24px 56px rgba(0, 0, 0, 0.32);
-  --brand-shadow-floating: 0 16px 32px rgba(0, 0, 0, 0.36);
-  --brand-shadow-hairline: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --brand-bg-body: #0d1210;
+  --brand-bg-sidebar: #0f1714;
+  --brand-bg-base: #141d19;
+  --brand-bg-page: #141d19;
+  --brand-bg-surface: #18211d;
+  --brand-bg-surface-raised: #1e2823;
+  --brand-bg-overlay: rgba(19, 28, 24, 0.88);
+
+  --brand-scrollbar-thumb: #38433d;
+  --brand-scrollbar-thumb-hover: #4a5750;
+  --brand-shadow-elevated: 0 22px 52px rgba(0, 0, 0, 0.3);
+  --brand-shadow-floating: 0 18px 40px rgba(0, 0, 0, 0.34);
+  --brand-shadow-hairline: 0 1px 2px rgba(0, 0, 0, 0.28);
 
   --el-bg-color: var(--brand-bg-surface);
   --el-bg-color-overlay: var(--brand-bg-surface-raised);
-  --el-bg-color-page: var(--brand-fill-lighter);
-  --el-fill-color-extra-light: color-mix(in srgb, var(--brand-fill-lighter), var(--brand-bg-surface) 38%);
+  --el-bg-color-page: var(--brand-bg-base);
+  --el-fill-color-extra-light: color-mix(in srgb, var(--brand-fill-lighter), var(--brand-bg-surface) 34%);
   --el-mask-color: rgba(2, 6, 12, 0.72);
   --el-overlay-color: rgba(2, 6, 12, 0.72);
   --el-overlay-color-light: rgba(2, 6, 12, 0.4);

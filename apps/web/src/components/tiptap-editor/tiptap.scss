@@ -373,9 +373,9 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 0.5rem;
-    min-height: 42px;
-    padding: 0.35rem 0.55rem;
+    gap: 0.375rem;
+    min-height: 40px;
+    padding: 0.3rem 0.5rem;
     border-bottom: 1px solid color-mix(in srgb, var(--tiptap-code-block-border) 70%, transparent);
   }
 
@@ -391,10 +391,10 @@
     flex: 0 0 auto;
     align-items: center;
     justify-content: center;
-    width: 24px;
-    height: 24px;
+    width: 22px;
+    height: 22px;
     border: none;
-    border-radius: 5px;
+    border-radius: 4px;
     background: transparent;
     color: var(--brand-text-secondary);
     cursor: pointer;
@@ -416,9 +416,9 @@
     box-sizing: border-box;
     flex: 1 1 auto;
     min-width: 0;
-    height: 28px;
+    height: 26px;
     border: 1px solid transparent;
-    border-radius: 5px;
+    border-radius: 4px;
     background: transparent;
     color: var(--brand-text-primary);
     font: inherit;
@@ -429,7 +429,7 @@
 
   .tiptap-code-block__title-btn {
     overflow: hidden;
-    padding: 0 0.3rem;
+    padding: 0 0.25rem;
     text-align: left;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -447,7 +447,7 @@
 
   .tiptap-code-block__title-text {
     overflow: hidden;
-    padding: 0 0.3rem;
+    padding: 0 0.25rem;
     text-overflow: ellipsis;
     white-space: nowrap;
 
@@ -457,7 +457,7 @@
   }
 
   .tiptap-code-block__title-input {
-    padding: 0 0.4rem;
+    padding: 0 0.5rem;
     border-color: color-mix(in srgb, var(--brand-primary) 42%, transparent);
     background: var(--brand-bg-surface);
     outline: none;
@@ -471,12 +471,11 @@
     display: inline-flex;
     flex: 0 0 auto;
     align-items: center;
-    height: 30px;
+    height: 28px;
     border: 1px solid var(--tiptap-code-block-border);
-    border-radius: 7px;
-    background: var(--tiptap-code-block-toolbar-background);
-    box-shadow: 0 8px 18px color-mix(in srgb, #111827 7%, transparent);
-    backdrop-filter: blur(10px);
+    border-radius: 6px;
+    background: color-mix(in srgb, var(--brand-bg-surface) 94%, var(--tiptap-code-block-toolbar-background));
+    box-shadow: var(--brand-shadow-hairline);
     opacity: 0;
     pointer-events: none;
     transform: translateY(-4px) scale(0.985);
@@ -519,9 +518,9 @@
 
   .tiptap-code-block__language-btn,
   .tiptap-code-block__language-label {
-    gap: 0.35rem;
+    gap: 0.25rem;
     max-width: 160px;
-    padding: 0 0.55rem;
+    padding: 0 0.5rem;
     font-size: 0.8125rem;
     line-height: 1;
 
@@ -546,13 +545,13 @@
   }
 
   .tiptap-code-block__icon-btn {
-    width: 30px;
+    width: 28px;
     font-size: 1rem;
     cursor: pointer;
 
     &:hover {
       color: var(--brand-primary);
-      background: color-mix(in srgb, var(--brand-primary) 9%, transparent);
+      background: color-mix(in srgb, var(--brand-primary) 7%, transparent);
     }
   }
 
@@ -576,8 +575,8 @@
     display: flex;
     flex: 0 0 auto;
     flex-direction: column;
-    min-width: 3.25rem;
-    padding: 0.5rem 0.8rem 0.5rem 1rem;
+    min-width: 3rem;
+    padding: 0.5rem 0.75rem 0.5rem 0.875rem;
     border-right: 1px solid color-mix(in srgb, var(--tiptap-code-block-border) 70%, transparent);
     color: var(--tiptap-code-block-line-number-color);
     font-family: var(--tiptap-code-font-family);
@@ -596,7 +595,7 @@
     flex: 1 1 auto;
     min-width: 0;
     margin: 0;
-    padding: 0.5rem 1rem;
+    padding: 0.5rem 0.875rem;
     overflow: visible;
     border: none;
     border-radius: 0;
@@ -773,7 +772,7 @@
 }
 
 .tiptap-code-block-language-panel {
-  padding: 0.75rem 0.75rem 0.5rem;
+  padding: 0.5rem 0.5rem 0.375rem;
 
   &__list {
     margin-top: 0.5rem;
@@ -784,10 +783,10 @@
     align-items: center;
     justify-content: space-between;
     width: 100%;
-    min-height: 34px;
-    padding: 0 0.7rem;
+    min-height: 30px;
+    padding: 0 0.5rem;
     border: none;
-    border-radius: 6px;
+    border-radius: 4px;
     background: transparent;
     color: var(--brand-text-primary);
     font-size: 0.875rem;
@@ -796,29 +795,29 @@
 
     &:hover,
     &.is-active {
-      background: var(--brand-fill-lighter);
+      background: color-mix(in srgb, var(--brand-fill-lighter) 86%, var(--brand-bg-surface));
     }
   }
 
   &__check {
-    width: 0.9rem;
-    height: 0.9rem;
+    width: 0.75rem;
+    height: 0.75rem;
     color: var(--brand-primary);
   }
 }
 
 .tiptap-code-block-more-panel {
-  padding: 0.35rem;
+  padding: 0.25rem;
 
   &__item {
     display: flex;
     align-items: center;
     justify-content: space-between;
     width: 100%;
-    min-height: 34px;
-    padding: 0 0.65rem;
+    min-height: 30px;
+    padding: 0 0.5rem;
     border: none;
-    border-radius: 6px;
+    border-radius: 4px;
     background: transparent;
     color: var(--brand-text-primary);
     font-size: 0.875rem;
@@ -826,7 +825,7 @@
     cursor: pointer;
 
     &:hover {
-      background: var(--brand-fill-lighter);
+      background: color-mix(in srgb, var(--brand-fill-lighter) 86%, var(--brand-bg-surface));
     }
 
     &:focus-visible {
@@ -835,8 +834,8 @@
     }
 
     svg {
-      width: 0.9rem;
-      height: 0.9rem;
+      width: 0.75rem;
+      height: 0.75rem;
       color: var(--brand-primary);
     }
   }
@@ -853,9 +852,9 @@
     width: 3rem;
 
     .el-select__wrapper {
-      min-height: 26px;
+      min-height: 24px;
       padding: 0 0.5rem;
-      border-radius: 6px;
+      border-radius: 5px;
       box-shadow: 0 0 0 1px var(--brand-border-muted) inset;
       font-size: 0.8125rem;
     }
@@ -890,12 +889,12 @@ html.dark {
   display: flex;
   flex-wrap: wrap;
   align-items: flex-start;
-  gap: 8px;
-  padding: 6px;
+  gap: 6px;
+  padding: 5px;
   border: 1px solid var(--brand-border-base);
-  border-radius: 10px;
-  background: var(--brand-bg-surface-raised);
-  box-shadow: var(--brand-shadow-floating);
+  border-radius: 8px;
+  background: var(--brand-bg-surface);
+  box-shadow: var(--brand-shadow-hairline);
 
   &__group {
     display: flex;
@@ -917,19 +916,25 @@ html.dark {
   position: fixed;
   z-index: 32;
   box-sizing: border-box;
-  padding: 0.75rem;
+  padding: 0.5625rem;
   border: 1px solid var(--brand-border-base);
   border-radius: 8px;
-  background: var(--brand-bg-surface-raised);
-  box-shadow: var(--brand-shadow-floating);
+  background: var(--brand-bg-surface);
+  box-shadow: var(--brand-shadow-hairline);
   overflow-y: auto;
+
+  :deep(.el-textarea__inner) {
+    padding: 0.5rem 0.625rem;
+    border-radius: 6px;
+    line-height: 1.5;
+  }
 
   &__actions {
     display: flex;
     align-items: center;
     justify-content: flex-end;
     gap: 0.5rem;
-    margin-top: 0.625rem;
+    margin-top: 0.5rem;
 
     > .el-button {
       margin-left: 0;
@@ -949,9 +954,9 @@ html.dark {
 
   &--inline,
   &__text {
-    padding: 0.08em 0.18em;
+    padding: 0.06em 0.16em;
     border-radius: 4px;
-    background: color-mix(in srgb, var(--el-color-primary-light-9) 76%, transparent);
+    background: color-mix(in srgb, var(--el-color-primary-light-9) 60%, transparent);
     -webkit-box-decoration-break: clone;
     box-decoration-break: clone;
   }
@@ -967,9 +972,9 @@ html.dark {
 
   &__code-block {
     margin: 0.25rem 0;
-    padding: 0.5rem 0.625rem;
+    padding: 0.375rem 0.5rem;
     border: 1px solid var(--brand-border-base);
-    border-radius: 6px;
+    border-radius: 4px;
     background: var(--brand-bg-page);
     color: var(--brand-text-primary);
     font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
@@ -985,8 +990,8 @@ html.dark {
   &.is-streaming.tiptap-ai-preview--inline::after,
   &.is-streaming &__paragraph:last-child > &__text::after,
   &.is-streaming &__code-block:last-child > &__code-text::after {
-    width: 0.45rem;
-    margin-left: 0.2rem;
+    width: 0.5rem;
+    margin-left: 0.25rem;
     color: var(--brand-primary);
     content: '▍';
     animation: tiptap-ai-preview-cursor 1s steps(1) infinite;
@@ -1032,10 +1037,10 @@ html.dark {
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  width: 32px;
-  height: 32px;
+  width: 30px;
+  height: 30px;
   border: none;
-  border-radius: 6px;
+  border-radius: 5px;
   background: transparent;
   color: var(--el-text-color-primary);
   line-height: 1;
@@ -1052,21 +1057,21 @@ html.dark {
   }
 
   &.is-active {
-    background-color: var(--el-color-primary-light-8);
+    background-color: color-mix(in srgb, var(--brand-primary) 8%, white);
     color: var(--el-color-primary);
   }
 
   &--dropdown {
     gap: 4px;
     width: auto;
-    min-width: 40px;
+    min-width: 38px;
     padding: 0 8px;
   }
 
   &--wide {
     width: auto;
     min-width: 0;
-    padding: 0 10px;
+    padding: 0 8px;
 
     .tiptap-bubble-btn__text {
       width: auto;
@@ -1124,11 +1129,11 @@ html.dark {
 .tiptap-bubble-ai-popover,
 .tiptap-block-trigger-popover {
   overflow: hidden !important;
-  padding: 8px !important;
+  padding: 6px !important;
   border: 1px solid var(--brand-border-base) !important;
-  border-radius: 10px !important;
-  background: var(--brand-bg-surface-raised) !important;
-  box-shadow: var(--brand-shadow-floating) !important;
+  border-radius: 8px !important;
+  background: var(--brand-bg-surface) !important;
+  box-shadow: var(--brand-shadow-hairline) !important;
 }
 
 .tiptap-bubble-ai-trigger {
@@ -1147,10 +1152,10 @@ html.dark {
     display: flex;
     align-items: center;
     width: 100%;
-    min-height: 30px;
-    padding: 0 10px;
+    min-height: 28px;
+    padding: 0 9px;
     border: none;
-    border-radius: 7px;
+    border-radius: 6px;
     background: transparent;
     color: var(--brand-text-primary);
     font-size: 0.8125rem;
@@ -1167,7 +1172,7 @@ html.dark {
 }
 
 .tiptap-block-trigger-popover {
-  padding: 10px 12px !important;
+  padding: 8px 10px !important;
   width: fit-content !important;
   max-width: calc(100vw - 24px) !important;
   box-shadow: none !important;
@@ -1196,8 +1201,8 @@ html.dark {
     gap: 10px;
     width: 100%;
     box-sizing: border-box;
-    height: 36px;
-    padding: 6px 10px;
+    height: 34px;
+    padding: 5px 9px;
     border: none;
     border-radius: 8px;
     background: transparent;
@@ -1210,7 +1215,7 @@ html.dark {
 
     &.is-active,
     &.is-submenu-active {
-      background: color-mix(in srgb, var(--brand-primary) 10%, white);
+      background: color-mix(in srgb, var(--brand-primary) 8%, white);
       color: var(--el-color-primary);
     }
   }
@@ -1237,7 +1242,7 @@ html.dark {
 
   &__divider {
     height: 1px;
-    margin: 6px 0;
+    margin: 5px 0;
     background: var(--el-border-color-lighter);
   }
 
@@ -1246,13 +1251,13 @@ html.dark {
 .tiptap-color-picker {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
 
   &__back {
     display: flex;
     align-items: center;
     width: 100%;
-    padding: 4px 4px 0;
+    padding: 3px 3px 0;
     border: none;
     background: transparent;
     color: var(--el-text-color-secondary);
@@ -1270,36 +1275,36 @@ html.dark {
   }
 
   &__section-title {
-    padding: 4px 4px 8px;
+    padding: 3px 3px 6px;
     color: var(--el-text-color-secondary);
     font-size: 12px;
     font-weight: 500;
 
     &:not(:first-child) {
-      margin-top: 8px;
+      margin-top: 6px;
     }
   }
 
   &__footer {
     display: flex;
     justify-content: flex-end;
-    gap: 6px;
-    margin-top: 6px;
-    padding-top: 8px;
+    gap: 4px;
+    margin-top: 4px;
+    padding-top: 6px;
     border-top: 1px solid var(--el-border-color-lighter);
   }
 
   &__grid {
     display: grid;
     grid-template-columns: repeat(5, minmax(0, 1fr));
-    gap: 6px;
+    gap: 4px;
   }
 
   &__swatch {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    height: 34px;
+    height: 32px;
     border: 1px solid var(--el-border-color-lighter);
     border-radius: 8px;
     background: #fff;
@@ -1369,7 +1374,7 @@ html.dark {
   position: fixed;
   z-index: 24;
   height: 2px;
-  border-radius: 999px;
+  border-radius: 50%;
   background: var(--brand-primary);
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--brand-primary) 18%, transparent);
   pointer-events: none;
@@ -1465,13 +1470,13 @@ html.dark {
   top: -9999px;
   left: -9999px;
   max-width: 18rem;
-  padding: 0.45rem 0.65rem;
+  padding: 0.5rem 0.75rem;
   overflow: hidden;
   border: 1px solid color-mix(in srgb, var(--brand-primary) 20%, var(--brand-border-base));
-  border-radius: 12px;
+  border-radius: 8px;
   background: color-mix(in srgb, var(--brand-bg-surface) 92%, white);
   color: var(--brand-text-primary);
-  box-shadow: var(--brand-shadow-floating);
+  box-shadow: var(--brand-shadow-hairline);
   font-size: 0.875rem;
   line-height: 1.4;
   text-overflow: ellipsis;
@@ -1486,7 +1491,7 @@ html.dark {
   width: max-content;
   min-width: 160px;
   max-width: 100%;
-  gap: 8px;
+  gap: 6px;
 }
 
 .tiptap-block-trigger-submenu-shell {
@@ -1503,24 +1508,24 @@ html.dark {
 .tiptap-block-trigger-menu__quick-grid {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
 }
 
 .tiptap-block-trigger-menu__quick-row {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: 4px;
 }
 
 .tiptap-block-trigger-menu__quick-item {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
+  width: 30px;
+  height: 30px;
   padding: 0;
   border: none;
-  border-radius: 8px;
+  border-radius: 6px;
   background: transparent;
   color: inherit;
   cursor: pointer;
@@ -1531,7 +1536,7 @@ html.dark {
   }
 
   &.is-active {
-    background: color-mix(in srgb, var(--brand-primary) 10%, white);
+    background: color-mix(in srgb, var(--brand-primary) 8%, white);
     color: var(--el-color-primary);
   }
 }
@@ -1560,8 +1565,8 @@ html.dark {
   align-items: center;
   gap: 10px;
   width: 100%;
-  min-height: 36px;
-  padding: 8px 10px;
+  min-height: 34px;
+  padding: 8px 9px;
   border: none;
   border-radius: 8px;
   background: transparent;
@@ -1575,7 +1580,7 @@ html.dark {
   }
 
   &.is-active {
-    background: color-mix(in srgb, var(--brand-primary) 10%, white);
+    background: color-mix(in srgb, var(--brand-primary) 8%, white);
     color: var(--el-color-primary);
   }
 }
@@ -1611,8 +1616,8 @@ html.dark {
     align-items: center;
     gap: 10px;
     width: 100%;
-    min-height: 36px;
-    padding: 8px 10px;
+    min-height: 34px;
+    padding: 8px 9px;
     border: none;
     border-radius: 8px;
     background: transparent;
@@ -1630,7 +1635,7 @@ html.dark {
     }
 
     &.is-active {
-      background: color-mix(in srgb, var(--brand-primary) 10%, white);
+      background: color-mix(in srgb, var(--brand-primary) 8%, white);
       color: var(--el-color-primary);
     }
   }
@@ -1659,12 +1664,12 @@ html.dark {
   display: flex;
   min-width: 18rem;
   flex-direction: column;
-  gap: 0.5rem;
-  padding: 0.75rem;
+  gap: 0.375rem;
+  padding: 0.625rem;
   border: 1px solid var(--brand-border-base);
-  border-radius: 10px;
-  background: var(--brand-bg-surface-raised);
-  box-shadow: var(--brand-shadow-floating);
+  border-radius: 8px;
+  background: var(--brand-bg-surface);
+  box-shadow: var(--brand-shadow-hairline);
 
   &__url-input {
     min-width: 14rem;
@@ -1675,7 +1680,7 @@ html.dark {
     display: flex;
     align-items: center;
     justify-content: flex-end;
-    gap: 0.375rem;
+    gap: 0.25rem;
   }
 }
 
@@ -1683,12 +1688,12 @@ html.dark {
   display: flex;
   width: min(34rem, calc(100vw - 2rem));
   flex-direction: column;
-  gap: 0.5rem;
-  padding: 0.75rem;
+  gap: 0.375rem;
+  padding: 0.625rem;
   border: 1px solid var(--brand-border-base);
-  border-radius: 10px;
-  background: var(--brand-bg-surface-raised);
-  box-shadow: var(--brand-shadow-floating);
+  border-radius: 8px;
+  background: var(--brand-bg-surface);
+  box-shadow: var(--brand-shadow-hairline);
 
   &__input {
     width: 100%;
@@ -1703,7 +1708,7 @@ html.dark {
     display: flex;
     align-items: center;
     justify-content: flex-end;
-    gap: 0.375rem;
+    gap: 0.25rem;
   }
 }
 
@@ -1725,7 +1730,7 @@ html.dark {
   display: block;
   width: 0.875rem;
   height: 1.5px;
-  border-radius: 999px;
+  border-radius: 50%;
   background-color: currentColor;
 }
 
@@ -1738,14 +1743,14 @@ html.dark {
 
   &__label {
     position: absolute;
-    top: -1.45rem;
+    top: -1.5rem;
     left: -1px;
     display: inline-flex;
     align-items: center;
-    gap: 0.35rem;
+    gap: 0.5rem;
     max-width: 14rem;
-    padding: 0.2rem 0.45rem;
-    border-radius: 999px;
+    padding: 0.25rem 0.5rem;
+    border-radius: 50%;
     color: white;
     box-shadow: 0 8px 24px rgba(15, 23, 42, 0.18);
     white-space: nowrap;
@@ -1754,7 +1759,7 @@ html.dark {
   &__avatar {
     width: 1rem;
     height: 1rem;
-    border-radius: 999px;
+    border-radius: 50%;
     object-fit: cover;
     background: rgba(255, 255, 255, 0.24);
   }
@@ -1777,6 +1782,6 @@ html.dark {
   }
 
   &__selection {
-    border-radius: 0.2rem;
+    border-radius: 0.25rem;
   }
 }

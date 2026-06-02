@@ -53,7 +53,7 @@ watch(
 </script>
 
 <template>
-  <aside class="docs-chat-panel relative flex w-[23rem] min-w-[23rem] max-w-[23rem] min-h-0 shrink-0 grow-0 flex-col">
+  <aside class="docs-chat-panel relative flex w-[var(--panel-docs-chat-width)] min-w-[var(--panel-docs-chat-width)] max-w-[var(--panel-docs-chat-width)] min-h-0 shrink-0 grow-0 flex-col">
     <div class="docs-chat-panel__picker-layer pointer-events-none absolute inset-0 z-[5]" />
 
     <DocsChatHeader
@@ -102,8 +102,8 @@ watch(
 
 <style scoped lang="scss">
 .docs-chat-panel {
-  border-left: 1px solid color-mix(in srgb, var(--brand-border-base) 76%, transparent);
-  background: color-mix(in srgb, var(--brand-bg-surface) 96%, var(--brand-bg-body));
+  border-left: 1px solid color-mix(in srgb, var(--brand-border-base) 74%, transparent);
+  background: color-mix(in srgb, var(--brand-bg-surface) 94%, var(--brand-bg-base));
 }
 
 .docs-chat-panel__composer {

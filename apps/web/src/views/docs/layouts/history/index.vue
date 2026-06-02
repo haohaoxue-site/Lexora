@@ -44,7 +44,7 @@ const { createRootDocument, openDefaultDocument } = useDocsPageActions()
 
       <ElButton
         type="primary"
-        class="min-w-[8.5rem]"
+        class="min-w-32"
         :disabled="!canRestoreSelectedSnapshot"
         :loading="isRestoringSnapshot"
         @click="restoreSelectedSnapshot"

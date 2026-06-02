@@ -33,7 +33,7 @@ function toggleGroup(groupId: string) {
       class="publication-sidebar-tree__group min-w-0 border-t border-t-[color-mix(in_srgb,var(--brand-border-base)_64%,transparent)] pt-5 first:border-t-0 first:pt-0"
     >
       <button
-        class="publication-sidebar-tree__group-trigger flex w-full min-w-0 cursor-pointer items-center justify-between gap-2 border-none bg-transparent px-[0.55rem] pb-[0.35rem] pt-[0.2rem] text-left text-main [font:inherit]"
+        class="publication-sidebar-tree__group-trigger flex w-full min-w-0 cursor-pointer items-center justify-between gap-2 border-none bg-transparent px-2 py-1 text-left text-main [font:inherit]"
         type="button"
         @click="toggleGroup(group.id)"
       >
@@ -41,11 +41,11 @@ function toggleGroup(groupId: string) {
         <SvgIcon
           category="ui"
           :icon="expandedByGroupId[group.id] ? 'chevron-down' : 'chevron-right'"
-          size="0.78rem"
+          size="12px"
         />
       </button>
 
-      <ul v-show="expandedByGroupId[group.id]" class="mt-[0.1rem] grid list-none gap-[0.12rem] p-0">
+      <ul v-show="expandedByGroupId[group.id]" class="mt-px grid list-none gap-px p-0">
         <PublicationSidebarPageNode
           v-for="page in group.pages"
           :key="page.id"

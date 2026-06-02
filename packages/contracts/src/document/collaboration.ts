@@ -297,23 +297,48 @@ export const DocumentCollaborationOverviewSchema = z.object({
   linkInvite: DocumentCollaborationLinkInviteSchema.nullable(),
 }).strict()
 
-export const DocumentCollaborationConsoleRootDocumentSchema = z.object({
+export const DocumentCollaborationConsoleLinkInviteSchema = z.object({
   id: z.string(),
-  title: z.string(),
+  permission: DocumentCollaborationPermissionSchema,
+  scope: DocumentCollaborationScopeSchema,
+  enabled: z.boolean(),
+  resolverCode: z.string(),
+  codeTail: z.string().nullable(),
   updatedAt: z.string(),
 }).strict()
 
-export const DocumentCollaborationConsoleItemSchema = z.object({
-  rootDocument: DocumentCollaborationConsoleRootDocumentSchema,
-  collaboratorCount: z.number().int().nonnegative(),
-  pendingInviteCount: z.number().int().nonnegative(),
-  linkInviteState: DocumentCollaborationLinkInviteStateSchema,
-  rangeSummary: DocumentCollaborationRangeSummarySchema,
-  updatedAt: z.string(),
-}).strict()
+export interface DocumentCollaborationConsoleTreeItem {
+  id: string
+  title: string
+  parentId: string | null
+  hasChildren: boolean
+  collaboratorCount: number
+  pendingInviteCount: number
+  linkInviteState: DocumentCollaborationLinkInviteState
+  linkInvite: DocumentCollaborationConsoleLinkInvite | null
+  rangeSummary: DocumentCollaborationRangeSummary
+  updatedAt: string
+  children: DocumentCollaborationConsoleTreeItem[]
+}
+
+export const DocumentCollaborationConsoleTreeItemSchema: z.ZodType<DocumentCollaborationConsoleTreeItem> = z.lazy(() =>
+  z.object({
+    id: z.string(),
+    title: z.string(),
+    parentId: z.string().nullable(),
+    hasChildren: z.boolean(),
+    collaboratorCount: z.number().int().nonnegative(),
+    pendingInviteCount: z.number().int().nonnegative(),
+    linkInviteState: DocumentCollaborationLinkInviteStateSchema,
+    linkInvite: DocumentCollaborationConsoleLinkInviteSchema.nullable(),
+    rangeSummary: DocumentCollaborationRangeSummarySchema,
+    updatedAt: z.string(),
+    children: z.array(DocumentCollaborationConsoleTreeItemSchema),
+  }).strict(),
+)
 
 export const DocumentCollaborationConsoleListResponseSchema = z.object({
-  items: z.array(DocumentCollaborationConsoleItemSchema),
+  tree: z.array(DocumentCollaborationConsoleTreeItemSchema),
 }).strict()
 
 export const CreateDocumentCollaborationUserInviteSchema = z.object({
@@ -350,7 +375,7 @@ export const DocumentCollaborationJoinResponseSchema = z.object({
   grant: DocumentCollaborationGrantSchema,
 }).strict()
 
-export const DocumentCollaborationCurrentGrantSummarySchema = z.object({
+export const DocumentCollaborationCurrentAccessSummarySchema = z.object({
   permission: DocumentCollaborationPermissionSchema,
   scope: DocumentCollaborationScopeSchema,
 }).strict()
@@ -365,7 +390,7 @@ export const DocumentCollaborationResolverPreviewSchema = z.object({
   permission: DocumentCollaborationPermissionSchema,
   scope: DocumentCollaborationScopeSchema,
   passwordRequired: z.boolean(),
-  currentGrant: DocumentCollaborationCurrentGrantSummarySchema.nullable(),
+  currentAccess: DocumentCollaborationCurrentAccessSummarySchema.nullable(),
 }).strict()
 
 export const ConfirmDocumentCollaborationResolverEntrySchema = z.object({
@@ -393,8 +418,7 @@ export type CollaborationResolverEntry = z.infer<typeof CollaborationResolverEnt
 export type DocumentCollaborationInheritedSource = z.infer<typeof DocumentCollaborationInheritedSourceSchema>
 export type DocumentCollaborationCollaborator = z.infer<typeof DocumentCollaborationCollaboratorSchema>
 export type DocumentCollaborationOverview = z.infer<typeof DocumentCollaborationOverviewSchema>
-export type DocumentCollaborationConsoleRootDocument = z.infer<typeof DocumentCollaborationConsoleRootDocumentSchema>
-export type DocumentCollaborationConsoleItem = z.infer<typeof DocumentCollaborationConsoleItemSchema>
+export type DocumentCollaborationConsoleLinkInvite = z.infer<typeof DocumentCollaborationConsoleLinkInviteSchema>
 export type DocumentCollaborationConsoleListResponse = z.infer<typeof DocumentCollaborationConsoleListResponseSchema>
 export type CreateDocumentCollaborationUserInviteRequest = z.infer<typeof CreateDocumentCollaborationUserInviteSchema>
 export type UpdateDocumentCollaborationGrantRequest = z.infer<typeof UpdateDocumentCollaborationGrantSchema>
@@ -402,6 +426,6 @@ export type SetDocumentCollaborationUserGrantRequest = z.infer<typeof SetDocumen
 export type UpsertDocumentCollaborationLinkInviteRequest = z.infer<typeof UpsertDocumentCollaborationLinkInviteSchema>
 export type UpsertDocumentCollaborationLinkInviteResponse = z.infer<typeof UpsertDocumentCollaborationLinkInviteResponseSchema>
 export type DocumentCollaborationJoinResponse = z.infer<typeof DocumentCollaborationJoinResponseSchema>
-export type DocumentCollaborationCurrentGrantSummary = z.infer<typeof DocumentCollaborationCurrentGrantSummarySchema>
+export type DocumentCollaborationCurrentAccessSummary = z.infer<typeof DocumentCollaborationCurrentAccessSummarySchema>
 export type DocumentCollaborationResolverPreview = z.infer<typeof DocumentCollaborationResolverPreviewSchema>
 export type ConfirmDocumentCollaborationResolverEntryRequest = z.infer<typeof ConfirmDocumentCollaborationResolverEntrySchema>

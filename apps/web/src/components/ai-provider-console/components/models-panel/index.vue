@@ -13,7 +13,7 @@ const emit = defineEmits<AiProviderModelsPanelEmits>()
       <h3 class="m-0 text-base font-semibold text-main">
         模型列表
       </h3>
-      <span class="ai-provider-console__section-summary ml-4px">
+      <span class="ai-provider-console__section-summary ml-1">
         {{ modelSummaryText }}
       </span>
       <ElButtonGroup class="ai-provider-console__section-action">

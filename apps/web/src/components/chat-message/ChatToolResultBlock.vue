@@ -41,20 +41,25 @@ function getToolResultSummary(text: string): string {
 <style scoped lang="scss">
 .chat-tool-result-block {
   overflow: hidden;
-  border: 1px solid color-mix(in srgb, var(--brand-border-base) 62%, transparent);
-  border-radius: 0.625rem;
-  background: color-mix(in srgb, var(--brand-fill-light) 54%, transparent);
+  border: 1px solid color-mix(in srgb, var(--brand-border-base) 56%, transparent);
+  border-radius: 0.5rem;
+  background: color-mix(in srgb, var(--brand-fill-light) 28%, transparent);
 
   .chat-tool-result-block__summary {
     display: flex;
     align-items: center;
     gap: 0.5rem;
     min-width: 0;
-    padding: 0.5rem 0.625rem;
+    padding: 0.375rem 0.5rem;
     color: var(--brand-text-secondary);
     cursor: pointer;
     font-size: 0.8125rem;
     line-height: 1.5;
+    list-style: none;
+
+    &::-webkit-details-marker {
+      display: none;
+    }
   }
 
   .chat-tool-result-block__index,
@@ -75,7 +80,7 @@ function getToolResultSummary(text: string): string {
   }
 
   .chat-tool-result-block__body {
-    padding: 0 0.625rem 0.625rem;
+    padding: 0 0.5rem 0.5rem;
   }
 }
 </style>

@@ -43,7 +43,7 @@ const {
     >
       <ElButton
         text
-        class="document-header-actions__icon-button h-8 min-w-8 w-8 rounded-lg p-0 text-[18px]"
+        class="document-header-actions__icon-button h-7 min-w-7 w-7 rounded-lg p-0 text-base"
         :class="{ 'is-active': isDocsChatPanelOpen }"
         title="AI 对话"
         @click="toggleDocsChatPanel"
@@ -55,7 +55,7 @@ const {
     <ElButton
       v-if="canShowCollaborationButton"
       text
-      class="document-header-actions__share-button h-7 min-h-7 rounded-[0.4375rem] border px-[0.5625rem] font-normal"
+      class="document-header-actions__share-button h-7 min-h-7 rounded-lg border px-2 font-normal"
       title="协作"
       @click="openCollaborationDialog"
     >
@@ -69,7 +69,7 @@ const {
     <ElButton
       v-if="canShowPublicationButton"
       text
-      class="document-header-actions__share-button h-7 min-h-7 rounded-[0.4375rem] border px-[0.5625rem] font-normal"
+      class="document-header-actions__share-button h-7 min-h-7 rounded-lg border px-2 font-normal"
       title="分享"
       @click="openPublicationDialog"
     >
@@ -86,18 +86,18 @@ const {
     >
       <ElButton
         text
-        class="document-header-actions__icon-button h-8 min-w-8 w-8 rounded-lg p-0 text-[18px]"
+        class="document-header-actions__icon-button h-7 min-w-7 w-7 rounded-lg p-0 text-base"
         title="更多"
       >
         <SvgIcon category="ui" icon="more" />
       </ElButton>
 
       <template #dropdown>
-        <ElDropdownMenu class="document-header-actions__menu box-border min-w-0 max-w-[9.25rem] w-[9.25rem] p-[0.3125rem]">
+        <ElDropdownMenu class="document-header-actions__menu box-border min-w-0 max-w-36 w-36 p-1">
           <ElPopover
             trigger="hover"
             placement="left-start"
-            :width="316"
+            :width="296"
             :show-arrow="false"
             :show-after="80"
             :hide-after="80"
@@ -105,7 +105,7 @@ const {
           >
             <template #reference>
               <li
-                class="document-header-actions__menu-item el-dropdown-menu__item box-border flex min-h-[2.125rem] w-full items-center gap-2 rounded-md px-2 text-main"
+                class="document-header-actions__menu-item el-dropdown-menu__item box-border flex min-h-8 w-full items-center gap-2 rounded-lg px-2 text-main"
                 role="menuitem"
                 tabindex="0"
               >
@@ -121,12 +121,12 @@ const {
               </li>
             </template>
 
-            <section class="document-page-width-menu px-[0.5625rem] pb-[0.625rem] pt-2">
+            <section class="document-page-width-menu px-2 pb-2 pt-2">
               <div class="mb-2 text-xs leading-5 text-secondary">
                 为当前文档选择合适页宽
               </div>
 
-              <div class="grid grid-cols-3 gap-[0.4375rem]">
+              <div class="grid grid-cols-3 gap-2">
                 <button
                   v-for="option in pageWidthOptions"
                   :key="option.value"
@@ -139,7 +139,7 @@ const {
                   @click="handlePageWidthOptionClick(option.value)"
                 >
                   <span class="document-page-width-menu__preview flex h-[2.875rem] w-[3.625rem] items-center justify-center rounded-md" aria-hidden="true">
-                    <span class="document-page-width-menu__preview-surface flex w-8 flex-col gap-[0.1875rem] rounded px-1 py-[0.3125rem]">
+                    <span class="document-page-width-menu__preview-surface flex w-8 flex-col gap-px rounded px-1 py-1">
                       <span class="document-page-width-menu__preview-line h-[0.15625rem] rounded-full is-primary" />
                       <span class="document-page-width-menu__preview-line h-[0.15625rem] rounded-full" />
                       <span class="document-page-width-menu__preview-line h-[0.15625rem] w-[72%] rounded-full is-short" />
@@ -156,7 +156,7 @@ const {
           <ElDropdownItem
             command="document-info"
             divided
-            class="document-header-actions__menu-item my-[0.375rem] min-h-[2.125rem] w-full box-border gap-2 rounded-md px-2 text-main"
+            class="document-header-actions__menu-item my-1 min-h-8 w-full box-border gap-2 rounded-lg px-2 text-main"
           >
             <template #icon>
               <span class="inline-flex h-4 w-4 flex-none items-center justify-center text-[16px] text-[color-mix(in_srgb,var(--brand-text-secondary)_86%,transparent)]">
@@ -168,7 +168,7 @@ const {
 
           <ElDropdownItem
             command="history"
-            class="document-header-actions__menu-item min-h-[2.125rem] w-full box-border gap-2 rounded-md px-2 text-main"
+            class="document-header-actions__menu-item min-h-8 w-full box-border gap-2 rounded-lg px-2 text-main"
           >
             <template #icon>
               <span class="inline-flex h-4 w-4 flex-none items-center justify-center text-[16px] text-[color-mix(in_srgb,var(--brand-text-secondary)_86%,transparent)]">

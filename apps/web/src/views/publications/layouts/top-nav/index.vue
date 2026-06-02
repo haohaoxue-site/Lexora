@@ -49,14 +49,14 @@ function resolveNavHref(item: ResolvedPublicationNavItem) {
     <RouterLink class="inline-flex min-w-0 items-center gap-2 text-main no-underline" :to="`/s/${props.site.id}`">
       <img
         v-if="props.site.logoUrl"
-        class="publication-top-nav__logo h-[1.55rem] w-[1.55rem] flex-[0_0_auto] rounded-[0.35rem] object-cover"
+        class="publication-top-nav__logo h-6 w-6 flex-[0_0_auto] rounded-lg object-cover"
         :src="props.site.logoUrl"
         alt=""
       >
-      <span v-else class="publication-top-nav__fallback-logo inline-flex h-[1.55rem] w-[1.55rem] flex-[0_0_auto] items-center justify-center rounded-[0.35rem] text-[0.85rem] font-800">
+      <span v-else class="publication-top-nav__fallback-logo inline-flex h-6 w-6 flex-[0_0_auto] items-center justify-center rounded-lg text-sm font-800">
         {{ props.site.title.slice(0, 1) }}
       </span>
-      <span class="overflow-hidden text-[0.95rem] font-700 leading-[1.4] text-ellipsis whitespace-nowrap">{{ props.site.title }}</span>
+      <span class="overflow-hidden text-base font-700 leading-[1.4] text-ellipsis whitespace-nowrap">{{ props.site.title }}</span>
     </RouterLink>
 
     <nav

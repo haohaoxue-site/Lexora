@@ -18,7 +18,7 @@ const {
 </script>
 
 <template>
-  <aside class="document-history-panel flex w-full min-w-[18rem] max-w-[20rem] flex-col max-[1180px]:min-w-0 max-[1180px]:max-w-full">
+  <aside class="document-history-panel flex w-full min-w-[var(--panel-docs-history-width)] max-w-[var(--panel-docs-history-width)] flex-col max-[1180px]:min-w-0 max-[1180px]:max-w-full">
     <div class="document-history-panel__header px-4 pb-[0.875rem] pt-[1.125rem]">
       <div class="text-base font-bold tracking-[0.01em] text-main">
         历史记录
@@ -148,16 +148,11 @@ const {
 
 <style scoped lang="scss">
 .document-history-panel {
-  border-left: 1px solid color-mix(in srgb, var(--brand-border-base) 80%, transparent);
-  background:
-    linear-gradient(
-      180deg,
-      color-mix(in srgb, var(--brand-bg-surface) 94%, var(--brand-primary) 6%) 0%,
-      var(--brand-bg-surface) 100%
-    );
+  border-left: 1px solid color-mix(in srgb, var(--brand-border-base) 74%, transparent);
+  background: color-mix(in srgb, var(--brand-bg-surface) 94%, var(--brand-bg-base));
 
   .document-history-panel__header {
-    border-bottom: 1px solid color-mix(in srgb, var(--brand-border-base) 72%, transparent);
+    border-bottom: 1px solid color-mix(in srgb, var(--brand-border-base) 70%, transparent);
   }
   .document-history-panel__group-caret {
     color: color-mix(in srgb, var(--brand-primary) 78%, transparent);
@@ -178,19 +173,19 @@ const {
       bottom: 0.625rem;
       left: 0;
       width: 2px;
-      border-radius: 999px;
+      border-radius: 50%;
       background: color-mix(in srgb, var(--brand-border-base) 68%, transparent);
       transition: background-color 0.16s ease;
     }
 
     &.is-selected::before {
-      background: color-mix(in srgb, var(--brand-primary) 82%, transparent);
+      background: color-mix(in srgb, var(--brand-primary) 74%, var(--brand-border-base));
     }
   }
 
   .document-history-panel__item-button {
     border: 0;
-    background: color-mix(in srgb, var(--brand-bg-surface) 90%, white 10%);
+    background: var(--brand-bg-surface);
     color: inherit;
     cursor: pointer;
     transition:
@@ -198,21 +193,21 @@ const {
       box-shadow 0.16s ease;
 
     &:hover {
-      background: color-mix(in srgb, var(--brand-bg-surface) 84%, white 16%);
+      background: color-mix(in srgb, var(--brand-fill-light) 86%, var(--brand-bg-surface));
     }
   }
 
   .document-history-panel__item.is-selected .document-history-panel__item-button {
-    background: color-mix(in srgb, var(--brand-primary) 12%, white 88%);
-    box-shadow: 0 10px 28px color-mix(in srgb, var(--brand-primary) 10%, transparent);
+    background: color-mix(in srgb, var(--brand-primary) 7%, var(--brand-bg-surface));
+    box-shadow: var(--brand-shadow-hairline);
   }
 
   .document-history-panel__item-time {
-    color: color-mix(in srgb, var(--brand-primary) 84%, transparent);
+    color: var(--brand-text-primary);
   }
 
   .document-history-panel__item-status {
-    background: color-mix(in srgb, var(--brand-primary) 12%, white 88%);
+    background: color-mix(in srgb, var(--brand-primary) 8%, var(--brand-bg-surface));
     color: var(--brand-primary);
   }
 }

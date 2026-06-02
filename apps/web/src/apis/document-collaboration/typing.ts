@@ -1,8 +1,8 @@
 export type {
   ConfirmDocumentCollaborationResolverEntryRequest,
   CreateDocumentCollaborationUserInviteRequest,
-  DocumentCollaborationConsoleItem,
   DocumentCollaborationConsoleListResponse,
+  DocumentCollaborationConsoleTreeItem,
   DocumentCollaborationGrant,
   DocumentCollaborationJoinResponse,
   DocumentCollaborationLinkInvite,

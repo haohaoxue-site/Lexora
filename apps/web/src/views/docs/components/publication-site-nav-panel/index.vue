@@ -252,15 +252,7 @@ function compareOrderedItem(left: { order: number, updatedAt: string }, right: {
 
 <template>
   <section class="publication-site-nav-panel grid gap-4">
-    <div class="flex items-start justify-between gap-4 max-[900px]:flex-col max-[900px]:items-stretch">
-      <div>
-        <h2 class="m-0 text-lg font-semibold text-main">
-          顶部导航
-        </h2>
-        <p class="m-0 mt-1 text-sm leading-5 text-secondary">
-          顶部导航可以指向站点内部首页、分组、页面，也可以跳转外部链接。
-        </p>
-      </div>
+    <div class="flex justify-end">
       <div class="inline-flex min-w-0 items-center gap-2 max-[900px]:flex-col max-[900px]:items-stretch">
         <ElButton @click="addInternalItem">
           添加内部链接

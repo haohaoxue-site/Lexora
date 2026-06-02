@@ -8,28 +8,28 @@ const activeTab = defineModel<SettingsContextBarModel>({ required: true })
   <ElTabs v-model="activeTab" class="settings-context-bar flex h-full max-w-full w-fit items-center">
     <ElTabPane name="user">
       <template #label>
-        <span class="inline-flex h-[var(--default-header-height)] items-center pr-[calc(var(--spacing)*4)] text-base font-semibold leading-[var(--default-header-height)]">
+        <span class="inline-flex h-[var(--default-header-height)] items-center pr-3.5 text-[15px] font-medium leading-none">
           账号
         </span>
       </template>
     </ElTabPane>
     <ElTabPane name="preference">
       <template #label>
-        <span class="inline-flex h-[var(--default-header-height)] items-center px-[calc(var(--spacing)*4)] text-base font-semibold leading-[var(--default-header-height)]">
+        <span class="inline-flex h-[var(--default-header-height)] items-center px-3.5 text-[15px] font-medium leading-none">
           偏好
         </span>
       </template>
     </ElTabPane>
     <ElTabPane name="providers">
       <template #label>
-        <span class="inline-flex h-[var(--default-header-height)] items-center px-[calc(var(--spacing)*4)] text-base font-semibold leading-[var(--default-header-height)]">
+        <span class="inline-flex h-[var(--default-header-height)] items-center px-3.5 text-[15px] font-medium leading-none">
           服务商
         </span>
       </template>
     </ElTabPane>
     <ElTabPane name="models-default">
       <template #label>
-        <span class="inline-flex h-[var(--default-header-height)] items-center px-[calc(var(--spacing)*4)] text-base font-semibold leading-[var(--default-header-height)]">
+        <span class="inline-flex h-[var(--default-header-height)] items-center px-3.5 text-[15px] font-medium leading-none">
           默认模型
         </span>
       </template>
@@ -59,6 +59,7 @@ const activeTab = defineModel<SettingsContextBarModel>({ required: true })
 
   :deep(.el-tabs__active-bar) {
     height: 0.1875rem;
+    border-radius: 50%;
     background: var(--brand-primary);
   }
 
@@ -66,14 +67,15 @@ const activeTab = defineModel<SettingsContextBarModel>({ required: true })
     height: 100%;
     color: var(--brand-text-secondary);
     padding: 0;
+    transition: color 0.18s ease;
   }
 
   :deep(.el-tabs__item.is-active) {
-    color: var(--brand-primary);
+    color: var(--brand-text-primary);
   }
 
   :deep(.el-tabs__item:not(.is-disabled):hover) {
-    color: var(--brand-primary);
+    color: var(--brand-text-primary);
   }
 
   :deep(.el-tabs__content) {

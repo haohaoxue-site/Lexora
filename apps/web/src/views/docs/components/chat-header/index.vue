@@ -20,11 +20,11 @@ const emits = defineEmits<DocsChatHeaderEmits>()
       @select="emits('selectHistory', $event)"
     />
 
-    <div v-if="props.hasActiveSession" class="docs-chat-header__actions flex flex-none items-center gap-[0.125rem]">
+    <div v-if="props.hasActiveSession" class="docs-chat-header__actions flex flex-none items-center gap-px">
       <ElTooltip content="新对话" placement="bottom" :show-after="120">
         <ElButton
           text
-          class="docs-chat-header__icon-button h-8 min-w-8 w-8 rounded-lg p-0 text-base"
+          class="docs-chat-header__icon-button h-7 min-w-7 w-7 rounded-lg p-0 text-base"
           title="新对话"
           @click="emits('newSession')"
         >
@@ -38,16 +38,16 @@ const emits = defineEmits<DocsChatHeaderEmits>()
       >
         <ElButton
           text
-          class="docs-chat-header__icon-button h-8 min-w-8 w-8 rounded-lg p-0 text-base"
+          class="docs-chat-header__icon-button h-7 min-w-7 w-7 rounded-lg p-0 text-base"
           title="更多"
         >
           <SvgIcon category="ui" icon="more" />
         </ElButton>
 
         <template #dropdown>
-          <ElDropdownMenu class="docs-chat-header__menu box-border min-w-[8.5rem] p-[0.3125rem]">
+          <ElDropdownMenu class="docs-chat-header__menu box-border min-w-32 p-1">
             <ElDropdownItem
-              class="docs-chat-header__menu-item min-h-[2.125rem] w-full box-border gap-2 rounded-md px-2"
+              class="docs-chat-header__menu-item min-h-8 w-full box-border gap-2 rounded-lg px-2"
               @click="emits('renameSession')"
             >
               <template #icon>
@@ -59,7 +59,7 @@ const emits = defineEmits<DocsChatHeaderEmits>()
             </ElDropdownItem>
 
             <ElDropdownItem
-              class="docs-chat-header__delete-item docs-chat-header__menu-item min-h-[2.125rem] w-full box-border gap-2 rounded-md px-2"
+              class="docs-chat-header__delete-item docs-chat-header__menu-item min-h-8 w-full box-border gap-2 rounded-lg px-2"
               :disabled="props.isDeleting"
               @click="emits('deleteSession')"
             >

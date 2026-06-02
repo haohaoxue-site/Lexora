@@ -270,7 +270,7 @@ function getScopeLabel(scope: keyof typeof DOCUMENT_COLLABORATION_SCOPE_LABELS) 
 
   &__item-meta {
     color: var(--brand-text-secondary);
-    font-size: 0.8125rem;
+    font-size: 13px;
     line-height: 1.5;
   }
 
@@ -306,11 +306,11 @@ function getScopeLabel(scope: keyof typeof DOCUMENT_COLLABORATION_SCOPE_LABELS) 
   &__item {
     display: flex;
     flex-direction: column;
-    gap: 0.875rem;
-    padding: 0.9375rem 1rem;
+    gap: 0.75rem;
+    padding: 0.75rem 0.875rem;
     border: 1px solid color-mix(in srgb, var(--brand-border-base) 76%, transparent);
-    border-radius: 0.875rem;
-    background: color-mix(in srgb, var(--brand-fill-lighter) 52%, transparent);
+    border-radius: 0.5rem;
+    background: color-mix(in srgb, var(--brand-fill-lighter) 42%, transparent);
   }
 
   &__item-main,
@@ -323,7 +323,7 @@ function getScopeLabel(scope: keyof typeof DOCUMENT_COLLABORATION_SCOPE_LABELS) 
     align-items: flex-start;
     justify-content: space-between;
     gap: 0.75rem;
-    margin-bottom: 0.375rem;
+    margin-bottom: 0.25rem;
   }
 
   &__item-title {

@@ -143,15 +143,6 @@ function toNullableText(value: string | null | undefined) {
 
 <template>
   <section v-loading="loading" class="publication-site-settings-panel grid w-full max-w-[52rem] gap-4">
-    <div>
-      <h2 class="m-0 text-lg font-semibold text-main">
-        站点设置
-      </h2>
-      <p class="m-0 mt-1 text-sm leading-5 text-secondary">
-        SITE 会渲染顶部导航、侧边栏和首页框架，公开路径为 /s/:siteId。
-      </p>
-    </div>
-
     <ElForm
       ref="formRef"
       :model="settingsForm"

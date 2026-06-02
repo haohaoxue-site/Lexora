@@ -9,13 +9,13 @@ const emits = defineEmits<CollaborationPasswordPanelEmits>()
 </script>
 
 <template>
-  <section class="collaboration-password-panel grid content-start gap-3.5">
+  <section class="collaboration-password-panel grid content-start gap-3">
     <div class="flex items-center justify-between gap-4">
       <div class="min-w-0">
         <h3 class="m-0 text-[0.95rem] font-bold leading-[1.4] text-main">
           启用链接密码
         </h3>
-        <p class="mt-[0.24rem] text-[0.82rem] leading-[1.45] text-secondary">
+        <p class="mt-1 text-[13px] leading-[1.45] text-secondary">
           开启后，访问协作链接需要输入 {{ props.passwordLength }} 位数字密码。
         </p>
       </div>
@@ -29,13 +29,13 @@ const emits = defineEmits<CollaborationPasswordPanelEmits>()
 
     <div
       v-if="props.passwordEnabled"
-      class="collaboration-password-panel__card flex items-center justify-between gap-4 rounded-lg px-[0.95rem] py-[0.85rem]"
+      class="collaboration-password-panel__card flex items-center justify-between gap-4 rounded-lg px-4 py-3"
     >
       <div>
         <div class="text-xs leading-[1.4] text-secondary">
           当前密码
         </div>
-        <div class="mt-[0.18rem] font-mono text-[0.98rem] font-semibold leading-[1.4] text-main">
+        <div class="mt-1 font-mono text-sm font-semibold leading-[1.4] text-main">
           {{ props.passwordStateLabel }}
         </div>
       </div>

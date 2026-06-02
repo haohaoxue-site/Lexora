@@ -37,29 +37,30 @@ const bodyText = computed(() => serializeChatComposerContent(props.message.metad
 .chat-user-message-content {
   display: flex;
   flex-direction: column;
-  gap: 0.375rem;
+  gap: 0.125rem;
 
   .chat-user-message-content__contexts {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.25rem;
+    gap: 0.125rem;
   }
 
   .chat-user-message-content__context {
-    max-width: 12rem;
+    max-width: 11rem;
     overflow: hidden;
     padding: 0.125rem 0.375rem;
-    border: 1px solid color-mix(in srgb, #fff 32%, transparent);
-    border-radius: 0.375rem;
-    background: color-mix(in srgb, #fff 14%, transparent);
-    color: color-mix(in srgb, #fff 88%, transparent);
+    border: 1px solid color-mix(in srgb, #fff 24%, transparent);
+    border-radius: 0.5rem;
+    background: color-mix(in srgb, #fff 10%, transparent);
+    color: color-mix(in srgb, #fff 84%, transparent);
     font-size: 0.75rem;
-    line-height: 1.35;
+    line-height: 1.25;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
 
   .chat-user-message-content__body {
+    line-height: 1.6;
     white-space: pre-wrap;
   }
 }

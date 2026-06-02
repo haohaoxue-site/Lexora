@@ -219,7 +219,7 @@ function toggleExpanded() {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 0.75rem;
+    gap: 0.625rem;
     padding: 0.125rem 0.25rem;
     color: var(--brand-text-primary);
     font-size: 13px;
@@ -229,12 +229,12 @@ function toggleExpanded() {
 
   &__manual-toggle {
     display: inline-grid;
-    width: 1.7rem;
-    height: 1.7rem;
+    width: 1.625rem;
+    height: 1.625rem;
     place-items: center;
     padding: 0;
     border: 0;
-    border-radius: 0.45rem;
+    border-radius: 0.375rem;
     background: transparent;
     color: var(--brand-text-tertiary);
     cursor: pointer;
@@ -249,7 +249,7 @@ function toggleExpanded() {
   &__manual-toggle {
     border: 1px solid color-mix(in srgb, var(--brand-border-base) 72%, transparent);
     background: color-mix(in srgb, white 94%, var(--brand-bg-surface) 6%);
-    box-shadow: 0 10px 24px color-mix(in srgb, var(--brand-text-primary) 7%, transparent);
+    box-shadow: var(--brand-shadow-hairline);
   }
 
   &__rail {
@@ -280,12 +280,12 @@ function toggleExpanded() {
     gap: 0.25rem;
     min-width: 9rem;
     width: max-content;
-    max-width: 15rem;
-    padding: 0.75rem;
+    max-width: 14rem;
+    padding: 0.625rem;
     border: 1px solid color-mix(in srgb, var(--brand-border-base) 72%, transparent);
-    border-radius: 1rem;
+    border-radius: 0.625rem;
     background: color-mix(in srgb, white 94%, var(--brand-bg-surface) 6%);
-    box-shadow: 0 14px 32px color-mix(in srgb, var(--brand-primary) 8%, transparent);
+    box-shadow: var(--brand-shadow-floating);
     opacity: 0;
     transform: translateX(10px);
     pointer-events: none;
@@ -337,7 +337,7 @@ function toggleExpanded() {
   &__item {
     --editor-outline-indent: 0rem;
     min-width: 0;
-    border-radius: 0.5rem;
+    border-radius: 0.375rem;
     color: color-mix(in srgb, var(--brand-text-primary) 78%, transparent);
     transition: background-color 0.16s ease, color 0.16s ease;
   }
@@ -355,7 +355,7 @@ function toggleExpanded() {
     flex: 1;
     width: 100%;
     min-width: 0;
-    padding: 0.375rem 0.5rem;
+    padding: 0.5rem;
     padding-inline-start: calc(0.5rem + var(--editor-outline-indent));
     color: inherit;
     text-align: left;
@@ -372,7 +372,7 @@ function toggleExpanded() {
   &__indicator-line {
     display: block;
     height: 2px;
-    border-radius: 999px;
+    border-radius: 50%;
     background: color-mix(in srgb, var(--brand-text-secondary) 22%, transparent);
     transition: background-color 0.16s ease;
   }
@@ -380,7 +380,7 @@ function toggleExpanded() {
   &__item-text {
     overflow: hidden;
     color: inherit;
-    font-size: 14px;
+    font-size: 13px;
     line-height: 1.4;
     text-align: left;
     text-overflow: ellipsis;
@@ -399,7 +399,7 @@ function toggleExpanded() {
   }
 
   &__item.is-active {
-    background: color-mix(in srgb, var(--brand-primary) 14%, white);
+    background: color-mix(in srgb, var(--brand-primary) 10%, white);
     color: var(--brand-text-primary);
   }
 
@@ -417,11 +417,11 @@ function toggleExpanded() {
 
   &--surface-transparent {
     .editor-outline__panel {
-      gap: 0.65rem;
+      gap: 0.5rem;
       width: 100%;
       min-width: 12rem;
       max-width: 15rem;
-      padding: 0.125rem 0;
+      padding: 0.25rem 0;
       border: 0;
       border-radius: 0;
       background: transparent;
@@ -436,16 +436,16 @@ function toggleExpanded() {
     }
 
     .editor-outline__outline-list {
-      gap: 0.15rem;
+      gap: 0.25rem;
     }
 
     .editor-outline__item {
-      border-radius: 0.4rem;
+      border-radius: 0.375rem;
       color: color-mix(in srgb, var(--brand-text-secondary) 86%, transparent);
     }
 
     .editor-outline__item-link {
-      padding: 0.36rem 0.25rem;
+      padding: 0.5rem 0.25rem;
       padding-inline-start: calc(0.25rem + var(--editor-outline-indent));
 
       &:hover,

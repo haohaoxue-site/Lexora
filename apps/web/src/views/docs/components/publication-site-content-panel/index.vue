@@ -231,25 +231,6 @@ function compareOrderedItem(left: { order: number, updatedAt: string }, right: {
 
 <template>
   <section v-loading="loading" class="publication-site-content-panel grid gap-4">
-    <div>
-      <div>
-        <h2 class="m-0 text-lg font-semibold text-main">
-          站点内容
-        </h2>
-        <p class="m-0 mt-1 text-sm leading-5 text-secondary">
-          分组和站点页面组成公开站点侧边栏；DESCENDANTS 的子页面沿用私有文档树顺序。
-        </p>
-      </div>
-    </div>
-
-    <ElAlert
-      title="子页面排序跟随私有文档树"
-      description="SITE 内容中只管理 root page 在 section 内的位置，子页面不会在这里单独排序。"
-      type="info"
-      :closable="false"
-      show-icon
-    />
-
     <div class="grid grid-cols-[minmax(20rem,0.8fr)_minmax(24rem,1.2fr)] items-start gap-4 max-[980px]:grid-cols-1">
       <section class="grid gap-3">
         <div class="text-base font-semibold text-main">
@@ -279,7 +260,7 @@ function compareOrderedItem(left: { order: number, updatedAt: string }, right: {
 
           <ElTableColumn min-width="180">
             <template #default="{ row }">
-              <div class="inline-flex min-w-0 items-center gap-[0.45rem]">
+              <div class="inline-flex min-w-0 items-center gap-2">
                 <span>{{ row.title }}</span>
                 <ElTag
                   v-if="row.status === DOCUMENT_PUBLICATION_ENTRY_STATUS.HIDDEN"
@@ -305,7 +286,7 @@ function compareOrderedItem(left: { order: number, updatedAt: string }, right: {
           </ElTableColumn>
           <ElTableColumn width="190" align="right">
             <template #default="{ row }">
-              <div class="inline-flex min-w-0 items-center gap-[0.45rem]">
+              <div class="inline-flex min-w-0 items-center gap-2">
                 <ElButton link type="primary" @click="renameSection(row)">
                   重命名
                 </ElButton>
@@ -376,7 +357,7 @@ function compareOrderedItem(left: { order: number, updatedAt: string }, right: {
 
       <ElTableColumn label="站点标题" min-width="220" show-overflow-tooltip>
         <template #default="{ row }">
-          <div class="inline-flex min-w-0 items-center gap-[0.45rem]">
+          <div class="inline-flex min-w-0 items-center gap-2">
             <span>{{ row.title }}</span>
             <ElTag
               v-if="row.status === DOCUMENT_PUBLICATION_ENTRY_STATUS.HIDDEN"
@@ -435,7 +416,7 @@ function compareOrderedItem(left: { order: number, updatedAt: string }, right: {
       </ElTableColumn>
       <ElTableColumn label="操作" width="220" align="right" header-align="right">
         <template #default="{ row }">
-          <div class="inline-flex min-w-0 items-center gap-[0.45rem]">
+          <div class="inline-flex min-w-0 items-center gap-2">
             <ElButton link type="primary" @click="renamePage(row)">
               重命名
             </ElButton>

@@ -91,31 +91,31 @@ const props = withDefaults(defineProps<{
 .chat-assistant-message {
   display: flex;
   flex-direction: column;
-  gap: 0.625rem;
+  gap: 0.5rem;
   min-width: 0;
 
   &.chat-assistant-message--docs {
-    gap: 0.5rem;
+    gap: 0.375rem;
     max-width: 100%;
   }
 }
 
 .chat-assistant-message__bubble {
-  padding: 0.625rem 1rem;
-  border-radius: 0.75rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.5rem;
   overflow-wrap: break-word;
   color: var(--brand-text-primary);
-  background: var(--brand-bg-surface-raised);
+  background: color-mix(in srgb, var(--brand-bg-surface) 94%, var(--brand-fill-light));
   border: 1px solid color-mix(in srgb, var(--brand-border-base) 70%, transparent);
   font-size: 0.875rem;
-  line-height: 1.625;
+  line-height: 1.6;
 
   .chat-assistant-message--docs & {
     max-width: min(18.5rem, 100%);
     padding: 0.5rem 0.75rem;
-    border-radius: 0.625rem;
+    border-radius: 0.5rem;
     font-size: 0.8125rem;
-    line-height: 1.55;
+    line-height: 1.5;
   }
 }
 
@@ -165,7 +165,7 @@ const props = withDefaults(defineProps<{
   span {
     width: 0.21875rem;
     height: 0.21875rem;
-    border-radius: 999px;
+    border-radius: 50%;
     background: color-mix(in srgb, var(--brand-primary) 82%, var(--brand-text-secondary));
     opacity: 0.35;
     transform: translateY(0);
@@ -196,7 +196,7 @@ const props = withDefaults(defineProps<{
   span {
     width: 0.125rem;
     height: 0.375rem;
-    border-radius: 999px;
+    border-radius: 50%;
     background: color-mix(in srgb, var(--brand-primary) 58%, transparent);
     transform-origin: center;
     animation: chat-assistant-message-wave 1.08s ease-in-out infinite;

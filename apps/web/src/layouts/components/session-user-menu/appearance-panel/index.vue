@@ -9,8 +9,8 @@ const emits = defineEmits<{
 </script>
 
 <template>
-  <div class="session-user-menu-subpanel absolute left-[calc(100%+12px)] top-1/2 z-[8] w-[216px] -translate-y-1/2 p-2.5">
-    <ul class="m-0 flex flex-col gap-1.5 p-0 list-none">
+  <div class="session-user-menu-subpanel absolute left-[calc(100%+10px)] top-1/2 z-[8] w-[172px] -translate-y-1/2 p-1">
+    <ul class="m-0 flex list-none flex-col gap-0.5 p-0">
       <li
         v-for="option in props.options"
         :key="option.value"
@@ -22,22 +22,22 @@ const emits = defineEmits<{
       >
         <button
           type="button"
-          class="session-appearance-option__button flex min-h-11 w-full items-center rounded-lg border-0 bg-transparent px-2.5 py-2"
+          class="session-appearance-option__button flex min-h-8 w-full items-center rounded-lg border-0 bg-transparent px-2 py-1"
           :disabled="props.isSaving"
           @click.stop="emits('select', option.value)"
         >
-          <span class="session-appearance-option__content flex h-full w-full items-center justify-between gap-4 text-left">
+          <span class="session-appearance-option__content flex h-full w-full items-center justify-between gap-2.5 text-left">
             <span class="session-appearance-option__label min-w-0">
-              <span class="truncate text-[13px] leading-none font-medium text-main">
+              <span class="truncate text-[13px] font-medium leading-none text-main">
                 {{ option.label }}
               </span>
             </span>
 
-            <span class="session-appearance-option__indicator flex w-4 shrink-0 items-center justify-center">
+            <span class="session-appearance-option__indicator flex w-3 shrink-0 items-center justify-center">
               <SvgIcon
                 category="ui"
                 icon="check"
-                size="14px"
+                size="12px"
                 class="session-appearance-option__check"
                 :class="{ 'is-visible': props.currentAppearance === option.value }"
               />
@@ -51,12 +51,10 @@ const emits = defineEmits<{
 
 <style scoped lang="scss">
 .session-user-menu-subpanel {
-  border: 1px solid color-mix(in srgb, var(--brand-border-base) 94%, transparent);
-  border-radius: 12px;
-  background: var(--brand-bg-surface-raised);
-  box-shadow:
-    0 16px 36px color-mix(in srgb, var(--brand-text-primary) 9%, transparent),
-    0 4px 12px color-mix(in srgb, var(--brand-text-primary) 5%, transparent);
+  border: 1px solid color-mix(in srgb, var(--brand-border-base) 82%, transparent);
+  border-radius: 8px;
+  background: var(--brand-bg-surface);
+  box-shadow: var(--brand-shadow-hairline);
 }
 
 .session-appearance-option__button {
@@ -72,7 +70,7 @@ const emits = defineEmits<{
   }
 
   &:hover:not(:disabled) {
-    background: color-mix(in srgb, var(--brand-fill-lighter) 76%, var(--brand-text-primary) 6%);
+    background: color-mix(in srgb, var(--brand-fill-light) 82%, var(--brand-bg-surface));
   }
 
   &:disabled {
@@ -82,11 +80,11 @@ const emits = defineEmits<{
 }
 
 .session-appearance-option.is-active .session-appearance-option__button {
-  color: var(--brand-primary);
-  background: color-mix(in srgb, var(--brand-primary) 10%, transparent);
+  color: var(--brand-text-primary);
+  background: color-mix(in srgb, var(--brand-primary) 8%, var(--brand-bg-surface));
 
   :deep(.text-main) {
-    color: var(--brand-primary);
+    color: var(--brand-text-primary);
   }
 }
 

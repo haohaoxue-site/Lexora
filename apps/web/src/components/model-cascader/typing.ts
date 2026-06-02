@@ -20,6 +20,7 @@ export interface ModelCascaderProps {
   clearable?: boolean
   filterable?: boolean
   showAllLevels?: boolean
+  popperClass?: string
 }
 
 export interface ModelCascaderEmits {

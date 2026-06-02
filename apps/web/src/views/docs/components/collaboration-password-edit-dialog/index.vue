@@ -16,7 +16,7 @@ const password = defineModel<string>('password', { required: true })
     width="420px"
     append-to-body
     align-center
-    body-class="pt-1 pb-[0.45rem]"
+    body-class="pt-1 pb-2"
     @update:model-value="visible => emits('update:modelValue', visible)"
   >
     <template #header>
@@ -25,8 +25,8 @@ const password = defineModel<string>('password', { required: true })
       </div>
     </template>
 
-    <div class="grid gap-[0.85rem]">
-      <div class="flex flex-wrap items-center gap-[0.55rem]">
+    <div class="grid gap-3">
+      <div class="flex flex-wrap items-center gap-2">
         <ElInput
           v-model="password"
           class="min-w-[16rem] flex-1"
@@ -36,7 +36,7 @@ const password = defineModel<string>('password', { required: true })
           clearable
           @keyup.enter="emits('submit')"
         />
-        <ElButton @click="emits('generate')">
+        <ElButton size="default" @click="emits('generate')">
           <SvgIcon category="ui" icon="sync-refresh" size="1rem" />
           随机生成
         </ElButton>
@@ -44,12 +44,12 @@ const password = defineModel<string>('password', { required: true })
 
       <div
         v-if="props.showValidation"
-        class="grid gap-[0.45rem] rounded-[0.45rem] bg-fill-lighter p-[0.8rem]"
+        class="collaboration-password-edit-dialog__validation grid gap-2 rounded-lg bg-fill-lighter p-3"
       >
         <p
           v-for="error in props.validationErrors"
           :key="error"
-          class="m-0 inline-flex items-center gap-[0.45rem] text-[0.92rem] leading-[1.45] text-danger"
+          class="m-0 inline-flex items-center gap-2 text-[0.92rem] leading-[1.45] text-danger"
         >
           <SvgIcon category="ui" icon="error" size="1rem" />
           {{ error }}
@@ -62,18 +62,18 @@ const password = defineModel<string>('password', { required: true })
     </div>
 
     <template #footer>
-      <div class="pt-[0.35rem]">
+      <div class="pt-1">
         <ElButton
-          size="large"
-          class="min-w-[5.5rem]"
+          size="default"
+          class="min-w-20"
           @click="emits('update:modelValue', false)"
         >
           取消
         </ElButton>
         <ElButton
           type="primary"
-          size="large"
-          class="min-w-[5.5rem]"
+          size="default"
+          class="min-w-20"
           :loading="props.saving"
           :disabled="!props.canSave"
           @click="emits('submit')"

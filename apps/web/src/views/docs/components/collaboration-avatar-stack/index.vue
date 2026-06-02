@@ -31,7 +31,7 @@ function openCollaborators() {
   <button
     v-if="props.owner || props.collaborators.length"
     type="button"
-    class="collaboration-avatar-stack inline-flex flex-[0_0_auto] items-center gap-0 rounded-full border-0 px-[0.45rem] py-[0.25rem]"
+    class="collaboration-avatar-stack inline-flex flex-[0_0_auto] items-center gap-0 rounded-full border-0 px-2 py-[0.25rem]"
     :class="{ 'is-clickable': props.canOpen }"
     aria-label="当前协作者"
     :aria-disabled="!props.canOpen"
@@ -67,7 +67,7 @@ function openCollaborators() {
         :size="28"
         :src="collaborator.user.avatarUrl ?? undefined"
         class="collaboration-avatar-stack__avatar"
-        :class="{ '-ml-[0.45rem]': collaboratorIndex > 0 }"
+        :class="{ '-ml-2': collaboratorIndex > 0 }"
       >
         {{ getCollaborationAvatarText(collaborator.user) }}
       </ElAvatar>
@@ -77,7 +77,7 @@ function openCollaborators() {
       v-if="remainingCollaboratorCount > 0"
       :size="28"
       class="collaboration-avatar-stack__avatar collaboration-avatar-stack__avatar--more"
-      :class="{ '-ml-[0.45rem]': visibleCollaborators.length > 0 }"
+      :class="{ '-ml-2': visibleCollaborators.length > 0 }"
     >
       +{{ remainingCollaboratorCount }}
     </ElAvatar>

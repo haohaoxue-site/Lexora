@@ -42,53 +42,55 @@ function isItemActing(documentId: string) {
 
 <template>
   <section class="docs-trash-page min-h-0 flex-1 overflow-auto p-[clamp(1.25rem,2vw,1.75rem)]">
-    <ElTable
-      v-loading="isLoading"
-      :data="tableItems"
-      row-key="id"
-      class="docs-trash-table"
-      element-loading-text="正在加载回收站"
-      :header-cell-style="tableHeaderCellStyle"
-      :cell-style="tableBodyCellStyle"
-    >
-      <template #empty>
-        <ElEmpty :description="errorMessage || '暂无已删除文档。'">
-          <ElButton v-if="errorMessage" type="primary" @click="loadItems">
-            重新加载
-          </ElButton>
-        </ElEmpty>
-      </template>
-
-      <ElTableColumn label="标题" prop="title" min-width="320" show-overflow-tooltip />
-      <ElTableColumn label="原位置" prop="locationLabel" min-width="260" show-overflow-tooltip />
-      <ElTableColumn label="删除时间" prop="trashedAtLabel" width="180" />
-
-      <ElTableColumn label="操作" width="180" align="right" header-align="right">
-        <template #default="{ row }">
-          <div class="flex flex-wrap justify-end gap-2">
-            <ElButton
-              size="small"
-              :loading="isItemActing(row.id)"
-              :disabled="isItemActing(row.id)"
-              @click="restoreItem(row.id)"
-            >
-              恢复
+    <div class="docs-trash-page__surface mx-auto w-full max-w-[var(--page-mode-table-max-width)] overflow-hidden rounded-lg">
+      <ElTable
+        v-loading="isLoading"
+        :data="tableItems"
+        row-key="id"
+        class="docs-trash-table"
+        element-loading-text="正在加载回收站"
+        :header-cell-style="tableHeaderCellStyle"
+        :cell-style="tableBodyCellStyle"
+      >
+        <template #empty>
+          <ElEmpty :description="errorMessage || '暂无已删除文档。'">
+            <ElButton v-if="errorMessage" type="primary" @click="loadItems">
+              重新加载
             </ElButton>
-
-            <ElButton
-              size="small"
-              type="danger"
-              plain
-              :loading="isItemActing(row.id)"
-              :disabled="isItemActing(row.id)"
-              @click="permanentlyDeleteItem(row.id)"
-            >
-              彻底删除
-            </ElButton>
-          </div>
+          </ElEmpty>
         </template>
-      </ElTableColumn>
-    </ElTable>
+
+        <ElTableColumn label="标题" prop="title" min-width="320" show-overflow-tooltip />
+        <ElTableColumn label="原位置" prop="locationLabel" min-width="260" show-overflow-tooltip />
+        <ElTableColumn label="删除时间" prop="trashedAtLabel" width="180" />
+
+        <ElTableColumn label="操作" width="180" align="right" header-align="right">
+          <template #default="{ row }">
+            <div class="flex flex-wrap justify-end gap-2">
+              <ElButton
+                size="small"
+                :loading="isItemActing(row.id)"
+                :disabled="isItemActing(row.id)"
+                @click="restoreItem(row.id)"
+              >
+                恢复
+              </ElButton>
+
+              <ElButton
+                size="small"
+                type="danger"
+                plain
+                :loading="isItemActing(row.id)"
+                :disabled="isItemActing(row.id)"
+                @click="permanentlyDeleteItem(row.id)"
+              >
+                彻底删除
+              </ElButton>
+            </div>
+          </template>
+        </ElTableColumn>
+      </ElTable>
+    </div>
   </section>
 </template>
 
@@ -97,15 +99,21 @@ function isItemActing(documentId: string) {
   background: var(--brand-bg-base);
 }
 
+.docs-trash-page__surface {
+  border: 1px solid color-mix(in srgb, var(--brand-border-base) 78%, transparent);
+  background: var(--brand-bg-surface);
+  box-shadow: var(--brand-shadow-hairline);
+}
+
 .docs-trash-table {
   --el-table-bg-color: transparent;
   --el-table-tr-bg-color: transparent;
   --el-fill-color-blank: transparent;
   --el-table-border-color: color-mix(in srgb, var(--brand-border-base) 68%, transparent);
-  --el-table-header-bg-color: color-mix(in srgb, var(--brand-fill-lighter) 46%, transparent);
+  --el-table-header-bg-color: color-mix(in srgb, var(--brand-fill-light) 86%, var(--brand-bg-surface));
   --el-table-header-text-color: var(--brand-text-secondary);
   --el-table-text-color: var(--brand-text-primary);
-  --el-table-row-hover-bg-color: color-mix(in srgb, var(--brand-primary) 4%, white);
+  --el-table-row-hover-bg-color: color-mix(in srgb, var(--brand-primary) 4%, var(--brand-bg-surface));
 
   :deep(.el-table__inner-wrapper::before) {
     display: none;

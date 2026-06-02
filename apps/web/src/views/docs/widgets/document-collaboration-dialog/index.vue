@@ -811,17 +811,16 @@ function resolveScopeChangeMessage(scope: DocumentCollaborationScope) {
     width="640px"
     append-to-body
     align-center
-    body-class="pt-[0.35rem]"
+    body-class="pt-1"
     :show-close="dialogView === 'overview'"
     @update:model-value="handleVisibleChange"
   >
     <template #header>
-      <div class="document-collaboration-dialog__header inline-flex items-center gap-[0.45rem]">
+      <div class="document-collaboration-dialog__header inline-flex items-center gap-2">
         <ElButton
           v-if="dialogView !== 'overview'"
           text
-          circle
-          class="document-collaboration-dialog__back h-[1.9rem] w-[1.9rem]"
+          class="document-collaboration-dialog__back h-8 min-w-8 w-8 rounded-lg p-0"
           aria-label="返回协作设置"
           @click="backToOverview"
         >
@@ -833,7 +832,7 @@ function resolveScopeChangeMessage(scope: DocumentCollaborationScope) {
 
     <div
       v-loading="isLoading"
-      class="document-collaboration-dialog__content grid content-start gap-[1.15rem]"
+      class="document-collaboration-dialog__content grid content-start gap-4"
       :class="{ 'document-collaboration-dialog__content--overview': dialogView === 'overview' }"
     >
       <ElAlert

@@ -84,21 +84,21 @@ const treeIconName = computed(() => {
           </ElButton>
 
           <template #dropdown>
-            <ElDropdownMenu class="document-tree-item__menu box-border min-w-0 w-[9.75rem] p-[0.3125rem]">
+            <ElDropdownMenu class="document-tree-item__menu box-border min-w-0 w-36 p-1">
               <ElDropdownItem
                 v-for="menuItem in menuItems"
                 :key="menuItem.command"
                 :command="menuItem.command"
                 :divided="menuItem.divided"
-                class="document-tree-item__menu-item min-h-[1.825rem] w-full box-border gap-[0.35rem] rounded px-1 text-sm text-main"
+                class="document-tree-item__menu-item min-h-8 w-full box-border gap-1.5 rounded-lg px-2 text-sm text-main"
                 :class="{
                   'document-tree-item__menu-item--delete text-error': menuItem.danger,
-                  'my-[0.375rem]': menuItem.divided,
+                  'my-1': menuItem.divided,
                 }"
               >
                 <template #icon>
                   <span
-                    class="inline-flex h-5 w-5 flex-none items-center justify-center"
+                    class="inline-flex h-4 w-4 flex-none items-center justify-center"
                     :class="menuItem.danger
                       ? 'text-[color-mix(in_srgb,var(--brand-error)_80%,var(--brand-text-secondary))]'
                       : 'text-[color-mix(in_srgb,var(--brand-text-secondary)_86%,transparent)]'"

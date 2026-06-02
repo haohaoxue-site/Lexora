@@ -11,7 +11,7 @@ const emits = defineEmits<AiProviderConsoleContentEmits>()
 </script>
 
 <template>
-  <main class="ai-provider-console__main flex min-h-0 min-w-0 flex-col overflow-hidden p-5 max-[1023px]:p-5">
+  <main class="ai-provider-console__main flex min-h-0 min-w-0 flex-col overflow-hidden p-4 max-[1023px]:p-4">
     <template v-if="props.selectedRow">
       <ProviderOverview
         :selected-title="props.selectedTitle"

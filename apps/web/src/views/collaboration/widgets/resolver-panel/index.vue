@@ -54,32 +54,13 @@ const passwordRules: FormRules<CollaborationPasswordFormModel> = {
   ],
 }
 
-const hasCurrentGrant = computed(() => Boolean(preview.value?.currentGrant))
-const needsPassword = computed(() => Boolean(preview.value?.passwordRequired && !hasCurrentGrant.value))
-const canConfirm = computed(() => {
-  const status = preview.value?.status
-
-  return (
-    status === DOCUMENT_COLLABORATION_RESOLVER_STATUS.PENDING
-    || status === DOCUMENT_COLLABORATION_RESOLVER_STATUS.ACCEPTED
-    || status === DOCUMENT_COLLABORATION_RESOLVER_STATUS.ENABLED
-  )
-})
+const hasCurrentAccess = computed(() => Boolean(preview.value?.currentAccess))
+const needsPassword = computed(() => Boolean(preview.value?.passwordRequired && !hasCurrentAccess.value))
+const canConfirm = computed(() => preview.value ? canConfirmEntry(preview.value) : false)
 const needsConfirm = computed(() => {
   const entry = preview.value
 
-  if (!entry || !canConfirm.value) {
-    return false
-  }
-
-  if (!entry.currentGrant) {
-    return true
-  }
-
-  return (
-    getCollaborationPermissionRank(entry.permission) > getCollaborationPermissionRank(entry.currentGrant.permission)
-    || getCollaborationScopeRank(entry.scope) > getCollaborationScopeRank(entry.currentGrant.scope)
-  )
+  return entry ? needsEntryConfirmation(entry) : false
 })
 const primaryActionLabel = computed(() => {
   if (!preview.value) {
@@ -120,7 +101,7 @@ const statusLabel = computed(() => {
   return ''
 })
 const unavailableMessage = computed(() => {
-  if (!preview.value || canConfirm.value || hasCurrentGrant.value) {
+  if (!preview.value || canConfirm.value || hasCurrentAccess.value) {
     return ''
   }
 
@@ -147,7 +128,12 @@ async function loadEntry() {
   passwordForm.password = ''
 
   try {
-    preview.value = await resolveDocumentCollaborationEntry(code.value)
+    const entry = await resolveDocumentCollaborationEntry(code.value)
+    preview.value = entry
+
+    if (shouldOpenDocumentDirectly(entry)) {
+      await openDocument(entry.rootDocumentId)
+    }
   }
   catch (error) {
     preview.value = null
@@ -156,6 +142,33 @@ async function loadEntry() {
   finally {
     isLoading.value = false
   }
+}
+
+function canConfirmEntry(entry: DocumentCollaborationResolverPreview) {
+  return (
+    entry.status === DOCUMENT_COLLABORATION_RESOLVER_STATUS.PENDING
+    || entry.status === DOCUMENT_COLLABORATION_RESOLVER_STATUS.ACCEPTED
+    || entry.status === DOCUMENT_COLLABORATION_RESOLVER_STATUS.ENABLED
+  )
+}
+
+function needsEntryConfirmation(entry: DocumentCollaborationResolverPreview) {
+  if (!canConfirmEntry(entry)) {
+    return false
+  }
+
+  if (!entry.currentAccess) {
+    return true
+  }
+
+  return (
+    getCollaborationPermissionRank(entry.permission) > getCollaborationPermissionRank(entry.currentAccess.permission)
+    || getCollaborationScopeRank(entry.scope) > getCollaborationScopeRank(entry.currentAccess.scope)
+  )
+}
+
+function shouldOpenDocumentDirectly(entry: DocumentCollaborationResolverPreview): entry is DocumentCollaborationResolverPreview & { rootDocumentId: string } {
+  return Boolean(entry.rootDocumentId && entry.currentAccess && !needsEntryConfirmation(entry))
 }
 
 async function handlePrimaryAction() {
@@ -237,10 +250,10 @@ async function handlePrimaryAction() {
           <ElDescriptionsItem label="邀请范围">
             {{ DOCUMENT_COLLABORATION_SCOPE_LABELS[preview.scope] }}
           </ElDescriptionsItem>
-          <ElDescriptionsItem v-if="preview.currentGrant" label="当前权限">
-            {{ DOCUMENT_COLLABORATION_PERMISSION_LABELS[preview.currentGrant.permission] }}
+          <ElDescriptionsItem v-if="preview.currentAccess" label="当前权限">
+            {{ DOCUMENT_COLLABORATION_PERMISSION_LABELS[preview.currentAccess.permission] }}
             ·
-            {{ DOCUMENT_COLLABORATION_SCOPE_LABELS[preview.currentGrant.scope] }}
+            {{ DOCUMENT_COLLABORATION_SCOPE_LABELS[preview.currentAccess.scope] }}
           </ElDescriptionsItem>
         </ElDescriptions>
 

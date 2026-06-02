@@ -15,8 +15,17 @@ export interface SinglePublicationPanelProps {
 
 export interface SinglePublicationPanelEmits {
   refresh: []
+  removeSitePage: [pageId: string]
   updateState: [documentId: string, state: DocumentSinglePublicationState, scope?: DocumentSinglePublicationScope]
 }
 
 export type SinglePublicationStateType = 'success' | 'primary' | 'warning' | 'info'
-export type PublicationSiteScopeByDocumentId = Map<string, PublicationSitePageScope>
+export type PublicationSiteCollectionState = 'none' | 'direct' | 'inherited' | 'hidden'
+
+export interface PublicationSiteCollectionInfo {
+  state: PublicationSiteCollectionState
+  label: string
+  type: SinglePublicationStateType
+  scope: PublicationSitePageScope | null
+  pageId: string | null
+}

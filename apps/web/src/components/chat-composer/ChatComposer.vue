@@ -365,8 +365,8 @@ function isSameContent(currentEditor: Editor, contentJSON: JSONContent) {
     position: relative;
     overflow: visible;
     border: 1px solid color-mix(in srgb, var(--brand-border-base) 80%, transparent);
-    border-radius: 0.75rem;
-    background: var(--brand-bg-surface-raised);
+    border-radius: 0.5rem;
+    background: var(--brand-bg-surface);
     box-shadow: var(--brand-shadow-hairline);
     transition:
       border-color 0.2s ease,
@@ -374,14 +374,14 @@ function isSameContent(currentEditor: Editor, contentJSON: JSONContent) {
 
     &:focus-within {
       border-color: color-mix(in srgb, var(--brand-primary) 32%, transparent);
-      box-shadow: var(--brand-shadow-floating);
+      box-shadow: 0 0 0 1px color-mix(in srgb, var(--brand-primary) 12%, transparent);
     }
   }
 
   .chat-composer__editor {
     max-height: min(40vh, 320px);
     overflow-y: auto;
-    padding: 0.75rem 0.875rem 0.25rem;
+    padding: 0.5rem 0.625rem 0.125rem;
   }
 
   :deep(.chat-composer__prosemirror) {
@@ -414,15 +414,15 @@ function isSameContent(currentEditor: Editor, contentJSON: JSONContent) {
     display: inline-flex;
     align-items: center;
     max-width: 12rem;
-    margin-inline: 0.08rem;
-    padding: 0.05rem 0.35rem;
-    border-radius: 0.375rem;
-    background: color-mix(in srgb, var(--brand-primary) 10%, var(--brand-bg-surface));
+    margin-inline: 0.125rem;
+    padding: 0.125rem 0.375rem;
+    border-radius: 0.5rem;
+    background: color-mix(in srgb, var(--brand-primary) 8%, var(--brand-bg-surface));
     color: var(--brand-primary);
     font-size: 0.85em;
     font-weight: 600;
-    line-height: 1.55;
-    vertical-align: 0.03em;
+    line-height: 1.45;
+    vertical-align: 0.02em;
     white-space: nowrap;
   }
 }

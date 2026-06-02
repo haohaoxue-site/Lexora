@@ -33,9 +33,9 @@ function showDocumentLibrary() {
     >
       <ElButton
         text
-        circle
-        class="docs-view__library-restore absolute left-3 top-3 z-[5] h-8 w-8"
+        class="docs-view__library-restore absolute left-3 top-3 z-[5] h-8 min-w-8 w-8 rounded-lg p-0"
         title="显示文档库"
+        aria-label="显示文档库"
         @click="showDocumentLibrary"
       >
         <SvgIcon category="ui" icon="pin" size="1rem" />

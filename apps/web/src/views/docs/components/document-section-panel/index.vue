@@ -30,6 +30,9 @@ const treeBodyRef = useTemplateRef<HTMLElement>('treeBody')
 const { height: treeBodyHeight } = useElementSize(treeBodyRef)
 const isOwnedCollection = computed(() => isOwnedDocumentCollection(props.group.id))
 const canCreateRoot = computed(() => isOwnedCollection.value && !props.selectionMode)
+const emptyDescription = computed(() =>
+  props.group.id === DOCUMENT_COLLECTION.COLLABORATION ? '暂无协作文档' : '暂无文档',
+)
 const treeProps = {
   value: 'id',
   label: 'title',
@@ -119,28 +122,28 @@ function expandActiveDocumentAncestors() {
 <template>
   <section
     class="document-tree-section flex min-w-0 flex-col"
-    :class="{ 'min-h-0 flex-1': props.fillHeight }"
+    :class="{ 'document-tree-section--fill min-h-0 flex-1': props.fillHeight }"
   >
-    <div class="document-tree-section__header group mb-2 flex items-center justify-between gap-2 rounded-lg px-2 py-1">
+    <div class="document-tree-section__header group flex h-8 items-center gap-1 px-3">
       <button
         type="button"
-        class="document-tree-section__header-button flex w-full min-w-0 flex-1 cursor-pointer items-center justify-between gap-1 border-none bg-transparent p-0 text-secondary transition-[background-color,color] duration-200 hover:bg-fill-light focus-visible:outline-none"
+        class="document-tree-section__header-button flex h-full w-full min-w-0 flex-1 cursor-pointer items-center gap-1 border-none bg-transparent p-0 text-secondary transition-[background-color,color] duration-200 focus-visible:outline-none"
         :aria-expanded="!isCollapsed"
         :aria-controls="`document-tree-section-group-${props.group.id}`"
         @click="toggleSection"
       >
-        <span class="text-xs font-medium tracking-[0.08em]">{{ displayLabel }}</span>
         <SvgIcon
           category="ui"
           :icon="chevronIconName"
           size="0.875rem"
-          class="document-tree-section__chevron translate-x-[-0.125rem] text-[0.875rem] opacity-0 transition-[opacity,transform] duration-200 group-hover:translate-x-0 group-hover:opacity-100 group-focus-within:translate-x-0 group-focus-within:opacity-100"
+          class="document-tree-section__chevron shrink-0 text-[0.875rem] transition-transform duration-200"
         />
+        <span class="min-w-0 truncate text-sm leading-none">{{ displayLabel }}</span>
       </button>
 
       <div
         v-if="$slots.headerAction || canCreateRoot"
-        class="flex shrink-0 items-center gap-1"
+        class="document-tree-section__actions flex shrink-0 items-center gap-1"
       >
         <div v-if="$slots.headerAction" class="inline-flex items-center" @click.stop>
           <slot name="headerAction" :group="props.group" />
@@ -161,7 +164,7 @@ function expandActiveDocumentAncestors() {
       :id="`document-tree-section-group-${props.group.id}`"
       ref="treeBody"
       role="group"
-      class="document-tree-section__body min-w-0"
+      class="document-tree-section__body min-w-0 px-3 pb-1 pt-1"
       :class="{ 'min-h-0 flex-1': props.fillHeight }"
     >
       <ElTreeV2
@@ -195,19 +198,42 @@ function expandActiveDocumentAncestors() {
       </ElTreeV2>
     </div>
 
-    <ElEmpty
+    <div
       v-else-if="!isCollapsed"
-      class="document-tree-section__empty"
-      :class="{ 'flex min-h-0 flex-1 flex-col justify-center': props.fillHeight }"
-      :image-size="48"
-      :description="props.group.id === DOCUMENT_COLLECTION.COLLABORATION ? '还没有协作文档' : '暂无文档'"
-    />
+      class="document-tree-section__empty flex min-h-9 items-center px-9 py-1.5 text-[13px] leading-5 text-secondary"
+    >
+      {{ emptyDescription }}
+    </div>
   </section>
 </template>
 
 <style scoped lang="scss">
 .document-tree-section {
-  .document-tree-section__tree {
+  & + & {
+    margin-top: 0.375rem;
+    padding-top: 0.375rem;
+    border-top: 1px solid color-mix(in srgb, var(--brand-border-base) 62%, transparent);
+  }
+
+  &__header {
+    background: color-mix(in srgb, var(--brand-fill-light) 74%, var(--brand-bg-sidebar));
+    transition: background-color 0.2s ease;
+
+    &:hover,
+    &:focus-within {
+      background: color-mix(in srgb, var(--brand-fill-light) 54%, var(--brand-bg-surface));
+    }
+  }
+
+  &__header-button {
+    color: var(--brand-text-secondary);
+  }
+
+  &__chevron {
+    color: var(--brand-text-secondary);
+  }
+
+  &__tree {
     --el-tree-node-content-height: 36px;
     background: transparent;
 

@@ -9,6 +9,14 @@
   --default-footer-height: 2.625rem;
   --page-panel-header-padding-block: 0;
   --page-panel-header-padding-inline: calc(var(--spacing) * 4);
+  --page-mode-form-max-width: 54rem;
+  --page-mode-chat-max-width: 48rem;
+  --page-mode-table-max-width: 86rem;
+  --page-mode-console-max-width: 92rem;
+  --panel-chat-session-width: 15.5rem;
+  --panel-docs-library-width: 16rem;
+  --panel-docs-chat-width: 22rem;
+  --panel-docs-history-width: 19rem;
 
   --sidebar-panel-brand-height: var(--default-header-height);
   --sidebar-panel-expanded-width: 13rem;

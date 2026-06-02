@@ -391,9 +391,10 @@ function getUnavailableReason(data: CascaderOption) {
     :clearable="componentProps.clearable"
     :filterable="componentProps.filterable"
     :show-all-levels="componentProps.showAllLevels"
+    :popper-class="componentProps.popperClass"
   >
     <template #default="{ data }">
-      <div class="model-cascader__node flex w-full min-w-0 items-center justify-between gap-3">
+      <div class="model-cascader__node flex min-w-0 flex-1 items-center justify-between gap-2">
         <span class="model-cascader__label min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">{{ data.label }}</span>
         <span v-if="getUnavailableReason(data)" class="model-cascader__reason shrink-0 text-xs text-secondary">
           {{ getUnavailableReason(data) }}

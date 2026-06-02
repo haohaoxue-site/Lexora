@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import type { DocsChatMessagesProps } from './typing'
 import { computed, nextTick, onUpdated, useTemplateRef } from 'vue'
+import ChatAssistantAvatar from '@/components/chat-message/ChatAssistantAvatar.vue'
 import ChatAssistantMessage from '@/components/chat-message/ChatAssistantMessage.vue'
 import ChatUserMessageContent from '@/components/chat-message/ChatUserMessageContent.vue'
+import { shouldShowAssistantPending } from '@/composables/chat/utils/chat-message-display'
 
 const props = defineProps<DocsChatMessagesProps>()
 
@@ -28,7 +30,7 @@ function scrollToBottom() {
       <div class="text-[0.95rem] font-semibold leading-6 text-main">
         开始新的文档对话
       </div>
-      <div class="mt-1 text-[0.8125rem] leading-[1.35rem]">
+      <div class="mt-1 text-[13px] leading-[1.35rem]">
         可以提问，或用 @ 添加文档上下文。
       </div>
     </div>
@@ -42,12 +44,19 @@ function scrollToBottom() {
       >
         <div
           v-if="message.role === 'user'"
-          class="max-w-[min(18.5rem,100%)] break-words rounded-[0.625rem] bg-primary px-3 py-2 text-[0.8125rem] leading-[1.55] text-white"
+          class="max-w-[min(18.5rem,100%)] break-words rounded-lg bg-primary px-3 py-2 text-[13px] leading-[1.55] text-white"
         >
           <ChatUserMessageContent :message="message" />
         </div>
 
-        <ChatAssistantMessage v-else :message="message" variant="docs" />
+        <div v-else class="flex min-w-0 max-w-full items-start gap-2">
+          <ChatAssistantAvatar
+            :pending="shouldShowAssistantPending(message)"
+            size="sm"
+            class="mt-0.5 shrink-0"
+          />
+          <ChatAssistantMessage :message="message" variant="docs" />
+        </div>
       </div>
     </div>
   </div>

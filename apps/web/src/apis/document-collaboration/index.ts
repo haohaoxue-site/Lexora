@@ -17,7 +17,7 @@ import { axios } from '@/utils/axios'
 
 export * from './typing'
 
-export function listDocumentCollaborationConsoleItems(workspaceId: string): Promise<DocumentCollaborationConsoleListResponse> {
+export function listDocumentCollaborationConsoleTree(workspaceId: string): Promise<DocumentCollaborationConsoleListResponse> {
   return axios.request({
     method: 'get',
     url: '/documents/collaborations',

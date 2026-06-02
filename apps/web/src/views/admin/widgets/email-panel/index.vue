@@ -150,7 +150,7 @@ function handleProviderChange(value: string | number | boolean | undefined) {
                   border
                   class="admin-email__provider-option !m-0 !h-auto !w-full text-left"
                 >
-                  <div class="admin-email__provider-option-content grid w-full gap-[0.45rem] p-4 leading-[1.6] whitespace-normal">
+                  <div class="admin-email__provider-option-content grid w-full gap-2 p-4 leading-[1.6] whitespace-normal">
                     <span class="admin-email__provider-title block text-[0.95rem] font-bold leading-[1.4] text-main">
                       {{ provider.title }}
                     </span>

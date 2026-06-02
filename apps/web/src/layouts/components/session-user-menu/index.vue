@@ -67,9 +67,8 @@ function getScopeLabel(scope: keyof typeof DOCUMENT_COLLABORATION_SCOPE_LABELS) 
     <ElPopover
       v-model:visible="menuVisible"
       trigger="click"
-      placement="right-start"
-      :width="236"
-      :offset="14"
+      placement="top-end"
+      :width="220"
       :show-arrow="false"
       teleported
       popper-class="session-user-menu-popper"
@@ -82,7 +81,7 @@ function getScopeLabel(scope: keyof typeof DOCUMENT_COLLABORATION_SCOPE_LABELS) 
           class="session-user-menu-trigger-badge"
         >
           <ElButton
-            class="session-user-sidebar-trigger !h-11 !w-11 !min-w-11 !justify-center overflow-hidden !rounded-xl border-none bg-transparent !p-0 text-main shadow-none"
+            class="session-user-sidebar-trigger !h-11 !w-11 !min-w-11 !justify-center overflow-hidden !rounded-lg border-none bg-transparent !p-0 text-main shadow-none"
             aria-label="打开用户菜单"
           >
             <EntityAvatar
@@ -98,13 +97,13 @@ function getScopeLabel(scope: keyof typeof DOCUMENT_COLLABORATION_SCOPE_LABELS) 
         </ElBadge>
       </template>
 
-      <div class="session-user-menu flex flex-col gap-1">
-        <div class="session-user-profile flex items-start gap-2 px-1 py-0.5">
+      <div class="session-user-menu flex flex-col gap-0.75">
+        <div class="session-user-profile flex items-start gap-1.75 px-0.75 py-0.25">
           <EntityAvatar
             :name="currentUser.displayName"
             :src="currentUser.avatarUrl"
             :alt="`${currentUser.displayName} 的头像`"
-            :size="34"
+            :size="32"
             shape="circle"
             kind="user"
             class="session-user-profile__avatar"
@@ -116,7 +115,7 @@ function getScopeLabel(scope: keyof typeof DOCUMENT_COLLABORATION_SCOPE_LABELS) 
                 <p class="m-0 truncate text-[13px] font-semibold leading-[1.125rem] text-main">
                   {{ currentUser.displayName }}
                 </p>
-                <p class="m-0 mt-0.5 truncate text-[11px] leading-4 text-secondary">
+                <p class="m-0 mt-[0.125rem] truncate text-[11px] leading-[0.9375rem] text-secondary">
                   {{ currentUser.email }}
                 </p>
               </div>
@@ -124,7 +123,7 @@ function getScopeLabel(scope: keyof typeof DOCUMENT_COLLABORATION_SCOPE_LABELS) 
               <ElTooltip v-if="contextSwitchAction" :content="contextSwitchAction.label" placement="top">
                 <ElButton
                   text
-                  class="session-user-profile__context-trigger !ml-0 !h-[1.625rem] !w-[1.625rem] !min-w-[1.625rem] !rounded-lg border-none !p-0"
+                  class="session-user-profile__context-trigger !ml-0 !h-6 !w-6 !min-w-6 !rounded-md border-none !p-0"
                   :aria-label="contextSwitchAction.label"
                   @click="switchContext"
                 >
@@ -142,16 +141,16 @@ function getScopeLabel(scope: keyof typeof DOCUMENT_COLLABORATION_SCOPE_LABELS) 
 
         <ElButton
           text
-          class="session-user-menu-row session-user-menu-row--code session-menu-button-fill !ml-0 !min-h-[2.625rem] !w-full !justify-start !rounded-[0.625rem] !px-2.5 !py-0"
+          class="session-user-menu-row session-user-menu-row--code session-menu-button-fill !ml-0 !min-h-[2.375rem] !w-full !justify-start !rounded-lg !px-2.25 !py-0"
           @click="handleCopyUserCode"
         >
-          <span class="session-user-menu-row__content flex h-full w-full items-center gap-2.5 text-left">
+          <span class="session-user-menu-row__content flex h-full w-full items-center gap-2.25 text-left">
             <span class="session-user-menu-row__summary min-w-0 flex-1">
-              <span class="session-user-menu-row__title block text-[11px] leading-4 text-secondary">协作码</span>
-              <strong class="block truncate pt-0.5 text-[12px] leading-4.5 text-main font-medium">{{ currentUser.userCode }}</strong>
+              <span class="session-user-menu-row__title block text-[11px] leading-[0.9375rem] text-secondary">协作码</span>
+              <strong class="block truncate pt-[0.125rem] text-[12px] leading-4 text-main font-medium">{{ currentUser.userCode }}</strong>
             </span>
 
-            <span class="session-user-menu-row__copy-indicator flex h-[1.625rem] w-[1.625rem] shrink-0 items-center justify-center rounded-lg text-[13px]">
+            <span class="session-user-menu-row__copy-indicator flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-[12px]">
               <CopyStateIcon :copied="copiedUserCode" />
             </span>
           </span>
@@ -162,15 +161,15 @@ function getScopeLabel(scope: keyof typeof DOCUMENT_COLLABORATION_SCOPE_LABELS) 
         <div class="session-menu-subpanel-anchor relative">
           <ElButton
             text
-            class="session-user-menu-row session-menu-button-fill !ml-0 !h-[2.375rem] !w-full !justify-start !rounded-[0.625rem] !px-2.5 !py-0 !leading-none"
+            class="session-user-menu-row session-user-menu-row--regular session-menu-button-fill !ml-0 !h-9 !w-full !justify-start !rounded-lg !px-2.25 !py-0 !leading-none"
             :class="{ 'is-active': appearanceMenuVisible }"
             :disabled="isSavingAppearance"
             @click.stop="toggleAppearanceMenu"
           >
-            <span class="session-user-menu-row__content flex h-full w-full items-center gap-2.5 text-left">
+            <span class="session-user-menu-row__content flex h-full w-full items-center gap-2.25 text-left">
               <SvgIcon category="ui" icon="contrast" size="14px" class="session-user-menu-row__icon flex h-4 w-4 shrink-0 items-center justify-center text-[14px]" />
 
-              <span class="session-user-menu-row__summary flex min-w-0 flex-1 items-center justify-between gap-2.5">
+              <span class="session-user-menu-row__summary flex min-w-0 flex-1 items-center justify-between gap-2">
                 <span class="session-user-menu-row__title overflow-hidden text-ellipsis whitespace-nowrap text-[13px] leading-none text-main">
                   主题
                 </span>
@@ -202,14 +201,14 @@ function getScopeLabel(scope: keyof typeof DOCUMENT_COLLABORATION_SCOPE_LABELS) 
         <div class="session-menu-subpanel-anchor relative">
           <ElButton
             text
-            class="session-user-menu-row session-menu-button-fill !ml-0 !h-[2.375rem] !w-full !justify-start !rounded-[0.625rem] !px-2.5 !py-0 !leading-none"
+            class="session-user-menu-row session-user-menu-row--regular session-menu-button-fill !ml-0 !h-9 !w-full !justify-start !rounded-lg !px-2.25 !py-0 !leading-none"
             :class="{ 'is-active': notificationPanelVisible }"
             @click.stop="toggleNotificationPanel"
           >
-            <span class="session-user-menu-row__content flex h-full w-full items-center gap-2.5 text-left">
+            <span class="session-user-menu-row__content flex h-full w-full items-center gap-2.25 text-left">
               <SvgIcon category="ui" icon="bell" size="14px" class="session-user-menu-row__icon flex h-4 w-4 shrink-0 items-center justify-center text-[14px]" />
 
-              <span class="session-user-menu-row__summary flex min-w-0 flex-1 items-center justify-between gap-2.5">
+              <span class="session-user-menu-row__summary flex min-w-0 flex-1 items-center justify-between gap-2">
                 <span class="session-user-menu-row__title overflow-hidden text-ellipsis whitespace-nowrap text-[13px] leading-none text-main">
                   站内信
                 </span>
@@ -254,11 +253,11 @@ function getScopeLabel(scope: keyof typeof DOCUMENT_COLLABORATION_SCOPE_LABELS) 
 
         <ElButton
           text
-          class="session-user-menu-row session-user-logout session-menu-button-fill !ml-0 !h-[2.375rem] !w-full !justify-start !rounded-[0.625rem] !px-2.5 !py-0 !leading-none"
+          class="session-user-menu-row session-user-menu-row--regular session-user-logout session-menu-button-fill !ml-0 !h-9 !w-full !justify-start !rounded-lg !px-2.25 !py-0 !leading-none"
           :disabled="isLoggingOut"
           @click="handleLogout"
         >
-          <span class="session-user-menu-row__content flex h-full w-full items-center gap-2.5 text-left">
+          <span class="session-user-menu-row__content flex h-full w-full items-center gap-2.25 text-left">
             <SvgIcon
               category="ui"
               :icon="getLogoutIconName()"
@@ -331,19 +330,23 @@ function getScopeLabel(scope: keyof typeof DOCUMENT_COLLABORATION_SCOPE_LABELS) 
 
 <style scoped lang="scss">
 :global(.session-user-menu-popper.el-popover) {
+  --session-user-menu-inset: 8px;
+
   position: relative;
   overflow: visible;
-  padding: 9px;
-  border: 1px solid color-mix(in srgb, var(--brand-border-base) 94%, transparent);
-  border-radius: 11px;
-  background: var(--brand-bg-surface-raised);
-  box-shadow:
-    0 14px 30px color-mix(in srgb, var(--brand-text-primary) 8%, transparent),
-    0 4px 9px color-mix(in srgb, var(--brand-text-primary) 5%, transparent);
+  padding: var(--session-user-menu-inset);
+  border: 1px solid color-mix(in srgb, var(--brand-border-base) 82%, transparent);
+  border-radius: 9px;
+  background: var(--brand-bg-surface);
+  box-shadow: var(--brand-shadow-hairline);
 }
 
 .session-user-menu-entry {
   display: inline-flex;
+}
+
+.session-user-menu {
+  gap: 0;
 }
 
 .session-user-menu-trigger-badge {
@@ -353,23 +356,21 @@ function getScopeLabel(scope: keyof typeof DOCUMENT_COLLABORATION_SCOPE_LABELS) 
     min-width: 1.125rem;
     height: 1.125rem;
     border: 2px solid var(--brand-bg-sidebar);
-    border-radius: 999px;
+    border-radius: 50%;
     box-shadow: none;
     transform: translate(12%, 8%);
   }
 }
 
 .session-user-profile__avatar {
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--brand-border-base) 70%, transparent);
-}
-
-.session-user-profile__avatar {
-  background: color-mix(in srgb, var(--brand-fill-light) 66%, var(--brand-bg-surface));
+  background: color-mix(in srgb, var(--brand-fill-light) 70%, var(--brand-bg-surface));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--brand-border-base) 72%, transparent);
 }
 
 .session-user-divider {
   height: 1px;
-  background: color-mix(in srgb, var(--brand-border-base) 78%, transparent);
+  margin: 0.375rem calc(0px - var(--session-user-menu-inset));
+  background: color-mix(in srgb, var(--brand-border-base) 70%, transparent);
 }
 
 .session-menu-button-fill > :deep(span) {
@@ -379,19 +380,30 @@ function getScopeLabel(scope: keyof typeof DOCUMENT_COLLABORATION_SCOPE_LABELS) 
 }
 
 .session-user-profile {
-  border-radius: 0.625rem;
+  margin-bottom: 0.375rem;
+  border-radius: 0.5rem;
+}
+
+.session-menu-subpanel-anchor {
+  & + & {
+    margin-top: 0.125rem;
+  }
+}
+
+.session-user-menu-row--regular {
+  font-size: 13px;
 }
 
 .session-user-profile__context-trigger {
   --el-button-text-color: var(--brand-text-secondary);
-  --el-fill-color-light: color-mix(in srgb, var(--brand-fill-lighter) 76%, var(--brand-text-primary) 5%);
+  --el-fill-color-light: color-mix(in srgb, var(--brand-fill-light) 76%, var(--brand-bg-surface));
 
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--brand-border-base) 78%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--brand-border-base) 74%, transparent);
   transition: color 0.18s ease, background-color 0.18s ease, box-shadow 0.18s ease;
 
   &:hover {
     --el-button-text-color: var(--brand-primary);
-    --el-fill-color-light: color-mix(in srgb, var(--brand-primary) 8%, transparent);
+    --el-fill-color-light: color-mix(in srgb, var(--brand-primary) 8%, var(--brand-bg-surface));
 
     box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--brand-primary) 18%, transparent);
   }
@@ -408,13 +420,13 @@ function getScopeLabel(scope: keyof typeof DOCUMENT_COLLABORATION_SCOPE_LABELS) 
   transition: background-color 0.18s ease, color 0.18s ease;
 
   &:hover:not(.is-disabled) {
-    --el-fill-color-light: color-mix(in srgb, var(--brand-fill-lighter) 78%, var(--brand-text-primary) 5%);
+    --el-fill-color-light: color-mix(in srgb, var(--brand-fill-light) 82%, var(--brand-bg-surface));
   }
 
   &.is-active {
-    --el-button-text-color: var(--brand-primary);
-    --el-fill-color-light: color-mix(in srgb, var(--brand-primary) 9%, transparent);
-    color: var(--brand-primary);
+    --el-button-text-color: var(--brand-text-primary);
+    --el-fill-color-light: color-mix(in srgb, var(--brand-primary) 8%, var(--brand-bg-surface));
+    color: var(--brand-text-primary);
 
     .session-user-menu-row__icon,
     .session-user-menu-row__current {
@@ -446,8 +458,8 @@ function getScopeLabel(scope: keyof typeof DOCUMENT_COLLABORATION_SCOPE_LABELS) 
 .session-user-menu-row__badge {
   min-width: 1.125rem;
   height: 1.125rem;
-  padding-inline: 0.3125rem;
-  border-radius: 999px;
+  padding-inline: 0.25rem;
+  border-radius: 50%;
   background: var(--brand-error);
   color: white;
   font-size: 0.6875rem;
@@ -457,23 +469,24 @@ function getScopeLabel(scope: keyof typeof DOCUMENT_COLLABORATION_SCOPE_LABELS) 
 }
 
 .session-user-menu-row--code {
-  border: 1px solid color-mix(in srgb, var(--brand-border-base) 78%, transparent);
-  background: color-mix(in srgb, var(--brand-fill-lighter) 72%, transparent);
+  border: 1px solid color-mix(in srgb, var(--brand-border-base) 72%, transparent);
+  background: color-mix(in srgb, var(--brand-fill-lighter) 28%, var(--brand-bg-surface));
 
   &:hover {
-    border-color: color-mix(in srgb, var(--brand-primary) 20%, transparent);
+    border-color: color-mix(in srgb, var(--brand-border-base) 82%, transparent);
+    background: color-mix(in srgb, var(--brand-fill-lighter) 42%, var(--brand-bg-surface));
   }
 }
 
 .session-user-menu-row__copy-indicator {
   color: var(--brand-text-secondary);
-  background: color-mix(in srgb, var(--brand-bg-surface) 82%, transparent);
+  background: color-mix(in srgb, var(--brand-fill-light) 58%, var(--brand-bg-surface));
   transition: background-color 0.18s ease, color 0.18s ease;
 }
 
 .session-user-menu-row--code:hover .session-user-menu-row__copy-indicator {
   color: var(--brand-primary);
-  background: color-mix(in srgb, var(--brand-primary) 8%, transparent);
+  background: color-mix(in srgb, var(--brand-primary) 6%, var(--brand-bg-surface));
 }
 
 .session-user-logout:hover {
@@ -486,7 +499,7 @@ function getScopeLabel(scope: keyof typeof DOCUMENT_COLLABORATION_SCOPE_LABELS) 
   transition: background-color 0.18s ease;
 
   &:hover {
-    background: color-mix(in srgb, var(--brand-fill-lighter) 78%, var(--brand-text-primary) 5%);
+    background: color-mix(in srgb, var(--brand-bg-surface) 88%, transparent);
   }
 
   &:focus-visible {

@@ -7,8 +7,8 @@ const emits = defineEmits<ChatContextBarEmits>()
 <template>
   <div class="chat-view-context flex w-full flex-wrap items-center justify-end gap-4">
     <div class="flex items-center gap-3">
-      <ElButton class="chat-view-context__new-chat-btn h-8 rounded-[0.5rem] px-3.5 text-sm font-normal" @click="emits('newChat')">
-        <span class="inline-flex items-center gap-[0.375rem]">
+      <ElButton class="chat-view-context__new-chat-btn h-8 rounded-lg px-3 text-sm font-medium" @click="emits('newChat')">
+        <span class="inline-flex items-center gap-1.5">
           <SvgIcon category="ui" icon="plus" size="0.875rem" />
           <span>新对话</span>
         </span>
@@ -20,7 +20,7 @@ const emits = defineEmits<ChatContextBarEmits>()
 <style scoped lang="scss">
 .chat-view-context__new-chat-btn {
   border-color: color-mix(in srgb, var(--brand-border-base) 72%, transparent);
-  background: color-mix(in srgb, var(--brand-bg-surface) 82%, transparent);
+  background: color-mix(in srgb, var(--brand-fill-light) 42%, var(--brand-bg-surface));
   color: var(--brand-text-primary);
   transition:
     border-color 0.2s ease,

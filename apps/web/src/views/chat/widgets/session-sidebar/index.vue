@@ -21,15 +21,15 @@ const {
 </script>
 
 <template>
-  <aside class="chat-session-sidebar flex min-h-0 w-64 shrink-0 flex-col">
-    <div class="chat-session-sidebar__header flex min-h-12 items-center justify-between border-b px-3 py-2 pl-[0.9rem]">
+  <aside class="chat-session-sidebar flex min-h-0 w-[var(--panel-chat-session-width)] shrink-0 flex-col">
+    <div class="chat-session-sidebar__header flex min-h-11 items-center justify-between border-b px-3 py-2">
       <template v-if="isSelectionMode">
-        <span class="min-w-0 whitespace-nowrap text-sm font-medium text-main">已选 {{ selectedCount }} 项</span>
+        <span class="chat-session-sidebar__selection-count min-w-0 whitespace-nowrap text-sm font-medium text-main">已选 {{ selectedCount }} 项</span>
         <div class="flex shrink-0 items-center gap-1">
           <ElButton
             text
             size="small"
-            class="chat-session-sidebar__header-text-btn px-[0.35rem] text-[0.8125rem] text-secondary"
+            class="chat-session-sidebar__header-text-btn h-7 rounded-lg px-2 text-[0.8125rem] text-secondary"
             :class="{ 'chat-session-sidebar__header-text-btn--delete': hasSelectedSessions }"
             :disabled="!hasSelectedSessions"
             :loading="isBatchDeleting"
@@ -40,7 +40,7 @@ const {
           <ElButton
             text
             size="small"
-            class="chat-session-sidebar__header-text-btn px-[0.35rem] text-[0.8125rem] text-secondary"
+            class="chat-session-sidebar__header-text-btn h-7 rounded-lg px-2 text-[0.8125rem] text-secondary"
             :disabled="isBatchDeleting"
             @click="exitSelectionMode"
           >
@@ -50,13 +50,12 @@ const {
       </template>
 
       <template v-else>
-        <span class="min-w-0 whitespace-nowrap text-sm font-medium text-main">对话列表</span>
+        <span class="chat-session-sidebar__header-title min-w-0 whitespace-nowrap text-sm font-medium text-main">对话列表</span>
         <div class="flex shrink-0 items-center gap-1">
           <ElButton
             text
-            circle
             size="small"
-            class="chat-session-sidebar__header-icon-btn h-7 w-7 text-secondary"
+            class="chat-session-sidebar__header-icon-btn h-7 w-7 rounded-lg p-0 text-secondary"
             title="多选"
             @click="enterSelectionMode"
           >
@@ -64,9 +63,8 @@ const {
           </ElButton>
           <ElButton
             text
-            circle
             size="small"
-            class="chat-session-sidebar__header-icon-btn h-7 w-7 text-secondary"
+            class="chat-session-sidebar__header-icon-btn h-7 w-7 rounded-lg p-0 text-secondary"
             title="收起对话列表"
             @click="emit('collapse')"
           >
@@ -81,16 +79,16 @@ const {
         暂无对话
       </div>
 
-      <ul v-else class="grid gap-2 list-none m-0 p-0">
+      <ul v-else class="m-0 grid list-none gap-1 p-0">
         <li
           v-for="session in sessions"
           :key="session.id"
-          class="chat-session-sidebar__item flex min-w-0 items-center gap-2 rounded-xl border border-transparent text-sm"
+          class="chat-session-sidebar__item flex min-w-0 items-center gap-2 rounded-lg border border-transparent text-sm"
           :class="getSessionItemStateClass(session.id)"
         >
           <button
             type="button"
-            class="chat-session-sidebar__item-main flex min-w-0 flex-1 items-center gap-2 border-none bg-transparent py-2.5 pl-[0.3rem] text-left text-main"
+            class="chat-session-sidebar__item-main flex min-w-0 flex-1 items-center gap-2 border-none bg-transparent py-2 pl-2 text-left text-main"
             @click="handleSessionClick(session.id)"
           >
             <ElCheckbox
@@ -108,26 +106,26 @@ const {
             v-if="!isSelectionMode"
             trigger="click"
             placement="bottom-end"
+            popper-class="chat-session-sidebar__more-popper"
             @command="command => handleSessionAction(session, command)"
           >
             <ElButton
               text
-              circle
               size="small"
-              class="chat-session-sidebar__actions-btn mr-2 h-5 w-5 shrink-0 opacity-0"
+              class="chat-session-sidebar__actions-btn mr-1.5 h-6 w-6 shrink-0 rounded-lg p-0 opacity-0"
             >
               <SvgIcon category="ui" icon="more" size="0.875rem" />
             </ElButton>
 
             <template #dropdown>
-              <ElDropdownMenu>
-                <ElDropdownItem command="rename">
+              <ElDropdownMenu class="chat-session-sidebar__menu box-border min-w-0 w-[8.5rem] p-1">
+                <ElDropdownItem command="rename" class="chat-session-sidebar__menu-item min-h-8 rounded-md px-2 text-main">
                   重命名
                 </ElDropdownItem>
                 <ElDropdownItem
                   command="delete"
                   divided
-                  class="chat-session-sidebar__menu-item chat-session-sidebar__menu-item--delete"
+                  class="chat-session-sidebar__menu-item chat-session-sidebar__menu-item--delete min-h-8 rounded-md px-2"
                 >
                   删除
                 </ElDropdownItem>
@@ -142,9 +140,10 @@ const {
 
 <style scoped lang="scss">
 .chat-session-sidebar {
-  border-right: 1px solid color-mix(in srgb, var(--brand-border-base) 80%, transparent);
+  border-right: 1px solid color-mix(in srgb, var(--brand-border-base) 74%, transparent);
   background: var(--brand-bg-sidebar);
 
+  .chat-session-sidebar__header-text-btn,
   .chat-session-sidebar__header-icon-btn {
     &:hover,
     &:focus-visible {
@@ -172,15 +171,15 @@ const {
       box-shadow 0.2s ease;
 
     &.active {
-      border-color: color-mix(in srgb, var(--brand-primary) 10%, transparent);
-      background: color-mix(in srgb, var(--brand-primary) 6%, transparent);
+      border-color: color-mix(in srgb, var(--brand-primary) 20%, transparent);
+      background: color-mix(in srgb, var(--brand-primary) 10%, transparent);
       box-shadow:
         0 1px 2px 0 color-mix(in srgb, var(--brand-primary) 6%, transparent),
         0 1px 2px 0 color-mix(in srgb, var(--brand-text-primary) 5%, transparent);
     }
 
     &.selected {
-      border-color: color-mix(in srgb, var(--brand-primary) 14%, transparent);
+      border-color: color-mix(in srgb, var(--brand-primary) 18%, transparent);
       background: color-mix(in srgb, var(--brand-primary) 7%, transparent);
     }
 
@@ -188,7 +187,7 @@ const {
       &:hover,
       &:focus-within {
         border-color: color-mix(in srgb, var(--brand-border-base) 70%, transparent);
-        background: var(--brand-bg-surface-raised);
+        background: color-mix(in srgb, var(--brand-bg-surface) 94%, transparent);
       }
     }
   }
@@ -201,8 +200,21 @@ const {
     color: var(--brand-primary);
   }
 
+  .chat-session-sidebar__item.active .chat-session-sidebar__actions-btn {
+    color: color-mix(in srgb, var(--brand-primary) 76%, transparent);
+
+    &:hover,
+    &:focus-visible {
+      color: var(--brand-primary);
+      background: color-mix(in srgb, var(--brand-primary) 10%, transparent);
+    }
+  }
+
   .chat-session-sidebar__actions-btn {
-    transition: opacity 0.2s ease, color 0.2s ease;
+    transition:
+      opacity 0.2s ease,
+      color 0.2s ease,
+      background-color 0.2s ease;
   }
 
   .chat-session-sidebar__item:hover .chat-session-sidebar__actions-btn,
@@ -210,6 +222,16 @@ const {
   .chat-session-sidebar__actions-btn:focus {
     opacity: 1;
   }
+}
+
+:global(.chat-session-sidebar__more-popper .el-popper__arrow) {
+  display: none;
+}
+
+:global(.chat-session-sidebar__menu-item:not(.is-disabled):hover),
+:global(.chat-session-sidebar__menu-item:not(.is-disabled):focus) {
+  background: color-mix(in srgb, var(--brand-fill-light) 72%, transparent);
+  color: var(--brand-text-primary);
 }
 
 :global(.el-dropdown-menu__item.chat-session-sidebar__menu-item--delete) {

@@ -24,7 +24,7 @@ const {
 
 <template>
   <div class="chat-input-box" :class="props.variant === 'hero' ? 'chat-input-box--hero p-0' : 'px-6 py-5'">
-    <div class="mx-auto" :class="props.variant === 'hero' ? 'max-w-none' : 'max-w-3xl'">
+    <div class="mx-auto" :class="props.variant === 'hero' ? 'max-w-none' : 'max-w-[var(--page-mode-chat-max-width)]'">
       <ChatComposer
         v-model:attachments="attachments"
         :content-j-s-o-n="contentJSON"

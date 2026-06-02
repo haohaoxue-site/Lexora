@@ -32,20 +32,20 @@ function getItemIconSrc(item: SidebarPanelItem, isActive: boolean) {
     <div class="sidebar-panel__brand-wrap flex h-[var(--sidebar-panel-brand-height)] shrink-0 items-center justify-center border-b px-3">
       <RouterLink
         :to="props.brand.to"
-        class="sidebar-panel__brand-link flex h-11 w-11 items-center justify-center rounded-[0.875rem]"
+        class="sidebar-panel__brand-link flex h-11 w-11 items-center justify-center rounded-lg"
         aria-label="打开同页入口"
       >
         <img
           :src="props.brand.iconSrc"
           alt=""
           aria-hidden="true"
-          class="sidebar-panel__brand-image block h-full w-full rounded-[0.875rem] object-cover"
+          class="sidebar-panel__brand-image block h-full w-full rounded-lg object-cover"
         >
       </RouterLink>
     </div>
 
     <ElScrollbar class="min-h-0 flex-1">
-      <nav class="sidebar-panel__nav flex flex-col items-center gap-2 px-3 py-4">
+      <nav class="sidebar-panel__nav flex flex-col items-center gap-1.5 px-3 py-4">
         <RouterLink
           v-for="item in props.items"
           :key="item.name"
@@ -57,15 +57,15 @@ function getItemIconSrc(item: SidebarPanelItem, isActive: boolean) {
             :href="href"
             :aria-label="item.label"
             :title="item.label"
-            class="sidebar-panel__nav-item flex h-12 w-12 items-center justify-center rounded-xl"
+            class="sidebar-panel__nav-item flex h-11 w-11 items-center justify-center rounded-lg"
             :class="getItemStateClass(isNavigationItemActive(item))"
             @click="navigate"
           >
-            <div class="sidebar-panel__nav-icon flex h-10 w-10 items-center justify-center" :class="getItemStateClass(isNavigationItemActive(item))">
+            <div class="sidebar-panel__nav-icon flex h-9 w-9 items-center justify-center" :class="getItemStateClass(isNavigationItemActive(item))">
               <SvgIcon
                 :category="item.iconCategory"
                 :icon="getItemIconSrc(item, isNavigationItemActive(item))"
-                size="2.5rem"
+                size="2.25rem"
                 class="sidebar-panel__nav-icon-image"
               />
             </div>
@@ -80,7 +80,7 @@ function getItemIconSrc(item: SidebarPanelItem, isActive: boolean) {
         :href="repositoryUrl"
         target="_blank"
         rel="noopener noreferrer"
-        class="sidebar-panel__external-link mx-auto flex h-11 w-11 items-center justify-center overflow-hidden rounded-xl"
+        class="sidebar-panel__external-link mx-auto flex h-11 w-11 items-center justify-center overflow-hidden rounded-lg"
         aria-label="打开 SamePage AI GitHub 项目地址"
         title="GitHub"
       >
@@ -98,11 +98,11 @@ function getItemIconSrc(item: SidebarPanelItem, isActive: boolean) {
 
 <style scoped lang="scss">
 .sidebar-panel {
-  border-right: 1px solid color-mix(in srgb, var(--brand-border-base) 80%, transparent);
+  border-right: 1px solid color-mix(in srgb, var(--brand-border-base) 74%, transparent);
   background: var(--brand-bg-sidebar);
 
   .sidebar-panel__brand-wrap {
-    border-bottom: 1px solid color-mix(in srgb, var(--brand-border-base) 76%, transparent);
+    border-bottom: 1px solid color-mix(in srgb, var(--brand-border-base) 70%, transparent);
   }
 
   .sidebar-panel__brand-link {
@@ -110,7 +110,7 @@ function getItemIconSrc(item: SidebarPanelItem, isActive: boolean) {
 
     &:focus-visible {
       outline: none;
-      box-shadow: 0 0 0 2px color-mix(in srgb, var(--brand-primary) 20%, transparent);
+      box-shadow: 0 0 0 2px color-mix(in srgb, var(--brand-primary) 18%, transparent);
     }
   }
 
@@ -132,8 +132,8 @@ function getItemIconSrc(item: SidebarPanelItem, isActive: boolean) {
     }
 
     &::before {
-      top: 0.625rem;
-      bottom: 0.625rem;
+      top: 0.5rem;
+      bottom: 0.5rem;
       left: -0.75rem;
       z-index: 2;
       width: 3px;
@@ -151,26 +151,26 @@ function getItemIconSrc(item: SidebarPanelItem, isActive: boolean) {
       z-index: 0;
       background: var(--sidebar-panel-row-bg);
       opacity: 1;
-      border-radius: 0.875rem;
+      border-radius: 0.5rem;
       transition: background-color 0.18s ease;
     }
 
     &:focus-visible {
-      outline: 2px solid color-mix(in srgb, var(--brand-primary) 22%, transparent);
+      outline: 2px solid color-mix(in srgb, var(--brand-primary) 20%, transparent);
       outline-offset: -2px;
     }
 
     &.active {
       --sidebar-panel-indicator-opacity: 1;
       --sidebar-panel-indicator-scale: 1;
-      --sidebar-panel-row-bg: color-mix(in srgb, var(--brand-primary) 8%, transparent);
+      --sidebar-panel-row-bg: color-mix(in srgb, var(--brand-primary) 10%, var(--brand-bg-surface));
 
-      color: var(--brand-primary);
+      color: var(--brand-text-primary);
     }
 
     &.idle {
       &:hover {
-        --sidebar-panel-row-bg: color-mix(in srgb, var(--brand-bg-surface) 72%, transparent);
+        --sidebar-panel-row-bg: color-mix(in srgb, var(--brand-bg-surface) 92%, transparent);
         color: var(--brand-text-primary);
       }
     }
@@ -179,6 +179,11 @@ function getItemIconSrc(item: SidebarPanelItem, isActive: boolean) {
   .sidebar-panel__nav-icon {
     z-index: 1;
     transition: color 0.2s ease;
+
+    &.active {
+      border-radius: 0.5rem;
+      background: color-mix(in srgb, var(--brand-primary) 8%, var(--brand-bg-surface));
+    }
   }
 
   .sidebar-panel__nav-label {
@@ -194,7 +199,7 @@ function getItemIconSrc(item: SidebarPanelItem, isActive: boolean) {
 
     &:hover {
       color: var(--brand-text-primary);
-      background: color-mix(in srgb, var(--brand-fill-lighter) 76%, var(--brand-text-primary) 6%);
+      background: color-mix(in srgb, var(--brand-bg-surface) 92%, transparent);
     }
 
     &:focus-visible {
@@ -204,7 +209,7 @@ function getItemIconSrc(item: SidebarPanelItem, isActive: boolean) {
   }
 
   .sidebar-panel__footer {
-    border-top: 1px solid color-mix(in srgb, var(--brand-border-base) 76%, transparent);
+    border-top: 1px solid color-mix(in srgb, var(--brand-border-base) 70%, transparent);
   }
 }
 </style>

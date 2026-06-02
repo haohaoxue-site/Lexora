@@ -63,7 +63,7 @@ function handleBodyClick(event: MouseEvent) {
 
 <template>
   <article class="publication-document-content text-main" :class="articleClass">
-    <header v-if="props.showHeader" class="publication-document-content__header mb-[1.6rem]">
+    <header v-if="props.showHeader" class="publication-document-content__header mb-6">
       <p v-if="props.showMeta" class="publication-document-content__meta m-0 mb-3 text-[13px] leading-[1.5] text-[var(--brand-text-tertiary)]">
         更新于 {{ updatedFromNow }}
       </p>
@@ -104,7 +104,7 @@ function handleBodyClick(event: MouseEvent) {
 .publication-document-content--plain {
   .publication-document-content__header {
     width: min(100%, var(--publication-document-content-body-width));
-    margin: 0 auto 1.35rem;
+    margin: 0 auto 1.5rem;
   }
 
   .publication-document-content__title {
@@ -128,7 +128,7 @@ function handleBodyClick(event: MouseEvent) {
 }
 
 .publication-document-content--site {
-  padding: 4.25rem 2rem 5rem;
+  padding: 4rem 2rem 5rem;
 }
 
 .publication-document-content__title {
@@ -237,7 +237,7 @@ function handleBodyClick(event: MouseEvent) {
   }
 
   .publication-document-content--site {
-    padding: 2.25rem 1.25rem 4rem;
+    padding: 2rem 1.25rem 4rem;
   }
 }
 </style>

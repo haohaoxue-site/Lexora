@@ -27,7 +27,7 @@ const {
   display: flex;
   height: var(--app-shell-height);
   overflow: hidden;
-  background: var(--brand-fill-light);
+  background: var(--brand-bg-body);
   color: var(--brand-text-primary);
   font-family: var(--el-font-family);
 
@@ -38,9 +38,7 @@ const {
     min-width: 0;
     min-height: 0;
     overflow: hidden;
-    border-left: 1px solid color-mix(in srgb, var(--brand-border-base) 60%, transparent);
-    background: var(--brand-bg-surface);
-    box-shadow: var(--brand-shadow-elevated);
+    background: var(--brand-bg-base);
   }
 }
 </style>

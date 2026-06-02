@@ -12,7 +12,7 @@ const emits = defineEmits<{
 </script>
 
 <template>
-  <div class="session-user-menu-subpanel session-notification-panel absolute left-[calc(100%+12px)] top-1/2 z-[8] w-[21rem] -translate-y-1/2 p-2.5">
+  <div class="session-user-menu-subpanel session-notification-panel absolute left-[calc(100%+12px)] top-1/2 z-[8] w-[20rem] -translate-y-1/2 p-2">
     <div class="mb-3 flex items-center justify-between gap-3">
       <div class="min-w-0">
         <h3 class="m-0 text-sm font-semibold leading-5 text-main">
@@ -45,7 +45,7 @@ const emits = defineEmits<{
         <li
           v-for="invitation in props.invitationItems"
           :key="invitation.id"
-          class="rounded-[0.625rem] border border-base bg-[color-mix(in_srgb,var(--brand-bg-surface)_92%,transparent)] p-3"
+          class="rounded-lg border border-base bg-[color-mix(in_srgb,var(--brand-bg-surface)_96%,transparent)] p-3"
         >
           <div class="flex items-start justify-between gap-3">
             <div class="min-w-0 flex-1">
@@ -98,11 +98,9 @@ const emits = defineEmits<{
 
 <style scoped lang="scss">
 .session-user-menu-subpanel {
-  border: 1px solid color-mix(in srgb, var(--brand-border-base) 94%, transparent);
-  border-radius: 12px;
-  background: var(--brand-bg-surface-raised);
-  box-shadow:
-    0 16px 36px color-mix(in srgb, var(--brand-text-primary) 9%, transparent),
-    0 4px 12px color-mix(in srgb, var(--brand-text-primary) 5%, transparent);
+  border: 1px solid color-mix(in srgb, var(--brand-border-base) 82%, transparent);
+  border-radius: 8px;
+  background: var(--brand-bg-surface);
+  box-shadow: var(--brand-shadow-hairline);
 }
 </style>

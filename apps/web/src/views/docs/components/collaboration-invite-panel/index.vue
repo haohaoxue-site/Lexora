@@ -32,7 +32,7 @@ function setScope(command: string | number | object) {
 </script>
 
 <template>
-  <section class="collaboration-invite-panel grid gap-[0.85rem]">
+  <section class="collaboration-invite-panel grid gap-3">
     <div class="flex items-center justify-between gap-4 max-[720px]:grid">
       <h3 class="m-0 text-[0.95rem] leading-[1.4]">
         邀请协作者
@@ -77,7 +77,7 @@ function setScope(command: string | number | object) {
       <template v-else-if="props.resolvedInvitee">
         <div class="flex min-w-0 items-center gap-3">
           <ElAvatar
-            :size="36"
+            :size="34"
             :src="props.resolvedInvitee.avatarUrl ?? undefined"
           >
             {{ getCollaborationAvatarText(props.resolvedInvitee) }}
@@ -104,10 +104,10 @@ function setScope(command: string | number | object) {
 
           <div
             v-if="props.canSubmitInvitation"
-            class="flex flex-[0_0_auto] flex-wrap justify-end gap-[0.45rem] max-[720px]:w-full max-[720px]:justify-start"
+            class="flex flex-[0_0_auto] flex-wrap justify-end gap-2 max-[720px]:w-full max-[720px]:justify-start"
           >
             <ElDropdown trigger="click" @command="setPermission">
-              <ElButton class="min-w-[6.2rem] justify-between gap-[0.45rem]">
+              <ElButton size="small" class="min-w-24 justify-between gap-2">
                 {{ formatCollaborationPermission(permission) }}
                 <SvgIcon category="ui" icon="chevron-down" size="0.82rem" />
               </ElButton>
@@ -127,7 +127,7 @@ function setScope(command: string | number | object) {
             </ElDropdown>
 
             <ElDropdown trigger="click" @command="setScope">
-              <ElButton class="min-w-[9.8rem] justify-between gap-[0.45rem]">
+              <ElButton size="small" class="min-w-[9.25rem] justify-between gap-2">
                 {{ formatCollaborationScope(scope) }}
                 <SvgIcon category="ui" icon="chevron-down" size="0.82rem" />
               </ElButton>
@@ -148,6 +148,7 @@ function setScope(command: string | number | object) {
 
             <ElButton
               type="primary"
+              size="small"
               :loading="props.isCreatingInvitation"
               @click="emits('submit')"
             >
@@ -157,6 +158,7 @@ function setScope(command: string | number | object) {
 
           <ElButton
             v-else-if="props.resolvedCollaborator"
+            size="small"
             @click="emits('openCollaborators')"
           >
             查看协作者

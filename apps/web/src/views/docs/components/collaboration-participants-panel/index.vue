@@ -59,7 +59,7 @@ function formatInheritMenuLabel(row: DocumentCollaborationCollaborator) {
 
 <template>
   <section class="collaboration-participants-panel grid content-start gap-3">
-    <p class="m-0 text-[0.9rem] leading-[1.5] text-secondary">
+    <p class="collaboration-participants-panel__description m-0 text-[0.9rem] leading-[1.5] text-secondary">
       所有可访问此文档的用户
     </p>
 
@@ -67,24 +67,24 @@ function formatInheritMenuLabel(row: DocumentCollaborationCollaborator) {
       :data="props.rows"
       :row-key="getParticipantRowKey"
       :show-header="false"
-      :max-height="288"
-      class="min-h-[8.75rem]"
+      :max-height="272"
+      class="collaboration-participants-panel__table min-h-36"
       empty-text="暂无协作者"
     >
       <ElTableColumn min-width="290">
         <template #default="{ row }">
           <div
             v-if="row.type === 'owner'"
-            class="flex min-w-0 items-center gap-3"
+            class="flex min-w-0 items-center gap-2.5"
           >
             <ElAvatar
-              :size="36"
+              :size="34"
               :src="row.owner.avatarUrl ?? undefined"
             >
               {{ getCollaborationAvatarText(row.owner) }}
             </ElAvatar>
             <div class="min-w-0 flex-1">
-              <div class="flex min-w-0 items-center gap-[0.4rem] text-sm font-medium leading-[1.4] text-main">
+              <div class="flex min-w-0 items-center gap-1.5 text-sm font-medium leading-[1.4] text-main">
                 <span class="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">
                   {{ getCollaborationIdentityName(row.owner) }}
                 </span>
@@ -100,10 +100,10 @@ function formatInheritMenuLabel(row: DocumentCollaborationCollaborator) {
 
           <div
             v-else
-            class="flex min-w-0 items-center gap-3"
+            class="flex min-w-0 items-center gap-2.5"
           >
             <ElAvatar
-              :size="36"
+              :size="34"
               :src="row.collaborator.user.avatarUrl ?? undefined"
             >
               {{ getCollaborationAvatarText(row.collaborator.user) }}
@@ -124,16 +124,17 @@ function formatInheritMenuLabel(row: DocumentCollaborationCollaborator) {
         <template #default="{ row }">
           <div
             v-if="row.type === 'collaborator'"
-            class="inline-flex flex-wrap justify-end gap-[0.4rem]"
+            class="inline-flex flex-wrap justify-end gap-1.5"
           >
             <ElDropdown
               trigger="click"
+              popper-class="collaboration-participants-panel__menu-popper"
               @command="command => emits('permissionCommand', row.collaborator, command)"
             >
               <ElButton
                 text
                 size="small"
-                class="gap-1 px-1 text-main font-medium"
+                class="h-7 gap-1 rounded-lg px-2 text-[13px] text-main font-medium"
                 :loading="props.actionId === getCollaboratorActionId(row.collaborator)"
               >
                 {{ formatCollaborationPermission(row.collaborator.effectivePermission) }}
@@ -168,12 +169,13 @@ function formatInheritMenuLabel(row: DocumentCollaborationCollaborator) {
             <ElDropdown
               v-if="canUpdateCollaboratorScope(row.collaborator)"
               trigger="click"
+              popper-class="collaboration-participants-panel__menu-popper"
               @command="command => emits('scopeCommand', row.collaborator, command)"
             >
               <ElButton
                 text
                 size="small"
-                class="min-w-[7.4rem] justify-between gap-1 px-1 text-main font-medium"
+                class="min-w-[7rem] h-7 justify-between gap-1 rounded-lg px-2 text-[13px] text-main font-medium"
                 :loading="props.actionId === getCollaboratorScopeActionId(row.collaborator)"
               >
                 {{ formatCollaborationScope(row.collaborator.effectiveScope) }}
@@ -196,7 +198,7 @@ function formatInheritMenuLabel(row: DocumentCollaborationCollaborator) {
 
             <span
               v-else
-              class="inline-flex min-h-7 items-center rounded-[0.45rem] bg-fill-lighter-a70 px-[0.65rem] text-[0.82rem] leading-none text-secondary"
+              class="inline-flex min-h-7 items-center rounded-lg bg-fill-lighter-a70 px-2.5 text-[13px] leading-none text-secondary"
             >
               {{ formatCollaborationScope(row.collaborator.effectiveScope) }}
             </span>
@@ -206,3 +208,15 @@ function formatInheritMenuLabel(row: DocumentCollaborationCollaborator) {
     </ElTable>
   </section>
 </template>
+
+<style scoped lang="scss">
+:global(.collaboration-participants-panel__menu-popper .el-dropdown-menu) {
+  padding: 0.25rem;
+}
+
+:global(.collaboration-participants-panel__menu-popper .el-dropdown-menu__item) {
+  min-height: 2rem;
+  border-radius: 0.5rem;
+  padding-inline: 0.5rem;
+}
+</style>

@@ -28,8 +28,8 @@ withDefaults(defineProps<{
   flex: 0 0 var(--default-header-height);
   height: var(--default-header-height);
   padding: var(--page-panel-header-padding-block) var(--page-panel-header-padding-inline);
-  border-bottom: 1px solid color-mix(in srgb, var(--brand-border-base) 80%, transparent);
-  backdrop-filter: blur(24px);
+  border-bottom: 1px solid color-mix(in srgb, var(--brand-border-base) 72%, transparent);
+  backdrop-filter: blur(18px);
   background: var(--brand-bg-overlay);
 }
 
@@ -55,6 +55,6 @@ withDefaults(defineProps<{
   flex: 1 1 0%;
   min-height: 0;
   overflow-y: auto;
-  background: var(--brand-bg-surface);
+  background: var(--brand-bg-base);
 }
 </style>

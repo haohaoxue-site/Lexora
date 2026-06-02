@@ -38,13 +38,13 @@ function resolveActionHref(href: string) {
   <main class="publication-home-page mx-auto w-[min(100%,72rem)] px-6 pt-[clamp(4rem,9vw,7rem)] pb-12 max-[640px]:px-4 max-[640px]:pt-10 max-[640px]:pb-8">
     <section class="publication-home-page__hero grid grid-cols-[minmax(0,1fr)_minmax(16rem,26rem)] items-center gap-[clamp(3rem,8vw,7rem)] max-[960px]:grid-cols-1">
       <div class="publication-home-page__hero-copy min-w-0">
-        <p class="publication-home-page__name m-0 mb-[0.35rem] text-[clamp(2.25rem,5vw,3.6rem)] font-800 leading-none text-transparent">
+        <p class="publication-home-page__name m-0 mb-1 text-[clamp(2.25rem,5vw,3.6rem)] font-800 leading-none text-transparent">
           {{ props.home.hero.name || props.site.title }}
         </p>
         <h1 class="max-w-[11em] m-0 text-[clamp(2.35rem,5.6vw,4.2rem)] font-800 leading-[1.1] text-main">
           {{ props.home.hero.text || props.site.title }}
         </h1>
-        <p v-if="props.home.hero.tagline || props.site.description" class="publication-home-page__tagline mt-[1.1rem] max-w-[34rem] text-[1.12rem] leading-[1.75] text-secondary">
+        <p v-if="props.home.hero.tagline || props.site.description" class="publication-home-page__tagline mt-4 max-w-[34rem] text-lg leading-7 text-secondary">
           {{ props.home.hero.tagline || props.site.description }}
         </p>
 
@@ -52,7 +52,7 @@ function resolveActionHref(href: string) {
           <a
             v-for="action in props.home.actions"
             :key="`${action.label}-${action.href}`"
-            class="publication-home-page__action inline-flex min-h-[2.45rem] items-center justify-center rounded-full px-[1.05rem] text-sm font-bold leading-[1.4] no-underline"
+            class="publication-home-page__action inline-flex min-h-10 items-center justify-center rounded-full px-4 text-sm font-bold leading-[1.4] no-underline"
             :class="`is-${action.theme}`"
             :href="resolveActionHref(action.href)"
             @click="handleActionClick(action.href, $event)"
@@ -71,13 +71,13 @@ function resolveActionHref(href: string) {
         >
         <div
           v-else
-          class="publication-home-page__fallback-visual relative grid w-[min(100%,17rem)] [aspect-ratio:0.82] content-start gap-4 rounded-[1.25rem] p-8 max-[960px]:w-32 max-[960px]:rounded-xl max-[960px]:p-[0.85rem]"
+          class="publication-home-page__fallback-visual relative grid w-[min(100%,17rem)] [aspect-ratio:0.82] content-start gap-4 rounded-2xl p-8 max-[960px]:w-32 max-[960px]:rounded-xl max-[960px]:p-3"
           aria-hidden="true"
         >
-          <span class="publication-home-page__fallback-mark inline-flex h-16 w-16 items-center justify-center rounded-xl text-[1.45rem] font-800 text-primary max-[960px]:h-8 max-[960px]:w-8 max-[960px]:rounded-[0.45rem] max-[960px]:text-[0.78rem]">SP</span>
-          <span class="publication-home-page__fallback-line is-wide block h-[0.65rem] rounded-full max-[960px]:h-[0.35rem]" />
-          <span class="publication-home-page__fallback-line block h-[0.65rem] rounded-full max-[960px]:h-[0.35rem]" />
-          <span class="publication-home-page__fallback-chip absolute bottom-[1.4rem] right-[1.4rem] rounded-[0.4rem] px-[0.62rem] py-[0.32rem] text-[0.8rem] font-800 leading-[1.2] text-white max-[960px]:bottom-[0.65rem] max-[960px]:right-[0.65rem] max-[960px]:px-[0.4rem] max-[960px]:py-[0.22rem] max-[960px]:text-[0.58rem]">Docs</span>
+          <span class="publication-home-page__fallback-mark inline-flex h-16 w-16 items-center justify-center rounded-xl text-2xl font-800 text-primary max-[960px]:h-8 max-[960px]:w-8 max-[960px]:rounded-lg max-[960px]:text-xs">SP</span>
+          <span class="publication-home-page__fallback-line is-wide block h-2 rounded-full max-[960px]:h-1" />
+          <span class="publication-home-page__fallback-line block h-2 rounded-full max-[960px]:h-1" />
+          <span class="publication-home-page__fallback-chip absolute bottom-6 right-6 rounded-lg px-2 py-1 text-xs font-800 leading-[1.2] text-white max-[960px]:bottom-3 max-[960px]:right-3 max-[960px]:px-1.5 max-[960px]:py-0.5 max-[960px]:text-[10px]">Docs</span>
         </div>
       </div>
     </section>
@@ -86,13 +86,13 @@ function resolveActionHref(href: string) {
       <article
         v-for="feature in props.home.features"
         :key="feature.title"
-        class="publication-home-page__feature min-w-0 rounded-lg px-[1.35rem] pb-[1.45rem] pt-[1.35rem]"
+        class="publication-home-page__feature min-w-0 rounded-lg p-5"
       >
-        <span v-if="feature.icon" class="publication-home-page__feature-icon mb-[1.1rem] inline-flex h-[2.35rem] w-[2.35rem] items-center justify-center rounded-[0.4rem] text-[1.15rem]">{{ feature.icon }}</span>
-        <h2 class="publication-home-page__feature-title m-0 text-[0.98rem] font-bold leading-[1.45] text-main">
+        <span v-if="feature.icon" class="publication-home-page__feature-icon mb-4 inline-flex h-9 w-9 items-center justify-center rounded-md text-lg">{{ feature.icon }}</span>
+        <h2 class="publication-home-page__feature-title m-0 text-base font-bold leading-[1.45] text-main">
           {{ feature.title }}
         </h2>
-        <p v-if="feature.details" class="publication-home-page__feature-details mt-[0.65rem] text-sm leading-[1.75] text-secondary">
+        <p v-if="feature.details" class="publication-home-page__feature-details mt-2 text-sm leading-[1.75] text-secondary">
           {{ feature.details }}
         </p>
       </article>
@@ -100,7 +100,7 @@ function resolveActionHref(href: string) {
 
     <footer
       v-if="props.home.footer.message || props.home.footer.copyright"
-      class="publication-home-page__footer mt-24 mx-[calc(50%-50vw)] grid gap-[0.2rem] border-t px-4 py-7 text-center text-[13px] leading-[1.65] text-[var(--brand-text-tertiary)]"
+      class="publication-home-page__footer mt-24 mx-[calc(50%-50vw)] grid gap-1 border-t px-4 py-7 text-center text-[13px] leading-[1.65] text-[var(--brand-text-tertiary)]"
     >
       <p v-if="props.home.footer.message" class="m-0">
         {{ props.home.footer.message }}
@@ -170,7 +170,7 @@ function resolveActionHref(href: string) {
 
 @media (max-width: 960px) {
   .publication-home-page__fallback-visual {
-    border-width: 0.45rem;
+    border-width: 0.5rem;
     box-shadow:
       0 0.55rem 0 color-mix(in srgb, var(--brand-primary) 26%, #111827 74%),
       0 1.35rem 2.5rem color-mix(in srgb, var(--brand-primary) 22%, transparent);

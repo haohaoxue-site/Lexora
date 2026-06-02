@@ -51,7 +51,7 @@ const {
           effect="light"
           :show-after="120"
         >
-          <span class="login-view__source-status inline-flex h-[1.625rem] items-center rounded px-2 text-[10px] font-[800] max-[420px]:h-6 max-[420px]:px-[0.4375rem]">
+          <span class="login-view__source-status inline-flex h-[1.625rem] items-center rounded px-2 text-[10px] font-[800] max-[420px]:h-6 max-[420px]:px-2">
             BETA
           </span>
         </ElTooltip>

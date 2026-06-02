@@ -59,13 +59,13 @@ watch(
   max-width: 100%;
   color: var(--brand-text-secondary);
   font-size: 0.8125rem;
-  line-height: 1.625;
+  line-height: 1.55;
 
   .chat-reasoning-block__toggle {
     display: inline-flex;
     align-items: center;
-    gap: 0.375rem;
-    min-height: 1.75rem;
+    gap: 0.3125rem;
+    min-height: 1.625rem;
     padding: 0;
     color: var(--brand-text-secondary);
     background: transparent;
@@ -84,8 +84,8 @@ watch(
   }
 
   .chat-reasoning-block__body {
-    margin-top: 0.375rem;
-    padding-left: 0.875rem;
+    margin-top: 0.3125rem;
+    padding-left: 0.625rem;
     border-left: 2px solid color-mix(in srgb, var(--brand-border-base) 78%, transparent);
     white-space: pre-wrap;
     overflow-wrap: anywhere;

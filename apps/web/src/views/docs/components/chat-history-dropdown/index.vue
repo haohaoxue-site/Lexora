@@ -28,7 +28,7 @@ function selectSession(sessionId: string) {
     v-model:visible="visible"
     placement="bottom-start"
     trigger="click"
-    :width="320"
+    :width="304"
     popper-class="docs-chat-history-dropdown__popover"
     :popper-style="{ padding: '0' }"
     @show="emits('load')"
@@ -38,7 +38,7 @@ function selectSession(sessionId: string) {
         type="button"
         class="docs-chat-history-dropdown__trigger inline-flex h-8 max-w-56 min-w-0 items-center gap-1.5 rounded-lg border-0 bg-transparent px-2 text-sm font-semibold leading-5 text-main"
       >
-        <span class="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">{{ props.title }}</span>
+        <span class="docs-chat-history-dropdown__trigger-title min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">{{ props.title }}</span>
         <ElIcon class="flex-none text-xs text-secondary">
           <ArrowDown />
         </ElIcon>
@@ -50,7 +50,7 @@ function selectSession(sessionId: string) {
       class="docs-chat-history-dropdown max-h-[min(60vh,26rem)] min-h-16 overflow-y-auto p-1.5"
       element-loading-text="正在加载"
     >
-      <div v-if="historySessions.length === 0 && !props.isLoading" class="px-3 py-5 text-center text-[0.8125rem] text-secondary">
+      <div v-if="historySessions.length === 0 && !props.isLoading" class="px-3 py-5 text-center text-[13px] text-secondary">
         暂无历史对话
       </div>
 
@@ -69,11 +69,11 @@ function selectSession(sessionId: string) {
             v-for="session in group.sessions"
             :key="session.id"
             type="button"
-            class="docs-chat-history-dropdown__item flex h-[2.125rem] w-full min-w-0 items-center rounded-md border-0 bg-transparent px-2 text-left text-main"
+            class="docs-chat-history-dropdown__item flex h-8 w-full min-w-0 items-center rounded-lg border-0 bg-transparent px-2 text-left text-main"
             :class="{ 'is-active': session.id === props.activeSessionId }"
             @click="selectSession(session.id)"
           >
-            <span class="min-w-0 overflow-hidden text-[0.8125rem] leading-5 text-ellipsis whitespace-nowrap">
+            <span class="min-w-0 overflow-hidden text-[13px] leading-5 text-ellipsis whitespace-nowrap">
               {{ session.title }}
             </span>
           </button>
@@ -100,7 +100,8 @@ function selectSession(sessionId: string) {
   &:hover,
   &:focus-visible,
   &.is-active {
-    background: color-mix(in srgb, var(--brand-primary) 7%, transparent);
+    background: color-mix(in srgb, var(--brand-primary) 8%, white);
+    color: var(--brand-primary);
     outline: none;
   }
 }

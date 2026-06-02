@@ -115,15 +115,15 @@ function getOverrideHint(group: SettingsModelIntentGroup) {
 </script>
 
 <template>
-  <div v-loading="isLoading" class="settings-default-models-page px-8 pb-12 pt-6 max-[1099px]:px-4">
-    <div class="grid grid-cols-2 items-start gap-[1.125rem] max-[1099px]:grid-cols-1">
+  <div v-loading="isLoading" class="settings-default-models-page mx-auto w-full max-w-[var(--page-mode-table-max-width)] px-8 pb-10 pt-5 max-[1099px]:px-4">
+    <div class="grid grid-cols-2 items-start gap-4 max-[1099px]:grid-cols-1">
       <section
         v-for="group in AI_MODEL_INTENT_GROUPS"
         :key="group.key"
         class="settings-default-models-page__group"
       >
-        <div class="settings-default-models-page__group-header px-6 pb-5 pt-[1.375rem]">
-          <div class="mb-[1.125rem] flex min-w-0 items-center justify-between gap-4 max-[1099px]:flex-col max-[1099px]:items-start max-[1099px]:gap-[0.375rem]">
+        <div class="settings-default-models-page__group-header px-5 pb-4 pt-4">
+          <div class="mb-4 flex min-w-0 items-center justify-between gap-4 max-[1099px]:flex-col max-[1099px]:items-start max-[1099px]:gap-[0.375rem]">
             <h2 class="m-0 text-lg font-bold text-main">
               {{ group.label }}
             </h2>
@@ -132,7 +132,7 @@ function getOverrideHint(group: SettingsModelIntentGroup) {
             </span>
           </div>
 
-          <div class="grid grid-cols-[5rem_minmax(0,1fr)] items-center gap-[1.125rem] max-[1099px]:grid-cols-1 max-[1099px]:gap-[0.625rem]">
+          <div class="grid grid-cols-[4.5rem_minmax(0,1fr)] items-center gap-4 max-[1099px]:grid-cols-1 max-[1099px]:gap-[0.625rem]">
             <span class="text-[0.8125rem] font-semibold leading-5 text-regular">默认模型</span>
             <ModelCascader
               :model-value="selections[group.key]"
@@ -153,9 +153,9 @@ function getOverrideHint(group: SettingsModelIntentGroup) {
           <section
             v-for="item in getGroupChildren(group)"
             :key="item.key"
-            class="settings-default-models-page__row grid min-h-[5.25rem] gap-3 px-6 pb-4 pt-[0.9375rem]"
+            class="settings-default-models-page__row grid min-h-[4.75rem] gap-2.5 px-5 py-3.5"
           >
-            <div class="flex min-w-0 items-center justify-between gap-[0.875rem] max-[1099px]:flex-col max-[1099px]:items-start max-[1099px]:gap-[0.375rem]">
+            <div class="flex min-w-0 items-center justify-between gap-3 max-[1099px]:flex-col max-[1099px]:items-start max-[1099px]:gap-[0.375rem]">
               <h3 class="m-0 text-sm font-semibold text-main">
                 {{ item.label }}
               </h3>
@@ -187,43 +187,41 @@ function getOverrideHint(group: SettingsModelIntentGroup) {
 .settings-default-models-page {
   .settings-default-models-page__group {
     overflow: hidden;
-    border: 1px solid color-mix(in srgb, var(--brand-border-base) 84%, transparent);
-    border-radius: 0.625rem;
+    border: 1px solid color-mix(in srgb, var(--brand-border-base) 80%, transparent);
+    border-radius: 0.5rem;
     background: var(--brand-bg-surface);
-    box-shadow: 0 0.75rem 2rem color-mix(in srgb, var(--brand-text-primary) 4.5%, transparent);
+    box-shadow: var(--brand-shadow-hairline);
   }
 
   .settings-default-models-page__group-header {
-    border-bottom: 1px solid color-mix(in srgb, var(--brand-border-base) 84%, transparent);
-    background: color-mix(in srgb, var(--brand-bg-surface-raised) 82%, var(--brand-bg-surface));
+    border-bottom: 1px solid color-mix(in srgb, var(--brand-border-base) 80%, transparent);
+    background: color-mix(in srgb, var(--brand-bg-surface-raised) 88%, var(--brand-bg-surface));
   }
 
   .settings-default-models-page__rows {
-    background: color-mix(in srgb, var(--brand-fill-light) 82%, var(--brand-border-light));
+    background: color-mix(in srgb, var(--brand-fill-light) 78%, var(--brand-border-light));
   }
 
   .settings-default-models-page__row {
-    background: color-mix(in srgb, var(--brand-fill-light) 82%, var(--brand-border-light));
+    background: color-mix(in srgb, var(--brand-fill-light) 78%, var(--brand-border-light));
   }
 
   .settings-default-models-page__row + .settings-default-models-page__row {
-    border-top: 1px solid color-mix(in srgb, var(--brand-border-dark) 68%, transparent);
+    border-top: 1px solid color-mix(in srgb, var(--brand-border-dark) 62%, transparent);
   }
 
   .settings-default-models-page__row:hover {
-    background: color-mix(in srgb, var(--brand-fill-light) 92%, var(--brand-bg-surface));
+    background: color-mix(in srgb, var(--brand-fill-light) 86%, var(--brand-bg-surface));
   }
 
   .settings-default-models-page__model-cascader {
     min-width: 0;
 
     :deep(.el-input__wrapper) {
-      min-height: 2.625rem;
+      min-height: 2.5rem;
       border-radius: 0.5rem;
       background: var(--brand-bg-surface);
-      box-shadow:
-        0 0 0 1px color-mix(in srgb, var(--brand-border-dark) 72%, transparent) inset,
-        0 1px 2px color-mix(in srgb, var(--brand-text-primary) 3%, transparent);
+      box-shadow: var(--brand-shadow-hairline);
     }
   }
 }

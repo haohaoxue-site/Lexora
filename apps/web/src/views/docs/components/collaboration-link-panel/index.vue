@@ -15,7 +15,7 @@ const scope = defineModel<DocumentCollaborationScope>('scope', { required: true 
 </script>
 
 <template>
-  <section class="collaboration-link-panel grid gap-[0.85rem] py-4">
+  <section class="collaboration-link-panel grid gap-3 py-4">
     <div class="flex items-center justify-between gap-4 max-[720px]:grid max-[720px]:items-stretch">
       <h3 class="m-0 text-[0.95rem] leading-[1.4] text-main">
         链接协作
@@ -23,6 +23,7 @@ const scope = defineModel<DocumentCollaborationScope>('scope', { required: true 
       <ElButton
         type="primary"
         plain
+        size="small"
         :disabled="props.isUpdatingLink"
         @click="emits('openPassword')"
       >
@@ -30,16 +31,16 @@ const scope = defineModel<DocumentCollaborationScope>('scope', { required: true 
       </ElButton>
     </div>
 
-    <div class="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-[0.85rem] max-[720px]:grid-cols-1 max-[720px]:items-stretch">
+    <div class="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 max-[720px]:grid-cols-1 max-[720px]:items-stretch">
       <span
-        class="collaboration-link-panel__icon inline-flex h-[2.65rem] w-[2.65rem] items-center justify-center rounded-full"
+        class="collaboration-link-panel__icon inline-flex h-10 w-10 items-center justify-center rounded-full"
         aria-hidden="true"
       >
         <SvgIcon category="ui" :icon="props.activeLink?.enabled ? 'link' : 'user-group'" size="1.15rem" />
       </span>
       <div class="min-w-0">
         <ElDropdown trigger="click" @command="command => emits('linkEnabledCommand', command)">
-          <ElButton text class="collaboration-link-panel__trigger h-auto gap-[0.25rem] p-0 text-[0.95rem]">
+          <ElButton text class="collaboration-link-panel__trigger h-auto gap-1 p-0 text-sm font-semibold">
             {{ props.accessTitle }}
             <SvgIcon category="ui" icon="chevron-down" size="0.82rem" />
           </ElButton>
@@ -54,12 +55,12 @@ const scope = defineModel<DocumentCollaborationScope>('scope', { required: true 
             </ElDropdownMenu>
           </template>
         </ElDropdown>
-        <p class="mt-[0.22rem] text-[0.82rem] leading-[1.45] text-secondary">
+        <p class="mt-1 text-[13px] leading-[1.45] text-secondary">
           {{ props.accessDescription }}
         </p>
       </div>
 
-      <div class="grid grid-cols-[8.25rem_6.75rem] gap-[0.55rem] max-[720px]:grid-cols-1">
+      <div class="grid grid-cols-[8rem_6.5rem] gap-2 max-[720px]:grid-cols-1">
         <ElSelect
           v-model="scope"
           size="small"
@@ -89,10 +90,9 @@ const scope = defineModel<DocumentCollaborationScope>('scope', { required: true 
       </div>
     </div>
 
-    <div class="collaboration-link-panel__footer flex items-center gap-[0.6rem] pt-[0.85rem]">
+    <div class="collaboration-link-panel__footer flex items-center gap-2 pt-3">
       <ElButton
-        class="gap-[0.35rem]"
-        round
+        class="gap-1.5 rounded-lg"
         :loading="props.isUpdatingLink"
         :disabled="!props.canCopyLink"
         @click="emits('copyLink')"
@@ -111,8 +111,8 @@ const scope = defineModel<DocumentCollaborationScope>('scope', { required: true 
 }
 
 .collaboration-link-panel__icon {
-  background: var(--brand-primary);
-  color: #ffffff;
+  background: color-mix(in srgb, var(--brand-primary) 12%, white);
+  color: var(--brand-primary);
 }
 
 .collaboration-link-panel__trigger {

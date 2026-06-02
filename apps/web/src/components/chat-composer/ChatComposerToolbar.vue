@@ -97,14 +97,14 @@ const emits = defineEmits<{
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 0.75rem;
-  padding: 0.5rem 0.625rem 0.625rem;
+  gap: 0.5rem;
+  padding: 0.375rem 0.5rem 0.5rem;
 
   .chat-composer-toolbar__left,
   .chat-composer-toolbar__right {
     display: flex;
     align-items: center;
-    gap: 0.375rem;
+    gap: 0.25rem;
     min-width: 0;
   }
 
@@ -122,7 +122,7 @@ const emits = defineEmits<{
     padding: 0;
     border: 1px solid color-mix(in srgb, var(--brand-border-base) 72%, transparent);
     border-radius: 0.5rem;
-    background: transparent;
+    background: color-mix(in srgb, var(--brand-fill-light) 36%, transparent);
     color: var(--brand-text-secondary);
     cursor: pointer;
 

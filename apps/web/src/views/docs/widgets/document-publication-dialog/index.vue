@@ -120,7 +120,7 @@ async function loadPublicationInfo() {
   }
   catch (error) {
     publicationInfo.value = null
-    errorMessage.value = error instanceof Error ? error.message : '加载单页分享设置失败'
+    errorMessage.value = error instanceof Error ? error.message : '加载页面分享设置失败'
   }
   finally {
     isLoading.value = false
@@ -143,10 +143,10 @@ async function updatePublicationState(
 
   try {
     publicationInfo.value = await updateDocumentSinglePublication(normalizedDocumentId.value, { state, scope })
-    ElMessage.success('单页分享状态已更新')
+    ElMessage.success('页面分享状态已更新')
   }
   catch (error) {
-    ElMessage.error(error instanceof Error ? error.message : '更新单页分享状态失败')
+    ElMessage.error(error instanceof Error ? error.message : '更新页面分享状态失败')
   }
   finally {
     isSaving.value = false
@@ -165,7 +165,7 @@ async function copyPublicationUrl() {
 
   try {
     await copy(publicationUrl.value)
-    ElMessage.success('单页链接已复制')
+    ElMessage.success('页面链接已复制')
   }
   catch {
     ElMessage.error('复制失败')
@@ -188,13 +188,13 @@ function openPublication() {
     width="560px"
     append-to-body
     align-center
-    body-class="pt-[0.35rem]"
+    body-class="pt-1"
     @update:model-value="handleVisibleChange"
   >
     <template #header>
-      <div class="inline-flex items-center gap-[0.45rem]">
+      <div class="inline-flex items-center gap-2">
         <span class="text-[1.15rem] font-bold leading-[1.4] text-main">分享页面</span>
-        <ElTooltip content="单页分享是公开阅读链接，不会创建协作者" placement="top">
+        <ElTooltip content="页面分享是公开阅读链接，不会创建协作者" placement="top">
           <span class="inline-flex text-[var(--brand-text-tertiary)]">
             <SvgIcon category="ui" icon="info" size="0.95rem" />
           </span>
@@ -221,9 +221,9 @@ function openPublication() {
         />
 
         <section class="grid gap-3">
-          <div class="document-publication-dialog__access-row grid grid-cols-[auto_minmax(0,1fr)_max-content] items-center gap-[0.85rem] max-[640px]:grid-cols-[auto_minmax(0,1fr)]">
+          <div class="document-publication-dialog__access-row grid grid-cols-[auto_minmax(0,1fr)_max-content] items-center gap-3 max-[640px]:grid-cols-[auto_minmax(0,1fr)]">
             <span
-              class="document-publication-dialog__access-icon inline-flex h-[2.65rem] w-[2.65rem] items-center justify-center rounded-full"
+              class="document-publication-dialog__access-icon inline-flex h-10 w-10 items-center justify-center rounded-full"
               :class="{ 'is-muted': !isPublished }"
               aria-hidden="true"
             >
@@ -238,7 +238,7 @@ function openPublication() {
               <ElDropdown trigger="click" @command="handlePublicationStateCommand">
                 <ElButton
                   text
-                  class="gap-1 h-auto p-0 text-[0.95rem] font-semibold text-main"
+                  class="h-auto gap-1 p-0 text-sm font-semibold text-main"
                   :loading="isSaving"
                 >
                   {{ publicationAccessTitle }}
@@ -268,7 +268,7 @@ function openPublication() {
                   </ElDropdownMenu>
                 </template>
               </ElDropdown>
-              <p class="m-0 mt-[0.22rem] text-[0.82rem] leading-[1.45] text-secondary">
+              <p class="m-0 mt-1 text-[13px] leading-[1.45] text-secondary">
                 {{ publicationAccessDescription }}
               </p>
             </div>
@@ -281,7 +281,7 @@ function openPublication() {
               <ElButton
                 link
                 type="primary"
-                class="min-w-0 h-auto justify-end gap-[0.28rem] p-0 text-[0.9rem] font-semibold max-[640px]:col-span-full max-[640px]:w-full max-[640px]:justify-start"
+                class="min-w-0 h-auto justify-end gap-1 p-0 text-sm font-semibold max-[640px]:col-span-full max-[640px]:w-full max-[640px]:justify-start"
                 :disabled="!isPublished || isSaving"
               >
                 {{ currentScopeLabel }}
@@ -307,10 +307,9 @@ function openPublication() {
     </div>
 
     <template #footer>
-      <div class="document-publication-dialog__footer flex items-center justify-between gap-3 pt-[0.9rem]">
+      <div class="document-publication-dialog__footer flex items-center justify-between gap-3 pt-3">
         <ElButton
-          class="gap-[0.35rem]"
-          round
+          class="gap-1.5 rounded-lg"
           :disabled="!isPublished"
           @click="copyPublicationUrl"
         >
@@ -331,11 +330,11 @@ function openPublication() {
 
 <style scoped lang="scss">
 .document-publication-dialog__access-icon {
-  background: var(--brand-primary);
-  color: #ffffff;
+  background: color-mix(in srgb, var(--brand-primary) 12%, white);
+  color: var(--brand-primary);
 
   &.is-muted {
-    background: color-mix(in srgb, var(--brand-text-tertiary) 24%, transparent);
+    background: color-mix(in srgb, var(--brand-fill-lighter) 82%, white);
     color: var(--brand-text-secondary);
   }
 }

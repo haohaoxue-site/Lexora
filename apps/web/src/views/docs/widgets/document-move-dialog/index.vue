@@ -185,7 +185,7 @@ function isOwnedCollection(collectionId: DocumentTreeCollectionId): collectionId
           <button
             v-if="isOwnedCollection(group.id)"
             type="button"
-            class="document-move-dialog__group-root flex w-full min-w-0 items-center gap-2 rounded-[0.4375rem] border-none bg-transparent px-[0.5rem] py-[0.45rem] text-left font-medium text-main"
+            class="document-move-dialog__group-root flex w-full min-w-0 items-center gap-2 rounded-lg border-none bg-transparent px-2 py-2 text-left font-medium text-main"
             :class="{ 'is-active': isGroupRootSelected(group) }"
             @click="selectGroupRoot(group)"
           >

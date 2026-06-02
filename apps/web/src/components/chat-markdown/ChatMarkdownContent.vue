@@ -53,7 +53,7 @@ async function handleClick(event: MouseEvent) {
   overflow-wrap: break-word;
 
   .chat-markdown__block + .chat-markdown__block {
-    margin-top: 0.75rem;
+    margin-top: 0.5rem;
   }
 
   :deep(p),
@@ -71,7 +71,7 @@ async function handleClick(event: MouseEvent) {
   :deep(ul + p),
   :deep(ol + p),
   :deep(blockquote + p) {
-    margin-top: 0.625rem;
+    margin-top: 0.5rem;
   }
 
   :deep(ul),
@@ -90,13 +90,13 @@ async function handleClick(event: MouseEvent) {
   }
 
   :deep(blockquote) {
-    padding-left: 0.75rem;
+    padding-left: 0.625rem;
     border-left: 3px solid color-mix(in srgb, var(--brand-primary) 42%, transparent);
     color: var(--brand-text-secondary);
   }
 
   :deep(code:not(.hljs, .chat-markdown__math-fallback)) {
-    padding: 0.08rem 0.28rem;
+    padding: 0.125rem 0.25rem;
     border-radius: 0.375rem;
     background: color-mix(in srgb, var(--brand-fill-light) 72%, transparent);
     font-size: 0.85em;
@@ -106,7 +106,7 @@ async function handleClick(event: MouseEvent) {
     max-width: 100%;
     overflow-x: auto;
     border: 1px solid color-mix(in srgb, var(--brand-border-base) 72%, transparent);
-    border-radius: 0.625rem;
+    border-radius: 0.5rem;
   }
 
   :deep(table) {
@@ -117,7 +117,7 @@ async function handleClick(event: MouseEvent) {
 
   :deep(th),
   :deep(td) {
-    padding: 0.5rem 0.625rem;
+    padding: 0.5rem;
     border-bottom: 1px solid color-mix(in srgb, var(--brand-border-base) 56%, transparent);
     text-align: left;
     vertical-align: top;
@@ -150,7 +150,7 @@ async function handleClick(event: MouseEvent) {
   :deep(.chat-markdown__code-block) {
     overflow: hidden;
     border: 1px solid var(--tiptap-code-block-border, color-mix(in srgb, var(--brand-border-base) 76%, transparent));
-    border-radius: 0.625rem;
+    border-radius: 0.5rem;
     background: var(--tiptap-code-block-background, color-mix(in srgb, var(--brand-fill-lighter) 74%, var(--brand-bg-surface)));
   }
 
@@ -158,11 +158,11 @@ async function handleClick(event: MouseEvent) {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 0.75rem;
-    min-height: 2rem;
-    padding: 0.375rem 0.625rem;
+    gap: 0.375rem;
+    min-height: 1.75rem;
+    padding: 0.25rem 0.5rem;
     border-bottom: 1px solid color-mix(in srgb, var(--brand-border-base) 64%, transparent);
-    background: var(--tiptap-code-block-toolbar-background, color-mix(in srgb, var(--brand-bg-surface-raised) 92%, transparent));
+    background: var(--tiptap-code-block-toolbar-background, color-mix(in srgb, var(--brand-fill-light) 56%, var(--brand-bg-surface)));
   }
 
   :deep(.chat-markdown__code-language) {
@@ -172,11 +172,11 @@ async function handleClick(event: MouseEvent) {
   }
 
   :deep(.chat-markdown__code-copy) {
-    height: 1.5rem;
-    padding: 0 0.5rem;
+    height: 1.375rem;
+    padding: 0 0.375rem;
     border: 1px solid color-mix(in srgb, var(--brand-border-base) 70%, transparent);
-    border-radius: 0.45rem;
-    background: color-mix(in srgb, var(--brand-bg-surface-raised) 86%, transparent);
+    border-radius: 0.5rem;
+    background: color-mix(in srgb, var(--brand-bg-surface) 92%, var(--brand-fill-light));
     color: var(--brand-text-secondary);
     font-size: 0.75rem;
     line-height: 1;
@@ -196,7 +196,7 @@ async function handleClick(event: MouseEvent) {
   :deep(.chat-markdown__code-pre),
   :deep(.chat-markdown__streaming-code) {
     overflow-x: auto;
-    padding: 0.75rem 0.875rem;
+    padding: 0.5rem 0.625rem;
   }
 
   :deep(.chat-markdown__code-pre code),

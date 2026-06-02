@@ -47,16 +47,16 @@ const panelAttachments = computed(() => getPanelAttachments(props.attachments))
 .chat-composer-context-tags {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.375rem;
-  padding: 0.5rem 0.625rem 0;
+  gap: 0.25rem;
+  padding: 0.5rem 0.5rem 0;
 
   .chat-composer-context-tags__tag {
     display: inline-flex;
     align-items: center;
-    gap: 0.375rem;
+    gap: 0.25rem;
     max-width: min(18rem, 100%);
-    height: 1.75rem;
-    padding: 0 0.25rem 0 0.625rem;
+    height: 1.625rem;
+    padding: 0 0.1875rem 0 0.5rem;
     border: 1px solid color-mix(in srgb, var(--brand-primary) 24%, var(--brand-border-base));
     border-radius: 0.5rem;
     background: color-mix(in srgb, var(--brand-primary) 7%, var(--brand-bg-surface));
@@ -82,11 +82,11 @@ const panelAttachments = computed(() => getPanelAttachments(props.attachments))
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 1.25rem;
-    height: 1.25rem;
+    width: 1.125rem;
+    height: 1.125rem;
     padding: 0;
     border: 0;
-    border-radius: 0.375rem;
+    border-radius: 0.5rem;
     background: transparent;
     color: var(--brand-text-secondary);
     cursor: pointer;
