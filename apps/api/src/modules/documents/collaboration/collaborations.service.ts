@@ -2,7 +2,7 @@ import type {
   ConfirmDocumentCollaborationResolverEntryRequest,
   CreateDocumentCollaborationUserInviteRequest,
   DocumentCollaborationConsoleListResponse,
-  DocumentCollaborationCurrentGrantSummary,
+  DocumentCollaborationCurrentAccessSummary,
   DocumentCollaborationGrant,
   DocumentCollaborationGrantSourceType,
   DocumentCollaborationJoinResponse,
@@ -32,7 +32,6 @@ import {
   DOCUMENT_COLLABORATION_SCOPE,
   DOCUMENT_COLLABORATION_USER_INVITE_STATUS,
   DOCUMENT_VISIBILITY,
-  WORKSPACE_TYPE,
 } from '@haohaoxue/samepage-contracts'
 import { isExactUserCodeQuery, normalizeUserCodeQuery } from '@haohaoxue/samepage-shared'
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common'
@@ -167,6 +166,8 @@ const collaborationRootDocumentSelect = {
 const collaborationConsoleDocumentSelect = {
   id: true,
   title: true,
+  parentId: true,
+  order: true,
   updatedAt: true,
   collaborationGrants: {
     where: {
@@ -191,6 +192,7 @@ const collaborationConsoleDocumentSelect = {
   collaborationLinkInvite: {
     select: {
       id: true,
+      permission: true,
       enabled: true,
       scope: true,
       updatedAt: true,
@@ -241,38 +243,33 @@ export class DocumentCollaborationsService {
     private readonly collabPermissionInvalidationPublisher: CollabPermissionInvalidationPublisherService,
   ) {}
 
-  async listManagementRoots(userId: string, workspaceId: string): Promise<DocumentCollaborationConsoleListResponse> {
+  async listManagementTree(userId: string, workspaceId: string): Promise<DocumentCollaborationConsoleListResponse> {
     const workspace = await this.documentAccessService.assertAccessibleWorkspace(userId, workspaceId)
     const documents = await this.prisma.document.findMany({
       where: {
         workspaceId: workspace.id,
+        createdBy: userId,
         visibility: DOCUMENT_VISIBILITY.PRIVATE,
         status: {
           in: [DocumentStatus.ACTIVE, DocumentStatus.LOCKED],
         },
         trashedAt: null,
-        ...(workspace.type === WORKSPACE_TYPE.TEAM ? { createdBy: userId } : {}),
-        OR: [
-          { collaborationGrants: { some: { status: DOCUMENT_COLLABORATION_GRANT_STATUS.ACTIVE } } },
-          { collaborationUserInvites: { some: { status: DOCUMENT_COLLABORATION_USER_INVITE_STATUS.PENDING } } },
-          { collaborationLinkInvite: { isNot: null } },
-        ],
       },
       select: collaborationConsoleDocumentSelect,
       orderBy: [
+        { order: 'asc' },
         { updatedAt: 'desc' },
-        { id: 'asc' },
       ],
     })
+    const linkCodes = await this.loadResolverCodes(
+      COLLABORATION_RESOLVER_ENTRY_TYPE.DOCUMENT_LINK_INVITE,
+      documents
+        .map(document => document.collaborationLinkInvite?.id)
+        .filter((id): id is string => Boolean(id)),
+    )
 
     return {
-      items: documents
-        .map(toDocumentCollaborationConsoleItem)
-        .sort((left, right) => {
-          const updatedDiff = Date.parse(right.updatedAt) - Date.parse(left.updatedAt)
-
-          return updatedDiff || left.rootDocument.id.localeCompare(right.rootDocument.id)
-        }),
+      tree: buildCollaborationConsoleTree(documents, linkCodes),
     }
   }
 
@@ -963,8 +960,8 @@ export class DocumentCollaborationsService {
       permission: invite.permission as DocumentCollaborationPermission,
       scope: invite.scope as DocumentCollaborationScope,
       passwordRequired: false,
-      currentGrant: currentUserId
-        ? await this.loadCurrentGrantSummary(invite.rootDocumentId, currentUserId)
+      currentAccess: currentUserId
+        ? await this.loadCurrentAccessSummary(invite.rootDocumentId, currentUserId)
         : null,
     }
   }
@@ -994,8 +991,8 @@ export class DocumentCollaborationsService {
       permission: link.permission as DocumentCollaborationPermission,
       scope: link.scope as DocumentCollaborationScope,
       passwordRequired: Boolean(link.passwordEnabled && link.passwordHash),
-      currentGrant: currentUserId
-        ? await this.loadCurrentGrantSummary(link.rootDocumentId, currentUserId)
+      currentAccess: currentUserId
+        ? await this.loadCurrentAccessSummary(link.rootDocumentId, currentUserId)
         : null,
     }
   }
@@ -1083,31 +1080,24 @@ export class DocumentCollaborationsService {
     }
   }
 
-  private async loadCurrentGrantSummary(
+  private async loadCurrentAccessSummary(
     rootDocumentId: string,
     userId: string,
-  ): Promise<DocumentCollaborationCurrentGrantSummary | null> {
-    const grant = await this.prisma.documentCollaborationGrant.findUnique({
-      where: {
-        rootDocumentId_userId: {
-          rootDocumentId,
-          userId,
-        },
-      },
-      select: {
-        permission: true,
-        scope: true,
-        status: true,
-      },
-    })
+  ): Promise<DocumentCollaborationCurrentAccessSummary | null> {
+    try {
+      const document = await this.documentAccessService.assertCanReadDocument(userId, rootDocumentId)
 
-    if (!grant || grant.status !== DOCUMENT_COLLABORATION_GRANT_STATUS.ACTIVE) {
-      return null
+      return {
+        permission: document.access.permission,
+        scope: document.access.scope,
+      }
     }
+    catch (error) {
+      if (error instanceof NotFoundException) {
+        return null
+      }
 
-    return {
-      permission: grant.permission as DocumentCollaborationPermission,
-      scope: grant.scope as DocumentCollaborationScope,
+      throw error
     }
   }
 
@@ -1287,41 +1277,92 @@ export class DocumentCollaborationsService {
   }
 }
 
-function toDocumentCollaborationConsoleItem(
+function buildCollaborationConsoleTree(
+  documents: PersistedCollaborationConsoleDocument[],
+  linkCodes: ReadonlyMap<string, string>,
+): DocumentCollaborationConsoleListResponse['tree'] {
+  const documentsById = new Map(documents.map(document => [document.id, document]))
+  const childrenByParent = new Map<string | null, PersistedCollaborationConsoleDocument[]>()
+
+  for (const document of documents) {
+    const parentId = document.parentId && documentsById.has(document.parentId) ? document.parentId : null
+    const children = childrenByParent.get(parentId) ?? []
+    children.push(document)
+    childrenByParent.set(parentId, children)
+  }
+
+  for (const children of childrenByParent.values()) {
+    children.sort(compareCollaborationConsoleDocument)
+  }
+
+  return (childrenByParent.get(null) ?? []).map(document =>
+    buildCollaborationConsoleTreeItem(document, childrenByParent, linkCodes),
+  )
+}
+
+function buildCollaborationConsoleTreeItem(
   document: PersistedCollaborationConsoleDocument,
-): DocumentCollaborationConsoleListResponse['items'][number] {
+  childrenByParent: ReadonlyMap<string | null, PersistedCollaborationConsoleDocument[]>,
+  linkCodes: ReadonlyMap<string, string>,
+): DocumentCollaborationConsoleListResponse['tree'][number] {
+  const children = (childrenByParent.get(document.id) ?? []).map(child =>
+    buildCollaborationConsoleTreeItem(child, childrenByParent, linkCodes),
+  )
   const updatedAt = maxUpdatedAt([
     document.updatedAt,
     ...document.collaborationGrants.map(grant => grant.updatedAt),
     ...document.collaborationUserInvites.map(invite => invite.updatedAt),
     ...(document.collaborationLinkInvite ? [document.collaborationLinkInvite.updatedAt] : []),
   ])
+  const linkInvite = document.collaborationLinkInvite
+  const resolverCode = linkInvite ? linkCodes.get(linkInvite.id) ?? '' : ''
 
   return {
-    rootDocument: {
-      id: document.id,
-      title: document.title,
-      updatedAt: document.updatedAt.toISOString(),
-    },
+    id: document.id,
+    title: document.title,
+    parentId: document.parentId,
+    hasChildren: children.length > 0,
     collaboratorCount: document.collaborationGrants.length,
     pendingInviteCount: document.collaborationUserInvites.length,
-    linkInviteState: document.collaborationLinkInvite
-      ? (document.collaborationLinkInvite.enabled
+    linkInviteState: linkInvite
+      ? (linkInvite.enabled
           ? DOCUMENT_COLLABORATION_LINK_INVITE_STATE.ENABLED
           : DOCUMENT_COLLABORATION_LINK_INVITE_STATE.DISABLED)
       : DOCUMENT_COLLABORATION_LINK_INVITE_STATE.NONE,
+    linkInvite: linkInvite
+      ? {
+          id: linkInvite.id,
+          permission: linkInvite.permission as DocumentCollaborationPermission,
+          scope: linkInvite.scope as DocumentCollaborationScope,
+          enabled: linkInvite.enabled,
+          resolverCode,
+          codeTail: resolverCode ? resolverCode.slice(-6) : null,
+          updatedAt: linkInvite.updatedAt.toISOString(),
+        }
+      : null,
     rangeSummary: resolveRangeSummary([
       ...document.collaborationGrants.map(grant => grant.scope as DocumentCollaborationScope),
       ...document.collaborationUserInvites.map(invite => invite.scope as DocumentCollaborationScope),
-      ...(document.collaborationLinkInvite
-        ? [document.collaborationLinkInvite.scope as DocumentCollaborationScope]
+      ...(linkInvite
+        ? [linkInvite.scope as DocumentCollaborationScope]
         : []),
     ]),
     updatedAt: updatedAt.toISOString(),
+    children,
   }
 }
 
-function resolveRangeSummary(scopes: DocumentCollaborationScope[]): DocumentCollaborationConsoleListResponse['items'][number]['rangeSummary'] {
+function compareCollaborationConsoleDocument(left: PersistedCollaborationConsoleDocument, right: PersistedCollaborationConsoleDocument) {
+  if (left.order !== right.order) {
+    return left.order - right.order
+  }
+
+  const updatedDiff = right.updatedAt.getTime() - left.updatedAt.getTime()
+
+  return updatedDiff || left.id.localeCompare(right.id)
+}
+
+function resolveRangeSummary(scopes: DocumentCollaborationScope[]): DocumentCollaborationConsoleListResponse['tree'][number]['rangeSummary'] {
   if (!scopes.length) {
     return DOCUMENT_COLLABORATION_RANGE_SUMMARY.NONE
   }

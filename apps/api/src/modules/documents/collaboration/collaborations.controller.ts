@@ -33,7 +33,7 @@ export class DocumentCollaborationsController {
   constructor(private readonly collaborationsService: DocumentCollaborationsService) {}
 
   @Get('collaborations')
-  async listManagementRoots(
+  async listManagementTree(
     @CurrentUser() authUser: AuthUserContext,
     @Query('workspaceId') workspaceId: string,
   ): Promise<DocumentCollaborationConsoleListResponse> {
@@ -41,7 +41,7 @@ export class DocumentCollaborationsController {
       throw new BadRequestException('缺少 workspaceId')
     }
 
-    return this.collaborationsService.listManagementRoots(authUser.id, workspaceId.trim())
+    return this.collaborationsService.listManagementTree(authUser.id, workspaceId.trim())
   }
 
   @Get(':documentId/collaborations')
