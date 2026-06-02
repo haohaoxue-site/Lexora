@@ -143,7 +143,7 @@ export const DOCUMENT_SITE_PUBLICATION_ROUTE_PREFIX = '/s'
 export const DOCUMENT_PUBLICATION_DEFAULT_SITE_HOME_CONFIG = {
   hero: {
     name: 'SamePage',
-    text: '协作文档与 AI Copilot',
+    text: 'AI 与协作',
     tagline: null,
     imageUrl: null,
   },

@@ -185,14 +185,6 @@ function handleMoreCommand(row: DocumentSinglePublicationTreeItem, command: stri
   }
 }
 
-function removeSitePage(row: DocumentSinglePublicationTreeItem) {
-  const pageId = resolveSiteCollectionInfo(row.id).pageId
-
-  if (pageId) {
-    emits('removeSitePage', pageId)
-  }
-}
-
 function collectSiteCollection(
   item: DocumentSinglePublicationTreeItem,
   inheritedScope: PublicationSitePageScope | null,
@@ -383,14 +375,6 @@ function resolveSiteCollection(input: {
               >
                 {{ resolveSiteScopeLabel(resolveSiteCollectionInfo(row.id).scope) }}
               </ElTag>
-              <ElButton
-                v-if="resolveSiteCollectionInfo(row.id).pageId"
-                link
-                type="danger"
-                @click="removeSitePage(row)"
-              >
-                移除
-              </ElButton>
             </div>
           </template>
         </ElTableColumn>

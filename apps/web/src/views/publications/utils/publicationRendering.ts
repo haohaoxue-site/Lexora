@@ -39,6 +39,9 @@ export function resolvePublicationNavItems(input: {
   siteId: string
 }): ResolvedPublicationNavItem[] {
   const pageById = new Map(collectPublicationSidebarPages(input.groups).map(page => [page.id, page]))
+  const firstPageByGroupId = new Map(
+    input.groups.flatMap(group => group.pages[0] ? [[group.id, group.pages[0]] as const] : []),
+  )
 
   return input.items.map((item) => {
     if (item.type === DOCUMENT_PUBLICATION_NAV_ITEM_TYPE.EXTERNAL) {
@@ -74,12 +77,16 @@ export function resolvePublicationNavItems(input: {
     }
 
     if (item.target === DOCUMENT_PUBLICATION_NAV_ITEM_INTERNAL_TARGET.SECTION && item.targetId) {
-      return {
-        disabled: false,
-        external: false,
-        href: `/s/${input.siteId}#publication-section-${item.targetId}`,
-        label: item.label,
-        openInNewTab: false,
+      const page = firstPageByGroupId.get(item.targetId)
+
+      if (page) {
+        return {
+          disabled: false,
+          external: false,
+          href: `/s/${input.siteId}/${page.documentId}`,
+          label: item.label,
+          openInNewTab: false,
+        }
       }
     }
 

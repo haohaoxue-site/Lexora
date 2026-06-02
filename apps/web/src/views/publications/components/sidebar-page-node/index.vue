@@ -1,6 +1,10 @@
 <script setup lang="ts">
 import type { PublicationSidebarPageNodeProps } from './typing'
 
+defineOptions({
+  name: 'PublicationSidebarPageNode',
+})
+
 const props = defineProps<PublicationSidebarPageNodeProps>()
 </script>
 
