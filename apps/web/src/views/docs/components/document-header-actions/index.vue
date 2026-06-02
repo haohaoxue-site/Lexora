@@ -6,6 +6,7 @@ import {
   DOCUMENT_PAGE_WIDTH_MODE_LABELS,
   DOCUMENT_PAGE_WIDTH_MODE_VALUES,
 } from '@haohaoxue/samepage-contracts'
+import ChatAssistantAvatar from '@/components/chat-message/ChatAssistantAvatar.vue'
 import { useDocumentHeaderActions } from '../../composables/useDocumentHeaderActions'
 
 const pageWidthPreviewClass: Record<DocumentPageWidthMode, string> = {
@@ -48,7 +49,7 @@ const {
         title="AI 对话"
         @click="toggleDocsChatPanel"
       >
-        <SvgIcon category="ui" icon="chat" />
+        <ChatAssistantAvatar />
       </ElButton>
     </ElTooltip>
 

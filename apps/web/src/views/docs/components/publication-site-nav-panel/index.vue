@@ -24,16 +24,22 @@ const props = withDefaults(defineProps<PublicationSiteNavPanelProps>(), {
 const emits = defineEmits<PublicationSiteNavPanelEmits>()
 
 const drafts = shallowRef<NavItemDraft[]>([])
-const activeSections = computed(() =>
-  [...props.sections]
-    .filter(section => section.status !== DOCUMENT_PUBLICATION_ENTRY_STATUS.REMOVED)
-    .sort(compareOrderedItem),
-)
 const activePages = computed(() =>
   [...props.pages]
     .filter(page => page.status !== DOCUMENT_PUBLICATION_ENTRY_STATUS.REMOVED)
     .sort(compareOrderedItem),
 )
+const firstPageIdBySectionId = computed(() => {
+  const pageMap = new Map<string, string>()
+
+  for (const page of activePages.value) {
+    if (!pageMap.has(page.sectionId)) {
+      pageMap.set(page.sectionId, page.id)
+    }
+  }
+
+  return pageMap
+})
 
 watch(
   () => props.navItems,
@@ -194,13 +200,6 @@ function saveNavItems() {
 }
 
 function resolveTargetOptions(item: NavItemDraft) {
-  if (item.target === DOCUMENT_PUBLICATION_NAV_ITEM_INTERNAL_TARGET.SECTION) {
-    return activeSections.value.map(section => ({
-      label: section.title,
-      value: section.id,
-    }))
-  }
-
   if (item.target === DOCUMENT_PUBLICATION_NAV_ITEM_INTERNAL_TARGET.PAGE) {
     return activePages.value.map(page => ({
       label: page.title,
@@ -232,8 +231,12 @@ function toDraft(item: PublicationNavItem): NavItemDraft {
     id: item.id,
     type: item.type,
     label: item.label,
-    target: item.target,
-    targetId: item.targetId ?? '',
+    target: item.target === DOCUMENT_PUBLICATION_NAV_ITEM_INTERNAL_TARGET.SECTION
+      ? DOCUMENT_PUBLICATION_NAV_ITEM_INTERNAL_TARGET.PAGE
+      : item.target,
+    targetId: item.target === DOCUMENT_PUBLICATION_NAV_ITEM_INTERNAL_TARGET.SECTION
+      ? firstPageIdBySectionId.value.get(item.targetId ?? '') ?? ''
+      : item.targetId ?? '',
     url: '',
     openTarget: DOCUMENT_PUBLICATION_NAV_ITEM_EXTERNAL_TARGET.BLANK,
     order: item.order,
@@ -309,7 +312,6 @@ function compareOrderedItem(left: { order: number, updatedAt: string }, right: {
               @change="value => patchDraft(row.localId, { target: value, targetId: '' })"
             >
               <ElOption label="首页" :value="DOCUMENT_PUBLICATION_NAV_ITEM_INTERNAL_TARGET.HOME" />
-              <ElOption label="分组" :value="DOCUMENT_PUBLICATION_NAV_ITEM_INTERNAL_TARGET.SECTION" />
               <ElOption label="页面" :value="DOCUMENT_PUBLICATION_NAV_ITEM_INTERNAL_TARGET.PAGE" />
             </ElSelect>
             <ElSelect

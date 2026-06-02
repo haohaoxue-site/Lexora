@@ -1,7 +1,7 @@
 <script setup lang="ts">
 const props = withDefaults(defineProps<{
   pending?: boolean
-  size?: 'md' | 'sm'
+  size?: 'md' | 'sm' | 'xs'
 }>(), {
   pending: false,
   size: 'md',
@@ -72,6 +72,11 @@ const props = withDefaults(defineProps<{
 .chat-assistant-avatar--sm {
   width: 1.5rem;
   height: 1.5rem;
+}
+
+.chat-assistant-avatar--xs {
+  width: 1.25rem;
+  height: 1.25rem;
 }
 
 .chat-assistant-avatar__image {
