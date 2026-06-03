@@ -146,7 +146,6 @@ const publicationPageSelect = {
   siteId: true,
   sectionId: true,
   documentId: true,
-  title: true,
   scope: true,
   order: true,
   status: true,
@@ -154,6 +153,11 @@ const publicationPageSelect = {
   createdBy: true,
   updatedAt: true,
   updatedBy: true,
+  document: {
+    select: {
+      title: true,
+    },
+  },
 } satisfies Prisma.DocumentPublicationPageSelect
 
 const publicationNavItemSelect = {
@@ -506,7 +510,6 @@ export class DocumentPublicationsService {
         siteId: site.id,
         sectionId: payload.sectionId,
         documentId: document.id,
-        title: payload.title ?? document.title,
         scope: payload.scope,
         order: payload.order ?? 0,
         createdBy: userId,
@@ -534,7 +537,6 @@ export class DocumentPublicationsService {
       where: { id: pageId },
       data: {
         sectionId: payload.sectionId,
-        title: payload.title,
         scope: payload.scope,
         order: payload.order,
         status: payload.status,
@@ -1004,7 +1006,7 @@ function buildSiteSidebarPage(
   return {
     id: page.id,
     documentId: document.id,
-    title: page.title,
+    title: document.title,
     href: `${DOCUMENT_SITE_PUBLICATION_ROUTE_PREFIX}/${siteId}/${document.id}`,
     children: page.scope === DOCUMENT_SITE_PUBLICATION_PAGE_SCOPE.DESCENDANTS
       ? buildSiteSidebarDescendantPages(siteId, document.id, context)
@@ -1137,7 +1139,7 @@ function toPublicationPage(page: PersistedPublicationPage) {
     siteId: page.siteId,
     sectionId: page.sectionId,
     documentId: page.documentId,
-    title: page.title,
+    title: page.document.title,
     scope: page.scope,
     order: page.order,
     status: page.status,

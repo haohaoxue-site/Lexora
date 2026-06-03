@@ -5,6 +5,7 @@ import type {
   PublicationSettingsTab,
   SiteConfigDraft,
   UpdateGroupDraft,
+  UpdatePageDraft,
 } from './typing'
 import type {
   DocumentSinglePublicationScope,
@@ -31,6 +32,7 @@ import {
   createPublicationSection,
   getPublicationSiteManagement,
   listDocumentSinglePublications,
+  removePublicationPage,
   removePublicationSection,
   removePublicationSiteMedia,
   replacePublicationNavItems,
@@ -266,6 +268,23 @@ async function createPage(payload: CreatePageDraft) {
   }, '添加站点页面失败')
 }
 
+async function updatePage(pageId: string, payload: UpdatePageDraft) {
+  await runSiteMutation(async () => {
+    applySiteManagement(await updatePublicationPage(pageId, {
+      workspaceId: currentWorkspaceId.value,
+      ...payload,
+    }))
+    ElMessage.success('站点页面已更新')
+  }, '更新站点页面失败')
+}
+
+async function removePage(pageId: string) {
+  await runSiteMutation(async () => {
+    applySiteManagement(await removePublicationPage(pageId, currentWorkspaceId.value))
+    ElMessage.success('页面已移出站点')
+  }, '移出站点页面失败')
+}
+
 async function reorderPages(orders: Array<{ pageId: string, order: number }>) {
   await runSiteMutation(async () => {
     let nextSiteManagement: PublicationSiteManagementResponse | null = null
@@ -424,6 +443,8 @@ function isPublicationSettingsTab(tab: string): tab is PublicationSettingsTab {
             @update-group="updateGroup"
             @remove-group="deleteGroup"
             @create-page="createPage"
+            @update-page="updatePage"
+            @remove-page="removePage"
             @reorder-pages="reorderPages"
           />
 

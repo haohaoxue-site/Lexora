@@ -490,7 +490,6 @@ model DocumentPublicationPage {
   siteId        String
   sectionId     String
   documentId    String
-  title         String
   scope         DocumentPublicationPageScope
   order         Int                            @default(0)
   status        DocumentPublicationEntryStatus @default(ACTIVE)

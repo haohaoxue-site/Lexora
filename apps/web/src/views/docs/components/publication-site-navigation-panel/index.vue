@@ -16,6 +16,7 @@ import {
   FolderOpened,
   HomeFilled,
   Link,
+  MoreFilled,
   Plus,
 } from '@element-plus/icons-vue'
 import {
@@ -174,6 +175,32 @@ function isDraftMoveDisabled(item: SiteNavigationItemDraft, direction: -1 | 1) {
   const index = drafts.value.findIndex(draft => draft.localId === item.localId)
 
   return index < 0 || index + direction < 0 || index + direction >= drafts.value.length
+}
+
+function removeDraft(localId: string) {
+  const currentIndex = drafts.value.findIndex(item => item.localId === localId)
+
+  if (currentIndex < 0) {
+    return
+  }
+
+  const nextDrafts = drafts.value
+    .filter(item => item.localId !== localId)
+    .map((item, index) => ({
+      ...item,
+      order: index,
+    }))
+
+  drafts.value = nextDrafts
+  selectedLocalId.value = nextDrafts[currentIndex]?.localId ?? nextDrafts[currentIndex - 1]?.localId ?? ''
+}
+
+function toggleDraftStatus(item: SiteNavigationItemDraft) {
+  patchDraft(item.localId, {
+    status: item.status === DOCUMENT_PUBLICATION_ENTRY_STATUS.ACTIVE
+      ? DOCUMENT_PUBLICATION_ENTRY_STATUS.HIDDEN
+      : DOCUMENT_PUBLICATION_ENTRY_STATUS.ACTIVE,
+  })
 }
 
 function handleCreateCommand(command: string | number | object) {
@@ -468,7 +495,7 @@ function compareOrderedItem(left: { order: number, updatedAt: string }, right: {
             </template>
           </ElTableColumn>
 
-          <ElTableColumn label="操作" width="84" align="right" header-align="right">
+          <ElTableColumn label="操作" width="128" align="right" header-align="right">
             <template #default="{ row }">
               <div class="inline-flex items-center justify-end gap-1">
                 <ElButton
@@ -487,6 +514,25 @@ function compareOrderedItem(left: { order: number, updatedAt: string }, right: {
                   title="下移"
                   @click.stop="moveDraft(row.localId, 1)"
                 />
+                <ElDropdown trigger="click">
+                  <ElButton
+                    text
+                    class="publication-site-navigation-panel__icon-button h-7 min-w-7 w-7 rounded-lg p-0"
+                    :icon="MoreFilled"
+                    title="更多操作"
+                    @click.stop
+                  />
+                  <template #dropdown>
+                    <ElDropdownMenu>
+                      <ElDropdownItem @click="toggleDraftStatus(row)">
+                        {{ row.status === DOCUMENT_PUBLICATION_ENTRY_STATUS.ACTIVE ? '隐藏导航项' : '显示导航项' }}
+                      </ElDropdownItem>
+                      <ElDropdownItem @click="removeDraft(row.localId)">
+                        删除导航项
+                      </ElDropdownItem>
+                    </ElDropdownMenu>
+                  </template>
+                </ElDropdown>
               </div>
             </template>
           </ElTableColumn>

@@ -9,12 +9,14 @@ import type {
   DocumentSinglePublicationTreeItem,
   PublicationPage,
   PublicationSection,
+  PublicationSitePageScope,
 } from '@/apis/document-publication'
 import { ArrowDown, ArrowUp } from '@element-plus/icons-vue'
 import {
   DOCUMENT_PUBLICATION_ENTRY_STATUS,
   DOCUMENT_SITE_PUBLICATION_PAGE_SCOPE,
   DOCUMENT_SITE_PUBLICATION_PAGE_SCOPE_LABELS,
+  DOCUMENT_SITE_PUBLICATION_PAGE_SCOPE_VALUES,
 } from '@haohaoxue/samepage-contracts/document/publication/constants'
 import { computed, reactive, shallowRef, watch } from 'vue'
 import { ElMessage, ElMessageBox } from '@/utils/element-plus'
@@ -30,7 +32,6 @@ const isCreatePageDialogOpen = shallowRef(false)
 const pageForm = reactive<PublicationPageForm>({
   sectionId: '',
   documentId: '',
-  title: '',
   scope: DOCUMENT_SITE_PUBLICATION_PAGE_SCOPE.PAGE,
   order: 0,
 })
@@ -71,6 +72,10 @@ const selectedSourceDocument = computed(() =>
 const selectedSourceDocumentTree = computed(() =>
   selectedSourceDocument.value ? [selectedSourceDocument.value] : [],
 )
+const pageScopeOptions = DOCUMENT_SITE_PUBLICATION_PAGE_SCOPE_VALUES.map(value => ({
+  value,
+  label: DOCUMENT_SITE_PUBLICATION_PAGE_SCOPE_LABELS[value],
+}))
 
 watch(
   activePages,
@@ -133,10 +138,44 @@ async function removeGroup(group: PublicationSection) {
   emits('removeGroup', group.id)
 }
 
+function togglePageStatus(page: PublicationPage) {
+  emits('updatePage', page.id, {
+    status: page.status === DOCUMENT_PUBLICATION_ENTRY_STATUS.ACTIVE
+      ? DOCUMENT_PUBLICATION_ENTRY_STATUS.HIDDEN
+      : DOCUMENT_PUBLICATION_ENTRY_STATUS.ACTIVE,
+  })
+}
+
+function updatePageScope(page: PublicationPage, scope: PublicationSitePageScope) {
+  if (page.scope === scope) {
+    return
+  }
+
+  emits('updatePage', page.id, { scope })
+}
+
+function handlePageScopeCommand(page: PublicationPage, command: string | number | object) {
+  updatePageScope(page, String(command) as PublicationSitePageScope)
+}
+
+async function removePage(page: PublicationPage) {
+  try {
+    await ElMessageBox.confirm('移出站点后，该页面将不再出现在公开站点目录中。', '移出站点页面', {
+      confirmButtonText: '移出',
+      cancelButtonText: '取消',
+      type: 'warning',
+    })
+  }
+  catch {
+    return
+  }
+
+  emits('removePage', page.id)
+}
+
 function openCreatePageDialog(group: PublicationSection) {
   pageForm.sectionId = group.id
   pageForm.documentId = ''
-  pageForm.title = ''
   pageForm.scope = DOCUMENT_SITE_PUBLICATION_PAGE_SCOPE.PAGE
   pageForm.order = pagesByGroupId.value.get(group.id)?.length ?? 0
   isCreatePageDialogOpen.value = true
@@ -156,7 +195,6 @@ function submitPage() {
   emits('createPage', {
     sectionId: pageForm.sectionId,
     documentId: pageForm.documentId,
-    title: pageForm.title.trim() || undefined,
     scope: pageForm.scope,
     order: pageForm.order,
   })
@@ -346,13 +384,16 @@ function compareOrderedItem(left: { order: number, updatedAt: string }, right: {
               v-if="!group.collapsed"
               class="grid gap-0 px-4"
             >
-              <button
+              <div
                 v-for="page in pagesByGroupId.get(group.id)"
                 :key="page.id"
-                type="button"
-                class="publication-site-group-panel__page-row grid min-h-13 grid-cols-[minmax(0,1fr)_auto_auto_auto_auto] items-center gap-3 rounded-lg border-0 bg-transparent px-3 text-left"
+                role="button"
+                tabindex="0"
+                class="publication-site-group-panel__page-row grid min-h-13 grid-cols-[minmax(0,1fr)_auto_auto_auto_auto_auto] items-center gap-3 rounded-lg px-3 text-left"
                 :class="{ 'is-selected': selectedPage?.id === page.id }"
                 @click="selectPage(page)"
+                @keydown.enter.prevent="selectPage(page)"
+                @keydown.space.prevent="selectPage(page)"
               >
                 <span class="inline-flex min-w-0 items-center gap-2 text-secondary">
                   <SvgIcon category="ui" icon="document-tree-file" size="1rem" />
@@ -360,9 +401,35 @@ function compareOrderedItem(left: { order: number, updatedAt: string }, right: {
                     {{ page.title }}
                   </span>
                 </span>
-                <span class="text-xs leading-5 text-secondary">
-                  {{ DOCUMENT_SITE_PUBLICATION_PAGE_SCOPE_LABELS[page.scope] }}
-                </span>
+                <ElDropdown
+                  trigger="click"
+                  :disabled="mutating"
+                  @command="command => handlePageScopeCommand(page, command)"
+                >
+                  <ElButton
+                    text
+                    size="small"
+                    class="publication-site-group-panel__scope-trigger h-7 gap-1 rounded-lg px-2 text-xs leading-5"
+                    :disabled="mutating"
+                    @click.stop
+                    @keydown.stop
+                  >
+                    {{ DOCUMENT_SITE_PUBLICATION_PAGE_SCOPE_LABELS[page.scope] }}
+                    <SvgIcon category="ui" icon="chevron-down" size="0.72rem" />
+                  </ElButton>
+                  <template #dropdown>
+                    <ElDropdownMenu>
+                      <ElDropdownItem
+                        v-for="option in pageScopeOptions"
+                        :key="option.value"
+                        :command="option.value"
+                        :disabled="page.scope === option.value"
+                      >
+                        {{ option.label }}
+                      </ElDropdownItem>
+                    </ElDropdownMenu>
+                  </template>
+                </ElDropdown>
                 <ElTag
                   size="small"
                   :type="page.status === DOCUMENT_PUBLICATION_ENTRY_STATUS.ACTIVE ? 'success' : 'info'"
@@ -386,7 +453,28 @@ function compareOrderedItem(left: { order: number, updatedAt: string }, right: {
                   title="下移页面"
                   @click.stop="movePage(page, 1)"
                 />
-              </button>
+                <ElDropdown trigger="click">
+                  <ElButton
+                    text
+                    class="publication-site-group-panel__icon-button h-7 min-w-7 w-7 rounded-lg p-0"
+                    :disabled="mutating"
+                    title="页面操作"
+                    @click.stop
+                  >
+                    <SvgIcon category="ui" icon="more" size="0.9rem" />
+                  </ElButton>
+                  <template #dropdown>
+                    <ElDropdownMenu>
+                      <ElDropdownItem @click="togglePageStatus(page)">
+                        {{ page.status === DOCUMENT_PUBLICATION_ENTRY_STATUS.ACTIVE ? '隐藏页面' : '显示页面' }}
+                      </ElDropdownItem>
+                      <ElDropdownItem @click="removePage(page)">
+                        移出站点
+                      </ElDropdownItem>
+                    </ElDropdownMenu>
+                  </template>
+                </ElDropdown>
+              </div>
 
               <div v-if="(pagesByGroupId.get(group.id)?.length ?? 0) === 0" class="border-t px-3 py-5 text-center text-xs text-secondary">
                 暂无页面
@@ -459,7 +547,7 @@ function compareOrderedItem(left: { order: number, updatedAt: string }, right: {
       width="32rem"
     >
       <div class="grid gap-3">
-        <ElForm label-position="top" size="small">
+        <ElForm label-position="top">
           <ElFormItem label="分组">
             <ElSelect v-model="pageForm.sectionId" disabled>
               <ElOption
@@ -480,9 +568,6 @@ function compareOrderedItem(left: { order: number, updatedAt: string }, right: {
               default-expand-all
               placeholder="从私有文档选择"
             />
-          </ElFormItem>
-          <ElFormItem label="站点标题">
-            <ElInput v-model="pageForm.title" maxlength="120" placeholder="留空使用文档标题" />
           </ElFormItem>
           <ElFormItem label="范围">
             <ElSelect v-model="pageForm.scope">
@@ -567,6 +652,16 @@ function compareOrderedItem(left: { order: number, updatedAt: string }, right: {
   }
 }
 
+.publication-site-group-panel__scope-trigger {
+  color: var(--brand-text-secondary);
+
+  &:hover,
+  &:focus-visible {
+    color: var(--brand-primary);
+    background: color-mix(in srgb, var(--brand-primary) 8%, transparent);
+  }
+}
+
 .publication-site-group-panel__collapse {
   color: var(--brand-text-secondary);
   cursor: pointer;
@@ -592,6 +687,11 @@ function compareOrderedItem(left: { order: number, updatedAt: string }, right: {
 
   &:hover {
     background: color-mix(in srgb, var(--brand-primary) 4%, white);
+  }
+
+  &:focus-visible {
+    outline: 2px solid color-mix(in srgb, var(--brand-primary) 42%, transparent);
+    outline-offset: -2px;
   }
 
   &.is-selected {

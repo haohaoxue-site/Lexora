@@ -227,7 +227,6 @@ export const CreatePublicationPageSchema = z.object({
   workspaceId: z.string().trim().min(1),
   sectionId: z.string().trim().min(1),
   documentId: z.string().trim().min(1),
-  title: z.string().trim().min(1).max(120).optional(),
   scope: PublicationSitePageScopeSchema,
   order: z.number().int().min(0).optional(),
 }).strict()
@@ -235,7 +234,6 @@ export const CreatePublicationPageSchema = z.object({
 export const UpdatePublicationPageSchema = z.object({
   workspaceId: z.string().trim().min(1),
   sectionId: z.string().trim().min(1).optional(),
-  title: z.string().trim().min(1).max(120).optional(),
   scope: PublicationSitePageScopeSchema.optional(),
   order: z.number().int().min(0).optional(),
   status: PublicationEntryStatusSchema.optional(),

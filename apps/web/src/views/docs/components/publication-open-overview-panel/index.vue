@@ -270,7 +270,7 @@ function filterDocumentTree(
             </template>
           </ElTableColumn>
 
-          <ElTableColumn label="公开状态" width="104">
+          <ElTableColumn label="公开状态" width="104" align="center" header-align="center">
             <template #default="{ row }">
               <ElTag
                 size="small"
@@ -282,7 +282,7 @@ function filterDocumentTree(
             </template>
           </ElTableColumn>
 
-          <ElTableColumn label="公开规则" width="110">
+          <ElTableColumn label="公开规则" width="120" align="center" header-align="center">
             <template #default="{ row }">
               <ElDropdown
                 trigger="click"
@@ -314,7 +314,7 @@ function filterDocumentTree(
             </template>
           </ElTableColumn>
 
-          <ElTableColumn label="范围" width="108">
+          <ElTableColumn label="范围" width="136" align="center" header-align="center">
             <template #default="{ row }">
               <ElDropdown
                 trigger="click"
