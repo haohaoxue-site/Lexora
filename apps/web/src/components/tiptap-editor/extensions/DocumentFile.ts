@@ -2,6 +2,7 @@ import {
   TIPTAP_DOCUMENT_FILE_NODE_PART,
   TIPTAP_DOCUMENT_FILE_NODE_TYPE,
 } from '@haohaoxue/samepage-contracts'
+import { prettyBytes } from '@haohaoxue/samepage-shared'
 import { mergeAttributes, Node } from '@tiptap/core'
 
 export const DocumentFile = Node.create({
@@ -100,7 +101,7 @@ export const DocumentFile = Node.create({
         ? node.attrs.mimeType
         : null,
       typeof node.attrs.size === 'number'
-        ? formatFileSize(node.attrs.size)
+        ? prettyBytes(node.attrs.size, { precision: 1 })
         : null,
     ].filter(Boolean)
 
@@ -115,15 +116,3 @@ export const DocumentFile = Node.create({
     ]
   },
 })
-
-function formatFileSize(size: number): string {
-  if (size < 1024) {
-    return `${size} B`
-  }
-
-  if (size < 1024 * 1024) {
-    return `${(size / 1024).toFixed(1)} KB`
-  }
-
-  return `${(size / (1024 * 1024)).toFixed(1)} MB`
-}

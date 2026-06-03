@@ -7,18 +7,18 @@ import type {
   PublicationSection,
 } from '@/apis/document-publication'
 
-export interface PublicationSiteNavPanelProps {
+export interface PublicationSiteNavigationPanelProps {
   sections: PublicationSection[]
   pages: PublicationPage[]
   navItems: PublicationNavItem[]
   saving?: boolean
 }
 
-export interface PublicationSiteNavPanelEmits {
+export interface PublicationSiteNavigationPanelEmits {
   save: [items: PublicationNavItemInput[]]
 }
 
-export interface NavItemDraft {
+export interface SiteNavigationItemDraft {
   localId: string
   id?: string
   type: PublicationNavItemInput['type']

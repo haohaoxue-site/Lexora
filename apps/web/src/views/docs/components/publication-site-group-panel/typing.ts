@@ -4,29 +4,35 @@ import type {
   PublicationPage,
   PublicationSection,
   PublicationSitePageScope,
-  UpdatePublicationPageRequest,
   UpdatePublicationSectionRequest,
 } from '@/apis/document-publication'
 
 export type CreatePageDraft = Omit<CreatePublicationPageRequest, 'workspaceId'>
-export type UpdateSectionDraft = Omit<UpdatePublicationSectionRequest, 'workspaceId'>
-export type UpdatePageDraft = Omit<UpdatePublicationPageRequest, 'workspaceId'>
+export type UpdateGroupDraft = Omit<UpdatePublicationSectionRequest, 'workspaceId'>
 
-export interface PublicationSiteContentPanelProps {
+export interface PublicationSiteGroupPanelProps {
   tree: DocumentSinglePublicationTreeItem[]
-  sections: PublicationSection[]
+  groups: PublicationSection[]
   pages: PublicationPage[]
   loading?: boolean
   mutating?: boolean
 }
 
-export interface PublicationSiteContentPanelEmits {
+export interface PublicationSiteGroupPanelEmits {
   createPage: [payload: CreatePageDraft]
-  createSection: [title: string]
-  removePage: [pageId: string]
-  removeSection: [sectionId: string]
-  updatePage: [pageId: string, payload: UpdatePageDraft]
-  updateSection: [sectionId: string, payload: UpdateSectionDraft]
+  createGroup: [title: string]
+  removeGroup: [groupId: string]
+  reorderPages: [orders: PublicationSitePageOrderDraft[]]
+  updateGroup: [groupId: string, payload: UpdateGroupDraft, options?: PublicationSiteGroupMutationOptions]
+}
+
+export interface PublicationSiteGroupMutationOptions {
+  silent?: boolean
+}
+
+export interface PublicationSitePageOrderDraft {
+  pageId: string
+  order: number
 }
 
 export interface DocumentSelectNode {
@@ -34,12 +40,6 @@ export interface DocumentSelectNode {
   label: string
   disabled: boolean
   children: DocumentSelectNode[]
-}
-
-export interface FlatDocumentItem {
-  id: string
-  title: string
-  depth: number
 }
 
 export interface PublicationPageForm {

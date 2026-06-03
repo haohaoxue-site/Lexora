@@ -8,6 +8,7 @@ import type {
   PublicationSingleDocumentResponse,
   PublicationSiteHomeConfig,
   PublicationSiteManagementResponse,
+  PublicationSiteMediaKind,
   PublicationSiteRenderResponse,
   ReplacePublicationNavItemsRequest,
   TiptapJsonContent,
@@ -17,14 +18,22 @@ import type {
   UpdatePublicationSectionRequest,
   UpsertPublicationSiteSettingsRequest,
 } from '@haohaoxue/samepage-contracts'
+import type { Buffer } from 'node:buffer'
+import type { StorageObject } from '../../../infrastructure/storage/storage.interface'
 import type { SinglePublicationAccessResolution } from './publication-access.service'
 import { randomUUID } from 'node:crypto'
+import { Readable } from 'node:stream'
+import { buffer as readStreamBuffer } from 'node:stream/consumers'
 import {
   DOCUMENT_PUBLICATION_DEFAULT_SITE_HOME_CONFIG,
   DOCUMENT_PUBLICATION_ENTRY_STATUS,
   DOCUMENT_PUBLICATION_NAV_ITEM_INTERNAL_TARGET,
   DOCUMENT_PUBLICATION_NAV_ITEM_TYPE,
   DOCUMENT_PUBLICATION_SITE_HOME_MODE,
+  DOCUMENT_PUBLICATION_SITE_MEDIA_KIND,
+  DOCUMENT_PUBLICATION_SITE_MEDIA_KIND_VALUES,
+  DOCUMENT_PUBLICATION_SITE_MEDIA_MAX_BYTES_BY_KIND,
+  DOCUMENT_PUBLICATION_SITE_MEDIA_MIME_TYPES,
   DOCUMENT_PUBLICATION_SITE_STATUS,
   DOCUMENT_PUBLICATION_SITE_THEME,
   DOCUMENT_SINGLE_PUBLICATION_EFFECTIVE_STATE,
@@ -35,14 +44,30 @@ import {
   DOCUMENT_SITE_PUBLICATION_ROUTE_PREFIX,
   DOCUMENT_VISIBILITY,
   PublicationSiteHomeConfigSchema,
+  SERVER_PATH,
 } from '@haohaoxue/samepage-contracts'
-import { buildDocumentBlockIndex, buildDocumentOutline, collectDocumentAssetIds, normalizePublicationHref } from '@haohaoxue/samepage-shared'
-import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common'
+import { buildDocumentBlockIndex, buildDocumentOutline, collectDocumentAssetIds, normalizePublicationHref, prettyBytes } from '@haohaoxue/samepage-shared'
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common'
 import { DocumentStatus, Prisma } from '@prisma/client'
 import { PrismaService } from '../../../database/prisma.service'
+import { StorageService } from '../../../infrastructure/storage/storage.service'
 import { auditUserSummarySelect, toAuditUserSummary } from '../../users/audit-user-summary'
 import { DocumentAccessService } from '../core/access.service'
 import { DocumentPublicationAccessService } from './publication-access.service'
+
+const PUBLICATION_SITE_MEDIA_BUCKET = 'document-publication-site-media'
+const PUBLICATION_SITE_MEDIA_FALLBACK_FILE_NAME = {
+  [DOCUMENT_PUBLICATION_SITE_MEDIA_KIND.LOGO]: 'site-logo',
+  [DOCUMENT_PUBLICATION_SITE_MEDIA_KIND.HOME_LOGO]: 'home-logo',
+} as const satisfies Record<PublicationSiteMediaKind, string>
+
+type PublicationSiteMediaMimeType = (typeof DOCUMENT_PUBLICATION_SITE_MEDIA_MIME_TYPES)[number]
+
+interface UpdatePublicationSiteMediaInput {
+  fileName: string
+  mimeType: string
+  buffer: Buffer
+}
 
 const publicDocumentProjectionSelect = {
   id: true,
@@ -183,6 +208,7 @@ type PersistedSinglePublicationSetting = Prisma.DocumentSinglePublicationSetting
 export class DocumentPublicationsService {
   constructor(
     private readonly prisma: PrismaService,
+    private readonly storageService: StorageService,
     private readonly documentAccessService: DocumentAccessService,
     private readonly publicationAccessService: DocumentPublicationAccessService,
   ) {}
@@ -303,12 +329,120 @@ export class DocumentPublicationsService {
         homeDocumentId: payload.homeDocumentId,
         homeConfig: payload.homeConfig ? toPrismaJsonValue(payload.homeConfig) : undefined,
         allowIndexing: payload.allowIndexing,
+        status: payload.status,
         updatedBy: userId,
       },
       select: publicationSiteSelect,
     })
 
     return this.loadPublicationSiteManagement(nextSite)
+  }
+
+  async updatePublicationSiteMedia(
+    userId: string,
+    workspaceId: string,
+    mediaKind: string,
+    payload: UpdatePublicationSiteMediaInput,
+  ): Promise<PublicationSiteManagementResponse> {
+    const kind = assertPublicationSiteMediaKind(mediaKind)
+    const mediaMimeType = assertPublicationSiteMediaMimeType(payload.mimeType, payload.buffer)
+    assertPublicationSiteMediaBuffer(kind, payload.buffer, mediaMimeType)
+
+    const site = await this.getOrCreatePublicationSite(userId, workspaceId)
+    const storageKey = buildPublicationSiteMediaStorageKey(site.id, kind)
+
+    await this.storageService.putObject({
+      bucket: PUBLICATION_SITE_MEDIA_BUCKET,
+      key: storageKey,
+      body: payload.buffer,
+      contentType: mediaMimeType,
+      contentDisposition: {
+        type: 'inline',
+        fileName: payload.fileName,
+        fallbackFileName: PUBLICATION_SITE_MEDIA_FALLBACK_FILE_NAME[kind],
+      },
+      contentLength: payload.buffer.length,
+      cacheControl: 'public, max-age=300',
+    })
+
+    const mediaUrl = buildPublicationSiteMediaUrl(site.id, kind)
+    const homeConfig = parsePublicationSiteHomeConfig(site.homeConfig)
+    const nextSite = await this.prisma.documentPublicationSite.update({
+      where: { id: site.id },
+      data: kind === DOCUMENT_PUBLICATION_SITE_MEDIA_KIND.LOGO
+        ? {
+            logoUrl: mediaUrl,
+            updatedBy: userId,
+          }
+        : {
+            homeConfig: toPrismaJsonValue({
+              ...homeConfig,
+              hero: {
+                ...homeConfig.hero,
+                imageUrl: mediaUrl,
+              },
+            }),
+            updatedBy: userId,
+          },
+      select: publicationSiteSelect,
+    })
+
+    return this.loadPublicationSiteManagement(nextSite)
+  }
+
+  async removePublicationSiteMedia(
+    userId: string,
+    workspaceId: string,
+    mediaKind: string,
+  ): Promise<PublicationSiteManagementResponse> {
+    const kind = assertPublicationSiteMediaKind(mediaKind)
+    const site = await this.getOrCreatePublicationSite(userId, workspaceId)
+    const homeConfig = parsePublicationSiteHomeConfig(site.homeConfig)
+    const nextSite = await this.prisma.documentPublicationSite.update({
+      where: { id: site.id },
+      data: kind === DOCUMENT_PUBLICATION_SITE_MEDIA_KIND.LOGO
+        ? {
+            logoUrl: null,
+            updatedBy: userId,
+          }
+        : {
+            homeConfig: toPrismaJsonValue({
+              ...homeConfig,
+              hero: {
+                ...homeConfig.hero,
+                imageUrl: null,
+              },
+            }),
+            updatedBy: userId,
+          },
+      select: publicationSiteSelect,
+    })
+
+    await this.storageService.deleteObject({
+      bucket: PUBLICATION_SITE_MEDIA_BUCKET,
+      key: buildPublicationSiteMediaStorageKey(site.id, kind),
+    })
+
+    return this.loadPublicationSiteManagement(nextSite)
+  }
+
+  async getPublicationSiteMedia(siteId: string, mediaKind: string): Promise<StorageObject> {
+    const kind = assertPublicationSiteMediaKind(mediaKind)
+    const site = await this.prisma.documentPublicationSite.findUnique({
+      where: { id: siteId },
+      select: { id: true, logoUrl: true, homeConfig: true },
+    })
+
+    if (!site || !isPublicationSiteMediaReferenced(site, kind)) {
+      throw new NotFoundException('资源不存在')
+    }
+
+    const media = await this.storageService.getObject({
+      bucket: PUBLICATION_SITE_MEDIA_BUCKET,
+      key: buildPublicationSiteMediaStorageKey(site.id, kind),
+    })
+
+    return normalizePublicationSiteMediaObject(media)
   }
 
   async createPublicationSection(
@@ -1072,6 +1206,132 @@ function parsePublicationSiteHomeConfig(value: Prisma.JsonValue | null): Publica
       })
       .filter(action => action !== null),
   }
+}
+
+function assertPublicationSiteMediaKind(value: string): PublicationSiteMediaKind {
+  if (DOCUMENT_PUBLICATION_SITE_MEDIA_KIND_VALUES.includes(value as PublicationSiteMediaKind)) {
+    return value as PublicationSiteMediaKind
+  }
+
+  throw new BadRequestException('不支持的站点图片类型')
+}
+
+function assertPublicationSiteMediaMimeType(mimeType: string, buffer: Buffer): PublicationSiteMediaMimeType {
+  const normalizedMimeType = mimeType.trim().toLowerCase()
+
+  if (DOCUMENT_PUBLICATION_SITE_MEDIA_MIME_TYPES.includes(normalizedMimeType as PublicationSiteMediaMimeType)) {
+    return normalizedMimeType as PublicationSiteMediaMimeType
+  }
+
+  if (normalizedMimeType === 'application/octet-stream' && isPublicationSiteSvg(buffer)) {
+    return 'image/svg+xml'
+  }
+
+  throw new BadRequestException('站点图片仅支持 JPG、PNG、WEBP、SVG 格式')
+}
+
+function assertPublicationSiteMediaBuffer(
+  kind: PublicationSiteMediaKind,
+  buffer: Buffer,
+  mimeType: PublicationSiteMediaMimeType,
+): void {
+  if (!buffer.length) {
+    throw new BadRequestException('站点图片文件不能为空')
+  }
+
+  const maxBytes = DOCUMENT_PUBLICATION_SITE_MEDIA_MAX_BYTES_BY_KIND[kind]
+
+  if (buffer.length > maxBytes) {
+    throw new BadRequestException(`站点图片大小不能超过 ${prettyBytes(maxBytes)}`)
+  }
+
+  if (!isPublicationSiteMediaSignatureMatched(buffer, mimeType)) {
+    throw new BadRequestException('站点图片文件格式不正确')
+  }
+
+  if (mimeType === 'image/svg+xml' && !isSafePublicationSiteSvg(buffer)) {
+    throw new BadRequestException('站点 SVG 包含不支持的内容')
+  }
+}
+
+function buildPublicationSiteMediaStorageKey(siteId: string, kind: PublicationSiteMediaKind): string {
+  return `document-publication-site/${siteId}/${kind}`
+}
+
+function buildPublicationSiteMediaUrl(siteId: string, kind: PublicationSiteMediaKind): string {
+  return `${SERVER_PATH}/documents/publications/site/media/${siteId}/${kind}?v=${Date.now()}`
+}
+
+function isPublicationSiteMediaReferenced(
+  site: { id: string, logoUrl: string | null, homeConfig: Prisma.JsonValue | null },
+  kind: PublicationSiteMediaKind,
+): boolean {
+  const expectedPath = `/documents/publications/site/media/${site.id}/${kind}`
+
+  if (kind === DOCUMENT_PUBLICATION_SITE_MEDIA_KIND.LOGO) {
+    return site.logoUrl?.includes(expectedPath) ?? false
+  }
+
+  return parsePublicationSiteHomeConfig(site.homeConfig).hero.imageUrl?.includes(expectedPath) ?? false
+}
+
+async function normalizePublicationSiteMediaObject(media: StorageObject): Promise<StorageObject> {
+  if (media.contentType !== 'application/octet-stream') {
+    return media
+  }
+
+  const bodyBuffer = await readStreamBuffer(media.body)
+
+  return {
+    ...media,
+    body: Readable.from(bodyBuffer),
+    contentType: isPublicationSiteSvg(bodyBuffer) && isSafePublicationSiteSvg(bodyBuffer)
+      ? 'image/svg+xml'
+      : media.contentType,
+    contentLength: bodyBuffer.length,
+  }
+}
+
+function isPublicationSiteMediaSignatureMatched(buffer: Buffer, mimeType: PublicationSiteMediaMimeType): boolean {
+  if (mimeType === 'image/jpeg') {
+    return buffer.length >= 3 && buffer[0] === 0xFF && buffer[1] === 0xD8 && buffer[2] === 0xFF
+  }
+
+  if (mimeType === 'image/png') {
+    return buffer.length >= 8
+      && buffer[0] === 0x89
+      && buffer[1] === 0x50
+      && buffer[2] === 0x4E
+      && buffer[3] === 0x47
+      && buffer[4] === 0x0D
+      && buffer[5] === 0x0A
+      && buffer[6] === 0x1A
+      && buffer[7] === 0x0A
+  }
+
+  if (mimeType === 'image/svg+xml') {
+    return isPublicationSiteSvg(buffer)
+  }
+
+  return buffer.length >= 12
+    && buffer.subarray(0, 4).toString('ascii') === 'RIFF'
+    && buffer.subarray(8, 12).toString('ascii') === 'WEBP'
+}
+
+function isPublicationSiteSvg(buffer: Buffer): boolean {
+  const text = buffer.toString('utf8').replace(/^\uFEFF/, '').trimStart()
+
+  return text.startsWith('<svg') || /^<\?xml[\s\S]{0,512}<svg/i.test(text)
+}
+
+function isSafePublicationSiteSvg(buffer: Buffer): boolean {
+  const text = buffer.toString('utf8')
+
+  return !/<script[\s>]/i.test(text)
+    && !/<foreignObject[\s>]/i.test(text)
+    && !/<(?:iframe|object|embed)[\s>]/i.test(text)
+    && !/\son[a-z]+\s*=/i.test(text)
+    && !/(?:href|xlink:href)\s*=\s*["']\s*javascript:/i.test(text)
 }
 
 function comparePublicationOrderedItem(left: { order: number, updatedAt: Date }, right: { order: number, updatedAt: Date }) {

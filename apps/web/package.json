@@ -39,6 +39,7 @@
     "@tiptap/vue-3": "^3.22.3",
     "@tiptap/y-tiptap": "^3.0.3",
     "@vueuse/core": "^14.2.1",
+    "@vueuse/router": "^14.3.0",
     "axios": "^1.15.2",
     "dayjs": "^1.11.20",
     "dompurify": "^3.4.7",

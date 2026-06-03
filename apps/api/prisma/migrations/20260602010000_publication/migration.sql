@@ -1,0 +1,1 @@
+ALTER TYPE "DocumentPublicationSiteStatus" ADD VALUE IF NOT EXISTS 'DISABLED';

@@ -75,6 +75,7 @@ enum DocumentSinglePublicationState {
 
 enum DocumentPublicationSiteStatus {
   ACTIVE
+  DISABLED
   REMOVED
 }
 

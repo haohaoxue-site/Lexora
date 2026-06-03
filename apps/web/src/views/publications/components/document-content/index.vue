@@ -16,13 +16,14 @@ const props = withDefaults(defineProps<PublicationDocumentContentProps>(), {
   outlineOptions: () => ({}),
   showHeader: true,
   showMeta: true,
+  showOutline: true,
 })
 const updatedFromNow = computed(() => dayjs(props.document.updatedAt).fromNow())
 const isEmpty = computed(() =>
   !hasDocumentContent(props.body) && collectDocumentAssetIds(props.body).length === 0,
 )
 const hasOutline = computed(() => hasHeadingNode(props.body))
-const showOutline = computed(() => props.layout === 'plain' && hasOutline.value)
+const showOutline = computed(() => props.showOutline && props.layout === 'plain' && hasOutline.value)
 const articleClass = computed(() => [
   `publication-document-content--${props.layout}`,
   {
@@ -64,7 +65,7 @@ function handleBodyClick(event: MouseEvent) {
 <template>
   <article class="publication-document-content text-main" :class="articleClass">
     <header v-if="props.showHeader" class="publication-document-content__header mb-6">
-      <p v-if="props.showMeta" class="publication-document-content__meta m-0 mb-3 text-[13px] leading-[1.5] text-[var(--brand-text-tertiary)]">
+      <p v-if="props.showMeta" class="publication-document-content__meta m-0 mb-3 text-[13px] leading-[1.5] text-[var(--publication-c-text-3)]">
         更新于 {{ updatedFromNow }}
       </p>
       <h1 class="publication-document-content__title m-0 font-bold leading-[1.18] text-main">
@@ -82,7 +83,7 @@ function handleBodyClick(event: MouseEvent) {
         :show-outline="showOutline"
       />
 
-      <p v-if="isEmpty" class="publication-document-content__empty mt-1 text-sm leading-[1.8] text-[var(--brand-text-tertiary)]">
+      <p v-if="isEmpty" class="publication-document-content__empty mt-1 text-sm leading-[1.8] text-[var(--publication-c-text-3)]">
         暂无内容
       </p>
     </div>
@@ -91,24 +92,24 @@ function handleBodyClick(event: MouseEvent) {
 
 <style scoped lang="scss">
 .publication-document-content {
-  --publication-document-content-body-width: 46rem;
-  --publication-document-content-width: 46rem;
+  --publication-document-content-body-width: 43rem;
+  --publication-document-content-width: 43rem;
   width: min(100%, var(--publication-document-content-width));
 }
 
 .publication-document-content--plain {
-  --publication-document-content-width: 76rem;
+  --publication-document-content-width: 70rem;
   margin: 0 auto;
 }
 
 .publication-document-content--plain {
   .publication-document-content__header {
     width: min(100%, var(--publication-document-content-body-width));
-    margin: 0 auto 1.5rem;
+    margin: 0 auto 2rem;
   }
 
   .publication-document-content__title {
-    font-size: clamp(1.9rem, 3vw, 2.35rem);
+    font-size: 1.75rem;
   }
 }
 
@@ -128,11 +129,14 @@ function handleBodyClick(event: MouseEvent) {
 }
 
 .publication-document-content--site {
-  padding: 4rem 2rem 5rem;
+  padding: 0;
 }
 
 .publication-document-content__title {
-  font-size: clamp(2rem, 4vw, 2.85rem);
+  color: var(--publication-c-text-1);
+  font-size: 1.75rem;
+  letter-spacing: 0;
+  line-height: 1.25;
 }
 
 .publication-document-content__body {
@@ -170,13 +174,13 @@ function handleBodyClick(event: MouseEvent) {
 
   :deep(.tiptap-editor__prosemirror .ProseMirror) {
     padding: 0;
-    color: var(--brand-text-primary);
-    font-size: 15px;
-    line-height: 1.72;
+    color: var(--publication-c-text-1);
+    font-size: 16px;
+    line-height: 1.75;
   }
 
   :deep(.tiptap-editor__prosemirror .ProseMirror > * + *) {
-    margin-top: 0.78em;
+    margin-top: 1rem;
   }
 
   :deep(.tiptap-editor__prosemirror .ProseMirror h1),
@@ -184,7 +188,65 @@ function handleBodyClick(event: MouseEvent) {
   :deep(.tiptap-editor__prosemirror .ProseMirror h3),
   :deep(.tiptap-editor__prosemirror .ProseMirror h4) {
     letter-spacing: 0;
+    color: var(--publication-c-text-1);
+    font-weight: 600;
     line-height: 1.28;
+    scroll-margin-top: calc(var(--publication-nav-height) + 1.5rem);
+  }
+
+  :deep(.tiptap-editor__prosemirror .ProseMirror h1) {
+    font-size: 1.75rem;
+    letter-spacing: 0;
+    line-height: 2.5rem;
+  }
+
+  :deep(.tiptap-editor__prosemirror .ProseMirror h2) {
+    margin: 3rem 0 1rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--publication-c-divider);
+    font-size: 1.5rem;
+    letter-spacing: 0;
+    line-height: 2rem;
+  }
+
+  :deep(.tiptap-editor__prosemirror .ProseMirror h3) {
+    margin: 2rem 0 0;
+    font-size: 1.25rem;
+    letter-spacing: 0;
+    line-height: 1.75rem;
+  }
+
+  :deep(.tiptap-editor__prosemirror .ProseMirror h4) {
+    margin: 1.5rem 0 0;
+    font-size: 1.125rem;
+    letter-spacing: 0;
+    line-height: 1.5rem;
+  }
+
+  :deep(.tiptap-editor__prosemirror .ProseMirror p) {
+    line-height: 1.75rem;
+  }
+
+  :deep(.tiptap-editor__prosemirror .ProseMirror a) {
+    color: var(--publication-c-brand-1);
+    font-weight: 500;
+    text-decoration: underline;
+    text-underline-offset: 0.125rem;
+    transition: color 0.25s;
+  }
+
+  :deep(.tiptap-editor__prosemirror .ProseMirror a:hover) {
+    color: var(--publication-c-brand-2);
+  }
+
+  :deep(.tiptap-editor__prosemirror .ProseMirror blockquote) {
+    border-left-color: var(--publication-c-divider);
+    color: var(--publication-c-text-2);
+  }
+
+  :deep(.tiptap-editor__prosemirror .ProseMirror code) {
+    color: var(--publication-c-brand-1);
+    background: var(--publication-c-brand-soft);
   }
 
   :deep(.is-empty[data-placeholder]::before) {
@@ -203,9 +265,18 @@ function handleBodyClick(event: MouseEvent) {
   }
 
   :deep(a.publication-link-disabled) {
-    color: var(--brand-text-tertiary);
+    color: var(--publication-c-text-3);
     cursor: not-allowed;
     text-decoration-style: dashed;
+  }
+}
+
+@media (min-width: 768px) {
+  .publication-document-content--plain,
+  .publication-document-content {
+    .publication-document-content__title {
+      font-size: 2rem;
+    }
   }
 }
 
@@ -237,7 +308,7 @@ function handleBodyClick(event: MouseEvent) {
   }
 
   .publication-document-content--site {
-    padding: 2rem 1.25rem 4rem;
+    padding: 0;
   }
 }
 </style>

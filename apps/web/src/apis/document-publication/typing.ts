@@ -21,6 +21,7 @@ export type {
   PublicationSiteHomeConfig,
   PublicationSiteHomeMode,
   PublicationSiteManagementResponse,
+  PublicationSiteMediaKind,
   PublicationSitePageScope,
   PublicationSiteRenderResponse,
   ReplacePublicationNavItemsRequest,

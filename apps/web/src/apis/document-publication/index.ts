@@ -5,6 +5,7 @@ import type {
   ListDocumentSinglePublicationsResponse,
   PublicationSingleDocumentResponse,
   PublicationSiteManagementResponse,
+  PublicationSiteMediaKind,
   PublicationSiteRenderResponse,
   ReplacePublicationNavItemsRequest,
   ResolveDocumentAssetsRequest,
@@ -63,6 +64,37 @@ export function updatePublicationSiteSettings(
     method: 'put',
     url: '/documents/publications/site',
     data,
+  })
+}
+
+export function updatePublicationSiteMedia(
+  workspaceId: string,
+  kind: PublicationSiteMediaKind,
+  file: File,
+): Promise<PublicationSiteManagementResponse> {
+  const formData = new FormData()
+  formData.set('file', file)
+
+  return axios.request({
+    method: 'put',
+    url: `/documents/publications/site/media/${kind}`,
+    params: {
+      workspaceId,
+    },
+    data: formData,
+  })
+}
+
+export function removePublicationSiteMedia(
+  workspaceId: string,
+  kind: PublicationSiteMediaKind,
+): Promise<PublicationSiteManagementResponse> {
+  return axios.request({
+    method: 'delete',
+    url: `/documents/publications/site/media/${kind}`,
+    params: {
+      workspaceId,
+    },
   })
 }
 

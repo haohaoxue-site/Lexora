@@ -25,19 +25,19 @@ function toggleGroup(groupId: string) {
 </script>
 
 <template>
-  <nav class="publication-sidebar-tree grid gap-5" aria-label="站点侧边栏">
+  <nav class="publication-sidebar-tree" aria-label="站点侧边栏">
     <section
       v-for="group in visibleGroups"
       :id="`publication-section-${group.id}`"
       :key="group.id"
-      class="publication-sidebar-tree__group min-w-0 border-t border-t-[color-mix(in_srgb,var(--brand-border-base)_64%,transparent)] pt-5 first:border-t-0 first:pt-0"
+      class="publication-sidebar-tree__group"
     >
       <button
-        class="publication-sidebar-tree__group-trigger flex w-full min-w-0 cursor-pointer items-center justify-between gap-2 border-none bg-transparent px-2 py-1 text-left text-main [font:inherit]"
+        class="publication-sidebar-tree__group-trigger"
         type="button"
         @click="toggleGroup(group.id)"
       >
-        <span class="min-w-0 overflow-hidden text-[13px] font-bold leading-[1.45] text-ellipsis whitespace-nowrap">{{ group.title }}</span>
+        <span class="publication-sidebar-tree__group-title">{{ group.title }}</span>
         <SvgIcon
           category="ui"
           :icon="expandedByGroupId[group.id] ? 'chevron-down' : 'chevron-right'"
@@ -45,7 +45,7 @@ function toggleGroup(groupId: string) {
         />
       </button>
 
-      <ul v-show="expandedByGroupId[group.id]" class="mt-px grid list-none gap-px p-0">
+      <ul v-show="expandedByGroupId[group.id]" class="publication-sidebar-tree__pages">
         <PublicationSidebarPageNode
           v-for="page in group.pages"
           :key="page.id"
@@ -59,10 +59,57 @@ function toggleGroup(groupId: string) {
 </template>
 
 <style scoped lang="scss">
+.publication-sidebar-tree {
+  display: grid;
+  gap: 0;
+}
+
+.publication-sidebar-tree__group {
+  min-width: 0;
+  padding-bottom: 1.5rem;
+
+  & + & {
+    border-top: 1px solid var(--publication-c-divider);
+    padding-top: 0.625rem;
+  }
+}
+
 .publication-sidebar-tree__group-trigger {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.25rem 0;
+  border: 0;
+  background: transparent;
+  color: var(--publication-c-text-1);
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+
   &:hover,
   &:focus-visible {
-    color: var(--brand-primary);
+    color: var(--publication-c-brand-1);
   }
+}
+
+.publication-sidebar-tree__group-title {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 0.875rem;
+  font-weight: 700;
+  line-height: 1.5rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.publication-sidebar-tree__pages {
+  display: grid;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
 </style>

@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import type { PublicationSingleDocumentPageProps } from './typing'
-import type { DocumentBodyEditorOutlineOptions } from '@/components/tiptap-editor'
 import { computed } from 'vue'
 import { SvgIcon } from '@/components/svg-icon'
 import dayjs from '@/utils/dayjs'
@@ -10,62 +9,79 @@ const props = defineProps<PublicationSingleDocumentPageProps>()
 const ownerName = computed(() => props.document.owner?.displayName || '用户')
 const documentTitle = computed(() => props.document.title || '未命名')
 const updatedAtText = computed(() => dayjs(props.document.updatedAt).format('YYYY年MM月DD日'))
-const outlineOptions: DocumentBodyEditorOutlineOptions = {
-  defaultExpanded: true,
-  layout: 'side',
-  mode: 'manual',
-  placement: 'right',
-  showSearch: false,
-  surface: 'transparent',
-}
 </script>
 
 <template>
-  <section class="publication-single-document-page flex h-screen min-h-0 flex-col overflow-hidden">
-    <header class="publication-single-document-page__topbar flex min-h-14 flex-[0_0_auto] items-center justify-between gap-5 px-[clamp(1rem,2vw,1.75rem)] py-2 max-[560px]:flex-col max-[560px]:items-start max-[560px]:gap-1">
-      <div class="publication-single-document-page__titlebar grid min-w-0 gap-px">
-        <div class="publication-single-document-page__breadcrumb flex min-w-0 items-center text-[13px] leading-[1.35] text-secondary">
+  <section class="publication-single-document-page">
+    <header class="publication-single-document-page__topbar">
+      <div class="publication-single-document-page__titlebar">
+        <div class="publication-single-document-page__breadcrumb">
           <span class="publication-single-document-page__owner">{{ ownerName }}</span>
           <SvgIcon category="ui" icon="chevron-right" size="12px" />
-          <strong class="publication-single-document-page__title font-bold text-main">{{ documentTitle }}</strong>
+          <strong class="publication-single-document-page__title">{{ documentTitle }}</strong>
         </div>
 
-        <p class="publication-single-document-page__time m-0 whitespace-nowrap text-xs leading-[1.4] text-[color-mix(in_srgb,var(--brand-text-tertiary)_68%,transparent)] max-[560px]:whitespace-normal">
+        <p class="publication-single-document-page__time">
           最近修改：{{ updatedAtText }}
         </p>
       </div>
 
-      <p class="publication-single-document-page__auth-hint m-0 flex-[0_1_auto] whitespace-nowrap text-right text-xs leading-[1.5] text-[color-mix(in_srgb,var(--brand-text-tertiary)_74%,transparent)] max-[560px]:whitespace-normal max-[560px]:text-left">
-        立即<RouterLink :to="{ name: 'login' }" class="publication-single-document-page__auth-link font-medium text-primary underline">
+      <p class="publication-single-document-page__auth-hint">
+        立即<RouterLink :to="{ name: 'login' }" class="publication-single-document-page__auth-link">
           注册或登录
         </RouterLink>，开始你的文档之旅吧~
       </p>
     </header>
 
-    <div class="publication-single-document-page__layout min-h-0 w-full flex-1 overflow-auto">
-      <main class="publication-single-document-page__main flex min-h-full min-w-0 justify-center px-[clamp(1.25rem,5vw,3rem)] pt-[clamp(1.75rem,4vw,3rem)] pb-20 max-[860px]:px-5 max-[860px]:pt-6 max-[860px]:pb-16">
-        <PublicationDocumentContent
-          :document="props.document"
-          :body="props.body"
-          layout="plain"
-          :outline-options="outlineOptions"
-          :show-meta="false"
-        />
-      </main>
-    </div>
+    <main class="publication-single-document-page__main">
+      <PublicationDocumentContent
+        :document="props.document"
+        :body="props.body"
+        layout="plain"
+        :show-meta="false"
+      />
+    </main>
   </section>
 </template>
 
 <style scoped lang="scss">
 .publication-single-document-page {
-  background:
-    linear-gradient(180deg, color-mix(in srgb, var(--brand-fill-blank) 70%, transparent) 0, transparent 9rem),
-    var(--brand-bg-surface);
+  min-height: 100vh;
+  background: var(--publication-c-bg);
 }
 
 .publication-single-document-page__topbar {
-  border-bottom: 1px solid color-mix(in srgb, var(--brand-border-base) 70%, transparent);
-  background: var(--brand-bg-surface);
+  display: flex;
+  min-height: 3.5rem;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.25rem;
+  padding: 0.5rem 1rem;
+  border-bottom: 1px solid var(--publication-c-gutter);
+  background: var(--publication-c-bg);
+}
+
+.publication-single-document-page__titlebar {
+  display: grid;
+  min-width: 0;
+  gap: 0.0625rem;
+}
+
+.publication-single-document-page__breadcrumb {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  color: var(--publication-c-text-2);
+  font-size: 0.8125rem;
+  line-height: 1.35;
+}
+
+.publication-single-document-page__time {
+  margin: 0;
+  color: var(--publication-c-text-3);
+  font-size: 0.75rem;
+  line-height: 1.4;
+  white-space: nowrap;
 }
 
 .publication-single-document-page__owner,
@@ -81,16 +97,61 @@ const outlineOptions: DocumentBodyEditorOutlineOptions = {
 
 .publication-single-document-page__title {
   max-width: min(38rem, 48vw);
+  color: var(--publication-c-text-1);
+  font-weight: 700;
+}
+
+.publication-single-document-page__auth-hint {
+  flex: 0 1 auto;
+  margin: 0;
+  color: var(--publication-c-text-3);
+  font-size: 0.75rem;
+  line-height: 1.5;
+  text-align: right;
+  white-space: nowrap;
 }
 
 .publication-single-document-page__auth-link {
+  color: var(--publication-c-brand-1);
+  font-weight: 500;
   text-decoration: underline;
-  text-decoration-color: color-mix(in srgb, var(--brand-primary) 42%, transparent);
+  text-decoration-color: color-mix(in srgb, var(--publication-c-brand-1) 42%, transparent);
   text-underline-offset: 0.18em;
 
   &:hover,
   &:focus-visible {
     text-decoration-color: currentColor;
+  }
+}
+
+.publication-single-document-page__main {
+  display: flex;
+  min-width: 0;
+  justify-content: center;
+  padding: 3rem 1.5rem 8rem;
+}
+
+@media (min-width: 640px) {
+  .publication-single-document-page__topbar {
+    padding-inline: 1.75rem;
+  }
+
+  .publication-single-document-page__main {
+    padding: 4rem 2rem 8rem;
+  }
+}
+
+@media (max-width: 560px) {
+  .publication-single-document-page__topbar {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.25rem;
+  }
+
+  .publication-single-document-page__time,
+  .publication-single-document-page__auth-hint {
+    text-align: left;
+    white-space: normal;
   }
 }
 </style>

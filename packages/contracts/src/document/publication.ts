@@ -37,11 +37,13 @@ export const DOCUMENT_SINGLE_PUBLICATION_EFFECTIVE_STATE_LABELS = {
 
 export const DOCUMENT_PUBLICATION_SITE_STATUS = {
   ACTIVE: 'ACTIVE',
+  DISABLED: 'DISABLED',
   REMOVED: 'REMOVED',
 } as const
 
 export const DOCUMENT_PUBLICATION_SITE_STATUS_VALUES = [
   DOCUMENT_PUBLICATION_SITE_STATUS.ACTIVE,
+  DOCUMENT_PUBLICATION_SITE_STATUS.DISABLED,
   DOCUMENT_PUBLICATION_SITE_STATUS.REMOVED,
 ] as const
 
@@ -139,6 +141,32 @@ export const DOCUMENT_PUBLICATION_NAV_ITEM_EXTERNAL_TARGET_VALUES = [
 
 export const DOCUMENT_SINGLE_PUBLICATION_ROUTE_PREFIX = '/p'
 export const DOCUMENT_SITE_PUBLICATION_ROUTE_PREFIX = '/s'
+export const DOCUMENT_PUBLICATION_SITE_TITLE_MAX_LENGTH = 30
+export const DOCUMENT_PUBLICATION_SITE_HOME_NAME_MAX_LENGTH = 30
+export const DOCUMENT_PUBLICATION_SITE_HOME_TEXT_MAX_LENGTH = 60
+export const DOCUMENT_PUBLICATION_SITE_HOME_TAGLINE_MAX_LENGTH = 60
+export const DOCUMENT_PUBLICATION_SITE_FOOTER_MESSAGE_MAX_LENGTH = 50
+export const DOCUMENT_PUBLICATION_SITE_FOOTER_COPYRIGHT_MAX_LENGTH = 30
+export const DOCUMENT_PUBLICATION_SITE_MEDIA_KIND = {
+  LOGO: 'logo',
+  HOME_LOGO: 'home-logo',
+} as const
+export const DOCUMENT_PUBLICATION_SITE_MEDIA_KIND_VALUES = [
+  DOCUMENT_PUBLICATION_SITE_MEDIA_KIND.LOGO,
+  DOCUMENT_PUBLICATION_SITE_MEDIA_KIND.HOME_LOGO,
+] as const
+export const DOCUMENT_PUBLICATION_SITE_MEDIA_MIME_TYPES = [
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+  'image/svg+xml',
+] as const
+export const DOCUMENT_PUBLICATION_SITE_LOGO_MEDIA_MAX_BYTES = 512 * 1024
+export const DOCUMENT_PUBLICATION_SITE_HOME_LOGO_MEDIA_MAX_BYTES = 2 * 1024 * 1024
+export const DOCUMENT_PUBLICATION_SITE_MEDIA_MAX_BYTES_BY_KIND = {
+  [DOCUMENT_PUBLICATION_SITE_MEDIA_KIND.LOGO]: DOCUMENT_PUBLICATION_SITE_LOGO_MEDIA_MAX_BYTES,
+  [DOCUMENT_PUBLICATION_SITE_MEDIA_KIND.HOME_LOGO]: DOCUMENT_PUBLICATION_SITE_HOME_LOGO_MEDIA_MAX_BYTES,
+} as const satisfies Record<(typeof DOCUMENT_PUBLICATION_SITE_MEDIA_KIND_VALUES)[number], number>
 
 export const DOCUMENT_PUBLICATION_DEFAULT_SITE_HOME_CONFIG = {
   hero: {
@@ -163,6 +191,7 @@ export const PublicationEntryStatusSchema = z.enum(DOCUMENT_PUBLICATION_ENTRY_ST
 export const PublicationSiteThemeSchema = z.enum(DOCUMENT_PUBLICATION_SITE_THEME_VALUES)
 export const PublicationSiteHomeModeSchema = z.enum(DOCUMENT_PUBLICATION_SITE_HOME_MODE_VALUES)
 export const PublicationSitePageScopeSchema = z.enum(DOCUMENT_SITE_PUBLICATION_PAGE_SCOPE_VALUES)
+export const PublicationSiteMediaKindSchema = z.enum(DOCUMENT_PUBLICATION_SITE_MEDIA_KIND_VALUES)
 export const PublicationNavItemTypeSchema = z.enum(DOCUMENT_PUBLICATION_NAV_ITEM_TYPE_VALUES)
 export const PublicationNavItemInternalTargetSchema = z.enum(DOCUMENT_PUBLICATION_NAV_ITEM_INTERNAL_TARGET_VALUES)
 export const PublicationNavItemExternalTargetSchema = z.enum(DOCUMENT_PUBLICATION_NAV_ITEM_EXTERNAL_TARGET_VALUES)
@@ -196,22 +225,22 @@ const PublicationSiteHomeFeatureSchema = z.object({
 
 export const PublicationSiteHomeConfigSchema = z.object({
   hero: z.object({
-    name: z.string().trim().min(1).max(80),
-    text: z.string().trim().min(1).max(120),
-    tagline: z.string().trim().max(240).nullable(),
+    name: z.string().trim().min(1).max(DOCUMENT_PUBLICATION_SITE_HOME_NAME_MAX_LENGTH),
+    text: z.string().trim().min(1).max(DOCUMENT_PUBLICATION_SITE_HOME_TEXT_MAX_LENGTH),
+    tagline: z.string().trim().max(DOCUMENT_PUBLICATION_SITE_HOME_TAGLINE_MAX_LENGTH).nullable(),
     imageUrl: z.string().trim().max(500).nullable(),
   }).strict(),
   actions: z.array(PublicationSiteHomeActionSchema).max(3),
   features: z.array(PublicationSiteHomeFeatureSchema).max(8),
   footer: z.object({
-    message: z.string().trim().max(160).nullable(),
-    copyright: z.string().trim().max(160).nullable(),
+    message: z.string().trim().max(DOCUMENT_PUBLICATION_SITE_FOOTER_MESSAGE_MAX_LENGTH).nullable(),
+    copyright: z.string().trim().max(DOCUMENT_PUBLICATION_SITE_FOOTER_COPYRIGHT_MAX_LENGTH).nullable(),
   }).strict(),
 }).strict()
 
 export const UpsertPublicationSiteSettingsSchema = z.object({
   workspaceId: z.string().trim().min(1),
-  title: z.string().trim().min(1).max(120).optional(),
+  title: z.string().trim().min(1).max(DOCUMENT_PUBLICATION_SITE_TITLE_MAX_LENGTH).optional(),
   description: z.string().trim().max(240).nullable().optional(),
   logoUrl: z.string().trim().max(500).nullable().optional(),
   theme: PublicationSiteThemeSchema.optional(),
@@ -219,6 +248,7 @@ export const UpsertPublicationSiteSettingsSchema = z.object({
   homeDocumentId: z.string().trim().nullable().optional(),
   homeConfig: PublicationSiteHomeConfigSchema.optional(),
   allowIndexing: z.boolean().optional(),
+  status: PublicationSiteStatusSchema.optional(),
 }).strict()
 
 export const DocumentSinglePublicationSettingSchema = z.object({
@@ -282,7 +312,7 @@ export const ListDocumentSinglePublicationsResponseSchema = z.object({
 export const PublicationSiteSchema = z.object({
   id: z.string(),
   workspaceId: z.string(),
-  title: z.string().trim().min(1).max(120),
+  title: z.string().trim().min(1).max(DOCUMENT_PUBLICATION_SITE_TITLE_MAX_LENGTH),
   description: z.string().trim().max(240).nullable(),
   logoUrl: z.string().trim().max(500).nullable(),
   theme: PublicationSiteThemeSchema,
@@ -533,6 +563,7 @@ export type PublicationEntryStatus = z.infer<typeof PublicationEntryStatusSchema
 export type PublicationSiteTheme = z.infer<typeof PublicationSiteThemeSchema>
 export type PublicationSiteHomeMode = z.infer<typeof PublicationSiteHomeModeSchema>
 export type PublicationSitePageScope = z.infer<typeof PublicationSitePageScopeSchema>
+export type PublicationSiteMediaKind = z.infer<typeof PublicationSiteMediaKindSchema>
 export type PublicationNavItemType = z.infer<typeof PublicationNavItemTypeSchema>
 export type PublicationNavItemInternalTarget = z.infer<typeof PublicationNavItemInternalTargetSchema>
 export type PublicationNavItemExternalTarget = z.infer<typeof PublicationNavItemExternalTargetSchema>

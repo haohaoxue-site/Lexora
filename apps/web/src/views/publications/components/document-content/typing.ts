@@ -8,4 +8,5 @@ export interface PublicationDocumentContentProps {
   outlineOptions?: DocumentBodyEditorOutlineOptions
   showHeader?: boolean
   showMeta?: boolean
+  showOutline?: boolean
 }

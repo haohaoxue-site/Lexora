@@ -8,8 +8,8 @@ const props = defineProps<PublicationSiteDocumentPageProps>()
 </script>
 
 <template>
-  <div class="publication-site-document-page grid min-h-[calc(100vh-4rem)] min-w-0 grid-cols-[17rem_minmax(0,1fr)_14rem] max-[1120px]:grid-cols-[16rem_minmax(0,1fr)] max-[860px]:grid-cols-1">
-    <aside class="publication-site-document-page__sidebar sticky top-16 h-[calc(100vh-4rem)] min-w-0 self-start overflow-y-auto overflow-x-hidden max-[860px]:hidden">
+  <div class="publication-site-document-page">
+    <aside class="publication-site-document-page__sidebar">
       <PublicationSidebarTree
         :groups="props.sidebarGroups"
         :site-id="props.siteId"
@@ -17,31 +17,128 @@ const props = defineProps<PublicationSiteDocumentPageProps>()
       />
     </aside>
 
-    <main class="publication-site-document-page__main flex min-w-0 justify-center">
-      <PublicationDocumentContent
-        :document="props.document"
-        :body="props.body"
-        layout="site"
-      />
+    <main class="publication-site-document-page__content">
+      <div class="publication-site-document-page__content-container">
+        <PublicationDocumentContent
+          :document="props.document"
+          :body="props.body"
+          layout="site"
+        />
+      </div>
     </main>
 
-    <aside class="publication-site-document-page__outline sticky top-16 h-[calc(100vh-4rem)] min-w-0 self-start overflow-y-auto overflow-x-hidden max-[1120px]:hidden">
-      <PublicationPageOutline :items="props.outline" />
+    <aside class="publication-site-document-page__aside">
+      <div class="publication-site-document-page__aside-curtain" />
+      <div class="publication-site-document-page__aside-container">
+        <PublicationPageOutline :items="props.outline" />
+      </div>
     </aside>
   </div>
 </template>
 
 <style scoped lang="scss">
-.publication-site-document-page__sidebar {
-  box-sizing: border-box;
-  padding: 1.4rem 1rem 2.5rem 1.25rem;
-  border-right: 1px solid color-mix(in srgb, var(--brand-border-base) 64%, transparent);
-  background: color-mix(in srgb, var(--brand-fill-blank) 34%, transparent);
+.publication-site-document-page {
+  display: grid;
+  min-height: calc(100vh - var(--publication-nav-height));
+  min-width: 0;
+  width: 100%;
+  grid-template-columns: minmax(0, 1fr);
 }
 
-.publication-site-document-page__outline {
+.publication-site-document-page__sidebar {
   box-sizing: border-box;
-  padding: 3.5rem 1.25rem 2rem 1.5rem;
-  border-left: 1px solid color-mix(in srgb, var(--brand-border-base) 64%, transparent);
+  position: sticky;
+  top: var(--publication-nav-height);
+  display: none;
+  height: calc(100vh - var(--publication-nav-height));
+  min-width: 0;
+  align-self: start;
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding: 2rem 2rem 6rem;
+  border-right: 1px solid var(--publication-c-gutter);
+  background: var(--publication-c-bg-alt);
+  scrollbar-width: none;
+
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+.publication-site-document-page__content {
+  min-width: 0;
+  padding: 2rem 1.5rem 6rem;
+}
+
+.publication-site-document-page__content-container {
+  width: min(100%, 43rem);
+  margin: 0 auto;
+}
+
+.publication-site-document-page__aside {
+  box-sizing: border-box;
+  position: sticky;
+  top: var(--publication-nav-height);
+  display: none;
+  height: calc(100vh - var(--publication-nav-height));
+  min-width: 0;
+  align-self: start;
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding: 3rem 2rem 2rem;
+  scrollbar-width: none;
+
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+.publication-site-document-page__aside-curtain {
+  position: fixed;
+  bottom: 0;
+  z-index: 10;
+  display: none;
+  width: 14rem;
+  height: 2rem;
+  background: linear-gradient(transparent, var(--publication-c-bg) 70%);
+  pointer-events: none;
+}
+
+.publication-site-document-page__aside-container {
+  min-height: calc(100vh - var(--publication-nav-height) - 3rem);
+  padding-bottom: 2rem;
+}
+
+@media (min-width: 640px) {
+  .publication-site-document-page__content {
+    padding: 3rem 2rem 8rem;
+  }
+}
+
+@media (min-width: 960px) {
+  .publication-site-document-page {
+    max-width: var(--publication-layout-max-width);
+    margin: 0 auto;
+    grid-template-columns: var(--publication-sidebar-width) minmax(0, 1fr);
+  }
+
+  .publication-site-document-page__sidebar {
+    display: block;
+  }
+
+  .publication-site-document-page__content {
+    padding: 3rem 2rem 8rem;
+  }
+}
+
+@media (min-width: 1280px) {
+  .publication-site-document-page {
+    grid-template-columns: var(--publication-sidebar-width) minmax(0, 1fr) var(--publication-aside-width);
+  }
+
+  .publication-site-document-page__aside,
+  .publication-site-document-page__aside-curtain {
+    display: block;
+  }
 }
 </style>

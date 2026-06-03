@@ -17,6 +17,7 @@ import TaskItem from '@tiptap/extension-task-item'
 import TaskList from '@tiptap/extension-task-list'
 import { TextStyle } from '@tiptap/extension-text-style'
 import StarterKit from '@tiptap/starter-kit'
+import { prettyBytes } from '../file'
 
 const TEXT_COLOR_CLASS_PATTERN = /^tiptap-highlight-[a-z-]+-text$/
 const BACKGROUND_COLOR_CLASS_PATTERN = /^tiptap-highlight-[a-z-]+-bg$/
@@ -389,7 +390,7 @@ function createDocumentFileSchemaExtension() {
           ? node.attrs.mimeType
           : null,
         typeof node.attrs.size === 'number'
-          ? formatFileSize(node.attrs.size)
+          ? prettyBytes(node.attrs.size, { precision: 1 })
           : null,
       ].filter(Boolean)
 
@@ -499,18 +500,6 @@ function resolveImageAlignStyle(value: 'left' | 'center' | 'right') {
 
 function isImageTextAlign(value: unknown): value is 'left' | 'center' | 'right' {
   return value === 'left' || value === 'center' || value === 'right'
-}
-
-function formatFileSize(size: number): string {
-  if (size < 1024) {
-    return `${size} B`
-  }
-
-  if (size < 1024 * 1024) {
-    return `${(size / 1024).toFixed(1)} KB`
-  }
-
-  return `${(size / (1024 * 1024)).toFixed(1)} MB`
 }
 
 function isTextAlignValue(value: unknown): value is 'left' | 'center' | 'right' {

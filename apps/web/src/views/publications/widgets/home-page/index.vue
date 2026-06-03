@@ -1,10 +1,32 @@
 <script setup lang="ts">
 import type { PublicationHomePageProps } from './typing'
 import { normalizePublicationHref } from '@haohaoxue/samepage-shared'
+import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 
 const props = defineProps<PublicationHomePageProps>()
 const router = useRouter()
+const featureGridClass = computed(() => {
+  const length = props.home.features.length
+
+  if (length === 2) {
+    return 'publication-home-page__features--grid-2'
+  }
+
+  if (length === 3) {
+    return 'publication-home-page__features--grid-3'
+  }
+
+  if (length > 3 && length % 3 === 0) {
+    return 'publication-home-page__features--grid-6'
+  }
+
+  if (length > 3) {
+    return 'publication-home-page__features--grid-4'
+  }
+
+  return null
+})
 
 function handleActionClick(href: string, event: MouseEvent) {
   const safeHref = normalizePublicationHref(href)
@@ -35,64 +57,69 @@ function resolveActionHref(href: string) {
 </script>
 
 <template>
-  <main class="publication-home-page mx-auto w-[min(100%,72rem)] px-6 pt-[clamp(4rem,9vw,7rem)] pb-12 max-[640px]:px-4 max-[640px]:pt-10 max-[640px]:pb-8">
-    <section class="publication-home-page__hero grid grid-cols-[minmax(0,1fr)_minmax(16rem,26rem)] items-center gap-[clamp(3rem,8vw,7rem)] max-[960px]:grid-cols-1">
-      <div class="publication-home-page__hero-copy min-w-0">
-        <p class="publication-home-page__name m-0 mb-1 text-[clamp(2.25rem,5vw,3.6rem)] font-800 leading-none text-transparent">
-          {{ props.home.hero.name || props.site.title }}
-        </p>
-        <h1 class="max-w-[11em] m-0 text-[clamp(2.35rem,5.6vw,4.2rem)] font-800 leading-[1.1] text-main">
-          {{ props.home.hero.text || props.site.title }}
-        </h1>
-        <p v-if="props.home.hero.tagline || props.site.description" class="publication-home-page__tagline mt-4 max-w-[34rem] text-lg leading-7 text-secondary">
-          {{ props.home.hero.tagline || props.site.description }}
-        </p>
+  <main class="publication-home-page">
+    <section
+      class="publication-home-page__hero"
+      :class="{ 'publication-home-page__hero--has-image': props.home.hero.imageUrl || props.site.logoUrl }"
+    >
+      <div class="publication-home-page__hero-container">
+        <div class="publication-home-page__hero-copy">
+          <h1 class="publication-home-page__heading">
+            <span v-if="props.home.hero.name" class="publication-home-page__name">
+              {{ props.home.hero.name }}
+            </span>
+            <span class="publication-home-page__text">
+              {{ props.home.hero.text || props.site.title }}
+            </span>
+          </h1>
 
-        <div v-if="props.home.actions.length" class="publication-home-page__actions mt-7 flex flex-wrap gap-3">
-          <a
-            v-for="action in props.home.actions"
-            :key="`${action.label}-${action.href}`"
-            class="publication-home-page__action inline-flex min-h-10 items-center justify-center rounded-full px-4 text-sm font-bold leading-[1.4] no-underline"
-            :class="`is-${action.theme}`"
-            :href="resolveActionHref(action.href)"
-            @click="handleActionClick(action.href, $event)"
-          >
-            {{ action.label }}
-          </a>
+          <p v-if="props.home.hero.tagline || props.site.description" class="publication-home-page__tagline">
+            {{ props.home.hero.tagline || props.site.description }}
+          </p>
+
+          <div v-if="props.home.actions.length" class="publication-home-page__actions">
+            <a
+              v-for="action in props.home.actions"
+              :key="`${action.label}-${action.href}`"
+              class="publication-home-page__action"
+              :class="`is-${action.theme}`"
+              :href="resolveActionHref(action.href)"
+              @click="handleActionClick(action.href, $event)"
+            >
+              {{ action.label }}
+            </a>
+          </div>
         </div>
-      </div>
 
-      <div class="publication-home-page__visual flex justify-center max-[960px]:order-[-1] max-[960px]:justify-start">
-        <img
-          v-if="props.home.hero.imageUrl || props.site.logoUrl"
-          class="publication-home-page__hero-image max-h-[21rem] w-[min(100%,21rem)] object-contain max-[960px]:w-32"
-          :src="props.home.hero.imageUrl || props.site.logoUrl || ''"
-          alt=""
-        >
-        <div
-          v-else
-          class="publication-home-page__fallback-visual relative grid w-[min(100%,17rem)] [aspect-ratio:0.82] content-start gap-4 rounded-2xl p-8 max-[960px]:w-32 max-[960px]:rounded-xl max-[960px]:p-3"
-          aria-hidden="true"
-        >
-          <span class="publication-home-page__fallback-mark inline-flex h-16 w-16 items-center justify-center rounded-xl text-2xl font-800 text-primary max-[960px]:h-8 max-[960px]:w-8 max-[960px]:rounded-lg max-[960px]:text-xs">SP</span>
-          <span class="publication-home-page__fallback-line is-wide block h-2 rounded-full max-[960px]:h-1" />
-          <span class="publication-home-page__fallback-line block h-2 rounded-full max-[960px]:h-1" />
-          <span class="publication-home-page__fallback-chip absolute bottom-6 right-6 rounded-lg px-2 py-1 text-xs font-800 leading-[1.2] text-white max-[960px]:bottom-3 max-[960px]:right-3 max-[960px]:px-1.5 max-[960px]:py-0.5 max-[960px]:text-[10px]">Docs</span>
+        <div v-if="props.home.hero.imageUrl || props.site.logoUrl" class="publication-home-page__visual">
+          <div class="publication-home-page__image-container">
+            <div class="publication-home-page__image-bg" aria-hidden="true" />
+            <img
+              class="publication-home-page__hero-image"
+              :src="props.home.hero.imageUrl || props.site.logoUrl || ''"
+              alt=""
+            >
+          </div>
         </div>
       </div>
     </section>
 
-    <section v-if="props.home.features.length" class="publication-home-page__features mt-[clamp(4rem,9vw,6rem)] grid grid-cols-4 gap-4 max-[960px]:grid-cols-2 max-[640px]:grid-cols-1" aria-label="特性">
+    <section
+      v-if="props.home.features.length"
+      class="publication-home-page__features"
+      :class="featureGridClass"
+      aria-label="特性"
+    >
       <article
         v-for="feature in props.home.features"
         :key="feature.title"
-        class="publication-home-page__feature min-w-0 rounded-lg p-5"
+        class="publication-home-page__feature"
       >
-        <span v-if="feature.icon" class="publication-home-page__feature-icon mb-4 inline-flex h-9 w-9 items-center justify-center rounded-md text-lg">{{ feature.icon }}</span>
-        <h2 class="publication-home-page__feature-title m-0 text-base font-bold leading-[1.45] text-main">
+        <span v-if="feature.icon" class="publication-home-page__feature-icon">{{ feature.icon }}</span>
+        <h2 class="publication-home-page__feature-title">
           {{ feature.title }}
         </h2>
-        <p v-if="feature.details" class="publication-home-page__feature-details mt-2 text-sm leading-[1.75] text-secondary">
+        <p v-if="feature.details" class="publication-home-page__feature-details">
           {{ feature.details }}
         </p>
       </article>
@@ -100,12 +127,12 @@ function resolveActionHref(href: string) {
 
     <footer
       v-if="props.home.footer.message || props.home.footer.copyright"
-      class="publication-home-page__footer mt-24 mx-[calc(50%-50vw)] grid gap-1 border-t px-4 py-7 text-center text-[13px] leading-[1.65] text-[var(--brand-text-tertiary)]"
+      class="publication-home-page__footer"
     >
-      <p v-if="props.home.footer.message" class="m-0">
+      <p v-if="props.home.footer.message" class="publication-home-page__footer-text">
         {{ props.home.footer.message }}
       </p>
-      <p v-if="props.home.footer.copyright" class="m-0">
+      <p v-if="props.home.footer.copyright" class="publication-home-page__footer-text">
         {{ props.home.footer.copyright }}
       </p>
     </footer>
@@ -113,67 +140,381 @@ function resolveActionHref(href: string) {
 </template>
 
 <style scoped lang="scss">
+.publication-home-page {
+  display: flex;
+  min-height: calc(100vh - var(--publication-nav-height));
+  flex-direction: column;
+}
+
+.publication-home-page__hero {
+  margin-top: calc(var(--publication-nav-height) * -1);
+  padding: calc(var(--publication-nav-height) + 3rem) 1.5rem 3rem;
+}
+
+.publication-home-page__hero-container {
+  display: flex;
+  flex-direction: column;
+  max-width: 72rem;
+  margin: 0 auto;
+}
+
+.publication-home-page__hero-copy {
+  position: relative;
+  z-index: 1;
+  order: 2;
+  min-width: 0;
+}
+
+.publication-home-page__hero--has-image .publication-home-page__hero-container {
+  text-align: center;
+}
+
+.publication-home-page__heading {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+}
+
+.publication-home-page__name,
+.publication-home-page__text {
+  width: fit-content;
+  max-width: 24.5rem;
+  color: var(--publication-c-text-1);
+  font-size: 2rem;
+  font-weight: 700;
+  letter-spacing: 0;
+  line-height: 2.5rem;
+  white-space: pre-wrap;
+}
+
 .publication-home-page__name {
-  background: linear-gradient(120deg, var(--brand-primary) 0%, color-mix(in srgb, var(--brand-primary) 58%, #ff4fd8 42%) 100%);
+  background: linear-gradient(120deg, #bd34fe 30%, #41d1ff);
   background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+}
+
+.publication-home-page__hero--has-image {
+  .publication-home-page__name,
+  .publication-home-page__text {
+    margin: 0 auto;
+  }
+}
+
+.publication-home-page__tagline {
+  max-width: 24.5rem;
+  margin: 0;
+  padding-top: 0.5rem;
+  color: var(--publication-c-text-2);
+  font-size: 1.125rem;
+  font-weight: 500;
+  line-height: 1.75rem;
+  white-space: pre-wrap;
+}
+
+.publication-home-page__hero--has-image .publication-home-page__tagline {
+  margin: 0 auto;
+}
+
+.publication-home-page__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  padding-top: 1.5rem;
+}
+
+.publication-home-page__hero--has-image .publication-home-page__actions {
+  justify-content: center;
 }
 
 .publication-home-page__action {
+  display: inline-flex;
+  min-height: 2.5rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  padding: 0 1rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  line-height: 1.5;
+  text-decoration: none;
+
   &.is-brand {
-    background: var(--brand-primary);
-    color: var(--brand-bg-surface);
+    background: var(--publication-c-brand-1);
+    color: var(--publication-c-bg);
   }
 
   &.is-alt {
-    background: color-mix(in srgb, var(--brand-fill-blank) 90%, var(--brand-primary) 10%);
-    color: var(--brand-text-primary);
+    background: var(--publication-c-bg-soft);
+    color: var(--publication-c-text-1);
+  }
+
+  &:hover,
+  &:focus-visible {
+    color: var(--publication-c-brand-1);
+  }
+
+  &.is-brand:hover,
+  &.is-brand:focus-visible {
+    background: var(--publication-c-brand-2);
+    color: var(--publication-c-bg);
   }
 }
 
-.publication-home-page__fallback-visual {
-  transform: rotate(7deg);
-  border: 0.8rem solid color-mix(in srgb, var(--brand-primary) 72%, #ffffff 28%);
-  background: var(--brand-bg-surface);
-  box-shadow:
-    0 1.1rem 0 color-mix(in srgb, var(--brand-primary) 26%, #111827 74%),
-    0 2.5rem 4rem color-mix(in srgb, var(--brand-primary) 24%, transparent);
+.publication-home-page__visual {
+  order: 1;
+  margin: -4.75rem -1.5rem -3rem;
 }
 
-.publication-home-page__fallback-mark {
-  background: color-mix(in srgb, var(--brand-primary) 12%, transparent);
+.publication-home-page__image-container {
+  position: relative;
+  width: 20rem;
+  height: 20rem;
+  margin: 0 auto;
 }
 
-.publication-home-page__fallback-line {
-  width: 62%;
-  background: color-mix(in srgb, var(--brand-primary) 16%, transparent);
-
-  &.is-wide {
-    width: 86%;
-  }
+.publication-home-page__image-bg {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  z-index: 0;
+  width: 12rem;
+  height: 12rem;
+  border-radius: 50%;
+  background-image: linear-gradient(
+    -45deg,
+    color-mix(in srgb, var(--publication-c-brand-1) 52%, #bd34fe) 50%,
+    color-mix(in srgb, var(--publication-c-brand-2) 54%, #47caff) 50%
+  );
+  filter: blur(44px);
+  opacity: 0.88;
+  pointer-events: none;
+  transform: translate(-50%, -50%);
 }
 
-.publication-home-page__fallback-chip {
-  background: color-mix(in srgb, var(--brand-primary) 86%, #ffffff 14%);
+.publication-home-page__hero-image {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  max-width: 12rem;
+  max-height: 12rem;
+  filter: drop-shadow(-2px 4px 6px rgb(0 0 0 / 20%));
+  object-fit: contain;
+  transform: translate(-50%, -50%);
+}
+
+.publication-home-page__features {
+  display: grid;
+  max-width: 72rem;
+  margin: 0 auto;
+  padding: 0 1.5rem;
+  gap: 1rem;
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .publication-home-page__feature {
-  background: color-mix(in srgb, var(--brand-fill-blank) 92%, var(--brand-primary) 8%);
+  min-width: 0;
+  height: 100%;
+  padding: 1.5rem;
+  border: 1px solid var(--publication-c-bg-soft);
+  border-radius: 0.5rem;
+  background: var(--publication-c-bg-soft);
 }
 
 .publication-home-page__feature-icon {
-  background: var(--brand-bg-surface);
+  display: inline-flex;
+  width: 3rem;
+  height: 3rem;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 1.25rem;
+  border-radius: 0.375rem;
+  background: var(--publication-c-brand-soft);
+  font-size: 1.5rem;
+}
+
+.publication-home-page__feature-title {
+  margin: 0;
+  color: var(--publication-c-text-1);
+  font-size: 1rem;
+  font-weight: 600;
+  line-height: 1.5rem;
+}
+
+.publication-home-page__feature-details {
+  margin: 0;
+  padding-top: 0.5rem;
+  color: var(--publication-c-text-2);
+  font-size: 0.875rem;
+  font-weight: 500;
+  line-height: 1.5rem;
 }
 
 .publication-home-page__footer {
-  border-top: 1px solid color-mix(in srgb, var(--brand-border-base) 65%, transparent);
+  display: grid;
+  gap: 0.25rem;
+  margin-top: auto;
+  padding: 1.75rem 1rem;
+  border-top: 1px solid var(--publication-c-gutter);
+  color: var(--publication-c-text-3);
+  text-align: center;
 }
 
-@media (max-width: 960px) {
-  .publication-home-page__fallback-visual {
-    border-width: 0.5rem;
-    box-shadow:
-      0 0.55rem 0 color-mix(in srgb, var(--brand-primary) 26%, #111827 74%),
-      0 1.35rem 2.5rem color-mix(in srgb, var(--brand-primary) 22%, transparent);
+.publication-home-page__footer-text {
+  margin: 0;
+  font-size: 0.8125rem;
+  line-height: 1.625;
+}
+
+@media (min-width: 640px) {
+  .publication-home-page__hero {
+    padding: calc(var(--publication-nav-height) + 5rem) 3rem 4rem;
+  }
+
+  .publication-home-page__name,
+  .publication-home-page__text {
+    max-width: 36rem;
+    font-size: 3rem;
+    line-height: 3.5rem;
+  }
+
+  .publication-home-page__tagline {
+    max-width: 36rem;
+    padding-top: 0.75rem;
+    font-size: 1.25rem;
+    line-height: 2rem;
+  }
+
+  .publication-home-page__actions {
+    padding-top: 2rem;
+  }
+
+  .publication-home-page__visual {
+    margin: -6.75rem -1.5rem -3rem;
+  }
+
+  .publication-home-page__image-container {
+    width: 24.5rem;
+    height: 24.5rem;
+  }
+
+  .publication-home-page__image-bg {
+    width: 16rem;
+    height: 16rem;
+    filter: blur(56px);
+  }
+
+  .publication-home-page__hero-image {
+    max-width: 16rem;
+    max-height: 16rem;
+  }
+
+  .publication-home-page__features {
+    padding: 0 3rem;
+  }
+
+  .publication-home-page__features--grid-2,
+  .publication-home-page__features--grid-4,
+  .publication-home-page__features--grid-6 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 768px) {
+  .publication-home-page__features--grid-2,
+  .publication-home-page__features--grid-4 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .publication-home-page__features--grid-3,
+  .publication-home-page__features--grid-6 {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 960px) {
+  .publication-home-page__hero {
+    padding: calc(var(--publication-nav-height) + 5rem) 4rem 4rem;
+  }
+
+  .publication-home-page__hero-container {
+    flex-direction: row;
+  }
+
+  .publication-home-page__hero-copy {
+    order: 1;
+    flex-grow: 1;
+    flex-shrink: 0;
+    width: calc((100% / 3) * 2);
+  }
+
+  .publication-home-page__hero--has-image {
+    .publication-home-page__hero-container {
+      text-align: left;
+    }
+
+    .publication-home-page__hero-copy {
+      max-width: 37rem;
+    }
+
+    .publication-home-page__name,
+    .publication-home-page__text,
+    .publication-home-page__tagline {
+      margin: 0;
+    }
+
+    .publication-home-page__actions {
+      justify-content: flex-start;
+    }
+  }
+
+  .publication-home-page__name,
+  .publication-home-page__text {
+    font-size: 3.5rem;
+    line-height: 4rem;
+  }
+
+  .publication-home-page__tagline {
+    font-size: 1.5rem;
+    line-height: 2.25rem;
+  }
+
+  .publication-home-page__visual {
+    order: 2;
+    flex-grow: 1;
+    min-height: 100%;
+    margin: 0;
+  }
+
+  .publication-home-page__image-container {
+    display: flex;
+    width: 100%;
+    height: 100%;
+    align-items: center;
+    justify-content: center;
+    transform: translate(-2rem, -2rem);
+  }
+
+  .publication-home-page__hero-image {
+    max-width: 20rem;
+    max-height: 20rem;
+  }
+
+  .publication-home-page__image-bg {
+    width: 20rem;
+    height: 20rem;
+    filter: blur(68px);
+  }
+
+  .publication-home-page__features {
+    padding: 0 4rem;
+  }
+
+  .publication-home-page__features--grid-4 {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 }
 </style>

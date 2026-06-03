@@ -28,10 +28,11 @@ import {
   UpdatePublicationSectionSchema,
   UpsertPublicationSiteSettingsSchema,
 } from '@haohaoxue/samepage-contracts'
-import { Body, Controller, Delete, Get, Param, Post, Put, Query, Req, Res } from '@nestjs/common'
+import { BadRequestException, Body, Controller, Delete, Get, Param, Post, Put, Query, Req, Res } from '@nestjs/common'
 import { CurrentUser } from '../../../decorators/current-user.decorator'
 import { Public } from '../../../decorators/public.decorator'
 import { ZodValidationPipe } from '../../../pipes/zod-validation.pipe'
+import { getRequestFile } from '../../../utils/request-file'
 import { DocumentAssetsService } from '../asset/asset.service'
 import { DocumentPublicationsService } from './publications.service'
 
@@ -128,6 +129,56 @@ export class DocumentPublicationsController {
     @Body(new ZodValidationPipe(UpsertPublicationSiteSettingsSchema)) payload: UpsertPublicationSiteSettingsRequest,
   ): Promise<PublicationSiteManagementResponse> {
     return this.publicationsService.updatePublicationSiteSettings(authUser.id, payload)
+  }
+
+  @Put('documents/publications/site/media/:kind')
+  async updatePublicationSiteMedia(
+    @CurrentUser() authUser: AuthUserContext,
+    @Param('kind') kind: string,
+    @Query(new ZodValidationPipe(ListDocumentSinglePublicationsQuerySchema)) query: ListDocumentSinglePublicationsQuery,
+    @Req() request: FastifyRequest,
+  ): Promise<PublicationSiteManagementResponse> {
+    const file = await getRequestFile(request)
+
+    if (!file) {
+      throw new BadRequestException('请选择站点图片')
+    }
+
+    return this.publicationsService.updatePublicationSiteMedia(authUser.id, query.workspaceId, kind, {
+      fileName: file.filename,
+      mimeType: file.mimetype,
+      buffer: await file.toBuffer(),
+    })
+  }
+
+  @Delete('documents/publications/site/media/:kind')
+  async removePublicationSiteMedia(
+    @CurrentUser() authUser: AuthUserContext,
+    @Param('kind') kind: string,
+    @Query(new ZodValidationPipe(ListDocumentSinglePublicationsQuerySchema)) query: ListDocumentSinglePublicationsQuery,
+  ): Promise<PublicationSiteManagementResponse> {
+    return this.publicationsService.removePublicationSiteMedia(authUser.id, query.workspaceId, kind)
+  }
+
+  @Public()
+  @Get('documents/publications/site/media/:siteId/:kind')
+  async getPublicationSiteMedia(
+    @Param('siteId') siteId: string,
+    @Param('kind') kind: string,
+    @Res() response: FastifyReply,
+  ): Promise<FastifyReply> {
+    const media = await this.publicationsService.getPublicationSiteMedia(siteId, kind)
+
+    response.header('cache-control', 'public, max-age=300')
+    response.header('content-type', media.contentType)
+    response.header('content-security-policy', 'default-src \'none\'; img-src data:; style-src \'unsafe-inline\'; sandbox')
+    response.header('x-content-type-options', 'nosniff')
+
+    if (media.contentLength !== null) {
+      response.header('content-length', String(media.contentLength))
+    }
+
+    return response.send(media.body)
   }
 
   @Post('documents/publications/site/sections')

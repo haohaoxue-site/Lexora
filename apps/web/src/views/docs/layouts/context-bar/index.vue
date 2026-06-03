@@ -1,5 +1,11 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import {
+  DOCUMENT_PUBLICATION_SITE_STATUS,
+  DOCUMENT_SITE_PUBLICATION_ROUTE_PREFIX,
+} from '@haohaoxue/samepage-contracts'
+import { computed, onBeforeUnmount, onMounted, shallowRef, watch } from 'vue'
+import { getPublicationSiteManagement } from '@/apis/document-publication'
+import { useWorkspaceStore } from '@/stores/workspace'
 import DocumentHeaderActions from '../../components/document-header-actions'
 import { useActiveDocument } from '../../composables/useActiveDocument'
 import { useDocsControlCenterTabs } from '../../composables/useDocsControlCenterTabs'
@@ -13,8 +19,14 @@ const {
   collaborationStatusTone,
   reconnectCollaboration,
 } = useActiveDocument()
+const workspaceStore = useWorkspaceStore()
 const { currentSurface, isDocumentSurface, visibleBreadcrumbLabels } = useDocsSurfaceState()
 const { activeTab } = useDocsControlCenterTabs()
+const PUBLICATION_SITE_STATE_EVENT = 'samepage:publication-site-state-change'
+const publicationSiteState = shallowRef<{
+  id: string
+  active: boolean
+} | null>(null)
 
 const surfaceContext = computed(() => {
   return {
@@ -23,6 +35,7 @@ const surfaceContext = computed(() => {
   }
 })
 const isControlCenterSurface = computed(() => currentSurface.value !== 'document')
+const isPublicationSettingsSurface = computed(() => currentSurface.value === 'publication-settings')
 const isSingleLine = computed(() => isDocumentSurface.value || !surfaceContext.value.description)
 const connectionStatusClass = computed(() =>
   collaborationStatusTone.value ? `is-${collaborationStatusTone.value}` : null,
@@ -30,6 +43,63 @@ const connectionStatusClass = computed(() =>
 const connectionStatusTitle = computed(() =>
   collaborationStatusHint.value || collaborationStatusLabel.value || undefined,
 )
+const publicationSiteUrl = computed(() => publicationSiteState.value
+  ? new URL(`${DOCUMENT_SITE_PUBLICATION_ROUTE_PREFIX}/${publicationSiteState.value.id}`, window.location.origin).toString()
+  : '',
+)
+const canOpenPublicationSite = computed(() => Boolean(publicationSiteUrl.value && publicationSiteState.value?.active))
+const publicationSiteActionLabel = computed(() =>
+  publicationSiteState.value && !publicationSiteState.value.active ? '站点已关闭' : '查看站点',
+)
+
+watch(
+  [isPublicationSettingsSurface, () => workspaceStore.currentWorkspace?.id ?? ''],
+  ([isPublicationSurface, workspaceId]) => {
+    if (!isPublicationSurface || !workspaceId) {
+      publicationSiteState.value = null
+      return
+    }
+
+    void loadPublicationSite(workspaceId)
+  },
+  { immediate: true },
+)
+
+onMounted(() => {
+  window.addEventListener(PUBLICATION_SITE_STATE_EVENT, handlePublicationSiteStateChange as EventListener)
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener(PUBLICATION_SITE_STATE_EVENT, handlePublicationSiteStateChange as EventListener)
+})
+
+async function loadPublicationSite(workspaceId: string) {
+  try {
+    const response = await getPublicationSiteManagement(workspaceId)
+    publicationSiteState.value = response.site
+      ? {
+          id: response.site.id,
+          active: response.site.status === DOCUMENT_PUBLICATION_SITE_STATUS.ACTIVE,
+        }
+      : null
+  }
+  catch {
+    publicationSiteState.value = null
+  }
+}
+
+function openPublicationSite() {
+  if (!canOpenPublicationSite.value) {
+    return
+  }
+
+  window.open(publicationSiteUrl.value, '_blank', 'noopener,noreferrer')
+}
+
+function handlePublicationSiteStateChange(event: Event) {
+  const nextState = (event as CustomEvent<typeof publicationSiteState.value>).detail
+  publicationSiteState.value = nextState
+}
 </script>
 
 <template>
@@ -93,6 +163,11 @@ const connectionStatusTitle = computed(() =>
 
     <div v-if="isDocumentSurface" class="docs-view-context__actions flex shrink-0 items-center gap-2">
       <DocumentHeaderActions />
+    </div>
+    <div v-else-if="isPublicationSettingsSurface" class="docs-view-context__actions flex shrink-0 items-center gap-2">
+      <ElButton :disabled="!canOpenPublicationSite" type="primary" @click="openPublicationSite">
+        {{ publicationSiteActionLabel }}
+      </ElButton>
     </div>
   </div>
 </template>

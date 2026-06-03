@@ -222,6 +222,7 @@ async function hydrateSitePublicationBody(
       <PublicationTopNav
         :site="siteRender.site"
         :nav-items="resolvedNavItems"
+        :home="!siteRender.currentPage"
       />
 
       <PublicationSiteDocumentPage
@@ -244,14 +245,33 @@ async function hydrateSitePublicationBody(
 
 <style scoped lang="scss">
 .publication-view {
+  --publication-c-bg: var(--brand-bg-surface);
+  --publication-c-bg-alt: var(--brand-fill-blank);
+  --publication-c-bg-soft: color-mix(in srgb, var(--brand-fill-lighter) 62%, var(--brand-bg-surface));
+  --publication-c-text-1: var(--brand-text-primary);
+  --publication-c-text-2: var(--brand-text-secondary);
+  --publication-c-text-3: var(--brand-text-tertiary);
+  --publication-c-divider: color-mix(in srgb, var(--brand-border-base) 82%, transparent);
+  --publication-c-gutter: color-mix(in srgb, var(--brand-border-base) 68%, transparent);
+  --publication-c-brand-1: var(--brand-primary);
+  --publication-c-brand-2: color-mix(in srgb, var(--brand-primary) 82%, var(--brand-text-primary));
+  --publication-c-brand-soft: color-mix(in srgb, var(--brand-primary) 10%, transparent);
+  --publication-layout-max-width: 90rem;
+  --publication-nav-height: 4rem;
+  --publication-sidebar-width: 17rem;
+  --publication-aside-width: 16rem;
   min-height: 100vh;
-  background: var(--brand-bg-surface);
-  color: var(--brand-text-primary);
+  background: var(--publication-c-bg);
+  color: var(--publication-c-text-1);
 }
 
 .publication-view--site {
-  background:
-    linear-gradient(180deg, color-mix(in srgb, var(--brand-fill-blank) 42%, transparent) 0, transparent 18rem),
-    var(--brand-bg-surface);
+  background: var(--publication-c-bg);
+}
+
+@media (min-width: 960px) {
+  .publication-view--site {
+    padding-top: var(--publication-nav-height);
+  }
 }
 </style>
