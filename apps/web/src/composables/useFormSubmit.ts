@@ -1,6 +1,6 @@
 import type { FormInstance } from 'element-plus'
-import { ElMessage } from 'element-plus'
 import { shallowRef } from 'vue'
+import { ElMessage } from '@/utils/element-plus'
 import { getRequestErrorDisplayMessage } from '@/utils/request-error'
 
 export function useFormSubmit<T = void>(options: {

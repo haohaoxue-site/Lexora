@@ -2,15 +2,14 @@ import type {
   DocumentOperationJob,
   DocumentTreeCollectionId,
   MoveDocumentTreeOperationRequest,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/samepage-contracts/document'
 import {
   DOCUMENT_COLLECTION,
   DOCUMENT_OPERATION_JOB_STATUS,
   DOCUMENT_PANE_STATE,
-} from '@haohaoxue/samepage-contracts'
-import { sleep } from '@haohaoxue/samepage-shared'
+} from '@haohaoxue/samepage-contracts/document/constants'
+import { sleep } from '@haohaoxue/samepage-shared/time'
 import { createSharedComposable } from '@vueuse/core'
-import { ElMessage, ElNotification } from 'element-plus'
 import { shallowRef, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import {
@@ -20,6 +19,7 @@ import {
 } from '@/apis/document'
 import { useUiStore } from '@/stores/ui'
 import { useWorkspaceStore } from '@/stores/workspace'
+import { ElMessage, ElNotification } from '@/utils/element-plus'
 import { useActiveDocument } from './useActiveDocument'
 import { useDocsContext } from './useDocsContext'
 import { useDocsSurfaceState } from './useDocsSurfaceState'

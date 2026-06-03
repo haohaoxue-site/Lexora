@@ -1,7 +1,7 @@
 import type { AppearancePreference, LanguagePreference } from '@haohaoxue/samepage-contracts'
-import { ElMessage } from 'element-plus'
 import { computed, onMounted, shallowRef } from 'vue'
 import { useUserStore } from '@/stores/user'
+import { ElMessage } from '@/utils/element-plus'
 import { getRequestErrorDisplayMessage } from '@/utils/request-error'
 
 export function useSettingsPreferencePage() {

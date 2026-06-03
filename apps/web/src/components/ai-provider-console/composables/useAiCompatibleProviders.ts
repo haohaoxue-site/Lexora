@@ -1,7 +1,6 @@
 import type { MaybeRefOrGetter, Ref, ShallowRef } from 'vue'
 import type { AiProviderConsoleMode, AiProviderFormController, AiProviderRow, CompatibleProviderKey } from '../typing'
 import type { AiProvider, AiProviderPreset } from '@/apis/ai'
-import { ElMessage, ElMessageBox } from 'element-plus'
 import { reactive, shallowRef, toValue } from 'vue'
 import {
   createPlatformAiProvider,
@@ -11,6 +10,7 @@ import {
   updatePlatformAiProvider,
   updateUserAiProvider,
 } from '@/apis/ai'
+import { ElMessage, ElMessageBox } from '@/utils/element-plus'
 import { getRequestErrorDisplayMessage } from '@/utils/request-error'
 import { isCompatibleProviderKey } from '../utils/providerDisplay'
 

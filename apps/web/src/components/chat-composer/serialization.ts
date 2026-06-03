@@ -5,8 +5,8 @@ import type {
 } from './typing'
 import {
   CHAT_MESSAGE_ATTACHMENT_PLACEMENT,
-} from '@haohaoxue/samepage-contracts'
-import { serializeChatMessageContentJSON } from '@haohaoxue/samepage-shared'
+} from '@haohaoxue/samepage-contracts/chat/constants'
+import { serializeChatMessageContentJSON } from '@haohaoxue/samepage-shared/chat'
 
 export function serializeChatComposerContent(contentJSON: ChatComposerContentJSON): ChatComposerSerializedContent {
   return serializeChatMessageContentJSON(contentJSON)

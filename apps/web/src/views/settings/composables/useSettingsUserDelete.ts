@@ -1,16 +1,14 @@
 import type { DeleteCurrentUserRequest } from '@haohaoxue/samepage-contracts'
-import {
-  ACCOUNT_DELETION_CONFIRMATION_PHRASE,
-  PERMISSIONS,
-} from '@haohaoxue/samepage-contracts'
+import { PERMISSIONS } from '@haohaoxue/samepage-contracts/rbac/constants'
+import { ACCOUNT_DELETION_CONFIRMATION_PHRASE } from '@haohaoxue/samepage-contracts/user/constants'
 import { createSharedComposable } from '@vueuse/core'
-import { ElMessage } from 'element-plus'
 import { computed, shallowRef } from 'vue'
 import { useRouter } from 'vue-router'
 import { deleteCurrentUser } from '@/apis/user'
 import { resetAdminRoutes } from '@/router'
 import { useAuthStore } from '@/stores/auth'
 import { useUserStore } from '@/stores/user'
+import { ElMessage } from '@/utils/element-plus'
 import { getRequestErrorDisplayMessage } from '@/utils/request-error'
 import { useSettingsUserAccount } from './useSettingsUserAccount'
 

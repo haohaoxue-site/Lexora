@@ -1,7 +1,7 @@
 import type { ChatSessionSidebarActionCommand } from '../typing'
 import type { ChatSession } from './useChatSessions'
-import { ElMessage, ElMessageBox } from 'element-plus'
 import { computed, shallowRef } from 'vue'
+import { ElMessage, ElMessageBox } from '@/utils/element-plus'
 import { useChatRouteState } from './useChatRouteState'
 import { useChatSessions } from './useChatSessions'
 

@@ -923,7 +923,7 @@ html.dark {
   box-shadow: var(--brand-shadow-hairline);
   overflow-y: auto;
 
-  :deep(.el-textarea__inner) {
+  .el-textarea__inner {
     padding: 0.5rem 0.625rem;
     border-radius: 6px;
     line-height: 1.5;

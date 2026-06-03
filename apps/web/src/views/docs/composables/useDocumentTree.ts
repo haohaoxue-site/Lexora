@@ -1,13 +1,13 @@
 import type { OwnedDocumentCollectionId } from '@haohaoxue/samepage-contracts'
-import { DOCUMENT_COLLECTION, DOCUMENT_DEFAULT_TITLE } from '@haohaoxue/samepage-contracts'
-import { resolveRootDocumentVisibility } from '@haohaoxue/samepage-shared'
+import { DOCUMENT_COLLECTION, DOCUMENT_DEFAULT_TITLE } from '@haohaoxue/samepage-contracts/document/constants'
+import { resolveRootDocumentVisibility } from '@haohaoxue/samepage-shared/document'
 import { createSharedComposable } from '@vueuse/core'
-import { ElMessage } from 'element-plus'
 import { computed, shallowRef } from 'vue'
 import {
   batchDeleteDocuments as batchDeleteDocumentsRequest,
   createDocument as createDocumentRequest,
 } from '@/apis/document'
+import { ElMessage } from '@/utils/element-plus'
 import {
   findDocumentPath,
   isOwnedDocumentCollection,

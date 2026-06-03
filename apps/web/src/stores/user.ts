@@ -7,8 +7,9 @@ import type {
   UserSettings,
 } from '@haohaoxue/samepage-contracts'
 import type { DeepReadonly } from 'vue'
-import { APPEARANCE_PREFERENCE, LANGUAGE_PREFERENCE, ROLES } from '@haohaoxue/samepage-contracts'
-import { resolveAppearancePreference } from '@haohaoxue/samepage-shared'
+import { ROLES } from '@haohaoxue/samepage-contracts/rbac/constants'
+import { APPEARANCE_PREFERENCE, LANGUAGE_PREFERENCE } from '@haohaoxue/samepage-contracts/user/constants'
+import { resolveAppearancePreference } from '@haohaoxue/samepage-shared/user'
 import { usePreferredDark } from '@vueuse/core'
 import { defineStore } from 'pinia'
 import { computed, reactive, readonly, shallowRef, watch } from 'vue'

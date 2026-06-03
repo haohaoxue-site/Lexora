@@ -1,8 +1,7 @@
 import type { ComputedRef, MaybeRefOrGetter } from 'vue'
 import type { AiProviderConsoleMode } from '../typing'
 import type { AiProvider } from '@/apis/ai'
-import { AI_PROVIDER_AUTH_MODE } from '@haohaoxue/samepage-contracts'
-import { ElMessage } from 'element-plus'
+import { AI_PROVIDER_AUTH_MODE } from '@haohaoxue/samepage-contracts/ai/constants'
 import { computed, reactive, shallowRef, toValue } from 'vue'
 import {
   getPlatformAiProviderCredential,
@@ -10,6 +9,7 @@ import {
   updatePlatformAiProvider,
   updateUserAiProvider,
 } from '@/apis/ai'
+import { ElMessage } from '@/utils/element-plus'
 import { getRequestErrorDisplayMessage } from '@/utils/request-error'
 import { isValidProviderEndpointUrl } from '../utils/providerDisplay'
 

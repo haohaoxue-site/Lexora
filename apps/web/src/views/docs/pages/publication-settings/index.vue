@@ -22,9 +22,8 @@ import { Collection, DataAnalysis, Guide, Setting } from '@element-plus/icons-vu
 import {
   DOCUMENT_PUBLICATION_SITE_MEDIA_KIND,
   DOCUMENT_PUBLICATION_SITE_STATUS,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/samepage-contracts/document/publication/constants'
 import { useRouteQuery } from '@vueuse/router'
-import { ElMessage } from 'element-plus'
 import { computed, shallowRef, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
@@ -42,6 +41,7 @@ import {
   updatePublicationSiteSettings,
 } from '@/apis/document-publication'
 import { useWorkspaceStore } from '@/stores/workspace'
+import { ElMessage } from '@/utils/element-plus'
 import PublicationOpenOverviewPanel from '../../components/publication-open-overview-panel'
 import PublicationSiteConfigPanel from '../../components/publication-site-config-panel'
 import PublicationSiteGroupPanel from '../../components/publication-site-group-panel'

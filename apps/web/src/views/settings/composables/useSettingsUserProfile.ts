@@ -1,7 +1,7 @@
 import { createSharedComposable } from '@vueuse/core'
-import { ElMessage } from 'element-plus'
 import { computed, reactive, shallowRef } from 'vue'
 import { useUserStore } from '@/stores/user'
+import { ElMessage } from '@/utils/element-plus'
 import { getRequestErrorDisplayMessage } from '@/utils/request-error'
 
 export const useSettingsUserProfile = createSharedComposable(() => {

@@ -1,11 +1,11 @@
 <script setup lang="ts">
-import type { DocumentPageWidthMode } from '@haohaoxue/samepage-contracts'
+import type { DocumentPageWidthMode } from '@haohaoxue/samepage-contracts/document'
 import type { PageWidthOptionView } from './typing'
 import {
   DOCUMENT_PAGE_WIDTH_MODE,
   DOCUMENT_PAGE_WIDTH_MODE_LABELS,
   DOCUMENT_PAGE_WIDTH_MODE_VALUES,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/samepage-contracts/document/constants'
 import ChatAssistantAvatar from '@/components/chat-message/ChatAssistantAvatar.vue'
 import { useDocumentHeaderActions } from '../../composables/useDocumentHeaderActions'
 

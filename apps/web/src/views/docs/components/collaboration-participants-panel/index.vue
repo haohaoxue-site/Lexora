@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type {
   DocumentCollaborationCollaborator,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/samepage-contracts/document/collaboration'
 import type {
   CollaborationParticipantRow,
   CollaborationParticipantsPanelEmits,
@@ -9,7 +9,7 @@ import type {
 } from './typing'
 import {
   DOCUMENT_COLLABORATION_COLLABORATOR_SOURCE,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/samepage-contracts/document/collaboration/constants'
 import {
   formatCollaborationIdentity,
   formatCollaborationPermission,

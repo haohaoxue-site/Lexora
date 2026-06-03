@@ -1,5 +1,5 @@
 import type { DocumentTreeGroup } from '@haohaoxue/samepage-contracts'
-import { formatDocumentCollectionLabel } from '@haohaoxue/samepage-shared'
+import { formatDocumentCollectionLabel } from '@haohaoxue/samepage-shared/document'
 import { computed } from 'vue'
 import { useDocsSurfaceState } from './useDocsSurfaceState'
 

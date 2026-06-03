@@ -1,5 +1,5 @@
 import type { ChatMessage } from '@/apis/chat'
-import { CHAT_MESSAGE_PART_TYPE, CHAT_MESSAGE_STATUS } from '@haohaoxue/samepage-contracts'
+import { CHAT_MESSAGE_PART_TYPE, CHAT_MESSAGE_STATUS } from '@haohaoxue/samepage-contracts/chat/constants'
 import dayjs from '@/utils/dayjs'
 
 type AssistantChatMessage = Extract<ChatMessage, { role: 'assistant' }>

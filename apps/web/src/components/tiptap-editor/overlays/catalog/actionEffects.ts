@@ -6,7 +6,7 @@ import type {
   TiptapEditorCommentTriggerSource,
 } from '../../core/typing'
 import type { LinkPanelController } from '../shared/useLinkPanel'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage, ElMessageBox } from '@/utils/element-plus'
 import { getRequestErrorDisplayMessage } from '@/utils/request-error'
 import { getCurrentImageAlt, insertEditorContent, updateCurrentImageAlt } from '../../commands/editorActions'
 import { createUploadedFileInsertContent, createUploadedImageInsertContent } from '../../content/documentAsset'

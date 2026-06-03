@@ -1,6 +1,6 @@
 import type { ChatApi } from './createChatApi'
 import type { ChatSessionEvent } from '@/apis/chat'
-import { ElMessage } from 'element-plus'
+import { ElMessage } from '@/utils/element-plus'
 import { getRequestErrorDisplayMessage } from '@/utils/request-error'
 
 export function createChatSessionEvents(api: ChatApi) {

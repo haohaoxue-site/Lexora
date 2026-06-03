@@ -18,7 +18,7 @@ import {
   DOCUMENT_SINGLE_PUBLICATION_SCOPE_LABELS,
   DOCUMENT_SINGLE_PUBLICATION_SCOPE_VALUES,
   DOCUMENT_SINGLE_PUBLICATION_STATE,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/samepage-contracts/document/publication/constants'
 import { computed, shallowRef, watch } from 'vue'
 
 const props = withDefaults(defineProps<PublicationOpenOverviewPanelProps>(), {

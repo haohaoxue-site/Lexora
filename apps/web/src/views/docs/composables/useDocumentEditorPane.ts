@@ -1,5 +1,5 @@
 import type { DocsDocumentEditorPaneProps } from '../typing'
-import { DOCUMENT_PANE_STATE } from '@haohaoxue/samepage-contracts'
+import { DOCUMENT_PANE_STATE } from '@haohaoxue/samepage-contracts/document/constants'
 import { computed, shallowRef, watch } from 'vue'
 
 export function useDocumentEditorPane(options: {

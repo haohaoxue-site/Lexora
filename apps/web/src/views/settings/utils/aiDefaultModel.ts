@@ -1,5 +1,5 @@
 import type { SettingsModelIntentGroup, SettingsModelIntentOption } from '../typing'
-import { AI_MODEL_INTENT_KEY } from '@haohaoxue/samepage-contracts'
+import { AI_MODEL_INTENT_KEY } from '@haohaoxue/samepage-contracts/ai/constants'
 
 const CHAT_ASSISTANT_INTENT_OPTION: SettingsModelIntentOption = {
   key: AI_MODEL_INTENT_KEY.CHAT_ASSISTANT_DEFAULT,

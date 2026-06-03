@@ -1,5 +1,5 @@
 import type { TiptapJsonContent, TiptapJsonNode } from '@haohaoxue/samepage-contracts'
-import { TIPTAP_BODY_BLOCK_ID_ATTRIBUTE } from '@haohaoxue/samepage-contracts'
+import { TIPTAP_BODY_BLOCK_ID_ATTRIBUTE } from '@haohaoxue/samepage-contracts/tiptap/constants'
 
 export function unwrapTiptapContent(content: TiptapJsonNode): TiptapJsonContent {
   if (!Array.isArray(content.content) || !content.content.length) {

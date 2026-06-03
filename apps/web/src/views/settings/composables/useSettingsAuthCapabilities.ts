@@ -1,5 +1,5 @@
 import type { AuthCapabilities } from '@/apis/capabilities'
-import { AUTH_PROVIDER_VALUES } from '@haohaoxue/samepage-contracts'
+import { AUTH_PROVIDER_VALUES } from '@haohaoxue/samepage-contracts/auth/constants'
 import { createSharedComposable } from '@vueuse/core'
 import { shallowRef } from 'vue'
 import { getAuthCapabilities } from '@/apis/capabilities'

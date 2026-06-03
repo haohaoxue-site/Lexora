@@ -3,8 +3,8 @@ import type {
   AiModelIntentKey,
   AiModelRef,
 } from '@/apis/ai'
-import { AI_DEFAULT_MODEL_STATUS } from '@haohaoxue/samepage-contracts'
-import { getAiModelIntentFallbackChain } from '@haohaoxue/samepage-shared'
+import { AI_DEFAULT_MODEL_STATUS } from '@haohaoxue/samepage-contracts/ai/constants'
+import { getAiModelIntentFallbackChain } from '@haohaoxue/samepage-shared/ai'
 
 export interface EffectiveAiDefaultModelPolicy {
   intentKey: AiModelIntentKey

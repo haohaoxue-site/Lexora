@@ -2,7 +2,7 @@ import type { Editor } from '@tiptap/core'
 import type { TiptapEditorUploadedFile, TiptapEditorUploadedImage } from '../content/typing'
 import { Extension } from '@tiptap/core'
 import { Plugin, PluginKey } from '@tiptap/pm/state'
-import { ElMessage } from 'element-plus'
+import { ElMessage } from '@/utils/element-plus'
 import { getRequestErrorDisplayMessage } from '@/utils/request-error'
 import {
   createAnimatedGifPasteFile,

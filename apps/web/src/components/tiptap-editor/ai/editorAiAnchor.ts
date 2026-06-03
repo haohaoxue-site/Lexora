@@ -1,7 +1,8 @@
 import type { AiAnchor } from '@haohaoxue/samepage-contracts'
 import type { Editor } from '@tiptap/core'
 import type { EditorAiAnchorRect, EditorAiPreviewAnchor } from './typing'
-import { AI_ANCHOR_KIND, AI_EDITOR_FIELD, AI_EDITOR_WORKFLOW_KEY, TIPTAP_BODY_BLOCK_ID_ATTRIBUTE } from '@haohaoxue/samepage-contracts'
+import { AI_ANCHOR_KIND, AI_EDITOR_FIELD, AI_EDITOR_WORKFLOW_KEY } from '@haohaoxue/samepage-contracts/ai/constants'
+import { TIPTAP_BODY_BLOCK_ID_ATTRIBUTE } from '@haohaoxue/samepage-contracts/tiptap/constants'
 import { TextSelection } from '@tiptap/pm/state'
 import { getCurrentBlock } from '../commands/currentBlock'
 

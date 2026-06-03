@@ -5,13 +5,14 @@ import vue from '@vitejs/plugin-vue'
 import vueJsx from '@vitejs/plugin-vue-jsx'
 import UnoCSS from 'unocss/vite'
 import AutoImport from 'unplugin-auto-import/vite'
+import ElementPlus from 'unplugin-element-plus/vite'
 import { ElementPlusResolver } from 'unplugin-vue-components/resolvers'
 import Components from 'unplugin-vue-components/vite'
 import { loadEnv } from 'vite'
 import { defineConfig } from 'vitest/config'
 
 const elementPlusResolver = ElementPlusResolver({
-  importStyle: false,
+  importStyle: 'css',
 })
 
 const editorDependencyDedupe = [
@@ -63,27 +64,28 @@ const editorOptimizedDependencies = [
   'element-plus/es',
 ]
 
-function createManualChunk(id: string) {
-  if (id.includes('/element-plus/') || id.includes('/@element-plus/')) {
-    return 'element-plus'
-  }
-
-  if (id.includes('/vue-router/') || id.includes('/pinia/') || id.includes('/vue/')) {
-    return 'vue-core'
-  }
-
-  if (id.includes('/@vueuse/')) {
-    return 'vueuse'
-  }
-
-  if (id.includes('/katex/')) {
-    return 'tiptap-katex'
-  }
-
-  if (id.includes('/highlight.js/') || id.includes('/lowlight/')) {
-    return 'tiptap-highlight'
-  }
-}
+const codeSplittingGroups = [
+  {
+    name: 'vue-core',
+    test: /[/\\](vue|vue-router|pinia)[/\\]/,
+    priority: 40,
+  },
+  {
+    name: 'vueuse',
+    test: /[/\\]@vueuse[/\\]/,
+    priority: 30,
+  },
+  {
+    name: 'tiptap-katex',
+    test: /[/\\]katex[/\\]/,
+    priority: 20,
+  },
+  {
+    name: 'tiptap-highlight',
+    test: /[/\\](highlight\.js|lowlight)[/\\]/,
+    priority: 20,
+  },
+]
 
 export default defineConfig(({ mode }) => {
   loadEnv(mode, process.cwd(), '')
@@ -102,6 +104,7 @@ export default defineConfig(({ mode }) => {
         dts: './components.d.ts',
         resolvers: [elementPlusResolver],
       }),
+      ElementPlus({}),
     ],
     resolve: {
       alias: {
@@ -130,8 +133,13 @@ export default defineConfig(({ mode }) => {
     build: {
       target: 'esnext',
       rolldownOptions: {
+        checks: {
+          invalidAnnotation: false,
+        },
         output: {
-          manualChunks: createManualChunk,
+          codeSplitting: {
+            groups: codeSplittingGroups,
+          },
         },
       },
     },

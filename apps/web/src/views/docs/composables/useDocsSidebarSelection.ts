@@ -1,6 +1,6 @@
 import type { DocumentTreeGroup } from '@haohaoxue/samepage-contracts'
-import { ElMessage, ElMessageBox } from 'element-plus'
 import { computed, shallowRef, watch } from 'vue'
+import { ElMessage, ElMessageBox } from '@/utils/element-plus'
 import { collectDocumentItemIds } from '../utils/documentTree'
 import { useDocsContext } from './useDocsContext'
 import { useDocumentTree } from './useDocumentTree'

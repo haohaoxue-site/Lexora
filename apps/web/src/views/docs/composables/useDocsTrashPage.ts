@@ -1,5 +1,4 @@
 import type { DocumentTrashItem } from '@haohaoxue/samepage-contracts'
-import { ElMessage, ElMessageBox } from 'element-plus'
 import { computed, shallowRef, watch } from 'vue'
 import {
   getTrashDocuments,
@@ -7,6 +6,7 @@ import {
   restoreDocumentFromTrash,
 } from '@/apis/document'
 import { useWorkspaceStore } from '@/stores/workspace'
+import { ElMessage, ElMessageBox } from '@/utils/element-plus'
 import { getRequestErrorDisplayMessage } from '@/utils/request-error'
 
 export function useDocsTrashPage() {

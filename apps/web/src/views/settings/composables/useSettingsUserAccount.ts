@@ -1,16 +1,17 @@
-import type { AuthProviderName, UserSettings } from '@haohaoxue/samepage-contracts'
+import type { AuthProviderName } from '@haohaoxue/samepage-contracts/auth'
+import type { UserSettings } from '@haohaoxue/samepage-contracts/user'
 import {
   AUTH_PROVIDER_VALUES,
   OAUTH_REDIRECT_BIND_STATUS,
   OAUTH_REDIRECT_QUERY,
-} from '@haohaoxue/samepage-contracts'
-import { formatAuthMethod, normalizeAuthProviderName } from '@haohaoxue/samepage-shared'
+} from '@haohaoxue/samepage-contracts/auth/constants'
+import { formatAuthMethod, normalizeAuthProviderName } from '@haohaoxue/samepage-shared/auth'
 import { createSharedComposable } from '@vueuse/core'
-import { ElMessage } from 'element-plus'
 import { computed, reactive, shallowRef } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { requestBindEmailCode, startOauthBinding } from '@/apis/user'
 import { useUserStore } from '@/stores/user'
+import { ElMessage } from '@/utils/element-plus'
 import { resolveOAuthRedirectErrorMessage } from '@/utils/oauth-redirect'
 import { getRequestErrorDisplayMessage } from '@/utils/request-error'
 import { useSettingsAuthCapabilities } from './useSettingsAuthCapabilities'

@@ -1,15 +1,11 @@
 import { z } from 'zod'
+import { TIPTAP_DOCUMENT_COLLABORATION_FIELD_VALUES } from './constants'
 import { TiptapJsonContentPayloadSchema } from './core'
 
-export const TIPTAP_DOCUMENT_COLLABORATION_FIELD = {
-  TITLE: 'title',
-  BODY: 'body',
-} as const
-
-export const TIPTAP_DOCUMENT_COLLABORATION_FIELD_VALUES = [
-  TIPTAP_DOCUMENT_COLLABORATION_FIELD.TITLE,
-  TIPTAP_DOCUMENT_COLLABORATION_FIELD.BODY,
-] as const
+export {
+  TIPTAP_DOCUMENT_COLLABORATION_FIELD,
+  TIPTAP_DOCUMENT_COLLABORATION_FIELD_VALUES,
+} from './constants'
 
 export const TiptapDocumentCollaborationFieldSchema = z.enum(TIPTAP_DOCUMENT_COLLABORATION_FIELD_VALUES)
 

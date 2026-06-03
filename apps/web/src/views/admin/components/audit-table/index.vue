@@ -8,7 +8,7 @@ import type {
 import {
   SYSTEM_ADMIN_AUDIT_TARGET_TYPE_LABELS,
   SYSTEM_ADMIN_AUDIT_TARGET_TYPE_VALUES,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/samepage-contracts/system-admin'
 import { computed } from 'vue'
 import { formatDateTime } from '@/utils/dayjs'
 

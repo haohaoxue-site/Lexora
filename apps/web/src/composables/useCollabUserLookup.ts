@@ -1,5 +1,5 @@
 import type { UserCollabIdentity } from '@haohaoxue/samepage-contracts'
-import { isExactUserCodeQuery, normalizeUserCodeQuery } from '@haohaoxue/samepage-shared'
+import { isExactUserCodeQuery, normalizeUserCodeQuery } from '@haohaoxue/samepage-shared/user'
 import { shallowRef } from 'vue'
 import { findUserByCode } from '@/apis/user'
 import { useUserStore } from '@/stores/user'

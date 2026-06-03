@@ -4,7 +4,7 @@ import {
   CHAT_MESSAGE_PART_TYPE,
   CHAT_MESSAGE_STATUS,
   CHAT_SESSION_EVENT_TYPE,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/samepage-contracts/chat/constants'
 import dayjs from '@/utils/dayjs'
 
 type ChatMessagePart = ChatMessage['parts'][number]

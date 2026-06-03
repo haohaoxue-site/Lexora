@@ -15,14 +15,14 @@ import {
   DOCUMENT_SINGLE_PUBLICATION_SCOPE_LABELS,
   DOCUMENT_SINGLE_PUBLICATION_SCOPE_VALUES,
   DOCUMENT_SINGLE_PUBLICATION_STATE,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/samepage-contracts/document/publication/constants'
 import { useClipboard } from '@vueuse/core'
-import { ElMessage } from 'element-plus'
 import { computed, shallowRef, watch } from 'vue'
 import {
   getDocumentSinglePublication,
   updateDocumentSinglePublication,
 } from '@/apis/document-publication'
+import { ElMessage } from '@/utils/element-plus'
 
 const props = withDefaults(defineProps<DocumentPublicationDialogProps>(), {
   documentId: '',

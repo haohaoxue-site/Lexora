@@ -3,15 +3,17 @@ import type {
   PublicationNavItem,
   PublicationSidebarGroup,
   PublicationSidebarPage,
+} from '@haohaoxue/samepage-contracts/document/publication'
+import type {
   TiptapJsonContent,
   TiptapJsonNode,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/samepage-contracts/tiptap'
 import {
   DOCUMENT_PUBLICATION_NAV_ITEM_EXTERNAL_TARGET,
   DOCUMENT_PUBLICATION_NAV_ITEM_INTERNAL_TARGET,
   DOCUMENT_PUBLICATION_NAV_ITEM_TYPE,
-} from '@haohaoxue/samepage-contracts'
-import { isExternalPublicationHref, normalizePublicationHref } from '@haohaoxue/samepage-shared'
+} from '@haohaoxue/samepage-contracts/document/publication/constants'
+import { isExternalPublicationHref, normalizePublicationHref } from '@haohaoxue/samepage-shared/document'
 
 export const PUBLICATION_UNPUBLISHED_MESSAGE = '此页面未发布'
 export const PUBLICATION_DISABLED_LINK_CLASS = 'publication-link-disabled'

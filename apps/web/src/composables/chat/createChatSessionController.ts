@@ -1,8 +1,8 @@
 import type { ChatApi } from './createChatApi'
 import type { ChatSessionSummaryPatch } from './utils/chat-session-summary'
 import type { ChatSessionDetail, ChatSessionSummary } from '@/apis/chat'
-import { ElMessage } from 'element-plus'
 import { shallowReactive, shallowRef, toRef } from 'vue'
+import { ElMessage } from '@/utils/element-plus'
 import { getRequestErrorDisplayMessage } from '@/utils/request-error'
 import {
   acceptChatSessionSnapshot,

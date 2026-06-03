@@ -6,6 +6,7 @@ import { createPinia } from 'pinia'
 import piniaPluginPersistedstate from 'pinia-plugin-persistedstate'
 import { createApp } from 'vue'
 import { useUserStore } from '@/stores/user'
+import 'element-plus/es/components/loading/style/css'
 
 export default function setupCreateApp(component: Component) {
   const app = createApp(component)

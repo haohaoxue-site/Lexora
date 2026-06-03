@@ -4,12 +4,12 @@ import type {
   DocumentTreeCollectionId,
   DocumentTreeGroup,
   OwnedDocumentCollectionId,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/samepage-contracts/document'
 import type { MoveTreeNode, SelectedMoveTarget } from './typing'
 import {
   DOCUMENT_COLLECTION,
   DOCUMENT_COLLECTION_LABELS,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/samepage-contracts/document/constants'
 import { computed, shallowRef, watch } from 'vue'
 import { getDocuments } from '@/apis/document'
 import { useWorkspaceStore } from '@/stores/workspace'

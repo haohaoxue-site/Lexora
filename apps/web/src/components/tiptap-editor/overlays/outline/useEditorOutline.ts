@@ -7,7 +7,7 @@ import {
   buildDocumentBlockIndex,
   buildDocumentOutline,
   searchDocumentBlocks,
-} from '@haohaoxue/samepage-shared'
+} from '@haohaoxue/samepage-shared/document'
 import {
   computed,
   shallowRef,

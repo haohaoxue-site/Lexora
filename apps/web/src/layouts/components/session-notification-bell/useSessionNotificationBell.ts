@@ -3,7 +3,6 @@ import type {
   NotificationSummary,
 } from '@/apis/notification'
 import dayjs from 'dayjs'
-import { ElMessage } from 'element-plus'
 import {
   computed,
   onMounted,
@@ -17,6 +16,7 @@ import {
 } from '@/apis/document-collaboration'
 import { getNotificationSummary } from '@/apis/notification'
 import { useWorkspaceStore } from '@/stores/workspace'
+import { ElMessage } from '@/utils/element-plus'
 import { getRequestErrorDisplayMessage } from '@/utils/request-error'
 import { useDocumentTree } from '@/views/docs/composables/useDocumentTree'
 

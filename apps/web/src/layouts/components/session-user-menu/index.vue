@@ -2,7 +2,7 @@
 import {
   DOCUMENT_COLLABORATION_PERMISSION_LABELS,
   DOCUMENT_COLLABORATION_SCOPE_LABELS,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/samepage-contracts/document/collaboration/constants'
 import CopyStateIcon from '@/components/copy-state-icon/CopyStateIcon.vue'
 import EntityAvatar from '@/components/entity-avatar'
 import SessionAppearancePanel from './appearance-panel'

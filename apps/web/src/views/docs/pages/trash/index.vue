@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { CSSProperties } from 'vue'
-import { formatDocumentLocation } from '@haohaoxue/samepage-shared'
+import { formatDocumentLocation } from '@haohaoxue/samepage-shared/document'
 import { computed } from 'vue'
 import { formatDateTime } from '@/utils/dayjs'
 import { useDocsTrashPage } from '../../composables/useDocsTrashPage'

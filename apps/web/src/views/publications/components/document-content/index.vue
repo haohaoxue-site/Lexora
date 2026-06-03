@@ -2,11 +2,11 @@
 import type { TiptapJsonContent } from '@haohaoxue/samepage-contracts'
 import type { PublicationDocumentContentProps } from './typing'
 import type { DocumentBodyEditorOutlineOptions } from '@/components/tiptap-editor'
-import { collectDocumentAssetIds, hasDocumentContent } from '@haohaoxue/samepage-shared'
-import { ElMessage } from 'element-plus'
+import { collectDocumentAssetIds, hasDocumentContent } from '@haohaoxue/samepage-shared/document'
 import { computed } from 'vue'
 import { DocumentBodyEditor } from '@/components/tiptap-editor'
 import dayjs from '@/utils/dayjs'
+import { ElMessage } from '@/utils/element-plus'
 import {
   PUBLICATION_DISABLED_LINK_CLASS,
   PUBLICATION_UNPUBLISHED_MESSAGE,

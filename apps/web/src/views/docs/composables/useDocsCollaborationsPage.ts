@@ -2,13 +2,12 @@ import type {
   DocumentCollaborationConsoleTreeItem,
   DocumentCollaborationPermission,
   DocumentCollaborationScope,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/samepage-contracts/document/collaboration'
 import {
   DOCUMENT_COLLABORATION_PERMISSION,
   DOCUMENT_COLLABORATION_SCOPE,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/samepage-contracts/document/collaboration/constants'
 import { useClipboard } from '@vueuse/core'
-import { ElMessage } from 'element-plus'
 import { computed, shallowRef, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import {
@@ -17,6 +16,7 @@ import {
   upsertDocumentCollaborationLink,
 } from '@/apis/document-collaboration'
 import { useWorkspaceStore } from '@/stores/workspace'
+import { ElMessage } from '@/utils/element-plus'
 import { getRequestErrorDisplayMessage } from '@/utils/request-error'
 import { useDocsCollaborationDialog } from './useDocsCollaborationDialog'
 

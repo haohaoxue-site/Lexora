@@ -4,7 +4,7 @@ import type {
   WorkspaceType,
 } from '@haohaoxue/samepage-contracts'
 import type { DeepReadonly } from 'vue'
-import { WORKSPACE_TYPE } from '@haohaoxue/samepage-contracts'
+import { WORKSPACE_TYPE } from '@haohaoxue/samepage-contracts/workspace/constants'
 import { defineStore } from 'pinia'
 import { computed, shallowRef } from 'vue'
 import { getPersonalWorkspace } from '@/apis/workspace'

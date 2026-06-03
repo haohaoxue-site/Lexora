@@ -14,7 +14,9 @@ import type {
   SwitchChatActiveMessageRequest,
   UpdateChatSessionTitleRequest,
 } from './typing'
-import { CHAT_SESSION_ORIGIN, ChatSessionEventSchema, SERVER_PATH } from '@haohaoxue/samepage-contracts'
+import { ChatSessionEventSchema } from '@haohaoxue/samepage-contracts/chat'
+import { CHAT_SESSION_ORIGIN } from '@haohaoxue/samepage-contracts/chat/constants'
+import { SERVER_PATH } from '@haohaoxue/samepage-contracts/server'
 import { useAuthStore } from '@/stores/auth'
 import { axios } from '@/utils/axios'
 import { createRequestError, createRequestErrorFromHttpResponse, toRequestError } from '@/utils/request-error'

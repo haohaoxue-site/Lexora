@@ -1,4 +1,4 @@
-import { OAUTH_REDIRECT_ERROR_CODE } from '@haohaoxue/samepage-contracts'
+import { OAUTH_REDIRECT_ERROR_CODE } from '@haohaoxue/samepage-contracts/auth/constants'
 
 interface ResolveOAuthRedirectErrorMessageOptions {
   purpose: 'login' | 'bind'

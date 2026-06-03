@@ -6,9 +6,9 @@ import type {
   ChatComposerModelRef,
   ChatComposerSubmitPayload,
 } from '@/components/chat-composer/typing'
-import { ElMessage } from 'element-plus'
 import { shallowRef } from 'vue'
 import { createEmptyChatComposerContentJSON } from '@/components/chat-composer/serialization'
+import { ElMessage } from '@/utils/element-plus'
 
 const HIGHLIGHT_DURATION_MS = 1400
 

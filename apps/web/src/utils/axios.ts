@@ -1,5 +1,6 @@
 import type { RequestResponse } from '@haohaoxue/samepage-contracts'
-import { AUTH_ERROR_CODE, SERVER_PATH } from '@haohaoxue/samepage-contracts'
+import { SERVER_PATH } from '@haohaoxue/samepage-contracts/server'
+import { AUTH_ERROR_CODE } from '@haohaoxue/samepage-contracts/status-code'
 import rawAxios, { AxiosHeaders } from 'axios'
 import { useAuthStore } from '@/stores/auth'
 import { createRequestErrorFromResponseEnvelope, toRequestError } from '@/utils/request-error'

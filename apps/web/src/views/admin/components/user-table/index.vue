@@ -9,9 +9,9 @@ import type {
 import {
   SYSTEM_ADMIN_USER_ROLE_FILTER,
   SYSTEM_ADMIN_USER_ROLE_FILTER_LABELS,
-  USER_STATUS,
-} from '@haohaoxue/samepage-contracts'
-import { formatAuthMethod } from '@haohaoxue/samepage-shared'
+} from '@haohaoxue/samepage-contracts/system-admin'
+import { USER_STATUS } from '@haohaoxue/samepage-contracts/user/constants'
+import { formatAuthMethod } from '@haohaoxue/samepage-shared/auth'
 import { computed } from 'vue'
 import { formatDateTime } from '@/utils/dayjs'
 import { useAdminUsers } from '../../composables/useAdminUsers'

@@ -2,7 +2,7 @@ import type { AuthProviderName } from '@haohaoxue/samepage-contracts'
 import type { FormInstance } from 'element-plus'
 import type { Ref } from 'vue'
 import type { UserAccountSectionProps } from '../typing'
-import { AUTH_PROVIDER_VALUES } from '@haohaoxue/samepage-contracts'
+import { AUTH_PROVIDER_VALUES } from '@haohaoxue/samepage-contracts/auth/constants'
 import { computed, reactive } from 'vue'
 import { AUTH_PROVIDER_UI_META } from '@/views/auth/utils/provider-ui'
 import {

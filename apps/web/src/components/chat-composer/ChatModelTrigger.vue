@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { ChatComposerModelRef } from './typing'
-import { AI_MODEL_INTENT_KEY } from '@haohaoxue/samepage-contracts'
+import { AI_MODEL_INTENT_KEY } from '@haohaoxue/samepage-contracts/ai/constants'
 import ModelCascader from '@/components/model-cascader'
 
 const props = defineProps<{

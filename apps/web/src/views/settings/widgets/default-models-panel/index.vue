@@ -1,8 +1,7 @@
 <script setup lang="ts">
 import type { SettingsModelIntentGroup, SettingsModelIntentOption } from '../../typing'
 import type { AiDefaultModelPolicyItem, AiModelIntentKey, AiModelRef } from '@/apis/ai'
-import { AI_DEFAULT_MODEL_STATUS } from '@haohaoxue/samepage-contracts'
-import { ElMessage } from 'element-plus'
+import { AI_DEFAULT_MODEL_STATUS } from '@haohaoxue/samepage-contracts/ai/constants'
 import { computed, onMounted, reactive, shallowRef } from 'vue'
 import {
   getAiDefaultModels,
@@ -13,6 +12,7 @@ import {
   buildAiDefaultModelPolicyRecord,
   resolveEffectiveAiDefaultModelPolicy,
 } from '@/utils/ai-default-model'
+import { ElMessage } from '@/utils/element-plus'
 import { getRequestErrorDisplayMessage } from '@/utils/request-error'
 import { AI_MODEL_INTENT_GROUPS } from '../../utils/aiDefaultModel'
 

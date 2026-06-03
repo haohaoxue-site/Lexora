@@ -7,7 +7,8 @@
     "module": "ESNext",
     "moduleResolution": "bundler",
     "paths": {
-      "@haohaoxue/samepage-contracts": ["../contracts/src/index.ts"]
+      "@haohaoxue/samepage-contracts": ["../contracts/src/index.ts"],
+      "@haohaoxue/samepage-contracts/*": ["../contracts/src/*"]
     },
     "resolveJsonModule": true,
     "types": ["node"],

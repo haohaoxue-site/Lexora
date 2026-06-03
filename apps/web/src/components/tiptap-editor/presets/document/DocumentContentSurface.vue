@@ -3,7 +3,7 @@ import type {
   DocumentContentSurfaceEmits,
   DocumentContentSurfaceProps,
 } from './typing'
-import { DOCUMENT_PAGE_WIDTH_MODE } from '@haohaoxue/samepage-contracts'
+import { DOCUMENT_PAGE_WIDTH_MODE } from '@haohaoxue/samepage-contracts/document/constants'
 import { computed } from 'vue'
 import DocumentBodyEditor from '../body/DocumentBodyEditor.vue'
 import DocumentTitleEditor from '../title/DocumentTitleEditor.vue'

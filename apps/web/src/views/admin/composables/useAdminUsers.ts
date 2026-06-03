@@ -5,15 +5,15 @@ import type {
   SystemAdminUserRoleFilter,
   SystemAdminUserStatus,
 } from '@/apis/system-admin'
-import { USER_STATUS } from '@haohaoxue/samepage-contracts'
+import { USER_STATUS } from '@haohaoxue/samepage-contracts/user/constants'
 import { createSharedComposable } from '@vueuse/core'
-import { ElMessage } from 'element-plus'
 import { reactive, shallowRef } from 'vue'
 import {
   getSystemAdminUserDetail,
   getSystemAdminUsers,
   updateSystemAdminUserStatus,
 } from '@/apis/system-admin'
+import { ElMessage } from '@/utils/element-plus'
 import { getRequestErrorDisplayMessage } from '@/utils/request-error'
 
 export const useAdminUsers = createSharedComposable(() => {

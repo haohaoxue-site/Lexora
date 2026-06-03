@@ -1,5 +1,7 @@
 import type { AiEditorStreamEvent, CreateAiEditorSessionRequest } from '@/apis/ai'
-import { AI_EDITOR_STREAM_EVENT_TYPE, AiEditorStreamEventSchema, STREAM_DONE_PAYLOAD } from '@haohaoxue/samepage-contracts'
+import { AiEditorStreamEventSchema } from '@haohaoxue/samepage-contracts/ai'
+import { AI_EDITOR_STREAM_EVENT_TYPE } from '@haohaoxue/samepage-contracts/ai/constants'
+import { STREAM_DONE_PAYLOAD } from '@haohaoxue/samepage-contracts/stream'
 import { createAiEditorSession } from '@/apis/ai'
 import { createRequestError, createRequestErrorFromHttpResponse, toRequestError } from '@/utils/request-error'
 import { EDITOR_AI_STREAM_ERROR_MESSAGE } from './constants'

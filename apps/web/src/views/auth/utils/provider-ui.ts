@@ -1,5 +1,5 @@
 import type { AuthProviderName } from '@haohaoxue/samepage-contracts'
-import { AUTH_PROVIDER } from '@haohaoxue/samepage-contracts'
+import { AUTH_PROVIDER } from '@haohaoxue/samepage-contracts/auth/constants'
 
 /**
  * 认证平台展示信息。

@@ -7,14 +7,14 @@ import type { ComputedRef, ShallowRef } from 'vue'
 import type { DocumentDeleteAction } from '../typing'
 import type { DocumentDeletePlan } from '../utils/documentTree'
 import type { NavigateToDocumentOptions } from './useDocsContext'
-import { getDocumentTitlePlainText } from '@haohaoxue/samepage-shared'
-import { ElMessage } from 'element-plus'
+import { getDocumentTitlePlainText } from '@haohaoxue/samepage-shared/document'
 import { computed, shallowRef } from 'vue'
 import {
   deleteDocument as deleteDocumentRequest,
   patchDocumentTitle as patchDocumentTitleRequest,
   permanentlyDeleteDocument as permanentlyDeleteDocumentRequest,
 } from '@/apis/document'
+import { ElMessage } from '@/utils/element-plus'
 import {
   collectDocumentItemIds,
   findDocumentPath,

@@ -9,9 +9,9 @@ import type {
   CreateChatSessionMessageRequest,
   EditAndSendChatMessageRequest,
 } from '@/apis/chat'
-import { CHAT_SESSION_EVENT_TYPE } from '@haohaoxue/samepage-contracts'
-import { ElMessage } from 'element-plus'
+import { CHAT_SESSION_EVENT_TYPE } from '@haohaoxue/samepage-contracts/chat/constants'
 import { watch } from 'vue'
+import { ElMessage } from '@/utils/element-plus'
 import { getRequestErrorDisplayMessage } from '@/utils/request-error'
 
 export interface ChatStreamControllerOptions {

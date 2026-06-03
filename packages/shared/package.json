@@ -5,6 +5,18 @@
   "private": true,
   "exports": {
     ".": "./src/index.ts",
+    "./agent": "./src/agent.ts",
+    "./ai": "./src/ai.ts",
+    "./auth": "./src/auth.ts",
+    "./chat": "./src/chat/index.ts",
+    "./collab": "./src/collab/index.ts",
+    "./document": "./src/document/index.ts",
+    "./file": "./src/file.ts",
+    "./system-email": "./src/system-email.ts",
+    "./time": "./src/time.ts",
+    "./tiptap": "./src/tiptap/index.ts",
+    "./user": "./src/user.ts",
+    "./ydoc": "./src/ydoc/index.ts",
     "./zod": "./src/zod.ts"
   },
   "scripts": {

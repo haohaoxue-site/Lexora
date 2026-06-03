@@ -9,8 +9,7 @@ import {
   SYSTEM_EMAIL_PROVIDER,
   SYSTEM_EMAIL_PROVIDER_DEFAULTS,
   SYSTEM_EMAIL_PROVIDER_LABELS,
-} from '@haohaoxue/samepage-contracts'
-import { ElMessage } from 'element-plus'
+} from '@haohaoxue/samepage-contracts/system-admin'
 import { computed, onMounted, reactive, shallowRef } from 'vue'
 import {
   getSystemEmailConfig,
@@ -20,6 +19,7 @@ import {
   updateSystemEmailServiceStatus,
 } from '@/apis/system-admin'
 import { useUserStore } from '@/stores/user'
+import { ElMessage } from '@/utils/element-plus'
 import { getRequestErrorDisplayMessage } from '@/utils/request-error'
 import { createEmailRules } from '@/views/auth/utils/rules'
 

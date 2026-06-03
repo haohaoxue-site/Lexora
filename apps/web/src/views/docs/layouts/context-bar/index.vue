@@ -2,7 +2,7 @@
 import {
   DOCUMENT_PUBLICATION_SITE_STATUS,
   DOCUMENT_SITE_PUBLICATION_ROUTE_PREFIX,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/samepage-contracts/document/publication/constants'
 import { computed, onBeforeUnmount, onMounted, shallowRef, watch } from 'vue'
 import { getPublicationSiteManagement } from '@/apis/document-publication'
 import { useWorkspaceStore } from '@/stores/workspace'

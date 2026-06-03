@@ -4,7 +4,7 @@ import type {
 } from '@haohaoxue/samepage-contracts'
 import type { ComputedRef } from 'vue'
 import type { DocumentDeletePlan } from '../utils/documentTree'
-import { formatDocumentCollectionLabel } from '@haohaoxue/samepage-shared'
+import { formatDocumentCollectionLabel } from '@haohaoxue/samepage-shared/document'
 import { computed, shallowRef } from 'vue'
 import { getDocuments } from '@/apis/document'
 import { useUiStore } from '@/stores/ui'

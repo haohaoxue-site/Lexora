@@ -4,14 +4,14 @@ import type {
   DocumentCollaborationLinkInviteState,
   DocumentCollaborationPermission,
   DocumentCollaborationScope,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/samepage-contracts/document/collaboration'
 import type { CSSProperties } from 'vue'
 import {
   DOCUMENT_COLLABORATION_LINK_INVITE_STATE,
   DOCUMENT_COLLABORATION_LINK_INVITE_STATE_LABELS,
   DOCUMENT_COLLABORATION_PERMISSION_LABELS,
   DOCUMENT_COLLABORATION_SCOPE_LABELS,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/samepage-contracts/document/collaboration/constants'
 import { computed } from 'vue'
 import { formatDateTime } from '@/utils/dayjs'
 import { useDocsCollaborationsPage } from '../../composables/useDocsCollaborationsPage'

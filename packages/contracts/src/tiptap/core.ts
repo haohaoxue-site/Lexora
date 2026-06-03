@@ -1,7 +1,8 @@
 import type { TiptapJsonMarkPayload, TiptapJsonNodePayload } from './_typing'
 import { z } from 'zod'
+import { TIPTAP_SCHEMA_VERSION } from './constants'
 
-export const TIPTAP_SCHEMA_VERSION = 1 as const
+export { TIPTAP_SCHEMA_VERSION } from './constants'
 
 const TiptapJsonMarkPayloadSchema = z.object({
   type: z.string(),

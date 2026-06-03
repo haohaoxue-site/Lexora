@@ -8,8 +8,8 @@ import type {
 import {
   CHAT_MESSAGE_ATTACHMENT_PLACEMENT,
   CHAT_MESSAGE_ATTACHMENT_TYPE,
-} from '@haohaoxue/samepage-contracts'
-import { getDocumentTitlePlainText } from '@haohaoxue/samepage-shared'
+} from '@haohaoxue/samepage-contracts/chat/constants'
+import { getDocumentTitlePlainText } from '@haohaoxue/samepage-shared/document'
 import { TextSelection } from '@tiptap/pm/state'
 import { nanoid } from 'nanoid'
 import {

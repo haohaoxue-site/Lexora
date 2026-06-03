@@ -3,7 +3,7 @@ import type {
   TiptapJsonContent,
   TiptapJsonNode,
 } from '@haohaoxue/samepage-contracts'
-import { TIPTAP_DOCUMENT_COLLABORATION_FIELD } from '@haohaoxue/samepage-contracts'
+import { TIPTAP_DOCUMENT_COLLABORATION_FIELD } from '@haohaoxue/samepage-contracts/tiptap/constants'
 import { getSchema } from '@tiptap/core'
 import { prosemirrorJSONToYXmlFragment, yXmlFragmentToProsemirrorJSON } from '@tiptap/y-tiptap'
 import * as Y from 'yjs'

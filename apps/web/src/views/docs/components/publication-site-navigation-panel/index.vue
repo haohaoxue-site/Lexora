@@ -23,10 +23,10 @@ import {
   DOCUMENT_PUBLICATION_NAV_ITEM_EXTERNAL_TARGET,
   DOCUMENT_PUBLICATION_NAV_ITEM_INTERNAL_TARGET,
   DOCUMENT_PUBLICATION_NAV_ITEM_TYPE,
-} from '@haohaoxue/samepage-contracts'
-import { normalizePublicationHref } from '@haohaoxue/samepage-shared'
-import { ElMessage } from 'element-plus'
+} from '@haohaoxue/samepage-contracts/document/publication/constants'
+import { normalizePublicationHref } from '@haohaoxue/samepage-shared/document'
 import { computed, shallowRef, watch } from 'vue'
+import { ElMessage } from '@/utils/element-plus'
 
 const props = withDefaults(defineProps<PublicationSiteNavigationPanelProps>(), {
   saving: false,

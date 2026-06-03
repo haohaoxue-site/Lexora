@@ -1,5 +1,5 @@
 import type { Editor, JSONContent } from '@tiptap/core'
-import { TiptapJsonContentPayloadSchema } from '@haohaoxue/samepage-contracts'
+import { TiptapJsonContentPayloadSchema } from '@haohaoxue/samepage-contracts/tiptap/core'
 import { DOMSerializer, Fragment } from '@tiptap/pm/model'
 import { getCurrentBlock } from '../commands/currentBlock'
 

@@ -6,7 +6,7 @@ import type {
   DocumentSectionPanelProps,
   DocumentSectionPanelSlots,
 } from './typing'
-import { DOCUMENT_COLLECTION } from '@haohaoxue/samepage-contracts'
+import { DOCUMENT_COLLECTION } from '@haohaoxue/samepage-contracts/document/constants'
 import { useElementSize } from '@vueuse/core'
 import { computed, nextTick, shallowRef, useTemplateRef, watch } from 'vue'
 import { useDocsContext } from '../../composables/useDocsContext'

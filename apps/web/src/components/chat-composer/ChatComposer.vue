@@ -7,7 +7,10 @@ import type {
   ChatComposerSubmitPayload,
 } from './typing'
 import type { ReadableDocumentSearchResult } from '@/apis/document'
-import { CHAT_MESSAGE_ATTACHMENT_PLACEMENT, CHAT_MESSAGE_ATTACHMENT_TYPE } from '@haohaoxue/samepage-contracts'
+import {
+  CHAT_MESSAGE_ATTACHMENT_PLACEMENT,
+  CHAT_MESSAGE_ATTACHMENT_TYPE,
+} from '@haohaoxue/samepage-contracts/chat/constants'
 import Placeholder from '@tiptap/extension-placeholder'
 import StarterKit from '@tiptap/starter-kit'
 import { EditorContent, useEditor } from '@tiptap/vue-3'

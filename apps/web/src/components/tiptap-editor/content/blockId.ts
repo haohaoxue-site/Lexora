@@ -2,7 +2,7 @@ import {
   TIPTAP_BODY_BLOCK_ID_ATTRIBUTE,
   TIPTAP_BODY_BLOCK_ID_NODE_TYPES,
   TIPTAP_BODY_BLOCK_ID_PREFIX,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/samepage-contracts/tiptap/document-body'
 import { customAlphabet } from 'nanoid'
 import { TIPTAP_NESTED_PARAGRAPH_PARENT_NODE_NAMES } from './blockTaxonomy'
 

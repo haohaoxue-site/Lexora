@@ -3,12 +3,12 @@ import type { CodeBlockLanguage } from './languages'
 import {
   TIPTAP_CODE_BLOCK_DEFAULT_TAB_SIZE,
   TIPTAP_CODE_BLOCK_TAB_SIZES,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/samepage-contracts/tiptap/document-body'
 import { NodeViewContent, nodeViewProps, NodeViewWrapper } from '@tiptap/vue-3'
 import { useClipboard } from '@vueuse/core'
-import { ElMessage } from 'element-plus'
 import { computed, nextTick, shallowRef, useTemplateRef, watch } from 'vue'
 import CopyStateIcon from '@/components/copy-state-icon/CopyStateIcon.vue'
+import { ElMessage } from '@/utils/element-plus'
 import TiptapIcon from '../../icons/TiptapIcon.vue'
 import {
   CODE_BLOCK_LANGUAGES,

@@ -12,13 +12,13 @@ import {
   DOCUMENT_COLLABORATION_PERMISSION_LABELS,
   DOCUMENT_COLLABORATION_RESOLVER_STATUS,
   DOCUMENT_COLLABORATION_SCOPE_LABELS,
-} from '@haohaoxue/samepage-contracts'
-import { ElMessage } from 'element-plus'
+} from '@haohaoxue/samepage-contracts/document/collaboration/constants'
 import { computed, reactive, shallowRef, useTemplateRef, watch } from 'vue'
 import {
   confirmDocumentCollaborationEntry,
   resolveDocumentCollaborationEntry,
 } from '@/apis/document-collaboration'
+import { ElMessage } from '@/utils/element-plus'
 import { getRequestErrorDisplayMessage } from '@/utils/request-error'
 import CollaborationPasswordForm from '../../components/password-form'
 import { useCollaborationResolverNavigation } from '../../composables/useCollaborationResolverNavigation'

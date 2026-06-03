@@ -3,9 +3,8 @@ import type { SessionContextSwitchAction, SessionMenuUser } from './typing'
 import {
   APPEARANCE_PREFERENCE_LABELS,
   APPEARANCE_PREFERENCE_VALUES,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/samepage-contracts/user/constants'
 import { useClipboard } from '@vueuse/core'
-import { ElMessage } from 'element-plus'
 import { computed, shallowRef, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { SvgIconCategory } from '@/components/svg-icon/typing'
@@ -14,6 +13,7 @@ import { useAuthSession } from '@/layouts/composables/useAuthSession'
 import { getWorkspaceEntryPath } from '@/layouts/utils/workspace-entry'
 import { ADMIN_ROUTE_NAME } from '@/router/constants'
 import { useUserStore } from '@/stores/user'
+import { ElMessage } from '@/utils/element-plus'
 import { getRequestErrorDisplayMessage } from '@/utils/request-error'
 
 /**

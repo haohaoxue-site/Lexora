@@ -3,15 +3,15 @@ import type {
   SystemAuthGovernance,
   UpdateSystemAuthGovernanceRequest,
 } from '@/apis/system-admin'
-import { AUTH_PROVIDER_VALUES } from '@haohaoxue/samepage-contracts'
+import { AUTH_PROVIDER_VALUES } from '@haohaoxue/samepage-contracts/auth/constants'
 import { createSharedComposable } from '@vueuse/core'
-import { ElMessage } from 'element-plus'
 import { computed, reactive, shallowRef } from 'vue'
 import {
   getSystemAuthGovernance,
   updateSystemAuthGovernance,
   updateSystemAuthInviteCode,
 } from '@/apis/system-admin'
+import { ElMessage } from '@/utils/element-plus'
 import { getRequestErrorDisplayMessage } from '@/utils/request-error'
 import { AUTH_PROVIDER_UI_META } from '@/views/auth/utils/provider-ui'
 

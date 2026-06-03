@@ -1,5 +1,5 @@
 import type { DocumentVersionSnapshot } from '@haohaoxue/samepage-contracts'
-import { isSameDocumentVersionSnapshotContent } from '@haohaoxue/samepage-shared'
+import { isSameDocumentVersionSnapshotContent } from '@haohaoxue/samepage-shared/document'
 import { createSharedComposable } from '@vueuse/core'
 import { computed, shallowRef, watch } from 'vue'
 import {

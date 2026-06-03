@@ -1,4 +1,4 @@
-import { OAUTH_REDIRECT_QUERY } from '@haohaoxue/samepage-contracts'
+import { OAUTH_REDIRECT_QUERY } from '@haohaoxue/samepage-contracts/auth/constants'
 import { computed, onMounted, shallowRef } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'

@@ -1,5 +1,5 @@
 import type { Router } from 'vue-router'
-import { ElMessageBox } from 'element-plus'
+import { ElMessageBox } from '@/utils/element-plus'
 
 interface ShowAiDefaultModelMissingDialogOptions {
   router: Router

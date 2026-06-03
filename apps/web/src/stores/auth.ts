@@ -1,7 +1,7 @@
 import type { RequestResponse } from '@haohaoxue/samepage-contracts'
 import type { Router } from 'vue-router'
 import type { TokenExchangeResponse } from '@/apis/auth'
-import { SERVER_PATH } from '@haohaoxue/samepage-contracts'
+import { SERVER_PATH } from '@haohaoxue/samepage-contracts/server'
 import { useSessionStorage } from '@vueuse/core'
 import rawAxios from 'axios'
 import { defineStore } from 'pinia'

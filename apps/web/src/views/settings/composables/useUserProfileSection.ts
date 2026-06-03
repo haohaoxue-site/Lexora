@@ -2,8 +2,8 @@ import type { FormInstance } from 'element-plus'
 import type { Ref } from 'vue'
 import type { UserProfileSectionProps } from '../typing'
 import { useClipboard } from '@vueuse/core'
-import { ElMessage } from 'element-plus'
 import { computed, reactive } from 'vue'
+import { ElMessage } from '@/utils/element-plus'
 import { createDisplayNameRules } from '@/views/auth/utils/rules'
 
 export function useUserProfileSection(options: {

@@ -6,7 +6,7 @@ import type {
 import {
   CHAT_MESSAGE_ATTACHMENT_PLACEMENT,
   CHAT_MESSAGE_ATTACHMENT_TYPE,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/samepage-contracts/chat/constants'
 import { serializeChatComposerContent } from './serialization'
 
 export function orderChatComposerAttachments(

@@ -1,11 +1,11 @@
 import type { WorkspaceType } from '@haohaoxue/samepage-contracts'
 import type { TiptapEditorCommentRequest } from '@/components/tiptap-editor'
 import { createSharedComposable } from '@vueuse/core'
-import { ElMessage } from 'element-plus'
 import { computed, shallowRef } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useWorkspaceStore } from '@/stores/workspace'
 import { resolveDocumentBlockIdFromHash } from '@/utils/documentBlockAnchor'
+import { ElMessage } from '@/utils/element-plus'
 
 export interface NavigateToDocumentOptions {
   replace?: boolean

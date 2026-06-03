@@ -1,8 +1,8 @@
 import {
   TIPTAP_DOCUMENT_FILE_NODE_PART,
   TIPTAP_DOCUMENT_FILE_NODE_TYPE,
-} from '@haohaoxue/samepage-contracts'
-import { prettyBytes } from '@haohaoxue/samepage-shared'
+} from '@haohaoxue/samepage-contracts/tiptap/document-body'
+import { prettyBytes } from '@haohaoxue/samepage-shared/file'
 import { mergeAttributes, Node } from '@tiptap/core'
 
 export const DocumentFile = Node.create({

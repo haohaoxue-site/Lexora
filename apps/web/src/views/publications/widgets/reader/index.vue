@@ -8,7 +8,7 @@ import type {
 import {
   collectDocumentAssetIds,
   hydrateDocumentAssetAttributes,
-} from '@haohaoxue/samepage-shared'
+} from '@haohaoxue/samepage-shared/document'
 import { computed, shallowRef, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import {

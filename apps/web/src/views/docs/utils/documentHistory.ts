@@ -6,11 +6,11 @@ import type {
   DocumentHistoryGroup,
   DocumentHistorySection,
 } from '../typing'
-import { DOCUMENT_VERSION_SNAPSHOT_SOURCE } from '@haohaoxue/samepage-contracts'
+import { DOCUMENT_VERSION_SNAPSHOT_SOURCE } from '@haohaoxue/samepage-contracts/document/constants'
 import {
   getDocumentVersionSnapshotTitlePlainText,
   isSameDocumentVersionSnapshotContent,
-} from '@haohaoxue/samepage-shared'
+} from '@haohaoxue/samepage-shared/document'
 import dayjs from '@/utils/dayjs'
 
 export function getDocumentHistoryEntryDetail(entry: DocumentHistoryEntry): string | null {

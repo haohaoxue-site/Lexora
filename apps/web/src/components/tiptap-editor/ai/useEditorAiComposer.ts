@@ -1,8 +1,7 @@
 import type { Editor } from '@tiptap/core'
 import type { ShallowRef } from 'vue'
 import type { EditorAiAnchorRect, EditorAiComposerDraft, EditorAiComposerMode, EditorAiComposerStatus, EditorAiSessionRuntime } from './typing'
-import { AI_EDITOR_STREAM_EVENT_TYPE } from '@haohaoxue/samepage-contracts'
-import { ElMessage } from 'element-plus'
+import { AI_EDITOR_STREAM_EVENT_TYPE } from '@haohaoxue/samepage-contracts/ai/constants'
 import { computed, onBeforeUnmount, shallowRef, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { acceptAiEditorCandidate, getAiDefaultModels, rejectAiEditorCandidate } from '@/apis/ai'
@@ -12,6 +11,7 @@ import {
   isAiDefaultModelPolicyReady,
   resolveEffectiveAiDefaultModelPolicy,
 } from '@/utils/ai-default-model'
+import { ElMessage } from '@/utils/element-plus'
 import { getRequestErrorDisplayMessage } from '@/utils/request-error'
 import {
   EDITOR_AI_ACCEPT_ERROR_FALLBACK,

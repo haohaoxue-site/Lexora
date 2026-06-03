@@ -1,9 +1,9 @@
 import type { ComputedRef, MaybeRefOrGetter } from 'vue'
 import type { AiProviderConsoleMode } from '../typing'
 import type { AiProvider } from '@/apis/ai'
-import { ElMessage } from 'element-plus'
 import { shallowRef, toValue } from 'vue'
 import { updatePlatformAiProvider, updateUserAiProvider } from '@/apis/ai'
+import { ElMessage } from '@/utils/element-plus'
 import { getRequestErrorDisplayMessage } from '@/utils/request-error'
 
 /**

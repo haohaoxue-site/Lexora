@@ -1,6 +1,6 @@
 import type { AiAnchor } from '@haohaoxue/samepage-contracts'
 import type { Editor, JSONContent } from '@tiptap/core'
-import { AI_ANCHOR_KIND } from '@haohaoxue/samepage-contracts'
+import { AI_ANCHOR_KIND } from '@haohaoxue/samepage-contracts/ai/constants'
 import { findBlockById } from '../commands/currentBlock'
 import { createTextInsertContent } from '../content/textInsertContent'
 

@@ -2,13 +2,15 @@ import type {
   DocumentCollaborationCollaborator,
   DocumentCollaborationPermission,
   DocumentCollaborationScope,
+} from '@haohaoxue/samepage-contracts/document/collaboration'
+import type {
   UserCollabIdentity,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/samepage-contracts/user'
 import {
   DOCUMENT_COLLABORATION_COLLABORATOR_SOURCE,
   DOCUMENT_COLLABORATION_PERMISSION_LABELS,
   DOCUMENT_COLLABORATION_SCOPE_LABELS,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/samepage-contracts/document/collaboration/constants'
 
 export function getCollaborationIdentityName(identity: UserCollabIdentity | { displayName: string, avatarUrl: string | null }) {
   return identity.displayName || ('userCode' in identity ? identity.userCode : '用户')

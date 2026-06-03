@@ -1,4 +1,4 @@
-import { AI_EDITOR_WORKFLOW_KEY, AI_MODEL_INTENT_KEY } from '@haohaoxue/samepage-contracts'
+import { AI_EDITOR_WORKFLOW_KEY, AI_MODEL_INTENT_KEY } from '@haohaoxue/samepage-contracts/ai/constants'
 
 export const EDITOR_AI_COMPOSER_MODE = Object.freeze({
   GENERATE: 'generate',

@@ -1,8 +1,8 @@
 import type { ChatModelItem } from '@/apis/chat'
 import { createSharedComposable } from '@vueuse/core'
-import { ElMessage } from 'element-plus'
 import { shallowRef } from 'vue'
 import { getChatModels } from '@/apis/chat'
+import { ElMessage } from '@/utils/element-plus'
 import { getRequestErrorDisplayMessage } from '@/utils/request-error'
 import { useChatRuntimeConfig } from './useChatRuntimeConfig'
 

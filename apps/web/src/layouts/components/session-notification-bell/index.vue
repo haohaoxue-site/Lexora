@@ -2,7 +2,7 @@
 import {
   DOCUMENT_COLLABORATION_PERMISSION_LABELS,
   DOCUMENT_COLLABORATION_SCOPE_LABELS,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/samepage-contracts/document/collaboration/constants'
 import { useSessionNotificationBell } from './useSessionNotificationBell'
 
 const props = withDefaults(defineProps<{

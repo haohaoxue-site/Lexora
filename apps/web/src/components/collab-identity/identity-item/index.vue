@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { CollabIdentityItemProps } from './typing'
-import { formatCollabIdentityLabel } from '@haohaoxue/samepage-shared'
+import { formatCollabIdentityLabel } from '@haohaoxue/samepage-shared/user'
 import { computed } from 'vue'
 import EntityAvatar from '@/components/entity-avatar'
 

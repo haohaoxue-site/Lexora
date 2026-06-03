@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import type { AiProviderModelTableEmits, AiProviderModelTableProps } from './typing'
 import type { AiModelType } from '@/apis/ai'
-import { ElSwitch, ElTable, ElTableColumn, ElTag } from 'element-plus'
 import { AI_MODEL_TYPE_LABELS } from '../../utils/modelDisplay'
 
 defineProps<AiProviderModelTableProps>()

@@ -1,5 +1,5 @@
 import type { TiptapJsonContent } from '@haohaoxue/samepage-contracts'
-import { serializeTiptapJsonContentToMarkdownLike } from '@haohaoxue/samepage-shared'
+import { serializeTiptapJsonContentToMarkdownLike } from '@haohaoxue/samepage-shared/document'
 
 export interface DocsSelectionMarkdownSnapshot {
   snapshot: string

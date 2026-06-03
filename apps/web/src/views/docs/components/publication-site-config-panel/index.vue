@@ -26,10 +26,10 @@ import {
   DOCUMENT_PUBLICATION_SITE_STATUS,
   DOCUMENT_PUBLICATION_SITE_THEME,
   DOCUMENT_PUBLICATION_SITE_TITLE_MAX_LENGTH,
-} from '@haohaoxue/samepage-contracts'
-import { prettyBytes } from '@haohaoxue/samepage-shared'
-import { ElMessage } from 'element-plus'
+} from '@haohaoxue/samepage-contracts/document/publication/constants'
+import { prettyBytes } from '@haohaoxue/samepage-shared/file'
 import { computed, reactive, useTemplateRef, watch } from 'vue'
+import { ElMessage } from '@/utils/element-plus'
 
 const props = withDefaults(defineProps<PublicationSiteConfigPanelProps>(), {
   loading: false,

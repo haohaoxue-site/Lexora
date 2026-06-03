@@ -17,13 +17,13 @@ import type {
   AiModelRef,
   AiProviderScope,
 } from '@/apis/ai'
-import { AI_PROVIDER_SCOPE } from '@haohaoxue/samepage-contracts'
-import { ElMessage } from 'element-plus'
+import { AI_PROVIDER_SCOPE } from '@haohaoxue/samepage-contracts/ai/constants'
 import { computed, shallowRef, watch } from 'vue'
 import {
   getAvailableAiProviderModels,
   getAvailableAiProviders,
 } from '@/apis/ai'
+import { ElMessage } from '@/utils/element-plus'
 import { getRequestErrorDisplayMessage } from '@/utils/request-error'
 
 const componentProps = withDefaults(defineProps<ModelCascaderProps>(), {

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { ChatMessage } from '@/apis/chat'
 import { ArrowDown } from '@element-plus/icons-vue'
-import { CHAT_MESSAGE_STATUS } from '@haohaoxue/samepage-contracts'
+import { CHAT_MESSAGE_STATUS } from '@haohaoxue/samepage-contracts/chat/constants'
 import { computed, ref, watch } from 'vue'
 
 const props = withDefaults(defineProps<{

@@ -1,7 +1,7 @@
 import type { MaybeRefOrGetter, Ref } from 'vue'
 import type { AiProviderConsoleMode, AiProviderFormController, AiProviderRow } from '../typing'
-import { ElMessage } from 'element-plus'
 import { onMounted, shallowRef } from 'vue'
+import { ElMessage } from '@/utils/element-plus'
 import { getRequestErrorDisplayMessage } from '@/utils/request-error'
 import {
   getProviderInitial,

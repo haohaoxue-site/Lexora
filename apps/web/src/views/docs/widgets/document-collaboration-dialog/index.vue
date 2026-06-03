@@ -26,10 +26,9 @@ import {
   DOCUMENT_COLLABORATION_SCOPE,
   DOCUMENT_COLLABORATION_SCOPE_LABELS,
   DOCUMENT_COLLABORATION_SCOPE_VALUES,
-  USER_CODE_REGEX,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/samepage-contracts/document/collaboration/constants'
+import { USER_CODE_REGEX } from '@haohaoxue/samepage-contracts/identity/constants'
 import { useClipboard, watchDebounced } from '@vueuse/core'
-import { ElMessage, ElMessageBox } from 'element-plus'
 import { computed, reactive, shallowRef, watch } from 'vue'
 import {
   createDocumentCollaborationInvitation,
@@ -41,6 +40,7 @@ import {
   updateDocumentCollaborationGrant,
   upsertDocumentCollaborationLink,
 } from '@/apis/document-collaboration'
+import { ElMessage, ElMessageBox } from '@/utils/element-plus'
 import CollaborationInvitePanel from '../../components/collaboration-invite-panel'
 import CollaborationLinkPanel from '../../components/collaboration-link-panel'
 import CollaborationParticipantsPanel from '../../components/collaboration-participants-panel'

@@ -2,7 +2,7 @@ import type {
   AiModelCapability,
   AiModelType,
 } from '@/apis/ai'
-import { AI_MODEL_CAPABILITY, AI_MODEL_TYPE } from '@haohaoxue/samepage-contracts'
+import { AI_MODEL_CAPABILITY, AI_MODEL_TYPE } from '@haohaoxue/samepage-contracts/ai/constants'
 
 export const AI_MODEL_TYPE_LABELS: Record<AiModelType, string> = {
   [AI_MODEL_TYPE.CHAT]: '对话',

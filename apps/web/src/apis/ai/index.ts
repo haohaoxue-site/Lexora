@@ -17,7 +17,7 @@ import type {
   UpsertAiProviderModelRequest,
   UpsertAiProviderModelsRequest,
 } from './typing'
-import { SERVER_PATH } from '@haohaoxue/samepage-contracts'
+import { SERVER_PATH } from '@haohaoxue/samepage-contracts/server'
 import { useAuthStore } from '@/stores/auth'
 import { axios } from '@/utils/axios'
 

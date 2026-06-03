@@ -17,19 +17,18 @@ import type {
 import {
   DOCUMENT_PANE_STATE,
   DOCUMENT_SAVE_STATE,
-  TIPTAP_SCHEMA_VERSION,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/samepage-contracts/document/constants'
+import { TIPTAP_SCHEMA_VERSION } from '@haohaoxue/samepage-contracts/tiptap/constants'
+import { createCollabAwarenessState } from '@haohaoxue/samepage-shared/collab'
 import {
   collectDocumentAssetIds,
-  createCollabAwarenessState,
   getDocumentSaveStateLabel,
   getDocumentTitlePlainText,
   getDocumentVersionSnapshotSummary,
   hasDocumentContent,
   hydrateDocumentAssetAttributes,
-} from '@haohaoxue/samepage-shared'
+} from '@haohaoxue/samepage-shared/document'
 import { createSharedComposable, useOnline } from '@vueuse/core'
-import { ElMessage } from 'element-plus'
 import {
   computed,
   shallowRef,
@@ -44,6 +43,7 @@ import {
 } from '@/apis/document'
 import { useUserStore } from '@/stores/user'
 import dayjs from '@/utils/dayjs'
+import { ElMessage } from '@/utils/element-plus'
 import { useDocsContext } from './useDocsContext'
 import { useDocsDocumentCollabRuntime } from './useDocsDocumentCollabRuntime'
 import { useDocumentTree } from './useDocumentTree'

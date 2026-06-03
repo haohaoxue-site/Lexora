@@ -6,11 +6,11 @@ import type {
   ChatComposerSubmitPayload,
 } from '@/components/chat-composer/typing'
 import { useClipboard } from '@vueuse/core'
-import { ElMessage } from 'element-plus'
 import { computed, nextTick, onUpdated, shallowRef, watch } from 'vue'
 import { createEmptyChatComposerContentJSON } from '@/components/chat-composer/serialization'
 import { SvgIconCategory } from '@/components/svg-icon/typing'
 import { getMessageText } from '@/composables/chat/utils/chat-message-display'
+import { ElMessage } from '@/utils/element-plus'
 import { useChatModelSettings } from './useChatModelSettings'
 import { useChatRuntimeOverlay } from './useChatRuntimeOverlay'
 import { useChatStream } from './useChatStream'

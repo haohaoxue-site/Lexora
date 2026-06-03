@@ -3,12 +3,12 @@ import type {
   DocumentPaneState,
   DocumentTreeCollectionId,
   DocumentTreeGroup,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/samepage-contracts/document'
 import type { DocsSurfaceView } from '../typing'
 import {
   DOCUMENT_COLLECTION,
   DOCUMENT_PANE_STATE,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/samepage-contracts/document/constants'
 import { createSharedComposable } from '@vueuse/core'
 import { computed, ref, watch } from 'vue'
 import { resolvePreferredDocumentId } from '../utils/documentTree'

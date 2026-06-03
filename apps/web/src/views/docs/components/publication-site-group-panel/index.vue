@@ -15,9 +15,9 @@ import {
   DOCUMENT_PUBLICATION_ENTRY_STATUS,
   DOCUMENT_SITE_PUBLICATION_PAGE_SCOPE,
   DOCUMENT_SITE_PUBLICATION_PAGE_SCOPE_LABELS,
-} from '@haohaoxue/samepage-contracts'
-import { ElMessage, ElMessageBox } from 'element-plus'
+} from '@haohaoxue/samepage-contracts/document/publication/constants'
 import { computed, reactive, shallowRef, watch } from 'vue'
+import { ElMessage, ElMessageBox } from '@/utils/element-plus'
 
 const props = withDefaults(defineProps<PublicationSiteGroupPanelProps>(), {
   loading: false,

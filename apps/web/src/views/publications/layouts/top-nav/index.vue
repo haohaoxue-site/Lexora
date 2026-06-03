@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import type { ResolvedPublicationNavItem } from '../../utils/publicationRendering'
 import type { PublicationTopNavProps } from './typing'
-import { normalizePublicationHref } from '@haohaoxue/samepage-shared'
-import { ElMessage } from 'element-plus'
+import { normalizePublicationHref } from '@haohaoxue/samepage-shared/document'
 import { onBeforeUnmount, onMounted, shallowRef } from 'vue'
 import { useRouter } from 'vue-router'
 import { SvgIcon } from '@/components/svg-icon'
+import { ElMessage } from '@/utils/element-plus'
 import { PUBLICATION_UNPUBLISHED_MESSAGE } from '../../utils/publicationRendering'
 
 const props = defineProps<PublicationTopNavProps>()

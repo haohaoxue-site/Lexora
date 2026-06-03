@@ -5,7 +5,6 @@ import type {
   AiProviderModelItem,
   UpsertAiProviderModelRequest,
 } from '@/apis/ai'
-import { ElMessage } from 'element-plus'
 import { computed, nextTick, reactive, shallowRef, toValue } from 'vue'
 import {
   discoverPlatformAiProviderModels,
@@ -17,6 +16,7 @@ import {
   upsertUserAiProviderModel,
   upsertUserAiProviderModels,
 } from '@/apis/ai'
+import { ElMessage } from '@/utils/element-plus'
 import { getRequestErrorDisplayMessage } from '@/utils/request-error'
 
 /**

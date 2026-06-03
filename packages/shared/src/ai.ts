@@ -4,7 +4,7 @@ import type {
   AiModelRef,
   AiModelType,
 } from '@haohaoxue/samepage-contracts'
-import { AI_MODEL_INTENT_DEFINITIONS, AI_MODEL_INTENT_KEY, AI_MODEL_TYPE } from '@haohaoxue/samepage-contracts'
+import { AI_MODEL_INTENT_DEFINITIONS, AI_MODEL_INTENT_KEY, AI_MODEL_TYPE } from '@haohaoxue/samepage-contracts/ai/constants'
 
 interface AiModelCapabilityTarget {
   modelType: AiModelType

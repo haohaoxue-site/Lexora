@@ -3,7 +3,7 @@ import {
   AUTH_PASSWORD_MAX_LENGTH,
   AUTH_PASSWORD_MIN_LENGTH,
   AUTH_PASSWORD_REQUIRED_PATTERN,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/samepage-contracts/identity/constants'
 
 const EMAIL_RE = /^[^\s@]+@[^\s@][^\s.@]*\.[^\s@]+$/
 const DISPLAY_NAME_MIN_LENGTH = 2
