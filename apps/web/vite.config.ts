@@ -147,6 +147,11 @@ export default defineConfig(({ mode }) => {
       environment: 'jsdom',
       include: ['./__tests__/**/*.spec.ts'],
       maxWorkers: 2,
+      server: {
+        deps: {
+          inline: ['element-plus'],
+        },
+      },
       setupFiles: './__tests__/setup.ts',
     },
   }
