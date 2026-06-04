@@ -84,7 +84,7 @@ export class SystemAdminService {
 
     const users = await this.prisma.user.findMany({
       where,
-      orderBy: { createdAt: 'desc' },
+      orderBy: { updatedAt: 'desc' },
       skip: (pageNo - 1) * pageSize,
       take: pageSize,
       select: {
