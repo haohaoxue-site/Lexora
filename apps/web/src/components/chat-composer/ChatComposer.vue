@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { Editor, EditorEvents, Extensions, JSONContent } from '@tiptap/core'
+import type { Editor, EditorEvents, JSONContent } from '@tiptap/core'
 import type {
   ChatComposerAttachment,
   ChatComposerEmits,
@@ -11,8 +11,6 @@ import {
   CHAT_MESSAGE_ATTACHMENT_PLACEMENT,
   CHAT_MESSAGE_ATTACHMENT_TYPE,
 } from '@haohaoxue/samepage-contracts/chat/constants'
-import Placeholder from '@tiptap/extension-placeholder'
-import StarterKit from '@tiptap/starter-kit'
 import { EditorContent, useEditor } from '@tiptap/vue-3'
 import { nanoid } from 'nanoid'
 import { computed, onBeforeUnmount, shallowRef, watch } from 'vue'
@@ -23,7 +21,7 @@ import {
 import ChatComposerContextTags from './ChatComposerContextTags.vue'
 import ChatComposerToolbar from './ChatComposerToolbar.vue'
 import ChatDocumentPicker from './ChatDocumentPicker.vue'
-import { CHAT_REFERENCE_NODE_NAME, ChatReference } from './extensions/ChatReference'
+import { CHAT_REFERENCE_NODE_NAME, createChatComposerExtensions } from './editorExtensions'
 import {
   garbageCollectInlineAttachments,
   serializeChatComposerContent,
@@ -56,7 +54,10 @@ const canSend = computed(() =>
 
 const editor = useEditor({
   content: props.contentJSON as JSONContent,
-  extensions: createChatComposerExtensions(),
+  extensions: createChatComposerExtensions({
+    getAttachments: () => props.attachments,
+    cloneInlineAttachment: cloneInlineAttachmentForPaste,
+  }),
   editable: !props.disabled,
   editorProps: {
     attributes: {
@@ -104,30 +105,6 @@ defineExpose({
     editor.value?.view.dom.focus()
   },
 })
-
-function createChatComposerExtensions(): Extensions {
-  return [
-    StarterKit.configure({
-      blockquote: false,
-      bulletList: false,
-      code: false,
-      codeBlock: false,
-      heading: false,
-      horizontalRule: false,
-      listItem: false,
-      orderedList: false,
-      strike: false,
-    }),
-    Placeholder.configure({
-      placeholder: '输入消息，Ctrl/⌘ + Enter 发送',
-    }),
-    ChatReference.configure({
-      getAttachmentById: attachmentId =>
-        props.attachments.find(attachment => attachment.id === attachmentId) ?? null,
-      cloneAttachment: cloneInlineAttachmentForPaste,
-    }),
-  ]
-}
 
 function handleEditorUpdate(options: EditorEvents['update']) {
   const contentJSON = options.editor.getJSON() as ChatComposerProps['contentJSON']
