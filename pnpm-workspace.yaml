@@ -9,12 +9,13 @@ packages:
   - 'apps/*'
   - 'packages/*'
 overrides:
-  fastify: 5.8.4
+  fastify: 5.8.5
   ioredis: 5.10.1
+  js-beautify>glob: 10.5.0
 catalog:
   '@types/node': ^25.6.0
   dotenv: ^17.4.2
-  fastify: 5.8.4
+  fastify: 5.8.5
   ioredis: 5.10.1
   pino: ^10.3.1
   pino-pretty: ^13.1.3
