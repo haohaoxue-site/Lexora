@@ -4,6 +4,7 @@
   "version": "1.0.0",
   "private": "true",
   "packageManager": "pnpm@11.5.0",
+  "license": "AGPL-3.0-only",
   "scripts": {
     "dev": "pnpm -r --parallel --if-present dev",
     "dev:infra": "docker compose -f infrastructure/compose.dev.yml up -d",
