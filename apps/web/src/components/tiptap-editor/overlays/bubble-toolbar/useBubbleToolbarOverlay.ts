@@ -1,12 +1,14 @@
 import type { Editor } from '@tiptap/core'
 import type { ComputedRef } from 'vue'
 import type { LinkPanelController } from '../shared/useLinkPanel'
-import { computed } from 'vue'
+import { computed, nextTick } from 'vue'
 import { isImageSelection } from '../../commands/editorActions'
 import { isMathNodeSelection } from '../../extensions/mathematics/mathNodeSelection'
 import { useEditorSnapshot } from '../shared/useEditorSnapshot'
 import { useLinkPanel } from '../shared/useLinkPanel'
 import { useLinkPanelMountGuard } from '../shared/useLinkPanelMountGuard'
+
+const BUBBLE_TOOLBAR_LINK_PANEL_PLUGIN_KEY = 'bubbleToolbarLinkPanel'
 
 /** 选择工具栏浮层显示上下文。 */
 export interface BubbleToolbarShouldShowContext {
@@ -34,7 +36,10 @@ export function useBubbleToolbarOverlay(editor: Editor): BubbleToolbarOverlayCon
   const editorSnapshot = useEditorSnapshot(editor, {
     ignoreCollaborationOrigin: true,
   })
-  const linkPanel = useLinkPanel(() => editor)
+  const linkPanel = useLinkPanel(() => editor, {
+    onClosed: hideLinkPanelMenu,
+    onOpened: showLinkPanelMenu,
+  })
   const shouldKeepLinkPanelMounted = computed(() => {
     void editorSnapshot.value
 
@@ -61,5 +66,32 @@ export function useBubbleToolbarOverlay(editor: Editor): BubbleToolbarOverlayCon
 
   function shouldShowLinkPanel({ from, to }: BubbleToolbarShouldShowContext): boolean {
     return Boolean(linkPanel.isOpen.value && !isImageSelection(editor) && (from !== to || editor.isActive('link')))
+  }
+
+  function dispatchLinkPanelMenuMeta(meta: 'hide' | 'show' | 'updatePosition') {
+    const view = editor.view
+
+    if (editor.isDestroyed || !view) {
+      return
+    }
+
+    view.dispatch(editor.state.tr.setMeta(BUBBLE_TOOLBAR_LINK_PANEL_PLUGIN_KEY, meta))
+  }
+
+  function showLinkPanelMenu() {
+    void nextTick(() => {
+      dispatchLinkPanelMenuMeta('show')
+
+      if (typeof window === 'undefined') {
+        dispatchLinkPanelMenuMeta('updatePosition')
+        return
+      }
+
+      window.requestAnimationFrame(() => dispatchLinkPanelMenuMeta('updatePosition'))
+    })
+  }
+
+  function hideLinkPanelMenu() {
+    void nextTick(() => dispatchLinkPanelMenuMeta('hide'))
   }
 }

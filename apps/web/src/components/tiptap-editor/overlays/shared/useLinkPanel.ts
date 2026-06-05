@@ -16,6 +16,7 @@ interface EditorSelectionRange {
 
 interface UseLinkPanelOptions {
   onClosed?: () => void
+  onOpened?: () => void
 }
 
 export interface LinkPanelController {
@@ -114,6 +115,7 @@ export function useLinkPanel(
     canRemove.value = editor.isActive('link') || Boolean(href)
     rememberSelection(editor)
     isOpen.value = true
+    options.onOpened?.()
   }
 
   function openEmptyBlock() {
@@ -130,6 +132,7 @@ export function useLinkPanel(
     rememberSelection(editor)
     rememberEmptyBlockRange(editor)
     isOpen.value = true
+    options.onOpened?.()
   }
 
   function cancel() {
@@ -169,25 +172,31 @@ export function useLinkPanel(
     if (mode.value === 'selection') {
       const href = linkUrl.value.trim()
       const chain = getLinkChain(editor)
-
-      if (href) {
-        chain.setLink({ href }).run()
-      }
-      else {
-        chain.unsetLink().run()
-      }
+      const didApply = href
+        ? chain.setLink({ href }).run()
+        : chain.unsetLink().run()
+      const collapsePosition = didApply ? editor.state.selection.to : null
 
       finalizeClose()
+
+      if (collapsePosition !== null) {
+        exitLinkMarkAtPosition(editor, collapsePosition)
+      }
+
       return
     }
 
-    insertEmptyBlockLink(
+    const didInsert = insertEmptyBlockLink(
       editor,
       emptyBlockRange.value,
       linkText.value.trim(),
       linkUrl.value.trim(),
     )
     finalizeClose()
+
+    if (didInsert) {
+      exitLinkMarkAtPosition(editor, editor.state.selection.from)
+    }
   }
 
   function remove() {
@@ -261,4 +270,8 @@ function insertEmptyBlockLink(
       ],
     },
   ).run()
+}
+
+function exitLinkMarkAtPosition(editor: Editor, position: number) {
+  editor.chain().focus().setTextSelection(position).unsetMark('link').run()
 }
