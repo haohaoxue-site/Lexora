@@ -1,6 +1,7 @@
 <script setup lang="ts">
+import type { DocsChatPanelEmits, DocsChatPanelProps } from './typing'
 import type { ChatComposerExposed } from '@/components/chat-composer/typing'
-import { nextTick, useTemplateRef, watch } from 'vue'
+import { computed, nextTick, useTemplateRef, watch } from 'vue'
 import ChatComposer from '@/components/chat-composer/ChatComposer.vue'
 import DocsChatHeader from '../../components/chat-header'
 import DocsChatMessages from '../../components/chat-messages'
@@ -8,6 +9,10 @@ import DocsChatRenameDialog from '../../components/chat-rename-dialog'
 import { useDocsChatPanel } from '../../composables/useDocsChatPanel'
 import { useDocsChatSessions } from '../../composables/useDocsChatSessions'
 
+const props = withDefaults(defineProps<DocsChatPanelProps>(), {
+  isResizing: false,
+})
+const emits = defineEmits<DocsChatPanelEmits>()
 const {
   activeSessionTitle,
   attachments,
@@ -42,6 +47,9 @@ const {
 } = useDocsChatSessions()
 
 const composerRef = useTemplateRef<ChatComposerExposed>('composer')
+const resizeHandleValueMin = computed(() => Math.round(props.minWidthPx))
+const resizeHandleValueMax = computed(() => Math.round(props.maxWidthPx))
+const resizeHandleValueNow = computed(() => Math.round(props.widthPx))
 
 watch(
   composerFocusRequestVersion,
@@ -54,7 +62,24 @@ watch(
 </script>
 
 <template>
-  <aside class="docs-chat-panel relative flex w-[var(--panel-docs-chat-width)] min-w-[var(--panel-docs-chat-width)] max-w-[var(--panel-docs-chat-width)] min-h-0 shrink-0 grow-0 flex-col">
+  <aside
+    class="docs-chat-panel relative flex min-h-0 shrink-0 grow-0 flex-col"
+    :class="{ 'is-resizing': props.isResizing }"
+  >
+    <div
+      class="docs-chat-panel__resize-handle"
+      role="separator"
+      tabindex="0"
+      aria-label="调整 AI 对话面板宽度"
+      aria-orientation="vertical"
+      :aria-valuemin="resizeHandleValueMin"
+      :aria-valuemax="resizeHandleValueMax"
+      :aria-valuenow="resizeHandleValueNow"
+      data-testid="docs-chat-panel-resize-handle"
+      @pointerdown="emits('resizeStart', $event)"
+      @dblclick="emits('resizeReset')"
+      @keydown="emits('resizeKeydown', $event)"
+    />
     <div class="docs-chat-panel__picker-layer pointer-events-none absolute inset-0 z-[5]" />
 
     <DocsChatHeader
@@ -103,8 +128,53 @@ watch(
 
 <style scoped lang="scss">
 .docs-chat-panel {
+  inline-size: var(--panel-docs-chat-width);
+  min-inline-size: var(--panel-docs-chat-width);
+  max-inline-size: var(--panel-docs-chat-width);
+  flex-basis: var(--panel-docs-chat-width);
   border-left: 1px solid color-mix(in srgb, var(--brand-border-base) 74%, transparent);
   background: color-mix(in srgb, var(--brand-bg-surface) 94%, var(--brand-bg-base));
+  transition:
+    inline-size 160ms ease,
+    min-inline-size 160ms ease,
+    max-inline-size 160ms ease,
+    flex-basis 160ms ease;
+
+  &.is-resizing {
+    transition: none;
+  }
+}
+
+.docs-chat-panel__resize-handle {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: -0.3125rem;
+  z-index: 7;
+  width: 0.625rem;
+  cursor: col-resize;
+  touch-action: none;
+  outline: none;
+
+  &::before {
+    position: absolute;
+    inset-block: 0;
+    inset-inline-start: 0.25rem;
+    width: 1px;
+    background: transparent;
+    content: '';
+    transition:
+      background 120ms ease,
+      box-shadow 120ms ease,
+      width 120ms ease;
+  }
+
+  &:hover::before,
+  &:focus-visible::before,
+  .docs-chat-panel.is-resizing &::before {
+    width: 2px;
+    background: color-mix(in srgb, var(--brand-primary) 58%, var(--brand-border-base));
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--brand-primary) 18%, transparent);
+  }
 }
 
 .docs-chat-panel__composer {

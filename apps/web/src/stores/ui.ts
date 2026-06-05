@@ -17,6 +17,7 @@ export const useUiStore = defineStore('ui', () => {
   const lastActiveChatSessionId = shallowRef<string | null>(null)
   const chatSessionSidebarPinned = shallowRef<boolean | null>(null)
   const documentLibrarySidebarCollapsed = shallowRef(false)
+  const docsChatPanelPreferredWidthPx = shallowRef<number | null>(null)
   const lastDocsControlCenterRouteName = shallowRef<DocsControlCenterRouteName>('docs-collaborations')
   const _lastOpenedDocumentIdByWorkspaceId = shallowRef<Record<string, string | null>>({})
 
@@ -45,6 +46,12 @@ export const useUiStore = defineStore('ui', () => {
     documentLibrarySidebarCollapsed.value = value
   }
 
+  function setDocsChatPanelPreferredWidthPx(value: number | null) {
+    docsChatPanelPreferredWidthPx.value = typeof value === 'number' && Number.isFinite(value)
+      ? Math.round(value)
+      : null
+  }
+
   function setLastDocsControlCenterRouteName(value: DocsControlCenterRouteName) {
     lastDocsControlCenterRouteName.value = value
   }
@@ -70,10 +77,12 @@ export const useUiStore = defineStore('ui', () => {
     clearLastOpenedDocumentIds,
     clearLastActiveChatSessionId,
     documentLibrarySidebarCollapsed,
+    docsChatPanelPreferredWidthPx,
     lastDocsControlCenterRouteName,
     getLastOpenedDocumentId,
     lastActiveChatSessionId,
     setChatSessionSidebarPinned,
+    setDocsChatPanelPreferredWidthPx,
     setDocumentLibrarySidebarCollapsed,
     setLastDocsControlCenterRouteName,
     setLastActiveChatSessionId,
@@ -89,6 +98,7 @@ export const useUiStore = defineStore('ui', () => {
       'lastActiveChatSessionId',
       'chatSessionSidebarPinned',
       'documentLibrarySidebarCollapsed',
+      'docsChatPanelPreferredWidthPx',
       'lastDocsControlCenterRouteName',
       '_lastOpenedDocumentIdByWorkspaceId',
     ],
