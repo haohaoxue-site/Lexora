@@ -5,7 +5,7 @@ import katex from 'katex'
 import { escapeHtml } from './markdownCodeHighlight'
 
 export function markdownMathPlugin(md: MarkdownIt): void {
-  md.inline.ruler.after('escape', 'chat_math_inline', parseInlineMath)
+  md.inline.ruler.before('escape', 'chat_math_inline', parseInlineMath)
   md.block.ruler.after('blockquote', 'chat_math_block', parseBlockMath, {
     alt: ['paragraph', 'reference', 'blockquote', 'list'],
   })
@@ -14,17 +14,25 @@ export function markdownMathPlugin(md: MarkdownIt): void {
   md.renderer.rules.chat_math_block = (tokens, index) => `<div class="chat-markdown__math-block">${renderMath(tokens[index]?.content ?? '', true)}</div>\n`
 }
 
+interface InlineMathMarker {
+  contentStart: number
+  closeLength: number
+  type: 'dollar' | 'paren'
+}
+
 function parseInlineMath(state: StateInline, silent: boolean): boolean {
-  if (state.src.charCodeAt(state.pos) !== 0x24) {
+  const marker = getInlineMathMarker(state.src, state.pos)
+
+  if (!marker) {
     return false
   }
 
-  const end = findClosingDollar(state.src, state.pos + 1)
+  const end = findInlineMathEnd(state.src, marker)
   if (end < 0) {
     return false
   }
 
-  const content = state.src.slice(state.pos + 1, end)
+  const content = state.src.slice(marker.contentStart, end)
   if (!content.trim()) {
     return false
   }
@@ -34,8 +42,36 @@ function parseInlineMath(state: StateInline, silent: boolean): boolean {
     token.content = content
   }
 
-  state.pos = end + 1
+  state.pos = end + marker.closeLength
   return true
+}
+
+function getInlineMathMarker(source: string, position: number): InlineMathMarker | null {
+  if (source.charCodeAt(position) === 0x24) {
+    return {
+      contentStart: position + 1,
+      closeLength: 1,
+      type: 'dollar',
+    }
+  }
+
+  if (source.startsWith('\\(', position)) {
+    return {
+      contentStart: position + 2,
+      closeLength: 2,
+      type: 'paren',
+    }
+  }
+
+  return null
+}
+
+function findInlineMathEnd(source: string, marker: InlineMathMarker): number {
+  if (marker.type === 'dollar') {
+    return findClosingDollar(source, marker.contentStart)
+  }
+
+  return findClosingParen(source, marker.contentStart)
 }
 
 function parseBlockMath(
@@ -93,6 +129,18 @@ function parseBlockMath(
 function findClosingDollar(source: string, start: number): number {
   for (let index = start; index < source.length; index += 1) {
     if (source[index] !== '$' || source[index - 1] === '\\') {
+      continue
+    }
+
+    return index
+  }
+
+  return -1
+}
+
+function findClosingParen(source: string, start: number): number {
+  for (let index = start; index < source.length - 1; index += 1) {
+    if (source[index] !== '\\' || source[index + 1] !== ')') {
       continue
     }
 

@@ -6,14 +6,41 @@ import type Token from 'markdown-it/lib/token.mjs'
 import type { ChatMarkdownRenderOptions } from './typing'
 import DOMPurify from 'dompurify'
 import MarkdownItConstructor from 'markdown-it'
+import { getChatStreamingProbe } from '@/composables/chat/utils/chat-streaming-probe'
 import { escapeHtml, highlightChatCode, resolveChatCodeLanguage } from './markdownCodeHighlight'
 import { markdownMathPlugin } from './markdownMath'
 
 const SAFE_LINK_PROTOCOL_PATTERN = /^(?:https?:|mailto:|\/|#)/i
+const markdownRendererByPhase = new Map<Required<ChatMarkdownRenderOptions>['phase'], MarkdownIt>()
 
 export function renderChatMarkdown(source: string, options: ChatMarkdownRenderOptions = {}): string {
-  const markdown = createMarkdownRenderer(options)
-  return sanitizeChatMarkdownHtml(markdown.render(source))
+  const phase = options.phase ?? 'final'
+  const markdown = getMarkdownRenderer(options)
+  const probe = getChatStreamingProbe()
+
+  if (!probe) {
+    return sanitizeChatMarkdownHtml(markdown.render(source))
+  }
+
+  const startedAt = performance.now()
+  const rendered = markdown.render(source)
+  const renderedAt = performance.now()
+  const sanitized = sanitizeChatMarkdownHtml(rendered)
+  const endedAt = performance.now()
+
+  probe.recordMarkdownRenderer?.({
+    phase,
+    sourceLength: source.length,
+    rawHtmlLength: rendered.length,
+    sanitizedHtmlLength: sanitized.length,
+    renderMs: renderedAt - startedAt,
+    sanitizeMs: endedAt - renderedAt,
+    totalMs: endedAt - startedAt,
+    startedAt,
+    endedAt,
+  })
+
+  return sanitized
 }
 
 export function renderStreamingCodeBlock(source: string): string {
@@ -24,6 +51,30 @@ export function renderStreamingCodeBlock(source: string): string {
   ].join(''))
 }
 
+export function renderStreamingTableBlock(source: string): string {
+  return sanitizeChatMarkdownHtml([
+    '<pre class="chat-markdown__streaming-table chat-markdown__streaming-code"><code>',
+    escapeHtml(source),
+    '</code></pre>',
+  ].join(''))
+}
+
+export function renderStreamingMathBlock(source: string): string {
+  return sanitizeChatMarkdownHtml([
+    '<p class="chat-markdown__streaming-math">',
+    escapeHtml(source).replaceAll('\n', '<br>'),
+    '</p>',
+  ].join(''))
+}
+
+export function renderStreamingTextBlock(source: string): string {
+  return sanitizeChatMarkdownHtml([
+    '<p class="chat-markdown__streaming-text">',
+    escapeHtml(source).replaceAll('\n', '<br>'),
+    '</p>',
+  ].join(''))
+}
+
 export function sanitizeChatMarkdownHtml(html: string): string {
   return DOMPurify.sanitize(html, {
     ADD_ATTR: ['target', 'rel', 'data-code', 'data-language'],
@@ -31,7 +82,20 @@ export function sanitizeChatMarkdownHtml(html: string): string {
   })
 }
 
-function createMarkdownRenderer(options: ChatMarkdownRenderOptions): MarkdownIt {
+function getMarkdownRenderer(options: ChatMarkdownRenderOptions): MarkdownIt {
+  const phase = options.phase ?? 'final'
+  const cachedMarkdown = markdownRendererByPhase.get(phase)
+
+  if (cachedMarkdown) {
+    return cachedMarkdown
+  }
+
+  const markdown = createMarkdownRenderer(phase)
+  markdownRendererByPhase.set(phase, markdown)
+  return markdown
+}
+
+function createMarkdownRenderer(phase: Required<ChatMarkdownRenderOptions>['phase']): MarkdownIt {
   const markdown = new MarkdownItConstructor({
     html: false,
     linkify: true,
@@ -46,7 +110,7 @@ function createMarkdownRenderer(options: ChatMarkdownRenderOptions): MarkdownIt 
   markdown.use(markdownMathPlugin)
   markdown.core.ruler.after('inline', 'chat_task_list', transformTaskListItems)
   markdown.renderer.rules.link_open = renderLinkOpen()
-  markdown.renderer.rules.fence = renderFence(options)
+  markdown.renderer.rules.fence = renderFence(phase)
   markdown.renderer.rules.table_open = () => '<div class="chat-markdown__table-scroll"><table>\n'
   markdown.renderer.rules.table_close = () => '</table></div>\n'
 
@@ -62,13 +126,13 @@ function renderLinkOpen() {
   }
 }
 
-function renderFence(options: ChatMarkdownRenderOptions) {
+function renderFence(phase: Required<ChatMarkdownRenderOptions>['phase']) {
   return (tokens: Token[], index: number) => {
     const token = tokens[index]
     const code = normalizeFenceCode(token?.content ?? '')
     const language = resolveChatCodeLanguage(token?.info ?? '')
     const dataCode = escapeHtml(encodeURIComponent(code))
-    const disabled = options.isStreaming ? ' disabled aria-disabled="true"' : ''
+    const disabled = phase === 'streaming' ? ' disabled aria-disabled="true"' : ''
 
     return [
       '<div class="chat-markdown__code-block" data-language="',

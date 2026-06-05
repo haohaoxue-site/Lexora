@@ -3,18 +3,30 @@ import type { ChatMessage } from '@/apis/chat'
 import { ArrowDown } from '@element-plus/icons-vue'
 import { CHAT_MESSAGE_STATUS } from '@haohaoxue/samepage-contracts/chat/constants'
 import { computed, ref, watch } from 'vue'
+import { useStreamingTextReveal } from '@/composables/chat/useStreamingTextReveal'
 
 const props = withDefaults(defineProps<{
+  messageId: string
   text: string
   status: ChatMessage['status']
   elapsedMs?: number | null
   defaultExpanded?: boolean
+  answerStarted?: boolean
 }>(), {
+  answerStarted: false,
   elapsedMs: null,
   defaultExpanded: false,
 })
 
 const isExpanded = ref(props.defaultExpanded)
+const isStreaming = computed(() => props.status === CHAT_MESSAGE_STATUS.STREAMING)
+const shouldAnimateText = computed(() => isStreaming.value && !props.answerStarted)
+const { visibleText } = useStreamingTextReveal({
+  animate: shouldAnimateText,
+  identity: () => props.messageId,
+  maxGraphemesPerFrame: 8,
+  source: () => props.text,
+})
 const elapsedSeconds = computed(() => props.elapsedMs ? Math.max(1, Math.round(props.elapsedMs / 1000)) : null)
 const summaryText = computed(() => {
   if (props.status === CHAT_MESSAGE_STATUS.STREAMING) {
@@ -49,7 +61,7 @@ watch(
     </button>
 
     <div v-if="isExpanded" class="chat-reasoning-block__body">
-      {{ props.text }}
+      {{ visibleText }}
     </div>
   </section>
 </template>

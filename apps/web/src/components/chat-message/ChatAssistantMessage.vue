@@ -1,17 +1,8 @@
 <script setup lang="ts">
 import type { ChatMessage } from '@/apis/chat'
+import { computed } from 'vue'
 import ChatMarkdownContent from '@/components/chat-markdown/ChatMarkdownContent.vue'
-import {
-  getAssistantFailureMessage,
-  getMessageText,
-  getMessageTextPartId,
-  getReasoningElapsedMs,
-  getReasoningText,
-  getToolResultParts,
-  isAssistantStreamingMessage,
-  shouldShowAssistantCancelled,
-  shouldShowAssistantPending,
-} from '@/composables/chat/utils/chat-message-display'
+import { createAssistantMessageDisplayModel } from '@/composables/chat/utils/chat-message-display'
 import ChatReasoningBlock from './ChatReasoningBlock.vue'
 import ChatToolResultBlock from './ChatToolResultBlock.vue'
 
@@ -21,34 +12,34 @@ const props = withDefaults(defineProps<{
 }>(), {
   variant: 'global',
 })
+
+const display = computed(() => createAssistantMessageDisplayModel(props.message))
+const answerStarted = computed(() => Boolean(display.value.messageText))
 </script>
 
 <template>
   <div class="chat-assistant-message" :class="`chat-assistant-message--${props.variant}`">
     <ChatReasoningBlock
-      v-if="getReasoningText(props.message)"
-      :text="getReasoningText(props.message)"
+      v-if="display.reasoningText"
+      :message-id="props.message.id"
+      :text="display.reasoningText"
       :status="props.message.status"
-      :elapsed-ms="getReasoningElapsedMs(props.message)"
-      :default-expanded="isAssistantStreamingMessage(props.message)"
+      :elapsed-ms="display.reasoningElapsedMs"
+      :default-expanded="display.isStreaming && !answerStarted"
+      :answer-started="answerStarted"
     />
 
-    <div v-if="getMessageText(props.message)" class="chat-assistant-message__bubble">
+    <div v-if="display.messageText" class="chat-assistant-message__bubble">
       <ChatMarkdownContent
         :message-id="props.message.id"
-        :part-id="getMessageTextPartId(props.message)"
-        :source="getMessageText(props.message)"
-        :status="props.message.status"
-        :is-streaming="isAssistantStreamingMessage(props.message)"
-      />
-      <span
-        v-if="isAssistantStreamingMessage(props.message)"
-        class="chat-assistant-message__stream-cursor"
+        :part-id="display.messageTextPartId"
+        :source="display.messageText"
+        :phase="display.markdownPhase"
       />
     </div>
 
     <div
-      v-else-if="shouldShowAssistantPending(props.message)"
+      v-else-if="display.showPending"
       class="chat-assistant-message__pending"
       aria-live="polite"
     >
@@ -68,21 +59,21 @@ const props = withDefaults(defineProps<{
       </span>
     </div>
 
-    <div v-if="getAssistantFailureMessage(props.message)" class="chat-assistant-message__error">
-      {{ getAssistantFailureMessage(props.message) }}
+    <div v-if="display.failureMessage" class="chat-assistant-message__error">
+      {{ display.failureMessage }}
     </div>
 
-    <div v-if="shouldShowAssistantCancelled(props.message)" class="chat-assistant-message__cancelled">
+    <div v-if="display.showCancelled" class="chat-assistant-message__cancelled">
       已停止
     </div>
 
     <ChatToolResultBlock
-      v-for="(part, index) in getToolResultParts(props.message)"
+      v-for="(part, index) in display.toolResultParts"
       :key="part.id"
       :message-id="props.message.id"
-      :status="props.message.status"
       :part="part"
       :index="index"
+      phase="final"
     />
   </div>
 </template>
@@ -224,31 +215,6 @@ const props = withDefaults(defineProps<{
   color: var(--el-color-danger);
 }
 
-.chat-assistant-message__stream-cursor {
-  display: inline-block;
-  width: 0.125rem;
-  height: 1rem;
-  margin-left: 0.125rem;
-  vertical-align: text-bottom;
-  background: currentColor;
-  animation: chat-assistant-message-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-
-  .chat-assistant-message--docs & {
-    height: 0.9rem;
-  }
-}
-
-@keyframes chat-assistant-message-pulse {
-  0%,
-  100% {
-    opacity: 1;
-  }
-
-  50% {
-    opacity: 0.5;
-  }
-}
-
 @keyframes chat-assistant-message-dot {
   0%,
   68%,
@@ -277,7 +243,6 @@ const props = withDefaults(defineProps<{
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .chat-assistant-message__stream-cursor,
   .chat-assistant-message__thinking-dots span,
   .chat-assistant-message__thinking-wave span {
     animation: none;

@@ -15,8 +15,9 @@ import type {
   UpdateChatSessionTitleRequest,
 } from './typing'
 import { ChatSessionEventSchema } from '@haohaoxue/samepage-contracts/chat'
-import { CHAT_SESSION_ORIGIN } from '@haohaoxue/samepage-contracts/chat/constants'
+import { CHAT_SESSION_EVENT_TYPE, CHAT_SESSION_ORIGIN } from '@haohaoxue/samepage-contracts/chat/constants'
 import { SERVER_PATH } from '@haohaoxue/samepage-contracts/server'
+import { getChatStreamingProbe } from '@/composables/chat/utils/chat-streaming-probe'
 import { useAuthStore } from '@/stores/auth'
 import { axios } from '@/utils/axios'
 import { createRequestError, createRequestErrorFromHttpResponse, toRequestError } from '@/utils/request-error'
@@ -247,7 +248,39 @@ export async function streamChatSessionEvents(
 
         const parsedEvent = ChatSessionEventSchema.safeParse(payload)
         if (parsedEvent.success) {
-          await onEvent(parsedEvent.data)
+          const event = parsedEvent.data
+          const probe = getChatStreamingProbe()
+
+          if (!probe) {
+            await onEvent(event)
+            continue
+          }
+
+          const startedAt = performance.now()
+          const marker = getChatEventMarker(event)
+          probe.recordChatEvent?.({
+            phase: 'received',
+            eventType: event.type,
+            sequence: event.sequence,
+            messageId: event.messageId,
+            runId: event.runId,
+            marker,
+            time: startedAt,
+          })
+
+          await onEvent(event)
+
+          const endedAt = performance.now()
+          probe.recordChatEvent?.({
+            phase: 'applied',
+            eventType: event.type,
+            sequence: event.sequence,
+            messageId: event.messageId,
+            runId: event.runId,
+            marker,
+            durationMs: endedAt - startedAt,
+            time: endedAt,
+          })
         }
       }
     }
@@ -301,4 +334,12 @@ function createChatSessionEventQuery(input: {
 
   const query = params.toString()
   return query ? `?${query}` : ''
+}
+
+function getChatEventMarker(event: ChatSessionEvent): string | null {
+  if (event.type !== CHAT_SESSION_EVENT_TYPE.MESSAGE_PART_DELTA) {
+    return null
+  }
+
+  return event.payload.delta.match(/\[\[stream-marker-\d+\]\]/)?.[0] ?? null
 }

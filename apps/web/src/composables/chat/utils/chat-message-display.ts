@@ -1,9 +1,38 @@
 import type { ChatMessage } from '@/apis/chat'
+import type { ChatMarkdownRenderPhase } from '@/components/chat-markdown/typing'
 import { CHAT_MESSAGE_PART_TYPE, CHAT_MESSAGE_STATUS } from '@haohaoxue/samepage-contracts/chat/constants'
 import dayjs from '@/utils/dayjs'
 
 type AssistantChatMessage = Extract<ChatMessage, { role: 'assistant' }>
 type ChatMessagePart = ChatMessage['parts'][number]
+
+export interface AssistantMessageDisplayModel {
+  reasoningText: string
+  reasoningElapsedMs: number | null
+  messageText: string
+  messageTextPartId: string
+  toolResultParts: ChatMessagePart[]
+  markdownPhase: ChatMarkdownRenderPhase
+  isStreaming: boolean
+  showPending: boolean
+  failureMessage: string
+  showCancelled: boolean
+}
+
+export function createAssistantMessageDisplayModel(message: ChatMessage): AssistantMessageDisplayModel {
+  return {
+    reasoningText: getReasoningText(message),
+    reasoningElapsedMs: getReasoningElapsedMs(message),
+    messageText: getMessageText(message),
+    messageTextPartId: getMessageTextPartId(message),
+    toolResultParts: getToolResultParts(message),
+    markdownPhase: getMarkdownRenderPhase(message),
+    isStreaming: isAssistantStreamingMessage(message),
+    showPending: shouldShowAssistantPending(message),
+    failureMessage: getAssistantFailureMessage(message),
+    showCancelled: shouldShowAssistantCancelled(message),
+  }
+}
 
 export function getMessageText(message: ChatMessage) {
   if (message.role === 'user') {
@@ -79,6 +108,20 @@ export function getAssistantFailureMessage(message: ChatMessage) {
 
 export function isAssistantStreamingMessage(message: ChatMessage) {
   return message.role === 'assistant' && message.status === CHAT_MESSAGE_STATUS.STREAMING
+}
+
+export function getMarkdownRenderPhase(message: ChatMessage): ChatMarkdownRenderPhase {
+  if (
+    message.role === 'assistant'
+    && (
+      message.status === CHAT_MESSAGE_STATUS.PENDING
+      || message.status === CHAT_MESSAGE_STATUS.STREAMING
+    )
+  ) {
+    return 'streaming'
+  }
+
+  return 'final'
 }
 
 export function shouldShowAssistantPending(message: ChatMessage) {

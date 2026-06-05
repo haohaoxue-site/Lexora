@@ -1,39 +1,103 @@
 <script setup lang="ts">
 import type { ChatMessage } from '@/apis/chat'
-import { computed } from 'vue'
+import type { ChatMarkdownRenderPhase } from '@/components/chat-markdown/typing'
+import { computed, shallowRef } from 'vue'
 import ChatMarkdownContent from '@/components/chat-markdown/ChatMarkdownContent.vue'
 
 const props = defineProps<{
   messageId: string
-  status: string
+  phase: ChatMarkdownRenderPhase
   part: ChatMessage['parts'][number]
   index: number
 }>()
+const TOOL_RESULT_BUDGET_THRESHOLD = 40_000
+const TOOL_RESULT_INITIAL_VISIBLE_CHARS = 12_000
+const TOOL_RESULT_INCREMENT_CHARS = 20_000
 
 const toolName = computed(() => props.part.metadata?.toolName ?? '返回结果')
 const summary = computed(() => getToolResultSummary(props.part.text))
+const hasMountedBody = shallowRef(false)
+const visibleCharLimit = shallowRef(TOOL_RESULT_INITIAL_VISIBLE_CHARS)
+const isBudgetMode = computed(() => props.part.text.length >= TOOL_RESULT_BUDGET_THRESHOLD)
+const visibleSource = computed(() => {
+  if (!isBudgetMode.value) {
+    return props.part.text
+  }
+
+  return sliceToolResultSource(props.part.text, visibleCharLimit.value)
+})
+const hasHiddenSource = computed(() => isBudgetMode.value && visibleSource.value.length < props.part.text.length)
+
+function handleToggle(event: Event): void {
+  if ((event.currentTarget as HTMLDetailsElement | null)?.open) {
+    hasMountedBody.value = true
+  }
+}
+
+function showMoreSource(): void {
+  visibleCharLimit.value = Math.min(
+    props.part.text.length,
+    visibleCharLimit.value + TOOL_RESULT_INCREMENT_CHARS,
+  )
+}
+
+function showAllSource(): void {
+  visibleCharLimit.value = props.part.text.length
+}
 
 function getToolResultSummary(text: string): string {
   const firstLine = text.split('\n').find(line => line.trim())?.trim() ?? '暂无内容'
   return firstLine.length > 80 ? `${firstLine.slice(0, 80)}...` : firstLine
 }
+
+function sliceToolResultSource(source: string, maxChars: number): string {
+  if (source.length <= maxChars) {
+    return source
+  }
+
+  const lineBreakIndex = source.lastIndexOf('\n', maxChars)
+  const minStableSlice = Math.floor(maxChars * 0.6)
+
+  return source.slice(0, lineBreakIndex > minStableSlice ? lineBreakIndex : maxChars)
+}
 </script>
 
 <template>
-  <details class="chat-tool-result-block">
+  <details class="chat-tool-result-block" @toggle="handleToggle">
     <summary class="chat-tool-result-block__summary">
       <span class="chat-tool-result-block__index">返回结果 {{ props.index + 1 }}</span>
       <span class="chat-tool-result-block__name">{{ toolName }}</span>
       <span class="chat-tool-result-block__text">{{ summary }}</span>
     </summary>
-    <div class="chat-tool-result-block__body">
+    <div
+      v-if="hasMountedBody"
+      class="chat-tool-result-block__body"
+    >
       <ChatMarkdownContent
         :message-id="props.messageId"
         :part-id="props.part.id"
-        :source="props.part.text"
-        :status="props.status"
-        :is-streaming="false"
+        :source="visibleSource"
+        :phase="props.phase"
       />
+      <div v-if="hasHiddenSource" class="chat-tool-result-block__controls flex flex-wrap items-center gap-2 pt-2">
+        <ElButton
+          size="small"
+          type="primary"
+          text
+          data-testid="tool-result-show-more"
+          @click="showMoreSource"
+        >
+          继续显示更多
+        </ElButton>
+        <ElButton
+          size="small"
+          text
+          data-testid="tool-result-show-all"
+          @click="showAllSource"
+        >
+          显示全部
+        </ElButton>
+      </div>
     </div>
   </details>
 </template>

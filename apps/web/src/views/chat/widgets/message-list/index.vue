@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { ComponentPublicInstance } from 'vue'
 import {
   ArrowLeft,
   ArrowRight,
@@ -9,6 +10,7 @@ import { useTemplateRef } from 'vue'
 import ChatAssistantAvatar from '@/components/chat-message/ChatAssistantAvatar.vue'
 import ChatUserMessageContent from '@/components/chat-message/ChatUserMessageContent.vue'
 import CopyStateIcon from '@/components/copy-state-icon/CopyStateIcon.vue'
+import { useDynamicChatVirtualList } from '@/composables/chat/useDynamicChatVirtualList'
 import { shouldShowAssistantPending } from '@/composables/chat/utils/chat-message-display'
 import { useChatMessageList } from '../../composables/useChatMessageList'
 
@@ -31,19 +33,41 @@ const {
   isMessageCopied,
   isConfigured,
   isStreaming,
+  listKey,
   messages,
   retryAssistantMessage,
   selectComposerModel,
   startEditMessage,
   submitEditMessage,
   switchToBranch,
-} = useChatMessageList({
+} = useChatMessageList()
+const {
+  handleScroll,
+  setItemElement,
+  spacerStyle,
+  virtualItems,
+} = useDynamicChatVirtualList({
+  items: messages,
+  listKey,
   scrollContainerRef,
+  estimateSize: 124,
+  overscan: 10,
+  bottomThreshold: 96,
+  getItemKey: message => message.id,
 })
+
+function setVirtualItemElement(key: string, element: Element | ComponentPublicInstance | null) {
+  setItemElement(key, element instanceof Element ? element : null)
+}
 </script>
 
 <template>
-  <div ref="scrollContainerRef" class="chat-message-list flex-1 overflow-y-auto px-6 py-4">
+  <div
+    ref="scrollContainerRef"
+    class="chat-message-list flex-1 overflow-y-auto px-6 py-4"
+    :data-message-count="messages.length"
+    @scroll="handleScroll"
+  >
     <div v-if="messages.length === 0" class="flex h-full items-center justify-center">
       <div class="text-center">
         <div class="chat-message-list__empty-icon mx-auto mb-4 flex h-[4.5rem] w-[4.5rem] items-center justify-center rounded-2xl" :class="emptyIconStateClass">
@@ -70,137 +94,148 @@ const {
       </div>
     </div>
 
-    <div v-else class="mx-auto max-w-[var(--page-mode-chat-max-width)] space-y-4">
+    <div v-else class="chat-message-list__virtual-shell mx-auto max-w-[var(--page-mode-chat-max-width)]">
       <div
-        v-for="msg in messages"
-        :key="msg.id"
-        class="chat-message-list__row flex gap-3"
-        :class="[getMessageRoleClass(msg.role), msg.role === 'user' ? 'justify-end' : 'justify-start']"
+        class="chat-message-list__virtual-space"
+        :style="spacerStyle"
       >
         <div
-          v-if="msg.role === 'assistant'"
-          class="mt-1 shrink-0"
+          v-for="virtual in virtualItems"
+          :key="virtual.key"
+          :ref="element => setVirtualItemElement(virtual.key, element)"
+          class="chat-message-list__virtual-item"
+          :style="virtual.style"
         >
-          <ChatAssistantAvatar :pending="shouldShowAssistantPending(msg)" />
-        </div>
-
-        <div v-if="msg.role === 'assistant'" class="chat-message-list__assistant-content flex min-w-0 max-w-[80%] flex-col gap-2">
-          <ChatAssistantMessage :message="msg" variant="global" />
-
-          <div class="chat-message-list__actions assistant flex items-center justify-start gap-1.5">
-            <ElTooltip content="复制回复" placement="bottom">
-              <ElButton
-                text
-                class="chat-message-list__action-button chat-message-list__copy-action h-7 min-w-7 w-7 rounded-lg p-0"
-                :class="{ 'is-copied': isMessageCopied(msg) }"
-                :disabled="!getMessageText(msg)"
-                :aria-label="isMessageCopied(msg) ? '回复已复制' : '复制回复'"
-                @click="copyMessage(msg)"
-              >
-                <CopyStateIcon :copied="isMessageCopied(msg)" />
-              </ElButton>
-            </ElTooltip>
-            <ElTooltip content="重试" placement="bottom">
-              <ElButton
-                text
-                class="chat-message-list__action-button h-7 min-w-7 w-7 rounded-lg p-0"
-                :icon="RefreshRight"
-                :disabled="isStreaming"
-                @click="retryAssistantMessage(msg)"
-              />
-            </ElTooltip>
-            <div v-if="msg.branch.count > 1" class="chat-message-list__branch ml-0.5 inline-flex items-center gap-0.5 rounded-md px-0.5 text-[0.8125rem] leading-none">
-              <ElButton
-                text
-                class="chat-message-list__branch-button h-4 min-w-4 w-4 rounded-md p-0"
-                :icon="ArrowLeft"
-                :disabled="isStreaming || !msg.branch.previousMessageId"
-                @click="switchToBranch(msg.branch.previousMessageId)"
-              />
-              <span class="inline-flex min-w-[2.25rem] items-center justify-center px-1">{{ msg.branch.index }} / {{ msg.branch.count }}</span>
-              <ElButton
-                text
-                class="chat-message-list__branch-button h-4 min-w-4 w-4 rounded-md p-0"
-                :icon="ArrowRight"
-                :disabled="isStreaming || !msg.branch.nextMessageId"
-                @click="switchToBranch(msg.branch.nextMessageId)"
-              />
+          <div
+            class="chat-message-list__row flex gap-3"
+            :class="[getMessageRoleClass(virtual.item.role), virtual.item.role === 'user' ? 'justify-end' : 'justify-start']"
+          >
+            <div
+              v-if="virtual.item.role === 'assistant'"
+              class="mt-1 shrink-0"
+            >
+              <ChatAssistantAvatar :pending="shouldShowAssistantPending(virtual.item)" />
             </div>
-          </div>
-        </div>
 
-        <div
-          v-else
-          class="chat-message-list__user-content flex min-w-0 max-w-[80%] flex-col items-end gap-2"
-          :class="{ 'is-editing': isEditingMessage(msg) }"
-        >
-          <div v-if="isEditingMessage(msg)" class="chat-message-list__edit-box">
-            <ChatComposer
-              :content-j-s-o-n="editingContentJSON"
-              :attachments="editingAttachments"
-              :selected-model-ref="composerSelectedModelRef"
-              :disabled="isStreaming"
-              :highlight-attachment-id="editingHighlightAttachmentId"
-              document-picker-teleport-to=".chat-view__picker-layer"
-              @update:content-j-s-o-n="editingContentJSON = $event"
-              @update:attachments="editingAttachments = $event"
-              @send="submitEditMessage(msg, $event)"
-              @select-model="selectComposerModel"
-              @highlight-attachment="highlightEditingAttachment"
-              @placeholder-upload="handleEditPlaceholderUpload"
-              @placeholder-command="handleEditPlaceholderCommand"
-            />
-            <div class="chat-message-list__edit-actions mt-3 flex justify-end gap-2">
-              <ElButton round @click="cancelEditMessage">
-                取消
-              </ElButton>
-            </div>
-          </div>
+            <div v-if="virtual.item.role === 'assistant'" class="chat-message-list__assistant-content flex min-w-0 max-w-[80%] flex-col gap-2">
+              <ChatAssistantMessage :message="virtual.item" variant="global" />
 
-          <template v-else>
-            <div class="chat-message-list__bubble user rounded-lg px-3 py-2 text-sm leading-[1.625] break-words">
-              <ChatUserMessageContent :message="msg" />
-            </div>
-            <div class="chat-message-list__actions user flex items-center justify-end gap-1.5">
-              <ElTooltip content="复制消息" placement="bottom">
-                <ElButton
-                  text
-                  class="chat-message-list__action-button chat-message-list__copy-action h-7 min-w-7 w-7 rounded-lg p-0"
-                  :class="{ 'is-copied': isMessageCopied(msg) }"
-                  :aria-label="isMessageCopied(msg) ? '消息已复制' : '复制消息'"
-                  @click="copyMessage(msg)"
-                >
-                  <CopyStateIcon :copied="isMessageCopied(msg)" />
-                </ElButton>
-              </ElTooltip>
-              <ElTooltip content="编辑" placement="bottom">
-                <ElButton
-                  text
-                  class="chat-message-list__action-button h-7 min-w-7 w-7 rounded-lg p-0"
-                  :icon="EditPen"
-                  :disabled="isStreaming"
-                  @click="startEditMessage(msg)"
-                />
-              </ElTooltip>
-              <div v-if="msg.branch.count > 1" class="chat-message-list__branch ml-0.5 inline-flex items-center gap-0.5 rounded-md px-0.5 text-[0.8125rem] leading-none">
-                <ElButton
-                  text
-                  class="chat-message-list__branch-button h-4 min-w-4 w-4 rounded-md p-0"
-                  :icon="ArrowLeft"
-                  :disabled="isStreaming || !msg.branch.previousMessageId"
-                  @click="switchToBranch(msg.branch.previousMessageId)"
-                />
-                <span class="inline-flex min-w-[2.25rem] items-center justify-center px-1">{{ msg.branch.index }} / {{ msg.branch.count }}</span>
-                <ElButton
-                  text
-                  class="chat-message-list__branch-button h-4 min-w-4 w-4 rounded-md p-0"
-                  :icon="ArrowRight"
-                  :disabled="isStreaming || !msg.branch.nextMessageId"
-                  @click="switchToBranch(msg.branch.nextMessageId)"
-                />
+              <div class="chat-message-list__actions assistant flex items-center justify-start gap-1.5">
+                <ElTooltip content="复制回复" placement="bottom">
+                  <ElButton
+                    text
+                    class="chat-message-list__action-button chat-message-list__copy-action h-7 min-w-7 w-7 rounded-lg p-0"
+                    :class="{ 'is-copied': isMessageCopied(virtual.item) }"
+                    :disabled="!getMessageText(virtual.item)"
+                    :aria-label="isMessageCopied(virtual.item) ? '回复已复制' : '复制回复'"
+                    @click="copyMessage(virtual.item)"
+                  >
+                    <CopyStateIcon :copied="isMessageCopied(virtual.item)" />
+                  </ElButton>
+                </ElTooltip>
+                <ElTooltip content="重试" placement="bottom">
+                  <ElButton
+                    text
+                    class="chat-message-list__action-button h-7 min-w-7 w-7 rounded-lg p-0"
+                    :icon="RefreshRight"
+                    :disabled="isStreaming"
+                    @click="retryAssistantMessage(virtual.item)"
+                  />
+                </ElTooltip>
+                <div v-if="virtual.item.branch.count > 1" class="chat-message-list__branch ml-0.5 inline-flex items-center gap-0.5 rounded-md px-0.5 text-[0.8125rem] leading-none">
+                  <ElButton
+                    text
+                    class="chat-message-list__branch-button h-4 min-w-4 w-4 rounded-md p-0"
+                    :icon="ArrowLeft"
+                    :disabled="isStreaming || !virtual.item.branch.previousMessageId"
+                    @click="switchToBranch(virtual.item.branch.previousMessageId)"
+                  />
+                  <span class="inline-flex min-w-[2.25rem] items-center justify-center px-1">{{ virtual.item.branch.index }} / {{ virtual.item.branch.count }}</span>
+                  <ElButton
+                    text
+                    class="chat-message-list__branch-button h-4 min-w-4 w-4 rounded-md p-0"
+                    :icon="ArrowRight"
+                    :disabled="isStreaming || !virtual.item.branch.nextMessageId"
+                    @click="switchToBranch(virtual.item.branch.nextMessageId)"
+                  />
+                </div>
               </div>
             </div>
-          </template>
+
+            <div
+              v-else
+              class="chat-message-list__user-content flex min-w-0 max-w-[80%] flex-col items-end gap-2"
+              :class="{ 'is-editing': isEditingMessage(virtual.item) }"
+            >
+              <div v-if="isEditingMessage(virtual.item)" class="chat-message-list__edit-box">
+                <ChatComposer
+                  :content-j-s-o-n="editingContentJSON"
+                  :attachments="editingAttachments"
+                  :selected-model-ref="composerSelectedModelRef"
+                  :disabled="isStreaming"
+                  :highlight-attachment-id="editingHighlightAttachmentId"
+                  document-picker-teleport-to=".chat-view__picker-layer"
+                  @update:content-j-s-o-n="editingContentJSON = $event"
+                  @update:attachments="editingAttachments = $event"
+                  @send="submitEditMessage(virtual.item, $event)"
+                  @select-model="selectComposerModel"
+                  @highlight-attachment="highlightEditingAttachment"
+                  @placeholder-upload="handleEditPlaceholderUpload"
+                  @placeholder-command="handleEditPlaceholderCommand"
+                />
+                <div class="chat-message-list__edit-actions mt-3 flex justify-end gap-2">
+                  <ElButton round @click="cancelEditMessage">
+                    取消
+                  </ElButton>
+                </div>
+              </div>
+
+              <template v-else>
+                <div class="chat-message-list__bubble user rounded-lg px-3 py-2 text-sm leading-[1.625] break-words">
+                  <ChatUserMessageContent :message="virtual.item" />
+                </div>
+                <div class="chat-message-list__actions user flex items-center justify-end gap-1.5">
+                  <ElTooltip content="复制消息" placement="bottom">
+                    <ElButton
+                      text
+                      class="chat-message-list__action-button chat-message-list__copy-action h-7 min-w-7 w-7 rounded-lg p-0"
+                      :class="{ 'is-copied': isMessageCopied(virtual.item) }"
+                      :aria-label="isMessageCopied(virtual.item) ? '消息已复制' : '复制消息'"
+                      @click="copyMessage(virtual.item)"
+                    >
+                      <CopyStateIcon :copied="isMessageCopied(virtual.item)" />
+                    </ElButton>
+                  </ElTooltip>
+                  <ElTooltip content="编辑" placement="bottom">
+                    <ElButton
+                      text
+                      class="chat-message-list__action-button h-7 min-w-7 w-7 rounded-lg p-0"
+                      :icon="EditPen"
+                      :disabled="isStreaming"
+                      @click="startEditMessage(virtual.item)"
+                    />
+                  </ElTooltip>
+                  <div v-if="virtual.item.branch.count > 1" class="chat-message-list__branch ml-0.5 inline-flex items-center gap-0.5 rounded-md px-0.5 text-[0.8125rem] leading-none">
+                    <ElButton
+                      text
+                      class="chat-message-list__branch-button h-4 min-w-4 w-4 rounded-md p-0"
+                      :icon="ArrowLeft"
+                      :disabled="isStreaming || !virtual.item.branch.previousMessageId"
+                      @click="switchToBranch(virtual.item.branch.previousMessageId)"
+                    />
+                    <span class="inline-flex min-w-[2.25rem] items-center justify-center px-1">{{ virtual.item.branch.index }} / {{ virtual.item.branch.count }}</span>
+                    <ElButton
+                      text
+                      class="chat-message-list__branch-button h-4 min-w-4 w-4 rounded-md p-0"
+                      :icon="ArrowRight"
+                      :disabled="isStreaming || !virtual.item.branch.nextMessageId"
+                      @click="switchToBranch(virtual.item.branch.nextMessageId)"
+                    />
+                  </div>
+                </div>
+              </template>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -209,6 +244,8 @@ const {
 
 <style scoped lang="scss">
 .chat-message-list {
+  overflow-anchor: none;
+
   .chat-message-list__empty-icon {
     &.configured {
       background: color-mix(in srgb, var(--brand-primary) 8%, transparent);
@@ -234,6 +271,11 @@ const {
       width: 100%;
       max-width: 100%;
     }
+  }
+
+  .chat-message-list__virtual-item {
+    box-sizing: border-box;
+    padding-bottom: 1rem;
   }
 
   .chat-message-list__bubble {

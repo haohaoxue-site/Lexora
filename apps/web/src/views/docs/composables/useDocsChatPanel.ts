@@ -82,6 +82,7 @@ export function createDocsChatPanelController(options: {
     options.overlay?.renderSession.value ?? options.sessions.activeSession.value,
   )
   const messages = computed(() => renderSession.value?.messages ?? [])
+  const renderSessionId = computed(() => renderSession.value?.id ?? null)
   const hasActiveSession = computed(() => Boolean(options.sessions.activeSession.value))
   const activeSessionTitle = computed(() => options.sessions.activeSession.value?.title ?? '新对话')
 
@@ -235,6 +236,7 @@ export function createDocsChatPanelController(options: {
     renameDialogVisible,
     renameDraft,
     registerBeforeSendHandler: host.registerBeforeSendHandler,
+    renderSessionId,
     resetComposer: host.resetComposer,
     requestComposerFocus,
     selectComposerModel: options.model.selectComposerModel,

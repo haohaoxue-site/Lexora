@@ -29,6 +29,7 @@ const {
   messages,
   openRenameDialog,
   renameDialogVisible,
+  renderSessionId,
   selectComposerModel,
   selectHistorySession,
   startNewSession,
@@ -70,7 +71,7 @@ watch(
       @delete-session="confirmDeleteActiveSession"
     />
 
-    <DocsChatMessages :messages="messages" />
+    <DocsChatMessages :messages="messages" :session-id="renderSessionId" />
 
     <div class="docs-chat-panel__composer flex-none p-3">
       <ChatComposer

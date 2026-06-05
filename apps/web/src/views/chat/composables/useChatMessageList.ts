@@ -1,4 +1,3 @@
-import type { Ref } from 'vue'
 import type { ChatMessage } from '@/apis/chat'
 import type {
   ChatComposerAttachment,
@@ -6,7 +5,7 @@ import type {
   ChatComposerSubmitPayload,
 } from '@/components/chat-composer/typing'
 import { useClipboard } from '@vueuse/core'
-import { computed, nextTick, onUpdated, shallowRef, watch } from 'vue'
+import { computed, shallowRef, watch } from 'vue'
 import { createEmptyChatComposerContentJSON } from '@/components/chat-composer/serialization'
 import { SvgIconCategory } from '@/components/svg-icon/typing'
 import { getMessageText } from '@/composables/chat/utils/chat-message-display'
@@ -17,9 +16,7 @@ import { useChatStream } from './useChatStream'
 
 const EDIT_HIGHLIGHT_DURATION_MS = 1400
 
-export function useChatMessageList(options: {
-  scrollContainerRef: Ref<HTMLElement | null>
-}) {
+export function useChatMessageList() {
   const {
     composerSelectedModelRef,
     isConfigured,
@@ -48,6 +45,7 @@ export function useChatMessageList(options: {
   })
 
   const messages = computed<ChatMessage[]>(() => renderSession.value?.messages ?? [])
+  const listKey = computed(() => renderSession.value?.id ?? null)
   const emptyIconStateClass = computed(() => isConfigured.value ? 'configured' : 'idle')
   const emptyIcon = computed(() => isConfigured.value
     ? {
@@ -59,21 +57,11 @@ export function useChatMessageList(options: {
         icon: 'ai-spark',
       })
 
-  onUpdated(() => {
-    void nextTick(scrollToBottom)
-  })
-
   watch(copiedMessage, (copied) => {
     if (!copied) {
       copiedMessageId.value = null
     }
   })
-
-  function scrollToBottom() {
-    if (options.scrollContainerRef.value) {
-      options.scrollContainerRef.value.scrollTop = options.scrollContainerRef.value.scrollHeight
-    }
-  }
 
   function getMessageRoleClass(role: ChatMessage['role']) {
     return role === 'user' ? 'user' : 'assistant'
@@ -190,6 +178,7 @@ export function useChatMessageList(options: {
     isMessageCopied,
     isConfigured,
     isStreaming,
+    listKey,
     messages,
     retryAssistantMessage,
     selectComposerModel,

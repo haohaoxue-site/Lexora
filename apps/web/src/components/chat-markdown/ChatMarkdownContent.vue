@@ -4,15 +4,14 @@ import { useStreamingMarkdownBlocks } from './useStreamingMarkdownBlocks'
 import 'katex/dist/katex.min.css'
 
 const props = withDefaults(defineProps<ChatMarkdownContentProps>(), {
-  status: undefined,
-  isStreaming: false,
+  phase: 'final',
 })
 
 const { blocks } = useStreamingMarkdownBlocks({
   messageId: () => props.messageId,
   partId: () => props.partId,
   source: () => props.source,
-  isStreaming: () => props.isStreaming,
+  phase: () => props.phase,
 })
 
 async function handleClick(event: MouseEvent) {
@@ -144,6 +143,11 @@ async function handleClick(event: MouseEvent) {
   }
 
   :deep(.chat-markdown__math-fallback) {
+    white-space: pre-wrap;
+  }
+
+  :deep(.chat-markdown__streaming-math) {
+    color: var(--brand-text-secondary);
     white-space: pre-wrap;
   }
 

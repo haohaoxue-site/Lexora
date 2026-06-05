@@ -1,10 +1,12 @@
+export type ChatMarkdownRenderPhase = 'streaming' | 'final'
+
 export interface ChatMarkdownRenderOptions {
-  isStreaming?: boolean
+  phase?: ChatMarkdownRenderPhase
 }
 
 export interface ChatMarkdownBlock {
   key: string
-  kind: 'markdown' | 'incomplete-code'
+  kind: 'markdown' | 'incomplete-code' | 'incomplete-table' | 'incomplete-math'
   source: string
   html: string
 }
@@ -17,6 +19,5 @@ export interface ChatMarkdownContentProps {
   messageId: string
   partId: string
   source: string
-  status?: string
-  isStreaming?: boolean
+  phase?: ChatMarkdownRenderPhase
 }
