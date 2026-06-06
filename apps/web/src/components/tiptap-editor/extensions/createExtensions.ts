@@ -34,6 +34,9 @@ import { DocumentImage } from '../extensions/DocumentImage'
 import { DocumentRuntimeNormalizer } from '../extensions/DocumentRuntimeNormalizer'
 import { HistorySelection } from '../extensions/HistorySelection'
 import { InlineCode } from '../extensions/InlineCode'
+import { LinkBoundary } from '../extensions/LinkBoundary'
+import { LinkClickOpen } from '../extensions/LinkClickOpen'
+import { LinkPanelSelectionHighlight } from '../extensions/LinkPanelSelectionHighlight'
 import { BlockMathematics, InlineMathematics } from '../extensions/Mathematics'
 import { PastePipeline } from '../extensions/PastePipeline'
 import { TextAlign } from '../extensions/TextAlign'
@@ -68,6 +71,7 @@ export function createBodyExtensions(options: {
     }),
     ...createCollaborationExtensions(options.collaboration),
     HistorySelection,
+    LinkClickOpen,
     Placeholder.configure({
       placeholder: ({ editor, node }) => resolveBodyPlaceholder(editor, node),
     }),
@@ -75,6 +79,8 @@ export function createBodyExtensions(options: {
     TextColorClass,
     TextAlign,
     InlineCode,
+    LinkBoundary,
+    LinkPanelSelectionHighlight,
     CodeBlock,
     InlineMathematics,
     BlockMathematics,

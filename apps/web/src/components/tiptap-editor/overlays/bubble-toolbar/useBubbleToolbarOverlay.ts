@@ -1,14 +1,24 @@
 import type { Editor } from '@tiptap/core'
 import type { ComputedRef } from 'vue'
+import type { LinkPreviewController } from '../link-preview/useLinkPreview'
 import type { LinkPanelController } from '../shared/useLinkPanel'
-import { computed, nextTick } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, shallowRef, watch } from 'vue'
 import { isImageSelection } from '../../commands/editorActions'
 import { isMathNodeSelection } from '../../extensions/mathematics/mathNodeSelection'
+import { useLinkPreview } from '../link-preview/useLinkPreview'
 import { useEditorSnapshot } from '../shared/useEditorSnapshot'
 import { useLinkPanel } from '../shared/useLinkPanel'
 import { useLinkPanelMountGuard } from '../shared/useLinkPanelMountGuard'
 
 const BUBBLE_TOOLBAR_LINK_PANEL_PLUGIN_KEY = 'bubbleToolbarLinkPanel'
+const CARET_NAVIGATION_KEYS = new Set([
+  'ArrowDown',
+  'ArrowLeft',
+  'ArrowRight',
+  'ArrowUp',
+  'End',
+  'Home',
+])
 
 /** 选择工具栏浮层显示上下文。 */
 export interface BubbleToolbarShouldShowContext {
@@ -24,6 +34,7 @@ export interface BubbleToolbarShouldShowContext {
 export interface BubbleToolbarOverlayController {
   /** 链接面板控制器 */
   linkPanel: LinkPanelController
+  linkPreview: LinkPreviewController
   /** 是否展示工具栏 */
   shouldShowToolbar: (context: BubbleToolbarShouldShowContext) => boolean
   /** 是否展示链接面板 */
@@ -40,6 +51,8 @@ export function useBubbleToolbarOverlay(editor: Editor): BubbleToolbarOverlayCon
     onClosed: hideLinkPanelMenu,
     onOpened: showLinkPanelMenu,
   })
+  const linkPreview = useLinkPreview(editor, linkPanel)
+  const pendingKeyboardCaretNavigation = shallowRef(false)
   const shouldKeepLinkPanelMounted = computed(() => {
     void editorSnapshot.value
 
@@ -49,8 +62,33 @@ export function useBubbleToolbarOverlay(editor: Editor): BubbleToolbarOverlayCon
 
   useLinkPanelMountGuard(linkPanel, shouldKeepLinkPanelMounted)
 
+  watch(editorSnapshot, openExistingLinkPanelAfterKeyboardNavigation)
+
+  onMounted(() => {
+    const editorElement = editor.view?.dom
+
+    if (!editorElement) {
+      return
+    }
+
+    editorElement.addEventListener('keydown', handleEditorKeydown)
+    editorElement.addEventListener('pointerdown', handleEditorPointerDown)
+  })
+
+  onBeforeUnmount(() => {
+    const editorElement = editor.view?.dom
+
+    if (!editorElement) {
+      return
+    }
+
+    editorElement.removeEventListener('keydown', handleEditorKeydown)
+    editorElement.removeEventListener('pointerdown', handleEditorPointerDown)
+  })
+
   return {
     linkPanel,
+    linkPreview,
     shouldShowToolbar,
     shouldShowLinkPanel,
     shouldKeepLinkPanelMounted,
@@ -61,7 +99,15 @@ export function useBubbleToolbarOverlay(editor: Editor): BubbleToolbarOverlayCon
       return false
     }
 
-    return isImageSelection(editor) || editor.isActive('link') || from !== to
+    if (linkPanel.isOpen.value) {
+      return false
+    }
+
+    if (from === to && editor.isActive('link')) {
+      return false
+    }
+
+    return isImageSelection(editor) || from !== to
   }
 
   function shouldShowLinkPanel({ from, to }: BubbleToolbarShouldShowContext): boolean {
@@ -93,5 +139,40 @@ export function useBubbleToolbarOverlay(editor: Editor): BubbleToolbarOverlayCon
 
   function hideLinkPanelMenu() {
     void nextTick(() => dispatchLinkPanelMenuMeta('hide'))
+  }
+
+  function handleEditorKeydown(event: KeyboardEvent) {
+    if (event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey || !CARET_NAVIGATION_KEYS.has(event.key)) {
+      return
+    }
+
+    pendingKeyboardCaretNavigation.value = true
+  }
+
+  function handleEditorPointerDown() {
+    pendingKeyboardCaretNavigation.value = false
+  }
+
+  function openExistingLinkPanelAfterKeyboardNavigation() {
+    if (!pendingKeyboardCaretNavigation.value) {
+      return
+    }
+
+    pendingKeyboardCaretNavigation.value = false
+
+    if (linkPanel.isOpen.value || isImageSelection(editor) || isMathNodeSelection(editor.state)) {
+      return
+    }
+
+    const { from, to } = editor.state.selection
+
+    if (from !== to || !editor.isActive('link')) {
+      return
+    }
+
+    linkPanel.openSelection({
+      focusInput: false,
+      selectLinkedText: false,
+    })
   }
 }

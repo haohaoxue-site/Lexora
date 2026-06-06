@@ -5,6 +5,7 @@ import type {
   TiptapEditorSelectionContextRequest,
 } from '../../core/typing'
 import { BubbleMenu } from '@tiptap/vue-3/menus'
+import LinkPreview from '../link-preview/LinkPreview.vue'
 import LinkPanel from '../shared/LinkPanel.vue'
 import BubbleToolbarGroup from './BubbleToolbarGroup.vue'
 import { useBubbleToolbar } from './useBubbleToolbar'
@@ -64,8 +65,11 @@ const controller = useBubbleToolbar(editor, {
     :editor="editor"
     plugin-key="bubbleToolbarLinkPanel"
     :should-show="controller.overlay.shouldShowLinkPanel"
+    :get-referenced-virtual-element="controller.overlay.linkPanel.getReferencedVirtualElement"
     :options="{ placement: 'bottom', offset: 8 }"
   >
     <LinkPanel :controller="controller.overlay.linkPanel" />
   </BubbleMenu>
+
+  <LinkPreview :controller="controller.overlay.linkPreview" />
 </template>

@@ -18,6 +18,10 @@ export interface LinkPanelViewController {
   assignPrimaryInputRef: (element: LinkPanelRefTarget) => void
   /** 绑定次输入框引用 */
   assignSecondaryInputRef: (element: LinkPanelRefTarget) => void
+  /** 保持主输入框焦点 */
+  keepPrimaryInputFocus: () => void
+  /** 保持次输入框焦点 */
+  keepSecondaryInputFocus: () => void
   /** 输入框键盘协议 */
   handleInputKeydown: (event: Event | KeyboardEvent) => void
 }
@@ -33,8 +37,12 @@ export function useLinkPanelView(controller: LinkPanelController): LinkPanelView
         return
       }
 
+      if (!controller.shouldFocusInputOnOpen.value) {
+        return
+      }
+
       await nextTick()
-      primaryInputRef.value?.focus()
+      keepPrimaryInputFocus()
     },
   )
 
@@ -46,8 +54,20 @@ export function useLinkPanelView(controller: LinkPanelController): LinkPanelView
     secondaryInputRef.value = normalizeFocusableElement(element)
   }
 
+  function keepPrimaryInputFocus() {
+    keepInputFocus(primaryInputRef)
+  }
+
+  function keepSecondaryInputFocus() {
+    keepInputFocus(secondaryInputRef)
+  }
+
   function handleInputKeydown(event: Event | KeyboardEvent) {
     if (!(event instanceof KeyboardEvent)) {
+      return
+    }
+
+    if (event.isComposing) {
       return
     }
 
@@ -63,11 +83,7 @@ export function useLinkPanelView(controller: LinkPanelController): LinkPanelView
       return
     }
 
-    if (
-      controller.mode.value === 'empty-block'
-      && event.key === 'Tab'
-      && event.shiftKey === false
-    ) {
+    if (controller.mode.value !== 'selection' && event.key === 'Tab' && event.shiftKey === false) {
       event.preventDefault()
       secondaryInputRef.value?.focus()
     }
@@ -78,6 +94,8 @@ export function useLinkPanelView(controller: LinkPanelController): LinkPanelView
     secondaryInputRef,
     assignPrimaryInputRef,
     assignSecondaryInputRef,
+    keepPrimaryInputFocus,
+    keepSecondaryInputFocus,
     handleInputKeydown,
   }
 }
@@ -89,4 +107,13 @@ function normalizeFocusableElement(target: LinkPanelRefTarget): FocusableElement
 
   const focus = (target as unknown as { focus?: unknown }).focus
   return typeof focus === 'function' ? target as unknown as FocusableElement : null
+}
+
+function keepInputFocus(target: ShallowRef<FocusableElement | null>) {
+  if (typeof window === 'undefined') {
+    target.value?.focus()
+    return
+  }
+
+  window.requestAnimationFrame(() => target.value?.focus())
 }
