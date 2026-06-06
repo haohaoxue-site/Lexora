@@ -36,8 +36,8 @@ import { HistorySelection } from '../extensions/HistorySelection'
 import { InlineCode } from '../extensions/InlineCode'
 import { LinkBoundary } from '../extensions/LinkBoundary'
 import { LinkClickOpen } from '../extensions/LinkClickOpen'
-import { LinkPanelSelectionHighlight } from '../extensions/LinkPanelSelectionHighlight'
 import { BlockMathematics, InlineMathematics } from '../extensions/Mathematics'
+import { PanelSelectionHighlight } from '../extensions/PanelSelectionHighlight'
 import { PastePipeline } from '../extensions/PastePipeline'
 import { TextAlign } from '../extensions/TextAlign'
 import { TextColorClass } from '../extensions/TextColorClass'
@@ -80,7 +80,7 @@ export function createBodyExtensions(options: {
     TextAlign,
     InlineCode,
     LinkBoundary,
-    LinkPanelSelectionHighlight,
+    PanelSelectionHighlight,
     CodeBlock,
     InlineMathematics,
     BlockMathematics,

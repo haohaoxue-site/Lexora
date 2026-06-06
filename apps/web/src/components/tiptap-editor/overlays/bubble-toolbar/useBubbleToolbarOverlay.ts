@@ -8,7 +8,7 @@ import { isMathNodeSelection } from '../../extensions/mathematics/mathNodeSelect
 import { useLinkPreview } from '../link-preview/useLinkPreview'
 import { useEditorSnapshot } from '../shared/useEditorSnapshot'
 import { useLinkPanel } from '../shared/useLinkPanel'
-import { useLinkPanelMountGuard } from '../shared/useLinkPanelMountGuard'
+import { usePanelMountGuard } from '../shared/usePanelMountGuard'
 
 const BUBBLE_TOOLBAR_LINK_PANEL_PLUGIN_KEY = 'bubbleToolbarLinkPanel'
 const CARET_NAVIGATION_KEYS = new Set([
@@ -60,7 +60,7 @@ export function useBubbleToolbarOverlay(editor: Editor): BubbleToolbarOverlayCon
     return (from !== to || editor.isActive('link')) && !isImageSelection(editor)
   })
 
-  useLinkPanelMountGuard(linkPanel, shouldKeepLinkPanelMounted)
+  usePanelMountGuard(linkPanel, shouldKeepLinkPanelMounted)
 
   watch(editorSnapshot, openExistingLinkPanelAfterKeyboardNavigation)
 
@@ -171,8 +171,7 @@ export function useBubbleToolbarOverlay(editor: Editor): BubbleToolbarOverlayCon
     }
 
     linkPanel.openSelection({
-      focusInput: false,
-      selectLinkedText: false,
+      source: 'keyboard-caret-navigation',
     })
   }
 }

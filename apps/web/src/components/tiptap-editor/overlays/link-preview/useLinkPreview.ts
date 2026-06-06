@@ -138,7 +138,9 @@ export function useLinkPreview(
 
     close()
     editor.chain().focus().setTextSelection(range).run()
-    linkPanel.openSelection()
+    linkPanel.openSelection({
+      source: 'preview-edit',
+    })
   }
 
   function close() {

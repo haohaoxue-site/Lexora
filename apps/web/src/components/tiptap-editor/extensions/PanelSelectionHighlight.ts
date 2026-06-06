@@ -3,34 +3,34 @@ import { Extension } from '@tiptap/core'
 import { Plugin, PluginKey } from '@tiptap/pm/state'
 import { Decoration, DecorationSet } from '@tiptap/pm/view'
 
-interface LinkPanelSelectionRange {
+interface PanelSelectionRange {
   from: number
   to: number
 }
 
-type LinkPanelSelectionMeta
+type PanelSelectionMeta
   = | {
-    range: LinkPanelSelectionRange
+    range: PanelSelectionRange
     type: 'set'
   }
   | {
     type: 'clear'
   }
 
-const LINK_PANEL_SELECTION_CLASS = 'tiptap-link-panel-selection'
-const linkPanelSelectionHighlightPluginKey = new PluginKey<LinkPanelSelectionRange | null>('linkPanelSelectionHighlight')
+const PANEL_SELECTION_CLASS = 'tiptap-panel-selection'
+const panelSelectionHighlightPluginKey = new PluginKey<PanelSelectionRange | null>('panelSelectionHighlight')
 
-export const LinkPanelSelectionHighlight = Extension.create({
-  name: 'linkPanelSelectionHighlight',
+export const PanelSelectionHighlight = Extension.create({
+  name: 'panelSelectionHighlight',
 
   addProseMirrorPlugins() {
     return [
-      new Plugin<LinkPanelSelectionRange | null>({
-        key: linkPanelSelectionHighlightPluginKey,
+      new Plugin<PanelSelectionRange | null>({
+        key: panelSelectionHighlightPluginKey,
         state: {
           init: () => null,
           apply(transaction, value) {
-            const meta = transaction.getMeta(linkPanelSelectionHighlightPluginKey) as LinkPanelSelectionMeta | undefined
+            const meta = transaction.getMeta(panelSelectionHighlightPluginKey) as PanelSelectionMeta | undefined
 
             if (meta?.type === 'clear') {
               return null
@@ -52,7 +52,7 @@ export const LinkPanelSelectionHighlight = Extension.create({
         },
         props: {
           decorations(state) {
-            const range = linkPanelSelectionHighlightPluginKey.getState(state)
+            const range = panelSelectionHighlightPluginKey.getState(state)
 
             if (!range) {
               return null
@@ -68,7 +68,7 @@ export const LinkPanelSelectionHighlight = Extension.create({
 
             return DecorationSet.create(state.doc, [
               Decoration.inline(from, to, {
-                class: LINK_PANEL_SELECTION_CLASS,
+                class: PANEL_SELECTION_CLASS,
               }),
             ])
           },
@@ -78,33 +78,33 @@ export const LinkPanelSelectionHighlight = Extension.create({
   },
 })
 
-export function setLinkPanelSelectionHighlight(editor: Editor, range: LinkPanelSelectionRange) {
+export function setPanelSelectionHighlight(editor: Editor, range: PanelSelectionRange) {
   if (!canDispatchEditorTransaction(editor)) {
     return
   }
 
   if (range.to <= range.from) {
-    clearLinkPanelSelectionHighlight(editor)
+    clearPanelSelectionHighlight(editor)
     return
   }
 
   editor.view.dispatch(editor.state.tr
-    .setMeta(linkPanelSelectionHighlightPluginKey, {
+    .setMeta(panelSelectionHighlightPluginKey, {
       range,
       type: 'set',
-    } satisfies LinkPanelSelectionMeta)
+    } satisfies PanelSelectionMeta)
     .setMeta('addToHistory', false))
 }
 
-export function clearLinkPanelSelectionHighlight(editor: Editor) {
+export function clearPanelSelectionHighlight(editor: Editor) {
   if (!canDispatchEditorTransaction(editor)) {
     return
   }
 
   editor.view.dispatch(editor.state.tr
-    .setMeta(linkPanelSelectionHighlightPluginKey, {
+    .setMeta(panelSelectionHighlightPluginKey, {
       type: 'clear',
-    } satisfies LinkPanelSelectionMeta)
+    } satisfies PanelSelectionMeta)
     .setMeta('addToHistory', false))
 }
 
@@ -114,7 +114,7 @@ function canDispatchEditorTransaction(editor: Editor): boolean {
     && typeof editor.state?.tr?.setMeta === 'function'
 }
 
-function normalizeRange(range: LinkPanelSelectionRange): LinkPanelSelectionRange | null {
+function normalizeRange(range: PanelSelectionRange): PanelSelectionRange | null {
   return range.to > range.from
     ? range
     : null

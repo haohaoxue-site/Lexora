@@ -1,55 +1,37 @@
 import type { Editor } from '@tiptap/core'
 import type { ComputedRef, ShallowRef } from 'vue'
-import { getMarkRange, posToDOMRect } from '@tiptap/core'
-import { TextSelection } from '@tiptap/pm/state'
+import type { EditorDocumentRange } from './editorRange'
+import type {
+  EditorRangeReferenceAnchor,
+  EditorRangeReferenceElement,
+} from './editorRangeReference'
+import type { SelectionPanelOpenIntent } from './selectionPanelOpenPolicy'
+import { getMarkRange } from '@tiptap/core'
 import { computed, shallowRef } from 'vue'
 import { getCurrentBlock } from '../../commands/currentBlock'
 import {
-  clearLinkPanelSelectionHighlight,
-  setLinkPanelSelectionHighlight,
-} from '../../extensions/LinkPanelSelectionHighlight'
-import { normalizeLinkHref, preserveExistingLinkHref } from './linkHref'
+  clearPanelSelectionHighlight,
+  setPanelSelectionHighlight,
+} from '../../extensions/PanelSelectionHighlight'
+import { selectEditorRange } from './editorRange'
+import {
+  createEditorRangeReferenceAnchor,
+  createEditorRangeReferenceElement,
+} from './editorRangeReference'
+import {
+  applyLinkToSelection,
+  exitLinkMarkAtPosition,
+  insertEmptyBlockLink,
+  removeLinkFromSelection,
+  replaceExistingLink,
+  restoreLinkSelection,
+} from './linkEditorCommands'
+import { normalizeLinkHref } from './linkHref'
+import { resolveExistingLinkDraftCommit } from './linkPanelDraft'
+import { resolveSelectionPanelOpenPolicy } from './selectionPanelOpenPolicy'
 
 type EditorResolver = () => Editor | null | undefined
-
 export type LinkPanelMode = 'selection' | 'empty-block' | 'existing-link'
-
-export interface LinkPanelOpenSelectionOptions {
-  focusInput?: boolean
-  selectLinkedText?: boolean
-}
-
-interface EditorSelectionRange {
-  /** 选区起点 */
-  from: number
-  /** 选区终点 */
-  to: number
-}
-
-interface LinkPanelReferenceRect {
-  bottom: number
-  height: number
-  left: number
-  right: number
-  top: number
-  width: number
-  x: number
-  y: number
-  toJSON: () => Omit<LinkPanelReferenceRect, 'toJSON'>
-}
-
-type LinkPanelReferenceRectData = Omit<LinkPanelReferenceRect, 'toJSON'>
-
-interface LinkPanelReferenceElement {
-  getBoundingClientRect: () => LinkPanelReferenceRect
-  getClientRects: () => LinkPanelReferenceRect[]
-}
-
-interface LinkPanelReferenceAnchor {
-  range: EditorSelectionRange
-  rect: LinkPanelReferenceRect
-  startRect: LinkPanelReferenceRect | null
-}
 
 interface UseLinkPanelOptions {
   onClosed?: () => void
@@ -64,8 +46,8 @@ export interface LinkPanelController {
   linkUrl: ShallowRef<string>
   shouldFocusInputOnOpen: ShallowRef<boolean>
   isConfirmDisabled: ComputedRef<boolean>
-  getReferencedVirtualElement: () => LinkPanelReferenceElement | null
-  openSelection: (options?: LinkPanelOpenSelectionOptions) => void
+  getReferencedVirtualElement: () => EditorRangeReferenceElement | null
+  openSelection: (intent?: SelectionPanelOpenIntent) => void
   openEmptyBlock: () => void
   toggle: () => void
   dismiss: () => void
@@ -89,34 +71,34 @@ export function useLinkPanel(
   const shouldFocusInputOnOpen = shallowRef(true)
   const initialLinkText = shallowRef('')
   const initialLinkUrl = shallowRef('')
-  const selectionRange = shallowRef<EditorSelectionRange | null>(null)
-  const emptyBlockRange = shallowRef<EditorSelectionRange | null>(null)
-  const referenceAnchor = shallowRef<LinkPanelReferenceAnchor | null>(null)
+  const selectionRange = shallowRef<EditorDocumentRange | null>(null)
+  const emptyBlockRange = shallowRef<EditorDocumentRange | null>(null)
+  const referenceAnchor = shallowRef<EditorRangeReferenceAnchor | null>(null)
   const normalizedLinkUrl = computed(() => normalizeLinkHref(linkUrl.value))
-  const linkHrefForCommit = computed(() => {
-    if (mode.value !== 'existing-link') {
-      return normalizedLinkUrl.value
-    }
-
-    return resolveExistingLinkHrefForCommit(
-      linkUrl.value,
-      initialLinkUrl.value,
-      normalizedLinkUrl.value,
-    )
-  })
+  const existingLinkDraftCommit = computed(() => resolveExistingLinkDraftCommit({
+    initialHref: initialLinkUrl.value,
+    initialText: initialLinkText.value,
+    linkText: linkText.value,
+    linkUrl: linkUrl.value,
+    normalizedHref: normalizedLinkUrl.value,
+  }))
   const isConfirmDisabled = computed(() => {
     if (mode.value === 'selection') {
       return !normalizedLinkUrl.value
     }
 
-    return !linkHrefForCommit.value || linkText.value.trim().length === 0
+    if (mode.value === 'existing-link') {
+      return !existingLinkDraftCommit.value
+    }
+
+    return !normalizedLinkUrl.value || linkText.value.trim().length === 0
   })
 
   function getEditorInstance() {
     return getEditor()
   }
 
-  function rememberSelection(editor: Editor, range?: EditorSelectionRange | null) {
+  function rememberSelection(editor: Editor, range?: EditorDocumentRange | null) {
     const { from, to } = editor.state.selection
     selectionRange.value = range ?? { from, to }
   }
@@ -132,21 +114,11 @@ export function useLinkPanel(
       : null
   }
 
-  function getLinkChain(editor: Editor) {
-    const chain = editor.chain().focus()
-
-    if (selectionRange.value) {
-      chain.setTextSelection(selectionRange.value)
-    }
-
-    return chain.extendMarkRange('link')
-  }
-
   function finalizeClose(notifyClosed = true) {
     const editor = getEditorInstance()
 
     if (editor) {
-      clearLinkPanelSelectionHighlight(editor)
+      clearPanelSelectionHighlight(editor)
     }
 
     isOpen.value = false
@@ -165,7 +137,7 @@ export function useLinkPanel(
     }
   }
 
-  function openSelection(openOptions: LinkPanelOpenSelectionOptions = {}) {
+  function openSelection(intent: SelectionPanelOpenIntent = {}) {
     const editor = getEditorInstance()
 
     if (!editor) {
@@ -174,7 +146,7 @@ export function useLinkPanel(
 
     const href = editor.getAttributes('link').href
     const isExistingLink = editor.isActive('link') || Boolean(href)
-    const shouldSelectLinkedText = openOptions.selectLinkedText ?? true
+    const openPolicy = resolveSelectionPanelOpenPolicy(intent)
     const linkRange = isExistingLink ? getCurrentLinkRange(editor) : null
     const selectionRangeTarget = linkRange ?? editor.state.selection
     const nextSelectionRange = {
@@ -187,21 +159,21 @@ export function useLinkPanel(
       ? editor.state.doc.textBetween(nextSelectionRange.from, nextSelectionRange.to, '\n')
       : ''
     linkUrl.value = typeof href === 'string' && href ? href : ''
-    shouldFocusInputOnOpen.value = openOptions.focusInput ?? true
+    shouldFocusInputOnOpen.value = openPolicy.focusInput
     initialLinkText.value = linkText.value
     initialLinkUrl.value = linkUrl.value
     canRemove.value = isExistingLink
     rememberSelection(editor, linkRange)
-    referenceAnchor.value = getReferenceAnchor(editor, nextSelectionRange)
+    referenceAnchor.value = createEditorRangeReferenceAnchor(editor, nextSelectionRange)
 
-    if (mode.value === 'selection' || (mode.value === 'existing-link' && shouldSelectLinkedText)) {
-      setLinkPanelSelectionHighlight(editor, nextSelectionRange)
+    if (mode.value === 'selection' || (mode.value === 'existing-link' && openPolicy.selectRange)) {
+      setPanelSelectionHighlight(editor, nextSelectionRange)
     }
     else {
-      clearLinkPanelSelectionHighlight(editor)
+      clearPanelSelectionHighlight(editor)
     }
 
-    if (mode.value === 'existing-link' && shouldSelectLinkedText) {
+    if (mode.value === 'existing-link' && openPolicy.selectRange) {
       selectEditorRange(editor, nextSelectionRange)
     }
 
@@ -224,7 +196,7 @@ export function useLinkPanel(
     initialLinkUrl.value = ''
     canRemove.value = false
     referenceAnchor.value = null
-    clearLinkPanelSelectionHighlight(editor)
+    clearPanelSelectionHighlight(editor)
     rememberSelection(editor)
     rememberEmptyBlockRange(editor)
     isOpen.value = true
@@ -235,7 +207,7 @@ export function useLinkPanel(
     const editor = getEditorInstance()
 
     if (editor && mode.value === 'selection') {
-      getLinkChain(editor).run()
+      restoreLinkSelection(editor, selectionRange.value)
     }
 
     if (editor && mode.value === 'existing-link') {
@@ -282,9 +254,10 @@ export function useLinkPanel(
         return
       }
 
-      const chain = getLinkChain(editor)
-      const didApply = chain.setLink({ href }).run()
-      const collapsePosition = didApply ? editor.state.selection.to : null
+      const collapsePosition = applyLinkToSelection(editor, {
+        href,
+        range: selectionRange.value,
+      })
 
       finalizeClose()
 
@@ -302,12 +275,11 @@ export function useLinkPanel(
       return
     }
 
-    const didInsert = insertEmptyBlockLink(
-      editor,
-      emptyBlockRange.value,
-      linkText.value.trim(),
-      normalizedLinkUrl.value,
-    )
+    const didInsert = insertEmptyBlockLink(editor, {
+      href: normalizedLinkUrl.value,
+      range: emptyBlockRange.value,
+      text: linkText.value.trim(),
+    })
     finalizeClose()
 
     if (didInsert) {
@@ -322,7 +294,7 @@ export function useLinkPanel(
       return
     }
 
-    getLinkChain(editor).unsetLink().run()
+    removeLinkFromSelection(editor, selectionRange.value)
     finalizeClose()
   }
 
@@ -341,10 +313,10 @@ export function useLinkPanel(
       return
     }
 
-    setLinkPanelSelectionHighlight(editor, selectionRange.value)
+    setPanelSelectionHighlight(editor, selectionRange.value)
   }
 
-  function getReferencedVirtualElement(): LinkPanelReferenceElement | null {
+  function getReferencedVirtualElement(): EditorRangeReferenceElement | null {
     const editor = getEditorInstance()
     const anchor = referenceAnchor.value
 
@@ -352,10 +324,7 @@ export function useLinkPanel(
       return null
     }
 
-    return {
-      getBoundingClientRect: () => getCurrentReferenceRect(editor, anchor),
-      getClientRects: () => [getCurrentReferenceRect(editor, anchor)],
-    }
+    return createEditorRangeReferenceElement(editor, anchor)
   }
 
   function commitExistingLinkDraft(editor: Editor) {
@@ -363,26 +332,24 @@ export function useLinkPanel(
       return false
     }
 
-    const href = linkHrefForCommit.value
-    const text = linkText.value.trim()
+    const draftCommit = existingLinkDraftCommit.value
 
-    if (!hasExistingLinkDraftChanged(text, href, initialLinkText.value, initialLinkUrl.value)) {
+    if (!draftCommit?.changed) {
       return false
     }
 
-    const nextRange = updateExistingLink(
-      editor,
-      selectionRange.value,
-      text,
-      href,
-    )
+    const nextRange = replaceExistingLink(editor, {
+      href: draftCommit.href,
+      range: selectionRange.value,
+      text: draftCommit.text,
+    })
 
     if (!nextRange) {
       return false
     }
 
     selectionRange.value = nextRange
-    setLinkPanelSelectionHighlight(editor, nextRange)
+    setPanelSelectionHighlight(editor, nextRange)
 
     return true
   }
@@ -409,7 +376,7 @@ export function useLinkPanel(
   }
 }
 
-function getCurrentLinkRange(editor: Editor): EditorSelectionRange | null {
+function getCurrentLinkRange(editor: Editor): EditorDocumentRange | null {
   const linkType = editor.schema.marks.link
 
   if (!linkType) {
@@ -424,213 +391,4 @@ function getCurrentLinkRange(editor: Editor): EditorSelectionRange | null {
         to: range.to,
       }
     : null
-}
-
-function selectEditorRange(editor: Editor, range: EditorSelectionRange) {
-  const view = editor.view
-
-  if (editor.isDestroyed || !view || range.to <= range.from || range.to > editor.state.doc.content.size) {
-    return
-  }
-
-  view.dispatch(editor.state.tr
-    .setSelection(TextSelection.create(editor.state.doc, range.from, range.to))
-    .setMeta('addToHistory', false))
-}
-
-function getReferenceAnchor(editor: Editor, range: EditorSelectionRange): LinkPanelReferenceAnchor | null {
-  const rect = getReferenceRect(editor, range)
-
-  if (!rect) {
-    return null
-  }
-
-  return {
-    range,
-    rect,
-    startRect: getPositionReferenceRect(editor, range.from),
-  }
-}
-
-function getReferenceRect(editor: Editor, range: EditorSelectionRange): LinkPanelReferenceRect | null {
-  const view = editor.view
-
-  if (!view || typeof view.coordsAtPos !== 'function' || range.to < range.from) {
-    return null
-  }
-
-  try {
-    return createReferenceRectSnapshot(posToDOMRect(view, range.from, range.to))
-  }
-  catch {
-    return null
-  }
-}
-
-function getPositionReferenceRect(editor: Editor, position: number): LinkPanelReferenceRect | null {
-  const view = editor.view
-
-  if (!view || typeof view.coordsAtPos !== 'function' || position > editor.state.doc.content.size) {
-    return null
-  }
-
-  try {
-    const rect = view.coordsAtPos(position)
-    return createReferenceRectSnapshot({
-      bottom: rect.bottom,
-      height: rect.bottom - rect.top,
-      left: rect.left,
-      right: rect.right,
-      top: rect.top,
-      width: rect.right - rect.left,
-      x: rect.left,
-      y: rect.top,
-    })
-  }
-  catch {
-    return null
-  }
-}
-
-function getCurrentReferenceRect(editor: Editor, anchor: LinkPanelReferenceAnchor): LinkPanelReferenceRect {
-  const currentStartRect = anchor.startRect
-    ? getPositionReferenceRect(editor, anchor.range.from)
-    : null
-
-  if (!currentStartRect || !anchor.startRect) {
-    return anchor.rect
-  }
-
-  return shiftReferenceRect(anchor.rect, {
-    left: currentStartRect.left - anchor.startRect.left,
-    top: currentStartRect.top - anchor.startRect.top,
-  })
-}
-
-function createReferenceRectSnapshot(rect: LinkPanelReferenceRectData): LinkPanelReferenceRect {
-  const data = {
-    bottom: rect.bottom,
-    height: rect.height,
-    left: rect.left,
-    right: rect.right,
-    top: rect.top,
-    width: rect.width,
-    x: rect.x,
-    y: rect.y,
-  }
-
-  return {
-    ...data,
-    toJSON: () => data,
-  }
-}
-
-function shiftReferenceRect(rect: LinkPanelReferenceRect, delta: { left: number, top: number }): LinkPanelReferenceRect {
-  return createReferenceRectSnapshot({
-    bottom: rect.bottom + delta.top,
-    height: rect.height,
-    left: rect.left + delta.left,
-    right: rect.right + delta.left,
-    top: rect.top + delta.top,
-    width: rect.width,
-    x: rect.x + delta.left,
-    y: rect.y + delta.top,
-  })
-}
-
-function updateExistingLink(
-  editor: Editor,
-  range: EditorSelectionRange | null,
-  text: string,
-  href: string | null,
-): EditorSelectionRange | null {
-  if (!range || !href) {
-    return null
-  }
-
-  const didApply = editor.chain().focus().insertContentAt(
-    range,
-    {
-      type: 'text',
-      text,
-      marks: [
-        {
-          type: 'link',
-          attrs: {
-            href,
-          },
-        },
-      ],
-    },
-  ).setTextSelection(range.from + text.length).unsetMark('link').run()
-
-  return didApply
-    ? {
-        from: range.from,
-        to: range.from + text.length,
-      }
-    : null
-}
-
-function insertEmptyBlockLink(
-  editor: Editor,
-  blockRange: EditorSelectionRange | null,
-  text: string,
-  href: string | null,
-) {
-  if (!blockRange || !href) {
-    return false
-  }
-
-  return editor.chain().focus().insertContentAt(
-    {
-      from: blockRange.from,
-      to: blockRange.to,
-    },
-    {
-      type: 'paragraph',
-      content: [
-        {
-          type: 'text',
-          text,
-          marks: [
-            {
-              type: 'link',
-              attrs: {
-                href,
-              },
-            },
-          ],
-        },
-      ],
-    },
-  ).run()
-}
-
-function exitLinkMarkAtPosition(editor: Editor, position: number) {
-  editor.chain().focus().setTextSelection(position).unsetMark('link').run()
-}
-
-function resolveExistingLinkHrefForCommit(
-  input: string,
-  initialHref: string,
-  normalizedHref: string | null,
-) {
-  if (normalizedHref) {
-    return normalizedHref
-  }
-
-  return input.trim() === initialHref.trim()
-    ? preserveExistingLinkHref(initialHref)
-    : null
-}
-
-function hasExistingLinkDraftChanged(
-  text: string,
-  href: string | null,
-  initialText: string,
-  initialHref: string,
-) {
-  return text !== initialText.trim()
-    || href !== preserveExistingLinkHref(initialHref)
 }

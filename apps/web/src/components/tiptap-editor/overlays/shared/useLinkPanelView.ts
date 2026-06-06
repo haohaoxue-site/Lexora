@@ -1,6 +1,10 @@
 import type { ComponentPublicInstance, ShallowRef } from 'vue'
 import type { LinkPanelController } from './useLinkPanel'
 import { nextTick, shallowRef, watch } from 'vue'
+import {
+  resolvePanelInputKeydownAction,
+  shouldFocusPanelPrimaryInput,
+} from './panelInputPolicy'
 
 interface FocusableElement {
   focus: () => void
@@ -8,21 +12,13 @@ interface FocusableElement {
 
 type LinkPanelRefTarget = Element | ComponentPublicInstance | null
 
-/** 链接面板视图控制器。 */
 export interface LinkPanelViewController {
-  /** 主输入框引用 */
   primaryInputRef: ShallowRef<FocusableElement | null>
-  /** 次输入框引用 */
   secondaryInputRef: ShallowRef<FocusableElement | null>
-  /** 绑定主输入框引用 */
   assignPrimaryInputRef: (element: LinkPanelRefTarget) => void
-  /** 绑定次输入框引用 */
   assignSecondaryInputRef: (element: LinkPanelRefTarget) => void
-  /** 保持主输入框焦点 */
   keepPrimaryInputFocus: () => void
-  /** 保持次输入框焦点 */
   keepSecondaryInputFocus: () => void
-  /** 输入框键盘协议 */
   handleInputKeydown: (event: Event | KeyboardEvent) => void
 }
 
@@ -33,11 +29,10 @@ export function useLinkPanelView(controller: LinkPanelController): LinkPanelView
   watch(
     () => [controller.isOpen.value, controller.mode.value] as const,
     async ([isOpen]) => {
-      if (!isOpen) {
-        return
-      }
-
-      if (!controller.shouldFocusInputOnOpen.value) {
+      if (!shouldFocusPanelPrimaryInput({
+        isOpen,
+        shouldFocusInputOnOpen: controller.shouldFocusInputOnOpen.value,
+      })) {
         return
       }
 
@@ -67,26 +62,30 @@ export function useLinkPanelView(controller: LinkPanelController): LinkPanelView
       return
     }
 
-    if (event.isComposing) {
+    const action = resolvePanelInputKeydownAction({
+      hasSecondaryInput: controller.mode.value !== 'selection',
+      isComposing: event.isComposing,
+      key: event.key,
+      shiftKey: event.shiftKey,
+    })
+
+    if (action === 'ignore') {
       return
     }
 
-    if (event.key === 'Enter') {
-      event.preventDefault()
+    event.preventDefault()
+
+    if (action === 'apply') {
       controller.apply()
       return
     }
 
-    if (event.key === 'Escape') {
-      event.preventDefault()
+    if (action === 'cancel') {
       controller.cancel()
       return
     }
 
-    if (controller.mode.value !== 'selection' && event.key === 'Tab' && event.shiftKey === false) {
-      event.preventDefault()
-      secondaryInputRef.value?.focus()
-    }
+    secondaryInputRef.value?.focus()
   }
 
   return {
