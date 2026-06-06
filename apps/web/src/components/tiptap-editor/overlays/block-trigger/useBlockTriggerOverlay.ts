@@ -37,7 +37,11 @@ export function useBlockTriggerOverlay(editor: Editor) {
   const anchorRect = shallowRef<DOMRect | null>(null)
   const editorDom = shallowRef<HTMLElement | null>(getEditorDomSafely(editor))
 
-  const shouldRenderTriggerMenu = computed(() => canShowTriggerMenu() && Boolean(anchorRect.value))
+  const shouldRenderTriggerMenu = computed(() =>
+    canShowTriggerMenu()
+    && Boolean(anchorRect.value)
+    && isAnchorRectVisible(anchorRect.value),
+  )
   const shouldKeepLinkPanelMounted = computed(() =>
     visible.value && activePanel.value === 'link' && shouldRenderTriggerMenu.value,
   )
@@ -140,6 +144,11 @@ export function useBlockTriggerOverlay(editor: Editor) {
     }
 
     syncAnchorRect()
+
+    if (!anchorRect.value || !isAnchorRectVisible(anchorRect.value)) {
+      return false
+    }
+
     visible.value = true
     activePanel.value = 'root'
     return true
@@ -241,6 +250,34 @@ export function useBlockTriggerOverlay(editor: Editor) {
   function hasEditorView() {
     return Boolean(getEditorDomSafely(editor)) && typeof getEditorViewSafely(editor)?.coordsAtPos === 'function'
   }
+
+  function isAnchorRectVisible(rect: DOMRect | null) {
+    if (!rect) {
+      return false
+    }
+
+    const visibleRect = resolveEditorVisibleRect()
+
+    return rect.bottom >= visibleRect.top
+      && rect.top <= visibleRect.bottom
+      && rect.right >= visibleRect.left
+      && rect.left <= visibleRect.right
+  }
+
+  function resolveEditorVisibleRect() {
+    const scrollContainer = findScrollContainer(editorDom.value ?? getEditorDomSafely(editor))
+
+    if (scrollContainer) {
+      return scrollContainer.getBoundingClientRect()
+    }
+
+    return {
+      top: 0,
+      right: window.innerWidth,
+      bottom: window.innerHeight,
+      left: 0,
+    }
+  }
 }
 
 function getEditorViewSafely(editor: Editor) {
@@ -256,4 +293,20 @@ function getEditorDomSafely(editor: Editor) {
   const view = getEditorViewSafely(editor)
 
   return view?.dom instanceof HTMLElement ? view.dom : null
+}
+
+function findScrollContainer(element: HTMLElement | null) {
+  let current = element?.parentElement ?? null
+
+  while (current) {
+    const style = window.getComputedStyle(current)
+
+    if (/auto|scroll|overlay/.test(style.overflowY)) {
+      return current
+    }
+
+    current = current.parentElement
+  }
+
+  return null
 }

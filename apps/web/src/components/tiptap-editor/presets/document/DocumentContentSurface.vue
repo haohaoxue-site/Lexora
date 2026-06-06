@@ -206,7 +206,7 @@ function resolveObjectKey(value: object | null) {
     flex-direction: column;
     min-height: 0;
     overflow-y: auto;
-    padding: 1rem 0 2rem;
+    padding: 1rem 0 32px;
   }
 
   .document-content-surface__body-editor {

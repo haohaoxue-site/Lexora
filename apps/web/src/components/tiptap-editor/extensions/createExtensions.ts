@@ -39,6 +39,7 @@ import { LinkClickOpen } from '../extensions/LinkClickOpen'
 import { BlockMathematics, InlineMathematics } from '../extensions/Mathematics'
 import { PanelSelectionHighlight } from '../extensions/PanelSelectionHighlight'
 import { PastePipeline } from '../extensions/PastePipeline'
+import { SelectionVisibility } from '../extensions/SelectionVisibility'
 import { TextAlign } from '../extensions/TextAlign'
 import { TextColorClass } from '../extensions/TextColorClass'
 
@@ -105,6 +106,7 @@ export function createBodyExtensions(options: {
       uploadImage: options.uploadImage,
       uploadFile: options.uploadFile,
     }),
+    SelectionVisibility,
   ]
 }
 

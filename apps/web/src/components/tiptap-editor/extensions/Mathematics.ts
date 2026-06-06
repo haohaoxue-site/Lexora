@@ -30,7 +30,7 @@ export const InlineMathematics = InlineMath.extend({
             range.from + match[1].length,
             range.to,
             this.type.create({ latex }),
-          )
+          ).scrollIntoView()
         },
       }),
     ]
@@ -78,7 +78,7 @@ export const BlockMathematics = BlockMath.extend({
             return
           }
 
-          state.tr.replaceWith(range.from, range.to, this.type.create({ latex }))
+          state.tr.replaceWith(range.from, range.to, this.type.create({ latex })).scrollIntoView()
         },
       }),
     ]

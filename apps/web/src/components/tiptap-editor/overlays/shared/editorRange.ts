@@ -15,5 +15,6 @@ export function selectEditorRange(editor: Editor, range: EditorDocumentRange) {
 
   view.dispatch(editor.state.tr
     .setSelection(TextSelection.create(editor.state.doc, range.from, range.to))
+    .scrollIntoView()
     .setMeta('addToHistory', false))
 }

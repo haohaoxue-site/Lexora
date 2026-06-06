@@ -39,10 +39,12 @@ export function runSamePageBackspacePolicy(props: CommandProps) {
       if (action.deleteCurrentBlock) {
         props.tr.delete(action.currentBlock.from, action.currentBlock.to)
         props.tr.setSelection(action.selection.map(props.tr.doc, props.tr.mapping))
+        props.tr.scrollIntoView()
         return true
       }
 
       props.tr.setSelection(action.selection)
+      props.tr.scrollIntoView()
       return true
     }
     case 'preserve-current-caret-landing':
@@ -50,6 +52,7 @@ export function runSamePageBackspacePolicy(props: CommandProps) {
       return true
     case 'select-previous-structural-boundary':
       props.tr.setSelection(NodeSelection.create(props.tr.doc, action.boundary.from))
+      props.tr.scrollIntoView()
       return true
   }
 }

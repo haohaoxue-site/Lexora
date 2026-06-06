@@ -109,6 +109,7 @@ export const HistorySelection = Extension.create({
 
           return newState.tr
             .setSelection(TextSelection.create(newState.doc, cursorPosition))
+            .scrollIntoView()
             .setMeta('addToHistory', false)
         },
       }),

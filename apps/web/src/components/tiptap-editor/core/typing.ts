@@ -54,6 +54,16 @@ export interface TiptapEditorProps {
    * @description 处理 IME 或特殊键盘布局绕过 keydown 的文本输入
    */
   handleTextInput?: TiptapEditorHandleTextInput
+  /**
+   * 滚动触发阈值
+   * @description 传给 ProseMirror scrollThreshold，用于选区接近边界时提前滚动
+   */
+  scrollThreshold?: EditorProps['scrollThreshold']
+  /**
+   * 滚动保留边距
+   * @description 传给 ProseMirror scrollMargin，用于选区滚动到可见区域后的上下留白
+   */
+  scrollMargin?: EditorProps['scrollMargin']
 }
 
 export interface TiptapEditorEmits {

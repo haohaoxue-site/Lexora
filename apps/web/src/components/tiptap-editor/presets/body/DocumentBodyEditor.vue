@@ -21,6 +21,18 @@ const props = withDefaults(defineProps<DocumentBodyEditorProps>(), {
 const emits = defineEmits<DocumentBodyEditorEmits>()
 const bodyEditor = shallowRef<Editor | null>(null)
 const blockTriggerMenuRef = useTemplateRef<BlockTriggerMenuExposed>('blockTriggerMenu')
+const BODY_EDITOR_SCROLL_THRESHOLD = {
+  top: 48,
+  right: 0,
+  bottom: 48,
+  left: 0,
+} as const
+const BODY_EDITOR_SCROLL_MARGIN = {
+  top: 48,
+  right: 0,
+  bottom: 72,
+  left: 0,
+} as const
 const {
   editorAiComposer,
   bodyEditorExtensions,
@@ -64,6 +76,8 @@ const {
       :editable="props.editable"
       :handle-key-down="handleBodyEditorKeyDown"
       :handle-text-input="handleBodyEditorTextInput"
+      :scroll-threshold="BODY_EDITOR_SCROLL_THRESHOLD"
+      :scroll-margin="BODY_EDITOR_SCROLL_MARGIN"
       @update:content="emits('update:content', $event)"
       @content-error="emits('contentError', $event)"
       @editor-change="handleBodyEditorChange"

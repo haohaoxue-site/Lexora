@@ -190,6 +190,7 @@ function turnIntoBlockMath(props: BlockCommandContext) {
 
     tr.replaceWith(currentBlock.from, currentBlock.to, blockMathType.create({ latex: '' }))
     tr.setSelection(NodeSelection.create(tr.doc, currentBlock.from))
+    tr.scrollIntoView()
 
     return true
   })
@@ -301,6 +302,7 @@ function mergeBlockBackward(props: CommandProps) {
       props.editor.state.selection.to,
     )
     props.tr.deleteSelection()
+    props.tr.scrollIntoView()
     return true
   }
 
@@ -332,6 +334,7 @@ function deleteForward(props: CommandProps) {
       props.editor.state.selection.to,
     )
     props.tr.deleteSelection()
+    props.tr.scrollIntoView()
     return true
   }
 
@@ -349,6 +352,7 @@ function deleteForward(props: CommandProps) {
     'start',
   )
   props.tr.delete(range.from, range.to)
+  props.tr.scrollIntoView()
   return true
 }
 
@@ -366,6 +370,7 @@ function deleteTextBeforeCaret(props: CommandProps) {
     range.to,
   )
   props.tr.delete(range.from, range.to)
+  props.tr.scrollIntoView()
   return true
 }
 
@@ -447,10 +452,12 @@ function deleteRangeAndSetLandingSelection(
   props.tr.delete(from, to)
 
   if (!landingSelection) {
+    props.tr.scrollIntoView()
     return
   }
 
   props.tr.setSelection(landingSelection.map(props.tr.doc, props.tr.mapping))
+  props.tr.scrollIntoView()
 }
 
 function resolveDeletionLandingSelection(
@@ -501,6 +508,7 @@ function duplicateCurrentBlock(props: CommandProps) {
   }
 
   props.tr.insert(currentBlock.to, currentBlock.node.copy(currentBlock.node.content))
+  props.tr.scrollIntoView()
   return true
 }
 
@@ -588,6 +596,7 @@ function deleteCurrentBlock(props: CommandProps) {
   }
 
   props.tr.delete(currentBlock.from, currentBlock.to)
+  props.tr.scrollIntoView()
   return true
 }
 
@@ -630,6 +639,7 @@ function setSelectionNearMovedBlock(props: CommandProps, blockStartPosition: num
   }
 
   props.tr.setSelection(selection)
+  props.tr.scrollIntoView()
 }
 
 function canHandlePlainBlockBoundary(editor: Editor) {

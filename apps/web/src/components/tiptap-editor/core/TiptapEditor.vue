@@ -25,6 +25,8 @@ const editor = useEditor({
     },
     handleKeyDown: props.handleKeyDown,
     handleTextInput: props.handleTextInput,
+    scrollMargin: props.scrollMargin,
+    scrollThreshold: props.scrollThreshold,
   },
   onContentError: handleContentError,
   onUpdate: handleEditorUpdate,
