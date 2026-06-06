@@ -8,18 +8,18 @@ import type {
 import type { MoveTreeNode, SelectedMoveTarget } from './typing'
 import {
   DOCUMENT_COLLECTION,
-  DOCUMENT_COLLECTION_LABELS,
 } from '@haohaoxue/samepage-contracts/document/constants'
 import { computed, shallowRef, watch } from 'vue'
 import { getDocuments } from '@/apis/document'
 import { useWorkspaceStore } from '@/stores/workspace'
 import { useDocsPageActions } from '../../composables/useDocsPageActions'
 import { useDocumentTree } from '../../composables/useDocumentTree'
-import { resolveDocumentTreeItemIcon } from '../../utils/documentTree'
+import { findDocumentItemPath, resolveDocumentTreeItemIcon } from '../../utils/documentTree'
 
 const workspaceStore = useWorkspaceStore()
 const tree = useDocumentTree()
 const pageActions = useDocsPageActions()
+const ROOT_TARGET_LABEL = '文档根目录'
 
 const selectedWorkspaceId = shallowRef<string>('')
 const selectedTarget = shallowRef<SelectedMoveTarget | null>(null)
@@ -34,6 +34,7 @@ const visibleGroups = computed(() =>
   targetGroups.value.filter(group => group.id !== DOCUMENT_COLLECTION.COLLABORATION),
 )
 const canConfirm = computed(() => Boolean(target.value && selectedTarget.value) && !isMoving.value)
+const selectedTargetLabel = computed(() => selectedTarget.value?.label ?? '请选择目标位置')
 
 watch(isOpen, async (open) => {
   if (!open) {
@@ -50,6 +51,10 @@ watch(isOpen, async (open) => {
   selectedWorkspaceId.value = workspace.id
   selectedTarget.value = null
   await loadTargetTree(workspace.id)
+
+  if (isOpen.value) {
+    selectRootTarget()
+  }
 })
 
 async function loadTargetTree(workspaceId: string) {
@@ -78,16 +83,20 @@ async function loadTargetTree(workspaceId: string) {
   }
 }
 
-function selectGroupRoot(group: DocumentTreeGroup) {
-  if (!isOwnedCollection(group.id) || !selectedWorkspaceId.value) {
+function selectRootTarget() {
+  const group = visibleGroups.value.find(item => isOwnedCollection(item.id))
+  const collectionId = group?.id
+
+  if (!collectionId || !isOwnedCollection(collectionId) || !selectedWorkspaceId.value) {
+    selectedTarget.value = null
     return
   }
 
   selectedTarget.value = {
     workspaceId: selectedWorkspaceId.value,
-    collectionId: group.id,
+    collectionId,
     parentId: null,
-    label: DOCUMENT_COLLECTION_LABELS[group.id],
+    label: ROOT_TARGET_LABEL,
   }
 }
 
@@ -100,7 +109,7 @@ function selectDocumentNode(group: DocumentTreeGroup, node: MoveTreeNode) {
     workspaceId: selectedWorkspaceId.value,
     collectionId: group.id,
     parentId: node.id,
-    label: node.title,
+    label: getDocumentNodePathLabel(group, node),
   }
 }
 
@@ -121,10 +130,10 @@ function getMoveTreeNodeIcon(node: MoveTreeNode, expanded: boolean) {
   return resolveDocumentTreeItemIcon(node, expanded)
 }
 
-function isGroupRootSelected(group: DocumentTreeGroup) {
-  return selectedTarget.value?.workspaceId === selectedWorkspaceId.value
-    && selectedTarget.value?.collectionId === group.id
-    && selectedTarget.value?.parentId === null
+function getDocumentNodePathLabel(group: DocumentTreeGroup, node: MoveTreeNode) {
+  const path = findDocumentItemPath(group.nodes, node.id)
+
+  return path?.map(item => item.title).join('/') ?? node.title
 }
 
 async function confirmMove() {
@@ -168,31 +177,20 @@ function isOwnedCollection(collectionId: DocumentTreeCollectionId): collectionId
     destroy-on-close
     align-center
     class="document-move-dialog"
-    body-class="pt-2"
+    body-class="document-move-dialog__content pt-2"
     @update:model-value="closeDialog"
   >
     <div class="document-move-dialog__body rounded-lg">
       <section
         v-loading="isLoading"
-        class="document-move-dialog__tree min-w-0 overflow-y-auto bg-surface p-3"
+        class="document-move-dialog__tree min-h-0 min-w-0 flex-1 overflow-y-auto bg-surface p-2"
         aria-label="目标文档树"
       >
         <div
           v-for="group in visibleGroups"
           :key="group.id"
-          class="grid gap-[0.875rem]"
+          class="min-w-0"
         >
-          <button
-            v-if="isOwnedCollection(group.id)"
-            type="button"
-            class="document-move-dialog__group-root flex w-full min-w-0 items-center gap-2 rounded-lg border-none bg-transparent px-2 py-2 text-left font-medium text-main"
-            :class="{ 'is-active': isGroupRootSelected(group) }"
-            @click="selectGroupRoot(group)"
-          >
-            <SvgIcon category="ui" icon="folder-chip" size="1rem" />
-            <span>{{ DOCUMENT_COLLECTION_LABELS[group.id] }}</span>
-          </button>
-
           <ElTree
             v-if="group.nodes.length"
             :data="toTreeNodes(group.nodes)"
@@ -201,7 +199,7 @@ function isOwnedCollection(collectionId: DocumentTreeCollectionId): collectionId
             highlight-current
             :current-node-key="selectedTarget?.parentId ?? undefined"
             default-expand-all
-            class="document-move-dialog__el-tree mt-1"
+            class="document-move-dialog__el-tree"
             @node-click="(node: MoveTreeNode) => selectDocumentNode(group, node)"
           >
             <template #default="{ node, data }">
@@ -215,10 +213,13 @@ function isOwnedCollection(collectionId: DocumentTreeCollectionId): collectionId
       </section>
     </div>
 
-    <div class="mt-3 flex gap-2 text-[13px] text-secondary">
+    <div class="document-move-dialog__target mt-3 flex min-h-8 items-center gap-2 text-[13px] leading-6 text-secondary">
       <span class="shrink-0">目标位置</span>
-      <span class="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-main">
-        {{ selectedTarget?.label ?? '请选择目标位置' }}
+      <span
+        class="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-main"
+        :title="selectedTargetLabel"
+      >
+        {{ selectedTargetLabel }}
       </span>
     </div>
 
@@ -227,7 +228,7 @@ function isOwnedCollection(collectionId: DocumentTreeCollectionId): collectionId
         取消
       </ElButton>
       <ElButton
-        class="ml-[10px]"
+        class="ml-[10px]!"
         type="primary"
         :loading="isMoving"
         :disabled="!canConfirm"
@@ -241,27 +242,20 @@ function isOwnedCollection(collectionId: DocumentTreeCollectionId): collectionId
 
 <style scoped lang="scss">
 .document-move-dialog__body {
-  min-height: 26rem;
-  max-height: 30rem;
+  display: flex;
+  height: min(26rem, calc(100vh - 15rem));
+  min-height: 18rem;
   border: 1px solid var(--brand-border-base);
   overflow: hidden;
-}
-
-.document-move-dialog__group-root {
-  cursor: pointer;
-}
-
-.document-move-dialog__group-root {
-  &:hover,
-  &.is-active {
-    background: var(--brand-fill-lighter);
-  }
 }
 
 .document-move-dialog__el-tree {
   --el-tree-node-hover-bg-color: var(--brand-fill-lighter);
 }
 
-:global(.document-move-dialog .el-dialog__body) {
+:global(.document-move-dialog .document-move-dialog__content) {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
 }
 </style>
