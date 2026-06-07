@@ -11,6 +11,8 @@ const BLOCK_TRIGGER_BUTTON_WIDTH = 40
 const BLOCK_TRIGGER_EMPTY_BUTTON_WIDTH = 30
 const BLOCK_TRIGGER_BUTTON_HEIGHT = 30
 const BLOCK_TRIGGER_BUTTON_GAP = 8
+const BLOCK_TRIGGER_HOTSPOT_X_PADDING = 12
+const BLOCK_TRIGGER_HOTSPOT_Y_PADDING = 6
 
 /** 块触发菜单浮层控制器 */
 export interface BlockTriggerOverlayController {
@@ -32,7 +34,7 @@ export function useBlockTriggerOverlay(editor: Editor) {
   const visible = shallowRef(false)
   const activePanel = shallowRef<BlockTriggerPanel>('root')
   const isEditorFocused = shallowRef(editor.isFocused)
-  const isEditorHovered = shallowRef(false)
+  const isTriggerHotspotHovered = shallowRef(false)
   const isTriggerHovered = shallowRef(false)
   const anchorRect = shallowRef<DOMRect | null>(null)
   const editorDom = shallowRef<HTMLElement | null>(getEditorDomSafely(editor))
@@ -49,9 +51,9 @@ export function useBlockTriggerOverlay(editor: Editor) {
     shouldRenderTriggerMenu.value
     && (
       visible.value
-      || isEditorFocused.value
-      || isEditorHovered.value
+      || isTriggerHotspotHovered.value
       || isTriggerHovered.value
+      || (isEditorFocused.value && isCurrentEmptyParagraphBlock())
     ),
   )
 
@@ -90,6 +92,7 @@ export function useBlockTriggerOverlay(editor: Editor) {
     editor.on('focus', handleEditorFocus)
     editor.on('blur', handleEditorBlur)
     editorDom.value?.addEventListener('mouseenter', handleEditorMouseEnter)
+    editorDom.value?.addEventListener('mousemove', handleEditorMouseMove)
     editorDom.value?.addEventListener('mouseleave', handleEditorMouseLeave)
     window.addEventListener('resize', handleViewportChange)
     document.addEventListener('scroll', handleViewportChange, true)
@@ -103,6 +106,7 @@ export function useBlockTriggerOverlay(editor: Editor) {
     editor.off('focus', handleEditorFocus)
     editor.off('blur', handleEditorBlur)
     editorDom.value?.removeEventListener('mouseenter', handleEditorMouseEnter)
+    editorDom.value?.removeEventListener('mousemove', handleEditorMouseMove)
     editorDom.value?.removeEventListener('mouseleave', handleEditorMouseLeave)
     window.removeEventListener('resize', handleViewportChange)
     document.removeEventListener('scroll', handleViewportChange, true)
@@ -207,11 +211,13 @@ export function useBlockTriggerOverlay(editor: Editor) {
 
     if (!canShowTriggerMenu()) {
       anchorRect.value = null
+      isTriggerHotspotHovered.value = false
       closeMenu()
       return
     }
 
     syncAnchorRect()
+    isTriggerHotspotHovered.value = false
   }
 
   function handleEditorFocus() {
@@ -227,16 +233,25 @@ export function useBlockTriggerOverlay(editor: Editor) {
     handleSelectionUpdate()
   }
 
-  function handleEditorMouseEnter() {
-    isEditorHovered.value = true
-
+  function handleEditorMouseEnter(event: MouseEvent) {
     if (canShowTriggerMenu()) {
       syncAnchorRect()
     }
+
+    syncTriggerHotspotHover(event)
+  }
+
+  function handleEditorMouseMove(event: MouseEvent) {
+    if (!canShowTriggerMenu()) {
+      isTriggerHotspotHovered.value = false
+      return
+    }
+
+    syncTriggerHotspotHover(event)
   }
 
   function handleEditorMouseLeave() {
-    isEditorHovered.value = false
+    isTriggerHotspotHovered.value = false
   }
 
   function handleViewportChange() {
@@ -248,7 +263,30 @@ export function useBlockTriggerOverlay(editor: Editor) {
   }
 
   function hasEditorView() {
-    return Boolean(getEditorDomSafely(editor)) && typeof getEditorViewSafely(editor)?.coordsAtPos === 'function'
+    return Boolean(getEditorDomSafely(editor))
+  }
+
+  function syncTriggerHotspotHover(event: MouseEvent) {
+    isTriggerHotspotHovered.value = isPointerInsideTriggerHotspot(event)
+  }
+
+  function isPointerInsideTriggerHotspot(event: MouseEvent) {
+    if (!anchorRect.value) {
+      return false
+    }
+
+    const buttonWidth = isCurrentEmptyParagraphBlock()
+      ? BLOCK_TRIGGER_EMPTY_BUTTON_WIDTH
+      : BLOCK_TRIGGER_BUTTON_WIDTH
+    const left = anchorRect.value.left - buttonWidth - BLOCK_TRIGGER_BUTTON_GAP - BLOCK_TRIGGER_HOTSPOT_X_PADDING
+    const right = anchorRect.value.left + BLOCK_TRIGGER_HOTSPOT_X_PADDING
+    const top = anchorRect.value.top - BLOCK_TRIGGER_HOTSPOT_Y_PADDING
+    const bottom = anchorRect.value.bottom + BLOCK_TRIGGER_HOTSPOT_Y_PADDING
+
+    return event.clientX >= left
+      && event.clientX <= right
+      && event.clientY >= top
+      && event.clientY <= bottom
   }
 
   function isAnchorRectVisible(rect: DOMRect | null) {
