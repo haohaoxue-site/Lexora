@@ -20,7 +20,7 @@ export const SelectionVisibility = Extension.create({
           return newState.tr
             .scrollIntoView()
             .setMeta(SELECTION_VISIBILITY_META, true)
-            .setMeta('addToHistory', false)
+            .setMeta('addToHistory', shouldAddSelectionVisibilityToHistory(transactions))
         },
       }),
     ]
@@ -28,7 +28,7 @@ export const SelectionVisibility = Extension.create({
 })
 
 function shouldScrollSelectionIntoView(transactions: readonly Transaction[]) {
-  if (!transactions.some(transaction => transaction.docChanged || transaction.selectionSet)) {
+  if (!transactions.some(transaction => transaction.selectionSet && !transaction.docChanged)) {
     return false
   }
 
@@ -41,4 +41,8 @@ function shouldScrollSelectionIntoView(transactions: readonly Transaction[]) {
   }
 
   return !transactions.every(transaction => isChangeOrigin(transaction))
+}
+
+function shouldAddSelectionVisibilityToHistory(transactions: readonly Transaction[]) {
+  return transactions.some(transaction => transaction.getMeta('addToHistory') !== false)
 }
