@@ -1,4 +1,5 @@
 import type { CommandProps, Editor } from '@tiptap/core'
+import type { Node as ProseMirrorNode } from '@tiptap/pm/model'
 import type { CurrentBlockSelection } from '../commands/currentBlock'
 import type { TurnIntoBlockType } from '../commands/turnInto'
 import { Extension } from '@tiptap/core'
@@ -10,9 +11,12 @@ import { recordHistorySelectionDeletedText } from '../commands/historySelection'
 import { TIPTAP_SPLIT_MERGE_EXCLUDED_ANCESTOR_NODE_NAMES } from '../content/blockTaxonomy'
 
 type HeadingTurnIntoBlockType = Extract<TurnIntoBlockType, 'heading-1' | 'heading-2' | 'heading-3' | 'heading-4' | 'heading-5'>
-type BlockCommandContext = Pick<CommandProps, 'commands' | 'editor'>
+type BlockCommandContext = Pick<CommandProps, 'commands' | 'editor' | 'tr'>
 type DeletionDirection = 'backward' | 'forward'
+type StandardListTypeName = 'bulletList' | 'orderedList'
 const EMPTY_STORED_MARKS: [] = []
+const STANDARD_LIST_NODE_TYPE_NAMES = new Set<string>(['bulletList', 'orderedList'])
+const LIST_ITEM_NODE_TYPE_NAMES = new Set<string>(['listItem', 'taskItem'])
 const SPLIT_MERGE_EXCLUDED_NODE_NAMES = new Set<string>(TIPTAP_SPLIT_MERGE_EXCLUDED_ANCESTOR_NODE_NAMES)
 
 const HEADING_LEVEL_BY_TARGET: Record<HeadingTurnIntoBlockType, 1 | 2 | 3 | 4 | 5> = {
@@ -144,6 +148,10 @@ function turnIntoHeading(props: BlockCommandContext, level: 1 | 2 | 3 | 4 | 5) {
 }
 
 function turnIntoBulletList(props: BlockCommandContext) {
+  if (turnActiveListInto(props, 'bulletList')) {
+    return true
+  }
+
   if (props.editor.isActive('bulletList')) {
     return true
   }
@@ -153,6 +161,10 @@ function turnIntoBulletList(props: BlockCommandContext) {
 }
 
 function turnIntoOrderedList(props: BlockCommandContext) {
+  if (turnActiveListInto(props, 'orderedList')) {
+    return true
+  }
+
   if (props.editor.isActive('orderedList')) {
     return true
   }
@@ -307,6 +319,14 @@ function mergeBlockBackward(props: CommandProps) {
   }
 
   if (!canMergeCurrentBlock(props.editor)) {
+    if (shouldHandleNestedListBackspace(props.editor.state.selection)) {
+      return props.commands.first(({ commands }) => [
+        () => commands.undoInputRule(),
+        () => deleteEmptyNestedListItemToParagraph(props),
+        () => deleteEmptyNestedParagraphBackward(props),
+      ])
+    }
+
     return props.commands.first(({ commands }) => [
       () => commands.undoInputRule(),
       () => deleteTextBeforeCaret(props),
@@ -498,6 +518,177 @@ function resolveDeleteBackwardTextRange(selection: Selection) {
     from: selection.from - deletedText.length,
     to: selection.from,
   }
+}
+
+function turnActiveListInto(props: BlockCommandContext, targetTypeName: StandardListTypeName) {
+  const activeList = resolveActiveStandardList(props.editor.state.selection)
+
+  if (!activeList) {
+    return false
+  }
+
+  if (activeList.node.type.name === targetTypeName) {
+    return true
+  }
+
+  const targetType = props.editor.schema.nodes[targetTypeName]
+
+  if (!targetType || !targetType.validContent(activeList.node.content)) {
+    return false
+  }
+
+  props.tr.setNodeMarkup(activeList.from, targetType, null, activeList.node.marks)
+  props.tr.scrollIntoView()
+  return true
+}
+
+function resolveActiveStandardList(selection: Selection): { from: number, node: ProseMirrorNode } | null {
+  const { $from } = selection
+
+  for (let depth = $from.depth; depth > 0; depth -= 1) {
+    const node = $from.node(depth)
+
+    if (!STANDARD_LIST_NODE_TYPE_NAMES.has(node.type.name)) {
+      continue
+    }
+
+    return {
+      from: $from.before(depth),
+      node,
+    }
+  }
+
+  return null
+}
+
+function deleteEmptyNestedListItemToParagraph(props: CommandProps) {
+  const range = resolveEmptyNestedListItemRange(props.editor.state.selection)
+
+  if (!range) {
+    return false
+  }
+
+  const paragraphType = props.editor.schema.nodes.paragraph
+
+  if (!paragraphType) {
+    return false
+  }
+
+  props.tr.replaceWith(range.from, range.to, paragraphType.create())
+  props.tr.setSelection(TextSelection.create(props.tr.doc, range.from + 1))
+  props.tr.scrollIntoView()
+  return true
+}
+
+function shouldHandleNestedListBackspace(selection: Selection) {
+  return Boolean(resolveEmptyNestedListItemRange(selection) || resolveEmptyNestedParagraphRange(selection))
+}
+
+function deleteEmptyNestedParagraphBackward(props: CommandProps) {
+  const range = resolveEmptyNestedParagraphRange(props.editor.state.selection)
+
+  if (!range) {
+    return false
+  }
+
+  props.tr.delete(range.from, range.to)
+  props.tr.setSelection(TextSelection.create(props.tr.doc, props.tr.mapping.map(range.previousTextEnd, -1)))
+  props.tr.scrollIntoView()
+  return true
+}
+
+function resolveEmptyNestedListItemRange(selection: Selection) {
+  if (
+    !(selection instanceof TextSelection)
+    || !selection.empty
+    || selection.$from.parentOffset !== 0
+    || selection.$from.parent.type.name !== 'paragraph'
+    || selection.$from.parent.content.size > 0
+  ) {
+    return null
+  }
+
+  const listItemDepth = findClosestAncestorDepth(selection, LIST_ITEM_NODE_TYPE_NAMES)
+
+  if (!listItemDepth) {
+    return null
+  }
+
+  const listItem = selection.$from.node(listItemDepth)
+  const listDepth = listItemDepth - 1
+  const list = selection.$from.node(listDepth)
+
+  if (
+    listItem.childCount !== 1
+    || listItem.firstChild?.type.name !== 'paragraph'
+    || listItem.firstChild.content.size > 0
+    || !STANDARD_LIST_NODE_TYPE_NAMES.has(list.type.name)
+    || list.childCount !== 1
+    || !findClosestAncestorDepth(selection, LIST_ITEM_NODE_TYPE_NAMES, listDepth - 1)
+  ) {
+    return null
+  }
+
+  const from = selection.$from.before(listDepth)
+
+  return {
+    from,
+    to: from + list.nodeSize,
+  }
+}
+
+function resolveEmptyNestedParagraphRange(selection: Selection) {
+  if (
+    !(selection instanceof TextSelection)
+    || !selection.empty
+    || selection.$from.parentOffset !== 0
+    || selection.$from.parent.type.name !== 'paragraph'
+    || selection.$from.parent.content.size > 0
+  ) {
+    return null
+  }
+
+  const paragraphDepth = selection.$from.depth
+  const parentDepth = paragraphDepth - 1
+  const parentNode = selection.$from.node(parentDepth)
+
+  if (!LIST_ITEM_NODE_TYPE_NAMES.has(parentNode.type.name)) {
+    return null
+  }
+
+  const paragraphIndex = selection.$from.index(parentDepth)
+
+  if (paragraphIndex <= 0) {
+    return null
+  }
+
+  const previousNode = parentNode.child(paragraphIndex - 1)
+
+  if (!previousNode.isTextblock) {
+    return null
+  }
+
+  const from = selection.$from.before(paragraphDepth)
+
+  return {
+    from,
+    previousTextEnd: from - 1,
+    to: selection.$from.after(paragraphDepth),
+  }
+}
+
+function findClosestAncestorDepth(
+  selection: Selection,
+  nodeTypeNames: Set<string>,
+  maxDepth = selection.$from.depth,
+) {
+  for (let depth = maxDepth; depth > 0; depth -= 1) {
+    if (nodeTypeNames.has(selection.$from.node(depth).type.name)) {
+      return depth
+    }
+  }
+
+  return null
 }
 
 function duplicateCurrentBlock(props: CommandProps) {
