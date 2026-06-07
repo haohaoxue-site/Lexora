@@ -17,6 +17,7 @@ import {
   createTextInsertContent,
   hasTextInsertMarkdownBlockContent,
 } from '../content/textInsertContent'
+import { uploadImagesWithPlaceholder } from './ImageUploadPlaceholder'
 
 export interface PastePipelineOptions {
   uploadImage?: (file: File) => Promise<TiptapEditorUploadedImage>
@@ -169,6 +170,12 @@ async function handleFilePaste(
 ) {
   try {
     const uploadFiles = await mergeAnimatedGifIntoFiles(files, options, html)
+
+    if (shouldUploadImagesWithPlaceholder(uploadFiles, options)) {
+      await uploadImagesWithPlaceholder(editor, uploadFiles, options.uploadImage)
+      return
+    }
+
     const content = await createFilePasteContent(uploadFiles, {
       uploadImage: options.uploadImage,
       uploadFile: options.uploadFile,
@@ -181,7 +188,10 @@ async function handleFilePaste(
     editor.chain().focus().insertContent(content).run()
   }
   catch (error) {
-    ElMessage.error(getRequestErrorDisplayMessage(error, '资源上传失败'))
+    ElMessage.error(getRequestErrorDisplayMessage(
+      error,
+      files.every(file => file.type.startsWith('image/')) ? '图片上传失败' : '资源上传失败',
+    ))
   }
 }
 
@@ -198,20 +208,25 @@ async function handleAnimatedGifPaste(
       return
     }
 
-    const content = await createFilePasteContent([animatedGifFile], {
-      uploadImage: options.uploadImage,
-      uploadFile: options.uploadFile,
-    })
-
-    if (!content.length) {
+    if (!options.uploadImage) {
+      editor.chain().focus().insertContent(html).run()
       return
     }
 
-    editor.chain().focus().insertContent(content).run()
+    await uploadImagesWithPlaceholder(editor, [animatedGifFile], options.uploadImage)
   }
   catch (error) {
-    ElMessage.error(getRequestErrorDisplayMessage(error, '资源上传失败'))
+    ElMessage.error(getRequestErrorDisplayMessage(error, '图片上传失败'))
   }
+}
+
+function shouldUploadImagesWithPlaceholder(
+  files: readonly File[],
+  options: PastePipelineOptions,
+): options is PastePipelineOptions & { uploadImage: (file: File) => Promise<TiptapEditorUploadedImage> } {
+  return Boolean(options.uploadImage)
+    && files.length > 0
+    && files.every(file => file.type.startsWith('image/'))
 }
 
 async function mergeAnimatedGifIntoFiles(

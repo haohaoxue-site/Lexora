@@ -9,7 +9,8 @@ import type { LinkPanelController } from '../shared/useLinkPanel'
 import { ElMessage, ElMessageBox } from '@/utils/element-plus'
 import { getRequestErrorDisplayMessage } from '@/utils/request-error'
 import { getCurrentImageAlt, insertEditorContent, updateCurrentImageAlt } from '../../commands/editorActions'
-import { createUploadedFileInsertContent, createUploadedImageInsertContent } from '../../content/documentAsset'
+import { createUploadedFileInsertContent } from '../../content/documentAsset'
+import { uploadImagesWithPlaceholder } from '../../extensions/ImageUploadPlaceholder'
 
 /** 菜单动作副作用参数。 */
 export interface MenuActionEffectsOptions {
@@ -174,8 +175,7 @@ export function createMenuActionEffects(options: MenuActionEffectsOptions): Menu
           return
         }
 
-        const uploadedImage = await options.uploadImage(file)
-        insertEditorContent(options.editor, createUploadedImageInsertContent(uploadedImage))
+        await uploadImagesWithPlaceholder(options.editor, [file], options.uploadImage)
         options.closeMenu?.()
         return
       }

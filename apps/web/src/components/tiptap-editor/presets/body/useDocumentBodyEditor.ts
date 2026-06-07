@@ -7,6 +7,8 @@ import type {
 } from '../../core/typing'
 import type { BlockTriggerMenuExposed } from '../../overlays/block-trigger/typing'
 import type { DocumentBodyEditorProps } from './typing'
+import { DOCUMENT_IMAGE_MAX_BYTES } from '@haohaoxue/samepage-contracts/document'
+import { prettyBytes } from '@haohaoxue/samepage-shared/file'
 import {
   computed,
   nextTick,
@@ -22,6 +24,8 @@ import { useEditorAiComposer } from '../../ai/useEditorAiComposer'
 import { createBodyExtensions } from '../../extensions/createExtensions'
 import { scrollDocumentBlockIntoView } from '../../overlays/block-trigger/blockTriggerDom'
 import { isTriggerMenuSelection } from './triggerSelection'
+
+const DOCUMENT_IMAGE_SIZE_LIMIT_LABEL = prettyBytes(DOCUMENT_IMAGE_MAX_BYTES)
 
 export function useDocumentBodyEditor(options: {
   blockTriggerMenuRef: TemplateRef<BlockTriggerMenuExposed | null>
@@ -144,6 +148,10 @@ export function useDocumentBodyEditor(options: {
   async function handleUploadImage(file: File) {
     if (!options.props.documentId) {
       throw new Error('当前文档未初始化，无法上传图片')
+    }
+
+    if (file.size > DOCUMENT_IMAGE_MAX_BYTES) {
+      throw new Error(`图片大小不能超过 ${DOCUMENT_IMAGE_SIZE_LIMIT_LABEL}`)
     }
 
     const asset = await uploadDocumentImage(options.props.documentId, file)

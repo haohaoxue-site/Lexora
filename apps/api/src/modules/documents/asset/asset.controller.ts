@@ -6,12 +6,13 @@ import type {
 } from '@haohaoxue/samepage-contracts'
 import type { FastifyReply, FastifyRequest } from 'fastify'
 import type { AuthUserContext } from '../../auth/auth.interface'
-import { ResolveDocumentAssetsSchema } from '@haohaoxue/samepage-contracts'
+import { DOCUMENT_IMAGE_MAX_BYTES, ResolveDocumentAssetsSchema } from '@haohaoxue/samepage-contracts'
 import { BadRequestException, Body, Controller, Get, Param, Post, Req, Res } from '@nestjs/common'
 import { CurrentUser } from '../../../decorators/current-user.decorator'
 import { Public } from '../../../decorators/public.decorator'
 import { ZodValidationPipe } from '../../../pipes/zod-validation.pipe'
-import { getRequestFile } from '../../../utils/request-file'
+import { getRequestFile, readRequestFileBuffer } from '../../../utils/request-file'
+import { DOCUMENT_IMAGE_TOO_LARGE_MESSAGE } from './asset.constants'
 import { DocumentAssetsService } from './asset.service'
 import { DocumentCollabTicketsService } from './collab-ticket.service'
 
@@ -37,7 +38,9 @@ export class DocumentAssetController {
     @Req() request: FastifyRequest,
     @Res({ passthrough: true }) response: FastifyReply,
   ): Promise<DocumentAsset> {
-    const file = await getRequestFile(request)
+    const file = await getRequestFile(request, {
+      maxBytes: DOCUMENT_IMAGE_MAX_BYTES,
+    })
 
     if (!file) {
       throw new BadRequestException('请选择图片文件')
@@ -48,7 +51,9 @@ export class DocumentAssetController {
       documentId: id,
       fileName: file.filename,
       mimeType: file.mimetype,
-      buffer: await file.toBuffer(),
+      buffer: await readRequestFileBuffer(file, {
+        fileTooLargeMessage: DOCUMENT_IMAGE_TOO_LARGE_MESSAGE,
+      }),
     })
     response.header('set-cookie', await this.documentAssetsService.buildAssetAccessCookie({
       kind: 'document',

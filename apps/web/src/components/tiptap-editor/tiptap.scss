@@ -167,6 +167,17 @@
     pointer-events: none;
   }
 
+  &[data-tiptap-image-upload-placeholder-active='true'] {
+    p.is-empty[data-placeholder]:not([data-placeholder=''])::before,
+    h1.is-empty[data-placeholder]:not([data-placeholder=''])::before,
+    h2.is-empty[data-placeholder]:not([data-placeholder=''])::before,
+    h3.is-empty[data-placeholder]:not([data-placeholder=''])::before,
+    h4.is-empty[data-placeholder]:not([data-placeholder=''])::before,
+    h5.is-empty[data-placeholder]:not([data-placeholder=''])::before {
+      content: none;
+    }
+  }
+
   &:not(.ProseMirror-focused) {
     p.is-empty[data-placeholder]:not(.is-editor-empty)::before,
     h1.is-empty[data-placeholder]:not(.is-editor-empty)::before,
@@ -279,6 +290,102 @@
     &.ProseMirror-selectednode {
       outline: 2px solid var(--el-color-primary);
     }
+  }
+
+  .tiptap-image-upload-placeholder {
+    position: relative;
+    display: inline-block;
+    box-sizing: border-box;
+    max-width: 100%;
+    margin: 1em 0;
+    overflow: hidden;
+    border-radius: 12px;
+    color: var(--brand-text-secondary);
+    line-height: 1.4;
+    user-select: none;
+    vertical-align: top;
+  }
+
+  .tiptap-image-upload-placeholder--fallback {
+    display: inline-flex;
+    justify-content: center;
+    align-items: center;
+    width: min(100%, 520px);
+    min-height: 11rem;
+    aspect-ratio: 16 / 9;
+    border: 1px solid color-mix(in srgb, var(--brand-border-base) 76%, transparent);
+    background: color-mix(in srgb, var(--brand-fill-lighter) 78%, var(--brand-bg-surface));
+  }
+
+  .tiptap-image-upload-placeholder__preview {
+    display: block;
+    max-width: 100%;
+    height: auto;
+    border-radius: inherit;
+    opacity: 0.82;
+  }
+
+  .tiptap-image-upload-placeholder__overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 1rem;
+    background: color-mix(in srgb, var(--brand-bg-surface) 42%, transparent);
+    pointer-events: none;
+  }
+
+  .tiptap-image-upload-placeholder--fallback .tiptap-image-upload-placeholder__overlay {
+    position: static;
+    min-height: inherit;
+    background: transparent;
+  }
+
+  .tiptap-image-upload-placeholder__status {
+    display: inline-flex;
+    box-sizing: border-box;
+    max-width: min(100%, 22rem);
+    align-items: center;
+    padding: 0.48rem 0.66rem;
+    border: 1px solid color-mix(in srgb, var(--brand-border-base) 66%, transparent);
+    border-radius: 8px;
+    background: color-mix(in srgb, var(--brand-bg-surface-raised) 92%, transparent);
+  }
+
+  .tiptap-image-upload-placeholder__indicator {
+    width: 1rem;
+    height: 1rem;
+    flex: 0 0 auto;
+    margin-right: 0.7rem;
+    border: 2px solid color-mix(in srgb, var(--brand-primary) 22%, transparent);
+    border-top-color: var(--brand-primary);
+    border-radius: 50%;
+    animation: tiptap-image-upload-spin 0.8s linear infinite;
+  }
+
+  .tiptap-image-upload-placeholder__text {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.12rem;
+  }
+
+  .tiptap-image-upload-placeholder__label {
+    color: var(--brand-text-primary);
+    font-size: 0.875rem;
+    font-weight: 600;
+    line-height: 1.4;
+  }
+
+  .tiptap-image-upload-placeholder__detail {
+    overflow: hidden;
+    color: var(--brand-text-secondary);
+    font-size: 0.75rem;
+    line-height: 1.4;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .tiptap-block-flash-target {
@@ -871,6 +978,18 @@
   100% {
     background: transparent;
     box-shadow: inset 0 0 0 1px transparent;
+  }
+}
+
+@keyframes tiptap-image-upload-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tiptap-editor .tiptap-image-upload-placeholder__indicator {
+    animation: none;
   }
 }
 

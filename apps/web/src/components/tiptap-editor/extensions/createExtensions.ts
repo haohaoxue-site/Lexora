@@ -33,6 +33,7 @@ import { DocumentFile } from '../extensions/DocumentFile'
 import { DocumentImage } from '../extensions/DocumentImage'
 import { DocumentRuntimeNormalizer } from '../extensions/DocumentRuntimeNormalizer'
 import { HistorySelection } from '../extensions/HistorySelection'
+import { ImageUploadPlaceholder } from '../extensions/ImageUploadPlaceholder'
 import { InlineCode } from '../extensions/InlineCode'
 import { LinkBoundary } from '../extensions/LinkBoundary'
 import { LinkClickOpen } from '../extensions/LinkClickOpen'
@@ -100,6 +101,7 @@ export function createBodyExtensions(options: {
       inline: false,
       resolveImageSrc: options.resolveImageSrc,
     }),
+    ImageUploadPlaceholder,
     DocumentFile,
     BlockCommands,
     PastePipeline.configure({

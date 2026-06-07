@@ -4,11 +4,12 @@ import type { StorageObject } from '../../../infrastructure/storage/storage.inte
 import { Buffer } from 'node:buffer'
 import { createSecretKey, randomUUID } from 'node:crypto'
 import { extname } from 'node:path'
-import { SERVER_PATH } from '@haohaoxue/samepage-contracts'
+import { DOCUMENT_IMAGE_MAX_BYTES, SERVER_PATH } from '@haohaoxue/samepage-contracts'
 import {
   BadRequestException,
   Injectable,
   NotFoundException,
+  PayloadTooLargeException,
 } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import {
@@ -23,9 +24,9 @@ import { StorageService } from '../../../infrastructure/storage/storage.service'
 import { sha256Hex } from '../../../utils/hash'
 import { DocumentAccessService } from '../core/access.service'
 import { DocumentPublicationAccessService } from '../publication/publication-access.service'
+import { DOCUMENT_IMAGE_TOO_LARGE_MESSAGE } from './asset.constants'
 
 const DOCUMENT_ASSET_BUCKET = 'document-asset'
-const DOCUMENT_IMAGE_MAX_SIZE_BYTES = 15 * 1024 * 1024
 const DOCUMENT_FILE_MAX_SIZE_BYTES = 50 * 1024 * 1024
 const DOCUMENT_ASSET_CONTENT_AUDIENCE = 'samepage-document-asset'
 const DOCUMENT_ASSET_ACCESS_TOKEN_TYPE = 'document-asset-access'
@@ -589,8 +590,8 @@ function assertDocumentImageBuffer(buffer: Buffer, mimeType: DocumentImageMimeTy
     throw new BadRequestException('图片文件不能为空')
   }
 
-  if (buffer.length > DOCUMENT_IMAGE_MAX_SIZE_BYTES) {
-    throw new BadRequestException('图片大小不能超过 15MB')
+  if (buffer.length > DOCUMENT_IMAGE_MAX_BYTES) {
+    throw new PayloadTooLargeException(DOCUMENT_IMAGE_TOO_LARGE_MESSAGE)
   }
 
   if (!isDocumentImageSignatureMatched(buffer, mimeType)) {

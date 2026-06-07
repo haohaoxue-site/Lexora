@@ -18,6 +18,12 @@ interface ApiErrorResponse {
   data: null
 }
 
+interface HttpLikeException {
+  statusCode?: unknown
+  status?: unknown
+  message?: unknown
+}
+
 @Catch()
 export class GlobalExceptionFilter implements ExceptionFilter {
   private readonly logger = new Logger(GlobalExceptionFilter.name)
@@ -31,6 +37,15 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       response
         .status(status)
         .send(this.normalizeHttpError(status, exception.getResponse()))
+      return
+    }
+
+    const status = this.resolveHttpLikeClientErrorStatus(exception)
+
+    if (status !== null) {
+      response
+        .status(status)
+        .send(this.buildErrorResponse(status, this.resolveUnknownErrorMessage(exception)))
       return
     }
 
@@ -71,5 +86,40 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       message,
       data: null,
     }
+  }
+
+  private resolveHttpLikeClientErrorStatus(exception: unknown): number | null {
+    if (!exception || typeof exception !== 'object') {
+      return null
+    }
+
+    const error = exception as HttpLikeException
+    const status = typeof error.statusCode === 'number'
+      ? error.statusCode
+      : typeof error.status === 'number'
+        ? error.status
+        : null
+
+    if (!status || status < 400 || status > 499) {
+      return null
+    }
+
+    return status
+  }
+
+  private resolveUnknownErrorMessage(exception: unknown): string {
+    if (exception instanceof Error && exception.message) {
+      return exception.message
+    }
+
+    if (exception && typeof exception === 'object') {
+      const error = exception as HttpLikeException
+
+      if (typeof error.message === 'string' && error.message) {
+        return error.message
+      }
+    }
+
+    return 'Unexpected error'
   }
 }
