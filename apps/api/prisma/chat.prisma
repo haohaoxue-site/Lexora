@@ -28,6 +28,14 @@ enum ChatSessionRunStatus {
   CANCELLED
 }
 
+enum ChatMessageGenerationStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
 enum ChatSessionEventType {
   MESSAGE_CREATED
   MESSAGE_STATUS_CHANGED
@@ -50,32 +58,39 @@ enum ChatSessionOrigin {
 }
 
 model ChatSession {
-  id                  String               @id @default(uuid())
-  workspaceId         String
-  origin              ChatSessionOrigin    @default(GLOBAL)
-  title               String
-  selectedProviderId  String?
-  selectedModelId     String?
-  historyVersion      Int                  @default(0)
-  activeRootMessageId String?
-  activeLeafMessageId String?
-  nextEventSequence   Int                  @default(1)
-  workspace           Workspace            @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  activeRootMessage   ChatSessionMessage?  @relation("ChatSessionActiveRootMessage", fields: [activeRootMessageId], references: [id], onDelete: SetNull)
-  activeLeafMessage   ChatSessionMessage?  @relation("ChatSessionActiveLeafMessage", fields: [activeLeafMessageId], references: [id], onDelete: SetNull)
-  messages            ChatSessionMessage[] @relation("ChatSessionMessages")
-  runs                ChatSessionRun[]
-  events              ChatSessionEvent[]
-  createdBy           String?
-  createdByUser       User?                @relation("ChatSessionCreator", fields: [createdBy], references: [id], onDelete: SetNull)
-  createdAt           DateTime             @default(now())
-  updatedAt           DateTime             @updatedAt
-  deletedAt           DateTime?
+  id                      String                  @id @default(uuid())
+  workspaceId             String
+  origin                  ChatSessionOrigin       @default(GLOBAL)
+  title                   String
+  selectedProviderId      String?
+  selectedModelId         String?
+  agentProfileId          String?
+  modelOverrideProviderId String?
+  modelOverrideModelId    String?
+  historyVersion          Int                     @default(0)
+  activeRootMessageId     String?
+  activeLeafMessageId     String?
+  nextEventSequence       Int                     @default(1)
+  workspace               Workspace               @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  agentProfile            AgentProfile?           @relation(fields: [agentProfileId], references: [id], onDelete: SetNull)
+  activeRootMessage       ChatSessionMessage?     @relation("ChatSessionActiveRootMessage", fields: [activeRootMessageId], references: [id], onDelete: SetNull)
+  activeLeafMessage       ChatSessionMessage?     @relation("ChatSessionActiveLeafMessage", fields: [activeLeafMessageId], references: [id], onDelete: SetNull)
+  messages                ChatSessionMessage[]    @relation("ChatSessionMessages")
+  runs                    ChatSessionRun[]
+  messageGenerations      ChatMessageGeneration[]
+  events                  ChatSessionEvent[]
+  createdBy               String?
+  createdByUser           User?                   @relation("ChatSessionCreator", fields: [createdBy], references: [id], onDelete: SetNull)
+  createdAt               DateTime                @default(now())
+  updatedAt               DateTime                @updatedAt
+  deletedAt               DateTime?
 
   @@index([workspaceId, updatedAt])
   @@index([workspaceId, origin, updatedAt])
   @@index([createdBy, updatedAt])
   @@index([selectedProviderId])
+  @@index([agentProfileId])
+  @@index([modelOverrideProviderId])
   @@index([activeRootMessageId])
   @@index([activeLeafMessageId])
 }
@@ -103,6 +118,7 @@ model ChatSessionMessage {
   activeRootForSessions  ChatSession[]                @relation("ChatSessionActiveRootMessage")
   activeLeafForSessions  ChatSession[]                @relation("ChatSessionActiveLeafMessage")
   runs                   ChatSessionRun[]
+  generation             ChatMessageGeneration?
   events                 ChatSessionEvent[]
   parts                  ChatSessionMessagePart[]
   contextSnapshots       ChatMessageContextSnapshot[]
@@ -159,7 +175,6 @@ model ChatSessionRun {
   assistantMessageId     String               @unique
   triggerUserMessageId   String
   actorUserId            String
-  workflowKey            String
   modelTargetSnapshot    Json?
   commandContext         Json
   status                 ChatSessionRunStatus @default(PENDING)
@@ -178,6 +193,38 @@ model ChatSessionRun {
   @@index([status, commandPublishedAt, dispatchLeaseExpiresAt])
   @@index([triggerUserMessageId])
   @@index([actorUserId, createdAt])
+}
+
+model ChatMessageGeneration {
+  id                     String                      @id @default(uuid())
+  generationId           String                      @unique
+  sessionId              String
+  assistantMessageId     String                      @unique
+  triggerUserMessageId   String
+  actorUserId            String
+  agentProfileId         String?
+  agentProfileSnapshot   Json
+  modelTargetSnapshot    Json
+  status                 ChatMessageGenerationStatus @default(PENDING)
+  attempt                Int                         @default(0)
+  idempotencyKey         String                      @unique
+  startedAt              DateTime?
+  commandPublishedAt     DateTime?
+  dispatchLeaseExpiresAt DateTime?
+  completedAt            DateTime?
+  error                  Json?
+  session                ChatSession                 @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  assistantMessage       ChatSessionMessage          @relation(fields: [assistantMessageId], references: [id], onDelete: Cascade)
+  agentProfile           AgentProfile?               @relation(fields: [agentProfileId], references: [id], onDelete: SetNull)
+  createdAt              DateTime                    @default(now())
+  updatedAt              DateTime                    @updatedAt
+  deletedAt              DateTime?
+
+  @@index([sessionId, status])
+  @@index([status, commandPublishedAt, dispatchLeaseExpiresAt])
+  @@index([triggerUserMessageId])
+  @@index([actorUserId, createdAt])
+  @@index([agentProfileId])
 }
 
 model ChatSessionEvent {

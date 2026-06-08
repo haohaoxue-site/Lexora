@@ -1,6 +1,13 @@
-import type { AgentCommandQueue, AgentControlHandler } from './typing'
-import type { AgentWorkflowRuntime } from './workflow'
-import { AGENT_RUN_CONTROL_TYPE, AgentRunCommandSchema } from '@haohaoxue/samepage-contracts'
+import type {
+  AgentCommandQueue,
+  AgentControlHandler,
+  AgentQueueCommand,
+  AgentRunner,
+} from './typing'
+import {
+  AGENT_RUNTIME_CONTROL_TYPE,
+  AgentGenerationCommandSchema,
+} from '@haohaoxue/samepage-contracts'
 
 export interface AgentIdempotencyStore {
   markStarted: (idempotencyKey: string) => boolean | Promise<boolean>
@@ -10,7 +17,7 @@ export interface AgentIdempotencyStore {
 
 export interface CreateAgentCommandWorkerOptions {
   queue: AgentCommandQueue
-  workflowRuntime: AgentWorkflowRuntime
+  runner: AgentRunner
   idempotency?: AgentIdempotencyStore
   onControl?: AgentControlHandler
 }
@@ -33,14 +40,14 @@ export function createAgentCommandWorker(options: CreateAgentCommandWorkerOption
 
       await options.queue.ready?.()
       unsubscribe = options.queue.subscribe(async (rawCommand) => {
-        const command = AgentRunCommandSchema.parse(rawCommand)
+        const command = parseAgentQueueCommand(rawCommand)
 
         if (!await idempotency.markStarted(command.idempotencyKey)) {
           return
         }
 
         try {
-          await options.workflowRuntime.submit(command)
+          await options.runner.submit(command)
         }
         catch (error) {
           await idempotency.clear(command.idempotencyKey)
@@ -48,8 +55,13 @@ export function createAgentCommandWorker(options: CreateAgentCommandWorkerOption
         }
       })
       unsubscribeControl = options.queue.subscribeControl?.((control) => {
-        if (control.type === AGENT_RUN_CONTROL_TYPE.CANCEL_RUN) {
-          options.workflowRuntime.cancel(control.runId)
+        if (control.type === AGENT_RUNTIME_CONTROL_TYPE.CANCEL_RUN) {
+          const cancelled = options.runner.cancel(control.runId)
+
+          if (!cancelled) {
+            return options.onControl?.(control)
+          }
+
           return
         }
 
@@ -65,6 +77,10 @@ export function createAgentCommandWorker(options: CreateAgentCommandWorkerOption
       await options.queue.close?.()
     },
   }
+}
+
+function parseAgentQueueCommand(rawCommand: unknown): AgentQueueCommand {
+  return AgentGenerationCommandSchema.parse(rawCommand)
 }
 
 function createMemoryAgentIdempotencyStore(): AgentIdempotencyStore {

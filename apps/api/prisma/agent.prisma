@@ -5,6 +5,25 @@ enum AgentRuntimeCleanupTaskStatus {
   FAILED
 }
 
+model AgentProfile {
+  id                 String                  @id @default(uuid())
+  ownerUserId        String
+  isDefault          Boolean                 @default(false)
+  name               String
+  description        String?
+  avatarUrl          String?
+  currentConfig      Json
+  ownerUser          User                    @relation("AgentProfileOwner", fields: [ownerUserId], references: [id], onDelete: Cascade)
+  chatSessions       ChatSession[]
+  messageGenerations ChatMessageGeneration[]
+  createdAt          DateTime                @default(now())
+  updatedAt          DateTime                @updatedAt
+  deletedAt          DateTime?
+
+  @@index([ownerUserId, isDefault, deletedAt])
+  @@index([ownerUserId, deletedAt])
+}
+
 model AgentRuntimeCleanupTask {
   id                    String                        @id @default(uuid())
   scope                 String

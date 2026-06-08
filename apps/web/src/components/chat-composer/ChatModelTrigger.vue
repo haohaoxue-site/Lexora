@@ -1,12 +1,16 @@
 <script setup lang="ts">
-import type { ChatComposerModelRef } from './typing'
+import type { ChatComposerModelRef, ChatComposerModelSelectionKind } from './typing'
 import { AI_MODEL_INTENT_KEY } from '@haohaoxue/samepage-contracts/ai/constants'
+import { computed } from 'vue'
 import ModelCascader from '@/components/model-cascader'
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   selectedModelRef?: ChatComposerModelRef | null
+  selectionKind?: ChatComposerModelSelectionKind
   disabled?: boolean
-}>()
+}>(), {
+  selectionKind: 'default',
+})
 
 const emits = defineEmits<{
   select: [modelRef: ChatComposerModelRef | null]
@@ -15,28 +19,67 @@ const emits = defineEmits<{
 function handleSelect(modelRef: ChatComposerModelRef | null) {
   emits('select', modelRef)
 }
+
+const selectionTooltip = computed(() => {
+  if (props.selectionKind === 'override') {
+    return '当前对话模型'
+  }
+
+  if (props.selectionKind === 'draft') {
+    return '新对话模型'
+  }
+
+  return '默认模型'
+})
 </script>
 
 <template>
-  <div class="chat-model-trigger" :class="{ 'is-disabled': props.disabled }">
-    <ModelCascader
-      :model-value="props.selectedModelRef"
-      :intent-key="AI_MODEL_INTENT_KEY.CHAT_ASSISTANT_DEFAULT"
-      :clearable="true"
-      :filterable="true"
-      :show-all-levels="false"
-      popper-class="chat-model-trigger__popper"
-      :disabled="props.disabled"
-      placeholder="选择模型"
-      @update:model-value="handleSelect"
-    />
-  </div>
+  <ElTooltip :content="selectionTooltip" placement="top" :show-after="300">
+    <div
+      class="chat-model-trigger"
+      :class="[`is-${props.selectionKind}`, { 'is-disabled': props.disabled }]"
+      :data-model-selection-kind="props.selectionKind"
+    >
+      <ModelCascader
+        :model-value="props.selectedModelRef"
+        :intent-key="AI_MODEL_INTENT_KEY.CHAT_ASSISTANT_DEFAULT"
+        :clearable="true"
+        :filterable="true"
+        :show-all-levels="false"
+        popper-class="chat-model-trigger__popper"
+        :disabled="props.disabled"
+        placeholder="选择模型"
+        @update:model-value="handleSelect"
+      />
+    </div>
+  </ElTooltip>
 </template>
 
 <style scoped lang="scss">
 .chat-model-trigger {
   display: inline-flex;
+  position: relative;
   min-width: 0;
+
+  &.is-override::after,
+  &.is-draft::after {
+    position: absolute;
+    inset-block-start: 0.3125rem;
+    inset-inline-end: 0.3125rem;
+    width: 0.375rem;
+    height: 0.375rem;
+    border-radius: 50%;
+    content: '';
+    pointer-events: none;
+  }
+
+  &.is-override::after {
+    background: var(--brand-primary);
+  }
+
+  &.is-draft::after {
+    background: var(--el-color-warning);
+  }
 
   :deep(.el-cascader) {
     width: auto;
@@ -58,6 +101,13 @@ function handleSelect(modelRef: ChatComposerModelRef | null) {
     transition:
       border-color 0.2s ease,
       background-color 0.2s ease;
+  }
+
+  &.is-override,
+  &.is-draft {
+    :deep(.el-cascader .el-input__wrapper) {
+      padding-inline-end: 0.875rem;
+    }
   }
 
   :deep(.el-cascader:not(.is-disabled) .el-input__wrapper:hover) {

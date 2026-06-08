@@ -1,12 +1,5 @@
-import type {
-  AgentGetChatSessionContextRequest,
-  AgentGetChatSessionContextResponse,
-} from '@haohaoxue/samepage-contracts'
+import type { ChatGenerationBootstrap } from '@haohaoxue/samepage-contracts'
 import {
-  AgentGetChatSessionContextRequestSchema,
-} from '@haohaoxue/samepage-contracts'
-import {
-  Body,
   Controller,
   HttpCode,
   HttpStatus,
@@ -14,7 +7,6 @@ import {
   Post,
 } from '@nestjs/common'
 import { Public } from '../../decorators/public.decorator'
-import { ZodValidationPipe } from '../../pipes/zod-validation.pipe'
 import { ChatSessionsService } from './chat-sessions.service'
 
 @Controller('internal/chat')
@@ -23,16 +15,12 @@ export class ChatAgentInternalController {
 
   @Public()
   @HttpCode(HttpStatus.OK)
-  @Post('sessions/:id/context')
-  async getChatSessionContext(
-    @Param('id') sessionId: string,
-    @Body(new ZodValidationPipe(AgentGetChatSessionContextRequestSchema))
-    payload: AgentGetChatSessionContextRequest,
-  ): Promise<AgentGetChatSessionContextResponse> {
-    return this.chatSessionsService.getAgentSessionContext({
-      actorId: payload.actorId,
-      sessionId,
-      triggerUserMessageId: payload.triggerUserMessageId,
+  @Post('generations/:generationId/bootstrap')
+  async getChatGenerationBootstrap(
+    @Param('generationId') generationId: string,
+  ): Promise<ChatGenerationBootstrap> {
+    return this.chatSessionsService.getAgentGenerationBootstrap({
+      generationId,
     })
   }
 }

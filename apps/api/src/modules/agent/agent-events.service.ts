@@ -1,49 +1,48 @@
-import type { AgentRunEvent, AgentWorkflowKey } from '@haohaoxue/samepage-contracts'
+import type { ChatGenerationEvent } from '@haohaoxue/samepage-contracts'
 import type Redis from 'ioredis'
-import { AGENT_QUEUE_NAME, AGENT_RUN_EVENT_TYPE, AgentRunEventSchema } from '@haohaoxue/samepage-contracts'
+import { AGENT_QUEUE_NAME, ChatGenerationEventSchema } from '@haohaoxue/samepage-contracts'
 import { Injectable } from '@nestjs/common'
 import { RedisService } from '../../infrastructure/redis/redis.service'
 
 const EVENT_FIELD = 'event'
 const DEFAULT_READ_COUNT = 20
 const DEFAULT_READ_BLOCK_MS = 1000
-const DEFAULT_RUN_TIMEOUT_MS = 10 * 60_000
+const DEFAULT_GENERATION_TIMEOUT_MS = 10 * 60_000
 const EMPTY_STREAM_ID = '0-0'
 
-export type AgentRunEventFailureReason = 'failed' | 'cancelled' | 'timed_out'
+export type AgentGenerationEventFailureReason = 'failed' | 'cancelled' | 'timed_out'
 
 type RedisStreamMessage = [string, string[]]
 type RedisStreamReadResult = Array<[string, RedisStreamMessage[]]>
 
-export interface ConsumeAgentRunEventsInput {
-  runId: string
-  workflowKey: AgentWorkflowKey
+export interface ConsumeAgentGenerationEventsInput {
+  generationId: string
   afterId: string
   timeoutMs?: number
   signal?: AbortSignal
-  messages?: AgentRunEventConsumerMessages
-  onEvent: (event: AgentRunEvent, sourceEventId: string) => void | Promise<void>
+  messages?: AgentGenerationEventConsumerMessages
+  onEvent: (event: ChatGenerationEvent, sourceEventId: string) => void | Promise<void>
 }
 
-export interface AgentRunEventConsumerMessages {
+export interface AgentGenerationEventConsumerMessages {
   aborted?: string
   cancelled?: string
   timedOut?: string
   failed?: string
 }
 
-export class AgentRunEventsConsumerError extends Error {
+export class AgentGenerationEventsConsumerError extends Error {
   constructor(
     message: string,
-    readonly reason: AgentRunEventFailureReason,
+    readonly reason: AgentGenerationEventFailureReason,
   ) {
     super(message)
-    this.name = 'AgentRunEventsConsumerError'
+    this.name = 'AgentGenerationEventsConsumerError'
   }
 }
 
 @Injectable()
-export class AgentRunEventsService {
+export class AgentGenerationEventsService {
   constructor(private readonly redisService: RedisService) {}
 
   async getLatestEventStreamId(): Promise<string> {
@@ -58,29 +57,29 @@ export class AgentRunEventsService {
     return result[0]?.[0] ?? EMPTY_STREAM_ID
   }
 
-  async consumeRunEvents(input: ConsumeAgentRunEventsInput): Promise<void> {
+  async consumeGenerationEvents(input: ConsumeAgentGenerationEventsInput): Promise<void> {
     const redis = this.redisService.createClient()
 
     try {
-      await this.consumeRunEventsWithClient(redis, input)
+      await this.consumeGenerationEventsWithClient(redis, input)
     }
     finally {
       await closeRedis(redis)
     }
   }
 
-  private async consumeRunEventsWithClient(
+  private async consumeGenerationEventsWithClient(
     redis: Redis,
-    input: ConsumeAgentRunEventsInput,
+    input: ConsumeAgentGenerationEventsInput,
   ): Promise<void> {
-    const timeoutMs = input.timeoutMs ?? DEFAULT_RUN_TIMEOUT_MS
+    const timeoutMs = input.timeoutMs ?? DEFAULT_GENERATION_TIMEOUT_MS
     const deadlineAt = Date.now() + timeoutMs
     const messages = normalizeMessages(input.messages)
     let lastId = input.afterId
 
     while (Date.now() < deadlineAt) {
       if (input.signal?.aborted) {
-        throw new AgentRunEventsConsumerError(messages.aborted, 'cancelled')
+        throw new AgentGenerationEventsConsumerError(messages.aborted, 'cancelled')
       }
 
       const remainingMs = Math.max(1, deadlineAt - Date.now())
@@ -95,32 +94,28 @@ export class AgentRunEventsService {
           lastId = messageId
           const event = parseEvent(fields)
 
-          if (!event || event.runId !== input.runId || event.workflowKey !== input.workflowKey) {
+          if (!event || event.generationId !== input.generationId) {
             continue
           }
 
           await input.onEvent(event, messageId)
 
-          if (event.type === AGENT_RUN_EVENT_TYPE.RUN_COMPLETED) {
+          if (event.type === 'generation.completed') {
             return
           }
 
-          if (event.type === AGENT_RUN_EVENT_TYPE.RUN_FAILED) {
-            throw new AgentRunEventsConsumerError(getFailureMessage(event, messages.failed), 'failed')
+          if (event.type === 'generation.failed') {
+            throw new AgentGenerationEventsConsumerError(getFailureMessage(event, messages.failed), 'failed')
           }
 
-          if (event.type === AGENT_RUN_EVENT_TYPE.RUN_CANCELLED) {
-            throw new AgentRunEventsConsumerError(getFailureMessage(event, messages.cancelled), 'cancelled')
-          }
-
-          if (event.type === AGENT_RUN_EVENT_TYPE.RUN_TIMED_OUT) {
-            throw new AgentRunEventsConsumerError(getFailureMessage(event, messages.timedOut), 'timed_out')
+          if (event.type === 'generation.cancelled') {
+            throw new AgentGenerationEventsConsumerError(getFailureMessage(event, messages.cancelled), 'cancelled')
           }
         }
       }
     }
 
-    throw new AgentRunEventsConsumerError(messages.timedOut, 'timed_out')
+    throw new AgentGenerationEventsConsumerError(messages.timedOut, 'timed_out')
   }
 }
 
@@ -140,14 +135,14 @@ function readNextBatch(
   ) as Promise<RedisStreamReadResult | null>
 }
 
-function parseEvent(fields: string[]): AgentRunEvent | null {
+function parseEvent(fields: string[]): ChatGenerationEvent | null {
   const rawEvent = getStreamField(fields, EVENT_FIELD)
   if (!rawEvent) {
     return null
   }
 
   try {
-    return AgentRunEventSchema.parse(JSON.parse(rawEvent))
+    return ChatGenerationEventSchema.parse(JSON.parse(rawEvent))
   }
   catch {
     return null
@@ -164,7 +159,7 @@ function getStreamField(fields: string[], fieldName: string): string | null {
   return null
 }
 
-export function getAgentRunEventText(event: AgentRunEvent): string | null {
+export function getChatGenerationEventText(event: ChatGenerationEvent): string | null {
   if (!event.payload || typeof event.payload !== 'object') {
     return null
   }
@@ -173,7 +168,7 @@ export function getAgentRunEventText(event: AgentRunEvent): string | null {
   return typeof text === 'string' ? text : null
 }
 
-function getFailureMessage(event: AgentRunEvent, fallback: string): string {
+function getFailureMessage(event: ChatGenerationEvent, fallback: string): string {
   if (event.payload && typeof event.payload === 'object') {
     const message = (event.payload as { message?: unknown }).message
     if (typeof message === 'string' && message.trim()) {
@@ -184,7 +179,7 @@ function getFailureMessage(event: AgentRunEvent, fallback: string): string {
   return fallback
 }
 
-function normalizeMessages(messages: AgentRunEventConsumerMessages = {}): Required<AgentRunEventConsumerMessages> {
+function normalizeMessages(messages: AgentGenerationEventConsumerMessages = {}): Required<AgentGenerationEventConsumerMessages> {
   return {
     aborted: messages.aborted ?? 'Agent 请求已取消',
     cancelled: messages.cancelled ?? 'Agent 运行已取消',

@@ -17,6 +17,7 @@ import { useChatMessageList } from '../../composables/useChatMessageList'
 const scrollContainerRef = useTemplateRef<HTMLElement>('scrollContainerRef')
 const {
   cancelEditMessage,
+  composerModelSelectionKind,
   composerSelectedModelRef,
   copyMessage,
   editingAttachments,
@@ -172,6 +173,7 @@ function setVirtualItemElement(key: string, element: Element | ComponentPublicIn
                   :content-j-s-o-n="editingContentJSON"
                   :attachments="editingAttachments"
                   :selected-model-ref="composerSelectedModelRef"
+                  :model-selection-kind="composerModelSelectionKind"
                   :disabled="isStreaming"
                   :highlight-attachment-id="editingHighlightAttachmentId"
                   document-picker-teleport-to=".chat-view__picker-layer"

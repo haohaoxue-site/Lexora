@@ -1,10 +1,10 @@
 import type { BaseCheckpointSaver } from '@langchain/langgraph'
 import type { AgentRuntimeTryLock } from './lock'
-import type { AgentControlResultPublisher, AgentRunControlCommand } from './typing'
+import type { AgentControlResultPublisher, AgentRuntimeControlCommand } from './typing'
 import {
   AGENT_CHAT_THREAD_PREFIX,
-  AGENT_RUN_CONTROL_RESULT_TYPE,
-  AGENT_RUN_CONTROL_TYPE,
+  AGENT_RUNTIME_CONTROL_RESULT_TYPE,
+  AGENT_RUNTIME_CONTROL_TYPE,
 } from '@haohaoxue/samepage-contracts'
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000
@@ -53,7 +53,7 @@ export interface CheckpointRetentionManager {
   start: () => void
   stop: () => Promise<void>
   sweepOnce: () => Promise<CheckpointRetentionSweepResult>
-  handleControl: (control: AgentRunControlCommand) => Promise<void>
+  handleControl: (control: AgentRuntimeControlCommand) => Promise<void>
 }
 
 interface CheckpointThreadAccess {
@@ -186,7 +186,7 @@ export function createCheckpointRetentionManager(
     sweepOnce,
 
     async handleControl(control) {
-      if (control.type !== AGENT_RUN_CONTROL_TYPE.DELETE_CHECKPOINT_THREAD) {
+      if (control.type !== AGENT_RUNTIME_CONTROL_TYPE.DELETE_CHECKPOINT_THREAD) {
         return
       }
 
@@ -227,10 +227,10 @@ export function createCheckpointRetentionManager(
 
 async function publishCheckpointDeleteCompleted(
   publisher: AgentControlResultPublisher | undefined,
-  control: AgentRunControlCommand,
+  control: AgentRuntimeControlCommand,
 ): Promise<void> {
   if (
-    control.type !== AGENT_RUN_CONTROL_TYPE.DELETE_CHECKPOINT_THREAD
+    control.type !== AGENT_RUNTIME_CONTROL_TYPE.DELETE_CHECKPOINT_THREAD
     || !control.cleanupTaskId
   ) {
     return
@@ -238,7 +238,7 @@ async function publishCheckpointDeleteCompleted(
 
   await publisher?.publish({
     controlId: control.controlId,
-    type: AGENT_RUN_CONTROL_RESULT_TYPE.CHECKPOINT_THREAD_DELETE_COMPLETED,
+    type: AGENT_RUNTIME_CONTROL_RESULT_TYPE.CHECKPOINT_THREAD_DELETE_COMPLETED,
     cleanupTaskId: control.cleanupTaskId,
     threadId: control.threadId,
   })
@@ -246,11 +246,11 @@ async function publishCheckpointDeleteCompleted(
 
 async function publishCheckpointDeleteFailed(
   publisher: AgentControlResultPublisher | undefined,
-  control: AgentRunControlCommand,
+  control: AgentRuntimeControlCommand,
   errorMessage: string,
 ): Promise<void> {
   if (
-    control.type !== AGENT_RUN_CONTROL_TYPE.DELETE_CHECKPOINT_THREAD
+    control.type !== AGENT_RUNTIME_CONTROL_TYPE.DELETE_CHECKPOINT_THREAD
     || !control.cleanupTaskId
   ) {
     return
@@ -258,7 +258,7 @@ async function publishCheckpointDeleteFailed(
 
   await publisher?.publish({
     controlId: control.controlId,
-    type: AGENT_RUN_CONTROL_RESULT_TYPE.CHECKPOINT_THREAD_DELETE_FAILED,
+    type: AGENT_RUNTIME_CONTROL_RESULT_TYPE.CHECKPOINT_THREAD_DELETE_FAILED,
     cleanupTaskId: control.cleanupTaskId,
     threadId: control.threadId,
     errorMessage,

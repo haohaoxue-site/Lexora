@@ -1,13 +1,7 @@
-import type {
-  AgentRunCommand,
-  AgentRunModelTarget,
-} from '@haohaoxue/samepage-contracts'
+import type { AgentGenerationCommand } from '@haohaoxue/samepage-contracts'
 import { randomUUID } from 'node:crypto'
 import {
-  AGENT_WORKFLOW_KEY,
-  AgentChatReplyContextSchema,
-  AgentRunCommandSchema,
-  AgentRunModelTargetSchema,
+  AgentGenerationCommandSchema,
   CHAT_MESSAGE_FAILURE_REASON,
   CHAT_SESSION_EVENT_TYPE,
 } from '@haohaoxue/samepage-contracts'
@@ -18,13 +12,14 @@ import {
   OnModuleInit,
 } from '@nestjs/common'
 import {
+  ChatMessageGenerationStatus,
   ChatSessionMessageStatus,
   ChatSessionRunStatus,
   Prisma,
 } from '@prisma/client'
 import { PrismaService } from '../../database/prisma.service'
-import { AgentRunCommandPublisherService } from '../agent/agent-command-publisher.service'
-import { AgentRunEventsService } from '../agent/agent-events.service'
+import { AgentCommandPublisherService } from '../agent/agent-command-publisher.service'
+import { AgentGenerationEventsService } from '../agent/agent-events.service'
 import { ChatRunProjectorService } from './chat-run-projector.service'
 import { ChatSessionEventsService } from './chat-session-events.service'
 
@@ -34,17 +29,20 @@ const DISPATCH_LEASE_MS = 60_000
 const EMPTY_AGENT_EVENT_STREAM_ID = '0-0'
 
 interface DispatchableChatRun {
-  runId: string
+  generationId: string
   sessionId: string
   assistantMessageId: string
   triggerUserMessageId: string
   actorUserId: string
-  workflowKey: string
-  status: ChatSessionRunStatus
+  status: ChatMessageGenerationStatus
+  attempt: number
+  idempotencyKey: string
   commandPublishedAt: Date | null
   dispatchLeaseExpiresAt: Date | null
-  modelTargetSnapshot: unknown
-  commandContext: unknown
+}
+
+interface ClaimedGeneration {
+  attempt: number
 }
 
 @Injectable()
@@ -55,8 +53,8 @@ export class ChatRunDispatcherService implements OnModuleInit, OnModuleDestroy {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly agentRunCommandPublisher: AgentRunCommandPublisherService,
-    private readonly agentRunEventsService: AgentRunEventsService,
+    private readonly agentCommandPublisher: AgentCommandPublisherService,
+    private readonly agentGenerationEventsService: AgentGenerationEventsService,
     private readonly chatSessionEvents: ChatSessionEventsService,
     private readonly chatRunProjector: ChatRunProjectorService,
   ) {}
@@ -86,7 +84,6 @@ export class ChatRunDispatcherService implements OnModuleInit, OnModuleDestroy {
       return
     }
 
-    const command = buildRunCommand(run)
     const afterId = await this.getProjectionAfterId(run)
     const claimed = await this.claimRun(run, now)
 
@@ -94,12 +91,14 @@ export class ChatRunDispatcherService implements OnModuleInit, OnModuleDestroy {
       return
     }
 
+    const command = buildGenerationCommand(run, claimed)
+
     try {
-      await this.agentRunCommandPublisher.publishRunCommand(command)
+      await this.agentCommandPublisher.publishGenerationCommand(command)
     }
     catch (error) {
       await this.markRunFailed({
-        runId: run.runId,
+        runId: run.generationId,
         sessionId: run.sessionId,
         assistantMessageId: run.assistantMessageId,
         message: error instanceof Error ? error.message : '发布聊天运行命令失败',
@@ -107,14 +106,14 @@ export class ChatRunDispatcherService implements OnModuleInit, OnModuleDestroy {
       return
     }
 
-    const commandPublished = await this.markCommandPublished(run.runId)
+    const commandPublished = await this.markCommandPublished(run.generationId)
     if (!commandPublished) {
       return
     }
 
-    this.logger.log(`chat run command published: session=${run.sessionId} run=${run.runId}`)
+    this.logger.log(`chat generation command published: session=${run.sessionId} generation=${run.generationId}`)
     void this.chatRunProjector.projectRun({
-      runId: run.runId,
+      runId: run.generationId,
       afterId,
     }).catch(error => this.logger.error(
       error instanceof Error ? error.message : 'project chat run failed',
@@ -130,21 +129,21 @@ export class ChatRunDispatcherService implements OnModuleInit, OnModuleDestroy {
     this.dispatching = true
     try {
       const now = new Date()
-      const runs = await this.prisma.chatSessionRun.findMany({
+      const runs = await this.prisma.chatMessageGeneration.findMany({
         where: {
           OR: [
-            { status: ChatSessionRunStatus.PENDING },
+            { status: ChatMessageGenerationStatus.PENDING },
             {
               commandPublishedAt: null,
               dispatchLeaseExpiresAt: {
                 lt: now,
               },
-              status: ChatSessionRunStatus.RUNNING,
+              status: ChatMessageGenerationStatus.RUNNING,
             },
           ],
         },
         select: {
-          runId: true,
+          generationId: true,
         },
         orderBy: {
           createdAt: 'asc',
@@ -153,7 +152,7 @@ export class ChatRunDispatcherService implements OnModuleInit, OnModuleDestroy {
       })
 
       for (const run of runs) {
-        await this.dispatchRun(run.runId)
+        await this.dispatchRun(run.generationId)
       }
     }
     finally {
@@ -162,65 +161,67 @@ export class ChatRunDispatcherService implements OnModuleInit, OnModuleDestroy {
   }
 
   private async getDispatchableRun(runId: string, now: Date): Promise<DispatchableChatRun | null> {
-    return this.prisma.chatSessionRun.findFirst({
+    return this.prisma.chatMessageGeneration.findFirst({
       where: {
-        runId,
+        generationId: runId,
         OR: [
-          { status: ChatSessionRunStatus.PENDING },
+          { status: ChatMessageGenerationStatus.PENDING },
           {
             commandPublishedAt: null,
             dispatchLeaseExpiresAt: {
               lt: now,
             },
-            status: ChatSessionRunStatus.RUNNING,
+            status: ChatMessageGenerationStatus.RUNNING,
           },
         ],
       },
       select: {
-        runId: true,
+        generationId: true,
         sessionId: true,
         assistantMessageId: true,
         triggerUserMessageId: true,
         actorUserId: true,
-        workflowKey: true,
         status: true,
+        attempt: true,
+        idempotencyKey: true,
         commandPublishedAt: true,
         dispatchLeaseExpiresAt: true,
-        modelTargetSnapshot: true,
-        commandContext: true,
       },
     })
   }
 
   private async getProjectionAfterId(run: DispatchableChatRun): Promise<string> {
-    if (run.status === ChatSessionRunStatus.RUNNING) {
-      return await this.chatSessionEvents.getLatestSourceEventStreamId(run.runId) ?? EMPTY_AGENT_EVENT_STREAM_ID
+    if (run.status === ChatMessageGenerationStatus.RUNNING) {
+      return await this.chatSessionEvents.getLatestSourceEventStreamId(run.generationId) ?? EMPTY_AGENT_EVENT_STREAM_ID
     }
 
-    return this.agentRunEventsService.getLatestEventStreamId()
+    return this.agentGenerationEventsService.getLatestEventStreamId()
   }
 
-  private async claimRun(run: DispatchableChatRun, now: Date): Promise<boolean> {
-    if (run.status === ChatSessionRunStatus.RUNNING) {
+  private async claimRun(run: DispatchableChatRun, now: Date): Promise<ClaimedGeneration | null> {
+    if (run.status === ChatMessageGenerationStatus.RUNNING) {
       return this.reclaimRun(run, now)
     }
 
     const dispatchLeaseExpiresAt = new Date(now.getTime() + DISPATCH_LEASE_MS)
     return this.prisma.$transaction(async (tx) => {
-      const update = await tx.chatSessionRun.updateMany({
+      const update = await tx.chatMessageGeneration.updateMany({
         where: {
-          runId: run.runId,
-          status: ChatSessionRunStatus.PENDING,
+          generationId: run.generationId,
+          status: ChatMessageGenerationStatus.PENDING,
         },
         data: {
-          status: ChatSessionRunStatus.RUNNING,
+          status: ChatMessageGenerationStatus.RUNNING,
           startedAt: now,
           dispatchLeaseExpiresAt,
+          attempt: {
+            increment: 1,
+          },
         },
       })
 
       if (update.count === 0) {
-        return false
+        return null
       }
 
       await tx.chatSessionMessage.update({
@@ -229,59 +230,110 @@ export class ChatRunDispatcherService implements OnModuleInit, OnModuleDestroy {
           status: ChatSessionMessageStatus.STREAMING,
         },
       })
+      await tx.chatSessionRun.updateMany({
+        where: {
+          runId: run.generationId,
+          status: ChatSessionRunStatus.PENDING,
+        },
+        data: {
+          status: ChatSessionRunStatus.RUNNING,
+          startedAt: now,
+          dispatchLeaseExpiresAt,
+        },
+      })
       await this.chatSessionEvents.appendEvents(tx, run.sessionId, [
         {
           type: CHAT_SESSION_EVENT_TYPE.RUN_STARTED,
-          runId: run.runId,
+          runId: run.generationId,
           payload: {},
         },
         {
           type: CHAT_SESSION_EVENT_TYPE.MESSAGE_STATUS_CHANGED,
           messageId: run.assistantMessageId,
-          runId: run.runId,
+          runId: run.generationId,
           payload: {
             status: 'streaming',
           },
         },
       ])
 
-      return true
+      return { attempt: run.attempt + 1 }
     })
   }
 
-  private async reclaimRun(run: DispatchableChatRun, now: Date): Promise<boolean> {
+  private async reclaimRun(run: DispatchableChatRun, now: Date): Promise<ClaimedGeneration | null> {
     const dispatchLeaseExpiresAt = new Date(now.getTime() + DISPATCH_LEASE_MS)
-    const update = await this.prisma.chatSessionRun.updateMany({
-      where: {
-        commandPublishedAt: null,
-        dispatchLeaseExpiresAt: {
-          lt: now,
+    return this.prisma.$transaction(async (tx) => {
+      const update = await tx.chatMessageGeneration.updateMany({
+        where: {
+          commandPublishedAt: null,
+          dispatchLeaseExpiresAt: {
+            lt: now,
+          },
+          generationId: run.generationId,
+          status: ChatMessageGenerationStatus.RUNNING,
         },
-        runId: run.runId,
-        status: ChatSessionRunStatus.RUNNING,
-      },
-      data: {
-        dispatchLeaseExpiresAt,
-      },
-    })
+        data: {
+          dispatchLeaseExpiresAt,
+          attempt: {
+            increment: 1,
+          },
+        },
+      })
 
-    return update.count > 0
+      if (update.count === 0) {
+        return null
+      }
+
+      await tx.chatSessionRun.updateMany({
+        where: {
+          commandPublishedAt: null,
+          dispatchLeaseExpiresAt: {
+            lt: now,
+          },
+          runId: run.generationId,
+          status: ChatSessionRunStatus.RUNNING,
+        },
+        data: {
+          dispatchLeaseExpiresAt,
+        },
+      })
+
+      return { attempt: run.attempt + 1 }
+    })
   }
 
   private async markCommandPublished(runId: string): Promise<boolean> {
     const commandPublishedAt = new Date()
-    const update = await this.prisma.chatSessionRun.updateMany({
-      where: {
-        commandPublishedAt: null,
-        runId,
-      },
-      data: {
-        commandPublishedAt,
-        dispatchLeaseExpiresAt: null,
-      },
-    })
+    return this.prisma.$transaction(async (tx) => {
+      const update = await tx.chatSessionRun.updateMany({
+        where: {
+          commandPublishedAt: null,
+          runId,
+        },
+        data: {
+          commandPublishedAt,
+          dispatchLeaseExpiresAt: null,
+        },
+      })
 
-    return update.count > 0
+      if (update.count === 0) {
+        return false
+      }
+
+      await tx.chatMessageGeneration.updateMany({
+        where: {
+          generationId: runId,
+          commandPublishedAt: null,
+        },
+        data: {
+          commandPublishedAt,
+          dispatchLeaseExpiresAt: null,
+        },
+      })
+
+      return true
+    })
   }
 
   private async markRunFailed(input: {
@@ -303,6 +355,20 @@ export class ChatRunDispatcherService implements OnModuleInit, OnModuleDestroy {
           dispatchLeaseExpiresAt: null,
         },
       })
+      await tx.chatMessageGeneration.updateMany({
+        where: {
+          generationId: input.runId,
+        },
+        data: {
+          status: ChatMessageGenerationStatus.FAILED,
+          completedAt,
+          dispatchLeaseExpiresAt: null,
+          error: toJsonObject({
+            failureReason: CHAT_MESSAGE_FAILURE_REASON.FAILED,
+            failureMessage: input.message,
+          }),
+        },
+      })
       await tx.chatSessionMessage.updateMany({
         where: {
           id: input.assistantMessageId,
@@ -321,7 +387,8 @@ export class ChatRunDispatcherService implements OnModuleInit, OnModuleDestroy {
           type: CHAT_SESSION_EVENT_TYPE.RUN_FAILED,
           runId: input.runId,
           payload: {
-            message: input.message,
+            failureReason: CHAT_MESSAGE_FAILURE_REASON.FAILED,
+            failureMessage: input.message,
           },
         },
         {
@@ -329,7 +396,8 @@ export class ChatRunDispatcherService implements OnModuleInit, OnModuleDestroy {
           messageId: input.assistantMessageId,
           runId: input.runId,
           payload: {
-            message: input.message,
+            failureReason: CHAT_MESSAGE_FAILURE_REASON.FAILED,
+            failureMessage: input.message,
           },
         },
       ])
@@ -337,47 +405,13 @@ export class ChatRunDispatcherService implements OnModuleInit, OnModuleDestroy {
   }
 }
 
-function buildRunCommand(run: {
-  runId: string
-  sessionId: string
-  assistantMessageId: string
-  triggerUserMessageId: string
-  actorUserId: string
-  workflowKey: string
-  modelTargetSnapshot: unknown
-  commandContext: unknown
-}): AgentRunCommand {
-  const modelTarget = AgentRunModelTargetSchema.parse(run.modelTargetSnapshot) satisfies AgentRunModelTarget
-  const commandContext = getCommandContext(run.commandContext)
-  const context = AgentChatReplyContextSchema.parse({
-    chatSessionId: run.sessionId,
-    triggerUserMessageId: run.triggerUserMessageId,
-    assistantMessageId: run.assistantMessageId,
-    expectedHistoryVersion: commandContext.expectedHistoryVersion,
-  })
-
-  return AgentRunCommandSchema.parse({
+function buildGenerationCommand(run: DispatchableChatRun, claim: ClaimedGeneration): AgentGenerationCommand {
+  return AgentGenerationCommandSchema.parse({
     commandId: randomUUID(),
-    runId: run.runId,
-    workflowKey: AGENT_WORKFLOW_KEY.CHAT_REPLY,
-    actorId: run.actorUserId,
-    modelTarget,
-    context,
-    idempotencyKey: `${AGENT_WORKFLOW_KEY.CHAT_REPLY}:${run.runId}`,
+    generationId: run.generationId,
+    idempotencyKey: run.idempotencyKey,
+    attempt: claim.attempt,
   })
-}
-
-function getCommandContext(value: unknown): { expectedHistoryVersion: number } {
-  if (!value || typeof value !== 'object') {
-    throw new Error('聊天运行上下文无效')
-  }
-
-  const expectedHistoryVersion = (value as { expectedHistoryVersion?: unknown }).expectedHistoryVersion
-  if (typeof expectedHistoryVersion !== 'number' || !Number.isInteger(expectedHistoryVersion)) {
-    throw new TypeError('聊天运行历史版本无效')
-  }
-
-  return { expectedHistoryVersion }
 }
 
 function toJsonObject(value: Record<string, unknown>): Prisma.InputJsonObject {

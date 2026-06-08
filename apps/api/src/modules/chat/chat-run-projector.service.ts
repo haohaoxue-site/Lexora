@@ -1,12 +1,9 @@
 import type {
-  AgentRunEvent,
+  ChatGenerationEvent,
   ChatMessageFailureReason,
   ChatMessageMetadata,
-  ChatMessagePartMetadata,
 } from '@haohaoxue/samepage-contracts'
 import {
-  AGENT_RUN_EVENT_TYPE,
-  AgentWorkflowKeySchema,
   CHAT_MESSAGE_FAILURE_REASON,
   CHAT_MESSAGE_PART_TYPE,
   CHAT_SESSION_EVENT_TYPE,
@@ -18,6 +15,7 @@ import {
   OnModuleInit,
 } from '@nestjs/common'
 import {
+  ChatMessageGenerationStatus,
   ChatSessionMessagePartType,
   ChatSessionMessageStatus,
   ChatSessionRunStatus,
@@ -25,9 +23,9 @@ import {
 } from '@prisma/client'
 import { PrismaService } from '../../database/prisma.service'
 import {
-  AgentRunEventsConsumerError,
-  AgentRunEventsService,
-  getAgentRunEventText,
+  AgentGenerationEventsConsumerError,
+  AgentGenerationEventsService,
+  getChatGenerationEventText,
 } from '../agent/agent-events.service'
 import { ChatSessionEventsService } from './chat-session-events.service'
 import { toPrismaChatMessagePartType } from './chat.utils'
@@ -45,7 +43,7 @@ export class ChatRunProjectorService implements OnModuleInit, OnModuleDestroy {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly agentRunEventsService: AgentRunEventsService,
+    private readonly agentGenerationEventsService: AgentGenerationEventsService,
     private readonly chatSessionEvents: ChatSessionEventsService,
   ) {}
 
@@ -113,7 +111,6 @@ export class ChatRunProjectorService implements OnModuleInit, OnModuleDestroy {
           runId: true,
           sessionId: true,
           assistantMessageId: true,
-          workflowKey: true,
           commandContext: true,
           status: true,
         },
@@ -127,9 +124,8 @@ export class ChatRunProjectorService implements OnModuleInit, OnModuleDestroy {
       let answerText = await this.getMessagePartText(run.assistantMessageId, ChatSessionMessagePartType.TEXT)
 
       try {
-        await this.agentRunEventsService.consumeRunEvents({
-          runId: run.runId,
-          workflowKey: AgentWorkflowKeySchema.parse(run.workflowKey),
+        await this.agentGenerationEventsService.consumeGenerationEvents({
+          generationId: run.runId,
           afterId: input.afterId,
           messages: {
             aborted: '聊天请求已取消',
@@ -138,8 +134,8 @@ export class ChatRunProjectorService implements OnModuleInit, OnModuleDestroy {
             failed: '聊天运行失败',
           },
           onEvent: async (event, sourceEventId) => {
-            if (event.type === AGENT_RUN_EVENT_TYPE.REASONING_DELTA) {
-              const text = getAgentRunEventText(event)
+            if (event.type === 'model.reasoning.delta') {
+              const text = getChatGenerationEventText(event)
               if (!text || await this.chatSessionEvents.hasSourceEvent(run.runId, sourceEventId)) {
                 return
               }
@@ -157,8 +153,8 @@ export class ChatRunProjectorService implements OnModuleInit, OnModuleDestroy {
               return
             }
 
-            if (event.type === AGENT_RUN_EVENT_TYPE.TEXT_DELTA) {
-              const text = getAgentRunEventText(event)
+            if (event.type === 'model.text.delta') {
+              const text = getChatGenerationEventText(event)
               if (!text || await this.chatSessionEvents.hasSourceEvent(run.runId, sourceEventId)) {
                 return
               }
@@ -176,27 +172,7 @@ export class ChatRunProjectorService implements OnModuleInit, OnModuleDestroy {
               return
             }
 
-            if (event.type === AGENT_RUN_EVENT_TYPE.TOOL_RESULT) {
-              const payload = readToolResultPayload(event)
-              if (!payload || await this.chatSessionEvents.hasSourceEvent(run.runId, sourceEventId)) {
-                return
-              }
-
-              await this.appendToolResultDelta({
-                runId: run.runId,
-                sessionId: run.sessionId,
-                messageId: run.assistantMessageId,
-                sourceEventId,
-                text: payload.content,
-                metadata: {
-                  toolCallId: payload.toolCallId,
-                  toolName: payload.toolName,
-                },
-              })
-              return
-            }
-
-            if (event.type === AGENT_RUN_EVENT_TYPE.RUN_COMPLETED) {
+            if (event.type === 'generation.completed') {
               await this.completeRun({
                 runId: run.runId,
                 sessionId: run.sessionId,
@@ -214,21 +190,19 @@ export class ChatRunProjectorService implements OnModuleInit, OnModuleDestroy {
               return
             }
 
-            if (event.type === AGENT_RUN_EVENT_TYPE.RUN_FAILED || event.type === AGENT_RUN_EVENT_TYPE.RUN_TIMED_OUT) {
+            if (event.type === 'generation.failed') {
               await this.failRun({
                 runId: run.runId,
                 sessionId: run.sessionId,
                 messageId: run.assistantMessageId,
                 sourceEventId,
-                failureReason: event.type === AGENT_RUN_EVENT_TYPE.RUN_TIMED_OUT
-                  ? CHAT_MESSAGE_FAILURE_REASON.TIMED_OUT
-                  : CHAT_MESSAGE_FAILURE_REASON.FAILED,
+                failureReason: CHAT_MESSAGE_FAILURE_REASON.FAILED,
                 failureMessage: getFailureMessageFromEvent(event, '聊天运行失败'),
               })
               return
             }
 
-            if (event.type === AGENT_RUN_EVENT_TYPE.RUN_CANCELLED) {
+            if (event.type === 'generation.cancelled') {
               await this.cancelRun({
                 runId: run.runId,
                 sessionId: run.sessionId,
@@ -356,74 +330,6 @@ export class ChatRunProjectorService implements OnModuleInit, OnModuleDestroy {
     }))
   }
 
-  private async appendToolResultDelta(input: {
-    runId: string
-    sessionId: string
-    messageId: string
-    sourceEventId: string
-    text: string
-    metadata: ChatMessagePartMetadata
-  }): Promise<void> {
-    await ignoreUniqueConstraint(async () => this.prisma.$transaction(async (tx) => {
-      if (!await isRunStatus(tx, input.runId, ChatSessionRunStatus.RUNNING)) {
-        return
-      }
-
-      const latestPart = await tx.chatSessionMessagePart.findFirst({
-        where: {
-          messageId: input.messageId,
-        },
-        select: {
-          order: true,
-        },
-        orderBy: {
-          order: 'desc',
-        },
-      })
-      const order = Math.max(2, (latestPart?.order ?? 1) + 1)
-      const part = await tx.chatSessionMessagePart.upsert({
-        where: {
-          messageId_order: {
-            messageId: input.messageId,
-            order,
-          },
-        },
-        create: {
-          messageId: input.messageId,
-          type: toPrismaChatMessagePartType(CHAT_MESSAGE_PART_TYPE.TOOL_RESULT),
-          text: input.text,
-          order,
-          metadata: toJsonObject(input.metadata),
-        },
-        update: {
-          type: toPrismaChatMessagePartType(CHAT_MESSAGE_PART_TYPE.TOOL_RESULT),
-          text: input.text,
-          metadata: toJsonObject(input.metadata),
-        },
-        select: {
-          id: true,
-          order: true,
-        },
-      })
-
-      await this.chatSessionEvents.appendEvents(tx, input.sessionId, [
-        {
-          type: CHAT_SESSION_EVENT_TYPE.MESSAGE_PART_DELTA,
-          messageId: input.messageId,
-          runId: input.runId,
-          sourceEventId: input.sourceEventId,
-          payload: {
-            partId: part.id,
-            partType: CHAT_MESSAGE_PART_TYPE.TOOL_RESULT,
-            order: part.order,
-            delta: input.text,
-            metadata: input.metadata,
-          },
-        },
-      ])
-    }))
-  }
-
   private async completeRun(input: {
     runId: string
     sessionId: string
@@ -471,6 +377,14 @@ export class ChatRunProjectorService implements OnModuleInit, OnModuleDestroy {
         where: { runId: input.runId },
         data: {
           status: ChatSessionRunStatus.COMPLETED,
+          completedAt,
+          dispatchLeaseExpiresAt: null,
+        },
+      })
+      await tx.chatMessageGeneration.updateMany({
+        where: { generationId: input.runId },
+        data: {
+          status: ChatMessageGenerationStatus.COMPLETED,
           completedAt,
           dispatchLeaseExpiresAt: null,
         },
@@ -533,6 +447,18 @@ export class ChatRunProjectorService implements OnModuleInit, OnModuleDestroy {
           dispatchLeaseExpiresAt: null,
         },
       })
+      await tx.chatMessageGeneration.updateMany({
+        where: { generationId: input.runId },
+        data: {
+          status: ChatMessageGenerationStatus.FAILED,
+          completedAt,
+          dispatchLeaseExpiresAt: null,
+          error: toJsonObject({
+            failureReason: input.failureReason,
+            failureMessage: input.failureMessage,
+          }),
+        },
+      })
       await tx.chatSession.update({
         where: { id: input.sessionId },
         data: {
@@ -591,6 +517,14 @@ export class ChatRunProjectorService implements OnModuleInit, OnModuleDestroy {
         where: { runId: input.runId },
         data: {
           status: ChatSessionRunStatus.CANCELLED,
+          completedAt,
+          dispatchLeaseExpiresAt: null,
+        },
+      })
+      await tx.chatMessageGeneration.updateMany({
+        where: { generationId: input.runId },
+        data: {
+          status: ChatMessageGenerationStatus.CANCELLED,
           completedAt,
           dispatchLeaseExpiresAt: null,
         },
@@ -680,7 +614,7 @@ function getExpectedHistoryVersion(value: unknown): number {
 }
 
 function buildCompletedMessageMetadata(input: {
-  event: AgentRunEvent
+  event: ChatGenerationEvent
   startedAt: number
   reasoningStartedAt: number | null
   reasoningEndedAt: number | null
@@ -696,7 +630,7 @@ function buildCompletedMessageMetadata(input: {
   }
 }
 
-function getDurationMs(event: AgentRunEvent): number | null {
+function getDurationMs(event: ChatGenerationEvent): number | null {
   if (!event.payload || typeof event.payload !== 'object') {
     return null
   }
@@ -706,7 +640,7 @@ function getDurationMs(event: AgentRunEvent): number | null {
 }
 
 function getFailureReason(error: unknown): ChatMessageFailureReason {
-  if (error instanceof AgentRunEventsConsumerError) {
+  if (error instanceof AgentGenerationEventsConsumerError) {
     return error.reason
   }
 
@@ -721,7 +655,7 @@ function getFailureMessage(error: unknown): string {
   return '聊天流式响应失败'
 }
 
-function getFailureMessageFromEvent(event: AgentRunEvent, fallback: string): string {
+function getFailureMessageFromEvent(event: ChatGenerationEvent, fallback: string): string {
   if (event.payload && typeof event.payload === 'object') {
     const message = (event.payload as { message?: unknown }).message
     if (typeof message === 'string' && message.trim()) {
@@ -730,38 +664,6 @@ function getFailureMessageFromEvent(event: AgentRunEvent, fallback: string): str
   }
 
   return fallback
-}
-
-function readToolResultPayload(event: AgentRunEvent): {
-  toolCallId: string
-  toolName: string
-  content: string
-} | null {
-  if (!event.payload || typeof event.payload !== 'object') {
-    return null
-  }
-
-  const payload = event.payload as {
-    toolCallId?: unknown
-    toolName?: unknown
-    content?: unknown
-  }
-  if (
-    typeof payload.toolCallId !== 'string'
-    || !payload.toolCallId.trim()
-    || typeof payload.toolName !== 'string'
-    || !payload.toolName.trim()
-    || typeof payload.content !== 'string'
-    || !payload.content
-  ) {
-    return null
-  }
-
-  return {
-    toolCallId: payload.toolCallId,
-    toolName: payload.toolName,
-    content: payload.content,
-  }
 }
 
 function toJsonObject(value: object): Prisma.InputJsonObject {

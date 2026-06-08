@@ -1,57 +1,49 @@
 import type {
-  AgentRunCommand,
-  AgentRunControlCommand,
-  AgentRunControlResult,
-  AgentRunEvent,
-  AgentRunEventType,
-  AgentRunModelTarget,
-  AgentWorkflowKey,
+  AgentGenerationCommand,
+  AgentRuntimeControlCommand,
+  AgentRuntimeControlResult,
+  AgentRuntimeModelTarget,
+  ChatGenerationBootstrap,
+  ChatGenerationEvent,
 } from '@haohaoxue/samepage-contracts'
 
 export type {
-  AgentRunCommand,
-  AgentRunControlCommand,
-  AgentRunControlResult,
-  AgentRunEvent,
-  AgentRunEventType,
-  AgentRunModelTarget,
-  AgentWorkflowKey,
+  AgentGenerationCommand,
+  AgentRuntimeControlCommand,
+  AgentRuntimeControlResult,
+  AgentRuntimeModelTarget,
+  ChatGenerationBootstrap,
+  ChatGenerationEvent,
 }
 
-export type AgentCommandHandler = (command: AgentRunCommand) => Promise<void> | void
-export type AgentControlHandler = (control: AgentRunControlCommand) => Promise<void> | void
+export type AgentQueueCommand = AgentGenerationCommand
+export type AgentCommandHandler = (command: AgentQueueCommand) => Promise<void> | void
+export type AgentControlHandler = (control: AgentRuntimeControlCommand) => Promise<void> | void
 
 export interface AgentCommandQueue {
-  publish: (command: AgentRunCommand) => Promise<void>
-  publishControl?: (control: AgentRunControlCommand) => Promise<void>
+  publish: (command: AgentQueueCommand) => Promise<void>
+  publishControl?: (control: AgentRuntimeControlCommand) => Promise<void>
   subscribe: (handler: AgentCommandHandler) => () => void
   subscribeControl?: (handler: AgentControlHandler) => () => void
   ready?: () => Promise<void>
   close?: () => Promise<void>
 }
 
+export interface AgentGenerationBootstrapClient {
+  getGenerationBootstrap: (options: { generationId: string }) => Promise<ChatGenerationBootstrap>
+}
+
+export interface AgentRunner {
+  submit: (command: AgentGenerationCommand) => Promise<unknown>
+  cancel: (generationId: string) => boolean
+}
+
 export interface AgentEventPublisher {
-  publish: (event: AgentRunEvent) => Promise<void>
+  publish: (event: ChatGenerationEvent) => Promise<void>
   close?: () => Promise<void>
 }
 
 export interface AgentControlResultPublisher {
-  publish: (result: AgentRunControlResult) => Promise<void>
+  publish: (result: AgentRuntimeControlResult) => Promise<void>
   close?: () => Promise<void>
-}
-
-export interface AgentWorkflowExecuteOptions {
-  actorId: string
-  runId: string
-  workflowKey: AgentWorkflowKey
-  context: Record<string, unknown>
-  payload: unknown
-  modelTarget: AgentRunModelTarget | null
-  signal: AbortSignal
-  emit: (event: AgentRunEvent) => Promise<void> | void
-}
-
-export interface AgentWorkflow {
-  workflowKey: AgentWorkflowKey
-  execute: (options: AgentWorkflowExecuteOptions) => Promise<unknown>
 }

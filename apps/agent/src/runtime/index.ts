@@ -1,15 +1,18 @@
 import type { AgentIdempotencyStore } from './command'
-import type { AgentCommandQueue, AgentControlHandler, AgentEventPublisher, AgentWorkflow } from './typing'
+import type {
+  AgentCommandQueue,
+  AgentControlHandler,
+  AgentEventPublisher,
+  AgentRunner,
+} from './typing'
 import { createAgentCommandWorker } from './command'
-import { createAgentWorkflowRuntime } from './workflow'
 
 export interface CreateAgentRuntimeOptions {
   queue: AgentCommandQueue
-  workflows?: AgentWorkflow[]
   events?: AgentEventPublisher
+  runner: AgentRunner
   idempotency?: AgentIdempotencyStore
   onControl?: AgentControlHandler
-  now?: () => number
 }
 
 export interface AgentRuntime {
@@ -18,16 +21,11 @@ export interface AgentRuntime {
 }
 
 export function createAgentRuntime(options: CreateAgentRuntimeOptions): AgentRuntime {
-  const workflowRuntime = createAgentWorkflowRuntime({
-    workflows: options.workflows,
-    events: options.events,
-    now: options.now,
-  })
   const commandWorker = createAgentCommandWorker({
     idempotency: options.idempotency,
     onControl: options.onControl,
     queue: options.queue,
-    workflowRuntime,
+    runner: options.runner,
   })
 
   return {
@@ -44,4 +42,3 @@ export function createAgentRuntime(options: CreateAgentRuntimeOptions): AgentRun
 
 export * from './command'
 export * from './typing'
-export * from './workflow'

@@ -3,14 +3,14 @@ import type {
   AgentChatContextSnapshot,
 } from '@haohaoxue/samepage-contracts'
 
-export interface ApplyChatReplyContextSnapshotsOptions {
+export interface ApplyAgentContextSnapshotsOptions {
   triggerUserMessageId: string | null | undefined
   contextSnapshots: AgentChatContextSnapshot[] | null | undefined
 }
 
-export function applyChatReplyContextSnapshotsToMessages(
+export function applyAgentContextSnapshotsToMessages(
   messages: AgentChatContextMessage[],
-  options: ApplyChatReplyContextSnapshotsOptions,
+  options: ApplyAgentContextSnapshotsOptions,
 ): AgentChatContextMessage[] {
   if (!options.triggerUserMessageId || !options.contextSnapshots?.length) {
     return messages
@@ -25,7 +25,7 @@ export function applyChatReplyContextSnapshotsToMessages(
   }
 
   let applied = false
-  const contextText = formatChatReplyContextSnapshots(snapshots)
+  const contextText = formatAgentContextSnapshots(snapshots)
   const nextMessages = messages.map((message) => {
     if (message.id !== options.triggerUserMessageId || message.role !== 'user') {
       return message
@@ -41,15 +41,15 @@ export function applyChatReplyContextSnapshotsToMessages(
   return applied ? nextMessages : messages
 }
 
-function formatChatReplyContextSnapshots(snapshots: AgentChatContextSnapshot[]): string {
+function formatAgentContextSnapshots(snapshots: AgentChatContextSnapshot[]): string {
   return [
     '[SamePage 上下文开始]',
-    ...snapshots.flatMap((snapshot, index) => formatChatReplyContextSnapshot(snapshot, index)),
+    ...snapshots.flatMap((snapshot, index) => formatAgentContextSnapshot(snapshot, index)),
     '[SamePage 上下文结束]',
   ].join('\n')
 }
 
-function formatChatReplyContextSnapshot(snapshot: AgentChatContextSnapshot, index: number): string[] {
+function formatAgentContextSnapshot(snapshot: AgentChatContextSnapshot, index: number): string[] {
   return [
     `[${index + 1}] ${snapshot.type}: ${snapshot.title}`,
     `documentId: ${snapshot.documentId}`,

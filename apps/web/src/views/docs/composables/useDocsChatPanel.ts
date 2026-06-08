@@ -1,6 +1,6 @@
 import type { ComputedRef, Ref } from 'vue'
 import type { ChatSessionDetail } from '@/apis/chat'
-import type { ChatComposerModelRef } from '@/components/chat-composer/typing'
+import type { ChatComposerModelRef, ChatComposerModelSelectionKind } from '@/components/chat-composer/typing'
 import type { ChatStreamController, SendChatComposerMessageInput } from '@/composables/chat/createChatStreamController'
 import { createSharedComposable } from '@vueuse/core'
 import { computed, onMounted, shallowRef, watch } from 'vue'
@@ -33,6 +33,7 @@ interface DocsChatPanelOverlay {
 
 interface DocsChatPanelModel {
   clearNewSessionModelDraft: () => void
+  composerModelSelectionKind: ComputedRef<ChatComposerModelSelectionKind>
   composerSelectedModelRef: ComputedRef<ChatComposerModelRef | null>
   isConfigured: ComputedRef<boolean>
   loadModelState?: () => Promise<void>
@@ -214,6 +215,7 @@ export function createDocsChatPanelController(options: {
     cancelRunId: options.stream.cancelRunId,
     clearSelectionContexts,
     composerFocusRequestVersion,
+    composerModelSelectionKind: options.model.composerModelSelectionKind,
     composerSelectedModelRef: options.model.composerSelectedModelRef,
     confirmDeleteActiveSession,
     contentJSON: host.contentJSON,

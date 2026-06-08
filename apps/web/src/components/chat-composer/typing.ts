@@ -8,6 +8,7 @@ import type {
 export type ChatComposerContentJSON = ChatMessageContentJSON
 export type ChatComposerAttachment = ChatMessageAttachmentInput
 export type ChatComposerModelRef = Pick<AiModelRef, 'providerId' | 'modelId'> & Partial<Pick<AiModelRef, 'scope' | 'providerKey'>>
+export type ChatComposerModelSelectionKind = 'default' | 'draft' | 'override'
 
 export interface ChatComposerSubmitPayload {
   content: string
@@ -19,6 +20,7 @@ export interface ChatComposerProps {
   contentJSON: ChatComposerContentJSON
   attachments: ChatComposerAttachment[]
   selectedModelRef?: ChatComposerModelRef | null
+  modelSelectionKind?: ChatComposerModelSelectionKind
   isStreaming?: boolean
   disabled?: boolean
   highlightAttachmentId?: string | null

@@ -5,7 +5,6 @@ import type {
   InlineMarkAction,
   TextAlignAction,
 } from './actionRegistry'
-import { canUseEditorAiRewriteSelection } from '../../ai/editorAiAnchor'
 import {
   canIndentBlock,
   canOutdentBlock,
@@ -41,10 +40,6 @@ export function isBubbleActionActive(editor: Editor, action: BubbleToolbarAction
 }
 
 export function isBubbleActionDisabled(editor: Editor, action: BubbleToolbarAction) {
-  if (action === 'ai-rewrite') {
-    return !canUseEditorAiRewriteSelection(editor)
-  }
-
   if (isIndentAction(action)) {
     return INDENT_DISABLED_HANDLERS[action](editor)
   }

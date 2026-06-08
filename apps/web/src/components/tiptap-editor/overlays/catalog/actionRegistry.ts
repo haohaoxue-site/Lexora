@@ -26,7 +26,6 @@ export type BubbleToolbarAction
     | 'link'
     | 'comment'
     | 'add-selection-context'
-    | 'ai-rewrite'
     | 'edit-image-alt'
 export type BlockMenuQuickAction = 'turn-into' | 'insert-link' | 'insert-inline-math' | 'insert-image' | 'insert-file'
 export type BlockMenuLeafAction = 'comment' | 'cut' | 'copy' | 'delete'
@@ -42,8 +41,6 @@ export interface MenuActionRegistryOptions {
   closeMenu?: () => void
   /** 评论请求回调 */
   onRequestComment?: (request: TiptapEditorCommentRequest) => void
-  /** 请求 AI 改写 */
-  onRequestAiRewrite?: () => void
   onRequestAddSelectionContext?: () => void
   /** 评论来源 */
   commentSource?: TiptapEditorCommentTriggerSource

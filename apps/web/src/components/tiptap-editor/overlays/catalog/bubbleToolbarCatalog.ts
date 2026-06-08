@@ -19,7 +19,7 @@ type BubbleToolbarActionContent
 type BubbleToolbarGroupItem
   = BubbleToolbarComponentItem | BubbleToolbarActionItem
 
-type BubbleToolbarComponent = 'turn-into' | 'color' | 'align' | 'ai'
+type BubbleToolbarComponent = 'turn-into' | 'color' | 'align'
 
 export type BubbleToolbarVariant = 'text' | 'image'
 export type BubbleToolbarTextStyle = 'mark-strong' | 'mark-italic' | 'mark-underline' | 'mark-strike' | 'label'
@@ -151,12 +151,18 @@ const TEXT_BUBBLE_TOOLBAR_GROUPS = [
     ],
   },
   {
-    key: 'ai',
+    key: 'selection-context',
     items: [
       {
-        kind: 'component',
-        component: 'ai',
-        description: 'AI',
+        kind: 'action',
+        action: 'add-selection-context',
+        description: '加入对话上下文',
+        content: {
+          kind: 'text',
+          value: '加入对话',
+          style: 'label',
+        },
+        buttonVariant: 'wide',
       },
     ],
   },

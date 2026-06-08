@@ -1,12 +1,12 @@
-import type { AgentRunControlResult } from '@haohaoxue/samepage-contracts'
+import type { AgentRuntimeControlResult } from '@haohaoxue/samepage-contracts'
 import type Redis from 'ioredis'
 import { randomUUID } from 'node:crypto'
 import process from 'node:process'
 import {
   AGENT_QUEUE_NAME,
-  AGENT_RUN_CONTROL_RESULT_TYPE,
-  AGENT_RUN_CONTROL_TYPE,
-  AgentRunControlResultSchema,
+  AGENT_RUNTIME_CONTROL_RESULT_TYPE,
+  AGENT_RUNTIME_CONTROL_TYPE,
+  AgentRuntimeControlResultSchema,
 } from '@haohaoxue/samepage-contracts'
 import { buildAgentChatThreadId, sleep } from '@haohaoxue/samepage-shared'
 import {
@@ -18,7 +18,7 @@ import {
 import { AgentRuntimeCleanupTaskStatus } from '@prisma/client'
 import { PrismaService } from '../../database/prisma.service'
 import { RedisService } from '../../infrastructure/redis/redis.service'
-import { AgentRunCommandPublisherService } from './agent-command-publisher.service'
+import { AgentCommandPublisherService } from './agent-command-publisher.service'
 
 const CHAT_SESSION_CLEANUP_SCOPE = 'chat_session'
 const DISPATCH_INTERVAL_MS = 5_000
@@ -49,7 +49,7 @@ export class AgentRuntimeCleanupTasksService implements OnModuleInit, OnModuleDe
   constructor(
     private readonly prisma: PrismaService,
     private readonly redisService: RedisService,
-    private readonly agentRunCommandPublisher: AgentRunCommandPublisherService,
+    private readonly agentCommandPublisher: AgentCommandPublisherService,
   ) {}
 
   onModuleInit(): void {
@@ -246,9 +246,9 @@ export class AgentRuntimeCleanupTasksService implements OnModuleInit, OnModuleDe
     }
 
     try {
-      await this.agentRunCommandPublisher.publishRunControl({
+      await this.agentCommandPublisher.publishRuntimeControl({
         controlId,
-        type: AGENT_RUN_CONTROL_TYPE.DELETE_CHECKPOINT_THREAD,
+        type: AGENT_RUNTIME_CONTROL_TYPE.DELETE_CHECKPOINT_THREAD,
         cleanupTaskId: task.id,
         threadId: task.threadId,
         reason: 'chat_session_deleted',
@@ -332,8 +332,8 @@ export class AgentRuntimeCleanupTasksService implements OnModuleInit, OnModuleDe
     await redis.xack(AGENT_QUEUE_NAME.CONTROL_RESULTS, CONTROL_RESULT_GROUP_NAME, messageId)
   }
 
-  private async applyControlResult(result: AgentRunControlResult): Promise<void> {
-    if (result.type === AGENT_RUN_CONTROL_RESULT_TYPE.CHECKPOINT_THREAD_DELETE_COMPLETED) {
+  private async applyControlResult(result: AgentRuntimeControlResult): Promise<void> {
+    if (result.type === AGENT_RUNTIME_CONTROL_RESULT_TYPE.CHECKPOINT_THREAD_DELETE_COMPLETED) {
       await this.prisma.agentRuntimeCleanupTask.updateMany({
         where: {
           id: result.cleanupTaskId,
@@ -419,14 +419,14 @@ function isBusyGroupError(error: unknown): boolean {
   return error instanceof Error && error.message.includes('BUSYGROUP')
 }
 
-function parseControlResult(fields: string[]): AgentRunControlResult | null {
+function parseControlResult(fields: string[]): AgentRuntimeControlResult | null {
   const rawResult = getStreamField(fields, CONTROL_RESULT_FIELD)
   if (!rawResult) {
     return null
   }
 
   try {
-    return AgentRunControlResultSchema.parse(JSON.parse(rawResult))
+    return AgentRuntimeControlResultSchema.parse(JSON.parse(rawResult))
   }
   catch {
     return null

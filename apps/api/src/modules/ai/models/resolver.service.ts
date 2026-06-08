@@ -1,4 +1,4 @@
-import type { AiModelIntentKey, AiModelRef } from '@haohaoxue/samepage-contracts'
+import type { AiModelCapability, AiModelIntentKey, AiModelRef } from '@haohaoxue/samepage-contracts'
 import { AiModelIntentKeySchema } from '@haohaoxue/samepage-contracts'
 import { getAiModelIntentFallbackChain, isAiModelCapabilitySatisfied, normalizeAiEndpoint } from '@haohaoxue/samepage-shared'
 import { BadRequestException, Injectable } from '@nestjs/common'
@@ -28,6 +28,9 @@ export interface ResolvedAiModelTarget {
   authMode: 'api-key' | 'bearer' | 'none'
   modelId: string
   modelName: string
+  capabilities: AiModelCapability[]
+  contextWindow: number | null
+  maxOutputTokens: number | null
 }
 
 @Injectable()
@@ -95,6 +98,9 @@ export class AiModelResolverService {
       authMode: toDomainAuthMode(provider.authMode),
       modelId: model.modelId,
       modelName: model.modelName,
+      capabilities: model.capabilities.map(toDomainCapability),
+      contextWindow: model.contextWindow,
+      maxOutputTokens: model.maxOutputTokens,
     }
   }
 

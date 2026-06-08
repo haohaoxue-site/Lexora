@@ -1032,131 +1032,11 @@ html.dark {
   display: inline-flex;
 }
 
-.tiptap-ai-composer {
-  position: fixed;
-  z-index: 32;
-  box-sizing: border-box;
-  padding: 0.5625rem;
-  border: 1px solid var(--brand-border-base);
-  border-radius: 8px;
-  background: var(--brand-bg-surface);
-  box-shadow: var(--brand-shadow-hairline);
-  overflow-y: auto;
-
-  .el-textarea__inner {
-    padding: 0.5rem 0.625rem;
-    border-radius: 6px;
-    line-height: 1.5;
-  }
-
-  &__actions {
-    display: flex;
-    align-items: center;
-    justify-content: flex-end;
-    gap: 0.5rem;
-    margin-top: 0.5rem;
-
-    > .el-button {
-      margin-left: 0;
-    }
-  }
-
-  &__error {
-    margin: 0.5rem 0 0;
-    color: var(--el-color-danger);
-    font-size: 0.75rem;
-    line-height: 1.5;
-  }
-}
-
-.tiptap-ai-preview {
-  color: inherit;
-
-  &--inline,
-  &__text {
-    padding: 0.06em 0.16em;
-    border-radius: 4px;
-    background: color-mix(in srgb, var(--el-color-primary-light-9) 60%, transparent);
-    -webkit-box-decoration-break: clone;
-    box-decoration-break: clone;
-  }
-
-  &--inline {
-    display: inline;
-    vertical-align: baseline;
-  }
-
-  &--block {
-    display: block;
-  }
-
-  &__code-block {
-    margin: 0.25rem 0;
-    padding: 0.375rem 0.5rem;
-    border: 1px solid var(--brand-border-base);
-    border-radius: 4px;
-    background: var(--brand-bg-page);
-    color: var(--brand-text-primary);
-    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
-    font-size: 0.875rem;
-    line-height: 1.6;
-    white-space: pre-wrap;
-  }
-
-  &__code-text {
-    display: block;
-  }
-
-  &.is-streaming.tiptap-ai-preview--inline::after,
-  &.is-streaming &__paragraph:last-child > &__text::after,
-  &.is-streaming &__code-block:last-child > &__code-text::after {
-    width: 0.5rem;
-    margin-left: 0.25rem;
-    color: var(--brand-primary);
-    content: '▍';
-    animation: tiptap-ai-preview-cursor 1s steps(1) infinite;
-  }
-
-  &.is-failed.tiptap-ai-preview--inline,
-  &.is-failed &__text {
-    background: var(--el-color-danger-light-9);
-    color: var(--el-color-danger);
-  }
-}
-
-.tiptap-ai-preview-anchor-block {
-  min-height: 0 !important;
-  height: 0 !important;
-  margin: 0 !important;
-  overflow: hidden !important;
-
-  &::before {
-    content: none !important;
-  }
-}
-
-.tiptap-ai-preview-selection {
-  border-radius: 4px;
-  background: color-mix(in srgb, var(--brand-primary) 12%, transparent);
-}
-
 .tiptap-panel-selection {
   border-radius: 2px;
   background: color-mix(in srgb, var(--brand-primary) 24%, transparent);
   box-decoration-break: clone;
   color: var(--brand-text-primary);
-}
-
-@keyframes tiptap-ai-preview-cursor {
-  0%,
-  48% {
-    opacity: 1;
-  }
-
-  49%,
-  100% {
-    opacity: 0;
-  }
 }
 
 .tiptap-bubble-btn {
@@ -1253,7 +1133,6 @@ html.dark {
 .tiptap-bubble-turn-into-popover,
 .tiptap-bubble-align-popover,
 .tiptap-bubble-color-picker-popover,
-.tiptap-bubble-ai-popover,
 .tiptap-block-trigger-popover {
   overflow: hidden !important;
   padding: 6px !important;
@@ -1261,41 +1140,6 @@ html.dark {
   border-radius: 8px !important;
   background: var(--brand-bg-surface) !important;
   box-shadow: var(--brand-shadow-hairline) !important;
-}
-
-.tiptap-bubble-ai-trigger {
-  width: auto;
-  min-width: 1rem;
-  font-size: 0.75rem;
-  font-weight: 600;
-}
-
-.tiptap-bubble-ai-menu {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-
-  &__item {
-    display: flex;
-    align-items: center;
-    width: 100%;
-    min-height: 28px;
-    padding: 0 9px;
-    border: none;
-    border-radius: 6px;
-    background: transparent;
-    color: var(--brand-text-primary);
-    font-size: 0.8125rem;
-    line-height: 1.4;
-    text-align: left;
-    cursor: pointer;
-    transition: background-color 0.15s ease, color 0.15s ease;
-
-    &:hover {
-      background: var(--el-fill-color-light);
-      color: var(--brand-primary);
-    }
-  }
 }
 
 .tiptap-block-trigger-popover {

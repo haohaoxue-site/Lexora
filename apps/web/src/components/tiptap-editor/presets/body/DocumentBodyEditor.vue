@@ -3,7 +3,6 @@ import type { Editor } from '@tiptap/core'
 import type { BlockTriggerMenuExposed } from '../../overlays/block-trigger/typing'
 import type { DocumentBodyEditorEmits, DocumentBodyEditorProps } from './typing'
 import { shallowRef, useTemplateRef } from 'vue'
-import EditorAiComposer from '../../ai/EditorAiComposer.vue'
 import TiptapEditor from '../../core/TiptapEditor.vue'
 import BlockTriggerMenu from '../../overlays/block-trigger/BlockTriggerMenu.vue'
 import BubbleToolbar from '../../overlays/bubble-toolbar/BubbleToolbar.vue'
@@ -34,7 +33,6 @@ const BODY_EDITOR_SCROLL_MARGIN = {
   left: 0,
 } as const
 const {
-  editorAiComposer,
   bodyEditorExtensions,
   handleBodyEditorChange,
   handleBodyEditorKeyDown,
@@ -60,7 +58,6 @@ const {
       :editor="bodyEditor"
       @request-comment="handleCommentRequest"
       @request-add-selection-context="emits('requestAddSelectionContext', $event)"
-      @request-ai-rewrite="editorAiComposer.openRewrite"
     />
 
     <MathPanelBubble
@@ -101,24 +98,6 @@ const {
       :upload-image="handleUploadImage"
       :upload-file="handleUploadFile"
       @request-comment="handleCommentRequest"
-    />
-
-    <EditorAiComposer
-      :visible="editorAiComposer.visible.value"
-      :mode="editorAiComposer.mode.value"
-      :status="editorAiComposer.status.value"
-      :prompt="editorAiComposer.prompt.value"
-      :anchor-style="editorAiComposer.anchorStyle.value"
-      :preview-text="editorAiComposer.previewText.value"
-      :error-message="editorAiComposer.errorMessage.value"
-      :can-submit="editorAiComposer.canSubmit.value"
-      :can-accept="editorAiComposer.canAccept.value"
-      :can-reject="editorAiComposer.canReject.value"
-      @update:prompt="editorAiComposer.updatePrompt"
-      @submit="editorAiComposer.submit"
-      @accept="editorAiComposer.accept"
-      @reject="editorAiComposer.reject"
-      @close="editorAiComposer.clear"
     />
   </section>
 </template>

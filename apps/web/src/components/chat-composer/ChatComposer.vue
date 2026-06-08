@@ -29,6 +29,7 @@ import {
 
 const props = withDefaults(defineProps<ChatComposerProps>(), {
   selectedModelRef: null,
+  modelSelectionKind: 'default',
   isStreaming: false,
   disabled: false,
   highlightAttachmentId: null,
@@ -311,6 +312,7 @@ function isSameContent(currentEditor: Editor, contentJSON: JSONContent) {
 
       <ChatComposerToolbar
         :selected-model-ref="props.selectedModelRef"
+        :model-selection-kind="props.modelSelectionKind"
         :is-streaming="props.isStreaming"
         :disabled="props.disabled"
         :can-send="canSend"

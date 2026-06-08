@@ -166,7 +166,6 @@ model Document {
   operationJobsAsSource     DocumentOperationJob[]            @relation("DocumentOperationJobSource")
   operationJobsAsResult     DocumentOperationJob[]            @relation("DocumentOperationJobResult")
   ydoc                      DocumentYdoc?
-  aiSessions                AiSession[]                       @relation("AiSessionDocument")
   createdAt                 DateTime                          @default(now())
   createdBy                 String
   createdByUser             User                              @relation("DocumentCreator", fields: [createdBy], references: [id], onDelete: Cascade)

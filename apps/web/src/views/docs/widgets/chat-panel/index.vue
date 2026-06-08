@@ -18,6 +18,7 @@ const {
   attachments,
   cancelActiveRun,
   composerFocusRequestVersion,
+  composerModelSelectionKind,
   composerSelectedModelRef,
   confirmDeleteActiveSession,
   contentJSON,
@@ -104,6 +105,7 @@ watch(
         v-model:attachments="attachments"
         :content-j-s-o-n="contentJSON"
         :selected-model-ref="composerSelectedModelRef"
+        :model-selection-kind="composerModelSelectionKind"
         :is-streaming="isStreaming"
         :highlight-attachment-id="highlightAttachmentId"
         document-picker-teleport-to=".docs-chat-panel__picker-layer"

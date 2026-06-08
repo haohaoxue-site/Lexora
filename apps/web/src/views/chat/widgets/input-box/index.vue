@@ -10,6 +10,7 @@ const props = withDefaults(defineProps<ChatInputBoxProps>(), {
 const {
   attachments,
   cancelActiveRun,
+  composerModelSelectionKind,
   composerSelectedModelRef,
   contentJSON,
   handlePlaceholderCommand,
@@ -29,6 +30,7 @@ const {
         v-model:attachments="attachments"
         :content-j-s-o-n="contentJSON"
         :selected-model-ref="composerSelectedModelRef"
+        :model-selection-kind="composerModelSelectionKind"
         :is-streaming="isStreaming"
         :highlight-attachment-id="highlightAttachmentId"
         document-picker-teleport-to=".chat-view__picker-layer"

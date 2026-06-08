@@ -4,6 +4,7 @@ import type {
   ChatComposerAttachment,
   ChatComposerContentJSON,
   ChatComposerModelRef,
+  ChatComposerModelSelectionKind,
   ChatComposerSubmitPayload,
 } from '@/components/chat-composer/typing'
 import { shallowRef } from 'vue'
@@ -16,6 +17,7 @@ export type ChatComposerBeforeSendHandler = (payload: ChatComposerSubmitPayload)
 
 export interface ChatComposerHostModel {
   composerSelectedModelRef: ComputedRef<ChatComposerModelRef | null>
+  composerModelSelectionKind?: ComputedRef<ChatComposerModelSelectionKind>
   clearNewSessionModelDraft: () => void
 }
 
@@ -63,7 +65,7 @@ export function createChatComposerHostState(options: {
     const nextPayload = applyBeforeSendHandlers(payload)
     const sent = await options.sendMessage({
       ...nextPayload,
-      modelRef,
+      modelRef: shouldPersistComposerModel(options.model.composerModelSelectionKind?.value) ? modelRef : undefined,
     })
     if (!sent) {
       return false
@@ -105,6 +107,10 @@ export function createChatComposerHostState(options: {
     registerBeforeSendHandler,
     resetComposer,
   }
+}
+
+function shouldPersistComposerModel(selectionKind: ChatComposerModelSelectionKind | undefined) {
+  return selectionKind === 'draft' || selectionKind === 'override'
 }
 
 function normalizeSelectedModelRef(modelRef: ChatComposerModelRef | null) {

@@ -20,7 +20,6 @@ import {
   uploadDocumentFile,
   uploadDocumentImage,
 } from '@/apis/document'
-import { useEditorAiComposer } from '../../ai/useEditorAiComposer'
 import { createBodyExtensions } from '../../extensions/createExtensions'
 import { scrollDocumentBlockIntoView } from '../../overlays/block-trigger/blockTriggerDom'
 import { isTriggerMenuSelection } from './triggerSelection'
@@ -40,11 +39,6 @@ export function useDocumentBodyEditor(options: {
     collaboration: options.props.collaboration,
   })
   const bodyEditor = computed(() => options.bodyEditor.value)
-  const editorAiComposer = useEditorAiComposer({
-    editor: options.bodyEditor,
-    getDocumentId: () => options.props.documentId,
-    getEditable: () => options.props.editable !== false,
-  })
   const pendingActiveBlockId = shallowRef<string | null>(null)
   const isResolvingActiveBlock = shallowRef(false)
   const imageSrcCache = new Map<string, Promise<string | null>>()
@@ -93,10 +87,6 @@ export function useDocumentBodyEditor(options: {
       return false
     }
 
-    if (editorAiComposer.openGenerateFromKeyboard(event)) {
-      return true
-    }
-
     if (event.key !== '/' || !isTriggerMenuSelection(editor)) {
       return false
     }
@@ -125,7 +115,6 @@ export function useDocumentBodyEditor(options: {
   return {
     bodyEditor,
     bodyEditorExtensions,
-    editorAiComposer,
     handleBodyEditorChange,
     handleBodyEditorKeyDown,
     handleBodyEditorTextInput,

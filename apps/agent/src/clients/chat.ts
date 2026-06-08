@@ -1,36 +1,29 @@
 import type {
-  AgentGetChatSessionContextRequest,
-  AgentGetChatSessionContextResponse,
+  ChatGenerationBootstrap,
 } from '@haohaoxue/samepage-contracts'
 import {
-  AgentGetChatSessionContextRequestSchema,
-  AgentGetChatSessionContextResponseSchema,
+  ChatGenerationBootstrapSchema,
 } from '@haohaoxue/samepage-contracts'
 import { normalizeApiInternalBaseUrl, postApiInternalJson } from './utils'
 
 export interface AgentChatApiClient {
-  getSessionContext: (options: AgentGetChatSessionContextOptions) => Promise<AgentGetChatSessionContextResponse>
+  getGenerationBootstrap: (options: AgentGetGenerationBootstrapOptions) => Promise<ChatGenerationBootstrap>
 }
 
-export interface AgentGetChatSessionContextOptions extends AgentGetChatSessionContextRequest {
-  sessionId: string
+export interface AgentGetGenerationBootstrapOptions {
+  generationId: string
 }
 
 export function createAgentChatApiClient(apiInternalUrl: string): AgentChatApiClient {
   const baseUrl = normalizeApiInternalBaseUrl(apiInternalUrl)
 
   return {
-    async getSessionContext(options) {
-      const payload = AgentGetChatSessionContextRequestSchema.parse({
-        actorId: options.actorId,
-        triggerUserMessageId: options.triggerUserMessageId,
-      })
-
-      return AgentGetChatSessionContextResponseSchema.parse(await postApiInternalJson({
+    async getGenerationBootstrap(options) {
+      return ChatGenerationBootstrapSchema.parse(await postApiInternalJson({
         baseUrl,
-        path: `internal/chat/sessions/${encodeURIComponent(options.sessionId)}/context`,
-        payload,
-        errorMessage: '读取聊天上下文失败',
+        path: `internal/chat/generations/${encodeURIComponent(options.generationId)}/bootstrap`,
+        payload: {},
+        errorMessage: '读取聊天生成上下文失败',
       }))
     },
   }

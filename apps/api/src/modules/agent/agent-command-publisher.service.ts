@@ -1,18 +1,21 @@
-import type { AgentRunCommand, AgentRunControlCommand } from '@haohaoxue/samepage-contracts'
+import type {
+  AgentGenerationCommand,
+  AgentRuntimeControlCommand,
+} from '@haohaoxue/samepage-contracts'
 import {
   AGENT_QUEUE_NAME,
-  AgentRunCommandSchema,
-  AgentRunControlCommandSchema,
+  AgentGenerationCommandSchema,
+  AgentRuntimeControlCommandSchema,
 } from '@haohaoxue/samepage-contracts'
 import { Injectable } from '@nestjs/common'
 import { RedisService } from '../../infrastructure/redis/redis.service'
 
 @Injectable()
-export class AgentRunCommandPublisherService {
+export class AgentCommandPublisherService {
   constructor(private readonly redisService: RedisService) {}
 
-  async publishRunCommand(command: AgentRunCommand): Promise<void> {
-    const normalizedCommand = AgentRunCommandSchema.parse(command)
+  async publishGenerationCommand(command: AgentGenerationCommand): Promise<void> {
+    const normalizedCommand = AgentGenerationCommandSchema.parse(command)
 
     await this.redisService.getClient().xadd(
       AGENT_QUEUE_NAME.COMMANDS,
@@ -22,8 +25,8 @@ export class AgentRunCommandPublisherService {
     )
   }
 
-  async publishRunControl(control: AgentRunControlCommand): Promise<void> {
-    const normalizedControl = AgentRunControlCommandSchema.parse(control)
+  async publishRuntimeControl(control: AgentRuntimeControlCommand): Promise<void> {
+    const normalizedControl = AgentRuntimeControlCommandSchema.parse(control)
 
     await this.redisService.getClient().xadd(
       AGENT_QUEUE_NAME.CONTROLS,

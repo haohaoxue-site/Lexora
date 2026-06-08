@@ -121,10 +121,6 @@ export function createMenuActionExecutors(
       return effects.editImageAlt()
     }
 
-    if (action === 'ai-rewrite') {
-      return effects.requestAiRewrite()
-    }
-
     if (action === 'add-selection-context') {
       return effects.requestAddSelectionContext()
     }

@@ -24,7 +24,6 @@ interface BubbleToolbarProps {
 interface BubbleToolbarEmits {
   requestComment: [request: TiptapEditorCommentRequest]
   requestAddSelectionContext: [request: TiptapEditorSelectionContextRequest]
-  requestAiRewrite: []
 }
 
 const props = defineProps<BubbleToolbarProps>()
@@ -34,7 +33,6 @@ const controller = useBubbleToolbar(editor, {
   onRequestComment: () => emits('requestComment', {
     source: 'bubble-toolbar',
   }),
-  onRequestAiRewrite: () => emits('requestAiRewrite'),
   onRequestAddSelectionContext: () => emits('requestAddSelectionContext', {
     editor,
     from: editor.state.selection.from,

@@ -1,6 +1,6 @@
 import type {
-  AgentRunModelTarget,
   AiModelRef,
+  ChatGenerationModelTargetSnapshot,
   ChatModelItem,
   ChatMutationResponse,
   ChatRuntimeConfig,
@@ -10,15 +10,15 @@ import type {
 } from '@haohaoxue/samepage-contracts'
 import { randomUUID } from 'node:crypto'
 import {
-  AGENT_RUN_CONTROL_TYPE,
-  AgentRunModelTargetSchema,
+  AGENT_RUNTIME_CONTROL_TYPE,
   AI_MODEL_INTENT_KEY,
+  ChatGenerationModelTargetSnapshotSchema,
 } from '@haohaoxue/samepage-contracts'
 import {
   Injectable,
   Logger,
 } from '@nestjs/common'
-import { AgentRunCommandPublisherService } from '../agent/agent-command-publisher.service'
+import { AgentCommandPublisherService } from '../agent/agent-command-publisher.service'
 import { AgentRuntimeCleanupTasksService } from '../agent/agent-runtime-cleanup-tasks.service'
 import { AiDefaultModelsService } from '../ai/models/defaults.service'
 import { AiModelResolverService } from '../ai/models/resolver.service'
@@ -64,6 +64,10 @@ interface UpdateChatSessionModelParams {
   modelRef: Pick<AiModelRef, 'providerId' | 'modelId'> | null
 }
 
+interface ResolvedChatModelTarget {
+  modelTargetSnapshot: ChatGenerationModelTargetSnapshot
+}
+
 @Injectable()
 export class ChatService {
   private readonly logger = new Logger(ChatService.name)
@@ -73,7 +77,7 @@ export class ChatService {
     private readonly modelResolverService: AiModelResolverService,
     private readonly defaultModelsService: AiDefaultModelsService,
     private readonly chatRunDispatcher: ChatRunDispatcherService,
-    private readonly agentRunCommandPublisher: AgentRunCommandPublisherService,
+    private readonly agentCommandPublisher: AgentCommandPublisherService,
     private readonly agentRuntimeCleanupTasks: AgentRuntimeCleanupTasksService,
   ) {}
 
@@ -95,7 +99,7 @@ export class ChatService {
           modelId: target.modelId,
           modelName: target.modelName,
           modelType: 'chat',
-          capabilities: [],
+          capabilities: target.capabilities,
           selectable: true,
           unavailableReason: null,
         },
@@ -130,41 +134,44 @@ export class ChatService {
   }
 
   async sendMessage(params: SendChatMessageParams): Promise<ChatMutationResponse> {
-    const runId = randomUUID()
+    const generationId = randomUUID()
     const modelTarget = await this.resolveChatModelTarget(params)
     const result = await this.chatSessionsService.sendMessage({
       ...params,
-      runId,
-      modelTarget,
+      generationId,
+      runId: generationId,
+      ...modelTarget,
     })
 
-    this.dispatchRun(runId, params.sessionId)
+    this.dispatchRun(generationId, params.sessionId)
     return result
   }
 
   async editAndSendMessage(params: EditAndSendChatMessageParams): Promise<ChatMutationResponse> {
-    const runId = randomUUID()
+    const generationId = randomUUID()
     const modelTarget = await this.resolveChatModelTarget(params)
     const result = await this.chatSessionsService.editAndSendMessage({
       ...params,
-      runId,
-      modelTarget,
+      generationId,
+      runId: generationId,
+      ...modelTarget,
     })
 
-    this.dispatchRun(runId, params.sessionId)
+    this.dispatchRun(generationId, params.sessionId)
     return result
   }
 
   async retryAssistantMessage(params: RetryChatAssistantMessageParams): Promise<ChatMutationResponse> {
-    const runId = randomUUID()
+    const generationId = randomUUID()
     const modelTarget = await this.resolveChatModelTarget(params)
     const result = await this.chatSessionsService.retryAssistantMessage({
       ...params,
-      runId,
-      modelTarget,
+      generationId,
+      runId: generationId,
+      ...modelTarget,
     })
 
-    this.dispatchRun(runId, params.sessionId)
+    this.dispatchRun(generationId, params.sessionId)
     return result
   }
 
@@ -197,9 +204,9 @@ export class ChatService {
   async cancelRun(params: CancelChatRunParams): Promise<ChatMutationResponse> {
     const result = await this.chatSessionsService.cancelRun(params)
 
-    await this.agentRunCommandPublisher.publishRunControl({
+    await this.agentCommandPublisher.publishRuntimeControl({
       controlId: randomUUID(),
-      type: AGENT_RUN_CONTROL_TYPE.CANCEL_RUN,
+      type: AGENT_RUNTIME_CONTROL_TYPE.CANCEL_RUN,
       runId: params.runId,
       reason: 'user_cancelled',
     }).catch(error => this.logger.warn(
@@ -209,33 +216,39 @@ export class ChatService {
     return result
   }
 
-  private async resolveChatModelTarget(params: ChatMessageMutationParams): Promise<AgentRunModelTarget> {
-    const sessionModelRef = await this.chatSessionsService.getSessionModelRef(params.userId, params.sessionId, params.origin)
+  private async resolveChatModelTarget(params: ChatMessageMutationParams): Promise<ResolvedChatModelTarget> {
+    const sessionModelRef = await this.chatSessionsService.getSessionModelSelection(params.userId, params.sessionId, params.origin)
     const target = await this.modelResolverService.resolveModelTarget({
       actorUserId: params.userId,
       intentKey: AI_MODEL_INTENT_KEY.CHAT_ASSISTANT_DEFAULT,
       requestedModelRef: sessionModelRef,
     })
 
-    return AgentRunModelTargetSchema.parse({
+    const modelTargetSnapshot = ChatGenerationModelTargetSnapshotSchema.parse({
       providerId: target.providerId,
       scope: target.scope,
       providerKey: target.providerKey,
       adapterKey: target.adapterKey,
       endpoint: target.endpoint,
-      apiKey: target.apiKey,
       authMode: target.authMode,
       modelId: target.modelId,
+      capabilities: target.capabilities,
+      contextWindow: target.contextWindow,
+      maxOutputTokens: target.maxOutputTokens,
     })
+
+    return {
+      modelTargetSnapshot,
+    }
   }
 
   private async cleanupDeletedChatSessions(input: {
     activeRunIds: string[]
     sessionIds: string[]
   }): Promise<void> {
-    await Promise.all(input.activeRunIds.map(runId => this.agentRunCommandPublisher.publishRunControl({
+    await Promise.all(input.activeRunIds.map(runId => this.agentCommandPublisher.publishRuntimeControl({
       controlId: randomUUID(),
-      type: AGENT_RUN_CONTROL_TYPE.CANCEL_RUN,
+      type: AGENT_RUNTIME_CONTROL_TYPE.CANCEL_RUN,
       runId,
       reason: 'chat_session_deleted',
     }).catch(error => this.logger.warn(

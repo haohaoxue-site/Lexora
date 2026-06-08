@@ -31,18 +31,6 @@ const AI_MODEL_INTENT_REQUIREMENTS = {
     modelType: AI_MODEL_TYPE.CHAT,
     requiredCapabilities: [],
   },
-  [AI_MODEL_INTENT_KEY.DOCUMENT_DEFAULT]: {
-    modelType: AI_MODEL_TYPE.CHAT,
-    requiredCapabilities: [],
-  },
-  [AI_MODEL_INTENT_KEY.DOCUMENT_GENERATE_DEFAULT]: {
-    modelType: AI_MODEL_TYPE.CHAT,
-    requiredCapabilities: [],
-  },
-  [AI_MODEL_INTENT_KEY.DOCUMENT_REWRITE_DEFAULT]: {
-    modelType: AI_MODEL_TYPE.CHAT,
-    requiredCapabilities: [],
-  },
 } as const satisfies Record<AiModelIntentKey, AiModelIntentRequirement>
 
 const TRAILING_SLASHES_RE = /\/+$/

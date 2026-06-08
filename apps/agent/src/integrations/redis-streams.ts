@@ -5,19 +5,19 @@ import type {
   AgentControlHandler,
   AgentControlResultPublisher,
   AgentEventPublisher,
-  AgentRunCommand,
-  AgentRunControlCommand,
-  AgentRunControlResult,
-  AgentRunEvent,
+  AgentQueueCommand,
+  AgentRuntimeControlCommand,
+  AgentRuntimeControlResult,
+  ChatGenerationEvent,
 } from '../runtime/typing'
 import type { AgentRedisClient, RedisCommandArgument, RedisStreamReadResult } from './redis-client'
 import process from 'node:process'
 import {
   AGENT_QUEUE_NAME,
-  AgentRunCommandSchema,
-  AgentRunControlCommandSchema,
-  AgentRunControlResultSchema,
-  AgentRunEventSchema,
+  AgentGenerationCommandSchema,
+  AgentRuntimeControlCommandSchema,
+  AgentRuntimeControlResultSchema,
+  ChatGenerationEventSchema,
 } from '@haohaoxue/samepage-contracts'
 import { sleepUnref } from '@haohaoxue/samepage-shared'
 
@@ -25,7 +25,7 @@ const DEFAULT_GROUP_NAME = 'samepage-agent'
 const DEFAULT_CONSUMER_NAME = `agent-${process.pid}`
 const DEFAULT_READ_COUNT = 10
 const DEFAULT_READ_BLOCK_MS = 1000
-const DEFAULT_MAX_ATTEMPTS = 3
+const DEFAULT_MAX_ATTEMPTS = 1
 const COMMAND_FIELD = 'command'
 const CONTROL_FIELD = 'control'
 const CONTROL_RESULT_FIELD = 'result'
@@ -273,7 +273,7 @@ export function createRedisStreamsAgentQueue(options: CreateRedisStreamsAgentQue
     if (!rawCommand) {
       await publishDeadLetter(redis, {
         messageId,
-        rawCommand: '',
+        command: null,
         errorMessage: 'command 字段缺失',
         attempts: 0,
       })
@@ -285,7 +285,7 @@ export function createRedisStreamsAgentQueue(options: CreateRedisStreamsAgentQue
     if (!command.ok) {
       await publishDeadLetter(redis, {
         messageId,
-        rawCommand,
+        command: null,
         errorMessage: command.errorMessage,
         attempts: 0,
       })
@@ -308,7 +308,7 @@ export function createRedisStreamsAgentQueue(options: CreateRedisStreamsAgentQue
 
     await publishDeadLetter(redis, {
       messageId,
-      rawCommand,
+      command: command.value,
       errorMessage: lastErrorMessage,
       attempts: maxAttempts,
     })
@@ -456,17 +456,19 @@ function readCommandBatch(
   )
 }
 
-function publishCommand(redis: AgentRedisClient, command: AgentRunCommand): Promise<string> {
+function publishCommand(redis: AgentRedisClient, command: AgentQueueCommand): Promise<string> {
+  const normalizedCommand = parseQueueCommand(command)
+
   return redis.xadd(
     AGENT_QUEUE_NAME.COMMANDS,
     '*',
     COMMAND_FIELD,
-    JSON.stringify(command),
+    JSON.stringify(normalizedCommand),
   )
 }
 
-function publishControl(redis: AgentRedisClient, control: AgentRunControlCommand): Promise<string> {
-  const normalizedControl = AgentRunControlCommandSchema.parse(control)
+function publishControl(redis: AgentRedisClient, control: AgentRuntimeControlCommand): Promise<string> {
+  const normalizedControl = AgentRuntimeControlCommandSchema.parse(control)
 
   return redis.xadd(
     AGENT_QUEUE_NAME.CONTROLS,
@@ -476,8 +478,8 @@ function publishControl(redis: AgentRedisClient, control: AgentRunControlCommand
   )
 }
 
-function publishControlResult(redis: AgentRedisClient, result: AgentRunControlResult): Promise<string> {
-  const normalizedResult = AgentRunControlResultSchema.parse(result)
+function publishControlResult(redis: AgentRedisClient, result: AgentRuntimeControlResult): Promise<string> {
+  const normalizedResult = AgentRuntimeControlResultSchema.parse(result)
 
   return redis.xadd(
     AGENT_QUEUE_NAME.CONTROL_RESULTS,
@@ -487,8 +489,8 @@ function publishControlResult(redis: AgentRedisClient, result: AgentRunControlRe
   )
 }
 
-function publishEvent(redis: AgentRedisClient, event: AgentRunEvent): Promise<string> {
-  const normalizedEvent = AgentRunEventSchema.parse(event)
+function publishEvent(redis: AgentRedisClient, event: ChatGenerationEvent): Promise<string> {
+  const normalizedEvent = ChatGenerationEventSchema.parse(event)
 
   return redis.xadd(
     AGENT_QUEUE_NAME.EVENTS,
@@ -502,23 +504,50 @@ function publishDeadLetter(
   redis: AgentRedisClient,
   options: {
     messageId: string
-    rawCommand: string
+    command: AgentQueueCommand | null
     errorMessage: string
     attempts: number
   },
 ): Promise<string> {
+  const summary = createDeadLetterCommandSummary(options.command)
+
   return redis.xadd(
     AGENT_QUEUE_NAME.DEAD_LETTER,
     '*',
     'originalId',
     options.messageId,
-    COMMAND_FIELD,
-    options.rawCommand,
+    'commandKind',
+    summary.commandKind,
+    ...toRedisFieldPairs(summary.fields),
     'error',
     options.errorMessage,
     'attempts',
     String(options.attempts),
   )
+}
+
+function createDeadLetterCommandSummary(command: AgentQueueCommand | null): {
+  commandKind: string
+  fields: Record<string, string | undefined>
+} {
+  if (!command) {
+    return {
+      commandKind: 'unknown',
+      fields: {},
+    }
+  }
+
+  return {
+    commandKind: 'generation',
+    fields: {
+      commandId: command.commandId,
+      generationId: command.generationId,
+    },
+  }
+}
+
+function toRedisFieldPairs(fields: Record<string, string | undefined>): string[] {
+  return Object.entries(fields).flatMap(([key, value]) => value ? [key, value] : [])
 }
 
 function getStreamField(fields: string[], fieldName: string): string | null {
@@ -531,11 +560,11 @@ function getStreamField(fields: string[], fieldName: string): string | null {
   return null
 }
 
-function parseCommand(rawCommand: string): { ok: true, value: AgentRunCommand } | { ok: false, errorMessage: string } {
+function parseCommand(rawCommand: string): { ok: true, value: AgentQueueCommand } | { ok: false, errorMessage: string } {
   try {
     return {
       ok: true,
-      value: AgentRunCommandSchema.parse(JSON.parse(rawCommand)),
+      value: parseQueueCommand(JSON.parse(rawCommand)),
     }
   }
   catch (error) {
@@ -546,11 +575,15 @@ function parseCommand(rawCommand: string): { ok: true, value: AgentRunCommand } 
   }
 }
 
-function parseControl(rawControl: string): { ok: true, value: AgentRunControlCommand } | { ok: false, errorMessage: string } {
+function parseQueueCommand(value: unknown): AgentQueueCommand {
+  return AgentGenerationCommandSchema.parse(value)
+}
+
+function parseControl(rawControl: string): { ok: true, value: AgentRuntimeControlCommand } | { ok: false, errorMessage: string } {
   try {
     return {
       ok: true,
-      value: AgentRunControlCommandSchema.parse(JSON.parse(rawControl)),
+      value: AgentRuntimeControlCommandSchema.parse(JSON.parse(rawControl)),
     }
   }
   catch (error) {

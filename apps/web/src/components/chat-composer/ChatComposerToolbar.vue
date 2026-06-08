@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import type { ChatComposerModelRef } from './typing'
+import type { ChatComposerModelRef, ChatComposerModelSelectionKind } from './typing'
 import { CloseBold } from '@element-plus/icons-vue'
 import ChatModelTrigger from './ChatModelTrigger.vue'
 
 const props = defineProps<{
   selectedModelRef?: ChatComposerModelRef | null
+  modelSelectionKind?: ChatComposerModelSelectionKind
   isStreaming?: boolean
   disabled?: boolean
   canSend?: boolean
@@ -63,6 +64,7 @@ const emits = defineEmits<{
     <div class="chat-composer-toolbar__right">
       <ChatModelTrigger
         :selected-model-ref="props.selectedModelRef"
+        :selection-kind="props.modelSelectionKind"
         :disabled="props.isStreaming"
         @select="emits('selectModel', $event)"
       />

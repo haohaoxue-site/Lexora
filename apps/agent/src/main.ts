@@ -1,7 +1,7 @@
 import process from 'node:process'
 import { createAgentChatApiClient } from './clients/chat'
-import { createAgentEditorApiClient } from './clients/editor'
 import { loadAgentConfig } from './config/runtime-config'
+import { createAgentRunner } from './core'
 import { createChatModelFactory } from './integrations/model-providers/chat-model'
 import { createAgentRedisClient } from './integrations/redis-client'
 import { createRedisAgentRuntimeTryLock } from './integrations/redis-lock'
@@ -15,12 +15,9 @@ import { createAgentRuntime } from './runtime'
 import { createCheckpointRetentionManager } from './runtime/checkpoint-retention'
 import { closeAgentCheckpointer, createAgentCheckpointer } from './runtime/checkpointer'
 import { createAgentServer } from './server/app'
-import { createChatReplyWorkflow } from './workflows/chat-reply'
-import { createEditorGenerateWorkflow, createEditorRewriteWorkflow } from './workflows/editor-reply'
 
 const config = loadAgentConfig()
 const chatApi = createAgentChatApiClient(config.apiInternalUrl)
-const editorApi = createAgentEditorApiClient(config.apiInternalUrl)
 const chatModelFactory = createChatModelFactory()
 const queueRedis = createAgentRedisClient(config.redisUrl)
 const runtimeRedis = createAgentRedisClient(config.redisUrl)
@@ -64,27 +61,25 @@ async function start(): Promise<void> {
     }),
     logger: app.log,
   })
+  const eventPublisher = createRedisStreamsAgentEventPublisher({
+    redis: eventRedis,
+  })
   agentRuntime = createAgentRuntime({
+    runner: createAgentRunner({
+      chatApi,
+      chatModelFactory,
+      checkpointer: agentCheckpointer,
+      events: eventPublisher,
+      threadRunTryLock,
+    }),
     idempotency: createRedisAgentIdempotencyStore({
       redis: runtimeRedis,
     }),
     queue: createRedisStreamsAgentQueue({
       redis: queueRedis,
     }),
-    events: createRedisStreamsAgentEventPublisher({
-      redis: eventRedis,
-    }),
+    events: eventPublisher,
     onControl: async control => await checkpointRetentionManager?.handleControl(control),
-    workflows: [
-      createChatReplyWorkflow({
-        chatApi,
-        chatModelFactory,
-        checkpointer: agentCheckpointer,
-        threadRunTryLock,
-      }),
-      createEditorGenerateWorkflow({ editorApi, chatModelFactory }),
-      createEditorRewriteWorkflow({ editorApi, chatModelFactory }),
-    ],
   })
 
   checkpointRetentionManager.start()

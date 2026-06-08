@@ -13,6 +13,8 @@ import {
   resolveChatRequestModelRef,
 } from './utils/chat-model-selection'
 
+export type ChatComposerModelSelectionKind = 'default' | 'draft' | 'override'
+
 export interface ChatComposerModelSessions {
   activeSession: Ref<ChatSessionDetail | null>
   replaceActiveSession: (session: ChatSessionDetail) => boolean
@@ -35,11 +37,20 @@ export function createChatComposerModelController(
     modelOptions.value,
     runtimeConfig.value.defaultModel,
   ))
-  const composerSelectedModelRef = computed(() =>
-    sessions.activeSession.value
-      ? sessionModelRef.value
-      : hasNewSessionModelDraft.value ? newSessionModelDraft.value : requestModelRef.value,
-  )
+  const composerSelectedModelRef = computed(() => {
+    if (sessions.activeSession.value) {
+      return sessionModelRef.value ?? requestModelRef.value
+    }
+
+    return hasNewSessionModelDraft.value ? newSessionModelDraft.value : requestModelRef.value
+  })
+  const composerModelSelectionKind = computed<ChatComposerModelSelectionKind>(() => {
+    if (sessions.activeSession.value) {
+      return sessionModelRef.value ? 'override' : 'default'
+    }
+
+    return hasNewSessionModelDraft.value ? 'draft' : 'default'
+  })
   const isConfigured = computed(() => Boolean(composerSelectedModelRef.value))
 
   async function loadModelState() {
@@ -86,6 +97,7 @@ export function createChatComposerModelController(
 
   return {
     clearNewSessionModelDraft,
+    composerModelSelectionKind,
     composerSelectedModelRef,
     isConfigured,
     loadModelState,

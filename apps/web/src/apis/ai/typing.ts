@@ -4,13 +4,9 @@ import type {
 } from '@haohaoxue/samepage-contracts'
 
 export type {
-  AiAnchor,
   AiAvailableModelOption,
   AiAvailableProviderOption,
-  AiCandidate,
   AiDefaultModelPolicyItem,
-  AiEditorStreamEvent,
-  AiEditorWorkflowKey,
   AiModelCapability,
   AiModelIntentKey,
   AiModelRef,
@@ -22,11 +18,6 @@ export type {
   AiProviderModels,
   AiProviderPreset,
   AiProviderScope,
-  AiRun,
-  AiSession,
-  CreateAiEditorSessionRequest,
-  CreateAiEditorSessionResponse,
-  ResolveAiEditorCandidateResponse,
   UpdateAiDefaultModelPolicyRequest,
 } from '@haohaoxue/samepage-contracts'
 

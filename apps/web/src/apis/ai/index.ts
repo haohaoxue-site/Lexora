@@ -9,21 +9,15 @@ import type {
   AiProviderModels,
   AiProviderPreset,
   AiProviderScope,
-  CreateAiEditorSessionRequest,
   CreateAiProviderRequest,
-  ResolveAiEditorCandidateResponse,
   UpdateAiDefaultModelPolicyRequest,
   UpdateAiProviderRequest,
   UpsertAiProviderModelRequest,
   UpsertAiProviderModelsRequest,
 } from './typing'
-import { SERVER_PATH } from '@haohaoxue/samepage-contracts/server'
-import { useAuthStore } from '@/stores/auth'
 import { axios } from '@/utils/axios'
 
 export * from './typing'
-
-const API_BASE_URL = SERVER_PATH
 
 export function getAiCompatibleProviderPresets(): Promise<AiProviderPreset[]> {
   return axios.request({
@@ -229,44 +223,5 @@ export function updateAiDefaultModel(
     method: 'put',
     url: `/users/me/ai/default-models/${intentKey}`,
     data,
-  })
-}
-
-export function createAiEditorSession(
-  data: CreateAiEditorSessionRequest,
-  options: {
-    signal?: AbortSignal
-  } = {},
-): Promise<Response> {
-  const authStore = useAuthStore()
-
-  return fetch(`${API_BASE_URL}/ai/editor/sessions`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${authStore.accessToken}`,
-    },
-    body: JSON.stringify(data),
-    signal: options.signal,
-  })
-}
-
-export function acceptAiEditorCandidate(
-  sessionId: string,
-  candidateId: string,
-): Promise<ResolveAiEditorCandidateResponse> {
-  return axios.request({
-    method: 'post',
-    url: `/ai/editor/sessions/${sessionId}/candidates/${candidateId}/accept`,
-  })
-}
-
-export function rejectAiEditorCandidate(
-  sessionId: string,
-  candidateId: string,
-): Promise<ResolveAiEditorCandidateResponse> {
-  return axios.request({
-    method: 'post',
-    url: `/ai/editor/sessions/${sessionId}/candidates/${candidateId}/reject`,
   })
 }

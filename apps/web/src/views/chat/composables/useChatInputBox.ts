@@ -16,6 +16,7 @@ export function useChatInputBox() {
     attachments: host.attachments,
     cancelActiveRun,
     cancelRunId,
+    composerModelSelectionKind: model.composerModelSelectionKind,
     composerSelectedModelRef: model.composerSelectedModelRef,
     contentJSON: host.contentJSON,
     handlePlaceholderCommand: host.handlePlaceholderCommand,

@@ -1,16 +1,17 @@
 import type {
   AgentChatContextMessage,
   AgentChatRuntimeContext,
+  AgentContextPolicy,
 } from '@haohaoxue/samepage-contracts'
 import type { BaseCheckpointSaver } from '@langchain/langgraph'
 
-export interface ChatReplyCheckpointState {
+export interface AgentCheckpointState {
   activePathKey: string
   activePathTailMessageId: string
   olderMessagesExcerpt: string
 }
 
-export interface ChatReplyGraphInput {
+export interface AgentGraphInput {
   sessionId: string
   sessionHistoryVersion: number
   activePathKey: string
@@ -19,24 +20,25 @@ export interface ChatReplyGraphInput {
   messages: AgentChatContextMessage[]
 }
 
-export interface ChatReplyGraphInputDecision {
+export interface AgentGraphInputDecision {
   mode: 'cold-start' | 'continue'
   shouldResetCheckpoint: boolean
-  graphInput: ChatReplyGraphInput
+  graphInput: AgentGraphInput
 }
 
-export interface ChatReplyMessageContext {
+export interface AgentContextWindow {
   olderMessagesExcerpt: string
   messages: AgentChatContextMessage[]
 }
 
-export const CHAT_REPLY_RECENT_USER_TURN_LIMIT = 3
-const CHAT_REPLY_OLDER_MESSAGES_EXCERPT_MAX_LENGTH = 2_000
+export const DEFAULT_AGENT_RECENT_USER_TURN_LIMIT = 3
+const DEFAULT_AGENT_RECENT_MESSAGE_LIMIT = 20
+const DEFAULT_AGENT_OLDER_MESSAGES_EXCERPT_MAX_LENGTH = 2_000
 
-export async function readChatReplyCheckpointState(
+export async function readAgentCheckpointState(
   checkpointer: BaseCheckpointSaver | undefined,
   threadId: string,
-): Promise<ChatReplyCheckpointState | null> {
+): Promise<AgentCheckpointState | null> {
   const checkpoint = await checkpointer?.getTuple({
     configurable: {
       thread_id: threadId,
@@ -47,14 +49,14 @@ export async function readChatReplyCheckpointState(
     return null
   }
 
-  return parseChatReplyCheckpointState(checkpoint.checkpoint.channel_values)
+  return parseAgentCheckpointState(checkpoint.checkpoint.channel_values)
 }
 
-export function resolveChatReplyGraphInput(
+export function resolveAgentGraphInput(
   runtimeContext: AgentChatRuntimeContext,
-  checkpointState: ChatReplyCheckpointState | null,
-): ChatReplyGraphInputDecision {
-  const compatible = isChatReplyCheckpointCompatible(runtimeContext, checkpointState)
+  checkpointState: AgentCheckpointState | null,
+): AgentGraphInputDecision {
+  const compatible = isAgentCheckpointCompatible(runtimeContext, checkpointState)
   const triggerUserMessage = readTriggerUserMessage(runtimeContext)
 
   return {
@@ -71,9 +73,9 @@ export function resolveChatReplyGraphInput(
   }
 }
 
-function isChatReplyCheckpointCompatible(
+function isAgentCheckpointCompatible(
   runtimeContext: AgentChatRuntimeContext,
-  checkpointState: ChatReplyCheckpointState | null,
+  checkpointState: AgentCheckpointState | null,
 ): boolean {
   if (!checkpointState || !runtimeContext.triggerParentMessageId) {
     return false
@@ -99,7 +101,7 @@ function isChatReplyCheckpointCompatible(
   return runtimePath[checkpointPath.length] === runtimeContext.triggerUserMessageId
 }
 
-function parseChatReplyCheckpointState(channelValues: Record<string, unknown>): ChatReplyCheckpointState | null {
+function parseAgentCheckpointState(channelValues: Record<string, unknown>): AgentCheckpointState | null {
   const activePathKey = readNonEmptyString(channelValues.activePathKey)
   const activePathTailMessageId = readNonEmptyString(channelValues.activePathTailMessageId)
 
@@ -114,15 +116,27 @@ function parseChatReplyCheckpointState(channelValues: Record<string, unknown>): 
   }
 }
 
-export function trimChatReplyMessageContext(input: ChatReplyMessageContext): ChatReplyMessageContext {
-  const windowStartIndex = getRecentMessageWindowStartIndex(input.messages)
+export function trimAgentContextWindow(
+  input: AgentContextWindow,
+  contextPolicy?: AgentContextPolicy | null,
+): AgentContextWindow {
+  const recentUserTurnLimit = contextPolicy?.recentUserTurnLimit ?? DEFAULT_AGENT_RECENT_USER_TURN_LIMIT
+  const recentMessageLimit = contextPolicy?.recentMessageLimit ?? DEFAULT_AGENT_RECENT_MESSAGE_LIMIT
+  const olderMessagesExcerptMaxLength = contextPolicy?.olderMessagesExcerptMaxLength
+    ?? DEFAULT_AGENT_OLDER_MESSAGES_EXCERPT_MAX_LENGTH
+  const windowStartIndex = Math.max(
+    getRecentMessageWindowStartIndex(input.messages, recentUserTurnLimit),
+    Math.max(0, input.messages.length - recentMessageLimit),
+  )
+
   if (windowStartIndex <= 0) {
     return input
   }
 
-  const nextOlderMessagesExcerpt = appendChatReplyOlderMessagesExcerpt(
+  const nextOlderMessagesExcerpt = appendAgentOlderMessagesExcerpt(
     input.olderMessagesExcerpt,
     input.messages.slice(0, windowStartIndex),
+    olderMessagesExcerptMaxLength,
   )
 
   return {
@@ -143,7 +157,7 @@ function readTriggerUserMessage(runtimeContext: AgentChatRuntimeContext): AgentC
   return triggerUserMessage
 }
 
-function getRecentMessageWindowStartIndex(messages: AgentChatContextMessage[]): number {
+function getRecentMessageWindowStartIndex(messages: AgentChatContextMessage[], recentUserTurnLimit: number): number {
   let userTurnCount = 0
 
   for (let index = messages.length - 1; index >= 0; index -= 1) {
@@ -152,7 +166,7 @@ function getRecentMessageWindowStartIndex(messages: AgentChatContextMessage[]): 
     }
 
     userTurnCount += 1
-    if (userTurnCount === CHAT_REPLY_RECENT_USER_TURN_LIMIT) {
+    if (userTurnCount === recentUserTurnLimit) {
       return index
     }
   }
@@ -160,17 +174,21 @@ function getRecentMessageWindowStartIndex(messages: AgentChatContextMessage[]): 
   return 0
 }
 
-function appendChatReplyOlderMessagesExcerpt(excerpt: string, messages: AgentChatContextMessage[]): string {
+function appendAgentOlderMessagesExcerpt(
+  excerpt: string,
+  messages: AgentChatContextMessage[],
+  maxLength: number,
+): string {
   const additions = messages
     .map(message => `${message.role === 'user' ? '用户' : '助手'}：${message.content}`)
     .join('\n')
   const nextExcerpt = [excerpt, additions].filter(Boolean).join('\n')
 
-  if (nextExcerpt.length <= CHAT_REPLY_OLDER_MESSAGES_EXCERPT_MAX_LENGTH) {
+  if (nextExcerpt.length <= maxLength) {
     return nextExcerpt
   }
 
-  return nextExcerpt.slice(nextExcerpt.length - CHAT_REPLY_OLDER_MESSAGES_EXCERPT_MAX_LENGTH)
+  return nextExcerpt.slice(nextExcerpt.length - maxLength)
 }
 
 function splitActivePathKey(activePathKey: string): string[] {

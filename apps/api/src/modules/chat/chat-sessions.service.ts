@@ -1,7 +1,10 @@
 import type {
-  AgentGetChatSessionContextResponse,
-  AgentRunModelTarget,
+  AgentChatRuntimeContext,
+  AgentProfileSnapshot,
+  AgentRuntimeModelTarget,
   AiModelRef,
+  ChatGenerationBootstrap,
+  ChatGenerationModelTargetSnapshot,
   ChatMessageAttachmentInput,
   ChatMessageContentJSON,
   ChatMessageFailureReason,
@@ -13,13 +16,19 @@ import type {
   ChatSessionOrigin,
   ChatSessionSummary,
 } from '@haohaoxue/samepage-contracts'
+import type { AgentProfileForGeneration } from '../agent/agent-profiles.service'
 import type { ChatContextSnapshotCreateData } from './chat-context-snapshots.service'
 import { randomUUID } from 'node:crypto'
 import {
-  AGENT_WORKFLOW_KEY,
+  AgentProfileConfigSchema,
+  AgentProfileSnapshotSchema,
+  AgentRuntimeModelTargetSchema,
+  AI_MODEL_INTENT_KEY,
   CHAT_RUN_STATUS,
   CHAT_SESSION_DEFAULT_TITLE,
   CHAT_SESSION_EVENT_TYPE,
+  ChatGenerationBootstrapSchema,
+  ChatGenerationModelTargetSnapshotSchema,
   ChatMutationResponseSchema,
   WORKSPACE_MEMBER_STATUS,
 } from '@haohaoxue/samepage-contracts'
@@ -31,6 +40,7 @@ import {
   NotFoundException,
 } from '@nestjs/common'
 import {
+  ChatMessageGenerationStatus,
   ChatSessionMessagePartType,
   ChatSessionMessageRole,
   ChatSessionMessageStatus,
@@ -38,6 +48,8 @@ import {
   Prisma,
 } from '@prisma/client'
 import { PrismaService } from '../../database/prisma.service'
+import { AgentProfilesService } from '../agent/agent-profiles.service'
+import { AiModelResolverService } from '../ai/models/resolver.service'
 import { ChatContextSnapshotsService } from './chat-context-snapshots.service'
 import { ChatSessionEventsService } from './chat-session-events.service'
 import {
@@ -59,6 +71,11 @@ const continuableAssistantStatuses = new Set<ChatSessionMessageStatus>([
   ChatSessionMessageStatus.CANCELLED,
 ])
 
+const bootstrappableGenerationStatuses = new Set<ChatMessageGenerationStatus>([
+  ChatMessageGenerationStatus.PENDING,
+  ChatMessageGenerationStatus.RUNNING,
+])
+
 const chatSessionSummarySelect = {
   id: true,
   workspaceId: true,
@@ -66,6 +83,8 @@ const chatSessionSummarySelect = {
   title: true,
   selectedProviderId: true,
   selectedModelId: true,
+  modelOverrideProviderId: true,
+  modelOverrideModelId: true,
   createdAt: true,
   updatedAt: true,
 } satisfies Prisma.ChatSessionSelect
@@ -157,6 +176,15 @@ const chatSessionDetailSelect = {
 
 const chatSessionRunDetailSelect = {
   ...chatSessionSummarySelect,
+  agentProfileId: true,
+  agentProfile: {
+    select: {
+      id: true,
+      ownerUserId: true,
+      name: true,
+      currentConfig: true,
+    },
+  },
   activeRootMessageId: true,
   activeLeafMessageId: true,
   nextEventSequence: true,
@@ -193,8 +221,18 @@ interface ActivePathState<T extends PersistedChatSessionMessage = PersistedChatS
 }
 
 const chatSessionModelRefSelect = {
-  selectedProviderId: true,
-  selectedModelId: true,
+  id: true,
+  agentProfileId: true,
+  modelOverrideProviderId: true,
+  modelOverrideModelId: true,
+  agentProfile: {
+    select: {
+      id: true,
+      ownerUserId: true,
+      name: true,
+      currentConfig: true,
+    },
+  },
 } satisfies Prisma.ChatSessionSelect
 
 type PersistedChatSessionModelRef = Prisma.ChatSessionGetPayload<{
@@ -210,8 +248,9 @@ interface CreateRunInput {
   attachments?: ChatMessageAttachmentInput[] | null
   sourceMessageId?: string
   targetMessageId?: string
+  generationId: string
   runId: string
-  modelTarget: AgentRunModelTarget
+  modelTargetSnapshot: ChatGenerationModelTargetSnapshot
 }
 
 interface CreatedRunResult {
@@ -229,6 +268,8 @@ export class ChatSessionsService {
     private readonly prisma: PrismaService,
     private readonly chatSessionEvents: ChatSessionEventsService,
     private readonly chatContextSnapshots: ChatContextSnapshotsService,
+    private readonly agentProfiles: AgentProfilesService,
+    private readonly modelResolverService: AiModelResolverService,
   ) {}
 
   async getSessions(userId: string, workspaceId: string, origin: ChatSessionOrigin): Promise<ChatSessionSummary[]> {
@@ -252,14 +293,22 @@ export class ChatSessionsService {
   async createSession(userId: string, workspaceId: string, origin: ChatSessionOrigin): Promise<ChatSessionDetail> {
     await this.assertWorkspaceAccess(userId, workspaceId)
 
-    const session = await this.prisma.chatSession.create({
-      data: {
-        workspaceId,
-        createdBy: userId,
-        origin: toPrismaChatSessionOrigin(origin),
-        title: CHAT_SESSION_DEFAULT_TITLE,
-      },
-      select: chatSessionDetailSelect,
+    const session = await this.prisma.$transaction(async (tx) => {
+      const agentProfile = await this.agentProfiles.ensureDefaultAgentProfile({
+        ownerUserId: userId,
+        tx,
+      })
+
+      return tx.chatSession.create({
+        data: {
+          workspaceId,
+          createdBy: userId,
+          origin: toPrismaChatSessionOrigin(origin),
+          title: CHAT_SESSION_DEFAULT_TITLE,
+          agentProfileId: agentProfile.id,
+        },
+        select: chatSessionDetailSelect,
+      })
     })
 
     return toChatSessionDetail(toChatSessionDetailRecord(session))
@@ -275,13 +324,20 @@ export class ChatSessionsService {
     ))
   }
 
-  async getSessionModelRef(
+  async getSessionModelSelection(
     userId: string,
     sessionId: string,
     origin: ChatSessionOrigin,
   ): Promise<Pick<AiModelRef, 'providerId' | 'modelId'> | null> {
     const session = await this.findAccessibleSessionModelRefOrThrow(userId, sessionId, origin)
-    return toChatSessionModelRef(session)
+    const sessionOverride = toChatSessionModelRef(session)
+
+    if (sessionOverride) {
+      return sessionOverride
+    }
+
+    const agentProfile = await this.resolveSessionAgentProfile(session, userId)
+    return resolveAgentProfileModelRef(agentProfile)
   }
 
   async updateSessionModel(input: {
@@ -293,8 +349,8 @@ export class ChatSessionsService {
     const result = await this.prisma.chatSession.updateMany({
       where: this.createAccessibleSessionWhere(input.userId, input.sessionId, input.origin),
       data: {
-        selectedProviderId: input.modelRef?.providerId ?? null,
-        selectedModelId: input.modelRef?.modelId ?? null,
+        modelOverrideProviderId: input.modelRef?.providerId ?? null,
+        modelOverrideModelId: input.modelRef?.modelId ?? null,
         updatedAt: new Date(),
       },
     })
@@ -576,6 +632,14 @@ export class ChatSessionsService {
           dispatchLeaseExpiresAt: null,
         },
       })
+      await tx.chatMessageGeneration.updateMany({
+        where: { generationId: run.runId },
+        data: {
+          status: ChatMessageGenerationStatus.CANCELLED,
+          completedAt,
+          dispatchLeaseExpiresAt: null,
+        },
+      })
       await tx.chatSessionMessage.update({
         where: { id: run.assistantMessageId },
         data: {
@@ -608,11 +672,70 @@ export class ChatSessionsService {
     return this.toMutationResponse(input.userId, input.origin, run.sessionId, latestSequence, run.runId)
   }
 
-  async getAgentSessionContext(input: {
+  async getAgentGenerationBootstrap(input: {
+    generationId: string
+  }): Promise<ChatGenerationBootstrap> {
+    const generation = await this.prisma.chatMessageGeneration.findFirst({
+      where: {
+        generationId: input.generationId,
+        deletedAt: null,
+      },
+      select: {
+        generationId: true,
+        sessionId: true,
+        assistantMessageId: true,
+        triggerUserMessageId: true,
+        actorUserId: true,
+        attempt: true,
+        status: true,
+        agentProfileSnapshot: true,
+        modelTargetSnapshot: true,
+      },
+    })
+
+    if (!generation) {
+      throw new NotFoundException('聊天生成不存在')
+    }
+
+    if (!bootstrappableGenerationStatuses.has(generation.status)) {
+      throw new ConflictException('聊天生成已结束')
+    }
+
+    const modelTargetSnapshot = ChatGenerationModelTargetSnapshotSchema.parse(generation.modelTargetSnapshot)
+    const [context, runtimeModelTarget] = await Promise.all([
+      this.resolveAgentRuntimeContext({
+        actorId: generation.actorUserId,
+        sessionId: generation.sessionId,
+        triggerUserMessageId: generation.triggerUserMessageId,
+      }),
+      this.resolveRuntimeModelTarget(generation.actorUserId, modelTargetSnapshot),
+    ])
+
+    if (context.assistantMessageId !== generation.assistantMessageId) {
+      throw new ConflictException('聊天生成上下文不匹配')
+    }
+
+    return ChatGenerationBootstrapSchema.parse({
+      generation: {
+        generationId: generation.generationId,
+        sessionId: generation.sessionId,
+        assistantMessageId: generation.assistantMessageId,
+        triggerUserMessageId: generation.triggerUserMessageId,
+        actorUserId: generation.actorUserId,
+        attempt: generation.attempt,
+      },
+      agentProfile: AgentProfileSnapshotSchema.parse(generation.agentProfileSnapshot),
+      model: modelTargetSnapshot,
+      runtimeModelTarget,
+      context,
+    })
+  }
+
+  private async resolveAgentRuntimeContext(input: {
     actorId: string
     sessionId: string
     triggerUserMessageId: string
-  }): Promise<AgentGetChatSessionContextResponse> {
+  }): Promise<AgentChatRuntimeContext> {
     const session = await this.findAccessibleSessionRunDetailOrThrow(input.actorId, input.sessionId)
     const path = resolvePathToMessage(session.messages, input.triggerUserMessageId)
     const triggerMessage = path.at(-1) ?? null
@@ -668,6 +791,17 @@ export class ChatSessionsService {
         },
         data: {
           status: ChatSessionRunStatus.RUNNING,
+          startedAt,
+        },
+      }),
+      this.prisma.chatMessageGeneration.updateMany({
+        where: {
+          generationId: input.runId,
+          assistantMessageId: input.messageId,
+          status: ChatMessageGenerationStatus.PENDING,
+        },
+        data: {
+          status: ChatMessageGenerationStatus.RUNNING,
           startedAt,
         },
       }),
@@ -737,6 +871,16 @@ export class ChatSessionsService {
           dispatchLeaseExpiresAt: null,
         },
       })
+      await tx.chatMessageGeneration.updateMany({
+        where: {
+          assistantMessageId: input.messageId,
+        },
+        data: {
+          status: ChatMessageGenerationStatus.COMPLETED,
+          completedAt,
+          dispatchLeaseExpiresAt: null,
+        },
+      })
     })
   }
 
@@ -769,6 +913,20 @@ export class ChatSessionsService {
           status: ChatSessionRunStatus.FAILED,
           completedAt,
           dispatchLeaseExpiresAt: null,
+        },
+      }),
+      this.prisma.chatMessageGeneration.updateMany({
+        where: {
+          assistantMessageId: input.messageId,
+        },
+        data: {
+          status: ChatMessageGenerationStatus.FAILED,
+          completedAt,
+          dispatchLeaseExpiresAt: null,
+          error: toJsonObject({
+            failureReason: input.failureReason,
+            failureMessage: input.failureMessage,
+          }),
         },
       }),
     ])
@@ -814,6 +972,9 @@ export class ChatSessionsService {
       : getNextBranchOrder(session.messages, null, ChatSessionMessageRole.USER)
 
     const latestSequence = await this.writeRunMutation(session.id, async (tx) => {
+      const agentProfile = await this.resolveSessionAgentProfile(session, input.userId, tx)
+      const agentProfileSnapshot = createAgentProfileSnapshot(agentProfile, now)
+
       await this.createUserMessage(tx, {
         id: triggerUserMessageId,
         sessionId: session.id,
@@ -851,8 +1012,18 @@ export class ChatSessionsService {
         assistantMessageId,
         triggerUserMessageId,
         actorUserId: input.userId,
-        modelTarget: input.modelTarget,
+        modelTargetSnapshot: input.modelTargetSnapshot,
         expectedHistoryVersion,
+      })
+      await this.createPendingGeneration(tx, {
+        sessionId: session.id,
+        generationId: input.generationId,
+        assistantMessageId,
+        triggerUserMessageId,
+        actorUserId: input.userId,
+        agentProfileId: agentProfile.id,
+        agentProfileSnapshot,
+        modelTargetSnapshot: input.modelTargetSnapshot,
       })
       await tx.chatSession.update({
         where: { id: session.id },
@@ -918,6 +1089,9 @@ export class ChatSessionsService {
     )
 
     const latestSequence = await this.writeRunMutation(session.id, async (tx) => {
+      const agentProfile = await this.resolveSessionAgentProfile(session, input.userId, tx)
+      const agentProfileSnapshot = createAgentProfileSnapshot(agentProfile, now)
+
       await this.createUserMessage(tx, {
         id: triggerUserMessageId,
         sessionId: session.id,
@@ -955,8 +1129,18 @@ export class ChatSessionsService {
         assistantMessageId,
         triggerUserMessageId,
         actorUserId: input.userId,
-        modelTarget: input.modelTarget,
+        modelTargetSnapshot: input.modelTargetSnapshot,
         expectedHistoryVersion,
+      })
+      await this.createPendingGeneration(tx, {
+        sessionId: session.id,
+        generationId: input.generationId,
+        assistantMessageId,
+        triggerUserMessageId,
+        actorUserId: input.userId,
+        agentProfileId: agentProfile.id,
+        agentProfileSnapshot,
+        modelTargetSnapshot: input.modelTargetSnapshot,
       })
       await tx.chatSession.update({
         where: { id: session.id },
@@ -1005,6 +1189,7 @@ export class ChatSessionsService {
     }
 
     const assistantMessageId = randomUUID()
+    const now = new Date()
     const expectedHistoryVersion = session.historyVersion + 1
     const rootMessageId = resolvePathToMessage(session.messages, triggerMessage.id)[0]?.id ?? triggerMessage.id
     const assistantBranchOrder = getNextBranchOrder(
@@ -1014,6 +1199,9 @@ export class ChatSessionsService {
     )
 
     const latestSequence = await this.writeRunMutation(session.id, async (tx) => {
+      const agentProfile = await this.resolveSessionAgentProfile(session, input.userId, tx)
+      const agentProfileSnapshot = createAgentProfileSnapshot(agentProfile, now)
+
       await this.createAssistantPendingMessage(tx, {
         id: assistantMessageId,
         sessionId: session.id,
@@ -1032,8 +1220,18 @@ export class ChatSessionsService {
         assistantMessageId,
         triggerUserMessageId: triggerMessage.id,
         actorUserId: input.userId,
-        modelTarget: input.modelTarget,
+        modelTargetSnapshot: input.modelTargetSnapshot,
         expectedHistoryVersion,
+      })
+      await this.createPendingGeneration(tx, {
+        sessionId: session.id,
+        generationId: input.generationId,
+        assistantMessageId,
+        triggerUserMessageId: triggerMessage.id,
+        actorUserId: input.userId,
+        agentProfileId: agentProfile.id,
+        agentProfileSnapshot,
+        modelTargetSnapshot: input.modelTargetSnapshot,
       })
       await tx.chatSession.update({
         where: { id: session.id },
@@ -1041,7 +1239,7 @@ export class ChatSessionsService {
           historyVersion: { increment: 1 },
           activeRootMessageId: rootMessageId,
           activeLeafMessageId: assistantMessageId,
-          updatedAt: new Date(),
+          updatedAt: now,
         },
       })
 
@@ -1183,7 +1381,7 @@ export class ChatSessionsService {
       assistantMessageId: string
       triggerUserMessageId: string
       actorUserId: string
-      modelTarget: AgentRunModelTarget
+      modelTargetSnapshot: ChatGenerationModelTargetSnapshot
       expectedHistoryVersion: number
     },
   ): Promise<void> {
@@ -1194,12 +1392,40 @@ export class ChatSessionsService {
         assistantMessageId: input.assistantMessageId,
         triggerUserMessageId: input.triggerUserMessageId,
         actorUserId: input.actorUserId,
-        workflowKey: AGENT_WORKFLOW_KEY.CHAT_REPLY,
-        modelTargetSnapshot: toJsonObject(input.modelTarget),
+        modelTargetSnapshot: toJsonValue(input.modelTargetSnapshot),
         commandContext: toJsonObject({
           expectedHistoryVersion: input.expectedHistoryVersion,
         }),
         status: ChatSessionRunStatus.PENDING,
+      },
+    })
+  }
+
+  private async createPendingGeneration(
+    tx: Prisma.TransactionClient,
+    input: {
+      sessionId: string
+      generationId: string
+      assistantMessageId: string
+      triggerUserMessageId: string
+      actorUserId: string
+      agentProfileId: string
+      agentProfileSnapshot: AgentProfileSnapshot
+      modelTargetSnapshot: ChatGenerationModelTargetSnapshot
+    },
+  ): Promise<void> {
+    await tx.chatMessageGeneration.create({
+      data: {
+        generationId: input.generationId,
+        sessionId: input.sessionId,
+        assistantMessageId: input.assistantMessageId,
+        triggerUserMessageId: input.triggerUserMessageId,
+        actorUserId: input.actorUserId,
+        agentProfileId: input.agentProfileId,
+        agentProfileSnapshot: toJsonValue(input.agentProfileSnapshot),
+        modelTargetSnapshot: toJsonValue(input.modelTargetSnapshot),
+        status: ChatMessageGenerationStatus.PENDING,
+        idempotencyKey: `chat:generation:${input.generationId}`,
       },
     })
   }
@@ -1391,6 +1617,59 @@ export class ChatSessionsService {
 
     return session
   }
+
+  private async resolveSessionAgentProfile(
+    session: Pick<PersistedChatSessionModelRef, 'id' | 'agentProfileId' | 'agentProfile'>,
+    userId: string,
+    tx?: Prisma.TransactionClient,
+  ): Promise<AgentProfileForGeneration> {
+    if (session.agentProfile) {
+      return session.agentProfile
+    }
+
+    const agentProfile = await this.agentProfiles.ensureDefaultAgentProfile({
+      ownerUserId: userId,
+      tx,
+    })
+    const client = tx ?? this.prisma
+
+    await client.chatSession.updateMany({
+      where: {
+        id: session.id,
+        agentProfileId: session.agentProfileId,
+      },
+      data: {
+        agentProfileId: agentProfile.id,
+      },
+    })
+
+    return agentProfile
+  }
+
+  private async resolveRuntimeModelTarget(
+    actorUserId: string,
+    snapshot: ChatGenerationModelTargetSnapshot,
+  ): Promise<AgentRuntimeModelTarget> {
+    const target = await this.modelResolverService.resolveModelTarget({
+      actorUserId,
+      intentKey: AI_MODEL_INTENT_KEY.CHAT_ASSISTANT_DEFAULT,
+      requestedModelRef: {
+        providerId: snapshot.providerId,
+        modelId: snapshot.modelId,
+      },
+    })
+
+    return AgentRuntimeModelTargetSchema.parse({
+      providerId: snapshot.providerId,
+      scope: snapshot.scope,
+      providerKey: snapshot.providerKey,
+      adapterKey: snapshot.adapterKey,
+      endpoint: snapshot.endpoint,
+      apiKey: target.apiKey,
+      authMode: snapshot.authMode,
+      modelId: snapshot.modelId,
+    })
+  }
 }
 
 function toChatSessionDetailRecord(
@@ -1406,12 +1685,40 @@ function toChatSessionDetailRecord(
     title: session.title,
     selectedProviderId: session.selectedProviderId,
     selectedModelId: session.selectedModelId,
+    modelOverrideProviderId: session.modelOverrideProviderId,
+    modelOverrideModelId: session.modelOverrideModelId,
     latestSequence: Math.max(0, session.nextEventSequence - 1),
     activeRun,
     createdAt: session.createdAt,
     updatedAt: session.updatedAt,
     messages: activePath.map(message => toChatSessionMessageRecord(message, session.messages)),
   }
+}
+
+function resolveAgentProfileModelRef(profile: AgentProfileForGeneration): Pick<AiModelRef, 'providerId' | 'modelId'> | null {
+  const config = AgentProfileConfigSchema.parse(profile.currentConfig)
+  if (
+    config.modelPolicy.selectionMode !== 'fixed_model'
+    || !config.modelPolicy.providerId
+    || !config.modelPolicy.modelId
+  ) {
+    return null
+  }
+
+  return {
+    providerId: config.modelPolicy.providerId,
+    modelId: config.modelPolicy.modelId,
+  }
+}
+
+function createAgentProfileSnapshot(profile: AgentProfileForGeneration, capturedAt: Date): AgentProfileSnapshot {
+  return AgentProfileSnapshotSchema.parse({
+    profileId: profile.id,
+    ownerUserId: profile.ownerUserId,
+    name: profile.name,
+    currentConfig: profile.currentConfig,
+    capturedAt: capturedAt.toISOString(),
+  })
 }
 
 function toChatSessionMessageRecord(

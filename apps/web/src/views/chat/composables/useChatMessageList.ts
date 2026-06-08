@@ -18,6 +18,7 @@ const EDIT_HIGHLIGHT_DURATION_MS = 1400
 
 export function useChatMessageList() {
   const {
+    composerModelSelectionKind,
     composerSelectedModelRef,
     isConfigured,
     selectComposerModel,
@@ -162,6 +163,7 @@ export function useChatMessageList() {
 
   return {
     cancelEditMessage,
+    composerModelSelectionKind,
     composerSelectedModelRef,
     copyMessage,
     editingAttachments,

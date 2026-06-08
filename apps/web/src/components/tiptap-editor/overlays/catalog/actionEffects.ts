@@ -22,8 +22,6 @@ export interface MenuActionEffectsOptions {
   closeMenu?: () => void
   /** 评论请求回调 */
   onRequestComment?: (request: TiptapEditorCommentRequest) => void
-  /** 请求 AI 改写 */
-  onRequestAiRewrite?: () => void
   onRequestAddSelectionContext?: () => void
   /** 评论来源 */
   commentSource?: TiptapEditorCommentTriggerSource
@@ -45,8 +43,6 @@ export interface MenuActionEffects {
   runClipboardAction: (action: () => Promise<boolean>, fallbackMessage: string) => Promise<void>
   /** 请求评论 */
   requestComment: () => void
-  /** 请求 AI 改写 */
-  requestAiRewrite: () => void
   requestAddSelectionContext: () => void
   /** 编辑图片描述 */
   editImageAlt: () => Promise<void>
@@ -67,7 +63,6 @@ export function createMenuActionEffects(options: MenuActionEffectsOptions): Menu
     runAndCloseMenu,
     runClipboardAction,
     requestComment,
-    requestAiRewrite,
     requestAddSelectionContext,
     editImageAlt,
     toggleLinkPanel,
@@ -102,11 +97,6 @@ export function createMenuActionEffects(options: MenuActionEffectsOptions): Menu
     options.onRequestComment?.({
       source: options.commentSource ?? 'bubble-toolbar',
     })
-    options.closeMenu?.()
-  }
-
-  function requestAiRewrite() {
-    options.onRequestAiRewrite?.()
     options.closeMenu?.()
   }
 

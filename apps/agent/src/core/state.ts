@@ -1,12 +1,15 @@
 import type {
   AgentChatContextMessage,
   AgentChatContextSnapshot,
-  AgentRunModelTarget,
+  AgentContextPolicy,
+  AgentProfileConfig,
+  AgentRuntimeModelTarget,
 } from '@haohaoxue/samepage-contracts'
-import type { AgentModelStreamPart } from '../../integrations/model-providers/stream-text'
+import type { AgentChatModelOptions } from '../integrations/model-providers/chat-model'
+import type { AgentModelStreamPart } from '../integrations/model-providers/stream-text'
 import { Annotation } from '@langchain/langgraph'
 
-export const ChatReplyState = Annotation.Root({
+export const AgentGraphState = Annotation.Root({
   sessionId: Annotation<string>(),
   sessionHistoryVersion: Annotation<number>(),
   activePathKey: Annotation<string>(),
@@ -19,8 +22,11 @@ export const ChatReplyState = Annotation.Root({
   responseText: Annotation<string>(),
 })
 
-export interface ChatReplyGraphContext {
-  modelTarget?: AgentRunModelTarget | null
+export interface AgentGraphContext {
+  modelTarget?: AgentRuntimeModelTarget | null
+  modelOptions?: AgentChatModelOptions | null
+  agentProfileConfig?: AgentProfileConfig | null
+  contextPolicy?: AgentContextPolicy | null
   triggerUserMessageId?: string | null
   contextSnapshots?: AgentChatContextSnapshot[] | null
   onStreamPart?: (part: AgentModelStreamPart) => Promise<void> | void

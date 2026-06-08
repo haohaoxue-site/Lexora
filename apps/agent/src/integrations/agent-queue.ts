@@ -1,10 +1,10 @@
-import type { AgentCommandHandler, AgentCommandQueue, AgentRunCommand } from '../runtime/typing'
+import type { AgentCommandHandler, AgentCommandQueue, AgentQueueCommand } from '../runtime/typing'
 
 export function createMemoryAgentCommandQueue(): AgentCommandQueue {
   const handlers = new Set<AgentCommandHandler>()
 
   return {
-    async publish(command: AgentRunCommand) {
+    async publish(command: AgentQueueCommand) {
       await Promise.all(Array.from(handlers, handler => handler(command)))
     },
 

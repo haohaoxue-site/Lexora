@@ -36,6 +36,8 @@ export interface ChatSessionSummaryRecord {
   title: string
   selectedProviderId: string | null
   selectedModelId: string | null
+  modelOverrideProviderId: string | null
+  modelOverrideModelId: string | null
   createdAt: Date
   updatedAt: Date
 }
@@ -262,15 +264,15 @@ function toChatMessagePartMetadata(metadata: unknown): ChatMessagePartMetadata |
 }
 
 export function toChatSessionModelRef(
-  session: Pick<ChatSessionSummaryRecord, 'selectedProviderId' | 'selectedModelId'>,
+  session: Pick<ChatSessionSummaryRecord, 'modelOverrideProviderId' | 'modelOverrideModelId'>,
 ): Pick<AiModelRef, 'providerId' | 'modelId'> | null {
-  if (!session.selectedProviderId || !session.selectedModelId) {
+  if (!session.modelOverrideProviderId || !session.modelOverrideModelId) {
     return null
   }
 
   return {
-    providerId: session.selectedProviderId,
-    modelId: session.selectedModelId,
+    providerId: session.modelOverrideProviderId,
+    modelId: session.modelOverrideModelId,
   }
 }
 
