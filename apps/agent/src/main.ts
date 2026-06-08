@@ -20,6 +20,7 @@ const config = loadAgentConfig()
 const chatApi = createAgentChatApiClient(config.apiInternalUrl)
 const chatModelFactory = createChatModelFactory()
 const queueRedis = createAgentRedisClient(config.redisUrl)
+const controlRedis = createAgentRedisClient(config.redisUrl)
 const runtimeRedis = createAgentRedisClient(config.redisUrl)
 const eventRedis = createAgentRedisClient(config.redisUrl)
 let agentRuntime: ReturnType<typeof createAgentRuntime> | null = null
@@ -35,6 +36,7 @@ const app = createAgentServer({
       await Promise.allSettled([
         runtimeRedis.quit(),
         queueRedis.quit(),
+        controlRedis.quit(),
         eventRedis.quit(),
       ])
       await closeAgentCheckpointer(agentCheckpointer)
@@ -76,6 +78,11 @@ async function start(): Promise<void> {
       redis: runtimeRedis,
     }),
     queue: createRedisStreamsAgentQueue({
+      controlRedis,
+      maxConcurrentRuns: config.maxConcurrentRuns,
+      onError: (error, context) => {
+        app.log.warn({ err: error, ...context }, 'agent queue in-flight task failed')
+      },
       redis: queueRedis,
     }),
     events: eventPublisher,

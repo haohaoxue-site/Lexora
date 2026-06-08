@@ -4,7 +4,6 @@ import { validateAgentEnv } from './env.schema'
 const DEFAULT_AGENT_HOST = '0.0.0.0'
 const DEFAULT_AGENT_PORT = 4200
 const DEFAULT_AGENT_RUN_TIMEOUT_MS = 60_000
-const DEFAULT_AGENT_MAX_CONCURRENT_RUNS = 8
 
 /** apps/agent 运行配置。 */
 export interface AgentConfig {
@@ -41,7 +40,7 @@ export function loadAgentConfig(env: EnvSource = process.env): AgentConfig {
     apiInternalUrl: agentEnv.API_INTERNAL_URL,
     redisUrl: agentEnv.REDIS_URL,
     runTimeoutMs: DEFAULT_AGENT_RUN_TIMEOUT_MS,
-    maxConcurrentRuns: DEFAULT_AGENT_MAX_CONCURRENT_RUNS,
+    maxConcurrentRuns: agentEnv.AGENT_MAX_CONCURRENT_RUNS,
     checkpointer: readCheckpointerConfig(agentEnv),
   }
 }

@@ -34,9 +34,24 @@ const DEFAULT_IDEMPOTENCY_KEY_PREFIX = 'samepage:agent:idempotency:'
 const DEFAULT_IDEMPOTENCY_TTL_SECONDS = 24 * 60 * 60
 
 export interface CreateRedisStreamsAgentQueueOptions {
-  /** Redis 客户端 */
+  /** command stream 的 Redis 客户端 */
   redis: AgentRedisClient
+  /** control stream 的 Redis 客户端 */
+  controlRedis?: AgentRedisClient
+  /** 单个 agent 实例同时执行的 generation 数量。 */
+  maxConcurrentRuns: number
+  onError?: RedisStreamsAgentQueueErrorHandler
 }
+
+export interface RedisStreamsAgentQueueErrorContext {
+  streamName: string
+  messageId: string
+}
+
+export type RedisStreamsAgentQueueErrorHandler = (
+  error: unknown,
+  context: RedisStreamsAgentQueueErrorContext,
+) => void
 
 export interface CreateRedisStreamsAgentEventPublisherOptions {
   /** Redis 客户端 */
@@ -88,11 +103,15 @@ export function createRedisAgentIdempotencyStore(
 
 export function createRedisStreamsAgentQueue(options: CreateRedisStreamsAgentQueueOptions): AgentCommandQueue {
   const redis = options.redis
+  const controlRedis = options.controlRedis ?? redis
   const groupName = DEFAULT_GROUP_NAME
   const consumerName = DEFAULT_CONSUMER_NAME
   const readCount = DEFAULT_READ_COUNT
   const readBlockMs = DEFAULT_READ_BLOCK_MS
   const maxAttempts = DEFAULT_MAX_ATTEMPTS
+  const maxConcurrentRuns = options.maxConcurrentRuns
+  const inFlightMessages = new Set<Promise<void>>()
+  const inFlightMessageIds = new Set<string>()
   let handler: AgentCommandHandler | null = null
   let controlHandler: AgentControlHandler | null = null
   let running = false
@@ -101,7 +120,7 @@ export function createRedisStreamsAgentQueue(options: CreateRedisStreamsAgentQue
 
   async function ready(): Promise<void> {
     await ensureConsumerGroup(redis, groupName, AGENT_QUEUE_NAME.COMMANDS)
-    await ensureConsumerGroup(redis, groupName, AGENT_QUEUE_NAME.CONTROLS)
+    await ensureConsumerGroup(controlRedis, groupName, AGENT_QUEUE_NAME.CONTROLS)
   }
 
   function subscribe(nextHandler: AgentCommandHandler): () => void {
@@ -136,7 +155,11 @@ export function createRedisStreamsAgentQueue(options: CreateRedisStreamsAgentQue
     running = false
     controlRunning = false
     closed = true
-    await redis.quit()
+    await waitForInFlightMessages()
+    await Promise.allSettled([
+      redis.quit(),
+      controlRedis === redis ? Promise.resolve() : controlRedis.quit(),
+    ])
   }
 
   async function consumeLoop(): Promise<void> {
@@ -154,7 +177,7 @@ export function createRedisStreamsAgentQueue(options: CreateRedisStreamsAgentQue
           continue
         }
 
-        const handledNew = await readBatch('>', true)
+        const handledNew = await readBatch('>', canBlockCommandRead())
 
         if (!handledNew) {
           await sleepUnref(readBlockMs)
@@ -171,10 +194,22 @@ export function createRedisStreamsAgentQueue(options: CreateRedisStreamsAgentQue
   }
 
   async function readBatch(streamId: string, block: boolean): Promise<boolean> {
+    await waitForCommandSlot()
+
+    const currentHandler = handler
+    if (!currentHandler) {
+      return false
+    }
+
+    const availableSlots = getAvailableCommandSlots()
+    if (availableSlots <= 0) {
+      return false
+    }
+
     const result = await readCommandBatch(redis, {
       groupName,
       consumerName,
-      readCount,
+      readCount: Math.min(readCount, availableSlots),
       readBlockMs,
       streamId,
       block,
@@ -184,21 +219,70 @@ export function createRedisStreamsAgentQueue(options: CreateRedisStreamsAgentQue
       return false
     }
 
-    const currentHandler = handler
-    if (!currentHandler) {
-      return false
-    }
-
     let handledMessage = false
 
     for (const [, messages] of result) {
       for (const [messageId, fields] of messages) {
+        if (inFlightMessageIds.has(messageId)) {
+          continue
+        }
+
         handledMessage = true
-        await handleMessage(messageId, fields, currentHandler)
+        trackInFlightMessage(messageId, () => handleMessage(messageId, fields, currentHandler))
       }
     }
 
     return handledMessage
+  }
+
+  async function waitForCommandSlot(): Promise<void> {
+    while (getAvailableCommandSlots() <= 0) {
+      if (closed || !running) {
+        return
+      }
+
+      await Promise.race(inFlightMessages)
+    }
+  }
+
+  function getAvailableCommandSlots(): number {
+    return maxConcurrentRuns - inFlightMessages.size
+  }
+
+  function canBlockCommandRead(): boolean {
+    return inFlightMessages.size === 0
+  }
+
+  function trackInFlightMessage(messageId: string, task: () => Promise<void>): void {
+    inFlightMessageIds.add(messageId)
+
+    const trackedTask = Promise.resolve()
+      .then(task)
+      .catch((error) => {
+        reportCommandTaskError(error, messageId)
+      })
+      .finally(() => {
+        inFlightMessages.delete(trackedTask)
+        inFlightMessageIds.delete(messageId)
+      })
+
+    inFlightMessages.add(trackedTask)
+  }
+
+  async function waitForInFlightMessages(): Promise<void> {
+    while (inFlightMessages.size > 0) {
+      await Promise.allSettled([...inFlightMessages])
+    }
+  }
+
+  function reportCommandTaskError(error: unknown, messageId: string): void {
+    try {
+      options.onError?.(error, {
+        streamName: AGENT_QUEUE_NAME.COMMANDS,
+        messageId,
+      })
+    }
+    catch {}
   }
 
   async function consumeControlLoop(): Promise<void> {
@@ -233,7 +317,7 @@ export function createRedisStreamsAgentQueue(options: CreateRedisStreamsAgentQue
   }
 
   async function readControlBatch(streamId: string, block: boolean): Promise<boolean> {
-    const result = await readAgentControlBatch(redis, {
+    const result = await readAgentControlBatch(controlRedis, {
       groupName,
       consumerName,
       readCount,
@@ -298,12 +382,14 @@ export function createRedisStreamsAgentQueue(options: CreateRedisStreamsAgentQue
     for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
       try {
         await currentHandler(command.value)
-        await redis.xack(AGENT_QUEUE_NAME.COMMANDS, groupName, messageId)
-        return
       }
       catch (error) {
         lastErrorMessage = getErrorMessage(error)
+        continue
       }
+
+      await redis.xack(AGENT_QUEUE_NAME.COMMANDS, groupName, messageId)
+      return
     }
 
     await publishDeadLetter(redis, {
@@ -323,18 +409,18 @@ export function createRedisStreamsAgentQueue(options: CreateRedisStreamsAgentQue
     const rawControl = getStreamField(fields, CONTROL_FIELD)
 
     if (!rawControl) {
-      await redis.xack(AGENT_QUEUE_NAME.CONTROLS, groupName, messageId)
+      await controlRedis.xack(AGENT_QUEUE_NAME.CONTROLS, groupName, messageId)
       return
     }
 
     const control = parseControl(rawControl)
     if (!control.ok) {
-      await redis.xack(AGENT_QUEUE_NAME.CONTROLS, groupName, messageId)
+      await controlRedis.xack(AGENT_QUEUE_NAME.CONTROLS, groupName, messageId)
       return
     }
 
     await currentHandler(control.value)
-    await redis.xack(AGENT_QUEUE_NAME.CONTROLS, groupName, messageId)
+    await controlRedis.xack(AGENT_QUEUE_NAME.CONTROLS, groupName, messageId)
   }
 
   return {
@@ -342,7 +428,7 @@ export function createRedisStreamsAgentQueue(options: CreateRedisStreamsAgentQue
       await publishCommand(redis, command)
     },
     async publishControl(control) {
-      await publishControl(redis, control)
+      await publishControl(controlRedis, control)
     },
     subscribe,
     subscribeControl,
