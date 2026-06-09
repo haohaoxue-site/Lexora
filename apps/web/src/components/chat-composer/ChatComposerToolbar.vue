@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import type { ChatComposerModelRef, ChatComposerModelSelectionKind } from './typing'
 import { CloseBold } from '@element-plus/icons-vue'
+import { computed } from 'vue'
+import { formatChatTokenCount } from '@/composables/chat/utils/chat-token-estimate'
 import ChatModelTrigger from './ChatModelTrigger.vue'
 
 const props = defineProps<{
@@ -9,6 +11,7 @@ const props = defineProps<{
   isStreaming?: boolean
   disabled?: boolean
   canSend?: boolean
+  inputTokenEstimate?: number
 }>()
 
 const emits = defineEmits<{
@@ -19,6 +22,14 @@ const emits = defineEmits<{
   send: []
   stop: []
 }>()
+
+const inputTokenText = computed(() => {
+  if (!props.inputTokenEstimate) {
+    return ''
+  }
+
+  return `输入约 ${formatChatTokenCount(props.inputTokenEstimate)} tokens`
+})
 </script>
 
 <template>
@@ -62,6 +73,16 @@ const emits = defineEmits<{
     </div>
 
     <div class="chat-composer-toolbar__right">
+      <ElTooltip
+        v-if="inputTokenText"
+        content="仅估算当前输入正文，不含历史消息、系统提示和文档全文"
+        placement="top"
+      >
+        <span class="chat-composer-toolbar__token-estimate">
+          {{ inputTokenText }}
+        </span>
+      </ElTooltip>
+
       <ChatModelTrigger
         :selected-model-ref="props.selectedModelRef"
         :selection-kind="props.modelSelectionKind"
@@ -114,6 +135,14 @@ const emits = defineEmits<{
     margin-left: auto;
   }
 
+  .chat-composer-toolbar__token-estimate {
+    color: var(--brand-text-tertiary);
+    font-size: 0.75rem;
+    line-height: 1.5;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
   .chat-composer-toolbar__icon-button,
   .chat-composer-toolbar__send-button {
     display: inline-flex;
@@ -159,6 +188,14 @@ const emits = defineEmits<{
     font-size: 0.95rem;
     font-weight: 700;
     line-height: 1;
+  }
+}
+
+@media (max-width: 42rem) {
+  .chat-composer-toolbar {
+    .chat-composer-toolbar__token-estimate {
+      display: none;
+    }
   }
 }
 </style>

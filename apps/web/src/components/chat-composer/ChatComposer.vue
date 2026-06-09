@@ -14,6 +14,7 @@ import {
 import { EditorContent, useEditor } from '@tiptap/vue-3'
 import { nanoid } from 'nanoid'
 import { computed, onBeforeUnmount, shallowRef, watch } from 'vue'
+import { estimateChatTextTokens } from '@/composables/chat/utils/chat-token-estimate'
 import {
   findDuplicatePanelAttachment,
   orderChatComposerAttachments,
@@ -32,6 +33,7 @@ const props = withDefaults(defineProps<ChatComposerProps>(), {
   modelSelectionKind: 'default',
   isStreaming: false,
   disabled: false,
+  inputTokenEstimate: undefined,
   highlightAttachmentId: null,
   documentPickerTeleportTo: '',
 })
@@ -42,6 +44,9 @@ const pickerMode = shallowRef<'panel' | 'inline'>('panel')
 let pastedAttachments: ChatComposerAttachment[] = []
 
 const serializedContent = computed(() => serializeChatComposerContent(props.contentJSON))
+const inputTokenEstimate = computed(() =>
+  props.inputTokenEstimate ?? estimateChatTextTokens(serializedContent.value.content),
+)
 const hasSelectedModel = computed(() => Boolean(
   props.selectedModelRef?.providerId.trim()
   && props.selectedModelRef.modelId.trim(),
@@ -316,6 +321,7 @@ function isSameContent(currentEditor: Editor, contentJSON: JSONContent) {
         :is-streaming="props.isStreaming"
         :disabled="props.disabled"
         :can-send="canSend"
+        :input-token-estimate="inputTokenEstimate"
         @open-panel-picker="openPanelPicker"
         @placeholder-upload="emits('placeholderUpload')"
         @placeholder-command="emits('placeholderCommand')"

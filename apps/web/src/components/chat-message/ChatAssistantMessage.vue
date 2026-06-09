@@ -9,8 +9,10 @@ import ChatToolResultBlock from './ChatToolResultBlock.vue'
 const props = withDefaults(defineProps<{
   message: ChatMessage
   variant?: 'global' | 'docs'
+  showUsageSummary?: boolean
 }>(), {
   variant: 'global',
+  showUsageSummary: true,
 })
 
 const display = computed(() => createAssistantMessageDisplayModel(props.message))
@@ -37,6 +39,17 @@ const answerStarted = computed(() => Boolean(display.value.messageText))
         :phase="display.markdownPhase"
       />
     </div>
+
+    <ElTooltip
+      v-if="props.showUsageSummary && display.usageSummary"
+      :content="display.usageTooltip"
+      placement="top"
+      effect="light"
+    >
+      <div class="chat-assistant-message__usage">
+        {{ display.usageSummary }}
+      </div>
+    </ElTooltip>
 
     <div
       v-else-if="display.showPending"
@@ -115,6 +128,17 @@ const answerStarted = computed(() => Boolean(display.value.messageText))
 .chat-assistant-message__cancelled {
   font-size: 0.8125rem;
   line-height: 1.5;
+}
+
+.chat-assistant-message__usage {
+  width: fit-content;
+  font-size: 0.75rem;
+  line-height: 1.25;
+  color: var(--brand-text-tertiary);
+
+  .chat-assistant-message--docs & {
+    font-size: 0.71875rem;
+  }
 }
 
 .chat-assistant-message__pending,

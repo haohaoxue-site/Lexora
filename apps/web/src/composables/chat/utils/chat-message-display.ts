@@ -1,6 +1,7 @@
 import type { ChatMessage } from '@/apis/chat'
 import type { ChatMarkdownRenderPhase } from '@/components/chat-markdown/typing'
 import { CHAT_MESSAGE_PART_TYPE, CHAT_MESSAGE_STATUS } from '@haohaoxue/samepage-contracts/chat/constants'
+import { prettyTokenCount } from '@haohaoxue/samepage-shared/tokens'
 import dayjs from '@/utils/dayjs'
 
 type AssistantChatMessage = Extract<ChatMessage, { role: 'assistant' }>
@@ -11,6 +12,8 @@ export interface AssistantMessageDisplayModel {
   reasoningElapsedMs: number | null
   messageText: string
   messageTextPartId: string
+  usageSummary: string
+  usageTooltip: string
   toolResultParts: ChatMessagePart[]
   markdownPhase: ChatMarkdownRenderPhase
   isStreaming: boolean
@@ -25,6 +28,8 @@ export function createAssistantMessageDisplayModel(message: ChatMessage): Assist
     reasoningElapsedMs: getReasoningElapsedMs(message),
     messageText: getMessageText(message),
     messageTextPartId: getMessageTextPartId(message),
+    usageSummary: getAssistantUsageSummary(message),
+    usageTooltip: getAssistantUsageTooltip(message),
     toolResultParts: getToolResultParts(message),
     markdownPhase: getMarkdownRenderPhase(message),
     isStreaming: isAssistantStreamingMessage(message),
@@ -32,6 +37,28 @@ export function createAssistantMessageDisplayModel(message: ChatMessage): Assist
     failureMessage: getAssistantFailureMessage(message),
     showCancelled: shouldShowAssistantCancelled(message),
   }
+}
+
+export function getAssistantUsageSummary(message: ChatMessage): string {
+  const usage = toAssistantChatMessage(message)?.metadata?.usage
+  if (!usage) {
+    return ''
+  }
+
+  return `消耗 ${prettyTokenCount(usage.totalTokens)} tokens · 入 ${prettyTokenCount(usage.inputTokens)} / 出 ${prettyTokenCount(usage.outputTokens)}`
+}
+
+export function getAssistantUsageTooltip(message: ChatMessage): string {
+  const usage = toAssistantChatMessage(message)?.metadata?.usage
+  if (!usage) {
+    return ''
+  }
+
+  return [
+    typeof usage.firstTokenLatencyMs === 'number' ? `首字时延 ${usage.firstTokenLatencyMs} ms` : null,
+    typeof usage.tokensPerSecond === 'number' ? `每秒 ${usage.tokensPerSecond} tokens` : null,
+    usage.estimated ? `来源：${formatUsageSource(usage.usageSource)}，含估算` : `来源：${formatUsageSource(usage.usageSource)}`,
+  ].filter(Boolean).join(' | ')
 }
 
 export function getMessageText(message: ChatMessage) {
@@ -139,4 +166,16 @@ export function shouldShowAssistantCancelled(message: ChatMessage) {
 
 function toAssistantChatMessage(message: ChatMessage): AssistantChatMessage | null {
   return message.role === 'assistant' ? message as AssistantChatMessage : null
+}
+
+function formatUsageSource(source: string): string {
+  if (source === 'provider') {
+    return '服务商'
+  }
+
+  if (source === 'mixed') {
+    return '服务商 + 本地估算'
+  }
+
+  return '本地估算'
 }

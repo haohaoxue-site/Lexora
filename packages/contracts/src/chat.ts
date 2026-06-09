@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { ChatGenerationUsageSnapshotSchema } from './agent/generation'
 import { AiAvailableModelOptionSchema, AiModelRefSchema } from './ai'
 import {
   CHAT_MESSAGE_ATTACHMENT_MAX_COUNT,
@@ -183,6 +184,7 @@ export const ChatAssistantMessageMetadataSchema = z.object({
   failureMessage: z.string().trim().min(1).optional(),
   elapsedMs: z.number().int().nonnegative().optional(),
   reasoningElapsedMs: z.number().int().nonnegative().optional(),
+  usage: ChatGenerationUsageSnapshotSchema.optional(),
   finishReason: z.string().trim().min(1).optional(),
 }).strict()
 
@@ -238,6 +240,19 @@ export const ChatMessageSchema = z.discriminatedUnion('role', [
   ChatAssistantMessageSchema,
 ])
 
+export const ChatTokenUsageAggregateSchema = z.object({
+  generationCount: z.number().int().nonnegative(),
+  inputTokens: z.number().int().nonnegative(),
+  outputTokens: z.number().int().nonnegative(),
+  reasoningTokens: z.number().int().nonnegative(),
+  totalTokens: z.number().int().nonnegative(),
+}).strict()
+
+export const ChatSessionUsageSummarySchema = z.object({
+  activePath: ChatTokenUsageAggregateSchema,
+  session: ChatTokenUsageAggregateSchema,
+}).strict()
+
 export const ChatSessionSummarySchema = ChatSessionSummaryBaseSchema
 
 export const ChatRunSummarySchema = z.object({
@@ -253,6 +268,7 @@ export const ChatRunSummarySchema = z.object({
 export const ChatSessionDetailSchema = ChatSessionSummarySchema.extend({
   latestSequence: z.number().int().nonnegative(),
   messages: z.array(ChatMessageSchema),
+  usage: ChatSessionUsageSummarySchema,
   activeRun: ChatRunSummarySchema.nullable().optional(),
 }).strict()
 
@@ -529,6 +545,8 @@ export type ChatMessageBranch = z.infer<typeof ChatMessageBranchSchema>
 export type ChatMessageMetadata = z.infer<typeof ChatMessageMetadataSchema>
 export type ChatAssistantMessageMetadata = z.infer<typeof ChatAssistantMessageMetadataSchema>
 export type ChatUserMessageMetadata = z.infer<typeof ChatUserMessageMetadataSchema>
+export type ChatTokenUsageAggregate = z.infer<typeof ChatTokenUsageAggregateSchema>
+export type ChatSessionUsageSummary = z.infer<typeof ChatSessionUsageSummarySchema>
 export type ChatMessagePartMetadata = z.infer<typeof ChatMessagePartMetadataSchema>
 export type ChatMessagePart = z.infer<typeof ChatMessagePartSchema>
 export type ChatUserMessage = z.infer<typeof ChatUserMessageSchema>

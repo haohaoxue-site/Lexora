@@ -6,18 +6,25 @@ import PagePanel from '@/layouts/panels/page-panel'
 import { useUiStore } from '@/stores/ui'
 import { useWorkspaceStore } from '@/stores/workspace'
 import { useChatRouteState } from '../../composables/useChatRouteState'
+import { useChatRuntimeOverlay } from '../../composables/useChatRuntimeOverlay'
 import { useChatSessions } from '../../composables/useChatSessions'
 import ChatContextBar from '../../layouts/context-bar'
 import ChatWorkspaceLayout from '../../layouts/workspace'
+import { createChatConversationUsageView } from '../../utils/chat-usage-display'
 
 const { loadRuntimeConfig } = useChatRuntimeConfig()
 const { refreshModels } = useChatModels()
 const { loadSessions } = useChatSessions()
+const { renderSession } = useChatRuntimeOverlay()
 const { isNewChatRoute, navigateToNewChat } = useChatRouteState()
 const uiStore = useUiStore()
 const workspaceStore = useWorkspaceStore()
 const shouldShowChatSidebar = computed(() => uiStore.chatSessionSidebarPinned ?? !isNewChatRoute.value)
 const isChatSidebarCollapsed = computed(() => !shouldShowChatSidebar.value)
+const conversationUsage = computed(() => createChatConversationUsageView(
+  renderSession.value?.usage,
+  renderSession.value?.messages ?? [],
+))
 
 function setChatSidebarPinned(value: boolean) {
   uiStore.setChatSessionSidebarPinned(value)
@@ -41,7 +48,10 @@ onMounted(async () => {
 <template>
   <PagePanel>
     <template #header>
-      <ChatContextBar @new-chat="navigateToNewChat" />
+      <ChatContextBar
+        :conversation-usage="conversationUsage"
+        @new-chat="navigateToNewChat"
+      />
     </template>
 
     <ChatWorkspaceLayout

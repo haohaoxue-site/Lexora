@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { ChatGenerationUsageSnapshotSchema } from './generation'
 
 const NonEmptyStringSchema = z.string().trim().min(1)
 
@@ -27,6 +28,7 @@ export const ChatGenerationEventSchema = z.discriminatedUnion('type', [
     type: z.literal('generation.completed'),
     payload: z.object({
       durationMs: z.number().int().nonnegative().optional(),
+      usage: ChatGenerationUsageSnapshotSchema.optional(),
     }).strict().default({}),
   }).strict(),
   GenerationEventBaseSchema.extend({

@@ -7,6 +7,7 @@ import {
   CHAT_MESSAGE_FAILURE_REASON,
   CHAT_MESSAGE_PART_TYPE,
   CHAT_SESSION_EVENT_TYPE,
+  ChatGenerationUsageSnapshotSchema,
 } from '@haohaoxue/samepage-contracts'
 import {
   Injectable,
@@ -386,6 +387,7 @@ export class ChatRunProjectorService implements OnModuleInit, OnModuleDestroy {
         data: {
           status: ChatMessageGenerationStatus.COMPLETED,
           completedAt,
+          usageSnapshot: input.metadata.usage ? toJsonObject(input.metadata.usage) : undefined,
           dispatchLeaseExpiresAt: null,
         },
       })
@@ -395,15 +397,18 @@ export class ChatRunProjectorService implements OnModuleInit, OnModuleDestroy {
           messageId: input.messageId,
           runId: input.runId,
           sourceEventId: `${input.sourceEventId}:message`,
-          payload: {
+          payload: toJsonObject({
             content: input.content,
-          },
+            metadata: input.metadata,
+          }),
         },
         {
           type: CHAT_SESSION_EVENT_TYPE.RUN_COMPLETED,
           runId: input.runId,
           sourceEventId: `${input.sourceEventId}:run`,
-          payload: {},
+          payload: toJsonObject({
+            usage: input.metadata.usage,
+          }),
         },
       ])
     }))
@@ -627,6 +632,7 @@ function buildCompletedMessageMetadata(input: {
   return {
     elapsedMs: durationMs,
     reasoningElapsedMs,
+    usage: getUsageFromEvent(input.event),
   }
 }
 
@@ -637,6 +643,19 @@ function getDurationMs(event: ChatGenerationEvent): number | null {
 
   const durationMs = (event.payload as { durationMs?: unknown }).durationMs
   return typeof durationMs === 'number' && Number.isFinite(durationMs) ? Math.max(0, Math.trunc(durationMs)) : null
+}
+
+function getUsageFromEvent(event: ChatGenerationEvent): ChatMessageMetadata['usage'] {
+  if (!event.payload || typeof event.payload !== 'object') {
+    return undefined
+  }
+
+  const usage = (event.payload as { usage?: unknown }).usage
+  if (!usage) {
+    return undefined
+  }
+
+  return ChatGenerationUsageSnapshotSchema.parse(usage)
 }
 
 function getFailureReason(error: unknown): ChatMessageFailureReason {

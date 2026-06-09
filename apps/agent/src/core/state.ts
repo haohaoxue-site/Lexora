@@ -4,9 +4,12 @@ import type {
   AgentContextPolicy,
   AgentProfileConfig,
   AgentRuntimeModelTarget,
+  ChatGenerationUsageSnapshot,
 } from '@haohaoxue/samepage-contracts'
 import type { AgentChatModelOptions } from '../integrations/model-providers/chat-model'
 import type { AgentModelStreamPart } from '../integrations/model-providers/stream-text'
+import type { AgentContextBudget, AgentModelLimits } from './context-budget'
+import type { AgentHistoryDigest } from './history-compaction'
 import { Annotation } from '@langchain/langgraph'
 
 export const AgentGraphState = Annotation.Root({
@@ -15,18 +18,23 @@ export const AgentGraphState = Annotation.Root({
   activePathKey: Annotation<string>(),
   activePathTailMessageId: Annotation<string>(),
   olderMessagesExcerpt: Annotation<string>(),
+  historyDigest: Annotation<AgentHistoryDigest | null>(),
   messages: Annotation<AgentChatContextMessage[], AgentChatContextMessage[]>({
     reducer: (current, update) => current.concat(update),
     default: () => [],
   }),
+  contextBudget: Annotation<AgentContextBudget | null>(),
+  usageSnapshot: Annotation<ChatGenerationUsageSnapshot | null>(),
   responseText: Annotation<string>(),
 })
 
 export interface AgentGraphContext {
   modelTarget?: AgentRuntimeModelTarget | null
   modelOptions?: AgentChatModelOptions | null
+  modelLimits?: AgentModelLimits | null
   agentProfileConfig?: AgentProfileConfig | null
   contextPolicy?: AgentContextPolicy | null
+  contextBudget?: AgentContextBudget | null
   triggerUserMessageId?: string | null
   contextSnapshots?: AgentChatContextSnapshot[] | null
   onStreamPart?: (part: AgentModelStreamPart) => Promise<void> | void

@@ -878,6 +878,7 @@ export class ChatSessionsService {
         data: {
           status: ChatMessageGenerationStatus.COMPLETED,
           completedAt,
+          usageSnapshot: input.metadata?.usage ? toJsonObject(input.metadata.usage) : undefined,
           dispatchLeaseExpiresAt: null,
         },
       })
@@ -1692,6 +1693,7 @@ function toChatSessionDetailRecord(
     createdAt: session.createdAt,
     updatedAt: session.updatedAt,
     messages: activePath.map(message => toChatSessionMessageRecord(message, session.messages)),
+    allMessages: session.messages.map(message => toChatSessionMessageRecord(message, session.messages)),
   }
 }
 

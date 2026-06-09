@@ -1,4 +1,4 @@
-import type { ChatMessage, ChatSessionEvent } from '@/apis/chat'
+import type { ChatMessage, ChatMessageMetadata, ChatSessionEvent } from '@/apis/chat'
 import {
   CHAT_MESSAGE_FAILURE_REASON,
   CHAT_MESSAGE_PART_TYPE,
@@ -26,7 +26,12 @@ export function applyChatSessionEventToMessages(
     case CHAT_SESSION_EVENT_TYPE.MESSAGE_STATUS_CHANGED:
       return updateMessageStatus(messages, event.messageId, event.payload.status)
     case CHAT_SESSION_EVENT_TYPE.MESSAGE_COMPLETED:
-      return completeMessage(messages, event.messageId, getPayloadString(event.payload, 'content') ?? '')
+      return completeMessage(
+        messages,
+        event.messageId,
+        getPayloadString(event.payload, 'content') ?? '',
+        getPayloadMetadata(event.payload),
+      )
     case CHAT_SESSION_EVENT_TYPE.MESSAGE_FAILED:
       return failMessage(
         messages,
@@ -110,6 +115,7 @@ function completeMessage(
   messages: ChatMessage[],
   messageId: string,
   content: string,
+  metadata: ChatMessageMetadata | null,
 ): ChatMessage[] {
   const index = messages.findIndex(message => message.id === messageId)
   if (index < 0) {
@@ -118,15 +124,23 @@ function completeMessage(
 
   const now = dayjs().toISOString()
   const message = messages[index]
+  const assistantMessage = toAssistantChatMessage(message)
   const parts = content
     ? replaceTextPart(message, content, now)
     : message.parts
 
+  if (!assistantMessage) {
+    return messages
+  }
+
   return updateMessage(messages, index, {
-    ...message,
+    ...assistantMessage,
     status: CHAT_MESSAGE_STATUS.COMPLETED,
     content,
     parts,
+    metadata: metadata
+      ? { ...(assistantMessage.metadata ?? {}), ...metadata }
+      : assistantMessage.metadata,
     updatedAt: now,
     completedAt: now,
   })
@@ -283,4 +297,11 @@ function toAssistantChatMessage(message: ChatMessage): AssistantChatMessage | nu
 function getPayloadString(payload: Record<string, unknown>, key: string): string | null {
   const value = payload[key]
   return typeof value === 'string' && value.trim() ? value : null
+}
+
+function getPayloadMetadata(payload: Record<string, unknown>): ChatMessageMetadata | null {
+  const metadata = payload.metadata
+  return metadata && typeof metadata === 'object'
+    ? metadata as ChatMessageMetadata
+    : null
 }

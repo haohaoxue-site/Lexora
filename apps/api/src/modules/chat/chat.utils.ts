@@ -13,6 +13,7 @@ import type {
   ChatRunSummary,
   ChatSessionDetail,
   ChatSessionSummary,
+  ChatSessionUsageSummary,
   ChatUserMessageMetadata,
   ChatSessionOrigin as ContractChatSessionOrigin,
 } from '@haohaoxue/samepage-contracts'
@@ -21,6 +22,7 @@ import {
   CHAT_MESSAGE_PART_TYPE,
   CHAT_MESSAGE_STATUS,
   CHAT_SESSION_ORIGIN,
+  ChatGenerationUsageSnapshotSchema,
 } from '@haohaoxue/samepage-contracts'
 import {
   ChatSessionMessageRole,
@@ -82,6 +84,7 @@ export interface ChatSessionDetailRecord extends ChatSessionSummaryRecord {
   activeRun?: ChatRunSummary | null
   latestSequence: number
   messages: ChatSessionMessageRecord[]
+  allMessages?: ChatSessionMessageRecord[]
 }
 
 export function toChatSessionSummary(session: ChatSessionSummaryRecord): ChatSessionSummary {
@@ -101,6 +104,10 @@ export function toChatSessionDetail(session: ChatSessionDetailRecord): ChatSessi
     ...toChatSessionSummary(session),
     latestSequence: session.latestSequence,
     messages: session.messages.map(toChatMessage),
+    usage: {
+      activePath: aggregateChatTokenUsage(session.messages),
+      session: aggregateChatTokenUsage(session.allMessages ?? session.messages),
+    },
   }
 
   if (session.activeRun) {
@@ -108,6 +115,33 @@ export function toChatSessionDetail(session: ChatSessionDetailRecord): ChatSessi
   }
 
   return detail
+}
+
+function aggregateChatTokenUsage(messages: ChatSessionMessageRecord[]): ChatSessionUsageSummary['activePath'] {
+  return messages.reduce<ChatSessionUsageSummary['activePath']>((total, message) => {
+    if (message.role !== ChatSessionMessageRole.ASSISTANT) {
+      return total
+    }
+
+    const usage = toChatMessageMetadata(message.metadata)?.usage
+    if (!usage) {
+      return total
+    }
+
+    return {
+      generationCount: total.generationCount + 1,
+      inputTokens: total.inputTokens + usage.inputTokens,
+      outputTokens: total.outputTokens + usage.outputTokens,
+      reasoningTokens: total.reasoningTokens + usage.reasoningTokens,
+      totalTokens: total.totalTokens + usage.totalTokens,
+    }
+  }, {
+    generationCount: 0,
+    inputTokens: 0,
+    outputTokens: 0,
+    reasoningTokens: 0,
+    totalTokens: 0,
+  })
 }
 
 export function getChatMessageContentSnapshot(
@@ -225,7 +259,20 @@ function toChatMessage(message: ChatSessionMessageRecord): ChatMessage {
 }
 
 function toChatMessageMetadata(metadata: unknown): ChatMessageMetadata | null {
-  return isRecord(metadata) ? metadata as ChatMessageMetadata : null
+  if (!isRecord(metadata)) {
+    return null
+  }
+
+  const usageResult = ChatGenerationUsageSnapshotSchema.safeParse(metadata.usage)
+  const normalized = { ...metadata }
+  if (usageResult.success) {
+    normalized.usage = usageResult.data
+  }
+  else {
+    delete normalized.usage
+  }
+
+  return normalized as ChatMessageMetadata
 }
 
 function toChatUserMessageMetadata(message: ChatSessionMessageRecord): ChatUserMessageMetadata {

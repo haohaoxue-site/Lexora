@@ -3,6 +3,7 @@ import type {
   ChatRunSummary,
   ChatSessionDetail,
   ChatSessionEvent,
+  ChatTokenUsageAggregate,
 } from '@/apis/chat'
 import {
   CHAT_MESSAGE_STATUS,
@@ -135,12 +136,18 @@ export function mergeChatRenderSession(
 ): ChatSessionDetail {
   const currentRun = getChatRuntimeOverlayCurrentRun(state, session.id)
   const cursor = getChatRuntimeOverlayCursor(state, session.id)
+  const messages = state.mergedMessagesBySessionId.get(session.id) ?? session.messages
+  const activePathUsage = aggregateChatMessageUsage(messages)
 
   return {
     ...session,
     latestSequence: Math.max(session.latestSequence, cursor ?? 0),
     activeRun: currentRun,
-    messages: state.mergedMessagesBySessionId.get(session.id) ?? session.messages,
+    messages,
+    usage: {
+      activePath: activePathUsage,
+      session: addUsageDelta(session.usage.session, subtractUsage(activePathUsage, session.usage.activePath)),
+    },
   }
 }
 
@@ -340,6 +347,59 @@ function isTerminalRunEvent(event: ChatSessionEvent): boolean {
   return event.type === CHAT_SESSION_EVENT_TYPE.RUN_COMPLETED
     || event.type === CHAT_SESSION_EVENT_TYPE.RUN_FAILED
     || event.type === CHAT_SESSION_EVENT_TYPE.RUN_CANCELLED
+}
+
+function aggregateChatMessageUsage(messages: ChatMessage[]): ChatTokenUsageAggregate {
+  return messages.reduce<ChatTokenUsageAggregate>((total, message) => {
+    const usage = message.role === 'assistant' ? message.metadata?.usage : null
+    if (!usage) {
+      return total
+    }
+
+    return {
+      generationCount: total.generationCount + 1,
+      inputTokens: total.inputTokens + usage.inputTokens,
+      outputTokens: total.outputTokens + usage.outputTokens,
+      reasoningTokens: total.reasoningTokens + usage.reasoningTokens,
+      totalTokens: total.totalTokens + usage.totalTokens,
+    }
+  }, createEmptyUsage())
+}
+
+function subtractUsage(
+  current: ChatTokenUsageAggregate,
+  baseline: ChatTokenUsageAggregate,
+): ChatTokenUsageAggregate {
+  return {
+    generationCount: Math.max(0, current.generationCount - baseline.generationCount),
+    inputTokens: Math.max(0, current.inputTokens - baseline.inputTokens),
+    outputTokens: Math.max(0, current.outputTokens - baseline.outputTokens),
+    reasoningTokens: Math.max(0, current.reasoningTokens - baseline.reasoningTokens),
+    totalTokens: Math.max(0, current.totalTokens - baseline.totalTokens),
+  }
+}
+
+function addUsageDelta(
+  base: ChatTokenUsageAggregate,
+  delta: ChatTokenUsageAggregate,
+): ChatTokenUsageAggregate {
+  return {
+    generationCount: base.generationCount + delta.generationCount,
+    inputTokens: base.inputTokens + delta.inputTokens,
+    outputTokens: base.outputTokens + delta.outputTokens,
+    reasoningTokens: base.reasoningTokens + delta.reasoningTokens,
+    totalTokens: base.totalTokens + delta.totalTokens,
+  }
+}
+
+function createEmptyUsage(): ChatTokenUsageAggregate {
+  return {
+    generationCount: 0,
+    inputTokens: 0,
+    outputTokens: 0,
+    reasoningTokens: 0,
+    totalTokens: 0,
+  }
 }
 
 function addTerminalRunId(

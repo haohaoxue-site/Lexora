@@ -4,11 +4,13 @@ import type {
   AgentContextPolicy,
 } from '@haohaoxue/samepage-contracts'
 import type { BaseCheckpointSaver } from '@langchain/langgraph'
+import type { AgentHistoryDigest } from './history-compaction'
 
 export interface AgentCheckpointState {
   activePathKey: string
   activePathTailMessageId: string
   olderMessagesExcerpt: string
+  historyDigest: AgentHistoryDigest | null
 }
 
 export interface AgentGraphInput {
@@ -17,6 +19,7 @@ export interface AgentGraphInput {
   activePathKey: string
   activePathTailMessageId: string
   olderMessagesExcerpt: string
+  historyDigest: AgentHistoryDigest | null
   messages: AgentChatContextMessage[]
 }
 
@@ -68,6 +71,7 @@ export function resolveAgentGraphInput(
       activePathKey: runtimeContext.activePathKey,
       activePathTailMessageId: runtimeContext.assistantMessageId,
       olderMessagesExcerpt: compatible ? checkpointState?.olderMessagesExcerpt ?? '' : '',
+      historyDigest: compatible ? checkpointState?.historyDigest ?? null : null,
       messages: compatible ? [triggerUserMessage] : runtimeContext.messages,
     },
   }
@@ -113,6 +117,7 @@ function parseAgentCheckpointState(channelValues: Record<string, unknown>): Agen
     activePathKey,
     activePathTailMessageId,
     olderMessagesExcerpt: readString(channelValues.olderMessagesExcerpt),
+    historyDigest: readAgentHistoryDigest(channelValues.historyDigest),
   }
 }
 
@@ -205,4 +210,34 @@ function readNonEmptyString(value: unknown): string | null {
 
 function readString(value: unknown): string {
   return typeof value === 'string' ? value : ''
+}
+
+function readAgentHistoryDigest(value: unknown): AgentHistoryDigest | null {
+  if (!value || typeof value !== 'object') {
+    return null
+  }
+
+  const digest = value as Partial<AgentHistoryDigest>
+  if (
+    digest.schemaVersion !== 1
+    || typeof digest.summary !== 'string'
+    || !Array.isArray(digest.coveredMessageIds)
+    || !digest.coveredMessageIds.every(item => typeof item === 'string')
+    || typeof digest.sourceHistoryVersion !== 'number'
+    || typeof digest.estimatedTokens !== 'number'
+    || typeof digest.createdAt !== 'string'
+    || typeof digest.updatedAt !== 'string'
+  ) {
+    return null
+  }
+
+  return {
+    schemaVersion: 1,
+    summary: digest.summary,
+    coveredMessageIds: digest.coveredMessageIds,
+    sourceHistoryVersion: digest.sourceHistoryVersion,
+    estimatedTokens: digest.estimatedTokens,
+    createdAt: digest.createdAt,
+    updatedAt: digest.updatedAt,
+  }
 }

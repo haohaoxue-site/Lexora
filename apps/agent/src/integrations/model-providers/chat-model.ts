@@ -13,6 +13,8 @@ export interface AgentChatModel {
 
 export interface AgentChatModelResponse {
   content: MessageContent
+  usage_metadata?: unknown
+  response_metadata?: unknown
 }
 
 export interface AgentChatModelOptions {

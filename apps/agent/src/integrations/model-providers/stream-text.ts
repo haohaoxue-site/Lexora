@@ -14,18 +14,38 @@ export type AgentModelStreamPart
 export interface ConsumeChatModelTextStreamOptions {
   onStreamPart?: (part: AgentModelStreamPart) => Promise<void> | void
   onTextDelta?: (text: string) => Promise<void> | void
+  now?: () => number
+}
+
+export interface AgentModelTokenUsage {
+  inputTokens?: number
+  outputTokens?: number
+  totalTokens?: number
+  reasoningTokens?: number
+}
+
+export interface AgentModelTextStreamResult {
+  text: string
+  providerUsage: AgentModelTokenUsage | null
+  firstTokenLatencyMs?: number
+  elapsedMs: number
 }
 
 export async function consumeChatModelTextStream(
   stream: AsyncIterable<AgentChatModelResponse>,
   options: ConsumeChatModelTextStreamOptions = {},
-): Promise<string> {
+): Promise<AgentModelTextStreamResult> {
   let responseText = ''
+  let providerUsage: AgentModelTokenUsage | null = null
+  let firstTokenAt: number | null = null
+  const now = options.now ?? (() => Date.now())
+  const startedAt = now()
   const tagParser = createReasoningTagStreamParser()
   const normalizeReasoningDelta = createLeadingBlankLineNormalizer()
   const normalizeTextDelta = createLeadingBlankLineNormalizer()
 
   for await (const chunk of stream) {
+    providerUsage = mergeTokenUsage(providerUsage, readProviderUsage(chunk))
     const reasoning = readChatModelResponseReasoning(chunk)
     const hasStructuredReasoning = Boolean(reasoning)
     if (reasoning) {
@@ -34,7 +54,9 @@ export async function consumeChatModelTextStream(
         type: 'reasoning.delta',
         text: normalizedReasoning,
         raw: chunk,
-      }, options)
+      }, options, () => {
+        firstTokenAt ??= now()
+      })
     }
 
     const text = readChatModelResponseText(chunk)
@@ -55,7 +77,9 @@ export async function consumeChatModelTextStream(
         responseText += normalizedText
       }
 
-      await emitPart({ ...part, text: normalizedText, raw: chunk }, options)
+      await emitPart({ ...part, text: normalizedText, raw: chunk }, options, () => {
+        firstTokenAt ??= now()
+      })
     }
   }
 
@@ -68,25 +92,132 @@ export async function consumeChatModelTextStream(
       responseText += normalizedText
     }
 
-    await emitPart({ ...part, text: normalizedText }, options)
+    await emitPart({ ...part, text: normalizedText }, options, () => {
+      firstTokenAt ??= now()
+    })
   }
 
-  return responseText
+  const completedAt = now()
+
+  return {
+    text: responseText,
+    providerUsage,
+    firstTokenLatencyMs: firstTokenAt === null ? undefined : Math.max(0, Math.trunc(firstTokenAt - startedAt)),
+    elapsedMs: Math.max(0, Math.trunc(completedAt - startedAt)),
+  }
 }
 
 async function emitPart(
   part: AgentModelStreamPart,
   options: ConsumeChatModelTextStreamOptions,
+  markFirstToken: () => void,
 ): Promise<void> {
   if ('text' in part && part.text === '') {
     return
   }
 
+  markFirstToken()
   await options.onStreamPart?.(part)
 
   if (part.type === 'text.delta') {
     await options.onTextDelta?.(part.text)
   }
+}
+
+function readProviderUsage(chunk: AgentChatModelResponse): AgentModelTokenUsage | null {
+  return readLangChainUsageMetadata(chunk.usage_metadata)
+    ?? readProviderResponseUsage(chunk.response_metadata)
+}
+
+function readLangChainUsageMetadata(value: unknown): AgentModelTokenUsage | null {
+  if (!value || typeof value !== 'object') {
+    return null
+  }
+
+  const usage = value as Record<string, unknown>
+  return normalizeUsage({
+    inputTokens: usage.input_tokens,
+    outputTokens: usage.output_tokens,
+    totalTokens: usage.total_tokens,
+    reasoningTokens: readNestedNumber(usage.output_token_details, 'reasoning'),
+  })
+}
+
+function readProviderResponseUsage(value: unknown): AgentModelTokenUsage | null {
+  if (!value || typeof value !== 'object') {
+    return null
+  }
+
+  const metadata = value as Record<string, unknown>
+  const usage = metadata.usage
+  if (!usage || typeof usage !== 'object') {
+    return null
+  }
+
+  const usageRecord = usage as Record<string, unknown>
+  return normalizeUsage({
+    inputTokens: usageRecord.input_tokens ?? usageRecord.prompt_tokens,
+    outputTokens: usageRecord.output_tokens ?? usageRecord.completion_tokens,
+    totalTokens: usageRecord.total_tokens,
+    reasoningTokens: readNestedNumber(usageRecord.output_tokens_details, 'reasoning_tokens')
+      ?? readNestedNumber(usageRecord.completion_tokens_details, 'reasoning_tokens'),
+  })
+}
+
+function normalizeUsage(input: {
+  inputTokens?: unknown
+  outputTokens?: unknown
+  totalTokens?: unknown
+  reasoningTokens?: unknown
+}): AgentModelTokenUsage | null {
+  const usage = {
+    inputTokens: readNonNegativeInteger(input.inputTokens),
+    outputTokens: readNonNegativeInteger(input.outputTokens),
+    totalTokens: readNonNegativeInteger(input.totalTokens),
+    reasoningTokens: readNonNegativeInteger(input.reasoningTokens),
+  }
+
+  if (
+    usage.inputTokens === undefined
+    && usage.outputTokens === undefined
+    && usage.totalTokens === undefined
+    && usage.reasoningTokens === undefined
+  ) {
+    return null
+  }
+
+  return usage
+}
+
+function mergeTokenUsage(
+  current: AgentModelTokenUsage | null,
+  next: AgentModelTokenUsage | null,
+): AgentModelTokenUsage | null {
+  if (!next) {
+    return current
+  }
+
+  if (!current) {
+    return next
+  }
+
+  const currentTotal = current.totalTokens ?? (current.inputTokens ?? 0) + (current.outputTokens ?? 0)
+  const nextTotal = next.totalTokens ?? (next.inputTokens ?? 0) + (next.outputTokens ?? 0)
+  return nextTotal >= currentTotal ? { ...current, ...next } : current
+}
+
+function readNestedNumber(value: unknown, key: string): number | undefined {
+  if (!value || typeof value !== 'object') {
+    return undefined
+  }
+
+  return readNonNegativeInteger((value as Record<string, unknown>)[key])
+}
+
+function readNonNegativeInteger(value: unknown): number | undefined {
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0
+    ? Math.trunc(value)
+    : undefined
 }
 
 type ReasoningTagPart = Extract<AgentModelStreamPart, { type: 'reasoning.delta' | 'text.delta' }>

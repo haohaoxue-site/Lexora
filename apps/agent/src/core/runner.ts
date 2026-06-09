@@ -82,6 +82,7 @@ export function createAgentRunner(inputs: CreateAgentRunnerInput): AgentRunner {
           generationId,
           payload: {
             durationMs,
+            usage: result.usageSnapshot ?? undefined,
           },
         }))
 
@@ -161,6 +162,7 @@ export async function executeAgentGeneration(input: {
       context: {
         agentProfileConfig: profileConfig,
         contextPolicy: profileConfig.contextPolicy,
+        modelLimits: input.bootstrap.model,
         modelOptions: toChatModelOptions(profileConfig),
         modelTarget: input.bootstrap.runtimeModelTarget,
         triggerUserMessageId: input.bootstrap.context.triggerUserMessageId,

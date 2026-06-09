@@ -1,12 +1,18 @@
 <script setup lang="ts">
-import type { ChatContextBarEmits } from './typing'
+import type {
+  ChatContextBarEmits,
+  ChatContextBarProps,
+} from './typing'
+import ChatUsagePopover from '../../components/usage-popover'
 
+const props = defineProps<ChatContextBarProps>()
 const emits = defineEmits<ChatContextBarEmits>()
 </script>
 
 <template>
   <div class="chat-view-context flex w-full flex-wrap items-center justify-end gap-4">
-    <div class="flex items-center gap-3">
+    <div class="flex items-center gap-2">
+      <ChatUsagePopover v-if="props.conversationUsage" :usage="props.conversationUsage" />
       <ElButton class="chat-view-context__new-chat-btn h-8 rounded-lg px-3 text-sm font-medium" @click="emits('newChat')">
         <span class="inline-flex items-center gap-1.5">
           <SvgIcon category="ui" icon="plus" size="0.875rem" />

@@ -12,6 +12,7 @@ import ChatUserMessageContent from '@/components/chat-message/ChatUserMessageCon
 import CopyStateIcon from '@/components/copy-state-icon/CopyStateIcon.vue'
 import { useDynamicChatVirtualList } from '@/composables/chat/useDynamicChatVirtualList'
 import { shouldShowAssistantPending } from '@/composables/chat/utils/chat-message-display'
+import ChatMessageUsageAction from '../../components/message-usage-action'
 import { useChatMessageList } from '../../composables/useChatMessageList'
 
 const scrollContainerRef = useTemplateRef<HTMLElement>('scrollContainerRef')
@@ -119,7 +120,7 @@ function setVirtualItemElement(key: string, element: Element | ComponentPublicIn
             </div>
 
             <div v-if="virtual.item.role === 'assistant'" class="chat-message-list__assistant-content flex min-w-0 max-w-[80%] flex-col gap-2">
-              <ChatAssistantMessage :message="virtual.item" variant="global" />
+              <ChatAssistantMessage :message="virtual.item" variant="global" :show-usage-summary="false" />
 
               <div class="chat-message-list__actions assistant flex items-center justify-start gap-1.5">
                 <ElTooltip content="复制回复" placement="bottom">
@@ -160,6 +161,7 @@ function setVirtualItemElement(key: string, element: Element | ComponentPublicIn
                     @click="switchToBranch(virtual.item.branch.nextMessageId)"
                   />
                 </div>
+                <ChatMessageUsageAction :message="virtual.item" />
               </div>
             </div>
 
@@ -234,6 +236,7 @@ function setVirtualItemElement(key: string, element: Element | ComponentPublicIn
                       @click="switchToBranch(virtual.item.branch.nextMessageId)"
                     />
                   </div>
+                  <ChatMessageUsageAction :message="virtual.item" />
                 </div>
               </template>
             </div>
