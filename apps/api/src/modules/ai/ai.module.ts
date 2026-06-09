@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common'
 
 // models
+import { AiModelCapabilityDefaultsService } from './models/capability-defaults.service'
 import { AiDefaultModelsService } from './models/defaults.service'
 import { AiProviderModelsService } from './models/provider-models.service'
 import { AiProvidersService } from './models/providers.service'
@@ -22,6 +23,7 @@ import { AiProviderPresetsService } from './providers/presets.service'
   providers: [
     AiProviderPresetsService,
     AiProviderAdaptersService,
+    AiModelCapabilityDefaultsService,
     AiProvidersService,
     AiProviderModelsService,
     AiDefaultModelsService,
@@ -29,6 +31,7 @@ import { AiProviderPresetsService } from './providers/presets.service'
   ],
   exports: [
     AiDefaultModelsService,
+    AiModelCapabilityDefaultsService,
     AiProviderAdaptersService,
     AiProvidersService,
     AiModelResolverService,

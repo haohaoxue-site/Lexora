@@ -1,5 +1,6 @@
 import type {
   AiModelCapability,
+  AiModelModality,
   AiModelType,
 } from '@haohaoxue/samepage-contracts'
 
@@ -9,6 +10,7 @@ export type {
   AiDefaultModelPolicyItem,
   AiModelCapability,
   AiModelIntentKey,
+  AiModelModality,
   AiModelRef,
   AiModelType,
   AiProvider,
@@ -65,10 +67,14 @@ export interface UpsertAiProviderModelRequest {
   modelType?: AiModelType
   /** 模型能力 */
   capabilities?: AiModelCapability[]
+  /** 输入模态 */
+  inputModalities?: AiModelModality[]
+  /** 输出模态 */
+  outputModalities?: AiModelModality[]
   /** 上下文窗口 */
-  contextWindow?: number
+  contextWindow?: number | null
   /** 最大输出 token */
-  maxOutputTokens?: number
+  maxOutputTokens?: number | null
   /** 是否启用 */
   enabled?: boolean
 }

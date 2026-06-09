@@ -27,7 +27,12 @@ const emit = defineEmits<AiProviderModelsPanelEmits>()
           {{ discoverModelsButtonText }}
         </ElButton>
         <ElTooltip content="添加模型" placement="top" effect="light">
-          <ElButton type="primary" plain @click="emit('openCreateModel')">
+          <ElButton
+            type="primary"
+            plain
+            aria-label="添加模型"
+            @click="emit('openCreateModel')"
+          >
             <SvgIcon category="ui" icon="plus" size="1rem" />
           </ElButton>
         </ElTooltip>
@@ -41,7 +46,9 @@ const emit = defineEmits<AiProviderModelsPanelEmits>()
     <div v-else v-loading="isLoadingModels" class="ai-provider-console__model-list">
       <ProviderModelTable
         :models="models"
+        :can-configure="true"
         :is-model-updating="isModelUpdating"
+        @configure-model="model => emit('configureModel', model)"
         @update-model-status="(model, value) => emit('updateModelStatus', model, value)"
       />
     </div>

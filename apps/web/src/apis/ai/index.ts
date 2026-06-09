@@ -73,7 +73,9 @@ export function getPlatformAiProviderModels(providerId: string): Promise<AiProvi
   })
 }
 
-export function discoverPlatformAiProviderModels(providerId: string): Promise<AiProviderModels> {
+export function discoverPlatformAiProviderModels(
+  providerId: string,
+): Promise<AiProviderModels> {
   return axios.request({
     method: 'post',
     url: `/system-admin/ai/providers/${providerId}/models/discover`,
@@ -149,7 +151,9 @@ export function getUserAiProviderModels(providerId: string): Promise<AiProviderM
   })
 }
 
-export function discoverUserAiProviderModels(providerId: string): Promise<AiProviderModels> {
+export function discoverUserAiProviderModels(
+  providerId: string,
+): Promise<AiProviderModels> {
   return axios.request({
     method: 'post',
     url: `/users/me/ai/providers/${providerId}/models/discover`,

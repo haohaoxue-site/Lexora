@@ -156,4 +156,4 @@ CLAUDE.md
 skills-lock.json
 todos/
 __tests__
-infrastructure/scripts
+infrastructure/_scripts

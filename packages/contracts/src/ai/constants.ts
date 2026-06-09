@@ -35,6 +35,7 @@ export const AI_MODEL_TYPE = {
   EMBEDDING: 'embedding',
   RERANK: 'rerank',
   IMAGE: 'image',
+  AUDIO: 'audio',
 } as const
 
 export const AI_MODEL_TYPE_VALUES = [
@@ -42,22 +43,41 @@ export const AI_MODEL_TYPE_VALUES = [
   AI_MODEL_TYPE.EMBEDDING,
   AI_MODEL_TYPE.RERANK,
   AI_MODEL_TYPE.IMAGE,
+  AI_MODEL_TYPE.AUDIO,
+] as const
+
+export const AI_MODEL_MODALITY = {
+  TEXT: 'text',
+  IMAGE: 'image',
+  AUDIO: 'audio',
+  VIDEO: 'video',
+  FILE: 'file',
+  EMBEDDING: 'embedding',
+} as const
+
+export const AI_MODEL_MODALITY_VALUES = [
+  AI_MODEL_MODALITY.TEXT,
+  AI_MODEL_MODALITY.IMAGE,
+  AI_MODEL_MODALITY.AUDIO,
+  AI_MODEL_MODALITY.VIDEO,
+  AI_MODEL_MODALITY.FILE,
+  AI_MODEL_MODALITY.EMBEDDING,
 ] as const
 
 export const AI_MODEL_CAPABILITY = {
   STREAMING: 'streaming',
-  VISION: 'vision',
   TOOL_CALL: 'tool_call',
   REASONING: 'reasoning',
   JSON_MODE: 'json_mode',
+  STRUCTURED_OUTPUT: 'structured_output',
 } as const
 
 export const AI_MODEL_CAPABILITY_VALUES = [
   AI_MODEL_CAPABILITY.STREAMING,
-  AI_MODEL_CAPABILITY.VISION,
   AI_MODEL_CAPABILITY.TOOL_CALL,
   AI_MODEL_CAPABILITY.REASONING,
   AI_MODEL_CAPABILITY.JSON_MODE,
+  AI_MODEL_CAPABILITY.STRUCTURED_OUTPUT,
 ] as const
 
 export const AI_MODEL_INTENT_KEY = {

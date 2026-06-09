@@ -13,7 +13,7 @@ export const AI_BUILTIN_PROVIDER_PRESETS = [
     endpointMode: AI_PROVIDER_ENDPOINT_MODE.FIXED,
     fixedEndpoint: 'https://api.openai.com/v1',
     authMode: AI_PROVIDER_AUTH_MODE.BEARER,
-    supportedModelTypes: [AI_MODEL_TYPE.CHAT, AI_MODEL_TYPE.EMBEDDING, AI_MODEL_TYPE.IMAGE],
+    supportedModelTypes: [AI_MODEL_TYPE.CHAT, AI_MODEL_TYPE.EMBEDDING, AI_MODEL_TYPE.IMAGE, AI_MODEL_TYPE.AUDIO],
   },
   {
     providerKey: 'deepseek',
@@ -42,7 +42,7 @@ export const AI_COMPATIBLE_PROVIDER_PRESETS = [
     adapterKey: 'openai-chat-completions',
     endpointMode: AI_PROVIDER_ENDPOINT_MODE.CUSTOM,
     authMode: AI_PROVIDER_AUTH_MODE.BEARER,
-    supportedModelTypes: [AI_MODEL_TYPE.CHAT, AI_MODEL_TYPE.EMBEDDING, AI_MODEL_TYPE.RERANK, AI_MODEL_TYPE.IMAGE],
+    supportedModelTypes: [AI_MODEL_TYPE.CHAT, AI_MODEL_TYPE.EMBEDDING, AI_MODEL_TYPE.RERANK, AI_MODEL_TYPE.IMAGE, AI_MODEL_TYPE.AUDIO],
   },
   {
     providerKey: 'anthropic-compatible',

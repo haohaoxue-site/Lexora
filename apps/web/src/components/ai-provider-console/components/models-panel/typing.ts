@@ -1,4 +1,8 @@
-import type { AiProviderModelItem, AiProviderModelStatusChange } from '../../typing'
+import type {
+  AiProviderModelConfigure,
+  AiProviderModelItem,
+  AiProviderModelStatusChange,
+} from '../../typing'
 
 export interface AiProviderModelsPanelProps {
   models: AiProviderModelItem[]
@@ -14,4 +18,5 @@ export interface AiProviderModelsPanelEmits {
   openDiscoverModels: []
   openCreateModel: []
   updateModelStatus: Parameters<AiProviderModelStatusChange>
+  configureModel: Parameters<AiProviderModelConfigure>
 }

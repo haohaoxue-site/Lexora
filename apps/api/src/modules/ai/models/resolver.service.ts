@@ -1,4 +1,10 @@
-import type { AiModelCapability, AiModelIntentKey, AiModelRef } from '@haohaoxue/samepage-contracts'
+import type {
+  AiModelCapability,
+  AiModelIntentKey,
+  AiModelModality,
+  AiModelRef,
+  AiModelType,
+} from '@haohaoxue/samepage-contracts'
 import { AiModelIntentKeySchema } from '@haohaoxue/samepage-contracts'
 import { getAiModelIntentFallbackChain, isAiModelCapabilitySatisfied, normalizeAiEndpoint } from '@haohaoxue/samepage-shared'
 import { BadRequestException, Injectable } from '@nestjs/common'
@@ -6,6 +12,7 @@ import { PrismaService } from '../../../database/prisma.service'
 import {
   toDomainAuthMode,
   toDomainCapability,
+  toDomainModality,
   toDomainModelType,
   toDomainScope,
 } from '../ai.utils'
@@ -28,6 +35,9 @@ export interface ResolvedAiModelTarget {
   authMode: 'api-key' | 'bearer' | 'none'
   modelId: string
   modelName: string
+  modelType: AiModelType
+  inputModalities: AiModelModality[]
+  outputModalities: AiModelModality[]
   capabilities: AiModelCapability[]
   contextWindow: number | null
   maxOutputTokens: number | null
@@ -98,6 +108,9 @@ export class AiModelResolverService {
       authMode: toDomainAuthMode(provider.authMode),
       modelId: model.modelId,
       modelName: model.modelName,
+      modelType: toDomainModelType(model.modelType),
+      inputModalities: model.inputModalities.map(toDomainModality),
+      outputModalities: model.outputModalities.map(toDomainModality),
       capabilities: model.capabilities.map(toDomainCapability),
       contextWindow: model.contextWindow,
       maxOutputTokens: model.maxOutputTokens,

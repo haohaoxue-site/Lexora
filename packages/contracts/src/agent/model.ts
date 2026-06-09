@@ -1,6 +1,8 @@
 import { z } from 'zod'
 import {
   AiModelCapabilitySchema,
+  AiModelModalitySchema,
+  AiModelTypeSchema,
   AiProviderAuthModeSchema,
   AiProviderScopeSchema,
 } from '../ai'
@@ -15,6 +17,10 @@ export const ChatGenerationModelTargetSnapshotSchema = z.object({
   endpoint: NonEmptyStringSchema,
   authMode: AiProviderAuthModeSchema,
   modelId: NonEmptyStringSchema,
+  modelName: NonEmptyStringSchema,
+  modelType: AiModelTypeSchema,
+  inputModalities: z.array(AiModelModalitySchema),
+  outputModalities: z.array(AiModelModalitySchema),
   capabilities: z.array(AiModelCapabilitySchema).default([]),
   contextWindow: z.number().int().positive().nullable().optional(),
   maxOutputTokens: z.number().int().positive().nullable().optional(),

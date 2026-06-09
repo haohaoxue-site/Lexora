@@ -1,11 +1,13 @@
 import type {
   AiModelCapability,
+  AiModelModality,
   AiModelType,
   AiProviderAuthMode,
   UpdateAiDefaultModelPolicyRequest,
 } from '@haohaoxue/samepage-contracts'
 import {
   AI_MODEL_CAPABILITY_VALUES,
+  AI_MODEL_MODALITY_VALUES,
   AI_MODEL_TYPE_VALUES,
   AI_PROVIDER_AUTH_MODE_VALUES,
 } from '@haohaoxue/samepage-contracts'
@@ -95,14 +97,24 @@ export class UpsertAiProviderModelDto {
   capabilities?: AiModelCapability[]
 
   @IsOptional()
-  @IsInt()
-  @Min(1)
-  contextWindow?: number
+  @IsArray()
+  @IsEnum(AI_MODEL_MODALITY_VALUES, { each: true })
+  inputModalities?: AiModelModality[]
+
+  @IsOptional()
+  @IsArray()
+  @IsEnum(AI_MODEL_MODALITY_VALUES, { each: true })
+  outputModalities?: AiModelModality[]
 
   @IsOptional()
   @IsInt()
   @Min(1)
-  maxOutputTokens?: number
+  contextWindow?: number | null
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  maxOutputTokens?: number | null
 
   @IsOptional()
   @IsBoolean()

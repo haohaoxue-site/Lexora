@@ -45,6 +45,7 @@ const searchKeyword = defineModel<string>('searchKeyword', { required: true })
     <div v-loading="isDiscovering" class="ai-provider-console__discover-list">
       <ProviderModelTable
         :models="models"
+        :can-configure="false"
         :is-model-updating="isModelUpdating"
         @update-model-status="(model, value) => emit('updateModelStatus', model, value)"
       />

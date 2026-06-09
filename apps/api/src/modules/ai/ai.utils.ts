@@ -4,6 +4,7 @@ import type {
   AiDefaultModelPolicyItem,
   AiModelCapability,
   AiModelIntentKey,
+  AiModelModality,
   AiModelRef,
   AiModelType,
   AiProvider,
@@ -15,6 +16,7 @@ import type {
 } from '@haohaoxue/samepage-contracts'
 import type {
   AiModelCapability as PrismaAiModelCapability,
+  AiModelModality as PrismaAiModelModality,
   AiModelType as PrismaAiModelType,
   AiProvider as PrismaAiProvider,
   AiProviderAuthMode as PrismaAiProviderAuthMode,
@@ -25,6 +27,7 @@ import type {
 } from '@prisma/client'
 import {
   AI_MODEL_CAPABILITY,
+  AI_MODEL_MODALITY,
   AI_MODEL_TYPE,
   AI_PROVIDER_AUTH_MODE,
   AI_PROVIDER_CREDENTIAL_STATUS,
@@ -84,6 +87,9 @@ export function toPrismaAuthMode(mode: AiProviderAuthMode): PrismaAiProviderAuth
 }
 
 export function toDomainModelType(type: PrismaAiModelType): AiModelType {
+  if (type === 'AUDIO') {
+    return AI_MODEL_TYPE.AUDIO
+  }
   if (type === 'EMBEDDING') {
     return AI_MODEL_TYPE.EMBEDDING
   }
@@ -97,6 +103,9 @@ export function toDomainModelType(type: PrismaAiModelType): AiModelType {
 }
 
 export function toPrismaModelType(type: AiModelType): PrismaAiModelType {
+  if (type === AI_MODEL_TYPE.AUDIO) {
+    return 'AUDIO'
+  }
   if (type === AI_MODEL_TYPE.EMBEDDING) {
     return 'EMBEDDING'
   }
@@ -110,9 +119,6 @@ export function toPrismaModelType(type: AiModelType): PrismaAiModelType {
 }
 
 export function toDomainCapability(capability: PrismaAiModelCapability): AiModelCapability {
-  if (capability === 'VISION') {
-    return AI_MODEL_CAPABILITY.VISION
-  }
   if (capability === 'TOOL_CALL') {
     return AI_MODEL_CAPABILITY.TOOL_CALL
   }
@@ -122,13 +128,13 @@ export function toDomainCapability(capability: PrismaAiModelCapability): AiModel
   if (capability === 'JSON_MODE') {
     return AI_MODEL_CAPABILITY.JSON_MODE
   }
+  if (capability === 'STRUCTURED_OUTPUT') {
+    return AI_MODEL_CAPABILITY.STRUCTURED_OUTPUT
+  }
   return AI_MODEL_CAPABILITY.STREAMING
 }
 
 export function toPrismaCapability(capability: AiModelCapability): PrismaAiModelCapability {
-  if (capability === AI_MODEL_CAPABILITY.VISION) {
-    return 'VISION'
-  }
   if (capability === AI_MODEL_CAPABILITY.TOOL_CALL) {
     return 'TOOL_CALL'
   }
@@ -138,7 +144,83 @@ export function toPrismaCapability(capability: AiModelCapability): PrismaAiModel
   if (capability === AI_MODEL_CAPABILITY.JSON_MODE) {
     return 'JSON_MODE'
   }
+  if (capability === AI_MODEL_CAPABILITY.STRUCTURED_OUTPUT) {
+    return 'STRUCTURED_OUTPUT'
+  }
   return 'STREAMING'
+}
+
+export function toDomainModality(modality: PrismaAiModelModality): AiModelModality {
+  if (modality === 'IMAGE') {
+    return AI_MODEL_MODALITY.IMAGE
+  }
+  if (modality === 'AUDIO') {
+    return AI_MODEL_MODALITY.AUDIO
+  }
+  if (modality === 'VIDEO') {
+    return AI_MODEL_MODALITY.VIDEO
+  }
+  if (modality === 'FILE') {
+    return AI_MODEL_MODALITY.FILE
+  }
+  if (modality === 'EMBEDDING') {
+    return AI_MODEL_MODALITY.EMBEDDING
+  }
+  return AI_MODEL_MODALITY.TEXT
+}
+
+export function toPrismaModality(modality: AiModelModality): PrismaAiModelModality {
+  if (modality === AI_MODEL_MODALITY.IMAGE) {
+    return 'IMAGE'
+  }
+  if (modality === AI_MODEL_MODALITY.AUDIO) {
+    return 'AUDIO'
+  }
+  if (modality === AI_MODEL_MODALITY.VIDEO) {
+    return 'VIDEO'
+  }
+  if (modality === AI_MODEL_MODALITY.FILE) {
+    return 'FILE'
+  }
+  if (modality === AI_MODEL_MODALITY.EMBEDDING) {
+    return 'EMBEDDING'
+  }
+  return 'TEXT'
+}
+
+export function getDefaultModelModalities(modelType: AiModelType): {
+  inputModalities: AiModelModality[]
+  outputModalities: AiModelModality[]
+} {
+  if (modelType === AI_MODEL_TYPE.EMBEDDING) {
+    return {
+      inputModalities: [AI_MODEL_MODALITY.TEXT],
+      outputModalities: [AI_MODEL_MODALITY.EMBEDDING],
+    }
+  }
+  if (modelType === AI_MODEL_TYPE.RERANK) {
+    return {
+      inputModalities: [AI_MODEL_MODALITY.TEXT],
+      outputModalities: [AI_MODEL_MODALITY.TEXT],
+    }
+  }
+  if (modelType === AI_MODEL_TYPE.IMAGE) {
+    return {
+      inputModalities: [AI_MODEL_MODALITY.TEXT],
+      outputModalities: [AI_MODEL_MODALITY.IMAGE],
+    }
+  }
+  if (modelType === AI_MODEL_TYPE.AUDIO) {
+    return {
+      inputModalities: [AI_MODEL_MODALITY.AUDIO],
+      outputModalities: [AI_MODEL_MODALITY.TEXT],
+    }
+  }
+
+  return {
+    inputModalities: [AI_MODEL_MODALITY.TEXT],
+    outputModalities: [AI_MODEL_MODALITY.TEXT],
+  }
 }
 
 export function toProvider(
@@ -176,6 +258,8 @@ export function toProviderModelItem(item: PrismaAiProviderModel): AiProviderMode
     modelId: item.modelId,
     modelName: item.modelName,
     modelType: toDomainModelType(item.modelType),
+    inputModalities: item.inputModalities.map(toDomainModality),
+    outputModalities: item.outputModalities.map(toDomainModality),
     capabilities: item.capabilities.map(toDomainCapability),
     contextWindow: item.contextWindow,
     maxOutputTokens: item.maxOutputTokens,
@@ -228,6 +312,8 @@ export function toAvailableModelOption(params: {
     modelId: params.model.modelId,
     modelName: params.model.modelName,
     modelType: toDomainModelType(params.model.modelType),
+    inputModalities: params.model.inputModalities.map(toDomainModality),
+    outputModalities: params.model.outputModalities.map(toDomainModality),
     capabilities: params.model.capabilities.map(toDomainCapability),
     selectable: params.selectable,
     unavailableReason: params.unavailableReason,

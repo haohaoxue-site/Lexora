@@ -3,6 +3,7 @@ import {
   AI_DEFAULT_MODEL_STATUS_VALUES,
   AI_MODEL_CAPABILITY_VALUES,
   AI_MODEL_INTENT_KEY_VALUES,
+  AI_MODEL_MODALITY_VALUES,
   AI_MODEL_TYPE_VALUES,
   AI_PROVIDER_AUTH_MODE_VALUES,
   AI_PROVIDER_CREDENTIAL_STATUS_VALUES,
@@ -19,6 +20,8 @@ export {
   AI_MODEL_INTENT_DEFINITIONS,
   AI_MODEL_INTENT_KEY,
   AI_MODEL_INTENT_KEY_VALUES,
+  AI_MODEL_MODALITY,
+  AI_MODEL_MODALITY_VALUES,
   AI_MODEL_TYPE,
   AI_MODEL_TYPE_VALUES,
   AI_PROVIDER_AUTH_MODE,
@@ -38,6 +41,7 @@ export const AiProviderEndpointModeSchema = z.enum(AI_PROVIDER_ENDPOINT_MODE_VAL
 export const AiProviderAuthModeSchema = z.enum(AI_PROVIDER_AUTH_MODE_VALUES)
 export const AiProviderSourceSchema = z.enum(AI_PROVIDER_SOURCE_VALUES)
 export const AiModelTypeSchema = z.enum(AI_MODEL_TYPE_VALUES)
+export const AiModelModalitySchema = z.enum(AI_MODEL_MODALITY_VALUES)
 export const AiModelCapabilitySchema = z.enum(AI_MODEL_CAPABILITY_VALUES)
 export const AiModelIntentKeySchema = z.enum(AI_MODEL_INTENT_KEY_VALUES)
 export const AiProviderCredentialStatusSchema = z.enum(AI_PROVIDER_CREDENTIAL_STATUS_VALUES)
@@ -97,6 +101,8 @@ export const AiProviderModelItemSchema = z.object({
   modelId: NonEmptyStringSchema,
   modelName: NonEmptyStringSchema,
   modelType: AiModelTypeSchema,
+  inputModalities: z.array(AiModelModalitySchema),
+  outputModalities: z.array(AiModelModalitySchema),
   capabilities: z.array(AiModelCapabilitySchema),
   contextWindow: OptionalLimitSchema,
   maxOutputTokens: OptionalLimitSchema,
@@ -116,6 +122,8 @@ export const AiAvailableModelOptionSchema = z.object({
   modelId: NonEmptyStringSchema,
   modelName: NonEmptyStringSchema,
   modelType: AiModelTypeSchema,
+  inputModalities: z.array(AiModelModalitySchema),
+  outputModalities: z.array(AiModelModalitySchema),
   capabilities: z.array(AiModelCapabilitySchema),
   selectable: z.boolean(),
   unavailableReason: z.string().trim().min(1).nullable(),
@@ -148,6 +156,7 @@ export type AiProviderEndpointMode = z.infer<typeof AiProviderEndpointModeSchema
 export type AiProviderAuthMode = z.infer<typeof AiProviderAuthModeSchema>
 export type AiProviderSource = z.infer<typeof AiProviderSourceSchema>
 export type AiModelType = z.infer<typeof AiModelTypeSchema>
+export type AiModelModality = z.infer<typeof AiModelModalitySchema>
 export type AiModelCapability = z.infer<typeof AiModelCapabilitySchema>
 export type AiModelIntentKey = z.infer<typeof AiModelIntentKeySchema>
 

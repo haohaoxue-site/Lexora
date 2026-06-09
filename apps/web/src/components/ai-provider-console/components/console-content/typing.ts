@@ -2,6 +2,7 @@ import type {
   AiProvider,
   AiProviderApiKeyForm,
   AiProviderEndpointForm,
+  AiProviderModelConfigure,
   AiProviderModelItem,
   AiProviderModelStatusChange,
   AiProviderRow,
@@ -35,4 +36,5 @@ export interface AiProviderConsoleContentEmits {
   openDiscoverModels: []
   openCreateModel: []
   updateModelStatus: Parameters<AiProviderModelStatusChange>
+  configureModel: Parameters<AiProviderModelConfigure>
 }

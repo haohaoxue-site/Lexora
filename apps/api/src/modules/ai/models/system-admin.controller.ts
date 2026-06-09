@@ -74,7 +74,9 @@ export class AiSystemAdminController {
 
   @RequirePermissions(PERMISSIONS.SYSTEM_ADMIN_AI_CONFIG_UPDATE)
   @Post('providers/:providerId/models/discover')
-  discoverModels(@Param('providerId') providerId: string): Promise<AiProviderModels> {
+  discoverModels(
+    @Param('providerId') providerId: string,
+  ): Promise<AiProviderModels> {
     return this.providerModelsService.discoverPlatformProviderModels(providerId)
   }
 

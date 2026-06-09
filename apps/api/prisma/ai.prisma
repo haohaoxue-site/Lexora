@@ -28,14 +28,24 @@ enum AiModelType {
   EMBEDDING
   RERANK
   IMAGE
+  AUDIO
+}
+
+enum AiModelModality {
+  TEXT
+  IMAGE
+  AUDIO
+  VIDEO
+  FILE
+  EMBEDDING
 }
 
 enum AiModelCapability {
   STREAMING
-  VISION
   TOOL_CALL
   REASONING
   JSON_MODE
+  STRUCTURED_OUTPUT
 }
 
 model AiProvider {
@@ -72,26 +82,48 @@ model AiProvider {
 }
 
 model AiProviderModel {
-  id              String              @id @default(uuid())
-  providerId      String
-  modelId         String
-  modelName       String
-  modelType       AiModelType
-  capabilities    AiModelCapability[]
-  contextWindow   Int?
-  maxOutputTokens Int?
-  enabled         Boolean             @default(true)
-  provider        AiProvider          @relation(fields: [providerId], references: [id], onDelete: Cascade)
-  createdAt       DateTime            @default(now())
-  updatedAt       DateTime            @updatedAt
-  updatedBy       String?
-  updatedByUser   User?               @relation("AiProviderModelUpdater", fields: [updatedBy], references: [id], onDelete: SetNull)
-  deletedAt       DateTime?
+  id                     String              @id @default(uuid())
+  providerId             String
+  modelId                String
+  modelName              String
+  modelType              AiModelType
+  inputModalities        AiModelModality[]
+  outputModalities       AiModelModality[]
+  capabilities           AiModelCapability[]
+  contextWindow          Int?
+  maxOutputTokens        Int?
+  capabilityConfiguredAt DateTime?
+  enabled                Boolean             @default(true)
+  provider               AiProvider          @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  createdAt              DateTime            @default(now())
+  updatedAt              DateTime            @updatedAt
+  updatedBy              String?
+  updatedByUser          User?               @relation("AiProviderModelUpdater", fields: [updatedBy], references: [id], onDelete: SetNull)
+  deletedAt              DateTime?
 
   @@unique([providerId, modelId])
   @@index([providerId, enabled])
   @@index([modelType])
   @@index([updatedBy])
+}
+
+model AiModelCapabilityDefault {
+  id               String              @id @default(uuid())
+  defaultsVersion  String
+  modelId          String
+  modelName        String
+  modelType        AiModelType
+  inputModalities  AiModelModality[]
+  outputModalities AiModelModality[]
+  capabilities     AiModelCapability[]
+  contextWindow    Int?
+  maxOutputTokens  Int?
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+
+  @@unique([modelId])
+  @@index([defaultsVersion])
+  @@index([modelType])
 }
 
 model AiDefaultModelPolicy {

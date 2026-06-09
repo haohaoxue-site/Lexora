@@ -5,6 +5,7 @@ import CompatibleProviderDialog from './components/compatible-provider-dialog'
 import ConsoleContent from './components/console-content'
 import CreateModelDialog from './components/create-model-dialog'
 import DiscoverModelsDialog from './components/discover-models-dialog'
+import ModelCapabilityDialog from './components/model-capability-dialog'
 import ProviderSidebar from './components/provider-sidebar'
 import { useAiProviderConsole } from './composables/useAiProviderConsole'
 
@@ -26,6 +27,7 @@ const {
   isDiscoveringModels,
   isAddingDiscoveredModels,
   isCreatingModel,
+  isSavingModelCapability,
   isUpdatingProviderStatus,
   isSavingEndpoint,
   isSavingApiKey,
@@ -36,11 +38,13 @@ const {
   editCompatibleProviderDialogVisible,
   discoverDialogVisible,
   createModelDialogVisible,
+  modelCapabilityDialogVisible,
   endpointForm,
   apiKeyForm,
   compatibleProviderCreateForm,
   compatibleProviderEditForm,
   createModelForm,
+  modelCapabilityForm,
   models,
   filteredDiscoveredModels,
   discoverSearchKeyword,
@@ -55,6 +59,7 @@ const {
   compatibleProviderCreateRules,
   compatibleProviderEditRules,
   createModelRules,
+  modelCapabilityRules,
   selectRow,
   openCreateCompatibleProviderDialog,
   createCompatibleProvider,
@@ -69,6 +74,8 @@ const {
   openCreateModelDialog,
   handleCreateModelIdInput,
   createModel,
+  openModelCapabilityDialog,
+  saveModelCapability,
   updateModelStatus,
   isModelUpdating,
   getProviderInitial,
@@ -122,6 +129,7 @@ const {
       @save-api-key="saveApiKey"
       @open-discover-models="openDiscoverModelsDialog"
       @open-create-model="openCreateModelDialog"
+      @configure-model="openModelCapabilityDialog"
       @update-model-status="updateModelStatus"
     />
 
@@ -156,7 +164,7 @@ const {
       :is-adding="isAddingDiscoveredModels"
       :is-model-updating="isModelUpdating"
       @add-all="addAllDiscoveredModels"
-      @refresh="refreshDiscoveredModels"
+      @refresh="refreshDiscoveredModels()"
       @update-model-status="updateModelStatus"
     />
 
@@ -168,6 +176,14 @@ const {
       :loading="isCreatingModel"
       @model-id-input="handleCreateModelIdInput"
       @submit="createModel"
+    />
+
+    <ModelCapabilityDialog
+      v-model:visible="modelCapabilityDialogVisible"
+      :form="modelCapabilityForm"
+      :rules="modelCapabilityRules"
+      :loading="isSavingModelCapability"
+      @submit="saveModelCapability"
     />
   </div>
 </template>

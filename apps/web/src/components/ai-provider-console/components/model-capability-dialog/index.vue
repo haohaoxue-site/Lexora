@@ -1,9 +1,8 @@
 <script setup lang="ts">
 import type { FormInstance } from 'element-plus'
-import type { AiProviderFormController } from '../../typing'
 import type {
-  AiProviderCreateModelDialogEmits,
-  AiProviderCreateModelDialogProps,
+  AiProviderModelCapabilityDialogEmits,
+  AiProviderModelCapabilityDialogProps,
 } from './typing'
 import { useTemplateRef } from 'vue'
 import {
@@ -12,43 +11,39 @@ import {
   AI_MODEL_TYPE_OPTIONS,
 } from '../../utils/modelDisplay'
 
-defineProps<AiProviderCreateModelDialogProps>()
+defineProps<AiProviderModelCapabilityDialogProps>()
 
-const emit = defineEmits<AiProviderCreateModelDialogEmits>()
+const emit = defineEmits<AiProviderModelCapabilityDialogEmits>()
 const visible = defineModel<boolean>('visible', { required: true })
 const formRef = useTemplateRef<FormInstance>('formRef')
 
-async function validate() {
-  return await formRef.value?.validate().catch(() => false) ?? false
+async function handleSubmit() {
+  const isValid = await formRef.value?.validate().catch(() => false)
+  if (isValid) {
+    emit('submit')
+  }
 }
-
-function clearValidate() {
-  formRef.value?.clearValidate()
-}
-
-defineExpose<AiProviderFormController>({
-  validate,
-  clearValidate,
-})
 </script>
 
 <template>
-  <ElDialog v-model="visible" title="添加模型" width="42rem">
+  <ElDialog
+    v-model="visible"
+    title="配置模型能力"
+    width="46rem"
+    class="ai-provider-console__model-capability-dialog"
+  >
     <ElForm
       ref="formRef"
       :model="form"
       :rules="rules"
-      label-width="7rem"
+      label-width="7.5rem"
+      class="ai-provider-console__model-capability-form"
     >
       <ElFormItem label="模型 ID" prop="modelId" required>
-        <ElInput
-          :model-value="form.modelId"
-          placeholder="例如：gpt-4.1"
-          @input="value => emit('modelIdInput', String(value))"
-        />
+        <ElInput v-model="form.modelId" disabled />
       </ElFormItem>
       <ElFormItem label="模型名称" prop="modelName">
-        <ElInput v-model="form.modelName" placeholder="例如：GPT-4.1" />
+        <ElInput v-model="form.modelName" />
       </ElFormItem>
       <ElFormItem label="模型用途" prop="modelType">
         <ElSelect v-model="form.modelType" class="w-full">
@@ -121,8 +116,8 @@ defineExpose<AiProviderFormController>({
       <ElButton @click="visible = false">
         取消
       </ElButton>
-      <ElButton type="primary" :loading="loading" @click="emit('submit')">
-        添加模型
+      <ElButton type="primary" :loading="loading" @click="handleSubmit">
+        保存配置
       </ElButton>
     </template>
   </ElDialog>

@@ -1,10 +1,17 @@
+import type { FormItemRule } from 'element-plus'
 import type { ComputedRef, MaybeRefOrGetter, Ref } from 'vue'
-import type { AiProviderConsoleMode, AiProviderFormController } from '../typing'
+import type {
+  AiProviderConsoleMode,
+  AiProviderCreateModelForm,
+  AiProviderFormController,
+  AiProviderModelCapabilityForm,
+} from '../typing'
 import type {
   AiProvider,
   AiProviderModelItem,
   UpsertAiProviderModelRequest,
 } from '@/apis/ai'
+import { AI_MODEL_CAPABILITY, AI_MODEL_MODALITY, AI_MODEL_TYPE } from '@haohaoxue/samepage-contracts/ai/constants'
 import { computed, nextTick, reactive, shallowRef, toValue } from 'vue'
 import {
   discoverPlatformAiProviderModels,
@@ -45,19 +52,30 @@ export function useAiProviderModels(options: UseAiProviderModelsOptions) {
   const isDiscoveringModels = shallowRef(false)
   const isAddingDiscoveredModels = shallowRef(false)
   const isCreatingModel = shallowRef(false)
+  const isSavingModelCapability = shallowRef(false)
   const discoverDialogVisible = shallowRef(false)
   const createModelDialogVisible = shallowRef(false)
+  const modelCapabilityDialogVisible = shallowRef(false)
+  const editingModel = shallowRef<AiProviderModelItem | null>(null)
   const updatingModelIds = shallowRef(new Set<string>())
 
-  const createModelForm = reactive({
-    modelId: '',
-    modelName: '',
-  })
+  const createModelForm = reactive<AiProviderCreateModelForm>(createDefaultModelForm())
+  const modelCapabilityForm = reactive<AiProviderModelCapabilityForm>(createDefaultModelForm())
 
-  const createModelRules = {
-    modelId: [{ required: true, message: '请输入模型 ID', trigger: 'blur' }],
-    modelName: [{ required: true, message: '请输入模型名称', trigger: 'blur' }],
+  const requiredListRule: FormItemRule = {
+    validator: (_rule, value: unknown, callback: (error?: Error) => void) => {
+      if (Array.isArray(value) && value.length > 0) {
+        callback()
+        return
+      }
+
+      callback(new Error('至少选择一项'))
+    },
+    trigger: 'change',
   }
+
+  const createModelRules = createModelFormRules(createModelForm)
+  const modelCapabilityRules = createModelFormRules(modelCapabilityForm)
 
   const totalModelCount = computed(() => models.value.length)
   const enabledModelCount = computed(() => models.value.filter(model => model.enabled).length)
@@ -136,7 +154,9 @@ export function useAiProviderModels(options: UseAiProviderModelsOptions) {
     await refreshDiscoveredModels({ showSuccessMessage: false })
   }
 
-  async function refreshDiscoveredModels(optionsOverride: { showSuccessMessage?: boolean } = {}) {
+  async function refreshDiscoveredModels(optionsOverride: {
+    showSuccessMessage?: boolean
+  } = {}) {
     const provider = options.selectedProvider.value
     if (!provider) {
       return
@@ -230,8 +250,7 @@ export function useAiProviderModels(options: UseAiProviderModelsOptions) {
   }
 
   function openCreateModelDialog() {
-    createModelForm.modelId = ''
-    createModelForm.modelName = ''
+    Object.assign(createModelForm, createDefaultModelForm())
     createModelDialogVisible.value = true
     void nextTick(() => options.createModelFormRef.value?.clearValidate())
   }
@@ -261,16 +280,8 @@ export function useAiProviderModels(options: UseAiProviderModelsOptions) {
 
     try {
       const item = currentMode() === 'platform'
-        ? await upsertPlatformAiProviderModel(provider.providerId, {
-            modelId: createModelForm.modelId.trim(),
-            modelName: createModelForm.modelName.trim(),
-            enabled: true,
-          })
-        : await upsertUserAiProviderModel(provider.providerId, {
-            modelId: createModelForm.modelId.trim(),
-            modelName: createModelForm.modelName.trim(),
-            enabled: true,
-          })
+        ? await upsertPlatformAiProviderModel(provider.providerId, buildFormModelPayload(createModelForm, true))
+        : await upsertUserAiProviderModel(provider.providerId, buildFormModelPayload(createModelForm, true))
 
       patchSavedModel(item)
       patchDiscoveredModel(item)
@@ -282,6 +293,62 @@ export function useAiProviderModels(options: UseAiProviderModelsOptions) {
     }
     finally {
       isCreatingModel.value = false
+    }
+  }
+
+  function openModelCapabilityDialog(model: AiProviderModelItem) {
+    editingModel.value = model
+    Object.assign(modelCapabilityForm, {
+      modelId: model.modelId,
+      modelName: model.modelName,
+      modelType: model.modelType,
+      inputModalities: [...model.inputModalities],
+      outputModalities: [...model.outputModalities],
+      capabilities: [...model.capabilities],
+      contextWindow: model.contextWindow,
+      maxOutputTokens: model.maxOutputTokens,
+    } satisfies AiProviderModelCapabilityForm)
+    modelCapabilityDialogVisible.value = true
+  }
+
+  async function saveModelCapability() {
+    const provider = options.selectedProvider.value
+    const model = editingModel.value
+    if (!provider || !model) {
+      return
+    }
+
+    const updateKey = getModelUpdateKey(model)
+    const nextUpdatingIds = new Set(updatingModelIds.value)
+    nextUpdatingIds.add(updateKey)
+    updatingModelIds.value = nextUpdatingIds
+    isSavingModelCapability.value = true
+
+    try {
+      const item = currentMode() === 'platform'
+        ? await upsertPlatformAiProviderModel(
+            provider.providerId,
+            buildFormModelPayload(modelCapabilityForm, model.enabled ?? false),
+          )
+        : await upsertUserAiProviderModel(
+            provider.providerId,
+            buildFormModelPayload(modelCapabilityForm, model.enabled ?? false),
+          )
+
+      patchSavedModel(item)
+      patchDiscoveredModel(item)
+      modelCapabilityDialogVisible.value = false
+      editingModel.value = null
+      ElMessage.success('模型配置已保存')
+    }
+    catch (error) {
+      ElMessage.error(getRequestErrorDisplayMessage(error, '保存模型配置失败'))
+    }
+    finally {
+      const nextIds = new Set(updatingModelIds.value)
+      nextIds.delete(updateKey)
+      updatingModelIds.value = nextIds
+      isSavingModelCapability.value = false
     }
   }
 
@@ -314,30 +381,127 @@ export function useAiProviderModels(options: UseAiProviderModelsOptions) {
       modelId: model.modelId,
       modelName: model.modelName,
       modelType: model.modelType,
+      inputModalities: model.inputModalities,
+      outputModalities: model.outputModalities,
       capabilities: model.capabilities,
+      contextWindow: model.contextWindow,
+      maxOutputTokens: model.maxOutputTokens,
       enabled,
-    }
-
-    if (model.contextWindow) {
-      payload.contextWindow = model.contextWindow
-    }
-    if (model.maxOutputTokens) {
-      payload.maxOutputTokens = model.maxOutputTokens
     }
 
     return payload
   }
 
+  function buildFormModelPayload(form: AiProviderModelCapabilityForm, enabled: boolean): UpsertAiProviderModelRequest {
+    const payload: UpsertAiProviderModelRequest = {
+      modelId: form.modelId.trim(),
+      modelName: form.modelName.trim(),
+      modelType: form.modelType,
+      inputModalities: [...form.inputModalities],
+      outputModalities: [...form.outputModalities],
+      capabilities: [...form.capabilities],
+      contextWindow: form.contextWindow,
+      maxOutputTokens: form.maxOutputTokens,
+      enabled,
+    }
+
+    return payload
+  }
+
+  function createDefaultModelForm(): AiProviderCreateModelForm {
+    return {
+      modelId: '',
+      modelName: '',
+      modelType: AI_MODEL_TYPE.CHAT,
+      inputModalities: [AI_MODEL_MODALITY.TEXT],
+      outputModalities: [AI_MODEL_MODALITY.TEXT],
+      capabilities: [AI_MODEL_CAPABILITY.STREAMING],
+      contextWindow: null,
+      maxOutputTokens: null,
+    }
+  }
+
   function sortModels(items: AiProviderModelItem[]) {
     return [...items].sort((left, right) =>
-      left.modelType.localeCompare(right.modelType)
-      || left.modelName.localeCompare(right.modelName)
+      left.modelName.localeCompare(right.modelName)
       || left.modelId.localeCompare(right.modelId),
     )
   }
 
   function currentMode() {
     return toValue(options.mode)
+  }
+
+  function createModelFormRules(form: AiProviderCreateModelForm | AiProviderModelCapabilityForm) {
+    return {
+      modelId: [{ required: true, message: '请输入模型 ID', trigger: 'blur' }],
+      modelName: [{ required: true, message: '请输入模型名称', trigger: 'blur' }],
+      modelType: [{ required: true, message: '请选择模型类型', trigger: 'change' }],
+      inputModalities: [requiredListRule, createModelModalitiesRule(form, 'input')],
+      outputModalities: [requiredListRule, createModelModalitiesRule(form, 'output')],
+      contextWindow: [createModelLimitRule(form)],
+      maxOutputTokens: [createModelLimitRule(form)],
+    }
+  }
+
+  function createModelModalitiesRule(
+    form: AiProviderCreateModelForm | AiProviderModelCapabilityForm,
+    target: 'input' | 'output',
+  ): FormItemRule {
+    return {
+      validator: (_rule, _value: unknown, callback: (error?: Error) => void) => {
+        const errorMessage = validateModelModalities(form, target)
+        callback(errorMessage ? new Error(errorMessage) : undefined)
+      },
+      trigger: 'change',
+    }
+  }
+
+  function createModelLimitRule(form: AiProviderCreateModelForm | AiProviderModelCapabilityForm): FormItemRule {
+    return {
+      validator: (_rule, _value: unknown, callback: (error?: Error) => void) => {
+        if (form.contextWindow !== null && form.maxOutputTokens !== null && form.maxOutputTokens > form.contextWindow) {
+          callback(new Error('最大输出不能大于上下文窗口'))
+          return
+        }
+
+        callback()
+      },
+      trigger: 'change',
+    }
+  }
+
+  function validateModelModalities(
+    form: AiProviderCreateModelForm | AiProviderModelCapabilityForm,
+    target: 'input' | 'output',
+  ) {
+    if (form.modelType === AI_MODEL_TYPE.CHAT) {
+      return requireModality(form, target, AI_MODEL_MODALITY.TEXT, target === 'input' ? '对话生成模型必须支持文本输入' : '对话生成模型必须支持文本输出')
+    }
+    if (form.modelType === AI_MODEL_TYPE.EMBEDDING) {
+      return requireModality(form, target, target === 'input' ? AI_MODEL_MODALITY.TEXT : AI_MODEL_MODALITY.EMBEDDING, target === 'input' ? '向量模型必须支持文本输入' : '向量模型必须输出向量')
+    }
+    if (form.modelType === AI_MODEL_TYPE.RERANK) {
+      return requireModality(form, target, AI_MODEL_MODALITY.TEXT, target === 'input' ? '重排模型必须支持文本输入' : '重排模型必须输出文本相关结果')
+    }
+    if (form.modelType === AI_MODEL_TYPE.IMAGE && target === 'output') {
+      return requireModality(form, target, AI_MODEL_MODALITY.IMAGE, '图像模型必须输出图像')
+    }
+    if (form.modelType === AI_MODEL_TYPE.AUDIO && !form.inputModalities.includes(AI_MODEL_MODALITY.AUDIO) && !form.outputModalities.includes(AI_MODEL_MODALITY.AUDIO)) {
+      return '音频模型必须支持音频输入或音频输出'
+    }
+
+    return null
+  }
+
+  function requireModality(
+    form: AiProviderCreateModelForm | AiProviderModelCapabilityForm,
+    target: 'input' | 'output',
+    modality: typeof AI_MODEL_MODALITY[keyof typeof AI_MODEL_MODALITY],
+    message: string,
+  ) {
+    const modalities = target === 'input' ? form.inputModalities : form.outputModalities
+    return modalities.includes(modality) ? null : message
   }
 
   return {
@@ -349,11 +513,15 @@ export function useAiProviderModels(options: UseAiProviderModelsOptions) {
     isDiscoveringModels,
     isAddingDiscoveredModels,
     isCreatingModel,
+    isSavingModelCapability,
     discoverDialogVisible,
     createModelDialogVisible,
+    modelCapabilityDialogVisible,
     updatingModelIds,
     createModelForm,
+    modelCapabilityForm,
     createModelRules,
+    modelCapabilityRules,
     totalModelCount,
     enabledModelCount,
     discoverModelsButtonText,
@@ -367,6 +535,8 @@ export function useAiProviderModels(options: UseAiProviderModelsOptions) {
     openCreateModelDialog,
     handleCreateModelIdInput,
     createModel,
+    openModelCapabilityDialog,
+    saveModelCapability,
     updateModelStatus,
     isModelUpdating,
   }

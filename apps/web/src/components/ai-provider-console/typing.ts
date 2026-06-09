@@ -1,5 +1,8 @@
 import type { FormRules } from 'element-plus'
 import type {
+  AiModelCapability,
+  AiModelModality,
+  AiModelType,
   AiProvider,
   AiProviderModelItem,
   AiProviderPreset,
@@ -41,10 +44,18 @@ export interface AiCompatibleProviderEditForm extends AiCompatibleProviderForm {
   providerId: string
 }
 
-export interface AiProviderCreateModelForm {
+export interface AiProviderModelCapabilityForm {
   modelId: string
   modelName: string
+  modelType: AiModelType
+  inputModalities: AiModelModality[]
+  outputModalities: AiModelModality[]
+  capabilities: AiModelCapability[]
+  contextWindow: number | null
+  maxOutputTokens: number | null
 }
+
+export type AiProviderCreateModelForm = AiProviderModelCapabilityForm
 
 export type AiProviderFormRules = FormRules
 
@@ -53,6 +64,10 @@ export type AiProviderStatusType = 'success' | 'info'
 export type AiProviderModelStatusChange = (
   model: AiProviderModelItem,
   value: string | number | boolean,
+) => void | Promise<void>
+
+export type AiProviderModelConfigure = (
+  model: AiProviderModelItem,
 ) => void | Promise<void>
 
 export type AiProviderRowCommand = 'edit' | 'delete'

@@ -6,6 +6,7 @@
     "experimentalDecorators": true,
     "module": "ESNext",
     "moduleResolution": "bundler",
+    "resolveJsonModule": true,
     "resolvePackageJsonExports": true,
     "strictBindCallApply": false,
     "strictNullChecks": true,

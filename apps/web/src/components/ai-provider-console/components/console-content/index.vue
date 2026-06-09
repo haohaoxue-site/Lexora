@@ -39,6 +39,7 @@ const emits = defineEmits<AiProviderConsoleContentEmits>()
         :is-model-updating="props.isModelUpdating"
         @open-discover-models="emits('openDiscoverModels')"
         @open-create-model="emits('openCreateModel')"
+        @configure-model="model => emits('configureModel', model)"
         @update-model-status="(model, value) => emits('updateModelStatus', model, value)"
       />
     </template>

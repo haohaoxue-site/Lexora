@@ -1,0 +1,1989 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-06-09T03:36:51.354Z",
+  "models": [
+    {
+      "modelId": "openai/gpt-5.5",
+      "modelName": "OpenAI: GPT-5.5",
+      "modelType": "chat",
+      "inputModalities": [
+        "file",
+        "image",
+        "text"
+      ],
+      "outputModalities": [
+        "text"
+      ],
+      "capabilities": [
+        "json_mode",
+        "reasoning",
+        "structured_output",
+        "tool_call"
+      ],
+      "limits": {
+        "contextWindow": 1050000,
+        "maxOutputTokens": 128000
+      }
+    },
+    {
+      "modelId": "openai/gpt-5.5-pro",
+      "modelName": "OpenAI: GPT-5.5 Pro",
+      "modelType": "chat",
+      "inputModalities": [
+        "file",
+        "image",
+        "text"
+      ],
+      "outputModalities": [
+        "text"
+      ],
+      "capabilities": [
+        "json_mode",
+        "reasoning",
+        "structured_output",
+        "tool_call"
+      ],
+      "limits": {
+        "contextWindow": 1050000,
+        "maxOutputTokens": 128000
+      }
+    },
+    {
+      "modelId": "openai/gpt-5.4",
+      "modelName": "OpenAI: GPT-5.4",
+      "modelType": "chat",
+      "inputModalities": [
+        "file",
+        "image",
+        "text"
+      ],
+      "outputModalities": [
+        "text"
+      ],
+      "capabilities": [
+        "json_mode",
+        "reasoning",
+        "structured_output",
+        "tool_call"
+      ],
+      "limits": {
+        "contextWindow": 1050000,
+        "maxOutputTokens": 128000
+      }
+    },
+    {
+      "modelId": "openai/gpt-5.4-mini",
+      "modelName": "OpenAI: GPT-5.4 Mini",
+      "modelType": "chat",
+      "inputModalities": [
+        "file",
+        "image",
+        "text"
+      ],
+      "outputModalities": [
+        "text"
+      ],
+      "capabilities": [
+        "json_mode",
+        "reasoning",
+        "structured_output",
+        "tool_call"
+      ],
+      "limits": {
+        "contextWindow": 400000,
+        "maxOutputTokens": 128000
+      }
+    },
+    {
+      "modelId": "openai/gpt-5.4-nano",
+      "modelName": "OpenAI: GPT-5.4 Nano",
+      "modelType": "chat",
+      "inputModalities": [
+        "file",
+        "image",
+        "text"
+      ],
+      "outputModalities": [
+        "text"
+      ],
+      "capabilities": [
+        "json_mode",
+        "reasoning",
+        "structured_output",
+        "tool_call"
+      ],
+      "limits": {
+        "contextWindow": 400000,
+        "maxOutputTokens": 128000
+      }
+    },
+    {
+      "modelId": "openai/gpt-5.4-pro",
+      "modelName": "OpenAI: GPT-5.4 Pro",
+      "modelType": "chat",
+      "inputModalities": [
+        "file",
+        "image",
+        "text"
+      ],
+      "outputModalities": [
+        "text"
+      ],
+      "capabilities": [
+        "json_mode",
+        "reasoning",
+        "structured_output",
+        "tool_call"
+      ],
+      "limits": {
+        "contextWindow": 1050000,
+        "maxOutputTokens": 128000
+      }
+    },
+    {
+      "modelId": "openai/gpt-5.3-chat",
+      "modelName": "OpenAI: GPT-5.3 Chat",
+      "modelType": "chat",
+      "inputModalities": [
+        "file",
+        "image",
+        "text"
+      ],
+      "outputModalities": [
+        "text"
+      ],
+      "capabilities": [
+        "json_mode",
+        "structured_output",
+        "tool_call"
+      ],
+      "limits": {
+        "contextWindow": 128000,
+        "maxOutputTokens": 16384
+      }
+    },
+    {
+      "modelId": "openai/gpt-5.3-codex",
+      "modelName": "OpenAI: GPT-5.3-Codex",
+      "modelType": "chat",
+      "inputModalities": [
+        "file",
+        "image",
+        "text"
+      ],
+      "outputModalities": [
+        "text"
+      ],
+      "capabilities": [
+        "json_mode",
+        "reasoning",
+        "structured_output",
+        "tool_call"
+      ],
+      "limits": {
+        "contextWindow": 400000,
+        "maxOutputTokens": 128000
+      }
+    },
+    {
+      "modelId": "openai/gpt-5.2",
+      "modelName": "OpenAI: GPT-5.2",
+      "modelType": "chat",
+      "inputModalities": [
+        "file",
+        "image",
+        "text"
+      ],
+      "outputModalities": [
+        "text"
+      ],
+      "capabilities": [
+        "json_mode",
+        "reasoning",
+        "structured_output",
+        "tool_call"
+      ],
+      "limits": {
+        "contextWindow": 400000,
+        "maxOutputTokens": 128000
+      }
+    },
+    {
+      "modelId": "openai/gpt-5.2-chat",
+      "modelName": "OpenAI: GPT-5.2 Chat",
+      "modelType": "chat",
+      "inputModalities": [
+        "file",
+        "image",
+        "text"
+      ],
+      "outputModalities": [
+        "text"
+      ],
+      "capabilities": [
+        "json_mode",
+        "structured_output",
+        "tool_call"
+      ],
+      "limits": {
+        "contextWindow": 128000,
+        "maxOutputTokens": 16384
+      }
+    },
+    {
+      "modelId": "google/gemma-4-31b-it",
+      "modelName": "Google: Gemma 4 31B",
+      "modelType": "chat",
+      "inputModalities": [
+        "image",
+        "text",
+        "video"
+      ],
+      "outputModalities": [
+        "text"
+      ],
+      "capabilities": [
+        "json_mode",
+        "reasoning",
+        "structured_output",
+        "tool_call"
+      ],
+      "limits": {
+        "contextWindow": 262144,
+        "maxOutputTokens": 8192
+      }
+    },
+    {
+      "modelId": "meta-llama/llama-4-maverick",
+      "modelName": "Meta: Llama 4 Maverick",
+      "modelType": "chat",
+      "inputModalities": [
+        "image",
+        "text"
+      ],
+      "outputModalities": [
+        "text"
+      ],
+      "capabilities": [
+        "json_mode",
+        "structured_output",
+        "tool_call"
+      ],
+      "limits": {
+        "contextWindow": 1048576,
+        "maxOutputTokens": 16384
+      }
+    },
+    {
+      "modelId": "meta-llama/llama-4-scout",
+      "modelName": "Meta: Llama 4 Scout",
+      "modelType": "chat",
+      "inputModalities": [
+        "image",
+        "text"
+      ],
+      "outputModalities": [
+        "text"
+      ],
+      "capabilities": [
+        "json_mode",
+        "structured_output",
+        "tool_call"
+      ],
+      "limits": {
+        "contextWindow": 10000000,
+        "maxOutputTokens": 16384
+      }
+    },
+    {
+      "modelId": "google/gemma-3-27b-it",
+      "modelName": "Google: Gemma 3 27B",
+      "modelType": "chat",
+      "inputModalities": [
+        "image",
+        "text"
+      ],
+      "outputModalities": [
+        "text"
+      ],
+      "capabilities": [
+        "json_mode",
+        "structured_output",
+        "tool_call"
+      ],
+      "limits": {
+        "contextWindow": 131072,
+        "maxOutputTokens": 16384
+      }
+    },
+    {
+      "modelId": "qwen/qwen3.5-plus-20260420",
+      "modelName": "Qwen: Qwen3.5 Plus 2026-04-20",
+      "modelType": "chat",
+      "inputModalities": [
+        "image",
+        "text",
+        "video"
+      ],
+      "outputModalities": [
+        "text"
+      ],
+      "capabilities": [
+        "json_mode",
+        "reasoning",
+        "structured_output",
+        "tool_call"
+      ],
+      "limits": {
+        "contextWindow": 1000000,
+        "maxOutputTokens": 65536
+      }
+    },
+    {
+      "modelId": "google/gemma-3-12b-it",
+      "modelName": "Google: Gemma 3 12B",
+      "modelType": "chat",
+      "inputModalities": [
+        "image",
+        "text"
+      ],
+      "outputModalities": [
+        "text"
+      ],
+      "capabilities": [
+        "json_mode",
+        "structured_output",
+        "tool_call"
+      ],
+      "limits": {
+        "contextWindow": 131072,
+        "maxOutputTokens": 16384
+      }
+    },
+    {
+      "modelId": "qwen/qwen3.7-plus",
+      "modelName": "Qwen: Qwen3.7 Plus",
+      "modelType": "chat",
+      "inputModalities": [
+        "image",
+        "text"
+      ],
+      "outputModalities": [
+        "text"
+      ],
+      "capabilities": [
+        "json_mode",
+        "reasoning",
+        "structured_output",
+        "tool_call"
+      ],
+      "limits": {
+        "contextWindow": 1000000,
+        "maxOutputTokens": 65536
+      }
+    },
+    {
+      "modelId": "qwen/qwen3.6-27b",
+      "modelName": "Qwen: Qwen3.6 27B",
+      "modelType": "chat",
+      "inputModalities": [
+        "image",
+        "text",
+        "video"
+      ],
+      "outputModalities": [
+        "text"
+      ],
+      "capabilities": [
+        "json_mode",
+        "reasoning",
+        "structured_output",
+        "tool_call"
+      ],
+      "limits": {
+        "contextWindow": 262144,
+        "maxOutputTokens": 131072
+      }
+    },
+    {
+      "modelId": "qwen/qwen3.6-35b-a3b",
+      "modelName": "Qwen: Qwen3.6 35B A3B",
+      "modelType": "chat",
+      "inputModalities": [
+        "image",
+        "text",
+        "video"
+      ],
+      "outputModalities": [
+        "text"
+      ],
+      "capabilities": [
+        "json_mode",
+        "reasoning",
+        "structured_output",
+        "tool_call"
+      ],
+      "limits": {
+        "contextWindow": 262144,
+        "maxOutputTokens": 262140
+      }
+    },
+    {
+      "modelId": "qwen/qwen3.6-flash",
+      "modelName": "Qwen: Qwen3.6 Flash",
+      "modelType": "chat",
+      "inputModalities": [
+        "image",
+        "text",
+        "video"
+      ],
+      "outputModalities": [
+        "text"
+      ],
+      "capabilities": [
+        "json_mode",
+        "reasoning",
+        "structured_output",
+        "tool_call"
+      ],
+      "limits": {
+        "contextWindow": 1000000,
+        "maxOutputTokens": 65536
+      }
+    },
+    {
+      "modelId": "qwen/qwen3.6-plus",
+      "modelName": "Qwen: Qwen3.6 Plus",
+      "modelType": "chat",
+      "inputModalities": [
+        "image",
+        "text",
+        "video"
+      ],
+      "outputModalities": [
+        "text"
+      ],
+      "capabilities": [
+        "json_mode",
+        "reasoning",
+        "structured_output",
+        "tool_call"
+      ],
+      "limits": {
+        "contextWindow": 1000000,
+        "maxOutputTokens": 65536
+      }
+    },
+    {
+      "modelId": "google/gemini-3.5-flash",
+      "modelName": "Google: Gemini 3.5 Flash",
+      "modelType": "chat",
+      "inputModalities": [
+        "audio",
+        "file",
+        "image",
+        "text",
+        "video"
+      ],
+      "outputModalities": [
+        "text"
+      ],
+      "capabilities": [
+        "json_mode",
+        "reasoning",
+        "structured_output",
+        "tool_call"
+      ],
+      "limits": {
+        "contextWindow": 1048576,
+        "maxOutputTokens": 65536
+      }
+    },
+    {
+      "modelId": "qwen/qwen3.5-122b-a10b",
+      "modelName": "Qwen: Qwen3.5-122B-A10B",
+      "modelType": "chat",
+      "inputModalities": [
+        "image",
+        "text",
+        "video"
+      ],
+      "outputModalities": [
+        "text"
+      ],
+      "capabilities": [
+        "json_mode",
+        "reasoning",
+        "structured_output",
+        "tool_call"
+      ],
+      "limits": {
+        "contextWindow": 262144,
+        "maxOutputTokens": 262144
+      }
+    },
+    {
+      "modelId": "qwen/qwen3.5-27b",
+      "modelName": "Qwen: Qwen3.5-27B",
+      "modelType": "chat",
+      "inputModalities": [
+        "image",
+        "text",
+        "video"
+      ],
+      "outputModalities": [
+        "text"
+      ],
+      "capabilities": [
+        "json_mode",
+        "reasoning",
+        "structured_output",
+        "tool_call"
+      ],
+      "limits": {
+        "contextWindow": 262144,
+        "maxOutputTokens": 65536
+      }
+    },
+    {
+      "modelId": "qwen/qwen3.5-35b-a3b",
+      "modelName": "Qwen: Qwen3.5-35B-A3B",
+      "modelType": "chat",
+      "inputModalities": [
+        "image",
+        "text",
+        "video"
+      ],
+      "outputModalities": [
+        "text"
+      ],
+      "capabilities": [
+        "json_mode",
+        "reasoning",
+        "structured_output",
+        "tool_call"
+      ],
+      "limits": {
+        "contextWindow": 262144,
+        "maxOutputTokens": 262144
+      }
+    },
+    {
+      "modelId": "qwen/qwen3.5-397b-a17b",
+      "modelName": "Qwen: Qwen3.5 397B A17B",
+      "modelType": "chat",
+      "inputModalities": [
+        "image",
+        "text",
+        "video"
+      ],
+      "outputModalities": [
+        "text"
+      ],
+      "capabilities": [
+        "json_mode",
+        "reasoning",
+        "structured_output",
+        "tool_call"
+      ],
+      "limits": {
+        "contextWindow": 262144,
+        "maxOutputTokens": 65536
+      }
+    },
+    {
+      "modelId": "google/gemini-3.1-flash-lite",
+      "modelName": "Google: Gemini 3.1 Flash Lite",
+      "modelType": "chat",
+      "inputModalities": [
+        "audio",
+        "file",
+        "image",
+        "text",
+        "video"
+      ],
+      "outputModalities": [
+        "text"
+      ],
+      "capabilities": [
+        "json_mode",
+        "reasoning",
+        "structured_output",
+        "tool_call"
+      ],
+      "limits": {
+        "contextWindow": 1048576,
+        "maxOutputTokens": 65536
+      }
+    },
+    {
+      "modelId": "google/gemini-2.5-flash",
+      "modelName": "Google: Gemini 2.5 Flash",
+      "modelType": "chat",
+      "inputModalities": [
+        "audio",
+        "file",
+        "image",
+        "text",
+        "video"
+      ],
+      "outputModalities": [
+        "text"
+      ],
+      "capabilities": [
+        "json_mode",
+        "reasoning",
+        "structured_output",
+        "tool_call"
+      ],
+      "limits": {
+        "contextWindow": 1048576,
+        "maxOutputTokens": 65535
+      }
+    },
+    {
+      "modelId": "google/gemini-2.5-flash-lite",
+      "modelName": "Google: Gemini 2.5 Flash Lite",
+      "modelType": "chat",
+      "inputModalities": [
+        "audio",
+        "file",
+        "image",
+        "text",
+        "video"
+      ],
+      "outputModalities": [
+        "text"
+      ],
+      "capabilities": [
+        "json_mode",
+        "reasoning",
+        "structured_output",
+        "tool_call"
+      ],
+      "limits": {
+        "contextWindow": 1048576,
+        "maxOutputTokens": 65535
+      }
+    },
+    {
+      "modelId": "google/gemini-2.5-pro",
+      "modelName": "Google: Gemini 2.5 Pro",
+      "modelType": "chat",
+      "inputModalities": [
+        "audio",
+        "file",
+        "image",
+        "text",
+        "video"
+      ],
+      "outputModalities": [
+        "text"
+      ],
+      "capabilities": [
+        "json_mode",
+        "reasoning",
+        "structured_output",
+        "tool_call"
+      ],
+      "limits": {
+        "contextWindow": 1048576,
+        "maxOutputTokens": 65536
+      }
+    },
+    {
+      "modelId": "anthropic/claude-haiku-4.5",
+      "modelName": "Anthropic: Claude Haiku 4.5",
+      "modelType": "chat",
+      "inputModalities": [
+        "file",
+        "image",
+        "text"
+      ],
+      "outputModalities": [
+        "text"
+      ],
+      "capabilities": [
+        "json_mode",
+        "reasoning",
+        "structured_output",
+        "tool_call"
+      ],
+      "limits": {
+        "contextWindow": 200000,
+        "maxOutputTokens": 64000
+      }
+    },
+    {
+      "modelId": "anthropic/claude-opus-4.1",
+      "modelName": "Anthropic: Claude Opus 4.1",
+      "modelType": "chat",
+      "inputModalities": [
+        "file",
+        "image",
+        "text"
+      ],
+      "outputModalities": [
+        "text"
+      ],
+      "capabilities": [
+        "json_mode",
+        "reasoning",
+        "structured_output",
+        "tool_call"
+      ],
+      "limits": {
+        "contextWindow": 200000,
+        "maxOutputTokens": 32000
+      }
+    },
+    {
+      "modelId": "anthropic/claude-opus-4.5",
+      "modelName": "Anthropic: Claude Opus 4.5",
+      "modelType": "chat",
+      "inputModalities": [
+        "file",
+        "image",
+        "text"
+      ],
+      "outputModalities": [
+        "text"
+      ],
+      "capabilities": [
+        "json_mode",
+        "reasoning",
+        "structured_output",
+        "tool_call"
+      ],
+      "limits": {
+        "contextWindow": 200000,
+        "maxOutputTokens": 64000
+      }
+    },
+    {
+      "modelId": "anthropic/claude-opus-4.6",
+      "modelName": "Anthropic: Claude Opus 4.6",
+      "modelType": "chat",
+      "inputModalities": [
+        "file",
+        "image",
+        "text"
+      ],
+      "outputModalities": [
+        "text"
+      ],
+      "capabilities": [
+        "json_mode",
+        "reasoning",
+        "structured_output",
+        "tool_call"
+      ],
+      "limits": {
+        "contextWindow": 1000000,
+        "maxOutputTokens": 128000
+      }
+    },
+    {
+      "modelId": "anthropic/claude-opus-4.7",
+      "modelName": "Anthropic: Claude Opus 4.7",
+      "modelType": "chat",
+      "inputModalities": [
+        "file",
+        "image",
+        "text"
+      ],
+      "outputModalities": [
+        "text"
+      ],
+      "capabilities": [
+        "json_mode",
+        "reasoning",
+        "structured_output",
+        "tool_call"
+      ],
+      "limits": {
+        "contextWindow": 1000000,
+        "maxOutputTokens": 128000
+      }
+    },
+    {
+      "modelId": "anthropic/claude-opus-4.8",
+      "modelName": "Anthropic: Claude Opus 4.8",
+      "modelType": "chat",
+      "inputModalities": [
+        "file",
+        "image",
+        "text"
+      ],
+      "outputModalities": [
+        "text"
+      ],
+      "capabilities": [
+        "json_mode",
+        "reasoning",
+        "structured_output",
+        "tool_call"
+      ],
+      "limits": {
+        "contextWindow": 1000000,
+        "maxOutputTokens": 128000
+      }
+    },
+    {
+      "modelId": "anthropic/claude-sonnet-4.5",
+      "modelName": "Anthropic: Claude Sonnet 4.5",
+      "modelType": "chat",
+      "inputModalities": [
+        "file",
+        "image",
+        "text"
+      ],
+      "outputModalities": [
+        "text"
+      ],
+      "capabilities": [
+        "json_mode",
+        "reasoning",
+        "structured_output",
+        "tool_call"
+      ],
+      "limits": {
+        "contextWindow": 1000000,
+        "maxOutputTokens": 64000
+      }
+    },
+    {
+      "modelId": "anthropic/claude-sonnet-4.6",
+      "modelName": "Anthropic: Claude Sonnet 4.6",
+      "modelType": "chat",
+      "inputModalities": [
+        "file",
+        "image",
+        "text"
+      ],
+      "outputModalities": [
+        "text"
+      ],
+      "capabilities": [
+        "json_mode",
+        "reasoning",
+        "structured_output",
+        "tool_call"
+      ],
+      "limits": {
+        "contextWindow": 1000000,
+        "maxOutputTokens": 128000
+      }
+    },
+    {
+      "modelId": "mistralai/mistral-small-3.2-24b-instruct",
+      "modelName": "Mistral: Mistral Small 3.2 24B",
+      "modelType": "chat",
+      "inputModalities": [
+        "image",
+        "text"
+      ],
+      "outputModalities": [
+        "text"
+      ],
+      "capabilities": [
+        "json_mode",
+        "structured_output",
+        "tool_call"
+      ],
+      "limits": {
+        "contextWindow": 128000,
+        "maxOutputTokens": 16384
+      }
+    },
+    {
+      "modelId": "meta-llama/llama-3.3-70b-instruct",
+      "modelName": "Meta: Llama 3.3 70B Instruct",
+      "modelType": "chat",
+      "inputModalities": [
+        "text"
+      ],
+      "outputModalities": [
+        "text"
+      ],
+      "capabilities": [
+        "json_mode",
+        "structured_output",
+        "tool_call"
+      ],
+      "limits": {
+        "contextWindow": 131072,
+        "maxOutputTokens": 16384
+      }
+    },
+    {
+      "modelId": "openai/gpt-audio",
+      "modelName": "OpenAI: GPT Audio",
+      "modelType": "audio",
+      "inputModalities": [
+        "audio",
+        "text"
+      ],
+      "outputModalities": [
+        "audio",
+        "text"
+      ],
+      "capabilities": [
+        "json_mode",
+        "structured_output",
+        "tool_call"
+      ],
+      "limits": {
+        "contextWindow": 128000,
+        "maxOutputTokens": 16384
+      }
+    },
+    {
+      "modelId": "openai/gpt-audio-mini",
+      "modelName": "OpenAI: GPT Audio Mini",
+      "modelType": "audio",
+      "inputModalities": [
+        "audio",
+        "text"
+      ],
+      "outputModalities": [
+        "audio",
+        "text"
+      ],
+      "capabilities": [
+        "json_mode",
+        "structured_output",
+        "tool_call"
+      ],
+      "limits": {
+        "contextWindow": 128000,
+        "maxOutputTokens": 16384
+      }
+    },
+    {
+      "modelId": "deepseek/deepseek-chat",
+      "modelName": "DeepSeek: DeepSeek V3",
+      "modelType": "chat",
+      "inputModalities": [
+        "text"
+      ],
+      "outputModalities": [
+        "text"
+      ],
+      "capabilities": [
+        "json_mode",
+        "structured_output",
+        "tool_call"
+      ],
+      "limits": {
+        "contextWindow": 131072,
+        "maxOutputTokens": 16000
+      }
+    },
+    {
+      "modelId": "deepseek/deepseek-chat-v3-0324",
+      "modelName": "DeepSeek: DeepSeek V3 0324",
+      "modelType": "chat",
+      "inputModalities": [
+        "text"
+      ],
+      "outputModalities": [
+        "text"
+      ],
+      "capabilities": [
+        "json_mode",
+        "structured_output",
+        "tool_call"
+      ],
+      "limits": {
+        "contextWindow": 163840,
+        "maxOutputTokens": 16384
+      }
+    },
+    {
+      "modelId": "deepseek/deepseek-chat-v3.1",
+      "modelName": "DeepSeek: DeepSeek V3.1",
+      "modelType": "chat",
+      "inputModalities": [
+        "text"
+      ],
+      "outputModalities": [
+        "text"
+      ],
+      "capabilities": [
+        "json_mode",
+        "reasoning",
+        "structured_output",
+        "tool_call"
+      ],
+      "limits": {
+        "contextWindow": 163840,
+        "maxOutputTokens": 32768
+      }
+    },
+    {
+      "modelId": "deepseek/deepseek-r1",
+      "modelName": "DeepSeek: R1",
+      "modelType": "chat",
+      "inputModalities": [
+        "text"
+      ],
+      "outputModalities": [
+        "text"
+      ],
+      "capabilities": [
+        "json_mode",
+        "reasoning",
+        "structured_output",
+        "tool_call"
+      ],
+      "limits": {
+        "contextWindow": 163840,
+        "maxOutputTokens": 16000
+      }
+    },
+    {
+      "modelId": "deepseek/deepseek-r1-0528",
+      "modelName": "DeepSeek: R1 0528",
+      "modelType": "chat",
+      "inputModalities": [
+        "text"
+      ],
+      "outputModalities": [
+        "text"
+      ],
+      "capabilities": [
+        "json_mode",
+        "reasoning",
+        "structured_output",
+        "tool_call"
+      ],
+      "limits": {
+        "contextWindow": 163840,
+        "maxOutputTokens": 32768
+      }
+    },
+    {
+      "modelId": "deepseek/deepseek-v3.1-terminus",
+      "modelName": "DeepSeek: DeepSeek V3.1 Terminus",
+      "modelType": "chat",
+      "inputModalities": [
+        "text"
+      ],
+      "outputModalities": [
+        "text"
+      ],
+      "capabilities": [
+        "json_mode",
+        "reasoning",
+        "structured_output",
+        "tool_call"
+      ],
+      "limits": {
+        "contextWindow": 163840,
+        "maxOutputTokens": 32768
+      }
+    },
+    {
+      "modelId": "deepseek/deepseek-v3.2",
+      "modelName": "DeepSeek: DeepSeek V3.2",
+      "modelType": "chat",
+      "inputModalities": [
+        "text"
+      ],
+      "outputModalities": [
+        "text"
+      ],
+      "capabilities": [
+        "json_mode",
+        "reasoning",
+        "structured_output",
+        "tool_call"
+      ],
+      "limits": {
+        "contextWindow": 131072,
+        "maxOutputTokens": 64000
+      }
+    },
+    {
+      "modelId": "deepseek/deepseek-v4-flash",
+      "modelName": "DeepSeek: DeepSeek V4 Flash",
+      "modelType": "chat",
+      "inputModalities": [
+        "text"
+      ],
+      "outputModalities": [
+        "text"
+      ],
+      "capabilities": [
+        "json_mode",
+        "reasoning",
+        "structured_output",
+        "tool_call"
+      ],
+      "limits": {
+        "contextWindow": 1048576,
+        "maxOutputTokens": 131072
+      }
+    },
+    {
+      "modelId": "deepseek/deepseek-v4-pro",
+      "modelName": "DeepSeek: DeepSeek V4 Pro",
+      "modelType": "chat",
+      "inputModalities": [
+        "text"
+      ],
+      "outputModalities": [
+        "text"
+      ],
+      "capabilities": [
+        "json_mode",
+        "reasoning",
+        "structured_output",
+        "tool_call"
+      ],
+      "limits": {
+        "contextWindow": 1048576,
+        "maxOutputTokens": 384000
+      }
+    },
+    {
+      "modelId": "anthropic/claude-3.5-haiku",
+      "modelName": "Anthropic: Claude 3.5 Haiku",
+      "modelType": "chat",
+      "inputModalities": [
+        "image",
+        "text"
+      ],
+      "outputModalities": [
+        "text"
+      ],
+      "capabilities": [
+        "tool_call"
+      ],
+      "limits": {
+        "contextWindow": 200000,
+        "maxOutputTokens": 8192
+      }
+    },
+    {
+      "modelId": "anthropic/claude-sonnet-4",
+      "modelName": "Anthropic: Claude Sonnet 4",
+      "modelType": "chat",
+      "inputModalities": [
+        "file",
+        "image",
+        "text"
+      ],
+      "outputModalities": [
+        "text"
+      ],
+      "capabilities": [
+        "reasoning",
+        "tool_call"
+      ],
+      "limits": {
+        "contextWindow": 1000000,
+        "maxOutputTokens": 64000
+      }
+    },
+    {
+      "modelId": "openai/gpt-5.4-image-2",
+      "modelName": "OpenAI: GPT-5.4 Image 2",
+      "modelType": "image",
+      "inputModalities": [
+        "file",
+        "image",
+        "text"
+      ],
+      "outputModalities": [
+        "image",
+        "text"
+      ],
+      "capabilities": [
+        "json_mode",
+        "reasoning",
+        "structured_output"
+      ],
+      "limits": {
+        "contextWindow": 272000,
+        "maxOutputTokens": 128000
+      }
+    },
+    {
+      "modelId": "openai/gpt-5-image",
+      "modelName": "OpenAI: GPT-5 Image",
+      "modelType": "image",
+      "inputModalities": [
+        "file",
+        "image",
+        "text"
+      ],
+      "outputModalities": [
+        "image",
+        "text"
+      ],
+      "capabilities": [
+        "json_mode",
+        "reasoning",
+        "structured_output"
+      ],
+      "limits": {
+        "contextWindow": 400000,
+        "maxOutputTokens": 128000
+      }
+    },
+    {
+      "modelId": "openai/gpt-5-image-mini",
+      "modelName": "OpenAI: GPT-5 Image Mini",
+      "modelType": "image",
+      "inputModalities": [
+        "file",
+        "image",
+        "text"
+      ],
+      "outputModalities": [
+        "image",
+        "text"
+      ],
+      "capabilities": [
+        "json_mode",
+        "reasoning",
+        "structured_output"
+      ],
+      "limits": {
+        "contextWindow": 400000,
+        "maxOutputTokens": 128000
+      }
+    },
+    {
+      "modelId": "google/gemma-3-4b-it",
+      "modelName": "Google: Gemma 3 4B",
+      "modelType": "chat",
+      "inputModalities": [
+        "image",
+        "text"
+      ],
+      "outputModalities": [
+        "text"
+      ],
+      "capabilities": [
+        "json_mode",
+        "structured_output"
+      ],
+      "limits": {
+        "contextWindow": 131072,
+        "maxOutputTokens": 16384
+      }
+    },
+    {
+      "modelId": "google/gemini-2.5-flash-image",
+      "modelName": "Google: Nano Banana (Gemini 2.5 Flash Image)",
+      "modelType": "image",
+      "inputModalities": [
+        "image",
+        "text"
+      ],
+      "outputModalities": [
+        "image",
+        "text"
+      ],
+      "capabilities": [
+        "json_mode",
+        "structured_output"
+      ],
+      "limits": {
+        "contextWindow": 32768,
+        "maxOutputTokens": 32768
+      }
+    },
+    {
+      "modelId": "google/gemma-4-26b-a4b-it",
+      "modelName": "Google: Gemma 4 26B A4B",
+      "modelType": "chat",
+      "inputModalities": [
+        "image",
+        "text",
+        "video"
+      ],
+      "outputModalities": [
+        "text"
+      ],
+      "capabilities": [
+        "json_mode",
+        "reasoning",
+        "structured_output",
+        "tool_call"
+      ],
+      "limits": {
+        "contextWindow": 262144,
+        "maxOutputTokens": null
+      }
+    },
+    {
+      "modelId": "x-ai/grok-4.20",
+      "modelName": "xAI: Grok 4.20",
+      "modelType": "chat",
+      "inputModalities": [
+        "file",
+        "image",
+        "text"
+      ],
+      "outputModalities": [
+        "text"
+      ],
+      "capabilities": [
+        "json_mode",
+        "reasoning",
+        "structured_output",
+        "tool_call"
+      ],
+      "limits": {
+        "contextWindow": 2000000,
+        "maxOutputTokens": null
+      }
+    },
+    {
+      "modelId": "x-ai/grok-4.3",
+      "modelName": "xAI: Grok 4.3",
+      "modelType": "chat",
+      "inputModalities": [
+        "image",
+        "text"
+      ],
+      "outputModalities": [
+        "text"
+      ],
+      "capabilities": [
+        "json_mode",
+        "reasoning",
+        "structured_output",
+        "tool_call"
+      ],
+      "limits": {
+        "contextWindow": 1000000,
+        "maxOutputTokens": null
+      }
+    },
+    {
+      "modelId": "mistralai/ministral-14b-2512",
+      "modelName": "Mistral: Ministral 3 14B 2512",
+      "modelType": "chat",
+      "inputModalities": [
+        "image",
+        "text"
+      ],
+      "outputModalities": [
+        "text"
+      ],
+      "capabilities": [
+        "json_mode",
+        "structured_output",
+        "tool_call"
+      ],
+      "limits": {
+        "contextWindow": 262144,
+        "maxOutputTokens": null
+      }
+    },
+    {
+      "modelId": "mistralai/ministral-3b-2512",
+      "modelName": "Mistral: Ministral 3 3B 2512",
+      "modelType": "chat",
+      "inputModalities": [
+        "image",
+        "text"
+      ],
+      "outputModalities": [
+        "text"
+      ],
+      "capabilities": [
+        "json_mode",
+        "structured_output",
+        "tool_call"
+      ],
+      "limits": {
+        "contextWindow": 131072,
+        "maxOutputTokens": null
+      }
+    },
+    {
+      "modelId": "mistralai/ministral-8b-2512",
+      "modelName": "Mistral: Ministral 3 8B 2512",
+      "modelType": "chat",
+      "inputModalities": [
+        "image",
+        "text"
+      ],
+      "outputModalities": [
+        "text"
+      ],
+      "capabilities": [
+        "json_mode",
+        "structured_output",
+        "tool_call"
+      ],
+      "limits": {
+        "contextWindow": 262144,
+        "maxOutputTokens": null
+      }
+    },
+    {
+      "modelId": "mistralai/mistral-large-2512",
+      "modelName": "Mistral: Mistral Large 3 2512",
+      "modelType": "chat",
+      "inputModalities": [
+        "file",
+        "image",
+        "text"
+      ],
+      "outputModalities": [
+        "text"
+      ],
+      "capabilities": [
+        "json_mode",
+        "structured_output",
+        "tool_call"
+      ],
+      "limits": {
+        "contextWindow": 262144,
+        "maxOutputTokens": null
+      }
+    },
+    {
+      "modelId": "mistralai/mistral-medium-3",
+      "modelName": "Mistral: Mistral Medium 3",
+      "modelType": "chat",
+      "inputModalities": [
+        "file",
+        "image",
+        "text"
+      ],
+      "outputModalities": [
+        "text"
+      ],
+      "capabilities": [
+        "json_mode",
+        "structured_output",
+        "tool_call"
+      ],
+      "limits": {
+        "contextWindow": 131072,
+        "maxOutputTokens": null
+      }
+    },
+    {
+      "modelId": "mistralai/mistral-medium-3-5",
+      "modelName": "Mistral: Mistral Medium 3.5",
+      "modelType": "chat",
+      "inputModalities": [
+        "file",
+        "image",
+        "text"
+      ],
+      "outputModalities": [
+        "text"
+      ],
+      "capabilities": [
+        "json_mode",
+        "reasoning",
+        "structured_output",
+        "tool_call"
+      ],
+      "limits": {
+        "contextWindow": 262144,
+        "maxOutputTokens": null
+      }
+    },
+    {
+      "modelId": "mistralai/mistral-medium-3.1",
+      "modelName": "Mistral: Mistral Medium 3.1",
+      "modelType": "chat",
+      "inputModalities": [
+        "file",
+        "image",
+        "text"
+      ],
+      "outputModalities": [
+        "text"
+      ],
+      "capabilities": [
+        "json_mode",
+        "structured_output",
+        "tool_call"
+      ],
+      "limits": {
+        "contextWindow": 131072,
+        "maxOutputTokens": null
+      }
+    },
+    {
+      "modelId": "mistralai/mistral-small-2603",
+      "modelName": "Mistral: Mistral Small 4",
+      "modelType": "chat",
+      "inputModalities": [
+        "image",
+        "text"
+      ],
+      "outputModalities": [
+        "text"
+      ],
+      "capabilities": [
+        "json_mode",
+        "reasoning",
+        "structured_output",
+        "tool_call"
+      ],
+      "limits": {
+        "contextWindow": 262144,
+        "maxOutputTokens": null
+      }
+    },
+    {
+      "modelId": "deepseek/deepseek-r1-distill-qwen-32b",
+      "modelName": "DeepSeek: R1 Distill Qwen 32B",
+      "modelType": "chat",
+      "inputModalities": [
+        "text"
+      ],
+      "outputModalities": [
+        "text"
+      ],
+      "capabilities": [
+        "json_mode",
+        "reasoning",
+        "structured_output"
+      ],
+      "limits": {
+        "contextWindow": 128000,
+        "maxOutputTokens": 32768
+      }
+    },
+    {
+      "modelId": "amazon.rerank-v1:0",
+      "modelName": "amazon.rerank-v1:0",
+      "modelType": "rerank",
+      "inputModalities": [
+        "text"
+      ],
+      "outputModalities": [
+        "text"
+      ],
+      "capabilities": [],
+      "limits": {
+        "contextWindow": 32000,
+        "maxOutputTokens": 32000
+      }
+    },
+    {
+      "modelId": "amazon.nova-2-multimodal-embeddings-v1:0",
+      "modelName": "amazon.nova-2-multimodal-embeddings-v1:0",
+      "modelType": "embedding",
+      "inputModalities": [
+        "text"
+      ],
+      "outputModalities": [
+        "embedding"
+      ],
+      "capabilities": [],
+      "limits": {
+        "contextWindow": 8172,
+        "maxOutputTokens": null
+      }
+    },
+    {
+      "modelId": "amazon.titan-embed-image-v1",
+      "modelName": "amazon.titan-embed-image-v1",
+      "modelType": "embedding",
+      "inputModalities": [
+        "text"
+      ],
+      "outputModalities": [
+        "embedding"
+      ],
+      "capabilities": [],
+      "limits": {
+        "contextWindow": 128,
+        "maxOutputTokens": null
+      }
+    },
+    {
+      "modelId": "amazon.titan-embed-text-v1",
+      "modelName": "amazon.titan-embed-text-v1",
+      "modelType": "embedding",
+      "inputModalities": [
+        "text"
+      ],
+      "outputModalities": [
+        "embedding"
+      ],
+      "capabilities": [],
+      "limits": {
+        "contextWindow": 8192,
+        "maxOutputTokens": null
+      }
+    },
+    {
+      "modelId": "amazon.titan-embed-text-v2:0",
+      "modelName": "amazon.titan-embed-text-v2:0",
+      "modelType": "embedding",
+      "inputModalities": [
+        "text"
+      ],
+      "outputModalities": [
+        "embedding"
+      ],
+      "capabilities": [],
+      "limits": {
+        "contextWindow": 8192,
+        "maxOutputTokens": null
+      }
+    },
+    {
+      "modelId": "azure/ada",
+      "modelName": "azure/ada",
+      "modelType": "embedding",
+      "inputModalities": [
+        "text"
+      ],
+      "outputModalities": [
+        "embedding"
+      ],
+      "capabilities": [],
+      "limits": {
+        "contextWindow": 8191,
+        "maxOutputTokens": null
+      }
+    },
+    {
+      "modelId": "eu.twelvelabs.marengo-embed-2-7-v1:0",
+      "modelName": "eu.twelvelabs.marengo-embed-2-7-v1:0",
+      "modelType": "embedding",
+      "inputModalities": [
+        "text"
+      ],
+      "outputModalities": [
+        "embedding"
+      ],
+      "capabilities": [],
+      "limits": {
+        "contextWindow": 77,
+        "maxOutputTokens": null
+      }
+    },
+    {
+      "modelId": "twelvelabs.marengo-embed-2-7-v1:0",
+      "modelName": "twelvelabs.marengo-embed-2-7-v1:0",
+      "modelType": "embedding",
+      "inputModalities": [
+        "text"
+      ],
+      "outputModalities": [
+        "embedding"
+      ],
+      "capabilities": [],
+      "limits": {
+        "contextWindow": 77,
+        "maxOutputTokens": null
+      }
+    },
+    {
+      "modelId": "us.twelvelabs.marengo-embed-2-7-v1:0",
+      "modelName": "us.twelvelabs.marengo-embed-2-7-v1:0",
+      "modelType": "embedding",
+      "inputModalities": [
+        "text"
+      ],
+      "outputModalities": [
+        "embedding"
+      ],
+      "capabilities": [],
+      "limits": {
+        "contextWindow": 77,
+        "maxOutputTokens": null
+      }
+    },
+    {
+      "modelId": "Qwen/Qwen3-VL-Embedding-8B",
+      "modelName": "Qwen/Qwen3-VL-Embedding-8B",
+      "modelType": "embedding",
+      "inputModalities": [
+        "embedding",
+        "image",
+        "text"
+      ],
+      "outputModalities": [
+        "embedding"
+      ],
+      "capabilities": [],
+      "limits": {
+        "contextWindow": null,
+        "maxOutputTokens": null
+      }
+    },
+    {
+      "modelId": "Qwen/Qwen3-Embedding-0.6B",
+      "modelName": "Qwen/Qwen3-Embedding-0.6B",
+      "modelType": "embedding",
+      "inputModalities": [
+        "embedding",
+        "text"
+      ],
+      "outputModalities": [
+        "embedding"
+      ],
+      "capabilities": [],
+      "limits": {
+        "contextWindow": null,
+        "maxOutputTokens": null
+      }
+    },
+    {
+      "modelId": "Qwen/Qwen3-Embedding-4B",
+      "modelName": "Qwen/Qwen3-Embedding-4B",
+      "modelType": "embedding",
+      "inputModalities": [
+        "embedding",
+        "text"
+      ],
+      "outputModalities": [
+        "embedding"
+      ],
+      "capabilities": [],
+      "limits": {
+        "contextWindow": null,
+        "maxOutputTokens": null
+      }
+    },
+    {
+      "modelId": "Qwen/Qwen3-Embedding-8B",
+      "modelName": "Qwen/Qwen3-Embedding-8B",
+      "modelType": "embedding",
+      "inputModalities": [
+        "embedding",
+        "text"
+      ],
+      "outputModalities": [
+        "embedding"
+      ],
+      "capabilities": [],
+      "limits": {
+        "contextWindow": null,
+        "maxOutputTokens": null
+      }
+    },
+    {
+      "modelId": "google/embeddinggemma-300m",
+      "modelName": "google/embeddinggemma-300m",
+      "modelType": "embedding",
+      "inputModalities": [
+        "embedding",
+        "text"
+      ],
+      "outputModalities": [
+        "embedding"
+      ],
+      "capabilities": [],
+      "limits": {
+        "contextWindow": null,
+        "maxOutputTokens": null
+      }
+    },
+    {
+      "modelId": "jinaai/jina-embeddings-v3",
+      "modelName": "jinaai/jina-embeddings-v3",
+      "modelType": "embedding",
+      "inputModalities": [
+        "text"
+      ],
+      "outputModalities": [
+        "embedding"
+      ],
+      "capabilities": [],
+      "limits": {
+        "contextWindow": null,
+        "maxOutputTokens": null
+      }
+    },
+    {
+      "modelId": "jinaai/jina-reranker-v2-base-multilingual",
+      "modelName": "jinaai/jina-reranker-v2-base-multilingual",
+      "modelType": "rerank",
+      "inputModalities": [
+        "text"
+      ],
+      "outputModalities": [
+        "text"
+      ],
+      "capabilities": [],
+      "limits": {
+        "contextWindow": null,
+        "maxOutputTokens": null
+      }
+    },
+    {
+      "modelId": "Alibaba-NLP/gte-large-en-v1.5",
+      "modelName": "Alibaba-NLP/gte-large-en-v1.5",
+      "modelType": "embedding",
+      "inputModalities": [
+        "embedding",
+        "text"
+      ],
+      "outputModalities": [
+        "embedding"
+      ],
+      "capabilities": [],
+      "limits": {
+        "contextWindow": null,
+        "maxOutputTokens": null
+      }
+    },
+    {
+      "modelId": "BAAI/bge-base-en-v1.5",
+      "modelName": "BAAI/bge-base-en-v1.5",
+      "modelType": "embedding",
+      "inputModalities": [
+        "embedding",
+        "text"
+      ],
+      "outputModalities": [
+        "embedding"
+      ],
+      "capabilities": [],
+      "limits": {
+        "contextWindow": null,
+        "maxOutputTokens": null
+      }
+    },
+    {
+      "modelId": "BAAI/bge-large-en-v1.5",
+      "modelName": "BAAI/bge-large-en-v1.5",
+      "modelType": "embedding",
+      "inputModalities": [
+        "embedding",
+        "text"
+      ],
+      "outputModalities": [
+        "embedding"
+      ],
+      "capabilities": [],
+      "limits": {
+        "contextWindow": null,
+        "maxOutputTokens": null
+      }
+    },
+    {
+      "modelId": "BAAI/bge-m3",
+      "modelName": "BAAI/bge-m3",
+      "modelType": "embedding",
+      "inputModalities": [
+        "embedding",
+        "text"
+      ],
+      "outputModalities": [
+        "embedding"
+      ],
+      "capabilities": [],
+      "limits": {
+        "contextWindow": null,
+        "maxOutputTokens": null
+      }
+    },
+    {
+      "modelId": "BAAI/bge-reranker-base",
+      "modelName": "BAAI/bge-reranker-base",
+      "modelType": "rerank",
+      "inputModalities": [
+        "text"
+      ],
+      "outputModalities": [
+        "text"
+      ],
+      "capabilities": [],
+      "limits": {
+        "contextWindow": null,
+        "maxOutputTokens": null
+      }
+    },
+    {
+      "modelId": "BAAI/bge-reranker-large",
+      "modelName": "BAAI/bge-reranker-large",
+      "modelType": "rerank",
+      "inputModalities": [
+        "text"
+      ],
+      "outputModalities": [
+        "text"
+      ],
+      "capabilities": [],
+      "limits": {
+        "contextWindow": null,
+        "maxOutputTokens": null
+      }
+    },
+    {
+      "modelId": "BAAI/bge-reranker-v2-m3",
+      "modelName": "BAAI/bge-reranker-v2-m3",
+      "modelType": "rerank",
+      "inputModalities": [
+        "text"
+      ],
+      "outputModalities": [
+        "text"
+      ],
+      "capabilities": [],
+      "limits": {
+        "contextWindow": null,
+        "maxOutputTokens": null
+      }
+    },
+    {
+      "modelId": "cross-encoder/mmarco-mMiniLMv2-L12-H384-v1",
+      "modelName": "cross-encoder/mmarco-mMiniLMv2-L12-H384-v1",
+      "modelType": "rerank",
+      "inputModalities": [
+        "text"
+      ],
+      "outputModalities": [
+        "text"
+      ],
+      "capabilities": [],
+      "limits": {
+        "contextWindow": null,
+        "maxOutputTokens": null
+      }
+    },
+    {
+      "modelId": "cross-encoder/ms-marco-MiniLM-L12-v2",
+      "modelName": "cross-encoder/ms-marco-MiniLM-L12-v2",
+      "modelType": "rerank",
+      "inputModalities": [
+        "text"
+      ],
+      "outputModalities": [
+        "text"
+      ],
+      "capabilities": [],
+      "limits": {
+        "contextWindow": null,
+        "maxOutputTokens": null
+      }
+    },
+    {
+      "modelId": "cross-encoder/ms-marco-MiniLM-L4-v2",
+      "modelName": "cross-encoder/ms-marco-MiniLM-L4-v2",
+      "modelType": "rerank",
+      "inputModalities": [
+        "text"
+      ],
+      "outputModalities": [
+        "text"
+      ],
+      "capabilities": [],
+      "limits": {
+        "contextWindow": null,
+        "maxOutputTokens": null
+      }
+    }
+  ]
+}
