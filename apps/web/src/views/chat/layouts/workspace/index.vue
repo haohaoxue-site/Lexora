@@ -3,6 +3,7 @@ import type {
   ChatWorkspaceLayoutEmits,
   ChatWorkspaceLayoutProps,
 } from './typing'
+import ChatAgentSettingsPanel from '../../widgets/agent-settings-panel'
 import ChatInputBox from '../../widgets/input-box'
 import ChatMessageList from '../../widgets/message-list'
 import ChatSessionSidebar from '../../widgets/session-sidebar'
@@ -12,7 +13,7 @@ const emits = defineEmits<ChatWorkspaceLayoutEmits>()
 </script>
 
 <template>
-  <div class="chat-view flex h-full min-h-0">
+  <div class="chat-view relative flex h-full min-h-0">
     <ChatSessionSidebar
       v-if="!props.isSidebarCollapsed"
       @collapse="emits('collapseSidebar')"
@@ -49,6 +50,13 @@ const emits = defineEmits<ChatWorkspaceLayoutEmits>()
         <ChatInputBox />
       </template>
     </div>
+
+    <ChatAgentSettingsPanel
+      v-if="props.isAgentSettingsOpen"
+      :agent-profile="props.agentProfile"
+      @close="emits('closeAgentSettings')"
+      @default-model-updated="emits('defaultModelUpdated')"
+    />
   </div>
 </template>
 

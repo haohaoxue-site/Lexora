@@ -5,6 +5,70 @@ enum AgentRuntimeCleanupTaskStatus {
   FAILED
 }
 
+enum AgentMemoryScope {
+  USER
+  USER_AGENT
+}
+
+enum AgentMemoryLane {
+  USER_PROFILE
+  USER_PREFERENCE
+  USER_FEEDBACK
+  AGENT_PERSONALIZATION
+  PROJECT_REFERENCE
+  TASK_KNOWLEDGE
+}
+
+enum AgentMemoryStatus {
+  ACTIVE
+  DISABLED
+  ARCHIVED
+}
+
+enum AgentMemorySensitivity {
+  NORMAL
+  SENSITIVE
+}
+
+enum AgentMemorySourceType {
+  MANUAL
+  USER_FEEDBACK
+  IMPORTED
+}
+
+enum AgentMemoryOperationMode {
+  DIRECT
+  PENDING_CONFIRMATION
+  BACKGROUND_SUGGESTION
+  IGNORED
+}
+
+enum AgentMemoryOperationAction {
+  CREATE
+  APPEND
+  UPDATE
+  DISABLE
+  FORGET
+  IGNORE
+  ASK_USER
+}
+
+enum AgentMemoryCandidateStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  DISMISSED
+}
+
+enum AgentMemoryCandidateKind {
+  PROFILE
+  PREFERENCE
+  FEEDBACK
+  PROJECT_REFERENCE
+  TASK_KNOWLEDGE
+  FORGET_REQUEST
+}
+
 model AgentProfile {
   id                 String                  @id @default(uuid())
   ownerUserId        String
@@ -16,12 +80,116 @@ model AgentProfile {
   ownerUser          User                    @relation("AgentProfileOwner", fields: [ownerUserId], references: [id], onDelete: Cascade)
   chatSessions       ChatSession[]
   messageGenerations ChatMessageGeneration[]
+  memories           AgentMemory[]
+  memoryCandidates   AgentMemoryCandidate[]
   createdAt          DateTime                @default(now())
   updatedAt          DateTime                @updatedAt
   deletedAt          DateTime?
 
   @@index([ownerUserId, isDefault, deletedAt])
   @@index([ownerUserId, deletedAt])
+}
+
+model AgentMemory {
+  id                 String                 @id @default(uuid())
+  scope              AgentMemoryScope
+  lane               AgentMemoryLane
+  ownerUserId        String
+  workspaceId        String?
+  agentProfileId     String?
+  slotKey            String?
+  slotValue          String?
+  content            String
+  summary            String?
+  sensitivity        AgentMemorySensitivity @default(NORMAL)
+  confidence         Float                  @default(1)
+  sourceType         AgentMemorySourceType  @default(MANUAL)
+  sourceSessionId    String?
+  sourceMessageId    String?
+  sourceGenerationId String?
+  status             AgentMemoryStatus      @default(ACTIVE)
+  supersedesMemoryId String?
+  createdByUserId    String
+  acceptedByUserId   String?
+  lastUsedAt         DateTime?
+  expiresAt          DateTime?
+  ownerUser          User                   @relation("AgentMemoryOwner", fields: [ownerUserId], references: [id], onDelete: Cascade)
+  agentProfile       AgentProfile?          @relation(fields: [agentProfileId], references: [id], onDelete: SetNull)
+  searchIndex        AgentMemorySearchIndex?
+  createdAt          DateTime               @default(now())
+  updatedAt          DateTime               @updatedAt
+  deletedAt          DateTime?
+
+  @@index([ownerUserId, scope, lane, status])
+  @@index([ownerUserId, status, updatedAt])
+  @@index([agentProfileId, status])
+  @@index([supersedesMemoryId])
+}
+
+model AgentMemoryCandidate {
+  id                 String                     @id @default(uuid())
+  ownerUserId        String
+  agentProfileId     String?
+  sessionId          String
+  sourceMessageId    String
+  sourceGenerationId String?
+  kind               AgentMemoryCandidateKind
+  action             AgentMemoryOperationAction
+  mode               AgentMemoryOperationMode
+  status             AgentMemoryCandidateStatus @default(PENDING)
+  scope              AgentMemoryScope
+  lane               AgentMemoryLane
+  slotKey            String?
+  slotValue          String?
+  content            String
+  summary            String?
+  reason             String?
+  confidence         Float                      @default(0)
+  sensitivity        AgentMemorySensitivity     @default(NORMAL)
+  relatedMemoryIds   Json                       @default("[]")
+  resultMemoryIds    Json                       @default("[]")
+  operation          Json
+  ownerUser          User                       @relation("AgentMemoryCandidateOwner", fields: [ownerUserId], references: [id], onDelete: Cascade)
+  agentProfile       AgentProfile?              @relation(fields: [agentProfileId], references: [id], onDelete: SetNull)
+  session            ChatSession                @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  sourceMessage      ChatSessionMessage         @relation(fields: [sourceMessageId], references: [id], onDelete: Cascade)
+  sourceGeneration   ChatMessageGeneration?     @relation(fields: [sourceGenerationId], references: [generationId], onDelete: SetNull)
+  acceptedAt         DateTime?
+  rejectedAt         DateTime?
+  dismissedAt        DateTime?
+  createdAt          DateTime                   @default(now())
+  updatedAt          DateTime                   @updatedAt
+  deletedAt          DateTime?
+
+  @@index([ownerUserId, status, createdAt])
+  @@index([agentProfileId, status])
+  @@index([sessionId, createdAt])
+  @@index([sourceMessageId])
+  @@index([sourceGenerationId])
+}
+
+model AgentMemorySearchIndex {
+  id                        String             @id @default(uuid())
+  memoryId                  String             @unique
+  scope                     AgentMemoryScope
+  lane                      AgentMemoryLane
+  ownerUserId               String
+  workspaceId               String?
+  agentProfileId            String?
+  searchText                String
+  contentHash               String
+  embedding                 Unsupported("vector")?
+  embeddingModelProviderKey String?
+  embeddingModelId          String?
+  embeddingDimensions       Int?
+  memory                    AgentMemory        @relation(fields: [memoryId], references: [id], onDelete: Cascade)
+  indexedAt                 DateTime           @default(now())
+  createdAt                 DateTime           @default(now())
+  updatedAt                 DateTime           @updatedAt
+
+  @@index([ownerUserId, scope, lane])
+  @@index([agentProfileId])
+  @@index([contentHash])
 }
 
 model AgentRuntimeCleanupTask {

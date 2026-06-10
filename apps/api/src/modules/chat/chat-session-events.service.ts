@@ -90,7 +90,12 @@ export class ChatSessionEventsService {
         messageId: event.messageId ?? null,
         runId: event.runId ?? null,
         sourceEventId: event.sourceEventId ?? null,
-        payload: event.payload ?? {},
+        payload: event.type === CHAT_SESSION_EVENT_TYPE.SNAPSHOT_REQUIRED
+          ? {
+              ...(event.payload ?? {}),
+              latestSequence,
+            }
+          : event.payload ?? {},
       })),
     })
 

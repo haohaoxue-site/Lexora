@@ -1,5 +1,6 @@
 import process from 'node:process'
 import { createAgentChatApiClient } from './clients/chat'
+import { createAgentMemoryApiClient } from './clients/memory'
 import { loadAgentConfig } from './config/runtime-config'
 import { createAgentRunner } from './core'
 import { createChatModelFactory } from './integrations/model-providers/chat-model'
@@ -18,6 +19,7 @@ import { createAgentServer } from './server/app'
 
 const config = loadAgentConfig()
 const chatApi = createAgentChatApiClient(config.apiInternalUrl)
+const memoryApi = createAgentMemoryApiClient(config.apiInternalUrl)
 const chatModelFactory = createChatModelFactory()
 const queueRedis = createAgentRedisClient(config.redisUrl)
 const controlRedis = createAgentRedisClient(config.redisUrl)
@@ -69,6 +71,7 @@ async function start(): Promise<void> {
   agentRuntime = createAgentRuntime({
     runner: createAgentRunner({
       chatApi,
+      memoryApi,
       chatModelFactory,
       checkpointer: agentCheckpointer,
       events: eventPublisher,

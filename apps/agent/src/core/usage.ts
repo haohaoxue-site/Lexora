@@ -1,4 +1,5 @@
 import type { ChatGenerationUsageSnapshot } from '@haohaoxue/samepage-contracts'
+import type { AgentMemoryRetrievalSnapshot } from '@haohaoxue/samepage-contracts/agent/memory'
 import type { BaseMessage } from '@langchain/core/messages'
 import type { AgentModelTokenUsage } from '../integrations/model-providers/stream-text'
 import type { AgentContextBudget } from './context-budget'
@@ -10,6 +11,7 @@ export interface CreateChatGenerationUsageSnapshotInput {
   outputText: string
   providerUsage?: AgentModelTokenUsage | null
   contextBudget?: AgentContextBudget | null
+  memoryRetrieval?: AgentMemoryRetrievalSnapshot | null
   firstTokenLatencyMs?: number
   elapsedMs: number
 }
@@ -40,6 +42,7 @@ export function createChatGenerationUsageSnapshot(
     firstTokenLatencyMs: input.firstTokenLatencyMs,
     tokensPerSecond: calculateTokensPerSecond(outputTokens, input.elapsedMs),
     contextBudget: input.contextBudget ?? undefined,
+    memoryRetrieval: input.memoryRetrieval ?? undefined,
   })
 }
 

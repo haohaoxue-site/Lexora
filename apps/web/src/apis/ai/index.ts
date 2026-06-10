@@ -1,7 +1,6 @@
 import type {
   AiAvailableModelOption,
   AiAvailableProviderOption,
-  AiDefaultModelPolicyItem,
   AiModelIntentKey,
   AiProvider,
   AiProviderCredential,
@@ -10,7 +9,6 @@ import type {
   AiProviderPreset,
   AiProviderScope,
   CreateAiProviderRequest,
-  UpdateAiDefaultModelPolicyRequest,
   UpdateAiProviderRequest,
   UpsertAiProviderModelRequest,
   UpsertAiProviderModelsRequest,
@@ -209,23 +207,5 @@ export function getAvailableAiProviderModels(
     method: 'get',
     url: `/users/me/ai/models/available/providers/${providerId}/models`,
     params: { intentKey },
-  })
-}
-
-export function getAiDefaultModels(): Promise<AiDefaultModelPolicyItem[]> {
-  return axios.request({
-    method: 'get',
-    url: '/users/me/ai/default-models',
-  })
-}
-
-export function updateAiDefaultModel(
-  intentKey: AiModelIntentKey,
-  data: UpdateAiDefaultModelPolicyRequest,
-): Promise<AiDefaultModelPolicyItem> {
-  return axios.request({
-    method: 'put',
-    url: `/users/me/ai/default-models/${intentKey}`,
-    data,
   })
 }

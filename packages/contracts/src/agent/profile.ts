@@ -1,5 +1,9 @@
 import { z } from 'zod'
+import { AiModelRefSchema } from '../ai'
+import { AgentMemoryPolicySchema } from './memory'
 import { AgentModelPolicySchema } from './model'
+
+export { AgentMemoryPolicySchema } from './memory'
 
 const NonEmptyStringSchema = z.string().trim().min(1)
 
@@ -15,10 +19,6 @@ export const AgentContextPolicySchema = z.object({
   recentUserTurnLimit: z.number().int().positive().default(8),
   olderMessagesExcerptMaxLength: z.number().int().nonnegative().default(2000),
 }).strict()
-
-export const AgentMemoryPolicySchema = z.object({
-  enabled: z.boolean().default(false),
-}).strict().default({ enabled: false })
 
 export const AgentToolPolicySchema = z.object({
   enabled: z.boolean().default(false),
@@ -51,10 +51,30 @@ export const AgentProfileSnapshotSchema = z.object({
   capturedAt: z.string().datetime(),
 }).strict()
 
+export const AgentProfileSettingsSchema = z.object({
+  profileId: NonEmptyStringSchema,
+  name: NonEmptyStringSchema,
+  description: z.string().trim().min(1).nullable(),
+  avatarUrl: z.string().trim().min(1).nullable(),
+  modelRef: AiModelRefSchema.pick({
+    providerId: true,
+    modelId: true,
+  }).nullable(),
+}).strict()
+
+export const UpdateAgentProfileModelPolicyRequestSchema = z.object({
+  modelRef: AiModelRefSchema.pick({
+    providerId: true,
+    modelId: true,
+  }).nullable(),
+}).strict()
+
 export type AgentProfileInstructions = z.infer<typeof AgentProfileInstructionsSchema>
 export type AgentContextPolicy = z.infer<typeof AgentContextPolicySchema>
-export type AgentMemoryPolicy = z.infer<typeof AgentMemoryPolicySchema>
+export type { AgentMemoryPolicy } from './memory'
 export type AgentToolPolicy = z.infer<typeof AgentToolPolicySchema>
 export type AgentSkillBinding = z.infer<typeof AgentSkillBindingSchema>
 export type AgentProfileConfig = z.infer<typeof AgentProfileConfigSchema>
 export type AgentProfileSnapshot = z.infer<typeof AgentProfileSnapshotSchema>
+export type AgentProfileSettings = z.infer<typeof AgentProfileSettingsSchema>
+export type UpdateAgentProfileModelPolicyRequest = z.infer<typeof UpdateAgentProfileModelPolicyRequestSchema>

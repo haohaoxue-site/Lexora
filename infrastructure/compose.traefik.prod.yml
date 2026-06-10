@@ -9,7 +9,7 @@ x-logging: &default-logging
 services:
   postgres:
     container_name: samepage-ai-postgres
-    image: postgres:16-alpine
+    image: pgvector/pgvector:pg16
     restart: unless-stopped
     logging: *default-logging
     environment:

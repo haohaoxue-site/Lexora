@@ -23,7 +23,6 @@ export interface ChatComposerProps {
   modelSelectionKind?: ChatComposerModelSelectionKind
   isStreaming?: boolean
   disabled?: boolean
-  inputTokenEstimate?: number
   highlightAttachmentId?: string | null
   documentPickerTeleportTo?: string
 }

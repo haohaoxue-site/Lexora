@@ -1,5 +1,6 @@
 import type { BaseCheckpointSaver } from '@langchain/langgraph'
 import type { AgentChatApiClient } from '../clients/chat'
+import type { AgentMemoryApiClient } from '../clients/memory'
 import type {
   AgentChatModelFactory,
   AgentChatModelOptions,
@@ -29,6 +30,7 @@ import { createAgentGraph } from './graph'
 
 export interface CreateAgentRunnerInput {
   chatApi: AgentChatApiClient
+  memoryApi?: AgentMemoryApiClient
   chatModelFactory: AgentChatModelFactory
   checkpointer?: BaseCheckpointSaver
   threadRunTryLock?: AgentRuntimeTryLock
@@ -42,6 +44,7 @@ export function createAgentRunner(inputs: CreateAgentRunnerInput): AgentRunner {
   const activeRuns = new Map<string, AbortController>()
   const graph = createAgentGraph({
     chatModelFactory: inputs.chatModelFactory,
+    memoryApi: inputs.memoryApi,
     checkpointer: inputs.checkpointer,
   })
   const threadRunTryLock = inputs.threadRunTryLock ?? createMemoryAgentRuntimeTryLock()
@@ -161,10 +164,14 @@ export async function executeAgentGeneration(input: {
       },
       context: {
         agentProfileConfig: profileConfig,
+        generationId: input.bootstrap.generation.generationId,
+        actorUserId: input.bootstrap.generation.actorUserId,
+        agentProfileId: input.bootstrap.agentProfile.profileId,
         contextPolicy: profileConfig.contextPolicy,
         modelLimits: input.bootstrap.model,
         modelOptions: toChatModelOptions(profileConfig),
         modelTarget: input.bootstrap.runtimeModelTarget,
+        memoryIgnoredForRun: input.bootstrap.context.memory.ignoredForRun,
         triggerUserMessageId: input.bootstrap.context.triggerUserMessageId,
         contextSnapshots: input.bootstrap.context.contextSnapshots,
         onStreamPart: async (part: AgentModelStreamPart) => await emitAgentModelStreamPart(part, {

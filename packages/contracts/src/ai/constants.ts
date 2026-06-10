@@ -83,11 +83,13 @@ export const AI_MODEL_CAPABILITY_VALUES = [
 export const AI_MODEL_INTENT_KEY = {
   CHAT_DEFAULT: 'chat.default',
   CHAT_ASSISTANT_DEFAULT: 'chat.assistant.default',
+  MEMORY_EMBEDDING_DEFAULT: 'memory.embedding.default',
 } as const
 
 export const AI_MODEL_INTENT_KEY_VALUES = [
   AI_MODEL_INTENT_KEY.CHAT_DEFAULT,
   AI_MODEL_INTENT_KEY.CHAT_ASSISTANT_DEFAULT,
+  AI_MODEL_INTENT_KEY.MEMORY_EMBEDDING_DEFAULT,
 ] as const
 
 type AiModelIntentKeyValue = typeof AI_MODEL_INTENT_KEY_VALUES[number]
@@ -102,6 +104,9 @@ export const AI_MODEL_INTENT_DEFINITIONS = {
   },
   [AI_MODEL_INTENT_KEY.CHAT_ASSISTANT_DEFAULT]: {
     parentKey: AI_MODEL_INTENT_KEY.CHAT_DEFAULT,
+  },
+  [AI_MODEL_INTENT_KEY.MEMORY_EMBEDDING_DEFAULT]: {
+    parentKey: null,
   },
 } as const satisfies Record<AiModelIntentKeyValue, AiModelIntentDefinition>
 

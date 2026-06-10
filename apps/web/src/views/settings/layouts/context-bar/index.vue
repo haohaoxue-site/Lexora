@@ -27,13 +27,6 @@ const activeTab = defineModel<SettingsContextBarModel>({ required: true })
         </span>
       </template>
     </ElTabPane>
-    <ElTabPane name="models-default">
-      <template #label>
-        <span class="inline-flex h-[var(--default-header-height)] items-center px-3.5 text-[15px] font-medium leading-none">
-          默认模型
-        </span>
-      </template>
-    </ElTabPane>
   </ElTabs>
 </template>
 

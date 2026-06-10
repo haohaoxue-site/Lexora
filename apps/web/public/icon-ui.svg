@@ -51,6 +51,16 @@
           <path d="M 8 39 L 17 29.8 L 23.1 35.5 L 30.8 27.8 L 35.4 32.4" fill="none" stroke="currentColor" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round" />
 
   </symbol>
+    <symbol id="memory-note" viewBox="0 0 48 48">
+
+        <path d="M 10 10 H 38 V 18 H 10 V 10 Z" fill="none" stroke="currentColor" stroke-width="3.6" stroke-linejoin="round" />
+          <path d="M 10 18 V 36 C 10 38.2091 11.7909 40 14 40 H 34 C 36.2091 40 38 38.2091 38 36 V 18" fill="none" stroke="currentColor" stroke-width="3.6" stroke-linejoin="round" />
+          <path d="M 17 15 H 31" fill="none" stroke="currentColor" stroke-width="3.6" stroke-linecap="round" />
+          <path d="M 17 26 H 31" fill="none" stroke="currentColor" stroke-width="3.6" stroke-linecap="round" />
+          <path d="M 17 33 H 27" fill="none" stroke="currentColor" stroke-width="3.6" stroke-linecap="round" />
+          <path d="M 14 15 H 14.6" fill="none" stroke="currentColor" stroke-width="3.6" stroke-linecap="round" />
+
+  </symbol>
     <symbol id="arrow-left" viewBox="0 0 48 48">
 
         <path d="M 29 13 L 17 24 L 29 35" fill="none" stroke="currentColor" stroke-width="3.8" stroke-linecap="round" stroke-linejoin="round" />
@@ -112,6 +122,12 @@
     <symbol id="chevron-down" viewBox="0 0 48 48">
 
         <path d="M 13 19 L 24 30 L 35 19" fill="none" stroke="currentColor" stroke-width="3.8" stroke-linecap="round" stroke-linejoin="round" />
+
+  </symbol>
+    <symbol id="close" viewBox="0 0 48 48">
+
+        <path d="M 15 15 L 33 33" fill="none" stroke="currentColor" stroke-width="3.8" stroke-linecap="round" />
+          <path d="M 33 15 L 15 33" fill="none" stroke="currentColor" stroke-width="3.8" stroke-linecap="round" />
 
   </symbol>
     <symbol id="contrast" viewBox="0 0 48 48">

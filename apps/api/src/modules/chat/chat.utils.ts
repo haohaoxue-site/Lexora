@@ -23,6 +23,7 @@ import {
   CHAT_MESSAGE_STATUS,
   CHAT_SESSION_ORIGIN,
   ChatGenerationUsageSnapshotSchema,
+  ChatMemoryOperationProjectionSchema,
 } from '@haohaoxue/samepage-contracts'
 import {
   ChatSessionMessageRole,
@@ -38,6 +39,12 @@ export interface ChatSessionSummaryRecord {
   title: string
   selectedProviderId: string | null
   selectedModelId: string | null
+  agentProfile: {
+    id: string
+    name: string
+    description: string | null
+    avatarUrl: string | null
+  } | null
   modelOverrideProviderId: string | null
   modelOverrideModelId: string | null
   createdAt: Date
@@ -93,6 +100,14 @@ export function toChatSessionSummary(session: ChatSessionSummaryRecord): ChatSes
     workspaceId: session.workspaceId,
     origin: toChatSessionOrigin(session.origin),
     title: session.title,
+    agentProfile: session.agentProfile
+      ? {
+          profileId: session.agentProfile.id,
+          name: session.agentProfile.name,
+          description: session.agentProfile.description,
+          avatarUrl: session.agentProfile.avatarUrl,
+        }
+      : null,
     modelRef: toChatSessionModelRef(session),
     createdAt: session.createdAt.toISOString(),
     updatedAt: session.updatedAt.toISOString(),
@@ -283,11 +298,17 @@ function toChatUserMessageMetadata(message: ChatSessionMessageRecord): ChatUserM
   const attachments = Array.isArray(metadata.attachments)
     ? metadata.attachments as ChatPersistedMessageAttachment[]
     : []
+  const memoryOperations = Array.isArray(metadata.memoryOperations)
+    ? metadata.memoryOperations.map(operation => ChatMemoryOperationProjectionSchema.safeParse(operation))
+        .filter(result => result.success)
+        .map(result => result.data)
+    : []
 
   return {
     contentJSON,
     attachments,
     contextSnapshotMetas: message.contextSnapshots.map(toChatMessageContextSnapshotMeta),
+    memoryOperations,
   }
 }
 

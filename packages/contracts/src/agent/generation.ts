@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { AgentMemoryRetrievalSnapshotSchema } from './memory'
 import { ChatGenerationModelTargetSnapshotSchema } from './model'
 import { AgentProfileSnapshotSchema } from './profile'
 
@@ -18,6 +19,7 @@ export const ChatGenerationContextBudgetSnapshotSchema = z.object({
   reservedOutputTokens: TokenCountSchema,
   systemPromptTokens: TokenCountSchema,
   contextSnapshotTokens: TokenCountSchema,
+  memoryPromptTokens: TokenCountSchema.default(0),
   historyDigestTokens: TokenCountSchema,
   recentMessageTokens: TokenCountSchema,
   safetyBufferTokens: TokenCountSchema,
@@ -40,6 +42,7 @@ export const ChatGenerationUsageSnapshotSchema = z.object({
   firstTokenLatencyMs: z.number().int().nonnegative().optional(),
   tokensPerSecond: z.number().nonnegative().optional(),
   contextBudget: ChatGenerationContextBudgetSnapshotSchema.optional(),
+  memoryRetrieval: AgentMemoryRetrievalSnapshotSchema.optional(),
 }).strict()
 
 export const ChatMessageGenerationSnapshotSchema = z.object({

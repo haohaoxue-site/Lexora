@@ -27,7 +27,6 @@ const AgentView = () => import('@/views/agent/index.vue')
 // const KnowledgeView = () => import('@/views/knowledge/index.vue') // TODO
 // const ScheduleView = () => import('@/views/schedule/index.vue') // TODO
 const SettingsView = () => import('@/views/settings/index.vue')
-const SettingsDefaultModelsPageView = () => import('@/views/settings/pages/default-models')
 const SettingsPreferencePageView = () => import('@/views/settings/pages/preference')
 const SettingsProvidersPageView = () => import('@/views/settings/pages/providers')
 const SettingsUserPageView = () => import('@/views/settings/pages/user')
@@ -187,11 +186,6 @@ const workspaceRouteChildren = [
         path: 'providers',
         name: 'settings-providers',
         component: SettingsProvidersPageView,
-      },
-      {
-        path: 'models-default',
-        name: 'settings-models-default',
-        component: SettingsDefaultModelsPageView,
       },
     ],
   },

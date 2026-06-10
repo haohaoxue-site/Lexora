@@ -18,6 +18,7 @@ export interface ResolveAgentContextBudgetInput {
   modelPolicy?: Pick<AgentModelPolicy, 'maxOutputTokens'> | null
   systemPrompt: string
   contextSnapshots: Array<Pick<AgentChatContextSnapshot, 'content'>>
+  memoryPrompt?: string | null
   historyDigest?: Pick<AgentHistoryDigest, 'summary'> | null
   recentMessages: Array<Pick<AgentChatContextMessage, 'role' | 'content'>>
 }
@@ -27,6 +28,7 @@ export interface AgentContextBudget {
   reservedOutputTokens: number
   systemPromptTokens: number
   contextSnapshotTokens: number
+  memoryPromptTokens: number
   historyDigestTokens: number
   recentMessageTokens: number
   safetyBufferTokens: number
@@ -56,12 +58,15 @@ export function resolveAgentContextBudget(input: ResolveAgentContextBudgetInput)
   const contextSnapshots = sumTokens(input.contextSnapshots.map(snapshot =>
     defaultAgentTokenEstimator.estimateContextSnapshotTokens(snapshot).estimatedTokens,
   ))
+  const memoryPrompt = input.memoryPrompt
+    ? defaultAgentTokenEstimator.estimateTextTokens(input.memoryPrompt).estimatedTokens
+    : 0
   const historyDigest = input.historyDigest
     ? defaultAgentTokenEstimator.estimateTextTokens(input.historyDigest.summary).estimatedTokens
     : 0
   const recentMessages = defaultAgentTokenEstimator.estimateMessagesTokens(input.recentMessages)
   const availableInputTokens = Math.max(0, contextWindow - reservedOutputTokens - safetyBufferTokens)
-  const fixedInputTokens = systemPrompt.estimatedTokens + contextSnapshots + historyDigest
+  const fixedInputTokens = systemPrompt.estimatedTokens + contextSnapshots + memoryPrompt + historyDigest
   const recentMessageBudgetTokens = Math.max(0, availableInputTokens - fixedInputTokens)
   const usedInputTokens = fixedInputTokens + recentMessages.estimatedTokens
   const budgetUsedRatio = availableInputTokens > 0 ? usedInputTokens / availableInputTokens : 1
@@ -71,6 +76,7 @@ export function resolveAgentContextBudget(input: ResolveAgentContextBudgetInput)
     reservedOutputTokens,
     systemPromptTokens: systemPrompt.estimatedTokens,
     contextSnapshotTokens: contextSnapshots,
+    memoryPromptTokens: memoryPrompt,
     historyDigestTokens: historyDigest,
     recentMessageTokens: recentMessages.estimatedTokens,
     safetyBufferTokens,

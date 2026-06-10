@@ -54,6 +54,10 @@ export class CreateChatSessionMessageRequestDto implements CreateChatSessionMess
   @IsOptional()
   @IsArray()
   attachments?: CreateChatSessionMessageRequest['attachments']
+
+  @IsOptional()
+  @IsObject()
+  memory!: CreateChatSessionMessageRequest['memory']
 }
 
 export class EditAndSendChatMessageRequestDto implements EditAndSendChatMessageRequest {
@@ -69,6 +73,10 @@ export class EditAndSendChatMessageRequestDto implements EditAndSendChatMessageR
   @IsOptional()
   @IsArray()
   attachments?: EditAndSendChatMessageRequest['attachments']
+
+  @IsOptional()
+  @IsObject()
+  memory!: EditAndSendChatMessageRequest['memory']
 }
 
 export class SwitchChatActiveMessageRequestDto implements SwitchChatActiveMessageRequest {

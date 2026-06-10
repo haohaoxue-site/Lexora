@@ -44,12 +44,8 @@ export interface ChatMessageUsageView {
 export function createChatConversationUsageView(
   usage: ChatSessionUsageSummary | undefined,
   messages: ChatMessage[],
-): ChatConversationUsageView | null {
+): ChatConversationUsageView {
   const latestUsage = getLatestAssistantUsage(messages)
-  if (!usage && messages.length === 0) {
-    return null
-  }
-
   const usageSummary = usage ?? {
     activePath: createEmptyUsageAggregate(),
     session: createEmptyUsageAggregate(),
@@ -66,9 +62,10 @@ export function createChatConversationUsageView(
     latestRows: latestUsage ? createAssistantUsageRows(latestUsage) : [],
     budget,
     notes: [
+      messages.length === 0 ? '当前对话尚未产生模型用量。' : null,
       '当前路径只统计正在阅读的分支。',
       '会话总计包含 sibling 分支的历史生成消耗。',
-    ],
+    ].filter(Boolean) as string[],
   }
 }
 
@@ -140,6 +137,15 @@ function createAssistantUsageRows(usage: AssistantUsage): ChatUsageDetailRow[] {
     usage.reasoningTokens > 0
       ? { label: '推理', value: `${formatChatTokenCount(usage.reasoningTokens)} tokens` }
       : null,
+    usage.memoryRetrieval
+      ? {
+          label: '长期记忆',
+          value: usage.memoryRetrieval.ignoredForRun
+            ? '本轮忽略'
+            : `${usage.memoryRetrieval.injectedCount} 条 / ${formatChatTokenCount(usage.memoryRetrieval.estimatedTokens)} tokens`,
+          tone: usage.memoryRetrieval.injectedCount > 0 ? 'default' : 'muted',
+        }
+      : null,
     { label: '总计', value: `${formatChatTokenCount(usage.totalTokens)} tokens` },
     typeof usage.firstTokenLatencyMs === 'number'
       ? { label: '首字时延', value: `${formatExactCount(usage.firstTokenLatencyMs)} ms` }
@@ -156,12 +162,24 @@ function createAssistantUsageRows(usage: AssistantUsage): ChatUsageDetailRow[] {
 }
 
 function createBudgetView(budget: ContextBudget): ChatConversationBudgetView {
-  const inputLimit = Math.max(0, budget.contextWindow - budget.reservedOutputTokens)
-  const usedInputTokens = budget.systemPromptTokens
-    + budget.contextSnapshotTokens
-    + budget.historyDigestTokens
-    + budget.recentMessageTokens
-    + budget.safetyBufferTokens
+  const contextWindow = normalizeTokenCount(budget.contextWindow)
+  const reservedOutputTokens = normalizeTokenCount(budget.reservedOutputTokens)
+  const systemPromptTokens = normalizeTokenCount(budget.systemPromptTokens)
+  const contextSnapshotTokens = normalizeTokenCount(budget.contextSnapshotTokens)
+  const memoryPromptTokens = normalizeTokenCount(budget.memoryPromptTokens)
+  const historyDigestTokens = normalizeTokenCount(budget.historyDigestTokens)
+  const recentMessageTokens = normalizeTokenCount(budget.recentMessageTokens)
+  const safetyBufferTokens = normalizeTokenCount(budget.safetyBufferTokens)
+  const availableInputTokens = normalizeTokenCount(budget.availableInputTokens)
+  const recentMessageBudgetTokens = normalizeTokenCount(budget.recentMessageBudgetTokens)
+  const overflowTokens = normalizeTokenCount(budget.overflowTokens)
+  const inputLimit = Math.max(0, contextWindow - reservedOutputTokens)
+  const usedInputTokens = systemPromptTokens
+    + contextSnapshotTokens
+    + memoryPromptTokens
+    + historyDigestTokens
+    + recentMessageTokens
+    + safetyBufferTokens
 
   return {
     usedPercent: Math.min(100, Math.max(0, budget.budgetUsedRatio * 100)),
@@ -169,24 +187,29 @@ function createBudgetView(budget: ContextBudget): ChatConversationBudgetView {
     usedText: `${formatChatTokenCount(usedInputTokens)} / ${formatChatTokenCount(inputLimit)} tokens`,
     sourceText: formatBudgetSource(budget.estimationSource),
     rows: [
-      { label: '上下文窗口', value: `${formatChatTokenCount(budget.contextWindow)} tokens` },
-      { label: '预留输出', value: `${formatChatTokenCount(budget.reservedOutputTokens)} tokens` },
-      { label: '系统提示', value: `${formatChatTokenCount(budget.systemPromptTokens)} tokens` },
-      { label: '上下文快照', value: `${formatChatTokenCount(budget.contextSnapshotTokens)} tokens` },
-      { label: '历史摘要', value: `${formatChatTokenCount(budget.historyDigestTokens)} tokens` },
-      { label: '最近消息', value: `${formatChatTokenCount(budget.recentMessageTokens)} tokens` },
-      { label: '安全缓冲', value: `${formatChatTokenCount(budget.safetyBufferTokens)} tokens` },
-      { label: '可用输入', value: `${formatChatTokenCount(budget.availableInputTokens)} tokens` },
-      { label: '消息预算', value: `${formatChatTokenCount(budget.recentMessageBudgetTokens)} tokens` },
-      budget.overflowTokens > 0
+      { label: '上下文窗口', value: `${formatChatTokenCount(contextWindow)} tokens` },
+      { label: '预留输出', value: `${formatChatTokenCount(reservedOutputTokens)} tokens` },
+      { label: '系统提示', value: `${formatChatTokenCount(systemPromptTokens)} tokens` },
+      { label: '上下文快照', value: `${formatChatTokenCount(contextSnapshotTokens)} tokens` },
+      { label: '长期记忆', value: `${formatChatTokenCount(memoryPromptTokens)} tokens` },
+      { label: '历史摘要', value: `${formatChatTokenCount(historyDigestTokens)} tokens` },
+      { label: '最近消息', value: `${formatChatTokenCount(recentMessageTokens)} tokens` },
+      { label: '安全缓冲', value: `${formatChatTokenCount(safetyBufferTokens)} tokens` },
+      { label: '可用输入', value: `${formatChatTokenCount(availableInputTokens)} tokens` },
+      { label: '消息预算', value: `${formatChatTokenCount(recentMessageBudgetTokens)} tokens` },
+      overflowTokens > 0
         ? {
             label: '溢出',
-            value: `${formatChatTokenCount(budget.overflowTokens)} tokens`,
+            value: `${formatChatTokenCount(overflowTokens)} tokens`,
             tone: 'warning',
           }
         : null,
     ].filter(Boolean) as ChatUsageDetailRow[],
   }
+}
+
+function normalizeTokenCount(value: number | null | undefined): number {
+  return typeof value === 'number' && Number.isFinite(value) ? Math.max(0, Math.round(value)) : 0
 }
 
 function formatUsageSource(source: AssistantUsage['usageSource']) {

@@ -1,10 +1,12 @@
 import type {
   AgentChatRuntimeContext,
+  AgentMemoryRunOptions,
   AgentProfileSnapshot,
   AgentRuntimeModelTarget,
   AiModelRef,
   ChatGenerationBootstrap,
   ChatGenerationModelTargetSnapshot,
+  ChatMemoryOperationProjection,
   ChatMessageAttachmentInput,
   ChatMessageContentJSON,
   ChatMessageFailureReason,
@@ -20,7 +22,7 @@ import type { AgentProfileForGeneration } from '../agent/agent-profiles.service'
 import type { ChatContextSnapshotCreateData } from './chat-context-snapshots.service'
 import { randomUUID } from 'node:crypto'
 import {
-  AgentProfileConfigSchema,
+  AgentMemoryRunOptionsSchema,
   AgentProfileSnapshotSchema,
   AgentRuntimeModelTargetSchema,
   AI_MODEL_INTENT_KEY,
@@ -37,6 +39,7 @@ import {
   BadRequestException,
   ConflictException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common'
 import {
@@ -48,7 +51,11 @@ import {
   Prisma,
 } from '@prisma/client'
 import { PrismaService } from '../../database/prisma.service'
-import { AgentProfilesService } from '../agent/agent-profiles.service'
+import { AgentMemoryOperationsService } from '../agent/agent-memory-operations.service'
+import {
+  AgentProfilesService,
+  resolveAgentProfileFixedModelRef,
+} from '../agent/agent-profiles.service'
 import { AiModelResolverService } from '../ai/models/resolver.service'
 import { ChatContextSnapshotsService } from './chat-context-snapshots.service'
 import { ChatSessionEventsService } from './chat-session-events.service'
@@ -83,6 +90,14 @@ const chatSessionSummarySelect = {
   title: true,
   selectedProviderId: true,
   selectedModelId: true,
+  agentProfile: {
+    select: {
+      id: true,
+      name: true,
+      description: true,
+      avatarUrl: true,
+    },
+  },
   modelOverrideProviderId: true,
   modelOverrideModelId: true,
   createdAt: true,
@@ -182,6 +197,8 @@ const chatSessionRunDetailSelect = {
       id: true,
       ownerUserId: true,
       name: true,
+      description: true,
+      avatarUrl: true,
       currentConfig: true,
     },
   },
@@ -230,6 +247,8 @@ const chatSessionModelRefSelect = {
       id: true,
       ownerUserId: true,
       name: true,
+      description: true,
+      avatarUrl: true,
       currentConfig: true,
     },
   },
@@ -251,25 +270,32 @@ interface CreateRunInput {
   generationId: string
   runId: string
   modelTargetSnapshot: ChatGenerationModelTargetSnapshot
+  memory?: AgentMemoryRunOptions
 }
 
 interface CreatedRunResult {
   sessionId: string
   runId: string
+  generationId: string
   assistantMessageId: string
   triggerUserMessageId: string
+  triggerUserContent: string
+  agentProfileId: string
   expectedHistoryVersion: number
   latestSequence: number
 }
 
 @Injectable()
 export class ChatSessionsService {
+  private readonly logger = new Logger(ChatSessionsService.name)
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly chatSessionEvents: ChatSessionEventsService,
     private readonly chatContextSnapshots: ChatContextSnapshotsService,
     private readonly agentProfiles: AgentProfilesService,
     private readonly modelResolverService: AiModelResolverService,
+    private readonly agentMemoryOperations?: AgentMemoryOperationsService,
   ) {}
 
   async getSessions(userId: string, workspaceId: string, origin: ChatSessionOrigin): Promise<ChatSessionSummary[]> {
@@ -337,7 +363,7 @@ export class ChatSessionsService {
     }
 
     const agentProfile = await this.resolveSessionAgentProfile(session, userId)
-    return resolveAgentProfileModelRef(agentProfile)
+    return resolveAgentProfileFixedModelRef(agentProfile)
   }
 
   async updateSessionModel(input: {
@@ -498,6 +524,7 @@ export class ChatSessionsService {
     attachments?: ChatMessageAttachmentInput[] | null
   }): Promise<ChatMutationResponse> {
     const result = await this.createRunFromUserMessage(input)
+    await this.processUserMessageMemoryOperations(input.userId, result)
     return this.toMutationResponse(input.userId, input.origin, result.sessionId, result.latestSequence, result.runId)
   }
 
@@ -508,6 +535,7 @@ export class ChatSessionsService {
     attachments?: ChatMessageAttachmentInput[] | null
   }): Promise<ChatMutationResponse> {
     const result = await this.createRunFromEditedUserMessage(input)
+    await this.processUserMessageMemoryOperations(input.userId, result)
     return this.toMutationResponse(input.userId, input.origin, result.sessionId, result.latestSequence, result.runId)
   }
 
@@ -702,11 +730,17 @@ export class ChatSessionsService {
     }
 
     const modelTargetSnapshot = ChatGenerationModelTargetSnapshotSchema.parse(generation.modelTargetSnapshot)
+    const run = await this.prisma.chatSessionRun.findUnique({
+      where: { runId: generation.generationId },
+      select: { commandContext: true },
+    })
+    const memory = readAgentMemoryRunOptions(run?.commandContext)
     const [context, runtimeModelTarget] = await Promise.all([
       this.resolveAgentRuntimeContext({
         actorId: generation.actorUserId,
         sessionId: generation.sessionId,
         triggerUserMessageId: generation.triggerUserMessageId,
+        memory,
       }),
       this.resolveRuntimeModelTarget(generation.actorUserId, modelTargetSnapshot),
     ])
@@ -735,6 +769,7 @@ export class ChatSessionsService {
     actorId: string
     sessionId: string
     triggerUserMessageId: string
+    memory: AgentMemoryRunOptions
   }): Promise<AgentChatRuntimeContext> {
     const session = await this.findAccessibleSessionRunDetailOrThrow(input.actorId, input.sessionId)
     const path = resolvePathToMessage(session.messages, input.triggerUserMessageId)
@@ -773,6 +808,7 @@ export class ChatSessionsService {
         order,
         content: snapshot.content,
       })),
+      memory: input.memory,
     }
   }
 
@@ -971,9 +1007,11 @@ export class ChatSessionsService {
     const userBranchOrder = userParentMessageId
       ? 1
       : getNextBranchOrder(session.messages, null, ChatSessionMessageRole.USER)
+    let resolvedAgentProfileId: string | null = null
 
     const latestSequence = await this.writeRunMutation(session.id, async (tx) => {
       const agentProfile = await this.resolveSessionAgentProfile(session, input.userId, tx)
+      resolvedAgentProfileId = agentProfile.id
       const agentProfileSnapshot = createAgentProfileSnapshot(agentProfile, now)
 
       await this.createUserMessage(tx, {
@@ -1015,6 +1053,7 @@ export class ChatSessionsService {
         actorUserId: input.userId,
         modelTargetSnapshot: input.modelTargetSnapshot,
         expectedHistoryVersion,
+        memory: input.memory,
       })
       await this.createPendingGeneration(tx, {
         sessionId: session.id,
@@ -1048,8 +1087,11 @@ export class ChatSessionsService {
     return {
       sessionId: session.id,
       runId: input.runId,
+      generationId: input.generationId,
       assistantMessageId,
       triggerUserMessageId,
+      triggerUserContent: normalizedContent,
+      agentProfileId: assertResolvedAgentProfileId(resolvedAgentProfileId),
       expectedHistoryVersion,
       latestSequence,
     }
@@ -1088,9 +1130,11 @@ export class ChatSessionsService {
       sourceMessage.parentMessageId,
       ChatSessionMessageRole.USER,
     )
+    let resolvedAgentProfileId: string | null = null
 
     const latestSequence = await this.writeRunMutation(session.id, async (tx) => {
       const agentProfile = await this.resolveSessionAgentProfile(session, input.userId, tx)
+      resolvedAgentProfileId = agentProfile.id
       const agentProfileSnapshot = createAgentProfileSnapshot(agentProfile, now)
 
       await this.createUserMessage(tx, {
@@ -1132,6 +1176,7 @@ export class ChatSessionsService {
         actorUserId: input.userId,
         modelTargetSnapshot: input.modelTargetSnapshot,
         expectedHistoryVersion,
+        memory: input.memory,
       })
       await this.createPendingGeneration(tx, {
         sessionId: session.id,
@@ -1163,8 +1208,11 @@ export class ChatSessionsService {
     return {
       sessionId: session.id,
       runId: input.runId,
+      generationId: input.generationId,
       assistantMessageId,
       triggerUserMessageId,
+      triggerUserContent: normalizedContent,
+      agentProfileId: assertResolvedAgentProfileId(resolvedAgentProfileId),
       expectedHistoryVersion,
       latestSequence,
     }
@@ -1198,9 +1246,11 @@ export class ChatSessionsService {
       triggerMessage.id,
       ChatSessionMessageRole.ASSISTANT,
     )
+    let resolvedAgentProfileId: string | null = null
 
     const latestSequence = await this.writeRunMutation(session.id, async (tx) => {
       const agentProfile = await this.resolveSessionAgentProfile(session, input.userId, tx)
+      resolvedAgentProfileId = agentProfile.id
       const agentProfileSnapshot = createAgentProfileSnapshot(agentProfile, now)
 
       await this.createAssistantPendingMessage(tx, {
@@ -1253,8 +1303,11 @@ export class ChatSessionsService {
     return {
       sessionId: session.id,
       runId: input.runId,
+      generationId: input.generationId,
       assistantMessageId,
       triggerUserMessageId: triggerMessage.id,
+      triggerUserContent: getChatMessageContentSnapshot(triggerMessage),
+      agentProfileId: assertResolvedAgentProfileId(resolvedAgentProfileId),
       expectedHistoryVersion,
       latestSequence,
     }
@@ -1384,6 +1437,7 @@ export class ChatSessionsService {
       actorUserId: string
       modelTargetSnapshot: ChatGenerationModelTargetSnapshot
       expectedHistoryVersion: number
+      memory?: AgentMemoryRunOptions
     },
   ): Promise<void> {
     await tx.chatSessionRun.create({
@@ -1396,6 +1450,7 @@ export class ChatSessionsService {
         modelTargetSnapshot: toJsonValue(input.modelTargetSnapshot),
         commandContext: toJsonObject({
           expectedHistoryVersion: input.expectedHistoryVersion,
+          memory: input.memory,
         }),
         status: ChatSessionRunStatus.PENDING,
       },
@@ -1428,6 +1483,93 @@ export class ChatSessionsService {
         status: ChatMessageGenerationStatus.PENDING,
         idempotencyKey: `chat:generation:${input.generationId}`,
       },
+    })
+  }
+
+  private async processUserMessageMemoryOperations(
+    userId: string,
+    run: CreatedRunResult,
+  ): Promise<void> {
+    if (!this.agentMemoryOperations) {
+      return
+    }
+
+    try {
+      const operations = await this.agentMemoryOperations.processUserMessage({
+        userId,
+        sessionId: run.sessionId,
+        messageId: run.triggerUserMessageId,
+        generationId: run.generationId,
+        agentProfileId: run.agentProfileId,
+        content: run.triggerUserContent,
+      })
+
+      if (operations.length === 0) {
+        return
+      }
+
+      await this.appendUserMessageMemoryOperations({
+        sessionId: run.sessionId,
+        messageId: run.triggerUserMessageId,
+        operations,
+      })
+    }
+    catch (error) {
+      this.logger.warn(`memory operation failed: ${error instanceof Error ? error.message : String(error)}`)
+    }
+  }
+
+  private async appendUserMessageMemoryOperations(input: {
+    sessionId: string
+    messageId: string
+    operations: ChatMemoryOperationProjection[]
+  }): Promise<void> {
+    await this.prisma.$transaction(async (tx) => {
+      const message = await tx.chatSessionMessage.findFirst({
+        where: {
+          id: input.messageId,
+          sessionId: input.sessionId,
+          role: ChatSessionMessageRole.USER,
+        },
+        select: {
+          metadata: true,
+        },
+      })
+
+      if (!message) {
+        return
+      }
+
+      const metadata = isRecord(message.metadata) ? message.metadata : {}
+      const existingOperations = Array.isArray(metadata.memoryOperations)
+        ? metadata.memoryOperations
+        : []
+
+      await tx.chatSessionMessage.updateMany({
+        where: {
+          id: input.messageId,
+          sessionId: input.sessionId,
+          role: ChatSessionMessageRole.USER,
+        },
+        data: {
+          metadata: toJsonObject({
+            ...metadata,
+            memoryOperations: [
+              ...existingOperations,
+              ...input.operations,
+            ],
+          }),
+        },
+      })
+      await this.chatSessionEvents.appendEvents(tx, input.sessionId, [
+        {
+          type: CHAT_SESSION_EVENT_TYPE.SNAPSHOT_REQUIRED,
+          messageId: input.messageId,
+          payload: toJsonObject({
+            reason: 'memory_operations_updated',
+          }),
+        },
+      ])
     })
   }
 
@@ -1686,6 +1828,7 @@ function toChatSessionDetailRecord(
     title: session.title,
     selectedProviderId: session.selectedProviderId,
     selectedModelId: session.selectedModelId,
+    agentProfile: session.agentProfile,
     modelOverrideProviderId: session.modelOverrideProviderId,
     modelOverrideModelId: session.modelOverrideModelId,
     latestSequence: Math.max(0, session.nextEventSequence - 1),
@@ -1697,22 +1840,6 @@ function toChatSessionDetailRecord(
   }
 }
 
-function resolveAgentProfileModelRef(profile: AgentProfileForGeneration): Pick<AiModelRef, 'providerId' | 'modelId'> | null {
-  const config = AgentProfileConfigSchema.parse(profile.currentConfig)
-  if (
-    config.modelPolicy.selectionMode !== 'fixed_model'
-    || !config.modelPolicy.providerId
-    || !config.modelPolicy.modelId
-  ) {
-    return null
-  }
-
-  return {
-    providerId: config.modelPolicy.providerId,
-    modelId: config.modelPolicy.modelId,
-  }
-}
-
 function createAgentProfileSnapshot(profile: AgentProfileForGeneration, capturedAt: Date): AgentProfileSnapshot {
   return AgentProfileSnapshotSchema.parse({
     profileId: profile.id,
@@ -1721,6 +1848,14 @@ function createAgentProfileSnapshot(profile: AgentProfileForGeneration, captured
     currentConfig: profile.currentConfig,
     capturedAt: capturedAt.toISOString(),
   })
+}
+
+function assertResolvedAgentProfileId(agentProfileId: string | null): string {
+  if (!agentProfileId) {
+    throw new ConflictException('聊天 AgentProfile 未解析')
+  }
+
+  return agentProfileId
 }
 
 function toChatSessionMessageRecord(
@@ -2009,6 +2144,18 @@ function toChatRunSummary(run: {
 
 function isUniqueConstraintError(error: unknown): boolean {
   return error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002'
+}
+
+function readAgentMemoryRunOptions(commandContext: unknown): AgentMemoryRunOptions {
+  if (isRecord(commandContext)) {
+    return AgentMemoryRunOptionsSchema.parse(commandContext.memory)
+  }
+
+  return AgentMemoryRunOptionsSchema.parse(undefined)
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
 function toJsonObject(value: object): Prisma.InputJsonObject

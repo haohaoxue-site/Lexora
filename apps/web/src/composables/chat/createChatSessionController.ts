@@ -119,6 +119,7 @@ export function createChatSessionController(
     }
 
     patchSessionSummary(session.id, {
+      agentProfile: session.agentProfile,
       modelRef: session.modelRef,
       title: session.title,
       updatedAt: session.updatedAt,

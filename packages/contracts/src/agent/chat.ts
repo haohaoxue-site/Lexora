@@ -3,6 +3,7 @@ import {
   ChatMessageContextSnapshotMetaSchema,
   ChatMessageRoleSchema,
 } from '../chat'
+import { AgentMemoryRunOptionsSchema } from './memory'
 
 const NonEmptyStringSchema = z.string().trim().min(1)
 
@@ -29,6 +30,7 @@ export const AgentChatRuntimeContextSchema = z.object({
   assistantMessageId: NonEmptyStringSchema,
   messages: z.array(AgentChatContextMessageSchema),
   contextSnapshots: z.array(AgentChatContextSnapshotSchema),
+  memory: AgentMemoryRunOptionsSchema,
 }).strict()
 
 export type AgentChatContextMessage = z.infer<typeof AgentChatContextMessageSchema>

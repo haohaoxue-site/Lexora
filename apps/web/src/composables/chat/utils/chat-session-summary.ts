@@ -1,6 +1,6 @@
 import type { ChatSessionDetail, ChatSessionSummary } from '@/apis/chat'
 
-export type ChatSessionSummaryPatch = Partial<Pick<ChatSessionSummary, 'modelRef' | 'title' | 'updatedAt'>>
+export type ChatSessionSummaryPatch = Partial<Pick<ChatSessionSummary, 'agentProfile' | 'modelRef' | 'title' | 'updatedAt'>>
 
 export function toChatSessionSummary(session: ChatSessionSummary | ChatSessionDetail): ChatSessionSummary {
   return {
@@ -8,6 +8,7 @@ export function toChatSessionSummary(session: ChatSessionSummary | ChatSessionDe
     workspaceId: session.workspaceId,
     origin: session.origin,
     title: session.title,
+    agentProfile: session.agentProfile,
     modelRef: session.modelRef,
     createdAt: session.createdAt,
     updatedAt: session.updatedAt,

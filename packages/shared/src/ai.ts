@@ -31,6 +31,10 @@ const AI_MODEL_INTENT_REQUIREMENTS = {
     modelType: AI_MODEL_TYPE.CHAT,
     requiredCapabilities: [],
   },
+  [AI_MODEL_INTENT_KEY.MEMORY_EMBEDDING_DEFAULT]: {
+    modelType: AI_MODEL_TYPE.EMBEDDING,
+    requiredCapabilities: [],
+  },
 } as const satisfies Record<AiModelIntentKey, AiModelIntentRequirement>
 
 const TRAILING_SLASHES_RE = /\/+$/

@@ -2,6 +2,7 @@ import type {
   AgentChatContextMessage,
   AgentChatContextSnapshot,
   AgentContextPolicy,
+  AgentMemoryRetrievalSnapshot,
   AgentProfileConfig,
   AgentRuntimeModelTarget,
   ChatGenerationUsageSnapshot,
@@ -19,6 +20,7 @@ export const AgentGraphState = Annotation.Root({
   activePathTailMessageId: Annotation<string>(),
   olderMessagesExcerpt: Annotation<string>(),
   historyDigest: Annotation<AgentHistoryDigest | null>(),
+  memoryRetrieval: Annotation<AgentMemoryRetrievalSnapshot | null>(),
   messages: Annotation<AgentChatContextMessage[], AgentChatContextMessage[]>({
     reducer: (current, update) => current.concat(update),
     default: () => [],
@@ -29,12 +31,16 @@ export const AgentGraphState = Annotation.Root({
 })
 
 export interface AgentGraphContext {
+  generationId?: string | null
+  actorUserId?: string | null
+  agentProfileId?: string | null
   modelTarget?: AgentRuntimeModelTarget | null
   modelOptions?: AgentChatModelOptions | null
   modelLimits?: AgentModelLimits | null
   agentProfileConfig?: AgentProfileConfig | null
   contextPolicy?: AgentContextPolicy | null
   contextBudget?: AgentContextBudget | null
+  memoryIgnoredForRun?: boolean
   triggerUserMessageId?: string | null
   contextSnapshots?: AgentChatContextSnapshot[] | null
   onStreamPart?: (part: AgentModelStreamPart) => Promise<void> | void

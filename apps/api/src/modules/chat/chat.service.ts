@@ -19,6 +19,7 @@ import {
   Logger,
 } from '@nestjs/common'
 import { AgentCommandPublisherService } from '../agent/agent-command-publisher.service'
+import { AgentProfilesService } from '../agent/agent-profiles.service'
 import { AgentRuntimeCleanupTasksService } from '../agent/agent-runtime-cleanup-tasks.service'
 import { AiDefaultModelsService } from '../ai/models/defaults.service'
 import { AiModelResolverService } from '../ai/models/resolver.service'
@@ -76,6 +77,7 @@ export class ChatService {
     private readonly chatSessionsService: ChatSessionsService,
     private readonly modelResolverService: AiModelResolverService,
     private readonly defaultModelsService: AiDefaultModelsService,
+    private readonly agentProfiles: AgentProfilesService,
     private readonly chatRunDispatcher: ChatRunDispatcherService,
     private readonly agentCommandPublisher: AgentCommandPublisherService,
     private readonly agentRuntimeCleanupTasks: AgentRuntimeCleanupTasksService,
@@ -83,9 +85,11 @@ export class ChatService {
 
   async getRuntimeConfig(userId: string): Promise<ChatRuntimeConfig> {
     try {
+      const agentProfile = await this.agentProfiles.getDefaultAgentProfileSettings(userId)
       const target = await this.modelResolverService.resolveModelTarget({
         actorUserId: userId,
         intentKey: AI_MODEL_INTENT_KEY.CHAT_ASSISTANT_DEFAULT,
+        requestedModelRef: agentProfile.modelRef ?? undefined,
       })
 
       return {

@@ -18,8 +18,15 @@ export interface ChatStreamControllerOptions {
   onSessionCreated?: (sessionId: string) => Promise<void> | void
 }
 
-export interface SendChatComposerMessageInput extends CreateChatSessionMessageRequest {
+type ChatMemoryRunOptions = CreateChatSessionMessageRequest['memory']
+
+export interface SendChatComposerMessageInput extends Omit<CreateChatSessionMessageRequest, 'memory'> {
+  memory?: ChatMemoryRunOptions
   modelRef?: ChatModelSelection['modelRef'] | null
+}
+
+type EditAndSendChatComposerMessageInput = Omit<EditAndSendChatMessageRequest, 'memory'> & {
+  memory?: ChatMemoryRunOptions
 }
 
 export function createChatStreamController(
@@ -90,6 +97,7 @@ export function createChatStreamController(
         content,
         contentJSON: input.contentJSON,
         attachments: input.attachments ?? [],
+        memory: input.memory ?? { ignoredForRun: false },
       }))
       return true
     }
@@ -99,7 +107,7 @@ export function createChatStreamController(
     }
   }
 
-  async function editAndSendMessage(messageId: string, payload: EditAndSendChatMessageRequest): Promise<boolean> {
+  async function editAndSendMessage(messageId: string, payload: EditAndSendChatComposerMessageInput): Promise<boolean> {
     const content = payload.content.trim()
     if (!activeSession.value || !content || isStreaming.value) {
       return false
@@ -110,6 +118,7 @@ export function createChatStreamController(
         content,
         contentJSON: payload.contentJSON,
         attachments: payload.attachments ?? [],
+        memory: payload.memory ?? { ignoredForRun: false },
       }))
       return true
     }

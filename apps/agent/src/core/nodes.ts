@@ -1,14 +1,21 @@
-import type { AgentChatContextMessage } from '@haohaoxue/samepage-contracts'
+import type {
+  AgentChatContextMessage,
+  AgentMemoryPolicy,
+  AgentMemoryRetrievalSnapshot,
+} from '@haohaoxue/samepage-contracts'
 import type { GraphNode } from '@langchain/langgraph'
+import type { AgentMemoryApiClient } from '../clients/memory'
 import type { AgentChatModelFactory } from '../integrations/model-providers/chat-model'
 import type { AgentHistoryDigest } from './history-compaction'
 import type { AgentGraphContext, AgentGraphState } from './state'
+import { AgentMemoryRetrievalSnapshotSchema } from '@haohaoxue/samepage-contracts'
 import { SystemMessage } from '@langchain/core/messages'
 import { Overwrite } from '@langchain/langgraph'
 import { consumeChatModelTextStream } from '../integrations/model-providers/stream-text'
 import { resolveAgentContextBudget } from './context-budget'
 import { applyAgentContextSnapshotsToMessages } from './context-window'
 import { compactAgentHistory } from './history-compaction'
+import { createAgentMemoryPromptBlock } from './memory-prompt'
 import { toLangChainChatMessages } from './message-conversion'
 import { createAgentSystemPrompt } from './prompt'
 import { createChatGenerationUsageSnapshot } from './usage'
@@ -17,9 +24,14 @@ export interface CreateCallModelNodeOptions {
   chatModelFactory: AgentChatModelFactory
 }
 
+export interface CreateRetrieveMemoryNodeOptions {
+  memoryApi?: AgentMemoryApiClient
+}
+
 interface AgentBudgetState {
   olderMessagesExcerpt: string
   historyDigest: AgentHistoryDigest | null
+  memoryRetrieval: AgentMemoryRetrievalSnapshot | null
   messages: AgentChatContextMessage[]
 }
 
@@ -44,6 +56,7 @@ export function createCallModelNode(options: CreateCallModelNodeOptions): GraphN
       state.olderMessagesExcerpt,
       state.historyDigest?.summary ?? null,
       config.context?.agentProfileConfig,
+      state.memoryRetrieval,
     )
 
     const stream = await model.stream(langChainMessages, {
@@ -58,6 +71,7 @@ export function createCallModelNode(options: CreateCallModelNodeOptions): GraphN
       outputText: streamResult.text,
       providerUsage: streamResult.providerUsage,
       contextBudget: config.context?.contextBudget ?? state.contextBudget,
+      memoryRetrieval: state.memoryRetrieval,
       firstTokenLatencyMs: streamResult.firstTokenLatencyMs,
       elapsedMs: streamResult.elapsedMs,
     })
@@ -72,6 +86,45 @@ export function createCallModelNode(options: CreateCallModelNodeOptions): GraphN
           content: streamResult.text,
         },
       ],
+    }
+  }
+}
+
+export function createRetrieveMemoryNode(options: CreateRetrieveMemoryNodeOptions): GraphNode<typeof AgentGraphState, AgentGraphContext> {
+  return async (state, config) => {
+    const memoryApi = options.memoryApi
+    const profileConfig = config.context?.agentProfileConfig
+    const generationId = config.context?.generationId
+    const actorUserId = config.context?.actorUserId
+
+    if (!memoryApi || !profileConfig || !generationId || !actorUserId) {
+      return {}
+    }
+
+    const policy = {
+      ...profileConfig.memoryPolicy,
+      ignoredForRun: profileConfig.memoryPolicy.ignoredForRun || Boolean(config.context?.memoryIgnoredForRun),
+    }
+    const query = resolveMemoryQuery(state, config.context?.triggerUserMessageId)
+
+    try {
+      const response = await memoryApi.retrieveMemories({
+        actorUserId,
+        agentProfileId: config.context?.agentProfileId ?? null,
+        generationId,
+        sessionId: state.sessionId,
+        query,
+        policy,
+      })
+
+      return {
+        memoryRetrieval: response.snapshot,
+      }
+    }
+    catch {
+      return {
+        memoryRetrieval: createRuntimeMemoryFallbackSnapshot(policy, query),
+      }
     }
   }
 }
@@ -125,6 +178,7 @@ function resolveBudgetForState(
       agentProfileConfig: context?.agentProfileConfig,
     }),
     contextSnapshots: context?.contextSnapshots ?? [],
+    memoryPrompt: createAgentMemoryPromptBlock(state.memoryRetrieval),
     historyDigest: state.historyDigest ?? (state.olderMessagesExcerpt
       ? { summary: state.olderMessagesExcerpt }
       : null),
@@ -137,13 +191,42 @@ function toLangChainMessages(
   olderMessagesExcerpt: string,
   historyDigestSummary: string | null,
   agentProfileConfig: AgentGraphContext['agentProfileConfig'],
+  memoryRetrieval: AgentMemoryRetrievalSnapshot | null,
 ) {
+  const memoryPrompt = createAgentMemoryPromptBlock(memoryRetrieval)
+  const systemPrompt = createAgentSystemPrompt({
+    agentProfileConfig,
+    historyDigestSummary: historyDigestSummary ?? undefined,
+    olderMessagesExcerpt,
+  })
   return [
-    new SystemMessage(createAgentSystemPrompt({
-      agentProfileConfig,
-      historyDigestSummary: historyDigestSummary ?? undefined,
-      olderMessagesExcerpt,
-    })),
+    new SystemMessage(memoryPrompt ? `${systemPrompt}\n\n${memoryPrompt}` : systemPrompt),
     ...toLangChainChatMessages(messages),
   ]
+}
+
+function resolveMemoryQuery(state: AgentBudgetState, triggerUserMessageId: string | null | undefined): string {
+  const triggerMessage = triggerUserMessageId
+    ? state.messages.find(message => message.id === triggerUserMessageId)
+    : null
+
+  return (triggerMessage ?? state.messages.at(-1))?.content ?? ''
+}
+
+function createRuntimeMemoryFallbackSnapshot(policy: AgentMemoryPolicy, query: string): AgentMemoryRetrievalSnapshot {
+  return AgentMemoryRetrievalSnapshotSchema.parse({
+    enabled: policy.enabled,
+    ignoredForRun: policy.ignoredForRun,
+    query,
+    scopes: policy.scopes,
+    lanes: policy.lanes,
+    selectedMemoryIds: [],
+    omittedMemoryIds: [],
+    injectedCount: 0,
+    estimatedTokens: 0,
+    budgetTokens: policy.maxInjectedTokens,
+    retriever: 'disabled',
+    renderedSections: [],
+    createdAt: new Date().toISOString(),
+  })
 }

@@ -79,6 +79,7 @@ model ChatSession {
   runs                    ChatSessionRun[]
   messageGenerations      ChatMessageGeneration[]
   events                  ChatSessionEvent[]
+  memoryCandidates        AgentMemoryCandidate[]
   createdBy               String?
   createdByUser           User?                   @relation("ChatSessionCreator", fields: [createdBy], references: [id], onDelete: SetNull)
   createdAt               DateTime                @default(now())
@@ -122,6 +123,7 @@ model ChatSessionMessage {
   events                 ChatSessionEvent[]
   parts                  ChatSessionMessagePart[]
   contextSnapshots       ChatMessageContextSnapshot[]
+  memoryCandidates       AgentMemoryCandidate[]
   createdAt              DateTime                     @default(now())
   updatedAt              DateTime                     @updatedAt
   deletedAt              DateTime?
@@ -217,6 +219,7 @@ model ChatMessageGeneration {
   session                ChatSession                 @relation(fields: [sessionId], references: [id], onDelete: Cascade)
   assistantMessage       ChatSessionMessage          @relation(fields: [assistantMessageId], references: [id], onDelete: Cascade)
   agentProfile           AgentProfile?               @relation(fields: [agentProfileId], references: [id], onDelete: SetNull)
+  memoryCandidates       AgentMemoryCandidate[]
   createdAt              DateTime                    @default(now())
   updatedAt              DateTime                    @updatedAt
   deletedAt              DateTime?

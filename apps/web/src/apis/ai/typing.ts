@@ -7,7 +7,6 @@ import type {
 export type {
   AiAvailableModelOption,
   AiAvailableProviderOption,
-  AiDefaultModelPolicyItem,
   AiModelCapability,
   AiModelIntentKey,
   AiModelModality,
@@ -20,7 +19,6 @@ export type {
   AiProviderModels,
   AiProviderPreset,
   AiProviderScope,
-  UpdateAiDefaultModelPolicyRequest,
 } from '@haohaoxue/samepage-contracts'
 
 /**

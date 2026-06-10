@@ -162,6 +162,7 @@ export class ChatController {
       content: payload.content,
       contentJSON: payload.contentJSON,
       attachments: payload.attachments,
+      memory: payload.memory,
     })
   }
 
@@ -181,6 +182,7 @@ export class ChatController {
       content: payload.content,
       contentJSON: payload.contentJSON,
       attachments: payload.attachments,
+      memory: payload.memory,
     })
   }
 

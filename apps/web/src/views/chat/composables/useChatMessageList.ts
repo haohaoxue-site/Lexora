@@ -15,6 +15,7 @@ import { useChatRuntimeOverlay } from './useChatRuntimeOverlay'
 import { useChatStream } from './useChatStream'
 
 const EDIT_HIGHLIGHT_DURATION_MS = 1400
+const DEFAULT_ASSISTANT_NAME = '小助手'
 
 export function useChatMessageList() {
   const {
@@ -47,6 +48,7 @@ export function useChatMessageList() {
 
   const messages = computed<ChatMessage[]>(() => renderSession.value?.messages ?? [])
   const listKey = computed(() => renderSession.value?.id ?? null)
+  const assistantName = computed(() => renderSession.value?.agentProfile?.name?.trim() || DEFAULT_ASSISTANT_NAME)
   const emptyIconStateClass = computed(() => isConfigured.value ? 'configured' : 'idle')
   const emptyIcon = computed(() => isConfigured.value
     ? {
@@ -162,6 +164,7 @@ export function useChatMessageList() {
   }
 
   return {
+    assistantName,
     cancelEditMessage,
     composerModelSelectionKind,
     composerSelectedModelRef,

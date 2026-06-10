@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { ChatGenerationUsageSnapshotSchema } from './agent/generation'
+import { AgentMemoryRunOptionsSchema, ChatMemoryOperationProjectionSchema } from './agent/memory'
 import { AiAvailableModelOptionSchema, AiModelRefSchema } from './ai'
 import {
   CHAT_MESSAGE_ATTACHMENT_MAX_COUNT,
@@ -53,6 +54,12 @@ const ChatSessionSummaryBaseSchema = z.object({
   workspaceId: NonEmptyStringSchema,
   origin: z.enum(CHAT_SESSION_ORIGIN_VALUES),
   title: ChatSessionTitleSchema,
+  agentProfile: z.object({
+    profileId: NonEmptyStringSchema,
+    name: NonEmptyStringSchema,
+    description: z.string().trim().min(1).nullable(),
+    avatarUrl: z.string().trim().min(1).nullable(),
+  }).strict().nullable(),
   modelRef: AiModelRefSchema.pick({
     providerId: true,
     modelId: true,
@@ -194,6 +201,7 @@ export const ChatUserMessageMetadataSchema = z.object({
   contentJSON: ChatMessageContentJSONSchema,
   attachments: z.array(ChatPersistedMessageAttachmentSchema).max(CHAT_MESSAGE_ATTACHMENT_MAX_COUNT),
   contextSnapshotMetas: z.array(ChatMessageContextSnapshotMetaSchema).max(CHAT_MESSAGE_ATTACHMENT_MAX_COUNT),
+  memoryOperations: z.array(ChatMemoryOperationProjectionSchema).default([]),
 }).strict()
 
 export const ChatMessagePartMetadataSchema = z.object({
@@ -302,6 +310,7 @@ const ChatSessionMessageRequestBaseSchema = z.object({
   content: z.string().trim().min(1).max(CHAT_MESSAGE_CONTENT_MAX_LENGTH),
   contentJSON: ChatMessageContentJSONSchema,
   attachments: z.array(ChatMessageAttachmentInputSchema).max(CHAT_MESSAGE_ATTACHMENT_MAX_COUNT).optional().nullable(),
+  memory: AgentMemoryRunOptionsSchema.optional(),
 }).strict().superRefine((value, ctx) => {
   const attachmentIds = new Set((value.attachments ?? []).map(attachment => attachment.id))
   for (const attachmentId of collectChatReferenceAttachmentIds(value.contentJSON)) {

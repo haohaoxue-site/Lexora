@@ -11,6 +11,7 @@
     "./agent/control": "./src/agent/control.ts",
     "./agent/events": "./src/agent/events.ts",
     "./agent/generation": "./src/agent/generation.ts",
+    "./agent/memory": "./src/agent/memory.ts",
     "./agent/model": "./src/agent/model.ts",
     "./agent/profile": "./src/agent/profile.ts",
     "./agent/queue": "./src/agent/queue.ts",
