@@ -16,6 +16,7 @@
     "./agent/profile": "./src/agent/profile.ts",
     "./agent/queue": "./src/agent/queue.ts",
     "./agent/runtime": "./src/agent/runtime.ts",
+    "./agent/skill": "./src/agent/skill.ts",
     "./agent/transport": "./src/agent/transport.ts",
     "./ai": "./src/ai.ts",
     "./ai/constants": "./src/ai/constants.ts",

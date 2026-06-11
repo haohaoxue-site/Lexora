@@ -12,10 +12,14 @@ import { AgentMemoryService } from './agent-memory.service'
 import { AgentProfilesController } from './agent-profiles.controller'
 import { AgentProfilesService } from './agent-profiles.service'
 import { AgentRuntimeCleanupTasksService } from './agent-runtime-cleanup-tasks.service'
+import { AgentSkillScannerService } from './agent-skill-scanner.service'
+import { AgentSkillsInternalController } from './agent-skills-internal.controller'
+import { AgentSkillsController } from './agent-skills.controller'
+import { AgentSkillsService } from './agent-skills.service'
 
 @Module({
   imports: [RedisModule, AiModule],
-  controllers: [AgentMemoryDocumentsController, AgentMemoryInternalController, AgentProfilesController],
+  controllers: [AgentMemoryDocumentsController, AgentMemoryInternalController, AgentProfilesController, AgentSkillsController, AgentSkillsInternalController],
   providers: [
     AgentCommandPublisherService,
     AgentGenerationEventsService,
@@ -25,6 +29,8 @@ import { AgentRuntimeCleanupTasksService } from './agent-runtime-cleanup-tasks.s
     AgentMemoryService,
     AgentProfilesService,
     AgentRuntimeCleanupTasksService,
+    AgentSkillScannerService,
+    AgentSkillsService,
   ],
   exports: [
     AgentCommandPublisherService,
@@ -35,6 +41,8 @@ import { AgentRuntimeCleanupTasksService } from './agent-runtime-cleanup-tasks.s
     AgentMemoryService,
     AgentProfilesService,
     AgentRuntimeCleanupTasksService,
+    AgentSkillScannerService,
+    AgentSkillsService,
   ],
 })
 export class AgentModule {}

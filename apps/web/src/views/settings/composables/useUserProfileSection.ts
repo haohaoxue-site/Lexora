@@ -14,8 +14,14 @@ export function useUserProfileSection(options: {
   props: UserProfileSectionProps
   profileFormRef: Ref<FormInstance | null>
 }) {
+  const displayName = computed({
+    get: () => options.displayName.value,
+    set: (nextDisplayName: string) => {
+      options.displayName.value = nextDisplayName
+    },
+  })
   const form = reactive({
-    displayName: options.displayName,
+    displayName,
   })
   const displayNameRules = {
     displayName: createDisplayNameRules(),

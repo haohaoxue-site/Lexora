@@ -7,6 +7,7 @@ import { CHAT_REFERENCE_NODE_NAME, ChatReference } from './extensions/ChatRefere
 
 export interface CreateChatComposerExtensionsOptions {
   getAttachments: () => ChatComposerAttachment[]
+  getPlaceholder?: () => string
   cloneInlineAttachment: (attachment: ChatComposerAttachment) => ChatReferenceCloneResult
 }
 
@@ -25,7 +26,7 @@ export function createChatComposerExtensions(options: CreateChatComposerExtensio
       strike: false,
     }),
     Placeholder.configure({
-      placeholder: '输入消息，Ctrl/⌘ + Enter 发送',
+      placeholder: () => options.getPlaceholder?.() ?? '输入消息，Ctrl/⌘ + Enter 发送',
     }),
     ChatReference.configure({
       getAttachmentById: attachmentId =>

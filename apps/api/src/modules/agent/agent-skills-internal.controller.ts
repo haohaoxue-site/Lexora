@@ -1,0 +1,43 @@
+import type {
+  ActivateAgentSkillRequest,
+  ActivateAgentSkillResponse,
+  ReadAgentSkillResourceRequest,
+  ReadAgentSkillResourceResponse,
+} from '@haohaoxue/samepage-contracts'
+import {
+  ActivateAgentSkillRequestSchema,
+  ReadAgentSkillResourceRequestSchema,
+} from '@haohaoxue/samepage-contracts'
+import {
+  Body,
+  Controller,
+  HttpCode,
+  HttpStatus,
+  Post,
+} from '@nestjs/common'
+import { Public } from '../../decorators/public.decorator'
+import { ZodValidationPipe } from '../../pipes/zod-validation.pipe'
+import { AgentSkillsService } from './agent-skills.service'
+
+@Controller('internal/agent/skills')
+export class AgentSkillsInternalController {
+  constructor(private readonly skills: AgentSkillsService) {}
+
+  @Public()
+  @HttpCode(HttpStatus.OK)
+  @Post('activate')
+  activateSkill(
+    @Body(new ZodValidationPipe(ActivateAgentSkillRequestSchema)) payload: ActivateAgentSkillRequest,
+  ): Promise<ActivateAgentSkillResponse> {
+    return this.skills.activateSkill(payload)
+  }
+
+  @Public()
+  @HttpCode(HttpStatus.OK)
+  @Post('resources/read')
+  readSkillResource(
+    @Body(new ZodValidationPipe(ReadAgentSkillResourceRequestSchema)) payload: ReadAgentSkillResourceRequest,
+  ): Promise<ReadAgentSkillResourceResponse> {
+    return this.skills.readSkillResource(payload)
+  }
+}

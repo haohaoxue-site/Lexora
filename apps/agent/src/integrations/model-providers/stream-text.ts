@@ -1,4 +1,6 @@
+import type { ToolCall } from '@langchain/core/messages'
 import type { AgentChatModelResponse } from './chat-model'
+import { AIMessageChunk } from '@langchain/core/messages'
 import {
   readChatModelResponseReasoning,
   readChatModelResponseText,
@@ -27,6 +29,7 @@ export interface AgentModelTokenUsage {
 export interface AgentModelTextStreamResult {
   text: string
   providerUsage: AgentModelTokenUsage | null
+  toolCalls: ToolCall[]
   firstTokenLatencyMs?: number
   elapsedMs: number
 }
@@ -43,8 +46,13 @@ export async function consumeChatModelTextStream(
   const tagParser = createReasoningTagStreamParser()
   const normalizeReasoningDelta = createLeadingBlankLineNormalizer()
   const normalizeTextDelta = createLeadingBlankLineNormalizer()
+  let responseChunk: AIMessageChunk | null = null
 
   for await (const chunk of stream) {
+    if (AIMessageChunk.isInstance(chunk)) {
+      responseChunk = responseChunk ? responseChunk.concat(chunk) : chunk
+    }
+
     providerUsage = mergeTokenUsage(providerUsage, readProviderUsage(chunk))
     const reasoning = readChatModelResponseReasoning(chunk)
     const hasStructuredReasoning = Boolean(reasoning)
@@ -102,9 +110,19 @@ export async function consumeChatModelTextStream(
   return {
     text: responseText,
     providerUsage,
+    toolCalls: normalizeToolCalls(responseChunk?.tool_calls ?? []),
     firstTokenLatencyMs: firstTokenAt === null ? undefined : Math.max(0, Math.trunc(firstTokenAt - startedAt)),
     elapsedMs: Math.max(0, Math.trunc(completedAt - startedAt)),
   }
+}
+
+function normalizeToolCalls(toolCalls: ToolCall[]): ToolCall[] {
+  return toolCalls.filter((toolCall): toolCall is ToolCall & { id: string } =>
+    typeof toolCall.id === 'string'
+    && toolCall.id.trim().length > 0
+    && typeof toolCall.name === 'string'
+    && toolCall.name.trim().length > 0,
+  )
 }
 
 async function emitPart(

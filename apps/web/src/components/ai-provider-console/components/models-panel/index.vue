@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { AiProviderModelsPanelEmits, AiProviderModelsPanelProps } from './typing'
+import Empty from '@/components/empty'
 import ProviderModelTable from '../model-table'
 
 defineProps<AiProviderModelsPanelProps>()
@@ -40,7 +41,7 @@ const emit = defineEmits<AiProviderModelsPanelEmits>()
     </div>
 
     <div v-if="shouldShowEmptyState" class="ai-provider-console__models-empty">
-      <ElEmpty description="暂无模型" />
+      <Empty compact description="暂无模型" />
     </div>
 
     <div v-else v-loading="isLoadingModels" class="ai-provider-console__model-list">

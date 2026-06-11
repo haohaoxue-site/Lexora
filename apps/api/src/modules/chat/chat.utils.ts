@@ -24,6 +24,7 @@ import {
   CHAT_SESSION_ORIGIN,
   ChatGenerationUsageSnapshotSchema,
   ChatMemoryOperationProjectionSchema,
+  ChatSkillInvocationSchema,
 } from '@haohaoxue/samepage-contracts'
 import {
   ChatSessionMessageRole,
@@ -290,7 +291,7 @@ function toChatMessageMetadata(metadata: unknown): ChatMessageMetadata | null {
   return normalized as ChatMessageMetadata
 }
 
-function toChatUserMessageMetadata(message: ChatSessionMessageRecord): ChatUserMessageMetadata {
+export function toChatUserMessageMetadata(message: ChatSessionMessageRecord): ChatUserMessageMetadata {
   const metadata = isRecord(message.metadata) ? message.metadata : {}
   const contentJSON = isRecord(metadata.contentJSON)
     ? metadata.contentJSON as ChatMessageContentJSON
@@ -298,6 +299,7 @@ function toChatUserMessageMetadata(message: ChatSessionMessageRecord): ChatUserM
   const attachments = Array.isArray(metadata.attachments)
     ? metadata.attachments as ChatPersistedMessageAttachment[]
     : []
+  const skillInvocationResult = ChatSkillInvocationSchema.safeParse(metadata.skillInvocation)
   const memoryOperations = Array.isArray(metadata.memoryOperations)
     ? metadata.memoryOperations.map(operation => ChatMemoryOperationProjectionSchema.safeParse(operation))
         .filter(result => result.success)
@@ -309,6 +311,7 @@ function toChatUserMessageMetadata(message: ChatSessionMessageRecord): ChatUserM
     attachments,
     contextSnapshotMetas: message.contextSnapshots.map(toChatMessageContextSnapshotMeta),
     memoryOperations,
+    skillInvocation: skillInvocationResult.success ? skillInvocationResult.data : null,
   }
 }
 

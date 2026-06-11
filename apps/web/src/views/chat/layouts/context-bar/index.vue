@@ -21,7 +21,7 @@ const emits = defineEmits<ChatContextBarEmits>()
           aria-label="Agent 设置"
           @click="emits('toggleAgentSettings')"
         >
-          <SvgIcon category="ui" icon="settings-gear" size="1rem" />
+          <SvgIcon category="ai" icon="agents" size="1.25rem" />
         </ElButton>
       </ElTooltip>
       <ElButton class="chat-view-context__new-chat-btn h-8 rounded-lg px-3 text-sm font-medium" @click="emits('newChat')">

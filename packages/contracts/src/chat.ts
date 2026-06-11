@@ -1,6 +1,10 @@
 import { z } from 'zod'
 import { ChatGenerationUsageSnapshotSchema } from './agent/generation'
 import { AgentMemoryRunOptionsSchema, ChatMemoryOperationProjectionSchema } from './agent/memory'
+import {
+  AGENT_TRANSLATOR_SKILL_KEY,
+  AgentTranslatorTargetLanguageSchema,
+} from './agent/translator'
 import { AiAvailableModelOptionSchema, AiModelRefSchema } from './ai'
 import {
   CHAT_MESSAGE_ATTACHMENT_MAX_COUNT,
@@ -76,6 +80,15 @@ export const ChatSessionEventTypeSchema = z.enum(CHAT_SESSION_EVENT_TYPE_VALUES)
 export const ChatSessionOriginSchema = z.enum(CHAT_SESSION_ORIGIN_VALUES)
 export const ChatMessageAttachmentTypeSchema = z.enum(CHAT_MESSAGE_ATTACHMENT_TYPE_VALUES)
 export const ChatMessageAttachmentPlacementSchema = z.enum(CHAT_MESSAGE_ATTACHMENT_PLACEMENT_VALUES)
+
+export const ChatTranslatorSkillInvocationSchema = z.object({
+  skillKey: z.literal(AGENT_TRANSLATOR_SKILL_KEY),
+  targetLanguage: AgentTranslatorTargetLanguageSchema,
+}).strict()
+
+export const ChatSkillInvocationSchema = z.discriminatedUnion('skillKey', [
+  ChatTranslatorSkillInvocationSchema,
+])
 
 export const ChatMessageBranchSchema = z.object({
   index: z.number().int().positive(),
@@ -192,6 +205,7 @@ export const ChatAssistantMessageMetadataSchema = z.object({
   elapsedMs: z.number().int().nonnegative().optional(),
   reasoningElapsedMs: z.number().int().nonnegative().optional(),
   usage: ChatGenerationUsageSnapshotSchema.optional(),
+  memoryOperations: z.array(ChatMemoryOperationProjectionSchema).optional(),
   finishReason: z.string().trim().min(1).optional(),
 }).strict()
 
@@ -202,6 +216,7 @@ export const ChatUserMessageMetadataSchema = z.object({
   attachments: z.array(ChatPersistedMessageAttachmentSchema).max(CHAT_MESSAGE_ATTACHMENT_MAX_COUNT),
   contextSnapshotMetas: z.array(ChatMessageContextSnapshotMetaSchema).max(CHAT_MESSAGE_ATTACHMENT_MAX_COUNT),
   memoryOperations: z.array(ChatMemoryOperationProjectionSchema).default([]),
+  skillInvocation: ChatSkillInvocationSchema.nullable().optional(),
 }).strict()
 
 export const ChatMessagePartMetadataSchema = z.object({
@@ -311,6 +326,7 @@ const ChatSessionMessageRequestBaseSchema = z.object({
   contentJSON: ChatMessageContentJSONSchema,
   attachments: z.array(ChatMessageAttachmentInputSchema).max(CHAT_MESSAGE_ATTACHMENT_MAX_COUNT).optional().nullable(),
   memory: AgentMemoryRunOptionsSchema.optional(),
+  skillInvocation: ChatSkillInvocationSchema.optional().nullable(),
 }).strict().superRefine((value, ctx) => {
   const attachmentIds = new Set((value.attachments ?? []).map(attachment => attachment.id))
   for (const attachmentId of collectChatReferenceAttachmentIds(value.contentJSON)) {
@@ -542,6 +558,8 @@ export type ChatSessionEventType = z.infer<typeof ChatSessionEventTypeSchema>
 export type ChatSessionOrigin = z.infer<typeof ChatSessionOriginSchema>
 export type ChatMessageAttachmentType = z.infer<typeof ChatMessageAttachmentTypeSchema>
 export type ChatMessageAttachmentPlacement = z.infer<typeof ChatMessageAttachmentPlacementSchema>
+export type ChatTranslatorSkillInvocation = z.infer<typeof ChatTranslatorSkillInvocationSchema>
+export type ChatSkillInvocation = z.infer<typeof ChatSkillInvocationSchema>
 export type ChatDocumentSelectionBoundary = z.infer<typeof ChatDocumentSelectionBoundarySchema>
 export type ChatDocumentScope = z.infer<typeof ChatDocumentScopeSchema>
 export type ChatMessageAttachmentInput = z.infer<typeof ChatMessageAttachmentInputSchema>

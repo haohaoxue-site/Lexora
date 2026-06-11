@@ -100,6 +100,10 @@ export const AGENT_MEMORY_OPERATION_ACTION_VALUES = [
   AGENT_MEMORY_OPERATION_ACTION.ASK_USER,
 ] as const
 
+export const AGENT_MEMORY_SLOT_KEY = {
+  AGENT_NAME: 'agent.name',
+} as const
+
 export const AGENT_MEMORY_CANDIDATE_STATUS = {
   PENDING: 'pending',
   ACCEPTED: 'accepted',
@@ -144,6 +148,24 @@ export const AGENT_MEMORY_DOCUMENT_ID_VALUES = [
   AGENT_MEMORY_DOCUMENT_ID.MEMORY,
 ] as const
 
+export const AGENT_MEMORY_SKILL_KEY = 'samepage.memory' as const
+
+export const AGENT_MEMORY_TOOL = {
+  REMEMBER: 'memory_remember',
+  UPDATE: 'memory_update',
+  FORGET: 'memory_forget',
+  IGNORE: 'memory_ignore',
+  ASK_USER: 'memory_ask_user',
+} as const
+
+export const AGENT_MEMORY_TOOL_VALUES = [
+  AGENT_MEMORY_TOOL.REMEMBER,
+  AGENT_MEMORY_TOOL.UPDATE,
+  AGENT_MEMORY_TOOL.FORGET,
+  AGENT_MEMORY_TOOL.IGNORE,
+  AGENT_MEMORY_TOOL.ASK_USER,
+] as const
+
 export const AgentMemoryScopeSchema = z.enum(AGENT_MEMORY_SCOPE_VALUES)
 export const AgentMemoryLaneSchema = z.enum(AGENT_MEMORY_LANE_VALUES)
 export const AgentMemoryStatusSchema = z.enum(AGENT_MEMORY_STATUS_VALUES)
@@ -154,6 +176,7 @@ export const AgentMemoryOperationActionSchema = z.enum(AGENT_MEMORY_OPERATION_AC
 export const AgentMemoryCandidateStatusSchema = z.enum(AGENT_MEMORY_CANDIDATE_STATUS_VALUES)
 export const AgentMemoryCandidateKindSchema = z.enum(AGENT_MEMORY_CANDIDATE_KIND_VALUES)
 export const AgentMemoryDocumentIdSchema = z.enum(AGENT_MEMORY_DOCUMENT_ID_VALUES)
+export const AgentMemoryToolNameSchema = z.enum(AGENT_MEMORY_TOOL_VALUES)
 
 const AgentMemoryLaneCountMapSchema = z.object({
   [AGENT_MEMORY_LANE.USER_PROFILE]: z.number().int().nonnegative().optional(),
@@ -164,6 +187,16 @@ const AgentMemoryLaneCountMapSchema = z.object({
   [AGENT_MEMORY_LANE.TASK_KNOWLEDGE]: z.number().int().nonnegative().optional(),
 }).strict()
 
+export const AgentMemoryWritingPolicySchema = z.object({
+  enabled: z.boolean().default(true),
+  minAutoApplyConfidence: z.number().min(0).max(1).default(0.8),
+  requireConfirmationForSensitive: z.boolean().default(true),
+}).strict().default({
+  enabled: true,
+  minAutoApplyConfidence: 0.8,
+  requireConfirmationForSensitive: true,
+})
+
 export const AgentMemoryPolicySchema = z.object({
   enabled: z.boolean().default(true),
   ignoredForRun: z.boolean().default(false),
@@ -173,6 +206,7 @@ export const AgentMemoryPolicySchema = z.object({
   perLaneBudget: AgentMemoryLaneCountMapSchema.default({}),
   maxInjectedTokens: z.number().int().positive().default(1200),
   includeSensitive: z.boolean().default(false),
+  writing: AgentMemoryWritingPolicySchema,
 }).strict().default({
   enabled: true,
   ignoredForRun: false,
@@ -182,6 +216,11 @@ export const AgentMemoryPolicySchema = z.object({
   perLaneBudget: {},
   maxInjectedTokens: 1200,
   includeSensitive: false,
+  writing: {
+    enabled: true,
+    minAutoApplyConfidence: 0.8,
+    requireConfirmationForSensitive: true,
+  },
 })
 
 export const AgentMemorySchema = z.object({
@@ -238,6 +277,54 @@ export const AgentMemoryOperationSchema = z.object({
   createdAt: IsoDateTimeStringSchema,
 }).strict()
 
+export const AgentMemoryOperationProposalSchema = AgentMemoryOperationSchema.omit({
+  operationId: true,
+  source: true,
+  createdAt: true,
+}).extend({
+  relatedMemoryIds: z.array(NonEmptyStringSchema).default([]),
+}).strict()
+
+export const AgentMemoryToolManifestSchema = z.object({
+  name: AgentMemoryToolNameSchema,
+  title: NonEmptyStringSchema,
+  description: NonEmptyStringSchema,
+  actions: z.array(AgentMemoryOperationActionSchema).min(1),
+}).strict()
+
+export const AgentMemorySkillManifestSchema = z.object({
+  key: z.literal(AGENT_MEMORY_SKILL_KEY),
+  title: NonEmptyStringSchema,
+  description: NonEmptyStringSchema,
+  tools: z.array(AgentMemoryToolManifestSchema).min(1),
+}).strict()
+
+export const AGENT_MEMORY_SKILL_MANIFEST = AgentMemorySkillManifestSchema.parse({
+  key: AGENT_MEMORY_SKILL_KEY,
+  title: 'Memory',
+  description: '让 Agent 在对话中基于用户意图和长期价值判断读写、更新、忘记或忽略记忆。',
+  tools: [
+    {
+      name: AGENT_MEMORY_TOOL.REMEMBER,
+      title: '记住信息',
+      description: '保存长期稳定、低风险且对未来对话有价值的信息。',
+      actions: [AGENT_MEMORY_OPERATION_ACTION.CREATE, AGENT_MEMORY_OPERATION_ACTION.APPEND],
+    },
+    {
+      name: AGENT_MEMORY_TOOL.UPDATE,
+      title: '更新记忆',
+      description: '在已知相关记忆的基础上修正、覆盖或关闭过期事实。',
+      actions: [AGENT_MEMORY_OPERATION_ACTION.UPDATE, AGENT_MEMORY_OPERATION_ACTION.DISABLE],
+    },
+    {
+      name: AGENT_MEMORY_TOOL.FORGET,
+      title: '忘记记忆',
+      description: '根据用户要求或明确失效信号归档相关记忆。',
+      actions: [AGENT_MEMORY_OPERATION_ACTION.FORGET],
+    },
+  ],
+})
+
 export const AgentMemoryOperationResultSchema = z.object({
   operationId: NonEmptyStringSchema,
   status: z.enum(['applied', 'pending_confirmation', 'ignored', 'failed']),
@@ -286,6 +373,7 @@ export const ChatMemoryOperationProjectionSchema = z.object({
   scope: AgentMemoryScopeSchema,
   lane: AgentMemoryLaneSchema,
   memoryIds: z.array(NonEmptyStringSchema),
+  archivedMemoryIds: z.array(NonEmptyStringSchema).default([]),
   candidateId: NonEmptyStringSchema.nullable(),
   title: NonEmptyStringSchema,
   detail: z.string().trim().min(1).nullable(),
@@ -335,9 +423,8 @@ export const ListAgentMemoryDocumentsQuerySchema = z.object({
 export const AgentMemoryDocumentSchema = z.object({
   id: AgentMemoryDocumentIdSchema,
   name: NonEmptyStringSchema,
-  title: NonEmptyStringSchema,
   summary: NonEmptyStringSchema,
-  content: NonEmptyStringSchema,
+  content: z.string(),
   sizeBytes: z.number().int().nonnegative(),
   updatedAt: IsoDateTimeStringSchema.nullable(),
   sourceMemoryIds: z.array(NonEmptyStringSchema),
@@ -364,6 +451,20 @@ export const RetrieveAgentMemoryResponseSchema = z.object({
   snapshot: AgentMemoryRetrievalSnapshotSchema,
 }).strict()
 
+export const ExecuteAgentMemoryOperationProposalsRequestSchema = z.object({
+  actorUserId: NonEmptyStringSchema,
+  sessionId: NonEmptyStringSchema,
+  messageId: NonEmptyStringSchema,
+  generationId: NonEmptyStringSchema,
+  agentProfileId: NonEmptyStringSchema.nullable(),
+  memoryWritingPolicy: AgentMemoryWritingPolicySchema.optional(),
+  operations: z.array(AgentMemoryOperationProposalSchema),
+}).strict()
+
+export const ExecuteAgentMemoryOperationProposalsResponseSchema = z.object({
+  operations: z.array(ChatMemoryOperationProjectionSchema),
+}).strict()
+
 export const AgentMemoryExtractorInputSchema = z.object({
   source: AgentMemoryOperationSourceSchema,
   userMessage: NonEmptyStringSchema,
@@ -386,12 +487,17 @@ export type AgentMemoryOperationAction = z.infer<typeof AgentMemoryOperationActi
 export type AgentMemoryCandidateStatus = z.infer<typeof AgentMemoryCandidateStatusSchema>
 export type AgentMemoryCandidateKind = z.infer<typeof AgentMemoryCandidateKindSchema>
 export type AgentMemoryDocumentId = z.infer<typeof AgentMemoryDocumentIdSchema>
+export type AgentMemoryWritingPolicy = z.infer<typeof AgentMemoryWritingPolicySchema>
 export type AgentMemoryPolicy = z.infer<typeof AgentMemoryPolicySchema>
 export type AgentMemory = z.infer<typeof AgentMemorySchema>
 export type AgentMemoryOperationSource = z.infer<typeof AgentMemoryOperationSourceSchema>
 export type AgentMemoryOperation = z.infer<typeof AgentMemoryOperationSchema>
+export type AgentMemoryOperationProposal = z.infer<typeof AgentMemoryOperationProposalSchema>
 export type AgentMemoryOperationResult = z.infer<typeof AgentMemoryOperationResultSchema>
 export type AgentMemoryCandidate = z.infer<typeof AgentMemoryCandidateSchema>
+export type AgentMemoryToolName = z.infer<typeof AgentMemoryToolNameSchema>
+export type AgentMemoryToolManifest = z.infer<typeof AgentMemoryToolManifestSchema>
+export type AgentMemorySkillManifest = z.infer<typeof AgentMemorySkillManifestSchema>
 export type AgentMemoryExtractorInput = z.infer<typeof AgentMemoryExtractorInputSchema>
 export type AgentMemoryExtractorOutput = z.infer<typeof AgentMemoryExtractorOutputSchema>
 export type ChatMemoryOperationProjection = z.infer<typeof ChatMemoryOperationProjectionSchema>
@@ -405,3 +511,5 @@ export type AgentMemoryDocumentsResponse = z.infer<typeof AgentMemoryDocumentsRe
 export type GetAgentMemoryDocumentParams = z.infer<typeof GetAgentMemoryDocumentParamsSchema>
 export type RetrieveAgentMemoryRequest = z.infer<typeof RetrieveAgentMemoryRequestSchema>
 export type RetrieveAgentMemoryResponse = z.infer<typeof RetrieveAgentMemoryResponseSchema>
+export type ExecuteAgentMemoryOperationProposalsRequest = z.infer<typeof ExecuteAgentMemoryOperationProposalsRequestSchema>
+export type ExecuteAgentMemoryOperationProposalsResponse = z.infer<typeof ExecuteAgentMemoryOperationProposalsResponseSchema>

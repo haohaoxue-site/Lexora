@@ -1,6 +1,8 @@
 import type { AiModelRef } from '@/apis/ai'
 import type { ChatModelItem, ChatModelSelection, ChatRuntimeConfig } from '@/apis/chat'
 
+export type ChatModelDisplayRef = NonNullable<ChatModelSelection['modelRef']> & Partial<Pick<AiModelRef, 'scope' | 'providerKey'>>
+
 export function normalizeModelSelection(value: ChatModelSelection): ChatModelSelection {
   return {
     modelRef: value.modelRef
@@ -94,16 +96,44 @@ export function resolveSelectedChatModel(
 
 export function resolveChatRequestModelRef(
   modelRef: ChatModelSelection['modelRef'] | null | undefined,
-  _modelOptions: ChatModelItem[],
+  modelOptions: ChatModelItem[],
   runtimeDefaultModel: ChatModelItem | null,
-): ChatModelSelection['modelRef'] | null {
+): ChatModelDisplayRef | null {
   const normalizedModelRef = normalizeNullableModelRef(modelRef)
 
   if (normalizedModelRef) {
+    const matchedModel = findMatchingModelOption(modelOptions, normalizedModelRef)
+    if (matchedModel?.selectable) {
+      return toModelDisplayRef(matchedModel)
+    }
+
+    if (
+      runtimeDefaultModel
+      && runtimeDefaultModel.providerId === normalizedModelRef.providerId
+      && runtimeDefaultModel.modelId === normalizedModelRef.modelId
+    ) {
+      return toModelDisplayRef(runtimeDefaultModel)
+    }
+
     return normalizedModelRef
   }
 
-  return toModelRef(runtimeDefaultModel)
+  return toModelDisplayRef(runtimeDefaultModel)
+}
+
+export function toModelDisplayRef(
+  value: Pick<AiModelRef, 'providerId' | 'modelId'> & Partial<Pick<AiModelRef, 'scope' | 'providerKey'>> | null | undefined,
+): ChatModelDisplayRef | null {
+  const modelRef = toModelRef(value)
+  if (!modelRef) {
+    return null
+  }
+
+  return {
+    ...modelRef,
+    ...(value?.scope ? { scope: value.scope } : {}),
+    ...(value?.providerKey?.trim() ? { providerKey: value.providerKey.trim() } : {}),
+  }
 }
 
 function isSameModelRef(

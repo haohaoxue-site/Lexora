@@ -7,6 +7,7 @@ import type {
   ChatComposerSubmitPayload,
 } from './typing'
 import type { ReadableDocumentSearchResult } from '@/apis/document'
+import { AGENT_TRANSLATOR_SKILL_KEY } from '@haohaoxue/samepage-contracts/agent'
 import {
   CHAT_MESSAGE_ATTACHMENT_PLACEMENT,
   CHAT_MESSAGE_ATTACHMENT_TYPE,
@@ -34,11 +35,14 @@ const props = withDefaults(defineProps<ChatComposerProps>(), {
   disabled: false,
   highlightAttachmentId: null,
   documentPickerTeleportTo: '',
+  translatorSkillEnabled: false,
+  translatorTargetLanguage: null,
 })
 const emits = defineEmits<ChatComposerEmits>()
 
 const pickerVisible = shallowRef(false)
 const pickerMode = shallowRef<'panel' | 'inline'>('panel')
+const skillCommandOpenSignal = shallowRef(0)
 let pastedAttachments: ChatComposerAttachment[] = []
 
 const serializedContent = computed(() => serializeChatComposerContent(props.contentJSON))
@@ -52,11 +56,17 @@ const canSend = computed(() =>
   && hasSelectedModel.value
   && Boolean(serializedContent.value.bodyTextWithoutReferences.trim()),
 )
+const editorPlaceholder = computed(() =>
+  props.translatorTargetLanguage
+    ? `输入要翻译为 ${props.translatorTargetLanguage.name} 的文本`
+    : '输入消息，Ctrl/⌘ + Enter 发送',
+)
 
 const editor = useEditor({
   content: props.contentJSON as JSONContent,
   extensions: createChatComposerExtensions({
     getAttachments: () => props.attachments,
+    getPlaceholder: () => editorPlaceholder.value,
     cloneInlineAttachment: cloneInlineAttachmentForPaste,
   }),
   editable: !props.disabled,
@@ -65,7 +75,7 @@ const editor = useEditor({
       class: 'chat-composer__prosemirror',
     },
     handleKeyDown: (_, event) => handleEditorKeyDown(event),
-    handleTextInput: (_, __, ___, text) => handleEditorTextInput(text),
+    handleTextInput: (_, from, to, text) => handleEditorTextInput(from, to, text),
     handlePaste: (_, event) => handleEditorPaste(event),
   },
   onUpdate: handleEditorUpdate,
@@ -96,6 +106,11 @@ watch(
   disabled => editor.value?.setEditable(!disabled, false),
 )
 
+watch(
+  () => props.translatorTargetLanguage,
+  () => refreshEditorPlaceholder(),
+)
+
 onBeforeUnmount(() => {
   editor.value?.destroy()
 })
@@ -118,6 +133,12 @@ function handleEditorUpdate(options: EditorEvents['update']) {
 }
 
 function handleEditorKeyDown(event: KeyboardEvent) {
+  if (event.key === 'Escape' && props.translatorTargetLanguage) {
+    event.preventDefault()
+    emits('update:translatorTargetLanguage', null)
+    return true
+  }
+
   if (event.key !== 'Enter' || (!event.metaKey && !event.ctrlKey)) {
     return false
   }
@@ -129,8 +150,21 @@ function handleEditorKeyDown(event: KeyboardEvent) {
   return true
 }
 
-function handleEditorTextInput(text: string) {
-  if (text !== '@' || props.disabled) {
+function handleEditorTextInput(from: number, to: number, text: string) {
+  if (props.disabled) {
+    return false
+  }
+
+  if (text === '/') {
+    if (!shouldOpenSkillCommandMenu(from, to)) {
+      return false
+    }
+
+    openSkillCommandMenu()
+    return true
+  }
+
+  if (text !== '@') {
     return false
   }
 
@@ -160,6 +194,10 @@ function openPanelPicker() {
 function openInlinePicker() {
   pickerMode.value = 'inline'
   pickerVisible.value = true
+}
+
+function openSkillCommandMenu() {
+  skillCommandOpenSignal.value += 1
 }
 
 function closePicker() {
@@ -208,8 +246,41 @@ function emitSend() {
     content: serializedContent.value.content.trim(),
     contentJSON: props.contentJSON,
     attachments: orderedSubmitAttachments.value,
+    skillInvocation: props.translatorTargetLanguage
+      ? {
+          skillKey: AGENT_TRANSLATOR_SKILL_KEY,
+          targetLanguage: props.translatorTargetLanguage,
+        }
+      : null,
   }
   emits('send', payload)
+}
+
+function shouldOpenSkillCommandMenu(from: number, to: number) {
+  const currentEditor = editor.value
+  if (
+    !currentEditor
+    || props.isStreaming
+    || props.translatorTargetLanguage
+    || from !== to
+  ) {
+    return false
+  }
+
+  const doc = currentEditor.state.doc
+  const textBeforeCursor = doc.textBetween(0, from, '', '')
+  const textAfterCursor = doc.textBetween(to, doc.content.size, '', '')
+
+  return !textBeforeCursor.trim() && !textAfterCursor.trim()
+}
+
+function refreshEditorPlaceholder() {
+  const currentEditor = editor.value
+  if (!currentEditor) {
+    return
+  }
+
+  currentEditor.view.dispatch(currentEditor.state.tr)
 }
 
 function insertInlineReference(attachment: ChatComposerAttachment, nodeId: string) {
@@ -316,9 +387,12 @@ function isSameContent(currentEditor: Editor, contentJSON: JSONContent) {
         :is-streaming="props.isStreaming"
         :disabled="props.disabled"
         :can-send="canSend"
+        :translator-skill-enabled="props.translatorSkillEnabled"
+        :translator-target-language="props.translatorTargetLanguage"
+        :skill-command-open-signal="skillCommandOpenSignal"
         @open-panel-picker="openPanelPicker"
         @placeholder-upload="emits('placeholderUpload')"
-        @placeholder-command="emits('placeholderCommand')"
+        @update:translator-target-language="emits('update:translatorTargetLanguage', $event)"
         @select-model="emits('selectModel', $event)"
         @send="emitSend"
         @stop="emits('stop')"

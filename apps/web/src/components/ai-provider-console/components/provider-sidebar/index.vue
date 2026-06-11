@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { AiProviderSidebarEmits, AiProviderSidebarProps } from './typing'
+import Empty from '@/components/empty'
 
 defineProps<AiProviderSidebarProps>()
 
@@ -83,7 +84,7 @@ const searchKeyword = defineModel<string>('searchKeyword', { required: true })
           </button>
         </template>
 
-        <ElEmpty v-if="rows.length === 0" :image-size="88" description="没有匹配的服务商" />
+        <Empty v-if="rows.length === 0" :image-size="88" description="没有匹配的服务商" />
       </div>
     </ElScrollbar>
 

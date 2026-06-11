@@ -49,29 +49,30 @@ enum AiModelCapability {
 }
 
 model AiProvider {
-  id              String                 @id @default(uuid())
-  scope           AiProviderScope
-  ownerUserId     String?
-  ownerKey        String
-  identityKey     String
-  source          AiProviderSource
-  providerKey     String
-  providerName    String
-  adapterKey      String
-  endpointMode    AiProviderEndpointMode
-  endpoint        String?
-  authMode        AiProviderAuthMode
-  apiKeyEncrypted String?
-  enabled         Boolean                @default(false)
-  visibility      AiProviderVisibility   @default(ALL_USERS)
-  ownerUser       User?                  @relation("AiProviderOwner", fields: [ownerUserId], references: [id], onDelete: Cascade)
-  models          AiProviderModel[]
-  defaultPolicies AiDefaultModelPolicy[]
-  createdAt       DateTime               @default(now())
-  updatedAt       DateTime               @updatedAt
-  updatedBy       String?
-  updatedByUser   User?                  @relation("AiProviderUpdater", fields: [updatedBy], references: [id], onDelete: SetNull)
-  deletedAt       DateTime?
+  id                        String                           @id @default(uuid())
+  scope                     AiProviderScope
+  ownerUserId               String?
+  ownerKey                  String
+  identityKey               String
+  source                    AiProviderSource
+  providerKey               String
+  providerName              String
+  adapterKey                String
+  endpointMode              AiProviderEndpointMode
+  endpoint                  String?
+  authMode                  AiProviderAuthMode
+  apiKeyEncrypted           String?
+  enabled                   Boolean                          @default(false)
+  visibility                AiProviderVisibility             @default(ALL_USERS)
+  ownerUser                 User?                            @relation("AiProviderOwner", fields: [ownerUserId], references: [id], onDelete: Cascade)
+  models                    AiProviderModel[]
+  defaultPolicies           AiDefaultModelPolicy[]
+  platformEmbeddingPolicies AiPlatformEmbeddingModelPolicy[]
+  createdAt                 DateTime                         @default(now())
+  updatedAt                 DateTime                         @updatedAt
+  updatedBy                 String?
+  updatedByUser             User?                            @relation("AiProviderUpdater", fields: [updatedBy], references: [id], onDelete: SetNull)
+  deletedAt                 DateTime?
 
   @@unique([ownerKey, identityKey])
   @@index([scope, enabled])
@@ -141,6 +142,21 @@ model AiDefaultModelPolicy {
   deletedAt     DateTime?
 
   @@unique([userId, intentKey])
+  @@index([providerId])
+  @@index([updatedBy])
+}
+
+model AiPlatformEmbeddingModelPolicy {
+  id            String     @id @default(uuid())
+  providerId    String
+  modelId       String
+  provider      AiProvider @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+  updatedBy     String?
+  updatedByUser User?      @relation("AiPlatformEmbeddingModelPolicyUpdater", fields: [updatedBy], references: [id], onDelete: SetNull)
+  deletedAt     DateTime?
+
   @@index([providerId])
   @@index([updatedBy])
 }

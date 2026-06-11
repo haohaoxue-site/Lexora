@@ -18,9 +18,9 @@ const { loadAuthCapabilities } = useSettingsAuthCapabilities()
 const {
   avatarUrl,
   canEditDisplayName,
+  displayName,
   isSavingDisplayName,
   isUploadingAvatar,
-  profileForm,
   saveDisplayName,
   syncProfileForm,
   uploadAvatar,
@@ -102,7 +102,7 @@ async function handleConfirmEmail() {
 
     <div v-else class="grid gap-4">
       <UserProfileSection
-        v-model:display-name="profileForm.displayName"
+        v-model:display-name="displayName"
         :avatar-url="avatarUrl"
         :user-code="account.userCode"
         :can-edit-display-name="canEditDisplayName"

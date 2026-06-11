@@ -18,6 +18,7 @@ export type {
   ChatSessionOrigin,
   ChatSessionSummary,
   ChatSessionUsageSummary,
+  ChatSkillInvocation,
   ChatTokenUsageAggregate,
   CreateChatSessionMessageRequest,
   EditAndSendChatMessageRequest,

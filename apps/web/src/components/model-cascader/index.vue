@@ -33,6 +33,8 @@ const componentProps = withDefaults(defineProps<ModelCascaderProps>(), {
   clearable: true,
   filterable: false,
   showAllLevels: true,
+  allowedScopes: () => [AI_PROVIDER_SCOPE.PLATFORM, AI_PROVIDER_SCOPE.USER],
+  hideUnavailable: false,
 })
 const emits = defineEmits<ModelCascaderEmits>()
 const VALUE_SEPARATOR = ':'
@@ -70,6 +72,11 @@ watch(() => componentProps.intentKey, () => {
   void loadSelectedModelRefOptions()
 })
 
+watch(() => componentProps.allowedScopes, () => {
+  resetAvailableModels()
+  void loadSelectedModelRefOptions()
+})
+
 watch(() => componentProps.modelValue, () => {
   void loadSelectedModelRefOptions()
 }, { immediate: true })
@@ -89,7 +96,7 @@ async function loadNode(
 
     if (node.level === 1) {
       const scope = parseScopeValue(nodeValue)
-      resolve(scope ? buildProviderOptions(await ensureAvailableProviders(scope)) : [])
+      resolve(scope && isAllowedScope(scope) ? buildProviderOptions(await ensureAvailableProviders(scope)) : [])
       return
     }
 
@@ -120,7 +127,7 @@ async function ensureAvailableProviders(scope: AiProviderScope) {
     return loadingPromise
   }
 
-  const promise = getAvailableAiProviders(componentProps.intentKey, scope)
+  const promise = (componentProps.availableProvidersLoader ?? getAvailableAiProviders)(componentProps.intentKey, scope)
     .then((providers) => {
       availableProvidersByScope.value = {
         ...availableProvidersByScope.value,
@@ -155,7 +162,7 @@ async function ensureAvailableModels(providerId: string) {
     return loadingPromise
   }
 
-  const promise = getAvailableAiProviderModels(componentProps.intentKey, providerId)
+  const promise = (componentProps.availableProviderModelsLoader ?? getAvailableAiProviderModels)(componentProps.intentKey, providerId)
     .then((models) => {
       availableModelsByProviderId.value = {
         ...availableModelsByProviderId.value,
@@ -208,49 +215,45 @@ function resetAvailableModels() {
 }
 
 function buildRootOptions(): ModelCascaderOption[] {
-  return [
-    {
-      value: buildScopeValue(AI_PROVIDER_SCOPE.PLATFORM),
-      label: '平台',
-      leaf: false,
-      nodeKind: 'scope',
-      scope: AI_PROVIDER_SCOPE.PLATFORM,
-    },
-    {
-      value: buildScopeValue(AI_PROVIDER_SCOPE.USER),
-      label: '个人',
-      leaf: false,
-      nodeKind: 'scope',
-      scope: AI_PROVIDER_SCOPE.USER,
-    },
-  ]
+  return componentProps.allowedScopes.map(scope => ({
+    value: buildScopeValue(scope),
+    label: getScopeLabel(scope),
+    leaf: false,
+    nodeKind: 'scope',
+    scope,
+  }))
 }
 
 function buildProviderOptions(providers: AiAvailableProviderOption[]) {
-  return providers.map<ModelCascaderOption>(provider => ({
-    value: buildProviderValue(provider.providerId),
-    label: provider.providerName,
-    leaf: false,
-    nodeKind: 'provider',
-    scope: provider.scope,
-    providerId: provider.providerId,
-    providerKey: provider.providerKey,
-  }))
+  return providers
+    .filter(provider => isAllowedScope(provider.scope))
+    .map<ModelCascaderOption>(provider => ({
+      value: buildProviderValue(provider.providerId),
+      label: provider.providerName,
+      leaf: false,
+      nodeKind: 'provider',
+      scope: provider.scope,
+      providerId: provider.providerId,
+      providerKey: provider.providerKey,
+    }))
 }
 
 function buildModelOptions(models: AiAvailableModelOption[]) {
-  return models.map<ModelCascaderOption>(item => ({
-    value: buildModelValue(item),
-    label: item.modelName || item.modelId,
-    disabled: !item.selectable,
-    leaf: true,
-    nodeKind: 'model',
-    scope: item.scope,
-    providerId: item.providerId,
-    providerKey: item.providerKey,
-    modelId: item.modelId,
-    unavailableReason: item.unavailableReason,
-  }))
+  return models
+    .filter(item => isAllowedScope(item.scope))
+    .filter(item => !componentProps.hideUnavailable || item.selectable)
+    .map<ModelCascaderOption>(item => ({
+      value: buildModelValue(item),
+      label: item.modelName || item.modelId,
+      disabled: !item.selectable,
+      leaf: true,
+      nodeKind: 'model',
+      scope: item.scope,
+      providerId: item.providerId,
+      providerKey: item.providerKey,
+      modelId: item.modelId,
+      unavailableReason: item.unavailableReason,
+    }))
 }
 
 function buildModelPath(modelRef: AiModelRef) {
@@ -272,11 +275,17 @@ function parseModelPath(value: CascaderValue | null | undefined): AiModelRef | n
     return null
   }
 
-  return parseModelValue(leafValue)
+  const modelRef = parseModelValue(leafValue)
+
+  return modelRef && isAllowedScope(modelRef.scope) ? modelRef : null
 }
 
 function resolveModelRef(modelRef: ModelCascaderModelRef): AiModelRef | null {
   if (modelRef.scope && modelRef.providerKey) {
+    if (!isAllowedScope(modelRef.scope)) {
+      return null
+    }
+
     return {
       providerId: modelRef.providerId,
       scope: modelRef.scope,
@@ -285,7 +294,7 @@ function resolveModelRef(modelRef: ModelCascaderModelRef): AiModelRef | null {
     }
   }
 
-  const matchedModel = availableModelsByProviderId.value[modelRef.providerId]?.find(item => item.modelId === modelRef.modelId && item.selectable)
+  const matchedModel = availableModelsByProviderId.value[modelRef.providerId]?.find(item => item.modelId === modelRef.modelId && item.selectable && isAllowedScope(item.scope))
 
   return matchedModel
     ? {
@@ -368,6 +377,14 @@ function encodeValuePart(value: string) {
 
 function isAiProviderScope(value: string | undefined): value is AiProviderScope {
   return value === AI_PROVIDER_SCOPE.PLATFORM || value === AI_PROVIDER_SCOPE.USER
+}
+
+function isAllowedScope(scope: AiProviderScope) {
+  return componentProps.allowedScopes.includes(scope)
+}
+
+function getScopeLabel(scope: AiProviderScope) {
+  return scope === AI_PROVIDER_SCOPE.PLATFORM ? '平台' : '个人'
 }
 
 function getNodeValue(node: CascaderNode) {

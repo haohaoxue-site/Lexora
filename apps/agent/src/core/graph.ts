@@ -1,5 +1,6 @@
 import type { BaseCheckpointSaver } from '@langchain/langgraph'
 import type { AgentMemoryApiClient } from '../clients/memory'
+import type { AgentSkillApiClient } from '../clients/skills'
 import type { AgentChatModelFactory } from '../integrations/model-providers/chat-model'
 import { END, START, StateGraph } from '@langchain/langgraph'
 import {
@@ -13,6 +14,7 @@ import { AgentGraphState } from './state'
 export interface CreateAgentGraphOptions {
   chatModelFactory: AgentChatModelFactory
   memoryApi?: AgentMemoryApiClient
+  skillApi?: AgentSkillApiClient
   checkpointer?: BaseCheckpointSaver
 }
 
@@ -25,6 +27,8 @@ export function createAgentGraph(options: CreateAgentGraphOptions) {
     .addNode('compactHistory', createCompactHistoryNode())
     .addNode('callModel', createCallModelNode({
       chatModelFactory: options.chatModelFactory,
+      memoryApi: options.memoryApi,
+      skillApi: options.skillApi,
     }))
     .addEdge(START, 'retrieveMemory')
     .addEdge('retrieveMemory', 'prepareContext')

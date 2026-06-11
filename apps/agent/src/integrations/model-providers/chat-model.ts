@@ -1,4 +1,5 @@
 import type { BaseMessage, MessageContent } from '@langchain/core/messages'
+import type { StructuredToolInterface } from '@langchain/core/tools'
 import type { ChatOpenAICallOptions } from '@langchain/openai'
 import type { AgentRuntimeModelTarget } from '../../runtime/typing'
 import { AI_PROVIDER_AUTH_MODE } from '@haohaoxue/samepage-contracts'
@@ -9,6 +10,10 @@ const MODEL_CALL_TIMEOUT_MS = 60_000
 
 export interface AgentChatModel {
   stream: (messages: BaseMessage[], options?: { signal?: AbortSignal }) => Promise<AsyncIterable<AgentChatModelResponse>>
+  bindTools?: (
+    tools: StructuredToolInterface[],
+    options?: { tool_choice?: 'auto' | 'any' | 'none' | string },
+  ) => AgentChatModel
 }
 
 export interface AgentChatModelResponse {
@@ -24,6 +29,14 @@ export interface AgentChatModelOptions {
   reasoningEffort?: 'low' | 'medium' | 'high'
 }
 
+interface BindableChatModel {
+  stream: AgentChatModel['stream']
+  bindTools?: (
+    tools: StructuredToolInterface[],
+    options?: { tool_choice?: 'auto' | 'any' | 'none' | string },
+  ) => BindableChatModel
+}
+
 export interface AgentChatModelFactory {
   createChatModel: (target: AgentRuntimeModelTarget, options?: AgentChatModelOptions) => AgentChatModel
 }
@@ -37,7 +50,7 @@ export function createChatModelFactory(): AgentChatModelFactory {
         case 'openai-chat-completions':
           return createOpenAIChatModel(target, options)
         case 'anthropic-messages':
-          return new ChatAnthropic({
+          return toAgentChatModel(new ChatAnthropic({
             model: target.modelId,
             temperature: options.temperature ?? 0,
             topP: options.topP,
@@ -45,7 +58,7 @@ export function createChatModelFactory(): AgentChatModelFactory {
             maxRetries: 1,
             apiKey: target.apiKey ?? 'samepage-no-auth',
             anthropicApiUrl: target.endpoint,
-          })
+          }) as BindableChatModel)
         default:
           throw new Error(`暂不支持的模型适配器: ${target.adapterKey}`)
       }
@@ -68,19 +81,25 @@ function createOpenAIChatModel(target: AgentRuntimeModelTarget, options: AgentCh
     useResponsesApi: false,
   })
 
-  if (!options.reasoningEffort) {
-    return model
-  }
+  return toAgentChatModel(model, options.reasoningEffort
+    ? streamOptions => ({
+      ...streamOptions,
+      reasoningEffort: options.reasoningEffort,
+    })
+    : undefined)
+}
 
+function toAgentChatModel(
+  model: BindableChatModel,
+  createCallOptions?: (options?: { signal?: AbortSignal }) => ChatOpenAICallOptions,
+): AgentChatModel {
   return {
     async stream(messages, streamOptions) {
-      const callOptions: ChatOpenAICallOptions = {
-        ...streamOptions,
-        reasoningEffort: options.reasoningEffort,
-      }
-
-      return await model.stream(messages, callOptions)
+      return await model.stream(messages, createCallOptions?.(streamOptions) ?? streamOptions)
     },
+    bindTools: model.bindTools
+      ? (tools, bindOptions) => toAgentChatModel(model.bindTools?.(tools, bindOptions) ?? model, createCallOptions)
+      : undefined,
   }
 }
 

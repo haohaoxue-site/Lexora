@@ -9,7 +9,6 @@
       </defs>
     
       <rect x="8" y="8" width="48" height="48" rx="16" fill="url(#nav-chat-active-bg)" />
-      <path d="M45 17L46.7 20.3L50 22L46.7 23.7L45 27L43.3 23.7L40 22L43.3 20.3L45 17Z" fill="white" fill-opacity="0.88" />
       <path d="M22 26C22 23.7909 23.7909 22 26 22H38C40.2091 22 42 23.7909 42 26V33C42 35.2091 40.2091 37 38 37H32.5L27 42V37H26C23.7909 37 22 35.2091 22 33V26Z" fill="none" stroke="white" stroke-width="3.25" stroke-linecap="round" stroke-linejoin="round" />
       <circle cx="28.5" cy="29.5" r="1.85" fill="white" />
       <circle cx="32" cy="29.5" r="1.85" fill="white" />
@@ -24,7 +23,6 @@
       </defs>
     
       <rect x="8" y="8" width="48" height="48" rx="16" fill="#FFF7ED" />
-      <path d="M44.5 17.5L46 20.5L49 22L46 23.5L44.5 26.5L43 23.5L40 22L43 20.5L44.5 17.5Z" fill="#FFD76D" />
       <path d="M22 26C22 23.7909 23.7909 22 26 22H38C40.2091 22 42 23.7909 42 26V33C42 35.2091 40.2091 37 38 37H32.5L27 42V37H26C23.7909 37 22 35.2091 22 33V26Z" fill="none" stroke="url(#nav-chat-line)" stroke-width="3.25" stroke-linecap="round" stroke-linejoin="round" />
       <circle cx="28.5" cy="29.5" r="1.85" fill="#FF9E71" />
       <circle cx="32" cy="29.5" r="1.85" fill="#FF8D8F" />
@@ -40,7 +38,6 @@
       </defs>
     
       <rect x="8" y="8" width="48" height="48" rx="16" fill="url(#nav-docs-active-bg)" />
-      <circle cx="46" cy="18.5" r="4.5" fill="#FFD879" fill-opacity="0.95" />
       <path d="M25.5 19H35.5L42 25.5V42C42 43.6569 40.6569 45 39 45H25.5C23.8431 45 22.5 43.6569 22.5 42V22C22.5 20.3431 23.8431 19 25.5 19Z" fill="none" stroke="white" stroke-width="3.25" stroke-linecap="round" stroke-linejoin="round" />
       <path d="M35 19V24.5C35 25.8807 36.1193 27 37.5 27H43" fill="none" stroke="white" stroke-width="3.25" stroke-linecap="round" stroke-linejoin="round" />
       <path d="M28 32H36.5" fill="none" stroke="white" stroke-width="3" stroke-linecap="round" />
@@ -55,7 +52,6 @@
       </defs>
     
       <rect x="8" y="8" width="48" height="48" rx="16" fill="#F6F2FF" />
-      <path d="M44 19L45.4 21.8L48.2 23.2L45.4 24.6L44 27.4L42.6 24.6L39.8 23.2L42.6 21.8L44 19Z" fill="#FFD879" />
       <path d="M25.5 19H35.5L42 25.5V42C42 43.6569 40.6569 45 39 45H25.5C23.8431 45 22.5 43.6569 22.5 42V22C22.5 20.3431 23.8431 19 25.5 19Z" fill="none" stroke="url(#nav-docs-line)" stroke-width="3.25" stroke-linecap="round" stroke-linejoin="round" />
       <path d="M35 19V24.5C35 25.8807 36.1193 27 37.5 27H43" fill="none" stroke="url(#nav-docs-line)" stroke-width="3.25" stroke-linecap="round" stroke-linejoin="round" />
       <path d="M28 32H36.5" fill="none" stroke="#A16BFF" stroke-width="3" stroke-linecap="round" />
@@ -107,7 +103,6 @@
       </defs>
     
       <rect x="8" y="8" width="48" height="48" rx="16" fill="url(#nav-knowledge-active-bg)" />
-      <circle cx="46" cy="19" r="4.5" fill="white" fill-opacity="0.3" />
       <path d="M18.5 26V38.5C18.5 41.2614 20.7386 43.5 23.5 43.5H37.5" fill="none" stroke="white" stroke-width="3.25" stroke-linecap="round" stroke-linejoin="round" stroke-opacity="0.85" />
       <rect x="24" y="20" width="18" height="20" rx="4.5" fill="none" stroke="white" stroke-width="3.25" />
       <path d="M29 26.5H37" fill="none" stroke="white" stroke-width="3" stroke-linecap="round" />
@@ -123,7 +118,6 @@
       </defs>
     
       <rect x="8" y="8" width="48" height="48" rx="16" fill="#F0FBF6" />
-      <circle cx="45.5" cy="19.5" r="4.5" fill="#FFE07A" />
       <path d="M18.5 26V38.5C18.5 41.2614 20.7386 43.5 23.5 43.5H37.5" fill="none" stroke="#9DDCC1" stroke-width="3.25" stroke-linecap="round" stroke-linejoin="round" />
       <rect x="24" y="20" width="18" height="20" rx="4.5" fill="none" stroke="url(#nav-knowledge-line)" stroke-width="3.25" />
       <path d="M29 26.5H37" fill="none" stroke="#2FB096" stroke-width="3" stroke-linecap="round" />
@@ -140,9 +134,6 @@
       </defs>
 
       <rect x="8" y="8" width="48" height="48" rx="16" fill="url(#nav-schedule-active-bg)" />
-      <circle cx="46" cy="19" r="4.5" fill="white" fill-opacity="0.28" />
-      <path d="M46 16.9V21.1" fill="none" stroke="white" stroke-width="1.6" stroke-linecap="round" stroke-opacity="0.84" />
-      <path d="M43.9 19H48.1" fill="none" stroke="white" stroke-width="1.6" stroke-linecap="round" stroke-opacity="0.84" />
       <rect x="21" y="21.5" width="22" height="22" rx="5.5" fill="none" stroke="white" stroke-width="3.25" />
       <path d="M21 29H43" fill="none" stroke="white" stroke-width="3.25" stroke-linecap="round" stroke-opacity="0.9" />
       <path d="M27 18.5V24" fill="none" stroke="white" stroke-width="3.25" stroke-linecap="round" />
@@ -163,64 +154,43 @@
       </defs>
 
       <rect x="8" y="8" width="48" height="48" rx="16" fill="#FFF7ED" />
-      <circle cx="45.5" cy="19.5" r="4.5" fill="#8AD6FF" />
-      <path d="M45.5 16.7V22.3" fill="none" stroke="white" stroke-width="1.8" stroke-linecap="round" />
-      <path d="M42.7 19.5H48.3" fill="none" stroke="white" stroke-width="1.8" stroke-linecap="round" />
       <rect x="21" y="21.5" width="22" height="22" rx="5.5" fill="none" stroke="url(#nav-schedule-line)" stroke-width="3.25" />
       <path d="M21 29H43" fill="none" stroke="#FF9B6C" stroke-width="3.25" stroke-linecap="round" />
       <path d="M27 18.5V24" fill="none" stroke="#FFAD63" stroke-width="3.25" stroke-linecap="round" />
       <path d="M37 18.5V24" fill="none" stroke="#59BFFF" stroke-width="3.25" stroke-linecap="round" />
       <path d="M27.5 35L31 38.5L37.5 32" fill="none" stroke="url(#nav-schedule-check)" stroke-width="3.25" stroke-linecap="round" stroke-linejoin="round" />
   </symbol>
-  <symbol id="model-service-active" viewBox="0 0 64 64">
+  <symbol id="skills-active" viewBox="0 0 64 64">
     <defs>
-        <linearGradient id="nav-model-service-active-bg" x1="12" y1="10" x2="53" y2="54" gradientUnits="userSpaceOnUse">
-          <stop stop-color="#7BD8FF" />
-          <stop offset="0.54" stop-color="#768CFF" />
-          <stop offset="1" stop-color="#FF88BA" />
-        </linearGradient>
-      </defs>
+      <linearGradient id="nav-skills-active-bg" x1="12" y1="10" x2="52" y2="54" gradientUnits="userSpaceOnUse">
+        <stop stop-color="#8EDBFF" />
+        <stop offset="0.52" stop-color="#7C8CFF" />
+        <stop offset="1" stop-color="#79DFAF" />
+      </linearGradient>
+    </defs>
 
-      <rect x="8" y="8" width="48" height="48" rx="16" fill="url(#nav-model-service-active-bg)" />
-      <circle cx="46" cy="19" r="4.5" fill="#FFE07A" fill-opacity="0.32" />
-      <path d="M46 16.9V21.1" fill="none" stroke="white" stroke-width="1.6" stroke-linecap="round" stroke-opacity="0.86" />
-      <path d="M43.9 19H48.1" fill="none" stroke="white" stroke-width="1.6" stroke-linecap="round" stroke-opacity="0.86" />
-      <path d="M32 21V17.5" fill="none" stroke="white" stroke-width="3" stroke-linecap="round" />
-      <circle cx="32" cy="16" r="3" fill="white" fill-opacity="0.92" />
-      <rect x="21.5" y="23" width="21" height="18.5" rx="6.5" fill="none" stroke="white" stroke-width="3.25" />
-      <path d="M19 31.5H21.5" fill="none" stroke="white" stroke-width="3.25" stroke-linecap="round" />
-      <path d="M42.5 31.5H45" fill="none" stroke="white" stroke-width="3.25" stroke-linecap="round" />
-      <circle cx="28.25" cy="31.2" r="2.1" fill="white" />
-      <circle cx="35.75" cy="31.2" r="2.1" fill="white" />
-      <path d="M28.8 36.4C30.6 38.1 33.4 38.1 35.2 36.4" fill="none" stroke="white" stroke-width="2.7" stroke-linecap="round" />
-      <path d="M25.5 45H38.5" fill="none" stroke="white" stroke-width="3" stroke-linecap="round" stroke-opacity="0.9" />
+      <rect x="8" y="8" width="48" height="48" rx="16" fill="url(#nav-skills-active-bg)" />
+      <path d="M19.5 25H44.5L41.75 18.5H22.25L19.5 25Z" fill="white" fill-opacity="0.95" stroke="white" stroke-width="2.75" stroke-linejoin="round" />
+      <path d="M20 25.25C21.75 28.25 25.25 28.25 27 25.25C28.75 28.25 32.25 28.25 34 25.25C35.75 28.25 39.25 28.25 41 25.25C41.75 26.75 43 27.5 44.5 27.5" fill="none" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
+      <path d="M22 29.5V43.5H42V29.5" fill="none" stroke="white" stroke-width="3.25" stroke-linecap="round" stroke-linejoin="round" />
+      <path d="M28.25 34.5C27.35 34.5 26.75 35.1 26.75 36C26.75 36.9 27.35 37.5 28.25 37.5H36.5" fill="none" stroke="white" stroke-width="2.55" stroke-linecap="round" stroke-linejoin="round" />
+      <path d="M28.25 37.5C27.35 37.5 26.75 38.1 26.75 39C26.75 39.9 27.35 40.5 28.25 40.5H36.5" fill="none" stroke="white" stroke-width="2.55" stroke-linecap="round" stroke-linejoin="round" />
   </symbol>
-  <symbol id="model-service" viewBox="0 0 64 64">
+  <symbol id="skills" viewBox="0 0 64 64">
     <defs>
-        <linearGradient id="nav-model-service-line" x1="20" y1="17" x2="44" y2="44" gradientUnits="userSpaceOnUse">
-          <stop stop-color="#55C7FF" />
-          <stop offset="0.52" stop-color="#7E8BFF" />
-          <stop offset="1" stop-color="#FF80B2" />
-        </linearGradient>
-        <linearGradient id="nav-model-service-smile" x1="28" y1="35" x2="36" y2="39" gradientUnits="userSpaceOnUse">
-          <stop stop-color="#FFB16E" />
-          <stop offset="1" stop-color="#FF7EAD" />
-        </linearGradient>
-      </defs>
+      <linearGradient id="nav-skills-line" x1="19" y1="18" x2="45" y2="44" gradientUnits="userSpaceOnUse">
+        <stop stop-color="#55C8FF" />
+        <stop offset="0.52" stop-color="#7B8EFF" />
+        <stop offset="1" stop-color="#4FCB9D" />
+      </linearGradient>
+    </defs>
 
-      <rect x="8" y="8" width="48" height="48" rx="16" fill="#F2F7FF" />
-      <circle cx="45.5" cy="19.5" r="4.5" fill="#FFE07A" />
-      <path d="M45.5 16.7V22.3" fill="none" stroke="white" stroke-width="1.8" stroke-linecap="round" />
-      <path d="M42.7 19.5H48.3" fill="none" stroke="white" stroke-width="1.8" stroke-linecap="round" />
-      <path d="M32 21V17.5" fill="none" stroke="url(#nav-model-service-line)" stroke-width="3" stroke-linecap="round" />
-      <circle cx="32" cy="16" r="3" fill="#8FDAFF" />
-      <rect x="21.5" y="23" width="21" height="18.5" rx="6.5" fill="none" stroke="url(#nav-model-service-line)" stroke-width="3.25" />
-      <path d="M19 31.5H21.5" fill="none" stroke="#77BFFF" stroke-width="3.25" stroke-linecap="round" />
-      <path d="M42.5 31.5H45" fill="none" stroke="#FF86B6" stroke-width="3.25" stroke-linecap="round" />
-      <circle cx="28.25" cy="31.2" r="2.1" fill="#6C95FF" />
-      <circle cx="35.75" cy="31.2" r="2.1" fill="#A17CFF" />
-      <path d="M28.8 36.4C30.6 38.1 33.4 38.1 35.2 36.4" fill="none" stroke="url(#nav-model-service-smile)" stroke-width="2.7" stroke-linecap="round" />
-      <path d="M25.5 45H38.5" fill="none" stroke="#89A0FF" stroke-width="3" stroke-linecap="round" />
+      <rect x="8" y="8" width="48" height="48" rx="16" fill="#F2FAFF" />
+      <path d="M19.5 25H44.5L41.75 18.5H22.25L19.5 25Z" fill="white" stroke="url(#nav-skills-line)" stroke-width="2.75" stroke-linejoin="round" />
+      <path d="M20 25.25C21.75 28.25 25.25 28.25 27 25.25C28.75 28.25 32.25 28.25 34 25.25C35.75 28.25 39.25 28.25 41 25.25C41.75 26.75 43 27.5 44.5 27.5" fill="none" stroke="url(#nav-skills-line)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
+      <path d="M22 29.5V43.5H42V29.5" fill="none" stroke="url(#nav-skills-line)" stroke-width="3.25" stroke-linecap="round" stroke-linejoin="round" />
+      <path d="M28.25 34.5C27.35 34.5 26.75 35.1 26.75 36C26.75 36.9 27.35 37.5 28.25 37.5H36.5" fill="none" stroke="url(#nav-skills-line)" stroke-width="2.55" stroke-linecap="round" stroke-linejoin="round" />
+      <path d="M28.25 37.5C27.35 37.5 26.75 38.1 26.75 39C26.75 39.9 27.35 40.5 28.25 40.5H36.5" fill="none" stroke="url(#nav-skills-line)" stroke-width="2.55" stroke-linecap="round" stroke-linejoin="round" />
   </symbol>
   <symbol id="user-settings-active" viewBox="0 0 64 64">
     <defs>
@@ -232,12 +202,8 @@
       </defs>
 
       <rect x="8" y="8" width="48" height="48" rx="16" fill="url(#nav-user-settings-active-bg)" />
-      <circle cx="46" cy="19" r="4.5" fill="#FFE07A" fill-opacity="0.28" />
-      <path d="M46 16.9V21.1" stroke="white" stroke-width="1.6" stroke-linecap="round" stroke-opacity="0.82" />
-      <path d="M43.9 19H48.1" stroke="white" stroke-width="1.6" stroke-linecap="round" stroke-opacity="0.82" />
       <circle cx="32" cy="25.5" r="5.75" fill="none" stroke="white" stroke-width="3.25" />
       <path d="M22.5 42C24.2781 37.6298 27.4448 35.4447 32 35.4447C36.5552 35.4447 39.7219 37.6298 41.5 42" fill="none" stroke="white" stroke-width="3.25" stroke-linecap="round" />
-      <path d="M42 31.5L43.3 34.1L45.9 35.4L43.3 36.7L42 39.3L40.7 36.7L38.1 35.4L40.7 34.1L42 31.5Z" fill="white" />
   </symbol>
   <symbol id="user-settings" viewBox="0 0 64 64">
     <defs>
@@ -246,19 +212,11 @@
           <stop offset="0.52" stop-color="#8C83FF" />
           <stop offset="1" stop-color="#FF89B5" />
         </linearGradient>
-        <linearGradient id="nav-user-settings-spark" x1="39" y1="31" x2="46" y2="39" gradientUnits="userSpaceOnUse">
-          <stop stop-color="#FFC16E" />
-          <stop offset="1" stop-color="#FF82A3" />
-        </linearGradient>
       </defs>
 
       <rect x="8" y="8" width="48" height="48" rx="16" fill="#F3F7FF" />
-      <circle cx="45.5" cy="19.5" r="4.5" fill="#FFE07A" />
-      <path d="M45.5 16.7V22.3" stroke="white" stroke-width="1.8" stroke-linecap="round" />
-      <path d="M42.7 19.5H48.3" stroke="white" stroke-width="1.8" stroke-linecap="round" />
       <circle cx="32" cy="25.5" r="5.75" fill="none" stroke="url(#nav-user-settings-line)" stroke-width="3.25" />
       <path d="M22.5 42C24.2781 37.6298 27.4448 35.4447 32 35.4447C36.5552 35.4447 39.7219 37.6298 41.5 42" fill="none" stroke="url(#nav-user-settings-line)" stroke-width="3.25" stroke-linecap="round" />
-      <path d="M42 31.5L43.3 34.1L45.9 35.4L43.3 36.7L42 39.3L40.7 36.7L38.1 35.4L40.7 34.1L42 31.5Z" fill="url(#nav-user-settings-spark)" />
   </symbol>
   <symbol id="overview-active" viewBox="0 0 64 64">
     <defs>
@@ -270,7 +228,6 @@
     </defs>
 
     <rect x="8" y="8" width="48" height="48" rx="16" fill="url(#nav-overview-active-bg)" />
-    <circle cx="45.5" cy="19" r="4.5" fill="white" fill-opacity="0.28" />
     <path d="M21 41.5H43" fill="none" stroke="white" stroke-width="3.2" stroke-linecap="round" />
     <path d="M24 36V30" fill="none" stroke="white" stroke-width="3.2" stroke-linecap="round" />
     <path d="M32 36V24" fill="none" stroke="white" stroke-width="3.2" stroke-linecap="round" />
@@ -287,9 +244,6 @@
     </defs>
 
     <rect x="8" y="8" width="48" height="48" rx="16" fill="#FFF6F0" />
-    <circle cx="45.5" cy="19" r="4.5" fill="#8BD9FF" />
-    <path d="M45.5 16.5V21.5" fill="none" stroke="white" stroke-width="1.7" stroke-linecap="round" />
-    <path d="M43 19H48" fill="none" stroke="white" stroke-width="1.7" stroke-linecap="round" />
     <path d="M21 41.5H43" fill="none" stroke="#FF9E70" stroke-width="3.2" stroke-linecap="round" />
     <path d="M24 36V30" fill="none" stroke="url(#nav-overview-line)" stroke-width="3.2" stroke-linecap="round" />
     <path d="M32 36V24" fill="none" stroke="url(#nav-overview-line)" stroke-width="3.2" stroke-linecap="round" />
@@ -306,7 +260,6 @@
     </defs>
 
     <rect x="8" y="8" width="48" height="48" rx="16" fill="url(#nav-users-active-bg)" />
-    <circle cx="45.5" cy="19" r="4.5" fill="white" fill-opacity="0.24" />
     <circle cx="29" cy="26.5" r="6" fill="none" stroke="white" stroke-width="3.25" />
     <path d="M19.5 43C21 38.7 24.1667 36.55 29 36.55C33.8333 36.55 37 38.7 38.5 43" fill="none" stroke="white" stroke-width="3.25" stroke-linecap="round" />
     <circle cx="40.5" cy="28" r="4.25" fill="none" stroke="white" stroke-width="3" stroke-opacity="0.76" />
@@ -322,7 +275,6 @@
     </defs>
 
     <rect x="8" y="8" width="48" height="48" rx="16" fill="#F1FBF7" />
-    <circle cx="45.5" cy="19" r="4.5" fill="#FFE07A" />
     <circle cx="29" cy="26.5" r="6" fill="none" stroke="url(#nav-users-line)" stroke-width="3.25" />
     <path d="M19.5 43C21 38.7 24.1667 36.55 29 36.55C33.8333 36.55 37 38.7 38.5 43" fill="none" stroke="url(#nav-users-line)" stroke-width="3.25" stroke-linecap="round" />
     <circle cx="40.5" cy="28" r="4.25" fill="none" stroke="#69B2F7" stroke-width="3" />
@@ -338,7 +290,6 @@
     </defs>
 
     <rect x="8" y="8" width="48" height="48" rx="16" fill="url(#nav-email-active-bg)" />
-    <circle cx="45.5" cy="19" r="4.5" fill="white" fill-opacity="0.26" />
     <rect x="19.5" y="23" width="25" height="18.5" rx="5" fill="none" stroke="white" stroke-width="3.25" />
     <path d="M22.5 26.5L30.1 32.3C31.2148 33.1508 32.7852 33.1508 33.9 32.3L41.5 26.5" fill="none" stroke="white" stroke-width="3.25" stroke-linecap="round" stroke-linejoin="round" />
     <path d="M24 38H31" fill="none" stroke="white" stroke-width="3" stroke-linecap="round" stroke-opacity="0.88" />
@@ -353,9 +304,6 @@
     </defs>
 
     <rect x="8" y="8" width="48" height="48" rx="16" fill="#F2FAFF" />
-    <circle cx="45.5" cy="19" r="4.5" fill="#FFE07A" />
-    <path d="M45.5 16.7V22.3" fill="none" stroke="white" stroke-width="1.8" stroke-linecap="round" />
-    <path d="M42.7 19.5H48.3" fill="none" stroke="white" stroke-width="1.8" stroke-linecap="round" />
     <rect x="19.5" y="23" width="25" height="18.5" rx="5" fill="none" stroke="url(#nav-email-line)" stroke-width="3.25" />
     <path d="M22.5 26.5L30.1 32.3C31.2148 33.1508 32.7852 33.1508 33.9 32.3L41.5 26.5" fill="none" stroke="url(#nav-email-line)" stroke-width="3.25" stroke-linecap="round" stroke-linejoin="round" />
     <path d="M24 38H31" fill="none" stroke="#67B3FF" stroke-width="3" stroke-linecap="round" />
@@ -370,7 +318,6 @@
     </defs>
 
     <rect x="8" y="8" width="48" height="48" rx="16" fill="url(#nav-model-providers-active-bg)" />
-    <circle cx="45.5" cy="19" r="4.5" fill="#FFE07A" fill-opacity="0.32" />
     <path d="M22 27H42L39 21H25L22 27Z" fill="none" stroke="white" stroke-width="3.25" stroke-linecap="round" stroke-linejoin="round" />
     <path d="M22.5 27.5C23.25 30.4 26.75 30.4 27.5 27.5C28.25 30.4 31.75 30.4 32.5 27.5C33.25 30.4 36.75 30.4 37.5 27.5C38.25 30.4 41.75 30.4 42.5 27.5" fill="none" stroke="white" stroke-width="3" stroke-linecap="round" />
     <path d="M25 33.5V43H39V33.5" fill="none" stroke="white" stroke-width="3.25" stroke-linecap="round" stroke-linejoin="round" />
@@ -391,9 +338,6 @@
     </defs>
 
     <rect x="8" y="8" width="48" height="48" rx="16" fill="#F3F7FF" />
-    <circle cx="45.5" cy="19.5" r="4.5" fill="#FFE07A" />
-    <path d="M45.5 16.8V22.2" fill="none" stroke="white" stroke-width="1.8" stroke-linecap="round" />
-    <path d="M42.8 19.5H48.2" fill="none" stroke="white" stroke-width="1.8" stroke-linecap="round" />
     <path d="M22 27H42L39 21H25L22 27Z" fill="none" stroke="url(#nav-model-providers-line)" stroke-width="3.25" stroke-linecap="round" stroke-linejoin="round" />
     <path d="M22.5 27.5C23.25 30.4 26.75 30.4 27.5 27.5C28.25 30.4 31.75 30.4 32.5 27.5C33.25 30.4 36.75 30.4 37.5 27.5C38.25 30.4 41.75 30.4 42.5 27.5" fill="none" stroke="url(#nav-model-providers-line)" stroke-width="3" stroke-linecap="round" />
     <path d="M25 33.5V43H39V33.5" fill="none" stroke="url(#nav-model-providers-line)" stroke-width="3.25" stroke-linecap="round" stroke-linejoin="round" />
@@ -409,7 +353,6 @@
     </defs>
 
     <rect x="8" y="8" width="48" height="48" rx="16" fill="url(#nav-audit-active-bg)" />
-    <circle cx="45.5" cy="19" r="4.5" fill="white" fill-opacity="0.24" />
     <path d="M32 18.5L43 23V31.5C43 38.05 39.1 43 32 45.5C24.9 43 21 38.05 21 31.5V23L32 18.5Z" fill="none" stroke="white" stroke-width="3.25" stroke-linejoin="round" />
     <path d="M27 32L30.5 35.5L38 27.5" fill="none" stroke="white" stroke-width="3.25" stroke-linecap="round" stroke-linejoin="round" />
   </symbol>
@@ -423,9 +366,6 @@
     </defs>
 
     <rect x="8" y="8" width="48" height="48" rx="16" fill="#F1FAFF" />
-    <circle cx="45.5" cy="19" r="4.5" fill="#FFE07A" />
-    <path d="M45.5 16.7V21.3" fill="none" stroke="white" stroke-width="1.7" stroke-linecap="round" />
-    <path d="M43.2 19H47.8" fill="none" stroke="white" stroke-width="1.7" stroke-linecap="round" />
     <path d="M32 18.5L43 23V31.5C43 38.05 39.1 43 32 45.5C24.9 43 21 38.05 21 31.5V23L32 18.5Z" fill="none" stroke="url(#nav-audit-line)" stroke-width="3.25" stroke-linejoin="round" />
     <path d="M27 32L30.5 35.5L38 27.5" fill="none" stroke="url(#nav-audit-line)" stroke-width="3.25" stroke-linecap="round" stroke-linejoin="round" />
   </symbol>

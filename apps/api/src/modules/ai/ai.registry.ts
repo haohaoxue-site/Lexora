@@ -25,6 +25,21 @@ export const AI_BUILTIN_PROVIDER_PRESETS = [
     supportedModelTypes: [AI_MODEL_TYPE.CHAT],
   },
   {
+    providerKey: 'siliconflow',
+    providerName: '硅基流动',
+    adapterKey: 'openai-chat-completions',
+    endpointMode: AI_PROVIDER_ENDPOINT_MODE.FIXED,
+    fixedEndpoint: 'https://api.siliconflow.cn/v1',
+    authMode: AI_PROVIDER_AUTH_MODE.BEARER,
+    supportedModelTypes: [
+      AI_MODEL_TYPE.CHAT,
+      AI_MODEL_TYPE.EMBEDDING,
+      AI_MODEL_TYPE.RERANK,
+      AI_MODEL_TYPE.IMAGE,
+      AI_MODEL_TYPE.AUDIO,
+    ],
+  },
+  {
     providerKey: 'anthropic',
     providerName: 'Anthropic',
     adapterKey: 'anthropic-messages',

@@ -8,6 +8,7 @@ import {
   CHAT_MESSAGE_PART_TYPE,
   CHAT_SESSION_EVENT_TYPE,
   ChatGenerationUsageSnapshotSchema,
+  ChatMemoryOperationProjectionSchema,
 } from '@haohaoxue/samepage-contracts'
 import {
   Injectable,
@@ -28,6 +29,7 @@ import {
   AgentGenerationEventsService,
   getChatGenerationEventText,
 } from '../agent/agent-events.service'
+import { AgentMemoryOperationsService } from '../agent/agent-memory-operations.service'
 import { ChatSessionEventsService } from './chat-session-events.service'
 import { toPrismaChatMessagePartType } from './chat.utils'
 
@@ -45,6 +47,7 @@ export class ChatRunProjectorService implements OnModuleInit, OnModuleDestroy {
   constructor(
     private readonly prisma: PrismaService,
     private readonly agentGenerationEventsService: AgentGenerationEventsService,
+    private readonly agentMemoryOperations: AgentMemoryOperationsService,
     private readonly chatSessionEvents: ChatSessionEventsService,
   ) {}
 
@@ -345,7 +348,8 @@ export class ChatRunProjectorService implements OnModuleInit, OnModuleDestroy {
     }
 
     const completedAt = new Date()
-    await ignoreUniqueConstraint(async () => this.prisma.$transaction(async (tx) => {
+    let finalizedMemoryIds: string[] = []
+    const committed = await ignoreUniqueConstraint(async () => this.prisma.$transaction(async (tx) => {
       if (!await isRunStatus(tx, input.runId, ChatSessionRunStatus.RUNNING)) {
         return
       }
@@ -391,7 +395,14 @@ export class ChatRunProjectorService implements OnModuleInit, OnModuleDestroy {
           dispatchLeaseExpiresAt: null,
         },
       })
+      const finalizeResult = await this.agentMemoryOperations.finalizeGenerationOperations(
+        tx,
+        input.runId,
+        input.metadata.memoryOperations ?? [],
+      )
+      finalizedMemoryIds = finalizeResult.archivedMemoryIds
       await this.chatSessionEvents.appendEvents(tx, input.sessionId, [
+        ...createSnapshotRequiredEvents(input.metadata),
         {
           type: CHAT_SESSION_EVENT_TYPE.MESSAGE_COMPLETED,
           messageId: input.messageId,
@@ -412,6 +423,9 @@ export class ChatRunProjectorService implements OnModuleInit, OnModuleDestroy {
         },
       ])
     }))
+    if (committed && finalizedMemoryIds.length > 0) {
+      await this.agentMemoryOperations.cleanupFinalizedMemoryIndexes(finalizedMemoryIds)
+    }
   }
 
   private async failRun(input: {
@@ -428,11 +442,16 @@ export class ChatRunProjectorService implements OnModuleInit, OnModuleDestroy {
     }
 
     const completedAt = new Date()
-    await ignoreUniqueConstraint(async () => this.prisma.$transaction(async (tx) => {
+    let rolledBackMemoryIds: string[] = []
+    let restoredMemoryIds: string[] = []
+    const committed = await ignoreUniqueConstraint(async () => this.prisma.$transaction(async (tx) => {
       if (!await isRunStatus(tx, input.runId, ChatSessionRunStatus.RUNNING)) {
         return
       }
 
+      const rollbackResult = await this.agentMemoryOperations.rollbackGenerationOperations(tx, input.runId)
+      rolledBackMemoryIds = rollbackResult.memoryIds
+      restoredMemoryIds = rollbackResult.restoredMemoryIds
       await tx.chatSessionMessage.update({
         where: { id: input.messageId },
         data: {
@@ -471,6 +490,7 @@ export class ChatRunProjectorService implements OnModuleInit, OnModuleDestroy {
         },
       })
       await this.chatSessionEvents.appendEvents(tx, input.sessionId, [
+        ...createSnapshotRequiredEventsForMemoryStateChanged(rollbackResult.changed),
         {
           type: CHAT_SESSION_EVENT_TYPE.MESSAGE_FAILED,
           messageId: input.messageId,
@@ -492,6 +512,9 @@ export class ChatRunProjectorService implements OnModuleInit, OnModuleDestroy {
         },
       ])
     }))
+    if (committed && (rolledBackMemoryIds.length > 0 || restoredMemoryIds.length > 0)) {
+      await this.agentMemoryOperations.cleanupRolledBackMemoryIndexes(rolledBackMemoryIds, restoredMemoryIds)
+    }
   }
 
   private async cancelRun(input: {
@@ -506,11 +529,16 @@ export class ChatRunProjectorService implements OnModuleInit, OnModuleDestroy {
     }
 
     const completedAt = new Date()
-    await ignoreUniqueConstraint(async () => this.prisma.$transaction(async (tx) => {
+    let rolledBackMemoryIds: string[] = []
+    let restoredMemoryIds: string[] = []
+    const committed = await ignoreUniqueConstraint(async () => this.prisma.$transaction(async (tx) => {
       if (!await isRunStatus(tx, input.runId, ChatSessionRunStatus.RUNNING)) {
         return
       }
 
+      const rollbackResult = await this.agentMemoryOperations.rollbackGenerationOperations(tx, input.runId)
+      rolledBackMemoryIds = rollbackResult.memoryIds
+      restoredMemoryIds = rollbackResult.restoredMemoryIds
       await tx.chatSessionMessage.update({
         where: { id: input.messageId },
         data: {
@@ -541,6 +569,7 @@ export class ChatRunProjectorService implements OnModuleInit, OnModuleDestroy {
         },
       })
       await this.chatSessionEvents.appendEvents(tx, input.sessionId, [
+        ...createSnapshotRequiredEventsForMemoryStateChanged(rollbackResult.changed),
         {
           type: CHAT_SESSION_EVENT_TYPE.MESSAGE_CANCELLED,
           messageId: input.messageId,
@@ -556,6 +585,9 @@ export class ChatRunProjectorService implements OnModuleInit, OnModuleDestroy {
         },
       ])
     }))
+    if (committed && (rolledBackMemoryIds.length > 0 || restoredMemoryIds.length > 0)) {
+      await this.agentMemoryOperations.cleanupRolledBackMemoryIndexes(rolledBackMemoryIds, restoredMemoryIds)
+    }
   }
 
   private async isTerminalRun(runId: string): Promise<boolean> {
@@ -584,13 +616,14 @@ async function isRunStatus(
   return run?.status === status
 }
 
-async function ignoreUniqueConstraint(write: () => Promise<void>): Promise<void> {
+async function ignoreUniqueConstraint(write: () => Promise<void>): Promise<boolean> {
   try {
     await write()
+    return true
   }
   catch (error) {
     if (isUniqueConstraintError(error)) {
-      return
+      return false
     }
 
     throw error
@@ -618,6 +651,18 @@ function getExpectedHistoryVersion(value: unknown): number {
   return expectedHistoryVersion
 }
 
+function createSnapshotRequiredEvents(metadata: ChatMessageMetadata) {
+  return metadata.memoryOperations && metadata.memoryOperations.length > 0
+    ? [{ type: CHAT_SESSION_EVENT_TYPE.SNAPSHOT_REQUIRED }]
+    : []
+}
+
+function createSnapshotRequiredEventsForMemoryStateChanged(changed: boolean) {
+  return changed
+    ? [{ type: CHAT_SESSION_EVENT_TYPE.SNAPSHOT_REQUIRED }]
+    : []
+}
+
 function buildCompletedMessageMetadata(input: {
   event: ChatGenerationEvent
   startedAt: number
@@ -633,6 +678,7 @@ function buildCompletedMessageMetadata(input: {
     elapsedMs: durationMs,
     reasoningElapsedMs,
     usage: getUsageFromEvent(input.event),
+    memoryOperations: getMemoryOperationsFromEvent(input.event),
   }
 }
 
@@ -656,6 +702,21 @@ function getUsageFromEvent(event: ChatGenerationEvent): ChatMessageMetadata['usa
   }
 
   return ChatGenerationUsageSnapshotSchema.parse(usage)
+}
+
+function getMemoryOperationsFromEvent(event: ChatGenerationEvent): NonNullable<ChatMessageMetadata['memoryOperations']> {
+  if (!event.payload || typeof event.payload !== 'object') {
+    return []
+  }
+
+  const operations = (event.payload as { memoryOperations?: unknown }).memoryOperations
+  if (!Array.isArray(operations)) {
+    return []
+  }
+
+  return operations.map(operation => ChatMemoryOperationProjectionSchema.safeParse(operation))
+    .filter(result => result.success)
+    .map(result => result.data)
 }
 
 function getFailureReason(error: unknown): ChatMessageFailureReason {

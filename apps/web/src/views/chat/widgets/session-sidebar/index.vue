@@ -119,13 +119,13 @@ const {
 
             <template #dropdown>
               <ElDropdownMenu class="chat-session-sidebar__menu box-border min-w-0 w-[8.5rem] p-1">
-                <ElDropdownItem command="rename" class="chat-session-sidebar__menu-item min-h-8 rounded-md px-2 text-main">
+                <ElDropdownItem command="rename" class="chat-session-sidebar__menu-item min-h-8 px-2 text-main">
                   重命名
                 </ElDropdownItem>
                 <ElDropdownItem
                   command="delete"
                   divided
-                  class="chat-session-sidebar__menu-item chat-session-sidebar__menu-item--delete min-h-8 rounded-md px-2"
+                  class="chat-session-sidebar__menu-item chat-session-sidebar__menu-item--delete min-h-8 px-2"
                 >
                   删除
                 </ElDropdownItem>

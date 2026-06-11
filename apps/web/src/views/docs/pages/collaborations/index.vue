@@ -13,6 +13,7 @@ import {
   DOCUMENT_COLLABORATION_SCOPE_LABELS,
 } from '@haohaoxue/samepage-contracts/document/collaboration/constants'
 import { computed } from 'vue'
+import Empty from '@/components/empty'
 import { formatDateTime } from '@/utils/dayjs'
 import { useDocsCollaborationsPage } from '../../composables/useDocsCollaborationsPage'
 
@@ -135,11 +136,11 @@ function handleMoreCommand(row: CollaborationConsoleTableItem, command: string |
         :cell-style="tableBodyCellStyle"
       >
         <template #empty>
-          <ElEmpty :description="errorMessage || '暂无私有文档'">
+          <Empty :description="errorMessage || '暂无私有文档'">
             <ElButton v-if="errorMessage" type="primary" @click="loadItems">
               重新加载
             </ElButton>
-          </ElEmpty>
+          </Empty>
         </template>
 
         <ElTableColumn label="文档" min-width="320" show-overflow-tooltip>

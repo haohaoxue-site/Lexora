@@ -1,0 +1,98 @@
+import type { AgentSkillCard } from '@/apis/agent-skills'
+import { AGENT_TRANSLATOR_SKILL_KEY } from '@haohaoxue/samepage-contracts/agent'
+import { createSharedComposable } from '@vueuse/core'
+import { computed, shallowRef } from 'vue'
+import {
+  disableAgentSkill,
+  enableAgentSkill,
+  getAgentSkills,
+} from '@/apis/agent-skills'
+import { ElMessage } from '@/utils/element-plus'
+import { getRequestErrorDisplayMessage } from '@/utils/request-error'
+
+export const useChatSkillState = createSharedComposable(() => {
+  const installedSkills = shallowRef<AgentSkillCard[]>([])
+  const isLoadingSkills = shallowRef(false)
+  const updatingSkillKeys = shallowRef(new Set<string>())
+  const translatorSkill = computed(() =>
+    installedSkills.value.find(skill => skill.key === AGENT_TRANSLATOR_SKILL_KEY) ?? null,
+  )
+  const translatorSkillEnabled = computed(() =>
+    Boolean(translatorSkill.value?.enabled),
+  )
+
+  async function loadSkills(options: { silent?: boolean } = {}) {
+    if (isLoadingSkills.value) {
+      return
+    }
+
+    isLoadingSkills.value = true
+    try {
+      const response = await getAgentSkills()
+      installedSkills.value = response.mySkills.filter(skill => skill.installed)
+    }
+    catch (error) {
+      if (!options.silent) {
+        ElMessage.error(getRequestErrorDisplayMessage(error, '技能加载失败'))
+      }
+    }
+    finally {
+      isLoadingSkills.value = false
+    }
+  }
+
+  async function setSkillEnabled(skill: AgentSkillCard, enabled: boolean) {
+    if (skill.enabled === enabled || !canToggleSkill(skill)) {
+      return
+    }
+
+    setSkillUpdating(skill.key, true)
+    try {
+      const response = enabled
+        ? await enableAgentSkill(skill.key)
+        : await disableAgentSkill(skill.key)
+      replaceSkill(response.skill)
+    }
+    catch (error) {
+      ElMessage.error(getRequestErrorDisplayMessage(error, enabled ? '技能开启失败' : '技能关闭失败'))
+    }
+    finally {
+      setSkillUpdating(skill.key, false)
+    }
+  }
+
+  function canToggleSkill(skill: AgentSkillCard) {
+    return skill.enabled ? skill.canDisable : skill.canEnable
+  }
+
+  function isSkillUpdating(skillKey: string) {
+    return updatingSkillKeys.value.has(skillKey)
+  }
+
+  function replaceSkill(nextSkill: AgentSkillCard) {
+    installedSkills.value = installedSkills.value.map(skill =>
+      skill.key === nextSkill.key ? nextSkill : skill,
+    )
+  }
+
+  function setSkillUpdating(skillKey: string, updating: boolean) {
+    const nextKeys = new Set(updatingSkillKeys.value)
+    if (updating) {
+      nextKeys.add(skillKey)
+    }
+    else {
+      nextKeys.delete(skillKey)
+    }
+    updatingSkillKeys.value = nextKeys
+  }
+
+  return {
+    canToggleSkill,
+    installedSkills,
+    isLoadingSkills,
+    isSkillUpdating,
+    loadSkills,
+    setSkillEnabled,
+    translatorSkillEnabled,
+  }
+})

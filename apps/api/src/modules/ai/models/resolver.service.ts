@@ -5,7 +5,8 @@ import type {
   AiModelRef,
   AiModelType,
 } from '@haohaoxue/samepage-contracts'
-import { AiModelIntentKeySchema } from '@haohaoxue/samepage-contracts'
+import type { Prisma } from '@prisma/client'
+import { AI_MODEL_INTENT_KEY, AiModelIntentKeySchema } from '@haohaoxue/samepage-contracts'
 import { getAiModelIntentFallbackChain, isAiModelCapabilitySatisfied, normalizeAiEndpoint } from '@haohaoxue/samepage-shared'
 import { BadRequestException, Injectable } from '@nestjs/common'
 import { PrismaService } from '../../../database/prisma.service'
@@ -17,6 +18,7 @@ import {
   toDomainScope,
 } from '../ai.utils'
 import { AiProviderAdaptersService } from '../providers/adapters.service'
+import { PLATFORM_EMBEDDING_MODEL_POLICY_ID } from './defaults.constants'
 
 export interface ResolveAiModelTargetParams {
   actorUserId: string
@@ -57,10 +59,7 @@ export class AiModelResolverService {
       where: {
         id: modelRef.providerId,
         enabled: true,
-        OR: [
-          { scope: 'PLATFORM', visibility: 'ALL_USERS' },
-          { scope: 'USER', ownerUserId: params.actorUserId },
-        ],
+        OR: this.getProviderAccessWhere(params.actorUserId, intentKey),
       },
     })
 
@@ -130,6 +129,10 @@ export class AiModelResolverService {
   }
 
   private async resolveDefaultModelRef(actorUserId: string, intentKey: AiModelIntentKey) {
+    if (intentKey === AI_MODEL_INTENT_KEY.MEMORY_EMBEDDING_DEFAULT) {
+      return this.resolvePlatformEmbeddingModelRef()
+    }
+
     const intentFallbackChain = getAiModelIntentFallbackChain(intentKey)
     const policies = await this.prisma.aiDefaultModelPolicy.findMany({
       where: {
@@ -151,5 +154,33 @@ export class AiModelResolverService {
     }
 
     throw new BadRequestException('请先配置默认模型')
+  }
+
+  private async resolvePlatformEmbeddingModelRef() {
+    const policy = await this.prisma.aiPlatformEmbeddingModelPolicy.findUnique({
+      where: { id: PLATFORM_EMBEDDING_MODEL_POLICY_ID },
+    })
+
+    if (!policy) {
+      throw new BadRequestException('请先配置平台向量模型')
+    }
+
+    return {
+      providerId: policy.providerId,
+      modelId: policy.modelId,
+    }
+  }
+
+  private getProviderAccessWhere(actorUserId: string, intentKey: AiModelIntentKey): Prisma.AiProviderWhereInput[] {
+    if (intentKey === AI_MODEL_INTENT_KEY.MEMORY_EMBEDDING_DEFAULT) {
+      return [
+        { scope: 'PLATFORM', visibility: 'ALL_USERS' },
+      ]
+    }
+
+    return [
+      { scope: 'PLATFORM', visibility: 'ALL_USERS' },
+      { scope: 'USER', ownerUserId: actorUserId },
+    ]
   }
 }

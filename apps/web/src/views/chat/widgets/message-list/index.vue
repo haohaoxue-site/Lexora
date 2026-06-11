@@ -45,7 +45,6 @@ const {
   emptyIconStateClass,
   getMessageRoleClass,
   getMessageText,
-  handleEditPlaceholderCommand,
   handleEditPlaceholderUpload,
   highlightEditingAttachment,
   isEditingMessage,
@@ -286,7 +285,6 @@ function formatMessageSentAt(value: string): string {
                   @select-model="selectComposerModel"
                   @highlight-attachment="highlightEditingAttachment"
                   @placeholder-upload="handleEditPlaceholderUpload"
-                  @placeholder-command="handleEditPlaceholderCommand"
                 />
                 <div class="chat-message-list__edit-actions mt-3 flex justify-end gap-2">
                   <ElButton round @click="cancelEditMessage">

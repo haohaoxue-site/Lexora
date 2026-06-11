@@ -27,6 +27,7 @@ import {
 } from '@haohaoxue/samepage-contracts/document/publication/constants'
 import { normalizePublicationHref } from '@haohaoxue/samepage-shared/document'
 import { computed, shallowRef, watch } from 'vue'
+import Empty from '@/components/empty'
 import { ElMessage } from '@/utils/element-plus'
 
 const props = withDefaults(defineProps<PublicationSiteNavigationPanelProps>(), {
@@ -447,7 +448,7 @@ function compareOrderedItem(left: { order: number, updatedAt: string }, right: {
           @row-click="handleRowClick"
         >
           <template #empty>
-            <ElEmpty description="暂无站点导航" />
+            <Empty compact description="暂无站点导航" />
           </template>
 
           <ElTableColumn label="导航项" min-width="180" show-overflow-tooltip>
@@ -621,7 +622,7 @@ function compareOrderedItem(left: { order: number, updatedAt: string }, right: {
         </section>
 
         <section v-else class="publication-site-navigation-panel__panel rounded-xl border bg-surface p-4">
-          <ElEmpty description="选择一个导航项" />
+          <Empty compact description="选择一个导航项" />
         </section>
       </aside>
     </div>

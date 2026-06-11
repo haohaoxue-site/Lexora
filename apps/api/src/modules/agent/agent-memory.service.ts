@@ -81,6 +81,16 @@ interface CreateAcceptedMemoryInput {
   sourceGenerationId?: string | null
 }
 
+interface FindTextMemoriesInput {
+  where: Prisma.AgentMemoryWhereInput
+  actorUserId: string
+  agentProfileId: string | null
+  scopes: PrismaAgentMemoryScope[]
+  lanes: AgentMemoryLane[]
+  includeSensitive: boolean
+  query: string
+}
+
 @Injectable()
 export class AgentMemoryService {
   private readonly logger = new Logger(AgentMemoryService.name)
@@ -228,6 +238,27 @@ export class AgentMemoryService {
     return archivedMemoryIds
   }
 
+  async deleteMemoryIndexesBestEffort(memoryIds: string[]): Promise<void> {
+    await Promise.all([...new Set(memoryIds)].map(memoryId => this.deleteMemoryIndexBestEffort(memoryId)))
+  }
+
+  async syncMemoryIndexesBestEffort(memoryIds: string[]): Promise<void> {
+    const uniqueMemoryIds = [...new Set(memoryIds.map(memoryId => memoryId.trim()).filter(Boolean))]
+    if (uniqueMemoryIds.length === 0) {
+      return
+    }
+
+    const memories = await this.prisma.agentMemory.findMany({
+      where: {
+        id: { in: uniqueMemoryIds },
+        status: 'ACTIVE',
+        deletedAt: null,
+      },
+    })
+
+    await Promise.all(memories.map(memory => this.syncMemoryIndexBestEffort(memory)))
+  }
+
   async retrieveMemoriesForAgent(payload: RetrieveAgentMemoryRequest): Promise<RetrieveAgentMemoryResponse> {
     await this.assertGenerationMemoryRequest(payload)
 
@@ -265,7 +296,15 @@ export class AgentMemoryService {
 
     const [pinnedMemories, textMemories] = await Promise.all([
       this.findPinnedMemories(where, pinnedLanes),
-      this.findTextMemories(where, retrievedLanes, payload.query),
+      this.findTextMemories({
+        where,
+        actorUserId: payload.actorUserId,
+        agentProfileId: payload.agentProfileId,
+        scopes: scopes.map(toPrismaMemoryScope),
+        lanes: retrievedLanes,
+        includeSensitive: policy.includeSensitive,
+        query: payload.query,
+      }),
     ])
     const selected = selectMemoriesForPrompt({
       memories: dedupeMemories([...pinnedMemories, ...textMemories]),
@@ -427,16 +466,17 @@ export class AgentMemoryService {
     return memories.flat()
   }
 
-  private async findTextMemories(
-    where: Prisma.AgentMemoryWhereInput,
-    lanes: AgentMemoryLane[],
-    query: string,
-  ): Promise<PrismaAgentMemory[]> {
-    if (lanes.length === 0) {
+  private async findTextMemories(input: FindTextMemoriesInput): Promise<PrismaAgentMemory[]> {
+    if (input.lanes.length === 0) {
       return Promise.resolve([])
     }
 
-    const terms = createMemorySearchTerms(query)
+    const vectorMemories = await this.findVectorMemories(input)
+    if (vectorMemories.length > 0) {
+      return vectorMemories
+    }
+
+    const terms = createMemorySearchTerms(input.query)
     if (terms.length === 0) {
       return Promise.resolve([])
     }
@@ -444,8 +484,8 @@ export class AgentMemoryService {
     const results = await this.prisma.agentMemorySearchIndex.findMany({
       where: {
         AND: [
-          { memory: { is: where } },
-          { lane: { in: lanes.map(toPrismaMemoryLane) } },
+          { memory: { is: input.where } },
+          { lane: { in: input.lanes.map(toPrismaMemoryLane) } },
           {
             OR: terms.map(term => ({
               searchText: { contains: term, mode: 'insensitive' as const },
@@ -464,6 +504,43 @@ export class AgentMemoryService {
     })
 
     return results.map(result => result.memory)
+  }
+
+  private async findVectorMemories(input: FindTextMemoriesInput): Promise<PrismaAgentMemory[]> {
+    const query = input.query.trim()
+    if (!query || input.scopes.length === 0 || input.lanes.length === 0) {
+      return []
+    }
+
+    const embedding = await this.indexing.createQueryEmbedding(input.actorUserId, query)
+    if (!embedding) {
+      return []
+    }
+
+    try {
+      return await this.prisma.$queryRaw<PrismaAgentMemory[]>(Prisma.sql`
+        SELECT m.*
+        FROM "AgentMemorySearchIndex" i
+        INNER JOIN "AgentMemory" m ON m."id" = i."memoryId"
+        WHERE i."embedding" IS NOT NULL
+          AND i."embeddingDimensions" = ${embedding.length}
+          AND m."ownerUserId" = ${input.actorUserId}
+          AND m."scope"::text IN (${Prisma.join(input.scopes)})
+          AND m."lane"::text IN (${Prisma.join(input.lanes.map(toPrismaMemoryLane))})
+          AND m."status"::text = 'ACTIVE'
+          AND m."deletedAt" IS NULL
+          AND (m."expiresAt" IS NULL OR m."expiresAt" > NOW())
+          ${input.includeSensitive ? Prisma.empty : Prisma.sql`AND m."sensitivity"::text = 'NORMAL'`}
+          ${input.agentProfileId
+            ? Prisma.sql`AND (m."scope"::text = 'USER' OR (m."scope"::text = 'USER_AGENT' AND m."agentProfileId" = ${input.agentProfileId}))`
+            : Prisma.sql`AND m."scope"::text = 'USER'`}
+        ORDER BY i."embedding" <=> ${formatVectorLiteral(embedding)}::vector, i."indexedAt" DESC
+        LIMIT 50
+      `)
+    }
+    catch {
+      return []
+    }
   }
 
   private async syncMemoryIndexBestEffort(memory: PrismaAgentMemory): Promise<void> {
@@ -672,6 +749,10 @@ function assertMemoryContentSafe(payload: Pick<CreateAcceptedMemoryInput, 'conte
 function normalizeNullableText(value: string | null | undefined): string | null {
   const normalized = value?.trim() ?? ''
   return normalized || null
+}
+
+function formatVectorLiteral(vector: number[]): string {
+  return `[${vector.join(',')}]`
 }
 
 function isSameSlotValue(memory: PrismaAgentMemory, payload: Pick<CreateAcceptedMemoryInput, 'content' | 'slotValue'>): boolean {

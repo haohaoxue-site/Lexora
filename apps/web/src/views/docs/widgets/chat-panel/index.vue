@@ -22,7 +22,6 @@ const {
   composerSelectedModelRef,
   confirmDeleteActiveSession,
   contentJSON,
-  handlePlaceholderCommand,
   handlePlaceholderUpload,
   handleSend,
   hasActiveSession,
@@ -114,7 +113,6 @@ watch(
         @stop="cancelActiveRun"
         @select-model="selectComposerModel"
         @placeholder-upload="handlePlaceholderUpload"
-        @placeholder-command="handlePlaceholderCommand"
         @highlight-attachment="highlightAttachment"
       />
     </div>

@@ -350,6 +350,9 @@ export class AiProvidersService {
         await tx.aiDefaultModelPolicy.deleteMany({
           where: { providerId: params.providerId },
         })
+        await tx.aiPlatformEmbeddingModelPolicy.deleteMany({
+          where: { providerId: params.providerId },
+        })
         await tx.aiProviderModel.deleteMany({
           where: { providerId: params.providerId },
         })

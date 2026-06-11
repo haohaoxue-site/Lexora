@@ -1,6 +1,7 @@
 import type { BaseCheckpointSaver } from '@langchain/langgraph'
 import type { AgentChatApiClient } from '../clients/chat'
 import type { AgentMemoryApiClient } from '../clients/memory'
+import type { AgentSkillApiClient } from '../clients/skills'
 import type {
   AgentChatModelFactory,
   AgentChatModelOptions,
@@ -27,10 +28,15 @@ import {
   emitAgentModelStreamPart,
 } from './events'
 import { createAgentGraph } from './graph'
+import {
+  createFocusedTranslatorThreadId,
+  resolveFocusedTranslatorInvocation,
+} from './skills/builtin/translator'
 
 export interface CreateAgentRunnerInput {
   chatApi: AgentChatApiClient
   memoryApi?: AgentMemoryApiClient
+  skillApi?: AgentSkillApiClient
   chatModelFactory: AgentChatModelFactory
   checkpointer?: BaseCheckpointSaver
   threadRunTryLock?: AgentRuntimeTryLock
@@ -45,6 +51,7 @@ export function createAgentRunner(inputs: CreateAgentRunnerInput): AgentRunner {
   const graph = createAgentGraph({
     chatModelFactory: inputs.chatModelFactory,
     memoryApi: inputs.memoryApi,
+    skillApi: inputs.skillApi,
     checkpointer: inputs.checkpointer,
   })
   const threadRunTryLock = inputs.threadRunTryLock ?? createMemoryAgentRuntimeTryLock()
@@ -86,11 +93,13 @@ export function createAgentRunner(inputs: CreateAgentRunnerInput): AgentRunner {
           payload: {
             durationMs,
             usage: result.usageSnapshot ?? undefined,
+            memoryOperations: result.memoryOperations ?? [],
           },
         }))
 
         return {
           text: result.responseText,
+          ...((result.memoryOperations?.length ?? 0) > 0 ? { memoryOperations: result.memoryOperations } : {}),
         }
       }
       catch (error) {
@@ -142,15 +151,27 @@ export async function executeAgentGeneration(input: {
 }) {
   const profileConfig = AgentProfileConfigSchema.parse(input.bootstrap.agentProfile.currentConfig)
   const threadId = input.bootstrap.context.threadId
-  const result = await input.threadRunTryLock.tryRunExclusive(threadId, async () => {
+  const focusedTranslatorInvocation = resolveFocusedTranslatorInvocation({
+    messages: input.bootstrap.context.messages,
+    triggerUserMessageId: input.bootstrap.context.triggerUserMessageId,
+    agentProfileConfig: profileConfig,
+    skillContext: input.bootstrap.skills,
+  })
+  const graphThreadId = focusedTranslatorInvocation
+    ? createFocusedTranslatorThreadId(threadId, input.bootstrap.generation.generationId)
+    : threadId
+  const result = await input.threadRunTryLock.tryRunExclusive(graphThreadId, async () => {
     if (input.bootstrap.context.messages.length === 0) {
       throw new Error('聊天触发消息不存在')
     }
 
-    const checkpointState = await readAgentCheckpointState(input.checkpointer, threadId)
+    const checkpointState = focusedTranslatorInvocation
+      ? null
+      : await readAgentCheckpointState(input.checkpointer, threadId)
     const graphInputDecision = resolveAgentGraphInput(
       input.bootstrap.context,
       checkpointState,
+      { focused: Boolean(focusedTranslatorInvocation) },
     )
 
     if (graphInputDecision.shouldResetCheckpoint) {
@@ -160,10 +181,11 @@ export async function executeAgentGeneration(input: {
     return await input.graph.invoke(graphInputDecision.graphInput, {
       signal: input.signal,
       configurable: {
-        thread_id: threadId,
+        thread_id: graphThreadId,
       },
       context: {
         agentProfileConfig: profileConfig,
+        skillContext: input.bootstrap.skills,
         generationId: input.bootstrap.generation.generationId,
         actorUserId: input.bootstrap.generation.actorUserId,
         agentProfileId: input.bootstrap.agentProfile.profileId,
@@ -172,8 +194,9 @@ export async function executeAgentGeneration(input: {
         modelOptions: toChatModelOptions(profileConfig),
         modelTarget: input.bootstrap.runtimeModelTarget,
         memoryIgnoredForRun: input.bootstrap.context.memory.ignoredForRun,
+        focusedTranslatorInvocation,
         triggerUserMessageId: input.bootstrap.context.triggerUserMessageId,
-        contextSnapshots: input.bootstrap.context.contextSnapshots,
+        contextSnapshots: focusedTranslatorInvocation ? [] : input.bootstrap.context.contextSnapshots,
         onStreamPart: async (part: AgentModelStreamPart) => await emitAgentModelStreamPart(part, {
           emit: input.emit,
           generationId: input.bootstrap.generation.generationId,

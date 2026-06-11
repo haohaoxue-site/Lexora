@@ -163,6 +163,7 @@ export class ChatController {
       contentJSON: payload.contentJSON,
       attachments: payload.attachments,
       memory: payload.memory,
+      skillInvocation: payload.skillInvocation,
     })
   }
 
@@ -183,6 +184,7 @@ export class ChatController {
       contentJSON: payload.contentJSON,
       attachments: payload.attachments,
       memory: payload.memory,
+      skillInvocation: payload.skillInvocation,
     })
   }
 

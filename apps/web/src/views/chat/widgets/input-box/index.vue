@@ -13,13 +13,14 @@ const {
   composerModelSelectionKind,
   composerSelectedModelRef,
   contentJSON,
-  handlePlaceholderCommand,
   handlePlaceholderUpload,
   handleSend,
   highlightAttachment,
   highlightAttachmentId,
   isStreaming,
   selectComposerModel,
+  translatorSkillEnabled,
+  translatorTargetLanguage,
 } = useChatInputBox()
 </script>
 
@@ -28,18 +29,19 @@ const {
     <div class="mx-auto" :class="props.variant === 'hero' ? 'max-w-none' : 'max-w-[var(--page-mode-chat-max-width)]'">
       <ChatComposer
         v-model:attachments="attachments"
+        v-model:translator-target-language="translatorTargetLanguage"
         :content-j-s-o-n="contentJSON"
         :selected-model-ref="composerSelectedModelRef"
         :model-selection-kind="composerModelSelectionKind"
         :is-streaming="isStreaming"
         :highlight-attachment-id="highlightAttachmentId"
+        :translator-skill-enabled="translatorSkillEnabled"
         document-picker-teleport-to=".chat-view__picker-layer"
         @update:content-j-s-o-n="contentJSON = $event"
         @send="handleSend"
         @stop="cancelActiveRun"
         @select-model="selectComposerModel"
         @placeholder-upload="handlePlaceholderUpload"
-        @placeholder-command="handlePlaceholderCommand"
         @highlight-attachment="highlightAttachment"
       />
       <div v-if="props.variant === 'dock'" class="mt-2 text-center text-xs text-secondary-a50">

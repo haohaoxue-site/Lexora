@@ -39,7 +39,7 @@ export function createChatComposerModelController(
   ))
   const composerSelectedModelRef = computed(() => {
     if (sessions.activeSession.value) {
-      return sessionModelRef.value ?? requestModelRef.value
+      return requestModelRef.value
     }
 
     return hasNewSessionModelDraft.value ? newSessionModelDraft.value : requestModelRef.value

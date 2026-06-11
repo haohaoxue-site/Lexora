@@ -1,12 +1,13 @@
 import type {
+  AgentChatContextMessage,
   AgentChatRuntimeContext,
   AgentMemoryRunOptions,
   AgentProfileSnapshot,
   AgentRuntimeModelTarget,
+  AgentRuntimeSkillContext,
   AiModelRef,
   ChatGenerationBootstrap,
   ChatGenerationModelTargetSnapshot,
-  ChatMemoryOperationProjection,
   ChatMessageAttachmentInput,
   ChatMessageContentJSON,
   ChatMessageFailureReason,
@@ -17,6 +18,7 @@ import type {
   ChatSessionDetail,
   ChatSessionOrigin,
   ChatSessionSummary,
+  ChatSkillInvocation,
 } from '@haohaoxue/samepage-contracts'
 import type { AgentProfileForGeneration } from '../agent/agent-profiles.service'
 import type { ChatContextSnapshotCreateData } from './chat-context-snapshots.service'
@@ -25,6 +27,7 @@ import {
   AgentMemoryRunOptionsSchema,
   AgentProfileSnapshotSchema,
   AgentRuntimeModelTargetSchema,
+  AgentRuntimeSkillContextSchema,
   AI_MODEL_INTENT_KEY,
   CHAT_RUN_STATUS,
   CHAT_SESSION_DEFAULT_TITLE,
@@ -32,6 +35,7 @@ import {
   ChatGenerationBootstrapSchema,
   ChatGenerationModelTargetSnapshotSchema,
   ChatMutationResponseSchema,
+  ChatSkillInvocationSchema,
   WORKSPACE_MEMBER_STATUS,
 } from '@haohaoxue/samepage-contracts'
 import { buildAgentChatThreadId } from '@haohaoxue/samepage-shared'
@@ -41,6 +45,7 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  Optional,
 } from '@nestjs/common'
 import {
   ChatMessageGenerationStatus,
@@ -51,11 +56,11 @@ import {
   Prisma,
 } from '@prisma/client'
 import { PrismaService } from '../../database/prisma.service'
-import { AgentMemoryOperationsService } from '../agent/agent-memory-operations.service'
 import {
   AgentProfilesService,
   resolveAgentProfileFixedModelRef,
 } from '../agent/agent-profiles.service'
+import { AgentSkillsService } from '../agent/agent-skills.service'
 import { AiModelResolverService } from '../ai/models/resolver.service'
 import { ChatContextSnapshotsService } from './chat-context-snapshots.service'
 import { ChatSessionEventsService } from './chat-session-events.service'
@@ -279,7 +284,6 @@ interface CreatedRunResult {
   generationId: string
   assistantMessageId: string
   triggerUserMessageId: string
-  triggerUserContent: string
   agentProfileId: string
   expectedHistoryVersion: number
   latestSequence: number
@@ -295,7 +299,7 @@ export class ChatSessionsService {
     private readonly chatContextSnapshots: ChatContextSnapshotsService,
     private readonly agentProfiles: AgentProfilesService,
     private readonly modelResolverService: AiModelResolverService,
-    private readonly agentMemoryOperations?: AgentMemoryOperationsService,
+    @Optional() private readonly agentSkills?: AgentSkillsService,
   ) {}
 
   async getSessions(userId: string, workspaceId: string, origin: ChatSessionOrigin): Promise<ChatSessionSummary[]> {
@@ -313,7 +317,7 @@ export class ChatSessionsService {
       ],
     })
 
-    return sessions.map(toChatSessionSummary)
+    return (await this.personalizeSessionAgentProfiles(userId, sessions)).map(toChatSessionSummary)
   }
 
   async createSession(userId: string, workspaceId: string, origin: ChatSessionOrigin): Promise<ChatSessionDetail> {
@@ -337,7 +341,9 @@ export class ChatSessionsService {
       })
     })
 
-    return toChatSessionDetail(toChatSessionDetailRecord(session))
+    return toChatSessionDetail(toChatSessionDetailRecord(
+      await this.personalizeSessionAgentProfile(userId, session),
+    ))
   }
 
   async getSession(userId: string, sessionId: string, origin: ChatSessionOrigin): Promise<ChatSessionDetail> {
@@ -345,7 +351,7 @@ export class ChatSessionsService {
     await this.repairActivePathSelection(session)
 
     return toChatSessionDetail(toChatSessionDetailRecord(
-      session,
+      await this.personalizeSessionAgentProfile(userId, session),
       await this.getActiveRunSummary(session.id),
     ))
   }
@@ -522,9 +528,9 @@ export class ChatSessionsService {
     content: string
     contentJSON: ChatMessageContentJSON
     attachments?: ChatMessageAttachmentInput[] | null
+    skillInvocation?: ChatSkillInvocation | null
   }): Promise<ChatMutationResponse> {
     const result = await this.createRunFromUserMessage(input)
-    await this.processUserMessageMemoryOperations(input.userId, result)
     return this.toMutationResponse(input.userId, input.origin, result.sessionId, result.latestSequence, result.runId)
   }
 
@@ -533,9 +539,9 @@ export class ChatSessionsService {
     content: string
     contentJSON: ChatMessageContentJSON
     attachments?: ChatMessageAttachmentInput[] | null
+    skillInvocation?: ChatSkillInvocation | null
   }): Promise<ChatMutationResponse> {
     const result = await this.createRunFromEditedUserMessage(input)
-    await this.processUserMessageMemoryOperations(input.userId, result)
     return this.toMutationResponse(input.userId, input.origin, result.sessionId, result.latestSequence, result.runId)
   }
 
@@ -730,12 +736,13 @@ export class ChatSessionsService {
     }
 
     const modelTargetSnapshot = ChatGenerationModelTargetSnapshotSchema.parse(generation.modelTargetSnapshot)
+    const agentProfileSnapshot = AgentProfileSnapshotSchema.parse(generation.agentProfileSnapshot)
     const run = await this.prisma.chatSessionRun.findUnique({
       where: { runId: generation.generationId },
       select: { commandContext: true },
     })
     const memory = readAgentMemoryRunOptions(run?.commandContext)
-    const [context, runtimeModelTarget] = await Promise.all([
+    const [context, runtimeModelTarget, skills] = await Promise.all([
       this.resolveAgentRuntimeContext({
         actorId: generation.actorUserId,
         sessionId: generation.sessionId,
@@ -743,6 +750,12 @@ export class ChatSessionsService {
         memory,
       }),
       this.resolveRuntimeModelTarget(generation.actorUserId, modelTargetSnapshot),
+      this.agentSkills
+        ? this.agentSkills.resolveRuntimeSkillContext({
+            actorUserId: generation.actorUserId,
+            agentProfile: agentProfileSnapshot,
+          })
+        : AgentRuntimeSkillContextSchema.parse({}),
     ])
 
     if (context.assistantMessageId !== generation.assistantMessageId) {
@@ -758,10 +771,11 @@ export class ChatSessionsService {
         actorUserId: generation.actorUserId,
         attempt: generation.attempt,
       },
-      agentProfile: AgentProfileSnapshotSchema.parse(generation.agentProfileSnapshot),
+      agentProfile: agentProfileSnapshot,
       model: modelTargetSnapshot,
       runtimeModelTarget,
       context,
+      skills,
     })
   }
 
@@ -798,17 +812,26 @@ export class ChatSessionsService {
       assistantMessageId: assistantMessage.id,
       messages: activePath
         .filter(message => message.role === ChatSessionMessageRole.USER || message.status === ChatSessionMessageStatus.COMPLETED)
-        .map(message => ({
-          id: message.id,
-          role: toChatMessageRole(message.role),
-          content: getChatMessageContentSnapshot(message),
-        })),
+        .map(message => this.toAgentContextMessage(message)),
       contextSnapshots: triggerMessage.contextSnapshots.map((snapshot, order) => ({
         ...toChatMessageContextSnapshotMeta(snapshot),
         order,
         content: snapshot.content,
       })),
       memory: input.memory,
+    }
+  }
+
+  private toAgentContextMessage(message: PersistedChatSessionRunDetailMessage): AgentChatContextMessage {
+    const skillInvocation = message.role === ChatSessionMessageRole.USER
+      ? readChatSkillInvocation(message.metadata)
+      : null
+
+    return {
+      id: message.id,
+      role: toChatMessageRole(message.role),
+      content: getChatMessageContentSnapshot(message),
+      ...(skillInvocation ? { skillInvocation } : {}),
     }
   }
 
@@ -973,6 +996,7 @@ export class ChatSessionsService {
     content: string
     contentJSON: ChatMessageContentJSON
     attachments?: ChatMessageAttachmentInput[] | null
+    skillInvocation?: ChatSkillInvocation | null
   }): Promise<CreatedRunResult> {
     const session = await this.findAccessibleSessionRunDetailOrThrow(input.userId, input.sessionId, input.origin)
     await this.assertNoActiveRun(session.id)
@@ -1013,12 +1037,20 @@ export class ChatSessionsService {
       const agentProfile = await this.resolveSessionAgentProfile(session, input.userId, tx)
       resolvedAgentProfileId = agentProfile.id
       const agentProfileSnapshot = createAgentProfileSnapshot(agentProfile, now)
+      await this.assertSkillInvocationAvailable({
+        userId: input.userId,
+        skillInvocation: input.skillInvocation,
+        agentProfileSnapshot,
+      })
 
       await this.createUserMessage(tx, {
         id: triggerUserMessageId,
         sessionId: session.id,
         content: normalizedContent,
-        metadata: resolvedContext.metadata,
+        metadata: {
+          ...resolvedContext.metadata,
+          skillInvocation: input.skillInvocation ?? null,
+        },
         contextSnapshots: resolvedContext.snapshots,
         parentMessageId: userParentMessageId,
         branchOrder: userBranchOrder,
@@ -1090,7 +1122,6 @@ export class ChatSessionsService {
       generationId: input.generationId,
       assistantMessageId,
       triggerUserMessageId,
-      triggerUserContent: normalizedContent,
       agentProfileId: assertResolvedAgentProfileId(resolvedAgentProfileId),
       expectedHistoryVersion,
       latestSequence,
@@ -1102,6 +1133,7 @@ export class ChatSessionsService {
     content: string
     contentJSON: ChatMessageContentJSON
     attachments?: ChatMessageAttachmentInput[] | null
+    skillInvocation?: ChatSkillInvocation | null
   }): Promise<CreatedRunResult> {
     const session = await this.findAccessibleSessionRunDetailOrThrow(input.userId, input.sessionId, input.origin)
     await this.assertNoActiveRun(session.id)
@@ -1136,12 +1168,20 @@ export class ChatSessionsService {
       const agentProfile = await this.resolveSessionAgentProfile(session, input.userId, tx)
       resolvedAgentProfileId = agentProfile.id
       const agentProfileSnapshot = createAgentProfileSnapshot(agentProfile, now)
+      await this.assertSkillInvocationAvailable({
+        userId: input.userId,
+        skillInvocation: input.skillInvocation,
+        agentProfileSnapshot,
+      })
 
       await this.createUserMessage(tx, {
         id: triggerUserMessageId,
         sessionId: session.id,
         content: normalizedContent,
-        metadata: resolvedContext.metadata,
+        metadata: {
+          ...resolvedContext.metadata,
+          skillInvocation: input.skillInvocation ?? null,
+        },
         contextSnapshots: resolvedContext.snapshots,
         parentMessageId: sourceMessage.parentMessageId,
         branchOrder: userBranchOrder,
@@ -1211,7 +1251,6 @@ export class ChatSessionsService {
       generationId: input.generationId,
       assistantMessageId,
       triggerUserMessageId,
-      triggerUserContent: normalizedContent,
       agentProfileId: assertResolvedAgentProfileId(resolvedAgentProfileId),
       expectedHistoryVersion,
       latestSequence,
@@ -1252,6 +1291,11 @@ export class ChatSessionsService {
       const agentProfile = await this.resolveSessionAgentProfile(session, input.userId, tx)
       resolvedAgentProfileId = agentProfile.id
       const agentProfileSnapshot = createAgentProfileSnapshot(agentProfile, now)
+      await this.assertSkillInvocationAvailable({
+        userId: input.userId,
+        skillInvocation: readChatSkillInvocation(triggerMessage.metadata),
+        agentProfileSnapshot,
+      })
 
       await this.createAssistantPendingMessage(tx, {
         id: assistantMessageId,
@@ -1306,7 +1350,6 @@ export class ChatSessionsService {
       generationId: input.generationId,
       assistantMessageId,
       triggerUserMessageId: triggerMessage.id,
-      triggerUserContent: getChatMessageContentSnapshot(triggerMessage),
       agentProfileId: assertResolvedAgentProfileId(resolvedAgentProfileId),
       expectedHistoryVersion,
       latestSequence,
@@ -1347,6 +1390,29 @@ export class ChatSessionsService {
     }
   }
 
+  private async assertSkillInvocationAvailable(input: {
+    userId: string
+    skillInvocation?: ChatSkillInvocation | null
+    agentProfileSnapshot: AgentProfileSnapshot
+  }): Promise<void> {
+    if (!input.skillInvocation) {
+      return
+    }
+
+    if (!this.agentSkills) {
+      throw new BadRequestException('技能不可用')
+    }
+
+    const skillContext = await this.agentSkills.resolveRuntimeSkillContext({
+      actorUserId: input.userId,
+      agentProfile: input.agentProfileSnapshot,
+    })
+
+    if (!hasAvailableSkill(skillContext, input.skillInvocation.skillKey)) {
+      throw new BadRequestException('技能未安装或未开启')
+    }
+  }
+
   private async createUserMessage(
     tx: Prisma.TransactionClient,
     input: {
@@ -1356,6 +1422,7 @@ export class ChatSessionsService {
       metadata: {
         contentJSON: ChatMessageContentJSON
         attachments: ChatPersistedMessageAttachment[]
+        skillInvocation?: ChatSkillInvocation | null
       }
       contextSnapshots: ChatContextSnapshotCreateData[]
       parentMessageId: string | null
@@ -1483,93 +1550,6 @@ export class ChatSessionsService {
         status: ChatMessageGenerationStatus.PENDING,
         idempotencyKey: `chat:generation:${input.generationId}`,
       },
-    })
-  }
-
-  private async processUserMessageMemoryOperations(
-    userId: string,
-    run: CreatedRunResult,
-  ): Promise<void> {
-    if (!this.agentMemoryOperations) {
-      return
-    }
-
-    try {
-      const operations = await this.agentMemoryOperations.processUserMessage({
-        userId,
-        sessionId: run.sessionId,
-        messageId: run.triggerUserMessageId,
-        generationId: run.generationId,
-        agentProfileId: run.agentProfileId,
-        content: run.triggerUserContent,
-      })
-
-      if (operations.length === 0) {
-        return
-      }
-
-      await this.appendUserMessageMemoryOperations({
-        sessionId: run.sessionId,
-        messageId: run.triggerUserMessageId,
-        operations,
-      })
-    }
-    catch (error) {
-      this.logger.warn(`memory operation failed: ${error instanceof Error ? error.message : String(error)}`)
-    }
-  }
-
-  private async appendUserMessageMemoryOperations(input: {
-    sessionId: string
-    messageId: string
-    operations: ChatMemoryOperationProjection[]
-  }): Promise<void> {
-    await this.prisma.$transaction(async (tx) => {
-      const message = await tx.chatSessionMessage.findFirst({
-        where: {
-          id: input.messageId,
-          sessionId: input.sessionId,
-          role: ChatSessionMessageRole.USER,
-        },
-        select: {
-          metadata: true,
-        },
-      })
-
-      if (!message) {
-        return
-      }
-
-      const metadata = isRecord(message.metadata) ? message.metadata : {}
-      const existingOperations = Array.isArray(metadata.memoryOperations)
-        ? metadata.memoryOperations
-        : []
-
-      await tx.chatSessionMessage.updateMany({
-        where: {
-          id: input.messageId,
-          sessionId: input.sessionId,
-          role: ChatSessionMessageRole.USER,
-        },
-        data: {
-          metadata: toJsonObject({
-            ...metadata,
-            memoryOperations: [
-              ...existingOperations,
-              ...input.operations,
-            ],
-          }),
-        },
-      })
-      await this.chatSessionEvents.appendEvents(tx, input.sessionId, [
-        {
-          type: CHAT_SESSION_EVENT_TYPE.SNAPSHOT_REQUIRED,
-          messageId: input.messageId,
-          payload: toJsonObject({
-            reason: 'memory_operations_updated',
-          }),
-        },
-      ])
     })
   }
 
@@ -1767,7 +1747,7 @@ export class ChatSessionsService {
     tx?: Prisma.TransactionClient,
   ): Promise<AgentProfileForGeneration> {
     if (session.agentProfile) {
-      return session.agentProfile
+      return this.personalizeAgentProfileForGeneration(userId, session.agentProfile, tx)
     }
 
     const agentProfile = await this.agentProfiles.ensureDefaultAgentProfile({
@@ -1786,7 +1766,59 @@ export class ChatSessionsService {
       },
     })
 
-    return agentProfile
+    return this.personalizeAgentProfileForGeneration(userId, agentProfile, tx)
+  }
+
+  private async personalizeSessionAgentProfile<T extends { agentProfile: { id: string, name: string } | null }>(
+    userId: string,
+    session: T,
+  ): Promise<T> {
+    return (await this.personalizeSessionAgentProfiles(userId, [session]))[0] ?? session
+  }
+
+  private async personalizeSessionAgentProfiles<T extends { agentProfile: { id: string, name: string } | null }>(
+    userId: string,
+    sessions: T[],
+  ): Promise<T[]> {
+    const profileIds = sessions
+      .map(session => session.agentProfile?.id)
+      .filter((id): id is string => Boolean(id))
+    const personalizedNameByProfileId = await this.agentProfiles.resolvePersonalizedAgentProfileNames(userId, profileIds)
+
+    if (personalizedNameByProfileId.size === 0) {
+      return sessions
+    }
+
+    return sessions.map((session) => {
+      const agentProfile = session.agentProfile
+      if (!agentProfile) {
+        return session
+      }
+
+      const personalizedName = personalizedNameByProfileId.get(agentProfile.id)
+      if (!personalizedName) {
+        return session
+      }
+
+      return {
+        ...session,
+        agentProfile: {
+          ...agentProfile,
+          name: personalizedName,
+        },
+      } as T
+    })
+  }
+
+  private async personalizeAgentProfileForGeneration(
+    userId: string,
+    profile: AgentProfileForGeneration,
+    tx?: Prisma.TransactionClient,
+  ): Promise<AgentProfileForGeneration> {
+    const personalizedName = (await this.agentProfiles.resolvePersonalizedAgentProfileNames(userId, [profile.id], tx)).get(profile.id)
+    return personalizedName
+      ? { ...profile, name: personalizedName }
+      : profile
   }
 
   private async resolveRuntimeModelTarget(
@@ -2144,6 +2176,19 @@ function toChatRunSummary(run: {
 
 function isUniqueConstraintError(error: unknown): boolean {
   return error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002'
+}
+
+function readChatSkillInvocation(metadata: unknown): ChatSkillInvocation | null {
+  if (!isRecord(metadata)) {
+    return null
+  }
+
+  const result = ChatSkillInvocationSchema.safeParse(metadata.skillInvocation)
+  return result.success ? result.data : null
+}
+
+function hasAvailableSkill(skillContext: AgentRuntimeSkillContext, skillKey: string): boolean {
+  return skillContext.availableSkills.some(skill => skill.key === skillKey)
 }
 
 function readAgentMemoryRunOptions(commandContext: unknown): AgentMemoryRunOptions {

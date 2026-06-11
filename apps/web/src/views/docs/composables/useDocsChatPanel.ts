@@ -220,7 +220,6 @@ export function createDocsChatPanelController(options: {
     confirmDeleteActiveSession,
     contentJSON: host.contentJSON,
     deleteActiveSession,
-    handlePlaceholderCommand: host.handlePlaceholderCommand,
     handlePlaceholderUpload: host.handlePlaceholderUpload,
     handleSend: host.handleSend,
     hasActiveSession,

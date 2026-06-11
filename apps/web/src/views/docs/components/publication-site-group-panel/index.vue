@@ -19,6 +19,7 @@ import {
   DOCUMENT_SITE_PUBLICATION_PAGE_SCOPE_VALUES,
 } from '@haohaoxue/samepage-contracts/document/publication/constants'
 import { computed, reactive, shallowRef, watch } from 'vue'
+import Empty from '@/components/empty'
 import { ElMessage, ElMessageBox } from '@/utils/element-plus'
 
 const props = withDefaults(defineProps<PublicationSiteGroupPanelProps>(), {
@@ -309,7 +310,7 @@ function compareOrderedItem(left: { order: number, updatedAt: string }, right: {
 
     <div class="grid grid-cols-[minmax(0,1fr)_minmax(18rem,23rem)] items-start gap-5 max-[1120px]:grid-cols-1">
       <div class="publication-site-group-panel__surface overflow-hidden rounded-xl border bg-surface">
-        <ElEmpty v-if="activeGroups.length === 0" description="暂无分组" />
+        <Empty v-if="activeGroups.length === 0" compact description="暂无分组" />
 
         <div v-else class="grid">
           <section
@@ -515,7 +516,7 @@ function compareOrderedItem(left: { order: number, updatedAt: string }, right: {
                     </template>
                   </ElTree>
 
-                  <ElEmpty v-else description="源文档不可用" />
+                  <Empty v-else compact description="源文档不可用" />
                 </div>
               </ElScrollbar>
             </div>
@@ -537,7 +538,7 @@ function compareOrderedItem(left: { order: number, updatedAt: string }, right: {
           </div>
         </template>
 
-        <ElEmpty v-else description="选择一个站点页面" />
+        <Empty v-else compact description="选择一个站点页面" />
       </aside>
     </div>
 

@@ -98,6 +98,7 @@ export function createChatStreamController(
         contentJSON: input.contentJSON,
         attachments: input.attachments ?? [],
         memory: input.memory ?? { ignoredForRun: false },
+        skillInvocation: input.skillInvocation ?? null,
       }))
       return true
     }
@@ -119,6 +120,7 @@ export function createChatStreamController(
         contentJSON: payload.contentJSON,
         attachments: payload.attachments ?? [],
         memory: payload.memory ?? { ignoredForRun: false },
+        skillInvocation: payload.skillInvocation ?? null,
       }))
       return true
     }

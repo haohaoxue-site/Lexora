@@ -12,6 +12,12 @@ export const useSettingsUserProfile = createSharedComposable(() => {
     displayName: '',
   })
 
+  const displayName = computed({
+    get: () => profileForm.displayName,
+    set: (nextDisplayName: string) => {
+      profileForm.displayName = nextDisplayName
+    },
+  })
   const avatarUrl = computed(() =>
     userStore.settings?.profile.avatarUrl ?? userStore.currentUser?.avatarUrl ?? null,
   )
@@ -61,9 +67,9 @@ export const useSettingsUserProfile = createSharedComposable(() => {
   return {
     avatarUrl,
     canEditDisplayName,
+    displayName,
     isSavingDisplayName,
     isUploadingAvatar,
-    profileForm,
     saveDisplayName,
     syncProfileForm,
     uploadAvatar,

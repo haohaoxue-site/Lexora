@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { ChatMessage } from '@/apis/chat'
+import { AGENT_TRANSLATOR_SKILL_KEY } from '@haohaoxue/samepage-contracts/agent'
 import { computed } from 'vue'
 import {
   getAttachmentDisplayLabel,
@@ -13,10 +14,24 @@ const props = defineProps<{
 
 const panelAttachments = computed(() => getPanelAttachments(props.message.metadata.attachments))
 const bodyText = computed(() => serializeChatComposerContent(props.message.metadata.contentJSON).content || props.message.content)
+const translatorSkillLabel = computed(() => {
+  const skillInvocation = props.message.metadata.skillInvocation
+  if (skillInvocation?.skillKey !== AGENT_TRANSLATOR_SKILL_KEY) {
+    return ''
+  }
+
+  return `翻译到 ${skillInvocation.targetLanguage.name}`
+})
 </script>
 
 <template>
   <div class="chat-user-message-content">
+    <div v-if="translatorSkillLabel" class="chat-user-message-content__skills">
+      <span class="chat-user-message-content__skill">
+        {{ translatorSkillLabel }}
+      </span>
+    </div>
+
     <div v-if="panelAttachments.length" class="chat-user-message-content__contexts">
       <span
         v-for="attachment in panelAttachments"
@@ -45,6 +60,13 @@ const bodyText = computed(() => serializeChatComposerContent(props.message.metad
     gap: 0.125rem;
   }
 
+  .chat-user-message-content__skills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.125rem;
+  }
+
+  .chat-user-message-content__skill,
   .chat-user-message-content__context {
     max-width: 11rem;
     overflow: hidden;
@@ -57,6 +79,11 @@ const bodyText = computed(() => serializeChatComposerContent(props.message.metad
     line-height: 1.25;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  .chat-user-message-content__skill {
+    border-color: color-mix(in srgb, #fff 34%, transparent);
+    background: color-mix(in srgb, #fff 16%, transparent);
   }
 
   .chat-user-message-content__body {

@@ -1,6 +1,7 @@
 import type {
   AiAvailableModelOption,
   AiAvailableProviderOption,
+  AiDefaultModelPolicyItem,
   AiModelIntentKey,
   AiProvider,
   AiProviderCredential,
@@ -9,6 +10,7 @@ import type {
   AiProviderPreset,
   AiProviderScope,
   CreateAiProviderRequest,
+  UpdateAiDefaultModelPolicyRequest,
   UpdateAiProviderRequest,
   UpsertAiProviderModelRequest,
   UpsertAiProviderModelsRequest,
@@ -28,6 +30,40 @@ export function getPlatformAiProviders(): Promise<AiProvider[]> {
   return axios.request({
     method: 'get',
     url: '/system-admin/ai/providers',
+  })
+}
+
+export function getPlatformEmbeddingAiModel(): Promise<AiDefaultModelPolicyItem> {
+  return axios.request({
+    method: 'get',
+    url: '/system-admin/ai/platform-embedding-model',
+  })
+}
+
+export function updatePlatformEmbeddingAiModel(
+  data: UpdateAiDefaultModelPolicyRequest,
+): Promise<AiDefaultModelPolicyItem> {
+  return axios.request({
+    method: 'put',
+    url: '/system-admin/ai/platform-embedding-model',
+    data,
+  })
+}
+
+export function getPlatformEmbeddingAvailableAiProviders(): Promise<AiAvailableProviderOption[]> {
+  return axios.request({
+    method: 'get',
+    url: '/system-admin/ai/platform-embedding-model/available/providers',
+  })
+}
+
+export function getPlatformEmbeddingAvailableAiProviderModels(
+  _intentKey: AiModelIntentKey,
+  providerId: string,
+): Promise<AiAvailableModelOption[]> {
+  return axios.request({
+    method: 'get',
+    url: `/system-admin/ai/platform-embedding-model/available/providers/${providerId}/models`,
   })
 }
 

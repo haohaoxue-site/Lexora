@@ -13,6 +13,7 @@ const envSchema = z.object({
   LINUX_DO_CLIENT_SECRET: optionalNonEmptyString(),
   GOOGLE_CLIENT_ID: optionalNonEmptyString(),
   GOOGLE_CLIENT_SECRET: optionalNonEmptyString(),
+  AGENT_SKILLS_ROOT: optionalNonEmptyString(),
   STORAGE_ENDPOINT: requiredEnvString('STORAGE_ENDPOINT'),
   STORAGE_ACCESS_KEY: z.string().trim().min(3, 'STORAGE_ACCESS_KEY 至少需要 3 个字符'),
   STORAGE_SECRET_KEY: z.string().trim().min(8, 'STORAGE_SECRET_KEY 至少需要 8 个字符'),

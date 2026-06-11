@@ -139,10 +139,6 @@ export function useChatMessageList() {
     ElMessage.info('文件上传入口待接入')
   }
 
-  function handleEditPlaceholderCommand() {
-    ElMessage.info('命令入口待接入')
-  }
-
   async function retryAssistantMessage(message: ChatMessage) {
     if (message.role !== 'assistant' || isStreaming.value) {
       return
@@ -176,7 +172,6 @@ export function useChatMessageList() {
     emptyIconStateClass,
     getMessageRoleClass,
     getMessageText,
-    handleEditPlaceholderCommand,
     handleEditPlaceholderUpload,
     highlightEditingAttachment,
     isEditingMessage,

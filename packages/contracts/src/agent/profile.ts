@@ -2,8 +2,10 @@ import { z } from 'zod'
 import { AiModelRefSchema } from '../ai'
 import { AgentMemoryPolicySchema } from './memory'
 import { AgentModelPolicySchema } from './model'
+import { AgentSkillBindingSchema } from './skill'
 
 export { AgentMemoryPolicySchema } from './memory'
+export type { AgentMemoryPolicy } from './memory'
 
 const NonEmptyStringSchema = z.string().trim().min(1)
 
@@ -21,13 +23,8 @@ export const AgentContextPolicySchema = z.object({
 }).strict()
 
 export const AgentToolPolicySchema = z.object({
-  enabled: z.boolean().default(false),
-}).strict().default({ enabled: false })
-
-export const AgentSkillBindingSchema = z.object({
-  key: NonEmptyStringSchema,
   enabled: z.boolean().default(true),
-}).strict()
+}).strict().default({ enabled: true })
 
 export const AgentProfileConfigSchema = z.object({
   schemaVersion: z.literal(1),
@@ -71,9 +68,9 @@ export const UpdateAgentProfileModelPolicyRequestSchema = z.object({
 
 export type AgentProfileInstructions = z.infer<typeof AgentProfileInstructionsSchema>
 export type AgentContextPolicy = z.infer<typeof AgentContextPolicySchema>
-export type { AgentMemoryPolicy } from './memory'
+export { AgentSkillBindingSchema } from './skill'
 export type AgentToolPolicy = z.infer<typeof AgentToolPolicySchema>
-export type AgentSkillBinding = z.infer<typeof AgentSkillBindingSchema>
+export type { AgentSkillBinding } from './skill'
 export type AgentProfileConfig = z.infer<typeof AgentProfileConfigSchema>
 export type AgentProfileSnapshot = z.infer<typeof AgentProfileSnapshotSchema>
 export type AgentProfileSettings = z.infer<typeof AgentProfileSettingsSchema>

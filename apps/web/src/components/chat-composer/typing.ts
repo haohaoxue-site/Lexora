@@ -1,8 +1,10 @@
+import type { AgentTranslatorTargetLanguage } from '@haohaoxue/samepage-contracts/agent'
 import type { AiModelRef } from '@/apis/ai'
 import type {
   ChatDocumentScope,
   ChatMessageAttachmentInput,
   ChatMessageContentJSON,
+  ChatSkillInvocation,
 } from '@/apis/chat'
 
 export type ChatComposerContentJSON = ChatMessageContentJSON
@@ -14,6 +16,7 @@ export interface ChatComposerSubmitPayload {
   content: string
   contentJSON: ChatComposerContentJSON
   attachments: ChatComposerAttachment[]
+  skillInvocation?: ChatSkillInvocation | null
 }
 
 export interface ChatComposerProps {
@@ -25,16 +28,18 @@ export interface ChatComposerProps {
   disabled?: boolean
   highlightAttachmentId?: string | null
   documentPickerTeleportTo?: string
+  translatorSkillEnabled?: boolean
+  translatorTargetLanguage?: AgentTranslatorTargetLanguage | null
 }
 
 export interface ChatComposerEmits {
   'update:contentJSON': [contentJSON: ChatComposerContentJSON]
   'update:attachments': [attachments: ChatComposerAttachment[]]
+  'update:translatorTargetLanguage': [targetLanguage: AgentTranslatorTargetLanguage | null]
   'send': [payload: ChatComposerSubmitPayload]
   'stop': []
   'selectModel': [modelRef: ChatComposerModelRef | null]
   'placeholderUpload': []
-  'placeholderCommand': []
   'highlightAttachment': [attachmentId: string]
 }
 

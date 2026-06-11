@@ -16,16 +16,13 @@ import {
 import { Injectable, NotFoundException } from '@nestjs/common'
 import { PrismaService } from '../../database/prisma.service'
 import {
-  getAgentMemoryLaneTitle,
   toAgentMemory,
 } from './agent-memory.utils'
 
 interface MemoryDocumentDefinition {
   id: AgentMemoryDocumentId
   name: string
-  title: string
   summary: string
-  emptyText: string
   lanes: AgentMemoryLane[]
 }
 
@@ -33,17 +30,13 @@ const MEMORY_DOCUMENT_DEFINITIONS: MemoryDocumentDefinition[] = [
   {
     id: AGENT_MEMORY_DOCUMENT_ID.SOUL,
     name: 'SOUL.md',
-    title: '你是谁',
     summary: 'Agent 的身份、性格、说话方式和相处原则',
-    emptyText: '当前还没有可展示的 Agent 设定记忆。',
     lanes: [AGENT_MEMORY_LANE.AGENT_PERSONALIZATION],
   },
   {
     id: AGENT_MEMORY_DOCUMENT_ID.USER,
     name: 'USER.md',
-    title: '用户信息',
     summary: '用户画像、偏好、状态和交互习惯',
-    emptyText: '当前还没有可展示的用户画像或偏好记忆。',
     lanes: [
       AGENT_MEMORY_LANE.USER_PROFILE,
       AGENT_MEMORY_LANE.USER_PREFERENCE,
@@ -53,9 +46,7 @@ const MEMORY_DOCUMENT_DEFINITIONS: MemoryDocumentDefinition[] = [
   {
     id: AGENT_MEMORY_DOCUMENT_ID.MEMORY,
     name: 'MEMORY.md',
-    title: '关键记忆',
     summary: '关键任务、事件、概念和注意事项',
-    emptyText: '当前还没有可展示的任务、事件或概念记忆。',
     lanes: [
       AGENT_MEMORY_LANE.PROJECT_REFERENCE,
       AGENT_MEMORY_LANE.TASK_KNOWLEDGE,
@@ -77,12 +68,14 @@ export class AgentMemoryDocumentsService {
   }
 
   async getDocument(userId: string, documentId: AgentMemoryDocumentId, query: ListAgentMemoryDocumentsQuery = {}): Promise<AgentMemoryDocument> {
-    const documents = await this.listDocuments(userId, query)
-    const document = documents.documents.find(item => item.id === documentId)
-
-    if (!document) {
+    const definition = MEMORY_DOCUMENT_DEFINITIONS.find(item => item.id === documentId)
+    if (!definition) {
       throw new NotFoundException('记忆文档不存在')
     }
+
+    const agentProfileId = await this.resolveAgentProfileId(userId, query.agentProfileId)
+    const memories = await this.findActiveMemories(userId, agentProfileId)
+    const document = createMemoryDocument(definition, memories)
 
     return AgentMemoryDocumentSchema.parse(document)
   }
@@ -148,12 +141,11 @@ function createMemoryDocument(
   memories: AgentMemory[],
 ): AgentMemoryDocument {
   const documentMemories = memories.filter(memory => definition.lanes.includes(memory.lane))
-  const content = renderMemoryDocument(definition, documentMemories)
+  const content = renderMemoryDocument(documentMemories)
 
   return {
     id: definition.id,
     name: definition.name,
-    title: definition.title,
     summary: definition.summary,
     content,
     sizeBytes: Buffer.byteLength(content, 'utf8'),
@@ -162,31 +154,8 @@ function createMemoryDocument(
   }
 }
 
-function renderMemoryDocument(definition: MemoryDocumentDefinition, memories: AgentMemory[]): string {
-  const lines = [`# ${definition.title}`, '']
-
-  if (memories.length === 0) {
-    lines.push(definition.emptyText)
-    return lines.join('\n')
-  }
-
-  definition.lanes.forEach((lane) => {
-    const laneMemories = memories.filter(memory => memory.lane === lane)
-    if (laneMemories.length === 0) {
-      return
-    }
-
-    if (lines.length > 2) {
-      lines.push('')
-    }
-
-    lines.push(`## ${getAgentMemoryLaneTitle(lane)}`, '')
-    laneMemories.forEach((memory) => {
-      lines.push(`- ${formatMemoryLine(memory)}`)
-    })
-  })
-
-  return lines.join('\n')
+function renderMemoryDocument(memories: AgentMemory[]): string {
+  return memories.map(memory => `- ${formatMemoryLine(memory)}`).join('\n')
 }
 
 function formatMemoryLine(memory: AgentMemory): string {

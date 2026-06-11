@@ -1,4 +1,12 @@
-import type { AiProvider, AiProviderCredential, AiProviderModelItem, AiProviderModels } from '@haohaoxue/samepage-contracts'
+import type {
+  AiAvailableModelOption,
+  AiAvailableProviderOption,
+  AiDefaultModelPolicyItem,
+  AiProvider,
+  AiProviderCredential,
+  AiProviderModelItem,
+  AiProviderModels,
+} from '@haohaoxue/samepage-contracts'
 import type { AuthUserContext } from '../../auth/auth.interface'
 import { PERMISSIONS } from '@haohaoxue/samepage-contracts'
 import {
@@ -16,9 +24,11 @@ import { RequirePermissions } from '../../../decorators/require-permissions.deco
 import {
   CreateAiProviderDto,
   UpdateAiProviderDto,
+  UpdateDefaultModelDto,
   UpsertAiProviderModelDto,
   UpsertAiProviderModelsDto,
 } from '../ai.dto'
+import { AiDefaultModelsService } from './defaults.service'
 import { AiProviderModelsService } from './provider-models.service'
 import { AiProvidersService } from './providers.service'
 
@@ -27,12 +37,42 @@ export class AiSystemAdminController {
   constructor(
     private readonly providersService: AiProvidersService,
     private readonly providerModelsService: AiProviderModelsService,
+    private readonly defaultModelsService: AiDefaultModelsService,
   ) {}
 
   @RequirePermissions(PERMISSIONS.SYSTEM_ADMIN_AI_CONFIG_READ)
   @Get('providers')
   getProviders(): Promise<AiProvider[]> {
     return this.providersService.getPlatformProviders()
+  }
+
+  @RequirePermissions(PERMISSIONS.SYSTEM_ADMIN_AI_CONFIG_READ)
+  @Get('platform-embedding-model')
+  getPlatformEmbeddingModel(): Promise<AiDefaultModelPolicyItem> {
+    return this.defaultModelsService.getPlatformEmbeddingModel()
+  }
+
+  @RequirePermissions(PERMISSIONS.SYSTEM_ADMIN_AI_CONFIG_READ)
+  @Get('platform-embedding-model/available/providers')
+  getPlatformEmbeddingAvailableProviders(): Promise<AiAvailableProviderOption[]> {
+    return this.defaultModelsService.getPlatformEmbeddingAvailableProviders()
+  }
+
+  @RequirePermissions(PERMISSIONS.SYSTEM_ADMIN_AI_CONFIG_READ)
+  @Get('platform-embedding-model/available/providers/:providerId/models')
+  getPlatformEmbeddingAvailableProviderModels(
+    @Param('providerId') providerId: string,
+  ): Promise<AiAvailableModelOption[]> {
+    return this.defaultModelsService.getPlatformEmbeddingAvailableProviderModels(providerId)
+  }
+
+  @RequirePermissions(PERMISSIONS.SYSTEM_ADMIN_AI_CONFIG_UPDATE)
+  @Put('platform-embedding-model')
+  updatePlatformEmbeddingModel(
+    @CurrentUser() authUser: AuthUserContext,
+    @Body() payload: UpdateDefaultModelDto,
+  ): Promise<AiDefaultModelPolicyItem> {
+    return this.defaultModelsService.updatePlatformEmbeddingModel(authUser.id, payload)
   }
 
   @RequirePermissions(PERMISSIONS.SYSTEM_ADMIN_AI_CONFIG_UPDATE)

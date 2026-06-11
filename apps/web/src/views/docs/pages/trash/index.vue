@@ -2,6 +2,7 @@
 import type { CSSProperties } from 'vue'
 import { formatDocumentLocation } from '@haohaoxue/samepage-shared/document'
 import { computed } from 'vue'
+import Empty from '@/components/empty'
 import { formatDateTime } from '@/utils/dayjs'
 import { useDocsTrashPage } from '../../composables/useDocsTrashPage'
 
@@ -53,11 +54,11 @@ function isItemActing(documentId: string) {
         :cell-style="tableBodyCellStyle"
       >
         <template #empty>
-          <ElEmpty :description="errorMessage || '暂无已删除文档。'">
+          <Empty :description="errorMessage || '暂无已删除文档。'">
             <ElButton v-if="errorMessage" type="primary" @click="loadItems">
               重新加载
             </ElButton>
-          </ElEmpty>
+          </Empty>
         </template>
 
         <ElTableColumn label="标题" prop="title" min-width="320" show-overflow-tooltip />

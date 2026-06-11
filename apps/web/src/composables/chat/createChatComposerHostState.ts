@@ -80,10 +80,6 @@ export function createChatComposerHostState(options: {
     ElMessage.info('文件上传入口待接入')
   }
 
-  function handlePlaceholderCommand() {
-    ElMessage.info('命令入口待接入')
-  }
-
   function highlightAttachment(attachmentId: string) {
     highlightAttachmentId.value = attachmentId
     if (highlightTimer) {
@@ -99,7 +95,6 @@ export function createChatComposerHostState(options: {
   return {
     attachments,
     contentJSON,
-    handlePlaceholderCommand,
     handlePlaceholderUpload,
     handleSend,
     highlightAttachment,

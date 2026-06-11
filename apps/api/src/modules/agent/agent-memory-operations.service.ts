@@ -1,13 +1,14 @@
 import type {
   AgentMemory,
   AgentMemoryOperation,
+  AgentMemoryOperationProposal,
+  AgentMemoryWritingPolicy,
   ChatMemoryOperationProjection,
 } from '@haohaoxue/samepage-contracts'
 import type {
   AgentMemoryCandidateKind as PrismaAgentMemoryCandidateKind,
   AgentMemoryOperationAction as PrismaAgentMemoryOperationAction,
 } from '@prisma/client'
-import type { ExtractedMemoryOperation } from './agent-memory-operations.utils'
 import { randomUUID } from 'node:crypto'
 import {
   AGENT_MEMORY_LANE,
@@ -19,10 +20,15 @@ import {
   AgentMemoryOperationSchema,
   ChatMemoryOperationProjectionSchema,
 } from '@haohaoxue/samepage-contracts'
-import { Injectable, Logger } from '@nestjs/common'
-import { Prisma } from '@prisma/client'
+import {
+  ConflictException,
+  ForbiddenException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common'
+import { ChatMessageGenerationStatus, Prisma } from '@prisma/client'
 import { PrismaService } from '../../database/prisma.service'
-import { extractExplicitMemoryOperations } from './agent-memory-operations.utils'
 import { AgentMemoryService } from './agent-memory.service'
 import {
   isUnsafeAgentMemoryPayload,
@@ -32,13 +38,32 @@ import {
   toPrismaMemoryScope,
 } from './agent-memory.utils'
 
-export interface ProcessUserMessageMemoryOperationsInput {
+const AUTO_APPLY_MIN_CONFIDENCE = 0.8
+const OPERABLE_GENERATION_STATUSES = new Set<ChatMessageGenerationStatus>([
+  ChatMessageGenerationStatus.PENDING,
+  ChatMessageGenerationStatus.RUNNING,
+])
+
+export interface ProcessAgentMemoryOperationProposalsInput {
   userId: string
   sessionId: string
   messageId: string
   generationId: string
   agentProfileId: string | null
-  content: string
+  operations: AgentMemoryOperationProposal[]
+  memoryWritingPolicy?: AgentMemoryWritingPolicy
+}
+
+export interface RollbackAgentMemoryOperationsResult {
+  memoryIds: string[]
+  restoredMemoryIds: string[]
+  dismissedCandidateCount: number
+  changed: boolean
+}
+
+export interface FinalizeAgentMemoryOperationsResult {
+  archivedMemoryIds: string[]
+  changed: boolean
 }
 
 @Injectable()
@@ -50,14 +75,20 @@ export class AgentMemoryOperationsService {
     private readonly memories: AgentMemoryService,
   ) {}
 
-  async processUserMessage(input: ProcessUserMessageMemoryOperationsInput): Promise<ChatMemoryOperationProjection[]> {
-    const operations = extractExplicitMemoryOperations(input.content)
+  async processOperationProposals(input: ProcessAgentMemoryOperationProposalsInput): Promise<ChatMemoryOperationProjection[]> {
+    const operations = input.operations
+      .filter(() => input.memoryWritingPolicy?.enabled !== false)
       .map(operation => this.createOperation(input, operation))
+    if (operations.length === 0) {
+      return []
+    }
+
+    await this.assertGenerationOperationRequest(input)
 
     const projections: ChatMemoryOperationProjection[] = []
     for (const operation of operations) {
       try {
-        projections.push(await this.executeOperation(input, operation))
+        projections.push(await this.executeOperation(input, await this.groundOperation(input, operation)))
       }
       catch (error) {
         this.logger.warn(`agent memory operation failed: ${formatErrorMessage(error)}`)
@@ -75,9 +106,154 @@ export class AgentMemoryOperationsService {
     return projections
   }
 
+  async rollbackGenerationOperations(
+    tx: Prisma.TransactionClient,
+    generationId: string,
+  ): Promise<RollbackAgentMemoryOperationsResult> {
+    const normalizedGenerationId = generationId.trim()
+    if (!normalizedGenerationId) {
+      return createEmptyRollbackResult()
+    }
+
+    const memories = await tx.agentMemory.findMany({
+      where: {
+        sourceGenerationId: normalizedGenerationId,
+        status: 'ACTIVE',
+        deletedAt: null,
+      },
+      select: {
+        id: true,
+        supersedesMemoryId: true,
+      },
+    })
+    const memoryIds = memories.map(memory => memory.id)
+    const restoredMemoryIds = memories
+      .map(memory => memory.supersedesMemoryId)
+      .filter((memoryId): memoryId is string => Boolean(memoryId))
+    const archivedAt = new Date()
+
+    if (memoryIds.length > 0) {
+      await tx.agentMemory.updateMany({
+        where: {
+          id: { in: memoryIds },
+          status: 'ACTIVE',
+          deletedAt: null,
+        },
+        data: {
+          status: 'ARCHIVED',
+          deletedAt: archivedAt,
+        },
+      })
+    }
+
+    if (restoredMemoryIds.length > 0) {
+      await tx.agentMemory.updateMany({
+        where: {
+          id: { in: restoredMemoryIds },
+          status: 'ARCHIVED',
+          deletedAt: { not: null },
+        },
+        data: {
+          status: 'ACTIVE',
+          deletedAt: null,
+        },
+      })
+    }
+
+    const dismissedCandidates = await tx.agentMemoryCandidate.updateMany({
+      where: {
+        sourceGenerationId: normalizedGenerationId,
+        status: 'PENDING',
+        deletedAt: null,
+      },
+      data: {
+        status: 'DISMISSED',
+        dismissedAt: archivedAt,
+      },
+    })
+
+    return {
+      memoryIds,
+      restoredMemoryIds,
+      dismissedCandidateCount: dismissedCandidates.count,
+      changed: memoryIds.length > 0 || restoredMemoryIds.length > 0 || dismissedCandidates.count > 0,
+    }
+  }
+
+  async finalizeGenerationOperations(
+    tx: Prisma.TransactionClient,
+    generationId: string,
+    operations: ChatMemoryOperationProjection[],
+  ): Promise<FinalizeAgentMemoryOperationsResult> {
+    const archivedMemoryIds = [
+      ...new Set(operations
+        .filter(operation => operation.status === 'applied')
+        .flatMap(operation => operation.archivedMemoryIds)),
+    ]
+    if (archivedMemoryIds.length === 0) {
+      return createEmptyFinalizeResult()
+    }
+
+    const generation = await tx.chatMessageGeneration.findFirst({
+      where: {
+        generationId,
+        deletedAt: null,
+      },
+      select: {
+        actorUserId: true,
+      },
+    })
+    if (!generation) {
+      return createEmptyFinalizeResult()
+    }
+
+    const memories = await tx.agentMemory.findMany({
+      where: {
+        id: { in: archivedMemoryIds },
+        ownerUserId: generation.actorUserId,
+        status: 'ACTIVE',
+        deletedAt: null,
+      },
+      select: {
+        id: true,
+      },
+    })
+    const activeMemoryIds = memories.map(memory => memory.id)
+    if (activeMemoryIds.length === 0) {
+      return createEmptyFinalizeResult()
+    }
+
+    await tx.agentMemory.updateMany({
+      where: {
+        id: { in: activeMemoryIds },
+        ownerUserId: generation.actorUserId,
+        status: 'ACTIVE',
+        deletedAt: null,
+      },
+      data: {
+        status: 'ARCHIVED',
+        deletedAt: new Date(),
+      },
+    })
+
+    return {
+      archivedMemoryIds: activeMemoryIds,
+      changed: true,
+    }
+  }
+
+  async cleanupRolledBackMemoryIndexes(memoryIds: string[], restoredMemoryIds: string[]): Promise<void> {
+    await this.memories.deleteMemoryIndexesBestEffort(memoryIds)
+    await this.memories.syncMemoryIndexesBestEffort(restoredMemoryIds)
+  }
+
+  async cleanupFinalizedMemoryIndexes(memoryIds: string[]): Promise<void> {
+    await this.memories.deleteMemoryIndexesBestEffort(memoryIds)
+  }
+
   private createOperation(
-    input: ProcessUserMessageMemoryOperationsInput,
-    extracted: ExtractedMemoryOperation,
+    input: ProcessAgentMemoryOperationProposalsInput,
+    proposal: AgentMemoryOperationProposal,
   ): AgentMemoryOperation {
     return AgentMemoryOperationSchema.parse({
       operationId: randomUUID(),
@@ -87,25 +263,47 @@ export class AgentMemoryOperationsService {
         generationId: input.generationId,
         userId: input.userId,
       },
-      action: extracted.action,
-      mode: extracted.mode,
-      scope: extracted.scope,
-      lane: extracted.lane,
-      slotKey: normalizeAgentMemorySlotKey(extracted.slotKey),
-      slotValue: extracted.slotValue,
-      content: extracted.content,
-      summary: extracted.summary,
-      query: extracted.query,
-      relatedMemoryIds: [],
-      confidence: extracted.confidence,
-      sensitivity: extracted.sensitivity,
-      reason: extracted.reason,
+      action: proposal.action,
+      mode: proposal.mode,
+      scope: proposal.scope,
+      lane: proposal.lane,
+      slotKey: normalizeAgentMemorySlotKey(proposal.slotKey),
+      slotValue: proposal.slotValue,
+      content: proposal.content,
+      summary: proposal.summary,
+      query: proposal.query,
+      relatedMemoryIds: proposal.relatedMemoryIds,
+      confidence: proposal.confidence,
+      sensitivity: proposal.sensitivity,
+      reason: proposal.reason,
       createdAt: new Date().toISOString(),
     })
   }
 
+  private async groundOperation(
+    input: ProcessAgentMemoryOperationProposalsInput,
+    operation: AgentMemoryOperation,
+  ): Promise<AgentMemoryOperation> {
+    if (!shouldSearchGroundOperation(operation)) {
+      return operation
+    }
+
+    const relatedMemories = await this.findRelatedMemories(input, operation)
+    const relatedMemoryIds = [
+      ...new Set([
+        ...operation.relatedMemoryIds,
+        ...relatedMemories.map(memory => memory.id),
+      ]),
+    ]
+
+    return AgentMemoryOperationSchema.parse({
+      ...operation,
+      relatedMemoryIds,
+    })
+  }
+
   private async executeOperation(
-    input: ProcessUserMessageMemoryOperationsInput,
+    input: ProcessAgentMemoryOperationProposalsInput,
     operation: AgentMemoryOperation,
   ): Promise<ChatMemoryOperationProjection> {
     if (operation.action === AGENT_MEMORY_OPERATION_ACTION.FORGET) {
@@ -131,7 +329,7 @@ export class AgentMemoryOperationsService {
   }
 
   private async executeWriteOperation(
-    input: ProcessUserMessageMemoryOperationsInput,
+    input: ProcessAgentMemoryOperationProposalsInput,
     operation: AgentMemoryOperation,
   ): Promise<ChatMemoryOperationProjection> {
     if (!operation.content) {
@@ -156,12 +354,16 @@ export class AgentMemoryOperationsService {
       })
     }
 
-    if (isUnsafeAgentMemoryPayload({
-      slotValue: operation.slotValue,
-      summary: operation.summary,
-      content: operation.content,
-    })) {
-      const candidateId = await this.createPendingCandidate(input, operation, '记忆内容需要进一步确认。')
+    if (
+      operation.action === AGENT_MEMORY_OPERATION_ACTION.UPDATE
+      && !operation.slotKey
+      && operation.relatedMemoryIds.length === 0
+    ) {
+      const reason = '更新记忆需要明确关联已有记忆。'
+      const candidateId = await this.createPendingCandidate(input, {
+        ...operation,
+        mode: AGENT_MEMORY_OPERATION_MODE.PENDING_CONFIRMATION,
+      }, reason)
       return this.createProjection({
         ...operation,
         mode: AGENT_MEMORY_OPERATION_MODE.PENDING_CONFIRMATION,
@@ -169,7 +371,23 @@ export class AgentMemoryOperationsService {
         status: 'pending_confirmation',
         title: '待确认记忆',
         detail: operation.content,
-        reason: '内容可能包含敏感信息或提示注入风险。',
+        reason,
+        memoryIds: [],
+        candidateId,
+      })
+    }
+
+    const requiresConfirmationReason = resolveWriteConfirmationReason(operation, input.memoryWritingPolicy)
+    if (requiresConfirmationReason) {
+      const candidateId = await this.createPendingCandidate(input, operation, requiresConfirmationReason)
+      return this.createProjection({
+        ...operation,
+        mode: AGENT_MEMORY_OPERATION_MODE.PENDING_CONFIRMATION,
+      }, {
+        status: 'pending_confirmation',
+        title: '待确认记忆',
+        detail: operation.content,
+        reason: requiresConfirmationReason,
         memoryIds: [],
         candidateId,
       })
@@ -202,6 +420,10 @@ export class AgentMemoryOperationsService {
       sourceMessageId: input.messageId,
       sourceGenerationId: input.generationId,
     })
+    const archivedMemoryIds = [
+      ...(memory.sourceGenerationId === input.generationId && memory.supersedesMemoryId ? [memory.supersedesMemoryId] : []),
+      ...(operation.action === AGENT_MEMORY_OPERATION_ACTION.UPDATE ? operation.relatedMemoryIds : []),
+    ]
 
     return this.createProjection(operation, {
       status: 'applied',
@@ -209,15 +431,35 @@ export class AgentMemoryOperationsService {
       detail: memory.content,
       reason: operation.reason,
       memoryIds: [memory.id],
+      archivedMemoryIds: [...new Set(archivedMemoryIds)],
       candidateId: null,
     })
   }
 
   private async executeForgetOperation(
-    input: ProcessUserMessageMemoryOperationsInput,
+    input: ProcessAgentMemoryOperationProposalsInput,
     operation: AgentMemoryOperation,
   ): Promise<ChatMemoryOperationProjection> {
-    const memories = await this.findRelatedMemories(input, operation)
+    if (operation.relatedMemoryIds.length === 0) {
+      const reason = '忘记记忆需要明确关联已有记忆。'
+      const candidateId = await this.createPendingCandidate(input, {
+        ...operation,
+        mode: AGENT_MEMORY_OPERATION_MODE.PENDING_CONFIRMATION,
+      }, reason)
+      return this.createProjection({
+        ...operation,
+        mode: AGENT_MEMORY_OPERATION_MODE.PENDING_CONFIRMATION,
+      }, {
+        status: 'pending_confirmation',
+        title: '待确认遗忘',
+        detail: operation.query,
+        reason,
+        memoryIds: [],
+        candidateId,
+      })
+    }
+
+    const memories = await this.findMemoriesByIds(input, operation)
     if (memories.length === 0) {
       return this.createProjection(operation, {
         status: 'ignored',
@@ -229,17 +471,7 @@ export class AgentMemoryOperationsService {
       })
     }
 
-    const archivedMemoryIds = await this.memories.archiveMemories(input.userId, memories.map(memory => memory.id))
-    if (archivedMemoryIds.length === 0) {
-      return this.createProjection(operation, {
-        status: 'ignored',
-        title: '未找到可忘记的记忆',
-        detail: operation.query,
-        reason: '没有找到匹配的已确认记忆。',
-        memoryIds: [],
-        candidateId: null,
-      })
-    }
+    const archivedMemoryIds = memories.map(memory => memory.id)
 
     return this.createProjection(operation, {
       status: 'applied',
@@ -247,12 +479,13 @@ export class AgentMemoryOperationsService {
       detail: `已归档 ${archivedMemoryIds.length} 条相关记忆。`,
       reason: operation.reason,
       memoryIds: archivedMemoryIds,
+      archivedMemoryIds,
       candidateId: null,
     })
   }
 
   private async createPendingCandidate(
-    input: ProcessUserMessageMemoryOperationsInput,
+    input: ProcessAgentMemoryOperationProposalsInput,
     operation: AgentMemoryOperation,
     reason: string,
   ): Promise<string> {
@@ -276,7 +509,7 @@ export class AgentMemoryOperationsService {
         reason,
         confidence: operation.confidence,
         sensitivity: operation.sensitivity === AGENT_MEMORY_SENSITIVITY.SENSITIVE ? 'SENSITIVE' : 'NORMAL',
-        relatedMemoryIds: [],
+        relatedMemoryIds: operation.relatedMemoryIds,
         resultMemoryIds: [],
         operation: toJsonValue({
           ...operation,
@@ -292,7 +525,7 @@ export class AgentMemoryOperationsService {
   }
 
   private async findDuplicateMemory(
-    input: ProcessUserMessageMemoryOperationsInput,
+    input: ProcessAgentMemoryOperationProposalsInput,
     operation: AgentMemoryOperation,
   ): Promise<AgentMemory | null> {
     if (!operation.content) {
@@ -315,9 +548,9 @@ export class AgentMemoryOperationsService {
   }
 
   private async findRelatedMemories(
-    input: ProcessUserMessageMemoryOperationsInput,
+    input: ProcessAgentMemoryOperationProposalsInput,
     operation: AgentMemoryOperation,
-  ): Promise<Array<{ id: string }>> {
+  ): Promise<AgentMemory[]> {
     const baseWhere: Prisma.AgentMemoryWhereInput = {
       ownerUserId: input.userId,
       scope: toPrismaMemoryScope(operation.scope),
@@ -326,39 +559,108 @@ export class AgentMemoryOperationsService {
       status: 'ACTIVE',
       deletedAt: null,
     }
-    const exactKeywords = createExactSearchKeywords(operation)
-    const exactMatches = exactKeywords.length > 0
-      ? await this.prisma.agentMemory.findMany({
-          where: {
-            ...baseWhere,
-            OR: createContainsConditions(exactKeywords),
-          },
-          select: {
-            id: true,
-          },
-          take: 20,
-        })
-      : []
+    if (operation.slotKey) {
+      const slotMatches = await this.prisma.agentMemory.findMany({
+        where: {
+          ...baseWhere,
+          slotKey: operation.slotKey,
+        },
+        take: 20,
+      })
 
-    if (exactMatches.length > 0) {
-      return exactMatches
+      if (slotMatches.length > 0) {
+        return slotMatches.map(toAgentMemory)
+      }
     }
 
-    const keywords = createSearchKeywords(operation)
-    if (keywords.length === 0) {
+    const terms = createGroundingSearchTerms(operation)
+    if (terms.length === 0) {
       return []
     }
 
-    return this.prisma.agentMemory.findMany({
+    const indexedMatches = await this.prisma.agentMemorySearchIndex.findMany({
+      where: {
+        AND: [
+          { memory: { is: baseWhere } },
+          { OR: createSearchIndexConditions(terms) },
+        ],
+      },
+      include: {
+        memory: true,
+      },
+      orderBy: [
+        { indexedAt: 'desc' },
+        { createdAt: 'desc' },
+      ],
+      take: 20,
+    })
+
+    if (indexedMatches.length > 0) {
+      return indexedMatches.map(match => toAgentMemory(match.memory))
+    }
+
+    const tableMatches = await this.prisma.agentMemory.findMany({
       where: {
         ...baseWhere,
-        OR: createContainsConditions(keywords),
-      },
-      select: {
-        id: true,
+        OR: createMemoryTextConditions(terms),
       },
       take: 20,
     })
+
+    return tableMatches.map(toAgentMemory)
+  }
+
+  private async findMemoriesByIds(
+    input: ProcessAgentMemoryOperationProposalsInput,
+    operation: AgentMemoryOperation,
+  ): Promise<AgentMemory[]> {
+    const memories = await this.prisma.agentMemory.findMany({
+      where: {
+        id: { in: operation.relatedMemoryIds },
+        ownerUserId: input.userId,
+        scope: toPrismaMemoryScope(operation.scope),
+        lane: toPrismaMemoryLane(operation.lane),
+        agentProfileId: operation.scope === AGENT_MEMORY_SCOPE.USER_AGENT ? input.agentProfileId : null,
+        status: 'ACTIVE',
+        deletedAt: null,
+      },
+      take: 20,
+    })
+
+    return memories.map(toAgentMemory)
+  }
+
+  private async assertGenerationOperationRequest(input: ProcessAgentMemoryOperationProposalsInput): Promise<void> {
+    const generation = await this.prisma.chatMessageGeneration.findFirst({
+      where: {
+        generationId: input.generationId,
+        deletedAt: null,
+      },
+      select: {
+        actorUserId: true,
+        sessionId: true,
+        triggerUserMessageId: true,
+        agentProfileId: true,
+        status: true,
+      },
+    })
+
+    if (!generation) {
+      throw new NotFoundException('聊天生成不存在')
+    }
+
+    if (!OPERABLE_GENERATION_STATUSES.has(generation.status)) {
+      throw new ConflictException('聊天生成已结束')
+    }
+
+    if (
+      generation.actorUserId !== input.userId
+      || generation.sessionId !== input.sessionId
+      || generation.triggerUserMessageId !== input.messageId
+      || (generation.agentProfileId ?? null) !== input.agentProfileId
+    ) {
+      throw new ForbiddenException('记忆操作上下文不匹配')
+    }
   }
 
   private createProjection(
@@ -369,6 +671,7 @@ export class AgentMemoryOperationsService {
       detail: string | null
       reason: string | null
       memoryIds: string[]
+      archivedMemoryIds?: string[]
       candidateId: string | null
     },
   ): ChatMemoryOperationProjection {
@@ -380,6 +683,7 @@ export class AgentMemoryOperationsService {
       scope: operation.scope,
       lane: operation.lane,
       memoryIds: input.memoryIds,
+      archivedMemoryIds: input.archivedMemoryIds ?? [],
       candidateId: input.candidateId,
       title: input.title,
       detail: input.detail,
@@ -389,26 +693,72 @@ export class AgentMemoryOperationsService {
   }
 }
 
-function createExactSearchKeywords(operation: AgentMemoryOperation): string[] {
-  const query = operation.query ?? operation.content ?? operation.slotValue ?? ''
-  const target = normalizeSearchTerm(query)
-    .replace(/^我/u, '')
-    .replace(/^喜欢/u, '')
-    .replace(/(?:这件事|这点|这个|这些)$/u, '')
-    .trim()
+function resolveWriteConfirmationReason(
+  operation: AgentMemoryOperation,
+  policy?: AgentMemoryWritingPolicy,
+): string | null {
+  if (!operation.content) {
+    return null
+  }
 
-  return [...new Set([query, target].map(normalizeSearchTerm).filter(term => term.length >= 2))]
+  if (
+    policy?.requireConfirmationForSensitive !== false
+    && operation.sensitivity === AGENT_MEMORY_SENSITIVITY.SENSITIVE
+  ) {
+    return '内容被识别为敏感记忆，需要用户确认。'
+  }
+
+  if (isUnsafeAgentMemoryPayload({
+    slotValue: operation.slotValue,
+    summary: operation.summary,
+    content: operation.content,
+  })) {
+    return '内容可能包含敏感信息或提示注入风险。'
+  }
+
+  if (
+    operation.mode === AGENT_MEMORY_OPERATION_MODE.BACKGROUND_SUGGESTION
+    && operation.confidence < (policy?.minAutoApplyConfidence ?? AUTO_APPLY_MIN_CONFIDENCE)
+  ) {
+    return '自动记忆置信度较低，需要用户确认。'
+  }
+
+  if (
+    operation.mode === AGENT_MEMORY_OPERATION_MODE.BACKGROUND_SUGGESTION
+    && operation.action !== AGENT_MEMORY_OPERATION_ACTION.CREATE
+    && operation.action !== AGENT_MEMORY_OPERATION_ACTION.APPEND
+  ) {
+    return '自动记忆会修改或删除已有记忆，需要用户确认。'
+  }
+
+  return null
 }
 
-function createSearchKeywords(operation: AgentMemoryOperation): string[] {
-  const query = createExactSearchKeywords(operation).at(-1) ?? operation.query ?? operation.content ?? operation.slotValue ?? ''
-  const tokens = query.match(/[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]+|[a-z0-9][\w.:-]*/giu) ?? []
-  const genericTerms = new Set(['我', '用户', '喜欢', '记住', '忘记', '这件事', '这个', '这些'])
-  const terms = tokens.flatMap((token) => {
-    if (genericTerms.has(token)) {
-      return []
-    }
+function createEmptyRollbackResult(): RollbackAgentMemoryOperationsResult {
+  return {
+    memoryIds: [],
+    restoredMemoryIds: [],
+    dismissedCandidateCount: 0,
+    changed: false,
+  }
+}
 
+function createEmptyFinalizeResult(): FinalizeAgentMemoryOperationsResult {
+  return {
+    archivedMemoryIds: [],
+    changed: false,
+  }
+}
+
+function shouldSearchGroundOperation(operation: AgentMemoryOperation): boolean {
+  return operation.action === AGENT_MEMORY_OPERATION_ACTION.CREATE
+    || operation.action === AGENT_MEMORY_OPERATION_ACTION.APPEND
+}
+
+function createGroundingSearchTerms(operation: AgentMemoryOperation): string[] {
+  const source = createSearchSourceValues(operation).join(' ')
+  const tokens = source.match(/[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]+|[a-z0-9][\w.:-]*/giu) ?? []
+  const terms = createSearchSourceValues(operation).flatMap(value => value.length <= 160 ? [value] : []).concat(tokens.flatMap((token) => {
     if (!/[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/u.test(token)) {
       return token.length >= 2 ? [token] : []
     }
@@ -418,12 +768,31 @@ function createSearchKeywords(operation: AgentMemoryOperation): string[] {
       token,
       ...Array.from({ length: Math.max(0, chars.length - 1) }, (_, index) => chars.slice(index, index + 2).join('')),
     ]
-  })
+  }))
 
   return [...new Set(terms.map(term => term.trim()).filter(term => term.length >= 2))].slice(0, 12)
 }
 
-function createContainsConditions(keywords: string[]): Prisma.AgentMemoryWhereInput[] {
+function createSearchSourceValues(operation: AgentMemoryOperation): string[] {
+  return [
+    operation.query,
+    operation.content,
+    operation.slotValue,
+    operation.summary,
+  ]
+    .filter((value): value is string => typeof value === 'string')
+    .map(normalizeSearchTerm)
+    .filter(value => value.length >= 2)
+    .filter((value, index, values) => values.indexOf(value) === index)
+}
+
+function createSearchIndexConditions(terms: string[]): Prisma.AgentMemorySearchIndexWhereInput[] {
+  return terms.map(term => ({
+    searchText: { contains: term, mode: 'insensitive' as const },
+  }))
+}
+
+function createMemoryTextConditions(keywords: string[]): Prisma.AgentMemoryWhereInput[] {
   return keywords.flatMap(keyword => [
     { content: { contains: keyword, mode: 'insensitive' as const } },
     { summary: { contains: keyword, mode: 'insensitive' as const } },

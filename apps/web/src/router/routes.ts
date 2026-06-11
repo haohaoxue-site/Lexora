@@ -5,8 +5,15 @@ import {
   DOCUMENT_SINGLE_PUBLICATION_ROUTE_PREFIX,
   DOCUMENT_SITE_PUBLICATION_ROUTE_PREFIX,
 } from '@haohaoxue/samepage-contracts/document/publication/constants'
+import { RouterView } from 'vue-router'
 import { SvgIconCategory } from '@/components/svg-icon/typing'
-import { ADMIN_ROUTE_NAME, ADMIN_ROUTE_PATH } from './constants'
+import {
+  ADMIN_ROUTE_NAME,
+  ADMIN_ROUTE_PATH,
+  SKILLS_MARKET_ROUTE_NAME,
+  SKILLS_ME_ROUTE_NAME,
+  SKILLS_ROUTE_NAME,
+} from './constants'
 
 const WorkspaceContainer = () => import('@/layouts/containers/workspace-container')
 const AdminView = () => import('@/views/admin')
@@ -23,7 +30,7 @@ const DocsCollaborationsPageView = () => import('@/views/docs/pages/collaboratio
 const DocsDocumentSurfaceView = () => import('@/views/docs/pages/document-surface')
 const DocsPublicationSettingsPageView = () => import('@/views/docs/pages/publication-settings')
 const DocsTrashPageView = () => import('@/views/docs/pages/trash')
-const AgentView = () => import('@/views/agent/index.vue')
+const SkillsView = () => import('@/views/skills/index.vue')
 // const KnowledgeView = () => import('@/views/knowledge/index.vue') // TODO
 // const ScheduleView = () => import('@/views/schedule/index.vue') // TODO
 const SettingsView = () => import('@/views/settings/index.vue')
@@ -150,15 +157,28 @@ const workspaceRouteChildren = [
   //   },
   // },
   {
-    path: 'agent',
-    name: 'agent',
-    component: AgentView,
+    path: 'skills',
+    name: SKILLS_ROUTE_NAME,
+    component: RouterView,
+    redirect: { name: SKILLS_ME_ROUTE_NAME },
     meta: {
-      navLabel: '智能体',
+      navLabel: '技能',
       navIconCategory: SvgIconCategory.NAV,
-      navIcon: 'model-service',
-      navActiveIcon: 'model-service-active',
+      navIcon: 'skills',
+      navActiveIcon: 'skills-active',
     },
+    children: [
+      {
+        path: 'market',
+        name: SKILLS_MARKET_ROUTE_NAME,
+        component: SkillsView,
+      },
+      {
+        path: 'me',
+        name: SKILLS_ME_ROUTE_NAME,
+        component: SkillsView,
+      },
+    ],
   },
   {
     path: 'settings',

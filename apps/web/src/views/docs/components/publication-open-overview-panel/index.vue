@@ -20,6 +20,7 @@ import {
   DOCUMENT_SINGLE_PUBLICATION_STATE,
 } from '@haohaoxue/samepage-contracts/document/publication/constants'
 import { computed, shallowRef, watch } from 'vue'
+import Empty from '@/components/empty'
 
 const props = withDefaults(defineProps<PublicationOpenOverviewPanelProps>(), {
   loading: false,
@@ -254,7 +255,7 @@ function filterDocumentTree(
           @row-click="handleRowClick"
         >
           <template #empty>
-            <ElEmpty description="暂无私有文档" />
+            <Empty compact description="暂无私有文档" />
           </template>
 
           <ElTableColumn label="文档" min-width="205" show-overflow-tooltip>

@@ -5,12 +5,18 @@ import type {
   UpdateAgentProfileModelPolicyRequest,
 } from '@haohaoxue/samepage-contracts'
 import {
+  AGENT_MEMORY_SKILL_KEY,
+  AGENT_MEMORY_SLOT_KEY,
   AgentProfileConfigSchema,
   AgentProfileSettingsSchema,
   AI_MODEL_INTENT_KEY,
 } from '@haohaoxue/samepage-contracts'
 import { Injectable, InternalServerErrorException } from '@nestjs/common'
-import { Prisma } from '@prisma/client'
+import {
+  Prisma,
+  AgentMemoryLane as PrismaAgentMemoryLane,
+  AgentMemoryScope as PrismaAgentMemoryScope,
+} from '@prisma/client'
 import { PrismaService } from '../../database/prisma.service'
 import { AiModelResolverService } from '../ai/models/resolver.service'
 
@@ -36,6 +42,16 @@ const DEFAULT_AGENT_PROFILE_CONFIG: AgentProfileConfig = AgentProfileConfigSchem
   instructions: {
     systemPrompt: '你是 SamePage 小助手。请根据用户问题、当前对话上下文和可用文档上下文，给出清晰、准确、可执行的回答。',
   },
+  skillBindings: [
+    {
+      key: AGENT_MEMORY_SKILL_KEY,
+      enabled: true,
+      priority: 0,
+    },
+  ],
+  toolPolicy: {
+    enabled: true,
+  },
 })
 
 @Injectable()
@@ -53,7 +69,7 @@ export class AgentProfilesService {
     const existingProfile = await this.findDefaultProfile(client, input.ownerUserId)
 
     if (existingProfile) {
-      return existingProfile
+      return this.ensureDefaultProfileCapabilities(client, existingProfile)
     }
 
     await client.agentProfile.createMany({
@@ -76,8 +92,9 @@ export class AgentProfilesService {
 
   async getDefaultAgentProfileSettings(ownerUserId: string): Promise<AgentProfileSettings> {
     const profile = await this.ensureDefaultAgentProfile({ ownerUserId })
+    const personalizedName = await this.resolvePersonalizedAgentProfileName(ownerUserId, profile.id)
 
-    return toAgentProfileSettings(profile)
+    return toAgentProfileSettings(profile, personalizedName)
   }
 
   async updateDefaultAgentProfileModelPolicy(
@@ -104,7 +121,63 @@ export class AgentProfilesService {
       select: agentProfileSelect,
     })
 
-    return toAgentProfileSettings(updatedProfile)
+    const personalizedName = await this.resolvePersonalizedAgentProfileName(ownerUserId, updatedProfile.id)
+
+    return toAgentProfileSettings(updatedProfile, personalizedName)
+  }
+
+  async resolvePersonalizedAgentProfileNames(
+    ownerUserId: string,
+    agentProfileIds: string[],
+    tx?: Prisma.TransactionClient,
+  ): Promise<Map<string, string>> {
+    const uniqueProfileIds = [...new Set(agentProfileIds.map(id => id.trim()).filter(Boolean))]
+    if (uniqueProfileIds.length === 0) {
+      return new Map()
+    }
+
+    const client = tx ?? this.prisma
+    const now = new Date()
+    const memories = await client.agentMemory.findMany({
+      where: {
+        ownerUserId,
+        scope: PrismaAgentMemoryScope.USER_AGENT,
+        lane: PrismaAgentMemoryLane.AGENT_PERSONALIZATION,
+        agentProfileId: {
+          in: uniqueProfileIds,
+        },
+        slotKey: AGENT_MEMORY_SLOT_KEY.AGENT_NAME,
+        status: 'ACTIVE',
+        deletedAt: null,
+        OR: [
+          { expiresAt: null },
+          { expiresAt: { gt: now } },
+        ],
+      },
+      select: {
+        agentProfileId: true,
+        slotValue: true,
+        content: true,
+      },
+      orderBy: [
+        { updatedAt: 'desc' },
+        { createdAt: 'desc' },
+      ],
+    })
+
+    const nameByProfileId = new Map<string, string>()
+    for (const memory of memories) {
+      if (!memory.agentProfileId || nameByProfileId.has(memory.agentProfileId)) {
+        continue
+      }
+
+      const name = normalizePersonalizedAgentProfileName(memory)
+      if (name) {
+        nameByProfileId.set(memory.agentProfileId, name)
+      }
+    }
+
+    return nameByProfileId
   }
 
   private findDefaultProfile(client: AgentProfileClient, ownerUserId: string): Promise<AgentProfileForGeneration | null> {
@@ -118,6 +191,28 @@ export class AgentProfilesService {
       orderBy: {
         createdAt: 'asc',
       },
+    })
+  }
+
+  private async ensureDefaultProfileCapabilities(
+    client: AgentProfileClient,
+    profile: AgentProfileForGeneration,
+  ): Promise<AgentProfileForGeneration> {
+    const currentConfig = AgentProfileConfigSchema.parse(profile.currentConfig)
+    const nextConfig = ensureDefaultMemorySkillBinding(currentConfig)
+
+    if (JSON.stringify(currentConfig) === JSON.stringify(nextConfig)) {
+      return profile
+    }
+
+    return client.agentProfile.update({
+      where: {
+        id: profile.id,
+      },
+      data: {
+        currentConfig: toJsonObject(nextConfig),
+      },
+      select: agentProfileSelect,
     })
   }
 
@@ -135,6 +230,14 @@ export class AgentProfilesService {
       providerId: target.providerId,
       modelId: target.modelId,
     }
+  }
+
+  private async resolvePersonalizedAgentProfileName(
+    ownerUserId: string,
+    agentProfileId: string,
+    tx?: Prisma.TransactionClient,
+  ): Promise<string | null> {
+    return (await this.resolvePersonalizedAgentProfileNames(ownerUserId, [agentProfileId], tx)).get(agentProfileId) ?? null
   }
 }
 
@@ -165,6 +268,44 @@ function createNextModelPolicy(
   }
 }
 
+function ensureDefaultMemorySkillBinding(config: AgentProfileConfig): AgentProfileConfig {
+  const existing = config.skillBindings.find(binding => binding.key === AGENT_MEMORY_SKILL_KEY)
+  if (existing) {
+    if (existing.enabled) {
+      return config
+    }
+
+    return AgentProfileConfigSchema.parse({
+      ...config,
+      toolPolicy: {
+        ...config.toolPolicy,
+        enabled: true,
+      },
+      skillBindings: config.skillBindings.map(binding =>
+        binding.key === AGENT_MEMORY_SKILL_KEY
+          ? { ...binding, enabled: true, config: {} }
+          : binding,
+      ),
+    })
+  }
+
+  return AgentProfileConfigSchema.parse({
+    ...config,
+    toolPolicy: {
+      ...config.toolPolicy,
+      enabled: true,
+    },
+    skillBindings: [
+      ...config.skillBindings,
+      {
+        key: AGENT_MEMORY_SKILL_KEY,
+        enabled: true,
+        priority: 0,
+      },
+    ],
+  })
+}
+
 export function resolveAgentProfileFixedModelRef(
   profile: Pick<AgentProfileForGeneration, 'currentConfig'>,
 ): Pick<AiModelRef, 'providerId' | 'modelId'> | null {
@@ -183,12 +324,22 @@ export function resolveAgentProfileFixedModelRef(
   }
 }
 
-function toAgentProfileSettings(profile: AgentProfileForGeneration): AgentProfileSettings {
+function toAgentProfileSettings(profile: AgentProfileForGeneration, personalizedName: string | null = null): AgentProfileSettings {
   return AgentProfileSettingsSchema.parse({
     profileId: profile.id,
-    name: profile.name,
+    name: personalizedName ?? profile.name,
     description: profile.description,
     avatarUrl: profile.avatarUrl,
     modelRef: resolveAgentProfileFixedModelRef(profile),
   })
+}
+
+function normalizePersonalizedAgentProfileName(memory: Pick<Prisma.AgentMemoryGetPayload<{
+  select: {
+    slotValue: true
+    content: true
+  }
+}>, 'slotValue' | 'content'>): string | null {
+  const name = (memory.slotValue ?? memory.content).replace(/\s+/g, ' ').trim()
+  return name || null
 }

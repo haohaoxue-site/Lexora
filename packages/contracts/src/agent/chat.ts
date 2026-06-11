@@ -2,6 +2,7 @@ import { z } from 'zod'
 import {
   ChatMessageContextSnapshotMetaSchema,
   ChatMessageRoleSchema,
+  ChatSkillInvocationSchema,
 } from '../chat'
 import { AgentMemoryRunOptionsSchema } from './memory'
 
@@ -13,6 +14,7 @@ export const AgentChatContextMessageSchema = z.object({
   id: NonEmptyStringSchema,
   role: ChatMessageRoleSchema,
   content: z.string(),
+  skillInvocation: ChatSkillInvocationSchema.nullable().optional(),
 }).strict()
 
 export const AgentChatContextSnapshotSchema = ChatMessageContextSnapshotMetaSchema.extend({
