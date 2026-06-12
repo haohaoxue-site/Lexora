@@ -8,6 +8,11 @@ enum PlatformNotificationStatus {
   PUBLISHED
 }
 
+enum PlatformNotificationAssetStatus {
+  READY
+  DELETED
+}
+
 model PlatformNotification {
   id            String                     @id @default(uuid())
   title         String
@@ -24,12 +29,42 @@ model PlatformNotification {
   deletedAt     DateTime?
   deletedBy     String?
   deletedByUser User?                      @relation("PlatformNotificationDeleter", fields: [deletedBy], references: [id], onDelete: SetNull)
+  assets        PlatformNotificationAsset[] @relation("PlatformNotificationAssets")
 
   @@index([status, publishedAt])
   @@index([updatedAt])
   @@index([createdBy])
   @@index([updatedBy])
   @@index([deletedBy])
+}
+
+model PlatformNotificationAsset {
+  id             String                          @id @default(uuid())
+  notificationId String?
+  notification   PlatformNotification?           @relation("PlatformNotificationAssets", fields: [notificationId], references: [id], onDelete: SetNull)
+  status         PlatformNotificationAssetStatus @default(READY)
+  bucket         String
+  objectKey      String
+  mimeType       String
+  size           Int
+  sha256         String
+  originalFileName String
+  width          Int?
+  height         Int?
+  createdAt      DateTime                        @default(now())
+  createdBy      String?
+  createdByUser  User?                           @relation("PlatformNotificationAssetCreator", fields: [createdBy], references: [id], onDelete: SetNull)
+  updatedAt      DateTime                        @updatedAt
+  deletedAt      DateTime?
+  deletedBy      String?
+  deletedByUser  User?                           @relation("PlatformNotificationAssetDeleter", fields: [deletedBy], references: [id], onDelete: SetNull)
+
+  @@unique([bucket, objectKey])
+  @@index([notificationId])
+  @@index([status, createdAt])
+  @@index([createdBy])
+  @@index([deletedBy])
+  @@index([sha256])
 }
 
 model NotificationReadReceipt {

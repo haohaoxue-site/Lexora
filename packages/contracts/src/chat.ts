@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { AgentToolCallKindSchema, AgentToolCallStatusSchema } from './agent/events'
 import { ChatGenerationUsageSnapshotSchema } from './agent/generation'
 import { AgentMemoryRunOptionsSchema, ChatMemoryOperationProjectionSchema } from './agent/memory'
 import {
@@ -228,6 +229,8 @@ export const ChatMessagePartMetadataSchema = z.object({
   elapsedMs: z.number().int().nonnegative().optional(),
   toolCallId: z.string().trim().min(1).optional(),
   toolName: z.string().trim().min(1).optional(),
+  toolKind: AgentToolCallKindSchema.optional(),
+  status: AgentToolCallStatusSchema.optional(),
   sourceId: z.string().trim().min(1).optional(),
   citationTarget: z.string().trim().min(1).optional(),
 }).strict()

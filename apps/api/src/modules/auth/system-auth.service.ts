@@ -1,21 +1,32 @@
 import type { AuthMethodName, AuthProviderName } from '@haohaoxue/samepage-contracts'
 import type { LocalCredential, SystemAuthConfig, User } from '@prisma/client'
 import type { BootstrapConfig, CryptoConfig } from '../../config/auth.config'
+import { readFile } from 'node:fs/promises'
+import { join } from 'node:path'
+import process from 'node:process'
 import { AUTH_METHOD, AUTH_PROVIDER, AUTH_PROVIDER_VALUES } from '@haohaoxue/samepage-contracts'
 import { formatAuthMethod } from '@haohaoxue/samepage-shared'
 import { BadRequestException, Injectable, Logger, OnModuleInit } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { Prisma } from '@prisma/client'
 import { PrismaService } from '../../database/prisma.service'
+import { StorageService } from '../../infrastructure/storage/storage.service'
 import { decryptAes256Gcm, encryptAes256Gcm } from '../../utils/crypto'
 import { RbacService } from '../rbac/rbac.service'
 import { SystemEmailService } from '../system-email/system-email.service'
-import { resolveUniqueUserCode } from '../users/users.utils'
+import { AVATAR_BUCKET } from '../users/users.constants'
+import {
+  buildAvatarUrl,
+  resolveUniqueUserCode,
+} from '../users/users.utils'
 import { PersonalWorkspacesService } from '../workspaces/personal-workspaces.service'
 import { hashPassword, verifyPassword } from './password.utils'
 import { generateSystemAdminInitialPassword } from './system-admin-password.utils'
 
 const SYSTEM_AUTH_CONFIG_ID = 'default'
+const SYSTEM_ADMIN_DISPLAY_NAME = 'SamePage'
+const SYSTEM_ADMIN_AVATAR_FILE_NAME = 'system-admin-avatar.png'
+const SYSTEM_ADMIN_AVATAR_CONTENT_TYPE = 'image/png'
 
 export interface RegistrationOptions {
   allowPasswordRegistration: boolean
@@ -54,6 +65,7 @@ export class SystemAuthService implements OnModuleInit {
     private readonly systemEmailService: SystemEmailService,
     private readonly personalWorkspacesService: PersonalWorkspacesService,
     configService: ConfigService,
+    private readonly storageService: StorageService,
   ) {
     this.bootstrapConfig = configService.getOrThrow<BootstrapConfig>('bootstrap')
     this.encryptionKey = configService.getOrThrow<CryptoConfig>('crypto').encryptionKey
@@ -69,6 +81,7 @@ export class SystemAuthService implements OnModuleInit {
     const existingSystemAdminUserId = config.systemAdminUserId
     const user = await this.ensureSystemAdminUser(systemAdminEmail)
     const localCredential = await this.ensureSystemAdminCredential(user.id)
+    await this.ensureSystemAdminAvatar(user)
 
     await this.prisma.systemAuthConfig.update({
       where: { id: SYSTEM_AUTH_CONFIG_ID },
@@ -273,7 +286,7 @@ export class SystemAuthService implements OnModuleInit {
         data: {
           email: normalizedEmail,
           status: 'ACTIVE',
-          displayName: existingUser.displayName || 'System Admin',
+          displayName: SYSTEM_ADMIN_DISPLAY_NAME,
         },
       })
 
@@ -297,7 +310,7 @@ export class SystemAuthService implements OnModuleInit {
       const user = await tx.user.create({
         data: {
           email: normalizedEmail,
-          displayName: 'System Admin',
+          displayName: SYSTEM_ADMIN_DISPLAY_NAME,
           status: 'ACTIVE',
           userCode,
         },
@@ -310,6 +323,44 @@ export class SystemAuthService implements OnModuleInit {
 
       return user
     })
+  }
+
+  private async ensureSystemAdminAvatar(user: User): Promise<void> {
+    const avatarStorageKey = buildSystemAdminAvatarStorageKey(user.id)
+    const avatarUrl = buildAvatarUrl(user.id)
+    const avatarBuffer = await readFile(resolveSystemAdminAvatarPath())
+
+    await this.storageService.putObject({
+      bucket: AVATAR_BUCKET,
+      key: avatarStorageKey,
+      body: avatarBuffer,
+      contentType: SYSTEM_ADMIN_AVATAR_CONTENT_TYPE,
+      contentDisposition: {
+        type: 'inline',
+        fileName: SYSTEM_ADMIN_AVATAR_FILE_NAME,
+        fallbackFileName: 'avatar',
+      },
+      contentLength: avatarBuffer.length,
+      cacheControl: 'public, max-age=300',
+    })
+
+    if (user.avatarStorageKey !== avatarStorageKey || !user.avatarUrl) {
+      await this.prisma.user.update({
+        where: { id: user.id },
+        data: {
+          displayName: SYSTEM_ADMIN_DISPLAY_NAME,
+          avatarUrl,
+          avatarStorageKey,
+        },
+      })
+    }
+
+    if (user.avatarStorageKey && user.avatarStorageKey !== avatarStorageKey) {
+      await this.storageService.deleteObject({
+        bucket: AVATAR_BUCKET,
+        key: user.avatarStorageKey,
+      })
+    }
   }
 
   private async ensureSystemAdminCredential(userId: string): Promise<{ createdInitialPassword: boolean, initialPassword?: string }> {
@@ -376,6 +427,14 @@ export class SystemAuthService implements OnModuleInit {
       })
     }
   }
+}
+
+function buildSystemAdminAvatarStorageKey(userId: string): string {
+  return `user-avatar/${userId}/system-admin-brand.png`
+}
+
+function resolveSystemAdminAvatarPath(): string {
+  return join(process.cwd(), 'assets', SYSTEM_ADMIN_AVATAR_FILE_NAME)
 }
 
 function isRegistrationInviteCodeRequired(

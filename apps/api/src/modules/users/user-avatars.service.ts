@@ -1,7 +1,10 @@
 import type { UpdateCurrentUserAvatarResponse } from '@haohaoxue/samepage-contracts'
 import type { StorageObject } from '../../infrastructure/storage/storage.interface'
+import type { AuthUserContext } from '../auth/auth.interface'
 import type { UpdateCurrentUserAvatarInput } from './users.interface'
+import { ROLES } from '@haohaoxue/samepage-contracts'
 import {
+  BadRequestException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common'
@@ -23,11 +26,15 @@ export class UserAvatarsService {
   ) {}
 
   async updateCurrentUserAvatar(
-    userId: string,
+    authUser: AuthUserContext,
     payload: UpdateCurrentUserAvatarInput,
   ): Promise<UpdateCurrentUserAvatarResponse> {
+    if (authUser.roles.includes(ROLES.SYSTEM_ADMIN)) {
+      throw new BadRequestException('系统管理员账号不支持修改头像')
+    }
+
     const currentUser = await this.prisma.user.findUnique({
-      where: { id: userId },
+      where: { id: authUser.id },
       select: {
         id: true,
         avatarStorageKey: true,
@@ -35,12 +42,12 @@ export class UserAvatarsService {
     })
 
     if (!currentUser) {
-      throw new NotFoundException(`User "${userId}" not found`)
+      throw new NotFoundException(`User "${authUser.id}" not found`)
     }
 
     const avatarMimeType = assertAvatarMimeType(payload.mimeType)
     assertAvatarBuffer(payload.buffer, avatarMimeType)
-    const avatarStorageKey = buildAvatarStorageKey(userId, avatarMimeType)
+    const avatarStorageKey = buildAvatarStorageKey(authUser.id, avatarMimeType)
 
     await this.storageService.putObject({
       bucket: AVATAR_BUCKET,
@@ -55,10 +62,10 @@ export class UserAvatarsService {
       contentLength: payload.buffer.length,
     })
 
-    const avatarUrl = buildAvatarUrl(userId)
+    const avatarUrl = buildAvatarUrl(authUser.id)
 
     await this.prisma.user.update({
-      where: { id: userId },
+      where: { id: authUser.id },
       data: {
         avatarUrl,
         avatarStorageKey,

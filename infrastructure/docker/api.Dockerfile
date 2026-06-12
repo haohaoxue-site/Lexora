@@ -48,6 +48,7 @@ WORKDIR /app
 
 COPY --chown=node:node package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
 COPY --chown=node:node apps/api/package.json apps/api/package.json
+COPY --chown=node:node apps/api/assets apps/api/assets
 COPY --chown=node:node apps/api/prisma apps/api/prisma
 COPY --chown=node:node apps/api/prisma.config.ts apps/api/prisma.config.ts
 

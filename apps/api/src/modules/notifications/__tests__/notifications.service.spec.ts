@@ -4,9 +4,10 @@ import {
   DOCUMENT_COLLABORATION_USER_INVITE_STATUS,
   NOTIFICATION_LIST_FILTER,
   NOTIFICATION_SOURCE_KIND,
+  PLATFORM_NOTIFICATION_STATUS,
 } from '@haohaoxue/samepage-contracts'
 import { describe, expect, it, vi } from 'vitest'
-import { NotificationsService } from './notifications.service'
+import { NotificationsService } from '../notifications.service'
 
 const platformContent = [{
   type: 'paragraph',
@@ -34,7 +35,8 @@ function createPrismaMock() {
     createMany: vi.fn().mockResolvedValue({ count: 0 }),
   }
 
-  return {
+  const prisma = {
+    $transaction: vi.fn(),
     $queryRaw: vi.fn().mockImplementation((query: unknown) => {
       const sqlText = getSqlText(query)
 
@@ -57,6 +59,20 @@ function createPrismaMock() {
       return Promise.resolve([])
     }),
     platformNotification: {
+      create: vi.fn().mockResolvedValue({
+        id: 'platform-1',
+        title: '平台升级通知',
+        content: platformContent,
+        summary: '平台升级将在今晚完成。',
+        status: 'DRAFT',
+        publishedAt: null,
+        createdAt: new Date('2026-06-12T09:00:00.000Z'),
+        createdBy: 'admin-1',
+        createdByUser: null,
+        updatedAt: new Date('2026-06-12T09:00:00.000Z'),
+        updatedBy: 'admin-1',
+        updatedByUser: null,
+      }),
       findUnique: vi.fn().mockResolvedValue({
         id: 'platform-1',
         status: 'DRAFT',
@@ -73,8 +89,8 @@ function createPrismaMock() {
         createdBy: 'admin-1',
         createdByUser: {
           id: 'admin-1',
-          displayName: '管理员',
-          avatarUrl: null,
+          displayName: 'SamePage',
+          avatarUrl: '/api/users/avatar/admin-1?v=1',
         },
         updatedAt: platformPublishedAt,
         updatedBy: 'admin-1',
@@ -132,12 +148,22 @@ function createPrismaMock() {
       notificationReadReceipt,
     },
   }
+  prisma.$transaction.mockImplementation(async (callback: (tx: typeof prisma) => unknown) => callback(prisma))
+
+  return prisma
+}
+
+function createNotificationAssetsMock() {
+  return {
+    assertAssetsCanBeAttached: vi.fn().mockResolvedValue(undefined),
+    attachAssetsToNotification: vi.fn().mockResolvedValue(undefined),
+  }
 }
 
 describe('notificationsService message list', () => {
   it('lists unread platform messages and collaboration invites in one timeline', async () => {
     const prisma = createPrismaMock()
-    const service = new NotificationsService(prisma as never)
+    const service = new NotificationsService(prisma as never, createNotificationAssetsMock() as never)
 
     const response = await service.listNotifications('user-1', {
       filter: NOTIFICATION_LIST_FILTER.UNREAD,
@@ -163,7 +189,7 @@ describe('notificationsService message list', () => {
       kind: NOTIFICATION_SOURCE_KIND.PLATFORM,
       sender: {
         displayName: 'SamePage',
-        avatarUrl: null,
+        avatarUrl: '/api/users/avatar/admin-1?v=1',
       },
       title: '平台升级通知',
       contentText: '平台升级将在今晚完成。',
@@ -173,7 +199,7 @@ describe('notificationsService message list', () => {
 
   it('marks all unread platform messages and collaboration invites as read', async () => {
     const prisma = createPrismaMock()
-    const service = new NotificationsService(prisma as never)
+    const service = new NotificationsService(prisma as never, createNotificationAssetsMock() as never)
 
     const response = await service.markAllAsRead('user-1')
 
@@ -230,7 +256,7 @@ describe('notificationsService message list', () => {
     prisma.platformNotification.findMany
       .mockResolvedValueOnce([newNotification, oldNotification])
       .mockResolvedValueOnce([oldNotification])
-    const service = new NotificationsService(prisma as never)
+    const service = new NotificationsService(prisma as never, createNotificationAssetsMock() as never)
 
     const firstPage = await service.listNotifications('user-1', {
       filter: NOTIFICATION_LIST_FILTER.ALL,
@@ -257,7 +283,7 @@ describe('notificationsService message list', () => {
       status: 'PUBLISHED',
       publishedAt: new Date('2026-06-12T10:00:00.000Z'),
     })
-    const service = new NotificationsService(prisma as never)
+    const service = new NotificationsService(prisma as never, createNotificationAssetsMock() as never)
 
     await expect(service.updatePlatformNotification('admin-1', 'platform-1', {
       title: '更新标题',
@@ -265,9 +291,60 @@ describe('notificationsService message list', () => {
     expect(prisma.platformNotification.update).not.toHaveBeenCalled()
   })
 
+  it('creates platform notifications and attaches referenced image assets in one transaction', async () => {
+    const prisma = createPrismaMock()
+    const notificationAssets = createNotificationAssetsMock()
+    const service = new NotificationsService(prisma as never, notificationAssets as never)
+
+    await service.createPlatformNotification('admin-1', {
+      title: '平台升级通知',
+      content: [{
+        type: 'image',
+        attrs: {
+          assetId: 'asset-1',
+        },
+      }],
+      status: PLATFORM_NOTIFICATION_STATUS.DRAFT,
+    })
+
+    expect(prisma.$transaction).toHaveBeenCalledTimes(1)
+    expect(notificationAssets.assertAssetsCanBeAttached).toHaveBeenCalledWith({
+      assetIds: ['asset-1'],
+    }, prisma)
+    expect(notificationAssets.attachAssetsToNotification).toHaveBeenCalledWith({
+      notificationId: 'platform-1',
+      assetIds: ['asset-1'],
+    }, prisma)
+  })
+
+  it('updates platform notification content and asset bindings in one transaction', async () => {
+    const prisma = createPrismaMock()
+    const notificationAssets = createNotificationAssetsMock()
+    const service = new NotificationsService(prisma as never, notificationAssets as never)
+
+    await service.updatePlatformNotification('admin-1', 'platform-1', {
+      content: [{
+        type: 'image',
+        attrs: {
+          assetId: 'asset-1',
+        },
+      }],
+    })
+
+    expect(prisma.$transaction).toHaveBeenCalledTimes(1)
+    expect(notificationAssets.assertAssetsCanBeAttached).toHaveBeenCalledWith({
+      notificationId: 'platform-1',
+      assetIds: ['asset-1'],
+    }, prisma)
+    expect(notificationAssets.attachAssetsToNotification).toHaveBeenCalledWith({
+      notificationId: 'platform-1',
+      assetIds: ['asset-1'],
+    }, prisma)
+  })
+
   it('records the deleting actor when deleting platform notifications', async () => {
     const prisma = createPrismaMock()
-    const service = new NotificationsService(prisma as never)
+    const service = new NotificationsService(prisma as never, createNotificationAssetsMock() as never)
 
     await service.deletePlatformNotification('admin-1', 'platform-1')
 

@@ -2,6 +2,7 @@ import type {
   ChatGenerationEvent,
   ChatMessageFailureReason,
   ChatMessageMetadata,
+  ChatMessagePartMetadata,
 } from '@haohaoxue/samepage-contracts'
 import {
   CHAT_MESSAGE_FAILURE_REASON,
@@ -36,6 +37,39 @@ import { toPrismaChatMessagePartType } from './chat.utils'
 const PROJECT_RUNNING_INTERVAL_MS = 2000
 const PROJECT_RUNNING_BATCH_SIZE = 5
 const EMPTY_AGENT_EVENT_STREAM_ID = '0-0'
+const TOOL_PART_ORDER_START = 10
+
+type ToolPartType = typeof CHAT_MESSAGE_PART_TYPE.TOOL_CALL | typeof CHAT_MESSAGE_PART_TYPE.TOOL_RESULT
+
+interface ToolPartEntry {
+  id?: string
+  order: number
+  text: string
+  metadata: ChatMessagePartMetadata | null
+}
+
+interface ToolPartState {
+  calls: Map<string, ToolPartEntry>
+  results: Map<string, ToolPartEntry>
+  nextOrder: number
+  usedOrders: Set<number>
+}
+
+interface UpsertToolPartInput {
+  runId: string
+  sessionId: string
+  messageId: string
+  sourceEventId: string
+  type: ToolPartType
+  toolCallId: string
+  toolName?: string
+  toolKind?: ChatMessagePartMetadata['toolKind']
+  status?: ChatMessagePartMetadata['status']
+  textDelta?: string
+  textSnapshot?: string
+  textIfEmpty?: string
+  elapsedMs?: number
+}
 
 @Injectable()
 export class ChatRunProjectorService implements OnModuleInit, OnModuleDestroy {
@@ -126,6 +160,7 @@ export class ChatRunProjectorService implements OnModuleInit, OnModuleDestroy {
 
       let reasoningText = await this.getMessagePartText(run.assistantMessageId, ChatSessionMessagePartType.REASONING)
       let answerText = await this.getMessagePartText(run.assistantMessageId, ChatSessionMessagePartType.TEXT)
+      const toolPartState = await this.getToolPartState(run.assistantMessageId)
 
       try {
         await this.agentGenerationEventsService.consumeGenerationEvents({
@@ -172,6 +207,130 @@ export class ChatRunProjectorService implements OnModuleInit, OnModuleDestroy {
                 type: CHAT_MESSAGE_PART_TYPE.TEXT,
                 text,
                 snapshotText: answerText,
+              })
+              return
+            }
+
+            if (event.type === 'model.tool.call.started') {
+              const payload = getToolEventPayload(event)
+              if (!payload?.toolCallId || await this.chatSessionEvents.hasSourceEvent(run.runId, sourceEventId)) {
+                return
+              }
+
+              await this.upsertToolPartSnapshot(toolPartState, {
+                runId: run.runId,
+                sessionId: run.sessionId,
+                messageId: run.assistantMessageId,
+                sourceEventId,
+                type: CHAT_MESSAGE_PART_TYPE.TOOL_CALL,
+                toolCallId: payload.toolCallId,
+                toolName: payload.toolName,
+                toolKind: payload.toolKind,
+                status: 'input_streaming',
+              })
+              return
+            }
+
+            if (event.type === 'model.tool.call.args.delta') {
+              const payload = getToolEventPayload(event)
+              const text = getChatGenerationEventText(event)
+              if (!payload?.toolCallId || !text || await this.chatSessionEvents.hasSourceEvent(run.runId, sourceEventId)) {
+                return
+              }
+
+              await this.upsertToolPartSnapshot(toolPartState, {
+                runId: run.runId,
+                sessionId: run.sessionId,
+                messageId: run.assistantMessageId,
+                sourceEventId,
+                type: CHAT_MESSAGE_PART_TYPE.TOOL_CALL,
+                toolCallId: payload.toolCallId,
+                textDelta: text,
+              })
+              return
+            }
+
+            if (event.type === 'model.tool.call.completed') {
+              const payload = getToolEventPayload(event)
+              if (!payload?.toolCallId || await this.chatSessionEvents.hasSourceEvent(run.runId, sourceEventId)) {
+                return
+              }
+
+              await this.upsertToolPartSnapshot(toolPartState, {
+                runId: run.runId,
+                sessionId: run.sessionId,
+                messageId: run.assistantMessageId,
+                sourceEventId,
+                type: CHAT_MESSAGE_PART_TYPE.TOOL_CALL,
+                toolCallId: payload.toolCallId,
+                toolName: payload.toolName,
+                toolKind: payload.toolKind,
+                status: 'input_available',
+              })
+              return
+            }
+
+            if (event.type === 'tool.execution.started') {
+              const payload = getToolEventPayload(event)
+              if (!payload?.toolCallId || !payload.toolName || await this.chatSessionEvents.hasSourceEvent(run.runId, sourceEventId)) {
+                return
+              }
+
+              await this.upsertToolPartSnapshot(toolPartState, {
+                runId: run.runId,
+                sessionId: run.sessionId,
+                messageId: run.assistantMessageId,
+                sourceEventId,
+                type: CHAT_MESSAGE_PART_TYPE.TOOL_CALL,
+                toolCallId: payload.toolCallId,
+                toolName: payload.toolName,
+                toolKind: payload.toolKind,
+                status: 'running',
+                textIfEmpty: payload.argumentsText,
+              })
+              return
+            }
+
+            if (event.type === 'tool.execution.completed') {
+              const payload = getToolEventPayload(event)
+              if (!payload?.toolCallId || !payload.toolName || await this.chatSessionEvents.hasSourceEvent(run.runId, sourceEventId)) {
+                return
+              }
+
+              await this.upsertToolPartSnapshot(toolPartState, {
+                runId: run.runId,
+                sessionId: run.sessionId,
+                messageId: run.assistantMessageId,
+                sourceEventId,
+                type: CHAT_MESSAGE_PART_TYPE.TOOL_RESULT,
+                toolCallId: payload.toolCallId,
+                toolName: payload.toolName,
+                toolKind: payload.toolKind,
+                status: payload.status === 'error' ? 'error' : 'success',
+                textSnapshot: payload.outputText ?? '',
+                elapsedMs: payload.durationMs,
+              })
+              return
+            }
+
+            if (event.type === 'tool.execution.failed') {
+              const payload = getToolEventPayload(event)
+              if (!payload?.toolCallId || !payload.toolName || await this.chatSessionEvents.hasSourceEvent(run.runId, sourceEventId)) {
+                return
+              }
+
+              await this.upsertToolPartSnapshot(toolPartState, {
+                runId: run.runId,
+                sessionId: run.sessionId,
+                messageId: run.assistantMessageId,
+                sourceEventId,
+                type: CHAT_MESSAGE_PART_TYPE.TOOL_RESULT,
+                toolCallId: payload.toolCallId,
+                toolName: payload.toolName,
+                toolKind: payload.toolKind,
+                status: 'error',
+                textSnapshot: payload.message,
+                elapsedMs: payload.durationMs,
               })
               return
             }
@@ -271,6 +430,131 @@ export class ChatRunProjectorService implements OnModuleInit, OnModuleDestroy {
     })
 
     return part?.text ?? ''
+  }
+
+  private async getToolPartState(messageId: string): Promise<ToolPartState> {
+    const parts = await this.prisma.chatSessionMessagePart.findMany({
+      where: {
+        messageId,
+      },
+      select: {
+        id: true,
+        type: true,
+        text: true,
+        order: true,
+        metadata: true,
+      },
+      orderBy: {
+        order: 'asc',
+      },
+    })
+    const state: ToolPartState = {
+      calls: new Map(),
+      results: new Map(),
+      nextOrder: TOOL_PART_ORDER_START,
+      usedOrders: new Set(),
+    }
+
+    for (const part of parts) {
+      state.usedOrders.add(part.order)
+      state.nextOrder = Math.max(state.nextOrder, part.order + 1)
+
+      if (
+        part.type !== ChatSessionMessagePartType.TOOL_CALL
+        && part.type !== ChatSessionMessagePartType.TOOL_RESULT
+      ) {
+        continue
+      }
+
+      const metadata = toChatMessagePartMetadata(part.metadata)
+      const toolCallId = metadata?.toolCallId
+      if (!toolCallId) {
+        continue
+      }
+
+      const entry = {
+        id: part.id,
+        order: part.order,
+        text: part.text,
+        metadata,
+      }
+
+      if (part.type === ChatSessionMessagePartType.TOOL_CALL) {
+        state.calls.set(toolCallId, entry)
+      }
+      else {
+        state.results.set(toolCallId, entry)
+      }
+    }
+
+    return state
+  }
+
+  private async upsertToolPartSnapshot(
+    state: ToolPartState,
+    input: UpsertToolPartInput,
+  ): Promise<void> {
+    const entry = getOrCreateToolPartEntry(state, input.type, input.toolCallId)
+    const nextText = resolveNextToolPartText(entry.text, input)
+    const delta = nextText.startsWith(entry.text)
+      ? nextText.slice(entry.text.length)
+      : nextText
+    const metadata = createToolPartMetadata(entry.metadata, input)
+
+    const committed = await ignoreUniqueConstraint(async () => this.prisma.$transaction(async (tx) => {
+      if (!await isRunStatus(tx, input.runId, ChatSessionRunStatus.RUNNING)) {
+        return
+      }
+
+      const part = await tx.chatSessionMessagePart.upsert({
+        where: {
+          messageId_order: {
+            messageId: input.messageId,
+            order: entry.order,
+          },
+        },
+        create: {
+          messageId: input.messageId,
+          type: toPrismaChatMessagePartType(input.type),
+          text: nextText,
+          order: entry.order,
+          metadata: toJsonObject(metadata),
+        },
+        update: {
+          type: toPrismaChatMessagePartType(input.type),
+          text: nextText,
+          metadata: toJsonObject(metadata),
+        },
+        select: {
+          id: true,
+          order: true,
+        },
+      })
+
+      entry.id = part.id
+      await this.chatSessionEvents.appendEvents(tx, input.sessionId, [
+        {
+          type: CHAT_SESSION_EVENT_TYPE.MESSAGE_PART_DELTA,
+          messageId: input.messageId,
+          runId: input.runId,
+          sourceEventId: input.sourceEventId,
+          payload: {
+            partId: part.id,
+            partType: input.type,
+            order: part.order,
+            delta,
+            metadata,
+          },
+        },
+      ])
+    }))
+
+    if (!committed) {
+      return
+    }
+
+    entry.text = nextText
+    entry.metadata = metadata
   }
 
   private async appendPartDelta(input: {
@@ -614,6 +898,139 @@ async function isRunStatus(
   })
 
   return run?.status === status
+}
+
+function getOrCreateToolPartEntry(
+  state: ToolPartState,
+  type: ToolPartType,
+  toolCallId: string,
+): ToolPartEntry {
+  const map = type === CHAT_MESSAGE_PART_TYPE.TOOL_CALL ? state.calls : state.results
+  const existing = map.get(toolCallId)
+  if (existing) {
+    return existing
+  }
+
+  const pairedCall = state.calls.get(toolCallId)
+  const order = resolveNewToolPartOrder(state, type, pairedCall)
+
+  const entry: ToolPartEntry = {
+    order,
+    text: '',
+    metadata: null,
+  }
+  map.set(toolCallId, entry)
+  return entry
+}
+
+function resolveNewToolPartOrder(
+  state: ToolPartState,
+  type: ToolPartType,
+  pairedCall: ToolPartEntry | undefined,
+): number {
+  if (type === CHAT_MESSAGE_PART_TYPE.TOOL_RESULT && pairedCall) {
+    return reserveToolPartOrder(state, pairedCall.order + 1)
+  }
+
+  const order = reserveToolPartOrder(state, state.nextOrder)
+  if (type === CHAT_MESSAGE_PART_TYPE.TOOL_CALL) {
+    state.nextOrder = Math.max(state.nextOrder, order + 2)
+  }
+  return order
+}
+
+function reserveToolPartOrder(state: ToolPartState, preferredOrder: number): number {
+  let order = preferredOrder
+  while (state.usedOrders.has(order)) {
+    order += 1
+  }
+
+  state.usedOrders.add(order)
+  state.nextOrder = Math.max(state.nextOrder, order + 1)
+  return order
+}
+
+function resolveNextToolPartText(current: string, input: UpsertToolPartInput): string {
+  if (input.textSnapshot !== undefined) {
+    return input.textSnapshot
+  }
+
+  if (!current && input.textIfEmpty !== undefined) {
+    return input.textIfEmpty
+  }
+
+  return current + (input.textDelta ?? '')
+}
+
+function createToolPartMetadata(
+  previous: ChatMessagePartMetadata | null,
+  input: UpsertToolPartInput,
+): ChatMessagePartMetadata {
+  return removeUndefined({
+    ...(previous ?? {}),
+    toolCallId: input.toolCallId,
+    toolName: input.toolName ?? previous?.toolName,
+    toolKind: input.toolKind ?? previous?.toolKind,
+    status: input.status ?? previous?.status,
+    elapsedMs: input.elapsedMs ?? previous?.elapsedMs,
+  })
+}
+
+function toChatMessagePartMetadata(value: unknown): ChatMessagePartMetadata | null {
+  return isRecord(value) ? value as ChatMessagePartMetadata : null
+}
+
+function getToolEventPayload(event: ChatGenerationEvent): {
+  toolCallId?: string
+  toolName?: string
+  toolKind?: ChatMessagePartMetadata['toolKind']
+  status?: 'success' | 'error'
+  argumentsText?: string
+  outputText?: string
+  message?: string
+  durationMs?: number
+} | null {
+  if (!isRecord(event.payload)) {
+    return null
+  }
+  const payload: Record<string, unknown> = event.payload
+
+  return {
+    toolCallId: readString(payload.toolCallId),
+    toolName: readString(payload.toolName),
+    toolKind: readToolKind(payload.toolKind),
+    status: payload.status === 'error' ? 'error' : payload.status === 'success' ? 'success' : undefined,
+    argumentsText: readString(payload.argumentsText),
+    outputText: readString(payload.outputText),
+    message: readString(payload.message),
+    durationMs: readNonNegativeInteger(payload.durationMs),
+  }
+}
+
+function readToolKind(value: unknown): ChatMessagePartMetadata['toolKind'] | undefined {
+  return value === 'function' || value === 'skill' || value === 'memory' || value === 'mcp'
+    ? value
+    : undefined
+}
+
+function readString(value: unknown): string | undefined {
+  return typeof value === 'string' && value.trim() ? value : undefined
+}
+
+function readNonNegativeInteger(value: unknown): number | undefined {
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0
+    ? Math.trunc(value)
+    : undefined
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === 'object' && !Array.isArray(value)
+}
+
+function removeUndefined<T extends Record<string, unknown>>(value: T): T {
+  return Object.fromEntries(
+    Object.entries(value).filter(([, item]) => item !== undefined),
+  ) as T
 }
 
 async function ignoreUniqueConstraint(write: () => Promise<void>): Promise<boolean> {

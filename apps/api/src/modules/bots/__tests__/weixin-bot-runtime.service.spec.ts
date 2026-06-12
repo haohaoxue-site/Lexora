@@ -1,7 +1,7 @@
 import { BOT_RUNTIME_STATE } from '@haohaoxue/samepage-contracts'
 import { BotAccountStatus } from '@prisma/client'
 import { describe, expect, it, vi } from 'vitest'
-import { WeixinBotRuntimeService } from './weixin-bot-runtime.service'
+import { WeixinBotRuntimeService } from '../weixin-bot-runtime.service'
 
 describe('weixinBotRuntimeService lifecycle', () => {
   it('does not persist user stop state during module shutdown', async () => {

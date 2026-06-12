@@ -36,10 +36,11 @@ import {
   Prisma,
 } from '@prisma/client'
 import { PrismaService } from '../../database/prisma.service'
+import { NotificationAssetsService } from './notification-assets.service'
+import { collectNotificationImageAssetIds } from './notification-content-assets'
 
 const SYSTEM_NOTIFICATION_SENDER = {
   displayName: 'SamePage',
-  avatarUrl: null,
 } as const
 
 const documentCollaborationUserInviteNotificationSelect = {
@@ -131,7 +132,10 @@ interface UnreadNotificationCountRow {
 
 @Injectable()
 export class NotificationsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notificationAssetsService: NotificationAssetsService,
+  ) {}
 
   async getNotificationSummary(userId: string): Promise<NotificationSummary> {
     const [
@@ -250,19 +254,29 @@ export class NotificationsService {
     payload: CreatePlatformNotificationRequest,
   ): Promise<PlatformNotification> {
     const content = normalizeTiptapContent(payload.content)
+    const assetIds = collectNotificationImageAssetIds(content)
     const status = payload.status as PlatformNotificationStatus
     const now = new Date()
-    const notification = await this.prisma.platformNotification.create({
-      data: {
-        title: payload.title,
-        content: toPrismaJsonValue(content),
-        summary: summarizeDocumentContent(content, 120, ''),
-        status,
-        publishedAt: status === PLATFORM_NOTIFICATION_STATUS.PUBLISHED ? now : null,
-        createdBy: actorUserId,
-        updatedBy: actorUserId,
-      },
-      select: platformNotificationSelect,
+    const notification = await this.prisma.$transaction(async (tx) => {
+      await this.notificationAssetsService.assertAssetsCanBeAttached({ assetIds }, tx)
+      const notification = await tx.platformNotification.create({
+        data: {
+          title: payload.title,
+          content: toPrismaJsonValue(content),
+          summary: summarizeDocumentContent(content, 120, ''),
+          status,
+          publishedAt: status === PLATFORM_NOTIFICATION_STATUS.PUBLISHED ? now : null,
+          createdBy: actorUserId,
+          updatedBy: actorUserId,
+        },
+        select: platformNotificationSelect,
+      })
+      await this.notificationAssetsService.attachAssetsToNotification({
+        notificationId: notification.id,
+        assetIds,
+      }, tx)
+
+      return notification
     })
 
     return mapPlatformNotification(notification)
@@ -277,36 +291,53 @@ export class NotificationsService {
       throw new BadRequestException('至少更新一项站内信内容')
     }
 
-    const current = await this.prisma.platformNotification.findUnique({
-      where: { id: notificationId },
-      select: {
-        id: true,
-        status: true,
-        publishedAt: true,
-      },
-    })
-
-    if (!current) {
-      throw new NotFoundException(`Platform notification "${notificationId}" not found`)
-    }
-
-    if (current.status === PLATFORM_NOTIFICATION_STATUS.PUBLISHED) {
-      throw new BadRequestException('已发布站内信不可编辑')
-    }
-
     const content = payload.content ? normalizeTiptapContent(payload.content) : undefined
+    const assetIds = content ? collectNotificationImageAssetIds(content) : undefined
     const status = payload.status as PlatformNotificationStatus | undefined
-    const notification = await this.prisma.platformNotification.update({
-      where: { id: notificationId },
-      data: {
-        title: payload.title,
-        content: content ? toPrismaJsonValue(content) : undefined,
-        summary: content ? summarizeDocumentContent(content, 120, '') : undefined,
-        status,
-        publishedAt: resolveNextPublishedAt(status, current.publishedAt),
-        updatedBy: actorUserId,
-      },
-      select: platformNotificationSelect,
+    const notification = await this.prisma.$transaction(async (tx) => {
+      const current = await tx.platformNotification.findUnique({
+        where: { id: notificationId },
+        select: {
+          id: true,
+          status: true,
+          publishedAt: true,
+        },
+      })
+
+      if (!current) {
+        throw new NotFoundException(`Platform notification "${notificationId}" not found`)
+      }
+
+      if (current.status === PLATFORM_NOTIFICATION_STATUS.PUBLISHED) {
+        throw new BadRequestException('已发布站内信不可编辑')
+      }
+
+      if (assetIds) {
+        await this.notificationAssetsService.assertAssetsCanBeAttached({
+          notificationId,
+          assetIds,
+        }, tx)
+      }
+      const notification = await tx.platformNotification.update({
+        where: { id: notificationId },
+        data: {
+          title: payload.title,
+          content: content ? toPrismaJsonValue(content) : undefined,
+          summary: content ? summarizeDocumentContent(content, 120, '') : undefined,
+          status,
+          publishedAt: resolveNextPublishedAt(status, current.publishedAt),
+          updatedBy: actorUserId,
+        },
+        select: platformNotificationSelect,
+      })
+      if (assetIds) {
+        await this.notificationAssetsService.attachAssetsToNotification({
+          notificationId: notification.id,
+          assetIds,
+        }, tx)
+      }
+
+      return notification
     })
 
     return mapPlatformNotification(notification)
@@ -745,7 +776,10 @@ function mapPlatformNotificationSource(notification: PersistedPlatformNotificati
       title: notification.title,
       content,
       contentText,
-      sender: SYSTEM_NOTIFICATION_SENDER,
+      sender: {
+        ...SYSTEM_NOTIFICATION_SENDER,
+        avatarUrl: notification.createdByUser?.avatarUrl ?? null,
+      },
       messageAt: messageAt.toISOString(),
       createdAt: notification.createdAt.toISOString(),
     },

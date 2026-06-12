@@ -36,6 +36,8 @@ const {
   total,
   updateContent,
   updateTitle,
+  uploadNotificationImage,
+  resolveNotificationImageSrc,
 } = useAdminNotifications()
 </script>
 
@@ -82,6 +84,8 @@ const {
         :deleting-notification-id="deletingNotificationId"
         :set-form-ref="setFormRef"
         :get-status-label="getStatusLabel"
+        :upload-image="uploadNotificationImage"
+        :resolve-image-src="resolveNotificationImageSrc"
         @view-notification="openViewDrawer"
         @edit-notification="openEditDrawer"
         @delete-notification="deleteNotification"

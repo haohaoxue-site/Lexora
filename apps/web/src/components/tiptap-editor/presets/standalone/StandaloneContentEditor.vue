@@ -1,5 +1,9 @@
 <script setup lang="ts">
 import type { Editor } from '@tiptap/core'
+import type {
+  TiptapEditorResolveImageSrc,
+  TiptapEditorUploadedImage,
+} from '../../content/typing'
 import type { TiptapEditorContent } from '../../core/typing'
 import { shallowRef } from 'vue'
 import TiptapEditor from '../../core/TiptapEditor.vue'
@@ -10,6 +14,9 @@ interface StandaloneContentEditorProps {
   content: TiptapEditorContent
   editable?: boolean
   placeholder?: string
+  canUploadImage?: boolean
+  uploadImage?: (file: File) => Promise<TiptapEditorUploadedImage>
+  resolveImageSrc?: TiptapEditorResolveImageSrc
 }
 
 interface StandaloneContentEditorEmits {
@@ -20,6 +27,9 @@ interface StandaloneContentEditorEmits {
 const props = withDefaults(defineProps<StandaloneContentEditorProps>(), {
   editable: true,
   placeholder: '输入内容，或直接开始写作。',
+  canUploadImage: false,
+  uploadImage: undefined,
+  resolveImageSrc: undefined,
 })
 const emits = defineEmits<StandaloneContentEditorEmits>()
 const editor = shallowRef<Editor | null>(null)
@@ -27,6 +37,8 @@ const extensions = createBodyExtensions({
   blockIds: false,
   placeholder: props.placeholder,
   emptyLinePlaceholder: '',
+  uploadImage: props.uploadImage,
+  resolveImageSrc: props.resolveImageSrc,
 })
 
 function handleEditorChange(nextEditor: Editor | null) {
@@ -39,6 +51,8 @@ function handleEditorChange(nextEditor: Editor | null) {
     <StandaloneContentToolbar
       v-if="editor && props.editable"
       :editor="editor"
+      :can-upload-image="props.canUploadImage"
+      :upload-image="props.uploadImage"
     />
 
     <TiptapEditor

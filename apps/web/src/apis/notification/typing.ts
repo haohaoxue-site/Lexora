@@ -9,7 +9,10 @@ export type {
   NotificationMarkAllReadResponse,
   NotificationSummary,
   PlatformNotification,
+  PlatformNotificationAsset,
   PlatformNotificationListResponse,
   PlatformNotificationStatus,
+  ResolvePlatformNotificationAssetsRequest,
+  ResolvePlatformNotificationAssetsResponse,
   UpdatePlatformNotificationRequest,
 } from '@haohaoxue/samepage-contracts'

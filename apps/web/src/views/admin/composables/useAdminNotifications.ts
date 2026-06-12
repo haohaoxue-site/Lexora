@@ -4,18 +4,26 @@ import type {
   PlatformNotification,
   PlatformNotificationStatus,
 } from '@/apis/notification'
+import type {
+  TiptapEditorResolveImageSrc,
+  TiptapEditorUploadedImage,
+} from '@/components/tiptap-editor/content/typing'
 import {
+  PLATFORM_NOTIFICATION_IMAGE_MAX_BYTES,
   PLATFORM_NOTIFICATION_STATUS,
   PLATFORM_NOTIFICATION_STATUS_VALUES,
   PLATFORM_NOTIFICATION_TITLE_MAX_LENGTH,
 } from '@haohaoxue/samepage-contracts/notification'
+import { prettyBytes } from '@haohaoxue/samepage-shared/file'
 import { createEmptyTiptapContent } from '@haohaoxue/samepage-shared/tiptap'
 import { computed, onMounted, reactive, shallowRef } from 'vue'
 import {
   createPlatformNotification,
   deletePlatformNotification,
   listPlatformNotifications,
+  resolvePlatformNotificationAssets,
   updatePlatformNotification,
+  uploadPlatformNotificationImage,
 } from '@/apis/notification'
 import { ElMessage, ElMessageBox } from '@/utils/element-plus'
 import { getRequestErrorDisplayMessage } from '@/utils/request-error'
@@ -31,6 +39,7 @@ const platformNotificationStatusLabels = {
   [PLATFORM_NOTIFICATION_STATUS.DRAFT]: '草稿',
   [PLATFORM_NOTIFICATION_STATUS.PUBLISHED]: '已发布',
 } as const satisfies Record<PlatformNotificationStatus, string>
+const PLATFORM_NOTIFICATION_IMAGE_SIZE_LIMIT_LABEL = prettyBytes(PLATFORM_NOTIFICATION_IMAGE_MAX_BYTES)
 
 export function useAdminNotifications() {
   const notifications = shallowRef<PlatformNotification[]>([])
@@ -52,6 +61,7 @@ export function useAdminNotifications() {
     title: '',
     content: createEmptyTiptapContent() as TiptapJsonContent,
   })
+  const imageSrcCache = new Map<string, Promise<string | null>>()
   const formRules: FormRules<typeof form> = {
     title: [
       { required: true, message: '请输入站内信标题', trigger: 'blur' },
@@ -235,6 +245,41 @@ export function useAdminNotifications() {
     }
   }
 
+  async function uploadNotificationImage(file: File): Promise<TiptapEditorUploadedImage> {
+    if (file.size > PLATFORM_NOTIFICATION_IMAGE_MAX_BYTES) {
+      throw new Error(`图片大小不能超过 ${PLATFORM_NOTIFICATION_IMAGE_SIZE_LIMIT_LABEL}`)
+    }
+
+    const asset = await uploadPlatformNotificationImage(file)
+
+    if (asset.contentUrl) {
+      imageSrcCache.set(asset.id, Promise.resolve(asset.contentUrl))
+    }
+
+    return asset
+  }
+
+  const resolveNotificationImageSrc: TiptapEditorResolveImageSrc = async (assetId) => {
+    const cachedSrc = imageSrcCache.get(assetId)
+
+    if (cachedSrc) {
+      return cachedSrc
+    }
+
+    const pendingSrc = resolvePlatformNotificationAssets({
+      assetIds: [assetId],
+    }).then((response) => {
+      const asset = response.assets.find(item => item.id === assetId)
+      return asset?.contentUrl ?? null
+    }).catch((error) => {
+      imageSrcCache.delete(assetId)
+      throw error
+    })
+
+    imageSrcCache.set(assetId, pendingSrc)
+    return pendingSrc
+  }
+
   async function handleStatusFilterChange(value: string | number | boolean | undefined) {
     if (value !== '' && !PLATFORM_NOTIFICATION_STATUS_VALUES.includes(value as PlatformNotificationStatus)) {
       return
@@ -290,6 +335,8 @@ export function useAdminNotifications() {
     deleteNotification,
     updateContent,
     updateTitle,
+    uploadNotificationImage,
+    resolveNotificationImageSrc,
   }
 
   function resetForm() {

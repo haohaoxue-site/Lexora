@@ -19,6 +19,7 @@ const userAccountSectionRef = useTemplateRef<UserAccountSectionExposed>('userAcc
 const { loadAuthCapabilities } = useSettingsAuthCapabilities()
 const {
   avatarUrl,
+  canEditAvatar,
   canEditDisplayName,
   displayName,
   isSavingDisplayName,
@@ -127,6 +128,7 @@ async function handleConfirmEmail() {
         v-model:display-name="displayName"
         :avatar-url="avatarUrl"
         :user-code="account.userCode"
+        :can-edit-avatar="canEditAvatar"
         :can-edit-display-name="canEditDisplayName"
         :is-saving-display-name="isSavingDisplayName"
         :is-uploading="isUploadingAvatar"

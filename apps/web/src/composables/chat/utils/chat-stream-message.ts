@@ -65,7 +65,7 @@ function appendMessagePartDelta(
     metadata: ChatMessagePart['metadata']
   },
 ): ChatMessage[] {
-  if (!input.delta) {
+  if (!input.delta && !input.metadata) {
     return messages
   }
 

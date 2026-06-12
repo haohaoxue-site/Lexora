@@ -4,6 +4,7 @@ import { computed } from 'vue'
 import ChatMarkdownContent from '@/components/chat-markdown/ChatMarkdownContent.vue'
 import { createAssistantMessageDisplayModel } from '@/composables/chat/utils/chat-message-display'
 import ChatReasoningBlock from './ChatReasoningBlock.vue'
+import ChatToolCallTimeline from './ChatToolCallTimeline.vue'
 import ChatToolResultBlock from './ChatToolResultBlock.vue'
 
 const props = withDefaults(defineProps<{
@@ -39,6 +40,8 @@ const answerStarted = computed(() => Boolean(display.value.messageText))
         :phase="display.markdownPhase"
       />
     </div>
+
+    <ChatToolCallTimeline :items="display.toolCallViews" />
 
     <ElTooltip
       v-if="props.showUsageSummary && display.usageSummary"

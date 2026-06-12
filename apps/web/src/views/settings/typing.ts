@@ -12,6 +12,7 @@ export type SettingsTabName = 'user' | 'preference' | 'providers'
 export interface UserProfileSectionProps {
   avatarUrl: string | null
   userCode: string
+  canEditAvatar: boolean
   canEditDisplayName: boolean
   isSavingDisplayName: boolean
   isUploading: boolean

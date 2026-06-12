@@ -1,4 +1,4 @@
-import type { ToolCall } from '@langchain/core/messages'
+import type { ToolCall, ToolCallChunk } from '@langchain/core/messages'
 import type { AgentChatModelResponse } from './chat-model'
 import { AIMessageChunk } from '@langchain/core/messages'
 import {
@@ -9,9 +9,38 @@ import {
 export type AgentModelStreamPart
   = | { type: 'reasoning.delta', text: string, raw?: unknown }
     | { type: 'text.delta', text: string, raw?: unknown }
-    | { type: 'tool.call.started', toolCallId: string, toolName: string, raw?: unknown }
+    | { type: 'tool.call.started', toolCallId: string, toolName?: string, raw?: unknown }
     | { type: 'tool.call.args.delta', toolCallId: string, text: string, raw?: unknown }
-    | { type: 'tool.call.completed', toolCallId: string, raw?: unknown }
+    | { type: 'tool.call.completed', toolCallId: string, toolName?: string, raw?: unknown }
+    | {
+      type: 'tool.execution.started'
+      toolCallId: string
+      toolName: string
+      toolKind: 'function' | 'skill' | 'memory' | 'mcp'
+      args?: unknown
+      argsText?: string
+      raw?: unknown
+    }
+    | {
+      type: 'tool.execution.completed'
+      toolCallId: string
+      toolName: string
+      toolKind: 'function' | 'skill' | 'memory' | 'mcp'
+      status: 'success' | 'error'
+      output?: unknown
+      outputText?: string
+      durationMs?: number
+      raw?: unknown
+    }
+    | {
+      type: 'tool.execution.failed'
+      toolCallId: string
+      toolName: string
+      toolKind: 'function' | 'skill' | 'memory' | 'mcp'
+      message: string
+      durationMs?: number
+      raw?: unknown
+    }
 
 export interface ConsumeChatModelTextStreamOptions {
   onStreamPart?: (part: AgentModelStreamPart) => Promise<void> | void
@@ -47,10 +76,14 @@ export async function consumeChatModelTextStream(
   const normalizeReasoningDelta = createLeadingBlankLineNormalizer()
   const normalizeTextDelta = createLeadingBlankLineNormalizer()
   let responseChunk: AIMessageChunk | null = null
+  const toolCallStreamState = createToolCallStreamState()
 
   for await (const chunk of stream) {
     if (AIMessageChunk.isInstance(chunk)) {
       responseChunk = responseChunk ? responseChunk.concat(chunk) : chunk
+      await emitToolCallChunkParts(chunk.tool_call_chunks ?? [], toolCallStreamState, options, chunk, () => {
+        firstTokenAt ??= now()
+      })
     }
 
     providerUsage = mergeTokenUsage(providerUsage, readProviderUsage(chunk))
@@ -105,6 +138,8 @@ export async function consumeChatModelTextStream(
     })
   }
 
+  await emitCompletedToolCallParts(toolCallStreamState, options)
+
   const completedAt = now()
 
   return {
@@ -114,6 +149,157 @@ export async function consumeChatModelTextStream(
     firstTokenLatencyMs: firstTokenAt === null ? undefined : Math.max(0, Math.trunc(firstTokenAt - startedAt)),
     elapsedMs: Math.max(0, Math.trunc(completedAt - startedAt)),
   }
+}
+
+interface ToolCallStreamItem {
+  toolCallId?: string
+  toolName?: string
+  argsText: string
+  pendingArgDeltas: string[]
+  started: boolean
+  completed: boolean
+}
+
+interface ToolCallStreamState {
+  items: Map<string, ToolCallStreamItem>
+}
+
+function createToolCallStreamState(): ToolCallStreamState {
+  return {
+    items: new Map(),
+  }
+}
+
+async function emitToolCallChunkParts(
+  chunks: ToolCallChunk[],
+  state: ToolCallStreamState,
+  options: ConsumeChatModelTextStreamOptions,
+  raw: unknown,
+  markFirstToken: () => void,
+): Promise<void> {
+  for (const [index, chunk] of chunks.entries()) {
+    const key = getToolCallChunkKey(chunk, index)
+    const fallbackKey = getToolCallChunkPositionKey(index)
+    const item = state.items.get(key) ?? state.items.get(fallbackKey) ?? {
+      toolCallId: undefined,
+      toolName: undefined,
+      argsText: '',
+      pendingArgDeltas: [],
+      started: false,
+      completed: false,
+    }
+
+    item.toolCallId = mergeOptionalChunkString(item.toolCallId, chunk.id)
+    item.toolName = mergeOptionalChunkString(item.toolName, chunk.name)
+
+    if (chunk.args) {
+      item.argsText += chunk.args
+    }
+
+    if (!item.toolCallId) {
+      if (chunk.args) {
+        item.pendingArgDeltas.push(chunk.args)
+      }
+      state.items.set(key, item)
+      continue
+    }
+
+    if (!item.started) {
+      item.started = true
+      await emitPart({
+        type: 'tool.call.started',
+        toolCallId: item.toolCallId,
+        toolName: item.toolName,
+        raw,
+      }, options, markFirstToken)
+
+      for (const pendingArgDelta of item.pendingArgDeltas) {
+        await emitPart({
+          type: 'tool.call.args.delta',
+          toolCallId: item.toolCallId,
+          text: pendingArgDelta,
+          raw,
+        }, options, markFirstToken)
+      }
+      item.pendingArgDeltas = []
+    }
+
+    if (chunk.args) {
+      await emitPart({
+        type: 'tool.call.args.delta',
+        toolCallId: item.toolCallId,
+        text: chunk.args,
+        raw,
+      }, options, markFirstToken)
+    }
+
+    state.items.set(key, item)
+    if (fallbackKey !== key) {
+      state.items.delete(fallbackKey)
+    }
+  }
+}
+
+async function emitCompletedToolCallParts(
+  state: ToolCallStreamState,
+  options: ConsumeChatModelTextStreamOptions,
+): Promise<void> {
+  for (const item of state.items.values()) {
+    if (!item.toolCallId || !item.started || item.completed) {
+      continue
+    }
+
+    item.completed = true
+    await emitPart({
+      type: 'tool.call.completed',
+      toolCallId: item.toolCallId,
+      toolName: item.toolName,
+    }, options, () => {})
+  }
+}
+
+function getToolCallChunkKey(chunk: ToolCallChunk, index: number): string {
+  if (typeof chunk.index === 'number') {
+    return `index:${chunk.index}`
+  }
+
+  if (chunk.id) {
+    return `id:${chunk.id}`
+  }
+
+  return `position:${index}`
+}
+
+function getToolCallChunkPositionKey(index: number): string {
+  return `position:${index}`
+}
+
+function mergeOptionalChunkString(current: string | undefined, fragment: string | undefined): string | undefined {
+  if (!fragment) {
+    return current
+  }
+
+  return mergeChunkString(current ?? '', fragment)
+}
+
+function mergeChunkString(current: string, fragment: string | undefined): string {
+  if (!fragment) {
+    return current
+  }
+
+  if (!current) {
+    return fragment
+  }
+
+  if (current.endsWith(fragment)) {
+    return current
+  }
+
+  if (fragment.startsWith(current)) {
+    return fragment
+  }
+
+  return `${current}${fragment}`
 }
 
 function normalizeToolCalls(toolCalls: ToolCall[]): ToolCall[] {

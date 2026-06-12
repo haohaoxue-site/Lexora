@@ -6,7 +6,10 @@ import type {
   NotificationMarkAllReadResponse,
   NotificationSummary,
   PlatformNotification,
+  PlatformNotificationAsset,
   PlatformNotificationListResponse,
+  ResolvePlatformNotificationAssetsRequest,
+  ResolvePlatformNotificationAssetsResponse,
   UpdatePlatformNotificationRequest,
 } from './typing'
 import { axios } from '@/utils/axios'
@@ -66,5 +69,36 @@ export function deletePlatformNotification(id: string): Promise<void> {
   return axios.request({
     method: 'delete',
     url: `/system-admin/notifications/${id}`,
+  })
+}
+
+export function uploadPlatformNotificationImage(file: File): Promise<PlatformNotificationAsset> {
+  const data = new FormData()
+  data.append('file', file)
+
+  return axios.request({
+    method: 'post',
+    url: '/system-admin/notifications/assets/images',
+    data,
+  })
+}
+
+export function resolvePlatformNotificationAssets(
+  data: ResolvePlatformNotificationAssetsRequest,
+): Promise<ResolvePlatformNotificationAssetsResponse> {
+  return axios.request({
+    method: 'post',
+    url: '/system-admin/notifications/assets/resolve',
+    data,
+  })
+}
+
+export function resolvePublishedNotificationAssets(
+  data: ResolvePlatformNotificationAssetsRequest,
+): Promise<ResolvePlatformNotificationAssetsResponse> {
+  return axios.request({
+    method: 'post',
+    url: '/notifications/assets/resolve',
+    data,
   })
 }

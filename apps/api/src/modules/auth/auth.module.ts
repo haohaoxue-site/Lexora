@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common'
+import { StorageModule } from '../../infrastructure/storage/storage.module'
 import { RbacModule } from '../rbac/rbac.module'
 import { SystemEmailModule } from '../system-email/system-email.module'
 import { WorkspacesModule } from '../workspaces/workspaces.module'
@@ -12,7 +13,7 @@ import { RegistrationInviteGrantsService } from './registration-invite-grants.se
 import { SystemAuthService } from './system-auth.service'
 
 @Module({
-  imports: [RbacModule, SystemEmailModule, WorkspacesModule],
+  imports: [RbacModule, StorageModule, SystemEmailModule, WorkspacesModule],
   controllers: [AuthController],
   providers: [AuthService, AuthRegistrationsService, AuthSessionsService, AuthMailerService, OAuthProviderService, RegistrationInviteGrantsService, SystemAuthService],
   exports: [AuthMailerService, AuthService, AuthSessionsService, RegistrationInviteGrantsService, SystemAuthService],

@@ -71,6 +71,8 @@ model User {
   createdPlatformNotifications             PlatformNotification[]             @relation("PlatformNotificationCreator")
   updatedPlatformNotifications             PlatformNotification[]             @relation("PlatformNotificationUpdater")
   deletedPlatformNotifications             PlatformNotification[]             @relation("PlatformNotificationDeleter")
+  createdPlatformNotificationAssets        PlatformNotificationAsset[]        @relation("PlatformNotificationAssetCreator")
+  deletedPlatformNotificationAssets        PlatformNotificationAsset[]        @relation("PlatformNotificationAssetDeleter")
   notificationReadReceipts                 NotificationReadReceipt[]          @relation("NotificationReadReceiptUser")
   updatedDefaultModelPolicies              AiDefaultModelPolicy[]             @relation("AiDefaultModelPolicyUpdater")
   updatedPlatformEmbeddingModelPolicies    AiPlatformEmbeddingModelPolicy[]   @relation("AiPlatformEmbeddingModelPolicyUpdater")

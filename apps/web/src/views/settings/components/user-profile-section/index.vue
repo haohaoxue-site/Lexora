@@ -71,11 +71,15 @@ const {
       />
 
       <div class="min-w-0">
-        <ElButton :loading="props.isUploading" @click="handlePickAvatar">
+        <ElButton
+          :disabled="!props.canEditAvatar"
+          :loading="props.isUploading"
+          @click="handlePickAvatar"
+        >
           {{ props.isUploading ? '上传中...' : '更换头像' }}
         </ElButton>
         <p class="mt-2 text-xs text-secondary">
-          支持 JPG、PNG、WEBP，大小不超过 2MB。
+          {{ props.canEditAvatar ? '支持 JPG、PNG、WEBP，大小不超过 2MB。' : '官方账号头像不可修改。' }}
         </p>
       </div>
 

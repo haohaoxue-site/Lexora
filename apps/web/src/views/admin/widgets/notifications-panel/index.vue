@@ -6,6 +6,10 @@ import type {
   PlatformNotification,
   PlatformNotificationStatus,
 } from '@/apis/notification'
+import type {
+  TiptapEditorResolveImageSrc,
+  TiptapEditorUploadedImage,
+} from '@/components/tiptap-editor/content/typing'
 import { PLATFORM_NOTIFICATION_STATUS } from '@haohaoxue/samepage-contracts/notification'
 import { StandaloneContentEditor } from '@/components/tiptap-editor'
 import { formatDateTime } from '@/utils/dayjs'
@@ -27,6 +31,8 @@ interface NotificationsPanelProps {
   deletingNotificationId: string
   setFormRef: (instance: FormInstance | null) => void
   getStatusLabel: (status: PlatformNotificationStatus) => string
+  uploadImage: (file: File) => Promise<TiptapEditorUploadedImage>
+  resolveImageSrc: TiptapEditorResolveImageSrc
 }
 
 interface NotificationsPanelEmits {
@@ -178,6 +184,7 @@ function isPublishedNotification(notification: PlatformNotification) {
           <StandaloneContentEditor
             :content="props.form.content"
             :editable="false"
+            :resolve-image-src="props.resolveImageSrc"
           />
         </div>
       </div>
@@ -203,6 +210,9 @@ function isPublishedNotification(notification: PlatformNotification) {
             <StandaloneContentEditor
               :content="props.form.content"
               :editable="!props.isViewing"
+              can-upload-image
+              :upload-image="props.uploadImage"
+              :resolve-image-src="props.resolveImageSrc"
               @update:content="emits('updateContent', $event)"
             />
           </div>

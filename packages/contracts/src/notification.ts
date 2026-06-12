@@ -39,12 +39,26 @@ export const PLATFORM_NOTIFICATION_STATUS_VALUES = [
 ] as const
 
 export const PLATFORM_NOTIFICATION_TITLE_MAX_LENGTH = 60
+export const PLATFORM_NOTIFICATION_IMAGE_MAX_BYTES = 2 * 1024 * 1024
+export const PLATFORM_NOTIFICATION_ASSET_RESOLVE_MAX_COUNT = 100
+
+export const PLATFORM_NOTIFICATION_ASSET_STATUS = {
+  READY: 'ready',
+  DELETED: 'deleted',
+} as const
+
+export const PLATFORM_NOTIFICATION_ASSET_STATUS_VALUES = [
+  PLATFORM_NOTIFICATION_ASSET_STATUS.READY,
+  PLATFORM_NOTIFICATION_ASSET_STATUS.DELETED,
+] as const
 
 const IsoDateTimeStringSchema = z.string().datetime()
+const NonEmptyStringSchema = z.string().trim().min(1)
 
 export const NotificationSourceKindSchema = z.enum(NOTIFICATION_SOURCE_KIND_VALUES)
 export const NotificationListFilterSchema = z.enum(NOTIFICATION_LIST_FILTER_VALUES)
 export const PlatformNotificationStatusSchema = z.enum(PLATFORM_NOTIFICATION_STATUS_VALUES)
+export const PlatformNotificationAssetStatusSchema = z.enum(PLATFORM_NOTIFICATION_ASSET_STATUS_VALUES)
 
 export const DocumentCollaborationUserInviteNotificationSchema = z.object({
   id: z.string(),
@@ -147,6 +161,28 @@ export const GetPlatformNotificationsQuerySchema = RequestPageParamsSchema.exten
 
 export const PlatformNotificationListResponseSchema = createPageDataSchema(PlatformNotificationSchema)
 
+export const PlatformNotificationAssetSchema = z.object({
+  id: z.string().trim().min(1),
+  notificationId: z.string().trim().min(1).nullable(),
+  status: PlatformNotificationAssetStatusSchema,
+  mimeType: z.string(),
+  size: z.number().int().nonnegative(),
+  fileName: z.string(),
+  width: z.number().int().positive().nullable(),
+  height: z.number().int().positive().nullable(),
+  contentUrl: z.string().nullable(),
+  createdAt: IsoDateTimeStringSchema,
+}).strict()
+
+export const ResolvePlatformNotificationAssetsSchema = z.object({
+  assetIds: z.array(NonEmptyStringSchema).min(1).max(PLATFORM_NOTIFICATION_ASSET_RESOLVE_MAX_COUNT),
+}).strict()
+
+export const ResolvePlatformNotificationAssetsResponseSchema = z.object({
+  assets: PlatformNotificationAssetSchema.array(),
+  unresolvedAssetIds: z.string().array(),
+}).strict()
+
 /**
  * 当前用户的消息提醒聚合。
  */
@@ -163,7 +199,11 @@ export type NotificationMarkAllReadResponse = z.infer<typeof NotificationMarkAll
 export type NotificationSummary = z.infer<typeof NotificationSummarySchema>
 export type DocumentCollaborationUserInviteNotification = z.infer<typeof DocumentCollaborationUserInviteNotificationSchema>
 export type PlatformNotification = z.infer<typeof PlatformNotificationSchema>
+export type PlatformNotificationAssetStatus = z.infer<typeof PlatformNotificationAssetStatusSchema>
+export type PlatformNotificationAsset = z.infer<typeof PlatformNotificationAssetSchema>
 export type CreatePlatformNotificationRequest = z.infer<typeof CreatePlatformNotificationRequestSchema>
 export type UpdatePlatformNotificationRequest = z.infer<typeof UpdatePlatformNotificationRequestSchema>
 export type GetPlatformNotificationsQuery = z.infer<typeof GetPlatformNotificationsQuerySchema>
 export type PlatformNotificationListResponse = z.infer<typeof PlatformNotificationListResponseSchema>
+export type ResolvePlatformNotificationAssetsRequest = z.infer<typeof ResolvePlatformNotificationAssetsSchema>
+export type ResolvePlatformNotificationAssetsResponse = z.infer<typeof ResolvePlatformNotificationAssetsResponseSchema>

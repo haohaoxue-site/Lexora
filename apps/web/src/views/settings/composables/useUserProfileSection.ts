@@ -27,9 +27,9 @@ export function useUserProfileSection(options: {
     displayName: createDisplayNameRules(),
   } as const
   const sectionDescription = computed(() =>
-    options.props.canEditDisplayName
+    options.props.canEditAvatar && options.props.canEditDisplayName
       ? '更换头像后会立即生效，显示名称保存后会同步更新。'
-      : '更换头像后会立即生效，当前账号的显示名称不可修改。',
+      : '当前账号的官方资料由系统统一维护。',
   )
   const {
     copy: copyUserCode,
@@ -41,6 +41,10 @@ export function useUserProfileSection(options: {
   })
 
   function handlePickAvatar() {
+    if (!options.props.canEditAvatar) {
+      return
+    }
+
     options.fileInputRef.value?.click()
   }
 

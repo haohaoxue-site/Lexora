@@ -112,7 +112,7 @@ export class UsersController {
       throw new BadRequestException('请选择头像文件')
     }
 
-    return this.userAvatarsService.updateCurrentUserAvatar(authUser.id, {
+    return this.userAvatarsService.updateCurrentUserAvatar(authUser, {
       fileName: file.filename,
       mimeType: file.mimetype,
       buffer: await file.toBuffer(),

@@ -1,13 +1,16 @@
 <script setup lang="ts">
 import type { NotificationListFilter } from '@haohaoxue/samepage-contracts'
 import type { SessionNotificationPanelProps } from '../typing'
+import type { TiptapEditorResolveImageSrc } from '@/components/tiptap-editor/content/typing'
 import type {
   SessionNotificationInvitationItem,
   SessionNotificationItem,
 } from '@/layouts/components/session-notification-bell/useSessionNotificationBell'
 import { NOTIFICATION_LIST_FILTER, NOTIFICATION_SOURCE_KIND } from '@haohaoxue/samepage-contracts/notification'
 import { computed, shallowRef, watch } from 'vue'
+import { resolvePublishedNotificationAssets } from '@/apis/notification'
 import EntityAvatar from '@/components/entity-avatar'
+import { StandaloneContentEditor } from '@/components/tiptap-editor'
 
 const props = defineProps<SessionNotificationPanelProps>()
 const emits = defineEmits<{
@@ -24,6 +27,8 @@ const OVERSCAN = 4
 const scrollContainerRef = shallowRef<HTMLElement | null>(null)
 const scrollTop = shallowRef(0)
 const pendingLoadMoreItemCount = shallowRef<number | null>(null)
+const selectedPlatformNotification = shallowRef<SessionNotificationItem | null>(null)
+const imageSrcCache = new Map<string, Promise<string | null>>()
 const filterOptions = computed(() => [
   { label: '全部', value: NOTIFICATION_LIST_FILTER.ALL },
   { label: `未读 ${props.unreadCount > 0 ? props.unreadCount : ''}`.trim(), value: NOTIFICATION_LIST_FILTER.UNREAD },
@@ -48,6 +53,7 @@ const totalHeight = computed(() => props.notificationItems.length * ROW_HEIGHT)
 
 watch(() => [props.activeFilter, props.notificationItems.length] as const, () => {
   pendingLoadMoreItemCount.value = null
+  selectedPlatformNotification.value = null
 })
 
 watch(() => props.isLoadingMore, (isLoadingMore, wasLoadingMore) => {
@@ -88,6 +94,56 @@ function requestLoadMore() {
 function isInvite(item: SessionNotificationItem) {
   return item.kind === NOTIFICATION_SOURCE_KIND.DOCUMENT_COLLABORATION_USER_INVITE && item.documentInviteItem
 }
+
+function isPlatformNotification(item: SessionNotificationItem) {
+  return item.kind === NOTIFICATION_SOURCE_KIND.PLATFORM
+}
+
+function openPlatformNotification(item: SessionNotificationItem) {
+  if (!isPlatformNotification(item)) {
+    return
+  }
+
+  selectedPlatformNotification.value = item
+}
+
+function handleNotificationItemKeydown(event: KeyboardEvent, item: SessionNotificationItem) {
+  if (!isPlatformNotification(item)) {
+    return
+  }
+
+  if (event.key !== 'Enter' && event.key !== ' ') {
+    return
+  }
+
+  event.preventDefault()
+  openPlatformNotification(item)
+}
+
+function closePlatformNotification() {
+  selectedPlatformNotification.value = null
+}
+
+const resolveNotificationImageSrc: TiptapEditorResolveImageSrc = async (assetId) => {
+  const cachedSrc = imageSrcCache.get(assetId)
+
+  if (cachedSrc) {
+    return cachedSrc
+  }
+
+  const pendingSrc = resolvePublishedNotificationAssets({
+    assetIds: [assetId],
+  }).then((response) => {
+    const asset = response.assets.find(item => item.id === assetId)
+    return asset?.contentUrl ?? null
+  }).catch((error) => {
+    imageSrcCache.delete(assetId)
+    throw error
+  })
+
+  imageSrcCache.set(assetId, pendingSrc)
+  return pendingSrc
+}
 </script>
 
 <template>
@@ -117,6 +173,7 @@ function isInvite(item: SessionNotificationItem) {
     </div>
 
     <ElSegmented
+      v-if="!selectedPlatformNotification"
       :model-value="props.activeFilter"
       :options="filterOptions"
       block
@@ -124,7 +181,39 @@ function isInvite(item: SessionNotificationItem) {
       @change="handleFilterChange"
     />
 
-    <p v-if="props.loadErrorMessage" class="session-notification-panel__state m-0 rounded-lg bg-danger-light px-3 py-2 text-xs leading-5 text-danger">
+    <div v-if="selectedPlatformNotification" class="session-notification-panel__detail min-h-0 flex-1 overflow-hidden rounded-lg border border-base bg-surface">
+      <div class="session-notification-panel__detail-header flex items-start gap-3 border-b border-base p-3">
+        <ElButton
+          text
+          class="session-notification-panel__back-button !h-7 !w-7 !p-0"
+          aria-label="返回站内信列表"
+          @click="closePlatformNotification"
+        >
+          <SvgIcon category="ui" icon="arrow-left" size="15px" />
+        </ElButton>
+
+        <div class="min-w-0 flex-1">
+          <div class="flex min-w-0 items-center justify-between gap-3">
+            <p class="m-0 truncate text-sm font-semibold leading-5 text-main">
+              {{ selectedPlatformNotification.senderLabel }}
+            </p>
+            <time class="shrink-0 text-xs leading-5 text-tertiary">{{ selectedPlatformNotification.receivedLabel }}</time>
+          </div>
+          <h4 class="m-0 mt-1 text-sm font-semibold leading-5 text-main">
+            {{ selectedPlatformNotification.title }}
+          </h4>
+        </div>
+      </div>
+
+      <StandaloneContentEditor
+        class="session-notification-panel__detail-editor"
+        :content="selectedPlatformNotification.content"
+        :editable="false"
+        :resolve-image-src="resolveNotificationImageSrc"
+      />
+    </div>
+
+    <p v-else-if="props.loadErrorMessage" class="session-notification-panel__state m-0 rounded-lg bg-danger-light px-3 py-2 text-xs leading-5 text-danger">
       {{ props.loadErrorMessage }}
     </p>
 
@@ -133,7 +222,7 @@ function isInvite(item: SessionNotificationItem) {
     </div>
 
     <div v-else-if="!props.notificationItems.length" class="session-notification-panel__state rounded-lg bg-fill-light px-3 py-8 text-center text-sm text-secondary">
-      暂无站内信。
+      暂无站内信
     </div>
 
     <div
@@ -147,8 +236,16 @@ function isInvite(item: SessionNotificationItem) {
           v-for="{ item, index, top } in virtualItems"
           :key="item.id"
           class="session-notification-panel__item absolute left-0 right-0 flex gap-3 border-b border-base bg-surface p-3"
-          :class="{ 'is-unread': item.isUnread }"
+          :class="{
+            'is-unread': item.isUnread,
+            'is-last': index === props.notificationItems.length - 1,
+            'is-clickable': isPlatformNotification(item),
+          }"
+          :role="isPlatformNotification(item) ? 'button' : undefined"
+          :tabindex="isPlatformNotification(item) ? 0 : undefined"
           :style="{ height: `${ROW_HEIGHT}px`, transform: `translateY(${top}px)` }"
+          @click="openPlatformNotification(item)"
+          @keydown="handleNotificationItemKeydown($event, item)"
         >
           <EntityAvatar
             :name="item.senderLabel"
@@ -176,12 +273,26 @@ function isInvite(item: SessionNotificationItem) {
               {{ item.contentText }}
             </p>
 
+            <div v-if="isPlatformNotification(item)" class="mt-2 flex justify-end">
+              <ElButton
+                text
+                size="small"
+                class="session-notification-panel__detail-link !h-7 !px-2"
+                @click.stop="openPlatformNotification(item)"
+              >
+                <span class="inline-flex items-center gap-1">
+                  查看详情
+                  <SvgIcon category="ui" icon="chevron-right" size="13px" />
+                </span>
+              </ElButton>
+            </div>
+
             <div v-if="isInvite(item) && item.documentInviteItem" class="mt-2 flex items-center justify-end">
               <ElButton
                 size="small"
                 plain
                 :disabled="Boolean(props.actingInvitationId)"
-                @click="emits('view', item.documentInviteItem)"
+                @click.stop="emits('view', item.documentInviteItem)"
               >
                 查看
               </ElButton>
@@ -190,7 +301,7 @@ function isInvite(item: SessionNotificationItem) {
                 plain
                 :disabled="Boolean(props.actingInvitationId)"
                 :loading="props.actingInvitationId === item.documentInviteItem.id && props.actingInvitationAction === 'decline'"
-                @click="emits('decline', item.documentInviteItem)"
+                @click.stop="emits('decline', item.documentInviteItem)"
               >
                 拒绝
               </ElButton>
@@ -199,7 +310,7 @@ function isInvite(item: SessionNotificationItem) {
                 type="primary"
                 :disabled="Boolean(props.actingInvitationId)"
                 :loading="props.actingInvitationId === item.documentInviteItem.id && props.actingInvitationAction === 'accept'"
-                @click="emits('accept', item.documentInviteItem)"
+                @click.stop="emits('accept', item.documentInviteItem)"
               >
                 接受
               </ElButton>
@@ -254,8 +365,35 @@ function isInvite(item: SessionNotificationItem) {
   &__item {
     transition: background-color 0.16s ease;
 
+    &.is-clickable {
+      cursor: pointer;
+    }
+
+    &.is-clickable:focus-visible {
+      outline: 2px solid color-mix(in srgb, var(--brand-primary) 32%, transparent);
+      outline-offset: -3px;
+    }
+
+    &.is-clickable:hover {
+      background: color-mix(in srgb, var(--brand-primary) 4%, var(--brand-bg-surface));
+    }
+
+    &::after {
+      position: absolute;
+      right: 0.75rem;
+      bottom: 0;
+      left: 0;
+      height: 1px;
+      background: var(--brand-fill-light);
+      content: '';
+    }
+
     &.is-unread {
       background: color-mix(in srgb, var(--brand-primary) 5%, var(--brand-bg-surface));
+    }
+
+    &.is-last::after {
+      display: none;
     }
   }
 
@@ -264,6 +402,57 @@ function isInvite(item: SessionNotificationItem) {
     overflow: hidden;
     -webkit-box-orient: vertical;
     -webkit-line-clamp: 2;
+  }
+
+  &__back-button {
+    --el-button-text-color: var(--brand-text-secondary);
+    --el-fill-color-light: color-mix(in srgb, var(--brand-fill-light) 76%, var(--brand-bg-surface));
+
+    border-radius: 0.375rem;
+
+    &:hover:not(.is-disabled) {
+      --el-button-text-color: var(--brand-primary);
+    }
+  }
+
+  &__detail-link {
+    --el-button-text-color: var(--brand-primary);
+    --el-fill-color-light: color-mix(in srgb, var(--brand-primary) 7%, var(--brand-bg-surface));
+
+    border-radius: 0.375rem;
+    font-weight: 600;
+
+    &:hover:not(.is-disabled) {
+      --el-button-text-color: var(--brand-primary);
+      --el-fill-color-light: color-mix(in srgb, var(--brand-primary) 11%, var(--brand-bg-surface));
+    }
+  }
+
+  &__detail-editor {
+    height: calc(100% - 4.625rem);
+
+    :deep(.standalone-content-editor) {
+      display: flex;
+      height: 100%;
+      min-height: 0;
+      flex-direction: column;
+    }
+
+    :deep(.standalone-content-editor__surface),
+    :deep(.tiptap-editor) {
+      min-height: 0;
+      flex: 1 1 0%;
+    }
+
+    :deep(.tiptap-editor__content) {
+      min-height: 0;
+      overflow: auto;
+    }
+
+    :deep(.ProseMirror) {
+      min-height: 100%;
+      padding: 0.875rem 1rem 1rem;
+    }
   }
 }
 </style>

@@ -2,7 +2,7 @@ import { CHAT_SESSION_ORIGIN } from '@haohaoxue/samepage-contracts'
 import { ConflictException } from '@nestjs/common'
 import { ChatSessionChannel, ChatSessionOrigin } from '@prisma/client'
 import { describe, expect, it, vi } from 'vitest'
-import { ChatSessionsService } from './chat-sessions.service'
+import { ChatSessionsService } from '../chat-sessions.service'
 
 function createBotSession() {
   const now = new Date('2026-06-12T00:00:00.000Z')

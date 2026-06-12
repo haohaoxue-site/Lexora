@@ -3,7 +3,7 @@ import { BOT_RUNTIME_STATE } from '@haohaoxue/samepage-contracts'
 import { ConflictException } from '@nestjs/common'
 import { BotAccountChannel, BotAccountStatus } from '@prisma/client'
 import { describe, expect, it, vi } from 'vitest'
-import { BotsService } from './bots.service'
+import { BotsService } from '../bots.service'
 
 function createBotAccount(overrides: Record<string, unknown> = {}) {
   const now = new Date('2026-06-12T00:00:00.000Z')
@@ -68,7 +68,7 @@ describe('botsService Weixin binding', () => {
   })
 
   it('keeps one Weixin bot per user and one owner per external account in schema', () => {
-    const schema = readFileSync(new URL('../../../prisma/bot.prisma', import.meta.url), 'utf8')
+    const schema = readFileSync(new URL('../../../../prisma/bot.prisma', import.meta.url), 'utf8')
 
     expect(schema).toContain('@@unique([userId, channel])')
     expect(schema).toContain('@@unique([channel, externalAccountId])')
