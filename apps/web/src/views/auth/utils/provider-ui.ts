@@ -1,5 +1,6 @@
 import type { AuthProviderName } from '@haohaoxue/samepage-contracts'
 import { AUTH_PROVIDER } from '@haohaoxue/samepage-contracts/auth/constants'
+import { SvgIconCategory } from '@/components/svg-icon/typing'
 
 /**
  * 认证平台展示信息。
@@ -7,19 +8,23 @@ import { AUTH_PROVIDER } from '@haohaoxue/samepage-contracts/auth/constants'
 export interface AuthProviderUiMeta {
   title: string
   icon: string
+  iconCategory: SvgIconCategory.BRAND
 }
 
 export const AUTH_PROVIDER_UI_META: Record<AuthProviderName, AuthProviderUiMeta> = {
   [AUTH_PROVIDER.GOOGLE]: {
     title: 'Google',
     icon: 'brand-google',
+    iconCategory: SvgIconCategory.BRAND,
   },
   [AUTH_PROVIDER.GITHUB]: {
     title: 'GitHub',
     icon: 'brand-github',
+    iconCategory: SvgIconCategory.BRAND,
   },
   [AUTH_PROVIDER.LINUX_DO]: {
     title: 'LinuxDo',
     icon: 'brand-linux-do',
+    iconCategory: SvgIconCategory.BRAND,
   },
 }

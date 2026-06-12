@@ -22,6 +22,7 @@
     "./ai/constants": "./src/ai/constants.ts",
     "./auth": "./src/auth.ts",
     "./auth/constants": "./src/auth/constants.ts",
+    "./bot": "./src/bot.ts",
     "./chat": "./src/chat.ts",
     "./chat/constants": "./src/chat/constants.ts",
     "./collab": "./src/collab/index.ts",

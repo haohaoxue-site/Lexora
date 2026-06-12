@@ -7,6 +7,7 @@ export function toChatSessionSummary(session: ChatSessionSummary | ChatSessionDe
     id: session.id,
     workspaceId: session.workspaceId,
     origin: session.origin,
+    channel: session.channel,
     title: session.title,
     agentProfile: session.agentProfile,
     modelRef: session.modelRef,

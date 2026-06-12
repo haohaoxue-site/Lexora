@@ -57,10 +57,16 @@ enum ChatSessionOrigin {
   DOCS
 }
 
+enum ChatSessionChannel {
+  DIRECT
+  WEIXIN_BOT
+}
+
 model ChatSession {
   id                      String                  @id @default(uuid())
   workspaceId             String
   origin                  ChatSessionOrigin       @default(GLOBAL)
+  channel                 ChatSessionChannel      @default(DIRECT)
   title                   String
   selectedProviderId      String?
   selectedModelId         String?
@@ -80,6 +86,7 @@ model ChatSession {
   messageGenerations      ChatMessageGeneration[]
   events                  ChatSessionEvent[]
   memoryCandidates        AgentMemoryCandidate[]
+  botConversation         BotConversation?        @relation("BotConversationChatSession")
   createdBy               String?
   createdByUser           User?                   @relation("ChatSessionCreator", fields: [createdBy], references: [id], onDelete: SetNull)
   createdAt               DateTime                @default(now())
@@ -88,6 +95,7 @@ model ChatSession {
 
   @@index([workspaceId, updatedAt])
   @@index([workspaceId, origin, updatedAt])
+  @@index([workspaceId, origin, channel, updatedAt])
   @@index([createdBy, updatedAt])
   @@index([selectedProviderId])
   @@index([agentProfileId])

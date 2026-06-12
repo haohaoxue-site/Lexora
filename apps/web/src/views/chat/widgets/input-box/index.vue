@@ -4,6 +4,7 @@ import ChatComposer from '@/components/chat-composer/ChatComposer.vue'
 import { useChatInputBox } from '../../composables/useChatInputBox'
 
 const props = withDefaults(defineProps<ChatInputBoxProps>(), {
+  isReadonly: false,
   variant: 'dock',
 })
 
@@ -21,13 +22,16 @@ const {
   selectComposerModel,
   translatorSkillEnabled,
   translatorTargetLanguage,
-} = useChatInputBox()
+} = useChatInputBox({
+  isReadonly: () => props.isReadonly,
+})
 </script>
 
 <template>
   <div class="chat-input-box" :class="props.variant === 'hero' ? 'chat-input-box--hero p-0' : 'px-6 py-5'">
     <div class="mx-auto" :class="props.variant === 'hero' ? 'max-w-none' : 'max-w-[var(--page-mode-chat-max-width)]'">
       <ChatComposer
+        v-if="!props.isReadonly"
         v-model:attachments="attachments"
         v-model:translator-target-language="translatorTargetLanguage"
         :content-j-s-o-n="contentJSON"
@@ -44,7 +48,20 @@ const {
         @placeholder-upload="handlePlaceholderUpload"
         @highlight-attachment="highlightAttachment"
       />
-      <div v-if="props.variant === 'dock'" class="mt-2 text-center text-xs text-secondary-a50">
+      <div v-else class="chat-input-box__readonly flex items-center gap-3 rounded-lg px-4 py-3">
+        <span class="chat-input-box__readonly-icon flex h-9 w-9 shrink-0 items-center justify-center rounded-lg">
+          <SvgIcon category="ui" icon="chat" size="1rem" />
+        </span>
+        <div class="min-w-0">
+          <div class="text-sm font-medium leading-5 text-main">
+            Bot 对话只读展示
+          </div>
+          <div class="mt-0.5 text-xs leading-5 text-secondary">
+            请在对应聊天平台继续发送消息。
+          </div>
+        </div>
+      </div>
+      <div v-if="props.variant === 'dock' && !props.isReadonly" class="mt-2 text-center text-xs text-secondary-a50">
         AI 回答仅供参考，请注意核实重要信息
       </div>
     </div>
@@ -63,6 +80,17 @@ const {
   &.chat-input-box--hero {
     border-top: 0;
     background-image: none;
+  }
+
+  &__readonly {
+    border: 1px solid color-mix(in srgb, var(--brand-border-base) 78%, transparent);
+    background: color-mix(in srgb, var(--brand-fill-lighter) 70%, var(--brand-bg-surface));
+  }
+
+  &__readonly-icon {
+    border: 1px solid color-mix(in srgb, var(--brand-border-base) 72%, transparent);
+    background: color-mix(in srgb, var(--brand-bg-surface) 88%, transparent);
+    color: var(--brand-text-secondary);
   }
 }
 </style>

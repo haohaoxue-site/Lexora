@@ -46,8 +46,8 @@ const emits = defineEmits<ChatWorkspaceLayoutEmits>()
       </section>
 
       <template v-else>
-        <ChatMessageList />
-        <ChatInputBox />
+        <ChatMessageList :is-readonly="props.isReadonlySession" />
+        <ChatInputBox :is-readonly="props.isReadonlySession" />
       </template>
     </div>
 

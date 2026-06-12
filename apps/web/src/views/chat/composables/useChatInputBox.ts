@@ -1,18 +1,24 @@
 import type { AgentTranslatorTargetLanguage } from '@haohaoxue/samepage-contracts/agent'
+import type { MaybeRefOrGetter } from 'vue'
 import type { ChatComposerSubmitPayload } from '@/components/chat-composer/typing'
-import { onMounted, shallowRef, watch } from 'vue'
+import { computed, onMounted, shallowRef, toValue, watch } from 'vue'
 import { createChatComposerHostState } from '@/composables/chat/createChatComposerHostState'
 import { useChatModelSettings } from './useChatModelSettings'
 import { useChatRuntimeOverlay } from './useChatRuntimeOverlay'
 import { useChatSkillState } from './useChatSkillState'
 import { useChatStream } from './useChatStream'
 
-export function useChatInputBox() {
+export interface UseChatInputBoxOptions {
+  isReadonly?: MaybeRefOrGetter<boolean>
+}
+
+export function useChatInputBox(options: UseChatInputBoxOptions = {}) {
   const model = useChatModelSettings()
   const { cancelRunId, isStreaming } = useChatRuntimeOverlay()
   const { loadSkills, translatorSkillEnabled } = useChatSkillState()
   const { cancelActiveRun, sendMessage } = useChatStream()
   const translatorTargetLanguage = shallowRef<AgentTranslatorTargetLanguage | null>(null)
+  const isReadonly = computed(() => Boolean(toValue(options.isReadonly)))
   const host = createChatComposerHostState({
     model,
     sendMessage,
@@ -29,6 +35,10 @@ export function useChatInputBox() {
   })
 
   async function handleSend(payload: ChatComposerSubmitPayload) {
+    if (isReadonly.value) {
+      return false
+    }
+
     const sent = await host.handleSend(payload)
     if (sent) {
       translatorTargetLanguage.value = null

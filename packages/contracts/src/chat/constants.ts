@@ -109,6 +109,16 @@ export const CHAT_SESSION_ORIGIN_VALUES = [
   CHAT_SESSION_ORIGIN.DOCS,
 ] as const
 
+export const CHAT_SESSION_CHANNEL = {
+  DIRECT: 'direct',
+  WEIXIN_BOT: 'weixin_bot',
+} as const
+
+export const CHAT_SESSION_CHANNEL_VALUES = [
+  CHAT_SESSION_CHANNEL.DIRECT,
+  CHAT_SESSION_CHANNEL.WEIXIN_BOT,
+] as const
+
 export const CHAT_MESSAGE_ATTACHMENT_TYPE = {
   DOCUMENT: 'document',
 } as const

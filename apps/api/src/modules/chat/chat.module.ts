@@ -22,5 +22,6 @@ import { ChatService } from './chat.service'
     ChatRunDispatcherService,
     ChatRunProjectorService,
   ],
+  exports: [ChatService, ChatSessionsService],
 })
 export class ChatModule {}

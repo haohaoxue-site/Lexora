@@ -17,6 +17,7 @@ import {
   CHAT_MESSAGE_PART_TYPE_VALUES,
   CHAT_MESSAGE_STATUS_VALUES,
   CHAT_RUN_STATUS_VALUES,
+  CHAT_SESSION_CHANNEL_VALUES,
   CHAT_SESSION_EVENT_TYPE,
   CHAT_SESSION_EVENT_TYPE_VALUES,
   CHAT_SESSION_ORIGIN_VALUES,
@@ -40,6 +41,8 @@ export {
   CHAT_MESSAGE_STATUS_VALUES,
   CHAT_RUN_STATUS,
   CHAT_RUN_STATUS_VALUES,
+  CHAT_SESSION_CHANNEL,
+  CHAT_SESSION_CHANNEL_VALUES,
   CHAT_SESSION_DEFAULT_TITLE,
   CHAT_SESSION_EVENT_TYPE,
   CHAT_SESSION_EVENT_TYPE_VALUES,
@@ -57,6 +60,7 @@ const ChatSessionSummaryBaseSchema = z.object({
   id: NonEmptyStringSchema,
   workspaceId: NonEmptyStringSchema,
   origin: z.enum(CHAT_SESSION_ORIGIN_VALUES),
+  channel: z.enum(CHAT_SESSION_CHANNEL_VALUES),
   title: ChatSessionTitleSchema,
   agentProfile: z.object({
     profileId: NonEmptyStringSchema,
@@ -77,6 +81,7 @@ export const ChatMessagePartTypeSchema = z.enum(CHAT_MESSAGE_PART_TYPE_VALUES)
 export const ChatMessageFailureReasonSchema = z.enum(CHAT_MESSAGE_FAILURE_REASON_VALUES)
 export const ChatRunStatusSchema = z.enum(CHAT_RUN_STATUS_VALUES)
 export const ChatSessionEventTypeSchema = z.enum(CHAT_SESSION_EVENT_TYPE_VALUES)
+export const ChatSessionChannelSchema = z.enum(CHAT_SESSION_CHANNEL_VALUES)
 export const ChatSessionOriginSchema = z.enum(CHAT_SESSION_ORIGIN_VALUES)
 export const ChatMessageAttachmentTypeSchema = z.enum(CHAT_MESSAGE_ATTACHMENT_TYPE_VALUES)
 export const ChatMessageAttachmentPlacementSchema = z.enum(CHAT_MESSAGE_ATTACHMENT_PLACEMENT_VALUES)
@@ -555,6 +560,7 @@ export type ChatMessagePartType = z.infer<typeof ChatMessagePartTypeSchema>
 export type ChatMessageFailureReason = z.infer<typeof ChatMessageFailureReasonSchema>
 export type ChatRunStatus = z.infer<typeof ChatRunStatusSchema>
 export type ChatSessionEventType = z.infer<typeof ChatSessionEventTypeSchema>
+export type ChatSessionChannel = z.infer<typeof ChatSessionChannelSchema>
 export type ChatSessionOrigin = z.infer<typeof ChatSessionOriginSchema>
 export type ChatMessageAttachmentType = z.infer<typeof ChatMessageAttachmentTypeSchema>
 export type ChatMessageAttachmentPlacement = z.infer<typeof ChatMessageAttachmentPlacementSchema>

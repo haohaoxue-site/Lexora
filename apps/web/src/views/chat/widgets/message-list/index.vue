@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { ComponentPublicInstance } from 'vue'
+import type { ChatMessageListProps } from './typing'
 import type { ChatMessage } from '@/apis/chat'
 import {
   ArrowLeft,
@@ -31,6 +32,9 @@ interface ChatMessageContentItem {
 
 type ChatMessageListItem = ChatMessageDayDividerItem | ChatMessageContentItem
 
+const props = withDefaults(defineProps<ChatMessageListProps>(), {
+  isReadonly: false,
+})
 const scrollContainerRef = useTemplateRef<HTMLElement>('scrollContainerRef')
 const {
   assistantName,
@@ -58,8 +62,26 @@ const {
   startEditMessage,
   submitEditMessage,
   switchToBranch,
-} = useChatMessageList()
+} = useChatMessageList({
+  isReadonly: () => props.isReadonly,
+})
 const messageItems = computed<ChatMessageListItem[]>(() => createMessageListItems(messages.value))
+const emptyTitle = computed(() => {
+  if (props.isReadonly) {
+    return 'Bot 对话只读展示'
+  }
+
+  return isConfigured.value ? '有什么可以帮助你的？' : '还不能开始对话'
+})
+const emptyDescription = computed(() => {
+  if (props.isReadonly) {
+    return '等待聊天平台的新消息进入 SamePage'
+  }
+
+  return isConfigured.value
+    ? '输入消息开始对话'
+    : '请先在右上角 Agent 设置选择默认模型，或检查服务商配置'
+})
 const {
   handleScroll,
   setItemElement,
@@ -169,13 +191,10 @@ function formatMessageSentAt(value: string): string {
           />
         </div>
         <div class="text-lg text-secondary">
-          {{ isConfigured ? '有什么可以帮助你的？' : '还不能开始对话' }}
+          {{ emptyTitle }}
         </div>
-        <div v-if="isConfigured" class="mt-1 text-sm text-secondary-a60">
-          输入消息开始对话
-        </div>
-        <div v-else class="mt-1 text-sm text-secondary-a60">
-          请先在右上角 Agent 设置选择默认模型，或检查服务商配置
+        <div class="mt-1 text-sm text-secondary-a60">
+          {{ emptyDescription }}
         </div>
       </div>
     </div>
@@ -236,7 +255,7 @@ function formatMessageSentAt(value: string): string {
                     text
                     class="chat-message-list__action-button h-7 min-w-7 w-7 rounded-lg p-0"
                     :icon="RefreshRight"
-                    :disabled="isStreaming"
+                    :disabled="isStreaming || props.isReadonly"
                     @click="retryAssistantMessage(virtual.item.message)"
                   />
                 </ElTooltip>
@@ -245,7 +264,7 @@ function formatMessageSentAt(value: string): string {
                     text
                     class="chat-message-list__branch-button h-4 min-w-4 w-4 rounded-md p-0"
                     :icon="ArrowLeft"
-                    :disabled="isStreaming || !virtual.item.message.branch.previousMessageId"
+                    :disabled="isStreaming || props.isReadonly || !virtual.item.message.branch.previousMessageId"
                     @click="switchToBranch(virtual.item.message.branch.previousMessageId)"
                   />
                   <span class="inline-flex min-w-[2.25rem] items-center justify-center px-1">{{ virtual.item.message.branch.index }} / {{ virtual.item.message.branch.count }}</span>
@@ -253,7 +272,7 @@ function formatMessageSentAt(value: string): string {
                     text
                     class="chat-message-list__branch-button h-4 min-w-4 w-4 rounded-md p-0"
                     :icon="ArrowRight"
-                    :disabled="isStreaming || !virtual.item.message.branch.nextMessageId"
+                    :disabled="isStreaming || props.isReadonly || !virtual.item.message.branch.nextMessageId"
                     @click="switchToBranch(virtual.item.message.branch.nextMessageId)"
                   />
                 </div>
@@ -276,7 +295,7 @@ function formatMessageSentAt(value: string): string {
                   :attachments="editingAttachments"
                   :selected-model-ref="composerSelectedModelRef"
                   :model-selection-kind="composerModelSelectionKind"
-                  :disabled="isStreaming"
+                  :disabled="isStreaming || props.isReadonly"
                   :highlight-attachment-id="editingHighlightAttachmentId"
                   document-picker-teleport-to=".chat-view__picker-layer"
                   @update:content-j-s-o-n="editingContentJSON = $event"
@@ -314,7 +333,7 @@ function formatMessageSentAt(value: string): string {
                       text
                       class="chat-message-list__action-button h-7 min-w-7 w-7 rounded-lg p-0"
                       :icon="EditPen"
-                      :disabled="isStreaming"
+                      :disabled="isStreaming || props.isReadonly"
                       @click="startEditMessage(virtual.item.message)"
                     />
                   </ElTooltip>
@@ -323,7 +342,7 @@ function formatMessageSentAt(value: string): string {
                       text
                       class="chat-message-list__branch-button h-4 min-w-4 w-4 rounded-md p-0"
                       :icon="ArrowLeft"
-                      :disabled="isStreaming || !virtual.item.message.branch.previousMessageId"
+                      :disabled="isStreaming || props.isReadonly || !virtual.item.message.branch.previousMessageId"
                       @click="switchToBranch(virtual.item.message.branch.previousMessageId)"
                     />
                     <span class="inline-flex min-w-[2.25rem] items-center justify-center px-1">{{ virtual.item.message.branch.index }} / {{ virtual.item.message.branch.count }}</span>
@@ -331,7 +350,7 @@ function formatMessageSentAt(value: string): string {
                       text
                       class="chat-message-list__branch-button h-4 min-w-4 w-4 rounded-md p-0"
                       :icon="ArrowRight"
-                      :disabled="isStreaming || !virtual.item.message.branch.nextMessageId"
+                      :disabled="isStreaming || props.isReadonly || !virtual.item.message.branch.nextMessageId"
                       @click="switchToBranch(virtual.item.message.branch.nextMessageId)"
                     />
                   </div>

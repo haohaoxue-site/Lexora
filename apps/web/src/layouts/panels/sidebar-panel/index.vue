@@ -85,7 +85,7 @@ function getItemIconSrc(item: SidebarPanelItem, isActive: boolean) {
         title="GitHub"
       >
         <span class="sidebar-panel__external-icon flex h-9 w-9 shrink-0 items-center justify-center">
-          <SvgIcon category="ui" icon="brand-github" size="20px" />
+          <SvgIcon category="brand" icon="brand-github" size="20px" />
         </span>
       </a>
     </nav>

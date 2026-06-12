@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { CHAT_SESSION_CHANNEL } from '@haohaoxue/samepage-contracts/chat/constants'
 import { computed, onMounted, ref } from 'vue'
 import { useChatModels } from '@/composables/chat/useChatModels'
 import { useChatRuntimeConfig } from '@/composables/chat/useChatRuntimeConfig'
@@ -27,6 +28,9 @@ const conversationUsage = computed(() => createChatConversationUsageView(
   renderSession.value?.messages ?? [],
 ))
 const agentProfile = computed(() => renderSession.value?.agentProfile ?? null)
+const isReadonlySession = computed(() =>
+  Boolean(renderSession.value && renderSession.value.channel !== CHAT_SESSION_CHANNEL.DIRECT),
+)
 
 function setChatSidebarPinned(value: boolean) {
   uiStore.setChatSessionSidebarPinned(value)
@@ -67,6 +71,7 @@ onMounted(async () => {
       :is-new-chat-route="isNewChatRoute"
       :is-sidebar-collapsed="isChatSidebarCollapsed"
       :is-agent-settings-open="isAgentSettingsOpen"
+      :is-readonly-session="isReadonlySession"
       :agent-profile="agentProfile"
       @collapse-sidebar="setChatSidebarPinned(false)"
       @show-sidebar="setChatSidebarPinned(true)"

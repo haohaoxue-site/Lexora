@@ -1,0 +1,65 @@
+enum BotAccountChannel {
+  WEIXIN
+}
+
+enum BotAccountStatus {
+  CONNECTED
+  DISCONNECTED
+  ERROR
+}
+
+model BotAccount {
+  id                  String              @id @default(uuid())
+  userId              String
+  channel             BotAccountChannel
+  externalAccountId   String
+  externalUserId      String?
+  displayName         String?
+  credentialEncrypted String
+  getUpdatesCursor    String              @default("")
+  status              BotAccountStatus    @default(CONNECTED)
+  lastError           String?
+  lastStartedAt       DateTime?
+  lastStoppedAt       DateTime?
+  lastInboundAt       DateTime?
+  lastOutboundAt      DateTime?
+  user                User                @relation("BotAccountOwner", fields: [userId], references: [id], onDelete: Cascade)
+  conversations       BotConversation[]
+  messageReceipts     BotMessageReceipt[]
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+
+  @@unique([userId, channel])
+  @@unique([channel, externalAccountId])
+  @@index([userId, channel, updatedAt])
+  @@index([channel, status, updatedAt])
+}
+
+model BotConversation {
+  id              String      @id @default(uuid())
+  accountId       String
+  peerExternalId  String
+  peerDisplayName String?
+  chatSessionId   String      @unique
+  contextToken    String?
+  lastInboundAt   DateTime?
+  lastOutboundAt  DateTime?
+  account         BotAccount  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  chatSession     ChatSession @relation("BotConversationChatSession", fields: [chatSessionId], references: [id], onDelete: Cascade)
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  @@unique([accountId, peerExternalId])
+  @@index([accountId, updatedAt])
+}
+
+model BotMessageReceipt {
+  id         String     @id @default(uuid())
+  accountId  String
+  messageKey String
+  account    BotAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  createdAt  DateTime   @default(now())
+
+  @@unique([accountId, messageKey])
+  @@index([accountId, createdAt])
+}

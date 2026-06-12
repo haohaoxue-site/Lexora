@@ -1,7 +1,19 @@
 <script setup lang="ts">
+import type { ChatSession } from '../../composables/useChatSessions'
 import type { ChatSessionSidebarEmits } from './typing'
+import { CHAT_SESSION_CHANNEL } from '@haohaoxue/samepage-contracts/chat/constants'
+import { computed, shallowRef } from 'vue'
 import { useChatSessions } from '../../composables/useChatSessions'
 import { useChatSessionSidebar } from '../../composables/useChatSessionSidebar'
+
+type ChatSessionGroupKey = 'direct' | 'connected'
+
+interface ChatSessionGroup {
+  key: ChatSessionGroupKey
+  title: string
+  emptyText: string
+  sessions: ChatSession[]
+}
 
 const emit = defineEmits<ChatSessionSidebarEmits>()
 const { sessions } = useChatSessions()
@@ -18,6 +30,52 @@ const {
   isSessionSelected,
   selectedCount,
 } = useChatSessionSidebar()
+const collapsedGroupKeys = shallowRef<Set<ChatSessionGroupKey>>(new Set())
+const sessionList = computed(() => sessions.value)
+const sessionGroups = computed<ChatSessionGroup[]>(() => {
+  const directSessions = sessionList.value.filter(session => session.channel === CHAT_SESSION_CHANNEL.DIRECT)
+  const connectedSessions = sessionList.value.filter(session => session.channel !== CHAT_SESSION_CHANNEL.DIRECT)
+
+  return [
+    {
+      key: 'direct',
+      title: '站内对话',
+      emptyText: '暂无站内对话',
+      sessions: directSessions,
+    },
+    {
+      key: 'connected',
+      title: 'Bot 对话',
+      emptyText: '暂无 Bot 对话',
+      sessions: connectedSessions,
+    },
+  ]
+})
+
+function isSessionGroupCollapsed(groupKey: ChatSessionGroupKey) {
+  return collapsedGroupKeys.value.has(groupKey)
+}
+
+function getSessionGroupChevronIcon(groupKey: ChatSessionGroupKey) {
+  return isSessionGroupCollapsed(groupKey) ? 'chevron-right' : 'chevron-down'
+}
+
+function toggleSessionGroup(groupKey: ChatSessionGroupKey) {
+  const nextCollapsedGroupKeys = new Set(collapsedGroupKeys.value)
+
+  if (nextCollapsedGroupKeys.has(groupKey)) {
+    nextCollapsedGroupKeys.delete(groupKey)
+  }
+  else {
+    nextCollapsedGroupKeys.add(groupKey)
+  }
+
+  collapsedGroupKeys.value = nextCollapsedGroupKeys
+}
+
+function isWeixinBotSession(session: ChatSession) {
+  return session.channel === CHAT_SESSION_CHANNEL.WEIXIN_BOT
+}
 </script>
 
 <template>
@@ -74,66 +132,116 @@ const {
       </template>
     </div>
 
-    <div class="chat-session-sidebar__scroller min-h-0 flex-1 overflow-x-hidden overflow-y-auto p-2">
-      <div v-if="sessions.length === 0" class="px-3 py-6 text-center text-xs text-secondary-a60">
+    <div class="chat-session-sidebar__scroller min-h-0 flex-1 overflow-x-hidden overflow-y-auto">
+      <div v-if="sessionList.length === 0" class="px-3 py-6 text-center text-xs text-secondary-a60">
         暂无对话
       </div>
 
-      <ul v-else class="m-0 grid list-none gap-1 p-0">
-        <li
-          v-for="session in sessions"
-          :key="session.id"
-          class="chat-session-sidebar__item flex min-w-0 items-center gap-2 rounded-lg border border-transparent text-sm"
-          :class="getSessionItemStateClass(session.id)"
+      <div v-else class="chat-session-sidebar__sections flex min-h-0 flex-auto flex-col pb-4 pt-2">
+        <section
+          v-for="group in sessionGroups"
+          :key="group.key"
+          class="chat-session-sidebar__group flex min-w-0 flex-col"
         >
-          <button
-            type="button"
-            class="chat-session-sidebar__item-main flex min-w-0 flex-1 items-center gap-2 border-none bg-transparent py-2 pl-2 text-left text-main"
-            @click="handleSessionClick(session.id)"
-          >
-            <ElCheckbox
-              v-if="isSelectionMode"
-              :model-value="isSessionSelected(session.id)"
-              class="shrink-0 h-4"
-              @click.stop
-              @change="() => handleSessionClick(session.id)"
-            />
-            <SvgIcon v-else category="ui" icon="chat" size="1rem" class="shrink-0" />
-            <span class="min-w-0 flex-1 truncate">{{ session.title }}</span>
-          </button>
-
-          <ElDropdown
-            v-if="!isSelectionMode"
-            trigger="click"
-            placement="bottom-end"
-            popper-class="chat-session-sidebar__more-popper"
-            @command="command => handleSessionAction(session, command)"
-          >
-            <ElButton
-              text
-              size="small"
-              class="chat-session-sidebar__actions-btn mr-1.5 h-6 w-6 shrink-0 rounded-lg p-0 opacity-0"
+          <div class="chat-session-sidebar__group-header group flex h-8 items-center gap-1 px-3">
+            <button
+              type="button"
+              class="chat-session-sidebar__group-header-button flex h-full w-full min-w-0 flex-1 cursor-pointer items-center gap-1 border-none bg-transparent p-0 text-secondary transition-[background-color,color] duration-200 focus-visible:outline-none"
+              :aria-expanded="!isSessionGroupCollapsed(group.key)"
+              :aria-controls="`chat-session-sidebar-group-${group.key}`"
+              @click="toggleSessionGroup(group.key)"
             >
-              <SvgIcon category="ui" icon="more" size="0.875rem" />
-            </ElButton>
+              <SvgIcon
+                category="ui"
+                :icon="getSessionGroupChevronIcon(group.key)"
+                size="0.875rem"
+                class="chat-session-sidebar__group-chevron shrink-0 text-[0.875rem] transition-transform duration-200"
+              />
+              <span class="chat-session-sidebar__group-title min-w-0 truncate text-sm leading-none">
+                {{ group.title }}
+              </span>
+            </button>
+          </div>
 
-            <template #dropdown>
-              <ElDropdownMenu class="chat-session-sidebar__menu box-border min-w-0 w-[8.5rem] p-1">
-                <ElDropdownItem command="rename" class="chat-session-sidebar__menu-item min-h-8 px-2 text-main">
-                  重命名
-                </ElDropdownItem>
-                <ElDropdownItem
-                  command="delete"
-                  divided
-                  class="chat-session-sidebar__menu-item chat-session-sidebar__menu-item--delete min-h-8 px-2"
+          <div
+            v-if="!isSessionGroupCollapsed(group.key)"
+            :id="`chat-session-sidebar-group-${group.key}`"
+            role="group"
+            class="chat-session-sidebar__group-body min-w-0 px-3 pb-1 pt-1"
+          >
+            <ul v-if="group.sessions.length" class="m-0 grid list-none gap-0 p-0">
+              <li
+                v-for="session in group.sessions"
+                :key="session.id"
+                class="chat-session-sidebar__item flex min-h-9 min-w-0 items-center rounded-lg border border-transparent text-[13px] leading-5"
+                :class="getSessionItemStateClass(session.id)"
+              >
+                <button
+                  type="button"
+                  class="chat-session-sidebar__item-main flex h-9 min-w-0 flex-1 items-center gap-1.5 border-none bg-transparent py-0 pl-2 pr-1 text-left text-inherit"
+                  @click="handleSessionClick(session.id)"
                 >
-                  删除
-                </ElDropdownItem>
-              </ElDropdownMenu>
-            </template>
-          </ElDropdown>
-        </li>
-      </ul>
+                  <ElCheckbox
+                    v-if="isSelectionMode"
+                    :model-value="isSessionSelected(session.id)"
+                    class="shrink-0 h-4"
+                    @click.stop
+                    @change="() => handleSessionClick(session.id)"
+                  />
+                  <template v-else>
+                    <SvgIcon
+                      v-if="isWeixinBotSession(session)"
+                      category="brand"
+                      icon="brand-weixin"
+                      size="1rem"
+                      class="shrink-0"
+                    />
+                    <SvgIcon v-else category="ui" icon="chat" size="1rem" class="shrink-0" />
+                  </template>
+                  <span class="chat-session-sidebar__item-title min-w-0 flex-1 truncate">{{ session.title }}</span>
+                </button>
+
+                <ElDropdown
+                  v-if="!isSelectionMode"
+                  trigger="click"
+                  placement="bottom-end"
+                  popper-class="chat-session-sidebar__more-popper"
+                  @command="command => handleSessionAction(session, command)"
+                >
+                  <ElButton
+                    text
+                    size="small"
+                    class="chat-session-sidebar__actions-btn mr-1.5 h-5 min-w-5 w-5 shrink-0 rounded-md p-0 opacity-0"
+                    title="更多操作"
+                    @click.stop
+                  >
+                    <SvgIcon category="ui" icon="more" size="14px" />
+                  </ElButton>
+
+                  <template #dropdown>
+                    <ElDropdownMenu class="chat-session-sidebar__menu box-border min-w-0 w-[8.5rem] p-1">
+                      <ElDropdownItem command="rename" class="chat-session-sidebar__menu-item min-h-8 px-2 text-main">
+                        重命名
+                      </ElDropdownItem>
+                      <ElDropdownItem
+                        command="delete"
+                        divided
+                        class="chat-session-sidebar__menu-item chat-session-sidebar__menu-item--delete min-h-8 px-2"
+                      >
+                        删除
+                      </ElDropdownItem>
+                    </ElDropdownMenu>
+                  </template>
+                </ElDropdown>
+              </li>
+            </ul>
+
+            <div v-else class="chat-session-sidebar__group-empty flex min-h-9 items-center px-6 py-1.5 text-[13px] leading-5 text-secondary">
+              {{ group.emptyText }}
+            </div>
+          </div>
+        </section>
+      </div>
     </div>
   </aside>
 </template>
@@ -163,7 +271,31 @@ const {
     }
   }
 
+  .chat-session-sidebar__group {
+    & + & {
+      margin-top: 0.375rem;
+      padding-top: 0.375rem;
+      border-top: 1px solid color-mix(in srgb, var(--brand-border-base) 62%, transparent);
+    }
+  }
+
+  .chat-session-sidebar__group-header {
+    background: color-mix(in srgb, var(--brand-fill-light) 74%, var(--brand-bg-sidebar));
+    transition: background-color 0.2s ease;
+
+    &:hover,
+    &:focus-within {
+      background: color-mix(in srgb, var(--brand-fill-light) 54%, var(--brand-bg-surface));
+    }
+  }
+
+  .chat-session-sidebar__group-header-button,
+  .chat-session-sidebar__group-chevron {
+    color: var(--brand-text-secondary);
+  }
+
   .chat-session-sidebar__item {
+    color: var(--brand-text-secondary);
     transition:
       border-color 0.2s ease,
       background-color 0.2s ease,
@@ -187,7 +319,8 @@ const {
       &:hover,
       &:focus-within {
         border-color: color-mix(in srgb, var(--brand-border-base) 70%, transparent);
-        background: color-mix(in srgb, var(--brand-bg-surface) 94%, transparent);
+        background: var(--brand-fill-lighter);
+        color: var(--brand-text-primary);
       }
     }
   }
@@ -196,8 +329,18 @@ const {
     cursor: pointer;
   }
 
-  .chat-session-sidebar__item.active .chat-session-sidebar__item-main {
+  .chat-session-sidebar__item.active .chat-session-sidebar__item-main,
+  .chat-session-sidebar__item.active .chat-session-sidebar__item-title {
     color: var(--brand-primary);
+  }
+
+  .chat-session-sidebar__item.active .chat-session-sidebar__item-title {
+    font-weight: 500;
+  }
+
+  .chat-session-sidebar__item.active .chat-session-sidebar__actions-btn,
+  .chat-session-sidebar__item.selected .chat-session-sidebar__actions-btn {
+    opacity: 1;
   }
 
   .chat-session-sidebar__item.active .chat-session-sidebar__actions-btn {
@@ -206,15 +349,22 @@ const {
     &:hover,
     &:focus-visible {
       color: var(--brand-primary);
-      background: color-mix(in srgb, var(--brand-primary) 10%, transparent);
+      background: transparent;
     }
   }
 
   .chat-session-sidebar__actions-btn {
+    color: var(--brand-text-secondary);
     transition:
       opacity 0.2s ease,
       color 0.2s ease,
       background-color 0.2s ease;
+
+    &:hover,
+    &:focus-visible {
+      color: var(--brand-primary);
+      background: var(--brand-bg-surface-raised);
+    }
   }
 
   .chat-session-sidebar__item:hover .chat-session-sidebar__actions-btn,

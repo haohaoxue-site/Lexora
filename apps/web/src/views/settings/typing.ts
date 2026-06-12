@@ -2,6 +2,9 @@ import type {
   AuthProviderName,
   DeleteCurrentUserRequest,
   UserSettings,
+  WeixinBotBindingStatus,
+  WeixinBotLoginStartResponse,
+  WeixinBotLoginStatusResponse,
 } from '@haohaoxue/samepage-contracts'
 
 export type SettingsTabName = 'user' | 'preference' | 'providers'
@@ -42,6 +45,26 @@ export interface UserAccountSectionEmits {
 export interface UserSettingsSectionHeaderProps {
   title: string
   description?: string
+}
+
+export interface BotsSectionProps {
+  status: WeixinBotBindingStatus
+  loginState: WeixinBotLoginStartResponse | WeixinBotLoginStatusResponse | null
+  isLoading: boolean
+  isStartingLogin: boolean
+  isPollingLogin: boolean
+  isSubmittingVerifyCode: boolean
+  isStartingBot: boolean
+  isStoppingBot: boolean
+  isDisconnecting: boolean
+}
+
+export interface BotsSectionEmits {
+  startLogin: []
+  submitVerifyCode: []
+  startRuntime: []
+  stopRuntime: []
+  disconnect: []
 }
 
 export interface UserPreferenceSectionProps {

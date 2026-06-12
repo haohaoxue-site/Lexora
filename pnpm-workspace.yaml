@@ -22,6 +22,7 @@ catalog:
   typescript: ^6.0.3
   zod: ^4.3.6
 allowBuilds:
+  '@google/genai': false
   '@nestjs/core': true
   '@parcel/watcher': true
   '@prisma/client': true
@@ -30,4 +31,7 @@ allowBuilds:
   '@swc/core': true
   esbuild: true
   msgpackr-extract: true
+  openclaw: false
   prisma: true
+  protobufjs: false
+  tree-sitter-bash: false

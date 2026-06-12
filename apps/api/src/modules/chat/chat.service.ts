@@ -27,6 +27,7 @@ import { ChatRunDispatcherService } from './chat-run-dispatcher.service'
 import { ChatSessionsService } from './chat-sessions.service'
 
 interface ChatMessageMutationParams {
+  allowChannelMutation?: boolean
   userId: string
   sessionId: string
   origin: ChatSessionOrigin

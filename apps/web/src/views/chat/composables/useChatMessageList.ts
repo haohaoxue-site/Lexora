@@ -1,3 +1,4 @@
+import type { MaybeRefOrGetter } from 'vue'
 import type { ChatMessage } from '@/apis/chat'
 import type {
   ChatComposerAttachment,
@@ -5,7 +6,7 @@ import type {
   ChatComposerSubmitPayload,
 } from '@/components/chat-composer/typing'
 import { useClipboard } from '@vueuse/core'
-import { computed, shallowRef, watch } from 'vue'
+import { computed, shallowRef, toValue, watch } from 'vue'
 import { createEmptyChatComposerContentJSON } from '@/components/chat-composer/serialization'
 import { SvgIconCategory } from '@/components/svg-icon/typing'
 import { getMessageText } from '@/composables/chat/utils/chat-message-display'
@@ -17,7 +18,11 @@ import { useChatStream } from './useChatStream'
 const EDIT_HIGHLIGHT_DURATION_MS = 1400
 const DEFAULT_ASSISTANT_NAME = '小助手'
 
-export function useChatMessageList() {
+export interface UseChatMessageListOptions {
+  isReadonly?: MaybeRefOrGetter<boolean>
+}
+
+export function useChatMessageList(options: UseChatMessageListOptions = {}) {
   const {
     composerModelSelectionKind,
     composerSelectedModelRef,
@@ -36,6 +41,7 @@ export function useChatMessageList() {
   const editingAttachments = shallowRef<ChatComposerAttachment[]>([])
   const editingHighlightAttachmentId = shallowRef<string | null>(null)
   const copiedMessageId = shallowRef<string | null>(null)
+  const isReadonly = computed(() => Boolean(toValue(options.isReadonly)))
   let editingHighlightTimer: ReturnType<typeof setTimeout> | null = null
   const {
     copy: copyText,
@@ -96,7 +102,7 @@ export function useChatMessageList() {
   }
 
   function startEditMessage(message: ChatMessage) {
-    if (message.role !== 'user' || isStreaming.value) {
+    if (message.role !== 'user' || isStreaming.value || isReadonly.value) {
       return
     }
 
@@ -114,7 +120,7 @@ export function useChatMessageList() {
   }
 
   async function submitEditMessage(message: ChatMessage, payload: ChatComposerSubmitPayload) {
-    if (message.role !== 'user') {
+    if (message.role !== 'user' || isReadonly.value) {
       return
     }
 
@@ -140,7 +146,7 @@ export function useChatMessageList() {
   }
 
   async function retryAssistantMessage(message: ChatMessage) {
-    if (message.role !== 'assistant' || isStreaming.value) {
+    if (message.role !== 'assistant' || isStreaming.value || isReadonly.value) {
       return
     }
 
@@ -148,7 +154,7 @@ export function useChatMessageList() {
   }
 
   async function switchToBranch(messageId: string | null) {
-    if (!messageId || isStreaming.value) {
+    if (!messageId || isStreaming.value || isReadonly.value) {
       return
     }
 

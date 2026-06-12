@@ -23,6 +23,11 @@ interface MemoryDocumentDefinition {
   id: AgentMemoryDocumentId
   name: string
   summary: string
+  blocks: MemoryDocumentBlockDefinition[]
+}
+
+interface MemoryDocumentBlockDefinition {
+  heading: string
   lanes: AgentMemoryLane[]
 }
 
@@ -31,25 +36,45 @@ const MEMORY_DOCUMENT_DEFINITIONS: MemoryDocumentDefinition[] = [
     id: AGENT_MEMORY_DOCUMENT_ID.SOUL,
     name: 'SOUL.md',
     summary: 'Agent 的身份、性格、说话方式和相处原则',
-    lanes: [AGENT_MEMORY_LANE.AGENT_PERSONALIZATION],
+    blocks: [
+      {
+        heading: '身份与相处方式',
+        lanes: [AGENT_MEMORY_LANE.AGENT_PERSONALIZATION],
+      },
+    ],
   },
   {
     id: AGENT_MEMORY_DOCUMENT_ID.USER,
     name: 'USER.md',
     summary: '用户画像、偏好、状态和交互习惯',
-    lanes: [
-      AGENT_MEMORY_LANE.USER_PROFILE,
-      AGENT_MEMORY_LANE.USER_PREFERENCE,
-      AGENT_MEMORY_LANE.USER_FEEDBACK,
+    blocks: [
+      {
+        heading: '用户画像',
+        lanes: [AGENT_MEMORY_LANE.USER_PROFILE],
+      },
+      {
+        heading: '偏好',
+        lanes: [AGENT_MEMORY_LANE.USER_PREFERENCE],
+      },
+      {
+        heading: '反馈与习惯',
+        lanes: [AGENT_MEMORY_LANE.USER_FEEDBACK],
+      },
     ],
   },
   {
     id: AGENT_MEMORY_DOCUMENT_ID.MEMORY,
     name: 'MEMORY.md',
     summary: '关键任务、事件、概念和注意事项',
-    lanes: [
-      AGENT_MEMORY_LANE.PROJECT_REFERENCE,
-      AGENT_MEMORY_LANE.TASK_KNOWLEDGE,
+    blocks: [
+      {
+        heading: '项目参考',
+        lanes: [AGENT_MEMORY_LANE.PROJECT_REFERENCE],
+      },
+      {
+        heading: '任务知识',
+        lanes: [AGENT_MEMORY_LANE.TASK_KNOWLEDGE],
+      },
     ],
   },
 ]
@@ -140,8 +165,9 @@ function createMemoryDocument(
   definition: MemoryDocumentDefinition,
   memories: AgentMemory[],
 ): AgentMemoryDocument {
-  const documentMemories = memories.filter(memory => definition.lanes.includes(memory.lane))
-  const content = renderMemoryDocument(documentMemories)
+  const documentMemories = pickDocumentMemories(definition, memories)
+  const content = renderMemoryDocument(definition, documentMemories)
+  const sourceMemoryIds = documentMemories.map(memory => memory.id)
 
   return {
     id: definition.id,
@@ -150,27 +176,72 @@ function createMemoryDocument(
     content,
     sizeBytes: Buffer.byteLength(content, 'utf8'),
     updatedAt: getLatestUpdatedAt(documentMemories),
-    sourceMemoryIds: documentMemories.map(memory => memory.id),
+    sourceMemoryIds,
   }
 }
 
-function renderMemoryDocument(memories: AgentMemory[]): string {
-  return memories.map(memory => `- ${formatMemoryLine(memory)}`).join('\n')
+function pickDocumentMemories(
+  definition: MemoryDocumentDefinition,
+  memories: AgentMemory[],
+): AgentMemory[] {
+  const lanes = new Set(definition.blocks.flatMap(block => block.lanes))
+
+  return memories.filter(memory => lanes.has(memory.lane))
 }
 
-function formatMemoryLine(memory: AgentMemory): string {
-  const text = normalizeMemoryText(memory.summary ?? memory.content)
+function renderMemoryDocument(
+  definition: MemoryDocumentDefinition,
+  memories: AgentMemory[],
+): string {
+  if (memories.length === 0) {
+    return ''
+  }
+
+  const blocks = definition.blocks
+    .map(block => ({
+      heading: block.heading,
+      memories: memories.filter(memory => block.lanes.includes(memory.lane)),
+    }))
+    .filter(block => block.memories.length > 0)
+
+  if (memories.length <= 2 || blocks.length <= 1) {
+    return memories.map(formatMemoryMarkdownText).join('\n\n')
+  }
+
+  return blocks.map(renderMemoryBlock).join('\n\n')
+}
+
+function renderMemoryBlock(block: { heading: string, memories: AgentMemory[] }): string {
+  return [
+    `## ${block.heading}`,
+    '',
+    ...block.memories.map(memory => `- ${formatMemoryMarkdownText(memory)}`),
+  ].join('\n')
+}
+
+function formatMemoryMarkdownText(memory: AgentMemory): string {
   const slotValue = normalizeMemoryText(memory.slotValue ?? '')
+  const summary = normalizeMemoryText(memory.summary ?? '')
+  const content = normalizeMemoryText(memory.content)
+  const text = summary || content
 
-  if (slotValue && !text.includes(slotValue)) {
-    return `${text}（${slotValue}）`
+  if (!slotValue || includesNormalizedText(text, slotValue)) {
+    return text
   }
 
-  return text
+  if (!text) {
+    return slotValue
+  }
+
+  return `${text}：${slotValue}`
 }
 
 function normalizeMemoryText(text: string): string {
   return text.replace(/\s+/g, ' ').trim()
+}
+
+function includesNormalizedText(text: string, value: string): boolean {
+  return text.toLocaleLowerCase().includes(value.toLocaleLowerCase())
 }
 
 function getLatestUpdatedAt(memories: AgentMemory[]): string | null {

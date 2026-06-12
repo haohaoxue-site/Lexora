@@ -56,7 +56,7 @@ const {
           </span>
         </ElTooltip>
         <span class="login-view__source-divider h-[1.125rem] w-px max-[420px]:hidden" />
-        <SvgIcon category="ui" icon="brand-github" size="1.125rem" class="login-view__source-icon shrink-0" />
+        <SvgIcon category="brand" icon="brand-github" size="1.125rem" class="login-view__source-icon shrink-0" />
         <span class="login-view__source-text shrink-0 max-[420px]:hidden">GitHub</span>
       </a>
     </template>
@@ -124,7 +124,7 @@ const {
           @click="handleStartLogin(item.provider)"
         >
           <span class="login-provider-btn__icon-wrap flex h-[2.125rem] w-[2.125rem] items-center justify-center rounded-lg border">
-            <SvgIcon category="ui" :icon="item.icon" size="1.125rem" class="login-provider-btn__icon" />
+            <SvgIcon :category="item.iconCategory" :icon="item.icon" size="1.125rem" class="login-provider-btn__icon" />
           </span>
           <span class="login-provider-btn__content grid min-h-[2.125rem] min-w-0 justify-items-end [grid-template-rows:1fr_1fr]">
             <span class="login-provider-btn__label min-w-0 self-end whitespace-nowrap text-right text-sm font-semibold">{{ item.title }}</span>

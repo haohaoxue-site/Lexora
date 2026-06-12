@@ -67,6 +67,7 @@ model User {
   updatedAiProviders                       AiProvider[]                       @relation("AiProviderUpdater")
   updatedAiProviderModels                  AiProviderModel[]                  @relation("AiProviderModelUpdater")
   aiDefaultModelPolicies                   AiDefaultModelPolicy[]             @relation("AiDefaultModelPolicyUser")
+  botAccounts                              BotAccount[]                       @relation("BotAccountOwner")
   updatedDefaultModelPolicies              AiDefaultModelPolicy[]             @relation("AiDefaultModelPolicyUpdater")
   updatedPlatformEmbeddingModelPolicies    AiPlatformEmbeddingModelPolicy[]   @relation("AiPlatformEmbeddingModelPolicyUpdater")
   systemAdminConfig                        SystemAuthConfig?                  @relation("SystemAuthConfigSystemAdmin")

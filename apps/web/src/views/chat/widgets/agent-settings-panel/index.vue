@@ -6,7 +6,7 @@ import type {
   ChatAgentSettingsPanelProps,
 } from './typing'
 import type {
-  AgentMemoryDocument,
+  AgentMemoryDocument as AgentMemoryDocumentContract,
   AgentMemoryDocumentId,
 } from '@/apis/agent-memory'
 import type { AgentProfileSettings } from '@/apis/agent-profile'
@@ -193,7 +193,7 @@ function handleSkillEnabledChange(skillKey: string, enabled: string | number | b
   void setSkillEnabled(skill, Boolean(enabled))
 }
 
-function toMemoryDocumentView(document: AgentMemoryDocument): AgentMemoryDocumentView {
+function toMemoryDocumentView(document: AgentMemoryDocumentContract): AgentMemoryDocumentView {
   return {
     id: document.id,
     name: document.name,
@@ -284,7 +284,7 @@ function resolveAgentProfileValue<K extends 'name' | 'description' | 'avatarUrl'
             </span>
             <span class="chat-agent-settings__row-main">
               <span class="chat-agent-settings__row-title">记忆</span>
-              <span class="chat-agent-settings__row-subtitle">查看 Agent 记忆</span>
+              <span class="chat-agent-settings__row-subtitle">查看长期记忆文档</span>
             </span>
             <SvgIcon category="ui" icon="chevron-right" size="1rem" class="chat-agent-settings__chevron" />
           </button>
@@ -393,16 +393,18 @@ function resolveAgentProfileValue<K extends 'name' | 'description' | 'avatarUrl'
 
     <section v-else class="chat-agent-settings__body is-document">
       <article v-if="selectedMemoryDocument" class="chat-agent-settings__document">
-        <div class="chat-agent-settings__document-meta">
-          {{ selectedMemoryDocument.sizeText }} · {{ selectedMemoryDocument.updatedAtText }}
+        <div v-if="hasSelectedMemoryContent" class="chat-agent-settings__document-content">
+          <div class="chat-agent-settings__document-meta">
+            <span>{{ selectedMemoryDocument.updatedAtText }}</span>
+            <span>{{ selectedMemoryDocument.sizeText }}</span>
+          </div>
+          <ChatMarkdownContent
+            :message-id="`agent-memory-document:${selectedMemoryDocument.id}`"
+            part-id="content"
+            :source="selectedMemoryDocument.content"
+            phase="final"
+          />
         </div>
-        <ChatMarkdownContent
-          v-if="hasSelectedMemoryContent"
-          :message-id="`agent-memory-${selectedMemoryDocument.id}`"
-          part-id="content"
-          :source="selectedMemoryDocument.content"
-          phase="final"
-        />
         <Empty
           v-else
           class="chat-agent-settings__empty"
@@ -678,15 +680,22 @@ button.chat-agent-settings__row,
   min-width: 0;
 }
 
+.chat-agent-settings__document-content {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
 .chat-agent-settings__document-meta {
-  margin-bottom: 1rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem 0.625rem;
+  align-items: center;
+  justify-content: space-between;
   color: var(--brand-text-tertiary);
   font-size: 0.8125rem;
   line-height: 1.45;
-}
-
-.chat-agent-settings__document :deep(.chat-markdown) {
-  font-size: 0.9375rem;
 }
 
 @media (max-width: 768px) {

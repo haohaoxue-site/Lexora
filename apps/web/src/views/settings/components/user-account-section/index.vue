@@ -135,7 +135,7 @@ defineExpose({
         <div class="flex min-w-0 items-center gap-3">
           <span class="user-account-section__oauth-icon-wrap flex h-10 w-10 shrink-0 items-center justify-center rounded-[0.875rem]">
             <SvgIcon
-              category="ui"
+              :category="row.iconCategory"
               :icon="row.icon"
               size="1.125rem"
               class="user-account-section__oauth-icon"

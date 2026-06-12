@@ -15,12 +15,14 @@ import type {
   ChatSessionSummary,
   ChatSessionUsageSummary,
   ChatUserMessageMetadata,
+  ChatSessionChannel as ContractChatSessionChannel,
   ChatSessionOrigin as ContractChatSessionOrigin,
 } from '@haohaoxue/samepage-contracts'
 import {
   CHAT_MESSAGE_ATTACHMENT_TYPE,
   CHAT_MESSAGE_PART_TYPE,
   CHAT_MESSAGE_STATUS,
+  CHAT_SESSION_CHANNEL,
   CHAT_SESSION_ORIGIN,
   ChatGenerationUsageSnapshotSchema,
   ChatMemoryOperationProjectionSchema,
@@ -28,6 +30,7 @@ import {
 } from '@haohaoxue/samepage-contracts'
 import {
   ChatSessionMessageRole,
+  ChatSessionChannel as PrismaChatSessionChannel,
   ChatSessionMessagePartType as PrismaChatSessionMessagePartType,
   ChatSessionMessageStatus as PrismaChatSessionMessageStatus,
   ChatSessionOrigin as PrismaChatSessionOrigin,
@@ -37,6 +40,7 @@ export interface ChatSessionSummaryRecord {
   id: string
   workspaceId: string
   origin: PrismaChatSessionOrigin
+  channel: PrismaChatSessionChannel
   title: string
   selectedProviderId: string | null
   selectedModelId: string | null
@@ -100,6 +104,7 @@ export function toChatSessionSummary(session: ChatSessionSummaryRecord): ChatSes
     id: session.id,
     workspaceId: session.workspaceId,
     origin: toChatSessionOrigin(session.origin),
+    channel: toChatSessionChannel(session.channel),
     title: session.title,
     agentProfile: session.agentProfile
       ? {
@@ -176,6 +181,14 @@ export function toChatSessionOrigin(origin: PrismaChatSessionOrigin): ChatSessio
 
 export function toPrismaChatSessionOrigin(origin: ContractChatSessionOrigin): PrismaChatSessionOrigin {
   return origin === CHAT_SESSION_ORIGIN.DOCS ? PrismaChatSessionOrigin.DOCS : PrismaChatSessionOrigin.GLOBAL
+}
+
+export function toChatSessionChannel(channel: PrismaChatSessionChannel): ChatSessionSummary['channel'] {
+  return channel === PrismaChatSessionChannel.WEIXIN_BOT ? CHAT_SESSION_CHANNEL.WEIXIN_BOT : CHAT_SESSION_CHANNEL.DIRECT
+}
+
+export function toPrismaChatSessionChannel(channel: ContractChatSessionChannel): PrismaChatSessionChannel {
+  return channel === CHAT_SESSION_CHANNEL.WEIXIN_BOT ? PrismaChatSessionChannel.WEIXIN_BOT : PrismaChatSessionChannel.DIRECT
 }
 
 export function toChatMessageStatus(status: PrismaChatSessionMessageStatus): ChatMessageStatus {

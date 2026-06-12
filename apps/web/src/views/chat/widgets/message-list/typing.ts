@@ -1,1 +1,3 @@
-export type ChatMessageListProps = Record<never, never>
+export interface ChatMessageListProps {
+  isReadonly?: boolean
+}

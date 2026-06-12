@@ -15,6 +15,7 @@ import type {
   ChatMutationResponse,
   ChatPersistedMessageAttachment,
   ChatRunSummary,
+  ChatSessionChannel,
   ChatSessionDetail,
   ChatSessionOrigin,
   ChatSessionSummary,
@@ -30,6 +31,7 @@ import {
   AgentRuntimeSkillContextSchema,
   AI_MODEL_INTENT_KEY,
   CHAT_RUN_STATUS,
+  CHAT_SESSION_CHANNEL,
   CHAT_SESSION_DEFAULT_TITLE,
   CHAT_SESSION_EVENT_TYPE,
   ChatGenerationBootstrapSchema,
@@ -54,6 +56,7 @@ import {
   ChatSessionMessageStatus,
   ChatSessionRunStatus,
   Prisma,
+  ChatSessionChannel as PrismaChatSessionChannel,
 } from '@prisma/client'
 import { PrismaService } from '../../database/prisma.service'
 import {
@@ -74,6 +77,7 @@ import {
   toChatSessionDetail,
   toChatSessionModelRef,
   toChatSessionSummary,
+  toPrismaChatSessionChannel,
   toPrismaChatSessionOrigin,
 } from './chat.utils'
 
@@ -92,6 +96,7 @@ const chatSessionSummarySelect = {
   id: true,
   workspaceId: true,
   origin: true,
+  channel: true,
   title: true,
   selectedProviderId: true,
   selectedModelId: true,
@@ -264,6 +269,7 @@ type PersistedChatSessionModelRef = Prisma.ChatSessionGetPayload<{
 }>
 
 interface CreateRunInput {
+  allowChannelMutation?: boolean
   userId: string
   sessionId: string
   origin: ChatSessionOrigin
@@ -321,20 +327,37 @@ export class ChatSessionsService {
   }
 
   async createSession(userId: string, workspaceId: string, origin: ChatSessionOrigin): Promise<ChatSessionDetail> {
-    await this.assertWorkspaceAccess(userId, workspaceId)
+    return this.createSessionForChannel({
+      userId,
+      workspaceId,
+      origin,
+      channel: CHAT_SESSION_CHANNEL.DIRECT,
+      title: CHAT_SESSION_DEFAULT_TITLE,
+    })
+  }
+
+  async createSessionForChannel(input: {
+    userId: string
+    workspaceId: string
+    origin: ChatSessionOrigin
+    channel: ChatSessionChannel
+    title: string
+  }): Promise<ChatSessionDetail> {
+    await this.assertWorkspaceAccess(input.userId, input.workspaceId)
 
     const session = await this.prisma.$transaction(async (tx) => {
       const agentProfile = await this.agentProfiles.ensureDefaultAgentProfile({
-        ownerUserId: userId,
+        ownerUserId: input.userId,
         tx,
       })
 
       return tx.chatSession.create({
         data: {
-          workspaceId,
-          createdBy: userId,
-          origin: toPrismaChatSessionOrigin(origin),
-          title: CHAT_SESSION_DEFAULT_TITLE,
+          workspaceId: input.workspaceId,
+          createdBy: input.userId,
+          origin: toPrismaChatSessionOrigin(input.origin),
+          channel: toPrismaChatSessionChannel(input.channel),
+          title: input.title.trim() || CHAT_SESSION_DEFAULT_TITLE,
           agentProfileId: agentProfile.id,
         },
         select: chatSessionDetailSelect,
@@ -342,7 +365,7 @@ export class ChatSessionsService {
     })
 
     return toChatSessionDetail(toChatSessionDetailRecord(
-      await this.personalizeSessionAgentProfile(userId, session),
+      await this.personalizeSessionAgentProfile(input.userId, session),
     ))
   }
 
@@ -559,6 +582,7 @@ export class ChatSessionsService {
     messageId: string
   }): Promise<ChatMutationResponse> {
     const session = await this.findAccessibleSessionRunDetailOrThrow(input.userId, input.sessionId, input.origin)
+    this.assertChannelMutationAllowed(session, false)
     await this.assertNoActiveRun(input.sessionId)
 
     const targetMessage = session.messages.find(message => message.id === input.messageId)
@@ -999,6 +1023,7 @@ export class ChatSessionsService {
     skillInvocation?: ChatSkillInvocation | null
   }): Promise<CreatedRunResult> {
     const session = await this.findAccessibleSessionRunDetailOrThrow(input.userId, input.sessionId, input.origin)
+    this.assertChannelMutationAllowed(session, input.allowChannelMutation)
     await this.assertNoActiveRun(session.id)
 
     const resolvedContext = await this.chatContextSnapshots.resolveForUserMessage({
@@ -1136,6 +1161,7 @@ export class ChatSessionsService {
     skillInvocation?: ChatSkillInvocation | null
   }): Promise<CreatedRunResult> {
     const session = await this.findAccessibleSessionRunDetailOrThrow(input.userId, input.sessionId, input.origin)
+    this.assertChannelMutationAllowed(session, input.allowChannelMutation)
     await this.assertNoActiveRun(session.id)
 
     const sourceMessage = session.messages.find(message => message.id === input.messageId)
@@ -1261,6 +1287,7 @@ export class ChatSessionsService {
     messageId: string
   }): Promise<CreatedRunResult> {
     const session = await this.findAccessibleSessionRunDetailOrThrow(input.userId, input.sessionId, input.origin)
+    this.assertChannelMutationAllowed(session, input.allowChannelMutation)
     await this.assertNoActiveRun(session.id)
 
     const sourceMessage = session.messages.find(message => message.id === input.messageId)
@@ -1388,6 +1415,17 @@ export class ChatSessionsService {
     if (activeRun) {
       throw new ConflictException('当前会话正在生成，请稍后再试')
     }
+  }
+
+  private assertChannelMutationAllowed(
+    session: Pick<PersistedChatSessionRunDetail, 'channel'>,
+    allowChannelMutation: boolean | undefined,
+  ): void {
+    if (allowChannelMutation || !session.channel || session.channel === PrismaChatSessionChannel.DIRECT) {
+      return
+    }
+
+    throw new ConflictException('Bot 对话只读展示')
   }
 
   private async assertSkillInvocationAvailable(input: {
@@ -1857,6 +1895,7 @@ function toChatSessionDetailRecord(
     id: session.id,
     workspaceId: session.workspaceId,
     origin: session.origin,
+    channel: session.channel,
     title: session.title,
     selectedProviderId: session.selectedProviderId,
     selectedModelId: session.selectedModelId,

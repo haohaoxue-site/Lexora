@@ -3,6 +3,7 @@ import type { UserAccountSectionExposed } from './typing'
 import { nextTick, onMounted, shallowRef, useTemplateRef } from 'vue'
 import { useUserStore } from '@/stores/user'
 import { getRequestErrorDisplayMessage } from '@/utils/request-error'
+import BotsSection from '../../components/bots-section'
 import UserAccountSection from '../../components/user-account-section'
 import UserDeleteSection from '../../components/user-delete-section'
 import UserProfileSection from '../../components/user-profile-section'
@@ -10,6 +11,7 @@ import { useSettingsAuthCapabilities } from '../../composables/useSettingsAuthCa
 import { useSettingsUserAccount } from '../../composables/useSettingsUserAccount'
 import { useSettingsUserDelete } from '../../composables/useSettingsUserDelete'
 import { useSettingsUserProfile } from '../../composables/useSettingsUserProfile'
+import { useSettingsWeixinBot } from '../../composables/useSettingsWeixinBot'
 
 const userStore = useUserStore()
 const userAccountSectionRef = useTemplateRef<UserAccountSectionExposed>('userAccountSectionRef')
@@ -49,6 +51,25 @@ const {
   isDeletingAccount,
   shouldShowDeleteAccountSection,
 } = useSettingsUserDelete()
+const {
+  disconnect: disconnectWeixinBot,
+  isDisconnecting: isDisconnectingWeixinBot,
+  isLoading: isLoadingWeixinBot,
+  isPollingLogin: isPollingWeixinLogin,
+  isStartingBot: isStartingWeixinBot,
+  isStartingLogin: isStartingWeixinLogin,
+  isStoppingBot: isStoppingWeixinBot,
+  isSubmittingVerifyCode: isSubmittingWeixinVerifyCode,
+  loadWeixinStatus,
+  loginDialogVisible: weixinLoginDialogVisible,
+  loginState: weixinLoginState,
+  startLogin: startWeixinLogin,
+  startRuntime: startWeixinRuntime,
+  status: weixinStatus,
+  stopRuntime: stopWeixinRuntime,
+  submitVerifyCode: submitWeixinVerifyCode,
+  verifyCode: weixinVerifyCode,
+} = useSettingsWeixinBot()
 
 const isLoading = shallowRef(false)
 const errorMessage = shallowRef('')
@@ -63,6 +84,7 @@ async function loadView() {
     await Promise.all([
       userStore.refreshContext(),
       loadAuthCapabilities(),
+      loadWeixinStatus({ silent: true }),
     ])
 
     syncProfileForm()
@@ -129,6 +151,25 @@ async function handleConfirmEmail() {
         @confirm-email="handleConfirmEmail"
         @start-oauth-binding="connectOauth"
         @disconnect-oauth-binding="disconnectOauth"
+      />
+
+      <BotsSection
+        v-model:login-visible="weixinLoginDialogVisible"
+        v-model:verify-code="weixinVerifyCode"
+        :status="weixinStatus"
+        :login-state="weixinLoginState"
+        :is-loading="isLoadingWeixinBot"
+        :is-starting-login="isStartingWeixinLogin"
+        :is-polling-login="isPollingWeixinLogin"
+        :is-submitting-verify-code="isSubmittingWeixinVerifyCode"
+        :is-starting-bot="isStartingWeixinBot"
+        :is-stopping-bot="isStoppingWeixinBot"
+        :is-disconnecting="isDisconnectingWeixinBot"
+        @start-login="startWeixinLogin"
+        @submit-verify-code="submitWeixinVerifyCode"
+        @start-runtime="startWeixinRuntime"
+        @stop-runtime="stopWeixinRuntime"
+        @disconnect="disconnectWeixinBot"
       />
     </div>
 

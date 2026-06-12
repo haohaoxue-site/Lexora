@@ -4,6 +4,7 @@ export interface ChatWorkspaceLayoutProps {
   agentProfile: ChatSessionSummary['agentProfile'] | null
   isAgentSettingsOpen: boolean
   isNewChatRoute: boolean
+  isReadonlySession: boolean
   isSidebarCollapsed: boolean
 }
 

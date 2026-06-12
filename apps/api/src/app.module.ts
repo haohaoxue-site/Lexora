@@ -10,6 +10,7 @@ import { AccessTokenGuard } from './guards/access-token.guard'
 import { PermissionsGuard } from './guards/permissions.guard'
 import { AiModule } from './modules/ai/ai.module'
 import { AuthModule } from './modules/auth/auth.module'
+import { BotsModule } from './modules/bots/bots.module'
 import { CapabilitiesModule } from './modules/capabilities/capabilities.module'
 import { ChatModule } from './modules/chat/chat.module'
 import { DocumentsModule } from './modules/documents/documents.module'
@@ -89,6 +90,7 @@ import { WorkspacesModule } from './modules/workspaces/workspaces.module'
     RbacModule,
     AuthModule,
     AiModule,
+    BotsModule,
     CapabilitiesModule,
     ChatModule,
     NotificationsModule,

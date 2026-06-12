@@ -1,5 +1,6 @@
 export enum SvgIconCategory {
   AI = 'ai',
+  BRAND = 'brand',
   NAV = 'nav',
   TIPTAP = 'tiptap',
   UI = 'ui',
