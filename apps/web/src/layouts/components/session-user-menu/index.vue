@@ -26,12 +26,16 @@ const {
   currentAppearance,
   currentAppearanceLabel,
   isSavingAppearance,
-  hasLoadedNotifications,
+  hasLoadedNotificationList,
   isLoadingNotifications,
+  isLoadingMoreNotifications,
+  isMarkingAllNotificationsRead,
   loadNotificationError,
-  invitationItems,
-  hasPendingInvitations,
-  pendingInvitationCount,
+  activeNotificationFilter,
+  notificationItems,
+  hasMoreNotifications,
+  hasUnreadNotifications,
+  unreadNotificationCount,
   actingInvitationId,
   actingInvitationAction,
   selectedInvitation,
@@ -39,11 +43,13 @@ const {
   copiedUserCode,
   toggleAppearanceMenu,
   toggleNotificationPanel,
-  refreshNotifications,
   handleCopyUserCode,
   handleViewInvitation,
   handleAcceptInvitation,
   handleDeclineInvitation,
+  handleNotificationFilterChange,
+  handleLoadMoreNotifications,
+  handleMarkAllNotificationsRead,
   closeInvitationDetail,
   handleAppearanceSelect,
   switchContext,
@@ -75,9 +81,9 @@ function getScopeLabel(scope: keyof typeof DOCUMENT_COLLABORATION_SCOPE_LABELS) 
     >
       <template #reference>
         <ElBadge
-          :value="pendingInvitationCount"
+          :value="unreadNotificationCount"
           :max="99"
-          :hidden="!hasPendingInvitations"
+          :hidden="!hasUnreadNotifications"
           class="session-user-menu-trigger-badge"
         >
           <ElButton
@@ -214,10 +220,10 @@ function getScopeLabel(scope: keyof typeof DOCUMENT_COLLABORATION_SCOPE_LABELS) 
                 </span>
 
                 <span
-                  v-if="hasPendingInvitations"
+                  v-if="hasUnreadNotifications"
                   class="session-user-menu-row__badge shrink-0"
                 >
-                  {{ pendingInvitationCount > 99 ? '99+' : pendingInvitationCount }}
+                  {{ unreadNotificationCount > 99 ? '99+' : unreadNotificationCount }}
                 </span>
                 <span v-else class="session-user-menu-row__current shrink-0 text-[12px] leading-none">
                   0
@@ -236,13 +242,20 @@ function getScopeLabel(scope: keyof typeof DOCUMENT_COLLABORATION_SCOPE_LABELS) 
 
           <SessionNotificationPanel
             v-if="notificationPanelVisible"
-            :has-loaded="hasLoadedNotifications"
+            :has-loaded-list="hasLoadedNotificationList"
             :is-loading="isLoadingNotifications"
+            :is-loading-more="isLoadingMoreNotifications"
+            :is-marking-all-read="isMarkingAllNotificationsRead"
             :load-error-message="loadNotificationError"
-            :invitation-items="invitationItems"
+            :active-filter="activeNotificationFilter"
+            :notification-items="notificationItems"
+            :unread-count="unreadNotificationCount"
+            :has-more="hasMoreNotifications"
             :acting-invitation-id="actingInvitationId"
             :acting-invitation-action="actingInvitationAction"
-            @refresh="refreshNotifications"
+            @filter-change="handleNotificationFilterChange"
+            @mark-all-read="handleMarkAllNotificationsRead"
+            @load-more="handleLoadMoreNotifications"
             @view="handleViewInvitation"
             @accept="handleAcceptInvitation"
             @decline="handleDeclineInvitation"
@@ -353,12 +366,18 @@ function getScopeLabel(scope: keyof typeof DOCUMENT_COLLABORATION_SCOPE_LABELS) 
   display: inline-flex;
 
   :deep(.el-badge__content.is-fixed) {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
     min-width: 1.125rem;
     height: 1.125rem;
+    padding: 0 0.25rem;
     border: 2px solid var(--brand-bg-sidebar);
-    border-radius: 50%;
+    border-radius: 999px;
     box-shadow: none;
-    transform: translate(12%, 8%);
+    line-height: 1;
+    transform: translate(56%, -36%);
   }
 }
 

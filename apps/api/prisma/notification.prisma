@@ -1,0 +1,47 @@
+enum NotificationSourceKind {
+  PLATFORM
+  DOCUMENT_COLLABORATION_USER_INVITE
+}
+
+enum PlatformNotificationStatus {
+  DRAFT
+  PUBLISHED
+}
+
+model PlatformNotification {
+  id            String                     @id @default(uuid())
+  title         String
+  content       Json
+  summary       String                     @default("")
+  status        PlatformNotificationStatus @default(DRAFT)
+  publishedAt   DateTime?
+  createdAt     DateTime                   @default(now())
+  createdBy     String?
+  createdByUser User?                      @relation("PlatformNotificationCreator", fields: [createdBy], references: [id], onDelete: SetNull)
+  updatedAt     DateTime                   @updatedAt
+  updatedBy     String?
+  updatedByUser User?                      @relation("PlatformNotificationUpdater", fields: [updatedBy], references: [id], onDelete: SetNull)
+  deletedAt     DateTime?
+  deletedBy     String?
+  deletedByUser User?                      @relation("PlatformNotificationDeleter", fields: [deletedBy], references: [id], onDelete: SetNull)
+
+  @@index([status, publishedAt])
+  @@index([updatedAt])
+  @@index([createdBy])
+  @@index([updatedBy])
+  @@index([deletedBy])
+}
+
+model NotificationReadReceipt {
+  id         String                 @id @default(uuid())
+  userId     String
+  sourceKind NotificationSourceKind
+  sourceId   String
+  readAt     DateTime               @default(now())
+  user       User                   @relation("NotificationReadReceiptUser", fields: [userId], references: [id], onDelete: Cascade)
+  createdAt  DateTime               @default(now())
+  updatedAt  DateTime               @updatedAt
+
+  @@unique([userId, sourceKind, sourceId])
+  @@index([userId, sourceKind, readAt])
+}

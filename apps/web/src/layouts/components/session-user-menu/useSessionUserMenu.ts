@@ -38,15 +38,22 @@ export function useSessionUserMenu(options: UseSessionUserMenuOptions) {
     actingInvitationId,
     closeInvitationDetail,
     declineInvitation,
-    hasLoaded,
-    hasPendingInvitations,
-    invitationItems,
+    activeFilter,
+    hasLoadedList,
+    hasMoreNotifications,
+    hasUnreadNotifications,
     isDetailDialogOpen,
     isLoading,
+    isLoadingMore,
+    isMarkingAllRead,
     loadErrorMessage,
-    loadSummary,
-    pendingInvitationCount,
+    loadMoreNotifications,
+    markAllUnreadNotificationsRead,
+    notificationItems,
+    refreshNotifications: refreshNotificationState,
     selectedInvitation,
+    setNotificationFilter,
+    unreadNotificationCount,
     viewInvitation,
   } = useSessionNotificationBell()
   const lastKnownUser = shallowRef(sessionUser.value)
@@ -127,23 +134,29 @@ export function useSessionUserMenu(options: UseSessionUserMenuOptions) {
     isSavingAppearance,
     toggleAppearanceMenu,
     notificationPanelVisible,
-    hasLoadedNotifications: hasLoaded,
+    hasLoadedNotificationList: hasLoadedList,
     isLoadingNotifications: isLoading,
+    isLoadingMoreNotifications: isLoadingMore,
+    isMarkingAllNotificationsRead: isMarkingAllRead,
     loadNotificationError: loadErrorMessage,
-    hasPendingInvitations,
-    invitationItems,
-    pendingInvitationCount,
+    activeNotificationFilter: activeFilter,
+    notificationItems,
+    hasMoreNotifications,
+    hasUnreadNotifications,
+    unreadNotificationCount,
     actingInvitationId,
     actingInvitationAction,
     selectedInvitation,
     isDetailDialogOpen,
     copiedUserCode,
     toggleNotificationPanel,
-    refreshNotifications,
     handleCopyUserCode,
     handleViewInvitation,
     handleAcceptInvitation,
     handleDeclineInvitation,
+    handleNotificationFilterChange,
+    handleLoadMoreNotifications,
+    handleMarkAllNotificationsRead,
     closeInvitationDetail,
     handleAppearanceSelect,
     switchContext,
@@ -164,7 +177,7 @@ export function useSessionUserMenu(options: UseSessionUserMenuOptions) {
     toggleSubmenu('notifications')
 
     if (nextVisible) {
-      await loadSummary()
+      await refreshNotificationState()
     }
   }
 
@@ -206,8 +219,16 @@ export function useSessionUserMenu(options: UseSessionUserMenuOptions) {
     await logout()
   }
 
-  async function refreshNotifications() {
-    await loadSummary()
+  async function handleNotificationFilterChange(...args: Parameters<typeof setNotificationFilter>) {
+    await setNotificationFilter(...args)
+  }
+
+  async function handleLoadMoreNotifications() {
+    await loadMoreNotifications()
+  }
+
+  async function handleMarkAllNotificationsRead() {
+    await markAllUnreadNotificationsRead()
   }
 
   async function handleCopyUserCode() {

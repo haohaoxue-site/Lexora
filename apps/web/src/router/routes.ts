@@ -250,6 +250,17 @@ const adminRouteChildren = [
     },
   },
   {
+    path: 'notifications',
+    name: 'admin-notifications',
+    component: () => import('@/views/admin/pages/notifications'),
+    meta: {
+      navLabel: '站内信',
+      navIconCategory: SvgIconCategory.NAV,
+      navIcon: 'notifications',
+      navActiveIcon: 'notifications-active',
+    },
+  },
+  {
     path: 'providers',
     name: 'admin-providers',
     component: () => import('@/views/admin/pages/providers'),

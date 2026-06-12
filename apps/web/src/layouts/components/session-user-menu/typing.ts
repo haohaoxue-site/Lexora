@@ -1,6 +1,6 @@
-import type { AppearancePreference } from '@haohaoxue/samepage-contracts'
+import type { AppearancePreference, NotificationListFilter } from '@haohaoxue/samepage-contracts'
 import type { SvgIconProps } from '@/components/svg-icon/typing'
-import type { SessionNotificationInvitationItem } from '@/layouts/components/session-notification-bell/useSessionNotificationBell'
+import type { SessionNotificationItem } from '@/layouts/components/session-notification-bell/useSessionNotificationBell'
 
 export interface SessionMenuUser {
   displayName: string
@@ -27,10 +27,15 @@ export interface SessionContextSwitchAction {
 }
 
 export interface SessionNotificationPanelProps {
-  hasLoaded: boolean
+  hasLoadedList: boolean
   isLoading: boolean
+  isLoadingMore: boolean
+  isMarkingAllRead: boolean
   loadErrorMessage: string
-  invitationItems: SessionNotificationInvitationItem[]
+  activeFilter: NotificationListFilter
+  notificationItems: SessionNotificationItem[]
+  unreadCount: number
+  hasMore: boolean
   actingInvitationId: string
   actingInvitationAction: 'accept' | 'decline' | null
 }

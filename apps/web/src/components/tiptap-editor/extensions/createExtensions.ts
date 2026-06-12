@@ -50,15 +50,27 @@ const COLLABORATION_Y_UNDO_OPTIONS: CollaborationOptions['yUndoOptions'] = {
   // pnpm 下 ySyncPluginKey 可能出现实例不一致，constructor 匹配能让 yUndo 捕获本地编辑事务。
   trackedOrigins: [ySyncPluginKey.constructor],
 }
-export function createBodyExtensions(options: {
+
+interface CreateBodyExtensionsOptions {
   uploadImage?: (file: File) => Promise<TiptapEditorUploadedImage>
   uploadFile?: (file: File) => Promise<TiptapEditorUploadedFile>
   resolveImageSrc?: TiptapEditorResolveImageSrc
   collaboration?: TiptapEditorCollaborationBinding | null
-} = {}): Extensions {
+  placeholder?: string
+  emptyLinePlaceholder?: string
+  blockIds?: boolean
+}
+
+export function createBodyExtensions(options: CreateBodyExtensionsOptions = {}): Extensions {
+  const blockIdentityExtensions = options.blockIds === false
+    ? []
+    : [
+        DocumentRuntimeNormalizer,
+        BlockId,
+      ]
+
   return [
-    DocumentRuntimeNormalizer,
-    BlockId,
+    ...blockIdentityExtensions,
     StarterKit.configure({
       heading: {
         levels: [1, 2, 3, 4, 5],
@@ -74,7 +86,7 @@ export function createBodyExtensions(options: {
     HistorySelection,
     LinkClickOpen,
     Placeholder.configure({
-      placeholder: ({ editor, node }) => resolveBodyPlaceholder(editor, node),
+      placeholder: ({ editor, node }) => resolveBodyPlaceholder(editor, node, options),
     }),
     TextStyle,
     TextColorClass,
@@ -110,7 +122,11 @@ export function createBodyExtensions(options: {
   ]
 }
 
-function resolveBodyPlaceholder(editor: Editor, node: ProseMirrorNode) {
+function resolveBodyPlaceholder(
+  editor: Editor,
+  node: ProseMirrorNode,
+  options: CreateBodyExtensionsOptions,
+) {
   if (node.type.name === 'heading') {
     return resolveHeadingPlaceholder(node.attrs?.level)
   }
@@ -120,10 +136,10 @@ function resolveBodyPlaceholder(editor: Editor, node: ProseMirrorNode) {
   }
 
   if (isOnlyEmptyParagraphDocument(editor)) {
-    return BODY_PLACEHOLDER
+    return options.placeholder ?? BODY_PLACEHOLDER
   }
 
-  return BODY_EMPTY_LINE_PLACEHOLDER
+  return options.emptyLinePlaceholder ?? BODY_EMPTY_LINE_PLACEHOLDER
 }
 
 function resolveHeadingPlaceholder(level: unknown) {

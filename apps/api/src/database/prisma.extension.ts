@@ -39,6 +39,7 @@ const SOFT_DELETE_MODEL_NAMES = new Set([
   'Workspace',
   'WorkspaceMember',
   'WorkspaceInvite',
+  'PlatformNotification',
 ])
 
 function supportsSoftDelete(modelName: string | undefined): boolean {

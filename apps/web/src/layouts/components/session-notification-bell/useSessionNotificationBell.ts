@@ -1,11 +1,18 @@
 import type {
   DocumentCollaborationUserInviteNotification,
+  NotificationItem,
+  NotificationListFilter,
   NotificationSummary,
 } from '@/apis/notification'
+import {
+  NOTIFICATION_LIST_FILTER,
+  NOTIFICATION_SOURCE_KIND,
+} from '@haohaoxue/samepage-contracts/notification'
 import dayjs from 'dayjs'
 import {
   computed,
   onMounted,
+  reactive,
   shallowRef,
   watch,
 } from 'vue'
@@ -14,7 +21,11 @@ import {
   acceptDocumentCollaborationInvitation,
   declineDocumentCollaborationInvitation,
 } from '@/apis/document-collaboration'
-import { getNotificationSummary } from '@/apis/notification'
+import {
+  getNotificationSummary,
+  listNotifications,
+  markAllNotificationsRead,
+} from '@/apis/notification'
 import { useWorkspaceStore } from '@/stores/workspace'
 import { ElMessage } from '@/utils/element-plus'
 import { getRequestErrorDisplayMessage } from '@/utils/request-error'
@@ -27,10 +38,22 @@ export type SessionNotificationInvitationItem = DocumentCollaborationUserInviteN
   receivedLabel: string
 }
 
+export type SessionNotificationItem = NotificationItem & {
+  senderLabel: string
+  receivedLabel: string
+  documentInviteItem: SessionNotificationInvitationItem | null
+}
+
 const EMPTY_NOTIFICATION_SUMMARY: NotificationSummary = {
+  unreadCount: 0,
   pendingDocumentCollaborationUserInviteCount: 0,
   pendingDocumentCollaborationUserInvites: [],
 }
+const NOTIFICATION_PAGE_LIMIT = 20
+const emptyCursorByFilter = {
+  [NOTIFICATION_LIST_FILTER.ALL]: null,
+  [NOTIFICATION_LIST_FILTER.UNREAD]: null,
+} satisfies Record<NotificationListFilter, string | null>
 
 export function useSessionNotificationBell() {
   const router = useRouter()
@@ -38,23 +61,29 @@ export function useSessionNotificationBell() {
   const documentTree = useDocumentTree()
   const popoverVisible = shallowRef(false)
   const summary = shallowRef<NotificationSummary>(EMPTY_NOTIFICATION_SUMMARY)
+  const activeFilter = shallowRef<NotificationListFilter>(NOTIFICATION_LIST_FILTER.ALL)
+  const notificationItems = shallowRef<SessionNotificationItem[]>([])
+  const nextCursorByFilter = reactive<Record<NotificationListFilter, string | null>>({ ...emptyCursorByFilter })
   const isLoading = shallowRef(false)
+  const isLoadingMore = shallowRef(false)
+  const isMarkingAllRead = shallowRef(false)
   const hasLoaded = shallowRef(false)
+  const hasLoadedList = shallowRef(false)
   const loadErrorMessage = shallowRef('')
   const actingInvitationId = shallowRef('')
   const actingInvitationAction = shallowRef<InvitationAction | null>(null)
   const selectedInvitation = shallowRef<SessionNotificationInvitationItem | null>(null)
   const isDetailDialogOpen = shallowRef(false)
   let summaryRequestId = 0
+  let listRequestId = 0
 
   const pendingInvitationCount = computed(() => summary.value.pendingDocumentCollaborationUserInviteCount)
   const hasPendingInvitations = computed(() => pendingInvitationCount.value > 0)
+  const unreadNotificationCount = computed(() => summary.value.unreadCount)
+  const hasUnreadNotifications = computed(() => unreadNotificationCount.value > 0)
+  const hasMoreNotifications = computed(() => Boolean(nextCursorByFilter[activeFilter.value]))
   const invitationItems = computed<SessionNotificationInvitationItem[]>(() =>
-    summary.value.pendingDocumentCollaborationUserInvites.map(invitation => ({
-      ...invitation,
-      inviterLabel: formatInvitationInviter(invitation),
-      receivedLabel: formatInvitationReceivedLabel(invitation),
-    })),
+    summary.value.pendingDocumentCollaborationUserInvites.map(toSessionInvitationItem),
   )
 
   watch(popoverVisible, (visible) => {
@@ -62,7 +91,7 @@ export function useSessionNotificationBell() {
       return
     }
 
-    void loadSummary()
+    void refreshNotifications()
   })
 
   onMounted(() => {
@@ -83,6 +112,7 @@ export function useSessionNotificationBell() {
       }
 
       summary.value = {
+        unreadCount: nextSummary.unreadCount,
         pendingDocumentCollaborationUserInviteCount: nextSummary.pendingDocumentCollaborationUserInviteCount,
         pendingDocumentCollaborationUserInvites: nextSummary.pendingDocumentCollaborationUserInvites,
       }
@@ -103,6 +133,115 @@ export function useSessionNotificationBell() {
       if (requestId === summaryRequestId) {
         isLoading.value = false
       }
+    }
+  }
+
+  async function loadNotificationList(options: { reset?: boolean } = {}) {
+    const reset = options.reset ?? true
+    const requestId = ++listRequestId
+    const filter = activeFilter.value
+    const cursor = reset ? undefined : nextCursorByFilter[filter] ?? undefined
+
+    if (!reset && !cursor) {
+      return
+    }
+
+    if (reset) {
+      isLoading.value = true
+    }
+    else {
+      isLoadingMore.value = true
+    }
+    loadErrorMessage.value = ''
+
+    try {
+      const response = await listNotifications({
+        filter,
+        cursor,
+        limit: NOTIFICATION_PAGE_LIMIT,
+      })
+
+      if (requestId !== listRequestId || filter !== activeFilter.value) {
+        return
+      }
+
+      notificationItems.value = reset
+        ? response.items.map(toSessionNotificationItem)
+        : [...notificationItems.value, ...response.items.map(toSessionNotificationItem)]
+      nextCursorByFilter[filter] = response.nextCursor
+      summary.value = {
+        ...summary.value,
+        unreadCount: response.unreadCount,
+      }
+      hasLoadedList.value = true
+    }
+    catch (error) {
+      if (requestId !== listRequestId) {
+        return
+      }
+
+      loadErrorMessage.value = getRequestErrorDisplayMessage(error, '加载站内信失败')
+
+      if (!hasLoadedList.value || reset) {
+        notificationItems.value = []
+      }
+    }
+    finally {
+      if (requestId === listRequestId) {
+        isLoading.value = false
+        isLoadingMore.value = false
+      }
+    }
+  }
+
+  async function refreshNotifications() {
+    await Promise.all([
+      loadSummary(),
+      loadNotificationList({ reset: true }),
+    ])
+  }
+
+  async function loadMoreNotifications() {
+    if (isLoading.value || isLoadingMore.value || !hasMoreNotifications.value) {
+      return
+    }
+
+    await loadNotificationList({ reset: false })
+  }
+
+  async function setNotificationFilter(filter: NotificationListFilter) {
+    if (activeFilter.value === filter) {
+      return
+    }
+
+    activeFilter.value = filter
+    nextCursorByFilter[filter] = null
+    notificationItems.value = []
+    hasLoadedList.value = false
+    await loadNotificationList({ reset: true })
+  }
+
+  async function markAllUnreadNotificationsRead() {
+    if (isMarkingAllRead.value || !hasUnreadNotifications.value) {
+      return
+    }
+
+    isMarkingAllRead.value = true
+
+    try {
+      const response = await markAllNotificationsRead()
+      summary.value = {
+        ...summary.value,
+        unreadCount: response.unreadCount,
+      }
+      await loadNotificationList({ reset: true })
+      ElMessage.success('已标记全部未读站内信')
+    }
+    catch (error) {
+      ElMessage.error(getRequestErrorDisplayMessage(error, '标记已读失败'))
+    }
+    finally {
+      isMarkingAllRead.value = false
     }
   }
 
@@ -164,7 +303,7 @@ export function useSessionNotificationBell() {
 
     try {
       await handler()
-      await loadSummary()
+      await refreshNotifications()
     }
     catch (error) {
       const fallbackMessage = action === 'accept'
@@ -186,18 +325,50 @@ export function useSessionNotificationBell() {
     actingInvitationAction,
     actingInvitationId,
     declineInvitation,
+    activeFilter,
     hasLoaded,
+    hasLoadedList,
     hasPendingInvitations,
+    hasMoreNotifications,
+    hasUnreadNotifications,
     invitationItems,
     isDetailDialogOpen,
     isLoading,
+    isLoadingMore,
+    isMarkingAllRead,
     loadErrorMessage,
+    loadMoreNotifications,
+    loadNotificationList,
     loadSummary,
+    markAllUnreadNotificationsRead,
+    notificationItems,
     pendingInvitationCount,
     popoverVisible,
+    refreshNotifications,
     selectedInvitation,
+    setNotificationFilter,
+    unreadNotificationCount,
     closeInvitationDetail,
     viewInvitation,
+  }
+}
+
+function toSessionNotificationItem(item: NotificationItem): SessionNotificationItem {
+  return {
+    ...item,
+    senderLabel: item.sender.displayName,
+    receivedLabel: formatNotificationReceivedLabel(item.messageAt),
+    documentInviteItem: item.kind === NOTIFICATION_SOURCE_KIND.DOCUMENT_COLLABORATION_USER_INVITE
+      ? toSessionInvitationItem(item.documentInvite)
+      : null,
+  }
+}
+
+function toSessionInvitationItem(invitation: DocumentCollaborationUserInviteNotification): SessionNotificationInvitationItem {
+  return {
+    ...invitation,
+    inviterLabel: formatInvitationInviter(invitation),
+    receivedLabel: formatInvitationReceivedLabel(invitation),
   }
 }
 
@@ -207,4 +378,8 @@ function formatInvitationInviter(invitation: DocumentCollaborationUserInviteNoti
 
 function formatInvitationReceivedLabel(invitation: DocumentCollaborationUserInviteNotification) {
   return `邀请发送于 ${dayjs(invitation.createdAt).format('YYYY-MM-DD HH:mm')}`
+}
+
+function formatNotificationReceivedLabel(value: string) {
+  return dayjs(value).format('YYYY-MM-DD HH:mm')
 }

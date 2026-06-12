@@ -20,6 +20,7 @@ export {
   DocumentBodyEditor,
   DocumentContentSurface,
   DocumentTitleEditor,
+  StandaloneContentEditor,
 } from './presets'
 export type { DocumentBodyEditorOutlineOptions } from './presets/body/typing'
 export type {
