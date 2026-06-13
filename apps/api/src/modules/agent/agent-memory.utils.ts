@@ -5,7 +5,7 @@ import type {
   AgentMemorySensitivity,
   AgentMemorySourceType,
   AgentMemoryStatus,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 import type {
   AgentMemory as PrismaAgentMemory,
   AgentMemoryLane as PrismaAgentMemoryLane,
@@ -20,7 +20,7 @@ import {
   AGENT_MEMORY_SENSITIVITY,
   AGENT_MEMORY_SOURCE_TYPE,
   AGENT_MEMORY_STATUS,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 
 export function toPrismaMemoryScope(scope: AgentMemoryScope): PrismaAgentMemoryScope {
   return scope === AGENT_MEMORY_SCOPE.USER_AGENT ? 'USER_AGENT' : 'USER'

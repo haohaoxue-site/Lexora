@@ -1,6 +1,6 @@
 import type { AgentMemory as PrismaAgentMemory } from '@prisma/client'
 import { createHash } from 'node:crypto'
-import { AI_MODEL_INTENT_KEY } from '@haohaoxue/samepage-contracts'
+import { AI_MODEL_INTENT_KEY } from '@haohaoxue/lexora-contracts'
 import { Injectable } from '@nestjs/common'
 import { Prisma } from '@prisma/client'
 import { PrismaService } from '../../database/prisma.service'

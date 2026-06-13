@@ -8,7 +8,7 @@ import type {
 import {
   SYSTEM_EMAIL_PROVIDER,
   SYSTEM_EMAIL_PROVIDER_DEFAULTS,
-} from '@haohaoxue/samepage-contracts/system-admin'
+} from '@haohaoxue/lexora-contracts/system-admin'
 import { computed, onMounted, reactive, shallowRef } from 'vue'
 import { useI18n } from 'vue-i18n'
 import {
@@ -67,7 +67,7 @@ export function useAdminEmail(options: {
     smtpSecure: true,
     smtpUsername: '',
     smtpPassword: '',
-    fromName: 'SamePage',
+    fromName: 'Lexora',
     fromEmail: '',
   })
   const testEmailForm = reactive({

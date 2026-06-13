@@ -6,11 +6,11 @@ import type {
   SystemAdminUserStatus,
   UpdateSystemAdminUserStatusRequest,
   UpdateSystemAuthInviteCodeRequest,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 import {
   SYSTEM_ADMIN_AUDIT_TARGET_TYPE_VALUES,
   SYSTEM_ADMIN_USER_ROLE_FILTER_VALUES,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 import { UserStatus } from '@prisma/client'
 import {
   IsEnum,

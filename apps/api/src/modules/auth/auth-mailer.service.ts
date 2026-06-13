@@ -1,5 +1,5 @@
-import type { ResolvedLanguagePreference } from '@haohaoxue/samepage-contracts'
-import { LANGUAGE_PREFERENCE } from '@haohaoxue/samepage-contracts/user/constants'
+import type { ResolvedLanguagePreference } from '@haohaoxue/lexora-contracts'
+import { LANGUAGE_PREFERENCE } from '@haohaoxue/lexora-contracts/user/constants'
 import { Injectable } from '@nestjs/common'
 import { SystemEmailService } from '../system-email/system-email.service'
 import { stripHtmlTags } from './html.utils'
@@ -64,18 +64,18 @@ function createVerificationEmailHtml(input: {
 function createRegistrationTemplate(language: ResolvedLanguagePreference, code: string) {
   if (language === LANGUAGE_PREFERENCE.ZH_CN) {
     return {
-      subject: 'SamePage 注册验证码',
+      subject: 'Lexora 注册验证码',
       title: '注册验证码',
-      intro: '你正在注册 SamePage，请在页面输入以下验证码：',
+      intro: '你正在注册 Lexora，请在页面输入以下验证码：',
       code,
       note: '验证码 10 分钟内有效。如非本人操作，请忽略这封邮件。',
     }
   }
 
   return {
-    subject: 'SamePage registration code',
+    subject: 'Lexora registration code',
     title: 'Registration code',
-    intro: 'Enter this verification code on SamePage to finish registration:',
+    intro: 'Enter this verification code on Lexora to finish registration:',
     code,
     note: 'This code is valid for 10 minutes. If you did not request it, ignore this email.',
   }
@@ -84,18 +84,18 @@ function createRegistrationTemplate(language: ResolvedLanguagePreference, code: 
 function createBindEmailTemplate(language: ResolvedLanguagePreference, code: string) {
   if (language === LANGUAGE_PREFERENCE.ZH_CN) {
     return {
-      subject: 'SamePage 邮箱绑定验证码',
+      subject: 'Lexora 邮箱绑定验证码',
       title: '邮箱绑定验证码',
-      intro: '你正在绑定 SamePage 登录邮箱，请在页面输入以下验证码：',
+      intro: '你正在绑定 Lexora 登录邮箱，请在页面输入以下验证码：',
       code,
       note: '验证码 10 分钟内有效。如非本人操作，请忽略这封邮件。',
     }
   }
 
   return {
-    subject: 'SamePage email binding code',
+    subject: 'Lexora email binding code',
     title: 'Email binding code',
-    intro: 'Enter this verification code on SamePage to bind your sign-in email:',
+    intro: 'Enter this verification code on Lexora to bind your sign-in email:',
     code,
     note: 'This code is valid for 10 minutes. If you did not request it, ignore this email.',
   }

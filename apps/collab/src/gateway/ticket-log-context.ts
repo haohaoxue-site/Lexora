@@ -1,4 +1,4 @@
-import type { CollabTicketPayload } from '@haohaoxue/samepage-contracts'
+import type { CollabTicketPayload } from '@haohaoxue/lexora-contracts'
 
 /** 可安全记录的协作票据上下文。 */
 export interface SafeCollabTicketLogContext {

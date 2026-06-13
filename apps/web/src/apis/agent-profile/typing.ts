@@ -1,4 +1,4 @@
 export type {
   AgentProfileSettings,
   UpdateAgentProfileModelPolicyRequest,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'

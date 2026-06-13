@@ -1,9 +1,9 @@
-import type { CollabPermissionInvalidationRequest } from '@haohaoxue/samepage-contracts'
+import type { CollabPermissionInvalidationRequest } from '@haohaoxue/lexora-contracts'
 import {
   COLLAB_PUBSUB_MESSAGE_TYPE,
   COLLAB_REDIS_CHANNEL,
   CollabPermissionInvalidationPubSubMessageSchema,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 import { Injectable, Logger } from '@nestjs/common'
 import { RedisService } from '../redis/redis.service'
 

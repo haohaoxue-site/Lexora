@@ -3,12 +3,12 @@ import type {
   ExecuteAgentMemoryOperationProposalsResponse,
   RetrieveAgentMemoryRequest,
   RetrieveAgentMemoryResponse,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 import {
   ExecuteAgentMemoryOperationProposalsRequestSchema,
   ExecuteAgentMemoryOperationProposalsResponseSchema,
   RetrieveAgentMemoryRequestSchema,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 import {
   Body,
   Controller,

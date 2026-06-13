@@ -1,6 +1,6 @@
-import type { PermissionCode, RoleCode } from '@haohaoxue/samepage-contracts'
+import type { PermissionCode, RoleCode } from '@haohaoxue/lexora-contracts'
 import type { Prisma } from '@prisma/client'
-import { PermissionSchema, ROLES, RoleSchema } from '@haohaoxue/samepage-contracts'
+import { PermissionSchema, ROLES, RoleSchema } from '@haohaoxue/lexora-contracts'
 import { Injectable, OnModuleInit } from '@nestjs/common'
 import { PrismaService } from '../../database/prisma.service'
 import { DEFAULT_RBAC_SEED } from './rbac.constants'

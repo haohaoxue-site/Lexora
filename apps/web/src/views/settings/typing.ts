@@ -5,7 +5,7 @@ import type {
   WeixinBotBindingStatus,
   WeixinBotLoginStartResponse,
   WeixinBotLoginStatusResponse,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 
 export type SettingsTabName = 'user' | 'preference' | 'providers'
 

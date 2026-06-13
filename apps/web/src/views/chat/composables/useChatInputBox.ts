@@ -1,4 +1,4 @@
-import type { AgentTranslatorTargetLanguage } from '@haohaoxue/samepage-contracts/agent'
+import type { AgentTranslatorTargetLanguage } from '@haohaoxue/lexora-contracts/agent'
 import type { MaybeRefOrGetter } from 'vue'
 import type { ChatComposerSubmitPayload } from '@/components/chat-composer/typing'
 import { computed, onMounted, shallowRef, toValue, watch } from 'vue'

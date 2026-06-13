@@ -1,4 +1,4 @@
-import type { AiModelCapability, AiModelModality, AiModelType } from '@haohaoxue/samepage-contracts'
+import type { AiModelCapability, AiModelModality, AiModelType } from '@haohaoxue/lexora-contracts'
 import type { OnModuleInit } from '@nestjs/common'
 import type { AiModelCapabilityDefault, Prisma } from '@prisma/client'
 import { createHash } from 'node:crypto'
@@ -6,7 +6,7 @@ import {
   AiModelCapabilitySchema,
   AiModelModalitySchema,
   AiModelTypeSchema,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 import { Injectable, Logger } from '@nestjs/common'
 import { z } from 'zod'
 import { PrismaService } from '../../../database/prisma.service'

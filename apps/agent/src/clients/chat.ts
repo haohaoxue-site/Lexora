@@ -1,9 +1,9 @@
 import type {
   ChatGenerationBootstrap,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 import {
   ChatGenerationBootstrapSchema,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 import { normalizeApiInternalBaseUrl, postApiInternalJson } from './utils'
 
 export interface AgentChatApiClient {

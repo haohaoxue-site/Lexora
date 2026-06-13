@@ -5,12 +5,12 @@ import type {
   SwitchChatActiveMessageRequest,
   UpdateChatSessionModelRequest,
   UpdateChatSessionTitleRequest,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 import {
   CHAT_MESSAGE_CONTENT_MAX_LENGTH,
   CHAT_SESSION_ORIGIN_VALUES,
   CHAT_SESSION_TITLE_MAX_LENGTH,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 import { Transform, Type } from 'class-transformer'
 import {
   IsArray,

@@ -1,5 +1,5 @@
-import type { DocumentPageWidthMode } from '@haohaoxue/samepage-contracts'
-import { DOCUMENT_PAGE_WIDTH_MODE } from '@haohaoxue/samepage-contracts/document/constants'
+import type { DocumentPageWidthMode } from '@haohaoxue/lexora-contracts'
+import { DOCUMENT_PAGE_WIDTH_MODE } from '@haohaoxue/lexora-contracts/document/constants'
 import { computed, shallowRef } from 'vue'
 import { patchDocumentLayout } from '@/apis/document'
 import { translate } from '@/i18n'

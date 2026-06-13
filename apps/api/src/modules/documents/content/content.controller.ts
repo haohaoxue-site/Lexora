@@ -7,13 +7,13 @@ import type {
   PatchDocumentTitleRequest,
   RestoreDocumentVersionSnapshotRequest,
   RestoreDocumentVersionSnapshotResponse,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 import type { AuthUserContext } from '../../auth/auth.interface'
 import {
   CreateDocumentVersionSnapshotSchema,
   PatchDocumentTitleSchema,
   RestoreDocumentVersionSnapshotSchema,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 import { Body, Controller, Get, Param, Patch, Post } from '@nestjs/common'
 import { CurrentUser } from '../../../decorators/current-user.decorator'
 import { ZodValidationPipe } from '../../../pipes/zod-validation.pipe'

@@ -1,4 +1,4 @@
-import type { UpdateAgentProfileModelPolicyRequest } from '@haohaoxue/samepage-contracts'
+import type { UpdateAgentProfileModelPolicyRequest } from '@haohaoxue/lexora-contracts'
 import { Type } from 'class-transformer'
 import {
   IsOptional,

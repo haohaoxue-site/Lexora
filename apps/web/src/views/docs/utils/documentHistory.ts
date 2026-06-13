@@ -1,4 +1,4 @@
-import type { DocumentVersionSnapshot } from '@haohaoxue/samepage-contracts'
+import type { DocumentVersionSnapshot } from '@haohaoxue/lexora-contracts'
 import type { Dayjs } from 'dayjs'
 import type {
   ActiveDocumentDetail,
@@ -6,11 +6,11 @@ import type {
   DocumentHistoryGroup,
   DocumentHistorySection,
 } from '../typing'
-import { DOCUMENT_VERSION_SNAPSHOT_SOURCE } from '@haohaoxue/samepage-contracts/document/constants'
+import { DOCUMENT_VERSION_SNAPSHOT_SOURCE } from '@haohaoxue/lexora-contracts/document/constants'
 import {
   getDocumentVersionSnapshotTitlePlainText,
   isSameDocumentVersionSnapshotContent,
-} from '@haohaoxue/samepage-shared/document'
+} from '@haohaoxue/lexora-shared/document'
 import { translate } from '@/i18n'
 import dayjs from '@/utils/dayjs'
 

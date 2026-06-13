@@ -1,4 +1,4 @@
-import type { AiProviderPreset } from '@haohaoxue/samepage-contracts'
+import type { AiProviderPreset } from '@haohaoxue/lexora-contracts'
 import { Injectable, NotFoundException } from '@nestjs/common'
 import {
   AI_BUILTIN_PROVIDER_PRESETS,

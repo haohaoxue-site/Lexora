@@ -1,5 +1,5 @@
-import type { DocumentItem, DocumentTreeCollectionId } from '@haohaoxue/samepage-contracts'
-import { buildDocumentPath } from '@haohaoxue/samepage-shared/document'
+import type { DocumentItem, DocumentTreeCollectionId } from '@haohaoxue/lexora-contracts'
+import { buildDocumentPath } from '@haohaoxue/lexora-shared/document'
 import { useClipboard } from '@vueuse/core'
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'

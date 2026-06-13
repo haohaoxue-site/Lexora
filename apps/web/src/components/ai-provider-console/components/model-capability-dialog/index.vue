@@ -11,7 +11,7 @@ import {
   AI_MODEL_MODALITY_VALUES,
   AI_MODEL_TYPE,
   AI_MODEL_TYPE_VALUES,
-} from '@haohaoxue/samepage-contracts/ai/constants'
+} from '@haohaoxue/lexora-contracts/ai/constants'
 import { computed, useTemplateRef } from 'vue'
 import { useI18n } from 'vue-i18n'
 

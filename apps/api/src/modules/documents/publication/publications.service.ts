@@ -17,7 +17,7 @@ import type {
   UpdatePublicationPageRequest,
   UpdatePublicationSectionRequest,
   UpsertPublicationSiteSettingsRequest,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 import type { Buffer } from 'node:buffer'
 import type { StorageObject } from '../../../infrastructure/storage/storage.interface'
 import type { SinglePublicationAccessResolution } from './publication-access.service'
@@ -45,8 +45,8 @@ import {
   DOCUMENT_VISIBILITY,
   PublicationSiteHomeConfigSchema,
   SERVER_PATH,
-} from '@haohaoxue/samepage-contracts'
-import { buildDocumentBlockIndex, buildDocumentOutline, collectDocumentAssetIds, normalizePublicationHref, prettyBytes } from '@haohaoxue/samepage-shared'
+} from '@haohaoxue/lexora-contracts'
+import { buildDocumentBlockIndex, buildDocumentOutline, collectDocumentAssetIds, normalizePublicationHref, prettyBytes } from '@haohaoxue/lexora-shared'
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common'
 import { DocumentStatus, Prisma } from '@prisma/client'
 import { PrismaService } from '../../../database/prisma.service'
@@ -645,7 +645,7 @@ export class DocumentPublicationsService {
       return await this.prisma.documentPublicationSite.create({
         data: {
           workspaceId,
-          title: 'SamePage Docs',
+          title: 'Lexora Docs',
           description: null,
           logoUrl: null,
           theme: DOCUMENT_PUBLICATION_SITE_THEME.DEFAULT,
@@ -1510,7 +1510,7 @@ function parseInternalDocumentHref(href: string): string | null {
   let url: URL
 
   try {
-    url = new URL(normalizedHref, 'https://samepage.local')
+    url = new URL(normalizedHref, 'https://lexora.local')
   }
   catch {
     return null

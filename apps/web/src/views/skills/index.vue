@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { AgentTranslatorSkillConfig } from '@haohaoxue/samepage-contracts'
+import type { AgentTranslatorSkillConfig } from '@haohaoxue/lexora-contracts'
 import type { CSSProperties } from 'vue'
 import type { AgentSkillCard } from '@/apis/agent-skills'
 import { computed, onMounted, shallowRef } from 'vue'

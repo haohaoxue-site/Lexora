@@ -24,8 +24,8 @@ import {
   DOCUMENT_PUBLICATION_NAV_ITEM_EXTERNAL_TARGET,
   DOCUMENT_PUBLICATION_NAV_ITEM_INTERNAL_TARGET,
   DOCUMENT_PUBLICATION_NAV_ITEM_TYPE,
-} from '@haohaoxue/samepage-contracts/document/publication/constants'
-import { normalizePublicationHref } from '@haohaoxue/samepage-shared/document'
+} from '@haohaoxue/lexora-contracts/document/publication/constants'
+import { normalizePublicationHref } from '@haohaoxue/lexora-shared/document'
 import { computed, shallowRef, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import Empty from '@/components/empty'

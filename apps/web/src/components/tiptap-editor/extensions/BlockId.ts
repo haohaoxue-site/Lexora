@@ -15,7 +15,7 @@ import {
 } from '../content/blockId'
 import { DOCUMENT_RUNTIME_NORMALIZER_TRANSACTION_META } from './DocumentRuntimeNormalizer'
 
-const BLOCK_ID_TRANSACTION_META = 'samepageBlockIdTransaction'
+const BLOCK_ID_TRANSACTION_META = 'lexoraBlockIdTransaction'
 
 /**
  * blockId 扩展配置。

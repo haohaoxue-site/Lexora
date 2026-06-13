@@ -1,4 +1,4 @@
-import type { AppearancePreference, LanguagePreference } from '@haohaoxue/samepage-contracts'
+import type { AppearancePreference, LanguagePreference } from '@haohaoxue/lexora-contracts'
 import { computed, shallowRef } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useUserStore } from '@/stores/user'

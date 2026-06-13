@@ -6,8 +6,8 @@ import type {
 import {
   BOT_RUNTIME_STATE,
   WEIXIN_BOT_LOGIN_STATUS,
-} from '@haohaoxue/samepage-contracts/bot'
-import { CHAT_SESSION_CHANNEL } from '@haohaoxue/samepage-contracts/chat/constants'
+} from '@haohaoxue/lexora-contracts/bot'
+import { CHAT_SESSION_CHANNEL } from '@haohaoxue/lexora-contracts/chat/constants'
 import { computed, onScopeDispose, shallowRef, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import {

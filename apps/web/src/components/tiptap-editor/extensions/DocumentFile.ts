@@ -1,8 +1,8 @@
 import {
   TIPTAP_DOCUMENT_FILE_NODE_PART,
   TIPTAP_DOCUMENT_FILE_NODE_TYPE,
-} from '@haohaoxue/samepage-contracts/tiptap/document-body'
-import { prettyBytes } from '@haohaoxue/samepage-shared/file'
+} from '@haohaoxue/lexora-contracts/tiptap/document-body'
+import { prettyBytes } from '@haohaoxue/lexora-shared/file'
 import { mergeAttributes, Node } from '@tiptap/core'
 import { translate } from '@/i18n'
 

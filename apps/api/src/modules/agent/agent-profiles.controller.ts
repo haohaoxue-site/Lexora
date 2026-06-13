@@ -1,4 +1,4 @@
-import type { AgentProfileSettings } from '@haohaoxue/samepage-contracts'
+import type { AgentProfileSettings } from '@haohaoxue/lexora-contracts'
 import type { AuthUserContext } from '../auth/auth.interface'
 import {
   Body,

@@ -3,15 +3,15 @@ import type {
   DocumentCollaborationScope,
   WorkspaceMemberRole,
   WorkspaceType,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 import {
   DOCUMENT_COLLABORATION_PERMISSION,
   DOCUMENT_COLLABORATION_SCOPE,
-} from '@haohaoxue/samepage-contracts/document/collaboration/constants'
+} from '@haohaoxue/lexora-contracts/document/collaboration/constants'
 import {
   WORKSPACE_MEMBER_ROLE,
   WORKSPACE_TYPE,
-} from '@haohaoxue/samepage-contracts/workspace/constants'
+} from '@haohaoxue/lexora-contracts/workspace/constants'
 
 /**
  * 文档协作能力矩阵。

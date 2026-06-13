@@ -1,4 +1,4 @@
-import type { TiptapJsonContent } from '@haohaoxue/samepage-contracts'
+import type { TiptapJsonContent } from '@haohaoxue/lexora-contracts'
 import type { TiptapEditorCollaborationBinding } from '../../core/typing'
 
 export interface DocumentTitleEditorProps {

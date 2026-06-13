@@ -1,5 +1,5 @@
 import type { AgentSkillCard } from '@/apis/agent-skills'
-import { AGENT_TRANSLATOR_SKILL_KEY } from '@haohaoxue/samepage-contracts/agent'
+import { AGENT_TRANSLATOR_SKILL_KEY } from '@haohaoxue/lexora-contracts/agent'
 import { createSharedComposable } from '@vueuse/core'
 import { computed, shallowRef } from 'vue'
 import {

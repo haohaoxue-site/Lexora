@@ -1,7 +1,7 @@
 import type {
   DocumentBlockHeadingLevel,
   DocumentBlockIndexEntry,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 
 export function resolveActiveOutlineBlockId(
   blockIndex: DocumentBlockIndexEntry[],

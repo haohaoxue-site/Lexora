@@ -11,7 +11,7 @@ const props = defineProps<{
 
 const route = useRoute()
 const { t } = useI18n({ useScope: 'global' })
-const repositoryUrl = 'https://github.com/haohaoxue-site/SamePage-AI'
+const repositoryUrl = 'https://github.com/haohaoxue-site/Lexora'
 
 function getItemStateClass(isActive: boolean) {
   return isActive ? 'active' : 'idle'

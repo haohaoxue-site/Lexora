@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { AgentSkillCard, AgentTranslatorSkillConfig } from '@haohaoxue/samepage-contracts'
+import type { AgentSkillCard, AgentTranslatorSkillConfig } from '@haohaoxue/lexora-contracts'
 import type { FormInstance } from 'element-plus'
 import { computed, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'

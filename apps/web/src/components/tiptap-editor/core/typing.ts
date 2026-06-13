@@ -1,7 +1,7 @@
 import type {
   CollabAwarenessState,
   TiptapJsonContent,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 import type { HocuspocusProvider } from '@hocuspocus/provider'
 import type { Editor, Extensions } from '@tiptap/core'
 import type { EditorProps } from '@tiptap/pm/view'

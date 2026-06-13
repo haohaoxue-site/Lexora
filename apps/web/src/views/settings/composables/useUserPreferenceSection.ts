@@ -1,10 +1,10 @@
-import type { AppearancePreference, LanguagePreference } from '@haohaoxue/samepage-contracts'
+import type { AppearancePreference, LanguagePreference } from '@haohaoxue/lexora-contracts'
 import {
   APPEARANCE_PREFERENCE,
   APPEARANCE_PREFERENCE_VALUES,
   LANGUAGE_PREFERENCE,
   LANGUAGE_PREFERENCE_VALUES,
-} from '@haohaoxue/samepage-contracts/user/constants'
+} from '@haohaoxue/lexora-contracts/user/constants'
 import { useI18n } from 'vue-i18n'
 
 const languagePreferenceLabelKey = {

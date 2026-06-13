@@ -11,7 +11,7 @@ import type {
   AiProviderModelItem,
   UpsertAiProviderModelRequest,
 } from '@/apis/ai'
-import { AI_MODEL_CAPABILITY, AI_MODEL_MODALITY, AI_MODEL_TYPE } from '@haohaoxue/samepage-contracts/ai/constants'
+import { AI_MODEL_CAPABILITY, AI_MODEL_MODALITY, AI_MODEL_TYPE } from '@haohaoxue/lexora-contracts/ai/constants'
 import { computed, nextTick, reactive, shallowRef, toValue } from 'vue'
 import { useI18n } from 'vue-i18n'
 import {

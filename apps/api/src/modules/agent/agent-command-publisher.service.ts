@@ -1,12 +1,12 @@
 import type {
   AgentGenerationCommand,
   AgentRuntimeControlCommand,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 import {
   AGENT_QUEUE_NAME,
   AgentGenerationCommandSchema,
   AgentRuntimeControlCommandSchema,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 import { Injectable } from '@nestjs/common'
 import { RedisService } from '../../infrastructure/redis/redis.service'
 

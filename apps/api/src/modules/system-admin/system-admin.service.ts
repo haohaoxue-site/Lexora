@@ -18,12 +18,12 @@ import type {
   UpdateSystemAuthInviteCodeRequest,
   UpdateSystemEmailConfigRequest,
   UpdateSystemEmailServiceStatusRequest,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 import {
   SYSTEM_ADMIN_AUDIT_TARGET_TYPE,
   SYSTEM_ADMIN_USER_DETAIL_LIMIT,
   SYSTEM_ADMIN_USER_ROLE_FILTER,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 import {
   BadRequestException,
   Injectable,

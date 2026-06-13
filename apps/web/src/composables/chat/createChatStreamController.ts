@@ -9,7 +9,7 @@ import type {
   CreateChatSessionMessageRequest,
   EditAndSendChatMessageRequest,
 } from '@/apis/chat'
-import { CHAT_SESSION_EVENT_TYPE } from '@haohaoxue/samepage-contracts/chat/constants'
+import { CHAT_SESSION_EVENT_TYPE } from '@haohaoxue/lexora-contracts/chat/constants'
 import { watch } from 'vue'
 import { translate } from '@/i18n'
 import { ElMessage } from '@/utils/element-plus'

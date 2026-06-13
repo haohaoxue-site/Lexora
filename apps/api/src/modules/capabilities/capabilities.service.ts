@@ -1,6 +1,6 @@
-import type { AuthCapabilities as AuthCapabilitiesView } from '@haohaoxue/samepage-contracts'
+import type { AuthCapabilities as AuthCapabilitiesView } from '@haohaoxue/lexora-contracts'
 import type { OAuthConfig, OAuthProviderConfig } from '../../config/auth.config'
-import { AUTH_PROVIDER, AUTH_PROVIDER_VALUES } from '@haohaoxue/samepage-contracts'
+import { AUTH_PROVIDER, AUTH_PROVIDER_VALUES } from '@haohaoxue/lexora-contracts'
 import { Injectable } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { SystemAuthService } from '../auth/system-auth.service'

@@ -1,12 +1,12 @@
 import type {
   TeamWorkspaceSummary,
   WorkspaceMemberSummary,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 import {
   WORKSPACE_MEMBER_ROLE,
   WORKSPACE_MEMBER_STATUS,
   WORKSPACE_TYPE,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 import {
   BadRequestException,
   Injectable,

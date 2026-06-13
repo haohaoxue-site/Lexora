@@ -71,7 +71,7 @@ export function resolveCurrentBlockElement(editor: Editor, currentBlock: Current
     }
   }
 
-  throw new TypeError('[samepage:tiptap] Current block is missing an available DOM node. Cannot position block menu.')
+  throw new TypeError('[lexora:tiptap] Current block is missing an available DOM node. Cannot position block menu.')
 }
 
 export function readBlockPreviewText(blockElement: HTMLElement) {

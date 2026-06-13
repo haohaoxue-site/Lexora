@@ -4,13 +4,13 @@ import type {
   AiModelType,
   AiProviderAuthMode,
   UpdateAiDefaultModelPolicyRequest,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 import {
   AI_MODEL_CAPABILITY_VALUES,
   AI_MODEL_MODALITY_VALUES,
   AI_MODEL_TYPE_VALUES,
   AI_PROVIDER_AUTH_MODE_VALUES,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 import { Transform, Type } from 'class-transformer'
 import {
   IsArray,

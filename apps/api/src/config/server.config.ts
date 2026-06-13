@@ -1,5 +1,5 @@
 import process from 'node:process'
-import { SERVER_PATH, SERVER_PORT } from '@haohaoxue/samepage-contracts'
+import { SERVER_PATH, SERVER_PORT } from '@haohaoxue/lexora-contracts'
 import { registerAs } from '@nestjs/config'
 
 const LEADING_OR_TRAILING_SLASHES_RE = /^\/+|\/+$/g

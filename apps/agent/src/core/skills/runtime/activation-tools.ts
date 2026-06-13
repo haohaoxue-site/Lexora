@@ -17,7 +17,7 @@ export function createAgentSkillTools(): StructuredToolInterface[] {
   return [
     tool(async () => 'skill activation requested', {
       name: AGENT_SKILL_TOOL_NAME.ACTIVATE,
-      description: 'Load the full instructions for a named SamePage Agent Skill before following that skill workflow.',
+      description: 'Load the full instructions for a named Lexora Agent Skill before following that skill workflow.',
       schema: ActivateSkillToolSchema,
     }),
     tool(async () => 'skill resource requested', {

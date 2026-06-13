@@ -1,4 +1,4 @@
-import type { DocumentYdocRuntimeState } from '@haohaoxue/samepage-contracts'
+import type { DocumentYdocRuntimeState } from '@haohaoxue/lexora-contracts'
 import type { DocumentYdocRuntimeStore } from './ydoc-runtime-store'
 import * as Y from 'yjs'
 

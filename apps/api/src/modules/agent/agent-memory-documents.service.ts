@@ -5,14 +5,14 @@ import type {
   AgentMemoryDocumentsResponse,
   AgentMemoryLane,
   ListAgentMemoryDocumentsQuery,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 import { Buffer } from 'node:buffer'
 import {
   AGENT_MEMORY_DOCUMENT_ID,
   AGENT_MEMORY_LANE,
   AgentMemoryDocumentSchema,
   AgentMemoryDocumentsResponseSchema,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 import { Injectable, NotFoundException } from '@nestjs/common'
 import { PrismaService } from '../../database/prisma.service'
 import {

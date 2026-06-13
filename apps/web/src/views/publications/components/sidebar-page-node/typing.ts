@@ -1,4 +1,4 @@
-import type { PublicationSidebarPage } from '@haohaoxue/samepage-contracts'
+import type { PublicationSidebarPage } from '@haohaoxue/lexora-contracts'
 
 export interface PublicationSidebarPageNodeProps {
   activeDocumentId: string | null

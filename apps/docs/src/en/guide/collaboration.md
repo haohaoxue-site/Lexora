@@ -4,7 +4,7 @@ Document collaboration means signed-in users accessing product pages under `/doc
 
 ## Invite a User
 
-To invite a specific user, enter the full user code. User codes start with `SP-` and do not rely on public usernames or editable display names.
+To invite a specific user, enter the full user code. User codes start with `LX-` and do not rely on public usernames or editable display names.
 
 After the invited user accepts, they receive collaboration access to the document.
 

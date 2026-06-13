@@ -3,11 +3,11 @@ import type {
   SystemEmailConfig,
   SystemEmailProvider,
   SystemEmailServiceStatus,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 import {
   SYSTEM_EMAIL_PROVIDER,
   SYSTEM_EMAIL_PROVIDER_DEFAULTS,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 
 export interface SystemEmailConfigRecord {
   provider: SystemEmailProvider
@@ -36,7 +36,7 @@ export function createDefaultSystemEmailConfig(): SystemEmailConfig {
     smtpPort: defaults.smtpPort,
     smtpSecure: defaults.smtpSecure,
     smtpUsername: '',
-    fromName: 'SamePage',
+    fromName: 'Lexora',
     fromEmail: '',
     hasPassword: false,
     lastTest: null,

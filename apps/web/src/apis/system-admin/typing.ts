@@ -27,4 +27,4 @@ export type {
   UpdateSystemAuthInviteCodeRequest,
   UpdateSystemEmailConfigRequest,
   UpdateSystemEmailServiceStatusRequest,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'

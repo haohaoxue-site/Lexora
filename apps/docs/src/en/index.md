@@ -2,12 +2,12 @@
 layout: home
 
 hero:
-  name: SamePage AI
-  text: AI and collaboration on the same page
+  name: Lexora
+  text: Documents, collaboration, and AI in one living workspace
   tagline: A collaborative document platform with AI chat, document editing, public publishing, admin tools, and self-hosting support.
   image:
     src: /ui.png
-    alt: SamePage AI interface preview
+    alt: Lexora interface preview
   actions:
     - theme: brand
       text: Quick Start

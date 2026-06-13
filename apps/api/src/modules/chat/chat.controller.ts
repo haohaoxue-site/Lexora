@@ -12,7 +12,7 @@ import type {
   CreateChatSessionRequest,
   EditAndSendChatMessageRequest,
   GetChatSessionsQuery,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 import type { FastifyReply } from 'fastify'
 import type { AuthUserContext } from '../auth/auth.interface'
 import {
@@ -23,8 +23,8 @@ import {
   CreateChatSessionRequestSchema,
   EditAndSendChatMessageRequestSchema,
   GetChatSessionsQuerySchema,
-} from '@haohaoxue/samepage-contracts'
-import { sleep } from '@haohaoxue/samepage-shared'
+} from '@haohaoxue/lexora-contracts'
+import { sleep } from '@haohaoxue/lexora-shared'
 import {
   BadRequestException,
   Body,

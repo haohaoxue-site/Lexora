@@ -1,11 +1,11 @@
-import type { ApiErrorCode } from '@haohaoxue/samepage-contracts'
+import type { ApiErrorCode } from '@haohaoxue/lexora-contracts'
 import type { ArgumentsHost, ExceptionFilter } from '@nestjs/common'
 import type { FastifyReply } from 'fastify'
 import {
   API_ERROR_CODE,
   ApiErrorCodeSchema,
   AUTH_ERROR_CODE,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 import {
   Catch,
   HttpException,

@@ -2,7 +2,7 @@
 import type {
   DocumentCollaborationPermission,
   DocumentCollaborationScope,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 import type {
   CollaborationLinkPanelEmits,
   CollaborationLinkPanelProps,

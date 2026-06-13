@@ -4,8 +4,8 @@ import type {
   PersistDocumentYdocUpdateRequest,
   PersistDocumentYdocUpdateResponse,
   TiptapJsonContent,
-} from '@haohaoxue/samepage-contracts'
-import { COLLAB_ERROR_CODE } from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
+import { COLLAB_ERROR_CODE } from '@haohaoxue/lexora-contracts'
 import {
   createTiptapDocumentCollaborationCheckpointState,
   createTiptapDocumentCollaborationTitlePatchCheckpoint,
@@ -13,7 +13,7 @@ import {
   resolveYdocUpdateSequenceError,
   toDocumentYdocCheckpointMetadata,
   toDocumentYdocUpdateRecord,
-} from '@haohaoxue/samepage-shared'
+} from '@haohaoxue/lexora-shared'
 import {
   ConflictException,
   Injectable,

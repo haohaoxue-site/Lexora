@@ -6,4 +6,4 @@ export type {
   TransferTeamWorkspaceOwnershipRequest,
   WorkspaceInviteSummary,
   WorkspaceMemberSummary,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'

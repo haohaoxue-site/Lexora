@@ -2,11 +2,11 @@ import type {
   AgentProfileConfig,
   AgentRuntimeSkillContext,
   ResolvedLanguagePreference,
-} from '@haohaoxue/samepage-contracts'
-import { LANGUAGE_PREFERENCE, LANGUAGE_PREFERENCE_LABELS } from '@haohaoxue/samepage-contracts/user/constants'
+} from '@haohaoxue/lexora-contracts'
+import { LANGUAGE_PREFERENCE, LANGUAGE_PREFERENCE_LABELS } from '@haohaoxue/lexora-contracts/user/constants'
 import { createSkillCatalogPromptBlock } from '../skills/runtime'
 
-export const BASE_AGENT_SYSTEM_PROMPT = '你是 SamePage 的智能助手。回答准确、简洁。'
+export const BASE_AGENT_SYSTEM_PROMPT = '你是 Lexora 的智能助手。回答准确、简洁。'
 
 const AGENT_HISTORY_DIGEST_PROMPT_PREFIX = '较早对话摘要：'
 

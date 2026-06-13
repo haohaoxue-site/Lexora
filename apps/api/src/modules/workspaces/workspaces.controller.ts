@@ -3,12 +3,12 @@ import type {
   TeamWorkspaceSummary,
   WorkspaceInviteSummary,
   WorkspaceMemberSummary,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 import type { FastifyReply } from 'fastify'
 import type { AuthUserContext } from '../auth/auth.interface'
 import {
   PERMISSIONS,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 import {
   Controller,
   Delete,

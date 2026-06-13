@@ -1,4 +1,4 @@
-import type { PublicationRenderedDocument, TiptapJsonContent } from '@haohaoxue/samepage-contracts'
+import type { PublicationRenderedDocument, TiptapJsonContent } from '@haohaoxue/lexora-contracts'
 import type { DocumentBodyEditorOutlineOptions } from '@/components/tiptap-editor'
 
 export interface PublicationDocumentContentProps {

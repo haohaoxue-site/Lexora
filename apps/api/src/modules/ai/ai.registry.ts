@@ -1,9 +1,9 @@
-import type { AiProviderPreset } from '@haohaoxue/samepage-contracts'
+import type { AiProviderPreset } from '@haohaoxue/lexora-contracts'
 import {
   AI_MODEL_TYPE,
   AI_PROVIDER_AUTH_MODE,
   AI_PROVIDER_ENDPOINT_MODE,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 
 export const AI_BUILTIN_PROVIDER_PRESETS = [
   {

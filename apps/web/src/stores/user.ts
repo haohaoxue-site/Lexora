@@ -6,11 +6,11 @@ import type {
   ResolvedLanguagePreference,
   SessionUser,
   UserSettings,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 import type { DeepReadonly } from 'vue'
-import { ROLES } from '@haohaoxue/samepage-contracts/rbac/constants'
-import { APPEARANCE_PREFERENCE, LANGUAGE_PREFERENCE } from '@haohaoxue/samepage-contracts/user/constants'
-import { resolveAppearancePreference, resolveLanguagePreference } from '@haohaoxue/samepage-shared/user'
+import { ROLES } from '@haohaoxue/lexora-contracts/rbac/constants'
+import { APPEARANCE_PREFERENCE, LANGUAGE_PREFERENCE } from '@haohaoxue/lexora-contracts/user/constants'
+import { resolveAppearancePreference, resolveLanguagePreference } from '@haohaoxue/lexora-shared/user'
 import { usePreferredDark, usePreferredLanguages } from '@vueuse/core'
 import { defineStore } from 'pinia'
 import { computed, reactive, readonly, shallowRef, watch } from 'vue'

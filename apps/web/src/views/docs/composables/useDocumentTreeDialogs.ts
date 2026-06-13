@@ -2,12 +2,12 @@ import type {
   DocumentCurrent,
   DocumentItem,
   DocumentTreeGroup,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 import type { ComputedRef, ShallowRef } from 'vue'
 import type { DocumentDeleteAction } from '../typing'
 import type { DocumentDeletePlan } from '../utils/documentTree'
 import type { NavigateToDocumentOptions } from './useDocsContext'
-import { getDocumentTitlePlainText } from '@haohaoxue/samepage-shared/document'
+import { getDocumentTitlePlainText } from '@haohaoxue/lexora-shared/document'
 import { computed, shallowRef } from 'vue'
 import {
   deleteDocument as deleteDocumentRequest,

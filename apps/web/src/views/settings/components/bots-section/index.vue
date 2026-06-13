@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { BotsSectionEmits, BotsSectionProps } from './typing'
-import { BOT_RUNTIME_STATE, WEIXIN_BOT_LOGIN_STATUS } from '@haohaoxue/samepage-contracts/bot'
+import { BOT_RUNTIME_STATE, WEIXIN_BOT_LOGIN_STATUS } from '@haohaoxue/lexora-contracts/bot'
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import UserSettingsSectionHeader from '../section-header'

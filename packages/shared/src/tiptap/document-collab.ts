@@ -2,8 +2,8 @@ import type {
   TiptapDocumentCollaborationContentProjection,
   TiptapJsonContent,
   TiptapJsonNode,
-} from '@haohaoxue/samepage-contracts'
-import { TIPTAP_DOCUMENT_COLLABORATION_FIELD } from '@haohaoxue/samepage-contracts/tiptap/constants'
+} from '@haohaoxue/lexora-contracts'
+import { TIPTAP_DOCUMENT_COLLABORATION_FIELD } from '@haohaoxue/lexora-contracts/tiptap/constants'
 import { getSchema } from '@tiptap/core'
 import { prosemirrorJSONToYXmlFragment, yXmlFragmentToProsemirrorJSON } from '@tiptap/y-tiptap'
 import * as Y from 'yjs'
@@ -56,7 +56,7 @@ export function hydrateTiptapDocumentCollaborationYdoc(
       content: wrapTiptapContent(content.body),
       schema: bodySchema,
     })
-  }, 'samepage-tiptap-document-collaboration-bootstrap')
+  }, 'lexora-tiptap-document-collaboration-bootstrap')
 }
 
 export function replaceTiptapDocumentCollaborationYdocTitle(
@@ -70,7 +70,7 @@ export function replaceTiptapDocumentCollaborationYdocTitle(
       content: wrapTiptapContent(toTiptapDocumentTitleEditorContent(title)),
       schema: titleSchema,
     })
-  }, 'samepage-tiptap-document-title-rename')
+  }, 'lexora-tiptap-document-title-rename')
 }
 
 export function createTiptapDocumentCollaborationTitlePatchCheckpoint(input: {

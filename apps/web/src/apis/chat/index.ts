@@ -14,9 +14,9 @@ import type {
   SwitchChatActiveMessageRequest,
   UpdateChatSessionTitleRequest,
 } from './typing'
-import { ChatSessionEventSchema } from '@haohaoxue/samepage-contracts/chat'
-import { CHAT_SESSION_EVENT_TYPE, CHAT_SESSION_ORIGIN } from '@haohaoxue/samepage-contracts/chat/constants'
-import { SERVER_PATH } from '@haohaoxue/samepage-contracts/server'
+import { ChatSessionEventSchema } from '@haohaoxue/lexora-contracts/chat'
+import { CHAT_SESSION_EVENT_TYPE, CHAT_SESSION_ORIGIN } from '@haohaoxue/lexora-contracts/chat/constants'
+import { SERVER_PATH } from '@haohaoxue/lexora-contracts/server'
 import { getChatStreamingProbe } from '@/composables/chat/utils/chat-streaming-probe'
 import { useAuthStore } from '@/stores/auth'
 import { axios } from '@/utils/axios'

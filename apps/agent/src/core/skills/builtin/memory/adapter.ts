@@ -1,5 +1,5 @@
 import type { RuntimeSkillAdapter } from '../../adapter'
-import { AGENT_MEMORY_SKILL_KEY } from '@haohaoxue/samepage-contracts'
+import { AGENT_MEMORY_SKILL_KEY } from '@haohaoxue/lexora-contracts'
 import {
   executeMemoryToolCalls,
 } from './executor'

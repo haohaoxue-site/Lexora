@@ -1,4 +1,4 @@
-const FALLBACK_ORIGIN = 'https://samepage.local'
+const FALLBACK_ORIGIN = 'https://lexora.local'
 
 export function buildDocumentBlockHash(blockId: string) {
   return `#${encodeURIComponent(blockId)}`

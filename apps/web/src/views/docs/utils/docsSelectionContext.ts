@@ -1,4 +1,4 @@
-import type { TiptapJsonContent } from '@haohaoxue/samepage-contracts'
+import type { TiptapJsonContent } from '@haohaoxue/lexora-contracts'
 import type { Editor } from '@tiptap/core'
 import type { Node as ProseMirrorNode } from '@tiptap/pm/model'
 import type { Transaction } from '@tiptap/pm/state'

@@ -4,11 +4,11 @@ import type {
   PublicationSingleDocumentResponse,
   PublicationSiteRenderResponse,
   TiptapJsonContent,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 import {
   collectDocumentAssetIds,
   hydrateDocumentAssetAttributes,
-} from '@haohaoxue/samepage-shared/document'
+} from '@haohaoxue/lexora-shared/document'
 import { computed, shallowRef, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'

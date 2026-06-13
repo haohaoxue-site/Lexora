@@ -1,7 +1,7 @@
-import type { ConfirmBindEmailRequest } from '@haohaoxue/samepage-contracts'
+import type { ConfirmBindEmailRequest } from '@haohaoxue/lexora-contracts'
 import { randomInt } from 'node:crypto'
-import { API_ERROR_CODE } from '@haohaoxue/samepage-contracts'
-import { resolveLanguagePreference } from '@haohaoxue/samepage-shared'
+import { API_ERROR_CODE } from '@haohaoxue/lexora-contracts'
+import { resolveLanguagePreference } from '@haohaoxue/lexora-shared'
 import {
   Injectable,
   NotFoundException,

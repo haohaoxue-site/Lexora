@@ -1,12 +1,12 @@
 <script setup lang="ts">
-import type { NotificationListFilter } from '@haohaoxue/samepage-contracts'
+import type { NotificationListFilter } from '@haohaoxue/lexora-contracts'
 import type { SessionNotificationPanelProps } from '../typing'
 import type { TiptapEditorResolveImageSrc } from '@/components/tiptap-editor/content/typing'
 import type {
   SessionNotificationInvitationItem,
   SessionNotificationItem,
 } from '@/layouts/components/session-notification-bell/useSessionNotificationBell'
-import { NOTIFICATION_LIST_FILTER, NOTIFICATION_SOURCE_KIND } from '@haohaoxue/samepage-contracts/notification'
+import { NOTIFICATION_LIST_FILTER, NOTIFICATION_SOURCE_KIND } from '@haohaoxue/lexora-contracts/notification'
 import { computed, shallowRef, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { resolvePublishedNotificationAssets } from '@/apis/notification'

@@ -1,4 +1,4 @@
-import type { SessionUser } from '@haohaoxue/samepage-contracts'
+import type { SessionUser } from '@haohaoxue/lexora-contracts'
 import type { FastifyRequest } from 'fastify'
 import type { JwtConfig } from '../../config/auth.config'
 import type {
@@ -8,7 +8,7 @@ import type {
 } from './auth.interface'
 import { Buffer } from 'node:buffer'
 import { createSecretKey, randomBytes, randomUUID } from 'node:crypto'
-import { AUTH_ERROR_CODE } from '@haohaoxue/samepage-contracts'
+import { AUTH_ERROR_CODE } from '@haohaoxue/lexora-contracts'
 import {
   Injectable,
   UnauthorizedException,

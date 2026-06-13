@@ -2,11 +2,11 @@ import type {
   DocumentCollaborationConsoleTreeItem,
   DocumentCollaborationPermission,
   DocumentCollaborationScope,
-} from '@haohaoxue/samepage-contracts/document/collaboration'
+} from '@haohaoxue/lexora-contracts/document/collaboration'
 import {
   DOCUMENT_COLLABORATION_PERMISSION,
   DOCUMENT_COLLABORATION_SCOPE,
-} from '@haohaoxue/samepage-contracts/document/collaboration/constants'
+} from '@haohaoxue/lexora-contracts/document/collaboration/constants'
 import { useClipboard } from '@vueuse/core'
 import { computed, shallowRef, watch } from 'vue'
 import { useRouter } from 'vue-router'

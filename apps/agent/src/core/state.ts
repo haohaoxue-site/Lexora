@@ -9,7 +9,7 @@ import type {
   ChatGenerationUsageSnapshot,
   ChatMemoryOperationProjection,
   ResolvedLanguagePreference,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 import type { AgentChatModelOptions } from '../integrations/model-providers/chat-model'
 import type { AgentModelStreamPart } from '../integrations/model-providers/stream-text'
 import type { AgentContextBudget, AgentModelLimits } from './context/budget'

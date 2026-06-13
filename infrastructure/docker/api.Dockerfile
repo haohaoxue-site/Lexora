@@ -19,13 +19,13 @@ COPY apps/api/prisma.config.ts apps/api/prisma.config.ts
 COPY packages/contracts/package.json packages/contracts/package.json
 COPY packages/shared/package.json packages/shared/package.json
 
-RUN pnpm install --filter @haohaoxue/samepage-api... --frozen-lockfile
+RUN pnpm install --filter @haohaoxue/lexora-api... --frozen-lockfile
 
 COPY packages/contracts packages/contracts
 COPY packages/shared packages/shared
 COPY apps/api apps/api
 
-RUN pnpm --filter @haohaoxue/samepage-api build
+RUN pnpm --filter @haohaoxue/lexora-api build
 
 FROM node:24-slim
 
@@ -54,7 +54,7 @@ COPY --chown=node:node apps/api/prisma.config.ts apps/api/prisma.config.ts
 
 USER node
 
-RUN pnpm install --filter @haohaoxue/samepage-api --prod --frozen-lockfile \
+RUN pnpm install --filter @haohaoxue/lexora-api --prod --frozen-lockfile \
   && rm -rf apps/api/node_modules/@haohaoxue
 
 COPY --chown=node:node --from=build /workspace/apps/api/dist /app/apps/api/dist

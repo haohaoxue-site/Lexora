@@ -1,10 +1,10 @@
 import type {
   DocumentItem,
   DocumentTreeGroup,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 import type { ComputedRef } from 'vue'
 import type { DocumentDeletePlan } from '../utils/documentTree'
-import { formatDocumentCollectionLabel } from '@haohaoxue/samepage-shared/document'
+import { formatDocumentCollectionLabel } from '@haohaoxue/lexora-shared/document'
 import { computed, shallowRef } from 'vue'
 import { getDocuments } from '@/apis/document'
 import { translate } from '@/i18n'

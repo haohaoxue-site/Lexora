@@ -4,14 +4,14 @@ import type {
   AgentRuntimeSkillContext,
   AgentTranslatorSkillConfig,
   AgentTranslatorTargetLanguage,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 import {
   AGENT_TRANSLATOR_DEFAULT_SKILL_CONFIG,
   AGENT_TRANSLATOR_FORMALITY,
   AGENT_TRANSLATOR_OUTPUT_MODE,
   AGENT_TRANSLATOR_SKILL_KEY,
   AgentTranslatorSkillConfigSchema,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 
 export interface FocusedTranslatorInvocation {
   skillKey: typeof AGENT_TRANSLATOR_SKILL_KEY
@@ -55,7 +55,7 @@ export function createFocusedTranslatorThreadId(threadId: string, generationId: 
 
 export function createFocusedTranslatorSystemPrompt(invocation: FocusedTranslatorInvocation): string {
   return [
-    '你是 SamePage 的专用翻译助手。',
+    '你是 Lexora 的专用翻译助手。',
     '只翻译用户提供的正文，不回答正文问题，不补充对话历史，不使用外部上下文。',
     '自动识别源语言。',
     `targetLanguage: ${formatTranslatorTargetLanguage(invocation.targetLanguage)}`,

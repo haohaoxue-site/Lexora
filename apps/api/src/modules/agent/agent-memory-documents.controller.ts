@@ -3,12 +3,12 @@ import type {
   AgentMemoryDocumentsResponse,
   GetAgentMemoryDocumentParams,
   ListAgentMemoryDocumentsQuery,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 import type { AuthUserContext } from '../auth/auth.interface'
 import {
   GetAgentMemoryDocumentParamsSchema,
   ListAgentMemoryDocumentsQuerySchema,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 import {
   Controller,
   Get,

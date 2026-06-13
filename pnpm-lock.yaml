@@ -49,10 +49,10 @@ importers:
 
   apps/agent:
     dependencies:
-      '@haohaoxue/samepage-contracts':
+      '@haohaoxue/lexora-contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
-      '@haohaoxue/samepage-shared':
+      '@haohaoxue/lexora-shared':
         specifier: workspace:*
         version: link:../../packages/shared
       '@langchain/anthropic':
@@ -113,10 +113,10 @@ importers:
       '@fastify/static':
         specifier: ^9.1.3
         version: 9.1.3
-      '@haohaoxue/samepage-contracts':
+      '@haohaoxue/lexora-contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
-      '@haohaoxue/samepage-shared':
+      '@haohaoxue/lexora-shared':
         specifier: workspace:*
         version: link:../../packages/shared
       '@nestjs/common':
@@ -240,10 +240,10 @@ importers:
       '@fastify/websocket':
         specifier: ^11.2.0
         version: 11.2.0
-      '@haohaoxue/samepage-contracts':
+      '@haohaoxue/lexora-contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
-      '@haohaoxue/samepage-shared':
+      '@haohaoxue/lexora-shared':
         specifier: workspace:*
         version: link:../../packages/shared
       '@hocuspocus/server':
@@ -304,10 +304,10 @@ importers:
       '@element-plus/icons-vue':
         specifier: ^2.3.2
         version: 2.3.2(vue@3.5.35(typescript@6.0.3))
-      '@haohaoxue/samepage-contracts':
+      '@haohaoxue/lexora-contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
-      '@haohaoxue/samepage-shared':
+      '@haohaoxue/lexora-shared':
         specifier: workspace:*
         version: link:../../packages/shared
       '@hocuspocus/provider':
@@ -498,7 +498,7 @@ importers:
 
   packages/shared:
     dependencies:
-      '@haohaoxue/samepage-contracts':
+      '@haohaoxue/lexora-contracts':
         specifier: workspace:*
         version: link:../contracts
       '@tiptap/core':

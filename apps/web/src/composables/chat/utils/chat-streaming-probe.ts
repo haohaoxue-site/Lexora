@@ -12,5 +12,5 @@ export function getChatStreamingProbe(): ChatStreamingProbe | null {
     return null
   }
 
-  return (window as typeof window & { __samePageChatStreamingProbe?: ChatStreamingProbe }).__samePageChatStreamingProbe ?? null
+  return (window as typeof window & { __lexoraChatStreamingProbe?: ChatStreamingProbe }).__lexoraChatStreamingProbe ?? null
 }

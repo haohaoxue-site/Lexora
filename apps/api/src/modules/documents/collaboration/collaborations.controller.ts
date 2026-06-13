@@ -12,7 +12,7 @@ import type {
   UpsertDocumentCollaborationLinkInviteRequest,
   UpsertDocumentCollaborationLinkInviteResponse,
   UserCollabIdentity,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 import type { AuthUserContext } from '../../auth/auth.interface'
 import {
   ConfirmDocumentCollaborationResolverEntrySchema,
@@ -20,7 +20,7 @@ import {
   SetDocumentCollaborationUserGrantSchema,
   UpdateDocumentCollaborationGrantSchema,
   UpsertDocumentCollaborationLinkInviteSchema,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 import { BadRequestException, Body, Controller, Delete, Get, Param, Patch, Post, Put, Query } from '@nestjs/common'
 import { CurrentUser } from '../../../decorators/current-user.decorator'
 import { OptionalCurrentUser } from '../../../decorators/optional-current-user.decorator'

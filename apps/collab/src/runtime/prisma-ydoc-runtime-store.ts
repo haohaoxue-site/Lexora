@@ -1,9 +1,9 @@
 import type {
   DocumentYdocRuntimeState,
   PersistDocumentYdocUpdateRequest,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 import type { DocumentYdocRuntimeStore } from './ydoc-runtime-store'
-import { COLLAB_ERROR_CODE } from '@haohaoxue/samepage-contracts'
+import { COLLAB_ERROR_CODE } from '@haohaoxue/lexora-contracts'
 import {
   createTiptapDocumentCollaborationYdoc,
   isYdocRuntimeInitialized,
@@ -11,7 +11,7 @@ import {
   resolveYdocUpdateSequenceError,
   toDocumentYdocCheckpointMetadata,
   toDocumentYdocUpdateRecord,
-} from '@haohaoxue/samepage-shared'
+} from '@haohaoxue/lexora-shared'
 import { PrismaPg } from '@prisma/adapter-pg'
 import { Prisma, PrismaClient } from '@prisma/client'
 import * as Y from 'yjs'

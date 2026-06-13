@@ -9,11 +9,11 @@ export function resolveBlockTriggerAnchorRect(editor: Editor): DOMRect {
   const currentBlock = getCurrentBlock(editor.state.selection)
 
   if (!currentBlock) {
-    throw new Error('[samepage:tiptap] Current selection does not resolve to a block node. Cannot position block menu.')
+    throw new Error('[lexora:tiptap] Current selection does not resolve to a block node. Cannot position block menu.')
   }
 
   if (!(editor.view.dom instanceof HTMLElement) || typeof editor.view.dom.getBoundingClientRect !== 'function') {
-    throw new TypeError('[samepage:tiptap] Editor view is missing the ProseMirror root node. Cannot position block menu.')
+    throw new TypeError('[lexora:tiptap] Editor view is missing the ProseMirror root node. Cannot position block menu.')
   }
 
   const blockElement = resolveCurrentBlockElement(editor, currentBlock)

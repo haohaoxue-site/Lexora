@@ -1,12 +1,12 @@
 <script setup lang="ts">
-import type { DocumentItem as DocumentTreeItemModel } from '@haohaoxue/samepage-contracts'
+import type { DocumentItem as DocumentTreeItemModel } from '@haohaoxue/lexora-contracts'
 import type { CheckedInfo, TreeNode, TreeNodeData, TreeV2Instance } from 'element-plus'
 import type {
   DocumentSectionPanelEmits,
   DocumentSectionPanelProps,
   DocumentSectionPanelSlots,
 } from './typing'
-import { DOCUMENT_COLLECTION } from '@haohaoxue/samepage-contracts/document/constants'
+import { DOCUMENT_COLLECTION } from '@haohaoxue/lexora-contracts/document/constants'
 import { useElementSize } from '@vueuse/core'
 import { computed, nextTick, shallowRef, useTemplateRef, watch } from 'vue'
 import { useI18n } from 'vue-i18n'

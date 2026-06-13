@@ -1,4 +1,4 @@
-import type { RequestPageParams } from '@haohaoxue/samepage-contracts'
+import type { RequestPageParams } from '@haohaoxue/lexora-contracts'
 import { Type } from 'class-transformer'
 import {
   IsInt,

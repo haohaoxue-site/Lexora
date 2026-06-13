@@ -1,4 +1,4 @@
-import type { AppearancePreference, NotificationListFilter } from '@haohaoxue/samepage-contracts'
+import type { AppearancePreference, NotificationListFilter } from '@haohaoxue/lexora-contracts'
 import type { SvgIconProps } from '@/components/svg-icon/typing'
 import type { SessionNotificationItem } from '@/layouts/components/session-notification-bell/useSessionNotificationBell'
 

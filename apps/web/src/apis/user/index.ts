@@ -1,4 +1,4 @@
-import type { AuthProviderName } from '@haohaoxue/samepage-contracts'
+import type { AuthProviderName } from '@haohaoxue/lexora-contracts'
 import type {
   ConfirmBindEmailRequest,
   DeleteCurrentUserRequest,

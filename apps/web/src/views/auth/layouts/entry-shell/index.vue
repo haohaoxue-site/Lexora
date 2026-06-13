@@ -30,7 +30,7 @@ defineSlots<AuthEntryShellSlots>()
           </div>
           <div class="auth-entry-shell__brand-text min-w-0">
             <div class="auth-entry-shell__brand-name text-lg font-bold whitespace-nowrap text-main">
-              SamePage AI
+              Lexora
             </div>
           </div>
         </div>

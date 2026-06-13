@@ -1,7 +1,7 @@
 import type {
   AgentChatContextMessage,
   AgentChatContextSnapshot,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 
 export interface ApplyAgentContextSnapshotsOptions {
   triggerUserMessageId: string | null | undefined
@@ -43,9 +43,9 @@ export function applyAgentContextSnapshotsToMessages(
 
 function formatAgentContextSnapshots(snapshots: AgentChatContextSnapshot[]): string {
   return [
-    '[SamePage 上下文开始]',
+    '[Lexora 上下文开始]',
     ...snapshots.flatMap((snapshot, index) => formatAgentContextSnapshot(snapshot, index)),
-    '[SamePage 上下文结束]',
+    '[Lexora 上下文结束]',
   ].join('\n')
 }
 

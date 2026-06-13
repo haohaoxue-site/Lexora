@@ -19,7 +19,7 @@ export default {
     const url = new URL(request.url)
 
     if (request.method === 'GET' && (url.pathname === '/' || url.pathname === '/healthz')) {
-      return new Response('samepage oauth proxy', {
+      return new Response('lexora oauth proxy', {
         headers: { 'content-type': 'text/plain; charset=utf-8' },
       })
     }

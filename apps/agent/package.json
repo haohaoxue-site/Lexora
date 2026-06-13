@@ -1,5 +1,5 @@
 {
-  "name": "@haohaoxue/samepage-agent",
+  "name": "@haohaoxue/lexora-agent",
   "type": "module",
   "version": "1.0.0",
   "private": true,
@@ -13,8 +13,8 @@
     "test:watch": "vitest --passWithNoTests"
   },
   "dependencies": {
-    "@haohaoxue/samepage-contracts": "workspace:*",
-    "@haohaoxue/samepage-shared": "workspace:*",
+    "@haohaoxue/lexora-contracts": "workspace:*",
+    "@haohaoxue/lexora-shared": "workspace:*",
     "@langchain/anthropic": "^1.3.28",
     "@langchain/core": "^1.1.42",
     "@langchain/langgraph": "^1.2.9",

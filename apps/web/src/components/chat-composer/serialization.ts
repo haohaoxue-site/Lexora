@@ -5,8 +5,8 @@ import type {
 } from './typing'
 import {
   CHAT_MESSAGE_ATTACHMENT_PLACEMENT,
-} from '@haohaoxue/samepage-contracts/chat/constants'
-import { serializeChatMessageContentJSON } from '@haohaoxue/samepage-shared/chat'
+} from '@haohaoxue/lexora-contracts/chat/constants'
+import { serializeChatMessageContentJSON } from '@haohaoxue/lexora-shared/chat'
 
 export function serializeChatComposerContent(contentJSON: ChatComposerContentJSON): ChatComposerSerializedContent {
   return serializeChatMessageContentJSON(contentJSON)

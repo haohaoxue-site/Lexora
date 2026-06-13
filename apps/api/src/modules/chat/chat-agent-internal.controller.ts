@@ -1,4 +1,4 @@
-import type { ChatGenerationBootstrap } from '@haohaoxue/samepage-contracts'
+import type { ChatGenerationBootstrap } from '@haohaoxue/lexora-contracts'
 import {
   Controller,
   HttpCode,

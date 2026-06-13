@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { CSSProperties } from 'vue'
-import { formatDocumentLocation } from '@haohaoxue/samepage-shared/document'
+import { formatDocumentLocation } from '@haohaoxue/lexora-shared/document'
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import Empty from '@/components/empty'

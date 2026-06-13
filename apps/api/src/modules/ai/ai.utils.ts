@@ -13,7 +13,7 @@ import type {
   AiProviderModelItem,
   AiProviderScope,
   AiProviderSource,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 import type {
   AiModelCapability as PrismaAiModelCapability,
   AiModelModality as PrismaAiModelModality,
@@ -34,7 +34,7 @@ import {
   AI_PROVIDER_ENDPOINT_MODE,
   AI_PROVIDER_SCOPE,
   AI_PROVIDER_SOURCE,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 
 interface ModelCountProjection {
   _count?: {

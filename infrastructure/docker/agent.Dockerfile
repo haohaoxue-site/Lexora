@@ -14,13 +14,13 @@ COPY apps/agent/package.json apps/agent/package.json
 COPY packages/contracts/package.json packages/contracts/package.json
 COPY packages/shared/package.json packages/shared/package.json
 
-RUN pnpm install --filter @haohaoxue/samepage-agent... --frozen-lockfile
+RUN pnpm install --filter @haohaoxue/lexora-agent... --frozen-lockfile
 
 COPY packages/contracts packages/contracts
 COPY packages/shared packages/shared
 COPY apps/agent apps/agent
 
-RUN pnpm --filter @haohaoxue/samepage-agent build
+RUN pnpm --filter @haohaoxue/lexora-agent build
 
 FROM node:24-slim
 
@@ -42,7 +42,7 @@ COPY --chown=node:node apps/agent/package.json apps/agent/package.json
 
 USER node
 
-RUN pnpm install --filter @haohaoxue/samepage-agent --prod --frozen-lockfile \
+RUN pnpm install --filter @haohaoxue/lexora-agent --prod --frozen-lockfile \
   && rm -rf apps/agent/node_modules/@haohaoxue
 
 COPY --chown=node:node --from=build /workspace/apps/agent/dist /app/apps/agent/dist

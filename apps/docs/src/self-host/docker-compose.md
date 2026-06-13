@@ -1,6 +1,6 @@
 # Docker Compose 部署
 
-SamePage AI 推荐使用 Docker Compose 部署。
+Lexora 推荐使用 Docker Compose 部署。
 
 ## 服务组成
 

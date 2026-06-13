@@ -5,7 +5,7 @@ import type {
   CollaborationPasswordFormExposed,
   CollaborationPasswordFormProps,
 } from './typing'
-import { DOCUMENT_COLLABORATION_LINK_PASSWORD_LENGTH } from '@haohaoxue/samepage-contracts/document/collaboration/constants'
+import { DOCUMENT_COLLABORATION_LINK_PASSWORD_LENGTH } from '@haohaoxue/lexora-contracts/document/collaboration/constants'
 import { reactive, useTemplateRef, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 

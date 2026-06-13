@@ -1,5 +1,5 @@
-import type { DocumentVersionSnapshot } from '@haohaoxue/samepage-contracts'
-import { isSameDocumentVersionSnapshotContent } from '@haohaoxue/samepage-shared/document'
+import type { DocumentVersionSnapshot } from '@haohaoxue/lexora-contracts'
+import { isSameDocumentVersionSnapshotContent } from '@haohaoxue/lexora-shared/document'
 import { createSharedComposable } from '@vueuse/core'
 import { computed, shallowRef, watch } from 'vue'
 import {

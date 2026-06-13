@@ -2,7 +2,7 @@ import { z } from 'zod'
 
 const NonEmptyStringSchema = z.string().trim().min(1)
 
-export const AGENT_TRANSLATOR_SKILL_KEY = 'samepage.translator' as const
+export const AGENT_TRANSLATOR_SKILL_KEY = 'lexora.translator' as const
 
 export const AGENT_TRANSLATOR_OUTPUT_MODE = {
   TRANSLATION_ONLY: 'translation_only',

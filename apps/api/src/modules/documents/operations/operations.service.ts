@@ -2,7 +2,7 @@ import type {
   DocumentOperationJob,
   MoveDocumentTreeOperationRequest,
   TiptapJsonContent,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 import { randomUUID } from 'node:crypto'
 import {
   COLLAB_PERMISSION_INVALIDATION_REASON,
@@ -12,7 +12,7 @@ import {
   DOCUMENT_VISIBILITY,
   TIPTAP_SCHEMA_VERSION,
   WORKSPACE_TYPE,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 import {
   collectDocumentAssetIds,
   createDocumentTitleContent,
@@ -21,7 +21,7 @@ import {
   resolveRootDocumentVisibility,
   rewriteDocumentAssetIds,
   summarizeDocumentContent,
-} from '@haohaoxue/samepage-shared'
+} from '@haohaoxue/lexora-shared'
 import {
   BadRequestException,
   ForbiddenException,

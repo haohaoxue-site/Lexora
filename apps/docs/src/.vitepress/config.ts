@@ -4,7 +4,7 @@ const zhGuideSidebar = [
   {
     text: '介绍',
     items: [
-      { text: '什么是 SamePage AI', link: '/guide/what-is-samepage-ai' },
+      { text: '什么是 Lexora', link: '/guide/what-is-lexora' },
       { text: '快速开始', link: '/guide/quick-start' },
     ],
   },
@@ -47,7 +47,7 @@ const enGuideSidebar = [
   {
     text: 'Introduction',
     items: [
-      { text: 'What is SamePage AI', link: '/en/guide/what-is-samepage-ai' },
+      { text: 'What is Lexora', link: '/en/guide/what-is-lexora' },
       { text: 'Quick Start', link: '/en/guide/quick-start' },
     ],
   },
@@ -87,8 +87,8 @@ const enSelfHostSidebar = [
 ]
 
 export default defineConfig({
-  title: 'SamePage AI',
-  description: 'AI 与协作同在一页',
+  title: 'Lexora',
+  description: '文档、协作与 AI 汇入同一个工作台',
   cleanUrls: true,
   outDir: '../dist',
   cacheDir: '../.vitepress/cache',
@@ -103,7 +103,7 @@ export default defineConfig({
       themeConfig: {
         nav: [
           { text: '首页', link: '/' },
-          { text: '指南', link: '/guide/what-is-samepage-ai' },
+          { text: '指南', link: '/guide/what-is-lexora' },
           { text: '自部署', link: '/self-host/docker-compose' },
         ],
         sidebar: {
@@ -115,11 +115,11 @@ export default defineConfig({
     en: {
       label: 'English',
       lang: 'en-US',
-      description: 'AI and collaboration on the same page',
+      description: 'Documents, collaboration, and AI in one living workspace',
       themeConfig: {
         nav: [
           { text: 'Home', link: '/en/' },
-          { text: 'Guide', link: '/en/guide/what-is-samepage-ai' },
+          { text: 'Guide', link: '/en/guide/what-is-lexora' },
           { text: 'Self-hosting', link: '/en/self-host/docker-compose' },
         ],
         sidebar: {

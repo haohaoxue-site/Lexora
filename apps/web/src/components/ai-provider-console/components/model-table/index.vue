@@ -9,7 +9,7 @@ import {
   AI_MODEL_CAPABILITY,
   AI_MODEL_MODALITY,
   AI_MODEL_TYPE,
-} from '@haohaoxue/samepage-contracts/ai/constants'
+} from '@haohaoxue/lexora-contracts/ai/constants'
 import { useI18n } from 'vue-i18n'
 import {
   formatModelLimit,

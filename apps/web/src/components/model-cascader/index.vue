@@ -17,7 +17,7 @@ import type {
   AiModelRef,
   AiProviderScope,
 } from '@/apis/ai'
-import { AI_PROVIDER_SCOPE } from '@haohaoxue/samepage-contracts/ai/constants'
+import { AI_PROVIDER_SCOPE } from '@haohaoxue/lexora-contracts/ai/constants'
 import { computed, shallowRef, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import {
@@ -47,6 +47,7 @@ const availableProvidersByScope = shallowRef<Partial<Record<AiProviderScope, AiA
 const providerLoadingPromises = shallowRef<Partial<Record<AiProviderScope, Promise<AiAvailableProviderOption[]>>>>({})
 const availableModelsByProviderId = shallowRef<Record<string, AiAvailableModelOption[]>>({})
 const modelLoadingPromises = shallowRef<Record<string, Promise<AiAvailableModelOption[]>>>({})
+const cascaderRenderVersion = shallowRef(0)
 
 const cascaderProps: CascaderProps = {
   lazy: true,
@@ -66,6 +67,19 @@ const selectedPath = computed<CascaderValue | null>({
   set: (value) => {
     emits('update:modelValue', parseModelPath(value))
   },
+})
+const cascaderRenderKey = computed(() => {
+  const modelRef = componentProps.modelValue
+  const modelKey = modelRef
+    ? [
+        modelRef.providerId,
+        modelRef.modelId,
+        modelRef.scope ?? '',
+        modelRef.providerKey ?? '',
+      ].join(':')
+    : 'empty'
+
+  return `${modelKey}:${cascaderRenderVersion.value}`
 })
 
 watch(() => componentProps.intentKey, () => {
@@ -193,11 +207,21 @@ async function loadSelectedModelRefOptions() {
   }
 
   try {
+    const initialModelRef = resolveModelRef(modelRef)
+    if (initialModelRef) {
+      await ensureAvailableProviders(initialModelRef.scope)
+    }
+
     await ensureAvailableModels(modelRef.providerId)
 
-    if (!resolveModelRef(modelRef)) {
+    const resolvedModelRef = resolveModelRef(modelRef)
+    if (!resolvedModelRef) {
       emits('update:modelValue', null)
+      return
     }
+
+    await ensureAvailableProviders(resolvedModelRef.scope)
+    cascaderRenderVersion.value += 1
   }
   catch (error) {
     ElMessage.error(getRequestErrorDisplayMessage(error, t('modelCascader.loadFailed')))
@@ -205,7 +229,14 @@ async function loadSelectedModelRefOptions() {
 }
 
 function shouldLoadModelRefOptions(modelRef: ModelCascaderModelRef | null): modelRef is ModelCascaderModelRef {
-  return Boolean(modelRef && (!modelRef.scope || !modelRef.providerKey))
+  if (!modelRef) {
+    return false
+  }
+
+  const resolvedModelRef = resolveModelRef(modelRef)
+  return !resolvedModelRef
+    || !availableProvidersByScope.value[resolvedModelRef.scope]
+    || !availableModelsByProviderId.value[resolvedModelRef.providerId]
 }
 
 function resetAvailableModels() {
@@ -401,6 +432,7 @@ function getUnavailableReason(data: CascaderOption) {
 
 <template>
   <ElCascader
+    :key="cascaderRenderKey"
     v-model="selectedPath"
     class="model-cascader w-full"
     :props="cascaderProps"

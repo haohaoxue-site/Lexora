@@ -1,7 +1,7 @@
 import {
   DOCUMENT_COLLABORATION_PERMISSION,
   DOCUMENT_COLLABORATION_SCOPE,
-} from '@haohaoxue/samepage-contracts/document/collaboration/constants'
+} from '@haohaoxue/lexora-contracts/document/collaboration/constants'
 
 export function getCollaborationPermissionRank(permission: string) {
   return permission === DOCUMENT_COLLABORATION_PERMISSION.EDIT ? 2 : 1

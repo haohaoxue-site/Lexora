@@ -1,9 +1,9 @@
 import type { Editor, JSONContent } from '@tiptap/core'
-import { TiptapJsonContentPayloadSchema } from '@haohaoxue/samepage-contracts/tiptap/core'
+import { TiptapJsonContentPayloadSchema } from '@haohaoxue/lexora-contracts/tiptap/core'
 import { DOMSerializer, Fragment } from '@tiptap/pm/model'
 import { getCurrentBlock } from '../commands/currentBlock'
 
-export const SAMEPAGE_BLOCK_CLIPBOARD_TYPE = 'application/x-samepage-block+json'
+export const LEXORA_BLOCK_CLIPBOARD_TYPE = 'application/x-lexora-block+json'
 
 export async function copyCurrentBlockToClipboard(editor: Editor) {
   const payload = createCurrentBlockClipboardPayload(editor)
@@ -66,7 +66,7 @@ async function writeClipboardPayload(payload: ClipboardPayload) {
   if (typeof ClipboardItem !== 'undefined' && typeof navigator.clipboard.write === 'function') {
     await navigator.clipboard.write([
       new ClipboardItem({
-        [SAMEPAGE_BLOCK_CLIPBOARD_TYPE]: new Blob([payload.json], { type: SAMEPAGE_BLOCK_CLIPBOARD_TYPE }),
+        [LEXORA_BLOCK_CLIPBOARD_TYPE]: new Blob([payload.json], { type: LEXORA_BLOCK_CLIPBOARD_TYPE }),
         'text/html': new Blob([payload.html], { type: 'text/html' }),
         'text/plain': new Blob([payload.text], { type: 'text/plain' }),
       }),

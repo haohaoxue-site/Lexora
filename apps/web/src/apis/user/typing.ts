@@ -16,4 +16,4 @@ export type {
   UserOauthBinding,
   UserSettings,
   UserSettingsPreferences,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'

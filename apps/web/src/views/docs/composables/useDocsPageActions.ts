@@ -2,13 +2,13 @@ import type {
   DocumentOperationJob,
   DocumentTreeCollectionId,
   MoveDocumentTreeOperationRequest,
-} from '@haohaoxue/samepage-contracts/document'
+} from '@haohaoxue/lexora-contracts/document'
 import {
   DOCUMENT_COLLECTION,
   DOCUMENT_OPERATION_JOB_STATUS,
   DOCUMENT_PANE_STATE,
-} from '@haohaoxue/samepage-contracts/document/constants'
-import { sleep } from '@haohaoxue/samepage-shared/time'
+} from '@haohaoxue/lexora-contracts/document/constants'
+import { sleep } from '@haohaoxue/lexora-shared/time'
 import { createSharedComposable } from '@vueuse/core'
 import { shallowRef, watch } from 'vue'
 import { useRouter } from 'vue-router'

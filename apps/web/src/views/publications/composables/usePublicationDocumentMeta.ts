@@ -31,7 +31,7 @@ function applyPublicationDocumentMeta(input: PublicationDocumentMetaInput) {
     return
   }
 
-  document.title = input.title ? `${input.title} - SamePage` : 'SamePage'
+  document.title = input.title ? `${input.title} - Lexora` : 'Lexora'
 
   const robotsMeta = resolvePublicationRobotsMeta()
   robotsMeta.setAttribute('content', input.allowIndexing ? 'index,follow' : 'noindex,nofollow')

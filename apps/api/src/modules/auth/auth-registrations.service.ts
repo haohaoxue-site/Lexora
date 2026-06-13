@@ -1,10 +1,10 @@
-import type { ResolvedLanguagePreference } from '@haohaoxue/samepage-contracts'
+import type { ResolvedLanguagePreference } from '@haohaoxue/lexora-contracts'
 import type { Prisma } from '@prisma/client'
 import type { FastifyRequest } from 'fastify'
 import type { TokenExchangeResult } from './auth.interface'
 import { randomInt } from 'node:crypto'
-import { API_ERROR_CODE, AUTH_METHOD } from '@haohaoxue/samepage-contracts'
-import { LANGUAGE_PREFERENCE } from '@haohaoxue/samepage-contracts/user/constants'
+import { API_ERROR_CODE, AUTH_METHOD } from '@haohaoxue/lexora-contracts'
+import { LANGUAGE_PREFERENCE } from '@haohaoxue/lexora-contracts/user/constants'
 import {
   Injectable,
 } from '@nestjs/common'

@@ -1,5 +1,5 @@
 import type { CollabHocuspocusContext } from './ports'
-import { COLLAB_ERROR_CODE } from '@haohaoxue/samepage-contracts'
+import { COLLAB_ERROR_CODE } from '@haohaoxue/lexora-contracts'
 
 /** 协作连接授权输入。 */
 export interface ApplyCollabConnectionAuthorizationInput {

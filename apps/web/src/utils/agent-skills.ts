@@ -1,11 +1,11 @@
 import type {
   AgentSkillCard,
-} from '@haohaoxue/samepage-contracts/agent'
+} from '@haohaoxue/lexora-contracts/agent'
 import type { SvgIconCategoryValue } from '@/components/svg-icon/typing'
 import {
   AGENT_MEMORY_SKILL_KEY,
   AGENT_TRANSLATOR_SKILL_KEY,
-} from '@haohaoxue/samepage-contracts/agent'
+} from '@haohaoxue/lexora-contracts/agent'
 
 type AgentSkillIconSource = Pick<AgentSkillCard, 'key' | 'category'>
 

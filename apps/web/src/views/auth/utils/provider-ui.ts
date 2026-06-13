@@ -1,5 +1,5 @@
-import type { AuthProviderName } from '@haohaoxue/samepage-contracts'
-import { AUTH_PROVIDER } from '@haohaoxue/samepage-contracts/auth/constants'
+import type { AuthProviderName } from '@haohaoxue/lexora-contracts'
+import { AUTH_PROVIDER } from '@haohaoxue/lexora-contracts/auth/constants'
 import { SvgIconCategory } from '@/components/svg-icon/typing'
 
 /**

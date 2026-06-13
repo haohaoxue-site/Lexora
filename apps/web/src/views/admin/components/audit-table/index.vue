@@ -8,7 +8,7 @@ import type {
 import {
   SYSTEM_ADMIN_AUDIT_TARGET_TYPE,
   SYSTEM_ADMIN_AUDIT_TARGET_TYPE_VALUES,
-} from '@haohaoxue/samepage-contracts/system-admin'
+} from '@haohaoxue/lexora-contracts/system-admin'
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { formatDateTime } from '@/utils/dayjs'

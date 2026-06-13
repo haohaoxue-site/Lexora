@@ -1,5 +1,5 @@
-import type { AuthMethodName, AuthProviderName } from '@haohaoxue/samepage-contracts'
-import { AUTH_METHOD_LABELS, AUTH_PROVIDER_ALIAS_MAP, AUTH_PROVIDER_VALUES } from '@haohaoxue/samepage-contracts/auth/constants'
+import type { AuthMethodName, AuthProviderName } from '@haohaoxue/lexora-contracts'
+import { AUTH_METHOD_LABELS, AUTH_PROVIDER_ALIAS_MAP, AUTH_PROVIDER_VALUES } from '@haohaoxue/lexora-contracts/auth/constants'
 
 const NON_ALPHANUMERIC_RE = /[^a-z0-9]+/g
 

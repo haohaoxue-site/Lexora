@@ -13,7 +13,7 @@ import type {
   SearchReadableDocumentsQuery,
   SearchReadableDocumentsResponse,
   TiptapJsonContent,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 import type { PersistedDocument, WorkspaceDocumentContext } from '../core/documents.utils'
 import {
   COLLAB_PERMISSION_INVALIDATION_REASON,
@@ -26,14 +26,14 @@ import {
   TIPTAP_SCHEMA_VERSION,
   WORKSPACE_MEMBER_STATUS,
   WORKSPACE_TYPE,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 import {
   createDocumentTitleContent,
   createTiptapDocumentCollaborationCheckpointState,
   getDocumentTitlePlainText,
   resolveOwnedDocumentCollectionId,
   summarizeDocumentContent,
-} from '@haohaoxue/samepage-shared'
+} from '@haohaoxue/lexora-shared'
 import {
   BadRequestException,
   ForbiddenException,

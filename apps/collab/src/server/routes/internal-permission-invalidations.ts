@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify'
 import type { CollabActiveConnectionRegistry } from '../../gateway/active-connections'
 import type { CollabPubSub } from '../../integrations/pubsub'
-import { COLLAB_PUBSUB_MESSAGE_TYPE, CollabPermissionInvalidationRequestSchema } from '@haohaoxue/samepage-contracts'
+import { COLLAB_PUBSUB_MESSAGE_TYPE, CollabPermissionInvalidationRequestSchema } from '@haohaoxue/lexora-contracts'
 
 export interface RegisterInternalPermissionInvalidationRoutesInput {
   app: FastifyInstance

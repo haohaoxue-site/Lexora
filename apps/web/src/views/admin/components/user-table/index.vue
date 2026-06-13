@@ -6,12 +6,12 @@ import type {
   SystemAdminUserRoleFilter,
   SystemAdminUserStatus,
 } from '@/apis/system-admin'
-import { AUTH_METHOD } from '@haohaoxue/samepage-contracts/auth/constants'
+import { AUTH_METHOD } from '@haohaoxue/lexora-contracts/auth/constants'
 import {
   SYSTEM_ADMIN_USER_ROLE_FILTER,
-} from '@haohaoxue/samepage-contracts/system-admin'
-import { USER_STATUS } from '@haohaoxue/samepage-contracts/user/constants'
-import { formatAuthMethod } from '@haohaoxue/samepage-shared/auth'
+} from '@haohaoxue/lexora-contracts/system-admin'
+import { USER_STATUS } from '@haohaoxue/lexora-contracts/user/constants'
+import { formatAuthMethod } from '@haohaoxue/lexora-shared/auth'
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { formatDateTime } from '@/utils/dayjs'

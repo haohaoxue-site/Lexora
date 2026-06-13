@@ -3,10 +3,10 @@ import type {
   DocumentAsset,
   ResolveDocumentAssetsRequest,
   ResolveDocumentAssetsResponse,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 import type { FastifyReply, FastifyRequest } from 'fastify'
 import type { AuthUserContext } from '../../auth/auth.interface'
-import { DOCUMENT_IMAGE_MAX_BYTES, ResolveDocumentAssetsSchema } from '@haohaoxue/samepage-contracts'
+import { DOCUMENT_IMAGE_MAX_BYTES, ResolveDocumentAssetsSchema } from '@haohaoxue/lexora-contracts'
 import { BadRequestException, Body, Controller, Get, Param, Post, Req, Res } from '@nestjs/common'
 import { CurrentUser } from '../../../decorators/current-user.decorator'
 import { Public } from '../../../decorators/public.decorator'

@@ -10,8 +10,8 @@ import {
   hasAnimatedGifPasteSource,
 } from '../content/animatedGifPaste'
 import {
+  LEXORA_BLOCK_CLIPBOARD_TYPE,
   parseStructuredClipboardContent,
-  SAMEPAGE_BLOCK_CLIPBOARD_TYPE,
 } from '../content/blockClipboard'
 import { createFilePasteContent } from '../content/pasteContent'
 import {
@@ -75,7 +75,7 @@ function handleEditorPaste(editor: Editor, event: ClipboardEvent, options: Paste
 
   if (!preferPlain) {
     const structuredContent = parseStructuredClipboardContent(
-      event.clipboardData.getData(SAMEPAGE_BLOCK_CLIPBOARD_TYPE),
+      event.clipboardData.getData(LEXORA_BLOCK_CLIPBOARD_TYPE),
     )
 
     if (structuredContent?.length) {

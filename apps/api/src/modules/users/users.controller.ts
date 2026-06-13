@@ -9,11 +9,11 @@ import type {
   UserPermissionList,
   UserSettings,
   UserSettingsPreferences,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 import type { FastifyReply, FastifyRequest } from 'fastify'
 import type { AuthUserContext } from '../auth/auth.interface'
-import { PERMISSIONS } from '@haohaoxue/samepage-contracts'
-import { normalizeAuthProviderName } from '@haohaoxue/samepage-shared'
+import { PERMISSIONS } from '@haohaoxue/lexora-contracts'
+import { normalizeAuthProviderName } from '@haohaoxue/lexora-shared'
 import {
   BadRequestException,
   Body,

@@ -4,7 +4,7 @@ import type {
   DocumentYdocRuntimeState,
   PersistDocumentYdocUpdateRequest,
   PersistDocumentYdocUpdateResponse,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 
 /** DocumentYdoc runtime 持久化。 */
 export interface DocumentYdocRuntimeStore {

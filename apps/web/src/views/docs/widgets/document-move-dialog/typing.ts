@@ -1,6 +1,6 @@
 import type {
   OwnedDocumentCollectionId,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 
 export interface MoveTreeNode {
   id: string

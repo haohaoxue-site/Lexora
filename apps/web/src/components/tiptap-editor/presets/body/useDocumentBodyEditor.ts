@@ -7,8 +7,8 @@ import type {
 } from '../../core/typing'
 import type { BlockTriggerMenuExposed } from '../../overlays/block-trigger/typing'
 import type { DocumentBodyEditorProps } from './typing'
-import { DOCUMENT_IMAGE_MAX_BYTES } from '@haohaoxue/samepage-contracts/document'
-import { prettyBytes } from '@haohaoxue/samepage-shared/file'
+import { DOCUMENT_IMAGE_MAX_BYTES } from '@haohaoxue/lexora-contracts/document'
+import { prettyBytes } from '@haohaoxue/lexora-shared/file'
 import {
   computed,
   nextTick,

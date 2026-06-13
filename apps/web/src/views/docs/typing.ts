@@ -5,7 +5,7 @@ import type {
   DocumentVersionSnapshot,
   TiptapJsonContent,
   TiptapSchemaVersion,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 import type {
   TiptapEditorCollaborationBinding,
   TiptapEditorCommentRequest,

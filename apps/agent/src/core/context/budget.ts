@@ -2,7 +2,7 @@ import type {
   AgentChatContextMessage,
   AgentChatContextSnapshot,
   AgentModelPolicy,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 import type { AgentHistoryDigest } from './history-compaction'
 import {
   defaultAgentTokenEstimator,

@@ -4,7 +4,7 @@ import type {
   AgentMemoryOperationProposal,
   AgentMemoryWritingPolicy,
   ChatMemoryOperationProjection,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 import type {
   AgentMemoryCandidateKind as PrismaAgentMemoryCandidateKind,
   AgentMemoryOperationAction as PrismaAgentMemoryOperationAction,
@@ -22,7 +22,7 @@ import {
   AgentMemoryOperationSchema,
   API_ERROR_CODE,
   ChatMemoryOperationProjectionSchema,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 import {
   Injectable,
   Logger,

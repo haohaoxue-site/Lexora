@@ -1,7 +1,7 @@
 import type {
   AgentChatContextMessage,
   AgentContextPolicy,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 
 export interface AgentContextWindow {
   olderMessagesExcerpt: string

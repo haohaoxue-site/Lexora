@@ -1,7 +1,7 @@
 import type {
   AgentChatContextMessage,
   AgentMemoryRetrievalSnapshot,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 import type { GraphNode } from '@langchain/langgraph'
 import type { AgentMemoryApiClient } from '../../clients/memory'
 import type { AgentSkillApiClient } from '../../clients/skills'

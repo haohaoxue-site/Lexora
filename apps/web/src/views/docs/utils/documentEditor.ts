@@ -1,4 +1,4 @@
-import type { DocumentVersionSnapshot } from '@haohaoxue/samepage-contracts'
+import type { DocumentVersionSnapshot } from '@haohaoxue/lexora-contracts'
 import type {
   ActiveDocumentDetail,
 } from '../typing'

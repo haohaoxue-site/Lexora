@@ -15,4 +15,4 @@ export type {
   ResolvePlatformNotificationAssetsRequest,
   ResolvePlatformNotificationAssetsResponse,
   UpdatePlatformNotificationRequest,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'

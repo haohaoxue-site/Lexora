@@ -4,7 +4,7 @@ import {
   SERVER_PATH,
   WORKSPACE_ICON_MAX_BYTES,
   WORKSPACE_ICON_MIME_TYPES,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 import { BadRequestException } from '@nestjs/common'
 
 const NON_ALPHANUMERIC_RE = /[^a-z0-9]+/g

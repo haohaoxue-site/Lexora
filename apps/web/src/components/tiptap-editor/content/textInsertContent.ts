@@ -1,5 +1,5 @@
 import type { JSONContent } from '@tiptap/core'
-import { TIPTAP_BODY_BLOCK_ID_ATTRIBUTE } from '@haohaoxue/samepage-contracts/tiptap/constants'
+import { TIPTAP_BODY_BLOCK_ID_ATTRIBUTE } from '@haohaoxue/lexora-contracts/tiptap/constants'
 import { normalizeCodeBlockLanguage } from '../extensions/code-block/languages'
 
 export interface TextInsertContentOptions {

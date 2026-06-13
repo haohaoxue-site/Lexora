@@ -40,7 +40,7 @@ export function createCollabFastifyLoggerOptions(logger: CollabConfig['logger'])
 }
 
 export function redactCollabTicketFromUrl(url: string): string {
-  const parsedUrl = new URL(url, 'http://samepage.local')
+  const parsedUrl = new URL(url, 'http://lexora.local')
 
   if (parsedUrl.searchParams.has('ticket')) {
     parsedUrl.searchParams.set('ticket', '[Redacted]')

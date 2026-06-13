@@ -6,7 +6,7 @@ import type {
   DocumentCollaborationPermission,
   DocumentCollaborationScope,
   UserCollabIdentity,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 import type { CollaborationParticipantRow } from '../../components/collaboration-participants-panel'
 import type {
   CollaborationDialogView,
@@ -24,8 +24,8 @@ import {
   DOCUMENT_COLLABORATION_PERMISSION_VALUES,
   DOCUMENT_COLLABORATION_SCOPE,
   DOCUMENT_COLLABORATION_SCOPE_VALUES,
-} from '@haohaoxue/samepage-contracts/document/collaboration/constants'
-import { USER_CODE_REGEX } from '@haohaoxue/samepage-contracts/identity/constants'
+} from '@haohaoxue/lexora-contracts/document/collaboration/constants'
+import { USER_CODE_REGEX } from '@haohaoxue/lexora-contracts/identity/constants'
 import { useClipboard, watchDebounced } from '@vueuse/core'
 import { computed, reactive, shallowRef, watch } from 'vue'
 import { useI18n } from 'vue-i18n'

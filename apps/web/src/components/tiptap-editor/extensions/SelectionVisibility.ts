@@ -3,7 +3,7 @@ import { Extension } from '@tiptap/core'
 import { isChangeOrigin } from '@tiptap/extension-collaboration'
 import { Plugin, PluginKey } from '@tiptap/pm/state'
 
-const SELECTION_VISIBILITY_META = 'samepageSelectionVisibility'
+const SELECTION_VISIBILITY_META = 'lexoraSelectionVisibility'
 
 export const SelectionVisibility = Extension.create({
   name: 'SelectionVisibility',

@@ -22,7 +22,7 @@ interface HistoryTransactionMeta {
   redo?: boolean
 }
 
-const historySelectionPluginKey = new PluginKey<HistorySelectionState>('samepage-history-selection')
+const historySelectionPluginKey = new PluginKey<HistorySelectionState>('lexora-history-selection')
 
 export const HistorySelection = Extension.create({
   name: 'HistorySelection',

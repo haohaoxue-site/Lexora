@@ -3,17 +3,17 @@ import type {
   PublicationNavItem,
   PublicationSidebarGroup,
   PublicationSidebarPage,
-} from '@haohaoxue/samepage-contracts/document/publication'
+} from '@haohaoxue/lexora-contracts/document/publication'
 import type {
   TiptapJsonContent,
   TiptapJsonNode,
-} from '@haohaoxue/samepage-contracts/tiptap'
+} from '@haohaoxue/lexora-contracts/tiptap'
 import {
   DOCUMENT_PUBLICATION_NAV_ITEM_EXTERNAL_TARGET,
   DOCUMENT_PUBLICATION_NAV_ITEM_INTERNAL_TARGET,
   DOCUMENT_PUBLICATION_NAV_ITEM_TYPE,
-} from '@haohaoxue/samepage-contracts/document/publication/constants'
-import { isExternalPublicationHref, normalizePublicationHref } from '@haohaoxue/samepage-shared/document'
+} from '@haohaoxue/lexora-contracts/document/publication/constants'
+import { isExternalPublicationHref, normalizePublicationHref } from '@haohaoxue/lexora-shared/document'
 import { translate } from '@/i18n'
 
 export const PUBLICATION_DISABLED_LINK_CLASS = 'publication-link-disabled'

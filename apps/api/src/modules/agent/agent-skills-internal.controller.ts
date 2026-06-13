@@ -3,11 +3,11 @@ import type {
   ActivateAgentSkillResponse,
   ReadAgentSkillResourceRequest,
   ReadAgentSkillResourceResponse,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 import {
   ActivateAgentSkillRequestSchema,
   ReadAgentSkillResourceRequestSchema,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 import {
   Body,
   Controller,

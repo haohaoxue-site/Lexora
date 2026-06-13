@@ -2,7 +2,7 @@ import type {
   DocumentCollaborationCollaborator,
   DocumentCollaborationOverview,
   DocumentCollaborationScope,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 
 export interface CollaborationOption<T extends string> {
   value: T

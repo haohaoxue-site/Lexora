@@ -1,7 +1,7 @@
-import type { ResolvedLanguagePreference } from '@haohaoxue/samepage-contracts'
+import type { ResolvedLanguagePreference } from '@haohaoxue/lexora-contracts'
 import type { FastifyRequest } from 'fastify'
-import { LANGUAGE_PREFERENCE } from '@haohaoxue/samepage-contracts/user/constants'
-import { resolveLanguagePreference } from '@haohaoxue/samepage-shared'
+import { LANGUAGE_PREFERENCE } from '@haohaoxue/lexora-contracts/user/constants'
+import { resolveLanguagePreference } from '@haohaoxue/lexora-shared'
 
 interface AcceptLanguageItem {
   language: string

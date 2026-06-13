@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import type { DocumentPageWidthMode } from '@haohaoxue/samepage-contracts/document'
+import type { DocumentPageWidthMode } from '@haohaoxue/lexora-contracts/document'
 import type { PageWidthOptionView } from './typing'
 import {
   DOCUMENT_PAGE_WIDTH_MODE,
   DOCUMENT_PAGE_WIDTH_MODE_VALUES,
-} from '@haohaoxue/samepage-contracts/document/constants'
+} from '@haohaoxue/lexora-contracts/document/constants'
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import ChatAssistantAvatar from '@/components/chat-message/ChatAssistantAvatar.vue'

@@ -1,5 +1,5 @@
 {
-  "name": "@haohaoxue/samepage-web",
+  "name": "@haohaoxue/lexora-web",
   "type": "module",
   "version": "1.0.0",
   "private": true,
@@ -15,8 +15,8 @@
   },
   "dependencies": {
     "@element-plus/icons-vue": "^2.3.2",
-    "@haohaoxue/samepage-contracts": "workspace:*",
-    "@haohaoxue/samepage-shared": "workspace:*",
+    "@haohaoxue/lexora-contracts": "workspace:*",
+    "@haohaoxue/lexora-shared": "workspace:*",
     "@hocuspocus/provider": "^4.0.0",
     "@tiptap/core": "^3.22.3",
     "@tiptap/extension-code-block-lowlight": "^3.22.5",

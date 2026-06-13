@@ -1,4 +1,4 @@
-import { CHAT_SESSION_ORIGIN } from '@haohaoxue/samepage-contracts/chat/constants'
+import { CHAT_SESSION_ORIGIN } from '@haohaoxue/lexora-contracts/chat/constants'
 import { createSharedComposable } from '@vueuse/core'
 import { createChatEngine } from '@/composables/chat/createChatEngine'
 import { useWorkspaceStore } from '@/stores/workspace'

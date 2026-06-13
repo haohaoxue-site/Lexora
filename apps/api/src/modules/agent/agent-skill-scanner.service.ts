@@ -1,4 +1,4 @@
-import type { AgentSkillCategory, AgentSkillRiskLevel } from '@haohaoxue/samepage-contracts'
+import type { AgentSkillCategory, AgentSkillRiskLevel } from '@haohaoxue/lexora-contracts'
 import type { AgentSkillsConfig } from '../../config/agent-skills.config'
 import { Buffer } from 'node:buffer'
 import { createHash } from 'node:crypto'
@@ -9,7 +9,7 @@ import {
   AGENT_SKILL_ACTIVATION_MODE,
   AGENT_SKILL_CATEGORY,
   AGENT_SKILL_RISK_LEVEL,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { Prisma } from '@prisma/client'

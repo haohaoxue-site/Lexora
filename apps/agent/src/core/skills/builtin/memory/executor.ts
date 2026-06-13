@@ -5,7 +5,7 @@ import type {
   AgentMemoryScope,
   AgentMemorySensitivity,
   ChatMemoryOperationProjection,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 import type { ToolCall } from '@langchain/core/messages'
 import type { AgentMemoryApiClient } from '../../../../clients/memory'
 import type { AgentGraphContext } from '../../../state'
@@ -13,7 +13,7 @@ import {
   AGENT_MEMORY_OPERATION_ACTION,
   AGENT_MEMORY_TOOL,
   AgentMemoryOperationProposalSchema,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 import { ToolMessage } from '@langchain/core/messages'
 import {
   MemoryAskUserSchema,

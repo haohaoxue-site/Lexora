@@ -1,4 +1,4 @@
-import { positiveIntegerWithDefault, requiredEnvString } from '@haohaoxue/samepage-shared'
+import { positiveIntegerWithDefault, requiredEnvString } from '@haohaoxue/lexora-shared'
 import { z } from 'zod'
 
 const agentEnvSchema = z.object({

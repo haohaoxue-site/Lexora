@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { ChatSession } from '../../composables/useChatSessions'
 import type { ChatSessionSidebarEmits } from './typing'
-import { CHAT_SESSION_CHANNEL } from '@haohaoxue/samepage-contracts/chat/constants'
+import { CHAT_SESSION_CHANNEL } from '@haohaoxue/lexora-contracts/chat/constants'
 import { computed, shallowRef } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useChatSessions } from '../../composables/useChatSessions'

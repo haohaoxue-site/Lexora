@@ -17,7 +17,7 @@ import {
   AgentGenerationCommandSchema,
   AgentProfileConfigSchema,
   ChatGenerationBootstrapSchema,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 import { createMemoryAgentRuntimeTryLock } from '../runtime/lock'
 import {
   readAgentCheckpointState,

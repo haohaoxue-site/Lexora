@@ -2,12 +2,12 @@
 layout: home
 
 hero:
-  name: SamePage AI
-  text: AI 与协作同在一页
+  name: Lexora
+  text: 文档、协作与 AI 汇入同一个工作台
   tagline: 面向个人与小团队的在线协作文档平台，内置 AI 对话、文档协作、公开发布和自部署能力。
   image:
     src: /ui.png
-    alt: SamePage
+    alt: Lexora 界面预览
   actions:
     - theme: brand
       text: 快速开始

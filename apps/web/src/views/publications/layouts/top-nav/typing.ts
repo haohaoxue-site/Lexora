@@ -1,4 +1,4 @@
-import type { PublicationSiteMeta } from '@haohaoxue/samepage-contracts'
+import type { PublicationSiteMeta } from '@haohaoxue/lexora-contracts'
 import type { ResolvedPublicationNavItem } from '../../utils/publicationRendering'
 
 export interface PublicationTopNavProps {

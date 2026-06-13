@@ -2,11 +2,11 @@ import type {
   CreateTeamWorkspaceRequest,
   CreateWorkspaceInviteRequest,
   TransferTeamWorkspaceOwnershipRequest,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 import {
   WORKSPACE_DESCRIPTION_MAX_LENGTH,
   WORKSPACE_NAME_MAX_LENGTH,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 import { IsOptional, IsString, MaxLength, MinLength } from 'class-validator'
 
 export class CreateTeamWorkspaceDto implements CreateTeamWorkspaceRequest {

@@ -1,11 +1,11 @@
-import type { AiProviderModelItem, AiProviderModels } from '@haohaoxue/samepage-contracts'
+import type { AiProviderModelItem, AiProviderModels } from '@haohaoxue/lexora-contracts'
 import type { AiProvider } from '@prisma/client'
 import type {
   UpsertAiProviderModelDto,
   UpsertAiProviderModelsDto,
 } from '../ai.dto'
 import type { EffectiveModelCapabilityDefaults } from './capability-defaults.service'
-import { AI_MODEL_MODALITY, AI_MODEL_TYPE } from '@haohaoxue/samepage-contracts'
+import { AI_MODEL_MODALITY, AI_MODEL_TYPE } from '@haohaoxue/lexora-contracts'
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common'
 import { PrismaService } from '../../../database/prisma.service'
 import {

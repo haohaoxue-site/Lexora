@@ -5,7 +5,7 @@ import {
   AGENT_MEMORY_SKILL_KEY,
   AGENT_MEMORY_SLOT_KEY,
   AGENT_MEMORY_TOOL,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 import { tool } from '@langchain/core/tools'
 import {
   MemoryForgetSchema,

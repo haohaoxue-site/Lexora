@@ -3,8 +3,8 @@ import type {
   TestSystemEmailConfigRequest,
   UpdateSystemEmailConfigRequest,
   UpdateSystemEmailServiceStatusRequest,
-} from '@haohaoxue/samepage-contracts'
-import { SYSTEM_EMAIL_PROVIDER_VALUES } from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
+import { SYSTEM_EMAIL_PROVIDER_VALUES } from '@haohaoxue/lexora-contracts'
 import { Transform } from 'class-transformer'
 import {
   IsBoolean,

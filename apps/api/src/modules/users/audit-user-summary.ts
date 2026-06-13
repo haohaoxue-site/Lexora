@@ -1,4 +1,4 @@
-import type { AuditUserSummary } from '@haohaoxue/samepage-contracts'
+import type { AuditUserSummary } from '@haohaoxue/lexora-contracts'
 import type { Prisma } from '@prisma/client'
 
 export const auditUserSummarySelect = {

@@ -1,10 +1,10 @@
-import type { AgentGenerationCommand } from '@haohaoxue/samepage-contracts'
+import type { AgentGenerationCommand } from '@haohaoxue/lexora-contracts'
 import { randomUUID } from 'node:crypto'
 import {
   AgentGenerationCommandSchema,
   CHAT_MESSAGE_FAILURE_REASON,
   CHAT_SESSION_EVENT_TYPE,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 import {
   Injectable,
   Logger,

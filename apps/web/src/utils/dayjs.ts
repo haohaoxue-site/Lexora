@@ -1,6 +1,6 @@
-import type { ResolvedLanguagePreference } from '@haohaoxue/samepage-contracts'
+import type { ResolvedLanguagePreference } from '@haohaoxue/lexora-contracts'
 import type { ConfigType } from 'dayjs'
-import { LANGUAGE_PREFERENCE } from '@haohaoxue/samepage-contracts/user/constants'
+import { LANGUAGE_PREFERENCE } from '@haohaoxue/lexora-contracts/user/constants'
 import dayjs from 'dayjs'
 import relativeTime from 'dayjs/plugin/relativeTime'
 import { translate } from '@/i18n'

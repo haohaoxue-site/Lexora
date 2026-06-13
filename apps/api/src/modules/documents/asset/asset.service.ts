@@ -1,10 +1,10 @@
-import type { DocumentAsset, ResolveDocumentAssetsResponse } from '@haohaoxue/samepage-contracts'
+import type { DocumentAsset, ResolveDocumentAssetsResponse } from '@haohaoxue/lexora-contracts'
 import type { JwtConfig } from '../../../config/auth.config'
 import type { StorageObject } from '../../../infrastructure/storage/storage.interface'
 import { Buffer } from 'node:buffer'
 import { createSecretKey, randomUUID } from 'node:crypto'
 import { extname } from 'node:path'
-import { DOCUMENT_IMAGE_MAX_BYTES, SERVER_PATH } from '@haohaoxue/samepage-contracts'
+import { DOCUMENT_IMAGE_MAX_BYTES, SERVER_PATH } from '@haohaoxue/lexora-contracts'
 import {
   BadRequestException,
   Injectable,
@@ -28,12 +28,12 @@ import { DOCUMENT_IMAGE_TOO_LARGE_MESSAGE } from './asset.constants'
 
 const DOCUMENT_ASSET_BUCKET = 'document-asset'
 const DOCUMENT_FILE_MAX_SIZE_BYTES = 50 * 1024 * 1024
-const DOCUMENT_ASSET_CONTENT_AUDIENCE = 'samepage-document-asset'
+const DOCUMENT_ASSET_CONTENT_AUDIENCE = 'lexora-document-asset'
 const DOCUMENT_ASSET_ACCESS_TOKEN_TYPE = 'document-asset-access'
 const DOCUMENT_ASSET_ACCESS_COOKIE_TTL_SECONDS = 60 * 5
 const DOCUMENT_ASSET_ACCESS_COOKIE_NAMES = {
-  document: 'samepage_document_asset_access',
-  publication: 'samepage_publication_asset_access',
+  document: 'lexora_document_asset_access',
+  publication: 'lexora_publication_asset_access',
 } as const
 const SINGLE_PUBLICATION_ASSET_SCOPE_PREFIX = 'single:'
 const DOCUMENT_FILE_EXTENSION_PREFIX = /^\./

@@ -1,4 +1,4 @@
-import type { TiptapJsonContent, TiptapJsonNode } from '@haohaoxue/samepage-contracts'
+import type { TiptapJsonContent, TiptapJsonNode } from '@haohaoxue/lexora-contracts'
 
 export function serializeTiptapJsonContentToMarkdownLike(content: TiptapJsonContent): string {
   return content

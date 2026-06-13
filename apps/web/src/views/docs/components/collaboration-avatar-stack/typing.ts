@@ -1,7 +1,7 @@
 import type {
   DocumentCollaborationCollaborator,
   DocumentCollaborationOverview,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 
 export type CollaborationOwner = DocumentCollaborationOverview['owner']
 

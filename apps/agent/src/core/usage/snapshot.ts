@@ -1,9 +1,9 @@
-import type { ChatGenerationUsageSnapshot } from '@haohaoxue/samepage-contracts'
-import type { AgentMemoryRetrievalSnapshot } from '@haohaoxue/samepage-contracts/agent/memory'
+import type { ChatGenerationUsageSnapshot } from '@haohaoxue/lexora-contracts'
+import type { AgentMemoryRetrievalSnapshot } from '@haohaoxue/lexora-contracts/agent/memory'
 import type { BaseMessage } from '@langchain/core/messages'
 import type { AgentModelTokenUsage } from '../../integrations/model-providers/stream-text'
 import type { AgentContextBudget } from '../context/budget'
-import { ChatGenerationUsageSnapshotSchema } from '@haohaoxue/samepage-contracts'
+import { ChatGenerationUsageSnapshotSchema } from '@haohaoxue/lexora-contracts'
 import { defaultAgentTokenEstimator } from '../tokens/estimator'
 
 export interface CreateChatGenerationUsageSnapshotInput {

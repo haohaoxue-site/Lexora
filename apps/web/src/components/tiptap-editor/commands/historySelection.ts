@@ -14,7 +14,7 @@ interface HistorySelectionTransactionMeta {
   deletedText: HistorySelectionDeletedTextRecord
 }
 
-export const HISTORY_SELECTION_TRANSACTION_META = 'samepageHistorySelection'
+export const HISTORY_SELECTION_TRANSACTION_META = 'lexoraHistorySelection'
 
 export function recordHistorySelectionDeletedText(
   transaction: Transaction,

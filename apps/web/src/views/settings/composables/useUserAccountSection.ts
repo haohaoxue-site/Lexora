@@ -1,12 +1,12 @@
-import type { AuthProviderName } from '@haohaoxue/samepage-contracts'
+import type { AuthProviderName } from '@haohaoxue/lexora-contracts'
 import type { FormInstance, FormItemRule, FormRules } from 'element-plus'
 import type { Ref } from 'vue'
 import type { UserAccountSectionProps } from '../typing'
-import { AUTH_PROVIDER_VALUES } from '@haohaoxue/samepage-contracts/auth/constants'
+import { AUTH_PROVIDER_VALUES } from '@haohaoxue/lexora-contracts/auth/constants'
 import {
   AUTH_PASSWORD_MAX_LENGTH,
   AUTH_PASSWORD_MIN_LENGTH,
-} from '@haohaoxue/samepage-contracts/identity/constants'
+} from '@haohaoxue/lexora-contracts/identity/constants'
 import { computed, reactive } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { AUTH_PROVIDER_UI_META } from '@/views/auth/utils/provider-ui'

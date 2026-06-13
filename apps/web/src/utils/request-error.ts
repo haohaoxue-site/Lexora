@@ -1,5 +1,5 @@
-import type { ApiErrorCode, RequestResponse } from '@haohaoxue/samepage-contracts'
-import { API_ERROR_CODE } from '@haohaoxue/samepage-contracts/status-code'
+import type { ApiErrorCode, RequestResponse } from '@haohaoxue/lexora-contracts'
+import { API_ERROR_CODE } from '@haohaoxue/lexora-contracts/status-code'
 import { translate } from '@/i18n'
 
 export type RequestErrorKind = 'business' | 'http' | 'rate_limit' | 'network' | 'parse' | 'unknown'

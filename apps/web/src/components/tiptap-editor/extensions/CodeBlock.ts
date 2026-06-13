@@ -2,7 +2,7 @@ import type { Editor } from '@tiptap/core'
 import {
   TIPTAP_CODE_BLOCK_DEFAULT_TAB_SIZE,
   TIPTAP_CODE_BLOCK_TAB_SIZES,
-} from '@haohaoxue/samepage-contracts/tiptap/document-body'
+} from '@haohaoxue/lexora-contracts/tiptap/document-body'
 import { CodeBlockLowlight } from '@tiptap/extension-code-block-lowlight'
 import { VueNodeViewRenderer } from '@tiptap/vue-3'
 import CodeBlockNodeView from './code-block/CodeBlockNodeView.vue'

@@ -4,10 +4,10 @@ import type {
   AiModelModality,
   AiModelRef,
   AiModelType,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 import type { Prisma } from '@prisma/client'
-import { AI_MODEL_INTENT_KEY, AiModelIntentKeySchema } from '@haohaoxue/samepage-contracts'
-import { getAiModelIntentFallbackChain, isAiModelCapabilitySatisfied, normalizeAiEndpoint } from '@haohaoxue/samepage-shared'
+import { AI_MODEL_INTENT_KEY, AiModelIntentKeySchema } from '@haohaoxue/lexora-contracts'
+import { getAiModelIntentFallbackChain, isAiModelCapabilitySatisfied, normalizeAiEndpoint } from '@haohaoxue/lexora-shared'
 import { BadRequestException, Injectable } from '@nestjs/common'
 import { PrismaService } from '../../../database/prisma.service'
 import {

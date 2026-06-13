@@ -5,7 +5,7 @@ import type {
   AgentRuntimeModelTarget,
   ChatGenerationBootstrap,
   ChatGenerationEvent,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 
 export type {
   AgentGenerationCommand,

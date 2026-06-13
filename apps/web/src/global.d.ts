@@ -36,7 +36,7 @@ declare module 'vue-router' {
 
 declare module '@tiptap/core' {
   interface Commands<ReturnType> {
-    samepageBlockCommands: {
+    lexoraBlockCommands: {
       turnIntoBlock: (target: TurnIntoBlockType) => ReturnType
       indentBlock: () => ReturnType
       outdentBlock: () => ReturnType

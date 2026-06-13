@@ -6,10 +6,10 @@ import type {
   TestSystemEmailConfigResponse,
   UpdateSystemEmailConfigRequest,
   UpdateSystemEmailServiceStatusRequest,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 import type { CryptoConfig } from '../../config/auth.config'
-import { API_ERROR_CODE, SYSTEM_EMAIL_PROVIDER_DEFAULTS } from '@haohaoxue/samepage-contracts'
-import { LANGUAGE_PREFERENCE } from '@haohaoxue/samepage-contracts/user/constants'
+import { API_ERROR_CODE, SYSTEM_EMAIL_PROVIDER_DEFAULTS } from '@haohaoxue/lexora-contracts'
+import { LANGUAGE_PREFERENCE } from '@haohaoxue/lexora-contracts/user/constants'
 import { Injectable } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { Prisma, SystemEmailProvider as PrismaSystemEmailProvider } from '@prisma/client'
@@ -356,15 +356,15 @@ function createSimpleEmailHtml(input: {
 function createTestEmailTemplate(language: ResolvedLanguagePreference) {
   if (language === LANGUAGE_PREFERENCE.ZH_CN) {
     return {
-      subject: 'SamePage 发件配置测试',
+      subject: 'Lexora 发件配置测试',
       title: '发件配置已生效',
-      content: '这是一封来自 SamePage 的测试邮件，说明当前系统发件配置可正常发送。',
+      content: '这是一封来自 Lexora 的测试邮件，说明当前系统发件配置可正常发送。',
     }
   }
 
   return {
-    subject: 'SamePage email configuration test',
+    subject: 'Lexora email configuration test',
     title: 'Email configuration is active',
-    content: 'This is a test email from SamePage. Your system email configuration can send mail.',
+    content: 'This is a test email from Lexora. Your system email configuration can send mail.',
   }
 }

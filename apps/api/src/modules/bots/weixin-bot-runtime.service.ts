@@ -1,4 +1,4 @@
-import type { BotRuntimeState } from '@haohaoxue/samepage-contracts'
+import type { BotRuntimeState } from '@haohaoxue/lexora-contracts'
 import type { Prisma } from '@prisma/client'
 import type { WeixinMessage, WeixinRuntimeAccount } from './bots.interface'
 import {
@@ -6,7 +6,7 @@ import {
   CHAT_MESSAGE_CONTENT_MAX_LENGTH,
   CHAT_SESSION_CHANNEL,
   CHAT_SESSION_ORIGIN,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 import {
   Injectable,
   Logger,
@@ -558,7 +558,7 @@ export class WeixinBotRuntimeService implements OnModuleInit, OnModuleDestroy {
       await sleep(BOT_REPLY_POLL_INTERVAL_MS)
     }
 
-    return '回复生成时间较长，请稍后在 SamePage 对话里查看。'
+    return '回复生成时间较长，请稍后在 Lexora 对话里查看。'
   }
 
   private async rememberMessage(accountId: string, messageKey: string): Promise<boolean> {

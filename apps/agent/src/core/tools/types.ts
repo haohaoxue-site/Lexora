@@ -1,4 +1,4 @@
-import type { ChatMemoryOperationProjection } from '@haohaoxue/samepage-contracts'
+import type { ChatMemoryOperationProjection } from '@haohaoxue/lexora-contracts'
 import type {
   AgentModelTextStreamResult,
   AgentModelTokenUsage,

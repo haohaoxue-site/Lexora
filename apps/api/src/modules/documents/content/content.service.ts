@@ -12,11 +12,11 @@ import type {
   RestoreDocumentVersionSnapshotRequest,
   RestoreDocumentVersionSnapshotResponse,
   TiptapJsonContent,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 import {
   COLLAB_PERMISSION_INVALIDATION_REASON,
   DOCUMENT_VERSION_SNAPSHOT_SOURCE,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 import {
   collectDocumentAssetIds,
   createDocumentTitleContent,
@@ -25,7 +25,7 @@ import {
   isSameDocumentVersionSnapshotContent,
   stripDocumentAssetRuntimeAttributes,
   summarizeDocumentContent,
-} from '@haohaoxue/samepage-shared'
+} from '@haohaoxue/lexora-shared'
 import {
   BadRequestException,
   ConflictException,

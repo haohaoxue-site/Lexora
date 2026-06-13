@@ -4,14 +4,14 @@ import type {
   ResolvedAppearancePreference,
   ResolvedLanguagePreference,
   UserCollabIdentity,
-} from '@haohaoxue/samepage-contracts'
-import { USER_CODE_REGEX } from '@haohaoxue/samepage-contracts/identity/constants'
+} from '@haohaoxue/lexora-contracts'
+import { USER_CODE_REGEX } from '@haohaoxue/lexora-contracts/identity/constants'
 import {
   APPEARANCE_PREFERENCE,
   APPEARANCE_PREFERENCE_LABELS,
   LANGUAGE_PREFERENCE,
   LANGUAGE_PREFERENCE_LABELS,
-} from '@haohaoxue/samepage-contracts/user/constants'
+} from '@haohaoxue/lexora-contracts/user/constants'
 
 export function formatLanguagePreference(value: LanguagePreference): string {
   return LANGUAGE_PREFERENCE_LABELS[value]

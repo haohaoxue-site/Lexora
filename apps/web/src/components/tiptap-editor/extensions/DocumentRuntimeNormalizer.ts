@@ -9,7 +9,7 @@ import {
   isBlockId,
 } from '../content/blockId'
 
-export const DOCUMENT_RUNTIME_NORMALIZER_TRANSACTION_META = 'samepageDocumentRuntimeNormalize'
+export const DOCUMENT_RUNTIME_NORMALIZER_TRANSACTION_META = 'lexoraDocumentRuntimeNormalize'
 
 // 只修复协作运行时产生的顶层无 blockId 合成空段，不作为通用内容整理器使用。
 export const DocumentRuntimeNormalizer = Extension.create({

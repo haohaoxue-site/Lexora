@@ -11,7 +11,7 @@ import type {
   TiptapJsonContent,
   TiptapJsonNode,
   WorkspaceType,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 import {
   DOCUMENT_COLLECTION,
   DOCUMENT_COLLECTION_LABELS,
@@ -19,9 +19,9 @@ import {
   DOCUMENT_SAVE_STATE,
   DOCUMENT_TITLE_MAX_LENGTH,
   DOCUMENT_VISIBILITY,
-} from '@haohaoxue/samepage-contracts/document/constants'
-import { TIPTAP_BODY_BLOCK_ID_ATTRIBUTE } from '@haohaoxue/samepage-contracts/tiptap/constants'
-import { WORKSPACE_TYPE } from '@haohaoxue/samepage-contracts/workspace/constants'
+} from '@haohaoxue/lexora-contracts/document/constants'
+import { TIPTAP_BODY_BLOCK_ID_ATTRIBUTE } from '@haohaoxue/lexora-contracts/tiptap/constants'
+import { WORKSPACE_TYPE } from '@haohaoxue/lexora-contracts/workspace/constants'
 
 export function isDocumentCollectionId(value: string): value is DocumentCollectionId {
   return DOCUMENT_COLLECTION_VALUES.includes(value as DocumentCollectionId)

@@ -1,11 +1,11 @@
 import type {
   ChatSessionEvent,
   ChatSessionEventType,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 import {
   CHAT_SESSION_EVENT_TYPE,
   ChatSessionEventSchema,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 import { Injectable } from '@nestjs/common'
 import {
   Prisma,

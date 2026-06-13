@@ -1,4 +1,4 @@
-import type { AuthProviderName } from '@haohaoxue/samepage-contracts'
+import type { AuthProviderName } from '@haohaoxue/lexora-contracts'
 import type { Prisma, User } from '@prisma/client'
 import type { FastifyRequest } from 'fastify'
 import type {
@@ -15,8 +15,8 @@ import {
   OAUTH_REDIRECT_BIND_STATUS,
   OAUTH_REDIRECT_ERROR_CODE,
   OAUTH_REDIRECT_QUERY,
-} from '@haohaoxue/samepage-contracts'
-import { formatAuthMethod } from '@haohaoxue/samepage-shared'
+} from '@haohaoxue/lexora-contracts'
+import { formatAuthMethod } from '@haohaoxue/lexora-shared'
 import {
   BadRequestException,
   Injectable,
@@ -614,7 +614,7 @@ export class AuthService {
     const userResponse = await this.fetchOAuthResource(userinfoEndpoint, {
       'Authorization': `Bearer ${accessToken}`,
       'Accept': 'application/vnd.github+json',
-      'User-Agent': 'samepage-api',
+      'User-Agent': 'lexora-api',
       'X-GitHub-Api-Version': '2022-11-28',
     })
 

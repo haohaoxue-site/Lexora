@@ -1,6 +1,6 @@
 import type { CollabHocuspocusRuntime, CreateHocuspocusRuntimeInput } from './ports'
 import type { CollabHocuspocusDocumentState } from './update-persistence-queue'
-import { COLLAB_ERROR_CODE } from '@haohaoxue/samepage-contracts'
+import { COLLAB_ERROR_CODE } from '@haohaoxue/lexora-contracts'
 import { Hocuspocus as HocuspocusServer } from '@hocuspocus/server'
 import { assertCollabUpdateSize } from '../gateway/limits'
 import { applyCollabConnectionAuthorization } from './authorization'
@@ -25,7 +25,7 @@ export function createHocuspocusRuntime(input: CreateHocuspocusRuntimeInput = {}
   const documentStates = new Map<string, CollabHocuspocusDocumentState>()
 
   const server = new HocuspocusServer({
-    name: 'samepage-collab',
+    name: 'lexora-collab',
     quiet: true,
     debounce: 1_000,
     maxDebounce: 10_000,

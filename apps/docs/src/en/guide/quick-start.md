@@ -1,6 +1,6 @@
 # Quick Start
 
-This page is for users who already have access to a SamePage AI instance. To deploy your own instance, start with [Docker Compose](/en/self-host/docker-compose).
+This page is for users who already have access to a Lexora instance. To deploy your own instance, start with [Docker Compose](/en/self-host/docker-compose).
 
 ## 1. Sign In
 
@@ -26,4 +26,4 @@ Use the document collaboration entry to invite a user by user code or create a c
 
 ## 6. Publish a Public Page
 
-Use publication settings when a document needs to be visible to outside visitors. SamePage AI supports single-page publishing and site publishing. Public pages are read-only and do not enter collaborative editing.
+Use publication settings when a document needs to be visible to outside visitors. Lexora supports single-page publishing and site publishing. Public pages are read-only and do not enter collaborative editing.

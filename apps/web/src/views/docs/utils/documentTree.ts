@@ -3,8 +3,8 @@ import type {
   DocumentTreeCollectionId,
   DocumentTreeGroup,
   OwnedDocumentCollectionId,
-} from '@haohaoxue/samepage-contracts'
-import { DOCUMENT_COLLECTION } from '@haohaoxue/samepage-contracts/document/constants'
+} from '@haohaoxue/lexora-contracts'
+import { DOCUMENT_COLLECTION } from '@haohaoxue/lexora-contracts/document/constants'
 
 export interface DocumentDeletePlan {
   rootDocumentIds: string[]

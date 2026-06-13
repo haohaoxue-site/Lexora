@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { ChatComposerModelRef, ChatComposerModelSelectionKind } from './typing'
-import { AI_MODEL_INTENT_KEY } from '@haohaoxue/samepage-contracts/ai/constants'
+import { AI_MODEL_INTENT_KEY } from '@haohaoxue/lexora-contracts/ai/constants'
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import ModelCascader from '@/components/model-cascader'

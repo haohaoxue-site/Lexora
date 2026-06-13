@@ -1,5 +1,5 @@
 import process from 'node:process'
-import { optionalNonEmptyString, requiredEnvString } from '@haohaoxue/samepage-shared'
+import { optionalNonEmptyString, requiredEnvString } from '@haohaoxue/lexora-shared'
 import { z } from 'zod'
 
 const envSchema = z.object({

@@ -7,7 +7,7 @@ import {
   AgentMemoryOperationModeSchema,
   AgentMemoryScopeSchema,
   AgentMemorySensitivitySchema,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 import { z } from 'zod'
 
 const NullableStringSchema = z.string().trim().min(1).nullable().default(null)

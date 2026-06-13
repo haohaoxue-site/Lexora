@@ -5,7 +5,7 @@ type TextAlignValue = 'left' | 'center' | 'right'
 
 declare module '@tiptap/core' {
   interface Commands<ReturnType> {
-    samepageTextAlign: {
+    lexoraTextAlign: {
       setTextAlign: (value: TextAlignValue) => ReturnType
       unsetTextAlign: () => ReturnType
     }

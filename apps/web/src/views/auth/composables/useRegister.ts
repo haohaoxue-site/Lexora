@@ -1,6 +1,6 @@
 import type { FormInstance, FormRules } from 'element-plus'
 import type { ShallowRef } from 'vue'
-import { AUTH_METHOD } from '@haohaoxue/samepage-contracts/auth/constants'
+import { AUTH_METHOD } from '@haohaoxue/lexora-contracts/auth/constants'
 import { computed, onMounted, reactive } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'

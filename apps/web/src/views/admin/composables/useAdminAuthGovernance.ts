@@ -1,9 +1,9 @@
-import type { AuthProviderName, SystemAuthProviderGovernance } from '@haohaoxue/samepage-contracts'
+import type { AuthProviderName, SystemAuthProviderGovernance } from '@haohaoxue/lexora-contracts'
 import type {
   SystemAuthGovernance,
   UpdateSystemAuthGovernanceRequest,
 } from '@/apis/system-admin'
-import { AUTH_PROVIDER_VALUES } from '@haohaoxue/samepage-contracts/auth/constants'
+import { AUTH_PROVIDER_VALUES } from '@haohaoxue/lexora-contracts/auth/constants'
 import { createSharedComposable } from '@vueuse/core'
 import { computed, reactive, shallowRef } from 'vue'
 import { useI18n } from 'vue-i18n'

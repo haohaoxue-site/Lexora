@@ -17,7 +17,7 @@ import type {
   ReadAgentSkillResourceRequest,
   ReadAgentSkillResourceResponse,
   UpdateAgentSkillConfigResponse,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 import { readFile, realpath } from 'node:fs/promises'
 import path from 'node:path'
 import {
@@ -43,7 +43,7 @@ import {
   MutateAgentSkillResponseSchema,
   ReadAgentSkillResourceResponseSchema,
   UpdateAgentSkillConfigResponseSchema,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 import {
   BadRequestException,
   ConflictException,

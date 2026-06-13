@@ -1,6 +1,6 @@
 # Storage and Dependencies
 
-A self-hosted SamePage AI instance depends on PostgreSQL, Redis, and object storage.
+A self-hosted Lexora instance depends on PostgreSQL, Redis, and object storage.
 
 ## PostgreSQL
 

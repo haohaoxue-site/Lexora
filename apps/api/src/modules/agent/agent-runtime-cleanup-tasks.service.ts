@@ -1,4 +1,4 @@
-import type { AgentRuntimeControlResult } from '@haohaoxue/samepage-contracts'
+import type { AgentRuntimeControlResult } from '@haohaoxue/lexora-contracts'
 import type Redis from 'ioredis'
 import { randomUUID } from 'node:crypto'
 import process from 'node:process'
@@ -7,8 +7,8 @@ import {
   AGENT_RUNTIME_CONTROL_RESULT_TYPE,
   AGENT_RUNTIME_CONTROL_TYPE,
   AgentRuntimeControlResultSchema,
-} from '@haohaoxue/samepage-contracts'
-import { buildAgentChatThreadId, sleep } from '@haohaoxue/samepage-shared'
+} from '@haohaoxue/lexora-contracts'
+import { buildAgentChatThreadId, sleep } from '@haohaoxue/lexora-shared'
 import {
   Injectable,
   Logger,
@@ -27,7 +27,7 @@ const CONTROL_LEASE_MS = 60_000
 const CONTROL_RESULT_FIELD = 'result'
 const CONTROL_RESULT_READ_BLOCK_MS = 1_000
 const CONTROL_RESULT_READ_COUNT = 20
-const CONTROL_RESULT_GROUP_NAME = 'samepage-api'
+const CONTROL_RESULT_GROUP_NAME = 'lexora-api'
 const CONTROL_RESULT_CONSUMER_NAME = `api-${process.pid}`
 const PENDING_RESULT_STREAM_ID = '0'
 const NEW_RESULT_STREAM_ID = '>'

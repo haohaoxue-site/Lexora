@@ -3,7 +3,7 @@ import type {
   PublicationRenderedDocument,
   PublicationSidebarGroup,
   TiptapJsonContent,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 
 export interface PublicationSiteDocumentPageProps {
   body: TiptapJsonContent

@@ -1,7 +1,7 @@
 import type {
   PublicationRenderedDocument,
   TiptapJsonContent,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 
 export interface PublicationSingleDocumentPageProps {
   body: TiptapJsonContent

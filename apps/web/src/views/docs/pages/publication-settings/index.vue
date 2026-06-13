@@ -23,7 +23,7 @@ import { Collection, DataAnalysis, Guide, Setting } from '@element-plus/icons-vu
 import {
   DOCUMENT_PUBLICATION_SITE_MEDIA_KIND,
   DOCUMENT_PUBLICATION_SITE_STATUS,
-} from '@haohaoxue/samepage-contracts/document/publication/constants'
+} from '@haohaoxue/lexora-contracts/document/publication/constants'
 import { useRouteQuery } from '@vueuse/router'
 import { computed, shallowRef, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -50,7 +50,7 @@ import PublicationSiteConfigPanel from '../../components/publication-site-config
 import PublicationSiteGroupPanel from '../../components/publication-site-group-panel'
 import PublicationSiteNavigationPanel from '../../components/publication-site-navigation-panel'
 
-const PUBLICATION_SITE_STATE_EVENT = 'samepage:publication-site-state-change'
+const PUBLICATION_SITE_STATE_EVENT = 'lexora:publication-site-state-change'
 const DEFAULT_PUBLICATION_SETTINGS_TAB: PublicationSettingsTab = 'open-overview'
 const PUBLICATION_SETTINGS_TAB_VALUES = [
   'open-overview',

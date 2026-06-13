@@ -4,7 +4,7 @@ import {
   CHAT_MESSAGE_PART_TYPE,
   CHAT_MESSAGE_STATUS,
   CHAT_SESSION_EVENT_TYPE,
-} from '@haohaoxue/samepage-contracts/chat/constants'
+} from '@haohaoxue/lexora-contracts/chat/constants'
 import { translate } from '@/i18n'
 import dayjs from '@/utils/dayjs'
 

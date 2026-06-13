@@ -8,7 +8,7 @@ import type {
   AgentMemorySourceType,
   RetrieveAgentMemoryRequest,
   RetrieveAgentMemoryResponse,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 import type {
   AgentMemory as PrismaAgentMemory,
   AgentMemoryLane as PrismaAgentMemoryLane,
@@ -21,7 +21,7 @@ import {
   AgentMemoryPolicySchema,
   AgentMemoryRetrievalSnapshotSchema,
   RetrieveAgentMemoryResponseSchema,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 import {
   BadRequestException,
   ConflictException,

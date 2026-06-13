@@ -1,4 +1,4 @@
-import type { DocumentTreeGroup } from '@haohaoxue/samepage-contracts'
+import type { DocumentTreeGroup } from '@haohaoxue/lexora-contracts'
 import { computed, shallowRef, watch } from 'vue'
 import { translate } from '@/i18n'
 import { ElMessage, ElMessageBox } from '@/utils/element-plus'

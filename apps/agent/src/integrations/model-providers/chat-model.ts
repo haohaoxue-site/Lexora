@@ -2,7 +2,7 @@ import type { BaseMessage, MessageContent } from '@langchain/core/messages'
 import type { StructuredToolInterface } from '@langchain/core/tools'
 import type { ChatOpenAICallOptions } from '@langchain/openai'
 import type { AgentRuntimeModelTarget } from '../../runtime/typing'
-import { AI_PROVIDER_AUTH_MODE } from '@haohaoxue/samepage-contracts'
+import { AI_PROVIDER_AUTH_MODE } from '@haohaoxue/lexora-contracts'
 import { ChatAnthropic } from '@langchain/anthropic'
 import { ChatOpenAI } from '@langchain/openai'
 
@@ -56,7 +56,7 @@ export function createChatModelFactory(): AgentChatModelFactory {
             topP: options.topP,
             maxTokens: options.maxOutputTokens,
             maxRetries: 1,
-            apiKey: target.apiKey ?? 'samepage-no-auth',
+            apiKey: target.apiKey ?? 'lexora-no-auth',
             anthropicApiUrl: target.endpoint,
           }) as BindableChatModel)
         default:
@@ -74,7 +74,7 @@ function createOpenAIChatModel(target: AgentRuntimeModelTarget, options: AgentCh
     maxTokens: options.maxOutputTokens,
     timeout: MODEL_CALL_TIMEOUT_MS,
     maxRetries: 1,
-    apiKey: target.apiKey ?? 'samepage-no-auth',
+    apiKey: target.apiKey ?? 'lexora-no-auth',
     configuration: {
       baseURL: target.endpoint,
     },

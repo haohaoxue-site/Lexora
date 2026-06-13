@@ -19,6 +19,7 @@ export type ChatComposerBeforeSendHandler = (payload: ChatComposerSubmitPayload)
 export interface ChatComposerHostModel {
   composerSelectedModelRef: ComputedRef<ChatComposerModelRef | null>
   composerModelSelectionKind?: ComputedRef<ChatComposerModelSelectionKind>
+  shouldPersistComposerModelRef?: ComputedRef<boolean>
   clearNewSessionModelDraft: () => void
 }
 
@@ -66,7 +67,7 @@ export function createChatComposerHostState(options: {
     const nextPayload = applyBeforeSendHandlers(payload)
     const sent = await options.sendMessage({
       ...nextPayload,
-      modelRef: shouldPersistComposerModel(options.model.composerModelSelectionKind?.value) ? modelRef : undefined,
+      modelRef: shouldPersistComposerModel(options.model) ? modelRef : undefined,
     })
     if (!sent) {
       return false
@@ -105,7 +106,13 @@ export function createChatComposerHostState(options: {
   }
 }
 
-function shouldPersistComposerModel(selectionKind: ChatComposerModelSelectionKind | undefined) {
+function shouldPersistComposerModel(model: ChatComposerHostModel) {
+  const explicitValue = model.shouldPersistComposerModelRef?.value
+  if (explicitValue !== undefined) {
+    return explicitValue
+  }
+
+  const selectionKind = model.composerModelSelectionKind?.value
   return selectionKind === 'draft' || selectionKind === 'override'
 }
 

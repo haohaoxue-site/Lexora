@@ -7,7 +7,7 @@ import type {
 import {
   AGENT_RUNTIME_CONTROL_TYPE,
   AgentGenerationCommandSchema,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 
 export interface AgentIdempotencyStore {
   markStarted: (idempotencyKey: string) => boolean | Promise<boolean>

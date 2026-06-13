@@ -1,5 +1,5 @@
 {
-  "name": "@haohaoxue/samepage-collab",
+  "name": "@haohaoxue/lexora-collab",
   "type": "module",
   "version": "1.0.0",
   "private": true,
@@ -14,8 +14,8 @@
   },
   "dependencies": {
     "@fastify/websocket": "^11.2.0",
-    "@haohaoxue/samepage-contracts": "workspace:*",
-    "@haohaoxue/samepage-shared": "workspace:*",
+    "@haohaoxue/lexora-contracts": "workspace:*",
+    "@haohaoxue/lexora-shared": "workspace:*",
     "@hocuspocus/server": "^4.0.0",
     "@prisma/adapter-pg": "^7.8.0",
     "@prisma/client": "^7.8.0",

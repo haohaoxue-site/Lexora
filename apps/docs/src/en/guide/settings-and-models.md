@@ -12,7 +12,7 @@ Preferences control the current user's UI language, appearance, and local experi
 
 ## Providers
 
-Providers connect AI models to SamePage AI. Current provider options include presets and compatible providers such as OpenAI-Compatible or Anthropic-Compatible endpoints.
+Providers connect AI models to Lexora. Current provider options include presets and compatible providers such as OpenAI-Compatible or Anthropic-Compatible endpoints.
 
 After adding a provider, configure its API endpoint, authentication mode, key, and model list.
 

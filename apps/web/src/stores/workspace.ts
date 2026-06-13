@@ -2,9 +2,9 @@ import type {
   PersonalWorkspaceSummary,
   TeamWorkspaceSummary,
   WorkspaceType,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 import type { DeepReadonly } from 'vue'
-import { WORKSPACE_TYPE } from '@haohaoxue/samepage-contracts/workspace/constants'
+import { WORKSPACE_TYPE } from '@haohaoxue/lexora-contracts/workspace/constants'
 import { defineStore } from 'pinia'
 import { computed, shallowRef } from 'vue'
 import { getPersonalWorkspace } from '@/apis/workspace'

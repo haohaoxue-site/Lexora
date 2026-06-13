@@ -1,5 +1,5 @@
 {
-  "name": "@haohaoxue/samepage-shared",
+  "name": "@haohaoxue/lexora-shared",
   "type": "module",
   "version": "1.0.0",
   "private": true,
@@ -27,7 +27,7 @@
     "test:watch": "vitest --passWithNoTests"
   },
   "dependencies": {
-    "@haohaoxue/samepage-contracts": "workspace:*",
+    "@haohaoxue/lexora-contracts": "workspace:*",
     "@tiptap/core": "^3.22.5",
     "@tiptap/extension-image": "^3.22.5",
     "@tiptap/extension-table": "^3.22.5",

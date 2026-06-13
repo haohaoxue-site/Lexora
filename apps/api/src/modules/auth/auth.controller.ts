@@ -5,11 +5,11 @@ import type {
   RequestEmailVerificationResponse,
   StartOAuthLoginResponse,
   TokenExchangeResponse,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 import type { FastifyReply, FastifyRequest } from 'fastify'
 import type { AuthUserContext, TokenExchangeResult } from './auth.interface'
-import { OAUTH_REDIRECT_ERROR_CODE } from '@haohaoxue/samepage-contracts'
-import { normalizeAuthProviderName } from '@haohaoxue/samepage-shared'
+import { OAUTH_REDIRECT_ERROR_CODE } from '@haohaoxue/lexora-contracts'
+import { normalizeAuthProviderName } from '@haohaoxue/lexora-shared'
 import {
   BadRequestException,
   Body,

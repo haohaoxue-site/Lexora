@@ -1,4 +1,4 @@
-import type { AgentRuntimeSkillContext } from '@haohaoxue/samepage-contracts'
+import type { AgentRuntimeSkillContext } from '@haohaoxue/lexora-contracts'
 import { escapeSkillPromptText } from './escape'
 
 export function createSkillCatalogPromptBlock(skillContext: AgentRuntimeSkillContext | null | undefined): string {

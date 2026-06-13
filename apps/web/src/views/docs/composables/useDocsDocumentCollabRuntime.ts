@@ -3,11 +3,11 @@ import type {
   CollabErrorCode,
   CreateCollabTicketResponse,
   TiptapJsonContent,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 import type { HocuspocusProvider } from '@hocuspocus/provider'
 import type { DocsDocumentEditorCollaborationBindings } from '../typing'
-import { COLLAB_ERROR_CODE } from '@haohaoxue/samepage-contracts/collab/constants'
-import { stripDocumentAssetRuntimeAttributes } from '@haohaoxue/samepage-shared/document'
+import { COLLAB_ERROR_CODE } from '@haohaoxue/lexora-contracts/collab/constants'
+import { stripDocumentAssetRuntimeAttributes } from '@haohaoxue/lexora-shared/document'
 import { HocuspocusProvider as HocuspocusRuntimeProvider } from '@hocuspocus/provider'
 import { computed, onScopeDispose, shallowRef, watch } from 'vue'
 import * as Y from 'yjs'

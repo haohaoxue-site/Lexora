@@ -3,4 +3,4 @@ export type {
   WeixinBotBindingStatus,
   WeixinBotLoginStartResponse,
   WeixinBotLoginStatusResponse,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'

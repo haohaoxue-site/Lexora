@@ -184,7 +184,7 @@ export const AGENT_MEMORY_DOCUMENT_ID_VALUES = [
   AGENT_MEMORY_DOCUMENT_ID.MEMORY,
 ] as const
 
-export const AGENT_MEMORY_SKILL_KEY = 'samepage.memory' as const
+export const AGENT_MEMORY_SKILL_KEY = 'lexora.memory' as const
 
 export const AGENT_MEMORY_TOOL = {
   REMEMBER: 'memory_remember',

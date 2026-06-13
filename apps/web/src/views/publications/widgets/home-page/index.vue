@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { PublicationHomePageProps } from './typing'
-import { normalizePublicationHref } from '@haohaoxue/samepage-shared/document'
+import { normalizePublicationHref } from '@haohaoxue/lexora-shared/document'
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'

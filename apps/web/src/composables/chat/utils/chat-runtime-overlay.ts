@@ -9,7 +9,7 @@ import {
   CHAT_MESSAGE_STATUS,
   CHAT_RUN_STATUS,
   CHAT_SESSION_EVENT_TYPE,
-} from '@haohaoxue/samepage-contracts/chat/constants'
+} from '@haohaoxue/lexora-contracts/chat/constants'
 import { applyChatSessionEventToMessages } from './chat-stream-message'
 
 export type ChatSessionRuntimeStatus = 'idle' | 'streaming' | 'reconnecting'

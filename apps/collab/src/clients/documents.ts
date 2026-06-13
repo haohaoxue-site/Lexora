@@ -3,13 +3,13 @@ import type {
   ConsumeCollabTicketResponse,
   MaterializeDocumentYdocCurrentProjectionRequest,
   MaterializeDocumentYdocCurrentProjectionResponse,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 import {
   CollabErrorCodeSchema,
   ConsumeCollabTicketRequestSchema,
   ConsumeCollabTicketResponseSchema,
   MaterializeDocumentYdocCurrentProjectionResponseSchema,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 import { ApiInternalRequestError, normalizeApiInternalBaseUrl, postApiInternalJson } from './utils'
 
 export interface CollabTicketClient {

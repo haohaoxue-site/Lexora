@@ -1,11 +1,11 @@
-import type { AuthProviderName } from '@haohaoxue/samepage-contracts/auth'
-import type { UserSettings } from '@haohaoxue/samepage-contracts/user'
+import type { AuthProviderName } from '@haohaoxue/lexora-contracts/auth'
+import type { UserSettings } from '@haohaoxue/lexora-contracts/user'
 import {
   AUTH_PROVIDER_VALUES,
   OAUTH_REDIRECT_BIND_STATUS,
   OAUTH_REDIRECT_QUERY,
-} from '@haohaoxue/samepage-contracts/auth/constants'
-import { formatAuthMethod, normalizeAuthProviderName } from '@haohaoxue/samepage-shared/auth'
+} from '@haohaoxue/lexora-contracts/auth/constants'
+import { formatAuthMethod, normalizeAuthProviderName } from '@haohaoxue/lexora-shared/auth'
 import { createSharedComposable } from '@vueuse/core'
 import { computed, reactive, shallowRef } from 'vue'
 import { useI18n } from 'vue-i18n'

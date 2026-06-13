@@ -36,7 +36,7 @@ export function createAgentGraph(options: CreateAgentGraphOptions) {
     .addEdge('compactHistory', 'callModel')
     .addEdge('callModel', END)
     .compile({
-      name: 'samepage.agent.core',
+      name: 'lexora.agent.core',
       checkpointer: options.checkpointer,
     })
 }

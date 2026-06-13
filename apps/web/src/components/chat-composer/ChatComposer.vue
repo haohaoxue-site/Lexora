@@ -7,11 +7,11 @@ import type {
   ChatComposerSubmitPayload,
 } from './typing'
 import type { ReadableDocumentSearchResult } from '@/apis/document'
-import { AGENT_TRANSLATOR_SKILL_KEY } from '@haohaoxue/samepage-contracts/agent'
+import { AGENT_TRANSLATOR_SKILL_KEY } from '@haohaoxue/lexora-contracts/agent'
 import {
   CHAT_MESSAGE_ATTACHMENT_PLACEMENT,
   CHAT_MESSAGE_ATTACHMENT_TYPE,
-} from '@haohaoxue/samepage-contracts/chat/constants'
+} from '@haohaoxue/lexora-contracts/chat/constants'
 import { EditorContent, useEditor } from '@tiptap/vue-3'
 import { nanoid } from 'nanoid'
 import { computed, onBeforeUnmount, shallowRef, watch } from 'vue'

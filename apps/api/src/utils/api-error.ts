@@ -1,4 +1,4 @@
-import type { ApiErrorCode } from '@haohaoxue/samepage-contracts'
+import type { ApiErrorCode } from '@haohaoxue/lexora-contracts'
 import {
   BadRequestException,
   ConflictException,

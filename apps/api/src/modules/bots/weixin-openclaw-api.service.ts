@@ -128,7 +128,7 @@ export class WeixinOpenClawApiService {
   }): Promise<void> {
     const request: WeixinSendMessageRequest = {
       msg: {
-        client_id: `samepage-weixin-${randomUUID()}`,
+        client_id: `lexora-weixin-${randomUUID()}`,
         context_token: params.contextToken,
         from_user_id: '',
         item_list: params.text
@@ -187,7 +187,7 @@ export class WeixinOpenClawApiService {
   private buildBaseInfo(): WeixinBaseInfo {
     return {
       channel_version: this.channelVersion,
-      bot_agent: `SamePage-AI/1.0.0 openclaw-weixin/${this.channelVersion}`,
+      bot_agent: `Lexora/1.0.0 openclaw-weixin/${this.channelVersion}`,
     }
   }
 

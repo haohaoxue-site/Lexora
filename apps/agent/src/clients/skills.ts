@@ -3,11 +3,11 @@ import type {
   ActivateAgentSkillResponse,
   ReadAgentSkillResourceRequest,
   ReadAgentSkillResourceResponse,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 import {
   ActivateAgentSkillResponseSchema,
   ReadAgentSkillResourceResponseSchema,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 import { normalizeApiInternalBaseUrl, postApiInternalJson } from './utils'
 
 export interface AgentSkillApiClient {

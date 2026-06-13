@@ -10,7 +10,7 @@
 
 ## 兼容服务商
 
-SamePage AI 支持 OpenAI-Compatible 和 Anthropic-Compatible 服务商。配置时需要填写服务商名称、接口地址、认证方式和密钥。
+Lexora 支持 OpenAI-Compatible 和 Anthropic-Compatible 服务商。配置时需要填写服务商名称、接口地址、认证方式和密钥。
 
 服务商支持从 `/models` 一类接口拉取模型列表；如果兼容服务商无法正确返回模型列表，也可以手动维护模型。
 

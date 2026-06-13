@@ -3,7 +3,7 @@ import {
   AUTH_PASSWORD_MAX_LENGTH,
   AUTH_PASSWORD_MIN_LENGTH,
   AUTH_PASSWORD_REQUIRED_PATTERN,
-} from '@haohaoxue/samepage-contracts/identity/constants'
+} from '@haohaoxue/lexora-contracts/identity/constants'
 import { translate } from '@/i18n'
 
 const EMAIL_RE = /^[^\s@]+@[^\s@][^\s.@]*\.[^\s@]+$/

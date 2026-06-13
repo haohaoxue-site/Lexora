@@ -1,4 +1,4 @@
-import type { DocumentItem, DocumentTreeCollectionId } from '@haohaoxue/samepage-contracts'
+import type { DocumentItem, DocumentTreeCollectionId } from '@haohaoxue/lexora-contracts'
 
 export interface DocumentItemProps {
   item: DocumentItem

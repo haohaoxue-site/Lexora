@@ -12,4 +12,4 @@ export type {
   StartOAuthLoginRequest,
   StartOAuthLoginResponse,
   TokenExchangeResponse,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'

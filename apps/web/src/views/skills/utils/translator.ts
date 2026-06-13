@@ -2,14 +2,14 @@ import type {
   AgentTranslatorFormality,
   AgentTranslatorOutputMode,
   AgentTranslatorSkillConfig,
-} from '@haohaoxue/samepage-contracts/agent'
+} from '@haohaoxue/lexora-contracts/agent'
 import {
   AGENT_TRANSLATOR_DEFAULT_SKILL_CONFIG,
   AGENT_TRANSLATOR_FORMALITY,
   AGENT_TRANSLATOR_OUTPUT_MODE,
   AGENT_TRANSLATOR_SKILL_KEY,
   AgentTranslatorSkillConfigSchema,
-} from '@haohaoxue/samepage-contracts/agent'
+} from '@haohaoxue/lexora-contracts/agent'
 
 export const TRANSLATOR_SKILL_KEY = AGENT_TRANSLATOR_SKILL_KEY
 

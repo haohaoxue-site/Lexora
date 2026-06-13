@@ -1,4 +1,4 @@
-import type { ChatMemoryOperationProjection } from '@haohaoxue/samepage-contracts/agent'
+import type { ChatMemoryOperationProjection } from '@haohaoxue/lexora-contracts/agent'
 import type { ChatMessage } from '@/apis/chat'
 import type { ChatMarkdownRenderPhase } from '@/components/chat-markdown/typing'
 import {
@@ -7,12 +7,12 @@ import {
   AGENT_MEMORY_SKILL_KEY,
   AGENT_MEMORY_TOOL,
   AGENT_TRANSLATOR_SKILL_KEY,
-} from '@haohaoxue/samepage-contracts/agent'
+} from '@haohaoxue/lexora-contracts/agent'
 import {
   CHAT_MESSAGE_PART_TYPE,
   CHAT_MESSAGE_STATUS,
-} from '@haohaoxue/samepage-contracts/chat/constants'
-import { prettyTokenCount } from '@haohaoxue/samepage-shared/tokens'
+} from '@haohaoxue/lexora-contracts/chat/constants'
+import { prettyTokenCount } from '@haohaoxue/lexora-shared/tokens'
 import { translate } from '@/i18n'
 import dayjs from '@/utils/dayjs'
 

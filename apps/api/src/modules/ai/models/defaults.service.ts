@@ -5,7 +5,7 @@ import type {
   AiModelIntentKey,
   AiProviderScope,
   UpdateAiDefaultModelPolicyRequest,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 import type {
   AiProvider,
   AiProviderModel,
@@ -16,8 +16,8 @@ import {
   AI_MODEL_INTENT_KEY,
   AiModelIntentKeySchema,
   AiProviderScopeSchema,
-} from '@haohaoxue/samepage-contracts'
-import { getAiModelIntentRequirement, isAiModelCapabilitySatisfied } from '@haohaoxue/samepage-shared'
+} from '@haohaoxue/lexora-contracts'
+import { getAiModelIntentRequirement, isAiModelCapabilitySatisfied } from '@haohaoxue/lexora-shared'
 import { BadRequestException, Injectable } from '@nestjs/common'
 import { PrismaService } from '../../../database/prisma.service'
 import {

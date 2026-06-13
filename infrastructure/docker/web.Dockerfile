@@ -14,13 +14,13 @@ COPY apps/web/package.json apps/web/package.json
 COPY packages/contracts/package.json packages/contracts/package.json
 COPY packages/shared/package.json packages/shared/package.json
 
-RUN pnpm install --filter @haohaoxue/samepage-web... --frozen-lockfile
+RUN pnpm install --filter @haohaoxue/lexora-web... --frozen-lockfile
 
 COPY packages/contracts packages/contracts
 COPY packages/shared packages/shared
 COPY apps/web apps/web
 
-RUN pnpm --filter @haohaoxue/samepage-web build
+RUN pnpm --filter @haohaoxue/lexora-web build
 
 FROM nginx:1.30-alpine
 

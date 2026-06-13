@@ -8,7 +8,7 @@ The admin user page displays instance users. Administrators can filter by keywor
 
 ## User Identity
 
-SamePage AI uses a global `User` identity. Collaboration invites use user codes instead of public usernames.
+Lexora uses a global `User` identity. Collaboration invites use user codes instead of public usernames.
 
 Display names are editable and must not be treated as unique identity credentials.
 

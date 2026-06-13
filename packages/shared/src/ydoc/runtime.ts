@@ -1,5 +1,5 @@
-import type { CollabErrorCode } from '@haohaoxue/samepage-contracts'
-import { COLLAB_ERROR_CODE } from '@haohaoxue/samepage-contracts/collab/constants'
+import type { CollabErrorCode } from '@haohaoxue/lexora-contracts'
+import { COLLAB_ERROR_CODE } from '@haohaoxue/lexora-contracts/collab/constants'
 
 export function isYdocRuntimeInitialized(input: {
   checkpointState: Uint8Array | null

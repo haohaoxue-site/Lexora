@@ -2,7 +2,7 @@ import type {
   AiModelCapability,
   AiModelModality,
   AiModelType,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 
 export type {
   AiAvailableModelOption,
@@ -21,7 +21,7 @@ export type {
   AiProviderPreset,
   AiProviderScope,
   UpdateAiDefaultModelPolicyRequest,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 
 /**
  * 创建服务商请求。

@@ -1,6 +1,6 @@
-# What is SamePage AI
+# What is Lexora
 
-SamePage AI is a collaborative document platform. It brings AI chat and document editing into one workspace. Documents can be published as public read-only pages or sites.
+Lexora is a collaborative document platform. It brings AI chat and document editing into one workspace. Documents can be published as public read-only pages or sites.
 
 ## Current Capabilities
 
@@ -13,7 +13,7 @@ SamePage AI is a collaborative document platform. It brings AI chat and document
 
 ## Product Boundaries
 
-SamePage AI separates three access modes:
+Lexora separates three access modes:
 
 - Private documents: visible only to the document owner.
 - In-product collaboration: signed-in users enter `/docs` with explicit read or edit access.
@@ -23,4 +23,4 @@ Collaboration links do not become public publishing links. Public publishing nev
 
 ## Who It Is For
 
-SamePage AI is for individuals, small teams, and communities that want control over their documents, model providers, and deployment.
+Lexora is for individuals, small teams, and communities that want control over their documents, model providers, and deployment.

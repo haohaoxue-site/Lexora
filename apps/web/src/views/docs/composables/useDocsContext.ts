@@ -1,4 +1,4 @@
-import type { WorkspaceType } from '@haohaoxue/samepage-contracts'
+import type { WorkspaceType } from '@haohaoxue/lexora-contracts'
 import type { TiptapEditorCommentRequest } from '@/components/tiptap-editor'
 import { createSharedComposable } from '@vueuse/core'
 import { computed, shallowRef } from 'vue'

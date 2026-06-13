@@ -1,13 +1,13 @@
 import type {
   DocumentOutlineItem,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 import type { Editor } from '@tiptap/core'
 import type { TiptapEditorContent } from '../../core/typing'
 import {
   buildDocumentBlockIndex,
   buildDocumentOutline,
   searchDocumentBlocks,
-} from '@haohaoxue/samepage-shared/document'
+} from '@haohaoxue/lexora-shared/document'
 import {
   computed,
   shallowRef,

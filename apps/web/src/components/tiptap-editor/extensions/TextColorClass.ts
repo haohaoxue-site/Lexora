@@ -5,11 +5,11 @@ const BACKGROUND_COLOR_CLASS_PATTERN = /^tiptap-highlight-[a-z-]+-bg$/
 
 declare module '@tiptap/core' {
   interface Commands<ReturnType> {
-    samepageTextColorClass: {
+    lexoraTextColorClass: {
       setTextColorClass: (className: string) => ReturnType
       unsetTextColorClass: () => ReturnType
     }
-    samepageHighlightClass: {
+    lexoraHighlightClass: {
       setHighlightClass: (className: string) => ReturnType
       unsetHighlightClass: () => ReturnType
     }

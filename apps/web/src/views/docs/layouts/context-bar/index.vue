@@ -2,7 +2,7 @@
 import {
   DOCUMENT_PUBLICATION_SITE_STATUS,
   DOCUMENT_SITE_PUBLICATION_ROUTE_PREFIX,
-} from '@haohaoxue/samepage-contracts/document/publication/constants'
+} from '@haohaoxue/lexora-contracts/document/publication/constants'
 import { computed, onBeforeUnmount, onMounted, shallowRef, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { getPublicationSiteManagement } from '@/apis/document-publication'
@@ -24,7 +24,7 @@ const { t } = useI18n()
 const workspaceStore = useWorkspaceStore()
 const { currentSurface, isDocumentSurface, visibleBreadcrumbLabels } = useDocsSurfaceState()
 const { activeTab } = useDocsControlCenterTabs()
-const PUBLICATION_SITE_STATE_EVENT = 'samepage:publication-site-state-change'
+const PUBLICATION_SITE_STATE_EVENT = 'lexora:publication-site-state-change'
 const publicationSiteState = shallowRef<{
   id: string
   active: boolean

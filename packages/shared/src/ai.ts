@@ -3,8 +3,8 @@ import type {
   AiModelIntentKey,
   AiModelRef,
   AiModelType,
-} from '@haohaoxue/samepage-contracts'
-import { AI_MODEL_INTENT_DEFINITIONS, AI_MODEL_INTENT_KEY, AI_MODEL_TYPE } from '@haohaoxue/samepage-contracts/ai/constants'
+} from '@haohaoxue/lexora-contracts'
+import { AI_MODEL_INTENT_DEFINITIONS, AI_MODEL_INTENT_KEY, AI_MODEL_TYPE } from '@haohaoxue/lexora-contracts/ai/constants'
 
 interface AiModelCapabilityTarget {
   modelType: AiModelType

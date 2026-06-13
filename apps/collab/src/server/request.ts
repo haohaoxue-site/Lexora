@@ -46,7 +46,7 @@ export function getTicketFromRequest(authorization: string | undefined, url: str
     return bearerToken
   }
 
-  return new URL(url, 'http://samepage.local').searchParams.get('ticket')
+  return new URL(url, 'http://lexora.local').searchParams.get('ticket')
 }
 
 export function resolveHandshakeRateLimitKey(request: FastifyRequest): string {
@@ -159,7 +159,7 @@ function appendWebRequestHeader(headers: Headers, name: string, value: string | 
 
 function resolveAbsoluteRequestUrl(request: FastifyRequest): string {
   const protocol = readForwardedProtocol(request)
-  const host = readForwardedHost(request) ?? readHeaderValue(request.headers.host) ?? 'samepage.local'
+  const host = readForwardedHost(request) ?? readHeaderValue(request.headers.host) ?? 'lexora.local'
 
   return new URL(request.url, `${protocol}://${host}`).toString()
 }

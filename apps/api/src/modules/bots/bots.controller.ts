@@ -3,11 +3,11 @@ import type {
   WeixinBotBindingStatus,
   WeixinBotLoginStartResponse,
   WeixinBotLoginStatusResponse,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 import type { AuthUserContext } from '../auth/auth.interface'
 import {
   SubmitWeixinBotVerifyCodeRequestSchema,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 import {
   Body,
   Controller,

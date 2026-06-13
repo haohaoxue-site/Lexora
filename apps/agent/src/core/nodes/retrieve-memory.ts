@@ -2,13 +2,13 @@ import type {
   AgentChatContextMessage,
   AgentMemoryPolicy,
   AgentMemoryRetrievalSnapshot,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 import type { GraphNode } from '@langchain/langgraph'
 import type { AgentMemoryApiClient } from '../../clients/memory'
 import type { AgentGraphContext, AgentGraphState } from '../state'
 import {
   AgentMemoryRetrievalSnapshotSchema,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 
 export interface CreateRetrieveMemoryNodeOptions {
   memoryApi?: AgentMemoryApiClient

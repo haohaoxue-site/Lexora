@@ -1,7 +1,7 @@
 import type {
   AppearancePreference,
   LanguagePreference,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 import { Buffer } from 'node:buffer'
 import { createHash, randomInt } from 'node:crypto'
 import {
@@ -9,7 +9,7 @@ import {
   USER_CODE_ALPHABET,
   USER_CODE_LENGTH,
   USER_CODE_PREFIX,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 
 import { BadRequestException } from '@nestjs/common'
 import {
@@ -21,7 +21,7 @@ import { normalizeEmail } from '../../utils/email'
 export {
   isExactUserCodeQuery,
   normalizeUserCodeQuery,
-} from '@haohaoxue/samepage-shared'
+} from '@haohaoxue/lexora-shared'
 
 const MAX_AVATAR_SIZE_BYTES = 2 * 1024 * 1024
 const STORAGE_KEY_RANDOM_UPPER_BOUND = 2 ** 32

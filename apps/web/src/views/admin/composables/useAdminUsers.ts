@@ -5,7 +5,7 @@ import type {
   SystemAdminUserRoleFilter,
   SystemAdminUserStatus,
 } from '@/apis/system-admin'
-import { USER_STATUS } from '@haohaoxue/samepage-contracts/user/constants'
+import { USER_STATUS } from '@haohaoxue/lexora-contracts/user/constants'
 import { createSharedComposable } from '@vueuse/core'
 import { reactive, shallowRef } from 'vue'
 import { useI18n } from 'vue-i18n'

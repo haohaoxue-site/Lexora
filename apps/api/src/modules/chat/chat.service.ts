@@ -7,13 +7,13 @@ import type {
   ChatSessionOrigin,
   CreateChatSessionMessageRequest,
   EditAndSendChatMessageRequest,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 import { randomUUID } from 'node:crypto'
 import {
   AGENT_RUNTIME_CONTROL_TYPE,
   AI_MODEL_INTENT_KEY,
   ChatGenerationModelTargetSnapshotSchema,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 import {
   Injectable,
   Logger,

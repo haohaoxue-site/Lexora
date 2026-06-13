@@ -1,6 +1,6 @@
-import type { OwnedDocumentCollectionId } from '@haohaoxue/samepage-contracts'
-import { DOCUMENT_COLLECTION, DOCUMENT_DEFAULT_TITLE } from '@haohaoxue/samepage-contracts/document/constants'
-import { resolveRootDocumentVisibility } from '@haohaoxue/samepage-shared/document'
+import type { OwnedDocumentCollectionId } from '@haohaoxue/lexora-contracts'
+import { DOCUMENT_COLLECTION, DOCUMENT_DEFAULT_TITLE } from '@haohaoxue/lexora-contracts/document/constants'
+import { resolveRootDocumentVisibility } from '@haohaoxue/lexora-shared/document'
 import { createSharedComposable } from '@vueuse/core'
 import { computed, shallowRef } from 'vue'
 import {

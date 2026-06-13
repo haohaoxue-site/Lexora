@@ -1,7 +1,7 @@
 import type { ComputedRef, MaybeRefOrGetter } from 'vue'
 import type { AiProviderConsoleMode } from '../typing'
 import type { AiProvider } from '@/apis/ai'
-import { AI_PROVIDER_AUTH_MODE } from '@haohaoxue/samepage-contracts/ai/constants'
+import { AI_PROVIDER_AUTH_MODE } from '@haohaoxue/lexora-contracts/ai/constants'
 import { computed, reactive, shallowRef, toValue } from 'vue'
 import { useI18n } from 'vue-i18n'
 import {

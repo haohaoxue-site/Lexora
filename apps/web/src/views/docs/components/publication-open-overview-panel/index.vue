@@ -16,7 +16,7 @@ import {
   DOCUMENT_SINGLE_PUBLICATION_SCOPE,
   DOCUMENT_SINGLE_PUBLICATION_SCOPE_VALUES,
   DOCUMENT_SINGLE_PUBLICATION_STATE,
-} from '@haohaoxue/samepage-contracts/document/publication/constants'
+} from '@haohaoxue/lexora-contracts/document/publication/constants'
 import { computed, shallowRef, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import Empty from '@/components/empty'

@@ -7,7 +7,7 @@ import type {
 import {
   NOTIFICATION_LIST_FILTER,
   NOTIFICATION_SOURCE_KIND,
-} from '@haohaoxue/samepage-contracts/notification'
+} from '@haohaoxue/lexora-contracts/notification'
 import dayjs from 'dayjs'
 import {
   computed,

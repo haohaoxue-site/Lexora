@@ -1,5 +1,5 @@
-import type { UserCollabIdentity } from '@haohaoxue/samepage-contracts'
-import { isExactUserCodeQuery, normalizeUserCodeQuery } from '@haohaoxue/samepage-shared/user'
+import type { UserCollabIdentity } from '@haohaoxue/lexora-contracts'
+import { isExactUserCodeQuery, normalizeUserCodeQuery } from '@haohaoxue/lexora-shared/user'
 import { shallowRef } from 'vue'
 import { findUserByCode } from '@/apis/user'
 import { translate } from '@/i18n'

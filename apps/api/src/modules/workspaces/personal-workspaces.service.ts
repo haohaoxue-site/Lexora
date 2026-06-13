@@ -1,9 +1,9 @@
-import type { PersonalWorkspaceSummary } from '@haohaoxue/samepage-contracts'
+import type { PersonalWorkspaceSummary } from '@haohaoxue/lexora-contracts'
 import {
   WORKSPACE_MEMBER_ROLE,
   WORKSPACE_MEMBER_STATUS,
   WORKSPACE_TYPE,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 import { Injectable, NotFoundException } from '@nestjs/common'
 import { Prisma } from '@prisma/client'
 import { PrismaService } from '../../database/prisma.service'

@@ -21,7 +21,7 @@ import type {
   ChatSessionSummary,
   ChatSkillInvocation,
   ResolvedLanguagePreference,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 import type { AgentProfileForGeneration } from '../agent/agent-profiles.service'
 import type { ChatContextSnapshotCreateData } from './chat-context-snapshots.service'
 import { randomUUID } from 'node:crypto'
@@ -41,9 +41,9 @@ import {
   ChatMutationResponseSchema,
   ChatSkillInvocationSchema,
   WORKSPACE_MEMBER_STATUS,
-} from '@haohaoxue/samepage-contracts'
-import { LANGUAGE_PREFERENCE } from '@haohaoxue/samepage-contracts/user/constants'
-import { buildAgentChatThreadId, resolveLanguagePreference } from '@haohaoxue/samepage-shared'
+} from '@haohaoxue/lexora-contracts'
+import { LANGUAGE_PREFERENCE } from '@haohaoxue/lexora-contracts/user/constants'
+import { buildAgentChatThreadId, resolveLanguagePreference } from '@haohaoxue/lexora-shared'
 import {
   BadRequestException,
   ConflictException,

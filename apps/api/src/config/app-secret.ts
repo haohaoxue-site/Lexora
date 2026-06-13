@@ -3,7 +3,7 @@ import { hkdfSync } from 'node:crypto'
 import { getEnv } from './env.schema'
 
 const MIN_APP_SECRET_LENGTH = 32
-const HKDF_SALT = Buffer.from('samepage-api', 'utf8')
+const HKDF_SALT = Buffer.from('lexora-api', 'utf8')
 
 interface DerivedSecretMaterial {
   encryptionKey: string
@@ -21,8 +21,8 @@ function deriveSecretMaterial(): DerivedSecretMaterial {
   const masterSecret = resolveMasterSecret()
 
   return {
-    encryptionKey: deriveSecret(masterSecret, 'samepage:encryption', 32).toString('hex'),
-    jwtAccessSecret: deriveSecret(masterSecret, 'samepage:jwt-access', 32).toString('base64url'),
+    encryptionKey: deriveSecret(masterSecret, 'lexora:encryption', 32).toString('hex'),
+    jwtAccessSecret: deriveSecret(masterSecret, 'lexora:jwt-access', 32).toString('base64url'),
   }
 }
 

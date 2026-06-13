@@ -1,4 +1,4 @@
-import { requiredEnvString } from '@haohaoxue/samepage-shared'
+import { requiredEnvString } from '@haohaoxue/lexora-shared'
 import { z } from 'zod'
 
 const collabEnvSchema = z.object({

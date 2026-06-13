@@ -3,9 +3,9 @@ import type {
   CreateDocumentMoveOperationResponse,
   DocumentOperationJob,
   MoveDocumentTreeOperationRequest,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 import type { AuthUserContext } from '../../auth/auth.interface'
-import { MoveDocumentTreeOperationSchema } from '@haohaoxue/samepage-contracts'
+import { MoveDocumentTreeOperationSchema } from '@haohaoxue/lexora-contracts'
 import { Body, Controller, Get, Param, Post } from '@nestjs/common'
 import { CurrentUser } from '../../../decorators/current-user.decorator'
 import { ZodValidationPipe } from '../../../pipes/zod-validation.pipe'

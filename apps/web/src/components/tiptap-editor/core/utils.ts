@@ -3,4 +3,4 @@ export {
   toTiptapDocumentTitleEditorContent,
   unwrapTiptapContent,
   wrapTiptapContent,
-} from '@haohaoxue/samepage-shared/tiptap'
+} from '@haohaoxue/lexora-shared/tiptap'

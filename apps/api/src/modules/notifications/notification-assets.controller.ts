@@ -2,7 +2,7 @@ import type {
   PlatformNotificationAsset,
   ResolvePlatformNotificationAssetsRequest,
   ResolvePlatformNotificationAssetsResponse,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 import type { FastifyReply, FastifyRequest } from 'fastify'
 import type { AuthUserContext } from '../auth/auth.interface'
 import {
@@ -10,7 +10,7 @@ import {
   PERMISSIONS,
   PLATFORM_NOTIFICATION_IMAGE_MAX_BYTES,
   ResolvePlatformNotificationAssetsSchema,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 import { Body, Controller, Get, Param, Post, Req, Res } from '@nestjs/common'
 import { CurrentUser } from '../../decorators/current-user.decorator'
 import { Public } from '../../decorators/public.decorator'

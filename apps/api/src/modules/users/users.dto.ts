@@ -7,7 +7,7 @@ import type {
   StartOauthBindingRequest,
   UpdateCurrentUserProfileRequest,
   UpdateUserPreferencesRequest,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 import {
   ACCOUNT_DELETION_CONFIRMATION_PHRASE,
   APPEARANCE_PREFERENCE_VALUES,
@@ -15,7 +15,7 @@ import {
   AUTH_PASSWORD_MIN_LENGTH,
   AUTH_PASSWORD_REQUIRED_PATTERN,
   LANGUAGE_PREFERENCE_VALUES,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 import {
   Equals,
   IsEmail,

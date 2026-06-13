@@ -2,7 +2,7 @@ import type { Ref } from 'vue'
 import type { ChatApi } from './createChatApi'
 import type { ChatSessionDetail } from '@/apis/chat'
 import type { ChatComposerModelRef } from '@/components/chat-composer/typing'
-import { computed, shallowRef } from 'vue'
+import { computed, shallowRef, watch } from 'vue'
 import { translate } from '@/i18n'
 import { ElMessage } from '@/utils/element-plus'
 import { getRequestErrorDisplayMessage } from '@/utils/request-error'
@@ -15,6 +15,7 @@ import {
 } from './utils/chat-model-selection'
 
 export type ChatComposerModelSelectionKind = 'default' | 'draft' | 'override'
+type NewSessionModelDraftSource = 'default' | 'draft'
 
 export interface ChatComposerModelSessions {
   activeSession: Ref<ChatSessionDetail | null>
@@ -30,29 +31,55 @@ export function createChatComposerModelController(
   const { loadRuntimeConfig, runtimeConfig } = useChatRuntimeConfig()
   const { modelOptions, refreshModels } = useChatModels()
   const newSessionModelDraft = shallowRef<ChatComposerModelRef | null>(null)
-  const hasNewSessionModelDraft = shallowRef(false)
+  const newSessionModelDraftSource = shallowRef<NewSessionModelDraftSource | null>(null)
 
   const sessionModelRef = computed(() => sessions.activeSession.value?.modelRef ?? null)
-  const requestModelRef = computed(() => resolveChatRequestModelRef(
-    sessionModelRef.value,
+  const defaultModelRef = computed(() => resolveChatRequestModelRef(
+    null,
     modelOptions.value,
     runtimeConfig.value.defaultModel,
   ))
-  const composerSelectedModelRef = computed(() => {
-    if (sessions.activeSession.value) {
-      return requestModelRef.value
-    }
-
-    return hasNewSessionModelDraft.value ? newSessionModelDraft.value : requestModelRef.value
-  })
+  const sessionRequestModelRef = computed(() => resolveChatRequestModelRef(
+    sessionModelRef.value,
+    modelOptions.value,
+    null,
+  ))
+  const requestModelRef = computed(() => sessions.activeSession.value
+    ? sessionRequestModelRef.value
+    : newSessionModelDraft.value)
+  const composerSelectedModelRef = computed(() => requestModelRef.value)
   const composerModelSelectionKind = computed<ChatComposerModelSelectionKind>(() => {
     if (sessions.activeSession.value) {
-      return sessionModelRef.value ? 'override' : 'default'
+      return sessionModelRef.value ? 'override' : 'draft'
     }
 
-    return hasNewSessionModelDraft.value ? 'draft' : 'default'
+    return newSessionModelDraftSource.value === 'draft' ? 'draft' : 'default'
+  })
+  const shouldPersistComposerModelRef = computed(() => {
+    if (sessions.activeSession.value) {
+      return Boolean(sessionModelRef.value)
+    }
+
+    return Boolean(newSessionModelDraft.value)
   })
   const isConfigured = computed(() => Boolean(composerSelectedModelRef.value))
+
+  watch(
+    () => [
+      sessions.activeSession.value?.id ?? null,
+      defaultModelRef.value,
+      newSessionModelDraftSource.value,
+    ] as const,
+    ([activeSessionId, defaultModel, draftSource]) => {
+      if (activeSessionId || draftSource || !defaultModel) {
+        return
+      }
+
+      newSessionModelDraft.value = defaultModel
+      newSessionModelDraftSource.value = 'default'
+    },
+    { immediate: true },
+  )
 
   async function loadModelState() {
     if (await loadRuntimeConfig()) {
@@ -70,7 +97,7 @@ export function createChatComposerModelController(
 
     if (!activeSession) {
       newSessionModelDraft.value = nextModelRef
-      hasNewSessionModelDraft.value = true
+      newSessionModelDraftSource.value = 'draft'
       return true
     }
 
@@ -93,7 +120,7 @@ export function createChatComposerModelController(
 
   function clearNewSessionModelDraft() {
     newSessionModelDraft.value = null
-    hasNewSessionModelDraft.value = false
+    newSessionModelDraftSource.value = null
   }
 
   return {
@@ -104,5 +131,6 @@ export function createChatComposerModelController(
     loadModelState,
     requestModelRef,
     selectComposerModel,
+    shouldPersistComposerModelRef,
   }
 }

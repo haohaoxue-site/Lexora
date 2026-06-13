@@ -1,4 +1,4 @@
-import type { TiptapJsonContent } from '@haohaoxue/samepage-contracts'
+import type { TiptapJsonContent } from '@haohaoxue/lexora-contracts'
 import type { FormInstance, FormRules } from 'element-plus'
 import type {
   PlatformNotification,
@@ -13,9 +13,9 @@ import {
   PLATFORM_NOTIFICATION_STATUS,
   PLATFORM_NOTIFICATION_STATUS_VALUES,
   PLATFORM_NOTIFICATION_TITLE_MAX_LENGTH,
-} from '@haohaoxue/samepage-contracts/notification'
-import { prettyBytes } from '@haohaoxue/samepage-shared/file'
-import { createEmptyTiptapContent } from '@haohaoxue/samepage-shared/tiptap'
+} from '@haohaoxue/lexora-contracts/notification'
+import { prettyBytes } from '@haohaoxue/lexora-shared/file'
+import { createEmptyTiptapContent } from '@haohaoxue/lexora-shared/tiptap'
 import { computed, onMounted, reactive, shallowRef } from 'vue'
 import { useI18n } from 'vue-i18n'
 import {

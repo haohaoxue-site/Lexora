@@ -5,7 +5,7 @@ import type {
   DocumentSaveState,
   DocumentVersionSnapshot,
   TiptapJsonContent,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 import type {
   ActiveDocumentDetail,
   DocsDocumentCollaborationStatusTone,
@@ -17,9 +17,9 @@ import type {
 import {
   DOCUMENT_PANE_STATE,
   DOCUMENT_SAVE_STATE,
-} from '@haohaoxue/samepage-contracts/document/constants'
-import { TIPTAP_SCHEMA_VERSION } from '@haohaoxue/samepage-contracts/tiptap/constants'
-import { createCollabAwarenessState } from '@haohaoxue/samepage-shared/collab'
+} from '@haohaoxue/lexora-contracts/document/constants'
+import { TIPTAP_SCHEMA_VERSION } from '@haohaoxue/lexora-contracts/tiptap/constants'
+import { createCollabAwarenessState } from '@haohaoxue/lexora-shared/collab'
 import {
   collectDocumentAssetIds,
   getDocumentSaveStateLabel,
@@ -27,7 +27,7 @@ import {
   getDocumentVersionSnapshotSummary,
   hasDocumentContent,
   hydrateDocumentAssetAttributes,
-} from '@haohaoxue/samepage-shared/document'
+} from '@haohaoxue/lexora-shared/document'
 import { createSharedComposable, useOnline } from '@vueuse/core'
 import {
   computed,

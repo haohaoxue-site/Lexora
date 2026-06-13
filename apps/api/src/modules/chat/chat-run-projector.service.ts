@@ -3,14 +3,14 @@ import type {
   ChatMessageFailureReason,
   ChatMessageMetadata,
   ChatMessagePartMetadata,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 import {
   CHAT_MESSAGE_FAILURE_REASON,
   CHAT_MESSAGE_PART_TYPE,
   CHAT_SESSION_EVENT_TYPE,
   ChatGenerationUsageSnapshotSchema,
   ChatMemoryOperationProjectionSchema,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 import {
   Injectable,
   Logger,

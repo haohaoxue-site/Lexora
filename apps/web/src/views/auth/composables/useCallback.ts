@@ -1,4 +1,4 @@
-import { OAUTH_REDIRECT_QUERY } from '@haohaoxue/samepage-contracts/auth/constants'
+import { OAUTH_REDIRECT_QUERY } from '@haohaoxue/lexora-contracts/auth/constants'
 import { computed, onMounted, shallowRef } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'

@@ -4,11 +4,11 @@ import type {
   DocumentTreeCollectionId,
   DocumentTreeGroup,
   OwnedDocumentCollectionId,
-} from '@haohaoxue/samepage-contracts/document'
+} from '@haohaoxue/lexora-contracts/document'
 import type { MoveTreeNode, SelectedMoveTarget } from './typing'
 import {
   DOCUMENT_COLLECTION,
-} from '@haohaoxue/samepage-contracts/document/constants'
+} from '@haohaoxue/lexora-contracts/document/constants'
 import { computed, shallowRef, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { getDocuments } from '@/apis/document'

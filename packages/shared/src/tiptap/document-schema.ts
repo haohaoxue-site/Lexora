@@ -6,7 +6,7 @@ import {
   TIPTAP_CODE_BLOCK_TAB_SIZES,
   TIPTAP_DOCUMENT_FILE_NODE_PART,
   TIPTAP_DOCUMENT_FILE_NODE_TYPE,
-} from '@haohaoxue/samepage-contracts/tiptap/document-body'
+} from '@haohaoxue/lexora-contracts/tiptap/document-body'
 import { Extension, mergeAttributes, Node } from '@tiptap/core'
 import Image from '@tiptap/extension-image'
 import { Table } from '@tiptap/extension-table'

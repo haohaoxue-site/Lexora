@@ -2,12 +2,12 @@ import type {
   ConsumeCollabTicketRequest,
   MaterializeDocumentYdocCurrentProjectionRequest,
   MaterializeDocumentYdocCurrentProjectionResponse,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 import type { FastifyReply } from 'fastify'
 import {
   ConsumeCollabTicketRequestSchema,
   MaterializeDocumentYdocCurrentProjectionSchema,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 import { Body, Controller, Param, Post, Res } from '@nestjs/common'
 import { Public } from '../../../decorators/public.decorator'
 import { ZodValidationPipe } from '../../../pipes/zod-validation.pipe'

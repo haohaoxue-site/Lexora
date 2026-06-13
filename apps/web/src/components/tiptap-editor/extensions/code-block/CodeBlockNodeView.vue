@@ -3,7 +3,7 @@ import type { CodeBlockLanguage } from './languages'
 import {
   TIPTAP_CODE_BLOCK_DEFAULT_TAB_SIZE,
   TIPTAP_CODE_BLOCK_TAB_SIZES,
-} from '@haohaoxue/samepage-contracts/tiptap/document-body'
+} from '@haohaoxue/lexora-contracts/tiptap/document-body'
 import { NodeViewContent, nodeViewProps, NodeViewWrapper } from '@tiptap/vue-3'
 import { useClipboard } from '@vueuse/core'
 import { computed, nextTick, shallowRef, useTemplateRef, watch } from 'vue'

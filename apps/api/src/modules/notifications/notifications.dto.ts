@@ -3,12 +3,12 @@ import type {
   NotificationListFilter,
   NotificationListQuery,
   PlatformNotificationStatus,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 import {
   NOTIFICATION_LIST_FILTER,
   NOTIFICATION_LIST_FILTER_VALUES,
   PLATFORM_NOTIFICATION_STATUS_VALUES,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 import { Type } from 'class-transformer'
 import {
   IsIn,

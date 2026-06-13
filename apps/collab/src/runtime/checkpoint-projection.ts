@@ -1,13 +1,13 @@
 import type {
   DocumentYdocCheckpointMetadata,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 import type { DocumentYdocCurrentProjectionClient } from '../clients/documents'
 import type { CollabMetricsCollector } from '../observability/metrics'
 import type { CollabFatalPersistenceFailure, CollabRuntimeLogger } from './ports'
 import type { CollabHocuspocusDocumentState } from './update-persistence-queue'
 import type { DocumentYdocRuntimeStore } from './ydoc-runtime-store'
-import { COLLAB_ERROR_CODE, TIPTAP_SCHEMA_VERSION } from '@haohaoxue/samepage-contracts'
-import { projectTiptapDocumentCollaborationYdoc, stripDocumentAssetRuntimeAttributes } from '@haohaoxue/samepage-shared'
+import { COLLAB_ERROR_CODE, TIPTAP_SCHEMA_VERSION } from '@haohaoxue/lexora-contracts'
+import { projectTiptapDocumentCollaborationYdoc, stripDocumentAssetRuntimeAttributes } from '@haohaoxue/lexora-shared'
 import * as Y from 'yjs'
 import { isDocumentYdocRuntimeStoreError } from './ydoc-runtime-store'
 

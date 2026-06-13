@@ -1,6 +1,6 @@
 # 存储与服务依赖
 
-SamePage AI 的自部署实例依赖数据库、Redis 和对象存储。
+Lexora 的自部署实例依赖数据库、Redis 和对象存储。
 
 ## PostgreSQL
 

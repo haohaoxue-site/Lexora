@@ -1,5 +1,5 @@
-import type { CollabErrorCode, CollabPermissionInvalidationRequest, CollabTicketPayload } from '@haohaoxue/samepage-contracts'
-import { COLLAB_ERROR_CODE } from '@haohaoxue/samepage-contracts'
+import type { CollabErrorCode, CollabPermissionInvalidationRequest, CollabTicketPayload } from '@haohaoxue/lexora-contracts'
+import { COLLAB_ERROR_CODE } from '@haohaoxue/lexora-contracts'
 
 const COLLAB_SOCKET_CLOSE_CODE = {
   PERMISSION_INVALIDATED: 4003,

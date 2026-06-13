@@ -10,7 +10,7 @@ import type {
   SystemAdminUserStatus,
   SystemAuthGovernance,
   SystemAuthProviderGovernance,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 
 export interface SystemAdminUserItemRecord {
   id: string

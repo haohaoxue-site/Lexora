@@ -10,7 +10,7 @@ The administrator maintains provider API keys. Use separate provider-side projec
 
 ## Compatible Providers
 
-SamePage AI supports OpenAI-Compatible and Anthropic-Compatible providers. Configuration includes provider name, endpoint, authentication mode, and key.
+Lexora supports OpenAI-Compatible and Anthropic-Compatible providers. Configuration includes provider name, endpoint, authentication mode, and key.
 
 Providers can fetch models from compatible model-list endpoints. If a provider cannot return a recognizable model list, models can be maintained manually.
 

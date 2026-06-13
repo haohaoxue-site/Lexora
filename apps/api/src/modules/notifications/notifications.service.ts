@@ -11,7 +11,7 @@ import type {
   PlatformNotificationListResponse,
   TiptapJsonContent,
   UpdatePlatformNotificationRequest,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 import { Buffer } from 'node:buffer'
 import { randomUUID } from 'node:crypto'
 import {
@@ -23,8 +23,8 @@ import {
   NOTIFICATION_SOURCE_KIND,
   PLATFORM_NOTIFICATION_STATUS,
   TiptapJsonContentPayloadSchema,
-} from '@haohaoxue/samepage-contracts'
-import { summarizeDocumentContent } from '@haohaoxue/samepage-shared'
+} from '@haohaoxue/lexora-contracts'
+import { summarizeDocumentContent } from '@haohaoxue/lexora-shared'
 import {
   Injectable,
 } from '@nestjs/common'
@@ -40,7 +40,7 @@ import { NotificationAssetsService } from './notification-assets.service'
 import { collectNotificationImageAssetIds } from './notification-content-assets'
 
 const SYSTEM_NOTIFICATION_SENDER = {
-  displayName: 'SamePage',
+  displayName: 'Lexora',
 } as const
 
 const documentCollaborationUserInviteNotificationSelect = {

@@ -1,4 +1,4 @@
-import type { ChatMessageContentJSON } from '@haohaoxue/samepage-contracts'
+import type { ChatMessageContentJSON } from '@haohaoxue/lexora-contracts'
 import type { WeixinMessage, WeixinMessageItem } from './bots.interface'
 import { WeixinMessageItemType, WeixinMessageType } from './bots.interface'
 

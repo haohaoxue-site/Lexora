@@ -2,7 +2,7 @@ import type {
   WeixinBotBindingStatus,
   WeixinBotLoginStartResponse,
   WeixinBotLoginStatusResponse,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 import type { BotAccount } from '@prisma/client'
 import type { WeixinCredential } from './bots.interface'
 import { randomUUID } from 'node:crypto'
@@ -11,7 +11,7 @@ import {
   BOT_RUNTIME_STATE,
   CHAT_SESSION_CHANNEL,
   WEIXIN_BOT_LOGIN_STATUS,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 import {
   BadRequestException,
   ConflictException,

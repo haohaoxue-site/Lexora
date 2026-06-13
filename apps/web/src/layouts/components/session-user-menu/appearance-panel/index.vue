@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { AppearancePreference } from '@haohaoxue/samepage-contracts'
+import type { AppearancePreference } from '@haohaoxue/lexora-contracts'
 import type { SessionAppearancePanelProps } from '../typing'
 
 const props = defineProps<SessionAppearancePanelProps>()

@@ -5,7 +5,7 @@ import type { TurnIntoBlockType } from '../commands/turnInto'
 import { Extension } from '@tiptap/core'
 import { NodeSelection, Selection, TextSelection } from '@tiptap/pm/state'
 import { CellSelection } from '@tiptap/pm/tables'
-import { runSamePageBackspacePolicy } from '../commands/block-context/backspace'
+import { runLexoraBackspacePolicy } from '../commands/block-context/backspace'
 import { findBlockById, getCurrentBlock } from '../commands/currentBlock'
 import { recordHistorySelectionDeletedText } from '../commands/historySelection'
 import { TIPTAP_SPLIT_MERGE_EXCLUDED_ANCESTOR_NODE_NAMES } from '../content/blockTaxonomy'
@@ -335,7 +335,7 @@ function mergeBlockBackward(props: CommandProps) {
 
   return props.commands.first(({ commands }) => [
     () => commands.undoInputRule(),
-    () => runSamePageBackspacePolicy(props),
+    () => runLexoraBackspacePolicy(props),
     () => commands.joinBackward(),
     () => commands.selectNodeBackward(),
   ])

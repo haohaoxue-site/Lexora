@@ -17,13 +17,13 @@ COPY apps/collab/package.json apps/collab/package.json
 COPY packages/contracts/package.json packages/contracts/package.json
 COPY packages/shared/package.json packages/shared/package.json
 
-RUN pnpm install --filter @haohaoxue/samepage-collab... --frozen-lockfile
+RUN pnpm install --filter @haohaoxue/lexora-collab... --frozen-lockfile
 
 COPY packages/contracts packages/contracts
 COPY packages/shared packages/shared
 COPY apps/collab apps/collab
 
-RUN pnpm --filter @haohaoxue/samepage-collab build
+RUN pnpm --filter @haohaoxue/lexora-collab build
 
 FROM node:24-slim AS production-deps
 
@@ -48,7 +48,7 @@ COPY --chown=node:node apps/api/prisma apps/collab/prisma
 
 USER node
 
-RUN pnpm install --filter @haohaoxue/samepage-collab --prod --frozen-lockfile \
+RUN pnpm install --filter @haohaoxue/lexora-collab --prod --frozen-lockfile \
   && cd /app/apps/collab \
   && prisma generate --schema prisma \
   && rm -rf /app/apps/collab/prisma /app/apps/collab/node_modules/@haohaoxue

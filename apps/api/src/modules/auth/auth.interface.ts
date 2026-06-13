@@ -1,4 +1,4 @@
-import type { PermissionCode, RoleCode, SessionUser } from '@haohaoxue/samepage-contracts'
+import type { PermissionCode, RoleCode, SessionUser } from '@haohaoxue/lexora-contracts'
 import type { JWTPayload } from 'jose'
 
 /**

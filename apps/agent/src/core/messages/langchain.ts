@@ -1,9 +1,9 @@
 import type {
   AgentChatContextMessage,
   ChatSkillInvocation,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 import type { BaseMessage } from '@langchain/core/messages'
-import { AGENT_TRANSLATOR_SKILL_KEY } from '@haohaoxue/samepage-contracts'
+import { AGENT_TRANSLATOR_SKILL_KEY } from '@haohaoxue/lexora-contracts'
 import { AIMessage, HumanMessage } from '@langchain/core/messages'
 
 export function toLangChainChatMessages(messages: AgentChatContextMessage[]): BaseMessage[] {
@@ -40,13 +40,13 @@ function formatSkillInvocation(skillInvocation: ChatSkillInvocation | null | und
 
   if (skillInvocation.skillKey === AGENT_TRANSLATOR_SKILL_KEY) {
     return [
-      '[SamePage 技能选择]',
+      '[Lexora 技能选择]',
       `skillKey: ${skillInvocation.skillKey}`,
       'sourceLanguage: auto',
       `targetLanguage: ${skillInvocation.targetLanguage.name}`,
       skillInvocation.targetLanguage.tag ? `targetLanguageTag: ${skillInvocation.targetLanguage.tag}` : '',
       'instruction: 用户已在对话输入区选择翻译目标语言；本轮优先使用 translator skill，将用户正文翻译为目标语言。',
-      '[SamePage 技能选择结束]',
+      '[Lexora 技能选择结束]',
     ].filter(Boolean).join('\n')
   }
 

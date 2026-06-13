@@ -1,4 +1,4 @@
-import type { DocumentTrashItem } from '@haohaoxue/samepage-contracts'
+import type { DocumentTrashItem } from '@haohaoxue/lexora-contracts'
 import { computed, shallowRef, watch } from 'vue'
 import {
   getTrashDocuments,

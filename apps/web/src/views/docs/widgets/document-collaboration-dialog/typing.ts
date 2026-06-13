@@ -1,7 +1,7 @@
 import type {
   DocumentCollaborationPermission,
   DocumentCollaborationScope,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 
 export type CollaborationDialogView = 'overview' | 'collaborators' | 'password'
 export type CollaboratorPermissionCommand = 'inherit' | 'read' | 'edit' | 'remove'

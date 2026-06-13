@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { CHAT_SESSION_CHANNEL } from '@haohaoxue/samepage-contracts/chat/constants'
+import { CHAT_SESSION_CHANNEL } from '@haohaoxue/lexora-contracts/chat/constants'
 import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useChatModels } from '@/composables/chat/useChatModels'
@@ -7,6 +7,7 @@ import { useChatRuntimeConfig } from '@/composables/chat/useChatRuntimeConfig'
 import PagePanel from '@/layouts/panels/page-panel'
 import { useUiStore } from '@/stores/ui'
 import { useWorkspaceStore } from '@/stores/workspace'
+import { useChatModelSettings } from '../../composables/useChatModelSettings'
 import { useChatRouteState } from '../../composables/useChatRouteState'
 import { useChatRuntimeOverlay } from '../../composables/useChatRuntimeOverlay'
 import { useChatSessions } from '../../composables/useChatSessions'
@@ -17,6 +18,7 @@ import { createChatConversationUsageView } from '../../utils/chat-usage-display'
 const { loadRuntimeConfig } = useChatRuntimeConfig()
 const { refreshModels } = useChatModels()
 const { loadSessions } = useChatSessions()
+const { clearNewSessionModelDraft } = useChatModelSettings()
 const { renderSession } = useChatRuntimeOverlay()
 const { isNewChatRoute, navigateToNewChat } = useChatRouteState()
 const { locale } = useI18n({ useScope: 'global' })
@@ -56,6 +58,11 @@ async function refreshChatModelState(options: { silent?: boolean } = {}) {
   }
 }
 
+async function startNewChat() {
+  clearNewSessionModelDraft()
+  await navigateToNewChat()
+}
+
 onMounted(async () => {
   await workspaceStore.ensurePersonalWorkspace()
   void loadSessions({
@@ -72,7 +79,7 @@ onMounted(async () => {
         :conversation-usage="conversationUsage"
         :is-agent-settings-open="isAgentSettingsOpen"
         @toggle-agent-settings="isAgentSettingsOpen = !isAgentSettingsOpen"
-        @new-chat="navigateToNewChat"
+        @new-chat="startNewChat"
       />
     </template>
 

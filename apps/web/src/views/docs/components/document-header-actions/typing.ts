@@ -1,4 +1,4 @@
-import type { DocumentPageWidthMode } from '@haohaoxue/samepage-contracts'
+import type { DocumentPageWidthMode } from '@haohaoxue/lexora-contracts'
 
 export interface PageWidthOptionView {
   value: DocumentPageWidthMode

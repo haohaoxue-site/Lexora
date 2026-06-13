@@ -1,30 +1,30 @@
 <p align="center">
-  <img src="apps/docs/src/public/logo.png" width="88" alt="SamePage AI Logo" />
+  <img src="apps/docs/src/public/logo.png" width="88" alt="Lexora Logo" />
 </p>
 
-<h1 align="center">SamePage AI</h1>
+<h1 align="center">Lexora 文灵</h1>
 
 <p align="center">
   <a href="./README.md">中文</a> · <strong>English</strong>
 </p>
 
 <p align="center">
-  AI and collaboration, on the same page.
+  Documents, collaboration, and AI in one living workspace.
 </p>
 
 <p align="center">
-  <a href="https://github.com/haohaoxue-site/SamePage-AI/blob/master/LICENSE"><img alt="License" src="https://img.shields.io/badge/license-AGPL--3.0--only-2f6f68"></a>
+  <a href="https://github.com/haohaoxue-site/Lexora/blob/master/LICENSE"><img alt="License" src="https://img.shields.io/badge/license-AGPL--3.0--only-2f6f68"></a>
   <img alt="Vue" src="https://img.shields.io/badge/Vue-3-42b883">
   <img alt="NestJS" src="https://img.shields.io/badge/NestJS-11-e0234e">
   <img alt="LangGraph" src="https://img.shields.io/badge/LangGraph-Agent-1f6feb">
   <img alt="Yjs" src="https://img.shields.io/badge/Yjs-Collaboration-f7b955">
 </p>
 
-SamePage AI is an online collaborative document platform for individuals, small teams, and communities. It brings document writing, AI chat, multi-user collaboration, and public publishing into one workspace, so knowledge capture, collaborative editing, and AI-assisted writing can happen in the same page context.
+Lexora is an online collaborative document platform for individuals, small teams, and communities. It brings document writing, AI chat, multi-user collaboration, and public publishing into one workspace, so knowledge capture, collaborative editing, and AI-assisted writing can happen in a shared work context.
 
 > This project is still under active development. Protocols, data structures, and product behavior may continue to change.
 
-![SamePage AI interface preview](apps/docs/src/public/ui.png)
+![Lexora interface preview](apps/docs/src/public/ui.png)
 
 ## Core Capabilities
 
@@ -51,7 +51,7 @@ SamePage AI is an online collaborative document platform for individuals, small 
 ## Project Structure
 
 ```txt
-samepage-ai/
+lexora/
 ├── apps/
 │   ├── web/         # Vue 3 frontend app
 │   ├── api/         # NestJS API service
@@ -66,7 +66,7 @@ samepage-ai/
 
 ## Local Development
 
-SamePage AI uses pnpm workspace.
+Lexora uses pnpm workspace.
 
 ```bash
 pnpm install
@@ -82,7 +82,7 @@ At minimum, `apps/api/.env` needs `APP_SECRET`, `SYSTEM_ADMIN`, `STORAGE_ACCESS_
 
 ## License
 
-SamePage AI is licensed under [AGPL-3.0-only](LICENSE).
+Lexora is licensed under [AGPL-3.0-only](LICENSE).
 
 ## Friendly Links
 

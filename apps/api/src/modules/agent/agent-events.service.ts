@@ -1,6 +1,6 @@
-import type { ChatGenerationEvent } from '@haohaoxue/samepage-contracts'
+import type { ChatGenerationEvent } from '@haohaoxue/lexora-contracts'
 import type Redis from 'ioredis'
-import { AGENT_QUEUE_NAME, ChatGenerationEventSchema } from '@haohaoxue/samepage-contracts'
+import { AGENT_QUEUE_NAME, ChatGenerationEventSchema } from '@haohaoxue/lexora-contracts'
 import { Injectable } from '@nestjs/common'
 import { RedisService } from '../../infrastructure/redis/redis.service'
 

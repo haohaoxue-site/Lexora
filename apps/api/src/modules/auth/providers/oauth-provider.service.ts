@@ -1,6 +1,6 @@
-import type { AuthProviderName } from '@haohaoxue/samepage-contracts'
+import type { AuthProviderName } from '@haohaoxue/lexora-contracts'
 import type { OAuthConfig, OAuthProviderConfig } from '../../../config/auth.config'
-import { AUTH_CALLBACK_PATH, AUTH_PROVIDER, SERVER_PATH } from '@haohaoxue/samepage-contracts'
+import { AUTH_CALLBACK_PATH, AUTH_PROVIDER, SERVER_PATH } from '@haohaoxue/lexora-contracts'
 import { BadRequestException, Injectable, InternalServerErrorException } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { AuthProvider } from '@prisma/client'

@@ -1,6 +1,6 @@
 # Document Pages
 
-Document pages are the core collaboration object in SamePage AI. Pages are organized as a tree and edited with a rich text editor.
+Document pages are the core collaboration object in Lexora. Pages are organized as a tree and edited with a rich text editor.
 
 ## Page Tree
 

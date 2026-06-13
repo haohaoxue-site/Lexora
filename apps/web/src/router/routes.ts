@@ -1,10 +1,10 @@
 import type { RouteLocationRaw, RouteRecordRaw } from 'vue-router'
 import type { SvgIconCategoryValue } from '@/components/svg-icon/typing'
-import { AUTH_CALLBACK_PATH } from '@haohaoxue/samepage-contracts/auth/constants'
+import { AUTH_CALLBACK_PATH } from '@haohaoxue/lexora-contracts/auth/constants'
 import {
   DOCUMENT_SINGLE_PUBLICATION_ROUTE_PREFIX,
   DOCUMENT_SITE_PUBLICATION_ROUTE_PREFIX,
-} from '@haohaoxue/samepage-contracts/document/publication/constants'
+} from '@haohaoxue/lexora-contracts/document/publication/constants'
 import { RouterView } from 'vue-router'
 import { SvgIconCategory } from '@/components/svg-icon/typing'
 import {

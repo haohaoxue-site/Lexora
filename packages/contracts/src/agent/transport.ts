@@ -1,7 +1,7 @@
 export const AGENT_QUEUE_NAME = {
-  COMMANDS: 'samepage:agent:commands',
-  CONTROLS: 'samepage:agent:controls',
-  CONTROL_RESULTS: 'samepage:agent:control-results',
-  EVENTS: 'samepage:agent:events',
-  DEAD_LETTER: 'samepage:agent:commands:dead-letter',
+  COMMANDS: 'lexora:agent:commands',
+  CONTROLS: 'lexora:agent:controls',
+  CONTROL_RESULTS: 'lexora:agent:control-results',
+  EVENTS: 'lexora:agent:events',
+  DEAD_LETTER: 'lexora:agent:commands:dead-letter',
 } as const

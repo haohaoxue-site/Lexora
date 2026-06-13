@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { CollabIdentityItemProps } from './typing'
-import { formatCollabIdentityLabel } from '@haohaoxue/samepage-shared/user'
+import { formatCollabIdentityLabel } from '@haohaoxue/lexora-shared/user'
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import EntityAvatar from '@/components/entity-avatar'

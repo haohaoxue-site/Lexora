@@ -17,7 +17,7 @@ import type {
   ChatUserMessageMetadata,
   ChatSessionChannel as ContractChatSessionChannel,
   ChatSessionOrigin as ContractChatSessionOrigin,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 import {
   CHAT_MESSAGE_ATTACHMENT_TYPE,
   CHAT_MESSAGE_PART_TYPE,
@@ -27,7 +27,7 @@ import {
   ChatGenerationUsageSnapshotSchema,
   ChatMemoryOperationProjectionSchema,
   ChatSkillInvocationSchema,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 import {
   ChatSessionMessageRole,
   ChatSessionChannel as PrismaChatSessionChannel,

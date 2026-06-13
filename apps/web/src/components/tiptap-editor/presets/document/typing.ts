@@ -1,4 +1,4 @@
-import type { DocumentPageWidthMode, TiptapJsonContent } from '@haohaoxue/samepage-contracts'
+import type { DocumentPageWidthMode, TiptapJsonContent } from '@haohaoxue/lexora-contracts'
 import type {
   TiptapEditorCollaborationBinding,
   TiptapEditorCommentRequest,

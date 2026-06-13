@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import type { AgentTranslatorTargetLanguage } from '@haohaoxue/samepage-contracts/agent'
+import type { AgentTranslatorTargetLanguage } from '@haohaoxue/lexora-contracts/agent'
 import type { DropdownInstance, InputInstance } from 'element-plus'
 import type { ChatComposerModelRef, ChatComposerModelSelectionKind } from './typing'
 import { ArrowDown, Check, CloseBold } from '@element-plus/icons-vue'
-import { AGENT_TRANSLATOR_PRESET_TARGET_LANGUAGES } from '@haohaoxue/samepage-contracts/agent'
+import { AGENT_TRANSLATOR_PRESET_TARGET_LANGUAGES } from '@haohaoxue/lexora-contracts/agent'
 import { computed, nextTick, shallowRef, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import ChatModelTrigger from './ChatModelTrigger.vue'

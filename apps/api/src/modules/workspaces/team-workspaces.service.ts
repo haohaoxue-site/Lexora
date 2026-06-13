@@ -1,11 +1,11 @@
-import type { CreateTeamWorkspaceRequest, TeamWorkspaceSummary } from '@haohaoxue/samepage-contracts'
+import type { CreateTeamWorkspaceRequest, TeamWorkspaceSummary } from '@haohaoxue/lexora-contracts'
 import type { StorageObject } from '../../infrastructure/storage/storage.interface'
 import { Buffer } from 'node:buffer'
 import {
   WORKSPACE_MEMBER_ROLE,
   WORKSPACE_MEMBER_STATUS,
   WORKSPACE_TYPE,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 import {
   BadRequestException,
   Injectable,

@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import type { TiptapJsonContent } from '@haohaoxue/samepage-contracts'
+import type { TiptapJsonContent } from '@haohaoxue/lexora-contracts'
 import type { PublicationDocumentContentProps } from './typing'
 import type { DocumentBodyEditorOutlineOptions } from '@/components/tiptap-editor'
-import { collectDocumentAssetIds, hasDocumentContent } from '@haohaoxue/samepage-shared/document'
+import { collectDocumentAssetIds, hasDocumentContent } from '@haohaoxue/lexora-shared/document'
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { DocumentBodyEditor } from '@/components/tiptap-editor'

@@ -1,7 +1,7 @@
 import {
   DOCUMENT_VISIBILITY,
   WORKSPACE_TYPE,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 import { Prisma } from '@prisma/client'
 
 export const documentSelect = {

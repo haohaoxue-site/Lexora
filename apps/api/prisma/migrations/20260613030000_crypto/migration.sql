@@ -1,0 +1,4 @@
+-- Record the SamePage -> Lexora encryption namespace data migration.
+-- Encrypted values cannot be rewritten in SQL because the key is derived from APP_SECRET.
+-- Run the API CLI command after applying migrations:
+-- pnpm --filter @haohaoxue/lexora-api crypto:migrate-namespace

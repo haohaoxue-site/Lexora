@@ -5,7 +5,7 @@ import { useI18n } from 'vue-i18n'
 import { useLogin } from '../../composables/useLogin'
 import AuthEntryShell from '../../layouts/entry-shell'
 
-const repositoryUrl = 'https://github.com/haohaoxue-site/SamePage-AI'
+const repositoryUrl = 'https://github.com/haohaoxue-site/Lexora'
 const passwordFormRef = useTemplateRef<FormInstance>('passwordFormRef')
 const oauthInviteFormRef = useTemplateRef<FormInstance>('oauthInviteFormRef')
 const { t } = useI18n({ useScope: 'global' })

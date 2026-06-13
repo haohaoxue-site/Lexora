@@ -1,5 +1,5 @@
 import type { DocsDocumentEditorFallbackProps } from '../typing'
-import { DOCUMENT_PANE_STATE } from '@haohaoxue/samepage-contracts/document/constants'
+import { DOCUMENT_PANE_STATE } from '@haohaoxue/lexora-contracts/document/constants'
 import { SvgIconCategory } from '@/components/svg-icon/typing'
 import { translate } from '@/i18n'
 

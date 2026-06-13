@@ -1,4 +1,4 @@
-import type { AgentRuntimeSkillCatalogItem, AgentRuntimeSkillContext } from '@haohaoxue/samepage-contracts'
+import type { AgentRuntimeSkillCatalogItem, AgentRuntimeSkillContext } from '@haohaoxue/lexora-contracts'
 import type { ToolCall } from '@langchain/core/messages'
 import type { AgentSkillApiClient } from '../../../clients/skills'
 import type { AgentGraphContext } from '../../state'

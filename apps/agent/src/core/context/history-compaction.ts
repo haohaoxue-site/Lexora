@@ -1,4 +1,4 @@
-import type { AgentChatContextMessage } from '@haohaoxue/samepage-contracts'
+import type { AgentChatContextMessage } from '@haohaoxue/lexora-contracts'
 import type { AgentContextBudget } from './budget'
 import { trimMessages } from '@langchain/core/messages'
 import { toLangChainChatMessages } from '../messages/langchain'

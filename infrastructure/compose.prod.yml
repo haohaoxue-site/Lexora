@@ -1,4 +1,4 @@
-name: samepage-ai
+name: lexora
 
 x-logging: &default-logging
   driver: local
@@ -8,7 +8,7 @@ x-logging: &default-logging
 
 services:
   postgres:
-    container_name: samepage-ai-postgres
+    container_name: lexora-postgres
     image: pgvector/pgvector:pg16
     restart: unless-stopped
     logging: *default-logging
@@ -17,7 +17,7 @@ services:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
-      - samepage-postgres-data:/var/lib/postgresql/data
+      - lexora-postgres-data:/var/lib/postgresql/data
     healthcheck:
       test: ['CMD-SHELL', 'pg_isready -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"']
       interval: 5s
@@ -26,13 +26,13 @@ services:
       start_period: 10s
 
   redis:
-    container_name: samepage-ai-redis
+    container_name: lexora-redis
     image: redis:7-alpine
     restart: unless-stopped
     logging: *default-logging
     command: ['redis-server', '--appendonly', 'yes']
     volumes:
-      - samepage-redis-data:/data
+      - lexora-redis-data:/data
     healthcheck:
       test: ['CMD', 'redis-cli', 'ping']
       interval: 5s
@@ -41,7 +41,7 @@ services:
       start_period: 5s
 
   rustfs:
-    container_name: samepage-ai-rustfs
+    container_name: lexora-rustfs
     image: rustfs/rustfs:latest
     restart: unless-stopped
     logging: *default-logging
@@ -52,11 +52,11 @@ services:
       RUSTFS_CONSOLE_ENABLE: 'false'
       RUSTFS_VOLUMES: /data
     volumes:
-      - samepage-rustfs-data:/data
+      - lexora-rustfs-data:/data
 
   migrate:
-    container_name: samepage-ai-migrate
-    image: haohaoxue/samepage-api:latest
+    container_name: lexora-migrate
+    image: haohaoxue/lexora-api:latest
     restart: 'no'
     logging: *default-logging
     working_dir: /app/apps/api
@@ -68,8 +68,8 @@ services:
         condition: service_healthy
 
   api:
-    container_name: samepage-ai-api
-    image: haohaoxue/samepage-api:latest
+    container_name: lexora-api
+    image: haohaoxue/lexora-api:latest
     restart: unless-stopped
     logging: *default-logging
     environment:
@@ -111,8 +111,8 @@ services:
       start_period: 20s
 
   collab:
-    container_name: samepage-ai-collab
-    image: haohaoxue/samepage-collab:latest
+    container_name: lexora-collab
+    image: haohaoxue/lexora-collab:latest
     restart: unless-stopped
     logging: *default-logging
     environment:
@@ -141,8 +141,8 @@ services:
       start_period: 15s
 
   agent:
-    container_name: samepage-ai-agent
-    image: haohaoxue/samepage-agent:latest
+    container_name: lexora-agent
+    image: haohaoxue/lexora-agent:latest
     restart: unless-stopped
     logging: *default-logging
     environment:
@@ -169,8 +169,8 @@ services:
       start_period: 15s
 
   web:
-    container_name: samepage-ai-web
-    image: haohaoxue/samepage-web:latest
+    container_name: lexora-web
+    image: haohaoxue/lexora-web:latest
     restart: unless-stopped
     logging: *default-logging
     depends_on:
@@ -182,6 +182,6 @@ services:
       - '80:80'
 
 volumes:
-  samepage-postgres-data:
-  samepage-redis-data:
-  samepage-rustfs-data:
+  lexora-postgres-data:
+  lexora-redis-data:
+  lexora-rustfs-data:

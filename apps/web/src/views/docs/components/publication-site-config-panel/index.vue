@@ -26,8 +26,8 @@ import {
   DOCUMENT_PUBLICATION_SITE_STATUS,
   DOCUMENT_PUBLICATION_SITE_THEME,
   DOCUMENT_PUBLICATION_SITE_TITLE_MAX_LENGTH,
-} from '@haohaoxue/samepage-contracts/document/publication/constants'
-import { prettyBytes } from '@haohaoxue/samepage-shared/file'
+} from '@haohaoxue/lexora-contracts/document/publication/constants'
+import { prettyBytes } from '@haohaoxue/lexora-shared/file'
 import { computed, reactive, useTemplateRef, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ElMessage } from '@/utils/element-plus'

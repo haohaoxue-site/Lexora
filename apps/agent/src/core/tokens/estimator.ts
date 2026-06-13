@@ -1,9 +1,9 @@
 import type {
   AgentChatContextMessage,
   AgentChatContextSnapshot,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 import type { BaseMessage, MessageContent } from '@langchain/core/messages'
-import { estimateTextTokenCount } from '@haohaoxue/samepage-shared/tokens'
+import { estimateTextTokenCount } from '@haohaoxue/lexora-shared/tokens'
 
 export type AgentTokenEstimationSource = 'heuristic'
 

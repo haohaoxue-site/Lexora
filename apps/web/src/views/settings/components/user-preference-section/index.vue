@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { AppearancePreference, LanguagePreference } from '@haohaoxue/samepage-contracts'
+import type { AppearancePreference, LanguagePreference } from '@haohaoxue/lexora-contracts'
 import type { UserPreferenceSectionProps } from './typing'
 import { useI18n } from 'vue-i18n'
 import { useUserPreferenceSection } from '../../composables/useUserPreferenceSection'

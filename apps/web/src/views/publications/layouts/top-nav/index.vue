@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { ResolvedPublicationNavItem } from '../../utils/publicationRendering'
 import type { PublicationTopNavProps } from './typing'
-import { normalizePublicationHref } from '@haohaoxue/samepage-shared/document'
+import { normalizePublicationHref } from '@haohaoxue/lexora-shared/document'
 import { onBeforeUnmount, onMounted, shallowRef } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'

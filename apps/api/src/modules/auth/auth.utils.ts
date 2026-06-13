@@ -1,6 +1,6 @@
 import type { Prisma } from '@prisma/client'
 import type { OAuthProfile } from './auth.interface'
-import { API_ERROR_CODE, AUTH_ERROR_CODE } from '@haohaoxue/samepage-contracts'
+import { API_ERROR_CODE, AUTH_ERROR_CODE } from '@haohaoxue/lexora-contracts'
 import { UnauthorizedException } from '@nestjs/common'
 
 type AuthErrorCode = (typeof AUTH_ERROR_CODE)[keyof typeof AUTH_ERROR_CODE]

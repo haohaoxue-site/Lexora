@@ -65,7 +65,7 @@ export const COLLAB_PUBSUB_MESSAGE_TYPE_VALUES = [
 ] as const
 
 export const COLLAB_REDIS_CHANNEL = {
-  PERMISSION_INVALIDATION: 'samepage:collab:permission-invalidation',
+  PERMISSION_INVALIDATION: 'lexora:collab:permission-invalidation',
 } as const
 
 export const DOCUMENT_COLLAB_STATELESS_MESSAGE_TYPE = {

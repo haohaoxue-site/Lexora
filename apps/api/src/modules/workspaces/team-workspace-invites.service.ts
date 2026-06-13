@@ -1,12 +1,12 @@
 import type {
   CreateWorkspaceInviteRequest,
   WorkspaceInviteSummary,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 import {
   WORKSPACE_INVITE_STATUS,
   WORKSPACE_TYPE,
-} from '@haohaoxue/samepage-contracts'
-import { isExactUserCodeQuery, normalizeUserCodeQuery } from '@haohaoxue/samepage-shared'
+} from '@haohaoxue/lexora-contracts'
+import { isExactUserCodeQuery, normalizeUserCodeQuery } from '@haohaoxue/lexora-shared'
 import {
   BadRequestException,
   ConflictException,

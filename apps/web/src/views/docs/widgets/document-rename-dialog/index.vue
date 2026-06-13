@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { FormInstance, FormRules } from 'element-plus'
 import type { RenameFormModel } from './typing'
-import { DOCUMENT_TITLE_MAX_LENGTH } from '@haohaoxue/samepage-contracts/document/constants'
+import { DOCUMENT_TITLE_MAX_LENGTH } from '@haohaoxue/lexora-contracts/document/constants'
 import { computed, nextTick, reactive, useTemplateRef, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ElMessage } from '@/utils/element-plus'

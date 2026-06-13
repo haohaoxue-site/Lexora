@@ -272,7 +272,7 @@ async function fetchJson(url) {
     const response = await fetch(url, {
       headers: {
         accept: 'application/json',
-        'user-agent': 'SamePage-AI model capability defaults sync',
+        'user-agent': 'Lexora model capability defaults sync',
       },
       signal: controller.signal,
     })

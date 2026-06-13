@@ -2,11 +2,11 @@
 import type {
   DocumentCollaborationPermission,
   DocumentCollaborationScope,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 import {
   DOCUMENT_COLLABORATION_PERMISSION,
   DOCUMENT_COLLABORATION_SCOPE,
-} from '@haohaoxue/samepage-contracts/document/collaboration/constants'
+} from '@haohaoxue/lexora-contracts/document/collaboration/constants'
 import { useI18n } from 'vue-i18n'
 import CopyStateIcon from '@/components/copy-state-icon/CopyStateIcon.vue'
 import EntityAvatar from '@/components/entity-avatar'

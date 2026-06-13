@@ -1,4 +1,4 @@
-import { COLLAB_ERROR_CODE } from '@haohaoxue/samepage-contracts'
+import { COLLAB_ERROR_CODE } from '@haohaoxue/lexora-contracts'
 
 /** 固定窗口限流器。 */
 export interface FixedWindowRateLimiter {

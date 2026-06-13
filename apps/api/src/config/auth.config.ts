@@ -3,8 +3,8 @@ import { getDerivedSecretMaterial } from './app-secret'
 import { getEnv } from './env.schema'
 
 const JWT_DEFAULTS = {
-  issuer: 'samepage-api',
-  audience: 'samepage-web',
+  issuer: 'lexora-api',
+  audience: 'lexora-web',
   accessTtlSeconds: 900,
   refreshTtlSeconds: 60 * 60 * 24 * 30,
 } satisfies Omit<JwtConfig, 'accessSecret'>

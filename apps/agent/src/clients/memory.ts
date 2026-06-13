@@ -3,11 +3,11 @@ import type {
   ExecuteAgentMemoryOperationProposalsResponse,
   RetrieveAgentMemoryRequest,
   RetrieveAgentMemoryResponse,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 import {
   ExecuteAgentMemoryOperationProposalsResponseSchema,
   RetrieveAgentMemoryResponseSchema,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 import { normalizeApiInternalBaseUrl, postApiInternalJson } from './utils'
 
 export interface AgentMemoryApiClient {

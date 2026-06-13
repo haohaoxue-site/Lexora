@@ -1,6 +1,6 @@
 # Docker Compose
 
-SamePage AI recommends Docker Compose for self-hosted deployment.
+Lexora recommends Docker Compose for self-hosted deployment.
 
 ## Services
 

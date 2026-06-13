@@ -1,11 +1,11 @@
-import type { DocumentTrashItem } from '@haohaoxue/samepage-contracts'
+import type { DocumentTrashItem } from '@haohaoxue/lexora-contracts'
 import type { AccessibleDocument } from '../core/access.service'
 import type { PersistedDocument, WorkspaceDocumentContext } from '../core/documents.utils'
 import {
   DOCUMENT_VISIBILITY,
   WORKSPACE_TYPE,
-} from '@haohaoxue/samepage-contracts'
-import { resolveOwnedDocumentCollectionId } from '@haohaoxue/samepage-shared'
+} from '@haohaoxue/lexora-contracts'
+import { resolveOwnedDocumentCollectionId } from '@haohaoxue/lexora-shared'
 import {
   BadRequestException,
   ForbiddenException,

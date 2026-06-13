@@ -2,9 +2,9 @@ import type {
   BatchDeleteDocumentsRequest,
   BatchDeleteDocumentsResponse,
   DocumentTrashItem,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 import type { AuthUserContext } from '../../auth/auth.interface'
-import { BatchDeleteDocumentsRequestSchema } from '@haohaoxue/samepage-contracts'
+import { BatchDeleteDocumentsRequestSchema } from '@haohaoxue/lexora-contracts'
 import { BadRequestException, Body, Controller, Delete, Get, Param, Post, Query } from '@nestjs/common'
 import { CurrentUser } from '../../../decorators/current-user.decorator'
 import { ZodValidationPipe } from '../../../pipes/zod-validation.pipe'

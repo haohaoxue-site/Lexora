@@ -1,5 +1,5 @@
-import type { ResolvedLanguagePreference } from '@haohaoxue/samepage-contracts'
-import { LANGUAGE_PREFERENCE } from '@haohaoxue/samepage-contracts/user/constants'
+import type { ResolvedLanguagePreference } from '@haohaoxue/lexora-contracts'
+import { LANGUAGE_PREFERENCE } from '@haohaoxue/lexora-contracts/user/constants'
 import en from 'element-plus/es/locale/lang/en'
 import zhCn from 'element-plus/es/locale/lang/zh-cn'
 import { createI18n } from 'vue-i18n'

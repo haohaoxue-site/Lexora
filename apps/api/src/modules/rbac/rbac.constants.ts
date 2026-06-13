@@ -1,4 +1,4 @@
-import { PERMISSIONS, ROLES } from '@haohaoxue/samepage-contracts'
+import { PERMISSIONS, ROLES } from '@haohaoxue/lexora-contracts'
 
 export const DEFAULT_RBAC_SEED = {
   permissions: [

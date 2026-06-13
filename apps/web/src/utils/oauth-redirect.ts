@@ -1,4 +1,4 @@
-import { OAUTH_REDIRECT_ERROR_CODE } from '@haohaoxue/samepage-contracts/auth/constants'
+import { OAUTH_REDIRECT_ERROR_CODE } from '@haohaoxue/lexora-contracts/auth/constants'
 import { translate } from '@/i18n'
 
 interface ResolveOAuthRedirectErrorMessageOptions {

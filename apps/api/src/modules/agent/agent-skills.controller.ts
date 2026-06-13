@@ -5,13 +5,13 @@ import type {
   UpdateAgentSkillConfigParams,
   UpdateAgentSkillConfigRequest,
   UpdateAgentSkillConfigResponse,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 import type { AuthUserContext } from '../auth/auth.interface'
 import {
   MutateAgentSkillParamsSchema,
   UpdateAgentSkillConfigParamsSchema,
   UpdateAgentSkillConfigRequestSchema,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 import { Body, Controller, Delete, Get, Param, Patch, Post } from '@nestjs/common'
 import { CurrentUser } from '../../decorators/current-user.decorator'
 import { ZodValidationPipe } from '../../pipes/zod-validation.pipe'

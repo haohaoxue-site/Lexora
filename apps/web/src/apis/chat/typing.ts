@@ -25,4 +25,4 @@ export type {
   EditAndSendChatMessageRequest,
   SwitchChatActiveMessageRequest,
   UpdateChatSessionTitleRequest,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'

@@ -2,13 +2,13 @@ import type {
   CollabTicketPayload,
   ConsumeCollabTicketResponse,
   CreateCollabTicketResponse,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 import type { CollabConfig } from '../../../config/collab.config'
 import { randomBytes } from 'node:crypto'
 import {
   COLLAB_ERROR_CODE,
   COLLAB_RUNTIME_ROLE,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 import { Injectable } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { PrismaService } from '../../../database/prisma.service'

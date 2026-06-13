@@ -7,14 +7,14 @@ import type {
   PatchDocumentMetaRequest,
   SearchReadableDocumentsQuery,
   SearchReadableDocumentsResponse,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 import type { AuthUserContext } from '../../auth/auth.interface'
 import {
   CreateDocumentSchema,
   PatchDocumentLayoutSchema,
   PatchDocumentMetaSchema,
   SearchReadableDocumentsQuerySchema,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 import { BadRequestException, Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common'
 import { CurrentUser } from '../../../decorators/current-user.decorator'
 import { ZodValidationPipe } from '../../../pipes/zod-validation.pipe'

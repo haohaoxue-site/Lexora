@@ -1,8 +1,8 @@
-import type { UpdateCurrentUserAvatarResponse } from '@haohaoxue/samepage-contracts'
+import type { UpdateCurrentUserAvatarResponse } from '@haohaoxue/lexora-contracts'
 import type { StorageObject } from '../../infrastructure/storage/storage.interface'
 import type { AuthUserContext } from '../auth/auth.interface'
 import type { UpdateCurrentUserAvatarInput } from './users.interface'
-import { ROLES } from '@haohaoxue/samepage-contracts'
+import { ROLES } from '@haohaoxue/lexora-contracts'
 import {
   BadRequestException,
   Injectable,

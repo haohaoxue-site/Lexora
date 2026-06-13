@@ -1,7 +1,7 @@
 import type {
   DocumentYdocCheckpointMetadata,
   DocumentYdocUpdateRecord,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 
 export function toDocumentYdocCheckpointMetadata(input: {
   documentId: string

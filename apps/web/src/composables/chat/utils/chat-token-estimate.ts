@@ -1,4 +1,4 @@
-import { estimateTextTokenCount, prettyTokenCount } from '@haohaoxue/samepage-shared/tokens'
+import { estimateTextTokenCount, prettyTokenCount } from '@haohaoxue/lexora-shared/tokens'
 
 export function estimateChatTextTokens(text: string): number {
   return estimateTextTokenCount(text)

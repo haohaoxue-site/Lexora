@@ -10,7 +10,7 @@ import {
 } from './blockTriggerDragProjector'
 import { createBlockDragPreviewElement, setBlockDragViewLock } from './blockTriggerDragView'
 
-const BLOCK_DRAG_DATA_TYPE = 'application/x-samepage-block-id'
+const BLOCK_DRAG_DATA_TYPE = 'application/x-lexora-block-id'
 
 /** 块触发拖拽控制器。 */
 export interface BlockTriggerDragController {

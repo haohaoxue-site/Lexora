@@ -4,7 +4,7 @@ import type {
   MutateAgentSkillResponse,
   UpdateAgentSkillConfigRequest,
   UpdateAgentSkillConfigResponse,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 
 export type {
   AgentSkillCard,

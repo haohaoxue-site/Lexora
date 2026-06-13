@@ -1,4 +1,4 @@
-import type { DeleteCurrentUserRequest } from '@haohaoxue/samepage-contracts'
+import type { DeleteCurrentUserRequest } from '@haohaoxue/lexora-contracts'
 import type { FormInstance, FormRules } from 'element-plus'
 import type { Ref } from 'vue'
 import type { UserDeleteSectionProps } from '../typing'

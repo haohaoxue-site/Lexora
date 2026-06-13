@@ -52,14 +52,14 @@ async function start(): Promise<void> {
   agentCheckpointer = await createAgentCheckpointer(config.checkpointer)
   const threadRunTryLock = createRedisAgentRuntimeTryLock({
     redis: runtimeRedis,
-    keyPrefix: 'samepage:agent:thread-lock:',
+    keyPrefix: 'lexora:agent:thread-lock:',
   })
   checkpointRetentionManager = createCheckpointRetentionManager({
     checkpointer: agentCheckpointer,
     retentionDays: config.checkpointer.retentionDays,
     lock: createRedisAgentRuntimeTryLock({
       redis: runtimeRedis,
-      keyPrefix: 'samepage:agent:lock:',
+      keyPrefix: 'lexora:agent:lock:',
     }),
     threadLock: threadRunTryLock,
     controlResults: createRedisStreamsAgentControlResultPublisher({

@@ -14,4 +14,4 @@ export type {
   UpsertDocumentCollaborationLinkInviteRequest,
   UpsertDocumentCollaborationLinkInviteResponse,
   UserCollabIdentity,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'

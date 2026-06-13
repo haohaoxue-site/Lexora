@@ -6,13 +6,13 @@ import type {
   PasswordRegisterRequest,
   RequestEmailVerificationRequest,
   StartOAuthLoginRequest,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 import {
   AUTH_METHOD_VALUES,
   AUTH_PASSWORD_MAX_LENGTH,
   AUTH_PASSWORD_MIN_LENGTH,
   AUTH_PASSWORD_REQUIRED_PATTERN,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 import {
   IsEmail,
   IsIn,

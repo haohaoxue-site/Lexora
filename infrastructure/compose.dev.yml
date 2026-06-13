@@ -1,18 +1,18 @@
 services:
   postgres:
     image: pgvector/pgvector:pg16
-    container_name: samepage-postgres
+    container_name: lexora-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_DB: samepage_ai
-      POSTGRES_USER: samepage_ai_pg
-      POSTGRES_PASSWORD: samepage_ai_pg
+      POSTGRES_DB: lexora
+      POSTGRES_USER: lexora_pg
+      POSTGRES_PASSWORD: lexora_pg
     ports:
       - '5432:5432'
     volumes:
-      - samepage-postgres-data:/var/lib/postgresql/data
+      - lexora-postgres-data:/var/lib/postgresql/data
     healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U postgres -d samepage_ai']
+      test: ['CMD-SHELL', 'pg_isready -U postgres -d lexora']
       interval: 5s
       timeout: 5s
       retries: 10
@@ -20,13 +20,13 @@ services:
 
   redis:
     image: redis:7-alpine
-    container_name: samepage-redis
+    container_name: lexora-redis
     restart: unless-stopped
     command: ['redis-server', '--appendonly', 'yes']
     ports:
       - '6379:6379'
     volumes:
-      - samepage-redis-data:/data
+      - lexora-redis-data:/data
     healthcheck:
       test: ['CMD', 'redis-cli', 'ping']
       interval: 5s
@@ -36,7 +36,7 @@ services:
 
   rustfs:
     image: rustfs/rustfs:latest
-    container_name: samepage-rustfs
+    container_name: lexora-rustfs
     restart: unless-stopped
     environment:
       RUSTFS_ACCESS_KEY: admin
@@ -48,11 +48,11 @@ services:
       - '9000:9000'
       - '9001:9001'
     volumes:
-      - samepage-rustfs-data:/data
-      - samepage-rustfs-logs:/logs
+      - lexora-rustfs-data:/data
+      - lexora-rustfs-logs:/logs
 
 volumes:
-  samepage-postgres-data:
-  samepage-redis-data:
-  samepage-rustfs-data:
-  samepage-rustfs-logs:
+  lexora-postgres-data:
+  lexora-redis-data:
+  lexora-rustfs-data:
+  lexora-rustfs-logs:

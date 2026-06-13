@@ -9,13 +9,13 @@ import type {
   TestSystemEmailConfigResponse,
   UpdateSystemAdminUserResponse,
   UpdateSystemAuthGovernanceRequest,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 import type { FastifyRequest } from 'fastify'
 import type { AuthUserContext } from '../auth/auth.interface'
 import {
   PERMISSIONS,
   UpdateSystemAuthGovernanceRequestSchema,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 import {
   Body,
   Controller,

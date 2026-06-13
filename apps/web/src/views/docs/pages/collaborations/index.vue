@@ -4,13 +4,13 @@ import type {
   DocumentCollaborationLinkInviteState,
   DocumentCollaborationPermission,
   DocumentCollaborationScope,
-} from '@haohaoxue/samepage-contracts/document/collaboration'
+} from '@haohaoxue/lexora-contracts/document/collaboration'
 import type { CSSProperties } from 'vue'
 import {
   DOCUMENT_COLLABORATION_LINK_INVITE_STATE,
   DOCUMENT_COLLABORATION_PERMISSION,
   DOCUMENT_COLLABORATION_SCOPE,
-} from '@haohaoxue/samepage-contracts/document/collaboration/constants'
+} from '@haohaoxue/lexora-contracts/document/collaboration/constants'
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import Empty from '@/components/empty'

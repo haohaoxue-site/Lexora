@@ -1,7 +1,7 @@
 import type {
   AgentChatContextMessage,
   AgentChatRuntimeContext,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 import type { AgentHistoryDigest } from '../context/history-compaction'
 import type { AgentCheckpointState } from './state'
 

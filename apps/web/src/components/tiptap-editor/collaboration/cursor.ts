@@ -1,4 +1,4 @@
-import type { CollabAwarenessState } from '@haohaoxue/samepage-contracts'
+import type { CollabAwarenessState } from '@haohaoxue/lexora-contracts'
 import type { DecorationAttrs } from '@tiptap/pm/view'
 import { translate } from '@/i18n'
 
@@ -51,26 +51,26 @@ export function renderTiptapCollaborationCursor(user: Record<string, unknown>) {
     ? user.color
     : CURSOR_COLOR_PALETTE[0]
 
-  cursor.className = 'samepage-collaboration-cursor'
+  cursor.className = 'lexora-collaboration-cursor'
   cursor.style.borderColor = color
 
-  label.className = 'samepage-collaboration-cursor__label'
+  label.className = 'lexora-collaboration-cursor__label'
   label.style.backgroundColor = color
 
   if (identity instanceof HTMLImageElement) {
-    identity.className = 'samepage-collaboration-cursor__avatar'
+    identity.className = 'lexora-collaboration-cursor__avatar'
     identity.alt = ''
     identity.src = typeof user.avatarUrl === 'string' ? user.avatarUrl : ''
     identity.referrerPolicy = 'no-referrer'
   }
   else {
-    identity.className = 'samepage-collaboration-cursor__avatar samepage-collaboration-cursor__avatar--fallback'
+    identity.className = 'lexora-collaboration-cursor__avatar lexora-collaboration-cursor__avatar--fallback'
     identity.textContent = typeof user.initials === 'string' && user.initials.length > 0
       ? user.initials
       : '?'
   }
 
-  name.className = 'samepage-collaboration-cursor__name'
+  name.className = 'lexora-collaboration-cursor__name'
   name.textContent = typeof user.name === 'string' && user.name.length > 0
     ? user.name
     : translate('editor.collaboration.collaborator')
@@ -87,7 +87,7 @@ export function renderTiptapCollaborationSelection(user: Record<string, unknown>
     : CURSOR_COLOR_PALETTE[0]
 
   return {
-    class: 'samepage-collaboration-cursor__selection',
+    class: 'lexora-collaboration-cursor__selection',
     style: `background-color: ${resolveCursorSelectionColor(color)};`,
   }
 }

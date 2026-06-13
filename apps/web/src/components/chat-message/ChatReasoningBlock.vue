@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { ChatMessage } from '@/apis/chat'
 import { ArrowDown } from '@element-plus/icons-vue'
-import { CHAT_MESSAGE_STATUS } from '@haohaoxue/samepage-contracts/chat/constants'
+import { CHAT_MESSAGE_STATUS } from '@haohaoxue/lexora-contracts/chat/constants'
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useStreamingTextReveal } from '@/composables/chat/useStreamingTextReveal'

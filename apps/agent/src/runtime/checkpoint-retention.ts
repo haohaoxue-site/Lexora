@@ -5,7 +5,7 @@ import {
   AGENT_CHAT_THREAD_PREFIX,
   AGENT_RUNTIME_CONTROL_RESULT_TYPE,
   AGENT_RUNTIME_CONTROL_TYPE,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000
 const DEFAULT_SWEEP_INTERVAL_MS = 60 * 60 * 1000

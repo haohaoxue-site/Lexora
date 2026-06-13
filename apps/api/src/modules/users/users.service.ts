@@ -5,9 +5,9 @@ import type {
   UpdateUserPreferencesRequest,
   UserCollabIdentity,
   UserSettings,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 import type { AuthUserContext } from '../auth/auth.interface'
-import { AUTH_PROVIDER, AUTH_PROVIDER_VALUES, ROLES } from '@haohaoxue/samepage-contracts'
+import { AUTH_PROVIDER, AUTH_PROVIDER_VALUES, ROLES } from '@haohaoxue/lexora-contracts'
 import {
   BadRequestException,
   Injectable,

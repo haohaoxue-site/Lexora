@@ -3,14 +3,14 @@ import type {
   AgentProfileSettings,
   AiModelRef,
   UpdateAgentProfileModelPolicyRequest,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 import {
   AGENT_MEMORY_SKILL_KEY,
   AGENT_MEMORY_SLOT_KEY,
   AgentProfileConfigSchema,
   AgentProfileSettingsSchema,
   AI_MODEL_INTENT_KEY,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 import { Injectable, InternalServerErrorException } from '@nestjs/common'
 import {
   Prisma,
@@ -40,7 +40,7 @@ const DEFAULT_AGENT_PROFILE_NAME = '小助手'
 const DEFAULT_AGENT_PROFILE_CONFIG: AgentProfileConfig = AgentProfileConfigSchema.parse({
   schemaVersion: 1,
   instructions: {
-    systemPrompt: '你是 SamePage 小助手。请根据用户问题、当前对话上下文和可用文档上下文，给出清晰、准确、可执行的回答。',
+    systemPrompt: '你是 Lexora 小助手。请根据用户问题、当前对话上下文和可用文档上下文，给出清晰、准确、可执行的回答。',
   },
   skillBindings: [
     {

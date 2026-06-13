@@ -10,7 +10,7 @@ import {
   DOCUMENT_COLLABORATION_LINK_PASSWORD_LENGTH,
   DOCUMENT_COLLABORATION_LINK_PASSWORD_REGEX,
   DOCUMENT_COLLABORATION_RESOLVER_STATUS,
-} from '@haohaoxue/samepage-contracts/document/collaboration/constants'
+} from '@haohaoxue/lexora-contracts/document/collaboration/constants'
 import { computed, reactive, shallowRef, useTemplateRef, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import {

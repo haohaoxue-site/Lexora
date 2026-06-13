@@ -1,5 +1,5 @@
-import type { CollabPubSubMessage } from '@haohaoxue/samepage-contracts'
-import { COLLAB_REDIS_CHANNEL, CollabPubSubMessageSchema } from '@haohaoxue/samepage-contracts'
+import type { CollabPubSubMessage } from '@haohaoxue/lexora-contracts'
+import { COLLAB_REDIS_CHANNEL, CollabPubSubMessageSchema } from '@haohaoxue/lexora-contracts'
 import Redis from 'ioredis'
 
 export type CollabPubSubHandler = (message: CollabPubSubMessage) => Promise<void> | void

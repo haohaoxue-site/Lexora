@@ -1,4 +1,4 @@
-import type { TiptapJsonContent } from '@haohaoxue/samepage-contracts'
+import type { TiptapJsonContent } from '@haohaoxue/lexora-contracts'
 import { Injectable } from '@nestjs/common'
 import { DocumentAccessService } from '../core/access.service'
 import { DocumentContentService } from './content.service'

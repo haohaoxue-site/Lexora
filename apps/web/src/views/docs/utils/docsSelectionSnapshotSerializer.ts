@@ -1,5 +1,5 @@
-import type { TiptapJsonContent } from '@haohaoxue/samepage-contracts'
-import { serializeTiptapJsonContentToMarkdownLike } from '@haohaoxue/samepage-shared/document'
+import type { TiptapJsonContent } from '@haohaoxue/lexora-contracts'
+import { serializeTiptapJsonContentToMarkdownLike } from '@haohaoxue/lexora-shared/document'
 
 export interface DocsSelectionMarkdownSnapshot {
   snapshot: string

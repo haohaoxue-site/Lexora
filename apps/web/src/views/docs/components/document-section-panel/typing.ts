@@ -1,4 +1,4 @@
-import type { DocumentTreeGroup } from '@haohaoxue/samepage-contracts'
+import type { DocumentTreeGroup } from '@haohaoxue/lexora-contracts'
 
 export interface DocumentSectionPanelProps {
   group: DocumentTreeGroup

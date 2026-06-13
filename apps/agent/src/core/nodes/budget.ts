@@ -1,7 +1,7 @@
 import type {
   AgentChatContextMessage,
   AgentMemoryRetrievalSnapshot,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 import type { AgentHistoryDigest } from '../context/history-compaction'
 import type { AgentGraphContext } from '../state'
 import { resolveAgentContextBudget } from '../context/budget'

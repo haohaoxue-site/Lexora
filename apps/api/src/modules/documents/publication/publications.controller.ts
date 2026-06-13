@@ -14,7 +14,7 @@ import type {
   UpdatePublicationPageRequest,
   UpdatePublicationSectionRequest,
   UpsertPublicationSiteSettingsRequest,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 import type { FastifyReply, FastifyRequest } from 'fastify'
 import type { AuthUserContext } from '../../auth/auth.interface'
 import {
@@ -27,7 +27,7 @@ import {
   UpdatePublicationPageSchema,
   UpdatePublicationSectionSchema,
   UpsertPublicationSiteSettingsSchema,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 import { BadRequestException, Body, Controller, Delete, Get, Param, Post, Put, Query, Req, Res } from '@nestjs/common'
 import { CurrentUser } from '../../../decorators/current-user.decorator'
 import { Public } from '../../../decorators/public.decorator'

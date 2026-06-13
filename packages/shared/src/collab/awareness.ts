@@ -1,4 +1,4 @@
-import type { CollabAwarenessState } from '@haohaoxue/samepage-contracts'
+import type { CollabAwarenessState } from '@haohaoxue/lexora-contracts'
 
 interface CollabAwarenessUserSource {
   id: string

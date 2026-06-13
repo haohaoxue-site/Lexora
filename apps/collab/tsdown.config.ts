@@ -6,7 +6,7 @@ export default defineConfig({
   clean: true,
   sourcemap: true,
   deps: {
-    alwaysBundle: [/^@haohaoxue\/samepage-(?:contracts|shared)(?:\/.*)?$/],
+    alwaysBundle: [/^@haohaoxue\/lexora-(?:contracts|shared)(?:\/.*)?$/],
   },
   unbundle: true,
 })

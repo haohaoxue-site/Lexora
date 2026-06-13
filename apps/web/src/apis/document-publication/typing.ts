@@ -31,4 +31,4 @@ export type {
   UpdatePublicationPageRequest,
   UpdatePublicationSectionRequest,
   UpsertPublicationSiteSettingsRequest,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'

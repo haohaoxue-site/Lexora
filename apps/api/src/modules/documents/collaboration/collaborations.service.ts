@@ -16,7 +16,7 @@ import type {
   UpdateDocumentCollaborationGrantRequest,
   UpsertDocumentCollaborationLinkInviteRequest,
   UpsertDocumentCollaborationLinkInviteResponse,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 import { randomBytes } from 'node:crypto'
 import {
   COLLAB_PERMISSION_INVALIDATION_REASON,
@@ -32,8 +32,8 @@ import {
   DOCUMENT_COLLABORATION_SCOPE,
   DOCUMENT_COLLABORATION_USER_INVITE_STATUS,
   DOCUMENT_VISIBILITY,
-} from '@haohaoxue/samepage-contracts'
-import { isExactUserCodeQuery, normalizeUserCodeQuery } from '@haohaoxue/samepage-shared'
+} from '@haohaoxue/lexora-contracts'
+import { isExactUserCodeQuery, normalizeUserCodeQuery } from '@haohaoxue/lexora-shared'
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common'
 import { DocumentStatus, Prisma } from '@prisma/client'
 import { PrismaService } from '../../../database/prisma.service'

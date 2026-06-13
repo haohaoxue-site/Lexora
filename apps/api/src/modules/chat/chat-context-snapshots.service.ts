@@ -3,15 +3,15 @@ import type {
   ChatMessageAttachmentInput,
   ChatMessageContentJSON,
   ChatPersistedMessageAttachment,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 import {
   CHAT_MESSAGE_ATTACHMENT_MAX_COUNT,
   CHAT_MESSAGE_ATTACHMENT_PLACEMENT,
   CHAT_MESSAGE_CONTENT_MAX_LENGTH,
   ChatMessageAttachmentInputSchema,
   ChatMessageContentJSONSchema,
-} from '@haohaoxue/samepage-contracts'
-import { serializeChatMessageContentJSON } from '@haohaoxue/samepage-shared'
+} from '@haohaoxue/lexora-contracts'
+import { serializeChatMessageContentJSON } from '@haohaoxue/lexora-shared'
 import { BadRequestException, Injectable } from '@nestjs/common'
 import { DocumentChatSnapshotService } from '../documents/content/document-chat-snapshot.service'
 

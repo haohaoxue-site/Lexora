@@ -1,4 +1,4 @@
-import type { CollabErrorCode } from '@haohaoxue/samepage-contracts'
+import type { CollabErrorCode } from '@haohaoxue/lexora-contracts'
 import type { Hocuspocus } from '@hocuspocus/server'
 import type { DocumentYdocCurrentProjectionClient } from '../clients/documents'
 import type { CollabMetricsCollector } from '../observability/metrics'

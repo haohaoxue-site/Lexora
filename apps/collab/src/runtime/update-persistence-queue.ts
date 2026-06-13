@@ -1,10 +1,10 @@
-import type { CollabErrorCode, DocumentYdocRuntimeState } from '@haohaoxue/samepage-contracts'
+import type { CollabErrorCode, DocumentYdocRuntimeState } from '@haohaoxue/lexora-contracts'
 import type { CollabMetricsCollector } from '../observability/metrics'
 import type { CollabFatalPersistenceFailure, CollabHocuspocusContext, CollabRuntimeLogger } from './ports'
 import type { DocumentYdocRuntimeStore } from './ydoc-runtime-store'
 import { randomUUID } from 'node:crypto'
-import { COLLAB_ERROR_CODE } from '@haohaoxue/samepage-contracts'
-import { sleep } from '@haohaoxue/samepage-shared'
+import { COLLAB_ERROR_CODE } from '@haohaoxue/lexora-contracts'
+import { sleep } from '@haohaoxue/lexora-shared'
 import { isDocumentYdocRuntimeStoreError } from './ydoc-runtime-store'
 
 const DEFAULT_UPDATE_PERSISTENCE_MAX_ATTEMPTS = 3

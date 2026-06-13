@@ -5,7 +5,7 @@ import type {
   DocumentVisibility,
   WorkspaceMemberRole,
   WorkspaceType,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 import {
   DOCUMENT_COLLABORATION_ACCESS_SOURCE,
   DOCUMENT_COLLABORATION_GRANT_STATUS,
@@ -15,12 +15,12 @@ import {
   WORKSPACE_MEMBER_ROLE,
   WORKSPACE_MEMBER_STATUS,
   WORKSPACE_TYPE,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 import {
   canManageDocumentCollaborators,
   getDocumentCollaborationCapabilities,
   getWorkspaceDocumentCollaborationCapabilities,
-} from '@haohaoxue/samepage-shared'
+} from '@haohaoxue/lexora-shared'
 import { Injectable, NotFoundException } from '@nestjs/common'
 import { Prisma } from '@prisma/client'
 import { PrismaService } from '../../../database/prisma.service'

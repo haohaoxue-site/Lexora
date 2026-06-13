@@ -1,5 +1,5 @@
-import type { AiModelIntentKey } from '@haohaoxue/samepage-contracts'
-import { AI_MODEL_INTENT_KEY, AI_MODEL_INTENT_KEY_VALUES } from '@haohaoxue/samepage-contracts'
+import type { AiModelIntentKey } from '@haohaoxue/lexora-contracts'
+import { AI_MODEL_INTENT_KEY, AI_MODEL_INTENT_KEY_VALUES } from '@haohaoxue/lexora-contracts'
 
 export const PLATFORM_EMBEDDING_MODEL_POLICY_ID = 'platform.embedding.default'
 

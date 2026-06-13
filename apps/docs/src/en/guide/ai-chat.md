@@ -1,6 +1,6 @@
 # AI Chat
 
-AI chat is one of the main SamePage AI surfaces. It is used for everyday questions, writing assistance, content organization, and document-aware conversations.
+AI chat is one of the main Lexora surfaces. It is used for everyday questions, writing assistance, content organization, and document-aware conversations.
 
 ## Sessions and Models
 
@@ -14,7 +14,7 @@ Assistant replies stream into the UI. You can stop generation and retry failed r
 
 ## Message Branches
 
-SamePage AI uses a message-tree model for chat. When you regenerate a reply or continue from an existing message, the UI displays branch navigation so you can switch between alternatives.
+Lexora uses a message-tree model for chat. When you regenerate a reply or continue from an existing message, the UI displays branch navigation so you can switch between alternatives.
 
 Switching branches updates the active path of the session without deleting other branches.
 

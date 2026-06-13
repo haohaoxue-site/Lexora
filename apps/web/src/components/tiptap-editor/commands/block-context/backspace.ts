@@ -7,7 +7,7 @@ import { getCurrentBlock } from '../currentBlock'
 
 const STRUCTURAL_BACKSPACE_BOUNDARY_NODE_NAMES = new Set<string>(TIPTAP_STRUCTURAL_BACKSPACE_BOUNDARY_NODE_NAMES)
 
-type SamePageBackspaceAction
+type LexoraBackspaceAction
   = | { type: 'reset-empty-heading' }
     | {
       type: 'move-into-previous-structural-boundary'
@@ -25,8 +25,8 @@ interface StructuralBackspaceBoundary {
   from: number
 }
 
-export function runSamePageBackspacePolicy(props: CommandProps) {
-  const action = resolveSamePageBackspaceAction(props.tr.selection)
+export function runLexoraBackspacePolicy(props: CommandProps) {
+  const action = resolveLexoraBackspaceAction(props.tr.selection)
 
   if (!action) {
     return false
@@ -57,9 +57,9 @@ export function runSamePageBackspacePolicy(props: CommandProps) {
   }
 }
 
-export function resolveSamePageBackspaceAction(
+export function resolveLexoraBackspaceAction(
   selection: ProseMirrorSelection,
-): SamePageBackspaceAction | null {
+): LexoraBackspaceAction | null {
   if (shouldResetEmptyHeading(selection)) {
     return { type: 'reset-empty-heading' }
   }
@@ -109,7 +109,7 @@ function resolvePreviousStructuralBackspaceBoundary(
 function resolveEmptyBlockAfterStructuralBoundaryAction(
   selection: ProseMirrorSelection,
   currentBlock: CurrentBlockSelection,
-): SamePageBackspaceAction {
+): LexoraBackspaceAction {
   const previousTextSelection = Selection.findFrom(
     selection.$from.doc.resolve(currentBlock.from),
     -1,

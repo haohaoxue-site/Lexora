@@ -1,6 +1,6 @@
 import type { AgentModelStreamPart } from '../../integrations/model-providers/stream-text'
 import type { ChatGenerationEvent } from '../../runtime/typing'
-import { ChatGenerationEventSchema } from '@haohaoxue/samepage-contracts'
+import { ChatGenerationEventSchema } from '@haohaoxue/lexora-contracts'
 
 export interface EmitAgentModelStreamPartOptions {
   generationId: string

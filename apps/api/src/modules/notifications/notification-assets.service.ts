@@ -1,7 +1,7 @@
 import type {
   PlatformNotificationAsset,
   ResolvePlatformNotificationAssetsResponse,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 import type { JwtConfig } from '../../config/auth.config'
 import type { StorageObject } from '../../infrastructure/storage/storage.interface'
 import { Buffer } from 'node:buffer'
@@ -10,8 +10,8 @@ import {
   API_ERROR_CODE,
   PLATFORM_NOTIFICATION_IMAGE_MAX_BYTES,
   SERVER_PATH,
-} from '@haohaoxue/samepage-contracts'
-import { prettyBytes } from '@haohaoxue/samepage-shared'
+} from '@haohaoxue/lexora-contracts'
+import { prettyBytes } from '@haohaoxue/lexora-shared'
 import {
   Injectable,
 } from '@nestjs/common'
@@ -28,9 +28,9 @@ import { apiBadRequest, apiNotFound, apiPayloadTooLarge } from '../../utils/api-
 import { sha256Hex } from '../../utils/hash'
 
 const PLATFORM_NOTIFICATION_ASSET_BUCKET = 'notification-asset'
-const PLATFORM_NOTIFICATION_ASSET_CONTENT_AUDIENCE = 'samepage-notification-asset'
+const PLATFORM_NOTIFICATION_ASSET_CONTENT_AUDIENCE = 'lexora-notification-asset'
 const PLATFORM_NOTIFICATION_ASSET_ACCESS_TOKEN_TYPE = 'notification-asset-access'
-const PLATFORM_NOTIFICATION_ASSET_ACCESS_COOKIE_NAME = 'samepage_notification_asset_access'
+const PLATFORM_NOTIFICATION_ASSET_ACCESS_COOKIE_NAME = 'lexora_notification_asset_access'
 const PLATFORM_NOTIFICATION_ASSET_ACCESS_COOKIE_TTL_SECONDS = 60 * 5
 const PLATFORM_NOTIFICATION_IMAGE_TOO_LARGE_MESSAGE = `图片大小不能超过 ${prettyBytes(PLATFORM_NOTIFICATION_IMAGE_MAX_BYTES)}`
 

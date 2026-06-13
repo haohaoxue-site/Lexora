@@ -1,4 +1,4 @@
-import type { ChatMemoryOperationProjection } from '@haohaoxue/samepage-contracts'
+import type { ChatMemoryOperationProjection } from '@haohaoxue/lexora-contracts'
 import type { ToolCall } from '@langchain/core/messages'
 import type { AgentMemoryApiClient } from '../../clients/memory'
 import type { AgentSkillApiClient } from '../../clients/skills'

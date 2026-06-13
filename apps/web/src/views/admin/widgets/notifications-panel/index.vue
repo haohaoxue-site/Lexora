@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { TiptapJsonContent } from '@haohaoxue/samepage-contracts'
+import type { TiptapJsonContent } from '@haohaoxue/lexora-contracts'
 import type { FormInstance, FormRules } from 'element-plus'
 import type { AdminNotificationForm } from '../../composables/useAdminNotifications'
 import type {
@@ -10,7 +10,7 @@ import type {
   TiptapEditorResolveImageSrc,
   TiptapEditorUploadedImage,
 } from '@/components/tiptap-editor/content/typing'
-import { PLATFORM_NOTIFICATION_STATUS } from '@haohaoxue/samepage-contracts/notification'
+import { PLATFORM_NOTIFICATION_STATUS } from '@haohaoxue/lexora-contracts/notification'
 import { useI18n } from 'vue-i18n'
 import { StandaloneContentEditor } from '@/components/tiptap-editor'
 import { formatDateTime } from '@/utils/dayjs'

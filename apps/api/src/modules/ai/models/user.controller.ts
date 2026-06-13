@@ -6,7 +6,7 @@ import type {
   AiProviderCredential,
   AiProviderModelItem,
   AiProviderModels,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 import type { AuthUserContext } from '../../auth/auth.interface'
 import {
   Body,

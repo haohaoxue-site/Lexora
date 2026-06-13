@@ -1,4 +1,4 @@
-import type { PermissionCode } from '@haohaoxue/samepage-contracts'
+import type { PermissionCode } from '@haohaoxue/lexora-contracts'
 import { SetMetadata } from '@nestjs/common'
 
 export const REQUIRE_PERMISSIONS_KEY = 'require_permissions'

@@ -1,4 +1,4 @@
-import type { AgentTranslatorTargetLanguage } from '@haohaoxue/samepage-contracts/agent'
+import type { AgentTranslatorTargetLanguage } from '@haohaoxue/lexora-contracts/agent'
 import type { AiModelRef } from '@/apis/ai'
 import type {
   ChatDocumentScope,

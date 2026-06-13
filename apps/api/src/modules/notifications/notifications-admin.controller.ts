@@ -3,13 +3,13 @@ import type {
   PlatformNotification,
   PlatformNotificationListResponse,
   UpdatePlatformNotificationRequest,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 import type { AuthUserContext } from '../auth/auth.interface'
 import {
   CreatePlatformNotificationRequestSchema,
   PERMISSIONS,
   UpdatePlatformNotificationRequestSchema,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 import {
   Body,
   Controller,

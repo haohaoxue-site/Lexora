@@ -25,4 +25,4 @@ export type {
   RestoreDocumentVersionSnapshotRequest,
   RestoreDocumentVersionSnapshotResponse,
   SearchReadableDocumentsResponse,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'

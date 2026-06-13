@@ -1,4 +1,4 @@
-import type { AiProviderPreset } from '@haohaoxue/samepage-contracts'
+import type { AiProviderPreset } from '@haohaoxue/lexora-contracts'
 import { Controller, Get } from '@nestjs/common'
 import { AiProviderPresetsService } from './presets.service'
 

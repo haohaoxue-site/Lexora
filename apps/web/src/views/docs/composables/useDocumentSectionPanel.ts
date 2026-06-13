@@ -1,5 +1,5 @@
-import type { DocumentTreeGroup } from '@haohaoxue/samepage-contracts'
-import { formatDocumentCollectionLabel } from '@haohaoxue/samepage-shared/document'
+import type { DocumentTreeGroup } from '@haohaoxue/lexora-contracts'
+import { formatDocumentCollectionLabel } from '@haohaoxue/lexora-shared/document'
 import { computed } from 'vue'
 import { useDocsSurfaceState } from './useDocsSurfaceState'
 

@@ -18,10 +18,10 @@ import {
   AgentRuntimeControlCommandSchema,
   AgentRuntimeControlResultSchema,
   ChatGenerationEventSchema,
-} from '@haohaoxue/samepage-contracts'
-import { sleepUnref } from '@haohaoxue/samepage-shared'
+} from '@haohaoxue/lexora-contracts'
+import { sleepUnref } from '@haohaoxue/lexora-shared'
 
-const DEFAULT_GROUP_NAME = 'samepage-agent'
+const DEFAULT_GROUP_NAME = 'lexora-agent'
 const DEFAULT_CONSUMER_NAME = `agent-${process.pid}`
 const DEFAULT_READ_COUNT = 10
 const DEFAULT_READ_BLOCK_MS = 1000
@@ -30,7 +30,7 @@ const COMMAND_FIELD = 'command'
 const CONTROL_FIELD = 'control'
 const CONTROL_RESULT_FIELD = 'result'
 const EVENT_FIELD = 'event'
-const DEFAULT_IDEMPOTENCY_KEY_PREFIX = 'samepage:agent:idempotency:'
+const DEFAULT_IDEMPOTENCY_KEY_PREFIX = 'lexora:agent:idempotency:'
 const DEFAULT_IDEMPOTENCY_TTL_SECONDS = 24 * 60 * 60
 
 export interface CreateRedisStreamsAgentQueueOptions {

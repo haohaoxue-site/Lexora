@@ -1,9 +1,9 @@
-import type { AppearancePreference } from '@haohaoxue/samepage-contracts'
+import type { AppearancePreference } from '@haohaoxue/lexora-contracts'
 import type { SessionAppearanceOption, SessionContextSwitchAction, SessionMenuUser } from './typing'
 import {
   APPEARANCE_PREFERENCE,
   APPEARANCE_PREFERENCE_VALUES,
-} from '@haohaoxue/samepage-contracts/user/constants'
+} from '@haohaoxue/lexora-contracts/user/constants'
 import { useClipboard } from '@vueuse/core'
 import { computed, shallowRef, watch } from 'vue'
 import { useI18n } from 'vue-i18n'

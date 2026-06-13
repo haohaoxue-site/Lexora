@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { ChatMessage } from '@/apis/chat'
-import { AGENT_TRANSLATOR_SKILL_KEY } from '@haohaoxue/samepage-contracts/agent'
+import { AGENT_TRANSLATOR_SKILL_KEY } from '@haohaoxue/lexora-contracts/agent'
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import {

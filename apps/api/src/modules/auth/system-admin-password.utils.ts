@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto'
-import { AUTH_PASSWORD_MAX_LENGTH } from '@haohaoxue/samepage-contracts'
+import { AUTH_PASSWORD_MAX_LENGTH } from '@haohaoxue/lexora-contracts'
 
 const SYSTEM_ADMIN_INITIAL_PASSWORD_PREFIX = 'Aa1'
 

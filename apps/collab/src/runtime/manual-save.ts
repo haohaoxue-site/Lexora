@@ -1,10 +1,10 @@
-import type { CollabErrorCode } from '@haohaoxue/samepage-contracts'
+import type { CollabErrorCode } from '@haohaoxue/lexora-contracts'
 import {
   COLLAB_ERROR_CODE,
   DOCUMENT_COLLAB_STATELESS_MESSAGE_TYPE,
   DocumentCollabStatelessSaveRequestPayloadSchema,
   DocumentCollabStatelessSaveResultPayloadSchema,
-} from '@haohaoxue/samepage-contracts'
+} from '@haohaoxue/lexora-contracts'
 
 export interface HandleDocumentCollabSaveRequestInput {
   payload: string
