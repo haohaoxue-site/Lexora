@@ -2,6 +2,7 @@ import type { UserCollabIdentity } from '@haohaoxue/samepage-contracts'
 import { isExactUserCodeQuery, normalizeUserCodeQuery } from '@haohaoxue/samepage-shared/user'
 import { shallowRef } from 'vue'
 import { findUserByCode } from '@/apis/user'
+import { translate } from '@/i18n'
 import { useUserStore } from '@/stores/user'
 import { getRequestErrorDisplayMessage } from '@/utils/request-error'
 
@@ -36,7 +37,7 @@ export function useCollabUserLookup(options: UseCollabUserLookupOptions = {}) {
     }
 
     if (!isExactUserCodeQuery(normalizedUserCode)) {
-      lookupErrorMessage.value = '请输入完整协作码'
+      lookupErrorMessage.value = translate('docs.collaboration.invalidUserCode')
       return null
     }
 
@@ -50,7 +51,7 @@ export function useCollabUserLookup(options: UseCollabUserLookupOptions = {}) {
       }
 
       if (userStore.currentUser?.id === user.id) {
-        lookupErrorMessage.value = options.selfTargetMessage ?? '不能选择自己'
+        lookupErrorMessage.value = options.selfTargetMessage ?? translate('docs.collaboration.selfTargetInvalid')
         return null
       }
 
@@ -62,7 +63,7 @@ export function useCollabUserLookup(options: UseCollabUserLookupOptions = {}) {
         return null
       }
 
-      lookupErrorMessage.value = getRequestErrorDisplayMessage(error, '未找到用户')
+      lookupErrorMessage.value = getRequestErrorDisplayMessage(error, translate('docs.collaboration.userNotFound'))
       return null
     }
     finally {

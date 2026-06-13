@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { Editor } from '@tiptap/core'
+import { useI18n } from 'vue-i18n'
 import TiptapIcon from '../../icons/TiptapIcon.vue'
 import {
   getActiveHighlightColor,
@@ -20,6 +21,7 @@ interface ColorPickerDropdownProps {
 }
 
 const props = defineProps<ColorPickerDropdownProps>()
+const { t } = useI18n()
 const HIGHLIGHT_CLASS_PREFIX_REGEXP = /^tiptap-highlight-/
 const {
   actionRegistry,
@@ -36,8 +38,8 @@ const {
       textColor,
       backgroundColor,
       isButtonActive: Boolean(textColor || backgroundColor),
-      textToken: formatColorToken(textColor, '文字'),
-      backgroundToken: formatColorToken(backgroundColor, '背景'),
+      textToken: formatColorToken(textColor, t('editor.common.textColor')),
+      backgroundToken: formatColorToken(backgroundColor, t('editor.common.backgroundColor')),
     }
   },
 })

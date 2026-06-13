@@ -9,6 +9,7 @@ import {
   shallowRef,
   watch,
 } from 'vue'
+import { translate } from '@/i18n'
 import dayjs from '@/utils/dayjs'
 import {
   buildDocumentHistorySections,
@@ -32,7 +33,11 @@ export function useDocumentHistoryPanel() {
 
   const hasDocument = computed(() => Boolean(currentDocument.value))
   const currentEntryTimeLabel = computed(() =>
-    currentDocument.value ? `更新于 ${dayjs(currentDocument.value.updatedAt).format('M月D日 HH:mm')}` : null,
+    currentDocument.value
+      ? translate('docs.history.updatedAt', {
+          time: dayjs(currentDocument.value.updatedAt).format(translate('docs.history.dateTimeFormat')),
+        })
+      : null,
   )
   const historySections = computed(() => buildDocumentHistorySections({
     document: currentDocument.value,

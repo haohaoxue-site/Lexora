@@ -8,6 +8,7 @@ import type {
 } from '@/layouts/components/session-notification-bell/useSessionNotificationBell'
 import { NOTIFICATION_LIST_FILTER, NOTIFICATION_SOURCE_KIND } from '@haohaoxue/samepage-contracts/notification'
 import { computed, shallowRef, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { resolvePublishedNotificationAssets } from '@/apis/notification'
 import EntityAvatar from '@/components/entity-avatar'
 import { StandaloneContentEditor } from '@/components/tiptap-editor'
@@ -21,6 +22,7 @@ const emits = defineEmits<{
   accept: [invitation: SessionNotificationInvitationItem]
   decline: [invitation: SessionNotificationInvitationItem]
 }>()
+const { t } = useI18n({ useScope: 'global' })
 
 const ROW_HEIGHT = 148
 const OVERSCAN = 4
@@ -30,8 +32,13 @@ const pendingLoadMoreItemCount = shallowRef<number | null>(null)
 const selectedPlatformNotification = shallowRef<SessionNotificationItem | null>(null)
 const imageSrcCache = new Map<string, Promise<string | null>>()
 const filterOptions = computed(() => [
-  { label: '全部', value: NOTIFICATION_LIST_FILTER.ALL },
-  { label: `未读 ${props.unreadCount > 0 ? props.unreadCount : ''}`.trim(), value: NOTIFICATION_LIST_FILTER.UNREAD },
+  { label: t('sessionMenu.notifications.all'), value: NOTIFICATION_LIST_FILTER.ALL },
+  {
+    label: props.unreadCount > 0
+      ? t('sessionMenu.notifications.unreadWithCount', { count: props.unreadCount })
+      : t('sessionMenu.notifications.unread'),
+    value: NOTIFICATION_LIST_FILTER.UNREAD,
+  },
 ])
 const canLoadMore = computed(() =>
   props.hasMore
@@ -151,19 +158,19 @@ const resolveNotificationImageSrc: TiptapEditorResolveImageSrc = async (assetId)
     <div class="mb-3 flex items-center justify-between gap-3">
       <div class="min-w-0">
         <h3 class="m-0 text-sm font-semibold leading-5 text-main">
-          站内信
+          {{ t('sessionMenu.notifications.title') }}
         </h3>
       </div>
 
       <div class="flex shrink-0 items-center gap-1.5">
-        <ElTooltip content="全部标记为已读" effect="dark" placement="top">
+        <ElTooltip :content="t('sessionMenu.notifications.markAllRead')" effect="dark" placement="top">
           <ElButton
             text
             size="small"
             class="session-notification-panel__mark-read-button !h-7 !w-7 !p-0"
             :disabled="!props.unreadCount || props.isMarkingAllRead"
             :loading="props.isMarkingAllRead"
-            aria-label="全部标记为已读"
+            :aria-label="t('sessionMenu.notifications.markAllRead')"
             @click="emits('markAllRead')"
           >
             <SvgIcon v-if="!props.isMarkingAllRead" category="ui" icon="check" size="15px" />
@@ -186,7 +193,7 @@ const resolveNotificationImageSrc: TiptapEditorResolveImageSrc = async (assetId)
         <ElButton
           text
           class="session-notification-panel__back-button !h-7 !w-7 !p-0"
-          aria-label="返回站内信列表"
+          :aria-label="t('sessionMenu.notifications.backToList')"
           @click="closePlatformNotification"
         >
           <SvgIcon category="ui" icon="arrow-left" size="15px" />
@@ -218,11 +225,11 @@ const resolveNotificationImageSrc: TiptapEditorResolveImageSrc = async (assetId)
     </p>
 
     <div v-else-if="props.isLoading && !props.hasLoadedList" class="session-notification-panel__state rounded-lg bg-fill-light px-3 py-8 text-center text-sm text-secondary">
-      正在加载站内信...
+      {{ t('sessionMenu.notifications.loading') }}
     </div>
 
     <div v-else-if="!props.notificationItems.length" class="session-notification-panel__state rounded-lg bg-fill-light px-3 py-8 text-center text-sm text-secondary">
-      暂无站内信
+      {{ t('sessionMenu.notifications.none') }}
     </div>
 
     <div
@@ -250,7 +257,7 @@ const resolveNotificationImageSrc: TiptapEditorResolveImageSrc = async (assetId)
           <EntityAvatar
             :name="item.senderLabel"
             :src="item.sender.avatarUrl"
-            :alt="`${item.senderLabel} 的头像`"
+            :alt="t('common.avatarAlt', { name: item.senderLabel })"
             :size="36"
             shape="circle"
             kind="workspace"
@@ -281,7 +288,7 @@ const resolveNotificationImageSrc: TiptapEditorResolveImageSrc = async (assetId)
                 @click.stop="openPlatformNotification(item)"
               >
                 <span class="inline-flex items-center gap-1">
-                  查看详情
+                  {{ t('sessionMenu.notifications.detail') }}
                   <SvgIcon category="ui" icon="chevron-right" size="13px" />
                 </span>
               </ElButton>
@@ -294,7 +301,7 @@ const resolveNotificationImageSrc: TiptapEditorResolveImageSrc = async (assetId)
                 :disabled="Boolean(props.actingInvitationId)"
                 @click.stop="emits('view', item.documentInviteItem)"
               >
-                查看
+                {{ t('sessionMenu.notifications.view') }}
               </ElButton>
               <ElButton
                 size="small"
@@ -303,7 +310,7 @@ const resolveNotificationImageSrc: TiptapEditorResolveImageSrc = async (assetId)
                 :loading="props.actingInvitationId === item.documentInviteItem.id && props.actingInvitationAction === 'decline'"
                 @click.stop="emits('decline', item.documentInviteItem)"
               >
-                拒绝
+                {{ t('sessionMenu.notifications.decline') }}
               </ElButton>
               <ElButton
                 size="small"
@@ -312,7 +319,7 @@ const resolveNotificationImageSrc: TiptapEditorResolveImageSrc = async (assetId)
                 :loading="props.actingInvitationId === item.documentInviteItem.id && props.actingInvitationAction === 'accept'"
                 @click.stop="emits('accept', item.documentInviteItem)"
               >
-                接受
+                {{ t('sessionMenu.notifications.accept') }}
               </ElButton>
             </div>
           </div>
@@ -322,7 +329,7 @@ const resolveNotificationImageSrc: TiptapEditorResolveImageSrc = async (assetId)
       </div>
 
       <div v-if="props.isLoadingMore" class="session-notification-panel__loading-more sticky bottom-0 bg-surface/95 px-3 py-2 text-center text-xs text-secondary">
-        正在加载...
+        {{ t('sessionMenu.notifications.loadingMore') }}
       </div>
     </div>
   </div>

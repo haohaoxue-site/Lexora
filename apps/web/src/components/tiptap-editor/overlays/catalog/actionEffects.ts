@@ -6,6 +6,7 @@ import type {
   TiptapEditorCommentTriggerSource,
 } from '../../core/typing'
 import type { LinkPanelController } from '../shared/useLinkPanel'
+import { translate } from '@/i18n'
 import { ElMessage, ElMessageBox } from '@/utils/element-plus'
 import { getRequestErrorDisplayMessage } from '@/utils/request-error'
 import { getCurrentImageAlt, insertEditorContent, updateCurrentImageAlt } from '../../commands/editorActions'
@@ -108,13 +109,13 @@ export function createMenuActionEffects(options: MenuActionEffectsOptions): Menu
   async function editImageAlt() {
     try {
       const { value } = await ElMessageBox.prompt(
-        '请输入图片描述，将写入图片 alt 字段。',
-        '编辑描述',
+        translate('editor.imageAlt.description'),
+        translate('editor.imageAlt.title'),
         {
           inputValue: getCurrentImageAlt(options.editor),
-          inputPlaceholder: '输入图片描述',
-          confirmButtonText: '保存',
-          cancelButtonText: '取消',
+          inputPlaceholder: translate('editor.imageAlt.placeholder'),
+          confirmButtonText: translate('editor.imageAlt.confirm'),
+          cancelButtonText: translate('editor.imageAlt.cancel'),
         },
       )
 
@@ -125,7 +126,7 @@ export function createMenuActionEffects(options: MenuActionEffectsOptions): Menu
         return
       }
 
-      ElMessage.error(getRequestErrorDisplayMessage(error, '更新图片描述失败'))
+      ElMessage.error(getRequestErrorDisplayMessage(error, translate('editor.imageAlt.updateFailed')))
     }
   }
 
@@ -179,7 +180,9 @@ export function createMenuActionEffects(options: MenuActionEffectsOptions): Menu
       options.closeMenu?.()
     }
     catch (error) {
-      ElMessage.error(getRequestErrorDisplayMessage(error, kind === 'image' ? '图片上传失败' : '附件上传失败'))
+      ElMessage.error(getRequestErrorDisplayMessage(error, kind === 'image'
+        ? translate('editor.upload.imageFailed')
+        : translate('editor.upload.assetFailed')))
     }
   }
 }

@@ -13,22 +13,23 @@ import { randomUUID } from 'node:crypto'
 import {
   AGENT_MEMORY_LANE,
   AGENT_MEMORY_OPERATION_ACTION,
+  AGENT_MEMORY_OPERATION_DISPLAY_CODE,
   AGENT_MEMORY_OPERATION_MODE,
+  AGENT_MEMORY_OPERATION_REASON_CODE,
   AGENT_MEMORY_SCOPE,
   AGENT_MEMORY_SENSITIVITY,
   AGENT_MEMORY_SOURCE_TYPE,
   AgentMemoryOperationSchema,
+  API_ERROR_CODE,
   ChatMemoryOperationProjectionSchema,
 } from '@haohaoxue/samepage-contracts'
 import {
-  ConflictException,
-  ForbiddenException,
   Injectable,
   Logger,
-  NotFoundException,
 } from '@nestjs/common'
 import { ChatMessageGenerationStatus, Prisma } from '@prisma/client'
 import { PrismaService } from '../../database/prisma.service'
+import { apiConflict, apiForbidden, apiNotFound } from '../../utils/api-error'
 import { AgentMemoryService } from './agent-memory.service'
 import {
   isUnsafeAgentMemoryPayload,
@@ -97,6 +98,7 @@ export class AgentMemoryOperationsService {
           title: '记忆更新失败',
           detail: operation.content ?? operation.query,
           reason: '记忆操作执行失败，请稍后重试。',
+          reasonCode: AGENT_MEMORY_OPERATION_REASON_CODE.FAILED,
           memoryIds: [],
           candidateId: null,
         }))
@@ -388,6 +390,7 @@ export class AgentMemoryOperationsService {
         title: '待确认记忆',
         detail: operation.content,
         reason: requiresConfirmationReason,
+        reasonCode: AGENT_MEMORY_OPERATION_REASON_CODE.SENSITIVE_CONTENT,
         memoryIds: [],
         candidateId,
       })
@@ -400,6 +403,8 @@ export class AgentMemoryOperationsService {
         title: '记忆已存在',
         detail: duplicate.content,
         reason: '已存在相同记忆，未重复保存。',
+        displayCode: AGENT_MEMORY_OPERATION_DISPLAY_CODE.EXISTS,
+        reasonCode: AGENT_MEMORY_OPERATION_REASON_CODE.DUPLICATE,
         memoryIds: [duplicate.id],
         candidateId: null,
       })
@@ -454,6 +459,7 @@ export class AgentMemoryOperationsService {
         title: '待确认遗忘',
         detail: operation.query,
         reason,
+        reasonCode: AGENT_MEMORY_OPERATION_REASON_CODE.BROAD_FORGET,
         memoryIds: [],
         candidateId,
       })
@@ -646,11 +652,11 @@ export class AgentMemoryOperationsService {
     })
 
     if (!generation) {
-      throw new NotFoundException('聊天生成不存在')
+      throw apiNotFound(API_ERROR_CODE.CHAT_GENERATION_NOT_FOUND)
     }
 
     if (!OPERABLE_GENERATION_STATUSES.has(generation.status)) {
-      throw new ConflictException('聊天生成已结束')
+      throw apiConflict(API_ERROR_CODE.CHAT_GENERATION_FINISHED)
     }
 
     if (
@@ -659,7 +665,7 @@ export class AgentMemoryOperationsService {
       || generation.triggerUserMessageId !== input.messageId
       || (generation.agentProfileId ?? null) !== input.agentProfileId
     ) {
-      throw new ForbiddenException('记忆操作上下文不匹配')
+      throw apiForbidden(API_ERROR_CODE.MEMORY_OPERATION_CONTEXT_MISMATCH)
     }
   }
 
@@ -667,9 +673,11 @@ export class AgentMemoryOperationsService {
     operation: AgentMemoryOperation,
     input: {
       status: ChatMemoryOperationProjection['status']
+      displayCode?: ChatMemoryOperationProjection['displayCode']
       title: string
       detail: string | null
       reason: string | null
+      reasonCode?: ChatMemoryOperationProjection['reasonCode']
       memoryIds: string[]
       archivedMemoryIds?: string[]
       candidateId: string | null
@@ -685,12 +693,51 @@ export class AgentMemoryOperationsService {
       memoryIds: input.memoryIds,
       archivedMemoryIds: input.archivedMemoryIds ?? [],
       candidateId: input.candidateId,
+      displayCode: input.displayCode ?? resolveProjectionDisplayCode(operation, input.status),
+      reasonCode: input.reasonCode ?? resolveProjectionReasonCode(input.status),
       title: input.title,
       detail: input.detail,
       reason: input.reason,
       createdAt: new Date().toISOString(),
     })
   }
+}
+
+function resolveProjectionDisplayCode(
+  operation: AgentMemoryOperation,
+  status: ChatMemoryOperationProjection['status'],
+): ChatMemoryOperationProjection['displayCode'] {
+  if (status === 'failed') {
+    return AGENT_MEMORY_OPERATION_DISPLAY_CODE.FAILED
+  }
+
+  if (status === 'pending_confirmation') {
+    return AGENT_MEMORY_OPERATION_DISPLAY_CODE.PENDING
+  }
+
+  if (status === 'ignored') {
+    return AGENT_MEMORY_OPERATION_DISPLAY_CODE.IGNORED
+  }
+
+  if (operation.action === AGENT_MEMORY_OPERATION_ACTION.FORGET) {
+    return AGENT_MEMORY_OPERATION_DISPLAY_CODE.FORGOTTEN
+  }
+
+  if (operation.action === AGENT_MEMORY_OPERATION_ACTION.UPDATE || operation.slotKey) {
+    return AGENT_MEMORY_OPERATION_DISPLAY_CODE.UPDATED
+  }
+
+  return AGENT_MEMORY_OPERATION_DISPLAY_CODE.REMEMBERED
+}
+
+function resolveProjectionReasonCode(
+  status: ChatMemoryOperationProjection['status'],
+): ChatMemoryOperationProjection['reasonCode'] {
+  if (status === 'failed') {
+    return AGENT_MEMORY_OPERATION_REASON_CODE.FAILED
+  }
+
+  return null
 }
 
 function resolveWriteConfirmationReason(

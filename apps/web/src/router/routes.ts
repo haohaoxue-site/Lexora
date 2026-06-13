@@ -1,5 +1,5 @@
-import type { RouteRecordRaw } from 'vue-router'
-import type { SidebarPanelItem } from '@/layouts/panels/typing'
+import type { RouteLocationRaw, RouteRecordRaw } from 'vue-router'
+import type { SvgIconCategoryValue } from '@/components/svg-icon/typing'
 import { AUTH_CALLBACK_PATH } from '@haohaoxue/samepage-contracts/auth/constants'
 import {
   DOCUMENT_SINGLE_PUBLICATION_ROUTE_PREFIX,
@@ -74,7 +74,7 @@ const workspaceRouteChildren = [
     name: 'home',
     component: ChatView,
     meta: {
-      navLabel: '对话',
+      navLabelKey: 'navigation.workspace.chat',
       navIconCategory: SvgIconCategory.NAV,
       navIcon: 'chat',
       navActiveIcon: 'chat-active',
@@ -95,7 +95,7 @@ const workspaceRouteChildren = [
     name: 'docs-nav',
     component: DocsView,
     meta: {
-      navLabel: '文档',
+      navLabelKey: 'navigation.workspace.docs',
       navIconCategory: SvgIconCategory.NAV,
       navIcon: 'docs',
       navActiveIcon: 'docs-active',
@@ -128,7 +128,7 @@ const workspaceRouteChildren = [
   //   name: 'code',
   //   component: CodeView,
   //   meta: {
-  //     navLabel: '代码',
+  //     navLabelKey: 'navigation.workspace.code',
   //     navIconCategory: SvgIconCategory.NAV,
   //     navIcon: 'code',
   //     navActiveIcon: 'code-active',
@@ -139,7 +139,7 @@ const workspaceRouteChildren = [
   //   name: 'schedule',
   //   component: ScheduleView,
   //   meta: {
-  //     navLabel: '日程',
+  //     navLabelKey: 'navigation.workspace.schedule',
   //     navIconCategory: SvgIconCategory.NAV,
   //     navIcon: 'schedule',
   //     navActiveIcon: 'schedule-active',
@@ -150,7 +150,7 @@ const workspaceRouteChildren = [
   //   name: 'knowledge',
   //   component: KnowledgeView,
   //   meta: {
-  //     navLabel: '知识库',
+  //     navLabelKey: 'navigation.workspace.knowledge',
   //     navIconCategory: SvgIconCategory.NAV,
   //     navIcon: 'knowledge',
   //     navActiveIcon: 'knowledge-active',
@@ -162,7 +162,7 @@ const workspaceRouteChildren = [
     component: RouterView,
     redirect: { name: SKILLS_ME_ROUTE_NAME },
     meta: {
-      navLabel: '技能',
+      navLabelKey: 'navigation.workspace.skills',
       navIconCategory: SvgIconCategory.NAV,
       navIcon: 'skills',
       navActiveIcon: 'skills-active',
@@ -186,7 +186,7 @@ const workspaceRouteChildren = [
     component: SettingsView,
     redirect: { name: 'settings-user' },
     meta: {
-      navLabel: '设置',
+      navLabelKey: 'navigation.workspace.settings',
       navIconCategory: SvgIconCategory.NAV,
       navIcon: 'user-settings',
       navActiveIcon: 'user-settings-active',
@@ -221,7 +221,7 @@ const adminRouteChildren = [
     name: ADMIN_ROUTE_ENTRY_NAME,
     component: () => import('@/views/admin/pages/overview'),
     meta: {
-      navLabel: '概览',
+      navLabelKey: 'navigation.admin.overview',
       navIconCategory: SvgIconCategory.NAV,
       navIcon: 'overview',
       navActiveIcon: 'overview-active',
@@ -232,7 +232,7 @@ const adminRouteChildren = [
     name: 'admin-users',
     component: () => import('@/views/admin/pages/users'),
     meta: {
-      navLabel: '用户',
+      navLabelKey: 'navigation.admin.users',
       navIconCategory: SvgIconCategory.NAV,
       navIcon: 'users',
       navActiveIcon: 'users-active',
@@ -243,7 +243,7 @@ const adminRouteChildren = [
     name: 'admin-email',
     component: () => import('@/views/admin/pages/email'),
     meta: {
-      navLabel: '邮件',
+      navLabelKey: 'navigation.admin.email',
       navIconCategory: SvgIconCategory.NAV,
       navIcon: 'email',
       navActiveIcon: 'email-active',
@@ -254,7 +254,7 @@ const adminRouteChildren = [
     name: 'admin-notifications',
     component: () => import('@/views/admin/pages/notifications'),
     meta: {
-      navLabel: '站内信',
+      navLabelKey: 'navigation.admin.notifications',
       navIconCategory: SvgIconCategory.NAV,
       navIcon: 'notifications',
       navActiveIcon: 'notifications-active',
@@ -265,7 +265,7 @@ const adminRouteChildren = [
     name: 'admin-providers',
     component: () => import('@/views/admin/pages/providers'),
     meta: {
-      navLabel: '服务商',
+      navLabelKey: 'navigation.admin.providers',
       navIconCategory: SvgIconCategory.NAV,
       navIcon: 'model-providers',
       navActiveIcon: 'model-providers-active',
@@ -276,7 +276,7 @@ const adminRouteChildren = [
     name: 'admin-audit',
     component: () => import('@/views/admin/pages/audit'),
     meta: {
-      navLabel: '审计',
+      navLabelKey: 'navigation.admin.audit',
       navIconCategory: SvgIconCategory.NAV,
       navIcon: 'audit',
       navActiveIcon: 'audit-active',
@@ -284,9 +284,9 @@ const adminRouteChildren = [
   },
 ] satisfies RouteRecordRaw[]
 
-export const adminNavigationItems: SidebarPanelItem[] = createNavigationItems(adminRouteChildren)
+export const adminNavigationItems: NavigationItemDefinition[] = createNavigationItems(adminRouteChildren)
 
-export const workspaceNavigationItems: SidebarPanelItem[] = createNavigationItems(workspaceRouteChildren)
+export const workspaceNavigationItems: NavigationItemDefinition[] = createNavigationItems(workspaceRouteChildren)
 
 export const protectedRoutes: RouteRecordRaw[] = [
   {
@@ -329,18 +329,27 @@ export const adminRoute: RouteRecordRaw = {
   children: adminRouteChildren,
 }
 
-function createNavigationItems(routes: RouteRecordRaw[]): SidebarPanelItem[] {
+export interface NavigationItemDefinition {
+  name: PropertyKey
+  labelKey: string
+  to: RouteLocationRaw
+  iconCategory: SvgIconCategory | SvgIconCategoryValue
+  icon: string
+  activeIcon?: string
+}
+
+function createNavigationItems(routes: RouteRecordRaw[]): NavigationItemDefinition[] {
   return routes.flatMap((route) => {
     const routeMeta = route.meta
 
-    if (!route.name || !routeMeta?.navLabel || !routeMeta.navIconCategory || !routeMeta.navIcon) {
+    if (!route.name || !routeMeta?.navLabelKey || !routeMeta.navIconCategory || !routeMeta.navIcon) {
       return []
     }
 
     return [{
       name: route.name,
       to: { name: route.name },
-      label: routeMeta.navLabel,
+      labelKey: routeMeta.navLabelKey,
       iconCategory: routeMeta.navIconCategory,
       icon: routeMeta.navIcon,
       activeIcon: routeMeta.navActiveIcon,

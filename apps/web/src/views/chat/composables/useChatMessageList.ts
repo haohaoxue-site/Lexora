@@ -7,6 +7,7 @@ import type {
 } from '@/components/chat-composer/typing'
 import { useClipboard } from '@vueuse/core'
 import { computed, shallowRef, toValue, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { createEmptyChatComposerContentJSON } from '@/components/chat-composer/serialization'
 import { SvgIconCategory } from '@/components/svg-icon/typing'
 import { getMessageText } from '@/composables/chat/utils/chat-message-display'
@@ -16,13 +17,13 @@ import { useChatRuntimeOverlay } from './useChatRuntimeOverlay'
 import { useChatStream } from './useChatStream'
 
 const EDIT_HIGHLIGHT_DURATION_MS = 1400
-const DEFAULT_ASSISTANT_NAME = '小助手'
 
 export interface UseChatMessageListOptions {
   isReadonly?: MaybeRefOrGetter<boolean>
 }
 
 export function useChatMessageList(options: UseChatMessageListOptions = {}) {
+  const { t } = useI18n({ useScope: 'global' })
   const {
     composerModelSelectionKind,
     composerSelectedModelRef,
@@ -54,7 +55,7 @@ export function useChatMessageList(options: UseChatMessageListOptions = {}) {
 
   const messages = computed<ChatMessage[]>(() => renderSession.value?.messages ?? [])
   const listKey = computed(() => renderSession.value?.id ?? null)
-  const assistantName = computed(() => renderSession.value?.agentProfile?.name?.trim() || DEFAULT_ASSISTANT_NAME)
+  const assistantName = computed(() => renderSession.value?.agentProfile?.name?.trim() || t('chat.messageList.assistantName'))
   const emptyIconStateClass = computed(() => isConfigured.value ? 'configured' : 'idle')
   const emptyIcon = computed(() => isConfigured.value
     ? {
@@ -79,12 +80,12 @@ export function useChatMessageList(options: UseChatMessageListOptions = {}) {
   async function copyMessage(message: ChatMessage) {
     const text = getMessageText(message)
     if (!text) {
-      ElMessage.warning('没有可复制的内容')
+      ElMessage.warning(t('chat.messageList.noCopyContent'))
       return
     }
 
     if (!isClipboardSupported.value) {
-      ElMessage.error('当前环境不支持复制')
+      ElMessage.error(t('chat.messageList.copyUnsupported'))
       return
     }
 
@@ -93,7 +94,7 @@ export function useChatMessageList(options: UseChatMessageListOptions = {}) {
       copiedMessageId.value = message.id
     }
     catch {
-      ElMessage.error('复制失败')
+      ElMessage.error(t('chat.messageList.copyFailed'))
     }
   }
 
@@ -142,7 +143,7 @@ export function useChatMessageList(options: UseChatMessageListOptions = {}) {
   }
 
   function handleEditPlaceholderUpload() {
-    ElMessage.info('文件上传入口待接入')
+    ElMessage.info(t('chat.messageList.uploadPending'))
   }
 
   async function retryAssistantMessage(message: ChatMessage) {

@@ -3,6 +3,7 @@ import type { FormInstance } from 'element-plus'
 import type { SystemEmailProvider } from '@/apis/system-admin'
 import { Promotion } from '@element-plus/icons-vue'
 import { computed, useTemplateRef } from 'vue'
+import { useI18n } from 'vue-i18n'
 import PagePanel from '@/layouts/panels/page-panel'
 import { formatDateTime } from '@/utils/dayjs'
 import AdminPageHeader from '../../components/page-header'
@@ -10,6 +11,7 @@ import { useAdminEmail } from '../../composables/useAdminEmail'
 
 const emailConfigFormRef = useTemplateRef<FormInstance>('emailConfigFormRef')
 const testEmailFormRef = useTemplateRef<FormInstance>('testEmailFormRef')
+const { t } = useI18n({ useScope: 'global' })
 const {
   closeTestDialog,
   currentConfig,
@@ -74,18 +76,18 @@ const canSendTestEmail = computed(() => {
 
 const testEmailTooltip = computed(() => {
   return canSendTestEmail.value
-    ? '使用当前已保存配置发送测试邮件，不受服务开关影响。'
-    : '请先保存完整 SMTP 配置和发件密码。'
+    ? t('admin.email.testCanSend')
+    : t('admin.email.testNeedConfig')
 })
 
 const lastTestPrimaryText = computed(() => {
   const lastTest = currentConfig.value?.lastTest
 
   if (!lastTest) {
-    return '尚未测试'
+    return t('admin.email.lastTestNever')
   }
 
-  return `${lastTest.succeeded ? '成功' : '失败'} · ${formatDateTime(lastTest.testedAt)}`
+  return `${lastTest.succeeded ? t('admin.email.lastTestSucceeded') : t('admin.email.lastTestFailed')} · ${formatDateTime(lastTest.testedAt)}`
 })
 
 const lastTestSecondaryText = computed(() => {
@@ -100,7 +102,7 @@ const lastTestSecondaryText = computed(() => {
   }
 
   if (!lastTest.succeeded && lastTest.recipientEmail.trim()) {
-    return `收件邮箱：${lastTest.recipientEmail}`
+    return t('admin.email.lastTestRecipient', { email: lastTest.recipientEmail })
   }
 
   return ''
@@ -122,7 +124,7 @@ function handleProviderChange(value: string | number | boolean | undefined) {
 <template>
   <PagePanel>
     <template #header>
-      <AdminPageHeader title="邮件" />
+      <AdminPageHeader :title="t('admin.pages.email')" />
     </template>
 
     <div v-loading="isLoading" class="admin-email min-h-full bg-fill-lighter p-4 lg:p-6">
@@ -133,7 +135,7 @@ function handleProviderChange(value: string | number | boolean | undefined) {
           <ElCard shadow="never" class="admin-email__main-card">
             <div class="admin-email__section">
               <h2 class="admin-email__section-title m-0 text-base font-bold leading-6 text-main">
-                SMTP 配置
+                {{ t('admin.email.smtpConfig') }}
               </h2>
 
               <ElRadioGroup
@@ -174,15 +176,15 @@ function handleProviderChange(value: string | number | boolean | undefined) {
                   <ElFormItem label="SMTP Host" prop="smtpHost">
                     <ElInput v-model="form.smtpHost" placeholder="smtp.exmail.qq.com" />
                   </ElFormItem>
-                  <ElFormItem label="端口" prop="smtpPort">
+                  <ElFormItem :label="t('admin.email.port')" prop="smtpPort">
                     <ElInputNumber v-model="form.smtpPort" :min="1" :max="65535" controls-position="right" class="w-full" />
                   </ElFormItem>
-                  <ElFormItem label="发件账号" prop="smtpUsername">
+                  <ElFormItem :label="t('admin.email.username')" prop="smtpUsername">
                     <ElInput v-model="form.smtpUsername" autocomplete="username" />
                   </ElFormItem>
-                  <ElFormItem label="发件密码" prop="smtpPassword">
+                  <ElFormItem :label="t('admin.email.password')" prop="smtpPassword">
                     <ElButton v-if="hasSavedPassword && !isEditingPassword" plain type="primary" class="w-full" @click="handleStartPasswordEdit">
-                      更换密码
+                      {{ t('admin.email.changePassword') }}
                     </ElButton>
                     <div v-else class="flex w-full items-start gap-3">
                       <ElInput
@@ -191,7 +193,7 @@ function handleProviderChange(value: string | number | boolean | undefined) {
                         type="password"
                         show-password
                         autocomplete="new-password"
-                        :placeholder="hasSavedPassword ? '输入新的发件密码' : '请输入发件密码'"
+                        :placeholder="hasSavedPassword ? t('admin.email.passwordUpdatePlaceholder') : t('admin.email.passwordPlaceholder')"
                       />
                       <ElButton
                         v-if="hasSavedPassword && isEditingPassword"
@@ -199,27 +201,27 @@ function handleProviderChange(value: string | number | boolean | undefined) {
                         class="shrink-0 self-center"
                         @click="handleKeepSavedPassword"
                       >
-                        取消更换
+                        {{ t('admin.email.keepPassword') }}
                       </ElButton>
                     </div>
                   </ElFormItem>
-                  <ElFormItem label="发件人名称" prop="fromName">
+                  <ElFormItem :label="t('admin.email.fromName')" prop="fromName">
                     <ElInput v-model="form.fromName" />
                   </ElFormItem>
-                  <ElFormItem label="发件邮箱" prop="fromEmail">
+                  <ElFormItem :label="t('admin.email.fromEmail')" prop="fromEmail">
                     <ElInput v-model="form.fromEmail" autocomplete="email" />
                   </ElFormItem>
                 </div>
 
                 <ElFormItem prop="smtpSecure">
                   <ElCheckbox v-model="form.smtpSecure">
-                    使用 SSL / TLS 加密连接
+                    {{ t('admin.email.secure') }}
                   </ElCheckbox>
                 </ElFormItem>
 
                 <div class="admin-email__form-actions flex justify-start pt-1">
                   <ElButton type="primary" :loading="isSaving" native-type="submit">
-                    {{ isSaving ? '保存中...' : '保存发件配置' }}
+                    {{ isSaving ? t('admin.email.saving') : t('admin.email.save') }}
                   </ElButton>
                 </div>
               </ElForm>
@@ -234,10 +236,10 @@ function handleProviderChange(value: string | number | boolean | undefined) {
             <div class="admin-email__side-header flex flex-wrap items-start justify-between gap-4">
               <div class="min-w-0">
                 <h2 class="admin-email__section-title m-0 text-base font-bold leading-6 text-main">
-                  邮件服务
+                  {{ t('admin.email.service') }}
                 </h2>
                 <p class="admin-email__section-description mt-1.5 text-[13px] leading-[1.7] text-secondary">
-                  当前发件身份：{{ senderIdentityText }}
+                  {{ t('admin.email.currentSender', { identity: senderIdentityText }) }}
                 </p>
               </div>
               <div class="admin-email__status-actions inline-flex items-center gap-2.5">
@@ -266,7 +268,7 @@ function handleProviderChange(value: string | number | boolean | undefined) {
             <ElDivider class="admin-email__side-divider !m-0" />
 
             <div class="admin-email__side-block flex flex-col gap-1">
-              <span class="admin-email__side-label text-xs font-semibold leading-[1.6] text-secondary">最近一次测试</span>
+              <span class="admin-email__side-label text-xs font-semibold leading-[1.6] text-secondary">{{ t('admin.email.lastTest') }}</span>
               <span class="admin-email__last-test-primary text-sm font-bold leading-[1.6] text-main">{{ lastTestPrimaryText }}</span>
               <p v-if="lastTestSecondaryText" class="admin-email__last-test-secondary m-0 text-xs leading-[1.6] text-secondary">
                 {{ lastTestSecondaryText }}
@@ -277,7 +279,7 @@ function handleProviderChange(value: string | number | boolean | undefined) {
 
         <ElDialog
           v-model="isTestDialogVisible"
-          title="发送测试邮件"
+          :title="t('admin.email.testTitle')"
           width="32rem"
           destroy-on-close
           @close="closeTestDialog"
@@ -289,11 +291,11 @@ function handleProviderChange(value: string | number | boolean | undefined) {
             label-position="top"
             @submit.prevent="handleSendTestEmail"
           >
-            <ElFormItem label="收件邮箱" prop="email">
+            <ElFormItem :label="t('admin.email.testRecipient')" prop="email">
               <ElInput
                 v-model="testEmailForm.email"
                 autocomplete="email"
-                placeholder="请输入收件邮箱"
+                :placeholder="t('admin.email.testRecipientPlaceholder')"
               />
             </ElFormItem>
           </ElForm>
@@ -301,10 +303,10 @@ function handleProviderChange(value: string | number | boolean | undefined) {
           <template #footer>
             <div class="flex justify-end gap-3">
               <ElButton @click="closeTestDialog">
-                取消
+                {{ t('admin.common.cancel') }}
               </ElButton>
               <ElButton type="primary" :loading="isTesting" @click="handleSendTestEmail">
-                {{ isTesting ? '发送中...' : '发送' }}
+                {{ isTesting ? t('admin.email.testSending') : t('admin.email.testSend') }}
               </ElButton>
             </div>
           </template>

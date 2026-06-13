@@ -38,6 +38,7 @@ export function resolveBudgetForState(
     systemPrompt: createAgentSystemPrompt({
       agentProfileConfig: context?.agentProfileConfig,
       skillContext: context?.skillContext,
+      defaultResponseLanguage: context?.defaultResponseLanguage ?? undefined,
     }),
     contextSnapshots: context?.contextSnapshots ?? [],
     memoryPrompt: createAgentMemoryPromptBlock(state.memoryRetrieval),

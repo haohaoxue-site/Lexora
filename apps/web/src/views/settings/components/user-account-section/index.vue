@@ -2,6 +2,7 @@
 import type { FormInstance } from 'element-plus'
 import type { UserAccountSectionEmits, UserAccountSectionProps } from './typing'
 import { useTemplateRef } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useUserAccountSection } from '../../composables/useUserAccountSection'
 import UserSettingsSectionHeader from '../section-header'
 
@@ -12,6 +13,7 @@ const codeModel = defineModel<string>('code', { required: true })
 const newPasswordModel = defineModel<string>('newPassword', { required: true })
 const confirmPasswordModel = defineModel<string>('confirmPassword', { required: true })
 const emailFormRef = useTemplateRef<FormInstance>('emailFormRef')
+const { t } = useI18n({ useScope: 'global' })
 const {
   clearEmailValidation,
   emailButtonText,
@@ -48,23 +50,23 @@ defineExpose({
 <template>
   <ElCard shadow="never" class="user-account-section">
     <UserSettingsSectionHeader
-      title="账户绑定"
+      :title="t('settings.user.account.title')"
       :description="sectionDescription"
     />
 
     <div v-if="showEmailStatus" class="mb-5 grid gap-3 md:grid-cols-2">
       <div class="user-account-section__status-card flex flex-col gap-[0.375rem] rounded-[1rem] p-4">
-        <span class="text-xs text-secondary">当前邮箱</span>
-        <strong class="text-base text-main">{{ props.account.email || '未绑定' }}</strong>
+        <span class="text-xs text-secondary">{{ t('settings.user.account.currentEmail') }}</span>
+        <strong class="text-base text-main">{{ props.account.email || t('settings.user.account.notBound') }}</strong>
         <span class="text-xs leading-6 text-secondary">
-          {{ props.account.emailVerified ? '邮箱已验证，可用于密码登录。' : '绑定邮箱后将通过验证码完成验证。' }}
+          {{ props.account.emailVerified ? t('settings.user.account.emailVerified') : t('settings.user.account.verifiedAfterBinding') }}
         </span>
       </div>
       <div class="user-account-section__status-card flex flex-col gap-[0.375rem] rounded-[1rem] p-4">
-        <span class="text-xs text-secondary">密码登录</span>
-        <strong class="text-base text-main">{{ props.account.hasPasswordAuth ? '已启用' : '未启用' }}</strong>
+        <span class="text-xs text-secondary">{{ t('settings.user.account.password') }}</span>
+        <strong class="text-base text-main">{{ props.account.hasPasswordAuth ? t('settings.user.account.passwordEnabled') : t('settings.user.account.passwordNotEnabled') }}</strong>
         <span class="text-xs leading-6 text-secondary">
-          {{ props.account.hasPasswordAuth ? '邮箱登录方式可继续使用。' : '完成设置后即可使用邮箱登录。' }}
+          {{ props.account.hasPasswordAuth ? t('settings.user.account.emailLoginAvailable') : t('settings.user.account.enableAfterSetup') }}
         </span>
       </div>
     </div>
@@ -79,20 +81,20 @@ defineExpose({
       @submit.prevent="handleConfirmEmail"
     >
       <div class="grid gap-4 md:grid-cols-2">
-        <ElFormItem label="邮箱" prop="email">
-          <ElInput v-model="form.email" autocomplete="email" placeholder="请输入需要绑定的邮箱地址" />
+        <ElFormItem :label="t('settings.user.account.email')" prop="email">
+          <ElInput v-model="form.email" autocomplete="email" :placeholder="t('settings.user.account.emailInputPlaceholder')" />
         </ElFormItem>
-        <ElFormItem label="验证码" prop="code">
+        <ElFormItem :label="t('settings.user.account.code')" prop="code">
           <div class="grid w-full grid-cols-[minmax(0,1fr)_auto] gap-3">
             <ElInput
               v-model="form.code"
               maxlength="6"
               inputmode="numeric"
               autocomplete="one-time-code"
-              placeholder="请输入 6 位验证码"
+              :placeholder="t('settings.user.account.codePlaceholder')"
             />
             <ElButton :disabled="isSendCodeDisabled" :loading="props.isSendingCode" @click="handleSendCode">
-              {{ props.isSendingCode ? '发送中...' : '发送验证码' }}
+              {{ props.isSendingCode ? t('settings.user.account.sendingCode') : t('settings.user.account.sendCode') }}
             </ElButton>
           </div>
         </ElFormItem>
@@ -100,29 +102,29 @@ defineExpose({
 
       <template v-if="requiresPasswordSetup">
         <div class="grid gap-4 md:grid-cols-2">
-          <ElFormItem label="登录密码" prop="newPassword">
+          <ElFormItem :label="t('settings.user.account.password')" prop="newPassword">
             <ElInput
               v-model="form.newPassword"
               type="password"
               show-password
               autocomplete="new-password"
-              placeholder="设置登录密码"
+              :placeholder="t('settings.user.account.passwordPlaceholder')"
             />
           </ElFormItem>
-          <ElFormItem label="确认登录密码" prop="confirmPassword">
+          <ElFormItem :label="t('settings.user.account.confirmPassword')" prop="confirmPassword">
             <ElInput
               v-model="form.confirmPassword"
               type="password"
               show-password
               autocomplete="new-password"
-              placeholder="再次输入登录密码"
+              :placeholder="t('settings.user.account.repeatPasswordPlaceholder')"
             />
           </ElFormItem>
         </div>
       </template>
 
       <ElButton type="primary" :disabled="isConfirmEmailDisabled" :loading="props.isBindingEmail" native-type="submit">
-        {{ props.isBindingEmail ? '提交中...' : emailButtonText }}
+        {{ props.isBindingEmail ? t('settings.user.account.submitLoading') : emailButtonText }}
       </ElButton>
     </ElForm>
 
@@ -147,7 +149,7 @@ defineExpose({
               {{ row.title }}
             </div>
             <div class="mt-1 text-[0.8125rem] text-secondary">
-              {{ row.connected ? `已绑定 ${row.username || '已授权账号'}` : row.canStartBinding ? '未绑定' : '系统已关闭绑定入口' }}
+              {{ row.connected ? t('settings.user.account.providerConnected', { account: row.username || t('settings.user.account.boundAccount') }) : row.canStartBinding ? t('settings.user.account.providerNotBound') : t('settings.user.account.providerDisabled') }}
             </div>
           </div>
         </div>
@@ -159,7 +161,7 @@ defineExpose({
             :disabled="!row.canStartBinding"
             @click="handleStartOauthBinding(row.provider)"
           >
-            {{ row.canStartBinding ? '立即绑定' : '已关闭' }}
+            {{ row.canStartBinding ? t('settings.user.account.bind') : t('settings.user.account.providerClosed') }}
           </ElButton>
           <ElButton
             v-else
@@ -169,7 +171,7 @@ defineExpose({
             :loading="props.disconnectingProvider === row.provider"
             @click="handleDisconnect(row.provider)"
           >
-            解绑
+            {{ t('settings.user.account.disconnect') }}
           </ElButton>
         </div>
       </div>

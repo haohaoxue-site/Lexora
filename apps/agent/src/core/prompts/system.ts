@@ -1,10 +1,12 @@
 import type {
   AgentProfileConfig,
   AgentRuntimeSkillContext,
+  ResolvedLanguagePreference,
 } from '@haohaoxue/samepage-contracts'
+import { LANGUAGE_PREFERENCE, LANGUAGE_PREFERENCE_LABELS } from '@haohaoxue/samepage-contracts/user/constants'
 import { createSkillCatalogPromptBlock } from '../skills/runtime'
 
-export const BASE_AGENT_SYSTEM_PROMPT = '你是 SamePage 的智能助手。回答准确、简洁，默认使用中文。'
+export const BASE_AGENT_SYSTEM_PROMPT = '你是 SamePage 的智能助手。回答准确、简洁。'
 
 const AGENT_HISTORY_DIGEST_PROMPT_PREFIX = '较早对话摘要：'
 
@@ -13,6 +15,7 @@ export interface CreateAgentSystemPromptOptions {
   historyDigestSummary?: string
   agentProfileConfig?: AgentProfileConfig | null
   skillContext?: AgentRuntimeSkillContext | null
+  defaultResponseLanguage?: ResolvedLanguagePreference
 }
 
 export function createAgentSystemPrompt(input: string | CreateAgentSystemPromptOptions): string {
@@ -21,6 +24,10 @@ export function createAgentSystemPrompt(input: string | CreateAgentSystemPromptO
     : input
   const lines = [BASE_AGENT_SYSTEM_PROMPT]
   const profileConfig = options.agentProfileConfig
+
+  lines.push(createDefaultResponseLanguageInstruction(
+    options.defaultResponseLanguage ?? LANGUAGE_PREFERENCE.ZH_CN,
+  ))
 
   if (profileConfig) {
     lines.push('Agent 指令：', profileConfig.instructions.systemPrompt)
@@ -53,4 +60,8 @@ export function createAgentSystemPrompt(input: string | CreateAgentSystemPromptO
   }
 
   return lines.join('\n')
+}
+
+function createDefaultResponseLanguageInstruction(language: ResolvedLanguagePreference): string {
+  return `默认回复语言：${LANGUAGE_PREFERENCE_LABELS[language]}。`
 }

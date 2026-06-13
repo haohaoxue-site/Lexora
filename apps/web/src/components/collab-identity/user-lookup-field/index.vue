@@ -4,20 +4,21 @@ import type {
   CollabUserLookupFieldProps,
 } from './typing'
 import { computed, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useCollabUserLookup } from '@/composables/useCollabUserLookup'
 import CollabIdentityItem from '../identity-item'
 
 const props = withDefaults(defineProps<CollabUserLookupFieldProps>(), {
-  placeholder: '请输入完整协作码，例如 SP-ABC2345',
-  lookupButtonText: '查找',
-  selfTargetMessage: '不能选择自己',
   disabled: false,
 })
 const emits = defineEmits<CollabUserLookupFieldEmits>()
+const { t } = useI18n()
 const code = defineModel<string>('code', {
   default: '',
 })
 const hasLookupCode = computed(() => code.value.trim().length > 0)
+const placeholder = computed(() => props.placeholder ?? t('docs.collaboration.lookupPlaceholder'))
+const lookupButtonText = computed(() => props.lookupButtonText ?? t('docs.collaboration.lookup'))
 
 const {
   isLookingUpUser,
@@ -71,7 +72,7 @@ async function handleLookup() {
         v-model="code"
         class="min-w-0 flex-1"
         :disabled="props.disabled"
-        :placeholder="props.placeholder"
+        :placeholder="placeholder"
         @keydown.enter.prevent="handleLookup"
       />
 
@@ -82,7 +83,7 @@ async function handleLookup() {
         :loading="isLookingUpUser"
         @click="handleLookup"
       >
-        {{ props.lookupButtonText }}
+        {{ lookupButtonText }}
       </ElButton>
     </div>
 

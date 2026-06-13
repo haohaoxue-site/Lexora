@@ -19,6 +19,7 @@ import type {
 } from '@/apis/ai'
 import { AI_PROVIDER_SCOPE } from '@haohaoxue/samepage-contracts/ai/constants'
 import { computed, shallowRef, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import {
   getAvailableAiProviderModels,
   getAvailableAiProviders,
@@ -28,7 +29,6 @@ import { getRequestErrorDisplayMessage } from '@/utils/request-error'
 
 const componentProps = withDefaults(defineProps<ModelCascaderProps>(), {
   modelValue: null,
-  placeholder: '选择模型',
   disabled: false,
   clearable: true,
   filterable: false,
@@ -37,6 +37,7 @@ const componentProps = withDefaults(defineProps<ModelCascaderProps>(), {
   hideUnavailable: false,
 })
 const emits = defineEmits<ModelCascaderEmits>()
+const { t } = useI18n({ useScope: 'global' })
 const VALUE_SEPARATOR = ':'
 const SCOPE_VALUE_PREFIX = 'scope'
 const PROVIDER_VALUE_PREFIX = 'provider'
@@ -110,7 +111,7 @@ async function loadNode(
   }
   catch (error) {
     reject()
-    ElMessage.error(getRequestErrorDisplayMessage(error, '加载模型列表失败'))
+    ElMessage.error(getRequestErrorDisplayMessage(error, t('modelCascader.loadFailed')))
   }
 }
 
@@ -199,7 +200,7 @@ async function loadSelectedModelRefOptions() {
     }
   }
   catch (error) {
-    ElMessage.error(getRequestErrorDisplayMessage(error, '加载模型列表失败'))
+    ElMessage.error(getRequestErrorDisplayMessage(error, t('modelCascader.loadFailed')))
   }
 }
 
@@ -384,7 +385,7 @@ function isAllowedScope(scope: AiProviderScope) {
 }
 
 function getScopeLabel(scope: AiProviderScope) {
-  return scope === AI_PROVIDER_SCOPE.PLATFORM ? '平台' : '个人'
+  return scope === AI_PROVIDER_SCOPE.PLATFORM ? t('modelCascader.scope.platform') : t('modelCascader.scope.user')
 }
 
 function getNodeValue(node: CascaderNode) {
@@ -403,7 +404,7 @@ function getUnavailableReason(data: CascaderOption) {
     v-model="selectedPath"
     class="model-cascader w-full"
     :props="cascaderProps"
-    :placeholder="componentProps.placeholder"
+    :placeholder="componentProps.placeholder ?? t('modelCascader.placeholder')"
     :disabled="componentProps.disabled"
     :clearable="componentProps.clearable"
     :filterable="componentProps.filterable"

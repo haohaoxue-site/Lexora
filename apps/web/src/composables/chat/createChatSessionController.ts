@@ -2,6 +2,7 @@ import type { ChatApi } from './createChatApi'
 import type { ChatSessionSummaryPatch } from './utils/chat-session-summary'
 import type { ChatSessionDetail, ChatSessionSummary } from '@/apis/chat'
 import { shallowReactive, shallowRef, toRef } from 'vue'
+import { translate } from '@/i18n'
 import { ElMessage } from '@/utils/element-plus'
 import { getRequestErrorDisplayMessage } from '@/utils/request-error'
 import {
@@ -72,7 +73,7 @@ export function createChatSessionController(
       await selectSession(nextActiveSessionId)
     }
     catch (error) {
-      ElMessage.error(getRequestErrorDisplayMessage(error, '加载聊天会话失败'))
+      ElMessage.error(getRequestErrorDisplayMessage(error, translate('chat.errors.loadSession')))
     }
     finally {
       isLoadingSessions.value = false
@@ -88,7 +89,7 @@ export function createChatSessionController(
       return session
     }
     catch (error) {
-      ElMessage.error(getRequestErrorDisplayMessage(error, '创建聊天会话失败'))
+      ElMessage.error(getRequestErrorDisplayMessage(error, translate('chat.errors.createSession')))
       return null
     }
   }
@@ -155,7 +156,7 @@ export function createChatSessionController(
     catch (error) {
       clearActiveChatSessionSnapshot(snapshotState)
       forgetActiveSession(id)
-      ElMessage.error(getRequestErrorDisplayMessage(error, '加载聊天会话失败'))
+      ElMessage.error(getRequestErrorDisplayMessage(error, translate('chat.errors.loadSession')))
       return false
     }
   }
@@ -186,7 +187,7 @@ export function createChatSessionController(
       return await selectSession(nextSession.id) ? nextSession.id : null
     }
     catch (error) {
-      ElMessage.error(getRequestErrorDisplayMessage(error, '删除聊天会话失败'))
+      ElMessage.error(getRequestErrorDisplayMessage(error, translate('chat.errors.deleteSession')))
       return activeSessionId.value
     }
   }
@@ -232,7 +233,7 @@ export function createChatSessionController(
       }
     }
     catch (error) {
-      ElMessage.error(getRequestErrorDisplayMessage(error, '批量删除聊天会话失败'))
+      ElMessage.error(getRequestErrorDisplayMessage(error, translate('chat.errors.batchDeleteSessions')))
       return {
         nextActiveSessionId: activeSessionId.value,
         deletedSessionIds: [],
@@ -244,7 +245,7 @@ export function createChatSessionController(
     const nextTitle = title.trim()
 
     if (!nextTitle) {
-      ElMessage.warning('请输入对话名称')
+      ElMessage.warning(translate('chat.session.renameRequired'))
       return false
     }
 
@@ -263,11 +264,11 @@ export function createChatSessionController(
         })
       }
 
-      ElMessage.success('对话已重命名')
+      ElMessage.success(translate('chat.session.renamed'))
       return true
     }
     catch (error) {
-      ElMessage.error(getRequestErrorDisplayMessage(error, '重命名聊天会话失败'))
+      ElMessage.error(getRequestErrorDisplayMessage(error, translate('chat.errors.renameSession')))
       return false
     }
   }
@@ -289,7 +290,7 @@ export function createChatSessionController(
       return session
     }
     catch (error) {
-      ElMessage.error(getRequestErrorDisplayMessage(error, '刷新聊天详情失败'))
+      ElMessage.error(getRequestErrorDisplayMessage(error, translate('chat.errors.loadSession')))
       return null
     }
   }

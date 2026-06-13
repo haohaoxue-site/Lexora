@@ -6,13 +6,14 @@ import type {
   SystemAdminUserRoleFilter,
   SystemAdminUserStatus,
 } from '@/apis/system-admin'
+import { AUTH_METHOD } from '@haohaoxue/samepage-contracts/auth/constants'
 import {
   SYSTEM_ADMIN_USER_ROLE_FILTER,
-  SYSTEM_ADMIN_USER_ROLE_FILTER_LABELS,
 } from '@haohaoxue/samepage-contracts/system-admin'
 import { USER_STATUS } from '@haohaoxue/samepage-contracts/user/constants'
 import { formatAuthMethod } from '@haohaoxue/samepage-shared/auth'
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { formatDateTime } from '@/utils/dayjs'
 import { useAdminUsers } from '../../composables/useAdminUsers'
 import UserDataExpansion from '../user-data-expansion'
@@ -36,28 +37,29 @@ const {
   userQuery,
   users,
 } = useAdminUsers()
+const { t } = useI18n({ useScope: 'global' })
 
-const statusColumnFilters = [
+const statusColumnFilters = computed<Array<{ text: string, value: SystemAdminUserStatus }>>(() => [
   {
-    text: '正常',
+    text: t('admin.users.active'),
     value: USER_STATUS.ACTIVE,
   },
   {
-    text: '已禁用',
+    text: t('admin.users.disabled'),
     value: USER_STATUS.DISABLED,
   },
-] satisfies Array<{ text: string, value: SystemAdminUserStatus }>
+])
 
-const roleColumnFilters = [
+const roleColumnFilters = computed<Array<{ text: string, value: SystemAdminUserRoleFilter }>>(() => [
   {
-    text: SYSTEM_ADMIN_USER_ROLE_FILTER_LABELS[SYSTEM_ADMIN_USER_ROLE_FILTER.SYSTEM_ADMIN],
+    text: t('admin.users.systemAdmin'),
     value: SYSTEM_ADMIN_USER_ROLE_FILTER.SYSTEM_ADMIN,
   },
   {
-    text: SYSTEM_ADMIN_USER_ROLE_FILTER_LABELS[SYSTEM_ADMIN_USER_ROLE_FILTER.REGULAR_USER],
+    text: t('admin.users.regularUser'),
     value: SYSTEM_ADMIN_USER_ROLE_FILTER.REGULAR_USER,
   },
-] satisfies Array<{ text: string, value: SystemAdminUserRoleFilter }>
+])
 
 const filteredStatusValues = computed(() => userQuery.status ? [userQuery.status] : [])
 const filteredRoleValues = computed(() => userQuery.role ? [userQuery.role] : [])
@@ -69,7 +71,7 @@ const tableHeaderCellStyle: CSSProperties = {
 
 function formatDate(value: string | null) {
   if (!value) {
-    return '暂无'
+    return t('admin.users.notAvailable')
   }
 
   return formatDateTime(value)
@@ -80,7 +82,11 @@ function getStatusStateClass(status: SystemAdminUserStatus) {
 }
 
 function getAdminRoleText(isSystemAdmin: boolean) {
-  return isSystemAdmin ? '系统管理员' : ''
+  return isSystemAdmin ? t('admin.users.systemAdmin') : ''
+}
+
+function formatAuthMethodLabel(method: Parameters<typeof formatAuthMethod>[0]) {
+  return method === AUTH_METHOD.PASSWORD ? t('admin.users.passwordAuth') : formatAuthMethod(method)
 }
 
 function resolveNextStatus(status: SystemAdminUserStatus): SystemAdminUserStatus {
@@ -120,14 +126,14 @@ function handleExpandChange(user: SystemAdminUserItem, expandedUsers: SystemAdmi
       <ElInput
         :model-value="keywordInput"
         clearable
-        placeholder="搜索名称、邮箱或协作码"
+        :placeholder="t('admin.users.search')"
         class="min-w-0 max-w-96"
         @update:model-value="updateKeyword"
         @keyup.enter="submitSearch"
       />
 
       <ElButton type="primary" :loading="isLoadingUsers" @click="submitSearch">
-        查询
+        {{ t('admin.users.searchSubmit') }}
       </ElButton>
     </div>
 
@@ -150,14 +156,14 @@ function handleExpandChange(user: SystemAdminUserItem, expandedUsers: SystemAdmi
         </template>
       </ElTableColumn>
 
-      <ElTableColumn label="用户信息" min-width="180" fixed>
+      <ElTableColumn :label="t('admin.users.userInfo')" min-width="180" fixed>
         <template #default="{ row }">
           <UserIdentityCell :user="row" />
         </template>
       </ElTableColumn>
 
       <ElTableColumn
-        label="账号状态"
+        :label="t('admin.users.status')"
         width="120" fixed
         column-key="status"
         :filters="statusColumnFilters"
@@ -168,24 +174,24 @@ function handleExpandChange(user: SystemAdminUserItem, expandedUsers: SystemAdmi
           <div class="user-table__status flex items-center gap-1.5">
             <div class="user-table__status-dot h-1.5 w-1.5 rounded-full" :class="getStatusStateClass(row.status)" />
             <span class="user-table__status-label text-xs font-medium" :class="getStatusStateClass(row.status)">
-              {{ row.status === USER_STATUS.ACTIVE ? '正常' : '已禁用' }}
+              {{ row.status === USER_STATUS.ACTIVE ? t('admin.users.active') : t('admin.users.disabled') }}
             </span>
           </div>
         </template>
       </ElTableColumn>
 
-      <ElTableColumn label="邮箱" min-width="220">
+      <ElTableColumn :label="t('admin.users.email')" min-width="220">
         <template #default="{ row }">
           <span v-if="row.email" class="text-xs text-secondary">
             {{ row.email }}
           </span>
           <span v-else class="text-xs text-placeholder">
-            未绑定
+            {{ t('admin.users.notBound') }}
           </span>
         </template>
       </ElTableColumn>
 
-      <ElTableColumn label="协作码" width="150">
+      <ElTableColumn :label="t('admin.users.collaborationCode')" width="150">
         <template #default="{ row }">
           <span class="font-mono text-xs font-medium text-secondary">
             {{ row.userCode }}
@@ -193,20 +199,20 @@ function handleExpandChange(user: SystemAdminUserItem, expandedUsers: SystemAdmi
         </template>
       </ElTableColumn>
 
-      <ElTableColumn label="创建时间" width="180">
+      <ElTableColumn :label="t('admin.users.createdAt')" width="180">
         <template #default="{ row }">
           <span class="text-xs text-secondary">{{ formatDate(row.createdAt) }}</span>
         </template>
       </ElTableColumn>
 
-      <ElTableColumn label="更新时间" width="180">
+      <ElTableColumn :label="t('admin.users.updatedAt')" width="180">
         <template #default="{ row }">
           <span class="text-xs text-secondary">{{ formatDate(row.updatedAt) }}</span>
         </template>
       </ElTableColumn>
 
       <ElTableColumn
-        label="后台权限"
+        :label="t('admin.users.role')"
         width="180"
         column-key="role"
         :filters="roleColumnFilters"
@@ -220,7 +226,7 @@ function handleExpandChange(user: SystemAdminUserItem, expandedUsers: SystemAdmi
         </template>
       </ElTableColumn>
 
-      <ElTableColumn label="登录方式" min-width="120">
+      <ElTableColumn :label="t('admin.users.authMethods')" min-width="120">
         <template #default="{ row }">
           <div class="user-table__auth-methods flex flex-wrap gap-1.5">
             <ElTag
@@ -230,13 +236,13 @@ function handleExpandChange(user: SystemAdminUserItem, expandedUsers: SystemAdmi
               effect="plain"
               class="rounded-md"
             >
-              {{ formatAuthMethod(method) }}
+              {{ formatAuthMethodLabel(method) }}
             </ElTag>
           </div>
         </template>
       </ElTableColumn>
 
-      <ElTableColumn label="操作" width="140" fixed="right">
+      <ElTableColumn :label="t('admin.common.operation')" width="140" fixed="right">
         <template #default="{ row }">
           <div class="user-table__actions flex min-h-6 items-center gap-2">
             <ElButton
@@ -246,7 +252,7 @@ function handleExpandChange(user: SystemAdminUserItem, expandedUsers: SystemAdmi
               :disabled="updatingUserId === row.id"
               @click="handleToggleStatus(row)"
             >
-              {{ row.status === USER_STATUS.ACTIVE ? '禁用' : '激活' }}
+              {{ row.status === USER_STATUS.ACTIVE ? t('admin.users.disable') : t('admin.users.activate') }}
             </ElButton>
           </div>
         </template>

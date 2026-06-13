@@ -9,6 +9,7 @@ import {
   RefreshRight,
 } from '@element-plus/icons-vue'
 import { computed, useTemplateRef } from 'vue'
+import { useI18n } from 'vue-i18n'
 import ChatAssistantAvatar from '@/components/chat-message/ChatAssistantAvatar.vue'
 import ChatUserMessageContent from '@/components/chat-message/ChatUserMessageContent.vue'
 import CopyStateIcon from '@/components/copy-state-icon/CopyStateIcon.vue'
@@ -35,6 +36,7 @@ type ChatMessageListItem = ChatMessageDayDividerItem | ChatMessageContentItem
 const props = withDefaults(defineProps<ChatMessageListProps>(), {
   isReadonly: false,
 })
+const { t } = useI18n({ useScope: 'global' })
 const scrollContainerRef = useTemplateRef<HTMLElement>('scrollContainerRef')
 const {
   assistantName,
@@ -68,19 +70,19 @@ const {
 const messageItems = computed<ChatMessageListItem[]>(() => createMessageListItems(messages.value))
 const emptyTitle = computed(() => {
   if (props.isReadonly) {
-    return 'Bot 对话只读展示'
+    return t('chat.messageList.emptyReadonlyTitle')
   }
 
-  return isConfigured.value ? '有什么可以帮助你的？' : '还不能开始对话'
+  return isConfigured.value ? t('chat.messageList.emptyConfiguredTitle') : t('chat.messageList.emptyUnconfiguredTitle')
 })
 const emptyDescription = computed(() => {
   if (props.isReadonly) {
-    return '等待聊天平台的新消息进入 SamePage'
+    return t('chat.messageList.emptyReadonlyDescription')
   }
 
   return isConfigured.value
-    ? '输入消息开始对话'
-    : '请先在右上角 Agent 设置选择默认模型，或检查服务商配置'
+    ? t('chat.messageList.emptyConfiguredDescription')
+    : t('chat.messageList.emptyUnconfiguredDescription')
 })
 const {
   handleScroll,
@@ -131,23 +133,23 @@ function createMessageListItems(sourceMessages: ChatMessage[]): ChatMessageListI
 function formatDayDividerLabel(value: string): string {
   const time = dayjs(value)
   if (!time.isValid()) {
-    return '较早'
+    return t('chat.messageList.older')
   }
 
   const today = dayjs()
   if (time.isSame(today, 'day')) {
-    return '今天'
+    return t('chat.messageList.today')
   }
 
   if (time.isSame(today.subtract(1, 'day'), 'day')) {
-    return '昨天'
+    return t('chat.messageList.yesterday')
   }
 
   if (time.isSame(today, 'year')) {
-    return time.format('M月D日 dddd')
+    return time.format(t('date.chatDayCurrentYear'))
   }
 
-  return time.format('YYYY年M月D日 dddd')
+  return time.format(t('date.chatDayFullYear'))
 }
 
 function formatMessageSentAt(value: string): string {
@@ -162,7 +164,7 @@ function formatMessageSentAt(value: string): string {
   }
 
   if (time.isSame(today.subtract(1, 'day'), 'day')) {
-    return `昨天 ${time.format('HH:mm')}`
+    return t('chat.messageList.yesterdayAt', { time: time.format('HH:mm') })
   }
 
   if (time.isSame(today, 'year')) {
@@ -238,19 +240,19 @@ function formatMessageSentAt(value: string): string {
               <ChatAssistantMessage :message="virtual.item.message" variant="global" :show-usage-summary="false" />
 
               <div class="chat-message-list__actions assistant flex items-center justify-start gap-1.5">
-                <ElTooltip content="复制回复" placement="bottom">
+                <ElTooltip :content="t('chat.messageList.copyReply')" placement="bottom">
                   <ElButton
                     text
                     class="chat-message-list__action-button chat-message-list__copy-action h-7 min-w-7 w-7 rounded-lg p-0"
                     :class="{ 'is-copied': isMessageCopied(virtual.item.message) }"
                     :disabled="!getMessageText(virtual.item.message)"
-                    :aria-label="isMessageCopied(virtual.item.message) ? '回复已复制' : '复制回复'"
+                    :aria-label="isMessageCopied(virtual.item.message) ? t('chat.messageList.replyCopied') : t('chat.messageList.copyReply')"
                     @click="copyMessage(virtual.item.message)"
                   >
                     <CopyStateIcon :copied="isMessageCopied(virtual.item.message)" />
                   </ElButton>
                 </ElTooltip>
-                <ElTooltip content="重试" placement="bottom">
+                <ElTooltip :content="t('chat.messageList.retry')" placement="bottom">
                   <ElButton
                     text
                     class="chat-message-list__action-button h-7 min-w-7 w-7 rounded-lg p-0"
@@ -307,7 +309,7 @@ function formatMessageSentAt(value: string): string {
                 />
                 <div class="chat-message-list__edit-actions mt-3 flex justify-end gap-2">
                   <ElButton round @click="cancelEditMessage">
-                    取消
+                    {{ t('chat.messageList.cancel') }}
                   </ElButton>
                 </div>
               </div>
@@ -317,18 +319,18 @@ function formatMessageSentAt(value: string): string {
                   <ChatUserMessageContent :message="virtual.item.message" />
                 </div>
                 <div class="chat-message-list__actions user flex items-center justify-end gap-1.5">
-                  <ElTooltip content="复制消息" placement="bottom">
+                  <ElTooltip :content="t('chat.messageList.copyMessage')" placement="bottom">
                     <ElButton
                       text
                       class="chat-message-list__action-button chat-message-list__copy-action h-7 min-w-7 w-7 rounded-lg p-0"
                       :class="{ 'is-copied': isMessageCopied(virtual.item.message) }"
-                      :aria-label="isMessageCopied(virtual.item.message) ? '消息已复制' : '复制消息'"
+                      :aria-label="isMessageCopied(virtual.item.message) ? t('chat.messageList.messageCopied') : t('chat.messageList.copyMessage')"
                       @click="copyMessage(virtual.item.message)"
                     >
                       <CopyStateIcon :copied="isMessageCopied(virtual.item.message)" />
                     </ElButton>
                   </ElTooltip>
-                  <ElTooltip content="编辑" placement="bottom">
+                  <ElTooltip :content="t('chat.messageList.edit')" placement="bottom">
                     <ElButton
                       text
                       class="chat-message-list__action-button h-7 min-w-7 w-7 rounded-lg p-0"

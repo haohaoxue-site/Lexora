@@ -15,6 +15,7 @@ import {
 import { EditorContent, useEditor } from '@tiptap/vue-3'
 import { nanoid } from 'nanoid'
 import { computed, onBeforeUnmount, shallowRef, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import {
   findDuplicatePanelAttachment,
   orderChatComposerAttachments,
@@ -39,6 +40,7 @@ const props = withDefaults(defineProps<ChatComposerProps>(), {
   translatorTargetLanguage: null,
 })
 const emits = defineEmits<ChatComposerEmits>()
+const { t } = useI18n({ useScope: 'global' })
 
 const pickerVisible = shallowRef(false)
 const pickerMode = shallowRef<'panel' | 'inline'>('panel')
@@ -58,8 +60,8 @@ const canSend = computed(() =>
 )
 const editorPlaceholder = computed(() =>
   props.translatorTargetLanguage
-    ? `输入要翻译为 ${props.translatorTargetLanguage.name} 的文本`
-    : '输入消息，Ctrl/⌘ + Enter 发送',
+    ? t('chat.composer.translatorPlaceholder', { language: props.translatorTargetLanguage.name })
+    : t('chat.composer.inputPlaceholder'),
 )
 
 const editor = useEditor({

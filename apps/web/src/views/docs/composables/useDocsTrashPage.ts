@@ -5,6 +5,7 @@ import {
   permanentlyDeleteDocument,
   restoreDocumentFromTrash,
 } from '@/apis/document'
+import { translate } from '@/i18n'
 import { useWorkspaceStore } from '@/stores/workspace'
 import { ElMessage, ElMessageBox } from '@/utils/element-plus'
 import { getRequestErrorDisplayMessage } from '@/utils/request-error'
@@ -63,7 +64,7 @@ export function useDocsTrashPage() {
       }
 
       items.value = []
-      errorMessage.value = getRequestErrorDisplayMessage(error, '回收站加载失败')
+      errorMessage.value = getRequestErrorDisplayMessage(error, translate('docs.trash.loadFailed'))
     }
     finally {
       if (requestId === loadRequestId) {
@@ -82,10 +83,10 @@ export function useDocsTrashPage() {
     try {
       await restoreDocumentFromTrash(documentId)
       items.value = items.value.filter(item => item.id !== documentId)
-      ElMessage.success('已恢复文档')
+      ElMessage.success(translate('docs.trash.restored'))
     }
     catch (error) {
-      ElMessage.error(getRequestErrorDisplayMessage(error, '恢复文档失败'))
+      ElMessage.error(getRequestErrorDisplayMessage(error, translate('docs.trash.restoreFailed')))
     }
     finally {
       if (actionItemId.value === documentId) {
@@ -101,12 +102,12 @@ export function useDocsTrashPage() {
 
     const targetItem = items.value.find(item => item.id === documentId)
     const confirmed = await ElMessageBox.confirm(
-      `将彻底删除「${targetItem?.title ?? '该文档'}」及其所有子文档，同时清理相关分享记录。`,
-      '彻底删除文档',
+      translate('docs.trash.deleteMessage', { title: targetItem?.title ?? translate('docs.deleteDialog.fallbackTitle') }),
+      translate('docs.trash.deleteTitle'),
       {
         type: 'warning',
-        confirmButtonText: '彻底删除',
-        cancelButtonText: '取消',
+        confirmButtonText: translate('docs.trash.deletePermanently'),
+        cancelButtonText: translate('docs.common.cancel'),
       },
     ).then(() => true).catch(() => false)
 
@@ -119,10 +120,10 @@ export function useDocsTrashPage() {
     try {
       await permanentlyDeleteDocument(documentId)
       items.value = items.value.filter(item => item.id !== documentId)
-      ElMessage.success('已彻底删除文档')
+      ElMessage.success(translate('docs.trash.deleteSuccess'))
     }
     catch (error) {
-      ElMessage.error(getRequestErrorDisplayMessage(error, '彻底删除文档失败'))
+      ElMessage.error(getRequestErrorDisplayMessage(error, translate('docs.trash.deleteFailed')))
     }
     finally {
       if (actionItemId.value === documentId) {

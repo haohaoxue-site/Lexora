@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, shallowRef } from 'vue'
+import { useI18n } from 'vue-i18n'
 import PagePanel from '@/layouts/panels/page-panel'
 import { getRequestErrorDisplayMessage } from '@/utils/request-error'
 import AuthGovernancePanel from '../../components/auth-governance-panel'
@@ -10,6 +11,7 @@ import { useAdminUsers } from '../../composables/useAdminUsers'
 
 const { errorMessage: usersErrorMessage, loadUsers } = useAdminUsers()
 const { errorMessage: governanceErrorMessage, loadGovernance } = useAdminAuthGovernance()
+const { t } = useI18n({ useScope: 'global' })
 
 const isLoading = shallowRef(false)
 const pageErrorMessage = shallowRef('')
@@ -34,7 +36,7 @@ async function loadData() {
     ])
   }
   catch (error) {
-    pageErrorMessage.value = getRequestErrorDisplayMessage(error, '加载用户管理数据失败')
+    pageErrorMessage.value = getRequestErrorDisplayMessage(error, t('admin.errors.loadUserManagement'))
   }
   finally {
     isLoading.value = false
@@ -45,7 +47,7 @@ async function loadData() {
 <template>
   <PagePanel>
     <template #header>
-      <AdminPageHeader title="用户" />
+      <AdminPageHeader :title="t('admin.pages.users')" />
     </template>
 
     <div v-loading="isLoading" class="admin-users min-h-full flex flex-col gap-6 bg-fill-lighter p-4 lg:p-6">

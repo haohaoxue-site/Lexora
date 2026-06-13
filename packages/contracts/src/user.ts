@@ -15,6 +15,7 @@ import { PermissionListSchema } from './rbac'
 import {
   ACCOUNT_DELETION_CONFIRMATION_PHRASE,
   APPEARANCE_PREFERENCE_VALUES,
+  LANGUAGE_PREFERENCE,
   LANGUAGE_PREFERENCE_VALUES,
   USER_STATUS_VALUES,
 } from './user/constants'
@@ -32,6 +33,10 @@ export {
 } from './user/constants'
 
 export const LanguagePreferenceSchema = z.enum(LANGUAGE_PREFERENCE_VALUES)
+export const ResolvedLanguagePreferenceSchema = z.enum([
+  LANGUAGE_PREFERENCE.ZH_CN,
+  LANGUAGE_PREFERENCE.EN_US,
+])
 export const AppearancePreferenceSchema = z.enum(APPEARANCE_PREFERENCE_VALUES)
 export const UserStatusSchema = z.enum(USER_STATUS_VALUES)
 
@@ -110,6 +115,7 @@ export const UserPermissionListSchema = PermissionListSchema
 export type UserStatus = z.infer<typeof UserStatusSchema>
 export type LanguagePreference = z.infer<typeof LanguagePreferenceSchema>
 export type AppearancePreference = z.infer<typeof AppearancePreferenceSchema>
+export type ResolvedLanguagePreference = Exclude<LanguagePreference, 'auto'>
 export type ResolvedAppearancePreference = Exclude<AppearancePreference, 'auto'>
 export type UserAccountIdentity = z.infer<typeof UserAccountIdentitySchema>
 export type AuditUserSummary = z.infer<typeof AuditUserSummarySchema>

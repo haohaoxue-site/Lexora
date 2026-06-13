@@ -6,6 +6,7 @@ import type {
 import { AUTH_PROVIDER_VALUES } from '@haohaoxue/samepage-contracts/auth/constants'
 import { createSharedComposable } from '@vueuse/core'
 import { computed, reactive, shallowRef } from 'vue'
+import { useI18n } from 'vue-i18n'
 import {
   getSystemAuthGovernance,
   updateSystemAuthGovernance,
@@ -30,64 +31,29 @@ export interface AuthGovernanceEntryCard {
   switches: readonly AuthGovernanceSwitchOption[]
 }
 
-const governanceFieldLabels: Record<string, string> = {
-  allowPasswordRegistration: '邮箱密码注册',
-  requirePasswordInviteCode: '邮箱注册邀请码',
-  ...Object.fromEntries(AUTH_PROVIDER_VALUES.flatMap((provider) => {
-    const title = AUTH_PROVIDER_UI_META[provider].title
-
-    return [
-      [`oauth:${provider}:allowLogin`, `${title} 登录`],
-      [`oauth:${provider}:allowRegistration`, `${title} 注册`],
-      [`oauth:${provider}:requireInviteCode`, `${title} 注册邀请码`],
-    ]
-  })),
-}
-
-const authGovernanceCards = [
-  {
-    key: 'password',
-    title: '邮箱密码',
-    description: '邮箱注册依赖发件服务，只影响新邮箱账号创建。',
-    switches: [
-      {
-        key: 'allowPasswordRegistration',
-        label: '注册',
-        description: '允许新邮箱账号注册。',
-      },
-      {
-        key: 'requirePasswordInviteCode',
-        label: '邀请码',
-        description: '邮箱密码注册时必须先验证邀请码。',
-      },
-    ],
-  },
-  ...createOAuthGovernanceCards(),
-] as const satisfies readonly AuthGovernanceEntryCard[]
-
-function createOAuthGovernanceCards(): AuthGovernanceEntryCard[] {
+function createOAuthGovernanceCards(t: ReturnType<typeof useI18n>['t']): AuthGovernanceEntryCard[] {
   return AUTH_PROVIDER_VALUES.map((provider) => {
     const title = AUTH_PROVIDER_UI_META[provider].title
 
     return {
       key: provider,
       title,
-      description: '登录控制入口和绑定，注册只影响新账号创建。',
+      description: t('admin.authGovernance.oauthDescription'),
       switches: [
         {
           key: `oauth:${provider}:allowLogin` as RegistrationGovernanceField,
-          label: '登录',
-          description: `允许使用 ${title} 登录或新增绑定。`,
+          label: t('admin.authGovernance.login'),
+          description: t('admin.authGovernance.loginDescription', { provider: title }),
         },
         {
           key: `oauth:${provider}:allowRegistration` as RegistrationGovernanceField,
-          label: '注册',
-          description: `允许新 ${title} 账号注册。`,
+          label: t('admin.authGovernance.register'),
+          description: t('admin.authGovernance.registerProviderDescription', { provider: title }),
         },
         {
           key: `oauth:${provider}:requireInviteCode` as RegistrationGovernanceField,
-          label: '邀请码',
-          description: '首次创建账号时必须先验证邀请码。',
+          label: t('admin.authGovernance.inviteCode'),
+          description: t('admin.authGovernance.requireInviteDescription'),
         },
       ],
     }
@@ -152,6 +118,7 @@ function setGovernanceSwitchValue(
 }
 
 export const useAdminAuthGovernance = createSharedComposable(() => {
+  const { t } = useI18n({ useScope: 'global' })
   const errorMessage = shallowRef('')
   const isInviteCodeDialogVisible = shallowRef(false)
   const isSavingInviteCode = shallowRef(false)
@@ -187,6 +154,26 @@ export const useAdminAuthGovernance = createSharedComposable(() => {
       || AUTH_PROVIDER_VALUES.some(provider => governance.oauthProviders[provider].requireInviteCode)
     ),
   )
+  const authGovernanceCards = computed<readonly AuthGovernanceEntryCard[]>(() => [
+    {
+      key: 'password',
+      title: t('admin.authGovernance.emailPassword'),
+      description: t('admin.authGovernance.emailPasswordDescription'),
+      switches: [
+        {
+          key: 'allowPasswordRegistration',
+          label: t('admin.authGovernance.register'),
+          description: t('admin.authGovernance.registerDescription'),
+        },
+        {
+          key: 'requirePasswordInviteCode',
+          label: t('admin.authGovernance.inviteCode'),
+          description: t('admin.authGovernance.requirePasswordInviteDescription'),
+        },
+      ],
+    },
+    ...createOAuthGovernanceCards(t),
+  ])
 
   function applyGovernance(nextGovernance: SystemAuthGovernance) {
     Object.assign(governance, nextGovernance)
@@ -198,7 +185,7 @@ export const useAdminAuthGovernance = createSharedComposable(() => {
       applyGovernance(nextGovernance)
     }
     catch (error) {
-      errorMessage.value = getRequestErrorDisplayMessage(error, '加载注册配置失败')
+      errorMessage.value = getRequestErrorDisplayMessage(error, t('admin.errors.loadGovernance'))
       throw error
     }
   }
@@ -215,11 +202,11 @@ export const useAdminAuthGovernance = createSharedComposable(() => {
       const nextGovernance = await updateSystemAuthGovernance(buildGovernanceUpdatePayload(field, nextValue))
 
       applyGovernance(nextGovernance)
-      ElMessage.success(`${governanceFieldLabels[field]}已更新`)
+      ElMessage.success(t('admin.authGovernance.updated', { field: getGovernanceFieldLabel(field) }))
     }
     catch (error) {
       setGovernanceSwitchValue(governance, field, previousValue)
-      ElMessage.error(getRequestErrorDisplayMessage(error, `更新${governanceFieldLabels[field]}失败`))
+      ElMessage.error(getRequestErrorDisplayMessage(error, t('admin.authGovernance.updateFailed', { field: getGovernanceFieldLabel(field) })))
     }
     finally {
       savingGovernanceFields[field] = false
@@ -271,7 +258,7 @@ export const useAdminAuthGovernance = createSharedComposable(() => {
     const inviteCode = inviteCodeForm.inviteCode.trim()
 
     if (inviteCode && inviteCode.length < 4) {
-      ElMessage.error('邀请码至少 4 位')
+      ElMessage.error(t('admin.authGovernance.inviteCodeMin'))
       return
     }
 
@@ -282,14 +269,37 @@ export const useAdminAuthGovernance = createSharedComposable(() => {
       applyGovernance(nextGovernance)
       isInviteCodeDialogVisible.value = false
       inviteCodeForm.inviteCode = ''
-      ElMessage.success(inviteCode ? '邀请码已更新' : '邀请码已清空')
+      ElMessage.success(inviteCode ? t('admin.authGovernance.inviteCodeUpdated') : t('admin.authGovernance.inviteCodeCleared'))
     }
     catch (error) {
-      ElMessage.error(getRequestErrorDisplayMessage(error, '更新邀请码失败'))
+      ElMessage.error(getRequestErrorDisplayMessage(error, t('admin.authGovernance.updateInviteCodeFailed')))
     }
     finally {
       isSavingInviteCode.value = false
     }
+  }
+
+  function getGovernanceFieldLabel(field: RegistrationGovernanceField) {
+    if (field === 'allowPasswordRegistration') {
+      return t('admin.authGovernance.fields.allowPasswordRegistration')
+    }
+
+    if (field === 'requirePasswordInviteCode') {
+      return t('admin.authGovernance.fields.requirePasswordInviteCode')
+    }
+
+    const { provider, option } = parseOAuthGovernanceField(field)
+    const providerTitle = AUTH_PROVIDER_UI_META[provider].title
+
+    if (option === 'allowLogin') {
+      return t('admin.authGovernance.fields.oauthAllowLogin', { provider: providerTitle })
+    }
+
+    if (option === 'allowRegistration') {
+      return t('admin.authGovernance.fields.oauthAllowRegistration', { provider: providerTitle })
+    }
+
+    return t('admin.authGovernance.fields.oauthRequireInviteCode', { provider: providerTitle })
   }
 
   return {

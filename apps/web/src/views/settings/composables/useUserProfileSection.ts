@@ -1,10 +1,19 @@
-import type { FormInstance } from 'element-plus'
+import type { FormInstance, FormItemRule } from 'element-plus'
 import type { Ref } from 'vue'
 import type { UserProfileSectionProps } from '../typing'
 import { useClipboard } from '@vueuse/core'
 import { computed, reactive } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { ElMessage } from '@/utils/element-plus'
-import { createDisplayNameRules } from '@/views/auth/utils/rules'
+
+const DISPLAY_NAME_MIN_LENGTH = 2
+const DISPLAY_NAME_MAX_LENGTH = 50
+
+type RuleValidator = NonNullable<FormItemRule['validator']>
+
+function resolveTrimmedValue(value: unknown) {
+  return typeof value === 'string' ? value.trim() : ''
+}
 
 export function useUserProfileSection(options: {
   displayName: Ref<string>
@@ -14,6 +23,7 @@ export function useUserProfileSection(options: {
   props: UserProfileSectionProps
   profileFormRef: Ref<FormInstance | null>
 }) {
+  const { t } = useI18n({ useScope: 'global' })
   const displayName = computed({
     get: () => options.displayName.value,
     set: (nextDisplayName: string) => {
@@ -23,13 +33,36 @@ export function useUserProfileSection(options: {
   const form = reactive({
     displayName,
   })
-  const displayNameRules = {
-    displayName: createDisplayNameRules(),
-  } as const
+  const createDisplayNameValidator = (): RuleValidator => (_rule, value, callback) => {
+    const label = t('settings.user.profile.displayName')
+    const normalizedValue = resolveTrimmedValue(value)
+
+    if (!normalizedValue) {
+      callback(new Error(t('settings.user.profile.displayNameRequired', { field: label })))
+      return
+    }
+
+    if (normalizedValue.length < DISPLAY_NAME_MIN_LENGTH || normalizedValue.length > DISPLAY_NAME_MAX_LENGTH) {
+      callback(new Error(t('settings.user.profile.displayNameLength', {
+        field: label,
+        min: DISPLAY_NAME_MIN_LENGTH,
+        max: DISPLAY_NAME_MAX_LENGTH,
+      })))
+      return
+    }
+
+    callback()
+  }
+  const displayNameRules = computed(() => ({
+    displayName: [{
+      required: true,
+      validator: createDisplayNameValidator(),
+    }],
+  }))
   const sectionDescription = computed(() =>
     options.props.canEditAvatar && options.props.canEditDisplayName
-      ? '更换头像后会立即生效，显示名称保存后会同步更新。'
-      : '当前账号的官方资料由系统统一维护。',
+      ? t('settings.user.profile.descriptionEditable')
+      : t('settings.user.profile.descriptionReadonly'),
   )
   const {
     copy: copyUserCode,
@@ -75,16 +108,16 @@ export function useUserProfileSection(options: {
 
   async function handleCopyUserCode() {
     if (!isClipboardSupported.value) {
-      ElMessage.error('当前环境不支持复制')
+      ElMessage.error(t('settings.user.profile.copyUnsupported'))
       return
     }
 
     try {
       await copyUserCode(options.props.userCode)
-      ElMessage.success('协作码已复制')
+      ElMessage.success(t('settings.user.profile.collaborationCodeCopied'))
     }
     catch {
-      ElMessage.error('复制失败')
+      ElMessage.error(t('settings.user.profile.copyFailed'))
     }
   }
 

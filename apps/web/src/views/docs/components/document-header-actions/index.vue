@@ -3,9 +3,10 @@ import type { DocumentPageWidthMode } from '@haohaoxue/samepage-contracts/docume
 import type { PageWidthOptionView } from './typing'
 import {
   DOCUMENT_PAGE_WIDTH_MODE,
-  DOCUMENT_PAGE_WIDTH_MODE_LABELS,
   DOCUMENT_PAGE_WIDTH_MODE_VALUES,
 } from '@haohaoxue/samepage-contracts/document/constants'
+import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import ChatAssistantAvatar from '@/components/chat-message/ChatAssistantAvatar.vue'
 import { useDocumentHeaderActions } from '../../composables/useDocumentHeaderActions'
 
@@ -14,12 +15,18 @@ const pageWidthPreviewClass: Record<DocumentPageWidthMode, string> = {
   [DOCUMENT_PAGE_WIDTH_MODE.DEFAULT]: 'is-default',
   [DOCUMENT_PAGE_WIDTH_MODE.FULL]: 'is-full',
 }
+const { t } = useI18n()
+const pageWidthLabelKey: Record<DocumentPageWidthMode, string> = {
+  [DOCUMENT_PAGE_WIDTH_MODE.NARROW]: 'docs.pageWidth.narrow',
+  [DOCUMENT_PAGE_WIDTH_MODE.DEFAULT]: 'docs.pageWidth.default',
+  [DOCUMENT_PAGE_WIDTH_MODE.FULL]: 'docs.pageWidth.full',
+}
 
-const pageWidthOptions: PageWidthOptionView[] = DOCUMENT_PAGE_WIDTH_MODE_VALUES.map(value => ({
+const pageWidthOptions = computed<PageWidthOptionView[]>(() => DOCUMENT_PAGE_WIDTH_MODE_VALUES.map(value => ({
   value,
-  label: DOCUMENT_PAGE_WIDTH_MODE_LABELS[value],
+  label: t(pageWidthLabelKey[value]),
   previewClass: pageWidthPreviewClass[value],
-}))
+})))
 
 const {
   currentPageWidthMode,
@@ -37,7 +44,7 @@ const {
 <template>
   <div class="document-header-actions flex items-center gap-1.5 text-main">
     <ElTooltip
-      content="AI 对话"
+      :content="t('docs.common.aiChat')"
       effect="dark"
       placement="bottom"
       :show-after="120"
@@ -46,7 +53,7 @@ const {
         text
         class="document-header-actions__icon-button h-7 min-w-7 w-7 rounded-lg p-0 text-base"
         :class="{ 'is-active': isDocsChatPanelOpen }"
-        title="AI 对话"
+        :title="t('docs.common.aiChat')"
         @click="toggleDocsChatPanel"
       >
         <ChatAssistantAvatar />
@@ -57,12 +64,12 @@ const {
       v-if="canShowCollaborationButton"
       text
       class="document-header-actions__share-button h-7 min-h-7 rounded-lg border px-2 font-normal"
-      title="协作"
+      :title="t('docs.common.collaboration')"
       @click="openCollaborationDialog"
     >
       <span class="inline-flex items-center gap-1 text-xs">
         <SvgIcon category="ui" icon="lock" />
-        <span class="text-xs leading-none">协作</span>
+        <span class="text-xs leading-none">{{ t('docs.common.collaboration') }}</span>
         <SvgIcon category="ui" icon="chevron-down" class="text-[10px] text-secondary" />
       </span>
     </ElButton>
@@ -71,12 +78,12 @@ const {
       v-if="canShowPublicationButton"
       text
       class="document-header-actions__share-button h-7 min-h-7 rounded-lg border px-2 font-normal"
-      title="分享"
+      :title="t('docs.common.share')"
       @click="openPublicationDialog"
     >
       <span class="inline-flex items-center gap-1 text-xs">
         <SvgIcon category="ui" icon="share-public" />
-        <span class="text-xs leading-none">分享</span>
+        <span class="text-xs leading-none">{{ t('docs.common.share') }}</span>
       </span>
     </ElButton>
 
@@ -88,7 +95,7 @@ const {
       <ElButton
         text
         class="document-header-actions__icon-button h-7 min-w-7 w-7 rounded-lg p-0 text-base"
-        title="更多"
+        :title="t('docs.common.more')"
       >
         <SvgIcon category="ui" icon="more" />
       </ElButton>
@@ -114,7 +121,7 @@ const {
                   <SvgIcon category="ui" icon="page-width" size="1rem" />
                 </span>
                 <span class="min-w-0 flex-1 overflow-hidden text-sm leading-5 text-ellipsis whitespace-nowrap">
-                  页宽设置
+                  {{ t('docs.pageWidth.title') }}
                 </span>
                 <span class="inline-flex h-[0.875rem] w-[0.875rem] flex-none items-center justify-center text-sm text-[color-mix(in_srgb,var(--brand-text-secondary)_72%,transparent)]">
                   <SvgIcon category="ui" icon="chevron-right" />
@@ -124,7 +131,7 @@ const {
 
             <section class="document-page-width-menu px-2 pb-2 pt-2">
               <div class="mb-2 text-xs leading-5 text-secondary">
-                为当前文档选择合适页宽
+                {{ t('docs.pageWidth.description') }}
               </div>
 
               <div class="grid grid-cols-3 gap-2">
@@ -164,7 +171,7 @@ const {
                 <SvgIcon category="ui" icon="info" size="1rem" />
               </span>
             </template>
-            文档信息
+            {{ t('docs.common.documentInfo') }}
           </ElDropdownItem>
 
           <ElDropdownItem
@@ -176,7 +183,7 @@ const {
                 <SvgIcon category="ui" icon="history" size="1rem" />
               </span>
             </template>
-            历史记录
+            {{ t('docs.common.history') }}
           </ElDropdownItem>
         </ElDropdownMenu>
       </template>

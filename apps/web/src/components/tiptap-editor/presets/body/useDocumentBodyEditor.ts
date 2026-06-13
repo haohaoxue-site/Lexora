@@ -20,6 +20,7 @@ import {
   uploadDocumentFile,
   uploadDocumentImage,
 } from '@/apis/document'
+import { translate } from '@/i18n'
 import { createBodyExtensions } from '../../extensions/createExtensions'
 import { scrollDocumentBlockIntoView } from '../../overlays/block-trigger/blockTriggerDom'
 import { isTriggerMenuSelection } from './triggerSelection'
@@ -136,11 +137,11 @@ export function useDocumentBodyEditor(options: {
 
   async function handleUploadImage(file: File) {
     if (!options.props.documentId) {
-      throw new Error('当前文档未初始化，无法上传图片')
+      throw new Error(translate('editor.upload.notReadyImage'))
     }
 
     if (file.size > DOCUMENT_IMAGE_MAX_BYTES) {
-      throw new Error(`图片大小不能超过 ${DOCUMENT_IMAGE_SIZE_LIMIT_LABEL}`)
+      throw new Error(translate('editor.upload.imageTooLarge', { size: DOCUMENT_IMAGE_SIZE_LIMIT_LABEL }))
     }
 
     const asset = await uploadDocumentImage(options.props.documentId, file)
@@ -154,7 +155,7 @@ export function useDocumentBodyEditor(options: {
 
   async function handleUploadFile(file: File) {
     if (!options.props.documentId) {
-      throw new Error('当前文档未初始化，无法上传附件')
+      throw new Error(translate('editor.upload.notReadyAttachment'))
     }
 
     return uploadDocumentFile(options.props.documentId, file)

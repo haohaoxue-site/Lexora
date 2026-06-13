@@ -2,6 +2,7 @@
 import type { ChatComposerAttachment } from './typing'
 import { Close } from '@element-plus/icons-vue'
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import {
   getAttachmentDisplayLabel,
   getPanelAttachments,
@@ -16,6 +17,7 @@ const emits = defineEmits<{
   remove: [attachmentId: string]
 }>()
 
+const { t } = useI18n({ useScope: 'global' })
 const panelAttachments = computed(() => getPanelAttachments(props.attachments))
 </script>
 
@@ -34,7 +36,7 @@ const panelAttachments = computed(() => getPanelAttachments(props.attachments))
       <button
         class="chat-composer-context-tags__remove"
         type="button"
-        aria-label="移除上下文"
+        :aria-label="t('chat.composer.removeContext')"
         @click.stop="emits('remove', attachment.id)"
       >
         <ElIcon><Close /></ElIcon>

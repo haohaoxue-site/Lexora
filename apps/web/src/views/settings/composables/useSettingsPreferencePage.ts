@@ -1,11 +1,13 @@
 import type { AppearancePreference, LanguagePreference } from '@haohaoxue/samepage-contracts'
-import { computed, onMounted, shallowRef } from 'vue'
+import { computed, shallowRef } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useUserStore } from '@/stores/user'
 import { ElMessage } from '@/utils/element-plus'
 import { getRequestErrorDisplayMessage } from '@/utils/request-error'
 
 export function useSettingsPreferencePage() {
   const userStore = useUserStore()
+  const { t } = useI18n({ useScope: 'global' })
   const errorMessage = shallowRef('')
   const isLoading = shallowRef(false)
   const isSavingLanguage = computed(() => userStore.isSavingLanguage)
@@ -23,31 +25,12 @@ export function useSettingsPreferencePage() {
     },
   })
 
-  onMounted(() => {
-    void loadPage()
-  })
-
-  async function loadPage() {
-    isLoading.value = true
-    errorMessage.value = ''
-
-    try {
-      await userStore.refreshSettings()
-    }
-    catch (error) {
-      errorMessage.value = getRequestErrorDisplayMessage(error, '加载偏好设置失败')
-    }
-    finally {
-      isLoading.value = false
-    }
-  }
-
   async function saveLanguagePreference(value: LanguagePreference) {
     try {
       await userStore.updateLanguagePreference(value)
     }
     catch (error) {
-      ElMessage.error(getRequestErrorDisplayMessage(error, '保存语言偏好失败'))
+      ElMessage.error(getRequestErrorDisplayMessage(error, t('settings.preference.saveLanguageFailed')))
     }
   }
 
@@ -56,7 +39,7 @@ export function useSettingsPreferencePage() {
       await userStore.updateAppearancePreference(value)
     }
     catch (error) {
-      ElMessage.error(getRequestErrorDisplayMessage(error, '保存外观偏好失败'))
+      ElMessage.error(getRequestErrorDisplayMessage(error, t('settings.preference.saveAppearanceFailed')))
     }
   }
 

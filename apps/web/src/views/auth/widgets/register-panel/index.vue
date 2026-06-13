@@ -1,12 +1,14 @@
 <script setup lang="ts">
 import type { FormInstance } from 'element-plus'
 import { computed, useTemplateRef } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { useRegister } from '../../composables/useRegister'
 import AuthEntryShell from '../../layouts/entry-shell'
 
 const router = useRouter()
 const registerRequestFormRef = useTemplateRef<FormInstance>('registerRequestFormRef')
+const { t } = useI18n({ useScope: 'global' })
 const {
   form,
   formRules,
@@ -20,18 +22,18 @@ const {
   registerRequestFormRef,
 })
 
-const isRegistrationClosed = computed(() => !isLoadingCapabilities && !passwordRegistrationEnabled)
-const pageTitle = computed(() => isRegistrationClosed.value ? '邮箱注册暂未开放' : '创建账号')
+const isRegistrationClosed = computed(() => !isLoadingCapabilities.value && !passwordRegistrationEnabled.value)
+const pageTitle = computed(() => isRegistrationClosed.value ? t('auth.register.closedTitle') : t('auth.register.title'))
 const pageDescription = computed(() => {
   if (isRegistrationClosed.value) {
-    return '当前仅支持已有账号登录。'
+    return t('auth.register.closedDescription')
   }
 
   if (passwordRegistrationInviteCodeRequired.value) {
-    return '输入邮箱和邀请码，我们会发送验证码。'
+    return t('auth.register.descriptionWithInvite')
   }
 
-  return '输入邮箱，我们会发送验证码。'
+  return t('auth.register.description')
 })
 
 function goToLogin() {
@@ -57,13 +59,13 @@ function goToLogin() {
       <ElResult
         v-if="isRegistrationClosed"
         icon="warning"
-        title="当前未开放邮箱注册"
-        sub-title="请返回登录页，使用已有账号或第三方账号继续。"
+        :title="t('auth.register.closedResultTitle')"
+        :sub-title="t('auth.register.closedResultSubtitle')"
         class="password-register-view__closed-result !p-0"
       >
         <template #extra>
           <ElButton type="primary" @click="goToLogin">
-            返回登录
+            {{ t('auth.common.returnLogin') }}
           </ElButton>
         </template>
       </ElResult>
@@ -78,19 +80,19 @@ function goToLogin() {
           class="password-register-view__form w-full"
           @submit.prevent="handleSubmitEmailVerificationRequest"
         >
-          <ElFormItem label="注册邮箱" prop="email">
+          <ElFormItem :label="t('auth.common.registerEmail')" prop="email">
             <ElInput
               v-model="form.email"
               autocomplete="email"
-              placeholder="输入邮箱地址"
+              :placeholder="t('auth.common.emailPlaceholder')"
               :disabled="isSubmitting"
             />
           </ElFormItem>
-          <ElFormItem v-if="passwordRegistrationInviteCodeRequired" label="邀请码" prop="inviteCode">
+          <ElFormItem v-if="passwordRegistrationInviteCodeRequired" :label="t('auth.common.inviteCode')" prop="inviteCode">
             <ElInput
               v-model="form.inviteCode"
               autocomplete="off"
-              placeholder="输入邀请码"
+              :placeholder="t('auth.common.inviteCodePlaceholder')"
               :disabled="isSubmitting"
             />
           </ElFormItem>
@@ -101,7 +103,7 @@ function goToLogin() {
             class="password-register-view__submit w-full min-h-[2.875rem]"
             :loading="isSubmitting"
           >
-            发送验证码
+            {{ t('auth.register.sendCode') }}
           </ElButton>
         </ElForm>
       </template>
@@ -109,9 +111,9 @@ function goToLogin() {
 
     <template #footer>
       <template v-if="loadErrorMessage || isLoadingCapabilities || passwordRegistrationEnabled">
-        <span class="password-register-view__footer-text text-secondary">已有账号？</span>
+        <span class="password-register-view__footer-text text-secondary">{{ t('auth.register.alreadyHaveAccount') }}</span>
         <RouterLink :to="{ name: 'login' }" class="password-register-view__footer-link text-primary font-semibold no-underline">
-          返回登录
+          {{ t('auth.common.returnLogin') }}
         </RouterLink>
       </template>
     </template>

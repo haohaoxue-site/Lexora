@@ -10,6 +10,7 @@ import type {
   UpdateSystemAdminUserResponse,
   UpdateSystemAuthGovernanceRequest,
 } from '@haohaoxue/samepage-contracts'
+import type { FastifyRequest } from 'fastify'
 import type { AuthUserContext } from '../auth/auth.interface'
 import {
   PERMISSIONS,
@@ -24,12 +25,14 @@ import {
   Post,
   Put,
   Query,
+  Req,
 } from '@nestjs/common'
 import { CurrentUser } from '../../decorators/current-user.decorator'
 import { PageQuery } from '../../decorators/page-query.decorator'
 import { RequirePermissions } from '../../decorators/require-permissions.decorator'
 import { RequestPageParamsDto } from '../../dto/request-page-params.dto'
 import { ZodValidationPipe } from '../../pipes/zod-validation.pipe'
+import { resolveRequestLanguage } from '../../utils/language'
 import {
   TestSystemEmailConfigDto,
   UpdateSystemEmailConfigDto,
@@ -140,8 +143,13 @@ export class SystemAdminController {
   async testEmailConfig(
     @CurrentUser() authUser: AuthUserContext,
     @Body() payload: TestSystemEmailConfigDto,
+    @Req() request: FastifyRequest,
   ): Promise<TestSystemEmailConfigResponse> {
-    return this.systemAdminService.testEmailConfig(authUser.id, payload)
+    return this.systemAdminService.testEmailConfig(
+      authUser.id,
+      payload,
+      resolveRequestLanguage(request),
+    )
   }
 
   @RequirePermissions(PERMISSIONS.SYSTEM_ADMIN_AUDIT_LOG_LIST)

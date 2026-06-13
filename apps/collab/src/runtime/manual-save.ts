@@ -1,4 +1,6 @@
+import type { CollabErrorCode } from '@haohaoxue/samepage-contracts'
 import {
+  COLLAB_ERROR_CODE,
   DOCUMENT_COLLAB_STATELESS_MESSAGE_TYPE,
   DocumentCollabStatelessSaveRequestPayloadSchema,
   DocumentCollabStatelessSaveResultPayloadSchema,
@@ -31,7 +33,7 @@ export async function handleDocumentCollabSaveRequest(
       requestId: request.requestId,
       ok: false,
       savedAt: null,
-      error: '当前连接没有写入权限',
+      errorCode: COLLAB_ERROR_CODE.READONLY_WRITE_REJECTED,
     })
     return true
   }
@@ -42,15 +44,15 @@ export async function handleDocumentCollabSaveRequest(
       requestId: request.requestId,
       ok: true,
       savedAt: result.savedAt,
-      error: null,
+      errorCode: null,
     })
   }
-  catch (error) {
+  catch {
     sendSaveResult(input.connection.sendStateless, {
       requestId: request.requestId,
       ok: false,
       savedAt: null,
-      error: error instanceof Error && error.message ? error.message : '保存失败',
+      errorCode: COLLAB_ERROR_CODE.PERSISTENCE_FAILED,
     })
   }
 
@@ -72,7 +74,7 @@ function sendSaveResult(
     requestId: string
     ok: boolean
     savedAt: string | null
-    error: string | null
+    errorCode: CollabErrorCode | null
   },
 ): void {
   sendStateless(JSON.stringify(DocumentCollabStatelessSaveResultPayloadSchema.parse({

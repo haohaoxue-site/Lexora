@@ -6,6 +6,7 @@ import type {
 import type { AiProviderScope } from '@/apis/ai'
 import { AI_MODEL_INTENT_KEY, AI_PROVIDER_SCOPE } from '@haohaoxue/samepage-contracts/ai/constants'
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import {
   getPlatformEmbeddingAvailableAiProviderModels,
   getPlatformEmbeddingAvailableAiProviders,
@@ -14,6 +15,7 @@ import ModelCascader from '@/components/model-cascader'
 
 const props = defineProps<PlatformModelSettingsPanelProps>()
 const emits = defineEmits<PlatformModelSettingsPanelEmits>()
+const { t } = useI18n({ useScope: 'global' })
 const PLATFORM_MODEL_SCOPES: AiProviderScope[] = [AI_PROVIDER_SCOPE.PLATFORM]
 
 const panelVisible = computed({
@@ -25,7 +27,7 @@ const panelVisible = computed({
 <template>
   <ElDrawer
     v-model="panelVisible"
-    title="平台模型配置"
+    :title="t('admin.platformModel.title')"
     size="28rem"
     append-to-body
     destroy-on-close
@@ -35,10 +37,10 @@ const panelVisible = computed({
       <section class="admin-platform-model-settings__section">
         <div class="admin-platform-model-settings__header">
           <div class="admin-platform-model-settings__label">
-            向量模型
+            {{ t('admin.platformModel.embeddingModel') }}
           </div>
           <ElTag v-if="props.modelPolicy?.invalidReason" type="danger" effect="plain" size="small">
-            配置异常
+            {{ t('admin.platformModel.abnormal') }}
           </ElTag>
         </div>
         <ModelCascader
@@ -52,7 +54,7 @@ const panelVisible = computed({
           :filterable="true"
           :show-all-levels="false"
           :disabled="props.loading || props.saving"
-          placeholder="选择平台向量模型"
+          :placeholder="t('admin.platformModel.placeholder')"
           @update:model-value="value => emits('updateModel', value)"
         />
         <p v-if="props.modelPolicy?.invalidReason" class="admin-platform-model-settings__error">

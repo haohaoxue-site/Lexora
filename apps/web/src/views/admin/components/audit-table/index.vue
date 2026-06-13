@@ -6,33 +6,42 @@ import type {
   SystemAdminAuditTargetType,
 } from './typing'
 import {
-  SYSTEM_ADMIN_AUDIT_TARGET_TYPE_LABELS,
+  SYSTEM_ADMIN_AUDIT_TARGET_TYPE,
   SYSTEM_ADMIN_AUDIT_TARGET_TYPE_VALUES,
 } from '@haohaoxue/samepage-contracts/system-admin'
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { formatDateTime } from '@/utils/dayjs'
 
 const props = defineProps<AdminAuditTableProps>()
 
 const emits = defineEmits<AdminAuditTableEmits>()
+const { t } = useI18n({ useScope: 'global' })
 
 const PAGINATION_HEIGHT = 73
 
-const targetTypeColumnFilters = SYSTEM_ADMIN_AUDIT_TARGET_TYPE_VALUES.map(value => ({
-  text: SYSTEM_ADMIN_AUDIT_TARGET_TYPE_LABELS[value],
+const targetTypeColumnFilters = computed(() => SYSTEM_ADMIN_AUDIT_TARGET_TYPE_VALUES.map(value => ({
+  text: formatTargetType(value),
   value,
-}))
+})))
 
 const filteredTargetTypeValues = computed(() => props.targetType ? [props.targetType] : [])
 const tableHeight = `calc(100% - ${PAGINATION_HEIGHT}px)`
 
 function formatTargetType(targetType: string) {
-  return SYSTEM_ADMIN_AUDIT_TARGET_TYPE_LABELS[targetType as SystemAdminAuditTargetType] ?? targetType
+  const keyMap = {
+    [SYSTEM_ADMIN_AUDIT_TARGET_TYPE.USER]: 'admin.audit.targetTypes.user',
+    [SYSTEM_ADMIN_AUDIT_TARGET_TYPE.SYSTEM_AUTH_CONFIG]: 'admin.audit.targetTypes.systemAuthConfig',
+    [SYSTEM_ADMIN_AUDIT_TARGET_TYPE.SYSTEM_EMAIL_CONFIG]: 'admin.audit.targetTypes.systemEmailConfig',
+    [SYSTEM_ADMIN_AUDIT_TARGET_TYPE.SYSTEM_EMAIL_SERVICE]: 'admin.audit.targetTypes.systemEmailService',
+  } as const
+
+  return targetType in keyMap ? t(keyMap[targetType as SystemAdminAuditTargetType]) : targetType
 }
 
 function formatMetadata(metadata: Record<string, unknown> | null) {
   if (!metadata) {
-    return '无附加信息'
+    return t('admin.audit.emptyMetadata')
   }
 
   return JSON.stringify(metadata, null, 2)
@@ -70,20 +79,20 @@ function handleFilterChange(filters: AdminAuditTableFilterMap) {
         </template>
       </ElTableColumn>
 
-      <ElTableColumn label="操作时间" width="180">
+      <ElTableColumn :label="t('admin.audit.time')" width="180">
         <template #default="{ row }">
           <span class="text-xs text-secondary">{{ formatDateTime(row.createdAt) }}</span>
         </template>
       </ElTableColumn>
 
-      <ElTableColumn label="动作" min-width="220">
+      <ElTableColumn :label="t('admin.audit.action')" min-width="220">
         <template #default="{ row }">
           <span class="font-medium text-main">{{ row.action }}</span>
         </template>
       </ElTableColumn>
 
       <ElTableColumn
-        label="对象类型"
+        :label="t('admin.audit.targetType')"
         width="140"
         column-key="targetType"
         :filters="targetTypeColumnFilters"
@@ -95,13 +104,13 @@ function handleFilterChange(filters: AdminAuditTableFilterMap) {
         </template>
       </ElTableColumn>
 
-      <ElTableColumn label="目标 ID" min-width="160">
+      <ElTableColumn :label="t('admin.audit.targetId')" min-width="160">
         <template #default="{ row }">
           <span class="audit-table__target-id font-mono text-xs text-secondary">{{ row.targetId || '-' }}</span>
         </template>
       </ElTableColumn>
 
-      <ElTableColumn label="操作人" min-width="180">
+      <ElTableColumn :label="t('admin.audit.actor')" min-width="180">
         <template #default="{ row }">
           <div class="audit-table__actor flex flex-col gap-0.5">
             <span class="audit-table__actor-name text-[13px] font-medium text-main">{{ row.actorDisplayName }}</span>

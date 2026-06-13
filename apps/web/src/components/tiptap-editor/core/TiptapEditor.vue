@@ -4,6 +4,7 @@ import type { TiptapEditorContent, TiptapEditorEmits, TiptapEditorProps } from '
 import { isChangeOrigin } from '@tiptap/extension-collaboration'
 import { EditorContent, useEditor } from '@tiptap/vue-3'
 import { onBeforeUnmount, watch } from 'vue'
+import { translate } from '@/i18n'
 import { unwrapTiptapContent, wrapTiptapContent } from './utils'
 
 const props = withDefaults(defineProps<TiptapEditorProps>(), {
@@ -89,7 +90,7 @@ watch(
       return
     }
 
-    throw new Error('TiptapEditor 不支持运行时替换 initialExtensions，请重建组件')
+    throw new Error(translate('editor.errors.initialExtensionsImmutable'))
   },
 )
 

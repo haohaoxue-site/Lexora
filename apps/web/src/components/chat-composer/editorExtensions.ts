@@ -3,6 +3,7 @@ import type { ChatReferenceCloneResult } from './extensions/ChatReference'
 import type { ChatComposerAttachment } from './typing'
 import Placeholder from '@tiptap/extension-placeholder'
 import StarterKit from '@tiptap/starter-kit'
+import { translate } from '@/i18n'
 import { CHAT_REFERENCE_NODE_NAME, ChatReference } from './extensions/ChatReference'
 
 export interface CreateChatComposerExtensionsOptions {
@@ -26,7 +27,7 @@ export function createChatComposerExtensions(options: CreateChatComposerExtensio
       strike: false,
     }),
     Placeholder.configure({
-      placeholder: () => options.getPlaceholder?.() ?? '输入消息，Ctrl/⌘ + Enter 发送',
+      placeholder: () => options.getPlaceholder?.() ?? translate('chat.composer.inputPlaceholder'),
     }),
     ChatReference.configure({
       getAttachmentById: attachmentId =>

@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import type { DocumentHistoryPanelProps } from './typing'
+import { useI18n } from 'vue-i18n'
 import { useDocumentHistoryPanel } from '../../composables/useDocumentHistoryPanel'
 
 defineProps<DocumentHistoryPanelProps>()
+const { t } = useI18n()
 const {
   currentEntryTimeLabel,
   hasDocument,
@@ -21,16 +23,16 @@ const {
   <aside class="document-history-panel flex w-full min-w-[var(--panel-docs-history-width)] max-w-[var(--panel-docs-history-width)] flex-col max-[1180px]:min-w-0 max-[1180px]:max-w-full">
     <div class="document-history-panel__header px-4 pb-[0.875rem] pt-[1.125rem]">
       <div class="text-base font-bold tracking-[0.01em] text-main">
-        历史记录
+        {{ t('docs.common.history') }}
       </div>
     </div>
 
     <div v-if="!hasDocument" class="px-4 py-4 text-[13px] leading-[1.6] text-secondary">
-      选择文档后可查看历史记录
+      {{ t('docs.history.noDocument') }}
     </div>
 
     <div v-else-if="isLoading" class="px-4 py-4 text-[13px] leading-[1.6] text-secondary">
-      正在加载历史记录...
+      {{ t('docs.history.loading') }}
     </div>
 
     <div v-else class="flex-1 overflow-y-auto px-[0.875rem] pb-5 pt-4">
@@ -45,10 +47,10 @@ const {
         >
           <div class="flex items-start justify-between gap-3">
             <div class="document-history-panel__item-time text-[13px] font-semibold leading-[1.4]">
-              当前内容
+              {{ t('docs.common.currentContent') }}
             </div>
             <span class="document-history-panel__item-status inline-flex items-center whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-semibold">
-              正在编辑
+              {{ t('docs.history.editing') }}
             </span>
           </div>
 
@@ -59,7 +61,7 @@ const {
       </article>
 
       <div v-if="!historySections.length" class="px-3 pt-1 text-xs text-secondary">
-        尚无历史版本
+        {{ t('docs.history.empty') }}
       </div>
 
       <section
@@ -94,7 +96,7 @@ const {
                 {{ group.label }}
               </span>
               <span class="ml-auto text-secondary">
-                {{ group.entries.length }} 条
+                {{ t('docs.common.entries', { count: group.entries.length }) }}
               </span>
             </button>
 
@@ -121,7 +123,7 @@ const {
                       v-if="entry.isCurrentContent"
                       class="document-history-panel__item-status inline-flex items-center whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-semibold"
                     >
-                      当前内容
+                      {{ t('docs.common.currentContent') }}
                     </span>
                   </div>
 

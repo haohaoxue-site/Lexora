@@ -31,6 +31,7 @@ import {
 import { CurrentUser } from '../../decorators/current-user.decorator'
 import { Public } from '../../decorators/public.decorator'
 import { RequirePermissions } from '../../decorators/require-permissions.decorator'
+import { readAcceptLanguageHeader } from '../../utils/language'
 import { getRequestFile } from '../../utils/request-file'
 import { AuthSessionsService } from '../auth/auth-sessions.service'
 import { AuthService } from '../auth/auth.service'
@@ -124,8 +125,13 @@ export class UsersController {
   async requestBindEmailCode(
     @CurrentUser() authUser: AuthUserContext,
     @Body() payload: RequestBindEmailCodeDto,
+    @Req() request: FastifyRequest,
   ): Promise<RequestBindEmailCodeResponse> {
-    return this.userEmailBindingsService.requestBindEmailCode(authUser.id, payload.email)
+    return this.userEmailBindingsService.requestBindEmailCode(
+      authUser.id,
+      payload.email,
+      readAcceptLanguageHeader(request.headers['accept-language']),
+    )
   }
 
   @RequirePermissions(PERMISSIONS.USER_UPDATE_SELF)

@@ -3,13 +3,15 @@ import type { ResolvedPublicationNavItem } from '../../utils/publicationRenderin
 import type { PublicationTopNavProps } from './typing'
 import { normalizePublicationHref } from '@haohaoxue/samepage-shared/document'
 import { onBeforeUnmount, onMounted, shallowRef } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { SvgIcon } from '@/components/svg-icon'
 import { ElMessage } from '@/utils/element-plus'
-import { PUBLICATION_UNPUBLISHED_MESSAGE } from '../../utils/publicationRendering'
+import { getPublicationUnpublishedMessage } from '../../utils/publicationRendering'
 
 const props = defineProps<PublicationTopNavProps>()
 const router = useRouter()
+const { t } = useI18n()
 const isMobileMenuOpen = shallowRef(false)
 const isAtTop = shallowRef(true)
 
@@ -29,7 +31,7 @@ onBeforeUnmount(() => {
 function handleNavClick(item: ResolvedPublicationNavItem, event: MouseEvent) {
   if (item.disabled) {
     event.preventDefault()
-    ElMessage.info(PUBLICATION_UNPUBLISHED_MESSAGE)
+    ElMessage.info(getPublicationUnpublishedMessage())
     return
   }
 
@@ -101,7 +103,7 @@ function toggleMobileMenu() {
       <nav
         v-if="props.navItems.length"
         class="publication-top-nav__links inline-flex min-w-0 items-center justify-end gap-5 max-[720px]:hidden"
-        aria-label="顶部导航"
+        :aria-label="t('docs.publicReader.topNavigation')"
       >
         <a
           v-for="item in props.navItems"
@@ -121,7 +123,7 @@ function toggleMobileMenu() {
         v-if="props.navItems.length"
         class="publication-top-nav__menu-button hidden h-8 w-8 flex-[0_0_auto] items-center justify-center rounded-md border-none bg-transparent p-0 text-secondary max-[720px]:inline-flex"
         type="button"
-        aria-label="打开站点导航"
+        :aria-label="t('docs.publicReader.openSiteNavigation')"
         :aria-expanded="isMobileMenuOpen"
         @click="toggleMobileMenu"
       >
@@ -133,7 +135,7 @@ function toggleMobileMenu() {
       v-if="props.navItems.length"
       class="publication-top-nav__mobile-menu"
       :class="{ 'is-open': isMobileMenuOpen }"
-      aria-label="移动端顶部导航"
+      :aria-label="t('docs.publicReader.mobileTopNavigation')"
     >
       <a
         v-for="item in props.navItems"

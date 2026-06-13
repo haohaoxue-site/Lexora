@@ -5,6 +5,7 @@ import type {
 } from './typing'
 import { ArrowDown } from '@element-plus/icons-vue'
 import { computed, shallowRef } from 'vue'
+import { useI18n } from 'vue-i18n'
 import {
   buildDocsChatHistoryGroups,
   limitDocsChatHistorySessions,
@@ -12,6 +13,7 @@ import {
 
 const props = defineProps<DocsChatHistoryDropdownProps>()
 const emits = defineEmits<DocsChatHistoryDropdownEmits>()
+const { t } = useI18n()
 
 const historySessions = computed(() => limitDocsChatHistorySessions(props.sessions))
 const historyGroups = computed(() => buildDocsChatHistoryGroups(historySessions.value))
@@ -48,10 +50,10 @@ function selectSession(sessionId: string) {
     <div
       v-loading="props.isLoading"
       class="docs-chat-history-dropdown max-h-[min(60vh,26rem)] min-h-16 overflow-y-auto p-1.5"
-      element-loading-text="正在加载"
+      :element-loading-text="t('docs.chat.historyLoading')"
     >
       <div v-if="historySessions.length === 0 && !props.isLoading" class="px-3 py-5 text-center text-[13px] text-secondary">
-        暂无历史对话
+        {{ t('docs.chat.historyEmpty') }}
       </div>
 
       <template v-else>

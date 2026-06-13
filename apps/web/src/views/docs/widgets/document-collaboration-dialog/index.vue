@@ -21,15 +21,14 @@ import {
   DOCUMENT_COLLABORATION_LINK_PASSWORD_LENGTH,
   DOCUMENT_COLLABORATION_LINK_PASSWORD_REGEX,
   DOCUMENT_COLLABORATION_PERMISSION,
-  DOCUMENT_COLLABORATION_PERMISSION_LABELS,
   DOCUMENT_COLLABORATION_PERMISSION_VALUES,
   DOCUMENT_COLLABORATION_SCOPE,
-  DOCUMENT_COLLABORATION_SCOPE_LABELS,
   DOCUMENT_COLLABORATION_SCOPE_VALUES,
 } from '@haohaoxue/samepage-contracts/document/collaboration/constants'
 import { USER_CODE_REGEX } from '@haohaoxue/samepage-contracts/identity/constants'
 import { useClipboard, watchDebounced } from '@vueuse/core'
 import { computed, reactive, shallowRef, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import {
   createDocumentCollaborationInvitation,
   disableDocumentCollaborationLink,
@@ -55,6 +54,7 @@ const props = withDefaults(defineProps<DocumentCollaborationDialogProps>(), {
   documentId: '',
 })
 const emits = defineEmits<DocumentCollaborationDialogEmits>()
+const { t } = useI18n()
 const { copy, isSupported: isClipboardSupported } = useClipboard({
   legacy: true,
 })
@@ -88,14 +88,14 @@ const linkForm = reactive<LinkForm>({
 const normalizedDocumentId = computed(() => props.documentId?.trim() ?? '')
 const dialogTitle = computed(() => {
   if (dialogView.value === 'collaborators') {
-    return '管理协作者'
+    return t('docs.collaboration.manageCollaborators')
   }
 
   if (dialogView.value === 'password') {
-    return '链接密码设置'
+    return t('docs.collaboration.passwordSettings')
   }
 
-  return '协作文档'
+  return t('docs.collaboration.collaborationDocument')
 })
 const owner = computed(() => overview.value?.owner ?? null)
 const collaborators = computed(() => overview.value?.collaborators ?? [])
@@ -135,16 +135,25 @@ const canSubmitInvitation = computed(() => Boolean(
   && !isResolvedOwner.value
   && !resolvedCollaborator.value,
 ))
-const invitationSubmitLabel = computed(() => resolvedInvitation.value ? '更新邀请' : '发送邀请')
-const linkAccessTitle = computed(() => activeLink.value?.enabled ? '获得链接的人' : '未开启')
+const invitationSubmitLabel = computed(() => resolvedInvitation.value
+  ? t('docs.collaboration.updateInvite')
+  : t('docs.collaboration.sendInvite'))
+const linkAccessTitle = computed(() => activeLink.value?.enabled
+  ? t('docs.collaboration.linkAccessEnabled')
+  : t('docs.collaboration.linkAccessDisabled'))
 const linkAccessDescription = computed(() => {
   if (!activeLink.value?.enabled) {
-    return '仅已加入的协作者可以访问'
+    return t('docs.collaboration.linkAccessMembersOnly')
   }
 
-  return `获得链接的人${formatCollaborationPermission(linkForm.permission)}，${formatCollaborationScope(linkForm.scope)}`
+  return t('docs.collaboration.linkAccessSummary', {
+    permission: formatCollaborationPermission(linkForm.permission),
+    scope: formatCollaborationScope(linkForm.scope),
+  })
 })
-const linkPasswordLabel = computed(() => activeLink.value?.passwordEnabled ? '管理密码' : '启用密码')
+const linkPasswordLabel = computed(() => activeLink.value?.passwordEnabled
+  ? t('docs.collaboration.managePassword')
+  : t('docs.collaboration.enablePasswordShort'))
 const canCopyLink = computed(() => Boolean(activeLink.value?.enabled && collaborationLinkUrl.value))
 const canOpenCollaborators = computed(() => participantRows.value.length > 0)
 const isPasswordEnabled = computed(() => passwordEnabledOverride.value ?? Boolean(activeLink.value?.passwordEnabled))
@@ -154,19 +163,19 @@ const passwordValidationErrors = computed(() => {
     return []
   }
 
-  return [`请输入 ${DOCUMENT_COLLABORATION_LINK_PASSWORD_LENGTH} 位数字`]
+  return [t('docs.collaboration.passwordRule', { length: DOCUMENT_COLLABORATION_LINK_PASSWORD_LENGTH })]
 })
 const canSavePassword = computed(() => passwordValidationErrors.value.length === 0 && !isUpdatingLink.value)
 const shouldShowPasswordValidation = computed(() => passwordDraft.value.length > 0 && passwordValidationErrors.value.length > 0)
-const passwordStateLabel = computed(() => activeLink.value?.password ?? (linkPasswordPreview.value || '未设置'))
-const permissionOptions = DOCUMENT_COLLABORATION_PERMISSION_VALUES.map(value => ({
+const passwordStateLabel = computed(() => activeLink.value?.password ?? (linkPasswordPreview.value || t('docs.collaboration.passwordUnset')))
+const permissionOptions = computed(() => DOCUMENT_COLLABORATION_PERMISSION_VALUES.map(value => ({
   value,
-  label: DOCUMENT_COLLABORATION_PERMISSION_LABELS[value],
-}))
-const scopeOptions = DOCUMENT_COLLABORATION_SCOPE_VALUES.map(value => ({
+  label: formatCollaborationPermission(value),
+})))
+const scopeOptions = computed(() => DOCUMENT_COLLABORATION_SCOPE_VALUES.map(value => ({
   value,
-  label: DOCUMENT_COLLABORATION_SCOPE_LABELS[value],
-}))
+  label: formatCollaborationScope(value),
+})))
 
 watch(
   () => [props.modelValue, normalizedDocumentId.value] as const,
@@ -247,7 +256,7 @@ async function loadOverview() {
     syncLinkForm()
   }
   catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : '加载协作设置失败'
+    errorMessage.value = error instanceof Error ? error.message : t('docs.collaboration.loadFailed')
   }
   finally {
     isLoading.value = false
@@ -268,7 +277,7 @@ async function resolveInvitationUser() {
 
   if (!isInvitationUserCodeExact.value) {
     resolvedInvitee.value = null
-    inviteeResolveError.value = '请输入完整协作码，例如 SP-XXXXXXX'
+    inviteeResolveError.value = t('docs.collaboration.invalidUserCode')
     return
   }
 
@@ -282,7 +291,7 @@ async function resolveInvitationUser() {
   }
   catch (error) {
     resolvedInvitee.value = null
-    inviteeResolveError.value = error instanceof Error ? error.message : '未找到用户'
+    inviteeResolveError.value = error instanceof Error ? error.message : t('docs.collaboration.userNotFound')
   }
   finally {
     isResolvingInvitee.value = false
@@ -316,16 +325,16 @@ async function submitInvitation() {
 
   if (!canSubmitInvitation.value) {
     if (isResolvedOwner.value) {
-      ElMessage.warning('文档所有者无需邀请')
+      ElMessage.warning(t('docs.collaboration.inviteOwnerNotNeeded'))
       return
     }
 
     if (resolvedCollaborator.value) {
-      ElMessage.warning('该用户已经是协作者，请在协作者列表调整权限')
+      ElMessage.warning(t('docs.collaboration.alreadyCollaboratorWarning'))
       return
     }
 
-    ElMessage.warning('请先输入可邀请的用户')
+    ElMessage.warning(t('docs.collaboration.noInviteeWarning'))
     return
   }
 
@@ -341,10 +350,12 @@ async function submitInvitation() {
 
     resetInvitationDraft()
     await loadOverview()
-    ElMessage.success(isUpdatingInvitation ? '协作邀请已更新' : '协作邀请已发送')
+    ElMessage.success(isUpdatingInvitation
+      ? t('docs.collaboration.inviteUpdated')
+      : t('docs.collaboration.inviteSent'))
   }
   catch (error) {
-    ElMessage.error(error instanceof Error ? error.message : '发送邀请失败')
+    ElMessage.error(error instanceof Error ? error.message : t('docs.collaboration.inviteFailed'))
   }
   finally {
     isCreatingInvitation.value = false
@@ -391,10 +402,10 @@ async function saveLink() {
       }
     }
     collaborationLinkUrl.value = buildCollaborationLinkUrl(response.resolverCode)
-    ElMessage.success(hadActiveLink ? '协作链接设置已保存' : '协作链接已生成')
+    ElMessage.success(hadActiveLink ? t('docs.collaboration.linkSaved') : t('docs.collaboration.linkGenerated'))
   }
   catch (error) {
-    ElMessage.error(error instanceof Error ? error.message : '更新协作链接失败')
+    ElMessage.error(error instanceof Error ? error.message : t('docs.collaboration.linkUpdateFailed'))
   }
   finally {
     isUpdatingLink.value = false
@@ -428,7 +439,7 @@ async function handlePasswordEnabledChange(value: string | number | boolean) {
     passwordEnabledOverride.value = true
 
     if (activeLink.value?.password || linkPasswordPreview.value) {
-      await updateLinkPasswordEnabled(true, '链接密码已启用')
+      await updateLinkPasswordEnabled(true, t('docs.collaboration.linkPasswordEnabled'))
       return
     }
 
@@ -437,7 +448,7 @@ async function handlePasswordEnabledChange(value: string | number | boolean) {
   }
 
   passwordEnabledOverride.value = false
-  await updateLinkPasswordEnabled(false, '链接密码已停用')
+  await updateLinkPasswordEnabled(false, t('docs.collaboration.linkPasswordDisabled'))
 }
 
 async function submitLinkPassword() {
@@ -446,13 +457,15 @@ async function submitLinkPassword() {
   }
 
   if (passwordValidationErrors.value.length > 0) {
-    ElMessage.warning(`请输入 ${DOCUMENT_COLLABORATION_LINK_PASSWORD_LENGTH} 位数字密码`)
+    ElMessage.warning(t('docs.collaboration.passwordRequired', { length: DOCUMENT_COLLABORATION_LINK_PASSWORD_LENGTH }))
     return
   }
 
   await saveLinkPassword(
     trimmedPasswordDraft.value,
-    activeLink.value?.passwordEnabled ? '链接密码已修改' : '链接密码已启用',
+    activeLink.value?.passwordEnabled
+      ? t('docs.collaboration.linkPasswordChanged')
+      : t('docs.collaboration.linkPasswordEnabled'),
   )
 }
 
@@ -491,7 +504,7 @@ async function saveLinkPassword(password: string, successMessage: string) {
   }
   catch (error) {
     passwordEnabledOverride.value = null
-    ElMessage.error(error instanceof Error ? error.message : '设置链接密码失败')
+    ElMessage.error(error instanceof Error ? error.message : t('docs.collaboration.setPasswordFailed'))
     return false
   }
   finally {
@@ -503,7 +516,7 @@ async function enableLinkPasswordWithGeneratedCode() {
   const generatedPassword = generateCollaborationPassword()
   linkPasswordPreview.value = generatedPassword
   passwordDraft.value = generatedPassword
-  await saveLinkPassword(generatedPassword, '链接密码已启用')
+  await saveLinkPassword(generatedPassword, t('docs.collaboration.linkPasswordEnabled'))
 }
 
 async function updateLinkPasswordEnabled(enabled: boolean, successMessage: string) {
@@ -538,7 +551,7 @@ async function updateLinkPasswordEnabled(enabled: boolean, successMessage: strin
   }
   catch (error) {
     passwordEnabledOverride.value = null
-    ElMessage.error(error instanceof Error ? error.message : '更新链接密码开关失败')
+    ElMessage.error(error instanceof Error ? error.message : t('docs.collaboration.passwordToggleFailed'))
   }
   finally {
     isUpdatingLink.value = false
@@ -568,10 +581,10 @@ async function disableLink() {
     await disableDocumentCollaborationLink(normalizedDocumentId.value)
     await loadOverview()
     collaborationLinkUrl.value = ''
-    ElMessage.success('协作链接已停用')
+    ElMessage.success(t('docs.collaboration.linkDisabled'))
   }
   catch (error) {
-    ElMessage.error(error instanceof Error ? error.message : '停用协作链接失败')
+    ElMessage.error(error instanceof Error ? error.message : t('docs.collaboration.linkDisableFailed'))
   }
   finally {
     isUpdatingLink.value = false
@@ -584,16 +597,16 @@ async function copyLink() {
   }
 
   if (!isClipboardSupported.value) {
-    ElMessage.error('当前环境不支持复制')
+    ElMessage.error(t('docs.common.copyUnsupported'))
     return
   }
 
   try {
     await copy(collaborationLinkUrl.value)
-    ElMessage.success('协作链接已复制')
+    ElMessage.success(t('docs.collaboration.linkCopied'))
   }
   catch {
-    ElMessage.error('复制失败')
+    ElMessage.error(t('docs.common.copyFailed'))
   }
 }
 
@@ -603,9 +616,9 @@ async function removeGrant(row: DocumentCollaborationGrant) {
   }
 
   try {
-    await ElMessageBox.confirm('移除后，对方将不能继续访问该协作文档。', '移除协作者', {
-      confirmButtonText: '移除',
-      cancelButtonText: '取消',
+    await ElMessageBox.confirm(t('docs.collaboration.removeConfirmMessage'), t('docs.collaboration.removeConfirmTitle'), {
+      confirmButtonText: t('docs.collaboration.remove'),
+      cancelButtonText: t('docs.common.cancel'),
       type: 'warning',
     })
   }
@@ -618,10 +631,10 @@ async function removeGrant(row: DocumentCollaborationGrant) {
   try {
     await removeDocumentCollaborationGrant(normalizedDocumentId.value, row.id)
     await loadOverview()
-    ElMessage.success('已移除协作者')
+    ElMessage.success(t('docs.collaboration.removed'))
   }
   catch (error) {
-    ElMessage.error(error instanceof Error ? error.message : '移除协作者失败')
+    ElMessage.error(error instanceof Error ? error.message : t('docs.collaboration.removeFailed'))
   }
   finally {
     actionId.value = ''
@@ -743,10 +756,10 @@ async function saveCollaboratorPermission(
     }
 
     await loadOverview()
-    ElMessage.success('协作者权限已更新')
+    ElMessage.success(t('docs.collaboration.permissionUpdated'))
   }
   catch (error) {
-    ElMessage.error(error instanceof Error ? error.message : '更新协作者权限失败')
+    ElMessage.error(error instanceof Error ? error.message : t('docs.collaboration.permissionUpdateFailed'))
   }
   finally {
     actionId.value = ''
@@ -764,9 +777,9 @@ async function handleCollaboratorScopeCommand(
   }
 
   try {
-    await ElMessageBox.confirm(resolveScopeChangeMessage(scope), '调整协作范围', {
-      confirmButtonText: '确认调整',
-      cancelButtonText: '取消',
+    await ElMessageBox.confirm(resolveScopeChangeMessage(scope), t('docs.collaboration.scopeAdjustTitle'), {
+      confirmButtonText: t('docs.collaboration.scopeAdjustConfirm'),
+      cancelButtonText: t('docs.common.cancel'),
       type: 'warning',
     })
   }
@@ -785,10 +798,10 @@ async function handleCollaboratorScopeCommand(
       scope,
     })
     await loadOverview()
-    ElMessage.success('协作范围已更新')
+    ElMessage.success(t('docs.collaboration.scopeUpdated'))
   }
   catch (error) {
-    ElMessage.error(error instanceof Error ? error.message : '更新协作范围失败')
+    ElMessage.error(error instanceof Error ? error.message : t('docs.collaboration.scopeUpdateFailed'))
   }
   finally {
     actionId.value = ''
@@ -797,10 +810,10 @@ async function handleCollaboratorScopeCommand(
 
 function resolveScopeChangeMessage(scope: DocumentCollaborationScope) {
   if (scope === DOCUMENT_COLLABORATION_SCOPE.DESCENDANTS) {
-    return '调整为“当前页面及子页面”后，该协作者会按当前权限访问这棵子页面。'
+    return t('docs.collaboration.scopeTreeChangeMessage')
   }
 
-  return '调整为“仅当前页面”后，该协作者将不再通过这条授权访问子页面；子页面可能失去访问。'
+  return t('docs.collaboration.scopeSelfChangeMessage')
 }
 </script>
 
@@ -821,7 +834,7 @@ function resolveScopeChangeMessage(scope: DocumentCollaborationScope) {
           v-if="dialogView !== 'overview'"
           text
           class="document-collaboration-dialog__back h-8 min-w-8 w-8 rounded-lg p-0"
-          aria-label="返回协作设置"
+          :aria-label="t('docs.collaboration.backToSettings')"
           @click="backToOverview"
         >
           <SvgIcon category="ui" icon="arrow-left" size="1rem" />

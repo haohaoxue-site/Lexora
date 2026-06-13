@@ -5,6 +5,7 @@ import type { ChatComposerModelRef, ChatComposerModelSelectionKind } from './typ
 import { ArrowDown, Check, CloseBold } from '@element-plus/icons-vue'
 import { AGENT_TRANSLATOR_PRESET_TARGET_LANGUAGES } from '@haohaoxue/samepage-contracts/agent'
 import { computed, nextTick, shallowRef, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import ChatModelTrigger from './ChatModelTrigger.vue'
 
 const props = defineProps<{
@@ -26,6 +27,7 @@ const emits = defineEmits<{
   'send': []
   'stop': []
 }>()
+const { t } = useI18n({ useScope: 'global' })
 
 const SKILL_TRANSLATOR_COMMAND = 'translator'
 const TRANSLATOR_CUSTOM_LANGUAGE_COMMAND = '__custom__'
@@ -40,7 +42,7 @@ const translatorParameterDropdownDisabled = computed(() =>
 const skillCommandDropdownDisabled = computed(() =>
   Boolean(props.disabled || props.isStreaming),
 )
-const skillCommandTooltip = computed(() => props.isStreaming ? '生成中不可切换技能' : '选择技能')
+const skillCommandTooltip = computed(() => props.isStreaming ? t('chat.composer.selectSkillDisabled') : t('chat.composer.selectSkill'))
 const customLanguageSubmitDisabled = computed(() => !customLanguageDraft.value.trim())
 const customTranslatorTargetSelected = computed(() =>
   Boolean(props.translatorTargetLanguage && !props.translatorTargetLanguage.tag),
@@ -138,24 +140,24 @@ function cancelCustomTranslatorLanguageInput() {
 <template>
   <div class="chat-composer-toolbar">
     <div class="chat-composer-toolbar__left">
-      <ElTooltip content="上传文件" placement="top">
+      <ElTooltip :content="t('chat.composer.uploadFile')" placement="top">
         <button
           class="chat-composer-toolbar__icon-button"
           type="button"
           :disabled="props.disabled"
-          aria-label="上传文件"
+          :aria-label="t('chat.composer.uploadFile')"
           @click="emits('placeholderUpload')"
         >
           <SvgIcon category="ui" icon="plus" size="1rem" />
         </button>
       </ElTooltip>
 
-      <ElTooltip content="选择文档" placement="top">
+      <ElTooltip :content="t('chat.composer.selectDocument')" placement="top">
         <button
           class="chat-composer-toolbar__icon-button"
           type="button"
           :disabled="props.disabled"
-          aria-label="选择文档"
+          :aria-label="t('chat.composer.selectDocument')"
           @click="emits('openPanelPicker')"
         >
           <span class="chat-composer-toolbar__symbol">@</span>
@@ -176,7 +178,7 @@ function cancelCustomTranslatorLanguageInput() {
               class="chat-composer-toolbar__icon-button"
               type="button"
               :disabled="skillCommandDropdownDisabled"
-              aria-label="选择技能"
+              :aria-label="t('chat.composer.selectSkill')"
             >
               <span class="chat-composer-toolbar__symbol">/</span>
             </button>
@@ -190,7 +192,7 @@ function cancelCustomTranslatorLanguageInput() {
                   >
                     <span class="chat-composer-toolbar__command-main">
                       <SvgIcon category="ai" icon="translate" size="1rem" />
-                      <span>翻译</span>
+                      <span>{{ t('chat.composer.translate') }}</span>
                     </span>
                   </ElDropdownItem>
                 </template>
@@ -199,7 +201,7 @@ function cancelCustomTranslatorLanguageInput() {
                   disabled
                   class="chat-composer-toolbar__command-empty"
                 >
-                  暂无可用技能
+                  {{ t('chat.composer.noSkills') }}
                 </ElDropdownItem>
               </ElDropdownMenu>
             </template>
@@ -210,11 +212,11 @@ function cancelCustomTranslatorLanguageInput() {
       <div v-else class="chat-composer-toolbar__selected-skill">
         <span class="chat-composer-toolbar__skill-chip">
           <SvgIcon class="chat-composer-toolbar__skill-icon" category="ai" icon="translate" size="1rem" />
-          <ElTooltip content="点击退出技能 ESC" placement="top" effect="dark">
+          <ElTooltip :content="t('chat.composer.exitSkillTooltip')" placement="top" effect="dark">
             <button
               class="chat-composer-toolbar__skill-close"
               type="button"
-              aria-label="退出当前技能"
+              :aria-label="t('chat.composer.exitSkill')"
               @click="clearTranslatorSkill"
             >
               <ElIcon><CloseBold /></ElIcon>
@@ -223,13 +225,13 @@ function cancelCustomTranslatorLanguageInput() {
         </span>
 
         <div v-if="customLanguageEditing" class="chat-composer-toolbar__parameter-edit">
-          <span class="chat-composer-toolbar__parameter-prefix">翻译为</span>
+          <span class="chat-composer-toolbar__parameter-prefix">{{ t('chat.composer.translateTo') }}</span>
           <ElInput
             ref="customLanguageInputRef"
             v-model="customLanguageDraft"
             class="chat-composer-toolbar__parameter-value chat-composer-toolbar__parameter-input"
-            aria-label="自定义目标语言"
-            placeholder="目标语言"
+            :aria-label="t('chat.composer.customTargetLanguage')"
+            :placeholder="t('chat.composer.targetLanguage')"
             maxlength="10"
             @keydown.enter.stop.prevent="confirmCustomTranslatorLanguage"
             @keydown.esc.stop.prevent="cancelCustomTranslatorLanguageInput"
@@ -238,7 +240,7 @@ function cancelCustomTranslatorLanguageInput() {
             class="chat-composer-toolbar__parameter-action"
             type="button"
             :disabled="customLanguageSubmitDisabled"
-            aria-label="确认目标语言"
+            :aria-label="t('chat.composer.confirmTargetLanguage')"
             @click="confirmCustomTranslatorLanguage"
           >
             <ElIcon><Check /></ElIcon>
@@ -246,7 +248,7 @@ function cancelCustomTranslatorLanguageInput() {
           <button
             class="chat-composer-toolbar__parameter-action"
             type="button"
-            aria-label="取消输入"
+            :aria-label="t('chat.composer.cancelInput')"
             @click="cancelCustomTranslatorLanguageInput"
           >
             <ElIcon><CloseBold /></ElIcon>
@@ -263,9 +265,9 @@ function cancelCustomTranslatorLanguageInput() {
             class="chat-composer-toolbar__parameter-button"
             type="button"
             :disabled="translatorParameterDropdownDisabled"
-            :aria-label="`翻译为 ${props.translatorTargetLanguage.name}`"
+            :aria-label="t('chat.composer.translateToAria', { language: props.translatorTargetLanguage.name })"
           >
-            <span class="chat-composer-toolbar__parameter-prefix">翻译为</span>
+            <span class="chat-composer-toolbar__parameter-prefix">{{ t('chat.composer.translateTo') }}</span>
             <span class="chat-composer-toolbar__parameter-value">{{ props.translatorTargetLanguage.name }}</span>
             <ElIcon class="chat-composer-toolbar__parameter-arrow">
               <ArrowDown />
@@ -290,7 +292,7 @@ function cancelCustomTranslatorLanguageInput() {
                 class="chat-composer-toolbar__translate-item"
                 :class="{ 'is-selected': customTranslatorTargetSelected }"
               >
-                其他
+                {{ t('chat.composer.other') }}
               </ElDropdownItem>
             </ElDropdownMenu>
           </template>
@@ -306,12 +308,12 @@ function cancelCustomTranslatorLanguageInput() {
         @select="emits('selectModel', $event)"
       />
 
-      <ElTooltip :content="props.isStreaming ? '停止生成' : '发送'" placement="top">
+      <ElTooltip :content="props.isStreaming ? t('chat.composer.stop') : t('chat.composer.send')" placement="top">
         <button
           v-if="props.isStreaming"
           class="chat-composer-toolbar__send-button is-stop"
           type="button"
-          aria-label="停止生成"
+          :aria-label="t('chat.composer.stop')"
           @click="emits('stop')"
         >
           <ElIcon><CloseBold /></ElIcon>
@@ -321,7 +323,7 @@ function cancelCustomTranslatorLanguageInput() {
           class="chat-composer-toolbar__send-button"
           type="button"
           :disabled="props.disabled || !props.canSend"
-          aria-label="发送"
+          :aria-label="t('chat.composer.send')"
           @click="emits('send')"
         >
           <SvgIcon category="ui" icon="send-light" size="1rem" />

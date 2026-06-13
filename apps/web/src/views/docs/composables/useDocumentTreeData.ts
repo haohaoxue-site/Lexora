@@ -7,6 +7,7 @@ import type { DocumentDeletePlan } from '../utils/documentTree'
 import { formatDocumentCollectionLabel } from '@haohaoxue/samepage-shared/document'
 import { computed, shallowRef } from 'vue'
 import { getDocuments } from '@/apis/document'
+import { translate } from '@/i18n'
 import { useUiStore } from '@/stores/ui'
 import {
   findDocumentPath,
@@ -43,7 +44,7 @@ export function useDocumentTreeData(options: UseDocumentTreeDataOptions) {
   ))
   const breadcrumbLabels = computed(() => {
     if (!activePath.value) {
-      return ['文档']
+      return [translate('docs.common.documents')]
     }
 
     return [

@@ -1,4 +1,5 @@
 import { OAUTH_REDIRECT_ERROR_CODE } from '@haohaoxue/samepage-contracts/auth/constants'
+import { translate } from '@/i18n'
 
 interface ResolveOAuthRedirectErrorMessageOptions {
   purpose: 'login' | 'bind'
@@ -13,8 +14,10 @@ export function resolveOAuthRedirectErrorMessage(
   const normalizedErrorCode = errorCode?.trim()
   const fallbackMessage = options.fallbackMessage
     ?? (options.purpose === 'bind'
-      ? `${options.providerLabel ?? '第三方账号'} 账号绑定失败`
-      : '第三方登录失败，请稍后重试')
+      ? translate('oauthRedirect.bindFailed', {
+          provider: options.providerLabel ?? translate('oauthRedirect.thirdPartyAccount'),
+        })
+      : translate('oauthRedirect.loginFailedRetry'))
 
   if (!normalizedErrorCode) {
     return fallbackMessage
@@ -22,18 +25,22 @@ export function resolveOAuthRedirectErrorMessage(
 
   if (normalizedErrorCode === OAUTH_REDIRECT_ERROR_CODE.CALLBACK_FAILED) {
     if (options.purpose === 'bind') {
-      return `${options.providerLabel ?? '第三方账号'} 账号绑定失败，请稍后重试`
+      return translate('oauthRedirect.bindFailedRetry', {
+        provider: options.providerLabel ?? translate('oauthRedirect.thirdPartyAccount'),
+      })
     }
 
-    return '第三方登录失败，请稍后重试'
+    return translate('oauthRedirect.loginFailedRetry')
   }
 
   if (normalizedErrorCode === OAUTH_REDIRECT_ERROR_CODE.REGISTRATION_INVITE_REQUIRED) {
     if (options.purpose === 'bind') {
-      return `${options.providerLabel ?? '第三方账号'} 账号绑定失败，请稍后重试`
+      return translate('oauthRedirect.bindFailedRetry', {
+        provider: options.providerLabel ?? translate('oauthRedirect.thirdPartyAccount'),
+      })
     }
 
-    return '请先验证邀请码后再创建新账号。'
+    return translate('oauthRedirect.registrationInviteRequired')
   }
 
   return fallbackMessage

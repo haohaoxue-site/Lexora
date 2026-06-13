@@ -7,18 +7,20 @@ import type {
   CollaborationLinkPanelEmits,
   CollaborationLinkPanelProps,
 } from './typing'
+import { useI18n } from 'vue-i18n'
 
 const props = defineProps<CollaborationLinkPanelProps>()
 const emits = defineEmits<CollaborationLinkPanelEmits>()
 const permission = defineModel<DocumentCollaborationPermission>('permission', { required: true })
 const scope = defineModel<DocumentCollaborationScope>('scope', { required: true })
+const { t } = useI18n()
 </script>
 
 <template>
   <section class="collaboration-link-panel grid gap-3 py-4">
     <div class="flex items-center justify-between gap-4 max-[720px]:grid max-[720px]:items-stretch">
       <h3 class="m-0 text-[0.95rem] leading-[1.4] text-main">
-        链接协作
+        {{ t('docs.collaboration.linkCollaboration') }}
       </h3>
       <ElButton
         type="primary"
@@ -47,10 +49,10 @@ const scope = defineModel<DocumentCollaborationScope>('scope', { required: true 
           <template #dropdown>
             <ElDropdownMenu>
               <ElDropdownItem command="disabled" :disabled="!props.activeLink">
-                未开启
+                {{ t('docs.collaboration.linkAccessDisabled') }}
               </ElDropdownItem>
               <ElDropdownItem command="enabled">
-                获得链接的人
+                {{ t('docs.collaboration.linkAccessEnabled') }}
               </ElDropdownItem>
             </ElDropdownMenu>
           </template>
@@ -98,7 +100,7 @@ const scope = defineModel<DocumentCollaborationScope>('scope', { required: true 
         @click="emits('copyLink')"
       >
         <SvgIcon category="ui" icon="link" size="0.95rem" />
-        复制链接
+        {{ t('docs.publication.copyLink') }}
       </ElButton>
     </div>
   </section>

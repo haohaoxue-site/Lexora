@@ -1,12 +1,14 @@
 import type { FormInstance, FormRules } from 'element-plus'
 import type { ShallowRef } from 'vue'
 import { computed, onMounted, reactive, shallowRef } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { useFormSubmit } from '@/composables/useFormSubmit'
 import { useAuthStore } from '@/stores/auth'
 import { completeAuthNavigation } from '../utils/navigation'
 import { clearPasswordRegistrationInviteGrant, consumePasswordRegistrationInviteGrant } from '../utils/registration-invite'
 import {
+  createAuthRuleMessages,
   createConfirmPasswordRules,
   createDisplayNameRules,
   createEmailRules,
@@ -19,10 +21,11 @@ import {
 const EMAIL_VERIFICATION_CODE_RE = /^\d{6}$/
 
 export function useRegisterVerify(options: { registerFormRef: ShallowRef<FormInstance | null> }) {
+  const { t } = useI18n({ useScope: 'global' })
   const route = useRoute()
   const router = useRouter()
   const authStore = useAuthStore()
-  const statusLabel = shallowRef('完成邮箱注册')
+  const statusLabelKey = shallowRef('auth.registerVerify.title')
   const errorMessage = shallowRef('')
   const form = reactive({
     email: '',
@@ -31,37 +34,44 @@ export function useRegisterVerify(options: { registerFormRef: ShallowRef<FormIns
     password: '',
     confirmPassword: '',
   })
-  const formRules: FormRules<typeof form> = {
-    email: createEmailRules('注册邮箱'),
+  const ruleMessages = createAuthRuleMessages((key, params) => params ? t(key, params) : t(key))
+  const formRules = computed<FormRules<typeof form>>(() => ({
+    email: createEmailRules(t('auth.common.registerEmail'), ruleMessages),
     code: [
       {
         required: true,
-        message: '请输入 6 位验证码',
+        message: t('auth.validation.codeRequired'),
       },
       {
         pattern: EMAIL_VERIFICATION_CODE_RE,
-        message: '验证码需为 6 位数字',
+        message: t('auth.validation.codeInvalid'),
       },
     ],
-    displayName: createDisplayNameRules(),
-    password: createPasswordRules(),
-    confirmPassword: createConfirmPasswordRules(() => form.password),
-  }
+    displayName: createDisplayNameRules(t('auth.common.displayName'), ruleMessages),
+    password: createPasswordRules(t('auth.common.password'), ruleMessages),
+    confirmPassword: createConfirmPasswordRules(
+      () => form.password,
+      t('auth.common.confirmPassword'),
+      t('auth.validation.confirmPasswordMismatch'),
+      ruleMessages,
+    ),
+  }))
 
   const routeEmail = computed(() => typeof route.query.email === 'string' ? route.query.email.trim() : '')
   const isReady = computed(() => Boolean(form.email) && !errorMessage.value)
+  const statusLabel = computed(() => t(statusLabelKey.value))
   const pageDescription = computed(() => {
     if (errorMessage.value) {
-      return '注册信息无效，请重新填写邮箱后获取验证码。'
+      return t('auth.registerVerify.invalidDescription')
     }
 
-    return '输入验证码并设置密码后即可完成注册。'
+    return t('auth.registerVerify.description')
   })
 
   function initEmail() {
     if (!routeEmail.value || !isValidEmail(routeEmail.value)) {
-      statusLabel.value = '注册信息无效'
-      errorMessage.value = '缺少注册邮箱，请重新填写邮箱地址。'
+      statusLabelKey.value = 'auth.registerVerify.invalidTitle'
+      errorMessage.value = t('auth.registerVerify.missingEmail')
       return
     }
 
@@ -87,7 +97,7 @@ export function useRegisterVerify(options: { registerFormRef: ShallowRef<FormIns
         consumePasswordRegistrationInviteGrant(form.email),
       )
     },
-    fallbackError: '注册失败',
+    fallbackError: () => t('auth.registerVerify.failed'),
     onSuccess: () => {
       clearPasswordRegistrationInviteGrant()
       return completeAuthNavigation(router, authStore)

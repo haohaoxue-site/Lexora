@@ -1,5 +1,6 @@
 import type { EntityAvatarProps } from './typing'
 import { computed, shallowRef, watch } from 'vue'
+import { translate } from '@/i18n'
 
 function resolveSize(value: number | string) {
   return typeof value === 'number'
@@ -17,7 +18,7 @@ function resolveFontSize(value: number | string) {
 
 export function useEntityAvatar(props: Readonly<EntityAvatarProps>) {
   const imageLoadFailed = shallowRef(false)
-  const avatarAlt = computed(() => props.alt?.trim() || `${props.name} 的图标`)
+  const avatarAlt = computed(() => props.alt?.trim() || translate('common.iconAlt', { name: props.name }))
   const avatarInitial = computed(() => props.name.trim().slice(0, 1).toUpperCase() || '?')
   const resolvedSrc = computed(() => {
     const src = props.src?.trim()

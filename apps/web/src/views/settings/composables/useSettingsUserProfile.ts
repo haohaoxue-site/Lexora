@@ -1,10 +1,12 @@
 import { createSharedComposable } from '@vueuse/core'
 import { computed, reactive, shallowRef } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useUserStore } from '@/stores/user'
 import { ElMessage } from '@/utils/element-plus'
 import { getRequestErrorDisplayMessage } from '@/utils/request-error'
 
 export const useSettingsUserProfile = createSharedComposable(() => {
+  const { t } = useI18n({ useScope: 'global' })
   const userStore = useUserStore()
   const isSavingDisplayName = shallowRef(false)
   const isUploadingAvatar = shallowRef(false)
@@ -40,10 +42,10 @@ export const useSettingsUserProfile = createSharedComposable(() => {
     try {
       await userStore.updateProfile(profileForm.displayName.trim())
       profileForm.displayName = userStore.currentUser?.displayName ?? profileForm.displayName
-      ElMessage.success('显示名称已更新')
+      ElMessage.success(t('settings.user.profile.displayNameUpdated'))
     }
     catch (error) {
-      ElMessage.error(getRequestErrorDisplayMessage(error, '保存显示名称失败'))
+      ElMessage.error(getRequestErrorDisplayMessage(error, t('settings.user.profile.displayNameSaveFailed')))
     }
     finally {
       isSavingDisplayName.value = false
@@ -55,10 +57,10 @@ export const useSettingsUserProfile = createSharedComposable(() => {
 
     try {
       await userStore.updateAvatar(file)
-      ElMessage.success('头像已更新')
+      ElMessage.success(t('settings.user.profile.avatarUpdated'))
     }
     catch (error) {
-      ElMessage.error(getRequestErrorDisplayMessage(error, '上传头像失败'))
+      ElMessage.error(getRequestErrorDisplayMessage(error, t('settings.user.profile.avatarUploadFailed')))
     }
     finally {
       isUploadingAvatar.value = false

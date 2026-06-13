@@ -1,12 +1,13 @@
 import type { FormInstance } from 'element-plus'
 import { shallowRef } from 'vue'
+import { translate } from '@/i18n'
 import { ElMessage } from '@/utils/element-plus'
 import { getRequestErrorDisplayMessage } from '@/utils/request-error'
 
 export function useFormSubmit<T = void>(options: {
   action: () => Promise<T>
   validate?: () => boolean
-  fallbackError?: string
+  fallbackError?: string | (() => string)
   onSuccess?: (result: T) => void | Promise<void>
 }) {
   const isSubmitting = shallowRef(false)
@@ -26,7 +27,11 @@ export function useFormSubmit<T = void>(options: {
       await options.onSuccess?.(result)
     }
     catch (error) {
-      ElMessage.error(getRequestErrorDisplayMessage(error, options.fallbackError ?? '操作失败'))
+      const fallbackError = typeof options.fallbackError === 'function'
+        ? options.fallbackError()
+        : options.fallbackError
+
+      ElMessage.error(getRequestErrorDisplayMessage(error, fallbackError ?? translate('common.requestFailed')))
     }
     finally {
       isSubmitting.value = false

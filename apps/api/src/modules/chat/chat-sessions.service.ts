@@ -20,6 +20,7 @@ import type {
   ChatSessionOrigin,
   ChatSessionSummary,
   ChatSkillInvocation,
+  ResolvedLanguagePreference,
 } from '@haohaoxue/samepage-contracts'
 import type { AgentProfileForGeneration } from '../agent/agent-profiles.service'
 import type { ChatContextSnapshotCreateData } from './chat-context-snapshots.service'
@@ -30,6 +31,7 @@ import {
   AgentRuntimeModelTargetSchema,
   AgentRuntimeSkillContextSchema,
   AI_MODEL_INTENT_KEY,
+  API_ERROR_CODE,
   CHAT_RUN_STATUS,
   CHAT_SESSION_CHANNEL,
   CHAT_SESSION_DEFAULT_TITLE,
@@ -40,7 +42,8 @@ import {
   ChatSkillInvocationSchema,
   WORKSPACE_MEMBER_STATUS,
 } from '@haohaoxue/samepage-contracts'
-import { buildAgentChatThreadId } from '@haohaoxue/samepage-shared'
+import { LANGUAGE_PREFERENCE } from '@haohaoxue/samepage-contracts/user/constants'
+import { buildAgentChatThreadId, resolveLanguagePreference } from '@haohaoxue/samepage-shared'
 import {
   BadRequestException,
   ConflictException,
@@ -59,12 +62,14 @@ import {
   ChatSessionChannel as PrismaChatSessionChannel,
 } from '@prisma/client'
 import { PrismaService } from '../../database/prisma.service'
+import { apiConflict, apiNotFound } from '../../utils/api-error'
 import {
   AgentProfilesService,
   resolveAgentProfileFixedModelRef,
 } from '../agent/agent-profiles.service'
 import { AgentSkillsService } from '../agent/agent-skills.service'
 import { AiModelResolverService } from '../ai/models/resolver.service'
+import { mapLanguagePreference } from '../users/users.utils'
 import { ChatContextSnapshotsService } from './chat-context-snapshots.service'
 import { ChatSessionEventsService } from './chat-session-events.service'
 import {
@@ -752,11 +757,11 @@ export class ChatSessionsService {
     })
 
     if (!generation) {
-      throw new NotFoundException('聊天生成不存在')
+      throw apiNotFound(API_ERROR_CODE.CHAT_GENERATION_NOT_FOUND)
     }
 
     if (!bootstrappableGenerationStatuses.has(generation.status)) {
-      throw new ConflictException('聊天生成已结束')
+      throw apiConflict(API_ERROR_CODE.CHAT_GENERATION_FINISHED)
     }
 
     const modelTargetSnapshot = ChatGenerationModelTargetSnapshotSchema.parse(generation.modelTargetSnapshot)
@@ -783,7 +788,7 @@ export class ChatSessionsService {
     ])
 
     if (context.assistantMessageId !== generation.assistantMessageId) {
-      throw new ConflictException('聊天生成上下文不匹配')
+      throw apiConflict(API_ERROR_CODE.CHAT_GENERATION_CONTEXT_MISMATCH)
     }
 
     return ChatGenerationBootstrapSchema.parse({
@@ -809,12 +814,24 @@ export class ChatSessionsService {
     triggerUserMessageId: string
     memory: AgentMemoryRunOptions
   }): Promise<AgentChatRuntimeContext> {
-    const session = await this.findAccessibleSessionRunDetailOrThrow(input.actorId, input.sessionId)
+    const [session, actor] = await Promise.all([
+      this.findAccessibleSessionRunDetailOrThrow(input.actorId, input.sessionId),
+      this.prisma.user.findUnique({
+        where: { id: input.actorId },
+        select: {
+          preference: {
+            select: {
+              languagePreference: true,
+            },
+          },
+        },
+      }),
+    ])
     const path = resolvePathToMessage(session.messages, input.triggerUserMessageId)
     const triggerMessage = path.at(-1) ?? null
 
     if (!triggerMessage || triggerMessage.role !== ChatSessionMessageRole.USER) {
-      throw new NotFoundException('聊天触发消息不存在')
+      throw apiNotFound(API_ERROR_CODE.CHAT_TRIGGER_MESSAGE_NOT_FOUND)
     }
 
     const activePath = resolveActivePath(session.messages, session.activeRootMessageId)
@@ -823,7 +840,7 @@ export class ChatSessionsService {
     )
 
     if (!assistantMessage) {
-      throw new ConflictException('聊天触发消息缺少助手响应')
+      throw apiConflict(API_ERROR_CODE.CHAT_TRIGGER_ASSISTANT_MISSING)
     }
 
     return {
@@ -834,6 +851,9 @@ export class ChatSessionsService {
       triggerUserMessageId: triggerMessage.id,
       triggerParentMessageId: triggerMessage.parentMessageId,
       assistantMessageId: assistantMessage.id,
+      defaultResponseLanguage: resolveAgentDefaultResponseLanguage(
+        mapLanguagePreference(actor?.preference?.languagePreference),
+      ),
       messages: activePath
         .filter(message => message.role === ChatSessionMessageRole.USER || message.status === ChatSessionMessageStatus.COMPLETED)
         .map(message => this.toAgentContextMessage(message)),
@@ -1883,6 +1903,14 @@ export class ChatSessionsService {
       modelId: snapshot.modelId,
     })
   }
+}
+
+function resolveAgentDefaultResponseLanguage(
+  languagePreference: ReturnType<typeof mapLanguagePreference>,
+): ResolvedLanguagePreference {
+  return languagePreference === LANGUAGE_PREFERENCE.AUTO
+    ? LANGUAGE_PREFERENCE.ZH_CN
+    : resolveLanguagePreference(languagePreference, [])
 }
 
 function toChatSessionDetailRecord(

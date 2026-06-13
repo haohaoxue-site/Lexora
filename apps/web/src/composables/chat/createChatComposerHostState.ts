@@ -9,6 +9,7 @@ import type {
 } from '@/components/chat-composer/typing'
 import { shallowRef } from 'vue'
 import { createEmptyChatComposerContentJSON } from '@/components/chat-composer/serialization'
+import { translate } from '@/i18n'
 import { ElMessage } from '@/utils/element-plus'
 
 const HIGHLIGHT_DURATION_MS = 1400
@@ -58,7 +59,7 @@ export function createChatComposerHostState(options: {
   async function handleSend(payload: ChatComposerSubmitPayload) {
     const modelRef = normalizeSelectedModelRef(options.model.composerSelectedModelRef.value)
     if (!modelRef) {
-      ElMessage.warning('请先选择模型')
+      ElMessage.warning(translate('chat.composer.selectModel'))
       return false
     }
 
@@ -77,7 +78,7 @@ export function createChatComposerHostState(options: {
   }
 
   function handlePlaceholderUpload() {
-    ElMessage.info('文件上传入口待接入')
+    ElMessage.info(translate('chat.composer.placeholderUpload'))
   }
 
   function highlightAttachment(attachmentId: string) {

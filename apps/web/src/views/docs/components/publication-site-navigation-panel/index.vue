@@ -27,6 +27,7 @@ import {
 } from '@haohaoxue/samepage-contracts/document/publication/constants'
 import { normalizePublicationHref } from '@haohaoxue/samepage-shared/document'
 import { computed, shallowRef, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import Empty from '@/components/empty'
 import { ElMessage } from '@/utils/element-plus'
 
@@ -34,6 +35,7 @@ const props = withDefaults(defineProps<PublicationSiteNavigationPanelProps>(), {
   saving: false,
 })
 const emits = defineEmits<PublicationSiteNavigationPanelEmits>()
+const { t } = useI18n()
 
 const drafts = shallowRef<SiteNavigationItemDraft[]>([])
 const selectedLocalId = shallowRef('')
@@ -82,7 +84,7 @@ function addInternalItem() {
     {
       localId,
       type: DOCUMENT_PUBLICATION_NAV_ITEM_TYPE.INTERNAL,
-      label: '首页',
+      label: t('docs.publicationSite.navigation.home'),
       target: DOCUMENT_PUBLICATION_NAV_ITEM_INTERNAL_TARGET.HOME,
       targetId: '',
       url: '',
@@ -102,7 +104,7 @@ function addExternalItem() {
     {
       localId,
       type: DOCUMENT_PUBLICATION_NAV_ITEM_TYPE.EXTERNAL,
-      label: '外部链接',
+      label: t('docs.publicationSite.navigation.externalLink'),
       target: DOCUMENT_PUBLICATION_NAV_ITEM_INTERNAL_TARGET.HOME,
       targetId: '',
       url: 'https://',
@@ -222,7 +224,7 @@ function saveSiteNavigationItems() {
     const label = draft.label.trim()
 
     if (!label) {
-      ElMessage.warning('导航名称不能为空')
+      ElMessage.warning(t('docs.publicationSite.navigation.labelRequired'))
       return
     }
 
@@ -230,14 +232,14 @@ function saveSiteNavigationItems() {
       const url = draft.url.trim()
 
       if (!url) {
-        ElMessage.warning(`请填写「${label}」的外部链接`)
+        ElMessage.warning(t('docs.publicationSite.navigation.externalUrlRequired', { label }))
         return
       }
 
       const safeUrl = normalizePublicationHref(url)
 
       if (!safeUrl) {
-        ElMessage.warning(`「${label}」只支持 http(s) 链接或站内路径`)
+        ElMessage.warning(t('docs.publicationSite.navigation.invalidUrl', { label }))
         return
       }
 
@@ -258,7 +260,7 @@ function saveSiteNavigationItems() {
       : draft.targetId.trim()
 
     if (draft.target !== DOCUMENT_PUBLICATION_NAV_ITEM_INTERNAL_TARGET.HOME && !targetId) {
-      ElMessage.warning(`请选择「${label}」的内部目标`)
+      ElMessage.warning(t('docs.publicationSite.navigation.internalTargetRequired', { label }))
       return
     }
 
@@ -267,7 +269,7 @@ function saveSiteNavigationItems() {
         .some(option => option.value === targetId)
 
       if (!isAvailableTarget) {
-        ElMessage.warning(`「${label}」的内部目标当前不可用`)
+        ElMessage.warning(t('docs.publicationSite.navigation.internalTargetUnavailable', { label }))
         return
       }
     }
@@ -311,30 +313,34 @@ function resolvePageTargetLabel(page: PublicationPage) {
 }
 
 function resolveTypeLabel(item: SiteNavigationItemDraft) {
-  return item.type === DOCUMENT_PUBLICATION_NAV_ITEM_TYPE.INTERNAL ? '内部链接' : '外部链接'
+  return item.type === DOCUMENT_PUBLICATION_NAV_ITEM_TYPE.INTERNAL
+    ? t('docs.publicationSite.navigation.internalLink')
+    : t('docs.publicationSite.navigation.externalLink')
 }
 
 function resolveStatusLabel(item: SiteNavigationItemDraft) {
-  return item.status === DOCUMENT_PUBLICATION_ENTRY_STATUS.ACTIVE ? '显示' : '隐藏'
+  return item.status === DOCUMENT_PUBLICATION_ENTRY_STATUS.ACTIVE
+    ? t('docs.publicationSite.status.visible')
+    : t('docs.publicationSite.status.hidden')
 }
 
 function resolveTargetLabel(item: SiteNavigationItemDraft) {
   if (item.type === DOCUMENT_PUBLICATION_NAV_ITEM_TYPE.EXTERNAL) {
-    return item.url || '未填写链接'
+    return item.url || t('docs.publicationSite.navigation.notFilledLink')
   }
 
   if (item.target === DOCUMENT_PUBLICATION_NAV_ITEM_INTERNAL_TARGET.HOME) {
-    return '站点首页'
+    return t('docs.publicationSite.navigation.home')
   }
 
   if (item.target === DOCUMENT_PUBLICATION_NAV_ITEM_INTERNAL_TARGET.SECTION) {
-    return sectionTitleById.value.get(item.targetId) ?? '未选择分组'
+    return sectionTitleById.value.get(item.targetId) ?? t('docs.publicationSite.navigation.noSection')
   }
 
   const page = pageById.value.get(item.targetId)
 
   if (!page) {
-    return '未选择页面'
+    return t('docs.publicationSite.navigation.noPage')
   }
 
   return resolvePageTargetLabel(page)
@@ -412,28 +418,28 @@ function compareOrderedItem(left: { order: number, updatedAt: string }, right: {
     <header class="flex flex-wrap items-end justify-between gap-3">
       <div class="grid gap-1">
         <h2 class="m-0 text-xl font-semibold leading-7 text-main">
-          站点导航
+          {{ t('docs.publicationSite.navigation.title') }}
         </h2>
       </div>
 
       <div class="inline-flex flex-wrap items-center justify-end gap-2">
         <ElDropdown trigger="click" @command="handleCreateCommand">
           <ElButton :icon="Plus">
-            新增导航项
+            {{ t('docs.publicationSite.navigation.addItem') }}
           </ElButton>
           <template #dropdown>
             <ElDropdownMenu>
               <ElDropdownItem command="internal">
-                内部链接
+                {{ t('docs.publicationSite.navigation.internalLink') }}
               </ElDropdownItem>
               <ElDropdownItem command="external">
-                外部链接
+                {{ t('docs.publicationSite.navigation.externalLink') }}
               </ElDropdownItem>
             </ElDropdownMenu>
           </template>
         </ElDropdown>
         <ElButton type="primary" :loading="saving" @click="saveSiteNavigationItems">
-          保存站点导航
+          {{ t('docs.publicationSite.navigation.save') }}
         </ElButton>
       </div>
     </header>
@@ -448,10 +454,10 @@ function compareOrderedItem(left: { order: number, updatedAt: string }, right: {
           @row-click="handleRowClick"
         >
           <template #empty>
-            <Empty compact description="暂无站点导航" />
+            <Empty compact :description="t('docs.publicationSite.navigation.empty')" />
           </template>
 
-          <ElTableColumn label="导航项" min-width="180" show-overflow-tooltip>
+          <ElTableColumn :label="t('docs.publicationSite.navigation.item')" min-width="180" show-overflow-tooltip>
             <template #default="{ row }">
               <span class="flex min-w-0 items-center gap-3">
                 <span class="publication-site-navigation-panel__item-icon flex h-9 w-9 items-center justify-center rounded-lg">
@@ -468,7 +474,7 @@ function compareOrderedItem(left: { order: number, updatedAt: string }, right: {
             </template>
           </ElTableColumn>
 
-          <ElTableColumn label="类型" width="96">
+          <ElTableColumn :label="t('docs.publicationSite.navigation.type')" width="96">
             <template #default="{ row }">
               <ElTag size="small" effect="plain">
                 {{ resolveTypeLabel(row) }}
@@ -476,7 +482,7 @@ function compareOrderedItem(left: { order: number, updatedAt: string }, right: {
             </template>
           </ElTableColumn>
 
-          <ElTableColumn label="目标" min-width="140" show-overflow-tooltip>
+          <ElTableColumn :label="t('docs.publicationSite.navigation.target')" min-width="140" show-overflow-tooltip>
             <template #default="{ row }">
               <span class="text-sm leading-5 text-secondary">
                 {{ resolveTargetLabel(row) }}
@@ -484,7 +490,7 @@ function compareOrderedItem(left: { order: number, updatedAt: string }, right: {
             </template>
           </ElTableColumn>
 
-          <ElTableColumn label="状态" width="78">
+          <ElTableColumn :label="t('docs.publicationSite.navigation.status')" width="78">
             <template #default="{ row }">
               <ElTag
                 size="small"
@@ -496,7 +502,7 @@ function compareOrderedItem(left: { order: number, updatedAt: string }, right: {
             </template>
           </ElTableColumn>
 
-          <ElTableColumn label="操作" width="128" align="right" header-align="right">
+          <ElTableColumn :label="t('docs.common.operation')" width="128" align="right" header-align="right">
             <template #default="{ row }">
               <div class="inline-flex items-center justify-end gap-1">
                 <ElButton
@@ -504,7 +510,7 @@ function compareOrderedItem(left: { order: number, updatedAt: string }, right: {
                   class="publication-site-navigation-panel__icon-button h-7 min-w-7 w-7 rounded-lg p-0"
                   :icon="ArrowUp"
                   :disabled="isDraftMoveDisabled(row, -1)"
-                  title="上移"
+                  :title="t('docs.publicationSite.navigation.moveUp')"
                   @click.stop="moveDraft(row.localId, -1)"
                 />
                 <ElButton
@@ -512,7 +518,7 @@ function compareOrderedItem(left: { order: number, updatedAt: string }, right: {
                   class="publication-site-navigation-panel__icon-button h-7 min-w-7 w-7 rounded-lg p-0"
                   :icon="ArrowDown"
                   :disabled="isDraftMoveDisabled(row, 1)"
-                  title="下移"
+                  :title="t('docs.publicationSite.navigation.moveDown')"
                   @click.stop="moveDraft(row.localId, 1)"
                 />
                 <ElDropdown trigger="click">
@@ -520,16 +526,16 @@ function compareOrderedItem(left: { order: number, updatedAt: string }, right: {
                     text
                     class="publication-site-navigation-panel__icon-button h-7 min-w-7 w-7 rounded-lg p-0"
                     :icon="MoreFilled"
-                    title="更多操作"
+                    :title="t('docs.common.moreActions')"
                     @click.stop
                   />
                   <template #dropdown>
                     <ElDropdownMenu>
                       <ElDropdownItem @click="toggleDraftStatus(row)">
-                        {{ row.status === DOCUMENT_PUBLICATION_ENTRY_STATUS.ACTIVE ? '隐藏导航项' : '显示导航项' }}
+                        {{ row.status === DOCUMENT_PUBLICATION_ENTRY_STATUS.ACTIVE ? t('docs.publicationSite.navigation.hideItem') : t('docs.publicationSite.navigation.showItem') }}
                       </ElDropdownItem>
                       <ElDropdownItem @click="removeDraft(row.localId)">
-                        删除导航项
+                        {{ t('docs.publicationSite.navigation.deleteItem') }}
                       </ElDropdownItem>
                     </ElDropdownMenu>
                   </template>
@@ -544,15 +550,15 @@ function compareOrderedItem(left: { order: number, updatedAt: string }, right: {
         <section v-if="selectedDraft" class="publication-site-navigation-panel__panel grid gap-4 rounded-xl border bg-surface p-4">
           <div class="grid gap-1">
             <h2 class="m-0 text-base font-semibold leading-6 text-main">
-              编辑导航项
+              {{ t('docs.publicationSite.navigation.editTitle') }}
             </h2>
             <p class="m-0 text-xs leading-5 text-tertiary">
-              调整当前导航项的名称和目标。
+              {{ t('docs.publicationSite.navigation.editDescription') }}
             </p>
           </div>
 
           <ElForm label-position="top">
-            <ElFormItem label="名称">
+            <ElFormItem :label="t('docs.publicationSite.navigation.name')">
               <ElInput
                 :model-value="selectedDraft.label"
                 maxlength="40"
@@ -560,43 +566,43 @@ function compareOrderedItem(left: { order: number, updatedAt: string }, right: {
               />
             </ElFormItem>
 
-            <ElFormItem label="类型">
+            <ElFormItem :label="t('docs.publicationSite.navigation.type')">
               <ElRadioGroup
                 :model-value="selectedDraft.type"
                 class="publication-site-navigation-panel__type-group"
                 @change="value => updateDraftType(selectedDraft, value)"
               >
                 <ElRadioButton
-                  label="内部链接"
+                  :label="t('docs.publicationSite.navigation.internalLink')"
                   :value="DOCUMENT_PUBLICATION_NAV_ITEM_TYPE.INTERNAL"
                 />
                 <ElRadioButton
-                  label="外部链接"
+                  :label="t('docs.publicationSite.navigation.externalLink')"
                   :value="DOCUMENT_PUBLICATION_NAV_ITEM_TYPE.EXTERNAL"
                 />
               </ElRadioGroup>
             </ElFormItem>
 
             <template v-if="selectedDraft.type === DOCUMENT_PUBLICATION_NAV_ITEM_TYPE.INTERNAL">
-              <ElFormItem label="内部目标">
+              <ElFormItem :label="t('docs.publicationSite.navigation.internalTarget')">
                 <ElSelect
                   :model-value="selectedDraft.target"
                   @change="value => patchDraft(selectedDraft.localId, { target: value, targetId: '' })"
                 >
-                  <ElOption label="站点首页" :value="DOCUMENT_PUBLICATION_NAV_ITEM_INTERNAL_TARGET.HOME" />
-                  <ElOption label="分组" :value="DOCUMENT_PUBLICATION_NAV_ITEM_INTERNAL_TARGET.SECTION" />
-                  <ElOption label="页面" :value="DOCUMENT_PUBLICATION_NAV_ITEM_INTERNAL_TARGET.PAGE" />
+                  <ElOption :label="t('docs.publicationSite.navigation.home')" :value="DOCUMENT_PUBLICATION_NAV_ITEM_INTERNAL_TARGET.HOME" />
+                  <ElOption :label="t('docs.publicationSite.navigation.section')" :value="DOCUMENT_PUBLICATION_NAV_ITEM_INTERNAL_TARGET.SECTION" />
+                  <ElOption :label="t('docs.publicationSite.navigation.page')" :value="DOCUMENT_PUBLICATION_NAV_ITEM_INTERNAL_TARGET.PAGE" />
                 </ElSelect>
               </ElFormItem>
 
               <ElFormItem
                 v-if="selectedDraft.target !== DOCUMENT_PUBLICATION_NAV_ITEM_INTERNAL_TARGET.HOME"
-                label="目标"
+                :label="t('docs.publicationSite.navigation.target')"
               >
                 <ElSelect
                   :model-value="selectedDraft.targetId"
-                  placeholder="选择目标"
-                  no-data-text="暂无可选目标"
+                  :placeholder="t('docs.publicationSite.navigation.chooseTarget')"
+                  :no-data-text="t('docs.publicationSite.navigation.noTargets')"
                   @change="value => patchDraft(selectedDraft.localId, { targetId: value })"
                 >
                   <ElOption
@@ -610,7 +616,7 @@ function compareOrderedItem(left: { order: number, updatedAt: string }, right: {
             </template>
 
             <template v-else>
-              <ElFormItem label="目标">
+              <ElFormItem :label="t('docs.publicationSite.navigation.target')">
                 <ElInput
                   :model-value="selectedDraft.url"
                   placeholder="https://example.com"
@@ -622,7 +628,7 @@ function compareOrderedItem(left: { order: number, updatedAt: string }, right: {
         </section>
 
         <section v-else class="publication-site-navigation-panel__panel rounded-xl border bg-surface p-4">
-          <Empty compact description="选择一个导航项" />
+          <Empty compact :description="t('docs.publicationSite.navigation.selectItem')" />
         </section>
       </aside>
     </div>

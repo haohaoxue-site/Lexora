@@ -7,15 +7,13 @@ import type { StorageObject } from '../../infrastructure/storage/storage.interfa
 import { Buffer } from 'node:buffer'
 import { createSecretKey, randomUUID } from 'node:crypto'
 import {
+  API_ERROR_CODE,
   PLATFORM_NOTIFICATION_IMAGE_MAX_BYTES,
   SERVER_PATH,
 } from '@haohaoxue/samepage-contracts'
 import { prettyBytes } from '@haohaoxue/samepage-shared'
 import {
-  BadRequestException,
   Injectable,
-  NotFoundException,
-  PayloadTooLargeException,
 } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import {
@@ -26,6 +24,7 @@ import { parse, serialize } from 'cookie'
 import { jwtVerify, SignJWT } from 'jose'
 import { PrismaService } from '../../database/prisma.service'
 import { StorageService } from '../../infrastructure/storage/storage.service'
+import { apiBadRequest, apiNotFound, apiPayloadTooLarge } from '../../utils/api-error'
 import { sha256Hex } from '../../utils/hash'
 
 const PLATFORM_NOTIFICATION_ASSET_BUCKET = 'notification-asset'
@@ -181,7 +180,7 @@ export class NotificationAssetsService {
     })
 
     if (count !== assetIds.length) {
-      throw new BadRequestException('正文中包含无效站内信图片')
+      throw apiBadRequest(API_ERROR_CODE.NOTIFICATION_ASSET_INVALID)
     }
   }
 
@@ -213,7 +212,7 @@ export class NotificationAssetsService {
       })
 
       if (attachResult.count !== assetIds.length) {
-        throw new BadRequestException('正文中包含无效站内信图片')
+        throw apiBadRequest(API_ERROR_CODE.NOTIFICATION_ASSET_INVALID)
       }
     }
 
@@ -259,7 +258,7 @@ export class NotificationAssetsService {
     })
 
     if (!asset) {
-      throw new NotFoundException('资源不存在')
+      throw apiNotFound(API_ERROR_CODE.RESOURCE_NOT_FOUND)
     }
 
     return this.storageService.getObject({
@@ -352,7 +351,7 @@ export class NotificationAssetsService {
     const token = parse(cookieHeader ?? '')[PLATFORM_NOTIFICATION_ASSET_ACCESS_COOKIE_NAME]
 
     if (!token) {
-      throw new NotFoundException('资源不存在')
+      throw apiNotFound(API_ERROR_CODE.RESOURCE_NOT_FOUND)
     }
 
     try {
@@ -369,13 +368,13 @@ export class NotificationAssetsService {
         payload.tokenType !== PLATFORM_NOTIFICATION_ASSET_ACCESS_TOKEN_TYPE
         || (payload.kind !== 'admin' && payload.kind !== 'published')
       ) {
-        throw new NotFoundException('资源不存在')
+        throw apiNotFound(API_ERROR_CODE.RESOURCE_NOT_FOUND)
       }
 
       return payload
     }
     catch {
-      throw new NotFoundException('资源不存在')
+      throw apiNotFound(API_ERROR_CODE.RESOURCE_NOT_FOUND)
     }
   }
 }
@@ -387,20 +386,20 @@ function assertNotificationImageMimeType(mimeType: string): PlatformNotification
     return normalizedMimeType as PlatformNotificationImageMimeType
   }
 
-  throw new BadRequestException('图片仅支持 JPG、PNG、WEBP、GIF 格式')
+  throw apiBadRequest(API_ERROR_CODE.NOTIFICATION_IMAGE_UNSUPPORTED_TYPE)
 }
 
 function assertNotificationImageBuffer(buffer: Buffer, mimeType: PlatformNotificationImageMimeType): void {
   if (!buffer.length) {
-    throw new BadRequestException('图片文件不能为空')
+    throw apiBadRequest(API_ERROR_CODE.NOTIFICATION_IMAGE_EMPTY)
   }
 
   if (buffer.length > PLATFORM_NOTIFICATION_IMAGE_MAX_BYTES) {
-    throw new PayloadTooLargeException(PLATFORM_NOTIFICATION_IMAGE_TOO_LARGE_MESSAGE)
+    throw apiPayloadTooLarge(API_ERROR_CODE.NOTIFICATION_IMAGE_TOO_LARGE, PLATFORM_NOTIFICATION_IMAGE_TOO_LARGE_MESSAGE)
   }
 
   if (!isNotificationImageSignatureMatched(buffer, mimeType)) {
-    throw new BadRequestException('图片文件格式不正确')
+    throw apiBadRequest(API_ERROR_CODE.NOTIFICATION_IMAGE_SIGNATURE_MISMATCH)
   }
 }
 

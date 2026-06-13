@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { Plus } from '@element-plus/icons-vue'
+import { useI18n } from 'vue-i18n'
 import PagePanel from '@/layouts/panels/page-panel'
 import AdminPageHeader from '../../components/page-header'
 import { useAdminNotifications } from '../../composables/useAdminNotifications'
@@ -39,15 +40,16 @@ const {
   uploadNotificationImage,
   resolveNotificationImageSrc,
 } = useAdminNotifications()
+const { t } = useI18n({ useScope: 'global' })
 </script>
 
 <template>
   <PagePanel>
     <template #header>
       <div class="admin-notifications__header flex min-w-0 flex-1 items-center justify-between gap-3">
-        <AdminPageHeader title="站内信" />
+        <AdminPageHeader :title="t('admin.pages.notifications')" />
         <ElButton type="primary" :icon="Plus" @click="openCreateDrawer">
-          新建
+          {{ t('admin.common.create') }}
         </ElButton>
       </div>
     </template>
@@ -63,7 +65,7 @@ const {
           @change="handleStatusFilterChange"
         />
         <ElButton plain :loading="isLoading" @click="loadNotifications">
-          刷新
+          {{ t('admin.common.refresh') }}
         </ElButton>
       </div>
 

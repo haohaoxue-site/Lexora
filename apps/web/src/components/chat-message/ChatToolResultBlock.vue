@@ -2,6 +2,7 @@
 import type { ChatMessage } from '@/apis/chat'
 import type { ChatMarkdownRenderPhase } from '@/components/chat-markdown/typing'
 import { computed, shallowRef } from 'vue'
+import { useI18n } from 'vue-i18n'
 import ChatMarkdownContent from '@/components/chat-markdown/ChatMarkdownContent.vue'
 
 const props = defineProps<{
@@ -14,7 +15,8 @@ const TOOL_RESULT_BUDGET_THRESHOLD = 40_000
 const TOOL_RESULT_INITIAL_VISIBLE_CHARS = 12_000
 const TOOL_RESULT_INCREMENT_CHARS = 20_000
 
-const toolName = computed(() => props.part.metadata?.toolName ?? '返回结果')
+const { t } = useI18n({ useScope: 'global' })
+const toolName = computed(() => props.part.metadata?.toolName ?? t('chat.messageDisplay.toolResultFallback'))
 const summary = computed(() => getToolResultSummary(props.part.text))
 const hasMountedBody = shallowRef(false)
 const visibleCharLimit = shallowRef(TOOL_RESULT_INITIAL_VISIBLE_CHARS)
@@ -46,7 +48,7 @@ function showAllSource(): void {
 }
 
 function getToolResultSummary(text: string): string {
-  const firstLine = text.split('\n').find(line => line.trim())?.trim() ?? '暂无内容'
+  const firstLine = text.split('\n').find(line => line.trim())?.trim() ?? t('chat.messageDisplay.toolResultNoContent')
   return firstLine.length > 80 ? `${firstLine.slice(0, 80)}...` : firstLine
 }
 
@@ -65,7 +67,7 @@ function sliceToolResultSource(source: string, maxChars: number): string {
 <template>
   <details class="chat-tool-result-block" @toggle="handleToggle">
     <summary class="chat-tool-result-block__summary">
-      <span class="chat-tool-result-block__index">返回结果 {{ props.index + 1 }}</span>
+      <span class="chat-tool-result-block__index">{{ t('chat.messageDisplay.resultTitle', { index: props.index + 1 }) }}</span>
       <span class="chat-tool-result-block__name">{{ toolName }}</span>
       <span class="chat-tool-result-block__text">{{ summary }}</span>
     </summary>
@@ -87,7 +89,7 @@ function sliceToolResultSource(source: string, maxChars: number): string {
           data-testid="tool-result-show-more"
           @click="showMoreSource"
         >
-          继续显示更多
+          {{ t('chat.messageDisplay.showMore') }}
         </ElButton>
         <ElButton
           size="small"
@@ -95,7 +97,7 @@ function sliceToolResultSource(source: string, maxChars: number): string {
           data-testid="tool-result-show-all"
           @click="showAllSource"
         >
-          显示全部
+          {{ t('chat.messageDisplay.showAll') }}
         </ElButton>
       </div>
     </div>

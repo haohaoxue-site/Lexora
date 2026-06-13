@@ -1,3 +1,5 @@
+import { translate } from '@/i18n'
+
 const ANIMATED_GIF_SOURCE_PATTERN = /^data:image\/gif[;,]|\.gif(?:[?#]|$)/i
 const PASTED_IMAGE_SOURCE_ATTRIBUTES = ['src', 'data-src', 'data-original', 'data-url', 'data-gif-src']
 
@@ -17,13 +19,13 @@ export async function createAnimatedGifPasteFile(html: string): Promise<File | n
   })
 
   if (!response.ok) {
-    throw new Error('GIF 动图下载失败')
+    throw new Error(translate('editor.upload.gifDownloadFailed'))
   }
 
   const blob = await response.blob()
 
   if (!isGifBlob(blob, source)) {
-    throw new Error('GIF 动图内容格式不正确')
+    throw new Error(translate('editor.upload.gifInvalid'))
   }
 
   return new File([blob], resolveGifFileName(source), {

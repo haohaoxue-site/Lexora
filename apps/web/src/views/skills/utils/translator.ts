@@ -13,18 +13,24 @@ import {
 
 export const TRANSLATOR_SKILL_KEY = AGENT_TRANSLATOR_SKILL_KEY
 
-export const translatorOutputModeOptions: Array<{ label: string, value: AgentTranslatorOutputMode }> = [
-  { label: '译文', value: AGENT_TRANSLATOR_OUTPUT_MODE.TRANSLATION_ONLY },
-  { label: '双语', value: AGENT_TRANSLATOR_OUTPUT_MODE.BILINGUAL },
-  { label: '译+注', value: AGENT_TRANSLATOR_OUTPUT_MODE.WITH_NOTES },
-]
+type Translate = (key: string) => string
 
-export const translatorFormalityOptions: Array<{ label: string, value: AgentTranslatorFormality }> = [
-  { label: '自动', value: AGENT_TRANSLATOR_FORMALITY.AUTO },
-  { label: '中性', value: AGENT_TRANSLATOR_FORMALITY.NEUTRAL },
-  { label: '正式', value: AGENT_TRANSLATOR_FORMALITY.FORMAL },
-  { label: '口语', value: AGENT_TRANSLATOR_FORMALITY.CASUAL },
-]
+export function createTranslatorOutputModeOptions(t: Translate): Array<{ label: string, value: AgentTranslatorOutputMode }> {
+  return [
+    { label: t('skills.translator.translationOnly'), value: AGENT_TRANSLATOR_OUTPUT_MODE.TRANSLATION_ONLY },
+    { label: t('skills.translator.bilingual'), value: AGENT_TRANSLATOR_OUTPUT_MODE.BILINGUAL },
+    { label: t('skills.translator.withNotes'), value: AGENT_TRANSLATOR_OUTPUT_MODE.WITH_NOTES },
+  ]
+}
+
+export function createTranslatorFormalityOptions(t: Translate): Array<{ label: string, value: AgentTranslatorFormality }> {
+  return [
+    { label: t('skills.translator.auto'), value: AGENT_TRANSLATOR_FORMALITY.AUTO },
+    { label: t('skills.translator.neutral'), value: AGENT_TRANSLATOR_FORMALITY.NEUTRAL },
+    { label: t('skills.translator.formal'), value: AGENT_TRANSLATOR_FORMALITY.FORMAL },
+    { label: t('skills.translator.casual'), value: AGENT_TRANSLATOR_FORMALITY.CASUAL },
+  ]
+}
 
 export interface TranslatorConfigFormModel {
   preserveFormatting: boolean

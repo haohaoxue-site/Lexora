@@ -2,6 +2,7 @@ import type { ReadableDocumentSearchResult } from '@/apis/document'
 import { useDebounceFn } from '@vueuse/core'
 import { computed, shallowRef } from 'vue'
 import { searchReadableDocumentsForChat } from '@/apis/document'
+import { translate } from '@/i18n'
 import { useWorkspaceStore } from '@/stores/workspace'
 import { getRequestErrorDisplayMessage } from '@/utils/request-error'
 
@@ -63,7 +64,7 @@ export function useChatDocumentSearch(options: UseChatDocumentSearchOptions = {}
         return
       }
       documents.value = []
-      errorMessage.value = getRequestErrorDisplayMessage(error, '搜索文档失败')
+      errorMessage.value = getRequestErrorDisplayMessage(error, translate('chat.composer.documentPicker.searchFailed'))
     }
     finally {
       if (currentRequestId === requestId) {

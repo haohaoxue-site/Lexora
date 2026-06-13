@@ -103,7 +103,7 @@ export const DocumentCollabStatelessSaveResultPayloadSchema = z.object({
   requestId: z.string().trim().min(1),
   ok: z.boolean(),
   savedAt: z.string().datetime().nullable(),
-  error: z.string().trim().min(1).nullable(),
+  errorCode: CollabErrorCodeSchema.nullable(),
 }).strict()
 
 export const DocumentCollabStatelessMessagePayloadSchema = z.discriminatedUnion('type', [

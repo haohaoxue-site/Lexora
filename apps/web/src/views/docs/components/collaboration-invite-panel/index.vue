@@ -7,6 +7,7 @@ import type {
   CollaborationInvitePanelEmits,
   CollaborationInvitePanelProps,
 } from './typing'
+import { useI18n } from 'vue-i18n'
 import {
   formatCollaborationIdentity,
   formatCollaborationPermission,
@@ -21,6 +22,7 @@ const emits = defineEmits<CollaborationInvitePanelEmits>()
 const userCode = defineModel<string>('userCode', { required: true })
 const permission = defineModel<DocumentCollaborationPermission>('permission', { required: true })
 const scope = defineModel<DocumentCollaborationScope>('scope', { required: true })
+const { t } = useI18n()
 
 function setPermission(command: string | number | object) {
   permission.value = String(command) as DocumentCollaborationPermission
@@ -35,7 +37,7 @@ function setScope(command: string | number | object) {
   <section class="collaboration-invite-panel grid gap-3">
     <div class="flex items-center justify-between gap-4 max-[720px]:grid">
       <h3 class="m-0 text-[0.95rem] leading-[1.4]">
-        邀请协作者
+        {{ t('docs.collaboration.inviteTitle') }}
       </h3>
       <CollaborationAvatarStack
         :owner="props.owner"
@@ -49,7 +51,7 @@ function setScope(command: string | number | object) {
       v-model="userCode"
       class="collaboration-invite-panel__input"
       size="large"
-      placeholder="输入完整协作码邀请用户"
+      :placeholder="t('docs.collaboration.invitePlaceholder')"
       clearable
     >
       <template #append>
@@ -69,7 +71,7 @@ function setScope(command: string | number | object) {
       class="collaboration-invite-panel__invitee-card rounded-lg p-3"
     >
       <p v-if="props.isResolvingInvitee" class="m-0 text-xs leading-[1.5] text-secondary">
-        正在查找用户
+        {{ t('docs.collaboration.resolvingUser') }}
       </p>
       <p v-else-if="props.inviteeResolveError && !props.resolvedInvitee" class="m-0 text-xs leading-[1.5] text-danger">
         {{ props.inviteeResolveError }}
@@ -88,16 +90,19 @@ function setScope(command: string | number | object) {
             </div>
             <div class="overflow-hidden text-xs leading-[1.4] text-secondary text-ellipsis whitespace-nowrap">
               <template v-if="props.isResolvedOwner">
-                文档所有者无需邀请
+                {{ t('docs.collaboration.inviteOwnerNotNeeded') }}
               </template>
               <template v-else-if="props.resolvedCollaborator">
-                已是协作者，{{ formatCollaborationSource(props.resolvedCollaborator) }}，{{ formatCollaborationPermission(props.resolvedCollaborator.effectivePermission) }}
+                {{ t('docs.collaboration.alreadyCollaborator', {
+                  source: formatCollaborationSource(props.resolvedCollaborator),
+                  permission: formatCollaborationPermission(props.resolvedCollaborator.effectivePermission),
+                }) }}
               </template>
               <template v-else-if="props.hasResolvedInvitation">
-                已有邀请，本次提交会更新权限和范围
+                {{ t('docs.collaboration.existingInvitation') }}
               </template>
               <template v-else>
-                将发送站内协作邀请
+                {{ t('docs.collaboration.willSendInvite') }}
               </template>
             </div>
           </div>
@@ -161,7 +166,7 @@ function setScope(command: string | number | object) {
             size="small"
             @click="emits('openCollaborators')"
           >
-            查看协作者
+            {{ t('docs.collaboration.viewCollaborators') }}
           </ElButton>
         </div>
       </template>

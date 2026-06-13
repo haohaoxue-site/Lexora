@@ -7,6 +7,7 @@ import type { ChatMarkdownRenderOptions } from './typing'
 import DOMPurify from 'dompurify'
 import MarkdownItConstructor from 'markdown-it'
 import { getChatStreamingProbe } from '@/composables/chat/utils/chat-streaming-probe'
+import { translate } from '@/i18n'
 import { escapeHtml, highlightChatCode, resolveChatCodeLanguage } from './markdownCodeHighlight'
 import { markdownMathPlugin } from './markdownMath'
 
@@ -144,7 +145,7 @@ function renderFence(phase: Required<ChatMarkdownRenderOptions>['phase']) {
       '</span>',
       '<button class="chat-markdown__code-copy" type="button" data-code="',
       dataCode,
-      `"${disabled}>复制</button>`,
+      `"${disabled}>${escapeHtml(translate('docs.common.copy'))}</button>`,
       '</div>',
       '<pre class="chat-markdown__code-pre"><code class="hljs language-',
       escapeHtml(language.highlightLanguage),

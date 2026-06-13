@@ -15,6 +15,7 @@ import {
   listDocumentCollaborationConsoleTree,
   upsertDocumentCollaborationLink,
 } from '@/apis/document-collaboration'
+import { translate } from '@/i18n'
 import { useWorkspaceStore } from '@/stores/workspace'
 import { ElMessage } from '@/utils/element-plus'
 import { getRequestErrorDisplayMessage } from '@/utils/request-error'
@@ -83,7 +84,7 @@ export function useDocsCollaborationsPage() {
       }
 
       tree.value = []
-      errorMessage.value = getRequestErrorDisplayMessage(error, '协作管理加载失败')
+      errorMessage.value = getRequestErrorDisplayMessage(error, translate('docs.collaboration.loadManagementFailed'))
     }
     finally {
       if (requestId === loadRequestId) {
@@ -106,7 +107,7 @@ export function useDocsCollaborationsPage() {
 
       await runLinkMutation(documentId, async () => {
         await disableDocumentCollaborationLink(documentId)
-        ElMessage.success('协作链接已停用')
+        ElMessage.success(translate('docs.collaboration.linkDisabled'))
       })
       return
     }
@@ -148,7 +149,7 @@ export function useDocsCollaborationsPage() {
   ) {
     await runLinkMutation(documentId, async () => {
       await upsertDocumentCollaborationLink(documentId, payload)
-      ElMessage.success('协作链接设置已保存')
+      ElMessage.success(translate('docs.collaboration.linkSaved'))
     })
   }
 
@@ -164,7 +165,7 @@ export function useDocsCollaborationsPage() {
       await loadItems()
     }
     catch (error) {
-      ElMessage.error(getRequestErrorDisplayMessage(error, '更新协作链接失败'))
+      ElMessage.error(getRequestErrorDisplayMessage(error, translate('docs.collaboration.linkUpdateFailed')))
     }
     finally {
       updatingDocumentId.value = null
@@ -180,16 +181,16 @@ export function useDocsCollaborationsPage() {
     }
 
     if (!isClipboardSupported.value) {
-      ElMessage.error('当前环境不支持复制')
+      ElMessage.error(translate('docs.common.copyUnsupported'))
       return
     }
 
     try {
       await copy(new URL(`/r/${encodeURIComponent(resolverCode)}`, window.location.origin).toString())
-      ElMessage.success('协作链接已复制')
+      ElMessage.success(translate('docs.collaboration.linkCopied'))
     }
     catch {
-      ElMessage.error('复制失败')
+      ElMessage.error(translate('docs.common.copyFailed'))
     }
   }
 
@@ -203,7 +204,7 @@ export function useDocsCollaborationsPage() {
       })
     }
     catch (error) {
-      ElMessage.error(getRequestErrorDisplayMessage(error, '打开文档失败'))
+      ElMessage.error(getRequestErrorDisplayMessage(error, translate('docs.collaboration.openDocumentFailed')))
     }
   }
 }

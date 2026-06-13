@@ -2,6 +2,7 @@ import type { DocumentItem, DocumentTreeCollectionId } from '@haohaoxue/samepage
 import { buildDocumentPath } from '@haohaoxue/samepage-shared/document'
 import { useClipboard } from '@vueuse/core'
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { ElMessage } from '@/utils/element-plus'
 import { isOwnedDocumentCollection } from '../utils/documentTree'
 import { useDocsCollaborationDialog } from './useDocsCollaborationDialog'
@@ -43,6 +44,7 @@ interface DocumentTreeItemMenuItem {
 
 export function useDocumentItem(options: UseDocumentItemOptions) {
   const { activeDocumentId } = useDocsContext()
+  const { t } = useI18n()
   const tree = useDocumentTree()
   const pageActions = useDocsPageActions()
   const { openDocumentCollaborationDialog } = useDocsCollaborationDialog()
@@ -77,16 +79,16 @@ export function useDocumentItem(options: UseDocumentItemOptions) {
 
   async function copyDocumentLink() {
     if (!isClipboardSupported.value) {
-      ElMessage.error('当前环境不支持复制')
+      ElMessage.error(t('docs.common.copyUnsupported'))
       return
     }
 
     try {
       await copy(new URL(buildDocumentPath(item.value.id), window.location.origin).toString())
-      ElMessage.success('链接已复制')
+      ElMessage.success(t('docs.treeMenu.linkCopied'))
     }
     catch {
-      ElMessage.error('复制链接失败')
+      ElMessage.error(t('docs.treeMenu.copyLinkFailed'))
     }
   }
 
@@ -111,14 +113,14 @@ export function useDocumentItem(options: UseDocumentItemOptions) {
   const menuItems = computed<DocumentTreeItemMenuItem[]>(() => {
     const items: DocumentTreeItemMenuItem[] = [{
       command: 'open-new-tab',
-      label: '在新标签页打开',
+      label: t('docs.treeMenu.openNewTab'),
       icon: 'document-menu-open-new',
     }]
 
     if (canManageCollaboration.value) {
       items.push({
         command: 'collaboration',
-        label: '协作',
+        label: t('docs.treeMenu.collaboration'),
         icon: 'document-menu-share',
         divided: true,
       })
@@ -126,7 +128,7 @@ export function useDocumentItem(options: UseDocumentItemOptions) {
 
     items.push({
       command: 'copy-link',
-      label: '复制链接',
+      label: t('docs.treeMenu.copyLink'),
       icon: 'link',
       divided: !canManageCollaboration.value,
     })
@@ -135,24 +137,24 @@ export function useDocumentItem(options: UseDocumentItemOptions) {
       items.push(
         {
           command: 'duplicate',
-          label: '创建副本',
+          label: t('docs.treeMenu.duplicate'),
           icon: 'document-menu-copy',
           divided: true,
         },
         {
           command: 'move',
-          label: '移动到',
+          label: t('docs.treeMenu.move'),
           icon: 'document-menu-move',
         },
         {
           command: 'rename',
-          label: '重命名',
+          label: t('docs.treeMenu.rename'),
           icon: 'document-menu-rename',
           divided: true,
         },
         {
           command: 'delete',
-          label: '删除',
+          label: t('docs.common.delete'),
           icon: 'trash-can',
           divided: true,
           danger: true,

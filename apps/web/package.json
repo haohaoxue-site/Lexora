@@ -57,6 +57,7 @@
     "prosemirror-view": "^1.41.8",
     "sass-embedded": "^1.99.0",
     "vue": "^3.5.33",
+    "vue-i18n": "^11.4.5",
     "vue-router": "^5.0.6",
     "y-protocols": "^1.0.7",
     "yjs": "^13.6.30"

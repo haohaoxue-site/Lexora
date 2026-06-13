@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import type { DocumentItemProps } from './typing'
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useDocumentItem } from '../../composables/useDocumentItem'
 import { resolveDocumentTreeItemIcon } from '../../utils/documentTree'
 
 const props = defineProps<DocumentItemProps>()
+const { t } = useI18n()
 const {
   actionsStateClass,
   canManageDocument,
@@ -60,7 +62,7 @@ const treeIconName = computed(() => {
           class="document-tree-item__icon-button ml-0 h-5 min-w-5 w-5 rounded-md p-0"
           :class="itemStateClass"
           :disabled="isActionPending"
-          title="新建子文档"
+          :title="t('docs.common.createChildDocument')"
           @click.stop="createChild"
         >
           <SvgIcon category="ui" icon="plus" size="14px" />
@@ -77,7 +79,7 @@ const treeIconName = computed(() => {
             data-testid="document-tree-item-menu-trigger"
             :class="itemStateClass"
             :disabled="isActionPending"
-            title="更多操作"
+            :title="t('docs.common.moreActions')"
             @click.stop
           >
             <SvgIcon category="ui" icon="more" size="14px" />

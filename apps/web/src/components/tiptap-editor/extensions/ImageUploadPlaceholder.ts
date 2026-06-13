@@ -6,6 +6,7 @@ import { prettyBytes } from '@haohaoxue/samepage-shared/file'
 import { Extension } from '@tiptap/core'
 import { Plugin, PluginKey } from '@tiptap/pm/state'
 import { Decoration, DecorationSet } from '@tiptap/pm/view'
+import { translate } from '@/i18n'
 import { createUploadedImageInsertContent } from '../content/documentAsset'
 
 interface ImageUploadPlaceholderRecord {
@@ -248,10 +249,12 @@ function createPlaceholderRecord(
     id,
     from,
     to,
-    label: files.length > 1 ? `正在上传 ${files.length} 张图片` : '正在上传图片',
+    label: files.length > 1
+      ? translate('editor.upload.uploadingImages', { count: files.length })
+      : translate('editor.upload.uploadingImage'),
     detail: files.length > 1
       ? files.map(file => prettyBytes(file.size, { precision: 1 })).join(' / ')
-      : `${files[0]?.name ?? '图片'} · ${prettyBytes(files[0]?.size ?? 0, { precision: 1 })}`,
+      : `${files[0]?.name ?? translate('editor.upload.imageFallback')} · ${prettyBytes(files[0]?.size ?? 0, { precision: 1 })}`,
     previewUrl: files.length === 1 ? createFilePreviewUrl(files[0]) : null,
   }
 }

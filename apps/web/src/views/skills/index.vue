@@ -3,6 +3,7 @@ import type { AgentTranslatorSkillConfig } from '@haohaoxue/samepage-contracts'
 import type { CSSProperties } from 'vue'
 import type { AgentSkillCard } from '@/apis/agent-skills'
 import { computed, onMounted, shallowRef } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import {
   disableAgentSkill,
@@ -31,6 +32,7 @@ type SkillMoreCommand = 'config' | 'uninstall'
 
 const route = useRoute()
 const router = useRouter()
+const { t } = useI18n()
 const skillsRouteNameByTab = {
   market: SKILLS_MARKET_ROUTE_NAME,
   me: SKILLS_ME_ROUTE_NAME,
@@ -67,7 +69,7 @@ const activeTab = computed<SkillsTabName>({
 })
 const marketSkills = computed(() => allSkills.value.filter(skill => skill.installMode === 'optional'))
 const visibleSkills = computed(() => activeTab.value === 'me' ? mySkills.value : marketSkills.value)
-const emptyDescription = computed(() => activeTab.value === 'market' ? '暂无技能' : '暂无已安装技能')
+const emptyDescription = computed(() => activeTab.value === 'market' ? t('skills.emptyMarket') : t('skills.emptyInstalled'))
 
 onMounted(() => {
   void loadSkills()
@@ -82,7 +84,7 @@ async function loadSkills() {
     mySkills.value = response.mySkills
   }
   catch (error) {
-    loadError.value = error instanceof Error ? error.message : '技能加载失败'
+    loadError.value = error instanceof Error ? error.message : t('skills.loadFailed')
   }
   finally {
     loading.value = false
@@ -106,7 +108,7 @@ function isSkillToggleDisabled(skill: AgentSkillCard) {
 }
 
 function getMarketActionText(skill: AgentSkillCard) {
-  return skill.installed ? '已安装' : '安装'
+  return skill.installed ? t('skills.installed') : t('skills.install')
 }
 
 function isMarketActionDisabled(skill: AgentSkillCard) {
@@ -122,10 +124,10 @@ async function handleInstallSkill(skill: AgentSkillCard) {
   try {
     await installAgentSkill(skill.key)
     await loadSkills()
-    ElMessage.success('技能已安装')
+    ElMessage.success(t('skills.installedMessage'))
   }
   catch (error) {
-    ElMessage.error(getRequestErrorDisplayMessage(error, '技能安装失败'))
+    ElMessage.error(getRequestErrorDisplayMessage(error, t('skills.installFailed')))
   }
   finally {
     mutatingSkillKey.value = null
@@ -141,10 +143,10 @@ async function handleEnableSkill(skill: AgentSkillCard) {
   try {
     await enableAgentSkill(skill.key)
     await loadSkills()
-    ElMessage.success('技能已开启')
+    ElMessage.success(t('skills.enabled'))
   }
   catch (error) {
-    ElMessage.error(getRequestErrorDisplayMessage(error, '技能开启失败'))
+    ElMessage.error(getRequestErrorDisplayMessage(error, t('skills.enableFailed')))
   }
   finally {
     mutatingSkillKey.value = null
@@ -160,10 +162,10 @@ async function handleDisableSkill(skill: AgentSkillCard) {
   try {
     await disableAgentSkill(skill.key)
     await loadSkills()
-    ElMessage.success('技能已关闭')
+    ElMessage.success(t('skills.disabled'))
   }
   catch (error) {
-    ElMessage.error(getRequestErrorDisplayMessage(error, '技能关闭失败'))
+    ElMessage.error(getRequestErrorDisplayMessage(error, t('skills.disableFailed')))
   }
   finally {
     mutatingSkillKey.value = null
@@ -177,12 +179,12 @@ async function handleUninstallSkill(skill: AgentSkillCard) {
 
   try {
     await ElMessageBox.confirm(
-      `移除「${skill.name}」后，Agent 将不再使用该技能。`,
-      '移除技能',
+      t('skills.removeConfirm', { name: skill.name }),
+      t('skills.removeTitle'),
       {
         type: 'warning',
-        confirmButtonText: '移除',
-        cancelButtonText: '取消',
+        confirmButtonText: t('skills.remove'),
+        cancelButtonText: t('docs.common.cancel'),
       },
     )
   }
@@ -194,10 +196,10 @@ async function handleUninstallSkill(skill: AgentSkillCard) {
   try {
     await uninstallAgentSkill(skill.key)
     await loadSkills()
-    ElMessage.success('技能已移除')
+    ElMessage.success(t('skills.removed'))
   }
   catch (error) {
-    ElMessage.error(getRequestErrorDisplayMessage(error, '技能移除失败'))
+    ElMessage.error(getRequestErrorDisplayMessage(error, t('skills.removeFailed')))
   }
   finally {
     mutatingSkillKey.value = null
@@ -250,10 +252,10 @@ async function handleSaveTranslatorConfig(config: AgentTranslatorSkillConfig) {
     await updateAgentSkillConfig(skill.key, { config })
     await loadSkills()
     translatorConfigDrawerVisible.value = false
-    ElMessage.success('翻译设置已保存')
+    ElMessage.success(t('skills.translator.saved'))
   }
   catch (error) {
-    ElMessage.error(getRequestErrorDisplayMessage(error, '翻译设置保存失败'))
+    ElMessage.error(getRequestErrorDisplayMessage(error, t('skills.translator.saveFailed')))
   }
   finally {
     savingSkillConfigKey.value = null
@@ -268,14 +270,14 @@ async function handleSaveTranslatorConfig(config: AgentTranslatorSkillConfig) {
         <ElTabPane name="market">
           <template #label>
             <span class="inline-flex h-[var(--default-header-height)] items-center pr-3.5 text-[15px] font-medium leading-none">
-              技能市场
+              {{ t('skills.market') }}
             </span>
           </template>
         </ElTabPane>
         <ElTabPane name="me">
           <template #label>
             <span class="inline-flex h-[var(--default-header-height)] items-center px-3.5 text-[15px] font-medium leading-none">
-              我的技能
+              {{ t('skills.mine') }}
             </span>
           </template>
         </ElTabPane>
@@ -340,7 +342,7 @@ async function handleSaveTranslatorConfig(config: AgentTranslatorSkillConfig) {
                       text
                       class="skills-view__more-btn h-7 min-w-7 w-7 rounded-lg p-0"
                       :disabled="Boolean(mutatingSkillKey)"
-                      aria-label="更多操作"
+                      :aria-label="t('skills.moreActions')"
                     >
                       <SvgIcon category="ui" icon="more" size="0.95rem" />
                     </ElButton>
@@ -352,7 +354,7 @@ async function handleSaveTranslatorConfig(config: AgentTranslatorSkillConfig) {
                           command="config"
                           class="skills-view__more-item min-h-8 px-2 text-main"
                         >
-                          配置
+                          {{ t('skills.config') }}
                         </ElDropdownItem>
                         <ElDropdownItem
                           v-if="skill.canUninstall"
@@ -360,7 +362,7 @@ async function handleSaveTranslatorConfig(config: AgentTranslatorSkillConfig) {
                           :divided="hasSkillConfig(skill)"
                           class="skills-view__more-item skills-view__more-item--danger min-h-8 px-2"
                         >
-                          移除
+                          {{ t('skills.remove') }}
                         </ElDropdownItem>
                       </ElDropdownMenu>
                     </template>

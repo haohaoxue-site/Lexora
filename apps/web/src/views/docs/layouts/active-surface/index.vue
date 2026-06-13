@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, useTemplateRef } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { SvgIcon } from '@/components/svg-icon'
 import { useUiStore } from '@/stores/ui'
 import { useDocsChatPanel } from '../../composables/useDocsChatPanel'
@@ -9,6 +10,7 @@ import DocsChatPanel from '../../widgets/chat-panel'
 import DocsSidebarLayout from '../sidebar'
 
 const uiStore = useUiStore()
+const { t } = useI18n()
 const docsViewRef = useTemplateRef<HTMLElement>('docsView')
 const { currentSurface, isDocumentSurface } = useDocsSurfaceState()
 const { isOpen: isDocsChatPanelOpen } = useDocsChatPanel()
@@ -46,7 +48,7 @@ function showDocumentLibrary() {
 
     <ElTooltip
       v-else-if="!isControlCenterSurface"
-      content="显示文档库"
+      :content="t('docs.common.documentLibrary')"
       effect="dark"
       placement="right"
       :show-after="120"
@@ -54,8 +56,8 @@ function showDocumentLibrary() {
       <ElButton
         text
         class="docs-view__library-restore absolute left-3 top-3 z-[5] h-8 min-w-8 w-8 rounded-lg p-0"
-        title="显示文档库"
-        aria-label="显示文档库"
+        :title="t('docs.common.documentLibrary')"
+        :aria-label="t('docs.common.documentLibrary')"
         @click="showDocumentLibrary"
       >
         <SvgIcon category="ui" icon="pin" size="1rem" />

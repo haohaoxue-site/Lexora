@@ -3,6 +3,7 @@ import type { FormInstance, FormRules } from 'element-plus'
 import type { RegistrationGovernanceField } from '../../composables/useAdminAuthGovernance'
 import type { InviteCodeFormModel } from './typing'
 import { reactive, useTemplateRef } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useAdminAuthGovernance } from '../../composables/useAdminAuthGovernance'
 
 const {
@@ -21,6 +22,7 @@ const {
 } = useAdminAuthGovernance()
 
 const inviteCodeFormRef = useTemplateRef<FormInstance>('inviteCodeFormRef')
+const { t } = useI18n({ useScope: 'global' })
 const inviteCodeFormModel = reactive<InviteCodeFormModel>({
   get inviteCode() {
     return inviteCodeForm.inviteCode
@@ -40,7 +42,7 @@ const inviteCodeFormRules: FormRules<InviteCodeFormModel> = {
           return
         }
 
-        callback(new Error('邀请码至少 4 位'))
+        callback(new Error(t('admin.authGovernance.inviteCodeMin')))
       },
       trigger: 'change',
     },
@@ -73,16 +75,16 @@ function handleSwitchChange(key: RegistrationGovernanceField, value: string | nu
     <div class="flex flex-col gap-5">
       <header class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <h2 class="m-0 text-base font-bold text-main">
-          认证注册
+          {{ t('admin.authGovernance.registration') }}
         </h2>
         <ElButton @click="openInviteCodeDialog">
-          设置/更换邀请码
+          {{ t('admin.authGovernance.setInviteCode') }}
         </ElButton>
       </header>
 
       <ElAlert
         v-if="shouldShowMissingInviteCodeWarning"
-        title="已启用邀请码要求，但当前还没有设置邀请码。对应入口的新用户注册会被后端拒绝。"
+        :title="t('admin.authGovernance.missingInviteCodeWarning')"
         type="warning"
         show-icon
         :closable="false"
@@ -123,13 +125,13 @@ function handleSwitchChange(key: RegistrationGovernanceField, value: string | nu
                   <template #content>
                     <div class="auth-governance-panel__switch-hint max-w-64">
                       <p class="auth-governance-panel__switch-hint-text m-0 text-xs leading-5 text-main">
-                        未启用发件服务，开启邮箱密码注册前请先前往邮件配置启用发件服务。
+                        {{ t('admin.authGovernance.emailRegistrationDisabledHint') }}
                       </p>
                       <RouterLink
                         to="/admin/email"
                         class="auth-governance-panel__switch-hint-link mt-2 inline-flex text-xs font-semibold text-primary no-underline hover:opacity-80"
                       >
-                        前往发件配置
+                        {{ t('admin.authGovernance.goEmailSettings') }}
                       </RouterLink>
                     </div>
                   </template>
@@ -158,7 +160,7 @@ function handleSwitchChange(key: RegistrationGovernanceField, value: string | nu
 
   <ElDialog
     v-model="isInviteCodeDialogVisible"
-    title="设置/更换邀请码"
+    :title="t('admin.authGovernance.inviteCodeDialogTitle')"
     width="28rem"
     align-center
     destroy-on-close
@@ -170,13 +172,13 @@ function handleSwitchChange(key: RegistrationGovernanceField, value: string | nu
       label-position="top"
       @submit.prevent="submitInviteCode"
     >
-      <ElFormItem label="新邀请码" prop="inviteCode">
+      <ElFormItem :label="t('admin.authGovernance.newInviteCode')" prop="inviteCode">
         <ElInput
           v-model="inviteCodeFormModel.inviteCode"
           autocomplete="off"
           clearable
           maxlength="120"
-          placeholder="输入新的注册邀请码，留空保存将清空"
+          :placeholder="t('admin.authGovernance.inviteCodePlaceholder')"
           show-word-limit
         />
       </ElFormItem>
@@ -184,10 +186,10 @@ function handleSwitchChange(key: RegistrationGovernanceField, value: string | nu
 
     <template #footer>
       <ElButton :disabled="isSavingInviteCode" @click="isInviteCodeDialogVisible = false">
-        取消
+        {{ t('admin.common.cancel') }}
       </ElButton>
       <ElButton type="primary" :loading="isSavingInviteCode" @click="submitInviteCode">
-        保存
+        {{ t('admin.common.save') }}
       </ElButton>
     </template>
   </ElDialog>

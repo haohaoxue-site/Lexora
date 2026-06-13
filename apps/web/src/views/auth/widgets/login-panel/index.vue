@@ -1,13 +1,14 @@
 <script setup lang="ts">
 import type { FormInstance } from 'element-plus'
 import { useTemplateRef } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useLogin } from '../../composables/useLogin'
 import AuthEntryShell from '../../layouts/entry-shell'
 
-const betaTooltipContent = '当前为 Beta 开发阶段，平台数据可能随版本迭代清空，请勿存放重要资料。'
 const repositoryUrl = 'https://github.com/haohaoxue-site/SamePage-AI'
 const passwordFormRef = useTemplateRef<FormInstance>('passwordFormRef')
 const oauthInviteFormRef = useTemplateRef<FormInstance>('oauthInviteFormRef')
+const { t } = useI18n({ useScope: 'global' })
 const {
   continueOauthAsExistingAccount,
   continueOauthWithInviteCode,
@@ -34,8 +35,8 @@ const {
 
 <template>
   <AuthEntryShell
-    title="欢迎回来"
-    description="使用邮箱或第三方账号继续。"
+    :title="t('auth.login.title')"
+    :description="t('auth.login.description')"
   >
     <template #actions>
       <a
@@ -43,10 +44,10 @@ const {
         target="_blank"
         rel="noopener noreferrer"
         class="login-view__source-link inline-flex min-h-[2.375rem] items-center gap-2 rounded-lg px-2.5 py-1.5 text-[13px] font-bold leading-none no-underline max-[420px]:min-h-[2.25rem] max-[420px]:gap-1.5 max-[420px]:px-2 max-[420px]:py-[0.3125rem]"
-        aria-label="打开 SamePage AI GitHub 项目地址"
+        :aria-label="t('auth.login.repositoryAria')"
       >
         <ElTooltip
-          :content="betaTooltipContent"
+          :content="t('auth.login.betaTooltip')"
           placement="top"
           effect="light"
           :show-after="120"
@@ -78,20 +79,20 @@ const {
       class="login-view__form w-full"
       @submit.prevent="handleSubmitPasswordLogin"
     >
-      <ElFormItem label="邮箱" prop="email">
+      <ElFormItem :label="t('auth.common.email')" prop="email">
         <ElInput
           v-model="passwordForm.email"
           autocomplete="email"
-          placeholder="输入邮箱地址"
+          :placeholder="t('auth.common.emailPlaceholder')"
         />
       </ElFormItem>
-      <ElFormItem label="密码" prop="password">
+      <ElFormItem :label="t('auth.common.password')" prop="password">
         <ElInput
           v-model="passwordForm.password"
           type="password"
           show-password
           autocomplete="current-password"
-          placeholder="输入密码"
+          :placeholder="t('auth.common.passwordPlaceholder')"
         />
       </ElFormItem>
 
@@ -101,13 +102,13 @@ const {
         class="login-view__submit mt-3 w-full min-h-[2.875rem] font-semibold"
         :loading="isPasswordSubmitting"
       >
-        登录
+        {{ t('auth.login.submit') }}
       </ElButton>
     </ElForm>
 
     <template v-if="hasOauthProviders">
       <div class="login-view__divider mt-1 flex items-center gap-3.5 text-secondary">
-        <span class="login-view__divider-text text-[13px] font-semibold">其他登录方式</span>
+        <span class="login-view__divider-text text-[13px] font-semibold">{{ t('auth.login.otherMethods') }}</span>
       </div>
 
       <div
@@ -145,9 +146,9 @@ const {
 
     <template #footer>
       <template v-if="passwordRegistrationEnabled && !isLoadingCapabilities">
-        <span class="login-view__footer-text text-secondary">还没有账号？</span>
+        <span class="login-view__footer-text text-secondary">{{ t('auth.login.noAccount') }}</span>
         <RouterLink :to="{ name: 'register' }" class="login-view__footer-link text-sm font-semibold text-primary no-underline">
-          创建邮箱账号
+          {{ t('auth.login.createEmailAccount') }}
         </RouterLink>
       </template>
     </template>
@@ -155,7 +156,7 @@ const {
 
   <ElDialog
     v-model="isOauthInviteDialogVisible"
-    :title="`使用 ${selectedOauthProviderMeta?.title ?? '第三方账号'} 继续`"
+    :title="t('auth.login.oauthDialogTitle', { provider: selectedOauthProviderMeta?.title ?? t('auth.common.thirdPartyAccount') })"
     width="28rem"
     align-center
     destroy-on-close
@@ -167,11 +168,11 @@ const {
       label-position="top"
       @submit.prevent="continueOauthWithInviteCode"
     >
-      <ElFormItem label="邀请码" prop="inviteCode">
+      <ElFormItem :label="t('auth.common.inviteCode')" prop="inviteCode">
         <ElInput
           v-model="oauthInviteForm.inviteCode"
           autocomplete="off"
-          placeholder="新用户请输入邀请码"
+          :placeholder="t('auth.login.inviteCodePlaceholder')"
         />
       </ElFormItem>
     </ElForm>
@@ -182,14 +183,14 @@ const {
           :loading="Boolean(startingOauthProvider)"
           @click="continueOauthAsExistingAccount"
         >
-          已有账号继续登录
+          {{ t('auth.login.continueExisting') }}
         </ElButton>
         <ElButton
           type="primary"
           :loading="Boolean(startingOauthProvider)"
           @click="continueOauthWithInviteCode"
         >
-          验证邀请码并继续
+          {{ t('auth.login.verifyInviteAndContinue') }}
         </ElButton>
       </div>
     </template>

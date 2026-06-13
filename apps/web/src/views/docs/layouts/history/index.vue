@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
 import DocsDocumentEditorPane from '../../components/document-editor-pane'
 import { useActiveDocument } from '../../composables/useActiveDocument'
 import { useDocsContext } from '../../composables/useDocsContext'
@@ -8,6 +9,7 @@ import { useDocsSurfaceState } from '../../composables/useDocsSurfaceState'
 import DocsHistoryPanel from '../history-panel'
 
 const { activeBlockId, handleRequestComment } = useDocsContext()
+const { t } = useI18n()
 const {
   isDocumentItemLoading,
   isRestoringSnapshot,
@@ -38,7 +40,7 @@ const { createRootDocument, openDefaultDocument } = useDocsPageActions()
       >
         <span class="inline-flex items-center gap-1.5 text-[13px] font-medium">
           <SvgIcon category="ui" icon="arrow-left" size="14px" />
-          <span>返回文档</span>
+          <span>{{ t('docs.history.back') }}</span>
         </span>
       </ElButton>
 
@@ -49,7 +51,7 @@ const { createRootDocument, openDefaultDocument } = useDocsPageActions()
         :loading="isRestoringSnapshot"
         @click="restoreSelectedSnapshot"
       >
-        还原此历史记录
+        {{ t('docs.history.restore') }}
       </ElButton>
 
       <div class="min-w-0 max-[1180px]:hidden" />

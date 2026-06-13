@@ -1,16 +1,18 @@
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
 import PagePanel from '@/layouts/panels/page-panel'
 import AdminMetricCard from '../../components/metric-card'
 import AdminPageHeader from '../../components/page-header'
 import { useAdminOverview } from '../../composables/useAdminOverview'
 
 const { overview, errorMessage, isLoading, metricCards } = useAdminOverview()
+const { t } = useI18n({ useScope: 'global' })
 </script>
 
 <template>
   <PagePanel>
     <template #header>
-      <AdminPageHeader title="概览" />
+      <AdminPageHeader :title="t('admin.pages.overview')" />
     </template>
 
     <div v-loading="isLoading" class="admin-overview min-h-full bg-fill-lighter p-4 lg:p-6">

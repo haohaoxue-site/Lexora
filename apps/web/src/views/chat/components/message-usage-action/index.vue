@@ -2,13 +2,22 @@
 import type { ChatMessage } from '@/apis/chat'
 import { DataAnalysis } from '@element-plus/icons-vue'
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { createChatMessageUsageView } from '../../utils/chat-usage-display'
 
 const props = defineProps<{
   message: ChatMessage
 }>()
 
-const usageView = computed(() => createChatMessageUsageView(props.message))
+const { locale, t } = useI18n({ useScope: 'global' })
+const usageView = computed(() => {
+  readReactiveLocale(locale.value)
+  return createChatMessageUsageView(props.message)
+})
+
+function readReactiveLocale(value: string): string {
+  return value
+}
 </script>
 
 <template>
@@ -40,7 +49,7 @@ const usageView = computed(() => createChatMessageUsageView(props.message))
           </div>
         </div>
         <ElTag v-if="usageView.estimated" size="small" type="warning" effect="plain">
-          估算
+          {{ t('chat.usage.estimate') }}
         </ElTag>
       </header>
 

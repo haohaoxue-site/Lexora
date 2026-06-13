@@ -1,5 +1,6 @@
 import type { CollabAwarenessState } from '@haohaoxue/samepage-contracts'
 import type { DecorationAttrs } from '@tiptap/pm/view'
+import { translate } from '@/i18n'
 
 const CURSOR_COLOR_PALETTE = [
   '#2563eb',
@@ -72,7 +73,7 @@ export function renderTiptapCollaborationCursor(user: Record<string, unknown>) {
   name.className = 'samepage-collaboration-cursor__name'
   name.textContent = typeof user.name === 'string' && user.name.length > 0
     ? user.name
-    : '协作者'
+    : translate('editor.collaboration.collaborator')
 
   label.append(identity, name)
   cursor.append(label)

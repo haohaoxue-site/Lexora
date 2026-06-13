@@ -15,26 +15,27 @@ import {
   projectTiptapDocumentCollaborationYdoc,
   TIPTAP_DOCUMENT_COLLABORATION_FIELD,
 } from '@/components/tiptap-editor'
+import { translate } from '@/i18n'
 
 const TRAILING_SLASH_PATTERN = /\/+$/
 const COLLABORATION_RECONNECT_GRACE_PERIOD = 5000
 const DOCUMENT_COLLABORATION_PERSISTENCE_CLOSE_CODE = 4004
-const COLLABORATION_CLOSE_MESSAGE_BY_REASON = {
-  [COLLAB_ERROR_CODE.TICKET_INVALID]: '协作票据无效，请重新连接后继续编辑。',
-  [COLLAB_ERROR_CODE.TICKET_EXPIRED]: '协作票据已失效，请重新连接后继续编辑。',
-  [COLLAB_ERROR_CODE.TICKET_REPLAYED]: '协作票据已被使用，请重新连接后继续编辑。',
-  [COLLAB_ERROR_CODE.RATE_LIMITED]: '协作连接过于频繁，请稍后再试。',
-  [COLLAB_ERROR_CODE.CONNECTION_LIMIT_EXCEEDED]: '协作连接数已达上限，请稍后再试。',
-  [COLLAB_ERROR_CODE.DOCUMENT_MISMATCH]: '协作文档不匹配，请刷新后重试。',
-  [COLLAB_ERROR_CODE.ENTRY_MISMATCH]: '协作入口不匹配，请刷新后重试。',
-  [COLLAB_ERROR_CODE.RUNTIME_EPOCH_EXPIRED]: '文档运行时已更新，请重新连接后继续编辑。',
-  [COLLAB_ERROR_CODE.PERMISSION_INVALIDATED]: '文档权限状态已变化，请重新连接后继续编辑。',
-  [COLLAB_ERROR_CODE.READONLY_WRITE_REJECTED]: '当前协作会话没有写入权限，请重新连接后继续编辑。',
-  [COLLAB_ERROR_CODE.UPDATE_TOO_LARGE]: '本次协作更新过大，已暂停编辑，请拆分内容后重试。',
-  [COLLAB_ERROR_CODE.UPDATE_SEQUENCE_GAP]: '协作保存水位异常，已暂停编辑，请重新加载文档后再继续。',
-  [COLLAB_ERROR_CODE.UPDATE_CHECKPOINTED]: '协作保存水位已过期，已暂停编辑，请重新加载文档后再继续。',
-  [COLLAB_ERROR_CODE.CHECKPOINT_EXPIRED]: '协作保存 checkpoint 已过期，已暂停编辑，请重新加载文档后再继续。',
-  [COLLAB_ERROR_CODE.PERSISTENCE_FAILED]: '协作保存失败，已暂停编辑以避免内容丢失。',
+const COLLABORATION_CLOSE_MESSAGE_KEY_BY_REASON = {
+  [COLLAB_ERROR_CODE.TICKET_INVALID]: 'docs.collabRuntime.ticketInvalid',
+  [COLLAB_ERROR_CODE.TICKET_EXPIRED]: 'docs.collabRuntime.ticketExpired',
+  [COLLAB_ERROR_CODE.TICKET_REPLAYED]: 'docs.collabRuntime.ticketReplayed',
+  [COLLAB_ERROR_CODE.RATE_LIMITED]: 'docs.collabRuntime.tooManyRequests',
+  [COLLAB_ERROR_CODE.CONNECTION_LIMIT_EXCEEDED]: 'docs.collabRuntime.connectionLimitExceeded',
+  [COLLAB_ERROR_CODE.DOCUMENT_MISMATCH]: 'docs.collabRuntime.documentMismatch',
+  [COLLAB_ERROR_CODE.ENTRY_MISMATCH]: 'docs.collabRuntime.entryMismatch',
+  [COLLAB_ERROR_CODE.RUNTIME_EPOCH_EXPIRED]: 'docs.collabRuntime.reconnectAfterRuntime',
+  [COLLAB_ERROR_CODE.PERMISSION_INVALIDATED]: 'docs.collabRuntime.invalidatedPermission',
+  [COLLAB_ERROR_CODE.READONLY_WRITE_REJECTED]: 'docs.collabRuntime.readonlyWriteRejected',
+  [COLLAB_ERROR_CODE.UPDATE_TOO_LARGE]: 'docs.collabRuntime.tooLarge',
+  [COLLAB_ERROR_CODE.UPDATE_SEQUENCE_GAP]: 'docs.collabRuntime.updateSequenceGap',
+  [COLLAB_ERROR_CODE.UPDATE_CHECKPOINTED]: 'docs.collabRuntime.updateCheckpointed',
+  [COLLAB_ERROR_CODE.CHECKPOINT_EXPIRED]: 'docs.collabRuntime.checkpointExpired',
+  [COLLAB_ERROR_CODE.PERSISTENCE_FAILED]: 'docs.collabRuntime.persistenceFailed',
 } satisfies Record<CollabErrorCode, string>
 
 /**
@@ -176,7 +177,7 @@ export function useDocsDocumentCollabRuntime() {
           hasTerminalConnectionError.value = true
           connectionError.value = resolveDocumentCollaborationCloseState({ reason }).message
             ?? reason
-            ?? '协作鉴权失败'
+            ?? translate('docs.collabRuntime.authFailed')
         },
         onClose: ({ event }) => {
           if (!isActiveConnectRequest(requestId, document)) {
@@ -329,7 +330,7 @@ export function useDocsDocumentCollabRuntime() {
     }
 
     if (!wasRemoteSynced) {
-      connectionError.value ??= '协作连接在同步前断开'
+      connectionError.value ??= translate('docs.collabRuntime.syncDisconnected')
       hasTerminalConnectionError.value = true
       replaceProvider(null)
       applyConnectionStatus('error')
@@ -449,7 +450,7 @@ function resolveDocumentCollaborationError(error: unknown): string {
     return error.message
   }
 
-  return '暂时无法建立协作连接'
+  return translate('docs.collabRuntime.genericConnectionFailed')
 }
 
 interface DocumentCollaborationCloseEventLike {
@@ -465,14 +466,14 @@ function resolveDocumentCollaborationCloseState(event: DocumentCollaborationClos
 
   if (reason) {
     return {
-      message: COLLABORATION_CLOSE_MESSAGE_BY_REASON[reason],
+      message: translate(COLLABORATION_CLOSE_MESSAGE_KEY_BY_REASON[reason]),
       terminal: true,
     }
   }
 
   if (event.code === DOCUMENT_COLLABORATION_PERSISTENCE_CLOSE_CODE) {
     return {
-      message: COLLABORATION_CLOSE_MESSAGE_BY_REASON[COLLAB_ERROR_CODE.PERSISTENCE_FAILED],
+      message: translate(COLLABORATION_CLOSE_MESSAGE_KEY_BY_REASON[COLLAB_ERROR_CODE.PERSISTENCE_FAILED]),
       terminal: true,
     }
   }

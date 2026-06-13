@@ -4,6 +4,7 @@ import {
   ChatMessageRoleSchema,
   ChatSkillInvocationSchema,
 } from '../chat'
+import { ResolvedLanguagePreferenceSchema } from '../user'
 import { AgentMemoryRunOptionsSchema } from './memory'
 
 const NonEmptyStringSchema = z.string().trim().min(1)
@@ -30,6 +31,7 @@ export const AgentChatRuntimeContextSchema = z.object({
   triggerUserMessageId: NonEmptyStringSchema,
   triggerParentMessageId: NonEmptyStringSchema.nullable(),
   assistantMessageId: NonEmptyStringSchema,
+  defaultResponseLanguage: ResolvedLanguagePreferenceSchema,
   messages: z.array(AgentChatContextMessageSchema),
   contextSnapshots: z.array(AgentChatContextSnapshotSchema),
   memory: AgentMemoryRunOptionsSchema,

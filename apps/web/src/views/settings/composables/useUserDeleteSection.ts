@@ -3,6 +3,7 @@ import type { FormInstance, FormRules } from 'element-plus'
 import type { Ref } from 'vue'
 import type { UserDeleteSectionProps } from '../typing'
 import { computed, reactive, shallowRef } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { normalizeAccountConfirmation } from '../utils/accountConfirmation'
 
 export function useUserDeleteSection(options: {
@@ -10,18 +11,27 @@ export function useUserDeleteSection(options: {
   onDeleteAccount: (payload: DeleteCurrentUserRequest) => void
   props: UserDeleteSectionProps
 }) {
+  const { t } = useI18n({ useScope: 'global' })
   const isDialogVisible = shallowRef(false)
   const form = reactive({
     accountConfirmation: '',
     confirmationPhrase: '',
   })
 
-  const accountLabel = computed(() => options.props.confirmationMode === 'email' ? '当前邮箱' : '当前显示名称')
+  const accountLabel = computed(() =>
+    options.props.confirmationMode === 'email'
+      ? t('settings.user.delete.accountLabel.email')
+      : t('settings.user.delete.accountLabel.displayName'),
+  )
   const accountPlaceholder = computed(() =>
-    options.props.confirmationMode === 'email' ? '请输入当前邮箱' : '请输入当前显示名称',
+    options.props.confirmationMode === 'email'
+      ? t('settings.user.delete.accountPlaceholder.email')
+      : t('settings.user.delete.accountPlaceholder.displayName'),
   )
   const accountValidatorMessage = computed(() =>
-    options.props.confirmationMode === 'email' ? '请输入当前邮箱完成确认' : '请输入当前显示名称完成确认',
+    options.props.confirmationMode === 'email'
+      ? t('settings.user.delete.accountRequired.email')
+      : t('settings.user.delete.accountRequired.displayName'),
   )
   const normalizedExpectedAccount = computed(() =>
     normalizeAccountConfirmation(options.props.confirmationTarget, options.props.confirmationMode),
@@ -57,13 +67,17 @@ export function useUserDeleteSection(options: {
     confirmationPhrase: [
       {
         required: true,
-        message: `请输入“${options.props.confirmationPhrase}”`,
+        message: t('settings.user.delete.confirmPhraseRequired', {
+          phrase: options.props.confirmationPhrase,
+        }),
         trigger: ['blur', 'change'],
       },
       {
         validator: (_rule, value: string, callback) => {
           if (value.trim() !== options.props.confirmationPhrase) {
-            callback(new Error(`请输入“${options.props.confirmationPhrase}”`))
+            callback(new Error(t('settings.user.delete.confirmPhraseRequired', {
+              phrase: options.props.confirmationPhrase,
+            })))
             return
           }
 

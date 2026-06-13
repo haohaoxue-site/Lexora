@@ -4,12 +4,13 @@ import type { PublicationDocumentContentProps } from './typing'
 import type { DocumentBodyEditorOutlineOptions } from '@/components/tiptap-editor'
 import { collectDocumentAssetIds, hasDocumentContent } from '@haohaoxue/samepage-shared/document'
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { DocumentBodyEditor } from '@/components/tiptap-editor'
 import dayjs from '@/utils/dayjs'
 import { ElMessage } from '@/utils/element-plus'
 import {
+  getPublicationUnpublishedMessage,
   PUBLICATION_DISABLED_LINK_CLASS,
-  PUBLICATION_UNPUBLISHED_MESSAGE,
 } from '../../utils/publicationRendering'
 
 const props = withDefaults(defineProps<PublicationDocumentContentProps>(), {
@@ -18,6 +19,7 @@ const props = withDefaults(defineProps<PublicationDocumentContentProps>(), {
   showMeta: true,
   showOutline: true,
 })
+const { t } = useI18n()
 const updatedFromNow = computed(() => dayjs(props.document.updatedAt).fromNow())
 const isEmpty = computed(() =>
   !hasDocumentContent(props.body) && collectDocumentAssetIds(props.body).length === 0,
@@ -58,7 +60,7 @@ function handleBodyClick(event: MouseEvent) {
 
   event.preventDefault()
   event.stopPropagation()
-  ElMessage.info(PUBLICATION_UNPUBLISHED_MESSAGE)
+  ElMessage.info(getPublicationUnpublishedMessage())
 }
 </script>
 
@@ -66,10 +68,10 @@ function handleBodyClick(event: MouseEvent) {
   <article class="publication-document-content text-main" :class="articleClass">
     <header v-if="props.showHeader" class="publication-document-content__header mb-6">
       <p v-if="props.showMeta" class="publication-document-content__meta m-0 mb-3 text-[13px] leading-[1.5] text-[var(--publication-c-text-3)]">
-        更新于 {{ updatedFromNow }}
+        {{ t('docs.publicReader.updatedAt', { date: updatedFromNow }) }}
       </p>
       <h1 class="publication-document-content__title m-0 font-bold leading-[1.18] text-main">
-        {{ props.document.title || '未命名' }}
+        {{ props.document.title || t('docs.common.noTitle') }}
       </h1>
     </header>
 
@@ -84,7 +86,7 @@ function handleBodyClick(event: MouseEvent) {
       />
 
       <p v-if="isEmpty" class="publication-document-content__empty mt-1 text-sm leading-[1.8] text-[var(--publication-c-text-3)]">
-        暂无内容
+        {{ t('docs.publicReader.emptyContent') }}
       </p>
     </div>
   </article>

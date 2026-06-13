@@ -7,6 +7,7 @@ import type {
 import { mergeAttributes, Node } from '@tiptap/core'
 import { Fragment, Slice as ProseMirrorSlice } from '@tiptap/pm/model'
 import { Plugin } from '@tiptap/pm/state'
+import { translate } from '@/i18n'
 
 export const CHAT_REFERENCE_NODE_NAME = 'chatReference'
 
@@ -156,7 +157,7 @@ function readReferenceAttrs(node: ProseMirrorNode): ChatReferenceAttrs {
     attachmentId: typeof node.attrs.attachmentId === 'string' ? node.attrs.attachmentId : '',
     label: typeof node.attrs.label === 'string' && node.attrs.label.length
       ? node.attrs.label
-      : '文档',
+      : translate('chat.composer.documentFallback'),
   }
 }
 
@@ -167,5 +168,5 @@ function renderStringAttribute(name: string, value: unknown) {
 }
 
 function normalizeReferenceText(value: string) {
-  return value.trim().replace(/^@/u, '') || '文档'
+  return value.trim().replace(/^@/u, '') || translate('chat.composer.documentFallback')
 }

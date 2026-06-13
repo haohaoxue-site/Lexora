@@ -20,6 +20,7 @@ import TaskList from '@tiptap/extension-task-list'
 import { TextStyle } from '@tiptap/extension-text-style'
 import StarterKit from '@tiptap/starter-kit'
 import { ySyncPluginKey } from '@tiptap/y-tiptap'
+import { translate } from '@/i18n'
 import {
   createTiptapCollaborationCursorUser,
   renderTiptapCollaborationCursor,
@@ -43,9 +44,6 @@ import { SelectionVisibility } from '../extensions/SelectionVisibility'
 import { TextAlign } from '../extensions/TextAlign'
 import { TextColorClass } from '../extensions/TextColorClass'
 
-const BODY_PLACEHOLDER = '输入 / 唤起命令，或直接开始写作。'
-const BODY_EMPTY_LINE_PLACEHOLDER = '按“/”启用命令'
-const TITLE_PLACEHOLDER = '输入文档标题'
 const COLLABORATION_Y_UNDO_OPTIONS: CollaborationOptions['yUndoOptions'] = {
   // pnpm 下 ySyncPluginKey 可能出现实例不一致，constructor 匹配能让 yUndo 捕获本地编辑事务。
   trackedOrigins: [ySyncPluginKey.constructor],
@@ -136,18 +134,18 @@ function resolveBodyPlaceholder(
   }
 
   if (isOnlyEmptyParagraphDocument(editor)) {
-    return options.placeholder ?? BODY_PLACEHOLDER
+    return options.placeholder ?? translate('editor.placeholders.body')
   }
 
-  return options.emptyLinePlaceholder ?? BODY_EMPTY_LINE_PLACEHOLDER
+  return options.emptyLinePlaceholder ?? translate('editor.placeholders.emptyLine')
 }
 
 function resolveHeadingPlaceholder(level: unknown) {
   if (typeof level === 'number' && Number.isInteger(level) && level > 0) {
-    return `标题${level}`
+    return translate('editor.placeholders.headingLevel', { level })
   }
 
-  return '标题'
+  return translate('editor.placeholders.heading')
 }
 
 function isOnlyEmptyParagraphDocument(editor: Editor) {
@@ -178,7 +176,7 @@ export function createTitleExtensions(options: {
     ...createCollaborationExtensions(options.collaboration),
     HistorySelection,
     Placeholder.configure({
-      placeholder: TITLE_PLACEHOLDER,
+      placeholder: translate('editor.placeholders.title'),
     }),
   ]
 }

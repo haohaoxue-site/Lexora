@@ -1,17 +1,19 @@
 <script setup lang="ts">
 import type { AiProviderSidebarEmits, AiProviderSidebarProps } from './typing'
+import { useI18n } from 'vue-i18n'
 import Empty from '@/components/empty'
 
 defineProps<AiProviderSidebarProps>()
 
 const emit = defineEmits<AiProviderSidebarEmits>()
 const searchKeyword = defineModel<string>('searchKeyword', { required: true })
+const { t } = useI18n({ useScope: 'global' })
 </script>
 
 <template>
   <aside class="ai-provider-console__sidebar">
     <div class="ai-provider-console__search">
-      <ElInput v-model="searchKeyword" clearable placeholder="搜索服务商..." />
+      <ElInput v-model="searchKeyword" clearable :placeholder="t('aiProvider.sidebar.searchPlaceholder')" />
     </div>
 
     <ElScrollbar class="min-h-0 flex-1">
@@ -43,16 +45,16 @@ const searchKeyword = defineModel<string>('searchKeyword', { required: true })
                 class="ai-provider-console__provider-status"
                 :type="getProviderStatusType(row)"
               >
-                {{ getProviderStatusLabel(row) }}
+                {{ row.provider.enabled ? t('aiProvider.status.enabled') : t('aiProvider.status.disabled') }}
               </ElTag>
             </button>
             <template #dropdown>
               <ElDropdownMenu>
                 <ElDropdownItem command="edit">
-                  编辑
+                  {{ t('aiProvider.common.edit') }}
                 </ElDropdownItem>
                 <ElDropdownItem command="delete" divided>
-                  删除
+                  {{ t('aiProvider.common.delete') }}
                 </ElDropdownItem>
               </ElDropdownMenu>
             </template>
@@ -79,19 +81,19 @@ const searchKeyword = defineModel<string>('searchKeyword', { required: true })
               class="ai-provider-console__provider-status"
               :type="getProviderStatusType(row)"
             >
-              {{ getProviderStatusLabel(row) }}
+              {{ row.provider.enabled ? t('aiProvider.status.enabled') : t('aiProvider.status.disabled') }}
             </ElTag>
           </button>
         </template>
 
-        <Empty v-if="rows.length === 0" :image-size="88" description="没有匹配的服务商" />
+        <Empty v-if="rows.length === 0" :image-size="88" :description="t('aiProvider.sidebar.empty')" />
       </div>
     </ElScrollbar>
 
     <div class="ai-provider-console__sidebar-footer">
       <ElButton class="w-full" size="large" type="primary" @click="emit('openCreateProvider')">
         <SvgIcon category="ui" icon="plus" size="1rem" class="mr-2" />
-        添加
+        {{ t('aiProvider.sidebar.add') }}
       </ElButton>
     </div>
   </aside>

@@ -3,6 +3,7 @@ import type { FormInstance, FormRules } from 'element-plus'
 import type { ShallowRef } from 'vue'
 import { AUTH_PROVIDER_VALUES } from '@haohaoxue/samepage-contracts/auth/constants'
 import { computed, onMounted, reactive, shallowRef } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { createRegistrationInviteGrant, startOAuthLogin } from '@/apis/auth'
 import { useFormSubmit } from '@/composables/useFormSubmit'
@@ -11,13 +12,14 @@ import { ElMessage, ElMessageBox } from '@/utils/element-plus'
 import { getRequestErrorDisplayMessage } from '@/utils/request-error'
 import { completeAuthNavigation, syncPendingRedirect } from '../utils/navigation'
 import { AUTH_PROVIDER_UI_META } from '../utils/provider-ui'
-import { createEmailRules, createPasswordRules, isValidEmail, isValidPassword } from '../utils/rules'
+import { createAuthRuleMessages, createEmailRules, createPasswordRules, isValidEmail, isValidPassword } from '../utils/rules'
 import { useAuthCapabilities } from './useAuthCapabilities'
 
 export function useLogin(options: {
   oauthInviteFormRef: ShallowRef<FormInstance | null>
   passwordFormRef: ShallowRef<FormInstance | null>
 }) {
+  const { t } = useI18n({ useScope: 'global' })
   const route = useRoute()
   const router = useRouter()
   const authStore = useAuthStore()
@@ -31,22 +33,23 @@ export function useLogin(options: {
   const oauthInviteForm = reactive({
     inviteCode: '',
   })
-  const passwordFormRules: FormRules<typeof passwordForm> = {
-    email: createEmailRules(),
-    password: createPasswordRules(),
-  }
-  const oauthInviteFormRules: FormRules<typeof oauthInviteForm> = {
+  const ruleMessages = createAuthRuleMessages((key, params) => params ? t(key, params) : t(key))
+  const passwordFormRules = computed<FormRules<typeof passwordForm>>(() => ({
+    email: createEmailRules(t('auth.common.email'), ruleMessages),
+    password: createPasswordRules(t('auth.common.password'), ruleMessages),
+  }))
+  const oauthInviteFormRules = computed<FormRules<typeof oauthInviteForm>>(() => ({
     inviteCode: [
       {
         required: true,
-        message: '请输入邀请码',
+        message: t('auth.validation.inviteCodeRequired'),
       },
       {
         min: 4,
-        message: '邀请码至少 4 位',
+        message: t('auth.validation.inviteCodeMin', { min: 4 }),
       },
     ],
-  }
+  }))
   const {
     authCapabilities,
     isLoadingCapabilities,
@@ -81,7 +84,7 @@ export function useLogin(options: {
       passwordForm.email = passwordForm.email.trim()
       await authStore.passwordLogin(passwordForm.email, passwordForm.password)
     },
-    fallbackError: '登录失败',
+    fallbackError: () => t('auth.login.failed'),
     onSuccess: () => completeAuthNavigation(router, authStore),
   })
 
@@ -97,7 +100,7 @@ export function useLogin(options: {
     }
     catch (error) {
       startingOauthProvider.value = null
-      ElMessage.error(getRequestErrorDisplayMessage(error, '发起第三方登录失败'))
+      ElMessage.error(getRequestErrorDisplayMessage(error, t('auth.login.startOauthFailed')))
     }
   }
 
@@ -110,11 +113,11 @@ export function useLogin(options: {
 
     if (!targetProvider.acceptingNewUsers) {
       const isConfirmed = await ElMessageBox.confirm(
-        `当前仅允许已绑定 ${targetProvider.title} 的账号登录。未绑定账号无法创建新账号。`,
-        `使用 ${targetProvider.title} 登录`,
+        t('auth.login.oauthExistingOnlyMessage', { provider: targetProvider.title }),
+        t('auth.login.oauthDialogTitle', { provider: targetProvider.title }),
         {
-          confirmButtonText: '继续登录',
-          cancelButtonText: '取消',
+          confirmButtonText: t('auth.login.continueLogin'),
+          cancelButtonText: t('auth.common.cancel'),
           type: 'info',
           autofocus: false,
         },
@@ -163,7 +166,7 @@ export function useLogin(options: {
     }
     catch (error) {
       startingOauthProvider.value = null
-      ElMessage.error(getRequestErrorDisplayMessage(error, '验证邀请码失败'))
+      ElMessage.error(getRequestErrorDisplayMessage(error, t('auth.login.verifyInviteFailed')))
     }
   }
 

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { ChatMessage } from '@/apis/chat'
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import ChatMarkdownContent from '@/components/chat-markdown/ChatMarkdownContent.vue'
 import { createAssistantMessageDisplayModel } from '@/composables/chat/utils/chat-message-display'
 import ChatReasoningBlock from './ChatReasoningBlock.vue'
@@ -16,8 +17,16 @@ const props = withDefaults(defineProps<{
   showUsageSummary: true,
 })
 
-const display = computed(() => createAssistantMessageDisplayModel(props.message))
+const { locale, t } = useI18n({ useScope: 'global' })
+const display = computed(() => {
+  readReactiveLocale(locale.value)
+  return createAssistantMessageDisplayModel(props.message)
+})
 const answerStarted = computed(() => Boolean(display.value.messageText))
+
+function readReactiveLocale(value: string): string {
+  return value
+}
 </script>
 
 <template>
@@ -60,7 +69,7 @@ const answerStarted = computed(() => Boolean(display.value.messageText))
       aria-live="polite"
     >
       <span class="chat-assistant-message__pending-status">
-        <span class="chat-assistant-message__pending-label">正在思考</span>
+        <span class="chat-assistant-message__pending-label">{{ t('chat.messageDisplay.pendingThinking') }}</span>
         <span class="chat-assistant-message__thinking-dots" aria-hidden="true">
           <span />
           <span />
@@ -80,7 +89,7 @@ const answerStarted = computed(() => Boolean(display.value.messageText))
     </div>
 
     <div v-if="display.showCancelled" class="chat-assistant-message__cancelled">
-      已停止
+      {{ t('chat.messageDisplay.stopped') }}
     </div>
 
     <ChatToolResultBlock

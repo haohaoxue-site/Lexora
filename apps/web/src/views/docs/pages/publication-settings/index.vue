@@ -26,6 +26,7 @@ import {
 } from '@haohaoxue/samepage-contracts/document/publication/constants'
 import { useRouteQuery } from '@vueuse/router'
 import { computed, shallowRef, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import {
   createPublicationPage,
@@ -61,6 +62,7 @@ const PUBLICATION_SETTINGS_TAB_VALUES = [
 const workspaceStore = useWorkspaceStore()
 const route = useRoute()
 const router = useRouter()
+const { t } = useI18n()
 
 const activeTab = useRouteQuery<string | string[] | undefined, PublicationSettingsTab>(
   'tab',
@@ -89,28 +91,28 @@ const site = computed<PublicationSite | null>(() => siteManagement.value?.site ?
 const siteGroups = computed<PublicationSection[]>(() => siteManagement.value?.sections ?? [])
 const pages = computed<PublicationPage[]>(() => siteManagement.value?.pages ?? [])
 const navItems = computed(() => siteManagement.value?.navItems ?? [])
-const navigationItems = [
+const navigationItems = computed(() => [
   {
     name: 'open-overview',
-    label: '公开概览',
+    label: t('docs.publicationSite.tabs.openOverview'),
     icon: DataAnalysis,
   },
   {
     name: 'site-config',
-    label: '站点配置',
+    label: t('docs.publicationSite.tabs.siteConfig'),
     icon: Setting,
   },
   {
     name: 'site-groups',
-    label: '站点分组',
+    label: t('docs.publicationSite.tabs.siteGroups'),
     icon: Collection,
   },
   {
     name: 'site-navigation',
-    label: '站点导航',
+    label: t('docs.publicationSite.tabs.siteNavigation'),
     icon: Guide,
   },
-] satisfies Array<{ name: PublicationSettingsTab, label: string, icon: Component }>
+] satisfies Array<{ name: PublicationSettingsTab, label: string, icon: Component }>)
 
 watch(
   currentWorkspaceId,
@@ -138,7 +140,7 @@ async function loadPublicationManagement() {
     applySiteManagement(siteResponse)
   }
   catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : '加载发布管理失败'
+    errorMessage.value = error instanceof Error ? error.message : t('docs.publicationSite.messages.loadManagementFailed')
   }
   finally {
     isLoading.value = false
@@ -171,10 +173,10 @@ async function updatePublicationOpenOverviewState(
       ...(scope ? { scope } : {}),
     })
     await reloadPublicationOpenOverviewTree()
-    ElMessage.success('公开状态已更新')
+    ElMessage.success(t('docs.publicationSite.messages.statusUpdated'))
   }
   catch (error) {
-    ElMessage.error(error instanceof Error ? error.message : '更新公开状态失败')
+    ElMessage.error(error instanceof Error ? error.message : t('docs.publicationSite.messages.statusUpdateFailed'))
   }
   finally {
     updatingPublicationOpenOverviewDocumentId.value = null
@@ -187,8 +189,8 @@ async function saveSiteConfig(payload: SiteConfigDraft) {
       workspaceId: currentWorkspaceId.value,
       ...payload,
     }))
-    ElMessage.success('站点配置已保存')
-  }, '保存站点配置失败')
+    ElMessage.success(t('docs.publicationSite.messages.configSaved'))
+  }, t('docs.publicationSite.messages.configSaveFailed'))
 }
 
 async function uploadSiteMedia(kind: PublicationSiteMediaKind, file: File) {
@@ -201,8 +203,8 @@ async function uploadSiteMedia(kind: PublicationSiteMediaKind, file: File) {
   try {
     await runSiteMutation(async () => {
       applySiteManagement(await updatePublicationSiteMedia(currentWorkspaceId.value, kind, file))
-      ElMessage.success(kind === DOCUMENT_PUBLICATION_SITE_MEDIA_KIND.LOGO ? '站点 Logo 已上传' : '首页 Logo 已上传')
-    }, '上传站点图片失败')
+      ElMessage.success(kind === DOCUMENT_PUBLICATION_SITE_MEDIA_KIND.LOGO ? t('docs.publicationSite.messages.siteLogoUploaded') : t('docs.publicationSite.messages.homeLogoUploaded'))
+    }, t('docs.publicationSite.messages.mediaUploadFailed'))
   }
   finally {
     uploadingSiteMediaKind.value = null
@@ -219,8 +221,8 @@ async function removeSiteMedia(kind: PublicationSiteMediaKind) {
   try {
     await runSiteMutation(async () => {
       applySiteManagement(await removePublicationSiteMedia(currentWorkspaceId.value, kind))
-      ElMessage.success(kind === DOCUMENT_PUBLICATION_SITE_MEDIA_KIND.LOGO ? '站点 Logo 已移除' : '首页 Logo 已移除')
-    }, '移除站点图片失败')
+      ElMessage.success(kind === DOCUMENT_PUBLICATION_SITE_MEDIA_KIND.LOGO ? t('docs.publicationSite.messages.siteLogoRemoved') : t('docs.publicationSite.messages.homeLogoRemoved'))
+    }, t('docs.publicationSite.messages.mediaRemoveFailed'))
   }
   finally {
     uploadingSiteMediaKind.value = null
@@ -234,8 +236,8 @@ async function createGroup(title: string) {
       title,
       order: siteGroups.value.length,
     }))
-    ElMessage.success('分组已创建')
-  }, '创建分组失败')
+    ElMessage.success(t('docs.publicationSite.messages.groupCreated'))
+  }, t('docs.publicationSite.messages.groupCreateFailed'))
 }
 
 async function updateGroup(groupId: string, payload: UpdateGroupDraft, options?: { silent?: boolean }) {
@@ -246,16 +248,16 @@ async function updateGroup(groupId: string, payload: UpdateGroupDraft, options?:
     }))
 
     if (!options?.silent) {
-      ElMessage.success('分组已更新')
+      ElMessage.success(t('docs.publicationSite.messages.groupUpdated'))
     }
-  }, '更新分组失败')
+  }, t('docs.publicationSite.messages.groupUpdateFailed'))
 }
 
 async function deleteGroup(groupId: string) {
   await runSiteMutation(async () => {
     applySiteManagement(await removePublicationSection(groupId, currentWorkspaceId.value))
-    ElMessage.success('分组已删除')
-  }, '删除分组失败')
+    ElMessage.success(t('docs.publicationSite.messages.groupDeleted'))
+  }, t('docs.publicationSite.messages.groupDeleteFailed'))
 }
 
 async function createPage(payload: CreatePageDraft) {
@@ -264,8 +266,8 @@ async function createPage(payload: CreatePageDraft) {
       workspaceId: currentWorkspaceId.value,
       ...payload,
     }))
-    ElMessage.success('页面已加入站点')
-  }, '添加站点页面失败')
+    ElMessage.success(t('docs.publicationSite.messages.pageAdded'))
+  }, t('docs.publicationSite.messages.pageAddFailed'))
 }
 
 async function updatePage(pageId: string, payload: UpdatePageDraft) {
@@ -274,15 +276,15 @@ async function updatePage(pageId: string, payload: UpdatePageDraft) {
       workspaceId: currentWorkspaceId.value,
       ...payload,
     }))
-    ElMessage.success('站点页面已更新')
-  }, '更新站点页面失败')
+    ElMessage.success(t('docs.publicationSite.messages.pageUpdated'))
+  }, t('docs.publicationSite.messages.pageUpdateFailed'))
 }
 
 async function removePage(pageId: string) {
   await runSiteMutation(async () => {
     applySiteManagement(await removePublicationPage(pageId, currentWorkspaceId.value))
-    ElMessage.success('页面已移出站点')
-  }, '移出站点页面失败')
+    ElMessage.success(t('docs.publicationSite.messages.pageRemoved'))
+  }, t('docs.publicationSite.messages.pageRemoveFailed'))
 }
 
 async function reorderPages(orders: Array<{ pageId: string, order: number }>) {
@@ -300,8 +302,8 @@ async function reorderPages(orders: Array<{ pageId: string, order: number }>) {
       applySiteManagement(nextSiteManagement)
     }
 
-    ElMessage.success('站点页面顺序已更新')
-  }, '更新站点页面顺序失败')
+    ElMessage.success(t('docs.publicationSite.messages.pageOrderUpdated'))
+  }, t('docs.publicationSite.messages.pageOrderUpdateFailed'))
 }
 
 async function saveSiteNavigationItems(items: PublicationNavItemInput[]) {
@@ -312,8 +314,8 @@ async function saveSiteNavigationItems(items: PublicationNavItemInput[]) {
     }
 
     applySiteManagement(await replacePublicationNavItems(payload))
-    ElMessage.success('站点导航已保存')
-  }, '保存站点导航失败')
+    ElMessage.success(t('docs.publicationSite.messages.navSaved'))
+  }, t('docs.publicationSite.messages.navSaveFailed'))
 }
 
 async function runSiteMutation(action: () => Promise<void>, errorText: string) {
@@ -389,7 +391,7 @@ function isPublicationSettingsTab(tab: string): tab is PublicationSettingsTab {
     >
       <template #default>
         <ElButton link type="primary" @click="loadPublicationManagement">
-          重新加载
+          {{ t('docs.common.reload') }}
         </ElButton>
       </template>
     </ElAlert>

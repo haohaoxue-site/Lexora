@@ -41,6 +41,7 @@ import {
   resolveDocumentAssets as resolveDocumentAssetsRequest,
   restoreDocumentVersionSnapshot as restoreDocumentVersionSnapshotRequest,
 } from '@/apis/document'
+import { translate } from '@/i18n'
 import { useUserStore } from '@/stores/user'
 import dayjs from '@/utils/dayjs'
 import { ElMessage } from '@/utils/element-plus'
@@ -238,10 +239,10 @@ export const useActiveDocument = createSharedComposable(() => {
       reconnectDocumentIfWritable(nextDocument)
 
       if (isNoopRestore) {
-        ElMessage.info('该历史记录已是当前内容')
+        ElMessage.info(translate('docs.history.restoreAlreadyCurrent'))
       }
       else {
-        ElMessage.success('已恢复到所选版本')
+        ElMessage.success(translate('docs.history.restoreSuccess'))
       }
     }
     catch (error) {
@@ -724,16 +725,16 @@ export function resolveDocumentErrorState(error: unknown): DocumentPaneState {
 
 export function resolveDocumentWriteErrorMessage(error: unknown): string {
   if (isUnsupportedSchemaVersionError(error)) {
-    return '当前编辑器版本不支持这篇文档，请刷新或升级后再试'
+    return translate('docs.history.restoreUnsupportedVersion')
   }
 
   const requestError = error as RequestError
 
   if (requestError.status === 409) {
-    return '文档版本已变化，请刷新后重试'
+    return translate('docs.history.restoreVersionChanged')
   }
 
-  return '操作失败，当前内容未变更'
+  return translate('docs.history.restoreNoChange')
 }
 
 export function isUnsupportedSchemaVersionError(error: unknown): error is UnsupportedSchemaVersionError {
@@ -790,23 +791,23 @@ function resolveEditableCollaborationStatusLabel(input: {
 
   if (input.isReadonlyFallback) {
     if (input.connectionError) {
-      return '协作已暂停，当前只读保护'
+      return translate('docs.collabRuntime.statusPausedReadonly')
     }
 
     return input.status === 'error'
-      ? '协作不可用，当前只读保护'
-      : '协作已中断，当前只读保护'
+      ? translate('docs.collabRuntime.statusUnavailableReadonly')
+      : translate('docs.collabRuntime.statusInterruptedReadonly')
   }
 
   switch (input.status) {
     case 'connecting':
-      return '协作连接中'
+      return translate('docs.collabRuntime.statusConnecting')
     case 'connected':
-      return '协作已连接'
+      return translate('docs.collabRuntime.statusConnected')
     case 'disconnected':
-      return '协作正在重连'
+      return translate('docs.collabRuntime.statusDisconnected')
     case 'error':
-      return '协作连接失败'
+      return translate('docs.collabRuntime.statusError')
     default:
       return null
   }
@@ -850,12 +851,12 @@ function resolveEditableCollaborationStatusHint(input: {
 
   if (input.isReadonlyFallback) {
     if (input.connectionError) {
-      return `${input.connectionError} 当前内容已进入只读保护，重新连接后才能继续编辑。`
+      return translate('docs.collabRuntime.readonlyWithError', { error: input.connectionError })
     }
 
     return input.status === 'error'
-      ? '当前内容已进入只读保护，点击重新连接后再尝试继续编辑。'
-      : '当前内容已进入只读保护，重新连接后才能继续编辑。'
+      ? translate('docs.collabRuntime.readonlyError')
+      : translate('docs.collabRuntime.readonlyDisconnected')
   }
 
   if (input.status === 'error' && input.connectionError) {
@@ -863,7 +864,7 @@ function resolveEditableCollaborationStatusHint(input: {
   }
 
   if (input.status === 'disconnected') {
-    return '短暂断线中，正在尝试恢复协作连接。'
+    return translate('docs.collabRuntime.disconnectedHint')
   }
 
   return null

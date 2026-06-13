@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import { nodeViewProps, NodeViewWrapper } from '@tiptap/vue-3'
 import { computed, nextTick, shallowRef, useTemplateRef, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { selectMathNode } from './mathNodeSelection'
 import { renderKatex } from './renderMath'
 import 'katex/dist/katex.min.css'
 
 const props = defineProps(nodeViewProps)
+const { t } = useI18n()
 
 const renderRef = useTemplateRef<HTMLElement>('render')
 const hasRenderError = shallowRef(false)
@@ -50,7 +52,7 @@ watch(latex, () => {
       @click="handleSelect"
       @mousedown="handleSelect"
     >
-      <span v-if="isEmpty" class="tiptap-math-block__placeholder">输入 LaTeX 公式</span>
+      <span v-if="isEmpty" class="tiptap-math-block__placeholder">{{ t('editor.math.placeholder') }}</span>
       <span v-else ref="render" class="tiptap-math-block__katex" />
     </button>
   </NodeViewWrapper>

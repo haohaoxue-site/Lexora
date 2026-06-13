@@ -7,6 +7,7 @@ import {
   enableAgentSkill,
   getAgentSkills,
 } from '@/apis/agent-skills'
+import { translate } from '@/i18n'
 import { ElMessage } from '@/utils/element-plus'
 import { getRequestErrorDisplayMessage } from '@/utils/request-error'
 
@@ -33,7 +34,7 @@ export const useChatSkillState = createSharedComposable(() => {
     }
     catch (error) {
       if (!options.silent) {
-        ElMessage.error(getRequestErrorDisplayMessage(error, '技能加载失败'))
+        ElMessage.error(getRequestErrorDisplayMessage(error, translate('chat.errors.loadSkills')))
       }
     }
     finally {
@@ -54,7 +55,10 @@ export const useChatSkillState = createSharedComposable(() => {
       replaceSkill(response.skill)
     }
     catch (error) {
-      ElMessage.error(getRequestErrorDisplayMessage(error, enabled ? '技能开启失败' : '技能关闭失败'))
+      ElMessage.error(getRequestErrorDisplayMessage(
+        error,
+        enabled ? translate('chat.errors.enableSkill') : translate('chat.errors.disableSkill'),
+      ))
     }
     finally {
       setSkillUpdating(skill.key, false)

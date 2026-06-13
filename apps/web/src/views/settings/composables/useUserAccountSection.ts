@@ -1,19 +1,26 @@
 import type { AuthProviderName } from '@haohaoxue/samepage-contracts'
-import type { FormInstance } from 'element-plus'
+import type { FormInstance, FormItemRule, FormRules } from 'element-plus'
 import type { Ref } from 'vue'
 import type { UserAccountSectionProps } from '../typing'
 import { AUTH_PROVIDER_VALUES } from '@haohaoxue/samepage-contracts/auth/constants'
+import {
+  AUTH_PASSWORD_MAX_LENGTH,
+  AUTH_PASSWORD_MIN_LENGTH,
+} from '@haohaoxue/samepage-contracts/identity/constants'
 import { computed, reactive } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { AUTH_PROVIDER_UI_META } from '@/views/auth/utils/provider-ui'
 import {
-  createConfirmPasswordRules,
-  createEmailRules,
-  createPasswordRules,
   isValidEmail,
   isValidPassword,
 } from '@/views/auth/utils/rules'
 
 const EMAIL_CODE_RE = /^\d{6}$/
+type RuleValidator = NonNullable<FormItemRule['validator']>
+
+function resolveTrimmedValue(value: unknown) {
+  return typeof value === 'string' ? value.trim() : ''
+}
 
 export function useUserAccountSection(options: {
   code: Ref<string>
@@ -27,6 +34,7 @@ export function useUserAccountSection(options: {
   onStartOauthBinding: (provider: AuthProviderName) => void
   props: UserAccountSectionProps
 }) {
+  const { t } = useI18n({ useScope: 'global' })
   const form = reactive({
     email: options.email,
     code: options.code,
@@ -41,31 +49,102 @@ export function useUserAccountSection(options: {
   const normalizedCode = computed(() => form.code.trim())
   const sectionDescription = computed(() => {
     if (options.props.emailBindingEnabled) {
-      return '管理邮箱与第三方登录方式。解绑第三方账号前，系统会校验是否仍保留可用登录方式。'
+      return t('settings.user.account.description.full')
     }
 
     if (hasEmailAccountInfo.value) {
-      return '查看邮箱与密码登录状态，并管理第三方登录方式。解绑第三方账号前，系统会校验是否仍保留可用登录方式。'
+      return t('settings.user.account.description.readonly')
     }
 
-    return '管理第三方登录方式。解绑第三方账号前，系统会校验是否仍保留可用登录方式。'
+    return t('settings.user.account.description.oauthOnly')
   })
 
-  const emailFormRules = computed(() => ({
-    email: createEmailRules('邮箱'),
+  const createEmailValidator = (): RuleValidator => (_rule, value, callback) => {
+    if (!isValidEmail(resolveTrimmedValue(value))) {
+      callback(new Error(t('settings.user.account.emailInvalid')))
+      return
+    }
+
+    callback()
+  }
+  const createPasswordValidator = (fieldKey: 'password' | 'confirmPassword'): RuleValidator => (_rule, value, callback) => {
+    const valueText = typeof value === 'string' ? value : ''
+    const field = t(`settings.user.account.${fieldKey}`)
+
+    if (!valueText) {
+      callback()
+      return
+    }
+
+    if (!isValidPassword(valueText)) {
+      callback(new Error(t('settings.user.account.passwordRule', {
+        field,
+        min: AUTH_PASSWORD_MIN_LENGTH,
+        max: AUTH_PASSWORD_MAX_LENGTH,
+      })))
+      return
+    }
+
+    callback()
+  }
+  const createConfirmPasswordValidator = (): RuleValidator => (_rule, value, callback) => {
+    const valueText = typeof value === 'string' ? value : ''
+
+    if (!valueText || valueText === form.newPassword) {
+      callback()
+      return
+    }
+
+    callback(new Error(t('settings.user.account.confirmPasswordMismatch')))
+  }
+
+  const emailFormRules = computed<FormRules>(() => ({
+    email: [
+      {
+        required: true,
+        message: t('settings.user.account.emailRequired'),
+        transform: resolveTrimmedValue,
+      },
+      {
+        validator: createEmailValidator(),
+        trigger: ['blur', 'change'],
+      },
+    ],
     code: [
       {
         required: true,
-        message: '请输入 6 位验证码',
+        message: t('settings.user.account.codeRequired'),
       },
       {
         pattern: EMAIL_CODE_RE,
-        message: '验证码需为 6 位数字',
+        message: t('settings.user.account.codeInvalid'),
       },
     ],
-    newPassword: requiresPasswordSetup.value ? createPasswordRules('登录密码') : [],
+    newPassword: requiresPasswordSetup.value
+      ? [
+          {
+            required: true,
+            message: t('settings.user.account.passwordRequired', {
+              field: t('settings.user.account.password'),
+            }),
+          },
+          {
+            validator: createPasswordValidator('password'),
+          },
+        ]
+      : [],
     confirmPassword: requiresPasswordSetup.value
-      ? createConfirmPasswordRules(() => form.newPassword, '确认登录密码')
+      ? [
+          {
+            required: true,
+            message: t('settings.user.account.passwordRequired', {
+              field: t('settings.user.account.confirmPassword'),
+            }),
+          },
+          {
+            validator: createConfirmPasswordValidator(),
+          },
+        ]
       : [],
   }))
 
@@ -85,10 +164,12 @@ export function useUserAccountSection(options: {
 
   const emailButtonText = computed(() => {
     if (requiresPasswordSetup.value) {
-      return options.props.account.email ? '更新邮箱并保留密码登录' : '绑定邮箱并启用密码登录'
+      return options.props.account.email
+        ? t('settings.user.account.updateEmailWithPassword')
+        : t('settings.user.account.bindEmailWithPassword')
     }
 
-    return options.props.account.email ? '更新邮箱' : '绑定邮箱'
+    return options.props.account.email ? t('settings.user.account.updateEmail') : t('settings.user.account.bindEmail')
   })
   const isSendCodeDisabled = computed(() =>
     options.props.isSendingCode || options.props.isBindingEmail || !isValidEmail(normalizedEmail.value),

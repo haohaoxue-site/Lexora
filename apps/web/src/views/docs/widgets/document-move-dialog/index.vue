@@ -10,6 +10,7 @@ import {
   DOCUMENT_COLLECTION,
 } from '@haohaoxue/samepage-contracts/document/constants'
 import { computed, shallowRef, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { getDocuments } from '@/apis/document'
 import { useWorkspaceStore } from '@/stores/workspace'
 import { useDocsPageActions } from '../../composables/useDocsPageActions'
@@ -19,7 +20,7 @@ import { findDocumentItemPath, resolveDocumentTreeItemIcon } from '../../utils/d
 const workspaceStore = useWorkspaceStore()
 const tree = useDocumentTree()
 const pageActions = useDocsPageActions()
-const ROOT_TARGET_LABEL = '文档根目录'
+const { t } = useI18n()
 
 const selectedWorkspaceId = shallowRef<string>('')
 const selectedTarget = shallowRef<SelectedMoveTarget | null>(null)
@@ -34,7 +35,7 @@ const visibleGroups = computed(() =>
   targetGroups.value.filter(group => group.id !== DOCUMENT_COLLECTION.COLLABORATION),
 )
 const canConfirm = computed(() => Boolean(target.value && selectedTarget.value) && !isMoving.value)
-const selectedTargetLabel = computed(() => selectedTarget.value?.label ?? '请选择目标位置')
+const selectedTargetLabel = computed(() => selectedTarget.value?.label ?? t('docs.moveDialog.selectTarget'))
 
 watch(isOpen, async (open) => {
   if (!open) {
@@ -96,7 +97,7 @@ function selectRootTarget() {
     workspaceId: selectedWorkspaceId.value,
     collectionId,
     parentId: null,
-    label: ROOT_TARGET_LABEL,
+    label: t('docs.moveDialog.root'),
   }
 }
 
@@ -172,7 +173,7 @@ function isOwnedCollection(collectionId: DocumentTreeCollectionId): collectionId
 <template>
   <ElDialog
     :model-value="isOpen"
-    title="移动到"
+    :title="t('docs.moveDialog.title')"
     width="760px"
     destroy-on-close
     align-center
@@ -184,7 +185,7 @@ function isOwnedCollection(collectionId: DocumentTreeCollectionId): collectionId
       <section
         v-loading="isLoading"
         class="document-move-dialog__tree min-h-0 min-w-0 flex-1 overflow-y-auto bg-surface p-2"
-        aria-label="目标文档树"
+        :aria-label="t('docs.moveDialog.targetDocumentTree')"
       >
         <div
           v-for="group in visibleGroups"
@@ -214,7 +215,7 @@ function isOwnedCollection(collectionId: DocumentTreeCollectionId): collectionId
     </div>
 
     <div class="document-move-dialog__target mt-3 flex min-h-8 items-center gap-2 text-[13px] leading-6 text-secondary">
-      <span class="shrink-0">目标位置</span>
+      <span class="shrink-0">{{ t('docs.moveDialog.targetLocation') }}</span>
       <span
         class="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-main"
         :title="selectedTargetLabel"
@@ -225,7 +226,7 @@ function isOwnedCollection(collectionId: DocumentTreeCollectionId): collectionId
 
     <template #footer>
       <ElButton :disabled="isMoving" @click="closeDialog">
-        取消
+        {{ t('docs.common.cancel') }}
       </ElButton>
       <ElButton
         class="ml-[10px]!"
@@ -234,7 +235,7 @@ function isOwnedCollection(collectionId: DocumentTreeCollectionId): collectionId
         :disabled="!canConfirm"
         @click="confirmMove"
       >
-        确定
+        {{ t('docs.common.confirm') }}
       </ElButton>
     </template>
   </ElDialog>

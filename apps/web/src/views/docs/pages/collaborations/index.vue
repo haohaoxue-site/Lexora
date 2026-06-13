@@ -8,14 +8,18 @@ import type {
 import type { CSSProperties } from 'vue'
 import {
   DOCUMENT_COLLABORATION_LINK_INVITE_STATE,
-  DOCUMENT_COLLABORATION_LINK_INVITE_STATE_LABELS,
-  DOCUMENT_COLLABORATION_PERMISSION_LABELS,
-  DOCUMENT_COLLABORATION_SCOPE_LABELS,
+  DOCUMENT_COLLABORATION_PERMISSION,
+  DOCUMENT_COLLABORATION_SCOPE,
 } from '@haohaoxue/samepage-contracts/document/collaboration/constants'
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import Empty from '@/components/empty'
 import { formatDateTime } from '@/utils/dayjs'
 import { useDocsCollaborationsPage } from '../../composables/useDocsCollaborationsPage'
+import {
+  formatCollaborationPermission,
+  formatCollaborationScope,
+} from '../../utils/documentCollaboration'
 
 const {
   errorMessage,
@@ -30,6 +34,7 @@ const {
   updateLinkPermission,
   updateLinkScope,
 } = useDocsCollaborationsPage()
+const { t } = useI18n()
 
 type CollaborationConsoleTableItem = DocumentCollaborationConsoleTreeItem & {
   linkInviteStateLabel: string
@@ -40,14 +45,24 @@ type CollaborationConsoleTableItem = DocumentCollaborationConsoleTreeItem & {
 }
 
 const tableTree = computed(() => tree.value.map(toTableItem))
-const permissionOptions = Object.entries(DOCUMENT_COLLABORATION_PERMISSION_LABELS).map(([value, label]) => ({
-  value: value as DocumentCollaborationPermission,
-  label,
-}))
-const scopeOptions = Object.entries(DOCUMENT_COLLABORATION_SCOPE_LABELS).map(([value, label]) => ({
-  value: value as DocumentCollaborationScope,
-  label,
-}))
+const permissionOptions = computed(() =>
+  [
+    DOCUMENT_COLLABORATION_PERMISSION.READ,
+    DOCUMENT_COLLABORATION_PERMISSION.EDIT,
+  ].map(value => ({
+    value,
+    label: formatCollaborationPermission(value),
+  })),
+)
+const scopeOptions = computed(() =>
+  [
+    DOCUMENT_COLLABORATION_SCOPE.SELF,
+    DOCUMENT_COLLABORATION_SCOPE.DESCENDANTS,
+  ].map(value => ({
+    value,
+    label: formatCollaborationScope(value),
+  })),
+)
 
 const tableHeaderCellStyle: CSSProperties = {
   padding: '1rem 1.25rem',
@@ -76,16 +91,28 @@ function resolveLinkInviteTagType(state: DocumentCollaborationLinkInviteState) {
 function toTableItem(item: DocumentCollaborationConsoleTreeItem): CollaborationConsoleTableItem {
   return {
     ...item,
-    linkInviteStateLabel: DOCUMENT_COLLABORATION_LINK_INVITE_STATE_LABELS[item.linkInviteState],
+    linkInviteStateLabel: formatLinkInviteStateLabel(item.linkInviteState),
     linkPermissionLabel: item.linkInvite
-      ? DOCUMENT_COLLABORATION_PERMISSION_LABELS[item.linkInvite.permission]
-      : '可阅读',
+      ? formatCollaborationPermission(item.linkInvite.permission)
+      : formatCollaborationPermission(DOCUMENT_COLLABORATION_PERMISSION.READ),
     linkScopeLabel: item.linkInvite
-      ? DOCUMENT_COLLABORATION_SCOPE_LABELS[item.linkInvite.scope]
-      : '仅当前页面',
+      ? formatCollaborationScope(item.linkInvite.scope)
+      : formatCollaborationScope(DOCUMENT_COLLABORATION_SCOPE.SELF),
     updatedAtLabel: formatDateTime(item.updatedAt),
     children: item.children.map(toTableItem),
   }
+}
+
+function formatLinkInviteStateLabel(state: DocumentCollaborationLinkInviteState) {
+  if (state === DOCUMENT_COLLABORATION_LINK_INVITE_STATE.ENABLED) {
+    return t('docs.collaboration.linkAccessEnabled')
+  }
+
+  if (state === DOCUMENT_COLLABORATION_LINK_INVITE_STATE.DISABLED) {
+    return t('docs.collaboration.linkClosed')
+  }
+
+  return t('docs.collaboration.linkAccessDisabled')
 }
 
 function isLinkActive(row: CollaborationConsoleTableItem) {
@@ -131,19 +158,19 @@ function handleMoreCommand(row: CollaborationConsoleTableItem, command: string |
         class="docs-collaborations-table"
         :tree-props="{ children: 'children' }"
         default-expand-all
-        element-loading-text="正在加载协作管理"
+        :element-loading-text="t('docs.collaboration.loadingManagement')"
         :header-cell-style="tableHeaderCellStyle"
         :cell-style="tableBodyCellStyle"
       >
         <template #empty>
-          <Empty :description="errorMessage || '暂无私有文档'">
+          <Empty :description="errorMessage || t('docs.publicationSite.overview.empty')">
             <ElButton v-if="errorMessage" type="primary" @click="loadItems">
-              重新加载
+              {{ t('docs.common.reload') }}
             </ElButton>
           </Empty>
         </template>
 
-        <ElTableColumn label="文档" min-width="320" show-overflow-tooltip>
+        <ElTableColumn :label="t('docs.common.document')" min-width="320" show-overflow-tooltip>
           <template #default="{ row }">
             <span class="inline-flex min-w-0 items-center gap-2 text-secondary">
               <SvgIcon
@@ -152,13 +179,13 @@ function handleMoreCommand(row: CollaborationConsoleTableItem, command: string |
                 size="1rem"
               />
               <span class="block min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">
-                {{ row.title || '未命名文档' }}
+                {{ row.title || t('docs.common.noTitle') }}
               </span>
             </span>
           </template>
         </ElTableColumn>
 
-        <ElTableColumn label="链接协作" width="150">
+        <ElTableColumn :label="t('docs.collaboration.linkCollaboration')" width="150">
           <template #default="{ row }">
             <ElDropdown
               trigger="click"
@@ -186,13 +213,13 @@ function handleMoreCommand(row: CollaborationConsoleTableItem, command: string |
                     command="disabled"
                     :disabled="row.linkInviteState !== DOCUMENT_COLLABORATION_LINK_INVITE_STATE.ENABLED"
                   >
-                    {{ row.linkInviteState === DOCUMENT_COLLABORATION_LINK_INVITE_STATE.NONE ? '未开启' : '已关闭' }}
+                    {{ row.linkInviteState === DOCUMENT_COLLABORATION_LINK_INVITE_STATE.NONE ? t('docs.collaboration.linkAccessDisabled') : t('docs.collaboration.linkClosed') }}
                   </ElDropdownItem>
                   <ElDropdownItem
                     command="enabled"
                     :disabled="row.linkInviteState === DOCUMENT_COLLABORATION_LINK_INVITE_STATE.ENABLED"
                   >
-                    获得链接的人
+                    {{ t('docs.collaboration.linkAccessEnabled') }}
                   </ElDropdownItem>
                 </ElDropdownMenu>
               </template>
@@ -200,7 +227,7 @@ function handleMoreCommand(row: CollaborationConsoleTableItem, command: string |
           </template>
         </ElTableColumn>
 
-        <ElTableColumn label="权限" width="120">
+        <ElTableColumn :label="t('docs.collaboration.permission')" width="120">
           <template #default="{ row }">
             <ElDropdown
               trigger="click"
@@ -233,7 +260,7 @@ function handleMoreCommand(row: CollaborationConsoleTableItem, command: string |
           </template>
         </ElTableColumn>
 
-        <ElTableColumn label="范围" width="150">
+        <ElTableColumn :label="t('docs.collaboration.scope')" width="150">
           <template #default="{ row }">
             <ElDropdown
               trigger="click"
@@ -266,11 +293,11 @@ function handleMoreCommand(row: CollaborationConsoleTableItem, command: string |
           </template>
         </ElTableColumn>
 
-        <ElTableColumn label="协作者" prop="collaboratorCount" width="100" />
-        <ElTableColumn label="待处理邀请" prop="pendingInviteCount" width="120" />
-        <ElTableColumn label="最近更新" prop="updatedAtLabel" width="180" />
+        <ElTableColumn :label="t('docs.common.currentCollaborators')" prop="collaboratorCount" width="100" />
+        <ElTableColumn :label="t('docs.collaboration.pendingInvites')" prop="pendingInviteCount" width="120" />
+        <ElTableColumn :label="t('docs.documentMeta.updatedAt')" prop="updatedAtLabel" width="180" />
 
-        <ElTableColumn label="操作" width="88" align="right" header-align="right">
+        <ElTableColumn :label="t('docs.common.operation')" width="88" align="right" header-align="right">
           <template #default="{ row }">
             <ElDropdown
               trigger="click"
@@ -279,7 +306,7 @@ function handleMoreCommand(row: CollaborationConsoleTableItem, command: string |
               <ElButton
                 text
                 class="docs-collaborations-table__more h-7 min-w-7 w-7 rounded-lg p-0"
-                title="更多操作"
+                :title="t('docs.common.moreActions')"
               >
                 <SvgIcon category="ui" icon="more" size="0.95rem" />
               </ElButton>
@@ -287,13 +314,13 @@ function handleMoreCommand(row: CollaborationConsoleTableItem, command: string |
               <template #dropdown>
                 <ElDropdownMenu>
                   <ElDropdownItem command="copy" :disabled="!isLinkActive(row)">
-                    复制协作链接
+                    {{ t('docs.collaboration.copyCollaborationLink') }}
                   </ElDropdownItem>
                   <ElDropdownItem command="detail">
-                    打开详情
+                    {{ t('docs.collaboration.openDetail') }}
                   </ElDropdownItem>
                   <ElDropdownItem command="document">
-                    打开文档
+                    {{ t('docs.collaboration.openDocument') }}
                   </ElDropdownItem>
                 </ElDropdownMenu>
               </template>

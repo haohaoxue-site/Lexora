@@ -8,6 +8,7 @@ import type {
   AgentRuntimeSkillContext,
   ChatGenerationUsageSnapshot,
   ChatMemoryOperationProjection,
+  ResolvedLanguagePreference,
 } from '@haohaoxue/samepage-contracts'
 import type { AgentChatModelOptions } from '../integrations/model-providers/chat-model'
 import type { AgentModelStreamPart } from '../integrations/model-providers/stream-text'
@@ -48,6 +49,7 @@ export interface AgentGraphContext {
   skillContext?: AgentRuntimeSkillContext | null
   contextPolicy?: AgentContextPolicy | null
   contextBudget?: AgentContextBudget | null
+  defaultResponseLanguage?: ResolvedLanguagePreference | null
   memoryIgnoredForRun?: boolean
   focusedTranslatorInvocation?: FocusedTranslatorInvocation | null
   triggerUserMessageId?: string | null

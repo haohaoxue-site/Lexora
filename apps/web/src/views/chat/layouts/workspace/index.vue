@@ -3,6 +3,7 @@ import type {
   ChatWorkspaceLayoutEmits,
   ChatWorkspaceLayoutProps,
 } from './typing'
+import { useI18n } from 'vue-i18n'
 import ChatAgentSettingsPanel from '../../widgets/agent-settings-panel'
 import ChatInputBox from '../../widgets/input-box'
 import ChatMessageList from '../../widgets/message-list'
@@ -10,6 +11,7 @@ import ChatSessionSidebar from '../../widgets/session-sidebar'
 
 const props = defineProps<ChatWorkspaceLayoutProps>()
 const emits = defineEmits<ChatWorkspaceLayoutEmits>()
+const { t } = useI18n({ useScope: 'global' })
 </script>
 
 <template>
@@ -26,8 +28,8 @@ const emits = defineEmits<ChatWorkspaceLayoutEmits>()
         v-if="props.isSidebarCollapsed"
         text
         class="chat-view__pin-sidebar-btn absolute left-4 top-4 z-[2] h-8 min-w-8 w-8 rounded-lg p-0"
-        title="显示对话列表"
-        aria-label="显示对话列表"
+        :title="t('chat.workspace.showSidebar')"
+        :aria-label="t('chat.workspace.showSidebar')"
         @click="emits('showSidebar')"
       >
         <SvgIcon category="ui" icon="pin" size="1rem" />
@@ -36,10 +38,10 @@ const emits = defineEmits<ChatWorkspaceLayoutEmits>()
       <section v-if="props.isNewChatRoute" class="chat-view-new flex h-full min-h-0 flex-1 items-center justify-center p-8">
         <div class="chat-view-new__content w-full max-w-[var(--page-mode-chat-max-width)] -translate-y-[8vh]">
           <h1 class="m-0 mb-2 text-center text-2xl leading-8 text-main font-semibold">
-            有什么可以帮助你的？
+            {{ t('chat.workspace.heroTitle') }}
           </h1>
           <p class="m-0 mb-7 text-center text-[0.9375rem] leading-[1.5] text-secondary">
-            问我任何问题，随时开始
+            {{ t('chat.workspace.heroDescription') }}
           </p>
           <ChatInputBox variant="hero" />
         </div>

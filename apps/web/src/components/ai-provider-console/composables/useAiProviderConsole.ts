@@ -1,11 +1,11 @@
 import type { MaybeRefOrGetter, Ref } from 'vue'
 import type { AiProviderConsoleMode, AiProviderFormController, AiProviderRow } from '../typing'
 import { onMounted, shallowRef } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { ElMessage } from '@/utils/element-plus'
 import { getRequestErrorDisplayMessage } from '@/utils/request-error'
 import {
   getProviderInitial,
-  getProviderStatusLabel,
   getProviderStatusType,
 } from '../utils/providerDisplay'
 import { useAiCompatibleProviders } from './useAiCompatibleProviders'
@@ -29,6 +29,7 @@ export interface UseAiProviderConsoleOptions {
 }
 
 export function useAiProviderConsole(options: UseAiProviderConsoleOptions) {
+  const { t } = useI18n({ useScope: 'global' })
   const isLoading = shallowRef(false)
 
   const catalog = useAiProviderCatalog({
@@ -91,7 +92,7 @@ export function useAiProviderConsole(options: UseAiProviderConsoleOptions) {
       ])
     }
     catch (error) {
-      ElMessage.error(getRequestErrorDisplayMessage(error, '加载服务商失败'))
+      ElMessage.error(getRequestErrorDisplayMessage(error, t('aiProvider.errors.loadProviders')))
     }
     finally {
       isLoading.value = false
@@ -179,7 +180,6 @@ export function useAiProviderConsole(options: UseAiProviderConsoleOptions) {
     updateModelStatus: models.updateModelStatus,
     isModelUpdating: models.isModelUpdating,
     getProviderInitial,
-    getProviderStatusLabel,
     getProviderStatusType,
     handleRowContextMenu,
   }

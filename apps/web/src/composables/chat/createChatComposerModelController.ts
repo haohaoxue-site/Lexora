@@ -3,6 +3,7 @@ import type { ChatApi } from './createChatApi'
 import type { ChatSessionDetail } from '@/apis/chat'
 import type { ChatComposerModelRef } from '@/components/chat-composer/typing'
 import { computed, shallowRef } from 'vue'
+import { translate } from '@/i18n'
 import { ElMessage } from '@/utils/element-plus'
 import { getRequestErrorDisplayMessage } from '@/utils/request-error'
 import { useChatModels } from './useChatModels'
@@ -85,7 +86,7 @@ export function createChatComposerModelController(
       return true
     }
     catch (error) {
-      ElMessage.error(getRequestErrorDisplayMessage(error, '切换模型失败'))
+      ElMessage.error(getRequestErrorDisplayMessage(error, translate('chat.errors.switchModel')))
       return false
     }
   }

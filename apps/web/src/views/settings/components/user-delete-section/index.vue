@@ -2,12 +2,14 @@
 import type { FormInstance } from 'element-plus'
 import type { UserDeleteSectionEmits, UserDeleteSectionProps } from './typing'
 import { useTemplateRef } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useUserDeleteSection } from '../../composables/useUserDeleteSection'
 import UserSettingsSectionHeader from '../section-header'
 
 const props = defineProps<UserDeleteSectionProps>()
 const emit = defineEmits<UserDeleteSectionEmits>()
 const deleteFormRef = useTemplateRef<FormInstance>('deleteFormRef')
+const { t } = useI18n({ useScope: 'global' })
 const {
   accountLabel,
   accountPlaceholder,
@@ -29,8 +31,8 @@ const {
 <template>
   <ElCard shadow="never" class="user-delete-section">
     <UserSettingsSectionHeader
-      title="删除账号"
-      description="删除后，当前邮箱、登录方式、文档和聊天记录都会被永久移除，无法恢复。"
+      :title="t('settings.user.delete.title')"
+      :description="t('settings.user.delete.description')"
     />
 
     <ElButton
@@ -38,19 +40,19 @@ const {
       :loading="props.isDeleting"
       @click="openDialog"
     >
-      {{ props.isDeleting ? '删除中...' : '删除账号' }}
+      {{ props.isDeleting ? t('settings.user.delete.deleting') : t('settings.user.delete.title') }}
     </ElButton>
 
     <ElDialog
       v-model="isDialogVisible"
-      title="确认删除账号"
+      :title="t('settings.user.delete.confirmDialogTitle')"
       width="32rem"
       destroy-on-close
       @closed="resetForm"
     >
       <div class="mb-4">
         <p class="m-0 text-sm leading-6 text-main">
-          输入 {{ accountLabel }} 与确认短语后，才会永久删除当前账号。
+          {{ t('settings.user.delete.dialogDescription', { accountLabel }) }}
         </p>
         <p class="mt-1.5 break-all text-sm leading-6 text-secondary">
           {{ accountLabel }}：{{ props.confirmationTarget }}
@@ -73,10 +75,10 @@ const {
           />
         </ElFormItem>
 
-        <ElFormItem label="确认短语" prop="confirmationPhrase">
+        <ElFormItem :label="t('settings.user.delete.confirmPhrase')" prop="confirmationPhrase">
           <ElInput
             v-model="form.confirmationPhrase"
-            :placeholder="`请输入“${props.confirmationPhrase}”`"
+            :placeholder="t('settings.user.delete.confirmPhrasePlaceholder', { phrase: props.confirmationPhrase })"
           />
         </ElFormItem>
       </ElForm>
@@ -84,7 +86,7 @@ const {
       <template #footer>
         <div class="flex justify-end gap-3">
           <ElButton @click="closeDialog">
-            取消
+            {{ t('settings.user.delete.cancel') }}
           </ElButton>
           <ElButton
             type="danger"
@@ -92,7 +94,7 @@ const {
             :loading="props.isDeleting"
             @click="handleConfirm"
           >
-            {{ props.isDeleting ? '删除中...' : '永久删除' }}
+            {{ props.isDeleting ? t('settings.user.delete.deleting') : t('settings.user.delete.permanentDelete') }}
           </ElButton>
         </div>
       </template>

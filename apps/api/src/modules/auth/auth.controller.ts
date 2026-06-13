@@ -26,6 +26,7 @@ import {
 import { Throttle } from '@nestjs/throttler'
 import { CurrentUser } from '../../decorators/current-user.decorator'
 import { Public } from '../../decorators/public.decorator'
+import { resolveRequestLanguage } from '../../utils/language'
 import { AuthRegistrationsService } from './auth-registrations.service'
 import { AuthSessionsService } from './auth-sessions.service'
 import {
@@ -133,10 +134,12 @@ export class AuthController {
   @Post('verify-email/request')
   async requestEmailVerification(
     @Body() payload: RequestEmailVerificationDto,
+    @Req() request: FastifyRequest,
   ): Promise<RequestEmailVerificationResponse> {
     await this.authRegistrationsService.requestEmailVerification(
       payload.email,
       payload.registrationInviteGrantToken,
+      resolveRequestLanguage(request),
     )
 
     return {

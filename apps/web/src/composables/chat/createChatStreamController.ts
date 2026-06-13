@@ -11,6 +11,7 @@ import type {
 } from '@/apis/chat'
 import { CHAT_SESSION_EVENT_TYPE } from '@haohaoxue/samepage-contracts/chat/constants'
 import { watch } from 'vue'
+import { translate } from '@/i18n'
 import { ElMessage } from '@/utils/element-plus'
 import { getRequestErrorDisplayMessage } from '@/utils/request-error'
 
@@ -103,7 +104,7 @@ export function createChatStreamController(
       return true
     }
     catch (error) {
-      ElMessage.error(getRequestErrorDisplayMessage(error, '发送消息失败'))
+      ElMessage.error(getRequestErrorDisplayMessage(error, translate('chat.errors.send')))
       return false
     }
   }
@@ -125,7 +126,7 @@ export function createChatStreamController(
       return true
     }
     catch (error) {
-      ElMessage.error(getRequestErrorDisplayMessage(error, '发送失败'))
+      ElMessage.error(getRequestErrorDisplayMessage(error, translate('chat.errors.send')))
       return false
     }
   }
@@ -140,7 +141,7 @@ export function createChatStreamController(
       return true
     }
     catch (error) {
-      ElMessage.error(getRequestErrorDisplayMessage(error, '重试失败'))
+      ElMessage.error(getRequestErrorDisplayMessage(error, translate('chat.errors.retry')))
       return false
     }
   }
@@ -157,7 +158,7 @@ export function createChatStreamController(
       return true
     }
     catch (error) {
-      ElMessage.error(getRequestErrorDisplayMessage(error, '切换分支失败'))
+      ElMessage.error(getRequestErrorDisplayMessage(error, translate('chat.errors.switchBranch')))
       return false
     }
   }
@@ -172,7 +173,7 @@ export function createChatStreamController(
       return true
     }
     catch (error) {
-      ElMessage.error(getRequestErrorDisplayMessage(error, '停止生成失败'))
+      ElMessage.error(getRequestErrorDisplayMessage(error, translate('chat.errors.stop')))
       return false
     }
   }

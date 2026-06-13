@@ -17,6 +17,7 @@ import {
   createDocumentMoveOperation,
   getDocumentOperationJob,
 } from '@/apis/document'
+import { translate } from '@/i18n'
 import { useUiStore } from '@/stores/ui'
 import { useWorkspaceStore } from '@/stores/workspace'
 import { ElMessage, ElNotification } from '@/utils/element-plus'
@@ -183,8 +184,8 @@ export const useDocsPageActions = createSharedComposable(() => {
       isDocumentOperationRunning.value = true
       const response = await createDocumentDuplicateOperation(documentId)
       const job = await waitDocumentOperationJob(response.job, {
-        runningTitle: '正在创建副本',
-        runningMessage: '文档较多或资源较大时会多花一些时间，完成后会自动打开副本',
+        runningTitle: translate('docs.operation.duplicateCreatingTitle'),
+        runningMessage: translate('docs.operation.duplicateCreatingMessage'),
       })
 
       await tree.loadTree()
@@ -195,10 +196,10 @@ export const useDocsPageActions = createSharedComposable(() => {
         })
       }
 
-      ElMessage.success('副本已创建')
+      ElMessage.success(translate('docs.operation.duplicateCreated'))
     }
     catch (error) {
-      ElMessage.error(error instanceof Error ? error.message : '创建副本失败')
+      ElMessage.error(error instanceof Error ? error.message : translate('docs.operation.duplicateFailed'))
     }
     finally {
       isDocumentOperationRunning.value = false
@@ -223,8 +224,8 @@ export const useDocsPageActions = createSharedComposable(() => {
       isDocumentOperationRunning.value = true
       const response = await createDocumentMoveOperation(documentId, payload)
       const job = await waitDocumentOperationJob(response.job, {
-        runningTitle: '正在移动文档',
-        runningMessage: '文档层级较深时会多花一些时间，完成后会自动切换到目标位置',
+        runningTitle: translate('docs.operation.moveMovingTitle'),
+        runningMessage: translate('docs.operation.moveMovingMessage'),
       })
 
       if (payload.targetWorkspaceId !== currentWorkspaceId.value) {
@@ -243,10 +244,10 @@ export const useDocsPageActions = createSharedComposable(() => {
         await activeDocument.reloadCurrentDocument()
       }
 
-      ElMessage.success('文档已移动')
+      ElMessage.success(translate('docs.operation.moved'))
     }
     catch (error) {
-      ElMessage.error(error instanceof Error ? error.message : '移动文档失败')
+      ElMessage.error(error instanceof Error ? error.message : translate('docs.operation.moveFailed'))
     }
     finally {
       isDocumentOperationRunning.value = false
@@ -317,13 +318,13 @@ function resolveInaccessibleDocumentRedirectMessage(input: {
 }) {
   if (input.paneState === DOCUMENT_PANE_STATE.FORBIDDEN) {
     return input.hasFallbackDocument
-      ? '你无权访问这篇文档，已为你打开其他可访问文档'
-      : '你无权访问这篇文档，已返回文档页'
+      ? translate('docs.operation.inaccessibleFallback')
+      : translate('docs.operation.inaccessibleReturned')
   }
 
   return input.hasFallbackDocument
-    ? '当前文档不存在或你无权访问，已为你打开其他可访问文档'
-    : '当前文档不存在或你无权访问，已返回文档页'
+    ? translate('docs.operation.missingFallback')
+    : translate('docs.operation.missingReturned')
 }
 
 async function waitDocumentOperationJob(
@@ -352,7 +353,7 @@ async function waitDocumentOperationJob(
       || currentJob.status === DOCUMENT_OPERATION_JOB_STATUS.RUNNING
     ) {
       if (Date.now() - startedAt > DOCUMENT_OPERATION_WAIT_TIMEOUT_MS) {
-        throw new Error('文档任务执行时间过长，请稍后刷新查看结果')
+        throw new Error(translate('docs.operation.taskTimeout'))
       }
 
       await sleep(DOCUMENT_OPERATION_POLL_INTERVAL_MS)
@@ -360,7 +361,7 @@ async function waitDocumentOperationJob(
     }
 
     if (currentJob.status === DOCUMENT_OPERATION_JOB_STATUS.FAILED) {
-      throw new Error(currentJob.errorMessage ?? '文档任务执行失败')
+      throw new Error(currentJob.errorMessage ?? translate('docs.operation.taskFailed'))
     }
 
     return currentJob

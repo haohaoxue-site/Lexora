@@ -1,8 +1,13 @@
 <script setup lang="ts">
+import type {
+  DocumentCollaborationPermission,
+  DocumentCollaborationScope,
+} from '@haohaoxue/samepage-contracts'
 import {
-  DOCUMENT_COLLABORATION_PERMISSION_LABELS,
-  DOCUMENT_COLLABORATION_SCOPE_LABELS,
+  DOCUMENT_COLLABORATION_PERMISSION,
+  DOCUMENT_COLLABORATION_SCOPE,
 } from '@haohaoxue/samepage-contracts/document/collaboration/constants'
+import { useI18n } from 'vue-i18n'
 import CopyStateIcon from '@/components/copy-state-icon/CopyStateIcon.vue'
 import EntityAvatar from '@/components/entity-avatar'
 import SessionAppearancePanel from './appearance-panel'
@@ -58,13 +63,24 @@ const {
 } = useSessionUserMenu({
   showContextSwitch: props.showContextSwitch,
 })
+const { t } = useI18n({ useScope: 'global' })
 
-function getPermissionLabel(permission: keyof typeof DOCUMENT_COLLABORATION_PERMISSION_LABELS) {
-  return DOCUMENT_COLLABORATION_PERMISSION_LABELS[permission]
+const permissionLabelKey = {
+  [DOCUMENT_COLLABORATION_PERMISSION.READ]: 'collaboration.permission.read',
+  [DOCUMENT_COLLABORATION_PERMISSION.EDIT]: 'collaboration.permission.edit',
+} as const satisfies Record<DocumentCollaborationPermission, string>
+
+const scopeLabelKey = {
+  [DOCUMENT_COLLABORATION_SCOPE.SELF]: 'collaboration.scope.self',
+  [DOCUMENT_COLLABORATION_SCOPE.DESCENDANTS]: 'collaboration.scope.descendants',
+} as const satisfies Record<DocumentCollaborationScope, string>
+
+function getPermissionLabel(permission: DocumentCollaborationPermission) {
+  return t(permissionLabelKey[permission])
 }
 
-function getScopeLabel(scope: keyof typeof DOCUMENT_COLLABORATION_SCOPE_LABELS) {
-  return DOCUMENT_COLLABORATION_SCOPE_LABELS[scope]
+function getScopeLabel(scope: DocumentCollaborationScope) {
+  return t(scopeLabelKey[scope])
 }
 </script>
 
@@ -88,12 +104,12 @@ function getScopeLabel(scope: keyof typeof DOCUMENT_COLLABORATION_SCOPE_LABELS) 
         >
           <ElButton
             class="session-user-sidebar-trigger !h-11 !w-11 !min-w-11 !justify-center overflow-hidden !rounded-lg border-none bg-transparent !p-0 text-main shadow-none"
-            aria-label="打开用户菜单"
+            :aria-label="t('sessionMenu.menu.open')"
           >
             <EntityAvatar
               :name="currentUser.displayName"
               :src="currentUser.avatarUrl"
-              :alt="`${currentUser.displayName} 的头像`"
+              :alt="t('common.avatarAlt', { name: currentUser.displayName })"
               :size="30"
               shape="circle"
               kind="user"
@@ -108,7 +124,7 @@ function getScopeLabel(scope: keyof typeof DOCUMENT_COLLABORATION_SCOPE_LABELS) 
           <EntityAvatar
             :name="currentUser.displayName"
             :src="currentUser.avatarUrl"
-            :alt="`${currentUser.displayName} 的头像`"
+            :alt="t('common.avatarAlt', { name: currentUser.displayName })"
             :size="32"
             shape="circle"
             kind="user"
@@ -152,7 +168,7 @@ function getScopeLabel(scope: keyof typeof DOCUMENT_COLLABORATION_SCOPE_LABELS) 
         >
           <span class="session-user-menu-row__content flex h-full w-full items-center gap-2.25 text-left">
             <span class="session-user-menu-row__summary min-w-0 flex-1">
-              <span class="session-user-menu-row__title block text-[11px] leading-[0.9375rem] text-secondary">协作码</span>
+              <span class="session-user-menu-row__title block text-[11px] leading-[0.9375rem] text-secondary">{{ t('sessionMenu.collaborationCode.title') }}</span>
               <strong class="block truncate pt-[0.125rem] text-[12px] leading-4 text-main font-medium">{{ currentUser.userCode }}</strong>
             </span>
 
@@ -177,7 +193,7 @@ function getScopeLabel(scope: keyof typeof DOCUMENT_COLLABORATION_SCOPE_LABELS) 
 
               <span class="session-user-menu-row__summary flex min-w-0 flex-1 items-center justify-between gap-2">
                 <span class="session-user-menu-row__title overflow-hidden text-ellipsis whitespace-nowrap text-[13px] leading-none text-main">
-                  主题
+                  {{ t('sessionMenu.appearance.title') }}
                 </span>
 
                 <span class="session-user-menu-row__current shrink-0 text-[12px] leading-none">
@@ -216,7 +232,7 @@ function getScopeLabel(scope: keyof typeof DOCUMENT_COLLABORATION_SCOPE_LABELS) 
 
               <span class="session-user-menu-row__summary flex min-w-0 flex-1 items-center justify-between gap-2">
                 <span class="session-user-menu-row__title overflow-hidden text-ellipsis whitespace-nowrap text-[13px] leading-none text-main">
-                  站内信
+                  {{ t('sessionMenu.notifications.title') }}
                 </span>
 
                 <span
@@ -278,7 +294,7 @@ function getScopeLabel(scope: keyof typeof DOCUMENT_COLLABORATION_SCOPE_LABELS) 
               class="session-user-menu-row__icon flex h-4 w-4 shrink-0 items-center justify-center text-[14px]"
               :class="{ 'animate-spin': isLoggingOut }"
             />
-            <span class="text-sm leading-none">{{ isLoggingOut ? '退出中...' : '退出登录' }}</span>
+            <span class="text-sm leading-none">{{ isLoggingOut ? t('sessionMenu.logout.loading') : t('sessionMenu.logout.title') }}</span>
           </span>
         </ElButton>
       </div>
@@ -286,7 +302,7 @@ function getScopeLabel(scope: keyof typeof DOCUMENT_COLLABORATION_SCOPE_LABELS) 
 
     <ElDialog
       :model-value="isDetailDialogOpen"
-      title="协作邀请"
+      :title="t('sessionMenu.invitation.title')"
       width="420px"
       append-to-body
       @update:model-value="(visible: boolean) => !visible && closeInvitationDetail()"
@@ -297,18 +313,18 @@ function getScopeLabel(scope: keyof typeof DOCUMENT_COLLABORATION_SCOPE_LABELS) 
             {{ selectedInvitation.documentTitle }}
           </h3>
           <p class="m-0 mt-1 text-sm leading-6 text-secondary">
-            {{ selectedInvitation.inviterLabel }} 邀请你协作文档
+            {{ t('sessionMenu.invitation.invitedDocument', { inviter: selectedInvitation.inviterLabel }) }}
           </p>
         </div>
 
         <ElDescriptions :column="1" border>
-          <ElDescriptionsItem label="权限">
+          <ElDescriptionsItem :label="t('sessionMenu.invitation.permission')">
             {{ getPermissionLabel(selectedInvitation.permission) }}
           </ElDescriptionsItem>
-          <ElDescriptionsItem label="范围">
+          <ElDescriptionsItem :label="t('sessionMenu.invitation.scope')">
             {{ getScopeLabel(selectedInvitation.scope) }}
           </ElDescriptionsItem>
-          <ElDescriptionsItem label="发送时间">
+          <ElDescriptionsItem :label="t('sessionMenu.invitation.sentAt')">
             {{ selectedInvitation.receivedLabel }}
           </ElDescriptionsItem>
         </ElDescriptions>
@@ -316,7 +332,7 @@ function getScopeLabel(scope: keyof typeof DOCUMENT_COLLABORATION_SCOPE_LABELS) 
 
       <template #footer>
         <ElButton :disabled="Boolean(actingInvitationId)" @click="closeInvitationDetail">
-          稍后处理
+          {{ t('sessionMenu.invitation.later') }}
         </ElButton>
         <ElButton
           v-if="selectedInvitation"
@@ -325,7 +341,7 @@ function getScopeLabel(scope: keyof typeof DOCUMENT_COLLABORATION_SCOPE_LABELS) 
           :loading="actingInvitationId === selectedInvitation.id && actingInvitationAction === 'decline'"
           @click="handleDeclineInvitation(selectedInvitation)"
         >
-          拒绝
+          {{ t('sessionMenu.invitation.decline') }}
         </ElButton>
         <ElButton
           v-if="selectedInvitation"
@@ -334,7 +350,7 @@ function getScopeLabel(scope: keyof typeof DOCUMENT_COLLABORATION_SCOPE_LABELS) 
           :loading="actingInvitationId === selectedInvitation.id && actingInvitationAction === 'accept'"
           @click="handleAcceptInvitation(selectedInvitation)"
         >
-          接受并打开
+          {{ t('sessionMenu.invitation.acceptAndOpen') }}
         </ElButton>
       </template>
     </ElDialog>

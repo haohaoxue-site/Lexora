@@ -11,6 +11,7 @@ import {
   getDocumentVersionSnapshotTitlePlainText,
   isSameDocumentVersionSnapshotContent,
 } from '@haohaoxue/samepage-shared/document'
+import { translate } from '@/i18n'
 import dayjs from '@/utils/dayjs'
 
 export function getDocumentHistoryEntryDetail(entry: DocumentHistoryEntry): string | null {
@@ -19,7 +20,7 @@ export function getDocumentHistoryEntryDetail(entry: DocumentHistoryEntry): stri
   }
 
   if (entry.changeCount > 1) {
-    return `本分钟内编辑 ${entry.changeCount} 次`
+    return translate('docs.history.editedTimes', { count: entry.changeCount })
   }
 
   return null
@@ -77,7 +78,7 @@ export function buildDocumentHistorySections(options: {
     if (recentUpdateEntries.length > 0) {
       groups.push({
         id: 'today-recent-updates',
-        label: '最近更新',
+        label: translate('docs.history.recentUpdates'),
         entries: recentUpdateEntries,
         collapsible: true,
         defaultExpanded: true,
@@ -96,7 +97,7 @@ export function buildDocumentHistorySections(options: {
 
     sections.push({
       id: 'today',
-      label: '今天',
+      label: translate('docs.history.today'),
       groups,
     })
   }
@@ -104,7 +105,7 @@ export function buildDocumentHistorySections(options: {
   if (yesterdayEntries.length > 0) {
     sections.push({
       id: 'yesterday',
-      label: '昨天',
+      label: translate('docs.history.yesterday'),
       groups: groupEntriesByTimeBucket({
         entries: yesterdayEntries,
         mode: 'hour',
@@ -115,7 +116,7 @@ export function buildDocumentHistorySections(options: {
   if (lastWeekEntries.length > 0) {
     sections.push({
       id: 'last-week',
-      label: '上周',
+      label: translate('docs.history.lastWeek'),
       groups: groupEntriesByTimeBucket({
         entries: lastWeekEntries,
         mode: 'day',
@@ -157,7 +158,7 @@ function collapseSnapshotsByMinute(options: {
       snapshot,
       timeLabel: formatHistoryTime(snapshot.createdAt),
       summary: resolveHistoryEntrySummary(snapshot, previousSnapshot, options.snapshotById),
-      userDisplayName: snapshot.createdByUser?.displayName ?? '未知用户',
+      userDisplayName: snapshot.createdByUser?.displayName ?? translate('docs.history.unknownUser'),
       changeCount: group.length,
       isCurrentSnapshot: snapshot.basedOnProjectionRevision === options.currentProjectionRevision,
       isCurrentContent: isSameDocumentVersionSnapshotContent(options.currentContent, snapshot),
@@ -174,10 +175,12 @@ function resolveHistoryEntrySummary(
     const restoredFromSnapshot = snapshotById.get(snapshot.restoredFromVersionSnapshotId)
 
     if (!restoredFromSnapshot) {
-      return '还原了历史版本'
+      return translate('docs.history.restored')
     }
 
-    return `还原自 ${formatHistoryTime(restoredFromSnapshot.createdAt)} 的版本`
+    return translate('docs.history.restoredFrom', {
+      time: formatHistoryTime(restoredFromSnapshot.createdAt),
+    })
   }
 
   if (!previousSnapshot) {
@@ -188,7 +191,7 @@ function resolveHistoryEntrySummary(
   const previousTitle = getDocumentVersionSnapshotTitlePlainText(previousSnapshot)
 
   if (nextTitle && nextTitle !== previousTitle) {
-    return `文档命名为${nextTitle}`
+    return translate('docs.history.renamedTo', { title: nextTitle })
   }
 
   return null
@@ -232,7 +235,7 @@ function buildMonthSections(entries: DocumentHistoryEntry[]): DocumentHistorySec
 
   return Array.from(sections.entries()).map(([sectionKey, sectionEntries]) => ({
     id: sectionKey,
-    label: dayjs(sectionKey).format('M月'),
+    label: dayjs(sectionKey).format(translate('docs.history.monthFormat')),
     groups: groupEntriesByTimeBucket({
       entries: sectionEntries,
       mode: 'day',
@@ -241,14 +244,13 @@ function buildMonthSections(entries: DocumentHistoryEntry[]): DocumentHistorySec
 }
 
 function formatHistoryTime(value: string) {
-  return dayjs(value).format('M月D日 HH:mm')
+  return dayjs(value).format(translate('docs.history.dateTimeFormat'))
 }
 
 function formatHourBucketLabel(value: string) {
-  const time = dayjs(value)
-  return `${time.format('M月D日 HH')}点`
+  return dayjs(value).format(translate('docs.history.hourFormat'))
 }
 
 function formatDayBucketLabel(value: string) {
-  return dayjs(value).format('M月D日')
+  return dayjs(value).format(translate('docs.history.dateFormat'))
 }

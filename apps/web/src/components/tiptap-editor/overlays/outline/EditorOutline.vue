@@ -2,6 +2,7 @@
 import type { Editor } from '@tiptap/core'
 import type { TiptapEditorContent } from '../../core/typing'
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { SvgIcon } from '@/components/svg-icon'
 import { useEditorOutline } from './useEditorOutline'
 
@@ -20,6 +21,7 @@ const props = withDefaults(defineProps<{
   showSearch: true,
   surface: 'card',
 })
+const { t } = useI18n()
 const {
   getBlockHref,
   getSearchResultText,
@@ -80,7 +82,7 @@ function toggleExpanded() {
   >
     <section v-if="isExpanded" class="editor-outline__panel">
       <div v-if="!props.showSearch || isManualMode" class="editor-outline__panel-header">
-        <span>大纲</span>
+        <span>{{ t('editor.outline.outline') }}</span>
       </div>
 
       <ElInput
@@ -88,14 +90,14 @@ function toggleExpanded() {
         class="editor-outline__search-input"
         :model-value="searchQuery"
         clearable
-        placeholder="搜索当前文档"
+        :placeholder="t('editor.outline.search')"
         @update:model-value="updateSearchQuery"
         @keydown="handleSearchKeydown"
       />
 
       <section v-if="props.showSearch && searchQuery.trim()" class="editor-outline__section">
         <div class="editor-outline__section-title">
-          搜索结果
+          {{ t('editor.outline.searchResults') }}
         </div>
 
         <ul v-if="searchResults.length" class="editor-outline__result-list">
@@ -121,13 +123,13 @@ function toggleExpanded() {
         </ul>
 
         <div v-else class="editor-outline__empty">
-          未找到匹配块
+          {{ t('editor.outline.emptySearch') }}
         </div>
       </section>
 
       <section class="editor-outline__section">
         <div v-if="props.showSearch" class="editor-outline__section-title">
-          大纲
+          {{ t('editor.outline.outline') }}
         </div>
 
         <ol class="editor-outline__outline-list">
@@ -160,7 +162,7 @@ function toggleExpanded() {
       v-if="isManualMode && !isExpanded"
       type="button"
       class="editor-outline__manual-toggle"
-      aria-label="展开目录"
+      :aria-label="t('editor.outline.expand')"
       @click="toggleExpanded"
     >
       <SvgIcon category="ui" icon="sidebar-open" size="1rem" />

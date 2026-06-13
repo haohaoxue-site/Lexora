@@ -1,20 +1,22 @@
 <script setup lang="ts">
 import type { DocsDocumentEditorEmits, DocsDocumentEditorProps } from './typing'
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { DocumentContentSurface } from '@/components/tiptap-editor'
 import dayjs, { formatDateTime } from '@/utils/dayjs'
 import { useDocumentEditor } from '../../composables/useDocumentEditor'
 
 const props = defineProps<DocsDocumentEditorProps>()
 const emits = defineEmits<DocsDocumentEditorEmits>()
+const { t } = useI18n()
 const { isHistoryMode, isEditable } = useDocumentEditor(props)
 const footerMetaItems = computed(() => [
   {
-    label: '创建时间',
+    label: t('docs.documentMeta.createdAt'),
     value: formatDateTime(props.document.createdAt),
   },
   {
-    label: '更新时间',
+    label: t('docs.documentMeta.updatedAt'),
     value: dayjs(props.document.updatedAt).fromNow(),
   },
 ])

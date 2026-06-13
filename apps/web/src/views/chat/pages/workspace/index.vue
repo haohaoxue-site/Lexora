@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { CHAT_SESSION_CHANNEL } from '@haohaoxue/samepage-contracts/chat/constants'
 import { computed, onMounted, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useChatModels } from '@/composables/chat/useChatModels'
 import { useChatRuntimeConfig } from '@/composables/chat/useChatRuntimeConfig'
 import PagePanel from '@/layouts/panels/page-panel'
@@ -18,19 +19,27 @@ const { refreshModels } = useChatModels()
 const { loadSessions } = useChatSessions()
 const { renderSession } = useChatRuntimeOverlay()
 const { isNewChatRoute, navigateToNewChat } = useChatRouteState()
+const { locale } = useI18n({ useScope: 'global' })
 const uiStore = useUiStore()
 const workspaceStore = useWorkspaceStore()
 const shouldShowChatSidebar = computed(() => uiStore.chatSessionSidebarPinned ?? !isNewChatRoute.value)
 const isChatSidebarCollapsed = computed(() => !shouldShowChatSidebar.value)
 const isAgentSettingsOpen = ref(false)
-const conversationUsage = computed(() => createChatConversationUsageView(
-  renderSession.value?.usage,
-  renderSession.value?.messages ?? [],
-))
+const conversationUsage = computed(() => {
+  readReactiveLocale(locale.value)
+  return createChatConversationUsageView(
+    renderSession.value?.usage,
+    renderSession.value?.messages ?? [],
+  )
+})
 const agentProfile = computed(() => renderSession.value?.agentProfile ?? null)
 const isReadonlySession = computed(() =>
   Boolean(renderSession.value && renderSession.value.channel !== CHAT_SESSION_CHANNEL.DIRECT),
 )
+
+function readReactiveLocale(value: string): string {
+  return value
+}
 
 function setChatSidebarPinned(value: boolean) {
   uiStore.setChatSessionSidebarPinned(value)

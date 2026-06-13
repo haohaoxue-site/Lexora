@@ -1,5 +1,6 @@
 import type { ChatApi } from './createChatApi'
 import type { ChatSessionEvent } from '@/apis/chat'
+import { translate } from '@/i18n'
 import { ElMessage } from '@/utils/element-plus'
 import { getRequestErrorDisplayMessage } from '@/utils/request-error'
 
@@ -51,7 +52,7 @@ export function createChatSessionEvents(api: ChatApi) {
         scheduleReconnect()
       }
       else {
-        ElMessage.error(getRequestErrorDisplayMessage(error, '聊天事件订阅已断开'))
+        ElMessage.error(getRequestErrorDisplayMessage(error, translate('chat.errors.loadEvents')))
       }
     }).finally(() => {
       if (eventSessionId === sessionId && eventController === controller) {

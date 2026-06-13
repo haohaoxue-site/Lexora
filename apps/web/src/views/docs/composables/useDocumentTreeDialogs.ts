@@ -14,6 +14,7 @@ import {
   patchDocumentTitle as patchDocumentTitleRequest,
   permanentlyDeleteDocument as permanentlyDeleteDocumentRequest,
 } from '@/apis/document'
+import { translate } from '@/i18n'
 import { ElMessage } from '@/utils/element-plus'
 import {
   collectDocumentItemIds,
@@ -188,14 +189,16 @@ export function useDocumentTreeDialogs(options: UseDocumentTreeDialogsOptions) {
         })
       }
 
-      ElMessage.success(action === 'trash' ? '文档已删除' : '已彻底删除文档')
+      ElMessage.success(action === 'trash'
+        ? translate('docs.documentTree.deleted')
+        : translate('docs.documentTree.deletedPermanently'))
     }
     catch (error) {
       ElMessage.error(error instanceof Error
         ? error.message
         : action === 'trash'
-          ? '删除文档失败'
-          : '彻底删除文档失败')
+          ? translate('docs.documentTree.deleteFailed')
+          : translate('docs.documentTree.deletePermanentlyFailed'))
     }
     finally {
       deleteActionKind.value = null

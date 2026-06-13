@@ -14,6 +14,7 @@ import type { AiModelRef } from '@/apis/ai'
 import { AI_MODEL_INTENT_KEY } from '@haohaoxue/samepage-contracts/ai/constants'
 import { prettyBytes } from '@haohaoxue/samepage-shared/file'
 import { computed, onMounted, shallowRef, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { getAgentMemoryDocuments } from '@/apis/agent-memory'
 import {
   getDefaultAgentProfileSettings,
@@ -30,13 +31,14 @@ import { useChatSkillState } from '../../composables/useChatSkillState'
 
 const props = defineProps<ChatAgentSettingsPanelProps>()
 const emits = defineEmits<ChatAgentSettingsPanelEmits>()
+const { t } = useI18n({ useScope: 'global' })
 
 type AgentSettingsView = 'overview' | 'skills' | 'memories' | 'document'
 
 const defaultAgentProfileSettings = shallowRef<AgentProfileSettings | null>(null)
 const agentProfileId = computed(() => props.agentProfile?.profileId ?? defaultAgentProfileSettings.value?.profileId ?? null)
-const agentName = computed(() => resolveAgentProfileValue('name') ?? '小助手')
-const agentDescription = computed(() => resolveAgentProfileValue('description') ?? '根据当前对话、文档上下文与长期记忆协助你完成工作。')
+const agentName = computed(() => resolveAgentProfileValue('name') ?? t('chat.agentSettings.fallbackName'))
+const agentDescription = computed(() => resolveAgentProfileValue('description') ?? t('chat.agentSettings.fallbackDescription'))
 const agentAvatarUrl = computed(() => resolveAgentProfileValue('avatarUrl') ?? '/ai-assistant-avatar.png')
 const {
   canToggleSkill,
@@ -64,18 +66,20 @@ const selectedMemoryDocument = computed(() => memoryDocuments.value.find(documen
 const hasSelectedMemoryContent = computed(() => Boolean(selectedMemoryDocument.value?.content.trim()))
 const panelTitle = computed(() => {
   if (currentView.value === 'document') {
-    return selectedMemoryDocument.value ? `记忆/${selectedMemoryDocument.value.name}` : '记忆'
+    return selectedMemoryDocument.value
+      ? t('chat.agentSettings.memoryDocumentTitle', { name: selectedMemoryDocument.value.name })
+      : t('chat.agentSettings.memory')
   }
 
   if (currentView.value === 'skills') {
-    return '技能'
+    return t('chat.agentSettings.skills')
   }
 
   if (currentView.value === 'memories') {
-    return '记忆'
+    return t('chat.agentSettings.memory')
   }
 
-  return 'Agent 设置'
+  return t('chat.agentSettings.title')
 })
 
 onMounted(() => {
@@ -125,11 +129,11 @@ async function loadMemoryDocuments() {
     }
     memoryDocuments.value = response.documents.map(toMemoryDocumentView)
   }
-  catch {
+  catch (error) {
     if (requestId !== memoryDocumentsRequestId) {
       return
     }
-    ElMessage.error('记忆文档加载失败')
+    ElMessage.error(getRequestErrorDisplayMessage(error, t('chat.errors.loadMemoryDocuments')))
   }
   finally {
     if (requestId === memoryDocumentsRequestId) {
@@ -150,7 +154,7 @@ async function loadDefaultAgentProfileSettings() {
     defaultModelRef.value = profile.modelRef
   }
   catch (error) {
-    ElMessage.error(getRequestErrorDisplayMessage(error, '默认模型加载失败'))
+    ElMessage.error(getRequestErrorDisplayMessage(error, t('chat.errors.loadDefaultModel')))
   }
   finally {
     isDefaultModelLoading.value = false
@@ -173,11 +177,11 @@ async function handleDefaultModelChange(modelRef: AiModelRef | null) {
     })
     defaultModelRef.value = profile.modelRef
     emits('defaultModelUpdated')
-    ElMessage.success(defaultModelRef.value ? '默认模型已更新' : '默认模型已清除')
+    ElMessage.success(defaultModelRef.value ? t('chat.agentSettings.defaultModelUpdated') : t('chat.agentSettings.defaultModelCleared'))
   }
   catch (error) {
     defaultModelRef.value = previousModelRef
-    ElMessage.error(getRequestErrorDisplayMessage(error, '默认模型更新失败'))
+    ElMessage.error(getRequestErrorDisplayMessage(error, t('chat.errors.updateDefaultModel')))
   }
   finally {
     isDefaultModelSaving.value = false
@@ -209,7 +213,7 @@ function formatMemoryDocumentSize(sizeBytes: number): string {
 }
 
 function formatMemoryDocumentUpdatedAt(updatedAt: string | null): string {
-  return updatedAt ? dayjs(updatedAt).format('YYYY/M/D HH:mm') : '尚未生成'
+  return updatedAt ? dayjs(updatedAt).format('YYYY/M/D HH:mm') : t('chat.agentSettings.memoryNotGenerated')
 }
 
 function resolveAgentProfileValue<K extends 'name' | 'description' | 'avatarUrl'>(key: K): AgentProfileSettings[K] | NonNullable<ChatAgentSettingsPanelProps['agentProfile']>[K] | null {
@@ -233,7 +237,7 @@ function resolveAgentProfileValue<K extends 'name' | 'description' | 'avatarUrl'
         v-if="currentView !== 'overview'"
         text
         class="chat-agent-settings__icon-btn h-8 min-w-8 w-8 rounded-lg p-0"
-        aria-label="返回"
+        :aria-label="t('chat.agentSettings.back')"
         @click="goBack"
       >
         <SvgIcon category="ui" icon="arrow-left" size="1rem" />
@@ -244,7 +248,7 @@ function resolveAgentProfileValue<K extends 'name' | 'description' | 'avatarUrl'
       <ElButton
         text
         class="chat-agent-settings__icon-btn h-8 min-w-8 w-8 rounded-lg p-0"
-        aria-label="关闭 Agent 设置"
+        :aria-label="t('chat.agentSettings.close')"
         @click="emits('close')"
       >
         <SvgIcon category="ui" icon="close" size="1rem" />
@@ -264,7 +268,7 @@ function resolveAgentProfileValue<K extends 'name' | 'description' | 'avatarUrl'
 
       <section class="chat-agent-settings__section">
         <div class="chat-agent-settings__section-label">
-          能力与资源
+          {{ t('chat.agentSettings.capabilitySection') }}
         </div>
         <div class="chat-agent-settings__rows">
           <button class="chat-agent-settings__row" type="button" @click="openSkills">
@@ -272,8 +276,8 @@ function resolveAgentProfileValue<K extends 'name' | 'description' | 'avatarUrl'
               <SvgIcon category="ui" icon="document-tree-file" size="1.125rem" />
             </span>
             <span class="chat-agent-settings__row-main">
-              <span class="chat-agent-settings__row-title">技能</span>
-              <span class="chat-agent-settings__row-subtitle">Agent 可以使用的多个技能</span>
+              <span class="chat-agent-settings__row-title">{{ t('chat.agentSettings.skills') }}</span>
+              <span class="chat-agent-settings__row-subtitle">{{ t('chat.agentSettings.skillsSubtitle') }}</span>
             </span>
             <SvgIcon category="ui" icon="chevron-right" size="1rem" class="chat-agent-settings__chevron" />
           </button>
@@ -283,8 +287,8 @@ function resolveAgentProfileValue<K extends 'name' | 'description' | 'avatarUrl'
               <SvgIcon category="ui" icon="memory-note" size="1.125rem" />
             </span>
             <span class="chat-agent-settings__row-main">
-              <span class="chat-agent-settings__row-title">记忆</span>
-              <span class="chat-agent-settings__row-subtitle">查看长期记忆文档</span>
+              <span class="chat-agent-settings__row-title">{{ t('chat.agentSettings.memory') }}</span>
+              <span class="chat-agent-settings__row-subtitle">{{ t('chat.agentSettings.memorySubtitle') }}</span>
             </span>
             <SvgIcon category="ui" icon="chevron-right" size="1rem" class="chat-agent-settings__chevron" />
           </button>
@@ -294,8 +298,8 @@ function resolveAgentProfileValue<K extends 'name' | 'description' | 'avatarUrl'
               <SvgIcon category="ui" icon="settings-gear" size="1.125rem" />
             </span>
             <span class="chat-agent-settings__row-main">
-              <span class="chat-agent-settings__row-title">默认模型</span>
-              <span class="chat-agent-settings__row-subtitle">新建对话会自动使用的模型</span>
+              <span class="chat-agent-settings__row-title">{{ t('chat.agentSettings.defaultModel') }}</span>
+              <span class="chat-agent-settings__row-subtitle">{{ t('chat.agentSettings.defaultModelSubtitle') }}</span>
             </span>
             <div class="chat-agent-settings__model-control">
               <ModelCascader
@@ -306,7 +310,7 @@ function resolveAgentProfileValue<K extends 'name' | 'description' | 'avatarUrl'
                 :filterable="true"
                 :show-all-levels="false"
                 :disabled="isDefaultModelLoading || isDefaultModelSaving"
-                placeholder="选择模型"
+                :placeholder="t('chat.agentSettings.modelPlaceholder')"
                 @update:model-value="handleDefaultModelChange"
               />
             </div>
@@ -317,13 +321,13 @@ function resolveAgentProfileValue<K extends 'name' | 'description' | 'avatarUrl'
 
     <section v-else-if="currentView === 'skills'" class="chat-agent-settings__body">
       <p class="chat-agent-settings__section-copy">
-        快速开启或关闭当前 Agent 对话可使用的内置技能。技能配置请到我的技能中调整。
+        {{ t('chat.agentSettings.skillsCopy') }}
       </p>
       <div v-if="isLoadingSkills" class="chat-agent-settings__placeholder">
-        正在加载技能
+        {{ t('chat.agentSettings.loadingSkills') }}
       </div>
       <div v-else-if="installedSkills.length === 0" class="chat-agent-settings__placeholder">
-        暂无可用技能
+        {{ t('chat.agentSettings.noSkills') }}
       </div>
       <div v-else class="chat-agent-settings__skill-list">
         <article
@@ -353,7 +357,7 @@ function resolveAgentProfileValue<K extends 'name' | 'description' | 'avatarUrl'
             :model-value="skill.enabled"
             :disabled="!canToggleSkill(skill) || isSkillUpdating(skill.key)"
             :loading="isSkillUpdating(skill.key)"
-            :aria-label="`${skill.name}${skill.enabled ? '已开启' : '已关闭'}`"
+            :aria-label="skill.enabled ? t('chat.agentSettings.skillEnabled', { name: skill.name }) : t('chat.agentSettings.skillDisabled', { name: skill.name })"
             @change="handleSkillEnabledChange(skill.key, $event)"
           />
         </article>
@@ -362,13 +366,13 @@ function resolveAgentProfileValue<K extends 'name' | 'description' | 'avatarUrl'
 
     <section v-else-if="currentView === 'memories'" class="chat-agent-settings__body">
       <div v-if="isMemoryDocumentsLoading" class="chat-agent-settings__placeholder">
-        正在加载记忆文档
+        {{ t('chat.agentSettings.loadingMemories') }}
       </div>
       <Empty
         v-else-if="memoryDocuments.length === 0"
         class="chat-agent-settings__empty"
         compact
-        description="暂无记忆"
+        :description="t('chat.agentSettings.noMemory')"
       />
       <div v-else class="chat-agent-settings__memory-list">
         <button
@@ -409,7 +413,7 @@ function resolveAgentProfileValue<K extends 'name' | 'description' | 'avatarUrl'
           v-else
           class="chat-agent-settings__empty"
           compact
-          description="这份记忆文档还没有内容"
+          :description="t('chat.agentSettings.emptyMemoryDocument')"
         />
       </article>
     </section>

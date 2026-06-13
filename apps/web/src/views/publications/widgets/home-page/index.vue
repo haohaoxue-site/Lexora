@@ -2,10 +2,12 @@
 import type { PublicationHomePageProps } from './typing'
 import { normalizePublicationHref } from '@haohaoxue/samepage-shared/document'
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 
 const props = defineProps<PublicationHomePageProps>()
 const router = useRouter()
+const { t } = useI18n()
 const featureGridClass = computed(() => {
   const length = props.home.features.length
 
@@ -108,7 +110,7 @@ function resolveActionHref(href: string) {
       v-if="props.home.features.length"
       class="publication-home-page__features"
       :class="featureGridClass"
-      aria-label="特性"
+      :aria-label="t('docs.publicReader.features')"
     >
       <article
         v-for="feature in props.home.features"

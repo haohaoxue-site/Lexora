@@ -2,6 +2,8 @@ import type { ChatMemoryOperationProjection } from '@haohaoxue/samepage-contract
 import type { ChatMessage } from '@/apis/chat'
 import type { ChatMarkdownRenderPhase } from '@/components/chat-markdown/typing'
 import {
+  AGENT_MEMORY_OPERATION_DISPLAY_CODE,
+  AGENT_MEMORY_OPERATION_REASON_CODE,
   AGENT_MEMORY_SKILL_KEY,
   AGENT_MEMORY_TOOL,
   AGENT_TRANSLATOR_SKILL_KEY,
@@ -11,6 +13,7 @@ import {
   CHAT_MESSAGE_STATUS,
 } from '@haohaoxue/samepage-contracts/chat/constants'
 import { prettyTokenCount } from '@haohaoxue/samepage-shared/tokens'
+import { translate } from '@/i18n'
 import dayjs from '@/utils/dayjs'
 
 type AssistantChatMessage = Extract<ChatMessage, { role: 'assistant' }>
@@ -71,7 +74,11 @@ export function getAssistantUsageSummary(message: ChatMessage): string {
     return ''
   }
 
-  return `消耗 ${prettyTokenCount(usage.totalTokens)} tokens · 入 ${prettyTokenCount(usage.inputTokens)} / 出 ${prettyTokenCount(usage.outputTokens)}`
+  return translate('chat.messageDisplay.usageSummary', {
+    input: prettyTokenCount(usage.inputTokens),
+    output: prettyTokenCount(usage.outputTokens),
+    total: prettyTokenCount(usage.totalTokens),
+  })
 }
 
 export function getAssistantUsageTooltip(message: ChatMessage): string {
@@ -81,9 +88,15 @@ export function getAssistantUsageTooltip(message: ChatMessage): string {
   }
 
   return [
-    typeof usage.firstTokenLatencyMs === 'number' ? `首字时延 ${usage.firstTokenLatencyMs} ms` : null,
-    typeof usage.tokensPerSecond === 'number' ? `每秒 ${usage.tokensPerSecond} tokens` : null,
-    usage.estimated ? `来源：${formatUsageSource(usage.usageSource)}，含估算` : `来源：${formatUsageSource(usage.usageSource)}`,
+    typeof usage.firstTokenLatencyMs === 'number'
+      ? translate('chat.messageDisplay.firstTokenLatency', { value: usage.firstTokenLatencyMs })
+      : null,
+    typeof usage.tokensPerSecond === 'number'
+      ? translate('chat.messageDisplay.tokensPerSecond', { value: usage.tokensPerSecond })
+      : null,
+    usage.estimated
+      ? translate('chat.messageDisplay.sourceWithEstimate', { source: formatUsageSource(usage.usageSource) })
+      : translate('chat.messageDisplay.source', { source: formatUsageSource(usage.usageSource) }),
   ].filter(Boolean).join(' | ')
 }
 
@@ -183,7 +196,7 @@ function createEmptyToolCallView(toolCallId: string, part: ChatMessagePart): Ass
     name: part.metadata?.toolName ?? 'tool',
     kind: part.metadata?.toolKind ?? 'function',
     status: part.metadata?.status ?? 'running',
-    displayTitle: '执行工具',
+    displayTitle: translate('chat.messageDisplay.executeTool'),
     displayDetails: [],
     argsText: '',
     resultText: '',
@@ -214,11 +227,10 @@ function createPublicToolCallView(
     return {
       ...view,
       status: getMemoryOperationToolStatus(memoryOperation, view.status),
-      displayTitle: memoryOperation?.title ?? getMemoryToolTitle(view.name),
+      displayTitle: getMemoryOperationTitle(memoryOperation, view.name),
       displayDetails: [
         memoryOperation?.detail,
-        memoryOperation?.status === 'pending_confirmation' ? memoryOperation.reason : null,
-        memoryOperation?.status === 'failed' ? memoryOperation.reason : null,
+        getMemoryOperationReason(memoryOperation),
       ].filter(isNonEmptyString),
     }
   }
@@ -233,14 +245,14 @@ function createPublicToolCallView(
 function getSkillActivationTitle(view: AssistantToolCallView): string {
   const skillKey = getStringArgument(view.argsText, 'skillKey')
   if (skillKey === AGENT_MEMORY_SKILL_KEY) {
-    return '已启用记忆能力'
+    return translate('chat.messageDisplay.memoryEnabled')
   }
 
   if (skillKey === AGENT_TRANSLATOR_SKILL_KEY) {
-    return '已启用翻译能力'
+    return translate('chat.messageDisplay.translatorEnabled')
   }
 
-  return '已启用技能'
+  return translate('chat.messageDisplay.skillEnabled')
 }
 
 function getMemoryOperationToolStatus(
@@ -264,26 +276,100 @@ function getMemoryOperationToolStatus(
 
 function getMemoryToolTitle(name: string): string {
   if (name === AGENT_MEMORY_TOOL.REMEMBER) {
-    return '已记住'
+    return translate('chat.messageDisplay.memoryRemembered')
   }
 
   if (name === AGENT_MEMORY_TOOL.UPDATE) {
-    return '已更新记忆'
+    return translate('chat.messageDisplay.memoryUpdated')
   }
 
   if (name === AGENT_MEMORY_TOOL.FORGET) {
-    return '已忘记记忆'
+    return translate('chat.messageDisplay.memoryForgotten')
   }
 
   if (name === AGENT_MEMORY_TOOL.IGNORE) {
-    return '未更新记忆'
+    return translate('chat.messageDisplay.memoryIgnored')
   }
 
   if (name === AGENT_MEMORY_TOOL.ASK_USER) {
-    return '待确认记忆'
+    return translate('chat.messageDisplay.memoryPending')
   }
 
-  return '记忆活动'
+  return translate('chat.messageDisplay.memoryActivity')
+}
+
+function getMemoryOperationTitle(
+  operation: ChatMemoryOperationProjection | undefined,
+  fallbackToolName: string,
+): string {
+  if (!operation?.displayCode) {
+    return operation?.title ?? getMemoryToolTitle(fallbackToolName)
+  }
+
+  if (operation.displayCode === AGENT_MEMORY_OPERATION_DISPLAY_CODE.REMEMBERED) {
+    return translate('chat.messageDisplay.memoryRemembered')
+  }
+
+  if (operation.displayCode === AGENT_MEMORY_OPERATION_DISPLAY_CODE.UPDATED) {
+    return translate('chat.messageDisplay.memoryUpdated')
+  }
+
+  if (operation.displayCode === AGENT_MEMORY_OPERATION_DISPLAY_CODE.FORGOTTEN) {
+    return translate('chat.messageDisplay.memoryForgotten')
+  }
+
+  if (operation.displayCode === AGENT_MEMORY_OPERATION_DISPLAY_CODE.IGNORED) {
+    return translate('chat.messageDisplay.memoryIgnored')
+  }
+
+  if (operation.displayCode === AGENT_MEMORY_OPERATION_DISPLAY_CODE.PENDING) {
+    return translate('chat.messageDisplay.memoryPending')
+  }
+
+  if (operation.displayCode === AGENT_MEMORY_OPERATION_DISPLAY_CODE.EXISTS) {
+    return translate('chat.messageDisplay.memoryExists')
+  }
+
+  if (operation.displayCode === AGENT_MEMORY_OPERATION_DISPLAY_CODE.FAILED) {
+    return translate('chat.messageDisplay.memoryFailed')
+  }
+
+  return getMemoryToolTitle(fallbackToolName)
+}
+
+function getMemoryOperationReason(operation: ChatMemoryOperationProjection | undefined): string | null {
+  if (
+    !operation
+    || (operation.status !== 'pending_confirmation' && operation.status !== 'failed')
+  ) {
+    return null
+  }
+
+  if (!operation.reasonCode) {
+    return operation.reason
+  }
+
+  if (operation.reasonCode === AGENT_MEMORY_OPERATION_REASON_CODE.SENSITIVE_CONTENT) {
+    return translate('chat.messageDisplay.memoryReasonSensitiveContent')
+  }
+
+  if (operation.reasonCode === AGENT_MEMORY_OPERATION_REASON_CODE.WRITING_DISABLED) {
+    return translate('chat.messageDisplay.memoryReasonWritingDisabled')
+  }
+
+  if (operation.reasonCode === AGENT_MEMORY_OPERATION_REASON_CODE.BROAD_FORGET) {
+    return translate('chat.messageDisplay.memoryReasonBroadForget')
+  }
+
+  if (operation.reasonCode === AGENT_MEMORY_OPERATION_REASON_CODE.DUPLICATE) {
+    return translate('chat.messageDisplay.memoryReasonDuplicate')
+  }
+
+  if (operation.reasonCode === AGENT_MEMORY_OPERATION_REASON_CODE.FAILED) {
+    return translate('chat.messageDisplay.memoryReasonFailed')
+  }
+
+  return operation.reason
 }
 
 function isMemoryToolName(name: string): boolean {
@@ -311,31 +397,31 @@ function getStringArgument(text: string, key: string): string | null {
 
 function getDisplayName(name: string): string {
   if (name === 'activate_skill') {
-    return '启用技能'
+    return translate('chat.messageDisplay.activateSkill')
   }
 
   if (name === 'read_skill_resource') {
-    return '读取技能资源'
+    return translate('chat.messageDisplay.readSkillResource')
   }
 
   if (name === AGENT_MEMORY_TOOL.REMEMBER) {
-    return '新增记忆'
+    return translate('chat.messageDisplay.rememberMemory')
   }
 
   if (name === AGENT_MEMORY_TOOL.UPDATE) {
-    return '更新记忆'
+    return translate('chat.messageDisplay.updateMemory')
   }
 
   if (name === AGENT_MEMORY_TOOL.FORGET) {
-    return '忘记记忆'
+    return translate('chat.messageDisplay.forgetMemory')
   }
 
   if (name === AGENT_MEMORY_TOOL.IGNORE) {
-    return '忽略记忆'
+    return translate('chat.messageDisplay.ignoreMemory')
   }
 
   if (name === AGENT_MEMORY_TOOL.ASK_USER) {
-    return '询问记忆'
+    return translate('chat.messageDisplay.askMemory')
   }
 
   return name
@@ -382,7 +468,7 @@ export function getAssistantFailureMessage(message: ChatMessage) {
     return ''
   }
 
-  return assistantMessage.metadata?.failureMessage ?? '生成失败，请稍后重试。'
+  return assistantMessage.metadata?.failureMessage ?? translate('chat.messageDisplay.failureMessage')
 }
 
 export function isAssistantStreamingMessage(message: ChatMessage) {
@@ -422,12 +508,12 @@ function toAssistantChatMessage(message: ChatMessage): AssistantChatMessage | nu
 
 function formatUsageSource(source: string): string {
   if (source === 'provider') {
-    return '服务商'
+    return translate('chat.messageDisplay.provider')
   }
 
   if (source === 'mixed') {
-    return '服务商 + 本地估算'
+    return translate('chat.messageDisplay.mixed')
   }
 
-  return '本地估算'
+  return translate('chat.messageDisplay.estimated')
 }

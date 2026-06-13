@@ -3,19 +3,21 @@ import type { FormInstance, FormRules } from 'element-plus'
 import type { RenameFormModel } from './typing'
 import { DOCUMENT_TITLE_MAX_LENGTH } from '@haohaoxue/samepage-contracts/document/constants'
 import { computed, nextTick, reactive, useTemplateRef, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { ElMessage } from '@/utils/element-plus'
 import { useActiveDocument } from '../../composables/useActiveDocument'
 import { useDocumentTree } from '../../composables/useDocumentTree'
 
 const tree = useDocumentTree()
 const activeDocument = useActiveDocument()
+const { t } = useI18n()
 const formRef = useTemplateRef<FormInstance>('formRef')
 const titleInputRef = useTemplateRef<{ focus: () => void }>('titleInputRef')
 
 const form = reactive<RenameFormModel>({
   title: '',
 })
-const rules: FormRules<RenameFormModel> = {
+const rules = computed<FormRules<RenameFormModel>>(() => ({
   title: [
     {
       validator: (_rule, value: string, callback) => {
@@ -24,17 +26,17 @@ const rules: FormRules<RenameFormModel> = {
           return
         }
 
-        callback(new Error('请输入文档名称'))
+        callback(new Error(t('docs.renameDialog.required')))
       },
       trigger: 'blur',
     },
     {
       max: DOCUMENT_TITLE_MAX_LENGTH,
-      message: `文档名称不能超过 ${DOCUMENT_TITLE_MAX_LENGTH} 个字符`,
+      message: t('docs.renameDialog.maxLength', { max: DOCUMENT_TITLE_MAX_LENGTH }),
       trigger: 'blur',
     },
   ],
-}
+}))
 
 const isOpen = computed(() => tree.isRenameDialogOpen.value)
 const isSubmitting = computed(() => tree.isRenaming.value)
@@ -79,10 +81,10 @@ async function confirmRename() {
     }
 
     activeDocument.applyDocumentTitleChanged(current)
-    ElMessage.success('已重命名')
+    ElMessage.success(t('docs.renameDialog.success'))
   }
   catch (error) {
-    ElMessage.error(error instanceof Error ? error.message : '重命名失败')
+    ElMessage.error(error instanceof Error ? error.message : t('docs.renameDialog.failed'))
   }
 }
 </script>
@@ -90,7 +92,7 @@ async function confirmRename() {
 <template>
   <ElDialog
     :model-value="isOpen"
-    title="重命名"
+    :title="t('docs.renameDialog.title')"
     width="28rem"
     align-center
     destroy-on-close
@@ -108,7 +110,7 @@ async function confirmRename() {
       class="pt-1"
       @submit.prevent
     >
-      <ElFormItem label="文档名称" prop="title">
+      <ElFormItem :label="t('docs.renameDialog.name')" prop="title">
         <ElInput
           ref="titleInputRef"
           v-model="form.title"
@@ -122,10 +124,10 @@ async function confirmRename() {
 
     <template #footer>
       <ElButton :disabled="isSubmitting" @click="tree.closeRenameDialog">
-        取消
+        {{ t('docs.common.cancel') }}
       </ElButton>
       <ElButton type="primary" :loading="isSubmitting" @click="confirmRename">
-        确定
+        {{ t('docs.common.confirm') }}
       </ElButton>
     </template>
   </ElDialog>

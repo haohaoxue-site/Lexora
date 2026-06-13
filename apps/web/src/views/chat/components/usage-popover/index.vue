@@ -1,9 +1,12 @@
 <script setup lang="ts">
 import type { ChatConversationUsageView } from '../../utils/chat-usage-display'
+import { useI18n } from 'vue-i18n'
 
 const props = defineProps<{
   usage: ChatConversationUsageView
 }>()
+
+const { t } = useI18n({ useScope: 'global' })
 </script>
 
 <template>
@@ -18,7 +21,7 @@ const props = defineProps<{
       <ElButton
         text
         class="chat-usage-popover__trigger h-8 min-w-8 w-8 rounded-lg p-0"
-        aria-label="查看对话信息"
+        :aria-label="t('chat.usage.open')"
       >
         <SvgIcon category="ui" icon="usage-window" size="1rem" />
       </ElButton>
@@ -27,16 +30,16 @@ const props = defineProps<{
     <section class="chat-usage-popover">
       <header class="chat-usage-popover__header">
         <div class="chat-usage-popover__title">
-          对话信息
+          {{ t('chat.usage.conversationInfo') }}
         </div>
         <div class="chat-usage-popover__subtitle">
-          上下文预算与最近一次回复
+          {{ t('chat.usage.conversationInfoSubtitle') }}
         </div>
       </header>
 
       <section v-if="props.usage.budget" class="chat-usage-popover__section is-budget">
         <div class="chat-usage-popover__section-head">
-          <span>上下文预算</span>
+          <span>{{ t('chat.usage.contextBudget') }}</span>
           <span>{{ props.usage.budget.usedText }}</span>
         </div>
         <div class="chat-usage-popover__budget-track">
@@ -67,7 +70,7 @@ const props = defineProps<{
 
       <section class="chat-usage-popover__section" :class="{ 'is-first': !props.usage.budget }">
         <div class="chat-usage-popover__section-head">
-          <span>对话累计</span>
+          <span>{{ t('chat.usage.conversationTotal') }}</span>
         </div>
         <div class="chat-usage-popover__rows">
           <div
@@ -84,7 +87,7 @@ const props = defineProps<{
 
       <section v-if="props.usage.latestRows.length" class="chat-usage-popover__section">
         <div class="chat-usage-popover__section-head">
-          <span>最近一次回复</span>
+          <span>{{ t('chat.usage.latestReply') }}</span>
         </div>
         <div class="chat-usage-popover__rows">
           <div

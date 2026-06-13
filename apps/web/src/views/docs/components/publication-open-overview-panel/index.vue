@@ -13,13 +13,12 @@ import type {
 import { Search } from '@element-plus/icons-vue'
 import {
   DOCUMENT_SINGLE_PUBLICATION_EFFECTIVE_STATE,
-  DOCUMENT_SINGLE_PUBLICATION_EFFECTIVE_STATE_LABELS,
   DOCUMENT_SINGLE_PUBLICATION_SCOPE,
-  DOCUMENT_SINGLE_PUBLICATION_SCOPE_LABELS,
   DOCUMENT_SINGLE_PUBLICATION_SCOPE_VALUES,
   DOCUMENT_SINGLE_PUBLICATION_STATE,
 } from '@haohaoxue/samepage-contracts/document/publication/constants'
 import { computed, shallowRef, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import Empty from '@/components/empty'
 
 const props = withDefaults(defineProps<PublicationOpenOverviewPanelProps>(), {
@@ -27,51 +26,52 @@ const props = withDefaults(defineProps<PublicationOpenOverviewPanelProps>(), {
   updatingDocumentId: null,
 })
 const emits = defineEmits<PublicationOpenOverviewPanelEmits>()
+const { t } = useI18n()
 
 const searchText = shallowRef('')
 const stateFilter = shallowRef<'all' | DocumentSinglePublicationEffectiveState>('all')
 const selectedDocumentId = shallowRef('')
 
-const singlePublicationStateOptions = [
+const singlePublicationStateOptions = computed(() => [
   {
     value: DOCUMENT_SINGLE_PUBLICATION_STATE.INHERIT,
-    label: '继承父级',
+    label: t('docs.publicationSite.overview.inheritParent'),
   },
   {
     value: DOCUMENT_SINGLE_PUBLICATION_STATE.ENABLED,
-    label: '公开链接',
+    label: t('docs.publicationSite.overview.publicLink'),
   },
   {
     value: DOCUMENT_SINGLE_PUBLICATION_STATE.DISABLED,
-    label: '关闭当前页',
+    label: t('docs.publication.closeCurrent'),
   },
-]
-const singlePublicationScopeOptions = DOCUMENT_SINGLE_PUBLICATION_SCOPE_VALUES.map(value => ({
+])
+const singlePublicationScopeOptions = computed(() => DOCUMENT_SINGLE_PUBLICATION_SCOPE_VALUES.map(value => ({
   value,
-  label: DOCUMENT_SINGLE_PUBLICATION_SCOPE_LABELS[value],
-}))
-const stateFilterOptions = [
+  label: formatSinglePublicationScope(value),
+})))
+const stateFilterOptions = computed(() => [
   {
     value: 'all',
-    label: '全部状态',
+    label: t('docs.publicationSite.overview.allStates'),
   },
   {
     value: DOCUMENT_SINGLE_PUBLICATION_EFFECTIVE_STATE.ENABLED,
-    label: '公开',
+    label: t('docs.publicationSite.overview.public'),
   },
   {
     value: DOCUMENT_SINGLE_PUBLICATION_EFFECTIVE_STATE.INHERITED_ENABLED,
-    label: '继承公开',
+    label: t('docs.publicationSite.overview.inheritedEnabled'),
   },
   {
     value: DOCUMENT_SINGLE_PUBLICATION_EFFECTIVE_STATE.DISABLED,
-    label: '已关闭',
+    label: t('docs.publicationSite.overview.closed'),
   },
   {
     value: DOCUMENT_SINGLE_PUBLICATION_EFFECTIVE_STATE.UNPUBLISHED,
-    label: '未公开',
+    label: t('docs.publicationSite.overview.notPublished'),
   },
-] satisfies Array<{ value: 'all' | DocumentSinglePublicationEffectiveState, label: string }>
+] satisfies Array<{ value: 'all' | DocumentSinglePublicationEffectiveState, label: string }>)
 
 const flatTree = computed(() => props.tree.flatMap(item => flattenDocumentTree(item)))
 const selectedRow = computed(() =>
@@ -81,7 +81,7 @@ const filteredTree = computed(() =>
   filterDocumentTree(props.tree, searchText.value.trim().toLowerCase(), stateFilter.value),
 )
 const documentTitleById = computed(() =>
-  new Map(flatTree.value.map(item => [item.id, item.title || '未命名'])),
+  new Map(flatTree.value.map(item => [item.id, item.title || t('docs.common.noTitle')])),
 )
 
 watch(
@@ -113,45 +113,65 @@ function resolveSingleStateType(state: DocumentSinglePublicationEffectiveState):
 }
 
 function resolveSingleStateLabel(state: DocumentSinglePublicationEffectiveState) {
-  return DOCUMENT_SINGLE_PUBLICATION_EFFECTIVE_STATE_LABELS[state]
+  if (state === DOCUMENT_SINGLE_PUBLICATION_EFFECTIVE_STATE.ENABLED) {
+    return t('docs.publicationSite.overview.public')
+  }
+
+  if (state === DOCUMENT_SINGLE_PUBLICATION_EFFECTIVE_STATE.INHERITED_ENABLED) {
+    return t('docs.publicationSite.overview.inheritedEnabled')
+  }
+
+  if (state === DOCUMENT_SINGLE_PUBLICATION_EFFECTIVE_STATE.DISABLED) {
+    return t('docs.publicationSite.overview.closed')
+  }
+
+  return t('docs.publicationSite.overview.notPublished')
 }
 
 function resolveSingleRuleLabel(state: DocumentSinglePublicationState) {
-  return singlePublicationStateOptions.find(option => option.value === state)?.label ?? '继承父级'
+  return singlePublicationStateOptions.value.find(option => option.value === state)?.label ?? t('docs.publicationSite.overview.inheritParent')
 }
 
 function resolveSingleScopeLabel(row: DocumentSinglePublicationTreeItem) {
   if (row.singlePublicationState !== DOCUMENT_SINGLE_PUBLICATION_STATE.ENABLED) {
-    return '继承父级'
+    return t('docs.publicationSite.overview.inheritParent')
   }
 
-  return DOCUMENT_SINGLE_PUBLICATION_SCOPE_LABELS[row.singlePublicationScope]
+  return formatSinglePublicationScope(row.singlePublicationScope)
 }
 
 function resolveSingleRuleDescription(row: DocumentSinglePublicationTreeItem) {
   if (row.singlePublicationState === DOCUMENT_SINGLE_PUBLICATION_STATE.ENABLED) {
-    return '该页面的公开状态直接生效'
+    return t('docs.publicationSite.overview.directRuleDescription')
   }
 
   if (row.singlePublicationState === DOCUMENT_SINGLE_PUBLICATION_STATE.DISABLED) {
-    return '该页面不会通过公开链接访问'
+    return t('docs.publicationSite.overview.unpublishedByRule')
   }
 
   if (row.inheritedFromDocumentId) {
-    return `继承自 ${documentTitleById.value.get(row.inheritedFromDocumentId) ?? '父级页面'}`
+    return t('docs.publicationSite.overview.inheritedFrom', {
+      title: documentTitleById.value.get(row.inheritedFromDocumentId) ?? t('docs.publicationSite.overview.parentPage'),
+    })
   }
 
-  return '当前页面未单独配置公开规则'
+  return t('docs.publicationSite.overview.noCustomRule')
 }
 
 function resolveSingleScopeDescription(row: DocumentSinglePublicationTreeItem) {
   if (row.singlePublicationState !== DOCUMENT_SINGLE_PUBLICATION_STATE.ENABLED) {
-    return '当前范围不会单独生效'
+    return t('docs.publicationSite.overview.currentRangeInactive')
   }
 
   return row.singlePublicationScope === DOCUMENT_SINGLE_PUBLICATION_SCOPE.DESCENDANTS
-    ? '对子页面同时生效'
-    : '仅对当前页面生效'
+    ? t('docs.publicationSite.overview.effectiveForChildren')
+    : t('docs.publicationSite.overview.effectiveForCurrent')
+}
+
+function formatSinglePublicationScope(scope: DocumentSinglePublicationScope) {
+  return scope === DOCUMENT_SINGLE_PUBLICATION_SCOPE.DESCENDANTS
+    ? t('docs.publication.scopeTree')
+    : t('docs.publication.scopePage')
 }
 
 function handleSingleStateCommand(row: DocumentSinglePublicationTreeItem, command: string | number | object) {
@@ -194,7 +214,7 @@ function filterDocumentTree(
 ): DocumentSinglePublicationTreeItem[] {
   return items.flatMap((item) => {
     const children = filterDocumentTree(item.children, keyword, state)
-    const matchesKeyword = !keyword || (item.title || '未命名').toLowerCase().includes(keyword)
+    const matchesKeyword = !keyword || (item.title || t('docs.common.noTitle')).toLowerCase().includes(keyword)
     const matchesState = state === 'all' || item.effectivePublicationState === state
 
     if ((matchesKeyword && matchesState) || children.length > 0) {
@@ -214,7 +234,7 @@ function filterDocumentTree(
     <header class="publication-open-overview-panel__header flex flex-wrap items-end justify-between gap-3">
       <div class="grid gap-1">
         <h2 class="m-0 text-xl font-semibold leading-7 text-main">
-          公开概览
+          {{ t('docs.publicationSite.overview.title') }}
         </h2>
       </div>
 
@@ -223,7 +243,7 @@ function filterDocumentTree(
           v-model="searchText"
           class="publication-open-overview-panel__search"
           clearable
-          placeholder="搜索文档名称"
+          :placeholder="t('docs.publicationSite.overview.searchPlaceholder')"
         >
           <template #suffix>
             <ElIcon class="text-secondary">
@@ -255,10 +275,10 @@ function filterDocumentTree(
           @row-click="handleRowClick"
         >
           <template #empty>
-            <Empty compact description="暂无私有文档" />
+            <Empty compact :description="t('docs.publicationSite.overview.empty')" />
           </template>
 
-          <ElTableColumn label="文档" min-width="205" show-overflow-tooltip>
+          <ElTableColumn :label="t('docs.publicationSite.overview.document')" min-width="205" show-overflow-tooltip>
             <template #default="{ row }">
               <span class="inline-flex min-w-0 items-center gap-2">
                 <SvgIcon
@@ -271,7 +291,7 @@ function filterDocumentTree(
             </template>
           </ElTableColumn>
 
-          <ElTableColumn label="公开状态" width="104" align="center" header-align="center">
+          <ElTableColumn :label="t('docs.publicationSite.overview.publicState')" width="104" align="center" header-align="center">
             <template #default="{ row }">
               <ElTag
                 size="small"
@@ -283,7 +303,7 @@ function filterDocumentTree(
             </template>
           </ElTableColumn>
 
-          <ElTableColumn label="公开规则" width="120" align="center" header-align="center">
+          <ElTableColumn :label="t('docs.publicationSite.overview.publicRule')" width="120" align="center" header-align="center">
             <template #default="{ row }">
               <ElDropdown
                 trigger="click"
@@ -315,7 +335,7 @@ function filterDocumentTree(
             </template>
           </ElTableColumn>
 
-          <ElTableColumn label="范围" width="136" align="center" header-align="center">
+          <ElTableColumn :label="t('docs.publicationSite.overview.scope')" width="136" align="center" header-align="center">
             <template #default="{ row }">
               <ElDropdown
                 trigger="click"
@@ -361,7 +381,7 @@ function filterDocumentTree(
             />
             <div class="grid min-w-0 gap-2">
               <h2 class="m-0 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-lg font-semibold leading-7 text-main">
-                {{ selectedRow.title || '未命名' }}
+                {{ selectedRow.title || t('docs.common.noTitle') }}
               </h2>
             </div>
           </div>
@@ -369,7 +389,7 @@ function filterDocumentTree(
 
         <div class="publication-open-overview-panel__detail-list grid gap-0">
           <div class="publication-open-overview-panel__detail-row">
-            <span>公开状态</span>
+            <span>{{ t('docs.publicationSite.overview.publicState') }}</span>
             <div class="publication-open-overview-panel__detail-value">
               <ElTag
                 size="small"
@@ -381,14 +401,14 @@ function filterDocumentTree(
             </div>
           </div>
           <div class="publication-open-overview-panel__detail-row">
-            <span>公开规则</span>
+            <span>{{ t('docs.publicationSite.overview.publicRule') }}</span>
             <div class="publication-open-overview-panel__detail-value">
               <strong>{{ resolveSingleRuleLabel(selectedRow.singlePublicationState) }}</strong>
               <small>{{ resolveSingleRuleDescription(selectedRow) }}</small>
             </div>
           </div>
           <div class="publication-open-overview-panel__detail-row">
-            <span>范围</span>
+            <span>{{ t('docs.publicationSite.overview.scope') }}</span>
             <div class="publication-open-overview-panel__detail-value">
               <strong>{{ resolveSingleScopeLabel(selectedRow) }}</strong>
               <small>{{ resolveSingleScopeDescription(selectedRow) }}</small>

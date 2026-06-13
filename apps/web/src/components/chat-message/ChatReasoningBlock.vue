@@ -3,6 +3,7 @@ import type { ChatMessage } from '@/apis/chat'
 import { ArrowDown } from '@element-plus/icons-vue'
 import { CHAT_MESSAGE_STATUS } from '@haohaoxue/samepage-contracts/chat/constants'
 import { computed, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useStreamingTextReveal } from '@/composables/chat/useStreamingTextReveal'
 
 const props = withDefaults(defineProps<{
@@ -18,6 +19,7 @@ const props = withDefaults(defineProps<{
   defaultExpanded: false,
 })
 
+const { t } = useI18n({ useScope: 'global' })
 const isExpanded = ref(props.defaultExpanded)
 const isStreaming = computed(() => props.status === CHAT_MESSAGE_STATUS.STREAMING)
 const shouldAnimateText = computed(() => isStreaming.value && !props.answerStarted)
@@ -30,14 +32,16 @@ const { visibleText } = useStreamingTextReveal({
 const elapsedSeconds = computed(() => props.elapsedMs ? Math.max(1, Math.round(props.elapsedMs / 1000)) : null)
 const summaryText = computed(() => {
   if (props.status === CHAT_MESSAGE_STATUS.STREAMING) {
-    return '思考中'
+    return t('chat.messageDisplay.pendingThinking')
   }
 
   if (props.status === CHAT_MESSAGE_STATUS.FAILED) {
-    return '思考中断'
+    return t('chat.messageDisplay.interruptedThinking')
   }
 
-  return elapsedSeconds.value ? `已思考 ${elapsedSeconds.value} 秒` : '已思考'
+  return elapsedSeconds.value
+    ? t('chat.messageDisplay.thinkingSeconds', { seconds: elapsedSeconds.value })
+    : t('chat.messageDisplay.thinkingDone')
 })
 
 watch(

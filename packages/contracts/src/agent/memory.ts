@@ -136,6 +136,42 @@ export const AGENT_MEMORY_CANDIDATE_KIND_VALUES = [
   AGENT_MEMORY_CANDIDATE_KIND.FORGET_REQUEST,
 ] as const
 
+export const AGENT_MEMORY_OPERATION_DISPLAY_CODE = {
+  REMEMBERED: 'memory.remembered',
+  UPDATED: 'memory.updated',
+  FORGOTTEN: 'memory.forgotten',
+  IGNORED: 'memory.ignored',
+  PENDING: 'memory.pending',
+  EXISTS: 'memory.exists',
+  FAILED: 'memory.failed',
+} as const
+
+export const AGENT_MEMORY_OPERATION_DISPLAY_CODE_VALUES = [
+  AGENT_MEMORY_OPERATION_DISPLAY_CODE.REMEMBERED,
+  AGENT_MEMORY_OPERATION_DISPLAY_CODE.UPDATED,
+  AGENT_MEMORY_OPERATION_DISPLAY_CODE.FORGOTTEN,
+  AGENT_MEMORY_OPERATION_DISPLAY_CODE.IGNORED,
+  AGENT_MEMORY_OPERATION_DISPLAY_CODE.PENDING,
+  AGENT_MEMORY_OPERATION_DISPLAY_CODE.EXISTS,
+  AGENT_MEMORY_OPERATION_DISPLAY_CODE.FAILED,
+] as const
+
+export const AGENT_MEMORY_OPERATION_REASON_CODE = {
+  SENSITIVE_CONTENT: 'memory.reason.sensitive-content',
+  WRITING_DISABLED: 'memory.reason.writing-disabled',
+  BROAD_FORGET: 'memory.reason.broad-forget',
+  DUPLICATE: 'memory.reason.duplicate',
+  FAILED: 'memory.reason.failed',
+} as const
+
+export const AGENT_MEMORY_OPERATION_REASON_CODE_VALUES = [
+  AGENT_MEMORY_OPERATION_REASON_CODE.SENSITIVE_CONTENT,
+  AGENT_MEMORY_OPERATION_REASON_CODE.WRITING_DISABLED,
+  AGENT_MEMORY_OPERATION_REASON_CODE.BROAD_FORGET,
+  AGENT_MEMORY_OPERATION_REASON_CODE.DUPLICATE,
+  AGENT_MEMORY_OPERATION_REASON_CODE.FAILED,
+] as const
+
 export const AGENT_MEMORY_DOCUMENT_ID = {
   SOUL: 'soul',
   USER: 'user',
@@ -175,6 +211,8 @@ export const AgentMemoryOperationModeSchema = z.enum(AGENT_MEMORY_OPERATION_MODE
 export const AgentMemoryOperationActionSchema = z.enum(AGENT_MEMORY_OPERATION_ACTION_VALUES)
 export const AgentMemoryCandidateStatusSchema = z.enum(AGENT_MEMORY_CANDIDATE_STATUS_VALUES)
 export const AgentMemoryCandidateKindSchema = z.enum(AGENT_MEMORY_CANDIDATE_KIND_VALUES)
+export const AgentMemoryOperationDisplayCodeSchema = z.enum(AGENT_MEMORY_OPERATION_DISPLAY_CODE_VALUES)
+export const AgentMemoryOperationReasonCodeSchema = z.enum(AGENT_MEMORY_OPERATION_REASON_CODE_VALUES)
 export const AgentMemoryDocumentIdSchema = z.enum(AGENT_MEMORY_DOCUMENT_ID_VALUES)
 export const AgentMemoryToolNameSchema = z.enum(AGENT_MEMORY_TOOL_VALUES)
 
@@ -375,6 +413,8 @@ export const ChatMemoryOperationProjectionSchema = z.object({
   memoryIds: z.array(NonEmptyStringSchema),
   archivedMemoryIds: z.array(NonEmptyStringSchema).default([]),
   candidateId: NonEmptyStringSchema.nullable(),
+  displayCode: AgentMemoryOperationDisplayCodeSchema,
+  reasonCode: AgentMemoryOperationReasonCodeSchema.nullable(),
   title: NonEmptyStringSchema,
   detail: z.string().trim().min(1).nullable(),
   reason: z.string().trim().min(1).nullable(),
@@ -486,6 +526,8 @@ export type AgentMemoryOperationMode = z.infer<typeof AgentMemoryOperationModeSc
 export type AgentMemoryOperationAction = z.infer<typeof AgentMemoryOperationActionSchema>
 export type AgentMemoryCandidateStatus = z.infer<typeof AgentMemoryCandidateStatusSchema>
 export type AgentMemoryCandidateKind = z.infer<typeof AgentMemoryCandidateKindSchema>
+export type AgentMemoryOperationDisplayCode = z.infer<typeof AgentMemoryOperationDisplayCodeSchema>
+export type AgentMemoryOperationReasonCode = z.infer<typeof AgentMemoryOperationReasonCodeSchema>
 export type AgentMemoryDocumentId = z.infer<typeof AgentMemoryDocumentIdSchema>
 export type AgentMemoryWritingPolicy = z.infer<typeof AgentMemoryWritingPolicySchema>
 export type AgentMemoryPolicy = z.infer<typeof AgentMemoryPolicySchema>

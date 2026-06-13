@@ -4,6 +4,7 @@ import type { TiptapEditorUploadedImage } from '../../content/typing'
 import type { InlineMarkAction } from '../../overlays/catalog/actionRegistry'
 import { RefreshLeft, RefreshRight } from '@element-plus/icons-vue'
 import { computed, shallowRef } from 'vue'
+import { useI18n } from 'vue-i18n'
 import TiptapIcon from '../../icons/TiptapIcon.vue'
 import AlignDropdown from '../../overlays/bubble-toolbar/AlignDropdown.vue'
 import BubbleToolbarButton from '../../overlays/bubble-toolbar/BubbleToolbarButton.vue'
@@ -23,7 +24,7 @@ interface StandaloneContentToolbarProps {
 
 type InlineToolbarItem = {
   action: InlineMarkAction
-  description: string
+  descriptionKey: string
 } & ({
   kind: 'text'
   value: string
@@ -37,6 +38,7 @@ const props = withDefaults(defineProps<StandaloneContentToolbarProps>(), {
   canUploadImage: false,
   uploadImage: undefined,
 })
+const { t } = useI18n({ useScope: 'global' })
 const editor = props.editor
 const imageInputRef = shallowRef<HTMLInputElement | null>(null)
 const editorSnapshot = useEditorSnapshot(editor, {
@@ -52,34 +54,34 @@ const actionRegistry = createMenuActionRegistry({
 const inlineItems = [
   {
     action: 'bold',
-    description: '加粗',
+    descriptionKey: 'editor.common.bold',
     kind: 'text',
     value: 'B',
     className: 'font-bold text-sm',
   },
   {
     action: 'italic',
-    description: '斜体',
+    descriptionKey: 'editor.common.italic',
     kind: 'text',
     value: 'I',
     className: 'text-sm italic',
   },
   {
     action: 'strike',
-    description: '删除线',
+    descriptionKey: 'editor.common.strike',
     kind: 'text',
     value: 'S',
     className: 'text-sm line-through',
   },
   {
     action: 'code',
-    description: '代码',
+    descriptionKey: 'editor.common.code',
     kind: 'icon',
     icon: 'code',
   },
   {
     action: 'underline',
-    description: '下划线',
+    descriptionKey: 'editor.common.underline',
     kind: 'text',
     value: 'U',
     className: 'text-sm underline',
@@ -151,11 +153,11 @@ function handleImageInputChange(event: Event) {
 </script>
 
 <template>
-  <div class="standalone-content-editor__toolbar tiptap-fixed-toolbar" role="toolbar" aria-label="正文工具栏">
+  <div class="standalone-content-editor__toolbar tiptap-fixed-toolbar" role="toolbar" :aria-label="t('editor.common.paragraph')">
     <div class="tiptap-fixed-toolbar__group">
       <BubbleToolbarButton
-        description="撤销"
-        aria-label="撤销"
+        :description="t('editor.common.undo')"
+        :aria-label="t('editor.common.undo')"
         :disabled="!toolbarState.canUndo"
         @mousedown.prevent
         @click="undo"
@@ -163,8 +165,8 @@ function handleImageInputChange(event: Event) {
         <RefreshLeft class="tiptap-fixed-toolbar__el-icon" />
       </BubbleToolbarButton>
       <BubbleToolbarButton
-        description="重做"
-        aria-label="重做"
+        :description="t('editor.common.redo')"
+        :aria-label="t('editor.common.redo')"
         :disabled="!toolbarState.canRedo"
         @mousedown.prevent
         @click="redo"
@@ -174,16 +176,16 @@ function handleImageInputChange(event: Event) {
     </div>
 
     <div class="tiptap-fixed-toolbar__group">
-      <TurnIntoDropdown :editor="editor" description="文本样式" />
-      <StandaloneContentListDropdown :editor="editor" description="列表" />
+      <TurnIntoDropdown :editor="editor" :description="t('editor.common.textStyle')" />
+      <StandaloneContentListDropdown :editor="editor" :description="t('editor.common.bulletList')" />
     </div>
 
     <div class="tiptap-fixed-toolbar__group">
       <BubbleToolbarButton
         v-for="item in inlineItems"
         :key="item.action"
-        :description="item.description"
-        :aria-label="item.description"
+        :description="t(item.descriptionKey)"
+        :aria-label="t(item.descriptionKey)"
         :active="toolbarState.marks[item.action].active"
         :disabled="toolbarState.marks[item.action].disabled"
         :data-toolbar-action="item.action"
@@ -206,7 +208,7 @@ function handleImageInputChange(event: Event) {
     </div>
 
     <div class="tiptap-fixed-toolbar__group">
-      <ColorPickerDropdown :editor="editor" description="颜色" />
+      <ColorPickerDropdown :editor="editor" :description="t('editor.common.color')" />
       <ElPopover
         v-model:visible="linkPopoverVisible"
         trigger="click"
@@ -218,8 +220,8 @@ function handleImageInputChange(event: Event) {
       >
         <template #reference>
           <BubbleToolbarButton
-            description="链接"
-            aria-label="链接"
+            :description="t('editor.common.link')"
+            :aria-label="t('editor.common.link')"
             :active="toolbarState.isLinkActive"
             @mousedown.prevent
           >
@@ -232,11 +234,11 @@ function handleImageInputChange(event: Event) {
     </div>
 
     <div class="tiptap-fixed-toolbar__group">
-      <AlignDropdown :editor="editor" description="对齐和缩进" />
+      <AlignDropdown :editor="editor" :description="t('editor.common.alignAndIndent')" />
       <BubbleToolbarButton
         v-if="toolbarState.canUploadImage"
-        description="图片"
-        aria-label="图片"
+        :description="t('editor.common.image')"
+        :aria-label="t('editor.common.image')"
         @mousedown.prevent
         @click="insertImage"
       >

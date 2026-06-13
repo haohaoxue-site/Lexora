@@ -8,6 +8,7 @@ import type {
 import { USER_STATUS } from '@haohaoxue/samepage-contracts/user/constants'
 import { createSharedComposable } from '@vueuse/core'
 import { reactive, shallowRef } from 'vue'
+import { useI18n } from 'vue-i18n'
 import {
   getSystemAdminUserDetail,
   getSystemAdminUsers,
@@ -17,6 +18,7 @@ import { ElMessage } from '@/utils/element-plus'
 import { getRequestErrorDisplayMessage } from '@/utils/request-error'
 
 export const useAdminUsers = createSharedComposable(() => {
+  const { t } = useI18n({ useScope: 'global' })
   let userListRequestId = 0
   const userDetailRequestIds = new Map<string, number>()
 
@@ -63,7 +65,7 @@ export const useAdminUsers = createSharedComposable(() => {
     }
     catch (error) {
       if (requestId === userListRequestId) {
-        errorMessage.value = getRequestErrorDisplayMessage(error, '加载用户列表失败')
+        errorMessage.value = getRequestErrorDisplayMessage(error, t('admin.errors.loadUsers'))
       }
       throw error
     }
@@ -84,7 +86,7 @@ export const useAdminUsers = createSharedComposable(() => {
       const updated = await updateSystemAdminUserStatus(user.id, {
         status: nextStatus,
       })
-      ElMessage.success(nextStatus === USER_STATUS.ACTIVE ? '用户已恢复' : '用户已禁用')
+      ElMessage.success(nextStatus === USER_STATUS.ACTIVE ? t('admin.users.restored') : t('admin.users.userDisabled'))
       await loadUsers().catch(() => {
         users.value = users.value.map(item =>
           item.id === user.id
@@ -97,7 +99,7 @@ export const useAdminUsers = createSharedComposable(() => {
       })
     }
     catch (error) {
-      ElMessage.error(getRequestErrorDisplayMessage(error, '更新用户状态失败'))
+      ElMessage.error(getRequestErrorDisplayMessage(error, t('admin.errors.updateUserStatus')))
     }
     finally {
       updatingUserId.value = null
@@ -129,7 +131,7 @@ export const useAdminUsers = createSharedComposable(() => {
     }
     catch (error) {
       if (userDetailRequestIds.get(userId) === requestId) {
-        setUserDetailErrorMessage(userId, getRequestErrorDisplayMessage(error, '加载用户数据失败'))
+        setUserDetailErrorMessage(userId, getRequestErrorDisplayMessage(error, t('admin.errors.loadUserData')))
       }
     }
     finally {

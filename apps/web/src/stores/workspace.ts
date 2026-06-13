@@ -8,6 +8,7 @@ import { WORKSPACE_TYPE } from '@haohaoxue/samepage-contracts/workspace/constant
 import { defineStore } from 'pinia'
 import { computed, shallowRef } from 'vue'
 import { getPersonalWorkspace } from '@/apis/workspace'
+import { translate } from '@/i18n'
 import { STORAGE_KEY } from '@/utils/storage'
 
 export const WORKSPACE_PERSIST_KEY = STORAGE_KEY.workspace
@@ -75,7 +76,7 @@ export const useWorkspaceStore = defineStore('workspace', () => {
     return null
   })
   const currentWorkspaceType = computed(() => currentWorkspace.value?.type ?? WORKSPACE_TYPE.PERSONAL)
-  const currentWorkspaceLabel = computed(() => '我的空间')
+  const currentWorkspaceLabel = computed(() => translate('workspace.personalSpace'))
   const switchableWorkspaces = computed<DeepReadonly<WorkspaceSwitcherItem[]>>(() => {
     const items: WorkspaceSwitcherItem[] = []
 
@@ -83,7 +84,7 @@ export const useWorkspaceStore = defineStore('workspace', () => {
       items.push({
         id: _personalWorkspace.value.id,
         type: WORKSPACE_TYPE.PERSONAL,
-        label: '我的空间',
+        label: translate('workspace.personalSpace'),
         iconUrl: _personalWorkspace.value.iconUrl,
       })
     }
@@ -121,7 +122,7 @@ export const useWorkspaceStore = defineStore('workspace', () => {
     }
 
     if (!_personalWorkspace.value) {
-      throw new Error('未找到个人空间')
+      throw new Error(translate('workspace.personalNotFound'))
     }
 
     normalizeSelectedWorkspace()
@@ -139,18 +140,18 @@ export const useWorkspaceStore = defineStore('workspace', () => {
     description?: string
   }) {
     void payload
-    throw new Error('该功能暂未开放')
+    throw new Error(translate('workspace.featureComingSoon'))
   }
 
   async function uploadWorkspaceIcon(workspaceId: string, file: File) {
     void workspaceId
     void file
-    throw new Error('该功能暂未开放')
+    throw new Error(translate('workspace.featureComingSoon'))
   }
 
   async function deleteWorkspace(workspaceId: string) {
     void workspaceId
-    throw new Error('该功能暂未开放')
+    throw new Error(translate('workspace.featureComingSoon'))
   }
 
   function selectWorkspace(workspaceId: string) {

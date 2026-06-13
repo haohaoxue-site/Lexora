@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useUiStore } from '@/stores/ui'
 import DocumentSectionPanel from '../../components/document-section-panel'
 import { useDocsPageActions } from '../../composables/useDocsPageActions'
@@ -8,6 +9,7 @@ import { useDocsSurfaceState } from '../../composables/useDocsSurfaceState'
 import { useDocumentTree } from '../../composables/useDocumentTree'
 
 const tree = useDocumentTree()
+const { t } = useI18n()
 const { isDocumentLoading } = tree
 const uiStore = useUiStore()
 const { visibleTreeGroups } = useDocsSurfaceState()
@@ -41,7 +43,7 @@ function openDocsControlCenter() {
   <aside class="docs-view__sidebar flex min-h-0 w-[var(--panel-docs-library-width)] max-w-[var(--panel-docs-library-width)] shrink-0 flex-col">
     <div class="docs-view__sidebar-header flex min-h-12 items-center justify-between gap-2 border-b px-3 py-2 pl-[0.9rem]">
       <template v-if="isSelectionMode">
-        <span class="docs-view__sidebar-selection-count min-w-0 whitespace-nowrap text-sm font-medium text-main">已选 {{ selectedCount }} 项</span>
+        <span class="docs-view__sidebar-selection-count min-w-0 whitespace-nowrap text-sm font-medium text-main">{{ t('docs.common.selectedCount', { count: selectedCount }) }}</span>
         <div class="flex shrink-0 items-center gap-1">
           <ElButton
             text
@@ -52,7 +54,7 @@ function openDocsControlCenter() {
             :loading="isBatchDeleting"
             @click="confirmBatchDelete"
           >
-            删除
+            {{ t('docs.common.delete') }}
           </ElButton>
           <ElButton
             text
@@ -61,19 +63,19 @@ function openDocsControlCenter() {
             :disabled="isBatchDeleting"
             @click="exitSelectionMode"
           >
-            取消
+            {{ t('docs.common.cancel') }}
           </ElButton>
         </div>
       </template>
 
       <template v-else>
-        <span class="docs-view__sidebar-header-title min-w-0 whitespace-nowrap text-sm font-medium text-main">文档库</span>
+        <span class="docs-view__sidebar-header-title min-w-0 whitespace-nowrap text-sm font-medium text-main">{{ t('docs.common.documentLibrary') }}</span>
         <div class="flex shrink-0 items-center gap-1">
           <ElButton
             text
             size="small"
             class="docs-view__sidebar-header-icon-btn h-8 min-w-8 w-8 rounded-lg p-0 text-secondary"
-            title="文档控制台"
+            :title="t('docs.common.documentConsole')"
             @click="openDocsControlCenter"
           >
             <SvgIcon category="ui" icon="settings-gear" size="0.95rem" />
@@ -82,7 +84,7 @@ function openDocsControlCenter() {
             text
             size="small"
             class="docs-view__sidebar-header-icon-btn h-8 min-w-8 w-8 rounded-lg p-0 text-secondary"
-            title="多选"
+            :title="t('docs.common.multiSelect')"
             @click="enterSelectionMode"
           >
             <SvgIcon category="ui" icon="select-multiple" size="0.95rem" />
@@ -91,7 +93,7 @@ function openDocsControlCenter() {
             text
             size="small"
             class="docs-view__sidebar-header-icon-btn h-8 min-w-8 w-8 rounded-lg p-0 text-secondary"
-            title="收起文档库"
+            :title="t('docs.common.collapseDocumentLibrary')"
             @click="collapseDocumentLibrary"
           >
             <SvgIcon category="ui" icon="pin-off" size="0.95rem" />
@@ -103,7 +105,7 @@ function openDocsControlCenter() {
     <ElScrollbar class="docs-view__sidebar-scroll flex-1 min-h-0" always>
       <div class="docs-view__sidebar-scroll-content flex min-h-full flex-col pb-4 pt-2">
         <div v-if="isDocumentLoading" class="px-3 py-4 text-sm text-secondary">
-          正在加载文档树...
+          {{ t('docs.common.loadingDocumentTree') }}
         </div>
 
         <div
@@ -111,7 +113,7 @@ function openDocsControlCenter() {
           class="docs-view__tree-sections flex min-h-0 flex-auto flex-col"
           :class="{ 'flex-1': isSingleTreeGroup }"
           role="tree"
-          aria-label="文档树"
+          :aria-label="t('docs.common.documentTree')"
         >
           <DocumentSectionPanel
             v-for="group in visibleTreeGroups"

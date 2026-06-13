@@ -1,5 +1,6 @@
 import type { Dayjs } from 'dayjs'
 import type { ChatSessionSummary } from '@/apis/chat'
+import { translate } from '@/i18n'
 import dayjs from '@/utils/dayjs'
 
 export const DOCS_CHAT_HISTORY_LIMIT = 20
@@ -28,27 +29,27 @@ export function buildDocsChatHistoryGroups(
   const groups: DocsChatHistoryGroup[] = [
     {
       id: 'today',
-      label: '今天',
+      label: translate('docs.history.today'),
       sessions: [],
     },
     {
       id: 'yesterday',
-      label: '昨天',
+      label: translate('docs.history.yesterday'),
       sessions: [],
     },
     {
       id: 'last-7-days',
-      label: '过去 7 天',
+      label: translate('docs.chat.last7Days'),
       sessions: [],
     },
     {
       id: 'last-30-days',
-      label: '过去 30 天',
+      label: translate('docs.chat.last30Days'),
       sessions: [],
     },
     {
       id: 'older',
-      label: '更早',
+      label: translate('docs.chat.older'),
       sessions: [],
     },
   ]

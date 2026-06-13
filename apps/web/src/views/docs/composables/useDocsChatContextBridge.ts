@@ -17,6 +17,7 @@ import {
   onScopeDispose,
   watch,
 } from 'vue'
+import { translate } from '@/i18n'
 import { createDocsSelectionSnapshot, mapDocsSelectionLiveRange } from '../utils/docsSelectionContext'
 import { useActiveDocument } from './useActiveDocument'
 import { useDocsChatPanel } from './useDocsChatPanel'
@@ -367,7 +368,7 @@ function isTextSelection(selection: unknown): selection is TextSelection {
 }
 
 function resolveDocumentTitle(document: DocsSelectionContextDocument) {
-  return getDocumentTitlePlainText(document.title) || '未命名文档'
+  return getDocumentTitlePlainText(document.title) || translate('docs.common.noTitle')
 }
 
 function collapseEditorSelection(editor: Editor, position: number) {

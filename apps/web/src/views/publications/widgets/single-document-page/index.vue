@@ -1,14 +1,16 @@
 <script setup lang="ts">
 import type { PublicationSingleDocumentPageProps } from './typing'
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { SvgIcon } from '@/components/svg-icon'
 import dayjs from '@/utils/dayjs'
 import PublicationDocumentContent from '../../components/document-content'
 
 const props = defineProps<PublicationSingleDocumentPageProps>()
-const ownerName = computed(() => props.document.owner?.displayName || '用户')
-const documentTitle = computed(() => props.document.title || '未命名')
-const updatedAtText = computed(() => dayjs(props.document.updatedAt).format('YYYY年MM月DD日'))
+const { t } = useI18n()
+const ownerName = computed(() => props.document.owner?.displayName || t('docs.publicReader.ownerFallback'))
+const documentTitle = computed(() => props.document.title || t('docs.common.noTitle'))
+const updatedAtText = computed(() => dayjs(props.document.updatedAt).format(t('docs.publicReader.updatedAtDate')))
 </script>
 
 <template>
@@ -22,14 +24,14 @@ const updatedAtText = computed(() => dayjs(props.document.updatedAt).format('YYY
         </div>
 
         <p class="publication-single-document-page__time">
-          最近修改：{{ updatedAtText }}
+          {{ t('docs.publicReader.modifiedAt', { date: updatedAtText }) }}
         </p>
       </div>
 
       <p class="publication-single-document-page__auth-hint">
-        立即<RouterLink :to="{ name: 'login' }" class="publication-single-document-page__auth-link">
-          注册或登录
-        </RouterLink>，开始你的文档之旅吧~
+        <RouterLink :to="{ name: 'login' }" class="publication-single-document-page__auth-link">
+          {{ t('docs.publicReader.authCtaBefore') }}
+        </RouterLink>{{ t('docs.publicReader.authCtaAfter') }}
       </p>
     </header>
 

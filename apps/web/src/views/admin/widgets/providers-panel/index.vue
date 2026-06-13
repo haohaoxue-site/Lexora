@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
 import AiProviderConsole from '@/components/ai-provider-console'
 import PagePanel from '@/layouts/panels/page-panel'
 import AdminPageHeader from '../../components/page-header'
@@ -14,18 +15,19 @@ const {
   openPlatformModelSettings,
   updatePlatformEmbeddingModel,
 } = useAdminPlatformEmbeddingModel()
+const { t } = useI18n({ useScope: 'global' })
 </script>
 
 <template>
   <PagePanel>
     <template #header>
       <div class="admin-providers-page__header flex min-w-0 flex-1 items-center justify-between gap-3">
-        <AdminPageHeader title="服务商" />
-        <ElTooltip content="平台模型配置" placement="bottom" effect="dark" :show-after="300">
+        <AdminPageHeader :title="t('admin.pages.providers')" />
+        <ElTooltip :content="t('admin.platformModel.title')" placement="bottom" effect="dark" :show-after="300">
           <ElButton
             text
             class="admin-providers-page__settings-button h-8 min-w-8 w-8 p-0"
-            aria-label="平台模型配置"
+            :aria-label="t('admin.platformModel.title')"
             @click="openPlatformModelSettings"
           >
             <SvgIcon category="ui" icon="settings-gear" size="1rem" />

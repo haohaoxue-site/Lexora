@@ -10,6 +10,7 @@ import {
   hydrateDocumentAssetAttributes,
 } from '@haohaoxue/samepage-shared/document'
 import { computed, shallowRef, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 import {
   getPublicationSiteRender,
@@ -28,6 +29,7 @@ import PublicationSingleDocumentPage from '../single-document-page'
 import PublicationSiteDocumentPage from '../site-document-page'
 
 const route = useRoute()
+const { t } = useI18n()
 const isLoading = shallowRef(true)
 const errorMessage = shallowRef('')
 const singleDocument = shallowRef<PublicationRenderedDocument | null>(null)
@@ -57,13 +59,13 @@ const activeDocument = computed(() => publicationMode.value === 'single'
 )
 const pageTitle = computed(() => {
   if (publicationMode.value === 'single') {
-    return singleDocument.value?.title || '公开文档'
+    return singleDocument.value?.title || t('docs.publicReader.defaultTitle')
   }
 
   const site = siteRender.value?.site
 
   if (!site) {
-    return '公开文档'
+    return t('docs.publicReader.defaultTitle')
   }
 
   return siteRender.value?.currentPage
@@ -108,7 +110,7 @@ async function loadPublication() {
     singleDocument.value = null
     siteRender.value = null
     hydratedBody.value = []
-    errorMessage.value = error instanceof Error ? error.message : '公开文档不存在或已下架'
+    errorMessage.value = error instanceof Error ? error.message : t('docs.publicReader.loadDocumentFailed')
   }
   finally {
     if (currentToken === loadToken) {
@@ -119,7 +121,7 @@ async function loadPublication() {
 
 async function loadSinglePublication(currentToken: number) {
   if (!singleDocumentId.value) {
-    throw new Error('公开文档不存在或已下架')
+    throw new Error(t('docs.publicReader.loadDocumentFailed'))
   }
 
   const response = await getSinglePublicDocument(singleDocumentId.value)
@@ -136,7 +138,7 @@ async function loadSinglePublication(currentToken: number) {
 
 async function loadSitePublication(currentToken: number) {
   if (!siteId.value) {
-    throw new Error('公开站点不存在或已下架')
+    throw new Error(t('docs.publicReader.loadSiteFailed'))
   }
 
   const response = await getPublicationSiteRender(siteId.value, siteDocumentId.value)
@@ -206,7 +208,7 @@ async function hydrateSitePublicationBody(
     <ElResult
       v-else-if="errorMessage"
       icon="warning"
-      title="无法查看文档"
+      :title="t('docs.publicReader.unavailableTitle')"
       :sub-title="errorMessage"
       class="publication-view__result mx-auto mt-16 w-[min(52rem,calc(100%-2rem))]"
     />

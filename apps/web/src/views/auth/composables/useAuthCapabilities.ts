@@ -1,9 +1,11 @@
 import type { AuthCapabilities } from '@/apis/capabilities'
 import { computed, shallowRef } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { getAuthCapabilities } from '@/apis/capabilities'
 import { getRequestErrorDisplayMessage } from '@/utils/request-error'
 
 export function useAuthCapabilities() {
+  const { t } = useI18n({ useScope: 'global' })
   const authCapabilities = shallowRef<AuthCapabilities | null>(null)
   const loadErrorMessage = shallowRef('')
   const isLoadingCapabilities = shallowRef(true)
@@ -20,7 +22,7 @@ export function useAuthCapabilities() {
       authCapabilities.value = await getAuthCapabilities()
     }
     catch (error) {
-      loadErrorMessage.value = getRequestErrorDisplayMessage(error, '加载可用登录方式失败')
+      loadErrorMessage.value = getRequestErrorDisplayMessage(error, t('auth.capabilities.loadFailed'))
     }
     finally {
       isLoadingCapabilities.value = false

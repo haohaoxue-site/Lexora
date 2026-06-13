@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
 import PagePanel from '@/layouts/panels/page-panel'
 import AuditTable from '../../components/audit-table'
 import AdminPageHeader from '../../components/page-header'
@@ -13,12 +14,13 @@ const {
   updatePageNo,
   updatePageSize,
 } = useAdminAudit()
+const { t } = useI18n({ useScope: 'global' })
 </script>
 
 <template>
   <PagePanel>
     <template #header>
-      <AdminPageHeader title="审计" />
+      <AdminPageHeader :title="t('admin.pages.audit')" />
     </template>
 
     <div class="admin-audit h-full min-h-0 flex bg-fill-lighter p-4 lg:p-6">

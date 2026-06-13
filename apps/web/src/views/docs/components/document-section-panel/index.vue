@@ -9,6 +9,7 @@ import type {
 import { DOCUMENT_COLLECTION } from '@haohaoxue/samepage-contracts/document/constants'
 import { useElementSize } from '@vueuse/core'
 import { computed, nextTick, shallowRef, useTemplateRef, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useDocsContext } from '../../composables/useDocsContext'
 import { useDocumentSectionPanel } from '../../composables/useDocumentSectionPanel'
 import { countDocumentItems, findDocumentItemPath, isOwnedDocumentCollection } from '../../utils/documentTree'
@@ -18,6 +19,7 @@ import DocumentToolbar from '../document-toolbar'
 const props = defineProps<DocumentSectionPanelProps>()
 const emit = defineEmits<DocumentSectionPanelEmits>()
 defineSlots<DocumentSectionPanelSlots>()
+const { t } = useI18n()
 const DOCUMENT_TREE_ITEM_SIZE = 36
 const DOCUMENT_TREE_MAX_HEIGHT = 420
 
@@ -31,7 +33,9 @@ const { height: treeBodyHeight } = useElementSize(treeBodyRef)
 const isOwnedCollection = computed(() => isOwnedDocumentCollection(props.group.id))
 const canCreateRoot = computed(() => isOwnedCollection.value && !props.selectionMode)
 const emptyDescription = computed(() =>
-  props.group.id === DOCUMENT_COLLECTION.COLLABORATION ? '暂无协作文档' : '暂无文档',
+  props.group.id === DOCUMENT_COLLECTION.COLLABORATION
+    ? t('docs.treeMenu.emptyCollaboration')
+    : t('docs.treeMenu.emptyDocuments'),
 )
 const treeProps = {
   value: 'id',

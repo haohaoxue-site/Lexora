@@ -3,10 +3,12 @@ import type {
   CollaborationPasswordEditDialogEmits,
   CollaborationPasswordEditDialogProps,
 } from './typing'
+import { useI18n } from 'vue-i18n'
 
 const props = defineProps<CollaborationPasswordEditDialogProps>()
 const emits = defineEmits<CollaborationPasswordEditDialogEmits>()
 const password = defineModel<string>('password', { required: true })
+const { t } = useI18n()
 </script>
 
 <template>
@@ -21,7 +23,7 @@ const password = defineModel<string>('password', { required: true })
   >
     <template #header>
       <div class="flex items-center">
-        <span class="text-[1.05rem] font-bold leading-[1.4] text-main">修改链接密码</span>
+        <span class="text-[1.05rem] font-bold leading-[1.4] text-main">{{ t('docs.collaboration.editLinkPassword') }}</span>
       </div>
     </template>
 
@@ -30,7 +32,7 @@ const password = defineModel<string>('password', { required: true })
         <ElInput
           v-model="password"
           class="min-w-[16rem] flex-1"
-          placeholder="请输入新密码"
+          :placeholder="t('docs.collaboration.passwordPlaceholder')"
           inputmode="numeric"
           :maxlength="props.passwordLength"
           clearable
@@ -38,7 +40,7 @@ const password = defineModel<string>('password', { required: true })
         />
         <ElButton size="default" @click="emits('generate')">
           <SvgIcon category="ui" icon="sync-refresh" size="1rem" />
-          随机生成
+          {{ t('docs.collaboration.generatePassword') }}
         </ElButton>
       </div>
 
@@ -57,7 +59,7 @@ const password = defineModel<string>('password', { required: true })
       </div>
 
       <p class="m-0 text-[0.88rem] leading-[1.65] text-secondary">
-        安全提示：请勿使用个人常用或其他平台中的密码
+        {{ t('docs.collaboration.passwordSecurityHint') }}
       </p>
     </div>
 
@@ -68,7 +70,7 @@ const password = defineModel<string>('password', { required: true })
           class="min-w-20"
           @click="emits('update:modelValue', false)"
         >
-          取消
+          {{ t('docs.common.cancel') }}
         </ElButton>
         <ElButton
           type="primary"
@@ -78,7 +80,7 @@ const password = defineModel<string>('password', { required: true })
           :disabled="!props.canSave"
           @click="emits('submit')"
         >
-          保存
+          {{ t('docs.common.save') }}
         </ElButton>
       </div>
     </template>

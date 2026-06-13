@@ -1,8 +1,10 @@
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
 import { useCallback } from '../../composables/useCallback'
 import AuthEntryShell from '../../layouts/entry-shell'
 
 const { statusLabel, errorMessage, pageDescription } = useCallback()
+const { t } = useI18n({ useScope: 'global' })
 </script>
 
 <template>
@@ -27,9 +29,9 @@ const { statusLabel, errorMessage, pageDescription } = useCallback()
 
     <template #footer>
       <RouterLink v-if="errorMessage" :to="{ name: 'login' }" class="auth-callback__back-link text-primary font-semibold no-underline">
-        返回登录
+        {{ t('auth.common.returnLogin') }}
       </RouterLink>
-      <span v-else class="auth-callback__hint text-sm text-secondary">请不要关闭当前页面。</span>
+      <span v-else class="auth-callback__hint text-sm text-secondary">{{ t('auth.callback.keepOpen') }}</span>
     </template>
   </AuthEntryShell>
 </template>

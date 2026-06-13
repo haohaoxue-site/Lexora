@@ -4,6 +4,7 @@ import {
   DOCUMENT_SITE_PUBLICATION_ROUTE_PREFIX,
 } from '@haohaoxue/samepage-contracts/document/publication/constants'
 import { computed, onBeforeUnmount, onMounted, shallowRef, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { getPublicationSiteManagement } from '@/apis/document-publication'
 import { useWorkspaceStore } from '@/stores/workspace'
 import DocumentHeaderActions from '../../components/document-header-actions'
@@ -19,6 +20,7 @@ const {
   collaborationStatusTone,
   reconnectCollaboration,
 } = useActiveDocument()
+const { t } = useI18n()
 const workspaceStore = useWorkspaceStore()
 const { currentSurface, isDocumentSurface, visibleBreadcrumbLabels } = useDocsSurfaceState()
 const { activeTab } = useDocsControlCenterTabs()
@@ -49,7 +51,9 @@ const publicationSiteUrl = computed(() => publicationSiteState.value
 )
 const canOpenPublicationSite = computed(() => Boolean(publicationSiteUrl.value && publicationSiteState.value?.active))
 const publicationSiteActionLabel = computed(() =>
-  publicationSiteState.value && !publicationSiteState.value.active ? '站点已关闭' : '查看站点',
+  publicationSiteState.value && !publicationSiteState.value.active
+    ? t('docs.publication.siteClosed')
+    : t('docs.common.viewSite'),
 )
 
 watch(

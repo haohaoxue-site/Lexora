@@ -4,18 +4,72 @@ import type {
   AiProviderModelCapabilityDialogEmits,
   AiProviderModelCapabilityDialogProps,
 } from './typing'
-import { useTemplateRef } from 'vue'
 import {
-  AI_MODEL_CAPABILITY_OPTIONS,
-  AI_MODEL_MODALITY_OPTIONS,
-  AI_MODEL_TYPE_OPTIONS,
-} from '../../utils/modelDisplay'
+  AI_MODEL_CAPABILITY,
+  AI_MODEL_CAPABILITY_VALUES,
+  AI_MODEL_MODALITY,
+  AI_MODEL_MODALITY_VALUES,
+  AI_MODEL_TYPE,
+  AI_MODEL_TYPE_VALUES,
+} from '@haohaoxue/samepage-contracts/ai/constants'
+import { computed, useTemplateRef } from 'vue'
+import { useI18n } from 'vue-i18n'
 
 defineProps<AiProviderModelCapabilityDialogProps>()
 
 const emit = defineEmits<AiProviderModelCapabilityDialogEmits>()
 const visible = defineModel<boolean>('visible', { required: true })
 const formRef = useTemplateRef<FormInstance>('formRef')
+const { t } = useI18n({ useScope: 'global' })
+const modelTypeOptions = computed(() => AI_MODEL_TYPE_VALUES.map(value => ({
+  label: getModelTypeLabel(value),
+  value,
+})))
+const modelModalityOptions = computed(() => AI_MODEL_MODALITY_VALUES.map(value => ({
+  label: getModelModalityLabel(value),
+  value,
+})))
+const modelCapabilityOptions = computed(() => AI_MODEL_CAPABILITY_VALUES.map(value => ({
+  label: getModelCapabilityLabel(value),
+  value,
+})))
+
+function getModelTypeLabel(value: typeof AI_MODEL_TYPE_VALUES[number]) {
+  const keyMap = {
+    [AI_MODEL_TYPE.CHAT]: 'aiProvider.modelType.chat',
+    [AI_MODEL_TYPE.EMBEDDING]: 'aiProvider.modelType.embedding',
+    [AI_MODEL_TYPE.RERANK]: 'aiProvider.modelType.rerank',
+    [AI_MODEL_TYPE.IMAGE]: 'aiProvider.modelType.image',
+    [AI_MODEL_TYPE.AUDIO]: 'aiProvider.modelType.audio',
+  } as const
+
+  return t(keyMap[value])
+}
+
+function getModelModalityLabel(value: typeof AI_MODEL_MODALITY_VALUES[number]) {
+  const keyMap = {
+    [AI_MODEL_MODALITY.TEXT]: 'aiProvider.modality.text',
+    [AI_MODEL_MODALITY.IMAGE]: 'aiProvider.modality.image',
+    [AI_MODEL_MODALITY.AUDIO]: 'aiProvider.modality.audio',
+    [AI_MODEL_MODALITY.VIDEO]: 'aiProvider.modality.video',
+    [AI_MODEL_MODALITY.FILE]: 'aiProvider.modality.file',
+    [AI_MODEL_MODALITY.EMBEDDING]: 'aiProvider.modality.embedding',
+  } as const
+
+  return t(keyMap[value])
+}
+
+function getModelCapabilityLabel(value: typeof AI_MODEL_CAPABILITY_VALUES[number]) {
+  const keyMap = {
+    [AI_MODEL_CAPABILITY.STREAMING]: 'aiProvider.capability.streaming',
+    [AI_MODEL_CAPABILITY.TOOL_CALL]: 'aiProvider.capability.toolCall',
+    [AI_MODEL_CAPABILITY.REASONING]: 'aiProvider.capability.reasoning',
+    [AI_MODEL_CAPABILITY.JSON_MODE]: 'aiProvider.capability.jsonMode',
+    [AI_MODEL_CAPABILITY.STRUCTURED_OUTPUT]: 'aiProvider.capability.structuredOutput',
+  } as const
+
+  return t(keyMap[value])
+}
 
 async function handleSubmit() {
   const isValid = await formRef.value?.validate().catch(() => false)
@@ -28,7 +82,7 @@ async function handleSubmit() {
 <template>
   <ElDialog
     v-model="visible"
-    title="配置模型能力"
+    :title="t('aiProvider.dialog.modelCapabilityTitle')"
     width="46rem"
     class="ai-provider-console__model-capability-dialog"
   >
@@ -39,26 +93,26 @@ async function handleSubmit() {
       label-width="7.5rem"
       class="ai-provider-console__model-capability-form"
     >
-      <ElFormItem label="模型 ID" prop="modelId" required>
+      <ElFormItem :label="t('aiProvider.model.modelId')" prop="modelId" required>
         <ElInput v-model="form.modelId" disabled />
       </ElFormItem>
-      <ElFormItem label="模型名称" prop="modelName">
+      <ElFormItem :label="t('aiProvider.model.modelName')" prop="modelName">
         <ElInput v-model="form.modelName" />
       </ElFormItem>
-      <ElFormItem label="模型用途" prop="modelType">
+      <ElFormItem :label="t('aiProvider.model.type')" prop="modelType">
         <ElSelect v-model="form.modelType" class="w-full">
           <ElOption
-            v-for="option in AI_MODEL_TYPE_OPTIONS"
+            v-for="option in modelTypeOptions"
             :key="option.value"
             :label="option.label"
             :value="option.value"
           />
         </ElSelect>
       </ElFormItem>
-      <ElFormItem label="输入模态" prop="inputModalities">
+      <ElFormItem :label="t('aiProvider.model.inputModalities')" prop="inputModalities">
         <ElCheckboxGroup v-model="form.inputModalities" class="ai-provider-console__checkbox-grid">
           <ElCheckbox
-            v-for="option in AI_MODEL_MODALITY_OPTIONS"
+            v-for="option in modelModalityOptions"
             :key="option.value"
             :value="option.value"
           >
@@ -66,10 +120,10 @@ async function handleSubmit() {
           </ElCheckbox>
         </ElCheckboxGroup>
       </ElFormItem>
-      <ElFormItem label="输出模态" prop="outputModalities">
+      <ElFormItem :label="t('aiProvider.model.outputModalities')" prop="outputModalities">
         <ElCheckboxGroup v-model="form.outputModalities" class="ai-provider-console__checkbox-grid">
           <ElCheckbox
-            v-for="option in AI_MODEL_MODALITY_OPTIONS"
+            v-for="option in modelModalityOptions"
             :key="option.value"
             :value="option.value"
           >
@@ -77,10 +131,10 @@ async function handleSubmit() {
           </ElCheckbox>
         </ElCheckboxGroup>
       </ElFormItem>
-      <ElFormItem label="模型能力" prop="capabilities">
+      <ElFormItem :label="t('aiProvider.model.capabilities')" prop="capabilities">
         <ElCheckboxGroup v-model="form.capabilities" class="ai-provider-console__checkbox-grid">
           <ElCheckbox
-            v-for="option in AI_MODEL_CAPABILITY_OPTIONS"
+            v-for="option in modelCapabilityOptions"
             :key="option.value"
             :value="option.value"
           >
@@ -89,24 +143,24 @@ async function handleSubmit() {
         </ElCheckboxGroup>
       </ElFormItem>
       <div class="ai-provider-console__model-limit-grid">
-        <ElFormItem label="上下文窗口" prop="contextWindow">
+        <ElFormItem :label="t('aiProvider.model.contextWindow')" prop="contextWindow">
           <ElInputNumber
             v-model="form.contextWindow"
             :min="1"
             :precision="0"
             controls-position="right"
             class="w-full"
-            placeholder="未配置"
+            :placeholder="t('aiProvider.model.unconfigured')"
           />
         </ElFormItem>
-        <ElFormItem label="最大输出" prop="maxOutputTokens">
+        <ElFormItem :label="t('aiProvider.model.maxOutput')" prop="maxOutputTokens">
           <ElInputNumber
             v-model="form.maxOutputTokens"
             :min="1"
             :precision="0"
             controls-position="right"
             class="w-full"
-            placeholder="未配置"
+            :placeholder="t('aiProvider.model.unconfigured')"
           />
         </ElFormItem>
       </div>
@@ -114,10 +168,10 @@ async function handleSubmit() {
 
     <template #footer>
       <ElButton @click="visible = false">
-        取消
+        {{ t('aiProvider.common.cancel') }}
       </ElButton>
       <ElButton type="primary" :loading="loading" @click="handleSubmit">
-        保存配置
+        {{ t('aiProvider.common.saveConfig') }}
       </ElButton>
     </template>
   </ElDialog>

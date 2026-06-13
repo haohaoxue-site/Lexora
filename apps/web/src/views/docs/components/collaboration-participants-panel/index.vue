@@ -10,6 +10,7 @@ import type {
 import {
   DOCUMENT_COLLABORATION_COLLABORATOR_SOURCE,
 } from '@haohaoxue/samepage-contracts/document/collaboration/constants'
+import { useI18n } from 'vue-i18n'
 import {
   formatCollaborationIdentity,
   formatCollaborationPermission,
@@ -21,6 +22,7 @@ import {
 
 const props = defineProps<CollaborationParticipantsPanelProps>()
 const emits = defineEmits<CollaborationParticipantsPanelEmits>()
+const { t } = useI18n()
 
 function getParticipantRowKey(row: CollaborationParticipantRow) {
   return row.id
@@ -50,17 +52,19 @@ function canInheritCollaborator(row: DocumentCollaborationCollaborator) {
 
 function formatInheritMenuLabel(row: DocumentCollaborationCollaborator) {
   if (!row.inheritedFrom) {
-    return '继承父级'
+    return t('docs.collaboration.inheritParent')
   }
 
-  return `继承父级（${formatCollaborationPermission(row.inheritedFrom.permission)}）`
+  return t('docs.collaboration.inheritParentWithPermission', {
+    permission: formatCollaborationPermission(row.inheritedFrom.permission),
+  })
 }
 </script>
 
 <template>
   <section class="collaboration-participants-panel grid content-start gap-3">
     <p class="collaboration-participants-panel__description m-0 text-[0.9rem] leading-[1.5] text-secondary">
-      所有可访问此文档的用户
+      {{ t('docs.collaboration.allUsers') }}
     </p>
 
     <ElTable
@@ -69,7 +73,7 @@ function formatInheritMenuLabel(row: DocumentCollaborationCollaborator) {
       :show-header="false"
       :max-height="272"
       class="collaboration-participants-panel__table min-h-36"
-      empty-text="暂无协作者"
+      :empty-text="t('docs.collaboration.noCollaborators')"
     >
       <ElTableColumn min-width="290">
         <template #default="{ row }">
@@ -89,11 +93,11 @@ function formatInheritMenuLabel(row: DocumentCollaborationCollaborator) {
                   {{ getCollaborationIdentityName(row.owner) }}
                 </span>
                 <ElTag size="small" type="primary" effect="plain">
-                  所有者
+                  {{ t('docs.collaboration.owner') }}
                 </ElTag>
               </div>
               <div class="overflow-hidden text-xs leading-[1.4] text-secondary text-ellipsis whitespace-nowrap">
-                拥有完整管理权限
+                {{ t('docs.collaboration.ownerDescription') }}
               </div>
             </div>
           </div>
@@ -150,17 +154,17 @@ function formatInheritMenuLabel(row: DocumentCollaborationCollaborator) {
                     {{ formatInheritMenuLabel(row.collaborator) }}
                   </ElDropdownItem>
                   <ElDropdownItem command="edit">
-                    可编辑
+                    {{ t('docs.collaboration.canEdit') }}
                   </ElDropdownItem>
                   <ElDropdownItem command="read">
-                    可阅读
+                    {{ t('docs.collaboration.canRead') }}
                   </ElDropdownItem>
                   <ElDropdownItem
                     command="remove"
                     divided
                     :disabled="!canRemoveCollaborator(row.collaborator)"
                   >
-                    移除
+                    {{ t('docs.collaboration.remove') }}
                   </ElDropdownItem>
                 </ElDropdownMenu>
               </template>

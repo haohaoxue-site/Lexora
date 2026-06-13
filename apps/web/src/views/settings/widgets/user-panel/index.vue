@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { UserAccountSectionExposed } from './typing'
 import { nextTick, onMounted, shallowRef, useTemplateRef } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useUserStore } from '@/stores/user'
 import { getRequestErrorDisplayMessage } from '@/utils/request-error'
 import BotsSection from '../../components/bots-section'
@@ -15,6 +16,7 @@ import { useSettingsWeixinBot } from '../../composables/useSettingsWeixinBot'
 
 const userStore = useUserStore()
 const userAccountSectionRef = useTemplateRef<UserAccountSectionExposed>('userAccountSectionRef')
+const { t } = useI18n({ useScope: 'global' })
 
 const { loadAuthCapabilities } = useSettingsAuthCapabilities()
 const {
@@ -93,7 +95,7 @@ async function loadView() {
     await consumeRouteFeedback()
   }
   catch (error) {
-    errorMessage.value = getRequestErrorDisplayMessage(error, '加载用户设置失败')
+    errorMessage.value = getRequestErrorDisplayMessage(error, t('settings.user.loadFailed'))
   }
   finally {
     isLoading.value = false

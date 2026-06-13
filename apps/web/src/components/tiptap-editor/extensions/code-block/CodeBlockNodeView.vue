@@ -7,6 +7,7 @@ import {
 import { NodeViewContent, nodeViewProps, NodeViewWrapper } from '@tiptap/vue-3'
 import { useClipboard } from '@vueuse/core'
 import { computed, nextTick, shallowRef, useTemplateRef, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import CopyStateIcon from '@/components/copy-state-icon/CopyStateIcon.vue'
 import { ElMessage } from '@/utils/element-plus'
 import TiptapIcon from '../../icons/TiptapIcon.vue'
@@ -18,9 +19,8 @@ import { ensureCodeBlockLanguageAndRefresh } from './lowlight'
 import { useCodeBlockLineNumbers } from './useCodeBlockLineNumbers'
 
 const props = defineProps(nodeViewProps)
+const { t } = useI18n()
 
-const CODE_BLOCK_DEFAULT_TITLE = '代码块'
-const CODE_BLOCK_TITLE_PLACEHOLDER = '请输入代码块名称'
 const CODE_BLOCK_TAB_SIZE_OPTIONS = TIPTAP_CODE_BLOCK_TAB_SIZES.map(size => ({
   label: size,
   value: size,
@@ -58,7 +58,7 @@ watch(
   },
 )
 const codeBlockName = computed(() => normalizeCodeBlockName(props.node.attrs.name))
-const displayTitle = computed(() => codeBlockName.value ?? CODE_BLOCK_DEFAULT_TITLE)
+const displayTitle = computed(() => codeBlockName.value ?? t('editor.codeBlock.defaultTitle'))
 const isCollapsed = computed(() => readonlyCollapsed.value ?? props.node.attrs.collapsed === true)
 const collapseIcon = computed(() => isCollapsed.value ? 'chevron-right' : 'chevron-down')
 const tabSize = computed(() => normalizeCodeBlockTabSize(props.node.attrs.tabSize))
@@ -214,7 +214,7 @@ function selectLanguage(language: CodeBlockLanguage) {
 
 async function copyCode() {
   if (!isClipboardSupported.value) {
-    ElMessage.error('当前浏览器不支持复制')
+    ElMessage.error(t('editor.codeBlock.copiedUnsupported'))
     return
   }
 
@@ -222,7 +222,7 @@ async function copyCode() {
     await copyCodeText(props.node.textContent)
   }
   catch {
-    ElMessage.error('复制失败')
+    ElMessage.error(t('editor.common.copyFailed'))
   }
 }
 
@@ -273,7 +273,7 @@ function updateTabSize(value: string | number | boolean | undefined) {
 }
 
 function showFormatPlaceholder() {
-  ElMessage.info('格式化能力稍后支持')
+  ElMessage.info(t('editor.codeBlock.formatComingSoon'))
   morePopoverVisible.value = false
 }
 </script>
@@ -296,7 +296,7 @@ function showFormatPlaceholder() {
         <button
           class="tiptap-code-block__collapse-btn"
           type="button"
-          :aria-label="isCollapsed ? '展开代码块' : '折叠代码块'"
+          :aria-label="isCollapsed ? t('editor.codeBlock.expand') : t('editor.codeBlock.collapse')"
           @click="toggleCollapsed"
           @mousedown.prevent
         >
@@ -309,7 +309,7 @@ function showFormatPlaceholder() {
           v-model="titleDraft"
           class="tiptap-code-block__title-input"
           type="text"
-          :placeholder="CODE_BLOCK_TITLE_PLACEHOLDER"
+          :placeholder="t('editor.codeBlock.titlePlaceholder')"
           @blur="commitTitle"
           @click.stop
           @keydown.stop="handleTitleKeydown"
@@ -345,7 +345,7 @@ function showFormatPlaceholder() {
 
           <span class="tiptap-code-block__divider" />
 
-          <ElTooltip content="复制代码" placement="top">
+          <ElTooltip :content="t('editor.common.copy')" placement="top">
             <button class="tiptap-code-block__icon-btn" type="button" @click="copyCode" @mousedown.prevent>
               <CopyStateIcon :copied="copied" />
             </button>
@@ -372,7 +372,7 @@ function showFormatPlaceholder() {
             <div class="tiptap-code-block-language-panel">
               <ElInput
                 v-model="languageQuery"
-                placeholder="搜索语言..."
+                :placeholder="t('editor.codeBlock.searchLanguage')"
                 size="small"
                 clearable
               />
@@ -399,7 +399,7 @@ function showFormatPlaceholder() {
 
           <span class="tiptap-code-block__divider" />
 
-          <ElTooltip content="复制代码" placement="top">
+          <ElTooltip :content="t('editor.common.copy')" placement="top">
             <button class="tiptap-code-block__icon-btn" type="button" @click="copyCode" @mousedown.prevent>
               <CopyStateIcon :copied="copied" />
             </button>
@@ -430,7 +430,7 @@ function showFormatPlaceholder() {
                 @keydown.enter.prevent="toggleLineNumbers"
                 @keydown.space.prevent="toggleLineNumbers"
               >
-                <span>行号</span>
+                <span>{{ t('editor.codeBlock.lineNumbers') }}</span>
                 <ElSwitch
                   :model-value="showLineNumbers"
                   size="small"
@@ -449,7 +449,7 @@ function showFormatPlaceholder() {
                 @keydown.enter.prevent="toggleWrapLines"
                 @keydown.space.prevent="toggleWrapLines"
               >
-                <span>自动换行</span>
+                <span>{{ t('editor.codeBlock.wrapLines') }}</span>
                 <ElSwitch
                   :model-value="wrapLines"
                   size="small"
@@ -459,8 +459,8 @@ function showFormatPlaceholder() {
                 />
               </div>
 
-              <div class="tiptap-code-block-more-panel__item tiptap-code-block-more-panel__item--select" role="group" aria-label="Tab 字符数">
-                <span>Tab字符</span>
+              <div class="tiptap-code-block-more-panel__item tiptap-code-block-more-panel__item--select" role="group" :aria-label="t('editor.codeBlock.tabSize')">
+                <span>{{ t('editor.codeBlock.tabSize') }}</span>
                 <ElSelect
                   class="tiptap-code-block-more-panel__select"
                   :model-value="tabSize"
@@ -481,7 +481,7 @@ function showFormatPlaceholder() {
               </div>
 
               <button class="tiptap-code-block-more-panel__item" type="button" @click="showFormatPlaceholder">
-                <span>格式化</span>
+                <span>{{ t('editor.codeBlock.format') }}</span>
               </button>
             </div>
           </ElPopover>

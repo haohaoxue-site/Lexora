@@ -1,4 +1,6 @@
-import type { RequestResponse } from '@haohaoxue/samepage-contracts'
+import type { ApiErrorCode, RequestResponse } from '@haohaoxue/samepage-contracts'
+import { API_ERROR_CODE } from '@haohaoxue/samepage-contracts/status-code'
+import { translate } from '@/i18n'
 
 export type RequestErrorKind = 'business' | 'http' | 'rate_limit' | 'network' | 'parse' | 'unknown'
 export type RequestErrorSource = 'axios' | 'fetch' | 'stream' | 'unknown'
@@ -7,6 +9,7 @@ export interface RequestErrorOptions {
   source?: RequestErrorSource
   status?: number
   code?: number
+  errorCode?: string
   message?: string
   data?: unknown
   bodyText?: string
@@ -27,11 +30,38 @@ type RequestErrorResolvedOptions = RequestErrorOptions & {
   source: RequestErrorSource
 }
 
+const API_ERROR_MESSAGE_KEY_BY_CODE: Partial<Record<ApiErrorCode, string>> = {
+  [API_ERROR_CODE.AUTH_ACCESS_TOKEN_EXPIRED]: 'requestError.api.authAccessTokenExpired',
+  [API_ERROR_CODE.SYSTEM_EMAIL_CONFIG_INCOMPLETE]: 'requestError.api.systemEmailConfigIncomplete',
+  [API_ERROR_CODE.SYSTEM_EMAIL_PASSWORD_MISSING]: 'requestError.api.systemEmailPasswordMissing',
+  [API_ERROR_CODE.SYSTEM_EMAIL_CONFIG_NOT_FOUND]: 'requestError.api.systemEmailConfigNotFound',
+  [API_ERROR_CODE.SYSTEM_EMAIL_DISABLED]: 'requestError.api.systemEmailDisabled',
+  [API_ERROR_CODE.EMAIL_BINDING_UNAVAILABLE]: 'requestError.api.emailBindingUnavailable',
+  [API_ERROR_CODE.EMAIL_ALREADY_BOUND]: 'requestError.api.emailAlreadyBound',
+  [API_ERROR_CODE.EMAIL_ALREADY_USED]: 'requestError.api.emailAlreadyUsed',
+  [API_ERROR_CODE.EMAIL_CODE_RATE_LIMITED]: 'requestError.api.emailCodeRateLimited',
+  [API_ERROR_CODE.EMAIL_CODE_EXPIRED]: 'requestError.api.emailCodeExpired',
+  [API_ERROR_CODE.EMAIL_CODE_ATTEMPT_LIMIT_EXCEEDED]: 'requestError.api.emailCodeAttemptLimitExceeded',
+  [API_ERROR_CODE.EMAIL_CODE_INVALID]: 'requestError.api.emailCodeInvalid',
+  [API_ERROR_CODE.FIRST_EMAIL_BINDING_PASSWORD_REQUIRED]: 'requestError.api.firstEmailBindingPasswordRequired',
+  [API_ERROR_CODE.REGISTRATION_EMAIL_EXISTS]: 'requestError.api.registrationEmailExists',
+  [API_ERROR_CODE.REGISTRATION_CODE_RATE_LIMITED]: 'requestError.api.registrationCodeRateLimited',
+  [API_ERROR_CODE.DISPLAY_NAME_REQUIRED]: 'requestError.api.displayNameRequired',
+  [API_ERROR_CODE.NOTIFICATION_EMPTY_UPDATE]: 'requestError.api.notificationEmptyUpdate',
+  [API_ERROR_CODE.NOTIFICATION_PUBLISHED_LOCKED]: 'requestError.api.notificationPublishedLocked',
+  [API_ERROR_CODE.NOTIFICATION_ASSET_INVALID]: 'requestError.api.notificationAssetInvalid',
+  [API_ERROR_CODE.NOTIFICATION_IMAGE_UNSUPPORTED_TYPE]: 'requestError.api.notificationImageUnsupportedType',
+  [API_ERROR_CODE.NOTIFICATION_IMAGE_EMPTY]: 'requestError.api.notificationImageEmpty',
+  [API_ERROR_CODE.NOTIFICATION_IMAGE_TOO_LARGE]: 'requestError.api.notificationImageTooLarge',
+  [API_ERROR_CODE.NOTIFICATION_IMAGE_SIGNATURE_MISMATCH]: 'requestError.api.notificationImageSignatureMismatch',
+}
+
 export class RequestError extends Error {
   readonly kind: RequestErrorKind
   readonly source: RequestErrorSource
   readonly status?: number
   readonly code?: number
+  readonly errorCode?: string
   readonly data?: unknown
   readonly bodyText?: string
   readonly rawMessage: string
@@ -45,6 +75,7 @@ export class RequestError extends Error {
     this.source = options.source
     this.status = options.status
     this.code = options.code
+    this.errorCode = options.errorCode
     this.data = options.data
     this.bodyText = options.bodyText
     this.rawMessage = options.rawMessage
@@ -58,11 +89,13 @@ export function createRequestError(options: RequestErrorOptions = {}) {
   const source = options.source ?? 'unknown'
   const status = getNumericValue(options.status)
   const code = getNumericValue(options.code) ?? getResponseCode(options.data)
+  const errorCode = getStringValue(options.errorCode) ?? getResponseErrorCode(options.data)
   const rawMessage = resolveRawMessage(options)
   const detailMessage = sanitizeDetailMessage(rawMessage)
   const kind = resolveRequestErrorKind({
     status,
     code,
+    errorCode,
     rawMessage,
     bodyText: options.bodyText,
   })
@@ -86,6 +119,7 @@ export function createRequestErrorFromResponseEnvelope(
   return createRequestError({
     ...options,
     code: getResponseCode(envelope),
+    errorCode: getResponseErrorCode(envelope),
     data: envelope,
     bodyText: typeof envelope === 'string' ? envelope : undefined,
   })
@@ -114,6 +148,7 @@ export function toRequestError(error: unknown, options: RequestErrorOptions = {}
     const requestError = error as Error & {
       status?: unknown
       code?: unknown
+      errorCode?: unknown
       data?: unknown
       bodyText?: unknown
     }
@@ -122,6 +157,7 @@ export function toRequestError(error: unknown, options: RequestErrorOptions = {}
       ...options,
       status: getNumericValue(requestError.status) ?? options.status,
       code: getNumericValue(requestError.code) ?? options.code,
+      errorCode: getStringValue(requestError.errorCode) ?? options.errorCode,
       data: requestError.data ?? options.data,
       bodyText: typeof requestError.bodyText === 'string' ? requestError.bodyText : options.bodyText,
       message: requestError.message || options.message,
@@ -133,6 +169,7 @@ export function toRequestError(error: unknown, options: RequestErrorOptions = {}
     const requestError = error as {
       status?: unknown
       code?: unknown
+      errorCode?: unknown
       data?: unknown
       bodyText?: unknown
       message?: unknown
@@ -142,6 +179,7 @@ export function toRequestError(error: unknown, options: RequestErrorOptions = {}
       ...options,
       status: getNumericValue(requestError.status) ?? options.status,
       code: getNumericValue(requestError.code) ?? options.code,
+      errorCode: getStringValue(requestError.errorCode) ?? options.errorCode,
       data: requestError.data ?? options.data ?? error,
       bodyText: typeof requestError.bodyText === 'string' ? requestError.bodyText : options.bodyText,
       message: extractMessage(requestError.message) || options.message,
@@ -161,24 +199,29 @@ export function isRequestError(error: unknown): error is RequestError {
   return error instanceof RequestError
 }
 
-export function getRequestErrorDisplayMessage(error: unknown, fallback = '请求失败') {
+export function getRequestErrorDisplayMessage(error: unknown, fallback = translate('requestError.requestFailed')) {
   const requestError = toRequestError(error)
   const effectiveStatus = getEffectiveStatus(requestError.status, requestError.code)
+  const apiErrorMessage = getApiErrorDisplayMessage(requestError.errorCode)
+
+  if (apiErrorMessage) {
+    return apiErrorMessage
+  }
 
   switch (requestError.kind) {
     case 'business':
       return requestError.detailMessage || fallback
     case 'rate_limit':
-      return '当前请求较多，请稍后再试。'
+      return translate('requestError.rateLimit')
     case 'network':
-      return '网络异常，请稍后再试。'
+      return translate('requestError.network')
     case 'parse':
       return effectiveStatus && effectiveStatus >= 500
-        ? '服务暂时不可用，请稍后再试。'
-        : '服务响应异常，请稍后再试。'
+        ? translate('requestError.serverUnavailable')
+        : translate('requestError.invalidResponse')
     case 'http':
       return effectiveStatus && effectiveStatus >= 500
-        ? '服务暂时不可用，请稍后再试。'
+        ? translate('requestError.serverUnavailable')
         : fallback
     default:
       return requestError.detailMessage || fallback
@@ -188,6 +231,7 @@ export function getRequestErrorDisplayMessage(error: unknown, fallback = '请求
 function resolveRequestErrorKind(options: {
   status?: number
   code?: number
+  errorCode?: string
   rawMessage: string
   bodyText?: string
 }): RequestErrorKind {
@@ -318,11 +362,19 @@ function extractMessage(raw: unknown): string {
 }
 
 function getEffectiveStatus(status?: number, code?: number) {
-  if (code && code !== 200 && code !== 201) {
+  if (isHttpErrorStatus(status)) {
+    return status
+  }
+
+  if (isHttpErrorStatus(code)) {
     return code
   }
 
-  return status
+  return undefined
+}
+
+function isHttpErrorStatus(value?: number) {
+  return typeof value === 'number' && value >= 400 && value <= 599
 }
 
 function getResponseCode(data: unknown) {
@@ -333,10 +385,34 @@ function getResponseCode(data: unknown) {
   return getNumericValue((data as { code?: unknown }).code)
 }
 
+function getResponseErrorCode(data: unknown) {
+  if (!data || typeof data !== 'object') {
+    return undefined
+  }
+
+  return getStringValue((data as { errorCode?: unknown }).errorCode)
+}
+
 function getNumericValue(value: unknown) {
   return typeof value === 'number' && Number.isFinite(value)
     ? value
     : undefined
+}
+
+function getStringValue(value: unknown) {
+  return typeof value === 'string' && value.trim()
+    ? value.trim()
+    : undefined
+}
+
+function getApiErrorDisplayMessage(errorCode: string | undefined) {
+  if (!errorCode) {
+    return ''
+  }
+
+  const key = API_ERROR_MESSAGE_KEY_BY_CODE[errorCode as ApiErrorCode]
+
+  return key ? translate(key, '') : ''
 }
 
 function collapseWhitespace(message: string) {

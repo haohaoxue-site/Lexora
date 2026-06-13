@@ -2,6 +2,7 @@ import type { ChatRuntimeConfig } from '@/apis/chat'
 import { createSharedComposable } from '@vueuse/core'
 import { shallowRef } from 'vue'
 import { getChatRuntimeConfig } from '@/apis/chat'
+import { translate } from '@/i18n'
 import { ElMessage } from '@/utils/element-plus'
 import { getRequestErrorDisplayMessage } from '@/utils/request-error'
 import { createEmptyRuntimeConfig } from './utils/chat-model-selection'
@@ -20,7 +21,7 @@ export const useChatRuntimeConfig = createSharedComposable(() => {
     }
     catch (error) {
       if (!silent) {
-        ElMessage.error(getRequestErrorDisplayMessage(error, '加载 AI 服务状态失败'))
+        ElMessage.error(getRequestErrorDisplayMessage(error, translate('chat.errors.loadAiStatus')))
       }
 
       return false

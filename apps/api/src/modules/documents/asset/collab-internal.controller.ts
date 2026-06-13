@@ -1,14 +1,14 @@
 import type {
   ConsumeCollabTicketRequest,
-  ConsumeCollabTicketResponse,
   MaterializeDocumentYdocCurrentProjectionRequest,
   MaterializeDocumentYdocCurrentProjectionResponse,
 } from '@haohaoxue/samepage-contracts'
+import type { FastifyReply } from 'fastify'
 import {
   ConsumeCollabTicketRequestSchema,
   MaterializeDocumentYdocCurrentProjectionSchema,
 } from '@haohaoxue/samepage-contracts'
-import { Body, Controller, Param, Post, UnauthorizedException } from '@nestjs/common'
+import { Body, Controller, Param, Post, Res } from '@nestjs/common'
 import { Public } from '../../../decorators/public.decorator'
 import { ZodValidationPipe } from '../../../pipes/zod-validation.pipe'
 import { DocumentContentService } from '../content/content.service'
@@ -38,13 +38,15 @@ export class DocumentCollabInternalController {
   async consumeDocumentCollabTicket(
     @Param('id') id: string,
     @Body(new ZodValidationPipe(ConsumeCollabTicketRequestSchema)) payload: ConsumeCollabTicketRequest,
-  ): Promise<ConsumeCollabTicketResponse> {
+    @Res() reply: FastifyReply,
+  ): Promise<void> {
     try {
-      return await this.documentCollabTicketsService.consumeDocumentCollabTicket(id, payload.token)
+      reply.send(await this.documentCollabTicketsService.consumeDocumentCollabTicket(id, payload.token))
     }
     catch (error) {
       if (error instanceof DocumentCollabTicketConsumeError) {
-        throw new UnauthorizedException(error.code)
+        reply.code(401).send({ code: error.code })
+        return
       }
 
       throw error

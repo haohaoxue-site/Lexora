@@ -4,9 +4,11 @@ import type {
   DocsChatRenameDialogProps,
 } from './typing'
 import { computed, shallowRef, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 
 const props = defineProps<DocsChatRenameDialogProps>()
 const emits = defineEmits<DocsChatRenameDialogEmits>()
+const { t } = useI18n()
 
 const draft = shallowRef('')
 const canSubmit = computed(() => Boolean(draft.value.trim()) && !props.loading)
@@ -32,7 +34,7 @@ function submit() {
 <template>
   <ElDialog
     :model-value="props.modelValue"
-    title="重命名对话"
+    :title="t('docs.chat.renameTitle')"
     width="360px"
     destroy-on-close
     @update:model-value="emits('update:modelValue', $event)"
@@ -42,14 +44,14 @@ function submit() {
       v-model="draft"
       maxlength="120"
       show-word-limit
-      placeholder="输入对话名称"
+      :placeholder="t('docs.chat.renamePlaceholder')"
       :disabled="props.loading"
       autofocus
     />
 
     <template #footer>
       <ElButton @click="emits('update:modelValue', false)">
-        取消
+        {{ t('docs.common.cancel') }}
       </ElButton>
       <ElButton
         type="primary"
@@ -57,7 +59,7 @@ function submit() {
         :disabled="!canSubmit"
         @click="submit"
       >
-        保存
+        {{ t('docs.common.save') }}
       </ElButton>
     </template>
   </ElDialog>

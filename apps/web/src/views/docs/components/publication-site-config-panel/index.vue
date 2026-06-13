@@ -29,6 +29,7 @@ import {
 } from '@haohaoxue/samepage-contracts/document/publication/constants'
 import { prettyBytes } from '@haohaoxue/samepage-shared/file'
 import { computed, reactive, useTemplateRef, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { ElMessage } from '@/utils/element-plus'
 
 const props = withDefaults(defineProps<PublicationSiteConfigPanelProps>(), {
@@ -38,6 +39,7 @@ const props = withDefaults(defineProps<PublicationSiteConfigPanelProps>(), {
 })
 const emits = defineEmits<PublicationSiteConfigPanelEmits>()
 const formRef = useTemplateRef<FormInstance>('formRef')
+const { t } = useI18n()
 
 const siteConfigForm = reactive<SiteConfigForm>({
   title: '',
@@ -50,34 +52,34 @@ const siteConfigForm = reactive<SiteConfigForm>({
   footerMessage: '',
   footerCopyright: '',
 })
-const siteConfigRules: FormRules<SiteConfigForm> = {
+const siteConfigRules = computed<FormRules<SiteConfigForm>>(() => ({
   title: [
-    { required: true, message: '请输入站点标题', trigger: 'blur' },
+    { required: true, message: t('docs.publicationSite.validation.siteTitleRequired'), trigger: 'blur' },
     {
       min: 1,
       max: DOCUMENT_PUBLICATION_SITE_TITLE_MAX_LENGTH,
-      message: `站点标题不能超过 ${DOCUMENT_PUBLICATION_SITE_TITLE_MAX_LENGTH} 个字符`,
+      message: t('docs.publicationSite.validation.siteTitleMax', { max: DOCUMENT_PUBLICATION_SITE_TITLE_MAX_LENGTH }),
       trigger: 'blur',
     },
   ],
   heroName: [
-    { required: true, message: '请输入首页名称', trigger: 'blur' },
-    { min: 1, max: DOCUMENT_PUBLICATION_SITE_HOME_NAME_MAX_LENGTH, message: `首页名称不能超过 ${DOCUMENT_PUBLICATION_SITE_HOME_NAME_MAX_LENGTH} 个字符`, trigger: 'blur' },
+    { required: true, message: t('docs.publicationSite.validation.homeNameRequired'), trigger: 'blur' },
+    { min: 1, max: DOCUMENT_PUBLICATION_SITE_HOME_NAME_MAX_LENGTH, message: t('docs.publicationSite.validation.homeNameMax', { max: DOCUMENT_PUBLICATION_SITE_HOME_NAME_MAX_LENGTH }), trigger: 'blur' },
   ],
   heroText: [
-    { required: true, message: '请输入首页主文案', trigger: 'blur' },
-    { min: 1, max: DOCUMENT_PUBLICATION_SITE_HOME_TEXT_MAX_LENGTH, message: `首页主文案不能超过 ${DOCUMENT_PUBLICATION_SITE_HOME_TEXT_MAX_LENGTH} 个字符`, trigger: 'blur' },
+    { required: true, message: t('docs.publicationSite.validation.homeTextRequired'), trigger: 'blur' },
+    { min: 1, max: DOCUMENT_PUBLICATION_SITE_HOME_TEXT_MAX_LENGTH, message: t('docs.publicationSite.validation.homeTextMax', { max: DOCUMENT_PUBLICATION_SITE_HOME_TEXT_MAX_LENGTH }), trigger: 'blur' },
   ],
   heroTagline: [
-    { max: DOCUMENT_PUBLICATION_SITE_HOME_TAGLINE_MAX_LENGTH, message: `首页说明不能超过 ${DOCUMENT_PUBLICATION_SITE_HOME_TAGLINE_MAX_LENGTH} 个字符`, trigger: 'blur' },
+    { max: DOCUMENT_PUBLICATION_SITE_HOME_TAGLINE_MAX_LENGTH, message: t('docs.publicationSite.validation.homeTaglineMax', { max: DOCUMENT_PUBLICATION_SITE_HOME_TAGLINE_MAX_LENGTH }), trigger: 'blur' },
   ],
   footerMessage: [
-    { max: DOCUMENT_PUBLICATION_SITE_FOOTER_MESSAGE_MAX_LENGTH, message: `页脚说明不能超过 ${DOCUMENT_PUBLICATION_SITE_FOOTER_MESSAGE_MAX_LENGTH} 个字符`, trigger: 'blur' },
+    { max: DOCUMENT_PUBLICATION_SITE_FOOTER_MESSAGE_MAX_LENGTH, message: t('docs.publicationSite.validation.footerMessageMax', { max: DOCUMENT_PUBLICATION_SITE_FOOTER_MESSAGE_MAX_LENGTH }), trigger: 'blur' },
   ],
   footerCopyright: [
-    { max: DOCUMENT_PUBLICATION_SITE_FOOTER_COPYRIGHT_MAX_LENGTH, message: `版权信息不能超过 ${DOCUMENT_PUBLICATION_SITE_FOOTER_COPYRIGHT_MAX_LENGTH} 个字符`, trigger: 'blur' },
+    { max: DOCUMENT_PUBLICATION_SITE_FOOTER_COPYRIGHT_MAX_LENGTH, message: t('docs.publicationSite.validation.footerCopyrightMax', { max: DOCUMENT_PUBLICATION_SITE_FOOTER_COPYRIGHT_MAX_LENGTH }), trigger: 'blur' },
   ],
-}
+}))
 
 const mediaAccept = DOCUMENT_PUBLICATION_SITE_MEDIA_MIME_TYPES.join(',')
 const siteLogoMediaSizeLimitLabel = prettyBytes(DOCUMENT_PUBLICATION_SITE_MEDIA_MAX_BYTES_BY_KIND[DOCUMENT_PUBLICATION_SITE_MEDIA_KIND.LOGO])
@@ -154,14 +156,14 @@ function buildHomeConfig(): PublicationSiteHomeConfig {
 
 function beforeMediaUpload(kind: PublicationSiteMediaKind, file: File) {
   if (!(DOCUMENT_PUBLICATION_SITE_MEDIA_MIME_TYPES as readonly string[]).includes(file.type)) {
-    ElMessage.error('站点图片仅支持 JPG、PNG、WEBP、SVG 格式')
+    ElMessage.error(t('docs.publicationSite.validation.unsupportedImageType'))
     return false
   }
 
   const maxBytes = DOCUMENT_PUBLICATION_SITE_MEDIA_MAX_BYTES_BY_KIND[kind]
 
   if (file.size > maxBytes) {
-    ElMessage.error(`站点图片大小不能超过 ${prettyBytes(maxBytes)}`)
+    ElMessage.error(t('docs.publicationSite.validation.imageTooLarge', { size: prettyBytes(maxBytes) }))
     return false
   }
 
@@ -170,7 +172,7 @@ function beforeMediaUpload(kind: PublicationSiteMediaKind, file: File) {
 
 function handleMediaUploadRequest(kind: PublicationSiteMediaKind, options: UploadRequestOptions) {
   if (props.saving || isMediaUploading.value) {
-    const error = new Error('站点图片正在上传')
+    const error = new Error(t('docs.publicationSite.validation.mediaUploading'))
     return Promise.reject(error)
   }
 
@@ -227,19 +229,19 @@ function toNullableText(value: string | null | undefined) {
   <section v-loading="loading" class="publication-site-config-panel grid gap-5">
     <header class="publication-site-config-panel__header flex flex-wrap items-center justify-between gap-4">
       <h2 class="m-0 text-xl font-semibold leading-7 text-main">
-        站点配置
+        {{ t('docs.publicationSite.config.title') }}
       </h2>
 
       <div class="flex flex-wrap items-center justify-end gap-3">
         <div class="publication-site-config-panel__access-toggle flex items-center gap-3 rounded-lg border px-3 py-2">
-          <span class="text-sm font-medium leading-5 text-main">开启访问</span>
+          <span class="text-sm font-medium leading-5 text-main">{{ t('docs.publicationSite.config.accessEnabled') }}</span>
           <ElSwitch
             v-model="siteConfigForm.siteAccessEnabled"
             size="small"
           />
         </div>
         <ElButton type="primary" :loading="saving" @click="submitSiteConfig">
-          保存设置
+          {{ t('docs.publicationSite.config.saveSettings') }}
         </ElButton>
       </div>
     </header>
@@ -254,11 +256,11 @@ function toNullableText(value: string | null | undefined) {
       >
         <section class="publication-site-config-panel__section grid gap-3">
           <h2 class="m-0 text-base font-semibold leading-6 text-main">
-            站点信息
+            {{ t('docs.publicationSite.config.siteInfo') }}
           </h2>
 
           <div class="publication-site-config-panel__two-column grid gap-4 max-[720px]:grid-cols-1">
-            <ElFormItem label="站点标题" prop="title">
+            <ElFormItem :label="t('docs.publicationSite.config.siteTitle')" prop="title">
               <ElInput
                 v-model="siteConfigForm.title"
                 :maxlength="DOCUMENT_PUBLICATION_SITE_TITLE_MAX_LENGTH"
@@ -266,25 +268,25 @@ function toNullableText(value: string | null | undefined) {
               />
             </ElFormItem>
 
-            <ElFormItem label="站点 Logo" prop="logoUrl">
+            <ElFormItem :label="t('docs.publicationSite.config.siteLogo')" prop="logoUrl">
               <div class="publication-site-config-panel__asset-row">
                 <div class="publication-site-config-panel__asset-preview publication-site-config-panel__asset-preview--site">
                   <img
                     v-if="siteConfigForm.logoUrl"
                     :src="siteConfigForm.logoUrl"
-                    alt="站点 Logo"
+                    :alt="t('docs.publicationSite.config.logoAlt')"
                   >
                   <div v-else class="publication-site-config-panel__asset-empty">
                     <ElIcon size="20">
                       <Plus />
                     </ElIcon>
                   </div>
-                  <span v-if="isSiteLogoUploading" class="publication-site-config-panel__upload-mask">上传中...</span>
+                  <span v-if="isSiteLogoUploading" class="publication-site-config-panel__upload-mask">{{ t('docs.publicationSite.config.uploading') }}</span>
                 </div>
 
                 <div class="grid min-w-0 gap-0.5">
-                  <span class="text-sm font-medium leading-5 text-main">站点导航标识</span>
-                  <span class="text-xs leading-5 text-secondary">JPG、PNG、WEBP、SVG，最大 {{ siteLogoMediaSizeLimitLabel }}</span>
+                  <span class="text-sm font-medium leading-5 text-main">{{ t('docs.publicationSite.config.siteNavigationLogo') }}</span>
+                  <span class="text-xs leading-5 text-secondary">{{ t('docs.publicationSite.config.mediaHint', { size: siteLogoMediaSizeLimitLabel }) }}</span>
                 </div>
 
                 <div class="publication-site-config-panel__asset-actions">
@@ -297,7 +299,7 @@ function toNullableText(value: string | null | undefined) {
                     :http-request="options => handleMediaUploadRequest(DOCUMENT_PUBLICATION_SITE_MEDIA_KIND.LOGO, options)"
                   >
                     <ElButton :icon="Upload" :disabled="saving || isMediaUploading">
-                      上传
+                      {{ t('docs.publicationSite.config.upload') }}
                     </ElButton>
                   </ElUpload>
                   <ElButton
@@ -306,7 +308,7 @@ function toNullableText(value: string | null | undefined) {
                     :disabled="saving || isMediaUploading"
                     @click="handleRemoveMedia(DOCUMENT_PUBLICATION_SITE_MEDIA_KIND.LOGO)"
                   >
-                    移除
+                    {{ t('docs.publicationSite.config.remove') }}
                   </ElButton>
                 </div>
               </div>
@@ -316,12 +318,12 @@ function toNullableText(value: string | null | undefined) {
 
         <section class="publication-site-config-panel__section grid gap-3">
           <h2 class="m-0 text-base font-semibold leading-6 text-main">
-            首页
+            {{ t('docs.publicationSite.config.home') }}
           </h2>
 
           <div class="publication-site-config-panel__two-column grid gap-4 max-[720px]:grid-cols-1">
             <div class="grid content-start gap-3">
-              <ElFormItem label="首页名称" prop="heroName">
+              <ElFormItem :label="t('docs.publicationSite.config.homeName')" prop="heroName">
                 <ElInput
                   v-model="siteConfigForm.heroName"
                   :maxlength="DOCUMENT_PUBLICATION_SITE_HOME_NAME_MAX_LENGTH"
@@ -329,7 +331,7 @@ function toNullableText(value: string | null | undefined) {
                 />
               </ElFormItem>
 
-              <ElFormItem label="首页主文案" prop="heroText">
+              <ElFormItem :label="t('docs.publicationSite.config.homeText')" prop="heroText">
                 <ElInput
                   v-model="siteConfigForm.heroText"
                   :maxlength="DOCUMENT_PUBLICATION_SITE_HOME_TEXT_MAX_LENGTH"
@@ -337,7 +339,7 @@ function toNullableText(value: string | null | undefined) {
                 />
               </ElFormItem>
 
-              <ElFormItem label="首页说明" prop="heroTagline">
+              <ElFormItem :label="t('docs.publicationSite.config.homeTagline')" prop="heroTagline">
                 <ElInput
                   v-model="siteConfigForm.heroTagline"
                   type="textarea"
@@ -348,25 +350,25 @@ function toNullableText(value: string | null | undefined) {
               </ElFormItem>
             </div>
 
-            <ElFormItem label="首页 Logo" prop="heroImageUrl">
+            <ElFormItem :label="t('docs.publicationSite.config.homeLogo')" prop="heroImageUrl">
               <div class="publication-site-config-panel__asset-row publication-site-config-panel__asset-row--home">
                 <div class="publication-site-config-panel__asset-preview publication-site-config-panel__asset-preview--home">
                   <img
                     v-if="siteConfigForm.heroImageUrl"
                     :src="siteConfigForm.heroImageUrl"
-                    alt="首页 Logo"
+                    :alt="t('docs.publicationSite.config.homeLogoAlt')"
                   >
                   <div v-else class="publication-site-config-panel__asset-empty">
                     <ElIcon size="24">
                       <Plus />
                     </ElIcon>
                   </div>
-                  <span v-if="isHomeLogoUploading" class="publication-site-config-panel__upload-mask">上传中...</span>
+                  <span v-if="isHomeLogoUploading" class="publication-site-config-panel__upload-mask">{{ t('docs.publicationSite.config.uploading') }}</span>
                 </div>
 
                 <div class="grid min-w-0 gap-0.5">
-                  <span class="text-sm font-medium leading-5 text-main">首页视觉</span>
-                  <span class="text-xs leading-5 text-secondary">用于站点首页首屏，最大 {{ homeLogoMediaSizeLimitLabel }}</span>
+                  <span class="text-sm font-medium leading-5 text-main">{{ t('docs.publicationSite.config.homeVisual') }}</span>
+                  <span class="text-xs leading-5 text-secondary">{{ t('docs.publicationSite.config.homeVisualHint', { size: homeLogoMediaSizeLimitLabel }) }}</span>
                 </div>
 
                 <div class="publication-site-config-panel__asset-actions">
@@ -379,7 +381,7 @@ function toNullableText(value: string | null | undefined) {
                     :http-request="options => handleMediaUploadRequest(DOCUMENT_PUBLICATION_SITE_MEDIA_KIND.HOME_LOGO, options)"
                   >
                     <ElButton :icon="Upload" :disabled="saving || isMediaUploading">
-                      上传
+                      {{ t('docs.publicationSite.config.upload') }}
                     </ElButton>
                   </ElUpload>
                   <ElButton
@@ -388,7 +390,7 @@ function toNullableText(value: string | null | undefined) {
                     :disabled="saving || isMediaUploading"
                     @click="handleRemoveMedia(DOCUMENT_PUBLICATION_SITE_MEDIA_KIND.HOME_LOGO)"
                   >
-                    移除
+                    {{ t('docs.publicationSite.config.remove') }}
                   </ElButton>
                 </div>
               </div>
@@ -396,7 +398,7 @@ function toNullableText(value: string | null | undefined) {
           </div>
 
           <div class="grid grid-cols-2 gap-3 max-[720px]:grid-cols-1">
-            <ElFormItem label="页脚说明" prop="footerMessage">
+            <ElFormItem :label="t('docs.publicationSite.config.footerMessage')" prop="footerMessage">
               <ElInput
                 v-model="siteConfigForm.footerMessage"
                 :maxlength="DOCUMENT_PUBLICATION_SITE_FOOTER_MESSAGE_MAX_LENGTH"
@@ -405,7 +407,7 @@ function toNullableText(value: string | null | undefined) {
               />
             </ElFormItem>
 
-            <ElFormItem label="版权信息" prop="footerCopyright">
+            <ElFormItem :label="t('docs.publicationSite.config.footerCopyright')" prop="footerCopyright">
               <ElInput
                 v-model="siteConfigForm.footerCopyright"
                 :maxlength="DOCUMENT_PUBLICATION_SITE_FOOTER_COPYRIGHT_MAX_LENGTH"
@@ -420,7 +422,7 @@ function toNullableText(value: string | null | undefined) {
       <aside class="publication-site-config-panel__preview grid gap-3 rounded-xl border bg-surface p-4">
         <div class="flex items-center gap-3">
           <h2 class="m-0 text-base font-semibold leading-6 text-main">
-            首页预览
+            {{ t('docs.publicationSite.config.preview') }}
           </h2>
         </div>
 
@@ -431,16 +433,16 @@ function toNullableText(value: string | null | undefined) {
             class="h-full w-full border-0"
             :src="sitePreviewUrl"
             scrolling="no"
-            title="公开站点首页预览"
+            :title="t('docs.publicationSite.config.previewIframeTitle')"
             @load="hidePreviewIframeScrollbar"
           />
           <div v-else class="grid h-full place-items-center px-6 text-center">
             <div class="grid gap-1">
               <strong class="text-sm font-semibold leading-5 text-main">
-                {{ site ? '站点已关闭' : '保存设置后生成预览' }}
+                {{ site ? t('docs.publicationSite.config.previewClosedTitle') : t('docs.publicationSite.config.previewUnsavedTitle') }}
               </strong>
               <span class="text-xs leading-5 text-secondary">
-                {{ site ? '开启访问后可查看真实首页。' : '真实预览会加载公开站点首页。' }}
+                {{ site ? t('docs.publicationSite.config.previewClosedDescription') : t('docs.publicationSite.config.previewUnsavedDescription') }}
               </span>
             </div>
           </div>

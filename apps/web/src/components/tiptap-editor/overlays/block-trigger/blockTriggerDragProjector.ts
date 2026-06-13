@@ -1,5 +1,6 @@
 import type { Editor } from '@tiptap/core'
 import type { EditorBlockPlacement } from '../../commands/editorActions'
+import { translate } from '@/i18n'
 import { findBlockById, getCurrentBlock } from '../../commands/currentBlock'
 import { findBlockElement, readBlockPreviewText } from './blockTriggerDom'
 
@@ -186,21 +187,23 @@ function resolveDropIndicatorTop(
 function getBlockPreviewFallback(currentBlock: NonNullable<ReturnType<typeof getCurrentBlock>>) {
   switch (currentBlock.node.type.name) {
     case 'heading':
-      return '标题'
+      return translate('editor.common.heading')
     case 'blockquote':
-      return '引用'
+      return translate('editor.common.blockquote')
     case 'codeBlock':
-      return '代码块'
+      return translate('editor.common.codeBlock')
     case 'blockMath':
-      return '公式块'
+      return translate('editor.common.blockMath')
     case 'horizontalRule':
-      return '分割线'
+      return translate('editor.common.divider')
     case 'taskItem':
-      return '任务'
+      return translate('editor.common.taskList')
     case 'listItem':
-      return currentBlock.parent.type.name === 'orderedList' ? '有序列表' : '无序列表'
+      return currentBlock.parent.type.name === 'orderedList'
+        ? translate('editor.common.orderedList')
+        : translate('editor.common.bulletList')
     default:
-      return '文本'
+      return translate('editor.common.paragraph')
   }
 }
 

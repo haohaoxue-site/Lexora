@@ -3,9 +3,11 @@ import type {
   CollaborationPasswordPanelEmits,
   CollaborationPasswordPanelProps,
 } from './typing'
+import { useI18n } from 'vue-i18n'
 
 const props = defineProps<CollaborationPasswordPanelProps>()
 const emits = defineEmits<CollaborationPasswordPanelEmits>()
+const { t } = useI18n()
 </script>
 
 <template>
@@ -13,10 +15,10 @@ const emits = defineEmits<CollaborationPasswordPanelEmits>()
     <div class="flex items-center justify-between gap-4">
       <div class="min-w-0">
         <h3 class="m-0 text-[0.95rem] font-bold leading-[1.4] text-main">
-          启用链接密码
+          {{ t('docs.collaboration.enablePassword') }}
         </h3>
         <p class="mt-1 text-[13px] leading-[1.45] text-secondary">
-          开启后，访问协作链接需要输入 {{ props.passwordLength }} 位数字密码。
+          {{ t('docs.collaboration.passwordDescription', { length: props.passwordLength }) }}
         </p>
       </div>
       <ElSwitch
@@ -33,7 +35,7 @@ const emits = defineEmits<CollaborationPasswordPanelEmits>()
     >
       <div>
         <div class="text-xs leading-[1.4] text-secondary">
-          当前密码
+          {{ t('docs.collaboration.currentPassword') }}
         </div>
         <div class="mt-1 font-mono text-sm font-semibold leading-[1.4] text-main">
           {{ props.passwordStateLabel }}
@@ -43,13 +45,13 @@ const emits = defineEmits<CollaborationPasswordPanelEmits>()
         :disabled="props.updating"
         @click="emits('editPassword')"
       >
-        修改密码
+        {{ t('docs.collaboration.editPassword') }}
       </ElButton>
     </div>
 
     <ElAlert
       v-else
-      title="当前链接不需要密码"
+      :title="t('docs.collaboration.noPassword')"
       type="info"
       :closable="false"
       show-icon

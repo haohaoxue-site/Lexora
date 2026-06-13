@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import type { DocumentToolbarProps } from './typing'
+import { useI18n } from 'vue-i18n'
 import { useDocsPageActions } from '../../composables/useDocsPageActions'
 import { useDocumentTree } from '../../composables/useDocumentTree'
 
 const props = defineProps<DocumentToolbarProps>()
+const { t } = useI18n()
 
 const { isMutatingTree: isBusy } = useDocumentTree()
 const { createRootDocument } = useDocsPageActions()
@@ -18,7 +20,7 @@ function handleCreateRoot() {
     text
     class="document-tree-toolbar document-tree-toolbar__button h-7 min-w-7 w-7 rounded-lg p-0"
     :disabled="isBusy"
-    title="新建文档"
+    :title="t('docs.common.createDocument')"
     @click="handleCreateRoot"
   >
     <SvgIcon category="ui" :icon="isBusy ? 'spinner-orbit' : 'plus'" size="1rem" :class="{ 'animate-spin': isBusy }" />

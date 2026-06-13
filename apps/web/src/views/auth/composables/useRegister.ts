@@ -1,34 +1,37 @@
 import type { FormInstance, FormRules } from 'element-plus'
 import type { ShallowRef } from 'vue'
 import { AUTH_METHOD } from '@haohaoxue/samepage-contracts/auth/constants'
-import { onMounted, reactive } from 'vue'
+import { computed, onMounted, reactive } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { createRegistrationInviteGrant, requestEmailVerification } from '@/apis/auth'
 import { useFormSubmit } from '@/composables/useFormSubmit'
 import { ElMessage } from '@/utils/element-plus'
 import { clearPasswordRegistrationInviteGrant, savePasswordRegistrationInviteGrant } from '../utils/registration-invite'
-import { createEmailRules, isValidEmail } from '../utils/rules'
+import { createAuthRuleMessages, createEmailRules, isValidEmail } from '../utils/rules'
 import { useAuthCapabilities } from './useAuthCapabilities'
 
 export function useRegister(options: { registerRequestFormRef: ShallowRef<FormInstance | null> }) {
+  const { t } = useI18n({ useScope: 'global' })
   const router = useRouter()
   const form = reactive({
     email: '',
     inviteCode: '',
   })
-  const formRules: FormRules<typeof form> = {
-    email: createEmailRules(),
+  const ruleMessages = createAuthRuleMessages((key, params) => params ? t(key, params) : t(key))
+  const formRules = computed<FormRules<typeof form>>(() => ({
+    email: createEmailRules(t('auth.common.email'), ruleMessages),
     inviteCode: [
       {
         required: true,
-        message: '请输入邀请码',
+        message: t('auth.validation.inviteCodeRequired'),
       },
       {
         min: 4,
-        message: '邀请码至少 4 位',
+        message: t('auth.validation.inviteCodeMin', { min: 4 }),
       },
     ],
-  }
+  }))
   const {
     isLoadingCapabilities,
     loadErrorMessage,
@@ -64,7 +67,7 @@ export function useRegister(options: { registerRequestFormRef: ShallowRef<FormIn
         clearPasswordRegistrationInviteGrant()
       }
 
-      ElMessage.success('验证码已发送，请查收邮箱')
+      ElMessage.success(t('auth.register.verificationSent'))
       await router.push({
         name: 'register-verify',
         query: {
@@ -72,7 +75,7 @@ export function useRegister(options: { registerRequestFormRef: ShallowRef<FormIn
         },
       })
     },
-    fallbackError: '发送验证码失败',
+    fallbackError: () => t('auth.register.sendCodeFailed'),
   })
 
   onMounted(() => {

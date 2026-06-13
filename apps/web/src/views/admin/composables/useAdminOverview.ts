@@ -1,10 +1,12 @@
 import type { SystemAdminOverview } from '@/apis/system-admin'
 import { computed, onMounted, shallowRef } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { getSystemAdminOverview } from '@/apis/system-admin'
 import { SvgIconCategory } from '@/components/svg-icon/typing'
 import { getRequestErrorDisplayMessage } from '@/utils/request-error'
 
 export function useAdminOverview() {
+  const { t } = useI18n({ useScope: 'global' })
   const overview = shallowRef<SystemAdminOverview | null>(null)
   const errorMessage = shallowRef('')
   const isLoading = shallowRef(false)
@@ -15,23 +17,29 @@ export function useAdminOverview() {
 
     return [
       {
-        label: '总用户',
+        label: t('admin.overview.totalUsers'),
         value: overview.value.totalUsers,
-        detail: `活跃 ${overview.value.activeUsers}，禁用 ${overview.value.disabledUsers}`,
+        detail: [
+          t('admin.overview.activeUsers', { count: overview.value.activeUsers }),
+          t('admin.overview.disabledUsers', { count: overview.value.disabledUsers }),
+        ].join(', '),
         iconCategory: SvgIconCategory.UI,
         icon: 'user-group',
       },
       {
-        label: '系统管理员',
+        label: t('admin.overview.systemAdmins'),
         value: overview.value.systemAdminCount,
-        detail: '拥有系统后台权限',
+        detail: t('admin.overview.systemAdminCountDetail'),
         iconCategory: SvgIconCategory.UI,
         icon: 'user-admin',
       },
       {
-        label: '总文档',
+        label: t('admin.overview.totalDocuments'),
         value: overview.value.totalDocuments,
-        detail: `发布 ${overview.value.publishedDocuments}，锁定 ${overview.value.lockedDocuments}`,
+        detail: [
+          t('admin.overview.publishedDocuments', { count: overview.value.publishedDocuments }),
+          t('admin.overview.lockedDocuments', { count: overview.value.lockedDocuments }),
+        ].join(', '),
         iconCategory: SvgIconCategory.UI,
         icon: 'document-view',
       },
@@ -46,7 +54,7 @@ export function useAdminOverview() {
       overview.value = await getSystemAdminOverview()
     }
     catch (error) {
-      errorMessage.value = getRequestErrorDisplayMessage(error, '加载系统概览失败')
+      errorMessage.value = getRequestErrorDisplayMessage(error, t('admin.errors.loadOverview'))
     }
     finally {
       isLoading.value = false

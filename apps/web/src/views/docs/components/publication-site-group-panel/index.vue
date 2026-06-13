@@ -15,10 +15,10 @@ import { ArrowDown, ArrowUp } from '@element-plus/icons-vue'
 import {
   DOCUMENT_PUBLICATION_ENTRY_STATUS,
   DOCUMENT_SITE_PUBLICATION_PAGE_SCOPE,
-  DOCUMENT_SITE_PUBLICATION_PAGE_SCOPE_LABELS,
   DOCUMENT_SITE_PUBLICATION_PAGE_SCOPE_VALUES,
 } from '@haohaoxue/samepage-contracts/document/publication/constants'
 import { computed, reactive, shallowRef, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import Empty from '@/components/empty'
 import { ElMessage, ElMessageBox } from '@/utils/element-plus'
 
@@ -27,6 +27,7 @@ const props = withDefaults(defineProps<PublicationSiteGroupPanelProps>(), {
   mutating: false,
 })
 const emits = defineEmits<PublicationSiteGroupPanelEmits>()
+const { t } = useI18n()
 
 const selectedPageId = shallowRef('')
 const isCreatePageDialogOpen = shallowRef(false)
@@ -73,10 +74,10 @@ const selectedSourceDocument = computed(() =>
 const selectedSourceDocumentTree = computed(() =>
   selectedSourceDocument.value ? [selectedSourceDocument.value] : [],
 )
-const pageScopeOptions = DOCUMENT_SITE_PUBLICATION_PAGE_SCOPE_VALUES.map(value => ({
+const pageScopeOptions = computed(() => DOCUMENT_SITE_PUBLICATION_PAGE_SCOPE_VALUES.map(value => ({
   value,
-  label: DOCUMENT_SITE_PUBLICATION_PAGE_SCOPE_LABELS[value],
-}))
+  label: formatPublicationSitePageScope(value),
+})))
 
 watch(
   activePages,
@@ -91,7 +92,7 @@ watch(
 )
 
 async function createGroup() {
-  const title = await promptText('新建分组', '分组名称', '')
+  const title = await promptText(t('docs.publicationSite.group.createGroupTitle'), t('docs.publicationSite.group.groupName'), '')
 
   if (!title) {
     return
@@ -101,7 +102,7 @@ async function createGroup() {
 }
 
 async function renameGroup(group: PublicationSection) {
-  const title = await promptText('重命名分组', '分组名称', group.title)
+  const title = await promptText(t('docs.publicationSite.group.renameGroupTitle'), t('docs.publicationSite.group.groupName'), group.title)
 
   if (!title || title === group.title) {
     return
@@ -126,9 +127,9 @@ function toggleGroupCollapsed(group: PublicationSection) {
 
 async function removeGroup(group: PublicationSection) {
   try {
-    await ElMessageBox.confirm('删除分组会同时移除该分组下的站点页面。', '删除分组', {
-      confirmButtonText: '删除',
-      cancelButtonText: '取消',
+    await ElMessageBox.confirm(t('docs.publicationSite.group.deleteGroupMessage'), t('docs.publicationSite.group.deleteGroupTitle'), {
+      confirmButtonText: t('docs.common.delete'),
+      cancelButtonText: t('docs.common.cancel'),
       type: 'warning',
     })
   }
@@ -161,9 +162,9 @@ function handlePageScopeCommand(page: PublicationPage, command: string | number 
 
 async function removePage(page: PublicationPage) {
   try {
-    await ElMessageBox.confirm('移出站点后，该页面将不再出现在公开站点目录中。', '移出站点页面', {
-      confirmButtonText: '移出',
-      cancelButtonText: '取消',
+    await ElMessageBox.confirm(t('docs.publicationSite.group.removePageMessage'), t('docs.publicationSite.group.removePageTitle'), {
+      confirmButtonText: t('docs.publicationSite.group.remove'),
+      cancelButtonText: t('docs.common.cancel'),
       type: 'warning',
     })
   }
@@ -184,12 +185,12 @@ function openCreatePageDialog(group: PublicationSection) {
 
 function submitPage() {
   if (!pageForm.sectionId) {
-    ElMessage.warning('请选择分组')
+    ElMessage.warning(t('docs.publicationSite.group.selectGroupWarning'))
     return
   }
 
   if (!pageForm.documentId) {
-    ElMessage.warning('请选择文档')
+    ElMessage.warning(t('docs.publicationSite.group.selectDocumentWarning'))
     return
   }
 
@@ -264,9 +265,9 @@ async function promptText(title: string, placeholder: string, inputValue: string
     const response = await ElMessageBox.prompt(placeholder, title, {
       inputValue,
       inputPattern: /\S+/,
-      inputErrorMessage: `${placeholder}不能为空`,
-      confirmButtonText: '保存',
-      cancelButtonText: '取消',
+      inputErrorMessage: t('docs.publicationSite.group.promptRequired', { field: placeholder }),
+      confirmButtonText: t('docs.common.save'),
+      cancelButtonText: t('docs.common.cancel'),
     })
 
     return response.value.trim()
@@ -279,7 +280,7 @@ async function promptText(title: string, placeholder: string, inputValue: string
 function toDocumentSelectNode(item: DocumentSinglePublicationTreeItem, publishedIds: Set<string>): DocumentSelectNode {
   return {
     value: item.id,
-    label: item.title || '未命名',
+    label: item.title || t('docs.common.noTitle'),
     disabled: publishedIds.has(item.id),
     children: item.children.map(child => toDocumentSelectNode(child, publishedIds)),
   }
@@ -292,6 +293,12 @@ function compareOrderedItem(left: { order: number, updatedAt: string }, right: {
 
   return right.updatedAt.localeCompare(left.updatedAt)
 }
+
+function formatPublicationSitePageScope(scope: PublicationSitePageScope) {
+  return scope === DOCUMENT_SITE_PUBLICATION_PAGE_SCOPE.DESCENDANTS
+    ? t('docs.publication.scopeTree')
+    : t('docs.publication.scopePage')
+}
 </script>
 
 <template>
@@ -299,18 +306,18 @@ function compareOrderedItem(left: { order: number, updatedAt: string }, right: {
     <header class="flex flex-wrap items-end justify-between gap-3">
       <div class="grid gap-1">
         <h2 class="m-0 text-xl font-semibold leading-7 text-main">
-          站点分组
+          {{ t('docs.publicationSite.group.title') }}
         </h2>
       </div>
 
       <ElButton type="primary" :loading="mutating" @click="createGroup">
-        新建分组
+        {{ t('docs.publicationSite.group.create') }}
       </ElButton>
     </header>
 
     <div class="grid grid-cols-[minmax(0,1fr)_minmax(18rem,23rem)] items-start gap-5 max-[1120px]:grid-cols-1">
       <div class="publication-site-group-panel__surface overflow-hidden rounded-xl border bg-surface">
-        <Empty v-if="activeGroups.length === 0" compact description="暂无分组" />
+        <Empty v-if="activeGroups.length === 0" compact :description="t('docs.publicationSite.group.empty')" />
 
         <div v-else class="grid">
           <section
@@ -323,7 +330,7 @@ function compareOrderedItem(left: { order: number, updatedAt: string }, right: {
                 <button
                   type="button"
                   class="publication-site-group-panel__collapse inline-flex h-7 w-7 items-center justify-center rounded-lg border-0 bg-transparent p-0"
-                  :title="group.collapsed ? '展开分组' : '收起分组'"
+                  :title="group.collapsed ? t('docs.publicationSite.group.expandGroup') : t('docs.publicationSite.group.collapseGroup')"
                   @click="toggleGroupCollapsed(group)"
                 >
                   <SvgIcon
@@ -342,7 +349,7 @@ function compareOrderedItem(left: { order: number, updatedAt: string }, right: {
                   type="info"
                   effect="plain"
                 >
-                  隐藏
+                  {{ t('docs.publicationSite.group.hidden') }}
                 </ElTag>
               </div>
 
@@ -350,7 +357,7 @@ function compareOrderedItem(left: { order: number, updatedAt: string }, right: {
                 <ElButton
                   text
                   class="publication-site-group-panel__icon-button h-7 min-w-7 w-7 rounded-lg p-0"
-                  title="向该分组添加页面"
+                  :title="t('docs.publicationSite.group.addPageToGroup')"
                   @click.stop="openCreatePageDialog(group)"
                 >
                   <SvgIcon category="ui" icon="plus" size="0.9rem" />
@@ -359,7 +366,7 @@ function compareOrderedItem(left: { order: number, updatedAt: string }, right: {
                   <ElButton
                     text
                     class="publication-site-group-panel__icon-button h-7 min-w-7 w-7 rounded-lg p-0"
-                    title="分组操作"
+                    :title="t('docs.publicationSite.group.groupActions')"
                     @click.stop
                   >
                     <SvgIcon category="ui" icon="more" size="0.9rem" />
@@ -367,13 +374,13 @@ function compareOrderedItem(left: { order: number, updatedAt: string }, right: {
                   <template #dropdown>
                     <ElDropdownMenu>
                       <ElDropdownItem @click="renameGroup(group)">
-                        重命名
+                        {{ t('docs.publicationSite.group.rename') }}
                       </ElDropdownItem>
                       <ElDropdownItem @click="toggleGroupStatus(group)">
-                        {{ group.status === DOCUMENT_PUBLICATION_ENTRY_STATUS.ACTIVE ? '隐藏分组' : '显示分组' }}
+                        {{ group.status === DOCUMENT_PUBLICATION_ENTRY_STATUS.ACTIVE ? t('docs.publicationSite.group.hideGroup') : t('docs.publicationSite.group.showGroup') }}
                       </ElDropdownItem>
                       <ElDropdownItem @click="removeGroup(group)">
-                        删除分组
+                        {{ t('docs.publicationSite.group.deleteGroup') }}
                       </ElDropdownItem>
                     </ElDropdownMenu>
                   </template>
@@ -415,7 +422,7 @@ function compareOrderedItem(left: { order: number, updatedAt: string }, right: {
                     @click.stop
                     @keydown.stop
                   >
-                    {{ DOCUMENT_SITE_PUBLICATION_PAGE_SCOPE_LABELS[page.scope] }}
+                    {{ formatPublicationSitePageScope(page.scope) }}
                     <SvgIcon category="ui" icon="chevron-down" size="0.72rem" />
                   </ElButton>
                   <template #dropdown>
@@ -436,14 +443,14 @@ function compareOrderedItem(left: { order: number, updatedAt: string }, right: {
                   :type="page.status === DOCUMENT_PUBLICATION_ENTRY_STATUS.ACTIVE ? 'success' : 'info'"
                   effect="plain"
                 >
-                  {{ page.status === DOCUMENT_PUBLICATION_ENTRY_STATUS.ACTIVE ? '显示' : '隐藏' }}
+                  {{ page.status === DOCUMENT_PUBLICATION_ENTRY_STATUS.ACTIVE ? t('docs.publicationSite.group.visible') : t('docs.publicationSite.group.hidden') }}
                 </ElTag>
                 <ElButton
                   text
                   class="publication-site-group-panel__icon-button h-7 min-w-7 w-7 rounded-lg p-0"
                   :icon="ArrowUp"
                   :disabled="mutating || isPageMoveDisabled(page, -1)"
-                  title="上移页面"
+                  :title="t('docs.publicationSite.group.movePageUp')"
                   @click.stop="movePage(page, -1)"
                 />
                 <ElButton
@@ -451,7 +458,7 @@ function compareOrderedItem(left: { order: number, updatedAt: string }, right: {
                   class="publication-site-group-panel__icon-button h-7 min-w-7 w-7 rounded-lg p-0"
                   :icon="ArrowDown"
                   :disabled="mutating || isPageMoveDisabled(page, 1)"
-                  title="下移页面"
+                  :title="t('docs.publicationSite.group.movePageDown')"
                   @click.stop="movePage(page, 1)"
                 />
                 <ElDropdown trigger="click">
@@ -459,7 +466,7 @@ function compareOrderedItem(left: { order: number, updatedAt: string }, right: {
                     text
                     class="publication-site-group-panel__icon-button h-7 min-w-7 w-7 rounded-lg p-0"
                     :disabled="mutating"
-                    title="页面操作"
+                    :title="t('docs.publicationSite.group.pageActions')"
                     @click.stop
                   >
                     <SvgIcon category="ui" icon="more" size="0.9rem" />
@@ -467,10 +474,10 @@ function compareOrderedItem(left: { order: number, updatedAt: string }, right: {
                   <template #dropdown>
                     <ElDropdownMenu>
                       <ElDropdownItem @click="togglePageStatus(page)">
-                        {{ page.status === DOCUMENT_PUBLICATION_ENTRY_STATUS.ACTIVE ? '隐藏页面' : '显示页面' }}
+                        {{ page.status === DOCUMENT_PUBLICATION_ENTRY_STATUS.ACTIVE ? t('docs.publicationSite.group.hidePage') : t('docs.publicationSite.group.showPage') }}
                       </ElDropdownItem>
                       <ElDropdownItem @click="removePage(page)">
-                        移出站点
+                        {{ t('docs.publicationSite.group.removeFromSite') }}
                       </ElDropdownItem>
                     </ElDropdownMenu>
                   </template>
@@ -478,7 +485,7 @@ function compareOrderedItem(left: { order: number, updatedAt: string }, right: {
               </div>
 
               <div v-if="(pagesByGroupId.get(group.id)?.length ?? 0) === 0" class="border-t px-3 py-5 text-center text-xs text-secondary">
-                暂无页面
+                {{ t('docs.publicationSite.group.noPages') }}
               </div>
             </div>
           </section>
@@ -489,7 +496,7 @@ function compareOrderedItem(left: { order: number, updatedAt: string }, right: {
         <template v-if="selectedPage">
           <section class="grid min-h-0 gap-3">
             <h2 class="m-0 text-base font-semibold leading-6 text-main">
-              源文档树
+              {{ t('docs.publicationSite.group.sourceDocumentTree') }}
             </h2>
 
             <div class="publication-site-group-panel__source-tree min-h-0 overflow-hidden rounded-xl border bg-surface">
@@ -503,20 +510,20 @@ function compareOrderedItem(left: { order: number, updatedAt: string }, right: {
                     :indent="18"
                     :expand-on-click-node="false"
                     default-expand-all
-                    aria-label="源文档树预览"
+                    :aria-label="t('docs.publicationSite.group.sourceTreePreview')"
                     class="publication-site-group-panel__source-el-tree"
                   >
                     <template #default="{ data }">
                       <span class="publication-site-group-panel__source-tree-node inline-flex min-w-0 items-center gap-2">
                         <SvgIcon category="ui" :icon="resolveSourceTreeIcon(data)" size="1rem" />
                         <span class="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">
-                          {{ data.title || '未命名' }}
+                          {{ data.title || t('docs.common.noTitle') }}
                         </span>
                       </span>
                     </template>
                   </ElTree>
 
-                  <Empty v-else compact description="源文档不可用" />
+                  <Empty v-else compact :description="t('docs.publicationSite.group.sourceUnavailable')" />
                 </div>
               </ElScrollbar>
             </div>
@@ -524,32 +531,32 @@ function compareOrderedItem(left: { order: number, updatedAt: string }, right: {
 
           <div class="publication-site-group-panel__detail-list grid gap-4">
             <div class="publication-site-group-panel__detail-row">
-              <span>源文档</span>
+              <span>{{ t('docs.publicationSite.group.sourceDocument') }}</span>
               <div class="publication-site-group-panel__detail-value">
                 <strong>{{ selectedSourceDocument?.title || selectedPage.title }}</strong>
               </div>
             </div>
             <div class="publication-site-group-panel__detail-row">
-              <span>范围</span>
+              <span>{{ t('docs.publicationSite.group.scope') }}</span>
               <div class="publication-site-group-panel__detail-value">
-                <strong>{{ DOCUMENT_SITE_PUBLICATION_PAGE_SCOPE_LABELS[selectedPage.scope] }}</strong>
+                <strong>{{ formatPublicationSitePageScope(selectedPage.scope) }}</strong>
               </div>
             </div>
           </div>
         </template>
 
-        <Empty v-else compact description="选择一个站点页面" />
+        <Empty v-else compact :description="t('docs.publicationSite.group.selectPage')" />
       </aside>
     </div>
 
     <ElDialog
       v-model="isCreatePageDialogOpen"
-      title="添加页面"
+      :title="t('docs.publicationSite.group.addPage')"
       width="32rem"
     >
       <div class="grid gap-3">
         <ElForm label-position="top">
-          <ElFormItem label="分组">
+          <ElFormItem :label="t('docs.publicationSite.group.group')">
             <ElSelect v-model="pageForm.sectionId" disabled>
               <ElOption
                 v-for="group in activeGroups"
@@ -559,7 +566,7 @@ function compareOrderedItem(left: { order: number, updatedAt: string }, right: {
               />
             </ElSelect>
           </ElFormItem>
-          <ElFormItem label="源文档">
+          <ElFormItem :label="t('docs.publicationSite.group.sourceDocument')">
             <ElTreeSelect
               v-model="pageForm.documentId"
               :data="documentOptions"
@@ -567,16 +574,16 @@ function compareOrderedItem(left: { order: number, updatedAt: string }, right: {
               filterable
               check-strictly
               default-expand-all
-              placeholder="从私有文档选择"
+              :placeholder="t('docs.publicationSite.group.selectDocument')"
             />
           </ElFormItem>
-          <ElFormItem label="范围">
+          <ElFormItem :label="t('docs.publicationSite.group.scope')">
             <ElSelect v-model="pageForm.scope">
               <ElOption
-                v-for="(label, value) in DOCUMENT_SITE_PUBLICATION_PAGE_SCOPE_LABELS"
-                :key="value"
-                :label="label"
-                :value="value"
+                v-for="option in pageScopeOptions"
+                :key="option.value"
+                :label="option.label"
+                :value="option.value"
               />
             </ElSelect>
           </ElFormItem>
@@ -585,10 +592,10 @@ function compareOrderedItem(left: { order: number, updatedAt: string }, right: {
 
       <template #footer>
         <ElButton size="small" :disabled="mutating" @click="isCreatePageDialogOpen = false">
-          取消
+          {{ t('docs.common.cancel') }}
         </ElButton>
         <ElButton size="small" type="primary" :loading="mutating" @click="submitPage">
-          加入站点
+          {{ t('docs.publicationSite.group.addToSite') }}
         </ElButton>
       </template>
     </ElDialog>

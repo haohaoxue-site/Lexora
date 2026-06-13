@@ -23,8 +23,8 @@ declare module 'vue-router' {
     allowWhenPasswordChangeRequired?: boolean
     /** 需要系统管理员权限 */
     requiresSystemAdmin?: boolean
-    /** 侧栏导航标题 */
-    navLabel?: string
+    /** 侧栏导航标题 i18n key */
+    navLabelKey?: string
     /** 侧栏导航图标分类 */
     navIconCategory?: SvgIconCategory
     /** 侧栏导航图标 */

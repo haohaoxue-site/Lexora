@@ -4,6 +4,7 @@ import {
 } from '@haohaoxue/samepage-contracts/tiptap/document-body'
 import { prettyBytes } from '@haohaoxue/samepage-shared/file'
 import { mergeAttributes, Node } from '@tiptap/core'
+import { translate } from '@/i18n'
 
 export const DocumentFile = Node.create({
   name: 'file',
@@ -95,7 +96,7 @@ export const DocumentFile = Node.create({
   renderHTML({ node, HTMLAttributes }) {
     const fileName = typeof node.attrs.fileName === 'string' && node.attrs.fileName.length
       ? node.attrs.fileName
-      : '未命名附件'
+      : translate('editor.common.unnamedAttachment')
     const metaParts = [
       typeof node.attrs.mimeType === 'string' && node.attrs.mimeType.length
         ? node.attrs.mimeType
@@ -112,7 +113,7 @@ export const DocumentFile = Node.create({
         'contenteditable': 'false',
       }, HTMLAttributes),
       ['div', { 'data-part': TIPTAP_DOCUMENT_FILE_NODE_PART.TITLE }, fileName],
-      ['div', { 'data-part': TIPTAP_DOCUMENT_FILE_NODE_PART.META }, metaParts.join(' · ') || '附件'],
+      ['div', { 'data-part': TIPTAP_DOCUMENT_FILE_NODE_PART.META }, metaParts.join(' · ') || translate('editor.common.attachment')],
     ]
   },
 })

@@ -4,7 +4,6 @@ export interface AiProviderSidebarProps {
   rows: AiProviderRow[]
   selectedRowKey: string | null
   getProviderInitial: (row: AiProviderRow) => string
-  getProviderStatusLabel: (row: AiProviderRow) => string
   getProviderStatusType: (row: AiProviderRow) => AiProviderStatusType
 }
 

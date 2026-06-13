@@ -1,4 +1,5 @@
 import type { BubbleToolbarAction } from './actionRegistry'
+import { translate } from '@/i18n'
 
 interface BubbleToolbarActionState {
   active: boolean
@@ -58,7 +59,7 @@ const TEXT_BUBBLE_TOOLBAR_GROUPS = [
       {
         kind: 'component',
         component: 'turn-into',
-        description: '文本',
+        description: 'Text',
       },
     ],
   },
@@ -68,7 +69,7 @@ const TEXT_BUBBLE_TOOLBAR_GROUPS = [
       {
         kind: 'component',
         component: 'align',
-        description: '缩进和对齐',
+        description: 'Align and indent',
       },
     ],
   },
@@ -78,7 +79,7 @@ const TEXT_BUBBLE_TOOLBAR_GROUPS = [
       {
         kind: 'action',
         action: 'bold',
-        description: '加粗',
+        description: 'Bold',
         content: {
           kind: 'text',
           value: 'B',
@@ -88,7 +89,7 @@ const TEXT_BUBBLE_TOOLBAR_GROUPS = [
       {
         kind: 'action',
         action: 'italic',
-        description: '斜体',
+        description: 'Italic',
         content: {
           kind: 'text',
           value: 'I',
@@ -98,7 +99,7 @@ const TEXT_BUBBLE_TOOLBAR_GROUPS = [
       {
         kind: 'action',
         action: 'underline',
-        description: '下划线',
+        description: 'Underline',
         content: {
           kind: 'text',
           value: 'U',
@@ -108,7 +109,7 @@ const TEXT_BUBBLE_TOOLBAR_GROUPS = [
       {
         kind: 'action',
         action: 'strike',
-        description: '删除线',
+        description: 'Strikethrough',
         content: {
           kind: 'text',
           value: 'S',
@@ -118,7 +119,7 @@ const TEXT_BUBBLE_TOOLBAR_GROUPS = [
       {
         kind: 'action',
         action: 'code',
-        description: '代码',
+        description: 'Code',
         content: {
           kind: 'icon',
           icon: 'code',
@@ -132,7 +133,7 @@ const TEXT_BUBBLE_TOOLBAR_GROUPS = [
       {
         kind: 'action',
         action: 'link',
-        description: '链接',
+        description: 'Link',
         content: {
           kind: 'icon',
           icon: 'link',
@@ -146,7 +147,7 @@ const TEXT_BUBBLE_TOOLBAR_GROUPS = [
       {
         kind: 'component',
         component: 'color',
-        description: '颜色',
+        description: 'Color',
       },
     ],
   },
@@ -156,10 +157,10 @@ const TEXT_BUBBLE_TOOLBAR_GROUPS = [
       {
         kind: 'action',
         action: 'add-selection-context',
-        description: '加入对话上下文',
+        description: 'Add to chat',
         content: {
           kind: 'text',
-          value: '加入对话',
+          value: 'Add to chat',
           style: 'label',
         },
         buttonVariant: 'wide',
@@ -172,7 +173,7 @@ const TEXT_BUBBLE_TOOLBAR_GROUPS = [
       {
         kind: 'action',
         action: 'comment',
-        description: '评论',
+        description: 'Comment',
         content: {
           kind: 'icon',
           icon: 'comment',
@@ -189,10 +190,10 @@ const IMAGE_BUBBLE_TOOLBAR_GROUPS = [
       {
         kind: 'action',
         action: 'edit-image-alt',
-        description: '编辑描述',
+        description: 'Edit description',
         content: {
           kind: 'text',
-          value: '编辑描述',
+          value: 'Edit description',
           style: 'label',
         },
         buttonVariant: 'wide',
@@ -205,10 +206,10 @@ const IMAGE_BUBBLE_TOOLBAR_GROUPS = [
       {
         kind: 'action',
         action: 'align-left',
-        description: '左对齐',
+        description: 'Align left',
         content: {
           kind: 'text',
-          value: '左对齐',
+          value: 'Align left',
           style: 'label',
         },
         buttonVariant: 'wide',
@@ -216,10 +217,10 @@ const IMAGE_BUBBLE_TOOLBAR_GROUPS = [
       {
         kind: 'action',
         action: 'align-center',
-        description: '居中对齐',
+        description: 'Align center',
         content: {
           kind: 'text',
-          value: '居中对齐',
+          value: 'Align center',
           style: 'label',
         },
         buttonVariant: 'wide',
@@ -227,10 +228,10 @@ const IMAGE_BUBBLE_TOOLBAR_GROUPS = [
       {
         kind: 'action',
         action: 'align-right',
-        description: '右对齐',
+        description: 'Align right',
         content: {
           kind: 'text',
-          value: '右对齐',
+          value: 'Align right',
           style: 'label',
         },
         buttonVariant: 'wide',
@@ -243,10 +244,10 @@ const IMAGE_BUBBLE_TOOLBAR_GROUPS = [
       {
         kind: 'action',
         action: 'comment',
-        description: '评论',
+        description: 'Comment',
         content: {
           kind: 'text',
-          value: '评论',
+          value: 'Comment',
           style: 'label',
         },
         buttonVariant: 'wide',
@@ -267,13 +268,60 @@ export function getBubbleToolbarViewGroups(
     ...group,
     items: group.items.map((item) => {
       if (item.kind === 'component') {
-        return item
+        return {
+          ...item,
+          description: getComponentDescription(item.component),
+        }
       }
 
       return {
         ...item,
+        description: getActionDescription(item.action),
+        content: translateActionContent(item),
         ...getActionState(item.action),
       }
     }),
   }))
+}
+
+function getComponentDescription(component: BubbleToolbarComponent) {
+  const keyMap = {
+    'turn-into': 'editor.common.textStyle',
+    'color': 'editor.common.color',
+    'align': 'editor.common.alignAndIndent',
+  } as const
+
+  return translate(keyMap[component])
+}
+
+function getActionDescription(action: BubbleToolbarAction) {
+  const keyMap = {
+    'bold': 'editor.common.bold',
+    'italic': 'editor.common.italic',
+    'underline': 'editor.common.underline',
+    'strike': 'editor.common.strike',
+    'code': 'editor.common.code',
+    'link': 'editor.common.link',
+    'add-selection-context': 'editor.common.addToChat',
+    'comment': 'editor.common.comment',
+    'edit-image-alt': 'editor.common.editDescription',
+    'align-left': 'editor.common.leftAlign',
+    'align-center': 'editor.common.centerAlign',
+    'align-right': 'editor.common.rightAlign',
+    'indent': 'editor.common.indent',
+    'outdent': 'editor.common.outdent',
+  } as const
+
+  return translate(keyMap[action])
+}
+
+function translateActionContent(item: BubbleToolbarActionItem): BubbleToolbarActionContent {
+  if (item.content.kind === 'icon' || item.content.style !== 'label') {
+    return item.content
+  }
+
+  return {
+    ...item.content,
+    value: getActionDescription(item.action),
+  }
 }

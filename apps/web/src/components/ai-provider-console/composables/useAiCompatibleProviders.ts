@@ -2,6 +2,7 @@ import type { MaybeRefOrGetter, Ref, ShallowRef } from 'vue'
 import type { AiProviderConsoleMode, AiProviderFormController, AiProviderRow, CompatibleProviderKey } from '../typing'
 import type { AiProvider, AiProviderPreset } from '@/apis/ai'
 import { reactive, shallowRef, toValue } from 'vue'
+import { useI18n } from 'vue-i18n'
 import {
   createPlatformAiProvider,
   createUserAiProvider,
@@ -51,6 +52,7 @@ export interface UseAiCompatibleProvidersOptions {
 }
 
 export function useAiCompatibleProviders(options: UseAiCompatibleProvidersOptions) {
+  const { t } = useI18n({ useScope: 'global' })
   const isCreatingCompatibleProvider = shallowRef(false)
   const isUpdatingCompatibleProvider = shallowRef(false)
   const createCompatibleProviderDialogVisible = shallowRef(false)
@@ -68,13 +70,13 @@ export function useAiCompatibleProviders(options: UseAiCompatibleProvidersOption
   })
 
   const compatibleProviderCreateRules = {
-    providerKey: [{ required: true, message: '请选择类型', trigger: 'change' }],
-    providerName: [{ required: true, message: '请输入名称', trigger: 'blur' }],
+    providerKey: [{ required: true, message: t('aiProvider.validation.providerTypeRequired'), trigger: 'change' }],
+    providerName: [{ required: true, message: t('aiProvider.validation.providerNameRequired'), trigger: 'blur' }],
   }
 
   const compatibleProviderEditRules = {
-    providerKey: [{ required: true, message: '请选择类型', trigger: 'change' }],
-    providerName: [{ required: true, message: '请输入名称', trigger: 'blur' }],
+    providerKey: [{ required: true, message: t('aiProvider.validation.providerTypeRequired'), trigger: 'change' }],
+    providerName: [{ required: true, message: t('aiProvider.validation.providerNameRequired'), trigger: 'blur' }],
   }
 
   async function openCreateCompatibleProviderDialog() {
@@ -111,10 +113,10 @@ export function useAiCompatibleProviders(options: UseAiCompatibleProvidersOption
       createCompatibleProviderDialogVisible.value = false
       options.patchProvider(provider)
       await options.selectRow(`provider:${provider.providerId}`)
-      ElMessage.success('服务商已添加')
+      ElMessage.success(t('aiProvider.messages.providerAdded'))
     }
     catch (error) {
-      ElMessage.error(getRequestErrorDisplayMessage(error, '添加服务商失败'))
+      ElMessage.error(getRequestErrorDisplayMessage(error, t('aiProvider.errors.addProvider')))
     }
     finally {
       isCreatingCompatibleProvider.value = false
@@ -151,12 +153,12 @@ export function useAiCompatibleProviders(options: UseAiCompatibleProvidersOption
 
     if (current.providerKey !== compatibleProviderEditForm.providerKey) {
       await ElMessageBox.confirm(
-        '切换类型会清空这个服务商已添加的模型，并移除相关默认模型选择。',
-        '切换服务商类型',
+        t('aiProvider.compatibleProvider.switchTypeConfirm'),
+        t('aiProvider.compatibleProvider.switchTypeTitle'),
         {
           type: 'warning',
-          confirmButtonText: '继续',
-          cancelButtonText: '取消',
+          confirmButtonText: t('aiProvider.common.continue'),
+          cancelButtonText: t('aiProvider.common.cancel'),
         },
       )
     }
@@ -182,10 +184,10 @@ export function useAiCompatibleProviders(options: UseAiCompatibleProvidersOption
       }
       options.syncCredentialForms()
       await options.loadApiKeyForSelectedProvider()
-      ElMessage.success('服务商已更新')
+      ElMessage.success(t('aiProvider.messages.providerUpdated'))
     }
     catch (error) {
-      ElMessage.error(getRequestErrorDisplayMessage(error, '更新服务商失败'))
+      ElMessage.error(getRequestErrorDisplayMessage(error, t('aiProvider.errors.updateProvider')))
     }
     finally {
       isUpdatingCompatibleProvider.value = false
@@ -198,12 +200,12 @@ export function useAiCompatibleProviders(options: UseAiCompatibleProvidersOption
     }
 
     await ElMessageBox.confirm(
-      `确认删除「${row.title}」？相关模型和默认模型选择会一起失效。`,
-      '删除服务商',
+      t('aiProvider.compatibleProvider.deleteConfirm', { title: row.title }),
+      t('aiProvider.compatibleProvider.deleteTitle'),
       {
         type: 'warning',
-        confirmButtonText: '删除',
-        cancelButtonText: '取消',
+        confirmButtonText: t('aiProvider.common.delete'),
+        cancelButtonText: t('aiProvider.common.cancel'),
       },
     )
 
@@ -226,10 +228,10 @@ export function useAiCompatibleProviders(options: UseAiCompatibleProvidersOption
         options.loadApiKeyForSelectedProvider(),
         options.loadModelsForSelectedProvider(),
       ])
-      ElMessage.success('服务商已删除')
+      ElMessage.success(t('aiProvider.messages.providerDeleted'))
     }
     catch (error) {
-      ElMessage.error(getRequestErrorDisplayMessage(error, '删除服务商失败'))
+      ElMessage.error(getRequestErrorDisplayMessage(error, t('aiProvider.errors.deleteProvider')))
     }
   }
 
@@ -252,14 +254,14 @@ export function useAiCompatibleProviders(options: UseAiCompatibleProvidersOption
     try {
       const presets = await options.ensureCompatiblePresets()
       if (presets.length === 0) {
-        ElMessage.warning('暂无可添加的兼容服务商类型')
+        ElMessage.warning(t('aiProvider.messages.noCompatibleProviderTypes'))
         return null
       }
 
       return presets
     }
     catch (error) {
-      ElMessage.error(getRequestErrorDisplayMessage(error, '加载服务商类型失败'))
+      ElMessage.error(getRequestErrorDisplayMessage(error, t('aiProvider.errors.loadProviderTypes')))
       return null
     }
   }

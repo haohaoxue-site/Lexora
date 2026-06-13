@@ -1,4 +1,6 @@
+import type { NavigationItemDefinition } from '@/router/routes'
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 import { ADMIN_ROUTE_PATH, isAdminRoutePath } from '@/router/constants'
 import { adminNavigationItems, workspaceNavigationItems } from '@/router/routes'
@@ -16,16 +18,17 @@ const adminBrand = {
 
 export function useWorkspaceContainer() {
   const route = useRoute()
+  const { t } = useI18n({ useScope: 'global' })
   const uiStore = useUiStore()
 
   const isAdminContainer = computed(() => isAdminRoutePath(route.path))
   const brand = computed(() => isAdminContainer.value ? adminBrand : workspaceBrand)
   const navigationItems = computed(() => {
     if (isAdminContainer.value) {
-      return adminNavigationItems
+      return localizeNavigationItems(adminNavigationItems)
     }
 
-    return workspaceNavigationItems.map(item => item.name === 'home'
+    return localizeNavigationItems(workspaceNavigationItems.map(item => item.name === 'home'
       ? {
           ...item,
           to: uiStore.lastActiveChatSessionId
@@ -37,11 +40,18 @@ export function useWorkspaceContainer() {
               }
             : item.to,
         }
-      : item)
+      : item))
   })
 
   return {
     brand,
     navigationItems,
+  }
+
+  function localizeNavigationItems(items: NavigationItemDefinition[]) {
+    return items.map(({ labelKey, ...item }) => ({
+      ...item,
+      label: t(labelKey),
+    }))
   }
 }

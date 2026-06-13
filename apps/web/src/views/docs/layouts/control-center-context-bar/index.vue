@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import type { DocsControlCenterContextBarModel } from './typing'
+import { useI18n } from 'vue-i18n'
 
 const activeTab = defineModel<DocsControlCenterContextBarModel>({ required: true })
+const { t } = useI18n()
 </script>
 
 <template>
@@ -9,21 +11,21 @@ const activeTab = defineModel<DocsControlCenterContextBarModel>({ required: true
     <ElTabPane name="collaborations">
       <template #label>
         <span class="inline-flex h-[var(--default-header-height)] items-center pr-3.5 text-[15px] font-medium leading-none">
-          协作
+          {{ t('docs.common.collaboration') }}
         </span>
       </template>
     </ElTabPane>
     <ElTabPane name="publications">
       <template #label>
         <span class="inline-flex h-[var(--default-header-height)] items-center px-3.5 text-[15px] font-medium leading-none">
-          发布
+          {{ t('docs.common.publication') }}
         </span>
       </template>
     </ElTabPane>
     <ElTabPane name="trash">
       <template #label>
         <span class="inline-flex h-[var(--default-header-height)] items-center px-3.5 text-[15px] font-medium leading-none">
-          回收站
+          {{ t('docs.common.trash') }}
         </span>
       </template>
     </ElTabPane>

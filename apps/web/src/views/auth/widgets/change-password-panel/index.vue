@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import type { FormInstance } from 'element-plus'
 import { useTemplateRef } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useChangePassword } from '../../composables/useChangePassword'
 import AuthEntryShell from '../../layouts/entry-shell'
 
 const changePasswordFormRef = useTemplateRef<FormInstance>('changePasswordFormRef')
+const { t } = useI18n({ useScope: 'global' })
 const {
   form,
   formRules,
@@ -19,7 +21,7 @@ const {
 
 <template>
   <AuthEntryShell
-    title="修改密码"
+    :title="t('auth.changePassword.title')"
     :description="pageDescription"
   >
     <ElAlert
@@ -27,7 +29,7 @@ const {
       type="warning"
       show-icon
       :closable="false"
-      title="当前正在使用初始密码，请先修改后继续。"
+      :title="t('auth.changePassword.forceAlert')"
       class="mb-4"
     />
 
@@ -39,17 +41,17 @@ const {
       class="w-full"
       @submit.prevent="handleSubmitChangePassword"
     >
-      <ElFormItem label="当前密码" prop="currentPassword">
-        <ElInput v-model="form.currentPassword" type="password" show-password autocomplete="current-password" placeholder="输入当前密码" />
+      <ElFormItem :label="t('auth.changePassword.currentPassword')" prop="currentPassword">
+        <ElInput v-model="form.currentPassword" type="password" show-password autocomplete="current-password" :placeholder="t('auth.changePassword.currentPasswordPlaceholder')" />
       </ElFormItem>
-      <ElFormItem label="新密码" prop="newPassword">
-        <ElInput v-model="form.newPassword" type="password" show-password autocomplete="new-password" placeholder="输入新密码" />
+      <ElFormItem :label="t('auth.changePassword.newPassword')" prop="newPassword">
+        <ElInput v-model="form.newPassword" type="password" show-password autocomplete="new-password" :placeholder="t('auth.changePassword.newPasswordPlaceholder')" />
       </ElFormItem>
-      <ElFormItem label="确认新密码" prop="confirmPassword">
-        <ElInput v-model="form.confirmPassword" type="password" show-password autocomplete="new-password" placeholder="再次输入新密码" />
+      <ElFormItem :label="t('auth.changePassword.confirmNewPassword')" prop="confirmPassword">
+        <ElInput v-model="form.confirmPassword" type="password" show-password autocomplete="new-password" :placeholder="t('auth.changePassword.confirmNewPasswordPlaceholder')" />
       </ElFormItem>
       <ElButton type="primary" native-type="submit" class="mt-3 w-full min-h-[2.875rem]" :loading="isSubmitting">
-        保存新密码
+        {{ t('auth.changePassword.submit') }}
       </ElButton>
     </ElForm>
   </AuthEntryShell>

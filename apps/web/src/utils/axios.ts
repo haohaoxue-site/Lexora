@@ -2,6 +2,7 @@ import type { RequestResponse } from '@haohaoxue/samepage-contracts'
 import { SERVER_PATH } from '@haohaoxue/samepage-contracts/server'
 import { AUTH_ERROR_CODE } from '@haohaoxue/samepage-contracts/status-code'
 import rawAxios, { AxiosHeaders } from 'axios'
+import { i18n } from '@/i18n'
 import { useAuthStore } from '@/stores/auth'
 import { createRequestErrorFromResponseEnvelope, toRequestError } from '@/utils/request-error'
 
@@ -15,15 +16,17 @@ http.interceptors.request.use((config) => {
     config.withCredentials = true
   }
 
+  const headers = AxiosHeaders.from(config.headers)
+  headers.set('Accept-Language', i18n.global.locale.value)
+  config.headers = headers
+
   const authStore = useAuthStore()
 
   if (!authStore.accessToken) {
     return config
   }
 
-  const headers = AxiosHeaders.from(config.headers)
   headers.set('Authorization', `Bearer ${authStore.accessToken}`)
-  config.headers = headers
 
   return config
 })

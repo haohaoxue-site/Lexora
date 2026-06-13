@@ -3,6 +3,7 @@ import type { AiProviderConsoleMode } from '../typing'
 import type { AiProvider } from '@/apis/ai'
 import { AI_PROVIDER_AUTH_MODE } from '@haohaoxue/samepage-contracts/ai/constants'
 import { computed, reactive, shallowRef, toValue } from 'vue'
+import { useI18n } from 'vue-i18n'
 import {
   getPlatformAiProviderCredential,
   getUserAiProviderCredential,
@@ -26,6 +27,7 @@ export interface UseAiProviderCredentialsOptions {
 }
 
 export function useAiProviderCredentials(options: UseAiProviderCredentialsOptions) {
+  const { t } = useI18n({ useScope: 'global' })
   const isSavingEndpoint = shallowRef(false)
   const isSavingApiKey = shallowRef(false)
   const isLoadingApiKey = shallowRef(false)
@@ -77,7 +79,7 @@ export function useAiProviderCredentials(options: UseAiProviderCredentialsOption
     catch (error) {
       if (apiKeyRequestId === requestId) {
         apiKeyForm.apiKey = ''
-        ElMessage.error(getRequestErrorDisplayMessage(error, '加载 API Key 失败'))
+        ElMessage.error(getRequestErrorDisplayMessage(error, t('aiProvider.errors.loadApiKey')))
       }
     }
     finally {
@@ -103,10 +105,10 @@ export function useAiProviderCredentials(options: UseAiProviderCredentialsOption
 
       options.patchProvider(nextProvider)
       apiKeyForm.apiKey = apiKey
-      ElMessage.success(apiKey ? 'API Key 已保存' : 'API Key 已清空')
+      ElMessage.success(apiKey ? t('aiProvider.messages.apiKeySaved') : t('aiProvider.messages.apiKeyCleared'))
     }
     catch (error) {
-      ElMessage.error(getRequestErrorDisplayMessage(error, '保存 API Key 失败'))
+      ElMessage.error(getRequestErrorDisplayMessage(error, t('aiProvider.errors.saveApiKey')))
     }
     finally {
       isSavingApiKey.value = false
@@ -121,12 +123,12 @@ export function useAiProviderCredentials(options: UseAiProviderCredentialsOption
 
     const endpoint = endpointForm.endpoint.trim()
     if (!endpoint) {
-      ElMessage.warning('请输入 API 地址')
+      ElMessage.warning(t('aiProvider.messages.endpointRequired'))
       return false
     }
 
     if (!isValidProviderEndpointUrl(endpoint)) {
-      ElMessage.warning('请输入合法的 API 地址')
+      ElMessage.warning(t('aiProvider.messages.endpointInvalid'))
       return false
     }
 
@@ -144,11 +146,11 @@ export function useAiProviderCredentials(options: UseAiProviderCredentialsOption
 
       options.patchProvider(nextProvider)
       endpointForm.endpoint = nextProvider.endpoint ?? endpoint
-      ElMessage.success('API 地址已保存')
+      ElMessage.success(t('aiProvider.messages.endpointSaved'))
       return true
     }
     catch (error) {
-      ElMessage.error(getRequestErrorDisplayMessage(error, '保存 API 地址失败'))
+      ElMessage.error(getRequestErrorDisplayMessage(error, t('aiProvider.errors.saveEndpoint')))
       return false
     }
     finally {

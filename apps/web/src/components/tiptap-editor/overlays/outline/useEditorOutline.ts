@@ -13,6 +13,7 @@ import {
   shallowRef,
   watch,
 } from 'vue'
+import { translate } from '@/i18n'
 import {
   buildDocumentBlockHash,
   replaceCurrentDocumentBlockHash,
@@ -89,11 +90,11 @@ export function useEditorOutline(options: {
   }
 
   function getHeadingText(item: DocumentOutlineItem) {
-    return item.plainText.trim() || '未命名标题'
+    return item.plainText.trim() || translate('editor.outline.headingFallback')
   }
 
   function getSearchResultText(value: string) {
-    return value.trim() || '空块'
+    return value.trim() || translate('editor.outline.blockEmpty')
   }
 
   function getBlockHref(blockId: string) {

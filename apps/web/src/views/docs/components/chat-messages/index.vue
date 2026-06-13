@@ -2,6 +2,7 @@
 import type { ComponentPublicInstance } from 'vue'
 import type { DocsChatMessagesProps } from './typing'
 import { computed, useTemplateRef } from 'vue'
+import { useI18n } from 'vue-i18n'
 import ChatAssistantAvatar from '@/components/chat-message/ChatAssistantAvatar.vue'
 import ChatAssistantMessage from '@/components/chat-message/ChatAssistantMessage.vue'
 import ChatUserMessageContent from '@/components/chat-message/ChatUserMessageContent.vue'
@@ -9,6 +10,7 @@ import { useDynamicChatVirtualList } from '@/composables/chat/useDynamicChatVirt
 import { shouldShowAssistantPending } from '@/composables/chat/utils/chat-message-display'
 
 const props = defineProps<DocsChatMessagesProps>()
+const { t } = useI18n()
 
 const scrollContainerRef = useTemplateRef<HTMLElement>('scrollContainerRef')
 const hasMessages = computed(() => props.messages.length > 0)
@@ -43,10 +45,10 @@ function setVirtualItemElement(key: string, element: Element | ComponentPublicIn
   >
     <div v-if="!hasMessages" class="flex min-h-48 flex-col justify-center text-center text-secondary">
       <div class="text-[0.95rem] font-semibold leading-6 text-main">
-        开始新的文档对话
+        {{ t('docs.chat.emptyTitle') }}
       </div>
       <div class="mt-1 text-[13px] leading-[1.35rem]">
-        可以提问，或用 @ 添加文档上下文。
+        {{ t('docs.chat.emptyDescription') }}
       </div>
     </div>
 

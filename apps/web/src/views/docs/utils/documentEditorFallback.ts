@@ -1,6 +1,7 @@
 import type { DocsDocumentEditorFallbackProps } from '../typing'
 import { DOCUMENT_PANE_STATE } from '@haohaoxue/samepage-contracts/document/constants'
 import { SvgIconCategory } from '@/components/svg-icon/typing'
+import { translate } from '@/i18n'
 
 /**
  * 回退态操作。
@@ -28,23 +29,23 @@ export function resolveDocumentEditorFallbackState(
 ): DocumentEditorFallbackState {
   if (props.contentError) {
     return {
-      title: '文档内容暂时无法打开',
+      title: translate('docs.fallback.contentErrorTitle'),
       description: props.hasFallbackDocument
-        ? '这篇文档当前无法在编辑器中恢复，你可以重新加载，或先打开其他可用文档。'
-        : '这篇文档当前无法在编辑器中恢复，你可以重新加载后再试。',
+        ? translate('docs.fallback.contentErrorDescription')
+        : translate('docs.fallback.contentErrorRetryDescription'),
       iconCategory: SvgIconCategory.UI,
       icon: 'warning',
       actions: [
         {
           event: 'retryLoad',
-          label: '重新加载',
+          label: translate('docs.fallback.retry'),
           type: 'primary',
         },
         ...(
           props.hasFallbackDocument
             ? [{
                 event: 'openFallbackDocument' as const,
-                label: '打开可用文档',
+                label: translate('docs.fallback.openAvailableDocument'),
               }]
             : []
         ),
@@ -54,8 +55,10 @@ export function resolveDocumentEditorFallbackState(
 
   if (props.paneState === DOCUMENT_PANE_STATE.LOADING) {
     return {
-      title: '正在准备文档',
-      description: props.isLoading ? '正在加载当前文档，请稍候。' : '正在恢复最近打开的内容，请稍候。',
+      title: translate('docs.fallback.loadingTitle'),
+      description: props.isLoading
+        ? translate('docs.fallback.loadingCurrentDescription')
+        : translate('docs.fallback.loadingRecentDescription'),
       iconCategory: SvgIconCategory.UI,
       icon: 'spinner-orbit',
       spin: true,
@@ -65,14 +68,14 @@ export function resolveDocumentEditorFallbackState(
 
   if (props.paneState === DOCUMENT_PANE_STATE.EMPTY) {
     return {
-      title: '还没有文档',
-      description: '先创建第一篇文档，之后进入工作区会自动回到最近内容。',
+      title: translate('docs.fallback.emptyTitle'),
+      description: translate('docs.fallback.emptyDescription'),
       iconCategory: SvgIconCategory.UI,
       icon: 'document-add',
       actions: [
         {
           event: 'createDocument',
-          label: '新建第一篇文档',
+          label: translate('docs.fallback.createFirstDocument'),
           type: 'primary',
         },
       ],
@@ -81,24 +84,24 @@ export function resolveDocumentEditorFallbackState(
 
   if (props.paneState === DOCUMENT_PANE_STATE.UNSUPPORTED_SCHEMA) {
     return {
-      title: '文档 schema 版本不受支持',
+      title: translate('docs.fallback.unsupportedTitle'),
       description: props.hasFallbackDocument
-        ? '当前工作区版本无法打开这篇文档，你可以先切到其他可用文档继续工作。'
-        : '当前工作区版本无法打开这篇文档，请刷新或升级后再试。你也可以先新建其他文档继续工作。',
+        ? translate('docs.fallback.unsupportedDescription')
+        : translate('docs.fallback.unsupportedRetryDescription'),
       iconCategory: SvgIconCategory.UI,
       icon: 'warning',
       actions: props.hasFallbackDocument
         ? [
             {
               event: 'openFallbackDocument',
-              label: '打开可用文档',
+              label: translate('docs.fallback.openAvailableDocument'),
               type: 'primary',
             },
           ]
         : [
             {
               event: 'createDocument',
-              label: '新建文档',
+              label: translate('docs.fallback.createDocument'),
               type: 'primary',
             },
           ],
@@ -107,22 +110,22 @@ export function resolveDocumentEditorFallbackState(
 
   if (props.paneState === DOCUMENT_PANE_STATE.NOT_FOUND) {
     return {
-      title: '文档不存在',
-      description: '这个链接可能已经失效，或者文档已被删除。',
+      title: translate('docs.fallback.notFoundTitle'),
+      description: translate('docs.fallback.notFoundDescription'),
       iconCategory: SvgIconCategory.UI,
       icon: 'document-unknown',
       actions: props.hasFallbackDocument
         ? [
             {
               event: 'openFallbackDocument',
-              label: '打开可用文档',
+              label: translate('docs.fallback.openAvailableDocument'),
               type: 'primary',
             },
           ]
         : [
             {
               event: 'createDocument',
-              label: '新建文档',
+              label: translate('docs.fallback.createDocument'),
               type: 'primary',
             },
           ],
@@ -131,15 +134,15 @@ export function resolveDocumentEditorFallbackState(
 
   if (props.paneState === DOCUMENT_PANE_STATE.FORBIDDEN) {
     return {
-      title: '无权访问这篇文档',
-      description: '你可以先回到其他可访问的文档继续工作。',
+      title: translate('docs.fallback.forbiddenTitle'),
+      description: translate('docs.fallback.forbiddenDescription'),
       iconCategory: SvgIconCategory.UI,
       icon: 'lock',
       actions: props.hasFallbackDocument
         ? [
             {
               event: 'openFallbackDocument',
-              label: '打开可用文档',
+              label: translate('docs.fallback.openAvailableDocument'),
               type: 'primary',
             },
           ]
@@ -149,21 +152,21 @@ export function resolveDocumentEditorFallbackState(
 
   if (props.paneState === DOCUMENT_PANE_STATE.ERROR) {
     return {
-      title: '文档加载失败',
-      description: '当前内容暂时无法打开，你可以重试或先回到其他文档。',
+      title: translate('docs.fallback.errorTitle'),
+      description: translate('docs.fallback.errorDescription'),
       iconCategory: SvgIconCategory.UI,
       icon: 'warning',
       actions: [
         {
           event: 'retryLoad',
-          label: '重新加载',
+          label: translate('docs.fallback.retry'),
           type: 'primary',
         },
         ...(
           props.hasFallbackDocument
             ? [{
                 event: 'openFallbackDocument' as const,
-                label: '打开可用文档',
+                label: translate('docs.fallback.openAvailableDocument'),
               }]
             : []
         ),
@@ -172,22 +175,22 @@ export function resolveDocumentEditorFallbackState(
   }
 
   return {
-    title: '选择一篇文档',
-    description: '已进入文档工作区，先打开一篇文档再开始编辑。',
+    title: translate('docs.fallback.selectTitle'),
+    description: translate('docs.fallback.selectDescription'),
     iconCategory: SvgIconCategory.UI,
     icon: 'document-view',
     actions: props.hasFallbackDocument
       ? [
           {
             event: 'openFallbackDocument',
-            label: '打开第一篇文档',
+            label: translate('docs.fallback.openFirstDocument'),
             type: 'primary',
           },
         ]
       : [
           {
             event: 'createDocument',
-            label: '新建文档',
+            label: translate('docs.fallback.createDocument'),
             type: 'primary',
           },
         ],

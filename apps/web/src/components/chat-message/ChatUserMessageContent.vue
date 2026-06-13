@@ -2,6 +2,7 @@
 import type { ChatMessage } from '@/apis/chat'
 import { AGENT_TRANSLATOR_SKILL_KEY } from '@haohaoxue/samepage-contracts/agent'
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import {
   getAttachmentDisplayLabel,
   getPanelAttachments,
@@ -12,6 +13,7 @@ const props = defineProps<{
   message: Extract<ChatMessage, { role: 'user' }>
 }>()
 
+const { t } = useI18n({ useScope: 'global' })
 const panelAttachments = computed(() => getPanelAttachments(props.message.metadata.attachments))
 const bodyText = computed(() => serializeChatComposerContent(props.message.metadata.contentJSON).content || props.message.content)
 const translatorSkillLabel = computed(() => {
@@ -20,7 +22,7 @@ const translatorSkillLabel = computed(() => {
     return ''
   }
 
-  return `翻译到 ${skillInvocation.targetLanguage.name}`
+  return t('chat.messageDisplay.translateTo', { language: skillInvocation.targetLanguage.name })
 })
 </script>
 

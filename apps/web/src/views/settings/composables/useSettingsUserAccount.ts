@@ -8,6 +8,7 @@ import {
 import { formatAuthMethod, normalizeAuthProviderName } from '@haohaoxue/samepage-shared/auth'
 import { createSharedComposable } from '@vueuse/core'
 import { computed, reactive, shallowRef } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { requestBindEmailCode, startOauthBinding } from '@/apis/user'
 import { useUserStore } from '@/stores/user'
@@ -29,17 +30,18 @@ function createDefaultAccount(): UserSettings['account'] {
   }
 }
 
-function formatProviderLabel(provider: string) {
+function formatProviderLabel(provider: string, fallbackProviderLabel: string) {
   const normalizedProvider = normalizeAuthProviderName(provider)
 
   if (normalizedProvider) {
     return formatAuthMethod(normalizedProvider)
   }
 
-  return '第三方账号'
+  return fallbackProviderLabel
 }
 
 export const useSettingsUserAccount = createSharedComposable(() => {
+  const { t } = useI18n({ useScope: 'global' })
   const route = useRoute()
   const router = useRouter()
   const userStore = useUserStore()
@@ -88,10 +90,10 @@ export const useSettingsUserAccount = createSharedComposable(() => {
       await requestBindEmailCode({
         email: emailForm.email.trim(),
       })
-      ElMessage.success('验证码已发送，请前往邮箱查看')
+      ElMessage.success(t('settings.user.account.emailSent'))
     }
     catch (error) {
-      ElMessage.error(getRequestErrorDisplayMessage(error, '发送验证码失败'))
+      ElMessage.error(getRequestErrorDisplayMessage(error, t('settings.user.account.sendCodeFailed')))
     }
     finally {
       isSendingEmailCode.value = false
@@ -110,11 +112,11 @@ export const useSettingsUserAccount = createSharedComposable(() => {
       })
 
       syncEmailForm()
-      ElMessage.success(hadEmail ? '邮箱已更新' : '邮箱已绑定')
+      ElMessage.success(hadEmail ? t('settings.user.account.emailUpdated') : t('settings.user.account.emailBound'))
       return true
     }
     catch (error) {
-      ElMessage.error(getRequestErrorDisplayMessage(error, '绑定邮箱失败'))
+      ElMessage.error(getRequestErrorDisplayMessage(error, t('settings.user.account.bindEmailFailed')))
       return false
     }
     finally {
@@ -133,7 +135,7 @@ export const useSettingsUserAccount = createSharedComposable(() => {
     }
     catch (error) {
       bindingProvider.value = null
-      ElMessage.error(getRequestErrorDisplayMessage(error, '发起账号绑定失败'))
+      ElMessage.error(getRequestErrorDisplayMessage(error, t('settings.user.account.bindProviderFailed')))
     }
   }
 
@@ -143,10 +145,12 @@ export const useSettingsUserAccount = createSharedComposable(() => {
     try {
       await userStore.disconnectOauth(provider)
       syncEmailForm()
-      ElMessage.success(`${formatProviderLabel(provider)} 已解绑`)
+      ElMessage.success(t('settings.user.account.providerDisconnected', {
+        provider: formatProviderLabel(provider, t('settings.user.account.fallbackProvider')),
+      }))
     }
     catch (error) {
-      ElMessage.error(getRequestErrorDisplayMessage(error, '解绑失败'))
+      ElMessage.error(getRequestErrorDisplayMessage(error, t('settings.user.account.disconnectFailed')))
     }
     finally {
       disconnectingProvider.value = null
@@ -168,15 +172,17 @@ export const useSettingsUserAccount = createSharedComposable(() => {
     delete nextQuery[OAUTH_REDIRECT_QUERY.BIND_ERROR_CODE]
     await router.replace({ query: nextQuery })
 
+    const providerLabel = formatProviderLabel(provider, t('settings.user.account.fallbackProvider'))
+
     if (bindStatus === OAUTH_REDIRECT_BIND_STATUS.SUCCESS) {
-      ElMessage.success(`${formatProviderLabel(provider)} 账号已绑定`)
+      ElMessage.success(t('settings.user.account.providerBound', { provider: providerLabel }))
       return
     }
 
     ElMessage.error(resolveOAuthRedirectErrorMessage(bindErrorCode, {
       purpose: 'bind',
-      providerLabel: formatProviderLabel(provider),
-      fallbackMessage: `${formatProviderLabel(provider)} 账号绑定失败`,
+      providerLabel,
+      fallbackMessage: t('oauthRedirect.bindFailed', { provider: providerLabel }),
     }))
   }
 

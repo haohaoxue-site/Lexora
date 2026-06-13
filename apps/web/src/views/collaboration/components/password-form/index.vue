@@ -7,9 +7,11 @@ import type {
 } from './typing'
 import { DOCUMENT_COLLABORATION_LINK_PASSWORD_LENGTH } from '@haohaoxue/samepage-contracts/document/collaboration/constants'
 import { reactive, useTemplateRef, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 
 const props = defineProps<CollaborationPasswordFormProps>()
 const emit = defineEmits<CollaborationPasswordFormEmits>()
+const { t } = useI18n()
 const passwordFormRef = useTemplateRef<FormInstance>('passwordFormRef')
 const form = reactive({
   password: props.password,
@@ -44,7 +46,7 @@ defineExpose<CollaborationPasswordFormExposed>({
     label-position="top"
     class="collaboration-password-form"
   >
-    <ElFormItem label="链接密码" prop="password">
+    <ElFormItem :label="t('collaborationResolver.password')" prop="password">
       <ElInput
         v-model="form.password"
         type="password"
@@ -52,7 +54,7 @@ defineExpose<CollaborationPasswordFormExposed>({
         inputmode="numeric"
         :disabled="props.disabled"
         :maxlength="DOCUMENT_COLLABORATION_LINK_PASSWORD_LENGTH"
-        :placeholder="`请输入 ${DOCUMENT_COLLABORATION_LINK_PASSWORD_LENGTH} 位协作链接密码`"
+        :placeholder="t('collaborationResolver.passwordPlaceholder', { length: DOCUMENT_COLLABORATION_LINK_PASSWORD_LENGTH })"
         @keyup.enter="emit('submit')"
       />
     </ElFormItem>

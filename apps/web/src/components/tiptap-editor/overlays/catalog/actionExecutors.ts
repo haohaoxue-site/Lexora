@@ -11,6 +11,7 @@ import type {
   MenuActionRegistry,
   TextAlignAction,
 } from './actionRegistry'
+import { translate } from '@/i18n'
 import {
   applyHighlightColor as applyEditorHighlightColor,
   applyTextAlign as applyEditorTextAlign,
@@ -76,8 +77,8 @@ export function createMenuActionExecutors(
 
   const leafExecutors: Record<BlockMenuLeafAction, () => Promise<void> | void> = {
     comment: effects.requestComment,
-    cut: () => effects.runClipboardAction(() => cutCurrentBlockToClipboard(editor), '剪切失败'),
-    copy: () => effects.runClipboardAction(() => copyCurrentBlockToClipboard(editor), '复制失败'),
+    cut: () => effects.runClipboardAction(() => cutCurrentBlockToClipboard(editor), translate('editor.common.cutFailed')),
+    copy: () => effects.runClipboardAction(() => copyCurrentBlockToClipboard(editor), translate('editor.common.copyFailed')),
     delete: () => effects.runAndCloseMenu(() => deleteCurrentBlock(editor)),
   }
 

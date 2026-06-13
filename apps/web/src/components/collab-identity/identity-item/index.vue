@@ -2,11 +2,13 @@
 import type { CollabIdentityItemProps } from './typing'
 import { formatCollabIdentityLabel } from '@haohaoxue/samepage-shared/user'
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import EntityAvatar from '@/components/entity-avatar'
 
 const props = withDefaults(defineProps<CollabIdentityItemProps>(), {
   avatarSize: 40,
 })
+const { t } = useI18n()
 
 const identityLabel = computed(() => formatCollabIdentityLabel(props.identity))
 </script>
@@ -16,7 +18,7 @@ const identityLabel = computed(() => formatCollabIdentityLabel(props.identity))
     <EntityAvatar
       :name="props.identity.displayName"
       :src="props.identity.avatarUrl"
-      :alt="`${props.identity.displayName} 的头像`"
+      :alt="t('common.avatarAlt', { name: props.identity.displayName })"
       :size="props.avatarSize"
       shape="circle"
       kind="user"

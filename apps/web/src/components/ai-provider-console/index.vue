@@ -79,7 +79,6 @@ const {
   updateModelStatus,
   isModelUpdating,
   getProviderInitial,
-  getProviderStatusLabel,
   getProviderStatusType,
   handleRowContextMenu,
 } = useAiProviderConsole({
@@ -97,7 +96,6 @@ const {
       :rows="filteredRows"
       :selected-row-key="selectedRowKey"
       :get-provider-initial="getProviderInitial"
-      :get-provider-status-label="getProviderStatusLabel"
       :get-provider-status-type="getProviderStatusType"
       @select-row="selectRow"
       @open-create-provider="openCreateCompatibleProviderDialog"

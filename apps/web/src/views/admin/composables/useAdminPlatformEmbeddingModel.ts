@@ -3,6 +3,7 @@ import type {
   AiModelRef,
 } from '@/apis/ai'
 import { shallowRef } from 'vue'
+import { useI18n } from 'vue-i18n'
 import {
   getPlatformEmbeddingAiModel,
   updatePlatformEmbeddingAiModel,
@@ -11,6 +12,7 @@ import { ElMessage } from '@/utils/element-plus'
 import { getRequestErrorDisplayMessage } from '@/utils/request-error'
 
 export function useAdminPlatformEmbeddingModel() {
+  const { t } = useI18n({ useScope: 'global' })
   const platformModelSettingsVisible = shallowRef(false)
   const platformEmbeddingModelPolicy = shallowRef<AiDefaultModelPolicyItem | null>(null)
   const platformEmbeddingModelRef = shallowRef<AiModelRef | null>(null)
@@ -32,7 +34,7 @@ export function useAdminPlatformEmbeddingModel() {
       syncPlatformEmbeddingModel(await getPlatformEmbeddingAiModel())
     }
     catch (error) {
-      ElMessage.error(getRequestErrorDisplayMessage(error, '平台向量模型加载失败'))
+      ElMessage.error(getRequestErrorDisplayMessage(error, t('admin.errors.loadEmbeddingModel')))
     }
     finally {
       isPlatformEmbeddingModelLoading.value = false
@@ -54,11 +56,11 @@ export function useAdminPlatformEmbeddingModel() {
           : null,
       })
       syncPlatformEmbeddingModel(policy)
-      ElMessage.success(policy.modelRef ? '平台向量模型已更新' : '平台向量模型已清除')
+      ElMessage.success(policy.modelRef ? t('admin.platformModel.updated') : t('admin.platformModel.cleared'))
     }
     catch (error) {
       platformEmbeddingModelRef.value = previousModelRef
-      ElMessage.error(getRequestErrorDisplayMessage(error, '平台向量模型更新失败'))
+      ElMessage.error(getRequestErrorDisplayMessage(error, t('admin.errors.updateEmbeddingModel')))
     }
     finally {
       isPlatformEmbeddingModelSaving.value = false

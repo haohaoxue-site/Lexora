@@ -1,4 +1,5 @@
 import type {
+  ResolvedLanguagePreference,
   SystemEmailConfig,
   SystemEmailProvider,
   SystemEmailServiceStatus,
@@ -7,15 +8,14 @@ import type {
   UpdateSystemEmailServiceStatusRequest,
 } from '@haohaoxue/samepage-contracts'
 import type { CryptoConfig } from '../../config/auth.config'
-import { SYSTEM_EMAIL_PROVIDER_DEFAULTS } from '@haohaoxue/samepage-contracts'
-import {
-  BadRequestException,
-  Injectable,
-} from '@nestjs/common'
+import { API_ERROR_CODE, SYSTEM_EMAIL_PROVIDER_DEFAULTS } from '@haohaoxue/samepage-contracts'
+import { LANGUAGE_PREFERENCE } from '@haohaoxue/samepage-contracts/user/constants'
+import { Injectable } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { Prisma, SystemEmailProvider as PrismaSystemEmailProvider } from '@prisma/client'
 import { createTransport } from 'nodemailer'
 import { PrismaService } from '../../database/prisma.service'
+import { apiBadRequest } from '../../utils/api-error'
 import { decryptAes256Gcm, encryptAes256Gcm, isEncryptedValue } from '../../utils/crypto'
 import { auditUserSummarySelect, toAuditUserSummary } from '../users/audit-user-summary'
 import {
@@ -191,8 +191,12 @@ export class SystemEmailService {
     return this.getEmailServiceStatus()
   }
 
-  async sendTestEmail(recipientEmail: string): Promise<TestSystemEmailConfigResponse> {
+  async sendTestEmail(
+    recipientEmail: string,
+    language: ResolvedLanguagePreference = LANGUAGE_PREFERENCE.EN_US,
+  ): Promise<TestSystemEmailConfigResponse> {
     const config = await this.getTransportConfig(false)
+    const template = createTestEmailTemplate(language)
     const transport = createTransport({
       host: config.smtpHost,
       port: config.smtpPort,
@@ -206,12 +210,9 @@ export class SystemEmailService {
     await transport.sendMail({
       from: `"${config.fromName}" <${config.fromEmail}>`,
       to: recipientEmail,
-      subject: 'SamePage 发件配置测试',
-      html: createSimpleEmailHtml({
-        title: '发件配置已生效',
-        content: '这是一封来自 SamePage 的测试邮件，说明当前系统发件配置可正常发送。',
-      }),
-      text: '这是一封来自 SamePage 的测试邮件，说明当前系统发件配置可正常发送。',
+      subject: template.subject,
+      html: createSimpleEmailHtml(template),
+      text: template.content,
     })
 
     return { sent: true }
@@ -263,11 +264,11 @@ export class SystemEmailService {
       || !input.fromName.trim()
       || !input.fromEmail.trim()
     ) {
-      throw new BadRequestException('启用发件服务前请先保存完整的 SMTP 配置')
+      throw apiBadRequest(API_ERROR_CODE.SYSTEM_EMAIL_CONFIG_INCOMPLETE)
     }
 
     if (!input.smtpPassword) {
-      throw new BadRequestException('启用发件服务前请先填写并保存发件密码')
+      throw apiBadRequest(API_ERROR_CODE.SYSTEM_EMAIL_PASSWORD_MISSING)
     }
   }
 
@@ -285,17 +286,17 @@ export class SystemEmailService {
     })
 
     if (!config) {
-      throw new BadRequestException('系统暂未保存发件配置，请先在后台完成配置')
+      throw apiBadRequest(API_ERROR_CODE.SYSTEM_EMAIL_CONFIG_NOT_FOUND)
     }
 
     if (requireEnabled && !config.enabled) {
-      throw new BadRequestException('系统暂未启用发件邮箱，请先在后台完成配置')
+      throw apiBadRequest(API_ERROR_CODE.SYSTEM_EMAIL_DISABLED)
     }
 
     const smtpPassword = this.decryptPassword(config.smtpPasswordEncrypted)
 
     if (!smtpPassword) {
-      throw new BadRequestException('系统发件密码缺失，请先在后台补充配置')
+      throw apiBadRequest(API_ERROR_CODE.SYSTEM_EMAIL_PASSWORD_MISSING)
     }
 
     const normalizedFields = normalizeSystemEmailEditableFields({
@@ -313,7 +314,7 @@ export class SystemEmailService {
       || !Number.isFinite(config.smtpPort)
       || config.smtpPort <= 0
     ) {
-      throw new BadRequestException('请先保存完整的 SMTP 配置后再发送测试邮件')
+      throw apiBadRequest(API_ERROR_CODE.SYSTEM_EMAIL_CONFIG_INCOMPLETE)
     }
 
     return {
@@ -350,4 +351,20 @@ function createSimpleEmailHtml(input: {
     `<p style="margin:0;">${input.content}</p>`,
     '</div>',
   ].join('')
+}
+
+function createTestEmailTemplate(language: ResolvedLanguagePreference) {
+  if (language === LANGUAGE_PREFERENCE.ZH_CN) {
+    return {
+      subject: 'SamePage 发件配置测试',
+      title: '发件配置已生效',
+      content: '这是一封来自 SamePage 的测试邮件，说明当前系统发件配置可正常发送。',
+    }
+  }
+
+  return {
+    subject: 'SamePage email configuration test',
+    title: 'Email configuration is active',
+    content: 'This is a test email from SamePage. Your system email configuration can send mail.',
+  }
 }

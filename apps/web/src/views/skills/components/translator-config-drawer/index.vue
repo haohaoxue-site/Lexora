@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import type { AgentSkillCard, AgentTranslatorSkillConfig } from '@haohaoxue/samepage-contracts'
 import type { FormInstance } from 'element-plus'
-import { reactive, ref, watch } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import {
   createTranslatorConfigFormModel,
+  createTranslatorFormalityOptions,
+  createTranslatorOutputModeOptions,
   toTranslatorSkillConfig,
-  translatorFormalityOptions,
-  translatorOutputModeOptions,
 } from '../../utils/translator'
 
 const props = defineProps<{
@@ -16,9 +17,12 @@ const props = defineProps<{
 const emit = defineEmits<{
   submit: [config: AgentTranslatorSkillConfig]
 }>()
+const { t } = useI18n()
 const visible = defineModel<boolean>('visible', { required: true })
 const formRef = ref<FormInstance>()
 const formModel = reactive(createTranslatorConfigFormModel(null))
+const outputModeOptions = computed(() => createTranslatorOutputModeOptions(t))
+const formalityOptions = computed(() => createTranslatorFormalityOptions(t))
 
 watch(
   () => [props.skill?.key, props.skill?.config, visible.value] as const,
@@ -41,7 +45,7 @@ async function handleSubmit() {
 <template>
   <ElDrawer
     v-model="visible"
-    title="翻译设置"
+    :title="t('skills.translator.title')"
     size="32rem"
     destroy-on-close
   >
@@ -51,17 +55,17 @@ async function handleSubmit() {
       label-position="top"
       class="translator-config-form"
     >
-      <ElFormItem label="输出模式">
-        <ElSegmented v-model="formModel.outputMode" :options="translatorOutputModeOptions" block class="w-full" />
+      <ElFormItem :label="t('skills.translator.outputMode')">
+        <ElSegmented v-model="formModel.outputMode" :options="outputModeOptions" block class="w-full" />
       </ElFormItem>
 
-      <ElFormItem label="语气">
-        <ElSegmented v-model="formModel.formality" :options="translatorFormalityOptions" block class="w-full" />
+      <ElFormItem :label="t('skills.translator.formality')">
+        <ElSegmented v-model="formModel.formality" :options="formalityOptions" block class="w-full" />
       </ElFormItem>
 
       <ElFormItem>
         <ElCheckbox v-model="formModel.preserveFormatting">
-          保留 Markdown、列表、表格、链接和代码块结构
+          {{ t('skills.translator.preserveFormatting') }}
         </ElCheckbox>
       </ElFormItem>
     </ElForm>
@@ -69,10 +73,10 @@ async function handleSubmit() {
     <template #footer>
       <div class="flex justify-end gap-2">
         <ElButton :disabled="saving" @click="visible = false">
-          取消
+          {{ t('docs.common.cancel') }}
         </ElButton>
         <ElButton type="primary" :loading="saving" @click="handleSubmit">
-          保存
+          {{ t('docs.common.save') }}
         </ElButton>
       </div>
     </template>

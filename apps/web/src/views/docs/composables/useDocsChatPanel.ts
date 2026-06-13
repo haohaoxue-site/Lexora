@@ -5,6 +5,7 @@ import type { ChatStreamController, SendChatComposerMessageInput } from '@/compo
 import { createSharedComposable } from '@vueuse/core'
 import { computed, onMounted, shallowRef, watch } from 'vue'
 import { createChatComposerHostState } from '@/composables/chat/createChatComposerHostState'
+import { translate } from '@/i18n'
 import { ElMessageBox } from '@/utils/element-plus'
 import { useActiveDocument } from './useActiveDocument'
 import { useDocsChatEngine } from './useDocsChatEngine'
@@ -85,7 +86,7 @@ export function createDocsChatPanelController(options: {
   const messages = computed(() => renderSession.value?.messages ?? [])
   const renderSessionId = computed(() => renderSession.value?.id ?? null)
   const hasActiveSession = computed(() => Boolean(options.sessions.activeSession.value))
-  const activeSessionTitle = computed(() => options.sessions.activeSession.value?.title ?? '新对话')
+  const activeSessionTitle = computed(() => options.sessions.activeSession.value?.title ?? translate('docs.chat.titleFallback'))
 
   function openPanel() {
     isOpen.value = true
@@ -172,12 +173,12 @@ export function createDocsChatPanelController(options: {
 
     try {
       await ElMessageBox.confirm(
-        '删除后将退出这条文档对话，进入新的空白对话态。',
-        '删除对话',
+        translate('docs.chat.deleteConfirm'),
+        translate('docs.chat.deleteTitle'),
         {
           type: 'warning',
-          confirmButtonText: '删除',
-          cancelButtonText: '取消',
+          confirmButtonText: translate('docs.chat.delete'),
+          cancelButtonText: translate('docs.common.cancel'),
         },
       )
     }

@@ -1,11 +1,13 @@
 import type { ConfirmBindEmailRequest } from '@haohaoxue/samepage-contracts'
 import { randomInt } from 'node:crypto'
+import { API_ERROR_CODE } from '@haohaoxue/samepage-contracts'
+import { resolveLanguagePreference } from '@haohaoxue/samepage-shared'
 import {
-  BadRequestException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common'
 import { PrismaService } from '../../database/prisma.service'
+import { apiBadRequest } from '../../utils/api-error'
 import { normalizeEmail } from '../../utils/email'
 import { sha256Hex } from '../../utils/hash'
 import { AuthMailerService } from '../auth/auth-mailer.service'
@@ -16,6 +18,7 @@ import {
   BIND_EMAIL_CODE_TTL_SECONDS,
   MAX_BIND_EMAIL_CODE_ATTEMPTS,
 } from './users.constants'
+import { mapLanguagePreference } from './users.utils'
 
 @Injectable()
 export class UserEmailBindingsService {
@@ -25,9 +28,13 @@ export class UserEmailBindingsService {
     private readonly systemEmailService: SystemEmailService,
   ) {}
 
-  async requestBindEmailCode(userId: string, rawEmail: string): Promise<{ requested: boolean }> {
+  async requestBindEmailCode(
+    userId: string,
+    rawEmail: string,
+    preferredLanguages: readonly string[] = [],
+  ): Promise<{ requested: boolean }> {
     if (!(await this.systemEmailService.isEnabled())) {
-      throw new BadRequestException('当前暂不支持绑定邮箱')
+      throw apiBadRequest(API_ERROR_CODE.EMAIL_BINDING_UNAVAILABLE)
     }
 
     const email = normalizeEmail(rawEmail)
@@ -35,6 +42,11 @@ export class UserEmailBindingsService {
       where: { id: userId },
       select: {
         email: true,
+        preference: {
+          select: {
+            languagePreference: true,
+          },
+        },
       },
     })
 
@@ -43,7 +55,7 @@ export class UserEmailBindingsService {
     }
 
     if (user.email === email) {
-      throw new BadRequestException('当前邮箱已绑定到该账号')
+      throw apiBadRequest(API_ERROR_CODE.EMAIL_ALREADY_BOUND)
     }
 
     await this.assertEmailAvailable(userId, email)
@@ -61,7 +73,7 @@ export class UserEmailBindingsService {
     })
 
     if (existingCode && Date.now() - existingCode.lastSentAt.getTime() < BIND_EMAIL_CODE_RESEND_INTERVAL_MS) {
-      throw new BadRequestException('验证码发送过于频繁，请稍后再试')
+      throw apiBadRequest(API_ERROR_CODE.EMAIL_CODE_RATE_LIMITED)
     }
 
     await this.prisma.userEmailVerificationCode.updateMany({
@@ -90,6 +102,10 @@ export class UserEmailBindingsService {
     await this.authMailerService.sendBindEmailCodeEmail({
       email,
       code,
+      language: resolveLanguagePreference(
+        mapLanguagePreference(user.preference?.languagePreference),
+        preferredLanguages,
+      ),
     })
 
     return { requested: true }
@@ -111,11 +127,11 @@ export class UserEmailBindingsService {
     })
 
     if (!latestCode || latestCode.expiresAt.getTime() <= Date.now()) {
-      throw new BadRequestException('验证码已失效，请重新获取')
+      throw apiBadRequest(API_ERROR_CODE.EMAIL_CODE_EXPIRED)
     }
 
     if (latestCode.attemptCount >= MAX_BIND_EMAIL_CODE_ATTEMPTS) {
-      throw new BadRequestException('验证码输入错误次数过多，请重新获取')
+      throw apiBadRequest(API_ERROR_CODE.EMAIL_CODE_ATTEMPT_LIMIT_EXCEEDED)
     }
 
     if (latestCode.codeHash !== sha256Hex(code)) {
@@ -127,7 +143,7 @@ export class UserEmailBindingsService {
           },
         },
       })
-      throw new BadRequestException('验证码错误')
+      throw apiBadRequest(API_ERROR_CODE.EMAIL_CODE_INVALID)
     }
 
     await this.assertEmailAvailable(userId, email)
@@ -160,7 +176,7 @@ export class UserEmailBindingsService {
       })
 
       if (consumed.count !== 1) {
-        throw new BadRequestException('验证码已失效，请重新获取')
+        throw apiBadRequest(API_ERROR_CODE.EMAIL_CODE_EXPIRED)
       }
 
       await tx.user.update({
@@ -183,7 +199,7 @@ export class UserEmailBindingsService {
       const password = payload.newPassword
 
       if (!password) {
-        throw new BadRequestException('首次绑定邮箱需要同时设置登录密码')
+        throw apiBadRequest(API_ERROR_CODE.FIRST_EMAIL_BINDING_PASSWORD_REQUIRED)
       }
 
       await tx.localCredential.create({
@@ -206,7 +222,7 @@ export class UserEmailBindingsService {
     })
 
     if (existingUser && existingUser.id !== userId) {
-      throw new BadRequestException('该邮箱已被其他账号使用')
+      throw apiBadRequest(API_ERROR_CODE.EMAIL_ALREADY_USED)
     }
   }
 }

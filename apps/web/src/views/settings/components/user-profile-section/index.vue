@@ -2,6 +2,7 @@
 import type { FormInstance } from 'element-plus'
 import type { UserProfileSectionEmits, UserProfileSectionProps } from './typing'
 import { useTemplateRef } from 'vue'
+import { useI18n } from 'vue-i18n'
 import CopyStateIcon from '@/components/copy-state-icon/CopyStateIcon.vue'
 import EntityAvatar from '@/components/entity-avatar'
 import { useUserProfileSection } from '../../composables/useUserProfileSection'
@@ -12,6 +13,7 @@ const emit = defineEmits<UserProfileSectionEmits>()
 const displayNameModel = defineModel<string>('displayName', { required: true })
 const profileFormRef = useTemplateRef<FormInstance>('profileFormRef')
 const fileInputRef = useTemplateRef<HTMLInputElement>('fileInputRef')
+const { t } = useI18n({ useScope: 'global' })
 const {
   copiedUserCode,
   displayNameRules,
@@ -34,22 +36,24 @@ const {
 <template>
   <ElCard shadow="never" class="user-profile-section">
     <UserSettingsSectionHeader
-      title="个人资料"
+      :title="t('settings.user.profile.title')"
       :description="sectionDescription"
     >
       <template #aside>
         <div class="user-profile-section__collab-code grid min-w-[11.25rem] grid-cols-[minmax(0,1fr)_auto] items-center gap-2 rounded-lg px-2 py-[0.3125rem] pl-[0.625rem] max-[640px]:w-full max-[640px]:min-w-0">
           <span class="flex min-w-0 flex-col gap-[0.125rem]">
-            <span class="text-[0.625rem] leading-none text-secondary">协作码</span>
+            <span class="text-[0.625rem] leading-none text-secondary">
+              {{ t('settings.user.profile.collaborationCode') }}
+            </span>
             <strong class="truncate font-mono text-xs leading-[1.1] text-main">{{ props.userCode }}</strong>
           </span>
-          <ElTooltip content="复制协作码" placement="top">
+          <ElTooltip :content="t('settings.user.profile.copyCollaborationCode')" placement="top">
             <ElButton
               text
               circle
               :type="copiedUserCode ? 'success' : 'primary'"
               class="user-profile-section__copy-button"
-              :aria-label="copiedUserCode ? '协作码已复制' : '复制协作码'"
+              :aria-label="copiedUserCode ? t('settings.user.profile.collaborationCodeCopied') : t('settings.user.profile.copyCollaborationCode')"
               @click="handleCopyUserCode"
             >
               <CopyStateIcon :copied="copiedUserCode" />
@@ -63,7 +67,7 @@ const {
       <EntityAvatar
         :name="form.displayName"
         :src="props.avatarUrl"
-        :alt="`${form.displayName} 的头像`"
+        :alt="t('settings.user.profile.avatarAlt', { name: form.displayName })"
         :size="72"
         shape="circle"
         kind="user"
@@ -76,10 +80,10 @@ const {
           :loading="props.isUploading"
           @click="handlePickAvatar"
         >
-          {{ props.isUploading ? '上传中...' : '更换头像' }}
+          {{ props.isUploading ? t('settings.user.profile.avatarUploading') : t('settings.user.profile.changeAvatar') }}
         </ElButton>
         <p class="mt-2 text-xs text-secondary">
-          {{ props.canEditAvatar ? '支持 JPG、PNG、WEBP，大小不超过 2MB。' : '官方账号头像不可修改。' }}
+          {{ props.canEditAvatar ? t('settings.user.profile.avatarUploadHint') : t('settings.user.profile.avatarLockedHint') }}
         </p>
       </div>
 
@@ -100,7 +104,7 @@ const {
       class="flex flex-col gap-1"
       @submit.prevent="handleSaveDisplayName"
     >
-      <ElFormItem label="显示名称" prop="displayName">
+      <ElFormItem :label="t('settings.user.profile.displayName')" prop="displayName">
         <div class="user-profile-section__display-name-row flex w-full items-start gap-3">
           <ElInput
             v-model="form.displayName"
@@ -116,7 +120,7 @@ const {
             :loading="props.isSavingDisplayName"
             native-type="submit"
           >
-            保存
+            {{ t('settings.user.profile.save') }}
           </ElButton>
         </div>
       </ElFormItem>

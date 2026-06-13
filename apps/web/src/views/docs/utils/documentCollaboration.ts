@@ -8,12 +8,13 @@ import type {
 } from '@haohaoxue/samepage-contracts/user'
 import {
   DOCUMENT_COLLABORATION_COLLABORATOR_SOURCE,
-  DOCUMENT_COLLABORATION_PERMISSION_LABELS,
-  DOCUMENT_COLLABORATION_SCOPE_LABELS,
+  DOCUMENT_COLLABORATION_PERMISSION,
+  DOCUMENT_COLLABORATION_SCOPE,
 } from '@haohaoxue/samepage-contracts/document/collaboration/constants'
+import { translate } from '@/i18n'
 
 export function getCollaborationIdentityName(identity: UserCollabIdentity | { displayName: string, avatarUrl: string | null }) {
-  return identity.displayName || ('userCode' in identity ? identity.userCode : '用户')
+  return identity.displayName || ('userCode' in identity ? identity.userCode : translate('docs.collaboration.userFallback'))
 }
 
 export function getCollaborationAvatarText(identity: UserCollabIdentity | { displayName: string, avatarUrl: string | null }) {
@@ -28,21 +29,25 @@ export function formatCollaborationIdentity(identity: UserCollabIdentity) {
 }
 
 export function formatCollaborationPermission(permission: DocumentCollaborationPermission) {
-  return DOCUMENT_COLLABORATION_PERMISSION_LABELS[permission]
+  return permission === DOCUMENT_COLLABORATION_PERMISSION.EDIT
+    ? translate('docs.collaboration.canEdit')
+    : translate('docs.collaboration.canRead')
 }
 
 export function formatCollaborationScope(scope: DocumentCollaborationScope) {
-  return DOCUMENT_COLLABORATION_SCOPE_LABELS[scope]
+  return scope === DOCUMENT_COLLABORATION_SCOPE.DESCENDANTS
+    ? translate('docs.collaboration.scopeDescendants')
+    : translate('docs.collaboration.scopeSelf')
 }
 
 export function formatCollaborationSource(row: DocumentCollaborationCollaborator) {
   if (row.source === DOCUMENT_COLLABORATION_COLLABORATOR_SOURCE.DIRECT) {
-    return '当前页面授权'
+    return translate('docs.collaboration.directGrant')
   }
 
   if (row.inheritedFrom?.title) {
-    return `继承自「${row.inheritedFrom.title}」`
+    return translate('docs.collaboration.inheritedFromTitle', { title: row.inheritedFrom.title })
   }
 
-  return '继承自父级页面'
+  return translate('docs.collaboration.inheritedFromParent')
 }

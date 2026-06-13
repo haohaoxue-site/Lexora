@@ -1,13 +1,15 @@
+import type { ResolvedLanguagePreference } from '@haohaoxue/samepage-contracts'
 import type { Prisma } from '@prisma/client'
 import type { FastifyRequest } from 'fastify'
 import type { TokenExchangeResult } from './auth.interface'
 import { randomInt } from 'node:crypto'
-import { AUTH_METHOD } from '@haohaoxue/samepage-contracts'
+import { API_ERROR_CODE, AUTH_METHOD } from '@haohaoxue/samepage-contracts'
+import { LANGUAGE_PREFERENCE } from '@haohaoxue/samepage-contracts/user/constants'
 import {
-  BadRequestException,
   Injectable,
 } from '@nestjs/common'
 import { PrismaService } from '../../database/prisma.service'
+import { apiBadRequest } from '../../utils/api-error'
 import { normalizeEmail } from '../../utils/email'
 import { sha256Hex } from '../../utils/hash'
 import { resolveUniqueUserCode } from '../users/users.utils'
@@ -33,7 +35,11 @@ export class AuthRegistrationsService {
     private readonly registrationInviteGrantsService: RegistrationInviteGrantsService,
   ) {}
 
-  async requestEmailVerification(email: string, registrationInviteGrantToken?: string): Promise<void> {
+  async requestEmailVerification(
+    email: string,
+    registrationInviteGrantToken?: string,
+    language: ResolvedLanguagePreference = LANGUAGE_PREFERENCE.EN_US,
+  ): Promise<void> {
     await this.systemAuthService.assertRegistrationAllowed(AUTH_METHOD.PASSWORD)
 
     const normalizedEmail = normalizeEmail(email)
@@ -43,7 +49,7 @@ export class AuthRegistrationsService {
     })
 
     if (existingUser) {
-      throw new BadRequestException('该邮箱已存在账号，请直接登录')
+      throw apiBadRequest(API_ERROR_CODE.REGISTRATION_EMAIL_EXISTS)
     }
 
     await this.registrationInviteGrantsService.assertGrantReady({
@@ -67,7 +73,7 @@ export class AuthRegistrationsService {
       latestVerification
       && Date.now() - latestVerification.createdAt.getTime() < REGISTRATION_EMAIL_VERIFICATION_RESEND_INTERVAL_MS
     ) {
-      throw new BadRequestException('验证码发送过于频繁，请稍后再试')
+      throw apiBadRequest(API_ERROR_CODE.REGISTRATION_CODE_RATE_LIMITED)
     }
 
     await this.prisma.authEmailVerificationToken.updateMany({
@@ -95,6 +101,7 @@ export class AuthRegistrationsService {
     await this.authMailerService.sendRegistrationCodeEmail({
       email: normalizedEmail,
       code,
+      language,
     })
   }
 
@@ -109,7 +116,7 @@ export class AuthRegistrationsService {
     const normalizedDisplayName = displayName.trim()
 
     if (!normalizedDisplayName.length) {
-      throw new BadRequestException('显示名称不能为空')
+      throw apiBadRequest(API_ERROR_CODE.DISPLAY_NAME_REQUIRED)
     }
 
     await this.systemAuthService.assertRegistrationAllowed(AUTH_METHOD.PASSWORD)
@@ -123,7 +130,7 @@ export class AuthRegistrationsService {
       })
 
       if (existingUser) {
-        throw new BadRequestException('该邮箱已存在账号，请直接登录')
+        throw apiBadRequest(API_ERROR_CODE.REGISTRATION_EMAIL_EXISTS)
       }
 
       await this.registrationInviteGrantsService.consumeGrantByToken({
@@ -187,11 +194,11 @@ export class AuthRegistrationsService {
     })
 
     if (!token || token.expiresAt.getTime() <= Date.now()) {
-      throw new BadRequestException('验证码已失效，请重新获取')
+      throw apiBadRequest(API_ERROR_CODE.EMAIL_CODE_EXPIRED)
     }
 
     if (token.tokenHash !== sha256Hex(normalizedCode)) {
-      throw new BadRequestException('验证码错误')
+      throw apiBadRequest(API_ERROR_CODE.EMAIL_CODE_INVALID)
     }
 
     const consumed = await tx.authEmailVerificationToken.updateMany({
@@ -205,7 +212,7 @@ export class AuthRegistrationsService {
     })
 
     if (consumed.count !== 1) {
-      throw new BadRequestException('验证码已失效，请重新获取')
+      throw apiBadRequest(API_ERROR_CODE.EMAIL_CODE_EXPIRED)
     }
 
     return {

@@ -3,14 +3,15 @@ import type {
   AuthProviderName,
   ConfirmBindEmailRequest,
   LanguagePreference,
+  ResolvedLanguagePreference,
   SessionUser,
   UserSettings,
 } from '@haohaoxue/samepage-contracts'
 import type { DeepReadonly } from 'vue'
 import { ROLES } from '@haohaoxue/samepage-contracts/rbac/constants'
 import { APPEARANCE_PREFERENCE, LANGUAGE_PREFERENCE } from '@haohaoxue/samepage-contracts/user/constants'
-import { resolveAppearancePreference } from '@haohaoxue/samepage-shared/user'
-import { usePreferredDark } from '@vueuse/core'
+import { resolveAppearancePreference, resolveLanguagePreference } from '@haohaoxue/samepage-shared/user'
+import { usePreferredDark, usePreferredLanguages } from '@vueuse/core'
 import { defineStore } from 'pinia'
 import { computed, reactive, readonly, shallowRef, watch } from 'vue'
 import {
@@ -22,6 +23,8 @@ import {
   updateCurrentUserProfile,
   updateUserPreferences,
 } from '@/apis/user'
+import { setI18nLocale } from '@/i18n'
+import { setDayjsLocale } from '@/utils/dayjs'
 import { STORAGE_KEY } from '@/utils/storage'
 
 export const USER_PERSIST_KEY = STORAGE_KEY.user
@@ -77,6 +80,7 @@ export const useUserStore = defineStore('user', () => {
   const _settings = shallowRef<UserSettings | null>(null)
   const _preferences = reactive<UserSettings['preferences']>(createDefaultPreferences())
   const preferredDark = usePreferredDark()
+  const preferredLanguages = usePreferredLanguages()
   const isSavingLanguage = shallowRef(false)
   const isSavingAppearance = shallowRef(false)
   const currentUser = computed<DeepReadonly<SessionUser> | null>(() =>
@@ -92,6 +96,9 @@ export const useUserStore = defineStore('user', () => {
   )
   const resolvedAppearance = computed(() =>
     resolveAppearancePreference(_preferences.appearance, systemMode.value),
+  )
+  const resolvedLanguage = computed<ResolvedLanguagePreference>(() =>
+    resolveLanguagePreference(_preferences.language, preferredLanguages.value),
   )
   const isDark = computed(() => resolvedAppearance.value === APPEARANCE_PREFERENCE.DARK)
   const isSystemAdmin = computed(() => _currentUser.value?.roles.includes(ROLES.SYSTEM_ADMIN) ?? false)
@@ -110,6 +117,19 @@ export const useUserStore = defineStore('user', () => {
     }
 
     document.documentElement.classList.toggle('dark', value === APPEARANCE_PREFERENCE.DARK)
+  }, {
+    immediate: true,
+  })
+
+  watch(resolvedLanguage, (value) => {
+    setI18nLocale(value)
+    setDayjsLocale(value)
+
+    if (typeof document === 'undefined') {
+      return
+    }
+
+    document.documentElement.lang = value
   }, {
     immediate: true,
   })
@@ -161,8 +181,7 @@ export const useUserStore = defineStore('user', () => {
 
   function setSettings(nextSettings: UserSettings) {
     _settings.value = cloneUserSettings(nextSettings)
-    _preferences.language = nextSettings.preferences.language
-    _preferences.appearance = nextSettings.preferences.appearance
+    hydratePreferences(nextSettings.preferences)
   }
 
   function patchSettings(mutator: (current: UserSettings) => UserSettings) {
@@ -217,33 +236,20 @@ export const useUserStore = defineStore('user', () => {
       return
     }
 
+    const previousPreferences = clonePreferences(_preferences)
     isSavingLanguage.value = true
-    const previousLanguage = _preferences.language
-    _preferences.language = nextLanguage
-    patchSettings(currentSettings => ({
-      ...currentSettings,
-      preferences: {
-        ...currentSettings.preferences,
-        language: nextLanguage,
-      },
-    }))
+    hydratePreferences({
+      ...previousPreferences,
+      language: nextLanguage,
+    })
 
     try {
-      const nextPreferences = await updateUserPreferences({
+      hydratePreferences(await updateUserPreferences({
         language: nextLanguage,
-      })
-
-      hydratePreferences(nextPreferences)
+      }))
     }
     catch (error) {
-      _preferences.language = previousLanguage
-      patchSettings(currentSettings => ({
-        ...currentSettings,
-        preferences: {
-          ...currentSettings.preferences,
-          language: previousLanguage,
-        },
-      }))
+      hydratePreferences(previousPreferences)
       throw error
     }
     finally {
@@ -256,33 +262,20 @@ export const useUserStore = defineStore('user', () => {
       return
     }
 
+    const previousPreferences = clonePreferences(_preferences)
     isSavingAppearance.value = true
-    const previousAppearance = _preferences.appearance
-    _preferences.appearance = nextAppearance
-    patchSettings(currentSettings => ({
-      ...currentSettings,
-      preferences: {
-        ...currentSettings.preferences,
-        appearance: nextAppearance,
-      },
-    }))
+    hydratePreferences({
+      ...previousPreferences,
+      appearance: nextAppearance,
+    })
 
     try {
-      const nextPreferences = await updateUserPreferences({
+      hydratePreferences(await updateUserPreferences({
         appearance: nextAppearance,
-      })
-
-      hydratePreferences(nextPreferences)
+      }))
     }
     catch (error) {
-      _preferences.appearance = previousAppearance
-      patchSettings(currentSettings => ({
-        ...currentSettings,
-        preferences: {
-          ...currentSettings.preferences,
-          appearance: previousAppearance,
-        },
-      }))
+      hydratePreferences(previousPreferences)
       throw error
     }
     finally {
@@ -310,6 +303,7 @@ export const useUserStore = defineStore('user', () => {
     preferences,
     systemMode,
     resolvedAppearance,
+    resolvedLanguage,
     isDark,
     isSystemAdmin,
     requiresPasswordChange,

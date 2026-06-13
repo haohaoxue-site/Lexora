@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { LinkPreviewController } from './useLinkPreview'
 import { useClipboard } from '@vueuse/core'
+import { useI18n } from 'vue-i18n'
 import CopyStateIcon from '@/components/copy-state-icon/CopyStateIcon.vue'
 import { SvgIcon } from '@/components/svg-icon'
 import { ElMessage } from '@/utils/element-plus'
@@ -10,6 +11,7 @@ interface LinkPreviewProps {
 }
 
 const props = defineProps<LinkPreviewProps>()
+const { t } = useI18n()
 const { copy, copied, isSupported } = useClipboard({
   legacy: true,
 })
@@ -20,7 +22,7 @@ async function copyHref() {
   }
 
   if (!isSupported.value) {
-    ElMessage.error('当前环境不支持复制')
+    ElMessage.error(t('editor.common.copyUnsupported'))
     return
   }
 
@@ -28,7 +30,7 @@ async function copyHref() {
     await copy(props.controller.href.value)
   }
   catch {
-    ElMessage.error('复制失败')
+    ElMessage.error(t('editor.common.copyFailed'))
   }
 }
 </script>
@@ -55,7 +57,7 @@ async function copyHref() {
       <button
         type="button"
         class="tiptap-link-preview__icon-btn"
-        aria-label="复制链接"
+        :aria-label="t('editor.common.copy')"
         @click="copyHref"
         @mousedown.prevent
       >
@@ -69,7 +71,7 @@ async function copyHref() {
         @mousedown.prevent
       >
         <SvgIcon category="ui" icon="edit" size="1rem" />
-        <span>编辑</span>
+        <span>{{ t('editor.common.edit') }}</span>
       </button>
     </div>
   </Teleport>

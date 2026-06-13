@@ -1,14 +1,16 @@
 <script setup lang="ts">
 import type { AdminPageHeaderProps } from './typing'
+import { useI18n } from 'vue-i18n'
 import { ADMIN_ROUTE_NAME } from '@/router/constants'
 
 defineProps<AdminPageHeaderProps>()
+const { t } = useI18n({ useScope: 'global' })
 </script>
 
 <template>
   <ElBreadcrumb separator="/" class="admin-page-header min-w-0">
     <ElBreadcrumbItem :to="{ name: ADMIN_ROUTE_NAME }">
-      系统后台
+      {{ t('admin.common.systemAdmin') }}
     </ElBreadcrumbItem>
     <ElBreadcrumbItem>
       {{ title }}

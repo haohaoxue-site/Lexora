@@ -1,11 +1,12 @@
 import type { AppearancePreference } from '@haohaoxue/samepage-contracts'
-import type { SessionContextSwitchAction, SessionMenuUser } from './typing'
+import type { SessionAppearanceOption, SessionContextSwitchAction, SessionMenuUser } from './typing'
 import {
-  APPEARANCE_PREFERENCE_LABELS,
+  APPEARANCE_PREFERENCE,
   APPEARANCE_PREFERENCE_VALUES,
 } from '@haohaoxue/samepage-contracts/user/constants'
 import { useClipboard } from '@vueuse/core'
 import { computed, shallowRef, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { SvgIconCategory } from '@/components/svg-icon/typing'
 import { useSessionNotificationBell } from '@/layouts/components/session-notification-bell/useSessionNotificationBell'
@@ -16,18 +17,22 @@ import { useUserStore } from '@/stores/user'
 import { ElMessage } from '@/utils/element-plus'
 import { getRequestErrorDisplayMessage } from '@/utils/request-error'
 
-/**
- * 会话菜单组合参数。
- */
 interface UseSessionUserMenuOptions {
   showContextSwitch: boolean
 }
 
 type SessionMenuPanel = 'appearance' | 'notifications' | null
 
+const appearancePreferenceLabelKey = {
+  [APPEARANCE_PREFERENCE.AUTO]: 'settings.preference.appearance.auto',
+  [APPEARANCE_PREFERENCE.LIGHT]: 'settings.preference.appearance.light',
+  [APPEARANCE_PREFERENCE.DARK]: 'settings.preference.appearance.dark',
+} as const
+
 export function useSessionUserMenu(options: UseSessionUserMenuOptions) {
   const route = useRoute()
   const router = useRouter()
+  const { t } = useI18n({ useScope: 'global' })
   const userStore = useUserStore()
   const menuVisible = shallowRef(false)
   const activeSubmenu = shallowRef<SessionMenuPanel>(null)
@@ -66,10 +71,10 @@ export function useSessionUserMenu(options: UseSessionUserMenuOptions) {
     legacy: true,
   })
 
-  const appearanceOptions = APPEARANCE_PREFERENCE_VALUES.map(value => ({
-    label: APPEARANCE_PREFERENCE_LABELS[value],
+  const appearanceOptions = computed<SessionAppearanceOption[]>(() => APPEARANCE_PREFERENCE_VALUES.map(value => ({
+    label: t(appearancePreferenceLabelKey[value]),
     value,
-  }))
+  })))
   const appearanceMenuVisible = computed(() => activeSubmenu.value === 'appearance')
   const notificationPanelVisible = computed(() => activeSubmenu.value === 'notifications')
   const currentUser = computed<SessionMenuUser>(() => {
@@ -90,7 +95,7 @@ export function useSessionUserMenu(options: UseSessionUserMenuOptions) {
 
     if (isAdminRoute.value) {
       return {
-        label: '进入工作区',
+        label: t('sessionMenu.context.enterWorkspace'),
         iconCategory: SvgIconCategory.UI,
         icon: 'arrow-left',
       }
@@ -98,7 +103,7 @@ export function useSessionUserMenu(options: UseSessionUserMenuOptions) {
 
     if (userStore.isSystemAdmin) {
       return {
-        label: '进入管理区',
+        label: t('sessionMenu.context.enterAdmin'),
         iconCategory: SvgIconCategory.UI,
         icon: 'user-admin',
       }
@@ -107,7 +112,7 @@ export function useSessionUserMenu(options: UseSessionUserMenuOptions) {
     return null
   })
   const currentAppearance = computed(() => userStore.preferences.appearance)
-  const currentAppearanceLabel = computed(() => APPEARANCE_PREFERENCE_LABELS[currentAppearance.value])
+  const currentAppearanceLabel = computed(() => t(appearancePreferenceLabelKey[currentAppearance.value]))
   const isSavingAppearance = computed(() => userStore.isSavingAppearance)
 
   watch(sessionUser, (user) => {
@@ -199,7 +204,7 @@ export function useSessionUserMenu(options: UseSessionUserMenuOptions) {
       await userStore.updateAppearancePreference(mode)
     }
     catch (error) {
-      ElMessage.error(getRequestErrorDisplayMessage(error, '保存外观偏好失败'))
+      ElMessage.error(getRequestErrorDisplayMessage(error, t('settings.preference.saveAppearanceFailed')))
     }
   }
 
@@ -233,16 +238,16 @@ export function useSessionUserMenu(options: UseSessionUserMenuOptions) {
 
   async function handleCopyUserCode() {
     if (!isClipboardSupported.value) {
-      ElMessage.error('当前环境不支持复制')
+      ElMessage.error(t('sessionMenu.collaborationCode.copyUnsupported'))
       return
     }
 
     try {
       await copy(currentUser.value.userCode)
-      ElMessage.success('协作码已复制')
+      ElMessage.success(t('sessionMenu.collaborationCode.copied'))
     }
     catch {
-      ElMessage.error('复制失败')
+      ElMessage.error(t('sessionMenu.collaborationCode.copyFailed'))
     }
   }
 

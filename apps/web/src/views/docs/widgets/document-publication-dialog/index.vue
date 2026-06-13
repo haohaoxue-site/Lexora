@@ -12,12 +12,12 @@ import {
   DOCUMENT_SINGLE_PUBLICATION_EFFECTIVE_STATE,
   DOCUMENT_SINGLE_PUBLICATION_ROUTE_PREFIX,
   DOCUMENT_SINGLE_PUBLICATION_SCOPE,
-  DOCUMENT_SINGLE_PUBLICATION_SCOPE_LABELS,
   DOCUMENT_SINGLE_PUBLICATION_SCOPE_VALUES,
   DOCUMENT_SINGLE_PUBLICATION_STATE,
 } from '@haohaoxue/samepage-contracts/document/publication/constants'
 import { useClipboard } from '@vueuse/core'
 import { computed, shallowRef, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import {
   getDocumentSinglePublication,
   updateDocumentSinglePublication,
@@ -28,6 +28,7 @@ const props = withDefaults(defineProps<DocumentPublicationDialogProps>(), {
   documentId: '',
 })
 const emits = defineEmits<DocumentPublicationDialogEmits>()
+const { t } = useI18n()
 const { copy, isSupported: isClipboardSupported } = useClipboard({
   legacy: true,
 })
@@ -57,31 +58,35 @@ const isPublished = computed(() =>
 )
 const publicationAccessTitle = computed(() => {
   if (isPublished.value) {
-    return '互联网获得链接的人'
+    return t('docs.publication.publicReaders')
   }
 
   if (effectiveState.value === DOCUMENT_SINGLE_PUBLICATION_EFFECTIVE_STATE.DISABLED) {
-    return '当前页面已关闭'
+    return t('docs.publication.closed')
   }
 
-  return '未开启'
+  return t('docs.publication.off')
 })
 const publicationAccessDescription = computed(() => {
   if (isPublished.value) {
-    return '互联网获得链接的人可阅读'
+    return t('docs.publication.publicReadersCanRead')
   }
 
   if (currentState.value === DOCUMENT_SINGLE_PUBLICATION_STATE.DISABLED) {
-    return '当前页面不会继承父级公开状态'
+    return t('docs.publication.wontInherit')
   }
 
-  return '只有拥有文档权限的人可以访问'
+  return t('docs.publication.readByPermission')
 })
-const currentScopeLabel = computed(() => DOCUMENT_SINGLE_PUBLICATION_SCOPE_LABELS[currentScope.value])
-const publicationScopeOptions = DOCUMENT_SINGLE_PUBLICATION_SCOPE_VALUES.map(value => ({
-  label: DOCUMENT_SINGLE_PUBLICATION_SCOPE_LABELS[value],
+const publicationScopeLabelKey = {
+  [DOCUMENT_SINGLE_PUBLICATION_SCOPE.PAGE]: 'docs.publication.scopePage',
+  [DOCUMENT_SINGLE_PUBLICATION_SCOPE.DESCENDANTS]: 'docs.publication.scopeTree',
+} as const satisfies Record<DocumentSinglePublicationScope, string>
+const currentScopeLabel = computed(() => t(publicationScopeLabelKey[currentScope.value]))
+const publicationScopeOptions = computed(() => DOCUMENT_SINGLE_PUBLICATION_SCOPE_VALUES.map(value => ({
+  label: t(publicationScopeLabelKey[value]),
   value,
-}))
+})))
 
 watch(
   () => [props.modelValue, normalizedDocumentId.value] as const,
@@ -120,7 +125,7 @@ async function loadPublicationInfo() {
   }
   catch (error) {
     publicationInfo.value = null
-    errorMessage.value = error instanceof Error ? error.message : '加载页面分享设置失败'
+    errorMessage.value = error instanceof Error ? error.message : t('docs.publication.loadFailed')
   }
   finally {
     isLoading.value = false
@@ -143,10 +148,10 @@ async function updatePublicationState(
 
   try {
     publicationInfo.value = await updateDocumentSinglePublication(normalizedDocumentId.value, { state, scope })
-    ElMessage.success('页面分享状态已更新')
+    ElMessage.success(t('docs.publication.updated'))
   }
   catch (error) {
-    ElMessage.error(error instanceof Error ? error.message : '更新页面分享状态失败')
+    ElMessage.error(error instanceof Error ? error.message : t('docs.publication.updateFailed'))
   }
   finally {
     isSaving.value = false
@@ -159,16 +164,16 @@ async function copyPublicationUrl() {
   }
 
   if (!isClipboardSupported.value) {
-    ElMessage.error('当前环境不支持复制')
+    ElMessage.error(t('docs.common.copyUnsupported'))
     return
   }
 
   try {
     await copy(publicationUrl.value)
-    ElMessage.success('页面链接已复制')
+    ElMessage.success(t('docs.publication.linkCopied'))
   }
   catch {
-    ElMessage.error('复制失败')
+    ElMessage.error(t('docs.common.copyFailed'))
   }
 }
 
@@ -193,8 +198,8 @@ function openPublication() {
   >
     <template #header>
       <div class="inline-flex items-center gap-2">
-        <span class="text-[1.15rem] font-bold leading-[1.4] text-main">分享页面</span>
-        <ElTooltip content="页面分享是公开阅读链接，不会创建协作者" placement="top">
+        <span class="text-[1.15rem] font-bold leading-[1.4] text-main">{{ t('docs.publication.shareTitle') }}</span>
+        <ElTooltip :content="t('docs.publication.shareDescription')" placement="top">
           <span class="inline-flex text-[var(--brand-text-tertiary)]">
             <SvgIcon category="ui" icon="info" size="0.95rem" />
           </span>
@@ -214,7 +219,7 @@ function openPublication() {
       <template v-else>
         <ElAlert
           v-if="effectiveState === DOCUMENT_SINGLE_PUBLICATION_EFFECTIVE_STATE.INHERITED_ENABLED"
-          title="当前页面继承了父级公开状态"
+          :title="t('docs.publication.inheritedHint')"
           type="info"
           :closable="false"
           show-icon
@@ -251,19 +256,19 @@ function openPublication() {
                       :command="DOCUMENT_SINGLE_PUBLICATION_STATE.INHERIT"
                       :disabled="currentState === DOCUMENT_SINGLE_PUBLICATION_STATE.INHERIT"
                     >
-                      继承父级
+                      {{ t('docs.publication.inherited') }}
                     </ElDropdownItem>
                     <ElDropdownItem
                       :command="DOCUMENT_SINGLE_PUBLICATION_STATE.ENABLED"
                       :disabled="currentState === DOCUMENT_SINGLE_PUBLICATION_STATE.ENABLED"
                     >
-                      公开链接
+                      {{ t('docs.publication.openLink') }}
                     </ElDropdownItem>
                     <ElDropdownItem
                       :command="DOCUMENT_SINGLE_PUBLICATION_STATE.DISABLED"
                       :disabled="currentState === DOCUMENT_SINGLE_PUBLICATION_STATE.DISABLED"
                     >
-                      关闭当前页
+                      {{ t('docs.publication.closeCurrent') }}
                     </ElDropdownItem>
                   </ElDropdownMenu>
                 </template>
@@ -314,14 +319,14 @@ function openPublication() {
           @click="copyPublicationUrl"
         >
           <SvgIcon category="ui" icon="link" size="0.95rem" />
-          复制链接
+          {{ t('docs.publication.copyLink') }}
         </ElButton>
         <ElButton
           text
           :disabled="!isPublished"
           @click="openPublication"
         >
-          查看页面
+          {{ t('docs.publication.viewPage') }}
         </ElButton>
       </div>
     </template>

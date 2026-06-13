@@ -13,6 +13,7 @@ import type {
 } from '@/apis/ai'
 import { AI_MODEL_CAPABILITY, AI_MODEL_MODALITY, AI_MODEL_TYPE } from '@haohaoxue/samepage-contracts/ai/constants'
 import { computed, nextTick, reactive, shallowRef, toValue } from 'vue'
+import { useI18n } from 'vue-i18n'
 import {
   discoverPlatformAiProviderModels,
   discoverUserAiProviderModels,
@@ -45,6 +46,7 @@ export interface UseAiProviderModelsOptions {
 }
 
 export function useAiProviderModels(options: UseAiProviderModelsOptions) {
+  const { t } = useI18n({ useScope: 'global' })
   const models = shallowRef<AiProviderModelItem[]>([])
   const discoveredModels = shallowRef<AiProviderModelItem[]>([])
   const discoverSearchKeyword = shallowRef('')
@@ -69,7 +71,7 @@ export function useAiProviderModels(options: UseAiProviderModelsOptions) {
         return
       }
 
-      callback(new Error('至少选择一项'))
+      callback(new Error(t('aiProvider.validation.requireModality')))
     },
     trigger: 'change',
   }
@@ -79,7 +81,7 @@ export function useAiProviderModels(options: UseAiProviderModelsOptions) {
 
   const totalModelCount = computed(() => models.value.length)
   const enabledModelCount = computed(() => models.value.filter(model => model.enabled).length)
-  const discoverModelsButtonText = computed(() => '获取模型列表')
+  const discoverModelsButtonText = computed(() => t('aiProvider.discover.fetch'))
   const filteredDiscoveredModels = computed(() => {
     const keyword = discoverSearchKeyword.value.trim().toLowerCase()
     if (!keyword) {
@@ -93,10 +95,13 @@ export function useAiProviderModels(options: UseAiProviderModelsOptions) {
   })
   const modelSummaryText = computed(() => {
     if (models.value.length > 0) {
-      return `共 ${models.value.length} 个模型，已启用 ${enabledModelCount.value} 个。`
+      return t('aiProvider.model.summary', {
+        enabled: enabledModelCount.value,
+        total: models.value.length,
+      })
     }
 
-    return '获取模型列表或手动添加模型后可启用服务商。'
+    return t('aiProvider.model.summaryEmpty')
   })
   const shouldShowModelsEmptyState = computed(() => !isLoadingModels.value && models.value.length === 0)
 
@@ -124,7 +129,7 @@ export function useAiProviderModels(options: UseAiProviderModelsOptions) {
     }
     catch (error) {
       models.value = []
-      ElMessage.error(getRequestErrorDisplayMessage(error, '加载模型失败'))
+      ElMessage.error(getRequestErrorDisplayMessage(error, t('aiProvider.errors.loadModels')))
     }
     finally {
       isLoadingModels.value = false
@@ -171,11 +176,11 @@ export function useAiProviderModels(options: UseAiProviderModelsOptions) {
 
       discoveredModels.value = result.models
       if (optionsOverride.showSuccessMessage ?? true) {
-        ElMessage.success(`已发现 ${result.models.length} 个模型`)
+        ElMessage.success(t('aiProvider.messages.modelsDiscovered', { count: result.models.length }))
       }
     }
     catch (error) {
-      ElMessage.error(getRequestErrorDisplayMessage(error, '获取模型列表失败'))
+      ElMessage.error(getRequestErrorDisplayMessage(error, t('aiProvider.errors.discoverModels')))
     }
     finally {
       isDiscoveringModels.value = false
@@ -204,10 +209,10 @@ export function useAiProviderModels(options: UseAiProviderModelsOptions) {
       models.value = sortModels(result.models)
       discoveredModels.value = discoveredModels.value.map(model => savedModelById.get(model.modelId) ?? model)
       options.patchProviderModelCount(provider.providerId, result.models.length)
-      ElMessage.success(`已添加 ${targetModels.length} 个模型`)
+      ElMessage.success(t('aiProvider.messages.modelsAdded', { count: targetModels.length }))
     }
     catch (error) {
-      ElMessage.error(getRequestErrorDisplayMessage(error, '添加全部模型失败'))
+      ElMessage.error(getRequestErrorDisplayMessage(error, t('aiProvider.errors.addAllModels')))
     }
     finally {
       isAddingDiscoveredModels.value = false
@@ -215,7 +220,7 @@ export function useAiProviderModels(options: UseAiProviderModelsOptions) {
   }
 
   async function updateModelStatus(model: AiProviderModelItem, value: string | number | boolean) {
-    await upsertModelStatus(model, Boolean(value), '更新模型状态失败')
+    await upsertModelStatus(model, Boolean(value), t('aiProvider.errors.updateModelStatus'))
   }
 
   async function upsertModelStatus(model: AiProviderModelItem, enabled: boolean, errorMessage: string) {
@@ -286,10 +291,10 @@ export function useAiProviderModels(options: UseAiProviderModelsOptions) {
       patchSavedModel(item)
       patchDiscoveredModel(item)
       createModelDialogVisible.value = false
-      ElMessage.success('模型已添加')
+      ElMessage.success(t('aiProvider.messages.modelAdded'))
     }
     catch (error) {
-      ElMessage.error(getRequestErrorDisplayMessage(error, '添加模型失败'))
+      ElMessage.error(getRequestErrorDisplayMessage(error, t('aiProvider.errors.addModel')))
     }
     finally {
       isCreatingModel.value = false
@@ -339,10 +344,10 @@ export function useAiProviderModels(options: UseAiProviderModelsOptions) {
       patchDiscoveredModel(item)
       modelCapabilityDialogVisible.value = false
       editingModel.value = null
-      ElMessage.success('模型配置已保存')
+      ElMessage.success(t('aiProvider.messages.modelConfigSaved'))
     }
     catch (error) {
-      ElMessage.error(getRequestErrorDisplayMessage(error, '保存模型配置失败'))
+      ElMessage.error(getRequestErrorDisplayMessage(error, t('aiProvider.errors.saveModelConfig')))
     }
     finally {
       const nextIds = new Set(updatingModelIds.value)
@@ -434,9 +439,9 @@ export function useAiProviderModels(options: UseAiProviderModelsOptions) {
 
   function createModelFormRules(form: AiProviderCreateModelForm | AiProviderModelCapabilityForm) {
     return {
-      modelId: [{ required: true, message: '请输入模型 ID', trigger: 'blur' }],
-      modelName: [{ required: true, message: '请输入模型名称', trigger: 'blur' }],
-      modelType: [{ required: true, message: '请选择模型类型', trigger: 'change' }],
+      modelId: [{ required: true, message: t('aiProvider.validation.modelIdRequired'), trigger: 'blur' }],
+      modelName: [{ required: true, message: t('aiProvider.validation.modelNameRequired'), trigger: 'blur' }],
+      modelType: [{ required: true, message: t('aiProvider.validation.modelTypeRequired'), trigger: 'change' }],
       inputModalities: [requiredListRule, createModelModalitiesRule(form, 'input')],
       outputModalities: [requiredListRule, createModelModalitiesRule(form, 'output')],
       contextWindow: [createModelLimitRule(form)],
@@ -461,7 +466,7 @@ export function useAiProviderModels(options: UseAiProviderModelsOptions) {
     return {
       validator: (_rule, _value: unknown, callback: (error?: Error) => void) => {
         if (form.contextWindow !== null && form.maxOutputTokens !== null && form.maxOutputTokens > form.contextWindow) {
-          callback(new Error('最大输出不能大于上下文窗口'))
+          callback(new Error(t('aiProvider.validation.maxOutputLimit')))
           return
         }
 
@@ -476,19 +481,19 @@ export function useAiProviderModels(options: UseAiProviderModelsOptions) {
     target: 'input' | 'output',
   ) {
     if (form.modelType === AI_MODEL_TYPE.CHAT) {
-      return requireModality(form, target, AI_MODEL_MODALITY.TEXT, target === 'input' ? '对话生成模型必须支持文本输入' : '对话生成模型必须支持文本输出')
+      return requireModality(form, target, AI_MODEL_MODALITY.TEXT, target === 'input' ? t('aiProvider.validation.requireChatInput') : t('aiProvider.validation.requireChatOutput'))
     }
     if (form.modelType === AI_MODEL_TYPE.EMBEDDING) {
-      return requireModality(form, target, target === 'input' ? AI_MODEL_MODALITY.TEXT : AI_MODEL_MODALITY.EMBEDDING, target === 'input' ? '向量模型必须支持文本输入' : '向量模型必须输出向量')
+      return requireModality(form, target, target === 'input' ? AI_MODEL_MODALITY.TEXT : AI_MODEL_MODALITY.EMBEDDING, target === 'input' ? t('aiProvider.validation.requireEmbeddingInput') : t('aiProvider.validation.requireEmbeddingOutput'))
     }
     if (form.modelType === AI_MODEL_TYPE.RERANK) {
-      return requireModality(form, target, AI_MODEL_MODALITY.TEXT, target === 'input' ? '重排模型必须支持文本输入' : '重排模型必须输出文本相关结果')
+      return requireModality(form, target, AI_MODEL_MODALITY.TEXT, target === 'input' ? t('aiProvider.validation.requireRerankInput') : t('aiProvider.validation.requireRerankOutput'))
     }
     if (form.modelType === AI_MODEL_TYPE.IMAGE && target === 'output') {
-      return requireModality(form, target, AI_MODEL_MODALITY.IMAGE, '图像模型必须输出图像')
+      return requireModality(form, target, AI_MODEL_MODALITY.IMAGE, t('aiProvider.validation.requireImageOutput'))
     }
     if (form.modelType === AI_MODEL_TYPE.AUDIO && !form.inputModalities.includes(AI_MODEL_MODALITY.AUDIO) && !form.outputModalities.includes(AI_MODEL_MODALITY.AUDIO)) {
-      return '音频模型必须支持音频输入或音频输出'
+      return t('aiProvider.validation.requireAudioModality')
     }
 
     return null

@@ -11,6 +11,7 @@ import type {
   TiptapEditorUploadedImage,
 } from '@/components/tiptap-editor/content/typing'
 import { PLATFORM_NOTIFICATION_STATUS } from '@haohaoxue/samepage-contracts/notification'
+import { useI18n } from 'vue-i18n'
 import { StandaloneContentEditor } from '@/components/tiptap-editor'
 import { formatDateTime } from '@/utils/dayjs'
 
@@ -50,6 +51,7 @@ interface NotificationsPanelEmits {
 
 const props = defineProps<NotificationsPanelProps>()
 const emits = defineEmits<NotificationsPanelEmits>()
+const { t } = useI18n({ useScope: 'global' })
 
 function handleDrawerVisibleUpdate(visible: boolean) {
   if (!visible) {
@@ -87,41 +89,41 @@ function isPublishedNotification(notification: PlatformNotification) {
         class="admin-notifications__table"
         height="calc(100vh - 15rem)"
       >
-        <ElTableColumn label="标题" min-width="220">
+        <ElTableColumn :label="t('admin.notifications.title')" min-width="220">
           <template #default="{ row }">
             <div class="min-w-0">
               <p class="m-0 truncate text-sm font-semibold leading-5 text-main">
                 {{ row.title }}
               </p>
               <p class="m-0 mt-1 line-clamp-2 text-xs leading-5 text-secondary">
-                {{ row.summary || '暂无摘要' }}
+                {{ row.summary || t('admin.notifications.noSummary') }}
               </p>
             </div>
           </template>
         </ElTableColumn>
-        <ElTableColumn label="状态" width="120">
+        <ElTableColumn :label="t('admin.notifications.status')" width="120">
           <template #default="{ row }">
             <ElTag :type="row.status === 'PUBLISHED' ? 'success' : 'info'" effect="plain">
               {{ props.getStatusLabel(row.status) }}
             </ElTag>
           </template>
         </ElTableColumn>
-        <ElTableColumn label="发布时间" width="180">
+        <ElTableColumn :label="t('admin.notifications.publishedAt')" width="180">
           <template #default="{ row }">
             {{ row.publishedAt ? formatDateTime(row.publishedAt) : '-' }}
           </template>
         </ElTableColumn>
-        <ElTableColumn label="更新人" width="160">
+        <ElTableColumn :label="t('admin.notifications.updatedBy')" width="160">
           <template #default="{ row }">
             {{ row.updatedByUser?.displayName ?? '-' }}
           </template>
         </ElTableColumn>
-        <ElTableColumn label="更新时间" width="180">
+        <ElTableColumn :label="t('admin.notifications.updatedAt')" width="180">
           <template #default="{ row }">
             {{ formatDateTime(row.updatedAt) }}
           </template>
         </ElTableColumn>
-        <ElTableColumn label="操作" width="132" fixed="right">
+        <ElTableColumn :label="t('admin.common.operation')" width="132" fixed="right">
           <template #default="{ row }">
             <ElButton
               v-if="isPublishedNotification(row)"
@@ -129,7 +131,7 @@ function isPublishedNotification(notification: PlatformNotification) {
               type="primary"
               @click="emits('viewNotification', row)"
             >
-              查看
+              {{ t('admin.common.view') }}
             </ElButton>
             <ElButton
               v-else
@@ -137,7 +139,7 @@ function isPublishedNotification(notification: PlatformNotification) {
               type="primary"
               @click="emits('editNotification', row)"
             >
-              编辑
+              {{ t('admin.common.edit') }}
             </ElButton>
             <ElButton
               link
@@ -145,7 +147,7 @@ function isPublishedNotification(notification: PlatformNotification) {
               :loading="props.deletingNotificationId === row.id"
               @click="emits('deleteNotification', row)"
             >
-              删除
+              {{ t('admin.common.delete') }}
             </ElButton>
           </template>
         </ElTableColumn>
@@ -197,7 +199,7 @@ function isPublishedNotification(notification: PlatformNotification) {
         label-position="top"
         class="admin-notifications__form"
       >
-        <ElFormItem label="标题" prop="title">
+        <ElFormItem :label="t('admin.notifications.title')" prop="title">
           <ElInput
             :model-value="props.form.title"
             :maxlength="props.titleMaxLength"
@@ -205,7 +207,7 @@ function isPublishedNotification(notification: PlatformNotification) {
             @update:model-value="handleTitleUpdate"
           />
         </ElFormItem>
-        <ElFormItem label="内容" prop="content">
+        <ElFormItem :label="t('admin.notifications.content')" prop="content">
           <div class="admin-notifications__editor w-full">
             <StandaloneContentEditor
               :content="props.form.content"
@@ -222,18 +224,18 @@ function isPublishedNotification(notification: PlatformNotification) {
       <template #footer>
         <div v-if="props.isViewing" class="flex justify-end">
           <ElButton @click="emits('closeDrawer')">
-            关闭
+            {{ t('admin.common.close') }}
           </ElButton>
         </div>
         <div v-else class="flex justify-end gap-3">
           <ElButton @click="emits('closeDrawer')">
-            取消
+            {{ t('admin.common.cancel') }}
           </ElButton>
           <ElButton :loading="props.isSaving" @click="emits('saveDraft')">
-            保存草稿
+            {{ t('admin.notifications.saveDraft') }}
           </ElButton>
           <ElButton type="primary" :loading="props.isSaving" @click="emits('publishNotification')">
-            {{ props.isEditing ? '保存并发布' : '发布' }}
+            {{ props.isEditing ? t('admin.notifications.saveAndPublish') : t('admin.notifications.publish') }}
           </ElButton>
         </div>
       </template>

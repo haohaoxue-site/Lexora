@@ -14,9 +14,13 @@ import {
   DOCUMENT_PUBLICATION_NAV_ITEM_TYPE,
 } from '@haohaoxue/samepage-contracts/document/publication/constants'
 import { isExternalPublicationHref, normalizePublicationHref } from '@haohaoxue/samepage-shared/document'
+import { translate } from '@/i18n'
 
-export const PUBLICATION_UNPUBLISHED_MESSAGE = '此页面未发布'
 export const PUBLICATION_DISABLED_LINK_CLASS = 'publication-link-disabled'
+
+export function getPublicationUnpublishedMessage() {
+  return translate('docs.publicReader.unpublishedMessage')
+}
 
 export interface ResolvedPublicationNavItem {
   disabled: boolean

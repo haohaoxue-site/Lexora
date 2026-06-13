@@ -17,6 +17,7 @@ import {
 import { prettyBytes } from '@haohaoxue/samepage-shared/file'
 import { createEmptyTiptapContent } from '@haohaoxue/samepage-shared/tiptap'
 import { computed, onMounted, reactive, shallowRef } from 'vue'
+import { useI18n } from 'vue-i18n'
 import {
   createPlatformNotification,
   deletePlatformNotification,
@@ -35,13 +36,10 @@ export interface AdminNotificationForm {
   content: TiptapJsonContent
 }
 
-const platformNotificationStatusLabels = {
-  [PLATFORM_NOTIFICATION_STATUS.DRAFT]: '草稿',
-  [PLATFORM_NOTIFICATION_STATUS.PUBLISHED]: '已发布',
-} as const satisfies Record<PlatformNotificationStatus, string>
 const PLATFORM_NOTIFICATION_IMAGE_SIZE_LIMIT_LABEL = prettyBytes(PLATFORM_NOTIFICATION_IMAGE_MAX_BYTES)
 
 export function useAdminNotifications() {
+  const { t } = useI18n({ useScope: 'global' })
   const notifications = shallowRef<PlatformNotification[]>([])
   const total = shallowRef(0)
   const errorMessage = shallowRef('')
@@ -64,28 +62,28 @@ export function useAdminNotifications() {
   const imageSrcCache = new Map<string, Promise<string | null>>()
   const formRules: FormRules<typeof form> = {
     title: [
-      { required: true, message: '请输入站内信标题', trigger: 'blur' },
-      { max: PLATFORM_NOTIFICATION_TITLE_MAX_LENGTH, message: `标题不能超过 ${PLATFORM_NOTIFICATION_TITLE_MAX_LENGTH} 个字符`, trigger: 'blur' },
+      { required: true, message: t('admin.notifications.titleRequired'), trigger: 'blur' },
+      { max: PLATFORM_NOTIFICATION_TITLE_MAX_LENGTH, message: t('admin.notifications.titleTooLong', { max: PLATFORM_NOTIFICATION_TITLE_MAX_LENGTH }), trigger: 'blur' },
     ],
   }
-  const statusOptions = [
-    { label: '全部', value: '' },
+  const statusOptions = computed(() => [
+    { label: t('admin.notifications.all'), value: '' },
     ...PLATFORM_NOTIFICATION_STATUS_VALUES.map(status => ({
-      label: platformNotificationStatusLabels[status],
+      label: getStatusLabel(status),
       value: status,
     })),
-  ]
+  ])
 
   const drawerTitle = computed(() => {
     if (drawerMode.value === 'create') {
-      return '新建站内信'
+      return t('admin.notifications.createTitle')
     }
 
     if (drawerMode.value === 'view') {
-      return '查看站内信'
+      return t('admin.notifications.viewTitle')
     }
 
-    return '编辑站内信'
+    return t('admin.notifications.editTitle')
   })
   const isEditing = computed(() => drawerMode.value === 'edit')
   const isViewing = computed(() => drawerMode.value === 'view')
@@ -105,7 +103,7 @@ export function useAdminNotifications() {
       total.value = response.total
     }
     catch (error) {
-      errorMessage.value = getRequestErrorDisplayMessage(error, '加载站内信失败')
+      errorMessage.value = getRequestErrorDisplayMessage(error, t('admin.errors.loadNotifications'))
     }
     finally {
       isLoading.value = false
@@ -155,7 +153,9 @@ export function useAdminNotifications() {
   }
 
   function getStatusLabel(status: PlatformNotificationStatus) {
-    return platformNotificationStatusLabels[status]
+    return status === PLATFORM_NOTIFICATION_STATUS.PUBLISHED
+      ? t('admin.notifications.publishedStatus')
+      : t('admin.notifications.draft')
   }
 
   async function saveDraft() {
@@ -196,12 +196,12 @@ export function useAdminNotifications() {
         })
       }
 
-      ElMessage.success(status === PLATFORM_NOTIFICATION_STATUS.PUBLISHED ? '站内信已发布' : '草稿已保存')
+      ElMessage.success(status === PLATFORM_NOTIFICATION_STATUS.PUBLISHED ? t('admin.notifications.publishedSuccess') : t('admin.notifications.draftSaved'))
       drawerVisible.value = false
       await loadNotifications()
     }
     catch (error) {
-      ElMessage.error(getRequestErrorDisplayMessage(error, '保存站内信失败'))
+      ElMessage.error(getRequestErrorDisplayMessage(error, t('admin.notifications.saveFailed')))
     }
     finally {
       isSaving.value = false
@@ -211,12 +211,12 @@ export function useAdminNotifications() {
   async function deleteNotification(notification: PlatformNotification) {
     try {
       await ElMessageBox.confirm(
-        `删除后，这条站内信将不再出现在用户站内信列表中。`,
-        `删除「${notification.title}」`,
+        t('admin.notifications.deleteConfirm'),
+        t('admin.notifications.deleteTitle', { title: notification.title }),
         {
           type: 'warning',
-          confirmButtonText: '删除',
-          cancelButtonText: '取消',
+          confirmButtonText: t('admin.common.delete'),
+          cancelButtonText: t('admin.common.cancel'),
           confirmButtonClass: 'el-button--danger',
         },
       )
@@ -229,7 +229,7 @@ export function useAdminNotifications() {
 
     try {
       await deletePlatformNotification(notification.id)
-      ElMessage.success('站内信已删除')
+      ElMessage.success(t('admin.notifications.deleteSuccess'))
 
       if (currentNotificationId.value === notification.id) {
         drawerVisible.value = false
@@ -238,7 +238,7 @@ export function useAdminNotifications() {
       await loadNotifications()
     }
     catch (error) {
-      ElMessage.error(getRequestErrorDisplayMessage(error, '删除站内信失败'))
+      ElMessage.error(getRequestErrorDisplayMessage(error, t('admin.notifications.deleteFailed')))
     }
     finally {
       deletingNotificationId.value = ''
@@ -247,7 +247,7 @@ export function useAdminNotifications() {
 
   async function uploadNotificationImage(file: File): Promise<TiptapEditorUploadedImage> {
     if (file.size > PLATFORM_NOTIFICATION_IMAGE_MAX_BYTES) {
-      throw new Error(`图片大小不能超过 ${PLATFORM_NOTIFICATION_IMAGE_SIZE_LIMIT_LABEL}`)
+      throw new Error(t('admin.notifications.imageSizeLimit', { size: PLATFORM_NOTIFICATION_IMAGE_SIZE_LIMIT_LABEL }))
     }
 
     const asset = await uploadPlatformNotificationImage(file)
@@ -324,7 +324,6 @@ export function useAdminNotifications() {
     openCreateDrawer,
     openEditDrawer,
     openViewDrawer,
-    platformNotificationStatusLabels,
     publishNotification,
     query,
     saveDraft,

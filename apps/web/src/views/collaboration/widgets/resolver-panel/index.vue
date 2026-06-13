@@ -9,17 +9,20 @@ import {
   COLLABORATION_RESOLVER_ENTRY_TYPE,
   DOCUMENT_COLLABORATION_LINK_PASSWORD_LENGTH,
   DOCUMENT_COLLABORATION_LINK_PASSWORD_REGEX,
-  DOCUMENT_COLLABORATION_PERMISSION_LABELS,
   DOCUMENT_COLLABORATION_RESOLVER_STATUS,
-  DOCUMENT_COLLABORATION_SCOPE_LABELS,
 } from '@haohaoxue/samepage-contracts/document/collaboration/constants'
 import { computed, reactive, shallowRef, useTemplateRef, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import {
   confirmDocumentCollaborationEntry,
   resolveDocumentCollaborationEntry,
 } from '@/apis/document-collaboration'
 import { ElMessage } from '@/utils/element-plus'
 import { getRequestErrorDisplayMessage } from '@/utils/request-error'
+import {
+  formatCollaborationPermission,
+  formatCollaborationScope,
+} from '../../../docs/utils/documentCollaboration'
 import CollaborationPasswordForm from '../../components/password-form'
 import { useCollaborationResolverNavigation } from '../../composables/useCollaborationResolverNavigation'
 import CollaborationResolverLayout from '../../layouts/resolver-shell'
@@ -28,6 +31,7 @@ import {
   getCollaborationScopeRank,
 } from '../../utils/collaborationResolver'
 
+const { t } = useI18n()
 const { code, openDocument } = useCollaborationResolverNavigation()
 const passwordFormRef = useTemplateRef<CollaborationPasswordFormExposed>('passwordFormRef')
 const preview = shallowRef<DocumentCollaborationResolverPreview | null>(null)
@@ -37,9 +41,9 @@ const errorMessage = shallowRef('')
 const passwordForm = reactive<CollaborationPasswordFormModel>({
   password: '',
 })
-const passwordRules: FormRules<CollaborationPasswordFormModel> = {
+const passwordRules = computed<FormRules<CollaborationPasswordFormModel>>(() => ({
   password: [
-    { required: true, message: '请输入协作链接密码', trigger: 'blur' },
+    { required: true, message: t('collaborationResolver.passwordRequired'), trigger: 'blur' },
     {
       validator: (_rule, value: string, callback) => {
         if (DOCUMENT_COLLABORATION_LINK_PASSWORD_REGEX.test(value.trim())) {
@@ -47,12 +51,12 @@ const passwordRules: FormRules<CollaborationPasswordFormModel> = {
           return
         }
 
-        callback(new Error(`请输入 ${DOCUMENT_COLLABORATION_LINK_PASSWORD_LENGTH} 位数字密码`))
+        callback(new Error(t('collaborationResolver.passwordRule', { length: DOCUMENT_COLLABORATION_LINK_PASSWORD_LENGTH })))
       },
       trigger: 'blur',
     },
   ],
-}
+}))
 
 const hasCurrentAccess = computed(() => Boolean(preview.value?.currentAccess))
 const needsPassword = computed(() => Boolean(preview.value?.passwordRequired && !hasCurrentAccess.value))
@@ -64,38 +68,38 @@ const needsConfirm = computed(() => {
 })
 const primaryActionLabel = computed(() => {
   if (!preview.value) {
-    return '打开文档'
+    return t('collaborationResolver.openDocument')
   }
 
-  return needsConfirm.value ? '加入并打开' : '打开文档'
+  return needsConfirm.value ? t('collaborationResolver.joinAndOpen') : t('collaborationResolver.openDocument')
 })
 const entryTypeLabel = computed(() => {
   if (preview.value?.type === COLLABORATION_RESOLVER_ENTRY_TYPE.DOCUMENT_USER_INVITE) {
-    return '指定用户邀请'
+    return t('collaborationResolver.documentInvite')
   }
 
-  return '协作链接'
+  return t('collaborationResolver.linkEntry')
 })
 const statusLabel = computed(() => {
   const status = preview.value?.status
 
   if (status === DOCUMENT_COLLABORATION_RESOLVER_STATUS.PENDING) {
-    return '待处理'
+    return t('collaborationResolver.pending')
   }
   if (status === DOCUMENT_COLLABORATION_RESOLVER_STATUS.ACCEPTED) {
-    return '已接受'
+    return t('collaborationResolver.accepted')
   }
   if (status === DOCUMENT_COLLABORATION_RESOLVER_STATUS.ENABLED) {
-    return '已开启'
+    return t('collaborationResolver.enabled')
   }
   if (status === DOCUMENT_COLLABORATION_RESOLVER_STATUS.DISABLED) {
-    return '已关闭'
+    return t('collaborationResolver.disabled')
   }
   if (status === DOCUMENT_COLLABORATION_RESOLVER_STATUS.DECLINED) {
-    return '已拒绝'
+    return t('collaborationResolver.rejected')
   }
   if (status === DOCUMENT_COLLABORATION_RESOLVER_STATUS.CANCELED) {
-    return '已取消'
+    return t('collaborationResolver.canceled')
   }
 
   return ''
@@ -105,7 +109,7 @@ const unavailableMessage = computed(() => {
     return ''
   }
 
-  return '这个协作入口已经不可用。'
+  return t('collaborationResolver.entryUnavailable')
 })
 
 watch(
@@ -118,7 +122,7 @@ watch(
 
 async function loadEntry() {
   if (!code.value) {
-    errorMessage.value = '协作入口无效'
+    errorMessage.value = t('collaborationResolver.entryInvalid')
     preview.value = null
     return
   }
@@ -137,7 +141,7 @@ async function loadEntry() {
   }
   catch (error) {
     preview.value = null
-    errorMessage.value = getRequestErrorDisplayMessage(error, '协作入口不存在或已失效')
+    errorMessage.value = getRequestErrorDisplayMessage(error, t('collaborationResolver.entryMissing'))
   }
   finally {
     isLoading.value = false
@@ -180,7 +184,7 @@ async function handlePrimaryAction() {
 
   if (!needsConfirm.value) {
     if (!entry.rootDocumentId) {
-      ElMessage.warning('请先登录后打开协作文档')
+      ElMessage.warning(t('collaborationResolver.loginRequired'))
       return
     }
 
@@ -199,11 +203,11 @@ async function handlePrimaryAction() {
       ...(needsPassword.value ? { password: passwordForm.password } : {}),
     })
 
-    ElMessage.success('已加入协作文档')
+    ElMessage.success(t('collaborationResolver.joined'))
     await openDocument(response.documentId)
   }
   catch (error) {
-    ElMessage.error(getRequestErrorDisplayMessage(error, '加入协作文档失败'))
+    ElMessage.error(getRequestErrorDisplayMessage(error, t('collaborationResolver.joinFailed')))
   }
   finally {
     isConfirming.value = false
@@ -216,7 +220,7 @@ async function handlePrimaryAction() {
     <ElResult
       v-if="errorMessage"
       icon="error"
-      title="无法打开协作入口"
+      :title="t('collaborationResolver.resultTitle')"
       :sub-title="errorMessage"
     />
 
@@ -234,26 +238,26 @@ async function handlePrimaryAction() {
             {{ preview.documentTitle }}
           </h1>
           <p class="collaboration-resolver-page__subtitle m-0 text-sm leading-[1.6] text-secondary">
-            {{ preview.inviter?.displayName || '有人' }} 邀请你协作文档
+            {{ t('collaborationResolver.inviteMessage', { name: preview.inviter?.displayName || t('collaborationResolver.fallbackInviter') }) }}
           </p>
         </div>
 
         <ElDescriptions :column="1" border class="collaboration-resolver-page__details min-w-0">
-          <ElDescriptionsItem label="入口状态">
+          <ElDescriptionsItem :label="t('collaborationResolver.entryStatus')">
             <ElTag size="small" effect="plain">
               {{ statusLabel }}
             </ElTag>
           </ElDescriptionsItem>
-          <ElDescriptionsItem label="邀请权限">
-            {{ DOCUMENT_COLLABORATION_PERMISSION_LABELS[preview.permission] }}
+          <ElDescriptionsItem :label="t('collaborationResolver.invitePermission')">
+            {{ formatCollaborationPermission(preview.permission) }}
           </ElDescriptionsItem>
-          <ElDescriptionsItem label="邀请范围">
-            {{ DOCUMENT_COLLABORATION_SCOPE_LABELS[preview.scope] }}
+          <ElDescriptionsItem :label="t('collaborationResolver.inviteScope')">
+            {{ formatCollaborationScope(preview.scope) }}
           </ElDescriptionsItem>
-          <ElDescriptionsItem v-if="preview.currentAccess" label="当前权限">
-            {{ DOCUMENT_COLLABORATION_PERMISSION_LABELS[preview.currentAccess.permission] }}
+          <ElDescriptionsItem v-if="preview.currentAccess" :label="t('collaborationResolver.currentAccess')">
+            {{ formatCollaborationPermission(preview.currentAccess.permission) }}
             ·
-            {{ DOCUMENT_COLLABORATION_SCOPE_LABELS[preview.currentAccess.scope] }}
+            {{ formatCollaborationScope(preview.currentAccess.scope) }}
           </ElDescriptionsItem>
         </ElDescriptions>
 

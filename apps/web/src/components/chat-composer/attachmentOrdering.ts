@@ -7,6 +7,7 @@ import {
   CHAT_MESSAGE_ATTACHMENT_PLACEMENT,
   CHAT_MESSAGE_ATTACHMENT_TYPE,
 } from '@haohaoxue/samepage-contracts/chat/constants'
+import { translate } from '@/i18n'
 import { serializeChatComposerContent } from './serialization'
 
 export function orderChatComposerAttachments(
@@ -53,7 +54,7 @@ export function getAttachmentDisplayLabel(attachment: ChatComposerAttachment): s
   }
 
   return attachment.scope.kind === 'selection'
-    ? `当前选区 · ${attachment.title}`
+    ? `${translate('chat.composer.currentSelection')} · ${attachment.title}`
     : attachment.title
 }
 

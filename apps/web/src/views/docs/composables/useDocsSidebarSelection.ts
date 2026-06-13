@@ -1,5 +1,6 @@
 import type { DocumentTreeGroup } from '@haohaoxue/samepage-contracts'
 import { computed, shallowRef, watch } from 'vue'
+import { translate } from '@/i18n'
 import { ElMessage, ElMessageBox } from '@/utils/element-plus'
 import { collectDocumentItemIds } from '../utils/documentTree'
 import { useDocsContext } from './useDocsContext'
@@ -51,7 +52,7 @@ export function useDocsSidebarSelection() {
 
   async function confirmBatchDelete() {
     if (!hasSelectedDocuments.value || !deletePlan.value) {
-      ElMessage.warning('请选择要删除的文档')
+      ElMessage.warning(translate('docs.trash.selectToDelete'))
       return
     }
 
@@ -60,11 +61,11 @@ export function useDocsSidebarSelection() {
         affectedDocumentCount: affectedDocumentCount.value,
         selectedCount: selectedCount.value,
       }),
-      '批量删除文档',
+      translate('docs.trash.batchDeleteTitle'),
       {
         type: 'warning',
-        confirmButtonText: '删除',
-        cancelButtonText: '取消',
+        confirmButtonText: translate('docs.common.delete'),
+        cancelButtonText: translate('docs.common.cancel'),
       },
     ).then(() => true).catch(() => false)
 
@@ -101,8 +102,11 @@ function resolveBatchDeleteConfirmMessage(input: {
   selectedCount: number
 }) {
   if (input.affectedDocumentCount > input.selectedCount) {
-    return `已选 ${input.selectedCount} 项，将删除 ${input.affectedDocumentCount} 个文档，包含子文档。删除后可在回收站恢复。`
+    return translate('docs.trash.batchDeleteDescription', {
+      affectedCount: input.affectedDocumentCount,
+      selectedCount: input.selectedCount,
+    })
   }
 
-  return `确认删除选中的 ${input.selectedCount} 个文档吗？删除后可在回收站恢复。`
+  return translate('docs.trash.batchDeleteSimpleDescription', { count: input.selectedCount })
 }

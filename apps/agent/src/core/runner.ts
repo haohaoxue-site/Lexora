@@ -190,6 +190,7 @@ export async function executeAgentGeneration(input: {
         actorUserId: input.bootstrap.generation.actorUserId,
         agentProfileId: input.bootstrap.agentProfile.profileId,
         contextPolicy: profileConfig.contextPolicy,
+        defaultResponseLanguage: input.bootstrap.context.defaultResponseLanguage,
         modelLimits: input.bootstrap.model,
         modelOptions: toChatModelOptions(profileConfig),
         modelTarget: input.bootstrap.runtimeModelTarget,

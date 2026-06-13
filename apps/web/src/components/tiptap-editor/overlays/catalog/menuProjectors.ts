@@ -15,6 +15,7 @@ import type {
   TurnIntoMenuScope,
   TurnIntoMenuTarget,
 } from './menuCatalog'
+import { translate } from '@/i18n'
 import { getCurrentBlock } from '../../commands/currentBlock'
 import {
   canIndentBlock,
@@ -98,7 +99,7 @@ export function getBlockTriggerViewState(editor: Editor): BlockTriggerViewState 
     currentTextColor: getActiveTextColor(editor),
     currentBackgroundColor: getActiveHighlightColor(editor),
     currentTriggerIcon: context.isEmptyBlock ? '+' : triggerDefinition.icon,
-    currentTriggerLabel: context.isEmptyBlock ? '插入块' : triggerDefinition.label,
+    currentTriggerLabel: context.isEmptyBlock ? translate('editor.common.insertBlock') : getTurnIntoLabel(context.blockTarget),
     canDrag: canDragCurrentBlock(context),
   }
 }
@@ -176,7 +177,7 @@ function projectBlockMenuQuickItems(
 
   return [
     {
-      label: definition.label,
+      label: getQuickInsertLabel(definition.action),
       icon: definition.icon,
       kind: definition.action,
     },
@@ -191,32 +192,36 @@ function projectBlockMenuItem(
     if (definition.action === 'align') {
       return {
         ...definition,
+        label: getPanelLabel(definition.action),
         children: projectAlignChildren(context),
       }
     }
 
     return {
-      label: definition.label,
+      label: getPanelLabel(definition.action),
       icon: definition.icon,
       kind: 'panel',
       action: 'color',
     }
   }
 
-  return definition
+  return {
+    ...definition,
+    label: getActionLabel(definition.action),
+  }
 }
 
 function projectAlignChildren(context: EditorBlockMenuContext): BlockMenuChildItem[] {
   return [
     ...BLOCK_MENU_TEXT_ALIGN_CHILD_REGISTRY.map(definition => ({
-      label: definition.label,
+      label: getAlignLabel(definition.action),
       icon: definition.icon,
       kind: 'text-align' as const,
       action: definition.action,
       isActive: context.textAlign === definition.value,
     })),
     ...BLOCK_MENU_INDENT_CHILD_REGISTRY.map(definition => ({
-      label: definition.label,
+      label: getAlignLabel(definition.action),
       icon: definition.icon,
       kind: 'indent' as const,
       action: definition.action,
@@ -255,13 +260,72 @@ function resolveTurnIntoMenuDefinition(target: TurnIntoMenuTarget): TurnIntoMenu
   if (typeof target === 'string') {
     return {
       ...baseDefinition,
+      label: getTurnIntoLabel(blockType),
       target: blockType,
     }
   }
 
   return {
-    label: target.label ?? baseDefinition.label,
+    label: target.label ?? getTurnIntoLabel(blockType),
     icon: target.icon ?? baseDefinition.icon,
     target: blockType,
   }
+}
+
+function getTurnIntoLabel(target: TurnIntoBlockType) {
+  const keyMap = {
+    'paragraph': 'editor.common.paragraph',
+    'heading-1': 'editor.common.headingLevel1',
+    'heading-2': 'editor.common.headingLevel2',
+    'heading-3': 'editor.common.headingLevel3',
+    'heading-4': 'editor.common.headingLevel4',
+    'heading-5': 'editor.common.headingLevel5',
+    'bulletList': 'editor.common.bulletList',
+    'orderedList': 'editor.common.orderedList',
+    'codeBlock': 'editor.common.codeBlock',
+    'blockMath': 'editor.common.blockMath',
+    'blockquote': 'editor.common.blockquote',
+    'divider': 'editor.common.divider',
+    'taskList': 'editor.common.taskList',
+  } as const
+
+  return translate(keyMap[target])
+}
+
+function getQuickInsertLabel(action: Exclude<BlockMenuQuickItem['kind'], 'turn-into'>) {
+  const keyMap = {
+    'insert-link': 'editor.common.link',
+    'insert-inline-math': 'editor.common.inlineMath',
+    'insert-image': 'editor.common.image',
+    'insert-file': 'editor.common.videoOrFile',
+  } as const
+
+  return translate(keyMap[action])
+}
+
+function getPanelLabel(action: 'align' | 'color') {
+  return action === 'align' ? translate('editor.common.alignAndIndent') : translate('editor.common.color')
+}
+
+function getActionLabel(action: 'comment' | 'cut' | 'copy' | 'delete') {
+  const keyMap = {
+    comment: 'editor.common.comment',
+    cut: 'editor.common.cut',
+    copy: 'editor.common.copy',
+    delete: 'editor.common.delete',
+  } as const
+
+  return translate(keyMap[action])
+}
+
+function getAlignLabel(action: 'align-left' | 'align-center' | 'align-right' | 'indent' | 'outdent') {
+  const keyMap = {
+    'align-left': 'editor.common.leftAlign',
+    'align-center': 'editor.common.centerAlign',
+    'align-right': 'editor.common.rightAlign',
+    'indent': 'editor.common.indent',
+    'outdent': 'editor.common.outdent',
+  } as const
+
+  return translate(keyMap[action])
 }

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { ChatInputBoxProps } from './typing'
+import { useI18n } from 'vue-i18n'
 import ChatComposer from '@/components/chat-composer/ChatComposer.vue'
 import { useChatInputBox } from '../../composables/useChatInputBox'
 
@@ -7,6 +8,7 @@ const props = withDefaults(defineProps<ChatInputBoxProps>(), {
   isReadonly: false,
   variant: 'dock',
 })
+const { t } = useI18n({ useScope: 'global' })
 
 const {
   attachments,
@@ -54,15 +56,15 @@ const {
         </span>
         <div class="min-w-0">
           <div class="text-sm font-medium leading-5 text-main">
-            Bot 对话只读展示
+            {{ t('chat.input.readonlyTitle') }}
           </div>
           <div class="mt-0.5 text-xs leading-5 text-secondary">
-            请在对应聊天平台继续发送消息。
+            {{ t('chat.input.readonlyDescription') }}
           </div>
         </div>
       </div>
       <div v-if="props.variant === 'dock' && !props.isReadonly" class="mt-2 text-center text-xs text-secondary-a50">
-        AI 回答仅供参考，请注意核实重要信息
+        {{ t('chat.input.disclaimer') }}
       </div>
     </div>
   </div>

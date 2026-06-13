@@ -2,6 +2,7 @@ import type { ChatModelItem } from '@/apis/chat'
 import { createSharedComposable } from '@vueuse/core'
 import { shallowRef } from 'vue'
 import { getChatModels } from '@/apis/chat'
+import { translate } from '@/i18n'
 import { ElMessage } from '@/utils/element-plus'
 import { getRequestErrorDisplayMessage } from '@/utils/request-error'
 import { useChatRuntimeConfig } from './useChatRuntimeConfig'
@@ -39,14 +40,16 @@ export const useChatModels = createSharedComposable(() => {
       modelOptions.value = result.models
 
       if (showSuccessMessage) {
-        ElMessage.success(result.models.length > 0 ? `已获取 ${result.models.length} 个模型` : '当前未获取到可用模型')
+        ElMessage.success(result.models.length > 0
+          ? translate('chat.model.loaded', { count: result.models.length })
+          : translate('chat.model.none'))
       }
     }
     catch (error) {
       modelOptions.value = []
 
       if (!silent) {
-        ElMessage.error(getRequestErrorDisplayMessage(error, '获取模型列表失败'))
+        ElMessage.error(getRequestErrorDisplayMessage(error, translate('chat.errors.loadModels')))
       }
     }
     finally {

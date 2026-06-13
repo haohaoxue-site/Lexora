@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { MathPanelController } from './useMathPanel'
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useMathPanelView } from './useMathPanelView'
 
 interface MathPanelProps {
@@ -9,6 +10,7 @@ interface MathPanelProps {
 
 const props = defineProps<MathPanelProps>()
 const view = useMathPanelView(props.controller)
+const { t } = useI18n()
 const inputType = computed(() => props.controller.mode.value === 'block' ? 'textarea' : 'text')
 const inputRows = computed(() => props.controller.mode.value === 'block' ? 4 : undefined)
 </script>
@@ -26,22 +28,22 @@ const inputRows = computed(() => props.controller.mode.value === 'block' ? 4 : u
       :type="inputType"
       :rows="inputRows"
       :autosize="controller.mode.value === 'block' ? { minRows: 3, maxRows: 8 } : false"
-      placeholder="输入 LaTeX 公式"
+      :placeholder="t('editor.math.placeholder')"
       @keydown="view.handleInputKeydown"
       @update:model-value="controller.updateDraftLatex"
     />
 
     <div class="tiptap-math-panel__actions">
       <ElButton size="small" type="primary" @click="controller.apply">
-        确认
+        {{ t('editor.common.confirm') }}
       </ElButton>
 
       <ElButton size="small" @click="controller.remove">
-        移除
+        {{ t('editor.common.remove') }}
       </ElButton>
 
       <ElButton size="small" @click="controller.cancel">
-        取消
+        {{ t('editor.common.cancel') }}
       </ElButton>
     </div>
   </div>

@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import type { UserIdentityCellProps } from './typing'
+import { useI18n } from 'vue-i18n'
 import EntityAvatar from '@/components/entity-avatar'
 
 defineProps<UserIdentityCellProps>()
+const { t } = useI18n({ useScope: 'global' })
 </script>
 
 <template>
@@ -10,7 +12,7 @@ defineProps<UserIdentityCellProps>()
     <EntityAvatar
       :name="user.displayName"
       :src="user.avatarUrl"
-      :alt="`${user.displayName} 的头像`"
+      :alt="t('common.avatarAlt', { name: user.displayName })"
       :size="40"
       shape="circle"
       kind="user"

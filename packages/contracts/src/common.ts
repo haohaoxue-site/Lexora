@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { ApiErrorCodeSchema } from './status-code'
 
 export const CountSchema = z.number().int().nonnegative()
 
@@ -9,6 +10,7 @@ export const RequestPageParamsSchema = z.object({
 
 export const RequestResponseSchema = z.object({
   code: z.number().int(),
+  errorCode: ApiErrorCodeSchema.nullable().optional(),
   message: z.string(),
   data: z.unknown().nullable(),
 }).strict()

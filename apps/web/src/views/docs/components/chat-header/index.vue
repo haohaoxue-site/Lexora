@@ -3,10 +3,12 @@ import type {
   DocsChatHeaderEmits,
   DocsChatHeaderProps,
 } from './typing'
+import { useI18n } from 'vue-i18n'
 import DocsChatHistoryDropdown from '../chat-history-dropdown'
 
 const props = defineProps<DocsChatHeaderProps>()
 const emits = defineEmits<DocsChatHeaderEmits>()
+const { t } = useI18n()
 </script>
 
 <template>
@@ -21,11 +23,11 @@ const emits = defineEmits<DocsChatHeaderEmits>()
     />
 
     <div v-if="props.hasActiveSession" class="docs-chat-header__actions flex flex-none items-center gap-px">
-      <ElTooltip content="新对话" placement="bottom" :show-after="120">
+      <ElTooltip :content="t('docs.chat.newChat')" placement="bottom" :show-after="120">
         <ElButton
           text
           class="docs-chat-header__icon-button h-7 min-w-7 w-7 rounded-lg p-0 text-base"
-          title="新对话"
+          :title="t('docs.chat.newChat')"
           @click="emits('newSession')"
         >
           <SvgIcon category="ui" icon="plus" />
@@ -39,7 +41,7 @@ const emits = defineEmits<DocsChatHeaderEmits>()
         <ElButton
           text
           class="docs-chat-header__icon-button h-7 min-w-7 w-7 rounded-lg p-0 text-base"
-          title="更多"
+          :title="t('docs.common.more')"
         >
           <SvgIcon category="ui" icon="more" />
         </ElButton>
@@ -55,7 +57,7 @@ const emits = defineEmits<DocsChatHeaderEmits>()
                   <SvgIcon category="ui" icon="edit" size="1rem" />
                 </span>
               </template>
-              重命名
+              {{ t('docs.chat.rename') }}
             </ElDropdownItem>
 
             <ElDropdownItem
@@ -68,7 +70,7 @@ const emits = defineEmits<DocsChatHeaderEmits>()
                   <SvgIcon category="ui" icon="trash-can" size="1rem" />
                 </span>
               </template>
-              删除
+              {{ t('docs.chat.delete') }}
             </ElDropdownItem>
           </ElDropdownMenu>
         </template>

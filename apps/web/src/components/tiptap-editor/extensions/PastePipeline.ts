@@ -2,6 +2,7 @@ import type { Editor } from '@tiptap/core'
 import type { TiptapEditorUploadedFile, TiptapEditorUploadedImage } from '../content/typing'
 import { Extension } from '@tiptap/core'
 import { Plugin, PluginKey } from '@tiptap/pm/state'
+import { translate } from '@/i18n'
 import { ElMessage } from '@/utils/element-plus'
 import { getRequestErrorDisplayMessage } from '@/utils/request-error'
 import {
@@ -190,7 +191,7 @@ async function handleFilePaste(
   catch (error) {
     ElMessage.error(getRequestErrorDisplayMessage(
       error,
-      files.every(file => file.type.startsWith('image/')) ? '图片上传失败' : '资源上传失败',
+      files.every(file => file.type.startsWith('image/')) ? translate('editor.upload.imageFailed') : translate('editor.upload.assetFailed'),
     ))
   }
 }
@@ -216,7 +217,7 @@ async function handleAnimatedGifPaste(
     await uploadImagesWithPlaceholder(editor, [animatedGifFile], options.uploadImage)
   }
   catch (error) {
-    ElMessage.error(getRequestErrorDisplayMessage(error, '图片上传失败'))
+    ElMessage.error(getRequestErrorDisplayMessage(error, translate('editor.upload.imageFailed')))
   }
 }
 

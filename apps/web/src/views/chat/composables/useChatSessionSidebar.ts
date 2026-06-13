@@ -1,11 +1,13 @@
 import type { ChatSessionSidebarActionCommand } from '../typing'
 import type { ChatSession } from './useChatSessions'
 import { computed, shallowRef } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { ElMessage, ElMessageBox } from '@/utils/element-plus'
 import { useChatRouteState } from './useChatRouteState'
 import { useChatSessions } from './useChatSessions'
 
 export function useChatSessionSidebar() {
+  const { t } = useI18n({ useScope: 'global' })
   const { activeSessionId, batchDeleteSessions, deleteSession, renameSession, selectSession } = useChatSessions()
   const { navigateToNewChat, navigateToSession } = useChatRouteState()
   const isSelectionMode = shallowRef(false)
@@ -61,14 +63,14 @@ export function useChatSessionSidebar() {
   async function promptRename(session: ChatSession) {
     const sessionTitle = formatSessionTitle(session.title)
     const nextTitle = await ElMessageBox.prompt(
-      '请输入新的对话名称',
-      '重命名对话',
+      t('chat.session.renamePrompt'),
+      t('chat.session.renameTitle'),
       {
         inputValue: sessionTitle,
-        inputPlaceholder: '对话名称',
-        inputValidator: value => Boolean(value.trim()) || '请输入对话名称',
-        confirmButtonText: '保存',
-        cancelButtonText: '取消',
+        inputPlaceholder: t('chat.session.renamePlaceholder'),
+        inputValidator: value => Boolean(value.trim()) || t('chat.session.renameRequired'),
+        confirmButtonText: t('chat.session.save'),
+        cancelButtonText: t('chat.session.cancel'),
       },
     ).then(result => typeof result.value === 'string' ? result.value.trim() : '').catch(() => null)
 
@@ -83,12 +85,12 @@ export function useChatSessionSidebar() {
     const sessionTitle = formatSessionTitle(session.title)
     const deletingActiveSession = activeSessionId.value === session.id
     const confirmed = await ElMessageBox.confirm(
-      `确认删除「${sessionTitle}」吗？此操作不可恢复。`,
-      '删除对话',
+      t('chat.session.deleteConfirm', { title: sessionTitle }),
+      t('chat.session.deleteTitle'),
       {
         type: 'warning',
-        confirmButtonText: '删除',
-        cancelButtonText: '取消',
+        confirmButtonText: t('chat.session.delete'),
+        cancelButtonText: t('chat.session.cancel'),
       },
     ).then(() => true).catch(() => false)
 
@@ -116,18 +118,18 @@ export function useChatSessionSidebar() {
 
   async function confirmBatchDelete() {
     if (selectedCount.value === 0) {
-      ElMessage.warning('请选择要删除的对话')
+      ElMessage.warning(t('chat.session.selectForDelete'))
       return
     }
 
     const deletingActiveSession = Boolean(activeSessionId.value && selectedSessionIds.value.has(activeSessionId.value))
     const confirmed = await ElMessageBox.confirm(
-      `确认删除选中的 ${selectedCount.value} 个对话吗？此操作不可恢复。`,
-      '批量删除对话',
+      t('chat.session.batchDeleteConfirm', { count: selectedCount.value }),
+      t('chat.session.batchDeleteTitle'),
       {
         type: 'warning',
-        confirmButtonText: '删除',
-        cancelButtonText: '取消',
+        confirmButtonText: t('chat.session.delete'),
+        cancelButtonText: t('chat.session.cancel'),
       },
     ).then(() => true).catch(() => false)
 
@@ -189,8 +191,8 @@ export function useChatSessionSidebar() {
     isSessionSelected,
     selectedCount,
   }
-}
 
-function formatSessionTitle(title: string) {
-  return title.trim() || '未命名对话'
+  function formatSessionTitle(title: string) {
+    return title.trim() || t('chat.session.unnamed')
+  }
 }

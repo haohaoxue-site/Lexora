@@ -1,12 +1,14 @@
 import type { FormInstance, FormRules } from 'element-plus'
 import type { Ref } from 'vue'
 import { computed, reactive } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { useFormSubmit } from '@/composables/useFormSubmit'
 import { useAuthStore } from '@/stores/auth'
 import { useUserStore } from '@/stores/user'
 import { completeAuthNavigation } from '../utils/navigation'
 import {
+  createAuthRuleMessages,
   createConfirmPasswordRules,
   createDifferentPasswordRule,
   createPasswordRules,
@@ -16,6 +18,7 @@ import {
 export function useChangePassword(options: {
   changePasswordFormRef: Ref<FormInstance | null>
 }) {
+  const { t } = useI18n({ useScope: 'global' })
   const router = useRouter()
   const authStore = useAuthStore()
   const userStore = useUserStore()
@@ -24,14 +27,27 @@ export function useChangePassword(options: {
     newPassword: '',
     confirmPassword: '',
   })
-  const formRules: FormRules<typeof form> = {
-    currentPassword: createPasswordRules('当前密码'),
+  const ruleMessages = createAuthRuleMessages((key, params) => params ? t(key, params) : t(key))
+  const formRules = computed<FormRules<typeof form>>(() => ({
+    currentPassword: createPasswordRules(t('auth.changePassword.currentPassword'), ruleMessages),
     newPassword: [
-      ...createPasswordRules('新密码'),
-      createDifferentPasswordRule(() => form.currentPassword),
+      ...createPasswordRules(t('auth.changePassword.newPassword'), ruleMessages),
+      createDifferentPasswordRule(
+        () => form.currentPassword,
+        t('auth.validation.differentPassword'),
+        ruleMessages,
+      ),
     ],
-    confirmPassword: createConfirmPasswordRules(() => form.newPassword, '确认新密码', '两次输入的新密码不一致'),
-  }
+    confirmPassword: createConfirmPasswordRules(
+      () => form.newPassword,
+      t('auth.changePassword.confirmNewPassword'),
+      t('auth.validation.confirmNewPasswordMismatch'),
+      {
+        ...ruleMessages,
+        confirmPasswordMismatch: () => t('auth.validation.confirmNewPasswordMismatch'),
+      },
+    ),
+  }))
 
   const { isSubmitting, submit: submitChangePassword } = useFormSubmit({
     validate: () =>
@@ -40,13 +56,13 @@ export function useChangePassword(options: {
       && form.confirmPassword === form.newPassword
       && form.currentPassword !== form.newPassword,
     action: () => authStore.updatePassword(form.currentPassword, form.newPassword),
-    fallbackError: '修改密码失败',
+    fallbackError: () => t('auth.changePassword.failed'),
     onSuccess: () => completeAuthNavigation(router, authStore),
   })
 
   const requiresPasswordChange = computed(() => userStore.requiresPasswordChange)
   const pageDescription = computed(() =>
-    requiresPasswordChange.value ? '首次登录需要先设置新密码。' : '输入当前密码并设置新密码。',
+    requiresPasswordChange.value ? t('auth.changePassword.firstLoginDescription') : t('auth.changePassword.defaultDescription'),
   )
 
   async function handleSubmitChangePassword() {

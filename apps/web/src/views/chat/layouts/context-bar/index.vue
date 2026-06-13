@@ -3,22 +3,24 @@ import type {
   ChatContextBarEmits,
   ChatContextBarProps,
 } from './typing'
+import { useI18n } from 'vue-i18n'
 import ChatUsagePopover from '../../components/usage-popover'
 
 const props = defineProps<ChatContextBarProps>()
 const emits = defineEmits<ChatContextBarEmits>()
+const { t } = useI18n({ useScope: 'global' })
 </script>
 
 <template>
   <div class="chat-view-context flex w-full flex-wrap items-center justify-end gap-4">
     <div class="flex items-center gap-2">
       <ChatUsagePopover :usage="props.conversationUsage" />
-      <ElTooltip content="Agent 设置" placement="bottom">
+      <ElTooltip :content="t('chat.workspace.agentSettings')" placement="bottom">
         <ElButton
           text
           class="chat-view-context__agent-btn h-8 min-w-8 w-8 rounded-lg p-0"
           :class="{ 'is-active': props.isAgentSettingsOpen }"
-          aria-label="Agent 设置"
+          :aria-label="t('chat.workspace.agentSettings')"
           @click="emits('toggleAgentSettings')"
         >
           <SvgIcon category="ai" icon="agents" size="1.25rem" />
@@ -27,7 +29,7 @@ const emits = defineEmits<ChatContextBarEmits>()
       <ElButton class="chat-view-context__new-chat-btn h-8 rounded-lg px-3 text-sm font-medium" @click="emits('newChat')">
         <span class="inline-flex items-center gap-1.5">
           <SvgIcon category="ui" icon="plus" size="0.875rem" />
-          <span>新对话</span>
+          <span>{{ t('chat.workspace.newChat') }}</span>
         </span>
       </ElButton>
     </div>

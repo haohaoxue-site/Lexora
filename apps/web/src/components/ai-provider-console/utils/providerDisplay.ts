@@ -19,10 +19,6 @@ export function getProviderInitial(row: AiProviderRow) {
   return row.title.trim().slice(0, 1).toUpperCase() || 'AI'
 }
 
-export function getProviderStatusLabel(row: AiProviderRow) {
-  return row.provider.enabled ? '已启用' : '未启用'
-}
-
 export function getProviderStatusType(row: AiProviderRow) {
   return row.provider.enabled ? 'success' : 'info'
 }

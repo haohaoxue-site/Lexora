@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import type { SettingsContextBarModel } from './typing'
+import { useI18n } from 'vue-i18n'
 
 const activeTab = defineModel<SettingsContextBarModel>({ required: true })
+const { t } = useI18n({ useScope: 'global' })
 </script>
 
 <template>
@@ -9,21 +11,21 @@ const activeTab = defineModel<SettingsContextBarModel>({ required: true })
     <ElTabPane name="user">
       <template #label>
         <span class="inline-flex h-[var(--default-header-height)] items-center pr-3.5 text-[15px] font-medium leading-none">
-          账号
+          {{ t('settings.tabs.account') }}
         </span>
       </template>
     </ElTabPane>
     <ElTabPane name="preference">
       <template #label>
         <span class="inline-flex h-[var(--default-header-height)] items-center px-3.5 text-[15px] font-medium leading-none">
-          偏好
+          {{ t('settings.tabs.preference') }}
         </span>
       </template>
     </ElTabPane>
     <ElTabPane name="providers">
       <template #label>
         <span class="inline-flex h-[var(--default-header-height)] items-center px-3.5 text-[15px] font-medium leading-none">
-          服务商
+          {{ t('settings.tabs.providers') }}
         </span>
       </template>
     </ElTabPane>

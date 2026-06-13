@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { LinkPanelController } from './useLinkPanel'
+import { useI18n } from 'vue-i18n'
 import { SvgIcon } from '@/components/svg-icon'
 import { useLinkPanelView } from './useLinkPanelView'
 
@@ -9,6 +10,7 @@ interface LinkPanelProps {
 
 const props = defineProps<LinkPanelProps>()
 const view = useLinkPanelView(props.controller)
+const { t } = useI18n()
 </script>
 
 <template>
@@ -20,23 +22,23 @@ const view = useLinkPanelView(props.controller)
   >
     <template v-if="controller.mode.value === 'existing-link'">
       <label class="tiptap-link-panel__field">
-        <span class="tiptap-link-panel__label">页面或 URL</span>
+        <span class="tiptap-link-panel__label">{{ t('editor.linkPanel.title') }}</span>
         <ElInput
           :ref="view.assignPrimaryInputRef"
           :model-value="controller.linkUrl.value"
           class="tiptap-link-panel__url-input"
-          placeholder="输入或粘贴链接..."
+          :placeholder="t('editor.linkPanel.hrefPlaceholder')"
           @keydown="view.handleInputKeydown"
           @update:model-value="controller.updateLinkUrl"
         />
       </label>
 
       <label class="tiptap-link-panel__field">
-        <span class="tiptap-link-panel__label">链接标题</span>
+        <span class="tiptap-link-panel__label">{{ t('editor.linkPanel.label') }}</span>
         <ElInput
           :ref="view.assignSecondaryInputRef"
           :model-value="controller.linkText.value"
-          placeholder="输入链接文字..."
+          :placeholder="t('editor.linkPanel.textPlaceholder')"
           @focus="controller.highlightLinkedText"
           @keydown="view.handleInputKeydown"
           @update:model-value="controller.updateLinkText"
@@ -49,7 +51,7 @@ const view = useLinkPanelView(props.controller)
         @click="controller.remove"
       >
         <SvgIcon category="ui" icon="trash-can" size="1rem" />
-        <span>移除链接</span>
+        <span>{{ t('editor.linkPanel.remove') }}</span>
       </button>
     </template>
 
@@ -58,7 +60,7 @@ const view = useLinkPanelView(props.controller)
         v-if="controller.mode.value === 'empty-block'"
         :ref="view.assignPrimaryInputRef"
         :model-value="controller.linkText.value"
-        placeholder="输入链接文字..."
+        :placeholder="t('editor.linkPanel.textPlaceholder')"
         @keydown="view.handleInputKeydown"
         @update:model-value="controller.updateLinkText"
       />
@@ -69,7 +71,7 @@ const view = useLinkPanelView(props.controller)
           : view.assignSecondaryInputRef"
         :model-value="controller.linkUrl.value"
         class="tiptap-link-panel__url-input"
-        placeholder="输入或粘贴链接..."
+        :placeholder="t('editor.linkPanel.hrefPlaceholder')"
         @keydown="view.handleInputKeydown"
         @update:model-value="controller.updateLinkUrl"
       />
@@ -85,7 +87,7 @@ const view = useLinkPanelView(props.controller)
         :disabled="controller.isConfirmDisabled.value"
         @click="controller.apply"
       >
-        确认
+        {{ t('editor.common.confirm') }}
       </ElButton>
 
       <ElButton
@@ -93,14 +95,14 @@ const view = useLinkPanelView(props.controller)
         size="small"
         @click="controller.remove"
       >
-        移除
+        {{ t('editor.common.remove') }}
       </ElButton>
 
       <ElButton
         size="small"
         @click="controller.cancel"
       >
-        取消
+        {{ t('editor.common.cancel') }}
       </ElButton>
     </div>
   </div>

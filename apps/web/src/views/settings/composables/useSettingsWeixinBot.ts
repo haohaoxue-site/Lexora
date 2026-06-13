@@ -9,6 +9,7 @@ import {
 } from '@haohaoxue/samepage-contracts/bot'
 import { CHAT_SESSION_CHANNEL } from '@haohaoxue/samepage-contracts/chat/constants'
 import { computed, onScopeDispose, shallowRef, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import {
   disconnectWeixinBot,
   getWeixinBotLoginStatus,
@@ -43,6 +44,7 @@ function createDefaultStatus(): WeixinBotBindingStatus {
 }
 
 export function useSettingsWeixinBot() {
+  const { t } = useI18n({ useScope: 'global' })
   const status = shallowRef<WeixinBotBindingStatus>(createDefaultStatus())
   const loginState = shallowRef<WeixinLoginState | null>(null)
   const loginDialogVisible = shallowRef(false)
@@ -78,7 +80,7 @@ export function useSettingsWeixinBot() {
     }
     catch (error) {
       if (!options.silent) {
-        ElMessage.error(getRequestErrorDisplayMessage(error, '加载微信 Bot 状态失败'))
+        ElMessage.error(getRequestErrorDisplayMessage(error, t('settings.user.bot.statusFailed')))
       }
     }
     finally {
@@ -97,7 +99,7 @@ export function useSettingsWeixinBot() {
       scheduleLoginPoll()
     }
     catch (error) {
-      ElMessage.error(getRequestErrorDisplayMessage(error, '发起微信扫码绑定失败'))
+      ElMessage.error(getRequestErrorDisplayMessage(error, t('settings.user.bot.bindFailed')))
     }
     finally {
       isStartingLogin.value = false
@@ -121,7 +123,7 @@ export function useSettingsWeixinBot() {
       }
     }
     catch (error) {
-      ElMessage.error(getRequestErrorDisplayMessage(error, '刷新微信扫码状态失败'))
+      ElMessage.error(getRequestErrorDisplayMessage(error, t('settings.user.bot.statusFailed')))
       scheduleLoginPoll(2500)
     }
     finally {
@@ -133,7 +135,7 @@ export function useSettingsWeixinBot() {
     const loginId = loginState.value?.loginId
     const code = verifyCode.value.trim()
     if (!loginId || !code) {
-      ElMessage.warning('请输入验证码')
+      ElMessage.warning(t('settings.user.bot.verifyCodeRequired'))
       return
     }
 
@@ -149,7 +151,7 @@ export function useSettingsWeixinBot() {
       }
     }
     catch (error) {
-      ElMessage.error(getRequestErrorDisplayMessage(error, '提交验证码失败'))
+      ElMessage.error(getRequestErrorDisplayMessage(error, t('settings.user.bot.submitCodeFailed')))
     }
     finally {
       isSubmittingVerifyCode.value = false
@@ -161,10 +163,10 @@ export function useSettingsWeixinBot() {
 
     try {
       status.value = await startWeixinBot()
-      ElMessage.success('微信 Bot 已启动')
+      ElMessage.success(t('settings.user.bot.started'))
     }
     catch (error) {
-      ElMessage.error(getRequestErrorDisplayMessage(error, '启动微信 Bot 失败'))
+      ElMessage.error(getRequestErrorDisplayMessage(error, t('settings.user.bot.startFailed')))
     }
     finally {
       isStartingBot.value = false
@@ -176,10 +178,10 @@ export function useSettingsWeixinBot() {
 
     try {
       status.value = await stopWeixinBot()
-      ElMessage.success('微信 Bot 已停止')
+      ElMessage.success(t('settings.user.bot.stopped'))
     }
     catch (error) {
-      ElMessage.error(getRequestErrorDisplayMessage(error, '停止微信 Bot 失败'))
+      ElMessage.error(getRequestErrorDisplayMessage(error, t('settings.user.bot.stopFailed')))
     }
     finally {
       isStoppingBot.value = false
@@ -188,12 +190,12 @@ export function useSettingsWeixinBot() {
 
   async function disconnect() {
     const confirmed = await ElMessageBox.confirm(
-      '解绑后将停止接收新的微信消息，历史对话仍保留在对话列表中。',
-      '解绑微信 Bot',
+      t('settings.user.bot.disconnectDescription'),
+      t('settings.user.bot.disconnectTitle'),
       {
         type: 'warning',
-        confirmButtonText: '解绑',
-        cancelButtonText: '取消',
+        confirmButtonText: t('settings.user.bot.disconnectConfirm'),
+        cancelButtonText: t('settings.user.bot.disconnectCancel'),
       },
     ).then(() => true).catch(() => false)
 
@@ -206,10 +208,10 @@ export function useSettingsWeixinBot() {
     try {
       await disconnectWeixinBot()
       status.value = createDefaultStatus()
-      ElMessage.success('微信 Bot 已解绑')
+      ElMessage.success(t('settings.user.bot.disconnected'))
     }
     catch (error) {
-      ElMessage.error(getRequestErrorDisplayMessage(error, '解绑微信 Bot 失败'))
+      ElMessage.error(getRequestErrorDisplayMessage(error, t('settings.user.bot.disconnectFailed')))
     }
     finally {
       isDisconnecting.value = false
@@ -224,7 +226,7 @@ export function useSettingsWeixinBot() {
     }
 
     if (nextState.status === WEIXIN_BOT_LOGIN_STATUS.CONFIRMED) {
-      ElMessage.success('微信 Bot 已绑定')
+      ElMessage.success(t('settings.user.bot.bound'))
       clearLoginPoll()
       loginDialogVisible.value = false
     }

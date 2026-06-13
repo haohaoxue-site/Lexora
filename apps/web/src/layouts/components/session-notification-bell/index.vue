@@ -1,8 +1,13 @@
 <script setup lang="ts">
+import type {
+  DocumentCollaborationPermission,
+  DocumentCollaborationScope,
+} from '@haohaoxue/samepage-contracts'
 import {
-  DOCUMENT_COLLABORATION_PERMISSION_LABELS,
-  DOCUMENT_COLLABORATION_SCOPE_LABELS,
+  DOCUMENT_COLLABORATION_PERMISSION,
+  DOCUMENT_COLLABORATION_SCOPE,
 } from '@haohaoxue/samepage-contracts/document/collaboration/constants'
+import { useI18n } from 'vue-i18n'
 import { useSessionNotificationBell } from './useSessionNotificationBell'
 
 const props = withDefaults(defineProps<{
@@ -29,13 +34,24 @@ const {
   selectedInvitation,
   viewInvitation,
 } = useSessionNotificationBell()
+const { t } = useI18n({ useScope: 'global' })
 
-function getPermissionLabel(permission: keyof typeof DOCUMENT_COLLABORATION_PERMISSION_LABELS) {
-  return DOCUMENT_COLLABORATION_PERMISSION_LABELS[permission]
+const permissionLabelKey = {
+  [DOCUMENT_COLLABORATION_PERMISSION.READ]: 'collaboration.permission.read',
+  [DOCUMENT_COLLABORATION_PERMISSION.EDIT]: 'collaboration.permission.edit',
+} as const satisfies Record<DocumentCollaborationPermission, string>
+
+const scopeLabelKey = {
+  [DOCUMENT_COLLABORATION_SCOPE.SELF]: 'collaboration.scope.self',
+  [DOCUMENT_COLLABORATION_SCOPE.DESCENDANTS]: 'collaboration.scope.descendants',
+} as const satisfies Record<DocumentCollaborationScope, string>
+
+function getPermissionLabel(permission: DocumentCollaborationPermission) {
+  return t(permissionLabelKey[permission])
 }
 
-function getScopeLabel(scope: keyof typeof DOCUMENT_COLLABORATION_SCOPE_LABELS) {
-  return DOCUMENT_COLLABORATION_SCOPE_LABELS[scope]
+function getScopeLabel(scope: DocumentCollaborationScope) {
+  return t(scopeLabelKey[scope])
 }
 </script>
 
@@ -72,12 +88,12 @@ function getScopeLabel(scope: keyof typeof DOCUMENT_COLLABORATION_SCOPE_LABELS) 
         <div class="session-notification-bell__header">
           <div class="session-notification-bell__header-main">
             <h3 class="session-notification-bell__title">
-              消息提醒
+              {{ t('sessionMenu.notifications.title') }}
             </h3>
           </div>
 
           <ElButton text :loading="isLoading" @click="loadSummary">
-            刷新
+            {{ t('sessionMenu.notifications.refresh') }}
           </ElButton>
         </div>
 
@@ -86,11 +102,11 @@ function getScopeLabel(scope: keyof typeof DOCUMENT_COLLABORATION_SCOPE_LABELS) 
         </p>
 
         <div v-else-if="isLoading && !hasLoaded" class="session-notification-bell__loading">
-          正在加载消息提醒...
+          {{ t('sessionMenu.notifications.loading') }}
         </div>
 
         <div v-else-if="!invitationItems.length" class="session-notification-bell__empty">
-          暂无待处理消息。
+          {{ t('sessionMenu.notifications.noPending') }}
         </div>
 
         <ul v-else class="session-notification-bell__list">
@@ -102,10 +118,10 @@ function getScopeLabel(scope: keyof typeof DOCUMENT_COLLABORATION_SCOPE_LABELS) 
             <div class="session-notification-bell__item-main">
               <div class="session-notification-bell__item-title-row">
                 <p class="session-notification-bell__item-title">
-                  {{ invitation.inviterLabel }} 邀请你协作《{{ invitation.documentTitle }}》
+                  {{ t('sessionMenu.invitation.invitedDocumentTitle', { inviter: invitation.inviterLabel, title: invitation.documentTitle }) }}
                 </p>
                 <ElTag size="small" type="primary" effect="plain">
-                  文档协作
+                  {{ t('sessionMenu.notifications.documentTag') }}
                 </ElTag>
               </div>
 
@@ -121,7 +137,7 @@ function getScopeLabel(scope: keyof typeof DOCUMENT_COLLABORATION_SCOPE_LABELS) 
                 :disabled="Boolean(actingInvitationId)"
                 @click="viewInvitation(invitation)"
               >
-                查看
+                {{ t('sessionMenu.notifications.view') }}
               </ElButton>
               <ElButton
                 size="small"
@@ -130,7 +146,7 @@ function getScopeLabel(scope: keyof typeof DOCUMENT_COLLABORATION_SCOPE_LABELS) 
                 :loading="actingInvitationId === invitation.id && actingInvitationAction === 'decline'"
                 @click="declineInvitation(invitation)"
               >
-                拒绝
+                {{ t('sessionMenu.notifications.decline') }}
               </ElButton>
               <ElButton
                 size="small"
@@ -139,7 +155,7 @@ function getScopeLabel(scope: keyof typeof DOCUMENT_COLLABORATION_SCOPE_LABELS) 
                 :loading="actingInvitationId === invitation.id && actingInvitationAction === 'accept'"
                 @click="acceptInvitation(invitation)"
               >
-                接受
+                {{ t('sessionMenu.notifications.accept') }}
               </ElButton>
             </div>
           </li>
@@ -149,7 +165,7 @@ function getScopeLabel(scope: keyof typeof DOCUMENT_COLLABORATION_SCOPE_LABELS) 
 
     <ElDialog
       :model-value="isDetailDialogOpen"
-      title="协作邀请"
+      :title="t('sessionMenu.invitation.title')"
       width="420px"
       append-to-body
       @update:model-value="(visible: boolean) => !visible && closeInvitationDetail()"
@@ -159,17 +175,17 @@ function getScopeLabel(scope: keyof typeof DOCUMENT_COLLABORATION_SCOPE_LABELS) 
           {{ selectedInvitation.documentTitle }}
         </h3>
         <p class="session-notification-bell__detail-subtitle">
-          {{ selectedInvitation.inviterLabel }} 邀请你协作文档
+          {{ t('sessionMenu.invitation.invitedDocument', { inviter: selectedInvitation.inviterLabel }) }}
         </p>
 
         <ElDescriptions :column="1" border>
-          <ElDescriptionsItem label="权限">
+          <ElDescriptionsItem :label="t('sessionMenu.invitation.permission')">
             {{ getPermissionLabel(selectedInvitation.permission) }}
           </ElDescriptionsItem>
-          <ElDescriptionsItem label="范围">
+          <ElDescriptionsItem :label="t('sessionMenu.invitation.scope')">
             {{ getScopeLabel(selectedInvitation.scope) }}
           </ElDescriptionsItem>
-          <ElDescriptionsItem label="发送时间">
+          <ElDescriptionsItem :label="t('sessionMenu.invitation.sentAt')">
             {{ selectedInvitation.receivedLabel }}
           </ElDescriptionsItem>
         </ElDescriptions>
@@ -180,7 +196,7 @@ function getScopeLabel(scope: keyof typeof DOCUMENT_COLLABORATION_SCOPE_LABELS) 
           :disabled="Boolean(actingInvitationId)"
           @click="closeInvitationDetail"
         >
-          稍后处理
+          {{ t('sessionMenu.invitation.later') }}
         </ElButton>
         <ElButton
           v-if="selectedInvitation"
@@ -189,7 +205,7 @@ function getScopeLabel(scope: keyof typeof DOCUMENT_COLLABORATION_SCOPE_LABELS) 
           :loading="actingInvitationId === selectedInvitation.id && actingInvitationAction === 'decline'"
           @click="declineInvitation(selectedInvitation)"
         >
-          拒绝
+          {{ t('sessionMenu.invitation.decline') }}
         </ElButton>
         <ElButton
           v-if="selectedInvitation"
@@ -198,7 +214,7 @@ function getScopeLabel(scope: keyof typeof DOCUMENT_COLLABORATION_SCOPE_LABELS) 
           :loading="actingInvitationId === selectedInvitation.id && actingInvitationAction === 'accept'"
           @click="acceptInvitation(selectedInvitation)"
         >
-          接受并打开
+          {{ t('sessionMenu.invitation.acceptAndOpen') }}
         </ElButton>
       </template>
     </ElDialog>

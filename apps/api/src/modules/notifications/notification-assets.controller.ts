@@ -6,15 +6,17 @@ import type {
 import type { FastifyReply, FastifyRequest } from 'fastify'
 import type { AuthUserContext } from '../auth/auth.interface'
 import {
+  API_ERROR_CODE,
   PERMISSIONS,
   PLATFORM_NOTIFICATION_IMAGE_MAX_BYTES,
   ResolvePlatformNotificationAssetsSchema,
 } from '@haohaoxue/samepage-contracts'
-import { BadRequestException, Body, Controller, Get, Param, Post, Req, Res } from '@nestjs/common'
+import { Body, Controller, Get, Param, Post, Req, Res } from '@nestjs/common'
 import { CurrentUser } from '../../decorators/current-user.decorator'
 import { Public } from '../../decorators/public.decorator'
 import { RequirePermissions } from '../../decorators/require-permissions.decorator'
 import { ZodValidationPipe } from '../../pipes/zod-validation.pipe'
+import { apiBadRequest } from '../../utils/api-error'
 import { getRequestFile, readRequestFileBuffer } from '../../utils/request-file'
 import { NotificationAssetsService } from './notification-assets.service'
 
@@ -36,7 +38,7 @@ export class NotificationAdminAssetsController {
     })
 
     if (!file) {
-      throw new BadRequestException('请选择图片文件')
+      throw apiBadRequest(API_ERROR_CODE.NOTIFICATION_IMAGE_EMPTY)
     }
 
     const asset = await this.notificationAssetsService.uploadImage({

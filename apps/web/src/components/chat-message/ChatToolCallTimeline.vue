@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import type { AssistantToolCallView } from '@/composables/chat/utils/chat-message-display'
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 
 const props = defineProps<{
   items: AssistantToolCallView[]
 }>()
 
+const { t } = useI18n({ useScope: 'global' })
 const summary = computed(() => {
   const total = props.items.length
   const failed = props.items.filter(item => item.status === 'error').length
@@ -21,52 +23,52 @@ const summary = computed(() => {
   const success = props.items.filter(item => item.status === 'success').length
 
   return [
-    `${total} 个调用`,
-    pending > 0 ? `${pending} 个进行中` : null,
-    requiresAction > 0 ? `${requiresAction} 个待确认` : null,
-    success > 0 ? `${success} 个成功` : null,
-    failed > 0 ? `${failed} 个失败` : null,
+    t('chat.messageDisplay.toolSummaryTotal', { count: total }),
+    pending > 0 ? t('chat.messageDisplay.toolSummaryPending', { count: pending }) : null,
+    requiresAction > 0 ? t('chat.messageDisplay.toolSummaryRequiresAction', { count: requiresAction }) : null,
+    success > 0 ? t('chat.messageDisplay.toolSummarySuccess', { count: success }) : null,
+    failed > 0 ? t('chat.messageDisplay.toolSummaryFailed', { count: failed }) : null,
   ].filter(Boolean).join(' · ')
 })
 
 function getKindLabel(kind: AssistantToolCallView['kind']): string {
   if (kind === 'skill') {
-    return '技能'
+    return t('chat.messageDisplay.skillKind')
   }
 
   if (kind === 'memory') {
-    return '记忆'
+    return t('chat.messageDisplay.memoryKind')
   }
 
   if (kind === 'mcp') {
     return 'MCP'
   }
 
-  return '函数'
+  return t('chat.messageDisplay.functionKind')
 }
 
 function getStatusLabel(status: AssistantToolCallView['status']): string {
   if (status === 'input_streaming') {
-    return '参数生成中'
+    return t('chat.messageDisplay.inputStreaming')
   }
 
   if (status === 'input_available') {
-    return '参数已生成'
+    return t('chat.messageDisplay.inputAvailable')
   }
 
   if (status === 'success') {
-    return '成功'
+    return t('chat.messageDisplay.success')
   }
 
   if (status === 'error') {
-    return '失败'
+    return t('chat.messageDisplay.toolFailed')
   }
 
   if (status === 'pending_confirmation' || status === 'requires_action') {
-    return '待确认'
+    return t('chat.messageDisplay.toolPendingConfirmation')
   }
 
-  return '运行中'
+  return t('chat.messageDisplay.running')
 }
 
 function formatDuration(durationMs: number | null): string {
@@ -81,7 +83,7 @@ function formatDuration(durationMs: number | null): string {
 <template>
   <details v-if="props.items.length > 0" class="chat-tool-call-timeline">
     <summary class="chat-tool-call-timeline__summary">
-      <span class="chat-tool-call-timeline__summary-title">调用活动</span>
+      <span class="chat-tool-call-timeline__summary-title">{{ t('chat.messageDisplay.toolActivity') }}</span>
       <span class="chat-tool-call-timeline__summary-text">{{ summary }}</span>
     </summary>
 

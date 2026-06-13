@@ -71,7 +71,7 @@ export function resolveCurrentBlockElement(editor: Editor, currentBlock: Current
     }
   }
 
-  throw new TypeError('[samepage:tiptap] 当前块缺少可用 DOM 节点，无法定位块菜单')
+  throw new TypeError('[samepage:tiptap] Current block is missing an available DOM node. Cannot position block menu.')
 }
 
 export function readBlockPreviewText(blockElement: HTMLElement) {

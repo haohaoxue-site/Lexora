@@ -2,6 +2,7 @@ import type { DocumentPageWidthMode } from '@haohaoxue/samepage-contracts'
 import { DOCUMENT_PAGE_WIDTH_MODE } from '@haohaoxue/samepage-contracts/document/constants'
 import { computed, shallowRef } from 'vue'
 import { patchDocumentLayout } from '@/apis/document'
+import { translate } from '@/i18n'
 import { ElMessage } from '@/utils/element-plus'
 import { useActiveDocument } from './useActiveDocument'
 import { useDocsChatPanel } from './useDocsChatPanel'
@@ -64,7 +65,7 @@ export function useDocumentHeaderActions() {
     }
     catch {
       patchDocumentPageWidthMode(currentDocumentId, previousPageWidthMode)
-      ElMessage.error('页宽设置失败，请稍后重试')
+      ElMessage.error(translate('docs.pageWidth.updateFailed'))
     }
     finally {
       isPageWidthUpdating.value = false
@@ -73,7 +74,7 @@ export function useDocumentHeaderActions() {
 
   function handleMenuCommand(command: unknown) {
     if (command === 'document-info') {
-      ElMessage.info('文档信息能力稍后接入')
+      ElMessage.info(translate('docs.headerActions.documentInfoComingSoon'))
       return
     }
 

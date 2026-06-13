@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import type { PublicationPageOutlineProps } from './typing'
+import { useI18n } from 'vue-i18n'
 
 const props = withDefaults(defineProps<PublicationPageOutlineProps>(), {
   showTitle: true,
 })
+const { t } = useI18n()
 </script>
 
 <template>
@@ -11,10 +13,10 @@ const props = withDefaults(defineProps<PublicationPageOutlineProps>(), {
     v-if="props.items.length"
     class="publication-page-outline"
     :class="{ 'publication-page-outline--nested': !props.showTitle }"
-    aria-label="页面导航"
+    :aria-label="t('docs.publicReader.pageNavigation')"
   >
     <p v-if="props.showTitle" class="publication-page-outline__title">
-      页面导航
+      {{ t('docs.publicReader.pageNavigation') }}
     </p>
 
     <ul class="publication-page-outline__list">

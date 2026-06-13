@@ -8,9 +8,9 @@ import type {
 import {
   SYSTEM_EMAIL_PROVIDER,
   SYSTEM_EMAIL_PROVIDER_DEFAULTS,
-  SYSTEM_EMAIL_PROVIDER_LABELS,
 } from '@haohaoxue/samepage-contracts/system-admin'
 import { computed, onMounted, reactive, shallowRef } from 'vue'
+import { useI18n } from 'vue-i18n'
 import {
   getSystemEmailConfig,
   getSystemEmailServiceStatus,
@@ -25,17 +25,17 @@ import { createEmailRules } from '@/views/auth/utils/rules'
 
 const providerMeta = {
   [SYSTEM_EMAIL_PROVIDER.TENCENT_EXMAIL]: {
-    title: SYSTEM_EMAIL_PROVIDER_LABELS[SYSTEM_EMAIL_PROVIDER.TENCENT_EXMAIL],
+    titleKey: 'admin.email.providers.tencentExmail',
     defaults: SYSTEM_EMAIL_PROVIDER_DEFAULTS[SYSTEM_EMAIL_PROVIDER.TENCENT_EXMAIL],
     disabled: false,
   },
   [SYSTEM_EMAIL_PROVIDER.GOOGLE_WORKSPACE]: {
-    title: SYSTEM_EMAIL_PROVIDER_LABELS[SYSTEM_EMAIL_PROVIDER.GOOGLE_WORKSPACE],
+    titleKey: 'admin.email.providers.googleWorkspace',
     defaults: SYSTEM_EMAIL_PROVIDER_DEFAULTS[SYSTEM_EMAIL_PROVIDER.GOOGLE_WORKSPACE],
     disabled: true,
   },
 } as const satisfies Record<SystemEmailProvider, {
-  title: string
+  titleKey: string
   defaults: {
     smtpHost: string
     smtpPort: number
@@ -50,6 +50,7 @@ export function useAdminEmail(options: {
 }) {
   type RuleValidator = NonNullable<FormItemRule['validator']>
 
+  const { t } = useI18n({ useScope: 'global' })
   const userStore = useUserStore()
   const currentConfig = shallowRef<SystemEmailConfig | null>(null)
   const currentServiceStatus = shallowRef<SystemEmailServiceStatus | null>(null)
@@ -76,6 +77,7 @@ export function useAdminEmail(options: {
   const providerCards = computed(() => Object.entries(providerMeta).map(([provider, meta]) => ({
     provider: provider as SystemEmailProvider,
     ...meta,
+    title: t(meta.titleKey),
   })))
 
   const defaultTestRecipientEmail = computed(() => userStore.currentUser?.email?.trim().toLowerCase() ?? '')
@@ -92,7 +94,7 @@ export function useAdminEmail(options: {
     }
 
     if (!normalizedValue) {
-      callback(new Error('启用发件服务前必须填写发件密码'))
+      callback(new Error(t('admin.email.enablePasswordRequired')))
       return
     }
 
@@ -103,7 +105,7 @@ export function useAdminEmail(options: {
     const normalizedValue = typeof value === 'string' ? value.trim() : ''
 
     if (!normalizedValue) {
-      callback(new Error('请输入 SMTP 主机地址'))
+      callback(new Error(t('admin.email.hostRequired')))
       return
     }
 
@@ -114,7 +116,7 @@ export function useAdminEmail(options: {
     const normalizedValue = typeof value === 'string' ? value.trim() : ''
 
     if (!normalizedValue) {
-      callback(new Error('请输入发件账号'))
+      callback(new Error(t('admin.email.usernameRequired')))
       return
     }
 
@@ -125,7 +127,7 @@ export function useAdminEmail(options: {
     const normalizedValue = typeof value === 'string' ? value.trim() : ''
 
     if (!normalizedValue) {
-      callback(new Error('请输入发件人名称'))
+      callback(new Error(t('admin.email.fromNameRequired')))
       return
     }
 
@@ -134,7 +136,7 @@ export function useAdminEmail(options: {
 
   const validatePort: RuleValidator = (_rule, value, callback) => {
     if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) {
-      callback(new Error('请输入合法端口'))
+      callback(new Error(t('admin.email.invalidPort')))
       return
     }
 
@@ -147,10 +149,10 @@ export function useAdminEmail(options: {
     smtpUsername: [{ validator: validateUsername }],
     smtpPassword: [{ validator: validatePassword }],
     fromName: [{ validator: validateFromName }],
-    fromEmail: createEmailRules('发件邮箱'),
+    fromEmail: createEmailRules(t('admin.email.fromEmail')),
   }
   const testEmailFormRules: FormRules<typeof testEmailForm> = {
-    email: createEmailRules('收件邮箱'),
+    email: createEmailRules(t('admin.email.testRecipient')),
   }
 
   async function loadConfig() {
@@ -174,7 +176,7 @@ export function useAdminEmail(options: {
       form.fromEmail = config.fromEmail
     }
     catch (error) {
-      errorMessage.value = getRequestErrorDisplayMessage(error, '加载发件配置失败')
+      errorMessage.value = getRequestErrorDisplayMessage(error, t('admin.email.loadFailed'))
     }
     finally {
       isLoading.value = false
@@ -203,10 +205,10 @@ export function useAdminEmail(options: {
         fromEmail: form.fromEmail,
       })
       resetPasswordDraft()
-      ElMessage.success('发件配置已保存')
+      ElMessage.success(t('admin.email.configSaved'))
     }
     catch (error) {
-      ElMessage.error(getRequestErrorDisplayMessage(error, '保存发件配置失败'))
+      ElMessage.error(getRequestErrorDisplayMessage(error, t('admin.email.saveFailed')))
     }
     finally {
       isSaving.value = false
@@ -225,11 +227,11 @@ export function useAdminEmail(options: {
 
       currentServiceStatus.value = nextStatus
 
-      ElMessage.success(nextEnabled ? '发件服务已启用' : '发件服务已关闭')
+      ElMessage.success(nextEnabled ? t('admin.email.enabled') : t('admin.email.disabled'))
     }
     catch (error) {
       currentServiceStatus.value = previousStatus
-      ElMessage.error(getRequestErrorDisplayMessage(error, nextEnabled ? '启用发件服务失败' : '关闭发件服务失败'))
+      ElMessage.error(getRequestErrorDisplayMessage(error, nextEnabled ? t('admin.email.serviceEnableFailed') : t('admin.email.serviceDisableFailed')))
     }
     finally {
       isUpdatingServiceStatus.value = false
@@ -291,10 +293,10 @@ export function useAdminEmail(options: {
         email: recipientEmail,
       })
       isTestDialogVisible.value = false
-      ElMessage.success(`测试邮件已发送到 ${recipientEmail}`)
+      ElMessage.success(t('admin.email.testSent', { email: recipientEmail }))
     }
     catch (error) {
-      ElMessage.error(getRequestErrorDisplayMessage(error, '发送测试邮件失败'))
+      ElMessage.error(getRequestErrorDisplayMessage(error, t('admin.email.testSendFailed')))
     }
     finally {
       currentConfig.value = await getSystemEmailConfig().catch(() => currentConfig.value)

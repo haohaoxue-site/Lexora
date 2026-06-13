@@ -3,6 +3,7 @@ import { PERMISSIONS } from '@haohaoxue/samepage-contracts/rbac/constants'
 import { ACCOUNT_DELETION_CONFIRMATION_PHRASE } from '@haohaoxue/samepage-contracts/user/constants'
 import { createSharedComposable } from '@vueuse/core'
 import { computed, shallowRef } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { deleteCurrentUser } from '@/apis/user'
 import { resetAdminRoutes } from '@/router'
@@ -16,6 +17,7 @@ export const DELETE_ACCOUNT_CONFIRMATION_PHRASE: DeleteCurrentUserRequest['confi
   = ACCOUNT_DELETION_CONFIRMATION_PHRASE
 
 export const useSettingsUserDelete = createSharedComposable(() => {
+  const { t } = useI18n({ useScope: 'global' })
   const router = useRouter()
   const authStore = useAuthStore()
   const userStore = useUserStore()
@@ -46,7 +48,7 @@ export const useSettingsUserDelete = createSharedComposable(() => {
     try {
       await deleteCurrentUser(payload)
       authStore.clearSession()
-      ElMessage.success('账号已删除')
+      ElMessage.success(t('settings.user.delete.deleted'))
 
       try {
         await router.replace({ name: 'login' })
@@ -58,7 +60,7 @@ export const useSettingsUserDelete = createSharedComposable(() => {
       return true
     }
     catch (error) {
-      ElMessage.error(getRequestErrorDisplayMessage(error, '删除账号失败'))
+      ElMessage.error(getRequestErrorDisplayMessage(error, t('settings.user.delete.deleteFailed')))
       return false
     }
     finally {

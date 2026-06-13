@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { SidebarPanelBrand, SidebarPanelItem } from '../typing'
+import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 import SessionUserMenu from '@/layouts/components/session-user-menu'
 
@@ -9,6 +10,7 @@ const props = defineProps<{
 }>()
 
 const route = useRoute()
+const { t } = useI18n({ useScope: 'global' })
 const repositoryUrl = 'https://github.com/haohaoxue-site/SamePage-AI'
 
 function getItemStateClass(isActive: boolean) {
@@ -33,7 +35,7 @@ function getItemIconSrc(item: SidebarPanelItem, isActive: boolean) {
       <RouterLink
         :to="props.brand.to"
         class="sidebar-panel__brand-link flex h-11 w-11 items-center justify-center rounded-lg"
-        aria-label="打开同页入口"
+        :aria-label="t('navigation.workspace.home')"
       >
         <img
           :src="props.brand.iconSrc"
@@ -75,13 +77,13 @@ function getItemIconSrc(item: SidebarPanelItem, isActive: boolean) {
       </nav>
     </ElScrollbar>
 
-    <nav class="sidebar-panel__external-nav shrink-0 border-t px-3 py-3" aria-label="项目链接">
+    <nav class="sidebar-panel__external-nav shrink-0 border-t px-3 py-3" :aria-label="t('navigation.projectLinks')">
       <a
         :href="repositoryUrl"
         target="_blank"
         rel="noopener noreferrer"
         class="sidebar-panel__external-link mx-auto flex h-11 w-11 items-center justify-center overflow-hidden rounded-lg"
-        aria-label="打开 SamePage AI GitHub 项目地址"
+        :aria-label="t('navigation.repository')"
         title="GitHub"
       >
         <span class="sidebar-panel__external-icon flex h-9 w-9 shrink-0 items-center justify-center">

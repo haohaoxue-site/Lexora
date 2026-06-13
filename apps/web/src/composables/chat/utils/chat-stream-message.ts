@@ -5,6 +5,7 @@ import {
   CHAT_MESSAGE_STATUS,
   CHAT_SESSION_EVENT_TYPE,
 } from '@haohaoxue/samepage-contracts/chat/constants'
+import { translate } from '@/i18n'
 import dayjs from '@/utils/dayjs'
 
 type ChatMessagePart = ChatMessage['parts'][number]
@@ -36,7 +37,7 @@ export function applyChatSessionEventToMessages(
       return failMessage(
         messages,
         event.messageId,
-        getPayloadString(event.payload, 'failureMessage') ?? getPayloadString(event.payload, 'message') ?? '生成失败',
+        getPayloadString(event.payload, 'failureMessage') ?? getPayloadString(event.payload, 'message') ?? translate('chat.errors.generationFailed'),
       )
     case CHAT_SESSION_EVENT_TYPE.MESSAGE_CANCELLED:
       return updateMessageStatus(messages, event.messageId, CHAT_MESSAGE_STATUS.CANCELLED, {

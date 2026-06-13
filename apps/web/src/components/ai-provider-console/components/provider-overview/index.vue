@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import type { AiProviderOverviewEmits, AiProviderOverviewProps } from './typing'
+import { useI18n } from 'vue-i18n'
 
 defineProps<AiProviderOverviewProps>()
 
 const emit = defineEmits<AiProviderOverviewEmits>()
+const { t } = useI18n({ useScope: 'global' })
 </script>
 
 <template>
@@ -23,7 +25,7 @@ const emit = defineEmits<AiProviderOverviewEmits>()
     <div class="ai-provider-console__overview-form">
       <div v-if="canEditEndpoint" class="ai-provider-console__field">
         <div class="ai-provider-console__field-label">
-          API 地址
+          {{ t('aiProvider.overview.apiEndpoint') }}
         </div>
         <ElInput
           v-model="endpointForm.endpoint"
@@ -43,7 +45,7 @@ const emit = defineEmits<AiProviderOverviewEmits>()
             type="password"
             show-password
             autocomplete="new-password"
-            placeholder="请输入 API Key"
+            :placeholder="t('aiProvider.overview.apiKeyPlaceholder')"
             :disabled="isLoadingApiKey || isSavingApiKey"
             @keyup.enter="emit('saveApiKey')"
           />
@@ -53,7 +55,7 @@ const emit = defineEmits<AiProviderOverviewEmits>()
             :disabled="isLoadingApiKey"
             @click="emit('saveApiKey')"
           >
-            保存
+            {{ t('aiProvider.common.save') }}
           </ElButton>
         </div>
       </div>

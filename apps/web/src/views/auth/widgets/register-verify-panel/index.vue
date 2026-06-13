@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import type { FormInstance } from 'element-plus'
 import { useTemplateRef } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useRegisterVerify } from '../../composables/useRegisterVerify'
 import AuthEntryShell from '../../layouts/entry-shell'
 
 const registerFormRef = useTemplateRef<FormInstance>('registerFormRef')
+const { t } = useI18n({ useScope: 'global' })
 const {
   errorMessage,
   form,
@@ -42,42 +44,42 @@ const {
         class="password-register-verify-view__form w-full"
         @submit.prevent="handleSubmitRegistration"
       >
-        <ElFormItem label="注册邮箱" prop="email">
+        <ElFormItem :label="t('auth.common.registerEmail')" prop="email">
           <ElInput v-model="form.email" disabled />
         </ElFormItem>
-        <ElFormItem label="验证码" prop="code">
+        <ElFormItem :label="t('auth.common.verificationCode')" prop="code">
           <ElInput
             v-model="form.code"
             maxlength="6"
-            placeholder="输入 6 位验证码"
+            :placeholder="t('auth.registerVerify.verificationCodePlaceholder')"
             :disabled="!isReady || isSubmitting"
           />
         </ElFormItem>
-        <ElFormItem label="显示名称" prop="displayName">
+        <ElFormItem :label="t('auth.common.displayName')" prop="displayName">
           <ElInput
             v-model="form.displayName"
             autocomplete="nickname"
-            placeholder="输入显示名称"
+            :placeholder="t('auth.registerVerify.displayNamePlaceholder')"
             :disabled="!isReady || isSubmitting"
           />
         </ElFormItem>
-        <ElFormItem label="密码" prop="password">
+        <ElFormItem :label="t('auth.common.password')" prop="password">
           <ElInput
             v-model="form.password"
             type="password"
             show-password
             autocomplete="new-password"
-            placeholder="设置密码"
+            :placeholder="t('auth.registerVerify.passwordPlaceholder')"
             :disabled="!isReady || isSubmitting"
           />
         </ElFormItem>
-        <ElFormItem label="确认密码" prop="confirmPassword">
+        <ElFormItem :label="t('auth.common.confirmPassword')" prop="confirmPassword">
           <ElInput
             v-model="form.confirmPassword"
             type="password"
             show-password
             autocomplete="new-password"
-            placeholder="再次输入密码"
+            :placeholder="t('auth.registerVerify.confirmPasswordPlaceholder')"
             :disabled="!isReady || isSubmitting"
           />
         </ElFormItem>
@@ -88,15 +90,15 @@ const {
           :loading="isSubmitting"
           :disabled="!isReady"
         >
-          完成注册
+          {{ t('auth.registerVerify.submit') }}
         </ElButton>
       </ElForm>
     </div>
 
     <template #footer>
-      <span class="password-register-verify-view__footer-text text-secondary">已有账号？</span>
+      <span class="password-register-verify-view__footer-text text-secondary">{{ t('auth.common.existingAccount') }}</span>
       <RouterLink :to="{ name: 'login' }" class="password-register-verify-view__footer-link text-primary font-semibold no-underline">
-        返回登录
+        {{ t('auth.common.returnLogin') }}
       </RouterLink>
     </template>
   </AuthEntryShell>

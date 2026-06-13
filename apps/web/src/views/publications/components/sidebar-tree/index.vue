@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import type { PublicationSidebarTreeProps } from './typing'
 import { computed, reactive, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { SvgIcon } from '@/components/svg-icon'
 import PublicationSidebarPageNode from '../sidebar-page-node'
 
 const props = defineProps<PublicationSidebarTreeProps>()
+const { t } = useI18n()
 const expandedByGroupId = reactive<Record<string, boolean>>({})
 
 const visibleGroups = computed(() => props.groups.filter(group => group.pages.length))
@@ -25,7 +27,7 @@ function toggleGroup(groupId: string) {
 </script>
 
 <template>
-  <nav class="publication-sidebar-tree" aria-label="站点侧边栏">
+  <nav class="publication-sidebar-tree" :aria-label="t('docs.publicReader.siteSidebar')">
     <section
       v-for="group in visibleGroups"
       :id="`publication-section-${group.id}`"

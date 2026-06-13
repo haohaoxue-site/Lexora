@@ -2,6 +2,7 @@ import type { ComputedRef, MaybeRefOrGetter } from 'vue'
 import type { AiProviderConsoleMode } from '../typing'
 import type { AiProvider } from '@/apis/ai'
 import { shallowRef, toValue } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { updatePlatformAiProvider, updateUserAiProvider } from '@/apis/ai'
 import { ElMessage } from '@/utils/element-plus'
 import { getRequestErrorDisplayMessage } from '@/utils/request-error'
@@ -21,6 +22,7 @@ export interface UseAiProviderStatusOptions {
 }
 
 export function useAiProviderStatus(options: UseAiProviderStatusOptions) {
+  const { t } = useI18n({ useScope: 'global' })
   const isUpdatingProviderStatus = shallowRef(false)
 
   async function updateProviderEnabled(value: string | number | boolean) {
@@ -31,7 +33,7 @@ export function useAiProviderStatus(options: UseAiProviderStatusOptions) {
     }
 
     if (enabled && options.enabledModelCount.value === 0) {
-      ElMessage.warning('请先添加并启用模型后再启用服务商')
+      ElMessage.warning(t('aiProvider.messages.requireEnabledModel'))
       return
     }
 
@@ -45,7 +47,7 @@ export function useAiProviderStatus(options: UseAiProviderStatusOptions) {
       options.patchProvider(nextProvider)
     }
     catch (error) {
-      ElMessage.error(getRequestErrorDisplayMessage(error, '更新服务商状态失败'))
+      ElMessage.error(getRequestErrorDisplayMessage(error, t('aiProvider.errors.updateProviderStatus')))
     }
     finally {
       isUpdatingProviderStatus.value = false

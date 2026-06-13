@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useDocumentTree } from '../../composables/useDocumentTree'
 
+const { t } = useI18n()
 const {
   closeDeleteDialog,
   confirmDeleteDocument,
@@ -14,7 +16,9 @@ const {
 const isSubmitting = computed(() => deleteActionKind.value !== null)
 const isDeletingToTrash = computed(() => deleteActionKind.value === 'trash')
 const isPermanentlyDeleting = computed(() => deleteActionKind.value === 'permanent')
-const dialogTitle = computed(() => `是否删除：${deleteDialogDocumentTitle.value || '该文档'}？`)
+const dialogTitle = computed(() => t('docs.deleteDialog.title', {
+  title: deleteDialogDocumentTitle.value || t('docs.deleteDialog.fallbackTitle'),
+}))
 
 function handleDialogVisibleChange(value: boolean) {
   if (value || isSubmitting.value) {
@@ -56,7 +60,7 @@ function handlePermanentlyDelete() {
   >
     <div class="grid gap-2">
       <p class="m-0 text-sm leading-[1.6] text-main">
-        删除后可在回收站中恢复，子文档会一并处理。
+        {{ t('docs.deleteDialog.description') }}
       </p>
     </div>
 
@@ -68,12 +72,12 @@ function handlePermanentlyDelete() {
           :disabled="isSubmitting"
           @click="handlePermanentlyDelete"
         >
-          彻底删除
+          {{ t('docs.common.permanentDelete') }}
         </ElButton>
 
         <div class="inline-flex items-center justify-end gap-3">
           <ElButton :disabled="isSubmitting" @click="closeDeleteDialog">
-            取消
+            {{ t('docs.common.cancel') }}
           </ElButton>
           <ElButton
             type="primary"
@@ -81,7 +85,7 @@ function handlePermanentlyDelete() {
             :disabled="isSubmitting"
             @click="handleDelete"
           >
-            删除
+            {{ t('docs.common.delete') }}
           </ElButton>
         </div>
       </div>

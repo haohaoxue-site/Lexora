@@ -7,6 +7,7 @@ import {
   batchDeleteDocuments as batchDeleteDocumentsRequest,
   createDocument as createDocumentRequest,
 } from '@/apis/document'
+import { translate } from '@/i18n'
 import { ElMessage } from '@/utils/element-plus'
 import {
   findDocumentPath,
@@ -103,7 +104,7 @@ export const useDocumentTree = createSharedComposable(() => {
         })
       }
 
-      ElMessage.success(`已删除 ${response.deletedDocumentIds.length} 个文档`)
+      ElMessage.success(translate('docs.documentTree.batchDeleted', { count: response.deletedDocumentIds.length }))
 
       return {
         deletedDocumentIds: response.deletedDocumentIds,
@@ -111,7 +112,7 @@ export const useDocumentTree = createSharedComposable(() => {
       }
     }
     catch (error) {
-      ElMessage.error(error instanceof Error ? error.message : '批量删除文档失败')
+      ElMessage.error(error instanceof Error ? error.message : translate('docs.documentTree.batchDeleteFailed'))
       return {
         deletedDocumentIds: [],
         nextDocumentId: activeDocumentId.value,

@@ -6,6 +6,7 @@ import type {
 } from '../../content/typing'
 import type { TiptapEditorContent } from '../../core/typing'
 import { shallowRef } from 'vue'
+import { translate } from '@/i18n'
 import TiptapEditor from '../../core/TiptapEditor.vue'
 import { createBodyExtensions } from '../../extensions/createExtensions'
 import StandaloneContentToolbar from './StandaloneContentToolbar.vue'
@@ -26,7 +27,7 @@ interface StandaloneContentEditorEmits {
 
 const props = withDefaults(defineProps<StandaloneContentEditorProps>(), {
   editable: true,
-  placeholder: '输入内容，或直接开始写作。',
+  placeholder: translate('editor.placeholders.standalone'),
   canUploadImage: false,
   uploadImage: undefined,
   resolveImageSrc: undefined,

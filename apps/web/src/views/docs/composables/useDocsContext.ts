@@ -3,6 +3,7 @@ import type { TiptapEditorCommentRequest } from '@/components/tiptap-editor'
 import { createSharedComposable } from '@vueuse/core'
 import { computed, shallowRef } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { translate } from '@/i18n'
 import { useWorkspaceStore } from '@/stores/workspace'
 import { resolveDocumentBlockIdFromHash } from '@/utils/documentBlockAnchor'
 import { ElMessage } from '@/utils/element-plus'
@@ -67,7 +68,7 @@ export const useDocsContext = createSharedComposable(() => {
 
   function handleRequestComment(request: TiptapEditorCommentRequest) {
     void request
-    ElMessage.info('评论能力稍后接入')
+    ElMessage.info(translate('docs.common.commentComingSoon'))
   }
 
   return {

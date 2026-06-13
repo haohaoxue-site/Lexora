@@ -23,6 +23,7 @@ import {
   updateChatSessionModel,
   updateChatSessionTitle,
 } from '@/apis/chat'
+import { translate } from '@/i18n'
 
 export interface CreateChatApiOptions {
   getWorkspaceId: () => string | null | undefined
@@ -33,7 +34,7 @@ export function createChatApi(origin: ChatSessionOrigin, options: CreateChatApiO
     const workspaceId = options.getWorkspaceId()?.trim()
 
     if (!workspaceId) {
-      throw new Error('未找到个人空间')
+      throw new Error(translate('chat.errors.missingWorkspace'))
     }
 
     return workspaceId

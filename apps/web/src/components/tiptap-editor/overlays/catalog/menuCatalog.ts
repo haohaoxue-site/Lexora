@@ -173,45 +173,45 @@ export interface BlockMenuVariantDefinition {
 }
 
 export const textColorOptions = [
-  { label: '默认', className: '' },
-  { label: '灰色', className: 'tiptap-highlight-gray-text' },
-  { label: '棕色', className: 'tiptap-highlight-brown-text' },
-  { label: '橙色', className: 'tiptap-highlight-orange-text' },
-  { label: '黄色', className: 'tiptap-highlight-yellow-text' },
-  { label: '绿色', className: 'tiptap-highlight-green-text' },
-  { label: '蓝色', className: 'tiptap-highlight-blue-text' },
-  { label: '紫色', className: 'tiptap-highlight-purple-text' },
-  { label: '粉色', className: 'tiptap-highlight-pink-text' },
-  { label: '红色', className: 'tiptap-highlight-red-text' },
+  { label: 'Default', className: '' },
+  { label: 'Gray', className: 'tiptap-highlight-gray-text' },
+  { label: 'Brown', className: 'tiptap-highlight-brown-text' },
+  { label: 'Orange', className: 'tiptap-highlight-orange-text' },
+  { label: 'Yellow', className: 'tiptap-highlight-yellow-text' },
+  { label: 'Green', className: 'tiptap-highlight-green-text' },
+  { label: 'Blue', className: 'tiptap-highlight-blue-text' },
+  { label: 'Purple', className: 'tiptap-highlight-purple-text' },
+  { label: 'Pink', className: 'tiptap-highlight-pink-text' },
+  { label: 'Red', className: 'tiptap-highlight-red-text' },
 ] as const satisfies readonly MenuColorOption[]
 
 export const backgroundColorOptions = [
-  { label: '默认', className: '' },
-  { label: '灰色', className: 'tiptap-highlight-gray-bg' },
-  { label: '棕色', className: 'tiptap-highlight-brown-bg' },
-  { label: '橙色', className: 'tiptap-highlight-orange-bg' },
-  { label: '黄色', className: 'tiptap-highlight-yellow-bg' },
-  { label: '绿色', className: 'tiptap-highlight-green-bg' },
-  { label: '蓝色', className: 'tiptap-highlight-blue-bg' },
-  { label: '紫色', className: 'tiptap-highlight-purple-bg' },
-  { label: '粉色', className: 'tiptap-highlight-pink-bg' },
-  { label: '红色', className: 'tiptap-highlight-red-bg' },
+  { label: 'Default', className: '' },
+  { label: 'Gray', className: 'tiptap-highlight-gray-bg' },
+  { label: 'Brown', className: 'tiptap-highlight-brown-bg' },
+  { label: 'Orange', className: 'tiptap-highlight-orange-bg' },
+  { label: 'Yellow', className: 'tiptap-highlight-yellow-bg' },
+  { label: 'Green', className: 'tiptap-highlight-green-bg' },
+  { label: 'Blue', className: 'tiptap-highlight-blue-bg' },
+  { label: 'Purple', className: 'tiptap-highlight-purple-bg' },
+  { label: 'Pink', className: 'tiptap-highlight-pink-bg' },
+  { label: 'Red', className: 'tiptap-highlight-red-bg' },
 ] as const satisfies readonly MenuColorOption[]
 
 export const TURN_INTO_ITEM_CATALOG = {
-  'paragraph': { label: '正文', icon: 'T' },
-  'heading-1': { label: '一级标题', icon: 'H1' },
-  'heading-2': { label: '二级标题', icon: 'H2' },
-  'heading-3': { label: '三级标题', icon: 'H3' },
-  'heading-4': { label: '四级标题', icon: 'H4' },
-  'heading-5': { label: '五级标题', icon: 'H5' },
-  'bulletList': { label: '无序列表', icon: 'list-ul' },
-  'orderedList': { label: '有序列表', icon: 'list-ol' },
-  'codeBlock': { label: '代码块', icon: 'code' },
-  'blockMath': { label: '公式块', icon: 'math-block' },
-  'blockquote': { label: '引用', icon: 'quote' },
-  'divider': { label: '分割线', icon: 'divider' },
-  'taskList': { label: '任务列表', icon: 'task' },
+  'paragraph': { label: 'Text', icon: 'T' },
+  'heading-1': { label: 'Heading 1', icon: 'H1' },
+  'heading-2': { label: 'Heading 2', icon: 'H2' },
+  'heading-3': { label: 'Heading 3', icon: 'H3' },
+  'heading-4': { label: 'Heading 4', icon: 'H4' },
+  'heading-5': { label: 'Heading 5', icon: 'H5' },
+  'bulletList': { label: 'Bullet list', icon: 'list-ul' },
+  'orderedList': { label: 'Numbered list', icon: 'list-ol' },
+  'codeBlock': { label: 'Code block', icon: 'code' },
+  'blockMath': { label: 'Formula block', icon: 'math-block' },
+  'blockquote': { label: 'Quote', icon: 'quote' },
+  'divider': { label: 'Divider', icon: 'divider' },
+  'taskList': { label: 'Task list', icon: 'task' },
 } as const satisfies Record<TurnIntoBlockType, Omit<TurnIntoMenuDefinition, 'target'>>
 
 export const BUBBLE_TURN_INTO_GROUP_REGISTRY = [
@@ -284,10 +284,10 @@ export const BLOCK_MENU_VARIANT_REGISTRY = {
   empty: {
     quickItems: [
       { kind: 'turn-into-scope', scope: 'block-empty' },
-      { kind: 'insert', label: '链接', icon: 'link', action: 'insert-link' },
-      { kind: 'insert', label: '行内公式', icon: 'inline-math', action: 'insert-inline-math' },
-      { kind: 'insert', label: '图片', icon: 'image', action: 'insert-image' },
-      { kind: 'insert', label: '视频或文件', icon: 'file', action: 'insert-file' },
+      { kind: 'insert', label: 'Link', icon: 'link', action: 'insert-link' },
+      { kind: 'insert', label: 'Inline formula', icon: 'inline-math', action: 'insert-inline-math' },
+      { kind: 'insert', label: 'Image', icon: 'image', action: 'insert-image' },
+      { kind: 'insert', label: 'Video or file', icon: 'file', action: 'insert-file' },
     ],
     menuItems: [],
   },
@@ -296,23 +296,23 @@ export const BLOCK_MENU_VARIANT_REGISTRY = {
       { kind: 'turn-into-scope', scope: 'block-content' },
     ],
     menuItems: [
-      { label: '缩进和对齐', icon: 'align', action: 'align', kind: 'panel' },
-      { label: '颜色', icon: 'color', action: 'color', kind: 'panel' },
-      { label: '评论', icon: 'comment', action: 'comment', kind: 'action' },
-      { label: '剪切', icon: 'cut', action: 'cut', kind: 'action' },
-      { label: '复制', icon: 'copy', action: 'copy', kind: 'action' },
-      { label: '删除', icon: 'delete', action: 'delete', kind: 'action' },
+      { label: 'Align and indent', icon: 'align', action: 'align', kind: 'panel' },
+      { label: 'Color', icon: 'color', action: 'color', kind: 'panel' },
+      { label: 'Comment', icon: 'comment', action: 'comment', kind: 'action' },
+      { label: 'Cut', icon: 'cut', action: 'cut', kind: 'action' },
+      { label: 'Copy', icon: 'copy', action: 'copy', kind: 'action' },
+      { label: 'Delete', icon: 'delete', action: 'delete', kind: 'action' },
     ],
   },
 } as const satisfies Record<'empty' | 'content', BlockMenuVariantDefinition>
 
 export const BLOCK_MENU_TEXT_ALIGN_CHILD_REGISTRY = [
-  { label: '左对齐', icon: 'align-left', action: 'align-left', value: 'left' },
-  { label: '居中对齐', icon: 'align-center', action: 'align-center', value: 'center' },
-  { label: '右对齐', icon: 'align-right', action: 'align-right', value: 'right' },
+  { label: 'Align left', icon: 'align-left', action: 'align-left', value: 'left' },
+  { label: 'Align center', icon: 'align-center', action: 'align-center', value: 'center' },
+  { label: 'Align right', icon: 'align-right', action: 'align-right', value: 'right' },
 ] as const satisfies readonly BlockMenuTextAlignDefinition[]
 
 export const BLOCK_MENU_INDENT_CHILD_REGISTRY = [
-  { label: '增加缩进', icon: 'indent', action: 'indent', isDisabled: context => !context.canIndent },
-  { label: '减少缩进', icon: 'outdent', action: 'outdent', isDisabled: context => !context.canOutdent },
+  { label: 'Increase indent', icon: 'indent', action: 'indent', isDisabled: context => !context.canIndent },
+  { label: 'Decrease indent', icon: 'outdent', action: 'outdent', isDisabled: context => !context.canOutdent },
 ] as const satisfies readonly BlockMenuIndentDefinition[]

@@ -1,19 +1,21 @@
 <script setup lang="ts">
 import type { EmptyProps } from './typing'
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { SvgIcon } from '@/components/svg-icon'
 
 const props = withDefaults(defineProps<EmptyProps>(), {
   title: '',
-  description: '暂无内容',
   icon: '',
   iconCategory: 'ui',
   imageSize: 72,
   compact: false,
 })
+const { t } = useI18n()
 
 const hasTitle = computed(() => props.title.trim().length > 0)
-const hasDescription = computed(() => props.description.trim().length > 0)
+const description = computed(() => props.description ?? t('common.emptyDescription'))
+const hasDescription = computed(() => description.value.trim().length > 0)
 const hasCustomIcon = computed(() => props.icon.trim().length > 0)
 const figureSize = computed(() => props.compact && props.imageSize === 72 ? 60 : props.imageSize)
 </script>
@@ -55,7 +57,7 @@ const figureSize = computed(() => props.compact && props.imageSize === 72 ? 60 :
           {{ props.title }}
         </p>
         <p v-if="hasDescription" class="app-empty__description">
-          {{ props.description }}
+          {{ description }}
         </p>
       </div>
     </template>

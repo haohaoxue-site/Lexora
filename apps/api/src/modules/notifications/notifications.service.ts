@@ -15,6 +15,7 @@ import type {
 import { Buffer } from 'node:buffer'
 import { randomUUID } from 'node:crypto'
 import {
+  API_ERROR_CODE,
   COLLABORATION_RESOLVER_ENTRY_STATUS,
   COLLABORATION_RESOLVER_ENTRY_TYPE,
   DOCUMENT_COLLABORATION_USER_INVITE_STATUS,
@@ -25,9 +26,7 @@ import {
 } from '@haohaoxue/samepage-contracts'
 import { summarizeDocumentContent } from '@haohaoxue/samepage-shared'
 import {
-  BadRequestException,
   Injectable,
-  NotFoundException,
 } from '@nestjs/common'
 import {
   DocumentStatus,
@@ -36,6 +35,7 @@ import {
   Prisma,
 } from '@prisma/client'
 import { PrismaService } from '../../database/prisma.service'
+import { apiBadRequest, apiNotFound } from '../../utils/api-error'
 import { NotificationAssetsService } from './notification-assets.service'
 import { collectNotificationImageAssetIds } from './notification-content-assets'
 
@@ -288,7 +288,7 @@ export class NotificationsService {
     payload: UpdatePlatformNotificationRequest,
   ): Promise<PlatformNotification> {
     if (Object.keys(payload).length === 0) {
-      throw new BadRequestException('至少更新一项站内信内容')
+      throw apiBadRequest(API_ERROR_CODE.NOTIFICATION_EMPTY_UPDATE)
     }
 
     const content = payload.content ? normalizeTiptapContent(payload.content) : undefined
@@ -305,11 +305,11 @@ export class NotificationsService {
       })
 
       if (!current) {
-        throw new NotFoundException(`Platform notification "${notificationId}" not found`)
+        throw apiNotFound(API_ERROR_CODE.RESOURCE_NOT_FOUND)
       }
 
       if (current.status === PLATFORM_NOTIFICATION_STATUS.PUBLISHED) {
-        throw new BadRequestException('已发布站内信不可编辑')
+        throw apiBadRequest(API_ERROR_CODE.NOTIFICATION_PUBLISHED_LOCKED)
       }
 
       if (assetIds) {
@@ -352,7 +352,7 @@ export class NotificationsService {
     })
 
     if (!current) {
-      throw new NotFoundException(`Platform notification "${notificationId}" not found`)
+      throw apiNotFound(API_ERROR_CODE.RESOURCE_NOT_FOUND)
     }
 
     await this.prisma.platformNotification.update({

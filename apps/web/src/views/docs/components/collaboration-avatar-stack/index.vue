@@ -4,6 +4,7 @@ import type {
   CollaborationAvatarStackProps,
 } from './typing'
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import {
   formatCollaborationIdentity,
   getCollaborationAvatarText,
@@ -14,6 +15,7 @@ const props = withDefaults(defineProps<CollaborationAvatarStackProps>(), {
   canOpen: false,
 })
 const emits = defineEmits<CollaborationAvatarStackEmits>()
+const { t } = useI18n()
 
 const visibleCollaborators = computed(() => props.collaborators.slice(0, 2))
 const remainingCollaboratorCount = computed(() => Math.max(props.collaborators.length - visibleCollaborators.value.length, 0))
@@ -33,13 +35,13 @@ function openCollaborators() {
     type="button"
     class="collaboration-avatar-stack inline-flex flex-[0_0_auto] items-center gap-0 rounded-full border-0 px-2 py-[0.25rem]"
     :class="{ 'is-clickable': props.canOpen }"
-    aria-label="当前协作者"
+    :aria-label="t('docs.common.currentCollaborators')"
     :aria-disabled="!props.canOpen"
     @click="openCollaborators"
   >
     <ElTooltip
       v-if="props.owner"
-      :content="`${getCollaborationIdentityName(props.owner)} · 文档所有者`"
+      :content="`${getCollaborationIdentityName(props.owner)} · ${t('docs.treeMenu.owner')}`"
       placement="top"
     >
       <ElAvatar

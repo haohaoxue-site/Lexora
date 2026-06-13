@@ -2,29 +2,31 @@
 import type { BotsSectionEmits, BotsSectionProps } from './typing'
 import { BOT_RUNTIME_STATE, WEIXIN_BOT_LOGIN_STATUS } from '@haohaoxue/samepage-contracts/bot'
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import UserSettingsSectionHeader from '../section-header'
 
 const props = defineProps<BotsSectionProps>()
 const emit = defineEmits<BotsSectionEmits>()
 const loginVisible = defineModel<boolean>('loginVisible', { required: true })
 const verifyCode = defineModel<string>('verifyCode', { required: true })
+const { t } = useI18n({ useScope: 'global' })
 
 const runtimeText = computed(() => {
   switch (props.status.runtimeState) {
     case BOT_RUNTIME_STATE.RUNNING:
-      return '运行中'
+      return t('settings.user.bot.runtime.running')
     case BOT_RUNTIME_STATE.STARTING:
-      return '启动中'
+      return t('settings.user.bot.runtime.starting')
     case BOT_RUNTIME_STATE.STOPPING:
-      return '停止中'
+      return t('settings.user.bot.runtime.stopping')
     case BOT_RUNTIME_STATE.ERROR:
-      return '异常'
+      return t('settings.user.bot.runtime.error')
     case BOT_RUNTIME_STATE.STOPPED:
-      return '已停止'
+      return t('settings.user.bot.runtime.stopped')
     case BOT_RUNTIME_STATE.NOT_BOUND:
-      return '未绑定'
+      return t('settings.user.bot.runtime.notBound')
     default:
-      return '未知'
+      return t('settings.user.bot.runtime.unknown')
   }
 })
 const runtimeTagType = computed(() => {
@@ -42,18 +44,18 @@ const runtimeTagType = computed(() => {
 const loginStatusText = computed(() => {
   switch (props.loginState?.status) {
     case WEIXIN_BOT_LOGIN_STATUS.SCANNED:
-      return '已扫码'
+      return t('settings.user.bot.login.scanned')
     case WEIXIN_BOT_LOGIN_STATUS.NEED_VERIFY_CODE:
-      return '需要验证码'
+      return t('settings.user.bot.login.needVerifyCode')
     case WEIXIN_BOT_LOGIN_STATUS.CONFIRMED:
-      return '已绑定'
+      return t('settings.user.bot.login.confirmed')
     case WEIXIN_BOT_LOGIN_STATUS.EXPIRED:
-      return '已过期'
+      return t('settings.user.bot.login.expired')
     case WEIXIN_BOT_LOGIN_STATUS.ERROR:
-      return '绑定失败'
+      return t('settings.user.bot.login.error')
     case WEIXIN_BOT_LOGIN_STATUS.WAITING:
     default:
-      return '等待扫码'
+      return t('settings.user.bot.login.waiting')
   }
 })
 const canSubmitVerifyCode = computed(() =>
@@ -74,8 +76,8 @@ const canStopRuntime = computed(() =>
 <template>
   <ElCard shadow="never" class="bots-section">
     <UserSettingsSectionHeader
-      title="Bot 绑定"
-      description="绑定后，聊天 Bot 可直接与 Agent 对话。"
+      :title="t('settings.user.bot.title')"
+      :description="t('settings.user.bot.description')"
     />
 
     <div v-loading="props.isLoading" class="bots-section__body grid gap-3">
@@ -86,13 +88,13 @@ const canStopRuntime = computed(() =>
           </span>
           <div class="min-w-0">
             <div class="flex flex-wrap items-center gap-2">
-              <strong class="text-base text-main">微信 Bot</strong>
+              <strong class="text-base text-main">{{ t('settings.user.bot.name') }}</strong>
               <ElTag v-if="props.status.bound" size="small" :type="runtimeTagType" effect="light">
                 {{ runtimeText }}
               </ElTag>
             </div>
             <div class="mt-1 text-[0.8125rem] leading-5 text-secondary">
-              {{ props.status.accountId ? `账号 ${props.status.accountId}` : '尚未绑定微信账号' }}
+              {{ props.status.accountId ? t('settings.user.bot.accountId', { id: props.status.accountId }) : t('settings.user.bot.notBoundAccount') }}
             </div>
           </div>
         </div>
@@ -100,7 +102,7 @@ const canStopRuntime = computed(() =>
         <div class="flex flex-wrap gap-2">
           <ElButton :loading="props.isStartingLogin" @click="emit('startLogin')">
             <SvgIcon category="ui" icon="link" size="0.95rem" class="mr-1.5" />
-            {{ props.status.bound ? '重新绑定' : '绑定微信' }}
+            {{ props.status.bound ? t('settings.user.bot.rebind') : t('settings.user.bot.bind') }}
           </ElButton>
           <ElButton
             v-if="canStartRuntime"
@@ -108,14 +110,14 @@ const canStopRuntime = computed(() =>
             @click="emit('startRuntime')"
           >
             <SvgIcon category="ui" icon="sync-refresh" size="0.95rem" class="mr-1.5" />
-            启动
+            {{ t('settings.user.bot.start') }}
           </ElButton>
           <ElButton
             v-if="canStopRuntime"
             :loading="props.isStoppingBot"
             @click="emit('stopRuntime')"
           >
-            停止
+            {{ t('settings.user.bot.stop') }}
           </ElButton>
           <ElButton
             v-if="props.status.bound"
@@ -125,7 +127,7 @@ const canStopRuntime = computed(() =>
             @click="emit('disconnect')"
           >
             <SvgIcon category="ui" icon="trash-can" size="0.95rem" class="mr-1.5" />
-            解绑
+            {{ t('settings.user.bot.disconnect') }}
           </ElButton>
         </div>
       </div>
@@ -141,7 +143,7 @@ const canStopRuntime = computed(() =>
 
     <ElDialog
       v-model="loginVisible"
-      title="绑定微信 Bot"
+      :title="t('settings.user.bot.bindDialogTitle')"
       width="24rem"
       align-center
       class="bots-section__dialog"
@@ -151,7 +153,7 @@ const canStopRuntime = computed(() =>
           <img
             v-if="props.loginState?.qrCodeDataUrl"
             :src="props.loginState.qrCodeDataUrl"
-            alt="微信扫码绑定二维码"
+            :alt="t('settings.user.bot.qrAlt')"
             class="h-[16.5rem] w-[16.5rem]"
           >
           <ElSkeleton v-else animated class="w-full px-4">
@@ -166,7 +168,7 @@ const canStopRuntime = computed(() =>
             {{ loginStatusText }}
           </div>
           <div class="mt-1 text-[0.8125rem] leading-5 text-secondary">
-            {{ props.loginState?.message ?? '正在创建二维码' }}
+            {{ props.loginState?.message ?? t('settings.user.bot.qrCreating') }}
           </div>
         </div>
 
@@ -176,7 +178,7 @@ const canStopRuntime = computed(() =>
         >
           <ElInput
             v-model="verifyCode"
-            placeholder="手机验证码"
+            :placeholder="t('settings.user.bot.verifyCodePlaceholder')"
             maxlength="12"
             @keyup.enter="emit('submitVerifyCode')"
           />
@@ -186,7 +188,7 @@ const canStopRuntime = computed(() =>
             :loading="props.isSubmittingVerifyCode"
             @click="emit('submitVerifyCode')"
           >
-            提交
+            {{ t('settings.user.bot.submit') }}
           </ElButton>
         </div>
       </div>
@@ -194,10 +196,10 @@ const canStopRuntime = computed(() =>
       <template #footer>
         <div class="flex items-center justify-between gap-3">
           <span class="text-[0.8125rem] text-secondary">
-            {{ props.isPollingLogin ? '正在等待确认' : '二维码有效期约 8 分钟' }}
+            {{ props.isPollingLogin ? t('settings.user.bot.polling') : t('settings.user.bot.qrTtl') }}
           </span>
           <ElButton @click="loginVisible = false">
-            关闭
+            {{ t('settings.user.bot.close') }}
           </ElButton>
         </div>
       </template>

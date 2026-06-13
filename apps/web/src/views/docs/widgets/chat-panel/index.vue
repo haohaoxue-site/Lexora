@@ -2,6 +2,7 @@
 import type { DocsChatPanelEmits, DocsChatPanelProps } from './typing'
 import type { ChatComposerExposed } from '@/components/chat-composer/typing'
 import { computed, nextTick, useTemplateRef, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import ChatComposer from '@/components/chat-composer/ChatComposer.vue'
 import DocsChatHeader from '../../components/chat-header'
 import DocsChatMessages from '../../components/chat-messages'
@@ -13,6 +14,7 @@ const props = withDefaults(defineProps<DocsChatPanelProps>(), {
   isResizing: false,
 })
 const emits = defineEmits<DocsChatPanelEmits>()
+const { t } = useI18n()
 const {
   activeSessionTitle,
   attachments,
@@ -70,7 +72,7 @@ watch(
       class="docs-chat-panel__resize-handle"
       role="separator"
       tabindex="0"
-      aria-label="调整 AI 对话面板宽度"
+      :aria-label="t('docs.chat.resizePanel')"
       aria-orientation="vertical"
       :aria-valuemin="resizeHandleValueMin"
       :aria-valuemax="resizeHandleValueMax"

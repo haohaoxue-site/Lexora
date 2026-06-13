@@ -2,6 +2,7 @@
 import type { ChatComposerModelRef, ChatComposerModelSelectionKind } from './typing'
 import { AI_MODEL_INTENT_KEY } from '@haohaoxue/samepage-contracts/ai/constants'
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import ModelCascader from '@/components/model-cascader'
 
 const props = withDefaults(defineProps<{
@@ -15,6 +16,7 @@ const props = withDefaults(defineProps<{
 const emits = defineEmits<{
   select: [modelRef: ChatComposerModelRef | null]
 }>()
+const { t } = useI18n({ useScope: 'global' })
 
 function handleSelect(modelRef: ChatComposerModelRef | null) {
   emits('select', modelRef)
@@ -22,14 +24,14 @@ function handleSelect(modelRef: ChatComposerModelRef | null) {
 
 const selectionTooltip = computed(() => {
   if (props.selectionKind === 'override') {
-    return '当前对话模型'
+    return t('chat.composer.currentModel')
   }
 
   if (props.selectionKind === 'draft') {
-    return '新对话模型'
+    return t('chat.composer.newChatModel')
   }
 
-  return '默认模型'
+  return t('chat.composer.defaultModel')
 })
 </script>
 
@@ -48,7 +50,7 @@ const selectionTooltip = computed(() => {
         :show-all-levels="false"
         popper-class="chat-model-trigger__popper"
         :disabled="props.disabled"
-        placeholder="选择模型"
+        :placeholder="t('chat.composer.selectModel')"
         @update:model-value="handleSelect"
       />
     </div>

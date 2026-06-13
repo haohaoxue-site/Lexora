@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import type { CSSProperties } from 'vue'
 import type { UserDataExpansionProps } from './typing'
+import { useI18n } from 'vue-i18n'
 import { formatDateTime } from '@/utils/dayjs'
 
 const props = defineProps<UserDataExpansionProps>()
+const { t } = useI18n({ useScope: 'global' })
 const tableCellStyle: CSSProperties = {
   paddingTop: '0.5rem',
   paddingBottom: '0.5rem',
@@ -11,10 +13,10 @@ const tableCellStyle: CSSProperties = {
 
 function getLimitText(total: number, shown: number, unit: string) {
   if (total <= shown) {
-    return `共 ${total} ${unit}`
+    return t('admin.users.detailTotal', { total, unit })
   }
 
-  return `共 ${total} ${unit}，展示最近 ${shown} ${unit}`
+  return t('admin.users.detailLimit', { shown, total, unit })
 }
 </script>
 
@@ -32,9 +34,9 @@ function getLimitText(total: number, shown: number, unit: string) {
     <div v-if="props.detail" class="flex flex-col gap-4">
       <section class="user-data-expansion__section min-w-0 w-full">
         <div class="user-data-expansion__section-header mb-3 flex items-baseline justify-between gap-3">
-          <span class="user-data-expansion__section-title text-[13px] font-bold text-main">文档数据</span>
+          <span class="user-data-expansion__section-title text-[13px] font-bold text-main">{{ t('admin.users.documentData') }}</span>
           <span class="user-data-expansion__section-meta text-xs text-secondary">
-            {{ getLimitText(props.detail.documentTotal, props.detail.documents.length, '篇') }}
+            {{ getLimitText(props.detail.documentTotal, props.detail.documents.length, t('admin.users.documentUnit')) }}
           </span>
         </div>
 
@@ -43,21 +45,21 @@ function getLimitText(total: number, shown: number, unit: string) {
           size="small"
           border
           row-key="id"
-          empty-text="暂无文档"
+          :empty-text="t('admin.users.documentEmpty')"
           class="user-data-expansion__table"
           :cell-style="tableCellStyle"
         >
-          <ElTableColumn label="标题" min-width="160">
+          <ElTableColumn :label="t('admin.users.title')" min-width="160">
             <template #default="{ row }">
-              <span class="text-xs font-medium text-main">{{ row.title || '未命名文档' }}</span>
+              <span class="text-xs font-medium text-main">{{ row.title || t('admin.users.unnamedDocument') }}</span>
             </template>
           </ElTableColumn>
-          <ElTableColumn label="创建时间" width="160">
+          <ElTableColumn :label="t('admin.users.createdAt')" width="160">
             <template #default="{ row }">
               <span class="text-xs text-secondary">{{ formatDateTime(row.createdAt) }}</span>
             </template>
           </ElTableColumn>
-          <ElTableColumn label="更新时间" width="160">
+          <ElTableColumn :label="t('admin.users.updatedAt')" width="160">
             <template #default="{ row }">
               <span class="text-xs text-secondary">{{ formatDateTime(row.updatedAt) }}</span>
             </template>
@@ -67,9 +69,9 @@ function getLimitText(total: number, shown: number, unit: string) {
 
       <section class="user-data-expansion__section min-w-0 w-full">
         <div class="user-data-expansion__section-header mb-3 flex items-baseline justify-between gap-3">
-          <span class="user-data-expansion__section-title text-[13px] font-bold text-main">对话数据</span>
+          <span class="user-data-expansion__section-title text-[13px] font-bold text-main">{{ t('admin.users.chatData') }}</span>
           <span class="user-data-expansion__section-meta text-xs text-secondary">
-            {{ getLimitText(props.detail.chatSessionTotal, props.detail.chatSessions.length, '条') }}
+            {{ getLimitText(props.detail.chatSessionTotal, props.detail.chatSessions.length, t('admin.users.chatUnit')) }}
           </span>
         </div>
 
@@ -78,21 +80,21 @@ function getLimitText(total: number, shown: number, unit: string) {
           size="small"
           border
           row-key="id"
-          empty-text="暂无对话"
+          :empty-text="t('admin.users.chatEmpty')"
           class="user-data-expansion__table"
           :cell-style="tableCellStyle"
         >
-          <ElTableColumn label="标题" min-width="180">
+          <ElTableColumn :label="t('admin.users.title')" min-width="180">
             <template #default="{ row }">
               <span class="text-xs font-medium text-main">{{ row.title }}</span>
             </template>
           </ElTableColumn>
-          <ElTableColumn label="创建时间" width="160">
+          <ElTableColumn :label="t('admin.users.createdAt')" width="160">
             <template #default="{ row }">
               <span class="text-xs text-secondary">{{ formatDateTime(row.createdAt) }}</span>
             </template>
           </ElTableColumn>
-          <ElTableColumn label="更新时间" width="160">
+          <ElTableColumn :label="t('admin.users.updatedAt')" width="160">
             <template #default="{ row }">
               <span class="text-xs text-secondary">{{ formatDateTime(row.updatedAt) }}</span>
             </template>

@@ -55,6 +55,7 @@ export function createCallModelNode(options: CreateCallModelNodeOptions): GraphN
           state.historyDigest?.summary ?? null,
           config.context?.agentProfileConfig,
           config.context?.skillContext,
+          config.context?.defaultResponseLanguage,
           state.memoryRetrieval,
         )
 
@@ -121,12 +122,14 @@ function toLangChainMessages(
   historyDigestSummary: string | null,
   agentProfileConfig: AgentGraphContext['agentProfileConfig'],
   skillContext: AgentGraphContext['skillContext'],
+  defaultResponseLanguage: AgentGraphContext['defaultResponseLanguage'],
   memoryRetrieval: AgentMemoryRetrievalSnapshot | null,
 ) {
   const memoryPrompt = createAgentMemoryPromptBlock(memoryRetrieval)
   const systemPrompt = createAgentSystemPrompt({
     agentProfileConfig,
     skillContext,
+    defaultResponseLanguage: defaultResponseLanguage ?? undefined,
     historyDigestSummary: historyDigestSummary ?? undefined,
     olderMessagesExcerpt,
   })

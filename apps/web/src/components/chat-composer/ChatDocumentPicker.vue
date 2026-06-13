@@ -2,6 +2,7 @@
 import type { ReadableDocumentSearchResult } from '@/apis/document'
 import { Close, Search } from '@element-plus/icons-vue'
 import { nextTick, useTemplateRef, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useChatDocumentSearch } from './useChatDocumentSearch'
 
 const props = defineProps<{
@@ -12,6 +13,7 @@ const emits = defineEmits<{
   close: []
   select: [document: ReadableDocumentSearchResult]
 }>()
+const { t } = useI18n({ useScope: 'global' })
 
 const searchInputRef = useTemplateRef<HTMLInputElement>('searchInput')
 const {
@@ -47,7 +49,7 @@ function handleInput(event: Event) {
 
 <template>
   <div v-if="props.visible" class="chat-document-picker-overlay" @mousedown.self="emits('close')">
-    <div class="chat-document-picker" role="dialog" aria-label="选择文档" @mousedown.stop>
+    <div class="chat-document-picker" role="dialog" :aria-label="t('chat.composer.documentPicker.aria')" @mousedown.stop>
       <div class="chat-document-picker__search">
         <ElIcon class="chat-document-picker__search-icon">
           <Search />
@@ -56,15 +58,15 @@ function handleInput(event: Event) {
           ref="searchInput"
           class="chat-document-picker__input"
           :value="query"
-          aria-label="搜索文档"
-          placeholder="搜索文档"
+          :aria-label="t('chat.composer.documentPicker.search')"
+          :placeholder="t('chat.composer.documentPicker.search')"
           @input="handleInput"
           @keydown.esc="emits('close')"
         >
         <button
           class="chat-document-picker__close"
           type="button"
-          aria-label="关闭文档选择"
+          :aria-label="t('chat.composer.documentPicker.close')"
           @click="emits('close')"
         >
           <ElIcon><Close /></ElIcon>
@@ -73,16 +75,16 @@ function handleInput(event: Event) {
 
       <div class="chat-document-picker__body">
         <div v-if="isLoading" class="chat-document-picker__state">
-          搜索中...
+          {{ t('chat.composer.documentPicker.loading') }}
         </div>
         <div v-else-if="errorMessage" class="chat-document-picker__state is-error">
           {{ errorMessage }}
         </div>
         <div v-else-if="!hasQuery" class="chat-document-picker__state">
-          搜索可访问文档
+          {{ t('chat.composer.documentPicker.idle') }}
         </div>
         <div v-else-if="isEmpty" class="chat-document-picker__state">
-          没有匹配文档
+          {{ t('chat.composer.documentPicker.empty') }}
         </div>
         <template v-else>
           <button

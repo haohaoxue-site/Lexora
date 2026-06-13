@@ -2,6 +2,7 @@
 import type { CSSProperties } from 'vue'
 import { formatDocumentLocation } from '@haohaoxue/samepage-shared/document'
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import Empty from '@/components/empty'
 import { formatDateTime } from '@/utils/dayjs'
 import { useDocsTrashPage } from '../../composables/useDocsTrashPage'
@@ -15,6 +16,7 @@ const {
   restoreItem,
   permanentlyDeleteItem,
 } = useDocsTrashPage()
+const { t } = useI18n()
 
 const tableItems = computed(() =>
   items.value.map(item => ({
@@ -49,23 +51,23 @@ function isItemActing(documentId: string) {
         :data="tableItems"
         row-key="id"
         class="docs-trash-table"
-        element-loading-text="正在加载回收站"
+        :element-loading-text="t('docs.trash.loading')"
         :header-cell-style="tableHeaderCellStyle"
         :cell-style="tableBodyCellStyle"
       >
         <template #empty>
-          <Empty :description="errorMessage || '暂无已删除文档。'">
+          <Empty :description="errorMessage || t('docs.trash.empty')">
             <ElButton v-if="errorMessage" type="primary" @click="loadItems">
-              重新加载
+              {{ t('docs.common.reload') }}
             </ElButton>
           </Empty>
         </template>
 
-        <ElTableColumn label="标题" prop="title" min-width="320" show-overflow-tooltip />
-        <ElTableColumn label="原位置" prop="locationLabel" min-width="260" show-overflow-tooltip />
-        <ElTableColumn label="删除时间" prop="trashedAtLabel" width="180" />
+        <ElTableColumn :label="t('docs.trash.title')" prop="title" min-width="320" show-overflow-tooltip />
+        <ElTableColumn :label="t('docs.trash.originalLocation')" prop="locationLabel" min-width="260" show-overflow-tooltip />
+        <ElTableColumn :label="t('docs.trash.deletedAt')" prop="trashedAtLabel" width="180" />
 
-        <ElTableColumn label="操作" width="180" align="right" header-align="right">
+        <ElTableColumn :label="t('docs.common.operation')" width="180" align="right" header-align="right">
           <template #default="{ row }">
             <div class="flex flex-wrap justify-end gap-2">
               <ElButton
@@ -74,7 +76,7 @@ function isItemActing(documentId: string) {
                 :disabled="isItemActing(row.id)"
                 @click="restoreItem(row.id)"
               >
-                恢复
+                {{ t('docs.common.restore') }}
               </ElButton>
 
               <ElButton
@@ -85,7 +87,7 @@ function isItemActing(documentId: string) {
                 :disabled="isItemActing(row.id)"
                 @click="permanentlyDeleteItem(row.id)"
               >
-                彻底删除
+                {{ t('docs.trash.deletePermanently') }}
               </ElButton>
             </div>
           </template>

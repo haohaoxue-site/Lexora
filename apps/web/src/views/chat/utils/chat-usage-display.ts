@@ -7,6 +7,7 @@ import {
   estimateChatTextTokens,
   formatChatTokenCount,
 } from '@/composables/chat/utils/chat-token-estimate'
+import { translate } from '@/i18n'
 
 type AssistantMessage = Extract<ChatMessage, { role: 'assistant' }>
 type AssistantUsage = NonNullable<NonNullable<AssistantMessage['metadata']>['usage']>
@@ -55,16 +56,16 @@ export function createChatConversationUsageView(
 
   return {
     summaryRows: [
-      createAggregateRow('当前路径', usageSummary.activePath),
-      createAggregateRow('会话总计', usageSummary.session),
-      createAggregateRow('分支外消耗', siblingUsage, siblingUsage.totalTokens > 0 ? 'warning' : 'muted'),
+      createAggregateRow(translate('chat.usage.activePath'), usageSummary.activePath),
+      createAggregateRow(translate('chat.usage.sessionTotal'), usageSummary.session),
+      createAggregateRow(translate('chat.usage.siblingUsage'), siblingUsage, siblingUsage.totalTokens > 0 ? 'warning' : 'muted'),
     ],
     latestRows: latestUsage ? createAssistantUsageRows(latestUsage) : [],
     budget,
     notes: [
-      messages.length === 0 ? '当前对话尚未产生模型用量。' : null,
-      '当前路径只统计正在阅读的分支。',
-      '会话总计包含 sibling 分支的历史生成消耗。',
+      messages.length === 0 ? translate('chat.usage.noUsage') : null,
+      translate('chat.usage.activePathNote'),
+      translate('chat.usage.sessionTotalNote'),
     ].filter(Boolean) as string[],
   }
 }
@@ -75,29 +76,35 @@ export function createChatMessageUsageView(message: ChatMessage): ChatMessageUsa
     const fallbackOutputTokens = estimateChatTextTokens(message.content)
 
     return {
-      title: '本轮回复消耗',
+      title: translate('chat.usage.replyTitle'),
       summary: usage
         ? `${formatChatTokenCount(usage.totalTokens)} tokens`
-        : fallbackOutputTokens > 0 ? `约 ${formatChatTokenCount(fallbackOutputTokens)} tokens` : '未记录',
+        : fallbackOutputTokens > 0
+          ? translate('chat.usage.approximateTokens', { tokens: formatChatTokenCount(fallbackOutputTokens) })
+          : translate('chat.usage.notRecorded'),
       rows: usage
         ? createAssistantUsageRows(usage)
         : [
-            { label: '输入', value: '未记录', tone: 'muted' },
+            { label: translate('chat.usage.input'), value: translate('chat.usage.notRecorded'), tone: 'muted' },
             {
-              label: '输出',
-              value: fallbackOutputTokens > 0 ? `约 ${formatChatTokenCount(fallbackOutputTokens)} tokens` : '未记录',
+              label: translate('chat.usage.output'),
+              value: fallbackOutputTokens > 0
+                ? translate('chat.usage.approximateTokens', { tokens: formatChatTokenCount(fallbackOutputTokens) })
+                : translate('chat.usage.notRecorded'),
               tone: fallbackOutputTokens > 0 ? 'warning' : 'muted',
             },
             {
-              label: '总计',
-              value: fallbackOutputTokens > 0 ? `至少约 ${formatChatTokenCount(fallbackOutputTokens)} tokens` : '未记录',
+              label: translate('chat.usage.total'),
+              value: fallbackOutputTokens > 0
+                ? translate('chat.usage.atLeastApproximateTokens', { tokens: formatChatTokenCount(fallbackOutputTokens) })
+                : translate('chat.usage.notRecorded'),
               tone: fallbackOutputTokens > 0 ? 'warning' : 'muted',
             },
-            { label: '来源', value: '历史记录缺少统计', tone: 'muted' },
+            { label: translate('chat.usage.source'), value: translate('chat.usage.missingHistoryStats'), tone: 'muted' },
           ],
       notes: usage
-        ? usage.estimated ? ['部分字段来自本地估算。'] : []
-        : ['这条历史消息生成时尚未记录用量，输入与上下文消耗无法回填。'],
+        ? usage.estimated ? [translate('chat.usage.estimatedFieldsNote')] : []
+        : [translate('chat.usage.missingHistoricalUsageNote')],
       estimated: usage?.estimated ?? true,
     }
   }
@@ -107,14 +114,14 @@ export function createChatMessageUsageView(message: ChatMessage): ChatMessageUsa
   const snapshotCount = message.metadata.contextSnapshotMetas.length
 
   return {
-    title: '用户输入估算',
-    summary: `约 ${formatChatTokenCount(textTokens)} tokens`,
+    title: translate('chat.usage.userInputTitle'),
+    summary: translate('chat.usage.approximateTokens', { tokens: formatChatTokenCount(textTokens) }),
     rows: [
-      { label: '消息正文', value: `约 ${formatChatTokenCount(textTokens)} tokens` },
-      { label: '附件', value: `${attachmentCount} 个`, tone: attachmentCount > 0 ? 'warning' : 'muted' },
-      { label: '上下文快照', value: `${snapshotCount} 个`, tone: snapshotCount > 0 ? 'warning' : 'muted' },
+      { label: translate('chat.usage.messageBody'), value: translate('chat.usage.approximateTokens', { tokens: formatChatTokenCount(textTokens) }) },
+      { label: translate('chat.usage.attachments'), value: translate('chat.usage.count', { count: attachmentCount }), tone: attachmentCount > 0 ? 'warning' : 'muted' },
+      { label: translate('chat.usage.contextSnapshots'), value: translate('chat.usage.count', { count: snapshotCount }), tone: snapshotCount > 0 ? 'warning' : 'muted' },
     ],
-    notes: ['仅估算当前用户消息正文，不含系统提示、历史消息和文档全文。'],
+    notes: [translate('chat.usage.userInputEstimateNote')],
     estimated: true,
   }
 }
@@ -132,29 +139,32 @@ function getLatestAssistantUsage(messages: ChatMessage[]): AssistantUsage | null
 
 function createAssistantUsageRows(usage: AssistantUsage): ChatUsageDetailRow[] {
   return [
-    { label: '输入', value: `${formatChatTokenCount(usage.inputTokens)} tokens` },
-    { label: '输出', value: `${formatChatTokenCount(usage.outputTokens)} tokens` },
+    { label: translate('chat.usage.input'), value: `${formatChatTokenCount(usage.inputTokens)} tokens` },
+    { label: translate('chat.usage.output'), value: `${formatChatTokenCount(usage.outputTokens)} tokens` },
     usage.reasoningTokens > 0
-      ? { label: '推理', value: `${formatChatTokenCount(usage.reasoningTokens)} tokens` }
+      ? { label: translate('chat.usage.reasoning'), value: `${formatChatTokenCount(usage.reasoningTokens)} tokens` }
       : null,
     usage.memoryRetrieval
       ? {
-          label: '长期记忆',
+          label: translate('chat.usage.longTermMemory'),
           value: usage.memoryRetrieval.ignoredForRun
-            ? '本轮忽略'
-            : `${usage.memoryRetrieval.injectedCount} 条 / ${formatChatTokenCount(usage.memoryRetrieval.estimatedTokens)} tokens`,
+            ? translate('chat.usage.ignoredThisRun')
+            : translate('chat.usage.memoryInjected', {
+                count: usage.memoryRetrieval.injectedCount,
+                tokens: formatChatTokenCount(usage.memoryRetrieval.estimatedTokens),
+              }),
           tone: usage.memoryRetrieval.injectedCount > 0 ? 'default' : 'muted',
         }
       : null,
-    { label: '总计', value: `${formatChatTokenCount(usage.totalTokens)} tokens` },
+    { label: translate('chat.usage.total'), value: `${formatChatTokenCount(usage.totalTokens)} tokens` },
     typeof usage.firstTokenLatencyMs === 'number'
-      ? { label: '首字时延', value: `${formatExactCount(usage.firstTokenLatencyMs)} ms` }
+      ? { label: translate('chat.usage.firstTokenLatency'), value: `${formatExactCount(usage.firstTokenLatencyMs)} ms` }
       : null,
     typeof usage.tokensPerSecond === 'number'
-      ? { label: '生成速度', value: `${usage.tokensPerSecond.toFixed(1)} tokens/s` }
+      ? { label: translate('chat.usage.generationSpeed'), value: `${usage.tokensPerSecond.toFixed(1)} tokens/s` }
       : null,
     {
-      label: '来源',
+      label: translate('chat.usage.source'),
       value: formatUsageSource(usage.usageSource),
       tone: usage.estimated ? 'warning' : 'default',
     },
@@ -187,19 +197,19 @@ function createBudgetView(budget: ContextBudget): ChatConversationBudgetView {
     usedText: `${formatChatTokenCount(usedInputTokens)} / ${formatChatTokenCount(inputLimit)} tokens`,
     sourceText: formatBudgetSource(budget.estimationSource),
     rows: [
-      { label: '上下文窗口', value: `${formatChatTokenCount(contextWindow)} tokens` },
-      { label: '预留输出', value: `${formatChatTokenCount(reservedOutputTokens)} tokens` },
-      { label: '系统提示', value: `${formatChatTokenCount(systemPromptTokens)} tokens` },
-      { label: '上下文快照', value: `${formatChatTokenCount(contextSnapshotTokens)} tokens` },
-      { label: '长期记忆', value: `${formatChatTokenCount(memoryPromptTokens)} tokens` },
-      { label: '历史摘要', value: `${formatChatTokenCount(historyDigestTokens)} tokens` },
-      { label: '最近消息', value: `${formatChatTokenCount(recentMessageTokens)} tokens` },
-      { label: '安全缓冲', value: `${formatChatTokenCount(safetyBufferTokens)} tokens` },
-      { label: '可用输入', value: `${formatChatTokenCount(availableInputTokens)} tokens` },
-      { label: '消息预算', value: `${formatChatTokenCount(recentMessageBudgetTokens)} tokens` },
+      { label: translate('chat.usage.contextWindow'), value: `${formatChatTokenCount(contextWindow)} tokens` },
+      { label: translate('chat.usage.reservedOutput'), value: `${formatChatTokenCount(reservedOutputTokens)} tokens` },
+      { label: translate('chat.usage.systemPrompt'), value: `${formatChatTokenCount(systemPromptTokens)} tokens` },
+      { label: translate('chat.usage.contextSnapshots'), value: `${formatChatTokenCount(contextSnapshotTokens)} tokens` },
+      { label: translate('chat.usage.longTermMemory'), value: `${formatChatTokenCount(memoryPromptTokens)} tokens` },
+      { label: translate('chat.usage.historyDigest'), value: `${formatChatTokenCount(historyDigestTokens)} tokens` },
+      { label: translate('chat.usage.recentMessages'), value: `${formatChatTokenCount(recentMessageTokens)} tokens` },
+      { label: translate('chat.usage.safetyBuffer'), value: `${formatChatTokenCount(safetyBufferTokens)} tokens` },
+      { label: translate('chat.usage.availableInput'), value: `${formatChatTokenCount(availableInputTokens)} tokens` },
+      { label: translate('chat.usage.messageBudget'), value: `${formatChatTokenCount(recentMessageBudgetTokens)} tokens` },
       overflowTokens > 0
         ? {
-            label: '溢出',
+            label: translate('chat.usage.overflow'),
             value: `${formatChatTokenCount(overflowTokens)} tokens`,
             tone: 'warning',
           }
@@ -215,22 +225,22 @@ function normalizeTokenCount(value: number | null | undefined): number {
 function formatUsageSource(source: AssistantUsage['usageSource']) {
   switch (source) {
     case 'provider':
-      return '服务商返回'
+      return translate('chat.usage.providerReturned')
     case 'mixed':
-      return '服务商 + 估算'
+      return translate('chat.usage.providerEstimated')
     case 'estimated':
-      return '本地估算'
+      return translate('chat.usage.localEstimated')
   }
 }
 
 function formatBudgetSource(source: ContextBudget['estimationSource']) {
   switch (source) {
     case 'provider-tokenizer':
-      return '服务商 tokenizer'
+      return translate('chat.usage.providerTokenizer')
     case 'tiktoken-compatible':
-      return '兼容 tokenizer'
+      return translate('chat.usage.compatibleTokenizer')
     case 'heuristic':
-      return '启发式估算'
+      return translate('chat.usage.heuristicEstimated')
   }
 }
 
@@ -245,7 +255,10 @@ function createAggregateRow(
 ): ChatUsageDetailRow {
   return {
     label,
-    value: `${formatChatTokenCount(usage.totalTokens)} tokens / ${formatExactCount(usage.generationCount)} 次`,
+    value: translate('chat.usage.aggregateValue', {
+      count: formatExactCount(usage.generationCount),
+      tokens: formatChatTokenCount(usage.totalTokens),
+    }),
     tone,
   }
 }

@@ -1,6 +1,7 @@
 import type {
   GetSystemAdminAuditLogsQuery,
   GetSystemAdminUsersQuery,
+  ResolvedLanguagePreference,
   SystemAdminAuditLogListResponse,
   SystemAdminAuditTargetType,
   SystemAdminOverview,
@@ -365,9 +366,10 @@ export class SystemAdminService {
   async testEmailConfig(
     actorUserId: string,
     payload: TestSystemEmailConfigRequest,
+    language?: ResolvedLanguagePreference,
   ): Promise<TestSystemEmailConfigResponse> {
     try {
-      const result = await this.systemEmailService.sendTestEmail(payload.email)
+      const result = await this.systemEmailService.sendTestEmail(payload.email, language)
 
       await this.createAuditLog(actorUserId, {
         action: 'system_email_config.tested',
