@@ -196,6 +196,17 @@ export const useUserStore = defineStore('user', () => {
     hydratePreferences(createDefaultPreferences())
   }
 
+  function setLocalLanguagePreference(nextLanguage: LanguagePreference) {
+    if (_preferences.language === nextLanguage) {
+      return
+    }
+
+    hydratePreferences({
+      ...clonePreferences(_preferences),
+      language: nextLanguage,
+    })
+  }
+
   async function refreshSettings() {
     const nextSettings = await getCurrentUserSettings()
     setSettings(nextSettings)
@@ -316,6 +327,7 @@ export const useUserStore = defineStore('user', () => {
     refreshContext,
     refreshSettings,
     resetPreferences,
+    setLocalLanguagePreference,
     updateProfile,
     updateAvatar,
     updateLanguagePreference,

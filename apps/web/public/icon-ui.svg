@@ -168,6 +168,18 @@
           <path d="M 29 19 L 19 29" fill="none" stroke="currentColor" stroke-width="3.6" stroke-linecap="round" />
 
   </symbol>
+    <symbol id="translate" viewBox="0 0 48 48">
+
+        <path d="M 7 12 H 29" fill="none" stroke="currentColor" stroke-width="3.7" stroke-linecap="round" />
+          <path d="M 18 7.5 V 12" fill="none" stroke="currentColor" stroke-width="3.7" stroke-linecap="round" />
+          <path d="M 12.5 18 C 14.3 23.2 18.9 27.5 25 29.5" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" />
+          <path d="M 25 18 C 23.4 23.4 19.2 27.8 12 31" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" />
+          <path d="M 32 40 L 38 22 L 44 40" fill="none" stroke="currentColor" stroke-width="3.7" stroke-linecap="round" stroke-linejoin="round" />
+          <path d="M 34.5 34 H 41.5" fill="none" stroke="currentColor" stroke-width="3.7" stroke-linecap="round" />
+          <path d="M 8 37 C 8 40.3138 10.6863 43 14 43 H 20" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" />
+          <path d="M 40 11 C 40 7.6863 37.3138 5 34 5 H 30" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" />
+
+  </symbol>
     <symbol id="edit" viewBox="0 0 48 48">
 
         <path d="M 11 37 L 12.7 29.7 L 31.3 11.1 C 32.76 9.64 35.14 9.64 36.6 11.1 L 36.9 11.4 C 38.36 12.86 38.36 15.24 36.9 16.7 L 18.3 35.3 L 11 37 Z" fill="none" stroke="currentColor" stroke-width="3.6" stroke-linejoin="round" />

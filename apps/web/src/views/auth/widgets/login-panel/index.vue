@@ -83,6 +83,7 @@ const {
         <ElInput
           v-model="passwordForm.email"
           autocomplete="email"
+          size="large"
           :placeholder="t('auth.common.emailPlaceholder')"
         />
       </ElFormItem>
@@ -92,6 +93,7 @@ const {
           type="password"
           show-password
           autocomplete="current-password"
+          size="large"
           :placeholder="t('auth.common.passwordPlaceholder')"
         />
       </ElFormItem>
@@ -99,7 +101,8 @@ const {
       <ElButton
         type="primary"
         native-type="submit"
-        class="login-view__submit mt-3 w-full min-h-[2.875rem] font-semibold"
+        size="large"
+        class="login-view__submit mt-3 w-full min-h-12 font-semibold"
         :loading="isPasswordSubmitting"
       >
         {{ t('auth.login.submit') }}
@@ -112,33 +115,31 @@ const {
       </div>
 
       <div
-        class="login-view__providers grid justify-start gap-2.5 [grid-template-columns:repeat(var(--provider-columns),7.8rem)] max-[420px]:![grid-template-columns:minmax(0,1fr)] min-[421px]:max-[680px]:![grid-template-columns:repeat(2,minmax(0,1fr))]"
+        class="login-view__providers grid justify-start gap-2.5 [grid-template-columns:repeat(var(--provider-columns),9.2rem)] max-[420px]:![grid-template-columns:minmax(0,1fr)] min-[421px]:max-[680px]:![grid-template-columns:repeat(2,minmax(0,1fr))]"
         :style="{ '--provider-columns': providers.length }"
       >
         <ElButton
           v-for="item in providers"
           :key="item.provider"
-          class="login-provider-btn !ml-0 !min-h-14 !w-full justify-between rounded-lg px-3 py-1.5"
+          class="login-provider-btn !ml-0 !min-h-14 !w-full justify-between rounded-lg px-2.5 py-1.5"
           :class="{ 'is-loading': startingOauthProvider === item.provider }"
           :disabled="startingOauthProvider === item.provider"
           :aria-busy="startingOauthProvider === item.provider"
           @click="handleStartLogin(item.provider)"
         >
-          <span class="login-provider-btn__icon-wrap flex h-[2.125rem] w-[2.125rem] items-center justify-center rounded-lg border">
+          <span class="login-provider-btn__icon-wrap flex h-8 w-8 items-center justify-center rounded-lg border">
             <SvgIcon :category="item.iconCategory" :icon="item.icon" size="1.125rem" class="login-provider-btn__icon" />
           </span>
-          <span class="login-provider-btn__content grid min-h-[2.125rem] min-w-0 justify-items-end [grid-template-rows:1fr_1fr]">
-            <span class="login-provider-btn__label min-w-0 self-end whitespace-nowrap text-right text-sm font-semibold">{{ item.title }}</span>
-            <span class="login-provider-btn__arrow-wrap flex h-[1.125rem] w-4 self-start items-center justify-center">
-              <SvgIcon
-                v-if="startingOauthProvider === item.provider"
-                category="ui"
-                icon="spinner-orbit"
-                size="1rem"
-                class="login-provider-btn__loading animate-spin"
-              />
-              <SvgIcon v-else category="ui" icon="arrow-right" size="1rem" class="login-provider-btn__arrow" />
-            </span>
+          <span class="login-provider-btn__label min-w-0 truncate text-left text-[13px] font-semibold">{{ item.title }}</span>
+          <span class="login-provider-btn__arrow-wrap flex h-[1.125rem] w-3.5 shrink-0 items-center justify-center">
+            <SvgIcon
+              v-if="startingOauthProvider === item.provider"
+              category="ui"
+              icon="spinner-orbit"
+              size="1rem"
+              class="login-provider-btn__loading animate-spin"
+            />
+            <SvgIcon v-else category="ui" icon="arrow-right" size="1rem" class="login-provider-btn__arrow" />
           </span>
         </ElButton>
       </div>
@@ -224,7 +225,9 @@ const {
   }
 
   &__submit {
+    border-radius: 7px;
     box-shadow: 0 18px 30px -24px color-mix(in srgb, var(--brand-primary) 45%, transparent);
+    letter-spacing: 0;
   }
 
   &__divider {
@@ -281,9 +284,9 @@ const {
     width: 100%;
     height: 2.25rem;
     display: grid;
-    grid-template-columns: 2.125rem minmax(0, 1fr);
+    grid-template-columns: 2rem minmax(0, 1fr) 0.875rem;
     align-items: center;
-    gap: 0.75rem;
+    gap: 0.5rem;
   }
 
   &__icon-wrap {

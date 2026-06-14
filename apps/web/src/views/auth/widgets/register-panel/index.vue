@@ -84,6 +84,7 @@ function goToLogin() {
             <ElInput
               v-model="form.email"
               autocomplete="email"
+              size="large"
               :placeholder="t('auth.common.emailPlaceholder')"
               :disabled="isSubmitting"
             />
@@ -92,6 +93,7 @@ function goToLogin() {
             <ElInput
               v-model="form.inviteCode"
               autocomplete="off"
+              size="large"
               :placeholder="t('auth.common.inviteCodePlaceholder')"
               :disabled="isSubmitting"
             />
@@ -100,7 +102,8 @@ function goToLogin() {
           <ElButton
             type="primary"
             native-type="submit"
-            class="password-register-view__submit w-full min-h-[2.875rem]"
+            size="large"
+            class="password-register-view__submit mt-2 w-full min-h-12 font-semibold"
             :loading="isSubmitting"
           >
             {{ t('auth.register.sendCode') }}
@@ -119,3 +122,13 @@ function goToLogin() {
     </template>
   </AuthEntryShell>
 </template>
+
+<style scoped lang="scss">
+.password-register-view {
+  &__submit {
+    border-radius: 7px;
+    box-shadow: 0 18px 30px -24px color-mix(in srgb, var(--brand-primary) 45%, transparent);
+    letter-spacing: 0;
+  }
+}
+</style>
