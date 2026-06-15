@@ -3,6 +3,12 @@ import type { useAuthStore } from '@/stores/auth'
 import { loadAdminRoutes, resetAdminRoutes } from '@/router'
 import { useUserStore } from '@/stores/user'
 
+const AUTH_FLOW_REDIRECT_PATHS = [
+  '/login',
+  '/register',
+  '/auth/change-password',
+]
+
 export async function completeAuthNavigation(router: Router, authStore: ReturnType<typeof useAuthStore>) {
   const userStore = useUserStore()
 
@@ -19,7 +25,7 @@ export async function completeAuthNavigation(router: Router, authStore: ReturnTy
   }
 
   const saved = authStore.consumeRedirect()
-  await router.replace(saved || { name: userStore.defaultRouteName })
+  await router.replace(resolvePostAuthRedirect(saved, userStore.defaultRouteName))
 }
 
 export function syncPendingRedirect(redirect: unknown, authStore: ReturnType<typeof useAuthStore>) {
@@ -34,4 +40,21 @@ export function syncPendingRedirect(redirect: unknown, authStore: ReturnType<typ
   }
 
   authStore.savePendingRedirect(normalizedRedirect)
+}
+
+function resolvePostAuthRedirect(saved: string, defaultRouteName: string) {
+  if (!saved || isAuthFlowRedirect(saved)) {
+    return { name: defaultRouteName }
+  }
+
+  return saved
+}
+
+function isAuthFlowRedirect(path: string) {
+  return AUTH_FLOW_REDIRECT_PATHS.some(authPath =>
+    path === authPath
+    || path.startsWith(`${authPath}?`)
+    || path.startsWith(`${authPath}#`)
+    || path.startsWith(`${authPath}/`),
+  )
 }
