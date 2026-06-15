@@ -8,7 +8,7 @@ const TextDeltaPayloadSchema = z.object({
   text: z.string(),
 }).strict()
 
-export const AgentToolCallKindSchema = z.enum(['function', 'skill', 'memory', 'mcp'])
+export const AgentToolCallKindSchema = z.enum(['function', 'skill', 'mcp'])
 export const AgentToolCallStatusSchema = z.enum([
   'input_streaming',
   'input_available',

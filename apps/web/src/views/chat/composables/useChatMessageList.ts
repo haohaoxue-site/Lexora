@@ -6,6 +6,7 @@ import type {
   ChatComposerSubmitPayload,
   ChatComposerUploadAvailability,
 } from '@/components/chat-composer/typing'
+import { AGENT_WEB_SEARCH_SKILL_KEY } from '@haohaoxue/lexora-contracts/agent'
 import { AI_MODEL_MODALITY } from '@haohaoxue/lexora-contracts/ai/constants'
 import { CHAT_MESSAGE_ATTACHMENT_PLACEMENT, CHAT_MESSAGE_ATTACHMENT_TYPE } from '@haohaoxue/lexora-contracts/chat/constants'
 import { FILE_SIZE_LIMITS } from '@haohaoxue/lexora-contracts/file'
@@ -23,6 +24,7 @@ import { useWorkspaceStore } from '@/stores/workspace'
 import { ElMessage } from '@/utils/element-plus'
 import { useChatModelSettings } from './useChatModelSettings'
 import { useChatRuntimeOverlay } from './useChatRuntimeOverlay'
+import { useChatSkillState } from './useChatSkillState'
 import { useChatStream } from './useChatStream'
 
 const EDIT_HIGHLIGHT_DURATION_MS = 1400
@@ -48,10 +50,12 @@ export function useChatMessageList(options: UseChatMessageListOptions = {}) {
     retryMessage,
     switchBranch,
   } = useChatStream()
+  const { webSearchSkillEnabled } = useChatSkillState()
   const editingMessageId = shallowRef<string | null>(null)
   const editingContentJSON = shallowRef<ChatComposerContentJSON>(createEmptyChatComposerContentJSON())
   const editingAttachments = shallowRef<ChatComposerAttachment[]>([])
   const editingHighlightAttachmentId = shallowRef<string | null>(null)
+  const editingWebSearchForRunEnabled = shallowRef(true)
   const copiedMessageId = shallowRef<string | null>(null)
   const isReadonly = computed(() => Boolean(toValue(options.isReadonly)))
   const workspaceId = computed(() => workspaceStore.currentWorkspace?.id ?? null)
@@ -139,6 +143,7 @@ export function useChatMessageList(options: UseChatMessageListOptions = {}) {
     editingContentJSON.value = cloneContentJSON(message.metadata.contentJSON)
     editingAttachments.value = message.metadata.attachments.map(attachment => ({ ...attachment }))
     editingHighlightAttachmentId.value = null
+    editingWebSearchForRunEnabled.value = !message.metadata.disabledSkillKeys.includes(AGENT_WEB_SEARCH_SKILL_KEY)
   }
 
   function cancelEditMessage() {
@@ -146,6 +151,7 @@ export function useChatMessageList(options: UseChatMessageListOptions = {}) {
     editingContentJSON.value = createEmptyChatComposerContentJSON()
     editingAttachments.value = []
     editingHighlightAttachmentId.value = null
+    editingWebSearchForRunEnabled.value = true
   }
 
   async function submitEditMessage(message: ChatMessage, payload: ChatComposerSubmitPayload) {
@@ -159,7 +165,14 @@ export function useChatMessageList(options: UseChatMessageListOptions = {}) {
       return
     }
 
-    if (await editAndSendMessage(message.id, payload)) {
+    const nextPayload = webSearchSkillEnabled.value
+      ? payload
+      : {
+          ...payload,
+          disabledSkillKeys: message.metadata.disabledSkillKeys,
+        }
+
+    if (await editAndSendMessage(message.id, nextPayload)) {
       cancelEditMessage()
     }
   }
@@ -314,6 +327,7 @@ export function useChatMessageList(options: UseChatMessageListOptions = {}) {
     editingAttachments,
     editingContentJSON,
     editingHighlightAttachmentId,
+    editingWebSearchForRunEnabled,
     emptyIcon,
     emptyIconStateClass,
     getMessageRoleClass,
@@ -333,6 +347,7 @@ export function useChatMessageList(options: UseChatMessageListOptions = {}) {
     submitEditMessage,
     switchToBranch,
     uploadAvailability,
+    webSearchSkillEnabled,
   }
 }
 

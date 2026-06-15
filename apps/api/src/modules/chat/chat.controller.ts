@@ -164,6 +164,7 @@ export class ChatController {
       attachments: payload.attachments,
       memory: payload.memory,
       skillInvocation: payload.skillInvocation,
+      disabledSkillKeys: payload.disabledSkillKeys,
     })
   }
 
@@ -185,6 +186,7 @@ export class ChatController {
       attachments: payload.attachments,
       memory: payload.memory,
       skillInvocation: payload.skillInvocation,
+      disabledSkillKeys: payload.disabledSkillKeys,
     })
   }
 

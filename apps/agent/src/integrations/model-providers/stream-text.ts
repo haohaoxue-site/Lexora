@@ -1,5 +1,7 @@
+import type { AgentToolCallKind } from '@haohaoxue/lexora-contracts/agent'
 import type { ToolCall, ToolCallChunk } from '@langchain/core/messages'
 import type { AgentChatModelResponse } from './chat-model'
+import { AGENT_WEB_SEARCH_TOOL } from '@haohaoxue/lexora-contracts/agent'
 import { AIMessageChunk } from '@langchain/core/messages'
 import {
   readChatModelResponseReasoning,
@@ -16,7 +18,7 @@ export type AgentModelStreamPart
       type: 'tool.execution.started'
       toolCallId: string
       toolName: string
-      toolKind: 'function' | 'skill' | 'memory' | 'mcp'
+      toolKind: AgentToolCallKind
       args?: unknown
       argsText?: string
       raw?: unknown
@@ -25,7 +27,7 @@ export type AgentModelStreamPart
       type: 'tool.execution.completed'
       toolCallId: string
       toolName: string
-      toolKind: 'function' | 'skill' | 'memory' | 'mcp'
+      toolKind: AgentToolCallKind
       status: 'success' | 'error'
       output?: unknown
       outputText?: string
@@ -36,7 +38,7 @@ export type AgentModelStreamPart
       type: 'tool.execution.failed'
       toolCallId: string
       toolName: string
-      toolKind: 'function' | 'skill' | 'memory' | 'mcp'
+      toolKind: AgentToolCallKind
       message: string
       durationMs?: number
       raw?: unknown
@@ -46,6 +48,9 @@ export interface ConsumeChatModelTextStreamOptions {
   onStreamPart?: (part: AgentModelStreamPart) => Promise<void> | void
   onTextDelta?: (text: string) => Promise<void> | void
   now?: () => number
+  textToolCalls?: {
+    allowedToolNames: ReadonlySet<string>
+  }
 }
 
 export interface AgentModelTokenUsage {
@@ -70,9 +75,11 @@ export async function consumeChatModelTextStream(
   let responseText = ''
   let providerUsage: AgentModelTokenUsage | null = null
   let firstTokenAt: number | null = null
+  const textToolCalls: ToolCall[] = []
   const now = options.now ?? (() => Date.now())
   const startedAt = now()
   const tagParser = createReasoningTagStreamParser()
+  const textToolCallParser = createEnabledTextToolCallStreamParser(options.textToolCalls)
   const normalizeReasoningDelta = createLeadingBlankLineNormalizer()
   const normalizeTextDelta = createLeadingBlankLineNormalizer()
   let responseChunk: AIMessageChunk | null = null
@@ -115,12 +122,30 @@ export async function consumeChatModelTextStream(
         : normalizeReasoningDelta(part.text)
 
       if (part.type === 'text.delta') {
-        responseText += normalizedText
+        await consumeTextDelta({
+          text: normalizedText,
+          raw: chunk,
+          parser: textToolCallParser,
+          textToolCalls,
+          appendText(delta) {
+            responseText += delta
+          },
+          emit: async delta => await emitPart({ ...part, text: delta, raw: chunk }, options, () => {
+            firstTokenAt ??= now()
+          }),
+          markToolCall: () => {
+            firstTokenAt ??= now()
+          },
+        })
+        continue
       }
 
-      await emitPart({ ...part, text: normalizedText, raw: chunk }, options, () => {
-        firstTokenAt ??= now()
-      })
+      if (part.type === 'reasoning.delta') {
+        await emitPart({ ...part, text: normalizedText, raw: chunk }, options, () => {
+          firstTokenAt ??= now()
+        })
+        continue
+      }
     }
   }
 
@@ -130,11 +155,44 @@ export async function consumeChatModelTextStream(
       : normalizeReasoningDelta(part.text)
 
     if (part.type === 'text.delta') {
-      responseText += normalizedText
+      await consumeTextDelta({
+        text: normalizedText,
+        parser: textToolCallParser,
+        textToolCalls,
+        appendText(delta) {
+          responseText += delta
+        },
+        emit: async delta => await emitPart({ ...part, text: delta }, options, () => {
+          firstTokenAt ??= now()
+        }),
+        markToolCall: () => {
+          firstTokenAt ??= now()
+        },
+      })
+      continue
     }
 
-    await emitPart({ ...part, text: normalizedText }, options, () => {
-      firstTokenAt ??= now()
+    if (part.type === 'reasoning.delta') {
+      await emitPart({ ...part, text: normalizedText }, options, () => {
+        firstTokenAt ??= now()
+      })
+      continue
+    }
+  }
+
+  if (textToolCallParser) {
+    await emitTextToolCallParseResult({
+      result: textToolCallParser.flush(),
+      textToolCalls,
+      appendText(delta) {
+        responseText += delta
+      },
+      emit: async delta => await emitPart({ type: 'text.delta', text: delta }, options, () => {
+        firstTokenAt ??= now()
+      }),
+      markToolCall: () => {
+        firstTokenAt ??= now()
+      },
     })
   }
 
@@ -145,7 +203,10 @@ export async function consumeChatModelTextStream(
   return {
     text: responseText,
     providerUsage,
-    toolCalls: normalizeToolCalls(responseChunk?.tool_calls ?? []),
+    toolCalls: normalizeToolCalls([
+      ...(responseChunk?.tool_calls ?? []),
+      ...textToolCalls,
+    ]),
     firstTokenLatencyMs: firstTokenAt === null ? undefined : Math.max(0, Math.trunc(firstTokenAt - startedAt)),
     elapsedMs: Math.max(0, Math.trunc(completedAt - startedAt)),
   }
@@ -309,6 +370,333 @@ function normalizeToolCalls(toolCalls: ToolCall[]): ToolCall[] {
     && typeof toolCall.name === 'string'
     && toolCall.name.trim().length > 0,
   )
+}
+
+interface TextToolCallParseResult {
+  textDeltas: string[]
+  toolCalls: ToolCall[]
+}
+
+type TextToolCallStreamParser = ReturnType<typeof createTextToolCallStreamParser>
+
+const TEXT_TOOL_CALL_LOOKBEHIND_LENGTH = 64
+const TEXT_TOOL_CALL_OPEN_PATTERN = /<\s*(?:[|｜]\s*[|｜]\s*DSML\s*[|｜]\s*[|｜]\s*)?tool_calls\s*>/i
+const TEXT_TOOL_CALL_CLOSE_PATTERN = /<\s*\/\s*(?:[|｜]\s*[|｜]\s*DSML\s*[|｜]\s*[|｜]\s*)?tool_calls\s*>/i
+const MARKUP_TAG_PATTERN = /<([^<>]*)>/g
+const TOOL_CALL_TAG_NAME_PATTERN = /^[a-z_][\w.-]*/i
+const INVOKE_TAG_PATTERN = /<invoke\b([^>]*)>([\s\S]*?)<\/invoke>/gi
+const PARAMETER_TAG_PATTERN = /<parameter\b([^>]*)>([\s\S]*?)<\/parameter>/gi
+const TEXT_TOOL_CALL_NAME_ALIASES: Record<string, string> = {
+  search: AGENT_WEB_SEARCH_TOOL.SEARCH,
+}
+
+function createEnabledTextToolCallStreamParser(
+  options: ConsumeChatModelTextStreamOptions['textToolCalls'],
+): TextToolCallStreamParser | null {
+  if (!options || options.allowedToolNames.size === 0) {
+    return null
+  }
+
+  return createTextToolCallStreamParser({
+    allowedToolNames: options.allowedToolNames,
+  })
+}
+
+async function consumeTextDelta(input: {
+  text: string
+  raw?: unknown
+  parser: TextToolCallStreamParser | null
+  textToolCalls: ToolCall[]
+  appendText: (text: string) => void
+  emit: (text: string) => Promise<void>
+  markToolCall: () => void
+}): Promise<void> {
+  if (!input.parser) {
+    input.appendText(input.text)
+    await input.emit(input.text)
+    return
+  }
+
+  await emitTextToolCallParseResult({
+    result: input.parser.write(input.text),
+    textToolCalls: input.textToolCalls,
+    appendText: input.appendText,
+    emit: input.emit,
+    markToolCall: input.markToolCall,
+  })
+}
+
+async function emitTextToolCallParseResult(input: {
+  result: TextToolCallParseResult
+  textToolCalls: ToolCall[]
+  appendText: (text: string) => void
+  emit: (text: string) => Promise<void>
+  markToolCall: () => void
+}): Promise<void> {
+  input.textToolCalls.push(...input.result.toolCalls)
+  if (input.result.toolCalls.length > 0) {
+    input.markToolCall()
+  }
+
+  for (const textDelta of input.result.textDeltas) {
+    input.appendText(textDelta)
+    await input.emit(textDelta)
+  }
+}
+
+function createTextToolCallStreamParser(input: {
+  allowedToolNames: ReadonlySet<string>
+}) {
+  let buffer = ''
+  let isInsideToolCallBlock = false
+  let textToolCallCount = 0
+
+  function nextToolCallId(): string {
+    textToolCallCount += 1
+    return `text_tool_call_${textToolCallCount}`
+  }
+
+  function drain(isFinal: boolean): TextToolCallParseResult {
+    const result: TextToolCallParseResult = {
+      textDeltas: [],
+      toolCalls: [],
+    }
+
+    while (buffer.length > 0) {
+      if (!isInsideToolCallBlock) {
+        const openTag = findPattern(buffer, TEXT_TOOL_CALL_OPEN_PATTERN)
+
+        if (!openTag) {
+          const flushLength = isFinal
+            ? buffer.length
+            : getTextFlushLengthWithoutToolCallOpenTag(buffer)
+
+          if (flushLength > 0) {
+            result.textDeltas.push(buffer.slice(0, flushLength))
+            buffer = buffer.slice(flushLength)
+          }
+          break
+        }
+
+        if (openTag.index > 0) {
+          result.textDeltas.push(buffer.slice(0, openTag.index))
+          buffer = buffer.slice(openTag.index)
+        }
+
+        isInsideToolCallBlock = true
+      }
+
+      const closeTag = findPattern(buffer, TEXT_TOOL_CALL_CLOSE_PATTERN)
+      if (!closeTag) {
+        if (isFinal) {
+          result.textDeltas.push(buffer)
+          buffer = ''
+          isInsideToolCallBlock = false
+        }
+        break
+      }
+
+      const blockEndIndex = closeTag.index + closeTag.text.length
+      const block = buffer.slice(0, blockEndIndex)
+      const toolCalls = parseTextToolCallBlock(block, nextToolCallId, input.allowedToolNames)
+      if (toolCalls.length > 0) {
+        result.toolCalls.push(...toolCalls)
+      }
+      else {
+        result.textDeltas.push(block)
+      }
+      buffer = buffer.slice(blockEndIndex)
+      isInsideToolCallBlock = false
+    }
+
+    return result
+  }
+
+  return {
+    write(text: string): TextToolCallParseResult {
+      buffer += text
+      return drain(false)
+    },
+    flush(): TextToolCallParseResult {
+      return drain(true)
+    },
+  }
+}
+
+function findPattern(input: string, pattern: RegExp): { index: number, text: string } | null {
+  const match = pattern.exec(input)
+  return match
+    ? {
+        index: match.index,
+        text: match[0],
+      }
+    : null
+}
+
+function getTextFlushLengthWithoutToolCallOpenTag(input: string): number {
+  const possibleOpenTagStart = input.lastIndexOf('<')
+  if (possibleOpenTagStart < 0) {
+    return input.length
+  }
+
+  const suffix = input.slice(possibleOpenTagStart)
+  return suffix.length <= TEXT_TOOL_CALL_LOOKBEHIND_LENGTH
+    ? possibleOpenTagStart
+    : input.length
+}
+
+function parseTextToolCallBlock(
+  block: string,
+  createToolCallId: () => string,
+  allowedToolNames: ReadonlySet<string>,
+): ToolCall[] {
+  const normalizedBlock = normalizeTextToolCallMarkup(block)
+  const toolCalls: ToolCall[] = []
+  let hasInvoke = false
+
+  for (const invokeMatch of normalizedBlock.matchAll(INVOKE_TAG_PATTERN)) {
+    hasInvoke = true
+    const rawToolName = readMarkupAttribute(invokeMatch[1] ?? '', 'name')
+    const toolName = normalizeTextToolCallName(rawToolName)
+    if (!toolName || !allowedToolNames.has(toolName)) {
+      return []
+    }
+
+    toolCalls.push({
+      id: createToolCallId(),
+      name: toolName,
+      args: parseTextToolCallParameters(invokeMatch[2] ?? ''),
+    })
+  }
+
+  return hasInvoke ? toolCalls : []
+}
+
+function normalizeTextToolCallMarkup(input: string): string {
+  return input.replace(MARKUP_TAG_PATTERN, (tag: string, body: string) => {
+    const normalizedBody = normalizeDsmlTagBody(body)
+    return normalizedBody ? `<${normalizedBody}>` : tag
+  })
+}
+
+function normalizeDsmlTagBody(body: string): string | null {
+  const trimmed = body.trim()
+  const isClosing = trimmed.startsWith('/')
+  const content = isClosing ? trimmed.slice(1).trimStart() : trimmed
+  const prefixLength = readDsmlTagPrefixLength(content)
+  if (prefixLength === null) {
+    return null
+  }
+
+  const normalizedContent = content.slice(prefixLength).trimStart()
+  const tagName = TOOL_CALL_TAG_NAME_PATTERN.exec(normalizedContent)?.[0]
+  if (!tagName) {
+    return null
+  }
+
+  return `${isClosing ? '/' : ''}${normalizedContent}`
+}
+
+function readDsmlTagPrefixLength(input: string): number | null {
+  let index = 0
+  index = skipHorizontalWhitespace(input, index)
+
+  const firstBarIndex = readDsmlBar(input, index)
+  if (firstBarIndex === null) {
+    return null
+  }
+
+  const secondBarIndex = readDsmlBar(input, firstBarIndex)
+  if (secondBarIndex === null) {
+    return null
+  }
+
+  index = skipHorizontalWhitespace(input, secondBarIndex)
+  if (input.slice(index, index + 4).toLowerCase() !== 'dsml') {
+    return null
+  }
+
+  index = skipHorizontalWhitespace(input, index + 4)
+  const thirdBarIndex = readDsmlBar(input, index)
+  if (thirdBarIndex === null) {
+    return null
+  }
+
+  return readDsmlBar(input, thirdBarIndex)
+}
+
+function readDsmlBar(input: string, startIndex: number): number | null {
+  const index = skipHorizontalWhitespace(input, startIndex)
+  const char = input[index]
+  return char === '|' || char === '｜' ? index + 1 : null
+}
+
+function skipHorizontalWhitespace(input: string, startIndex: number): number {
+  let index = startIndex
+  while (input[index] === ' ' || input[index] === '\t') {
+    index += 1
+  }
+
+  return index
+}
+
+function parseTextToolCallParameters(input: string): Record<string, unknown> {
+  const args: Record<string, unknown> = {}
+
+  for (const parameterMatch of input.matchAll(PARAMETER_TAG_PATTERN)) {
+    const attributes = parameterMatch[1] ?? ''
+    const name = readMarkupAttribute(attributes, 'name')
+    if (!name) {
+      continue
+    }
+
+    args[name] = parseTextToolCallParameterValue(
+      parameterMatch[2] ?? '',
+      readMarkupAttribute(attributes, 'string') !== 'false',
+    )
+  }
+
+  return args
+}
+
+function parseTextToolCallParameterValue(value: string, isString: boolean): unknown {
+  if (isString) {
+    return value
+  }
+
+  const trimmed = value.trim()
+  if (trimmed === 'true') {
+    return true
+  }
+
+  if (trimmed === 'false') {
+    return false
+  }
+
+  if (/^-?\d+(?:\.\d+)?$/.test(trimmed)) {
+    return Number(trimmed)
+  }
+
+  try {
+    return JSON.parse(trimmed)
+  }
+  catch {
+    return trimmed
+  }
+}
+
+function normalizeTextToolCallName(name: string | null): string | null {
+  const normalizedName = name?.trim()
+  if (!normalizedName) {
+    return null
+  }
+
+  return TEXT_TOOL_CALL_NAME_ALIASES[normalizedName] ?? normalizedName
+}
+
+function readMarkupAttribute(attributes: string, name: string): string | null {
+  const match = new RegExp(`\\b${name}\\s*=\\s*(?:"([^"]*)"|'([^']*)'|([^\\s"'>]+))`, 'i').exec(attributes)
+  return match?.[1] ?? match?.[2] ?? match?.[3] ?? null
 }
 
 async function emitPart(

@@ -2,6 +2,7 @@ import type { ChatMemoryOperationProjection } from '@haohaoxue/lexora-contracts'
 import type { ToolCall } from '@langchain/core/messages'
 import type { AgentMemoryApiClient } from '../../clients/memory'
 import type { AgentSkillApiClient } from '../../clients/skills'
+import type { WebSearchClient } from '../../integrations/web-search'
 import type { RuntimeSkillAdapter } from '../skills/adapters'
 import type { LoadedAgentSkill } from '../skills/runtime'
 import type { AgentGraphContext } from '../state'
@@ -16,6 +17,7 @@ import {
 export async function executeRuntimeToolCalls(input: {
   memoryApi?: AgentMemoryApiClient
   skillApi?: AgentSkillApiClient
+  webSearch?: WebSearchClient
   skillAdapters?: readonly RuntimeSkillAdapter[]
   context: AgentGraphContext
   sessionId: string
@@ -31,6 +33,7 @@ export async function executeRuntimeToolCalls(input: {
   let loadedSkills = input.loadedSkills
   const services = {
     memoryApi: input.memoryApi,
+    webSearch: input.webSearch,
   }
   const skillAdapters = input.skillAdapters ?? DEFAULT_RUNTIME_SKILL_ADAPTERS
   const handledToolCalls = new Set<ToolCall>()

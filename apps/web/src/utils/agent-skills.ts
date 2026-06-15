@@ -5,6 +5,7 @@ import type { SvgIconCategoryValue } from '@/components/svg-icon/typing'
 import {
   AGENT_MEMORY_SKILL_KEY,
   AGENT_TRANSLATOR_SKILL_KEY,
+  AGENT_WEB_SEARCH_SKILL_KEY,
 } from '@haohaoxue/lexora-contracts/agent'
 
 type AgentSkillIconSource = Pick<AgentSkillCard, 'key' | 'category'>
@@ -26,6 +27,13 @@ export function resolveAgentSkillIcon(skill: AgentSkillIconSource): AgentSkillIc
     return {
       category: 'ai',
       icon: 'translate',
+    }
+  }
+
+  if (skill.key === AGENT_WEB_SEARCH_SKILL_KEY) {
+    return {
+      category: 'ui',
+      icon: 'globe',
     }
   }
 

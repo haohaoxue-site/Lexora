@@ -1,6 +1,7 @@
 import type { StructuredToolInterface } from '@langchain/core/tools'
 import type { AgentMemoryApiClient } from '../../clients/memory'
 import type { AgentSkillApiClient } from '../../clients/skills'
+import type { WebSearchClient } from '../../integrations/web-search'
 import type { RuntimeSkillAdapter } from '../skills/adapters'
 import type { LoadedAgentSkill } from '../skills/runtime'
 import type { AgentGraphContext } from '../state'
@@ -14,12 +15,14 @@ export function resolveRuntimeVisibleTools(input: {
   context: AgentGraphContext | undefined
   memoryApi?: AgentMemoryApiClient
   skillApi?: AgentSkillApiClient
+  webSearch?: WebSearchClient
   skillAdapters?: readonly RuntimeSkillAdapter[]
   loadedSkills: LoadedAgentSkill[]
 }): StructuredToolInterface[] {
   const tools: StructuredToolInterface[] = []
   const services = {
     memoryApi: input.memoryApi,
+    webSearch: input.webSearch,
   }
   const skillAdapters = input.skillAdapters ?? DEFAULT_RUNTIME_SKILL_ADAPTERS
   const hasSkillRuntime = Boolean(input.skillApi)

@@ -242,6 +242,16 @@
           <path d="M 18 14 H 30" fill="none" stroke="currentColor" stroke-width="3.6" stroke-linecap="round" />
 
   </symbol>
+    <symbol id="globe" viewBox="0 0 48 48">
+
+        <circle cx="24" cy="24" r="18.5" fill="none" stroke="currentColor" stroke-width="3.6" />
+          <path d="M 5.5 24 H 42.5" fill="none" stroke="currentColor" stroke-width="3.6" stroke-linecap="round" />
+          <path d="M 24 5.5 C 29.5 10.6 32.3 16.8 32.3 24 C 32.3 31.2 29.5 37.4 24 42.5" fill="none" stroke="currentColor" stroke-width="3.6" stroke-linecap="round" />
+          <path d="M 24 5.5 C 18.5 10.6 15.7 16.8 15.7 24 C 15.7 31.2 18.5 37.4 24 42.5" fill="none" stroke="currentColor" stroke-width="3.6" stroke-linecap="round" />
+          <path d="M 10.4 12.5 H 37.6" fill="none" stroke="currentColor" stroke-width="3.6" stroke-linecap="round" />
+          <path d="M 10.4 35.5 H 37.6" fill="none" stroke="currentColor" stroke-width="3.6" stroke-linecap="round" />
+
+  </symbol>
     <symbol id="info" viewBox="0 0 48 48">
 
         <circle cx="24" cy="24" r="14" fill="none" stroke="currentColor" stroke-width="3.6" />

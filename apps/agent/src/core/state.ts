@@ -48,6 +48,7 @@ export interface AgentGraphContext {
   modelLimits?: AgentModelLimits | null
   agentProfileConfig?: AgentProfileConfig | null
   skillContext?: AgentRuntimeSkillContext | null
+  disabledSkillKeys?: string[]
   contextPolicy?: AgentContextPolicy | null
   contextBudget?: AgentContextBudget | null
   defaultResponseLanguage?: ResolvedLanguagePreference | null

@@ -3,6 +3,7 @@ import type { AgentChatApiClient } from '../clients/chat'
 import type { AgentMemoryApiClient } from '../clients/memory'
 import type { AgentSkillApiClient } from '../clients/skills'
 import type { AgentChatModelFactory } from '../integrations/model-providers/chat-model'
+import type { WebSearchClient } from '../integrations/web-search'
 import { END, START, StateGraph } from '@langchain/langgraph'
 import {
   createCallModelNode,
@@ -17,6 +18,7 @@ export interface CreateAgentGraphOptions {
   chatModelFactory: AgentChatModelFactory
   memoryApi?: AgentMemoryApiClient
   skillApi?: AgentSkillApiClient
+  webSearch?: WebSearchClient
   checkpointer?: BaseCheckpointSaver
 }
 
@@ -32,6 +34,7 @@ export function createAgentGraph(options: CreateAgentGraphOptions) {
       chatModelFactory: options.chatModelFactory,
       memoryApi: options.memoryApi,
       skillApi: options.skillApi,
+      webSearch: options.webSearch,
     }))
     .addEdge(START, 'retrieveMemory')
     .addEdge('retrieveMemory', 'prepareContext')

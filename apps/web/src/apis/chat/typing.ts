@@ -2,6 +2,7 @@ export type {
   AiModelModality,
   BatchDeleteChatSessionsRequest,
   BatchDeleteChatSessionsResponse,
+  ChatDisabledSkillKeys,
   ChatDocumentScope,
   ChatMessage,
   ChatMessageAttachmentInput,

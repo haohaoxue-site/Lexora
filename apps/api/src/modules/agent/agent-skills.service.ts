@@ -32,6 +32,7 @@ import {
   AGENT_TRANSLATOR_DEFAULT_SKILL_CONFIG,
   AGENT_TRANSLATOR_OUTPUT_MODE,
   AGENT_TRANSLATOR_SKILL_KEY,
+  AGENT_WEB_SEARCH_SKILL_KEY,
   AgentProfileConfigSchema,
   AgentProfileSnapshotSchema,
   AgentRuntimeSkillContextSchema,
@@ -39,6 +40,7 @@ import {
   AgentSkillCategorySchema,
   AgentSkillRiskLevelSchema,
   AgentTranslatorSkillConfigSchema,
+  AgentWebSearchSkillConfigSchema,
   ListAgentSkillsResponseSchema,
   MutateAgentSkillResponseSchema,
   ReadAgentSkillResourceResponseSchema,
@@ -831,6 +833,10 @@ function normalizeSkillBindingConfig(skillKey: string, config: unknown): AgentSk
     return normalizeTranslatorSkillConfig(config)
   }
 
+  if (skillKey === AGENT_WEB_SEARCH_SKILL_KEY) {
+    return normalizeWebSearchSkillConfig(config)
+  }
+
   return AgentSkillBindingConfigSchema.parse(config)
 }
 
@@ -853,6 +859,27 @@ function normalizeTranslatorSkillConfig(config: unknown): AgentSkillBindingConfi
   return cleanedResult.success ? cleanedResult.data : AGENT_TRANSLATOR_DEFAULT_SKILL_CONFIG
 }
 
+function normalizeWebSearchSkillConfig(config: unknown): AgentSkillBindingConfig {
+  const result = AgentWebSearchSkillConfigSchema.safeParse(config)
+  if (result.success) {
+    return result.data
+  }
+
+  if (!isRecord(config)) {
+    return AgentWebSearchSkillConfigSchema.parse({})
+  }
+
+  const cleanedResult = AgentWebSearchSkillConfigSchema.safeParse({
+    providers: config.providers,
+    maxResults: config.maxResults,
+    searchContextSize: config.searchContextSize,
+    allowedDomains: config.allowedDomains,
+    blockedDomains: config.blockedDomains,
+  })
+
+  return cleanedResult.success ? cleanedResult.data : AgentWebSearchSkillConfigSchema.parse({})
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
@@ -862,6 +889,10 @@ function getDefaultSkillBindingConfig(skillKey: string): AgentSkillBindingConfig
     return AGENT_TRANSLATOR_DEFAULT_SKILL_CONFIG
   }
 
+  if (skillKey === AGENT_WEB_SEARCH_SKILL_KEY) {
+    return AgentWebSearchSkillConfigSchema.parse({})
+  }
+
   return {}
 }
 
@@ -869,6 +900,22 @@ function renderBuiltInSkillInstructions(
   definition: (typeof AGENT_FIRST_PARTY_SKILL_DEFINITIONS)[number],
   binding: AgentSkillBinding,
 ): string {
+  if (definition.key === AGENT_WEB_SEARCH_SKILL_KEY) {
+    const config = AgentWebSearchSkillConfigSchema.parse(binding.config)
+
+    return [
+      definition.instructions,
+      '',
+      '<web_search_runtime_config>',
+      `providers: ${config.providers.join(', ')}`,
+      `maxResults: ${config.maxResults}`,
+      `searchContextSize: ${config.searchContextSize}`,
+      `allowedDomains: ${config.allowedDomains.length > 0 ? config.allowedDomains.join(', ') : 'any'}`,
+      `blockedDomains: ${config.blockedDomains.length > 0 ? config.blockedDomains.join(', ') : 'none'}`,
+      '</web_search_runtime_config>',
+    ].join('\n')
+  }
+
   if (definition.key !== AGENT_TRANSLATOR_SKILL_KEY) {
     return definition.instructions
   }

@@ -1,14 +1,18 @@
 import type { ChatMemoryOperationProjection } from '@haohaoxue/lexora-contracts'
+import type { AgentToolCallKind } from '@haohaoxue/lexora-contracts/agent'
 import type { BaseMessage, ToolCall } from '@langchain/core/messages'
+import type { StructuredToolInterface } from '@langchain/core/tools'
 import type { AgentMemoryApiClient } from '../../clients/memory'
 import type { AgentSkillApiClient } from '../../clients/skills'
 import type { AgentChatModel } from '../../integrations/model-providers/chat-model'
 import type { AgentModelStreamPart } from '../../integrations/model-providers/stream-text'
+import type { WebSearchClient } from '../../integrations/web-search'
 import type { RuntimeSkillAdapter } from '../skills/adapters'
 import type { LoadedAgentSkill } from '../skills/runtime'
 import type { AgentGraphContext } from '../state'
 import type { AgentModelCallResult } from './types'
 import { AGENT_MEMORY_TOOL_VALUES } from '@haohaoxue/lexora-contracts'
+import { AGENT_WEB_SEARCH_TOOL_VALUES } from '@haohaoxue/lexora-contracts/agent'
 import { AIMessage } from '@langchain/core/messages'
 import { consumeChatModelTextStream } from '../../integrations/model-providers/stream-text'
 import { AGENT_SKILL_TOOL_NAME } from '../skills/runtime'
@@ -26,6 +30,7 @@ export async function callModelWithRuntimeTools(input: {
   context: AgentGraphContext | undefined
   memoryApi?: AgentMemoryApiClient
   skillApi?: AgentSkillApiClient
+  webSearch?: WebSearchClient
   skillAdapters?: readonly RuntimeSkillAdapter[]
   signal?: AbortSignal
 }): Promise<AgentModelCallResult> {
@@ -40,10 +45,13 @@ export async function callModelWithRuntimeTools(input: {
   let tools = resolveRuntimeVisibleTools({
     context: input.context,
     memoryApi: input.memoryApi,
+    webSearch: input.webSearch,
     skillApi: input.skillApi,
     skillAdapters: input.skillAdapters,
     loadedSkills,
   })
+  let visibleSkillToolNames = createVisibleSkillToolNameSet(tools)
+  let textToolCallToolNames = visibleSkillToolNames
 
   if (tools.length === 0) {
     return streamModelWithoutTools({
@@ -57,6 +65,7 @@ export async function callModelWithRuntimeTools(input: {
     messages,
     input.signal,
     input.context,
+    textToolCallToolNames,
   )
   addModelCallMetrics(metrics, lastResult)
 
@@ -74,7 +83,7 @@ export async function callModelWithRuntimeTools(input: {
         type: 'tool.execution.started',
         toolCallId,
         toolName: toolCall.name,
-        toolKind: getToolCallKind(toolCall.name),
+        toolKind: getToolCallKind(toolCall.name, visibleSkillToolNames),
         args: toolCall.args,
         argsText: stringifyToolPayload(toolCall.args),
         raw: toolCall,
@@ -83,6 +92,7 @@ export async function callModelWithRuntimeTools(input: {
 
     const toolResult = await executeRuntimeToolCallsWithEvents({
       memoryApi: input.memoryApi,
+      webSearch: input.webSearch,
       skillApi: input.skillApi,
       skillAdapters: input.skillAdapters,
       context: input.context,
@@ -90,12 +100,14 @@ export async function callModelWithRuntimeTools(input: {
       toolCalls: lastResult.toolCalls,
       loadedSkills,
       startedAtByToolCallId: toolExecutionStartedAt,
+      visibleSkillToolNames,
     })
     await emitToolExecutionResults({
       context: input.context,
       toolCalls: lastResult.toolCalls,
       toolMessages: toolResult.toolMessages,
       startedAtByToolCallId: toolExecutionStartedAt,
+      visibleSkillToolNames,
     })
     loadedSkills = toolResult.loadedSkills
     memoryOperations.push(...toolResult.operations)
@@ -104,10 +116,13 @@ export async function callModelWithRuntimeTools(input: {
     tools = resolveRuntimeVisibleTools({
       context: input.context,
       memoryApi: input.memoryApi,
+      webSearch: input.webSearch,
       skillApi: input.skillApi,
       skillAdapters: input.skillAdapters,
       loadedSkills,
     })
+    visibleSkillToolNames = createVisibleSkillToolNameSet(tools)
+    textToolCallToolNames = visibleSkillToolNames
 
     lastResult = round === 2 || tools.length === 0
       ? await consumeStreamingModelCall(input.model, messages, input.signal, input.context)
@@ -116,6 +131,7 @@ export async function callModelWithRuntimeTools(input: {
           messages,
           input.signal,
           input.context,
+          textToolCallToolNames,
         )
     addModelCallMetrics(metrics, lastResult)
   }
@@ -132,12 +148,14 @@ export async function callModelWithRuntimeTools(input: {
 async function executeRuntimeToolCallsWithEvents(input: {
   memoryApi?: AgentMemoryApiClient
   skillApi?: AgentSkillApiClient
+  webSearch?: WebSearchClient
   skillAdapters?: readonly RuntimeSkillAdapter[]
   context: AgentGraphContext | undefined
   sessionId: string
   toolCalls: BaseToolCall[]
   loadedSkills: LoadedAgentSkill[]
   startedAtByToolCallId: Map<string, number>
+  visibleSkillToolNames: ReadonlySet<string>
 }): Promise<{
   toolMessages: Awaited<ReturnType<typeof executeRuntimeToolCalls>>['toolMessages']
   operations: ChatMemoryOperationProjection[]
@@ -146,6 +164,7 @@ async function executeRuntimeToolCallsWithEvents(input: {
   try {
     return await executeRuntimeToolCalls({
       memoryApi: input.memoryApi,
+      webSearch: input.webSearch,
       skillApi: input.skillApi,
       skillAdapters: input.skillAdapters,
       context: input.context ?? {},
@@ -159,6 +178,7 @@ async function executeRuntimeToolCallsWithEvents(input: {
       context: input.context,
       toolCalls: input.toolCalls,
       startedAtByToolCallId: input.startedAtByToolCallId,
+      visibleSkillToolNames: input.visibleSkillToolNames,
       error,
     })
     throw error
@@ -174,6 +194,7 @@ async function emitToolExecutionResults(input: {
     status?: 'success' | 'error'
   }>
   startedAtByToolCallId: Map<string, number>
+  visibleSkillToolNames: ReadonlySet<string>
 }): Promise<void> {
   const messagesByToolCallId = new Map(input.toolMessages.map(message => [message.tool_call_id, message]))
 
@@ -181,7 +202,7 @@ async function emitToolExecutionResults(input: {
     const toolCallId = getToolCallId(toolCall)
     const startedAt = input.startedAtByToolCallId.get(toolCallId) ?? Date.now()
     const durationMs = Math.max(0, Math.trunc(Date.now() - startedAt))
-    const toolKind = getToolCallKind(toolCall.name)
+    const toolKind = getToolCallKind(toolCall.name, input.visibleSkillToolNames)
     const toolMessage = messagesByToolCallId.get(toolCallId)
     const outputText = toolMessage ? stringifyToolPayload(toolMessage.content) : undefined
     const status = toolMessage?.status === 'error' ? 'error' : 'success'
@@ -204,6 +225,7 @@ async function emitToolExecutionFailures(input: {
   context: AgentGraphContext | undefined
   toolCalls: BaseToolCall[]
   startedAtByToolCallId: Map<string, number>
+  visibleSkillToolNames: ReadonlySet<string>
   error: unknown
 }): Promise<void> {
   for (const toolCall of input.toolCalls) {
@@ -213,7 +235,7 @@ async function emitToolExecutionFailures(input: {
       type: 'tool.execution.failed',
       toolCallId,
       toolName: toolCall.name,
-      toolKind: getToolCallKind(toolCall.name),
+      toolKind: getToolCallKind(toolCall.name, input.visibleSkillToolNames),
       message: formatToolExecutionError(input.error),
       durationMs: Math.max(0, Math.trunc(Date.now() - startedAt)),
       raw: input.error,
@@ -227,16 +249,22 @@ function getToolCallId(toolCall: BaseToolCall): string {
   return toolCall.id ?? `${toolCall.name}:missing-id`
 }
 
-function getToolCallKind(toolName: string): 'function' | 'skill' | 'memory' | 'mcp' {
-  if ((AGENT_MEMORY_TOOL_VALUES as readonly string[]).includes(toolName)) {
-    return 'memory'
-  }
-
-  if ((Object.values(AGENT_SKILL_TOOL_NAME) as string[]).includes(toolName)) {
+function getToolCallKind(toolName: string, visibleSkillToolNames: ReadonlySet<string>): AgentToolCallKind {
+  if (visibleSkillToolNames.has(toolName) || isKnownRuntimeSkillToolName(toolName)) {
     return 'skill'
   }
 
   return toolName.startsWith('mcp_') ? 'mcp' : 'function'
+}
+
+function createVisibleSkillToolNameSet(tools: StructuredToolInterface[]): ReadonlySet<string> {
+  return new Set(tools.map(tool => tool.name))
+}
+
+function isKnownRuntimeSkillToolName(toolName: string): boolean {
+  return (Object.values(AGENT_SKILL_TOOL_NAME) as string[]).includes(toolName)
+    || (AGENT_MEMORY_TOOL_VALUES as readonly string[]).includes(toolName)
+    || (AGENT_WEB_SEARCH_TOOL_VALUES as readonly string[]).includes(toolName)
 }
 
 function stringifyToolPayload(value: unknown): string {
@@ -281,9 +309,13 @@ async function consumeStreamingModelCall(
   messages: BaseMessage[],
   signal: AbortSignal | undefined,
   context: AgentGraphContext | undefined,
+  textToolCallToolNames?: ReadonlySet<string>,
 ) {
   const stream = await model.stream(messages, { signal })
   return consumeChatModelTextStream(stream, {
     onStreamPart: context?.onStreamPart,
+    textToolCalls: textToolCallToolNames && textToolCallToolNames.size > 0
+      ? { allowedToolNames: textToolCallToolNames }
+      : undefined,
   })
 }

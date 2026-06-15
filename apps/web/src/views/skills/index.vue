@@ -1,5 +1,8 @@
 <script setup lang="ts">
-import type { AgentTranslatorSkillConfig } from '@haohaoxue/lexora-contracts'
+import type {
+  AgentTranslatorSkillConfig,
+  AgentWebSearchSkillConfig,
+} from '@haohaoxue/lexora-contracts'
 import type { CSSProperties } from 'vue'
 import type { AgentSkillCard } from '@/apis/agent-skills'
 import { computed, onMounted, shallowRef } from 'vue'
@@ -23,9 +26,13 @@ import { resolveAgentSkillIcon } from '@/utils/agent-skills'
 import { ElMessage, ElMessageBox } from '@/utils/element-plus'
 import { getRequestErrorDisplayMessage } from '@/utils/request-error'
 import TranslatorConfigDrawer from './components/translator-config-drawer/index.vue'
+import WebSearchConfigDrawer from './components/web-search-config-drawer/index.vue'
 import {
   TRANSLATOR_SKILL_KEY,
 } from './utils/translator'
+import {
+  WEB_SEARCH_SKILL_KEY,
+} from './utils/web-search'
 
 type SkillsTabName = 'market' | 'me'
 type SkillMoreCommand = 'config' | 'uninstall'
@@ -46,6 +53,7 @@ const mutatingSkillKey = shallowRef<string | null>(null)
 const savingSkillConfigKey = shallowRef<string | null>(null)
 const configuringSkill = shallowRef<AgentSkillCard | null>(null)
 const translatorConfigDrawerVisible = shallowRef(false)
+const webSearchConfigDrawerVisible = shallowRef(false)
 const skillTooltipStyle: CSSProperties = {
   maxWidth: '20rem',
   whiteSpace: 'normal',
@@ -95,8 +103,12 @@ function isTranslatorSkill(skill: AgentSkillCard | null) {
   return skill?.key === TRANSLATOR_SKILL_KEY
 }
 
+function isWebSearchSkill(skill: AgentSkillCard | null) {
+  return skill?.key === WEB_SEARCH_SKILL_KEY
+}
+
 function hasSkillConfig(skill: AgentSkillCard) {
-  return isTranslatorSkill(skill)
+  return isTranslatorSkill(skill) || isWebSearchSkill(skill)
 }
 
 function hasSkillMoreActions(skill: AgentSkillCard) {
@@ -223,7 +235,7 @@ async function handleSkillToggleChange(skill: AgentSkillCard, value: boolean | s
 function handleSkillMoreCommand(skill: AgentSkillCard, command: string | number | object) {
   const normalizedCommand = String(command) as SkillMoreCommand
   if (normalizedCommand === 'config') {
-    handleOpenTranslatorConfig(skill)
+    handleOpenSkillConfig(skill)
     return
   }
 
@@ -232,13 +244,14 @@ function handleSkillMoreCommand(skill: AgentSkillCard, command: string | number 
   }
 }
 
-function handleOpenTranslatorConfig(skill: AgentSkillCard) {
+function handleOpenSkillConfig(skill: AgentSkillCard) {
   if (!skill.installed) {
     return
   }
 
   configuringSkill.value = skill
-  translatorConfigDrawerVisible.value = true
+  translatorConfigDrawerVisible.value = isTranslatorSkill(skill)
+  webSearchConfigDrawerVisible.value = isWebSearchSkill(skill)
 }
 
 async function handleSaveTranslatorConfig(config: AgentTranslatorSkillConfig) {
@@ -256,6 +269,27 @@ async function handleSaveTranslatorConfig(config: AgentTranslatorSkillConfig) {
   }
   catch (error) {
     ElMessage.error(getRequestErrorDisplayMessage(error, t('skills.translator.saveFailed')))
+  }
+  finally {
+    savingSkillConfigKey.value = null
+  }
+}
+
+async function handleSaveWebSearchConfig(config: AgentWebSearchSkillConfig) {
+  const skill = configuringSkill.value
+  if (!skill || savingSkillConfigKey.value) {
+    return
+  }
+
+  savingSkillConfigKey.value = skill.key
+  try {
+    await updateAgentSkillConfig(skill.key, { config })
+    await loadSkills()
+    webSearchConfigDrawerVisible.value = false
+    ElMessage.success(t('skills.webSearch.saved'))
+  }
+  catch (error) {
+    ElMessage.error(getRequestErrorDisplayMessage(error, t('skills.webSearch.saveFailed')))
   }
   finally {
     savingSkillConfigKey.value = null
@@ -406,6 +440,12 @@ async function handleSaveTranslatorConfig(config: AgentTranslatorSkillConfig) {
       :skill="configuringSkill"
       :saving="savingSkillConfigKey === configuringSkill?.key"
       @submit="handleSaveTranslatorConfig"
+    />
+    <WebSearchConfigDrawer
+      v-model:visible="webSearchConfigDrawerVisible"
+      :skill="configuringSkill"
+      :saving="savingSkillConfigKey === configuringSkill?.key"
+      @submit="handleSaveWebSearchConfig"
     />
   </PagePanel>
 </template>

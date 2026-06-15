@@ -21,6 +21,8 @@ const props = defineProps<{
   uploadAvailability?: ChatComposerUploadAvailability
   translatorSkillEnabled?: boolean
   translatorTargetLanguage?: AgentTranslatorTargetLanguage | null
+  webSearchSkillEnabled?: boolean
+  webSearchForRunEnabled?: boolean
   skillCommandOpenSignal?: number
 }>()
 
@@ -29,6 +31,7 @@ const emits = defineEmits<{
   'uploadImage': []
   'uploadFile': []
   'update:translatorTargetLanguage': [targetLanguage: AgentTranslatorTargetLanguage | null]
+  'update:webSearchForRunEnabled': [enabled: boolean]
   'selectModel': [modelRef: ChatComposerModelRef | null]
   'send': []
   'stop': []
@@ -55,6 +58,12 @@ const customTranslatorTargetSelected = computed(() =>
 )
 const imageUploadDisabled = computed(() => Boolean(props.uploadAvailability?.image.disabled))
 const fileUploadDisabled = computed(() => Boolean(props.uploadAvailability?.file.disabled))
+const webSearchToggleDisabled = computed(() => Boolean(props.disabled || props.isStreaming))
+const webSearchToggleTooltip = computed(() =>
+  props.webSearchForRunEnabled
+    ? t('chat.composer.disableWebSearch')
+    : t('chat.composer.enableWebSearch'),
+)
 
 watch(
   () => props.skillCommandOpenSignal,
@@ -127,6 +136,14 @@ function handleUploadCommand(command: string | number | object) {
 function clearTranslatorSkill() {
   customLanguageEditing.value = false
   emits('update:translatorTargetLanguage', null)
+}
+
+function toggleWebSearchForRun() {
+  if (webSearchToggleDisabled.value) {
+    return
+  }
+
+  emits('update:webSearchForRunEnabled', !props.webSearchForRunEnabled)
 }
 
 function getDefaultTranslatorTargetLanguage() {
@@ -233,6 +250,26 @@ function cancelCustomTranslatorLanguageInput() {
         >
           <span class="chat-composer-toolbar__symbol">@</span>
         </button>
+      </ElTooltip>
+
+      <ElTooltip
+        v-if="props.webSearchSkillEnabled"
+        :content="webSearchToggleTooltip"
+        placement="top"
+      >
+        <span>
+          <button
+            class="chat-composer-toolbar__icon-button chat-composer-toolbar__web-search-button"
+            :class="{ 'is-active': props.webSearchForRunEnabled }"
+            type="button"
+            :disabled="webSearchToggleDisabled"
+            :aria-label="webSearchToggleTooltip"
+            :aria-pressed="props.webSearchForRunEnabled"
+            @click="toggleWebSearchForRun"
+          >
+            <SvgIcon category="ui" icon="globe" size="1rem" />
+          </button>
+        </span>
       </ElTooltip>
 
       <span class="chat-composer-toolbar__divider" aria-hidden="true" />
@@ -447,6 +484,17 @@ function cancelCustomTranslatorLanguageInput() {
     &:disabled {
       cursor: not-allowed;
       opacity: 0.48;
+    }
+  }
+
+  .chat-composer-toolbar__web-search-button.is-active {
+    border-color: color-mix(in srgb, var(--brand-primary) 42%, transparent);
+    background: color-mix(in srgb, var(--brand-primary) 12%, var(--brand-bg-surface));
+    color: var(--brand-primary);
+
+    &:hover:not(:disabled) {
+      background: color-mix(in srgb, var(--brand-primary) 18%, var(--brand-bg-surface));
+      color: var(--brand-primary);
     }
   }
 

@@ -123,6 +123,18 @@ function renderActivatedSkill(skill: AgentRuntimeSkillCatalogItem & {
     : skill.resources.slice(0, 100).map(resource =>
         `- ${resource.path} (${resource.sizeBytes} bytes${resource.executable ? ', executable' : ''})`,
       ).join('\n')
+  const runtimeTools = skill.tools.length === 0
+    ? '- none'
+    : [
+        'Use the exact tool name shown below after this skill is activated. Do not call activate_skill again for this skill unless activation failed.',
+        ...skill.tools.map(tool => [
+          '  <tool>',
+          `    <name>${escapeSkillPromptText(tool.name)}</name>`,
+          `    <title>${escapeSkillPromptText(tool.title)}</title>`,
+          `    <description>${escapeSkillPromptText(tool.description)}</description>`,
+          '  </tool>',
+        ].join('\n')),
+      ].join('\n')
 
   return [
     `<skill_content key="${escapeSkillPromptText(skill.key)}">`,
@@ -133,6 +145,10 @@ function renderActivatedSkill(skill: AgentRuntimeSkillCatalogItem & {
     '<instructions>',
     skill.instructions,
     '</instructions>',
+    '',
+    '<runtime_tools>',
+    runtimeTools,
+    '</runtime_tools>',
     '',
     '<resource_policy>',
     'Use read_skill_resource to load referenced files by relative path. Script execution is disabled.',

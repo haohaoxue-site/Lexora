@@ -62,6 +62,10 @@ export class CreateChatSessionMessageRequestDto implements CreateChatSessionMess
   @IsOptional()
   @IsObject()
   skillInvocation!: CreateChatSessionMessageRequest['skillInvocation']
+
+  @IsOptional()
+  @IsArray()
+  disabledSkillKeys!: CreateChatSessionMessageRequest['disabledSkillKeys']
 }
 
 export class EditAndSendChatMessageRequestDto implements EditAndSendChatMessageRequest {
@@ -85,6 +89,10 @@ export class EditAndSendChatMessageRequestDto implements EditAndSendChatMessageR
   @IsOptional()
   @IsObject()
   skillInvocation!: EditAndSendChatMessageRequest['skillInvocation']
+
+  @IsOptional()
+  @IsArray()
+  disabledSkillKeys!: EditAndSendChatMessageRequest['disabledSkillKeys']
 }
 
 export class SwitchChatActiveMessageRequestDto implements SwitchChatActiveMessageRequest {

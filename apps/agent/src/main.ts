@@ -13,6 +13,7 @@ import {
   createRedisStreamsAgentEventPublisher,
   createRedisStreamsAgentQueue,
 } from './integrations/redis-streams'
+import { createWebSearchClient } from './integrations/web-search'
 import { createAgentRuntime } from './runtime'
 import { createCheckpointRetentionManager } from './runtime/checkpoint-retention'
 import { closeAgentCheckpointer, createAgentCheckpointer } from './runtime/checkpointer'
@@ -23,6 +24,7 @@ const chatApi = createAgentChatApiClient(config.apiInternalUrl)
 const memoryApi = createAgentMemoryApiClient(config.apiInternalUrl)
 const skillApi = createAgentSkillApiClient(config.apiInternalUrl)
 const chatModelFactory = createChatModelFactory()
+const webSearch = createWebSearchClient()
 const queueRedis = createAgentRedisClient(config.redisUrl)
 const controlRedis = createAgentRedisClient(config.redisUrl)
 const runtimeRedis = createAgentRedisClient(config.redisUrl)
@@ -75,6 +77,7 @@ async function start(): Promise<void> {
       chatApi,
       memoryApi,
       skillApi,
+      webSearch,
       chatModelFactory,
       checkpointer: agentCheckpointer,
       events: eventPublisher,

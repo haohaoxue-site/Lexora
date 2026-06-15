@@ -7,6 +7,7 @@ import {
   AGENT_MEMORY_SKILL_KEY,
   AGENT_MEMORY_TOOL,
   AGENT_TRANSLATOR_SKILL_KEY,
+  AGENT_WEB_SEARCH_TOOL,
 } from '@haohaoxue/lexora-contracts/agent'
 import {
   CHAT_MESSAGE_PART_TYPE,
@@ -235,6 +236,14 @@ function createPublicToolCallView(
     }
   }
 
+  if (isWebSearchToolName(view.name)) {
+    return {
+      ...view,
+      displayTitle: getWebSearchTitle(view),
+      displayDetails: getWebSearchDetails(view),
+    }
+  }
+
   return {
     ...view,
     displayTitle: getDisplayName(view.name),
@@ -376,19 +385,65 @@ function isMemoryToolName(name: string): boolean {
   return (Object.values(AGENT_MEMORY_TOOL) as string[]).includes(name)
 }
 
+function isWebSearchToolName(name: string): boolean {
+  return (Object.values(AGENT_WEB_SEARCH_TOOL) as string[]).includes(name)
+}
+
+function getWebSearchTitle(view: AssistantToolCallView): string {
+  if (view.status === 'success') {
+    return translate('chat.messageDisplay.webSearchCompleted')
+  }
+
+  if (view.status === 'error') {
+    return translate('chat.messageDisplay.webSearchFailed')
+  }
+
+  return translate('chat.messageDisplay.webSearchRunning')
+}
+
+function getWebSearchDetails(view: AssistantToolCallView): string[] {
+  const args = parseJsonObject(view.argsText)
+  const result = parseJsonObject(view.resultText)
+  const query = getStringValue(result, 'query') ?? getStringValue(args, 'query')
+  const results = Array.isArray(result?.results) ? result.results : []
+  const sources = results
+    .map(item => isRecord(item) ? getStringValue(item, 'source') : null)
+    .filter(isNonEmptyString)
+
+  return [
+    query,
+    results.length > 0
+      ? translate('chat.messageDisplay.webSearchResultSummary', {
+          count: results.length,
+          sources: sources.slice(0, 5).join(', '),
+        })
+      : view.status === 'success'
+        ? translate('chat.messageDisplay.webSearchNoResults')
+        : null,
+  ].filter(isNonEmptyString)
+}
+
 function getStringArgument(text: string, key: string): string | null {
+  return getStringValue(parseJsonObject(text), key)
+}
+
+function getStringValue(value: Record<string, unknown> | null, key: string): string | null {
+  if (!value) {
+    return null
+  }
+
+  const item = value[key]
+  return typeof item === 'string' ? item : null
+}
+
+function parseJsonObject(text: string): Record<string, unknown> | null {
   if (!text.trim()) {
     return null
   }
 
   try {
     const parsed: unknown = JSON.parse(text)
-    if (!parsed || typeof parsed !== 'object') {
-      return null
-    }
-
-    const value = (parsed as Record<string, unknown>)[key]
-    return typeof value === 'string' ? value : null
+    return isRecord(parsed) ? parsed : null
   }
   catch {
     return null
@@ -424,7 +479,15 @@ function getDisplayName(name: string): string {
     return translate('chat.messageDisplay.askMemory')
   }
 
+  if (name === AGENT_WEB_SEARCH_TOOL.SEARCH) {
+    return translate('chat.messageDisplay.webSearchRunning')
+  }
+
   return name
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
 function isNonEmptyString(value: string | null | undefined): value is string {

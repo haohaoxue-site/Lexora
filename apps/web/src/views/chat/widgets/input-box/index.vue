@@ -26,6 +26,8 @@ const {
   translatorSkillEnabled,
   translatorTargetLanguage,
   uploadAvailability,
+  webSearchForRunEnabled,
+  webSearchSkillEnabled,
 } = useChatInputBox({
   isReadonly: () => props.isReadonly,
 })
@@ -38,6 +40,7 @@ const {
         v-if="!props.isReadonly"
         v-model:attachments="attachments"
         v-model:translator-target-language="translatorTargetLanguage"
+        v-model:web-search-for-run-enabled="webSearchForRunEnabled"
         :content-j-s-o-n="contentJSON"
         :selected-model-ref="composerSelectedModelRef"
         :model-selection-kind="composerModelSelectionKind"
@@ -45,6 +48,7 @@ const {
         :highlight-attachment-id="highlightAttachmentId"
         :upload-availability="uploadAvailability"
         :translator-skill-enabled="translatorSkillEnabled"
+        :web-search-skill-enabled="webSearchSkillEnabled"
         document-picker-teleport-to=".chat-view__picker-layer"
         @update:content-j-s-o-n="contentJSON = $event"
         @send="handleSend"

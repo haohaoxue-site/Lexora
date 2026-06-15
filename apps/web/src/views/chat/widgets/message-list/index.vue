@@ -47,6 +47,7 @@ const {
   editingAttachments,
   editingContentJSON,
   editingHighlightAttachmentId,
+  editingWebSearchForRunEnabled,
   emptyIcon,
   emptyIconStateClass,
   getMessageRoleClass,
@@ -66,6 +67,7 @@ const {
   submitEditMessage,
   switchToBranch,
   uploadAvailability,
+  webSearchSkillEnabled,
 } = useChatMessageList({
   isReadonly: () => props.isReadonly,
 })
@@ -295,11 +297,13 @@ function formatMessageSentAt(value: string): string {
 
               <div v-if="isEditingMessage(virtual.item.message)" class="chat-message-list__edit-box">
                 <ChatComposer
+                  v-model:web-search-for-run-enabled="editingWebSearchForRunEnabled"
                   :content-j-s-o-n="editingContentJSON"
                   :attachments="editingAttachments"
                   :selected-model-ref="composerSelectedModelRef"
                   :model-selection-kind="composerModelSelectionKind"
                   :upload-availability="uploadAvailability"
+                  :web-search-skill-enabled="webSearchSkillEnabled"
                   :disabled="isStreaming || props.isReadonly"
                   :highlight-attachment-id="editingHighlightAttachmentId"
                   document-picker-teleport-to=".chat-view__picker-layer"

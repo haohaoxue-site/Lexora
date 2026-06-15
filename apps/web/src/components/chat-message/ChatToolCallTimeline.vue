@@ -1,5 +1,9 @@
 <script setup lang="ts">
 import type { AssistantToolCallView } from '@/composables/chat/utils/chat-message-display'
+import {
+  AGENT_MEMORY_TOOL,
+  AGENT_WEB_SEARCH_TOOL,
+} from '@haohaoxue/lexora-contracts/agent'
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 
@@ -31,20 +35,32 @@ const summary = computed(() => {
   ].filter(Boolean).join(' · ')
 })
 
-function getKindLabel(kind: AssistantToolCallView['kind']): string {
-  if (kind === 'skill') {
-    return t('chat.messageDisplay.skillKind')
-  }
-
-  if (kind === 'memory') {
+function getKindLabel(item: AssistantToolCallView): string {
+  if (isMemoryToolName(item.name)) {
     return t('chat.messageDisplay.memoryKind')
   }
 
-  if (kind === 'mcp') {
+  if (isWebSearchToolName(item.name)) {
+    return t('chat.messageDisplay.webKind')
+  }
+
+  if (item.kind === 'skill') {
+    return t('chat.messageDisplay.skillKind')
+  }
+
+  if (item.kind === 'mcp') {
     return 'MCP'
   }
 
   return t('chat.messageDisplay.functionKind')
+}
+
+function isMemoryToolName(name: string): boolean {
+  return (Object.values(AGENT_MEMORY_TOOL) as string[]).includes(name)
+}
+
+function isWebSearchToolName(name: string): boolean {
+  return (Object.values(AGENT_WEB_SEARCH_TOOL) as string[]).includes(name)
 }
 
 function getStatusLabel(status: AssistantToolCallView['status']): string {
@@ -95,7 +111,7 @@ function formatDuration(durationMs: number | null): string {
         :class="`chat-tool-call-timeline__item--${item.status}`"
       >
         <div class="chat-tool-call-timeline__item-header">
-          <span class="chat-tool-call-timeline__kind">{{ getKindLabel(item.kind) }}</span>
+          <span class="chat-tool-call-timeline__kind">{{ getKindLabel(item) }}</span>
           <span class="chat-tool-call-timeline__name">{{ item.displayTitle }}</span>
           <span class="chat-tool-call-timeline__status">{{ getStatusLabel(item.status) }}</span>
           <span v-if="formatDuration(item.durationMs)" class="chat-tool-call-timeline__duration">

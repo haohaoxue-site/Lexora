@@ -6,6 +6,7 @@ import { createChatComposerHostState } from '@/composables/chat/createChatCompos
 import { useWorkspaceStore } from '@/stores/workspace'
 import { useChatModelSettings } from './useChatModelSettings'
 import { useChatRuntimeOverlay } from './useChatRuntimeOverlay'
+import { useChatSessions } from './useChatSessions'
 import { useChatSkillState } from './useChatSkillState'
 import { useChatStream } from './useChatStream'
 
@@ -16,10 +17,32 @@ export interface UseChatInputBoxOptions {
 export function useChatInputBox(options: UseChatInputBoxOptions = {}) {
   const workspaceStore = useWorkspaceStore()
   const model = useChatModelSettings()
+  const { activeSessionId } = useChatSessions()
   const { cancelRunId, isStreaming } = useChatRuntimeOverlay()
-  const { loadSkills, translatorSkillEnabled } = useChatSkillState()
+  const { loadSkills, translatorSkillEnabled, webSearchSkillEnabled } = useChatSkillState()
   const { cancelActiveRun, sendMessage } = useChatStream()
   const translatorTargetLanguage = shallowRef<AgentTranslatorTargetLanguage | null>(null)
+  const newSessionWebSearchForRunEnabled = shallowRef(true)
+  const webSearchForRunEnabledBySessionId = shallowRef(new Map<string, boolean>())
+  const webSearchForRunEnabled = computed({
+    get() {
+      const sessionId = activeSessionId.value
+      if (!sessionId) {
+        return newSessionWebSearchForRunEnabled.value
+      }
+
+      return webSearchForRunEnabledBySessionId.value.get(sessionId) ?? true
+    },
+    set(enabled: boolean) {
+      const sessionId = activeSessionId.value
+      if (!sessionId) {
+        newSessionWebSearchForRunEnabled.value = enabled
+        return
+      }
+
+      setWebSearchForRunEnabled(sessionId, enabled)
+    },
+  })
   const isReadonly = computed(() => Boolean(toValue(options.isReadonly)))
   const workspaceId = computed(() => workspaceStore.currentWorkspace?.id ?? null)
   const host = createChatComposerHostState({
@@ -38,17 +61,40 @@ export function useChatInputBox(options: UseChatInputBoxOptions = {}) {
     }
   })
 
+  watch(activeSessionId, (sessionId) => {
+    if (!sessionId) {
+      newSessionWebSearchForRunEnabled.value = true
+    }
+  })
+
   async function handleSend(payload: ChatComposerSubmitPayload) {
     if (isReadonly.value) {
       return false
     }
 
+    const isNewSessionSend = !activeSessionId.value
+    const newSessionWebSearchEnabled = newSessionWebSearchForRunEnabled.value
     const sent = await host.handleSend(payload)
     if (sent) {
       translatorTargetLanguage.value = null
+      if (isNewSessionSend && activeSessionId.value) {
+        setWebSearchForRunEnabled(activeSessionId.value, newSessionWebSearchEnabled)
+        newSessionWebSearchForRunEnabled.value = true
+      }
     }
 
     return sent
+  }
+
+  function setWebSearchForRunEnabled(sessionId: string, enabled: boolean) {
+    const nextValues = new Map(webSearchForRunEnabledBySessionId.value)
+    if (enabled) {
+      nextValues.delete(sessionId)
+    }
+    else {
+      nextValues.set(sessionId, false)
+    }
+    webSearchForRunEnabledBySessionId.value = nextValues
   }
 
   return {
@@ -68,5 +114,7 @@ export function useChatInputBox(options: UseChatInputBoxOptions = {}) {
     translatorSkillEnabled,
     translatorTargetLanguage,
     uploadAvailability: host.uploadAvailability,
+    webSearchForRunEnabled,
+    webSearchSkillEnabled,
   }
 }

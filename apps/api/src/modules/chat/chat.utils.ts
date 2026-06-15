@@ -24,6 +24,7 @@ import {
   CHAT_MESSAGE_STATUS,
   CHAT_SESSION_CHANNEL,
   CHAT_SESSION_ORIGIN,
+  ChatDisabledSkillKeysSchema,
   ChatGenerationUsageSnapshotSchema,
   ChatMemoryOperationProjectionSchema,
   ChatSkillInvocationSchema,
@@ -325,6 +326,7 @@ export function toChatUserMessageMetadata(message: ChatSessionMessageRecord): Ch
     contextSnapshotMetas: message.contextSnapshots.map(toChatMessageContextSnapshotMeta),
     memoryOperations,
     skillInvocation: skillInvocationResult.success ? skillInvocationResult.data : null,
+    disabledSkillKeys: ChatDisabledSkillKeysSchema.parse(metadata.disabledSkillKeys),
   }
 }
 

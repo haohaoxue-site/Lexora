@@ -420,6 +420,7 @@ export class WeixinBotRuntimeService implements OnModuleInit, OnModuleDestroy {
       content,
       contentJSON: toPlainTextContentJSON(content),
       attachments: [],
+      disabledSkillKeys: [],
     })
 
     const assistantMessageId = mutation.run?.assistantMessageId

@@ -7,6 +7,7 @@ import type {
   AgentChatModelOptions,
 } from '../integrations/model-providers/chat-model'
 import type { AgentModelStreamPart } from '../integrations/model-providers/stream-text'
+import type { WebSearchClient } from '../integrations/web-search'
 import type { AgentRuntimeTryLock } from '../runtime/lock'
 import type {
   AgentEventPublisher,
@@ -37,6 +38,7 @@ export interface CreateAgentRunnerInput {
   chatApi: AgentChatApiClient
   memoryApi?: AgentMemoryApiClient
   skillApi?: AgentSkillApiClient
+  webSearch?: WebSearchClient
   chatModelFactory: AgentChatModelFactory
   checkpointer?: BaseCheckpointSaver
   threadRunTryLock?: AgentRuntimeTryLock
@@ -53,6 +55,7 @@ export function createAgentRunner(inputs: CreateAgentRunnerInput): AgentRunner {
     chatModelFactory: inputs.chatModelFactory,
     memoryApi: inputs.memoryApi,
     skillApi: inputs.skillApi,
+    webSearch: inputs.webSearch,
     checkpointer: inputs.checkpointer,
   })
   const threadRunTryLock = inputs.threadRunTryLock ?? createMemoryAgentRuntimeTryLock()
@@ -187,6 +190,7 @@ export async function executeAgentGeneration(input: {
       context: {
         agentProfileConfig: profileConfig,
         skillContext: input.bootstrap.skills,
+        disabledSkillKeys: input.bootstrap.context.disabledSkillKeys,
         generationId: input.bootstrap.generation.generationId,
         actorUserId: input.bootstrap.generation.actorUserId,
         agentProfileId: input.bootstrap.agentProfile.profileId,

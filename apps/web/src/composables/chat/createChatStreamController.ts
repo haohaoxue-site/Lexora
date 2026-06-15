@@ -21,13 +21,15 @@ export interface ChatStreamControllerOptions {
 
 type ChatMemoryRunOptions = CreateChatSessionMessageRequest['memory']
 
-export interface SendChatComposerMessageInput extends Omit<CreateChatSessionMessageRequest, 'memory'> {
+export interface SendChatComposerMessageInput extends Omit<CreateChatSessionMessageRequest, 'memory' | 'disabledSkillKeys'> {
   memory?: ChatMemoryRunOptions
+  disabledSkillKeys?: CreateChatSessionMessageRequest['disabledSkillKeys']
   modelRef?: ChatModelSelection['modelRef'] | null
 }
 
-type EditAndSendChatComposerMessageInput = Omit<EditAndSendChatMessageRequest, 'memory'> & {
+type EditAndSendChatComposerMessageInput = Omit<EditAndSendChatMessageRequest, 'memory' | 'disabledSkillKeys'> & {
   memory?: ChatMemoryRunOptions
+  disabledSkillKeys?: EditAndSendChatMessageRequest['disabledSkillKeys']
 }
 
 export function createChatStreamController(
@@ -100,6 +102,7 @@ export function createChatStreamController(
         attachments: input.attachments ?? [],
         memory: input.memory ?? { ignoredForRun: false },
         skillInvocation: input.skillInvocation ?? null,
+        disabledSkillKeys: input.disabledSkillKeys ?? [],
       }))
       return true
     }
@@ -122,6 +125,7 @@ export function createChatStreamController(
         attachments: payload.attachments ?? [],
         memory: payload.memory ?? { ignoredForRun: false },
         skillInvocation: payload.skillInvocation ?? null,
+        disabledSkillKeys: payload.disabledSkillKeys ?? [],
       }))
       return true
     }

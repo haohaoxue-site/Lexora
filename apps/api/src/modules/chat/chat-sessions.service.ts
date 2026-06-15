@@ -6,6 +6,7 @@ import type {
   AgentRuntimeModelTarget,
   AgentRuntimeSkillContext,
   AiModelRef,
+  ChatDisabledSkillKeys,
   ChatGenerationBootstrap,
   ChatGenerationModelTargetSnapshot,
   ChatMessageAttachmentInput,
@@ -37,6 +38,7 @@ import {
   CHAT_SESSION_CHANNEL,
   CHAT_SESSION_DEFAULT_TITLE,
   CHAT_SESSION_EVENT_TYPE,
+  ChatDisabledSkillKeysSchema,
   ChatGenerationBootstrapSchema,
   ChatGenerationModelTargetSnapshotSchema,
   ChatMutationResponseSchema,
@@ -298,6 +300,7 @@ interface CreateRunInput {
   runId: string
   modelTargetSnapshot: ChatGenerationModelTargetSnapshot
   memory?: AgentMemoryRunOptions
+  disabledSkillKeys?: ChatDisabledSkillKeys
 }
 
 interface CreatedRunResult {
@@ -809,12 +812,14 @@ export class ChatSessionsService {
       select: { commandContext: true },
     })
     const memory = readAgentMemoryRunOptions(run?.commandContext)
+    const disabledSkillKeys = readChatDisabledSkillKeys(run?.commandContext)
     const [context, runtimeModelTarget, skills] = await Promise.all([
       this.resolveAgentRuntimeContext({
         actorId: generation.actorUserId,
         sessionId: generation.sessionId,
         triggerUserMessageId: generation.triggerUserMessageId,
         memory,
+        disabledSkillKeys,
       }),
       this.resolveRuntimeModelTarget(generation.actorUserId, modelTargetSnapshot),
       this.agentSkills
@@ -842,7 +847,7 @@ export class ChatSessionsService {
       model: modelTargetSnapshot,
       runtimeModelTarget,
       context,
-      skills,
+      skills: filterRuntimeSkillContext(skills, disabledSkillKeys),
     })
   }
 
@@ -851,6 +856,7 @@ export class ChatSessionsService {
     sessionId: string
     triggerUserMessageId: string
     memory: AgentMemoryRunOptions
+    disabledSkillKeys: ChatDisabledSkillKeys
   }): Promise<AgentChatRuntimeContext> {
     const [session, actor] = await Promise.all([
       this.findAccessibleSessionRunDetailOrThrow(input.actorId, input.sessionId),
@@ -902,6 +908,7 @@ export class ChatSessionsService {
       })),
       inputAttachments: readChatInputAttachments(triggerMessage.metadata),
       memory: input.memory,
+      disabledSkillKeys: input.disabledSkillKeys,
     }
   }
 
@@ -1142,6 +1149,7 @@ export class ChatSessionsService {
         metadata: {
           ...resolvedContext.metadata,
           skillInvocation: input.skillInvocation ?? null,
+          disabledSkillKeys: input.disabledSkillKeys ?? [],
         },
         contextSnapshots: resolvedContext.snapshots,
         parentMessageId: userParentMessageId,
@@ -1178,6 +1186,7 @@ export class ChatSessionsService {
         modelTargetSnapshot: input.modelTargetSnapshot,
         expectedHistoryVersion,
         memory: input.memory,
+        disabledSkillKeys: input.disabledSkillKeys,
       })
       await this.createPendingGeneration(tx, {
         sessionId: session.id,
@@ -1283,6 +1292,7 @@ export class ChatSessionsService {
         metadata: {
           ...resolvedContext.metadata,
           skillInvocation: input.skillInvocation ?? null,
+          disabledSkillKeys: input.disabledSkillKeys ?? [],
         },
         contextSnapshots: resolvedContext.snapshots,
         parentMessageId: sourceMessage.parentMessageId,
@@ -1320,6 +1330,7 @@ export class ChatSessionsService {
         modelTargetSnapshot: input.modelTargetSnapshot,
         expectedHistoryVersion,
         memory: input.memory,
+        disabledSkillKeys: input.disabledSkillKeys,
       })
       await this.createPendingGeneration(tx, {
         sessionId: session.id,
@@ -1383,6 +1394,7 @@ export class ChatSessionsService {
       inputModalities: input.modelTargetSnapshot.inputModalities,
       attachments: readChatInputAttachments(triggerMessage.metadata),
     })
+    const disabledSkillKeys = readChatDisabledSkillKeys(triggerMessage.metadata)
 
     const assistantMessageId = randomUUID()
     const now = new Date()
@@ -1425,6 +1437,7 @@ export class ChatSessionsService {
         actorUserId: input.userId,
         modelTargetSnapshot: input.modelTargetSnapshot,
         expectedHistoryVersion,
+        disabledSkillKeys,
       })
       await this.createPendingGeneration(tx, {
         sessionId: session.id,
@@ -1544,6 +1557,7 @@ export class ChatSessionsService {
         contentJSON: ChatMessageContentJSON
         attachments: ChatPersistedMessageAttachment[]
         skillInvocation?: ChatSkillInvocation | null
+        disabledSkillKeys?: ChatDisabledSkillKeys
       }
       contextSnapshots: ChatContextSnapshotCreateData[]
       parentMessageId: string | null
@@ -1636,6 +1650,7 @@ export class ChatSessionsService {
       modelTargetSnapshot: ChatGenerationModelTargetSnapshot
       expectedHistoryVersion: number
       memory?: AgentMemoryRunOptions
+      disabledSkillKeys?: ChatDisabledSkillKeys
     },
   ): Promise<void> {
     await tx.chatSessionRun.create({
@@ -1649,6 +1664,7 @@ export class ChatSessionsService {
         commandContext: toJsonObject({
           expectedHistoryVersion: input.expectedHistoryVersion,
           memory: input.memory,
+          disabledSkillKeys: input.disabledSkillKeys,
         }),
         status: ChatSessionRunStatus.PENDING,
       },
@@ -2327,6 +2343,14 @@ function readChatSkillInvocation(metadata: unknown): ChatSkillInvocation | null 
   return result.success ? result.data : null
 }
 
+function readChatDisabledSkillKeys(metadata: unknown): ChatDisabledSkillKeys {
+  if (!isRecord(metadata)) {
+    return ChatDisabledSkillKeysSchema.parse(undefined)
+  }
+
+  return ChatDisabledSkillKeysSchema.parse(metadata.disabledSkillKeys)
+}
+
 function readChatInputAttachments(metadata: unknown) {
   if (!isRecord(metadata)) {
     return []
@@ -2361,6 +2385,20 @@ function assertChatInputModalitiesSupported(input: {
 
 function hasAvailableSkill(skillContext: AgentRuntimeSkillContext, skillKey: string): boolean {
   return skillContext.availableSkills.some(skill => skill.key === skillKey)
+}
+
+function filterRuntimeSkillContext(
+  skillContext: AgentRuntimeSkillContext,
+  disabledSkillKeys: ChatDisabledSkillKeys,
+): AgentRuntimeSkillContext {
+  if (disabledSkillKeys.length === 0) {
+    return skillContext
+  }
+
+  const disabledSkillKeySet = new Set(disabledSkillKeys)
+  return AgentRuntimeSkillContextSchema.parse({
+    availableSkills: skillContext.availableSkills.filter(skill => !disabledSkillKeySet.has(skill.key)),
+  })
 }
 
 function readAgentMemoryRunOptions(commandContext: unknown): AgentMemoryRunOptions {

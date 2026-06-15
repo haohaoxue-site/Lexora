@@ -1008,7 +1008,7 @@ function getToolEventPayload(event: ChatGenerationEvent): {
 }
 
 function readToolKind(value: unknown): ChatMessagePartMetadata['toolKind'] | undefined {
-  return value === 'function' || value === 'skill' || value === 'memory' || value === 'mcp'
+  return value === 'function' || value === 'skill' || value === 'mcp'
     ? value
     : undefined
 }

@@ -8,7 +8,7 @@ import type {
   ChatComposerSubmitPayload,
 } from './typing'
 import type { ReadableDocumentSearchResult } from '@/apis/document'
-import { AGENT_TRANSLATOR_SKILL_KEY } from '@haohaoxue/lexora-contracts/agent'
+import { AGENT_TRANSLATOR_SKILL_KEY, AGENT_WEB_SEARCH_SKILL_KEY } from '@haohaoxue/lexora-contracts/agent'
 import {
   CHAT_MESSAGE_ATTACHMENT_PLACEMENT,
   CHAT_MESSAGE_ATTACHMENT_TYPE,
@@ -43,6 +43,8 @@ const props = withDefaults(defineProps<ChatComposerProps>(), {
   }),
   translatorSkillEnabled: false,
   translatorTargetLanguage: null,
+  webSearchSkillEnabled: false,
+  webSearchForRunEnabled: true,
 })
 const emits = defineEmits<ChatComposerEmits>()
 const { t } = useI18n({ useScope: 'global' })
@@ -308,6 +310,9 @@ function emitSend() {
           targetLanguage: props.translatorTargetLanguage,
         }
       : null,
+    disabledSkillKeys: props.webSearchSkillEnabled && !props.webSearchForRunEnabled
+      ? [AGENT_WEB_SEARCH_SKILL_KEY]
+      : [],
   }
   emits('send', payload)
 }
@@ -459,11 +464,14 @@ function isSameContent(currentEditor: Editor, contentJSON: JSONContent) {
         :upload-availability="props.uploadAvailability"
         :translator-skill-enabled="props.translatorSkillEnabled"
         :translator-target-language="props.translatorTargetLanguage"
+        :web-search-skill-enabled="props.webSearchSkillEnabled"
+        :web-search-for-run-enabled="props.webSearchForRunEnabled"
         :skill-command-open-signal="skillCommandOpenSignal"
         @open-panel-picker="openPanelPicker"
         @upload-image="openImageUpload"
         @upload-file="openFileUpload"
         @update:translator-target-language="emits('update:translatorTargetLanguage', $event)"
+        @update:web-search-for-run-enabled="emits('update:webSearchForRunEnabled', $event)"
         @select-model="emits('selectModel', $event)"
         @send="emitSend"
         @stop="emits('stop')"

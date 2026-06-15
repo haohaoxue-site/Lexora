@@ -5,10 +5,13 @@ import type {
   UpdateAgentProfileModelPolicyRequest,
 } from '@haohaoxue/lexora-contracts'
 import {
+  AGENT_FIRST_PARTY_SKILL_DEFINITIONS,
   AGENT_MEMORY_SKILL_KEY,
   AGENT_MEMORY_SLOT_KEY,
+  AGENT_WEB_SEARCH_SKILL_KEY,
   AgentProfileConfigSchema,
   AgentProfileSettingsSchema,
+  AgentWebSearchSkillConfigSchema,
   AI_MODEL_INTENT_KEY,
 } from '@haohaoxue/lexora-contracts'
 import { Injectable, InternalServerErrorException } from '@nestjs/common'
@@ -42,13 +45,7 @@ const DEFAULT_AGENT_PROFILE_CONFIG: AgentProfileConfig = AgentProfileConfigSchem
   instructions: {
     systemPrompt: '你是 Lexora 小助手。请根据用户问题、当前对话上下文和可用文档上下文，给出清晰、准确、可执行的回答。',
   },
-  skillBindings: [
-    {
-      key: AGENT_MEMORY_SKILL_KEY,
-      enabled: true,
-      priority: 0,
-    },
-  ],
+  skillBindings: createDefaultFirstPartySkillBindings(),
   toolPolicy: {
     enabled: true,
   },
@@ -199,7 +196,7 @@ export class AgentProfilesService {
     profile: AgentProfileForGeneration,
   ): Promise<AgentProfileForGeneration> {
     const currentConfig = AgentProfileConfigSchema.parse(profile.currentConfig)
-    const nextConfig = ensureDefaultMemorySkillBinding(currentConfig)
+    const nextConfig = ensureDefaultFirstPartySkillBindings(currentConfig)
 
     if (JSON.stringify(currentConfig) === JSON.stringify(nextConfig)) {
       return profile
@@ -268,42 +265,88 @@ function createNextModelPolicy(
   }
 }
 
-function ensureDefaultMemorySkillBinding(config: AgentProfileConfig): AgentProfileConfig {
-  const existing = config.skillBindings.find(binding => binding.key === AGENT_MEMORY_SKILL_KEY)
-  if (existing) {
-    if (existing.enabled) {
-      return config
+function createDefaultFirstPartySkillBindings(): AgentProfileConfig['skillBindings'] {
+  return AGENT_FIRST_PARTY_SKILL_DEFINITIONS
+    .filter(definition => definition.defaultInstalled && definition.defaultEnabled)
+    .map((definition, index) => ({
+      key: definition.key,
+      enabled: true,
+      priority: index,
+      config: getDefaultFirstPartySkillBindingConfig(definition.key),
+    }))
+}
+
+function ensureDefaultFirstPartySkillBindings(config: AgentProfileConfig): AgentProfileConfig {
+  const bindingByKey = new Map(config.skillBindings.map(binding => [binding.key, binding]))
+  const firstPartyDefinitionByKey = new Map(AGENT_FIRST_PARTY_SKILL_DEFINITIONS.map(definition => [definition.key, definition]))
+  let nextPriority = config.skillBindings.reduce((max, binding) => Math.max(max, binding.priority), -1) + 1
+
+  const skillBindings = config.skillBindings.map((binding) => {
+    const definition = firstPartyDefinitionByKey.get(binding.key)
+    if (!definition) {
+      return binding
     }
 
-    return AgentProfileConfigSchema.parse({
-      ...config,
-      toolPolicy: {
-        ...config.toolPolicy,
+    const normalizedBinding = {
+      ...binding,
+      config: normalizeDefaultFirstPartySkillBindingConfig(binding.key, binding.config),
+    }
+
+    if (!definition.canDisable && definition.defaultEnabled && !binding.enabled) {
+      return {
+        ...normalizedBinding,
         enabled: true,
-      },
-      skillBindings: config.skillBindings.map(binding =>
-        binding.key === AGENT_MEMORY_SKILL_KEY
-          ? { ...binding, enabled: true, config: {} }
-          : binding,
-      ),
+      }
+    }
+
+    return normalizedBinding
+  })
+
+  for (const definition of AGENT_FIRST_PARTY_SKILL_DEFINITIONS) {
+    if (
+      bindingByKey.has(definition.key)
+      || !definition.defaultInstalled
+      || !definition.defaultEnabled
+    ) {
+      continue
+    }
+
+    skillBindings.push({
+      key: definition.key,
+      enabled: true,
+      priority: nextPriority,
+      config: getDefaultFirstPartySkillBindingConfig(definition.key),
     })
+    nextPriority += 1
   }
 
   return AgentProfileConfigSchema.parse({
     ...config,
-    toolPolicy: {
-      ...config.toolPolicy,
-      enabled: true,
-    },
-    skillBindings: [
-      ...config.skillBindings,
-      {
-        key: AGENT_MEMORY_SKILL_KEY,
-        enabled: true,
-        priority: 0,
-      },
-    ],
+    skillBindings,
   })
+}
+
+function getDefaultFirstPartySkillBindingConfig(skillKey: string): AgentProfileConfig['skillBindings'][number]['config'] {
+  if (skillKey === AGENT_WEB_SEARCH_SKILL_KEY) {
+    return AgentWebSearchSkillConfigSchema.parse({})
+  }
+
+  return {}
+}
+
+function normalizeDefaultFirstPartySkillBindingConfig(
+  skillKey: string,
+  config: AgentProfileConfig['skillBindings'][number]['config'],
+): AgentProfileConfig['skillBindings'][number]['config'] {
+  if (skillKey === AGENT_WEB_SEARCH_SKILL_KEY) {
+    return AgentWebSearchSkillConfigSchema.parse(config)
+  }
+
+  if (skillKey === AGENT_MEMORY_SKILL_KEY) {
+    return {}
+  }
+
+  return config
 }
 
 export function resolveAgentProfileFixedModelRef(

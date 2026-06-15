@@ -96,6 +96,11 @@ export const ChatSkillInvocationSchema = z.discriminatedUnion('skillKey', [
   ChatTranslatorSkillInvocationSchema,
 ])
 
+export const ChatDisabledSkillKeysSchema = z.array(NonEmptyStringSchema)
+  .max(20)
+  .default([])
+  .transform(skillKeys => Array.from(new Set(skillKeys)))
+
 export const ChatMessageBranchSchema = z.object({
   index: z.number().int().positive(),
   count: z.number().int().positive(),
@@ -252,6 +257,7 @@ export const ChatUserMessageMetadataSchema = z.object({
   contextSnapshotMetas: z.array(ChatMessageContextSnapshotMetaSchema).max(CHAT_MESSAGE_ATTACHMENT_MAX_COUNT),
   memoryOperations: z.array(ChatMemoryOperationProjectionSchema).default([]),
   skillInvocation: ChatSkillInvocationSchema.nullable().optional(),
+  disabledSkillKeys: ChatDisabledSkillKeysSchema,
 }).strict()
 
 export const ChatMessagePartMetadataSchema = z.object({
@@ -377,6 +383,7 @@ const ChatSessionMessageRequestBaseSchema = z.object({
   attachments: z.array(ChatMessageAttachmentInputSchema).max(CHAT_MESSAGE_ATTACHMENT_MAX_COUNT).optional().nullable(),
   memory: AgentMemoryRunOptionsSchema.optional(),
   skillInvocation: ChatSkillInvocationSchema.optional().nullable(),
+  disabledSkillKeys: ChatDisabledSkillKeysSchema,
 }).strict().superRefine((value, ctx) => {
   const attachmentById = new Map((value.attachments ?? []).map(attachment => [attachment.id, attachment]))
   for (const attachmentId of collectChatReferenceAttachmentIds(value.contentJSON)) {
@@ -620,6 +627,7 @@ export type ChatMessageAttachmentType = z.infer<typeof ChatMessageAttachmentType
 export type ChatMessageAttachmentPlacement = z.infer<typeof ChatMessageAttachmentPlacementSchema>
 export type ChatTranslatorSkillInvocation = z.infer<typeof ChatTranslatorSkillInvocationSchema>
 export type ChatSkillInvocation = z.infer<typeof ChatSkillInvocationSchema>
+export type ChatDisabledSkillKeys = z.infer<typeof ChatDisabledSkillKeysSchema>
 export type ChatDocumentSelectionBoundary = z.infer<typeof ChatDocumentSelectionBoundarySchema>
 export type ChatDocumentScope = z.infer<typeof ChatDocumentScopeSchema>
 export type ChatDocumentMessageAttachmentInput = z.infer<typeof ChatDocumentMessageAttachmentInputSchema>

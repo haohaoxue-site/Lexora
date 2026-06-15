@@ -1,6 +1,7 @@
 import type { AgentTranslatorTargetLanguage } from '@haohaoxue/lexora-contracts/agent'
 import type { AiModelRef } from '@/apis/ai'
 import type {
+  ChatDisabledSkillKeys,
   ChatDocumentScope,
   ChatMessageAttachmentInput,
   ChatMessageContentJSON,
@@ -27,6 +28,7 @@ export interface ChatComposerSubmitPayload {
   contentJSON: ChatComposerContentJSON
   attachments: ChatComposerAttachment[]
   skillInvocation?: ChatSkillInvocation | null
+  disabledSkillKeys?: ChatDisabledSkillKeys
 }
 
 export interface ChatComposerProps {
@@ -41,12 +43,15 @@ export interface ChatComposerProps {
   uploadAvailability?: ChatComposerUploadAvailability
   translatorSkillEnabled?: boolean
   translatorTargetLanguage?: AgentTranslatorTargetLanguage | null
+  webSearchSkillEnabled?: boolean
+  webSearchForRunEnabled?: boolean
 }
 
 export interface ChatComposerEmits {
   'update:contentJSON': [contentJSON: ChatComposerContentJSON]
   'update:attachments': [attachments: ChatComposerAttachment[]]
   'update:translatorTargetLanguage': [targetLanguage: AgentTranslatorTargetLanguage | null]
+  'update:webSearchForRunEnabled': [enabled: boolean]
   'send': [payload: ChatComposerSubmitPayload]
   'stop': []
   'selectModel': [modelRef: ChatComposerModelRef | null]

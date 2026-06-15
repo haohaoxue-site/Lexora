@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import {
+  ChatDisabledSkillKeysSchema,
   ChatFileMessageAttachmentSchema,
   ChatImageMessageAttachmentSchema,
   ChatMessageContextSnapshotMetaSchema,
@@ -52,6 +53,7 @@ export const AgentChatRuntimeContextSchema = z.object({
   contextSnapshots: z.array(AgentChatContextSnapshotSchema),
   inputAttachments: z.array(AgentChatInputAttachmentSchema).default([]),
   memory: AgentMemoryRunOptionsSchema,
+  disabledSkillKeys: ChatDisabledSkillKeysSchema,
 }).strict()
 
 export type AgentChatContextMessage = z.infer<typeof AgentChatContextMessageSchema>
