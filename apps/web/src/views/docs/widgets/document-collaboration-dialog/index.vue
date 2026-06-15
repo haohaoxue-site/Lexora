@@ -844,12 +844,38 @@ function resolveScopeChangeMessage(scope: DocumentCollaborationScope) {
     </template>
 
     <div
-      v-loading="isLoading"
       class="document-collaboration-dialog__content grid content-start gap-4"
       :class="{ 'document-collaboration-dialog__content--overview': dialogView === 'overview' }"
     >
+      <ElSkeleton v-if="isLoading" animated>
+        <template #template>
+          <div class="grid gap-4">
+            <section class="rounded-lg border border-border-a60 p-4">
+              <div class="mb-4 flex items-center justify-between gap-3">
+                <ElSkeletonItem variant="h3" class="max-w-32" />
+                <ElSkeletonItem variant="button" class="h-8 max-w-20" />
+              </div>
+              <div class="grid gap-3 sm:grid-cols-[minmax(0,1fr)_9rem_9rem]">
+                <ElSkeletonItem variant="rect" class="h-10 w-full" />
+                <ElSkeletonItem variant="rect" class="h-10 w-full" />
+                <ElSkeletonItem variant="rect" class="h-10 w-full" />
+              </div>
+            </section>
+            <section class="rounded-lg border border-border-a60 p-4">
+              <div class="mb-4 flex items-center justify-between gap-3">
+                <ElSkeletonItem variant="h3" class="max-w-36" />
+                <ElSkeletonItem variant="button" class="h-8 max-w-24" />
+              </div>
+              <div class="grid gap-3">
+                <ElSkeletonItem v-for="row in 3" :key="row" variant="rect" class="h-10 w-full" />
+              </div>
+            </section>
+          </div>
+        </template>
+      </ElSkeleton>
+
       <ElAlert
-        v-if="errorMessage"
+        v-else-if="errorMessage"
         :title="errorMessage"
         type="error"
         :closable="false"

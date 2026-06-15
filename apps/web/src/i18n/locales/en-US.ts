@@ -3,6 +3,8 @@ export const enUS = {
     avatarAlt: '{name}\'s avatar',
     emptyDescription: 'No content',
     iconAlt: '{name} icon',
+    loadingDescription: 'Please wait.',
+    loadingTitle: 'Loading',
     requestFailed: 'Request failed',
   },
   date: {

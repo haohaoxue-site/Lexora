@@ -20,6 +20,7 @@ import {
 import { computed, shallowRef, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import Empty from '@/components/empty'
+import { LoadingTableSkeleton } from '@/components/loading'
 
 const props = withDefaults(defineProps<PublicationOpenOverviewPanelProps>(), {
   loading: false,
@@ -265,7 +266,6 @@ function filterDocumentTree(
     <div class="grid grid-cols-[minmax(0,1fr)_minmax(21rem,24rem)] items-start gap-5 max-[1180px]:grid-cols-1">
       <div class="publication-open-overview-panel__surface overflow-hidden rounded-xl border bg-surface">
         <ElTable
-          v-loading="loading"
           :data="filteredTree"
           row-key="id"
           class="publication-open-overview-panel__table"
@@ -275,7 +275,8 @@ function filterDocumentTree(
           @row-click="handleRowClick"
         >
           <template #empty>
-            <Empty compact :description="t('docs.publicationSite.overview.empty')" />
+            <LoadingTableSkeleton v-if="loading" compact />
+            <Empty v-else compact :description="t('docs.publicationSite.overview.empty')" />
           </template>
 
           <ElTableColumn :label="t('docs.publicationSite.overview.document')" min-width="205" show-overflow-tooltip>

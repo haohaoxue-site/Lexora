@@ -13,7 +13,7 @@ const {
 </script>
 
 <template>
-  <div v-loading="isLoading" class="settings-preference-page mx-auto w-full max-w-[var(--page-mode-form-max-width)] px-6 py-6">
+  <div class="settings-preference-page mx-auto w-full max-w-[var(--page-mode-form-max-width)] px-6 py-6">
     <ElAlert
       v-if="errorMessage"
       :title="errorMessage"
@@ -22,6 +22,19 @@ const {
       :closable="false"
       class="mb-4"
     />
+
+    <ElSkeleton v-else-if="isLoading" animated>
+      <template #template>
+        <ElCard shadow="never">
+          <div class="grid gap-5">
+            <ElSkeletonItem variant="h3" class="max-w-32" />
+            <ElSkeletonItem variant="text" class="max-w-72" />
+            <ElSkeletonItem variant="rect" class="h-12" />
+            <ElSkeletonItem variant="rect" class="h-12" />
+          </div>
+        </ElCard>
+      </template>
+    </ElSkeleton>
 
     <UserPreferenceSection
       v-else

@@ -226,7 +226,7 @@ function toNullableText(value: string | null | undefined) {
 </script>
 
 <template>
-  <section v-loading="loading" class="publication-site-config-panel grid gap-5">
+  <section class="publication-site-config-panel grid gap-5">
     <header class="publication-site-config-panel__header flex flex-wrap items-center justify-between gap-4">
       <h2 class="m-0 text-xl font-semibold leading-7 text-main">
         {{ t('docs.publicationSite.config.title') }}
@@ -246,7 +246,26 @@ function toNullableText(value: string | null | undefined) {
       </div>
     </header>
 
-    <div class="publication-site-config-panel__body grid items-start gap-5 max-[1280px]:grid-cols-1">
+    <ElSkeleton v-if="loading" animated>
+      <template #template>
+        <div class="publication-site-config-panel__body grid items-start gap-5 max-[1280px]:grid-cols-1">
+          <section class="rounded-xl border border-border-a60 bg-surface p-5">
+            <div class="grid gap-5">
+              <ElSkeletonItem variant="h3" class="max-w-36" />
+              <div class="publication-site-config-panel__two-column grid gap-4 max-[720px]:grid-cols-1">
+                <ElSkeletonItem variant="rect" class="h-10 w-full" />
+                <ElSkeletonItem variant="rect" class="h-10 w-full" />
+              </div>
+              <ElSkeletonItem variant="h3" class="max-w-36" />
+              <ElSkeletonItem variant="rect" class="h-32 w-full" />
+              <ElSkeletonItem variant="rect" class="h-24 w-full" />
+            </div>
+          </section>
+        </div>
+      </template>
+    </ElSkeleton>
+
+    <div v-else class="publication-site-config-panel__body grid items-start gap-5 max-[1280px]:grid-cols-1">
       <ElForm
         ref="formRef"
         :model="siteConfigForm"

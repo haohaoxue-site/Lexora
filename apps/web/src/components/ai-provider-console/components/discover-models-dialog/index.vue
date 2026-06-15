@@ -4,6 +4,7 @@ import type {
   AiProviderDiscoverModelsDialogProps,
 } from './typing'
 import { useI18n } from 'vue-i18n'
+import { LoadingTableSkeleton } from '@/components/loading'
 import ProviderModelTable from '../model-table'
 
 defineProps<AiProviderDiscoverModelsDialogProps>()
@@ -44,8 +45,11 @@ const { t } = useI18n({ useScope: 'global' })
       </div>
     </div>
 
-    <div v-loading="isDiscovering" class="ai-provider-console__discover-list">
+    <div class="ai-provider-console__discover-list">
+      <LoadingTableSkeleton v-if="isDiscovering && models.length === 0" />
+
       <ProviderModelTable
+        v-else
         :models="models"
         :can-configure="false"
         :is-model-updating="isModelUpdating"

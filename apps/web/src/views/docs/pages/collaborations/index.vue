@@ -14,6 +14,7 @@ import {
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import Empty from '@/components/empty'
+import { LoadingTableSkeleton } from '@/components/loading'
 import { formatDateTime } from '@/utils/dayjs'
 import { useDocsCollaborationsPage } from '../../composables/useDocsCollaborationsPage'
 import {
@@ -152,18 +153,18 @@ function handleMoreCommand(row: CollaborationConsoleTableItem, command: string |
   <section class="docs-collaborations-page min-h-0 flex-1 overflow-auto p-[clamp(1.25rem,2vw,1.75rem)]">
     <div class="docs-collaborations-page__surface mx-auto w-full max-w-[var(--page-mode-table-max-width)] overflow-hidden rounded-lg">
       <ElTable
-        v-loading="isLoading"
         :data="tableTree"
         row-key="id"
         class="docs-collaborations-table"
         :tree-props="{ children: 'children' }"
         default-expand-all
-        :element-loading-text="t('docs.collaboration.loadingManagement')"
         :header-cell-style="tableHeaderCellStyle"
         :cell-style="tableBodyCellStyle"
       >
         <template #empty>
-          <Empty :description="errorMessage || t('docs.publicationSite.overview.empty')">
+          <LoadingTableSkeleton v-if="isLoading" compact />
+
+          <Empty v-else :description="errorMessage || t('docs.publicationSite.overview.empty')">
             <ElButton v-if="errorMessage" type="primary" @click="loadItems">
               {{ t('docs.common.reload') }}
             </ElButton>

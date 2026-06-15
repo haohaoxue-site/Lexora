@@ -14,6 +14,8 @@ import { USER_STATUS } from '@haohaoxue/lexora-contracts/user/constants'
 import { formatAuthMethod } from '@haohaoxue/lexora-shared/auth'
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
+import Empty from '@/components/empty'
+import { LoadingTableSkeleton } from '@/components/loading'
 import { formatDateTime } from '@/utils/dayjs'
 import { useAdminUsers } from '../../composables/useAdminUsers'
 import UserDataExpansion from '../user-data-expansion'
@@ -138,7 +140,6 @@ function handleExpandChange(user: SystemAdminUserItem, expandedUsers: SystemAdmi
     </div>
 
     <ElTable
-      v-loading="isLoadingUsers"
       :data="users"
       row-key="id" stripe border
       class="admin-table user-table"
@@ -146,6 +147,11 @@ function handleExpandChange(user: SystemAdminUserItem, expandedUsers: SystemAdmi
       @expand-change="handleExpandChange"
       @filter-change="handleFilterChange"
     >
+      <template #empty>
+        <LoadingTableSkeleton v-if="isLoadingUsers" compact />
+        <Empty v-else compact />
+      </template>
+
       <ElTableColumn type="expand" width="52" fixed>
         <template #default="{ row }">
           <UserDataExpansion

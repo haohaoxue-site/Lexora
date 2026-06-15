@@ -226,10 +226,25 @@ async function handlePrimaryAction() {
 
     <div
       v-else
-      v-loading="isLoading"
       class="collaboration-resolver-page__panel grid min-h-[18rem] w-full max-w-[34rem] gap-5 rounded-[1rem] border p-8"
     >
-      <template v-if="preview">
+      <ElSkeleton v-if="isLoading" animated>
+        <template #template>
+          <div class="grid gap-5">
+            <div class="grid gap-2">
+              <ElSkeletonItem variant="text" class="max-w-24" />
+              <ElSkeletonItem variant="h3" class="max-w-64" />
+              <ElSkeletonItem variant="text" class="max-w-80" />
+            </div>
+            <ElSkeletonItem variant="rect" class="h-28 w-full" />
+            <div class="flex justify-end">
+              <ElSkeletonItem variant="button" class="h-9 max-w-24" />
+            </div>
+          </div>
+        </template>
+      </ElSkeleton>
+
+      <template v-else-if="preview">
         <div class="collaboration-resolver-page__header grid gap-1.5">
           <p class="collaboration-resolver-page__kicker m-0 text-[13px] font-bold leading-6 text-primary">
             {{ entryTypeLabel }}

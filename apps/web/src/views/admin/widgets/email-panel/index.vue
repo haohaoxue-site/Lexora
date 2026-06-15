@@ -127,8 +127,42 @@ function handleProviderChange(value: string | number | boolean | undefined) {
       <AdminPageHeader :title="t('admin.pages.email')" />
     </template>
 
-    <div v-loading="isLoading" class="admin-email min-h-full bg-fill-lighter p-4 lg:p-6">
+    <div class="admin-email min-h-full bg-fill-lighter p-4 lg:p-6">
       <ElAlert v-if="errorMessage" :title="errorMessage" type="error" show-icon :closable="false" class="rounded-xl" />
+
+      <ElSkeleton v-else-if="isLoading" animated>
+        <template #template>
+          <div class="admin-email__columns grid gap-6 lg:grid-cols-[minmax(0,1.5fr)_minmax(22rem,0.9fr)]">
+            <section class="rounded-lg border border-border-a60 bg-surface p-5">
+              <ElSkeletonItem variant="h3" class="max-w-36" />
+              <div class="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
+                <ElSkeletonItem variant="rect" class="h-20 w-full" />
+                <ElSkeletonItem variant="rect" class="h-20 w-full" />
+              </div>
+              <div class="mt-7 grid grid-cols-1 gap-4 md:grid-cols-2">
+                <ElSkeletonItem v-for="field in 6" :key="field" variant="rect" class="h-11 w-full" />
+              </div>
+              <ElSkeletonItem variant="button" class="mt-5 h-9 max-w-24" />
+            </section>
+
+            <aside class="order-first rounded-lg border border-border-a60 bg-surface p-5 lg:order-none">
+              <div class="mb-5 flex items-start justify-between gap-4">
+                <div class="grid min-w-0 flex-1 gap-2">
+                  <ElSkeletonItem variant="h3" class="max-w-28" />
+                  <ElSkeletonItem variant="text" class="max-w-60" />
+                </div>
+                <ElSkeletonItem variant="circle" class="h-8 w-8 shrink-0" />
+              </div>
+              <ElSkeletonItem variant="rect" class="h-px w-full" />
+              <div class="mt-5 grid gap-2">
+                <ElSkeletonItem variant="text" class="max-w-24" />
+                <ElSkeletonItem variant="h3" class="max-w-44" />
+                <ElSkeletonItem variant="text" class="max-w-64" />
+              </div>
+            </aside>
+          </div>
+        </template>
+      </ElSkeleton>
 
       <template v-else>
         <div class="admin-email__columns grid gap-6 lg:grid-cols-[minmax(0,1.5fr)_minmax(22rem,0.9fr)]">

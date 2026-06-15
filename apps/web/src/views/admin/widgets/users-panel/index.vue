@@ -50,11 +50,41 @@ async function loadData() {
       <AdminPageHeader :title="t('admin.pages.users')" />
     </template>
 
-    <div v-loading="isLoading" class="admin-users min-h-full flex flex-col gap-6 bg-fill-lighter p-4 lg:p-6">
+    <div class="admin-users min-h-full flex flex-col gap-6 bg-fill-lighter p-4 lg:p-6">
       <ElAlert v-if="errorMessage" :title="errorMessage" type="error" show-icon :closable="false" class="rounded-xl" />
 
-      <AuthGovernancePanel />
-      <UserTable />
+      <ElSkeleton v-else-if="isLoading" animated class="grid gap-6">
+        <template #template>
+          <section class="rounded-lg border border-border-a60 bg-surface p-5">
+            <div class="mb-5 flex items-center justify-between gap-4">
+              <div class="grid min-w-0 flex-1 gap-2">
+                <ElSkeletonItem variant="h3" class="max-w-40" />
+                <ElSkeletonItem variant="text" class="max-w-72" />
+              </div>
+              <ElSkeletonItem variant="button" class="h-8 max-w-24" />
+            </div>
+            <div class="grid gap-3 md:grid-cols-2">
+              <ElSkeletonItem variant="rect" class="h-11 w-full" />
+              <ElSkeletonItem variant="rect" class="h-11 w-full" />
+            </div>
+          </section>
+
+          <section class="overflow-hidden rounded-lg border border-border-a60 bg-surface">
+            <div class="flex items-center justify-between gap-3 border-b border-border-a60 px-5 py-4">
+              <ElSkeletonItem variant="rect" class="h-8 max-w-96" />
+              <ElSkeletonItem variant="button" class="h-8 max-w-20" />
+            </div>
+            <div class="grid gap-3 p-5">
+              <ElSkeletonItem v-for="row in 6" :key="row" variant="rect" class="h-10 w-full" />
+            </div>
+          </section>
+        </template>
+      </ElSkeleton>
+
+      <template v-else>
+        <AuthGovernancePanel />
+        <UserTable />
+      </template>
     </div>
   </PagePanel>
 </template>

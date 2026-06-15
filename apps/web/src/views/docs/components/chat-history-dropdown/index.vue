@@ -47,12 +47,17 @@ function selectSession(sessionId: string) {
       </button>
     </template>
 
-    <div
-      v-loading="props.isLoading"
-      class="docs-chat-history-dropdown max-h-[min(60vh,26rem)] min-h-16 overflow-y-auto p-1.5"
-      :element-loading-text="t('docs.chat.historyLoading')"
-    >
-      <div v-if="historySessions.length === 0 && !props.isLoading" class="px-3 py-5 text-center text-[13px] text-secondary">
+    <div class="docs-chat-history-dropdown max-h-[min(60vh,26rem)] min-h-16 overflow-y-auto p-1.5">
+      <ElSkeleton v-if="props.isLoading" animated class="px-2 py-2">
+        <template #template>
+          <div class="grid gap-2">
+            <ElSkeletonItem variant="text" class="max-w-20" />
+            <ElSkeletonItem v-for="item in 4" :key="item" variant="rect" class="h-8 w-full" />
+          </div>
+        </template>
+      </ElSkeleton>
+
+      <div v-else-if="historySessions.length === 0" class="px-3 py-5 text-center text-[13px] text-secondary">
         {{ t('docs.chat.historyEmpty') }}
       </div>
 

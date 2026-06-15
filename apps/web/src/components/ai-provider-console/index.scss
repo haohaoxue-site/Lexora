@@ -32,6 +32,28 @@
     padding: 0 0.875rem 0.875rem;
   }
 
+  .ai-provider-console__skeleton {
+    display: contents;
+  }
+
+  .ai-provider-console__skeleton-sidebar {
+    display: grid;
+    align-content: start;
+    gap: 1rem;
+    min-height: 0;
+    padding: 0.875rem;
+    border-right: 1px solid var(--brand-border-base);
+  }
+
+  .ai-provider-console__skeleton-main {
+    display: flex;
+    min-height: 0;
+    flex-direction: column;
+    gap: 1rem;
+    padding: 1rem;
+    overflow: hidden;
+  }
+
   .ai-provider-console__provider-item {
     position: relative;
     display: flex;

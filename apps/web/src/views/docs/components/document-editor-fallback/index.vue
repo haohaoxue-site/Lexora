@@ -4,6 +4,7 @@ import type {
   DocsDocumentEditorFallbackProps,
 } from './typing'
 import Empty from '@/components/empty'
+import Loading from '@/components/loading'
 import { useDocumentEditorFallback } from '../../composables/useDocumentEditorFallback'
 
 const props = defineProps<DocsDocumentEditorFallbackProps>()
@@ -18,7 +19,17 @@ const { emitAction, fallbackState } = useDocumentEditorFallback({
 
 <template>
   <div class="docs-document-editor-fallback flex min-h-0 flex-1 items-center justify-center">
+    <Loading
+      v-if="fallbackState.spin"
+      :title="fallbackState.title"
+      :description="fallbackState.description"
+      :icon="fallbackState.icon"
+      :icon-category="fallbackState.iconCategory"
+      compact
+    />
+
     <Empty
+      v-else
       :title="fallbackState.title"
       :description="fallbackState.description"
       :icon="fallbackState.icon"

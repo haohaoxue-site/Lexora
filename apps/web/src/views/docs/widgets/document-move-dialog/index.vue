@@ -183,34 +183,46 @@ function isOwnedCollection(collectionId: DocumentTreeCollectionId): collectionId
   >
     <div class="document-move-dialog__body rounded-lg">
       <section
-        v-loading="isLoading"
         class="document-move-dialog__tree min-h-0 min-w-0 flex-1 overflow-y-auto bg-surface p-2"
         :aria-label="t('docs.moveDialog.targetDocumentTree')"
       >
-        <div
-          v-for="group in visibleGroups"
-          :key="group.id"
-          class="min-w-0"
-        >
-          <ElTree
-            v-if="group.nodes.length"
-            :data="toTreeNodes(group.nodes)"
-            node-key="id"
-            :props="{ label: 'title', children: 'children', disabled: 'disabled' }"
-            highlight-current
-            :current-node-key="selectedTarget?.parentId ?? undefined"
-            default-expand-all
-            class="document-move-dialog__el-tree"
-            @node-click="(node: MoveTreeNode) => selectDocumentNode(group, node)"
+        <ElSkeleton v-if="isLoading" animated class="p-2">
+          <template #template>
+            <div class="grid gap-2">
+              <div v-for="node in 7" :key="node" class="flex items-center gap-2" :class="node > 1 ? 'pl-5' : ''">
+                <ElSkeletonItem variant="circle" class="h-4 w-4 shrink-0" />
+                <ElSkeletonItem variant="text" class="max-w-56" />
+              </div>
+            </div>
+          </template>
+        </ElSkeleton>
+
+        <template v-else>
+          <div
+            v-for="group in visibleGroups"
+            :key="group.id"
+            class="min-w-0"
           >
-            <template #default="{ node, data }">
-              <span class="inline-flex min-w-0 items-center gap-2">
-                <SvgIcon category="ui" :icon="getMoveTreeNodeIcon(data, Boolean(node.expanded))" size="1rem" />
-                <span class="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">{{ data.title }}</span>
-              </span>
-            </template>
-          </ElTree>
-        </div>
+            <ElTree
+              v-if="group.nodes.length"
+              :data="toTreeNodes(group.nodes)"
+              node-key="id"
+              :props="{ label: 'title', children: 'children', disabled: 'disabled' }"
+              highlight-current
+              :current-node-key="selectedTarget?.parentId ?? undefined"
+              default-expand-all
+              class="document-move-dialog__el-tree"
+              @node-click="(node: MoveTreeNode) => selectDocumentNode(group, node)"
+            >
+              <template #default="{ node, data }">
+                <span class="inline-flex min-w-0 items-center gap-2">
+                  <SvgIcon category="ui" :icon="getMoveTreeNodeIcon(data, Boolean(node.expanded))" size="1rem" />
+                  <span class="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">{{ data.title }}</span>
+                </span>
+              </template>
+            </ElTree>
+          </div>
+        </template>
       </section>
     </div>
 

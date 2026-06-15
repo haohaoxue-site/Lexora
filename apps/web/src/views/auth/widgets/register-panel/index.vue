@@ -70,10 +70,19 @@ function goToLogin() {
         </template>
       </ElResult>
 
+      <ElSkeleton v-else-if="isLoadingCapabilities" animated class="w-full">
+        <template #template>
+          <div class="grid gap-4">
+            <ElSkeletonItem variant="rect" class="h-10 w-full" />
+            <ElSkeletonItem variant="rect" class="h-10 w-full" />
+            <ElSkeletonItem variant="button" class="h-12 w-full" />
+          </div>
+        </template>
+      </ElSkeleton>
+
       <template v-else>
         <ElForm
           ref="registerRequestFormRef"
-          v-loading="isLoadingCapabilities"
           :model="form"
           :rules="formRules"
           label-position="top"

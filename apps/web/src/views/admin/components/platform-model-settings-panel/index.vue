@@ -33,8 +33,21 @@ const panelVisible = computed({
     destroy-on-close
     class="admin-platform-model-settings-drawer"
   >
-    <div v-loading="props.loading" class="admin-platform-model-settings">
-      <section class="admin-platform-model-settings__section">
+    <div class="admin-platform-model-settings">
+      <ElSkeleton v-if="props.loading" animated>
+        <template #template>
+          <section class="grid gap-3">
+            <div class="flex items-center justify-between gap-3">
+              <ElSkeletonItem variant="h3" class="max-w-36" />
+              <ElSkeletonItem variant="button" class="h-6 max-w-16" />
+            </div>
+            <ElSkeletonItem variant="rect" class="h-10 w-full" />
+            <ElSkeletonItem variant="text" class="max-w-64" />
+          </section>
+        </template>
+      </ElSkeleton>
+
+      <section v-else class="admin-platform-model-settings__section">
         <div class="admin-platform-model-settings__header">
           <div class="admin-platform-model-settings__label">
             {{ t('admin.platformModel.embeddingModel') }}

@@ -2,6 +2,7 @@
 import type { AiProviderModelsPanelEmits, AiProviderModelsPanelProps } from './typing'
 import { useI18n } from 'vue-i18n'
 import Empty from '@/components/empty'
+import { LoadingTableSkeleton } from '@/components/loading'
 import ProviderModelTable from '../model-table'
 
 defineProps<AiProviderModelsPanelProps>()
@@ -46,8 +47,11 @@ const { t } = useI18n({ useScope: 'global' })
       <Empty compact :description="t('aiProvider.model.empty')" />
     </div>
 
-    <div v-else v-loading="isLoadingModels" class="ai-provider-console__model-list">
+    <div v-else class="ai-provider-console__model-list">
+      <LoadingTableSkeleton v-if="isLoadingModels" />
+
       <ProviderModelTable
+        v-else
         :models="models"
         :can-configure="true"
         :is-model-updating="isModelUpdating"

@@ -5,6 +5,8 @@ export const zhCN = {
     avatarAlt: '{name} 的头像',
     emptyDescription: '暂无内容',
     iconAlt: '{name} 的图标',
+    loadingDescription: '请稍候。',
+    loadingTitle: '正在加载',
     requestFailed: '请求失败',
   },
   date: {

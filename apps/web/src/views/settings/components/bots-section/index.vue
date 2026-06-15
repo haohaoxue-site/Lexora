@@ -80,65 +80,82 @@ const canStopRuntime = computed(() =>
       :description="t('settings.user.bot.description')"
     />
 
-    <div v-loading="props.isLoading" class="bots-section__body grid gap-3">
-      <div class="bots-section__status flex flex-wrap items-center justify-between gap-4 rounded-[1rem] p-4">
-        <div class="flex min-w-0 items-center gap-3">
-          <span class="bots-section__icon flex h-10 w-10 shrink-0 items-center justify-center rounded-[0.875rem]">
-            <SvgIcon category="brand" icon="brand-weixin" size="1.45rem" />
-          </span>
-          <div class="min-w-0">
-            <div class="flex flex-wrap items-center gap-2">
-              <strong class="text-base text-main">{{ t('settings.user.bot.name') }}</strong>
-              <ElTag v-if="props.status.bound" size="small" :type="runtimeTagType" effect="light">
-                {{ runtimeText }}
-              </ElTag>
+    <div class="bots-section__body grid gap-3">
+      <ElSkeleton v-if="props.isLoading" animated>
+        <template #template>
+          <div class="bots-section__status flex flex-wrap items-center justify-between gap-4 rounded-[1rem] p-4">
+            <div class="flex min-w-0 flex-1 items-center gap-3">
+              <ElSkeletonItem variant="circle" class="h-10 w-10 shrink-0" />
+              <div class="grid flex-1 gap-2">
+                <ElSkeletonItem variant="h3" class="max-w-28" />
+                <ElSkeletonItem variant="text" class="max-w-52" />
+              </div>
             </div>
-            <div class="mt-1 text-[0.8125rem] leading-5 text-secondary">
-              {{ props.status.accountId ? t('settings.user.bot.accountId', { id: props.status.accountId }) : t('settings.user.bot.notBoundAccount') }}
+            <ElSkeletonItem variant="button" class="h-8 max-w-28" />
+          </div>
+        </template>
+      </ElSkeleton>
+
+      <template v-else>
+        <div class="bots-section__status flex flex-wrap items-center justify-between gap-4 rounded-[1rem] p-4">
+          <div class="flex min-w-0 items-center gap-3">
+            <span class="bots-section__icon flex h-10 w-10 shrink-0 items-center justify-center rounded-[0.875rem]">
+              <SvgIcon category="brand" icon="brand-weixin" size="1.45rem" />
+            </span>
+            <div class="min-w-0">
+              <div class="flex flex-wrap items-center gap-2">
+                <strong class="text-base text-main">{{ t('settings.user.bot.name') }}</strong>
+                <ElTag v-if="props.status.bound" size="small" :type="runtimeTagType" effect="light">
+                  {{ runtimeText }}
+                </ElTag>
+              </div>
+              <div class="mt-1 text-[0.8125rem] leading-5 text-secondary">
+                {{ props.status.accountId ? t('settings.user.bot.accountId', { id: props.status.accountId }) : t('settings.user.bot.notBoundAccount') }}
+              </div>
             </div>
+          </div>
+
+          <div class="flex flex-wrap gap-2">
+            <ElButton :loading="props.isStartingLogin" @click="emit('startLogin')">
+              <SvgIcon category="ui" icon="link" size="0.95rem" class="mr-1.5" />
+              {{ props.status.bound ? t('settings.user.bot.rebind') : t('settings.user.bot.bind') }}
+            </ElButton>
+            <ElButton
+              v-if="canStartRuntime"
+              :loading="props.isStartingBot"
+              @click="emit('startRuntime')"
+            >
+              <SvgIcon category="ui" icon="sync-refresh" size="0.95rem" class="mr-1.5" />
+              {{ t('settings.user.bot.start') }}
+            </ElButton>
+            <ElButton
+              v-if="canStopRuntime"
+              :loading="props.isStoppingBot"
+              @click="emit('stopRuntime')"
+            >
+              {{ t('settings.user.bot.stop') }}
+            </ElButton>
+            <ElButton
+              v-if="props.status.bound"
+              type="danger"
+              plain
+              :loading="props.isDisconnecting"
+              @click="emit('disconnect')"
+            >
+              <SvgIcon category="ui" icon="trash-can" size="0.95rem" class="mr-1.5" />
+              {{ t('settings.user.bot.disconnect') }}
+            </ElButton>
           </div>
         </div>
 
-        <div class="flex flex-wrap gap-2">
-          <ElButton :loading="props.isStartingLogin" @click="emit('startLogin')">
-            <SvgIcon category="ui" icon="link" size="0.95rem" class="mr-1.5" />
-            {{ props.status.bound ? t('settings.user.bot.rebind') : t('settings.user.bot.bind') }}
-          </ElButton>
-          <ElButton
-            v-if="canStartRuntime"
-            :loading="props.isStartingBot"
-            @click="emit('startRuntime')"
-          >
-            <SvgIcon category="ui" icon="sync-refresh" size="0.95rem" class="mr-1.5" />
-            {{ t('settings.user.bot.start') }}
-          </ElButton>
-          <ElButton
-            v-if="canStopRuntime"
-            :loading="props.isStoppingBot"
-            @click="emit('stopRuntime')"
-          >
-            {{ t('settings.user.bot.stop') }}
-          </ElButton>
-          <ElButton
-            v-if="props.status.bound"
-            type="danger"
-            plain
-            :loading="props.isDisconnecting"
-            @click="emit('disconnect')"
-          >
-            <SvgIcon category="ui" icon="trash-can" size="0.95rem" class="mr-1.5" />
-            {{ t('settings.user.bot.disconnect') }}
-          </ElButton>
-        </div>
-      </div>
-
-      <ElAlert
-        v-if="props.status.lastError"
-        type="error"
-        show-icon
-        :closable="false"
-        :title="props.status.lastError"
-      />
+        <ElAlert
+          v-if="props.status.lastError"
+          type="error"
+          show-icon
+          :closable="false"
+          :title="props.status.lastError"
+        />
+      </template>
     </div>
 
     <ElDialog

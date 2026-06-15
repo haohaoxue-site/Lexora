@@ -207,9 +207,26 @@ function openPublication() {
       </div>
     </template>
 
-    <div v-loading="isLoading" class="grid gap-4">
+    <div class="grid gap-4">
+      <ElSkeleton v-if="isLoading" animated>
+        <template #template>
+          <div class="grid gap-4">
+            <div class="grid grid-cols-[auto_minmax(0,1fr)_max-content] items-center gap-3 max-[640px]:grid-cols-[auto_minmax(0,1fr)]">
+              <ElSkeletonItem variant="circle" class="h-10 w-10" />
+              <div class="grid gap-2">
+                <ElSkeletonItem variant="h3" class="max-w-40" />
+                <ElSkeletonItem variant="text" class="max-w-64" />
+              </div>
+              <ElSkeletonItem variant="button" class="h-8 max-w-20 max-[640px]:col-span-2 max-[640px]:w-full" />
+            </div>
+            <ElSkeletonItem variant="rect" class="h-10 w-full" />
+            <ElSkeletonItem variant="rect" class="h-10 w-full" />
+          </div>
+        </template>
+      </ElSkeleton>
+
       <ElAlert
-        v-if="errorMessage"
+        v-else-if="errorMessage"
         :title="errorMessage"
         type="error"
         :closable="false"

@@ -4,6 +4,7 @@ import { formatDocumentLocation } from '@haohaoxue/lexora-shared/document'
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import Empty from '@/components/empty'
+import { LoadingTableSkeleton } from '@/components/loading'
 import { formatDateTime } from '@/utils/dayjs'
 import { useDocsTrashPage } from '../../composables/useDocsTrashPage'
 
@@ -47,16 +48,16 @@ function isItemActing(documentId: string) {
   <section class="docs-trash-page min-h-0 flex-1 overflow-auto p-[clamp(1.25rem,2vw,1.75rem)]">
     <div class="docs-trash-page__surface mx-auto w-full max-w-[var(--page-mode-table-max-width)] overflow-hidden rounded-lg">
       <ElTable
-        v-loading="isLoading"
         :data="tableItems"
         row-key="id"
         class="docs-trash-table"
-        :element-loading-text="t('docs.trash.loading')"
         :header-cell-style="tableHeaderCellStyle"
         :cell-style="tableBodyCellStyle"
       >
         <template #empty>
-          <Empty :description="errorMessage || t('docs.trash.empty')">
+          <LoadingTableSkeleton v-if="isLoading" compact />
+
+          <Empty v-else :description="errorMessage || t('docs.trash.empty')">
             <ElButton v-if="errorMessage" type="primary" @click="loadItems">
               {{ t('docs.common.reload') }}
             </ElButton>

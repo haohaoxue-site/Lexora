@@ -11,6 +11,8 @@ import {
 } from '@haohaoxue/lexora-contracts/system-admin'
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
+import Empty from '@/components/empty'
+import { LoadingTableSkeleton } from '@/components/loading'
 import { formatDateTime } from '@/utils/dayjs'
 
 const props = defineProps<AdminAuditTableProps>()
@@ -61,13 +63,17 @@ function handleFilterChange(filters: AdminAuditTableFilterMap) {
 <template>
   <div class="audit-table__surface flex h-full min-h-0 flex-col">
     <ElTable
-      v-loading="props.loading"
       :data="props.logs"
       :height="tableHeight"
       row-key="id" stripe border
       class="admin-table audit-table"
       @filter-change="handleFilterChange"
     >
+      <template #empty>
+        <LoadingTableSkeleton v-if="props.loading" compact />
+        <Empty v-else compact />
+      </template>
+
       <ElTableColumn type="expand" width="56">
         <template #default="{ row }">
           <div class="audit-table__metadata-wrap bg-fill-lighter-a70 px-5 py-4">

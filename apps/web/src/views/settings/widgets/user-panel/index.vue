@@ -115,7 +115,7 @@ async function handleConfirmEmail() {
 </script>
 
 <template>
-  <div v-loading="isLoading" class="settings-user-page mx-auto w-full max-w-[var(--page-mode-form-max-width)] px-6 py-6">
+  <div class="settings-user-page mx-auto w-full max-w-[var(--page-mode-form-max-width)] px-6 py-6">
     <ElAlert
       v-if="errorMessage"
       :title="errorMessage"
@@ -124,6 +124,37 @@ async function handleConfirmEmail() {
       :closable="false"
       class="mb-4"
     />
+
+    <ElSkeleton v-else-if="isLoading" animated class="grid gap-4">
+      <template #template>
+        <ElCard shadow="never">
+          <div class="flex items-center gap-4">
+            <ElSkeletonItem variant="circle" class="h-16 w-16" />
+            <div class="grid flex-1 gap-3">
+              <ElSkeletonItem variant="h3" class="max-w-36" />
+              <ElSkeletonItem variant="text" class="max-w-72" />
+            </div>
+          </div>
+        </ElCard>
+        <ElCard shadow="never">
+          <div class="grid gap-5">
+            <ElSkeletonItem variant="h3" class="max-w-32" />
+            <div class="grid grid-cols-2 gap-4 max-[720px]:grid-cols-1">
+              <ElSkeletonItem variant="rect" class="h-20" />
+              <ElSkeletonItem variant="rect" class="h-20" />
+            </div>
+            <ElSkeletonItem variant="rect" class="h-16" />
+            <ElSkeletonItem variant="rect" class="h-16" />
+          </div>
+        </ElCard>
+        <ElCard shadow="never">
+          <div class="grid gap-4">
+            <ElSkeletonItem variant="h3" class="max-w-28" />
+            <ElSkeletonItem variant="rect" class="h-18" />
+          </div>
+        </ElCard>
+      </template>
+    </ElSkeleton>
 
     <div v-else class="grid gap-4">
       <UserProfileSection

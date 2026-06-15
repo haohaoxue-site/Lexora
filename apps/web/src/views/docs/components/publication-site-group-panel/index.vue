@@ -302,7 +302,7 @@ function formatPublicationSitePageScope(scope: PublicationSitePageScope) {
 </script>
 
 <template>
-  <section v-loading="loading" class="publication-site-group-panel grid gap-5">
+  <section class="publication-site-group-panel grid gap-5">
     <header class="flex flex-wrap items-end justify-between gap-3">
       <div class="grid gap-1">
         <h2 class="m-0 text-xl font-semibold leading-7 text-main">
@@ -315,7 +315,34 @@ function formatPublicationSitePageScope(scope: PublicationSitePageScope) {
       </ElButton>
     </header>
 
-    <div class="grid grid-cols-[minmax(0,1fr)_minmax(18rem,23rem)] items-start gap-5 max-[1120px]:grid-cols-1">
+    <ElSkeleton v-if="loading" animated>
+      <template #template>
+        <div class="grid grid-cols-[minmax(0,1fr)_minmax(18rem,23rem)] items-start gap-5 max-[1120px]:grid-cols-1">
+          <section class="rounded-xl border border-border-a60 bg-surface p-4">
+            <div class="grid gap-3">
+              <div v-for="group in 3" :key="group" class="grid gap-3 rounded-lg border border-border-a60 p-3">
+                <div class="flex items-center gap-2">
+                  <ElSkeletonItem variant="circle" class="h-7 w-7 shrink-0" />
+                  <ElSkeletonItem variant="h3" class="max-w-40" />
+                </div>
+                <ElSkeletonItem variant="rect" class="h-9 w-full" />
+                <ElSkeletonItem variant="rect" class="h-9 w-full" />
+              </div>
+            </div>
+          </section>
+          <aside class="rounded-xl border border-border-a60 bg-surface p-4">
+            <div class="grid gap-4">
+              <ElSkeletonItem variant="h3" class="max-w-36" />
+              <ElSkeletonItem variant="rect" class="h-10 w-full" />
+              <ElSkeletonItem variant="rect" class="h-10 w-full" />
+              <ElSkeletonItem variant="button" class="h-8 max-w-24" />
+            </div>
+          </aside>
+        </div>
+      </template>
+    </ElSkeleton>
+
+    <div v-else class="grid grid-cols-[minmax(0,1fr)_minmax(18rem,23rem)] items-start gap-5 max-[1120px]:grid-cols-1">
       <div class="publication-site-group-panel__surface overflow-hidden rounded-xl border bg-surface">
         <Empty v-if="activeGroups.length === 0" compact :description="t('docs.publicationSite.group.empty')" />
 

@@ -12,6 +12,8 @@ import type {
 } from '@/components/tiptap-editor/content/typing'
 import { PLATFORM_NOTIFICATION_STATUS } from '@haohaoxue/lexora-contracts/notification'
 import { useI18n } from 'vue-i18n'
+import Empty from '@/components/empty'
+import { LoadingTableSkeleton } from '@/components/loading'
 import { StandaloneContentEditor } from '@/components/tiptap-editor'
 import { formatDateTime } from '@/utils/dayjs'
 
@@ -83,12 +85,16 @@ function isPublishedNotification(notification: PlatformNotification) {
   <section class="admin-notifications-panel">
     <div class="admin-notifications-panel__table-wrap">
       <ElTable
-        v-loading="props.isLoading"
         :data="props.notifications"
         row-key="id"
         class="admin-notifications__table"
         height="calc(100vh - 15rem)"
       >
+        <template #empty>
+          <LoadingTableSkeleton v-if="props.isLoading" compact />
+          <Empty v-else compact />
+        </template>
+
         <ElTableColumn :label="t('admin.notifications.title')" min-width="220">
           <template #default="{ row }">
             <div class="min-w-0">
