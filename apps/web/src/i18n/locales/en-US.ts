@@ -1258,6 +1258,7 @@ export const enUS = {
   },
   chat: {
     composer: {
+      addAttachment: 'Add attachment',
       cancelInput: 'Cancel input',
       confirmTargetLanguage: 'Confirm target language',
       currentModel: 'Current conversation model',
@@ -1277,10 +1278,17 @@ export const enUS = {
       exitSkill: 'Exit current skill',
       exitSkillTooltip: 'Click to exit skill. ESC',
       inputPlaceholder: 'Type a message, Ctrl/Cmd + Enter to send',
+      textModality: 'text',
+      imageModality: 'image',
+      imageTooLarge: 'Image must be {size} or smaller',
+      fileModality: 'file',
+      fileTooLarge: 'File must be {size} or smaller',
+      modelUnsupportedAttachments: '{model} does not support {modalities} input. Switch to a model that supports it.',
+      modelUnsupportedFileUpload: 'The current model does not support file input',
+      modelUnsupportedImageUpload: 'The current model does not support image input',
       newChatModel: 'New conversation model',
       noSkills: 'No available skills',
       other: 'Other',
-      placeholderUpload: 'File upload is not connected yet',
       removeContext: 'Remove context',
       selectDocument: 'Select document',
       selectModel: 'Select model',
@@ -1294,6 +1302,8 @@ export const enUS = {
       translateToAria: 'Translate to {language}',
       translatorPlaceholder: 'Type text to translate into {language}',
       uploadFile: 'Upload file',
+      uploadFailed: 'Upload failed',
+      uploadImage: 'Upload image',
     },
     errors: {
       batchDeleteSessions: 'Failed to delete chat sessions',
@@ -1370,7 +1380,6 @@ export const enUS = {
       retry: 'Retry',
       replyCopied: 'Reply copied',
       today: 'Today',
-      uploadPending: 'File upload is not connected yet',
       yesterday: 'Yesterday',
       yesterdayAt: 'Yesterday {time}',
     },
@@ -1563,6 +1572,7 @@ export const enUS = {
   requestError: {
     api: {
       authAccessTokenExpired: 'Your session has expired. Please sign in again.',
+      chatModelInputModalityUnsupported: 'The current model does not support this attachment type. Switch to a compatible model.',
       displayNameRequired: 'Enter a display name.',
       emailAlreadyBound: 'This email is already bound to your account.',
       emailAlreadyUsed: 'This email is already used by another account.',

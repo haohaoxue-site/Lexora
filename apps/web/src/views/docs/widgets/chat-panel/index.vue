@@ -24,8 +24,9 @@ const {
   composerSelectedModelRef,
   confirmDeleteActiveSession,
   contentJSON,
-  handlePlaceholderUpload,
   handleSend,
+  handleUploadAttachmentFiles,
+  handleUploadImageFiles,
   hasActiveSession,
   highlightAttachment,
   highlightAttachmentId,
@@ -41,6 +42,7 @@ const {
   selectHistorySession,
   startNewSession,
   submitRename,
+  uploadAvailability,
 } = useDocsChatPanel()
 const {
   activeSessionId,
@@ -109,12 +111,14 @@ watch(
         :model-selection-kind="composerModelSelectionKind"
         :is-streaming="isStreaming"
         :highlight-attachment-id="highlightAttachmentId"
+        :upload-availability="uploadAvailability"
         document-picker-teleport-to=".docs-chat-panel__picker-layer"
         @update:content-j-s-o-n="contentJSON = $event"
         @send="handleSend"
         @stop="cancelActiveRun"
         @select-model="selectComposerModel"
-        @placeholder-upload="handlePlaceholderUpload"
+        @upload-image-files="handleUploadImageFiles"
+        @upload-attachment-files="handleUploadAttachmentFiles"
         @highlight-attachment="highlightAttachment"
       />
     </div>

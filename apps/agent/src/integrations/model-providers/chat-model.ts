@@ -7,6 +7,8 @@ import { ChatAnthropic } from '@langchain/anthropic'
 import { ChatOpenAI } from '@langchain/openai'
 
 const MODEL_CALL_TIMEOUT_MS = 60_000
+const OPENAI_COMPATIBLE_USER_AGENT = 'Lexora-Agent/1.0'
+const STAINLESS_HEADER_PREFIX = 'x-stainless-'
 
 export interface AgentChatModel {
   stream: (messages: BaseMessage[], options?: { signal?: AbortSignal }) => Promise<AsyncIterable<AgentChatModelResponse>>
@@ -77,6 +79,10 @@ function createOpenAIChatModel(target: AgentRuntimeModelTarget, options: AgentCh
     apiKey: target.apiKey ?? 'lexora-no-auth',
     configuration: {
       baseURL: target.endpoint,
+      defaultHeaders: {
+        'User-Agent': OPENAI_COMPATIBLE_USER_AGENT,
+      },
+      fetch: createOpenAICompatibleFetch(),
     },
     useResponsesApi: false,
   })
@@ -100,6 +106,24 @@ function toAgentChatModel(
     bindTools: model.bindTools
       ? (tools, bindOptions) => toAgentChatModel(model.bindTools?.(tools, bindOptions) ?? model, createCallOptions)
       : undefined,
+  }
+}
+
+function createOpenAICompatibleFetch(): typeof fetch {
+  return async (input, init) => {
+    const headers = new Headers(init?.headers)
+    headers.set('User-Agent', OPENAI_COMPATIBLE_USER_AGENT)
+
+    for (const headerName of [...headers.keys()]) {
+      if (headerName.toLowerCase().startsWith(STAINLESS_HEADER_PREFIX)) {
+        headers.delete(headerName)
+      }
+    }
+
+    return fetch(input, {
+      ...init,
+      headers,
+    })
   }
 }
 

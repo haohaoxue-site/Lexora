@@ -1159,6 +1159,8 @@
         "text"
       ],
       "capabilities": [
+        "json_mode",
+        "structured_output",
         "tool_call"
       ],
       "limits": {

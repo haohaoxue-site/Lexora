@@ -121,9 +121,9 @@ export const ChatDocumentScopeSchema = z.discriminatedUnion('kind', [
   }).strict(),
 ])
 
-const ChatMessageAttachmentBaseSchema = z.object({
+const ChatDocumentMessageAttachmentBaseSchema = z.object({
   id: NonEmptyStringSchema,
-  type: ChatMessageAttachmentTypeSchema,
+  type: z.literal('document'),
   placement: ChatMessageAttachmentPlacementSchema,
   documentId: NonEmptyStringSchema,
   title: NonEmptyStringSchema,
@@ -131,16 +131,45 @@ const ChatMessageAttachmentBaseSchema = z.object({
   size: z.number().int().nonnegative(),
 }).strict()
 
-export const ChatMessageAttachmentInputSchema = ChatMessageAttachmentBaseSchema.extend({
+export const ChatDocumentMessageAttachmentInputSchema = ChatDocumentMessageAttachmentBaseSchema.extend({
   snapshot: z.string().optional(),
 }).strict()
 
-export const ChatPersistedMessageAttachmentSchema = ChatMessageAttachmentBaseSchema
+export const ChatUploadedMessageAttachmentBaseSchema = z.object({
+  id: NonEmptyStringSchema,
+  type: z.enum(['image', 'file']),
+  placement: z.literal('panel'),
+  assetId: NonEmptyStringSchema,
+  title: NonEmptyStringSchema,
+  fileName: NonEmptyStringSchema,
+  mimeType: NonEmptyStringSchema,
+  size: z.number().int().positive(),
+}).strict()
+
+export const ChatImageMessageAttachmentSchema = ChatUploadedMessageAttachmentBaseSchema.extend({
+  type: z.literal('image'),
+}).strict()
+
+export const ChatFileMessageAttachmentSchema = ChatUploadedMessageAttachmentBaseSchema.extend({
+  type: z.literal('file'),
+}).strict()
+
+export const ChatMessageAttachmentInputSchema = z.discriminatedUnion('type', [
+  ChatDocumentMessageAttachmentInputSchema,
+  ChatImageMessageAttachmentSchema,
+  ChatFileMessageAttachmentSchema,
+])
+
+export const ChatPersistedMessageAttachmentSchema = z.discriminatedUnion('type', [
+  ChatDocumentMessageAttachmentBaseSchema,
+  ChatImageMessageAttachmentSchema,
+  ChatFileMessageAttachmentSchema,
+])
 export const PersistedChatMessageAttachmentSchema = ChatPersistedMessageAttachmentSchema
 
 export const ChatMessageContextSnapshotMetaSchema = z.object({
   id: NonEmptyStringSchema,
-  type: ChatMessageAttachmentTypeSchema,
+  type: z.literal('document'),
   documentId: NonEmptyStringSchema,
   title: NonEmptyStringSchema,
   scope: ChatDocumentScopeSchema,
@@ -316,6 +345,19 @@ export const ChatRuntimeConfigSchema = z.object({
   notReadyReason: z.string().trim().min(1).nullable(),
 }).strict()
 
+export const ChatAssetUploadQuerySchema = z.object({
+  workspaceId: NonEmptyStringSchema,
+}).strict()
+
+export const ChatUploadedAssetSchema = z.object({
+  id: NonEmptyStringSchema,
+  type: z.enum(['image', 'file']),
+  fileName: NonEmptyStringSchema,
+  mimeType: NonEmptyStringSchema,
+  size: z.number().int().positive(),
+  createdAt: IsoDateTimeStringSchema,
+}).strict()
+
 export const CreateChatSessionRequestSchema = z.object({
   workspaceId: NonEmptyStringSchema,
   origin: ChatSessionOriginSchema.optional(),
@@ -336,17 +378,26 @@ const ChatSessionMessageRequestBaseSchema = z.object({
   memory: AgentMemoryRunOptionsSchema.optional(),
   skillInvocation: ChatSkillInvocationSchema.optional().nullable(),
 }).strict().superRefine((value, ctx) => {
-  const attachmentIds = new Set((value.attachments ?? []).map(attachment => attachment.id))
+  const attachmentById = new Map((value.attachments ?? []).map(attachment => [attachment.id, attachment]))
   for (const attachmentId of collectChatReferenceAttachmentIds(value.contentJSON)) {
-    if (attachmentIds.has(attachmentId)) {
+    const attachment = attachmentById.get(attachmentId)
+
+    if (!attachment) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['contentJSON'],
+        message: 'chatReference attachmentId must exist in attachments',
+      })
       continue
     }
 
-    ctx.addIssue({
-      code: 'custom',
-      path: ['contentJSON'],
-      message: 'chatReference attachmentId must exist in attachments',
-    })
+    if (attachment.type !== 'document' || attachment.placement !== 'inline') {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['contentJSON'],
+        message: 'chatReference can only target inline document attachments',
+      })
+    }
   }
 })
 
@@ -571,6 +622,10 @@ export type ChatTranslatorSkillInvocation = z.infer<typeof ChatTranslatorSkillIn
 export type ChatSkillInvocation = z.infer<typeof ChatSkillInvocationSchema>
 export type ChatDocumentSelectionBoundary = z.infer<typeof ChatDocumentSelectionBoundarySchema>
 export type ChatDocumentScope = z.infer<typeof ChatDocumentScopeSchema>
+export type ChatDocumentMessageAttachmentInput = z.infer<typeof ChatDocumentMessageAttachmentInputSchema>
+export type ChatUploadedMessageAttachment = z.infer<typeof ChatUploadedMessageAttachmentBaseSchema>
+export type ChatImageMessageAttachment = z.infer<typeof ChatImageMessageAttachmentSchema>
+export type ChatFileMessageAttachment = z.infer<typeof ChatFileMessageAttachmentSchema>
 export type ChatMessageAttachmentInput = z.infer<typeof ChatMessageAttachmentInputSchema>
 export type ChatPersistedMessageAttachment = z.infer<typeof ChatPersistedMessageAttachmentSchema>
 export type PersistedChatMessageAttachment = z.infer<typeof PersistedChatMessageAttachmentSchema>
@@ -593,6 +648,8 @@ export type ChatSessionDetail = z.infer<typeof ChatSessionDetailSchema>
 export type ChatModelItem = z.infer<typeof ChatModelItemSchema>
 export type ChatModelListResponse = z.infer<typeof ChatModelListResponseSchema>
 export type ChatRuntimeConfig = z.infer<typeof ChatRuntimeConfigSchema>
+export type ChatAssetUploadQuery = z.infer<typeof ChatAssetUploadQuerySchema>
+export type ChatUploadedAsset = z.infer<typeof ChatUploadedAssetSchema>
 export type ChatRunSummary = z.infer<typeof ChatRunSummarySchema>
 export type CreateChatSessionRequest = z.infer<typeof CreateChatSessionRequestSchema>
 export type ChatSessionOriginQuery = z.infer<typeof ChatSessionOriginQuerySchema>

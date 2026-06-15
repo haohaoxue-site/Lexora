@@ -45,12 +45,30 @@ export function createChatComposerModelController(
     null,
   ))
   const requestModelRef = computed(() => sessions.activeSession.value
-    ? sessionRequestModelRef.value
+    ? sessionRequestModelRef.value ?? defaultModelRef.value
     : newSessionModelDraft.value)
   const composerSelectedModelRef = computed(() => requestModelRef.value)
+  const composerSelectedModel = computed(() => {
+    const modelRef = composerSelectedModelRef.value
+    if (!modelRef) {
+      return null
+    }
+
+    const matchedModel = modelOptions.value.find(model =>
+      model.providerId === modelRef.providerId && model.modelId === modelRef.modelId,
+    )
+    if (matchedModel) {
+      return matchedModel
+    }
+
+    const defaultModel = runtimeConfig.value.defaultModel
+    return defaultModel?.providerId === modelRef.providerId && defaultModel.modelId === modelRef.modelId
+      ? defaultModel
+      : null
+  })
   const composerModelSelectionKind = computed<ChatComposerModelSelectionKind>(() => {
     if (sessions.activeSession.value) {
-      return sessionModelRef.value ? 'override' : 'draft'
+      return sessionModelRef.value ? 'override' : 'default'
     }
 
     return newSessionModelDraftSource.value === 'draft' ? 'draft' : 'default'
@@ -126,6 +144,7 @@ export function createChatComposerModelController(
   return {
     clearNewSessionModelDraft,
     composerModelSelectionKind,
+    composerSelectedModel,
     composerSelectedModelRef,
     isConfigured,
     loadModelState,

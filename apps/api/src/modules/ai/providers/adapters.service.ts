@@ -152,17 +152,23 @@ export class AiProviderAdaptersService {
     }
 
     const label = getString(record.name)
+      ?? getString(record.display_name)
       ?? getLocalizedLabel(record.label)
       ?? modelId
     const properties = isRecord(record.model_properties) ? record.model_properties : {}
     const architecture = isRecord(record.architecture) ? record.architecture : {}
     const modelType = inferProviderModelType(modelId)
-    const inputModalities = normalizeModalities([
+    const capabilitySignals = getEnabledCapabilitySignals(record.capabilities)
+    const rawInputModalities = normalizeModalities([
       ...getStringArray(record.input_modalities),
       ...getStringArray(properties.input_modalities),
       ...getStringArray(architecture.input_modalities),
+      ...capabilitySignals,
       ...(record.supports_vision === true ? [AI_MODEL_MODALITY.IMAGE] : []),
     ])
+    const inputModalities = modelType === AI_MODEL_TYPE.CHAT && rawInputModalities.length > 0
+      ? [...new Set([AI_MODEL_MODALITY.TEXT, ...rawInputModalities])]
+      : rawInputModalities
     const outputModalities = normalizeModalities([
       ...getStringArray(record.output_modalities),
       ...getStringArray(properties.output_modalities),
@@ -178,11 +184,13 @@ export class AiProviderAdaptersService {
       capabilities: inferModelCapabilities(record),
       contextWindow: getNumber(properties.context_size)
         ?? getNumber(properties.context_length)
+        ?? getNumber(record.max_input_tokens)
         ?? getNumber(record.context_window)
         ?? getNumber(record.context_length)
         ?? null,
       maxOutputTokens: getNumber(properties.max_output_tokens)
         ?? getNumber(properties.max_output_length)
+        ?? getNumber(record.max_tokens)
         ?? getNumber(record.max_output_tokens)
         ?? getNumber(record.max_output_length)
         ?? null,
@@ -229,6 +237,33 @@ function getLocalizedLabel(value: unknown): string | null {
   return getString(value.zh_Hans) ?? getString(value.en_US)
 }
 
+function getEnabledCapabilitySignals(value: unknown): string[] {
+  if (!isRecord(value)) {
+    return []
+  }
+
+  const signals: string[] = []
+  for (const [key, enabled] of Object.entries(value)) {
+    if (enabled === true) {
+      signals.push(key)
+      continue
+    }
+
+    if (!isRecord(enabled)) {
+      continue
+    }
+
+    signals.push(key)
+    for (const [nestedKey, nestedEnabled] of Object.entries(enabled)) {
+      if (nestedEnabled === true) {
+        signals.push(`${key}_${nestedKey}`)
+      }
+    }
+  }
+
+  return signals
+}
+
 export function inferProviderModelType(modelId: string): AiModelType {
   const normalizedModelId = modelId.toLowerCase()
   if (normalizedModelId.includes('audio') || normalizedModelId.includes('whisper') || normalizedModelId.includes('tts')) {
@@ -264,7 +299,7 @@ function normalizeModalities(values: string[]): AiModelModality[] {
     if (item.includes('video')) {
       modalities.push(AI_MODEL_MODALITY.VIDEO)
     }
-    if (item.includes('file') || item.includes('pdf')) {
+    if (item.includes('file') || item.includes('pdf') || item.includes('document')) {
       modalities.push(AI_MODEL_MODALITY.FILE)
     }
     if (item.includes('embedding')) {
@@ -279,19 +314,23 @@ function inferModelCapabilities(record: Record<string, unknown>): AiModelCapabil
   const supportedParameters = [
     ...getStringArray(record.supported_parameters),
     ...getStringArray(record.supported_features),
-  ]
+    ...getStringArray(record.capabilities),
+    ...getEnabledCapabilitySignals(record.capabilities),
+  ].map(item => item.toLowerCase())
   const capabilities: AiModelCapability[] = []
+  const hasSignal = (...needles: string[]) =>
+    supportedParameters.some(item => needles.some(needle => item === needle || item.includes(needle)))
 
-  if (supportedParameters.includes('tools') || supportedParameters.includes('tool_choice') || record.supports_function_calling === true) {
+  if (hasSignal('tools', 'tool_choice', 'tool_use', 'function_calling') || record.supports_function_calling === true) {
     capabilities.push(AI_MODEL_CAPABILITY.TOOL_CALL)
   }
-  if (supportedParameters.includes('response_format') || supportedParameters.includes('json_mode') || record.supports_response_schema === true) {
+  if (hasSignal('response_format', 'json_mode') || record.supports_response_schema === true) {
     capabilities.push(AI_MODEL_CAPABILITY.JSON_MODE)
   }
-  if (supportedParameters.includes('structured_outputs') || supportedParameters.includes('structured_output') || record.supports_response_schema === true) {
+  if (hasSignal('structured_outputs', 'structured_output') || record.supports_response_schema === true) {
     capabilities.push(AI_MODEL_CAPABILITY.STRUCTURED_OUTPUT)
   }
-  if (supportedParameters.includes('reasoning') || supportedParameters.includes('include_reasoning') || record.supports_reasoning === true) {
+  if (hasSignal('reasoning', 'include_reasoning', 'thinking') || record.supports_reasoning === true) {
     capabilities.push(AI_MODEL_CAPABILITY.REASONING)
   }
 

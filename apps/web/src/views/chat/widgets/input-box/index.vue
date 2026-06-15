@@ -16,14 +16,16 @@ const {
   composerModelSelectionKind,
   composerSelectedModelRef,
   contentJSON,
-  handlePlaceholderUpload,
   handleSend,
+  handleUploadAttachmentFiles,
+  handleUploadImageFiles,
   highlightAttachment,
   highlightAttachmentId,
   isStreaming,
   selectComposerModel,
   translatorSkillEnabled,
   translatorTargetLanguage,
+  uploadAvailability,
 } = useChatInputBox({
   isReadonly: () => props.isReadonly,
 })
@@ -41,13 +43,15 @@ const {
         :model-selection-kind="composerModelSelectionKind"
         :is-streaming="isStreaming"
         :highlight-attachment-id="highlightAttachmentId"
+        :upload-availability="uploadAvailability"
         :translator-skill-enabled="translatorSkillEnabled"
         document-picker-teleport-to=".chat-view__picker-layer"
         @update:content-j-s-o-n="contentJSON = $event"
         @send="handleSend"
         @stop="cancelActiveRun"
         @select-model="selectComposerModel"
-        @placeholder-upload="handlePlaceholderUpload"
+        @upload-image-files="handleUploadImageFiles"
+        @upload-attachment-files="handleUploadAttachmentFiles"
         @highlight-attachment="highlightAttachment"
       />
       <div v-else class="chat-input-box__readonly flex items-center gap-3 rounded-lg px-4 py-3">

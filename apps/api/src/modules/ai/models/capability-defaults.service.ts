@@ -283,7 +283,58 @@ function getModelDefaultIdKeys(modelId: string): string[] {
   return [...new Set([
     normalizedModelId,
     openAiAlias,
+    ...getClaudeModelDefaultIdKeys(normalizedModelId),
   ].filter((value): value is string => Boolean(value)))]
+}
+
+function getClaudeModelDefaultIdKeys(modelId: string): string[] {
+  const keys: string[] = []
+  const normalizedModelId = modelId.trim().toLowerCase()
+  const addKey = (key: string) => {
+    if (!keys.includes(key)) {
+      keys.push(key)
+    }
+  }
+
+  const familyMinorMatch = normalizedModelId.match(/(?:^|[^a-z0-9])claude-(opus|sonnet|haiku)-(\d{1,2})-(\d{1,2})(?:-20\d{6})?(?=$|[^a-z0-9])/)
+  if (familyMinorMatch) {
+    const family = familyMinorMatch[1]
+    const major = familyMinorMatch[2]
+    const minor = familyMinorMatch[3]
+    addKey(`claude-${family}-${major}.${minor}`)
+    addKey(`claude-${family}-${major}-${minor}`)
+  }
+
+  const versionMinorMatch = normalizedModelId.match(/(?:^|[^a-z0-9])claude-(\d{1,2})-(\d{1,2})-(opus|sonnet|haiku)(?:-20\d{6})?(?=$|[^a-z0-9])/)
+  if (versionMinorMatch) {
+    const major = versionMinorMatch[1]
+    const minor = versionMinorMatch[2]
+    const family = versionMinorMatch[3]
+    addKey(`claude-${major}.${minor}-${family}`)
+    addKey(`claude-${major}-${minor}-${family}`)
+  }
+
+  const canonicalMinorMatch = normalizedModelId.match(/(?:^|[^a-z0-9])(claude-(?:(?:opus|sonnet|haiku)-\d{1,2}\.\d{1,2}|\d{1,2}\.\d{1,2}-(?:opus|sonnet|haiku)))(?=$|[^a-z0-9])/)
+  if (canonicalMinorMatch) {
+    addKey(canonicalMinorMatch[1])
+  }
+
+  const familyMajorMatch = normalizedModelId.match(/(?:^|[^a-z0-9])claude-(opus|sonnet|haiku)-(\d{1,2})(?:-20\d{6})?(?!-\d)(?=$|[^a-z0-9])/)
+  if (familyMajorMatch) {
+    addKey(`claude-${familyMajorMatch[1]}-${familyMajorMatch[2]}`)
+  }
+
+  const versionMajorMatch = normalizedModelId.match(/(?:^|[^a-z0-9])claude-(\d{1,2})-(opus|sonnet|haiku)(?:-20\d{6})?(?!-\d)(?=$|[^a-z0-9])/)
+  if (versionMajorMatch) {
+    addKey(`claude-${versionMajorMatch[1]}-${versionMajorMatch[2]}`)
+  }
+
+  const canonicalMajorMatch = normalizedModelId.match(/(?:^|[^a-z0-9])(claude-(?:(?:opus|sonnet|haiku)-\d{1,2}|\d{1,2}-(?:opus|sonnet|haiku)))(?!-\d)(?=$|[^a-z0-9])/)
+  if (canonicalMajorMatch) {
+    addKey(canonicalMajorMatch[1])
+  }
+
+  return keys
 }
 
 function toEffectiveDefaults(model: AiModelCapabilityDefault): EffectiveModelCapabilityDefaults {

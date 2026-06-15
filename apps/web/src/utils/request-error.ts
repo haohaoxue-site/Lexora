@@ -54,6 +54,7 @@ const API_ERROR_MESSAGE_KEY_BY_CODE: Partial<Record<ApiErrorCode, string>> = {
   [API_ERROR_CODE.NOTIFICATION_IMAGE_EMPTY]: 'requestError.api.notificationImageEmpty',
   [API_ERROR_CODE.NOTIFICATION_IMAGE_TOO_LARGE]: 'requestError.api.notificationImageTooLarge',
   [API_ERROR_CODE.NOTIFICATION_IMAGE_SIGNATURE_MISMATCH]: 'requestError.api.notificationImageSignatureMismatch',
+  [API_ERROR_CODE.CHAT_MODEL_INPUT_MODALITY_UNSUPPORTED]: 'requestError.api.chatModelInputModalityUnsupported',
 }
 
 export class RequestError extends Error {

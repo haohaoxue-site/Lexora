@@ -49,6 +49,7 @@ export function createAgentRunner(inputs: CreateAgentRunnerInput): AgentRunner {
   const now = inputs.now ?? (() => Date.now())
   const activeRuns = new Map<string, AbortController>()
   const graph = createAgentGraph({
+    chatApi: inputs.chatApi,
     chatModelFactory: inputs.chatModelFactory,
     memoryApi: inputs.memoryApi,
     skillApi: inputs.skillApi,
@@ -198,6 +199,7 @@ export async function executeAgentGeneration(input: {
         focusedTranslatorInvocation,
         triggerUserMessageId: input.bootstrap.context.triggerUserMessageId,
         contextSnapshots: focusedTranslatorInvocation ? [] : input.bootstrap.context.contextSnapshots,
+        inputAttachments: focusedTranslatorInvocation ? [] : input.bootstrap.context.inputAttachments,
         onStreamPart: async (part: AgentModelStreamPart) => await emitAgentModelStreamPart(part, {
           emit: input.emit,
           generationId: input.bootstrap.generation.generationId,

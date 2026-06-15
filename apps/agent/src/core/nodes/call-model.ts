@@ -1,8 +1,10 @@
 import type {
+  AgentChatAttachmentContent,
   AgentChatContextMessage,
   AgentMemoryRetrievalSnapshot,
 } from '@haohaoxue/lexora-contracts'
 import type { GraphNode } from '@langchain/langgraph'
+import type { AgentChatApiClient } from '../../clients/chat'
 import type { AgentMemoryApiClient } from '../../clients/memory'
 import type { AgentSkillApiClient } from '../../clients/skills'
 import type {
@@ -21,7 +23,10 @@ import {
 import { callModelWithRuntimeTools } from '../tools'
 import { createChatGenerationUsageSnapshot } from '../usage/snapshot'
 
+const INPUT_ATTACHMENT_CONTENT_FETCH_CONCURRENCY = 3
+
 export interface CreateCallModelNodeOptions {
+  chatApi: AgentChatApiClient
   chatModelFactory: AgentChatModelFactory
   memoryApi?: AgentMemoryApiClient
   skillApi?: AgentSkillApiClient
@@ -46,7 +51,7 @@ export function createCallModelNode(options: CreateCallModelNodeOptions): GraphN
           focusedTranslatorInvocation,
           config.context?.triggerUserMessageId,
         )
-      : toLangChainMessages(
+      : await toLangChainMessages(
           applyAgentContextSnapshotsToMessages(state.messages, {
             triggerUserMessageId: config.context?.triggerUserMessageId,
             contextSnapshots: config.context?.contextSnapshots,
@@ -57,6 +62,12 @@ export function createCallModelNode(options: CreateCallModelNodeOptions): GraphN
           config.context?.skillContext,
           config.context?.defaultResponseLanguage,
           state.memoryRetrieval,
+          config.context?.triggerUserMessageId,
+          await resolveInputAttachmentContents({
+            chatApi: options.chatApi,
+            generationId: config.context?.generationId,
+            inputAttachments: config.context?.inputAttachments,
+          }),
         )
 
     const streamResult = await callModelWithRuntimeTools({
@@ -116,6 +127,48 @@ function toFocusedTranslatorMessages(
   ]
 }
 
+async function resolveInputAttachmentContents(input: {
+  chatApi: AgentChatApiClient
+  generationId?: string | null
+  inputAttachments?: AgentGraphContext['inputAttachments']
+}): Promise<AgentChatAttachmentContent[]> {
+  const attachments = input.inputAttachments ?? []
+  if (attachments.length === 0) {
+    return []
+  }
+
+  if (!input.generationId) {
+    throw new Error('聊天附件缺少生成上下文')
+  }
+
+  return mapWithConcurrency(attachments, INPUT_ATTACHMENT_CONTENT_FETCH_CONCURRENCY, attachment =>
+    input.chatApi.getGenerationAssetContent({
+      generationId: input.generationId!,
+      assetId: attachment.assetId,
+    }))
+}
+
+async function mapWithConcurrency<TInput, TOutput>(
+  items: readonly TInput[],
+  concurrency: number,
+  mapper: (item: TInput) => Promise<TOutput>,
+): Promise<TOutput[]> {
+  const results: TOutput[] = Array.from({ length: items.length })
+  let nextIndex = 0
+
+  async function worker() {
+    while (nextIndex < items.length) {
+      const currentIndex = nextIndex
+      nextIndex += 1
+      results[currentIndex] = await mapper(items[currentIndex]!)
+    }
+  }
+
+  const workerCount = Math.min(concurrency, items.length)
+  await Promise.all(Array.from({ length: workerCount }, () => worker()))
+  return results
+}
+
 function toLangChainMessages(
   messages: AgentChatContextMessage[],
   olderMessagesExcerpt: string,
@@ -124,6 +177,8 @@ function toLangChainMessages(
   skillContext: AgentGraphContext['skillContext'],
   defaultResponseLanguage: AgentGraphContext['defaultResponseLanguage'],
   memoryRetrieval: AgentMemoryRetrievalSnapshot | null,
+  triggerUserMessageId: string | null | undefined,
+  inputAttachments: AgentChatAttachmentContent[],
 ) {
   const memoryPrompt = createAgentMemoryPromptBlock(memoryRetrieval)
   const systemPrompt = createAgentSystemPrompt({
@@ -135,6 +190,9 @@ function toLangChainMessages(
   })
   return [
     new SystemMessage(memoryPrompt ? `${systemPrompt}\n\n${memoryPrompt}` : systemPrompt),
-    ...toLangChainChatMessages(messages),
+    ...toLangChainChatMessages(messages, {
+      triggerUserMessageId,
+      inputAttachments,
+    }),
   ]
 }

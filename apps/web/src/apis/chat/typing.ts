@@ -1,4 +1,5 @@
 export type {
+  AiModelModality,
   BatchDeleteChatSessionsRequest,
   BatchDeleteChatSessionsResponse,
   ChatDocumentScope,
@@ -21,6 +22,7 @@ export type {
   ChatSessionUsageSummary,
   ChatSkillInvocation,
   ChatTokenUsageAggregate,
+  ChatUploadedAsset,
   CreateChatSessionMessageRequest,
   EditAndSendChatMessageRequest,
   SwitchChatActiveMessageRequest,

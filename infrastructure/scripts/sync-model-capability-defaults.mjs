@@ -746,10 +746,49 @@ function stripInternalQualityScore(model) {
 }
 
 function canonicalizeModelId(modelId) {
-  return modelId
+  const normalized = modelId
     .trim()
     .replace(/^~/, '')
     .replace(/^openrouter\//, '')
+
+  return canonicalizeAnthropicClaudeModelId(normalized) ?? normalized
+}
+
+function canonicalizeAnthropicClaudeModelId(modelId) {
+  const normalized = modelId.trim().toLowerCase()
+  const canonicalModelId = readCanonicalClaudeModelId(normalized)
+
+  return canonicalModelId ? `anthropic/${canonicalModelId}` : null
+}
+
+function readCanonicalClaudeModelId(modelId) {
+  const familyMinorMatch = modelId.match(/(?:^|[^a-z0-9])claude-(opus|sonnet|haiku)-(\d{1,2})-(\d{1,2})(?:-20\d{6})?(?=$|[^a-z0-9])/)
+  if (familyMinorMatch) {
+    return `claude-${familyMinorMatch[1]}-${familyMinorMatch[2]}.${familyMinorMatch[3]}`
+  }
+
+  const versionMinorMatch = modelId.match(/(?:^|[^a-z0-9])claude-(\d{1,2})-(\d{1,2})-(opus|sonnet|haiku)(?:-20\d{6})?(?=$|[^a-z0-9])/)
+  if (versionMinorMatch) {
+    return `claude-${versionMinorMatch[1]}.${versionMinorMatch[2]}-${versionMinorMatch[3]}`
+  }
+
+  const canonicalMinorMatch = modelId.match(/(?:^|[^a-z0-9])(claude-(?:(?:opus|sonnet|haiku)-\d{1,2}\.\d{1,2}|\d{1,2}\.\d{1,2}-(?:opus|sonnet|haiku)))(?=$|[^a-z0-9])/)
+  if (canonicalMinorMatch) {
+    return canonicalMinorMatch[1]
+  }
+
+  const familyMajorMatch = modelId.match(/(?:^|[^a-z0-9])claude-(opus|sonnet|haiku)-(\d{1,2})(?:-20\d{6})?(?!-\d)(?=$|[^a-z0-9])/)
+  if (familyMajorMatch) {
+    return `claude-${familyMajorMatch[1]}-${familyMajorMatch[2]}`
+  }
+
+  const versionMajorMatch = modelId.match(/(?:^|[^a-z0-9])claude-(\d{1,2})-(opus|sonnet|haiku)(?:-20\d{6})?(?!-\d)(?=$|[^a-z0-9])/)
+  if (versionMajorMatch) {
+    return `claude-${versionMajorMatch[1]}-${versionMajorMatch[2]}`
+  }
+
+  const canonicalMajorMatch = modelId.match(/(?:^|[^a-z0-9])(claude-(?:(?:opus|sonnet|haiku)-\d{1,2}|\d{1,2}-(?:opus|sonnet|haiku)))(?!-\d)(?=$|[^a-z0-9])/)
+  return canonicalMajorMatch?.[1] ?? null
 }
 
 function normalizeProviderKey(providerKey) {

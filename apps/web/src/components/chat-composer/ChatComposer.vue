@@ -2,6 +2,7 @@
 import type { Editor, EditorEvents, JSONContent } from '@tiptap/core'
 import type {
   ChatComposerAttachment,
+  ChatComposerDocumentAttachment,
   ChatComposerEmits,
   ChatComposerProps,
   ChatComposerSubmitPayload,
@@ -36,6 +37,10 @@ const props = withDefaults(defineProps<ChatComposerProps>(), {
   disabled: false,
   highlightAttachmentId: null,
   documentPickerTeleportTo: '',
+  uploadAvailability: () => ({
+    image: { disabled: false },
+    file: { disabled: false },
+  }),
   translatorSkillEnabled: false,
   translatorTargetLanguage: null,
 })
@@ -45,6 +50,8 @@ const { t } = useI18n({ useScope: 'global' })
 const pickerVisible = shallowRef(false)
 const pickerMode = shallowRef<'panel' | 'inline'>('panel')
 const skillCommandOpenSignal = shallowRef(0)
+const imageInputRef = shallowRef<HTMLInputElement | null>(null)
+const fileInputRef = shallowRef<HTMLInputElement | null>(null)
 let pastedAttachments: ChatComposerAttachment[] = []
 
 const serializedContent = computed(() => serializeChatComposerContent(props.contentJSON))
@@ -185,6 +192,7 @@ function handleEditorPaste(event: ClipboardEvent) {
   if (text) {
     editor.value?.commands.insertContent(text)
   }
+  emitUploadFiles(files)
   return true
 }
 
@@ -204,6 +212,40 @@ function openSkillCommandMenu() {
 
 function closePicker() {
   pickerVisible.value = false
+}
+
+function openImageUpload() {
+  if (props.disabled || props.isStreaming || props.uploadAvailability.image.disabled) {
+    return
+  }
+  imageInputRef.value?.click()
+}
+
+function openFileUpload() {
+  if (props.disabled || props.isStreaming || props.uploadAvailability.file.disabled) {
+    return
+  }
+  fileInputRef.value?.click()
+}
+
+function handleImageInputChange(event: Event) {
+  if (props.uploadAvailability.image.disabled) {
+    resetFileInput(event)
+    return
+  }
+
+  emitUploadFiles(Array.from((event.target as HTMLInputElement).files ?? []).filter(isImageFile))
+  resetFileInput(event)
+}
+
+function handleFileInputChange(event: Event) {
+  if (props.uploadAvailability.file.disabled) {
+    resetFileInput(event)
+    return
+  }
+
+  emitUploadFiles(Array.from((event.target as HTMLInputElement).files ?? []))
+  resetFileInput(event)
 }
 
 function handlePickDocument(document: ReadableDocumentSearchResult) {
@@ -237,6 +279,18 @@ function addInlineDocumentReference(document: ReadableDocumentSearchResult) {
 
 function removePanelAttachment(attachmentId: string) {
   emits('update:attachments', props.attachments.filter(attachment => attachment.id !== attachmentId))
+}
+
+function emitUploadFiles(files: File[]) {
+  const imageFiles = files.filter(isImageFile)
+  const attachmentFiles = files.filter(file => !isImageFile(file))
+
+  if (imageFiles.length > 0) {
+    emits('uploadImageFiles', imageFiles)
+  }
+  if (attachmentFiles.length > 0) {
+    emits('uploadAttachmentFiles', attachmentFiles)
+  }
 }
 
 function emitSend() {
@@ -285,7 +339,7 @@ function refreshEditorPlaceholder() {
   currentEditor.view.dispatch(currentEditor.state.tr)
 }
 
-function insertInlineReference(attachment: ChatComposerAttachment, nodeId: string) {
+function insertInlineReference(attachment: ChatComposerDocumentAttachment, nodeId: string) {
   const currentEditor = editor.value
   if (!currentEditor) {
     return
@@ -316,7 +370,11 @@ function insertInlineReference(attachment: ChatComposerAttachment, nodeId: strin
 }
 
 function cloneInlineAttachmentForPaste(attachment: ChatComposerAttachment) {
-  const clonedAttachment: ChatComposerAttachment = {
+  if (attachment.type !== CHAT_MESSAGE_ATTACHMENT_TYPE.DOCUMENT) {
+    throw new Error('chatReference 只能复制文档附件')
+  }
+
+  const clonedAttachment: ChatComposerDocumentAttachment = {
     ...attachment,
     id: createAttachmentId(),
     placement: CHAT_MESSAGE_ATTACHMENT_PLACEMENT.INLINE,
@@ -342,8 +400,8 @@ function cloneInlineAttachmentForPaste(attachment: ChatComposerAttachment) {
 
 function createDocumentAttachment(
   document: ReadableDocumentSearchResult,
-  placement: ChatComposerAttachment['placement'],
-): ChatComposerAttachment {
+  placement: ChatComposerDocumentAttachment['placement'],
+): ChatComposerDocumentAttachment {
   return {
     id: createAttachmentId(),
     type: CHAT_MESSAGE_ATTACHMENT_TYPE.DOCUMENT,
@@ -363,6 +421,15 @@ function createAttachmentId() {
 
 function createReferenceNodeId() {
   return `ref_${nanoid(10)}`
+}
+
+function isImageFile(file: File) {
+  return file.type.startsWith('image/')
+}
+
+function resetFileInput(event: Event) {
+  const input = event.target as HTMLInputElement
+  input.value = ''
 }
 
 function isSameContent(currentEditor: Editor, contentJSON: JSONContent) {
@@ -389,16 +456,38 @@ function isSameContent(currentEditor: Editor, contentJSON: JSONContent) {
         :is-streaming="props.isStreaming"
         :disabled="props.disabled"
         :can-send="canSend"
+        :upload-availability="props.uploadAvailability"
         :translator-skill-enabled="props.translatorSkillEnabled"
         :translator-target-language="props.translatorTargetLanguage"
         :skill-command-open-signal="skillCommandOpenSignal"
         @open-panel-picker="openPanelPicker"
-        @placeholder-upload="emits('placeholderUpload')"
+        @upload-image="openImageUpload"
+        @upload-file="openFileUpload"
         @update:translator-target-language="emits('update:translatorTargetLanguage', $event)"
         @select-model="emits('selectModel', $event)"
         @send="emitSend"
         @stop="emits('stop')"
       />
+
+      <input
+        ref="imageInputRef"
+        class="chat-composer__file-input"
+        type="file"
+        accept="image/*"
+        multiple
+        tabindex="-1"
+        aria-hidden="true"
+        @change="handleImageInputChange"
+      >
+      <input
+        ref="fileInputRef"
+        class="chat-composer__file-input"
+        type="file"
+        multiple
+        tabindex="-1"
+        aria-hidden="true"
+        @change="handleFileInputChange"
+      >
 
       <Teleport
         defer
@@ -440,6 +529,10 @@ function isSameContent(currentEditor: Editor, contentJSON: JSONContent) {
     max-height: min(40vh, 320px);
     overflow-y: auto;
     padding: 0.5rem 0.625rem 0.125rem;
+  }
+
+  .chat-composer__file-input {
+    display: none;
   }
 
   :deep(.chat-composer__prosemirror) {

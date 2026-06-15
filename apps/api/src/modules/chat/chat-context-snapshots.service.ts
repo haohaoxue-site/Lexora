@@ -1,4 +1,5 @@
 import type {
+  ChatDocumentMessageAttachmentInput,
   ChatDocumentScope,
   ChatMessageAttachmentInput,
   ChatMessageContentJSON,
@@ -11,14 +12,15 @@ import {
   ChatMessageAttachmentInputSchema,
   ChatMessageContentJSONSchema,
 } from '@haohaoxue/lexora-contracts'
-import { serializeChatMessageContentJSON } from '@haohaoxue/lexora-shared'
+import { isChatUploadedMessageAttachment, serializeChatMessageContentJSON } from '@haohaoxue/lexora-shared/chat'
 import { BadRequestException, Injectable } from '@nestjs/common'
 import { DocumentChatSnapshotService } from '../documents/content/document-chat-snapshot.service'
+import { ChatAssetsService } from './chat-assets.service'
 
 const CHAT_CONTEXT_SNAPSHOT_MAX_CONTENT_LENGTH = 200_000
 
 export interface ChatContextSnapshotCreateData {
-  type: ChatPersistedMessageAttachment['type']
+  type: 'document'
   documentId: string
   title: string
   scope: ChatDocumentScope
@@ -43,10 +45,16 @@ export interface ResolvedChatUserMessageContext {
 
 @Injectable()
 export class ChatContextSnapshotsService {
-  constructor(private readonly documentChatSnapshotService: DocumentChatSnapshotService) {}
+  constructor(
+    private readonly documentChatSnapshotService: DocumentChatSnapshotService,
+    private readonly chatAssetsService: ChatAssetsService,
+  ) {}
 
   async resolveForUserMessage(input: {
     userId: string
+    workspaceId: string
+    sessionId?: string
+    reusableAssetMessageIds?: string[]
     contentJSON: ChatMessageContentJSON
     attachments?: ChatMessageAttachmentInput[] | null
   }): Promise<ResolvedChatUserMessageContext> {
@@ -72,9 +80,26 @@ export class ChatContextSnapshotsService {
     })
     const snapshotDraftsByKey = new Map<string, ChatContextSnapshotCreateData>()
     const persistedAttachments: ChatPersistedMessageAttachment[] = []
+    const documentAttachmentCount = orderedAttachments.attachments.filter(attachment => attachment.type === 'document').length
+    const uploadedAttachmentById = await this.chatAssetsService.resolveUploadedAttachments({
+      actorId: input.userId,
+      workspaceId: input.workspaceId,
+      sessionId: input.sessionId,
+      reusableMessageIds: input.reusableAssetMessageIds,
+      attachments: orderedAttachments.attachments,
+    })
     const capturedAt = new Date()
 
     for (const attachment of orderedAttachments.attachments) {
+      if (isChatUploadedMessageAttachment(attachment)) {
+        const uploadedAttachment = uploadedAttachmentById.get(attachment.id)
+        if (!uploadedAttachment) {
+          throw new BadRequestException('上传附件不存在或不可访问')
+        }
+        persistedAttachments.push(uploadedAttachment)
+        continue
+      }
+
       const snapshotKey = createSnapshotKey(attachment)
       let snapshot = snapshotDraftsByKey.get(snapshotKey)
 
@@ -110,7 +135,7 @@ export class ChatContextSnapshotsService {
       snapshots: [...snapshotDraftsByKey.values()],
       diagnostics: {
         removedInlineAttachmentIds: orderedAttachments.removedInlineAttachmentIds,
-        dedupedSnapshotCount: persistedAttachments.length - snapshotDraftsByKey.size,
+        dedupedSnapshotCount: documentAttachmentCount - snapshotDraftsByKey.size,
       },
     }
   }
@@ -139,6 +164,9 @@ export class ChatContextSnapshotsService {
       const attachment = attachmentById.get(attachmentId)
       if (!attachment) {
         throw new BadRequestException('正文引用的聊天上下文附件不存在')
+      }
+      if (attachment.type !== 'document') {
+        throw new BadRequestException('正文引用只能指向行内文档上下文附件')
       }
       if (attachment.placement !== CHAT_MESSAGE_ATTACHMENT_PLACEMENT.INLINE) {
         throw new BadRequestException('正文引用只能指向行内上下文附件')
@@ -172,7 +200,7 @@ export class ChatContextSnapshotsService {
 
   private async resolveAttachmentSnapshot(input: {
     userId: string
-    attachment: ChatMessageAttachmentInput
+    attachment: ChatDocumentMessageAttachmentInput
   }): Promise<{
     content: string
     size: number
@@ -214,12 +242,12 @@ export class ChatContextSnapshotsService {
   }
 }
 
-function createSnapshotKey(attachment: ChatMessageAttachmentInput): string {
+function createSnapshotKey(attachment: ChatDocumentMessageAttachmentInput): string {
   return `${attachment.type}:${attachment.documentId}:${JSON.stringify(attachment.scope)}`
 }
 
 function toPersistedAttachment(
-  attachment: ChatMessageAttachmentInput,
+  attachment: ChatDocumentMessageAttachmentInput,
   size: number,
 ): ChatPersistedMessageAttachment {
   return {

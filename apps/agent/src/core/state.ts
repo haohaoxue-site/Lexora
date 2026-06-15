@@ -1,6 +1,7 @@
 import type {
   AgentChatContextMessage,
   AgentChatContextSnapshot,
+  AgentChatInputAttachment,
   AgentContextPolicy,
   AgentMemoryRetrievalSnapshot,
   AgentProfileConfig,
@@ -54,5 +55,6 @@ export interface AgentGraphContext {
   focusedTranslatorInvocation?: FocusedTranslatorInvocation | null
   triggerUserMessageId?: string | null
   contextSnapshots?: AgentChatContextSnapshot[] | null
+  inputAttachments?: AgentChatInputAttachment[] | null
   onStreamPart?: (part: AgentModelStreamPart) => Promise<void> | void
 }

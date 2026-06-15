@@ -1,5 +1,5 @@
 import type { ComputedRef, Ref } from 'vue'
-import type { ChatSessionDetail } from '@/apis/chat'
+import type { ChatModelItem, ChatSessionDetail } from '@/apis/chat'
 import type { ChatComposerModelRef, ChatComposerModelSelectionKind } from '@/components/chat-composer/typing'
 import type { ChatStreamController, SendChatComposerMessageInput } from '@/composables/chat/createChatStreamController'
 import { createSharedComposable } from '@vueuse/core'
@@ -9,6 +9,7 @@ import { translate } from '@/i18n'
 import { ElMessageBox } from '@/utils/element-plus'
 import { useActiveDocument } from './useActiveDocument'
 import { useDocsChatEngine } from './useDocsChatEngine'
+import { useDocsContext } from './useDocsContext'
 
 interface DocsChatPanelSessions {
   activeSession: Ref<ChatSessionDetail | null>
@@ -35,6 +36,7 @@ interface DocsChatPanelOverlay {
 interface DocsChatPanelModel {
   clearNewSessionModelDraft: () => void
   composerModelSelectionKind: ComputedRef<ChatComposerModelSelectionKind>
+  composerSelectedModel: ComputedRef<ChatModelItem | null>
   composerSelectedModelRef: ComputedRef<ChatComposerModelRef | null>
   isConfigured: ComputedRef<boolean>
   loadModelState?: () => Promise<void>
@@ -69,7 +71,9 @@ export function createDocsChatPanelController(options: {
   overlay?: DocsChatPanelOverlay
   model: DocsChatPanelModel
 }) {
+  const { currentWorkspaceId } = useDocsContext()
   const host = createChatComposerHostState({
+    workspaceId: currentWorkspaceId,
     model: options.model,
     sendMessage: options.stream.sendMessage,
   })
@@ -121,7 +125,9 @@ export function createDocsChatPanelController(options: {
   }
 
   function clearSelectionContexts() {
-    const nextAttachments = host.attachments.value.filter(attachment => attachment.scope.kind !== 'selection')
+    const nextAttachments = host.attachments.value.filter(attachment =>
+      attachment.type !== 'document' || attachment.scope.kind !== 'selection',
+    )
     if (nextAttachments.length !== host.attachments.value.length) {
       host.attachments.value = nextAttachments
     }
@@ -221,7 +227,8 @@ export function createDocsChatPanelController(options: {
     confirmDeleteActiveSession,
     contentJSON: host.contentJSON,
     deleteActiveSession,
-    handlePlaceholderUpload: host.handlePlaceholderUpload,
+    handleUploadAttachmentFiles: host.handleUploadAttachmentFiles,
+    handleUploadImageFiles: host.handleUploadImageFiles,
     handleSend: host.handleSend,
     hasActiveSession,
     highlightAttachment: host.highlightAttachment,
@@ -246,5 +253,6 @@ export function createDocsChatPanelController(options: {
     startNewSession,
     submitRename,
     togglePanel,
+    uploadAvailability: host.uploadAvailability,
   }
 }

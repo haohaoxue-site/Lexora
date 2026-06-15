@@ -1,8 +1,12 @@
 <script setup lang="ts">
 import type { AgentTranslatorTargetLanguage } from '@haohaoxue/lexora-contracts/agent'
 import type { DropdownInstance, InputInstance } from 'element-plus'
-import type { ChatComposerModelRef, ChatComposerModelSelectionKind } from './typing'
-import { ArrowDown, Check, CloseBold } from '@element-plus/icons-vue'
+import type {
+  ChatComposerModelRef,
+  ChatComposerModelSelectionKind,
+  ChatComposerUploadAvailability,
+} from './typing'
+import { ArrowDown, Check, CloseBold, Document, Picture } from '@element-plus/icons-vue'
 import { AGENT_TRANSLATOR_PRESET_TARGET_LANGUAGES } from '@haohaoxue/lexora-contracts/agent'
 import { computed, nextTick, shallowRef, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -14,6 +18,7 @@ const props = defineProps<{
   isStreaming?: boolean
   disabled?: boolean
   canSend?: boolean
+  uploadAvailability?: ChatComposerUploadAvailability
   translatorSkillEnabled?: boolean
   translatorTargetLanguage?: AgentTranslatorTargetLanguage | null
   skillCommandOpenSignal?: number
@@ -21,7 +26,8 @@ const props = defineProps<{
 
 const emits = defineEmits<{
   'openPanelPicker': []
-  'placeholderUpload': []
+  'uploadImage': []
+  'uploadFile': []
   'update:translatorTargetLanguage': [targetLanguage: AgentTranslatorTargetLanguage | null]
   'selectModel': [modelRef: ChatComposerModelRef | null]
   'send': []
@@ -47,6 +53,8 @@ const customLanguageSubmitDisabled = computed(() => !customLanguageDraft.value.t
 const customTranslatorTargetSelected = computed(() =>
   Boolean(props.translatorTargetLanguage && !props.translatorTargetLanguage.tag),
 )
+const imageUploadDisabled = computed(() => Boolean(props.uploadAvailability?.image.disabled))
+const fileUploadDisabled = computed(() => Boolean(props.uploadAvailability?.file.disabled))
 
 watch(
   () => props.skillCommandOpenSignal,
@@ -99,6 +107,23 @@ function handleSkillCommand(command: string | number | object) {
   emits('update:translatorTargetLanguage', getDefaultTranslatorTargetLanguage())
 }
 
+function handleUploadCommand(command: string | number | object) {
+  const commandValue = String(command)
+  if (commandValue === 'image') {
+    if (imageUploadDisabled.value) {
+      return
+    }
+    emits('uploadImage')
+    return
+  }
+  if (commandValue === 'file') {
+    if (fileUploadDisabled.value) {
+      return
+    }
+    emits('uploadFile')
+  }
+}
+
 function clearTranslatorSkill() {
   customLanguageEditing.value = false
   emits('update:translatorTargetLanguage', null)
@@ -140,16 +165,62 @@ function cancelCustomTranslatorLanguageInput() {
 <template>
   <div class="chat-composer-toolbar">
     <div class="chat-composer-toolbar__left">
-      <ElTooltip :content="t('chat.composer.uploadFile')" placement="top">
-        <button
-          class="chat-composer-toolbar__icon-button"
-          type="button"
-          :disabled="props.disabled"
-          :aria-label="t('chat.composer.uploadFile')"
-          @click="emits('placeholderUpload')"
-        >
-          <SvgIcon category="ui" icon="plus" size="1rem" />
-        </button>
+      <ElTooltip :content="t('chat.composer.addAttachment')" placement="top">
+        <span>
+          <ElDropdown
+            trigger="click"
+            :disabled="props.disabled || props.isStreaming"
+            @command="handleUploadCommand"
+          >
+            <button
+              class="chat-composer-toolbar__icon-button"
+              type="button"
+              :disabled="props.disabled || props.isStreaming"
+              :aria-label="t('chat.composer.addAttachment')"
+            >
+              <SvgIcon category="ui" icon="plus" size="1rem" />
+            </button>
+
+            <template #dropdown>
+              <ElDropdownMenu class="chat-composer-toolbar__upload-menu">
+                <ElDropdownItem
+                  command="image"
+                  class="chat-composer-toolbar__upload-item"
+                  :disabled="imageUploadDisabled"
+                >
+                  <ElTooltip
+                    :disabled="!imageUploadDisabled"
+                    :content="t('chat.composer.modelUnsupportedImageUpload')"
+                    placement="right"
+                    effect="dark"
+                  >
+                    <span class="chat-composer-toolbar__command-main">
+                      <ElIcon><Picture /></ElIcon>
+                      <span>{{ t('chat.composer.uploadImage') }}</span>
+                    </span>
+                  </ElTooltip>
+                </ElDropdownItem>
+                <ElDropdownItem
+                  command="file"
+                  class="chat-composer-toolbar__upload-item"
+                  :disabled="fileUploadDisabled"
+                >
+                  <ElTooltip
+                    :disabled="!fileUploadDisabled"
+                    :content="t('chat.composer.modelUnsupportedFileUpload')"
+                    placement="right"
+                    effect="dark"
+                  >
+                    <span class="chat-composer-toolbar__command-main">
+                      <ElIcon><Document /></ElIcon>
+                      <span>{{ t('chat.composer.uploadFile') }}</span>
+                    </span>
+                  </ElTooltip>
+                </ElDropdownItem>
+              </ElDropdownMenu>
+            </template>
+          </ElDropdown>
+        </span>
       </ElTooltip>
 
       <ElTooltip :content="t('chat.composer.selectDocument')" placement="top">
@@ -559,13 +630,19 @@ function cancelCustomTranslatorLanguageInput() {
   padding: 0.25rem;
 }
 
+:global(.chat-composer-toolbar__upload-menu) {
+  min-width: 9rem;
+  padding: 0.25rem;
+}
+
 :global(.el-dropdown-menu__item.chat-composer-toolbar__translate-item) {
   min-height: 2rem;
   padding: 0 0.625rem;
 }
 
 :global(.el-dropdown-menu__item.chat-composer-toolbar__command-item),
-:global(.el-dropdown-menu__item.chat-composer-toolbar__command-empty) {
+:global(.el-dropdown-menu__item.chat-composer-toolbar__command-empty),
+:global(.el-dropdown-menu__item.chat-composer-toolbar__upload-item) {
   min-height: 2rem;
   padding: 0 0.625rem;
 }

@@ -62,6 +62,15 @@ enum ChatSessionChannel {
   WEIXIN_BOT
 }
 
+enum ChatAssetKind {
+  IMAGE
+  FILE
+}
+
+enum ChatAssetStatus {
+  READY
+}
+
 model ChatSession {
   id                      String                  @id @default(uuid())
   workspaceId             String
@@ -85,6 +94,7 @@ model ChatSession {
   runs                    ChatSessionRun[]
   messageGenerations      ChatMessageGeneration[]
   events                  ChatSessionEvent[]
+  assets                  ChatAsset[]             @relation("ChatSessionAssets")
   memoryCandidates        AgentMemoryCandidate[]
   botConversation         BotConversation?        @relation("BotConversationChatSession")
   createdBy               String?
@@ -131,6 +141,7 @@ model ChatSessionMessage {
   events                 ChatSessionEvent[]
   parts                  ChatSessionMessagePart[]
   contextSnapshots       ChatMessageContextSnapshot[]
+  uploadedAssets         ChatAsset[]                  @relation("ChatMessageAssets")
   memoryCandidates       AgentMemoryCandidate[]
   createdAt              DateTime                     @default(now())
   updatedAt              DateTime                     @updatedAt
@@ -142,6 +153,34 @@ model ChatSessionMessage {
   @@index([sourceMessageId])
   @@index([agentRunId])
   @@index([sessionId, createdAt])
+}
+
+model ChatAsset {
+  id               String              @id @default(uuid())
+  workspaceId      String
+  ownerUserId      String
+  sessionId        String?
+  messageId        String?
+  kind             ChatAssetKind
+  status           ChatAssetStatus     @default(READY)
+  bucket           String
+  objectKey        String
+  mimeType         String
+  size             Int
+  sha256           String
+  originalFileName String
+  workspace        Workspace           @relation("WorkspaceChatAssets", fields: [workspaceId], references: [id], onDelete: Cascade)
+  ownerUser        User                @relation("ChatAssetOwner", fields: [ownerUserId], references: [id], onDelete: Cascade)
+  session          ChatSession?        @relation("ChatSessionAssets", fields: [sessionId], references: [id], onDelete: SetNull)
+  message          ChatSessionMessage? @relation("ChatMessageAssets", fields: [messageId], references: [id], onDelete: SetNull)
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+  deletedAt        DateTime?
+
+  @@index([workspaceId, ownerUserId, createdAt])
+  @@index([sessionId])
+  @@index([messageId])
+  @@index([ownerUserId, createdAt])
 }
 
 model ChatMessageContextSnapshot {

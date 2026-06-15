@@ -51,7 +51,8 @@ const {
   emptyIconStateClass,
   getMessageRoleClass,
   getMessageText,
-  handleEditPlaceholderUpload,
+  handleEditUploadAttachmentFiles,
+  handleEditUploadImageFiles,
   highlightEditingAttachment,
   isEditingMessage,
   isMessageCopied,
@@ -64,6 +65,7 @@ const {
   startEditMessage,
   submitEditMessage,
   switchToBranch,
+  uploadAvailability,
 } = useChatMessageList({
   isReadonly: () => props.isReadonly,
 })
@@ -297,6 +299,7 @@ function formatMessageSentAt(value: string): string {
                   :attachments="editingAttachments"
                   :selected-model-ref="composerSelectedModelRef"
                   :model-selection-kind="composerModelSelectionKind"
+                  :upload-availability="uploadAvailability"
                   :disabled="isStreaming || props.isReadonly"
                   :highlight-attachment-id="editingHighlightAttachmentId"
                   document-picker-teleport-to=".chat-view__picker-layer"
@@ -305,7 +308,8 @@ function formatMessageSentAt(value: string): string {
                   @send="submitEditMessage(virtual.item.message, $event)"
                   @select-model="selectComposerModel"
                   @highlight-attachment="highlightEditingAttachment"
-                  @placeholder-upload="handleEditPlaceholderUpload"
+                  @upload-image-files="handleEditUploadImageFiles"
+                  @upload-attachment-files="handleEditUploadAttachmentFiles"
                 />
                 <div class="chat-message-list__edit-actions mt-3 flex justify-end gap-2">
                   <ElButton round @click="cancelEditMessage">

@@ -7,7 +7,7 @@ import type {
 } from '../../core/typing'
 import type { BlockTriggerMenuExposed } from '../../overlays/block-trigger/typing'
 import type { DocumentBodyEditorProps } from './typing'
-import { DOCUMENT_IMAGE_MAX_BYTES } from '@haohaoxue/lexora-contracts/document'
+import { FILE_SIZE_LIMITS } from '@haohaoxue/lexora-contracts/file'
 import { prettyBytes } from '@haohaoxue/lexora-shared/file'
 import {
   computed,
@@ -25,7 +25,7 @@ import { createBodyExtensions } from '../../extensions/createExtensions'
 import { scrollDocumentBlockIntoView } from '../../overlays/block-trigger/blockTriggerDom'
 import { isTriggerMenuSelection } from './triggerSelection'
 
-const DOCUMENT_IMAGE_SIZE_LIMIT_LABEL = prettyBytes(DOCUMENT_IMAGE_MAX_BYTES)
+const DOCUMENT_IMAGE_SIZE_LIMIT_LABEL = prettyBytes(FILE_SIZE_LIMITS.DOCUMENT_IMAGE)
 
 export function useDocumentBodyEditor(options: {
   blockTriggerMenuRef: TemplateRef<BlockTriggerMenuExposed | null>
@@ -140,7 +140,7 @@ export function useDocumentBodyEditor(options: {
       throw new Error(translate('editor.upload.notReadyImage'))
     }
 
-    if (file.size > DOCUMENT_IMAGE_MAX_BYTES) {
+    if (file.size > FILE_SIZE_LIMITS.DOCUMENT_IMAGE) {
       throw new Error(translate('editor.upload.imageTooLarge', { size: DOCUMENT_IMAGE_SIZE_LIMIT_LABEL }))
     }
 

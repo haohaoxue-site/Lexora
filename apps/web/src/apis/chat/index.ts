@@ -9,6 +9,7 @@ import type {
   ChatSessionEvent,
   ChatSessionOrigin,
   ChatSessionSummary,
+  ChatUploadedAsset,
   CreateChatSessionMessageRequest,
   EditAndSendChatMessageRequest,
   SwitchChatActiveMessageRequest,
@@ -182,6 +183,14 @@ export function getChatModels(): Promise<ChatModelListResponse> {
   })
 }
 
+export function uploadChatImage(workspaceId: string, file: File): Promise<ChatUploadedAsset> {
+  return uploadChatAsset('/chat/assets/images', workspaceId, file)
+}
+
+export function uploadChatFile(workspaceId: string, file: File): Promise<ChatUploadedAsset> {
+  return uploadChatAsset('/chat/assets/files', workspaceId, file)
+}
+
 export async function streamChatSessionEvents(
   sessionId: string,
   afterSequence: number | null,
@@ -316,6 +325,20 @@ function createChatSessionWorkspaceParams(options: ChatSessionWorkspaceOptions):
     ...createChatSessionOriginParams(options),
     workspaceId: options.workspaceId,
   }
+}
+
+function uploadChatAsset(url: string, workspaceId: string, file: File): Promise<ChatUploadedAsset> {
+  const formData = new FormData()
+  formData.append('file', file)
+
+  return axios.request({
+    method: 'post',
+    url,
+    params: {
+      workspaceId,
+    },
+    data: formData,
+  })
 }
 
 function resolveChatSessionOrigin(options: ChatSessionOriginOptions): ChatSessionOrigin {

@@ -9,8 +9,18 @@ import type {
 
 export type ChatComposerContentJSON = ChatMessageContentJSON
 export type ChatComposerAttachment = ChatMessageAttachmentInput
+export type ChatComposerDocumentAttachment = Extract<ChatComposerAttachment, { type: 'document' }>
 export type ChatComposerModelRef = Pick<AiModelRef, 'providerId' | 'modelId'> & Partial<Pick<AiModelRef, 'scope' | 'providerKey'>>
 export type ChatComposerModelSelectionKind = 'default' | 'draft' | 'override'
+
+export interface ChatComposerUploadItemAvailability {
+  disabled: boolean
+}
+
+export interface ChatComposerUploadAvailability {
+  image: ChatComposerUploadItemAvailability
+  file: ChatComposerUploadItemAvailability
+}
 
 export interface ChatComposerSubmitPayload {
   content: string
@@ -28,6 +38,7 @@ export interface ChatComposerProps {
   disabled?: boolean
   highlightAttachmentId?: string | null
   documentPickerTeleportTo?: string
+  uploadAvailability?: ChatComposerUploadAvailability
   translatorSkillEnabled?: boolean
   translatorTargetLanguage?: AgentTranslatorTargetLanguage | null
 }
@@ -39,7 +50,8 @@ export interface ChatComposerEmits {
   'send': [payload: ChatComposerSubmitPayload]
   'stop': []
   'selectModel': [modelRef: ChatComposerModelRef | null]
-  'placeholderUpload': []
+  'uploadImageFiles': [files: File[]]
+  'uploadAttachmentFiles': [files: File[]]
   'highlightAttachment': [attachmentId: string]
 }
 

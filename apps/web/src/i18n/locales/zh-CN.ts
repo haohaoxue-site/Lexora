@@ -1260,6 +1260,7 @@ export const zhCN = {
   },
   chat: {
     composer: {
+      addAttachment: '添加附件',
       cancelInput: '取消输入',
       confirmTargetLanguage: '确认目标语言',
       currentModel: '当前对话模型',
@@ -1279,10 +1280,17 @@ export const zhCN = {
       exitSkill: '退出当前技能',
       exitSkillTooltip: '点击退出技能 ESC',
       inputPlaceholder: '输入消息，Ctrl/⌘ + Enter 发送',
+      textModality: '文本',
+      imageModality: '图片',
+      imageTooLarge: '图片大小不能超过 {size}',
+      fileModality: '文件',
+      fileTooLarge: '文件大小不能超过 {size}',
+      modelUnsupportedAttachments: '{model} 不支持{modalities}输入，请切换支持该类型的模型。',
+      modelUnsupportedFileUpload: '当前模型不支持文件输入',
+      modelUnsupportedImageUpload: '当前模型不支持图片输入',
       newChatModel: '新对话模型',
       noSkills: '暂无可用技能',
       other: '其他',
-      placeholderUpload: '文件上传入口待接入',
       removeContext: '移除上下文',
       selectDocument: '选择文档',
       selectModel: '选择模型',
@@ -1296,6 +1304,8 @@ export const zhCN = {
       translateToAria: '翻译为 {language}',
       translatorPlaceholder: '输入要翻译为 {language} 的文本',
       uploadFile: '上传文件',
+      uploadFailed: '上传失败',
+      uploadImage: '上传图片',
     },
     errors: {
       batchDeleteSessions: '批量删除聊天会话失败',
@@ -1372,7 +1382,6 @@ export const zhCN = {
       retry: '重试',
       replyCopied: '回复已复制',
       today: '今天',
-      uploadPending: '文件上传入口待接入',
       yesterday: '昨天',
       yesterdayAt: '昨天 {time}',
     },
@@ -1565,6 +1574,7 @@ export const zhCN = {
   requestError: {
     api: {
       authAccessTokenExpired: '登录状态已过期，请重新登录。',
+      chatModelInputModalityUnsupported: '当前模型不支持该附件类型，请切换支持的模型。',
       displayNameRequired: '请输入显示名称。',
       emailAlreadyBound: '当前邮箱已绑定到该账号。',
       emailAlreadyUsed: '该邮箱已被其他账号使用。',

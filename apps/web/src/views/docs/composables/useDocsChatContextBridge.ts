@@ -75,7 +75,7 @@ export function createDocsChatContextBridgeController(options: {
   )
   const stopAttachmentWatch = watch(
     () => options.panel.attachments.value
-      .filter(attachment => attachment.scope.kind === 'selection')
+      .filter(attachment => attachment.type === 'document' && attachment.scope.kind === 'selection')
       .map(attachment => attachment.id)
       .join('\n'),
     () => pruneDetachedSelectionAnchors(),
@@ -157,7 +157,7 @@ export function createDocsChatContextBridgeController(options: {
     return {
       ...payload,
       attachments: payload.attachments.flatMap((attachment) => {
-        if (attachment.scope.kind !== 'selection') {
+        if (attachment.type !== 'document' || attachment.scope.kind !== 'selection') {
           return [attachment]
         }
 
@@ -173,7 +173,7 @@ export function createDocsChatContextBridgeController(options: {
     const nextAttachments: ChatComposerAttachment[] = []
 
     for (const attachment of attachments) {
-      if (attachment.scope.kind !== 'selection') {
+      if (attachment.type !== 'document' || attachment.scope.kind !== 'selection') {
         nextAttachments.push(attachment)
         continue
       }
@@ -328,7 +328,7 @@ export function createDocsChatContextBridgeController(options: {
   function pruneDetachedSelectionAnchors() {
     const activeSelectionAttachmentIds = new Set(
       options.panel.attachments.value
-        .filter(attachment => attachment.scope.kind === 'selection')
+        .filter(attachment => attachment.type === 'document' && attachment.scope.kind === 'selection')
         .map(attachment => attachment.id),
     )
 

@@ -37,6 +37,7 @@
     "./document/collaboration/constants": "./src/document/collaboration/constants.ts",
     "./document/publication/constants": "./src/document/publication/constants.ts",
     "./document/ydoc": "./src/document/ydoc.ts",
+    "./file": "./src/file.ts",
     "./identity": "./src/identity.ts",
     "./identity/constants": "./src/identity/constants.ts",
     "./notification": "./src/notification.ts",

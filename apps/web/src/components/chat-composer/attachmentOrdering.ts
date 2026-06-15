@@ -1,6 +1,7 @@
 import type {
   ChatComposerAttachment,
   ChatComposerContentJSON,
+  ChatComposerDocumentAttachment,
   ChatComposerDocumentScope,
 } from './typing'
 import {
@@ -37,10 +38,11 @@ export function getPanelAttachments(attachments: ChatComposerAttachment[]): Chat
 
 export function findDuplicatePanelAttachment(
   attachments: ChatComposerAttachment[],
-  candidate: Pick<ChatComposerAttachment, 'type' | 'placement' | 'documentId' | 'scope'>,
+  candidate: Pick<ChatComposerDocumentAttachment, 'type' | 'placement' | 'documentId' | 'scope'>,
 ): ChatComposerAttachment | null {
   return attachments.find(attachment =>
-    attachment.type === candidate.type
+    attachment.type === CHAT_MESSAGE_ATTACHMENT_TYPE.DOCUMENT
+    && attachment.type === candidate.type
     && attachment.placement === CHAT_MESSAGE_ATTACHMENT_PLACEMENT.PANEL
     && candidate.placement === CHAT_MESSAGE_ATTACHMENT_PLACEMENT.PANEL
     && attachment.documentId === candidate.documentId
@@ -50,7 +52,7 @@ export function findDuplicatePanelAttachment(
 
 export function getAttachmentDisplayLabel(attachment: ChatComposerAttachment): string {
   if (attachment.type !== CHAT_MESSAGE_ATTACHMENT_TYPE.DOCUMENT) {
-    return attachment.title
+    return attachment.fileName
   }
 
   return attachment.scope.kind === 'selection'

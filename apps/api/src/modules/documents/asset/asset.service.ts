@@ -1,10 +1,18 @@
 import type { DocumentAsset, ResolveDocumentAssetsResponse } from '@haohaoxue/lexora-contracts'
+import type { SupportedImageMimeType } from '@haohaoxue/lexora-contracts/file'
 import type { JwtConfig } from '../../../config/auth.config'
 import type { StorageObject } from '../../../infrastructure/storage/storage.interface'
 import { Buffer } from 'node:buffer'
 import { createSecretKey, randomUUID } from 'node:crypto'
-import { extname } from 'node:path'
-import { DOCUMENT_IMAGE_MAX_BYTES, SERVER_PATH } from '@haohaoxue/lexora-contracts'
+import { SERVER_PATH } from '@haohaoxue/lexora-contracts'
+import { FILE_SIZE_LIMITS } from '@haohaoxue/lexora-contracts/file'
+import {
+  isImageSignatureMatched,
+  normalizeFileMimeType,
+  normalizeSupportedImageMimeType,
+  resolveSafeFileExtension,
+  resolveSupportedImageExtension,
+} from '@haohaoxue/lexora-shared/file'
 import {
   BadRequestException,
   Injectable,
@@ -27,7 +35,6 @@ import { DocumentPublicationAccessService } from '../publication/publication-acc
 import { DOCUMENT_IMAGE_TOO_LARGE_MESSAGE } from './asset.constants'
 
 const DOCUMENT_ASSET_BUCKET = 'document-asset'
-const DOCUMENT_FILE_MAX_SIZE_BYTES = 50 * 1024 * 1024
 const DOCUMENT_ASSET_CONTENT_AUDIENCE = 'lexora-document-asset'
 const DOCUMENT_ASSET_ACCESS_TOKEN_TYPE = 'document-asset-access'
 const DOCUMENT_ASSET_ACCESS_COOKIE_TTL_SECONDS = 60 * 5
@@ -36,17 +43,6 @@ const DOCUMENT_ASSET_ACCESS_COOKIE_NAMES = {
   publication: 'lexora_publication_asset_access',
 } as const
 const SINGLE_PUBLICATION_ASSET_SCOPE_PREFIX = 'single:'
-const DOCUMENT_FILE_EXTENSION_PREFIX = /^\./
-const DOCUMENT_FILE_EXTENSION_PATTERN = /^[a-z0-9]{1,16}$/
-
-const DOCUMENT_IMAGE_EXTENSION_MAP = {
-  'image/gif': 'gif',
-  'image/jpeg': 'jpg',
-  'image/png': 'png',
-  'image/webp': 'webp',
-} as const
-
-type DocumentImageMimeType = keyof typeof DOCUMENT_IMAGE_EXTENSION_MAP
 
 type PersistedDocumentAsset = Prisma.DocumentAssetGetPayload<{
   select: typeof documentAssetSelect
@@ -126,7 +122,7 @@ export class DocumentAssetsService {
     const objectKey = buildDocumentAssetObjectKey({
       documentId: input.documentId,
       assetId,
-      extension: DOCUMENT_IMAGE_EXTENSION_MAP[mimeType],
+      extension: resolveSupportedImageExtension(mimeType),
     })
 
     await this.storageService.putObject({
@@ -175,7 +171,7 @@ export class DocumentAssetsService {
   }): Promise<DocumentAsset> {
     await this.documentAccessService.assertCanEditDocument(input.actorId, input.documentId)
 
-    const mimeType = normalizeDocumentFileMimeType(input.mimeType)
+    const mimeType = normalizeFileMimeType(input.mimeType)
     assertDocumentFileBuffer(input.buffer)
     const assetId = randomUUID()
     const objectKey = buildDocumentAssetObjectKey({
@@ -575,26 +571,26 @@ function isSinglePublicationAssetScopeId(publicationId: string): boolean {
   return publicationId.startsWith(SINGLE_PUBLICATION_ASSET_SCOPE_PREFIX)
 }
 
-function assertDocumentImageMimeType(mimeType: string): DocumentImageMimeType {
-  const normalizedMimeType = mimeType.trim().toLowerCase()
+function assertDocumentImageMimeType(mimeType: string): SupportedImageMimeType {
+  const normalizedMimeType = normalizeSupportedImageMimeType(mimeType)
 
-  if (normalizedMimeType in DOCUMENT_IMAGE_EXTENSION_MAP) {
-    return normalizedMimeType as DocumentImageMimeType
+  if (normalizedMimeType) {
+    return normalizedMimeType
   }
 
   throw new BadRequestException('图片仅支持 JPG、PNG、WEBP、GIF 格式')
 }
 
-function assertDocumentImageBuffer(buffer: Buffer, mimeType: DocumentImageMimeType): void {
+function assertDocumentImageBuffer(buffer: Buffer, mimeType: SupportedImageMimeType): void {
   if (!buffer.length) {
     throw new BadRequestException('图片文件不能为空')
   }
 
-  if (buffer.length > DOCUMENT_IMAGE_MAX_BYTES) {
+  if (buffer.length > FILE_SIZE_LIMITS.DOCUMENT_IMAGE) {
     throw new PayloadTooLargeException(DOCUMENT_IMAGE_TOO_LARGE_MESSAGE)
   }
 
-  if (!isDocumentImageSignatureMatched(buffer, mimeType)) {
+  if (!isImageSignatureMatched(buffer, mimeType)) {
     throw new BadRequestException('图片文件格式不正确')
   }
 }
@@ -604,36 +600,9 @@ function assertDocumentFileBuffer(buffer: Buffer): void {
     throw new BadRequestException('附件文件不能为空')
   }
 
-  if (buffer.length > DOCUMENT_FILE_MAX_SIZE_BYTES) {
+  if (buffer.length > FILE_SIZE_LIMITS.DOCUMENT_FILE) {
     throw new BadRequestException('附件大小不能超过 50MB')
   }
-}
-
-function isDocumentImageSignatureMatched(buffer: Buffer, mimeType: DocumentImageMimeType): boolean {
-  if (mimeType === 'image/jpeg') {
-    return buffer.length >= 3 && buffer[0] === 0xFF && buffer[1] === 0xD8 && buffer[2] === 0xFF
-  }
-
-  if (mimeType === 'image/png') {
-    return buffer.length >= 8
-      && buffer[0] === 0x89
-      && buffer[1] === 0x50
-      && buffer[2] === 0x4E
-      && buffer[3] === 0x47
-      && buffer[4] === 0x0D
-      && buffer[5] === 0x0A
-      && buffer[6] === 0x1A
-      && buffer[7] === 0x0A
-  }
-
-  if (mimeType === 'image/gif') {
-    return buffer.length >= 6
-      && ['GIF87a', 'GIF89a'].includes(buffer.subarray(0, 6).toString('ascii'))
-  }
-
-  return buffer.length >= 12
-    && buffer.subarray(0, 4).toString('ascii') === 'RIFF'
-    && buffer.subarray(8, 12).toString('ascii') === 'WEBP'
 }
 
 function buildDocumentAssetObjectKey(input: {
@@ -654,19 +623,8 @@ function normalizeRequestedAssetIds(assetIds: string[]): string[] {
   )
 }
 
-function normalizeDocumentFileMimeType(mimeType: string): string {
-  const normalizedMimeType = mimeType.trim().toLowerCase()
-  return normalizedMimeType || 'application/octet-stream'
-}
-
 function resolveDocumentFileExtension(fileName: string): string {
-  const rawExtension = extname(fileName).replace(DOCUMENT_FILE_EXTENSION_PREFIX, '').trim().toLowerCase()
-
-  if (DOCUMENT_FILE_EXTENSION_PATTERN.test(rawExtension)) {
-    return rawExtension
-  }
-
-  return 'bin'
+  return resolveSafeFileExtension(fileName, 'bin')
 }
 
 function toDocumentAssetKind(kind: DocumentAssetKind): DocumentAsset['kind'] {

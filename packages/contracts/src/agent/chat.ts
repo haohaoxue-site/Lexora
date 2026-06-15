@@ -1,5 +1,7 @@
 import { z } from 'zod'
 import {
+  ChatFileMessageAttachmentSchema,
+  ChatImageMessageAttachmentSchema,
   ChatMessageContextSnapshotMetaSchema,
   ChatMessageRoleSchema,
   ChatSkillInvocationSchema,
@@ -23,6 +25,20 @@ export const AgentChatContextSnapshotSchema = ChatMessageContextSnapshotMetaSche
   content: z.string(),
 }).strict()
 
+export const AgentChatInputAttachmentSchema = z.discriminatedUnion('type', [
+  ChatImageMessageAttachmentSchema,
+  ChatFileMessageAttachmentSchema,
+])
+
+export const AgentChatAttachmentContentSchema = z.discriminatedUnion('type', [
+  ChatImageMessageAttachmentSchema.extend({
+    contentBase64: NonEmptyStringSchema,
+  }).strict(),
+  ChatFileMessageAttachmentSchema.extend({
+    contentBase64: NonEmptyStringSchema,
+  }).strict(),
+])
+
 export const AgentChatRuntimeContextSchema = z.object({
   sessionId: NonEmptyStringSchema,
   threadId: NonEmptyStringSchema,
@@ -34,9 +50,12 @@ export const AgentChatRuntimeContextSchema = z.object({
   defaultResponseLanguage: ResolvedLanguagePreferenceSchema,
   messages: z.array(AgentChatContextMessageSchema),
   contextSnapshots: z.array(AgentChatContextSnapshotSchema),
+  inputAttachments: z.array(AgentChatInputAttachmentSchema).default([]),
   memory: AgentMemoryRunOptionsSchema,
 }).strict()
 
 export type AgentChatContextMessage = z.infer<typeof AgentChatContextMessageSchema>
 export type AgentChatContextSnapshot = z.infer<typeof AgentChatContextSnapshotSchema>
+export type AgentChatInputAttachment = z.infer<typeof AgentChatInputAttachmentSchema>
+export type AgentChatAttachmentContent = z.infer<typeof AgentChatAttachmentContentSchema>
 export type AgentChatRuntimeContext = z.infer<typeof AgentChatRuntimeContextSchema>

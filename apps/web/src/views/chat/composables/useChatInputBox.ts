@@ -3,6 +3,7 @@ import type { MaybeRefOrGetter } from 'vue'
 import type { ChatComposerSubmitPayload } from '@/components/chat-composer/typing'
 import { computed, onMounted, shallowRef, toValue, watch } from 'vue'
 import { createChatComposerHostState } from '@/composables/chat/createChatComposerHostState'
+import { useWorkspaceStore } from '@/stores/workspace'
 import { useChatModelSettings } from './useChatModelSettings'
 import { useChatRuntimeOverlay } from './useChatRuntimeOverlay'
 import { useChatSkillState } from './useChatSkillState'
@@ -13,13 +14,16 @@ export interface UseChatInputBoxOptions {
 }
 
 export function useChatInputBox(options: UseChatInputBoxOptions = {}) {
+  const workspaceStore = useWorkspaceStore()
   const model = useChatModelSettings()
   const { cancelRunId, isStreaming } = useChatRuntimeOverlay()
   const { loadSkills, translatorSkillEnabled } = useChatSkillState()
   const { cancelActiveRun, sendMessage } = useChatStream()
   const translatorTargetLanguage = shallowRef<AgentTranslatorTargetLanguage | null>(null)
   const isReadonly = computed(() => Boolean(toValue(options.isReadonly)))
+  const workspaceId = computed(() => workspaceStore.currentWorkspace?.id ?? null)
   const host = createChatComposerHostState({
+    workspaceId,
     model,
     sendMessage,
   })
@@ -54,13 +58,15 @@ export function useChatInputBox(options: UseChatInputBoxOptions = {}) {
     composerModelSelectionKind: model.composerModelSelectionKind,
     composerSelectedModelRef: model.composerSelectedModelRef,
     contentJSON: host.contentJSON,
-    handlePlaceholderUpload: host.handlePlaceholderUpload,
     handleSend,
+    handleUploadAttachmentFiles: host.handleUploadAttachmentFiles,
+    handleUploadImageFiles: host.handleUploadImageFiles,
     highlightAttachment: host.highlightAttachment,
     highlightAttachmentId: host.highlightAttachmentId,
     isStreaming,
     selectComposerModel: model.selectComposerModel,
     translatorSkillEnabled,
     translatorTargetLanguage,
+    uploadAvailability: host.uploadAvailability,
   }
 }

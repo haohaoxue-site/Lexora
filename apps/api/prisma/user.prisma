@@ -59,6 +59,7 @@ model User {
   createdWorkspaceInvites                  WorkspaceInvite[]                  @relation("WorkspaceInviteCreator")
   updatedWorkspaceInvites                  WorkspaceInvite[]                  @relation("WorkspaceInviteUpdater")
   createdChatSessions                      ChatSession[]                      @relation("ChatSessionCreator")
+  chatAssets                               ChatAsset[]                        @relation("ChatAssetOwner")
   agentProfiles                            AgentProfile[]                     @relation("AgentProfileOwner")
   agentMemories                            AgentMemory[]                      @relation("AgentMemoryOwner")
   agentMemoryCandidates                    AgentMemoryCandidate[]             @relation("AgentMemoryCandidateOwner")

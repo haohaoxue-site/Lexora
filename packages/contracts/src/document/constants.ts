@@ -31,7 +31,6 @@ export const DOCUMENT_TITLE_MAX_LENGTH = 120
 export const DOCUMENT_DEFAULT_TITLE = '新文档'
 export const DOCUMENT_CHAT_SEARCH_LIMIT = 20
 export const DOCUMENT_CHAT_SEARCH_QUERY_MAX_LENGTH = 80
-export const DOCUMENT_IMAGE_MAX_BYTES = 2 * 1024 * 1024
 
 export const DOCUMENT_SAVE_STATE = {
   IDLE: 'idle',

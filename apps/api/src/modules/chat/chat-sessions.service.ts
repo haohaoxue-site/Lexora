@@ -23,6 +23,7 @@ import type {
   ResolvedLanguagePreference,
 } from '@haohaoxue/lexora-contracts'
 import type { AgentProfileForGeneration } from '../agent/agent-profiles.service'
+import type { ChatAssetStorageLocator } from './chat-assets.service'
 import type { ChatContextSnapshotCreateData } from './chat-context-snapshots.service'
 import { randomUUID } from 'node:crypto'
 import {
@@ -39,11 +40,14 @@ import {
   ChatGenerationBootstrapSchema,
   ChatGenerationModelTargetSnapshotSchema,
   ChatMutationResponseSchema,
+  ChatPersistedMessageAttachmentSchema,
   ChatSkillInvocationSchema,
   WORKSPACE_MEMBER_STATUS,
 } from '@haohaoxue/lexora-contracts'
 import { LANGUAGE_PREFERENCE } from '@haohaoxue/lexora-contracts/user/constants'
-import { buildAgentChatThreadId, resolveLanguagePreference } from '@haohaoxue/lexora-shared'
+import { buildAgentChatThreadId } from '@haohaoxue/lexora-shared/agent'
+import { isChatUploadedMessageAttachment, resolveMissingChatAttachmentInputModalities } from '@haohaoxue/lexora-shared/chat'
+import { resolveLanguagePreference } from '@haohaoxue/lexora-shared/user'
 import {
   BadRequestException,
   ConflictException,
@@ -62,7 +66,7 @@ import {
   ChatSessionChannel as PrismaChatSessionChannel,
 } from '@prisma/client'
 import { PrismaService } from '../../database/prisma.service'
-import { apiConflict, apiNotFound } from '../../utils/api-error'
+import { apiBadRequest, apiConflict, apiNotFound } from '../../utils/api-error'
 import {
   AgentProfilesService,
   resolveAgentProfileFixedModelRef,
@@ -70,6 +74,7 @@ import {
 import { AgentSkillsService } from '../agent/agent-skills.service'
 import { AiModelResolverService } from '../ai/models/resolver.service'
 import { mapLanguagePreference } from '../users/users.utils'
+import { ChatAssetsService } from './chat-assets.service'
 import { ChatContextSnapshotsService } from './chat-context-snapshots.service'
 import { ChatSessionEventsService } from './chat-session-events.service'
 import {
@@ -230,6 +235,12 @@ const chatSessionRunDetailSelect = {
   },
 } satisfies Prisma.ChatSessionSelect
 
+const chatAssetStorageLocatorSelect = {
+  id: true,
+  bucket: true,
+  objectKey: true,
+} satisfies Prisma.ChatAssetSelect & Record<keyof ChatAssetStorageLocator, true>
+
 type PersistedChatSessionDetail = Prisma.ChatSessionGetPayload<{
   select: typeof chatSessionDetailSelect
 }>
@@ -308,6 +319,7 @@ export class ChatSessionsService {
     private readonly prisma: PrismaService,
     private readonly chatSessionEvents: ChatSessionEventsService,
     private readonly chatContextSnapshots: ChatContextSnapshotsService,
+    private readonly chatAssets: ChatAssetsService,
     private readonly agentProfiles: AgentProfilesService,
     private readonly modelResolverService: AiModelResolverService,
     @Optional() private readonly agentSkills?: AgentSkillsService,
@@ -466,6 +478,12 @@ export class ChatSessionsService {
           runId: true,
         },
       })
+      const chatAssets = await tx.chatAsset.findMany({
+        where: {
+          sessionId,
+        },
+        select: chatAssetStorageLocatorSelect,
+      })
       const deleteResult = await tx.chatSession.deleteMany({
         where: this.createAccessibleSessionWhere(userId, sessionId, origin),
       })
@@ -473,12 +491,15 @@ export class ChatSessionsService {
       return {
         count: deleteResult.count,
         activeRunIds: activeRuns.map(run => run.runId),
+        chatAssets,
       }
     })
 
     if (result.count === 0) {
       throw new NotFoundException('聊天会话不存在')
     }
+
+    await this.deleteStoredChatAssetsAfterSessionDelete(result.chatAssets)
 
     return {
       activeRunIds: result.activeRunIds,
@@ -513,6 +534,7 @@ export class ChatSessionsService {
         return {
           activeRunIds: [],
           deletedSessionIds,
+          chatAssets: [],
         }
       }
 
@@ -531,6 +553,13 @@ export class ChatSessionsService {
         },
       })
 
+      const chatAssets = await tx.chatAsset.findMany({
+        where: {
+          sessionId: { in: deletedSessionIds },
+        },
+        select: chatAssetStorageLocatorSelect,
+      })
+
       await tx.chatSession.deleteMany({
         where: {
           id: { in: deletedSessionIds },
@@ -542,12 +571,15 @@ export class ChatSessionsService {
       return {
         activeRunIds: activeRuns.map(run => run.runId),
         deletedSessionIds,
+        chatAssets,
       }
     })
 
     if (result.deletedSessionIds.length === 0) {
       throw new NotFoundException('聊天会话不存在')
     }
+
+    await this.deleteStoredChatAssetsAfterSessionDelete(result.chatAssets)
 
     return result
   }
@@ -578,6 +610,12 @@ export class ChatSessionsService {
   }): Promise<ChatMutationResponse> {
     const result = await this.createRunFromRetriedAssistantMessage(input)
     return this.toMutationResponse(input.userId, input.origin, result.sessionId, result.latestSequence, result.runId)
+  }
+
+  private async deleteStoredChatAssetsAfterSessionDelete(assets: ChatAssetStorageLocator[]): Promise<void> {
+    await this.chatAssets.deleteStoredAssets(assets).catch(error => this.logger.warn(
+      error instanceof Error ? error.message : 'deleted chat session asset cleanup failed',
+    ))
   }
 
   async switchActiveMessage(input: {
@@ -862,6 +900,7 @@ export class ChatSessionsService {
         order,
         content: snapshot.content,
       })),
+      inputAttachments: readChatInputAttachments(triggerMessage.metadata),
       memory: input.memory,
     }
   }
@@ -1048,8 +1087,14 @@ export class ChatSessionsService {
 
     const resolvedContext = await this.chatContextSnapshots.resolveForUserMessage({
       userId: input.userId,
+      workspaceId: session.workspaceId,
+      sessionId: session.id,
       contentJSON: input.contentJSON,
       attachments: input.attachments,
+    })
+    assertChatInputModalitiesSupported({
+      inputModalities: input.modelTargetSnapshot.inputModalities,
+      attachments: resolvedContext.metadata.attachments,
     })
     const normalizedContent = resolvedContext.content
 
@@ -1091,6 +1136,8 @@ export class ChatSessionsService {
       await this.createUserMessage(tx, {
         id: triggerUserMessageId,
         sessionId: session.id,
+        workspaceId: session.workspaceId,
+        actorId: input.userId,
         content: normalizedContent,
         metadata: {
           ...resolvedContext.metadata,
@@ -1191,8 +1238,15 @@ export class ChatSessionsService {
 
     const resolvedContext = await this.chatContextSnapshots.resolveForUserMessage({
       userId: input.userId,
+      workspaceId: session.workspaceId,
+      sessionId: session.id,
+      reusableAssetMessageIds: [sourceMessage.id],
       contentJSON: input.contentJSON,
       attachments: input.attachments,
+    })
+    assertChatInputModalitiesSupported({
+      inputModalities: input.modelTargetSnapshot.inputModalities,
+      attachments: resolvedContext.metadata.attachments,
     })
     const normalizedContent = resolvedContext.content
 
@@ -1223,6 +1277,8 @@ export class ChatSessionsService {
       await this.createUserMessage(tx, {
         id: triggerUserMessageId,
         sessionId: session.id,
+        workspaceId: session.workspaceId,
+        actorId: input.userId,
         content: normalizedContent,
         metadata: {
           ...resolvedContext.metadata,
@@ -1232,6 +1288,7 @@ export class ChatSessionsService {
         parentMessageId: sourceMessage.parentMessageId,
         branchOrder: userBranchOrder,
         sourceMessageId: sourceMessage.id,
+        reusableAssetMessageIds: [sourceMessage.id],
         completedAt: now,
       })
       await this.createAssistantPendingMessage(tx, {
@@ -1322,6 +1379,10 @@ export class ChatSessionsService {
     if (!triggerMessage || triggerMessage.role !== ChatSessionMessageRole.USER) {
       throw new ConflictException('助手消息父节点不是用户消息')
     }
+    assertChatInputModalitiesSupported({
+      inputModalities: input.modelTargetSnapshot.inputModalities,
+      attachments: readChatInputAttachments(triggerMessage.metadata),
+    })
 
     const assistantMessageId = randomUUID()
     const now = new Date()
@@ -1476,6 +1537,8 @@ export class ChatSessionsService {
     input: {
       id: string
       sessionId: string
+      workspaceId: string
+      actorId: string
       content: string
       metadata: {
         contentJSON: ChatMessageContentJSON
@@ -1486,6 +1549,7 @@ export class ChatSessionsService {
       parentMessageId: string | null
       branchOrder: number
       sourceMessageId: string | null
+      reusableAssetMessageIds?: string[]
       completedAt: Date
     },
   ): Promise<void> {
@@ -1523,6 +1587,15 @@ export class ChatSessionsService {
           },
         },
       },
+    })
+
+    await this.chatAssets.bindAssetsToMessage(tx, {
+      actorId: input.actorId,
+      workspaceId: input.workspaceId,
+      sessionId: input.sessionId,
+      messageId: input.id,
+      reusableMessageIds: input.reusableAssetMessageIds,
+      attachments: input.metadata.attachments,
     })
   }
 
@@ -2252,6 +2325,38 @@ function readChatSkillInvocation(metadata: unknown): ChatSkillInvocation | null 
 
   const result = ChatSkillInvocationSchema.safeParse(metadata.skillInvocation)
   return result.success ? result.data : null
+}
+
+function readChatInputAttachments(metadata: unknown) {
+  if (!isRecord(metadata)) {
+    return []
+  }
+
+  const result = ChatPersistedMessageAttachmentSchema.array().safeParse(metadata.attachments)
+  if (!result.success) {
+    return []
+  }
+
+  return result.data.filter(isChatUploadedMessageAttachment)
+}
+
+function assertChatInputModalitiesSupported(input: {
+  inputModalities: readonly ChatGenerationModelTargetSnapshot['inputModalities'][number][]
+  attachments: readonly ChatPersistedMessageAttachment[]
+}): void {
+  const missingModalities = resolveMissingChatAttachmentInputModalities({
+    attachments: input.attachments,
+    inputModalities: input.inputModalities,
+  })
+
+  if (missingModalities.length === 0) {
+    return
+  }
+
+  throw apiBadRequest(
+    API_ERROR_CODE.CHAT_MODEL_INPUT_MODALITY_UNSUPPORTED,
+    'Chat model input modality unsupported',
+  )
 }
 
 function hasAvailableSkill(skillContext: AgentRuntimeSkillContext, skillKey: string): boolean {
