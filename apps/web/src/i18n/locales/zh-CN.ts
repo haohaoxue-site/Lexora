@@ -1304,7 +1304,7 @@ export const zhCN = {
       enableWebSearch: '启用本次对话搜索',
       exitSkill: '退出当前技能',
       exitSkillTooltip: '点击退出技能 ESC',
-      inputPlaceholder: '输入消息，Ctrl/⌘ + Enter 发送',
+      inputPlaceholder: '输入消息，Enter 发送，Shift + Enter 换行',
       textModality: '文本',
       imageModality: '图片',
       imageTooLarge: '图片大小不能超过 {size}',

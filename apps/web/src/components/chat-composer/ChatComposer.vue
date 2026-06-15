@@ -150,7 +150,7 @@ function handleEditorKeyDown(event: KeyboardEvent) {
     return true
   }
 
-  if (event.key !== 'Enter' || (!event.metaKey && !event.ctrlKey)) {
+  if (!isSendKeydown(event)) {
     return false
   }
 
@@ -159,6 +159,13 @@ function handleEditorKeyDown(event: KeyboardEvent) {
     emitSend()
   }
   return true
+}
+
+function isSendKeydown(event: KeyboardEvent) {
+  return event.key === 'Enter'
+    && !event.isComposing
+    && !event.shiftKey
+    && !event.altKey
 }
 
 function handleEditorTextInput(from: number, to: number, text: string) {

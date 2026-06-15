@@ -1302,7 +1302,7 @@ export const enUS = {
       enableWebSearch: 'Enable web search for this conversation',
       exitSkill: 'Exit current skill',
       exitSkillTooltip: 'Click to exit skill. ESC',
-      inputPlaceholder: 'Type a message, Ctrl/Cmd + Enter to send',
+      inputPlaceholder: 'Type a message, Enter to send, Shift + Enter for a new line',
       textModality: 'text',
       imageModality: 'image',
       imageTooLarge: 'Image must be {size} or smaller',
