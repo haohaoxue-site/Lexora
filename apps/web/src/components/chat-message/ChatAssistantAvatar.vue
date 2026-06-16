@@ -1,8 +1,7 @@
 <script setup lang="ts">
-const props = withDefaults(defineProps<{
-  pending?: boolean
-  size?: 'md' | 'sm' | 'xs'
-}>(), {
+import type { ChatAssistantAvatarProps } from './typing'
+
+const props = withDefaults(defineProps<ChatAssistantAvatarProps>(), {
   pending: false,
   size: 'md',
 })

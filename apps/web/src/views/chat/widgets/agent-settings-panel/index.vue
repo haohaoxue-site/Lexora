@@ -20,14 +20,14 @@ import {
   getDefaultAgentProfileSettings,
   updateDefaultAgentProfileModel,
 } from '@/apis/agent-profile'
-import ChatMarkdownContent from '@/components/chat-markdown/ChatMarkdownContent.vue'
+import { ChatMarkdownContent } from '@/components/chat-markdown'
 import Empty from '@/components/empty'
 import ModelCascader from '@/components/model-cascader'
+import { useChatSkillState } from '@/composables/chat/useChatSkillState'
 import { resolveAgentSkillIcon } from '@/utils/agent-skills'
 import dayjs from '@/utils/dayjs'
 import { ElMessage } from '@/utils/element-plus'
 import { getRequestErrorDisplayMessage } from '@/utils/request-error'
-import { useChatSkillState } from '../../composables/useChatSkillState'
 
 const props = defineProps<ChatAgentSettingsPanelProps>()
 const emits = defineEmits<ChatAgentSettingsPanelEmits>()

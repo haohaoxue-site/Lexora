@@ -1,10 +1,10 @@
 import type { ComputedRef, Ref } from 'vue'
 import type { ChatModelItem, ChatSessionDetail } from '@/apis/chat'
-import type { ChatComposerModelRef, ChatComposerModelSelectionKind } from '@/components/chat-composer/typing'
+import type { ChatComposerModelRef, ChatComposerModelSelectionKind } from '@/components/chat-composer'
 import type { ChatStreamController, SendChatComposerMessageInput } from '@/composables/chat/createChatStreamController'
 import { createSharedComposable } from '@vueuse/core'
 import { computed, onMounted, shallowRef, watch } from 'vue'
-import { createChatComposerHostState } from '@/composables/chat/createChatComposerHostState'
+import { createChatSurfaceController } from '@/composables/chat/createChatSurfaceController'
 import { translate } from '@/i18n'
 import { ElMessageBox } from '@/utils/element-plus'
 import { useActiveDocument } from './useActiveDocument'
@@ -26,7 +26,9 @@ interface DocsChatPanelStream {
   cancelActiveRun: ChatStreamController['cancelActiveRun']
   cancelRunId: ChatStreamController['cancelRunId']
   isStreaming: ChatStreamController['isStreaming']
+  retryMessage: ChatStreamController['retryMessage']
   sendMessage: (input: SendChatComposerMessageInput) => Promise<boolean>
+  switchBranch: ChatStreamController['switchBranch']
 }
 
 interface DocsChatPanelOverlay {
@@ -60,6 +62,7 @@ export const useDocsChatPanel = createSharedComposable(() => {
 
   onMounted(() => {
     void engine.model.loadModelState?.()
+    void controller.loadSkills({ silent: true })
   })
 
   return controller
@@ -72,11 +75,48 @@ export function createDocsChatPanelController(options: {
   model: DocsChatPanelModel
 }) {
   const { currentWorkspaceId } = useDocsContext()
-  const host = createChatComposerHostState({
+  const surface = createChatSurfaceController({
     workspaceId: currentWorkspaceId,
     model: options.model,
-    sendMessage: options.stream.sendMessage,
+    sessions: {
+      activeSessionId: options.sessions.activeSessionId,
+    },
+    stream: {
+      isStreaming: options.stream.isStreaming,
+      retryMessage: options.stream.retryMessage,
+      sendMessage: options.stream.sendMessage,
+      switchBranch: options.stream.switchBranch,
+    },
   })
+  const { composer, messages: surfaceMessages } = surface
+  const {
+    attachments,
+    composerModelSelectionKind,
+    composerSelectedModelRef,
+    contentJSON,
+    handleSend,
+    handleUploadAttachmentFiles,
+    handleUploadImageFiles,
+    highlightAttachment,
+    highlightAttachmentId,
+    isConfigured,
+    loadSkills,
+    registerBeforeSendHandler,
+    resetComposer,
+    resetNewSessionComposerState,
+    selectComposerModel,
+    translatorSkillEnabled,
+    translatorTargetLanguage,
+    uploadAvailability,
+    webSearchForRunEnabled,
+    webSearchSkillEnabled,
+  } = composer
+  const {
+    copyMessage,
+    isMessageCopied,
+    retryAssistantMessage,
+    switchToBranch,
+  } = surfaceMessages.actions
   const isOpen = shallowRef(false)
   const composerFocusRequestVersion = shallowRef(0)
   const renameDialogVisible = shallowRef(false)
@@ -91,7 +131,6 @@ export function createDocsChatPanelController(options: {
   const renderSessionId = computed(() => renderSession.value?.id ?? null)
   const hasActiveSession = computed(() => Boolean(options.sessions.activeSession.value))
   const activeSessionTitle = computed(() => options.sessions.activeSession.value?.title ?? translate('docs.chat.titleFallback'))
-
   function openPanel() {
     isOpen.value = true
   }
@@ -113,27 +152,26 @@ export function createDocsChatPanelController(options: {
       return false
     }
 
-    host.resetComposer()
+    resetComposer()
     options.model.clearNewSessionModelDraft()
     return true
   }
 
   function startNewSession() {
     options.sessions.clearActiveSession()
-    host.resetComposer()
-    options.model.clearNewSessionModelDraft()
+    resetNewSessionComposerState()
   }
 
   function clearSelectionContexts() {
-    const nextAttachments = host.attachments.value.filter(attachment =>
+    const nextAttachments = attachments.value.filter(attachment =>
       attachment.type !== 'document' || attachment.scope.kind !== 'selection',
     )
-    if (nextAttachments.length !== host.attachments.value.length) {
-      host.attachments.value = nextAttachments
+    if (nextAttachments.length !== attachments.value.length) {
+      attachments.value = nextAttachments
     }
 
-    if (host.highlightAttachmentId.value && !nextAttachments.some(attachment => attachment.id === host.highlightAttachmentId.value)) {
-      host.highlightAttachmentId.value = null
+    if (highlightAttachmentId.value && !nextAttachments.some(attachment => attachment.id === highlightAttachmentId.value)) {
+      highlightAttachmentId.value = null
     }
   }
 
@@ -206,8 +244,7 @@ export function createDocsChatPanelController(options: {
       await options.sessions.deleteSession(session.id, {
         selectFallbackSession: false,
       })
-      host.resetComposer()
-      options.model.clearNewSessionModelDraft()
+      resetNewSessionComposerState()
       return true
     }
     finally {
@@ -217,42 +254,51 @@ export function createDocsChatPanelController(options: {
 
   return {
     activeSessionTitle,
-    attachments: host.attachments,
+    attachments,
     cancelActiveRun: options.stream.cancelActiveRun,
     cancelRunId: options.stream.cancelRunId,
     clearSelectionContexts,
     composerFocusRequestVersion,
-    composerModelSelectionKind: options.model.composerModelSelectionKind,
-    composerSelectedModelRef: options.model.composerSelectedModelRef,
+    composerModelSelectionKind,
+    composerSelectedModelRef,
     confirmDeleteActiveSession,
-    contentJSON: host.contentJSON,
+    contentJSON,
+    copyMessage,
     deleteActiveSession,
-    handleUploadAttachmentFiles: host.handleUploadAttachmentFiles,
-    handleUploadImageFiles: host.handleUploadImageFiles,
-    handleSend: host.handleSend,
+    handleSend,
+    handleUploadAttachmentFiles,
+    handleUploadImageFiles,
     hasActiveSession,
-    highlightAttachment: host.highlightAttachment,
-    highlightAttachmentId: host.highlightAttachmentId,
-    isConfigured: options.model.isConfigured,
+    highlightAttachment,
+    highlightAttachmentId,
+    isConfigured,
     isDeleting,
+    isMessageCopied,
     isOpen,
     isRenaming,
-    isStreaming: options.stream.isStreaming,
+    isStreaming: surfaceMessages.isStreaming,
     loadHistorySessions,
+    loadSkills,
     messages,
     openPanel,
     openRenameDialog,
     renameDialogVisible,
     renameDraft,
-    registerBeforeSendHandler: host.registerBeforeSendHandler,
+    registerBeforeSendHandler,
     renderSessionId,
-    resetComposer: host.resetComposer,
+    resetComposer,
+    retryAssistantMessage,
     requestComposerFocus,
-    selectComposerModel: options.model.selectComposerModel,
+    selectComposerModel,
     selectHistorySession,
     startNewSession,
     submitRename,
+    switchToBranch,
     togglePanel,
-    uploadAvailability: host.uploadAvailability,
+    translatorSkillEnabled,
+    translatorTargetLanguage,
+    uploadAvailability,
+    webSearchForRunEnabled,
+    webSearchSkillEnabled,
   }
 }

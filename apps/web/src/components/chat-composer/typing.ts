@@ -60,6 +60,80 @@ export interface ChatComposerEmits {
   'highlightAttachment': [attachmentId: string]
 }
 
+export interface ChatComposerToolbarProps {
+  selectedModelRef?: ChatComposerModelRef | null
+  modelSelectionKind?: ChatComposerModelSelectionKind
+  isStreaming?: boolean
+  disabled?: boolean
+  canSend?: boolean
+  uploadAvailability?: ChatComposerUploadAvailability
+  translatorSkillEnabled?: boolean
+  translatorTargetLanguage?: AgentTranslatorTargetLanguage | null
+  webSearchSkillEnabled?: boolean
+  webSearchForRunEnabled?: boolean
+  skillCommandOpenSignal?: number
+}
+
+export interface ChatComposerToolbarEmits {
+  'openPanelPicker': []
+  'uploadImage': []
+  'uploadFile': []
+  'update:translatorTargetLanguage': [targetLanguage: AgentTranslatorTargetLanguage | null]
+  'update:webSearchForRunEnabled': [enabled: boolean]
+  'selectModel': [modelRef: ChatComposerModelRef | null]
+  'send': []
+  'stop': []
+}
+
+export interface ChatComposerAttachmentMenuProps {
+  disabled?: boolean
+  isStreaming?: boolean
+  uploadAvailability?: ChatComposerUploadAvailability
+}
+
+export interface ChatComposerAttachmentMenuEmits {
+  openPanelPicker: []
+  uploadImage: []
+  uploadFile: []
+}
+
+export interface ChatComposerWebSearchButtonProps {
+  disabled?: boolean
+  isStreaming?: boolean
+  webSearchSkillEnabled?: boolean
+  webSearchForRunEnabled?: boolean
+}
+
+export interface ChatComposerWebSearchButtonEmits {
+  'update:webSearchForRunEnabled': [enabled: boolean]
+}
+
+export interface ChatComposerSkillControlsProps {
+  disabled?: boolean
+  isStreaming?: boolean
+  translatorSkillEnabled?: boolean
+  translatorTargetLanguage?: AgentTranslatorTargetLanguage | null
+  skillCommandOpenSignal?: number
+}
+
+export interface ChatComposerSkillControlsEmits {
+  'update:translatorTargetLanguage': [targetLanguage: AgentTranslatorTargetLanguage | null]
+}
+
+export interface ChatComposerSubmitControlsProps {
+  selectedModelRef?: ChatComposerModelRef | null
+  modelSelectionKind?: ChatComposerModelSelectionKind
+  isStreaming?: boolean
+  disabled?: boolean
+  canSend?: boolean
+}
+
+export interface ChatComposerSubmitControlsEmits {
+  selectModel: [modelRef: ChatComposerModelRef | null]
+  send: []
+  stop: []
+}
+
 export interface ChatComposerExposed {
   focus: () => void
 }

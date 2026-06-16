@@ -1,19 +1,12 @@
 <script setup lang="ts">
-import type { ChatMessage } from '@/apis/chat'
+import type { ChatReasoningBlockProps } from './typing'
 import { ArrowDown } from '@element-plus/icons-vue'
 import { CHAT_MESSAGE_STATUS } from '@haohaoxue/lexora-contracts/chat/constants'
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useStreamingTextReveal } from '@/composables/chat/useStreamingTextReveal'
 
-const props = withDefaults(defineProps<{
-  messageId: string
-  text: string
-  status: ChatMessage['status']
-  elapsedMs?: number | null
-  defaultExpanded?: boolean
-  answerStarted?: boolean
-}>(), {
+const props = withDefaults(defineProps<ChatReasoningBlockProps>(), {
   answerStarted: false,
   elapsedMs: null,
   defaultExpanded: false,

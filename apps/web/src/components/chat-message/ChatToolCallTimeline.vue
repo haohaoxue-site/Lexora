@@ -1,15 +1,10 @@
 <script setup lang="ts">
+import type { ChatToolCallTimelineProps } from './typing'
 import type { AssistantToolCallView } from '@/composables/chat/utils/chat-message-display'
-import {
-  AGENT_MEMORY_TOOL,
-  AGENT_WEB_SEARCH_TOOL,
-} from '@haohaoxue/lexora-contracts/agent'
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 
-const props = defineProps<{
-  items: AssistantToolCallView[]
-}>()
+const props = defineProps<ChatToolCallTimelineProps>()
 
 const { t } = useI18n({ useScope: 'global' })
 const summary = computed(() => {
@@ -36,14 +31,6 @@ const summary = computed(() => {
 })
 
 function getKindLabel(item: AssistantToolCallView): string {
-  if (isMemoryToolName(item.name)) {
-    return t('chat.messageDisplay.memoryKind')
-  }
-
-  if (isWebSearchToolName(item.name)) {
-    return t('chat.messageDisplay.webKind')
-  }
-
   if (item.kind === 'skill') {
     return t('chat.messageDisplay.skillKind')
   }
@@ -53,14 +40,6 @@ function getKindLabel(item: AssistantToolCallView): string {
   }
 
   return t('chat.messageDisplay.functionKind')
-}
-
-function isMemoryToolName(name: string): boolean {
-  return (Object.values(AGENT_MEMORY_TOOL) as string[]).includes(name)
-}
-
-function isWebSearchToolName(name: string): boolean {
-  return (Object.values(AGENT_WEB_SEARCH_TOOL) as string[]).includes(name)
 }
 
 function getStatusLabel(status: AssistantToolCallView['status']): string {

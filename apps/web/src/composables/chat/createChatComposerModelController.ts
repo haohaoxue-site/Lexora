@@ -1,7 +1,7 @@
 import type { Ref } from 'vue'
 import type { ChatApi } from './createChatApi'
 import type { ChatSessionDetail } from '@/apis/chat'
-import type { ChatComposerModelRef } from '@/components/chat-composer/typing'
+import type { ChatComposerModelRef } from '@/components/chat-composer'
 import { computed, shallowRef, watch } from 'vue'
 import { translate } from '@/i18n'
 import { ElMessage } from '@/utils/element-plus'

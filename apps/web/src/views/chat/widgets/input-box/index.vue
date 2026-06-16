@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { ChatInputBoxProps } from './typing'
 import { useI18n } from 'vue-i18n'
-import ChatComposer from '@/components/chat-composer/ChatComposer.vue'
+import { ChatComposer } from '@/components/chat-composer'
 import { useChatInputBox } from '../../composables/useChatInputBox'
 
 const props = withDefaults(defineProps<ChatInputBoxProps>(), {

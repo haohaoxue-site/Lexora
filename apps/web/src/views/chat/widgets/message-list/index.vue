@@ -2,17 +2,13 @@
 import type { ComponentPublicInstance } from 'vue'
 import type { ChatMessageListProps } from './typing'
 import type { ChatMessage } from '@/apis/chat'
-import {
-  ArrowLeft,
-  ArrowRight,
-  EditPen,
-  RefreshRight,
-} from '@element-plus/icons-vue'
 import { computed, useTemplateRef } from 'vue'
 import { useI18n } from 'vue-i18n'
-import ChatAssistantAvatar from '@/components/chat-message/ChatAssistantAvatar.vue'
-import ChatUserMessageContent from '@/components/chat-message/ChatUserMessageContent.vue'
-import CopyStateIcon from '@/components/copy-state-icon/CopyStateIcon.vue'
+import {
+  ChatAssistantAvatar,
+  ChatMessageActions,
+  ChatUserMessageContent,
+} from '@/components/chat-message'
 import { useDynamicChatVirtualList } from '@/composables/chat/useDynamicChatVirtualList'
 import { shouldShowAssistantPending } from '@/composables/chat/utils/chat-message-display'
 import dayjs from '@/utils/dayjs'
@@ -51,7 +47,6 @@ const {
   emptyIcon,
   emptyIconStateClass,
   getMessageRoleClass,
-  getMessageText,
   handleEditUploadAttachmentFiles,
   handleEditUploadImageFiles,
   highlightEditingAttachment,
@@ -243,47 +238,22 @@ function formatMessageSentAt(value: string): string {
 
               <ChatAssistantMessage :message="virtual.item.message" variant="global" :show-usage-summary="false" />
 
-              <div class="chat-message-list__actions assistant flex items-center justify-start gap-1.5">
-                <ElTooltip :content="t('chat.messageList.copyReply')" placement="bottom">
-                  <ElButton
-                    text
-                    class="chat-message-list__action-button chat-message-list__copy-action h-7 min-w-7 w-7 rounded-lg p-0"
-                    :class="{ 'is-copied': isMessageCopied(virtual.item.message) }"
-                    :disabled="!getMessageText(virtual.item.message)"
-                    :aria-label="isMessageCopied(virtual.item.message) ? t('chat.messageList.replyCopied') : t('chat.messageList.copyReply')"
-                    @click="copyMessage(virtual.item.message)"
-                  >
-                    <CopyStateIcon :copied="isMessageCopied(virtual.item.message)" />
-                  </ElButton>
-                </ElTooltip>
-                <ElTooltip :content="t('chat.messageList.retry')" placement="bottom">
-                  <ElButton
-                    text
-                    class="chat-message-list__action-button h-7 min-w-7 w-7 rounded-lg p-0"
-                    :icon="RefreshRight"
-                    :disabled="isStreaming || props.isReadonly"
-                    @click="retryAssistantMessage(virtual.item.message)"
-                  />
-                </ElTooltip>
-                <div v-if="virtual.item.message.branch.count > 1" class="chat-message-list__branch ml-0.5 inline-flex items-center gap-0.5 rounded-md px-0.5 text-[0.8125rem] leading-none">
-                  <ElButton
-                    text
-                    class="chat-message-list__branch-button h-4 min-w-4 w-4 rounded-md p-0"
-                    :icon="ArrowLeft"
-                    :disabled="isStreaming || props.isReadonly || !virtual.item.message.branch.previousMessageId"
-                    @click="switchToBranch(virtual.item.message.branch.previousMessageId)"
-                  />
-                  <span class="inline-flex min-w-[2.25rem] items-center justify-center px-1">{{ virtual.item.message.branch.index }} / {{ virtual.item.message.branch.count }}</span>
-                  <ElButton
-                    text
-                    class="chat-message-list__branch-button h-4 min-w-4 w-4 rounded-md p-0"
-                    :icon="ArrowRight"
-                    :disabled="isStreaming || props.isReadonly || !virtual.item.message.branch.nextMessageId"
-                    @click="switchToBranch(virtual.item.message.branch.nextMessageId)"
-                  />
-                </div>
-                <ChatMessageUsageAction :message="virtual.item.message" />
-              </div>
+              <ChatMessageActions
+                class="chat-message-list__actions assistant flex items-center justify-start gap-1.5"
+                :message="virtual.item.message"
+                :copied="isMessageCopied(virtual.item.message)"
+                :is-streaming="isStreaming"
+                :is-readonly="props.isReadonly"
+                show-retry
+                variant="global"
+                @copy-message="copyMessage"
+                @retry-assistant-message="retryAssistantMessage"
+                @switch-branch="switchToBranch"
+              >
+                <template #after>
+                  <ChatMessageUsageAction :message="virtual.item.message" />
+                </template>
+              </ChatMessageActions>
             </div>
 
             <div
@@ -326,46 +296,22 @@ function formatMessageSentAt(value: string): string {
                 <div class="chat-message-list__bubble user rounded-lg px-3 py-2 text-sm leading-[1.625] break-words">
                   <ChatUserMessageContent :message="virtual.item.message" />
                 </div>
-                <div class="chat-message-list__actions user flex items-center justify-end gap-1.5">
-                  <ElTooltip :content="t('chat.messageList.copyMessage')" placement="bottom">
-                    <ElButton
-                      text
-                      class="chat-message-list__action-button chat-message-list__copy-action h-7 min-w-7 w-7 rounded-lg p-0"
-                      :class="{ 'is-copied': isMessageCopied(virtual.item.message) }"
-                      :aria-label="isMessageCopied(virtual.item.message) ? t('chat.messageList.messageCopied') : t('chat.messageList.copyMessage')"
-                      @click="copyMessage(virtual.item.message)"
-                    >
-                      <CopyStateIcon :copied="isMessageCopied(virtual.item.message)" />
-                    </ElButton>
-                  </ElTooltip>
-                  <ElTooltip :content="t('chat.messageList.edit')" placement="bottom">
-                    <ElButton
-                      text
-                      class="chat-message-list__action-button h-7 min-w-7 w-7 rounded-lg p-0"
-                      :icon="EditPen"
-                      :disabled="isStreaming || props.isReadonly"
-                      @click="startEditMessage(virtual.item.message)"
-                    />
-                  </ElTooltip>
-                  <div v-if="virtual.item.message.branch.count > 1" class="chat-message-list__branch ml-0.5 inline-flex items-center gap-0.5 rounded-md px-0.5 text-[0.8125rem] leading-none">
-                    <ElButton
-                      text
-                      class="chat-message-list__branch-button h-4 min-w-4 w-4 rounded-md p-0"
-                      :icon="ArrowLeft"
-                      :disabled="isStreaming || props.isReadonly || !virtual.item.message.branch.previousMessageId"
-                      @click="switchToBranch(virtual.item.message.branch.previousMessageId)"
-                    />
-                    <span class="inline-flex min-w-[2.25rem] items-center justify-center px-1">{{ virtual.item.message.branch.index }} / {{ virtual.item.message.branch.count }}</span>
-                    <ElButton
-                      text
-                      class="chat-message-list__branch-button h-4 min-w-4 w-4 rounded-md p-0"
-                      :icon="ArrowRight"
-                      :disabled="isStreaming || props.isReadonly || !virtual.item.message.branch.nextMessageId"
-                      @click="switchToBranch(virtual.item.message.branch.nextMessageId)"
-                    />
-                  </div>
-                  <ChatMessageUsageAction :message="virtual.item.message" />
-                </div>
+                <ChatMessageActions
+                  class="chat-message-list__actions user flex items-center justify-end gap-1.5"
+                  :message="virtual.item.message"
+                  :copied="isMessageCopied(virtual.item.message)"
+                  :is-streaming="isStreaming"
+                  :is-readonly="props.isReadonly"
+                  show-edit
+                  variant="global"
+                  @copy-message="copyMessage"
+                  @edit-message="startEditMessage"
+                  @switch-branch="switchToBranch"
+                >
+                  <template #after>
+                    <ChatMessageUsageAction :message="virtual.item.message" />
+                  </template>
+                </ChatMessageActions>
               </template>
             </div>
           </div>
@@ -465,29 +411,14 @@ function formatMessageSentAt(value: string): string {
       opacity 160ms ease,
       transform 160ms ease;
 
-    :deep(.el-button.is-text:not(.is-disabled):hover),
-    :deep(.el-button.is-text:not(.is-disabled):focus-visible) {
+    :deep(.el-button.is-text:not(.is-disabled):not(.chat-message-actions__branch-button):hover),
+    :deep(.el-button.is-text:not(.is-disabled):not(.chat-message-actions__branch-button):focus-visible) {
       color: var(--brand-text-primary);
       background-color: color-mix(in srgb, var(--brand-fill-light) 72%, transparent);
     }
 
     :deep(.el-button.is-text:not(.is-disabled):active) {
       background-color: color-mix(in srgb, var(--brand-fill-light) 92%, transparent);
-    }
-  }
-
-  .chat-message-list__action-button {
-    background: color-mix(in srgb, var(--brand-fill-light) 34%, transparent);
-  }
-
-  .chat-message-list__copy-action {
-    transition:
-      color 0.16s ease,
-      transform 0.16s ease;
-
-    &.is-copied {
-      color: var(--brand-success);
-      transform: translateY(-0.0625rem);
     }
   }
 
@@ -498,30 +429,6 @@ function formatMessageSentAt(value: string): string {
     opacity: 1;
     pointer-events: auto;
     transform: translateY(0);
-  }
-
-  .chat-message-list__branch {
-    color: var(--brand-text-secondary);
-    font-variant-numeric: tabular-nums;
-  }
-
-  .chat-message-list__branch-button {
-    background: transparent;
-    color: inherit;
-
-    :deep(.el-icon) {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 0.625rem;
-      line-height: 1;
-    }
-  }
-
-  :deep(.el-button.is-text.chat-message-list__branch-button:not(.is-disabled):hover),
-  :deep(.el-button.is-text.chat-message-list__branch-button:not(.is-disabled):focus-visible) {
-    background-color: transparent;
-    color: var(--brand-text-primary);
   }
 
   .chat-message-list__edit-box {

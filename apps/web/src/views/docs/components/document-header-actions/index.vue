@@ -7,7 +7,7 @@ import {
 } from '@haohaoxue/lexora-contracts/document/constants'
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
-import ChatAssistantAvatar from '@/components/chat-message/ChatAssistantAvatar.vue'
+import { ChatAssistantAvatar } from '@/components/chat-message'
 import { useDocumentHeaderActions } from '../../composables/useDocumentHeaderActions'
 
 const pageWidthPreviewClass: Record<DocumentPageWidthMode, string> = {

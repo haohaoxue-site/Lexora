@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import type { DocsChatPanelEmits, DocsChatPanelProps } from './typing'
-import type { ChatComposerExposed } from '@/components/chat-composer/typing'
+import type { ChatComposerExposed } from '@/components/chat-composer'
 import { computed, nextTick, useTemplateRef, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import ChatComposer from '@/components/chat-composer/ChatComposer.vue'
+import { ChatComposer } from '@/components/chat-composer'
 import DocsChatHeader from '../../components/chat-header'
 import DocsChatMessages from '../../components/chat-messages'
 import DocsChatRenameDialog from '../../components/chat-rename-dialog'
@@ -24,6 +24,7 @@ const {
   composerSelectedModelRef,
   confirmDeleteActiveSession,
   contentJSON,
+  copyMessage,
   handleSend,
   handleUploadAttachmentFiles,
   handleUploadImageFiles,
@@ -34,15 +35,22 @@ const {
   isRenaming,
   isStreaming,
   loadHistorySessions,
+  isMessageCopied,
   messages,
   openRenameDialog,
   renameDialogVisible,
   renderSessionId,
+  retryAssistantMessage,
   selectComposerModel,
   selectHistorySession,
   startNewSession,
   submitRename,
+  switchToBranch,
+  translatorSkillEnabled,
+  translatorTargetLanguage,
   uploadAvailability,
+  webSearchForRunEnabled,
+  webSearchSkillEnabled,
 } = useDocsChatPanel()
 const {
   activeSessionId,
@@ -100,18 +108,30 @@ watch(
       @delete-session="confirmDeleteActiveSession"
     />
 
-    <DocsChatMessages :messages="messages" :session-id="renderSessionId" />
+    <DocsChatMessages
+      :messages="messages"
+      :session-id="renderSessionId"
+      :is-streaming="isStreaming"
+      :is-message-copied="isMessageCopied"
+      @copy-message="copyMessage"
+      @retry-assistant-message="retryAssistantMessage"
+      @switch-branch="switchToBranch"
+    />
 
     <div class="docs-chat-panel__composer flex-none p-3">
       <ChatComposer
         ref="composer"
         v-model:attachments="attachments"
+        v-model:translator-target-language="translatorTargetLanguage"
+        v-model:web-search-for-run-enabled="webSearchForRunEnabled"
         :content-j-s-o-n="contentJSON"
         :selected-model-ref="composerSelectedModelRef"
         :model-selection-kind="composerModelSelectionKind"
         :is-streaming="isStreaming"
         :highlight-attachment-id="highlightAttachmentId"
         :upload-availability="uploadAvailability"
+        :translator-skill-enabled="translatorSkillEnabled"
+        :web-search-skill-enabled="webSearchSkillEnabled"
         document-picker-teleport-to=".docs-chat-panel__picker-layer"
         @update:content-j-s-o-n="contentJSON = $event"
         @send="handleSend"

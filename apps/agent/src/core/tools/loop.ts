@@ -5,7 +5,11 @@ import type { StructuredToolInterface } from '@langchain/core/tools'
 import type { AgentMemoryApiClient } from '../../clients/memory'
 import type { AgentSkillApiClient } from '../../clients/skills'
 import type { AgentChatModel } from '../../integrations/model-providers/chat-model'
-import type { AgentModelStreamPart } from '../../integrations/model-providers/stream-text'
+import type {
+  AgentModelStreamPart,
+  TextToolCallCandidate,
+  TextToolCallPolicy,
+} from '../../integrations/model-providers/stream-text'
 import type { WebSearchClient } from '../../integrations/web-search'
 import type { RuntimeSkillAdapter } from '../skills/adapters'
 import type { LoadedAgentSkill } from '../skills/runtime'
@@ -51,7 +55,15 @@ export async function callModelWithRuntimeTools(input: {
     loadedSkills,
   })
   let visibleSkillToolNames = createVisibleSkillToolNameSet(tools)
-  let textToolCallToolNames = visibleSkillToolNames
+  let textToolCallPolicy = createTextToolCallPolicy({
+    context: input.context,
+    memoryApi: input.memoryApi,
+    webSearch: input.webSearch,
+    skillApi: input.skillApi,
+    skillAdapters: input.skillAdapters,
+    loadedSkills,
+    visibleToolNames: visibleSkillToolNames,
+  })
 
   if (tools.length === 0) {
     return streamModelWithoutTools({
@@ -65,7 +77,7 @@ export async function callModelWithRuntimeTools(input: {
     messages,
     input.signal,
     input.context,
-    textToolCallToolNames,
+    textToolCallPolicy,
   )
   addModelCallMetrics(metrics, lastResult)
 
@@ -112,6 +124,10 @@ export async function callModelWithRuntimeTools(input: {
     loadedSkills = toolResult.loadedSkills
     memoryOperations.push(...toolResult.operations)
     messages.push(...toolResult.toolMessages)
+    const shouldForceFinalResponse = shouldContinueWithFinalResponse({
+      toolCalls: lastResult.toolCalls,
+      toolMessages: toolResult.toolMessages,
+    })
 
     tools = resolveRuntimeVisibleTools({
       context: input.context,
@@ -122,16 +138,24 @@ export async function callModelWithRuntimeTools(input: {
       loadedSkills,
     })
     visibleSkillToolNames = createVisibleSkillToolNameSet(tools)
-    textToolCallToolNames = visibleSkillToolNames
+    textToolCallPolicy = createTextToolCallPolicy({
+      context: input.context,
+      memoryApi: input.memoryApi,
+      webSearch: input.webSearch,
+      skillApi: input.skillApi,
+      skillAdapters: input.skillAdapters,
+      loadedSkills,
+      visibleToolNames: visibleSkillToolNames,
+    })
 
-    lastResult = round === 2 || tools.length === 0
-      ? await consumeStreamingModelCall(input.model, messages, input.signal, input.context)
+    lastResult = shouldForceFinalResponse || round === 2 || tools.length === 0
+      ? await consumeFinalStreamingModelCall(input.model, messages, input.signal, input.context)
       : await consumeStreamingModelCall(
           input.model.bindTools(tools, { tool_choice: 'auto' }),
           messages,
           input.signal,
           input.context,
-          textToolCallToolNames,
+          textToolCallPolicy,
         )
     addModelCallMetrics(metrics, lastResult)
   }
@@ -261,10 +285,96 @@ function createVisibleSkillToolNameSet(tools: StructuredToolInterface[]): Readon
   return new Set(tools.map(tool => tool.name))
 }
 
+function createTextToolCallPolicy(input: {
+  context: AgentGraphContext | undefined
+  memoryApi?: AgentMemoryApiClient
+  skillApi?: AgentSkillApiClient
+  webSearch?: WebSearchClient
+  skillAdapters?: readonly RuntimeSkillAdapter[]
+  loadedSkills: LoadedAgentSkill[]
+  visibleToolNames: ReadonlySet<string>
+}): TextToolCallPolicy {
+  const activatableSkillByToolName = createActivatableSkillToolNameMap(input)
+
+  return {
+    allowedToolNames: input.visibleToolNames,
+    isToolCallAllowed({ toolCall, toolCalls }) {
+      const skillKey = activatableSkillByToolName.get(toolCall.name)
+      return Boolean(skillKey && hasSameBlockSkillActivation(toolCalls, skillKey))
+    },
+  }
+}
+
+function createActivatableSkillToolNameMap(input: {
+  context: AgentGraphContext | undefined
+  memoryApi?: AgentMemoryApiClient
+  skillApi?: AgentSkillApiClient
+  webSearch?: WebSearchClient
+  skillAdapters?: readonly RuntimeSkillAdapter[]
+  loadedSkills: LoadedAgentSkill[]
+}): ReadonlyMap<string, string> {
+  const result = new Map<string, string>()
+
+  for (const skill of input.context?.skillContext?.availableSkills ?? []) {
+    const declaredToolNames = new Set(skill.tools.map(tool => tool.name))
+    if (declaredToolNames.size === 0) {
+      continue
+    }
+
+    const visibleAfterActivation = resolveRuntimeVisibleTools({
+      context: input.context,
+      memoryApi: input.memoryApi,
+      webSearch: input.webSearch,
+      skillApi: input.skillApi,
+      skillAdapters: input.skillAdapters,
+      loadedSkills: upsertLoadedSkill(input.loadedSkills, skill.key),
+    })
+    for (const tool of visibleAfterActivation) {
+      if (declaredToolNames.has(tool.name)) {
+        result.set(tool.name, skill.key)
+      }
+    }
+  }
+
+  return result
+}
+
+function upsertLoadedSkill(loadedSkills: LoadedAgentSkill[], skillKey: string): LoadedAgentSkill[] {
+  return loadedSkills.some(skill => skill.key === skillKey)
+    ? loadedSkills
+    : [...loadedSkills, { key: skillKey }]
+}
+
+function hasSameBlockSkillActivation(toolCalls: readonly TextToolCallCandidate[], skillKey: string): boolean {
+  return toolCalls.some(toolCall =>
+    toolCall.name === AGENT_SKILL_TOOL_NAME.ACTIVATE
+    && readStringToolCallArg(toolCall.args, 'skillKey') === skillKey,
+  )
+}
+
+function readStringToolCallArg(args: Record<string, unknown>, key: string): string | null {
+  const value = args[key]
+  return typeof value === 'string' ? value : null
+}
+
 function isKnownRuntimeSkillToolName(toolName: string): boolean {
-  return (Object.values(AGENT_SKILL_TOOL_NAME) as string[]).includes(toolName)
-    || (AGENT_MEMORY_TOOL_VALUES as readonly string[]).includes(toolName)
-    || (AGENT_WEB_SEARCH_TOOL_VALUES as readonly string[]).includes(toolName)
+  return getKnownRuntimeSkillToolNames().includes(toolName)
+}
+
+function getKnownRuntimeSkillToolNames(): readonly string[] {
+  return [
+    ...Object.values(AGENT_SKILL_TOOL_NAME),
+    ...AGENT_MEMORY_TOOL_VALUES,
+    ...AGENT_WEB_SEARCH_TOOL_VALUES,
+  ]
+}
+
+function shouldContinueWithFinalResponse(input: {
+  toolCalls: BaseToolCall[]
+  toolMessages: Array<{ status?: 'success' | 'error' }>
+}): boolean {
+  return input.toolMessages.some(message => message.status === 'error')
+    || input.toolCalls.some(toolCall => (AGENT_WEB_SEARCH_TOOL_VALUES as readonly string[]).includes(toolCall.name))
 }
 
 function stringifyToolPayload(value: unknown): string {
@@ -309,13 +419,27 @@ async function consumeStreamingModelCall(
   messages: BaseMessage[],
   signal: AbortSignal | undefined,
   context: AgentGraphContext | undefined,
-  textToolCallToolNames?: ReadonlySet<string>,
+  textToolCallPolicy?: TextToolCallPolicy,
 ) {
   const stream = await model.stream(messages, { signal })
   return consumeChatModelTextStream(stream, {
     onStreamPart: context?.onStreamPart,
-    textToolCalls: textToolCallToolNames && textToolCallToolNames.size > 0
-      ? { allowedToolNames: textToolCallToolNames }
+    textToolCalls: textToolCallPolicy && textToolCallPolicy.allowedToolNames.size > 0
+      ? textToolCallPolicy
       : undefined,
   })
+}
+
+async function consumeFinalStreamingModelCall(
+  model: AgentChatModel,
+  messages: BaseMessage[],
+  signal: AbortSignal | undefined,
+  context: AgentGraphContext | undefined,
+) {
+  const result = await consumeStreamingModelCall(model, messages, signal, context)
+
+  return {
+    ...result,
+    toolCalls: [],
+  }
 }

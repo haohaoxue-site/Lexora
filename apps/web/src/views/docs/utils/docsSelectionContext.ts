@@ -2,7 +2,7 @@ import type { TiptapJsonContent } from '@haohaoxue/lexora-contracts'
 import type { Editor } from '@tiptap/core'
 import type { Node as ProseMirrorNode } from '@tiptap/pm/model'
 import type { Transaction } from '@tiptap/pm/state'
-import type { ChatComposerDocumentSelectionScope } from '@/components/chat-composer/typing'
+import type { ChatComposerDocumentSelectionScope } from '@/components/chat-composer'
 import {
   BODY_BLOCK_ID_ATTRIBUTE,
   isAddressableBodyBlock,

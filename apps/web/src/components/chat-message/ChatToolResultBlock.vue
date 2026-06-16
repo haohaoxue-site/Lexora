@@ -1,16 +1,10 @@
 <script setup lang="ts">
-import type { ChatMessage } from '@/apis/chat'
-import type { ChatMarkdownRenderPhase } from '@/components/chat-markdown/typing'
+import type { ChatToolResultBlockProps } from './typing'
 import { computed, shallowRef } from 'vue'
 import { useI18n } from 'vue-i18n'
-import ChatMarkdownContent from '@/components/chat-markdown/ChatMarkdownContent.vue'
+import { ChatMarkdownContent } from '@/components/chat-markdown'
 
-const props = defineProps<{
-  messageId: string
-  phase: ChatMarkdownRenderPhase
-  part: ChatMessage['parts'][number]
-  index: number
-}>()
+const props = defineProps<ChatToolResultBlockProps>()
 const TOOL_RESULT_BUDGET_THRESHOLD = 40_000
 const TOOL_RESULT_INITIAL_VISIBLE_CHARS = 12_000
 const TOOL_RESULT_INCREMENT_CHARS = 20_000

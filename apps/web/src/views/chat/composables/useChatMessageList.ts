@@ -5,26 +5,25 @@ import type {
   ChatComposerContentJSON,
   ChatComposerSubmitPayload,
   ChatComposerUploadAvailability,
-} from '@/components/chat-composer/typing'
+} from '@/components/chat-composer'
 import { AGENT_WEB_SEARCH_SKILL_KEY } from '@haohaoxue/lexora-contracts/agent'
 import { AI_MODEL_MODALITY } from '@haohaoxue/lexora-contracts/ai/constants'
 import { CHAT_MESSAGE_ATTACHMENT_PLACEMENT, CHAT_MESSAGE_ATTACHMENT_TYPE } from '@haohaoxue/lexora-contracts/chat/constants'
 import { FILE_SIZE_LIMITS } from '@haohaoxue/lexora-contracts/file'
 import { resolveMissingChatAttachmentInputModalities } from '@haohaoxue/lexora-shared/chat'
 import { isTextLikeFile, prettyBytes } from '@haohaoxue/lexora-shared/file'
-import { useClipboard } from '@vueuse/core'
-import { computed, shallowRef, toValue, watch } from 'vue'
+import { computed, shallowRef, toValue } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { uploadChatFile, uploadChatImage } from '@/apis/chat'
 import { createEmptyChatComposerContentJSON } from '@/components/chat-composer/serialization'
 import { SvgIconCategory } from '@/components/svg-icon/typing'
-import { getMessageText } from '@/composables/chat/utils/chat-message-display'
+import { useChatMessageActions } from '@/composables/chat/useChatMessageActions'
+import { useChatSkillState } from '@/composables/chat/useChatSkillState'
 import { translate } from '@/i18n'
 import { useWorkspaceStore } from '@/stores/workspace'
 import { ElMessage } from '@/utils/element-plus'
 import { useChatModelSettings } from './useChatModelSettings'
 import { useChatRuntimeOverlay } from './useChatRuntimeOverlay'
-import { useChatSkillState } from './useChatSkillState'
 import { useChatStream } from './useChatStream'
 
 const EDIT_HIGHLIGHT_DURATION_MS = 1400
@@ -56,17 +55,14 @@ export function useChatMessageList(options: UseChatMessageListOptions = {}) {
   const editingAttachments = shallowRef<ChatComposerAttachment[]>([])
   const editingHighlightAttachmentId = shallowRef<string | null>(null)
   const editingWebSearchForRunEnabled = shallowRef(true)
-  const copiedMessageId = shallowRef<string | null>(null)
   const isReadonly = computed(() => Boolean(toValue(options.isReadonly)))
   const workspaceId = computed(() => workspaceStore.currentWorkspace?.id ?? null)
   let editingHighlightTimer: ReturnType<typeof setTimeout> | null = null
-  const {
-    copy: copyText,
-    copied: copiedMessage,
-    isSupported: isClipboardSupported,
-  } = useClipboard({
-    copiedDuring: 1400,
-    legacy: true,
+  const messageActions = useChatMessageActions({
+    isReadonly,
+    isStreaming,
+    retryMessage,
+    switchBranch,
   })
 
   const messages = computed<ChatMessage[]>(() => renderSession.value?.messages ?? [])
@@ -99,39 +95,8 @@ export function useChatMessageList(options: UseChatMessageListOptions = {}) {
     }
   })
 
-  watch(copiedMessage, (copied) => {
-    if (!copied) {
-      copiedMessageId.value = null
-    }
-  })
-
   function getMessageRoleClass(role: ChatMessage['role']) {
     return role === 'user' ? 'user' : 'assistant'
-  }
-
-  async function copyMessage(message: ChatMessage) {
-    const text = getMessageText(message)
-    if (!text) {
-      ElMessage.warning(t('chat.messageList.noCopyContent'))
-      return
-    }
-
-    if (!isClipboardSupported.value) {
-      ElMessage.error(t('chat.messageList.copyUnsupported'))
-      return
-    }
-
-    try {
-      await copyText(text)
-      copiedMessageId.value = message.id
-    }
-    catch {
-      ElMessage.error(t('chat.messageList.copyFailed'))
-    }
-  }
-
-  function isMessageCopied(message: ChatMessage) {
-    return copiedMessage.value && copiedMessageId.value === message.id
   }
 
   function startEditMessage(message: ChatMessage) {
@@ -298,22 +263,6 @@ export function useChatMessageList(options: UseChatMessageListOptions = {}) {
     })
   }
 
-  async function retryAssistantMessage(message: ChatMessage) {
-    if (message.role !== 'assistant' || isStreaming.value || isReadonly.value) {
-      return
-    }
-
-    await retryMessage(message.id)
-  }
-
-  async function switchToBranch(messageId: string | null) {
-    if (!messageId || isStreaming.value || isReadonly.value) {
-      return
-    }
-
-    await switchBranch(messageId)
-  }
-
   function isEditingMessage(message: ChatMessage) {
     return editingMessageId.value === message.id
   }
@@ -323,7 +272,7 @@ export function useChatMessageList(options: UseChatMessageListOptions = {}) {
     cancelEditMessage,
     composerModelSelectionKind,
     composerSelectedModelRef,
-    copyMessage,
+    copyMessage: messageActions.copyMessage,
     editingAttachments,
     editingContentJSON,
     editingHighlightAttachmentId,
@@ -331,21 +280,20 @@ export function useChatMessageList(options: UseChatMessageListOptions = {}) {
     emptyIcon,
     emptyIconStateClass,
     getMessageRoleClass,
-    getMessageText,
     handleEditUploadAttachmentFiles,
     handleEditUploadImageFiles,
     highlightEditingAttachment,
     isEditingMessage,
-    isMessageCopied,
+    isMessageCopied: messageActions.isMessageCopied,
     isConfigured,
     isStreaming,
     listKey,
     messages,
-    retryAssistantMessage,
+    retryAssistantMessage: messageActions.retryAssistantMessage,
     selectComposerModel,
     startEditMessage,
     submitEditMessage,
-    switchToBranch,
+    switchToBranch: messageActions.switchToBranch,
     uploadAvailability,
     webSearchSkillEnabled,
   }

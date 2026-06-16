@@ -8,7 +8,7 @@ import type {
   ChatComposerModelSelectionKind,
   ChatComposerSubmitPayload,
   ChatComposerUploadAvailability,
-} from '@/components/chat-composer/typing'
+} from '@/components/chat-composer'
 import { AI_MODEL_MODALITY } from '@haohaoxue/lexora-contracts/ai/constants'
 import { CHAT_MESSAGE_ATTACHMENT_PLACEMENT, CHAT_MESSAGE_ATTACHMENT_TYPE } from '@haohaoxue/lexora-contracts/chat/constants'
 import { FILE_SIZE_LIMITS } from '@haohaoxue/lexora-contracts/file'

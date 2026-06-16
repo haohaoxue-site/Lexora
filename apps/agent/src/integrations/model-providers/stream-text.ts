@@ -44,13 +44,24 @@ export type AgentModelStreamPart
       raw?: unknown
     }
 
+export interface TextToolCallCandidate {
+  name: string
+  args: Record<string, unknown>
+}
+
+export interface TextToolCallPolicy {
+  allowedToolNames: ReadonlySet<string>
+  isToolCallAllowed?: (input: {
+    toolCall: TextToolCallCandidate
+    toolCalls: readonly TextToolCallCandidate[]
+  }) => boolean
+}
+
 export interface ConsumeChatModelTextStreamOptions {
   onStreamPart?: (part: AgentModelStreamPart) => Promise<void> | void
   onTextDelta?: (text: string) => Promise<void> | void
   now?: () => number
-  textToolCalls?: {
-    allowedToolNames: ReadonlySet<string>
-  }
+  textToolCalls?: TextToolCallPolicy
 }
 
 export interface AgentModelTokenUsage {
@@ -80,6 +91,7 @@ export async function consumeChatModelTextStream(
   const startedAt = now()
   const tagParser = createReasoningTagStreamParser()
   const textToolCallParser = createEnabledTextToolCallStreamParser(options.textToolCalls)
+  const reasoningToolCallBlockStripper = createTextToolCallBlockStripper()
   const normalizeReasoningDelta = createLeadingBlankLineNormalizer()
   const normalizeTextDelta = createLeadingBlankLineNormalizer()
   let responseChunk: AIMessageChunk | null = null
@@ -98,12 +110,13 @@ export async function consumeChatModelTextStream(
     const hasStructuredReasoning = Boolean(reasoning)
     if (reasoning) {
       const normalizedReasoning = normalizeReasoningDelta(reasoning)
-      await emitPart({
-        type: 'reasoning.delta',
-        text: normalizedReasoning,
+      await emitReasoningTextDeltas({
+        deltas: reasoningToolCallBlockStripper.write(normalizedReasoning),
         raw: chunk,
-      }, options, () => {
-        firstTokenAt ??= now()
+        options,
+        markFirstToken: () => {
+          firstTokenAt ??= now()
+        },
       })
     }
 
@@ -196,6 +209,14 @@ export async function consumeChatModelTextStream(
     })
   }
 
+  await emitReasoningTextDeltas({
+    deltas: reasoningToolCallBlockStripper.flush(),
+    options,
+    markFirstToken: () => {
+      firstTokenAt ??= now()
+    },
+  })
+
   await emitCompletedToolCallParts(toolCallStreamState, options)
 
   const completedAt = now()
@@ -209,6 +230,21 @@ export async function consumeChatModelTextStream(
     ]),
     firstTokenLatencyMs: firstTokenAt === null ? undefined : Math.max(0, Math.trunc(firstTokenAt - startedAt)),
     elapsedMs: Math.max(0, Math.trunc(completedAt - startedAt)),
+  }
+}
+
+async function emitReasoningTextDeltas(input: {
+  deltas: string[]
+  raw?: unknown
+  options: ConsumeChatModelTextStreamOptions
+  markFirstToken: () => void
+}): Promise<void> {
+  for (const text of input.deltas) {
+    await emitPart({
+      type: 'reasoning.delta',
+      text,
+      raw: input.raw,
+    }, input.options, input.markFirstToken)
   }
 }
 
@@ -385,7 +421,7 @@ const TEXT_TOOL_CALL_CLOSE_PATTERN = /<\s*\/\s*(?:[|｜]\s*[|｜]\s*DSML\s*[|｜
 const MARKUP_TAG_PATTERN = /<([^<>]*)>/g
 const TOOL_CALL_TAG_NAME_PATTERN = /^[a-z_][\w.-]*/i
 const INVOKE_TAG_PATTERN = /<invoke\b([^>]*)>([\s\S]*?)<\/invoke>/gi
-const PARAMETER_TAG_PATTERN = /<parameter\b([^>]*)>([\s\S]*?)<\/parameter>/gi
+const PARAMETER_TAG_PATTERN = /<parameter\b([^>]*)>([\s\S]*?)(?:<\/parameter>|<parameter\s*>)/gi
 const TEXT_TOOL_CALL_NAME_ALIASES: Record<string, string> = {
   search: AGENT_WEB_SEARCH_TOOL.SEARCH,
 }
@@ -397,9 +433,7 @@ function createEnabledTextToolCallStreamParser(
     return null
   }
 
-  return createTextToolCallStreamParser({
-    allowedToolNames: options.allowedToolNames,
-  })
+  return createTextToolCallStreamParser(options)
 }
 
 async function consumeTextDelta(input: {
@@ -498,7 +532,7 @@ function createTextToolCallStreamParser(input: {
 
       const blockEndIndex = closeTag.index + closeTag.text.length
       const block = buffer.slice(0, blockEndIndex)
-      const toolCalls = parseTextToolCallBlock(block, nextToolCallId, input.allowedToolNames)
+      const toolCalls = parseTextToolCallBlock(block, nextToolCallId, input)
       if (toolCalls.length > 0) {
         result.toolCalls.push(...toolCalls)
       }
@@ -518,6 +552,64 @@ function createTextToolCallStreamParser(input: {
       return drain(false)
     },
     flush(): TextToolCallParseResult {
+      return drain(true)
+    },
+  }
+}
+
+function createTextToolCallBlockStripper() {
+  let buffer = ''
+  let isInsideToolCallBlock = false
+
+  function drain(isFinal: boolean): string[] {
+    const textDeltas: string[] = []
+
+    while (buffer.length > 0) {
+      if (!isInsideToolCallBlock) {
+        const openTag = findPattern(buffer, TEXT_TOOL_CALL_OPEN_PATTERN)
+
+        if (!openTag) {
+          const flushLength = isFinal
+            ? buffer.length
+            : getTextFlushLengthWithoutToolCallOpenTag(buffer)
+
+          if (flushLength > 0) {
+            textDeltas.push(buffer.slice(0, flushLength))
+            buffer = buffer.slice(flushLength)
+          }
+          break
+        }
+
+        if (openTag.index > 0) {
+          textDeltas.push(buffer.slice(0, openTag.index))
+          buffer = buffer.slice(openTag.index)
+        }
+
+        isInsideToolCallBlock = true
+      }
+
+      const closeTag = findPattern(buffer, TEXT_TOOL_CALL_CLOSE_PATTERN)
+      if (!closeTag) {
+        if (isFinal) {
+          buffer = ''
+          isInsideToolCallBlock = false
+        }
+        break
+      }
+
+      buffer = buffer.slice(closeTag.index + closeTag.text.length)
+      isInsideToolCallBlock = false
+    }
+
+    return textDeltas
+  }
+
+  return {
+    write(text: string): string[] {
+      buffer += text
+      return drain(false)
+    },
+    flush(): string[] {
       return drain(true)
     },
   }
@@ -548,28 +640,44 @@ function getTextFlushLengthWithoutToolCallOpenTag(input: string): number {
 function parseTextToolCallBlock(
   block: string,
   createToolCallId: () => string,
-  allowedToolNames: ReadonlySet<string>,
+  policy: TextToolCallPolicy,
 ): ToolCall[] {
   const normalizedBlock = normalizeTextToolCallMarkup(block)
-  const toolCalls: ToolCall[] = []
+  const candidates: TextToolCallCandidate[] = []
   let hasInvoke = false
 
   for (const invokeMatch of normalizedBlock.matchAll(INVOKE_TAG_PATTERN)) {
     hasInvoke = true
     const rawToolName = readMarkupAttribute(invokeMatch[1] ?? '', 'name')
     const toolName = normalizeTextToolCallName(rawToolName)
-    if (!toolName || !allowedToolNames.has(toolName)) {
+    if (!toolName) {
       return []
     }
 
-    toolCalls.push({
-      id: createToolCallId(),
+    candidates.push({
       name: toolName,
       args: parseTextToolCallParameters(invokeMatch[2] ?? ''),
     })
   }
 
-  return hasInvoke ? toolCalls : []
+  if (!hasInvoke || candidates.some(toolCall => !isTextToolCallAllowed(toolCall, candidates, policy))) {
+    return []
+  }
+
+  return candidates.map(toolCall => ({
+    id: createToolCallId(),
+    name: toolCall.name,
+    args: toolCall.args,
+  }))
+}
+
+function isTextToolCallAllowed(
+  toolCall: TextToolCallCandidate,
+  toolCalls: readonly TextToolCallCandidate[],
+  policy: TextToolCallPolicy,
+): boolean {
+  return policy.allowedToolNames.has(toolCall.name)
+    || Boolean(policy.isToolCallAllowed?.({ toolCall, toolCalls }))
 }
 
 function normalizeTextToolCallMarkup(input: string): string {

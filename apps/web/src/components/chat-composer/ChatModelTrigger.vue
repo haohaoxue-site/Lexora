@@ -61,6 +61,7 @@ const selectionTooltip = computed(() => {
 .chat-model-trigger {
   display: inline-flex;
   position: relative;
+  flex: 1 1 0;
   min-width: 0;
 
   &.is-override::after,
@@ -84,12 +85,14 @@ const selectionTooltip = computed(() => {
   }
 
   :deep(.el-cascader) {
-    width: auto;
+    width: 100%;
+    min-width: 0;
     line-height: normal;
   }
 
   :deep(.el-cascader .el-input) {
-    width: 9rem;
+    width: 100%;
+    min-width: 0;
   }
 
   :deep(.el-cascader .el-input__wrapper) {

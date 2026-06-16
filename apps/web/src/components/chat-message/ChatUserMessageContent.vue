@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { ChatMessage } from '@/apis/chat'
+import type { ChatUserMessageContentProps } from './typing'
 import { AGENT_TRANSLATOR_SKILL_KEY } from '@haohaoxue/lexora-contracts/agent'
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -9,9 +9,7 @@ import {
 } from '@/components/chat-composer/attachmentOrdering'
 import { serializeChatComposerContent } from '@/components/chat-composer/serialization'
 
-const props = defineProps<{
-  message: Extract<ChatMessage, { role: 'user' }>
-}>()
+const props = defineProps<ChatUserMessageContentProps>()
 
 const { t } = useI18n({ useScope: 'global' })
 const panelAttachments = computed(() => getPanelAttachments(props.message.metadata.attachments))

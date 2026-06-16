@@ -1,12 +1,10 @@
 import type { ChatMemoryOperationProjection } from '@haohaoxue/lexora-contracts/agent'
 import type { ChatMessage } from '@/apis/chat'
-import type { ChatMarkdownRenderPhase } from '@/components/chat-markdown/typing'
+import type { ChatMarkdownRenderPhase } from '@/components/chat-markdown'
 import {
   AGENT_MEMORY_OPERATION_DISPLAY_CODE,
   AGENT_MEMORY_OPERATION_REASON_CODE,
-  AGENT_MEMORY_SKILL_KEY,
   AGENT_MEMORY_TOOL,
-  AGENT_TRANSLATOR_SKILL_KEY,
   AGENT_WEB_SEARCH_TOOL,
 } from '@haohaoxue/lexora-contracts/agent'
 import {
@@ -212,16 +210,8 @@ function createPublicToolCallView(
   view: AssistantToolCallView,
   memoryOperation?: ChatMemoryOperationProjection,
 ): AssistantToolCallView | null {
-  if (view.name === 'read_skill_resource') {
+  if (view.name === 'activate_skill' || view.name === 'read_skill_resource') {
     return null
-  }
-
-  if (view.name === 'activate_skill') {
-    return {
-      ...view,
-      displayTitle: getSkillActivationTitle(view),
-      displayDetails: [],
-    }
   }
 
   if (isMemoryToolName(view.name)) {
@@ -249,19 +239,6 @@ function createPublicToolCallView(
     displayTitle: getDisplayName(view.name),
     displayDetails: [],
   }
-}
-
-function getSkillActivationTitle(view: AssistantToolCallView): string {
-  const skillKey = getStringArgument(view.argsText, 'skillKey')
-  if (skillKey === AGENT_MEMORY_SKILL_KEY) {
-    return translate('chat.messageDisplay.memoryEnabled')
-  }
-
-  if (skillKey === AGENT_TRANSLATOR_SKILL_KEY) {
-    return translate('chat.messageDisplay.translatorEnabled')
-  }
-
-  return translate('chat.messageDisplay.skillEnabled')
 }
 
 function getMemoryOperationToolStatus(
@@ -421,10 +398,6 @@ function getWebSearchDetails(view: AssistantToolCallView): string[] {
         ? translate('chat.messageDisplay.webSearchNoResults')
         : null,
   ].filter(isNonEmptyString)
-}
-
-function getStringArgument(text: string, key: string): string | null {
-  return getStringValue(parseJsonObject(text), key)
 }
 
 function getStringValue(value: Record<string, unknown> | null, key: string): string | null {

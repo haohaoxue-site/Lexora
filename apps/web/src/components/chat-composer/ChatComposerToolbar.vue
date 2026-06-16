@@ -1,443 +1,59 @@
 <script setup lang="ts">
-import type { AgentTranslatorTargetLanguage } from '@haohaoxue/lexora-contracts/agent'
-import type { DropdownInstance, InputInstance } from 'element-plus'
 import type {
-  ChatComposerModelRef,
-  ChatComposerModelSelectionKind,
-  ChatComposerUploadAvailability,
+  ChatComposerToolbarEmits,
+  ChatComposerToolbarProps,
 } from './typing'
-import { ArrowDown, Check, CloseBold, Document, Picture } from '@element-plus/icons-vue'
-import { AGENT_TRANSLATOR_PRESET_TARGET_LANGUAGES } from '@haohaoxue/lexora-contracts/agent'
-import { computed, nextTick, shallowRef, watch } from 'vue'
-import { useI18n } from 'vue-i18n'
-import ChatModelTrigger from './ChatModelTrigger.vue'
+import ChatComposerAttachmentMenu from './ChatComposerAttachmentMenu.vue'
+import ChatComposerSkillControls from './ChatComposerSkillControls.vue'
+import ChatComposerSubmitControls from './ChatComposerSubmitControls.vue'
+import ChatComposerWebSearchButton from './ChatComposerWebSearchButton.vue'
 
-const props = defineProps<{
-  selectedModelRef?: ChatComposerModelRef | null
-  modelSelectionKind?: ChatComposerModelSelectionKind
-  isStreaming?: boolean
-  disabled?: boolean
-  canSend?: boolean
-  uploadAvailability?: ChatComposerUploadAvailability
-  translatorSkillEnabled?: boolean
-  translatorTargetLanguage?: AgentTranslatorTargetLanguage | null
-  webSearchSkillEnabled?: boolean
-  webSearchForRunEnabled?: boolean
-  skillCommandOpenSignal?: number
-}>()
-
-const emits = defineEmits<{
-  'openPanelPicker': []
-  'uploadImage': []
-  'uploadFile': []
-  'update:translatorTargetLanguage': [targetLanguage: AgentTranslatorTargetLanguage | null]
-  'update:webSearchForRunEnabled': [enabled: boolean]
-  'selectModel': [modelRef: ChatComposerModelRef | null]
-  'send': []
-  'stop': []
-}>()
-const { t } = useI18n({ useScope: 'global' })
-
-const SKILL_TRANSLATOR_COMMAND = 'translator'
-const TRANSLATOR_CUSTOM_LANGUAGE_COMMAND = '__custom__'
-const skillCommandDropdownRef = shallowRef<DropdownInstance>()
-const customLanguageInputRef = shallowRef<InputInstance>()
-const customLanguageEditing = shallowRef(false)
-const customLanguageDraft = shallowRef('')
-
-const translatorParameterDropdownDisabled = computed(() =>
-  Boolean(props.disabled || props.isStreaming || !props.translatorSkillEnabled),
-)
-const skillCommandDropdownDisabled = computed(() =>
-  Boolean(props.disabled || props.isStreaming),
-)
-const skillCommandTooltip = computed(() => props.isStreaming ? t('chat.composer.selectSkillDisabled') : t('chat.composer.selectSkill'))
-const customLanguageSubmitDisabled = computed(() => !customLanguageDraft.value.trim())
-const customTranslatorTargetSelected = computed(() =>
-  Boolean(props.translatorTargetLanguage && !props.translatorTargetLanguage.tag),
-)
-const imageUploadDisabled = computed(() => Boolean(props.uploadAvailability?.image.disabled))
-const fileUploadDisabled = computed(() => Boolean(props.uploadAvailability?.file.disabled))
-const webSearchToggleDisabled = computed(() => Boolean(props.disabled || props.isStreaming))
-const webSearchToggleTooltip = computed(() =>
-  props.webSearchForRunEnabled
-    ? t('chat.composer.disableWebSearch')
-    : t('chat.composer.enableWebSearch'),
-)
-
-watch(
-  () => props.skillCommandOpenSignal,
-  async (signal, previousSignal) => {
-    if (
-      !signal
-      || signal === previousSignal
-      || props.translatorTargetLanguage
-      || skillCommandDropdownDisabled.value
-    ) {
-      return
-    }
-
-    await nextTick()
-    skillCommandDropdownRef.value?.handleOpen()
-  },
-)
-
-watch(
-  () => [props.disabled, props.isStreaming, props.translatorTargetLanguage] as const,
-  ([disabled, isStreaming, targetLanguage]) => {
-    if (disabled || isStreaming || !targetLanguage) {
-      customLanguageEditing.value = false
-    }
-  },
-)
-
-function handleTranslatorCommand(command: string | number | object) {
-  const commandValue = String(command)
-  if (commandValue === TRANSLATOR_CUSTOM_LANGUAGE_COMMAND) {
-    void openCustomTranslatorLanguageInput()
-    return
-  }
-
-  const language = AGENT_TRANSLATOR_PRESET_TARGET_LANGUAGES.find(item => item.tag === commandValue)
-  if (!language) {
-    return
-  }
-
-  customLanguageEditing.value = false
-  emits('update:translatorTargetLanguage', language)
-}
-
-function handleSkillCommand(command: string | number | object) {
-  const commandValue = String(command)
-  if (commandValue !== SKILL_TRANSLATOR_COMMAND) {
-    return
-  }
-
-  emits('update:translatorTargetLanguage', getDefaultTranslatorTargetLanguage())
-}
-
-function handleUploadCommand(command: string | number | object) {
-  const commandValue = String(command)
-  if (commandValue === 'image') {
-    if (imageUploadDisabled.value) {
-      return
-    }
-    emits('uploadImage')
-    return
-  }
-  if (commandValue === 'file') {
-    if (fileUploadDisabled.value) {
-      return
-    }
-    emits('uploadFile')
-  }
-}
-
-function clearTranslatorSkill() {
-  customLanguageEditing.value = false
-  emits('update:translatorTargetLanguage', null)
-}
-
-function toggleWebSearchForRun() {
-  if (webSearchToggleDisabled.value) {
-    return
-  }
-
-  emits('update:webSearchForRunEnabled', !props.webSearchForRunEnabled)
-}
-
-function getDefaultTranslatorTargetLanguage() {
-  return { ...AGENT_TRANSLATOR_PRESET_TARGET_LANGUAGES[0] }
-}
-
-function isTranslatorTargetSelected(language: AgentTranslatorTargetLanguage) {
-  return props.translatorTargetLanguage?.tag === language.tag
-}
-
-async function openCustomTranslatorLanguageInput() {
-  customLanguageDraft.value = customTranslatorTargetSelected.value
-    ? props.translatorTargetLanguage?.name ?? ''
-    : ''
-  customLanguageEditing.value = true
-  await nextTick()
-  customLanguageInputRef.value?.focus()
-}
-
-function confirmCustomTranslatorLanguage() {
-  const name = customLanguageDraft.value.trim()
-  if (!name) {
-    return
-  }
-
-  customLanguageDraft.value = name
-  customLanguageEditing.value = false
-  emits('update:translatorTargetLanguage', { name })
-}
-
-function cancelCustomTranslatorLanguageInput() {
-  customLanguageEditing.value = false
-}
+const props = defineProps<ChatComposerToolbarProps>()
+const emit = defineEmits<ChatComposerToolbarEmits>()
 </script>
 
 <template>
   <div class="chat-composer-toolbar">
     <div class="chat-composer-toolbar__left">
-      <ElTooltip :content="t('chat.composer.addAttachment')" placement="top">
-        <span>
-          <ElDropdown
-            trigger="click"
-            :disabled="props.disabled || props.isStreaming"
-            @command="handleUploadCommand"
-          >
-            <button
-              class="chat-composer-toolbar__icon-button"
-              type="button"
-              :disabled="props.disabled || props.isStreaming"
-              :aria-label="t('chat.composer.addAttachment')"
-            >
-              <SvgIcon category="ui" icon="plus" size="1rem" />
-            </button>
+      <ChatComposerAttachmentMenu
+        :disabled="props.disabled"
+        :is-streaming="props.isStreaming"
+        :upload-availability="props.uploadAvailability"
+        @open-panel-picker="emit('openPanelPicker')"
+        @upload-image="emit('uploadImage')"
+        @upload-file="emit('uploadFile')"
+      />
 
-            <template #dropdown>
-              <ElDropdownMenu class="chat-composer-toolbar__upload-menu">
-                <ElDropdownItem
-                  command="image"
-                  class="chat-composer-toolbar__upload-item"
-                  :disabled="imageUploadDisabled"
-                >
-                  <ElTooltip
-                    :disabled="!imageUploadDisabled"
-                    :content="t('chat.composer.modelUnsupportedImageUpload')"
-                    placement="right"
-                    effect="dark"
-                  >
-                    <span class="chat-composer-toolbar__command-main">
-                      <ElIcon><Picture /></ElIcon>
-                      <span>{{ t('chat.composer.uploadImage') }}</span>
-                    </span>
-                  </ElTooltip>
-                </ElDropdownItem>
-                <ElDropdownItem
-                  command="file"
-                  class="chat-composer-toolbar__upload-item"
-                  :disabled="fileUploadDisabled"
-                >
-                  <ElTooltip
-                    :disabled="!fileUploadDisabled"
-                    :content="t('chat.composer.modelUnsupportedFileUpload')"
-                    placement="right"
-                    effect="dark"
-                  >
-                    <span class="chat-composer-toolbar__command-main">
-                      <ElIcon><Document /></ElIcon>
-                      <span>{{ t('chat.composer.uploadFile') }}</span>
-                    </span>
-                  </ElTooltip>
-                </ElDropdownItem>
-              </ElDropdownMenu>
-            </template>
-          </ElDropdown>
-        </span>
-      </ElTooltip>
-
-      <ElTooltip :content="t('chat.composer.selectDocument')" placement="top">
-        <button
-          class="chat-composer-toolbar__icon-button"
-          type="button"
-          :disabled="props.disabled"
-          :aria-label="t('chat.composer.selectDocument')"
-          @click="emits('openPanelPicker')"
-        >
-          <span class="chat-composer-toolbar__symbol">@</span>
-        </button>
-      </ElTooltip>
-
-      <ElTooltip
-        v-if="props.webSearchSkillEnabled"
-        :content="webSearchToggleTooltip"
-        placement="top"
-      >
-        <span>
-          <button
-            class="chat-composer-toolbar__icon-button chat-composer-toolbar__web-search-button"
-            :class="{ 'is-active': props.webSearchForRunEnabled }"
-            type="button"
-            :disabled="webSearchToggleDisabled"
-            :aria-label="webSearchToggleTooltip"
-            :aria-pressed="props.webSearchForRunEnabled"
-            @click="toggleWebSearchForRun"
-          >
-            <SvgIcon category="ui" icon="globe" size="1rem" />
-          </button>
-        </span>
-      </ElTooltip>
+      <ChatComposerWebSearchButton
+        :disabled="props.disabled"
+        :is-streaming="props.isStreaming"
+        :web-search-skill-enabled="props.webSearchSkillEnabled"
+        :web-search-for-run-enabled="props.webSearchForRunEnabled"
+        @update:web-search-for-run-enabled="emit('update:webSearchForRunEnabled', $event)"
+      />
 
       <span class="chat-composer-toolbar__divider" aria-hidden="true" />
 
-      <ElTooltip v-if="!props.translatorTargetLanguage" :content="skillCommandTooltip" placement="top">
-        <span>
-          <ElDropdown
-            ref="skillCommandDropdownRef"
-            trigger="click"
-            :disabled="skillCommandDropdownDisabled"
-            @command="handleSkillCommand"
-          >
-            <button
-              class="chat-composer-toolbar__icon-button"
-              type="button"
-              :disabled="skillCommandDropdownDisabled"
-              :aria-label="t('chat.composer.selectSkill')"
-            >
-              <span class="chat-composer-toolbar__symbol">/</span>
-            </button>
-
-            <template #dropdown>
-              <ElDropdownMenu class="chat-composer-toolbar__command-menu">
-                <template v-if="props.translatorSkillEnabled">
-                  <ElDropdownItem
-                    :command="SKILL_TRANSLATOR_COMMAND"
-                    class="chat-composer-toolbar__command-item"
-                  >
-                    <span class="chat-composer-toolbar__command-main">
-                      <SvgIcon category="ai" icon="translate" size="1rem" />
-                      <span>{{ t('chat.composer.translate') }}</span>
-                    </span>
-                  </ElDropdownItem>
-                </template>
-                <ElDropdownItem
-                  v-else
-                  disabled
-                  class="chat-composer-toolbar__command-empty"
-                >
-                  {{ t('chat.composer.noSkills') }}
-                </ElDropdownItem>
-              </ElDropdownMenu>
-            </template>
-          </ElDropdown>
-        </span>
-      </ElTooltip>
-
-      <div v-else class="chat-composer-toolbar__selected-skill">
-        <span class="chat-composer-toolbar__skill-chip">
-          <SvgIcon class="chat-composer-toolbar__skill-icon" category="ai" icon="translate" size="1rem" />
-          <ElTooltip :content="t('chat.composer.exitSkillTooltip')" placement="top" effect="dark">
-            <button
-              class="chat-composer-toolbar__skill-close"
-              type="button"
-              :aria-label="t('chat.composer.exitSkill')"
-              @click="clearTranslatorSkill"
-            >
-              <ElIcon><CloseBold /></ElIcon>
-            </button>
-          </ElTooltip>
-        </span>
-
-        <div v-if="customLanguageEditing" class="chat-composer-toolbar__parameter-edit">
-          <span class="chat-composer-toolbar__parameter-prefix">{{ t('chat.composer.translateTo') }}</span>
-          <ElInput
-            ref="customLanguageInputRef"
-            v-model="customLanguageDraft"
-            class="chat-composer-toolbar__parameter-value chat-composer-toolbar__parameter-input"
-            :aria-label="t('chat.composer.customTargetLanguage')"
-            :placeholder="t('chat.composer.targetLanguage')"
-            maxlength="10"
-            @keydown.enter.stop.prevent="confirmCustomTranslatorLanguage"
-            @keydown.esc.stop.prevent="cancelCustomTranslatorLanguageInput"
-          />
-          <button
-            class="chat-composer-toolbar__parameter-action"
-            type="button"
-            :disabled="customLanguageSubmitDisabled"
-            :aria-label="t('chat.composer.confirmTargetLanguage')"
-            @click="confirmCustomTranslatorLanguage"
-          >
-            <ElIcon><Check /></ElIcon>
-          </button>
-          <button
-            class="chat-composer-toolbar__parameter-action"
-            type="button"
-            :aria-label="t('chat.composer.cancelInput')"
-            @click="cancelCustomTranslatorLanguageInput"
-          >
-            <ElIcon><CloseBold /></ElIcon>
-          </button>
-        </div>
-
-        <ElDropdown
-          v-else
-          trigger="click"
-          :disabled="translatorParameterDropdownDisabled"
-          @command="handleTranslatorCommand"
-        >
-          <button
-            class="chat-composer-toolbar__parameter-button"
-            type="button"
-            :disabled="translatorParameterDropdownDisabled"
-            :aria-label="t('chat.composer.translateToAria', { language: props.translatorTargetLanguage.name })"
-          >
-            <span class="chat-composer-toolbar__parameter-prefix">{{ t('chat.composer.translateTo') }}</span>
-            <span class="chat-composer-toolbar__parameter-value">{{ props.translatorTargetLanguage.name }}</span>
-            <ElIcon class="chat-composer-toolbar__parameter-arrow">
-              <ArrowDown />
-            </ElIcon>
-          </button>
-
-          <template #dropdown>
-            <ElDropdownMenu class="chat-composer-toolbar__translate-menu">
-              <ElDropdownItem
-                v-for="language in AGENT_TRANSLATOR_PRESET_TARGET_LANGUAGES"
-                :key="language.tag"
-                :command="language.tag"
-                class="chat-composer-toolbar__translate-item"
-                :class="{ 'is-selected': isTranslatorTargetSelected(language) }"
-              >
-                {{ language.name }}
-              </ElDropdownItem>
-
-              <ElDropdownItem
-                divided
-                :command="TRANSLATOR_CUSTOM_LANGUAGE_COMMAND"
-                class="chat-composer-toolbar__translate-item"
-                :class="{ 'is-selected': customTranslatorTargetSelected }"
-              >
-                {{ t('chat.composer.other') }}
-              </ElDropdownItem>
-            </ElDropdownMenu>
-          </template>
-        </ElDropdown>
-      </div>
-    </div>
-
-    <div class="chat-composer-toolbar__right">
-      <ChatModelTrigger
-        :selected-model-ref="props.selectedModelRef"
-        :selection-kind="props.modelSelectionKind"
-        :disabled="props.isStreaming"
-        @select="emits('selectModel', $event)"
+      <ChatComposerSkillControls
+        :disabled="props.disabled"
+        :is-streaming="props.isStreaming"
+        :translator-skill-enabled="props.translatorSkillEnabled"
+        :translator-target-language="props.translatorTargetLanguage"
+        :skill-command-open-signal="props.skillCommandOpenSignal"
+        @update:translator-target-language="emit('update:translatorTargetLanguage', $event)"
       />
-
-      <ElTooltip :content="props.isStreaming ? t('chat.composer.stop') : t('chat.composer.send')" placement="top">
-        <button
-          v-if="props.isStreaming"
-          class="chat-composer-toolbar__send-button is-stop"
-          type="button"
-          :aria-label="t('chat.composer.stop')"
-          @click="emits('stop')"
-        >
-          <ElIcon><CloseBold /></ElIcon>
-        </button>
-        <button
-          v-else
-          class="chat-composer-toolbar__send-button"
-          type="button"
-          :disabled="props.disabled || !props.canSend"
-          :aria-label="t('chat.composer.send')"
-          @click="emits('send')"
-        >
-          <SvgIcon category="ui" icon="send-light" size="1rem" />
-        </button>
-      </ElTooltip>
     </div>
+
+    <ChatComposerSubmitControls
+      :selected-model-ref="props.selectedModelRef"
+      :model-selection-kind="props.modelSelectionKind"
+      :is-streaming="props.isStreaming"
+      :disabled="props.disabled"
+      :can-send="props.canSend"
+      @select-model="emit('selectModel', $event)"
+      @send="emit('send')"
+      @stop="emit('stop')"
+    />
   </div>
 </template>
 
@@ -450,20 +66,33 @@ function cancelCustomTranslatorLanguageInput() {
   padding: 0.375rem 0.5rem 0.5rem;
 
   .chat-composer-toolbar__left,
-  .chat-composer-toolbar__right {
+  :deep(.chat-composer-toolbar__right) {
     display: flex;
     align-items: center;
     gap: 0.25rem;
     min-width: 0;
   }
 
-  .chat-composer-toolbar__right {
+  .chat-composer-toolbar__left {
+    flex: 1 1 0;
+    overflow: hidden;
+  }
+
+  :deep(.chat-composer-toolbar__right) {
+    flex: 0 1 11.25rem;
+    justify-content: flex-end;
     margin-left: auto;
   }
 
-  .chat-composer-toolbar__icon-button,
-  .chat-composer-toolbar__parameter-button,
-  .chat-composer-toolbar__send-button {
+  :deep(.chat-model-trigger) {
+    flex: 1 1 0;
+    max-width: 9rem;
+    min-width: 0;
+  }
+
+  :deep(.chat-composer-toolbar__icon-button),
+  :deep(.chat-composer-toolbar__parameter-button),
+  :deep(.chat-composer-toolbar__send-button) {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -487,7 +116,7 @@ function cancelCustomTranslatorLanguageInput() {
     }
   }
 
-  .chat-composer-toolbar__web-search-button.is-active {
+  :deep(.chat-composer-toolbar__web-search-button.is-active) {
     border-color: color-mix(in srgb, var(--brand-primary) 42%, transparent);
     background: color-mix(in srgb, var(--brand-primary) 12%, var(--brand-bg-surface));
     color: var(--brand-primary);
@@ -506,14 +135,14 @@ function cancelCustomTranslatorLanguageInput() {
     background: color-mix(in srgb, var(--brand-border-base) 70%, transparent);
   }
 
-  .chat-composer-toolbar__selected-skill {
+  :deep(.chat-composer-toolbar__selected-skill) {
     display: inline-flex;
     min-width: 0;
     align-items: center;
     gap: 0.625rem;
   }
 
-  .chat-composer-toolbar__skill-chip {
+  :deep(.chat-composer-toolbar__skill-chip) {
     display: inline-flex;
     height: 2rem;
     flex: 0 0 auto;
@@ -525,11 +154,11 @@ function cancelCustomTranslatorLanguageInput() {
     color: var(--brand-primary);
   }
 
-  .chat-composer-toolbar__skill-icon {
+  :deep(.chat-composer-toolbar__skill-icon) {
     flex: 0 0 auto;
   }
 
-  .chat-composer-toolbar__skill-close {
+  :deep(.chat-composer-toolbar__skill-close) {
     display: inline-flex;
     width: 1.25rem;
     height: 1.25rem;
@@ -549,7 +178,7 @@ function cancelCustomTranslatorLanguageInput() {
     }
   }
 
-  .chat-composer-toolbar__parameter-button {
+  :deep(.chat-composer-toolbar__parameter-button) {
     width: auto;
     max-width: 13rem;
     gap: 0.375rem;
@@ -559,7 +188,7 @@ function cancelCustomTranslatorLanguageInput() {
     color: var(--brand-text-primary);
   }
 
-  .chat-composer-toolbar__parameter-edit {
+  :deep(.chat-composer-toolbar__parameter-edit) {
     display: inline-flex;
     height: 2rem;
     max-width: 16rem;
@@ -572,7 +201,7 @@ function cancelCustomTranslatorLanguageInput() {
     color: var(--brand-text-primary);
   }
 
-  .chat-composer-toolbar__parameter-prefix {
+  :deep(.chat-composer-toolbar__parameter-prefix) {
     flex: 0 0 auto;
     color: var(--brand-text-tertiary);
     font-size: 0.8125rem;
@@ -580,7 +209,7 @@ function cancelCustomTranslatorLanguageInput() {
     line-height: 1;
   }
 
-  .chat-composer-toolbar__parameter-value {
+  :deep(.chat-composer-toolbar__parameter-value) {
     min-width: 0;
     overflow: hidden;
     font-size: 0.875rem;
@@ -590,36 +219,36 @@ function cancelCustomTranslatorLanguageInput() {
     white-space: nowrap;
   }
 
-  .chat-composer-toolbar__parameter-arrow {
+  :deep(.chat-composer-toolbar__parameter-arrow) {
     flex: 0 0 auto;
     color: var(--brand-text-secondary);
     font-size: 0.8125rem;
   }
 
-  .chat-composer-toolbar__parameter-input {
+  :deep(.chat-composer-toolbar__parameter-input) {
     width: 5.75rem;
     flex: 0 1 5.75rem;
     min-width: 4.5rem;
     overflow: visible;
     line-height: normal;
     white-space: normal;
-
-    :deep(.el-input__wrapper) {
-      height: 1.75rem;
-      padding: 0 0.5rem;
-      border-radius: 0.375rem;
-      background: var(--brand-bg-surface);
-      box-shadow: 0 0 0 1px color-mix(in srgb, var(--brand-border-base) 86%, transparent) inset;
-    }
-
-    :deep(.el-input__inner) {
-      color: var(--brand-text-primary);
-      font-size: 0.875rem;
-      font-weight: 400;
-    }
   }
 
-  .chat-composer-toolbar__parameter-action {
+  :deep(.chat-composer-toolbar__parameter-input .el-input__wrapper) {
+    height: 1.75rem;
+    padding: 0 0.5rem;
+    border-radius: 0.375rem;
+    background: var(--brand-bg-surface);
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--brand-border-base) 86%, transparent) inset;
+  }
+
+  :deep(.chat-composer-toolbar__parameter-input .el-input__inner) {
+    color: var(--brand-text-primary);
+    font-size: 0.875rem;
+    font-weight: 400;
+  }
+
+  :deep(.chat-composer-toolbar__parameter-action) {
     display: inline-flex;
     width: 1.75rem;
     height: 1.75rem;
@@ -645,7 +274,8 @@ function cancelCustomTranslatorLanguageInput() {
     }
   }
 
-  .chat-composer-toolbar__send-button {
+  :deep(.chat-composer-toolbar__send-button) {
+    flex: 0 0 auto;
     border-color: var(--brand-primary);
     background: var(--brand-primary);
     color: #fff;
@@ -656,12 +286,12 @@ function cancelCustomTranslatorLanguageInput() {
     }
   }
 
-  .chat-composer-toolbar__send-button.is-stop {
+  :deep(.chat-composer-toolbar__send-button.is-stop) {
     border-color: var(--el-color-danger);
     background: var(--el-color-danger);
   }
 
-  .chat-composer-toolbar__symbol {
+  :deep(.chat-composer-toolbar__symbol) {
     font-size: 0.95rem;
     font-weight: 700;
     line-height: 1;

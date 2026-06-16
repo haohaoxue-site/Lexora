@@ -1,15 +1,22 @@
 <script setup lang="ts">
 import type { ComponentPublicInstance } from 'vue'
-import type { DocsChatMessagesProps } from './typing'
+import type { DocsChatMessagesEmits, DocsChatMessagesProps } from './typing'
 import { computed, useTemplateRef } from 'vue'
 import { useI18n } from 'vue-i18n'
-import ChatAssistantAvatar from '@/components/chat-message/ChatAssistantAvatar.vue'
-import ChatAssistantMessage from '@/components/chat-message/ChatAssistantMessage.vue'
-import ChatUserMessageContent from '@/components/chat-message/ChatUserMessageContent.vue'
+import {
+  ChatAssistantAvatar,
+  ChatAssistantMessage,
+  ChatMessageActions,
+  ChatUserMessageContent,
+} from '@/components/chat-message'
 import { useDynamicChatVirtualList } from '@/composables/chat/useDynamicChatVirtualList'
 import { shouldShowAssistantPending } from '@/composables/chat/utils/chat-message-display'
 
-const props = defineProps<DocsChatMessagesProps>()
+const props = withDefaults(defineProps<DocsChatMessagesProps>(), {
+  isReadonly: false,
+  isStreaming: false,
+})
+const emits = defineEmits<DocsChatMessagesEmits>()
 const { t } = useI18n()
 
 const scrollContainerRef = useTemplateRef<HTMLElement>('scrollContainerRef')
@@ -33,6 +40,10 @@ const {
 
 function setVirtualItemElement(key: string, element: Element | ComponentPublicInstance | null) {
   setItemElement(key, element instanceof Element ? element : null)
+}
+
+function isCopied(message: DocsChatMessagesProps['messages'][number]) {
+  return props.isMessageCopied?.(message) ?? false
 }
 </script>
 
@@ -70,9 +81,22 @@ function setVirtualItemElement(key: string, element: Element | ComponentPublicIn
         >
           <div
             v-if="virtual.item.role === 'user'"
-            class="max-w-[min(18.5rem,100%)] break-words rounded-lg bg-primary px-3 py-2 text-[13px] leading-[1.55] text-white"
+            class="docs-chat-messages__user-content flex max-w-[min(18.5rem,100%)] flex-col items-end gap-1.5"
           >
-            <ChatUserMessageContent :message="virtual.item" />
+            <div class="max-w-full break-words rounded-lg bg-primary px-3 py-2 text-[13px] leading-[1.55] text-white">
+              <ChatUserMessageContent :message="virtual.item" />
+            </div>
+
+            <ChatMessageActions
+              class="docs-chat-messages__actions user flex items-center justify-end gap-1"
+              :message="virtual.item"
+              :copied="isCopied(virtual.item)"
+              :is-streaming="props.isStreaming"
+              :is-readonly="props.isReadonly"
+              variant="docs"
+              @copy-message="emits('copyMessage', $event)"
+              @switch-branch="emits('switchBranch', $event)"
+            />
           </div>
 
           <div v-else class="flex min-w-0 max-w-full items-start gap-2">
@@ -81,7 +105,22 @@ function setVirtualItemElement(key: string, element: Element | ComponentPublicIn
               size="sm"
               class="mt-0.5 shrink-0"
             />
-            <ChatAssistantMessage :message="virtual.item" variant="docs" />
+            <div class="docs-chat-messages__assistant-content flex min-w-0 max-w-full flex-col items-start gap-1.5">
+              <ChatAssistantMessage :message="virtual.item" variant="docs" />
+
+              <ChatMessageActions
+                class="docs-chat-messages__actions assistant flex items-center justify-start gap-1"
+                :message="virtual.item"
+                :copied="isCopied(virtual.item)"
+                :is-streaming="props.isStreaming"
+                :is-readonly="props.isReadonly"
+                show-retry
+                variant="docs"
+                @copy-message="emits('copyMessage', $event)"
+                @retry-assistant-message="emits('retryAssistantMessage', $event)"
+                @switch-branch="emits('switchBranch', $event)"
+              />
+            </div>
           </div>
         </div>
       </div>
@@ -97,5 +136,9 @@ function setVirtualItemElement(key: string, element: Element | ComponentPublicIn
 .docs-chat-messages__virtual-item {
   box-sizing: border-box;
   padding-bottom: 0.875rem;
+}
+
+.docs-chat-messages__actions {
+  color: var(--brand-text-tertiary);
 }
 </style>

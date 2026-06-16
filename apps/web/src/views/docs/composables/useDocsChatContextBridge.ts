@@ -4,7 +4,7 @@ import type { ActiveDocumentDetail } from '../typing'
 import type {
   ChatComposerAttachment,
   ChatComposerSubmitPayload,
-} from '@/components/chat-composer/typing'
+} from '@/components/chat-composer'
 import {
   CHAT_MESSAGE_ATTACHMENT_PLACEMENT,
   CHAT_MESSAGE_ATTACHMENT_TYPE,

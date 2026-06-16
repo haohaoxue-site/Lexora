@@ -1,13 +1,10 @@
-import type { AgentTranslatorTargetLanguage } from '@haohaoxue/lexora-contracts/agent'
 import type { MaybeRefOrGetter } from 'vue'
-import type { ChatComposerSubmitPayload } from '@/components/chat-composer/typing'
-import { computed, onMounted, shallowRef, toValue, watch } from 'vue'
-import { createChatComposerHostState } from '@/composables/chat/createChatComposerHostState'
+import { computed, onMounted, toValue } from 'vue'
+import { createChatSurfaceController } from '@/composables/chat/createChatSurfaceController'
 import { useWorkspaceStore } from '@/stores/workspace'
 import { useChatModelSettings } from './useChatModelSettings'
 import { useChatRuntimeOverlay } from './useChatRuntimeOverlay'
 import { useChatSessions } from './useChatSessions'
-import { useChatSkillState } from './useChatSkillState'
 import { useChatStream } from './useChatStream'
 
 export interface UseChatInputBoxOptions {
@@ -19,101 +16,61 @@ export function useChatInputBox(options: UseChatInputBoxOptions = {}) {
   const model = useChatModelSettings()
   const { activeSessionId } = useChatSessions()
   const { cancelRunId, isStreaming } = useChatRuntimeOverlay()
-  const { loadSkills, translatorSkillEnabled, webSearchSkillEnabled } = useChatSkillState()
   const { cancelActiveRun, sendMessage } = useChatStream()
-  const translatorTargetLanguage = shallowRef<AgentTranslatorTargetLanguage | null>(null)
-  const newSessionWebSearchForRunEnabled = shallowRef(true)
-  const webSearchForRunEnabledBySessionId = shallowRef(new Map<string, boolean>())
-  const webSearchForRunEnabled = computed({
-    get() {
-      const sessionId = activeSessionId.value
-      if (!sessionId) {
-        return newSessionWebSearchForRunEnabled.value
-      }
-
-      return webSearchForRunEnabledBySessionId.value.get(sessionId) ?? true
-    },
-    set(enabled: boolean) {
-      const sessionId = activeSessionId.value
-      if (!sessionId) {
-        newSessionWebSearchForRunEnabled.value = enabled
-        return
-      }
-
-      setWebSearchForRunEnabled(sessionId, enabled)
-    },
-  })
   const isReadonly = computed(() => Boolean(toValue(options.isReadonly)))
   const workspaceId = computed(() => workspaceStore.currentWorkspace?.id ?? null)
-  const host = createChatComposerHostState({
-    workspaceId,
+  const surface = createChatSurfaceController({
+    isReadonly,
     model,
-    sendMessage,
+    sessions: {
+      activeSessionId,
+    },
+    stream: {
+      isStreaming,
+      sendMessage,
+    },
+    workspaceId,
   })
-
-  onMounted(() => {
-    void loadSkills({ silent: true })
-  })
-
-  watch(translatorSkillEnabled, (enabled) => {
-    if (!enabled) {
-      translatorTargetLanguage.value = null
-    }
-  })
-
-  watch(activeSessionId, (sessionId) => {
-    if (!sessionId) {
-      newSessionWebSearchForRunEnabled.value = true
-    }
-  })
-
-  async function handleSend(payload: ChatComposerSubmitPayload) {
-    if (isReadonly.value) {
-      return false
-    }
-
-    const isNewSessionSend = !activeSessionId.value
-    const newSessionWebSearchEnabled = newSessionWebSearchForRunEnabled.value
-    const sent = await host.handleSend(payload)
-    if (sent) {
-      translatorTargetLanguage.value = null
-      if (isNewSessionSend && activeSessionId.value) {
-        setWebSearchForRunEnabled(activeSessionId.value, newSessionWebSearchEnabled)
-        newSessionWebSearchForRunEnabled.value = true
-      }
-    }
-
-    return sent
-  }
-
-  function setWebSearchForRunEnabled(sessionId: string, enabled: boolean) {
-    const nextValues = new Map(webSearchForRunEnabledBySessionId.value)
-    if (enabled) {
-      nextValues.delete(sessionId)
-    }
-    else {
-      nextValues.set(sessionId, false)
-    }
-    webSearchForRunEnabledBySessionId.value = nextValues
-  }
-
-  return {
-    attachments: host.attachments,
-    cancelActiveRun,
-    cancelRunId,
-    composerModelSelectionKind: model.composerModelSelectionKind,
-    composerSelectedModelRef: model.composerSelectedModelRef,
-    contentJSON: host.contentJSON,
+  const { composer } = surface
+  const {
+    attachments,
+    composerModelSelectionKind,
+    composerSelectedModelRef,
+    contentJSON,
     handleSend,
-    handleUploadAttachmentFiles: host.handleUploadAttachmentFiles,
-    handleUploadImageFiles: host.handleUploadImageFiles,
-    highlightAttachment: host.highlightAttachment,
-    highlightAttachmentId: host.highlightAttachmentId,
-    isStreaming,
-    selectComposerModel: model.selectComposerModel,
+    handleUploadAttachmentFiles,
+    handleUploadImageFiles,
+    highlightAttachment,
+    highlightAttachmentId,
+    selectComposerModel,
     translatorSkillEnabled,
     translatorTargetLanguage,
-    uploadAvailability: host.uploadAvailability,
+    uploadAvailability,
+    webSearchForRunEnabled,
+    webSearchSkillEnabled,
+  } = composer
+
+  onMounted(() => {
+    void composer.loadSkills({ silent: true })
+  })
+
+  return {
+    attachments,
+    cancelActiveRun,
+    cancelRunId,
+    composerModelSelectionKind,
+    composerSelectedModelRef,
+    contentJSON,
+    handleSend,
+    handleUploadAttachmentFiles,
+    handleUploadImageFiles,
+    highlightAttachment,
+    highlightAttachmentId,
+    isStreaming,
+    selectComposerModel,
+    translatorSkillEnabled,
+    translatorTargetLanguage,
+    uploadAvailability,
     webSearchForRunEnabled,
     webSearchSkillEnabled,
   }

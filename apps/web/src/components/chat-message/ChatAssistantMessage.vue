@@ -1,18 +1,14 @@
 <script setup lang="ts">
-import type { ChatMessage } from '@/apis/chat'
+import type { ChatAssistantMessageProps } from './typing'
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
-import ChatMarkdownContent from '@/components/chat-markdown/ChatMarkdownContent.vue'
+import { ChatMarkdownContent } from '@/components/chat-markdown'
 import { createAssistantMessageDisplayModel } from '@/composables/chat/utils/chat-message-display'
 import ChatReasoningBlock from './ChatReasoningBlock.vue'
 import ChatToolCallTimeline from './ChatToolCallTimeline.vue'
 import ChatToolResultBlock from './ChatToolResultBlock.vue'
 
-const props = withDefaults(defineProps<{
-  message: ChatMessage
-  variant?: 'global' | 'docs'
-  showUsageSummary?: boolean
-}>(), {
+const props = withDefaults(defineProps<ChatAssistantMessageProps>(), {
   variant: 'global',
   showUsageSummary: true,
 })
