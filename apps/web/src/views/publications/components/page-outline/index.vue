@@ -2,6 +2,10 @@
 import type { PublicationPageOutlineProps } from './typing'
 import { useI18n } from 'vue-i18n'
 
+defineOptions({
+  name: 'PublicationPageOutline',
+})
+
 const props = withDefaults(defineProps<PublicationPageOutlineProps>(), {
   showTitle: true,
 })

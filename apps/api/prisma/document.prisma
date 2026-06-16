@@ -100,6 +100,7 @@ enum DocumentPublicationPageScope {
 }
 
 enum DocumentPublicationNavItemType {
+  GROUP
   INTERNAL
   EXTERNAL
 }
@@ -510,8 +511,10 @@ model DocumentPublicationPage {
 model DocumentPublicationNavItem {
   id            String                                    @id @default(uuid())
   siteId        String
+  parentId      String?
   type          DocumentPublicationNavItemType
-  label         String
+  label         String?
+  icon          String?
   target        DocumentPublicationNavItemInternalTarget?
   targetId      String?
   url           String?
@@ -519,6 +522,8 @@ model DocumentPublicationNavItem {
   order         Int                                       @default(0)
   status        DocumentPublicationEntryStatus            @default(ACTIVE)
   site          DocumentPublicationSite                   @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  parent        DocumentPublicationNavItem?                @relation("DocumentPublicationNavItemChildren", fields: [parentId], references: [id], onDelete: Cascade)
+  children      DocumentPublicationNavItem[]               @relation("DocumentPublicationNavItemChildren")
   createdAt     DateTime                                  @default(now())
   createdBy     String?
   createdByUser User?                                     @relation("DocumentPublicationNavItemCreator", fields: [createdBy], references: [id], onDelete: SetNull)
@@ -527,6 +532,7 @@ model DocumentPublicationNavItem {
   updatedByUser User?                                     @relation("DocumentPublicationNavItemUpdater", fields: [updatedBy], references: [id], onDelete: SetNull)
 
   @@index([siteId, status, order])
+  @@index([siteId, parentId, status, order])
   @@index([type, target, targetId])
 }
 

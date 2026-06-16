@@ -56,6 +56,12 @@ function handleActionClick(href: string, event: MouseEvent) {
 function resolveActionHref(href: string) {
   return normalizePublicationHref(href) ?? undefined
 }
+
+function isMediaIconSource(value: string | null | undefined) {
+  const source = value?.trim() ?? ''
+
+  return source.startsWith('/') || /^https?:\/\//i.test(source)
+}
 </script>
 
 <template>
@@ -117,7 +123,14 @@ function resolveActionHref(href: string) {
         :key="feature.title"
         class="publication-home-page__feature"
       >
-        <span v-if="feature.icon" class="publication-home-page__feature-icon">{{ feature.icon }}</span>
+        <span v-if="feature.icon" class="publication-home-page__feature-icon">
+          <img
+            v-if="isMediaIconSource(feature.icon)"
+            :src="feature.icon"
+            alt=""
+          >
+          <span v-else>{{ feature.icon }}</span>
+        </span>
         <h2 class="publication-home-page__feature-title">
           {{ feature.title }}
         </h2>
@@ -150,7 +163,7 @@ function resolveActionHref(href: string) {
 
 .publication-home-page__hero {
   margin-top: calc(var(--publication-nav-height) * -1);
-  padding: calc(var(--publication-nav-height) + 3rem) 1.5rem 3rem;
+  padding: calc(var(--publication-nav-height) + 2rem) 1.5rem 3rem;
 }
 
 .publication-home-page__hero-container {
@@ -234,8 +247,8 @@ function resolveActionHref(href: string) {
   min-height: 2.5rem;
   align-items: center;
   justify-content: center;
-  border-radius: 50%;
-  padding: 0 1rem;
+  border-radius: 0.75rem;
+  padding: 0 1.125rem;
   font-size: 0.875rem;
   font-weight: 600;
   line-height: 1.5;
@@ -336,6 +349,13 @@ function resolveActionHref(href: string) {
   border-radius: 0.375rem;
   background: var(--publication-c-brand-soft);
   font-size: 1.5rem;
+
+  img {
+    display: block;
+    max-width: calc(100% - 0.75rem);
+    max-height: calc(100% - 0.75rem);
+    object-fit: contain;
+  }
 }
 
 .publication-home-page__feature-title {
@@ -373,7 +393,7 @@ function resolveActionHref(href: string) {
 
 @media (min-width: 640px) {
   .publication-home-page__hero {
-    padding: calc(var(--publication-nav-height) + 5rem) 3rem 4rem;
+    padding: calc(var(--publication-nav-height) + 3rem) 3rem 4rem;
   }
 
   .publication-home-page__name,
@@ -439,7 +459,7 @@ function resolveActionHref(href: string) {
 
 @media (min-width: 960px) {
   .publication-home-page__hero {
-    padding: calc(var(--publication-nav-height) + 5rem) 4rem 4rem;
+    padding: calc(var(--publication-nav-height) + 3rem) 4rem 4rem;
   }
 
   .publication-home-page__hero-container {

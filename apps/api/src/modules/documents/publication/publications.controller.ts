@@ -5,6 +5,7 @@ import type {
   ListDocumentSinglePublicationsQuery,
   ListDocumentSinglePublicationsResponse,
   PublicationSingleDocumentResponse,
+  PublicationSiteCustomMediaResponse,
   PublicationSiteManagementResponse,
   PublicationSiteRenderResponse,
   ReplacePublicationNavItemsRequest,
@@ -158,6 +159,49 @@ export class DocumentPublicationsController {
     @Query(new ZodValidationPipe(ListDocumentSinglePublicationsQuerySchema)) query: ListDocumentSinglePublicationsQuery,
   ): Promise<PublicationSiteManagementResponse> {
     return this.publicationsService.removePublicationSiteMedia(authUser.id, query.workspaceId, kind)
+  }
+
+  @Put('documents/publications/site/custom-media/:scope/:mediaId')
+  async updatePublicationSiteCustomMedia(
+    @CurrentUser() authUser: AuthUserContext,
+    @Param('scope') scope: string,
+    @Param('mediaId') mediaId: string,
+    @Query(new ZodValidationPipe(ListDocumentSinglePublicationsQuerySchema)) query: ListDocumentSinglePublicationsQuery,
+    @Req() request: FastifyRequest,
+  ): Promise<PublicationSiteCustomMediaResponse> {
+    const file = await getRequestFile(request)
+
+    if (!file) {
+      throw new BadRequestException('请选择站点图片')
+    }
+
+    return this.publicationsService.updatePublicationSiteCustomMedia(authUser.id, query.workspaceId, scope, mediaId, {
+      fileName: file.filename,
+      mimeType: file.mimetype,
+      buffer: await file.toBuffer(),
+    })
+  }
+
+  @Public()
+  @Get('documents/publications/site/media/:siteId/custom/:scope/:mediaId')
+  async getPublicationSiteCustomMedia(
+    @Param('siteId') siteId: string,
+    @Param('scope') scope: string,
+    @Param('mediaId') mediaId: string,
+    @Res() response: FastifyReply,
+  ): Promise<FastifyReply> {
+    const media = await this.publicationsService.getPublicationSiteCustomMedia(siteId, scope, mediaId)
+
+    response.header('cache-control', 'public, max-age=300')
+    response.header('content-type', media.contentType)
+    response.header('content-security-policy', 'default-src \'none\'; img-src data:; style-src \'unsafe-inline\'; sandbox')
+    response.header('x-content-type-options', 'nosniff')
+
+    if (media.contentLength !== null) {
+      response.header('content-length', String(media.contentLength))
+    }
+
+    return response.send(media.body)
   }
 
   @Public()

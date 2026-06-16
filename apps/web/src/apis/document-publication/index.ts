@@ -4,6 +4,8 @@ import type {
   DocumentSinglePublicationInfo,
   ListDocumentSinglePublicationsResponse,
   PublicationSingleDocumentResponse,
+  PublicationSiteCustomMediaResponse,
+  PublicationSiteCustomMediaScope,
   PublicationSiteManagementResponse,
   PublicationSiteMediaKind,
   PublicationSiteRenderResponse,
@@ -78,6 +80,25 @@ export function updatePublicationSiteMedia(
   return axios.request({
     method: 'put',
     url: `/documents/publications/site/media/${kind}`,
+    params: {
+      workspaceId,
+    },
+    data: formData,
+  })
+}
+
+export function updatePublicationSiteCustomMedia(
+  workspaceId: string,
+  scope: PublicationSiteCustomMediaScope,
+  mediaId: string,
+  file: File,
+): Promise<PublicationSiteCustomMediaResponse> {
+  const formData = new FormData()
+  formData.set('file', file)
+
+  return axios.request({
+    method: 'put',
+    url: `/documents/publications/site/custom-media/${scope}/${mediaId}`,
     params: {
       workspaceId,
     },

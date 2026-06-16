@@ -4,8 +4,14 @@ import type {
   DocumentSinglePublicationInfo,
   ListDocumentSinglePublicationsResponse,
   PublicationInternalLinkResolution,
+  PublicationNavItemExternalTarget,
+  PublicationNavItemInput,
+  PublicationNavItemInternalTarget,
+  PublicationNavItemType,
   PublicationRenderedDocument,
   PublicationSingleDocumentResponse,
+  PublicationSiteCustomMediaResponse,
+  PublicationSiteCustomMediaScope,
   PublicationSiteHomeConfig,
   PublicationSiteManagementResponse,
   PublicationSiteMediaKind,
@@ -29,6 +35,8 @@ import {
   DOCUMENT_PUBLICATION_ENTRY_STATUS,
   DOCUMENT_PUBLICATION_NAV_ITEM_INTERNAL_TARGET,
   DOCUMENT_PUBLICATION_NAV_ITEM_TYPE,
+  DOCUMENT_PUBLICATION_SITE_CUSTOM_MEDIA_MAX_BYTES_BY_SCOPE,
+  DOCUMENT_PUBLICATION_SITE_CUSTOM_MEDIA_SCOPE_VALUES,
   DOCUMENT_PUBLICATION_SITE_HOME_MODE,
   DOCUMENT_PUBLICATION_SITE_MEDIA_KIND,
   DOCUMENT_PUBLICATION_SITE_MEDIA_KIND_VALUES,
@@ -163,8 +171,10 @@ const publicationPageSelect = {
 const publicationNavItemSelect = {
   id: true,
   siteId: true,
+  parentId: true,
   type: true,
   label: true,
+  icon: true,
   target: true,
   targetId: true,
   url: true,
@@ -430,6 +440,39 @@ export class DocumentPublicationsService {
     return this.loadPublicationSiteManagement(nextSite)
   }
 
+  async updatePublicationSiteCustomMedia(
+    userId: string,
+    workspaceId: string,
+    mediaScope: string,
+    mediaId: string,
+    payload: UpdatePublicationSiteMediaInput,
+  ): Promise<PublicationSiteCustomMediaResponse> {
+    const scope = assertPublicationSiteCustomMediaScope(mediaScope)
+    const safeMediaId = assertPublicationSiteCustomMediaId(mediaId)
+    const mediaMimeType = assertPublicationSiteMediaMimeType(payload.mimeType, payload.buffer)
+    assertPublicationSiteCustomMediaBuffer(scope, payload.buffer, mediaMimeType)
+
+    const site = await this.getOrCreatePublicationSite(userId, workspaceId)
+
+    await this.storageService.putObject({
+      bucket: PUBLICATION_SITE_MEDIA_BUCKET,
+      key: buildPublicationSiteCustomMediaStorageKey(site.id, scope, safeMediaId),
+      body: payload.buffer,
+      contentType: mediaMimeType,
+      contentDisposition: {
+        type: 'inline',
+        fileName: payload.fileName,
+        fallbackFileName: 'site-media',
+      },
+      contentLength: payload.buffer.length,
+      cacheControl: 'public, max-age=300',
+    })
+
+    return {
+      mediaUrl: buildPublicationSiteCustomMediaUrl(site.id, scope, safeMediaId),
+    }
+  }
+
   async getPublicationSiteMedia(siteId: string, mediaKind: string): Promise<StorageObject> {
     const kind = assertPublicationSiteMediaKind(mediaKind)
     const site = await this.prisma.documentPublicationSite.findUnique({
@@ -444,6 +487,26 @@ export class DocumentPublicationsService {
     const media = await this.storageService.getObject({
       bucket: PUBLICATION_SITE_MEDIA_BUCKET,
       key: buildPublicationSiteMediaStorageKey(site.id, kind),
+    })
+
+    return normalizePublicationSiteMediaObject(media)
+  }
+
+  async getPublicationSiteCustomMedia(siteId: string, mediaScope: string, mediaId: string): Promise<StorageObject> {
+    const scope = assertPublicationSiteCustomMediaScope(mediaScope)
+    const safeMediaId = assertPublicationSiteCustomMediaId(mediaId)
+    const site = await this.prisma.documentPublicationSite.findUnique({
+      where: { id: siteId },
+      select: { id: true },
+    })
+
+    if (!site) {
+      throw new NotFoundException('资源不存在')
+    }
+
+    const media = await this.storageService.getObject({
+      bucket: PUBLICATION_SITE_MEDIA_BUCKET,
+      key: buildPublicationSiteCustomMediaStorageKey(site.id, scope, safeMediaId),
     })
 
     return normalizePublicationSiteMediaObject(media)
@@ -560,16 +623,20 @@ export class DocumentPublicationsService {
     payload: ReplacePublicationNavItemsRequest,
   ): Promise<PublicationSiteManagementResponse> {
     const site = await this.getOrCreatePublicationSite(userId, payload.workspaceId)
+    const items = preparePublicationNavItemInputs(payload.items)
+
     await this.prisma.$bypass.documentPublicationNavItem.deleteMany({
       where: { siteId: site.id },
     })
     const now = new Date()
     await this.prisma.documentPublicationNavItem.createMany({
-      data: payload.items.map(item => ({
-        id: item.id ?? randomUUID(),
+      data: items.map(item => ({
+        id: item.id,
         siteId: site.id,
+        parentId: item.parentId,
         type: item.type,
         label: item.label,
+        icon: item.icon,
         target: item.type === DOCUMENT_PUBLICATION_NAV_ITEM_TYPE.INTERNAL ? item.target : null,
         targetId: item.type === DOCUMENT_PUBLICATION_NAV_ITEM_TYPE.INTERNAL ? item.targetId : null,
         url: item.type === DOCUMENT_PUBLICATION_NAV_ITEM_TYPE.EXTERNAL ? item.url : null,
@@ -1046,6 +1113,100 @@ function resolveSitePublishedDocument(
   return document
 }
 
+interface PreparedPublicationNavItem {
+  id: string
+  parentId: string | null
+  type: PublicationNavItemType
+  label: string | null
+  icon: string | null
+  target: PublicationNavItemInternalTarget | null
+  targetId: string | null
+  url: string | null
+  openTarget: PublicationNavItemExternalTarget | null
+  order: number
+  status: PublicationNavItemInput['status']
+}
+
+function preparePublicationNavItemInputs(items: PublicationNavItemInput[]): PreparedPublicationNavItem[] {
+  const preparedItems = items.map((item): PreparedPublicationNavItem => {
+    const id = item.id?.trim() || randomUUID()
+    const label = normalizeNullableText(item.label)
+    const icon = normalizeNullableText(item.icon)
+    const parentId = normalizeNullableText(item.parentId)
+
+    if (item.type === DOCUMENT_PUBLICATION_NAV_ITEM_TYPE.GROUP) {
+      if (!label) {
+        throw new BadRequestException('下拉导航名称不能为空')
+      }
+
+      return {
+        id,
+        parentId: null,
+        type: DOCUMENT_PUBLICATION_NAV_ITEM_TYPE.GROUP,
+        label,
+        icon,
+        target: null,
+        targetId: null,
+        url: null,
+        openTarget: null,
+        order: item.order,
+        status: item.status,
+      }
+    }
+
+    if (!label && !icon) {
+      throw new BadRequestException('导航名称和图标至少填写一个')
+    }
+
+    if (item.type === DOCUMENT_PUBLICATION_NAV_ITEM_TYPE.EXTERNAL) {
+      return {
+        id,
+        parentId,
+        type: DOCUMENT_PUBLICATION_NAV_ITEM_TYPE.EXTERNAL,
+        label,
+        icon,
+        target: null,
+        targetId: null,
+        url: normalizePublicationHref(item.url),
+        openTarget: item.openTarget,
+        order: item.order,
+        status: item.status,
+      }
+    }
+
+    return {
+      id,
+      parentId,
+      type: DOCUMENT_PUBLICATION_NAV_ITEM_TYPE.INTERNAL,
+      label,
+      icon,
+      target: item.target,
+      targetId: item.target === DOCUMENT_PUBLICATION_NAV_ITEM_INTERNAL_TARGET.HOME ? null : item.targetId,
+      url: null,
+      openTarget: null,
+      order: item.order,
+      status: item.status,
+    }
+  })
+  const groupIds = new Set(
+    preparedItems
+      .filter(item => item.type === DOCUMENT_PUBLICATION_NAV_ITEM_TYPE.GROUP)
+      .map(item => item.id),
+  )
+
+  for (const item of preparedItems) {
+    if (item.type === DOCUMENT_PUBLICATION_NAV_ITEM_TYPE.GROUP && item.parentId) {
+      throw new BadRequestException('下拉导航不能作为子项')
+    }
+
+    if (item.parentId && !groupIds.has(item.parentId)) {
+      throw new BadRequestException('导航子项只能归属到下拉导航')
+    }
+  }
+
+  return preparedItems
+}
+
 function toRenderedDocument(document: PersistedPublicationDocument): PublicationRenderedDocument {
   if (!document.currentProjection) {
     throw new NotFoundException('公开页面不存在或未发布')
@@ -1151,12 +1312,35 @@ function toPublicationPage(page: PersistedPublicationPage) {
 }
 
 function toPublicationNavItem(item: PersistedPublicationNavItem): PublicationSiteRenderResponse['navItems'][number] {
+  if (item.type === DOCUMENT_PUBLICATION_NAV_ITEM_TYPE.GROUP) {
+    return {
+      id: item.id,
+      siteId: item.siteId,
+      parentId: null,
+      type: DOCUMENT_PUBLICATION_NAV_ITEM_TYPE.GROUP,
+      label: item.label ?? '',
+      icon: normalizeNullableText(item.icon),
+      target: null,
+      targetId: null,
+      url: null,
+      openTarget: null,
+      order: item.order,
+      status: item.status,
+      createdAt: item.createdAt.toISOString(),
+      createdBy: item.createdBy,
+      updatedAt: item.updatedAt.toISOString(),
+      updatedBy: item.updatedBy,
+    }
+  }
+
   if (item.type === DOCUMENT_PUBLICATION_NAV_ITEM_TYPE.EXTERNAL) {
     return {
       id: item.id,
       siteId: item.siteId,
+      parentId: item.parentId,
       type: DOCUMENT_PUBLICATION_NAV_ITEM_TYPE.EXTERNAL,
-      label: item.label,
+      label: normalizeNullableText(item.label),
+      icon: normalizeNullableText(item.icon),
       target: null,
       targetId: null,
       url: normalizePublicationHref(item.url) ?? '',
@@ -1173,8 +1357,10 @@ function toPublicationNavItem(item: PersistedPublicationNavItem): PublicationSit
   return {
     id: item.id,
     siteId: item.siteId,
+    parentId: item.parentId,
     type: DOCUMENT_PUBLICATION_NAV_ITEM_TYPE.INTERNAL,
-    label: item.label,
+    label: normalizeNullableText(item.label),
+    icon: normalizeNullableText(item.icon),
     target: item.target ?? DOCUMENT_PUBLICATION_NAV_ITEM_INTERNAL_TARGET.HOME,
     targetId: item.targetId,
     url: null,
@@ -1189,7 +1375,21 @@ function toPublicationNavItem(item: PersistedPublicationNavItem): PublicationSit
 }
 
 function isRenderablePublicationNavItem(item: PublicationSiteRenderResponse['navItems'][number]) {
-  return item.type !== DOCUMENT_PUBLICATION_NAV_ITEM_TYPE.EXTERNAL || Boolean(normalizePublicationHref(item.url))
+  if (item.type === DOCUMENT_PUBLICATION_NAV_ITEM_TYPE.EXTERNAL) {
+    return Boolean(normalizePublicationHref(item.url))
+  }
+
+  if (item.type === DOCUMENT_PUBLICATION_NAV_ITEM_TYPE.GROUP) {
+    return Boolean(item.label.trim())
+  }
+
+  return Boolean(item.label?.trim() || item.icon?.trim())
+}
+
+function normalizeNullableText(value: string | null | undefined): string | null {
+  const text = value?.trim() ?? ''
+
+  return text || null
 }
 
 function parsePublicationSiteHomeConfig(value: Prisma.JsonValue | null): PublicationSiteHomeConfig {
@@ -1218,6 +1418,24 @@ function assertPublicationSiteMediaKind(value: string): PublicationSiteMediaKind
   throw new BadRequestException('不支持的站点图片类型')
 }
 
+function assertPublicationSiteCustomMediaScope(value: string): PublicationSiteCustomMediaScope {
+  if (DOCUMENT_PUBLICATION_SITE_CUSTOM_MEDIA_SCOPE_VALUES.includes(value as PublicationSiteCustomMediaScope)) {
+    return value as PublicationSiteCustomMediaScope
+  }
+
+  throw new BadRequestException('不支持的站点图片类型')
+}
+
+function assertPublicationSiteCustomMediaId(value: string): string {
+  const mediaId = value.trim()
+
+  if (/^[\w-]{1,80}$/.test(mediaId)) {
+    return mediaId
+  }
+
+  throw new BadRequestException('站点图片标识不正确')
+}
+
 function assertPublicationSiteMediaMimeType(mimeType: string, buffer: Buffer): PublicationSiteMediaMimeType {
   const normalizedMimeType = mimeType.trim().toLowerCase()
 
@@ -1237,11 +1455,33 @@ function assertPublicationSiteMediaBuffer(
   buffer: Buffer,
   mimeType: PublicationSiteMediaMimeType,
 ): void {
+  assertPublicationSiteImageBuffer(
+    buffer,
+    mimeType,
+    DOCUMENT_PUBLICATION_SITE_MEDIA_MAX_BYTES_BY_KIND[kind],
+  )
+}
+
+function assertPublicationSiteCustomMediaBuffer(
+  scope: PublicationSiteCustomMediaScope,
+  buffer: Buffer,
+  mimeType: PublicationSiteMediaMimeType,
+): void {
+  assertPublicationSiteImageBuffer(
+    buffer,
+    mimeType,
+    DOCUMENT_PUBLICATION_SITE_CUSTOM_MEDIA_MAX_BYTES_BY_SCOPE[scope],
+  )
+}
+
+function assertPublicationSiteImageBuffer(
+  buffer: Buffer,
+  mimeType: PublicationSiteMediaMimeType,
+  maxBytes: number,
+): void {
   if (!buffer.length) {
     throw new BadRequestException('站点图片文件不能为空')
   }
-
-  const maxBytes = DOCUMENT_PUBLICATION_SITE_MEDIA_MAX_BYTES_BY_KIND[kind]
 
   if (buffer.length > maxBytes) {
     throw new BadRequestException(`站点图片大小不能超过 ${prettyBytes(maxBytes)}`)
@@ -1260,8 +1500,24 @@ function buildPublicationSiteMediaStorageKey(siteId: string, kind: PublicationSi
   return `document-publication-site/${siteId}/${kind}`
 }
 
+function buildPublicationSiteCustomMediaStorageKey(
+  siteId: string,
+  scope: PublicationSiteCustomMediaScope,
+  mediaId: string,
+): string {
+  return `document-publication-site/${siteId}/custom/${scope}/${mediaId}`
+}
+
 function buildPublicationSiteMediaUrl(siteId: string, kind: PublicationSiteMediaKind): string {
   return `${SERVER_PATH}/documents/publications/site/media/${siteId}/${kind}?v=${Date.now()}`
+}
+
+function buildPublicationSiteCustomMediaUrl(
+  siteId: string,
+  scope: PublicationSiteCustomMediaScope,
+  mediaId: string,
+): string {
+  return `${SERVER_PATH}/documents/publications/site/media/${siteId}/custom/${scope}/${mediaId}?v=${Date.now()}`
 }
 
 function isPublicationSiteMediaReferenced(

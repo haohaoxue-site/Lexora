@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { ResolvedPublicationNavItem } from '../../utils/publicationRendering'
 import type { PublicationTopNavProps } from './typing'
+import type { SvgIconCategoryValue } from '@/components/svg-icon/typing'
 import { normalizePublicationHref } from '@haohaoxue/lexora-shared/document'
 import { onBeforeUnmount, onMounted, shallowRef } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -14,6 +15,12 @@ const router = useRouter()
 const { t } = useI18n()
 const isMobileMenuOpen = shallowRef(false)
 const isAtTop = shallowRef(true)
+const navIconAliases: Record<string, { category: SvgIconCategoryValue, icon: string }> = {
+  github: { category: 'brand', icon: 'brand-github' },
+  link: { category: 'ui', icon: 'link' },
+  docs: { category: 'nav', icon: 'docs' },
+  document: { category: 'nav', icon: 'docs' },
+}
 
 function syncTopState() {
   isAtTop.value = window.scrollY <= 0
@@ -73,6 +80,30 @@ function resolveNavHref(item: ResolvedPublicationNavItem) {
 function toggleMobileMenu() {
   isMobileMenuOpen.value = !isMobileMenuOpen.value
 }
+
+function resolveNavIconAlias(icon: string | null) {
+  const normalizedIcon = icon?.trim()
+
+  if (!normalizedIcon) {
+    return null
+  }
+
+  return navIconAliases[normalizedIcon] ?? navIconAliases[normalizedIcon.toLowerCase()] ?? null
+}
+
+function isNavIconImageSource(icon: string | null) {
+  const source = icon?.trim() ?? ''
+
+  return source.startsWith('/') || /^https?:\/\//i.test(source)
+}
+
+function resolveNavLabel(item: ResolvedPublicationNavItem) {
+  return item.label?.trim() || item.ariaLabel
+}
+
+function hasVisibleNavLabel(item: ResolvedPublicationNavItem) {
+  return Boolean(item.label?.trim())
+}
 </script>
 
 <template>
@@ -105,18 +136,105 @@ function toggleMobileMenu() {
         class="publication-top-nav__links inline-flex min-w-0 items-center justify-end gap-5 max-[720px]:hidden"
         :aria-label="t('docs.publicReader.topNavigation')"
       >
-        <a
+        <template
           v-for="item in props.navItems"
-          :key="`${item.label}-${item.href}`"
-          class="publication-top-nav__link text-[13px] font-semibold leading-[1.4] text-secondary no-underline whitespace-nowrap"
-          :class="{ 'is-disabled': item.disabled }"
-          :href="resolveNavHref(item)"
-          :target="item.external && item.openInNewTab ? '_blank' : undefined"
-          :rel="item.external && item.openInNewTab ? 'noopener noreferrer' : undefined"
-          @click="handleNavClick(item, $event)"
+          :key="item.id"
         >
-          {{ item.label }}
-        </a>
+          <ElDropdown
+            v-if="item.children.length"
+            trigger="hover"
+            popper-class="publication-top-nav__dropdown-popper"
+          >
+            <button
+              class="publication-top-nav__trigger"
+              type="button"
+              :aria-label="item.ariaLabel"
+              :title="item.ariaLabel"
+            >
+              <span v-if="item.icon" class="publication-top-nav__item-icon">
+                <img
+                  v-if="isNavIconImageSource(item.icon)"
+                  :src="item.icon"
+                  alt=""
+                >
+                <SvgIcon
+                  v-else-if="resolveNavIconAlias(item.icon)"
+                  :category="resolveNavIconAlias(item.icon)?.category"
+                  :icon="resolveNavIconAlias(item.icon)?.icon ?? ''"
+                  size="1rem"
+                />
+                <span v-else>{{ item.icon }}</span>
+              </span>
+              <span v-if="hasVisibleNavLabel(item)">{{ item.label }}</span>
+              <SvgIcon category="ui" icon="chevron-down" size="0.72rem" />
+            </button>
+
+            <template #dropdown>
+              <ElDropdownMenu class="publication-top-nav__dropdown-menu">
+                <ElDropdownItem
+                  v-for="child in item.children"
+                  :key="child.id"
+                  class="publication-top-nav__dropdown-item"
+                >
+                  <a
+                    class="publication-top-nav__dropdown-link"
+                    :class="{ 'is-disabled': child.disabled, 'is-icon-only': !hasVisibleNavLabel(child) }"
+                    :href="resolveNavHref(child)"
+                    :aria-label="child.ariaLabel"
+                    :title="child.ariaLabel"
+                    :target="child.external && child.openInNewTab ? '_blank' : undefined"
+                    :rel="child.external && child.openInNewTab ? 'noopener noreferrer' : undefined"
+                    @click="handleNavClick(child, $event)"
+                  >
+                    <span v-if="child.icon" class="publication-top-nav__item-icon">
+                      <img
+                        v-if="isNavIconImageSource(child.icon)"
+                        :src="child.icon"
+                        alt=""
+                      >
+                      <SvgIcon
+                        v-else-if="resolveNavIconAlias(child.icon)"
+                        :category="resolveNavIconAlias(child.icon)?.category"
+                        :icon="resolveNavIconAlias(child.icon)?.icon ?? ''"
+                        size="1rem"
+                      />
+                      <span v-else>{{ child.icon }}</span>
+                    </span>
+                    <span v-if="hasVisibleNavLabel(child)">{{ child.label }}</span>
+                  </a>
+                </ElDropdownItem>
+              </ElDropdownMenu>
+            </template>
+          </ElDropdown>
+
+          <a
+            v-else
+            class="publication-top-nav__link text-[13px] font-semibold leading-[1.4] text-secondary no-underline whitespace-nowrap"
+            :class="{ 'is-disabled': item.disabled, 'is-icon-only': !hasVisibleNavLabel(item) }"
+            :href="resolveNavHref(item)"
+            :aria-label="item.ariaLabel"
+            :title="item.ariaLabel"
+            :target="item.external && item.openInNewTab ? '_blank' : undefined"
+            :rel="item.external && item.openInNewTab ? 'noopener noreferrer' : undefined"
+            @click="handleNavClick(item, $event)"
+          >
+            <span v-if="item.icon" class="publication-top-nav__item-icon">
+              <img
+                v-if="isNavIconImageSource(item.icon)"
+                :src="item.icon"
+                alt=""
+              >
+              <SvgIcon
+                v-else-if="resolveNavIconAlias(item.icon)"
+                :category="resolveNavIconAlias(item.icon)?.category"
+                :icon="resolveNavIconAlias(item.icon)?.icon ?? ''"
+                size="1rem"
+              />
+              <span v-else>{{ item.icon }}</span>
+            </span>
+            <span v-if="hasVisibleNavLabel(item)">{{ item.label }}</span>
+          </a>
+        </template>
       </nav>
 
       <button
@@ -137,18 +255,86 @@ function toggleMobileMenu() {
       :class="{ 'is-open': isMobileMenuOpen }"
       :aria-label="t('docs.publicReader.mobileTopNavigation')"
     >
-      <a
+      <template
         v-for="item in props.navItems"
-        :key="`mobile-${item.label}-${item.href}`"
-        class="publication-top-nav__mobile-link"
-        :class="{ 'is-disabled': item.disabled }"
-        :href="resolveNavHref(item)"
-        :target="item.external && item.openInNewTab ? '_blank' : undefined"
-        :rel="item.external && item.openInNewTab ? 'noopener noreferrer' : undefined"
-        @click="handleMobileNavClick(item, $event)"
+        :key="`mobile-${item.id}`"
       >
-        {{ item.label }}
-      </a>
+        <div v-if="item.children.length" class="publication-top-nav__mobile-group">
+          <div class="publication-top-nav__mobile-group-label">
+            <span v-if="item.icon" class="publication-top-nav__item-icon">
+              <img
+                v-if="isNavIconImageSource(item.icon)"
+                :src="item.icon"
+                alt=""
+              >
+              <SvgIcon
+                v-else-if="resolveNavIconAlias(item.icon)"
+                :category="resolveNavIconAlias(item.icon)?.category"
+                :icon="resolveNavIconAlias(item.icon)?.icon ?? ''"
+                size="1rem"
+              />
+              <span v-else>{{ item.icon }}</span>
+            </span>
+            <span>{{ resolveNavLabel(item) }}</span>
+          </div>
+          <a
+            v-for="child in item.children"
+            :key="`mobile-child-${child.id}`"
+            class="publication-top-nav__mobile-link is-child"
+            :class="{ 'is-disabled': child.disabled, 'is-icon-only': !hasVisibleNavLabel(child) }"
+            :href="resolveNavHref(child)"
+            :aria-label="child.ariaLabel"
+            :title="child.ariaLabel"
+            :target="child.external && child.openInNewTab ? '_blank' : undefined"
+            :rel="child.external && child.openInNewTab ? 'noopener noreferrer' : undefined"
+            @click="handleMobileNavClick(child, $event)"
+          >
+            <span v-if="child.icon" class="publication-top-nav__item-icon">
+              <img
+                v-if="isNavIconImageSource(child.icon)"
+                :src="child.icon"
+                alt=""
+              >
+              <SvgIcon
+                v-else-if="resolveNavIconAlias(child.icon)"
+                :category="resolveNavIconAlias(child.icon)?.category"
+                :icon="resolveNavIconAlias(child.icon)?.icon ?? ''"
+                size="1rem"
+              />
+              <span v-else>{{ child.icon }}</span>
+            </span>
+            <span v-if="hasVisibleNavLabel(child)">{{ child.label }}</span>
+          </a>
+        </div>
+
+        <a
+          v-else
+          class="publication-top-nav__mobile-link"
+          :class="{ 'is-disabled': item.disabled, 'is-icon-only': !hasVisibleNavLabel(item) }"
+          :href="resolveNavHref(item)"
+          :aria-label="item.ariaLabel"
+          :title="item.ariaLabel"
+          :target="item.external && item.openInNewTab ? '_blank' : undefined"
+          :rel="item.external && item.openInNewTab ? 'noopener noreferrer' : undefined"
+          @click="handleMobileNavClick(item, $event)"
+        >
+          <span v-if="item.icon" class="publication-top-nav__item-icon">
+            <img
+              v-if="isNavIconImageSource(item.icon)"
+              :src="item.icon"
+              alt=""
+            >
+            <SvgIcon
+              v-else-if="resolveNavIconAlias(item.icon)"
+              :category="resolveNavIconAlias(item.icon)?.category"
+              :icon="resolveNavIconAlias(item.icon)?.icon ?? ''"
+              size="1rem"
+            />
+            <span v-else>{{ item.icon }}</span>
+          </span>
+          <span v-if="hasVisibleNavLabel(item)">{{ item.label }}</span>
+        </a>
+      </template>
     </nav>
 
     <div class="publication-top-nav__divider" aria-hidden="true">
@@ -257,9 +443,87 @@ function toggleMobileMenu() {
 }
 
 .publication-top-nav__link {
+  display: inline-flex;
+  min-height: 2rem;
+  align-items: center;
+  gap: 0.375rem;
+
   &:hover,
   &:focus-visible {
     color: var(--publication-c-brand-1);
+  }
+
+  &.is-icon-only {
+    width: 2rem;
+    justify-content: center;
+  }
+
+  &.is-disabled {
+    color: var(--publication-c-text-3);
+    cursor: not-allowed;
+  }
+}
+
+.publication-top-nav__trigger {
+  display: inline-flex;
+  min-height: 2rem;
+  align-items: center;
+  gap: 0.375rem;
+  border: 0;
+  background: transparent;
+  color: var(--publication-c-text-2);
+  cursor: pointer;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  line-height: 1.4;
+  padding: 0;
+  white-space: nowrap;
+
+  &:hover,
+  &:focus-visible {
+    color: var(--publication-c-brand-1);
+  }
+}
+
+.publication-top-nav__item-icon {
+  display: inline-flex;
+  width: 1.25rem;
+  height: 1.25rem;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  font-size: 1rem;
+  line-height: 1;
+
+  img {
+    display: block;
+    max-width: 1.25rem;
+    max-height: 1.25rem;
+    object-fit: contain;
+  }
+}
+
+.publication-top-nav__dropdown-link {
+  display: flex;
+  min-height: 2rem;
+  min-width: 8rem;
+  align-items: center;
+  gap: 0.5rem;
+  border-radius: 0.375rem;
+  color: var(--publication-c-text-2);
+  font-size: 0.875rem;
+  font-weight: 500;
+  line-height: 1.45;
+  text-decoration: none;
+
+  &:hover,
+  &:focus-visible {
+    color: var(--publication-c-brand-1);
+  }
+
+  &.is-icon-only {
+    min-width: 2rem;
+    justify-content: center;
   }
 
   &.is-disabled {
@@ -294,7 +558,9 @@ function toggleMobileMenu() {
 }
 
 .publication-top-nav__mobile-link {
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
   border-radius: 0.375rem;
   padding: 0.5rem 0.75rem;
   color: var(--publication-c-text-2);
@@ -302,6 +568,16 @@ function toggleMobileMenu() {
   font-weight: 500;
   line-height: 1.5;
   text-decoration: none;
+
+  &.is-child {
+    margin-left: 1rem;
+  }
+
+  &.is-icon-only {
+    width: fit-content;
+    min-width: 2.5rem;
+    justify-content: center;
+  }
 
   &:hover,
   &:focus-visible {
@@ -313,6 +589,42 @@ function toggleMobileMenu() {
     color: var(--publication-c-text-3);
     cursor: not-allowed;
   }
+}
+
+.publication-top-nav__mobile-group {
+  display: grid;
+  gap: 0.125rem;
+}
+
+.publication-top-nav__mobile-group-label {
+  display: flex;
+  min-height: 2rem;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.375rem 0.75rem;
+  color: var(--publication-c-text-3);
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+:global(.publication-top-nav__dropdown-popper) {
+  --el-dropdown-menu-box-shadow: 0 12px 32px rgb(0 0 0 / 10%);
+}
+
+:global(.publication-top-nav__dropdown-popper .el-dropdown-menu) {
+  min-width: 9rem;
+  padding: 0.375rem;
+  border: 1px solid var(--publication-c-gutter);
+}
+
+:global(.publication-top-nav__dropdown-popper .el-dropdown-menu__item) {
+  border-radius: 0.375rem;
+  padding: 0 0.5rem;
+}
+
+:global(.publication-top-nav__dropdown-popper .el-dropdown-menu__item:not(.is-disabled):focus) {
+  background: var(--publication-c-bg-soft);
 }
 
 @media (min-width: 768px) {

@@ -23,10 +23,15 @@ export function getPublicationUnpublishedMessage() {
 }
 
 export interface ResolvedPublicationNavItem {
+  ariaLabel: string
+  children: ResolvedPublicationNavItem[]
   disabled: boolean
   external: boolean
   href: string
-  label: string
+  icon: string | null
+  id: string
+  isGroup: boolean
+  label: string | null
   openInNewTab: boolean
 }
 
@@ -48,76 +53,215 @@ export function resolvePublicationNavItems(input: {
   const firstPageByGroupId = new Map(
     input.groups.flatMap(group => group.pages[0] ? [[group.id, group.pages[0]] as const] : []),
   )
+  const resolvedById = new Map<string, ResolvedPublicationNavItem>()
+  const topLevelItems: ResolvedPublicationNavItem[] = []
 
-  return input.items.map((item) => {
-    if (item.type === DOCUMENT_PUBLICATION_NAV_ITEM_TYPE.EXTERNAL) {
-      const href = normalizePublicationHref(item.url)
+  for (const item of input.items) {
+    resolvedById.set(item.id, resolvePublicationNavItem({
+      firstPageByGroupId,
+      item,
+      pageById,
+      siteId: input.siteId,
+    }))
+  }
 
-      if (!href) {
-        return {
-          disabled: true,
-          external: false,
-          href: '#',
-          label: item.label,
-          openInNewTab: false,
-        }
-      }
+  for (const item of input.items) {
+    const resolvedItem = resolvedById.get(item.id)
 
-      return {
-        disabled: false,
-        external: isExternalPublicationHref(href),
-        href,
-        label: item.label,
-        openInNewTab: isExternalPublicationHref(href) && item.openTarget === DOCUMENT_PUBLICATION_NAV_ITEM_EXTERNAL_TARGET.BLANK,
-      }
+    if (!resolvedItem) {
+      continue
     }
 
-    if (item.target === DOCUMENT_PUBLICATION_NAV_ITEM_INTERNAL_TARGET.HOME) {
-      return {
-        disabled: false,
-        external: false,
-        href: `/s/${input.siteId}`,
-        label: item.label,
-        openInNewTab: false,
-      }
+    const parentId = item.type === DOCUMENT_PUBLICATION_NAV_ITEM_TYPE.GROUP ? null : item.parentId
+    const parentItem = parentId ? resolvedById.get(parentId) : null
+
+    if (parentId && !parentItem) {
+      continue
     }
 
-    if (item.target === DOCUMENT_PUBLICATION_NAV_ITEM_INTERNAL_TARGET.SECTION && item.targetId) {
-      const page = firstPageByGroupId.get(item.targetId)
-
-      if (page) {
-        return {
-          disabled: false,
-          external: false,
-          href: `/s/${input.siteId}/${page.documentId}`,
-          label: item.label,
-          openInNewTab: false,
-        }
+    if (parentId) {
+      if (parentItem?.isGroup) {
+        parentItem.children.push(resolvedItem)
       }
+
+      continue
     }
 
-    if (item.target === DOCUMENT_PUBLICATION_NAV_ITEM_INTERNAL_TARGET.PAGE && item.targetId) {
-      const page = pageById.get(item.targetId)
+    topLevelItems.push(resolvedItem)
+  }
 
-      if (page) {
-        return {
-          disabled: false,
-          external: false,
-          href: `/s/${input.siteId}/${page.documentId}`,
-          label: item.label,
-          openInNewTab: false,
-        }
-      }
-    }
+  return topLevelItems.filter(item => !item.isGroup || item.children.length > 0)
+}
 
+function resolvePublicationNavItem(input: {
+  firstPageByGroupId: Map<string, PublicationSidebarPage>
+  item: PublicationNavItem
+  pageById: Map<string, PublicationSidebarPage>
+  siteId: string
+}): ResolvedPublicationNavItem {
+  const { item } = input
+
+  if (item.type === DOCUMENT_PUBLICATION_NAV_ITEM_TYPE.GROUP) {
     return {
-      disabled: true,
+      ariaLabel: item.label,
+      children: [],
+      disabled: false,
       external: false,
       href: '#',
+      icon: item.icon,
+      id: item.id,
+      isGroup: true,
       label: item.label,
       openInNewTab: false,
     }
+  }
+
+  const fallbackLabel = resolvePublicationNavItemFallbackLabel(item)
+
+  if (item.type === DOCUMENT_PUBLICATION_NAV_ITEM_TYPE.EXTERNAL) {
+    const href = normalizePublicationHref(item.url)
+
+    if (!href) {
+      return toResolvedPublicationNavLeaf({
+        ariaLabel: resolvePublicationNavItemAriaLabel(item.label, item.icon, fallbackLabel),
+        disabled: true,
+        external: false,
+        href: '#',
+        icon: item.icon,
+        id: item.id,
+        label: item.label,
+        openInNewTab: false,
+      })
+    }
+
+    return toResolvedPublicationNavLeaf({
+      ariaLabel: resolvePublicationNavItemAriaLabel(item.label, item.icon, resolveExternalHrefLabel(href)),
+      disabled: false,
+      external: isExternalPublicationHref(href),
+      href,
+      icon: item.icon,
+      id: item.id,
+      label: item.label,
+      openInNewTab: isExternalPublicationHref(href) && item.openTarget === DOCUMENT_PUBLICATION_NAV_ITEM_EXTERNAL_TARGET.BLANK,
+    })
+  }
+
+  if (item.target === DOCUMENT_PUBLICATION_NAV_ITEM_INTERNAL_TARGET.HOME) {
+    return toResolvedPublicationNavLeaf({
+      ariaLabel: resolvePublicationNavItemAriaLabel(item.label, item.icon, fallbackLabel),
+      disabled: false,
+      external: false,
+      href: `/s/${input.siteId}`,
+      icon: item.icon,
+      id: item.id,
+      label: item.label,
+      openInNewTab: false,
+    })
+  }
+
+  if (item.target === DOCUMENT_PUBLICATION_NAV_ITEM_INTERNAL_TARGET.SECTION && item.targetId) {
+    const page = input.firstPageByGroupId.get(item.targetId)
+
+    if (page) {
+      return toResolvedPublicationNavLeaf({
+        ariaLabel: resolvePublicationNavItemAriaLabel(item.label, item.icon, page.title),
+        disabled: false,
+        external: false,
+        href: `/s/${input.siteId}/${page.documentId}`,
+        icon: item.icon,
+        id: item.id,
+        label: item.label,
+        openInNewTab: false,
+      })
+    }
+  }
+
+  if (item.target === DOCUMENT_PUBLICATION_NAV_ITEM_INTERNAL_TARGET.PAGE && item.targetId) {
+    const page = input.pageById.get(item.targetId)
+
+    if (page) {
+      return toResolvedPublicationNavLeaf({
+        ariaLabel: resolvePublicationNavItemAriaLabel(item.label, item.icon, page.title),
+        disabled: false,
+        external: false,
+        href: `/s/${input.siteId}/${page.documentId}`,
+        icon: item.icon,
+        id: item.id,
+        label: item.label,
+        openInNewTab: false,
+      })
+    }
+  }
+
+  return toResolvedPublicationNavLeaf({
+    ariaLabel: resolvePublicationNavItemAriaLabel(item.label, item.icon, fallbackLabel),
+    disabled: true,
+    external: false,
+    href: '#',
+    icon: item.icon,
+    id: item.id,
+    label: item.label,
+    openInNewTab: false,
   })
+}
+
+function toResolvedPublicationNavLeaf(input: Omit<ResolvedPublicationNavItem, 'children' | 'isGroup'>): ResolvedPublicationNavItem {
+  return {
+    ...input,
+    children: [],
+    isGroup: false,
+  }
+}
+
+function resolvePublicationNavItemFallbackLabel(item: PublicationNavItem): string {
+  if (item.type === DOCUMENT_PUBLICATION_NAV_ITEM_TYPE.INTERNAL) {
+    if (item.target === DOCUMENT_PUBLICATION_NAV_ITEM_INTERNAL_TARGET.HOME) {
+      return translate('docs.publicationSite.navigation.home')
+    }
+
+    if (item.target === DOCUMENT_PUBLICATION_NAV_ITEM_INTERNAL_TARGET.SECTION) {
+      return translate('docs.publicationSite.navigation.section')
+    }
+
+    return translate('docs.publicationSite.navigation.page')
+  }
+
+  if (item.type === DOCUMENT_PUBLICATION_NAV_ITEM_TYPE.EXTERNAL) {
+    return resolveExternalHrefLabel(item.url)
+  }
+
+  return item.label
+}
+
+function resolvePublicationNavItemAriaLabel(label: string | null, icon: string | null, fallback: string): string {
+  if (label?.trim()) {
+    return label
+  }
+
+  if (icon?.trim() && !isPublicationNavMediaIconSource(icon)) {
+    return icon
+  }
+
+  return fallback
+}
+
+function isPublicationNavMediaIconSource(icon: string) {
+  return icon.startsWith('/') || /^https?:\/\//i.test(icon)
+}
+
+function resolveExternalHrefLabel(href: string | null): string {
+  const safeHref = normalizePublicationHref(href)
+
+  if (!safeHref) {
+    return translate('docs.publicationSite.navigation.externalLink')
+  }
+
+  try {
+    return new URL(safeHref, window.location.origin).hostname || translate('docs.publicationSite.navigation.externalLink')
+  }
+  catch {
+    return translate('docs.publicationSite.navigation.externalLink')
+  }
 }
 
 export function collectPublicationSidebarPages(groups: PublicationSidebarGroup[]): PublicationSidebarPage[] {

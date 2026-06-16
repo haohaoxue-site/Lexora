@@ -15,6 +15,7 @@ import type {
   PublicationPage,
   PublicationSection,
   PublicationSite,
+  PublicationSiteCustomMediaScope,
   PublicationSiteManagementResponse,
   PublicationSiteMediaKind,
   ReplacePublicationNavItemsRequest,
@@ -40,6 +41,7 @@ import {
   updateDocumentSinglePublication,
   updatePublicationPage,
   updatePublicationSection,
+  updatePublicationSiteCustomMedia,
   updatePublicationSiteMedia,
   updatePublicationSiteSettings,
 } from '@/apis/document-publication'
@@ -83,6 +85,7 @@ const siteManagement = shallowRef<PublicationSiteManagementResponse | null>(null
 const isLoading = shallowRef(false)
 const isSiteMutating = shallowRef(false)
 const uploadingSiteMediaKind = shallowRef<PublicationSiteMediaKind | null>(null)
+const uploadingSiteCustomMediaKey = shallowRef('')
 const updatingPublicationOpenOverviewDocumentId = shallowRef<string | null>(null)
 const errorMessage = shallowRef('')
 
@@ -226,6 +229,29 @@ async function removeSiteMedia(kind: PublicationSiteMediaKind) {
   }
   finally {
     uploadingSiteMediaKind.value = null
+  }
+}
+
+async function uploadSiteCustomMedia(scope: PublicationSiteCustomMediaScope, mediaId: string, file: File): Promise<string> {
+  if (!currentWorkspaceId.value || isSiteMutating.value) {
+    return ''
+  }
+
+  uploadingSiteCustomMediaKey.value = `${scope}:${mediaId}`
+  isSiteMutating.value = true
+
+  try {
+    const response = await updatePublicationSiteCustomMedia(currentWorkspaceId.value, scope, mediaId, file)
+    ElMessage.success(t('docs.publicationSite.messages.mediaUploaded'))
+    return response.mediaUrl
+  }
+  catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : t('docs.publicationSite.messages.mediaUploadFailed'))
+    return ''
+  }
+  finally {
+    uploadingSiteCustomMediaKey.value = ''
+    isSiteMutating.value = false
   }
 }
 
@@ -426,9 +452,14 @@ function isPublicationSettingsTab(tab: string): tab is PublicationSettingsTab {
           <PublicationSiteConfigPanel
             v-else-if="activeTab === 'site-config'"
             :site="site"
+            :tree="publicationOpenOverviewTree"
+            :sections="siteGroups"
+            :pages="pages"
             :loading="isLoading"
             :saving="isSiteMutating"
             :uploading-media-kind="uploadingSiteMediaKind"
+            :uploading-custom-media-key="uploadingSiteCustomMediaKey"
+            :upload-custom-media="uploadSiteCustomMedia"
             @save="saveSiteConfig"
             @upload-media="uploadSiteMedia"
             @remove-media="removeSiteMedia"
@@ -456,6 +487,8 @@ function isPublicationSettingsTab(tab: string): tab is PublicationSettingsTab {
             :pages="pages"
             :nav-items="navItems"
             :saving="isSiteMutating"
+            :uploading-custom-media-key="uploadingSiteCustomMediaKey"
+            :upload-custom-media="uploadSiteCustomMedia"
             @save="saveSiteNavigationItems"
           />
         </main>

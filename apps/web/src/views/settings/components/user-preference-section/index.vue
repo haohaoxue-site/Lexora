@@ -36,7 +36,6 @@ const {
         <ElRadioButton
           v-for="item in languageOptions"
           :key="item"
-          :label="item"
           :value="item"
         >
           {{ formatLanguagePreference(item) }}
@@ -56,7 +55,6 @@ const {
         <ElRadioButton
           v-for="item in appearanceOptions"
           :key="item"
-          :label="item"
           :value="item"
         >
           {{ formatAppearancePreference(item) }}

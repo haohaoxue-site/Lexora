@@ -1,5 +1,9 @@
 import type {
+  DocumentSinglePublicationTreeItem,
+  PublicationPage,
+  PublicationSection,
   PublicationSite,
+  PublicationSiteCustomMediaScope,
   PublicationSiteHomeConfig,
   PublicationSiteMediaKind,
   UpsertPublicationSiteSettingsRequest,
@@ -9,9 +13,14 @@ export type SiteConfigDraft = Omit<UpsertPublicationSiteSettingsRequest, 'worksp
 
 export interface PublicationSiteConfigPanelProps {
   site: PublicationSite | null
+  tree: DocumentSinglePublicationTreeItem[]
+  sections: PublicationSection[]
+  pages: PublicationPage[]
   loading?: boolean
   saving?: boolean
   uploadingMediaKind?: PublicationSiteMediaKind | null
+  uploadingCustomMediaKey?: string
+  uploadCustomMedia?: (scope: PublicationSiteCustomMediaScope, mediaId: string, file: File) => Promise<string>
 }
 
 export interface PublicationSiteConfigPanelEmits {
@@ -28,8 +37,24 @@ export interface SiteConfigForm {
   heroText: string
   heroTagline: string
   heroImageUrl: string
+  actions: SiteHomeActionDraft[]
+  features: SiteHomeFeatureDraft[]
   footerMessage: string
   footerCopyright: string
 }
 
 export type SiteHomeConfigDraft = PublicationSiteHomeConfig
+
+export interface SiteHomeActionDraft {
+  localId: string
+  label: string
+  targetDocumentId: string
+  theme: PublicationSiteHomeConfig['actions'][number]['theme']
+}
+
+export interface SiteHomeFeatureDraft {
+  localId: string
+  title: string
+  details: string
+  icon: string
+}

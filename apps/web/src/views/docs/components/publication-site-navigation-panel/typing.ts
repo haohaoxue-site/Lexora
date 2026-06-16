@@ -5,6 +5,7 @@ import type {
   PublicationNavItemInternalTarget,
   PublicationPage,
   PublicationSection,
+  PublicationSiteCustomMediaScope,
 } from '@/apis/document-publication'
 
 export interface PublicationSiteNavigationPanelProps {
@@ -12,6 +13,8 @@ export interface PublicationSiteNavigationPanelProps {
   pages: PublicationPage[]
   navItems: PublicationNavItem[]
   saving?: boolean
+  uploadingCustomMediaKey?: string
+  uploadCustomMedia?: (scope: PublicationSiteCustomMediaScope, mediaId: string, file: File) => Promise<string>
 }
 
 export interface PublicationSiteNavigationPanelEmits {
@@ -23,6 +26,8 @@ export interface SiteNavigationItemDraft {
   id?: string
   type: PublicationNavItemInput['type']
   label: string
+  icon: string
+  parentId: string
   target: PublicationNavItemInternalTarget
   targetId: string
   url: string

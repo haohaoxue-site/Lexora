@@ -18,6 +18,8 @@ export type {
   PublicationSection,
   PublicationSingleDocumentResponse,
   PublicationSite,
+  PublicationSiteCustomMediaResponse,
+  PublicationSiteCustomMediaScope,
   PublicationSiteHomeConfig,
   PublicationSiteHomeMode,
   PublicationSiteManagementResponse,

@@ -5,12 +5,23 @@ import {
   DOCUMENT_PUBLICATION_ENTRY_STATUS,
   DOCUMENT_PUBLICATION_ENTRY_STATUS_VALUES,
   DOCUMENT_PUBLICATION_NAV_ITEM_EXTERNAL_TARGET_VALUES,
+  DOCUMENT_PUBLICATION_NAV_ITEM_ICON_MAX_LENGTH,
   DOCUMENT_PUBLICATION_NAV_ITEM_INTERNAL_TARGET,
   DOCUMENT_PUBLICATION_NAV_ITEM_INTERNAL_TARGET_VALUES,
+  DOCUMENT_PUBLICATION_NAV_ITEM_LABEL_MAX_LENGTH,
+  DOCUMENT_PUBLICATION_NAV_ITEM_MAX_COUNT,
   DOCUMENT_PUBLICATION_NAV_ITEM_TYPE,
   DOCUMENT_PUBLICATION_NAV_ITEM_TYPE_VALUES,
+  DOCUMENT_PUBLICATION_SITE_CUSTOM_MEDIA_SCOPE_VALUES,
   DOCUMENT_PUBLICATION_SITE_FOOTER_COPYRIGHT_MAX_LENGTH,
   DOCUMENT_PUBLICATION_SITE_FOOTER_MESSAGE_MAX_LENGTH,
+  DOCUMENT_PUBLICATION_SITE_HOME_ACTION_HREF_MAX_LENGTH,
+  DOCUMENT_PUBLICATION_SITE_HOME_ACTION_LABEL_MAX_LENGTH,
+  DOCUMENT_PUBLICATION_SITE_HOME_ACTION_MAX_COUNT,
+  DOCUMENT_PUBLICATION_SITE_HOME_FEATURE_DETAILS_MAX_LENGTH,
+  DOCUMENT_PUBLICATION_SITE_HOME_FEATURE_ICON_MAX_LENGTH,
+  DOCUMENT_PUBLICATION_SITE_HOME_FEATURE_MAX_COUNT,
+  DOCUMENT_PUBLICATION_SITE_HOME_FEATURE_TITLE_MAX_LENGTH,
   DOCUMENT_PUBLICATION_SITE_HOME_MODE_VALUES,
   DOCUMENT_PUBLICATION_SITE_HOME_NAME_MAX_LENGTH,
   DOCUMENT_PUBLICATION_SITE_HOME_TAGLINE_MAX_LENGTH,
@@ -31,12 +42,27 @@ export {
   DOCUMENT_PUBLICATION_ENTRY_STATUS_VALUES,
   DOCUMENT_PUBLICATION_NAV_ITEM_EXTERNAL_TARGET,
   DOCUMENT_PUBLICATION_NAV_ITEM_EXTERNAL_TARGET_VALUES,
+  DOCUMENT_PUBLICATION_NAV_ITEM_ICON_MAX_LENGTH,
   DOCUMENT_PUBLICATION_NAV_ITEM_INTERNAL_TARGET,
   DOCUMENT_PUBLICATION_NAV_ITEM_INTERNAL_TARGET_VALUES,
+  DOCUMENT_PUBLICATION_NAV_ITEM_LABEL_MAX_LENGTH,
+  DOCUMENT_PUBLICATION_NAV_ITEM_MAX_COUNT,
   DOCUMENT_PUBLICATION_NAV_ITEM_TYPE,
   DOCUMENT_PUBLICATION_NAV_ITEM_TYPE_VALUES,
+  DOCUMENT_PUBLICATION_SITE_CUSTOM_MEDIA_MAX_BYTES,
+  DOCUMENT_PUBLICATION_SITE_CUSTOM_MEDIA_MAX_BYTES_BY_SCOPE,
+  DOCUMENT_PUBLICATION_SITE_CUSTOM_MEDIA_SCOPE,
+  DOCUMENT_PUBLICATION_SITE_CUSTOM_MEDIA_SCOPE_VALUES,
   DOCUMENT_PUBLICATION_SITE_FOOTER_COPYRIGHT_MAX_LENGTH,
   DOCUMENT_PUBLICATION_SITE_FOOTER_MESSAGE_MAX_LENGTH,
+  DOCUMENT_PUBLICATION_SITE_HOME_ACTION_HREF_MAX_LENGTH,
+  DOCUMENT_PUBLICATION_SITE_HOME_ACTION_LABEL_MAX_LENGTH,
+  DOCUMENT_PUBLICATION_SITE_HOME_ACTION_MAX_COUNT,
+  DOCUMENT_PUBLICATION_SITE_HOME_FEATURE_DETAILS_MAX_LENGTH,
+  DOCUMENT_PUBLICATION_SITE_HOME_FEATURE_ICON_MAX_LENGTH,
+  DOCUMENT_PUBLICATION_SITE_HOME_FEATURE_ICON_MEDIA_MAX_BYTES,
+  DOCUMENT_PUBLICATION_SITE_HOME_FEATURE_MAX_COUNT,
+  DOCUMENT_PUBLICATION_SITE_HOME_FEATURE_TITLE_MAX_LENGTH,
   DOCUMENT_PUBLICATION_SITE_HOME_LOGO_MEDIA_MAX_BYTES,
   DOCUMENT_PUBLICATION_SITE_HOME_MODE,
   DOCUMENT_PUBLICATION_SITE_HOME_MODE_VALUES,
@@ -77,6 +103,7 @@ export const PublicationSiteThemeSchema = z.enum(DOCUMENT_PUBLICATION_SITE_THEME
 export const PublicationSiteHomeModeSchema = z.enum(DOCUMENT_PUBLICATION_SITE_HOME_MODE_VALUES)
 export const PublicationSitePageScopeSchema = z.enum(DOCUMENT_SITE_PUBLICATION_PAGE_SCOPE_VALUES)
 export const PublicationSiteMediaKindSchema = z.enum(DOCUMENT_PUBLICATION_SITE_MEDIA_KIND_VALUES)
+export const PublicationSiteCustomMediaScopeSchema = z.enum(DOCUMENT_PUBLICATION_SITE_CUSTOM_MEDIA_SCOPE_VALUES)
 export const PublicationNavItemTypeSchema = z.enum(DOCUMENT_PUBLICATION_NAV_ITEM_TYPE_VALUES)
 export const PublicationNavItemInternalTargetSchema = z.enum(DOCUMENT_PUBLICATION_NAV_ITEM_INTERNAL_TARGET_VALUES)
 export const PublicationNavItemExternalTargetSchema = z.enum(DOCUMENT_PUBLICATION_NAV_ITEM_EXTERNAL_TARGET_VALUES)
@@ -97,15 +124,15 @@ function PublicationSafeHrefSchema(maxLength: number) {
 }
 
 const PublicationSiteHomeActionSchema = z.object({
-  label: z.string().trim().min(1).max(40),
-  href: PublicationSafeHrefSchema(240),
+  label: z.string().trim().min(1).max(DOCUMENT_PUBLICATION_SITE_HOME_ACTION_LABEL_MAX_LENGTH),
+  href: PublicationSafeHrefSchema(DOCUMENT_PUBLICATION_SITE_HOME_ACTION_HREF_MAX_LENGTH),
   theme: z.enum(['brand', 'alt']).default('brand'),
 }).strict()
 
 const PublicationSiteHomeFeatureSchema = z.object({
-  title: z.string().trim().min(1).max(80),
-  details: z.string().trim().max(240).nullable(),
-  icon: z.string().trim().max(40).nullable(),
+  title: z.string().trim().min(1).max(DOCUMENT_PUBLICATION_SITE_HOME_FEATURE_TITLE_MAX_LENGTH),
+  details: z.string().trim().max(DOCUMENT_PUBLICATION_SITE_HOME_FEATURE_DETAILS_MAX_LENGTH).nullable(),
+  icon: z.string().trim().max(DOCUMENT_PUBLICATION_SITE_HOME_FEATURE_ICON_MAX_LENGTH).nullable(),
 }).strict()
 
 export const PublicationSiteHomeConfigSchema = z.object({
@@ -115,12 +142,16 @@ export const PublicationSiteHomeConfigSchema = z.object({
     tagline: z.string().trim().max(DOCUMENT_PUBLICATION_SITE_HOME_TAGLINE_MAX_LENGTH).nullable(),
     imageUrl: z.string().trim().max(500).nullable(),
   }).strict(),
-  actions: z.array(PublicationSiteHomeActionSchema).max(3),
-  features: z.array(PublicationSiteHomeFeatureSchema).max(8),
+  actions: z.array(PublicationSiteHomeActionSchema).max(DOCUMENT_PUBLICATION_SITE_HOME_ACTION_MAX_COUNT),
+  features: z.array(PublicationSiteHomeFeatureSchema).max(DOCUMENT_PUBLICATION_SITE_HOME_FEATURE_MAX_COUNT),
   footer: z.object({
     message: z.string().trim().max(DOCUMENT_PUBLICATION_SITE_FOOTER_MESSAGE_MAX_LENGTH).nullable(),
     copyright: z.string().trim().max(DOCUMENT_PUBLICATION_SITE_FOOTER_COPYRIGHT_MAX_LENGTH).nullable(),
   }).strict(),
+}).strict()
+
+export const PublicationSiteCustomMediaResponseSchema = z.object({
+  mediaUrl: z.string().trim().min(1).max(500),
 }).strict()
 
 export const UpsertPublicationSiteSettingsSchema = z.object({
@@ -241,9 +272,21 @@ export const UpdatePublicationPageSchema = z.object({
 
 const PublicationNavItemInputBaseSchema = z.object({
   id: z.string().trim().min(1).optional(),
-  label: z.string().trim().min(1).max(40),
+  parentId: z.string().trim().nullable().optional(),
+  label: z.string().trim().max(DOCUMENT_PUBLICATION_NAV_ITEM_LABEL_MAX_LENGTH).nullable().optional(),
+  icon: z.string().trim().max(DOCUMENT_PUBLICATION_NAV_ITEM_ICON_MAX_LENGTH).nullable().optional(),
   order: z.number().int().min(0),
   status: PublicationEntryStatusSchema.default(DOCUMENT_PUBLICATION_ENTRY_STATUS.ACTIVE),
+}).strict()
+
+export const PublicationGroupNavItemInputSchema = PublicationNavItemInputBaseSchema.extend({
+  type: z.literal(DOCUMENT_PUBLICATION_NAV_ITEM_TYPE.GROUP),
+  label: z.string().trim().min(1).max(DOCUMENT_PUBLICATION_NAV_ITEM_LABEL_MAX_LENGTH),
+  parentId: z.null().optional(),
+  target: z.null().optional(),
+  targetId: z.null().optional(),
+  url: z.null().optional(),
+  openTarget: z.null().optional(),
 }).strict()
 
 export const PublicationInternalNavItemInputSchema = PublicationNavItemInputBaseSchema.extend({
@@ -253,6 +296,14 @@ export const PublicationInternalNavItemInputSchema = PublicationNavItemInputBase
   url: z.null().optional(),
   openTarget: z.null().optional(),
 }).strict().superRefine((item, ctx) => {
+  if (!hasPublicationNavItemVisibleIdentity(item)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: '导航名称和图标至少填写一个',
+      path: ['label'],
+    })
+  }
+
   if (item.target === DOCUMENT_PUBLICATION_NAV_ITEM_INTERNAL_TARGET.HOME) {
     if (item.targetId !== null) {
       ctx.addIssue({
@@ -280,16 +331,25 @@ export const PublicationExternalNavItemInputSchema = PublicationNavItemInputBase
   targetId: z.null().optional(),
   url: PublicationSafeHrefSchema(500),
   openTarget: PublicationNavItemExternalTargetSchema,
-}).strict()
+}).strict().superRefine((item, ctx) => {
+  if (!hasPublicationNavItemVisibleIdentity(item)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: '导航名称和图标至少填写一个',
+      path: ['label'],
+    })
+  }
+})
 
 export const PublicationNavItemInputSchema = z.discriminatedUnion('type', [
+  PublicationGroupNavItemInputSchema,
   PublicationInternalNavItemInputSchema,
   PublicationExternalNavItemInputSchema,
 ])
 
 export const ReplacePublicationNavItemsSchema = z.object({
   workspaceId: z.string().trim().min(1),
-  items: z.array(PublicationNavItemInputSchema).max(12),
+  items: z.array(PublicationNavItemInputSchema).max(DOCUMENT_PUBLICATION_NAV_ITEM_MAX_COUNT),
 }).strict()
 
 export const PublicationSectionSchema = z.object({
@@ -314,11 +374,29 @@ export const PublicationPageSchema = z.object({
   ...PublicationAuditFieldsSchema,
 }).strict()
 
+export const PublicationGroupNavItemSchema = z.object({
+  id: z.string(),
+  siteId: z.string(),
+  parentId: z.null(),
+  type: z.literal(DOCUMENT_PUBLICATION_NAV_ITEM_TYPE.GROUP),
+  label: z.string().trim().min(1).max(DOCUMENT_PUBLICATION_NAV_ITEM_LABEL_MAX_LENGTH),
+  icon: z.string().trim().max(DOCUMENT_PUBLICATION_NAV_ITEM_ICON_MAX_LENGTH).nullable(),
+  target: z.null(),
+  targetId: z.null(),
+  url: z.null(),
+  openTarget: z.null(),
+  order: z.number().int().min(0),
+  status: PublicationEntryStatusSchema,
+  ...PublicationAuditFieldsSchema,
+}).strict()
+
 export const PublicationInternalNavItemSchema = z.object({
   id: z.string(),
   siteId: z.string(),
+  parentId: z.string().nullable(),
   type: z.literal(DOCUMENT_PUBLICATION_NAV_ITEM_TYPE.INTERNAL),
-  label: z.string().trim().min(1).max(40),
+  label: z.string().trim().max(DOCUMENT_PUBLICATION_NAV_ITEM_LABEL_MAX_LENGTH).nullable(),
+  icon: z.string().trim().max(DOCUMENT_PUBLICATION_NAV_ITEM_ICON_MAX_LENGTH).nullable(),
   target: PublicationNavItemInternalTargetSchema,
   targetId: z.string().nullable(),
   url: z.null(),
@@ -331,8 +409,10 @@ export const PublicationInternalNavItemSchema = z.object({
 export const PublicationExternalNavItemSchema = z.object({
   id: z.string(),
   siteId: z.string(),
+  parentId: z.string().nullable(),
   type: z.literal(DOCUMENT_PUBLICATION_NAV_ITEM_TYPE.EXTERNAL),
-  label: z.string().trim().min(1).max(40),
+  label: z.string().trim().max(DOCUMENT_PUBLICATION_NAV_ITEM_LABEL_MAX_LENGTH).nullable(),
+  icon: z.string().trim().max(DOCUMENT_PUBLICATION_NAV_ITEM_ICON_MAX_LENGTH).nullable(),
   target: z.null(),
   targetId: z.null(),
   url: PublicationSafeHrefSchema(500),
@@ -343,6 +423,7 @@ export const PublicationExternalNavItemSchema = z.object({
 }).strict()
 
 export const PublicationNavItemSchema = z.discriminatedUnion('type', [
+  PublicationGroupNavItemSchema,
   PublicationInternalNavItemSchema,
   PublicationExternalNavItemSchema,
 ])
@@ -447,6 +528,8 @@ export type PublicationSiteTheme = z.infer<typeof PublicationSiteThemeSchema>
 export type PublicationSiteHomeMode = z.infer<typeof PublicationSiteHomeModeSchema>
 export type PublicationSitePageScope = z.infer<typeof PublicationSitePageScopeSchema>
 export type PublicationSiteMediaKind = z.infer<typeof PublicationSiteMediaKindSchema>
+export type PublicationSiteCustomMediaScope = z.infer<typeof PublicationSiteCustomMediaScopeSchema>
+export type PublicationSiteCustomMediaResponse = z.infer<typeof PublicationSiteCustomMediaResponseSchema>
 export type PublicationNavItemType = z.infer<typeof PublicationNavItemTypeSchema>
 export type PublicationNavItemInternalTarget = z.infer<typeof PublicationNavItemInternalTargetSchema>
 export type PublicationNavItemExternalTarget = z.infer<typeof PublicationNavItemExternalTargetSchema>
@@ -461,6 +544,7 @@ export type PublicationSite = z.infer<typeof PublicationSiteSchema>
 export type PublicationSiteManagementResponse = z.infer<typeof PublicationSiteManagementResponseSchema>
 export type PublicationSection = z.infer<typeof PublicationSectionSchema>
 export type PublicationPage = z.infer<typeof PublicationPageSchema>
+export type PublicationGroupNavItem = z.infer<typeof PublicationGroupNavItemSchema>
 export type PublicationInternalNavItem = z.infer<typeof PublicationInternalNavItemSchema>
 export type PublicationExternalNavItem = z.infer<typeof PublicationExternalNavItemSchema>
 export type PublicationNavItem = z.infer<typeof PublicationNavItemSchema>
@@ -478,6 +562,10 @@ export type PublicationSiteMeta = z.infer<typeof PublicationSiteMetaSchema>
 export type PublicationSidebarGroup = z.infer<typeof PublicationSidebarGroupSchema>
 export type PublicationSiteRenderResponse = z.infer<typeof PublicationSiteRenderResponseSchema>
 export type PublicationSingleDocumentResponse = z.infer<typeof PublicationSingleDocumentResponseSchema>
+
+function hasPublicationNavItemVisibleIdentity(item: { icon?: string | null, label?: string | null }): boolean {
+  return Boolean(item.label?.trim() || item.icon?.trim())
+}
 
 function isSafePublicationHrefValue(value: string): boolean {
   const href = value.trim()
