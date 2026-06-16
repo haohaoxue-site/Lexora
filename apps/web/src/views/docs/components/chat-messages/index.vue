@@ -76,14 +76,14 @@ function isCopied(message: DocsChatMessagesProps['messages'][number]) {
         :style="virtual.style"
       >
         <div
-          class="docs-chat-messages__item flex min-w-0"
+          class="docs-chat-messages__item flex min-w-0 w-full"
           :class="virtual.item.role === 'user' ? 'justify-end' : 'justify-start'"
         >
           <div
             v-if="virtual.item.role === 'user'"
-            class="docs-chat-messages__user-content flex max-w-[min(18.5rem,100%)] flex-col items-end gap-1.5"
+            class="docs-chat-messages__user-content flex min-w-0 flex-col items-end gap-1.5"
           >
-            <div class="max-w-full break-words rounded-lg bg-primary px-3 py-2 text-[13px] leading-[1.55] text-white">
+            <div class="docs-chat-messages__user-bubble max-w-full break-words rounded-lg bg-primary px-3 py-2 text-[13px] leading-[1.55] text-white">
               <ChatUserMessageContent :message="virtual.item" />
             </div>
 
@@ -99,13 +99,13 @@ function isCopied(message: DocsChatMessagesProps['messages'][number]) {
             />
           </div>
 
-          <div v-else class="flex min-w-0 max-w-full items-start gap-2">
+          <div v-else class="docs-chat-messages__assistant-row flex min-w-0 w-full items-start gap-2">
             <ChatAssistantAvatar
               :pending="shouldShowAssistantPending(virtual.item)"
               size="sm"
               class="mt-0.5 shrink-0"
             />
-            <div class="docs-chat-messages__assistant-content flex min-w-0 max-w-full flex-col items-start gap-1.5">
+            <div class="docs-chat-messages__assistant-content flex min-w-0 flex-1 flex-col items-start gap-1.5">
               <ChatAssistantMessage :message="virtual.item" variant="docs" />
 
               <ChatMessageActions
@@ -130,7 +130,17 @@ function isCopied(message: DocsChatMessagesProps['messages'][number]) {
 
 <style scoped lang="scss">
 .docs-chat-messages {
+  --docs-chat-message-max-inline-size: min(30rem, 100%);
+
   overflow-anchor: none;
+}
+
+.docs-chat-messages__user-content {
+  max-inline-size: var(--docs-chat-message-max-inline-size);
+}
+
+.docs-chat-messages__user-bubble {
+  min-inline-size: 0;
 }
 
 .docs-chat-messages__virtual-item {

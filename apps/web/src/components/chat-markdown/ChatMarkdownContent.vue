@@ -46,6 +46,7 @@ async function handleClick(event: MouseEvent) {
 <style scoped lang="scss">
 .chat-markdown {
   min-width: 0;
+  max-width: 100%;
   color: var(--brand-text-primary);
   font-size: 0.875rem;
   line-height: 1.65;

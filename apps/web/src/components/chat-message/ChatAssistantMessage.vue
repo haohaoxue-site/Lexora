@@ -108,11 +108,14 @@ function readReactiveLocale(value: string): string {
 
   &.chat-assistant-message--docs {
     gap: 0.375rem;
+    inline-size: 100%;
     max-width: 100%;
   }
 }
 
 .chat-assistant-message__bubble {
+  min-inline-size: 0;
+  max-inline-size: 100%;
   padding: 0.5rem 0.75rem;
   border-radius: 0.5rem;
   overflow-wrap: break-word;
@@ -123,7 +126,8 @@ function readReactiveLocale(value: string): string {
   line-height: 1.6;
 
   .chat-assistant-message--docs & {
-    max-width: min(18.5rem, 100%);
+    inline-size: fit-content;
+    max-inline-size: var(--docs-chat-message-max-inline-size, min(30rem, 100%));
     padding: 0.5rem 0.75rem;
     border-radius: 0.5rem;
     font-size: 0.8125rem;
