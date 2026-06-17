@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import {
+  AiModelCapabilitySchema,
   AiProviderAuthModeSchema,
   AiProviderScopeSchema,
 } from '../ai'
@@ -15,6 +16,7 @@ export const AgentRuntimeModelTargetSchema = z.object({
   apiKey: NonEmptyStringSchema.nullable(),
   authMode: AiProviderAuthModeSchema,
   modelId: NonEmptyStringSchema,
+  capabilities: z.array(AiModelCapabilitySchema),
 }).strict()
 
 export type AgentRuntimeModelTarget = z.infer<typeof AgentRuntimeModelTargetSchema>

@@ -21,7 +21,7 @@ export const ChatGenerationModelTargetSnapshotSchema = z.object({
   modelType: AiModelTypeSchema,
   inputModalities: z.array(AiModelModalitySchema),
   outputModalities: z.array(AiModelModalitySchema),
-  capabilities: z.array(AiModelCapabilitySchema).default([]),
+  capabilities: z.array(AiModelCapabilitySchema),
   contextWindow: z.number().int().positive().nullable().optional(),
   maxOutputTokens: z.number().int().positive().nullable().optional(),
 }).strict()

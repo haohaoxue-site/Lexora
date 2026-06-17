@@ -195,14 +195,7 @@ export class ChatSessionEventsService {
 }
 
 function toAgentEventStreamId(sourceEventId: string): string {
-  if (sourceEventId.endsWith(':message')) {
-    return sourceEventId.slice(0, -':message'.length)
-  }
-  if (sourceEventId.endsWith(':run')) {
-    return sourceEventId.slice(0, -':run'.length)
-  }
-
-  return sourceEventId
+  return sourceEventId.replace(/:[^:]+$/, '')
 }
 
 function toChatSessionEvent(event: PersistedChatSessionEvent): ChatSessionEvent {

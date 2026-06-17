@@ -1990,6 +1990,7 @@ export class ChatSessionsService {
       apiKey: target.apiKey,
       authMode: snapshot.authMode,
       modelId: snapshot.modelId,
+      capabilities: snapshot.capabilities,
     })
   }
 }

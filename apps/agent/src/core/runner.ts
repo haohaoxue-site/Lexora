@@ -14,6 +14,7 @@ import type {
   AgentRunner,
   ChatGenerationEvent,
 } from '../runtime/typing'
+import type { AgentRuntimeWarning } from './state'
 import {
   AgentGenerationCommandSchema,
   AgentProfileConfigSchema,
@@ -34,6 +35,10 @@ import {
   resolveFocusedTranslatorInvocation,
 } from './skills/builtin/translator'
 
+interface AgentRunnerLogger {
+  warn: (payload: Record<string, unknown>, message?: string) => void
+}
+
 export interface CreateAgentRunnerInput {
   chatApi: AgentChatApiClient
   memoryApi?: AgentMemoryApiClient
@@ -43,6 +48,7 @@ export interface CreateAgentRunnerInput {
   checkpointer?: BaseCheckpointSaver
   threadRunTryLock?: AgentRuntimeTryLock
   events?: AgentEventPublisher
+  logger?: AgentRunnerLogger
   now?: () => number
 }
 
@@ -86,6 +92,7 @@ export function createAgentRunner(inputs: CreateAgentRunnerInput): AgentRunner {
           checkpointer: inputs.checkpointer,
           emit: async event => await events.publish(event),
           graph,
+          logger: inputs.logger,
           signal: abortController.signal,
           threadRunTryLock,
         })
@@ -152,6 +159,7 @@ export async function executeAgentGeneration(input: {
   threadRunTryLock: AgentRuntimeTryLock
   signal: AbortSignal
   emit: (event: ChatGenerationEvent) => Promise<void> | void
+  logger?: AgentRunnerLogger
 }) {
   const profileConfig = AgentProfileConfigSchema.parse(input.bootstrap.agentProfile.currentConfig)
   const threadId = input.bootstrap.context.threadId
@@ -208,6 +216,15 @@ export async function executeAgentGeneration(input: {
           emit: input.emit,
           generationId: input.bootstrap.generation.generationId,
         }),
+        onRuntimeWarning: (warning: AgentRuntimeWarning) => input.logger?.warn({
+          warning,
+          generationId: input.bootstrap.generation.generationId,
+          sessionId: input.bootstrap.context.sessionId,
+          providerId: input.bootstrap.runtimeModelTarget.providerId,
+          adapterKey: input.bootstrap.runtimeModelTarget.adapterKey,
+          modelId: input.bootstrap.runtimeModelTarget.modelId,
+          capabilities: input.bootstrap.runtimeModelTarget.capabilities,
+        }, warning.message),
       },
     })
   })

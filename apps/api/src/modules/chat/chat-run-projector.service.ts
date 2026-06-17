@@ -4,6 +4,7 @@ import type {
   ChatMessageMetadata,
   ChatMessagePartMetadata,
 } from '@haohaoxue/lexora-contracts'
+import type { ChatSessionEventDraft } from './chat-session-events.service'
 import {
   CHAT_MESSAGE_FAILURE_REASON,
   CHAT_MESSAGE_PART_TYPE,
@@ -11,6 +12,7 @@ import {
   ChatGenerationUsageSnapshotSchema,
   ChatMemoryOperationProjectionSchema,
 } from '@haohaoxue/lexora-contracts'
+import { createAgentInternalToolProtocolStripper } from '@haohaoxue/lexora-shared/agent'
 import {
   Injectable,
   Logger,
@@ -69,6 +71,13 @@ interface UpsertToolPartInput {
   textSnapshot?: string
   textIfEmpty?: string
   elapsedMs?: number
+}
+
+interface PendingSinglePartDelta {
+  sourceEventId: string
+  type: typeof CHAT_MESSAGE_PART_TYPE.REASONING | typeof CHAT_MESSAGE_PART_TYPE.TEXT
+  text: string
+  snapshotText: string
 }
 
 @Injectable()
@@ -161,6 +170,9 @@ export class ChatRunProjectorService implements OnModuleInit, OnModuleDestroy {
       let reasoningText = await this.getMessagePartText(run.assistantMessageId, ChatSessionMessagePartType.REASONING)
       let answerText = await this.getMessagePartText(run.assistantMessageId, ChatSessionMessagePartType.TEXT)
       const toolPartState = await this.getToolPartState(run.assistantMessageId)
+      // Persistence defense only; agent runtime owns tool protocol correctness.
+      const reasoningTextStripper = createAgentInternalToolProtocolStripper()
+      const answerTextStripper = createAgentInternalToolProtocolStripper()
 
       try {
         await this.agentGenerationEventsService.consumeGenerationEvents({
@@ -174,8 +186,13 @@ export class ChatRunProjectorService implements OnModuleInit, OnModuleDestroy {
           },
           onEvent: async (event, sourceEventId) => {
             if (event.type === 'model.reasoning.delta') {
-              const text = getChatGenerationEventText(event)
-              if (!text || await this.chatSessionEvents.hasSourceEvent(run.runId, sourceEventId)) {
+              const rawText = getChatGenerationEventText(event)
+              if (!rawText || await this.chatSessionEvents.hasSourceEvent(run.runId, sourceEventId)) {
+                return
+              }
+
+              const text = reasoningTextStripper.write(rawText).textDeltas.join('')
+              if (!text) {
                 return
               }
 
@@ -193,8 +210,13 @@ export class ChatRunProjectorService implements OnModuleInit, OnModuleDestroy {
             }
 
             if (event.type === 'model.text.delta') {
-              const text = getChatGenerationEventText(event)
-              if (!text || await this.chatSessionEvents.hasSourceEvent(run.runId, sourceEventId)) {
+              const rawText = getChatGenerationEventText(event)
+              if (!rawText || await this.chatSessionEvents.hasSourceEvent(run.runId, sourceEventId)) {
+                return
+              }
+
+              const text = answerTextStripper.write(rawText).textDeltas.join('')
+              if (!text) {
                 return
               }
 
@@ -336,6 +358,29 @@ export class ChatRunProjectorService implements OnModuleInit, OnModuleDestroy {
             }
 
             if (event.type === 'generation.completed') {
+              const pendingPartDeltas: PendingSinglePartDelta[] = []
+              const flushedReasoningText = reasoningTextStripper.flush().textDeltas.join('')
+              if (flushedReasoningText) {
+                reasoningText += flushedReasoningText
+                pendingPartDeltas.push({
+                  sourceEventId: `${sourceEventId}:reasoning-flush`,
+                  type: CHAT_MESSAGE_PART_TYPE.REASONING,
+                  text: flushedReasoningText,
+                  snapshotText: reasoningText,
+                })
+              }
+
+              const flushedAnswerText = answerTextStripper.flush().textDeltas.join('')
+              if (flushedAnswerText) {
+                answerText += flushedAnswerText
+                pendingPartDeltas.push({
+                  sourceEventId: `${sourceEventId}:text-flush`,
+                  type: CHAT_MESSAGE_PART_TYPE.TEXT,
+                  text: flushedAnswerText,
+                  snapshotText: answerText,
+                })
+              }
+
               await this.completeRun({
                 runId: run.runId,
                 sessionId: run.sessionId,
@@ -349,6 +394,7 @@ export class ChatRunProjectorService implements OnModuleInit, OnModuleDestroy {
                   reasoningEndedAt: null,
                 }),
                 expectedHistoryVersion: getExpectedHistoryVersion(run.commandContext),
+                pendingPartDeltas,
               })
               return
             }
@@ -626,6 +672,7 @@ export class ChatRunProjectorService implements OnModuleInit, OnModuleDestroy {
     content: string
     metadata: ChatMessageMetadata
     expectedHistoryVersion: number
+    pendingPartDeltas?: PendingSinglePartDelta[]
   }): Promise<void> {
     if (await this.chatSessionEvents.hasSourceEvent(input.runId, `${input.sourceEventId}:message`)) {
       return
@@ -685,7 +732,48 @@ export class ChatRunProjectorService implements OnModuleInit, OnModuleDestroy {
         input.metadata.memoryOperations ?? [],
       )
       finalizedMemoryIds = finalizeResult.archivedMemoryIds
+      const pendingPartEvents: ChatSessionEventDraft[] = []
+      for (const pendingDelta of input.pendingPartDeltas ?? []) {
+        const order = getSinglePartOrder(pendingDelta.type)
+        const part = await tx.chatSessionMessagePart.upsert({
+          where: {
+            messageId_order: {
+              messageId: input.messageId,
+              order,
+            },
+          },
+          create: {
+            messageId: input.messageId,
+            type: toPrismaChatMessagePartType(pendingDelta.type),
+            text: pendingDelta.snapshotText,
+            order,
+          },
+          update: {
+            type: toPrismaChatMessagePartType(pendingDelta.type),
+            text: pendingDelta.snapshotText,
+          },
+          select: {
+            id: true,
+            order: true,
+          },
+        })
+
+        pendingPartEvents.push({
+          type: CHAT_SESSION_EVENT_TYPE.MESSAGE_PART_DELTA,
+          messageId: input.messageId,
+          runId: input.runId,
+          sourceEventId: pendingDelta.sourceEventId,
+          payload: {
+            partId: part.id,
+            partType: pendingDelta.type,
+            order: part.order,
+            delta: pendingDelta.text,
+            metadata: null,
+          },
+        })
+      }
       await this.chatSessionEvents.appendEvents(tx, input.sessionId, [
+        ...pendingPartEvents,
         ...createSnapshotRequiredEvents(input.metadata),
         {
           type: CHAT_SESSION_EVENT_TYPE.MESSAGE_COMPLETED,

@@ -58,4 +58,11 @@ export interface AgentGraphContext {
   contextSnapshots?: AgentChatContextSnapshot[] | null
   inputAttachments?: AgentChatInputAttachment[] | null
   onStreamPart?: (part: AgentModelStreamPart) => Promise<void> | void
+  onRuntimeWarning?: (warning: AgentRuntimeWarning) => Promise<void> | void
+}
+
+export interface AgentRuntimeWarning {
+  code: string
+  message: string
+  details?: Record<string, unknown>
 }

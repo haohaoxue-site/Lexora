@@ -81,6 +81,7 @@ async function start(): Promise<void> {
       chatModelFactory,
       checkpointer: agentCheckpointer,
       events: eventPublisher,
+      logger: app.log,
       threadRunTryLock,
     }),
     idempotency: createRedisAgentIdempotencyStore({
