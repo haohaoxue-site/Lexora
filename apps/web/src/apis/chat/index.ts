@@ -12,6 +12,8 @@ import type {
   ChatUploadedAsset,
   CreateChatSessionMessageRequest,
   EditAndSendChatMessageRequest,
+  ResumeChatRunRequest,
+  RetryChatAssistantMessageRequest,
   SwitchChatActiveMessageRequest,
   UpdateChatSessionTitleRequest,
 } from './typing'
@@ -139,12 +141,14 @@ export function editAndSendChatMessage(
 export function retryChatAssistantMessage(
   sessionId: string,
   messageId: string,
+  data: RetryChatAssistantMessageRequest = {},
   options: ChatSessionOriginOptions = {},
 ): Promise<ChatMutationResponse> {
   return axios.request({
     method: 'post',
     url: `/chat/sessions/${sessionId}/messages/${messageId}/retry`,
     params: createChatSessionOriginParams(options),
+    data,
   })
 }
 
@@ -166,6 +170,19 @@ export function cancelChatRun(runId: string, options: ChatSessionOriginOptions =
     method: 'post',
     url: `/chat/runs/${runId}/cancel`,
     params: createChatSessionOriginParams(options),
+  })
+}
+
+export function resumeChatRun(
+  runId: string,
+  data: ResumeChatRunRequest,
+  options: ChatSessionOriginOptions = {},
+): Promise<ChatMutationResponse> {
+  return axios.request({
+    method: 'post',
+    url: `/chat/runs/${runId}/resume`,
+    params: createChatSessionOriginParams(options),
+    data,
   })
 }
 

@@ -1,3 +1,9 @@
+import type {
+  AgentClientAction,
+  AgentGenerationCommand,
+  ChatGenerationUsageSnapshot,
+  ChatMemoryOperationProjection,
+} from '@haohaoxue/lexora-contracts'
 import type { BaseCheckpointSaver } from '@langchain/langgraph'
 import type { AgentChatApiClient } from '../clients/chat'
 import type { AgentMemoryApiClient } from '../clients/memory'
@@ -16,16 +22,20 @@ import type {
 } from '../runtime/typing'
 import type { AgentRuntimeWarning } from './state'
 import {
+  AGENT_GENERATION_COMMAND_KIND,
+  AgentClientActionSchema,
   AgentGenerationCommandSchema,
   AgentProfileConfigSchema,
   ChatGenerationBootstrapSchema,
 } from '@haohaoxue/lexora-contracts'
+import { Command } from '@langchain/langgraph'
 import { createMemoryAgentRuntimeTryLock } from '../runtime/lock'
 import {
   readAgentCheckpointState,
   resolveAgentGraphInput,
 } from './checkpoint'
 import {
+  createAgentClientActionRequiredEvent,
   createAgentGenerationLifecycleEvent,
   emitAgentModelStreamPart,
 } from './events'
@@ -38,6 +48,21 @@ import {
 interface AgentRunnerLogger {
   warn: (payload: Record<string, unknown>, message?: string) => void
 }
+
+interface CompletedAgentGenerationExecution {
+  status: 'completed'
+  responseText: string
+  usageSnapshot?: ChatGenerationUsageSnapshot | null
+  memoryOperations?: ChatMemoryOperationProjection[]
+}
+
+interface InterruptedAgentGenerationExecution {
+  status: 'interrupted'
+  action: AgentClientAction
+}
+
+type AgentGenerationExecution = CompletedAgentGenerationExecution | InterruptedAgentGenerationExecution
+type AgentGraphInvokeInput = Parameters<ReturnType<typeof createAgentGraph>['invoke']>[0]
 
 export interface CreateAgentRunnerInput {
   chatApi: AgentChatApiClient
@@ -90,6 +115,7 @@ export function createAgentRunner(inputs: CreateAgentRunnerInput): AgentRunner {
         const result = await executeAgentGeneration({
           bootstrap,
           checkpointer: inputs.checkpointer,
+          command,
           emit: async event => await events.publish(event),
           graph,
           logger: inputs.logger,
@@ -97,6 +123,16 @@ export function createAgentRunner(inputs: CreateAgentRunnerInput): AgentRunner {
           threadRunTryLock,
         })
         const durationMs = now() - startedAt
+
+        if (result.status === 'interrupted') {
+          await events.publish(createAgentClientActionRequiredEvent({
+            generationId,
+            action: result.action,
+          }))
+          return {
+            actionRequired: result.action,
+          }
+        }
 
         await events.publish(createAgentGenerationLifecycleEvent({
           type: 'generation.completed',
@@ -154,6 +190,7 @@ export function createAgentRunner(inputs: CreateAgentRunnerInput): AgentRunner {
 
 export async function executeAgentGeneration(input: {
   bootstrap: ReturnType<typeof ChatGenerationBootstrapSchema.parse>
+  command: AgentGenerationCommand
   graph: ReturnType<typeof createAgentGraph>
   checkpointer?: BaseCheckpointSaver
   threadRunTryLock: AgentRuntimeTryLock
@@ -177,20 +214,16 @@ export async function executeAgentGeneration(input: {
       throw new Error('聊天触发消息不存在')
     }
 
-    const checkpointState = focusedTranslatorInvocation
-      ? null
-      : await readAgentCheckpointState(input.checkpointer, threadId)
-    const graphInputDecision = resolveAgentGraphInput(
-      input.bootstrap.context,
-      checkpointState,
-      { focused: Boolean(focusedTranslatorInvocation) },
-    )
+    const graphInput = input.command.kind === AGENT_GENERATION_COMMAND_KIND.RESUME
+      ? createResumeGraphCommand(input.command)
+      : await createStartGraphInput({
+          bootstrap: input.bootstrap,
+          checkpointer: input.checkpointer,
+          focused: Boolean(focusedTranslatorInvocation),
+          threadId,
+        })
 
-    if (graphInputDecision.shouldResetCheckpoint) {
-      await input.checkpointer?.deleteThread(threadId)
-    }
-
-    return await input.graph.invoke(graphInputDecision.graphInput, {
+    return await input.graph.invoke(graphInput, {
       signal: input.signal,
       configurable: {
         thread_id: graphThreadId,
@@ -199,6 +232,7 @@ export async function executeAgentGeneration(input: {
         agentProfileConfig: profileConfig,
         skillContext: input.bootstrap.skills,
         disabledSkillKeys: input.bootstrap.context.disabledSkillKeys,
+        runtimeHints: input.bootstrap.context.runtimeHints,
         generationId: input.bootstrap.generation.generationId,
         actorUserId: input.bootstrap.generation.actorUserId,
         agentProfileId: input.bootstrap.agentProfile.profileId,
@@ -233,7 +267,83 @@ export async function executeAgentGeneration(input: {
     throw new Error(`聊天会话正在运行: ${input.bootstrap.context.sessionId}`)
   }
 
-  return result
+  const interruptedAction = readClientActionInterrupt(result)
+  if (interruptedAction) {
+    return {
+      status: 'interrupted',
+      action: interruptedAction,
+    } satisfies AgentGenerationExecution
+  }
+
+  return createCompletedAgentGenerationExecution(result)
+}
+
+async function createStartGraphInput(input: {
+  bootstrap: ReturnType<typeof ChatGenerationBootstrapSchema.parse>
+  checkpointer?: BaseCheckpointSaver
+  threadId: string
+  focused: boolean
+}) {
+  const checkpointState = input.focused
+    ? null
+    : await readAgentCheckpointState(input.checkpointer, input.threadId)
+  const graphInputDecision = resolveAgentGraphInput(
+    input.bootstrap.context,
+    checkpointState,
+    { focused: input.focused },
+  )
+
+  if (graphInputDecision.shouldResetCheckpoint) {
+    await input.checkpointer?.deleteThread(input.threadId)
+  }
+
+  return graphInputDecision.graphInput
+}
+
+function createResumeGraphCommand(command: AgentGenerationCommand): AgentGraphInvokeInput {
+  if (!command.resume) {
+    throw new Error('Resume generation command is missing resume payload')
+  }
+
+  return new Command({
+    resume: command.resume,
+  }) as AgentGraphInvokeInput
+}
+
+function readClientActionInterrupt(result: unknown): AgentClientAction | null {
+  if (!isRecord(result) || !Array.isArray(result.__interrupt__)) {
+    return null
+  }
+
+  for (const item of result.__interrupt__) {
+    if (!isRecord(item)) {
+      continue
+    }
+
+    const parsed = AgentClientActionSchema.safeParse(item.value)
+    if (parsed.success) {
+      return parsed.data
+    }
+  }
+
+  return null
+}
+
+function createCompletedAgentGenerationExecution(result: unknown): CompletedAgentGenerationExecution {
+  if (!isRecord(result) || typeof result.responseText !== 'string') {
+    throw new Error('Agent graph completed without response text')
+  }
+
+  return {
+    status: 'completed',
+    responseText: result.responseText,
+    usageSnapshot: isNullableRecord(result.usageSnapshot)
+      ? result.usageSnapshot as ChatGenerationUsageSnapshot | null
+      : null,
+    memoryOperations: Array.isArray(result.memoryOperations)
+      ? result.memoryOperations as ChatMemoryOperationProjection[]
+      : [],
+  }
 }
 
 function toChatModelOptions(profileConfig: ReturnType<typeof AgentProfileConfigSchema.parse>): AgentChatModelOptions {
@@ -249,6 +359,14 @@ function createNoopAgentEventPublisher(): AgentEventPublisher {
   return {
     async publish() {},
   }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+function isNullableRecord(value: unknown): value is Record<string, unknown> | null {
+  return value === null || isRecord(value)
 }
 
 function getAgentGenerationErrorMessage(error: unknown): string {

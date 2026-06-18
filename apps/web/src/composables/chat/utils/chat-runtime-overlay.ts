@@ -110,6 +110,11 @@ export function applyChatRuntimeOverlayEvent(
     return true
   }
 
+  if (event.type === CHAT_SESSION_EVENT_TYPE.RUN_REQUIRES_ACTION) {
+    updateCurrentRun(state, event, CHAT_RUN_STATUS.REQUIRES_ACTION)
+    return true
+  }
+
   if (isTerminalRunEvent(event)) {
     markTerminalRun(state, event)
     const terminalMessageEvent = createMessageTerminalEventFromRunEvent(state, event)
@@ -216,7 +221,9 @@ export function clearChatRuntimeOverlaySession(
 }
 
 function isActiveRun(run: ChatRunSummary | null): run is ChatRunSummary {
-  return run?.status === CHAT_RUN_STATUS.PENDING || run?.status === CHAT_RUN_STATUS.RUNNING
+  return run?.status === CHAT_RUN_STATUS.PENDING
+    || run?.status === CHAT_RUN_STATUS.RUNNING
+    || run?.status === CHAT_RUN_STATUS.REQUIRES_ACTION
 }
 
 function updateCurrentRun(
@@ -236,6 +243,9 @@ function updateCurrentRun(
   state.currentRunBySessionId.set(event.sessionId, {
     ...currentRun,
     status,
+    requiredAction: event.type === CHAT_SESSION_EVENT_TYPE.RUN_REQUIRES_ACTION
+      ? event.payload.action
+      : null,
     startedAt: currentRun.startedAt ?? event.createdAt,
   })
 }

@@ -6,11 +6,15 @@ import type {
 } from '@haohaoxue/lexora-contracts'
 import {
   AGENT_FIRST_PARTY_SKILL_DEFINITIONS,
+  AGENT_LOCATION_SKILL_KEY,
   AGENT_MEMORY_SKILL_KEY,
   AGENT_MEMORY_SLOT_KEY,
+  AGENT_TIME_SKILL_KEY,
   AGENT_WEB_SEARCH_SKILL_KEY,
+  AgentLocationSkillConfigSchema,
   AgentProfileConfigSchema,
   AgentProfileSettingsSchema,
+  AgentTimeSkillConfigSchema,
   AgentWebSearchSkillConfigSchema,
   AI_MODEL_INTENT_KEY,
 } from '@haohaoxue/lexora-contracts'
@@ -277,11 +281,12 @@ function createDefaultFirstPartySkillBindings(): AgentProfileConfig['skillBindin
 }
 
 function ensureDefaultFirstPartySkillBindings(config: AgentProfileConfig): AgentProfileConfig {
-  const bindingByKey = new Map(config.skillBindings.map(binding => [binding.key, binding]))
+  const existingSkillBindings = config.skillBindings.filter(binding => !isLegacyAutoInstalledLocationBinding(binding))
+  const bindingByKey = new Map(existingSkillBindings.map(binding => [binding.key, binding]))
   const firstPartyDefinitionByKey = new Map(AGENT_FIRST_PARTY_SKILL_DEFINITIONS.map(definition => [definition.key, definition]))
-  let nextPriority = config.skillBindings.reduce((max, binding) => Math.max(max, binding.priority), -1) + 1
+  let nextPriority = existingSkillBindings.reduce((max, binding) => Math.max(max, binding.priority), -1) + 1
 
-  const skillBindings = config.skillBindings.map((binding) => {
+  const skillBindings = existingSkillBindings.map((binding) => {
     const definition = firstPartyDefinitionByKey.get(binding.key)
     if (!definition) {
       return binding
@@ -326,7 +331,16 @@ function ensureDefaultFirstPartySkillBindings(config: AgentProfileConfig): Agent
   })
 }
 
+function isLegacyAutoInstalledLocationBinding(binding: AgentProfileConfig['skillBindings'][number]): boolean {
+  return binding.key === AGENT_LOCATION_SKILL_KEY
+    && !AgentLocationSkillConfigSchema.safeParse(binding.config).success
+}
+
 function getDefaultFirstPartySkillBindingConfig(skillKey: string): AgentProfileConfig['skillBindings'][number]['config'] {
+  if (skillKey === AGENT_TIME_SKILL_KEY) {
+    return AgentTimeSkillConfigSchema.parse({})
+  }
+
   if (skillKey === AGENT_WEB_SEARCH_SKILL_KEY) {
     return AgentWebSearchSkillConfigSchema.parse({})
   }
@@ -338,8 +352,16 @@ function normalizeDefaultFirstPartySkillBindingConfig(
   skillKey: string,
   config: AgentProfileConfig['skillBindings'][number]['config'],
 ): AgentProfileConfig['skillBindings'][number]['config'] {
+  if (skillKey === AGENT_TIME_SKILL_KEY) {
+    return AgentTimeSkillConfigSchema.parse(config)
+  }
+
   if (skillKey === AGENT_WEB_SEARCH_SKILL_KEY) {
     return AgentWebSearchSkillConfigSchema.parse(config)
+  }
+
+  if (skillKey === AGENT_LOCATION_SKILL_KEY) {
+    return AgentLocationSkillConfigSchema.parse(config)
   }
 
   if (skillKey === AGENT_MEMORY_SKILL_KEY) {

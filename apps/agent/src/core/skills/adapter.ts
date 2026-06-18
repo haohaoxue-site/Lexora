@@ -12,6 +12,7 @@ export interface RuntimeSkillAdapterServices {
 
 export interface RuntimeSkillAdapter {
   key: string
+  toolNames: readonly string[]
   isAvailable: (input: {
     context: AgentGraphContext | undefined
     services: RuntimeSkillAdapterServices

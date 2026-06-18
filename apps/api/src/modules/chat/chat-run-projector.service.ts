@@ -1,4 +1,5 @@
 import type {
+  AgentClientAction,
   ChatGenerationEvent,
   ChatMessageFailureReason,
   ChatMessageMetadata,
@@ -6,6 +7,7 @@ import type {
 } from '@haohaoxue/lexora-contracts'
 import type { ChatSessionEventDraft } from './chat-session-events.service'
 import {
+  AGENT_LOCATION_SKILL_KEY,
   CHAT_MESSAGE_FAILURE_REASON,
   CHAT_MESSAGE_PART_TYPE,
   CHAT_SESSION_EVENT_TYPE,
@@ -328,7 +330,7 @@ export class ChatRunProjectorService implements OnModuleInit, OnModuleDestroy {
                 toolCallId: payload.toolCallId,
                 toolName: payload.toolName,
                 toolKind: payload.toolKind,
-                status: payload.status === 'error' ? 'error' : 'success',
+                status: payload.status ?? 'success',
                 textSnapshot: payload.outputText ?? '',
                 elapsedMs: payload.durationMs,
               })
@@ -353,6 +355,33 @@ export class ChatRunProjectorService implements OnModuleInit, OnModuleDestroy {
                 status: 'error',
                 textSnapshot: payload.message,
                 elapsedMs: payload.durationMs,
+              })
+              return
+            }
+
+            if (event.type === 'generation.client_action.required') {
+              const action = event.payload.action
+              if (await this.chatSessionEvents.hasSourceEvent(run.runId, sourceEventId)) {
+                return
+              }
+
+              await this.upsertToolPartSnapshot(toolPartState, {
+                runId: run.runId,
+                sessionId: run.sessionId,
+                messageId: run.assistantMessageId,
+                sourceEventId: `${sourceEventId}:tool`,
+                type: CHAT_MESSAGE_PART_TYPE.TOOL_CALL,
+                toolCallId: action.toolCallId,
+                toolName: action.toolName,
+                toolKind: 'skill',
+                status: 'requires_action',
+              })
+              await this.requireClientActionRun({
+                runId: run.runId,
+                sessionId: run.sessionId,
+                messageId: run.assistantMessageId,
+                sourceEventId,
+                action,
               })
               return
             }
@@ -681,7 +710,8 @@ export class ChatRunProjectorService implements OnModuleInit, OnModuleDestroy {
     const completedAt = new Date()
     let finalizedMemoryIds: string[] = []
     const committed = await ignoreUniqueConstraint(async () => this.prisma.$transaction(async (tx) => {
-      if (!await isRunStatus(tx, input.runId, ChatSessionRunStatus.RUNNING)) {
+      const run = await readRunningRunForTerminalUpdate(tx, input.runId)
+      if (!run) {
         return
       }
 
@@ -715,6 +745,7 @@ export class ChatRunProjectorService implements OnModuleInit, OnModuleDestroy {
           status: ChatSessionRunStatus.COMPLETED,
           completedAt,
           dispatchLeaseExpiresAt: null,
+          commandContext: toJsonObject(clearLocationClientIpRuntimeInput(run.commandContext)),
         },
       })
       await tx.chatMessageGeneration.updateMany({
@@ -800,6 +831,67 @@ export class ChatRunProjectorService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
+  private async requireClientActionRun(input: {
+    runId: string
+    sessionId: string
+    messageId: string
+    sourceEventId: string
+    action: AgentClientAction
+  }): Promise<void> {
+    if (await this.chatSessionEvents.hasSourceEvent(input.runId, input.sourceEventId)) {
+      return
+    }
+
+    const updatedAt = new Date()
+    await ignoreUniqueConstraint(async () => this.prisma.$transaction(async (tx) => {
+      const run = await tx.chatSessionRun.findUnique({
+        where: { runId: input.runId },
+        select: {
+          commandContext: true,
+          status: true,
+        },
+      })
+      if (!run || run.status !== ChatSessionRunStatus.RUNNING) {
+        return
+      }
+
+      await tx.chatSessionRun.update({
+        where: { runId: input.runId },
+        data: {
+          status: ChatSessionRunStatus.REQUIRES_ACTION,
+          commandPublishedAt: null,
+          dispatchLeaseExpiresAt: null,
+          commandContext: toJsonObject(setPendingClientAction(run.commandContext, input.action)),
+        },
+      })
+      await tx.chatMessageGeneration.updateMany({
+        where: { generationId: input.runId },
+        data: {
+          status: ChatMessageGenerationStatus.REQUIRES_ACTION,
+          commandPublishedAt: null,
+          dispatchLeaseExpiresAt: null,
+        },
+      })
+      await tx.chatSession.update({
+        where: { id: input.sessionId },
+        data: {
+          updatedAt,
+        },
+      })
+      await this.chatSessionEvents.appendEvents(tx, input.sessionId, [
+        {
+          type: CHAT_SESSION_EVENT_TYPE.RUN_REQUIRES_ACTION,
+          messageId: input.messageId,
+          runId: input.runId,
+          sourceEventId: input.sourceEventId,
+          payload: toJsonObject({
+            action: input.action,
+          }),
+        },
+      ])
+    }))
+  }
+
   private async failRun(input: {
     runId: string
     sessionId: string
@@ -817,7 +909,8 @@ export class ChatRunProjectorService implements OnModuleInit, OnModuleDestroy {
     let rolledBackMemoryIds: string[] = []
     let restoredMemoryIds: string[] = []
     const committed = await ignoreUniqueConstraint(async () => this.prisma.$transaction(async (tx) => {
-      if (!await isRunStatus(tx, input.runId, ChatSessionRunStatus.RUNNING)) {
+      const run = await readRunningRunForTerminalUpdate(tx, input.runId)
+      if (!run) {
         return
       }
 
@@ -841,6 +934,7 @@ export class ChatRunProjectorService implements OnModuleInit, OnModuleDestroy {
           status: ChatSessionRunStatus.FAILED,
           completedAt,
           dispatchLeaseExpiresAt: null,
+          commandContext: toJsonObject(clearLocationClientIpRuntimeInput(run.commandContext)),
         },
       })
       await tx.chatMessageGeneration.updateMany({
@@ -904,7 +998,8 @@ export class ChatRunProjectorService implements OnModuleInit, OnModuleDestroy {
     let rolledBackMemoryIds: string[] = []
     let restoredMemoryIds: string[] = []
     const committed = await ignoreUniqueConstraint(async () => this.prisma.$transaction(async (tx) => {
-      if (!await isRunStatus(tx, input.runId, ChatSessionRunStatus.RUNNING)) {
+      const run = await readRunningRunForTerminalUpdate(tx, input.runId)
+      if (!run) {
         return
       }
 
@@ -924,6 +1019,7 @@ export class ChatRunProjectorService implements OnModuleInit, OnModuleDestroy {
           status: ChatSessionRunStatus.CANCELLED,
           completedAt,
           dispatchLeaseExpiresAt: null,
+          commandContext: toJsonObject(clearLocationClientIpRuntimeInput(run.commandContext)),
         },
       })
       await tx.chatMessageGeneration.updateMany({
@@ -986,6 +1082,56 @@ async function isRunStatus(
   })
 
   return run?.status === status
+}
+
+async function readRunningRunForTerminalUpdate(
+  tx: Prisma.TransactionClient,
+  runId: string,
+): Promise<{
+  commandContext: unknown
+} | null> {
+  const run = await tx.chatSessionRun.findUnique({
+    where: { runId },
+    select: {
+      commandContext: true,
+      status: true,
+    },
+  })
+
+  return run?.status === ChatSessionRunStatus.RUNNING
+    ? { commandContext: run.commandContext }
+    : null
+}
+
+function clearLocationClientIpRuntimeInput(commandContext: unknown): Record<string, unknown> {
+  const base = isRecord(commandContext) ? { ...commandContext } : {}
+  const runtimeHints = isRecord(base.runtimeHints) ? { ...base.runtimeHints } : null
+  const skillInputs = isRecord(runtimeHints?.skillInputs) ? { ...runtimeHints.skillInputs } : null
+  const locationInput = isRecord(skillInputs?.[AGENT_LOCATION_SKILL_KEY])
+    ? { ...skillInputs[AGENT_LOCATION_SKILL_KEY] }
+    : null
+
+  if (!runtimeHints || !skillInputs || !locationInput || !('clientIp' in locationInput)) {
+    return base
+  }
+
+  delete locationInput.clientIp
+  if (Object.keys(locationInput).length > 0) {
+    skillInputs[AGENT_LOCATION_SKILL_KEY] = locationInput
+  }
+  else {
+    delete skillInputs[AGENT_LOCATION_SKILL_KEY]
+  }
+
+  return removeUndefined({
+    ...base,
+    runtimeHints: Object.keys(skillInputs).length > 0
+      ? {
+          ...runtimeHints,
+          skillInputs,
+        }
+      : undefined,
+  })
 }
 
 function getOrCreateToolPartEntry(
@@ -1072,7 +1218,7 @@ function getToolEventPayload(event: ChatGenerationEvent): {
   toolCallId?: string
   toolName?: string
   toolKind?: ChatMessagePartMetadata['toolKind']
-  status?: 'success' | 'error'
+  status?: 'success' | 'error' | 'requires_action'
   argumentsText?: string
   outputText?: string
   message?: string
@@ -1087,12 +1233,18 @@ function getToolEventPayload(event: ChatGenerationEvent): {
     toolCallId: readString(payload.toolCallId),
     toolName: readString(payload.toolName),
     toolKind: readToolKind(payload.toolKind),
-    status: payload.status === 'error' ? 'error' : payload.status === 'success' ? 'success' : undefined,
+    status: readToolStatus(payload.status),
     argumentsText: readString(payload.argumentsText),
     outputText: readString(payload.outputText),
     message: readString(payload.message),
     durationMs: readNonNegativeInteger(payload.durationMs),
   }
+}
+
+function readToolStatus(value: unknown): 'success' | 'error' | 'requires_action' | undefined {
+  return value === 'success' || value === 'error' || value === 'requires_action'
+    ? value
+    : undefined
 }
 
 function readToolKind(value: unknown): ChatMessagePartMetadata['toolKind'] | undefined {
@@ -1113,6 +1265,17 @@ function readNonNegativeInteger(value: unknown): number | undefined {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === 'object' && !Array.isArray(value)
+}
+
+function setPendingClientAction(commandContext: unknown, action: AgentClientAction): Record<string, unknown> {
+  const base = isRecord(commandContext) ? { ...commandContext } : {}
+
+  return removeUndefined({
+    ...base,
+    pendingClientAction: action,
+    resumeClientActionResult: undefined,
+    resumeCommandIdempotencyKey: undefined,
+  })
 }
 
 function removeUndefined<T extends Record<string, unknown>>(value: T): T {

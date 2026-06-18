@@ -2,9 +2,14 @@ import type { ChatMemoryOperationProjection } from '@haohaoxue/lexora-contracts/
 import type { ChatMessage } from '@/apis/chat'
 import type { ChatMarkdownRenderPhase } from '@/components/chat-markdown'
 import {
-  AGENT_MEMORY_OPERATION_DISPLAY_CODE,
+  AGENT_LOCATION_SKILL_KEY,
+  AGENT_LOCATION_TOOL,
   AGENT_MEMORY_OPERATION_REASON_CODE,
+  AGENT_MEMORY_SKILL_KEY,
   AGENT_MEMORY_TOOL,
+  AGENT_TIME_SKILL_KEY,
+  AGENT_TIME_TOOL,
+  AGENT_WEB_SEARCH_SKILL_KEY,
   AGENT_WEB_SEARCH_TOOL,
 } from '@haohaoxue/lexora-contracts/agent'
 import {
@@ -218,7 +223,7 @@ function createPublicToolCallView(
     return {
       ...view,
       status: getMemoryOperationToolStatus(memoryOperation, view.status),
-      displayTitle: getMemoryOperationTitle(memoryOperation, view.name),
+      displayTitle: getToolDisplayTitle(view),
       displayDetails: [
         memoryOperation?.detail,
         getMemoryOperationReason(memoryOperation),
@@ -229,14 +234,14 @@ function createPublicToolCallView(
   if (isWebSearchToolName(view.name)) {
     return {
       ...view,
-      displayTitle: getWebSearchTitle(view),
+      displayTitle: getToolDisplayTitle(view),
       displayDetails: getWebSearchDetails(view),
     }
   }
 
   return {
     ...view,
-    displayTitle: getDisplayName(view.name),
+    displayTitle: getToolDisplayTitle(view),
     displayDetails: [],
   }
 }
@@ -258,69 +263,6 @@ function getMemoryOperationToolStatus(
   }
 
   return 'success'
-}
-
-function getMemoryToolTitle(name: string): string {
-  if (name === AGENT_MEMORY_TOOL.REMEMBER) {
-    return translate('chat.messageDisplay.memoryRemembered')
-  }
-
-  if (name === AGENT_MEMORY_TOOL.UPDATE) {
-    return translate('chat.messageDisplay.memoryUpdated')
-  }
-
-  if (name === AGENT_MEMORY_TOOL.FORGET) {
-    return translate('chat.messageDisplay.memoryForgotten')
-  }
-
-  if (name === AGENT_MEMORY_TOOL.IGNORE) {
-    return translate('chat.messageDisplay.memoryIgnored')
-  }
-
-  if (name === AGENT_MEMORY_TOOL.ASK_USER) {
-    return translate('chat.messageDisplay.memoryPending')
-  }
-
-  return translate('chat.messageDisplay.memoryActivity')
-}
-
-function getMemoryOperationTitle(
-  operation: ChatMemoryOperationProjection | undefined,
-  fallbackToolName: string,
-): string {
-  if (!operation?.displayCode) {
-    return operation?.title ?? getMemoryToolTitle(fallbackToolName)
-  }
-
-  if (operation.displayCode === AGENT_MEMORY_OPERATION_DISPLAY_CODE.REMEMBERED) {
-    return translate('chat.messageDisplay.memoryRemembered')
-  }
-
-  if (operation.displayCode === AGENT_MEMORY_OPERATION_DISPLAY_CODE.UPDATED) {
-    return translate('chat.messageDisplay.memoryUpdated')
-  }
-
-  if (operation.displayCode === AGENT_MEMORY_OPERATION_DISPLAY_CODE.FORGOTTEN) {
-    return translate('chat.messageDisplay.memoryForgotten')
-  }
-
-  if (operation.displayCode === AGENT_MEMORY_OPERATION_DISPLAY_CODE.IGNORED) {
-    return translate('chat.messageDisplay.memoryIgnored')
-  }
-
-  if (operation.displayCode === AGENT_MEMORY_OPERATION_DISPLAY_CODE.PENDING) {
-    return translate('chat.messageDisplay.memoryPending')
-  }
-
-  if (operation.displayCode === AGENT_MEMORY_OPERATION_DISPLAY_CODE.EXISTS) {
-    return translate('chat.messageDisplay.memoryExists')
-  }
-
-  if (operation.displayCode === AGENT_MEMORY_OPERATION_DISPLAY_CODE.FAILED) {
-    return translate('chat.messageDisplay.memoryFailed')
-  }
-
-  return getMemoryToolTitle(fallbackToolName)
 }
 
 function getMemoryOperationReason(operation: ChatMemoryOperationProjection | undefined): string | null {
@@ -364,18 +306,6 @@ function isMemoryToolName(name: string): boolean {
 
 function isWebSearchToolName(name: string): boolean {
   return (Object.values(AGENT_WEB_SEARCH_TOOL) as string[]).includes(name)
-}
-
-function getWebSearchTitle(view: AssistantToolCallView): string {
-  if (view.status === 'success') {
-    return translate('chat.messageDisplay.webSearchCompleted')
-  }
-
-  if (view.status === 'error') {
-    return translate('chat.messageDisplay.webSearchFailed')
-  }
-
-  return translate('chat.messageDisplay.webSearchRunning')
 }
 
 function getWebSearchDetails(view: AssistantToolCallView): string[] {
@@ -423,40 +353,36 @@ function parseJsonObject(text: string): Record<string, unknown> | null {
   }
 }
 
-function getDisplayName(name: string): string {
-  if (name === 'activate_skill') {
-    return translate('chat.messageDisplay.activateSkill')
+const FIRST_PARTY_SKILL_DISPLAY_NAME_BY_TOOL_NAME = new Map<string, string>(
+  [
+    { skillKey: AGENT_TIME_SKILL_KEY, toolNames: Object.values(AGENT_TIME_TOOL) },
+    { skillKey: AGENT_LOCATION_SKILL_KEY, toolNames: Object.values(AGENT_LOCATION_TOOL) },
+    { skillKey: AGENT_MEMORY_SKILL_KEY, toolNames: Object.values(AGENT_MEMORY_TOOL) },
+    { skillKey: AGENT_WEB_SEARCH_SKILL_KEY, toolNames: Object.values(AGENT_WEB_SEARCH_TOOL) },
+  ].flatMap(skill =>
+    skill.toolNames.map(toolName => [toolName, getShortSkillName(skill.skillKey)]),
+  ),
+)
+
+function getToolDisplayTitle(view: AssistantToolCallView): string {
+  const namespace = getToolDisplayNamespace(view)
+  return namespace ? `${namespace}/${view.name}` : view.name
+}
+
+function getToolDisplayNamespace(view: AssistantToolCallView): string | null {
+  if (view.kind === 'skill') {
+    return FIRST_PARTY_SKILL_DISPLAY_NAME_BY_TOOL_NAME.get(view.name) ?? null
   }
 
-  if (name === 'read_skill_resource') {
-    return translate('chat.messageDisplay.readSkillResource')
+  if (view.kind === 'mcp') {
+    return 'mcp'
   }
 
-  if (name === AGENT_MEMORY_TOOL.REMEMBER) {
-    return translate('chat.messageDisplay.rememberMemory')
-  }
+  return view.kind === 'function' ? 'function' : null
+}
 
-  if (name === AGENT_MEMORY_TOOL.UPDATE) {
-    return translate('chat.messageDisplay.updateMemory')
-  }
-
-  if (name === AGENT_MEMORY_TOOL.FORGET) {
-    return translate('chat.messageDisplay.forgetMemory')
-  }
-
-  if (name === AGENT_MEMORY_TOOL.IGNORE) {
-    return translate('chat.messageDisplay.ignoreMemory')
-  }
-
-  if (name === AGENT_MEMORY_TOOL.ASK_USER) {
-    return translate('chat.messageDisplay.askMemory')
-  }
-
-  if (name === AGENT_WEB_SEARCH_TOOL.SEARCH) {
-    return translate('chat.messageDisplay.webSearchRunning')
-  }
-
-  return name
+function getShortSkillName(skillKey: string): string {
+  return skillKey.startsWith('lexora.') ? skillKey.slice('lexora.'.length) : skillKey
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

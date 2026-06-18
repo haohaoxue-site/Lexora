@@ -23,6 +23,7 @@ enum ChatSessionMessagePartType {
 enum ChatSessionRunStatus {
   PENDING
   RUNNING
+  REQUIRES_ACTION
   COMPLETED
   FAILED
   CANCELLED
@@ -31,6 +32,7 @@ enum ChatSessionRunStatus {
 enum ChatMessageGenerationStatus {
   PENDING
   RUNNING
+  REQUIRES_ACTION
   COMPLETED
   FAILED
   CANCELLED
@@ -44,6 +46,7 @@ enum ChatSessionEventType {
   MESSAGE_FAILED
   MESSAGE_CANCELLED
   RUN_STARTED
+  RUN_REQUIRES_ACTION
   RUN_COMPLETED
   RUN_FAILED
   RUN_CANCELLED

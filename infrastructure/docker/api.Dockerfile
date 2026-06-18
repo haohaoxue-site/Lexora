@@ -1,11 +1,10 @@
-FROM node:24-slim AS build
+FROM node:26-slim AS build
 
 ENV PNPM_HOME=/pnpm
 ENV PATH="${PNPM_HOME}:${PATH}"
-ENV COREPACK_NPM_REGISTRY=https://registry.npmmirror.com
+ENV NPM_CONFIG_REGISTRY=https://registry.npmmirror.com
 
-RUN corepack enable \
-  && corepack prepare pnpm@10.33.0 --activate \
+RUN npm install --global pnpm@11.5.0 \
   && apt-get update \
   && apt-get install -y --no-install-recommends openssl \
   && rm -rf /var/lib/apt/lists/*
@@ -27,15 +26,14 @@ COPY apps/api apps/api
 
 RUN pnpm --filter @haohaoxue/lexora-api build
 
-FROM node:24-slim
+FROM node:26-slim
 
 ENV PNPM_HOME=/pnpm
 ENV NODE_ENV=production
 ENV PRISMA_HIDE_UPDATE_MESSAGE=1
-ENV COREPACK_NPM_REGISTRY=https://registry.npmmirror.com
+ENV NPM_CONFIG_REGISTRY=https://registry.npmmirror.com
 
-RUN corepack enable \
-  && corepack prepare pnpm@10.33.0 --activate \
+RUN npm install --global pnpm@11.5.0 \
   && apt-get update \
   && apt-get install -y --no-install-recommends openssl \
   && rm -rf /var/lib/apt/lists/* \

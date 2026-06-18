@@ -1,5 +1,8 @@
 import type { RuntimeSkillAdapter } from '../../adapter'
-import { AGENT_MEMORY_SKILL_KEY } from '@haohaoxue/lexora-contracts'
+import {
+  AGENT_MEMORY_SKILL_KEY,
+  AGENT_MEMORY_TOOL_VALUES,
+} from '@haohaoxue/lexora-contracts'
 import {
   executeMemoryToolCalls,
 } from './executor'
@@ -12,6 +15,7 @@ import {
 export function createMemoryRuntimeSkillAdapter(): RuntimeSkillAdapter {
   return {
     key: AGENT_MEMORY_SKILL_KEY,
+    toolNames: AGENT_MEMORY_TOOL_VALUES,
     isAvailable({ context, services }) {
       return Boolean(services.memoryApi && isMemorySkillActive(context))
     },

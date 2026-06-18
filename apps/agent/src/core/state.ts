@@ -5,6 +5,7 @@ import type {
   AgentContextPolicy,
   AgentMemoryRetrievalSnapshot,
   AgentProfileConfig,
+  AgentRuntimeHints,
   AgentRuntimeModelTarget,
   AgentRuntimeSkillContext,
   ChatGenerationUsageSnapshot,
@@ -49,6 +50,7 @@ export interface AgentGraphContext {
   agentProfileConfig?: AgentProfileConfig | null
   skillContext?: AgentRuntimeSkillContext | null
   disabledSkillKeys?: string[]
+  runtimeHints?: AgentRuntimeHints | null
   contextPolicy?: AgentContextPolicy | null
   contextBudget?: AgentContextBudget | null
   defaultResponseLanguage?: ResolvedLanguagePreference | null

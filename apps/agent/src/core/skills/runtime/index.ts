@@ -1,4 +1,5 @@
 export * from './activation-tools'
+export * from './active'
 export * from './catalog-prompt'
 export * from './executor'
 export * from './tool-names'

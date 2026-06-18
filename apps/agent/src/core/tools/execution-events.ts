@@ -11,10 +11,17 @@ import type { LoadedAgentSkill } from '../skills/runtime'
 import type { AgentGraphContext } from '../state'
 import type { AgentToolProtocol } from './protocol'
 import type { BaseToolCall } from './utils'
-import { AGENT_MEMORY_TOOL_VALUES } from '@haohaoxue/lexora-contracts'
-import { AGENT_WEB_SEARCH_TOOL_VALUES } from '@haohaoxue/lexora-contracts/agent'
+import {
+  AGENT_LOCATION_TOOL_VALUES,
+  AGENT_TIME_TOOL_VALUES,
+  AGENT_WEB_SEARCH_TOOL_VALUES,
+  GetCurrentLocationToolResponseSchema,
+  GetCurrentTimeToolResponseSchema,
+} from '@haohaoxue/lexora-contracts/agent'
+import { isGraphInterrupt } from '@langchain/langgraph'
 import { AGENT_SKILL_TOOL_NAME } from '../skills/runtime'
 import { executeRuntimeToolCalls } from './dispatch'
+import { listRuntimeSkillToolNames } from './registry'
 import {
   formatToolExecutionError,
   getToolCallId,
@@ -63,11 +70,7 @@ export async function executeRuntimeToolCallsWithEvents(input: {
   loadedSkills: LoadedAgentSkill[]
   visibleSkillToolNames: ReadonlySet<string>
 }): Promise<RuntimeToolExecutionResult> {
-  const startedAtByToolCallId = await emitToolExecutionStarts({
-    context: input.context,
-    toolCalls: input.toolCalls,
-    visibleSkillToolNames: input.visibleSkillToolNames,
-  })
+  const startedAtByToolCallId = new Map<string, number>()
 
   try {
     const result = await executeRuntimeToolCalls({
@@ -79,26 +82,46 @@ export async function executeRuntimeToolCallsWithEvents(input: {
       sessionId: input.sessionId,
       toolCalls: input.toolCalls,
       loadedSkills: input.loadedSkills,
-    })
+      observer: {
+        async onToolCallsStarted(toolCalls) {
+          const groupStartedAtByToolCallId = await emitToolExecutionStarts({
+            context: input.context,
+            toolCalls,
+            visibleSkillToolNames: input.visibleSkillToolNames,
+          })
 
-    await emitToolExecutionResults({
-      context: input.context,
-      toolCalls: input.toolCalls,
-      toolMessages: result.toolMessages,
-      startedAtByToolCallId,
-      visibleSkillToolNames: input.visibleSkillToolNames,
+          for (const [toolCallId, startedAt] of groupStartedAtByToolCallId) {
+            startedAtByToolCallId.set(toolCallId, startedAt)
+          }
+        },
+        async onToolCallsCompleted(toolCalls, toolMessages) {
+          await emitToolExecutionResults({
+            context: input.context,
+            toolCalls,
+            toolMessages,
+            startedAtByToolCallId,
+            visibleSkillToolNames: input.visibleSkillToolNames,
+          })
+        },
+        async onToolCallsFailed(toolCalls, error) {
+          await emitToolExecutionFailures({
+            context: input.context,
+            toolCalls,
+            startedAtByToolCallId,
+            visibleSkillToolNames: input.visibleSkillToolNames,
+            error,
+          })
+        },
+      },
     })
 
     return result
   }
   catch (error) {
-    await emitToolExecutionFailures({
-      context: input.context,
-      toolCalls: input.toolCalls,
-      startedAtByToolCallId,
-      visibleSkillToolNames: input.visibleSkillToolNames,
-      error,
-    })
+    if (isGraphInterrupt(error)) {
+      throw error
+    }
+
     throw error
   }
 }
@@ -109,10 +132,70 @@ export function createVisibleSkillToolNameSet(tools: StructuredToolInterface[]):
 
 export function shouldContinueWithFinalResponse(input: {
   toolCalls: BaseToolCall[]
-  toolMessages: Array<{ status?: 'success' | 'error' }>
+  toolMessages: Array<{
+    tool_call_id?: string
+    content?: unknown
+    status?: 'success' | 'error'
+  }>
 }): boolean {
   return input.toolMessages.some(message => message.status === 'error')
+    || hasUserInputRequiredToolResult(input)
     || input.toolCalls.some(toolCall => (AGENT_WEB_SEARCH_TOOL_VALUES as readonly string[]).includes(toolCall.name))
+}
+
+function hasUserInputRequiredToolResult(input: {
+  toolCalls: BaseToolCall[]
+  toolMessages: Array<{
+    tool_call_id?: string
+    content?: unknown
+  }>
+}): boolean {
+  const toolMessageByCallId = new Map(input.toolMessages.map(message => [message.tool_call_id, message]))
+
+  return input.toolCalls.some((toolCall) => {
+    const toolMessage = toolMessageByCallId.get(getToolCallId(toolCall))
+    if (!toolMessage) {
+      return false
+    }
+
+    return isUserInputRequiredToolResult(toolCall.name, toolMessage.content)
+  })
+}
+
+function isUserInputRequiredToolResult(toolName: string, content: unknown): boolean {
+  const payload = parseToolJsonPayload(content)
+  if (!payload) {
+    return false
+  }
+
+  if ((AGENT_LOCATION_TOOL_VALUES as readonly string[]).includes(toolName)) {
+    const parsed = GetCurrentLocationToolResponseSchema.safeParse(payload)
+    return parsed.success && parsed.data.status === 'needs_location'
+  }
+
+  if ((AGENT_TIME_TOOL_VALUES as readonly string[]).includes(toolName)) {
+    const parsed = GetCurrentTimeToolResponseSchema.safeParse(payload)
+    return parsed.success && parsed.data.status === 'needs_timezone'
+  }
+
+  return false
+}
+
+function parseToolJsonPayload(content: unknown): unknown | null {
+  if (typeof content === 'string') {
+    try {
+      return JSON.parse(content)
+    }
+    catch {
+      return null
+    }
+  }
+
+  return isRecord(content) ? content : null
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
 async function emitToolExecutionStarts(input: {
@@ -211,7 +294,6 @@ function isKnownRuntimeSkillToolName(toolName: string): boolean {
 function getKnownRuntimeSkillToolNames(): readonly string[] {
   return [
     ...Object.values(AGENT_SKILL_TOOL_NAME),
-    ...AGENT_MEMORY_TOOL_VALUES,
-    ...AGENT_WEB_SEARCH_TOOL_VALUES,
+    ...listRuntimeSkillToolNames(),
   ]
 }

@@ -1,3 +1,7 @@
+import type {
+  AgentClientAction,
+  AgentClientActionResult,
+} from '@haohaoxue/lexora-contracts/agent/client-action'
 import type { ChatApi } from './createChatApi'
 import type { ChatRuntimeOverlay } from './createChatRuntimeOverlay'
 import type { ChatSessionController } from './createChatSessionController'
@@ -9,11 +13,16 @@ import type {
   CreateChatSessionMessageRequest,
   EditAndSendChatMessageRequest,
 } from '@/apis/chat'
-import { CHAT_SESSION_EVENT_TYPE } from '@haohaoxue/lexora-contracts/chat/constants'
+import { AGENT_TIME_SKILL_KEY } from '@haohaoxue/lexora-contracts/agent'
+import {
+  CHAT_RUN_STATUS,
+  CHAT_SESSION_EVENT_TYPE,
+} from '@haohaoxue/lexora-contracts/chat/constants'
 import { watch } from 'vue'
 import { translate } from '@/i18n'
 import { ElMessage } from '@/utils/element-plus'
 import { getRequestErrorDisplayMessage } from '@/utils/request-error'
+import { resolveBrowserTimeZone } from '@/utils/time-zone'
 
 export interface ChatStreamControllerOptions {
   onSessionCreated?: (sessionId: string) => Promise<void> | void
@@ -60,6 +69,7 @@ export function createChatStreamController(
     startSessionEventStream,
     stopSessionEventStream,
   } = sessionEvents
+  const pendingClientActionKeys = new Set<string>()
 
   watch(activeSessionId, (sessionId, previousSessionId) => {
     if (previousSessionId && previousSessionId !== sessionId) {
@@ -78,6 +88,9 @@ export function createChatStreamController(
 
     if (run) {
       startActiveSessionEventStream()
+      if (run.status === CHAT_RUN_STATUS.REQUIRES_ACTION && run.requiredAction) {
+        void handleClientAction(run.runId, run.requiredAction)
+      }
       return
     }
 
@@ -103,6 +116,7 @@ export function createChatStreamController(
         memory: input.memory ?? { ignoredForRun: false },
         skillInvocation: input.skillInvocation ?? null,
         disabledSkillKeys: input.disabledSkillKeys ?? [],
+        runtimeHints: input.runtimeHints ?? createBrowserRuntimeHints(),
       }))
       return true
     }
@@ -126,6 +140,7 @@ export function createChatStreamController(
         memory: payload.memory ?? { ignoredForRun: false },
         skillInvocation: payload.skillInvocation ?? null,
         disabledSkillKeys: payload.disabledSkillKeys ?? [],
+        runtimeHints: payload.runtimeHints ?? createBrowserRuntimeHints(),
       }))
       return true
     }
@@ -141,7 +156,9 @@ export function createChatStreamController(
     }
 
     try {
-      handleMutationResponse(await api.retryAssistantMessage(activeSession.value.id, messageId))
+      handleMutationResponse(await api.retryAssistantMessage(activeSession.value.id, messageId, {
+        runtimeHints: createBrowserRuntimeHints(),
+      }))
       return true
     }
     catch (error) {
@@ -200,7 +217,9 @@ export function createChatStreamController(
       return
     }
 
-    applyEvent(event)
+    if (!applyEvent(event)) {
+      return
+    }
 
     if (event.type === CHAT_SESSION_EVENT_TYPE.SNAPSHOT_REQUIRED) {
       const session = await refreshActiveSession(event.sessionId)
@@ -218,6 +237,11 @@ export function createChatStreamController(
       return
     }
 
+    if (event.type === CHAT_SESSION_EVENT_TYPE.RUN_REQUIRES_ACTION) {
+      await handleClientAction(event.runId, event.payload.action)
+      return
+    }
+
     if (isTerminalEvent(event)) {
       if (!isStreaming.value) {
         stopSessionEventStream(event.sessionId)
@@ -226,6 +250,29 @@ export function createChatStreamController(
       patchSessionSummary(event.sessionId, {
         updatedAt: event.createdAt,
       })
+    }
+  }
+
+  async function handleClientAction(
+    runId: string,
+    action: AgentClientAction,
+  ): Promise<void> {
+    const actionKey = `${runId}:${action.type}:${action.toolCallId}`
+    if (pendingClientActionKeys.has(actionKey)) {
+      return
+    }
+
+    pendingClientActionKeys.add(actionKey)
+    try {
+      handleMutationResponse(await api.resumeRun(runId, {
+        resume: await resolveClientActionResult(action),
+      }))
+    }
+    catch (error) {
+      ElMessage.error(getRequestErrorDisplayMessage(error, translate('chat.errors.send')))
+    }
+    finally {
+      pendingClientActionKeys.delete(actionKey)
     }
   }
 
@@ -280,6 +327,17 @@ export function createChatStreamController(
   }
 }
 
+async function resolveClientActionResult(action: AgentClientAction): Promise<AgentClientActionResult> {
+  return {
+    type: action.resultType,
+    toolCallId: action.toolCallId,
+    error: {
+      code: 'unsupported_client_action',
+      message: `Unsupported client action: ${action.type}`,
+    },
+  }
+}
+
 function isTerminalEvent(event: ChatSessionEvent): boolean {
   return event.type === CHAT_SESSION_EVENT_TYPE.RUN_COMPLETED
     || event.type === CHAT_SESSION_EVENT_TYPE.RUN_FAILED
@@ -297,3 +355,17 @@ function isSameModelRef(
 }
 
 export type ChatStreamController = ReturnType<typeof createChatStreamController>
+
+function createBrowserRuntimeHints(): NonNullable<CreateChatSessionMessageRequest['runtimeHints']> {
+  const detectedTimeZone = resolveBrowserTimeZone()
+
+  return {
+    skillInputs: detectedTimeZone
+      ? {
+          [AGENT_TIME_SKILL_KEY]: {
+            detectedTimeZone,
+          },
+        }
+      : {},
+  }
+}

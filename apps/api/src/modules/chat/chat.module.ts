@@ -7,6 +7,7 @@ import { ChatAgentInternalController } from './chat-agent-internal.controller'
 import { ChatAssetsController } from './chat-assets.controller'
 import { ChatAssetsService } from './chat-assets.service'
 import { ChatContextSnapshotsService } from './chat-context-snapshots.service'
+import { ChatLocationResolverService } from './chat-location-resolver.service'
 import { ChatRunDispatcherService } from './chat-run-dispatcher.service'
 import { ChatRunProjectorService } from './chat-run-projector.service'
 import { ChatSessionEventsService } from './chat-session-events.service'
@@ -20,6 +21,7 @@ import { ChatService } from './chat.service'
   providers: [
     ChatService,
     ChatAssetsService,
+    ChatLocationResolverService,
     ChatSessionsService,
     ChatContextSnapshotsService,
     ChatSessionEventsService,

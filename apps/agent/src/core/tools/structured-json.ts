@@ -8,6 +8,7 @@ import { HumanMessage } from '@langchain/core/messages'
 import { z } from 'zod'
 import { consumeChatModelTextStream } from '../../integrations/model-providers/stream-text'
 import { shouldContinueWithFinalResponse } from './execution-events'
+import { MAX_RUNTIME_TOOL_ROUNDS } from './limits'
 import {
   formatToolExecutionError,
   getToolCallId,
@@ -34,7 +35,7 @@ type StructuredJsonToolDecision = z.infer<typeof StructuredJsonToolDecisionSchem
 type StructuredJsonToolCallsDecision = Extract<StructuredJsonToolDecision, { kind: 'tool_calls' }>
 
 export async function runStructuredJsonToolProtocol(session: RuntimeToolLoopSession): Promise<AgentModelCallResult> {
-  for (let round = 0; round < 3 && session.visibleTools.length > 0; round += 1) {
+  for (let round = 0; round < MAX_RUNTIME_TOOL_ROUNDS && session.visibleTools.length > 0; round += 1) {
     const selection = await consumeStructuredJsonToolDecisionWithRepair({
       model: session.model,
       messages: session.messages,
@@ -70,7 +71,7 @@ export async function runStructuredJsonToolProtocol(session: RuntimeToolLoopSess
 
     session.refreshVisibleTools()
 
-    if (shouldForceFinalResponse || round === 2 || session.visibleTools.length === 0) {
+    if (shouldForceFinalResponse || round === MAX_RUNTIME_TOOL_ROUNDS - 1 || session.visibleTools.length === 0) {
       const finalResult = await session.consumeFinalResponse()
       session.recordModelCall(finalResult)
       return session.createCallResult(finalResult)

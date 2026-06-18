@@ -1,3 +1,4 @@
+import type { AgentClientAction } from '@haohaoxue/lexora-contracts'
 import type { AgentModelStreamPart } from '../../integrations/model-providers/stream-text'
 import type { ChatGenerationEvent } from '../../runtime/typing'
 import { ChatGenerationEventSchema } from '@haohaoxue/lexora-contracts'
@@ -125,5 +126,18 @@ export function createAgentGenerationLifecycleEvent(input: {
     type: input.type,
     generationId: input.generationId,
     payload: input.payload,
+  })
+}
+
+export function createAgentClientActionRequiredEvent(input: {
+  generationId: string
+  action: AgentClientAction
+}): ChatGenerationEvent {
+  return ChatGenerationEventSchema.parse({
+    type: 'generation.client_action.required',
+    generationId: input.generationId,
+    payload: {
+      action: input.action,
+    },
   })
 }

@@ -1,8 +1,11 @@
 import type {
   AgentChatContextMessage,
   AgentChatRuntimeContext,
+  AgentClientAction,
+  AgentClientActionResult,
   AgentMemoryRunOptions,
   AgentProfileSnapshot,
+  AgentRuntimeHints,
   AgentRuntimeModelTarget,
   AgentRuntimeSkillContext,
   AiModelRef,
@@ -28,12 +31,15 @@ import type { ChatAssetStorageLocator } from './chat-assets.service'
 import type { ChatContextSnapshotCreateData } from './chat-context-snapshots.service'
 import { randomUUID } from 'node:crypto'
 import {
+  AgentClientActionSchema,
   AgentMemoryRunOptionsSchema,
   AgentProfileSnapshotSchema,
+  AgentRuntimeHintsSchema,
   AgentRuntimeModelTargetSchema,
   AgentRuntimeSkillContextSchema,
   AI_MODEL_INTENT_KEY,
   API_ERROR_CODE,
+  CHAT_MESSAGE_PART_TYPE,
   CHAT_RUN_STATUS,
   CHAT_SESSION_CHANNEL,
   CHAT_SESSION_DEFAULT_TITLE,
@@ -89,6 +95,7 @@ import {
   toChatSessionDetail,
   toChatSessionModelRef,
   toChatSessionSummary,
+  toPrismaChatMessagePartType,
   toPrismaChatSessionChannel,
   toPrismaChatSessionOrigin,
 } from './chat.utils'
@@ -102,7 +109,14 @@ const continuableAssistantStatuses = new Set<ChatSessionMessageStatus>([
 const bootstrappableGenerationStatuses = new Set<ChatMessageGenerationStatus>([
   ChatMessageGenerationStatus.PENDING,
   ChatMessageGenerationStatus.RUNNING,
+  ChatMessageGenerationStatus.REQUIRES_ACTION,
 ])
+
+const activeRunStatuses: ChatSessionRunStatus[] = [
+  ChatSessionRunStatus.PENDING,
+  ChatSessionRunStatus.RUNNING,
+  ChatSessionRunStatus.REQUIRES_ACTION,
+]
 
 const chatSessionSummarySelect = {
   id: true,
@@ -301,6 +315,7 @@ interface CreateRunInput {
   modelTargetSnapshot: ChatGenerationModelTargetSnapshot
   memory?: AgentMemoryRunOptions
   disabledSkillKeys?: ChatDisabledSkillKeys
+  runtimeHints?: AgentRuntimeHints
 }
 
 interface CreatedRunResult {
@@ -312,6 +327,11 @@ interface CreatedRunResult {
   agentProfileId: string
   expectedHistoryVersion: number
   latestSequence: number
+}
+
+interface PreparedResumeRunResult {
+  response: ChatMutationResponse
+  shouldDispatch: boolean
 }
 
 @Injectable()
@@ -471,10 +491,7 @@ export class ChatSessionsService {
           sessionId,
           session: this.createAccessibleSessionWhere(userId, sessionId, origin),
           status: {
-            in: [
-              ChatSessionRunStatus.PENDING,
-              ChatSessionRunStatus.RUNNING,
-            ],
+            in: activeRunStatuses,
           },
         },
         select: {
@@ -545,10 +562,7 @@ export class ChatSessionsService {
         where: {
           sessionId: { in: deletedSessionIds },
           status: {
-            in: [
-              ChatSessionRunStatus.PENDING,
-              ChatSessionRunStatus.RUNNING,
-            ],
+            in: activeRunStatuses,
           },
         },
         select: {
@@ -711,6 +725,7 @@ export class ChatSessionsService {
         runId: true,
         sessionId: true,
         assistantMessageId: true,
+        commandContext: true,
         status: true,
       },
     })
@@ -722,6 +737,7 @@ export class ChatSessionsService {
     if (
       run.status !== ChatSessionRunStatus.PENDING
       && run.status !== ChatSessionRunStatus.RUNNING
+      && run.status !== ChatSessionRunStatus.REQUIRES_ACTION
     ) {
       return this.toMutationResponse(input.userId, input.origin, run.sessionId, await this.chatSessionEvents.getLatestSequence(run.sessionId), run.runId)
     }
@@ -776,6 +792,150 @@ export class ChatSessionsService {
     return this.toMutationResponse(input.userId, input.origin, run.sessionId, latestSequence, run.runId)
   }
 
+  async prepareResumeRun(input: {
+    userId: string
+    runId: string
+    origin: ChatSessionOrigin
+    resume: AgentClientActionResult
+  }): Promise<PreparedResumeRunResult> {
+    const run = await this.prisma.chatSessionRun.findFirst({
+      where: {
+        runId: input.runId,
+        actorUserId: input.userId,
+        session: {
+          origin: toPrismaChatSessionOrigin(input.origin),
+          workspace: this.createWorkspaceAccessWhere(input.userId),
+        },
+      },
+      select: {
+        runId: true,
+        sessionId: true,
+        assistantMessageId: true,
+        commandContext: true,
+        status: true,
+      },
+    })
+
+    if (!run) {
+      throw new NotFoundException('聊天运行不存在')
+    }
+
+    if (run.status !== ChatSessionRunStatus.REQUIRES_ACTION) {
+      return {
+        response: await this.toMutationResponse(
+          input.userId,
+          input.origin,
+          run.sessionId,
+          await this.chatSessionEvents.getLatestSequence(run.sessionId),
+          run.runId,
+        ),
+        shouldDispatch: false,
+      }
+    }
+
+    const pendingAction = readPendingClientAction(run.commandContext)
+    if (!pendingAction) {
+      throw new ConflictException('聊天运行缺少待处理的客户端动作')
+    }
+
+    if (!isClientActionResultForAction(input.resume, pendingAction)) {
+      throw new BadRequestException('客户端动作结果与当前聊天运行不匹配')
+    }
+
+    const now = new Date()
+    const dispatchLeaseExpiresAt = new Date(now.getTime() - 1)
+    const result = await this.prisma.$transaction(async (tx) => {
+      const runUpdate = await tx.chatSessionRun.updateMany({
+        where: {
+          runId: run.runId,
+          status: ChatSessionRunStatus.REQUIRES_ACTION,
+        },
+        data: {
+          status: ChatSessionRunStatus.RUNNING,
+          commandPublishedAt: null,
+          dispatchLeaseExpiresAt,
+        },
+      })
+
+      if (runUpdate.count === 0) {
+        return null
+      }
+
+      const generation = await tx.chatMessageGeneration.update({
+        where: {
+          generationId: run.runId,
+        },
+        data: {
+          status: ChatMessageGenerationStatus.RUNNING,
+          commandPublishedAt: null,
+          dispatchLeaseExpiresAt,
+          attempt: {
+            increment: 1,
+          },
+        },
+        select: {
+          attempt: true,
+        },
+      })
+      await tx.chatSessionRun.update({
+        where: { runId: run.runId },
+        data: {
+          commandContext: toJsonObject(setResumeClientActionResult(
+            run.commandContext,
+            input.resume,
+            `chat:generation:${run.runId}:resume:${generation.attempt}`,
+          )),
+        },
+      })
+      await tx.chatSession.update({
+        where: { id: run.sessionId },
+        data: {
+          updatedAt: now,
+        },
+      })
+      const clientActionToolResult = await createClientActionToolResultPart({
+        tx,
+        action: pendingAction,
+        messageId: run.assistantMessageId,
+        runId: run.runId,
+        resume: input.resume,
+      })
+      const latestSequence = await this.chatSessionEvents.appendEvents(tx, run.sessionId, [
+        clientActionToolResult.event,
+        {
+          type: CHAT_SESSION_EVENT_TYPE.RUN_STARTED,
+          messageId: run.assistantMessageId,
+          runId: run.runId,
+          payload: {
+            resume: true,
+          },
+        },
+      ])
+
+      return {
+        latestSequence,
+      }
+    })
+
+    if (!result) {
+      return {
+        response: await this.toMutationResponse(
+          input.userId,
+          input.origin,
+          run.sessionId,
+          await this.chatSessionEvents.getLatestSequence(run.sessionId),
+          run.runId,
+        ),
+        shouldDispatch: false,
+      }
+    }
+
+    return {
+      response: await this.toMutationResponse(input.userId, input.origin, run.sessionId, result.latestSequence, run.runId),
+      shouldDispatch: true,
+    }
+  }
+
   async getAgentGenerationBootstrap(input: {
     generationId: string
   }): Promise<ChatGenerationBootstrap> {
@@ -813,6 +973,7 @@ export class ChatSessionsService {
     })
     const memory = readAgentMemoryRunOptions(run?.commandContext)
     const disabledSkillKeys = readChatDisabledSkillKeys(run?.commandContext)
+    const runtimeHints = readAgentRuntimeHints(run?.commandContext)
     const [context, runtimeModelTarget, skills] = await Promise.all([
       this.resolveAgentRuntimeContext({
         actorId: generation.actorUserId,
@@ -820,6 +981,7 @@ export class ChatSessionsService {
         triggerUserMessageId: generation.triggerUserMessageId,
         memory,
         disabledSkillKeys,
+        runtimeHints,
       }),
       this.resolveRuntimeModelTarget(generation.actorUserId, modelTargetSnapshot),
       this.agentSkills
@@ -857,6 +1019,7 @@ export class ChatSessionsService {
     triggerUserMessageId: string
     memory: AgentMemoryRunOptions
     disabledSkillKeys: ChatDisabledSkillKeys
+    runtimeHints: AgentRuntimeHints
   }): Promise<AgentChatRuntimeContext> {
     const [session, actor] = await Promise.all([
       this.findAccessibleSessionRunDetailOrThrow(input.actorId, input.sessionId),
@@ -909,6 +1072,7 @@ export class ChatSessionsService {
       inputAttachments: readChatInputAttachments(triggerMessage.metadata),
       memory: input.memory,
       disabledSkillKeys: input.disabledSkillKeys,
+      runtimeHints: input.runtimeHints,
     }
   }
 
@@ -1187,6 +1351,7 @@ export class ChatSessionsService {
         expectedHistoryVersion,
         memory: input.memory,
         disabledSkillKeys: input.disabledSkillKeys,
+        runtimeHints: input.runtimeHints,
       })
       await this.createPendingGeneration(tx, {
         sessionId: session.id,
@@ -1331,6 +1496,7 @@ export class ChatSessionsService {
         expectedHistoryVersion,
         memory: input.memory,
         disabledSkillKeys: input.disabledSkillKeys,
+        runtimeHints: input.runtimeHints,
       })
       await this.createPendingGeneration(tx, {
         sessionId: session.id,
@@ -1438,6 +1604,7 @@ export class ChatSessionsService {
         modelTargetSnapshot: input.modelTargetSnapshot,
         expectedHistoryVersion,
         disabledSkillKeys,
+        runtimeHints: input.runtimeHints,
       })
       await this.createPendingGeneration(tx, {
         sessionId: session.id,
@@ -1498,7 +1665,7 @@ export class ChatSessionsService {
       where: {
         sessionId,
         status: {
-          in: [ChatSessionRunStatus.PENDING, ChatSessionRunStatus.RUNNING],
+          in: activeRunStatuses,
         },
       },
       select: {
@@ -1651,6 +1818,7 @@ export class ChatSessionsService {
       expectedHistoryVersion: number
       memory?: AgentMemoryRunOptions
       disabledSkillKeys?: ChatDisabledSkillKeys
+      runtimeHints?: AgentRuntimeHints
     },
   ): Promise<void> {
     await tx.chatSessionRun.create({
@@ -1665,6 +1833,7 @@ export class ChatSessionsService {
           expectedHistoryVersion: input.expectedHistoryVersion,
           memory: input.memory,
           disabledSkillKeys: input.disabledSkillKeys,
+          runtimeHints: input.runtimeHints,
         }),
         status: ChatSessionRunStatus.PENDING,
       },
@@ -1727,6 +1896,7 @@ export class ChatSessionsService {
         status: true,
         assistantMessageId: true,
         triggerUserMessageId: true,
+        commandContext: true,
         createdAt: true,
         startedAt: true,
         completedAt: true,
@@ -1745,7 +1915,7 @@ export class ChatSessionsService {
       where: {
         sessionId,
         status: {
-          in: [ChatSessionRunStatus.PENDING, ChatSessionRunStatus.RUNNING],
+          in: activeRunStatuses,
         },
       },
       select: {
@@ -1753,6 +1923,7 @@ export class ChatSessionsService {
         status: true,
         assistantMessageId: true,
         triggerUserMessageId: true,
+        commandContext: true,
         createdAt: true,
         startedAt: true,
         completedAt: true,
@@ -2301,6 +2472,9 @@ function toChatRunStatus(status: ChatSessionRunStatus): ChatRunSummary['status']
   if (status === ChatSessionRunStatus.RUNNING) {
     return CHAT_RUN_STATUS.RUNNING
   }
+  if (status === ChatSessionRunStatus.REQUIRES_ACTION) {
+    return CHAT_RUN_STATUS.REQUIRES_ACTION
+  }
   if (status === ChatSessionRunStatus.FAILED) {
     return CHAT_RUN_STATUS.FAILED
   }
@@ -2316,6 +2490,7 @@ function toChatRunSummary(run: {
   status: ChatSessionRunStatus
   assistantMessageId: string
   triggerUserMessageId: string
+  commandContext: unknown
   createdAt: Date
   startedAt: Date | null
   completedAt: Date | null
@@ -2325,6 +2500,9 @@ function toChatRunSummary(run: {
     status: toChatRunStatus(run.status),
     assistantMessageId: run.assistantMessageId,
     triggerUserMessageId: run.triggerUserMessageId,
+    requiredAction: run.status === ChatSessionRunStatus.REQUIRES_ACTION
+      ? readPendingClientAction(run.commandContext)
+      : null,
     createdAt: run.createdAt.toISOString(),
     startedAt: run.startedAt?.toISOString() ?? null,
     completedAt: run.completedAt?.toISOString() ?? null,
@@ -2408,6 +2586,178 @@ function readAgentMemoryRunOptions(commandContext: unknown): AgentMemoryRunOptio
   }
 
   return AgentMemoryRunOptionsSchema.parse(undefined)
+}
+
+function readAgentRuntimeHints(commandContext: unknown): AgentRuntimeHints {
+  if (isRecord(commandContext)) {
+    return AgentRuntimeHintsSchema.parse(commandContext.runtimeHints)
+  }
+
+  return AgentRuntimeHintsSchema.parse(undefined)
+}
+
+function readPendingClientAction(commandContext: unknown): AgentClientAction | null {
+  if (!isRecord(commandContext)) {
+    return null
+  }
+
+  const result = AgentClientActionSchema.safeParse(commandContext.pendingClientAction)
+  return result.success ? result.data : null
+}
+
+function setResumeClientActionResult(
+  commandContext: unknown,
+  resume: AgentClientActionResult,
+  idempotencyKey: string,
+): Record<string, unknown> {
+  const base = isRecord(commandContext) ? { ...commandContext } : {}
+
+  return {
+    ...base,
+    resumeClientActionResult: resume,
+    resumeCommandIdempotencyKey: idempotencyKey,
+  }
+}
+
+function isClientActionResultForAction(
+  result: AgentClientActionResult,
+  action: AgentClientAction,
+): boolean {
+  return result.type === action.resultType && result.toolCallId === action.toolCallId
+}
+
+async function createClientActionToolResultPart(input: {
+  tx: Prisma.TransactionClient
+  action: AgentClientAction
+  messageId: string
+  runId: string
+  resume: AgentClientActionResult
+}) {
+  const existingParts = await input.tx.chatSessionMessagePart.findMany({
+    where: {
+      messageId: input.messageId,
+      deletedAt: null,
+    },
+    select: {
+      order: true,
+      type: true,
+      metadata: true,
+    },
+  })
+  const usedOrders = new Set(existingParts.map(part => part.order))
+  const callPart = existingParts.find(part =>
+    part.type === ChatSessionMessagePartType.TOOL_CALL
+    && readMetadataToolCallId(part.metadata) === input.action.toolCallId,
+  )
+  const fallbackOrder = Math.max(-1, ...existingParts.map(part => part.order)) + 1
+  const order = reserveAvailablePartOrder(
+    usedOrders,
+    callPart ? callPart.order + 1 : fallbackOrder,
+  )
+  const text = createClientActionToolResultText(input.resume)
+  const part = await input.tx.chatSessionMessagePart.create({
+    data: {
+      messageId: input.messageId,
+      type: toPrismaChatMessagePartType(CHAT_MESSAGE_PART_TYPE.TOOL_RESULT),
+      text,
+      order,
+      metadata: toJsonObject(createClientActionToolResultMetadata(input.action, input.resume)),
+    },
+    select: {
+      id: true,
+      order: true,
+    },
+  })
+  const projection = createClientActionToolResultPartProjection({
+    action: input.action,
+    order: part.order,
+    partId: part.id,
+    resume: input.resume,
+  })
+
+  return {
+    event: {
+      type: CHAT_SESSION_EVENT_TYPE.MESSAGE_PART_DELTA,
+      messageId: input.messageId,
+      runId: input.runId,
+      sourceEventId: null,
+      payload: projection.payload,
+    },
+  }
+}
+
+export function createClientActionToolResultPartProjection(input: {
+  action: AgentClientAction
+  order: number
+  partId: string
+  resume: AgentClientActionResult
+}) {
+  const text = createClientActionToolResultText(input.resume)
+  const metadata = createClientActionToolResultMetadata(input.action, input.resume)
+
+  return {
+    text,
+    metadata,
+    payload: {
+      partId: input.partId,
+      partType: CHAT_MESSAGE_PART_TYPE.TOOL_RESULT,
+      order: input.order,
+      delta: text,
+      metadata,
+    },
+  }
+}
+
+function createClientActionToolResultMetadata(
+  action: AgentClientAction,
+  resume: AgentClientActionResult,
+) {
+  return {
+    toolCallId: action.toolCallId,
+    toolName: action.toolName,
+    toolKind: 'skill',
+    status: resolveClientActionToolResultStatus(resume),
+  } as const
+}
+
+function resolveClientActionToolResultStatus(
+  resume: AgentClientActionResult,
+): 'success' | 'error' {
+  return resume.error ? 'error' : 'success'
+}
+
+function createClientActionToolResultText(resume: AgentClientActionResult): string {
+  if (resume.error) {
+    return JSON.stringify({
+      status: 'failed',
+      reason: resume.error.message ?? resume.error.code,
+    })
+  }
+
+  if (resume.payload) {
+    return JSON.stringify(resume.payload)
+  }
+
+  return JSON.stringify({
+    status: 'ok',
+  })
+}
+
+function reserveAvailablePartOrder(usedOrders: Set<number>, preferredOrder: number): number {
+  let order = preferredOrder
+  while (usedOrders.has(order)) {
+    order += 1
+  }
+  return order
+}
+
+function readMetadataToolCallId(metadata: unknown): string | null {
+  if (!isRecord(metadata)) {
+    return null
+  }
+
+  const toolCallId = metadata.toolCallId
+  return typeof toolCallId === 'string' && toolCallId.trim() ? toolCallId : null
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

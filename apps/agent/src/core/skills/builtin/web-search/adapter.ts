@@ -1,5 +1,8 @@
 import type { RuntimeSkillAdapter } from '../../adapter'
-import { AGENT_WEB_SEARCH_SKILL_KEY } from '@haohaoxue/lexora-contracts'
+import {
+  AGENT_WEB_SEARCH_SKILL_KEY,
+  AGENT_WEB_SEARCH_TOOL_VALUES,
+} from '@haohaoxue/lexora-contracts'
 import { executeWebSearchToolCalls } from './executor'
 import {
   createWebSearchSkillTools,
@@ -10,6 +13,7 @@ import {
 export function createWebSearchRuntimeSkillAdapter(): RuntimeSkillAdapter {
   return {
     key: AGENT_WEB_SEARCH_SKILL_KEY,
+    toolNames: AGENT_WEB_SEARCH_TOOL_VALUES,
     isAvailable({ context, services }) {
       return Boolean(services.webSearch && isWebSearchSkillActive(context))
     },

@@ -42,6 +42,7 @@ const eventTypeToPrisma = {
   [CHAT_SESSION_EVENT_TYPE.MESSAGE_FAILED]: PrismaChatSessionEventType.MESSAGE_FAILED,
   [CHAT_SESSION_EVENT_TYPE.MESSAGE_CANCELLED]: PrismaChatSessionEventType.MESSAGE_CANCELLED,
   [CHAT_SESSION_EVENT_TYPE.RUN_STARTED]: PrismaChatSessionEventType.RUN_STARTED,
+  [CHAT_SESSION_EVENT_TYPE.RUN_REQUIRES_ACTION]: PrismaChatSessionEventType.RUN_REQUIRES_ACTION,
   [CHAT_SESSION_EVENT_TYPE.RUN_COMPLETED]: PrismaChatSessionEventType.RUN_COMPLETED,
   [CHAT_SESSION_EVENT_TYPE.RUN_FAILED]: PrismaChatSessionEventType.RUN_FAILED,
   [CHAT_SESSION_EVENT_TYPE.RUN_CANCELLED]: PrismaChatSessionEventType.RUN_CANCELLED,
@@ -194,8 +195,9 @@ export class ChatSessionEventsService {
   }
 }
 
-function toAgentEventStreamId(sourceEventId: string): string {
-  return sourceEventId.replace(/:[^:]+$/, '')
+function toAgentEventStreamId(sourceEventId: string): string | null {
+  const streamId = sourceEventId.replace(/:[^:]+$/, '')
+  return /^\d+-\d+$/.test(streamId) ? streamId : null
 }
 
 function toChatSessionEvent(event: PersistedChatSessionEvent): ChatSessionEvent {

@@ -79,7 +79,7 @@ export class WeixinOpenClawApiService {
       })
     }
     catch (error) {
-      if (error instanceof Error && error.name === 'AbortError') {
+      if (isAbortLikeError(error)) {
         return { status: 'wait' }
       }
 
@@ -108,7 +108,7 @@ export class WeixinOpenClawApiService {
       })
     }
     catch (error) {
-      if (error instanceof Error && error.name === 'AbortError') {
+      if (isAbortLikeError(error)) {
         return {
           get_updates_buf: params.getUpdatesCursor,
           msgs: [],
@@ -210,68 +210,48 @@ export class WeixinOpenClawApiService {
 
   private async apiGetJson<T>(options: JsonRequestOptions): Promise<T> {
     const url = new URL(options.endpoint, ensureTrailingSlash(options.baseUrl))
-    const controller = options.timeoutMs ? new AbortController() : undefined
-    const timer = controller && options.timeoutMs
-      ? setTimeout(() => controller.abort(), options.timeoutMs)
+    const signal = options.timeoutMs
+      ? AbortSignal.timeout(options.timeoutMs)
       : undefined
 
-    try {
-      const response = await fetch(url, {
-        headers: this.buildCommonHeaders(),
-        method: 'GET',
-        ...(controller ? { signal: controller.signal } : {}),
-      })
-      const rawText = await response.text()
+    const response = await fetch(url, {
+      headers: this.buildCommonHeaders(),
+      method: 'GET',
+      ...(signal ? { signal } : {}),
+    })
+    const rawText = await response.text()
 
-      if (!response.ok) {
-        throw new Error(`${options.label} ${response.status}: ${rawText}`)
-      }
+    if (!response.ok) {
+      throw new Error(`${options.label} ${response.status}: ${rawText}`)
+    }
 
-      return JSON.parse(rawText) as T
-    }
-    finally {
-      if (timer) {
-        clearTimeout(timer)
-      }
-    }
+    return JSON.parse(rawText) as T
   }
 
   private async apiPostJson<T>(options: PostJsonRequestOptions): Promise<T> {
     const url = new URL(options.endpoint, ensureTrailingSlash(options.baseUrl))
-    const controller = options.timeoutMs !== undefined
-      ? new AbortController()
-      : undefined
-    const timer = controller && options.timeoutMs !== undefined
-      ? setTimeout(() => controller.abort(), options.timeoutMs)
-      : undefined
-    const { signal, cleanup } = combineAbortSignals(controller, options.abortSignal)
+    const signal = resolveAbortSignal([
+      options.timeoutMs !== undefined ? AbortSignal.timeout(options.timeoutMs) : undefined,
+      options.abortSignal,
+    ])
 
-    try {
-      const response = await fetch(url, {
-        body: JSON.stringify(options.body),
-        headers: this.buildJsonHeaders(options.token),
-        method: 'POST',
-        ...(signal ? { signal } : {}),
-      })
-      const rawText = await response.text()
+    const response = await fetch(url, {
+      body: JSON.stringify(options.body),
+      headers: this.buildJsonHeaders(options.token),
+      method: 'POST',
+      ...(signal ? { signal } : {}),
+    })
+    const rawText = await response.text()
 
-      if (!response.ok) {
-        throw new Error(`${options.label} ${response.status}: ${rawText}`)
-      }
-
-      if (!rawText) {
-        return {} as T
-      }
-
-      return JSON.parse(rawText) as T
+    if (!response.ok) {
+      throw new Error(`${options.label} ${response.status}: ${rawText}`)
     }
-    finally {
-      if (timer) {
-        clearTimeout(timer)
-      }
 
-      cleanup()
+    if (!rawText) {
+      return {} as T
     }
+
+    return JSON.parse(rawText) as T
   }
 }
 
@@ -303,48 +283,17 @@ function randomWechatUin(): string {
   return Buffer.from(String(uint32), 'utf-8').toString('base64')
 }
 
-function combineAbortSignals(
-  internal: AbortController | undefined,
-  external: AbortSignal | undefined,
-): {
-  cleanup: () => void
-  signal?: AbortSignal
-} {
-  if (!internal && !external) {
-    return {
-      cleanup: () => {},
-      signal: undefined,
-    }
+function resolveAbortSignal(signals: Array<AbortSignal | undefined>): AbortSignal | undefined {
+  const availableSignals = signals.filter((signal): signal is AbortSignal => Boolean(signal))
+  if (availableSignals.length === 0) {
+    return undefined
   }
 
-  if (!internal) {
-    return {
-      cleanup: () => {},
-      signal: external,
-    }
-  }
+  return availableSignals.length === 1
+    ? availableSignals[0]
+    : AbortSignal.any(availableSignals)
+}
 
-  if (!external) {
-    return {
-      cleanup: () => {},
-      signal: internal.signal,
-    }
-  }
-
-  if (external.aborted) {
-    internal.abort()
-
-    return {
-      cleanup: () => {},
-      signal: internal.signal,
-    }
-  }
-
-  const onExternalAbort = () => internal.abort()
-  external.addEventListener('abort', onExternalAbort, { once: true })
-
-  return {
-    cleanup: () => external.removeEventListener('abort', onExternalAbort),
-    signal: internal.signal,
-  }
+function isAbortLikeError(error: unknown): boolean {
+  return error instanceof Error && (error.name === 'AbortError' || error.name === 'TimeoutError')
 }

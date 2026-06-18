@@ -265,27 +265,19 @@ async function skippedSource(key) {
 }
 
 async function fetchJson(url) {
-  const controller = new AbortController()
-  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
+  const response = await fetch(url, {
+    headers: {
+      accept: 'application/json',
+      'user-agent': 'Lexora model capability defaults sync',
+    },
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+  })
 
-  try {
-    const response = await fetch(url, {
-      headers: {
-        accept: 'application/json',
-        'user-agent': 'Lexora model capability defaults sync',
-      },
-      signal: controller.signal,
-    })
-
-    if (!response.ok) {
-      throw new Error(`${url} returned HTTP ${response.status}`)
-    }
-
-    return await response.json()
+  if (!response.ok) {
+    throw new Error(`${url} returned HTTP ${response.status}`)
   }
-  finally {
-    clearTimeout(timeout)
-  }
+
+  return await response.json()
 }
 
 async function readCacheJson(cacheDir, filename) {

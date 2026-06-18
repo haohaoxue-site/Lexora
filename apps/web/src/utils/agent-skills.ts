@@ -3,6 +3,7 @@ import type {
 } from '@haohaoxue/lexora-contracts/agent'
 import type { SvgIconCategoryValue } from '@/components/svg-icon/typing'
 import {
+  AGENT_LOCATION_SKILL_KEY,
   AGENT_MEMORY_SKILL_KEY,
   AGENT_TRANSLATOR_SKILL_KEY,
   AGENT_WEB_SEARCH_SKILL_KEY,
@@ -20,6 +21,13 @@ export function resolveAgentSkillIcon(skill: AgentSkillIconSource): AgentSkillIc
     return {
       category: 'ui',
       icon: 'memory-note',
+    }
+  }
+
+  if (skill.key === AGENT_LOCATION_SKILL_KEY) {
+    return {
+      category: 'ui',
+      icon: 'pin',
     }
   }
 

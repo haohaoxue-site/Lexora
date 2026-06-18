@@ -7,21 +7,11 @@ import {
   AgentWebSearchSkillConfigSchema,
 } from '@haohaoxue/lexora-contracts'
 import { tool } from '@langchain/core/tools'
+import { isRuntimeSkillActive } from '../../runtime'
 import { WebSearchToolInputSchema } from './schemas'
 
 export function isWebSearchSkillActive(context: AgentGraphContext | undefined): boolean {
-  if (context?.disabledSkillKeys?.includes(AGENT_WEB_SEARCH_SKILL_KEY)) {
-    return false
-  }
-
-  const config = context?.agentProfileConfig
-  if (!config?.toolPolicy.enabled) {
-    return false
-  }
-
-  return config.skillBindings.some(binding =>
-    binding.key === AGENT_WEB_SEARCH_SKILL_KEY && binding.enabled,
-  )
+  return isRuntimeSkillActive(context, AGENT_WEB_SEARCH_SKILL_KEY)
 }
 
 export function createWebSearchSkillTools(): StructuredToolInterface[] {
@@ -31,6 +21,10 @@ export function createWebSearchSkillTools(): StructuredToolInterface[] {
       description: [
         'Search the public web for current or externally verifiable information.',
         'Use for latest facts, recent events, source verification, product/vendor changes, or questions that require URLs.',
+        'If the task contains relative dates or times such as today, tomorrow, this week, or latest, call get_current_time first and use its date anchors when forming the query.',
+        'For weather, nearby places, local news, routing, stores, or regional policy, call get_current_location first unless the user explicitly provided a location.',
+        'If get_current_location returns needs_location, ask for location before searching.',
+        'Do not infer search location from time zone, language, locale, IP, provider region, or server defaults.',
         'Do not use for private Lexora documents, local files, or stable reasoning that does not need external sources.',
       ].join(' '),
       schema: WebSearchToolInputSchema,

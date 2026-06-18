@@ -109,30 +109,22 @@ export class AgentMemoryIndexingService {
     target: Awaited<ReturnType<AiModelResolverService['resolveModelTarget']>>,
     text: string,
   ): Promise<number[]> {
-    const controller = new AbortController()
-    const timeout = setTimeout(() => controller.abort(), EMBEDDING_REQUEST_TIMEOUT_MS)
+    const response = await fetch(`${target.endpoint.replace(TRAILING_SLASHES_RE, '')}/embeddings`, {
+      method: 'POST',
+      headers: createEmbeddingRequestHeaders(target),
+      body: JSON.stringify({
+        model: target.modelId,
+        input: text,
+      }),
+      signal: AbortSignal.timeout(EMBEDDING_REQUEST_TIMEOUT_MS),
+    })
 
-    try {
-      const response = await fetch(`${target.endpoint.replace(TRAILING_SLASHES_RE, '')}/embeddings`, {
-        method: 'POST',
-        headers: createEmbeddingRequestHeaders(target),
-        body: JSON.stringify({
-          model: target.modelId,
-          input: text,
-        }),
-        signal: controller.signal,
-      })
-
-      if (!response.ok) {
-        throw new Error(`embedding request failed: HTTP ${response.status}`)
-      }
-
-      const payload = await response.json().catch(() => null)
-      return parseEmbeddingResponse(payload)
+    if (!response.ok) {
+      throw new Error(`embedding request failed: HTTP ${response.status}`)
     }
-    finally {
-      clearTimeout(timeout)
-    }
+
+    const payload = await response.json().catch(() => null)
+    return parseEmbeddingResponse(payload)
   }
 
   private async updateMemoryEmbedding(memoryId: string, embedding: MemoryEmbedding): Promise<void> {

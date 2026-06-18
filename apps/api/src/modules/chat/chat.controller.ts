@@ -12,8 +12,10 @@ import type {
   CreateChatSessionRequest,
   EditAndSendChatMessageRequest,
   GetChatSessionsQuery,
+  ResumeChatRunRequest,
+  RetryChatAssistantMessageRequest,
 } from '@haohaoxue/lexora-contracts'
-import type { FastifyReply } from 'fastify'
+import type { FastifyReply, FastifyRequest } from 'fastify'
 import type { AuthUserContext } from '../auth/auth.interface'
 import {
   BatchDeleteChatSessionsRequestSchema,
@@ -23,6 +25,8 @@ import {
   CreateChatSessionRequestSchema,
   EditAndSendChatMessageRequestSchema,
   GetChatSessionsQuerySchema,
+  ResumeChatRunRequestSchema,
+  RetryChatAssistantMessageRequestSchema,
 } from '@haohaoxue/lexora-contracts'
 import { sleep } from '@haohaoxue/lexora-shared'
 import {
@@ -35,6 +39,7 @@ import {
   Patch,
   Post,
   Query,
+  Req,
   Res,
 } from '@nestjs/common'
 import { CurrentUser } from '../../decorators/current-user.decorator'
@@ -49,6 +54,8 @@ import {
 import { ChatService } from './chat.service'
 
 const SESSION_EVENT_POLL_INTERVAL_MS = 1000
+const SESSION_EVENT_HEARTBEAT_INTERVAL_MS = 15_000
+const SESSION_EVENT_INITIAL_PADDING = ' '.repeat(2048)
 
 @Controller('chat')
 export class ChatController {
@@ -151,6 +158,7 @@ export class ChatController {
   @Post('sessions/:id/messages')
   async sendMessage(
     @CurrentUser() authUser: AuthUserContext,
+    @Req() request: FastifyRequest,
     @Param('id') sessionId: string,
     @Query('origin') origin: string | undefined,
     @Body(new ZodValidationPipe(CreateChatSessionMessageRequestSchema)) payload: CreateChatSessionMessageRequest,
@@ -165,12 +173,15 @@ export class ChatController {
       memory: payload.memory,
       skillInvocation: payload.skillInvocation,
       disabledSkillKeys: payload.disabledSkillKeys,
+      runtimeHints: payload.runtimeHints,
+      request,
     })
   }
 
   @Post('sessions/:id/messages/:messageId/edit-and-send')
   async editAndSendMessage(
     @CurrentUser() authUser: AuthUserContext,
+    @Req() request: FastifyRequest,
     @Param('id') sessionId: string,
     @Param('messageId') messageId: string,
     @Query('origin') origin: string | undefined,
@@ -187,21 +198,27 @@ export class ChatController {
       memory: payload.memory,
       skillInvocation: payload.skillInvocation,
       disabledSkillKeys: payload.disabledSkillKeys,
+      runtimeHints: payload.runtimeHints,
+      request,
     })
   }
 
   @Post('sessions/:id/messages/:messageId/retry')
   async retryAssistantMessage(
     @CurrentUser() authUser: AuthUserContext,
+    @Req() request: FastifyRequest,
     @Param('id') sessionId: string,
     @Param('messageId') messageId: string,
     @Query('origin') origin: string | undefined,
+    @Body(new ZodValidationPipe(RetryChatAssistantMessageRequestSchema)) payload: RetryChatAssistantMessageRequest,
   ): Promise<ChatMutationResponse> {
     return this.chatService.retryAssistantMessage({
       userId: authUser.id,
       sessionId,
       messageId,
       origin: parseChatSessionOrigin(origin),
+      runtimeHints: payload.runtimeHints,
+      request,
     })
   }
 
@@ -233,6 +250,23 @@ export class ChatController {
     })
   }
 
+  @Post('runs/:runId/resume')
+  async resumeRun(
+    @CurrentUser() authUser: AuthUserContext,
+    @Param('runId') runId: string,
+    @Query('origin') origin: string | undefined,
+    @Req() request: FastifyRequest,
+    @Body(new ZodValidationPipe(ResumeChatRunRequestSchema)) payload: ResumeChatRunRequest,
+  ): Promise<ChatMutationResponse> {
+    return this.chatService.resumeRun({
+      userId: authUser.id,
+      runId,
+      origin: parseChatSessionOrigin(origin),
+      request,
+      resume: payload.resume,
+    })
+  }
+
   @Get('sessions/:id/events')
   async streamSessionEvents(
     @CurrentUser() authUser: AuthUserContext,
@@ -245,13 +279,17 @@ export class ChatController {
 
     reply.raw.writeHead(200, {
       'Content-Type': 'text/event-stream',
-      'Cache-Control': 'no-cache',
+      'Cache-Control': 'no-cache, no-transform',
       'Connection': 'keep-alive',
+      'X-Accel-Buffering': 'no',
     })
+    reply.raw.flushHeaders?.()
+    writeSessionComment(reply, `connected ${SESSION_EVENT_INITIAL_PADDING}`)
 
     let cursor = parseAfterSequence(afterSequence)
     const minimumSequence = await this.chatSessionEvents.getMinimumSequence(sessionId)
     const latestSequence = await this.chatSessionEvents.getLatestSequence(sessionId)
+    let lastHeartbeatAt = Date.now()
 
     if (cursor === null || (minimumSequence !== null && cursor < minimumSequence - 1)) {
       writeSessionEvent(reply, this.chatSessionEvents.createSnapshotRequiredEvent({
@@ -259,6 +297,7 @@ export class ChatController {
         latestSequence,
       }))
       cursor = latestSequence
+      lastHeartbeatAt = Date.now()
     }
 
     try {
@@ -272,6 +311,12 @@ export class ChatController {
 
           writeSessionEvent(reply, event)
           cursor = event.sequence
+          lastHeartbeatAt = Date.now()
+        }
+
+        if (Date.now() - lastHeartbeatAt >= SESSION_EVENT_HEARTBEAT_INTERVAL_MS && isReplyWritable(reply)) {
+          writeSessionComment(reply, 'heartbeat')
+          lastHeartbeatAt = Date.now()
         }
 
         await sleep(SESSION_EVENT_POLL_INTERVAL_MS)
@@ -321,6 +366,10 @@ function parseChatSessionOrigin(value: string | undefined): ChatSessionOrigin {
 
 function writeSessionEvent(reply: FastifyReply, event: ChatSessionEvent): void {
   reply.raw.write(`data: ${JSON.stringify(event)}\n\n`)
+}
+
+function writeSessionComment(reply: FastifyReply, value: string): void {
+  reply.raw.write(`: ${value}\n\n`)
 }
 
 function isReplyWritable(reply: FastifyReply): boolean {

@@ -7,6 +7,7 @@ import {
   AGENT_MEMORY_TOOL,
 } from '@haohaoxue/lexora-contracts'
 import { tool } from '@langchain/core/tools'
+import { isRuntimeSkillActive } from '../../runtime'
 import {
   MemoryForgetSchema,
   MemoryUpdateSchema,
@@ -15,13 +16,11 @@ import {
 
 export function isMemorySkillActive(context: AgentGraphContext | undefined): boolean {
   const config = context?.agentProfileConfig
-  if (!config || !config.toolPolicy.enabled || config.memoryPolicy.writing.enabled === false) {
+  if (!config || config.memoryPolicy.writing.enabled === false) {
     return false
   }
 
-  return config.skillBindings.some(binding =>
-    binding.key === AGENT_MEMORY_SKILL_KEY && binding.enabled,
-  )
+  return isRuntimeSkillActive(context, AGENT_MEMORY_SKILL_KEY)
 }
 
 export function createMemorySkillTools(): StructuredToolInterface[] {

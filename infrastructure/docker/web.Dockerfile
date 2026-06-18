@@ -1,11 +1,10 @@
-FROM node:24-slim AS build
+FROM node:26-slim AS build
 
 ENV PNPM_HOME=/pnpm
 ENV PATH="${PNPM_HOME}:${PATH}"
-ENV COREPACK_NPM_REGISTRY=https://registry.npmmirror.com
+ENV NPM_CONFIG_REGISTRY=https://registry.npmmirror.com
 
-RUN corepack enable \
-  && corepack prepare pnpm@10.33.0 --activate
+RUN npm install --global pnpm@11.5.0
 
 WORKDIR /workspace
 

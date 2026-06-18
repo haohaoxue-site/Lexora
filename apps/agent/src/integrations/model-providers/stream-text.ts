@@ -28,7 +28,7 @@ export type AgentModelStreamPart
       toolCallId: string
       toolName: string
       toolKind: AgentToolCallKind
-      status: 'success' | 'error'
+      status: 'success' | 'error' | 'requires_action'
       output?: unknown
       outputText?: string
       durationMs?: number

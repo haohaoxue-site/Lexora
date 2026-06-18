@@ -56,14 +56,12 @@ export class AiProviderAdaptersService {
     }
 
     const headers = this.buildModelListHeaders(provider.authMode, apiKey)
-    const controller = new AbortController()
-    const timeout = setTimeout(() => controller.abort(), MODEL_LIST_TIMEOUT_MS)
 
     try {
       const response = await fetch(`${endpoint.replace(TRAILING_SLASHES_RE, '')}/models`, {
         method: 'GET',
         headers,
-        signal: controller.signal,
+        signal: AbortSignal.timeout(MODEL_LIST_TIMEOUT_MS),
       })
 
       if (!response.ok) {
@@ -84,9 +82,6 @@ export class AiProviderAdaptersService {
       }
 
       throw new BadRequestException('获取模型列表失败，请检查 API 地址和密钥')
-    }
-    finally {
-      clearTimeout(timeout)
     }
   }
 

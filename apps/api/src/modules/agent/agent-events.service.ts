@@ -104,6 +104,10 @@ export class AgentGenerationEventsService {
             return
           }
 
+          if (event.type === 'generation.client_action.required') {
+            return
+          }
+
           if (event.type === 'generation.failed') {
             throw new AgentGenerationEventsConsumerError(getFailureMessage(event, messages.failed), 'failed')
           }

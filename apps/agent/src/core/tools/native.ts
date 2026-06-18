@@ -2,12 +2,13 @@ import type { RuntimeToolLoopSession } from './session'
 import type { AgentModelCallResult } from './types'
 import { AIMessage } from '@langchain/core/messages'
 import { shouldContinueWithFinalResponse } from './execution-events'
+import { MAX_RUNTIME_TOOL_ROUNDS } from './limits'
 
 export async function runNativeToolProtocol(session: RuntimeToolLoopSession): Promise<AgentModelCallResult> {
   let lastResult = await session.consumeVisibleNativeToolCall()
   session.recordModelCall(lastResult)
 
-  for (let round = 0; round < 3 && lastResult.toolCalls.length > 0; round += 1) {
+  for (let round = 0; round < MAX_RUNTIME_TOOL_ROUNDS && lastResult.toolCalls.length > 0; round += 1) {
     session.appendMessage(new AIMessage({
       content: lastResult.text,
       tool_calls: lastResult.toolCalls,
@@ -23,7 +24,7 @@ export async function runNativeToolProtocol(session: RuntimeToolLoopSession): Pr
 
     session.refreshVisibleTools()
 
-    lastResult = shouldForceFinalResponse || round === 2 || session.visibleTools.length === 0
+    lastResult = shouldForceFinalResponse || round === MAX_RUNTIME_TOOL_ROUNDS - 1 || session.visibleTools.length === 0
       ? await session.consumeFinalResponse()
       : await session.consumeVisibleNativeToolCall()
     session.recordModelCall(lastResult)

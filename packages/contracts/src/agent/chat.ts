@@ -9,6 +9,7 @@ import {
 } from '../chat'
 import { ResolvedLanguagePreferenceSchema } from '../user'
 import { AgentMemoryRunOptionsSchema } from './memory'
+import { AgentRuntimeHintsSchema } from './runtime'
 
 const NonEmptyStringSchema = z.string().trim().min(1)
 
@@ -54,6 +55,7 @@ export const AgentChatRuntimeContextSchema = z.object({
   inputAttachments: z.array(AgentChatInputAttachmentSchema).default([]),
   memory: AgentMemoryRunOptionsSchema,
   disabledSkillKeys: ChatDisabledSkillKeysSchema,
+  runtimeHints: AgentRuntimeHintsSchema,
 }).strict()
 
 export type AgentChatContextMessage = z.infer<typeof AgentChatContextMessageSchema>

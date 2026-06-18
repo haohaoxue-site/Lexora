@@ -103,11 +103,15 @@ function normalizeProviderList(providers: AgentWebSearchProvider[]): AgentWebSea
 }
 
 function formatProviderError(error: unknown): string {
-  if (error instanceof Error && error.name === 'AbortError') {
+  if (isAbortLikeError(error)) {
     return 'Web search timed out.'
   }
 
   return error instanceof Error && error.message.trim()
     ? error.message.trim()
     : 'Web search failed.'
+}
+
+function isAbortLikeError(error: unknown): boolean {
+  return error instanceof Error && (error.name === 'AbortError' || error.name === 'TimeoutError')
 }

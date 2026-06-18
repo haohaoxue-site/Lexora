@@ -1,9 +1,12 @@
 <script setup lang="ts">
 import type {
+  AgentLocationSkillConfig,
+  AgentTimeSkillConfig,
   AgentTranslatorSkillConfig,
   AgentWebSearchSkillConfig,
 } from '@haohaoxue/lexora-contracts'
 import type { CSSProperties } from 'vue'
+import type { SkillConfigDrawerKey } from './utils/config-drawers'
 import type { AgentSkillCard } from '@/apis/agent-skills'
 import { computed, onMounted, shallowRef } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -25,8 +28,17 @@ import {
 import { resolveAgentSkillIcon } from '@/utils/agent-skills'
 import { ElMessage, ElMessageBox } from '@/utils/element-plus'
 import { getRequestErrorDisplayMessage } from '@/utils/request-error'
+import LocationConfigDrawer from './components/location-config-drawer/index.vue'
+import TimeConfigDrawer from './components/time-config-drawer/index.vue'
 import TranslatorConfigDrawer from './components/translator-config-drawer/index.vue'
 import WebSearchConfigDrawer from './components/web-search-config-drawer/index.vue'
+import { hasSkillConfigDrawer } from './utils/config-drawers'
+import {
+  LOCATION_SKILL_KEY,
+} from './utils/location'
+import {
+  TIME_SKILL_KEY,
+} from './utils/time'
 import {
   TRANSLATOR_SKILL_KEY,
 } from './utils/translator'
@@ -36,6 +48,7 @@ import {
 
 type SkillsTabName = 'market' | 'me'
 type SkillMoreCommand = 'config' | 'uninstall'
+type SkillConfigFormValue = AgentTimeSkillConfig | AgentLocationSkillConfig | AgentTranslatorSkillConfig | AgentWebSearchSkillConfig
 
 const route = useRoute()
 const router = useRouter()
@@ -52,8 +65,36 @@ const loadError = shallowRef<string | null>(null)
 const mutatingSkillKey = shallowRef<string | null>(null)
 const savingSkillConfigKey = shallowRef<string | null>(null)
 const configuringSkill = shallowRef<AgentSkillCard | null>(null)
+const timeConfigDrawerVisible = shallowRef(false)
+const locationConfigDrawerVisible = shallowRef(false)
 const translatorConfigDrawerVisible = shallowRef(false)
 const webSearchConfigDrawerVisible = shallowRef(false)
+const skillConfigDrawerByKey = {
+  [TIME_SKILL_KEY]: {
+    visible: timeConfigDrawerVisible,
+    savedMessageKey: 'skills.time.saved',
+    saveFailedMessageKey: 'skills.time.saveFailed',
+  },
+  [LOCATION_SKILL_KEY]: {
+    visible: locationConfigDrawerVisible,
+    savedMessageKey: 'skills.location.saved',
+    saveFailedMessageKey: 'skills.location.saveFailed',
+  },
+  [TRANSLATOR_SKILL_KEY]: {
+    visible: translatorConfigDrawerVisible,
+    savedMessageKey: 'skills.translator.saved',
+    saveFailedMessageKey: 'skills.translator.saveFailed',
+  },
+  [WEB_SEARCH_SKILL_KEY]: {
+    visible: webSearchConfigDrawerVisible,
+    savedMessageKey: 'skills.webSearch.saved',
+    saveFailedMessageKey: 'skills.webSearch.saveFailed',
+  },
+} as const satisfies Record<SkillConfigDrawerKey, {
+  visible: typeof timeConfigDrawerVisible
+  savedMessageKey: string
+  saveFailedMessageKey: string
+}>
 const skillTooltipStyle: CSSProperties = {
   maxWidth: '20rem',
   whiteSpace: 'normal',
@@ -99,20 +140,12 @@ async function loadSkills() {
   }
 }
 
-function isTranslatorSkill(skill: AgentSkillCard | null) {
-  return skill?.key === TRANSLATOR_SKILL_KEY
-}
-
-function isWebSearchSkill(skill: AgentSkillCard | null) {
-  return skill?.key === WEB_SEARCH_SKILL_KEY
-}
-
-function hasSkillConfig(skill: AgentSkillCard) {
-  return isTranslatorSkill(skill) || isWebSearchSkill(skill)
-}
-
 function hasSkillMoreActions(skill: AgentSkillCard) {
-  return (skill.installed && hasSkillConfig(skill)) || skill.canUninstall
+  return canOpenSkillConfig(skill) || skill.canUninstall
+}
+
+function canOpenSkillConfig(skill: AgentSkillCard) {
+  return skill.canConfigure && hasSkillConfigDrawer(skill.key)
 }
 
 function isSkillToggleDisabled(skill: AgentSkillCard) {
@@ -245,18 +278,30 @@ function handleSkillMoreCommand(skill: AgentSkillCard, command: string | number 
 }
 
 function handleOpenSkillConfig(skill: AgentSkillCard) {
-  if (!skill.installed) {
+  if (!canOpenSkillConfig(skill)) {
+    return
+  }
+
+  const drawer = getSkillConfigDrawer(skill.key)
+  if (!drawer) {
     return
   }
 
   configuringSkill.value = skill
-  translatorConfigDrawerVisible.value = isTranslatorSkill(skill)
-  webSearchConfigDrawerVisible.value = isWebSearchSkill(skill)
+  Object.values(skillConfigDrawerByKey).forEach((definition) => {
+    definition.visible.value = false
+  })
+  drawer.visible.value = true
 }
 
-async function handleSaveTranslatorConfig(config: AgentTranslatorSkillConfig) {
+async function handleSaveSkillConfig(config: SkillConfigFormValue) {
   const skill = configuringSkill.value
   if (!skill || savingSkillConfigKey.value) {
+    return
+  }
+
+  const drawer = getSkillConfigDrawer(skill.key)
+  if (!drawer) {
     return
   }
 
@@ -264,36 +309,21 @@ async function handleSaveTranslatorConfig(config: AgentTranslatorSkillConfig) {
   try {
     await updateAgentSkillConfig(skill.key, { config })
     await loadSkills()
-    translatorConfigDrawerVisible.value = false
-    ElMessage.success(t('skills.translator.saved'))
+    drawer.visible.value = false
+    ElMessage.success(t(drawer.savedMessageKey))
   }
   catch (error) {
-    ElMessage.error(getRequestErrorDisplayMessage(error, t('skills.translator.saveFailed')))
+    ElMessage.error(getRequestErrorDisplayMessage(error, t(drawer.saveFailedMessageKey)))
   }
   finally {
     savingSkillConfigKey.value = null
   }
 }
 
-async function handleSaveWebSearchConfig(config: AgentWebSearchSkillConfig) {
-  const skill = configuringSkill.value
-  if (!skill || savingSkillConfigKey.value) {
-    return
-  }
-
-  savingSkillConfigKey.value = skill.key
-  try {
-    await updateAgentSkillConfig(skill.key, { config })
-    await loadSkills()
-    webSearchConfigDrawerVisible.value = false
-    ElMessage.success(t('skills.webSearch.saved'))
-  }
-  catch (error) {
-    ElMessage.error(getRequestErrorDisplayMessage(error, t('skills.webSearch.saveFailed')))
-  }
-  finally {
-    savingSkillConfigKey.value = null
-  }
+function getSkillConfigDrawer(skillKey: string): typeof skillConfigDrawerByKey[SkillConfigDrawerKey] | null {
+  return hasSkillConfigDrawer(skillKey)
+    ? skillConfigDrawerByKey[skillKey]
+    : null
 }
 </script>
 
@@ -384,7 +414,7 @@ async function handleSaveWebSearchConfig(config: AgentWebSearchSkillConfig) {
                     <template #dropdown>
                       <ElDropdownMenu class="skills-view__more-menu box-border min-w-0 w-32 p-1">
                         <ElDropdownItem
-                          v-if="hasSkillConfig(skill)"
+                          v-if="canOpenSkillConfig(skill)"
                           command="config"
                           class="skills-view__more-item min-h-8 px-2 text-main"
                         >
@@ -393,7 +423,7 @@ async function handleSaveWebSearchConfig(config: AgentWebSearchSkillConfig) {
                         <ElDropdownItem
                           v-if="skill.canUninstall"
                           command="uninstall"
-                          :divided="hasSkillConfig(skill)"
+                          :divided="canOpenSkillConfig(skill)"
                           class="skills-view__more-item skills-view__more-item--danger min-h-8 px-2"
                         >
                           {{ t('skills.remove') }}
@@ -435,17 +465,29 @@ async function handleSaveWebSearchConfig(config: AgentWebSearchSkillConfig) {
       </div>
     </section>
 
+    <TimeConfigDrawer
+      v-model:visible="timeConfigDrawerVisible"
+      :skill="configuringSkill"
+      :saving="savingSkillConfigKey === configuringSkill?.key"
+      @submit="handleSaveSkillConfig"
+    />
+    <LocationConfigDrawer
+      v-model:visible="locationConfigDrawerVisible"
+      :skill="configuringSkill"
+      :saving="savingSkillConfigKey === configuringSkill?.key"
+      @submit="handleSaveSkillConfig"
+    />
     <TranslatorConfigDrawer
       v-model:visible="translatorConfigDrawerVisible"
       :skill="configuringSkill"
       :saving="savingSkillConfigKey === configuringSkill?.key"
-      @submit="handleSaveTranslatorConfig"
+      @submit="handleSaveSkillConfig"
     />
     <WebSearchConfigDrawer
       v-model:visible="webSearchConfigDrawerVisible"
       :skill="configuringSkill"
       :saving="savingSkillConfigKey === configuringSkill?.key"
-      @submit="handleSaveWebSearchConfig"
+      @submit="handleSaveSkillConfig"
     />
   </PagePanel>
 </template>

@@ -23,22 +23,26 @@ import path from 'node:path'
 import {
   ActivateAgentSkillResponseSchema,
   AGENT_FIRST_PARTY_SKILL_DEFINITIONS,
+  AGENT_LOCATION_SKILL_KEY,
   AGENT_MEMORY_SKILL_KEY,
   AGENT_SKILL_ACTIVATION_MODE,
   AGENT_SKILL_CATEGORY,
   AGENT_SKILL_INSTALL_MODE,
   AGENT_SKILL_RISK_LEVEL,
   AGENT_SKILL_SOURCE_SCOPE,
+  AGENT_TIME_SKILL_KEY,
   AGENT_TRANSLATOR_DEFAULT_SKILL_CONFIG,
   AGENT_TRANSLATOR_OUTPUT_MODE,
   AGENT_TRANSLATOR_SKILL_KEY,
   AGENT_WEB_SEARCH_SKILL_KEY,
+  AgentLocationSkillConfigSchema,
   AgentProfileConfigSchema,
   AgentProfileSnapshotSchema,
   AgentRuntimeSkillContextSchema,
   AgentSkillBindingConfigSchema,
   AgentSkillCategorySchema,
   AgentSkillRiskLevelSchema,
+  AgentTimeSkillConfigSchema,
   AgentTranslatorSkillConfigSchema,
   AgentWebSearchSkillConfigSchema,
   ListAgentSkillsResponseSchema,
@@ -62,6 +66,44 @@ import { AgentProfilesService } from './agent-profiles.service'
 const MAX_RESOURCE_BYTES = 5 * 1024 * 1024
 const SCRIPT_EXECUTION_ENABLED = false
 const builtInSkillByKey = new Map(AGENT_FIRST_PARTY_SKILL_DEFINITIONS.map(skill => [skill.key, skill]))
+
+interface BuiltInSkillConfigHandler {
+  defaultConfig: () => AgentSkillBindingConfig
+  normalize: (config: unknown) => AgentSkillBindingConfig
+  renderInstructions?: (
+    definition: (typeof AGENT_FIRST_PARTY_SKILL_DEFINITIONS)[number],
+    binding: AgentSkillBinding,
+  ) => string
+}
+
+const builtInSkillConfigHandlerByKey = {
+  [AGENT_MEMORY_SKILL_KEY]: {
+    defaultConfig: () => ({}),
+    normalize: () => ({}),
+  },
+  [AGENT_LOCATION_SKILL_KEY]: {
+    defaultConfig: () => AgentLocationSkillConfigSchema.parse({}),
+    normalize: normalizeLocationSkillConfig,
+  },
+  [AGENT_TIME_SKILL_KEY]: {
+    defaultConfig: () => AgentTimeSkillConfigSchema.parse({}),
+    normalize: normalizeTimeSkillConfig,
+  },
+  [AGENT_TRANSLATOR_SKILL_KEY]: {
+    defaultConfig: () => AGENT_TRANSLATOR_DEFAULT_SKILL_CONFIG,
+    normalize: normalizeTranslatorSkillConfig,
+    renderInstructions: renderTranslatorRuntimeInstructions,
+  },
+  [AGENT_WEB_SEARCH_SKILL_KEY]: {
+    defaultConfig: () => AgentWebSearchSkillConfigSchema.parse({}),
+    normalize: normalizeWebSearchSkillConfig,
+    renderInstructions: renderWebSearchRuntimeInstructions,
+  },
+} satisfies Record<string, BuiltInSkillConfigHandler>
+
+export function listBuiltInSkillConfigHandlerKeys(): readonly string[] {
+  return Object.keys(builtInSkillConfigHandlerByKey)
+}
 
 const marketSkillSelect = {
   id: true,
@@ -95,7 +137,7 @@ type SkillFileRecord = MarketSkill['files'][number]
 
 type ResolvedSkillDefinition = Pick<
   AgentSkillDefinition,
-  'key' | 'installMode' | 'defaultInstalled' | 'defaultEnabled' | 'canDisable' | 'canUninstall'
+  'key' | 'installMode' | 'defaultInstalled' | 'defaultEnabled' | 'canDisable' | 'canUninstall' | 'configurable'
 > & {
   canInstall: boolean
 }
@@ -503,6 +545,7 @@ export class AgentSkillsService {
         defaultEnabled: builtIn.defaultEnabled,
         canDisable: builtIn.canDisable,
         canUninstall: builtIn.canUninstall,
+        configurable: builtIn.configurable,
         canInstall: builtIn.installMode === AGENT_SKILL_INSTALL_MODE.OPTIONAL,
       }
     }
@@ -519,6 +562,7 @@ export class AgentSkillsService {
       defaultEnabled: true,
       canDisable: true,
       canUninstall: true,
+      configurable: false,
       canInstall: true,
     }
   }
@@ -571,6 +615,7 @@ function toBuiltInSkillCard(
     installMode: definition.installMode,
     defaultInstalled: definition.defaultInstalled,
     defaultEnabled: definition.defaultEnabled,
+    configurable: definition.configurable,
     tools: definition.tools,
     installed,
     enabled,
@@ -578,6 +623,7 @@ function toBuiltInSkillCard(
     canEnable: installed && !enabled,
     canDisable: installed && enabled && definition.canDisable,
     canUninstall: installed && definition.canUninstall,
+    canConfigure: installed && definition.configurable,
     config: normalizeSkillBindingConfig(definition.key, binding?.config ?? getDefaultSkillBindingConfig(definition.key)),
     sourceScope: AGENT_SKILL_SOURCE_SCOPE.BUILTIN,
     resourceCount: 0,
@@ -603,6 +649,7 @@ function toMarketSkillCard(
     installMode: AGENT_SKILL_INSTALL_MODE.OPTIONAL,
     defaultInstalled: false,
     defaultEnabled: true,
+    configurable: false,
     tools: [],
     installed,
     enabled,
@@ -610,6 +657,7 @@ function toMarketSkillCard(
     canEnable: installed && !enabled,
     canDisable: installed && enabled,
     canUninstall: installed,
+    canConfigure: false,
     config: binding?.config ?? {},
     sourceScope: AGENT_SKILL_SOURCE_SCOPE.EXTERNAL,
     resourceCount: skill.files.length,
@@ -728,6 +776,10 @@ function updateSkillBindingConfig(
   skill: ResolvedSkillDefinition,
   nextBindingConfig: AgentSkillBindingConfig,
 ): AgentProfileConfig {
+  if (!skill.configurable) {
+    throw new ConflictException('技能不支持配置')
+  }
+
   const existing = config.skillBindings.find(binding => binding.key === skill.key)
   if (!existing && skill.installMode === AGENT_SKILL_INSTALL_MODE.OPTIONAL) {
     throw new ConflictException('技能尚未安装')
@@ -785,24 +837,22 @@ function resolveRuntimeEnabledSkillBindings(config: AgentProfileConfig): AgentSk
     return []
   }
 
-  const bindingByKey = new Map(config.skillBindings.map(binding => [binding.key, binding]))
-  const builtInSkillKeySet = new Set(AGENT_FIRST_PARTY_SKILL_DEFINITIONS.map(definition => definition.key))
-  const skillBindings = config.skillBindings.map(binding =>
-    builtInSkillKeySet.has(binding.key)
-      ? { ...binding, config: normalizeSkillBindingConfig(binding.key, binding.config) }
-      : binding,
-  )
+  const skillBindings = config.skillBindings.map((binding) => {
+    const definition = builtInSkillByKey.get(binding.key)
+    if (!definition) {
+      return binding
+    }
+
+    return {
+      ...binding,
+      enabled: !definition.canDisable && definition.defaultEnabled ? true : binding.enabled,
+      config: normalizeSkillBindingConfig(binding.key, binding.config),
+    }
+  })
+  const existingSkillKeys = new Set(skillBindings.map(binding => binding.key))
 
   for (const definition of AGENT_FIRST_PARTY_SKILL_DEFINITIONS) {
-    const existing = bindingByKey.get(definition.key)
-    if (existing) {
-      if (!definition.canDisable && definition.defaultEnabled && !existing.enabled) {
-        skillBindings.splice(skillBindings.indexOf(existing), 1, {
-          ...existing,
-          enabled: true,
-          config: normalizeSkillBindingConfig(definition.key, existing.config),
-        })
-      }
+    if (existingSkillKeys.has(definition.key)) {
       continue
     }
 
@@ -825,19 +875,11 @@ function resolveRuntimeEnabledSkillBindings(config: AgentProfileConfig): AgentSk
 }
 
 function normalizeSkillBindingConfig(skillKey: string, config: unknown): AgentSkillBindingConfig {
-  if (skillKey === AGENT_MEMORY_SKILL_KEY) {
-    return {}
-  }
+  const handler = getBuiltInSkillConfigHandler(skillKey)
 
-  if (skillKey === AGENT_TRANSLATOR_SKILL_KEY) {
-    return normalizeTranslatorSkillConfig(config)
-  }
-
-  if (skillKey === AGENT_WEB_SEARCH_SKILL_KEY) {
-    return normalizeWebSearchSkillConfig(config)
-  }
-
-  return AgentSkillBindingConfigSchema.parse(config)
+  return handler
+    ? handler.normalize(config)
+    : AgentSkillBindingConfigSchema.parse(config)
 }
 
 function normalizeTranslatorSkillConfig(config: unknown): AgentSkillBindingConfig {
@@ -857,6 +899,41 @@ function normalizeTranslatorSkillConfig(config: unknown): AgentSkillBindingConfi
   })
 
   return cleanedResult.success ? cleanedResult.data : AGENT_TRANSLATOR_DEFAULT_SKILL_CONFIG
+}
+
+function normalizeTimeSkillConfig(config: unknown): AgentSkillBindingConfig {
+  const result = AgentTimeSkillConfigSchema.safeParse(config)
+  if (result.success) {
+    return result.data
+  }
+
+  if (!isRecord(config)) {
+    return AgentTimeSkillConfigSchema.parse({})
+  }
+
+  const cleanedResult = AgentTimeSkillConfigSchema.safeParse({
+    timeZone: config.timeZone,
+  })
+
+  return cleanedResult.success ? cleanedResult.data : AgentTimeSkillConfigSchema.parse({})
+}
+
+function normalizeLocationSkillConfig(config: unknown): AgentSkillBindingConfig {
+  const result = AgentLocationSkillConfigSchema.safeParse(config)
+  if (result.success) {
+    return result.data
+  }
+
+  if (!isRecord(config)) {
+    return AgentLocationSkillConfigSchema.parse({})
+  }
+
+  const cleanedResult = AgentLocationSkillConfigSchema.safeParse({
+    mode: config.mode,
+    fixedLocation: config.fixedLocation,
+  })
+
+  return cleanedResult.success ? cleanedResult.data : AgentLocationSkillConfigSchema.parse({})
 }
 
 function normalizeWebSearchSkillConfig(config: unknown): AgentSkillBindingConfig {
@@ -885,41 +962,24 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function getDefaultSkillBindingConfig(skillKey: string): AgentSkillBindingConfig {
-  if (skillKey === AGENT_TRANSLATOR_SKILL_KEY) {
-    return AGENT_TRANSLATOR_DEFAULT_SKILL_CONFIG
-  }
+  const handler = getBuiltInSkillConfigHandler(skillKey)
 
-  if (skillKey === AGENT_WEB_SEARCH_SKILL_KEY) {
-    return AgentWebSearchSkillConfigSchema.parse({})
-  }
-
-  return {}
+  return handler ? handler.defaultConfig() : {}
 }
 
 function renderBuiltInSkillInstructions(
   definition: (typeof AGENT_FIRST_PARTY_SKILL_DEFINITIONS)[number],
   binding: AgentSkillBinding,
 ): string {
-  if (definition.key === AGENT_WEB_SEARCH_SKILL_KEY) {
-    const config = AgentWebSearchSkillConfigSchema.parse(binding.config)
+  const handler = getBuiltInSkillConfigHandler(definition.key)
 
-    return [
-      definition.instructions,
-      '',
-      '<web_search_runtime_config>',
-      `providers: ${config.providers.join(', ')}`,
-      `maxResults: ${config.maxResults}`,
-      `searchContextSize: ${config.searchContextSize}`,
-      `allowedDomains: ${config.allowedDomains.length > 0 ? config.allowedDomains.join(', ') : 'any'}`,
-      `blockedDomains: ${config.blockedDomains.length > 0 ? config.blockedDomains.join(', ') : 'none'}`,
-      '</web_search_runtime_config>',
-    ].join('\n')
-  }
+  return handler?.renderInstructions?.(definition, binding) ?? definition.instructions
+}
 
-  if (definition.key !== AGENT_TRANSLATOR_SKILL_KEY) {
-    return definition.instructions
-  }
-
+function renderTranslatorRuntimeInstructions(
+  definition: (typeof AGENT_FIRST_PARTY_SKILL_DEFINITIONS)[number],
+  binding: AgentSkillBinding,
+): string {
   const config = AgentTranslatorSkillConfigSchema.parse(binding.config)
 
   return [
@@ -936,6 +996,29 @@ function renderBuiltInSkillInstructions(
     '',
     'If the current user request does not explicitly name a target language, use the target language selected in the current invocation.',
   ].join('\n')
+}
+
+function renderWebSearchRuntimeInstructions(
+  definition: (typeof AGENT_FIRST_PARTY_SKILL_DEFINITIONS)[number],
+  binding: AgentSkillBinding,
+): string {
+  const config = AgentWebSearchSkillConfigSchema.parse(binding.config)
+
+  return [
+    definition.instructions,
+    '',
+    '<web_search_runtime_config>',
+    `providers: ${config.providers.join(', ')}`,
+    `maxResults: ${config.maxResults}`,
+    `searchContextSize: ${config.searchContextSize}`,
+    `allowedDomains: ${config.allowedDomains.length > 0 ? config.allowedDomains.join(', ') : 'any'}`,
+    `blockedDomains: ${config.blockedDomains.length > 0 ? config.blockedDomains.join(', ') : 'none'}`,
+    '</web_search_runtime_config>',
+  ].join('\n')
+}
+
+function getBuiltInSkillConfigHandler(skillKey: string): BuiltInSkillConfigHandler | undefined {
+  return builtInSkillConfigHandlerByKey[skillKey as keyof typeof builtInSkillConfigHandlerByKey]
 }
 
 function formatTranslatorOutputMode(mode: string): string {

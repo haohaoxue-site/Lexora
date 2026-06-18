@@ -1,7 +1,12 @@
 import { z } from 'zod'
+import {
+  AgentClientActionResultSchema,
+  AgentClientActionSchema,
+} from './agent/client-action'
 import { AgentToolCallKindSchema, AgentToolCallStatusSchema } from './agent/events'
 import { ChatGenerationUsageSnapshotSchema } from './agent/generation'
 import { AgentMemoryRunOptionsSchema, ChatMemoryOperationProjectionSchema } from './agent/memory'
+import { AgentRuntimeHintsSchema } from './agent/runtime'
 import {
   AGENT_TRANSLATOR_SKILL_KEY,
   AgentTranslatorTargetLanguageSchema,
@@ -326,6 +331,7 @@ export const ChatRunSummarySchema = z.object({
   status: ChatRunStatusSchema,
   assistantMessageId: NonEmptyStringSchema,
   triggerUserMessageId: NonEmptyStringSchema,
+  requiredAction: AgentClientActionSchema.nullable().default(null),
   createdAt: IsoDateTimeStringSchema,
   startedAt: IsoDateTimeStringSchema.nullable(),
   completedAt: IsoDateTimeStringSchema.nullable(),
@@ -384,6 +390,7 @@ const ChatSessionMessageRequestBaseSchema = z.object({
   memory: AgentMemoryRunOptionsSchema.optional(),
   skillInvocation: ChatSkillInvocationSchema.optional().nullable(),
   disabledSkillKeys: ChatDisabledSkillKeysSchema,
+  runtimeHints: AgentRuntimeHintsSchema.optional(),
 }).strict().superRefine((value, ctx) => {
   const attachmentById = new Map((value.attachments ?? []).map(attachment => [attachment.id, attachment]))
   for (const attachmentId of collectChatReferenceAttachmentIds(value.contentJSON)) {
@@ -412,13 +419,19 @@ export const CreateChatSessionMessageRequestSchema = ChatSessionMessageRequestBa
 
 export const EditAndSendChatMessageRequestSchema = ChatSessionMessageRequestBaseSchema
 
-export const RetryChatAssistantMessageRequestSchema = z.object({}).strict()
+export const RetryChatAssistantMessageRequestSchema = z.object({
+  runtimeHints: AgentRuntimeHintsSchema.optional(),
+}).strict().default({})
 
 export const SwitchChatActiveMessageRequestSchema = z.object({
   messageId: NonEmptyStringSchema,
 }).strict()
 
 export const CancelChatRunRequestSchema = z.object({}).strict()
+
+export const ResumeChatRunRequestSchema = z.object({
+  resume: AgentClientActionResultSchema,
+}).strict()
 
 export const UpdateChatSessionModelRequestSchema = z.object({
   modelRef: AiModelRefSchema.pick({
@@ -460,7 +473,7 @@ const ChatSessionMessagePartDeltaEventSchema = ChatSessionEventBaseSchema.extend
   type: z.literal(CHAT_SESSION_EVENT_TYPE.MESSAGE_PART_DELTA),
   messageId: NonEmptyStringSchema,
   runId: NonEmptyStringSchema,
-  sourceEventId: NonEmptyStringSchema,
+  sourceEventId: NonEmptyStringSchema.nullable(),
   payload: z.object({
     partId: NonEmptyStringSchema,
     partType: ChatMessagePartTypeSchema,
@@ -522,6 +535,14 @@ const ChatSessionRunStartedEventSchema = ChatSessionEventBaseSchema.extend({
   payload: ChatSessionEventPayloadSchema,
 }).strict()
 
+const ChatSessionRunRequiresActionEventSchema = ChatSessionEventBaseSchema.extend({
+  type: z.literal(CHAT_SESSION_EVENT_TYPE.RUN_REQUIRES_ACTION),
+  runId: NonEmptyStringSchema,
+  payload: z.object({
+    action: AgentClientActionSchema,
+  }).strict(),
+}).strict()
+
 const ChatSessionRunCompletedEventSchema = ChatSessionEventBaseSchema.extend({
   type: z.literal(CHAT_SESSION_EVENT_TYPE.RUN_COMPLETED),
   runId: NonEmptyStringSchema,
@@ -560,6 +581,7 @@ export const ChatSessionEventSchema = z.discriminatedUnion('type', [
   ChatSessionMessageFailedEventSchema,
   ChatSessionMessageCancelledEventSchema,
   ChatSessionRunStartedEventSchema,
+  ChatSessionRunRequiresActionEventSchema,
   ChatSessionRunCompletedEventSchema,
   ChatSessionRunFailedEventSchema,
   ChatSessionRunCancelledEventSchema,
@@ -667,6 +689,7 @@ export type EditAndSendChatMessageRequest = z.infer<typeof EditAndSendChatMessag
 export type RetryChatAssistantMessageRequest = z.infer<typeof RetryChatAssistantMessageRequestSchema>
 export type SwitchChatActiveMessageRequest = z.infer<typeof SwitchChatActiveMessageRequestSchema>
 export type CancelChatRunRequest = z.infer<typeof CancelChatRunRequestSchema>
+export type ResumeChatRunRequest = z.infer<typeof ResumeChatRunRequestSchema>
 export type ChatMutationResponse = z.infer<typeof ChatMutationResponseSchema>
 export type UpdateChatSessionModelRequest = z.infer<typeof UpdateChatSessionModelRequestSchema>
 export type UpdateChatSessionTitleRequest = z.infer<typeof UpdateChatSessionTitleRequestSchema>

@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { AgentClientActionSchema } from './client-action'
 import { ChatGenerationUsageSnapshotSchema } from './generation'
 import { ChatMemoryOperationProjectionSchema } from './memory'
 
@@ -35,7 +36,7 @@ const ToolCallArgumentsPayloadSchema = ToolCallEventBasePayloadSchema.extend({
 }).strict()
 
 const ToolExecutionResultPayloadSchema = ToolCallEventBasePayloadSchema.extend({
-  status: z.enum(['success', 'error']).default('success'),
+  status: z.enum(['success', 'error', 'requires_action']).default('success'),
   output: z.unknown().optional(),
   outputText: z.string().optional(),
   durationMs: z.number().int().nonnegative().optional(),
@@ -82,6 +83,12 @@ export const ChatGenerationEventSchema = z.discriminatedUnion('type', [
     payload: ToolCallEventBasePayloadSchema.extend({
       message: z.string().trim().min(1),
       durationMs: z.number().int().nonnegative().optional(),
+    }).strict(),
+  }).strict(),
+  GenerationEventBaseSchema.extend({
+    type: z.literal('generation.client_action.required'),
+    payload: z.object({
+      action: AgentClientActionSchema,
     }).strict(),
   }).strict(),
   GenerationEventBaseSchema.extend({

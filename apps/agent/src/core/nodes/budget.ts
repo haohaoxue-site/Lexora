@@ -6,7 +6,9 @@ import type { AgentHistoryDigest } from '../context/history-compaction'
 import type { AgentGraphContext } from '../state'
 import { resolveAgentContextBudget } from '../context/budget'
 import { createAgentSystemPrompt } from '../prompts/system'
+import { isLocationSkillActive } from '../skills/builtin/location'
 import { createAgentMemoryPromptBlock } from '../skills/builtin/memory'
+import { isTimeSkillActive } from '../skills/builtin/time'
 import { createFocusedTranslatorSystemPrompt } from '../skills/builtin/translator'
 
 export interface AgentBudgetState {
@@ -39,6 +41,8 @@ export function resolveBudgetForState(
       agentProfileConfig: context?.agentProfileConfig,
       skillContext: context?.skillContext,
       defaultResponseLanguage: context?.defaultResponseLanguage ?? undefined,
+      timeSkillActive: isTimeSkillActive(context),
+      locationSkillActive: isLocationSkillActive(context),
     }),
     contextSnapshots: context?.contextSnapshots ?? [],
     memoryPrompt: createAgentMemoryPromptBlock(state.memoryRetrieval),

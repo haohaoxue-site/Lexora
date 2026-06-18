@@ -3,6 +3,10 @@ import type {
   AgentRuntimeSkillContext,
   ResolvedLanguagePreference,
 } from '@haohaoxue/lexora-contracts'
+import {
+  AGENT_LOCATION_TOOL,
+  AGENT_TIME_TOOL,
+} from '@haohaoxue/lexora-contracts'
 import { LANGUAGE_PREFERENCE, LANGUAGE_PREFERENCE_LABELS } from '@haohaoxue/lexora-contracts/user/constants'
 import { createSkillCatalogPromptBlock } from '../skills/runtime'
 
@@ -16,6 +20,8 @@ export interface CreateAgentSystemPromptOptions {
   agentProfileConfig?: AgentProfileConfig | null
   skillContext?: AgentRuntimeSkillContext | null
   defaultResponseLanguage?: ResolvedLanguagePreference
+  timeSkillActive?: boolean
+  locationSkillActive?: boolean
 }
 
 export function createAgentSystemPrompt(input: string | CreateAgentSystemPromptOptions): string {
@@ -28,6 +34,12 @@ export function createAgentSystemPrompt(input: string | CreateAgentSystemPromptO
   lines.push(createDefaultResponseLanguageInstruction(
     options.defaultResponseLanguage ?? LANGUAGE_PREFERENCE.ZH_CN,
   ))
+  if (options.timeSkillActive) {
+    lines.push(createTimeSkillInstruction())
+  }
+  if (options.locationSkillActive) {
+    lines.push(createLocationSkillInstruction())
+  }
 
   if (profileConfig) {
     lines.push('Agent 指令：', profileConfig.instructions.systemPrompt)
@@ -64,4 +76,21 @@ export function createAgentSystemPrompt(input: string | CreateAgentSystemPromptO
 
 function createDefaultResponseLanguageInstruction(language: ResolvedLanguagePreference): string {
   return `默认回复语言：${LANGUAGE_PREFERENCE_LABELS[language]}。`
+}
+
+function createTimeSkillInstruction(): string {
+  return [
+    '时间技能：',
+    `- 涉及“今天、明天、当前时间、本地日期、未来一周”等相对时间时，先调用 ${AGENT_TIME_TOOL.GET_CURRENT_TIME} 获取时间锚点。`,
+    `- ${AGENT_TIME_TOOL.GET_CURRENT_TIME} 返回的是时间和日期上下文，不是地理位置、城市、国家/地区或天气位置。`,
+  ].join('\n')
+}
+
+function createLocationSkillInstruction(): string {
+  return [
+    '位置技能：',
+    `- 涉及天气、附近、本地资讯、区域政策、路线、门店等位置敏感问题时，先调用 ${AGENT_LOCATION_TOOL.GET_CURRENT_LOCATION} 获取位置上下文。`,
+    `- ${AGENT_LOCATION_TOOL.GET_CURRENT_LOCATION} 返回 ok 时使用返回的位置；返回 needs_location 时先询问地点，不要联网搜索。`,
+    '- 不要从时间、时区、语言、locale、服务商区域或服务端默认值推断地点。',
+  ].join('\n')
 }

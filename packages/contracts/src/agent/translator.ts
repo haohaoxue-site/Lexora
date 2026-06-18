@@ -63,6 +63,12 @@ export const AgentTranslatorSkillConfigSchema = z.object({
 
 export const AGENT_TRANSLATOR_DEFAULT_SKILL_CONFIG = AgentTranslatorSkillConfigSchema.parse({})
 
+export const AGENT_TRANSLATOR_SKILL_MANIFEST = {
+  title: '翻译',
+  description: '自动识别源语言，并按本轮指令或默认配置翻译为目标语言。',
+  tools: [],
+} as const
+
 export type AgentTranslatorOutputMode = z.infer<typeof AgentTranslatorOutputModeSchema>
 export type AgentTranslatorFormality = z.infer<typeof AgentTranslatorFormalitySchema>
 export type AgentTranslatorTargetLanguage = z.infer<typeof AgentTranslatorTargetLanguageSchema>

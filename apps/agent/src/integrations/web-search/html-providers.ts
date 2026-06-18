@@ -118,38 +118,30 @@ function createHtmlProviderWebSearchClient(input: CreateHtmlProviderWebSearchCli
       }
 
       const request = normalizeWebSearchRequest(requestInput, input.provider)
-      const abortController = new AbortController()
-      const timeout = setTimeout(() => abortController.abort(), request.timeoutMs)
+      const url = new URL(input.searchUrl)
+      url.searchParams.set(input.queryParam, request.query)
 
-      try {
-        const url = new URL(input.searchUrl)
-        url.searchParams.set(input.queryParam, request.query)
+      const response = await fetchImpl(url, {
+        headers: {
+          'accept': 'text/html,application/xhtml+xml',
+          'accept-language': 'zh-CN,zh;q=0.9,en;q=0.8',
+          'user-agent': userAgent,
+        },
+        signal: AbortSignal.timeout(request.timeoutMs),
+      })
 
-        const response = await fetchImpl(url, {
-          headers: {
-            'accept': 'text/html,application/xhtml+xml',
-            'accept-language': 'zh-CN,zh;q=0.9,en;q=0.8',
-            'user-agent': userAgent,
-          },
-          signal: abortController.signal,
-        })
-
-        if (!response.ok) {
-          throw new Error(`${input.provider} 搜索失败: HTTP ${response.status}`)
-        }
-
-        const html = await response.text()
-        return WebSearchToolResponseSchema.parse({
-          query: request.query,
-          results: input.parseResults(html, request),
-          providers: [input.provider],
-          providerErrors: [],
-          fetchedAt: now().toISOString(),
-        })
+      if (!response.ok) {
+        throw new Error(`${input.provider} 搜索失败: HTTP ${response.status}`)
       }
-      finally {
-        clearTimeout(timeout)
-      }
+
+      const html = await response.text()
+      return WebSearchToolResponseSchema.parse({
+        query: request.query,
+        results: input.parseResults(html, request),
+        providers: [input.provider],
+        providerErrors: [],
+        fetchedAt: now().toISOString(),
+      })
     },
   }
 }

@@ -1,4 +1,5 @@
 import type {
+  AgentRuntimeHints,
   AiModelRef,
   ChatGenerationModelTargetSnapshot,
   ChatModelItem,
@@ -7,10 +8,16 @@ import type {
   ChatSessionOrigin,
   CreateChatSessionMessageRequest,
   EditAndSendChatMessageRequest,
+  ResumeChatRunRequest,
+  RetryChatAssistantMessageRequest,
 } from '@haohaoxue/lexora-contracts'
+import type { FastifyRequest } from 'fastify'
 import { randomUUID } from 'node:crypto'
 import {
+  AGENT_LOCATION_SKILL_KEY,
   AGENT_RUNTIME_CONTROL_TYPE,
+  AgentLocationSkillConfigSchema,
+  AgentProfileConfigSchema,
   AI_MODEL_INTENT_KEY,
   ChatGenerationModelTargetSnapshotSchema,
 } from '@haohaoxue/lexora-contracts'
@@ -23,6 +30,8 @@ import { AgentProfilesService } from '../agent/agent-profiles.service'
 import { AgentRuntimeCleanupTasksService } from '../agent/agent-runtime-cleanup-tasks.service'
 import { AiDefaultModelsService } from '../ai/models/defaults.service'
 import { AiModelResolverService } from '../ai/models/resolver.service'
+import { ChatLocationResolverService } from './chat-location-resolver.service'
+import { createRuntimeHintsWithLocationClientIp } from './chat-location-runtime.utils'
 import { ChatRunDispatcherService } from './chat-run-dispatcher.service'
 import { ChatSessionsService } from './chat-sessions.service'
 
@@ -39,13 +48,17 @@ interface BatchDeleteChatSessionsParams {
   origin: ChatSessionOrigin
 }
 
-interface SendChatMessageParams extends ChatMessageMutationParams, CreateChatSessionMessageRequest {}
+interface RequestRuntimeParams {
+  request?: FastifyRequest
+}
 
-interface EditAndSendChatMessageParams extends ChatMessageMutationParams, EditAndSendChatMessageRequest {
+interface SendChatMessageParams extends ChatMessageMutationParams, CreateChatSessionMessageRequest, RequestRuntimeParams {}
+
+interface EditAndSendChatMessageParams extends ChatMessageMutationParams, EditAndSendChatMessageRequest, RequestRuntimeParams {
   messageId: string
 }
 
-interface RetryChatAssistantMessageParams extends ChatMessageMutationParams {
+interface RetryChatAssistantMessageParams extends ChatMessageMutationParams, RetryChatAssistantMessageRequest, RequestRuntimeParams {
   messageId: string
 }
 
@@ -57,6 +70,10 @@ interface CancelChatRunParams {
   userId: string
   runId: string
   origin: ChatSessionOrigin
+}
+
+interface ResumeChatRunParams extends CancelChatRunParams, ResumeChatRunRequest {
+  request: FastifyRequest
 }
 
 interface UpdateChatSessionModelParams {
@@ -80,6 +97,7 @@ export class ChatService {
     private readonly defaultModelsService: AiDefaultModelsService,
     private readonly agentProfiles: AgentProfilesService,
     private readonly chatRunDispatcher: ChatRunDispatcherService,
+    private readonly chatLocationResolver: ChatLocationResolverService,
     private readonly agentCommandPublisher: AgentCommandPublisherService,
     private readonly agentRuntimeCleanupTasks: AgentRuntimeCleanupTasksService,
   ) {}
@@ -143,8 +161,11 @@ export class ChatService {
   async sendMessage(params: SendChatMessageParams): Promise<ChatMutationResponse> {
     const generationId = randomUUID()
     const modelTarget = await this.resolveChatModelTarget(params)
+    const runtimeHints = await this.resolveLocationRuntimeHints(params)
+    const { request: _request, ...mutationParams } = params
     const result = await this.chatSessionsService.sendMessage({
-      ...params,
+      ...mutationParams,
+      runtimeHints,
       generationId,
       runId: generationId,
       ...modelTarget,
@@ -157,8 +178,11 @@ export class ChatService {
   async editAndSendMessage(params: EditAndSendChatMessageParams): Promise<ChatMutationResponse> {
     const generationId = randomUUID()
     const modelTarget = await this.resolveChatModelTarget(params)
+    const runtimeHints = await this.resolveLocationRuntimeHints(params)
+    const { request: _request, ...mutationParams } = params
     const result = await this.chatSessionsService.editAndSendMessage({
-      ...params,
+      ...mutationParams,
+      runtimeHints,
       generationId,
       runId: generationId,
       ...modelTarget,
@@ -171,8 +195,11 @@ export class ChatService {
   async retryAssistantMessage(params: RetryChatAssistantMessageParams): Promise<ChatMutationResponse> {
     const generationId = randomUUID()
     const modelTarget = await this.resolveChatModelTarget(params)
+    const runtimeHints = await this.resolveLocationRuntimeHints(params)
+    const { request: _request, ...mutationParams } = params
     const result = await this.chatSessionsService.retryAssistantMessage({
-      ...params,
+      ...mutationParams,
+      runtimeHints,
       generationId,
       runId: generationId,
       ...modelTarget,
@@ -223,6 +250,18 @@ export class ChatService {
     return result
   }
 
+  async resumeRun(params: ResumeChatRunParams): Promise<ChatMutationResponse> {
+    const prepared = await this.chatSessionsService.prepareResumeRun({
+      ...params,
+    })
+    if (!prepared.shouldDispatch) {
+      return prepared.response
+    }
+
+    this.dispatchRun(params.runId, prepared.response.session.id)
+    return prepared.response
+  }
+
   private async resolveChatModelTarget(params: ChatMessageMutationParams): Promise<ResolvedChatModelTarget> {
     const sessionModelRef = await this.chatSessionsService.getSessionModelSelection(params.userId, params.sessionId, params.origin)
     const target = await this.modelResolverService.resolveModelTarget({
@@ -251,6 +290,48 @@ export class ChatService {
     return {
       modelTargetSnapshot,
     }
+  }
+
+  private async resolveLocationRuntimeHints(params: RequestRuntimeParams & {
+    userId: string
+    disabledSkillKeys?: string[]
+    runtimeHints?: AgentRuntimeHints
+  }): Promise<AgentRuntimeHints | undefined> {
+    const sanitizedRuntimeHints = params.runtimeHints
+      ? createRuntimeHintsWithLocationClientIp({
+          runtimeHints: params.runtimeHints,
+          clientIp: null,
+        })
+      : undefined
+
+    if (!params.request) {
+      return sanitizedRuntimeHints
+    }
+
+    if (params.disabledSkillKeys?.includes(AGENT_LOCATION_SKILL_KEY)) {
+      return sanitizedRuntimeHints
+    }
+
+    if (!await this.shouldResolveAutomaticLocation(params.userId)) {
+      return sanitizedRuntimeHints
+    }
+
+    return this.chatLocationResolver.resolveRuntimeHints({
+      request: params.request,
+      runtimeHints: sanitizedRuntimeHints,
+    })
+  }
+
+  private async shouldResolveAutomaticLocation(userId: string): Promise<boolean> {
+    const profile = await this.agentProfiles.ensureDefaultAgentProfile({ ownerUserId: userId })
+    const config = AgentProfileConfigSchema.parse(profile.currentConfig)
+    const binding = config.skillBindings.find(item => item.key === AGENT_LOCATION_SKILL_KEY)
+    if (!binding?.enabled) {
+      return false
+    }
+
+    const locationConfig = AgentLocationSkillConfigSchema.safeParse(binding.config)
+    return locationConfig.success && locationConfig.data.mode === 'auto'
   }
 
   private async cleanupDeletedChatSessions(input: {

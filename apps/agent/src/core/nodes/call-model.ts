@@ -16,7 +16,9 @@ import { HumanMessage, SystemMessage } from '@langchain/core/messages'
 import { applyAgentContextSnapshotsToMessages } from '../context/snapshots'
 import { toLangChainChatMessages } from '../messages/langchain'
 import { createAgentSystemPrompt } from '../prompts/system'
+import { isLocationSkillActive } from '../skills/builtin/location'
 import { createAgentMemoryPromptBlock } from '../skills/builtin/memory'
+import { isTimeSkillActive } from '../skills/builtin/time'
 import {
   createFocusedTranslatorHumanContent,
   createFocusedTranslatorSystemPrompt,
@@ -65,6 +67,8 @@ export function createCallModelNode(options: CreateCallModelNodeOptions): GraphN
           config.context?.defaultResponseLanguage,
           state.memoryRetrieval,
           config.context?.triggerUserMessageId,
+          isTimeSkillActive(config.context),
+          isLocationSkillActive(config.context),
           await resolveInputAttachmentContents({
             chatApi: options.chatApi,
             generationId: config.context?.generationId,
@@ -181,6 +185,8 @@ function toLangChainMessages(
   defaultResponseLanguage: AgentGraphContext['defaultResponseLanguage'],
   memoryRetrieval: AgentMemoryRetrievalSnapshot | null,
   triggerUserMessageId: string | null | undefined,
+  timeSkillActive: boolean,
+  locationSkillActive: boolean,
   inputAttachments: AgentChatAttachmentContent[],
 ) {
   const memoryPrompt = createAgentMemoryPromptBlock(memoryRetrieval)
@@ -188,6 +194,8 @@ function toLangChainMessages(
     agentProfileConfig,
     skillContext,
     defaultResponseLanguage: defaultResponseLanguage ?? undefined,
+    timeSkillActive,
+    locationSkillActive,
     historyDigestSummary: historyDigestSummary ?? undefined,
     olderMessagesExcerpt,
   })

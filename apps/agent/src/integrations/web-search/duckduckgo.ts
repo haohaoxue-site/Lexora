@@ -42,37 +42,29 @@ export function createDuckDuckGoWebSearchClient(
       }
 
       const request = normalizeWebSearchRequest(input)
-      const abortController = new AbortController()
-      const timeout = setTimeout(() => abortController.abort(), request.timeoutMs)
+      const url = new URL(DUCKDUCKGO_LITE_SEARCH_URL)
+      url.searchParams.set('q', request.query)
 
-      try {
-        const url = new URL(DUCKDUCKGO_LITE_SEARCH_URL)
-        url.searchParams.set('q', request.query)
+      const response = await fetchImpl(url, {
+        headers: {
+          'accept': 'text/html,application/xhtml+xml',
+          'user-agent': userAgent,
+        },
+        signal: AbortSignal.timeout(request.timeoutMs),
+      })
 
-        const response = await fetchImpl(url, {
-          headers: {
-            'accept': 'text/html,application/xhtml+xml',
-            'user-agent': userAgent,
-          },
-          signal: abortController.signal,
-        })
-
-        if (!response.ok) {
-          throw new Error(`DuckDuckGo 搜索失败: HTTP ${response.status}`)
-        }
-
-        const html = await response.text()
-        return WebSearchToolResponseSchema.parse({
-          query: request.query,
-          results: parseDuckDuckGoLiteResults(html, request),
-          providers: [AGENT_WEB_SEARCH_PROVIDER.DUCKDUCKGO],
-          providerErrors: [],
-          fetchedAt: now().toISOString(),
-        })
+      if (!response.ok) {
+        throw new Error(`DuckDuckGo 搜索失败: HTTP ${response.status}`)
       }
-      finally {
-        clearTimeout(timeout)
-      }
+
+      const html = await response.text()
+      return WebSearchToolResponseSchema.parse({
+        query: request.query,
+        results: parseDuckDuckGoLiteResults(html, request),
+        providers: [AGENT_WEB_SEARCH_PROVIDER.DUCKDUCKGO],
+        providerErrors: [],
+        fetchedAt: now().toISOString(),
+      })
     },
   }
 }

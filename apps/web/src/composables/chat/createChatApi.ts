@@ -5,6 +5,8 @@ import type {
   ChatSessionOrigin,
   CreateChatSessionMessageRequest,
   EditAndSendChatMessageRequest,
+  ResumeChatRunRequest,
+  RetryChatAssistantMessageRequest,
   SwitchChatActiveMessageRequest,
   UpdateChatSessionTitleRequest,
 } from '@/apis/chat'
@@ -16,6 +18,7 @@ import {
   editAndSendChatMessage,
   getChatSession,
   getChatSessions,
+  resumeChatRun,
   retryChatAssistantMessage,
   sendChatSessionMessage,
   streamChatSessionEvents,
@@ -52,9 +55,11 @@ export function createChatApi(origin: ChatSessionOrigin, options: CreateChatApiO
     sendMessage: (sessionId: string, data: CreateChatSessionMessageRequest) => sendChatSessionMessage(sessionId, data, { origin }),
     editAndSendMessage: (sessionId: string, messageId: string, data: EditAndSendChatMessageRequest) =>
       editAndSendChatMessage(sessionId, messageId, data, { origin }),
-    retryAssistantMessage: (sessionId: string, messageId: string) => retryChatAssistantMessage(sessionId, messageId, { origin }),
+    retryAssistantMessage: (sessionId: string, messageId: string, data: RetryChatAssistantMessageRequest = {}) =>
+      retryChatAssistantMessage(sessionId, messageId, data, { origin }),
     switchActiveMessage: (sessionId: string, data: SwitchChatActiveMessageRequest) => switchChatActiveMessage(sessionId, data, { origin }),
     cancelRun: (runId: string) => cancelChatRun(runId, { origin }),
+    resumeRun: (runId: string, data: ResumeChatRunRequest) => resumeChatRun(runId, data, { origin }),
     streamEvents: (
       sessionId: string,
       afterSequence: number | null,

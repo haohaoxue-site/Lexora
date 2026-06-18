@@ -26,6 +26,8 @@ export type {
   ChatUploadedAsset,
   CreateChatSessionMessageRequest,
   EditAndSendChatMessageRequest,
+  ResumeChatRunRequest,
+  RetryChatAssistantMessageRequest,
   SwitchChatActiveMessageRequest,
   UpdateChatSessionTitleRequest,
 } from '@haohaoxue/lexora-contracts'
