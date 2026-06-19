@@ -115,29 +115,35 @@ function isMediaIconSource(value: string | null | undefined) {
     <section
       v-if="props.home.features.length"
       class="publication-home-page__features"
-      :class="featureGridClass"
       :aria-label="t('docs.publicReader.features')"
     >
-      <article
-        v-for="feature in props.home.features"
-        :key="feature.title"
-        class="publication-home-page__feature"
-      >
-        <span v-if="feature.icon" class="publication-home-page__feature-icon">
-          <img
-            v-if="isMediaIconSource(feature.icon)"
-            :src="feature.icon"
-            alt=""
+      <div class="publication-home-page__features-container">
+        <div class="publication-home-page__features-items">
+          <div
+            v-for="feature in props.home.features"
+            :key="feature.title"
+            class="publication-home-page__feature-item"
+            :class="featureGridClass"
           >
-          <span v-else>{{ feature.icon }}</span>
-        </span>
-        <h2 class="publication-home-page__feature-title">
-          {{ feature.title }}
-        </h2>
-        <p v-if="feature.details" class="publication-home-page__feature-details">
-          {{ feature.details }}
-        </p>
-      </article>
+            <article class="publication-home-page__feature">
+              <span v-if="feature.icon" class="publication-home-page__feature-icon">
+                <img
+                  v-if="isMediaIconSource(feature.icon)"
+                  :src="feature.icon"
+                  alt=""
+                >
+                <span v-else>{{ feature.icon }}</span>
+              </span>
+              <h2 class="publication-home-page__feature-title">
+                {{ feature.title }}
+              </h2>
+              <p v-if="feature.details" class="publication-home-page__feature-details">
+                {{ feature.details }}
+              </p>
+            </article>
+          </div>
+        </div>
+      </div>
     </section>
 
     <footer
@@ -163,7 +169,7 @@ function isMediaIconSource(value: string | null | undefined) {
 
 .publication-home-page__hero {
   margin-top: calc(var(--publication-nav-height) * -1);
-  padding: calc(var(--publication-nav-height) + 2rem) 1.5rem 3rem;
+  padding: calc(var(--publication-nav-height) + 3rem) 1.5rem 3rem;
 }
 
 .publication-home-page__hero-container {
@@ -322,12 +328,24 @@ function isMediaIconSource(value: string | null | undefined) {
 }
 
 .publication-home-page__features {
-  display: grid;
+  padding: 0 1.5rem;
+  position: relative;
+}
+
+.publication-home-page__features-container {
   max-width: 72rem;
   margin: 0 auto;
-  padding: 0 1.5rem;
-  gap: 1rem;
-  grid-template-columns: minmax(0, 1fr);
+}
+
+.publication-home-page__features-items {
+  display: flex;
+  flex-wrap: wrap;
+  margin: -0.5rem;
+}
+
+.publication-home-page__feature-item {
+  width: 100%;
+  padding: 0.5rem;
 }
 
 .publication-home-page__feature {
@@ -335,7 +353,7 @@ function isMediaIconSource(value: string | null | undefined) {
   height: 100%;
   padding: 1.5rem;
   border: 1px solid var(--publication-c-bg-soft);
-  border-radius: 0.5rem;
+  border-radius: 0.75rem;
   background: var(--publication-c-bg-soft);
 }
 
@@ -393,7 +411,7 @@ function isMediaIconSource(value: string | null | undefined) {
 
 @media (min-width: 640px) {
   .publication-home-page__hero {
-    padding: calc(var(--publication-nav-height) + 3rem) 3rem 4rem;
+    padding: calc(var(--publication-nav-height) + 5rem) 3rem 4rem;
   }
 
   .publication-home-page__name,
@@ -438,28 +456,28 @@ function isMediaIconSource(value: string | null | undefined) {
     padding: 0 3rem;
   }
 
-  .publication-home-page__features--grid-2,
-  .publication-home-page__features--grid-4,
-  .publication-home-page__features--grid-6 {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+  .publication-home-page__feature-item.publication-home-page__features--grid-2,
+  .publication-home-page__feature-item.publication-home-page__features--grid-4,
+  .publication-home-page__feature-item.publication-home-page__features--grid-6 {
+    width: calc(100% / 2);
   }
 }
 
 @media (min-width: 768px) {
-  .publication-home-page__features--grid-2,
-  .publication-home-page__features--grid-4 {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+  .publication-home-page__feature-item.publication-home-page__features--grid-2,
+  .publication-home-page__feature-item.publication-home-page__features--grid-4 {
+    width: calc(100% / 2);
   }
 
-  .publication-home-page__features--grid-3,
-  .publication-home-page__features--grid-6 {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+  .publication-home-page__feature-item.publication-home-page__features--grid-3,
+  .publication-home-page__feature-item.publication-home-page__features--grid-6 {
+    width: calc(100% / 3);
   }
 }
 
 @media (min-width: 960px) {
   .publication-home-page__hero {
-    padding: calc(var(--publication-nav-height) + 3rem) 4rem 4rem;
+    padding: calc(var(--publication-nav-height) + 5rem) 4rem 4rem;
   }
 
   .publication-home-page__hero-container {
@@ -535,8 +553,8 @@ function isMediaIconSource(value: string | null | undefined) {
     padding: 0 4rem;
   }
 
-  .publication-home-page__features--grid-4 {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+  .publication-home-page__feature-item.publication-home-page__features--grid-4 {
+    width: calc(100% / 4);
   }
 }
 </style>

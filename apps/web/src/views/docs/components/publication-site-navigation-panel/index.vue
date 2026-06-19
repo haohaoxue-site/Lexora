@@ -27,6 +27,7 @@ import {
   DOCUMENT_PUBLICATION_NAV_ITEM_EXTERNAL_TARGET,
   DOCUMENT_PUBLICATION_NAV_ITEM_INTERNAL_TARGET,
   DOCUMENT_PUBLICATION_NAV_ITEM_LABEL_MAX_LENGTH,
+  DOCUMENT_PUBLICATION_NAV_ITEM_MAX_DEPTH,
   DOCUMENT_PUBLICATION_NAV_ITEM_TYPE,
   DOCUMENT_PUBLICATION_SITE_CUSTOM_MEDIA_MAX_BYTES_BY_SCOPE,
   DOCUMENT_PUBLICATION_SITE_CUSTOM_MEDIA_SCOPE,
@@ -37,7 +38,7 @@ import { prettyBytes } from '@haohaoxue/lexora-shared/file'
 import { computed, shallowRef, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import Empty from '@/components/empty'
-import { ElMessage } from '@/utils/element-plus'
+import { ElMessage, ElMessageBox } from '@/utils/element-plus'
 
 const props = withDefaults(defineProps<PublicationSiteNavigationPanelProps>(), {
   saving: false,
@@ -78,6 +79,9 @@ const selectedDraft = computed(() =>
   drafts.value.find(item => item.localId === selectedLocalId.value) ?? drafts.value[0] ?? null,
 )
 const navigationTree = computed(() => buildNavigationTree(drafts.value))
+const draftByLocalId = computed(() =>
+  new Map(drafts.value.map(item => [item.localId, item])),
+)
 const mediaAccept = DOCUMENT_PUBLICATION_SITE_MEDIA_MIME_TYPES.join(',')
 const navIconMediaSizeLimitLabel = prettyBytes(DOCUMENT_PUBLICATION_SITE_CUSTOM_MEDIA_MAX_BYTES_BY_SCOPE[DOCUMENT_PUBLICATION_SITE_CUSTOM_MEDIA_SCOPE.NAV_ICON])
 
@@ -93,6 +97,11 @@ watch(
 )
 
 function addInternalItem(parentId = '') {
+  if (parentId && !canAddChildItem(parentId)) {
+    ElMessage.warning(t('docs.publicationSite.navigation.maxDepthExceeded'))
+    return
+  }
+
   const localId = crypto.randomUUID()
 
   drafts.value = [
@@ -116,6 +125,11 @@ function addInternalItem(parentId = '') {
 }
 
 function addExternalItem(parentId = '') {
+  if (parentId && !canAddChildItem(parentId)) {
+    ElMessage.warning(t('docs.publicationSite.navigation.maxDepthExceeded'))
+    return
+  }
+
   const localId = crypto.randomUUID()
 
   drafts.value = [
@@ -162,7 +176,9 @@ function addGroupItem() {
 }
 
 function patchDraft(localId: string, patch: Partial<SiteNavigationItemDraft>) {
-  const convertedGroupId = patch.type && patch.type !== DOCUMENT_PUBLICATION_NAV_ITEM_TYPE.GROUP ? localId : ''
+  const currentDraft = drafts.value.find(item => item.localId === localId)
+  const convertedGroupId = currentDraft?.type === DOCUMENT_PUBLICATION_NAV_ITEM_TYPE.GROUP && patch.type && patch.type !== DOCUMENT_PUBLICATION_NAV_ITEM_TYPE.GROUP ? localId : ''
+  const convertedGroupParentId = convertedGroupId ? currentDraft?.parentId ?? '' : ''
   const nextDrafts = drafts.value.map((item) => {
     if (item.localId !== localId) {
       return item
@@ -178,7 +194,6 @@ function patchDraft(localId: string, patch: Partial<SiteNavigationItemDraft>) {
     }
 
     if (patch.type === DOCUMENT_PUBLICATION_NAV_ITEM_TYPE.GROUP) {
-      nextItem.parentId = ''
       nextItem.target = DOCUMENT_PUBLICATION_NAV_ITEM_INTERNAL_TARGET.HOME
       nextItem.targetId = ''
       nextItem.url = ''
@@ -194,17 +209,26 @@ function patchDraft(localId: string, patch: Partial<SiteNavigationItemDraft>) {
   })
 
   drafts.value = convertedGroupId
-    ? nextDrafts.map(item => item.parentId === convertedGroupId ? { ...item, parentId: '' } : item)
+    ? nextDrafts.map(item => item.parentId === convertedGroupId ? { ...item, parentId: convertedGroupParentId } : item)
     : nextDrafts
 }
 
 function updateDraftType(item: SiteNavigationItemDraft, value: SiteNavigationItemDraft['type']) {
+  if (value === DOCUMENT_PUBLICATION_NAV_ITEM_TYPE.GROUP && !canUseGroupType(item)) {
+    ElMessage.warning(t('docs.publicationSite.navigation.groupDepthLimit'))
+    return
+  }
+
   if (value !== item.type) {
     patchDraft(item.localId, { type: value })
   }
 }
 
-function resolveSegmentedOptionStyle(active: boolean) {
+function resolveSegmentedOptionStyle(active: boolean, disabled = false) {
+  if (disabled) {
+    return ''
+  }
+
   return active
     ? 'background-color: var(--brand-primary) !important; color: #fff !important;'
     : 'background-color: transparent !important; color: var(--brand-text-secondary) !important;'
@@ -310,23 +334,47 @@ function isDraftMoveDisabled(item: SiteNavigationItemDraft, direction: -1 | 1) {
   return index < 0 || index + direction < 0 || index + direction >= siblings.length
 }
 
-function removeDraft(localId: string) {
+async function removeDraft(localId: string) {
   const currentIndex = drafts.value.findIndex(item => item.localId === localId)
+  const currentDraft = drafts.value[currentIndex]
 
-  if (currentIndex < 0) {
+  if (currentIndex < 0 || !currentDraft) {
     return
   }
 
+  if (drafts.value.some(item => item.parentId === localId)) {
+    try {
+      await ElMessageBox.confirm(
+        t('docs.publicationSite.navigation.deleteMenuMessage', {
+          name: resolveItemDisplayLabel(currentDraft),
+        }),
+        t('docs.publicationSite.navigation.deleteMenuTitle'),
+        {
+          confirmButtonText: t('docs.common.delete'),
+          cancelButtonText: t('docs.common.cancel'),
+          type: 'warning',
+        },
+      )
+    }
+    catch {
+      return
+    }
+  }
+
+  const descendantLocalIds = collectDescendantLocalIds(localId)
+  const removedLocalIds = new Set([localId, ...descendantLocalIds])
   const nextDrafts = drafts.value
-    .filter(item => item.localId !== localId)
+    .filter(item => !removedLocalIds.has(item.localId))
     .map((item, index) => ({
       ...item,
-      parentId: item.parentId === localId ? '' : item.parentId,
       order: index,
     }))
 
   drafts.value = nextDrafts
-  selectedLocalId.value = nextDrafts[currentIndex]?.localId ?? nextDrafts[currentIndex - 1]?.localId ?? ''
+
+  if (removedLocalIds.has(selectedLocalId.value)) {
+    selectedLocalId.value = nextDrafts[currentIndex]?.localId ?? nextDrafts[currentIndex - 1]?.localId ?? ''
+  }
 }
 
 function toggleDraftStatus(item: SiteNavigationItemDraft) {
@@ -358,6 +406,18 @@ function saveSiteNavigationItems() {
   const orderedDrafts = flattenNavigationTree(navigationTree.value)
 
   for (const [index, draft] of orderedDrafts.entries()) {
+    const depth = resolveDraftDepth(draft.localId)
+
+    if (depth > DOCUMENT_PUBLICATION_NAV_ITEM_MAX_DEPTH) {
+      ElMessage.warning(t('docs.publicationSite.navigation.maxDepthExceeded'))
+      return
+    }
+
+    if (draft.type === DOCUMENT_PUBLICATION_NAV_ITEM_TYPE.GROUP && depth >= DOCUMENT_PUBLICATION_NAV_ITEM_MAX_DEPTH) {
+      ElMessage.warning(t('docs.publicationSite.navigation.groupDepthLimit'))
+      return
+    }
+
     const label = draft.label.trim()
     const icon = draft.icon.trim()
     const itemLabel = label || icon || t('docs.publicationSite.navigation.item')
@@ -371,6 +431,7 @@ function saveSiteNavigationItems() {
       items.push({
         id: draft.id ?? draft.localId,
         type: DOCUMENT_PUBLICATION_NAV_ITEM_TYPE.GROUP,
+        parentId: draft.parentId || null,
         label,
         icon: icon || null,
         order: index,
@@ -548,6 +609,73 @@ function resolveNavIcon(item: SiteNavigationItemDraft) {
   return HomeFilled
 }
 
+function resolveDraftDepth(localId: string) {
+  return resolveDraftDepthByLocalId(localId, new Set())
+}
+
+function resolveDraftDepthByLocalId(localId: string, visiting: Set<string>): number {
+  const item = draftByLocalId.value.get(localId)
+
+  if (!item?.parentId) {
+    return 1
+  }
+
+  if (visiting.has(localId)) {
+    return DOCUMENT_PUBLICATION_NAV_ITEM_MAX_DEPTH + 1
+  }
+
+  visiting.add(localId)
+
+  const depth = resolveDraftDepthByLocalId(item.parentId, visiting) + 1
+
+  visiting.delete(localId)
+
+  return depth
+}
+
+function canUseGroupType(item: SiteNavigationItemDraft) {
+  return resolveDraftDepth(item.localId) < DOCUMENT_PUBLICATION_NAV_ITEM_MAX_DEPTH
+}
+
+function canAddChildItem(itemOrLocalId: SiteNavigationItemDraft | string) {
+  const item = typeof itemOrLocalId === 'string'
+    ? draftByLocalId.value.get(itemOrLocalId)
+    : itemOrLocalId
+
+  return item?.type === DOCUMENT_PUBLICATION_NAV_ITEM_TYPE.GROUP
+    && resolveDraftDepth(item.localId) < DOCUMENT_PUBLICATION_NAV_ITEM_MAX_DEPTH
+}
+
+function collectDescendantLocalIds(parentId: string) {
+  const childIdsByParentId = new Map<string, string[]>()
+
+  for (const item of drafts.value) {
+    if (!item.parentId) {
+      continue
+    }
+
+    const childIds = childIdsByParentId.get(item.parentId) ?? []
+    childIds.push(item.localId)
+    childIdsByParentId.set(item.parentId, childIds)
+  }
+
+  const descendantLocalIds: string[] = []
+  const stack = [...(childIdsByParentId.get(parentId) ?? [])]
+
+  while (stack.length > 0) {
+    const localId = stack.shift()
+
+    if (!localId) {
+      continue
+    }
+
+    descendantLocalIds.push(localId)
+    stack.push(...(childIdsByParentId.get(localId) ?? []))
+  }
+
+  return descendantLocalIds
+}
+
 function selectDraft(localId: string) {
   selectedLocalId.value = localId
 }
@@ -637,7 +765,7 @@ function toDraft(item: PublicationNavItem): SiteNavigationItemDraft {
       type: item.type,
       label: item.label,
       icon: item.icon ?? '',
-      parentId: '',
+      parentId: item.parentId ?? '',
       target: DOCUMENT_PUBLICATION_NAV_ITEM_INTERNAL_TARGET.HOME,
       targetId: '',
       url: '',
@@ -740,7 +868,7 @@ function compareOrderedItem(left: { order: number, updatedAt: string }, right: {
 
           <ElTableColumn :label="t('docs.publicationSite.navigation.item')" min-width="180" show-overflow-tooltip>
             <template #default="{ row }">
-              <span class="flex min-w-0 items-center gap-3">
+              <span class="publication-site-navigation-panel__item-content inline-flex min-w-0 items-center gap-3 align-middle">
                 <span class="publication-site-navigation-panel__item-icon flex h-9 w-9 items-center justify-center rounded-lg">
                   <img
                     v-if="isUploadedMediaSource(row.icon)"
@@ -753,7 +881,7 @@ function compareOrderedItem(left: { order: number, updatedAt: string }, right: {
                   </ElIcon>
                 </span>
                 <span class="grid min-w-0 gap-0.5">
-                  <span class="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-sm font-medium leading-5">
+                  <span class="publication-site-navigation-panel__item-label min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-sm font-medium leading-5">
                     {{ resolveItemDisplayLabel(row) }}
                   </span>
                   <span v-if="row.type === DOCUMENT_PUBLICATION_NAV_ITEM_TYPE.GROUP" class="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-xs leading-4 text-tertiary">
@@ -825,7 +953,7 @@ function compareOrderedItem(left: { order: number, updatedAt: string }, right: {
                         {{ row.status === DOCUMENT_PUBLICATION_ENTRY_STATUS.ACTIVE ? t('docs.publicationSite.navigation.hideItem') : t('docs.publicationSite.navigation.showItem') }}
                       </ElDropdownItem>
                       <ElDropdownItem
-                        v-if="row.type === DOCUMENT_PUBLICATION_NAV_ITEM_TYPE.GROUP"
+                        v-if="canAddChildItem(row)"
                         @click="addInternalItem(row.localId)"
                       >
                         {{ t('docs.publicationSite.navigation.addChildItem') }}
@@ -878,7 +1006,7 @@ function compareOrderedItem(left: { order: number, updatedAt: string }, right: {
                   <span v-if="isNavIconUploading(selectedDraft)" class="publication-site-navigation-panel__upload-mask">{{ t('docs.publicationSite.navigation.uploading') }}</span>
                 </div>
                 <div class="grid min-w-0 gap-1">
-                  <div class="flex flex-wrap gap-2">
+                  <div class="publication-site-navigation-panel__icon-actions flex flex-wrap items-center gap-2">
                     <ElUpload
                       action="#"
                       :accept="mediaAccept"
@@ -912,9 +1040,10 @@ function compareOrderedItem(left: { order: number, updatedAt: string }, right: {
                   type="button"
                   class="publication-site-navigation-panel__type-option"
                   :class="{ 'is-active': selectedDraft.type === DOCUMENT_PUBLICATION_NAV_ITEM_TYPE.GROUP }"
-                  :style="resolveSegmentedOptionStyle(selectedDraft.type === DOCUMENT_PUBLICATION_NAV_ITEM_TYPE.GROUP)"
+                  :style="resolveSegmentedOptionStyle(selectedDraft.type === DOCUMENT_PUBLICATION_NAV_ITEM_TYPE.GROUP, !canUseGroupType(selectedDraft))"
                   role="radio"
                   :aria-checked="selectedDraft.type === DOCUMENT_PUBLICATION_NAV_ITEM_TYPE.GROUP"
+                  :disabled="!canUseGroupType(selectedDraft)"
                   @click="updateDraftType(selectedDraft, DOCUMENT_PUBLICATION_NAV_ITEM_TYPE.GROUP)"
                 >
                   {{ t('docs.publicationSite.navigation.group') }}
@@ -1028,6 +1157,11 @@ function compareOrderedItem(left: { order: number, updatedAt: string }, right: {
     height: 4rem;
   }
 
+  :deep(.el-table__expand-icon) {
+    position: relative;
+    left: -0.25rem;
+  }
+
   :deep(.el-table__row) {
     cursor: pointer;
   }
@@ -1088,8 +1222,9 @@ function compareOrderedItem(left: { order: number, updatedAt: string }, right: {
   font-weight: 600;
 }
 
-.publication-site-navigation-panel__icon-upload :deep(.el-upload) {
-  display: block;
+.publication-site-navigation-panel__icon-actions :deep(.el-upload) {
+  display: inline-flex;
+  align-items: center;
 }
 
 .publication-site-navigation-panel__icon-button {
@@ -1131,6 +1266,11 @@ function compareOrderedItem(left: { order: number, updatedAt: string }, right: {
   &:hover {
     background: color-mix(in srgb, var(--brand-primary) 6%, var(--brand-bg-surface));
     color: var(--brand-primary);
+  }
+
+  &:disabled {
+    color: var(--brand-text-placeholder);
+    cursor: not-allowed;
   }
 
   &.is-active {

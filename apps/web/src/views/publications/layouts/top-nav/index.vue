@@ -171,38 +171,41 @@ function hasVisibleNavLabel(item: ResolvedPublicationNavItem) {
 
             <template #dropdown>
               <ElDropdownMenu class="publication-top-nav__dropdown-menu">
-                <ElDropdownItem
+                <template
                   v-for="child in item.children"
                   :key="child.id"
-                  class="publication-top-nav__dropdown-item"
                 >
-                  <a
-                    class="publication-top-nav__dropdown-link"
-                    :class="{ 'is-disabled': child.disabled, 'is-icon-only': !hasVisibleNavLabel(child) }"
-                    :href="resolveNavHref(child)"
-                    :aria-label="child.ariaLabel"
-                    :title="child.ariaLabel"
-                    :target="child.external && child.openInNewTab ? '_blank' : undefined"
-                    :rel="child.external && child.openInNewTab ? 'noopener noreferrer' : undefined"
-                    @click="handleNavClick(child, $event)"
+                  <ElDropdownItem
+                    class="publication-top-nav__dropdown-item"
                   >
-                    <span v-if="child.icon" class="publication-top-nav__item-icon">
-                      <img
-                        v-if="isNavIconImageSource(child.icon)"
-                        :src="child.icon"
-                        alt=""
-                      >
-                      <SvgIcon
-                        v-else-if="resolveNavIconAlias(child.icon)"
-                        :category="resolveNavIconAlias(child.icon)?.category"
-                        :icon="resolveNavIconAlias(child.icon)?.icon ?? ''"
-                        size="1rem"
-                      />
-                      <span v-else>{{ child.icon }}</span>
-                    </span>
-                    <span v-if="hasVisibleNavLabel(child)">{{ child.label }}</span>
-                  </a>
-                </ElDropdownItem>
+                    <a
+                      class="publication-top-nav__dropdown-link"
+                      :class="{ 'is-disabled': child.disabled, 'is-icon-only': !hasVisibleNavLabel(child) }"
+                      :href="resolveNavHref(child)"
+                      :aria-label="child.ariaLabel"
+                      :title="child.ariaLabel"
+                      :target="child.external && child.openInNewTab ? '_blank' : undefined"
+                      :rel="child.external && child.openInNewTab ? 'noopener noreferrer' : undefined"
+                      @click="handleNavClick(child, $event)"
+                    >
+                      <span v-if="child.icon" class="publication-top-nav__item-icon">
+                        <img
+                          v-if="isNavIconImageSource(child.icon)"
+                          :src="child.icon"
+                          alt=""
+                        >
+                        <SvgIcon
+                          v-else-if="resolveNavIconAlias(child.icon)"
+                          :category="resolveNavIconAlias(child.icon)?.category"
+                          :icon="resolveNavIconAlias(child.icon)?.icon ?? ''"
+                          size="1rem"
+                        />
+                        <span v-else>{{ child.icon }}</span>
+                      </span>
+                      <span v-if="hasVisibleNavLabel(child)">{{ child.label }}</span>
+                    </a>
+                  </ElDropdownItem>
+                </template>
               </ElDropdownMenu>
             </template>
           </ElDropdown>
@@ -277,34 +280,37 @@ function hasVisibleNavLabel(item: ResolvedPublicationNavItem) {
             </span>
             <span>{{ resolveNavLabel(item) }}</span>
           </div>
-          <a
+          <template
             v-for="child in item.children"
             :key="`mobile-child-${child.id}`"
-            class="publication-top-nav__mobile-link is-child"
-            :class="{ 'is-disabled': child.disabled, 'is-icon-only': !hasVisibleNavLabel(child) }"
-            :href="resolveNavHref(child)"
-            :aria-label="child.ariaLabel"
-            :title="child.ariaLabel"
-            :target="child.external && child.openInNewTab ? '_blank' : undefined"
-            :rel="child.external && child.openInNewTab ? 'noopener noreferrer' : undefined"
-            @click="handleMobileNavClick(child, $event)"
           >
-            <span v-if="child.icon" class="publication-top-nav__item-icon">
-              <img
-                v-if="isNavIconImageSource(child.icon)"
-                :src="child.icon"
-                alt=""
-              >
-              <SvgIcon
-                v-else-if="resolveNavIconAlias(child.icon)"
-                :category="resolveNavIconAlias(child.icon)?.category"
-                :icon="resolveNavIconAlias(child.icon)?.icon ?? ''"
-                size="1rem"
-              />
-              <span v-else>{{ child.icon }}</span>
-            </span>
-            <span v-if="hasVisibleNavLabel(child)">{{ child.label }}</span>
-          </a>
+            <a
+              class="publication-top-nav__mobile-link is-child"
+              :class="{ 'is-disabled': child.disabled, 'is-icon-only': !hasVisibleNavLabel(child) }"
+              :href="resolveNavHref(child)"
+              :aria-label="child.ariaLabel"
+              :title="child.ariaLabel"
+              :target="child.external && child.openInNewTab ? '_blank' : undefined"
+              :rel="child.external && child.openInNewTab ? 'noopener noreferrer' : undefined"
+              @click="handleMobileNavClick(child, $event)"
+            >
+              <span v-if="child.icon" class="publication-top-nav__item-icon">
+                <img
+                  v-if="isNavIconImageSource(child.icon)"
+                  :src="child.icon"
+                  alt=""
+                >
+                <SvgIcon
+                  v-else-if="resolveNavIconAlias(child.icon)"
+                  :category="resolveNavIconAlias(child.icon)?.category"
+                  :icon="resolveNavIconAlias(child.icon)?.icon ?? ''"
+                  size="1rem"
+                />
+                <span v-else>{{ child.icon }}</span>
+              </span>
+              <span v-if="hasVisibleNavLabel(child)">{{ child.label }}</span>
+            </a>
+          </template>
         </div>
 
         <a
@@ -447,10 +453,16 @@ function hasVisibleNavLabel(item: ResolvedPublicationNavItem) {
   min-height: 2rem;
   align-items: center;
   gap: 0.375rem;
+  border-radius: 0.375rem;
+  outline: none;
 
-  &:hover,
+  &:hover {
+    color: var(--publication-c-brand-1);
+  }
+
   &:focus-visible {
     color: var(--publication-c-brand-1);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--publication-c-brand-1) 28%, transparent);
   }
 
   &.is-icon-only {
@@ -470,18 +482,24 @@ function hasVisibleNavLabel(item: ResolvedPublicationNavItem) {
   align-items: center;
   gap: 0.375rem;
   border: 0;
+  border-radius: 0.375rem;
   background: transparent;
   color: var(--publication-c-text-2);
   cursor: pointer;
   font-size: 0.8125rem;
   font-weight: 600;
   line-height: 1.4;
+  outline: none;
   padding: 0;
   white-space: nowrap;
 
-  &:hover,
+  &:hover {
+    color: var(--publication-c-brand-1);
+  }
+
   &:focus-visible {
     color: var(--publication-c-brand-1);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--publication-c-brand-1) 28%, transparent);
   }
 }
 
@@ -506,19 +524,27 @@ function hasVisibleNavLabel(item: ResolvedPublicationNavItem) {
 .publication-top-nav__dropdown-link {
   display: flex;
   min-height: 2rem;
-  min-width: 8rem;
+  width: max-content;
+  min-width: 6.5rem;
+  max-width: min(20rem, calc(100vw - 3rem));
   align-items: center;
   gap: 0.5rem;
   border-radius: 0.375rem;
+  padding: 0 0.75rem;
   color: var(--publication-c-text-2);
   font-size: 0.875rem;
   font-weight: 500;
   line-height: 1.45;
+  outline: none;
   text-decoration: none;
 
-  &:hover,
+  &:hover {
+    color: var(--publication-c-brand-1);
+  }
+
   &:focus-visible {
     color: var(--publication-c-brand-1);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--publication-c-brand-1) 28%, transparent);
   }
 
   &.is-icon-only {
@@ -530,13 +556,25 @@ function hasVisibleNavLabel(item: ResolvedPublicationNavItem) {
     color: var(--publication-c-text-3);
     cursor: not-allowed;
   }
+
+  > span:last-child {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
 }
 
 .publication-top-nav__menu-button {
+  outline: none;
+
   &:hover,
   &:focus-visible {
     background: var(--publication-c-brand-soft);
     color: var(--publication-c-brand-1);
+  }
+
+  &:focus-visible {
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--publication-c-brand-1) 28%, transparent);
   }
 }
 
@@ -567,6 +605,7 @@ function hasVisibleNavLabel(item: ResolvedPublicationNavItem) {
   font-size: 0.875rem;
   font-weight: 500;
   line-height: 1.5;
+  outline: none;
   text-decoration: none;
 
   &.is-child {
@@ -583,6 +622,10 @@ function hasVisibleNavLabel(item: ResolvedPublicationNavItem) {
   &:focus-visible {
     background: var(--publication-c-bg-soft);
     color: var(--publication-c-brand-1);
+  }
+
+  &:focus-visible {
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--publication-c-brand-1) 28%, transparent);
   }
 
   &.is-disabled {
@@ -606,21 +649,35 @@ function hasVisibleNavLabel(item: ResolvedPublicationNavItem) {
   font-size: 0.75rem;
   font-weight: 700;
   line-height: 1.4;
+
+  &.is-child {
+    margin-left: 1rem;
+  }
 }
 
 :global(.publication-top-nav__dropdown-popper) {
   --el-dropdown-menu-box-shadow: 0 12px 32px rgb(0 0 0 / 10%);
 }
 
+:global(.publication-top-nav__dropdown-popper .el-scrollbar__wrap) {
+  overflow-x: hidden;
+}
+
 :global(.publication-top-nav__dropdown-popper .el-dropdown-menu) {
-  min-width: 9rem;
-  padding: 0.375rem;
+  width: max-content;
+  min-width: 8rem;
+  max-width: min(20rem, calc(100vw - 1.5rem));
+  padding: 0.75rem;
   border: 1px solid var(--publication-c-gutter);
+  border-radius: 0.75rem;
+  overflow: hidden;
 }
 
 :global(.publication-top-nav__dropdown-popper .el-dropdown-menu__item) {
   border-radius: 0.375rem;
-  padding: 0 0.5rem;
+  padding: 0;
+  width: max-content;
+  max-width: 100%;
 }
 
 :global(.publication-top-nav__dropdown-popper .el-dropdown-menu__item:not(.is-disabled):focus) {

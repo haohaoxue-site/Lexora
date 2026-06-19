@@ -34,6 +34,7 @@ import {
   DOCUMENT_PUBLICATION_DEFAULT_SITE_HOME_CONFIG,
   DOCUMENT_PUBLICATION_ENTRY_STATUS,
   DOCUMENT_PUBLICATION_NAV_ITEM_INTERNAL_TARGET,
+  DOCUMENT_PUBLICATION_NAV_ITEM_MAX_DEPTH,
   DOCUMENT_PUBLICATION_NAV_ITEM_TYPE,
   DOCUMENT_PUBLICATION_SITE_CUSTOM_MEDIA_MAX_BYTES_BY_SCOPE,
   DOCUMENT_PUBLICATION_SITE_CUSTOM_MEDIA_SCOPE_VALUES,
@@ -1136,12 +1137,12 @@ function preparePublicationNavItemInputs(items: PublicationNavItemInput[]): Prep
 
     if (item.type === DOCUMENT_PUBLICATION_NAV_ITEM_TYPE.GROUP) {
       if (!label) {
-        throw new BadRequestException('下拉导航名称不能为空')
+        throw new BadRequestException('菜单名称不能为空')
       }
 
       return {
         id,
-        parentId: null,
+        parentId,
         type: DOCUMENT_PUBLICATION_NAV_ITEM_TYPE.GROUP,
         label,
         icon,
@@ -1193,18 +1194,90 @@ function preparePublicationNavItemInputs(items: PublicationNavItemInput[]): Prep
       .filter(item => item.type === DOCUMENT_PUBLICATION_NAV_ITEM_TYPE.GROUP)
       .map(item => item.id),
   )
+  const itemIds = new Set<string>()
 
   for (const item of preparedItems) {
-    if (item.type === DOCUMENT_PUBLICATION_NAV_ITEM_TYPE.GROUP && item.parentId) {
-      throw new BadRequestException('下拉导航不能作为子项')
+    if (itemIds.has(item.id)) {
+      throw new BadRequestException('导航项 ID 不能重复')
     }
 
+    itemIds.add(item.id)
+
     if (item.parentId && !groupIds.has(item.parentId)) {
-      throw new BadRequestException('导航子项只能归属到下拉导航')
+      throw new BadRequestException('导航子项只能归属到菜单')
     }
   }
 
+  validatePublicationNavItemDepth(preparedItems)
+
   return preparedItems
+}
+
+function validatePublicationNavItemDepth(items: PreparedPublicationNavItem[]) {
+  const itemById = new Map(items.map(item => [item.id, item]))
+  const depthById = new Map<string, number>()
+  const visiting = new Set<string>()
+
+  for (const item of items) {
+    const depth = resolvePublicationNavItemDepth(item, {
+      depthById,
+      itemById,
+      visiting,
+    })
+
+    if (depth > DOCUMENT_PUBLICATION_NAV_ITEM_MAX_DEPTH) {
+      throw new BadRequestException('导航最多支持两级')
+    }
+
+    if (item.type === DOCUMENT_PUBLICATION_NAV_ITEM_TYPE.GROUP && depth >= DOCUMENT_PUBLICATION_NAV_ITEM_MAX_DEPTH) {
+      throw new BadRequestException('二级导航不能设为菜单')
+    }
+  }
+}
+
+function resolvePublicationNavItemDepth(
+  item: PreparedPublicationNavItem,
+  context: {
+    depthById: Map<string, number>
+    itemById: Map<string, PreparedPublicationNavItem>
+    visiting: Set<string>
+  },
+): number {
+  const cachedDepth = context.depthById.get(item.id)
+
+  if (cachedDepth) {
+    return cachedDepth
+  }
+
+  if (!item.parentId) {
+    context.depthById.set(item.id, 1)
+    return 1
+  }
+
+  const parent = context.itemById.get(item.parentId)
+
+  if (!parent) {
+    throw new BadRequestException('导航父级不存在')
+  }
+
+  if (parent.type !== DOCUMENT_PUBLICATION_NAV_ITEM_TYPE.GROUP) {
+    throw new BadRequestException('导航子项只能归属到菜单')
+  }
+
+  if (context.visiting.has(item.id)) {
+    throw new BadRequestException('导航层级不能形成循环')
+  }
+
+  context.visiting.add(item.id)
+
+  try {
+    const depth = resolvePublicationNavItemDepth(parent, context) + 1
+    context.depthById.set(item.id, depth)
+    return depth
+  }
+  finally {
+    context.visiting.delete(item.id)
+  }
 }
 
 function toRenderedDocument(document: PersistedPublicationDocument): PublicationRenderedDocument {
@@ -1316,7 +1389,7 @@ function toPublicationNavItem(item: PersistedPublicationNavItem): PublicationSit
     return {
       id: item.id,
       siteId: item.siteId,
-      parentId: null,
+      parentId: item.parentId,
       type: DOCUMENT_PUBLICATION_NAV_ITEM_TYPE.GROUP,
       label: item.label ?? '',
       icon: normalizeNullableText(item.icon),

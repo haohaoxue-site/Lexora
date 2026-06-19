@@ -38,7 +38,6 @@ const { t } = useI18n()
 .publication-page-outline {
   position: relative;
   min-width: 0;
-  border-left: 1px solid var(--publication-c-divider);
   padding-left: 1rem;
   color: var(--publication-c-text-2);
   font-size: 0.8125rem;

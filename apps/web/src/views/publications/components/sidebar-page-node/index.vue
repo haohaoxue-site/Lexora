@@ -66,7 +66,8 @@ const props = defineProps<PublicationSidebarPageNodeProps>()
     color: var(--publication-c-brand-1);
   }
 
-  &.is-active {
+  &.is-active,
+  &.router-link-active.router-link-exact-active {
     color: var(--publication-c-brand-1);
     font-weight: 600;
 

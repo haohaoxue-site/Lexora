@@ -68,7 +68,7 @@ function toggleGroup(groupId: string) {
 
 .publication-sidebar-tree__group {
   min-width: 0;
-  padding-bottom: 1.5rem;
+  padding-bottom: 0.5rem;
 
   & + & {
     border-top: 1px solid var(--publication-c-divider);

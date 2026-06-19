@@ -7,7 +7,9 @@ import type {
 
 export interface PublicationSiteDocumentPageProps {
   body: TiptapJsonContent
-  document: PublicationRenderedDocument
+  document: PublicationRenderedDocument | null
+  activeDocumentId?: string | null
+  isLoading?: boolean
   outline: PublicationPageOutlineItem[]
   sidebarGroups: PublicationSidebarGroup[]
   siteId: string

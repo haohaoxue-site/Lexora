@@ -75,9 +75,32 @@ const pageTitle = computed(() => {
 const allowIndexing = computed(() =>
   publicationMode.value === 'site' && Boolean(siteRender.value?.site.allowIndexing),
 )
+const hasReusableSiteShell = computed(() => publicationMode.value === 'site' && Boolean(siteRender.value))
+const showGlobalLoading = computed(() => isLoading.value && !hasReusableSiteShell.value)
+const isSiteHomeRoute = computed(() => publicationMode.value === 'site' && !siteDocumentId.value)
+const isSiteDocumentLoading = computed(() =>
+  publicationMode.value === 'site'
+  && isLoading.value
+  && Boolean(siteRender.value)
+  && Boolean(siteDocumentId.value),
+)
+const siteActiveDocumentId = computed(() => siteDocumentId.value ?? siteRender.value?.currentPage?.documentId ?? null)
+const displayedSiteDocument = computed(() => {
+  if (!siteRender.value?.currentPage) {
+    return null
+  }
+
+  if (isSiteDocumentLoading.value && siteRender.value.currentPage.documentId !== siteDocumentId.value) {
+    return null
+  }
+
+  return siteRender.value.currentPage
+})
+const displayedSiteBody = computed(() => displayedSiteDocument.value ? hydratedBody.value : [])
+const displayedSiteOutline = computed(() => displayedSiteDocument.value ? siteRender.value?.outline ?? [] : [])
 
 watch(
-  () => route.fullPath,
+  () => [route.name, route.params.siteId, route.params.documentId],
   () => {
     void loadPublication()
   },
@@ -201,7 +224,7 @@ async function hydrateSitePublicationBody(
 
 <template>
   <section class="publication-view" :class="`publication-view--${publicationMode}`">
-    <div v-if="isLoading" class="publication-view__loading mx-auto mt-16 w-[min(52rem,calc(100%-2rem))]">
+    <div v-if="showGlobalLoading" class="publication-view__loading mx-auto mt-16 w-[min(52rem,calc(100%-2rem))]">
       <ElSkeleton :rows="8" animated />
     </div>
 
@@ -224,16 +247,18 @@ async function hydrateSitePublicationBody(
       <PublicationTopNav
         :site="siteRender.site"
         :nav-items="resolvedNavItems"
-        :home="!siteRender.currentPage"
+        :home="isSiteHomeRoute"
       />
 
       <PublicationSiteDocumentPage
-        v-if="siteRender.currentPage"
-        :document="siteRender.currentPage"
-        :body="hydratedBody"
-        :outline="siteRender.outline"
+        v-if="siteDocumentId"
+        :document="displayedSiteDocument"
+        :body="displayedSiteBody"
+        :outline="displayedSiteOutline"
         :sidebar-groups="siteRender.sidebarGroups"
         :site-id="siteRender.site.id"
+        :active-document-id="siteActiveDocumentId"
+        :is-loading="isSiteDocumentLoading"
       />
 
       <PublicationHomePage

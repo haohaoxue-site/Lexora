@@ -47,6 +47,7 @@ export {
   DOCUMENT_PUBLICATION_NAV_ITEM_INTERNAL_TARGET_VALUES,
   DOCUMENT_PUBLICATION_NAV_ITEM_LABEL_MAX_LENGTH,
   DOCUMENT_PUBLICATION_NAV_ITEM_MAX_COUNT,
+  DOCUMENT_PUBLICATION_NAV_ITEM_MAX_DEPTH,
   DOCUMENT_PUBLICATION_NAV_ITEM_TYPE,
   DOCUMENT_PUBLICATION_NAV_ITEM_TYPE_VALUES,
   DOCUMENT_PUBLICATION_SITE_CUSTOM_MEDIA_MAX_BYTES,
@@ -282,7 +283,6 @@ const PublicationNavItemInputBaseSchema = z.object({
 export const PublicationGroupNavItemInputSchema = PublicationNavItemInputBaseSchema.extend({
   type: z.literal(DOCUMENT_PUBLICATION_NAV_ITEM_TYPE.GROUP),
   label: z.string().trim().min(1).max(DOCUMENT_PUBLICATION_NAV_ITEM_LABEL_MAX_LENGTH),
-  parentId: z.null().optional(),
   target: z.null().optional(),
   targetId: z.null().optional(),
   url: z.null().optional(),
@@ -377,7 +377,7 @@ export const PublicationPageSchema = z.object({
 export const PublicationGroupNavItemSchema = z.object({
   id: z.string(),
   siteId: z.string(),
-  parentId: z.null(),
+  parentId: z.string().nullable(),
   type: z.literal(DOCUMENT_PUBLICATION_NAV_ITEM_TYPE.GROUP),
   label: z.string().trim().min(1).max(DOCUMENT_PUBLICATION_NAV_ITEM_LABEL_MAX_LENGTH),
   icon: z.string().trim().max(DOCUMENT_PUBLICATION_NAV_ITEM_ICON_MAX_LENGTH).nullable(),

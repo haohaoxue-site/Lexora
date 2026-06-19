@@ -72,7 +72,7 @@ export function resolvePublicationNavItems(input: {
       continue
     }
 
-    const parentId = item.type === DOCUMENT_PUBLICATION_NAV_ITEM_TYPE.GROUP ? null : item.parentId
+    const parentId = item.parentId
     const parentItem = parentId ? resolvedById.get(parentId) : null
 
     if (parentId && !parentItem) {
@@ -90,7 +90,7 @@ export function resolvePublicationNavItems(input: {
     topLevelItems.push(resolvedItem)
   }
 
-  return topLevelItems.filter(item => !item.isGroup || item.children.length > 0)
+  return pruneEmptyPublicationNavGroups(topLevelItems)
 }
 
 function resolvePublicationNavItem(input: {
@@ -211,6 +211,20 @@ function toResolvedPublicationNavLeaf(input: Omit<ResolvedPublicationNavItem, 'c
     children: [],
     isGroup: false,
   }
+}
+
+function pruneEmptyPublicationNavGroups(items: ResolvedPublicationNavItem[]): ResolvedPublicationNavItem[] {
+  return items.flatMap((item) => {
+    const children = pruneEmptyPublicationNavGroups(item.children)
+
+    if (item.isGroup) {
+      return children.length
+        ? [{ ...item, children }]
+        : []
+    }
+
+    return [{ ...item, children }]
+  })
 }
 
 function resolvePublicationNavItemFallbackLabel(item: PublicationNavItem): string {
