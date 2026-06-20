@@ -61,6 +61,7 @@ model User {
   createdChatSessions                      ChatSession[]                      @relation("ChatSessionCreator")
   chatAssets                               ChatAsset[]                        @relation("ChatAssetOwner")
   agentProfiles                            AgentProfile[]                     @relation("AgentProfileOwner")
+  agentSkillCredentials                    AgentSkillCredential[]             @relation("AgentSkillCredentialOwner")
   agentMemories                            AgentMemory[]                      @relation("AgentMemoryOwner")
   agentMemoryCandidates                    AgentMemoryCandidate[]             @relation("AgentMemoryCandidateOwner")
   adminAuditLogs                           AdminAuditLog[]                    @relation("AdminAuditLogActor")

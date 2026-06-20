@@ -1,3 +1,4 @@
+export * from './amap'
 export * from './bootstrap'
 export * from './chat'
 export * from './client-action'

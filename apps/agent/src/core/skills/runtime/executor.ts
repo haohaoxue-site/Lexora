@@ -4,10 +4,7 @@ import type { AgentSkillApiClient } from '../../../clients/skills'
 import type { AgentGraphContext } from '../../state'
 import type { LoadedAgentSkill } from './types'
 import { ToolMessage } from '@langchain/core/messages'
-import {
-  ActivateSkillToolSchema,
-  ReadSkillResourceToolSchema,
-} from './activation-tools'
+import { ActivateSkillToolSchema } from './activation-tools'
 import { escapeSkillPromptText } from './escape'
 import { AGENT_SKILL_TOOL_NAME } from './tool-names'
 
@@ -71,34 +68,6 @@ export async function executeAgentSkillToolCalls(input: {
         }))
         continue
       }
-
-      if (toolCall.name === AGENT_SKILL_TOOL_NAME.READ_RESOURCE) {
-        const args = ReadSkillResourceToolSchema.parse(toolCall.args)
-        const loadedSkill = loadedSkills.find(skill => skill.key === args.skillKey)
-        if (!loadedSkill) {
-          toolMessages.push(createSkillToolMessage(toolCall, {
-            status: 'failed',
-            reason: `Skill is not activated: ${args.skillKey}`,
-          }, 'error'))
-          continue
-        }
-
-        const response = await input.skillApi.readSkillResource({
-          actorUserId: input.context.actorUserId,
-          generationId: input.context.generationId,
-          skillKey: loadedSkill.key,
-          path: args.path,
-        })
-
-        toolMessages.push(new ToolMessage({
-          tool_call_id: toolCall.id ?? `${toolCall.name}:missing-id`,
-          content: [
-            `<skill_resource skill="${escapeSkillPromptText(response.skillKey)}" path="${escapeSkillPromptText(response.path)}" sha256="${escapeSkillPromptText(response.sha256)}">`,
-            response.content,
-            '</skill_resource>',
-          ].join('\n'),
-        }))
-      }
     }
     catch (error) {
       toolMessages.push(createSkillToolMessage(toolCall, {
@@ -116,23 +85,17 @@ export async function executeAgentSkillToolCalls(input: {
 
 function renderActivatedSkill(skill: AgentRuntimeSkillCatalogItem & {
   instructions: string
-  resources: Array<{ path: string, sizeBytes: number, executable: boolean }>
 }): string {
-  const resources = skill.resources.length === 0
-    ? '- none'
-    : skill.resources.slice(0, 100).map(resource =>
-        `- ${resource.path} (${resource.sizeBytes} bytes${resource.executable ? ', executable' : ''})`,
-      ).join('\n')
-  const runtimeTools = skill.tools.length === 0
+  const runtimeActions = skill.actions.length === 0
     ? '- none'
     : [
-        'Use the exact tool name shown below after this skill is activated. Do not call activate_skill again for this skill unless activation failed.',
-        ...skill.tools.map(tool => [
-          '  <tool>',
-          `    <name>${escapeSkillPromptText(tool.name)}</name>`,
-          `    <title>${escapeSkillPromptText(tool.title)}</title>`,
-          `    <description>${escapeSkillPromptText(tool.description)}</description>`,
-          '  </tool>',
+        'Use the exact action name shown below after this skill is activated. Do not call activate_skill again for this skill unless activation failed.',
+        ...skill.actions.map(action => [
+          '  <action>',
+          `    <name>${escapeSkillPromptText(action.name)}</name>`,
+          `    <title>${escapeSkillPromptText(action.title)}</title>`,
+          `    <description>${escapeSkillPromptText(action.description)}</description>`,
+          '  </action>',
         ].join('\n')),
       ].join('\n')
 
@@ -146,17 +109,9 @@ function renderActivatedSkill(skill: AgentRuntimeSkillCatalogItem & {
     skill.instructions,
     '</instructions>',
     '',
-    '<runtime_tools>',
-    runtimeTools,
-    '</runtime_tools>',
-    '',
-    '<resource_policy>',
-    'Use read_skill_resource to load referenced files by relative path. Script execution is disabled.',
-    '</resource_policy>',
-    '',
-    '<available_resources>',
-    resources,
-    '</available_resources>',
+    '<runtime_actions>',
+    runtimeActions,
+    '</runtime_actions>',
     '</skill_content>',
   ].join('\n')
 }

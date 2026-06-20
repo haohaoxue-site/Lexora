@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type {
+  AgentAmapMcpSkillCredentialConfig,
   AgentLocationSkillConfig,
   AgentTimeSkillConfig,
   AgentTranslatorSkillConfig,
@@ -28,10 +29,14 @@ import {
 import { resolveAgentSkillIcon } from '@/utils/agent-skills'
 import { ElMessage, ElMessageBox } from '@/utils/element-plus'
 import { getRequestErrorDisplayMessage } from '@/utils/request-error'
+import AmapMcpConfigDrawer from './components/amap-mcp-config-drawer/index.vue'
 import LocationConfigDrawer from './components/location-config-drawer/index.vue'
 import TimeConfigDrawer from './components/time-config-drawer/index.vue'
 import TranslatorConfigDrawer from './components/translator-config-drawer/index.vue'
 import WebSearchConfigDrawer from './components/web-search-config-drawer/index.vue'
+import {
+  AMAP_MCP_SKILL_KEY,
+} from './utils/amap'
 import { hasSkillConfigDrawer } from './utils/config-drawers'
 import {
   LOCATION_SKILL_KEY,
@@ -48,7 +53,12 @@ import {
 
 type SkillsTabName = 'market' | 'me'
 type SkillMoreCommand = 'config' | 'uninstall'
-type SkillConfigFormValue = AgentTimeSkillConfig | AgentLocationSkillConfig | AgentTranslatorSkillConfig | AgentWebSearchSkillConfig
+type SkillConfigFormValue
+  = | AgentTimeSkillConfig
+    | AgentLocationSkillConfig
+    | AgentTranslatorSkillConfig
+    | AgentWebSearchSkillConfig
+    | AgentAmapMcpSkillCredentialConfig
 
 const route = useRoute()
 const router = useRouter()
@@ -69,6 +79,7 @@ const timeConfigDrawerVisible = shallowRef(false)
 const locationConfigDrawerVisible = shallowRef(false)
 const translatorConfigDrawerVisible = shallowRef(false)
 const webSearchConfigDrawerVisible = shallowRef(false)
+const amapMcpConfigDrawerVisible = shallowRef(false)
 const skillConfigDrawerByKey = {
   [TIME_SKILL_KEY]: {
     visible: timeConfigDrawerVisible,
@@ -89,6 +100,11 @@ const skillConfigDrawerByKey = {
     visible: webSearchConfigDrawerVisible,
     savedMessageKey: 'skills.webSearch.saved',
     saveFailedMessageKey: 'skills.webSearch.saveFailed',
+  },
+  [AMAP_MCP_SKILL_KEY]: {
+    visible: amapMcpConfigDrawerVisible,
+    savedMessageKey: 'skills.amap.saved',
+    saveFailedMessageKey: 'skills.amap.saveFailed',
   },
 } as const satisfies Record<SkillConfigDrawerKey, {
   visible: typeof timeConfigDrawerVisible
@@ -116,8 +132,8 @@ const activeTab = computed<SkillsTabName>({
     })
   },
 })
-const marketSkills = computed(() => allSkills.value.filter(skill => skill.installMode === 'optional'))
-const visibleSkills = computed(() => activeTab.value === 'me' ? mySkills.value : marketSkills.value)
+const installableSkills = computed(() => allSkills.value.filter(skill => skill.installMode === 'optional'))
+const visibleSkills = computed(() => activeTab.value === 'me' ? mySkills.value : installableSkills.value)
 const emptyDescription = computed(() => activeTab.value === 'market' ? t('skills.emptyMarket') : t('skills.emptyInstalled'))
 
 onMounted(() => {
@@ -148,12 +164,23 @@ function canOpenSkillConfig(skill: AgentSkillCard) {
   return skill.canConfigure && hasSkillConfigDrawer(skill.key)
 }
 
+function canConfigureSkillBeforeInstall(skill: AgentSkillCard) {
+  return !skill.installed
+    && skill.canInstall
+    && skill.configurable
+    && hasSkillConfigDrawer(skill.key)
+}
+
 function isSkillToggleDisabled(skill: AgentSkillCard) {
   return (!skill.canEnable && !skill.canDisable) || Boolean(mutatingSkillKey.value)
 }
 
 function getMarketActionText(skill: AgentSkillCard) {
-  return skill.installed ? t('skills.installed') : t('skills.install')
+  if (skill.installed) {
+    return t('skills.installed')
+  }
+
+  return t('skills.install')
 }
 
 function isMarketActionDisabled(skill: AgentSkillCard) {
@@ -162,6 +189,11 @@ function isMarketActionDisabled(skill: AgentSkillCard) {
 
 async function handleInstallSkill(skill: AgentSkillCard) {
   if (!skill.canInstall || mutatingSkillKey.value) {
+    return
+  }
+
+  if (canConfigureSkillBeforeInstall(skill)) {
+    handleOpenSkillConfig(skill)
     return
   }
 
@@ -278,7 +310,7 @@ function handleSkillMoreCommand(skill: AgentSkillCard, command: string | number 
 }
 
 function handleOpenSkillConfig(skill: AgentSkillCard) {
-  if (!canOpenSkillConfig(skill)) {
+  if (!canOpenSkillConfig(skill) && !canConfigureSkillBeforeInstall(skill)) {
     return
   }
 
@@ -306,17 +338,24 @@ async function handleSaveSkillConfig(config: SkillConfigFormValue) {
   }
 
   savingSkillConfigKey.value = skill.key
+  const installingSkill = !skill.installed
+  if (installingSkill) {
+    mutatingSkillKey.value = skill.key
+  }
   try {
     await updateAgentSkillConfig(skill.key, { config })
     await loadSkills()
     drawer.visible.value = false
-    ElMessage.success(t(drawer.savedMessageKey))
+    ElMessage.success(t(installingSkill ? 'skills.installedMessage' : drawer.savedMessageKey))
   }
   catch (error) {
     ElMessage.error(getRequestErrorDisplayMessage(error, t(drawer.saveFailedMessageKey)))
   }
   finally {
     savingSkillConfigKey.value = null
+    if (mutatingSkillKey.value === skill.key) {
+      mutatingSkillKey.value = null
+    }
   }
 }
 
@@ -485,6 +524,12 @@ function getSkillConfigDrawer(skillKey: string): typeof skillConfigDrawerByKey[S
     />
     <WebSearchConfigDrawer
       v-model:visible="webSearchConfigDrawerVisible"
+      :skill="configuringSkill"
+      :saving="savingSkillConfigKey === configuringSkill?.key"
+      @submit="handleSaveSkillConfig"
+    />
+    <AmapMcpConfigDrawer
+      v-model:visible="amapMcpConfigDrawerVisible"
       :skill="configuringSkill"
       :saving="savingSkillConfigKey === configuringSkill?.key"
       @submit="handleSaveSkillConfig"

@@ -1,4 +1,3 @@
-import type { ToolCall } from '@langchain/core/messages'
 import type { StructuredToolInterface } from '@langchain/core/tools'
 import type { AgentGraphContext } from '../../../state'
 import {
@@ -30,10 +29,6 @@ export function createWebSearchSkillTools(): StructuredToolInterface[] {
       schema: WebSearchToolInputSchema,
     }),
   ]
-}
-
-export function isWebSearchToolCall(toolCall: ToolCall): boolean {
-  return toolCall.name === AGENT_WEB_SEARCH_TOOL.SEARCH
 }
 
 export function resolveWebSearchSkillConfig(context: AgentGraphContext) {

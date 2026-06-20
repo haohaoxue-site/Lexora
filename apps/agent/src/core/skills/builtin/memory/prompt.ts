@@ -84,7 +84,7 @@ export function createMemorySkillPromptBlock(): string {
   return [
     'Active skill: Memory.',
     AGENT_MEMORY_SKILL_DEFINITION.instructions,
-    'Available memory tools are provider function calls. Use them silently when durable memory should be written, updated, or forgotten.',
+    'Available memory actions are skill tools. Use them silently when durable memory should be written, updated, or forgotten.',
   ].join('\n')
 }
 

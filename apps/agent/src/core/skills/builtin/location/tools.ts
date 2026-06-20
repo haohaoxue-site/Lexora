@@ -1,4 +1,3 @@
-import type { ToolCall } from '@langchain/core/messages'
 import type { StructuredToolInterface } from '@langchain/core/tools'
 import type { AgentGraphContext } from '../../../state'
 import {
@@ -25,8 +24,4 @@ export function createLocationSkillTools(): StructuredToolInterface[] {
       schema: GetCurrentLocationToolInputSchema,
     }),
   ]
-}
-
-export function isLocationToolCall(toolCall: ToolCall): boolean {
-  return toolCall.name === AGENT_LOCATION_TOOL.GET_CURRENT_LOCATION
 }

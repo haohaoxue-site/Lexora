@@ -21,6 +21,7 @@ const { t } = useI18n()
 const visible = defineModel<boolean>('visible', { required: true })
 const formRef = ref<FormInstance>()
 const formModel = reactive(createLocationConfigFormModel(null))
+const submitActionText = computed(() => props.skill?.installed === false ? t('skills.install') : t('docs.common.save'))
 const rules = computed<FormRules<LocationConfigFormModel>>(() => ({
   fixedLocationLabel: [
     {
@@ -111,7 +112,7 @@ function validateLocation(_rule: unknown, _value: unknown, callback: (error?: Er
           {{ t('docs.common.cancel') }}
         </ElButton>
         <ElButton type="primary" :loading="saving" @click="handleSubmit">
-          {{ t('docs.common.save') }}
+          {{ submitActionText }}
         </ElButton>
       </div>
     </template>

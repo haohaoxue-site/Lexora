@@ -5,14 +5,13 @@ import type { AgentMemoryApiClient } from '../../clients/memory'
 import type { AgentSkillApiClient } from '../../clients/skills'
 import type { AgentChatModel } from '../../integrations/model-providers/chat-model'
 import type { WebSearchClient } from '../../integrations/web-search'
-import type { RuntimeSkillAdapter } from '../skills/adapters'
+import type { RuntimeSkillActionProvider } from '../skills/adapters'
 import type { LoadedAgentSkill } from '../skills/runtime'
 import type { AgentGraphContext } from '../state'
 import type { ToolProtocolUnavailableReason } from './execution-events'
 import type { StreamingModelCallResult } from './model-call'
 import type { AgentModelCallResult } from './types'
 import {
-  createVisibleSkillToolNameSet,
   emitToolProtocolUnavailableWarning,
   executeRuntimeToolCallsWithEvents,
 } from './execution-events'
@@ -25,7 +24,7 @@ import {
   consumeStreamingModelCall,
   streamModelWithoutTools,
 } from './model-call'
-import { resolveRuntimeVisibleTools } from './visibility'
+import { createRuntimeToolRegistry } from './registry'
 
 export interface RuntimeToolLoopInput {
   model: AgentChatModel
@@ -35,7 +34,7 @@ export interface RuntimeToolLoopInput {
   memoryApi?: AgentMemoryApiClient
   skillApi?: AgentSkillApiClient
   webSearch?: WebSearchClient
-  skillAdapters?: readonly RuntimeSkillAdapter[]
+  skillActionProviders?: readonly RuntimeSkillActionProvider[]
   signal?: AbortSignal
 }
 
@@ -49,12 +48,11 @@ export class RuntimeToolLoopSession {
   private readonly memoryApi: AgentMemoryApiClient | undefined
   private readonly skillApi: AgentSkillApiClient | undefined
   private readonly webSearch: WebSearchClient | undefined
-  private readonly skillAdapters: readonly RuntimeSkillAdapter[] | undefined
+  private readonly skillActionProviders: readonly RuntimeSkillActionProvider[] | undefined
   private readonly metrics = createAggregatedModelCallMetrics()
   private readonly memoryOperations: ChatMemoryOperationProjection[] = []
   private loadedSkills: LoadedAgentSkill[] = []
   private tools: StructuredToolInterface[]
-  private visibleSkillToolNames: ReadonlySet<string>
 
   constructor(input: RuntimeToolLoopInput) {
     this.model = input.model
@@ -65,17 +63,13 @@ export class RuntimeToolLoopSession {
     this.memoryApi = input.memoryApi
     this.skillApi = input.skillApi
     this.webSearch = input.webSearch
-    this.skillAdapters = input.skillAdapters
-    this.tools = this.resolveVisibleTools()
-    this.visibleSkillToolNames = createVisibleSkillToolNameSet(this.tools)
+    this.skillActionProviders = input.skillActionProviders
+    const registry = this.resolveRuntimeToolRegistry()
+    this.tools = registry.tools
   }
 
   get visibleTools(): StructuredToolInterface[] {
     return this.tools
-  }
-
-  get currentVisibleSkillToolNames(): ReadonlySet<string> {
-    return this.visibleSkillToolNames
   }
 
   recordModelCall(result: StreamingModelCallResult): void {
@@ -107,17 +101,16 @@ export class RuntimeToolLoopSession {
     return consumeFinalStreamingModelCall(this.model, this.messages, this.signal, this.context)
   }
 
-  async executeToolCalls(toolCalls: ToolCall[]) {
+  async executeSkillActions(toolCalls: ToolCall[]) {
     const result = await executeRuntimeToolCallsWithEvents({
       memoryApi: this.memoryApi,
       webSearch: this.webSearch,
       skillApi: this.skillApi,
-      skillAdapters: this.skillAdapters,
+      skillActionProviders: this.skillActionProviders,
       context: this.context,
       sessionId: this.sessionId,
       toolCalls,
       loadedSkills: this.loadedSkills,
-      visibleSkillToolNames: this.visibleSkillToolNames,
     })
 
     this.loadedSkills = result.loadedSkills
@@ -126,8 +119,8 @@ export class RuntimeToolLoopSession {
   }
 
   refreshVisibleTools(): void {
-    this.tools = this.resolveVisibleTools()
-    this.visibleSkillToolNames = createVisibleSkillToolNameSet(this.tools)
+    const registry = this.resolveRuntimeToolRegistry()
+    this.tools = registry.tools
   }
 
   async warnToolProtocolUnavailable(reason: ToolProtocolUnavailableReason): Promise<void> {
@@ -157,13 +150,13 @@ export class RuntimeToolLoopSession {
     }
   }
 
-  private resolveVisibleTools(): StructuredToolInterface[] {
-    return resolveRuntimeVisibleTools({
+  private resolveRuntimeToolRegistry() {
+    return createRuntimeToolRegistry({
       context: this.context,
       memoryApi: this.memoryApi,
       webSearch: this.webSearch,
       skillApi: this.skillApi,
-      skillAdapters: this.skillAdapters,
+      skillActionProviders: this.skillActionProviders,
       loadedSkills: this.loadedSkills,
     })
   }

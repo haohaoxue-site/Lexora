@@ -20,12 +20,14 @@ import type {
   AgentRunner,
   ChatGenerationEvent,
 } from '../runtime/typing'
+import type { RuntimeSkillActionProvider } from './skills/adapters'
 import type { AgentRuntimeWarning } from './state'
 import {
   AGENT_GENERATION_COMMAND_KIND,
   AgentClientActionSchema,
   AgentGenerationCommandSchema,
   AgentProfileConfigSchema,
+  AgentRuntimeSkillCredentialsSchema,
   ChatGenerationBootstrapSchema,
 } from '@haohaoxue/lexora-contracts'
 import { Command } from '@langchain/langgraph'
@@ -69,6 +71,7 @@ export interface CreateAgentRunnerInput {
   memoryApi?: AgentMemoryApiClient
   skillApi?: AgentSkillApiClient
   webSearch?: WebSearchClient
+  skillActionProviders?: readonly RuntimeSkillActionProvider[]
   chatModelFactory: AgentChatModelFactory
   checkpointer?: BaseCheckpointSaver
   threadRunTryLock?: AgentRuntimeTryLock
@@ -87,6 +90,7 @@ export function createAgentRunner(inputs: CreateAgentRunnerInput): AgentRunner {
     memoryApi: inputs.memoryApi,
     skillApi: inputs.skillApi,
     webSearch: inputs.webSearch,
+    skillActionProviders: inputs.skillActionProviders,
     checkpointer: inputs.checkpointer,
   })
   const threadRunTryLock = inputs.threadRunTryLock ?? createMemoryAgentRuntimeTryLock()
@@ -199,6 +203,7 @@ export async function executeAgentGeneration(input: {
   logger?: AgentRunnerLogger
 }) {
   const profileConfig = AgentProfileConfigSchema.parse(input.bootstrap.agentProfile.currentConfig)
+  const skillCredentials = AgentRuntimeSkillCredentialsSchema.parse(input.bootstrap.skillCredentials)
   const threadId = input.bootstrap.context.threadId
   const focusedTranslatorInvocation = resolveFocusedTranslatorInvocation({
     messages: input.bootstrap.context.messages,
@@ -231,6 +236,7 @@ export async function executeAgentGeneration(input: {
       context: {
         agentProfileConfig: profileConfig,
         skillContext: input.bootstrap.skills,
+        skillCredentials,
         disabledSkillKeys: input.bootstrap.context.disabledSkillKeys,
         runtimeHints: input.bootstrap.context.runtimeHints,
         generationId: input.bootstrap.generation.generationId,

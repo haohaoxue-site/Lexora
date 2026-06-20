@@ -1,18 +1,12 @@
 import type {
   ActivateAgentSkillRequest,
   ActivateAgentSkillResponse,
-  ReadAgentSkillResourceRequest,
-  ReadAgentSkillResourceResponse,
 } from '@haohaoxue/lexora-contracts'
-import {
-  ActivateAgentSkillResponseSchema,
-  ReadAgentSkillResourceResponseSchema,
-} from '@haohaoxue/lexora-contracts'
+import { ActivateAgentSkillResponseSchema } from '@haohaoxue/lexora-contracts'
 import { normalizeApiInternalBaseUrl, postApiInternalJson } from './utils'
 
 export interface AgentSkillApiClient {
   activateSkill: (payload: ActivateAgentSkillRequest) => Promise<ActivateAgentSkillResponse>
-  readSkillResource: (payload: ReadAgentSkillResourceRequest) => Promise<ReadAgentSkillResourceResponse>
 }
 
 export function createAgentSkillApiClient(apiInternalUrl: string): AgentSkillApiClient {
@@ -25,15 +19,6 @@ export function createAgentSkillApiClient(apiInternalUrl: string): AgentSkillApi
         path: 'internal/agent/skills/activate',
         payload,
         errorMessage: '激活技能失败',
-      }))
-    },
-
-    async readSkillResource(payload) {
-      return ReadAgentSkillResourceResponseSchema.parse(await postApiInternalJson({
-        baseUrl,
-        path: 'internal/agent/skills/resources/read',
-        payload,
-        errorMessage: '读取技能资源失败',
       }))
     },
   }

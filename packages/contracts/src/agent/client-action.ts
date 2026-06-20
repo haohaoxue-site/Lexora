@@ -6,8 +6,8 @@ export const AgentClientActionSchema = z.object({
   type: NonEmptyStringSchema,
   resultType: NonEmptyStringSchema,
   toolCallId: NonEmptyStringSchema,
-  toolName: NonEmptyStringSchema.optional(),
   skillKey: NonEmptyStringSchema.optional(),
+  actionName: NonEmptyStringSchema,
   reason: NonEmptyStringSchema.optional(),
   payload: z.record(z.string(), z.unknown()).optional(),
 }).strict()

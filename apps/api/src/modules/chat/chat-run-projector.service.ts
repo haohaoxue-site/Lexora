@@ -66,8 +66,8 @@ interface UpsertToolPartInput {
   sourceEventId: string
   type: ToolPartType
   toolCallId: string
-  toolName?: string
-  toolKind?: ChatMessagePartMetadata['toolKind']
+  skillKey?: string
+  actionName?: string
   status?: ChatMessagePartMetadata['status']
   textDelta?: string
   textSnapshot?: string
@@ -248,8 +248,8 @@ export class ChatRunProjectorService implements OnModuleInit, OnModuleDestroy {
                 sourceEventId,
                 type: CHAT_MESSAGE_PART_TYPE.TOOL_CALL,
                 toolCallId: payload.toolCallId,
-                toolName: payload.toolName,
-                toolKind: payload.toolKind,
+                skillKey: payload.skillKey,
+                actionName: payload.actionName,
                 status: 'input_streaming',
               })
               return
@@ -287,8 +287,8 @@ export class ChatRunProjectorService implements OnModuleInit, OnModuleDestroy {
                 sourceEventId,
                 type: CHAT_MESSAGE_PART_TYPE.TOOL_CALL,
                 toolCallId: payload.toolCallId,
-                toolName: payload.toolName,
-                toolKind: payload.toolKind,
+                skillKey: payload.skillKey,
+                actionName: payload.actionName,
                 status: 'input_available',
               })
               return
@@ -296,7 +296,7 @@ export class ChatRunProjectorService implements OnModuleInit, OnModuleDestroy {
 
             if (event.type === 'tool.execution.started') {
               const payload = getToolEventPayload(event)
-              if (!payload?.toolCallId || !payload.toolName || await this.chatSessionEvents.hasSourceEvent(run.runId, sourceEventId)) {
+              if (!payload?.toolCallId || !payload.actionName || await this.chatSessionEvents.hasSourceEvent(run.runId, sourceEventId)) {
                 return
               }
 
@@ -307,8 +307,8 @@ export class ChatRunProjectorService implements OnModuleInit, OnModuleDestroy {
                 sourceEventId,
                 type: CHAT_MESSAGE_PART_TYPE.TOOL_CALL,
                 toolCallId: payload.toolCallId,
-                toolName: payload.toolName,
-                toolKind: payload.toolKind,
+                skillKey: payload.skillKey,
+                actionName: payload.actionName,
                 status: 'running',
                 textIfEmpty: payload.argumentsText,
               })
@@ -317,7 +317,7 @@ export class ChatRunProjectorService implements OnModuleInit, OnModuleDestroy {
 
             if (event.type === 'tool.execution.completed') {
               const payload = getToolEventPayload(event)
-              if (!payload?.toolCallId || !payload.toolName || await this.chatSessionEvents.hasSourceEvent(run.runId, sourceEventId)) {
+              if (!payload?.toolCallId || !payload.actionName || await this.chatSessionEvents.hasSourceEvent(run.runId, sourceEventId)) {
                 return
               }
 
@@ -328,8 +328,8 @@ export class ChatRunProjectorService implements OnModuleInit, OnModuleDestroy {
                 sourceEventId,
                 type: CHAT_MESSAGE_PART_TYPE.TOOL_RESULT,
                 toolCallId: payload.toolCallId,
-                toolName: payload.toolName,
-                toolKind: payload.toolKind,
+                skillKey: payload.skillKey,
+                actionName: payload.actionName,
                 status: payload.status ?? 'success',
                 textSnapshot: payload.outputText ?? '',
                 elapsedMs: payload.durationMs,
@@ -339,7 +339,7 @@ export class ChatRunProjectorService implements OnModuleInit, OnModuleDestroy {
 
             if (event.type === 'tool.execution.failed') {
               const payload = getToolEventPayload(event)
-              if (!payload?.toolCallId || !payload.toolName || await this.chatSessionEvents.hasSourceEvent(run.runId, sourceEventId)) {
+              if (!payload?.toolCallId || !payload.actionName || await this.chatSessionEvents.hasSourceEvent(run.runId, sourceEventId)) {
                 return
               }
 
@@ -350,8 +350,8 @@ export class ChatRunProjectorService implements OnModuleInit, OnModuleDestroy {
                 sourceEventId,
                 type: CHAT_MESSAGE_PART_TYPE.TOOL_RESULT,
                 toolCallId: payload.toolCallId,
-                toolName: payload.toolName,
-                toolKind: payload.toolKind,
+                skillKey: payload.skillKey,
+                actionName: payload.actionName,
                 status: 'error',
                 textSnapshot: payload.message,
                 elapsedMs: payload.durationMs,
@@ -372,8 +372,8 @@ export class ChatRunProjectorService implements OnModuleInit, OnModuleDestroy {
                 sourceEventId: `${sourceEventId}:tool`,
                 type: CHAT_MESSAGE_PART_TYPE.TOOL_CALL,
                 toolCallId: action.toolCallId,
-                toolName: action.toolName,
-                toolKind: 'skill',
+                skillKey: action.skillKey,
+                actionName: action.actionName,
                 status: 'requires_action',
               })
               await this.requireClientActionRun({
@@ -1203,8 +1203,8 @@ function createToolPartMetadata(
   return removeUndefined({
     ...(previous ?? {}),
     toolCallId: input.toolCallId,
-    toolName: input.toolName ?? previous?.toolName,
-    toolKind: input.toolKind ?? previous?.toolKind,
+    skillKey: input.skillKey ?? previous?.skillKey,
+    actionName: input.actionName ?? previous?.actionName,
     status: input.status ?? previous?.status,
     elapsedMs: input.elapsedMs ?? previous?.elapsedMs,
   })
@@ -1216,8 +1216,8 @@ function toChatMessagePartMetadata(value: unknown): ChatMessagePartMetadata | nu
 
 function getToolEventPayload(event: ChatGenerationEvent): {
   toolCallId?: string
-  toolName?: string
-  toolKind?: ChatMessagePartMetadata['toolKind']
+  skillKey?: string
+  actionName?: string
   status?: 'success' | 'error' | 'requires_action'
   argumentsText?: string
   outputText?: string
@@ -1231,8 +1231,8 @@ function getToolEventPayload(event: ChatGenerationEvent): {
 
   return {
     toolCallId: readString(payload.toolCallId),
-    toolName: readString(payload.toolName),
-    toolKind: readToolKind(payload.toolKind),
+    skillKey: readString(payload.skillKey),
+    actionName: readString(payload.actionName),
     status: readToolStatus(payload.status),
     argumentsText: readString(payload.argumentsText),
     outputText: readString(payload.outputText),
@@ -1243,12 +1243,6 @@ function getToolEventPayload(event: ChatGenerationEvent): {
 
 function readToolStatus(value: unknown): 'success' | 'error' | 'requires_action' | undefined {
   return value === 'success' || value === 'error' || value === 'requires_action'
-    ? value
-    : undefined
-}
-
-function readToolKind(value: unknown): ChatMessagePartMetadata['toolKind'] | undefined {
-  return value === 'function' || value === 'skill' || value === 'mcp'
     ? value
     : undefined
 }

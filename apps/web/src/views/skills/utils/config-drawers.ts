@@ -1,4 +1,7 @@
 import {
+  AMAP_MCP_SKILL_KEY,
+} from './amap'
+import {
   LOCATION_SKILL_KEY,
 } from './location'
 import {
@@ -16,6 +19,7 @@ export const SKILL_CONFIG_DRAWER_KEYS = [
   LOCATION_SKILL_KEY,
   TRANSLATOR_SKILL_KEY,
   WEB_SEARCH_SKILL_KEY,
+  AMAP_MCP_SKILL_KEY,
 ] as const
 
 export type SkillConfigDrawerKey = typeof SKILL_CONFIG_DRAWER_KEYS[number]

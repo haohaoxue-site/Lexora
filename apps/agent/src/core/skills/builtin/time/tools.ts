@@ -1,4 +1,3 @@
-import type { ToolCall } from '@langchain/core/messages'
 import type { StructuredToolInterface } from '@langchain/core/tools'
 import type { AgentGraphContext } from '../../../state'
 import {
@@ -27,8 +26,4 @@ export function createTimeSkillTools(): StructuredToolInterface[] {
       schema: GetCurrentTimeToolInputSchema,
     }),
   ]
-}
-
-export function isTimeToolCall(toolCall: ToolCall): boolean {
-  return toolCall.name === AGENT_TIME_TOOL.GET_CURRENT_TIME
 }

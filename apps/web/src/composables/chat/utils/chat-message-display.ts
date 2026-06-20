@@ -2,14 +2,20 @@ import type { ChatMemoryOperationProjection } from '@haohaoxue/lexora-contracts/
 import type { ChatMessage } from '@/apis/chat'
 import type { ChatMarkdownRenderPhase } from '@/components/chat-markdown'
 import {
+  AGENT_AMAP_MCP_SKILL_KEY,
+  AGENT_AMAP_MCP_SKILL_MANIFEST,
   AGENT_LOCATION_SKILL_KEY,
-  AGENT_LOCATION_TOOL,
+  AGENT_LOCATION_SKILL_MANIFEST,
   AGENT_MEMORY_OPERATION_REASON_CODE,
   AGENT_MEMORY_SKILL_KEY,
+  AGENT_MEMORY_SKILL_MANIFEST,
   AGENT_MEMORY_TOOL,
   AGENT_TIME_SKILL_KEY,
-  AGENT_TIME_TOOL,
+  AGENT_TIME_SKILL_MANIFEST,
+  AGENT_TRANSLATOR_SKILL_KEY,
+  AGENT_TRANSLATOR_SKILL_MANIFEST,
   AGENT_WEB_SEARCH_SKILL_KEY,
+  AGENT_WEB_SEARCH_SKILL_MANIFEST,
   AGENT_WEB_SEARCH_TOOL,
 } from '@haohaoxue/lexora-contracts/agent'
 import {
@@ -41,8 +47,8 @@ export interface AssistantMessageDisplayModel {
 
 export interface AssistantToolCallView {
   id: string
-  name: string
-  kind: NonNullable<ChatMessagePart['metadata']>['toolKind'] | 'function'
+  skillKey: string | null
+  actionName: string
   status: NonNullable<ChatMessagePart['metadata']>['status'] | 'running'
   displayTitle: string
   displayDetails: string[]
@@ -158,8 +164,8 @@ export function getAssistantToolCallViews(message: ChatMessage): AssistantToolCa
     if (part.type === CHAT_MESSAGE_PART_TYPE.TOOL_CALL) {
       viewsById.set(toolCallId, {
         ...current,
-        name: part.metadata?.toolName ?? current.name,
-        kind: part.metadata?.toolKind ?? current.kind,
+        skillKey: part.metadata?.skillKey ?? current.skillKey,
+        actionName: part.metadata?.actionName ?? current.actionName,
         status: part.metadata?.status ?? current.status,
         argsText: part.text,
         order: Math.min(current.order, part.order),
@@ -171,8 +177,8 @@ export function getAssistantToolCallViews(message: ChatMessage): AssistantToolCa
     if (part.type === CHAT_MESSAGE_PART_TYPE.TOOL_RESULT) {
       viewsById.set(toolCallId, {
         ...current,
-        name: part.metadata?.toolName ?? current.name,
-        kind: part.metadata?.toolKind ?? current.kind,
+        skillKey: part.metadata?.skillKey ?? current.skillKey,
+        actionName: part.metadata?.actionName ?? current.actionName,
         status: part.metadata?.status ?? current.status,
         resultText: part.text,
         durationMs: typeof part.metadata?.elapsedMs === 'number' ? part.metadata.elapsedMs : current.durationMs,
@@ -185,7 +191,7 @@ export function getAssistantToolCallViews(message: ChatMessage): AssistantToolCa
   return [...viewsById.values()]
     .sort((first, second) => first.order - second.order)
     .map((view) => {
-      const memoryOperation = isMemoryToolName(view.name)
+      const memoryOperation = isMemoryToolName(view.actionName)
         ? memoryOperations[memoryOperationIndex++]
         : undefined
 
@@ -197,8 +203,8 @@ export function getAssistantToolCallViews(message: ChatMessage): AssistantToolCa
 function createEmptyToolCallView(toolCallId: string, part: ChatMessagePart): AssistantToolCallView {
   return {
     id: toolCallId,
-    name: part.metadata?.toolName ?? 'tool',
-    kind: part.metadata?.toolKind ?? 'function',
+    skillKey: part.metadata?.skillKey ?? null,
+    actionName: part.metadata?.actionName ?? 'action',
     status: part.metadata?.status ?? 'running',
     displayTitle: translate('chat.messageDisplay.executeTool'),
     displayDetails: [],
@@ -215,11 +221,11 @@ function createPublicToolCallView(
   view: AssistantToolCallView,
   memoryOperation?: ChatMemoryOperationProjection,
 ): AssistantToolCallView | null {
-  if (view.name === 'activate_skill' || view.name === 'read_skill_resource') {
+  if (view.actionName === 'activate_skill') {
     return null
   }
 
-  if (isMemoryToolName(view.name)) {
+  if (isMemoryToolName(view.actionName)) {
     return {
       ...view,
       status: getMemoryOperationToolStatus(memoryOperation, view.status),
@@ -231,7 +237,7 @@ function createPublicToolCallView(
     }
   }
 
-  if (isWebSearchToolName(view.name)) {
+  if (isWebSearchToolName(view.actionName)) {
     return {
       ...view,
       displayTitle: getToolDisplayTitle(view),
@@ -353,32 +359,74 @@ function parseJsonObject(text: string): Record<string, unknown> | null {
   }
 }
 
-const FIRST_PARTY_SKILL_DISPLAY_NAME_BY_TOOL_NAME = new Map<string, string>(
-  [
-    { skillKey: AGENT_TIME_SKILL_KEY, toolNames: Object.values(AGENT_TIME_TOOL) },
-    { skillKey: AGENT_LOCATION_SKILL_KEY, toolNames: Object.values(AGENT_LOCATION_TOOL) },
-    { skillKey: AGENT_MEMORY_SKILL_KEY, toolNames: Object.values(AGENT_MEMORY_TOOL) },
-    { skillKey: AGENT_WEB_SEARCH_SKILL_KEY, toolNames: Object.values(AGENT_WEB_SEARCH_TOOL) },
-  ].flatMap(skill =>
-    skill.toolNames.map(toolName => [toolName, getShortSkillName(skill.skillKey)]),
+const FIRST_PARTY_SKILL_DISPLAY_ITEMS = [
+  createSkillDisplayItem(AGENT_TIME_SKILL_KEY, AGENT_TIME_SKILL_MANIFEST),
+  createSkillDisplayItem(AGENT_LOCATION_SKILL_KEY, AGENT_LOCATION_SKILL_MANIFEST),
+  createSkillDisplayItem(AGENT_MEMORY_SKILL_KEY, AGENT_MEMORY_SKILL_MANIFEST),
+  createSkillDisplayItem(AGENT_TRANSLATOR_SKILL_KEY, AGENT_TRANSLATOR_SKILL_MANIFEST),
+  createSkillDisplayItem(AGENT_WEB_SEARCH_SKILL_KEY, AGENT_WEB_SEARCH_SKILL_MANIFEST),
+  createSkillDisplayItem(AGENT_AMAP_MCP_SKILL_KEY, AGENT_AMAP_MCP_SKILL_MANIFEST),
+] as const
+const FIRST_PARTY_SKILL_DISPLAY_NAME_BY_SKILL_KEY = new Map<string, string>(
+  FIRST_PARTY_SKILL_DISPLAY_ITEMS.map(skill => [skill.key, skill.title]),
+)
+const FIRST_PARTY_SKILL_DISPLAY_NAME_BY_ACTION_NAME = new Map<string, string>(
+  FIRST_PARTY_SKILL_DISPLAY_ITEMS.flatMap(skill =>
+    skill.actions.map(action => [action.name, skill.title]),
+  ),
+)
+const FIRST_PARTY_ACTION_DISPLAY_TITLE_BY_ACTION_NAME = new Map<string, string>(
+  FIRST_PARTY_SKILL_DISPLAY_ITEMS.flatMap(skill =>
+    skill.actions.map(action => [action.name, action.title]),
+  ),
+)
+const FIRST_PARTY_ACTION_DISPLAY_TITLE_BY_SKILL_ACTION_KEY = new Map<string, string>(
+  FIRST_PARTY_SKILL_DISPLAY_ITEMS.flatMap(skill =>
+    skill.actions.map(action => [createSkillActionDisplayKey(skill.key, action.name), action.title]),
   ),
 )
 
+function createSkillDisplayItem(
+  key: string,
+  manifest: {
+    title: string
+    tools: ReadonlyArray<{
+      name: string
+      title: string
+    }>
+  },
+) {
+  return {
+    key,
+    title: manifest.title,
+    actions: manifest.tools.map(tool => ({
+      name: tool.name,
+      title: tool.title,
+    })),
+  }
+}
+
 function getToolDisplayTitle(view: AssistantToolCallView): string {
   const namespace = getToolDisplayNamespace(view)
-  return namespace ? `${namespace}/${view.name}` : view.name
+  const actionName = view.actionName
+  const actionTitle = view.skillKey
+    ? FIRST_PARTY_ACTION_DISPLAY_TITLE_BY_SKILL_ACTION_KEY.get(createSkillActionDisplayKey(view.skillKey, actionName))
+    ?? FIRST_PARTY_ACTION_DISPLAY_TITLE_BY_ACTION_NAME.get(actionName)
+    ?? actionName
+    : FIRST_PARTY_ACTION_DISPLAY_TITLE_BY_ACTION_NAME.get(actionName) ?? actionName
+  return namespace ? `${namespace}/${actionTitle}` : actionTitle
+}
+
+function createSkillActionDisplayKey(skillKey: string, actionName: string): string {
+  return `${skillKey}:${actionName}`
 }
 
 function getToolDisplayNamespace(view: AssistantToolCallView): string | null {
-  if (view.kind === 'skill') {
-    return FIRST_PARTY_SKILL_DISPLAY_NAME_BY_TOOL_NAME.get(view.name) ?? null
+  if (view.skillKey) {
+    return FIRST_PARTY_SKILL_DISPLAY_NAME_BY_SKILL_KEY.get(view.skillKey) ?? getShortSkillName(view.skillKey)
   }
 
-  if (view.kind === 'mcp') {
-    return 'mcp'
-  }
-
-  return view.kind === 'function' ? 'function' : null
+  return FIRST_PARTY_SKILL_DISPLAY_NAME_BY_ACTION_NAME.get(view.actionName) ?? null
 }
 
 function getShortSkillName(skillKey: string): string {

@@ -23,6 +23,7 @@ const formRef = ref<FormInstance>()
 const formModel = reactive(createTranslatorConfigFormModel(null))
 const outputModeOptions = computed(() => createTranslatorOutputModeOptions(t))
 const formalityOptions = computed(() => createTranslatorFormalityOptions(t))
+const submitActionText = computed(() => props.skill?.installed === false ? t('skills.install') : t('docs.common.save'))
 
 watch(
   () => [props.skill?.key, props.skill?.config, visible.value] as const,
@@ -76,7 +77,7 @@ async function handleSubmit() {
           {{ t('docs.common.cancel') }}
         </ElButton>
         <ElButton type="primary" :loading="saving" @click="handleSubmit">
-          {{ t('docs.common.save') }}
+          {{ submitActionText }}
         </ElButton>
       </div>
     </template>

@@ -3,7 +3,7 @@ import {
   AgentClientActionResultSchema,
   AgentClientActionSchema,
 } from './agent/client-action'
-import { AgentToolCallKindSchema, AgentToolCallStatusSchema } from './agent/events'
+import { AgentToolCallStatusSchema } from './agent/events'
 import { ChatGenerationUsageSnapshotSchema } from './agent/generation'
 import { AgentMemoryRunOptionsSchema, ChatMemoryOperationProjectionSchema } from './agent/memory'
 import { AgentRuntimeHintsSchema } from './agent/runtime'
@@ -268,8 +268,8 @@ export const ChatUserMessageMetadataSchema = z.object({
 export const ChatMessagePartMetadataSchema = z.object({
   elapsedMs: z.number().int().nonnegative().optional(),
   toolCallId: z.string().trim().min(1).optional(),
-  toolName: z.string().trim().min(1).optional(),
-  toolKind: AgentToolCallKindSchema.optional(),
+  skillKey: z.string().trim().min(1).optional(),
+  actionName: z.string().trim().min(1).optional(),
   status: AgentToolCallStatusSchema.optional(),
   sourceId: z.string().trim().min(1).optional(),
   citationTarget: z.string().trim().min(1).optional(),

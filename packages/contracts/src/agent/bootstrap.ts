@@ -3,7 +3,7 @@ import { AgentChatRuntimeContextSchema } from './chat'
 import { ChatGenerationModelTargetSnapshotSchema } from './model'
 import { AgentProfileSnapshotSchema } from './profile'
 import { AgentRuntimeModelTargetSchema } from './runtime'
-import { AgentRuntimeSkillContextSchema } from './skill'
+import { AgentRuntimeSkillContextSchema, AgentRuntimeSkillCredentialsSchema } from './skill'
 
 const NonEmptyStringSchema = z.string().trim().min(1)
 
@@ -21,6 +21,7 @@ export const ChatGenerationBootstrapSchema = z.object({
   runtimeModelTarget: AgentRuntimeModelTargetSchema,
   context: AgentChatRuntimeContextSchema,
   skills: AgentRuntimeSkillContextSchema,
+  skillCredentials: AgentRuntimeSkillCredentialsSchema,
 }).strict()
 
 export type ChatGenerationBootstrap = z.infer<typeof ChatGenerationBootstrapSchema>

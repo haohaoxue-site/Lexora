@@ -1,20 +1,22 @@
-import type { RuntimeSkillAdapter } from './adapter'
-import { createLocationRuntimeSkillAdapter } from './builtin/location'
-import { createMemoryRuntimeSkillAdapter } from './builtin/memory'
-import { createTimeRuntimeSkillAdapter } from './builtin/time'
-import { createWebSearchRuntimeSkillAdapter } from './builtin/web-search/adapter'
+import type { RuntimeSkillActionProvider } from './adapter'
+import { createLocationSkillActionProvider } from './builtin/location'
+import { createMemorySkillActionProvider } from './builtin/memory'
+import { createTimeSkillActionProvider } from './builtin/time'
+import { createWebSearchSkillActionProvider } from './builtin/web-search/adapter'
+import { createAmapMcpSkillActionProvider } from './mcp/amap'
 
-export const DEFAULT_RUNTIME_SKILL_ADAPTERS = [
-  createTimeRuntimeSkillAdapter(),
-  createLocationRuntimeSkillAdapter(),
-  createMemoryRuntimeSkillAdapter(),
-  createWebSearchRuntimeSkillAdapter(),
+export const DEFAULT_RUNTIME_SKILL_ACTION_PROVIDERS = [
+  createTimeSkillActionProvider(),
+  createLocationSkillActionProvider(),
+  createMemorySkillActionProvider(),
+  createWebSearchSkillActionProvider(),
+  createAmapMcpSkillActionProvider(),
 ] as const
 
-export function listRuntimeSkillAdapterKeys(
-  adapters: readonly RuntimeSkillAdapter[] = DEFAULT_RUNTIME_SKILL_ADAPTERS,
+export function listRuntimeSkillActionProviderKeys(
+  providers: readonly RuntimeSkillActionProvider[] = DEFAULT_RUNTIME_SKILL_ACTION_PROVIDERS,
 ): readonly string[] {
-  return adapters.map(adapter => adapter.key)
+  return providers.map(provider => provider.key)
 }
 
-export type { RuntimeSkillAdapter, RuntimeSkillAdapterServices } from './adapter'
+export type { RuntimeSkillActionProvider, RuntimeSkillActionProviderServices } from './adapter'

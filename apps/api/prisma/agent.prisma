@@ -69,17 +69,6 @@ enum AgentMemoryCandidateKind {
   FORGET_REQUEST
 }
 
-enum AgentSkillSourceScope {
-  BUILTIN
-  MARKET
-}
-
-enum AgentSkillTrustLevel {
-  TRUSTED
-  REVIEW_REQUIRED
-  QUARANTINED
-}
-
 model AgentProfile {
   id                 String                  @id @default(uuid())
   ownerUserId        String
@@ -101,47 +90,17 @@ model AgentProfile {
   @@index([ownerUserId, deletedAt])
 }
 
-model AgentSkill {
-  id             String               @id @default(uuid())
-  scope          AgentSkillSourceScope @default(MARKET)
-  skillKey       String               @unique
-  name           String
-  description    String
-  category       String
-  activationMode String
-  riskLevel      String
-  version        String?
-  sourcePath     String
-  rootPath       String
-  skillMdPath    String
-  packageHash    String
-  frontmatter    Json
-  instructions   String
-  trustLevel     AgentSkillTrustLevel  @default(REVIEW_REQUIRED)
-  enabled        Boolean              @default(true)
-  files          AgentSkillFile[]
-  createdAt      DateTime             @default(now())
-  updatedAt      DateTime             @updatedAt
-  deletedAt      DateTime?
+model AgentSkillCredential {
+  id                  String   @id @default(uuid())
+  ownerUserId         String
+  skillKey            String
+  credentialEncrypted String
+  ownerUser           User     @relation("AgentSkillCredentialOwner", fields: [ownerUserId], references: [id], onDelete: Cascade)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
 
-  @@index([scope, enabled, deletedAt])
-  @@index([skillKey, enabled, deletedAt])
-  @@index([sourcePath])
-}
-
-model AgentSkillFile {
-  id         String     @id @default(uuid())
-  skillId    String
-  relPath    String
-  sizeBytes  BigInt
-  sha256     String
-  executable Boolean    @default(false)
-  skill      AgentSkill @relation(fields: [skillId], references: [id], onDelete: Cascade)
-  createdAt  DateTime   @default(now())
-  updatedAt  DateTime   @updatedAt
-
-  @@unique([skillId, relPath])
-  @@index([skillId])
+  @@unique([ownerUserId, skillKey])
+  @@index([skillKey])
 }
 
 model AgentMemory {

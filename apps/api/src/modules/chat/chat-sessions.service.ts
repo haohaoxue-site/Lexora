@@ -8,6 +8,7 @@ import type {
   AgentRuntimeHints,
   AgentRuntimeModelTarget,
   AgentRuntimeSkillContext,
+  AgentRuntimeSkillCredentials,
   AiModelRef,
   ChatDisabledSkillKeys,
   ChatGenerationBootstrap,
@@ -37,6 +38,7 @@ import {
   AgentRuntimeHintsSchema,
   AgentRuntimeModelTargetSchema,
   AgentRuntimeSkillContextSchema,
+  AgentRuntimeSkillCredentialsSchema,
   AI_MODEL_INTENT_KEY,
   API_ERROR_CODE,
   CHAT_MESSAGE_PART_TYPE,
@@ -974,7 +976,7 @@ export class ChatSessionsService {
     const memory = readAgentMemoryRunOptions(run?.commandContext)
     const disabledSkillKeys = readChatDisabledSkillKeys(run?.commandContext)
     const runtimeHints = readAgentRuntimeHints(run?.commandContext)
-    const [context, runtimeModelTarget, skills] = await Promise.all([
+    const [context, runtimeModelTarget, skills, skillCredentials] = await Promise.all([
       this.resolveAgentRuntimeContext({
         actorId: generation.actorUserId,
         sessionId: generation.sessionId,
@@ -990,6 +992,12 @@ export class ChatSessionsService {
             agentProfile: agentProfileSnapshot,
           })
         : AgentRuntimeSkillContextSchema.parse({}),
+      this.agentSkills
+        ? this.agentSkills.resolveRuntimeSkillCredentials({
+            actorUserId: generation.actorUserId,
+            agentProfile: agentProfileSnapshot,
+          })
+        : AgentRuntimeSkillCredentialsSchema.parse([]),
     ])
 
     if (context.assistantMessageId !== generation.assistantMessageId) {
@@ -1010,6 +1018,7 @@ export class ChatSessionsService {
       runtimeModelTarget,
       context,
       skills: filterRuntimeSkillContext(skills, disabledSkillKeys),
+      skillCredentials: filterRuntimeSkillCredentials(skillCredentials, disabledSkillKeys),
     })
   }
 
@@ -2580,6 +2589,20 @@ function filterRuntimeSkillContext(
   })
 }
 
+function filterRuntimeSkillCredentials(
+  skillCredentials: AgentRuntimeSkillCredentials,
+  disabledSkillKeys: ChatDisabledSkillKeys,
+): AgentRuntimeSkillCredentials {
+  if (disabledSkillKeys.length === 0) {
+    return skillCredentials
+  }
+
+  const disabledSkillKeySet = new Set(disabledSkillKeys)
+  return AgentRuntimeSkillCredentialsSchema.parse(
+    skillCredentials.filter(credential => !disabledSkillKeySet.has(credential.key)),
+  )
+}
+
 function readAgentMemoryRunOptions(commandContext: unknown): AgentMemoryRunOptions {
   if (isRecord(commandContext)) {
     return AgentMemoryRunOptionsSchema.parse(commandContext.memory)
@@ -2714,8 +2737,8 @@ function createClientActionToolResultMetadata(
 ) {
   return {
     toolCallId: action.toolCallId,
-    toolName: action.toolName,
-    toolKind: 'skill',
+    skillKey: action.skillKey,
+    actionName: action.actionName,
     status: resolveClientActionToolResultStatus(resume),
   } as const
 }

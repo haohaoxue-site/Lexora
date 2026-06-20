@@ -11,6 +11,7 @@ import type {
   AgentChatModelFactory,
 } from '../../integrations/model-providers/chat-model'
 import type { WebSearchClient } from '../../integrations/web-search'
+import type { RuntimeSkillActionProvider } from '../skills/adapters'
 import type { AgentGraphContext, AgentGraphState } from '../state'
 import { HumanMessage, SystemMessage } from '@langchain/core/messages'
 import { applyAgentContextSnapshotsToMessages } from '../context/snapshots'
@@ -34,6 +35,7 @@ export interface CreateCallModelNodeOptions {
   memoryApi?: AgentMemoryApiClient
   skillApi?: AgentSkillApiClient
   webSearch?: WebSearchClient
+  skillActionProviders?: readonly RuntimeSkillActionProvider[]
 }
 
 export function createCallModelNode(options: CreateCallModelNodeOptions): GraphNode<typeof AgentGraphState, AgentGraphContext> {
@@ -84,6 +86,7 @@ export function createCallModelNode(options: CreateCallModelNodeOptions): GraphN
       memoryApi: focusedTranslatorInvocation ? undefined : options.memoryApi,
       skillApi: focusedTranslatorInvocation ? undefined : options.skillApi,
       webSearch: focusedTranslatorInvocation ? undefined : options.webSearch,
+      skillActionProviders: focusedTranslatorInvocation ? undefined : options.skillActionProviders,
       signal: config.signal,
     })
     const usageSnapshot = createChatGenerationUsageSnapshot({

@@ -20,6 +20,7 @@
     "@langchain/langgraph": "^1.2.9",
     "@langchain/langgraph-checkpoint-postgres": "1.0.1",
     "@langchain/openai": "^1.4.5",
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "dotenv": "catalog:",
     "fastify": "catalog:",
     "ioredis": "catalog:",

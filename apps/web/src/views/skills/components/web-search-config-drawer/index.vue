@@ -25,6 +25,7 @@ const formRef = ref<FormInstance>()
 const formModel = reactive(createWebSearchConfigFormModel(null))
 const providerOptions = computed(() => createWebSearchProviderOptions(t))
 const contextSizeOptions = computed(() => createWebSearchContextSizeOptions(t))
+const submitActionText = computed(() => props.skill?.installed === false ? t('skills.install') : t('docs.common.save'))
 const rules = computed<FormRules<WebSearchConfigFormModel>>(() => ({
   providers: [
     {
@@ -153,7 +154,7 @@ function validateDomainText(_rule: unknown, value: unknown, callback: (error?: E
           {{ t('docs.common.cancel') }}
         </ElButton>
         <ElButton type="primary" :loading="saving" @click="handleSubmit">
-          {{ t('docs.common.save') }}
+          {{ submitActionText }}
         </ElButton>
       </div>
     </template>

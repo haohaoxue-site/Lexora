@@ -58,7 +58,7 @@ export async function runStructuredJsonToolProtocol(session: RuntimeToolLoopSess
     const toolCalls = normalizeStructuredJsonToolCalls(selection.decision.toolCalls, round)
     assertStructuredJsonToolCallsAreVisible(toolCalls, session.visibleTools)
 
-    const toolResult = await session.executeToolCalls(toolCalls)
+    const toolResult = await session.executeSkillActions(toolCalls)
     session.appendMessage(createStructuredJsonToolResultMessage({
       toolCalls,
       toolMessages: toolResult.toolMessages,

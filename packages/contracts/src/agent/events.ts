@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { AgentClientActionSchema } from './client-action'
 import { ChatGenerationUsageSnapshotSchema } from './generation'
 import { ChatMemoryOperationProjectionSchema } from './memory'
+import { AgentSkillConnectorTypeSchema } from './skill'
 
 const NonEmptyStringSchema = z.string().trim().min(1)
 
@@ -9,7 +10,6 @@ const TextDeltaPayloadSchema = z.object({
   text: z.string(),
 }).strict()
 
-export const AgentToolCallKindSchema = z.enum(['function', 'skill', 'mcp'])
 export const AgentToolCallStatusSchema = z.enum([
   'input_streaming',
   'input_available',
@@ -26,8 +26,9 @@ const GenerationEventBaseSchema = z.object({
 
 const ToolCallEventBasePayloadSchema = z.object({
   toolCallId: NonEmptyStringSchema,
-  toolName: NonEmptyStringSchema.optional(),
-  toolKind: AgentToolCallKindSchema.default('function'),
+  skillKey: NonEmptyStringSchema.optional(),
+  actionName: NonEmptyStringSchema.optional(),
+  connectorType: AgentSkillConnectorTypeSchema.optional(),
 }).strict()
 
 const ToolCallArgumentsPayloadSchema = ToolCallEventBasePayloadSchema.extend({
@@ -113,6 +114,5 @@ export const ChatGenerationEventSchema = z.discriminatedUnion('type', [
   }).strict(),
 ])
 
-export type AgentToolCallKind = z.infer<typeof AgentToolCallKindSchema>
 export type AgentToolCallStatus = z.infer<typeof AgentToolCallStatusSchema>
 export type ChatGenerationEvent = z.infer<typeof ChatGenerationEventSchema>

@@ -30,18 +30,6 @@ const summary = computed(() => {
   ].filter(Boolean).join(' · ')
 })
 
-function getKindLabel(item: AssistantToolCallView): string {
-  if (item.kind === 'skill') {
-    return t('chat.messageDisplay.skillKind')
-  }
-
-  if (item.kind === 'mcp') {
-    return 'MCP'
-  }
-
-  return t('chat.messageDisplay.functionKind')
-}
-
 function getStatusLabel(status: AssistantToolCallView['status']): string {
   if (status === 'input_streaming') {
     return t('chat.messageDisplay.inputStreaming')
@@ -90,7 +78,6 @@ function formatDuration(durationMs: number | null): string {
         :class="`chat-tool-call-timeline__item--${item.status}`"
       >
         <div class="chat-tool-call-timeline__item-header">
-          <span class="chat-tool-call-timeline__kind">{{ getKindLabel(item) }}</span>
           <span class="chat-tool-call-timeline__name">{{ item.displayTitle }}</span>
           <span class="chat-tool-call-timeline__status">{{ getStatusLabel(item.status) }}</span>
           <span v-if="formatDuration(item.durationMs)" class="chat-tool-call-timeline__duration">
@@ -181,7 +168,6 @@ function formatDuration(durationMs: number | null): string {
   line-height: 1.45;
 }
 
-.chat-tool-call-timeline__kind,
 .chat-tool-call-timeline__status {
   flex-shrink: 0;
   border-radius: 0.25rem;

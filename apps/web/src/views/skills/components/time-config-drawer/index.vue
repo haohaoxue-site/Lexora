@@ -23,6 +23,7 @@ const visible = defineModel<boolean>('visible', { required: true })
 const formRef = ref<FormInstance>()
 const formModel = reactive(createTimeConfigFormModel(null))
 const detectedTimeZone = shallowRef<string | null>(null)
+const submitActionText = computed(() => props.skill?.installed === false ? t('skills.install') : t('docs.common.save'))
 const rules = computed<FormRules<TimeConfigFormModel>>(() => ({
   timeZone: [
     {
@@ -107,7 +108,7 @@ function validateTimeZone(_rule: unknown, value: unknown, callback: (error?: Err
           {{ t('docs.common.cancel') }}
         </ElButton>
         <ElButton type="primary" :loading="saving" @click="handleSubmit">
-          {{ t('docs.common.save') }}
+          {{ submitActionText }}
         </ElButton>
       </div>
     </template>

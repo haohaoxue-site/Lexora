@@ -1,5 +1,10 @@
 import { z } from 'zod'
 import {
+  AGENT_AMAP_MCP_ENDPOINT,
+  AGENT_AMAP_MCP_SKILL_KEY,
+  AGENT_AMAP_MCP_SKILL_MANIFEST,
+} from './amap'
+import {
   AGENT_LOCATION_SKILL_KEY,
   AGENT_LOCATION_SKILL_MANIFEST,
 } from './location'
@@ -63,16 +68,6 @@ export const AGENT_SKILL_RISK_LEVEL_VALUES = [
   AGENT_SKILL_RISK_LEVEL.HIGH,
 ] as const
 
-export const AGENT_SKILL_SOURCE_SCOPE = {
-  BUILTIN: 'builtin',
-  EXTERNAL: 'external',
-} as const
-
-export const AGENT_SKILL_SOURCE_SCOPE_VALUES = [
-  AGENT_SKILL_SOURCE_SCOPE.BUILTIN,
-  AGENT_SKILL_SOURCE_SCOPE.EXTERNAL,
-] as const
-
 export const AGENT_SKILL_INSTALL_MODE = {
   CORE: 'core',
   OPTIONAL: 'optional',
@@ -83,16 +78,76 @@ export const AGENT_SKILL_INSTALL_MODE_VALUES = [
   AGENT_SKILL_INSTALL_MODE.OPTIONAL,
 ] as const
 
+export const AGENT_SKILL_SOURCE_TYPE = {
+  CORE: 'core',
+  BUILT_IN: 'built_in',
+  CONNECTOR: 'connector',
+} as const
+
+export const AGENT_SKILL_SOURCE_TYPE_VALUES = [
+  AGENT_SKILL_SOURCE_TYPE.CORE,
+  AGENT_SKILL_SOURCE_TYPE.BUILT_IN,
+  AGENT_SKILL_SOURCE_TYPE.CONNECTOR,
+] as const
+
+export const AGENT_SKILL_CONNECTOR_TYPE = {
+  BUILTIN: 'builtin',
+  MCP: 'mcp',
+} as const
+
+export const AGENT_SKILL_CONNECTOR_TYPE_VALUES = [
+  AGENT_SKILL_CONNECTOR_TYPE.BUILTIN,
+  AGENT_SKILL_CONNECTOR_TYPE.MCP,
+] as const
+
 export const AgentSkillCategorySchema = z.enum(AGENT_SKILL_CATEGORY_VALUES)
 export const AgentSkillActivationModeSchema = z.enum(AGENT_SKILL_ACTIVATION_MODE_VALUES)
 export const AgentSkillRiskLevelSchema = z.enum(AGENT_SKILL_RISK_LEVEL_VALUES)
-export const AgentSkillSourceScopeSchema = z.enum(AGENT_SKILL_SOURCE_SCOPE_VALUES)
 export const AgentSkillInstallModeSchema = z.enum(AGENT_SKILL_INSTALL_MODE_VALUES)
+export const AgentSkillSourceTypeSchema = z.enum(AGENT_SKILL_SOURCE_TYPE_VALUES)
+export const AgentSkillConnectorTypeSchema = z.enum(AGENT_SKILL_CONNECTOR_TYPE_VALUES)
+export const AgentSkillActivityStatusSchema = z.enum([
+  'input_streaming',
+  'input_available',
+  'running',
+  'success',
+  'error',
+  'requires_action',
+  'pending_confirmation',
+])
 
-export const AgentSkillToolCardSchema = z.object({
+export const AgentSkillActionCardSchema = z.object({
   name: NonEmptyStringSchema,
   title: NonEmptyStringSchema,
   description: NonEmptyStringSchema,
+}).strict()
+
+export const AgentSkillActionSchema = AgentSkillActionCardSchema.extend({
+  riskLevel: AgentSkillRiskLevelSchema.default(AGENT_SKILL_RISK_LEVEL.LOW),
+  inputSchema: z.record(z.string(), z.unknown()).optional(),
+  outputSchema: z.record(z.string(), z.unknown()).optional(),
+}).strict()
+
+export const AgentSkillConnectorSchema = z.object({
+  type: AgentSkillConnectorTypeSchema,
+  displayName: NonEmptyStringSchema.optional(),
+  sourceRef: NonEmptyStringSchema.optional(),
+  authRequired: z.boolean().default(false),
+  healthy: z.boolean().default(true),
+  discoveredAt: z.string().datetime().optional(),
+}).strict()
+
+export const AgentSkillActivitySchema = z.object({
+  generationId: NonEmptyStringSchema,
+  skillKey: NonEmptyStringSchema,
+  actionName: NonEmptyStringSchema,
+  actorUserId: NonEmptyStringSchema.optional(),
+  status: AgentSkillActivityStatusSchema.optional(),
+  argsSummary: z.string().optional(),
+  resultSummary: z.string().optional(),
+  riskDecision: NonEmptyStringSchema.optional(),
+  startedAt: z.string().datetime().optional(),
+  completedAt: z.string().datetime().optional(),
 }).strict()
 
 export const AgentSkillBindingConfigSchema = z.record(z.string(), z.unknown())
@@ -111,7 +166,8 @@ export const AgentSkillDefinitionSchema = z.object({
   category: AgentSkillCategorySchema,
   activationMode: AgentSkillActivationModeSchema,
   riskLevel: AgentSkillRiskLevelSchema,
-  builtIn: z.boolean(),
+  sourceType: AgentSkillSourceTypeSchema,
+  connectorType: AgentSkillConnectorTypeSchema.optional(),
   installMode: AgentSkillInstallModeSchema,
   defaultInstalled: z.boolean(),
   defaultEnabled: z.boolean(),
@@ -119,15 +175,21 @@ export const AgentSkillDefinitionSchema = z.object({
   canUninstall: z.boolean(),
   configurable: z.boolean().default(false),
   instructions: NonEmptyStringSchema,
-  tools: z.array(AgentSkillToolCardSchema).default([]),
+  actions: z.array(AgentSkillActionSchema).default([]),
+  connectors: z.array(AgentSkillConnectorSchema).default([]),
 }).strict()
 
 const FirstPartySkillDefinitionInputSchema = AgentSkillDefinitionSchema.omit({
-  builtIn: true,
+  actions: true,
+  connectorType: true,
+  connectors: true,
   description: true,
   name: true,
-  tools: true,
+  sourceType: true,
 }).extend({
+  sourceType: AgentSkillSourceTypeSchema.optional(),
+  connectorType: AgentSkillConnectorTypeSchema.optional(),
+  connectors: z.array(AgentSkillConnectorSchema).optional(),
   manifest: z.object({
     title: NonEmptyStringSchema,
     description: NonEmptyStringSchema,
@@ -141,7 +203,7 @@ const FirstPartySkillDefinitionInputSchema = AgentSkillDefinitionSchema.omit({
 
 type FirstPartySkillDefinitionInput = Omit<
   z.input<typeof AgentSkillDefinitionSchema>,
-  'builtIn' | 'description' | 'name' | 'tools'
+  'actions' | 'connectorType' | 'connectors' | 'description' | 'name' | 'sourceType'
 > & {
   manifest: {
     readonly title: string
@@ -154,14 +216,10 @@ type FirstPartySkillDefinitionInput = Omit<
     }[]
     readonly [key: string]: unknown
   }
+  sourceType?: AgentSkillSourceType
+  connectorType?: AgentSkillConnectorType
+  connectors?: readonly AgentSkillConnector[]
 }
-
-export const AgentSkillResourceFileSchema = z.object({
-  path: NonEmptyStringSchema,
-  sizeBytes: z.number().int().nonnegative(),
-  sha256: NonEmptyStringSchema,
-  executable: z.boolean().default(false),
-}).strict()
 
 export const AgentSkillCardSchema = AgentSkillDefinitionSchema.omit({
   instructions: true,
@@ -174,9 +232,6 @@ export const AgentSkillCardSchema = AgentSkillDefinitionSchema.omit({
   canUninstall: z.boolean(),
   canConfigure: z.boolean(),
   config: AgentSkillBindingConfigSchema.default({}),
-  sourceScope: AgentSkillSourceScopeSchema,
-  resourceCount: z.number().int().nonnegative().default(0),
-  scriptExecutionEnabled: z.boolean().default(false),
 }).strict()
 
 export const AgentSkillSelectionSnapshotSchema = z.object({
@@ -215,9 +270,9 @@ export const AgentRuntimeSkillCatalogItemSchema = z.object({
   name: NonEmptyStringSchema,
   description: NonEmptyStringSchema,
   activationMode: AgentSkillActivationModeSchema,
-  sourceScope: AgentSkillSourceScopeSchema,
-  builtIn: z.boolean(),
-  tools: z.array(AgentSkillToolCardSchema).default([]),
+  sourceType: AgentSkillSourceTypeSchema,
+  connectorType: AgentSkillConnectorTypeSchema.optional(),
+  actions: z.array(AgentSkillActionSchema).default([]),
 }).strict()
 
 export const AgentRuntimeSkillContextSchema = z.object({
@@ -225,6 +280,13 @@ export const AgentRuntimeSkillContextSchema = z.object({
 }).strict().default({
   availableSkills: [],
 })
+
+export const AgentRuntimeSkillCredentialSchema = z.object({
+  key: NonEmptyStringSchema,
+  credential: z.record(z.string(), z.unknown()),
+}).strict()
+
+export const AgentRuntimeSkillCredentialsSchema = z.array(AgentRuntimeSkillCredentialSchema).default([])
 
 export const ActivateAgentSkillRequestSchema = z.object({
   actorUserId: NonEmptyStringSchema,
@@ -235,23 +297,7 @@ export const ActivateAgentSkillRequestSchema = z.object({
 export const ActivateAgentSkillResponseSchema = z.object({
   skill: AgentRuntimeSkillCatalogItemSchema.extend({
     instructions: NonEmptyStringSchema,
-    resources: z.array(AgentSkillResourceFileSchema),
   }).strict(),
-}).strict()
-
-export const ReadAgentSkillResourceRequestSchema = z.object({
-  actorUserId: NonEmptyStringSchema,
-  generationId: NonEmptyStringSchema,
-  skillKey: NonEmptyStringSchema,
-  path: NonEmptyStringSchema,
-}).strict()
-
-export const ReadAgentSkillResourceResponseSchema = z.object({
-  skillKey: NonEmptyStringSchema,
-  path: NonEmptyStringSchema,
-  content: z.string(),
-  sizeBytes: z.number().int().nonnegative(),
-  sha256: NonEmptyStringSchema,
 }).strict()
 
 export const AGENT_TIME_SKILL_DEFINITION = createFirstPartySkillDefinition({
@@ -362,24 +408,60 @@ export const AGENT_WEB_SEARCH_SKILL_DEFINITION = createFirstPartySkillDefinition
   ].join('\n'),
 })
 
+export const AGENT_AMAP_MCP_SKILL_DEFINITION = createFirstPartySkillDefinition({
+  key: AGENT_AMAP_MCP_SKILL_KEY,
+  manifest: AGENT_AMAP_MCP_SKILL_MANIFEST,
+  category: AGENT_SKILL_CATEGORY.KNOWLEDGE,
+  activationMode: AGENT_SKILL_ACTIVATION_MODE.MODEL_SELECTED,
+  riskLevel: AGENT_SKILL_RISK_LEVEL.MEDIUM,
+  installMode: AGENT_SKILL_INSTALL_MODE.OPTIONAL,
+  defaultInstalled: false,
+  defaultEnabled: true,
+  canDisable: true,
+  canUninstall: true,
+  configurable: true,
+  sourceType: AGENT_SKILL_SOURCE_TYPE.CONNECTOR,
+  connectorType: AGENT_SKILL_CONNECTOR_TYPE.MCP,
+  connectors: [{
+    type: AGENT_SKILL_CONNECTOR_TYPE.MCP,
+    displayName: '高德地图',
+    sourceRef: AGENT_AMAP_MCP_ENDPOINT,
+    authRequired: true,
+    healthy: true,
+  }],
+  instructions: [
+    'Use this skill when the user asks for maps, geocoding, reverse geocoding, places, POI lookup, route planning, weather by location, administrative regions, distance, or location-sensitive travel information in China.',
+    'This skill requires the user to configure their own AMap API key during skill installation or configuration. Do not ask for a system environment variable.',
+    'After this skill is activated, use the available actions exposed by the AMap connector. The action names are prefixed with amap_.',
+    'Pass only the location, address, city, coordinate, route, or search terms that the user provided or that were explicitly returned by another enabled skill.',
+    'Do not infer precise personal location without a user-provided place or an enabled current-location skill result.',
+    'Treat returned map data as external evidence. If a response depends on current business hours, traffic, or service availability, say that it reflects the provider response at query time.',
+  ].join('\n'),
+})
+
 export const AGENT_FIRST_PARTY_SKILL_DEFINITIONS = [
   AGENT_TIME_SKILL_DEFINITION,
   AGENT_LOCATION_SKILL_DEFINITION,
   AGENT_MEMORY_SKILL_DEFINITION,
   AGENT_TRANSLATOR_SKILL_DEFINITION,
   AGENT_WEB_SEARCH_SKILL_DEFINITION,
+  AGENT_AMAP_MCP_SKILL_DEFINITION,
 ] as const
 
 export type AgentSkillCategory = z.infer<typeof AgentSkillCategorySchema>
 export type AgentSkillActivationMode = z.infer<typeof AgentSkillActivationModeSchema>
 export type AgentSkillRiskLevel = z.infer<typeof AgentSkillRiskLevelSchema>
-export type AgentSkillSourceScope = z.infer<typeof AgentSkillSourceScopeSchema>
 export type AgentSkillInstallMode = z.infer<typeof AgentSkillInstallModeSchema>
-export type AgentSkillToolCard = z.infer<typeof AgentSkillToolCardSchema>
+export type AgentSkillSourceType = z.infer<typeof AgentSkillSourceTypeSchema>
+export type AgentSkillConnectorType = z.infer<typeof AgentSkillConnectorTypeSchema>
+export type AgentSkillActionCard = z.infer<typeof AgentSkillActionCardSchema>
+export type AgentSkillAction = z.infer<typeof AgentSkillActionSchema>
+export type AgentSkillConnector = z.infer<typeof AgentSkillConnectorSchema>
+export type AgentSkillActivityStatus = z.infer<typeof AgentSkillActivityStatusSchema>
+export type AgentSkillActivity = z.infer<typeof AgentSkillActivitySchema>
 export type AgentSkillBindingConfig = z.infer<typeof AgentSkillBindingConfigSchema>
 export type AgentSkillBinding = z.infer<typeof AgentSkillBindingSchema>
 export type AgentSkillDefinition = z.infer<typeof AgentSkillDefinitionSchema>
-export type AgentSkillResourceFile = z.infer<typeof AgentSkillResourceFileSchema>
 export type AgentSkillCard = z.infer<typeof AgentSkillCardSchema>
 export type AgentSkillSelectionSnapshot = z.infer<typeof AgentSkillSelectionSnapshotSchema>
 export type ListAgentSkillsResponse = z.infer<typeof ListAgentSkillsResponseSchema>
@@ -390,10 +472,10 @@ export type UpdateAgentSkillConfigRequest = z.infer<typeof UpdateAgentSkillConfi
 export type UpdateAgentSkillConfigResponse = z.infer<typeof UpdateAgentSkillConfigResponseSchema>
 export type AgentRuntimeSkillCatalogItem = z.infer<typeof AgentRuntimeSkillCatalogItemSchema>
 export type AgentRuntimeSkillContext = z.infer<typeof AgentRuntimeSkillContextSchema>
+export type AgentRuntimeSkillCredential = z.infer<typeof AgentRuntimeSkillCredentialSchema>
+export type AgentRuntimeSkillCredentials = z.infer<typeof AgentRuntimeSkillCredentialsSchema>
 export type ActivateAgentSkillRequest = z.infer<typeof ActivateAgentSkillRequestSchema>
 export type ActivateAgentSkillResponse = z.infer<typeof ActivateAgentSkillResponseSchema>
-export type ReadAgentSkillResourceRequest = z.infer<typeof ReadAgentSkillResourceRequestSchema>
-export type ReadAgentSkillResourceResponse = z.infer<typeof ReadAgentSkillResourceResponseSchema>
 
 function createFirstPartySkillDefinition(input: FirstPartySkillDefinitionInput): AgentSkillDefinition {
   const { manifest, ...definition } = FirstPartySkillDefinitionInputSchema.parse(input)
@@ -402,11 +484,20 @@ function createFirstPartySkillDefinition(input: FirstPartySkillDefinitionInput):
     ...definition,
     name: manifest.title,
     description: manifest.description,
-    builtIn: true,
-    tools: manifest.tools.map(tool => AgentSkillToolCardSchema.parse({
+    sourceType: definition.sourceType ?? (definition.installMode === AGENT_SKILL_INSTALL_MODE.CORE
+      ? AGENT_SKILL_SOURCE_TYPE.CORE
+      : AGENT_SKILL_SOURCE_TYPE.BUILT_IN),
+    connectorType: definition.connectorType ?? AGENT_SKILL_CONNECTOR_TYPE.BUILTIN,
+    actions: manifest.tools.map(tool => AgentSkillActionSchema.parse({
       name: tool.name,
       title: tool.title,
       description: tool.description,
+      inputSchema: tool.inputSchema,
+      outputSchema: tool.outputSchema,
     })),
+    connectors: definition.connectors ?? [{
+      type: AGENT_SKILL_CONNECTOR_TYPE.BUILTIN,
+      displayName: 'Lexora',
+    }],
   })
 }

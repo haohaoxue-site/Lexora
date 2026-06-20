@@ -3,25 +3,19 @@ import type { ToolCall } from '@langchain/core/messages'
 import type { AgentMemoryApiClient } from '../../clients/memory'
 import type { AgentSkillApiClient } from '../../clients/skills'
 import type { WebSearchClient } from '../../integrations/web-search'
-import type { RuntimeSkillAdapter } from '../skills/adapters'
+import type { RuntimeSkillActionProvider } from '../skills/adapters'
 import type { LoadedAgentSkill } from '../skills/runtime'
 import type { AgentGraphContext } from '../state'
+import type { RuntimeSkillActionMetadata, RuntimeToolDescriptor } from './registry'
 import { ToolMessage } from '@langchain/core/messages'
 import { isGraphInterrupt } from '@langchain/langgraph'
-import {
-  executeAgentSkillToolCalls,
-  isAgentSkillToolCall,
-} from '../skills/runtime'
-import {
-  createRuntimeSkillAdapterServices,
-  createRuntimeToolRegistry,
-} from './registry'
+import { createRuntimeToolRegistry } from './registry'
 
 export async function executeRuntimeToolCalls(input: {
   memoryApi?: AgentMemoryApiClient
   skillApi?: AgentSkillApiClient
   webSearch?: WebSearchClient
-  skillAdapters?: readonly RuntimeSkillAdapter[]
+  skillActionProviders?: readonly RuntimeSkillActionProvider[]
   context: AgentGraphContext
   sessionId: string
   toolCalls: ToolCall[]
@@ -35,50 +29,71 @@ export async function executeRuntimeToolCalls(input: {
   const toolMessages: ToolMessage[] = []
   const operations: ChatMemoryOperationProjection[] = []
   let loadedSkills = input.loadedSkills
-  const services = createRuntimeSkillAdapterServices(input)
   let registry = createRuntimeToolRegistry({
     ...input,
     loadedSkills,
   })
   const handledToolCalls = new Set<ToolCall>()
-  const skillCalls = input.skillApi
-    ? input.toolCalls.filter(toolCall =>
-        isAgentSkillToolCall(toolCall) && registry.hasVisibleTool(toolCall.name),
-      )
-    : []
-  if (skillCalls.length > 0 && input.skillApi) {
-    const result = await executeObservedToolCallGroup(input.observer, skillCalls, () =>
-      executeAgentSkillToolCalls({
-        skillApi: input.skillApi!,
-        context: input.context,
-        toolCalls: skillCalls,
-        loadedSkills,
-      }))
-    loadedSkills = result.loadedSkills
-    toolMessages.push(...result.toolMessages)
-    skillCalls.forEach(toolCall => handledToolCalls.add(toolCall))
-    registry = createRuntimeToolRegistry({
-      ...input,
-      loadedSkills,
-    })
-  }
 
-  for (const adapter of registry.availableSkillAdapters) {
-    const adapterCalls = input.toolCalls.filter(toolCall => !handledToolCalls.has(toolCall) && adapter.isToolCall(toolCall))
-    if (adapterCalls.length === 0) {
+  const preActionToolCalls = input.toolCalls.filter((toolCall) => {
+    const descriptor = registry.getDescriptor(toolCall.name)
+    return descriptor?.executeBeforeSkillActions === true
+  })
+
+  for (const toolCall of preActionToolCalls) {
+    const descriptor = registry.getDescriptor(toolCall.name)
+    if (!descriptor) {
       continue
     }
 
-    const result = await executeObservedToolCallGroup(input.observer, adapterCalls, () =>
-      adapter.executeToolCalls({
+    const result = await executeObservedToolCallGroup(input.observer, [toolCall], () =>
+      descriptor.execute({
         context: input.context,
-        services,
         sessionId: input.sessionId,
-        toolCalls: adapterCalls,
-      }))
+        toolCalls: [toolCall],
+        loadedSkills,
+      }), createDescriptorMetadataByActionName(descriptor))
+    loadedSkills = result.loadedSkills ?? loadedSkills
     operations.push(...result.memoryOperations ?? [])
     toolMessages.push(...result.toolMessages)
-    adapterCalls.forEach(toolCall => handledToolCalls.add(toolCall))
+    handledToolCalls.add(toolCall)
+
+    if (descriptor.refreshRegistryAfterExecution) {
+      registry = createRuntimeToolRegistry({
+        ...input,
+        loadedSkills,
+      })
+    }
+  }
+
+  for (const toolCall of input.toolCalls) {
+    if (handledToolCalls.has(toolCall)) {
+      continue
+    }
+
+    const descriptor = registry.getDescriptor(toolCall.name)
+    if (!descriptor) {
+      continue
+    }
+
+    const result = await executeObservedToolCallGroup(input.observer, [toolCall], () =>
+      descriptor.execute({
+        context: input.context,
+        sessionId: input.sessionId,
+        toolCalls: [toolCall],
+        loadedSkills,
+      }), createDescriptorMetadataByActionName(descriptor))
+    operations.push(...result.memoryOperations ?? [])
+    loadedSkills = result.loadedSkills ?? loadedSkills
+    toolMessages.push(...result.toolMessages)
+    handledToolCalls.add(toolCall)
+
+    if (descriptor.refreshRegistryAfterExecution) {
+      registry = createRuntimeToolRegistry({
+        ...input,
+        loadedSkills,
+      })
+    }
   }
 
   const unavailableToolCalls: ToolCall[] = []
@@ -91,7 +106,7 @@ export async function executeRuntimeToolCalls(input: {
   }
 
   if (unavailableToolCalls.length > 0) {
-    await input.observer?.onToolCallsStarted?.(unavailableToolCalls)
+    await input.observer?.onToolCallsStarted?.(unavailableToolCalls, new Map())
     const unavailableToolMessages = unavailableToolCalls.map(toolCall => new ToolMessage({
       tool_call_id: toolCall.id ?? `${toolCall.name}:missing-id`,
       status: 'error',
@@ -112,7 +127,10 @@ export async function executeRuntimeToolCalls(input: {
 }
 
 export interface RuntimeToolExecutionObserver {
-  onToolCallsStarted?: (toolCalls: ToolCall[]) => Promise<void>
+  onToolCallsStarted?: (
+    toolCalls: ToolCall[],
+    metadataByActionName: ReadonlyMap<string, RuntimeSkillActionMetadata>,
+  ) => Promise<void>
   onToolCallsCompleted?: (toolCalls: ToolCall[], toolMessages: ToolMessage[]) => Promise<void>
   onToolCallsFailed?: (toolCalls: ToolCall[], error: unknown) => Promise<void>
 }
@@ -123,8 +141,9 @@ async function executeObservedToolCallGroup<TResult extends {
   observer: RuntimeToolExecutionObserver | undefined,
   toolCalls: ToolCall[],
   execute: () => Promise<TResult>,
+  metadataByActionName: ReadonlyMap<string, RuntimeSkillActionMetadata>,
 ): Promise<TResult> {
-  await observer?.onToolCallsStarted?.(toolCalls)
+  await observer?.onToolCallsStarted?.(toolCalls, metadataByActionName)
 
   try {
     const result = await execute()
@@ -138,4 +157,15 @@ async function executeObservedToolCallGroup<TResult extends {
 
     throw error
   }
+}
+
+function createDescriptorMetadataByActionName(
+  descriptor: RuntimeToolDescriptor,
+): ReadonlyMap<string, RuntimeSkillActionMetadata> {
+  return new Map([
+    [descriptor.name, {
+      skillKey: descriptor.ownerSkillKey,
+      connectorType: descriptor.connectorType,
+    }],
+  ])
 }

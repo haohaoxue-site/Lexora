@@ -40,7 +40,7 @@ export async function emitAgentModelStreamPart(
       generationId: options.generationId,
       payload: {
         toolCallId: part.toolCallId,
-        toolName: part.toolName,
+        actionName: part.actionName,
       },
     }))
     return
@@ -64,7 +64,7 @@ export async function emitAgentModelStreamPart(
       generationId: options.generationId,
       payload: {
         toolCallId: part.toolCallId,
-        toolName: part.toolName,
+        actionName: part.actionName,
       },
     }))
     return
@@ -76,8 +76,9 @@ export async function emitAgentModelStreamPart(
       generationId: options.generationId,
       payload: {
         toolCallId: part.toolCallId,
-        toolName: part.toolName,
-        toolKind: part.toolKind,
+        skillKey: part.skillKey,
+        actionName: part.actionName,
+        connectorType: part.connectorType,
         arguments: part.args,
         argumentsText: part.argsText,
       },
@@ -91,8 +92,9 @@ export async function emitAgentModelStreamPart(
       generationId: options.generationId,
       payload: {
         toolCallId: part.toolCallId,
-        toolName: part.toolName,
-        toolKind: part.toolKind,
+        skillKey: part.skillKey,
+        actionName: part.actionName,
+        connectorType: part.connectorType,
         status: part.status,
         output: part.output,
         outputText: part.outputText,
@@ -108,8 +110,9 @@ export async function emitAgentModelStreamPart(
       generationId: options.generationId,
       payload: {
         toolCallId: part.toolCallId,
-        toolName: part.toolName,
-        toolKind: part.toolKind,
+        skillKey: part.skillKey,
+        actionName: part.actionName,
+        connectorType: part.connectorType,
         message: part.message,
         durationMs: part.durationMs,
       },

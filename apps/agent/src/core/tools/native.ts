@@ -14,7 +14,7 @@ export async function runNativeToolProtocol(session: RuntimeToolLoopSession): Pr
       tool_calls: lastResult.toolCalls,
     }))
 
-    const toolResult = await session.executeToolCalls(lastResult.toolCalls)
+    const toolResult = await session.executeSkillActions(lastResult.toolCalls)
     session.appendToolMessages(toolResult.toolMessages)
 
     const shouldForceFinalResponse = shouldContinueWithFinalResponse({

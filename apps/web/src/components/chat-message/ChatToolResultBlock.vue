@@ -10,7 +10,7 @@ const TOOL_RESULT_INITIAL_VISIBLE_CHARS = 12_000
 const TOOL_RESULT_INCREMENT_CHARS = 20_000
 
 const { t } = useI18n({ useScope: 'global' })
-const toolName = computed(() => props.part.metadata?.toolName ?? t('chat.messageDisplay.toolResultFallback'))
+const actionName = computed(() => props.part.metadata?.actionName ?? t('chat.messageDisplay.toolResultFallback'))
 const summary = computed(() => getToolResultSummary(props.part.text))
 const hasMountedBody = shallowRef(false)
 const visibleCharLimit = shallowRef(TOOL_RESULT_INITIAL_VISIBLE_CHARS)
@@ -62,7 +62,7 @@ function sliceToolResultSource(source: string, maxChars: number): string {
   <details class="chat-tool-result-block" @toggle="handleToggle">
     <summary class="chat-tool-result-block__summary">
       <span class="chat-tool-result-block__index">{{ t('chat.messageDisplay.resultTitle', { index: props.index + 1 }) }}</span>
-      <span class="chat-tool-result-block__name">{{ toolName }}</span>
+      <span class="chat-tool-result-block__name">{{ actionName }}</span>
       <span class="chat-tool-result-block__text">{{ summary }}</span>
     </summary>
     <div

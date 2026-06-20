@@ -30,7 +30,6 @@ const SOFT_DELETE_MODEL_NAMES = new Set([
   'AiDefaultModelPolicy',
   'AiPlatformEmbeddingModelPolicy',
   'AgentProfile',
-  'AgentSkill',
   'AgentMemory',
   'AgentMemoryCandidate',
   'AdminAuditLog',

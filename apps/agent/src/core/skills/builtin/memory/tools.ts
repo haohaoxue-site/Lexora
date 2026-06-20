@@ -1,4 +1,3 @@
-import type { ToolCall } from '@langchain/core/messages'
 import type { StructuredToolInterface } from '@langchain/core/tools'
 import type { AgentGraphContext } from '../../../state'
 import {
@@ -53,12 +52,4 @@ export function createMemorySkillTools(): StructuredToolInterface[] {
       schema: MemoryForgetSchema,
     }),
   ]
-}
-
-export function isMemoryToolCall(toolCall: ToolCall): boolean {
-  return toolCall.name === AGENT_MEMORY_TOOL.REMEMBER
-    || toolCall.name === AGENT_MEMORY_TOOL.UPDATE
-    || toolCall.name === AGENT_MEMORY_TOOL.FORGET
-    || toolCall.name === AGENT_MEMORY_TOOL.IGNORE
-    || toolCall.name === AGENT_MEMORY_TOOL.ASK_USER
 }

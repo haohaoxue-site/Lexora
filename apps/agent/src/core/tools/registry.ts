@@ -1,31 +1,54 @@
-import type { AgentToolCallKind } from '@haohaoxue/lexora-contracts/agent'
+import type { ChatMemoryOperationProjection } from '@haohaoxue/lexora-contracts'
+import type { AgentSkillConnectorType } from '@haohaoxue/lexora-contracts/agent'
+import type { ToolCall, ToolMessage } from '@langchain/core/messages'
 import type { StructuredToolInterface } from '@langchain/core/tools'
 import type { AgentMemoryApiClient } from '../../clients/memory'
 import type { AgentSkillApiClient } from '../../clients/skills'
 import type { WebSearchClient } from '../../integrations/web-search'
-import type { RuntimeSkillAdapter, RuntimeSkillAdapterServices } from '../skills/adapters'
+import type { RuntimeSkillActionProvider, RuntimeSkillActionProviderServices } from '../skills/adapters'
 import type { LoadedAgentSkill } from '../skills/runtime'
 import type { AgentGraphContext } from '../state'
-import { AGENT_SKILL_ACTIVATION_MODE } from '@haohaoxue/lexora-contracts'
-import { DEFAULT_RUNTIME_SKILL_ADAPTERS } from '../skills/adapters'
+import { AGENT_SKILL_ACTIVATION_MODE, AGENT_SKILL_CONNECTOR_TYPE } from '@haohaoxue/lexora-contracts'
+import { DEFAULT_RUNTIME_SKILL_ACTION_PROVIDERS } from '../skills/adapters'
 import {
   createAgentSkillTools,
+  executeAgentSkillToolCalls,
   isSkillLoaded,
 } from '../skills/runtime'
 
+export interface RuntimeToolDescriptorExecutionInput {
+  context: AgentGraphContext
+  sessionId: string
+  toolCalls: ToolCall[]
+  loadedSkills: LoadedAgentSkill[]
+}
+
+export interface RuntimeToolDescriptorExecutionResult {
+  toolMessages: ToolMessage[]
+  memoryOperations?: ChatMemoryOperationProjection[]
+  loadedSkills?: LoadedAgentSkill[]
+}
+
 export interface RuntimeToolDescriptor {
   name: string
-  kind: AgentToolCallKind
   tool: StructuredToolInterface
   ownerSkillKey?: string
+  connectorType?: AgentSkillConnectorType
+  executeBeforeSkillActions?: boolean
+  refreshRegistryAfterExecution?: boolean
+  execute: (input: RuntimeToolDescriptorExecutionInput) => Promise<RuntimeToolDescriptorExecutionResult>
+}
+
+export interface RuntimeSkillActionMetadata {
+  skillKey?: string
+  connectorType?: AgentSkillConnectorType
 }
 
 export interface RuntimeToolRegistry {
   tools: StructuredToolInterface[]
   descriptors: RuntimeToolDescriptor[]
-  availableSkillAdapters: RuntimeSkillAdapter[]
-  visibleSkillToolNames: ReadonlySet<string>
-  hasVisibleTool: (toolName: string) => boolean
+  getDescriptor: (actionName: string) => RuntimeToolDescriptor | undefined
+  hasVisibleTool: (actionName: string) => boolean
 }
 
 export function createRuntimeToolRegistry(input: {
@@ -33,74 +56,91 @@ export function createRuntimeToolRegistry(input: {
   memoryApi?: AgentMemoryApiClient
   skillApi?: AgentSkillApiClient
   webSearch?: WebSearchClient
-  skillAdapters?: readonly RuntimeSkillAdapter[]
+  skillActionProviders?: readonly RuntimeSkillActionProvider[]
   loadedSkills: LoadedAgentSkill[]
 }): RuntimeToolRegistry {
   const descriptors: RuntimeToolDescriptor[] = []
-  const availableSkillAdapters: RuntimeSkillAdapter[] = []
-  const adapterServices = createRuntimeSkillAdapterServices(input)
-  const skillAdapters = input.skillAdapters ?? DEFAULT_RUNTIME_SKILL_ADAPTERS
+  const providerServices = createRuntimeSkillActionProviderServices(input)
+  const skillActionProviders = input.skillActionProviders ?? DEFAULT_RUNTIME_SKILL_ACTION_PROVIDERS
   const hasSkillRuntime = Boolean(input.skillApi)
 
-  if (hasRuntimeSkillCatalog(input)) {
+  if (hasRuntimeSkillCatalog(input) && input.skillApi) {
     descriptors.push(...createAgentSkillTools().map(tool => ({
       name: tool.name,
-      kind: 'skill' as const,
       tool,
+      connectorType: AGENT_SKILL_CONNECTOR_TYPE.BUILTIN,
+      executeBeforeSkillActions: true,
+      refreshRegistryAfterExecution: true,
+      async execute(executeInput: RuntimeToolDescriptorExecutionInput) {
+        const result = await executeAgentSkillToolCalls({
+          skillApi: input.skillApi!,
+          context: executeInput.context,
+          toolCalls: executeInput.toolCalls,
+          loadedSkills: executeInput.loadedSkills,
+        })
+
+        return {
+          toolMessages: result.toolMessages,
+          loadedSkills: result.loadedSkills,
+        }
+      },
     })))
   }
 
-  for (const adapter of skillAdapters) {
-    if (
-      !adapter.isAvailable({ context: input.context, services: adapterServices })
-      || (requiresRuntimeSkillActivation(input.context, adapter.key, hasSkillRuntime) && !isSkillLoaded(input.loadedSkills, adapter.key))
-    ) {
+  for (const provider of skillActionProviders) {
+    const needsActivation = requiresRuntimeSkillActivation(input.context, provider.key, hasSkillRuntime)
+    if (needsActivation && !isSkillLoaded(input.loadedSkills, provider.key)) {
       continue
     }
 
-    availableSkillAdapters.push(adapter)
-    descriptors.push(...adapter.createTools({
+    if (!provider.isAvailable({ context: input.context, services: providerServices })) {
+      continue
+    }
+
+    descriptors.push(...provider.createTools({
       context: input.context,
-      services: adapterServices,
+      services: providerServices,
     }).map(tool => ({
       name: tool.name,
-      kind: 'skill' as const,
       tool,
-      ownerSkillKey: adapter.key,
+      ownerSkillKey: provider.key,
+      connectorType: getSkillConnectorType(input.context, provider.key) ?? AGENT_SKILL_CONNECTOR_TYPE.BUILTIN,
+      async execute(executeInput: RuntimeToolDescriptorExecutionInput) {
+        return provider.executeActions({
+          context: executeInput.context,
+          services: providerServices,
+          sessionId: executeInput.sessionId,
+          toolCalls: executeInput.toolCalls,
+        })
+      },
     })))
   }
 
   const tools = descriptors.map(descriptor => descriptor.tool)
+  const descriptorByName = new Map(descriptors.map(descriptor => [descriptor.name, descriptor]))
   const visibleToolNames = new Set(descriptors.map(descriptor => descriptor.name))
-  const visibleSkillToolNames = new Set(
-    descriptors
-      .filter(descriptor => descriptor.kind === 'skill')
-      .map(descriptor => descriptor.name),
-  )
-
   return {
     descriptors,
     tools,
-    availableSkillAdapters,
-    visibleSkillToolNames,
-    hasVisibleTool: toolName => visibleToolNames.has(toolName),
+    getDescriptor: actionName => descriptorByName.get(actionName),
+    hasVisibleTool: actionName => visibleToolNames.has(actionName),
   }
 }
 
-export function createRuntimeSkillAdapterServices(input: {
+export function createRuntimeSkillActionProviderServices(input: {
   memoryApi?: AgentMemoryApiClient
   webSearch?: WebSearchClient
-}): RuntimeSkillAdapterServices {
+}): RuntimeSkillActionProviderServices {
   return {
     memoryApi: input.memoryApi,
     webSearch: input.webSearch,
   }
 }
 
-export function listRuntimeSkillToolNames(
-  skillAdapters: readonly RuntimeSkillAdapter[] = DEFAULT_RUNTIME_SKILL_ADAPTERS,
+export function listRuntimeSkillActionNames(
+  providers: readonly RuntimeSkillActionProvider[] = DEFAULT_RUNTIME_SKILL_ACTION_PROVIDERS,
 ): readonly string[] {
-  return skillAdapters.flatMap(adapter => adapter.toolNames)
+  return providers.flatMap(provider => provider.actionNames)
 }
 
 function hasRuntimeSkillCatalog(input: {
@@ -125,4 +165,11 @@ function requiresRuntimeSkillActivation(
 
   const catalogItem = context?.skillContext?.availableSkills.find(skill => skill.key === skillKey)
   return catalogItem?.activationMode !== AGENT_SKILL_ACTIVATION_MODE.ALWAYS_ON
+}
+
+function getSkillConnectorType(
+  context: AgentGraphContext | undefined,
+  skillKey: string,
+): AgentSkillConnectorType | undefined {
+  return context?.skillContext?.availableSkills.find(skill => skill.key === skillKey)?.connectorType
 }

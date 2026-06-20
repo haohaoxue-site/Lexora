@@ -12,7 +12,6 @@ import { AgentMemoryService } from './agent-memory.service'
 import { AgentProfilesController } from './agent-profiles.controller'
 import { AgentProfilesService } from './agent-profiles.service'
 import { AgentRuntimeCleanupTasksService } from './agent-runtime-cleanup-tasks.service'
-import { AgentSkillScannerService } from './agent-skill-scanner.service'
 import { AgentSkillsInternalController } from './agent-skills-internal.controller'
 import { AgentSkillsController } from './agent-skills.controller'
 import { AgentSkillsService } from './agent-skills.service'
@@ -29,7 +28,6 @@ import { AgentSkillsService } from './agent-skills.service'
     AgentMemoryService,
     AgentProfilesService,
     AgentRuntimeCleanupTasksService,
-    AgentSkillScannerService,
     AgentSkillsService,
   ],
   exports: [
@@ -41,7 +39,6 @@ import { AgentSkillsService } from './agent-skills.service'
     AgentMemoryService,
     AgentProfilesService,
     AgentRuntimeCleanupTasksService,
-    AgentSkillScannerService,
     AgentSkillsService,
   ],
 })

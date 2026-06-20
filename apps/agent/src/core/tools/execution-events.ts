@@ -1,15 +1,14 @@
 import type { ChatMemoryOperationProjection } from '@haohaoxue/lexora-contracts'
-import type { AgentToolCallKind } from '@haohaoxue/lexora-contracts/agent'
 import type { ToolMessage } from '@langchain/core/messages'
-import type { StructuredToolInterface } from '@langchain/core/tools'
 import type { AgentMemoryApiClient } from '../../clients/memory'
 import type { AgentSkillApiClient } from '../../clients/skills'
 import type { AgentModelStreamPart } from '../../integrations/model-providers/stream-text'
 import type { WebSearchClient } from '../../integrations/web-search'
-import type { RuntimeSkillAdapter } from '../skills/adapters'
+import type { RuntimeSkillActionProvider } from '../skills/adapters'
 import type { LoadedAgentSkill } from '../skills/runtime'
 import type { AgentGraphContext } from '../state'
 import type { AgentToolProtocol } from './protocol'
+import type { RuntimeSkillActionMetadata } from './registry'
 import type { BaseToolCall } from './utils'
 import {
   AGENT_LOCATION_TOOL_VALUES,
@@ -19,9 +18,7 @@ import {
   GetCurrentTimeToolResponseSchema,
 } from '@haohaoxue/lexora-contracts/agent'
 import { isGraphInterrupt } from '@langchain/langgraph'
-import { AGENT_SKILL_TOOL_NAME } from '../skills/runtime'
 import { executeRuntimeToolCalls } from './dispatch'
-import { listRuntimeSkillToolNames } from './registry'
 import {
   formatToolExecutionError,
   getToolCallId,
@@ -63,35 +60,43 @@ export async function executeRuntimeToolCallsWithEvents(input: {
   memoryApi?: AgentMemoryApiClient
   skillApi?: AgentSkillApiClient
   webSearch?: WebSearchClient
-  skillAdapters?: readonly RuntimeSkillAdapter[]
+  skillActionProviders?: readonly RuntimeSkillActionProvider[]
   context: AgentGraphContext | undefined
   sessionId: string
   toolCalls: BaseToolCall[]
   loadedSkills: LoadedAgentSkill[]
-  visibleSkillToolNames: ReadonlySet<string>
 }): Promise<RuntimeToolExecutionResult> {
   const startedAtByToolCallId = new Map<string, number>()
+  const actionMetadataByToolCallId = new Map<string, RuntimeSkillActionMetadata>()
 
   try {
     const result = await executeRuntimeToolCalls({
       memoryApi: input.memoryApi,
       webSearch: input.webSearch,
       skillApi: input.skillApi,
-      skillAdapters: input.skillAdapters,
+      skillActionProviders: input.skillActionProviders,
       context: input.context ?? {},
       sessionId: input.sessionId,
       toolCalls: input.toolCalls,
       loadedSkills: input.loadedSkills,
       observer: {
-        async onToolCallsStarted(toolCalls) {
+        async onToolCallsStarted(toolCalls, metadataByActionName) {
           const groupStartedAtByToolCallId = await emitToolExecutionStarts({
             context: input.context,
             toolCalls,
-            visibleSkillToolNames: input.visibleSkillToolNames,
+            skillActionMetadataByActionName: metadataByActionName,
           })
 
           for (const [toolCallId, startedAt] of groupStartedAtByToolCallId) {
             startedAtByToolCallId.set(toolCallId, startedAt)
+          }
+
+          for (const toolCall of toolCalls) {
+            const toolCallId = getToolCallId(toolCall)
+            actionMetadataByToolCallId.set(
+              toolCallId,
+              getSkillActionMetadata(toolCall.name, metadataByActionName),
+            )
           }
         },
         async onToolCallsCompleted(toolCalls, toolMessages) {
@@ -100,7 +105,7 @@ export async function executeRuntimeToolCallsWithEvents(input: {
             toolCalls,
             toolMessages,
             startedAtByToolCallId,
-            visibleSkillToolNames: input.visibleSkillToolNames,
+            actionMetadataByToolCallId,
           })
         },
         async onToolCallsFailed(toolCalls, error) {
@@ -108,7 +113,7 @@ export async function executeRuntimeToolCallsWithEvents(input: {
             context: input.context,
             toolCalls,
             startedAtByToolCallId,
-            visibleSkillToolNames: input.visibleSkillToolNames,
+            actionMetadataByToolCallId,
             error,
           })
         },
@@ -124,10 +129,6 @@ export async function executeRuntimeToolCallsWithEvents(input: {
 
     throw error
   }
-}
-
-export function createVisibleSkillToolNameSet(tools: StructuredToolInterface[]): ReadonlySet<string> {
-  return new Set(tools.map(tool => tool.name))
 }
 
 export function shouldContinueWithFinalResponse(input: {
@@ -158,22 +159,22 @@ function hasUserInputRequiredToolResult(input: {
       return false
     }
 
-    return isUserInputRequiredToolResult(toolCall.name, toolMessage.content)
+    return isUserInputRequiredActionResult(toolCall.name, toolMessage.content)
   })
 }
 
-function isUserInputRequiredToolResult(toolName: string, content: unknown): boolean {
+function isUserInputRequiredActionResult(actionName: string, content: unknown): boolean {
   const payload = parseToolJsonPayload(content)
   if (!payload) {
     return false
   }
 
-  if ((AGENT_LOCATION_TOOL_VALUES as readonly string[]).includes(toolName)) {
+  if ((AGENT_LOCATION_TOOL_VALUES as readonly string[]).includes(actionName)) {
     const parsed = GetCurrentLocationToolResponseSchema.safeParse(payload)
     return parsed.success && parsed.data.status === 'needs_location'
   }
 
-  if ((AGENT_TIME_TOOL_VALUES as readonly string[]).includes(toolName)) {
+  if ((AGENT_TIME_TOOL_VALUES as readonly string[]).includes(actionName)) {
     const parsed = GetCurrentTimeToolResponseSchema.safeParse(payload)
     return parsed.success && parsed.data.status === 'needs_timezone'
   }
@@ -201,17 +202,19 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 async function emitToolExecutionStarts(input: {
   context: AgentGraphContext | undefined
   toolCalls: BaseToolCall[]
-  visibleSkillToolNames: ReadonlySet<string>
+  skillActionMetadataByActionName: ReadonlyMap<string, RuntimeSkillActionMetadata>
 }): Promise<Map<string, number>> {
   const toolExecutionStartedAt = new Map<string, number>()
   for (const toolCall of input.toolCalls) {
     const toolCallId = getToolCallId(toolCall)
+    const actionMetadata = getSkillActionMetadata(toolCall.name, input.skillActionMetadataByActionName)
     toolExecutionStartedAt.set(toolCallId, Date.now())
     await input.context?.onStreamPart?.({
       type: 'tool.execution.started',
       toolCallId,
-      toolName: toolCall.name,
-      toolKind: getToolCallKind(toolCall.name, input.visibleSkillToolNames),
+      skillKey: actionMetadata.skillKey,
+      actionName: toolCall.name,
+      connectorType: actionMetadata.connectorType,
       args: toolCall.args,
       argsText: stringifyToolPayload(toolCall.args),
       raw: toolCall,
@@ -230,7 +233,7 @@ async function emitToolExecutionResults(input: {
     status?: 'success' | 'error'
   }>
   startedAtByToolCallId: Map<string, number>
-  visibleSkillToolNames: ReadonlySet<string>
+  actionMetadataByToolCallId: ReadonlyMap<string, RuntimeSkillActionMetadata>
 }): Promise<void> {
   const messagesByToolCallId = new Map(input.toolMessages.map(message => [message.tool_call_id, message]))
 
@@ -238,7 +241,10 @@ async function emitToolExecutionResults(input: {
     const toolCallId = getToolCallId(toolCall)
     const startedAt = input.startedAtByToolCallId.get(toolCallId) ?? Date.now()
     const durationMs = Math.max(0, Math.trunc(Date.now() - startedAt))
-    const toolKind = getToolCallKind(toolCall.name, input.visibleSkillToolNames)
+    const actionMetadata = getSkillActionMetadataByToolCallId(
+      toolCallId,
+      input.actionMetadataByToolCallId,
+    )
     const toolMessage = messagesByToolCallId.get(toolCallId)
     const outputText = toolMessage ? stringifyToolPayload(toolMessage.content) : undefined
     const status = toolMessage?.status === 'error' ? 'error' : 'success'
@@ -246,8 +252,9 @@ async function emitToolExecutionResults(input: {
     await input.context?.onStreamPart?.({
       type: 'tool.execution.completed',
       toolCallId,
-      toolName: toolCall.name,
-      toolKind,
+      skillKey: actionMetadata.skillKey,
+      actionName: toolCall.name,
+      connectorType: actionMetadata.connectorType,
       status,
       output: toolMessage?.content,
       outputText,
@@ -261,17 +268,22 @@ async function emitToolExecutionFailures(input: {
   context: AgentGraphContext | undefined
   toolCalls: BaseToolCall[]
   startedAtByToolCallId: Map<string, number>
-  visibleSkillToolNames: ReadonlySet<string>
+  actionMetadataByToolCallId: ReadonlyMap<string, RuntimeSkillActionMetadata>
   error: unknown
 }): Promise<void> {
   for (const toolCall of input.toolCalls) {
     const toolCallId = getToolCallId(toolCall)
     const startedAt = input.startedAtByToolCallId.get(toolCallId) ?? Date.now()
+    const actionMetadata = getSkillActionMetadataByToolCallId(
+      toolCallId,
+      input.actionMetadataByToolCallId,
+    )
     await input.context?.onStreamPart?.({
       type: 'tool.execution.failed',
       toolCallId,
-      toolName: toolCall.name,
-      toolKind: getToolCallKind(toolCall.name, input.visibleSkillToolNames),
+      skillKey: actionMetadata.skillKey,
+      actionName: toolCall.name,
+      connectorType: actionMetadata.connectorType,
       message: formatToolExecutionError(input.error),
       durationMs: Math.max(0, Math.trunc(Date.now() - startedAt)),
       raw: input.error,
@@ -279,21 +291,16 @@ async function emitToolExecutionFailures(input: {
   }
 }
 
-function getToolCallKind(toolName: string, visibleSkillToolNames: ReadonlySet<string>): AgentToolCallKind {
-  if (visibleSkillToolNames.has(toolName) || isKnownRuntimeSkillToolName(toolName)) {
-    return 'skill'
-  }
-
-  return toolName.startsWith('mcp_') ? 'mcp' : 'function'
+function getSkillActionMetadata(
+  actionName: string,
+  metadataByActionName: ReadonlyMap<string, RuntimeSkillActionMetadata>,
+): RuntimeSkillActionMetadata {
+  return metadataByActionName.get(actionName) ?? {}
 }
 
-function isKnownRuntimeSkillToolName(toolName: string): boolean {
-  return getKnownRuntimeSkillToolNames().includes(toolName)
-}
-
-function getKnownRuntimeSkillToolNames(): readonly string[] {
-  return [
-    ...Object.values(AGENT_SKILL_TOOL_NAME),
-    ...listRuntimeSkillToolNames(),
-  ]
+function getSkillActionMetadataByToolCallId(
+  toolCallId: string,
+  metadataByToolCallId: ReadonlyMap<string, RuntimeSkillActionMetadata>,
+): RuntimeSkillActionMetadata {
+  return metadataByToolCallId.get(toolCallId) ?? {}
 }

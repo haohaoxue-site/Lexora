@@ -1,4 +1,4 @@
-import type { RuntimeSkillAdapter } from '../../adapter'
+import type { RuntimeSkillActionProvider } from '../../adapter'
 import {
   AGENT_WEB_SEARCH_SKILL_KEY,
   AGENT_WEB_SEARCH_TOOL_VALUES,
@@ -7,21 +7,19 @@ import { executeWebSearchToolCalls } from './executor'
 import {
   createWebSearchSkillTools,
   isWebSearchSkillActive,
-  isWebSearchToolCall,
 } from './tools'
 
-export function createWebSearchRuntimeSkillAdapter(): RuntimeSkillAdapter {
+export function createWebSearchSkillActionProvider(): RuntimeSkillActionProvider {
   return {
     key: AGENT_WEB_SEARCH_SKILL_KEY,
-    toolNames: AGENT_WEB_SEARCH_TOOL_VALUES,
+    actionNames: AGENT_WEB_SEARCH_TOOL_VALUES,
     isAvailable({ context, services }) {
       return Boolean(services.webSearch && isWebSearchSkillActive(context))
     },
     createTools() {
       return createWebSearchSkillTools()
     },
-    isToolCall: isWebSearchToolCall,
-    async executeToolCalls(input) {
+    async executeActions(input) {
       if (!input.services.webSearch) {
         return {
           toolMessages: [],

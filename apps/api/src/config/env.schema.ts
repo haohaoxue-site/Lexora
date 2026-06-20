@@ -13,7 +13,6 @@ const envSchema = z.object({
   LINUX_DO_CLIENT_SECRET: optionalNonEmptyString(),
   GOOGLE_CLIENT_ID: optionalNonEmptyString(),
   GOOGLE_CLIENT_SECRET: optionalNonEmptyString(),
-  AGENT_SKILLS_ROOT: optionalNonEmptyString(),
   LEXORA_TRUST_CLOUDFLARE_IP_HEADERS: z
     .enum(['true', 'false'])
     .default('false')

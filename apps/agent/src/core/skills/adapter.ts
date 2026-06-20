@@ -5,26 +5,25 @@ import type { AgentMemoryApiClient } from '../../clients/memory'
 import type { WebSearchClient } from '../../integrations/web-search'
 import type { AgentGraphContext } from '../state'
 
-export interface RuntimeSkillAdapterServices {
+export interface RuntimeSkillActionProviderServices {
   memoryApi?: AgentMemoryApiClient
   webSearch?: WebSearchClient
 }
 
-export interface RuntimeSkillAdapter {
+export interface RuntimeSkillActionProvider {
   key: string
-  toolNames: readonly string[]
+  actionNames: readonly string[]
   isAvailable: (input: {
     context: AgentGraphContext | undefined
-    services: RuntimeSkillAdapterServices
+    services: RuntimeSkillActionProviderServices
   }) => boolean
   createTools: (input: {
     context: AgentGraphContext | undefined
-    services: RuntimeSkillAdapterServices
+    services: RuntimeSkillActionProviderServices
   }) => StructuredToolInterface[]
-  isToolCall: (toolCall: ToolCall) => boolean
-  executeToolCalls: (input: {
+  executeActions: (input: {
     context: AgentGraphContext
-    services: RuntimeSkillAdapterServices
+    services: RuntimeSkillActionProviderServices
     sessionId: string
     toolCalls: ToolCall[]
   }) => Promise<{

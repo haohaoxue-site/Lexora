@@ -1,4 +1,4 @@
-import type { AgentToolCallKind } from '@haohaoxue/lexora-contracts/agent'
+import type { AgentSkillConnectorType } from '@haohaoxue/lexora-contracts/agent'
 import type { ToolCall, ToolCallChunk } from '@langchain/core/messages'
 import type { AgentChatModelResponse } from './chat-model'
 import { createAgentInternalToolProtocolStripper } from '@haohaoxue/lexora-shared/agent'
@@ -11,14 +11,15 @@ import {
 export type AgentModelStreamPart
   = | { type: 'reasoning.delta', text: string, raw?: unknown }
     | { type: 'text.delta', text: string, raw?: unknown }
-    | { type: 'tool.call.started', toolCallId: string, toolName?: string, raw?: unknown }
+    | { type: 'tool.call.started', toolCallId: string, actionName?: string, raw?: unknown }
     | { type: 'tool.call.args.delta', toolCallId: string, text: string, raw?: unknown }
-    | { type: 'tool.call.completed', toolCallId: string, toolName?: string, raw?: unknown }
+    | { type: 'tool.call.completed', toolCallId: string, actionName?: string, raw?: unknown }
     | {
       type: 'tool.execution.started'
       toolCallId: string
-      toolName: string
-      toolKind: AgentToolCallKind
+      skillKey?: string
+      actionName?: string
+      connectorType?: AgentSkillConnectorType
       args?: unknown
       argsText?: string
       raw?: unknown
@@ -26,8 +27,9 @@ export type AgentModelStreamPart
     | {
       type: 'tool.execution.completed'
       toolCallId: string
-      toolName: string
-      toolKind: AgentToolCallKind
+      skillKey?: string
+      actionName?: string
+      connectorType?: AgentSkillConnectorType
       status: 'success' | 'error' | 'requires_action'
       output?: unknown
       outputText?: string
@@ -37,8 +39,9 @@ export type AgentModelStreamPart
     | {
       type: 'tool.execution.failed'
       toolCallId: string
-      toolName: string
-      toolKind: AgentToolCallKind
+      skillKey?: string
+      actionName?: string
+      connectorType?: AgentSkillConnectorType
       message: string
       durationMs?: number
       raw?: unknown
@@ -244,7 +247,7 @@ async function emitReasoningTextDeltas(input: {
 
 interface ToolCallStreamItem {
   toolCallId?: string
-  toolName?: string
+  actionName?: string
   argsText: string
   pendingArgDeltas: string[]
   started: boolean
@@ -273,7 +276,7 @@ async function emitToolCallChunkParts(
     const fallbackKey = getToolCallChunkPositionKey(index)
     const item = state.items.get(key) ?? state.items.get(fallbackKey) ?? {
       toolCallId: undefined,
-      toolName: undefined,
+      actionName: undefined,
       argsText: '',
       pendingArgDeltas: [],
       started: false,
@@ -281,7 +284,7 @@ async function emitToolCallChunkParts(
     }
 
     item.toolCallId = mergeOptionalChunkString(item.toolCallId, chunk.id)
-    item.toolName = mergeOptionalChunkString(item.toolName, chunk.name)
+    item.actionName = mergeOptionalChunkString(item.actionName, chunk.name)
 
     if (chunk.args) {
       item.argsText += chunk.args
@@ -300,7 +303,7 @@ async function emitToolCallChunkParts(
       await emitPart({
         type: 'tool.call.started',
         toolCallId: item.toolCallId,
-        toolName: item.toolName,
+        actionName: item.actionName,
         raw,
       }, options, markFirstToken)
 
@@ -344,7 +347,7 @@ async function emitCompletedToolCallParts(
     await emitPart({
       type: 'tool.call.completed',
       toolCallId: item.toolCallId,
-      toolName: item.toolName,
+      actionName: item.actionName,
     }, options, () => {})
   }
 }

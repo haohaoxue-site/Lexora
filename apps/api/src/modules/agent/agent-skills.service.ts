@@ -5,69 +5,61 @@ import type {
   AgentProfileSnapshot,
   AgentRuntimeSkillCatalogItem,
   AgentRuntimeSkillContext,
+  AgentRuntimeSkillCredentials,
   AgentSkillBinding,
   AgentSkillBindingConfig,
   AgentSkillCard,
-  AgentSkillCategory,
   AgentSkillDefinition,
-  AgentSkillResourceFile,
-  AgentSkillRiskLevel,
   ListAgentSkillsResponse,
   MutateAgentSkillResponse,
-  ReadAgentSkillResourceRequest,
-  ReadAgentSkillResourceResponse,
   UpdateAgentSkillConfigResponse,
 } from '@haohaoxue/lexora-contracts'
-import { readFile, realpath } from 'node:fs/promises'
-import path from 'node:path'
+import type { CryptoConfig } from '../../config/auth.config'
 import {
   ActivateAgentSkillResponseSchema,
+  AGENT_AMAP_MCP_SKILL_KEY,
   AGENT_FIRST_PARTY_SKILL_DEFINITIONS,
   AGENT_LOCATION_SKILL_KEY,
   AGENT_MEMORY_SKILL_KEY,
-  AGENT_SKILL_ACTIVATION_MODE,
-  AGENT_SKILL_CATEGORY,
   AGENT_SKILL_INSTALL_MODE,
-  AGENT_SKILL_RISK_LEVEL,
-  AGENT_SKILL_SOURCE_SCOPE,
   AGENT_TIME_SKILL_KEY,
   AGENT_TRANSLATOR_DEFAULT_SKILL_CONFIG,
   AGENT_TRANSLATOR_OUTPUT_MODE,
   AGENT_TRANSLATOR_SKILL_KEY,
   AGENT_WEB_SEARCH_SKILL_KEY,
+  AgentAmapMcpSkillCardConfigSchema,
+  AgentAmapMcpSkillConfigSchema,
+  AgentAmapMcpSkillCredentialConfigSchema,
   AgentLocationSkillConfigSchema,
   AgentProfileConfigSchema,
   AgentProfileSnapshotSchema,
   AgentRuntimeSkillContextSchema,
+  AgentRuntimeSkillCredentialsSchema,
   AgentSkillBindingConfigSchema,
-  AgentSkillCategorySchema,
-  AgentSkillRiskLevelSchema,
   AgentTimeSkillConfigSchema,
   AgentTranslatorSkillConfigSchema,
   AgentWebSearchSkillConfigSchema,
   ListAgentSkillsResponseSchema,
   MutateAgentSkillResponseSchema,
-  ReadAgentSkillResourceResponseSchema,
   UpdateAgentSkillConfigResponseSchema,
 } from '@haohaoxue/lexora-contracts'
 import {
-  BadRequestException,
   ConflictException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common'
+import { ConfigService } from '@nestjs/config'
 import {
   ChatMessageGenerationStatus,
   Prisma,
 } from '@prisma/client'
 import { PrismaService } from '../../database/prisma.service'
+import { decryptAes256Gcm, encryptAes256Gcm } from '../../utils/crypto'
 import { AgentProfilesService } from './agent-profiles.service'
 
-const MAX_RESOURCE_BYTES = 5 * 1024 * 1024
-const SCRIPT_EXECUTION_ENABLED = false
-const builtInSkillByKey = new Map(AGENT_FIRST_PARTY_SKILL_DEFINITIONS.map(skill => [skill.key, skill]))
+const skillDefinitionByKey = new Map(AGENT_FIRST_PARTY_SKILL_DEFINITIONS.map(skill => [skill.key, skill]))
 
-interface BuiltInSkillConfigHandler {
+interface SkillConfigHandler {
   defaultConfig: () => AgentSkillBindingConfig
   normalize: (config: unknown) => AgentSkillBindingConfig
   renderInstructions?: (
@@ -76,7 +68,7 @@ interface BuiltInSkillConfigHandler {
   ) => string
 }
 
-const builtInSkillConfigHandlerByKey = {
+const skillConfigHandlerByKey = {
   [AGENT_MEMORY_SKILL_KEY]: {
     defaultConfig: () => ({}),
     normalize: () => ({}),
@@ -99,41 +91,15 @@ const builtInSkillConfigHandlerByKey = {
     normalize: normalizeWebSearchSkillConfig,
     renderInstructions: renderWebSearchRuntimeInstructions,
   },
-} satisfies Record<string, BuiltInSkillConfigHandler>
-
-export function listBuiltInSkillConfigHandlerKeys(): readonly string[] {
-  return Object.keys(builtInSkillConfigHandlerByKey)
-}
-
-const marketSkillSelect = {
-  id: true,
-  skillKey: true,
-  name: true,
-  description: true,
-  category: true,
-  activationMode: true,
-  riskLevel: true,
-  rootPath: true,
-  instructions: true,
-  updatedAt: true,
-  files: {
-    select: {
-      relPath: true,
-      sizeBytes: true,
-      sha256: true,
-      executable: true,
-    },
-    orderBy: {
-      relPath: 'asc',
-    },
+  [AGENT_AMAP_MCP_SKILL_KEY]: {
+    defaultConfig: () => AgentAmapMcpSkillConfigSchema.parse({}),
+    normalize: normalizeAmapMcpSkillConfig,
   },
-} satisfies Prisma.AgentSkillSelect
+} satisfies Record<string, SkillConfigHandler>
 
-type MarketSkill = Prisma.AgentSkillGetPayload<{
-  select: typeof marketSkillSelect
-}>
-
-type SkillFileRecord = MarketSkill['files'][number]
+export function listSkillConfigHandlerKeys(): readonly string[] {
+  return Object.keys(skillConfigHandlerByKey)
+}
 
 type ResolvedSkillDefinition = Pick<
   AgentSkillDefinition,
@@ -144,30 +110,36 @@ type ResolvedSkillDefinition = Pick<
 
 @Injectable()
 export class AgentSkillsService {
+  private readonly encryptionKey: string
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly profiles: AgentProfilesService,
-  ) {}
+    configService: ConfigService,
+  ) {
+    this.encryptionKey = configService.getOrThrow<CryptoConfig>('crypto').encryptionKey
+  }
 
   async listDefaultAgentSkills(ownerUserId: string): Promise<ListAgentSkillsResponse> {
-    const profile = await this.profiles.ensureDefaultAgentProfile({ ownerUserId })
+    const [profile, configuredCredentialSkillKeys, cardCredentialPayloadBySkillKey] = await Promise.all([
+      this.profiles.ensureDefaultAgentProfile({ ownerUserId }),
+      this.listConfiguredCredentialSkillKeys(ownerUserId),
+      this.listSkillCardCredentialPayloads(ownerUserId),
+    ])
     const config = AgentProfileConfigSchema.parse(profile.currentConfig)
     const bindingByKey = new Map(config.skillBindings.map(binding => [binding.key, binding]))
-    const marketSkills = await this.findActiveMarketSkills()
-    const builtInSkills = AGENT_FIRST_PARTY_SKILL_DEFINITIONS.map(definition =>
-      toBuiltInSkillCard(definition, bindingByKey.get(definition.key)),
+    const skillCards = AGENT_FIRST_PARTY_SKILL_DEFINITIONS.map(definition =>
+      toSkillCard(
+        definition,
+        bindingByKey.get(definition.key),
+        configuredCredentialSkillKeys,
+        cardCredentialPayloadBySkillKey,
+      ),
     )
-    const marketSkillCards = marketSkills.map(skill =>
-      toMarketSkillCard(skill, bindingByKey.get(skill.skillKey)),
-    )
-    const skills = [...builtInSkills, ...marketSkillCards]
 
     return ListAgentSkillsResponseSchema.parse({
-      skills,
-      mySkills: [
-        ...builtInSkills.filter(skill => skill.installed),
-        ...marketSkillCards.filter(skill => skill.installed),
-      ],
+      skills: skillCards,
+      mySkills: skillCards.filter(skill => skill.installed),
     })
   }
 
@@ -184,6 +156,10 @@ export class AgentSkillsService {
 
     if (!skillDefinition.canInstall) {
       throw new ConflictException('该技能无需安装')
+    }
+
+    if (isCredentialRequiredSkill(normalizedSkillKey)) {
+      throw new ConflictException('该技能需要先配置凭证')
     }
 
     await this.prisma.$transaction(async (tx) => {
@@ -274,6 +250,13 @@ export class AgentSkillsService {
           currentConfig: toJsonObject(nextConfig),
         },
       })
+
+      await tx.agentSkillCredential.deleteMany({
+        where: {
+          ownerUserId,
+          skillKey: normalizedSkillKey,
+        },
+      })
     })
 
     const response = await this.listDefaultAgentSkills(ownerUserId)
@@ -358,25 +341,77 @@ export class AgentSkillsService {
     }
 
     const normalizedConfig = normalizeSkillBindingConfig(normalizedSkillKey, config)
+    const credentialMutation = extractSkillCredentialMutation(normalizedSkillKey, config)
 
     await this.prisma.$transaction(async (tx) => {
-      const currentProfile = await tx.agentProfile.findFirst({
-        where: {
-          id: profile.id,
-          ownerUserId,
-          deletedAt: null,
-        },
-        select: {
-          currentConfig: true,
-        },
-      })
+      const [currentProfile, existingCredential] = await Promise.all([
+        tx.agentProfile.findFirst({
+          where: {
+            id: profile.id,
+            ownerUserId,
+            deletedAt: null,
+          },
+          select: {
+            currentConfig: true,
+          },
+        }),
+        tx.agentSkillCredential.findUnique({
+          where: {
+            ownerUserId_skillKey: {
+              ownerUserId,
+              skillKey: normalizedSkillKey,
+            },
+          },
+          select: {
+            id: true,
+          },
+        }),
+      ])
 
       if (!currentProfile) {
         throw new NotFoundException('默认 AgentProfile 不存在')
       }
 
       const currentConfig = AgentProfileConfigSchema.parse(currentProfile.currentConfig)
+      const hasBinding = currentConfig.skillBindings.some(binding => binding.key === skillDefinition.key)
+      if (
+        !hasBinding
+        && isCredentialRequiredSkill(normalizedSkillKey)
+        && credentialMutation?.kind !== 'set'
+        && !existingCredential
+      ) {
+        throw new ConflictException('该技能需要先配置凭证')
+      }
+
       const nextConfig = updateSkillBindingConfig(currentConfig, skillDefinition, normalizedConfig)
+
+      if (credentialMutation?.kind === 'set') {
+        const credentialEncrypted = this.encryptCredentialPayload(credentialMutation.payload)
+        await tx.agentSkillCredential.upsert({
+          where: {
+            ownerUserId_skillKey: {
+              ownerUserId,
+              skillKey: normalizedSkillKey,
+            },
+          },
+          create: {
+            ownerUserId,
+            skillKey: normalizedSkillKey,
+            credentialEncrypted,
+          },
+          update: {
+            credentialEncrypted,
+          },
+        })
+      }
+      else if (credentialMutation?.kind === 'delete') {
+        await tx.agentSkillCredential.deleteMany({
+          where: {
+            ownerUserId,
+            skillKey: normalizedSkillKey,
+          },
+        })
+      }
 
       await tx.agentProfile.update({
         where: {
@@ -407,164 +442,132 @@ export class AgentSkillsService {
       return AgentRuntimeSkillContextSchema.parse({})
     }
 
-    const enabledBindings = resolveRuntimeEnabledSkillBindings(config)
-    const marketSkillKeys = enabledBindings
-      .map(binding => binding.key)
-      .filter(key => !builtInSkillByKey.has(key))
-
-    const marketSkillByKey = new Map(
-      (marketSkillKeys.length === 0 ? [] : await this.findActiveMarketSkills(marketSkillKeys))
-        .map(skill => [skill.skillKey, skill]),
-    )
+    const configuredCredentialSkillKeys = await this.listConfiguredCredentialSkillKeys(input.actorUserId)
+    const enabledBindings = resolveRuntimeEnabledSkillBindings(config, configuredCredentialSkillKeys)
     const availableSkills = enabledBindings
       .slice()
       .sort((left, right) => left.priority - right.priority)
       .map((binding): AgentRuntimeSkillCatalogItem | null => {
-        const builtIn = builtInSkillByKey.get(binding.key)
-        if (builtIn) {
-          return toBuiltInRuntimeCatalogItem(builtIn)
-        }
-
-        const skill = marketSkillByKey.get(binding.key)
-        return skill ? toMarketRuntimeCatalogItem(skill) : null
+        const definition = skillDefinitionByKey.get(binding.key)
+        return definition ? toRuntimeCatalogItem(definition) : null
       })
       .filter((item): item is AgentRuntimeSkillCatalogItem => Boolean(item))
 
     return AgentRuntimeSkillContextSchema.parse({ availableSkills })
   }
 
+  async resolveRuntimeSkillCredentials(input: {
+    actorUserId: string
+    agentProfile: AgentProfileSnapshot
+  }): Promise<AgentRuntimeSkillCredentials> {
+    const agentProfile = AgentProfileSnapshotSchema.parse(input.agentProfile)
+    const config = AgentProfileConfigSchema.parse(agentProfile.currentConfig)
+    if (!config.toolPolicy.enabled || input.actorUserId !== agentProfile.ownerUserId) {
+      return AgentRuntimeSkillCredentialsSchema.parse([])
+    }
+
+    const configuredCredentialSkillKeys = await this.listConfiguredCredentialSkillKeys(input.actorUserId)
+    const enabledSkillKeys = resolveRuntimeEnabledSkillBindings(config, configuredCredentialSkillKeys).map(binding => binding.key)
+    if (enabledSkillKeys.length === 0) {
+      return AgentRuntimeSkillCredentialsSchema.parse([])
+    }
+
+    const credentials = await this.prisma.agentSkillCredential.findMany({
+      where: {
+        ownerUserId: input.actorUserId,
+        skillKey: {
+          in: enabledSkillKeys,
+        },
+      },
+      select: {
+        skillKey: true,
+        credentialEncrypted: true,
+      },
+    })
+
+    return AgentRuntimeSkillCredentialsSchema.parse(credentials.map(credential => ({
+      key: credential.skillKey,
+      credential: this.decryptCredentialPayload(credential.credentialEncrypted),
+    })))
+  }
+
   async activateSkill(payload: ActivateAgentSkillRequest): Promise<ActivateAgentSkillResponse> {
     const snapshot = await this.resolveGenerationAgentProfileSnapshot(payload.actorUserId, payload.generationId)
     const skillKey = normalizeSkillKey(payload.skillKey)
-    const binding = getEnabledSkillBinding(snapshot.currentConfig, skillKey)
+    const credentialSkillKeys = await this.listConfiguredCredentialSkillKeys(payload.actorUserId)
+    const binding = getEnabledSkillBinding(snapshot.currentConfig, skillKey, credentialSkillKeys)
 
-    const builtIn = builtInSkillByKey.get(skillKey)
-    if (builtIn) {
-      return ActivateAgentSkillResponseSchema.parse({
-        skill: {
-          ...toBuiltInRuntimeCatalogItem(builtIn),
-          instructions: renderBuiltInSkillInstructions(builtIn, binding),
-          resources: [],
-        },
-      })
-    }
-
-    const skill = await this.findActiveMarketSkill(skillKey)
-    if (!skill) {
+    const definition = skillDefinitionByKey.get(skillKey)
+    if (!definition) {
       throw new NotFoundException('技能不存在或不可用')
     }
 
     return ActivateAgentSkillResponseSchema.parse({
       skill: {
-        ...toMarketRuntimeCatalogItem(skill),
-        instructions: skill.instructions,
-        resources: skill.files.map(toSkillResourceFile),
+        ...toRuntimeCatalogItem(definition),
+        instructions: renderSkillInstructions(definition, binding),
       },
     })
   }
 
-  async readSkillResource(payload: ReadAgentSkillResourceRequest): Promise<ReadAgentSkillResourceResponse> {
-    const snapshot = await this.resolveGenerationAgentProfileSnapshot(payload.actorUserId, payload.generationId)
-    const skillKey = normalizeSkillKey(payload.skillKey)
-    getEnabledSkillBinding(snapshot.currentConfig, skillKey)
-
-    if (builtInSkillByKey.has(skillKey)) {
-      throw new NotFoundException('内置技能没有可读取资源')
-    }
-
-    const skill = await this.findActiveMarketSkill(skillKey)
-    if (!skill) {
-      throw new NotFoundException('技能不存在或不可用')
-    }
-
-    const resourcePath = normalizeResourcePath(payload.path)
-    const file = skill.files.find(item => item.relPath === resourcePath)
-    if (!file) {
-      throw new NotFoundException('技能资源不存在')
-    }
-
-    const sizeBytes = toSafeFileSize(file.sizeBytes)
-    if (sizeBytes > MAX_RESOURCE_BYTES) {
-      throw new BadRequestException('技能资源超过读取上限')
-    }
-
-    const realRootPath = await realpath(skill.rootPath)
-    const absolutePath = path.resolve(skill.rootPath, resourcePath)
-    const realFilePath = await realpath(absolutePath)
-    assertPathInside(realRootPath, realFilePath)
-
-    const content = await readFile(realFilePath, 'utf8')
-
-    return ReadAgentSkillResourceResponseSchema.parse({
-      skillKey,
-      path: resourcePath,
-      content,
-      sizeBytes,
-      sha256: file.sha256,
-    })
-  }
-
-  private async findActiveMarketSkills(skillKeys?: string[]): Promise<MarketSkill[]> {
-    return this.prisma.agentSkill.findMany({
+  private async listConfiguredCredentialSkillKeys(ownerUserId: string): Promise<ReadonlySet<string>> {
+    const credentials = await this.prisma.agentSkillCredential.findMany({
       where: {
-        scope: 'MARKET',
-        enabled: true,
-        deletedAt: null,
-        ...(skillKeys ? { skillKey: { in: skillKeys } } : {}),
+        ownerUserId,
       },
-      select: marketSkillSelect,
-      orderBy: [
-        { name: 'asc' },
-        { skillKey: 'asc' },
-      ],
+      select: {
+        skillKey: true,
+      },
     })
+
+    return new Set(credentials.map(credential => credential.skillKey))
   }
 
-  private async findActiveMarketSkill(skillKey: string): Promise<MarketSkill | null> {
-    return this.prisma.agentSkill.findFirst({
+  private async listSkillCardCredentialPayloads(ownerUserId: string): Promise<ReadonlyMap<string, Record<string, unknown>>> {
+    const credentials = await this.prisma.agentSkillCredential.findMany({
       where: {
-        skillKey,
-        scope: 'MARKET',
-        enabled: true,
-        deletedAt: null,
+        ownerUserId,
+        skillKey: {
+          in: [AGENT_AMAP_MCP_SKILL_KEY],
+        },
       },
-      select: marketSkillSelect,
-      orderBy: [
-        { updatedAt: 'desc' },
-      ],
+      select: {
+        skillKey: true,
+        credentialEncrypted: true,
+      },
     })
+
+    return new Map(credentials.map(credential => [
+      credential.skillKey,
+      this.decryptCredentialPayload(credential.credentialEncrypted),
+    ]))
+  }
+
+  private encryptCredentialPayload(payload: Record<string, unknown>): string {
+    return encryptAes256Gcm(JSON.stringify(payload), this.encryptionKey)
+  }
+
+  private decryptCredentialPayload(credentialEncrypted: string): Record<string, unknown> {
+    const payload: unknown = JSON.parse(decryptAes256Gcm(credentialEncrypted, this.encryptionKey))
+    return isRecord(payload) ? payload : {}
   }
 
   private async resolveSkillDefinition(skillKey: string): Promise<ResolvedSkillDefinition | null> {
-    const builtIn = builtInSkillByKey.get(skillKey)
-    if (builtIn) {
+    const definition = skillDefinitionByKey.get(skillKey)
+    if (definition) {
       return {
-        key: builtIn.key,
-        installMode: builtIn.installMode,
-        defaultInstalled: builtIn.defaultInstalled,
-        defaultEnabled: builtIn.defaultEnabled,
-        canDisable: builtIn.canDisable,
-        canUninstall: builtIn.canUninstall,
-        configurable: builtIn.configurable,
-        canInstall: builtIn.installMode === AGENT_SKILL_INSTALL_MODE.OPTIONAL,
+        key: definition.key,
+        installMode: definition.installMode,
+        defaultInstalled: definition.defaultInstalled,
+        defaultEnabled: definition.defaultEnabled,
+        canDisable: definition.canDisable,
+        canUninstall: definition.canUninstall,
+        configurable: definition.configurable,
+        canInstall: definition.installMode === AGENT_SKILL_INSTALL_MODE.OPTIONAL,
       }
     }
 
-    const marketSkill = await this.findActiveMarketSkill(skillKey)
-    if (!marketSkill) {
-      return null
-    }
-
-    return {
-      key: marketSkill.skillKey,
-      installMode: AGENT_SKILL_INSTALL_MODE.OPTIONAL,
-      defaultInstalled: false,
-      defaultEnabled: true,
-      canDisable: true,
-      canUninstall: true,
-      configurable: false,
-      canInstall: true,
-    }
+    return null
   }
 
   private async resolveGenerationAgentProfileSnapshot(actorUserId: string, generationId: string): Promise<AgentProfileSnapshot> {
@@ -593,9 +596,11 @@ export class AgentSkillsService {
   }
 }
 
-function toBuiltInSkillCard(
+function toSkillCard(
   definition: (typeof AGENT_FIRST_PARTY_SKILL_DEFINITIONS)[number],
   binding: AgentSkillBinding | undefined,
+  configuredCredentialSkillKeys: ReadonlySet<string>,
+  cardCredentialPayloadBySkillKey: ReadonlyMap<string, Record<string, unknown>>,
 ): AgentSkillCard {
   const installed = definition.defaultInstalled || Boolean(binding)
   const enabled = installed
@@ -611,12 +616,14 @@ function toBuiltInSkillCard(
     category: definition.category,
     activationMode: definition.activationMode,
     riskLevel: definition.riskLevel,
-    builtIn: true,
+    sourceType: definition.sourceType,
+    connectorType: definition.connectorType,
     installMode: definition.installMode,
     defaultInstalled: definition.defaultInstalled,
     defaultEnabled: definition.defaultEnabled,
     configurable: definition.configurable,
-    tools: definition.tools,
+    actions: definition.actions,
+    connectors: definition.connectors,
     installed,
     enabled,
     canInstall: !installed && definition.installMode === AGENT_SKILL_INSTALL_MODE.OPTIONAL,
@@ -624,48 +631,16 @@ function toBuiltInSkillCard(
     canDisable: installed && enabled && definition.canDisable,
     canUninstall: installed && definition.canUninstall,
     canConfigure: installed && definition.configurable,
-    config: normalizeSkillBindingConfig(definition.key, binding?.config ?? getDefaultSkillBindingConfig(definition.key)),
-    sourceScope: AGENT_SKILL_SOURCE_SCOPE.BUILTIN,
-    resourceCount: 0,
-    scriptExecutionEnabled: false,
+    config: toSkillCardConfig(
+      definition.key,
+      normalizeSkillBindingConfig(definition.key, binding?.config ?? getDefaultSkillBindingConfig(definition.key)),
+      configuredCredentialSkillKeys,
+      cardCredentialPayloadBySkillKey,
+    ),
   }
 }
 
-function toMarketSkillCard(
-  skill: MarketSkill,
-  binding: AgentSkillBinding | undefined,
-): AgentSkillCard {
-  const installed = Boolean(binding)
-  const enabled = binding?.enabled ?? false
-
-  return {
-    key: skill.skillKey,
-    name: skill.name,
-    description: skill.description,
-    category: parseSkillCategory(skill.category),
-    activationMode: AGENT_SKILL_ACTIVATION_MODE.MODEL_SELECTED,
-    riskLevel: parseSkillRiskLevel(skill.riskLevel),
-    builtIn: false,
-    installMode: AGENT_SKILL_INSTALL_MODE.OPTIONAL,
-    defaultInstalled: false,
-    defaultEnabled: true,
-    configurable: false,
-    tools: [],
-    installed,
-    enabled,
-    canInstall: !installed,
-    canEnable: installed && !enabled,
-    canDisable: installed && enabled,
-    canUninstall: installed,
-    canConfigure: false,
-    config: binding?.config ?? {},
-    sourceScope: AGENT_SKILL_SOURCE_SCOPE.EXTERNAL,
-    resourceCount: skill.files.length,
-    scriptExecutionEnabled: SCRIPT_EXECUTION_ENABLED,
-  }
-}
-
-function toBuiltInRuntimeCatalogItem(
+function toRuntimeCatalogItem(
   definition: (typeof AGENT_FIRST_PARTY_SKILL_DEFINITIONS)[number],
 ): AgentRuntimeSkillCatalogItem {
   return {
@@ -673,41 +648,10 @@ function toBuiltInRuntimeCatalogItem(
     name: definition.name,
     description: definition.description,
     activationMode: definition.activationMode,
-    sourceScope: AGENT_SKILL_SOURCE_SCOPE.BUILTIN,
-    builtIn: true,
-    tools: definition.tools,
+    sourceType: definition.sourceType,
+    connectorType: definition.connectorType,
+    actions: definition.actions,
   }
-}
-
-function toMarketRuntimeCatalogItem(skill: MarketSkill): AgentRuntimeSkillCatalogItem {
-  return {
-    key: skill.skillKey,
-    name: skill.name,
-    description: skill.description,
-    activationMode: AGENT_SKILL_ACTIVATION_MODE.MODEL_SELECTED,
-    sourceScope: AGENT_SKILL_SOURCE_SCOPE.EXTERNAL,
-    builtIn: false,
-    tools: [],
-  }
-}
-
-function toSkillResourceFile(file: SkillFileRecord): AgentSkillResourceFile {
-  return {
-    path: file.relPath,
-    sizeBytes: toSafeFileSize(file.sizeBytes),
-    sha256: file.sha256,
-    executable: file.executable,
-  }
-}
-
-function parseSkillCategory(value: string): AgentSkillCategory {
-  const result = AgentSkillCategorySchema.safeParse(value)
-  return result.success ? result.data : AGENT_SKILL_CATEGORY.PRODUCTIVITY
-}
-
-function parseSkillRiskLevel(value: string): AgentSkillRiskLevel {
-  const result = AgentSkillRiskLevelSchema.safeParse(value)
-  return result.success ? result.data : AGENT_SKILL_RISK_LEVEL.LOW
 }
 
 function installSkillBinding(
@@ -781,10 +725,6 @@ function updateSkillBindingConfig(
   }
 
   const existing = config.skillBindings.find(binding => binding.key === skill.key)
-  if (!existing && skill.installMode === AGENT_SKILL_INSTALL_MODE.OPTIONAL) {
-    throw new ConflictException('技能尚未安装')
-  }
-
   const normalizedConfig = normalizeSkillBindingConfig(skill.key, nextBindingConfig)
   const skillBindings = existing
     ? config.skillBindings.map(binding =>
@@ -819,12 +759,16 @@ function removeSkillBinding(config: AgentProfileConfig, skillKey: string): Agent
   })
 }
 
-function getEnabledSkillBinding(config: AgentProfileConfig, skillKey: string): AgentSkillBinding {
+function getEnabledSkillBinding(
+  config: AgentProfileConfig,
+  skillKey: string,
+  configuredCredentialSkillKeys: ReadonlySet<string>,
+): AgentSkillBinding {
   if (!config.toolPolicy.enabled) {
     throw new ConflictException('当前 AgentProfile 未启用工具')
   }
 
-  const binding = resolveRuntimeEnabledSkillBindings(config).find(item => item.key === skillKey)
+  const binding = resolveRuntimeEnabledSkillBindings(config, configuredCredentialSkillKeys).find(item => item.key === skillKey)
   if (!binding) {
     throw new NotFoundException('技能未启用')
   }
@@ -832,13 +776,16 @@ function getEnabledSkillBinding(config: AgentProfileConfig, skillKey: string): A
   return binding
 }
 
-function resolveRuntimeEnabledSkillBindings(config: AgentProfileConfig): AgentSkillBinding[] {
+function resolveRuntimeEnabledSkillBindings(
+  config: AgentProfileConfig,
+  configuredCredentialSkillKeys: ReadonlySet<string>,
+): AgentSkillBinding[] {
   if (!config.toolPolicy.enabled) {
     return []
   }
 
   const skillBindings = config.skillBindings.map((binding) => {
-    const definition = builtInSkillByKey.get(binding.key)
+    const definition = skillDefinitionByKey.get(binding.key)
     if (!definition) {
       return binding
     }
@@ -871,11 +818,11 @@ function resolveRuntimeEnabledSkillBindings(config: AgentProfileConfig): AgentSk
   return AgentProfileConfigSchema.parse({
     ...config,
     skillBindings,
-  }).skillBindings.filter(binding => binding.enabled)
+  }).skillBindings.filter(binding => binding.enabled && isRuntimeSkillBindingReady(binding, configuredCredentialSkillKeys))
 }
 
 function normalizeSkillBindingConfig(skillKey: string, config: unknown): AgentSkillBindingConfig {
-  const handler = getBuiltInSkillConfigHandler(skillKey)
+  const handler = getSkillConfigHandler(skillKey)
 
   return handler
     ? handler.normalize(config)
@@ -957,21 +904,83 @@ function normalizeWebSearchSkillConfig(config: unknown): AgentSkillBindingConfig
   return cleanedResult.success ? cleanedResult.data : AgentWebSearchSkillConfigSchema.parse({})
 }
 
+function normalizeAmapMcpSkillConfig(_config: unknown): AgentSkillBindingConfig {
+  return AgentAmapMcpSkillConfigSchema.parse({})
+}
+
+function toSkillCardConfig(
+  skillKey: string,
+  config: AgentSkillBindingConfig,
+  configuredCredentialSkillKeys: ReadonlySet<string>,
+  cardCredentialPayloadBySkillKey: ReadonlyMap<string, Record<string, unknown>>,
+): AgentSkillBindingConfig {
+  if (skillKey === AGENT_AMAP_MCP_SKILL_KEY) {
+    const credentialResult = AgentAmapMcpSkillCredentialConfigSchema.safeParse(cardCredentialPayloadBySkillKey.get(skillKey) ?? {})
+    const apiKey = credentialResult.success ? credentialResult.data.apiKey?.trim() ?? '' : ''
+
+    return AgentAmapMcpSkillCardConfigSchema.parse({
+      apiKeyConfigured: configuredCredentialSkillKeys.has(skillKey),
+      apiKey,
+    })
+  }
+
+  return config
+}
+
+function isRuntimeSkillBindingReady(
+  binding: AgentSkillBinding,
+  configuredCredentialSkillKeys: ReadonlySet<string>,
+): boolean {
+  return !isCredentialRequiredSkill(binding.key) || configuredCredentialSkillKeys.has(binding.key)
+}
+
+function isCredentialRequiredSkill(skillKey: string): boolean {
+  return skillKey === AGENT_AMAP_MCP_SKILL_KEY
+}
+
+type SkillCredentialMutation
+  = | {
+    kind: 'set'
+    payload: Record<string, unknown>
+  }
+  | {
+    kind: 'delete'
+  }
+
+function extractSkillCredentialMutation(
+  skillKey: string,
+  config: AgentSkillBindingConfig,
+): SkillCredentialMutation | null {
+  if (skillKey !== AGENT_AMAP_MCP_SKILL_KEY) {
+    return null
+  }
+
+  if (!isRecord(config) || !('apiKey' in config)) {
+    return null
+  }
+
+  const result = AgentAmapMcpSkillCredentialConfigSchema.safeParse(config)
+  const apiKey = result.success ? result.data.apiKey?.trim() : undefined
+  return apiKey
+    ? { kind: 'set', payload: { apiKey } }
+    : { kind: 'delete' }
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
 function getDefaultSkillBindingConfig(skillKey: string): AgentSkillBindingConfig {
-  const handler = getBuiltInSkillConfigHandler(skillKey)
+  const handler = getSkillConfigHandler(skillKey)
 
   return handler ? handler.defaultConfig() : {}
 }
 
-function renderBuiltInSkillInstructions(
+function renderSkillInstructions(
   definition: (typeof AGENT_FIRST_PARTY_SKILL_DEFINITIONS)[number],
   binding: AgentSkillBinding,
 ): string {
-  const handler = getBuiltInSkillConfigHandler(definition.key)
+  const handler = getSkillConfigHandler(definition.key)
 
   return handler?.renderInstructions?.(definition, binding) ?? definition.instructions
 }
@@ -1017,8 +1026,8 @@ function renderWebSearchRuntimeInstructions(
   ].join('\n')
 }
 
-function getBuiltInSkillConfigHandler(skillKey: string): BuiltInSkillConfigHandler | undefined {
-  return builtInSkillConfigHandlerByKey[skillKey as keyof typeof builtInSkillConfigHandlerByKey]
+function getSkillConfigHandler(skillKey: string): SkillConfigHandler | undefined {
+  return skillConfigHandlerByKey[skillKey as keyof typeof skillConfigHandlerByKey]
 }
 
 function formatTranslatorOutputMode(mode: string): string {
@@ -1035,32 +1044,6 @@ function formatTranslatorOutputMode(mode: string): string {
 
 function normalizeSkillKey(value: string): string {
   return value.trim().toLowerCase()
-}
-
-function normalizeResourcePath(value: string): string {
-  const normalized = value.replaceAll('\\', '/')
-  const parts = normalized.split('/').filter(Boolean)
-  if (normalized.startsWith('/') || parts.length === 0 || parts.some(part => part === '..' || part === '.')) {
-    throw new BadRequestException('技能资源路径不合法')
-  }
-
-  return parts.join('/')
-}
-
-function toSafeFileSize(value: bigint): number {
-  const size = Number(value)
-  if (!Number.isSafeInteger(size) || size < 0) {
-    throw new BadRequestException('技能资源大小不合法')
-  }
-
-  return size
-}
-
-function assertPathInside(basePath: string, targetPath: string): void {
-  const prefix = basePath.endsWith(path.sep) ? basePath : `${basePath}${path.sep}`
-  if (targetPath !== basePath && !targetPath.startsWith(prefix)) {
-    throw new BadRequestException('技能资源路径越界')
-  }
 }
 
 function toJsonObject(value: object): Prisma.InputJsonObject {

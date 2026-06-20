@@ -6,6 +6,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./agent": "./src/agent/index.ts",
+    "./agent/amap": "./src/agent/amap.ts",
     "./agent/bootstrap": "./src/agent/bootstrap.ts",
     "./agent/chat": "./src/agent/chat.ts",
     "./agent/client-action": "./src/agent/client-action.ts",

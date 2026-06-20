@@ -1,13 +1,8 @@
 import type {
   ActivateAgentSkillRequest,
   ActivateAgentSkillResponse,
-  ReadAgentSkillResourceRequest,
-  ReadAgentSkillResourceResponse,
 } from '@haohaoxue/lexora-contracts'
-import {
-  ActivateAgentSkillRequestSchema,
-  ReadAgentSkillResourceRequestSchema,
-} from '@haohaoxue/lexora-contracts'
+import { ActivateAgentSkillRequestSchema } from '@haohaoxue/lexora-contracts'
 import {
   Body,
   Controller,
@@ -30,14 +25,5 @@ export class AgentSkillsInternalController {
     @Body(new ZodValidationPipe(ActivateAgentSkillRequestSchema)) payload: ActivateAgentSkillRequest,
   ): Promise<ActivateAgentSkillResponse> {
     return this.skills.activateSkill(payload)
-  }
-
-  @Public()
-  @HttpCode(HttpStatus.OK)
-  @Post('resources/read')
-  readSkillResource(
-    @Body(new ZodValidationPipe(ReadAgentSkillResourceRequestSchema)) payload: ReadAgentSkillResourceRequest,
-  ): Promise<ReadAgentSkillResourceResponse> {
-    return this.skills.readSkillResource(payload)
   }
 }
