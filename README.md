@@ -70,15 +70,13 @@ lexora/
 
 ```bash
 pnpm install
+cp infrastructure/.env.dev.example infrastructure/.env
 pnpm dev:infra
-cp apps/api/.env.example apps/api/.env
-cp apps/collab/.env.example apps/collab/.env
-cp apps/agent/.env.example apps/agent/.env
 pnpm dev:db:sync
 pnpm dev
 ```
 
-`apps/api/.env` 至少需要补齐 `APP_SECRET`、`SYSTEM_ADMIN`、`STORAGE_ACCESS_KEY` 和 `STORAGE_SECRET_KEY`。
+`infrastructure/.env` 是本地开发配置真源。`pnpm dev` 会先按白名单生成 `apps/api/.env`、`apps/collab/.env` 和 `apps/agent/.env`；这些生成文件可以临时手改，但下一次运行 `pnpm dev` 会被覆盖。
 
 ## 许可证
 

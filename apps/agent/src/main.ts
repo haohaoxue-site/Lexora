@@ -20,9 +20,18 @@ import { closeAgentCheckpointer, createAgentCheckpointer } from './runtime/check
 import { createAgentServer } from './server/app'
 
 const config = loadAgentConfig()
-const chatApi = createAgentChatApiClient(config.apiInternalUrl)
-const memoryApi = createAgentMemoryApiClient(config.apiInternalUrl)
-const skillApi = createAgentSkillApiClient(config.apiInternalUrl)
+const chatApi = createAgentChatApiClient({
+  apiInternalUrl: config.apiInternalUrl,
+  appInternalKey: config.appInternalKey,
+})
+const memoryApi = createAgentMemoryApiClient({
+  apiInternalUrl: config.apiInternalUrl,
+  appInternalKey: config.appInternalKey,
+})
+const skillApi = createAgentSkillApiClient({
+  apiInternalUrl: config.apiInternalUrl,
+  appInternalKey: config.appInternalKey,
+})
 const chatModelFactory = createChatModelFactory()
 const webSearch = createWebSearchClient()
 const queueRedis = createAgentRedisClient(config.redisUrl)

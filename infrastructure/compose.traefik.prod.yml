@@ -77,6 +77,7 @@ services:
       DATABASE_URL: ${DATABASE_URL}
       REDIS_URL: ${REDIS_URL}
       APP_SECRET: ${APP_SECRET}
+      APP_INTERNAL_KEY: ${APP_INTERNAL_KEY}
       SYSTEM_ADMIN: ${SYSTEM_ADMIN}
       LEXORA_TRUST_CLOUDFLARE_IP_HEADERS: ${LEXORA_TRUST_CLOUDFLARE_IP_HEADERS:-false}
       OAUTH_PROXY_URL: ${OAUTH_PROXY_URL:-}
@@ -121,6 +122,7 @@ services:
       DATABASE_URL: ${DATABASE_URL}
       REDIS_URL: ${REDIS_URL}
       API_INTERNAL_URL: http://api:3000
+      APP_INTERNAL_KEY: ${APP_INTERNAL_KEY}
     depends_on:
       api:
         condition: service_healthy
@@ -151,6 +153,7 @@ services:
       REDIS_URL: ${REDIS_URL}
       AGENT_CHECKPOINTER_DATABASE_URL: ${DATABASE_URL}
       API_INTERNAL_URL: http://api:3000
+      APP_INTERNAL_KEY: ${APP_INTERNAL_KEY}
     depends_on:
       api:
         condition: service_healthy

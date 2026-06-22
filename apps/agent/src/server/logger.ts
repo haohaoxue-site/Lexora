@@ -10,6 +10,7 @@ export function createAgentFastifyLoggerOptions(logger: AgentConfig['logger']): 
         'req.headers.cookie',
         'req.headers["set-cookie"]',
         'req.headers["x-api-key"]',
+        'req.headers["x-app-internal-key"]',
       ],
       censor: '[Redacted]',
     },

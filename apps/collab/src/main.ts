@@ -11,9 +11,11 @@ const ydocRuntimeStore = createPrismaDocumentYdocRuntimeStore({
 })
 const currentProjectionClient = createDocumentYdocCurrentProjectionClient({
   apiInternalUrl: config.apiInternalUrl,
+  appInternalKey: config.appInternalKey,
 })
 const ticketClient = createCollabTicketClient({
   apiInternalUrl: config.apiInternalUrl,
+  appInternalKey: config.appInternalKey,
 })
 const pubSub = createRedisCollabPubSub({
   redisUrl: config.redisUrl,

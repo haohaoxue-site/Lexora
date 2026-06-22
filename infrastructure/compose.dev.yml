@@ -4,15 +4,15 @@ services:
     container_name: lexora-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_DB: lexora
-      POSTGRES_USER: lexora_pg
-      POSTGRES_PASSWORD: lexora_pg
+      POSTGRES_DB: ${POSTGRES_DB:-lexora}
+      POSTGRES_USER: ${POSTGRES_USER:-lexora_pg}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-lexora-U_xpXAEX6RcGTYgdZD2M9M4Ur_ogZWWy}
     ports:
       - '5432:5432'
     volumes:
       - lexora-postgres-data:/var/lib/postgresql/data
     healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U postgres -d lexora']
+      test: ['CMD-SHELL', 'pg_isready -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"']
       interval: 5s
       timeout: 5s
       retries: 10
@@ -39,8 +39,8 @@ services:
     container_name: lexora-rustfs
     restart: unless-stopped
     environment:
-      RUSTFS_ACCESS_KEY: admin
-      RUSTFS_SECRET_KEY: password123
+      RUSTFS_ACCESS_KEY: ${STORAGE_ACCESS_KEY:-lexora-dev-storage}
+      RUSTFS_SECRET_KEY: ${STORAGE_SECRET_KEY:-lexora-vzg240p0_XCZZlBhxX-JRmy_6xQzhFhR}
       RUSTFS_REGION: auto
       RUSTFS_CONSOLE_ENABLE: 'true'
       RUSTFS_VOLUMES: /data

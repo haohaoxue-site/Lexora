@@ -5,6 +5,7 @@ import { z } from 'zod'
 const envSchema = z.object({
   DATABASE_URL: requiredEnvString('DATABASE_URL'),
   APP_SECRET: z.string().trim().min(32, 'APP_SECRET 至少需要 32 个字符'),
+  APP_INTERNAL_KEY: z.string().trim().min(32, 'APP_INTERNAL_KEY 至少需要 32 个字符'),
   REDIS_URL: requiredEnvString('REDIS_URL'),
   OAUTH_PROXY_URL: optionalNonEmptyString(),
   GITHUB_CLIENT_ID: optionalNonEmptyString(),

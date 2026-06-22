@@ -15,6 +15,7 @@ export interface CollabConfig {
   logger: CollabLoggerConfig
   databaseUrl: string
   apiInternalUrl: string
+  appInternalKey: string
   redisUrl: string
   maxConnections: number
   handshakeRateLimitMax: number
@@ -39,6 +40,7 @@ export function loadCollabConfig(env: EnvSource = process.env): CollabConfig {
     logger: readLoggerConfig(env),
     databaseUrl: collabEnv.DATABASE_URL,
     apiInternalUrl: collabEnv.API_INTERNAL_URL,
+    appInternalKey: collabEnv.APP_INTERNAL_KEY,
     redisUrl: collabEnv.REDIS_URL,
     maxConnections: DEFAULT_COLLAB_MAX_CONNECTIONS,
     handshakeRateLimitMax: DEFAULT_COLLAB_HANDSHAKE_RATE_LIMIT_MAX,

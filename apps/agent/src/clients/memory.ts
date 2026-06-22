@@ -17,8 +17,13 @@ export interface AgentMemoryApiClient {
   ) => Promise<ExecuteAgentMemoryOperationProposalsResponse>
 }
 
-export function createAgentMemoryApiClient(apiInternalUrl: string): AgentMemoryApiClient {
-  const baseUrl = normalizeApiInternalBaseUrl(apiInternalUrl)
+export interface CreateAgentMemoryApiClientInput {
+  apiInternalUrl: string
+  appInternalKey: string
+}
+
+export function createAgentMemoryApiClient(input: CreateAgentMemoryApiClientInput): AgentMemoryApiClient {
+  const baseUrl = normalizeApiInternalBaseUrl(input.apiInternalUrl)
 
   return {
     async retrieveMemories(payload) {
@@ -27,6 +32,7 @@ export function createAgentMemoryApiClient(apiInternalUrl: string): AgentMemoryA
         path: 'internal/agent/memory/retrieve',
         payload,
         errorMessage: '读取长期记忆失败',
+        appInternalKey: input.appInternalKey,
       }))
     },
 
@@ -36,6 +42,7 @@ export function createAgentMemoryApiClient(apiInternalUrl: string): AgentMemoryA
         path: 'internal/agent/memory/operations',
         payload,
         errorMessage: '执行长期记忆工具失败',
+        appInternalKey: input.appInternalKey,
       }))
     },
   }

@@ -7,6 +7,7 @@ import { LoggerModule } from 'nestjs-pino'
 import { AppConfigModule } from './config/app-config.module'
 import { PrismaModule } from './database/prisma.module'
 import { AccessTokenGuard } from './guards/access-token.guard'
+import { AppInternalKeyGuard } from './guards/app-internal-key.guard'
 import { PermissionsGuard } from './guards/permissions.guard'
 import { AiModule } from './modules/ai/ai.module'
 import { AuthModule } from './modules/auth/auth.module'
@@ -66,6 +67,7 @@ import { WorkspacesModule } from './modules/workspaces/workspaces.module'
                 'req.headers.cookie',
                 'req.headers["set-cookie"]',
                 'req.headers["x-api-key"]',
+                'req.headers["x-app-internal-key"]',
                 'req.body.provider.apiKey',
                 'req.body.apiKey',
               ],
@@ -101,6 +103,10 @@ import { WorkspacesModule } from './modules/workspaces/workspaces.module'
     DocumentsModule,
   ],
   providers: [
+    {
+      provide: APP_GUARD,
+      useClass: AppInternalKeyGuard,
+    },
     {
       provide: APP_GUARD,
       useClass: ThrottlerGuard,

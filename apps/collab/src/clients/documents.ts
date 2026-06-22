@@ -28,10 +28,12 @@ export interface DocumentYdocCurrentProjectionClient {
 
 export interface CreateCollabTicketClientInput {
   apiInternalUrl: string
+  appInternalKey: string
 }
 
 export interface CreateDocumentYdocCurrentProjectionClientInput {
   apiInternalUrl: string
+  appInternalKey: string
 }
 
 export class CollabTicketClientError extends Error {
@@ -54,6 +56,7 @@ export function createCollabTicketClient(input: CreateCollabTicketClientInput): 
             token,
           }),
           errorMessage: `consume-collab-ticket-failed:${documentId}`,
+          appInternalKey: input.appInternalKey,
         }))
       }
       catch (error) {
@@ -84,6 +87,7 @@ export function createDocumentYdocCurrentProjectionClient(
           path: `internal/documents/${encodeURIComponent(documentId)}/ydoc-current-projections`,
           payload,
           errorMessage: `document-ydoc-current-projection-failed:${documentId}`,
+          appInternalKey: input.appInternalKey,
         }))
       }
       catch (error) {

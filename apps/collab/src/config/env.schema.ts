@@ -4,6 +4,7 @@ import { z } from 'zod'
 const collabEnvSchema = z.object({
   DATABASE_URL: requiredEnvString('DATABASE_URL'),
   API_INTERNAL_URL: requiredEnvString('API_INTERNAL_URL'),
+  APP_INTERNAL_KEY: requiredEnvString('APP_INTERNAL_KEY'),
   REDIS_URL: requiredEnvString('REDIS_URL'),
 })
 

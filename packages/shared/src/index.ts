@@ -1,5 +1,6 @@
 export * from './agent'
 export * from './ai'
+export * from './app-internal-key'
 export * from './auth'
 export * from './chat'
 export * from './collab'

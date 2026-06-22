@@ -1,3 +1,4 @@
+import { APP_INTERNAL_KEY_HEADER } from '@haohaoxue/lexora-contracts'
 import { z } from 'zod'
 
 const ApiResponseEnvelopeSchema = z.object({
@@ -15,11 +16,13 @@ export async function postApiInternalJson(options: {
   path: string
   payload: unknown
   errorMessage: string
+  appInternalKey: string
 }): Promise<unknown> {
   const response = await fetch(new URL(options.path, options.baseUrl), {
     method: 'POST',
     headers: {
       'content-type': 'application/json',
+      [APP_INTERNAL_KEY_HEADER]: options.appInternalKey,
     },
     body: JSON.stringify(options.payload),
   })

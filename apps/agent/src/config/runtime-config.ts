@@ -11,6 +11,7 @@ export interface AgentConfig {
   port: number
   logger: AgentLoggerConfig
   apiInternalUrl: string
+  appInternalKey: string
   redisUrl: string
   runTimeoutMs: number
   maxConcurrentRuns: number
@@ -38,6 +39,7 @@ export function loadAgentConfig(env: EnvSource = process.env): AgentConfig {
     port: DEFAULT_AGENT_PORT,
     logger: readLoggerConfig(env),
     apiInternalUrl: agentEnv.API_INTERNAL_URL,
+    appInternalKey: agentEnv.APP_INTERNAL_KEY,
     redisUrl: agentEnv.REDIS_URL,
     runTimeoutMs: DEFAULT_AGENT_RUN_TIMEOUT_MS,
     maxConcurrentRuns: agentEnv.AGENT_MAX_CONCURRENT_RUNS,

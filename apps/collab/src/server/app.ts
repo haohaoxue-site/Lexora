@@ -86,6 +86,7 @@ export function createCollabServer(input: CreateCollabServerInput): FastifyInsta
   registerInternalPermissionInvalidationRoutes({
     app,
     activeConnections,
+    appInternalKey: input.config.appInternalKey,
     pubSub: input.pubSub,
   })
   registerDocumentCollabWsRoute({

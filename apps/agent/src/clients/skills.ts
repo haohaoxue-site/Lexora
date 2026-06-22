@@ -9,8 +9,13 @@ export interface AgentSkillApiClient {
   activateSkill: (payload: ActivateAgentSkillRequest) => Promise<ActivateAgentSkillResponse>
 }
 
-export function createAgentSkillApiClient(apiInternalUrl: string): AgentSkillApiClient {
-  const baseUrl = normalizeApiInternalBaseUrl(apiInternalUrl)
+export interface CreateAgentSkillApiClientInput {
+  apiInternalUrl: string
+  appInternalKey: string
+}
+
+export function createAgentSkillApiClient(input: CreateAgentSkillApiClientInput): AgentSkillApiClient {
+  const baseUrl = normalizeApiInternalBaseUrl(input.apiInternalUrl)
 
   return {
     async activateSkill(payload) {
@@ -19,6 +24,7 @@ export function createAgentSkillApiClient(apiInternalUrl: string): AgentSkillApi
         path: 'internal/agent/skills/activate',
         payload,
         errorMessage: '激活技能失败',
+        appInternalKey: input.appInternalKey,
       }))
     },
   }

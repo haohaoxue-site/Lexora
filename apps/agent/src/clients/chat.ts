@@ -22,8 +22,13 @@ export interface AgentGetGenerationAssetContentOptions {
   assetId: string
 }
 
-export function createAgentChatApiClient(apiInternalUrl: string): AgentChatApiClient {
-  const baseUrl = normalizeApiInternalBaseUrl(apiInternalUrl)
+export interface CreateAgentChatApiClientInput {
+  apiInternalUrl: string
+  appInternalKey: string
+}
+
+export function createAgentChatApiClient(input: CreateAgentChatApiClientInput): AgentChatApiClient {
+  const baseUrl = normalizeApiInternalBaseUrl(input.apiInternalUrl)
 
   return {
     async getGenerationBootstrap(options) {
@@ -32,6 +37,7 @@ export function createAgentChatApiClient(apiInternalUrl: string): AgentChatApiCl
         path: `internal/chat/generations/${encodeURIComponent(options.generationId)}/bootstrap`,
         payload: {},
         errorMessage: '读取聊天生成上下文失败',
+        appInternalKey: input.appInternalKey,
       }))
     },
 
@@ -41,6 +47,7 @@ export function createAgentChatApiClient(apiInternalUrl: string): AgentChatApiCl
         path: `internal/chat/generations/${encodeURIComponent(options.generationId)}/assets/${encodeURIComponent(options.assetId)}/content`,
         payload: {},
         errorMessage: '读取聊天附件内容失败',
+        appInternalKey: input.appInternalKey,
       }))
     },
   }

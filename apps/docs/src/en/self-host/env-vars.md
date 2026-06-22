@@ -17,6 +17,7 @@ Environment variables define database, cache, storage, login, and system securit
 | Variable | Description |
 | --- | --- |
 | `APP_SECRET` | Root signing and encryption secret. Use a strong random value. |
+| `APP_INTERNAL_KEY` | Internal service key shared by API, Collab, and Agent. Production deployments must use a strong random value; development can use the default. |
 | `SYSTEM_ADMIN` | Initial system administrator identifier. |
 
 Do not change `APP_SECRET` casually on an existing instance, because it may affect issued credentials or encrypted data.
