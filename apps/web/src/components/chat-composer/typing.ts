@@ -39,6 +39,7 @@ export interface ChatComposerProps {
   attachments: ChatComposerAttachment[]
   selectedModelRef?: ChatComposerModelRef | null
   modelSelectionKind?: ChatComposerModelSelectionKind
+  isSubmitting?: boolean
   isStreaming?: boolean
   disabled?: boolean
   highlightAttachmentId?: string | null
@@ -69,6 +70,7 @@ export interface ChatComposerEmits {
 export interface ChatComposerToolbarProps {
   selectedModelRef?: ChatComposerModelRef | null
   modelSelectionKind?: ChatComposerModelSelectionKind
+  isSubmitting?: boolean
   isStreaming?: boolean
   disabled?: boolean
   canSend?: boolean
@@ -135,6 +137,7 @@ export interface ChatComposerSkillControlsEmits {
 export interface ChatComposerSubmitControlsProps {
   selectedModelRef?: ChatComposerModelRef | null
   modelSelectionKind?: ChatComposerModelSelectionKind
+  isSubmitting?: boolean
   isStreaming?: boolean
   disabled?: boolean
   canSend?: boolean

@@ -508,6 +508,27 @@ export function shouldShowAssistantPending(message: ChatMessage) {
   )
 }
 
+export function getUserMessageDeliveryLabel(message: ChatMessage) {
+  if (message.role !== 'user') {
+    return ''
+  }
+
+  if (message.status === CHAT_MESSAGE_STATUS.PENDING) {
+    return translate('chat.messageDisplay.userSending')
+  }
+
+  if (message.status === CHAT_MESSAGE_STATUS.FAILED) {
+    return translate('chat.messageDisplay.userSendFailed')
+  }
+
+  return ''
+}
+
+export function shouldShowUserMessageDelivery(message: ChatMessage) {
+  return message.role === 'user'
+    && (message.status === CHAT_MESSAGE_STATUS.PENDING || message.status === CHAT_MESSAGE_STATUS.FAILED)
+}
+
 export function shouldShowAssistantCancelled(message: ChatMessage) {
   return message.role === 'assistant' && message.status === CHAT_MESSAGE_STATUS.CANCELLED
 }

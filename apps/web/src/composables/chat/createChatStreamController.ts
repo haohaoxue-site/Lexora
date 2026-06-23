@@ -7,18 +7,24 @@ import type { ChatRuntimeOverlay } from './createChatRuntimeOverlay'
 import type { ChatSessionController } from './createChatSessionController'
 import type { ChatSessionEvents } from './createChatSessionEvents'
 import type {
+  ChatMessage,
   ChatModelSelection,
   ChatMutationResponse,
+  ChatSessionDetail,
   ChatSessionEvent,
   CreateChatSessionMessageRequest,
   EditAndSendChatMessageRequest,
 } from '@/apis/chat'
 import { AGENT_TIME_SKILL_KEY } from '@haohaoxue/lexora-contracts/agent'
 import {
+  CHAT_MESSAGE_STATUS,
   CHAT_RUN_STATUS,
+  CHAT_SESSION_CHANNEL,
+  CHAT_SESSION_DEFAULT_TITLE,
   CHAT_SESSION_EVENT_TYPE,
 } from '@haohaoxue/lexora-contracts/chat/constants'
-import { watch } from 'vue'
+import dayjs from 'dayjs'
+import { shallowRef, watch } from 'vue'
 import { translate } from '@/i18n'
 import { ElMessage } from '@/utils/element-plus'
 import { getRequestErrorDisplayMessage } from '@/utils/request-error'
@@ -63,13 +69,17 @@ export function createChatStreamController(
     cancelRunId,
     currentRun,
     isStreaming,
+    markPendingUserMessageFailed,
+    movePendingUserMessages,
     seedFromMutationResponse,
+    stagePendingUserMessage,
   } = runtimeOverlay
   const {
     startSessionEventStream,
     stopSessionEventStream,
   } = sessionEvents
   const pendingClientActionKeys = new Set<string>()
+  const isSubmitting = shallowRef(false)
 
   watch(activeSessionId, (sessionId, previousSessionId) => {
     if (previousSessionId && previousSessionId !== sessionId) {
@@ -99,16 +109,34 @@ export function createChatStreamController(
 
   async function sendMessage(input: SendChatComposerMessageInput): Promise<boolean> {
     const content = input.content.trim()
-    if (!content || isStreaming.value) {
+    if (!content || isSubmitting.value || isStreaming.value) {
       return false
     }
 
-    const session = await ensureSessionReady(input.modelRef)
-    if (!session) {
-      return false
-    }
+    isSubmitting.value = true
+    let pendingSubmission: PendingSubmission | null = null
+    let pendingSessionId: string | null = null
 
     try {
+      pendingSubmission = stagePendingSubmission(input, content)
+      pendingSessionId = pendingSubmission.sessionId
+      const session = await ensureSessionReady(input.modelRef)
+      if (!session) {
+        markPendingUserMessageFailed({
+          sessionId: pendingSessionId,
+          messageId: pendingSubmission.messageId,
+        })
+        return false
+      }
+
+      if (pendingSubmission.sessionId !== session.id) {
+        movePendingUserMessages({
+          fromSessionId: pendingSubmission.sessionId,
+          toSession: session,
+        })
+        pendingSessionId = session.id
+      }
+
       handleMutationResponse(await api.sendMessage(session.id, {
         content,
         contentJSON: input.contentJSON,
@@ -121,14 +149,23 @@ export function createChatStreamController(
       return true
     }
     catch (error) {
+      if (pendingSubmission) {
+        markPendingUserMessageFailed({
+          sessionId: pendingSessionId ?? pendingSubmission.sessionId,
+          messageId: pendingSubmission.messageId,
+        })
+      }
       ElMessage.error(getRequestErrorDisplayMessage(error, translate('chat.errors.send')))
       return false
+    }
+    finally {
+      isSubmitting.value = false
     }
   }
 
   async function editAndSendMessage(messageId: string, payload: EditAndSendChatComposerMessageInput): Promise<boolean> {
     const content = payload.content.trim()
-    if (!activeSession.value || !content || isStreaming.value) {
+    if (!activeSession.value || !content || isSubmitting.value || isStreaming.value) {
       return false
     }
 
@@ -151,7 +188,7 @@ export function createChatStreamController(
   }
 
   async function retryMessage(messageId: string): Promise<boolean> {
-    if (!activeSession.value || isStreaming.value) {
+    if (!activeSession.value || isSubmitting.value || isStreaming.value) {
       return false
     }
 
@@ -168,7 +205,7 @@ export function createChatStreamController(
   }
 
   async function switchBranch(messageId: string): Promise<boolean> {
-    if (!activeSession.value || isStreaming.value) {
+    if (!activeSession.value || isSubmitting.value || isStreaming.value) {
       return false
     }
 
@@ -276,6 +313,35 @@ export function createChatStreamController(
     }
   }
 
+  function stagePendingSubmission(input: SendChatComposerMessageInput, content: string): PendingSubmission {
+    const createdAt = dayjs().toISOString()
+    const currentSession = activeSession.value
+    const session = currentSession ?? createTemporaryChatSession({
+      id: createLocalChatId('chat-session'),
+      workspaceId: api.getWorkspaceId(),
+      origin: api.origin,
+      modelRef: input.modelRef ?? null,
+      createdAt,
+    })
+    const message = createPendingUserMessage({
+      id: createLocalChatId('chat-message'),
+      content,
+      input,
+      createdAt,
+    })
+
+    stagePendingUserMessage({
+      session,
+      message,
+      temporary: !currentSession,
+    })
+
+    return {
+      messageId: message.id,
+      sessionId: session.id,
+    }
+  }
+
   async function ensureSessionReady(modelRef?: ChatModelSelection['modelRef'] | null) {
     let sessionId = activeSessionId.value
     if (!sessionId) {
@@ -320,10 +386,116 @@ export function createChatStreamController(
     cancelActiveRun,
     cancelRunId,
     editAndSendMessage,
+    isSubmitting,
     isStreaming,
     retryMessage,
     sendMessage,
     switchBranch,
+  }
+}
+
+interface PendingSubmission {
+  messageId: string
+  sessionId: string
+}
+
+let localChatIdSeed = 0
+
+function createLocalChatId(prefix: string): string {
+  localChatIdSeed += 1
+  return `local-${prefix}-${localChatIdSeed}`
+}
+
+function createTemporaryChatSession(input: {
+  id: string
+  workspaceId: string
+  origin: ChatSessionDetail['origin']
+  modelRef: ChatModelSelection['modelRef'] | null
+  createdAt: string
+}): ChatSessionDetail {
+  return {
+    id: input.id,
+    workspaceId: input.workspaceId,
+    origin: input.origin,
+    channel: CHAT_SESSION_CHANNEL.DIRECT,
+    title: CHAT_SESSION_DEFAULT_TITLE,
+    agentProfile: null,
+    modelRef: input.modelRef
+      ? {
+          providerId: input.modelRef.providerId,
+          modelId: input.modelRef.modelId,
+        }
+      : null,
+    latestSequence: 0,
+    messages: [],
+    usage: createEmptySessionUsage(),
+    activeRun: null,
+    createdAt: input.createdAt,
+    updatedAt: input.createdAt,
+  }
+}
+
+function createPendingUserMessage(input: {
+  id: string
+  content: string
+  input: SendChatComposerMessageInput
+  createdAt: string
+}): ChatMessage {
+  return {
+    id: input.id,
+    role: 'user',
+    status: CHAT_MESSAGE_STATUS.PENDING,
+    content: input.content,
+    branch: {
+      index: 1,
+      count: 1,
+      previousMessageId: null,
+      nextMessageId: null,
+    },
+    parts: [],
+    metadata: {
+      contentJSON: cloneContentJSON(input.input.contentJSON),
+      attachments: toPendingMessageAttachments(input.input.attachments ?? []),
+      contextSnapshotMetas: [],
+      memoryOperations: [],
+      skillInvocation: input.input.skillInvocation ?? null,
+      disabledSkillKeys: input.input.disabledSkillKeys ?? [],
+    },
+    createdAt: input.createdAt,
+    updatedAt: input.createdAt,
+    completedAt: null,
+  }
+}
+
+function toPendingMessageAttachments(
+  attachments: NonNullable<SendChatComposerMessageInput['attachments']>,
+): Extract<ChatMessage, { role: 'user' }>['metadata']['attachments'] {
+  return attachments.map((attachment) => {
+    if (attachment.type !== 'document') {
+      return attachment
+    }
+
+    const { snapshot: _snapshot, ...persistedAttachment } = attachment
+    return persistedAttachment
+  })
+}
+
+function cloneContentJSON(contentJSON: SendChatComposerMessageInput['contentJSON']): SendChatComposerMessageInput['contentJSON'] {
+  return JSON.parse(JSON.stringify(contentJSON)) as SendChatComposerMessageInput['contentJSON']
+}
+
+function createEmptySessionUsage(): ChatSessionDetail['usage'] {
+  const empty = {
+    generationCount: 0,
+    inputTokens: 0,
+    outputTokens: 0,
+    reasoningTokens: 0,
+    totalTokens: 0,
+  }
+
+  return {
+    activePath: empty,
+    session: empty,
   }
 }
 

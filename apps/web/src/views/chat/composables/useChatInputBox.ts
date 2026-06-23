@@ -16,7 +16,7 @@ export function useChatInputBox(options: UseChatInputBoxOptions = {}) {
   const model = useChatModelSettings()
   const { activeSessionId } = useChatSessions()
   const { cancelRunId, isStreaming } = useChatRuntimeOverlay()
-  const { cancelActiveRun, sendMessage } = useChatStream()
+  const { cancelActiveRun, isSubmitting, sendMessage } = useChatStream()
   const isReadonly = computed(() => Boolean(toValue(options.isReadonly)))
   const workspaceId = computed(() => workspaceStore.currentWorkspace?.id ?? null)
   const surface = createChatSurfaceController({
@@ -26,6 +26,7 @@ export function useChatInputBox(options: UseChatInputBoxOptions = {}) {
       activeSessionId,
     },
     stream: {
+      isSubmitting,
       isStreaming,
       sendMessage,
     },
@@ -66,6 +67,7 @@ export function useChatInputBox(options: UseChatInputBoxOptions = {}) {
     handleUploadImageFiles,
     highlightAttachment,
     highlightAttachmentId,
+    isSubmitting: surface.composer.isSubmitting,
     isStreaming,
     selectComposerModel,
     translatorSkillEnabled,

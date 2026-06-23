@@ -21,6 +21,7 @@ const {
   handleUploadImageFiles,
   highlightAttachment,
   highlightAttachmentId,
+  isSubmitting,
   isStreaming,
   selectComposerModel,
   translatorSkillEnabled,
@@ -44,6 +45,7 @@ const {
         :content-j-s-o-n="contentJSON"
         :selected-model-ref="composerSelectedModelRef"
         :model-selection-kind="composerModelSelectionKind"
+        :is-submitting="isSubmitting"
         :is-streaming="isStreaming"
         :highlight-attachment-id="highlightAttachmentId"
         :upload-availability="uploadAvailability"

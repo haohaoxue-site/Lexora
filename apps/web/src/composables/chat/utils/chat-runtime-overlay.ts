@@ -10,6 +10,7 @@ import {
   CHAT_RUN_STATUS,
   CHAT_SESSION_EVENT_TYPE,
 } from '@haohaoxue/lexora-contracts/chat/constants'
+import dayjs from 'dayjs'
 import { applyChatSessionEventToMessages } from './chat-stream-message'
 
 export type ChatSessionRuntimeStatus = 'idle' | 'streaming' | 'reconnecting'
@@ -18,6 +19,8 @@ export interface ChatRuntimeOverlayState {
   cursorBySessionId: Map<string, number>
   currentRunBySessionId: Map<string, ChatRunSummary | null>
   mergedMessagesBySessionId: Map<string, ChatMessage[]>
+  pendingUserMessagesBySessionId: Map<string, ChatMessage[]>
+  temporarySession: ChatSessionDetail | null
   terminalRunIdsBySessionId: Map<string, Set<string>>
   terminalMessageIdsBySessionId: Map<string, Set<string>>
   assistantMessageIdByRunId: Map<string, string>
@@ -29,6 +32,8 @@ export function createChatRuntimeOverlayState(): ChatRuntimeOverlayState {
     cursorBySessionId: new Map(),
     currentRunBySessionId: new Map(),
     mergedMessagesBySessionId: new Map(),
+    pendingUserMessagesBySessionId: new Map(),
+    temporarySession: null,
     terminalRunIdsBySessionId: new Map(),
     terminalMessageIdsBySessionId: new Map(),
     assistantMessageIdByRunId: new Map(),
@@ -72,6 +77,7 @@ export function seedChatRuntimeOverlayFromMutationResponse(
     ...input.session,
     latestSequence: Math.max(input.session.latestSequence, input.latestSequence),
   })
+  clearChatPendingUserMessages(state, input.session.id)
   state.cursorBySessionId.set(input.session.id, input.latestSequence)
 
   if (input.run && !isTerminalRunId(state, input.session.id, input.run.runId)) {
@@ -141,7 +147,10 @@ export function mergeChatRenderSession(
 ): ChatSessionDetail {
   const currentRun = getChatRuntimeOverlayCurrentRun(state, session.id)
   const cursor = getChatRuntimeOverlayCursor(state, session.id)
-  const messages = state.mergedMessagesBySessionId.get(session.id) ?? session.messages
+  const messages = mergePendingUserMessages(
+    state.mergedMessagesBySessionId.get(session.id) ?? session.messages,
+    state.pendingUserMessagesBySessionId.get(session.id) ?? [],
+  )
   const activePathUsage = aggregateChatMessageUsage(messages)
 
   return {
@@ -154,6 +163,101 @@ export function mergeChatRenderSession(
       session: addUsageDelta(session.usage.session, subtractUsage(activePathUsage, session.usage.activePath)),
     },
   }
+}
+
+export function stageChatPendingUserMessage(
+  state: ChatRuntimeOverlayState,
+  input: {
+    session: ChatSessionDetail
+    message: ChatMessage
+    temporary?: boolean
+  },
+): void {
+  const currentMessages = state.pendingUserMessagesBySessionId.get(input.session.id) ?? []
+  const nextMessages = [
+    ...currentMessages.filter(message => message.id !== input.message.id),
+    input.message,
+  ]
+
+  state.pendingUserMessagesBySessionId.set(input.session.id, nextMessages)
+  if (input.temporary) {
+    if (state.temporarySession && state.temporarySession.id !== input.session.id) {
+      state.pendingUserMessagesBySessionId.delete(state.temporarySession.id)
+    }
+    state.temporarySession = mergeChatRenderSession(input.session, state)
+  }
+}
+
+export function moveChatPendingUserMessages(
+  state: ChatRuntimeOverlayState,
+  input: {
+    fromSessionId: string
+    toSession: ChatSessionDetail
+  },
+): void {
+  const messages = state.pendingUserMessagesBySessionId.get(input.fromSessionId)
+  if (!messages?.length) {
+    return
+  }
+
+  state.pendingUserMessagesBySessionId.delete(input.fromSessionId)
+  state.pendingUserMessagesBySessionId.set(input.toSession.id, [
+    ...(state.pendingUserMessagesBySessionId.get(input.toSession.id) ?? []),
+    ...messages,
+  ])
+
+  if (state.temporarySession?.id === input.fromSessionId) {
+    state.temporarySession = null
+  }
+}
+
+export function markChatPendingUserMessageFailed(
+  state: ChatRuntimeOverlayState,
+  input: {
+    sessionId: string
+    messageId: string
+  },
+): void {
+  const currentMessages = state.pendingUserMessagesBySessionId.get(input.sessionId) ?? []
+  const nextMessages = currentMessages.map(message =>
+    message.id === input.messageId
+      ? {
+          ...message,
+          status: CHAT_MESSAGE_STATUS.FAILED,
+          updatedAt: dayjs().toISOString(),
+        }
+      : message,
+  )
+
+  state.pendingUserMessagesBySessionId.set(input.sessionId, nextMessages)
+  if (state.temporarySession?.id === input.sessionId) {
+    state.temporarySession = mergeChatRenderSession(state.temporarySession, state)
+  }
+}
+
+export function clearChatPendingUserMessages(
+  state: ChatRuntimeOverlayState,
+  sessionId: string,
+): void {
+  state.pendingUserMessagesBySessionId.delete(sessionId)
+  if (state.temporarySession?.id === sessionId) {
+    state.temporarySession = null
+  }
+}
+
+export function clearChatRuntimeOverlayTemporarySession(state: ChatRuntimeOverlayState): void {
+  const temporarySessionId = state.temporarySession?.id
+  if (!temporarySessionId) {
+    return
+  }
+
+  clearChatPendingUserMessages(state, temporarySessionId)
+}
+
+export function getChatRuntimeOverlayTemporarySession(state: ChatRuntimeOverlayState): ChatSessionDetail | null {
+  return state.temporarySession
+    ? mergeChatRenderSession(state.temporarySession, state)
+    : null
 }
 
 export function getChatRuntimeOverlayCursor(
@@ -215,6 +319,7 @@ export function clearChatRuntimeOverlaySession(
   state.cursorBySessionId.delete(sessionId)
   state.currentRunBySessionId.delete(sessionId)
   state.mergedMessagesBySessionId.delete(sessionId)
+  clearChatPendingUserMessages(state, sessionId)
   state.terminalRunIdsBySessionId.delete(sessionId)
   state.terminalMessageIdsBySessionId.delete(sessionId)
   state.pausedSessionIds.delete(sessionId)
@@ -357,6 +462,19 @@ function isTerminalRunEvent(event: ChatSessionEvent): boolean {
   return event.type === CHAT_SESSION_EVENT_TYPE.RUN_COMPLETED
     || event.type === CHAT_SESSION_EVENT_TYPE.RUN_FAILED
     || event.type === CHAT_SESSION_EVENT_TYPE.RUN_CANCELLED
+}
+
+function mergePendingUserMessages(messages: ChatMessage[], pendingMessages: ChatMessage[]): ChatMessage[] {
+  if (pendingMessages.length === 0) {
+    return messages
+  }
+
+  const messageIds = new Set(messages.map(message => message.id))
+  const appendedMessages = pendingMessages.filter(message => !messageIds.has(message.id))
+
+  return appendedMessages.length > 0
+    ? [...messages, ...appendedMessages]
+    : messages
 }
 
 function aggregateChatMessageUsage(messages: ChatMessage[]): ChatTokenUsageAggregate {

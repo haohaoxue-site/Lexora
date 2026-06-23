@@ -17,6 +17,7 @@ export interface ChatSurfaceSessionPort {
 }
 
 export interface ChatSurfaceStreamPort {
+  isSubmitting?: MaybeRefOrGetter<boolean>
   isStreaming: MaybeRefOrGetter<boolean>
   retryMessage?: (messageId: string) => Promise<boolean>
   sendMessage: (input: SendChatComposerMessageInput) => Promise<boolean>
@@ -42,7 +43,9 @@ export interface CreateChatSurfaceControllerOptions {
 export function createChatSurfaceController(options: CreateChatSurfaceControllerOptions) {
   const activeSessionId = computed(() => toValue(options.sessions.activeSessionId) ?? null)
   const isReadonly = computed(() => Boolean(toValue(options.isReadonly)))
+  const isSubmitting = computed(() => Boolean(toValue(options.stream.isSubmitting)))
   const isStreaming = computed(() => Boolean(toValue(options.stream.isStreaming)))
+  const isBusy = computed(() => isSubmitting.value || isStreaming.value)
   const composerHost = createChatComposerHostState({
     workspaceId: options.workspaceId,
     model: options.model,
@@ -53,7 +56,7 @@ export function createChatSurfaceController(options: CreateChatSurfaceController
   })
   const messageActions = useChatMessageActions({
     isReadonly,
-    isStreaming,
+    isStreaming: isBusy,
     retryMessage: options.stream.retryMessage,
     switchBranch: options.stream.switchBranch,
   })
@@ -102,10 +105,13 @@ export function createChatSurfaceController(options: CreateChatSurfaceController
       highlightAttachment: composerHost.highlightAttachment,
       highlightAttachmentId: composerHost.highlightAttachmentId,
       isConfigured: options.model.isConfigured,
+      isSubmitting,
       isStreaming,
       loadSkills: skillControls.loadSkills,
       registerAfterSendHandler: composerHost.registerAfterSendHandler,
       registerBeforeSendHandler: composerHost.registerBeforeSendHandler,
+      registerSendFailureHandler: composerHost.registerSendFailureHandler,
+      registerSubmitStartHandler: composerHost.registerSubmitStartHandler,
       resetComposer: composerHost.resetComposer,
       resetNewSessionComposerState,
       selectComposerModel: options.model.selectComposerModel,
@@ -117,6 +123,7 @@ export function createChatSurfaceController(options: CreateChatSurfaceController
     },
     messages: {
       actions: messageActions,
+      isBusy,
       isStreaming,
     },
   }

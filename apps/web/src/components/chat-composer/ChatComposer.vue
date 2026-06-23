@@ -36,6 +36,7 @@ import ChatComposerToolbar from './ChatComposerToolbar.vue'
 import ChatDocumentPicker from './ChatDocumentPicker.vue'
 import { CHAT_REFERENCE_NODE_NAME, createChatComposerExtensions } from './editorExtensions'
 import {
+  createEmptyChatComposerContentJSON,
   garbageCollectInlineAttachments,
   serializeChatComposerContent,
 } from './serialization'
@@ -43,6 +44,7 @@ import {
 const props = withDefaults(defineProps<ChatComposerProps>(), {
   selectedModelRef: null,
   modelSelectionKind: 'default',
+  isSubmitting: false,
   isStreaming: false,
   disabled: false,
   highlightAttachmentId: null,
@@ -69,6 +71,7 @@ const fileInputRef = shallowRef<HTMLInputElement | null>(null)
 let pastedAttachments: ChatComposerAttachment[] = []
 
 const serializedContent = computed(() => serializeChatComposerContent(props.contentJSON))
+const isComposerLocked = computed(() => Boolean(props.disabled || props.isSubmitting))
 const hasSelectedModel = computed(() => Boolean(
   props.selectedModelRef?.providerId.trim()
   && props.selectedModelRef.modelId.trim(),
@@ -103,7 +106,7 @@ const documentAssistantSelectionContext = computed(() => {
 })
 const hasDocumentAssistantSelectionContext = computed(() => documentAssistantSelectionContext.value.canSend)
 const canSend = computed(() =>
-  !props.disabled
+  !isComposerLocked.value
   && !props.isStreaming
   && hasSelectedModel.value
   && (
@@ -130,7 +133,7 @@ const editor = useEditor({
     getPlaceholder: () => editorPlaceholder.value,
     cloneInlineAttachment: cloneInlineAttachmentForPaste,
   }),
-  editable: !props.disabled,
+  editable: !isComposerLocked.value,
   editorProps: {
     attributes: {
       class: 'chat-composer__prosemirror',
@@ -156,8 +159,19 @@ watch(
 )
 
 watch(
-  () => props.disabled,
-  disabled => editor.value?.setEditable(!disabled, false),
+  () => props.isSubmitting,
+  (isSubmitting, wasSubmitting) => {
+    if (!isSubmitting || wasSubmitting) {
+      return
+    }
+
+    clearEditorContent()
+  },
+)
+
+watch(
+  isComposerLocked,
+  locked => editor.value?.setEditable(!locked, false),
 )
 
 watch(
@@ -273,14 +287,14 @@ function closePicker() {
 }
 
 function openImageUpload() {
-  if (props.disabled || props.isStreaming || props.uploadAvailability.image.disabled) {
+  if (isComposerLocked.value || props.isStreaming || props.uploadAvailability.image.disabled) {
     return
   }
   imageInputRef.value?.click()
 }
 
 function openFileUpload() {
-  if (props.disabled || props.isStreaming || props.uploadAvailability.file.disabled) {
+  if (isComposerLocked.value || props.isStreaming || props.uploadAvailability.file.disabled) {
     return
   }
   fileInputRef.value?.click()
@@ -385,6 +399,7 @@ function shouldOpenSkillCommandMenu(from: number, to: number) {
   const currentEditor = editor.value
   if (
     !currentEditor
+    || props.isSubmitting
     || props.isStreaming
     || props.translatorTargetLanguage
     || props.documentAssistantEditIntent
@@ -407,6 +422,17 @@ function refreshEditorPlaceholder() {
   }
 
   currentEditor.view.dispatch(currentEditor.state.tr)
+}
+
+function clearEditorContent() {
+  const currentEditor = editor.value
+  if (!currentEditor) {
+    return
+  }
+
+  currentEditor.commands.setContent(createEmptyChatComposerContentJSON() as JSONContent, {
+    emitUpdate: false,
+  })
 }
 
 function insertInlineReference(attachment: ChatComposerDocumentAttachment, nodeId: string) {
@@ -566,6 +592,7 @@ function isSameContent(currentEditor: Editor, contentJSON: JSONContent) {
       <ChatComposerToolbar
         :selected-model-ref="props.selectedModelRef"
         :model-selection-kind="props.modelSelectionKind"
+        :is-submitting="props.isSubmitting"
         :is-streaming="props.isStreaming"
         :disabled="props.disabled"
         :can-send="canSend"

@@ -45,6 +45,7 @@ export function useChatMessageList(options: UseChatMessageListOptions = {}) {
   const { renderSession } = useChatRuntimeOverlay()
   const {
     editAndSendMessage,
+    isSubmitting,
     isStreaming,
     retryMessage,
     switchBranch,
@@ -56,11 +57,12 @@ export function useChatMessageList(options: UseChatMessageListOptions = {}) {
   const editingHighlightAttachmentId = shallowRef<string | null>(null)
   const editingWebSearchForRunEnabled = shallowRef(true)
   const isReadonly = computed(() => Boolean(toValue(options.isReadonly)))
+  const isBusy = computed(() => isSubmitting.value || isStreaming.value)
   const workspaceId = computed(() => workspaceStore.currentWorkspace?.id ?? null)
   let editingHighlightTimer: ReturnType<typeof setTimeout> | null = null
   const messageActions = useChatMessageActions({
     isReadonly,
-    isStreaming,
+    isStreaming: isBusy,
     retryMessage,
     switchBranch,
   })
@@ -100,7 +102,7 @@ export function useChatMessageList(options: UseChatMessageListOptions = {}) {
   }
 
   function startEditMessage(message: ChatMessage) {
-    if (message.role !== 'user' || isStreaming.value || isReadonly.value) {
+    if (message.role !== 'user' || isBusy.value || isReadonly.value) {
       return
     }
 
@@ -284,6 +286,7 @@ export function useChatMessageList(options: UseChatMessageListOptions = {}) {
     handleEditUploadImageFiles,
     highlightEditingAttachment,
     isEditingMessage,
+    isBusy,
     isMessageCopied: messageActions.isMessageCopied,
     isConfigured,
     isStreaming,

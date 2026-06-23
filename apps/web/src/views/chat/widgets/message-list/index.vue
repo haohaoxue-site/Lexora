@@ -10,7 +10,11 @@ import {
   ChatUserMessageContent,
 } from '@/components/chat-message'
 import { useDynamicChatVirtualList } from '@/composables/chat/useDynamicChatVirtualList'
-import { shouldShowAssistantPending } from '@/composables/chat/utils/chat-message-display'
+import {
+  getUserMessageDeliveryLabel,
+  shouldShowAssistantPending,
+  shouldShowUserMessageDelivery,
+} from '@/composables/chat/utils/chat-message-display'
 import dayjs from '@/utils/dayjs'
 import ChatMessageUsageAction from '../../components/message-usage-action'
 import { useChatMessageList } from '../../composables/useChatMessageList'
@@ -50,10 +54,10 @@ const {
   handleEditUploadAttachmentFiles,
   handleEditUploadImageFiles,
   highlightEditingAttachment,
+  isBusy,
   isEditingMessage,
   isMessageCopied,
   isConfigured,
-  isStreaming,
   listKey,
   messages,
   retryAssistantMessage,
@@ -242,7 +246,7 @@ function formatMessageSentAt(value: string): string {
                 class="chat-message-list__actions assistant flex items-center justify-start gap-1.5"
                 :message="virtual.item.message"
                 :copied="isMessageCopied(virtual.item.message)"
-                :is-streaming="isStreaming"
+                :is-streaming="isBusy"
                 :is-readonly="props.isReadonly"
                 show-retry
                 variant="global"
@@ -274,7 +278,7 @@ function formatMessageSentAt(value: string): string {
                   :model-selection-kind="composerModelSelectionKind"
                   :upload-availability="uploadAvailability"
                   :web-search-skill-enabled="webSearchSkillEnabled"
-                  :disabled="isStreaming || props.isReadonly"
+                  :disabled="isBusy || props.isReadonly"
                   :highlight-attachment-id="editingHighlightAttachmentId"
                   document-picker-teleport-to=".chat-view__picker-layer"
                   @update:content-j-s-o-n="editingContentJSON = $event"
@@ -296,11 +300,19 @@ function formatMessageSentAt(value: string): string {
                 <div class="chat-message-list__bubble user rounded-lg px-3 py-2 text-sm leading-[1.625] break-words">
                   <ChatUserMessageContent :message="virtual.item.message" />
                 </div>
+                <div
+                  v-if="shouldShowUserMessageDelivery(virtual.item.message)"
+                  class="chat-message-list__user-delivery text-xs leading-4"
+                  :class="virtual.item.message.status === 'failed' ? 'is-failed' : 'is-pending'"
+                >
+                  {{ getUserMessageDeliveryLabel(virtual.item.message) }}
+                </div>
                 <ChatMessageActions
+                  v-if="!shouldShowUserMessageDelivery(virtual.item.message)"
                   class="chat-message-list__actions user flex items-center justify-end gap-1.5"
                   :message="virtual.item.message"
                   :copied="isMessageCopied(virtual.item.message)"
-                  :is-streaming="isStreaming"
+                  :is-streaming="isBusy"
                   :is-readonly="props.isReadonly"
                   show-edit
                   variant="global"
@@ -399,6 +411,14 @@ function formatMessageSentAt(value: string): string {
       white-space: pre-wrap;
       color: #fff;
       background: var(--brand-primary);
+    }
+  }
+
+  .chat-message-list__user-delivery {
+    color: var(--brand-text-tertiary);
+
+    &.is-failed {
+      color: var(--el-color-danger);
     }
   }
 

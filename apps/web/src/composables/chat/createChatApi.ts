@@ -45,6 +45,7 @@ export function createChatApi(origin: ChatSessionOrigin, options: CreateChatApiO
 
   return {
     origin,
+    getWorkspaceId,
     getSessions: () => getChatSessions({ origin, workspaceId: getWorkspaceId() }),
     createSession: () => createChatSession({ origin, workspaceId: getWorkspaceId() }),
     getSession: (sessionId: string) => getChatSession(sessionId, { origin }),

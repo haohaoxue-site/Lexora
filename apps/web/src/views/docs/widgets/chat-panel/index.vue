@@ -33,8 +33,10 @@ const {
   hasActiveSession,
   highlightAttachment,
   highlightAttachmentId,
+  isBusy,
   isDeleting,
   isRenaming,
+  isSubmitting,
   isStreaming,
   loadHistorySessions,
   isMessageCopied,
@@ -113,7 +115,7 @@ watch(
     <DocsChatMessages
       :messages="messages"
       :session-id="renderSessionId"
-      :is-streaming="isStreaming"
+      :is-streaming="isBusy"
       :is-message-copied="isMessageCopied"
       @copy-message="copyMessage"
       @retry-assistant-message="retryAssistantMessage"
@@ -130,6 +132,7 @@ watch(
         :content-j-s-o-n="contentJSON"
         :selected-model-ref="composerSelectedModelRef"
         :model-selection-kind="composerModelSelectionKind"
+        :is-submitting="isSubmitting"
         :is-streaming="isStreaming"
         :highlight-attachment-id="highlightAttachmentId"
         :upload-availability="uploadAvailability"

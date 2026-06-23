@@ -24,6 +24,8 @@ const HIGHLIGHT_DURATION_MS = 1400
 
 export type ChatComposerBeforeSendHandler = (payload: ChatComposerSubmitPayload) => ChatComposerSubmitPayload
 export type ChatComposerAfterSendHandler = (payload: ChatComposerSubmitPayload) => void
+export type ChatComposerSendFailureHandler = (payload: ChatComposerSubmitPayload) => void
+export type ChatComposerSubmitStartHandler = (payload: ChatComposerSubmitPayload) => void
 
 export interface ChatComposerHostModel {
   composerSelectedModelRef: ComputedRef<ChatComposerModelRef | null>
@@ -45,6 +47,8 @@ export function createChatComposerHostState(options: {
   const highlightAttachmentId = shallowRef<string | null>(null)
   const beforeSendHandlers = new Set<ChatComposerBeforeSendHandler>()
   const afterSendHandlers = new Set<ChatComposerAfterSendHandler>()
+  const sendFailureHandlers = new Set<ChatComposerSendFailureHandler>()
+  const submitStartHandlers = new Set<ChatComposerSubmitStartHandler>()
   const uploadAvailability = computed<ChatComposerUploadAvailability>(() => {
     const selectedModel = options.model.composerSelectedModel.value
     const imageDisabled = isModelMissingInputModality(selectedModel, AI_MODEL_MODALITY.IMAGE)
@@ -81,6 +85,18 @@ export function createChatComposerHostState(options: {
     return () => afterSendHandlers.delete(handler)
   }
 
+  function registerSendFailureHandler(handler: ChatComposerSendFailureHandler) {
+    sendFailureHandlers.add(handler)
+
+    return () => sendFailureHandlers.delete(handler)
+  }
+
+  function registerSubmitStartHandler(handler: ChatComposerSubmitStartHandler) {
+    submitStartHandlers.add(handler)
+
+    return () => submitStartHandlers.delete(handler)
+  }
+
   function applyBeforeSendHandlers(payload: ChatComposerSubmitPayload) {
     let nextPayload = payload
 
@@ -93,6 +109,18 @@ export function createChatComposerHostState(options: {
 
   function notifyAfterSendHandlers(payload: ChatComposerSubmitPayload) {
     for (const handler of afterSendHandlers) {
+      handler(payload)
+    }
+  }
+
+  function notifySendFailureHandlers(payload: ChatComposerSubmitPayload) {
+    for (const handler of sendFailureHandlers) {
+      handler(payload)
+    }
+  }
+
+  function notifySubmitStartHandlers(payload: ChatComposerSubmitPayload) {
+    for (const handler of submitStartHandlers) {
       handler(payload)
     }
   }
@@ -111,11 +139,17 @@ export function createChatComposerHostState(options: {
       return false
     }
 
+    const submittedPayload = cloneSubmitPayload(nextPayload)
+    notifySubmitStartHandlers(nextPayload)
+    resetComposer()
+
     const sent = await options.sendMessage({
       ...nextPayload,
       modelRef: shouldPersistComposerModel(options.model) ? modelRef : undefined,
     })
     if (!sent) {
+      notifySendFailureHandlers(nextPayload)
+      restoreComposer(submittedPayload)
       return false
     }
 
@@ -123,6 +157,11 @@ export function createChatComposerHostState(options: {
     resetComposer()
     options.model.clearNewSessionModelDraft()
     return true
+  }
+
+  function restoreComposer(payload: ChatComposerSubmitPayload) {
+    contentJSON.value = payload.contentJSON
+    attachments.value = payload.attachments
   }
 
   async function handleUploadImageFiles(files: File[]) {
@@ -251,6 +290,8 @@ export function createChatComposerHostState(options: {
     highlightAttachmentId,
     registerAfterSendHandler,
     registerBeforeSendHandler,
+    registerSendFailureHandler,
+    registerSubmitStartHandler,
     resetComposer,
     uploadAvailability,
   }
@@ -264,6 +305,10 @@ function shouldPersistComposerModel(model: ChatComposerHostModel) {
 
   const selectionKind = model.composerModelSelectionKind?.value
   return selectionKind === 'draft' || selectionKind === 'override'
+}
+
+function cloneSubmitPayload(payload: ChatComposerSubmitPayload): ChatComposerSubmitPayload {
+  return JSON.parse(JSON.stringify(payload)) as ChatComposerSubmitPayload
 }
 
 function normalizeSelectedModelRef(modelRef: ChatComposerModelRef | null) {

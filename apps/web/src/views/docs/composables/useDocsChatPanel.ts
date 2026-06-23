@@ -5,6 +5,7 @@ import type { ChatStreamController, SendChatComposerMessageInput } from '@/compo
 import { createSharedComposable } from '@vueuse/core'
 import { computed, onMounted, shallowRef, watch } from 'vue'
 import { createChatSurfaceController } from '@/composables/chat/createChatSurfaceController'
+import { getMessageText } from '@/composables/chat/utils/chat-message-display'
 import { translate } from '@/i18n'
 import { ElMessageBox } from '@/utils/element-plus'
 import { useActiveDocument } from './useActiveDocument'
@@ -26,6 +27,7 @@ interface DocsChatPanelSessions {
 interface DocsChatPanelStream {
   cancelActiveRun: ChatStreamController['cancelActiveRun']
   cancelRunId: ChatStreamController['cancelRunId']
+  isSubmitting: ChatStreamController['isSubmitting']
   isStreaming: ChatStreamController['isStreaming']
   retryMessage: ChatStreamController['retryMessage']
   sendMessage: (input: SendChatComposerMessageInput) => Promise<boolean>
@@ -33,6 +35,7 @@ interface DocsChatPanelStream {
 }
 
 interface DocsChatPanelOverlay {
+  clearTemporarySession: () => void
   renderSession: ComputedRef<ChatSessionDetail | null>
 }
 
@@ -84,6 +87,7 @@ export function createDocsChatPanelController(options: {
       activeSessionId: options.sessions.activeSessionId,
     },
     stream: {
+      isSubmitting: options.stream.isSubmitting,
       isStreaming: options.stream.isStreaming,
       retryMessage: options.stream.retryMessage,
       sendMessage: options.stream.sendMessage,
@@ -104,9 +108,12 @@ export function createDocsChatPanelController(options: {
     highlightAttachment,
     highlightAttachmentId,
     isConfigured,
+    isSubmitting,
     loadSkills,
     registerAfterSendHandler,
     registerBeforeSendHandler,
+    registerSendFailureHandler,
+    registerSubmitStartHandler,
     resetComposer,
     resetNewSessionComposerState,
     selectComposerModel,
@@ -138,7 +145,7 @@ export function createDocsChatPanelController(options: {
   const activeSessionTitle = computed(() => options.sessions.activeSession.value?.title ?? translate('docs.chat.titleFallback'))
   const documentAiCandidateSyncKey = computed(() =>
     messages.value
-      .map(message => `${message.id}:${message.role}:${message.status}:${message.role === 'assistant' ? readMessageContent(message).length : ''}`)
+      .map(message => `${message.id}:${message.role}:${message.status}:${message.role === 'assistant' ? getMessageText(message).length : ''}`)
       .join('|'),
   )
 
@@ -175,6 +182,7 @@ export function createDocsChatPanelController(options: {
   }
 
   function startNewSession() {
+    options.overlay?.clearTemporarySession()
     options.sessions.clearActiveSession()
     resetNewSessionComposerState()
   }
@@ -261,6 +269,7 @@ export function createDocsChatPanelController(options: {
       await options.sessions.deleteSession(session.id, {
         selectFallbackSession: false,
       })
+      options.overlay?.clearTemporarySession()
       resetNewSessionComposerState()
       return true
     }
@@ -290,11 +299,13 @@ export function createDocsChatPanelController(options: {
     hasActiveSession,
     highlightAttachment,
     highlightAttachmentId,
+    isBusy: surfaceMessages.isBusy,
     isConfigured,
     isDeleting,
     isMessageCopied,
     isOpen,
     isRenaming,
+    isSubmitting,
     isStreaming: surfaceMessages.isStreaming,
     loadHistorySessions,
     loadSkills,
@@ -305,6 +316,8 @@ export function createDocsChatPanelController(options: {
     renameDraft,
     registerAfterSendHandler,
     registerBeforeSendHandler,
+    registerSendFailureHandler,
+    registerSubmitStartHandler,
     renderSessionId,
     resetComposer,
     retryAssistantMessage,
@@ -321,8 +334,4 @@ export function createDocsChatPanelController(options: {
     webSearchForRunEnabled,
     webSearchSkillEnabled,
   }
-}
-
-function readMessageContent(message: { content?: unknown }) {
-  return typeof message.content === 'string' ? message.content : ''
 }

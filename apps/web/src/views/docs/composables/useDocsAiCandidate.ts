@@ -9,6 +9,7 @@ import {
 import { CHAT_MESSAGE_STATUS } from '@haohaoxue/lexora-contracts/chat/constants'
 import { createSharedComposable } from '@vueuse/core'
 import { shallowRef } from 'vue'
+import { getMessageText } from '@/composables/chat/utils/chat-message-display'
 import { mapDocsSelectionLiveRange } from '../utils/docsSelectionContext'
 import { serializeDocsSelectionSnapshotToMarkdownLike } from '../utils/docsSelectionSnapshotSerializer'
 import {
@@ -132,6 +133,15 @@ export const useDocsAiCandidate = createSharedComposable(() => {
     }
   }
 
+  function clearSelectionSourcePending(attachmentId: string) {
+    pendingSelectionSourceAttachmentIds.delete(attachmentId)
+
+    const source = selectionSourceByAttachmentId.get(attachmentId)
+    if (source) {
+      cleanupPendingSelectionSourceTracker(source.editor)
+    }
+  }
+
   function isSelectionSourcePending(attachmentId: string) {
     return pendingSelectionSourceAttachmentIds.has(attachmentId)
   }
@@ -175,7 +185,7 @@ export const useDocsAiCandidate = createSharedComposable(() => {
       const replacementText = normalizeCandidateTextForIntent({
         intent,
         source,
-        text: readMessageContent(assistantMessage),
+        text: getMessageText(assistantMessage),
       })
 
       if (!replacementText) {
@@ -390,6 +400,7 @@ export const useDocsAiCandidate = createSharedComposable(() => {
     acceptCandidate,
     activeCandidate,
     clearSelectionSources,
+    clearSelectionSourcePending,
     forgetSelectionSource,
     isSelectionSourcePending,
     markSelectionSourcePending,
@@ -428,10 +439,6 @@ function isTerminalAssistantStatus(status: ChatMessage['status']) {
   return status === CHAT_MESSAGE_STATUS.COMPLETED
     || status === CHAT_MESSAGE_STATUS.FAILED
     || status === CHAT_MESSAGE_STATUS.CANCELLED
-}
-
-function readMessageContent(message: { content?: unknown }) {
-  return typeof message.content === 'string' ? message.content : ''
 }
 
 function readEditorSliceContent(editor: Editor, from: number, to: number) {

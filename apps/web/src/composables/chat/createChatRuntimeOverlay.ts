@@ -3,15 +3,20 @@ import type { ChatMutationResponse, ChatSessionDetail, ChatSessionEvent } from '
 import { computed, shallowRef, watch } from 'vue'
 import {
   applyChatRuntimeOverlayEvent,
+  clearChatRuntimeOverlayTemporarySession,
   createChatRuntimeOverlayState,
   getChatRuntimeOverlayCancelRunId,
   getChatRuntimeOverlayCurrentRun,
   getChatRuntimeOverlayCursor,
   getChatRuntimeOverlayIsStreaming,
   getChatRuntimeOverlayStatus,
+  getChatRuntimeOverlayTemporarySession,
+  markChatPendingUserMessageFailed,
   mergeChatRenderSession,
+  moveChatPendingUserMessages,
   seedChatRuntimeOverlayFromMutationResponse,
   seedChatRuntimeOverlayFromSnapshot,
+  stageChatPendingUserMessage,
 } from './utils/chat-runtime-overlay'
 
 export function createChatRuntimeOverlay(sessionController: ChatSessionController) {
@@ -23,7 +28,7 @@ export function createChatRuntimeOverlay(sessionController: ChatSessionControlle
     trackOverlayVersion()
     return activeSession.value
       ? mergeChatRenderSession(activeSession.value, overlayState)
-      : null
+      : getChatRuntimeOverlayTemporarySession(overlayState)
   })
   const currentRun = computed(() => {
     trackOverlayVersion()
@@ -74,6 +79,26 @@ export function createChatRuntimeOverlay(sessionController: ChatSessionControlle
     return changed
   }
 
+  function stagePendingUserMessage(input: Parameters<typeof stageChatPendingUserMessage>[1]): void {
+    stageChatPendingUserMessage(overlayState, input)
+    touch()
+  }
+
+  function movePendingUserMessages(input: Parameters<typeof moveChatPendingUserMessages>[1]): void {
+    moveChatPendingUserMessages(overlayState, input)
+    touch()
+  }
+
+  function markPendingUserMessageFailed(input: Parameters<typeof markChatPendingUserMessageFailed>[1]): void {
+    markChatPendingUserMessageFailed(overlayState, input)
+    touch()
+  }
+
+  function clearTemporarySession(): void {
+    clearChatRuntimeOverlayTemporarySession(overlayState)
+    touch()
+  }
+
   function touch(): void {
     overlayVersion.value += 1
   }
@@ -86,10 +111,14 @@ export function createChatRuntimeOverlay(sessionController: ChatSessionControlle
     activeCursor,
     applyEvent,
     cancelRunId,
+    clearTemporarySession,
     currentRun,
     isStreaming,
+    markPendingUserMessageFailed,
+    movePendingUserMessages,
     renderSession,
     seedFromMutationResponse,
+    stagePendingUserMessage,
     status,
   }
 }

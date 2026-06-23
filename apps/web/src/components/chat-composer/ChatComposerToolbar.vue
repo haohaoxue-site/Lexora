@@ -3,6 +3,7 @@ import type {
   ChatComposerToolbarEmits,
   ChatComposerToolbarProps,
 } from './typing'
+import { computed } from 'vue'
 import ChatComposerAttachmentMenu from './ChatComposerAttachmentMenu.vue'
 import ChatComposerSkillControls from './ChatComposerSkillControls.vue'
 import ChatComposerSubmitControls from './ChatComposerSubmitControls.vue'
@@ -10,6 +11,7 @@ import ChatComposerWebSearchButton from './ChatComposerWebSearchButton.vue'
 
 const props = defineProps<ChatComposerToolbarProps>()
 const emit = defineEmits<ChatComposerToolbarEmits>()
+const interactionStreaming = computed(() => Boolean(props.isStreaming || props.isSubmitting))
 </script>
 
 <template>
@@ -17,7 +19,7 @@ const emit = defineEmits<ChatComposerToolbarEmits>()
     <div class="chat-composer-toolbar__left">
       <ChatComposerAttachmentMenu
         :disabled="props.disabled"
-        :is-streaming="props.isStreaming"
+        :is-streaming="interactionStreaming"
         :upload-availability="props.uploadAvailability"
         @open-panel-picker="emit('openPanelPicker')"
         @upload-image="emit('uploadImage')"
@@ -26,7 +28,7 @@ const emit = defineEmits<ChatComposerToolbarEmits>()
 
       <ChatComposerWebSearchButton
         :disabled="props.disabled"
-        :is-streaming="props.isStreaming"
+        :is-streaming="interactionStreaming"
         :web-search-skill-enabled="props.webSearchSkillEnabled"
         :web-search-for-run-enabled="props.webSearchForRunEnabled"
         @update:web-search-for-run-enabled="emit('update:webSearchForRunEnabled', $event)"
@@ -36,7 +38,7 @@ const emit = defineEmits<ChatComposerToolbarEmits>()
 
       <ChatComposerSkillControls
         :disabled="props.disabled"
-        :is-streaming="props.isStreaming"
+        :is-streaming="interactionStreaming"
         :document-assistant-edit-intent="props.documentAssistantEditIntent"
         :document-assistant-skill-enabled="props.documentAssistantSkillEnabled"
         :translator-skill-enabled="props.translatorSkillEnabled"
@@ -50,6 +52,7 @@ const emit = defineEmits<ChatComposerToolbarEmits>()
     <ChatComposerSubmitControls
       :selected-model-ref="props.selectedModelRef"
       :model-selection-kind="props.modelSelectionKind"
+      :is-submitting="props.isSubmitting"
       :is-streaming="props.isStreaming"
       :disabled="props.disabled"
       :can-send="props.canSend"

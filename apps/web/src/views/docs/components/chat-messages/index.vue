@@ -10,7 +10,11 @@ import {
   ChatUserMessageContent,
 } from '@/components/chat-message'
 import { useDynamicChatVirtualList } from '@/composables/chat/useDynamicChatVirtualList'
-import { shouldShowAssistantPending } from '@/composables/chat/utils/chat-message-display'
+import {
+  getUserMessageDeliveryLabel,
+  shouldShowAssistantPending,
+  shouldShowUserMessageDelivery,
+} from '@/composables/chat/utils/chat-message-display'
 
 const props = withDefaults(defineProps<DocsChatMessagesProps>(), {
   isReadonly: false,
@@ -86,8 +90,16 @@ function isCopied(message: DocsChatMessagesProps['messages'][number]) {
             <div class="docs-chat-messages__user-bubble max-w-full break-words rounded-lg bg-primary px-3 py-2 text-[13px] leading-[1.55] text-white">
               <ChatUserMessageContent :message="virtual.item" />
             </div>
+            <div
+              v-if="shouldShowUserMessageDelivery(virtual.item)"
+              class="docs-chat-messages__user-delivery text-xs leading-4"
+              :class="virtual.item.status === 'failed' ? 'is-failed' : 'is-pending'"
+            >
+              {{ getUserMessageDeliveryLabel(virtual.item) }}
+            </div>
 
             <ChatMessageActions
+              v-if="!shouldShowUserMessageDelivery(virtual.item)"
               class="docs-chat-messages__actions user flex items-center justify-end gap-1"
               :message="virtual.item"
               :copied="isCopied(virtual.item)"
@@ -141,6 +153,14 @@ function isCopied(message: DocsChatMessagesProps['messages'][number]) {
 
 .docs-chat-messages__user-bubble {
   min-inline-size: 0;
+}
+
+.docs-chat-messages__user-delivery {
+  color: var(--brand-text-tertiary);
+
+  &.is-failed {
+    color: var(--el-color-danger);
+  }
 }
 
 .docs-chat-messages__virtual-item {

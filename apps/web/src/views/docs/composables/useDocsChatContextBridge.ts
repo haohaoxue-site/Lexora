@@ -75,8 +75,9 @@ interface DocsChatContextBridgePanel {
   documentAssistantEditIntent: Ref<AgentDocumentAssistantEditIntent | null>
   highlightAttachment: (attachmentId: string) => void
   openPanel: () => void
-  registerAfterSendHandler: (handler: (payload: ChatComposerSubmitPayload) => void) => () => boolean
   registerBeforeSendHandler: (handler: (payload: ChatComposerSubmitPayload) => ChatComposerSubmitPayload) => () => boolean
+  registerSendFailureHandler: (handler: (payload: ChatComposerSubmitPayload) => void) => () => boolean
+  registerSubmitStartHandler: (handler: (payload: ChatComposerSubmitPayload) => void) => () => boolean
   requestComposerFocus: () => void
 }
 
@@ -105,7 +106,8 @@ export function createDocsChatContextBridgeController(options: {
   let autoAnchorSelectionVersion: number | null = null
   let activeAnchorPreviewEditor: Editor | null = null
   let anchorContextMutationDepth = 0
-  const unregisterAfterSend = options.panel.registerAfterSendHandler(markSelectionSourcesSent)
+  const unregisterSubmitStart = options.panel.registerSubmitStartHandler(markSelectionSourcesSent)
+  const unregisterSendFailure = options.panel.registerSendFailureHandler(clearPendingSelectionSources)
   const unregisterBeforeSend = options.panel.registerBeforeSendHandler(refreshSelectionSnapshotsForSend)
   const stopDocumentAssistantIntentWatch = watch(
     () => options.panel.documentAssistantEditIntent.value,
@@ -379,6 +381,14 @@ export function createDocsChatContextBridgeController(options: {
     for (const attachment of payload.attachments) {
       if (attachment.type === 'document' && attachment.scope.kind === 'selection') {
         docsAiCandidate.markSelectionSourcePending(attachment.id)
+      }
+    }
+  }
+
+  function clearPendingSelectionSources(payload: ChatComposerSubmitPayload) {
+    for (const attachment of payload.attachments) {
+      if (attachment.type === 'document' && attachment.scope.kind === 'selection') {
+        docsAiCandidate.clearSelectionSourcePending(attachment.id)
       }
     }
   }
@@ -802,7 +812,8 @@ export function createDocsChatContextBridgeController(options: {
     stopDocumentWatch()
     stopAttachmentWatch()
     stopDocumentAssistantIntentWatch()
-    unregisterAfterSend()
+    unregisterSubmitStart()
+    unregisterSendFailure()
     unregisterBeforeSend()
     clearAllSelectionContexts()
   }
@@ -885,7 +896,9 @@ export function createDocsChatContextBridgeController(options: {
     }
 
     options.panel.attachments.value = options.panel.attachments.value.filter(attachment => attachment.id !== attachmentId)
-    removeSelectionAnchor(attachmentId)
+    removeSelectionAnchor(attachmentId, {
+      forgetSource: !docsAiCandidate.isSelectionSourcePending(attachmentId),
+    })
     autoAnchorAttachmentId = null
   }
 
