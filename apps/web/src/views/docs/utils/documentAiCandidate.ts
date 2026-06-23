@@ -51,13 +51,13 @@ export function normalizeDocumentAssistantCandidateTextForIntent(input: Normaliz
     return text
   }
 
-  const withoutPrefix = stripExistingBoundaryLine({
+  const withoutPrefix = stripExistingBoundaryText({
     boundaryLine: input.anchorPrefix,
     side: 'start',
     text,
   })
 
-  return stripExistingBoundaryLine({
+  return stripExistingBoundaryText({
     boundaryLine: input.anchorSuffix,
     side: 'end',
     text: withoutPrefix,
@@ -82,7 +82,7 @@ function unwrapSingleParagraphInlineContent(content: JSONContent[]) {
   return node.content?.length ? node.content : null
 }
 
-function stripExistingBoundaryLine(input: {
+function stripExistingBoundaryText(input: {
   boundaryLine: string
   side: 'end' | 'start'
   text: string
@@ -96,11 +96,27 @@ function stripExistingBoundaryLine(input: {
   const lines = input.text.split(/\r?\n/)
 
   if (input.side === 'start') {
+    const textStartOffset = input.text.length - input.text.trimStart().length
+
+    if (input.text.slice(textStartOffset).startsWith(boundaryLine)) {
+      return input.text
+        .slice(textStartOffset + boundaryLine.length)
+        .trimStart()
+    }
+
     const firstContentLineIndex = lines.findIndex(line => line.trim().length > 0)
 
     return firstContentLineIndex >= 0 && lines[firstContentLineIndex]?.trim() === boundaryLine
       ? lines.slice(firstContentLineIndex + 1).join('\n').trimStart()
       : input.text
+  }
+
+  const trimmedEndText = input.text.trimEnd()
+
+  if (trimmedEndText.endsWith(boundaryLine)) {
+    return trimmedEndText
+      .slice(0, -boundaryLine.length)
+      .trimEnd()
   }
 
   const lastContentLineIndex = findLastContentLineIndex(lines)

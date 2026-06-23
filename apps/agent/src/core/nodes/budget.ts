@@ -9,8 +9,11 @@ import { createAgentSystemPrompt } from '../prompts/system'
 import { isLocationSkillActive } from '../skills/action-providers/builtin/location'
 import { createAgentMemoryPromptBlock } from '../skills/action-providers/builtin/memory'
 import { isTimeSkillActive } from '../skills/action-providers/builtin/time'
-import { createDirectDocumentAssistantSystemPrompt } from '../skills/direct-invocations/document-assistant'
-import { createDirectTranslatorSystemPrompt } from '../skills/direct-invocations/translator'
+import {
+  createDirectInvocationSystemPrompt,
+  resolveContextSnapshotsForDirectInvocation,
+  resolveDirectInvocationRuntime,
+} from '../skills/direct-invocations'
 
 export interface AgentBudgetState {
   olderMessagesExcerpt: string
@@ -23,24 +26,13 @@ export function resolveBudgetForState(
   state: AgentBudgetState,
   context: AgentGraphContext | undefined,
 ) {
-  if (context?.directTranslatorInvocation) {
+  const directInvocationRuntime = resolveDirectInvocationRuntime(context)
+  if (directInvocationRuntime) {
     return resolveAgentContextBudget({
-      model: context.modelLimits ?? {},
-      modelPolicy: context.agentProfileConfig?.modelPolicy,
-      systemPrompt: createDirectTranslatorSystemPrompt(context.directTranslatorInvocation),
-      contextSnapshots: [],
-      memoryPrompt: null,
-      historyDigest: null,
-      recentMessages: state.messages,
-    })
-  }
-
-  if (context?.directDocumentAssistantInvocation) {
-    return resolveAgentContextBudget({
-      model: context.modelLimits ?? {},
-      modelPolicy: context.agentProfileConfig?.modelPolicy,
-      systemPrompt: createDirectDocumentAssistantSystemPrompt(context.directDocumentAssistantInvocation),
-      contextSnapshots: context.contextSnapshots ?? [],
+      model: context?.modelLimits ?? {},
+      modelPolicy: context?.agentProfileConfig?.modelPolicy,
+      systemPrompt: createDirectInvocationSystemPrompt(directInvocationRuntime),
+      contextSnapshots: resolveContextSnapshotsForDirectInvocation(directInvocationRuntime, context?.contextSnapshots),
       memoryPrompt: null,
       historyDigest: null,
       recentMessages: state.messages,

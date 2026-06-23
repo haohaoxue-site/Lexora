@@ -9,6 +9,7 @@ import type { AgentGraphContext, AgentGraphState } from '../state'
 import {
   AgentMemoryRetrievalSnapshotSchema,
 } from '@haohaoxue/lexora-contracts'
+import { resolveDirectInvocationRuntime } from '../skills/direct-invocations'
 
 export interface CreateRetrieveMemoryNodeOptions {
   memoryApi?: AgentMemoryApiClient
@@ -21,7 +22,7 @@ export function createRetrieveMemoryNode(options: CreateRetrieveMemoryNodeOption
     const generationId = config.context?.generationId
     const actorUserId = config.context?.actorUserId
 
-    if (config.context?.directTranslatorInvocation || config.context?.directDocumentAssistantInvocation) {
+    if (resolveDirectInvocationRuntime(config.context)) {
       return {
         memoryRetrieval: null,
       }

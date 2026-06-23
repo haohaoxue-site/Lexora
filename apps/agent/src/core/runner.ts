@@ -43,13 +43,9 @@ import {
 } from './events'
 import { createAgentGraph } from './graph'
 import {
-  createDirectDocumentAssistantThreadId,
-  resolveDirectDocumentAssistantInvocation,
-} from './skills/direct-invocations/document-assistant'
-import {
-  createDirectTranslatorThreadId,
-  resolveDirectTranslatorInvocation,
-} from './skills/direct-invocations/translator'
+  resolveContextSnapshotsForDirectInvocation,
+  resolveDirectInvocationRun,
+} from './skills/direct-invocations'
 
 interface AgentRunnerLogger {
   warn: (payload: Record<string, unknown>, message?: string) => void
@@ -209,24 +205,20 @@ export async function executeAgentGeneration(input: {
   const profileConfig = AgentProfileConfigSchema.parse(input.bootstrap.agentProfile.currentConfig)
   const skillCredentials = AgentRuntimeSkillCredentialsSchema.parse(input.bootstrap.skillCredentials)
   const threadId = input.bootstrap.context.threadId
-  const directTranslatorInvocation = resolveDirectTranslatorInvocation({
-    messages: input.bootstrap.context.messages,
-    triggerUserMessageId: input.bootstrap.context.triggerUserMessageId,
-    agentProfileConfig: profileConfig,
-    skillContext: input.bootstrap.skills,
-  })
-  const directDocumentAssistantInvocation = resolveDirectDocumentAssistantInvocation({
+  const directInvocationRun = resolveDirectInvocationRun({
     messages: input.bootstrap.context.messages,
     contextSnapshots: input.bootstrap.context.contextSnapshots,
     triggerUserMessageId: input.bootstrap.context.triggerUserMessageId,
+    threadId,
+    generationId: input.bootstrap.generation.generationId,
+    agentProfileConfig: profileConfig,
     skillContext: input.bootstrap.skills,
   })
-  const directInvocation = Boolean(directTranslatorInvocation || directDocumentAssistantInvocation)
-  const graphThreadId = directTranslatorInvocation
-    ? createDirectTranslatorThreadId(threadId, input.bootstrap.generation.generationId)
-    : directDocumentAssistantInvocation
-      ? createDirectDocumentAssistantThreadId(threadId, input.bootstrap.generation.generationId)
-      : threadId
+  const directInvocation = Boolean(directInvocationRun)
+  const graphThreadId = directInvocationRun?.graphThreadId ?? threadId
+  const contextSnapshots = directInvocationRun
+    ? resolveContextSnapshotsForDirectInvocation(directInvocationRun, input.bootstrap.context.contextSnapshots)
+    : input.bootstrap.context.contextSnapshots
   const result = await input.threadRunTryLock.tryRunExclusive(graphThreadId, async () => {
     if (input.bootstrap.context.messages.length === 0) {
       throw new Error('聊天触发消息不存在')
@@ -261,10 +253,9 @@ export async function executeAgentGeneration(input: {
         modelOptions: toChatModelOptions(profileConfig),
         modelTarget: input.bootstrap.runtimeModelTarget,
         memoryIgnoredForRun: input.bootstrap.context.memory.ignoredForRun,
-        directDocumentAssistantInvocation,
-        directTranslatorInvocation,
+        ...directInvocationRun?.stateContext,
         triggerUserMessageId: input.bootstrap.context.triggerUserMessageId,
-        contextSnapshots: directTranslatorInvocation ? [] : input.bootstrap.context.contextSnapshots,
+        contextSnapshots,
         inputAttachments: directInvocation ? [] : input.bootstrap.context.inputAttachments,
         onStreamPart: async (part: AgentModelStreamPart) => await emitAgentModelStreamPart(part, {
           emit: input.emit,

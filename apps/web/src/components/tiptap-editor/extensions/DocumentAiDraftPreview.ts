@@ -1,14 +1,14 @@
 import type { Editor, JSONContent } from '@tiptap/core'
 import type { Node as ProseMirrorNode, Schema } from '@tiptap/pm/model'
-import type { EditorState, Transaction } from '@tiptap/pm/state'
-import type { EditorView } from '@tiptap/pm/view'
+import type { Transaction } from '@tiptap/pm/state'
 import { AGENT_DOCUMENT_ASSISTANT_EDIT_INTENT } from '@haohaoxue/lexora-contracts/agent'
 import { Extension } from '@tiptap/core'
 import { DOMSerializer, Fragment } from '@tiptap/pm/model'
-import { Plugin, PluginKey } from '@tiptap/pm/state'
-import { Decoration, DecorationSet } from '@tiptap/pm/view'
+import { EditorState, Plugin, PluginKey } from '@tiptap/pm/state'
+import { Decoration, DecorationSet, EditorView } from '@tiptap/pm/view'
 import { translate } from '@/i18n'
 import { isAddressableBodyBlock } from '../content/blockId'
+import { mapTiptapRange } from '../utils/rangeMapping'
 
 export interface DocumentAiDraftPreviewState {
   id: string
@@ -51,6 +51,10 @@ type DocumentAiAnchorPreviewMeta
 
 const DOCUMENT_AI_DRAFT_DELETED_CLASS = 'tiptap-document-ai-draft-preview__deleted'
 const DOCUMENT_AI_DRAFT_DELETED_BLOCK_CLASS = 'tiptap-document-ai-draft-preview__deleted-block'
+const DOCUMENT_AI_DRAFT_CONTENT_CLASS = 'tiptap-document-ai-draft-preview__content'
+const DOCUMENT_AI_DRAFT_INSERTED_CLASS = 'tiptap-document-ai-draft-preview__inserted'
+const DOCUMENT_AI_DRAFT_LOCAL_EDITOR_CLASS = 'tiptap-document-ai-draft-preview__local-editor'
+const DOCUMENT_AI_DRAFT_LOCAL_PROSEMIRROR_CLASS = 'tiptap-document-ai-draft-preview__prosemirror'
 const DOCUMENT_AI_ANCHOR_ACTIVE_CLASS = 'tiptap-document-ai-anchor-preview--active'
 const DOCUMENT_AI_ANCHOR_SELECTION_CLASS = 'tiptap-document-ai-anchor-preview__selection'
 const DOCUMENT_AI_ANCHOR_BLOCK_CLASS = 'tiptap-document-ai-anchor-preview__block'
@@ -59,6 +63,7 @@ const DOCUMENT_AI_ANCHOR_CURSOR_TEST_ID = 'document-ai-anchor-preview'
 const documentAiDraftPreviewPluginKey = new PluginKey<DocumentAiDraftPreviewState | null>('documentAiDraftPreview')
 const documentAiAnchorPreviewPluginKey = new PluginKey<DocumentAiAnchorPreviewState | null>('documentAiAnchorPreview')
 type DocumentAiDraftRenderMode = 'block' | 'inline'
+const documentAiDraftLocalEditorViews = new WeakMap<Node, EditorView>()
 
 export const DocumentAiDraftPreview = Extension.create<DocumentAiDraftPreviewOptions>({
   name: 'documentAiDraftPreview',
@@ -112,7 +117,10 @@ export const DocumentAiDraftPreview = Extension.create<DocumentAiDraftPreviewOpt
                 }),
                 {
                   key: draft.id,
+                  destroy: destroyDocumentAiDraftWidget,
+                  ignoreSelection: true,
                   side: 1,
+                  stopEvent: () => true,
                 },
               ),
             ]
@@ -243,27 +251,31 @@ export function hasDocumentAiAnchorPreview(state: EditorState): boolean {
 }
 
 function mapDraft(transaction: Transaction, draft: DocumentAiDraftPreviewState): DocumentAiDraftPreviewState {
-  const from = transaction.mapping.map(draft.from, -1)
+  const mappedRange = mapTiptapRange(draft, transaction.mapping, {
+    dropWhenDeletedAcross: false,
+    allowCollapsed: true,
+  })
 
   return {
     ...draft,
-    from,
-    to: Math.max(from, transaction.mapping.map(draft.to, 1)),
+    from: mappedRange?.from ?? draft.from,
+    to: mappedRange?.to ?? draft.to,
   }
 }
 
 function mapAnchor(transaction: Transaction, anchor: DocumentAiAnchorPreviewState): DocumentAiAnchorPreviewState | null {
-  const from = transaction.mapping.mapResult(anchor.from, -1)
-  const to = transaction.mapping.mapResult(anchor.to, 1)
+  const mappedRange = mapTiptapRange(anchor, transaction.mapping, {
+    allowCollapsed: true,
+  })
 
-  if (from.deletedAcross || to.deletedAcross) {
+  if (!mappedRange) {
     return null
   }
 
   return {
     ...anchor,
-    from: from.pos,
-    to: Math.max(from.pos, to.pos),
+    from: mappedRange.from,
+    to: mappedRange.to,
   }
 }
 
@@ -318,7 +330,22 @@ function createDocumentAiDraftWidget(input: {
   root.dataset.testid = 'document-ai-draft-preview'
   root.setAttribute('aria-label', translate('docs.aiCandidate.title'))
 
-  const candidateContent = serializeCandidateContent(input.schema, input.draft.candidateContent, input.renderMode)
+  const content = document.createElement(input.renderMode === 'inline' ? 'span' : 'div')
+  content.className = DOCUMENT_AI_DRAFT_CONTENT_CLASS
+  const localEditor = input.renderMode === 'block'
+    ? createLocalDraftEditor(input.schema, input.draft.candidateContent)
+    : null
+
+  if (localEditor) {
+    content.append(localEditor.dom)
+    documentAiDraftLocalEditorViews.set(root, localEditor.view)
+  }
+  else {
+    const candidateContent = serializeCandidateContent(input.schema, input.draft.candidateContent, input.renderMode)
+    markCandidateContent(candidateContent)
+    content.append(candidateContent)
+  }
+
   const rejectButton = createDraftButton({
     className: 'tiptap-document-ai-draft-preview__button',
     label: translate('docs.aiCandidate.reject'),
@@ -334,8 +361,19 @@ function createDocumentAiDraftWidget(input: {
   actions.className = 'tiptap-document-ai-draft-preview__actions'
   actions.append(rejectButton, acceptButton)
 
-  root.append(candidateContent, actions)
+  root.append(content, actions)
   return root
+}
+
+function destroyDocumentAiDraftWidget(node: Node) {
+  const localEditorView = documentAiDraftLocalEditorViews.get(node)
+
+  if (!localEditorView) {
+    return
+  }
+
+  localEditorView.destroy()
+  documentAiDraftLocalEditorViews.delete(node)
 }
 
 function createDocumentAiAnchorCursorView(view: EditorView) {
@@ -480,14 +518,7 @@ function createDraftButton(input: {
 
 function serializeCandidateContent(schema: Schema, content: JSONContent[], renderMode: DocumentAiDraftRenderMode) {
   const fragment = document.createDocumentFragment()
-  const nodes = content.flatMap((node) => {
-    try {
-      return [schema.nodeFromJSON(node)]
-    }
-    catch {
-      return []
-    }
-  })
+  const nodes = createCandidateNodes(schema, content)
 
   if (!nodes.length) {
     return fragment
@@ -504,6 +535,54 @@ function serializeCandidateContent(schema: Schema, content: JSONContent[], rende
     .fromSchema(schema)
     .serializeFragment(Fragment.fromArray(nodes), { document }))
   return fragment
+}
+
+function createLocalDraftEditor(schema: Schema, content: JSONContent[]) {
+  const nodes = createCandidateNodes(schema, content)
+  const doc = schema.topNodeType.createAndFill(null, Fragment.fromArray(nodes))
+
+  if (!doc) {
+    return null
+  }
+
+  const dom = document.createElement('div')
+  dom.className = DOCUMENT_AI_DRAFT_LOCAL_EDITOR_CLASS
+  dom.dataset.documentAiDraftLocalEditor = 'true'
+
+  const view = new EditorView(dom, {
+    state: EditorState.create({
+      doc,
+      schema,
+    }),
+    editable: () => false,
+    attributes: {
+      class: `tiptap-editor__prosemirror ${DOCUMENT_AI_DRAFT_LOCAL_PROSEMIRROR_CLASS}`,
+    },
+  })
+
+  return {
+    dom,
+    view,
+  }
+}
+
+function createCandidateNodes(schema: Schema, content: JSONContent[]) {
+  return content.flatMap((node) => {
+    try {
+      return [schema.nodeFromJSON(node)]
+    }
+    catch {
+      return []
+    }
+  })
+}
+
+function markCandidateContent(fragment: DocumentFragment) {
+  for (const node of Array.from(fragment.childNodes)) {
+    if (node instanceof HTMLElement) {
+      node.classList.add(DOCUMENT_AI_DRAFT_INSERTED_CLASS)
+    }
+  }
 }
 
 function resolveDraftRenderMode(draft: DocumentAiDraftPreviewState): DocumentAiDraftRenderMode {

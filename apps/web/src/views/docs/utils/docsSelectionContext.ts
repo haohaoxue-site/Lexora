@@ -8,6 +8,7 @@ import {
   BODY_BLOCK_ID_ATTRIBUTE,
   isAddressableBodyBlock,
 } from '@/components/tiptap-editor/content/blockId'
+import { mapTiptapRange } from '@/components/tiptap-editor/utils/rangeMapping'
 import {
   createDocsSelectionMarkdownSnapshot,
   serializeDocsSelectionSnapshotToMarkdownLike,
@@ -162,16 +163,8 @@ export function mapDocsSelectionLiveRange(
     return range
   }
 
-  const from = transaction.mapping.mapResult(range.from, -1)
-  const to = transaction.mapping.mapResult(range.to, 1)
-
-  if (from.deletedAcross || to.deletedAcross) {
-    return null
-  }
-
-  const mappedRange = normalizeDocsSelectionRange({
-    from: from.pos,
-    to: to.pos,
+  const mappedRange = mapTiptapRange(range, transaction.mapping, {
+    allowCollapsed: true,
   })
 
   if (!mappedRange) {
