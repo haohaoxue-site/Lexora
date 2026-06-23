@@ -1,9 +1,9 @@
-import process from 'node:process'
 import { createCollabTicketClient, createDocumentYdocCurrentProjectionClient } from './clients/documents'
 import { loadCollabConfig } from './config/runtime-config'
 import { createRedisCollabPubSub } from './integrations/pubsub'
 import { createPrismaDocumentYdocRuntimeStore } from './runtime/prisma-ydoc-runtime-store'
 import { createCollabServer } from './server/app'
+import { registerCollabProcessShutdown } from './server/shutdown'
 
 const config = loadCollabConfig()
 const ydocRuntimeStore = createPrismaDocumentYdocRuntimeStore({
@@ -38,12 +38,5 @@ async function start(): Promise<void> {
   app.log.info(`Collab is running on ${appUrl}/${apiPrefix}`)
 }
 
-async function shutdown(signal: NodeJS.Signals): Promise<void> {
-  app.log.info({ signal }, 'Collab is shutting down')
-  await app.close()
-}
-
-process.once('SIGTERM', signal => void shutdown(signal))
-process.once('SIGINT', signal => void shutdown(signal))
-
+registerCollabProcessShutdown(app)
 void start()
