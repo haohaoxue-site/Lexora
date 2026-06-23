@@ -51,10 +51,12 @@ type DocumentAiAnchorPreviewMeta
 
 const DOCUMENT_AI_DRAFT_DELETED_CLASS = 'tiptap-document-ai-draft-preview__deleted'
 const DOCUMENT_AI_DRAFT_DELETED_BLOCK_CLASS = 'tiptap-document-ai-draft-preview__deleted-block'
-const DOCUMENT_AI_DRAFT_CONTENT_CLASS = 'tiptap-document-ai-draft-preview__content'
+const DOCUMENT_AI_DRAFT_EMPTY_ANCHOR_CLASS = 'tiptap-document-ai-draft-preview__empty-anchor'
 const DOCUMENT_AI_DRAFT_INSERTED_CLASS = 'tiptap-document-ai-draft-preview__inserted'
 const DOCUMENT_AI_DRAFT_LOCAL_EDITOR_CLASS = 'tiptap-document-ai-draft-preview__local-editor'
 const DOCUMENT_AI_DRAFT_LOCAL_PROSEMIRROR_CLASS = 'tiptap-document-ai-draft-preview__prosemirror'
+const DOCUMENT_AI_DRAFT_ACTIONS_CLASS = 'tiptap-document-ai-draft-preview__actions'
+const DOCUMENT_AI_DRAFT_CHANGE_ATTRIBUTE = 'data-document-ai-draft-change'
 const DOCUMENT_AI_ANCHOR_ACTIVE_CLASS = 'tiptap-document-ai-anchor-preview--active'
 const DOCUMENT_AI_ANCHOR_SELECTION_CLASS = 'tiptap-document-ai-anchor-preview__selection'
 const DOCUMENT_AI_ANCHOR_BLOCK_CLASS = 'tiptap-document-ai-anchor-preview__block'
@@ -107,16 +109,14 @@ export const DocumentAiDraftPreview = Extension.create<DocumentAiDraftPreviewOpt
             const renderMode = resolveDraftRenderMode(draft)
             const decorations = [
               Decoration.widget(
-                resolveDraftWidgetPosition(state.doc, draft, renderMode),
+                resolveDocumentAiDraftWidgetPosition(state.doc, draft, renderMode),
                 () => createDocumentAiDraftWidget({
                   draft,
-                  onAccept: this.options.onAccept,
-                  onReject: this.options.onReject,
                   renderMode,
                   schema: state.schema,
                 }),
                 {
-                  key: draft.id,
+                  key: `${draft.id}:content`,
                   destroy: destroyDocumentAiDraftWidget,
                   ignoreSelection: true,
                   side: 1,
@@ -124,13 +124,23 @@ export const DocumentAiDraftPreview = Extension.create<DocumentAiDraftPreviewOpt
                 },
               ),
             ]
+            const hiddenAnchorRange = resolveDocumentAiDraftHiddenAnchorRange(state.doc, draft, renderMode)
+
+            if (hiddenAnchorRange) {
+              decorations.unshift(Decoration.node(hiddenAnchorRange.from, hiddenAnchorRange.to, {
+                'class': DOCUMENT_AI_DRAFT_EMPTY_ANCHOR_CLASS,
+                'data-document-ai-draft-anchor': 'empty',
+              }))
+            }
 
             if (draft.intent !== AGENT_DOCUMENT_ASSISTANT_EDIT_INTENT.CONTINUE_AT_ANCHOR && draft.to > draft.from) {
               decorations.unshift(draft.previewMode === 'block'
                 ? Decoration.node(draft.from, draft.to, {
+                    [DOCUMENT_AI_DRAFT_CHANGE_ATTRIBUTE]: 'deleted',
                     class: DOCUMENT_AI_DRAFT_DELETED_BLOCK_CLASS,
                   })
                 : Decoration.inline(draft.from, draft.to, {
+                    [DOCUMENT_AI_DRAFT_CHANGE_ATTRIBUTE]: 'deleted',
                     class: DOCUMENT_AI_DRAFT_DELETED_CLASS,
                   }))
             }
@@ -138,6 +148,10 @@ export const DocumentAiDraftPreview = Extension.create<DocumentAiDraftPreviewOpt
             return DecorationSet.create(state.doc, decorations)
           },
         },
+        view: view => createDocumentAiDraftActionView(view, {
+          onAccept: this.options.onAccept,
+          onReject: this.options.onReject,
+        }),
       }),
       new Plugin<DocumentAiAnchorPreviewState | null>({
         key: documentAiAnchorPreviewPluginKey,
@@ -319,49 +333,31 @@ function normalizeAnchor(
 
 function createDocumentAiDraftWidget(input: {
   draft: DocumentAiDraftPreviewState
-  onAccept?: (candidateId: string) => void
-  onReject?: (candidateId: string) => void
   renderMode: DocumentAiDraftRenderMode
   schema: Schema
 }) {
   const root = document.createElement(input.renderMode === 'inline' ? 'span' : 'section')
   root.className = `tiptap-document-ai-draft-preview tiptap-document-ai-draft-preview--${input.renderMode}`
   root.contentEditable = 'false'
+  root.dataset.documentAiDraftId = input.draft.id
+  root.setAttribute(DOCUMENT_AI_DRAFT_CHANGE_ATTRIBUTE, 'inserted')
   root.dataset.testid = 'document-ai-draft-preview'
   root.setAttribute('aria-label', translate('docs.aiCandidate.title'))
 
-  const content = document.createElement(input.renderMode === 'inline' ? 'span' : 'div')
-  content.className = DOCUMENT_AI_DRAFT_CONTENT_CLASS
   const localEditor = input.renderMode === 'block'
     ? createLocalDraftEditor(input.schema, input.draft.candidateContent)
     : null
 
   if (localEditor) {
-    content.append(localEditor.dom)
+    root.append(localEditor.dom)
     documentAiDraftLocalEditorViews.set(root, localEditor.view)
   }
   else {
     const candidateContent = serializeCandidateContent(input.schema, input.draft.candidateContent, input.renderMode)
     markCandidateContent(candidateContent)
-    content.append(candidateContent)
+    root.append(candidateContent)
   }
 
-  const rejectButton = createDraftButton({
-    className: 'tiptap-document-ai-draft-preview__button',
-    label: translate('docs.aiCandidate.reject'),
-    onClick: () => input.onReject?.(input.draft.id),
-  })
-  const acceptButton = createDraftButton({
-    className: 'tiptap-document-ai-draft-preview__button is-primary',
-    label: translate('docs.aiCandidate.accept'),
-    onClick: () => input.onAccept?.(input.draft.id),
-  })
-
-  const actions = document.createElement('div')
-  actions.className = 'tiptap-document-ai-draft-preview__actions'
-  actions.append(rejectButton, acceptButton)
-
-  root.append(content, actions)
   return root
 }
 
@@ -374,6 +370,161 @@ function destroyDocumentAiDraftWidget(node: Node) {
 
   localEditorView.destroy()
   documentAiDraftLocalEditorViews.delete(node)
+}
+
+function createDocumentAiDraftActionView(view: EditorView, options: DocumentAiDraftPreviewOptions) {
+  let actions: HTMLElement | null = null
+  let parent: HTMLElement | null = null
+  let currentDraftId: string | null = null
+  let currentView = view
+  let positionUpdateFrame: number | null = null
+
+  function update(nextView: EditorView) {
+    currentView = nextView
+    const draft = documentAiDraftPreviewPluginKey.getState(nextView.state)
+
+    if (!draft) {
+      remove()
+      return
+    }
+
+    const nextParent = resolveEditorOverlayParent(nextView)
+
+    if (!nextParent) {
+      remove()
+      return
+    }
+
+    if (!actions || currentDraftId !== draft.id) {
+      actions?.remove()
+      actions = createDocumentAiDraftActions({
+        draft,
+        onAccept: options.onAccept,
+        onReject: options.onReject,
+      })
+      currentDraftId = draft.id
+      parent = null
+    }
+
+    if (parent !== nextParent) {
+      actions.remove()
+      nextParent.append(actions)
+      parent = nextParent
+    }
+
+    schedulePositionUpdate()
+  }
+
+  function schedulePositionUpdate() {
+    if (positionUpdateFrame !== null) {
+      return
+    }
+
+    positionUpdateFrame = globalThis.requestAnimationFrame(() => {
+      positionUpdateFrame = null
+      positionActions()
+    })
+  }
+
+  function positionActions() {
+    const draft = documentAiDraftPreviewPluginKey.getState(currentView.state)
+
+    if (!actions || !parent || !draft) {
+      return
+    }
+
+    const anchorRect = resolveDraftActionAnchorRect(currentView, draft)
+
+    if (!anchorRect) {
+      return
+    }
+
+    const parentRect = parent.getBoundingClientRect()
+    const actionWidth = actions.offsetWidth
+    const minX = parent.scrollLeft + 4
+    const maxX = parent.scrollLeft + parent.clientWidth - actionWidth - 4
+    const preferredX = anchorRect.right - parentRect.left + parent.scrollLeft + 8
+    const x = Math.max(minX, Math.min(preferredX, maxX))
+    const y = anchorRect.top - parentRect.top + parent.scrollTop
+
+    actions.style.transform = `translate(${x}px, ${Math.max(parent.scrollTop, y)}px)`
+  }
+
+  function remove() {
+    actions?.remove()
+    actions = null
+    parent = null
+    currentDraftId = null
+  }
+
+  update(view)
+  globalThis.addEventListener('resize', schedulePositionUpdate)
+  document.addEventListener('scroll', schedulePositionUpdate, true)
+
+  return {
+    destroy() {
+      globalThis.removeEventListener('resize', schedulePositionUpdate)
+      document.removeEventListener('scroll', schedulePositionUpdate, true)
+      if (positionUpdateFrame !== null) {
+        globalThis.cancelAnimationFrame(positionUpdateFrame)
+      }
+      remove()
+    },
+    update,
+  }
+}
+
+function createDocumentAiDraftActions(input: {
+  draft: DocumentAiDraftPreviewState
+  onAccept?: (candidateId: string) => void
+  onReject?: (candidateId: string) => void
+}) {
+  const rejectButton = createDraftButton({
+    className: 'tiptap-document-ai-draft-preview__button',
+    label: translate('docs.aiCandidate.reject'),
+    onClick: () => input.onReject?.(input.draft.id),
+  })
+  const acceptButton = createDraftButton({
+    className: 'tiptap-document-ai-draft-preview__button is-primary',
+    label: translate('docs.aiCandidate.accept'),
+    onClick: () => input.onAccept?.(input.draft.id),
+  })
+  const actions = document.createElement('div')
+
+  actions.className = DOCUMENT_AI_DRAFT_ACTIONS_CLASS
+  actions.contentEditable = 'false'
+  actions.dataset.documentAiDraftActions = input.draft.id
+  actions.append(rejectButton, acceptButton)
+  return actions
+}
+
+function resolveDraftActionAnchorRect(view: EditorView, draft: DocumentAiDraftPreviewState): DOMRect | null {
+  const previewElement = view.dom.querySelector<HTMLElement>('[data-testid="document-ai-draft-preview"]')
+  const firstPreviewBlock = previewElement?.querySelector<HTMLElement>(`.${DOCUMENT_AI_DRAFT_LOCAL_PROSEMIRROR_CLASS} > *`)
+
+  if (firstPreviewBlock) {
+    return firstPreviewBlock.getBoundingClientRect()
+  }
+
+  if (previewElement) {
+    return previewElement.getBoundingClientRect()
+  }
+
+  const renderMode = resolveDraftRenderMode(draft)
+  const position = resolveDocumentAiDraftWidgetPosition(view.state.doc, draft, renderMode)
+  const coords = view.coordsAtPos(position)
+
+  return {
+    bottom: coords.bottom,
+    height: coords.bottom - coords.top,
+    left: coords.left,
+    right: coords.right,
+    toJSON: () => ({}),
+    top: coords.top,
+    width: coords.right - coords.left,
+    x: coords.left,
+    y: coords.top,
+  }
 }
 
 function createDocumentAiAnchorCursorView(view: EditorView) {
@@ -475,8 +626,12 @@ function createDocumentAiAnchorCursorElement() {
   return cursor
 }
 
-function resolveAnchorCursorParent(view: EditorView) {
+function resolveEditorOverlayParent(view: EditorView) {
   return view.dom.closest<HTMLElement>('.tiptap-editor') ?? view.dom.parentElement
+}
+
+function resolveAnchorCursorParent(view: EditorView) {
+  return resolveEditorOverlayParent(view)
 }
 
 function positionAnchorCursor(input: {
@@ -595,7 +750,7 @@ function canRenderInlineCandidateContent(content: JSONContent[]) {
   return content.length === 1 && content[0]?.type === 'paragraph'
 }
 
-function resolveDraftWidgetPosition(
+export function resolveDocumentAiDraftWidgetPosition(
   doc: ProseMirrorNode,
   draft: DocumentAiDraftPreviewState,
   renderMode: DocumentAiDraftRenderMode,
@@ -606,7 +761,53 @@ function resolveDraftWidgetPosition(
     return position
   }
 
+  const hiddenAnchorRange = resolveDocumentAiDraftHiddenAnchorRange(doc, draft, renderMode)
+
+  if (hiddenAnchorRange) {
+    return hiddenAnchorRange.from
+  }
+
   return resolveAddressableBlockEndPosition(doc, position)
+}
+
+export function resolveDocumentAiDraftHiddenAnchorRange(
+  doc: ProseMirrorNode,
+  draft: DocumentAiDraftPreviewState,
+  renderMode: DocumentAiDraftRenderMode,
+) {
+  if (
+    renderMode !== 'block'
+    || draft.intent !== AGENT_DOCUMENT_ASSISTANT_EDIT_INTENT.CONTINUE_AT_ANCHOR
+    || draft.to !== draft.from
+  ) {
+    return null
+  }
+
+  return resolveCollapsedEmptyAddressableBlockRange(doc, draft.to)
+}
+
+function resolveCollapsedEmptyAddressableBlockRange(doc: ProseMirrorNode, position: number) {
+  const resolvedPosition = doc.resolve(clampPosition(position, doc.content.size))
+
+  for (let depth = resolvedPosition.depth; depth > 0; depth -= 1) {
+    const node = resolvedPosition.node(depth)
+    const parent = resolvedPosition.node(depth - 1)
+
+    if (!isAddressableBodyBlock(node, parent)) {
+      continue
+    }
+
+    if (!node.isTextblock || node.content.size > 0) {
+      return null
+    }
+
+    return {
+      from: resolvedPosition.before(depth),
+      to: resolvedPosition.after(depth),
+    }
+  }
+
+  return null
 }
 
 function resolveAddressableBlockEndPosition(doc: ProseMirrorNode, position: number) {

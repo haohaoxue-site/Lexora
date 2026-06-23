@@ -160,24 +160,22 @@ const {
   }
 
   :deep(.tiptap-document-ai-draft-preview) {
-    position: relative;
     margin: 0;
     padding: 0;
     color: var(--brand-text-primary);
+  }
+
+  :deep(.tiptap-document-ai-draft-preview__empty-anchor) {
+    display: none;
   }
 
   :deep(.tiptap-document-ai-draft-preview--block) {
     display: block;
   }
 
-  :deep(.tiptap-document-ai-draft-preview--block .tiptap-document-ai-draft-preview__content) {
-    display: block;
-  }
-
   :deep(.tiptap-document-ai-draft-preview__local-editor) {
     display: block;
-    border-radius: 0.125rem;
-    background: color-mix(in srgb, var(--brand-primary) 7%, transparent);
+    background: transparent;
   }
 
   :deep(.tiptap-document-ai-draft-preview__prosemirror) {
@@ -186,6 +184,11 @@ const {
     padding: 0;
     background: transparent;
     pointer-events: auto;
+  }
+
+  :deep(.tiptap-document-ai-draft-preview__prosemirror > *) {
+    border-radius: 0.125rem;
+    background: color-mix(in srgb, var(--brand-primary) 7%, transparent);
   }
 
   :deep(.tiptap-document-ai-draft-preview__prosemirror > :first-child) {
@@ -203,45 +206,25 @@ const {
 
   :deep(.tiptap-document-ai-draft-preview--inline) {
     display: inline;
-  }
-
-  :deep(.tiptap-document-ai-draft-preview--inline .tiptap-document-ai-draft-preview__content),
-  :deep(.tiptap-document-ai-draft-preview--inline .tiptap-document-ai-draft-preview__content > *) {
-    display: inline;
-    margin: 0;
-  }
-
-  :deep(.tiptap-document-ai-draft-preview--inline .tiptap-document-ai-draft-preview__content) {
     border-radius: 0.125rem;
     background: color-mix(in srgb, var(--brand-primary) 9%, transparent);
     box-decoration-break: clone;
   }
 
-  :deep(.tiptap-document-ai-draft-preview--block .tiptap-document-ai-draft-preview__actions) {
+  :deep(.tiptap-document-ai-draft-preview__actions) {
     display: inline-flex;
     position: absolute;
     z-index: 3;
     top: 0;
-    right: 0;
+    left: 0;
+    align-items: center;
     gap: 0.375rem;
     padding: 0.125rem;
     border: 1px solid color-mix(in srgb, var(--brand-primary) 22%, var(--brand-border-base));
     border-radius: 0.375rem;
     background: color-mix(in srgb, var(--brand-bg-surface-raised) 94%, transparent);
     box-shadow: var(--brand-shadow-hairline);
-  }
-
-  :deep(.tiptap-document-ai-draft-preview--inline .tiptap-document-ai-draft-preview__actions) {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.25rem;
-    margin-left: 0.375rem;
-    padding: 0.125rem;
-    border: 1px solid color-mix(in srgb, var(--brand-primary) 22%, var(--brand-border-base));
-    border-radius: 0.375rem;
-    background: color-mix(in srgb, var(--brand-bg-surface-raised) 94%, transparent);
-    box-shadow: var(--brand-shadow-hairline);
-    vertical-align: middle;
+    pointer-events: auto;
   }
 
   :deep(.tiptap-document-ai-draft-preview__button) {
