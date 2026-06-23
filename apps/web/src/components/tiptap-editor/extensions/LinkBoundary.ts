@@ -21,7 +21,7 @@ export const LinkBoundary = Extension.create({
 function createLinkBoundaryExitTransaction(state: EditorState): Transaction | null {
   const linkType = state.schema.marks.link
 
-  // Link autolink 会在右边界保留 stored mark，这里显式退出，避免后续输入继续并入链接。
+  // Link mark 右边界可能保留 stored mark，这里显式退出，避免后续输入继续并入链接。
   if (!linkType || !state.selection.empty || !isAtLinkRightBoundary(state, linkType)) {
     return null
   }

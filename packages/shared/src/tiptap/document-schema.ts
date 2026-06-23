@@ -18,6 +18,7 @@ import TaskList from '@tiptap/extension-task-list'
 import { TextStyle } from '@tiptap/extension-text-style'
 import StarterKit from '@tiptap/starter-kit'
 import { prettyBytes } from '../file'
+import { createTiptapDocumentBodyLinkOptions } from './document-link'
 
 const TEXT_COLOR_CLASS_PATTERN = /^tiptap-highlight-[a-z-]+-text$/
 const BACKGROUND_COLOR_CLASS_PATTERN = /^tiptap-highlight-[a-z-]+-bg$/
@@ -61,9 +62,7 @@ export function createTiptapDocumentBodySchemaExtensions(): Extensions {
       heading: {
         levels: [1, 2, 3, 4, 5],
       },
-      link: {
-        openOnClick: false,
-      },
+      link: createTiptapDocumentBodyLinkOptions(),
     }),
     TextStyle,
     createTextColorClassSchemaExtension(),

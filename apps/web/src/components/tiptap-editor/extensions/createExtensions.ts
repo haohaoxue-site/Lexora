@@ -8,6 +8,7 @@ import type {
 } from '../content/typing'
 import type { TiptapEditorCollaborationBinding } from '../core/typing'
 import type { DocumentAiDraftPreviewOptions } from '../extensions/DocumentAiDraftPreview'
+import { createTiptapDocumentBodyLinkOptions } from '@haohaoxue/lexora-shared/tiptap'
 import { isNodeEmpty } from '@tiptap/core'
 import Collaboration from '@tiptap/extension-collaboration'
 import CollaborationCursor from '@tiptap/extension-collaboration-cursor'
@@ -76,9 +77,7 @@ export function createBodyExtensions(options: CreateBodyExtensionsOptions = {}):
       heading: {
         levels: [1, 2, 3, 4, 5],
       },
-      link: {
-        openOnClick: false,
-      },
+      link: createTiptapDocumentBodyLinkOptions(),
       code: false,
       codeBlock: false,
       undoRedo: options.collaboration ? false : undefined,
