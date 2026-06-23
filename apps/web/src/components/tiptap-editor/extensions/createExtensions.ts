@@ -7,6 +7,7 @@ import type {
   TiptapEditorUploadedImage,
 } from '../content/typing'
 import type { TiptapEditorCollaborationBinding } from '../core/typing'
+import type { DocumentAiDraftPreviewOptions } from '../extensions/DocumentAiDraftPreview'
 import { isNodeEmpty } from '@tiptap/core'
 import Collaboration from '@tiptap/extension-collaboration'
 import CollaborationCursor from '@tiptap/extension-collaboration-cursor'
@@ -29,6 +30,7 @@ import {
 import { BlockCommands } from '../extensions/BlockCommands'
 import { BlockId } from '../extensions/BlockId'
 import { CodeBlock } from '../extensions/CodeBlock'
+import { DocumentAiDraftPreview } from '../extensions/DocumentAiDraftPreview'
 import { DocumentFile } from '../extensions/DocumentFile'
 import { DocumentImage } from '../extensions/DocumentImage'
 import { DocumentRuntimeNormalizer } from '../extensions/DocumentRuntimeNormalizer'
@@ -57,6 +59,7 @@ interface CreateBodyExtensionsOptions {
   placeholder?: string
   emptyLinePlaceholder?: string
   blockIds?: boolean
+  aiDraftPreview?: DocumentAiDraftPreviewOptions
 }
 
 export function createBodyExtensions(options: CreateBodyExtensionsOptions = {}): Extensions {
@@ -92,6 +95,7 @@ export function createBodyExtensions(options: CreateBodyExtensionsOptions = {}):
     InlineCode,
     LinkBoundary,
     PanelSelectionHighlight,
+    DocumentAiDraftPreview.configure(options.aiDraftPreview),
     CodeBlock,
     InlineMathematics,
     BlockMathematics,

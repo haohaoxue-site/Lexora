@@ -64,6 +64,10 @@
     <path d="M17 27H27" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" />
     <path d="M17 33H27" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" />
   </symbol>
+  <symbol id="edit" viewBox="0 0 48 48">
+    <path d="M11 37L12.7 29.7L31.3 11.1C32.76 9.64 35.14 9.64 36.6 11.1L36.9 11.4C38.36 12.86 38.36 15.24 36.9 16.7L18.3 35.3L11 37Z" fill="none" stroke="currentColor" stroke-width="3.6" stroke-linejoin="round" />
+    <path d="M28.7 13.7L34.3 19.3" fill="none" stroke="currentColor" stroke-width="3.6" stroke-linecap="round" />
+  </symbol>
   <symbol id="code" viewBox="0 0 48 48">
     <path d="M19 14L11 24L19 34" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" />
       <path d="M29 14L37 24L29 34" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" />

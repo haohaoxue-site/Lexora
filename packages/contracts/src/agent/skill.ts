@@ -5,6 +5,10 @@ import {
   AGENT_AMAP_MCP_SKILL_MANIFEST,
 } from './amap'
 import {
+  AGENT_DOCUMENT_ASSISTANT_SKILL_KEY,
+  AGENT_DOCUMENT_ASSISTANT_SKILL_MANIFEST,
+} from './document-assistant'
+import {
   AGENT_LOCATION_SKILL_KEY,
   AGENT_LOCATION_SKILL_MANIFEST,
 } from './location'
@@ -25,6 +29,8 @@ import {
   AGENT_WEB_SEARCH_SKILL_KEY,
   AGENT_WEB_SEARCH_SKILL_MANIFEST,
 } from './web-search'
+
+export { AGENT_DOCUMENT_ASSISTANT_SKILL_KEY } from './document-assistant'
 
 const NonEmptyStringSchema = z.string().trim().min(1)
 
@@ -385,6 +391,28 @@ export const AGENT_TRANSLATOR_SKILL_DEFINITION = createFirstPartySkillDefinition
   ].join('\n'),
 })
 
+export const AGENT_DOCUMENT_ASSISTANT_SKILL_DEFINITION = createFirstPartySkillDefinition({
+  key: AGENT_DOCUMENT_ASSISTANT_SKILL_KEY,
+  manifest: AGENT_DOCUMENT_ASSISTANT_SKILL_MANIFEST,
+  category: AGENT_SKILL_CATEGORY.COLLABORATION,
+  activationMode: AGENT_SKILL_ACTIVATION_MODE.MANUAL,
+  riskLevel: AGENT_SKILL_RISK_LEVEL.MEDIUM,
+  installMode: AGENT_SKILL_INSTALL_MODE.CORE,
+  defaultInstalled: true,
+  defaultEnabled: true,
+  canDisable: false,
+  canUninstall: false,
+  configurable: false,
+  instructions: [
+    'Use this skill when the user explicitly asks to rewrite, continue, improve, shorten, expand, polish, transform, or otherwise edit the current Lexora document or a selected document range.',
+    'For document editing, return candidate content only. 不要直接写入文档正文, do not claim the document has been modified, and wait for the client-side acceptance flow before any write becomes collaborative state.',
+    'Use Markdown syntax to express the candidate 富文本结构 whenever needed, including headings, paragraphs, bullet and ordered lists, task lists, code blocks, quotes, tables, inline marks, links, and mixed selections.',
+    'If the requested edit cannot preserve the existing rich structure reliably, explain the limitation and ask the user to narrow the selection instead of flattening the content into plain text.',
+    'Do not expose Tiptap JSON, HTML, or implementation details to the user unless they explicitly ask for them. Do not wrap the entire candidate in a Markdown code fence.',
+    'This skill has no runtime action tools in the first version. Use the provided document context snapshots and the activated edit intent.',
+  ].join('\n'),
+})
+
 export const AGENT_WEB_SEARCH_SKILL_DEFINITION = createFirstPartySkillDefinition({
   key: AGENT_WEB_SEARCH_SKILL_KEY,
   manifest: AGENT_WEB_SEARCH_SKILL_MANIFEST,
@@ -444,6 +472,7 @@ export const AGENT_FIRST_PARTY_SKILL_DEFINITIONS = [
   AGENT_LOCATION_SKILL_DEFINITION,
   AGENT_MEMORY_SKILL_DEFINITION,
   AGENT_TRANSLATOR_SKILL_DEFINITION,
+  AGENT_DOCUMENT_ASSISTANT_SKILL_DEFINITION,
   AGENT_WEB_SEARCH_SKILL_DEFINITION,
   AGENT_AMAP_MCP_SKILL_DEFINITION,
 ] as const

@@ -1,4 +1,6 @@
+import type { AgentDocumentAssistantEditIntent } from '@haohaoxue/lexora-contracts/agent'
 import type {
+  TiptapEditorBlockContextRequest,
   TiptapEditorCollaborationBinding,
   TiptapEditorCommentRequest,
   TiptapEditorContent,
@@ -12,6 +14,15 @@ export interface DocumentBodyEditorOutlineOptions {
   placement?: 'left' | 'right'
   showSearch?: boolean
   surface?: 'card' | 'transparent'
+}
+
+export interface DocumentBodyEditorAiDraftPreview {
+  id: string
+  intent: AgentDocumentAssistantEditIntent
+  previewMode?: 'block' | 'inline'
+  from: number
+  to: number
+  candidateContent: TiptapEditorContent
 }
 
 export interface DocumentBodyEditorProps {
@@ -50,6 +61,16 @@ export interface DocumentBodyEditorProps {
    * @description 普通编辑器默认悬停展开；公开阅读页可配置为右侧常驻大纲
    */
   outlineOptions?: DocumentBodyEditorOutlineOptions
+  /**
+   * AI 候选修改
+   * @description 本地预览状态，不写入正文或协作文档
+   */
+  aiDraftPreview?: DocumentBodyEditorAiDraftPreview | null
+  /**
+   * 是否显示块级 AI 重写入口
+   * @description 只控制入口展示，实际目标状态由上层文档工作区维护
+   */
+  aiBlockRewriteEnabled?: boolean
 }
 
 export interface DocumentBodyEditorEmits {
@@ -57,4 +78,8 @@ export interface DocumentBodyEditorEmits {
   'contentError': [error: Error]
   'requestComment': [request: TiptapEditorCommentRequest]
   'requestAddSelectionContext': [request: TiptapEditorSelectionContextRequest]
+  'requestAiBlockRewrite': [request: TiptapEditorBlockContextRequest]
+  'selectionChange': [request: TiptapEditorSelectionContextRequest]
+  'acceptAiDraftPreview': [candidateId: string]
+  'rejectAiDraftPreview': [candidateId: string]
 }

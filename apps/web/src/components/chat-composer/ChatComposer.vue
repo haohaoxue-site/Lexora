@@ -1,14 +1,22 @@
 <script setup lang="ts">
+import type { AgentDocumentAssistantEditIntent } from '@haohaoxue/lexora-contracts/agent'
 import type { Editor, EditorEvents, JSONContent } from '@tiptap/core'
 import type {
   ChatComposerAttachment,
   ChatComposerDocumentAttachment,
+  ChatComposerDocumentSelectionScope,
   ChatComposerEmits,
   ChatComposerProps,
   ChatComposerSubmitPayload,
 } from './typing'
 import type { ReadableDocumentSearchResult } from '@/apis/document'
-import { AGENT_TRANSLATOR_SKILL_KEY, AGENT_WEB_SEARCH_SKILL_KEY } from '@haohaoxue/lexora-contracts/agent'
+import {
+  AGENT_DOCUMENT_ASSISTANT_EDIT_INTENT,
+  AGENT_DOCUMENT_ASSISTANT_SKILL_KEY,
+  AGENT_TRANSLATOR_SKILL_KEY,
+  AGENT_WEB_SEARCH_SKILL_KEY,
+} from '@haohaoxue/lexora-contracts/agent'
+import { CHAT_CONTEXT_SNAPSHOT_MAX_CONTENT_LENGTH } from '@haohaoxue/lexora-contracts/chat'
 import {
   CHAT_MESSAGE_ATTACHMENT_PLACEMENT,
   CHAT_MESSAGE_ATTACHMENT_TYPE,
@@ -17,8 +25,10 @@ import { EditorContent, useEditor } from '@tiptap/vue-3'
 import { nanoid } from 'nanoid'
 import { computed, onBeforeUnmount, shallowRef, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { createPlainTextChatContentJSON } from '@/composables/chat/utils/chat-message-content'
 import {
   findDuplicatePanelAttachment,
+  getDocumentSelectionDisplayModeFromIntent,
   orderChatComposerAttachments,
 } from './attachmentOrdering'
 import ChatComposerContextTags from './ChatComposerContextTags.vue'
@@ -41,6 +51,8 @@ const props = withDefaults(defineProps<ChatComposerProps>(), {
     image: { disabled: false },
     file: { disabled: false },
   }),
+  documentAssistantEditIntent: null,
+  documentAssistantSkillEnabled: false,
   translatorSkillEnabled: false,
   translatorTargetLanguage: null,
   webSearchSkillEnabled: false,
@@ -61,16 +73,54 @@ const hasSelectedModel = computed(() => Boolean(
   props.selectedModelRef?.providerId.trim()
   && props.selectedModelRef.modelId.trim(),
 ))
+const orderedSubmitAttachments = computed(() =>
+  orderChatComposerAttachments(
+    garbageCollectInlineAttachments(props.contentJSON, props.attachments),
+    props.contentJSON,
+  ),
+)
+const documentAssistantSelectionContext = computed(() => {
+  const intent = props.documentAssistantEditIntent
+
+  if (!intent) {
+    return {
+      canSend: false,
+      selectionCount: 0,
+      validSelectionCount: 0,
+    }
+  }
+
+  const selectionAttachments = orderedSubmitAttachments.value.filter(isDocumentSelectionAttachment)
+  const validSelectionAttachments = selectionAttachments.filter(attachment =>
+    isValidDocumentAssistantSelectionAttachment(attachment, intent),
+  )
+
+  return {
+    canSend: selectionAttachments.length === 1 && validSelectionAttachments.length === 1,
+    selectionCount: selectionAttachments.length,
+    validSelectionCount: validSelectionAttachments.length,
+  }
+})
+const hasDocumentAssistantSelectionContext = computed(() => documentAssistantSelectionContext.value.canSend)
 const canSend = computed(() =>
   !props.disabled
   && !props.isStreaming
   && hasSelectedModel.value
-  && Boolean(serializedContent.value.bodyTextWithoutReferences.trim()),
+  && (
+    props.documentAssistantEditIntent
+      ? hasDocumentAssistantSelectionContext.value
+      : Boolean(serializedContent.value.bodyTextWithoutReferences.trim())
+  ),
 )
 const editorPlaceholder = computed(() =>
   props.translatorTargetLanguage
     ? t('chat.composer.translatorPlaceholder', { language: props.translatorTargetLanguage.name })
-    : t('chat.composer.inputPlaceholder'),
+    : props.documentAssistantEditIntent
+      ? t('chat.composer.documentAssistantPlaceholder')
+      : t('chat.composer.inputPlaceholder'),
+)
+const documentSelectionDisplayMode = computed(() =>
+  getDocumentSelectionDisplayModeFromIntent(props.documentAssistantEditIntent),
 )
 
 const editor = useEditor({
@@ -92,13 +142,6 @@ const editor = useEditor({
   onUpdate: handleEditorUpdate,
 })
 
-const orderedSubmitAttachments = computed(() =>
-  orderChatComposerAttachments(
-    garbageCollectInlineAttachments(props.contentJSON, props.attachments),
-    props.contentJSON,
-  ),
-)
-
 watch(
   () => props.contentJSON,
   (contentJSON) => {
@@ -119,6 +162,11 @@ watch(
 
 watch(
   () => props.translatorTargetLanguage,
+  () => refreshEditorPlaceholder(),
+)
+
+watch(
+  () => props.documentAssistantEditIntent,
   () => refreshEditorPlaceholder(),
 )
 
@@ -144,9 +192,10 @@ function handleEditorUpdate(options: EditorEvents['update']) {
 }
 
 function handleEditorKeyDown(event: KeyboardEvent) {
-  if (event.key === 'Escape' && props.translatorTargetLanguage) {
+  if (event.key === 'Escape' && (props.translatorTargetLanguage || props.documentAssistantEditIntent)) {
     event.preventDefault()
     emits('update:translatorTargetLanguage', null)
+    emits('update:documentAssistantEditIntent', null)
     return true
   }
 
@@ -307,16 +356,24 @@ function emitSend() {
     return
   }
 
+  const content = serializedContent.value.content.trim() || getDefaultDocumentAssistantPrompt()
   const payload: ChatComposerSubmitPayload = {
-    content: serializedContent.value.content.trim(),
-    contentJSON: props.contentJSON,
+    content,
+    contentJSON: serializedContent.value.bodyTextWithoutReferences.trim()
+      ? props.contentJSON
+      : createPlainTextChatContentJSON(content),
     attachments: orderedSubmitAttachments.value,
     skillInvocation: props.translatorTargetLanguage
       ? {
           skillKey: AGENT_TRANSLATOR_SKILL_KEY,
           targetLanguage: props.translatorTargetLanguage,
         }
-      : null,
+      : props.documentAssistantEditIntent
+        ? {
+            skillKey: AGENT_DOCUMENT_ASSISTANT_SKILL_KEY,
+            intent: props.documentAssistantEditIntent,
+          }
+        : null,
     disabledSkillKeys: props.webSearchSkillEnabled && !props.webSearchForRunEnabled
       ? [AGENT_WEB_SEARCH_SKILL_KEY]
       : [],
@@ -330,6 +387,7 @@ function shouldOpenSkillCommandMenu(from: number, to: number) {
     !currentEditor
     || props.isStreaming
     || props.translatorTargetLanguage
+    || props.documentAssistantEditIntent
     || from !== to
   ) {
     return false
@@ -435,6 +493,48 @@ function createReferenceNodeId() {
   return `ref_${nanoid(10)}`
 }
 
+function getDefaultDocumentAssistantPrompt() {
+  if (props.documentAssistantEditIntent === AGENT_DOCUMENT_ASSISTANT_EDIT_INTENT.CONTINUE_AT_ANCHOR) {
+    return t('chat.composer.documentAssistantContinuePrompt')
+  }
+
+  return t('chat.composer.documentAssistantRewritePrompt')
+}
+
+function isValidDocumentAssistantSelectionAttachment(
+  attachment: ChatComposerAttachment,
+  intent: AgentDocumentAssistantEditIntent,
+) {
+  if (!isDocumentSelectionAttachment(attachment)) {
+    return false
+  }
+
+  if (
+    typeof attachment.snapshot !== 'string'
+    || attachment.snapshot.length > CHAT_CONTEXT_SNAPSHOT_MAX_CONTENT_LENGTH
+  ) {
+    return false
+  }
+
+  if (intent === AGENT_DOCUMENT_ASSISTANT_EDIT_INTENT.CONTINUE_AT_ANCHOR) {
+    return true
+  }
+
+  return !isCollapsedDocumentSelectionScope(attachment.scope) && Boolean(attachment.snapshot.trim())
+}
+
+function isDocumentSelectionAttachment(
+  attachment: ChatComposerAttachment,
+): attachment is ChatComposerDocumentAttachment & { scope: ChatComposerDocumentSelectionScope } {
+  return attachment.type === CHAT_MESSAGE_ATTACHMENT_TYPE.DOCUMENT
+    && attachment.scope.kind === 'selection'
+}
+
+function isCollapsedDocumentSelectionScope(scope: ChatComposerDocumentSelectionScope) {
+  return scope.from.blockId === scope.to.blockId
+    && scope.from.offset === scope.to.offset
+}
+
 function isImageFile(file: File) {
   return file.type.startsWith('image/')
 }
@@ -454,6 +554,7 @@ function isSameContent(currentEditor: Editor, contentJSON: JSONContent) {
     <div class="chat-composer__surface">
       <ChatComposerContextTags
         :attachments="props.attachments"
+        :document-selection-display-mode="documentSelectionDisplayMode"
         :highlight-attachment-id="props.highlightAttachmentId"
         @remove="removePanelAttachment"
       />
@@ -469,6 +570,8 @@ function isSameContent(currentEditor: Editor, contentJSON: JSONContent) {
         :disabled="props.disabled"
         :can-send="canSend"
         :upload-availability="props.uploadAvailability"
+        :document-assistant-edit-intent="props.documentAssistantEditIntent"
+        :document-assistant-skill-enabled="props.documentAssistantSkillEnabled"
         :translator-skill-enabled="props.translatorSkillEnabled"
         :translator-target-language="props.translatorTargetLanguage"
         :web-search-skill-enabled="props.webSearchSkillEnabled"
@@ -477,6 +580,7 @@ function isSameContent(currentEditor: Editor, contentJSON: JSONContent) {
         @open-panel-picker="openPanelPicker"
         @upload-image="openImageUpload"
         @upload-file="openFileUpload"
+        @update:document-assistant-edit-intent="emits('update:documentAssistantEditIntent', $event)"
         @update:translator-target-language="emits('update:translatorTargetLanguage', $event)"
         @update:web-search-for-run-enabled="emits('update:webSearchForRunEnabled', $event)"
         @select-model="emits('selectModel', $event)"

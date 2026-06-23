@@ -5,11 +5,15 @@ import { ElMessage } from '@/utils/element-plus'
 import { getRequestErrorDisplayMessage } from '@/utils/request-error'
 
 export function createChatSessionEvents(api: ChatApi) {
+  const RECONNECT_BASE_DELAY_MS = 1_000
+  const RECONNECT_MAX_DELAY_MS = 30_000
+
   let eventController: AbortController | null = null
   let eventSessionId: string | null = null
   let eventAfterSequence: number | null = null
   let eventHandler: ((event: ChatSessionEvent) => void | Promise<void>) | null = null
   let reconnectTimer: ReturnType<typeof setTimeout> | null = null
+  let reconnectAttempt = 0
 
   function startSessionEventStream(
     sessionId: string,
@@ -39,6 +43,7 @@ export function createChatSessionEvents(api: ChatApi) {
       sessionId,
       afterSequence,
       async (event) => {
+        reconnectAttempt = 0
         eventAfterSequence = event.sequence
         await eventHandler?.(event)
       },
@@ -49,6 +54,7 @@ export function createChatSessionEvents(api: ChatApi) {
       }
 
       if (eventSessionId === sessionId && eventController === controller) {
+        eventController = null
         scheduleReconnect()
       }
       else {
@@ -57,6 +63,7 @@ export function createChatSessionEvents(api: ChatApi) {
     }).finally(() => {
       if (eventSessionId === sessionId && eventController === controller) {
         eventController = null
+        scheduleReconnect()
       }
     })
   }
@@ -72,10 +79,16 @@ export function createChatSessionEvents(api: ChatApi) {
     eventSessionId = null
     eventAfterSequence = null
     eventHandler = null
+    reconnectAttempt = 0
   }
 
   function scheduleReconnect(): void {
     clearReconnectTimer()
+    const reconnectDelay = Math.min(
+      RECONNECT_MAX_DELAY_MS,
+      RECONNECT_BASE_DELAY_MS * 2 ** reconnectAttempt,
+    )
+    reconnectAttempt += 1
 
     reconnectTimer = setTimeout(() => {
       reconnectTimer = null
@@ -85,7 +98,7 @@ export function createChatSessionEvents(api: ChatApi) {
       }
 
       openSessionEventStream(eventSessionId, eventAfterSequence)
-    }, 1000)
+    }, reconnectDelay)
   }
 
   function clearReconnectTimer(): void {

@@ -69,6 +69,11 @@
     cursor: inherit !important;
   }
 
+  &.tiptap-document-ai-anchor-preview--active::selection,
+  &.tiptap-document-ai-anchor-preview--active *::selection {
+    background: transparent;
+  }
+
   h1,
   h2,
   h3 {
@@ -1867,15 +1872,20 @@ html.dark {
     display: inline-flex;
     align-items: center;
     gap: 0.5rem;
-    max-width: 14rem;
+    box-sizing: border-box;
+    height: 1.5rem;
+    min-width: 0;
+    max-width: 18rem;
     padding: 0.25rem 0.5rem;
-    border-radius: 50%;
+    border-radius: 0.5rem;
     color: white;
     box-shadow: 0 8px 24px rgba(15, 23, 42, 0.18);
+    line-height: 1;
     white-space: nowrap;
   }
 
   &__avatar {
+    flex: 0 0 1rem;
     width: 1rem;
     height: 1rem;
     border-radius: 50%;
@@ -1893,11 +1903,16 @@ html.dark {
   }
 
   &__name {
+    flex: 0 1 auto;
+    width: max-content;
+    min-width: 0;
+    max-width: 14rem;
     overflow: hidden;
     font-size: 0.75rem;
     font-weight: 600;
     line-height: 1;
     text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   &__selection {

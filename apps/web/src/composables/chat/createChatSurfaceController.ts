@@ -70,6 +70,7 @@ export function createChatSurfaceController(options: CreateChatSurfaceController
       return false
     }
 
+    skillControls.clearDocumentAssistantEditIntent()
     skillControls.clearTranslatorTargetLanguage()
     if (isNewSessionSend && activeSessionId.value) {
       skillControls.setSessionWebSearchForRunEnabled(activeSessionId.value, newSessionWebSearchEnabled)
@@ -82,6 +83,8 @@ export function createChatSurfaceController(options: CreateChatSurfaceController
   function resetNewSessionComposerState() {
     composerHost.resetComposer()
     options.model.clearNewSessionModelDraft()
+    skillControls.clearDocumentAssistantEditIntent()
+    skillControls.clearTranslatorTargetLanguage()
     skillControls.resetNewSessionWebSearchForRunEnabled()
   }
 
@@ -91,6 +94,8 @@ export function createChatSurfaceController(options: CreateChatSurfaceController
       composerModelSelectionKind: options.model.composerModelSelectionKind,
       composerSelectedModelRef: options.model.composerSelectedModelRef,
       contentJSON: composerHost.contentJSON,
+      documentAssistantEditIntent: skillControls.documentAssistantEditIntent,
+      documentAssistantSkillEnabled: skillControls.documentAssistantSkillEnabled,
       handleSend,
       handleUploadAttachmentFiles: composerHost.handleUploadAttachmentFiles,
       handleUploadImageFiles: composerHost.handleUploadImageFiles,
@@ -99,6 +104,7 @@ export function createChatSurfaceController(options: CreateChatSurfaceController
       isConfigured: options.model.isConfigured,
       isStreaming,
       loadSkills: skillControls.loadSkills,
+      registerAfterSendHandler: composerHost.registerAfterSendHandler,
       registerBeforeSendHandler: composerHost.registerBeforeSendHandler,
       resetComposer: composerHost.resetComposer,
       resetNewSessionComposerState,

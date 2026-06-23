@@ -90,3 +90,10 @@ export interface TiptapEditorSelectionContextRequest {
   from: number
   to: number
 }
+
+export interface TiptapEditorBlockContextRequest {
+  editor: Editor
+  blockId: string
+  from: number
+  to: number
+}

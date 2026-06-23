@@ -21,7 +21,7 @@ export function createRetrieveMemoryNode(options: CreateRetrieveMemoryNodeOption
     const generationId = config.context?.generationId
     const actorUserId = config.context?.actorUserId
 
-    if (config.context?.focusedTranslatorInvocation) {
+    if (config.context?.directTranslatorInvocation || config.context?.directDocumentAssistantInvocation) {
       return {
         memoryRetrieval: null,
       }

@@ -3,6 +3,12 @@ import {
   AgentClientActionResultSchema,
   AgentClientActionSchema,
 } from './agent/client-action'
+import {
+  AGENT_DOCUMENT_ASSISTANT_ANCHOR_CONTEXT_MAX_LENGTH,
+  AGENT_DOCUMENT_ASSISTANT_EDIT_INTENT,
+  AGENT_DOCUMENT_ASSISTANT_SKILL_KEY,
+  AgentDocumentAssistantSkillInvocationSchema,
+} from './agent/document-assistant'
 import { AgentToolCallStatusSchema } from './agent/events'
 import { ChatGenerationUsageSnapshotSchema } from './agent/generation'
 import { AgentMemoryRunOptionsSchema, ChatMemoryOperationProjectionSchema } from './agent/memory'
@@ -62,6 +68,7 @@ export const ChatMessageRoleSchema = z.enum(['user', 'assistant'])
 const IsoDateTimeStringSchema = z.string().datetime()
 const NonEmptyStringSchema = z.string().trim().min(1)
 const ChatSessionTitleSchema = z.string().trim().min(1).max(CHAT_SESSION_TITLE_MAX_LENGTH)
+export const CHAT_CONTEXT_SNAPSHOT_MAX_CONTENT_LENGTH = 200_000
 const ChatSessionSummaryBaseSchema = z.object({
   id: NonEmptyStringSchema,
   workspaceId: NonEmptyStringSchema,
@@ -99,6 +106,7 @@ export const ChatTranslatorSkillInvocationSchema = z.object({
 
 export const ChatSkillInvocationSchema = z.discriminatedUnion('skillKey', [
   ChatTranslatorSkillInvocationSchema,
+  AgentDocumentAssistantSkillInvocationSchema,
 ])
 
 export const ChatDisabledSkillKeysSchema = z.array(NonEmptyStringSchema)
@@ -116,6 +124,7 @@ export const ChatMessageBranchSchema = z.object({
 export const ChatDocumentSelectionBoundarySchema = z.object({
   blockId: NonEmptyStringSchema,
   offset: z.number().int().nonnegative(),
+  position: z.number().int().nonnegative().optional().describe('发送瞬间的 ProseMirror 绝对位置，只用于本次定位展示和运行期映射，不可作为持久回放定位依据。'),
 }).strict()
 
 export const ChatDocumentScopeSchema = z.discriminatedUnion('kind', [
@@ -142,7 +151,7 @@ const ChatDocumentMessageAttachmentBaseSchema = z.object({
 }).strict()
 
 export const ChatDocumentMessageAttachmentInputSchema = ChatDocumentMessageAttachmentBaseSchema.extend({
-  snapshot: z.string().optional(),
+  snapshot: z.string().max(CHAT_CONTEXT_SNAPSHOT_MAX_CONTENT_LENGTH).optional(),
 }).strict()
 
 export const ChatUploadedMessageAttachmentBaseSchema = z.object({
@@ -393,6 +402,9 @@ const ChatSessionMessageRequestBaseSchema = z.object({
   runtimeHints: AgentRuntimeHintsSchema.optional(),
 }).strict().superRefine((value, ctx) => {
   const attachmentById = new Map((value.attachments ?? []).map(attachment => [attachment.id, attachment]))
+
+  validateDocumentAssistantContext(value, ctx)
+
   for (const attachmentId of collectChatReferenceAttachmentIds(value.contentJSON)) {
     const attachment = attachmentById.get(attachmentId)
 
@@ -610,6 +622,104 @@ function countContentJSONNodes(value: unknown): number {
   }
 
   return count
+}
+
+function validateDocumentAssistantContext(
+  value: {
+    attachments?: z.infer<typeof ChatMessageAttachmentInputSchema>[] | null
+    skillInvocation?: z.infer<typeof ChatSkillInvocationSchema> | null
+  },
+  ctx: z.RefinementCtx,
+) {
+  if (value.skillInvocation?.skillKey !== AGENT_DOCUMENT_ASSISTANT_SKILL_KEY) {
+    return
+  }
+
+  const selectionAttachments: Array<{
+    attachment: z.infer<typeof ChatDocumentMessageAttachmentInputSchema> & { scope: { kind: 'selection' } }
+    index: number
+  }> = []
+
+  for (const [index, attachment] of (value.attachments ?? []).entries()) {
+    if (isDocumentSelectionAttachment(attachment)) {
+      selectionAttachments.push({ attachment, index })
+    }
+  }
+
+  if (selectionAttachments.length !== 1) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['attachments'],
+      message: 'document assistant requires exactly one document selection attachment',
+    })
+    return
+  }
+
+  const selection = selectionAttachments[0]
+
+  if (!selection) {
+    return
+  }
+
+  const snapshot = selection.attachment.snapshot
+
+  if (typeof snapshot !== 'string') {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['attachments', selection.index, 'snapshot'],
+      message: 'document assistant selection attachment requires a send-time snapshot',
+    })
+    return
+  }
+
+  if (
+    value.skillInvocation.intent === AGENT_DOCUMENT_ASSISTANT_EDIT_INTENT.REWRITE_SELECTION
+    && isCollapsedDocumentSelectionScope(selection.attachment.scope)
+  ) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['attachments', selection.index, 'scope'],
+      message: 'document assistant rewrite requires a non-collapsed document selection',
+    })
+  }
+
+  if (
+    value.skillInvocation.intent === AGENT_DOCUMENT_ASSISTANT_EDIT_INTENT.REWRITE_SELECTION
+    && !snapshot.trim()
+  ) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['attachments', selection.index, 'snapshot'],
+      message: 'document assistant rewrite selection snapshot cannot be empty',
+    })
+  }
+
+  if (
+    value.skillInvocation.intent === AGENT_DOCUMENT_ASSISTANT_EDIT_INTENT.CONTINUE_AT_ANCHOR
+    && snapshot.length > AGENT_DOCUMENT_ASSISTANT_ANCHOR_CONTEXT_MAX_LENGTH
+  ) {
+    ctx.addIssue({
+      code: 'too_big',
+      maximum: AGENT_DOCUMENT_ASSISTANT_ANCHOR_CONTEXT_MAX_LENGTH,
+      origin: 'string',
+      inclusive: true,
+      path: ['attachments', selection.index, 'snapshot'],
+      message: 'document assistant anchor context snapshot is too large',
+    })
+  }
+}
+
+function isDocumentSelectionAttachment(
+  attachment: z.infer<typeof ChatMessageAttachmentInputSchema>,
+): attachment is z.infer<typeof ChatDocumentMessageAttachmentInputSchema> & { scope: { kind: 'selection' } } {
+  return attachment.type === 'document' && attachment.scope.kind === 'selection'
+}
+
+function isCollapsedDocumentSelectionScope(
+  scope: Extract<z.infer<typeof ChatDocumentScopeSchema>, { kind: 'selection' }>,
+) {
+  return scope.from.blockId === scope.to.blockId
+    && scope.from.offset === scope.to.offset
 }
 
 function collectChatReferenceAttachmentIds(value: unknown): string[] {

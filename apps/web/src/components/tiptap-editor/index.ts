@@ -10,6 +10,7 @@ export {
 export type { TiptapDocumentCollaborationContentProjection } from './collaboration/ydoc'
 export type { TurnIntoBlockType } from './commands/turnInto'
 export type {
+  TiptapEditorBlockContextRequest,
   TiptapEditorCollaborationBinding,
   TiptapEditorCommentRequest,
   TiptapEditorContent,

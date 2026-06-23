@@ -6,6 +6,7 @@ import type {
   ChatPersistedMessageAttachment,
 } from '@haohaoxue/lexora-contracts'
 import {
+  CHAT_CONTEXT_SNAPSHOT_MAX_CONTENT_LENGTH,
   CHAT_MESSAGE_ATTACHMENT_MAX_COUNT,
   CHAT_MESSAGE_ATTACHMENT_PLACEMENT,
   CHAT_MESSAGE_CONTENT_MAX_LENGTH,
@@ -16,8 +17,6 @@ import { isChatUploadedMessageAttachment, serializeChatMessageContentJSON } from
 import { BadRequestException, Injectable } from '@nestjs/common'
 import { DocumentChatSnapshotService } from '../documents/content/document-chat-snapshot.service'
 import { ChatAssetsService } from './chat-assets.service'
-
-const CHAT_CONTEXT_SNAPSHOT_MAX_CONTENT_LENGTH = 200_000
 
 export interface ChatContextSnapshotCreateData {
   type: 'document'

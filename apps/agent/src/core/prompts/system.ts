@@ -8,7 +8,7 @@ import {
   AGENT_TIME_TOOL,
 } from '@haohaoxue/lexora-contracts'
 import { LANGUAGE_PREFERENCE, LANGUAGE_PREFERENCE_LABELS } from '@haohaoxue/lexora-contracts/user/constants'
-import { createSkillCatalogPromptBlock } from '../skills/runtime'
+import { createSkillCatalogPromptBlock } from '../skills/activation'
 
 export const BASE_AGENT_SYSTEM_PROMPT = '你是 Lexora 的智能助手。回答准确、简洁。'
 

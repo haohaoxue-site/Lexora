@@ -11,19 +11,23 @@ import type {
   AgentChatModelFactory,
 } from '../../integrations/model-providers/chat-model'
 import type { WebSearchClient } from '../../integrations/web-search'
-import type { RuntimeSkillActionProvider } from '../skills/adapters'
+import type { RuntimeSkillActionProvider } from '../skills/action-providers'
 import type { AgentGraphContext, AgentGraphState } from '../state'
 import { HumanMessage, SystemMessage } from '@langchain/core/messages'
 import { applyAgentContextSnapshotsToMessages } from '../context/snapshots'
 import { toLangChainChatMessages } from '../messages/langchain'
 import { createAgentSystemPrompt } from '../prompts/system'
-import { isLocationSkillActive } from '../skills/builtin/location'
-import { createAgentMemoryPromptBlock } from '../skills/builtin/memory'
-import { isTimeSkillActive } from '../skills/builtin/time'
+import { isLocationSkillActive } from '../skills/action-providers/builtin/location'
+import { createAgentMemoryPromptBlock } from '../skills/action-providers/builtin/memory'
+import { isTimeSkillActive } from '../skills/action-providers/builtin/time'
 import {
-  createFocusedTranslatorHumanContent,
-  createFocusedTranslatorSystemPrompt,
-} from '../skills/builtin/translator'
+  createDirectDocumentAssistantHumanContent,
+  createDirectDocumentAssistantSystemPrompt,
+} from '../skills/direct-invocations/document-assistant'
+import {
+  createDirectTranslatorHumanContent,
+  createDirectTranslatorSystemPrompt,
+} from '../skills/direct-invocations/translator'
 import { callModelWithRuntimeTools } from '../tools'
 import { createChatGenerationUsageSnapshot } from '../usage/snapshot'
 
@@ -50,43 +54,52 @@ export function createCallModelNode(options: CreateCallModelNodeOptions): GraphN
     const model = modelOptions
       ? options.chatModelFactory.createChatModel(modelTarget, modelOptions)
       : options.chatModelFactory.createChatModel(modelTarget)
-    const focusedTranslatorInvocation = config.context?.focusedTranslatorInvocation ?? null
-    const langChainMessages = focusedTranslatorInvocation
-      ? toFocusedTranslatorMessages(
+    const directTranslatorInvocation = config.context?.directTranslatorInvocation ?? null
+    const directDocumentAssistantInvocation = config.context?.directDocumentAssistantInvocation ?? null
+    const directInvocation = Boolean(directTranslatorInvocation || directDocumentAssistantInvocation)
+    const langChainMessages = directTranslatorInvocation
+      ? toDirectTranslatorMessages(
           state.messages,
-          focusedTranslatorInvocation,
+          directTranslatorInvocation,
           config.context?.triggerUserMessageId,
         )
-      : await toLangChainMessages(
-          applyAgentContextSnapshotsToMessages(state.messages, {
-            triggerUserMessageId: config.context?.triggerUserMessageId,
-            contextSnapshots: config.context?.contextSnapshots,
-          }),
-          state.olderMessagesExcerpt,
-          state.historyDigest?.summary ?? null,
-          config.context?.agentProfileConfig,
-          config.context?.skillContext,
-          config.context?.defaultResponseLanguage,
-          state.memoryRetrieval,
-          config.context?.triggerUserMessageId,
-          isTimeSkillActive(config.context),
-          isLocationSkillActive(config.context),
-          await resolveInputAttachmentContents({
-            chatApi: options.chatApi,
-            generationId: config.context?.generationId,
-            inputAttachments: config.context?.inputAttachments,
-          }),
-        )
+      : directDocumentAssistantInvocation
+        ? toDirectDocumentAssistantMessages(
+            state.messages,
+            directDocumentAssistantInvocation,
+            config.context?.triggerUserMessageId,
+            config.context?.contextSnapshots,
+          )
+        : await toLangChainMessages(
+            applyAgentContextSnapshotsToMessages(state.messages, {
+              triggerUserMessageId: config.context?.triggerUserMessageId,
+              contextSnapshots: config.context?.contextSnapshots,
+            }),
+            state.olderMessagesExcerpt,
+            state.historyDigest?.summary ?? null,
+            config.context?.agentProfileConfig,
+            config.context?.skillContext,
+            config.context?.defaultResponseLanguage,
+            state.memoryRetrieval,
+            config.context?.triggerUserMessageId,
+            isTimeSkillActive(config.context),
+            isLocationSkillActive(config.context),
+            await resolveInputAttachmentContents({
+              chatApi: options.chatApi,
+              generationId: config.context?.generationId,
+              inputAttachments: config.context?.inputAttachments,
+            }),
+          )
 
     const streamResult = await callModelWithRuntimeTools({
       model,
       messages: langChainMessages,
       sessionId: state.sessionId,
       context: config.context,
-      memoryApi: focusedTranslatorInvocation ? undefined : options.memoryApi,
-      skillApi: focusedTranslatorInvocation ? undefined : options.skillApi,
-      webSearch: focusedTranslatorInvocation ? undefined : options.webSearch,
-      skillActionProviders: focusedTranslatorInvocation ? undefined : options.skillActionProviders,
+      memoryApi: directInvocation ? undefined : options.memoryApi,
+      skillApi: directInvocation ? undefined : options.skillApi,
+      webSearch: directInvocation ? undefined : options.webSearch,
+      skillActionProviders: directInvocation ? undefined : options.skillActionProviders,
       signal: config.signal,
     })
     const usageSnapshot = createChatGenerationUsageSnapshot({
@@ -94,7 +107,7 @@ export function createCallModelNode(options: CreateCallModelNodeOptions): GraphN
       outputText: streamResult.text,
       providerUsage: streamResult.providerUsage,
       contextBudget: config.context?.contextBudget ?? state.contextBudget,
-      memoryRetrieval: focusedTranslatorInvocation ? null : state.memoryRetrieval,
+      memoryRetrieval: directInvocation ? null : state.memoryRetrieval,
       firstTokenLatencyMs: streamResult.firstTokenLatencyMs,
       elapsedMs: streamResult.elapsedMs,
     })
@@ -114,9 +127,38 @@ export function createCallModelNode(options: CreateCallModelNodeOptions): GraphN
   }
 }
 
-function toFocusedTranslatorMessages(
+function toDirectDocumentAssistantMessages(
   messages: AgentChatContextMessage[],
-  invocation: NonNullable<AgentGraphContext['focusedTranslatorInvocation']>,
+  invocation: NonNullable<AgentGraphContext['directDocumentAssistantInvocation']>,
+  triggerUserMessageId: string | null | undefined,
+  contextSnapshots: AgentGraphContext['contextSnapshots'],
+) {
+  const invocationContextSnapshotIds = new Set(invocation.contextSnapshotIds)
+  const contextualMessages = applyAgentContextSnapshotsToMessages(messages, {
+    triggerUserMessageId,
+    contextSnapshots: contextSnapshots?.filter(snapshot => invocationContextSnapshotIds.has(snapshot.id)),
+  })
+  const triggerMessage = triggerUserMessageId
+    ? contextualMessages.find(message => message.id === triggerUserMessageId && message.role === 'user')
+    : null
+  const sourceMessage = triggerMessage ?? contextualMessages.findLast(message => message.role === 'user') ?? contextualMessages.at(-1)
+
+  if (!sourceMessage) {
+    throw new Error('文档助手缺少用户正文')
+  }
+
+  return [
+    new SystemMessage(createDirectDocumentAssistantSystemPrompt(invocation)),
+    new HumanMessage({
+      id: sourceMessage.id,
+      content: createDirectDocumentAssistantHumanContent(sourceMessage),
+    }),
+  ]
+}
+
+function toDirectTranslatorMessages(
+  messages: AgentChatContextMessage[],
+  invocation: NonNullable<AgentGraphContext['directTranslatorInvocation']>,
   triggerUserMessageId: string | null | undefined,
 ) {
   const triggerMessage = triggerUserMessageId
@@ -129,10 +171,10 @@ function toFocusedTranslatorMessages(
   }
 
   return [
-    new SystemMessage(createFocusedTranslatorSystemPrompt(invocation)),
+    new SystemMessage(createDirectTranslatorSystemPrompt(invocation)),
     new HumanMessage({
       id: sourceMessage.id,
-      content: createFocusedTranslatorHumanContent(sourceMessage),
+      content: createDirectTranslatorHumanContent(sourceMessage),
     }),
   ]
 }

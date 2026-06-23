@@ -17,7 +17,8 @@ import type { AgentChatModelOptions } from '../integrations/model-providers/chat
 import type { AgentModelStreamPart } from '../integrations/model-providers/stream-text'
 import type { AgentContextBudget, AgentModelLimits } from './context/budget'
 import type { AgentHistoryDigest } from './context/history-compaction'
-import type { FocusedTranslatorInvocation } from './skills/builtin/translator'
+import type { DirectDocumentAssistantInvocation } from './skills/direct-invocations/document-assistant'
+import type { DirectTranslatorInvocation } from './skills/direct-invocations/translator'
 import { Annotation } from '@langchain/langgraph'
 
 export const AgentGraphState = Annotation.Root({
@@ -57,7 +58,8 @@ export interface AgentGraphContext {
   contextBudget?: AgentContextBudget | null
   defaultResponseLanguage?: ResolvedLanguagePreference | null
   memoryIgnoredForRun?: boolean
-  focusedTranslatorInvocation?: FocusedTranslatorInvocation | null
+  directDocumentAssistantInvocation?: DirectDocumentAssistantInvocation | null
+  directTranslatorInvocation?: DirectTranslatorInvocation | null
   triggerUserMessageId?: string | null
   contextSnapshots?: AgentChatContextSnapshot[] | null
   inputAttachments?: AgentChatInputAttachment[] | null

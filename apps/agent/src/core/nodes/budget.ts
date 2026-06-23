@@ -6,10 +6,11 @@ import type { AgentHistoryDigest } from '../context/history-compaction'
 import type { AgentGraphContext } from '../state'
 import { resolveAgentContextBudget } from '../context/budget'
 import { createAgentSystemPrompt } from '../prompts/system'
-import { isLocationSkillActive } from '../skills/builtin/location'
-import { createAgentMemoryPromptBlock } from '../skills/builtin/memory'
-import { isTimeSkillActive } from '../skills/builtin/time'
-import { createFocusedTranslatorSystemPrompt } from '../skills/builtin/translator'
+import { isLocationSkillActive } from '../skills/action-providers/builtin/location'
+import { createAgentMemoryPromptBlock } from '../skills/action-providers/builtin/memory'
+import { isTimeSkillActive } from '../skills/action-providers/builtin/time'
+import { createDirectDocumentAssistantSystemPrompt } from '../skills/direct-invocations/document-assistant'
+import { createDirectTranslatorSystemPrompt } from '../skills/direct-invocations/translator'
 
 export interface AgentBudgetState {
   olderMessagesExcerpt: string
@@ -22,12 +23,24 @@ export function resolveBudgetForState(
   state: AgentBudgetState,
   context: AgentGraphContext | undefined,
 ) {
-  if (context?.focusedTranslatorInvocation) {
+  if (context?.directTranslatorInvocation) {
     return resolveAgentContextBudget({
       model: context.modelLimits ?? {},
       modelPolicy: context.agentProfileConfig?.modelPolicy,
-      systemPrompt: createFocusedTranslatorSystemPrompt(context.focusedTranslatorInvocation),
+      systemPrompt: createDirectTranslatorSystemPrompt(context.directTranslatorInvocation),
       contextSnapshots: [],
+      memoryPrompt: null,
+      historyDigest: null,
+      recentMessages: state.messages,
+    })
+  }
+
+  if (context?.directDocumentAssistantInvocation) {
+    return resolveAgentContextBudget({
+      model: context.modelLimits ?? {},
+      modelPolicy: context.agentProfileConfig?.modelPolicy,
+      systemPrompt: createDirectDocumentAssistantSystemPrompt(context.directDocumentAssistantInvocation),
+      contextSnapshots: context.contextSnapshots ?? [],
       memoryPrompt: null,
       historyDigest: null,
       recentMessages: state.messages,

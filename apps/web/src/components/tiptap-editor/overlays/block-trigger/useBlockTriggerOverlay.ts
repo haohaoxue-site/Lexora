@@ -131,7 +131,6 @@ export function useBlockTriggerOverlay(editor: Editor) {
   function canShowTriggerMenu() {
     return hasEditorView()
       && editor.isEditable
-      && editor.state.selection.empty
       && Boolean(getCurrentBlock(editor.state.selection))
   }
 

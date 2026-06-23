@@ -30,6 +30,8 @@ const { contentError, handleContentError, handleRetryLoad, shouldShowEditor } = 
       @content-error="handleContentError"
       @request-comment="emits('requestComment', $event)"
       @request-add-selection-context="emits('requestAddSelectionContext', $event)"
+      @request-ai-block-rewrite="emits('requestAiBlockRewrite', $event)"
+      @selection-change="emits('selectionChange', $event)"
       @title-autofocus-applied="emits('titleAutofocusApplied')"
     />
 

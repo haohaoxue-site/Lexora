@@ -14,6 +14,8 @@ const props = withDefaults(defineProps<DocumentContentSurfaceProps>(), {
   titleCollaboration: null,
   bodyCollaboration: null,
   activeBlockId: null,
+  bodyAiDraftPreview: null,
+  bodyAiBlockRewriteEnabled: false,
   pageWidthMode: DOCUMENT_PAGE_WIDTH_MODE.DEFAULT,
   showOutline: true,
   footerMetaItems: () => [],
@@ -87,12 +89,18 @@ function resolveObjectKey(value: object | null) {
         :content="props.body"
         :collaboration="props.bodyCollaboration"
         :active-block-id="props.activeBlockId"
+        :ai-draft-preview="props.bodyAiDraftPreview"
+        :ai-block-rewrite-enabled="props.bodyAiBlockRewriteEnabled"
         :editable="props.editable"
         :show-outline="props.showOutline"
         @update:content="emits('updateContent', $event)"
         @content-error="emits('contentError', $event)"
         @request-comment="emits('requestComment', $event)"
         @request-add-selection-context="emits('requestAddSelectionContext', $event)"
+        @request-ai-block-rewrite="emits('requestBodyAiBlockRewrite', $event)"
+        @selection-change="emits('selectionChange', $event)"
+        @accept-ai-draft-preview="emits('acceptBodyAiDraftPreview', $event)"
+        @reject-ai-draft-preview="emits('rejectBodyAiDraftPreview', $event)"
       />
     </div>
 

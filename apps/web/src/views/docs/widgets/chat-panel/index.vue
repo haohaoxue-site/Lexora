@@ -25,6 +25,8 @@ const {
   confirmDeleteActiveSession,
   contentJSON,
   copyMessage,
+  documentAssistantEditIntent,
+  documentAssistantSkillEnabled,
   handleSend,
   handleUploadAttachmentFiles,
   handleUploadImageFiles,
@@ -122,6 +124,7 @@ watch(
       <ChatComposer
         ref="composer"
         v-model:attachments="attachments"
+        v-model:document-assistant-edit-intent="documentAssistantEditIntent"
         v-model:translator-target-language="translatorTargetLanguage"
         v-model:web-search-for-run-enabled="webSearchForRunEnabled"
         :content-j-s-o-n="contentJSON"
@@ -130,6 +133,7 @@ watch(
         :is-streaming="isStreaming"
         :highlight-attachment-id="highlightAttachmentId"
         :upload-availability="uploadAvailability"
+        :document-assistant-skill-enabled="documentAssistantSkillEnabled"
         :translator-skill-enabled="translatorSkillEnabled"
         :web-search-skill-enabled="webSearchSkillEnabled"
         document-picker-teleport-to=".docs-chat-panel__picker-layer"

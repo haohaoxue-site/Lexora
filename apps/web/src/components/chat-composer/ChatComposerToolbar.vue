@@ -37,9 +37,12 @@ const emit = defineEmits<ChatComposerToolbarEmits>()
       <ChatComposerSkillControls
         :disabled="props.disabled"
         :is-streaming="props.isStreaming"
+        :document-assistant-edit-intent="props.documentAssistantEditIntent"
+        :document-assistant-skill-enabled="props.documentAssistantSkillEnabled"
         :translator-skill-enabled="props.translatorSkillEnabled"
         :translator-target-language="props.translatorTargetLanguage"
         :skill-command-open-signal="props.skillCommandOpenSignal"
+        @update:document-assistant-edit-intent="emit('update:documentAssistantEditIntent', $event)"
         @update:translator-target-language="emit('update:translatorTargetLanguage', $event)"
       />
     </div>

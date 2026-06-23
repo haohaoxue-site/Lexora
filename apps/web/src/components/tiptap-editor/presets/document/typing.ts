@@ -1,9 +1,11 @@
 import type { DocumentPageWidthMode, TiptapJsonContent } from '@haohaoxue/lexora-contracts'
 import type {
+  TiptapEditorBlockContextRequest,
   TiptapEditorCollaborationBinding,
   TiptapEditorCommentRequest,
   TiptapEditorSelectionContextRequest,
 } from '../../core/typing'
+import type { DocumentBodyEditorAiDraftPreview } from '../body/typing'
 
 /**
  * 文档内容面页脚元信息。
@@ -41,6 +43,16 @@ export interface DocumentContentSurfaceProps {
   showOutline?: boolean
   /** 页脚元信息 */
   footerMetaItems?: DocumentContentSurfaceFooterMetaItem[]
+  /**
+   * 正文 AI 候选修改
+   * @description 本地预览，不写入正文或协作文档
+   */
+  bodyAiDraftPreview?: DocumentBodyEditorAiDraftPreview | null
+  /**
+   * 是否显示正文块级 AI 重写入口
+   * @description 只控制入口，目标状态由上层页面能力维护
+   */
+  bodyAiBlockRewriteEnabled?: boolean
 }
 
 /**
@@ -52,5 +64,9 @@ export interface DocumentContentSurfaceEmits {
   contentError: [error: Error]
   requestComment: [request: TiptapEditorCommentRequest]
   requestAddSelectionContext: [request: TiptapEditorSelectionContextRequest]
+  requestBodyAiBlockRewrite: [request: TiptapEditorBlockContextRequest]
+  selectionChange: [request: TiptapEditorSelectionContextRequest]
+  acceptBodyAiDraftPreview: [candidateId: string]
+  rejectBodyAiDraftPreview: [candidateId: string]
   titleAutofocusApplied: []
 }

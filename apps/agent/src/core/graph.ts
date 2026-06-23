@@ -4,7 +4,7 @@ import type { AgentMemoryApiClient } from '../clients/memory'
 import type { AgentSkillApiClient } from '../clients/skills'
 import type { AgentChatModelFactory } from '../integrations/model-providers/chat-model'
 import type { WebSearchClient } from '../integrations/web-search'
-import type { RuntimeSkillActionProvider } from './skills/adapters'
+import type { RuntimeSkillActionProvider } from './skills/action-providers'
 import { END, START, StateGraph } from '@langchain/langgraph'
 import {
   createCallModelNode,

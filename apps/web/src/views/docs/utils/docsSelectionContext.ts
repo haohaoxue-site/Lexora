@@ -3,11 +3,15 @@ import type { Editor } from '@tiptap/core'
 import type { Node as ProseMirrorNode } from '@tiptap/pm/model'
 import type { Transaction } from '@tiptap/pm/state'
 import type { ChatComposerDocumentSelectionScope } from '@/components/chat-composer'
+import { AGENT_DOCUMENT_ASSISTANT_ANCHOR_CONTEXT_MAX_LENGTH } from '@haohaoxue/lexora-contracts/agent'
 import {
   BODY_BLOCK_ID_ATTRIBUTE,
   isAddressableBodyBlock,
 } from '@/components/tiptap-editor/content/blockId'
-import { createDocsSelectionMarkdownSnapshot } from './docsSelectionSnapshotSerializer'
+import {
+  createDocsSelectionMarkdownSnapshot,
+  serializeDocsSelectionSnapshotToMarkdownLike,
+} from './docsSelectionSnapshotSerializer'
 
 const UNSUPPORTED_SELECTION_BLOCK_TYPES = new Set([
   'table',
@@ -16,6 +20,11 @@ const UNSUPPORTED_SELECTION_BLOCK_TYPES = new Set([
   'horizontalRule',
   'blockMath',
 ])
+const DOCUMENT_ASSISTANT_ANCHOR_CONTEXT_TRUNCATION_PREFIX = '...'
+const DOCUMENT_ASSISTANT_ANCHOR_BEFORE_LABEL = '[锚点前文]'
+const DOCUMENT_ASSISTANT_ANCHOR_POSITION_LABEL = '[续写位置]'
+const DOCUMENT_ASSISTANT_ANCHOR_AFTER_LABEL = '[锚点后文]'
+const DOCUMENT_ASSISTANT_ANCHOR_EMPTY_TEXT = '(无)'
 
 export interface DocsSelectionLiveRange {
   from: number
@@ -26,6 +35,10 @@ export interface DocsSelectionSnapshot {
   scope: ChatComposerDocumentSelectionScope
   snapshot: string
   size: number
+}
+
+export interface DocsBlockLiveRange extends DocsSelectionLiveRange {
+  blockId: string
 }
 
 export function resolveDocsSelectionScope(
@@ -46,7 +59,9 @@ export function resolveDocsSelectionScope(
     return null
   }
 
-  const blockIds = collectSelectionBlockIds(doc, range)
+  const blockIds = range.from === range.to
+    ? [fromBoundary.blockId]
+    : collectSelectionBlockIds(doc, range)
 
   if (!blockIds.length) {
     return null
@@ -77,8 +92,61 @@ export function createDocsSelectionSnapshot(
     return null
   }
 
-  const content = selectionSliceToContent(editor.state.doc, normalizedRange)
-  const snapshot = createDocsSelectionMarkdownSnapshot(content)
+  const content = normalizedRange.from === normalizedRange.to
+    ? null
+    : selectionSliceToContent(editor.state.doc, normalizedRange)
+  const snapshot = normalizedRange.from === normalizedRange.to
+    ? createDocsAnchorMarkdownSnapshot(editor.state.doc, normalizedRange.from)
+    : createDocsSelectionMarkdownSnapshot(content ?? [])
+
+  return {
+    scope,
+    ...snapshot,
+  }
+}
+
+export function createDocsBlockSnapshot(
+  editor: Editor,
+  range: DocsBlockLiveRange,
+): DocsSelectionSnapshot | null {
+  if (!range.blockId || range.to <= range.from) {
+    return null
+  }
+
+  const resolvedPosition = editor.state.doc.resolve(range.from)
+  const node = resolvedPosition.nodeAfter
+
+  if (
+    !node
+    || !isAddressableBodyBlock(node, resolvedPosition.parent)
+    || readBlockId(node) !== range.blockId
+    || range.from + node.nodeSize !== range.to
+    || isUnsupportedSelectionBlock(node)
+  ) {
+    return null
+  }
+
+  const textLength = node.textContent.length
+  const scope: ChatComposerDocumentSelectionScope = {
+    kind: 'selection',
+    field: 'body',
+    blockIds: [range.blockId],
+    from: {
+      blockId: range.blockId,
+      offset: 0,
+      position: range.from,
+    },
+    to: {
+      blockId: range.blockId,
+      offset: textLength,
+      position: range.to,
+    },
+  }
+  const snapshot = createDocsSelectionMarkdownSnapshot(blockNodeToSnapshotContent(node))
+
+  if (!snapshot.snapshot.trim()) {
+    return null
+  }
 
   return {
     scope,
@@ -101,10 +169,20 @@ export function mapDocsSelectionLiveRange(
     return null
   }
 
-  return normalizeDocsSelectionRange({
+  const mappedRange = normalizeDocsSelectionRange({
     from: from.pos,
     to: to.pos,
   })
+
+  if (!mappedRange) {
+    return null
+  }
+
+  if (range.to > range.from && mappedRange.to <= mappedRange.from) {
+    return null
+  }
+
+  return mappedRange
 }
 
 function collectSelectionBlockIds(
@@ -171,6 +249,7 @@ function resolveSelectionBoundary(
     return {
       blockId,
       offset: node.textBetween(0, relativeOffset, '\n', '\n').length,
+      position,
     }
   }
 
@@ -190,7 +269,7 @@ function normalizeDocsSelectionRange(range: DocsSelectionLiveRange): DocsSelecti
   const from = Math.min(range.from, range.to)
   const to = Math.max(range.from, range.to)
 
-  if (from >= to) {
+  if (from > to) {
     return null
   }
 
@@ -198,6 +277,95 @@ function normalizeDocsSelectionRange(range: DocsSelectionLiveRange): DocsSelecti
     from,
     to,
   }
+}
+
+function createDocsAnchorMarkdownSnapshot(
+  doc: ProseMirrorNode,
+  position: number,
+): Pick<DocsSelectionSnapshot, 'snapshot' | 'size'> {
+  const normalizedPosition = clampAnchorPosition(doc, position)
+  const beforeMarkdown = serializeDocSliceToMarkdown(doc, 0, normalizedPosition)
+  const afterMarkdown = serializeDocSliceToMarkdown(doc, normalizedPosition, doc.content.size)
+  const { before, after } = boundAnchorContext({
+    before: beforeMarkdown,
+    after: afterMarkdown,
+  })
+  const snapshot = [
+    DOCUMENT_ASSISTANT_ANCHOR_BEFORE_LABEL,
+    before || DOCUMENT_ASSISTANT_ANCHOR_EMPTY_TEXT,
+    DOCUMENT_ASSISTANT_ANCHOR_POSITION_LABEL,
+    DOCUMENT_ASSISTANT_ANCHOR_AFTER_LABEL,
+    after || DOCUMENT_ASSISTANT_ANCHOR_EMPTY_TEXT,
+  ].join('\n')
+
+  return {
+    snapshot,
+    size: snapshot.length,
+  }
+}
+
+function clampAnchorPosition(doc: ProseMirrorNode, position: number) {
+  return Math.max(0, Math.min(position, doc.content.size))
+}
+
+function serializeDocSliceToMarkdown(doc: ProseMirrorNode, from: number, to: number) {
+  if (to <= from) {
+    return ''
+  }
+
+  const json = doc.cut(from, to).toJSON().content
+  const content = Array.isArray(json) ? json as TiptapJsonContent : []
+  return serializeDocsSelectionSnapshotToMarkdownLike(content).trim()
+}
+
+function boundAnchorContext(input: {
+  before: string
+  after: string
+}) {
+  const beforeText = input.before.trim()
+  const afterText = input.after.trim()
+  const overhead = [
+    DOCUMENT_ASSISTANT_ANCHOR_BEFORE_LABEL,
+    DOCUMENT_ASSISTANT_ANCHOR_POSITION_LABEL,
+    DOCUMENT_ASSISTANT_ANCHOR_AFTER_LABEL,
+    DOCUMENT_ASSISTANT_ANCHOR_EMPTY_TEXT,
+  ].join('\n').length + 8
+  const contextBudget = Math.max(0, AGENT_DOCUMENT_ASSISTANT_ANCHOR_CONTEXT_MAX_LENGTH - overhead)
+  const halfBudget = Math.floor(contextBudget / 2)
+  let beforeBudget = Math.min(beforeText.length, halfBudget)
+  const afterBudget = Math.min(afterText.length, contextBudget - beforeBudget)
+  beforeBudget = Math.min(beforeText.length, contextBudget - afterBudget)
+
+  return {
+    before: truncateStart(beforeText, beforeBudget),
+    after: truncateEnd(afterText, afterBudget),
+  }
+}
+
+function truncateStart(text: string, maxLength: number) {
+  if (text.length <= maxLength) {
+    return text
+  }
+
+  const retainedLength = Math.max(0, maxLength - DOCUMENT_ASSISTANT_ANCHOR_CONTEXT_TRUNCATION_PREFIX.length)
+  if (retainedLength === 0) {
+    return DOCUMENT_ASSISTANT_ANCHOR_CONTEXT_TRUNCATION_PREFIX.slice(0, maxLength)
+  }
+
+  return `${DOCUMENT_ASSISTANT_ANCHOR_CONTEXT_TRUNCATION_PREFIX}${text.slice(-retainedLength).trimStart()}`
+}
+
+function truncateEnd(text: string, maxLength: number) {
+  if (text.length <= maxLength) {
+    return text
+  }
+
+  const retainedLength = Math.max(0, maxLength - DOCUMENT_ASSISTANT_ANCHOR_CONTEXT_TRUNCATION_PREFIX.length)
+  if (retainedLength === 0) {
+    return DOCUMENT_ASSISTANT_ANCHOR_CONTEXT_TRUNCATION_PREFIX.slice(0, maxLength)
+  }
+
+  return `${text.slice(0, retainedLength).trimEnd()}${DOCUMENT_ASSISTANT_ANCHOR_CONTEXT_TRUNCATION_PREFIX}`
 }
 
 function readBlockId(node: ProseMirrorNode): string | null {
@@ -208,4 +376,9 @@ function readBlockId(node: ProseMirrorNode): string | null {
 
 function isUnsupportedSelectionBlock(node: ProseMirrorNode) {
   return UNSUPPORTED_SELECTION_BLOCK_TYPES.has(node.type.name)
+}
+
+function blockNodeToSnapshotContent(node: ProseMirrorNode): TiptapJsonContent {
+  const json = node.toJSON()
+  return json ? [json] as TiptapJsonContent : []
 }

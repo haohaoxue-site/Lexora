@@ -1,4 +1,7 @@
-import type { AgentTranslatorTargetLanguage } from '@haohaoxue/lexora-contracts/agent'
+import type {
+  AgentDocumentAssistantEditIntent,
+  AgentTranslatorTargetLanguage,
+} from '@haohaoxue/lexora-contracts/agent'
 import type { AiModelRef } from '@/apis/ai'
 import type {
   ChatDisabledSkillKeys,
@@ -41,6 +44,8 @@ export interface ChatComposerProps {
   highlightAttachmentId?: string | null
   documentPickerTeleportTo?: string
   uploadAvailability?: ChatComposerUploadAvailability
+  documentAssistantEditIntent?: AgentDocumentAssistantEditIntent | null
+  documentAssistantSkillEnabled?: boolean
   translatorSkillEnabled?: boolean
   translatorTargetLanguage?: AgentTranslatorTargetLanguage | null
   webSearchSkillEnabled?: boolean
@@ -50,6 +55,7 @@ export interface ChatComposerProps {
 export interface ChatComposerEmits {
   'update:contentJSON': [contentJSON: ChatComposerContentJSON]
   'update:attachments': [attachments: ChatComposerAttachment[]]
+  'update:documentAssistantEditIntent': [intent: AgentDocumentAssistantEditIntent | null]
   'update:translatorTargetLanguage': [targetLanguage: AgentTranslatorTargetLanguage | null]
   'update:webSearchForRunEnabled': [enabled: boolean]
   'send': [payload: ChatComposerSubmitPayload]
@@ -67,6 +73,8 @@ export interface ChatComposerToolbarProps {
   disabled?: boolean
   canSend?: boolean
   uploadAvailability?: ChatComposerUploadAvailability
+  documentAssistantEditIntent?: AgentDocumentAssistantEditIntent | null
+  documentAssistantSkillEnabled?: boolean
   translatorSkillEnabled?: boolean
   translatorTargetLanguage?: AgentTranslatorTargetLanguage | null
   webSearchSkillEnabled?: boolean
@@ -78,6 +86,7 @@ export interface ChatComposerToolbarEmits {
   'openPanelPicker': []
   'uploadImage': []
   'uploadFile': []
+  'update:documentAssistantEditIntent': [intent: AgentDocumentAssistantEditIntent | null]
   'update:translatorTargetLanguage': [targetLanguage: AgentTranslatorTargetLanguage | null]
   'update:webSearchForRunEnabled': [enabled: boolean]
   'selectModel': [modelRef: ChatComposerModelRef | null]
@@ -111,12 +120,15 @@ export interface ChatComposerWebSearchButtonEmits {
 export interface ChatComposerSkillControlsProps {
   disabled?: boolean
   isStreaming?: boolean
+  documentAssistantEditIntent?: AgentDocumentAssistantEditIntent | null
+  documentAssistantSkillEnabled?: boolean
   translatorSkillEnabled?: boolean
   translatorTargetLanguage?: AgentTranslatorTargetLanguage | null
   skillCommandOpenSignal?: number
 }
 
 export interface ChatComposerSkillControlsEmits {
+  'update:documentAssistantEditIntent': [intent: AgentDocumentAssistantEditIntent | null]
   'update:translatorTargetLanguage': [targetLanguage: AgentTranslatorTargetLanguage | null]
 }
 
@@ -153,6 +165,7 @@ export interface ChatReferenceAttrs {
 export interface ChatDocumentSelectionBoundary {
   blockId: string
   offset: number
+  position?: number
 }
 
 export interface ChatComposerDocumentSelectionScope {

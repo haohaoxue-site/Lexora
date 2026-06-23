@@ -5,16 +5,16 @@ import type { StructuredToolInterface } from '@langchain/core/tools'
 import type { AgentMemoryApiClient } from '../../clients/memory'
 import type { AgentSkillApiClient } from '../../clients/skills'
 import type { WebSearchClient } from '../../integrations/web-search'
-import type { RuntimeSkillActionProvider, RuntimeSkillActionProviderServices } from '../skills/adapters'
-import type { LoadedAgentSkill } from '../skills/runtime'
+import type { RuntimeSkillActionProvider, RuntimeSkillActionProviderServices } from '../skills/action-providers'
+import type { LoadedAgentSkill } from '../skills/activation'
 import type { AgentGraphContext } from '../state'
 import { AGENT_SKILL_ACTIVATION_MODE, AGENT_SKILL_CONNECTOR_TYPE } from '@haohaoxue/lexora-contracts'
-import { DEFAULT_RUNTIME_SKILL_ACTION_PROVIDERS } from '../skills/adapters'
+import { DEFAULT_RUNTIME_SKILL_ACTION_PROVIDERS } from '../skills/action-providers'
 import {
   createAgentSkillTools,
   executeAgentSkillToolCalls,
   isSkillLoaded,
-} from '../skills/runtime'
+} from '../skills/activation'
 
 export interface RuntimeToolDescriptorExecutionInput {
   context: AgentGraphContext
@@ -150,7 +150,9 @@ function hasRuntimeSkillCatalog(input: {
   return Boolean(
     input.skillApi
     && input.context?.skillContext
-    && input.context.skillContext.availableSkills.length > 0,
+    && input.context.skillContext.availableSkills.some(skill =>
+      skill.activationMode !== AGENT_SKILL_ACTIVATION_MODE.MANUAL,
+    ),
   )
 }
 

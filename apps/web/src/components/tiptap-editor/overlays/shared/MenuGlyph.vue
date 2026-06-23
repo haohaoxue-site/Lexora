@@ -30,6 +30,7 @@ const MENU_GLYPH_ICON_REGISTRY: Record<string, string> = {
   'link': 'link',
   'image': 'image',
   'file': 'file',
+  'edit': 'edit',
   'comment': 'comment',
   '+': 'plus',
   'align': 'align-left',

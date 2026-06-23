@@ -7,6 +7,7 @@ import type {
   TiptapSchemaVersion,
 } from '@haohaoxue/lexora-contracts'
 import type {
+  TiptapEditorBlockContextRequest,
   TiptapEditorCollaborationBinding,
   TiptapEditorCommentRequest,
   TiptapEditorSelectionContextRequest,
@@ -78,6 +79,8 @@ export interface DocsDocumentEditorPaneEmits {
   updateContent: [content: TiptapJsonContent]
   requestComment: [request: TiptapEditorCommentRequest]
   requestAddSelectionContext: [request: TiptapEditorSelectionContextRequest]
+  requestAiBlockRewrite: [request: TiptapEditorBlockContextRequest]
+  selectionChange: [request: TiptapEditorSelectionContextRequest]
   titleAutofocusApplied: []
   createDocument: []
   openFallbackDocument: []
@@ -109,6 +112,8 @@ export interface DocsDocumentEditorEmits {
   contentError: [error: Error]
   requestComment: [request: TiptapEditorCommentRequest]
   requestAddSelectionContext: [request: TiptapEditorSelectionContextRequest]
+  requestAiBlockRewrite: [request: TiptapEditorBlockContextRequest]
+  selectionChange: [request: TiptapEditorSelectionContextRequest]
   titleAutofocusApplied: []
 }
 

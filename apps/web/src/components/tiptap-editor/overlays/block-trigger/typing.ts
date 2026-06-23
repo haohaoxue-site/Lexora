@@ -1,6 +1,6 @@
 import type { Editor } from '@tiptap/core'
 import type { TiptapEditorUploadedFile, TiptapEditorUploadedImage } from '../../content/typing'
-import type { TiptapEditorCommentRequest } from '../../core/typing'
+import type { TiptapEditorBlockContextRequest, TiptapEditorCommentRequest } from '../../core/typing'
 
 /**
  * 块触发菜单属性。
@@ -12,6 +12,8 @@ export interface BlockTriggerMenuProps {
   uploadImage?: (file: File) => Promise<TiptapEditorUploadedImage>
   /** 文件上传能力 */
   uploadFile?: (file: File) => Promise<TiptapEditorUploadedFile>
+  /** 是否显示块级 AI 重写入口 */
+  aiBlockRewriteEnabled?: boolean
 }
 
 /**
@@ -19,6 +21,7 @@ export interface BlockTriggerMenuProps {
  */
 export interface BlockTriggerMenuEmits {
   requestComment: [request: TiptapEditorCommentRequest]
+  requestAiBlockRewrite: [request: TiptapEditorBlockContextRequest]
 }
 
 /**

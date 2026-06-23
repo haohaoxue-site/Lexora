@@ -4,6 +4,7 @@ import type { LinkPreviewController } from '../link-preview/useLinkPreview'
 import type { LinkPanelController } from '../shared/useLinkPanel'
 import { computed, nextTick, onBeforeUnmount, onMounted, shallowRef, watch } from 'vue'
 import { isImageSelection } from '../../commands/editorActions'
+import { hasDocumentAiAnchorPreview } from '../../extensions/DocumentAiDraftPreview'
 import { isMathNodeSelection } from '../../extensions/mathematics/mathNodeSelection'
 import { useLinkPreview } from '../link-preview/useLinkPreview'
 import { useEditorSnapshot } from '../shared/useEditorSnapshot'
@@ -11,6 +12,7 @@ import { useLinkPanel } from '../shared/useLinkPanel'
 import { usePanelMountGuard } from '../shared/usePanelMountGuard'
 
 const BUBBLE_TOOLBAR_LINK_PANEL_PLUGIN_KEY = 'bubbleToolbarLinkPanel'
+const BUBBLE_TOOLBAR_MENU_PLUGIN_KEY = 'bubbleToolbarMenu'
 const CARET_NAVIGATION_KEYS = new Set([
   'ArrowDown',
   'ArrowLeft',
@@ -53,16 +55,20 @@ export function useBubbleToolbarOverlay(editor: Editor): BubbleToolbarOverlayCon
   })
   const linkPreview = useLinkPreview(editor, linkPanel)
   const pendingKeyboardCaretNavigation = shallowRef(false)
+  let selectionOverlayHiddenForDocumentAi = false
   const shouldKeepLinkPanelMounted = computed(() => {
     void editorSnapshot.value
 
     const { from, to } = editor.state.selection
-    return (from !== to || editor.isActive('link')) && !isImageSelection(editor)
+    return !shouldHideSelectionOverlayForDocumentAi()
+      && (from !== to || editor.isActive('link'))
+      && !isImageSelection(editor)
   })
 
   usePanelMountGuard(linkPanel, shouldKeepLinkPanelMounted)
 
   watch(editorSnapshot, openExistingLinkPanelAfterKeyboardNavigation)
+  watch(editorSnapshot, syncDocumentAiSelectionOverlayVisibility)
 
   onMounted(() => {
     const editorElement = editor.view?.dom
@@ -95,6 +101,10 @@ export function useBubbleToolbarOverlay(editor: Editor): BubbleToolbarOverlayCon
   }
 
   function shouldShowToolbar({ from, to }: BubbleToolbarShouldShowContext): boolean {
+    if (shouldHideSelectionOverlayForDocumentAi()) {
+      return false
+    }
+
     if (isMathNodeSelection(editor.state)) {
       return false
     }
@@ -111,17 +121,31 @@ export function useBubbleToolbarOverlay(editor: Editor): BubbleToolbarOverlayCon
   }
 
   function shouldShowLinkPanel({ from, to }: BubbleToolbarShouldShowContext): boolean {
-    return Boolean(linkPanel.isOpen.value && !isImageSelection(editor) && (from !== to || editor.isActive('link')))
+    return Boolean(
+      !shouldHideSelectionOverlayForDocumentAi()
+      && linkPanel.isOpen.value
+      && !isImageSelection(editor)
+      && (from !== to || editor.isActive('link')),
+    )
   }
 
-  function dispatchLinkPanelMenuMeta(meta: 'hide' | 'show' | 'updatePosition') {
+  function dispatchBubbleMenuMeta(pluginKey: string, meta: 'hide' | 'show' | 'updatePosition') {
     const view = editor.view
 
     if (editor.isDestroyed || !view) {
       return
     }
 
-    view.dispatch(editor.state.tr.setMeta(BUBBLE_TOOLBAR_LINK_PANEL_PLUGIN_KEY, meta))
+    view.dispatch(editor.state.tr.setMeta(pluginKey, meta))
+  }
+
+  function dispatchLinkPanelMenuMeta(meta: 'hide' | 'show' | 'updatePosition') {
+    dispatchBubbleMenuMeta(BUBBLE_TOOLBAR_LINK_PANEL_PLUGIN_KEY, meta)
+  }
+
+  function hideSelectionOverlayMenus() {
+    dispatchBubbleMenuMeta(BUBBLE_TOOLBAR_MENU_PLUGIN_KEY, 'hide')
+    dispatchLinkPanelMenuMeta('hide')
   }
 
   function showLinkPanelMenu() {
@@ -164,6 +188,10 @@ export function useBubbleToolbarOverlay(editor: Editor): BubbleToolbarOverlayCon
       return
     }
 
+    if (shouldHideSelectionOverlayForDocumentAi()) {
+      return
+    }
+
     const { from, to } = editor.state.selection
 
     if (from !== to || !editor.isActive('link')) {
@@ -173,5 +201,31 @@ export function useBubbleToolbarOverlay(editor: Editor): BubbleToolbarOverlayCon
     linkPanel.openSelection({
       source: 'keyboard-caret-navigation',
     })
+  }
+
+  function syncDocumentAiSelectionOverlayVisibility() {
+    if (!shouldHideSelectionOverlayForDocumentAi()) {
+      selectionOverlayHiddenForDocumentAi = false
+      return
+    }
+
+    if (selectionOverlayHiddenForDocumentAi) {
+      return
+    }
+
+    selectionOverlayHiddenForDocumentAi = true
+    hideSelectionOverlayMenus()
+  }
+
+  function shouldHideSelectionOverlayForDocumentAi() {
+    const editorElement = editor.view?.dom
+    const activeElement = editorElement?.ownerDocument.activeElement
+    const editorHasDomFocus = Boolean(
+      editorElement
+      && activeElement
+      && editorElement.contains(activeElement),
+    )
+
+    return hasDocumentAiAnchorPreview(editor.state) && !editorHasDomFocus
   }
 }

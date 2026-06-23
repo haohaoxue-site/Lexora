@@ -35,6 +35,10 @@ import {
   TURN_INTO_SCOPE_REGISTRY,
 } from './menuCatalog'
 
+export interface BlockTriggerViewStateOptions {
+  aiBlockRewriteEnabled?: boolean
+}
+
 export function getTurnIntoMenuItems(
   editor: Editor,
   scope: TurnIntoMenuScope,
@@ -79,18 +83,18 @@ export function getEditorBlockMenuContext(editor: Editor): EditorBlockMenuContex
   }
 }
 
-export function getBlockMenuModel(editor: Editor): BlockMenuModel {
+export function getBlockMenuModel(editor: Editor, options: BlockTriggerViewStateOptions = {}): BlockMenuModel {
   const context = getEditorBlockMenuContext(editor)
-  return projectBlockMenuModel(editor, context)
+  return projectBlockMenuModel(editor, context, options)
 }
 
 export function getAlignMenuItems(editor: Editor): BlockMenuChildItem[] {
   return projectAlignChildren(getEditorBlockMenuContext(editor))
 }
 
-export function getBlockTriggerViewState(editor: Editor): BlockTriggerViewState {
+export function getBlockTriggerViewState(editor: Editor, options: BlockTriggerViewStateOptions = {}): BlockTriggerViewState {
   const context = getEditorBlockMenuContext(editor)
-  const model = projectBlockMenuModel(editor, context)
+  const model = projectBlockMenuModel(editor, context, options)
   const triggerDefinition = TURN_INTO_ITEM_CATALOG[context.blockTarget]
 
   return {
@@ -112,14 +116,20 @@ export function getActiveHighlightColor(editor: Editor): string {
   return getCurrentHighlightClass(editor)
 }
 
-function projectBlockMenuModel(editor: Editor, context: EditorBlockMenuContext): BlockMenuModel {
+function projectBlockMenuModel(
+  editor: Editor,
+  context: EditorBlockMenuContext,
+  options: BlockTriggerViewStateOptions,
+): BlockMenuModel {
   const variant = context.isEmptyBlock
     ? BLOCK_MENU_VARIANT_REGISTRY.empty
     : BLOCK_MENU_VARIANT_REGISTRY.content
 
   return {
     quickItems: variant.quickItems.flatMap(definition => projectBlockMenuQuickItems(editor, definition)),
-    menuItems: variant.menuItems.map(definition => projectBlockMenuItem(context, definition)),
+    menuItems: variant.menuItems
+      .filter(definition => options.aiBlockRewriteEnabled || definition.action !== 'rewrite-block')
+      .map(definition => projectBlockMenuItem(context, definition)),
   }
 }
 
@@ -307,12 +317,13 @@ function getPanelLabel(action: 'align' | 'color') {
   return action === 'align' ? translate('editor.common.alignAndIndent') : translate('editor.common.color')
 }
 
-function getActionLabel(action: 'comment' | 'cut' | 'copy' | 'delete') {
+function getActionLabel(action: 'comment' | 'rewrite-block' | 'cut' | 'copy' | 'delete') {
   const keyMap = {
-    comment: 'editor.common.comment',
-    cut: 'editor.common.cut',
-    copy: 'editor.common.copy',
-    delete: 'editor.common.delete',
+    'comment': 'editor.common.comment',
+    'rewrite-block': 'editor.common.rewriteBlock',
+    'cut': 'editor.common.cut',
+    'copy': 'editor.common.copy',
+    'delete': 'editor.common.delete',
   } as const
 
   return translate(keyMap[action])

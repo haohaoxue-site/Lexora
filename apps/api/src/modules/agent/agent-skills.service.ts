@@ -18,6 +18,7 @@ import type { CryptoConfig } from '../../config/auth.config'
 import {
   ActivateAgentSkillResponseSchema,
   AGENT_AMAP_MCP_SKILL_KEY,
+  AGENT_DOCUMENT_ASSISTANT_SKILL_KEY,
   AGENT_FIRST_PARTY_SKILL_DEFINITIONS,
   AGENT_LOCATION_SKILL_KEY,
   AGENT_MEMORY_SKILL_KEY,
@@ -85,6 +86,10 @@ const skillConfigHandlerByKey = {
     defaultConfig: () => AGENT_TRANSLATOR_DEFAULT_SKILL_CONFIG,
     normalize: normalizeTranslatorSkillConfig,
     renderInstructions: renderTranslatorRuntimeInstructions,
+  },
+  [AGENT_DOCUMENT_ASSISTANT_SKILL_KEY]: {
+    defaultConfig: () => ({}),
+    normalize: () => ({}),
   },
   [AGENT_WEB_SEARCH_SKILL_KEY]: {
     defaultConfig: () => AgentWebSearchSkillConfigSchema.parse({}),

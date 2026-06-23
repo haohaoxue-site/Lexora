@@ -1,7 +1,7 @@
 import type { Editor } from '@tiptap/core'
 import type { Ref } from 'vue'
 import type { TiptapEditorUploadedFile, TiptapEditorUploadedImage } from '../../content/typing'
-import type { TiptapEditorCommentRequest } from '../../core/typing'
+import type { TiptapEditorBlockContextRequest, TiptapEditorCommentRequest } from '../../core/typing'
 import type {
   BlockMenuChildItem,
   BlockMenuItem,
@@ -9,6 +9,8 @@ import type {
 } from '../catalog/menuRegistry'
 import type { LinkPanelController } from '../shared/useLinkPanel'
 import type { BlockTriggerPanel } from './useBlockTriggerOverlay'
+import { getCurrentBlock } from '../../commands/currentBlock'
+import { BODY_BLOCK_ID_ATTRIBUTE } from '../../content/blockId'
 import { createMenuActionRegistry } from '../catalog/actionRegistry'
 
 export function useBlockTriggerActions(options: {
@@ -19,6 +21,7 @@ export function useBlockTriggerActions(options: {
   imageInputRef: Ref<HTMLInputElement | null>
   fileInputRef: Ref<HTMLInputElement | null>
   linkPanel: LinkPanelController
+  onRequestAiBlockRewrite?: (request: TiptapEditorBlockContextRequest) => void
   onRequestComment: (request: TiptapEditorCommentRequest) => void
   uploadImage?: (file: File) => Promise<TiptapEditorUploadedImage>
   uploadFile?: (file: File) => Promise<TiptapEditorUploadedFile>
@@ -67,6 +70,10 @@ export function useBlockTriggerActions(options: {
       return options.openPanel(item.action)
     }
 
+    if (item.action === 'rewrite-block') {
+      return requestAiBlockRewrite()
+    }
+
     return actionRegistry.leaf.execute(item.action)
   }
 
@@ -112,6 +119,23 @@ export function useBlockTriggerActions(options: {
     }
 
     return { from, to }
+  }
+
+  function requestAiBlockRewrite() {
+    const currentBlock = getCurrentBlock(options.editor.state.selection)
+    const blockId = currentBlock?.node.attrs[BODY_BLOCK_ID_ATTRIBUTE]
+
+    if (!currentBlock || typeof blockId !== 'string' || !blockId) {
+      return
+    }
+
+    options.closeMenu()
+    options.onRequestAiBlockRewrite?.({
+      editor: options.editor,
+      blockId,
+      from: currentBlock.from,
+      to: currentBlock.to,
+    })
   }
 
   function handlePickImageResult(event: Event) {

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { DocumentSelectionDisplayMode } from './attachmentOrdering'
 import type { ChatComposerAttachment } from './typing'
 import { Close } from '@element-plus/icons-vue'
 import { computed } from 'vue'
@@ -10,6 +11,7 @@ import {
 
 const props = defineProps<{
   attachments: ChatComposerAttachment[]
+  documentSelectionDisplayMode?: DocumentSelectionDisplayMode | null
   highlightAttachmentId?: string | null
 }>()
 
@@ -19,6 +21,12 @@ const emits = defineEmits<{
 
 const { t } = useI18n({ useScope: 'global' })
 const panelAttachments = computed(() => getPanelAttachments(props.attachments))
+
+function getDisplayLabel(attachment: ChatComposerAttachment) {
+  return getAttachmentDisplayLabel(attachment, {
+    documentSelectionDisplayMode: props.documentSelectionDisplayMode,
+  })
+}
 </script>
 
 <template>
@@ -28,10 +36,10 @@ const panelAttachments = computed(() => getPanelAttachments(props.attachments))
       :key="attachment.id"
       class="chat-composer-context-tags__tag"
       :class="{ 'is-highlighted': attachment.id === props.highlightAttachmentId }"
-      :title="getAttachmentDisplayLabel(attachment)"
+      :title="getDisplayLabel(attachment)"
     >
       <span class="chat-composer-context-tags__label">
-        {{ getAttachmentDisplayLabel(attachment) }}
+        {{ getDisplayLabel(attachment) }}
       </span>
       <button
         class="chat-composer-context-tags__remove"

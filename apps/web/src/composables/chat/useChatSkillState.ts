@@ -1,5 +1,9 @@
 import type { AgentSkillCard } from '@/apis/agent-skills'
-import { AGENT_TRANSLATOR_SKILL_KEY, AGENT_WEB_SEARCH_SKILL_KEY } from '@haohaoxue/lexora-contracts/agent'
+import {
+  AGENT_DOCUMENT_ASSISTANT_SKILL_KEY,
+  AGENT_TRANSLATOR_SKILL_KEY,
+  AGENT_WEB_SEARCH_SKILL_KEY,
+} from '@haohaoxue/lexora-contracts/agent'
 import { createSharedComposable } from '@vueuse/core'
 import { computed, shallowRef } from 'vue'
 import {
@@ -20,6 +24,12 @@ export const useChatSkillState = createSharedComposable(() => {
   )
   const translatorSkillEnabled = computed(() =>
     Boolean(translatorSkill.value?.enabled),
+  )
+  const documentAssistantSkill = computed(() =>
+    installedSkills.value.find(skill => skill.key === AGENT_DOCUMENT_ASSISTANT_SKILL_KEY) ?? null,
+  )
+  const documentAssistantSkillEnabled = computed(() =>
+    Boolean(documentAssistantSkill.value?.enabled),
   )
   const webSearchSkill = computed(() =>
     installedSkills.value.find(skill => skill.key === AGENT_WEB_SEARCH_SKILL_KEY) ?? null,
@@ -103,6 +113,7 @@ export const useChatSkillState = createSharedComposable(() => {
     isSkillUpdating,
     loadSkills,
     setSkillEnabled,
+    documentAssistantSkillEnabled,
     translatorSkillEnabled,
     webSearchSkillEnabled,
   }

@@ -8,6 +8,7 @@ import { createChatSurfaceController } from '@/composables/chat/createChatSurfac
 import { translate } from '@/i18n'
 import { ElMessageBox } from '@/utils/element-plus'
 import { useActiveDocument } from './useActiveDocument'
+import { useDocsAiCandidate } from './useDocsAiCandidate'
 import { useDocsChatEngine } from './useDocsChatEngine'
 import { useDocsContext } from './useDocsContext'
 
@@ -75,6 +76,7 @@ export function createDocsChatPanelController(options: {
   model: DocsChatPanelModel
 }) {
   const { currentWorkspaceId } = useDocsContext()
+  const docsAiCandidate = useDocsAiCandidate()
   const surface = createChatSurfaceController({
     workspaceId: currentWorkspaceId,
     model: options.model,
@@ -94,6 +96,8 @@ export function createDocsChatPanelController(options: {
     composerModelSelectionKind,
     composerSelectedModelRef,
     contentJSON,
+    documentAssistantEditIntent,
+    documentAssistantSkillEnabled,
     handleSend,
     handleUploadAttachmentFiles,
     handleUploadImageFiles,
@@ -101,6 +105,7 @@ export function createDocsChatPanelController(options: {
     highlightAttachmentId,
     isConfigured,
     loadSkills,
+    registerAfterSendHandler,
     registerBeforeSendHandler,
     resetComposer,
     resetNewSessionComposerState,
@@ -131,6 +136,18 @@ export function createDocsChatPanelController(options: {
   const renderSessionId = computed(() => renderSession.value?.id ?? null)
   const hasActiveSession = computed(() => Boolean(options.sessions.activeSession.value))
   const activeSessionTitle = computed(() => options.sessions.activeSession.value?.title ?? translate('docs.chat.titleFallback'))
+  const documentAiCandidateSyncKey = computed(() =>
+    messages.value
+      .map(message => `${message.id}:${message.role}:${message.status}:${message.role === 'assistant' ? readMessageContent(message).length : ''}`)
+      .join('|'),
+  )
+
+  watch(
+    documentAiCandidateSyncKey,
+    () => docsAiCandidate.syncFromMessages(messages.value),
+    { immediate: true },
+  )
+
   function openPanel() {
     isOpen.value = true
   }
@@ -263,6 +280,8 @@ export function createDocsChatPanelController(options: {
     composerSelectedModelRef,
     confirmDeleteActiveSession,
     contentJSON,
+    documentAssistantEditIntent,
+    documentAssistantSkillEnabled,
     copyMessage,
     deleteActiveSession,
     handleSend,
@@ -284,6 +303,7 @@ export function createDocsChatPanelController(options: {
     openRenameDialog,
     renameDialogVisible,
     renameDraft,
+    registerAfterSendHandler,
     registerBeforeSendHandler,
     renderSessionId,
     resetComposer,
@@ -301,4 +321,8 @@ export function createDocsChatPanelController(options: {
     webSearchForRunEnabled,
     webSearchSkillEnabled,
   }
+}
+
+function readMessageContent(message: { content?: unknown }) {
+  return typeof message.content === 'string' ? message.content : ''
 }

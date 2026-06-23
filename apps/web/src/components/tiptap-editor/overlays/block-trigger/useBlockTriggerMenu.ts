@@ -1,6 +1,6 @@
 import type { Editor } from '@tiptap/core'
 import type { TiptapEditorUploadedFile, TiptapEditorUploadedImage } from '../../content/typing'
-import type { TiptapEditorCommentRequest } from '../../core/typing'
+import type { TiptapEditorBlockContextRequest, TiptapEditorCommentRequest } from '../../core/typing'
 import { computed, ref } from 'vue'
 import { useBlockTriggerActions } from './useBlockTriggerActions'
 import { useBlockTriggerDrag } from './useBlockTriggerDrag'
@@ -10,6 +10,8 @@ import { useBlockTriggerState } from './useBlockTriggerState'
 
 export function useBlockTriggerMenu(options: {
   editor: Editor
+  aiBlockRewriteEnabled?: boolean
+  onRequestAiBlockRewrite?: (request: TiptapEditorBlockContextRequest) => void
   onRequestComment: (request: TiptapEditorCommentRequest) => void
   uploadImage?: (file: File) => Promise<TiptapEditorUploadedImage>
   uploadFile?: (file: File) => Promise<TiptapEditorUploadedFile>
@@ -17,7 +19,9 @@ export function useBlockTriggerMenu(options: {
   const imageInputRef = ref<HTMLInputElement | null>(null)
   const fileInputRef = ref<HTMLInputElement | null>(null)
   const overlay = useBlockTriggerOverlay(options.editor)
-  const state = useBlockTriggerState(options.editor)
+  const state = useBlockTriggerState(options.editor, {
+    aiBlockRewriteEnabled: options.aiBlockRewriteEnabled,
+  })
   const drag = useBlockTriggerDrag({
     editor: options.editor,
     canDrag: computed(() => state.value.canDrag),
@@ -32,6 +36,7 @@ export function useBlockTriggerMenu(options: {
     imageInputRef,
     fileInputRef,
     linkPanel: linkPanelController.linkPanel,
+    onRequestAiBlockRewrite: options.onRequestAiBlockRewrite,
     onRequestComment: options.onRequestComment,
     uploadImage: options.uploadImage,
     uploadFile: options.uploadFile,

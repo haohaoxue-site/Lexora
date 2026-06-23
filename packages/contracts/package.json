@@ -11,6 +11,7 @@
     "./agent/chat": "./src/agent/chat.ts",
     "./agent/client-action": "./src/agent/client-action.ts",
     "./agent/control": "./src/agent/control.ts",
+    "./agent/document-assistant": "./src/agent/document-assistant.ts",
     "./agent/events": "./src/agent/events.ts",
     "./agent/generation": "./src/agent/generation.ts",
     "./agent/location": "./src/agent/location.ts",

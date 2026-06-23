@@ -4,11 +4,13 @@ import type {
   TiptapEditorCommentRequest,
   TiptapEditorHandleKeyDown,
   TiptapEditorHandleTextInput,
+  TiptapEditorSelectionContextRequest,
 } from '../../core/typing'
 import type { BlockTriggerMenuExposed } from '../../overlays/block-trigger/typing'
 import type { DocumentBodyEditorProps } from './typing'
 import { FILE_SIZE_LIMITS } from '@haohaoxue/lexora-contracts/file'
 import { prettyBytes } from '@haohaoxue/lexora-shared/file'
+import { TextSelection } from '@tiptap/pm/state'
 import {
   computed,
   nextTick,
@@ -22,6 +24,10 @@ import {
 } from '@/apis/document'
 import { translate } from '@/i18n'
 import { createBodyExtensions } from '../../extensions/createExtensions'
+import {
+  clearDocumentAiDraftPreview,
+  setDocumentAiDraftPreview,
+} from '../../extensions/DocumentAiDraftPreview'
 import { scrollDocumentBlockIntoView } from '../../overlays/block-trigger/blockTriggerDom'
 import { isTriggerMenuSelection } from './triggerSelection'
 
@@ -30,7 +36,10 @@ const DOCUMENT_IMAGE_SIZE_LIMIT_LABEL = prettyBytes(FILE_SIZE_LIMITS.DOCUMENT_IM
 export function useDocumentBodyEditor(options: {
   blockTriggerMenuRef: TemplateRef<BlockTriggerMenuExposed | null>
   bodyEditor: ShallowRef<Editor | null>
+  onAcceptAiDraftPreview: (candidateId: string) => void
   onRequestComment: (request: TiptapEditorCommentRequest) => void
+  onRejectAiDraftPreview: (candidateId: string) => void
+  onSelectionChange: (request: TiptapEditorSelectionContextRequest) => void
   props: DocumentBodyEditorProps
 }) {
   const bodyEditorExtensions = createBodyExtensions({
@@ -38,6 +47,10 @@ export function useDocumentBodyEditor(options: {
     uploadFile: handleUploadFile,
     resolveImageSrc: resolveDocumentImageSrc,
     collaboration: options.props.collaboration,
+    aiDraftPreview: {
+      onAccept: candidateId => options.onAcceptAiDraftPreview(candidateId),
+      onReject: candidateId => options.onRejectAiDraftPreview(candidateId),
+    },
   })
   const bodyEditor = computed(() => options.bodyEditor.value)
   const pendingActiveBlockId = shallowRef<string | null>(null)
@@ -57,6 +70,64 @@ export function useDocumentBodyEditor(options: {
       }
 
       await scrollToPendingActiveBlock(editor)
+    },
+    {
+      immediate: true,
+      flush: 'post',
+    },
+  )
+
+  watch(
+    [
+      bodyEditor,
+      () => options.props.aiDraftPreview,
+    ],
+    ([editor, preview]) => {
+      if (!editor) {
+        return
+      }
+
+      if (!preview) {
+        clearDocumentAiDraftPreview(editor)
+        return
+      }
+
+      setDocumentAiDraftPreview(editor, {
+        id: preview.id,
+        intent: preview.intent,
+        previewMode: preview.previewMode,
+        from: preview.from,
+        to: preview.to,
+        candidateContent: preview.candidateContent,
+      })
+    },
+    {
+      immediate: true,
+      flush: 'post',
+    },
+  )
+
+  watch(
+    bodyEditor,
+    (editor, _previousEditor, onCleanup) => {
+      if (!editor) {
+        return
+      }
+
+      const emitSelectionChange = () => emitTextSelectionChange(editor)
+
+      if (typeof editor.on !== 'function' || typeof editor.off !== 'function') {
+        return
+      }
+
+      editor.on('selectionUpdate', emitSelectionChange)
+      editor.on('focus', emitSelectionChange)
+      emitSelectionChange()
+
+      onCleanup(() => {
+        editor.off('selectionUpdate', emitSelectionChange)
+        editor.off('focus', emitSelectionChange)
+      })
     },
     {
       immediate: true,
@@ -111,6 +182,20 @@ export function useDocumentBodyEditor(options: {
 
   function handleBodyEditorChange(editor: Editor | null) {
     options.bodyEditor.value = editor
+  }
+
+  function emitTextSelectionChange(editor: Editor) {
+    const { selection } = editor.state
+
+    if (!(selection instanceof TextSelection)) {
+      return
+    }
+
+    options.onSelectionChange({
+      editor,
+      from: selection.from,
+      to: selection.to,
+    })
   }
 
   return {

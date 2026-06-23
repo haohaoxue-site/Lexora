@@ -20,7 +20,7 @@ const {
   updateDocumentTitle,
 } = useActiveDocument()
 const { docsDocumentEditorMode, isDocsDocumentEditable } = useDocsHistoryState()
-const { handleAddSelectionContext } = useDocsChatContextBridge()
+const { handleAddSelectionContext, handleEditorSelectionChange, handleRewriteBlockContext } = useDocsChatContextBridge()
 const {
   documentPaneState,
   hasVisibleFallbackDocument: hasFallbackDocument,
@@ -50,6 +50,8 @@ const shouldAutofocusTitle = computed(() =>
     @update-content="updateDocumentContent"
     @request-comment="handleRequestComment"
     @request-add-selection-context="handleAddSelectionContext"
+    @request-ai-block-rewrite="handleRewriteBlockContext"
+    @selection-change="handleEditorSelectionChange"
     @title-autofocus-applied="markTitleAutofocusApplied"
     @create-document="createRootDocument()"
     @open-fallback-document="openDefaultDocument()"

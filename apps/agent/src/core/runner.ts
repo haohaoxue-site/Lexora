@@ -20,7 +20,7 @@ import type {
   AgentRunner,
   ChatGenerationEvent,
 } from '../runtime/typing'
-import type { RuntimeSkillActionProvider } from './skills/adapters'
+import type { RuntimeSkillActionProvider } from './skills/action-providers'
 import type { AgentRuntimeWarning } from './state'
 import {
   AGENT_GENERATION_COMMAND_KIND,
@@ -43,9 +43,13 @@ import {
 } from './events'
 import { createAgentGraph } from './graph'
 import {
-  createFocusedTranslatorThreadId,
-  resolveFocusedTranslatorInvocation,
-} from './skills/builtin/translator'
+  createDirectDocumentAssistantThreadId,
+  resolveDirectDocumentAssistantInvocation,
+} from './skills/direct-invocations/document-assistant'
+import {
+  createDirectTranslatorThreadId,
+  resolveDirectTranslatorInvocation,
+} from './skills/direct-invocations/translator'
 
 interface AgentRunnerLogger {
   warn: (payload: Record<string, unknown>, message?: string) => void
@@ -205,15 +209,24 @@ export async function executeAgentGeneration(input: {
   const profileConfig = AgentProfileConfigSchema.parse(input.bootstrap.agentProfile.currentConfig)
   const skillCredentials = AgentRuntimeSkillCredentialsSchema.parse(input.bootstrap.skillCredentials)
   const threadId = input.bootstrap.context.threadId
-  const focusedTranslatorInvocation = resolveFocusedTranslatorInvocation({
+  const directTranslatorInvocation = resolveDirectTranslatorInvocation({
     messages: input.bootstrap.context.messages,
     triggerUserMessageId: input.bootstrap.context.triggerUserMessageId,
     agentProfileConfig: profileConfig,
     skillContext: input.bootstrap.skills,
   })
-  const graphThreadId = focusedTranslatorInvocation
-    ? createFocusedTranslatorThreadId(threadId, input.bootstrap.generation.generationId)
-    : threadId
+  const directDocumentAssistantInvocation = resolveDirectDocumentAssistantInvocation({
+    messages: input.bootstrap.context.messages,
+    contextSnapshots: input.bootstrap.context.contextSnapshots,
+    triggerUserMessageId: input.bootstrap.context.triggerUserMessageId,
+    skillContext: input.bootstrap.skills,
+  })
+  const directInvocation = Boolean(directTranslatorInvocation || directDocumentAssistantInvocation)
+  const graphThreadId = directTranslatorInvocation
+    ? createDirectTranslatorThreadId(threadId, input.bootstrap.generation.generationId)
+    : directDocumentAssistantInvocation
+      ? createDirectDocumentAssistantThreadId(threadId, input.bootstrap.generation.generationId)
+      : threadId
   const result = await input.threadRunTryLock.tryRunExclusive(graphThreadId, async () => {
     if (input.bootstrap.context.messages.length === 0) {
       throw new Error('聊天触发消息不存在')
@@ -224,7 +237,7 @@ export async function executeAgentGeneration(input: {
       : await createStartGraphInput({
           bootstrap: input.bootstrap,
           checkpointer: input.checkpointer,
-          focused: Boolean(focusedTranslatorInvocation),
+          directInvocation,
           threadId,
         })
 
@@ -248,10 +261,11 @@ export async function executeAgentGeneration(input: {
         modelOptions: toChatModelOptions(profileConfig),
         modelTarget: input.bootstrap.runtimeModelTarget,
         memoryIgnoredForRun: input.bootstrap.context.memory.ignoredForRun,
-        focusedTranslatorInvocation,
+        directDocumentAssistantInvocation,
+        directTranslatorInvocation,
         triggerUserMessageId: input.bootstrap.context.triggerUserMessageId,
-        contextSnapshots: focusedTranslatorInvocation ? [] : input.bootstrap.context.contextSnapshots,
-        inputAttachments: focusedTranslatorInvocation ? [] : input.bootstrap.context.inputAttachments,
+        contextSnapshots: directTranslatorInvocation ? [] : input.bootstrap.context.contextSnapshots,
+        inputAttachments: directInvocation ? [] : input.bootstrap.context.inputAttachments,
         onStreamPart: async (part: AgentModelStreamPart) => await emitAgentModelStreamPart(part, {
           emit: input.emit,
           generationId: input.bootstrap.generation.generationId,
@@ -288,15 +302,15 @@ async function createStartGraphInput(input: {
   bootstrap: ReturnType<typeof ChatGenerationBootstrapSchema.parse>
   checkpointer?: BaseCheckpointSaver
   threadId: string
-  focused: boolean
+  directInvocation: boolean
 }) {
-  const checkpointState = input.focused
+  const checkpointState = input.directInvocation
     ? null
     : await readAgentCheckpointState(input.checkpointer, input.threadId)
   const graphInputDecision = resolveAgentGraphInput(
     input.bootstrap.context,
     checkpointState,
-    { focused: input.focused },
+    { directInvocation: input.directInvocation },
   )
 
   if (graphInputDecision.shouldResetCheckpoint) {

@@ -10,7 +10,8 @@ export type { BlockMenuAlignAction, BlockMenuQuickAction, TextAlignAction } from
 
 export type BlockMenuTextAlign = 'left' | 'center' | 'right'
 export type BlockMenuPanelAction = 'align' | 'color'
-export type BlockMenuAction = BlockMenuPanelAction | BlockMenuLeafAction
+export type BlockMenuAssistantAction = 'rewrite-block'
+export type BlockMenuAction = BlockMenuPanelAction | BlockMenuLeafAction | BlockMenuAssistantAction
 
 /** 菜单颜色项 */
 export interface MenuColorOption {
@@ -87,7 +88,7 @@ export interface BlockMenuActionItem {
   label: string
   icon: string
   kind: 'action'
-  action: BlockMenuLeafAction
+  action: BlockMenuLeafAction | BlockMenuAssistantAction
 }
 
 /** 块菜单对齐面板项 */
@@ -130,7 +131,7 @@ export interface BlockTriggerViewState {
 export interface BlockMenuActionDefinition {
   label: string
   icon: string
-  action: BlockMenuLeafAction
+  action: BlockMenuLeafAction | BlockMenuAssistantAction
   kind: 'action'
 }
 
@@ -299,6 +300,7 @@ export const BLOCK_MENU_VARIANT_REGISTRY = {
       { label: 'Align and indent', icon: 'align', action: 'align', kind: 'panel' },
       { label: 'Color', icon: 'color', action: 'color', kind: 'panel' },
       { label: 'Comment', icon: 'comment', action: 'comment', kind: 'action' },
+      { label: 'Rewrite this block', icon: 'edit', action: 'rewrite-block', kind: 'action' },
       { label: 'Cut', icon: 'cut', action: 'cut', kind: 'action' },
       { label: 'Copy', icon: 'copy', action: 'copy', kind: 'action' },
       { label: 'Delete', icon: 'delete', action: 'delete', kind: 'action' },

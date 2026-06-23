@@ -34,6 +34,8 @@ const {
   visible,
 } = useBlockTriggerMenu({
   editor: props.editor,
+  aiBlockRewriteEnabled: props.aiBlockRewriteEnabled,
+  onRequestAiBlockRewrite: request => emits('requestAiBlockRewrite', request),
   onRequestComment: request => emits('requestComment', request),
   uploadImage: props.uploadImage,
   uploadFile: props.uploadFile,
@@ -63,6 +65,7 @@ defineExpose<BlockTriggerMenuExposed>({
     v-if="shouldRenderTriggerMenu"
     class="tiptap-block-trigger-anchor"
     :style="anchorStyle"
+    @click="openMenu"
     @mouseenter="handleTriggerMouseEnter"
     @mouseleave="handleTriggerMouseLeave"
   >

@@ -23,6 +23,7 @@ import { ElMessage } from '@/utils/element-plus'
 const HIGHLIGHT_DURATION_MS = 1400
 
 export type ChatComposerBeforeSendHandler = (payload: ChatComposerSubmitPayload) => ChatComposerSubmitPayload
+export type ChatComposerAfterSendHandler = (payload: ChatComposerSubmitPayload) => void
 
 export interface ChatComposerHostModel {
   composerSelectedModelRef: ComputedRef<ChatComposerModelRef | null>
@@ -43,6 +44,7 @@ export function createChatComposerHostState(options: {
   const attachments = shallowRef<ChatComposerAttachment[]>([])
   const highlightAttachmentId = shallowRef<string | null>(null)
   const beforeSendHandlers = new Set<ChatComposerBeforeSendHandler>()
+  const afterSendHandlers = new Set<ChatComposerAfterSendHandler>()
   const uploadAvailability = computed<ChatComposerUploadAvailability>(() => {
     const selectedModel = options.model.composerSelectedModel.value
     const imageDisabled = isModelMissingInputModality(selectedModel, AI_MODEL_MODALITY.IMAGE)
@@ -73,6 +75,12 @@ export function createChatComposerHostState(options: {
     return () => beforeSendHandlers.delete(handler)
   }
 
+  function registerAfterSendHandler(handler: ChatComposerAfterSendHandler) {
+    afterSendHandlers.add(handler)
+
+    return () => afterSendHandlers.delete(handler)
+  }
+
   function applyBeforeSendHandlers(payload: ChatComposerSubmitPayload) {
     let nextPayload = payload
 
@@ -81,6 +89,12 @@ export function createChatComposerHostState(options: {
     }
 
     return nextPayload
+  }
+
+  function notifyAfterSendHandlers(payload: ChatComposerSubmitPayload) {
+    for (const handler of afterSendHandlers) {
+      handler(payload)
+    }
   }
 
   async function handleSend(payload: ChatComposerSubmitPayload) {
@@ -105,6 +119,7 @@ export function createChatComposerHostState(options: {
       return false
     }
 
+    notifyAfterSendHandlers(nextPayload)
     resetComposer()
     options.model.clearNewSessionModelDraft()
     return true
@@ -234,6 +249,7 @@ export function createChatComposerHostState(options: {
     handleSend,
     highlightAttachment,
     highlightAttachmentId,
+    registerAfterSendHandler,
     registerBeforeSendHandler,
     resetComposer,
     uploadAvailability,

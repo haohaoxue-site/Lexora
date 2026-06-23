@@ -1,15 +1,28 @@
 import type {
+  AgentDocumentAssistantEditIntent,
+} from '@haohaoxue/lexora-contracts/agent'
+import type {
   ChatComposerAttachment,
   ChatComposerContentJSON,
   ChatComposerDocumentAttachment,
   ChatComposerDocumentScope,
+  ChatComposerDocumentSelectionScope,
 } from './typing'
+import {
+  AGENT_DOCUMENT_ASSISTANT_EDIT_INTENT,
+} from '@haohaoxue/lexora-contracts/agent'
 import {
   CHAT_MESSAGE_ATTACHMENT_PLACEMENT,
   CHAT_MESSAGE_ATTACHMENT_TYPE,
 } from '@haohaoxue/lexora-contracts/chat/constants'
 import { translate } from '@/i18n'
 import { serializeChatComposerContent } from './serialization'
+
+export type DocumentSelectionDisplayMode = 'selection' | 'continue' | 'rewrite'
+
+export interface AttachmentDisplayLabelOptions {
+  documentSelectionDisplayMode?: DocumentSelectionDisplayMode | null
+}
 
 export function orderChatComposerAttachments(
   attachments: ChatComposerAttachment[],
@@ -50,14 +63,31 @@ export function findDuplicatePanelAttachment(
   ) ?? null
 }
 
-export function getAttachmentDisplayLabel(attachment: ChatComposerAttachment): string {
+export function getAttachmentDisplayLabel(
+  attachment: ChatComposerAttachment,
+  options: AttachmentDisplayLabelOptions = {},
+): string {
   if (attachment.type !== CHAT_MESSAGE_ATTACHMENT_TYPE.DOCUMENT) {
     return attachment.fileName
   }
 
-  return attachment.scope.kind === 'selection'
-    ? `${translate('chat.composer.currentSelection')} · ${attachment.title}`
-    : attachment.title
+  if (!isDocumentSelectionAttachment(attachment)) {
+    return attachment.title
+  }
+
+  return getDocumentSelectionAttachmentLabel(attachment, options)
+}
+
+export function getDocumentSelectionDisplayModeFromIntent(
+  intent: AgentDocumentAssistantEditIntent | null | undefined,
+): DocumentSelectionDisplayMode | null {
+  if (!intent) {
+    return null
+  }
+
+  return intent === AGENT_DOCUMENT_ASSISTANT_EDIT_INTENT.CONTINUE_AT_ANCHOR
+    ? 'continue'
+    : 'rewrite'
 }
 
 export function isSameDocumentScope(left: ChatComposerDocumentScope, right: ChatComposerDocumentScope): boolean {
@@ -76,4 +106,54 @@ export function isSameDocumentScope(left: ChatComposerDocumentScope, right: Chat
     && left.to.offset === right.to.offset
     && left.blockIds.length === right.blockIds.length
     && left.blockIds.every((blockId, index) => blockId === right.blockIds[index])
+}
+
+function getDocumentSelectionAttachmentLabel(
+  attachment: ChatComposerDocumentAttachment & { scope: ChatComposerDocumentSelectionScope },
+  options: AttachmentDisplayLabelOptions,
+) {
+  const location = formatDocumentSelectionLocation(attachment.scope)
+  const labelKey = getDocumentSelectionLabelKey(options.documentSelectionDisplayMode)
+
+  return translate(labelKey, {
+    location,
+    title: attachment.title,
+  })
+}
+
+function isDocumentSelectionAttachment(
+  attachment: ChatComposerDocumentAttachment,
+): attachment is ChatComposerDocumentAttachment & { scope: ChatComposerDocumentSelectionScope } {
+  return attachment.scope.kind === 'selection'
+}
+
+function formatDocumentSelectionLocation(scope: ChatComposerDocumentSelectionScope) {
+  const from = formatDocumentSelectionBoundary(scope.from)
+  const to = formatDocumentSelectionBoundary(scope.to)
+
+  if (from === to) {
+    return from
+  }
+
+  return `${from}-${to}`
+}
+
+function getDocumentSelectionLabelKey(mode: DocumentSelectionDisplayMode | null | undefined) {
+  if (mode === 'continue') {
+    return 'chat.composer.documentAssistantContinueContext'
+  }
+
+  if (mode === 'rewrite') {
+    return 'chat.composer.documentAssistantRewriteContext'
+  }
+
+  return 'chat.composer.currentSelectionContext'
+}
+
+function getSelectionBoundaryPosition(boundary: ChatComposerDocumentSelectionScope['from']) {
+  return boundary.position ?? boundary.offset
+}
+
+function formatDocumentSelectionBoundary(boundary: ChatComposerDocumentSelectionScope['from']) {
+  return `${boundary.blockId}#${getSelectionBoundaryPosition(boundary)}`
 }

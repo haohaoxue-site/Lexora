@@ -16,7 +16,7 @@ export interface AgentGraphInput {
 }
 
 export interface AgentGraphInputDecision {
-  mode: 'cold-start' | 'continue' | 'focused'
+  mode: 'cold-start' | 'continue' | 'direct-invocation'
   shouldResetCheckpoint: boolean
   graphInput: AgentGraphInput
 }
@@ -24,13 +24,13 @@ export interface AgentGraphInputDecision {
 export function resolveAgentGraphInput(
   runtimeContext: AgentChatRuntimeContext,
   checkpointState: AgentCheckpointState | null,
-  options: { focused?: boolean } = {},
+  options: { directInvocation?: boolean } = {},
 ): AgentGraphInputDecision {
   const triggerUserMessage = readTriggerUserMessage(runtimeContext)
 
-  if (options.focused) {
+  if (options.directInvocation) {
     return {
-      mode: 'focused',
+      mode: 'direct-invocation',
       shouldResetCheckpoint: false,
       graphInput: {
         sessionId: runtimeContext.sessionId,

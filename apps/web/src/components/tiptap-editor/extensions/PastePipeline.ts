@@ -13,11 +13,11 @@ import {
   LEXORA_BLOCK_CLIPBOARD_TYPE,
   parseStructuredClipboardContent,
 } from '../content/blockClipboard'
-import { createFilePasteContent } from '../content/pasteContent'
 import {
-  createTextInsertContent,
-  hasTextInsertMarkdownBlockContent,
-} from '../content/textInsertContent'
+  createMarkdownInsertContent,
+  hasMarkdownInsertBlockSyntax,
+} from '../content/markdownContent'
+import { createFilePasteContent } from '../content/pasteContent'
 import { uploadImagesWithPlaceholder } from './ImageUploadPlaceholder'
 
 export interface PastePipelineOptions {
@@ -93,7 +93,7 @@ function handleEditorPaste(editor: Editor, event: ClipboardEvent, options: Paste
     return editor
       .chain()
       .focus()
-      .insertContent(createTextInsertContent(text, { markdownBlocks: true }))
+      .insertContent(createMarkdownInsertContent(editor, text))
       .run()
   }
 
@@ -123,6 +123,10 @@ function shouldInsertPlainTextInline(editor: Editor, text: string, html: string,
     return false
   }
 
+  if (hasMarkdownInsertBlockSyntax(text)) {
+    return false
+  }
+
   if (html.length && !preferPlain) {
     return false
   }
@@ -137,7 +141,7 @@ function shouldInsertPlainTextInline(editor: Editor, text: string, html: string,
 function shouldInsertMarkdownTextBlocks(text: string, html: string, preferPlain: boolean) {
   return !preferPlain
     && text.length > 0
-    && hasTextInsertMarkdownBlockContent(text)
+    && hasMarkdownInsertBlockSyntax(text)
     && !hasSemanticCodeBlockHtml(html)
 }
 
