@@ -67,11 +67,9 @@ function formatHumanMessageContent(
 function formatAttachmentContentBlock(attachment: AgentChatAttachmentContent): Record<string, unknown> {
   if (attachment.type === CHAT_MESSAGE_ATTACHMENT_TYPE.IMAGE) {
     return {
-      type: 'image',
-      data: attachment.contentBase64,
-      mimeType: attachment.mimeType,
-      metadata: {
-        filename: attachment.fileName,
+      type: 'image_url',
+      image_url: {
+        url: `data:${attachment.mimeType};base64,${attachment.contentBase64}`,
       },
     }
   }
