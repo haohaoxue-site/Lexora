@@ -48,7 +48,12 @@ export function createChatSessionEvents(api: ChatApi) {
         await eventHandler?.(event)
       },
       { signal: controller.signal },
-    ).catch((error) => {
+    ).then(() => {
+      if (eventSessionId === sessionId && eventController === controller) {
+        eventController = null
+        reconnectAttempt = 0
+      }
+    }).catch((error) => {
       if (isAbortError(error)) {
         return
       }
@@ -56,15 +61,10 @@ export function createChatSessionEvents(api: ChatApi) {
       if (eventSessionId === sessionId && eventController === controller) {
         eventController = null
         scheduleReconnect()
+        return
       }
-      else {
-        ElMessage.error(getRequestErrorDisplayMessage(error, translate('chat.errors.loadEvents')))
-      }
-    }).finally(() => {
-      if (eventSessionId === sessionId && eventController === controller) {
-        eventController = null
-        scheduleReconnect()
-      }
+
+      ElMessage.error(getRequestErrorDisplayMessage(error, translate('chat.errors.loadEvents')))
     })
   }
 
