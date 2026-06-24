@@ -1,9 +1,13 @@
 import type { TiptapJsonContent } from '@haohaoxue/lexora-contracts'
+import type { AgentDocumentAssistantEditIntent } from '@haohaoxue/lexora-contracts/agent'
 import type { Editor } from '@tiptap/core'
 import type { Node as ProseMirrorNode } from '@tiptap/pm/model'
 import type { Transaction } from '@tiptap/pm/state'
 import type { ChatComposerDocumentSelectionScope } from '@/components/chat-composer'
-import { AGENT_DOCUMENT_ASSISTANT_ANCHOR_CONTEXT_MAX_LENGTH } from '@haohaoxue/lexora-contracts/agent'
+import {
+  AGENT_DOCUMENT_ASSISTANT_ANCHOR_CONTEXT_MAX_LENGTH,
+  AGENT_DOCUMENT_ASSISTANT_EDIT_INTENT,
+} from '@haohaoxue/lexora-contracts/agent'
 import {
   BODY_BLOCK_ID_ATTRIBUTE,
   isAddressableBodyBlock,
@@ -36,6 +40,10 @@ export interface DocsSelectionSnapshot {
   scope: ChatComposerDocumentSelectionScope
   snapshot: string
   size: number
+}
+
+export interface CreateDocsSelectionSnapshotOptions {
+  intent?: AgentDocumentAssistantEditIntent | null
 }
 
 export interface DocsBlockLiveRange extends DocsSelectionLiveRange {
@@ -80,6 +88,7 @@ export function resolveDocsSelectionScope(
 export function createDocsSelectionSnapshot(
   editor: Editor,
   range: DocsSelectionLiveRange,
+  options: CreateDocsSelectionSnapshotOptions = {},
 ): DocsSelectionSnapshot | null {
   const normalizedRange = normalizeDocsSelectionRange(range)
 
@@ -87,17 +96,18 @@ export function createDocsSelectionSnapshot(
     return null
   }
 
-  const scope = resolveDocsSelectionScope(editor.state.doc, normalizedRange.from, normalizedRange.to)
+  const snapshotRange = resolveSnapshotRangeForIntent(normalizedRange, options.intent)
+  const scope = resolveDocsSelectionScope(editor.state.doc, snapshotRange.from, snapshotRange.to)
 
   if (!scope) {
     return null
   }
 
-  const content = normalizedRange.from === normalizedRange.to
+  const content = snapshotRange.from === snapshotRange.to
     ? null
-    : selectionSliceToContent(editor.state.doc, normalizedRange)
-  const snapshot = normalizedRange.from === normalizedRange.to
-    ? createDocsAnchorMarkdownSnapshot(editor.state.doc, normalizedRange.from)
+    : selectionSliceToContent(editor.state.doc, snapshotRange)
+  const snapshot = snapshotRange.from === snapshotRange.to
+    ? createDocsAnchorMarkdownSnapshot(editor.state.doc, snapshotRange.from)
     : createDocsSelectionMarkdownSnapshot(content ?? [])
 
   return {
@@ -269,6 +279,20 @@ function normalizeDocsSelectionRange(range: DocsSelectionLiveRange): DocsSelecti
   return {
     from,
     to,
+  }
+}
+
+function resolveSnapshotRangeForIntent(
+  range: DocsSelectionLiveRange,
+  intent: AgentDocumentAssistantEditIntent | null | undefined,
+): DocsSelectionLiveRange {
+  if (intent !== AGENT_DOCUMENT_ASSISTANT_EDIT_INTENT.CONTINUE_AT_ANCHOR) {
+    return range
+  }
+
+  return {
+    from: range.to,
+    to: range.to,
   }
 }
 

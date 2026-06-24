@@ -144,7 +144,9 @@ export function createDocsChatContextBridgeController(options: {
       return false
     }
 
-    const snapshot = createDocsSelectionSnapshot(request.editor, range)
+    const snapshot = createDocsSelectionSnapshot(request.editor, range, {
+      intent: options.panel.documentAssistantEditIntent.value,
+    })
 
     if (!snapshot) {
       return false
@@ -341,6 +343,8 @@ export function createDocsChatContextBridgeController(options: {
         : createDocsSelectionSnapshot(anchor.editor, {
             from: sourceRange.from,
             to: sourceRange.to,
+          }, {
+            intent: options.panel.documentAssistantEditIntent.value,
           })
 
       if (!snapshot) {
@@ -487,7 +491,7 @@ export function createDocsChatContextBridgeController(options: {
           from: selection.from,
           to: selection.to,
         }
-    const snapshot = createDocsSelectionSnapshot(selection.editor, range)
+    const snapshot = createDocsSelectionSnapshot(selection.editor, range, { intent })
 
     if (!snapshot) {
       return null
