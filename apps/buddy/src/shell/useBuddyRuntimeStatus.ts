@@ -1,5 +1,4 @@
 import type {
-  BuddyApproval,
   BuddyAppSettings,
   BuddyClaudeRuntimeStatus,
   BuddyCodexRuntimeStatus,
@@ -16,8 +15,6 @@ import { onMounted, onUnmounted, readonly, shallowRef } from 'vue'
 import { createAsyncEventQueue } from '@/lib/asyncEventQueue'
 import { isTauriRuntime, normalizeBuddyCommandError } from '@/lib/invokeClient'
 import {
-  approveBuddyCodexAppServerRequestApproval,
-  approveBuddyReadOnlyTask,
   countBuddyRunEvents,
   createBrowserAppSettings,
   createBrowserClaudeRuntimeStatus,
@@ -26,8 +23,6 @@ import {
   createBrowserRuntimeDiagnostics,
   createBrowserRuntimeStatus,
   createBrowserUsageSnapshot,
-  denyBuddyApproval,
-  listBuddyApprovals,
   listBuddyRunEventSummaries,
   listBuddyRuns,
   listenBuddyAppSettingsChanged,
@@ -44,7 +39,6 @@ import { createBuddyRuntimeRefreshPlan } from '@/shell/buddyRuntimeRefreshPlan'
 
 const BUDDY_BACKEND_STATUS_MIN_REFRESH_MS = 60_000
 const BUDDY_USAGE_SNAPSHOT_MIN_REFRESH_MS = 3 * 60_000
-const CODEX_APP_SERVER_REQUEST_APPROVAL_KIND = 'run.codex_app_server_request'
 
 interface LoadedRuntimeValue<T> {
   loadedAt: number | null
@@ -73,12 +67,9 @@ export function useBuddyRuntimeStatus() {
   const runs = shallowRef<ReadonlyArray<BuddyRun>>([])
   const runEventCounts = shallowRef<ReadonlyArray<BuddyRunEventCount>>([])
   const runEventSummaries = shallowRef<ReadonlyArray<BuddyRunEventSummary>>([])
-  const approvals = shallowRef<ReadonlyArray<BuddyApproval>>([])
   const errorMessage = shallowRef<string | null>(null)
-  const isResolvingApproval = shallowRef(false)
   const isLoadingRunEventSummaries = shallowRef(false)
   const isUpdatingAppSettings = shallowRef(false)
-  const isLoading = shallowRef(false)
   let unlistenAppSettingsChanged: (() => void) | null = null
   let selectedRunEventSummaryRunId: string | null = null
   let runEventSummaryRequestId = 0
@@ -101,7 +92,6 @@ export function useBuddyRuntimeStatus() {
   async function refresh() {
     const generation = ++refreshGeneration
     const plan = createBuddyRuntimeRefreshPlan()
-    isLoading.value = true
     errorMessage.value = null
 
     try {
@@ -110,13 +100,11 @@ export function useBuddyRuntimeStatus() {
         settings,
         localStateStatus,
         runList,
-        approvalList,
       ] = await Promise.all([
         loadBuddyRuntimeStatus(),
         loadBuddyAppSettings(),
         loadBuddyLocalStateStatus(),
         listBuddyRuns(),
-        listBuddyApprovals({ status: 'pending' }),
       ])
       if (generation !== refreshGeneration)
         return
@@ -124,7 +112,6 @@ export function useBuddyRuntimeStatus() {
       status.value = runtimeStatus
       appSettings.value = settings
       localState.value = localStateStatus
-      approvals.value = approvalList
       runs.value = runList
       queueBackgroundRefresh(plan.backgroundTasks, runList, generation)
     }
@@ -136,15 +123,10 @@ export function useBuddyRuntimeStatus() {
       runtimeDiagnostics.value = createBrowserRuntimeDiagnostics()
       localState.value = createBrowserLocalStateStatus()
       usageSnapshot.value = createBrowserUsageSnapshot()
-      approvals.value = []
       runs.value = []
       runEventCounts.value = []
       clearRunEventSummarySelection()
       errorMessage.value = normalizeBuddyCommandError(error).message
-    }
-    finally {
-      if (generation === refreshGeneration)
-        isLoading.value = false
     }
   }
 
@@ -363,56 +345,6 @@ export function useBuddyRuntimeStatus() {
     }
   }
 
-  async function approveApproval(approvalId: string, approvalKind: string) {
-    if (!approvalId || isResolvingApproval.value)
-      return false
-
-    isResolvingApproval.value = true
-    errorMessage.value = null
-
-    try {
-      if (approvalKind === CODEX_APP_SERVER_REQUEST_APPROVAL_KIND)
-        await approveBuddyCodexAppServerRequestApproval(approvalId)
-      else
-        await approveBuddyReadOnlyTask(approvalId)
-
-      await refresh()
-      return true
-    }
-    catch (error) {
-      const message = normalizeBuddyCommandError(error).message
-      await refresh()
-      errorMessage.value = message
-      return false
-    }
-    finally {
-      isResolvingApproval.value = false
-    }
-  }
-
-  async function denyApproval(approvalId: string) {
-    if (!approvalId || isResolvingApproval.value)
-      return false
-
-    isResolvingApproval.value = true
-    errorMessage.value = null
-
-    try {
-      await denyBuddyApproval(approvalId)
-      await refresh()
-      return true
-    }
-    catch (error) {
-      const message = normalizeBuddyCommandError(error).message
-      await refresh()
-      errorMessage.value = message
-      return false
-    }
-    finally {
-      isResolvingApproval.value = false
-    }
-  }
-
   onMounted(() => {
     void refresh()
     void listenBuddyAppSettingsChanged((settings) => {
@@ -432,16 +364,11 @@ export function useBuddyRuntimeStatus() {
 
   return {
     appSettings: readonly(appSettings),
-    approvals: readonly(approvals),
-    approveApproval,
     runtimeDiagnostics: readonly(runtimeDiagnostics),
     claudeRuntimeStatus: readonly(claudeRuntimeStatus),
     codexRuntimeStatus: readonly(codexRuntimeStatus),
-    denyApproval,
     errorMessage: readonly(errorMessage),
-    isLoading: readonly(isLoading),
     isLoadingRunEventSummaries: readonly(isLoadingRunEventSummaries),
-    isResolvingApproval: readonly(isResolvingApproval),
     isUpdatingAppSettings: readonly(isUpdatingAppSettings),
     localState: readonly(localState),
     loadRunEventSummaries,

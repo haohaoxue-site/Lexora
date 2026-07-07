@@ -8,16 +8,11 @@ import { useBuddyRuntimeStatus } from '@/shell/useBuddyRuntimeStatus'
 
 const {
   appSettings,
-  approvals,
-  approveApproval,
   runtimeDiagnostics,
   claudeRuntimeStatus,
   codexRuntimeStatus,
-  denyApproval,
   errorMessage,
-  isLoading,
   isLoadingRunEventSummaries,
-  isResolvingApproval,
   isUpdatingAppSettings,
   localState,
   loadRunEventSummaries,
@@ -46,14 +41,11 @@ useBuddyContextMenuGuard(() => appSettings.value.allowNativeContextMenu)
         <div class="buddy-shell__panel">
           <BuddyControlPanel
             :app-settings="appSettings"
-            :approvals="approvals"
             :runtime-diagnostics="runtimeDiagnostics"
             :claude-runtime-status="claudeRuntimeStatus"
             :codex-runtime-status="codexRuntimeStatus"
             :error-message="errorMessage"
-            :is-loading="isLoading"
             :is-loading-run-event-summaries="isLoadingRunEventSummaries"
-            :is-resolving-approval="isResolvingApproval"
             :is-updating-app-settings="isUpdatingAppSettings"
             :language="locale"
             :local-state="localState"
@@ -62,8 +54,6 @@ useBuddyContextMenuGuard(() => appSettings.value.allowNativeContextMenu)
             :runs="runs"
             :runtime-status="status"
             :usage-snapshot="usageSnapshot"
-            @approve-approval="approveApproval"
-            @deny-approval="denyApproval"
             @select-log-run="loadRunEventSummaries"
             @update-app-settings="updateAppSettings"
           />

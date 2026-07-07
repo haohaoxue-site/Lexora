@@ -23,6 +23,7 @@ gdk = "0.18"
 gdk-pixbuf = "0.18"
 glib = "0.18"
 gtk = "0.18"
+libc = "0.2"
 libloading = "0.7"
 rusqlite = { version = "0.37", features = [ "bundled" ] }
 serde = { version = "1", features = [ "derive" ] }

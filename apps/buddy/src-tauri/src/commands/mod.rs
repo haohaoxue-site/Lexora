@@ -1,5 +1,5 @@
 use std::{
-    collections::HashMap,
+    collections::{BTreeSet, HashMap},
     fs,
     path::{Component, Path, PathBuf},
     sync::{
@@ -50,10 +50,14 @@ type BuddyCommandResult<T> = Result<T, BuddyCommandError>;
 
 const BUDDY_ANIMATION_INTENT_START_TAG: &str = "<lexora_buddy_animation_intent>";
 const BUDDY_ANIMATION_INTENT_END_TAG: &str = "</lexora_buddy_animation_intent>";
+const BUDDY_HOST_ACTION_START_TAG: &str = "<lexora_buddy_host_action>";
+const BUDDY_HOST_ACTION_END_TAG: &str = "</lexora_buddy_host_action>";
 const CODEX_APP_SERVER_APPROVAL_POLL_INTERVAL_MS: u64 = 250;
 const CODEX_APP_SERVER_APPROVAL_WAIT_TIMEOUT_MS: u64 = 30 * 60 * 1000;
 const BUDDY_CLIPBOARD_FILE_COUNT_LIMIT: usize = 16;
 const BUDDY_CLIPBOARD_FILE_MAX_BYTES: u64 = 8 * 1024 * 1024;
+const BUDDY_HOST_SKILL_NAME: &str = "lexora-buddy-host";
+const BUDDY_HOST_ACTION_SOURCE: &str = "buddy_builtin_host_skill";
 const CODEX_APPROVAL_SCOPE_DECISION_AUTO_DENIED: &str = "auto_denied";
 const CODEX_APPROVAL_SCOPE_DECISION_REQUIRES_USER_REVIEW: &str = "requires_user_review";
 const CODEX_APPROVAL_SCOPE_STATUS_AUTHORIZED: &str = "authorized";
@@ -512,6 +516,14 @@ pub fn set_buddy_native_pet_animation(
     animation: String,
 ) -> BuddyCommandResult<()> {
     Ok(pet_process.set_animation(&animation)?)
+}
+
+#[tauri::command]
+pub fn control_buddy_native_pet_host_action(
+    pet_process: State<'_, NativePetSidecarProcess>,
+    action: serde_json::Value,
+) -> BuddyCommandResult<()> {
+    Ok(pet_process.control_host_action(action)?)
 }
 
 fn buddy_current_window_frame_state(window: &Window) -> BuddyCommandResult<BuddyWindowFrameState> {
@@ -1445,13 +1457,13 @@ fn create_buddy_agent_turn_plan(
 
     let runtime_content =
         compose_buddy_chat_runtime_content(&content, &attachments, &context_items);
-    let builtin_animation_skill =
-        create_buddy_builtin_animation_skill_input(Path::new(&state.global_runtime_cwd()))?;
+    let builtin_host_skill =
+        create_buddy_builtin_host_skill_input(Path::new(&state.global_runtime_cwd()))?;
     let runtime_inputs = compose_buddy_chat_codex_inputs(
         &runtime_content,
         inputs,
         &attachments,
-        Some(builtin_animation_skill),
+        Some(builtin_host_skill),
     )?;
     let attachment_count = attachments.len();
     let external_thread_id = state
@@ -1976,7 +1988,6 @@ fn create_codex_app_server_approval_scope(
             target_root,
         };
     }
-
     CodexAppServerApprovalScope {
         authorization_root,
         cwd,
@@ -1996,6 +2007,10 @@ fn is_supported_codex_app_server_approval_method(method: &str) -> bool {
 
 fn normalize_absolute_scope_path(path: &str) -> Option<PathBuf> {
     let path = Path::new(path.trim());
+    normalize_absolute_scope_path_buf(path)
+}
+
+fn normalize_absolute_scope_path_buf(path: &Path) -> Option<PathBuf> {
     if !path.is_absolute() {
         return None;
     }
@@ -2159,6 +2174,14 @@ fn execute_existing_codex_read_only_run(
     events.extend(runtime_result.projected_events);
 
     let runtime_output = runtime_result.output;
+    append_buddy_host_action_events(
+        &storage,
+        &run.id,
+        &mut events,
+        target.event_session_id(),
+        &event_publisher,
+        &runtime_output,
+    )?;
     let assistant_content = create_codex_assistant_display_content(&runtime_output.final_message);
     abort_if_buddy_run_cancelled(
         &storage,
@@ -2605,12 +2628,385 @@ fn create_runtime_error_memory_eligibility_payload() -> serde_json::Value {
 }
 
 fn create_codex_assistant_display_content(final_message: &str) -> String {
-    let display_content = strip_buddy_animation_intent_blocks(final_message);
+    let display_content = strip_buddy_host_action_blocks(final_message);
     if display_content.is_empty() {
         "Codex 已完成，但没有返回可展示文本。".to_owned()
     } else {
         display_content
     }
+}
+
+fn append_buddy_host_action_events(
+    storage: &BuddyStorage,
+    run_id: &str,
+    events: &mut Vec<BuddyRunEvent>,
+    session_id: Option<&str>,
+    event_publisher: &BuddyRunStateEventPublisher,
+    runtime_output: &CodexRuntimeOutput,
+) -> Result<(), BuddyError> {
+    for payload in collect_buddy_host_action_payloads(runtime_output, events) {
+        let event = storage.append_run_event(CreateBuddyRunEventRequest {
+            event_type: BuddyRunEventType::HostAction.as_str().to_owned(),
+            payload,
+            run_id: run_id.to_owned(),
+        })?;
+        event_publisher.emit_event(&event, session_id);
+        events.push(event);
+    }
+
+    Ok(())
+}
+
+fn collect_buddy_host_action_payloads(
+    runtime_output: &CodexRuntimeOutput,
+    events: &[BuddyRunEvent],
+) -> Vec<serde_json::Value> {
+    let mut seen = BTreeSet::new();
+    let mut payloads = Vec::new();
+    let mut streamed_message = String::new();
+
+    for event in events {
+        if event.event_type != "message.delta" {
+            continue;
+        }
+        if let Some(delta) = read_json_string_field(&event.payload, "delta") {
+            streamed_message.push_str(&delta);
+        }
+    }
+
+    for content in [&streamed_message, runtime_output.final_message.as_str()] {
+        for payload in extract_buddy_host_action_payloads(content) {
+            let key = serde_json::to_string(&payload).unwrap_or_default();
+            if seen.insert(key) {
+                payloads.push(payload);
+            }
+        }
+    }
+
+    payloads
+}
+
+fn extract_buddy_host_action_payloads(content: &str) -> Vec<serde_json::Value> {
+    let host_actions = extract_buddy_json_tag_payloads(
+        content,
+        BUDDY_HOST_ACTION_START_TAG,
+        BUDDY_HOST_ACTION_END_TAG,
+    )
+    .into_iter()
+    .filter_map(normalize_buddy_host_action_payload);
+
+    let legacy_intents = extract_buddy_json_tag_payloads(
+        content,
+        BUDDY_ANIMATION_INTENT_START_TAG,
+        BUDDY_ANIMATION_INTENT_END_TAG,
+    )
+    .into_iter()
+    .filter_map(normalize_buddy_legacy_animation_intent_payload);
+
+    host_actions.chain(legacy_intents).collect()
+}
+
+fn extract_buddy_json_tag_payloads(
+    content: &str,
+    start_tag: &str,
+    end_tag: &str,
+) -> Vec<serde_json::Value> {
+    let mut payloads = Vec::new();
+    let mut remaining = content;
+
+    while let Some(start_index) = remaining.find(start_tag) {
+        let body_start = start_index + start_tag.len();
+        let Some(end_offset) = remaining[body_start..].find(end_tag) else {
+            break;
+        };
+        let body_end = body_start + end_offset;
+        let body = remaining[body_start..body_end].trim();
+        if let Ok(value) = serde_json::from_str::<serde_json::Value>(body) {
+            payloads.push(value);
+        }
+        let after_end = body_end + end_tag.len();
+        remaining = &remaining[after_end..];
+    }
+
+    payloads
+}
+
+fn normalize_buddy_host_action_payload(value: serde_json::Value) -> Option<serde_json::Value> {
+    let object = value.as_object()?;
+
+    match read_buddy_json_trimmed_string(object, "action")? {
+        "animation" => normalize_buddy_host_animation_action_payload(object),
+        "move" => normalize_buddy_host_move_action_payload(object),
+        "sequence" => normalize_buddy_host_sequence_action_payload(object),
+        _ => None,
+    }
+}
+
+fn normalize_buddy_host_animation_action_payload(
+    object: &serde_json::Map<String, serde_json::Value>,
+) -> Option<serde_json::Value> {
+    let animation = read_buddy_json_trimmed_string(object, "animation")?;
+    if !is_buddy_host_animation_name(animation) {
+        return None;
+    }
+
+    let mut payload = serde_json::json!({
+        "version": 1,
+        "action": "animation",
+        "animation": animation,
+        "source": BUDDY_HOST_ACTION_SOURCE,
+    });
+    append_buddy_host_animation_fields(&mut payload, object)?;
+    Some(payload)
+}
+
+fn normalize_buddy_host_move_action_payload(
+    object: &serde_json::Map<String, serde_json::Value>,
+) -> Option<serde_json::Value> {
+    let target = normalize_buddy_host_move_target(object.get("target")?)?;
+    let mut payload = serde_json::json!({
+        "version": 1,
+        "action": "move",
+        "target": target,
+        "source": BUDDY_HOST_ACTION_SOURCE,
+    });
+    append_buddy_host_move_fields(&mut payload, object)?;
+    Some(payload)
+}
+
+fn normalize_buddy_host_sequence_action_payload(
+    object: &serde_json::Map<String, serde_json::Value>,
+) -> Option<serde_json::Value> {
+    let steps = object.get("steps")?.as_array()?;
+    if steps.is_empty() || steps.len() > 8 {
+        return None;
+    }
+
+    let normalized_steps = steps
+        .iter()
+        .map(normalize_buddy_host_sequence_step)
+        .collect::<Option<Vec<_>>>()?;
+
+    let mut payload = serde_json::json!({
+        "version": 1,
+        "action": "sequence",
+        "steps": normalized_steps,
+        "source": BUDDY_HOST_ACTION_SOURCE,
+    });
+    append_buddy_host_common_fields(&mut payload, object)?;
+    Some(payload)
+}
+
+fn normalize_buddy_host_sequence_step(value: &serde_json::Value) -> Option<serde_json::Value> {
+    let object = value.as_object()?;
+    match read_buddy_json_trimmed_string(object, "type")
+        .or_else(|| read_buddy_json_trimmed_string(object, "action"))?
+    {
+        "animation" => {
+            let animation = read_buddy_json_trimmed_string(object, "animation")?;
+            if !is_buddy_host_animation_name(animation) {
+                return None;
+            }
+            let mut payload = serde_json::json!({
+                "type": "animation",
+                "animation": animation,
+            });
+            append_buddy_host_animation_fields(&mut payload, object)?;
+            Some(payload)
+        }
+        "move" => {
+            let target = normalize_buddy_host_move_target(object.get("target")?)?;
+            let mut payload = serde_json::json!({
+                "type": "move",
+                "target": target,
+            });
+            append_buddy_host_move_fields(&mut payload, object)?;
+            Some(payload)
+        }
+        _ => None,
+    }
+}
+
+fn normalize_buddy_host_move_target(value: &serde_json::Value) -> Option<serde_json::Value> {
+    if let Some(target) = value.as_str().map(str::trim) {
+        return match target {
+            "center" | "home" => Some(serde_json::json!({ "kind": target })),
+            _ => None,
+        };
+    }
+
+    let object = value.as_object()?;
+    match read_buddy_json_trimmed_string(object, "kind")? {
+        "center" => Some(serde_json::json!({ "kind": "center" })),
+        "home" => Some(serde_json::json!({ "kind": "home" })),
+        "edge" => {
+            let edge = read_buddy_json_trimmed_string(object, "edge")?;
+            if !matches!(edge, "left" | "right" | "top" | "bottom") {
+                return None;
+            }
+            Some(serde_json::json!({ "kind": "edge", "edge": edge }))
+        }
+        "position" => {
+            let x = read_buddy_json_i32_field(object, "x")?;
+            let y = read_buddy_json_i32_field(object, "y")?;
+            Some(serde_json::json!({ "kind": "position", "x": x, "y": y }))
+        }
+        "x" => {
+            let x = read_buddy_json_i32_field(object, "x")?;
+            Some(serde_json::json!({ "kind": "x", "x": x }))
+        }
+        _ => None,
+    }
+}
+
+fn normalize_buddy_legacy_animation_intent_payload(
+    value: serde_json::Value,
+) -> Option<serde_json::Value> {
+    let object = value.as_object()?;
+    let intent = read_buddy_json_trimmed_string(object, "intent")?;
+    let animation = map_buddy_legacy_animation_intent_name(intent)?;
+
+    let mut payload = serde_json::json!({
+        "version": 1,
+        "action": "animation",
+        "animation": animation,
+        "source": BUDDY_HOST_ACTION_SOURCE,
+    });
+    append_buddy_host_animation_fields(&mut payload, object)?;
+    Some(payload)
+}
+
+fn append_buddy_host_animation_fields(
+    payload: &mut serde_json::Value,
+    object: &serde_json::Map<String, serde_json::Value>,
+) -> Option<()> {
+    append_buddy_host_common_fields(payload, object)?;
+    if let Some(duration_ms) = object
+        .get("durationMs")
+        .and_then(serde_json::Value::as_u64)
+        .filter(|duration_ms| (100..=30_000).contains(duration_ms))
+    {
+        payload["durationMs"] = serde_json::json!(duration_ms);
+    }
+    Some(())
+}
+
+fn append_buddy_host_move_fields(
+    payload: &mut serde_json::Value,
+    object: &serde_json::Map<String, serde_json::Value>,
+) -> Option<()> {
+    append_buddy_host_common_fields(payload, object)?;
+    if let Some(after) = object
+        .get("after")
+        .and_then(serde_json::Value::as_str)
+        .map(str::trim)
+        .filter(|after| !after.is_empty())
+    {
+        if !is_buddy_host_animation_name(after) {
+            return None;
+        }
+        payload["after"] = serde_json::json!(after);
+    }
+    Some(())
+}
+
+fn append_buddy_host_common_fields(
+    payload: &mut serde_json::Value,
+    object: &serde_json::Map<String, serde_json::Value>,
+) -> Option<()> {
+    if let Some(priority) = object
+        .get("priority")
+        .and_then(serde_json::Value::as_str)
+        .map(str::trim)
+        .filter(|priority| !priority.is_empty())
+    {
+        if !is_buddy_host_action_priority(priority) {
+            return None;
+        }
+        payload["priority"] = serde_json::json!(priority);
+    }
+    if let Some(reason) = object
+        .get("reason")
+        .and_then(serde_json::Value::as_str)
+        .map(str::trim)
+        .filter(|reason| !reason.is_empty())
+    {
+        payload["reason"] = serde_json::json!(reason.chars().take(120).collect::<String>());
+    }
+    Some(())
+}
+
+fn read_buddy_json_trimmed_string<'a>(
+    object: &'a serde_json::Map<String, serde_json::Value>,
+    key: &str,
+) -> Option<&'a str> {
+    object
+        .get(key)
+        .and_then(serde_json::Value::as_str)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+}
+
+fn read_buddy_json_i32_field(
+    object: &serde_json::Map<String, serde_json::Value>,
+    key: &str,
+) -> Option<i32> {
+    object.get(key)?.as_i64()?.try_into().ok()
+}
+
+fn map_buddy_legacy_animation_intent_name(value: &str) -> Option<&'static str> {
+    Some(match value {
+        "focus" => "working",
+        "celebrate" => "celebrate",
+        "curious" => "curious",
+        "explain" => "explain",
+        "idle" => "idle",
+        "reassure" => "reassure",
+        "run_left" => "run_left",
+        "run_right" => "run_right",
+        "sleep" => "sleep",
+        "stumble_recover_left" => "stumble_recover_left",
+        "stumble_recover_right" => "stumble_recover_right",
+        "trip_fall_left" => "trip_fall_left",
+        "trip_fall_right" => "trip_fall_right",
+        "wake" => "wake",
+        _ => return None,
+    })
+}
+
+fn is_buddy_host_animation_name(value: &str) -> bool {
+    matches!(
+        value,
+        "idle"
+            | "run_left"
+            | "run_right"
+            | "sleep"
+            | "wake"
+            | "hover"
+            | "tap"
+            | "grab_start"
+            | "drag"
+            | "approval"
+            | "thinking"
+            | "working"
+            | "celebrate"
+            | "sad"
+            | "reassure"
+            | "explain"
+            | "curious"
+            | "trip_fall_left"
+            | "fallen_idle_left"
+            | "fallen_get_up_left"
+            | "trip_fall_right"
+            | "fallen_idle_right"
+            | "fallen_get_up_right"
+            | "stumble_recover_left"
+            | "stumble_recover_right"
+    )
+}
+
+fn is_buddy_host_action_priority(value: &str) -> bool {
+    matches!(value, "background" | "normal" | "high" | "urgent")
 }
 
 fn persist_completed_codex_run(
@@ -3102,33 +3498,35 @@ fn is_safe_buddy_codex_image_url(url: &str) -> bool {
     url.starts_with("data:image/") && url.contains(";base64,")
 }
 
-fn create_buddy_builtin_animation_skill_input(
-    data_dir: &Path,
-) -> BuddyResult<TrustedCodexSkillInput> {
-    const BUDDY_ANIMATION_SKILL_NAME: &str = "lexora-buddy-animation";
-    const BUDDY_ANIMATION_SKILL_MD: &str =
-        include_str!("../../builtin-skills/lexora-buddy-animation/SKILL.md");
+fn create_buddy_builtin_host_skill_input(data_dir: &Path) -> BuddyResult<TrustedCodexSkillInput> {
+    const BUDDY_HOST_SKILL_MD: &str = include_str!("../../skills/_builtin/SKILL.md");
 
-    let skill_dir = data_dir
-        .join("agent-skills")
-        .join(BUDDY_ANIMATION_SKILL_NAME);
+    let skill_dir = data_dir.join("host-skills").join(BUDDY_HOST_SKILL_NAME);
     let skill_path = skill_dir.join("SKILL.md");
-    std::fs::create_dir_all(&skill_dir)?;
-    let should_write = std::fs::read_to_string(&skill_path)
-        .map(|current| current != BUDDY_ANIMATION_SKILL_MD)
-        .unwrap_or(true);
-    if should_write {
-        std::fs::write(&skill_path, BUDDY_ANIMATION_SKILL_MD)?;
-    }
+    write_buddy_builtin_skill_file(&skill_path, BUDDY_HOST_SKILL_MD)?;
 
     let path = skill_path.to_str().ok_or_else(|| {
-        BuddyError::Validation("Buddy builtin animation skill path is not valid UTF-8".to_owned())
+        BuddyError::Validation("Buddy builtin host skill path is not valid UTF-8".to_owned())
     })?;
 
     Ok(TrustedCodexSkillInput {
-        name: BUDDY_ANIMATION_SKILL_NAME.to_owned(),
+        name: BUDDY_HOST_SKILL_NAME.to_owned(),
         path: path.to_owned(),
     })
+}
+
+fn write_buddy_builtin_skill_file(path: &Path, content: &str) -> BuddyResult<()> {
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+    let should_write = std::fs::read_to_string(path)
+        .map(|current| current != content)
+        .unwrap_or(true);
+    if should_write {
+        std::fs::write(path, content)?;
+    }
+
+    Ok(())
 }
 
 fn append_unique_codex_skill_input(
@@ -3247,24 +3645,64 @@ fn compose_buddy_runtime_instructions(context_pack: Option<&str>) -> String {
     }
 }
 
-fn strip_buddy_animation_intent_blocks(content: &str) -> String {
-    let Some(start_index) = content.find(BUDDY_ANIMATION_INTENT_START_TAG) else {
-        return content.trim().to_owned();
-    };
-    let body_start = start_index + BUDDY_ANIMATION_INTENT_START_TAG.len();
-    let Some(end_offset) = content[body_start..].find(BUDDY_ANIMATION_INTENT_END_TAG) else {
-        return content[..start_index].trim().to_owned();
-    };
+fn strip_buddy_host_action_blocks(content: &str) -> String {
+    let stripped = strip_buddy_tagged_blocks(
+        content,
+        BUDDY_HOST_ACTION_START_TAG,
+        BUDDY_HOST_ACTION_END_TAG,
+    );
+    strip_buddy_tagged_blocks(
+        &stripped,
+        BUDDY_ANIMATION_INTENT_START_TAG,
+        BUDDY_ANIMATION_INTENT_END_TAG,
+    )
+}
 
-    let body_end = body_start + end_offset;
-    let after_end = body_end + BUDDY_ANIMATION_INTENT_END_TAG.len();
-    format!("{}{}", &content[..start_index], &content[after_end..])
+fn strip_buddy_tagged_blocks(content: &str, start_tag: &str, end_tag: &str) -> String {
+    let mut stripped = String::new();
+    let mut remaining = content;
+
+    loop {
+        let Some(start_index) = remaining.find(start_tag) else {
+            stripped.push_str(remaining);
+            break;
+        };
+        stripped.push_str(&remaining[..start_index]);
+        let body_start = start_index + start_tag.len();
+        let Some(end_offset) = remaining[body_start..].find(end_tag) else {
+            break;
+        };
+        let body_end = body_start + end_offset;
+        let after_end = body_end + end_tag.len();
+        remaining = &remaining[after_end..];
+    }
+
+    let stripped = stripped
         .lines()
         .map(str::trim_end)
         .collect::<Vec<_>>()
-        .join("\n")
-        .trim()
-        .to_owned()
+        .join("\n");
+
+    collapse_consecutive_newlines(&stripped).trim().to_owned()
+}
+
+fn collapse_consecutive_newlines(value: &str) -> String {
+    let mut output = String::new();
+    let mut previous_was_newline = false;
+
+    for char in value.chars() {
+        if char == '\n' {
+            if !previous_was_newline {
+                output.push(char);
+            }
+            previous_was_newline = true;
+        } else {
+            output.push(char);
+            previous_was_newline = false;
+        }
+    }
+
+    output
 }
 
 struct CodexRuntimeOutput {
@@ -3611,16 +4049,17 @@ mod tests {
     use std::path::Path;
 
     use super::{
-        compose_buddy_chat_codex_inputs, compose_buddy_chat_runtime_content,
-        compose_buddy_chat_user_message_content, create_buddy_agent_turn_plan,
-        create_buddy_clipboard_file_from_path, create_buddy_clipboard_files_from_paths,
-        create_codex_app_server_approval_scope, create_memory_context_pack_event_payload,
+        append_buddy_host_action_events, compose_buddy_chat_codex_inputs,
+        compose_buddy_chat_runtime_content, compose_buddy_chat_user_message_content,
+        create_buddy_agent_turn_plan, create_buddy_clipboard_file_from_path,
+        create_buddy_clipboard_files_from_paths, create_codex_app_server_approval_scope,
+        create_memory_context_pack_event_payload, extract_buddy_host_action_payloads,
         materialize_buddy_chat_attachments, persist_completed_codex_run, prepare_codex_run_context,
         record_codex_chat_turn_memory, record_codex_run_cancelled,
-        record_codex_runtime_error_state, wait_for_codex_app_server_approval, BuddyChatAttachment,
-        BuddyChatPromptContextItem, BuddyCodexRunTarget, BuddyRunCancellationRegistry,
-        BuddyRunStateEventPublisher, CodexRuntimeOutput, StartBuddyAgentTurnRequest,
-        TrustedCodexSkillInput,
+        record_codex_runtime_error_state, strip_buddy_host_action_blocks,
+        wait_for_codex_app_server_approval, BuddyChatAttachment, BuddyChatPromptContextItem,
+        BuddyCodexRunTarget, BuddyRunCancellationRegistry, BuddyRunStateEventPublisher,
+        CodexRuntimeOutput, StartBuddyAgentTurnRequest, TrustedCodexSkillInput,
     };
     use crate::agents::codex;
     use crate::context_pack::{
@@ -3633,8 +4072,8 @@ mod tests {
     use crate::storage::{
         AppendBuddyConversationMessageRequest, BuddyStorage, CreateBuddyConversationRequest,
         CreateBuddyConversationRunRequest, CreateBuddyMemoryCandidateRequest,
-        CreateBuddyMemoryItemRequest, CreateBuddyRunRequest, CreateBuddySessionRequest,
-        UpsertBuddyProjectRequest,
+        CreateBuddyMemoryItemRequest, CreateBuddyRunEventRequest, CreateBuddyRunRequest,
+        CreateBuddySessionRequest, UpsertBuddyProjectRequest,
     };
     use crate::{app_paths::BuddyAppPaths, state::BuddyAppState};
     use std::{fs, path::PathBuf, sync::atomic::Ordering};
@@ -3767,6 +4206,97 @@ mod tests {
             Some("/tmp/lexora-project/apps/buddy")
         );
         assert_eq!(scope.authorization_root, "/tmp/lexora-project");
+    }
+
+    #[test]
+    fn keeps_buddy_animation_script_command_for_user_review() {
+        let temp_dir = create_buddy_test_dir("lexora-buddy-approval-animation-script");
+        let request = create_codex_app_server_approval_request(
+            "item/commandExecution/requestApproval",
+            serde_json::json!({
+                "command": "/usr/bin/zsh -lc \"node agent-skills/lexora-buddy-animation/scripts/lexora-buddy-pet.mjs state\"",
+                "cwd": temp_dir.to_string_lossy(),
+            }),
+        );
+
+        let scope = create_codex_app_server_approval_scope(&temp_dir.to_string_lossy(), &request);
+
+        assert_eq!(scope.decision, "requires_user_review");
+        assert_eq!(scope.status, "authorized");
+        fs::remove_dir_all(&temp_dir).expect("cleanup temp dir");
+    }
+
+    #[test]
+    fn extracts_and_strips_buddy_host_action_blocks() {
+        let content = r#"我会让桌宠庆祝。
+<lexora_buddy_host_action>{"action":"sequence","steps":[{"type":"move","target":"center"},{"type":"animation","animation":"celebrate","durationMs":3000},{"type":"move","target":{"kind":"home"},"after":"sleep"}],"priority":"high","reason":"done"}</lexora_buddy_host_action>
+继续保持安静。
+<lexora_buddy_animation_intent>{"intent":"unknown","durationMs":3000}</lexora_buddy_animation_intent>"#;
+
+        let payloads = extract_buddy_host_action_payloads(content);
+        let stripped = strip_buddy_host_action_blocks(content);
+
+        assert_eq!(payloads.len(), 1);
+        assert_eq!(payloads[0]["action"], "sequence");
+        assert_eq!(payloads[0]["priority"], "high");
+        assert_eq!(payloads[0]["reason"], "done");
+        assert_eq!(payloads[0]["source"], "buddy_builtin_host_skill");
+        assert_eq!(payloads[0]["steps"][0]["target"]["kind"], "center");
+        assert_eq!(payloads[0]["steps"][1]["animation"], "celebrate");
+        assert_eq!(payloads[0]["steps"][1]["durationMs"], 3000);
+        assert_eq!(payloads[0]["steps"][2]["target"]["kind"], "home");
+        assert_eq!(payloads[0]["steps"][2]["after"], "sleep");
+        assert_eq!(stripped, "我会让桌宠庆祝。\n继续保持安静。");
+    }
+
+    #[test]
+    fn appends_buddy_host_action_event_from_streamed_message_delta() {
+        let storage = create_codex_approval_test_storage();
+        let run = create_codex_approval_test_run(&storage);
+        let message_delta = storage
+            .append_run_event(CreateBuddyRunEventRequest {
+                event_type: "message.delta".to_owned(),
+                payload: serde_json::json!({
+                    "delta": "处理中 <lexora_buddy_host_action>{\"action\":\"move\",\"target\":{\"kind\":\"edge\",\"edge\":\"left\"},\"after\":\"celebrate\"}</lexora_buddy_host_action>",
+                    "itemId": "message-1",
+                    "protocol": "codex_app_server",
+                    "threadId": "thread-1",
+                    "turnId": "turn-1",
+                }),
+                run_id: run.id.clone(),
+            })
+            .expect("append message delta");
+        let mut events = vec![message_delta];
+        let runtime_output = CodexRuntimeOutput {
+            final_memory_citation: None,
+            final_message: "已处理。".to_owned(),
+            protocol: "codex_app_server",
+            stdout_bytes: None,
+            thread_id: Some("thread-1".to_owned()),
+            turn_id: Some("turn-1".to_owned()),
+        };
+
+        append_buddy_host_action_events(
+            &storage,
+            &run.id,
+            &mut events,
+            None,
+            &BuddyRunStateEventPublisher::disabled(),
+            &runtime_output,
+        )
+        .expect("append host action");
+        let stored_events = storage
+            .list_run_events(run.id, None, 10)
+            .expect("list events");
+        let host_action_event = stored_events
+            .iter()
+            .find(|event| event.event_type == "host.action")
+            .expect("host action event");
+
+        assert_eq!(host_action_event.payload["action"], "move");
+        assert_eq!(host_action_event.payload["target"]["kind"], "edge");
+        assert_eq!(host_action_event.payload["target"]["edge"], "left");
+        assert_eq!(host_action_event.payload["after"], "celebrate");
     }
 
     #[test]
@@ -5199,14 +5729,15 @@ mod tests {
     }
 
     #[test]
-    fn appends_buddy_builtin_animation_skill_to_codex_inputs() {
+    fn appends_trusted_skill_to_codex_inputs() {
         let input = compose_buddy_chat_codex_inputs(
             "写一篇文章",
             Vec::new(),
             &[],
             Some(TrustedCodexSkillInput {
-                name: "lexora-buddy-animation".to_owned(),
-                path: "/tmp/lexora-buddy-animation/SKILL.md".to_owned(),
+                name: "lexora-buddy-host".to_owned(),
+                path: "/home/user/.local/share/lexora-buddy/host-skills/lexora-buddy-host/SKILL.md"
+                    .to_owned(),
             }),
         )
         .expect("compose inputs");
@@ -5214,8 +5745,8 @@ mod tests {
         assert!(input.iter().any(|item| matches!(
             item,
             codex::CodexUserInput::Skill { name, path }
-                if name == "lexora-buddy-animation"
-                    && path == "/tmp/lexora-buddy-animation/SKILL.md"
+                if name == "lexora-buddy-host"
+                    && path == "/home/user/.local/share/lexora-buddy/host-skills/lexora-buddy-host/SKILL.md"
         )));
     }
 
@@ -5298,9 +5829,9 @@ mod tests {
     }
 
     #[test]
-    fn agent_turn_plan_materializes_and_injects_buddy_builtin_animation_skill() {
+    fn agent_turn_plan_materializes_and_injects_buddy_builtin_host_skill() {
         let temp_dir = std::env::temp_dir().join(format!(
-            "lexora-buddy-plan-animation-skill-{}",
+            "lexora-buddy-plan-host-skill-{}",
             uuid::Uuid::new_v4()
         ));
         let state =
@@ -5333,16 +5864,30 @@ mod tests {
             .runtime_inputs
             .iter()
             .find_map(|input| match input {
-                codex::CodexUserInput::Skill { name, path } if name == "lexora-buddy-animation" => {
+                codex::CodexUserInput::Skill { name, path } if name == "lexora-buddy-host" => {
                     Some(path)
                 }
                 _ => None,
             })
-            .expect("builtin animation skill input");
+            .expect("builtin host skill input");
         assert!(skill_path.starts_with(temp_dir.to_string_lossy().as_ref()));
-        assert!(std::fs::read_to_string(skill_path)
-            .expect("read skill")
-            .contains("Lexora Buddy animation is host UI state"));
+        assert!(skill_path.contains("/host-skills/lexora-buddy-host/"));
+        let skill_content = std::fs::read_to_string(skill_path).expect("read skill");
+        assert!(skill_content.contains("host-only skill"));
+        assert!(skill_content.contains("Do not run commands"));
+        assert!(skill_content.contains("name: lexora-buddy-host"));
+        assert!(skill_content.contains("<lexora_buddy_host_action>"));
+        assert!(!skill_content.contains("name: lexora-buddy-animation"));
+        assert!(!skill_content.contains("LEXORA_BUDDY_PET_SOCKET"));
+        assert!(!skill_content.contains("native-pet.sock"));
+        assert!(!skill_content.contains("diagnose"));
+        assert!(!skill_content.contains("node <skill_dir>/scripts/lexora-buddy-pet.mjs"));
+        let skill_dir = std::path::Path::new(skill_path)
+            .parent()
+            .expect("skill dir");
+        assert!(!skill_dir.join("scripts").exists());
+        assert!(!skill_dir.join("references").exists());
+        assert!(!skill_dir.join("agents").exists());
 
         let _ = std::fs::remove_dir_all(temp_dir);
     }

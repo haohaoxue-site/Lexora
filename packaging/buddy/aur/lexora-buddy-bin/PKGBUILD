@@ -2,7 +2,7 @@
 
 pkgname=lexora-buddy-bin
 pkgver=0.1.0
-pkgrel=1
+pkgrel=2
 pkgdesc="Desktop pet and local agent companion for Lexora"
 arch=('x86_64')
 url="https://github.com/haohaoxue-site/Lexora"
@@ -24,7 +24,7 @@ conflicts=('lexora-buddy')
 options=('!strip' '!debug')
 install="${pkgname}.install"
 source_x86_64=("lexora-buddy-${pkgver}-amd64.deb::${url}/releases/download/v${pkgver}/Lexora%20Buddy_${pkgver}_amd64.deb")
-sha256sums_x86_64=('bc5e8fb9cb860e56013b5c8053c70eeaf57560a20830249aae0516b1d8f75752')
+sha256sums_x86_64=('1e5b5991534e35740106e93f45411e7d6964b91433621377f7fca94d5a372a74')
 
 package() {
   local data_archive

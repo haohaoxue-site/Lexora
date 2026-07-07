@@ -40,6 +40,7 @@ const CODEX_SCOPE_STATUS_LABELS: Record<string, string> = {
   authorized: '授权项目内',
   invalid_path: '路径无效',
   outside_authorized_project: '超出授权项目',
+  trusted_buddy_capability: 'Buddy 内置能力',
   unsupported_request: '不支持的请求',
 }
 

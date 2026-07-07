@@ -1,6 +1,8 @@
-use std::{path::Path, process::Command};
+use std::path::Path;
 
-use crate::agents::subprocess_env::apply_agent_subprocess_env_from;
+use crate::agents::subprocess_env::{
+    create_agent_subprocess_command, create_agent_subprocess_command_from_env,
+};
 
 #[derive(serde::Serialize, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
@@ -198,9 +200,8 @@ fn run_claude_success_probe_with_program_and_env<const N: usize>(
     args: [&str; N],
     env_source: impl IntoIterator<Item = (String, String)>,
 ) -> Option<String> {
-    let mut command = Command::new(program);
+    let mut command = create_agent_subprocess_command_from_env(program, env_source);
     command.args(args);
-    apply_agent_subprocess_env_from(&mut command, env_source);
     let output = command.output().ok()?;
 
     if !output.status.success() {
@@ -211,9 +212,8 @@ fn run_claude_success_probe_with_program_and_env<const N: usize>(
 }
 
 fn run_claude_output_probe<const N: usize>(args: [&str; N]) -> Option<String> {
-    let mut command = Command::new("claude");
+    let mut command = create_agent_subprocess_command(Path::new("claude"));
     command.args(args);
-    apply_agent_subprocess_env_from(&mut command, std::env::vars());
     let output = command.output().ok()?;
 
     Some(format_command_output(output.stdout, output.stderr))

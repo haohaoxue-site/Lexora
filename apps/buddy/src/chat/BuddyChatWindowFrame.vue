@@ -66,12 +66,14 @@ function dragWindow(event: MouseEvent) {
           @mousedown.stop
           @pointerdown.stop
         >
-          <img
-            class="buddy-chat-frame__app-icon"
-            :src="appIconUrl"
-            alt=""
-            draggable="false"
-          >
+          <span class="buddy-chat-frame__app-icon-surface">
+            <img
+              class="buddy-chat-frame__app-icon"
+              :src="appIconUrl"
+              alt=""
+              draggable="false"
+            >
+          </span>
         </button>
         <div class="buddy-chat-frame__title-text">
           <strong>{{ title }}</strong>
@@ -120,12 +122,6 @@ function dragWindow(event: MouseEvent) {
 </template>
 
 <style scoped lang="scss">
-@property --buddy-chat-frame-avatar-ring-progress {
-  syntax: "<angle>";
-  inherits: false;
-  initial-value: 0deg;
-}
-
 .buddy-chat-frame {
   display: grid;
   grid-template-rows: 48px minmax(0, 1fr);
@@ -194,9 +190,6 @@ function dragWindow(event: MouseEvent) {
 }
 
 .buddy-chat-frame__identity-button {
-  --buddy-chat-frame-avatar-hover-ring: rgb(255 234 186 / 72%);
-  --buddy-chat-frame-avatar-ring-progress: 0deg;
-
   position: relative;
   display: grid;
   place-items: center;
@@ -209,62 +202,110 @@ function dragWindow(event: MouseEvent) {
   cursor: pointer;
   isolation: isolate;
   -webkit-app-region: no-drag;
+  overflow: hidden;
   outline: none;
   padding: 0;
 }
 
-.buddy-chat-frame__identity-button::before {
+.buddy-chat-frame__identity-button::before,
+.buddy-chat-frame__identity-button::after {
   position: absolute;
-  z-index: 2;
-  inset: 1px;
-  border-radius: inherit;
-  background: conic-gradient(
-    from -45deg,
-    var(--buddy-chat-frame-avatar-hover-ring) 0deg,
-    var(--buddy-chat-frame-avatar-hover-ring) var(--buddy-chat-frame-avatar-ring-progress),
-    rgb(255 234 186 / 0%) var(--buddy-chat-frame-avatar-ring-progress),
-    rgb(255 234 186 / 0%) 360deg
-  );
   content: "";
-  opacity: 0;
-  padding: 1px;
   pointer-events: none;
-  mask:
-    linear-gradient(#000 0 0) content-box,
-    linear-gradient(#000 0 0);
-  mask-composite: exclude;
-  -webkit-mask:
-    linear-gradient(#000 0 0) content-box,
-    linear-gradient(#000 0 0);
-  -webkit-mask-composite: xor;
+}
+
+.buddy-chat-frame__identity-button::before {
+  z-index: 2;
+  inset: 0;
+  border: 1px solid rgb(255 229 175 / 42%);
+  border-radius: inherit;
+}
+
+.buddy-chat-frame__identity-button::after {
+  z-index: 3;
+  top: 0;
+  left: 0;
+  width: 9px;
+  height: 1px;
+  border-radius: 1px;
+  background: linear-gradient(
+    90deg,
+    rgb(255 246 216 / 0%) 0%,
+    rgb(255 246 216 / 96%) 48%,
+    rgb(117 218 255 / 86%) 72%,
+    rgb(255 246 216 / 0%) 100%
+  );
+  opacity: 0;
+  transform: translate(3px, 0);
+  transform-origin: left center;
+}
+
+.buddy-chat-frame__app-icon-surface {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  border-radius: 7px;
+  background: transparent;
 }
 
 .buddy-chat-frame__app-icon {
-  position: relative;
-  z-index: 1;
-  box-sizing: border-box;
+  display: block;
   width: 24px;
   height: 24px;
   flex: 0 0 auto;
-  overflow: hidden;
-  border: 1px solid rgb(255 229 175 / 44%);
-  border-radius: 8px;
   object-fit: cover;
 }
 
-.buddy-chat-frame__identity-button:hover::before,
-.buddy-chat-frame__identity-button:focus-visible::before {
-  animation: buddy-chat-frame-avatar-ring-flow 0.56s linear forwards;
+.buddy-chat-frame__identity-button:hover::after {
+  animation: buddy-chat-frame-avatar-ring-flow 1.2s linear infinite;
   opacity: 1;
 }
 
 @keyframes buddy-chat-frame-avatar-ring-flow {
-  from {
-    --buddy-chat-frame-avatar-ring-progress: 0deg;
+  0% {
+    transform: translate(3px, 0);
   }
 
-  to {
-    --buddy-chat-frame-avatar-ring-progress: 360deg;
+  23% {
+    transform: translate(17px, 0);
+  }
+
+  25% {
+    transform: translate(25px, 3px) rotate(90deg);
+  }
+
+  48% {
+    transform: translate(25px, 17px) rotate(90deg);
+  }
+
+  50% {
+    transform: translate(23px, 25px) rotate(180deg);
+  }
+
+  73% {
+    transform: translate(9px, 25px) rotate(180deg);
+  }
+
+  75% {
+    transform: translate(0, 23px) rotate(270deg);
+  }
+
+  98% {
+    transform: translate(0, 9px) rotate(270deg);
+  }
+
+  100% {
+    transform: translate(3px, 0) rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .buddy-chat-frame__identity-button::after {
+    animation: none;
   }
 }
 

@@ -3,7 +3,6 @@ export type BuddyRuntimeImmediateRefreshTask
     | 'appSettings'
     | 'localStateStatus'
     | 'runs'
-    | 'approvals'
 
 export type BuddyRuntimeBackgroundRefreshTask
   = | 'runtimeDiagnostics'
@@ -22,7 +21,6 @@ export function createBuddyRuntimeRefreshPlan(): BuddyRuntimeRefreshPlan {
       'appSettings',
       'localStateStatus',
       'runs',
-      'approvals',
     ],
     backgroundTasks: [
       'runtimeDiagnostics',

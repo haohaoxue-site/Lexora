@@ -14,10 +14,15 @@ import {
   loadBuddyRuntimeStatus,
 } from '@/lib/tauriRuntime'
 import { resolveBuddyAiAnimationIntentFromRunEvents } from '@/pet/buddyAnimation'
+import {
+  createBuddyNativePetHostActionPlaybackKey,
+  resolveBuddyNativePetHostActionFromRunEvents,
+} from '@/pet/buddyHostAction'
 import { createBuddyPetAnimationPlaybackKey, createBuddyPetStateView } from '@/pet/petStateView'
 import { useBuddyAppSettings } from '@/shell/useBuddyAppSettings'
 import { useBuddyContextMenuGuard } from '@/shell/useBuddyContextMenuGuard'
 import { useBuddyNativePetAnimationSync } from '@/shell/useBuddyNativePetAnimationSync'
+import { useBuddyNativePetHostActionSync } from '@/shell/useBuddyNativePetHostActionSync'
 
 const {
   appSettings,
@@ -29,6 +34,8 @@ const naiveLocale = computed(() => locale.value === 'zh-CN' ? zhCN : enUS)
 const naiveDateLocale = computed(() => locale.value === 'zh-CN' ? dateZhCN : dateEnUS)
 
 const {
+  approvals: chatApprovals,
+  approveApproval: approveChatApproval,
   authorizeProjectFromFolderPicker,
   runtimeStatus: chatCodexRuntimeStatus,
   closeDrawer,
@@ -36,6 +43,7 @@ const {
   composerVersion,
   currentCwd,
   currentTarget,
+  denyApproval: denyChatApproval,
   deleteConversation,
   errorMessage: chatErrorMessage,
   globalConversationItems,
@@ -44,6 +52,7 @@ const {
   isAuthorizingProject,
   isDrawerOpen,
   isLoading: isChatLoading,
+  isResolvingApproval: isResolvingChatApproval,
   isSending: isChatSending,
   messages: chatMessages,
   openDrawer,
@@ -105,6 +114,13 @@ const activeChatRuntime = computed(() =>
         target: currentTarget.value,
       }),
 )
+const pendingApprovalIds = computed(() => chatApprovals.value.map(approval => approval.id))
+const nativePetHostAction = computed(() => {
+  if (runtimeStatus.value.shell !== 'tauri')
+    return null
+
+  return resolveBuddyNativePetHostActionFromRunEvents(chatRunEvents.value)
+})
 
 const nativePetState = computed(() => {
   if (runtimeStatus.value.shell !== 'tauri')
@@ -120,7 +136,7 @@ const nativePetState = computed(() => {
     isSending: isChatSending.value,
     latestRunStatus: latestRun.value?.status ?? null,
     nowUnixMs: animationNowUnixMs.value,
-    pendingApprovalCount: 0,
+    pendingApprovalCount: chatApprovals.value.length,
     runtimeErrorMessage: appSettingsErrorMessage.value,
   })
 })
@@ -132,9 +148,18 @@ const nativePetAnimationPlaybackKey = computed(() => {
   return createBuddyPetAnimationPlaybackKey({
     animation: nativePetState.value.animation,
     latestRun: latestRun.value,
-    pendingApprovalIds: [],
+    pendingApprovalIds: pendingApprovalIds.value,
     runEvents: chatRunEvents.value,
   })
+})
+
+const nativePetHostActionPlaybackKey = computed(() =>
+  createBuddyNativePetHostActionPlaybackKey(nativePetHostAction.value),
+)
+
+useBuddyNativePetHostActionSync({
+  action: () => nativePetHostAction.value?.action,
+  playbackKey: () => nativePetHostActionPlaybackKey.value,
 })
 
 useBuddyNativePetAnimationSync({
@@ -194,6 +219,7 @@ function updateDrawerOpen(nextOpen: boolean) {
         <div class="buddy-shell__panel">
           <BuddyChatPanel
             :app-settings="appSettings"
+            :approvals="chatApprovals"
             :claude-runtime-status="claudeRuntimeStatus"
             :codex-runtime-status="chatCodexRuntimeStatus"
             :composer-draft="composerDraft"
@@ -207,6 +233,7 @@ function updateDrawerOpen(nextOpen: boolean) {
             :header-title="headerTitle"
             :is-adding-project="isAuthorizingProject"
             :is-loading="isChatLoading"
+            :is-resolving-approval="isResolvingChatApproval"
             :is-sending="isChatSending"
             :language="locale"
             :messages="chatMessages"
@@ -216,7 +243,9 @@ function updateDrawerOpen(nextOpen: boolean) {
             :selected-runtime="activeChatRuntime"
             :show-runtime-selector="showRuntimeSelector"
             @add-project="authorizeProjectFromFolderPicker"
+            @approve-approval="approveChatApproval"
             @composer-error="setChatErrorMessage"
+            @deny-approval="denyChatApproval"
             @delete-conversation="deleteConversation"
             @draft-change="updateDraft"
             @open-global-draft="openGlobalDraft"

@@ -1,0 +1,4 @@
+interface:
+  display_name: Lexora Buddy Animation
+  short_description: Control the local Lexora Buddy desktop pet
+  default_prompt: Use $lexora-buddy-animation to move the desktop pet to the left side and make it dance.

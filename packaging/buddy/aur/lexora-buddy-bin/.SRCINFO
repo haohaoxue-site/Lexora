@@ -1,7 +1,7 @@
 pkgbase = lexora-buddy-bin
 	pkgdesc = Desktop pet and local agent companion for Lexora
 	pkgver = 0.1.0
-	pkgrel = 1
+	pkgrel = 2
 	url = https://github.com/haohaoxue-site/Lexora
 	install = lexora-buddy-bin.install
 	arch = x86_64
@@ -21,6 +21,6 @@ pkgbase = lexora-buddy-bin
 	options = !strip
 	options = !debug
 	source_x86_64 = lexora-buddy-0.1.0-amd64.deb::https://github.com/haohaoxue-site/Lexora/releases/download/v0.1.0/Lexora%20Buddy_0.1.0_amd64.deb
-	sha256sums_x86_64 = bc5e8fb9cb860e56013b5c8053c70eeaf57560a20830249aae0516b1d8f75752
+	sha256sums_x86_64 = 1e5b5991534e35740106e93f45411e7d6964b91433621377f7fca94d5a372a74
 
 pkgname = lexora-buddy-bin

@@ -112,6 +112,7 @@ impl BuddyMessageVersionStatus {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum BuddyRunEventType {
     AssistantReferences,
+    HostAction,
     MemoryCandidateCreated,
     MemoryContextPack,
     MessageCompleted,
@@ -127,6 +128,7 @@ impl BuddyRunEventType {
     pub(crate) const fn as_str(self) -> &'static str {
         match self {
             Self::AssistantReferences => "assistant.references",
+            Self::HostAction => "host.action",
             Self::MemoryCandidateCreated => "memory.candidate.created",
             Self::MemoryContextPack => "memory.context_pack",
             Self::MessageCompleted => "message.completed",
@@ -191,5 +193,6 @@ mod tests {
             BuddyRunEventType::MemoryCandidateCreated.as_str(),
             "memory.candidate.created"
         );
+        assert_eq!(BuddyRunEventType::HostAction.as_str(), "host.action");
     }
 }

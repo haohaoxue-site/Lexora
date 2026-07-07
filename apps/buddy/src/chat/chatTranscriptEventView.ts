@@ -29,6 +29,12 @@ export type BuddyChatRunActivityKind
 
 const BUDDY_ANIMATION_INTENT_START_TAG = '<lexora_buddy_animation_intent>'
 const BUDDY_ANIMATION_INTENT_END_TAG = '</lexora_buddy_animation_intent>'
+const BUDDY_HOST_ACTION_START_TAG = '<lexora_buddy_host_action>'
+const BUDDY_HOST_ACTION_END_TAG = '</lexora_buddy_host_action>'
+const BUDDY_HIDDEN_HOST_BLOCK_TAGS = [
+  [BUDDY_HOST_ACTION_START_TAG, BUDDY_HOST_ACTION_END_TAG],
+  [BUDDY_ANIMATION_INTENT_START_TAG, BUDDY_ANIMATION_INTENT_END_TAG],
+] as const
 const CHAT_ACTIVITY_OUTPUT_PREVIEW_CHARS = 12000
 
 export function createChatRunActivityRows(
@@ -249,26 +255,28 @@ export function stripBuddyAnimationIntentBlocks(delta: string | null): string | 
   let stripped = delta
   let changed = false
 
-  for (;;) {
-    const start = stripped.indexOf(BUDDY_ANIMATION_INTENT_START_TAG)
-    if (start < 0)
-      break
+  for (const [startTag, endTag] of BUDDY_HIDDEN_HOST_BLOCK_TAGS) {
+    for (;;) {
+      const start = stripped.indexOf(startTag)
+      if (start < 0)
+        break
 
-    const bodyStart = start + BUDDY_ANIMATION_INTENT_START_TAG.length
-    const end = stripped.indexOf(BUDDY_ANIMATION_INTENT_END_TAG, bodyStart)
-    changed = true
-    if (end < 0) {
-      stripped = stripped.slice(0, start)
-      break
+      const bodyStart = start + startTag.length
+      const end = stripped.indexOf(endTag, bodyStart)
+      changed = true
+      if (end < 0) {
+        stripped = stripped.slice(0, start)
+        break
+      }
+
+      stripped = `${stripped.slice(0, start)}${stripped.slice(end + endTag.length)}`
     }
 
-    stripped = `${stripped.slice(0, start)}${stripped.slice(end + BUDDY_ANIMATION_INTENT_END_TAG.length)}`
-  }
-
-  const orphanEnd = stripped.indexOf(BUDDY_ANIMATION_INTENT_END_TAG)
-  if (orphanEnd >= 0) {
-    changed = true
-    stripped = stripped.slice(orphanEnd + BUDDY_ANIMATION_INTENT_END_TAG.length)
+    const orphanEnd = stripped.indexOf(endTag)
+    if (orphanEnd >= 0) {
+      changed = true
+      stripped = stripped.slice(orphanEnd + endTag.length)
+    }
   }
 
   return changed ? normalizeBuddyAnimationIntentStrippedText(stripped) : stripped

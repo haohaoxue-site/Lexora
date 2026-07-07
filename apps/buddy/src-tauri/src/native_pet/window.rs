@@ -17,21 +17,25 @@ use super::{
     assets::{load_default_app_icon, load_default_pet_animation_set, load_default_pet_spritesheet},
     bounds::{
         native_pet_runtime_initial_placement, native_pet_runtime_resolve_window_placement,
-        NativePetBoundsResolution,
+        NativePetBoundsResolution, NATIVE_PET_BOUNDS_POLICY,
     },
     coordinates::{
-        native_pet_cursor_position, NativePetLogicalOffset, NativePetLogicalPoint,
-        NativePetLogicalSize, NativePetLogicalVelocity, NATIVE_PET_COORDINATE_SPACE,
+        native_pet_cursor_position, native_pet_window_rect, NativePetLogicalOffset,
+        NativePetLogicalPoint, NativePetLogicalRect, NativePetLogicalSize,
+        NativePetLogicalVelocity, NativePetPosition, NATIVE_PET_COORDINATE_SPACE,
     },
     drag_state::{NativePetDragFrameUpdate, NativePetDragPhase, NativePetDragStateMachine},
     geometry::{native_pet_window_logical_size, NativePetFacing},
     layer_shell::LayerShellApi,
+    monitor_layout::NativePetMonitorLayout,
     physics::{native_pet_clamped_dt_seconds, NativePetInertiaState, NativePetPhysicsPhase},
     physics_params::NativePetPhysicsParams,
     process::{
-        create_native_pet_control_channel, drain_native_pet_control_messages,
-        emit_native_pet_sidecar_event, NativePetControlMessage, NativePetControlPoll,
-        NativePetLaunchConfig, NativePetLayer, NativePetSidecarEvent,
+        create_native_pet_control_channel, drain_native_pet_control_requests,
+        emit_native_pet_sidecar_event, native_pet_control_capabilities_response,
+        native_pet_control_ok_response, NativePetControlMessage, NativePetControlPoll,
+        NativePetControlRequest, NativePetControlRequestKind, NativePetLaunchConfig,
+        NativePetLayer, NativePetSidecarEvent, NativePetWalkEdge, NativePetWalkTarget,
     },
     renderer::{
         clear_transparent, draw_pet_frame, install_transparent_window_css,
@@ -55,6 +59,8 @@ const NATIVE_PET_SLEEP_AFTER_IDLE_MS: u64 = 45_000;
 const NATIVE_PET_TASK_PRESENCE_FIRST_AFTER_MS: u64 = 22_000;
 const NATIVE_PET_TASK_PRESENCE_INTERVAL_MS: u64 = 24_000;
 const NATIVE_PET_TASK_PRESENCE_TRIGGER_WINDOW_MS: u64 = MAX_FRAME_ELAPSED_MS * 2;
+const NATIVE_PET_SCRIPTED_WALK_SPEED_LOGICAL_PX_PER_S: f64 = 620.0;
+const NATIVE_PET_SCRIPTED_WALK_COMPLETE_DISTANCE_PX: f64 = 6.0;
 
 #[derive(Debug, Clone)]
 struct NativePetDragState {
@@ -82,10 +88,24 @@ struct NativePetEdgeRunoutStep {
     next_state: Option<NativePetEdgeRunoutState>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct NativePetScriptedWalkState {
+    after_animation: Option<NativePetAnimationName>,
+    target_position: crate::native_pet::coordinates::NativePetPosition,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+struct NativePetScriptedWalkStep {
+    animation: NativePetAnimationName,
+    finished: bool,
+    movement_dx: f64,
+    position: crate::native_pet::coordinates::NativePetPosition,
+}
+
 #[derive(Clone)]
 struct NativePetRuntimeState {
     animation_playback: Rc<Cell<NativePetAnimationPlayback>>,
-    control_messages: Rc<std::sync::mpsc::Receiver<NativePetControlMessage>>,
+    control_messages: Rc<std::sync::mpsc::Receiver<NativePetControlRequest>>,
     drag_state: Rc<RefCell<Option<NativePetDragState>>>,
     edge_runout_state: Rc<Cell<Option<NativePetEdgeRunoutState>>>,
     idle_lifecycle_elapsed_ms: Rc<Cell<u64>>,
@@ -97,6 +117,7 @@ struct NativePetRuntimeState {
     physics_params: Rc<NativePetPhysicsParams>,
     pointer_hovered: Rc<Cell<bool>>,
     requested_animation: Rc<Cell<NativePetAnimationName>>,
+    scripted_walk_state: Rc<RefCell<Option<NativePetScriptedWalkState>>>,
     task_presence_elapsed_ms: Rc<Cell<u64>>,
     throw_outcome_seed: Rc<Cell<u64>>,
 }
@@ -121,6 +142,7 @@ impl NativePetRuntimeState {
             physics_params: Rc::new(NativePetPhysicsParams::default()),
             pointer_hovered: Rc::new(Cell::new(false)),
             requested_animation: Rc::new(Cell::new(NativePetAnimationName::Idle)),
+            scripted_walk_state: Rc::new(RefCell::new(None)),
             task_presence_elapsed_ms: Rc::new(Cell::new(0)),
             throw_outcome_seed: Rc::new(Cell::new(native_pet_initial_throw_outcome_seed())),
         })
@@ -197,6 +219,7 @@ pub(super) fn run_native_pet_sidecar(config: NativePetLaunchConfig) -> BuddyResu
         physics_params,
         pointer_hovered,
         requested_animation,
+        scripted_walk_state,
         task_presence_elapsed_ms,
         throw_outcome_seed,
     } = runtime_state;
@@ -299,6 +322,7 @@ pub(super) fn run_native_pet_sidecar(config: NativePetLaunchConfig) -> BuddyResu
         let drag_state = Rc::clone(&drag_state);
         let inertia_state = Rc::clone(&inertia_state);
         let edge_runout_state = Rc::clone(&edge_runout_state);
+        let scripted_walk_state = Rc::clone(&scripted_walk_state);
         let window_position = Rc::clone(&window_position);
         drawing_area.connect_button_press_event(move |drawing_area, event| {
             let mut playback = animation_playback.get();
@@ -312,6 +336,11 @@ pub(super) fn run_native_pet_sidecar(config: NativePetLaunchConfig) -> BuddyResu
                 local_x,
                 local_y,
             );
+            if pointer_hits_visible_pet {
+                requested_animation.set(native_pet_requested_animation_after_pointer_interaction(
+                    requested_animation.get(),
+                ));
+            }
             if native_pet_pointer_press_can_open_chat(pointer_hits_visible_pet, event.button()) {
                 if native_pet_button_press_opens_chat(event)
                     || native_pet_open_chat_click_matches(
@@ -339,6 +368,7 @@ pub(super) fn run_native_pet_sidecar(config: NativePetLaunchConfig) -> BuddyResu
                 return glib::Propagation::Proceed;
             }
 
+            scripted_walk_state.replace(None);
             if let Some(get_up_animation) = native_pet_fallen_get_up_animation(playback.name) {
                 requested_animation.set(NativePetAnimationName::Idle);
                 playback.restart_animation(get_up_animation);
@@ -596,6 +626,7 @@ pub(super) fn run_native_pet_sidecar(config: NativePetLaunchConfig) -> BuddyResu
         let drag_state = Rc::clone(&drag_state);
         let edge_runout_state = Rc::clone(&edge_runout_state);
         let inertia_state = Rc::clone(&inertia_state);
+        let scripted_walk_state = Rc::clone(&scripted_walk_state);
         let gtk_window = gtk_window.clone();
         let layer_shell = Rc::clone(&layer_shell);
         let pet_facing = Rc::clone(&pet_facing);
@@ -732,7 +763,60 @@ pub(super) fn run_native_pet_sidecar(config: NativePetLaunchConfig) -> BuddyResu
             } else {
                 false
             };
-            let is_motion_locked = is_dragging || is_inertia_active || is_edge_runout_active;
+            let is_scripted_walk_active =
+                if is_dragging || is_inertia_active || is_edge_runout_active {
+                    false
+                } else {
+                    let mut scripted_walk_state = scripted_walk_state.borrow_mut();
+                    if let Some(state) = *scripted_walk_state {
+                        let movement_adapter = NativePetWindowMovementAdapter::new(
+                            &gtk_window,
+                            layer_shell.as_ref().as_ref(),
+                            &window_monitor_index,
+                            &window_position,
+                        );
+                        let step = native_pet_step_scripted_walk(
+                            window_position.get(),
+                            state.target_position,
+                            elapsed_ms,
+                        );
+                        let placement = native_pet_runtime_resolve_window_placement(
+                            step.position,
+                            window_size,
+                            None,
+                        )
+                        .placement;
+                        if step.movement_dx.abs() > 1.0 {
+                            pet_facing.set(if step.movement_dx > 0.0 {
+                                NativePetFacing::Right
+                            } else {
+                                NativePetFacing::Left
+                            });
+                        }
+                        movement_adapter.move_to(placement);
+                        playback.set_animation(step.animation);
+                        if step.finished {
+                            let after_animation =
+                                state.after_animation.unwrap_or(NativePetAnimationName::Idle);
+                            requested_animation.set(
+                                native_pet_requested_animation_for_control_animation(
+                                    after_animation,
+                                ),
+                            );
+                            playback.restart_animation(after_animation);
+                            *scripted_walk_state = None;
+                            false
+                        } else {
+                            true
+                        }
+                    } else {
+                        false
+                    }
+                };
+            let is_motion_locked = is_dragging
+                || is_inertia_active
+                || is_edge_runout_active
+                || is_scripted_walk_active;
 
             if !is_motion_locked {
                 let movement_adapter = NativePetWindowMovementAdapter::new(
@@ -751,42 +835,125 @@ pub(super) fn run_native_pet_sidecar(config: NativePetLaunchConfig) -> BuddyResu
             }
 
             let control_poll =
-                drain_native_pet_control_messages(&control_messages, |message| match message {
-                    NativePetControlMessage::SetAnimation(animation) => {
-                        let requested =
-                            native_pet_requested_animation_for_control_animation(animation);
-                        if requested_animation.replace(requested) != requested {
-                            task_presence_elapsed_ms.set(0);
+                drain_native_pet_control_requests(&control_messages, |request| {
+                    let response = match request.kind() {
+                        NativePetControlRequestKind::QueryState => native_pet_control_state_response(
+                            window_position.get(),
+                            window_monitor_index.get(),
+                            window_size,
+                            playback.name,
+                            requested_animation.get(),
+                            *scripted_walk_state.borrow(),
+                            drag_state.borrow().is_some(),
+                            inertia_state.borrow().is_some(),
+                            edge_runout_state.get().is_some(),
+                        ),
+                        NativePetControlRequestKind::QueryCapabilities => {
+                            native_pet_control_capabilities_response()
                         }
-                        if !matches!(requested, NativePetAnimationName::Idle) {
-                            if idle_lifecycle_elapsed_ms.get() > 0 {
-                                idle_presence_schedule_seed.set(
-                                    native_pet_next_idle_presence_schedule_seed(
-                                        idle_presence_schedule_seed.get(),
-                                    ),
-                                );
+                        NativePetControlRequestKind::Command(message) => {
+                            match message {
+                                NativePetControlMessage::SetAnimation(animation) => {
+                                    scripted_walk_state.replace(None);
+                                    let requested =
+                                        native_pet_requested_animation_for_control_animation(
+                                            animation,
+                                        );
+                                    if requested_animation.replace(requested) != requested {
+                                        task_presence_elapsed_ms.set(0);
+                                    }
+                                    if !matches!(requested, NativePetAnimationName::Idle) {
+                                        if idle_lifecycle_elapsed_ms.get() > 0 {
+                                            idle_presence_schedule_seed.set(
+                                                native_pet_next_idle_presence_schedule_seed(
+                                                    idle_presence_schedule_seed.get(),
+                                                ),
+                                            );
+                                        }
+                                        idle_lifecycle_elapsed_ms.set(0);
+                                    }
+                                    if !is_motion_locked
+                                        && !native_pet_should_keep_scripted_action_playing(
+                                            playback.name,
+                                        )
+                                    {
+                                        let target_animation = if animation == requested {
+                                            native_pet_animation_for_lifecycle(
+                                                pointer_hovered.get(),
+                                                false,
+                                                false,
+                                                requested,
+                                                playback.name,
+                                                idle_lifecycle_elapsed_ms.get(),
+                                                idle_presence_schedule_seed.get(),
+                                            )
+                                        } else {
+                                            animation
+                                        };
+                                        playback.restart_animation(target_animation);
+                                    }
+                                }
+                                NativePetControlMessage::WalkToEdge { edge, after } => {
+                                    native_pet_start_scripted_walk(
+                                        window_position.get(),
+                                        window_size,
+                                        NativePetWalkTarget::Edge(edge),
+                                        after,
+                                        &inertia_state,
+                                        &edge_runout_state,
+                                        &idle_lifecycle_elapsed_ms,
+                                        &task_presence_elapsed_ms,
+                                        &requested_animation,
+                                        &scripted_walk_state,
+                                    );
+                                }
+                                NativePetControlMessage::WalkToPosition { x, y, after } => {
+                                    native_pet_start_scripted_walk(
+                                        window_position.get(),
+                                        window_size,
+                                        NativePetWalkTarget::Position { x, y },
+                                        after,
+                                        &inertia_state,
+                                        &edge_runout_state,
+                                        &idle_lifecycle_elapsed_ms,
+                                        &task_presence_elapsed_ms,
+                                        &requested_animation,
+                                        &scripted_walk_state,
+                                    );
+                                }
+                                NativePetControlMessage::WalkToX { x, after } => {
+                                    native_pet_start_scripted_walk(
+                                        window_position.get(),
+                                        window_size,
+                                        NativePetWalkTarget::X { x },
+                                        after,
+                                        &inertia_state,
+                                        &edge_runout_state,
+                                        &idle_lifecycle_elapsed_ms,
+                                        &task_presence_elapsed_ms,
+                                        &requested_animation,
+                                        &scripted_walk_state,
+                                    );
+                                }
+                                NativePetControlMessage::WalkToTarget { target, after } => {
+                                    native_pet_start_scripted_walk(
+                                        window_position.get(),
+                                        window_size,
+                                        target,
+                                        after,
+                                        &inertia_state,
+                                        &edge_runout_state,
+                                        &idle_lifecycle_elapsed_ms,
+                                        &task_presence_elapsed_ms,
+                                        &requested_animation,
+                                        &scripted_walk_state,
+                                    );
+                                }
                             }
-                            idle_lifecycle_elapsed_ms.set(0);
+                            native_pet_control_ok_response()
                         }
-                        if !is_motion_locked {
-                            if !native_pet_should_keep_scripted_action_playing(playback.name) {
-                                let target_animation = if animation == requested {
-                                    native_pet_animation_for_lifecycle(
-                                        pointer_hovered.get(),
-                                        false,
-                                        false,
-                                        requested,
-                                        playback.name,
-                                        idle_lifecycle_elapsed_ms.get(),
-                                        idle_presence_schedule_seed.get(),
-                                    )
-                                } else {
-                                    animation
-                                };
-                                playback.restart_animation(target_animation);
-                            }
-                        }
-                    }
+                    };
+                    request.respond(response);
                 });
             if matches!(control_poll, NativePetControlPoll::Disconnected) {
                 gtk::main_quit();
@@ -798,7 +965,7 @@ pub(super) fn run_native_pet_sidecar(config: NativePetLaunchConfig) -> BuddyResu
                 current_idle_lifecycle_elapsed_ms,
                 elapsed_ms,
                 pointer_hovered.get(),
-                is_dragging || is_edge_runout_active,
+                is_dragging || is_edge_runout_active || is_scripted_walk_active,
                 is_inertia_active,
                 requested_animation.get(),
             );
@@ -815,14 +982,14 @@ pub(super) fn run_native_pet_sidecar(config: NativePetLaunchConfig) -> BuddyResu
                 task_presence_elapsed_ms.get(),
                 elapsed_ms,
                 pointer_hovered.get(),
-                is_dragging || is_edge_runout_active,
+                is_dragging || is_edge_runout_active || is_scripted_walk_active,
                 is_inertia_active,
                 requested_animation.get(),
             );
             task_presence_elapsed_ms.set(next_task_presence_elapsed_ms);
             let lifecycle_animation = native_pet_animation_for_lifecycle(
                 pointer_hovered.get(),
-                is_dragging || is_edge_runout_active,
+                is_dragging || is_edge_runout_active || is_scripted_walk_active,
                 is_inertia_active,
                 requested_animation.get(),
                 playback.name,
@@ -834,7 +1001,7 @@ pub(super) fn run_native_pet_sidecar(config: NativePetLaunchConfig) -> BuddyResu
             }
             if let Some(task_presence_animation) = native_pet_task_presence_animation(
                 pointer_hovered.get(),
-                is_dragging || is_edge_runout_active,
+                is_dragging || is_edge_runout_active || is_scripted_walk_active,
                 is_inertia_active,
                 requested_animation.get(),
                 playback.name,
@@ -1042,11 +1209,307 @@ fn reconcile_native_pet_visible_placement(
 
 fn native_pet_bounds_changed(
     bounds: NativePetBoundsResolution,
-    current_position: crate::native_pet::coordinates::NativePetPosition,
+    current_position: NativePetPosition,
     current_monitor_index: Option<i32>,
 ) -> bool {
     bounds.placement.position != current_position
         || bounds.placement.monitor_index != current_monitor_index
+}
+
+fn native_pet_start_scripted_walk(
+    current_position: NativePetPosition,
+    window_size: NativePetLogicalSize,
+    target: NativePetWalkTarget,
+    after: Option<NativePetAnimationName>,
+    inertia_state: &Rc<RefCell<Option<NativePetInertiaState>>>,
+    edge_runout_state: &Rc<Cell<Option<NativePetEdgeRunoutState>>>,
+    idle_lifecycle_elapsed_ms: &Rc<Cell<u64>>,
+    task_presence_elapsed_ms: &Rc<Cell<u64>>,
+    requested_animation: &Rc<Cell<NativePetAnimationName>>,
+    scripted_walk_state: &Rc<RefCell<Option<NativePetScriptedWalkState>>>,
+) {
+    inertia_state.replace(None);
+    edge_runout_state.set(None);
+    idle_lifecycle_elapsed_ms.set(0);
+    task_presence_elapsed_ms.set(0);
+    requested_animation.set(NativePetAnimationName::Idle);
+    scripted_walk_state.replace(Some(NativePetScriptedWalkState {
+        after_animation: after,
+        target_position: native_pet_walk_target_position(current_position, window_size, target),
+    }));
+}
+
+fn native_pet_control_state_response(
+    current_position: NativePetPosition,
+    current_monitor_index: Option<i32>,
+    window_size: NativePetLogicalSize,
+    current_animation: NativePetAnimationName,
+    requested_animation: NativePetAnimationName,
+    scripted_walk_state: Option<NativePetScriptedWalkState>,
+    is_dragging: bool,
+    is_inertia_active: bool,
+    is_edge_runout_active: bool,
+) -> serde_json::Value {
+    let is_scripted_walk_active = scripted_walk_state.is_some();
+    serde_json::json!({
+        "ok": true,
+        "coordinateSpace": NATIVE_PET_COORDINATE_SPACE.label(),
+        "position": native_pet_position_json(current_position),
+        "window": {
+            "width": window_size.width,
+            "height": window_size.height,
+        },
+        "monitor": native_pet_current_monitor_json(
+            current_position,
+            current_monitor_index,
+            window_size,
+        ),
+        "animation": {
+            "current": current_animation.manifest_key(),
+            "requested": requested_animation.manifest_key(),
+        },
+        "motion": {
+            "active": is_dragging
+                || is_inertia_active
+                || is_edge_runout_active
+                || is_scripted_walk_active,
+            "dragging": is_dragging,
+            "inertiaActive": is_inertia_active,
+            "edgeRunoutActive": is_edge_runout_active,
+            "scriptedWalkActive": is_scripted_walk_active,
+            "targetPosition": scripted_walk_state
+                .map(|state| native_pet_position_json(state.target_position)),
+        },
+    })
+}
+
+fn native_pet_current_monitor_json(
+    current_position: NativePetPosition,
+    current_monitor_index: Option<i32>,
+    window_size: NativePetLogicalSize,
+) -> serde_json::Value {
+    let Some(layout) = NativePetMonitorLayout::capture() else {
+        return serde_json::Value::Null;
+    };
+    let current_rect = native_pet_window_rect(current_position, window_size);
+    let anchor = current_rect.center();
+    let monitor = current_monitor_index
+        .and_then(|index| {
+            layout
+                .monitors()
+                .iter()
+                .find(|monitor| monitor.index == index)
+        })
+        .or_else(|| layout.monitor_at_point(anchor))
+        .or_else(|| layout.nearest_monitor_to_point(anchor))
+        .or_else(|| layout.primary_monitor());
+    let Some(monitor) = monitor else {
+        return serde_json::Value::Null;
+    };
+
+    serde_json::json!({
+        "index": monitor.index,
+        "isPrimary": monitor.is_primary,
+        "geometry": native_pet_rect_json(monitor.logical_geometry),
+        "workarea": native_pet_rect_json(monitor.logical_workarea),
+    })
+}
+
+fn native_pet_position_json(position: NativePetPosition) -> serde_json::Value {
+    serde_json::json!({
+        "x": position.x,
+        "y": position.y,
+    })
+}
+
+fn native_pet_rect_json(rect: NativePetLogicalRect) -> serde_json::Value {
+    serde_json::json!({
+        "x": rect.x,
+        "y": rect.y,
+        "width": rect.width,
+        "height": rect.height,
+    })
+}
+
+fn native_pet_walk_target_position(
+    current_position: NativePetPosition,
+    window_size: NativePetLogicalSize,
+    target: NativePetWalkTarget,
+) -> NativePetPosition {
+    if let Some(target_position) =
+        native_pet_visible_walk_target_position(current_position, window_size, target)
+    {
+        return target_position;
+    }
+
+    let requested_position = match target {
+        NativePetWalkTarget::Center | NativePetWalkTarget::Home => current_position,
+        NativePetWalkTarget::Edge(NativePetWalkEdge::Left) => NativePetPosition {
+            x: i32::MIN / 2,
+            y: current_position.y,
+        },
+        NativePetWalkTarget::Edge(NativePetWalkEdge::Right) => NativePetPosition {
+            x: i32::MAX / 2,
+            y: current_position.y,
+        },
+        NativePetWalkTarget::Edge(NativePetWalkEdge::Top) => NativePetPosition {
+            x: current_position.x,
+            y: i32::MIN / 2,
+        },
+        NativePetWalkTarget::Edge(NativePetWalkEdge::Bottom) => NativePetPosition {
+            x: current_position.x,
+            y: i32::MAX / 2,
+        },
+        NativePetWalkTarget::Position { x, y } => NativePetPosition { x, y },
+        NativePetWalkTarget::X { x } => NativePetPosition {
+            x,
+            y: current_position.y,
+        },
+    };
+    native_pet_runtime_resolve_window_placement(
+        requested_position,
+        window_size,
+        Some(native_pet_window_rect(current_position, window_size).center()),
+    )
+    .placement
+    .position
+}
+
+fn native_pet_visible_walk_target_position(
+    current_position: NativePetPosition,
+    window_size: NativePetLogicalSize,
+    target: NativePetWalkTarget,
+) -> Option<NativePetPosition> {
+    let layout = NativePetMonitorLayout::capture()?;
+    let current_rect = native_pet_window_rect(current_position, window_size);
+    let anchor = current_rect.center();
+    let monitor = layout
+        .monitor_at_point(anchor)
+        .or_else(|| layout.nearest_monitor_to_point(anchor))
+        .or_else(|| layout.primary_monitor())?;
+    let bounds = monitor.available_bounds();
+    let visible_position = native_pet_visible_walk_target_position_for_bounds(
+        current_position,
+        window_size,
+        target,
+        bounds,
+        NATIVE_PET_BOUNDS_POLICY.monitor_margin_logical_px,
+    );
+
+    Some(
+        native_pet_runtime_resolve_window_placement(visible_position, window_size, Some(anchor))
+            .placement
+            .position,
+    )
+}
+
+#[cfg(test)]
+fn native_pet_visible_walk_edge_target_position_for_bounds(
+    current_position: NativePetPosition,
+    window_size: NativePetLogicalSize,
+    edge: NativePetWalkEdge,
+    bounds: NativePetLogicalRect,
+    margin_logical_px: i32,
+) -> NativePetPosition {
+    native_pet_visible_walk_target_position_for_bounds(
+        current_position,
+        window_size,
+        NativePetWalkTarget::Edge(edge),
+        bounds,
+        margin_logical_px,
+    )
+}
+
+fn native_pet_visible_walk_target_position_for_bounds(
+    current_position: NativePetPosition,
+    window_size: NativePetLogicalSize,
+    target: NativePetWalkTarget,
+    bounds: NativePetLogicalRect,
+    margin_logical_px: i32,
+) -> NativePetPosition {
+    let margin = margin_logical_px.max(0);
+    let min_x = bounds.x + margin;
+    let min_y = bounds.y + margin;
+    let max_x = (bounds.right() - window_size.width - margin).max(min_x);
+    let max_y = (bounds.bottom() - window_size.height - margin).max(min_y);
+    let center_x = bounds.x + ((bounds.width - window_size.width) / 2);
+    let center_y = bounds.y + ((bounds.height - window_size.height) / 2);
+    let requested = match target {
+        NativePetWalkTarget::Center => NativePetPosition {
+            x: center_x,
+            y: center_y,
+        },
+        NativePetWalkTarget::Home => NativePetPosition { x: max_x, y: max_y },
+        NativePetWalkTarget::Position { x, y } => NativePetPosition { x, y },
+        NativePetWalkTarget::X { x } => NativePetPosition {
+            x,
+            y: current_position.y,
+        },
+        NativePetWalkTarget::Edge(edge) => NativePetPosition {
+            x: match edge {
+                NativePetWalkEdge::Left => min_x,
+                NativePetWalkEdge::Right => max_x,
+                NativePetWalkEdge::Top | NativePetWalkEdge::Bottom => current_position.x,
+            },
+            y: match edge {
+                NativePetWalkEdge::Top => min_y,
+                NativePetWalkEdge::Bottom => max_y,
+                NativePetWalkEdge::Left | NativePetWalkEdge::Right => current_position.y,
+            },
+        },
+    };
+
+    NativePetPosition {
+        x: requested.x.clamp(min_x, max_x),
+        y: requested.y.clamp(min_y, max_y),
+    }
+}
+
+fn native_pet_step_scripted_walk(
+    current_position: NativePetPosition,
+    target_position: NativePetPosition,
+    elapsed_ms: u64,
+) -> NativePetScriptedWalkStep {
+    let dx = f64::from(target_position.x - current_position.x);
+    let dy = f64::from(target_position.y - current_position.y);
+    let distance = dx.hypot(dy);
+    let animation = if dx >= 0.0 {
+        NativePetAnimationName::RunRight
+    } else {
+        NativePetAnimationName::RunLeft
+    };
+
+    if distance <= NATIVE_PET_SCRIPTED_WALK_COMPLETE_DISTANCE_PX || elapsed_ms == 0 {
+        return NativePetScriptedWalkStep {
+            animation,
+            finished: true,
+            movement_dx: dx,
+            position: target_position,
+        };
+    }
+
+    let max_step = NATIVE_PET_SCRIPTED_WALK_SPEED_LOGICAL_PX_PER_S * elapsed_ms as f64 / 1_000.0;
+    if max_step >= distance {
+        return NativePetScriptedWalkStep {
+            animation,
+            finished: true,
+            movement_dx: dx,
+            position: target_position,
+        };
+    }
+
+    let ratio = max_step / distance;
+    let position = NativePetPosition {
+        x: (f64::from(current_position.x) + dx * ratio).round() as i32,
+        y: (f64::from(current_position.y) + dy * ratio).round() as i32,
+    };
+
+    NativePetScriptedWalkStep {
+        animation,
+        finished: false,
+        movement_dx: f64::from(position.x - current_position.x),
+        position,
+    }
 }
 
 fn native_pet_edge_runout_after_inertia_step(
@@ -1163,6 +1626,16 @@ fn native_pet_requested_animation_for_control_animation(
     }
 
     control_animation
+}
+
+fn native_pet_requested_animation_after_pointer_interaction(
+    requested: NativePetAnimationName,
+) -> NativePetAnimationName {
+    if matches!(requested, NativePetAnimationName::Sleep) {
+        return NativePetAnimationName::Idle;
+    }
+
+    requested
 }
 
 fn native_pet_fallen_get_up_animation(
@@ -1566,10 +2039,13 @@ mod tests {
     use crate::native_pet::{
         animation::{native_pet_requested_animation_fallback, NativePetAnimationName},
         assets::load_default_pet_animation_set,
-        coordinates::{NativePetLogicalPoint, NativePetLogicalVelocity, NativePetPosition},
+        coordinates::{
+            NativePetLogicalPoint, NativePetLogicalRect, NativePetLogicalSize,
+            NativePetLogicalVelocity, NativePetPosition,
+        },
         drag_state::{NativePetDragPhase, NativePetDragStateMachine},
         geometry::NativePetFacing,
-        process::NativePetLayer,
+        process::{NativePetLayer, NativePetWalkEdge, NativePetWalkTarget},
     };
 
     use super::validate_layer_shell_availability;
@@ -1580,14 +2056,17 @@ mod tests {
         native_pet_fallen_get_up_animation, native_pet_frame_dt_seconds,
         native_pet_idle_lifecycle_elapsed_ms, native_pet_open_chat_click_matches,
         native_pet_pointer_cursor_name, native_pet_pointer_press_can_open_chat,
+        native_pet_requested_animation_after_pointer_interaction,
         native_pet_requested_animation_for_control_animation,
         native_pet_should_apply_lifecycle_animation, native_pet_should_block_pointer_interaction,
         native_pet_should_keep_fallen_waiting, native_pet_should_keep_scripted_action_playing,
-        native_pet_should_start_pointer_interaction, native_pet_task_presence_animation,
-        native_pet_task_presence_elapsed_ms, native_pet_window_local_pointer_tracking_position,
-        record_native_pet_drag_motion_sample, take_native_pet_drag_frame_update,
-        NativePetDragState, NativePetEdgeRunoutState, NativePetOpenChatClick,
-        NATIVE_PET_EDGE_RUNOUT_MAX_MS, NATIVE_PET_EDGE_RUNOUT_MIN_MS,
+        native_pet_should_start_pointer_interaction, native_pet_step_scripted_walk,
+        native_pet_task_presence_animation, native_pet_task_presence_elapsed_ms,
+        native_pet_visible_walk_edge_target_position_for_bounds,
+        native_pet_visible_walk_target_position_for_bounds,
+        native_pet_window_local_pointer_tracking_position, record_native_pet_drag_motion_sample,
+        take_native_pet_drag_frame_update, NativePetDragState, NativePetEdgeRunoutState,
+        NativePetOpenChatClick, NATIVE_PET_EDGE_RUNOUT_MAX_MS, NATIVE_PET_EDGE_RUNOUT_MIN_MS,
     };
     use crate::native_pet::physics_params::NativePetPhysicsParams;
 
@@ -1667,6 +2146,120 @@ mod tests {
         assert_eq!(
             native_pet_frame_dt_seconds(Some(1_000_000), 1_016_000, &params),
             0.016
+        );
+    }
+
+    #[test]
+    fn scripted_walk_advances_toward_target_with_directional_run_animation() {
+        let step = native_pet_step_scripted_walk(
+            NativePetPosition { x: 400, y: 700 },
+            NativePetPosition { x: 0, y: 700 },
+            100,
+        );
+
+        assert_eq!(step.animation, NativePetAnimationName::RunLeft);
+        assert!(!step.finished);
+        assert!(step.position.x < 400);
+        assert_eq!(step.position.y, 700);
+        assert!(step.movement_dx < 0.0);
+    }
+
+    #[test]
+    fn scripted_walk_finishes_when_next_step_reaches_target() {
+        let step = native_pet_step_scripted_walk(
+            NativePetPosition { x: 0, y: 700 },
+            NativePetPosition { x: 24, y: 700 },
+            100,
+        );
+
+        assert_eq!(step.animation, NativePetAnimationName::RunRight);
+        assert!(step.finished);
+        assert_eq!(step.position, NativePetPosition { x: 24, y: 700 });
+    }
+
+    #[test]
+    fn scripted_walk_edge_targets_keep_pet_fully_visible() {
+        let bounds = NativePetLogicalRect::new(0, 0, 1920, 1040);
+        let window_size = NativePetLogicalSize::new(240, 180);
+        let current_position = NativePetPosition { x: -144, y: 990 };
+
+        assert_eq!(
+            native_pet_visible_walk_edge_target_position_for_bounds(
+                current_position,
+                window_size,
+                NativePetWalkEdge::Left,
+                bounds,
+                24,
+            ),
+            NativePetPosition { x: 24, y: 836 }
+        );
+        assert_eq!(
+            native_pet_visible_walk_edge_target_position_for_bounds(
+                current_position,
+                window_size,
+                NativePetWalkEdge::Right,
+                bounds,
+                24,
+            ),
+            NativePetPosition { x: 1656, y: 836 }
+        );
+        assert_eq!(
+            native_pet_visible_walk_edge_target_position_for_bounds(
+                current_position,
+                window_size,
+                NativePetWalkEdge::Top,
+                bounds,
+                24,
+            ),
+            NativePetPosition { x: 24, y: 24 }
+        );
+        assert_eq!(
+            native_pet_visible_walk_edge_target_position_for_bounds(
+                current_position,
+                window_size,
+                NativePetWalkEdge::Bottom,
+                bounds,
+                24,
+            ),
+            NativePetPosition { x: 24, y: 836 }
+        );
+    }
+
+    #[test]
+    fn scripted_walk_named_targets_resolve_inside_visible_bounds() {
+        let bounds = NativePetLogicalRect::new(0, 40, 2560, 1400);
+        let window_size = NativePetLogicalSize::new(240, 180);
+        let current_position = NativePetPosition { x: 1200, y: 700 };
+
+        assert_eq!(
+            native_pet_visible_walk_target_position_for_bounds(
+                current_position,
+                window_size,
+                NativePetWalkTarget::Center,
+                bounds,
+                24,
+            ),
+            NativePetPosition { x: 1160, y: 650 }
+        );
+        assert_eq!(
+            native_pet_visible_walk_target_position_for_bounds(
+                current_position,
+                window_size,
+                NativePetWalkTarget::Home,
+                bounds,
+                24,
+            ),
+            NativePetPosition { x: 2296, y: 1236 }
+        );
+        assert_eq!(
+            native_pet_visible_walk_target_position_for_bounds(
+                current_position,
+                window_size,
+                NativePetWalkTarget::Position { x: -900, y: 3000 },
+                bounds,
+                24,
+            ),
+            NativePetPosition { x: 24, y: 1236 }
         );
     }
 
@@ -2074,6 +2667,31 @@ mod tests {
                 NativePetAnimationName::Sleep,
             ),
             NativePetAnimationName::Sleep
+        );
+    }
+
+    #[test]
+    fn pointer_interaction_clears_sleep_request_without_clearing_task_requests() {
+        let requested =
+            native_pet_requested_animation_after_pointer_interaction(NativePetAnimationName::Sleep);
+        assert_eq!(requested, NativePetAnimationName::Idle);
+        assert_eq!(
+            native_pet_animation_for_lifecycle(
+                false,
+                false,
+                false,
+                requested,
+                NativePetAnimationName::Wake,
+                0,
+                0,
+            ),
+            NativePetAnimationName::Idle
+        );
+        assert_eq!(
+            native_pet_requested_animation_after_pointer_interaction(
+                NativePetAnimationName::Working,
+            ),
+            NativePetAnimationName::Working
         );
     }
 

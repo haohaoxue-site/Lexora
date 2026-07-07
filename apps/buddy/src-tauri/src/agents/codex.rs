@@ -1,7 +1,7 @@
 use std::{
     io::Write,
     path::{Path, PathBuf},
-    process::{Command, Stdio},
+    process::Stdio,
     sync::{
         atomic::{AtomicBool, Ordering},
         Arc,
@@ -12,7 +12,9 @@ use std::{
 
 use crate::{
     agents::redaction::sanitize_process_stderr_line,
-    agents::subprocess_env::{apply_agent_subprocess_env, apply_agent_subprocess_env_from},
+    agents::subprocess_env::{
+        create_agent_subprocess_command, create_agent_subprocess_command_from_env,
+    },
     error::{BuddyError, BuddyResult},
 };
 
@@ -215,13 +217,12 @@ pub fn run_codex_exec_with_cancellation(
     cwd: Option<&str>,
     cancellation: Option<Arc<AtomicBool>>,
 ) -> BuddyResult<CodexExecOutput> {
-    let mut command = Command::new("codex");
+    let mut command = create_agent_subprocess_command(Path::new("codex"));
     command
         .args(build_codex_exec_args(output_path, cwd))
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
-    apply_agent_subprocess_env(&mut command);
 
     let mut child = command
         .spawn()
@@ -311,9 +312,8 @@ fn run_codex_probe_with_program_and_env<const N: usize>(
     args: [&str; N],
     env_source: impl IntoIterator<Item = (String, String)>,
 ) -> Option<String> {
-    let mut command = Command::new(program);
+    let mut command = create_agent_subprocess_command_from_env(program, env_source);
     command.args(args);
-    apply_agent_subprocess_env_from(&mut command, env_source);
     let output = command.output().ok()?;
     if !output.status.success() {
         return None;
@@ -331,9 +331,8 @@ fn run_codex_output_probe_with_program_and_env<const N: usize>(
     args: [&str; N],
     env_source: impl IntoIterator<Item = (String, String)>,
 ) -> Option<String> {
-    let mut command = Command::new(program);
+    let mut command = create_agent_subprocess_command_from_env(program, env_source);
     command.args(args);
-    apply_agent_subprocess_env_from(&mut command, env_source);
     let output = command.output().ok()?;
     let stdout = String::from_utf8_lossy(&output.stdout);
     let stderr = String::from_utf8_lossy(&output.stderr);
@@ -495,5 +494,37 @@ printf '%s\n' "NODE_OPTIONS=${NODE_OPTIONS-unset}"
         assert!(output.contains("NODE_OPTIONS=unset"));
 
         let _ = fs::remove_dir_all(temp_dir);
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn codex_probe_discovers_cli_from_user_runtime_path_when_desktop_path_is_minimal() {
+        use std::{fs, os::unix::fs::PermissionsExt};
+
+        let home = std::env::temp_dir().join(format!(
+            "lexora-buddy-codex-desktop-env-{}",
+            uuid::Uuid::new_v4()
+        ));
+        let pnpm_bin = home.join(".local/share/pnpm/bin");
+        fs::create_dir_all(&pnpm_bin).expect("create pnpm bin");
+        let script_path = pnpm_bin.join("codex");
+        fs::write(&script_path, "#!/bin/sh\nprintf '%s\n' 'codex-cli 9.9.9'\n")
+            .expect("write fake codex");
+        fs::set_permissions(&script_path, fs::Permissions::from_mode(0o755))
+            .expect("make fake codex executable");
+
+        let output = run_codex_probe_with_program_and_env(
+            Path::new("codex"),
+            ["--version"],
+            vec![
+                ("HOME".to_owned(), home.to_string_lossy().into_owned()),
+                ("PATH".to_owned(), "/usr/bin".to_owned()),
+            ],
+        )
+        .expect("probe should find codex from inferred user runtime path");
+
+        assert!(output.contains("codex-cli 9.9.9"));
+
+        let _ = fs::remove_dir_all(home);
     }
 }

@@ -584,6 +584,7 @@ fn project_chat_run_event_payload(event_type: &str, payload: Value) -> Value {
     };
 
     match event_type {
+        "host.action" => project_host_action_payload(&payload),
         "animation.intent" => project_selected_payload(
             &payload,
             &[
@@ -708,6 +709,38 @@ fn project_message_delta_payload(payload: &Map<String, Value>) -> Value {
         "delta",
         CHAT_EVENT_TEXT_MAX_CHARS,
         1,
+    );
+
+    Value::Object(projected)
+}
+
+fn project_host_action_payload(payload: &Map<String, Value>) -> Value {
+    let mut projected = Map::new();
+    for key in [
+        "action",
+        "after",
+        "animation",
+        "durationMs",
+        "priority",
+        "reason",
+        "source",
+        "version",
+    ] {
+        insert_compact_value(&mut projected, payload, key, CHAT_EVENT_FIELD_MAX_CHARS, 1);
+    }
+    insert_compact_value(
+        &mut projected,
+        payload,
+        "target",
+        CHAT_EVENT_FIELD_MAX_CHARS,
+        2,
+    );
+    insert_compact_value(
+        &mut projected,
+        payload,
+        "steps",
+        CHAT_EVENT_FIELD_MAX_CHARS,
+        4,
     );
 
     Value::Object(projected)
@@ -1430,6 +1463,32 @@ mod tests {
         assert_eq!(projected["externalThreadId"], json!("thread-1"));
         assert_eq!(projected["protocol"], json!("codex_app_server"));
         assert!(projected.get("conversationId").is_none());
+    }
+
+    #[test]
+    fn projects_host_action_for_chat_events_without_flattening_steps() {
+        let projected = project_chat_run_event_payload(
+            "host.action",
+            json!({
+                "version": 1,
+                "action": "sequence",
+                "source": "buddy_builtin_host_skill",
+                "steps": [
+                    { "type": "move", "target": { "kind": "center" } },
+                    { "type": "animation", "animation": "celebrate", "durationMs": 3000 },
+                    { "type": "move", "target": { "kind": "home" }, "after": "sleep" }
+                ],
+                "debugBlob": "internal-only"
+            }),
+        );
+
+        assert_eq!(projected["action"], json!("sequence"));
+        assert_eq!(projected["version"], json!(1));
+        assert_eq!(projected["steps"][0]["target"]["kind"], json!("center"));
+        assert_eq!(projected["steps"][1]["animation"], json!("celebrate"));
+        assert_eq!(projected["steps"][2]["target"]["kind"], json!("home"));
+        assert_eq!(projected["steps"][2]["after"], json!("sleep"));
+        assert!(projected.get("debugBlob").is_none());
     }
 
     #[test]

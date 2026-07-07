@@ -1,7 +1,10 @@
 use crate::agents::{
     claude::{self, ClaudeRuntimeStatus},
     codex::{self, CodexRuntimeStatus},
-    subprocess_env::{summarize_current_agent_subprocess_env, AgentSubprocessEnvSummary},
+    subprocess_env::{
+        build_agent_subprocess_env, summarize_current_agent_subprocess_env,
+        AgentSubprocessEnvSummary,
+    },
 };
 
 #[derive(serde::Serialize)]
@@ -38,8 +41,9 @@ pub fn detect_runtime_diagnostics() -> BuddyRuntimeDiagnostics {
     let codex_status = codex::detect_codex_runtime_status();
     let claude_status = claude::detect_claude_runtime_status();
     let subprocess_env = summarize_current_agent_subprocess_env();
-    let codex_home = std::env::var("CODEX_HOME")
-        .ok()
+    let effective_env = build_agent_subprocess_env(std::env::vars());
+    let codex_home = effective_env
+        .get("CODEX_HOME")
         .map(|value| value.trim().to_owned())
         .filter(|value| !value.is_empty());
     let app_server_smoke = if codex_status.app_server_available {

@@ -7,6 +7,7 @@ import type {
 } from '@/chat/buddyChatWorkspace'
 import type { BuddyChatDraftAttachment } from '@/chat/chatAttachmentView'
 import type {
+  BuddyApproval,
   BuddyChatModelSelection,
   BuddyChatPromptContextItem,
   BuddyChatRunEvent,
@@ -39,11 +40,15 @@ import { resolveBuddyLocale, translateBuddy } from '@/i18n/buddyI18n'
 import { createAsyncEventQueue } from '@/lib/asyncEventQueue'
 import { isTauriRuntime, normalizeBuddyCommandError } from '@/lib/invokeClient'
 import {
+  approveBuddyCodexAppServerRequestApproval,
+  approveBuddyReadOnlyTask,
   authorizeBuddyProjectFromFolderPicker,
   cancelBuddyChatRun,
   createBrowserCodexRuntimeStatus,
   deleteBuddyConversation,
+  denyBuddyApproval,
   getBuddyRun,
+  listBuddyApprovals,
   listBuddyChatConversationEvents,
   listBuddyChatRunEvents,
   listBuddyConversationMessages,
@@ -70,6 +75,7 @@ const RUN_EVENT_POLL_INTERVAL_MS = 360
 const RUN_EVENT_SIGNAL_FALLBACK_MS = 3000
 const RUN_EVENT_POLL_TIMEOUT_MS = 30 * 60 * 1000
 const WORKSPACE_STATE_KEY = 'buddy.chat.workspace'
+const CODEX_APP_SERVER_REQUEST_APPROVAL_KIND = 'run.codex_app_server_request'
 
 export function useBuddyWorkspaceChat(options: {
   language?: () => string
@@ -82,10 +88,12 @@ export function useBuddyWorkspaceChat(options: {
   const draft = shallowRef<BuddyChatDraftState>(createEmptyBuddyChatDraft())
   const messages = shallowRef<ReadonlyArray<BuddyMessage>>([])
   const runEvents = shallowRef<ReadonlyArray<BuddyChatRunEvent>>([])
+  const approvals = shallowRef<ReadonlyArray<BuddyApproval>>([])
   const errorMessage = shallowRef<string | null>(null)
   const isDrawerOpen = shallowRef(false)
   const isAuthorizingProject = shallowRef(false)
   const isLoading = shallowRef(false)
+  const isResolvingApproval = shallowRef(false)
   const isSending = shallowRef(false)
   const composerVersion = shallowRef(0)
   const activeRunId = shallowRef<string | null>(null)
@@ -133,6 +141,16 @@ export function useBuddyWorkspaceChat(options: {
   const composerDraft = computed(() =>
     currentTarget.value.kind === 'draft' ? draft.value : null,
   )
+  const pendingApprovals = computed(() =>
+    approvals.value.filter(approval =>
+      isPendingApprovalVisibleForCurrentTarget({
+        activeRunId: activeRunId.value,
+        approval,
+        runs: runs.value,
+        target: currentTarget.value,
+      }),
+    ),
+  )
 
   function t(key: Parameters<typeof translateBuddy>[1]) {
     return translateBuddy(resolveBuddyLocale(options.language?.() ?? 'zh-CN'), key)
@@ -152,14 +170,23 @@ export function useBuddyWorkspaceChat(options: {
         draft.value = createEmptyBuddyChatDraft()
         messages.value = []
         runEvents.value = []
+        approvals.value = []
         composerVersion.value += 1
         return
       }
 
-      const [nextProjects, nextConversations, nextRuns, codexStatus, workspaceSetting] = await Promise.all([
+      const [
+        nextProjects,
+        nextConversations,
+        nextRuns,
+        nextApprovals,
+        codexStatus,
+        workspaceSetting,
+      ] = await Promise.all([
         listBuddyProjects(),
         listBuddyConversations(),
         listBuddyRuns({ limit: 100 }),
+        listBuddyApprovals({ status: 'pending' }),
         loadBuddyCodexRuntimeStatus(),
         readBuddySettingJson(WORKSPACE_STATE_KEY),
       ])
@@ -174,6 +201,7 @@ export function useBuddyWorkspaceChat(options: {
       projects.value = nextProjects
       conversations.value = nextConversations
       runs.value = nextRuns
+      approvals.value = nextApprovals
       draft.value = restored.draft
       currentTarget.value = resolveRestoredTarget(
         restored.lastTarget,
@@ -278,6 +306,7 @@ export function useBuddyWorkspaceChat(options: {
           : createGlobalDraftTarget()
         messages.value = []
         runEvents.value = []
+        await refreshPendingApprovals()
         composerVersion.value += 1
       }
 
@@ -437,6 +466,7 @@ export function useBuddyWorkspaceChat(options: {
     try {
       const cancelledRun = await cancelBuddyChatRun(runId)
       runs.value = mergeBuddyRunSnapshots(runs.value, [cancelledRun])
+      await refreshPendingApprovals()
       if (cancelledRun.conversationId)
         queueTurnReconcile(cancelledRun.conversationId)
       else
@@ -450,6 +480,56 @@ export function useBuddyWorkspaceChat(options: {
 
   function setErrorMessage(message: string | null) {
     errorMessage.value = message
+  }
+
+  async function approveApproval(approvalId: string, approvalKind: string) {
+    if (!approvalId || isResolvingApproval.value)
+      return false
+
+    isResolvingApproval.value = true
+    errorMessage.value = null
+
+    try {
+      const result = approvalKind === CODEX_APP_SERVER_REQUEST_APPROVAL_KIND
+        ? await approveBuddyCodexAppServerRequestApproval(approvalId)
+        : await approveBuddyReadOnlyTask(approvalId)
+      applyApprovalResolution(result)
+      await refreshPendingApprovals()
+      return true
+    }
+    catch (error) {
+      const message = normalizeBuddyCommandError(error).message
+      await refreshPendingApprovals()
+      errorMessage.value = message
+      return false
+    }
+    finally {
+      isResolvingApproval.value = false
+    }
+  }
+
+  async function denyApproval(approvalId: string) {
+    if (!approvalId || isResolvingApproval.value)
+      return false
+
+    isResolvingApproval.value = true
+    errorMessage.value = null
+
+    try {
+      const result = await denyBuddyApproval(approvalId)
+      applyApprovalResolution(result)
+      await refreshPendingApprovals()
+      return true
+    }
+    catch (error) {
+      const message = normalizeBuddyCommandError(error).message
+      await refreshPendingApprovals()
+      errorMessage.value = message
+      return false
+    }
+    finally {
+      isResolvingApproval.value = false
+    }
   }
 
   async function refreshConversationForCurrentTarget() {
@@ -478,15 +558,26 @@ export function useBuddyWorkspaceChat(options: {
   }
 
   async function refreshCollections() {
-    const [nextProjects, nextConversations, nextRuns] = await Promise.all([
+    const [nextProjects, nextConversations, nextRuns, nextApprovals] = await Promise.all([
       listBuddyProjects(),
       listBuddyConversations(),
       listBuddyRuns({ limit: 100 }),
+      listBuddyApprovals({ status: 'pending' }),
     ])
     projects.value = nextProjects
     conversations.value = nextConversations
     runs.value = nextRuns
+    approvals.value = nextApprovals
     currentTarget.value = resolveAvailableTarget(currentTarget.value, nextConversations, draft.value)
+  }
+
+  async function refreshPendingApprovals() {
+    if (!isTauriRuntime()) {
+      approvals.value = []
+      return
+    }
+
+    approvals.value = await listBuddyApprovals({ status: 'pending' })
   }
 
   function releaseSendingRun(sendingRunId: string | null) {
@@ -532,15 +623,21 @@ export function useBuddyWorkspaceChat(options: {
     const startedAt = Date.now()
 
     for (;;) {
-      const [nextEvents, nextRun]: [ReadonlyArray<BuddyChatRunEvent>, BuddyRun] = await Promise.all([
+      const [nextEvents, nextRun, nextApprovals]: [
+        ReadonlyArray<BuddyChatRunEvent>,
+        BuddyRun,
+        ReadonlyArray<BuddyApproval>,
+      ] = await Promise.all([
         listBuddyChatRunEvents({
           afterId,
           limit: 100,
           runId,
         }),
         getBuddyRun(runId),
+        listBuddyApprovals({ status: 'pending' }),
       ])
       runs.value = mergeBuddyRunSnapshots(runs.value, [nextRun])
+      approvals.value = nextApprovals
 
       if (nextEvents.length > 0) {
         events.push(...nextEvents)
@@ -604,6 +701,39 @@ export function useBuddyWorkspaceChat(options: {
     return runEventSignalGate.waitForRun(runId, RUN_EVENT_SIGNAL_FALLBACK_MS)
   }
 
+  function applyApprovalResolution(result: unknown) {
+    const events = extractApprovalResolutionEvents(result)
+    if (events.length > 0) {
+      mergeCurrentRunEvents(events)
+      for (const event of events)
+        runEventSignalGate.signalRun(event.runId)
+    }
+    const run = extractApprovalResolutionRun(result)
+    if (run)
+      runs.value = mergeBuddyRunSnapshots(runs.value, [run])
+  }
+
+  function mergeCurrentRunEvents(nextEvents: ReadonlyArray<BuddyChatRunEvent>) {
+    if (currentTarget.value.kind !== 'conversation') {
+      return
+    }
+
+    const conversationId = currentTarget.value.conversationId
+    const visibleRunIds = new Set(
+      runs.value
+        .filter(run => run.conversationId === conversationId)
+        .map(run => run.id),
+    )
+    if (activeRunId.value)
+      visibleRunIds.add(activeRunId.value)
+
+    const relevantEvents = nextEvents.filter(event => visibleRunIds.has(event.runId))
+    if (relevantEvents.length === 0)
+      return
+
+    runEvents.value = mergeBuddyChatRunEvents(runEvents.value, relevantEvents)
+  }
+
   function scheduleWorkspacePersistence() {
     if (!hasHydratedWorkspace)
       return
@@ -640,12 +770,15 @@ export function useBuddyWorkspaceChat(options: {
 
   return {
     runtimeStatus: readonly(runtimeStatus),
+    approvals: pendingApprovals,
+    approveApproval,
     authorizeProjectFromFolderPicker,
     closeDrawer,
     composerDraft,
     composerVersion: readonly(composerVersion),
     conversations: readonly(conversations),
     currentTarget: readonly(currentTarget),
+    denyApproval,
     deleteConversation,
     draft: readonly(draft),
     errorMessage: readonly(errorMessage),
@@ -655,6 +788,7 @@ export function useBuddyWorkspaceChat(options: {
     isAuthorizingProject: readonly(isAuthorizingProject),
     isDrawerOpen,
     isLoading: readonly(isLoading),
+    isResolvingApproval: readonly(isResolvingApproval),
     isSending: readonly(isSending),
     messages: readonly(messages),
     openDrawer,
@@ -734,4 +868,71 @@ function resolveRunFailureMessage(
   }
 
   return translate('chat.codexRunFailed')
+}
+
+function isPendingApprovalVisibleForCurrentTarget(options: {
+  activeRunId: string | null
+  approval: BuddyApproval
+  runs: ReadonlyArray<BuddyRun>
+  target: BuddyChatWorkspaceTarget
+}) {
+  if (options.approval.status !== 'pending' || !options.approval.runId)
+    return false
+  if (options.activeRunId === options.approval.runId)
+    return true
+  if (options.target.kind !== 'conversation')
+    return false
+
+  const conversationId = options.target.conversationId
+  return options.runs.some(run =>
+    run.id === options.approval.runId
+    && run.conversationId === conversationId,
+  )
+}
+
+function extractApprovalResolutionEvents(result: unknown): ReadonlyArray<BuddyChatRunEvent> {
+  if (typeof result !== 'object' || result === null)
+    return []
+
+  const record = result as { event?: unknown, events?: unknown }
+  if (isBuddyChatRunEvent(record.event))
+    return [record.event]
+  if (Array.isArray(record.events))
+    return record.events.filter(isBuddyChatRunEvent)
+
+  return []
+}
+
+function extractApprovalResolutionRun(result: unknown): BuddyRun | null {
+  if (typeof result !== 'object' || result === null)
+    return null
+
+  const run = (result as { run?: unknown }).run
+  return isBuddyRun(run) ? run : null
+}
+
+function isBuddyChatRunEvent(value: unknown): value is BuddyChatRunEvent {
+  return typeof value === 'object'
+    && value !== null
+    && typeof (value as BuddyChatRunEvent).id === 'number'
+    && typeof (value as BuddyChatRunEvent).runId === 'string'
+    && typeof (value as BuddyChatRunEvent).eventType === 'string'
+}
+
+function isBuddyRun(value: unknown): value is BuddyRun {
+  return typeof value === 'object'
+    && value !== null
+    && typeof (value as BuddyRun).id === 'string'
+    && typeof (value as BuddyRun).status === 'string'
+}
+
+function mergeBuddyChatRunEvents(
+  currentEvents: ReadonlyArray<BuddyChatRunEvent>,
+  nextEvents: ReadonlyArray<BuddyChatRunEvent>,
+) {
+  const eventByKey = new Map<string, BuddyChatRunEvent>()
+  for (const event of [...currentEvents, ...nextEvents])
+    eventByKey.set(`${event.runId}:${event.id}`, event)
+
+  return [...eventByKey.values()].sort((first, second) => first.id - second.id)
 }

@@ -91,6 +91,7 @@ pub fn run() {
             commands::approve_buddy_codex_app_server_request_approval,
             commands::approve_buddy_read_only_task,
             commands::cancel_buddy_chat_run,
+            commands::control_buddy_native_pet_host_action,
             commands::count_buddy_run_events,
             commands::create_buddy_message,
             commands::create_buddy_session,

@@ -1,4 +1,8 @@
-use std::{collections::BTreeMap, process::Command};
+use std::{
+    collections::BTreeMap,
+    path::{Path, PathBuf},
+    process::Command,
+};
 
 const AGENT_SUBPROCESS_ENV_ALLOWLIST: &[&str] = &[
     "ALL_PROXY",
@@ -27,6 +31,7 @@ const AGENT_SUBPROCESS_ENV_ALLOWLIST: &[&str] = &[
     "OPENAI_ORG_ID",
     "OPENAI_PROJECT",
     "PATH",
+    "PNPM_HOME",
     "REQUESTS_CA_BUNDLE",
     "SHELL",
     "SSL_CERT_DIR",
@@ -55,16 +60,24 @@ pub struct AgentSubprocessEnvSummary {
     pub blocked_keys: Vec<String>,
 }
 
-pub fn apply_agent_subprocess_env(command: &mut Command) {
-    apply_agent_subprocess_env_from(command, std::env::vars());
+pub fn create_agent_subprocess_command(program: &Path) -> Command {
+    create_agent_subprocess_command_from_env(program, std::env::vars())
 }
 
-pub fn apply_agent_subprocess_env_from(
-    command: &mut Command,
+pub fn create_agent_subprocess_command_from_env(
+    program: &Path,
     source: impl IntoIterator<Item = (String, String)>,
-) {
+) -> Command {
+    let env = build_agent_subprocess_env(source);
+    let mut command = Command::new(resolve_agent_subprocess_program(program, &env));
+    apply_agent_subprocess_env_map(&mut command, &env);
+
+    command
+}
+
+pub fn apply_agent_subprocess_env_map(command: &mut Command, env: &BTreeMap<String, String>) {
     command.env_clear();
-    for (key, value) in build_agent_subprocess_env(source) {
+    for (key, value) in env {
         command.env(key, value);
     }
 }
@@ -72,10 +85,14 @@ pub fn apply_agent_subprocess_env_from(
 pub fn build_agent_subprocess_env(
     source: impl IntoIterator<Item = (String, String)>,
 ) -> BTreeMap<String, String> {
-    source
+    let mut env = source
         .into_iter()
         .filter(|(key, _)| should_pass_agent_subprocess_env_key(key))
-        .collect()
+        .collect::<BTreeMap<_, _>>();
+
+    enrich_agent_subprocess_env(&mut env);
+
+    env
 }
 
 pub fn summarize_current_agent_subprocess_env() -> AgentSubprocessEnvSummary {
@@ -85,13 +102,15 @@ pub fn summarize_current_agent_subprocess_env() -> AgentSubprocessEnvSummary {
 pub fn summarize_agent_subprocess_env(
     source: impl IntoIterator<Item = (String, String)>,
 ) -> AgentSubprocessEnvSummary {
-    let mut passed_keys = Vec::new();
+    let source = source.into_iter().collect::<Vec<_>>();
+    let effective_env = build_agent_subprocess_env(source.clone());
+    let mut passed_keys = effective_env.keys().cloned().collect::<Vec<_>>();
     let mut blocked_keys = Vec::new();
 
     for (key, _) in source {
-        if should_pass_agent_subprocess_env_key(&key) {
-            passed_keys.push(key);
-        } else if should_report_blocked_agent_subprocess_env_key(&key) {
+        if !should_pass_agent_subprocess_env_key(&key)
+            && should_report_blocked_agent_subprocess_env_key(&key)
+        {
             blocked_keys.push(key);
         }
     }
@@ -111,6 +130,134 @@ pub fn should_pass_agent_subprocess_env_key(key: &str) -> bool {
     AGENT_SUBPROCESS_ENV_ALLOWLIST.contains(&key)
 }
 
+pub fn resolve_agent_subprocess_program(program: &Path, env: &BTreeMap<String, String>) -> PathBuf {
+    if program.is_absolute() || program.components().count() != 1 {
+        return program.to_path_buf();
+    }
+
+    let Some(program_name) = program.to_str().filter(|value| !value.is_empty()) else {
+        return program.to_path_buf();
+    };
+    let Some(path) = env.get("PATH") else {
+        return program.to_path_buf();
+    };
+
+    for dir in std::env::split_paths(path) {
+        let candidate = dir.join(program_name);
+        if is_executable_file(&candidate) {
+            return candidate;
+        }
+    }
+
+    program.to_path_buf()
+}
+
+fn enrich_agent_subprocess_env(env: &mut BTreeMap<String, String>) {
+    let Some(home) = env
+        .get("HOME")
+        .map(|value| value.trim())
+        .filter(|value| !value.is_empty())
+        .map(PathBuf::from)
+    else {
+        return;
+    };
+
+    prepend_existing_user_runtime_dirs(env, &home);
+    infer_codex_home(env, &home);
+}
+
+fn prepend_existing_user_runtime_dirs(env: &mut BTreeMap<String, String>, home: &Path) {
+    let mut current_paths = env
+        .get("PATH")
+        .map(|path| std::env::split_paths(path).collect::<Vec<_>>())
+        .unwrap_or_default();
+    let mut discovered_paths = candidate_user_runtime_dirs(env, home)
+        .into_iter()
+        .filter(|path| path.is_dir())
+        .filter(|path| !current_paths.iter().any(|current| current == path))
+        .collect::<Vec<_>>();
+
+    if discovered_paths.is_empty() {
+        return;
+    }
+
+    discovered_paths.append(&mut current_paths);
+    if let Ok(joined) = std::env::join_paths(discovered_paths) {
+        env.insert("PATH".to_owned(), joined.to_string_lossy().into_owned());
+    }
+}
+
+fn candidate_user_runtime_dirs(env: &BTreeMap<String, String>, home: &Path) -> Vec<PathBuf> {
+    let mut dirs = Vec::new();
+
+    if let Some(pnpm_home) = env
+        .get("PNPM_HOME")
+        .map(|value| value.trim())
+        .filter(|value| !value.is_empty())
+    {
+        let pnpm_home = PathBuf::from(pnpm_home);
+        dirs.push(pnpm_home.join("bin"));
+        dirs.push(pnpm_home);
+    }
+
+    let xdg_data_home = env
+        .get("XDG_DATA_HOME")
+        .map(|value| value.trim())
+        .filter(|value| !value.is_empty())
+        .map(PathBuf::from)
+        .unwrap_or_else(|| home.join(".local/share"));
+
+    dirs.push(xdg_data_home.join("pnpm/bin"));
+    dirs.push(xdg_data_home.join("pnpm"));
+    dirs.push(home.join(".local/bin"));
+    dirs.push(home.join("bin"));
+    dirs.push(home.join(".cargo/bin"));
+    dirs.push(home.join(".bun/bin"));
+    dirs.push(home.join(".deno/bin"));
+    dirs.push(home.join(".npm-global/bin"));
+    dirs.push(home.join(".yarn/bin"));
+
+    dirs
+}
+
+fn infer_codex_home(env: &mut BTreeMap<String, String>, home: &Path) {
+    if env
+        .get("CODEX_HOME")
+        .is_some_and(|value| !value.trim().is_empty())
+    {
+        return;
+    }
+
+    let codex_home = home.join(".codex");
+    if codex_home.is_dir() {
+        env.insert(
+            "CODEX_HOME".to_owned(),
+            codex_home.to_string_lossy().into_owned(),
+        );
+    }
+}
+
+fn is_executable_file(path: &Path) -> bool {
+    let Ok(metadata) = path.metadata() else {
+        return false;
+    };
+    if !metadata.is_file() {
+        return false;
+    }
+
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+
+        metadata.permissions().mode() & 0o111 != 0
+    }
+
+    #[cfg(not(unix))]
+    {
+        true
+    }
+}
+
 fn should_report_blocked_agent_subprocess_env_key(key: &str) -> bool {
     let upper = key.to_ascii_uppercase();
     upper == "APP_INTERNAL_KEY"
@@ -126,6 +273,65 @@ fn should_report_blocked_agent_subprocess_env_key(key: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    #[cfg(unix)]
+    fn agent_subprocess_env_discovers_user_runtime_paths_and_codex_home() {
+        use std::fs;
+
+        let home = std::env::temp_dir().join(format!(
+            "lexora-buddy-agent-env-home-{}",
+            uuid::Uuid::new_v4()
+        ));
+        let pnpm_bin = home.join(".local/share/pnpm/bin");
+        let codex_home = home.join(".codex");
+        fs::create_dir_all(&pnpm_bin).expect("create pnpm bin");
+        fs::create_dir_all(&codex_home).expect("create codex home");
+
+        let env = build_agent_subprocess_env([
+            ("PATH".to_owned(), "/usr/bin".to_owned()),
+            ("HOME".to_owned(), home.to_string_lossy().into_owned()),
+        ]);
+        let path_entries =
+            std::env::split_paths(env.get("PATH").expect("PATH")).collect::<Vec<_>>();
+
+        assert_eq!(path_entries.first(), Some(&pnpm_bin));
+        assert_eq!(
+            env.get("CODEX_HOME").map(String::as_str),
+            Some(codex_home.to_string_lossy().as_ref())
+        );
+
+        let _ = fs::remove_dir_all(home);
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn resolves_agent_program_from_effective_user_runtime_path() {
+        use std::{fs, os::unix::fs::PermissionsExt, path::Path};
+
+        let home = std::env::temp_dir().join(format!(
+            "lexora-buddy-agent-program-home-{}",
+            uuid::Uuid::new_v4()
+        ));
+        let pnpm_bin = home.join(".local/share/pnpm/bin");
+        fs::create_dir_all(&pnpm_bin).expect("create pnpm bin");
+        let codex_path = pnpm_bin.join("codex");
+        fs::write(&codex_path, "#!/bin/sh\n").expect("write fake codex");
+        fs::set_permissions(&codex_path, fs::Permissions::from_mode(0o755))
+            .expect("make fake codex executable");
+
+        let env = build_agent_subprocess_env([
+            ("PATH".to_owned(), "/usr/bin".to_owned()),
+            ("HOME".to_owned(), home.to_string_lossy().into_owned()),
+        ]);
+
+        assert_eq!(
+            resolve_agent_subprocess_program(Path::new("codex"), &env),
+            codex_path
+        );
+
+        let _ = fs::remove_dir_all(home);
+    }
 
     #[test]
     fn agent_subprocess_env_keeps_runtime_provider_proxy_and_certificate_keys() {

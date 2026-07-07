@@ -145,6 +145,9 @@ function resolveRunEventTitle(eventType: BuddyRunEventType, t: BuddyTranslate) {
   if (eventType === 'animation.intent')
     return t('event.animationIntent')
 
+  if (eventType === 'host.action')
+    return t('event.hostAction')
+
   if (eventType === 'assistant.references')
     return t('event.assistantReferences')
 

@@ -1635,6 +1635,7 @@ dependencies = [
  "gdk-pixbuf",
  "glib",
  "gtk",
+ "libc",
  "libloading",
  "rusqlite",
  "serde",

@@ -1,4 +1,5 @@
 import type { BuddyAnimationName } from '@/pet/buddyAnimation'
+import type { BuddyNativePetHostAction } from '@/pet/buddyHostAction'
 import { listen } from '@tauri-apps/api/event'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { invokeBuddyCommand, isTauriRuntime } from '@/lib/invokeClient'
@@ -487,6 +488,7 @@ export type BuddyRunEventType
     | 'approval.resolved'
     | 'assistant.references'
     | 'codex.notification'
+    | 'host.action'
     | 'memory.candidate.created'
     | 'memory.context_pack'
     | 'plan.delta'
@@ -1191,6 +1193,15 @@ export async function setBuddyNativePetAnimation(
     return
 
   await invokeBuddyCommand<void>('set_buddy_native_pet_animation', { animation })
+}
+
+export async function controlBuddyNativePetHostAction(
+  action: BuddyNativePetHostAction,
+): Promise<void> {
+  if (!isTauriRuntime())
+    return
+
+  await invokeBuddyCommand<void>('control_buddy_native_pet_host_action', { action })
 }
 
 function assertDesktopCommandAvailable() {

@@ -14,7 +14,10 @@ use std::{
 
 use crate::{
     agents::redaction::sanitize_process_stderr_line,
-    agents::subprocess_env::{apply_agent_subprocess_env_from, build_agent_subprocess_env},
+    agents::subprocess_env::{
+        apply_agent_subprocess_env_map, build_agent_subprocess_env,
+        resolve_agent_subprocess_program,
+    },
     error::{BuddyError, BuddyResult},
 };
 
@@ -218,15 +221,16 @@ fn spawn_codex_app_server_with_env(
 ) -> std::io::Result<Child> {
     let mut last_error = None;
     let subprocess_env = build_agent_subprocess_env(env_source);
+    let resolved_program = resolve_agent_subprocess_program(program, &subprocess_env);
 
     for attempt in 0..4 {
-        let mut command = Command::new(program);
+        let mut command = Command::new(&resolved_program);
         command
             .arg("app-server")
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped());
-        apply_agent_subprocess_env_from(&mut command, subprocess_env.clone());
+        apply_agent_subprocess_env_map(&mut command, &subprocess_env);
 
         match command.spawn() {
             Ok(child) => return Ok(child),

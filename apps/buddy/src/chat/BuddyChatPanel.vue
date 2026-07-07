@@ -9,6 +9,7 @@ import type {
 import type { BuddyChatDraftAttachment } from '@/chat/chatAttachmentView'
 import type { BuddyLocale } from '@/i18n/buddyI18n'
 import type {
+  BuddyApproval,
   BuddyAppSettings,
   BuddyChatModelSelection,
   BuddyChatPromptContextItem,
@@ -19,15 +20,19 @@ import type {
   BuddyMessage,
   BuddyRuntime,
 } from '@/lib/tauriRuntime'
+import { computed } from 'vue'
 import newConversationArchmageUrl from '@/assets/window/new-conversation-archmage.png'
+import BuddyChatApprovalBanner from '@/chat/BuddyChatApprovalBanner.vue'
 import BuddyChatComposer from '@/chat/BuddyChatComposer.vue'
 import BuddyChatHistoryDrawer from '@/chat/BuddyChatHistoryDrawer.vue'
 import BuddyChatMessageList from '@/chat/BuddyChatMessageList.vue'
 import BuddyChatWindowFrame from '@/chat/BuddyChatWindowFrame.vue'
 import { useBuddyI18n } from '@/i18n/buddyI18n'
+import { createApprovalViewRows } from '@/panel/approvalView'
 
 const props = defineProps<{
   appSettings: BuddyAppSettings
+  approvals: ReadonlyArray<BuddyApproval>
   claudeRuntimeStatus: BuddyClaudeRuntimeStatus
   codexRuntimeStatus: BuddyCodexRuntimeStatus
   composerDraft: {
@@ -45,6 +50,7 @@ const props = defineProps<{
   headerTitle: string
   isAddingProject: boolean
   isLoading: boolean
+  isResolvingApproval: boolean
   isSending: boolean
   language: BuddyLocale
   messages: ReadonlyArray<BuddyMessage>
@@ -57,7 +63,9 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   addProject: []
+  approveApproval: [approvalId: string, approvalKind: string]
   composerError: [message: string]
+  denyApproval: [approvalId: string]
   draftChange: [payload: {
     attachments: ReadonlyArray<BuddyChatDraftAttachment>
     contentJSON: JSONContent
@@ -81,6 +89,7 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useBuddyI18n(() => props.language)
+const approvalRows = computed(() => createApprovalViewRows(props.approvals))
 
 function send(payload: {
   attachments: ReadonlyArray<BuddyChatDraftAttachment>
@@ -180,6 +189,14 @@ function closeDrawer() {
         >
           {{ errorMessage }}
         </p>
+
+        <BuddyChatApprovalBanner
+          :is-resolving-approval="isResolvingApproval"
+          :language="language"
+          :rows="approvalRows"
+          @approve-approval="(approvalId, approvalKind) => emit('approveApproval', approvalId, approvalKind)"
+          @deny-approval="emit('denyApproval', $event)"
+        />
 
         <BuddyChatComposer
           :cwd="currentCwd"

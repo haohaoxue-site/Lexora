@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import type { BuddyLocale } from '@/i18n/buddyI18n'
 import type {
-  BuddyApproval,
   BuddyAppSettings,
   BuddyClaudeRuntimeStatus,
   BuddyCodexRuntimeStatus,
@@ -32,8 +31,6 @@ import claudeIconUrl from '@/assets/brand/claude.svg'
 import codexIconUrl from '@/assets/brand/codex.svg'
 import { useBuddyWindowFrame } from '@/chat/useBuddyWindowFrame'
 import { useBuddyI18n } from '@/i18n/buddyI18n'
-import { createApprovalViewRows } from '@/panel/approvalView'
-import BuddyApprovalQueue from '@/panel/BuddyApprovalQueue.vue'
 import BuddyConversationLog from '@/panel/BuddyConversationLog.vue'
 import BuddySettingsRows from '@/panel/BuddySettingsRows.vue'
 import BuddyUsagePanel from '@/panel/BuddyUsagePanel.vue'
@@ -44,14 +41,11 @@ type BuddyPanelPage = BuddyRuntime | 'usage' | 'logs' | 'settings'
 
 const props = defineProps<{
   appSettings: BuddyAppSettings
-  approvals: ReadonlyArray<BuddyApproval>
   runtimeDiagnostics: BuddyRuntimeDiagnostics
   claudeRuntimeStatus: BuddyClaudeRuntimeStatus
   codexRuntimeStatus: BuddyCodexRuntimeStatus
   errorMessage: string | null
-  isLoading: boolean
   isLoadingRunEventSummaries: boolean
-  isResolvingApproval: boolean
   isUpdatingAppSettings: boolean
   language: BuddyLocale
   localState: BuddyLocalStateStatus
@@ -63,8 +57,6 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{
-  approveApproval: [approvalId: string, approvalKind: string]
-  denyApproval: [approvalId: string]
   selectLogRun: [runId: string]
   updateAppSettings: [request: UpdateBuddyAppSettingsRequest]
 }>()
@@ -150,7 +142,6 @@ const visibleResizeHandles = computed(() => isMaximized.value ? [] : resizeHandl
 const conversationLogRows = computed(() =>
   createConversationLogRunRows(props.runs, props.runEventCounts, t),
 )
-const approvalRows = computed(() => createApprovalViewRows(props.approvals))
 
 const activeLogRunId = computed(() => {
   if (
@@ -875,14 +866,6 @@ function resolveDirectoryPath(path: string) {
           v-if="activePage === 'codex'"
           class="buddy-control__page"
         >
-          <BuddyApprovalQueue
-            :is-loading="isLoading"
-            :is-resolving-approval="isResolvingApproval"
-            :rows="approvalRows"
-            @approve-approval="(approvalId, approvalKind) => emit('approveApproval', approvalId, approvalKind)"
-            @deny-approval="emit('denyApproval', $event)"
-          />
-
           <div class="buddy-control__detail-panel">
             <header class="buddy-control__detail-head">
               <div>
