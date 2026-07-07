@@ -1,0 +1,788 @@
+{
+  "id": "lexora-buddy-default",
+  "name": "Lexora Buddy",
+  "kind": "sprite-sheet",
+  "source": "bundled",
+  "image": "spritesheet.webp",
+  "frame": {
+    "width": 192,
+    "height": 208
+  },
+  "sheet": {
+    "columns": 8,
+    "rows": 20
+  },
+  "animations": [
+    {
+      "name": "idle",
+      "description": "Quiet breathing and blinking while Buddy is available but not focused on a task.",
+      "row": 0,
+      "frames": [
+        {
+          "index": 0,
+          "durationMs": 700
+        },
+        {
+          "index": 1,
+          "durationMs": 160
+        },
+        {
+          "index": 2,
+          "durationMs": 120
+        },
+        {
+          "index": 3,
+          "durationMs": 180
+        },
+        {
+          "index": 4,
+          "durationMs": 160
+        },
+        {
+          "index": 5,
+          "durationMs": 900
+        }
+      ],
+      "loop": true
+    },
+    {
+      "name": "run_left",
+      "description": "Buddy is moving or running toward the left side of the desktop.",
+      "row": 1,
+      "frames": [
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15
+      ],
+      "loop": true,
+      "fps": 8
+    },
+    {
+      "name": "run_right",
+      "description": "Buddy is moving or running toward the right side of the desktop.",
+      "row": 2,
+      "frames": [
+        16,
+        17,
+        18,
+        19,
+        20,
+        21,
+        22,
+        23
+      ],
+      "loop": true,
+      "fps": 8
+    },
+    {
+      "name": "drag",
+      "description": "User is grabbing and moving Buddy around the desktop.",
+      "row": 3,
+      "frames": [
+        24,
+        25,
+        26,
+        27,
+        28,
+        29
+      ],
+      "loop": true,
+      "fps": 12
+    },
+    {
+      "name": "grab_start",
+      "description": "Short pickup anticipation when the user first presses Buddy before a drag is confirmed.",
+      "row": 3,
+      "frames": [
+        {
+          "index": 24,
+          "durationMs": 55
+        },
+        {
+          "index": 25,
+          "durationMs": 65
+        },
+        {
+          "index": 26,
+          "durationMs": 90
+        },
+        {
+          "index": 27,
+          "durationMs": 75
+        }
+      ],
+      "loop": false
+    },
+    {
+      "name": "celebrate",
+      "description": "A short happy success reaction for completed work, accepted changes, or positive AI outcomes.",
+      "row": 4,
+      "frames": [
+        {
+          "index": 32,
+          "durationMs": 80
+        },
+        {
+          "index": 33,
+          "durationMs": 100
+        },
+        {
+          "index": 34,
+          "durationMs": 120
+        },
+        {
+          "index": 35,
+          "durationMs": 160
+        },
+        {
+          "index": 36,
+          "durationMs": 460
+        },
+        {
+          "index": 37,
+          "durationMs": 260
+        },
+        {
+          "index": 38,
+          "durationMs": 180
+        },
+        {
+          "index": 39,
+          "durationMs": 360
+        }
+      ],
+      "loop": false
+    },
+    {
+      "name": "sleep",
+      "description": "Low-energy resting loop for long idle periods.",
+      "row": 5,
+      "frames": [
+        {
+          "index": 41,
+          "durationMs": 180
+        },
+        {
+          "index": 42,
+          "durationMs": 220
+        },
+        {
+          "index": 43,
+          "durationMs": 260
+        },
+        {
+          "index": 44,
+          "durationMs": 1200
+        }
+      ],
+      "loop": true
+    },
+    {
+      "name": "wake",
+      "description": "Short wake-up transition after rest or after the user drops Buddy.",
+      "row": 5,
+      "frames": [
+        {
+          "index": 44,
+          "durationMs": 160
+        },
+        {
+          "index": 45,
+          "durationMs": 130
+        },
+        {
+          "index": 46,
+          "durationMs": 180
+        },
+        {
+          "index": 47,
+          "durationMs": 240
+        }
+      ],
+      "loop": false
+    },
+    {
+      "name": "thinking",
+      "description": "Focused thinking loop for active reasoning, waiting, or task planning.",
+      "row": 6,
+      "frames": [
+        {
+          "index": 48,
+          "durationMs": 160
+        },
+        {
+          "index": 49,
+          "durationMs": 180
+        },
+        {
+          "index": 50,
+          "durationMs": 260
+        },
+        {
+          "index": 51,
+          "durationMs": 460
+        },
+        {
+          "index": 52,
+          "durationMs": 280
+        },
+        {
+          "index": 53,
+          "durationMs": 340
+        },
+        {
+          "index": 54,
+          "durationMs": 220
+        },
+        {
+          "index": 55,
+          "durationMs": 520
+        }
+      ],
+      "loop": true
+    },
+    {
+      "name": "approval",
+      "description": "Waiting-for-user-approval state with a subtle attentive pose.",
+      "row": 6,
+      "frames": [
+        {
+          "index": 50,
+          "durationMs": 220
+        },
+        {
+          "index": 51,
+          "durationMs": 260
+        },
+        {
+          "index": 52,
+          "durationMs": 420
+        },
+        {
+          "index": 53,
+          "durationMs": 620
+        },
+        {
+          "index": 54,
+          "durationMs": 320
+        },
+        {
+          "index": 55,
+          "durationMs": 700
+        }
+      ],
+      "loop": true
+    },
+    {
+      "name": "sad",
+      "description": "Soft error or blocked state without being alarming.",
+      "row": 7,
+      "frames": [
+        {
+          "index": 57,
+          "durationMs": 360
+        },
+        {
+          "index": 58,
+          "durationMs": 520
+        },
+        {
+          "index": 59,
+          "durationMs": 820
+        },
+        {
+          "index": 60,
+          "durationMs": 700
+        }
+      ],
+      "loop": true
+    },
+    {
+      "name": "reassure",
+      "description": "Gentle recovery or encouragement reaction after a failure or user concern.",
+      "row": 7,
+      "frames": [
+        {
+          "index": 59,
+          "durationMs": 260
+        },
+        {
+          "index": 60,
+          "durationMs": 420
+        },
+        {
+          "index": 61,
+          "durationMs": 520
+        },
+        {
+          "index": 62,
+          "durationMs": 360
+        },
+        {
+          "index": 63,
+          "durationMs": 680
+        }
+      ],
+      "loop": false
+    },
+    {
+      "name": "working",
+      "description": "Busy working loop for active local agent execution.",
+      "row": 8,
+      "frames": [
+        {
+          "index": 64,
+          "durationMs": 120
+        },
+        {
+          "index": 65,
+          "durationMs": 140
+        },
+        {
+          "index": 66,
+          "durationMs": 160
+        },
+        {
+          "index": 67,
+          "durationMs": 220
+        },
+        {
+          "index": 68,
+          "durationMs": 340
+        },
+        {
+          "index": 69,
+          "durationMs": 260
+        },
+        {
+          "index": 70,
+          "durationMs": 180
+        },
+        {
+          "index": 71,
+          "durationMs": 420
+        }
+      ],
+      "loop": true
+    },
+    {
+      "name": "explain",
+      "description": "Explanatory gesture for AI responses, status narration, or teaching-like moments.",
+      "row": 8,
+      "frames": [
+        {
+          "index": 66,
+          "durationMs": 140
+        },
+        {
+          "index": 67,
+          "durationMs": 180
+        },
+        {
+          "index": 68,
+          "durationMs": 360
+        },
+        {
+          "index": 69,
+          "durationMs": 520
+        },
+        {
+          "index": 70,
+          "durationMs": 300
+        },
+        {
+          "index": 71,
+          "durationMs": 440
+        }
+      ],
+      "loop": true
+    },
+    {
+      "name": "tap",
+      "description": "Short user click reaction.",
+      "row": 9,
+      "frames": [
+        {
+          "index": 72,
+          "durationMs": 70
+        },
+        {
+          "index": 73,
+          "durationMs": 90
+        },
+        {
+          "index": 74,
+          "durationMs": 130
+        },
+        {
+          "index": 75,
+          "durationMs": 220
+        },
+        {
+          "index": 76,
+          "durationMs": 160
+        }
+      ],
+      "loop": false
+    },
+    {
+      "name": "hover",
+      "description": "Curious hover loop while the pointer is near Buddy.",
+      "row": 9,
+      "frames": [
+        {
+          "index": 75,
+          "durationMs": 180
+        },
+        {
+          "index": 76,
+          "durationMs": 180
+        },
+        {
+          "index": 77,
+          "durationMs": 260
+        },
+        {
+          "index": 78,
+          "durationMs": 520
+        },
+        {
+          "index": 79,
+          "durationMs": 460
+        }
+      ],
+      "loop": true
+    },
+    {
+      "name": "curious",
+      "description": "Questioning or inspecting reaction for ambiguous AI/user context.",
+      "row": 9,
+      "frames": [
+        {
+          "index": 72,
+          "durationMs": 120
+        },
+        {
+          "index": 73,
+          "durationMs": 160
+        },
+        {
+          "index": 74,
+          "durationMs": 220
+        },
+        {
+          "index": 75,
+          "durationMs": 850
+        },
+        {
+          "index": 76,
+          "durationMs": 650
+        },
+        {
+          "index": 77,
+          "durationMs": 220
+        },
+        {
+          "index": 78,
+          "durationMs": 160
+        },
+        {
+          "index": 79,
+          "durationMs": 500
+        }
+      ],
+      "loop": false
+    },
+    {
+      "name": "trip_fall_left",
+      "description": "One-shot left-facing stumble where Buddy trips while running and ends lying on the ground.",
+      "row": 10,
+      "frames": [
+        {
+          "index": 80,
+          "durationMs": 90
+        },
+        {
+          "index": 81,
+          "durationMs": 90
+        },
+        {
+          "index": 82,
+          "durationMs": 95
+        },
+        {
+          "index": 83,
+          "durationMs": 115
+        },
+        {
+          "index": 84,
+          "durationMs": 120
+        },
+        {
+          "index": 85,
+          "durationMs": 135
+        },
+        {
+          "index": 86,
+          "durationMs": 220
+        },
+        {
+          "index": 87,
+          "durationMs": 360
+        }
+      ],
+      "loop": false
+    },
+    {
+      "name": "fallen_idle_left",
+      "description": "Left-facing fallen idle loop while Buddy waits for the user to click and help her up.",
+      "row": 11,
+      "frames": [
+        {
+          "index": 88,
+          "durationMs": 900
+        },
+        {
+          "index": 89,
+          "durationMs": 1100
+        }
+      ],
+      "loop": true
+    },
+    {
+      "name": "fallen_get_up_left",
+      "description": "One-shot left-facing recovery after the user clicks fallen Buddy.",
+      "row": 12,
+      "frames": [
+        {
+          "index": 96,
+          "durationMs": 110
+        },
+        {
+          "index": 97,
+          "durationMs": 130
+        },
+        {
+          "index": 98,
+          "durationMs": 150
+        },
+        {
+          "index": 99,
+          "durationMs": 180
+        },
+        {
+          "index": 100,
+          "durationMs": 220
+        },
+        {
+          "index": 101,
+          "durationMs": 180
+        },
+        {
+          "index": 102,
+          "durationMs": 260
+        }
+      ],
+      "loop": false
+    },
+    {
+      "name": "trip_fall_right",
+      "description": "One-shot right-facing stumble where Buddy trips while running and ends lying on the ground.",
+      "row": 13,
+      "frames": [
+        {
+          "index": 104,
+          "durationMs": 90
+        },
+        {
+          "index": 105,
+          "durationMs": 90
+        },
+        {
+          "index": 106,
+          "durationMs": 95
+        },
+        {
+          "index": 107,
+          "durationMs": 115
+        },
+        {
+          "index": 108,
+          "durationMs": 120
+        },
+        {
+          "index": 109,
+          "durationMs": 135
+        },
+        {
+          "index": 110,
+          "durationMs": 220
+        },
+        {
+          "index": 111,
+          "durationMs": 360
+        }
+      ],
+      "loop": false
+    },
+    {
+      "name": "fallen_idle_right",
+      "description": "Right-facing fallen idle loop while Buddy waits for the user to click and help her up.",
+      "row": 14,
+      "frames": [
+        {
+          "index": 112,
+          "durationMs": 900
+        },
+        {
+          "index": 113,
+          "durationMs": 1100
+        }
+      ],
+      "loop": true
+    },
+    {
+      "name": "fallen_get_up_right",
+      "description": "One-shot right-facing recovery after the user clicks fallen Buddy.",
+      "row": 15,
+      "frames": [
+        {
+          "index": 120,
+          "durationMs": 110
+        },
+        {
+          "index": 121,
+          "durationMs": 130
+        },
+        {
+          "index": 122,
+          "durationMs": 150
+        },
+        {
+          "index": 123,
+          "durationMs": 180
+        },
+        {
+          "index": 124,
+          "durationMs": 220
+        },
+        {
+          "index": 125,
+          "durationMs": 180
+        },
+        {
+          "index": 126,
+          "durationMs": 260
+        }
+      ],
+      "loop": false
+    },
+    {
+      "name": "stumble_recover_left",
+      "description": "One-shot left-facing run where Buddy wobbles, catches balance, and stands upright.",
+      "row": 16,
+      "frames": [
+        {
+          "index": 128,
+          "durationMs": 90
+        },
+        {
+          "index": 129,
+          "durationMs": 90
+        },
+        {
+          "index": 130,
+          "durationMs": 95
+        },
+        {
+          "index": 131,
+          "durationMs": 115
+        },
+        {
+          "index": 132,
+          "durationMs": 140
+        },
+        {
+          "index": 133,
+          "durationMs": 150
+        },
+        {
+          "index": 134,
+          "durationMs": 160
+        },
+        {
+          "index": 135,
+          "durationMs": 180
+        },
+        {
+          "index": 136,
+          "durationMs": 220
+        },
+        {
+          "index": 137,
+          "durationMs": 320
+        }
+      ],
+      "loop": false
+    },
+    {
+      "name": "stumble_recover_right",
+      "description": "One-shot right-facing run where Buddy wobbles, catches balance, and stands upright.",
+      "row": 18,
+      "frames": [
+        {
+          "index": 144,
+          "durationMs": 90
+        },
+        {
+          "index": 145,
+          "durationMs": 90
+        },
+        {
+          "index": 146,
+          "durationMs": 95
+        },
+        {
+          "index": 147,
+          "durationMs": 115
+        },
+        {
+          "index": 148,
+          "durationMs": 140
+        },
+        {
+          "index": 149,
+          "durationMs": 150
+        },
+        {
+          "index": 150,
+          "durationMs": 160
+        },
+        {
+          "index": 151,
+          "durationMs": 180
+        },
+        {
+          "index": 152,
+          "durationMs": 220
+        },
+        {
+          "index": 153,
+          "durationMs": 320
+        }
+      ],
+      "loop": false
+    }
+  ],
+  "moodAnimations": {
+    "idle": "idle",
+    "thinking": "thinking",
+    "done": "celebrate",
+    "error": "sad"
+  }
+}

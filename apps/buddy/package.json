@@ -1,0 +1,43 @@
+{
+  "name": "@lexora/buddy",
+  "type": "module",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "predev": "node ../../packaging/buddy/dev/install-desktop-identity.mjs",
+    "dev": "tauri dev",
+    "dev:desktop-identity": "node ../../packaging/buddy/dev/install-desktop-identity.mjs",
+    "dev:web": "vite --host 127.0.0.1",
+    "build": "vue-tsc -b --pretty false && vite build",
+    "build:desktop": "tauri build",
+    "lint:fix": "eslint . --fix",
+    "type-check": "vue-tsc -b --pretty false",
+    "test": "vitest run --passWithNoTests",
+    "test:watch": "vitest --passWithNoTests",
+    "tauri": "tauri"
+  },
+  "dependencies": {
+    "@tauri-apps/api": "^2.0.0",
+    "@tiptap/core": "^3.22.3",
+    "@tiptap/extension-placeholder": "^3.22.3",
+    "@tiptap/pm": "^3.22.3",
+    "@tiptap/starter-kit": "^3.22.3",
+    "@tiptap/vue-3": "^3.22.3",
+    "@vicons/fluent": "^0.13.0",
+    "dompurify": "^3.4.7",
+    "marked": "^18.0.5",
+    "naive-ui": "^2.44.1",
+    "vue": "^3.5.33"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.0.0",
+    "@types/node": "catalog:",
+    "@vitejs/plugin-vue": "^6.0.6",
+    "@vue/tsconfig": "^0.9.1",
+    "sass-embedded": "^1.99.0",
+    "typescript": "catalog:",
+    "unocss": "^66.6.8",
+    "vite": "^8.0.10",
+    "vue-tsc": "^3.2.7"
+  }
+}

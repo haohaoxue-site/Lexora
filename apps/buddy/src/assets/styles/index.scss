@@ -1,0 +1,82 @@
+:root {
+  color-scheme: light;
+  font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", "Source Han Sans SC", "Noto Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+
+  --buddy-bg-body: #f4f6f3;
+  --buddy-bg-surface: #fffefc;
+  --buddy-bg-surface-raised: #ffffff;
+  --buddy-fill-base: #edf2ee;
+  --buddy-fill-light: #f7f9f6;
+  --buddy-border-base: #cad7cf;
+  --buddy-border-light: #dde7e0;
+  --buddy-window-border: #aebdb4;
+  --buddy-text-primary: #17211c;
+  --buddy-text-regular: #34453d;
+  --buddy-text-secondary: #66746d;
+  --buddy-text-placeholder: #8b9891;
+  --buddy-text-on-accent: #ffffff;
+  --buddy-accent-primary: #2f7d66;
+  --buddy-accent-success: #2f9d6a;
+  --buddy-accent-warning: #d68b32;
+  --buddy-accent-danger: #c85252;
+  --buddy-font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  --buddy-chat-final-color: var(--buddy-text-regular);
+  --buddy-chat-process-color: color-mix(in srgb, var(--buddy-text-regular) 28%, var(--buddy-text-secondary));
+  --buddy-chat-user-color: var(--buddy-text-regular);
+  --buddy-chat-meta-color: var(--buddy-text-secondary);
+  --buddy-chat-tool-title-color: color-mix(in srgb, var(--buddy-text-regular) 28%, var(--buddy-text-secondary));
+  --buddy-chat-tool-body-color: var(--buddy-text-secondary);
+  --buddy-chat-code-color: var(--buddy-text-secondary);
+  --buddy-chat-danger-color: color-mix(in srgb, var(--buddy-accent-danger) 82%, var(--buddy-text-secondary));
+  --buddy-chat-final-font-size: 14px;
+  --buddy-chat-final-line-height: 1.64;
+  --buddy-chat-final-heading-font-size: 14px;
+  --buddy-chat-final-heading-line-height: 1.44;
+  --buddy-chat-process-font-size: 13px;
+  --buddy-chat-process-line-height: 1.56;
+  --buddy-chat-user-font-size: 14px;
+  --buddy-chat-user-line-height: 1.5;
+  --buddy-chat-meta-font-size: 13px;
+  --buddy-chat-meta-line-height: 1.4;
+  --buddy-chat-tool-font-size: 12.5px;
+  --buddy-chat-tool-line-height: 1.45;
+  --buddy-chat-tool-body-line-height: 1.5;
+  --buddy-chat-caption-font-size: 12px;
+  --buddy-chat-caption-line-height: 1.4;
+  --buddy-chat-code-font-size: 12px;
+  --buddy-chat-code-line-height: 1.6;
+  --buddy-shadow-raised: 0 18px 48px rgb(23 33 28 / 14%);
+  --buddy-shadow-window:
+    inset 0 0 0 1px rgb(255 255 255 / 72%),
+    inset 0 -1px 0 rgb(36 54 45 / 8%),
+    0 18px 48px rgb(23 33 28 / 12%);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+}
+
+body {
+  background: transparent;
+  color: var(--buddy-text-primary);
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}

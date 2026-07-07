@@ -1,0 +1,106 @@
+name: Buddy Linux Deb Build
+
+on:
+  workflow_dispatch:
+    inputs:
+      upload_release_asset:
+        description: Upload the hash-checked deb to the requested GitHub Release.
+        required: true
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+jobs:
+  build-linux-deb:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.5.0
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install Tauri Linux dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            curl \
+            file \
+            libayatana-appindicator3-dev \
+            libgtk-layer-shell-dev \
+            librsvg2-dev \
+            libssl-dev \
+            libwebkit2gtk-4.1-dev \
+            libxdo-dev \
+            patchelf \
+            wget \
+            xvfb
+
+      - name: Install workspace dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Type-check Buddy
+        run: pnpm --filter @lexora/buddy type-check
+
+      - name: Build deb bundle
+        run: RUST_MIN_STACK=16777216 pnpm --filter @lexora/buddy tauri build --ci --bundles deb
+
+      - name: Run GUI smoke
+        run: node packaging/buddy/ci/run-gui-smoke.mjs --required
+
+      - name: Verify deb release asset metadata
+        run: node packaging/buddy/ci/verify-linux-deb-artifact.mjs --local --github-env "$GITHUB_ENV"
+
+      - name: Write Linux readiness evidence
+        env:
+          LEXORA_BUDDY_EVIDENCE_KIND: linux-deb-workflow
+          LEXORA_BUDDY_EVIDENCE_OUTPUT: ${{ runner.temp }}/lexora-buddy-linux-deb-evidence.json
+          LEXORA_BUDDY_EVIDENCE_TEXT: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: node packaging/buddy/ci/write-readiness-evidence.mjs
+
+      - name: Write GUI smoke readiness evidence
+        env:
+          LEXORA_BUDDY_EVIDENCE_KIND: gui-smoke
+          LEXORA_BUDDY_EVIDENCE_OUTPUT: ${{ runner.temp }}/lexora-buddy-gui-smoke-evidence.json
+          LEXORA_BUDDY_EVIDENCE_TEXT: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}#buddy-gui-smoke
+        run: node packaging/buddy/ci/write-readiness-evidence.mjs
+
+      - name: Upload deb artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: lexora-buddy-linux-deb
+          path: apps/buddy/src-tauri/target/release/bundle/deb/*.deb
+          if-no-files-found: error
+
+      - name: Upload Linux readiness evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: lexora-buddy-linux-deb-readiness-evidence
+          path: ${{ runner.temp }}/lexora-buddy-linux-deb-evidence.json
+          if-no-files-found: error
+
+      - name: Upload GUI smoke readiness evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: lexora-buddy-gui-smoke-readiness-evidence
+          path: ${{ runner.temp }}/lexora-buddy-gui-smoke-evidence.json
+          if-no-files-found: error
+
+      - name: Upload deb to GitHub Release
+        if: inputs.upload_release_asset
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "$LEXORA_BUDDY_RELEASE_TAG" "$LEXORA_BUDDY_DEB_PATH#$LEXORA_BUDDY_RELEASE_ASSET_NAME" --repo "$LEXORA_BUDDY_RELEASE_REPO" --clobber

@@ -1,0 +1,26 @@
+pkgbase = lexora-buddy-bin
+	pkgdesc = Desktop pet and local agent companion for Lexora
+	pkgver = 0.1.0
+	pkgrel = 1
+	url = https://github.com/haohaoxue-site/Lexora
+	install = lexora-buddy-bin.install
+	arch = x86_64
+	license = AGPL-3.0-only
+	depends = cairo
+	depends = desktop-file-utils
+	depends = gdk-pixbuf2
+	depends = glib2
+	depends = gtk-layer-shell
+	depends = gtk3
+	depends = hicolor-icon-theme
+	depends = libsoup3
+	depends = pango
+	depends = webkit2gtk-4.1
+	provides = lexora-buddy
+	conflicts = lexora-buddy
+	options = !strip
+	options = !debug
+	source_x86_64 = lexora-buddy-0.1.0-amd64.deb::https://github.com/haohaoxue-site/Lexora/releases/download/v0.1.0/Lexora%20Buddy_0.1.0_amd64.deb
+	sha256sums_x86_64 = bc5e8fb9cb860e56013b5c8053c70eeaf57560a20830249aae0516b1d8f75752
+
+pkgname = lexora-buddy-bin

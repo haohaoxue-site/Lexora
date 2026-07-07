@@ -1,0 +1,51 @@
+name: Buddy AUR Install Check
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  aur-install:
+    runs-on: ubuntu-24.04
+    container: archlinux:latest
+    steps:
+      - name: Install Arch packaging tools
+        run: pacman -Syu --noconfirm git base-devel sudo
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+
+      - name: Prepare makepkg user
+        run: |
+          useradd -m builder
+          echo "builder ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/builder
+          chmod 440 /etc/sudoers.d/builder
+          chown -R builder:builder "$GITHUB_WORKSPACE"
+
+      - name: Build and install AUR package
+        working-directory: packaging/buddy/aur/lexora-buddy-bin
+        run: sudo -u builder makepkg -si --noconfirm --needed
+
+      - name: Run installed Buddy health smoke
+        run: lexora-buddy --buddy-health-check
+
+      - name: Write AUR install readiness evidence
+        env:
+          LEXORA_BUDDY_EVIDENCE_KIND: aur-install
+          LEXORA_BUDDY_EVIDENCE_OUTPUT: ${{ runner.temp }}/lexora-buddy-aur-install-evidence.json
+          LEXORA_BUDDY_EVIDENCE_TEXT: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}#buddy-aur-install
+        run: node packaging/buddy/ci/write-readiness-evidence.mjs
+
+      - name: Upload AUR install readiness evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: lexora-buddy-aur-install-readiness-evidence
+          path: ${{ runner.temp }}/lexora-buddy-aur-install-evidence.json
+          if-no-files-found: error

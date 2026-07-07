@@ -6,6 +6,11 @@ export default antfu({
   },
   vue: true,
 }, {
+  ignores: [
+    '**/src-tauri/gen/schemas/**',
+    '**/src-tauri/target/**',
+  ],
+}, {
   files: ['apps/api/src/**/*.ts'],
   rules: {
     'ts/consistent-type-imports': 'off',
