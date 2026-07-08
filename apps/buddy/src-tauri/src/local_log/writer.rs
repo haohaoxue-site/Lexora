@@ -39,9 +39,11 @@ pub fn append_jsonl_event(path: &Path, event: &LocalLogEvent) -> BuddyResult<()>
         event_type: &event.event_type,
         payload: &event.payload,
     };
+    let mut serialized = serde_json::to_vec(&line)?;
+    serialized.push(b'\n');
+
     let mut file = OpenOptions::new().create(true).append(true).open(path)?;
-    serde_json::to_writer(&mut file, &line)?;
-    file.write_all(b"\n")?;
+    file.write_all(&serialized)?;
 
     Ok(())
 }

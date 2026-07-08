@@ -1,10 +1,9 @@
 use rusqlite::{params, Connection};
 use uuid::Uuid;
 
-use crate::{
-    error::{BuddyError, BuddyResult},
-    storage::projects,
-};
+use crate::error::{BuddyError, BuddyResult};
+
+use super::{projects, BuddyStorage};
 
 #[derive(Clone, Debug, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -25,6 +24,26 @@ pub struct BuddySession {
     pub title: Option<String>,
     pub created_at: String,
     pub updated_at: String,
+}
+
+impl BuddyStorage {
+    pub fn create_session(&self, request: CreateBuddySessionRequest) -> BuddyResult<BuddySession> {
+        self.with_connection("create_session", |connection| {
+            self::create_session(connection, request)
+        })
+    }
+
+    pub fn list_sessions(&self, limit: i64) -> BuddyResult<Vec<BuddySession>> {
+        self.with_connection("list_sessions", |connection| {
+            self::list_sessions(connection, limit)
+        })
+    }
+
+    pub fn delete_session(&self, id: String) -> BuddyResult<bool> {
+        self.with_connection("delete_session", |connection| {
+            self::delete_session(connection, &id)
+        })
+    }
 }
 
 pub fn create_session(

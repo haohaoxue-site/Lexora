@@ -6,6 +6,7 @@ use crate::{
         UpdateBuddyAppSettingsRequest,
     },
     app_paths::{BuddyAppPaths, BuddyAppPathsStatus},
+    domain::BuddyApprovalTerminalStatus,
     error::BuddyResult,
     memory,
     storage::{
@@ -151,7 +152,7 @@ impl BuddyAppState {
     pub fn resolve_codex_app_server_request_approval(
         &self,
         approval_id: String,
-        status: String,
+        status: BuddyApprovalTerminalStatus,
     ) -> BuddyResult<BuddyResolvedCodexAppServerRequestApproval> {
         self.storage
             .resolve_codex_app_server_request_approval(approval_id, status)

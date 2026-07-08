@@ -164,17 +164,17 @@ pub fn build_context_pack(input: BuddyContextPackBuildInput<'_>) -> BuddyResult<
             "不要要求用户检查 .lexora 配置，除非当前任务明确需要本地 Buddy 配置诊断。".to_owned(),
         ],
     };
-    let content = render_context_pack(
-        &persona,
-        &intent,
-        &project_scope,
-        &conversation_path,
-        &selected_context,
-        &memory_eligibility,
-        &retrieved_memory,
-        &runtime_instruction,
-        input.max_chars,
-    );
+    let content = render_context_pack(BuddyContextPackRenderInput {
+        persona: &persona,
+        intent: &intent,
+        project_scope: &project_scope,
+        conversation_path: &conversation_path,
+        selected_context: &selected_context,
+        memory_eligibility: &memory_eligibility,
+        retrieved_memory: &retrieved_memory,
+        runtime_instruction: &runtime_instruction,
+        max_chars: input.max_chars,
+    });
 
     Ok(BuddyContextPack {
         hash: stable_hash(&content),
@@ -240,30 +240,23 @@ fn read_retrieved_memory(
     memory_root: &Path,
     source_ref: &BuddyMemorySourceRef,
 ) -> BuddyResult<Option<BuddyContextPackRetrievedMemory>> {
-    let Some(path) = safe_memory_file_path(memory_root, &source_ref.relative_path) else {
+    let Some(resolved_ref) = BuddyContextPackSourceRef::resolve(memory_root, source_ref) else {
         return Ok(None);
     };
-    let content = match std::fs::read_to_string(path) {
-        Ok(content) => content,
-        Err(_) => return Ok(None),
-    };
-    let snippet = read_line_range(&content, source_ref.line_start, source_ref.line_end);
+    let content = std::fs::read_to_string(&resolved_ref.absolute_path)?;
+    let snippet = read_line_range(&content, resolved_ref.line_range);
     if snippet.trim().is_empty() {
         return Ok(None);
     }
-    let citation_label = format!(
-        "{}:{}-{}",
-        source_ref.relative_path, source_ref.line_start, source_ref.line_end
-    );
 
     Ok(Some(BuddyContextPackRetrievedMemory {
-        citation_label,
+        citation_label: resolved_ref.citation_label(),
         content: compact_text(&snippet, 720),
         content_hash: source_ref.content_hash.clone(),
-        line_end: source_ref.line_end,
-        line_start: source_ref.line_start,
+        line_end: resolved_ref.line_range.line_end,
+        line_start: resolved_ref.line_range.line_start,
         note: "Accepted Buddy memory file reference.".to_owned(),
-        path: source_ref.relative_path.clone(),
+        path: resolved_ref.relative_path.to_owned(),
         project_id: source_ref.project_id.clone(),
         scope: source_ref.scope.clone(),
         source_event_id: source_ref.source_event_id.clone(),
@@ -272,8 +265,34 @@ fn read_retrieved_memory(
     }))
 }
 
-fn safe_memory_file_path(memory_root: &Path, relative_path: &str) -> Option<PathBuf> {
-    let relative_path = relative_path.trim();
+struct BuddyContextPackSourceRef<'a> {
+    absolute_path: PathBuf,
+    line_range: BuddyContextPackLineRange,
+    relative_path: &'a str,
+}
+
+impl<'a> BuddyContextPackSourceRef<'a> {
+    fn resolve(memory_root: &Path, source_ref: &'a BuddyMemorySourceRef) -> Option<Self> {
+        let relative_path = checked_memory_relative_path(source_ref.relative_path.trim())?;
+        let line_range =
+            BuddyContextPackLineRange::new(source_ref.line_start, source_ref.line_end)?;
+
+        Some(Self {
+            absolute_path: memory_root.join(relative_path),
+            line_range,
+            relative_path,
+        })
+    }
+
+    fn citation_label(&self) -> String {
+        format!(
+            "{}:{}-{}",
+            self.relative_path, self.line_range.line_start, self.line_range.line_end
+        )
+    }
+}
+
+fn checked_memory_relative_path(relative_path: &str) -> Option<&str> {
     if relative_path.is_empty() || relative_path.starts_with('/') {
         return None;
     }
@@ -285,36 +304,54 @@ fn safe_memory_file_path(memory_root: &Path, relative_path: &str) -> Option<Path
         return None;
     }
 
-    Some(memory_root.join(path))
+    Some(relative_path)
 }
 
-fn read_line_range(content: &str, line_start: i64, line_end: i64) -> String {
-    if line_start <= 0 || line_end < line_start {
-        return String::new();
-    }
-    let start = (line_start - 1) as usize;
-    let count = (line_end - line_start + 1) as usize;
-
+fn read_line_range(content: &str, line_range: BuddyContextPackLineRange) -> String {
     content
         .lines()
-        .skip(start)
-        .take(count)
+        .skip(line_range.zero_based_start)
+        .take(line_range.count)
         .collect::<Vec<_>>()
         .join("\n")
 }
 
-#[allow(clippy::too_many_arguments)]
-fn render_context_pack(
-    persona: &BuddyContextPackPersona,
-    intent: &BuddyContextPackIntent,
-    project_scope: &BuddyContextPackProjectScope,
-    conversation_path: &BuddyContextPackConversationPath,
-    selected_context: &BuddyContextPackSelectedContext,
-    memory_eligibility: &BuddyContextPackMemoryEligibility,
-    retrieved_memory: &[BuddyContextPackRetrievedMemory],
-    runtime_instruction: &BuddyContextPackRuntimeInstruction,
+#[derive(Clone, Copy)]
+struct BuddyContextPackLineRange {
+    count: usize,
+    line_end: i64,
+    line_start: i64,
+    zero_based_start: usize,
+}
+
+impl BuddyContextPackLineRange {
+    fn new(line_start: i64, line_end: i64) -> Option<Self> {
+        if line_start <= 0 || line_end < line_start {
+            return None;
+        }
+
+        Some(Self {
+            count: usize::try_from(line_end - line_start + 1).ok()?,
+            line_end,
+            line_start,
+            zero_based_start: usize::try_from(line_start - 1).ok()?,
+        })
+    }
+}
+
+struct BuddyContextPackRenderInput<'a> {
+    persona: &'a BuddyContextPackPersona,
+    intent: &'a BuddyContextPackIntent,
+    project_scope: &'a BuddyContextPackProjectScope,
+    conversation_path: &'a BuddyContextPackConversationPath,
+    selected_context: &'a BuddyContextPackSelectedContext,
+    memory_eligibility: &'a BuddyContextPackMemoryEligibility,
+    retrieved_memory: &'a [BuddyContextPackRetrievedMemory],
+    runtime_instruction: &'a BuddyContextPackRuntimeInstruction,
     max_chars: usize,
-) -> String {
+}
+
+fn render_context_pack(input: BuddyContextPackRenderInput<'_>) -> String {
     let mut content = format!(
         "Lexora Buddy context pack\n\
          Persona\n\
@@ -339,27 +376,31 @@ fn render_context_pack(
          - durableWrite: {}\n\
          - reasons: {}\n\
          Retrieved memory\n",
-        persona.name,
-        persona.role,
-        persona.response_language,
-        intent.name,
-        intent.runtime.as_deref().unwrap_or("none"),
-        intent.memory_policy,
-        intent.reason,
-        project_scope.cwd,
-        project_scope.source_project.as_deref().unwrap_or("none"),
-        conversation_path.note,
-        render_selected_context_summary(selected_context),
-        memory_eligibility.retrieval,
-        memory_eligibility.candidate_generation,
-        memory_eligibility.durable_write,
-        memory_eligibility.reasons.join(", ")
+        input.persona.name,
+        input.persona.role,
+        input.persona.response_language,
+        input.intent.name,
+        input.intent.runtime.as_deref().unwrap_or("none"),
+        input.intent.memory_policy,
+        input.intent.reason,
+        input.project_scope.cwd,
+        input
+            .project_scope
+            .source_project
+            .as_deref()
+            .unwrap_or("none"),
+        input.conversation_path.note,
+        render_selected_context_summary(input.selected_context),
+        input.memory_eligibility.retrieval,
+        input.memory_eligibility.candidate_generation,
+        input.memory_eligibility.durable_write,
+        input.memory_eligibility.reasons.join(", ")
     );
 
-    if retrieved_memory.is_empty() {
+    if input.retrieved_memory.is_empty() {
         content.push_str("- none\n");
     } else {
-        for memory in retrieved_memory {
+        for memory in input.retrieved_memory {
             let block = format!(
                 "- [{}] {} scope={} sourceRunId={} sourceEventId={}\n  note: {}\n  excerpt:\n{}\n",
                 memory.source_kind,
@@ -370,7 +411,7 @@ fn render_context_pack(
                 memory.note,
                 indent_block(&memory.content, "  ")
             );
-            if content.chars().count() + block.chars().count() > max_chars {
+            if content.chars().count() + block.chars().count() > input.max_chars {
                 break;
             }
             content.push_str(&block);
@@ -378,13 +419,13 @@ fn render_context_pack(
     }
 
     content.push_str("Runtime instruction\n");
-    for item in &runtime_instruction.items {
+    for item in &input.runtime_instruction.items {
         content.push_str("- ");
         content.push_str(item);
         content.push('\n');
     }
 
-    compact_text(&content, max_chars)
+    compact_text(&content, input.max_chars)
 }
 
 fn indent_block(content: &str, prefix: &str) -> String {
@@ -429,4 +470,74 @@ fn compact_text(text: &str, max_chars: usize) -> String {
         .collect::<String>();
     compacted.push('…');
     compacted
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{read_line_range, BuddyContextPackLineRange, BuddyContextPackSourceRef};
+    use crate::storage::BuddyMemorySourceRef;
+
+    #[test]
+    fn read_line_range_returns_requested_one_based_span() {
+        let content = "alpha\nbeta\ngamma\ndelta";
+        let line_range = BuddyContextPackLineRange::new(2, 3).expect("line range");
+
+        assert_eq!(read_line_range(content, line_range), "beta\ngamma");
+    }
+
+    #[test]
+    fn line_range_rejects_invalid_ranges() {
+        assert!(BuddyContextPackLineRange::new(0, 1).is_none());
+        assert!(BuddyContextPackLineRange::new(2, 1).is_none());
+    }
+
+    #[test]
+    fn source_ref_rejects_paths_outside_memory_root() {
+        let mut source_ref = memory_source_ref("../outside.md", 1, 1);
+
+        assert!(
+            BuddyContextPackSourceRef::resolve(std::path::Path::new("/tmp"), &source_ref).is_none()
+        );
+
+        source_ref.relative_path = "/absolute.md".to_owned();
+        assert!(
+            BuddyContextPackSourceRef::resolve(std::path::Path::new("/tmp"), &source_ref).is_none()
+        );
+    }
+
+    #[test]
+    fn source_ref_resolves_safe_path_and_citation_label() {
+        let source_ref = memory_source_ref("global/MEMORY.md", 4, 6);
+        let resolved =
+            BuddyContextPackSourceRef::resolve(std::path::Path::new("/tmp/memory"), &source_ref)
+                .expect("source ref");
+
+        assert_eq!(
+            resolved.absolute_path,
+            std::path::Path::new("/tmp/memory/global/MEMORY.md")
+        );
+        assert_eq!(resolved.citation_label(), "global/MEMORY.md:4-6");
+    }
+
+    fn memory_source_ref(
+        relative_path: &str,
+        line_start: i64,
+        line_end: i64,
+    ) -> BuddyMemorySourceRef {
+        BuddyMemorySourceRef {
+            candidate_id: "candidate-1".to_owned(),
+            content_hash: "hash-1".to_owned(),
+            created_at: "2026-01-01T00:00:00.000Z".to_owned(),
+            id: "source-ref-1".to_owned(),
+            line_end,
+            line_start,
+            project_id: None,
+            relative_path: relative_path.to_owned(),
+            scope: "global".to_owned(),
+            source_event_id: None,
+            source_kind: "buddy_memory_file".to_owned(),
+            source_log_path: None,
+            source_run_id: None,
+        }
+    }
 }

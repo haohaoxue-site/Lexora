@@ -21,6 +21,7 @@ pub(super) struct NativePetPhysicsStep {
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub(super) struct NativePetInertiaState {
     position: NativePetLogicalPoint,
+    window_position: NativePetPosition,
     velocity: NativePetLogicalVelocity,
 }
 
@@ -43,6 +44,7 @@ impl NativePetInertiaState {
 
         Some(Self {
             position: NativePetLogicalPoint::from_position(position),
+            window_position: position,
             velocity,
         })
     }
@@ -68,11 +70,21 @@ impl NativePetInertiaState {
             self.position.x + average_velocity.x * clamped_dt_seconds,
             self.position.y + average_velocity.y * clamped_dt_seconds,
         );
-        let raw_window_position = raw_position.round_to_window_position();
+        let Some(raw_window_position) = raw_position.round_to_window_position() else {
+            self.velocity = NativePetLogicalVelocity::default();
+            return NativePetPhysicsStep {
+                clamped_dt_seconds,
+                hit_position_clamp: true,
+                phase: NativePetPhysicsPhase::Idle,
+                position: self.window_position,
+                velocity: self.velocity,
+            };
+        };
         let clamped_window_position = clamp_position(raw_window_position);
         let hit_position_clamp = clamped_window_position != raw_window_position;
 
         self.position = NativePetLogicalPoint::from_position(clamped_window_position);
+        self.window_position = clamped_window_position;
         self.velocity = if hit_position_clamp
             || next_velocity.speed() < params.stop_velocity_threshold_logical_px_per_s
         {
@@ -101,7 +113,17 @@ pub(super) fn native_pet_clamped_dt_seconds(
     dt_seconds: f64,
     params: &NativePetPhysicsParams,
 ) -> f64 {
-    dt_seconds.clamp(0.0, params.max_dt_seconds)
+    if !dt_seconds.is_finite() {
+        return 0.0;
+    }
+
+    let max_dt_seconds = if params.max_dt_seconds.is_finite() && params.max_dt_seconds > 0.0 {
+        params.max_dt_seconds
+    } else {
+        0.0
+    };
+
+    dt_seconds.clamp(0.0, max_dt_seconds)
 }
 
 #[cfg(test)]
@@ -156,6 +178,22 @@ mod tests {
                 y: -200.0
             }
         );
+    }
+
+    #[test]
+    fn non_finite_frame_delta_keeps_inertia_at_current_position() {
+        let params = NativePetPhysicsParams::default();
+        let mut inertia = NativePetInertiaState::from_release(
+            NativePetPosition { x: 100, y: 200 },
+            NativePetLogicalVelocity { x: 600.0, y: 0.0 },
+            &params,
+        )
+        .expect("high speed release should enter inertia");
+
+        let step = inertia.step(f64::NAN, &params, |position| position);
+
+        assert_eq!(step.position, NativePetPosition { x: 100, y: 200 });
+        assert_eq!(step.clamped_dt_seconds, 0.0);
     }
 
     #[test]

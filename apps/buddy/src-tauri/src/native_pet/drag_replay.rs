@@ -5,7 +5,7 @@ use crate::error::{BuddyError, BuddyResult};
 use super::{
     animation::{NativePetAnimationName, NativePetAnimationPlayback, NativePetAnimationSet},
     assets::load_default_pet_animation_set,
-    coordinates::{native_pet_cursor_position, NativePetPosition},
+    coordinates::{native_pet_cursor_position, NativePetLogicalPoint, NativePetPosition},
     drag_state::{NativePetDragStateMachine, PET_DRAG_START_DISTANCE},
 };
 
@@ -81,7 +81,12 @@ fn replay_native_pet_drag(
         ));
     };
 
-    let first_cursor = native_pet_cursor_position(first_sample.root_x, first_sample.root_y);
+    let Some(first_cursor) = native_pet_cursor_position(first_sample.root_x, first_sample.root_y)
+    else {
+        return Err(BuddyError::Runtime(
+            "native pet drag replay received invalid initial pointer sample".to_owned(),
+        ));
+    };
     let mut drag_frame =
         NativePetDragStateMachine::begin(origin_position, first_cursor, first_sample.time_ms);
     let mut playback = NativePetAnimationPlayback::new(NativePetAnimationName::Drag);
@@ -96,7 +101,11 @@ fn replay_native_pet_drag(
         let elapsed_ms = sample.time_ms.saturating_sub(previous_time_ms).max(1);
         previous_time_ms = sample.time_ms;
 
-        let cursor_position = native_pet_cursor_position(sample.root_x, sample.root_y);
+        let Some(cursor_position) = native_pet_cursor_position(sample.root_x, sample.root_y) else {
+            return Err(BuddyError::Runtime(
+                "native pet drag replay received invalid pointer sample".to_owned(),
+            ));
+        };
         drag_frame.record_pointer_sample(cursor_position, sample.time_ms);
         if let Some(update) = drag_frame.take_frame_update() {
             if update.distance >= PET_DRAG_START_DISTANCE {
@@ -113,9 +122,14 @@ fn replay_native_pet_drag(
             previous_frame_index = frame_index;
         }
 
-        let expected_position = NativePetPosition {
-            x: origin_position.x + (cursor_position.x - first_cursor.x).round() as i32,
-            y: origin_position.y + (cursor_position.y - first_cursor.y).round() as i32,
+        let Some(expected_position) = NativePetLogicalPoint::new(
+            f64::from(origin_position.x) + cursor_position.x - first_cursor.x,
+            f64::from(origin_position.y) + cursor_position.y - first_cursor.y,
+        )
+        .round_to_window_position() else {
+            return Err(BuddyError::Runtime(
+                "native pet drag replay produced invalid expected position".to_owned(),
+            ));
         };
         let follow_error = ((window_position.x - expected_position.x) as f64)
             .hypot((window_position.y - expected_position.y) as f64);

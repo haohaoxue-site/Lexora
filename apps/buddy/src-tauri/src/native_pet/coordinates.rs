@@ -103,6 +103,11 @@ impl NativePetLogicalPoint {
         Self { x, y }
     }
 
+    pub(super) fn try_new(x: f64, y: f64) -> Option<Self> {
+        let point = Self::new(x, y);
+        point.is_finite().then_some(point)
+    }
+
     pub(super) fn from_position(position: NativePetPosition) -> Self {
         Self::new(f64::from(position.x), f64::from(position.y))
     }
@@ -111,11 +116,15 @@ impl NativePetLogicalPoint {
         (self.x - other.x).hypot(self.y - other.y)
     }
 
-    pub(super) fn round_to_window_position(self) -> NativePetPosition {
-        NativePetPosition {
-            x: self.x.round() as i32,
-            y: self.y.round() as i32,
-        }
+    pub(super) fn is_finite(self) -> bool {
+        self.x.is_finite() && self.y.is_finite()
+    }
+
+    pub(super) fn round_to_window_position(self) -> Option<NativePetPosition> {
+        Some(NativePetPosition {
+            x: native_pet_round_logical_px(self.x)?,
+            y: native_pet_round_logical_px(self.y)?,
+        })
     }
 }
 
@@ -123,6 +132,12 @@ impl NativePetLogicalPoint {
 pub(super) struct NativePetLogicalOffset {
     pub(super) x: f64,
     pub(super) y: f64,
+}
+
+impl NativePetLogicalOffset {
+    pub(super) fn is_finite(self) -> bool {
+        self.x.is_finite() && self.y.is_finite()
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
@@ -136,6 +151,10 @@ impl NativePetLogicalVelocity {
         self.x.hypot(self.y)
     }
 
+    pub(super) fn is_finite(self) -> bool {
+        self.x.is_finite() && self.y.is_finite()
+    }
+
     pub(super) fn scaled(self, factor: f64) -> Self {
         Self {
             x: self.x * factor,
@@ -144,6 +163,10 @@ impl NativePetLogicalVelocity {
     }
 
     pub(super) fn clamp_speed(self, max_speed: f64) -> Self {
+        if !self.is_finite() || !max_speed.is_finite() || max_speed <= 0.0 {
+            return Self::default();
+        }
+
         let speed = self.speed();
         if speed <= max_speed || speed == 0.0 {
             return self;
@@ -153,8 +176,11 @@ impl NativePetLogicalVelocity {
     }
 }
 
-pub(super) fn native_pet_cursor_position(root_x: f64, root_y: f64) -> NativePetLogicalPoint {
-    NativePetLogicalPoint::new(root_x, root_y)
+pub(super) fn native_pet_cursor_position(
+    root_x: f64,
+    root_y: f64,
+) -> Option<NativePetLogicalPoint> {
+    NativePetLogicalPoint::try_new(root_x, root_y)
 }
 
 pub(super) fn native_pet_grab_offset(
@@ -170,11 +196,23 @@ pub(super) fn native_pet_grab_offset(
 pub(super) fn native_pet_position_from_cursor_offset(
     cursor_position: NativePetLogicalPoint,
     grab_offset: NativePetLogicalOffset,
-) -> NativePetPosition {
-    NativePetPosition {
-        x: (cursor_position.x - grab_offset.x).round() as i32,
-        y: (cursor_position.y - grab_offset.y).round() as i32,
+) -> Option<NativePetPosition> {
+    if !cursor_position.is_finite() || !grab_offset.is_finite() {
+        return None;
     }
+
+    Some(NativePetPosition {
+        x: native_pet_round_logical_px(cursor_position.x - grab_offset.x)?,
+        y: native_pet_round_logical_px(cursor_position.y - grab_offset.y)?,
+    })
+}
+
+fn native_pet_round_logical_px(value: f64) -> Option<i32> {
+    value.is_finite().then(|| {
+        value
+            .round()
+            .clamp(f64::from(i32::MIN), f64::from(i32::MAX)) as i32
+    })
 }
 
 pub(super) fn native_pet_window_rect(
@@ -187,9 +225,10 @@ pub(super) fn native_pet_window_rect(
 #[cfg(test)]
 mod tests {
     use super::{
-        native_pet_grab_offset, native_pet_position_from_cursor_offset, native_pet_window_rect,
-        NativePetCoordinateSpace, NativePetLogicalPoint, NativePetLogicalRect,
-        NativePetLogicalSize, NativePetPosition, NATIVE_PET_COORDINATE_SPACE,
+        native_pet_grab_offset, native_pet_position_from_cursor_offset,
+        native_pet_round_logical_px, native_pet_window_rect, NativePetCoordinateSpace,
+        NativePetLogicalPoint, NativePetLogicalRect, NativePetLogicalSize, NativePetPosition,
+        NATIVE_PET_COORDINATE_SPACE,
     };
 
     #[test]
@@ -221,8 +260,7 @@ mod tests {
             ),
         );
 
-        assert_eq!(position.x, 212);
-        assert_eq!(position.y, 295);
+        assert_eq!(position, Some(NativePetPosition { x: 212, y: 295 }));
     }
 
     #[test]
@@ -235,13 +273,38 @@ mod tests {
             ),
         );
 
-        assert_eq!(position, NativePetPosition { x: -220, y: 132 });
+        assert_eq!(position, Some(NativePetPosition { x: -220, y: 132 }));
     }
 
     #[test]
     fn rounds_logical_point_back_to_window_position() {
         let position = NativePetLogicalPoint::new(120.4, -99.6).round_to_window_position();
-        assert_eq!(position, NativePetPosition { x: 120, y: -100 });
+        assert_eq!(position, Some(NativePetPosition { x: 120, y: -100 }));
+    }
+
+    #[test]
+    fn rejects_non_finite_cursor_when_mapping_window_origin() {
+        let position = native_pet_position_from_cursor_offset(
+            NativePetLogicalPoint::new(f64::NAN, 144.0),
+            native_pet_grab_offset(
+                NativePetPosition { x: -240, y: 120 },
+                NativePetLogicalPoint::new(-220.0, 132.0),
+            ),
+        );
+
+        assert_eq!(position, None);
+    }
+
+    #[test]
+    fn saturates_extreme_finite_logical_pixels() {
+        assert_eq!(
+            native_pet_round_logical_px(f64::from(i32::MAX) * 2.0),
+            Some(i32::MAX)
+        );
+        assert_eq!(
+            native_pet_round_logical_px(f64::from(i32::MIN) * 2.0),
+            Some(i32::MIN)
+        );
     }
 
     #[test]

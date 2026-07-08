@@ -19,11 +19,17 @@ pub(super) struct NativePetPointerSamples {
 impl NativePetPointerSamples {
     pub(super) fn new(initial_sample: NativePetPointerSample) -> Self {
         let mut samples = VecDeque::with_capacity(NATIVE_PET_POINTER_SAMPLE_CAPACITY);
-        samples.push_back(initial_sample);
+        if initial_sample.cursor_position.is_finite() {
+            samples.push_back(initial_sample);
+        }
         Self { samples }
     }
 
     pub(super) fn push(&mut self, sample: NativePetPointerSample) {
+        if !sample.cursor_position.is_finite() {
+            return;
+        }
+
         if let Some(last) = self.samples.back().copied() {
             if last == sample {
                 return;
@@ -70,6 +76,10 @@ impl NativePetPointerSamples {
 
             let dx = sample.cursor_position.x - previous.cursor_position.x;
             let dy = sample.cursor_position.y - previous.cursor_position.y;
+            if !dx.is_finite() || !dy.is_finite() {
+                continue;
+            }
+
             let segment_dt_seconds = segment_dt_ms as f64 / 1000.0;
             let segment_speed = dx.hypot(dy) / segment_dt_seconds;
             if segment_speed > params.max_sample_velocity_logical_px_per_s {
@@ -185,5 +195,27 @@ mod tests {
             velocity.speed().round() as i32,
             params.max_velocity_logical_px_per_s.round() as i32
         );
+    }
+
+    #[test]
+    fn ignores_non_finite_pointer_samples_for_release_velocity() {
+        let params = NativePetPhysicsParams::default();
+        let mut samples = NativePetPointerSamples::new(NativePetPointerSample {
+            cursor_position: NativePetLogicalPoint::new(100.0, 100.0),
+            time_ms: 0,
+        });
+        samples.push(NativePetPointerSample {
+            cursor_position: NativePetLogicalPoint::new(f64::NAN, 120.0),
+            time_ms: 16,
+        });
+        samples.push(NativePetPointerSample {
+            cursor_position: NativePetLogicalPoint::new(130.0, 100.0),
+            time_ms: 32,
+        });
+
+        let velocity = samples.release_velocity(&params);
+
+        assert!(velocity.x.is_finite());
+        assert_eq!(velocity.y, 0.0);
     }
 }

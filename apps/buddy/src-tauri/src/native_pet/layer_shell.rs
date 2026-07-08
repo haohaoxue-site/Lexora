@@ -3,6 +3,8 @@ use std::ffi::CString;
 use glib::translate::ToGlibPtr;
 use libloading::Library;
 
+use crate::error::{BuddyError, BuddyResult};
+
 use super::{bounds::NativePetWindowPlacement, process::NativePetLayer};
 
 const GTK_LAYER_SHELL_LAYER_BOTTOM: i32 = 1;
@@ -29,6 +31,19 @@ impl NativePetLayer {
     }
 }
 
+pub(super) fn validate_layer_shell_availability(
+    layer: NativePetLayer,
+    available: bool,
+) -> BuddyResult<()> {
+    if matches!(layer, NativePetLayer::AlwaysOnTop) && !available {
+        return Err(BuddyError::Runtime(
+            "gtk-layer-shell is required for always-on-top native pet window".to_owned(),
+        ));
+    }
+
+    Ok(())
+}
+
 pub(super) struct LayerShellApi {
     _library: Library,
     init_for_window: GtkLayerInitForWindow,
@@ -42,39 +57,48 @@ pub(super) struct LayerShellApi {
 
 impl LayerShellApi {
     pub(super) fn load() -> Option<Self> {
+        // SAFETY: Loading this optional system library only enables Wayland layer-shell support.
+        // We keep the Library alive in LayerShellApi for at least as long as the loaded symbols.
         let library = unsafe { Library::new("libgtk-layer-shell.so.0").ok()? };
+        // SAFETY: The symbol names and function signatures match the gtk-layer-shell C ABI.
         let init_for_window = unsafe {
             *library
                 .get::<GtkLayerInitForWindow>(b"gtk_layer_init_for_window\0")
                 .ok()?
         };
+        // SAFETY: The symbol names and function signatures match the gtk-layer-shell C ABI.
         let set_layer = unsafe {
             *library
                 .get::<GtkLayerSetLayer>(b"gtk_layer_set_layer\0")
                 .ok()?
         };
+        // SAFETY: The symbol names and function signatures match the gtk-layer-shell C ABI.
         let set_monitor = unsafe {
             library
                 .get::<GtkLayerSetMonitor>(b"gtk_layer_set_monitor\0")
                 .ok()
                 .map(|symbol| *symbol)
         };
+        // SAFETY: The symbol names and function signatures match the gtk-layer-shell C ABI.
         let set_anchor = unsafe {
             *library
                 .get::<GtkLayerSetAnchor>(b"gtk_layer_set_anchor\0")
                 .ok()?
         };
+        // SAFETY: The symbol names and function signatures match the gtk-layer-shell C ABI.
         let set_margin = unsafe {
             *library
                 .get::<GtkLayerSetMargin>(b"gtk_layer_set_margin\0")
                 .ok()?
         };
+        // SAFETY: The symbol names and function signatures match the gtk-layer-shell C ABI.
         let set_namespace = unsafe {
             library
                 .get::<GtkLayerSetNamespace>(b"gtk_layer_set_namespace\0")
                 .ok()
                 .map(|symbol| *symbol)
         };
+        // SAFETY: The symbol names and function signatures match the gtk-layer-shell C ABI.
         let try_force_commit = unsafe {
             library
                 .get::<GtkLayerTryForceCommit>(b"gtk_layer_try_force_commit\0")
@@ -101,6 +125,8 @@ impl LayerShellApi {
         placement: NativePetWindowPlacement,
     ) {
         let window = window.to_glib_none().0;
+        // SAFETY: window is borrowed from a live gtk::Window and all function pointers were loaded
+        // from gtk-layer-shell with matching ABI signatures.
         unsafe {
             (self.init_for_window)(window);
             if let Some(set_namespace) = self.set_namespace {
@@ -118,11 +144,17 @@ impl LayerShellApi {
     }
 
     pub(super) fn set_placement(&self, window: &gtk::Window, placement: NativePetWindowPlacement) {
+        // SAFETY: window is borrowed from a live gtk::Window and placement only changes layer-shell
+        // margins/monitor through validated gtk-layer-shell function pointers.
         unsafe {
             self.set_placement_by_ptr(window.to_glib_none().0, placement);
         }
     }
 
+    /// # Safety
+    ///
+    /// `window` must be a valid pointer borrowed from a live `gtk::Window`, and the loaded
+    /// gtk-layer-shell function pointers must match their declared C ABI signatures.
     unsafe fn set_placement_by_ptr(
         &self,
         window: *mut gtk::ffi::GtkWindow,
@@ -130,16 +162,22 @@ impl LayerShellApi {
     ) {
         if let Some(set_monitor) = self.set_monitor {
             let monitor_ptr = native_pet_layer_shell_monitor_ptr(placement.monitor_index);
-            set_monitor(window, monitor_ptr);
+            // SAFETY: caller guarantees `window` is valid, and `monitor_ptr` is either null or a
+            // GdkMonitor pointer owned by the current default display.
+            unsafe { set_monitor(window, monitor_ptr) };
         }
 
         let local_position = placement.layer_shell_position;
-        (self.set_margin)(window, GTK_LAYER_SHELL_EDGE_LEFT, local_position.x);
-        (self.set_margin)(window, GTK_LAYER_SHELL_EDGE_TOP, local_position.y);
-        (self.set_margin)(window, GTK_LAYER_SHELL_EDGE_RIGHT, 0);
-        (self.set_margin)(window, GTK_LAYER_SHELL_EDGE_BOTTOM, 0);
+        // SAFETY: caller guarantees `window` is valid for gtk-layer-shell margin calls.
+        unsafe {
+            (self.set_margin)(window, GTK_LAYER_SHELL_EDGE_LEFT, local_position.x);
+            (self.set_margin)(window, GTK_LAYER_SHELL_EDGE_TOP, local_position.y);
+            (self.set_margin)(window, GTK_LAYER_SHELL_EDGE_RIGHT, 0);
+            (self.set_margin)(window, GTK_LAYER_SHELL_EDGE_BOTTOM, 0);
+        }
         if let Some(try_force_commit) = self.try_force_commit {
-            try_force_commit(window);
+            // SAFETY: caller guarantees `window` is valid for gtk-layer-shell commit calls.
+            unsafe { try_force_commit(window) };
         }
     }
 }
@@ -160,7 +198,10 @@ fn native_pet_layer_shell_monitor_ptr(monitor_index: Option<i32>) -> *mut gdk::f
 
 #[cfg(test)]
 mod tests {
-    use super::{GTK_LAYER_SHELL_LAYER_BOTTOM, GTK_LAYER_SHELL_LAYER_OVERLAY};
+    use super::{
+        validate_layer_shell_availability, GTK_LAYER_SHELL_LAYER_BOTTOM,
+        GTK_LAYER_SHELL_LAYER_OVERLAY,
+    };
     use crate::native_pet::process::NativePetLayer;
 
     #[test]
@@ -173,5 +214,10 @@ mod tests {
             NativePetLayer::Normal.gtk_layer(),
             GTK_LAYER_SHELL_LAYER_BOTTOM
         );
+    }
+
+    #[test]
+    fn rejects_always_on_top_without_layer_shell() {
+        assert!(validate_layer_shell_availability(NativePetLayer::AlwaysOnTop, false).is_err());
     }
 }

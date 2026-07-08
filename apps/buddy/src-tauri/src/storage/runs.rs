@@ -3,8 +3,12 @@ use rusqlite::{params, Connection};
 use super::{
     conversations,
     run_events::{self, BuddyRunEvent, CreateBuddyRunEventRequest},
+    BuddyStorage,
 };
-use crate::error::{BuddyError, BuddyResult};
+use crate::{
+    domain::{BuddyRunStatus, BuddyRunTerminalStatus},
+    error::{BuddyError, BuddyResult},
+};
 
 #[derive(Clone, Debug, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -66,6 +70,24 @@ pub struct BuddyRun {
 pub struct BuddyFinishedRun {
     pub run: BuddyRun,
     pub event: BuddyRunEvent,
+}
+
+impl BuddyStorage {
+    pub fn find_run(&self, id: String) -> BuddyResult<BuddyRun> {
+        self.with_connection("find_run", |connection| self::find_run(connection, &id))
+    }
+
+    pub fn list_runs(&self, session_id: Option<String>, limit: i64) -> BuddyResult<Vec<BuddyRun>> {
+        self.with_connection("list_runs", |connection| {
+            self::list_runs(connection, session_id, limit)
+        })
+    }
+
+    pub fn update_run_status(&self, id: String, status: BuddyRunStatus) -> BuddyResult<BuddyRun> {
+        self.with_connection("update_run_status", |connection| {
+            self::update_run_status(connection, id, status)
+        })
+    }
 }
 
 pub(crate) fn create_run_with_log_path(
@@ -206,11 +228,12 @@ pub fn list_runs(
 pub fn update_run_status(
     connection: &Connection,
     id: String,
-    status: String,
+    status: BuddyRunStatus,
 ) -> BuddyResult<BuddyRun> {
     let current = find_run(connection, &id)?;
+    let status_str = status.as_str();
     if is_terminal_status(&current.status) {
-        if current.status == status {
+        if current.status == status_str {
             return Ok(current);
         }
 
@@ -219,14 +242,14 @@ pub fn update_run_status(
             current.id, current.status
         )));
     }
-    if current.status == "running" && status == "queued" {
+    if current.status == BuddyRunStatus::Running.as_str() && status == BuddyRunStatus::Queued {
         return Err(BuddyError::Validation(format!(
             "run {} cannot move from running back to queued",
             current.id
         )));
     }
 
-    let is_terminal = matches!(status.as_str(), "completed" | "failed" | "cancelled");
+    let is_terminal = is_terminal_status(status_str);
     let completed_at_expression = if is_terminal {
         "strftime('%Y-%m-%dT%H:%M:%fZ', 'now')"
     } else {
@@ -241,7 +264,7 @@ pub fn update_run_status(
         "#
     );
 
-    connection.execute(&sql, params![status, id])?;
+    connection.execute(&sql, params![status_str, id])?;
     touch_run_owner(connection, &id)?;
 
     find_run(connection, &id)
@@ -250,22 +273,15 @@ pub fn update_run_status(
 pub fn finish_run(
     connection: &Connection,
     id: String,
-    status: String,
-    event_type: String,
+    terminal_status: BuddyRunTerminalStatus,
     payload: serde_json::Value,
 ) -> BuddyResult<BuddyFinishedRun> {
-    let expected_event_type = terminal_event_type(&status).ok_or_else(|| {
-        BuddyError::Validation(format!("run terminal status is invalid: {status}"))
-    })?;
-    if event_type != expected_event_type {
-        return Err(BuddyError::Validation(format!(
-            "run terminal event {event_type} does not match status {status}"
-        )));
-    }
-
+    let status = terminal_status.run_status();
+    let status_str = status.as_str();
+    let event_type = terminal_status.event_type().as_str();
     let current = find_run(connection, &id)?;
     let run = if is_terminal_status(&current.status) {
-        if current.status != status {
+        if current.status != status_str {
             return Err(BuddyError::Validation(format!(
                 "run {} is already terminal with status {}",
                 current.id, current.status
@@ -276,15 +292,11 @@ pub fn finish_run(
     } else {
         update_run_status(connection, id.clone(), status)?
     };
-    let event = match run_events::find_latest_run_event_by_type(connection, &id, &event_type)? {
+    let event = match run_events::find_latest_run_event_by_type(connection, &id, event_type)? {
         Some(event) => event,
         None => run_events::append_run_event(
             connection,
-            CreateBuddyRunEventRequest {
-                event_type,
-                payload,
-                run_id: id,
-            },
+            CreateBuddyRunEventRequest::new(id, terminal_status.event_type(), payload),
         )?,
     };
 
@@ -326,15 +338,6 @@ pub(crate) fn touch_run_owner(connection: &Connection, run_id: &str) -> BuddyRes
 
 fn is_terminal_status(status: &str) -> bool {
     matches!(status, "completed" | "failed" | "cancelled")
-}
-
-fn terminal_event_type(status: &str) -> Option<&'static str> {
-    match status {
-        "completed" => Some("run.completed"),
-        "failed" => Some("run.failed"),
-        "cancelled" => Some("run.cancelled"),
-        _ => None,
-    }
 }
 
 pub(super) fn find_run(connection: &Connection, id: &str) -> BuddyResult<BuddyRun> {

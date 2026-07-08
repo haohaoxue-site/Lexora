@@ -2,6 +2,8 @@ use rusqlite::{params, types::Type, OptionalExtension};
 
 use crate::error::{BuddyError, BuddyResult};
 
+use super::BuddyStorage;
+
 #[derive(Clone, Debug, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct BuddyRegisteredAttachment {
@@ -24,6 +26,23 @@ pub struct CreateBuddyRegisteredAttachmentRequest {
     pub size_bytes: u64,
     pub path: String,
     pub source: String,
+}
+
+impl BuddyStorage {
+    pub fn create_attachment(
+        &self,
+        request: CreateBuddyRegisteredAttachmentRequest,
+    ) -> BuddyResult<BuddyRegisteredAttachment> {
+        self.with_connection("create_attachment", |connection| {
+            self::create_attachment(connection, request)
+        })
+    }
+
+    pub fn find_attachment(&self, id: &str) -> BuddyResult<Option<BuddyRegisteredAttachment>> {
+        self.with_connection("find_attachment", |connection| {
+            self::find_attachment(connection, id)
+        })
+    }
 }
 
 pub fn create_attachment(

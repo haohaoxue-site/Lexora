@@ -99,6 +99,10 @@ impl NativePetDragStateMachine {
         cursor_position: NativePetLogicalPoint,
         time_ms: u64,
     ) {
+        if !cursor_position.is_finite() {
+            return;
+        }
+
         if time_ms < self.latest_event_time_ms {
             return;
         }
@@ -132,7 +136,7 @@ impl NativePetDragStateMachine {
             self.phase = NativePetDragPhase::Dragging;
         }
         let position =
-            native_pet_position_from_cursor_offset(self.latest_cursor_position, self.grab_offset);
+            native_pet_position_from_cursor_offset(self.latest_cursor_position, self.grab_offset)?;
         self.submitted_cursor_position = self.latest_cursor_position;
 
         Some(NativePetDragFrameUpdate {
@@ -286,6 +290,23 @@ mod tests {
         assert_eq!(
             drag.latest_cursor_position(),
             NativePetLogicalPoint::new(560.0, 500.0)
+        );
+    }
+
+    #[test]
+    fn ignores_non_finite_pointer_sample_instead_of_committing_window_move() {
+        let mut drag = NativePetDragStateMachine::begin(
+            NativePetPosition { x: 200, y: 300 },
+            NativePetLogicalPoint::new(500.0, 500.0),
+            0,
+        );
+
+        drag.record_pointer_sample(NativePetLogicalPoint::new(f64::NAN, 500.0), 16);
+
+        assert!(drag.take_frame_update().is_none());
+        assert_eq!(
+            drag.latest_cursor_position(),
+            NativePetLogicalPoint::new(500.0, 500.0)
         );
     }
 }

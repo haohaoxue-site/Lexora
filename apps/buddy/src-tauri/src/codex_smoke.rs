@@ -229,6 +229,7 @@ mod tests {
     use super::{create_codex_smoke_check_report, BuddyCodexSmokeCheckReport};
     use crate::{
         commands,
+        domain::{BuddyRunEventType, BuddyRunStatus, BuddyRunTerminalStatus},
         storage::{
             AppendBuddyConversationMessageRequest, BuddyRunEvent, BuddyStorage,
             CreateBuddyConversationRequest, CreateBuddyConversationRunRequest,
@@ -299,16 +300,16 @@ mod tests {
             })
             .expect("run");
         let run = storage
-            .update_run_status(run.id, "running".to_owned())
+            .update_run_status(run.id, BuddyRunStatus::Running)
             .expect("running");
         let started = storage
-            .append_run_event(CreateBuddyRunEventRequest {
-                event_type: "run.started".to_owned(),
-                payload: serde_json::json!({
+            .append_run_event(CreateBuddyRunEventRequest::new(
+                run.id.clone(),
+                BuddyRunEventType::RunStarted,
+                serde_json::json!({
                     "protocol": "codex_app_server",
                 }),
-                run_id: run.id.clone(),
-            })
+            ))
             .expect("started");
         let assistant_message = storage
             .append_conversation_message(AppendBuddyConversationMessageRequest {
@@ -327,8 +328,7 @@ mod tests {
         let completed = storage
             .finish_run(
                 run.id.clone(),
-                "completed".to_owned(),
-                "run.completed".to_owned(),
+                BuddyRunTerminalStatus::Completed,
                 serde_json::json!({
                     "protocol": "codex_app_server",
                 }),

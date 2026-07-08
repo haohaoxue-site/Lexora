@@ -4,6 +4,8 @@ use rusqlite::{params, Connection, OptionalExtension};
 
 use crate::error::{BuddyError, BuddyResult};
 
+use super::BuddyStorage;
+
 #[derive(Clone, Debug, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct UpsertBuddyProjectRequest {
@@ -18,6 +20,26 @@ pub struct BuddyProject {
     pub name: String,
     pub created_at: String,
     pub updated_at: String,
+}
+
+impl BuddyStorage {
+    pub fn upsert_project(&self, request: UpsertBuddyProjectRequest) -> BuddyResult<BuddyProject> {
+        self.with_connection("upsert_project", |connection| {
+            self::upsert_project(connection, request)
+        })
+    }
+
+    pub fn list_projects(&self, limit: i64) -> BuddyResult<Vec<BuddyProject>> {
+        self.with_connection("list_projects", |connection| {
+            self::list_projects(connection, limit)
+        })
+    }
+
+    pub fn find_project(&self, root: &str) -> BuddyResult<Option<BuddyProject>> {
+        self.with_connection("find_project", |connection| {
+            self::find_project(connection, root)
+        })
+    }
 }
 
 pub fn upsert_project(
@@ -38,7 +60,8 @@ pub fn upsert_project(
         params![root, name],
     )?;
 
-    find_project(connection, &root).map(|project| project.expect("project was just written"))
+    find_project(connection, &root)?
+        .ok_or_else(|| BuddyError::Sqlite(rusqlite::Error::QueryReturnedNoRows))
 }
 
 pub fn list_projects(connection: &Connection, limit: i64) -> BuddyResult<Vec<BuddyProject>> {
@@ -96,7 +119,7 @@ fn normalize_project_root(root: &str) -> BuddyResult<String> {
 
     let canonical = canonicalize_project_root(Path::new(normalized))?;
 
-    Ok(path_to_utf8_string(canonical)?)
+    path_to_utf8_string(canonical)
 }
 
 fn normalize_project_root_for_lookup(root: &str) -> BuddyResult<Option<String>> {
@@ -111,7 +134,7 @@ fn normalize_project_root_for_lookup(root: &str) -> BuddyResult<Option<String>> 
         Err(error) => return Err(error),
     };
 
-    Ok(Some(path_to_utf8_string(canonical)?))
+    path_to_utf8_string(canonical).map(Some)
 }
 
 fn canonicalize_project_root(root: &Path) -> BuddyResult<PathBuf> {

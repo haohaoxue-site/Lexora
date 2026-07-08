@@ -137,7 +137,7 @@ fn contains_secret_assignment(line: &str, key: &str) -> bool {
     };
     let after_key = line[index + key.len()..]
         .trim_start()
-        .trim_start_matches(|ch| matches!(ch, '"' | '\'' | '`'))
+        .trim_start_matches(&['"', '\'', '`'][..])
         .trim_start();
     let Some(value) = after_key
         .strip_prefix('=')
@@ -341,7 +341,7 @@ mod tests {
             .expect("accept project memory candidate");
         let raw_memory = std::fs::read_to_string(
             root.join(
-                &accepted
+                accepted
                     .source_ref
                     .relative_path
                     .replace("MEMORY.md", "raw_memories.md"),
@@ -352,7 +352,7 @@ mod tests {
             .expect("read project memory");
         let summary = std::fs::read_to_string(
             root.join(
-                &accepted
+                accepted
                     .source_ref
                     .relative_path
                     .replace("MEMORY.md", "memory_summary.md"),

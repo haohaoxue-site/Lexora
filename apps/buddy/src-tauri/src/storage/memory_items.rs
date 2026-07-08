@@ -1,6 +1,6 @@
 #![cfg_attr(not(test), allow(dead_code))]
 
-use rusqlite::{params, Connection};
+use rusqlite::{params, types::Type, Connection};
 use uuid::Uuid;
 
 use crate::error::BuddyResult;
@@ -263,7 +263,9 @@ fn find_memory_item(connection: &Connection, id: &str) -> BuddyResult<BuddyMemor
 
 fn map_memory_item(row: &rusqlite::Row<'_>) -> rusqlite::Result<BuddyMemoryItem> {
     let tags_json: String = row.get(4)?;
-    let tags = serde_json::from_str(&tags_json).unwrap_or_default();
+    let tags = serde_json::from_str(&tags_json).map_err(|error| {
+        rusqlite::Error::FromSqlConversionFailure(4, Type::Text, Box::new(error))
+    })?;
 
     Ok(BuddyMemoryItem {
         id: row.get(0)?,
@@ -296,7 +298,7 @@ fn build_fts_query(query: &str) -> String {
 mod tests {
     use rusqlite::Connection;
 
-    use super::{create_memory_item, CreateBuddyMemoryItemRequest};
+    use super::{create_memory_item, find_memory_item, CreateBuddyMemoryItemRequest};
 
     #[test]
     fn rolls_back_memory_item_when_search_index_insert_fails() {
@@ -340,5 +342,35 @@ mod tests {
 
         assert!(result.is_err());
         assert_eq!(count, 0);
+    }
+
+    #[test]
+    fn rejects_invalid_memory_item_tags_json() {
+        let connection = Connection::open_in_memory().expect("open memory database");
+        connection
+            .execute_batch(
+                r#"
+                CREATE TABLE memory_items (
+                  id TEXT PRIMARY KEY,
+                  scope TEXT NOT NULL,
+                  memory_type TEXT NOT NULL,
+                  content TEXT NOT NULL,
+                  tags_json TEXT NOT NULL DEFAULT '[]',
+                  source_project TEXT,
+                  source_run_id TEXT,
+                  confidence REAL NOT NULL DEFAULT 1,
+                  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+                  updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+                  expires_at TEXT
+                );
+                INSERT INTO memory_items(id, scope, memory_type, content, tags_json)
+                VALUES ('memory-1', 'global', 'continuity.chat_turn', 'broken tags', '{');
+                "#,
+            )
+            .expect("create memory_items fixture");
+
+        let error = find_memory_item(&connection, "memory-1").expect_err("invalid tags json");
+
+        assert!(matches!(error, crate::error::BuddyError::Sqlite(_)));
     }
 }

@@ -105,13 +105,14 @@ impl NativePetMonitorLayout {
         &self,
         point: NativePetLogicalPoint,
     ) -> Option<&NativePetMonitorInfo> {
+        if !point.is_finite() {
+            return self.primary_monitor();
+        }
+
         self.monitors.iter().min_by(|left, right| {
-            native_pet_distance_sq_to_rect(point, left.available_bounds())
-                .partial_cmp(&native_pet_distance_sq_to_rect(
-                    point,
-                    right.available_bounds(),
-                ))
-                .expect("distance comparison should be finite")
+            native_pet_distance_sq_to_rect(point, left.available_bounds()).total_cmp(
+                &native_pet_distance_sq_to_rect(point, right.available_bounds()),
+            )
         })
     }
 }
@@ -189,6 +190,16 @@ mod tests {
         let monitor = layout
             .nearest_monitor_to_point(NativePetLogicalPoint::new(4000.0, 100.0))
             .expect("should find nearest monitor");
+
+        assert_eq!(monitor.index, 1);
+    }
+
+    #[test]
+    fn falls_back_to_primary_monitor_when_point_is_not_finite() {
+        let layout = build_test_layout();
+        let monitor = layout
+            .nearest_monitor_to_point(NativePetLogicalPoint::new(f64::NAN, 100.0))
+            .expect("should fall back to primary monitor");
 
         assert_eq!(monitor.index, 1);
     }

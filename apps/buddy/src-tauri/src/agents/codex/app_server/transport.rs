@@ -242,7 +242,9 @@ fn spawn_codex_app_server_with_env(
         }
     }
 
-    Err(last_error.expect("text-file-busy retry must keep the last spawn error"))
+    Err(last_error.unwrap_or_else(|| {
+        std::io::Error::other("text-file-busy retry exited without a spawn error")
+    }))
 }
 
 fn push_stderr_tail_line(lines: &Arc<Mutex<VecDeque<String>>>, line: String) {

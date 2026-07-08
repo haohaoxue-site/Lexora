@@ -3,6 +3,8 @@ use uuid::Uuid;
 
 use crate::error::{BuddyError, BuddyResult};
 
+use super::BuddyStorage;
+
 #[derive(Clone, Debug, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct BuddyRuntimeBinding {
@@ -16,6 +18,70 @@ pub struct BuddyRuntimeBinding {
     pub external_session_id: Option<String>,
     pub created_at: String,
     pub updated_at: String,
+}
+
+impl BuddyStorage {
+    pub fn upsert_runtime_binding(
+        &self,
+        session_id: String,
+        runtime: String,
+        cwd: Option<String>,
+        external_thread_id: Option<String>,
+        external_session_id: Option<String>,
+    ) -> BuddyResult<BuddyRuntimeBinding> {
+        self.with_connection("upsert_runtime_binding", |connection| {
+            self::upsert_runtime_binding(
+                connection,
+                session_id,
+                runtime,
+                cwd,
+                external_thread_id,
+                external_session_id,
+            )
+        })
+    }
+
+    #[cfg_attr(not(test), allow(dead_code))]
+    pub fn find_conversation_runtime_binding(
+        &self,
+        conversation_id: String,
+        branch_id: String,
+        runtime: String,
+        cwd: Option<String>,
+    ) -> BuddyResult<Option<BuddyRuntimeBinding>> {
+        self.with_connection("find_conversation_runtime_binding", |connection| {
+            self::find_conversation_runtime_binding(
+                connection,
+                conversation_id,
+                branch_id,
+                runtime,
+                cwd,
+            )
+        })
+    }
+
+    #[cfg_attr(not(test), allow(dead_code))]
+    pub fn upsert_conversation_runtime_binding(
+        &self,
+        conversation_id: String,
+        branch_id: String,
+        runtime: String,
+        cwd: Option<String>,
+        external_thread_id: Option<String>,
+        external_session_id: Option<String>,
+    ) -> BuddyResult<BuddyRuntimeBinding> {
+        self.with_connection("upsert_conversation_runtime_binding", |connection| {
+            self::upsert_conversation_runtime_binding(
+                connection,
+                conversation_id,
+                branch_id,
+                runtime,
+                cwd,
+                external_thread_id,
+                external_session_id,
+            )
+        })
+    }
 }
 
 pub fn find_runtime_binding(

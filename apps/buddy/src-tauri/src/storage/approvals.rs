@@ -1,7 +1,12 @@
 use rusqlite::{params, types::Type, Connection};
 use uuid::Uuid;
 
-use crate::error::{BuddyError, BuddyResult};
+use crate::{
+    domain::{BuddyApprovalStatus, BuddyApprovalTerminalStatus},
+    error::{BuddyError, BuddyResult},
+};
+
+use super::BuddyStorage;
 
 pub const CODEX_APP_SERVER_REQUEST_APPROVAL_KIND: &str = "run.codex_app_server_request";
 
@@ -25,6 +30,33 @@ pub struct BuddyApproval {
     pub resolved_at: Option<String>,
 }
 
+impl BuddyStorage {
+    pub fn list_approvals(
+        &self,
+        status: Option<String>,
+        limit: i64,
+    ) -> BuddyResult<Vec<BuddyApproval>> {
+        self.with_connection("list_approvals", |connection| {
+            self::list_approvals(connection, status, limit)
+        })
+    }
+
+    pub fn create_approval(
+        &self,
+        request: CreateBuddyApprovalRequest,
+    ) -> BuddyResult<BuddyApproval> {
+        self.with_connection("create_approval", |connection| {
+            self::create_approval(connection, request)
+        })
+    }
+
+    pub fn find_approval(&self, approval_id: String) -> BuddyResult<BuddyApproval> {
+        self.with_connection("find_approval", |connection| {
+            self::find_approval(connection, &approval_id)
+        })
+    }
+}
+
 pub fn create_approval(
     connection: &Connection,
     request: CreateBuddyApprovalRequest,
@@ -35,9 +67,15 @@ pub fn create_approval(
     connection.execute(
         r#"
         INSERT INTO approvals(id, run_id, kind, status, payload_json)
-        VALUES (?1, ?2, ?3, 'pending', ?4)
+        VALUES (?1, ?2, ?3, ?4, ?5)
         "#,
-        params![id, request.run_id, request.kind, payload],
+        params![
+            id,
+            request.run_id,
+            request.kind,
+            BuddyApprovalStatus::Pending.as_str(),
+            payload
+        ],
     )?;
 
     find_approval(connection, &id)
@@ -98,21 +136,21 @@ pub fn list_approvals(
 pub fn resolve_approval(
     connection: &Connection,
     id: &str,
-    status: &str,
+    status: BuddyApprovalTerminalStatus,
 ) -> BuddyResult<BuddyApproval> {
-    validate_approval_status(status)?;
+    let resolved_status = status.as_str();
     connection.execute(
         r#"
         UPDATE approvals
         SET status = ?1,
             resolved_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
-        WHERE id = ?2 AND status = 'pending'
+        WHERE id = ?2 AND status = ?3
         "#,
-        params![status, id],
+        params![resolved_status, id, BuddyApprovalStatus::Pending.as_str()],
     )?;
 
     let approval = find_approval(connection, id)?;
-    if approval.status != status {
+    if approval.status != resolved_status {
         return Err(BuddyError::Validation("approval is not pending".to_owned()));
     }
 
@@ -137,7 +175,13 @@ fn map_approval(row: &rusqlite::Row<'_>) -> rusqlite::Result<BuddyApproval> {
 }
 
 fn validate_approval_status(status: &str) -> BuddyResult<()> {
-    if matches!(status, "pending" | "approved" | "denied" | "cancelled") {
+    if matches!(
+        status,
+        value if value == BuddyApprovalStatus::Pending.as_str()
+            || value == BuddyApprovalStatus::Approved.as_str()
+            || value == BuddyApprovalStatus::Denied.as_str()
+            || value == BuddyApprovalStatus::Cancelled.as_str()
+    ) {
         return Ok(());
     }
 
