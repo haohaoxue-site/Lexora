@@ -28,23 +28,49 @@ Lexora is a document-driven AI workspace for individuals. It brings document wri
 
 ## Core Capabilities
 
+Lexora consists of a document-driven web workspace and a standalone Buddy desktop product. Both are designed for individuals and keep independent runtime and data boundaries.
+
+### Web Workspace
+
+A document-centered AI workspace that can be self-hosted.
+
 | Capability | Description |
 | --- | --- |
-| AI Chat | Model selection, streaming responses, message branches, retry flows, and document-aware context. |
-| Document Writing | Page trees, rich text blocks, tables, code blocks, math, version history, and trash. |
-| Public Publishing | Single-page publishing and site publishing with VitePress-like public pages. |
-| BYOK Model Access | Platform-level or user-level model providers with OpenAI-Compatible and Anthropic-Compatible endpoints. |
+| Documents and Knowledge | Page trees, rich-text editing, tables, code blocks, math, autosave, and trash. |
+| AI Chat and Document AI | Model selection, streaming replies, message branches, retries, and document-aware continuation and rewriting. |
+| History and Publishing | Version snapshots, history restore, single-page publishing, and site publishing. |
+| Models and Deployment | BYOK, platform-level and user-level model providers, and Docker Compose self-hosting. |
+
+### Lexora Buddy
+
+A standalone personal AI companion that runs locally.
+
+| Capability | Description |
+| --- | --- |
+| Local Conversations | Connect multiple model providers and keep conversation and run history on the local machine. |
+| Project Context | Understand and work with documents, files, and code in authorized directories. |
+| Controlled Execution | Use Skills, MCP, and local tools while requesting confirmation for sensitive operations. |
+| Desktop Companion | Present runtime status through notifications, progress feedback, and a native desktop pet. |
 
 ## Tech Stack
 
+### Web Workspace and Services
+
 | Layer | Technology |
 | --- | --- |
-| Web | Vue 3, Vite, Vue Router, Pinia, Element Plus, UnoCSS |
-| Editor | Tiptap, ProseMirror, REST autosave, version snapshots |
+| Web | Vue 3, TypeScript, Vite, Vue Router, Pinia, Element Plus, UnoCSS |
+| Editor | Tiptap, ProseMirror |
 | API | NestJS, Fastify, Prisma, PostgreSQL, Redis, BullMQ |
-| Agent | LangGraph, LangChain, Postgres Checkpointer, Redis queues |
-| Contracts | Zod, shared endpoint registry, domain constants and types |
-| Infrastructure | Docker Compose, RustFS, Nginx |
+| Agent | LangGraph, LangChain, PostgreSQL Checkpointer, Redis Streams |
+| Infrastructure | Docker Compose, Nginx, RustFS |
+
+### Lexora Buddy
+
+| Layer | Technology |
+| --- | --- |
+| Desktop | Electron, Vue 3, TypeScript, Vite, Naive UI, UnoCSS |
+| Agent Runtime | Pi SDK, MCP SDK, Node.js, SQLite, JSONL |
+| Native Pet | Rust, GTK, Cairo, GDK Pixbuf |
 
 ## Project Structure
 
@@ -54,7 +80,7 @@ lexora/
 │   ├── web/         # Vue 3 frontend app
 │   ├── api/         # NestJS API service
 │   ├── agent/       # LangGraph AI runtime service
-│   ├── buddy/       # Local desktop companion and Agent runtime
+│   ├── buddy/       # Local personal AI companion and desktop pet
 │   └── docs/        # Product documentation site
 ├── packages/
 │   ├── contracts/   # Shared schemas, endpoints, constants, and domain types

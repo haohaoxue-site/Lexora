@@ -1,271 +1,323 @@
 import type { Ref } from 'vue'
-import type { LocalApproval, LocalChatApi, LocalMessage, LocalRun, LocalRunEvent, LocalRunStateEvent, LocalTurnStart } from '../../electron/shared/localChatApi'
-import { shallowRef } from 'vue'
-import { getRunSyncRetryDelay, mergeLocalRunEvents } from './desktopChatState'
+import type {
+  LocalApproval,
+  LocalChatApi,
+  LocalConversationTimelineItem,
+  LocalMessage,
+  LocalRun,
+  LocalRunEvent,
+  LocalTurnStart,
+} from '../../electron/shared/localChatApi'
+import { computed, shallowRef } from 'vue'
 
-const RUN_EVENT_LIMIT = 1_000
-const INITIAL_RUN_EVENT_LIMIT = 500
-const RUN_EVENT_BATCH_LIMIT = 200
-const RUN_SYNC_INTERVAL_MS = 80
+const TIMELINE_PAGE_SIZE = 100
 
 interface DesktopRunSyncOptions {
+  activeBranchId: Ref<string | null>
   activeConversationId: Ref<string | null>
   api: LocalChatApi
   onError: (error: unknown) => void
-  refreshCollections: () => Promise<void>
 }
 
 export function useDesktopRunSync(options: DesktopRunSyncOptions) {
-  const messages = shallowRef<ReadonlyArray<LocalMessage>>([])
+  let hasLoadedTimelinePage = false
+  const timelineItems = shallowRef<ReadonlyArray<LocalConversationTimelineItem>>([])
+  const messages = computed<ReadonlyArray<LocalMessage>>(() => timelineItems.value.filter(
+    (item): item is Extract<LocalConversationTimelineItem, { kind: 'message' }> =>
+      item.kind === 'message',
+  ))
   const runs = shallowRef<ReadonlyArray<LocalRun>>([])
   const runEvents = shallowRef<ReadonlyArray<LocalRunEvent>>([])
   const approvals = shallowRef<ReadonlyArray<LocalApproval>>([])
-  const runEventCursors = new Map<string, number>()
-  const pendingRunIds = new Set<string>()
-  const runSyncRetryAttempts = new Map<string, number>()
+  const isLoadingOlderMessages = shallowRef(false)
+  const timelineCursor = shallowRef<string | null>(null)
+  const hasOlderMessages = computed(() => timelineCursor.value !== null)
+  const knownRunIds = new Set<string>()
+  let loadedBranchId: string | null = null
+  let loadedConversationId: string | null = null
+  let olderLoadGeneration = 0
+  let projectionGeneration = 0
   let refreshGeneration = 0
-  let runSyncTimer: number | null = null
-  let isRunSyncing = false
-  let conversationRefreshCount = 0
+  let refreshTimer: number | null = null
 
   async function refreshActiveConversation() {
     const conversationId = options.activeConversationId.value
-    const generation = ++refreshGeneration
-    if (!conversationId) {
+    const branchId = options.activeBranchId.value
+    if (!conversationId || !branchId) {
       clearConversationState()
       return
     }
-
-    conversationRefreshCount += 1
+    if (loadedConversationId !== conversationId || loadedBranchId !== branchId) {
+      resetConversationProjection()
+      loadedConversationId = conversationId
+      loadedBranchId = branchId
+    }
+    const generation = ++refreshGeneration
+    const isInitialTimelinePage = !hasLoadedTimelinePage
     try {
-      const [nextMessages, nextRuns, nextEvents, pendingApprovals] = await Promise.all([
-        options.api.conversations.listMessages({ conversationId, limit: 100 }),
-        options.api.runs.list({ conversationId, limit: 100 }),
-        options.api.runs.listConversationChatEvents({
+      const [timelinePage, pendingApprovals] = await Promise.all([
+        options.api.conversations.listTimeline({
+          branchId,
           conversationId,
-          eventLimit: INITIAL_RUN_EVENT_LIMIT,
-          runLimit: 40,
+          limit: TIMELINE_PAGE_SIZE,
         }),
-        options.api.approvals.list({ status: 'pending', limit: 100 }),
+        options.api.approvals.list({ limit: 100, status: 'pending' }),
       ])
-      if (generation !== refreshGeneration || conversationId !== options.activeConversationId.value)
+      if (
+        generation !== refreshGeneration
+        || branchId !== options.activeBranchId.value
+        || conversationId !== options.activeConversationId.value
+      ) {
         return
-
-      const runIds = new Set(nextRuns.map(run => run.id))
-      messages.value = nextMessages
-      runs.value = nextRuns
-      runEvents.value = nextEvents.slice(-RUN_EVENT_LIMIT)
-      approvals.value = pendingApprovals.filter(approval => approval.runId && runIds.has(approval.runId))
-      replaceRunEventCursors(nextEvents)
+      }
+      if (isInitialTimelinePage && !hasLoadedTimelinePage) {
+        timelineItems.value = timelinePage.items
+        timelineCursor.value = timelinePage.nextCursor
+        hasLoadedTimelinePage = true
+      }
+      else {
+        timelineItems.value = mergeTailTimelineItems(timelineItems.value, timelinePage.items)
+      }
+      upsertRuns(timelinePage.runs)
+      runEvents.value = mergeTimelineEvents(
+        runEvents.value,
+        timelinePage.runEvents,
+        timelinePage.runs,
+      )
+      const runIds = new Set(runs.value.map(run => run.id))
+      approvals.value = pendingApprovals.filter(approval => runIds.has(approval.runId))
     }
     catch (error) {
       options.onError(error)
     }
-    finally {
-      conversationRefreshCount -= 1
-      if (conversationRefreshCount === 0 && pendingRunIds.size)
-        scheduleRunSync()
+  }
+
+  async function loadOlderMessages(): Promise<boolean> {
+    const conversationId = loadedConversationId
+    const branchId = loadedBranchId
+    const cursor = timelineCursor.value
+    if (
+      !conversationId
+      || !branchId
+      || !cursor
+      || !hasLoadedTimelinePage
+      || isLoadingOlderMessages.value
+    ) {
+      return false
     }
-  }
-
-  function handleRunStateEvent(event: LocalRunStateEvent) {
-    pendingRunIds.add(event.runId)
-    scheduleRunSync()
-  }
-
-  function scheduleRunSync(delayMs = RUN_SYNC_INTERVAL_MS) {
-    if (runSyncTimer !== null || isRunSyncing || conversationRefreshCount > 0)
-      return
-
-    runSyncTimer = window.setTimeout(() => {
-      runSyncTimer = null
-      void flushRunUpdates()
-    }, delayMs)
-  }
-
-  async function flushRunUpdates() {
-    const conversationId = options.activeConversationId.value
-    if (!conversationId || pendingRunIds.size === 0)
-      return
-
-    const runIds = [...pendingRunIds]
-    pendingRunIds.clear()
-    isRunSyncing = true
+    const sourceProjectionGeneration = projectionGeneration
+    const requestGeneration = ++olderLoadGeneration
+    isLoadingOlderMessages.value = true
     try {
-      const settledUpdates = await Promise.allSettled(runIds.map(async (runId) => {
-        const [run, events] = await Promise.all([
-          options.api.runs.get(runId),
-          options.api.runs.listChatEvents({
-            runId,
-            afterId: runEventCursors.get(runId) ?? null,
-            limit: RUN_EVENT_BATCH_LIMIT,
-          }),
-        ])
-        return { events, run }
-      }))
-
-      if (conversationId !== options.activeConversationId.value)
-        return
-
-      const updates: Array<{ events: ReadonlyArray<LocalRunEvent>, run: LocalRun }> = []
-      for (const [index, result] of settledUpdates.entries()) {
-        const runId = runIds[index]!
-        if (result.status === 'fulfilled') {
-          runSyncRetryAttempts.delete(runId)
-          updates.push(result.value)
-          continue
-        }
-
-        const retryAttempt = (runSyncRetryAttempts.get(runId) ?? 0) + 1
-        if (retryAttempt <= 4) {
-          runSyncRetryAttempts.set(runId, retryAttempt)
-          pendingRunIds.add(runId)
-        }
-        else {
-          runSyncRetryAttempts.delete(runId)
-        }
-        options.onError(result.reason)
+      const page = await options.api.conversations.listTimeline({
+        branchId,
+        conversationId,
+        cursor,
+        limit: TIMELINE_PAGE_SIZE,
+      })
+      if (
+        requestGeneration !== olderLoadGeneration
+        || sourceProjectionGeneration !== projectionGeneration
+        || conversationId !== options.activeConversationId.value
+        || branchId !== options.activeBranchId.value
+        || timelineCursor.value !== cursor
+      ) {
+        return false
       }
-
-      const matchingUpdates = updates.filter(update => update.run.conversationId === conversationId)
-      const nextRuns = matchingUpdates.map(update => update.run)
-      const nextEvents = matchingUpdates.flatMap(update => update.events)
-      if (nextRuns.length)
-        upsertRuns(nextRuns)
-      if (nextEvents.length) {
-        runEvents.value = mergeLocalRunEvents(runEvents.value, nextEvents, RUN_EVENT_LIMIT)
-        updateRunEventCursors(nextEvents)
-      }
-      for (const update of matchingUpdates) {
-        if (update.events.length === RUN_EVENT_BATCH_LIMIT)
-          pendingRunIds.add(update.run.id)
-      }
-
-      await refreshPendingApprovals(conversationId)
-      if (nextRuns.some(run => isTerminalRun(run.status))) {
-        await Promise.all([
-          refreshMessages(conversationId),
-          options.refreshCollections(),
-        ])
-      }
+      const currentIds = new Set(timelineItems.value.map(timelineItemKey))
+      const prepended = page.items.some(item => !currentIds.has(timelineItemKey(item)))
+      timelineItems.value = mergeOlderTimelineItems(timelineItems.value, page.items)
+      upsertRuns(page.runs)
+      runEvents.value = mergeTimelineEvents(runEvents.value, page.runEvents, page.runs)
+      timelineCursor.value = page.nextCursor
+      return prepended
     }
     catch (error) {
-      options.onError(error)
+      if (
+        sourceProjectionGeneration === projectionGeneration
+        && conversationId === options.activeConversationId.value
+        && branchId === options.activeBranchId.value
+      ) {
+        options.onError(error)
+      }
+      return false
     }
     finally {
-      isRunSyncing = false
-      if (pendingRunIds.size) {
-        const retryAttempt = Math.min(
-          ...[...pendingRunIds].map(runId => runSyncRetryAttempts.get(runId) ?? 0),
-        )
-        scheduleRunSync(retryAttempt > 0
-          ? getRunSyncRetryDelay(retryAttempt)
-          : RUN_SYNC_INTERVAL_MS)
-      }
+      if (requestGeneration === olderLoadGeneration)
+        isLoadingOlderMessages.value = false
     }
   }
 
-  function upsertRuns(incoming: ReadonlyArray<LocalRun>) {
-    runs.value = mergeRuns(runs.value, incoming)
+  function handleRunEvent(event: LocalRunEvent) {
+    if (
+      loadedConversationId !== options.activeConversationId.value
+      || loadedBranchId !== options.activeBranchId.value
+      || !knownRunIds.has(event.runId)
+    ) {
+      return
+    }
+    runEvents.value = mergeEvents(runEvents.value, [event])
+    scheduleRefresh()
   }
 
-  function applyTurnStart(turn: LocalTurnStart) {
-    if (turn.conversation.id !== options.activeConversationId.value)
+  function scheduleRefresh() {
+    if (refreshTimer !== null)
       return
+    refreshTimer = window.setTimeout(() => {
+      refreshTimer = null
+      void refreshActiveConversation()
+        .catch(options.onError)
+    }, 100)
+  }
 
-    messages.value = mergeMessages(
-      messages.value,
-      [turn.userMessage, ...(turn.assistantMessage ? [turn.assistantMessage] : [])],
+  function applyRunStart(turn: LocalTurnStart) {
+    if (
+      turn.branchId !== options.activeBranchId.value
+      || turn.conversationId !== options.activeConversationId.value
+    ) {
+      return
+    }
+    if (loadedConversationId !== turn.conversationId || loadedBranchId !== turn.branchId) {
+      resetConversationProjection()
+      loadedConversationId = turn.conversationId
+      loadedBranchId = turn.branchId
+    }
+    knownRunIds.add(turn.runId)
+    upsertRuns([turn.run])
+    scheduleRefresh()
+  }
+
+  function applyRegeneratedTurn(turn: LocalTurnStart, assistantMessageId: string) {
+    applyReplacementTurn(turn, assistantMessageId)
+  }
+
+  function applyEditedTurn(turn: LocalTurnStart, userMessageId: string) {
+    applyReplacementTurn(turn, userMessageId)
+  }
+
+  function applyReplacementTurn(turn: LocalTurnStart, replacedMessageId: string) {
+    if (
+      turn.branchId !== options.activeBranchId.value
+      || turn.conversationId !== options.activeConversationId.value
+    ) {
+      return
+    }
+    const replacedIndex = timelineItems.value.findIndex(item =>
+      item.kind === 'message' && item.id === replacedMessageId,
     )
-    if (turn.run)
-      upsertRuns([turn.run])
+    const retainedTimeline = replacedIndex < 0 ? [] : timelineItems.value.slice(0, replacedIndex)
+    resetConversationProjection()
+    loadedConversationId = turn.conversationId
+    loadedBranchId = turn.branchId
+    timelineItems.value = retainedTimeline
+    knownRunIds.add(turn.runId)
+    upsertRuns([turn.run])
+    scheduleRefresh()
   }
 
   function clearConversationState() {
+    loadedBranchId = null
+    loadedConversationId = null
+    resetConversationProjection()
+  }
+
+  function resetConversationProjection() {
     refreshGeneration += 1
-    messages.value = []
+    projectionGeneration += 1
+    olderLoadGeneration += 1
+    hasLoadedTimelinePage = false
+    timelineCursor.value = null
+    isLoadingOlderMessages.value = false
+    timelineItems.value = []
     runs.value = []
     runEvents.value = []
     approvals.value = []
-    runEventCursors.clear()
-    pendingRunIds.clear()
-    runSyncRetryAttempts.clear()
-    if (runSyncTimer !== null) {
-      window.clearTimeout(runSyncTimer)
-      runSyncTimer = null
+    knownRunIds.clear()
+  }
+
+  function upsertRuns(incoming: ReadonlyArray<LocalRun>) {
+    const byId = new Map(runs.value.map(run => [run.id, run]))
+    for (const run of incoming) {
+      byId.set(run.id, run)
+      knownRunIds.add(run.id)
     }
-  }
-
-  function replaceRunEventCursors(events: ReadonlyArray<LocalRunEvent>) {
-    runEventCursors.clear()
-    updateRunEventCursors(events)
-  }
-
-  function updateRunEventCursors(events: ReadonlyArray<LocalRunEvent>) {
-    for (const event of events)
-      runEventCursors.set(event.runId, Math.max(runEventCursors.get(event.runId) ?? 0, event.id))
-  }
-
-  async function refreshMessages(conversationId: string) {
-    const nextMessages = await options.api.conversations.listMessages({ conversationId, limit: 100 })
-    if (conversationId === options.activeConversationId.value)
-      messages.value = nextMessages
-  }
-
-  async function refreshPendingApprovals(conversationId: string) {
-    const pendingApprovals = await options.api.approvals.list({ status: 'pending', limit: 100 })
-    if (conversationId !== options.activeConversationId.value)
-      return
-
-    const runIds = new Set(runs.value.map(run => run.id))
-    approvals.value = pendingApprovals.filter(approval => approval.runId && runIds.has(approval.runId))
-  }
-
-  function dispose() {
-    if (runSyncTimer !== null)
-      window.clearTimeout(runSyncTimer)
+    runs.value = [...byId.values()].sort((left, right) =>
+      right.startedAt.localeCompare(left.startedAt),
+    )
   }
 
   return {
     approvals,
-    applyTurnStart,
+    applyEditedTurn,
+    applyRegeneratedTurn,
+    applyRunStart,
     clearConversationState,
-    dispose,
-    handleRunStateEvent,
+    dispose() {
+      if (refreshTimer !== null)
+        window.clearTimeout(refreshTimer)
+    },
+    handleRunEvent,
+    hasOlderMessages,
+    isLoadingOlderMessages,
+    loadOlderMessages,
     messages,
     refreshActiveConversation,
     runEvents,
     runs,
+    timelineItems,
     upsertRuns,
   }
 }
 
-function mergeMessages(
-  current: ReadonlyArray<LocalMessage>,
-  incoming: ReadonlyArray<LocalMessage>,
-): ReadonlyArray<LocalMessage> {
-  const byId = new Map(current.map(message => [message.id, message]))
-  for (const message of incoming)
-    byId.set(message.id, message)
-
-  return [...byId.values()]
-    .sort((left, right) => left.createdAt.localeCompare(right.createdAt))
-    .slice(-100)
+function mergeTailTimelineItems(
+  current: ReadonlyArray<LocalConversationTimelineItem>,
+  incoming: ReadonlyArray<LocalConversationTimelineItem>,
+): ReadonlyArray<LocalConversationTimelineItem> {
+  const incomingById = new Map(incoming.map(item => [timelineItemKey(item), item]))
+  const currentIds = new Set(current.map(timelineItemKey))
+  return [
+    ...current.map(item => incomingById.get(timelineItemKey(item)) ?? item),
+    ...incoming.filter(item => !currentIds.has(timelineItemKey(item))),
+  ]
 }
 
-function mergeRuns(
-  current: ReadonlyArray<LocalRun>,
-  incoming: ReadonlyArray<LocalRun>,
-): ReadonlyArray<LocalRun> {
-  const byId = new Map(current.map(run => [run.id, run]))
-  for (const run of incoming)
-    byId.set(run.id, run)
-
-  return [...byId.values()]
-    .sort((left, right) => right.startedAt.localeCompare(left.startedAt))
-    .slice(0, 100)
+function mergeOlderTimelineItems(
+  current: ReadonlyArray<LocalConversationTimelineItem>,
+  incoming: ReadonlyArray<LocalConversationTimelineItem>,
+): ReadonlyArray<LocalConversationTimelineItem> {
+  const currentIds = new Set(current.map(timelineItemKey))
+  return [
+    ...incoming.filter(item => !currentIds.has(timelineItemKey(item))),
+    ...current,
+  ]
 }
 
-function isTerminalRun(status: LocalRun['status']): boolean {
-  return status === 'completed' || status === 'failed' || status === 'cancelled'
+function timelineItemKey(item: LocalConversationTimelineItem): string {
+  return `${item.kind}:${item.id}`
+}
+
+function mergeEvents(
+  current: ReadonlyArray<LocalRunEvent>,
+  incoming: ReadonlyArray<LocalRunEvent>,
+): ReadonlyArray<LocalRunEvent> {
+  const byId = new Map(current.map(event => [`${event.runId}:${event.sequence}`, event]))
+  for (const event of incoming)
+    byId.set(`${event.runId}:${event.sequence}`, event)
+  return [...byId.values()]
+    .sort((left, right) => left.createdAt.localeCompare(right.createdAt)
+      || left.sequence - right.sequence)
+}
+
+function mergeTimelineEvents(
+  current: ReadonlyArray<LocalRunEvent>,
+  incoming: ReadonlyArray<LocalRunEvent>,
+  runs: ReadonlyArray<LocalRun>,
+): ReadonlyArray<LocalRunEvent> {
+  const terminalRunIds = new Set(runs.flatMap(run => (
+    run.status === 'queued' || run.status === 'running' ? [] : [run.id]
+  )))
+  return mergeEvents(
+    current.filter(event => !terminalRunIds.has(event.runId)),
+    incoming,
+  )
 }

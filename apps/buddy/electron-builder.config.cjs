@@ -1,17 +1,15 @@
 const { join } = require('node:path')
 const process = require('node:process')
+const { sourceDateEpoch } = require('./buddy.version.json')
+const { desktopName, productName } = require('./package.json')
 
-process.env.SOURCE_DATE_EPOCH ??= '1704067200'
+process.env.SOURCE_DATE_EPOCH ??= String(sourceDateEpoch)
 
-const runtimeExecutables = [
-  'lexora-buddy-runtime',
-  'lexora-buddy-pet',
-]
 const macro = name => `$${`{${name}}`}`
 
 module.exports = {
-  appId: 'com.lexora.desktop',
-  productName: 'Lexora',
+  appId: desktopName,
+  productName,
   asar: true,
   electronFuses: {
     enableCookieEncryption: true,
@@ -22,31 +20,37 @@ module.exports = {
   },
   npmRebuild: false,
   directories: {
-    output: 'dist-packages',
+    output: '.output/package/desktop',
   },
   files: [
-    'out/**/*',
+    '.output/build/electron/**/*',
     'package.json',
   ],
   extraResources: [
-    ...runtimeExecutables.map(executable => ({
-      from: join('runtime', 'target', 'release', executable),
-      to: join('runtime', executable),
-    })),
     {
-      from: join('runtime', 'icons'),
-      to: join('runtime', 'icons'),
+      from: join('.output', 'build', 'native-pet', 'release', 'lexora-buddy-pet'),
+      to: join('native-pet', 'lexora-buddy-pet'),
+    },
+    {
+      from: join('resources', 'icons'),
+      to: 'icons',
+    },
+    {
+      from: join('service', 'resources'),
+      to: join('service', 'resources'),
     },
   ],
   linux: {
     category: 'Utility',
-    executableName: 'lexora',
-    icon: 'runtime/icons',
+    executableName: 'lexora-buddy',
+    icon: 'resources/icons/app',
     syncDesktopName: true,
     target: ['deb'],
   },
   deb: {
     depends: [
+      'bubblewrap',
+      'git',
       'libgtk-3-0',
       'libnotify4',
       'libnss3',
@@ -59,5 +63,5 @@ module.exports = {
       'libgtk-layer-shell0',
     ],
   },
-  artifactName: `Lexora-${macro('version')}-${macro('os')}-${macro('arch')}.${macro('ext')}`,
+  artifactName: `Lexora-Buddy-${macro('version')}-${macro('os')}-${macro('arch')}.${macro('ext')}`,
 }

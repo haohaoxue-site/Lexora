@@ -1,4 +1,2 @@
-dist/
-dist-packages/
-out/
-runtime/target/
+.output/
+native-pet/target/

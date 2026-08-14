@@ -8,9 +8,17 @@ export interface DesktopIconOptions {
 }
 
 export function resolveDesktopIconPath(options: DesktopIconOptions): string {
+  return resolveIconPath(options, 'app', '256x256.png')
+}
+
+function resolveIconPath(
+  options: DesktopIconOptions,
+  directory: string,
+  name: string,
+): string {
   const iconPath = options.isPackaged
-    ? join(options.resourcesPath, 'runtime', 'icons', 'icon.png')
-    : join(options.appPath, 'runtime', 'icons', 'icon.png')
+    ? join(options.resourcesPath, 'icons', directory, name)
+    : join(options.appPath, 'resources', 'icons', directory, name)
 
   if (!existsSync(iconPath))
     throw new Error(`Lexora desktop icon is missing: ${iconPath}`)

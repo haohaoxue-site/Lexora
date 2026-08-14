@@ -1,0 +1,26 @@
+[package]
+name = "lexora-buddy-pet"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[features]
+default = [ "pet" ]
+pet = []
+
+[dependencies]
+cairo-rs = "0.18"
+gdk = "0.18"
+gdk-pixbuf = "0.18"
+glib = "0.18"
+gtk = "0.18"
+libc = "0.2"
+libloading = "0.7"
+serde = { version = "1", features = [ "derive" ] }
+serde_json = "1"
+thiserror = "2"
+toml = "0.8"
+uuid = { version = "1", features = [
+  "v4",
+  "v7"
+] }

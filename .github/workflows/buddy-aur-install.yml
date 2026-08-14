@@ -26,8 +26,8 @@ jobs:
       - run: pnpm check:buddy
       - uses: actions/upload-artifact@v4
         with:
-          name: lexora-desktop-deb
-          path: apps/buddy/dist-packages/Lexora-*-linux-amd64.deb
+          name: lexora-buddy-deb
+          path: apps/buddy/.output/artifacts/desktop/Lexora-Buddy-*-linux-amd64.deb
           if-no-files-found: error
 
   arch-install:
@@ -43,7 +43,7 @@ jobs:
           node-version-file: .node-version
       - uses: actions/download-artifact@v4
         with:
-          name: lexora-desktop-deb
+          name: lexora-buddy-deb
           path: artifacts
       - name: Prepare makepkg user
         run: |
@@ -54,23 +54,20 @@ jobs:
       - name: Build and install Arch package
         working-directory: packaging/buddy/aur/lexora-buddy-bin
         run: |
-          deb_path="$(find "$GITHUB_WORKSPACE/artifacts" -maxdepth 1 -name 'Lexora-*-linux-amd64.deb' -print -quit)"
+          deb_path="$(find "$GITHUB_WORKSPACE/artifacts" -maxdepth 1 -name 'Lexora-Buddy-*-linux-amd64.deb' -print -quit)"
           deb_sha256="$(sha256sum "$deb_path" | cut -d ' ' -f 1)"
           sudo -u builder env \
             LEXORA_BUDDY_DEB_URL="file://$deb_path" \
             LEXORA_BUDDY_DEB_SHA256="$deb_sha256" \
             makepkg -si --noconfirm --needed
-      - name: Smoke installed Desktop, Runtime and pet entrypoints
+      - name: Smoke installed Desktop utility runtime and pet entrypoints
         env:
-          LEXORA_BUDDY_PET_PATH: /opt/Lexora/resources/runtime/lexora-buddy-pet
-          LEXORA_DESKTOP_EXECUTABLE_PATH: /opt/Lexora/lexora
+          LEXORA_BUDDY_PET_PATH: /opt/Lexora Buddy/resources/native-pet/lexora-buddy-pet
+          LEXORA_DESKTOP_EXECUTABLE_PATH: /opt/Lexora Buddy/lexora-buddy
         run: |
           smoke_root="$RUNNER_TEMP/lexora-buddy-arch-smoke"
           install -d -m 700 -o builder -g builder "$smoke_root" "$smoke_root/runtime"
-          sudo -u builder /opt/Lexora/resources/runtime/lexora-buddy-runtime \
-            --buddy-health-check \
-            --buddy-health-check-data-dir "$smoke_root/health"
-          sudo -u builder /opt/Lexora/resources/runtime/lexora-buddy-pet \
+          sudo -u builder "/opt/Lexora Buddy/resources/native-pet/lexora-buddy-pet" \
             --buddy-native-pet-smoke-check
           sudo -u builder env \
             HOME=/home/builder \

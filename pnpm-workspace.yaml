@@ -37,3 +37,5 @@ allowBuilds:
   prisma: true
   protobufjs: false
   tree-sitter-bash: false
+patchedDependencies:
+  '@earendil-works/pi-ai@0.84.1': patches/@earendil-works__pi-ai@0.84.1.patch

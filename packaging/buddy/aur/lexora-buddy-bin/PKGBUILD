@@ -3,13 +3,14 @@
 pkgname=lexora-buddy-bin
 pkgver=0.1.0
 pkgrel=1
-pkgdesc="Lexora Desktop with a local Codex runtime and desktop pet"
+pkgdesc="Lexora Buddy local personal AI companion and native desktop pet"
 arch=('x86_64')
 url="https://github.com/haohaoxue-site/Lexora"
 license=('AGPL-3.0-only')
 depends=(
   'alsa-lib'
   'at-spi2-core'
+  'bubblewrap'
   'cairo'
   'dbus'
   'desktop-file-utils'
@@ -17,6 +18,7 @@ depends=(
   'gcc-libs'
   'glib2'
   'glibc'
+  'git'
   'gtk-layer-shell'
   'gtk3'
   'hicolor-icon-theme'
@@ -41,20 +43,20 @@ depends=(
   'util-linux-libs'
   'xdg-utils'
 )
-provides=('lexora-desktop')
-conflicts=('lexora-desktop')
+provides=('lexora-buddy')
+conflicts=('lexora-buddy')
 options=('!strip' '!debug')
 install="${pkgname}.install"
-_deb_name="Lexora-${pkgver}-linux-amd64.deb"
+_deb_name="Lexora-Buddy-${pkgver}-linux-amd64.deb"
 _deb_url="${LEXORA_BUDDY_DEB_URL:-${url}/releases/download/v${pkgver}/${_deb_name}}"
-_deb_sha256="${LEXORA_BUDDY_DEB_SHA256:-f34da7f8c4af2780755b35979e2c98e45c6652bc0d59bf05f03acab4cf9414de}"
-source_x86_64=("lexora-${pkgver}-amd64.deb::${_deb_url}")
+_deb_sha256="${LEXORA_BUDDY_DEB_SHA256:-54b6b35055cc3c5180929544e2ef6913914a0ffa6d45d7ffc8ca75ddcd6bf7a2}"
+source_x86_64=("lexora-buddy-${pkgver}-amd64.deb::${_deb_url}")
 sha256sums_x86_64=("${_deb_sha256}")
 
 package() {
   local data_archive
 
-  bsdtar --no-same-owner -xf "${srcdir}/lexora-${pkgver}-amd64.deb" -C "${srcdir}"
+  bsdtar --no-same-owner -xf "${srcdir}/lexora-buddy-${pkgver}-amd64.deb" -C "${srcdir}"
   data_archive="$(find "${srcdir}" -maxdepth 1 -name 'data.tar.*' -print -quit)"
   test -n "${data_archive}"
   bsdtar --no-same-owner -xf "${data_archive}" -C "${pkgdir}"

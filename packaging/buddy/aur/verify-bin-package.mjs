@@ -21,12 +21,13 @@ export function verifyBuddyAurPackage(options = {}) {
   const errors = []
   const requiredPkgbuildFragments = [
     `pkgver=${version}`,
-    `_deb_name="Lexora-\${pkgver}-linux-amd64.deb"`,
+    `_deb_name="Lexora-Buddy-\${pkgver}-linux-amd64.deb"`,
     `releases/download/v\${pkgver}/\${_deb_name}`,
-    `source_x86_64=("lexora-\${pkgver}-amd64.deb::\${_deb_url}")`,
+    `source_x86_64=("lexora-buddy-\${pkgver}-amd64.deb::\${_deb_url}")`,
     'data.tar.*',
     'alsa-lib',
     'desktop-file-utils',
+    'git',
     'gtk-layer-shell',
     'hicolor-icon-theme',
     'libcups',
@@ -37,8 +38,8 @@ export function verifyBuddyAurPackage(options = {}) {
   ]
   const requiredSrcinfoFragments = [
     `pkgver = ${version}`,
-    `source_x86_64 = lexora-${version}-amd64.deb::https://github.com/haohaoxue-site/Lexora/releases/download/v${version}/Lexora-${version}-linux-amd64.deb`,
-    'provides = lexora-desktop',
+    `source_x86_64 = lexora-buddy-${version}-amd64.deb::https://github.com/haohaoxue-site/Lexora/releases/download/v${version}/Lexora-Buddy-${version}-linux-amd64.deb`,
+    'provides = lexora-buddy',
   ]
 
   for (const fragment of requiredPkgbuildFragments) {

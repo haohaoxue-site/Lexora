@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import type { DesktopAppInfo, LexoraConfigPatch } from '../../electron/shared/desktopApi'
 import type { DesktopChatController } from './useDesktopChat'
-import { NCard, NSelect, NSpin, NSwitch } from 'naive-ui'
+import { NSelect, NSpin, NSwitch } from 'naive-ui'
 import { computed, shallowRef } from 'vue'
 import { useBuddyI18n } from '@/i18n/buddyI18n'
+import DesktopNotificationsSettings from './DesktopNotificationsSettings.vue'
 
 type GeneralSettingField = 'language' | 'theme' | 'autostart'
 
@@ -32,82 +33,99 @@ async function updateSetting(field: GeneralSettingField, patch: LexoraConfigPatc
 
 <template>
   <section v-if="chat.config.value" class="desktop-general-settings">
-    <NCard :title="t('desktop.settings.appearance')" size="small">
-      <div class="desktop-settings-row">
-        <div>
-          <strong>{{ t('settings.language') }}</strong>
+    <section class="desktop-general-settings__section">
+      <h2>{{ t('desktop.settings.appearance') }}</h2>
+      <div class="desktop-general-settings__group">
+        <div class="desktop-settings-row">
+          <div>
+            <strong>{{ t('settings.language') }}</strong>
+          </div>
+          <div class="desktop-settings-row__control">
+            <NSelect
+              :options="languageOptions"
+              :value="chat.config.value.desktop.language"
+              @update:value="updateSetting('language', { desktop: { language: $event } })"
+            />
+            <NSpin v-if="pendingFields.has('language')" size="small" />
+            <small v-else-if="failedField === 'language'" class="is-error">
+              {{ chat.settingsError.value ?? t('desktop.settings.saveFailed') }}
+            </small>
+          </div>
         </div>
-        <div class="desktop-settings-row__control">
-          <NSelect
-            :aria-label="t('settings.language')"
-            :options="languageOptions"
-            :value="chat.config.value.desktop.language"
-            @update:value="updateSetting('language', { desktop: { language: $event } })"
-          />
-          <NSpin v-if="pendingFields.has('language')" size="small" />
-          <small v-else-if="failedField === 'language'" class="is-error">
-            {{ chat.settingsError.value ?? t('desktop.settings.saveFailed') }}
-          </small>
+        <div class="desktop-settings-row">
+          <div>
+            <strong>{{ t('desktop.settings.theme') }}</strong>
+          </div>
+          <div class="desktop-settings-row__control">
+            <NSelect
+              :options="themeOptions"
+              :value="chat.config.value.desktop.theme"
+              @update:value="updateSetting('theme', { desktop: { theme: $event } })"
+            />
+            <NSpin v-if="pendingFields.has('theme')" size="small" />
+            <small v-else-if="failedField === 'theme'" class="is-error">
+              {{ chat.settingsError.value ?? t('desktop.settings.saveFailed') }}
+            </small>
+          </div>
         </div>
       </div>
-      <div class="desktop-settings-row">
-        <div>
-          <strong>{{ t('desktop.settings.theme') }}</strong>
-        </div>
-        <div class="desktop-settings-row__control">
-          <NSelect
-            :aria-label="t('desktop.settings.theme')"
-            :options="themeOptions"
-            :value="chat.config.value.desktop.theme"
-            @update:value="updateSetting('theme', { desktop: { theme: $event } })"
-          />
-          <NSpin v-if="pendingFields.has('theme')" size="small" />
-          <small v-else-if="failedField === 'theme'" class="is-error">
-            {{ chat.settingsError.value ?? t('desktop.settings.saveFailed') }}
-          </small>
-        </div>
-      </div>
-    </NCard>
+    </section>
 
-    <NCard :title="t('desktop.settings.system')" size="small">
-      <div class="desktop-settings-row">
-        <div>
-          <strong>{{ t('settings.autostart') }}</strong>
-          <small>{{ t('desktop.settings.autostartDescription') }}</small>
+    <DesktopNotificationsSettings :chat="chat" />
+
+    <section class="desktop-general-settings__section">
+      <h2>{{ t('desktop.settings.system') }}</h2>
+      <div class="desktop-general-settings__group">
+        <div class="desktop-settings-row">
+          <div>
+            <strong>{{ t('settings.autostart') }}</strong>
+            <small>{{ t('desktop.settings.autostartDescription') }}</small>
+          </div>
+          <div class="desktop-settings-row__control is-compact">
+            <NSwitch
+              :value="chat.config.value.desktop.launchAtLogin"
+              @update:value="updateSetting('autostart', { desktop: { launchAtLogin: $event } })"
+            />
+            <NSpin v-if="pendingFields.has('autostart')" size="small" />
+            <small v-else-if="failedField === 'autostart'" class="is-error">
+              {{ chat.settingsError.value ?? t('desktop.settings.saveFailed') }}
+            </small>
+          </div>
         </div>
-        <div class="desktop-settings-row__control is-compact">
-          <NSwitch
-            :aria-label="t('settings.autostart')"
-            :value="chat.config.value.desktop.launchAtLogin"
-            @update:value="updateSetting('autostart', { desktop: { launchAtLogin: $event } })"
-          />
-          <NSpin v-if="pendingFields.has('autostart')" size="small" />
-          <small v-else-if="failedField === 'autostart'" class="is-error">
-            {{ chat.settingsError.value ?? t('desktop.settings.saveFailed') }}
-          </small>
+        <div class="desktop-settings-row">
+          <div>
+            <strong>{{ t('settings.appVersion') }}</strong>
+          </div>
+          <div class="desktop-settings-row__value">
+            {{ appInfo?.version ?? '-' }}
+          </div>
         </div>
       </div>
-      <div class="desktop-settings-row">
-        <div>
-          <strong>{{ t('settings.appVersion') }}</strong>
-        </div>
-        <div class="desktop-settings-row__value">
-          {{ appInfo?.version ?? '-' }}
-        </div>
-      </div>
-    </NCard>
+    </section>
   </section>
 </template>
 
 <style scoped lang="scss">
 .desktop-general-settings {
   display: grid;
-  gap: 1rem;
+  gap: 1.8rem;
 }
 
-.desktop-general-settings :deep(.n-card) {
-  border-color: var(--buddy-border-light);
-  background: var(--buddy-bg-surface-raised);
+.desktop-general-settings__section {
+  display: grid;
+  gap: 0.8rem;
+}
+
+.desktop-general-settings__section h2 {
+  margin: 0;
+  font-size: 0.92rem;
+}
+
+.desktop-general-settings__group {
+  overflow: hidden;
+  border: 1px solid var(--buddy-border-light);
+  border-radius: 0.65rem;
+  background: var(--buddy-bg-surface);
 }
 
 .desktop-settings-row {
@@ -117,6 +135,7 @@ async function updateSetting(field: GeneralSettingField, patch: LexoraConfigPatc
   align-items: center;
   gap: 2rem;
   border-bottom: 1px solid var(--buddy-border-light);
+  padding: 0.75rem 0.9rem;
 }
 
 .desktop-settings-row:last-child {

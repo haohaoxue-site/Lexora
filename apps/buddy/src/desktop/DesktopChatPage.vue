@@ -1,502 +1,454 @@
 <script setup lang="ts">
 import type { DesktopComposerSubmitPayload } from './desktopComposerInput'
+import type { DesktopSettingsCategory } from './desktopViewState'
 import type { DesktopChatController } from './useDesktopChat'
-import { NButton } from 'naive-ui'
-import { computed, onBeforeUnmount, onMounted, shallowRef } from 'vue'
+import type { BuddyChatMessageListHandle, ChatMessageScrollMetrics } from '@/chat/chatMessageViewport'
+import {
+  ArrowClockwise20Regular,
+  Settings20Regular,
+  Warning20Regular,
+} from '@vicons/fluent'
+import { NButton, NIcon } from 'naive-ui'
+import { computed, nextTick, shallowRef, useTemplateRef, watch } from 'vue'
+import { DESKTOP_ASSET_URLS } from '@/assets/desktopAssetUrls'
 import BuddyChatMessageList from '@/chat/BuddyChatMessageList.vue'
-import DesktopApprovalCard from '@/desktop/DesktopApprovalCard.vue'
-import DesktopChatComposer from '@/desktop/DesktopChatComposer.vue'
-import DesktopChatSidebar from '@/desktop/DesktopChatSidebar.vue'
-import { useModalFocusTrap } from '@/desktop/useModalFocusTrap'
 import { useBuddyI18n } from '@/i18n/buddyI18n'
+import DesktopApprovalCard from './DesktopApprovalCard.vue'
+import DesktopChatComposer from './DesktopChatComposer.vue'
+import { isNearChatTail } from './desktopChatScroll'
 
 const props = defineProps<{
+  activeSearchMessageId: string | null
   chat: DesktopChatController
+  matchingSearchMessageIds: ReadonlyArray<string>
 }>()
 const emit = defineEmits<{
-  openAgent: []
+  openSettings: [category: DesktopSettingsCategory]
 }>()
 
 const chat = props.chat
 const { t } = useBuddyI18n(chat.language)
-const pendingConversationDeletion = shallowRef<{ id: string, label: string } | null>(null)
-const deletionDialog = shallowRef<HTMLElement | null>(null)
+const messageList = useTemplateRef<BuddyChatMessageListHandle>('messageList')
+const followsChatTail = shallowRef(true)
+const isRestoringHistoryAnchor = shallowRef(false)
 const isEmpty = computed(() => chat.activeConversationId.value === null)
-useModalFocusTrap(() => pendingConversationDeletion.value !== null, deletionDialog)
+const visibleBlocker = computed(() => chat.visibleChatBlocker.value)
+const runtimeTransitioning = computed(() => (
+  !visibleBlocker.value
+  && ['stopped', 'starting', 'restarting', 'stopping'].includes(chat.runtimeState.value.status)
+))
+let searchRevealGeneration = 0
 
-const runtimeLabel = computed(() => {
-  if (chat.runtimeState.value.status === 'ready') {
-    return chat.codexStatus.value?.loginStatus === 'logged_in'
-      ? t('desktop.chat.codexConnected')
-      : t('desktop.chat.codexLoginRequired')
-  }
-
-  if (chat.runtimeState.value.status === 'offline')
-    return t('desktop.chat.runtimeOffline')
-
-  return t('desktop.chat.runtimeStarting')
-})
-
-onMounted(() => {
-  document.addEventListener('keydown', handleDocumentKeydown)
-})
-
-onBeforeUnmount(() => {
-  document.removeEventListener('keydown', handleDocumentKeydown)
-})
+watch(
+  () => [chat.activeConversationId.value, chat.activeBranchId.value],
+  () => {
+    followsChatTail.value = true
+    void scrollToChatTailAfterRender()
+  },
+)
+watch(
+  () => props.activeSearchMessageId,
+  (messageId) => {
+    if (messageId)
+      void revealSearchMessage(messageId)
+  },
+)
+watch(
+  [
+    () => chat.isLoading.value,
+    () => chat.timelineItems.value.length,
+    () => chat.runEvents.value.length,
+  ],
+  () => {
+    if (followsChatTail.value)
+      void scrollToChatTailAfterRender()
+  },
+)
 
 async function sendMessage(payload: DesktopComposerSubmitPayload) {
   await chat.send(payload)
 }
 
-function requestConversationDeletion(conversationId: string) {
-  const conversation = chat.conversations.value.find(item => item.id === conversationId)
-  pendingConversationDeletion.value = {
-    id: conversationId,
-    label: conversation?.title?.trim() || t('desktop.chat.untitled'),
+function dismissBlocker() {
+  chat.dismissChatBlocker()
+}
+
+function handleMessageViewportPosition(
+  metrics: ChatMessageScrollMetrics,
+  tailScrollSettling: boolean,
+) {
+  const tailDistance = metrics.scrollHeight - metrics.scrollTop - metrics.clientHeight
+  if (tailScrollSettling && tailDistance <= metrics.clientHeight * 2) {
+    followsChatTail.value = true
+    return
+  }
+  followsChatTail.value = isNearChatTail(metrics)
+  if (!followsChatTail.value)
+    messageList.value?.cancelTailScroll()
+}
+
+function handleMessageViewportScroll(
+  metrics: ChatMessageScrollMetrics,
+  tailScrollSettling: boolean,
+) {
+  handleMessageViewportPosition(metrics, tailScrollSettling)
+  if (
+    metrics.scrollTop <= 64
+    && chat.hasOlderMessages.value
+    && !chat.isLoadingOlderMessages.value
+    && !isRestoringHistoryAnchor.value
+  ) {
+    void loadOlderMessagesWithAnchor()
   }
 }
 
-async function confirmConversationDeletion() {
-  const pending = pendingConversationDeletion.value
-  if (!pending)
-    return
-
-  pendingConversationDeletion.value = null
-  await chat.deleteConversation(pending.id)
+async function scrollToChatTailAfterRender() {
+  await nextTick()
+  await messageList.value?.scrollToTail()
 }
 
-function handleDocumentKeydown(event: KeyboardEvent) {
-  if (event.key === 'Escape')
-    pendingConversationDeletion.value = null
+async function loadOlderMessagesWithAnchor() {
+  const list = messageList.value
+  const anchor = list?.captureScrollAnchor()
+  if (!list || !anchor)
+    return
+  const loaded = await chat.loadOlderMessages()
+  if (!loaded)
+    return
+  isRestoringHistoryAnchor.value = true
+  followsChatTail.value = false
+  try {
+    await nextTick()
+    await list.restoreScrollAnchor(anchor)
+  }
+  finally {
+    isRestoringHistoryAnchor.value = false
+  }
+}
+
+async function revealSearchMessage(messageId: string) {
+  const generation = ++searchRevealGeneration
+  let needsOlderMessages = shouldLoadOlderSearchMessage(messageId, generation)
+  while (needsOlderMessages) {
+    const loaded = await chat.loadOlderMessages()
+    if (!loaded)
+      break
+    needsOlderMessages = shouldLoadOlderSearchMessage(messageId, generation)
+  }
+  if (generation !== searchRevealGeneration || props.activeSearchMessageId !== messageId)
+    return
+  await nextTick()
+  await messageList.value?.scrollToMessage(messageId)
+}
+
+function shouldLoadOlderSearchMessage(messageId: string, generation: number) {
+  return generation === searchRevealGeneration
+    && chat.hasOlderMessages.value
+    && !chat.timelineItems.value.some(
+      item => item.kind === 'message' && item.id === messageId,
+    )
 }
 </script>
 
 <template>
   <section class="desktop-chat-page">
-    <header class="desktop-chat-page__header">
-      <div class="desktop-chat-page__title">
-        <strong>{{ chat.currentTitle.value }}</strong>
-        <span v-if="chat.currentCwd.value" :title="chat.currentCwd.value">
-          {{ chat.currentCwd.value }}
-        </span>
-      </div>
-      <button
-        class="desktop-chat-page__runtime"
-        :class="`is-${chat.runtimeState.value.status}`"
-        type="button"
-        :title="runtimeLabel"
-        @click="emit('openAgent')"
-      >
-        <i />
-        {{ runtimeLabel }}
-      </button>
-    </header>
-
-    <div v-if="chat.errorMessage.value" class="desktop-chat-page__error" role="alert">
-      <span>{{ chat.errorMessage.value }}</span>
-      <button
-        v-if="chat.runtimeState.value.status === 'offline'"
-        type="button"
-        @click="chat.restartChatRuntime"
-      >
-        {{ t('desktop.chat.runtimeRestart') }}
-      </button>
-    </div>
-
-    <div
-      class="desktop-chat-page__workspace"
-      :class="{ 'is-empty': isEmpty, 'is-sidebar-collapsed': chat.sidebarCollapsed.value }"
-    >
-      <aside v-if="!chat.sidebarCollapsed.value" class="desktop-chat-page__sidebar">
-        <DesktopChatSidebar
-          :active-conversation-id="chat.activeConversationId.value"
-          :conversations="chat.conversations.value"
-          :project-root="chat.projectRoot.value"
-          :projects="chat.projects.value"
-          :language="chat.language.value"
-          @add-project="chat.authorizeProject"
-          @collapse="chat.setSidebarCollapsed(true)"
-          @delete-conversation="requestConversationDeletion"
-          @new-global="chat.startGlobalConversation"
-          @new-project="chat.startProjectConversation"
-          @open-conversation="chat.openConversation"
-        />
-      </aside>
-
-      <main class="desktop-chat-page__main">
-        <NButton
-          v-if="chat.sidebarCollapsed.value"
-          class="desktop-chat-page__show-sidebar"
-          circle
-          quaternary
-          :title="t('desktop.sidebar.expand')"
-          :aria-label="t('desktop.sidebar.expand')"
-          @click="chat.setSidebarCollapsed(false)"
-        >
-          ☰
-        </NButton>
-
-        <section v-if="isEmpty" class="desktop-chat-page__hero">
-          <span class="desktop-chat-page__hero-mark">L</span>
-          <h1>{{ chat.currentScope.value === 'project' ? t('desktop.chat.projectHero') : t('desktop.chat.globalHero') }}</h1>
-          <p v-if="chat.currentCwd.value">
-            {{ t('desktop.chat.projectDescription') }}
-          </p>
-          <p v-else>
-            {{ t('desktop.chat.globalDescription') }}
-          </p>
-          <DesktopChatComposer
-            :attachments="chat.attachments.value"
-            :can-send="chat.canSend.value"
-            :composer-content="chat.composerContent.value"
-            :draft="chat.draft.value"
-            :is-running="Boolean(chat.activeRun.value)"
-            :is-selecting-files="chat.isSelectingFiles.value"
-            :is-sending="chat.isSending.value"
-            :language="chat.language.value"
-            :load-context-options="chat.listContextOptions"
-            :models="chat.models.value"
-            :selected-effort="chat.selectedEffort.value"
-            :selected-model="chat.selectedModel.value"
-            :selected-model-id="chat.selectedModelId.value"
-            :selected-service-tier="chat.selectedServiceTier.value"
-            @attach="chat.selectAttachments"
-            @remove-attachment="chat.removeAttachment"
-            @send="sendMessage"
-            @stop="chat.cancelActiveRun"
-            @update-content="chat.updateComposerContent"
-            @update-effort="chat.selectedEffort.value = $event"
-            @update-model="chat.selectModel"
-            @update-service-tier="chat.selectedServiceTier.value = $event"
-          />
-        </section>
-
-        <template v-else>
-          <div class="desktop-chat-page__messages">
-            <div v-if="chat.isLoading.value" class="desktop-chat-page__loading">
-              {{ t('desktop.chat.loading') }}
-            </div>
-            <BuddyChatMessageList
-              v-else
-              :language="chat.language.value"
-              :messages="chat.messages.value"
-              :run-events="chat.runEvents.value"
-            />
-          </div>
-          <footer class="desktop-chat-page__composer-dock">
-            <div v-if="chat.approvalViews.value.length" class="desktop-chat-page__approvals">
-              <DesktopApprovalCard
-                v-for="approval in chat.approvalViews.value"
-                :key="approval.approval.id"
-                :approval="approval"
-                :language="chat.language.value"
-                :resolving="chat.resolvingApprovalIds.value.has(approval.approval.id)"
-                @approve="chat.resolveApproval(approval.approval.id, 'approve')"
-                @deny="chat.resolveApproval(approval.approval.id, 'deny')"
-              />
-            </div>
-            <DesktopChatComposer
-              :attachments="chat.attachments.value"
-              :can-send="chat.canSend.value"
-              :composer-content="chat.composerContent.value"
-              :draft="chat.draft.value"
-              :is-running="Boolean(chat.activeRun.value)"
-              :is-selecting-files="chat.isSelectingFiles.value"
-              :is-sending="chat.isSending.value"
-              :language="chat.language.value"
-              :load-context-options="chat.listContextOptions"
-              :models="chat.models.value"
-              :selected-effort="chat.selectedEffort.value"
-              :selected-model="chat.selectedModel.value"
-              :selected-model-id="chat.selectedModelId.value"
-              :selected-service-tier="chat.selectedServiceTier.value"
-              @attach="chat.selectAttachments"
-              @remove-attachment="chat.removeAttachment"
-              @send="sendMessage"
-              @stop="chat.cancelActiveRun"
-              @update-content="chat.updateComposerContent"
-              @update-effort="chat.selectedEffort.value = $event"
-              @update-model="chat.selectModel"
-              @update-service-tier="chat.selectedServiceTier.value = $event"
-            />
-          </footer>
-        </template>
-      </main>
-    </div>
-
-    <div
-      v-if="pendingConversationDeletion"
-      class="desktop-chat-page__dialog-backdrop"
-      role="presentation"
-      @click.self="pendingConversationDeletion = null"
-    >
-      <section
-        ref="deletionDialog"
-        aria-labelledby="delete-conversation-title"
-        aria-describedby="delete-conversation-description"
-        aria-modal="true"
-        class="desktop-chat-page__dialog"
-        role="alertdialog"
-        tabindex="-1"
-      >
-        <h2 id="delete-conversation-title">
-          {{ t('chat.deleteConversationConfirmTitle') }}
-        </h2>
-        <p id="delete-conversation-description">
-          {{ t('chat.deleteConversationConfirmMessage', { title: pendingConversationDeletion.label }) }}
+    <main class="desktop-chat-page__content">
+      <section v-if="isEmpty" class="desktop-chat-page__welcome">
+        <img :src="DESKTOP_ASSET_URLS.appIcon" alt="" draggable="false" height="48" width="48">
+        <h1>{{ t('desktop.chat.globalHero') }}</h1>
+        <p v-if="chat.activeProject.value">
+          {{ t('desktop.chat.projectContext', { project: chat.activeProject.value.name }) }}
         </p>
-        <div>
-          <NButton @click="pendingConversationDeletion = null">
-            {{ t('common.cancel') }}
-          </NButton>
-          <NButton type="error" autofocus @click="confirmConversationDeletion">
-            {{ t('chat.deleteConversation') }}
-          </NButton>
-        </div>
       </section>
-    </div>
+
+      <div v-else-if="chat.isLoading.value" class="desktop-chat-page__loading">
+        {{ t('desktop.chat.loading') }}
+      </div>
+
+      <BuddyChatMessageList
+        v-else
+        ref="messageList"
+        :active-branch-id="chat.activeBranchId.value!"
+        :active-search-message-id="activeSearchMessageId"
+        :actions-disabled="!chat.canMutateBranch.value"
+        :branches="chat.branches.value"
+        class="desktop-chat-page__messages"
+        :has-older-messages="chat.hasOlderMessages.value"
+        :is-loading-older-messages="chat.isLoadingOlderMessages.value"
+        :language="chat.language.value"
+        :matching-search-message-ids="matchingSearchMessageIds"
+        :timeline-items="chat.timelineItems.value"
+        :run-events="chat.runEvents.value"
+        :runs="chat.runs.value"
+        @activate-branch="chat.activateBranch"
+        @edit-user-message="chat.editUserMessage"
+        @regenerate-assistant="chat.regenerateAssistant"
+        @scroll="handleMessageViewportScroll"
+        @scroll-position="handleMessageViewportPosition"
+      />
+    </main>
+
+    <footer class="desktop-chat-page__composer-dock">
+      <div class="desktop-chat-page__composer-stack">
+        <article
+          v-if="visibleBlocker"
+          class="desktop-chat-page__alert"
+          :class="`is-${visibleBlocker.kind}`"
+          role="alert"
+        >
+          <NIcon :component="Warning20Regular" />
+          <div>
+            <strong>{{ t(`desktop.chat.blocker.${visibleBlocker.kind}.title`) }}</strong>
+            <p>{{ visibleBlocker.kind === 'runtime' && chat.runtimeError.value ? chat.runtimeError.value : t(`desktop.chat.blocker.${visibleBlocker.kind}.description`) }}</p>
+          </div>
+          <div class="desktop-chat-page__alert-actions">
+            <NButton
+              v-if="visibleBlocker.kind === 'runtime' && chat.canRestartRuntime.value"
+              size="small"
+              type="error"
+              ghost
+              @click="chat.restartRuntime"
+            >
+              <template #icon>
+                <NIcon :component="ArrowClockwise20Regular" />
+              </template>
+              {{ t('desktop.chat.runtimeRestart') }}
+            </NButton>
+            <NButton
+              size="small"
+              :type="visibleBlocker.kind === 'runtime' ? 'default' : 'primary'"
+              @click="emit('openSettings', visibleBlocker.kind === 'runtime' ? 'data' : 'models')"
+            >
+              <template #icon>
+                <NIcon :component="Settings20Regular" />
+              </template>
+              {{ t(`desktop.chat.blocker.${visibleBlocker.kind}.action`) }}
+            </NButton>
+            <NButton v-if="visibleBlocker.dismissible" text size="small" @click="dismissBlocker">
+              {{ t('desktop.chat.blocker.ignore') }}
+            </NButton>
+          </div>
+        </article>
+
+        <article v-else-if="chat.errorMessage.value" class="desktop-chat-page__alert is-runtime" role="alert">
+          <NIcon :component="Warning20Regular" />
+          <div><p>{{ chat.errorMessage.value }}</p></div>
+        </article>
+
+        <div v-if="runtimeTransitioning" class="desktop-chat-page__starting" role="status">
+          <i />{{ t('desktop.chat.runtimeStarting') }}
+        </div>
+
+        <div v-if="chat.approvalViews.value.length" class="desktop-chat-page__approvals">
+          <DesktopApprovalCard
+            v-for="approval in chat.approvalViews.value"
+            :key="approval.id"
+            :approval="approval"
+            :language="chat.language.value"
+            :resolving="chat.resolvingApprovalIds.value.has(approval.id)"
+            @approve="chat.resolveApproval(approval.id, 'approve')"
+            @deny="chat.resolveApproval(approval.id, 'deny')"
+          />
+        </div>
+
+        <DesktopChatComposer
+          :attachments="chat.attachments.value"
+          :can-send="chat.canSend.value"
+          :composer-content="chat.composerContent.value"
+          :context-usage="chat.contextUsage.value"
+          :draft="chat.draft.value"
+          :is-running="Boolean(chat.activeRun.value)"
+          :is-selecting-files="chat.isSelectingFiles.value"
+          :is-sending="chat.isSending.value"
+          :language="chat.language.value"
+          :load-context-options="chat.listContextOptions"
+          :models="chat.models.value"
+          :providers="chat.providers.value"
+          :selected-effort="chat.selectedEffort.value"
+          :selected-model="chat.selectedModel.value"
+          :selected-model-id="chat.selectedModelId.value"
+          :selected-service-tier="chat.selectedServiceTier.value"
+          @attach="chat.selectAttachments"
+          @remove-attachment="chat.removeAttachment"
+          @send="sendMessage"
+          @stop="chat.cancelActiveRun"
+          @update-content="chat.updateComposerContent"
+          @update-effort="chat.selectedEffort.value = $event"
+          @update-model="chat.selectModel"
+          @update-service-tier="chat.selectedServiceTier.value = $event"
+        />
+      </div>
+    </footer>
   </section>
 </template>
 
 <style scoped lang="scss">
 .desktop-chat-page {
   display: flex;
-  width: 100%;
-  height: 100%;
   min-width: 0;
   min-height: 0;
   flex-direction: column;
   background: var(--buddy-bg-surface);
-  overflow: hidden;
 }
 
-.desktop-chat-page__header {
-  display: flex;
-  min-height: 3.75rem;
-  flex: none;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  border-bottom: 1px solid var(--buddy-border-light);
-  padding: 0.65rem 1rem;
-}
-
-.desktop-chat-page__title {
-  display: grid;
-  min-width: 0;
-  gap: 0.15rem;
-
-  strong {
-    color: var(--buddy-text-primary);
-    font-size: 0.92rem;
-  }
-
-  span {
-    max-width: min(42rem, 60vw);
-    overflow: hidden;
-    color: var(--buddy-text-placeholder);
-    font-family: var(--buddy-font-mono);
-    font-size: 0.66rem;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-}
-
-.desktop-chat-page__runtime {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  border: 0;
-  background: transparent;
-  color: var(--buddy-text-secondary);
-  font-size: 0.72rem;
-
-  i {
-    width: 0.48rem;
-    height: 0.48rem;
-    border-radius: 50%;
-    background: var(--buddy-accent-warning);
-  }
-
-  &.is-ready i {
-    background: var(--buddy-accent-success);
-  }
-
-  &.is-offline {
-    cursor: pointer;
-
-    i {
-      background: var(--buddy-accent-danger);
-    }
-  }
-}
-
-.desktop-chat-page__error {
-  display: flex;
-  flex: none;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  border-bottom: 1px solid color-mix(in srgb, var(--buddy-accent-danger) 28%, transparent);
-  background: color-mix(in srgb, var(--buddy-accent-danger) 7%, var(--buddy-bg-surface));
-  color: var(--buddy-accent-danger);
-  font-size: 0.78rem;
-  padding: 0.5rem 1rem;
-
-  button {
-    border: 0;
-    background: transparent;
-    color: inherit;
-    cursor: pointer;
-    font-weight: 650;
-  }
-}
-
-.desktop-chat-page__workspace {
-  display: flex;
-  min-width: 0;
-  min-height: 0;
-  flex: 1;
-  overflow: hidden;
-}
-
-.desktop-chat-page__sidebar {
-  width: 17rem;
-  height: 100%;
-  min-width: 13rem;
-  min-height: 0;
-  flex: none;
-  border-right: 1px solid var(--buddy-border-light);
-  background: var(--buddy-fill-light);
-  overflow: hidden;
-}
-
-.desktop-chat-page__main {
-  position: relative;
+.desktop-chat-page__content {
   display: flex;
   min-width: 0;
   min-height: 0;
   flex: 1;
   flex-direction: column;
+  overflow: hidden;
 }
 
-.desktop-chat-page__show-sidebar {
-  position: absolute;
-  z-index: 4;
-  top: 0.75rem;
-  left: 0.75rem;
-  color: var(--buddy-text-secondary);
-}
-
-.desktop-chat-page__hero {
+.desktop-chat-page__welcome {
   display: grid;
-  width: 100%;
-  min-height: 0;
+  max-width: 34rem;
   flex: 1;
   align-content: center;
   justify-items: center;
-  padding: 2rem 1rem 4rem;
+  gap: 0.65rem;
+  margin: 0 auto;
+  padding: 2rem 1.25rem 4rem;
+  text-align: center;
+
+  img {
+    width: 3rem;
+    height: 3rem;
+    border-radius: 0.85rem;
+  }
+
+  h1,
+  p {
+    margin: 0;
+  }
 
   h1 {
-    margin: 0;
-    color: var(--buddy-text-primary);
-    font-size: clamp(1.45rem, 3vw, 2rem);
-    letter-spacing: -0.035em;
+    font-size: clamp(1.55rem, 3vw, 2rem);
+    font-weight: 650;
+    letter-spacing: -0.04em;
   }
 
-  > p {
-    margin: 0.65rem 0 1.25rem;
+  p {
     color: var(--buddy-text-secondary);
-    font-size: 0.9rem;
-  }
-
-  :deep(.desktop-chat-composer-wrap) {
-    width: min(52rem, calc(100% - 2rem));
+    font-size: 0.78rem;
   }
 }
 
-.desktop-chat-page__hero-mark {
+.desktop-chat-page__loading {
   display: grid;
-  width: 2.65rem;
-  height: 2.65rem;
+  flex: 1;
   place-items: center;
-  margin-bottom: 1rem;
-  border-radius: 0.85rem;
-  background: var(--buddy-accent-primary);
-  color: var(--buddy-text-on-accent);
-  font-size: 1.1rem;
-  font-weight: 750;
-  box-shadow: 0 0.65rem 1.6rem color-mix(in srgb, var(--buddy-accent-primary) 24%, transparent);
+  color: var(--buddy-text-secondary);
+  font-size: 0.75rem;
 }
 
 .desktop-chat-page__messages {
   min-height: 0;
   flex: 1;
-  overflow: hidden;
-  padding-top: 1rem;
-}
-
-.desktop-chat-page__loading {
-  display: grid;
-  height: 100%;
-  place-items: center;
-  color: var(--buddy-text-placeholder);
-  font-size: 0.82rem;
 }
 
 .desktop-chat-page__composer-dock {
   flex: none;
-  background: linear-gradient(180deg, transparent, var(--buddy-bg-surface) 1.5rem);
-  padding: 1rem 1.5rem 1.25rem;
+  background: var(--buddy-bg-surface);
+  padding: 0 var(--buddy-chat-inline-gutter) 1rem;
+}
 
-  > :deep(.desktop-chat-composer-wrap) {
-    width: min(52rem, 100%);
-    margin: 0 auto;
+.desktop-chat-page__composer-stack {
+  display: grid;
+  width: min(100%, var(--buddy-chat-reading-width));
+  gap: 0.55rem;
+  margin: 0 auto;
+}
+
+.desktop-chat-page__alert {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.7rem;
+  border: 1px solid color-mix(in srgb, var(--buddy-accent-warning) 34%, var(--buddy-border-light));
+  border-radius: 0.65rem;
+  background: color-mix(in srgb, var(--buddy-accent-warning) 8%, var(--buddy-bg-surface));
+  color: var(--buddy-text-regular);
+  padding: 0.65rem 0.75rem;
+
+  > .n-icon {
+    color: var(--buddy-accent-warning);
+    font-size: 1.1rem;
   }
-}
 
-.desktop-chat-page__approvals {
-  display: grid;
-  width: min(52rem, 100%);
-  gap: 0.35rem;
-  margin: 0 auto 0.5rem;
-}
+  &.is-runtime {
+    border-color: color-mix(in srgb, var(--buddy-accent-danger) 35%, var(--buddy-border-light));
+    background: color-mix(in srgb, var(--buddy-accent-danger) 7%, var(--buddy-bg-surface));
 
-.desktop-chat-page__dialog-backdrop {
-  position: fixed;
-  z-index: 100;
-  display: grid;
-  background: rgb(20 27 24 / 38%);
-  inset: 0;
-  place-items: center;
-}
+    > .n-icon {
+      color: var(--buddy-accent-danger);
+    }
+  }
 
-.desktop-chat-page__dialog {
-  width: min(26rem, calc(100vw - 2rem));
-  border: 1px solid var(--buddy-border-light);
-  border-radius: 0.9rem;
-  background: var(--buddy-bg-surface-raised);
-  box-shadow: 0 1.2rem 4rem rgb(20 27 24 / 20%);
-  padding: 1.1rem;
-
-  h2 {
+  strong,
+  p {
     margin: 0;
-    color: var(--buddy-text-primary);
-    font-size: 1rem;
+  }
+
+  strong {
+    font-size: 0.75rem;
   }
 
   p {
-    margin: 0.65rem 0 1rem;
+    margin-top: 0.12rem;
     color: var(--buddy-text-secondary);
-    font-size: 0.82rem;
-    line-height: 1.6;
+    font-size: 0.68rem;
+    line-height: 1.45;
+  }
+}
+
+.desktop-chat-page__alert-actions,
+.desktop-chat-page__approvals {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.desktop-chat-page__approvals {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.desktop-chat-page__starting {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  color: var(--buddy-text-secondary);
+  font-size: 0.68rem;
+  padding: 0 0.25rem;
+
+  i {
+    width: 0.45rem;
+    height: 0.45rem;
+    border-radius: 50%;
+    background: var(--buddy-accent-warning);
+    animation: desktop-runtime-pulse 1.2s ease-in-out infinite;
+  }
+}
+
+@keyframes desktop-runtime-pulse {
+  50% { opacity: 0.35; }
+}
+
+@media (max-width: 760px) {
+  .desktop-chat-page__alert {
+    grid-template-columns: auto minmax(0, 1fr);
   }
 
-  > div {
-    display: flex;
-    justify-content: flex-end;
-    gap: 0.5rem;
+  .desktop-chat-page__alert-actions {
+    grid-column: 2;
+    justify-content: flex-start;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .desktop-chat-page__starting i {
+    animation: none;
   }
 }
 </style>

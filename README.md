@@ -28,23 +28,49 @@ Lexora 是一个面向个人的文档驱动 AI 工作空间。它把文档编写
 
 ## 核心能力
 
+Lexora 由文档驱动的 Web 工作台和独立的 Buddy 桌面产品组成。两者都面向个人使用，并保持各自的运行与数据边界。
+
+### Web 工作台
+
+以文档为中心的 AI 工作空间，支持自部署。
+
 | 能力 | 描述 |
 | --- | --- |
-| AI 对话 | 模型选择、流式回复、消息分支、失败重试，以及从文档场景带入上下文。 |
-| 文档编写 | 页面树、富文本块、表格、代码块、数学公式、历史版本和回收站。 |
-| 公开发布 | 单页发布和站点发布，站点访问时为 VitePress-Like 风格的页面。 |
-| BYOK 模型接入 | 支持平台级或用户级模型服务商，并兼容 OpenAI-Compatible、Anthropic-Compatible 等接口。 |
+| 文档与知识 | 页面树、富文本编辑、表格、代码块、数学公式、自动保存和回收站。 |
+| AI 对话与文档 AI | 模型选择、流式回复、消息分支、失败重试，以及基于文档上下文的续写与改写。 |
+| 历史与发布 | 文档版本快照、历史恢复、单页发布和站点发布。 |
+| 模型与部署 | 支持 BYOK、平台级与用户级模型服务商，以及 Docker Compose 自部署。 |
+
+### Lexora Buddy
+
+独立运行于本机的个人 AI 伙伴。
+
+| 能力 | 描述 |
+| --- | --- |
+| 本地对话 | 连接多种模型服务商，并在本机保存会话与运行历史。 |
+| 项目上下文 | 在授权目录中理解和处理文档、文件与代码。 |
+| 受控执行 | 使用 Skills、MCP 与本机工具完成任务，在关键操作前请求确认。 |
+| 桌面陪伴 | 通过通知、过程反馈和原生桌宠呈现运行状态。 |
 
 ## 技术栈
 
+### Web 工作台与服务端
+
 | 层级 | 技术 |
 | --- | --- |
-| Web | Vue 3、Vite、Vue Router、Pinia、Element Plus、UnoCSS |
-| Editor | Tiptap、ProseMirror、REST 自动保存、版本快照 |
+| Web | Vue 3、TypeScript、Vite、Vue Router、Pinia、Element Plus、UnoCSS |
+| Editor | Tiptap、ProseMirror |
 | API | NestJS、Fastify、Prisma、PostgreSQL、Redis、BullMQ |
-| Agent | LangGraph、LangChain、Postgres Checkpointer、Redis 队列 |
-| Contracts | Zod、共享 endpoint registry、领域常量和类型 |
-| Infrastructure | Docker Compose、RustFS、Nginx |
+| Agent | LangGraph、LangChain、PostgreSQL Checkpointer、Redis Streams |
+| Infrastructure | Docker Compose、Nginx、RustFS |
+
+### Lexora Buddy
+
+| 层级 | 技术 |
+| --- | --- |
+| Desktop | Electron、Vue 3、TypeScript、Vite、Naive UI、UnoCSS |
+| Agent Runtime | Pi SDK、MCP SDK、Node.js、SQLite、JSONL |
+| Native Pet | Rust、GTK、Cairo、GDK Pixbuf |
 
 ## 项目结构
 
@@ -54,7 +80,7 @@ lexora/
 │   ├── web/         # Vue 3 前端应用
 │   ├── api/         # NestJS API 服务
 │   ├── agent/       # LangGraph AI 运行服务
-│   ├── buddy/       # 本地桌宠与 Agent 运行时
+│   ├── buddy/       # 本地个人 AI 伙伴与桌宠
 │   └── docs/        # 产品文档站点
 ├── packages/
 │   ├── contracts/   # 共享契约层：schema、endpoint、常量、领域类型

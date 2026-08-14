@@ -2,11 +2,19 @@
 import type { JSONContent } from '@tiptap/core'
 import type {
   LocalAttachment,
-  LocalCodexContextOptions,
-  LocalPromptContextOption,
+  LocalProvider,
   LocalRuntimeModelOption,
   LocalWorkspaceDraft,
 } from '../../electron/shared/localChatApi'
+import type {
+  BuddyServiceTier,
+  BuddyThinkingLevel,
+} from '../../shared/modelSelection'
+import type {
+  DesktopComposerContextOptions,
+  DesktopPromptContextOption,
+} from './desktopComposerInput'
+import type { DesktopContextUsage as DesktopContextUsageValue } from './desktopContextUsage'
 import type { BuddyLocale } from '@/i18n/buddyI18n'
 import Placeholder from '@tiptap/extension-placeholder'
 import StarterKit from '@tiptap/starter-kit'
@@ -30,6 +38,7 @@ import {
   serializeDesktopComposerContent,
   shouldSubmitDesktopComposerKey,
 } from './desktopComposerInput'
+import DesktopContextUsage from './DesktopContextUsage.vue'
 import DesktopModelSelector from './DesktopModelSelector.vue'
 import { DesktopPromptToken } from './DesktopPromptToken'
 
@@ -37,17 +46,19 @@ const props = defineProps<{
   attachments: ReadonlyArray<LocalAttachment>
   canSend: boolean
   composerContent: LocalWorkspaceDraft['composerContent']
+  contextUsage: DesktopContextUsageValue | null
   draft: string
   isRunning: boolean
   isSelectingFiles: boolean
   isSending: boolean
   language: BuddyLocale
-  loadContextOptions: (fileQuery: string | null) => Promise<LocalCodexContextOptions>
+  loadContextOptions: (fileQuery: string | null) => Promise<DesktopComposerContextOptions>
   models: ReadonlyArray<LocalRuntimeModelOption>
-  selectedEffort: string | null
+  providers: ReadonlyArray<LocalProvider>
+  selectedEffort: BuddyThinkingLevel | null
   selectedModel: LocalRuntimeModelOption | null
   selectedModelId: string | null
-  selectedServiceTier: string | null
+  selectedServiceTier: BuddyServiceTier | null
 }>()
 
 const emit = defineEmits<{
@@ -56,14 +67,14 @@ const emit = defineEmits<{
   send: [payload: ReturnType<typeof serializeDesktopComposerContent>]
   stop: []
   updateContent: [content: string, value: LocalWorkspaceDraft['composerContent']]
-  updateEffort: [value: string | null]
+  updateEffort: [value: BuddyThinkingLevel | null]
   updateModel: [value: string]
-  updateServiceTier: [value: string | null]
+  updateServiceTier: [value: BuddyServiceTier | null]
 }>()
 
 const { t } = useBuddyI18n(() => props.language)
 const contentJSON = shallowRef<JSONContent>(resolveComposerContent(props.composerContent, props.draft))
-const contextOptions = shallowRef<LocalCodexContextOptions>({ files: [], plugins: [], skills: [] })
+const contextOptions = shallowRef<DesktopComposerContextOptions>({ files: [], skills: [] })
 const activeTrigger = shallowRef<ReturnType<typeof findDesktopComposerTrigger>>(null)
 const activeSuggestionIndex = shallowRef(0)
 const isLoadingContext = shallowRef(false)
@@ -71,7 +82,11 @@ let contextRequestId = 0
 let isHydrating = false
 
 const serializedContent = computed(() => serializeDesktopComposerContent(contentJSON.value))
-const suggestions = computed(() => createDesktopComposerSuggestions(activeTrigger.value, contextOptions.value))
+const suggestions = computed(() => createDesktopComposerSuggestions(
+  activeTrigger.value,
+  contextOptions.value,
+  key => t(key),
+))
 const canSubmit = computed(() =>
   props.canSend && (serializedContent.value.content.length > 0 || props.attachments.length > 0),
 )
@@ -95,7 +110,7 @@ const editor = useEditor({
   ],
   editorProps: {
     attributes: {
-      'aria-label': t('desktop.chat.message'),
+      'aria-label': t('desktop.chat.messageInput'),
       'class': 'desktop-chat-composer__prosemirror',
     },
     handleKeyDown: (_view, event) => handleEditorKeydown(event),
@@ -206,7 +221,7 @@ async function refreshContextOptions(trigger: ReturnType<typeof findDesktopCompo
   }
   catch {
     if (requestId === contextRequestId)
-      contextOptions.value = { files: [], plugins: [], skills: [] }
+      contextOptions.value = { files: [], skills: [] }
   }
   finally {
     if (requestId === contextRequestId)
@@ -214,7 +229,7 @@ async function refreshContextOptions(trigger: ReturnType<typeof findDesktopCompo
   }
 }
 
-function selectSuggestion(option: LocalPromptContextOption | undefined) {
+function selectSuggestion(option: DesktopPromptContextOption | undefined) {
   const currentEditor = editor.value
   const trigger = activeTrigger.value
   if (!currentEditor || !trigger || !option)
@@ -235,7 +250,7 @@ function selectSuggestion(option: LocalPromptContextOption | undefined) {
   activeTrigger.value = null
 }
 
-function suggestionKind(option: LocalPromptContextOption) {
+function suggestionKind(option: DesktopPromptContextOption) {
   return option.kind === 'skill' ? '$' : option.kind === 'slashCommand' ? '/' : '@'
 }
 
@@ -259,18 +274,20 @@ function normalizeComposerContent(value: JSONContent): LocalWorkspaceDraft['comp
       <div v-for="(attachment, index) in attachments" :key="attachment.attachmentId">
         <img
           v-if="attachment.kind === 'image' && resolveBuddyAttachmentPreviewUrl(attachment)"
-          :src="resolveBuddyAttachmentPreviewUrl(attachment)"
+          :src="resolveBuddyAttachmentPreviewUrl(attachment) ?? undefined"
           :alt="attachment.name"
+          height="29"
+          width="29"
         >
         <span v-else class="desktop-chat-composer__file-kind">
           {{ attachment.kind === 'text' ? 'TXT' : 'FILE' }}
         </span>
-        <span :title="attachment.name">{{ attachment.name }}</span>
+        <span>{{ attachment.name }}</span>
         <NButton
-          circle
+          class="buddy-icon-button"
           quaternary
           size="tiny"
-          :aria-label="t('chat.removeAttachment')"
+          :aria-label="t('desktop.chat.removeAttachment')"
           @click="emit('removeAttachment', index)"
         >
           <template #icon>
@@ -311,10 +328,10 @@ function normalizeComposerContent(value: JSONContent): LocalWorkspaceDraft['comp
 
       <div class="desktop-chat-composer__toolbar">
         <NButton
-          circle
+          class="buddy-icon-button"
           quaternary
-          :disabled="isSelectingFiles || isSending"
           :aria-label="t('desktop.chat.addAttachment')"
+          :disabled="isSelectingFiles || isSending"
           @click="emit('attach')"
         >
           <template #icon>
@@ -323,10 +340,17 @@ function normalizeComposerContent(value: JSONContent): LocalWorkspaceDraft['comp
         </NButton>
 
         <div class="desktop-chat-composer__actions">
+          <DesktopContextUsage
+            :is-running="isRunning"
+            :language="language"
+            :usage="contextUsage"
+          />
+
           <DesktopModelSelector
             :disabled="isSending"
             :language="language"
             :models="models"
+            :providers="providers"
             :selected-effort="selectedEffort"
             :selected-model="selectedModel"
             :selected-model-id="selectedModelId"
@@ -338,10 +362,10 @@ function normalizeComposerContent(value: JSONContent): LocalWorkspaceDraft['comp
 
           <NButton
             v-if="isRunning"
-            circle
+            class="buddy-icon-button"
             secondary
             type="error"
-            :aria-label="t('chat.stop')"
+            :aria-label="t('desktop.chat.stop')"
             @click="emit('stop')"
           >
             <template #icon>
@@ -350,11 +374,11 @@ function normalizeComposerContent(value: JSONContent): LocalWorkspaceDraft['comp
           </NButton>
           <NButton
             v-else
-            circle
+            class="buddy-icon-button"
             type="primary"
+            :aria-label="t('desktop.chat.send')"
             :disabled="!canSubmit"
             :loading="isSending"
-            :aria-label="t('chat.send')"
             @click="submit"
           >
             <template #icon>
@@ -370,22 +394,20 @@ function normalizeComposerContent(value: JSONContent): LocalWorkspaceDraft['comp
 
 <style scoped lang="scss">
 .desktop-chat-composer-wrap {
-  width: min(52rem, calc(100% - 3rem));
+  width: 100%;
   margin: 0 auto;
 }
 
 .desktop-chat-composer {
   position: relative;
   border: 1px solid var(--buddy-border-base);
-  border-radius: 1rem;
-  background: color-mix(in srgb, var(--buddy-bg-surface-raised) 96%, transparent);
-  box-shadow: 0 0.7rem 2.2rem rgb(23 33 28 / 9%);
-  padding: 0.75rem;
-  transition: border-color 150ms ease, box-shadow 150ms ease;
+  border-radius: 0.75rem;
+  background: var(--buddy-bg-surface);
+  padding: 0.65rem;
+  transition: border-color 120ms ease;
 
   &:focus-within {
     border-color: color-mix(in srgb, var(--buddy-accent-primary) 58%, var(--buddy-border-base));
-    box-shadow: 0 0.8rem 2.5rem rgb(23 33 28 / 11%);
   }
 }
 
@@ -493,7 +515,7 @@ function normalizeComposerContent(value: JSONContent): LocalWorkspaceDraft['comp
   width: 1.55rem;
   height: 1.55rem;
   place-items: center;
-  border-radius: 0.42rem;
+  border-radius: var(--buddy-radius-micro);
   background: color-mix(in srgb, var(--buddy-accent-primary) 12%, transparent);
   color: var(--buddy-accent-primary);
   font-weight: 750;
@@ -574,7 +596,7 @@ function normalizeComposerContent(value: JSONContent): LocalWorkspaceDraft['comp
 
 @media (max-width: 760px) {
   .desktop-chat-composer-wrap {
-    width: calc(100% - 1.5rem);
+    width: 100%;
   }
 }
 </style>

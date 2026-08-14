@@ -4,39 +4,33 @@ import { resolve } from 'node:path'
 import process from 'node:process'
 
 import { writeOutput } from '../../shared/cli-output.mjs'
+import { resolveBuddyOutputPaths } from './output-paths.mjs'
 
 const repoRoot = resolve(import.meta.dirname, '../../..')
-const defaultRuntimePath = resolve(
-  repoRoot,
-  'apps/buddy/runtime/target/release/lexora-buddy-runtime',
-)
 const defaultPetPath = resolve(
-  repoRoot,
-  'apps/buddy/runtime/target/release/lexora-buddy-pet',
+  resolveBuddyOutputPaths(repoRoot).build.nativePet,
+  'release/lexora-buddy-pet',
 )
-const runtimeOnlyMarkers = [
+const agentRuntimeMarkers = [
   'chat.startTurn',
-  'codex.listModels',
-  'codex runtime failed',
+  'host.credentials.read',
+  'mcp__',
+  'providers.list',
   'runtime.shutdown',
   'sqlite operation failed',
 ]
 
 export function verifyPetBinaryBoundary(options = {}) {
-  const runtimePath = options.runtimePath ?? defaultRuntimePath
   const petPath = options.petPath ?? defaultPetPath
-  const runtime = readFileSync(runtimePath)
   const pet = readFileSync(petPath)
   const errors = []
 
-  if (pet.equals(runtime))
-    errors.push('standalone pet must not reuse the Desktop Runtime executable')
-
-  for (const marker of runtimeOnlyMarkers) {
+  if (!pet.subarray(0, 4).equals(Buffer.from([0x7F, 0x45, 0x4C, 0x46])))
+    errors.push('standalone pet must be an ELF executable')
+  for (const marker of agentRuntimeMarkers) {
     if (pet.includes(Buffer.from(marker)))
-      errors.push(`standalone pet contains Desktop Runtime protocol marker: ${marker}`)
+      errors.push(`standalone pet contains Buddy Local Service marker: ${marker}`)
   }
-
   return errors
 }
 

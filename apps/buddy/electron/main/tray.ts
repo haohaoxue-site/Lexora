@@ -1,5 +1,5 @@
 import type { LexoraConfig } from '../shared/desktopApi'
-import type { RuntimeSupervisor, RuntimeSupervisorState } from './runtime/RuntimeSupervisor'
+import type { BuddyServiceSupervisor, BuddyServiceSupervisorState } from './runtime/BuddyServiceSupervisor'
 import { Menu, nativeImage, Tray } from 'electron'
 import { resolveDesktopIconPath } from './desktopIcon'
 import { translateDesktopNative, translateDesktopRuntimeStatus } from './desktopNativeI18n'
@@ -11,12 +11,12 @@ export interface CreateDesktopTrayOptions {
   onOpenDesktop: () => void
   onQuit: () => void
   resourcesPath: string
-  runtime: RuntimeSupervisor
+  runtime: BuddyServiceSupervisor
 }
 
 export interface DesktopTrayController {
   destroy: () => void
-  setRuntimeState: (state: RuntimeSupervisorState) => void
+  setRuntimeState: (state: BuddyServiceSupervisorState) => void
   setLanguage: (language: LexoraConfig['desktop']['language']) => void
 }
 
@@ -40,8 +40,10 @@ export function createDesktopTray(options: CreateDesktopTrayOptions): DesktopTra
       },
       {
         label: translateDesktopNative(language, 'restartRuntime'),
-        enabled: runtimeState.status !== 'starting' && runtimeState.status !== 'stopping',
-        click: () => void options.runtime.restart(),
+        enabled: runtimeState.status !== 'starting'
+          && runtimeState.status !== 'stopping'
+          && !(runtimeState.status === 'offline' && runtimeState.pid !== null),
+        click: () => void options.runtime.restart().catch(() => {}),
       },
       { type: 'separator' },
       {
@@ -51,7 +53,7 @@ export function createDesktopTray(options: CreateDesktopTrayOptions): DesktopTra
     ]))
   }
 
-  tray.setToolTip('Lexora')
+  tray.setToolTip('Lexora Buddy')
   tray.on('click', options.onOpenDesktop)
   rebuildMenu()
 

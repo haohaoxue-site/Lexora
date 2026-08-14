@@ -1,16 +1,18 @@
 import type { LexoraConfig } from '../shared/desktopApi'
-import type { RuntimeSupervisorStatus } from './runtime/RuntimeSupervisor'
+import type { BuddyServiceSupervisorStatus } from './runtime/BuddyServiceSupervisor'
 
 type DesktopLanguage = LexoraConfig['desktop']['language']
 
 const messages = {
   'en-US': {
-    authorizeProject: 'Authorize local project',
-    open: 'Open Lexora',
-    quit: 'Quit Lexora',
+    backgroundCloseBody: 'Lexora Buddy is still running in the background.',
+    backgroundCloseTitle: 'Lexora Buddy remains available',
+    open: 'Open Lexora Buddy',
+    quit: 'Quit Lexora Buddy',
     restartRuntime: 'Restart local runtime',
     runtime: 'Local runtime: {status}',
     selectAttachments: 'Select attachments',
+    selectProjectDirectory: 'Select project directory',
     statusOffline: 'offline',
     statusReady: 'ready',
     statusRestarting: 'restarting',
@@ -19,12 +21,14 @@ const messages = {
     statusStopping: 'stopping',
   },
   'zh-CN': {
-    authorizeProject: '授权本地项目',
-    open: '打开 Lexora',
-    quit: '退出 Lexora',
+    backgroundCloseBody: 'Lexora Buddy 仍在后台运行。',
+    backgroundCloseTitle: 'Lexora Buddy 仍可随时使用',
+    open: '打开 Lexora Buddy',
+    quit: '退出 Lexora Buddy',
     restartRuntime: '重新启动本地运行时',
     runtime: '本地运行时：{status}',
     selectAttachments: '选择附件',
+    selectProjectDirectory: '选择项目目录',
     statusOffline: '离线',
     statusReady: '已就绪',
     statusRestarting: '正在重启',
@@ -42,7 +46,7 @@ export function translateDesktopNative(language: DesktopLanguage, key: NativeMes
 
 export function translateDesktopRuntimeStatus(
   language: DesktopLanguage,
-  status: RuntimeSupervisorStatus,
+  status: BuddyServiceSupervisorStatus,
 ) {
   const statusKey = `status${status[0]!.toUpperCase()}${status.slice(1)}` as NativeMessageKey
   return translateDesktopNative(language, 'runtime').replace(

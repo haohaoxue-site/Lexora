@@ -4,6 +4,7 @@ import { join, resolve } from 'node:path'
 import process from 'node:process'
 
 import { writeOutput } from '../../shared/cli-output.mjs'
+import { resolveBuddyOutputPaths } from '../release/output-paths.mjs'
 
 const repoRoot = resolve(import.meta.dirname, '../../..')
 
@@ -22,12 +23,12 @@ export function readBuddyDebReleaseMetadata(cwd = repoRoot) {
   if (!releaseUrl || !expectedHash)
     throw new Error('AUR PKGBUILD is missing the release URL or deb sha256')
 
-  const releaseAssetName = `Lexora-${version}-linux-amd64.deb`
+  const releaseAssetName = `Lexora-Buddy-${version}-linux-amd64.deb`
   const sourceUrl = `${releaseUrl}/releases/download/v${version}/${releaseAssetName}`
   const releaseRepo = new URL(releaseUrl).pathname.replace(/^\//, '')
 
   return {
-    debPath: join(cwd, 'apps/buddy/dist-packages', releaseAssetName),
+    debPath: join(resolveBuddyOutputPaths(cwd).artifacts.desktop, releaseAssetName),
     expectedHash,
     releaseAssetName,
     releaseRepo,

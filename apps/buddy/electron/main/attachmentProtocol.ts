@@ -1,7 +1,10 @@
-import type { RuntimeSupervisor } from './runtime/RuntimeSupervisor'
+import type { BuddyServiceSupervisor } from './runtime/BuddyServiceSupervisor'
 import { readFile } from 'node:fs/promises'
 import { protocol } from 'electron'
-import { localChatSchemas } from '../shared/localChatApiSchemas'
+import {
+  localChatResponseSchemas,
+  localChatSchemas,
+} from '../shared/localChatApiSchemas'
 
 const ATTACHMENT_PROTOCOL = 'lexora-attachment'
 
@@ -17,7 +20,7 @@ export function registerAttachmentSchemePrivileges(): void {
   }])
 }
 
-export function installAttachmentProtocol(runtime: RuntimeSupervisor): () => void {
+export function installAttachmentProtocol(runtime: BuddyServiceSupervisor): () => void {
   protocol.handle(ATTACHMENT_PROTOCOL, async (request) => {
     if (request.method !== 'GET')
       return new Response(null, { status: 405 })
@@ -31,8 +34,9 @@ export function installAttachmentProtocol(runtime: RuntimeSupervisor): () => voi
       return new Response(null, { status: 400 })
 
     try {
-      const preview = localChatSchemas.attachmentPreview.parse(
-        await runtime.request('attachments.resolvePreview', { attachmentId }),
+      const input = localChatSchemas.attachmentPreview.parse({ attachmentId })
+      const preview = localChatResponseSchemas.attachmentPreview.parse(
+        await runtime.request('attachments.resolvePreview', input),
       )
       const body = await readFile(preview.path)
       return new Response(body, {

@@ -1,0 +1,515 @@
+import type {
+  LocalConversationTimelineItem,
+  LocalMessage,
+  LocalRun,
+  LocalRunEvent,
+} from '../../electron/shared/localChatApi'
+import type { ApprovalReviewPayload } from '../../shared/approvalReviewPayload'
+import type { BuddyReasoningKind } from '../../shared/reasoningPresentation'
+import type { BuddyToolPresentation } from '../../shared/runEventPresentation'
+import { approvalReviewPayloadSchema } from '../../shared/approvalReviewPayload'
+import {
+  buddyReasoningKindSchema,
+  resolveBuddyReasoningKind,
+} from '../../shared/reasoningPresentation'
+import { buddyToolPresentationSchema } from '../../shared/runEventPresentation'
+
+export { resolveChatAgentTurnOpen } from './chatAgentTurnDisclosure'
+export { projectChatTimelineRows } from './chatTimelineProjection'
+
+export interface ChatAgentReasoningNode {
+  contentIndex: number
+  id: string
+  kind: 'reasoning'
+  reasoningKind: BuddyReasoningKind
+  status: 'completed' | 'interrupted' | 'running'
+  text: string
+}
+
+export interface ChatAgentNarrationNode {
+  id: string
+  kind: 'text'
+  messageId: string
+  text: string
+}
+
+export interface ChatAgentToolNode {
+  approvalId?: string
+  description: string | null
+  id: string
+  isError: boolean
+  kind: 'tool'
+  presentation: BuddyToolPresentation
+  status: 'awaiting_approval' | 'completed' | 'failed' | 'interrupted' | 'running'
+  toolCallId: string
+  toolName: string
+}
+
+export type ChatAgentTurnNode = ChatAgentNarrationNode | ChatAgentReasoningNode | ChatAgentToolNode
+
+export interface ChatAgentReasoningEntry {
+  detail: ChatAgentReasoningNode | null
+  id: string
+  summary: ChatAgentReasoningNode | null
+}
+
+export interface ChatAgentReasoningGroup {
+  entries: ChatAgentReasoningEntry[]
+  id: string
+  kind: 'reasoning-group'
+}
+
+export type ChatAgentTurnRow = ChatAgentNarrationNode | ChatAgentReasoningGroup | ChatAgentToolNode
+
+export interface ChatAgentTurn {
+  completedAt: string | null
+  failureCode?: string | null
+  failureMessage?: string | null
+  finalMessageId: string | null
+  nodes: ChatAgentTurnNode[]
+  reasoningLevel: string | null
+  runId: string
+  startedAt: string
+  status: LocalRun['status']
+  triggeringMessageId: string
+}
+
+export function projectChatAgentTurns(
+  events: ReadonlyArray<LocalRunEvent>,
+  runs: ReadonlyArray<LocalRun>,
+): ChatAgentTurn[] {
+  const eventsByRunId = new Map<string, LocalRunEvent[]>()
+  for (const event of events) {
+    const runEvents = eventsByRunId.get(event.runId) ?? []
+    runEvents.push(event)
+    eventsByRunId.set(event.runId, runEvents)
+  }
+  return runs
+    .filter(run => run.purpose !== 'conversation.compaction')
+    .map(run => projectChatAgentTurn(run, eventsByRunId.get(run.id) ?? []))
+}
+
+function projectChatAgentTurn(
+  run: LocalRun,
+  events: ReadonlyArray<LocalRunEvent>,
+): ChatAgentTurn {
+  const reasoning = new Map<string, ChatAgentReasoningNode & { order: number }>()
+  const tools = new Map<string, ChatAgentToolNode & { order: number }>()
+  const approvalTools = new Map<string, string>()
+  const text: Array<ChatAgentNarrationNode & { order: number }> = []
+  let failureMessage: string | null = null
+  let finalMessageId: string | null = null
+  for (const event of events) {
+    const payload = readPayload(event.payload)
+    if (!payload)
+      continue
+    if (event.type === 'run.failed') {
+      failureMessage = readString(payload.errorMessage) || null
+      continue
+    }
+    if (event.type.startsWith('message.block.')) {
+      const messageId = readString(payload.messageId)
+      const contentIndex = readNonnegativeInteger(payload.contentIndex)
+      if (!messageId || contentIndex === null || payload.kind !== 'reasoning')
+        continue
+      const id = `reasoning:${messageId}:${contentIndex}`
+      const parsedReasoningKind = buddyReasoningKindSchema.safeParse(payload.reasoningKind)
+      const reasoningKind = parsedReasoningKind.success
+        ? parsedReasoningKind.data
+        : reasoning.get(id)?.reasoningKind ?? resolveBuddyReasoningKind({ provider: run.providerId })
+      const current = reasoning.get(id) ?? {
+        contentIndex,
+        id,
+        kind: 'reasoning' as const,
+        order: event.sequence,
+        reasoningKind,
+        status: 'running' as const,
+        text: '',
+      }
+      if (event.type === 'message.block.delta') {
+        reasoning.set(id, {
+          ...current,
+          reasoningKind,
+          text: current.text + readString(payload.delta),
+        })
+      }
+      else if (event.type === 'message.block.completed') {
+        reasoning.set(id, {
+          ...current,
+          reasoningKind,
+          status: 'completed',
+          text: readString(payload.content),
+        })
+      }
+      else {
+        reasoning.set(id, current)
+      }
+      continue
+    }
+    if (event.type === 'message.completed') {
+      const messageId = readString(payload.messageId)
+      const content = readPayload(payload.content)
+      if (!messageId)
+        continue
+      if (payload.stopReason === 'tool_use') {
+        const value = readString(content?.text)
+        const normalized = normalizeProcessNarration(value)
+        const duplicatesReasoning = normalized && [...reasoning.values()].some(node => (
+          normalizeProcessNarration(node.text) === normalized
+        ))
+        if (normalized && !duplicatesReasoning) {
+          text.push({
+            id: `process-text:${messageId}`,
+            kind: 'text',
+            messageId,
+            order: event.sequence,
+            text: value,
+          })
+        }
+      }
+      else {
+        finalMessageId = messageId
+      }
+      continue
+    }
+    if (event.type === 'approval.requested') {
+      const approvalId = readString(payload.id)
+      const toolCallId = readString(payload.toolCallId)
+      const current = tools.get(toolCallId)
+      const review = approvalReviewPayloadSchema.safeParse(payload.review)
+      const base = current ?? (review.success
+        ? {
+            id: `tool:${toolCallId}`,
+            isError: false,
+            kind: 'tool' as const,
+            order: event.sequence,
+            presentation: approvalPresentation(review.data),
+            status: 'running' as const,
+            toolCallId,
+            toolName: review.data.toolName,
+            description: readString(payload.summary) || null,
+          }
+        : null)
+      if (approvalId && toolCallId)
+        approvalTools.set(approvalId, toolCallId)
+      if (approvalId && toolCallId && base) {
+        tools.set(toolCallId, {
+          ...base,
+          approvalId,
+          status: 'awaiting_approval',
+        })
+      }
+      continue
+    }
+    if (event.type === 'approval.resolved') {
+      const approvalId = readString(payload.id)
+      const toolCallId = approvalTools.get(approvalId)
+      const current = toolCallId ? tools.get(toolCallId) : undefined
+      if (current?.status === 'awaiting_approval') {
+        tools.set(current.toolCallId, {
+          ...current,
+          isError: payload.status !== 'approved',
+          status: payload.status === 'approved' ? 'running' : 'failed',
+        })
+      }
+      continue
+    }
+    if (event.type === 'tool.started' || event.type === 'tool.updated' || event.type === 'tool.completed') {
+      const toolCallId = readString(payload.toolCallId)
+      const toolName = readString(payload.toolName)
+      const presentation = buddyToolPresentationSchema.safeParse(payload.presentation)
+      if (!toolCallId || !toolName || !presentation.success)
+        continue
+      const current = tools.get(toolCallId)
+      const isError = event.type === 'tool.completed' && payload.isError === true
+      const narration = current ? null : text.at(-1)
+      const description = current?.description
+        ?? narration?.text
+        ?? specificToolDescription(presentation.data.description)
+        ?? null
+      if (narration && description === narration.text)
+        text.pop()
+      tools.set(toolCallId, {
+        ...(current?.approvalId ? { approvalId: current.approvalId } : {}),
+        description,
+        id: `tool:${toolCallId}`,
+        isError,
+        kind: 'tool',
+        order: current?.order ?? event.sequence,
+        presentation: presentation.data,
+        status: event.type === 'tool.completed'
+          ? isError ? 'failed' : 'completed'
+          : 'running',
+        toolCallId,
+        toolName,
+      })
+    }
+  }
+  const terminal = run.status !== 'queued' && run.status !== 'running'
+  const reasoningNodes = [...reasoning.values()].filter(node => (
+    node.text.trim() || (!terminal && node.status === 'running')
+  ))
+  const nodes = [...reasoningNodes, ...text, ...tools.values()]
+    .sort((left, right) => left.order - right.order)
+    .map(({ order: _order, ...node }) => {
+      if (node.kind === 'text' || !terminal || node.status !== 'running')
+        return node
+      return { ...node, status: 'interrupted' as const }
+    })
+  return {
+    completedAt: run.completedAt,
+    ...(run.status === 'failed'
+      ? { failureCode: run.errorCode, failureMessage }
+      : {}),
+    finalMessageId,
+    nodes,
+    reasoningLevel: run.reasoningLevel,
+    runId: run.id,
+    startedAt: run.startedAt,
+    status: run.status,
+    triggeringMessageId: run.triggeringMessageId,
+  }
+}
+
+export function projectChatAgentTurnRows(nodes: ReadonlyArray<ChatAgentTurnNode>): ChatAgentTurnRow[] {
+  const rows: ChatAgentTurnRow[] = []
+  let reasoning: ChatAgentReasoningNode[] = []
+  const flushReasoning = () => {
+    if (reasoning.length === 0)
+      return
+    rows.push({
+      entries: projectReasoningEntries(reasoning),
+      id: `reasoning-group:${reasoning[0]!.id}`,
+      kind: 'reasoning-group',
+    })
+    reasoning = []
+  }
+
+  for (const node of nodes) {
+    if (node.kind === 'reasoning') {
+      reasoning.push(node)
+      continue
+    }
+    flushReasoning()
+    rows.push(node)
+  }
+  flushReasoning()
+  return rows
+}
+
+const GENERIC_TOOL_DESCRIPTIONS = new Set([
+  'run a shell command in the authorized directory',
+  'execute a shell command',
+  'execute bash commands',
+])
+
+function specificToolDescription(value: string | null): string | null {
+  if (!value)
+    return null
+  return GENERIC_TOOL_DESCRIPTIONS.has(normalizeProcessNarration(value).toLowerCase())
+    ? null
+    : value
+}
+
+function projectReasoningEntries(nodes: ReadonlyArray<ChatAgentReasoningNode>): ChatAgentReasoningEntry[] {
+  const entries: ChatAgentReasoningEntry[] = []
+  for (const node of nodes) {
+    if (node.reasoningKind === 'summary') {
+      entries.push({
+        detail: null,
+        id: `reasoning-entry:${node.id}`,
+        summary: node,
+      })
+      continue
+    }
+    const previous = entries.at(-1)
+    if (previous?.summary && !previous.detail) {
+      previous.detail = node
+      continue
+    }
+    entries.push({
+      detail: node,
+      id: `reasoning-entry:${node.id}`,
+      summary: null,
+    })
+  }
+  return entries
+}
+
+function approvalPresentation(review: ApprovalReviewPayload): BuddyToolPresentation {
+  if ('command' in review) {
+    return {
+      card: 'terminal',
+      command: review.command,
+      cwd: null,
+      description: null,
+      exitCode: null,
+      output: null,
+      signal: null,
+      truncated: false,
+    }
+  }
+  const argumentNames = 'argumentNames' in review
+    ? review.argumentNames
+    : review.targetPaths.length > 0 ? ['targetPaths'] : []
+  if (review.toolName.startsWith('mcp__')) {
+    const [, connector = 'connector', ...toolParts] = review.toolName.split('__')
+    return {
+      argumentNames,
+      card: 'connector',
+      connector,
+      description: null,
+      output: null,
+      tool: toolParts.join('__') || review.toolName,
+      truncated: false,
+    }
+  }
+  return {
+    argumentNames,
+    card: 'generic',
+    description: null,
+    output: null,
+    truncated: false,
+  }
+}
+
+export interface ChatRecoveryNotice {
+  createdAt: string
+  missingAttachmentCount: number
+  runId: string
+  sequence: number
+}
+
+export interface StreamingAssistantMessage {
+  id: string
+  text: string
+}
+
+export function projectLatestRunActivity(
+  events: ReadonlyArray<LocalRunEvent>,
+  runs: ReadonlyArray<LocalRun>,
+): LocalRunEvent | null {
+  const activeRunIds = new Set(runs
+    .filter(run => run.status === 'queued' || run.status === 'running')
+    .map(run => run.id))
+  for (let index = events.length - 1; index >= 0; index -= 1) {
+    const event = events[index]!
+    if (
+      activeRunIds.has(event.runId)
+      && !event.type.startsWith('message.')
+      && !event.type.startsWith('session.')
+      && !event.type.startsWith('usage.')
+    ) {
+      return event
+    }
+  }
+  return null
+}
+
+export function projectChatRecoveryNotices(
+  timelineItems: ReadonlyArray<LocalConversationTimelineItem>,
+  events: ReadonlyArray<LocalRunEvent>,
+  runs: ReadonlyArray<LocalRun>,
+): ReadonlyArray<ChatRecoveryNotice> {
+  const loadedMessageIds = new Set(timelineItems.flatMap(item =>
+    item.kind === 'message' ? [item.id] : [],
+  ))
+  const runById = new Map(runs.map(run => [run.id, run]))
+
+  return events.flatMap((event): ChatRecoveryNotice[] => {
+    if (event.type !== 'session.recovery.degraded')
+      return []
+    const run = runById.get(event.runId)
+    if (!run || !loadedMessageIds.has(run.triggeringMessageId))
+      return []
+    const payload = readPayload(event.payload)
+    const missingAttachmentCount = payload?.missingAttachmentCount
+    if (
+      typeof missingAttachmentCount !== 'number'
+      || !Number.isSafeInteger(missingAttachmentCount)
+      || missingAttachmentCount <= 0
+    ) {
+      return []
+    }
+    return [{
+      createdAt: event.createdAt,
+      missingAttachmentCount,
+      runId: event.runId,
+      sequence: event.sequence,
+    }]
+  }).sort((left, right) =>
+    left.createdAt.localeCompare(right.createdAt) || left.sequence - right.sequence,
+  )
+}
+
+export function projectStreamingAssistantMessage(
+  messages: ReadonlyArray<LocalMessage>,
+  events: ReadonlyArray<LocalRunEvent>,
+  runs: ReadonlyArray<LocalRun>,
+): StreamingAssistantMessage | null {
+  const persistedIds = new Set(messages.map(message => message.id))
+  const runById = new Map(runs.map(run => [run.id, run]))
+  const candidates = new Map<string, StreamingAssistantMessage>()
+  for (const event of events) {
+    const run = runById.get(event.runId)
+    const isActive = run?.status === 'queued' || run?.status === 'running'
+    const isPendingPersistedFinal = event.type === 'message.completed'
+      && !!run
+      && persistedIds.has(run.triggeringMessageId)
+    if (!isActive && !isPendingPersistedFinal)
+      continue
+    const payload = readPayload(event.payload)
+    if (!payload)
+      continue
+    const messageId = typeof payload?.messageId === 'string' ? payload.messageId : null
+    if (!messageId || persistedIds.has(messageId))
+      continue
+    if (event.type === 'message.started') {
+      candidates.set(messageId, { id: messageId, text: '' })
+      continue
+    }
+    if (event.type === 'message.delta') {
+      const delta = typeof payload.delta === 'string' ? payload.delta : ''
+      const current = candidates.get(messageId) ?? { id: messageId, text: '' }
+      candidates.set(messageId, { ...current, text: current.text + delta })
+      continue
+    }
+    if (event.type === 'message.completed') {
+      if (payload.stopReason === 'tool_use') {
+        candidates.delete(messageId)
+        continue
+      }
+      const content = readPayload(payload.content)
+      const text = typeof content?.text === 'string'
+        ? content.text
+        : candidates.get(messageId)?.text ?? ''
+      candidates.set(messageId, { id: messageId, text })
+    }
+  }
+  return [...candidates.values()].at(-1) ?? null
+}
+
+function readPayload(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : null
+}
+
+function readString(value: unknown): string {
+  return typeof value === 'string' ? value : ''
+}
+
+function readNonnegativeInteger(value: unknown): number | null {
+  return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0
+    ? value
+    : null
+}
+
+function normalizeProcessNarration(value: string): string {
+  return value
+    .replace(/\[([^\]]+)\]\([^)]*\)/g, '$1')
+    .replace(/[*_~`#>]/g, '')
+    .replace(/^\s*[-+]\s+/gm, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
