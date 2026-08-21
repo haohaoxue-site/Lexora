@@ -3,7 +3,9 @@
   "compilerOptions": {
     "tsBuildInfoFile": "./.output/cache/typescript/tsconfig.app.tsbuildinfo",
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@buddy-electron/*": ["./electron/*"],
+      "@buddy-shared/*": ["./shared/*"]
     },
     "types": ["vite/client"],
     "strict": true,

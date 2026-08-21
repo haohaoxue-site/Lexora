@@ -6,13 +6,17 @@ import { dirname } from 'node:path'
 import process from 'node:process'
 import { parse, stringify } from 'smol-toml'
 import { z } from 'zod'
+import {
+  DEFAULT_DESKTOP_CHAT_SIDEBAR_SECTION_ORDER,
+  DESKTOP_CHAT_SIDEBAR_SECTIONS,
+} from '../../shared/desktopApi'
 
 const desktopConfigSchema = z.object({
   background_close_notice_shown: z.boolean().default(false),
-  chat_sidebar_section_order: z.tuple([
-    z.enum(['recent', 'projects']),
-    z.enum(['recent', 'projects']),
-  ]).refine(([first, second]) => first !== second).default(['recent', 'projects']),
+  chat_sidebar_section_order: z.array(z.enum(DESKTOP_CHAT_SIDEBAR_SECTIONS))
+    .length(DESKTOP_CHAT_SIDEBAR_SECTIONS.length)
+    .refine(sections => new Set(sections).size === sections.length)
+    .default([...DEFAULT_DESKTOP_CHAT_SIDEBAR_SECTION_ORDER]),
   language: z.enum(['zh-CN', 'en-US']).default('zh-CN'),
   launch_at_login: z.boolean().default(false),
   notifications_enabled: z.boolean().default(true),
@@ -21,7 +25,7 @@ const desktopConfigSchema = z.object({
   theme: z.enum(['system', 'light', 'dark']).default('system'),
 }).passthrough().default({
   background_close_notice_shown: false,
-  chat_sidebar_section_order: ['recent', 'projects'],
+  chat_sidebar_section_order: [...DEFAULT_DESKTOP_CHAT_SIDEBAR_SECTION_ORDER],
   language: 'zh-CN',
   launch_at_login: false,
   notifications_enabled: true,

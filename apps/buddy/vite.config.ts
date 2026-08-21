@@ -20,6 +20,8 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
+      '@buddy-electron': fileURLToPath(new URL('./electron', import.meta.url)),
+      '@buddy-shared': fileURLToPath(new URL('./shared', import.meta.url)),
     },
   },
   server: {

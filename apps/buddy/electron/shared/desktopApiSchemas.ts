@@ -1,10 +1,10 @@
 import type { LexoraConfigPatch } from './desktopApi'
 import { z } from 'zod'
+import { DESKTOP_CHAT_SIDEBAR_SECTIONS } from './desktopApi'
 
-const chatSidebarSectionOrderSchema = z.tuple([
-  z.enum(['recent', 'projects']),
-  z.enum(['recent', 'projects']),
-]).refine(([first, second]) => first !== second)
+const chatSidebarSectionOrderSchema = z.array(z.enum(DESKTOP_CHAT_SIDEBAR_SECTIONS))
+  .length(DESKTOP_CHAT_SIDEBAR_SECTIONS.length)
+  .refine(sections => new Set(sections).size === sections.length)
 
 export const feedbackIssueInputSchema = z.object({
   feedback: z.string().max(4_000),

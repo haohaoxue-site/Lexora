@@ -351,7 +351,7 @@ else {
 
         const renderedRecoveryAction = await desktopWindow.webContents.executeJavaScript(
           `new Promise((resolve) => {
-            globalThis.location.hash = 'settings/data'
+            globalThis.location.hash = '/settings/data'
             const deadline = Date.now() + 10_000
             const inspect = () => {
               const notice = globalThis.document.querySelector('[data-runtime-recovery-action]')

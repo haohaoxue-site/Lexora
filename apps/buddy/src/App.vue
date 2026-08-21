@@ -1,12 +1,14 @@
 <script setup lang="ts">
 import type { GlobalThemeOverrides } from 'naive-ui'
+import { usePreferredDark } from '@vueuse/core'
 import { darkTheme, NConfigProvider, NMessageProvider } from 'naive-ui'
-import { computed, onBeforeUnmount, onMounted, shallowRef } from 'vue'
-import DesktopShell from '@/desktop/DesktopShell.vue'
+import { computed, shallowRef } from 'vue'
+import DesktopAppProvider from '@/app/DesktopAppProvider.vue'
+import DesktopShell from '@/layouts/DesktopShell.vue'
 
 type DesktopThemePreference = 'system' | 'light' | 'dark'
 
-const systemPrefersDark = shallowRef(false)
+const systemPrefersDark = usePreferredDark()
 const themePreference = shallowRef<DesktopThemePreference>('system')
 const prefersDark = computed(() =>
   themePreference.value === 'dark'
@@ -33,23 +35,6 @@ const themeOverrides = computed<GlobalThemeOverrides>(() => ({
     primaryColorSuppl: prefersDark.value ? '#68b99f' : '#3d8f76',
   },
 }))
-
-let colorScheme: MediaQueryList | null = null
-
-function syncColorScheme(event: Pick<MediaQueryListEvent, 'matches'> | MediaQueryList) {
-  systemPrefersDark.value = event.matches
-}
-
-onMounted(() => {
-  colorScheme = window.matchMedia('(prefers-color-scheme: dark)')
-  syncColorScheme(colorScheme)
-  colorScheme.addEventListener('change', syncColorScheme)
-})
-
-onBeforeUnmount(() => {
-  colorScheme?.removeEventListener('change', syncColorScheme)
-  colorScheme = null
-})
 </script>
 
 <template>
@@ -59,7 +44,9 @@ onBeforeUnmount(() => {
   >
     <NMessageProvider placement="top">
       <div class="buddy-app" :class="{ 'is-dark': prefersDark }">
-        <DesktopShell @theme-change="themePreference = $event" />
+        <DesktopAppProvider @theme-change="themePreference = $event">
+          <DesktopShell />
+        </DesktopAppProvider>
       </div>
     </NMessageProvider>
   </NConfigProvider>

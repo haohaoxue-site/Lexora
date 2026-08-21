@@ -43,12 +43,19 @@ export interface DesktopAppInfo {
   version: string
 }
 
-export type DesktopChatSidebarSection = 'recent' | 'projects'
+export const DESKTOP_CHAT_SIDEBAR_SECTIONS = ['recent', 'projects'] as const
+
+export type DesktopChatSidebarSection = typeof DESKTOP_CHAT_SIDEBAR_SECTIONS[number]
+export type DesktopChatSidebarSectionOrder = DesktopChatSidebarSection[]
+
+export const DEFAULT_DESKTOP_CHAT_SIDEBAR_SECTION_ORDER: Readonly<
+  DesktopChatSidebarSectionOrder
+> = [...DESKTOP_CHAT_SIDEBAR_SECTIONS]
 
 export interface LexoraConfig {
   desktop: {
     backgroundCloseNoticeShown: boolean
-    chatSidebarSectionOrder: [DesktopChatSidebarSection, DesktopChatSidebarSection]
+    chatSidebarSectionOrder: DesktopChatSidebarSectionOrder
     language: 'zh-CN' | 'en-US'
     launchAtLogin: boolean
     notificationsEnabled: boolean
