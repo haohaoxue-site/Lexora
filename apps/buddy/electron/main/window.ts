@@ -1,13 +1,21 @@
 import type { BrowserWindowConstructorOptions } from 'electron'
 import type { DesktopWindowState } from '../shared/desktopApi'
+import type { ExecuteDesktopCommand } from './desktopCommands'
+import type { DesktopWindowPlacement } from './desktopWindowState'
 import { join } from 'node:path'
-import { BrowserWindow, shell } from 'electron'
+import { BrowserWindow, Menu, shell } from 'electron'
 import { DESKTOP_IPC_CHANNELS } from '../shared/desktopApi'
+import { registerDesktopCommandShortcuts } from './desktopCommands'
+import { createDesktopContextMenuTemplate } from './desktopContextMenu'
 import { isAllowedExternalUrl, isAllowedRendererNavigation } from './security/navigationPolicy'
 
 export interface CreateDesktopWindowOptions {
   iconPath: string
   isQuitting: () => boolean
+  executeCommand: ExecuteDesktopCommand
+  onHidden?: () => void
+  onPlacementChanged?: (placement: DesktopWindowPlacement) => void
+  placement?: DesktopWindowPlacement | null
   rendererUrl: string | null
   showOnReady?: boolean
 }
@@ -17,17 +25,23 @@ export interface DesktopWindowHandle {
   window: BrowserWindow
 }
 
+const DARK_WINDOW_BACKGROUND = '#171816'
+const LIGHT_WINDOW_BACKGROUND = '#f5f4f1'
+
 export function createDesktopWindow(options: CreateDesktopWindowOptions): DesktopWindowHandle {
   const windowOptions: BrowserWindowConstructorOptions = {
-    width: 1280,
-    height: 820,
+    width: options.placement?.width ?? 1280,
+    height: options.placement?.height ?? 820,
+    x: options.placement?.x,
+    y: options.placement?.y,
     minWidth: 980,
     minHeight: 640,
     autoHideMenuBar: true,
+    backgroundColor: LIGHT_WINDOW_BACKGROUND,
     frame: false,
     icon: options.iconPath,
     show: false,
-    title: 'Lexora',
+    title: 'Lexora Buddy',
     webPreferences: {
       preload: join(__dirname, '../preload/index.cjs'),
       contextIsolation: true,
@@ -38,7 +52,12 @@ export function createDesktopWindow(options: CreateDesktopWindowOptions): Deskto
     },
   }
   const window = new BrowserWindow(windowOptions)
+  window.webContents.session.setPermissionCheckHandler(() => false)
+  window.webContents.session.setPermissionRequestHandler((_webContents, _permission, callback) => {
+    callback(false)
+  })
   window.removeMenu()
+  registerDesktopCommandShortcuts(window, options.executeCommand)
   let trustedRendererUrl = ''
 
   const publishWindowState = () => {
@@ -49,10 +68,34 @@ export function createDesktopWindow(options: CreateDesktopWindowOptions): Deskto
       )
     }
   }
+  let placementTimer: ReturnType<typeof setTimeout> | null = null
+  const publishPlacement = () => {
+    if (!options.onPlacementChanged)
+      return
+    if (placementTimer)
+      clearTimeout(placementTimer)
+    placementTimer = setTimeout(() => {
+      placementTimer = null
+      if (window.isDestroyed())
+        return
+      options.onPlacementChanged?.({
+        ...window.getNormalBounds(),
+        maximized: window.isMaximized(),
+      })
+    }, 250)
+  }
 
   window.on('always-on-top-changed', publishWindowState)
   window.on('maximize', publishWindowState)
   window.on('unmaximize', publishWindowState)
+  window.on('maximize', publishPlacement)
+  window.on('move', publishPlacement)
+  window.on('resize', publishPlacement)
+  window.on('unmaximize', publishPlacement)
+  window.once('closed', () => {
+    if (placementTimer)
+      clearTimeout(placementTimer)
+  })
 
   window.on('close', (event) => {
     if (options.isQuitting())
@@ -60,9 +103,12 @@ export function createDesktopWindow(options: CreateDesktopWindowOptions): Deskto
 
     event.preventDefault()
     window.hide()
+    options.onHidden?.()
   })
 
   window.once('ready-to-show', () => {
+    if (options.placement?.maximized)
+      window.maximize()
     if (options.showOnReady !== false)
       window.show()
   })
@@ -83,6 +129,15 @@ export function createDesktopWindow(options: CreateDesktopWindowOptions): Deskto
       void shell.openExternal(url)
   })
 
+  window.webContents.on('context-menu', (_event, params) => {
+    const template = createDesktopContextMenuTemplate({
+      isEditable: params.isEditable,
+      selectionText: params.selectionText,
+    })
+    if (template.length > 0)
+      Menu.buildFromTemplate(template).popup({ window })
+  })
+
   return {
     window,
     async load() {
@@ -92,11 +147,15 @@ export function createDesktopWindow(options: CreateDesktopWindowOptions): Deskto
         return
       }
 
-      const rendererPath = join(__dirname, '../renderer/index.html')
-      await window.loadFile(rendererPath, { hash: 'chat' })
-      trustedRendererUrl = window.webContents.getURL()
+      trustedRendererUrl = 'lexora-app://renderer/index.html'
+      await window.loadURL(`${trustedRendererUrl}#chat`)
     },
   }
+}
+
+export function applyDesktopWindowAppearance(window: BrowserWindow, dark: boolean): void {
+  const color = dark ? DARK_WINDOW_BACKGROUND : LIGHT_WINDOW_BACKGROUND
+  window.setBackgroundColor(color)
 }
 
 export function readDesktopWindowState(window: BrowserWindow): DesktopWindowState {

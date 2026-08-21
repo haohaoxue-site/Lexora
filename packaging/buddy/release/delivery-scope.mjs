@@ -1,6 +1,7 @@
 const deliverablePrefixes = [
   'apps/buddy/',
   'packaging/buddy/',
+  'packages/assets/',
 ]
 
 const deliverableFiles = new Set([
@@ -16,11 +17,10 @@ const deliverableFiles = new Set([
 ])
 
 const forbiddenPrefixes = [
+  'apps/buddy/.output/',
   'apps/buddy/dist/',
-  'apps/buddy/dist-packages/',
   'apps/buddy/node_modules/',
-  'apps/buddy/out/',
-  'apps/buddy/runtime/target/',
+  'apps/buddy/native-pet/target/',
   'packaging/buddy/external-readiness.evidence.json',
   'todos/',
 ]

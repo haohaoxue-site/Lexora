@@ -9,6 +9,7 @@ const buddyVersion = JSON.parse(
 ) as { version?: string }
 
 export default defineConfig({
+  cacheDir: fileURLToPath(new URL('./.output/cache/vite', import.meta.url)),
   define: {
     __LEXORA_BUDDY_VERSION__: JSON.stringify(buddyVersion.version ?? ''),
   },
@@ -26,6 +27,7 @@ export default defineConfig({
     strictPort: true,
   },
   build: {
+    outDir: fileURLToPath(new URL('./.output/build/renderer-preview', import.meta.url)),
     target: 'esnext',
   },
 })

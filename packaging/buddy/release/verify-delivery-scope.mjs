@@ -20,6 +20,7 @@ const deliveryStatusPathspecs = [
   'package.json',
   'pnpm-lock.yaml',
   'packaging',
+  'packages/assets',
   'todos',
 ]
 

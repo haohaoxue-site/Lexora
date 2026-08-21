@@ -4,27 +4,29 @@ import { basename, join, resolve } from 'node:path'
 import process from 'node:process'
 
 import { writeOutput } from '../../shared/cli-output.mjs'
+import { resolveBuddyOutputPaths } from './output-paths.mjs'
 import { assertPetBinaryBoundary } from './verify-pet-binary-boundary.mjs'
 
 const repoRoot = resolve(import.meta.dirname, '../../..')
-const buddyRoot = join(repoRoot, 'apps/buddy')
+const paths = resolveBuddyOutputPaths(repoRoot)
+const buddyRoot = paths.buddyRoot
 const version = JSON.parse(
   readFileSync(join(buddyRoot, 'buddy.version.json'), 'utf8'),
 ).version
 const architecture = normalizeArchitecture(process.arch)
 const packageName = `Lexora-Pet-${version}-linux-${architecture}`
-const outputRoot = join(buddyRoot, 'dist-packages')
-const stagingRoot = join(outputRoot, 'pet-only')
+const outputRoot = paths.artifacts.pet
+const stagingRoot = paths.package.pet
 const packageRoot = join(stagingRoot, packageName)
-const runtimeSource = join(buddyRoot, 'runtime/target/release/lexora-buddy-runtime')
-const petSource = join(buddyRoot, 'runtime/target/release/lexora-buddy-pet')
+const petSource = join(paths.build.nativePet, 'release/lexora-buddy-pet')
 const petTarget = join(packageRoot, 'bin/lexora-buddy-pet')
 
 if (process.platform !== 'linux')
   throw new Error('Lexora Pet standalone packaging currently supports Linux only')
 
 rmSync(stagingRoot, { force: true, recursive: true })
-assertPetBinaryBoundary({ petPath: petSource, runtimePath: runtimeSource })
+rmSync(outputRoot, { force: true, recursive: true })
+assertPetBinaryBoundary({ petPath: petSource })
 mkdirSync(join(packageRoot, 'bin'), { recursive: true })
 mkdirSync(join(packageRoot, 'share/applications'), { recursive: true })
 mkdirSync(join(packageRoot, 'share/icons/hicolor/256x256/apps'), { recursive: true })
@@ -32,7 +34,7 @@ mkdirSync(join(packageRoot, 'share/icons/hicolor/256x256/apps'), { recursive: tr
 cpSync(petSource, petTarget)
 chmodSync(petTarget, 0o755)
 cpSync(
-  join(buddyRoot, 'runtime/icons/icon.png'),
+  join(buddyRoot, 'resources/icons/app/256x256.png'),
   join(packageRoot, 'share/icons/hicolor/256x256/apps/lexora-buddy.png'),
 )
 writeFileSync(
@@ -57,7 +59,7 @@ writeFileSync(
     'Copy bin/lexora-buddy-pet into PATH, then run:',
     '  lexora-buddy-pet --native-pet',
     '',
-    'This package contains only the native pet. It does not include Lexora Desktop or Codex chat.',
+    'This package contains only the native pet. It does not include Lexora Desktop or its Buddy Local Service.',
     '',
   ].join('\n'),
 )

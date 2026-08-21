@@ -8,33 +8,41 @@ import { parse, stringify } from 'smol-toml'
 import { z } from 'zod'
 
 const desktopConfigSchema = z.object({
+  background_close_notice_shown: z.boolean().default(false),
+  chat_sidebar_section_order: z.tuple([
+    z.enum(['recent', 'projects']),
+    z.enum(['recent', 'projects']),
+  ]).refine(([first, second]) => first !== second).default(['recent', 'projects']),
   language: z.enum(['zh-CN', 'en-US']).default('zh-CN'),
   launch_at_login: z.boolean().default(false),
+  notifications_enabled: z.boolean().default(true),
+  notify_when_focused: z.boolean().default(false),
+  sidebar_collapsed: z.boolean().default(false),
   theme: z.enum(['system', 'light', 'dark']).default('system'),
 }).passthrough().default({
+  background_close_notice_shown: false,
+  chat_sidebar_section_order: ['recent', 'projects'],
   language: 'zh-CN',
   launch_at_login: false,
+  notifications_enabled: true,
+  notify_when_focused: false,
+  sidebar_collapsed: false,
   theme: 'system',
 })
 
-const codexConfigSchema = z.object({
-  default_model: z.string().default(''),
-  reasoning_effort: z.string().trim().min(1).default('medium'),
+const petConfigSchema = z.object({
+  always_on_top: z.boolean().default(true),
+  enabled: z.boolean().default(true),
+  remember_position: z.boolean().default(true),
 }).passthrough().default({
-  default_model: '',
-  reasoning_effort: 'medium',
+  always_on_top: true,
+  enabled: true,
+  remember_position: true,
 })
 
 const lexoraConfigFileSchema = z.object({
-  agent: z.object({
-    codex: codexConfigSchema,
-  }).passthrough().default({
-    codex: {
-      default_model: '',
-      reasoning_effort: 'medium',
-    },
-  }),
   desktop: desktopConfigSchema,
+  pet: petConfigSchema,
 }).passthrough()
 
 export class LexoraConfigError extends Error {
@@ -129,15 +137,19 @@ function decodeConfig(value: unknown): LexoraConfig {
 
   return {
     desktop: {
+      backgroundCloseNoticeShown: config.desktop.background_close_notice_shown,
+      chatSidebarSectionOrder: config.desktop.chat_sidebar_section_order,
       language: config.desktop.language,
       launchAtLogin: config.desktop.launch_at_login,
+      notificationsEnabled: config.desktop.notifications_enabled,
+      notifyWhenFocused: config.desktop.notify_when_focused,
+      sidebarCollapsed: config.desktop.sidebar_collapsed,
       theme: config.desktop.theme,
     },
-    agent: {
-      codex: {
-        defaultModel: config.agent.codex.default_model,
-        reasoningEffort: config.agent.codex.reasoning_effort,
-      },
+    pet: {
+      alwaysOnTop: config.pet.always_on_top,
+      enabled: config.pet.enabled,
+      rememberPosition: config.pet.remember_position,
     },
   }
 }
@@ -145,15 +157,19 @@ function decodeConfig(value: unknown): LexoraConfig {
 function encodeConfig(config: LexoraConfig) {
   return {
     desktop: {
+      background_close_notice_shown: config.desktop.backgroundCloseNoticeShown,
+      chat_sidebar_section_order: config.desktop.chatSidebarSectionOrder,
       language: config.desktop.language,
-      theme: config.desktop.theme,
       launch_at_login: config.desktop.launchAtLogin,
+      notifications_enabled: config.desktop.notificationsEnabled,
+      notify_when_focused: config.desktop.notifyWhenFocused,
+      sidebar_collapsed: config.desktop.sidebarCollapsed,
+      theme: config.desktop.theme,
     },
-    agent: {
-      codex: {
-        default_model: config.agent.codex.defaultModel,
-        reasoning_effort: config.agent.codex.reasoningEffort,
-      },
+    pet: {
+      always_on_top: config.pet.alwaysOnTop,
+      enabled: config.pet.enabled,
+      remember_position: config.pet.rememberPosition,
     },
   }
 }
@@ -164,11 +180,9 @@ function mergeConfig(current: LexoraConfig, patch: LexoraConfigPatch): LexoraCon
       ...current.desktop,
       ...patch.desktop,
     },
-    agent: {
-      codex: {
-        ...current.agent.codex,
-        ...patch.agent?.codex,
-      },
+    pet: {
+      ...current.pet,
+      ...patch.pet,
     },
   }
 }
@@ -176,25 +190,21 @@ function mergeConfig(current: LexoraConfig, patch: LexoraConfigPatch): LexoraCon
 function mergeConfigFile(file: unknown, config: LexoraConfig): Record<string, unknown> {
   const root = asRecord(file)
   const desktop = asRecord(root.desktop)
-  const agent = asRecord(root.agent)
-  const codex = asRecord(agent.codex)
+  const pet = asRecord(root.pet)
   const encoded = encodeConfig(config)
-
-  return {
+  const next: Record<string, unknown> = {
     ...root,
     desktop: {
       ...desktop,
       ...encoded.desktop,
     },
-    agent: {
-      ...agent,
-      ...encoded.agent,
-      codex: {
-        ...codex,
-        ...encoded.agent.codex,
-      },
+    pet: {
+      ...pet,
+      ...encoded.pet,
     },
   }
+  delete next.agent
+  return next
 }
 
 function asRecord(value: unknown): Record<string, unknown> {

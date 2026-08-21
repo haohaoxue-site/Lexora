@@ -19,8 +19,21 @@ export function verifyLinuxReleaseWorkflow(cwd = repoRoot) {
 
   const buildJob = publishOffset < 0 ? workflow : workflow.slice(0, publishOffset)
   const publishJob = publishOffset < 0 ? '' : workflow.slice(publishOffset)
+  const installDebCommand = 'sudo apt-get install -y ./apps/buddy/.output/artifacts/desktop/Lexora-Buddy-*-linux-amd64.deb'
+  const guiSmokeCommand = 'node packaging/buddy/ci/run-gui-smoke.mjs'
+  const installOffset = buildJob.indexOf(installDebCommand)
+  const guiSmokeOffset = buildJob.indexOf(guiSmokeCommand)
   if (/gh release (?:create|upload)/.test(buildJob))
     errors.push('Linux build job must not mutate GitHub Releases')
+  if (installOffset < 0 || guiSmokeOffset < 0 || installOffset > guiSmokeOffset)
+    errors.push('Linux build job must install the built Desktop deb before GUI smoke')
+  if (
+    !buildJob.includes('LEXORA_DESKTOP_EXECUTABLE_PATH: /opt/Lexora Buddy/lexora-buddy')
+    || !buildJob.includes('LEXORA_BUDDY_PET_PATH: /opt/Lexora Buddy/resources/native-pet/lexora-buddy-pet')
+    || guiSmokeOffset < 0
+  ) {
+    errors.push('Linux build job must run GUI smoke against the installed Desktop and native pet')
+  }
   if (!publishJob.includes('needs: build-linux'))
     errors.push('Linux release publication must consume the verified build job')
   if (!/if:\s+\$\{\{\s*inputs\.upload_release_asset\s*&&\s*github\.ref\s*==\s*'refs\/heads\/master'\s*\}\}/.test(publishJob))

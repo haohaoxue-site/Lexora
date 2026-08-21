@@ -1,0 +1,57 @@
+diff --git a/dist/api/openai-responses-shared.js b/dist/api/openai-responses-shared.js
+index a2049d5a1f633d7a96aa3cf080ded6310df8f97f..cd1f08e0f8300d04cae27662d8815731cd0a7083 100644
+--- a/dist/api/openai-responses-shared.js
++++ b/dist/api/openai-responses-shared.js
+@@ -465,6 +465,9 @@ export async function processResponsesStream(openaiStream, output, stream, model
+             const slot = getSlot(event.output_index, "thinking");
+             if (!slot)
+                 continue;
++            if (slot.block.reasoningKind === "thinking")
++                continue;
++            slot.block.reasoningKind = "summary";
+             slot.block.thinking += event.delta;
+             stream.push({
+                 type: "thinking_delta",
+@@ -477,6 +480,9 @@ export async function processResponsesStream(openaiStream, output, stream, model
+             const slot = getSlot(event.output_index, "thinking");
+             if (!slot)
+                 continue;
++            if (slot.block.reasoningKind === "thinking")
++                continue;
++            slot.block.reasoningKind = "summary";
+             slot.block.thinking += "\n\n";
+             stream.push({
+                 type: "thinking_delta",
+@@ -489,6 +495,9 @@ export async function processResponsesStream(openaiStream, output, stream, model
+             const slot = getSlot(event.output_index, "thinking");
+             if (!slot)
+                 continue;
++            if (slot.block.reasoningKind !== "thinking")
++                slot.block.thinking = "";
++            slot.block.reasoningKind = "thinking";
+             slot.block.thinking += event.delta;
+             stream.push({
+                 type: "thinking_delta",
+@@ -561,7 +570,8 @@ export async function processResponsesStream(openaiStream, output, stream, model
+             if (item.type === "reasoning" && slot?.type === "thinking") {
+                 const summaryText = item.summary?.map((s) => s.text).join("\n\n") || "";
+                 const contentText = item.content?.map((c) => c.text).join("\n\n") || "";
+-                slot.block.thinking = summaryText || contentText || slot.block.thinking;
++                slot.block.thinking = contentText || summaryText || slot.block.thinking;
++                slot.block.reasoningKind = contentText ? "thinking" : "summary";
+                 slot.block.thinkingSignature = JSON.stringify(item);
+                 reasoningBlocksById.set(item.id, slot.block);
+                 stream.push({
+diff --git a/dist/types.d.ts b/dist/types.d.ts
+index 6ea9e391ecbf6a54c111170ad74653dcc9135085..fd4de133e4e4f7f28bdd7b0acf24b48a4e41c99f 100644
+--- a/dist/types.d.ts
++++ b/dist/types.d.ts
+@@ -233,6 +233,8 @@ export interface ThinkingContent {
+     type: "thinking";
+     thinking: string;
+     thinkingSignature?: string;
++    /** Whether the provider exposed full reasoning or only a reasoning summary. */
++    reasoningKind?: "summary" | "thinking";
+     /** When true, the thinking content was redacted by safety filters. The opaque
+      *  encrypted payload is stored in `thinkingSignature` so it can be passed back
+      *  to the API for multi-turn continuity. */

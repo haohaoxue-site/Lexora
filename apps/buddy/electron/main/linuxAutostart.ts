@@ -18,7 +18,7 @@ export function resolveLinuxConfigDirectory(
 
 export async function syncLinuxAutostart(options: LinuxAutostartOptions): Promise<void> {
   const autostartDirectory = join(options.configDirectory, 'autostart')
-  const entryPath = join(autostartDirectory, 'lexora.desktop')
+  const entryPath = join(autostartDirectory, 'site.haohaoxue.LexoraBuddy.desktop')
   if (!options.enabled) {
     await rm(entryPath, { force: true })
     return
@@ -34,8 +34,9 @@ export async function syncLinuxAutostart(options: LinuxAutostartOptions): Promis
     '[Desktop Entry]',
     'Type=Application',
     'Version=1.0',
-    'Name=Lexora',
-    `Exec="${executablePath}"`,
+    'Name=Lexora Buddy',
+    `TryExec=${executablePath}`,
+    `Exec="${executablePath}" --background`,
     'Terminal=false',
     'X-GNOME-Autostart-enabled=true',
     '',

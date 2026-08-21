@@ -15,4 +15,5 @@
 - 原图、可编辑源和参考材料放在 `sources/` 下。
 - 派生出的最终品牌图放在 `brand/`。
 - 派生出的 Buddy 运行时资源放在 `buddy/pets/<id>/`。
+- Electron App 与 Tray 共用 `brand/app-icon.png`；各尺寸产物由 `packaging/buddy/assets/generate-icons.mjs` 生成到 `apps/buddy/resources/icons/app/`。
 - 本地候选图、私有源、临时 sheet 和生成脚本不是最终资产，不放在这个包的公开结构里。

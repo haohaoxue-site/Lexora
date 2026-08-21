@@ -1,11 +1,12 @@
 {
   "compilerOptions": {
-    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.node.tsbuildinfo",
+    "tsBuildInfoFile": "./.output/cache/typescript/tsconfig.node.tsbuildinfo",
     "target": "ESNext",
     "lib": ["ESNext"],
     "moduleDetection": "force",
     "module": "ESNext",
     "moduleResolution": "bundler",
+    "resolveJsonModule": true,
     "types": ["node", "electron-vite/node"],
     "allowImportingTsExtensions": true,
     "strict": true,
@@ -20,6 +21,7 @@
   },
   "include": [
     "electron.vite.config.ts",
+    "service/**/*.ts",
     "electron/**/*.ts",
     "shared/**/*.ts",
     "vite.config.ts",

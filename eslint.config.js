@@ -7,9 +7,8 @@ export default antfu({
   vue: true,
 }, {
   ignores: [
-    '**/runtime/target/**',
-    '**/dist-packages/**',
-    '**/out/**',
+    '**/.output/**',
+    '**/native-pet/target/**',
   ],
 }, {
   files: ['apps/api/src/**/*.ts'],

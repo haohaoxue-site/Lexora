@@ -1,5 +1,6 @@
 import type { Plugin } from 'vite'
 import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { fileURLToPath, URL } from 'node:url'
 import vue from '@vitejs/plugin-vue'
 import { defineConfig, externalizeDepsPlugin } from 'electron-vite'
@@ -22,20 +23,33 @@ function allowDevelopmentWebSockets(): Plugin {
 const buddyVersion = JSON.parse(
   readFileSync(new URL('./buddy.version.json', import.meta.url), 'utf8'),
 ) as { version?: string }
+const electronOutputRoot = fileURLToPath(
+  new URL('./.output/build/electron', import.meta.url),
+)
+const electronCacheRoot = fileURLToPath(
+  new URL('./.output/cache/electron-vite', import.meta.url),
+)
 
 export default defineConfig({
   main: {
+    cacheDir: join(electronCacheRoot, 'main'),
     plugins: [externalizeDepsPlugin()],
     build: {
+      outDir: join(electronOutputRoot, 'main'),
       rollupOptions: {
         external: ['electron'],
-        input: fileURLToPath(new URL('./electron/main/index.ts', import.meta.url)),
+        input: {
+          'index': fileURLToPath(new URL('./electron/main/index.ts', import.meta.url)),
+          'buddy-service': fileURLToPath(new URL('./service/src/index.ts', import.meta.url)),
+        },
       },
     },
   },
   preload: {
+    cacheDir: join(electronCacheRoot, 'preload'),
     plugins: [externalizeDepsPlugin()],
     build: {
+      outDir: join(electronOutputRoot, 'preload'),
       rollupOptions: {
         external: ['electron'],
         input: fileURLToPath(new URL('./electron/preload/index.ts', import.meta.url)),
@@ -46,6 +60,7 @@ export default defineConfig({
     },
   },
   renderer: {
+    cacheDir: join(electronCacheRoot, 'renderer'),
     root: fileURLToPath(new URL('.', import.meta.url)),
     define: {
       __LEXORA_BUDDY_VERSION__: JSON.stringify(buddyVersion.version ?? ''),
@@ -65,6 +80,7 @@ export default defineConfig({
       strictPort: true,
     },
     build: {
+      outDir: join(electronOutputRoot, 'renderer'),
       target: 'esnext',
       rollupOptions: {
         input: fileURLToPath(new URL('./index.html', import.meta.url)),

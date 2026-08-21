@@ -94,7 +94,7 @@ function summarizePayload(payload: unknown) {
           @click="selectedRunId = run.id"
         >
           <span>
-            <strong>{{ run.intent ?? run.runtime }}</strong>
+            <strong>{{ run.purpose }}</strong>
             <small>{{ formatDate(run.startedAt) }}</small>
           </span>
           <NTag :bordered="false" size="small" :type="statusType(run.status)">
@@ -107,14 +107,14 @@ function summarizePayload(payload: unknown) {
         <NEmpty v-if="!selectedRun" :description="t('log.detailEmpty')" />
         <template v-else>
           <div class="desktop-run-log-section__meta">
-            <div><span>{{ t('desktop.logs.cwd') }}</span><code>{{ selectedRun.cwd ?? '-' }}</code></div>
-            <div><span>{{ t('desktop.logs.thread') }}</span><code>{{ selectedRun.externalThreadId ?? '-' }}</code></div>
+            <div><span>{{ t('desktop.logs.provider') }}</span><code>{{ selectedRun.providerId }}</code></div>
+            <div><span>{{ t('desktop.logs.model') }}</span><code>{{ selectedRun.modelId }}</code></div>
           </div>
           <NEmpty v-if="!events.length" :description="t('control.noRecords')" />
           <ol v-else>
-            <li v-for="event in events" :key="event.id">
+            <li v-for="event in events" :key="`${event.runId}:${event.sequence}`">
               <div>
-                <strong>{{ event.eventType }}</strong>
+                <strong>{{ event.type }}</strong>
                 <time>{{ formatDate(event.createdAt) }}</time>
               </div>
               <code>{{ summarizePayload(event.payload) }}</code>
@@ -144,6 +144,7 @@ function summarizePayload(payload: unknown) {
   > aside {
     display: grid;
     align-content: start;
+    gap: 0.25rem;
     max-height: 28rem;
     overflow-y: auto;
     border-right: 1px solid var(--buddy-border-light);

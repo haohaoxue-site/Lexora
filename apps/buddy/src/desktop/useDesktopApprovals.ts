@@ -1,10 +1,6 @@
 import type { Ref } from 'vue'
-import type {
-  LocalApproval,
-  LocalChatApi,
-} from '../../electron/shared/localChatApi'
-import { computed, readonly, shallowRef } from 'vue'
-import { projectDesktopApproval } from './desktopChatState'
+import type { LocalApproval, LocalChatApi } from '../../electron/shared/localChatApi'
+import { readonly, shallowRef } from 'vue'
 
 interface UseDesktopApprovalsOptions {
   api: LocalChatApi
@@ -15,22 +11,20 @@ interface UseDesktopApprovalsOptions {
 
 export function useDesktopApprovals(options: UseDesktopApprovalsOptions) {
   const resolvingApprovalIds = shallowRef<ReadonlySet<string>>(new Set())
-  const approvalViews = computed(() => options.approvals.value.map(projectDesktopApproval))
 
   async function resolveApproval(approvalId: string, decision: 'approve' | 'deny') {
     if (resolvingApprovalIds.value.has(approvalId))
       return
-
     const approval = options.approvals.value.find(item => item.id === approvalId)
-    if (!approval || (decision === 'approve' && approval.kind !== 'run.codex_app_server_request'))
+    if (!approval || approval.status !== 'pending')
       return
 
     resolvingApprovalIds.value = new Set([...resolvingApprovalIds.value, approvalId])
     try {
-      if (decision === 'deny')
-        await options.api.approvals.deny(approvalId)
+      if (decision === 'approve')
+        await options.api.approvals.approve(approvalId)
       else
-        await options.api.approvals.approveCodex(approvalId)
+        await options.api.approvals.deny(approvalId)
       await options.refresh()
     }
     catch (error) {
@@ -44,7 +38,7 @@ export function useDesktopApprovals(options: UseDesktopApprovalsOptions) {
   }
 
   return {
-    approvalViews: readonly(approvalViews),
+    approvalViews: options.approvals,
     resolveApproval,
     resolvingApprovalIds: readonly(resolvingApprovalIds),
   }

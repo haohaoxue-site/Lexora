@@ -1,21 +1,21 @@
-export type DesktopView = 'chat' | 'agent' | 'settings'
-export type DesktopAgentId = 'codex'
-export type DesktopSettingsTab = 'general' | 'directories' | 'logs'
+export type DesktopView = 'chat' | 'settings'
+export type DesktopSettingsCategory = 'app' | 'models' | 'pet' | 'local' | 'data'
 
 export type DesktopRoute
   = | { view: 'chat' }
-    | { view: 'agent', agentId: DesktopAgentId | null }
-    | { view: 'settings', settingsTab: DesktopSettingsTab }
+    | { view: 'settings', category: DesktopSettingsCategory }
 
 interface DesktopLocation {
   hash: string
   pathname: string
 }
 
-const DESKTOP_SETTINGS_TABS: ReadonlySet<string> = new Set([
-  'general',
-  'directories',
-  'logs',
+const DESKTOP_SETTINGS_CATEGORIES: ReadonlySet<string> = new Set([
+  'app',
+  'models',
+  'pet',
+  'local',
+  'data',
 ])
 
 export function resolveDesktopRoute(location: DesktopLocation): DesktopRoute {
@@ -29,9 +29,7 @@ export function resolveDesktopRoute(location: DesktopLocation): DesktopRoute {
 
 export function toDesktopRouteHash(route: DesktopRoute): string {
   if (route.view === 'settings')
-    return `#settings/${route.settingsTab}`
-  if (route.view === 'agent')
-    return route.agentId ? `#agent/${route.agentId}` : '#agent'
+    return `#settings/${route.category}`
 
   return '#chat'
 }
@@ -40,15 +38,9 @@ function parseDesktopRoute(value: string): DesktopRoute | null {
   const [view, detail] = value.split('/')
   if (view === 'chat')
     return { view: 'chat' }
-  if (view === 'agent') {
-    return {
-      agentId: detail === 'codex' ? detail : null,
-      view: 'agent',
-    }
-  }
   if (view === 'settings') {
     return {
-      settingsTab: isDesktopSettingsTab(detail) ? detail : 'general',
+      category: isDesktopSettingsCategory(detail) ? detail : 'app',
       view,
     }
   }
@@ -56,6 +48,6 @@ function parseDesktopRoute(value: string): DesktopRoute | null {
   return null
 }
 
-function isDesktopSettingsTab(value: string | undefined): value is DesktopSettingsTab {
-  return value !== undefined && DESKTOP_SETTINGS_TABS.has(value)
+function isDesktopSettingsCategory(value: string | undefined): value is DesktopSettingsCategory {
+  return value !== undefined && DESKTOP_SETTINGS_CATEGORIES.has(value)
 }

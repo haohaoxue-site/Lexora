@@ -1,33 +1,66 @@
 import type { BrowserWindow, IpcMainInvokeEvent } from 'electron'
 import type { LexoraConfig } from '../shared/desktopApi'
 import type { LexoraConfigStore } from './config/LexoraConfigStore'
+import type { ExecuteDesktopCommand } from './desktopCommands'
+import process from 'node:process'
 import { app, ipcMain } from 'electron'
 import {
   DESKTOP_IPC_CHANNELS,
 } from '../shared/desktopApi'
-import { lexoraConfigPatchSchema } from '../shared/desktopApiSchemas'
+import {
+  feedbackIssueInputSchema,
+  lexoraConfigPatchSchema,
+  releasePageInputSchema,
+} from '../shared/desktopApiSchemas'
+import { getDesktopCommand, isDesktopCommandId, resolveDesktopPlatform } from '../shared/desktopCommands'
 import { readDesktopWindowState } from './window'
 
 export interface RegisterDesktopIpcOptions {
+  checkForUpdates: () => Promise<unknown>
   configPath: string
   configStore: LexoraConfigStore
   getWindow: () => BrowserWindow | null
   onConfigUpdated: (config: LexoraConfig) => Promise<void> | void
-  requestQuit: () => void
+  openFeedbackIssue: (feedback: string) => Promise<unknown>
+  openReleasePage: (url: string) => Promise<unknown>
+  executeCommand: ExecuteDesktopCommand
 }
 
 export function registerDesktopIpc(options: RegisterDesktopIpcOptions): void {
+  ipcMain.handle(DESKTOP_IPC_CHANNELS.appCheckForUpdates, (event) => {
+    assertTrustedSender(event, options.getWindow())
+    return options.checkForUpdates()
+  })
+
   ipcMain.handle(DESKTOP_IPC_CHANNELS.appGetInfo, (event) => {
     assertTrustedSender(event, options.getWindow())
     return {
+      chromiumVersion: process.versions.chrome,
       configPath: options.configPath,
+      electronVersion: process.versions.electron,
+      nodeVersion: process.versions.node,
+      platform: resolveDesktopPlatform(process.platform),
       version: app.getVersion(),
     }
   })
 
-  ipcMain.handle(DESKTOP_IPC_CHANNELS.lifecycleQuit, (event) => {
+  ipcMain.handle(DESKTOP_IPC_CHANNELS.commandExecute, async (event, commandId: unknown) => {
     assertTrustedSender(event, options.getWindow())
-    setImmediate(options.requestQuit)
+    if (!isDesktopCommandId(commandId) || getDesktopCommand(commandId).execution !== 'main')
+      throw new Error('Unsupported Desktop command')
+    await options.executeCommand(commandId)
+  })
+
+  ipcMain.handle(DESKTOP_IPC_CHANNELS.appOpenFeedbackIssue, async (event, input: unknown) => {
+    assertTrustedSender(event, options.getWindow())
+    const { feedback } = feedbackIssueInputSchema.parse(input)
+    await options.openFeedbackIssue(feedback)
+  })
+
+  ipcMain.handle(DESKTOP_IPC_CHANNELS.appOpenReleasePage, async (event, input: unknown) => {
+    assertTrustedSender(event, options.getWindow())
+    const { url } = releasePageInputSchema.parse(input)
+    await options.openReleasePage(url)
   })
 
   ipcMain.handle(DESKTOP_IPC_CHANNELS.settingsGet, (event) => {
@@ -45,10 +78,6 @@ export function registerDesktopIpc(options: RegisterDesktopIpcOptions): void {
   ipcMain.handle(DESKTOP_IPC_CHANNELS.windowGetState, (event) => {
     const window = requireTrustedWindow(event, options.getWindow())
     return readDesktopWindowState(window)
-  })
-
-  ipcMain.handle(DESKTOP_IPC_CHANNELS.windowHide, (event) => {
-    requireTrustedWindow(event, options.getWindow()).hide()
   })
 
   ipcMain.handle(DESKTOP_IPC_CHANNELS.windowMinimize, (event) => {

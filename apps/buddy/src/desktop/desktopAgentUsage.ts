@@ -1,93 +1,81 @@
 import type { LocalUsageSnapshot } from '../../electron/shared/localChatApi'
 
-type LocalUsageRecord = LocalUsageSnapshot['records'][number]
-type LocalUsageRuntime = LocalUsageRecord['runtime']
+type UsageRecord = LocalUsageSnapshot['records'][number]
+
 export interface DesktopUsageTotals {
-  cacheCreationTokens: number
   cacheReadTokens: number
+  cacheWriteTokens: number
   inputTokens: number
   outputTokens: number
+  reasoningTokens: number
   recordCount: number
+  totalCost: number
   totalTokens: number
 }
 
 export interface DesktopAgentUsage {
+  byModel: ReadonlyMap<string, DesktopUsageTotals>
+  byProvider: ReadonlyMap<string, DesktopUsageTotals>
+  byPurpose: ReadonlyMap<string, DesktopUsageTotals>
   daily: ReadonlyMap<string, DesktopUsageTotals>
-  latestDate: string | null
-  records: ReadonlyArray<LocalUsageRecord>
+  latestAt: string | null
   totals: DesktopUsageTotals
 }
 
-export type DesktopUsagePresentation
-  = | 'empty'
-    | 'empty-error'
-    | 'initial-loading'
-    | 'ready'
-    | 'refreshing'
-    | 'stale-error'
-
-interface DesktopUsagePresentationOptions {
-  hasError: boolean
-  hasSnapshot: boolean
-  isLoading: boolean
-}
-
-export function resolveDesktopUsagePresentation(
-  options: DesktopUsagePresentationOptions,
-): DesktopUsagePresentation {
-  if (options.isLoading)
-    return options.hasSnapshot ? 'refreshing' : 'initial-loading'
-  if (options.hasError)
-    return options.hasSnapshot ? 'stale-error' : 'empty-error'
-
-  return options.hasSnapshot ? 'ready' : 'empty'
-}
-
-export function createDesktopAgentUsage(
-  snapshot: LocalUsageSnapshot | null,
-  runtime: LocalUsageRuntime,
-): DesktopAgentUsage {
-  const records = snapshot?.records.filter(record => record.runtime === runtime) ?? []
-  const totals = createEmptyUsageTotals()
-  const daily = new Map<string, DesktopUsageTotals>()
-  let latestDate: string | null = null
-
-  for (const record of records) {
-    addUsageRecord(totals, record)
-    if (!record.date)
-      continue
-
-    const aggregate = daily.get(record.date) ?? createEmptyUsageTotals()
-    addUsageRecord(aggregate, record)
-    daily.set(record.date, aggregate)
-    if (latestDate === null || record.date > latestDate)
-      latestDate = record.date
+export function createDesktopAgentUsage(snapshot: LocalUsageSnapshot | null): DesktopAgentUsage {
+  const usage: DesktopAgentUsage = {
+    byModel: new Map(),
+    byProvider: new Map(),
+    byPurpose: new Map(),
+    daily: new Map(),
+    latestAt: null,
+    totals: snapshot ? { ...snapshot.totals } : emptyTotals(),
   }
-
-  return {
-    daily,
-    latestDate,
-    records,
-    totals,
+  for (const record of snapshot?.records ?? []) {
+    addToGroup(usage.byProvider as Map<string, DesktopUsageTotals>, record.providerId, record)
+    addToGroup(
+      usage.byModel as Map<string, DesktopUsageTotals>,
+      `${record.providerId}:${record.modelId}`,
+      record,
+    )
+    addToGroup(usage.byPurpose as Map<string, DesktopUsageTotals>, record.purpose, record)
+    addToGroup(usage.daily as Map<string, DesktopUsageTotals>, record.createdAt.slice(0, 10), record)
+    if (!usage.latestAt || record.createdAt > usage.latestAt)
+      usage.latestAt = record.createdAt
   }
+  return usage
 }
 
-function createEmptyUsageTotals(): DesktopUsageTotals {
-  return {
-    cacheCreationTokens: 0,
-    cacheReadTokens: 0,
-    inputTokens: 0,
-    outputTokens: 0,
-    recordCount: 0,
-    totalTokens: 0,
-  }
+function addToGroup(
+  group: Map<string, DesktopUsageTotals>,
+  key: string,
+  record: UsageRecord,
+) {
+  const totals = group.get(key) ?? emptyTotals()
+  addRecord(totals, record)
+  group.set(key, totals)
 }
 
-function addUsageRecord(totals: DesktopUsageTotals, record: LocalUsageRecord) {
-  totals.cacheCreationTokens += record.cacheCreationTokens
+function addRecord(totals: DesktopUsageTotals, record: UsageRecord) {
   totals.cacheReadTokens += record.cacheReadTokens
+  totals.cacheWriteTokens += record.cacheWriteTokens
   totals.inputTokens += record.inputTokens
   totals.outputTokens += record.outputTokens
+  totals.reasoningTokens += record.reasoningTokens ?? 0
   totals.recordCount += 1
+  totals.totalCost += record.totalCost
   totals.totalTokens += record.totalTokens
+}
+
+function emptyTotals(): DesktopUsageTotals {
+  return {
+    cacheReadTokens: 0,
+    cacheWriteTokens: 0,
+    inputTokens: 0,
+    outputTokens: 0,
+    reasoningTokens: 0,
+    recordCount: 0,
+    totalCost: 0,
+    totalTokens: 0,
+  }
 }

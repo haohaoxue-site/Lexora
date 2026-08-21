@@ -1,19 +1,37 @@
 import type {
   LocalApproval,
   LocalAttachment,
-  LocalClaudeRuntimeStatus,
-  LocalCodexContextOptions,
-  LocalCodexRuntimeStatus,
+  LocalBuddyServiceSupervisorState,
+  LocalChatCommandRequest,
+  LocalConnector,
+  LocalConnectorConfig,
+  LocalConnectorCredential,
+  LocalConnectorCredentialMutation,
+  LocalContextUsageSnapshot,
+  LocalContextUsageSnapshotRequest,
   LocalConversation,
-  LocalMessage,
+  LocalConversationBranch,
+  LocalConversationSummary,
+  LocalConversationTimelinePage,
+  LocalCustomProvider,
+  LocalCustomProviderModel,
+  LocalDefaultModel,
+  LocalMessagePage,
+  LocalNotificationList,
   LocalProject,
+  LocalProjectFile,
+  LocalPromptContextItem,
+  LocalProvider,
+  LocalProviderAuthChallenge,
   LocalRun,
   LocalRunEvent,
-  LocalRunStateEvent,
+  LocalRuntimeDataBackup,
+  LocalRuntimeDataBackupStorage,
+  LocalRuntimeDataOperation,
+  LocalRuntimeDataRecoveryReceipt,
   LocalRuntimeModelOption,
-  LocalRuntimeSupervisorState,
+  LocalSkillCatalog,
   LocalStartTurnRequest,
-  LocalStateStatus,
   LocalTurnStart,
   LocalUsageSnapshot,
   LocalWorkspaceSetting,
@@ -21,16 +39,21 @@ import type {
 } from './localChatApiSchemas'
 
 export type LocalChatErrorCode
-  = | 'CODEX_RUNTIME_FAILED'
+  = | 'APPROVAL_REQUIRED'
+    | 'AUTHENTICATION_REQUIRED'
+    | 'CONNECTOR_UNAVAILABLE'
+    | 'CREDENTIAL_STORE_UNAVAILABLE'
+    | 'DIRECTORY_NOT_AUTHORIZED'
     | 'LOCAL_CHAT_OPERATION_FAILED'
-    | 'LOCAL_DATA_INVALID'
-    | 'LOCAL_IO_FAILED'
-    | 'LOCAL_STORAGE_FAILED'
-    | 'RUNTIME_EXECUTION_FAILED'
+    | 'MODEL_SYNC_FAILED'
+    | 'MODEL_SYNC_UNSUPPORTED'
+    | 'PATH_OUTSIDE_GRANTED_DIRECTORY'
+    | 'PROJECT_HAS_ACTIVE_RUNS'
+    | 'PROVIDER_HAS_ACTIVE_RUNS'
+    | 'PROVIDER_LOGIN_CANCELLED'
+    | 'PROVIDER_UNAVAILABLE'
     | 'RUNTIME_PROTOCOL_ERROR'
-    | 'RUNTIME_RESPONSE_INVALID'
     | 'RUNTIME_UNAVAILABLE'
-    | 'UNSUPPORTED_CAPABILITY'
     | 'VALIDATION_FAILED'
 
 export interface LocalChatPublicError {
@@ -40,6 +63,24 @@ export interface LocalChatPublicError {
 
 const LOCAL_CHAT_ERROR_MARKER = 'LEXORA_LOCAL_CHAT_ERROR'
 const LOCAL_CHAT_ERROR_PATTERN = /LEXORA_LOCAL_CHAT_ERROR:([A-Z0-9_]+):(0|1)/
+const LOCAL_CHAT_ERROR_CODES = new Set<LocalChatErrorCode>([
+  'APPROVAL_REQUIRED',
+  'AUTHENTICATION_REQUIRED',
+  'CONNECTOR_UNAVAILABLE',
+  'CREDENTIAL_STORE_UNAVAILABLE',
+  'DIRECTORY_NOT_AUTHORIZED',
+  'LOCAL_CHAT_OPERATION_FAILED',
+  'MODEL_SYNC_FAILED',
+  'MODEL_SYNC_UNSUPPORTED',
+  'PATH_OUTSIDE_GRANTED_DIRECTORY',
+  'PROJECT_HAS_ACTIVE_RUNS',
+  'PROVIDER_HAS_ACTIVE_RUNS',
+  'PROVIDER_LOGIN_CANCELLED',
+  'PROVIDER_UNAVAILABLE',
+  'RUNTIME_PROTOCOL_ERROR',
+  'RUNTIME_UNAVAILABLE',
+  'VALIDATION_FAILED',
+])
 
 export function formatLocalChatPublicError(error: LocalChatPublicError): string {
   return `${LOCAL_CHAT_ERROR_MARKER}:${error.code}:${error.retryable ? '1' : '0'}`
@@ -49,46 +90,51 @@ export function parseLocalChatPublicError(message: string): LocalChatPublicError
   const match = LOCAL_CHAT_ERROR_PATTERN.exec(message)
   if (!match || !isLocalChatErrorCode(match[1]))
     return null
-
-  return {
-    code: match[1],
-    retryable: match[2] === '1',
-  }
+  return { code: match[1], retryable: match[2] === '1' }
 }
 
 export function isLocalChatErrorCode(value: string | undefined): value is LocalChatErrorCode {
-  return value === 'CODEX_RUNTIME_FAILED'
-    || value === 'LOCAL_CHAT_OPERATION_FAILED'
-    || value === 'LOCAL_DATA_INVALID'
-    || value === 'LOCAL_IO_FAILED'
-    || value === 'LOCAL_STORAGE_FAILED'
-    || value === 'RUNTIME_EXECUTION_FAILED'
-    || value === 'RUNTIME_PROTOCOL_ERROR'
-    || value === 'RUNTIME_RESPONSE_INVALID'
-    || value === 'RUNTIME_UNAVAILABLE'
-    || value === 'UNSUPPORTED_CAPABILITY'
-    || value === 'VALIDATION_FAILED'
+  return Boolean(value && LOCAL_CHAT_ERROR_CODES.has(value as LocalChatErrorCode))
 }
 
 export type {
   LocalApproval,
   LocalAttachment,
-  LocalClaudeRuntimeStatus,
-  LocalCodexContextOptions,
-  LocalCodexInput,
-  LocalCodexRuntimeStatus,
+  LocalBuddyServiceSupervisorState,
+  LocalChatCommandRequest,
+  LocalConnector,
+  LocalConnectorConfig,
+  LocalConnectorCredential,
+  LocalConnectorCredentialMutation,
+  LocalContextUsageSnapshot,
+  LocalContextUsageSnapshotRequest,
   LocalConversation,
+  LocalConversationBranch,
+  LocalConversationSummary,
+  LocalConversationTimelineItem,
+  LocalConversationTimelinePage,
+  LocalCustomProvider,
+  LocalCustomProviderModel,
+  LocalDefaultModel,
   LocalMessage,
-  LocalMessageAttachment,
+  LocalMessagePage,
+  LocalNotification,
+  LocalNotificationList,
   LocalProject,
-  LocalPromptContextOption,
+  LocalProjectFile,
+  LocalPromptContextItem,
+  LocalProvider,
+  LocalProviderAuthChallenge,
   LocalRun,
   LocalRunEvent,
-  LocalRunStateEvent,
+  LocalRuntimeDataBackup,
+  LocalRuntimeDataBackupStorage,
+  LocalRuntimeDataOperation,
+  LocalRuntimeDataRecoveryReceipt,
+  LocalRuntimeDataRestore,
   LocalRuntimeModelOption,
-  LocalRuntimeSupervisorState,
+  LocalSkillCatalog,
   LocalStartTurnRequest,
-  LocalStateStatus,
   LocalTurnStart,
   LocalUsageSnapshot,
   LocalWorkspaceDraft,
@@ -97,106 +143,272 @@ export type {
 } from './localChatApiSchemas'
 
 export const LOCAL_CHAT_IPC_CHANNELS = {
-  runtimeStatus: 'lexora:runtime:status',
-  runtimeLocalState: 'lexora:runtime:local-state',
-  runtimeRestart: 'lexora:runtime:restart',
-  runtimeStateChanged: 'lexora:runtime:state-changed',
-  runEvent: 'lexora:chat:run-event',
-  codexStatus: 'lexora:codex:status',
-  codexListModels: 'lexora:codex:list-models',
-  codexListContextOptions: 'lexora:codex:list-context-options',
-  claudeStatus: 'lexora:claude:status',
-  usageSnapshot: 'lexora:usage:snapshot',
-  projectsAuthorize: 'lexora:projects:authorize',
-  projectsList: 'lexora:projects:list',
-  workspaceStateRead: 'lexora:workspace-state:read',
-  workspaceStateWrite: 'lexora:workspace-state:write',
-  conversationsList: 'lexora:conversations:list',
-  conversationsDelete: 'lexora:conversations:delete',
-  conversationsListMessages: 'lexora:conversations:list-messages',
-  runsList: 'lexora:runs:list',
-  runsGet: 'lexora:runs:get',
-  runsListChatEvents: 'lexora:runs:list-chat-events',
-  runsListConversationChatEvents: 'lexora:runs:list-conversation-chat-events',
-  approvalsList: 'lexora:approvals:list',
-  approvalsDeny: 'lexora:approvals:deny',
-  approvalsApproveCodex: 'lexora:approvals:approve-codex',
-  attachmentsSelectFiles: 'lexora:attachments:select-files',
-  attachmentsRelease: 'lexora:attachments:release',
-  attachmentsCleanupDrafts: 'lexora:attachments:cleanup-drafts',
-  chatStartTurn: 'lexora:chat:start-turn',
-  chatCancel: 'lexora:chat:cancel',
+  approvalsApprove: 'lexora:buddy:approvals:approve',
+  approvalsDeny: 'lexora:buddy:approvals:deny',
+  approvalsList: 'lexora:buddy:approvals:list',
+  attachmentsCleanupDrafts: 'lexora:buddy:attachments:cleanup-drafts',
+  attachmentsRelease: 'lexora:buddy:attachments:release',
+  attachmentsSelectFiles: 'lexora:buddy:attachments:select-files',
+  chatCancel: 'lexora:buddy:chat:cancel',
+  chatEditUserMessage: 'lexora:buddy:chat:edit-user-message',
+  chatExecuteCommand: 'lexora:buddy:chat:execute-command',
+  chatRegenerateAssistant: 'lexora:buddy:chat:regenerate-assistant',
+  chatStartTurn: 'lexora:buddy:chat:start-turn',
+  contextUsageSnapshot: 'lexora:buddy:context:usage-snapshot',
+  connectorsClearCredential: 'lexora:buddy:connectors:clear-credential',
+  connectorsList: 'lexora:buddy:connectors:list',
+  connectorsRemove: 'lexora:buddy:connectors:remove',
+  connectorsSetCredential: 'lexora:buddy:connectors:set-credential',
+  connectorsTrust: 'lexora:buddy:connectors:trust',
+  connectorsUpsert: 'lexora:buddy:connectors:upsert',
+  conversationsDelete: 'lexora:buddy:conversations:delete',
+  conversationsActivateBranch: 'lexora:buddy:conversations:activate-branch',
+  conversationsList: 'lexora:buddy:conversations:list',
+  conversationsListBranches: 'lexora:buddy:conversations:list-branches',
+  conversationsListMessages: 'lexora:buddy:conversations:list-messages',
+  conversationsRename: 'lexora:buddy:conversations:rename',
+  conversationsListTimeline: 'lexora:buddy:conversations:list-timeline',
+  notificationsList: 'lexora:buddy:notifications:list',
+  notificationsMarkAllSeen: 'lexora:buddy:notifications:mark-all-seen',
+  notificationsMarkSeen: 'lexora:buddy:notifications:mark-seen',
+  projectsCreate: 'lexora:buddy:projects:create',
+  projectsDelete: 'lexora:buddy:projects:delete',
+  projectsList: 'lexora:buddy:projects:list',
+  projectsSearchFiles: 'lexora:buddy:projects:search-files',
+  projectsSelectDirectory: 'lexora:buddy:projects:select-directory',
+  projectsUpdate: 'lexora:buddy:projects:update',
+  providerAuthChallenge: 'lexora:buddy:providers:auth-challenge',
+  providersCancelAuth: 'lexora:buddy:providers:cancel-auth',
+  providersAdd: 'lexora:buddy:providers:add',
+  providersClearCredential: 'lexora:buddy:providers:clear-credential',
+  providersGetDefaultModel: 'lexora:buddy:providers:get-default-model',
+  providersList: 'lexora:buddy:providers:list',
+  providersListModels: 'lexora:buddy:providers:list-models',
+  providersLogin: 'lexora:buddy:providers:login',
+  providersLogout: 'lexora:buddy:providers:logout',
+  providersRemove: 'lexora:buddy:providers:remove',
+  providersRespondToAuth: 'lexora:buddy:providers:respond-to-auth',
+  providersSetDefaultModel: 'lexora:buddy:providers:set-default-model',
+  providersSetEnabled: 'lexora:buddy:providers:set-enabled',
+  providersSetModelEnabled: 'lexora:buddy:providers:set-model-enabled',
+  providersSetModelParameters: 'lexora:buddy:providers:set-model-parameters',
+  providersAcknowledgeModelSource: 'lexora:buddy:providers:acknowledge-model-source',
+  providersRestoreModelSource: 'lexora:buddy:providers:restore-model-source',
+  providersSyncModels: 'lexora:buddy:providers:sync-models',
+  providersUpsertManualModel: 'lexora:buddy:providers:upsert-manual-model',
+  providersUpsertCustom: 'lexora:buddy:providers:upsert-custom',
+  runEvent: 'lexora:buddy:runs:event',
+  runsGet: 'lexora:buddy:runs:get',
+  runsList: 'lexora:buddy:runs:list',
+  runsListEvents: 'lexora:buddy:runs:list-events',
+  runtimeCancelDataOperation: 'lexora:buddy:runtime:cancel-data-operation',
+  runtimeDataOperationChanged: 'lexora:buddy:runtime:data-operation-changed',
+  runtimeDeleteDataBackup: 'lexora:buddy:runtime:delete-data-backup',
+  runtimeGetDataBackupStorage: 'lexora:buddy:runtime:get-data-backup-storage',
+  runtimeGetDataRecoveryReceipt: 'lexora:buddy:runtime:get-data-recovery-receipt',
+  runtimeGetDataOperation: 'lexora:buddy:runtime:get-data-operation',
+  runtimeListDataBackups: 'lexora:buddy:runtime:list-data-backups',
+  runtimeOpenDataDirectory: 'lexora:buddy:runtime:open-data-directory',
+  runtimeRestart: 'lexora:buddy:runtime:restart',
+  runtimeStartDataBackup: 'lexora:buddy:runtime:start-data-backup',
+  runtimeStartDataRestore: 'lexora:buddy:runtime:start-data-restore',
+  runtimeStateChanged: 'lexora:buddy:runtime:state-changed',
+  runtimeStatus: 'lexora:buddy:runtime:status',
+  runtimeValidateDataBackup: 'lexora:buddy:runtime:validate-data-backup',
+  skillsList: 'lexora:buddy:skills:list',
+  usageSnapshot: 'lexora:buddy:usage:snapshot',
+  workspaceStateRead: 'lexora:buddy:workspace-state:read',
+  workspaceStateWrite: 'lexora:buddy:workspace-state:write',
 } as const
+
+interface LocalMutationResult {
+  ok: true
+}
 
 export interface LocalChatApi {
   runtime: {
-    getStatus: () => Promise<LocalRuntimeSupervisorState>
-    getLocalState: () => Promise<LocalStateStatus>
-    restart: () => Promise<LocalRuntimeSupervisorState>
-    onStateChanged: (listener: (state: LocalRuntimeSupervisorState) => void) => () => void
+    cancelDataOperation: (operationId: string) => Promise<LocalRuntimeDataOperation>
+    deleteDataBackup: (backupId: string) => Promise<{ readonly deletedBackupId: string }>
+    getDataBackupStorage: () => Promise<LocalRuntimeDataBackupStorage>
+    getDataRecoveryReceipt: () => Promise<LocalRuntimeDataRecoveryReceipt | null>
+    getDataOperation: () => Promise<LocalRuntimeDataOperation | null>
+    getStatus: () => Promise<LocalBuddyServiceSupervisorState>
+    listDataBackups: () => Promise<ReadonlyArray<LocalRuntimeDataBackup>>
+    openDataDirectory: () => Promise<LocalMutationResult>
+    restart: () => Promise<LocalBuddyServiceSupervisorState>
+    startDataBackup: () => Promise<LocalRuntimeDataOperation>
+    startDataRestore: (backupId: string) => Promise<LocalRuntimeDataOperation>
+    validateDataBackup: (backupId: string) => Promise<LocalRuntimeDataBackup>
+    onDataOperationChanged: (listener: (operation: LocalRuntimeDataOperation) => void) => () => void
+    onStateChanged: (listener: (state: LocalBuddyServiceSupervisorState) => void) => () => void
   }
-  codex: {
-    getStatus: () => Promise<LocalCodexRuntimeStatus>
-    listModels: () => Promise<ReadonlyArray<LocalRuntimeModelOption>>
-    listContextOptions: (input: {
-      cwd: string | null
-      fileQuery?: string | null
-    }) => Promise<LocalCodexContextOptions>
+  providers: {
+    acknowledgeModelSourceUpdate: (
+      providerId: string,
+      modelId: string,
+    ) => Promise<LocalRuntimeModelOption>
+    add: (providerId: string) => Promise<LocalProvider>
+    clearCredential: (providerId: string) => Promise<LocalMutationResult>
+    getDefaultModel: () => Promise<LocalDefaultModel | null>
+    list: () => Promise<ReadonlyArray<LocalProvider>>
+    listModels: (providerId?: string | null) => Promise<ReadonlyArray<LocalRuntimeModelOption>>
+    login: (providerId: string, authType: 'api_key' | 'oauth') => Promise<LocalMutationResult>
+    respondToAuth: (challengeId: string, value: string) => Promise<LocalMutationResult>
+    cancelAuth: (challengeId: string) => Promise<LocalMutationResult>
+    logout: (providerId: string) => Promise<LocalMutationResult>
+    remove: (providerId: string) => Promise<LocalMutationResult>
+    setDefaultModel: (
+      model: LocalDefaultModel | null,
+    ) => Promise<LocalDefaultModel | null>
+    setEnabled: (providerId: string, enabled: boolean) => Promise<LocalProvider>
+    setModelEnabled: (
+      providerId: string,
+      modelId: string,
+      enabled: boolean,
+    ) => Promise<LocalRuntimeModelOption>
+    setModelParameters: (
+      providerId: string,
+      modelId: string,
+      parameters: { contextWindow: number, maxTokens: number },
+    ) => Promise<LocalRuntimeModelOption>
+    restoreModelSourceParameters: (
+      providerId: string,
+      modelId: string,
+    ) => Promise<LocalRuntimeModelOption>
+    syncModels: (providerId: string) => Promise<ReadonlyArray<LocalRuntimeModelOption>>
+    upsertManualModel: (
+      providerId: string,
+      model: LocalCustomProviderModel,
+    ) => Promise<LocalRuntimeModelOption>
+    upsertCustom: (provider: LocalCustomProvider) => Promise<LocalProvider>
+    onAuthChallenge: (listener: (challenge: LocalProviderAuthChallenge) => void) => () => void
   }
-  claude: {
-    getStatus: () => Promise<LocalClaudeRuntimeStatus>
-  }
-  usage: {
-    getSnapshot: () => Promise<LocalUsageSnapshot>
+  notifications: {
+    list: () => Promise<LocalNotificationList>
+    markAllSeen: () => Promise<LocalNotificationList>
+    markSeen: (notificationId: string, revision: string) => Promise<LocalNotificationList>
   }
   projects: {
-    authorize: () => Promise<LocalProject | null>
+    create: (input: {
+      instructions: string
+      memoryScope: 'personal_and_project' | 'project_only'
+      name: string
+      root: string | null
+    }) => Promise<LocalProject>
+    delete: (projectId: string) => Promise<LocalMutationResult>
     list: (limit?: number) => Promise<ReadonlyArray<LocalProject>>
+    searchFiles: (projectId: string, query: string) => Promise<ReadonlyArray<LocalProjectFile>>
+    selectDirectory: () => Promise<string | null>
+    update: (input: {
+      instructions: string
+      memoryScope: 'personal_and_project' | 'project_only'
+      name: string
+      projectId: string
+      root: string | null
+    }) => Promise<LocalProject>
+  }
+  skills: {
+    list: (projectId?: string | null) => Promise<LocalSkillCatalog>
+  }
+  connectors: {
+    list: () => Promise<ReadonlyArray<LocalConnector>>
+    upsert: (input: {
+      config: LocalConnectorConfig
+      credential: LocalConnectorCredentialMutation
+    }) => Promise<ReadonlyArray<LocalConnector>>
+    remove: (connectorId: string) => Promise<LocalMutationResult>
+    trust: (connectorId: string) => Promise<LocalMutationResult>
+    setCredential: (
+      connectorId: string,
+      credential: LocalConnectorCredential,
+    ) => Promise<LocalMutationResult>
+    clearCredential: (connectorId: string) => Promise<LocalMutationResult>
+  }
+  context: {
+    getUsageSnapshot: (
+      input: LocalContextUsageSnapshotRequest,
+    ) => Promise<LocalContextUsageSnapshot>
   }
   workspaceState: {
     read: () => Promise<LocalWorkspaceSetting | null>
     write: (value: LocalWorkspaceStateValue) => Promise<LocalWorkspaceSetting>
   }
   conversations: {
-    list: (limit?: number) => Promise<ReadonlyArray<LocalConversation>>
+    list: (limit?: number) => Promise<ReadonlyArray<LocalConversationSummary>>
     delete: (conversationId: string) => Promise<boolean>
-    listMessages: (input: {
+    activateBranch: (input: {
+      branchId: string
       conversationId: string
+    }) => Promise<LocalConversation>
+    listBranches: (conversationId: string) => Promise<ReadonlyArray<LocalConversationBranch>>
+    listMessages: (input: {
+      branchId?: string
+      conversationId: string
+      cursor?: string
       limit?: number
-    }) => Promise<ReadonlyArray<LocalMessage>>
+    }) => Promise<LocalMessagePage>
+    rename: (conversationId: string, title: string) => Promise<LocalConversation>
+    listTimeline: (input: {
+      branchId?: string
+      conversationId: string
+      cursor?: string
+      limit?: number
+    }) => Promise<LocalConversationTimelinePage>
   }
   runs: {
     list: (input?: {
-      sessionId?: string | null
       conversationId?: string | null
       limit?: number
     }) => Promise<ReadonlyArray<LocalRun>>
     get: (runId: string) => Promise<LocalRun>
-    listChatEvents: (input: {
-      runId: string
-      afterId?: number | null
+    listEvents: (input: {
+      afterSequence?: number
       limit?: number
-    }) => Promise<ReadonlyArray<LocalRunEvent>>
-    listConversationChatEvents: (input: {
+      runId: string
+    } | {
       conversationId: string
-      afterId?: number | null
-      runLimit?: number
-      eventLimit?: number
+      limit?: number
     }) => Promise<ReadonlyArray<LocalRunEvent>>
   }
   approvals: {
-    list: (input?: { status?: string | null, limit?: number }) => Promise<ReadonlyArray<LocalApproval>>
-    deny: (approvalId: string) => Promise<unknown>
-    approveCodex: (approvalId: string) => Promise<unknown>
+    list: (input?: {
+      limit?: number
+      runId?: string | null
+      status?: 'pending' | 'approved' | 'denied' | 'cancelled' | null
+    }) => Promise<ReadonlyArray<LocalApproval>>
+    approve: (approvalId: string) => Promise<LocalApproval>
+    deny: (approvalId: string) => Promise<LocalApproval>
   }
   attachments: {
     selectFiles: (input: { remainingCount: number }) => Promise<ReadonlyArray<LocalAttachment>>
-    release: (attachmentIds: ReadonlyArray<string>) => Promise<{ releasedAttachmentIds: ReadonlyArray<string> }>
-    cleanupDrafts: (retainedAttachmentIds: ReadonlyArray<string>) => Promise<{ releasedAttachmentIds: ReadonlyArray<string> }>
+    release: (
+      attachmentIds: ReadonlyArray<string>,
+    ) => Promise<{ releasedAttachmentIds: ReadonlyArray<string> }>
+    cleanupDrafts: (
+      retainedAttachmentIds: ReadonlyArray<string>,
+    ) => Promise<{ releasedAttachmentIds: ReadonlyArray<string> }>
+  }
+  usage: {
+    getSnapshot: () => Promise<LocalUsageSnapshot>
   }
   chat: {
+    editUserMessage: (input: {
+      attachmentIds: ReadonlyArray<string>
+      content: string
+      contextItems: ReadonlyArray<LocalPromptContextItem>
+      conversationId: string
+      modelSelection: LocalStartTurnRequest['modelSelection']
+      requestId: string
+      userMessageId: string
+    }) => Promise<LocalTurnStart>
+    executeCommand: (request: LocalChatCommandRequest) => Promise<LocalTurnStart>
     startTurn: (request: LocalStartTurnRequest) => Promise<LocalTurnStart>
+    regenerateAssistant: (input: {
+      assistantMessageId: string
+      conversationId: string
+      requestId: string
+    }) => Promise<LocalTurnStart>
     cancel: (runId: string) => Promise<LocalRun>
-    onRunEvent: (listener: (event: LocalRunStateEvent) => void) => () => void
+    onRunEvent: (listener: (event: LocalRunEvent) => void) => () => void
   }
 }
