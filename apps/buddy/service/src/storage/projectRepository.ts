@@ -66,18 +66,15 @@ export interface ProjectRepository {
 interface ProjectRow {
   active_run_count: number
   id: string
-  root: string
-  canonical_root: string
   directory_canonical_root: string | null
   directory_root: string | null
   directory_access_granted_at: string | null
   directory_resources_trusted_at: string | null
-  managed_root: string | null
+  managed_data_deleted_at: string | null
+  managed_root: string
   memory_scope: ProjectMemoryScope
   instructions: string
   name: string
-  access_granted_at: string
-  resources_trusted_at: string | null
   revoked_at: string | null
   created_at: string
   updated_at: string
@@ -109,9 +106,9 @@ export function createProjectRepository(database: DatabaseSync): ProjectReposito
   const list = database.prepare(`${projectSelection} ORDER BY projects.name, projects.id`)
   const create = database.prepare(`
     INSERT INTO projects (
-      id, root, canonical_root, managed_root, memory_scope, instructions,
-      name, access_granted_at, resources_trusted_at, revoked_at, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?)
+      id, managed_root, managed_data_deleted_at, memory_scope, instructions,
+      name, revoked_at, created_at, updated_at
+    ) VALUES (?, ?, NULL, ?, ?, ?, NULL, ?, ?)
   `)
   const bindDirectory = database.prepare(`
     INSERT INTO project_directory_bindings (
@@ -144,8 +141,8 @@ export function createProjectRepository(database: DatabaseSync): ProjectReposito
   `)
   const completeDeletion = database.prepare(`
     UPDATE projects
-    SET managed_root = NULL, updated_at = ?
-    WHERE id = ? AND revoked_at IS NOT NULL AND managed_root IS NOT NULL
+    SET managed_data_deleted_at = ?, updated_at = ?
+    WHERE id = ? AND revoked_at IS NOT NULL AND managed_data_deleted_at IS NULL
   `)
   const insertEvent = database.prepare(`
     INSERT INTO project_events (id, project_id, event_type, payload_json, created_at)
@@ -161,20 +158,16 @@ export function createProjectRepository(database: DatabaseSync): ProjectReposito
 
   return {
     completeDeletion(id, completedAt) {
-      return Number(completeDeletion.run(completedAt, id).changes) === 1
+      return Number(completeDeletion.run(completedAt, completedAt, id).changes) === 1
     },
     create(input) {
       return withTransaction(database, () => {
         create.run(
           input.id,
           input.managedRoot,
-          input.managedRoot,
-          input.managedRoot,
           input.memoryScope,
           input.instructions,
           input.name,
-          input.authorizedAt,
-          input.authorizedAt,
           input.authorizedAt,
           input.authorizedAt,
         )
@@ -265,11 +258,11 @@ function toProject(row: ProjectRow): ProjectRecord {
   return {
     activeRunCount: row.active_run_count,
     id: row.id,
-    root: directoryRoot ?? row.root,
-    canonicalRoot: directoryCanonicalRoot ?? row.canonical_root,
+    root: directoryRoot ?? row.managed_root,
+    canonicalRoot: directoryCanonicalRoot ?? row.managed_root,
     directoryRoot,
     directoryCanonicalRoot,
-    managedRoot: row.managed_root,
+    managedRoot: row.managed_data_deleted_at === null ? row.managed_root : null,
     memoryScope: row.memory_scope,
     instructions: row.instructions,
     name: row.name,

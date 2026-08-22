@@ -5,12 +5,11 @@ import { dirname, join } from 'node:path'
 import { DatabaseSync as NodeDatabaseSync } from 'node:sqlite'
 
 import {
-  BUDDY_MINIMUM_UPGRADABLE_VERSION,
   BUDDY_SCHEMA_MIGRATIONS,
   BUDDY_SCHEMA_VERSION,
 } from './schema'
 
-export const BUDDY_DATABASE_FILE_NAME = 'buddy-v3.sqlite3'
+export const BUDDY_DATABASE_FILE_NAME = 'buddy.sqlite3'
 
 export interface OpenBuddyDatabaseOptions {
   buddyHome?: string
@@ -51,8 +50,6 @@ function migrateBuddyDatabase(database: DatabaseSync): void {
   const currentVersion = readSchemaVersion(database)
   if (currentVersion > BUDDY_SCHEMA_VERSION)
     throw new BuddyDatabaseVersionError('newer schema version')
-  if (currentVersion > 0 && currentVersion < BUDDY_MINIMUM_UPGRADABLE_VERSION)
-    throw new BuddyDatabaseVersionError('unsupported schema version')
   if (currentVersion === 0 && hasApplicationTables(database))
     throw new BuddyDatabaseVersionError('unversioned schema')
 

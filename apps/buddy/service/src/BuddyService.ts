@@ -96,7 +96,7 @@ import { createUsageRepository } from './storage/usageRepository'
 import { createWorkspaceRepository } from './storage/workspaceRepository'
 import { UsageService } from './usage/UsageService'
 
-const WORKSPACE_STATE_KEY = 'buddy.chat.workspace.v4'
+const WORKSPACE_STATE_KEY = 'buddy.chat.workspace.v1'
 const INTERNAL_PROJECT_ID = 'lexora-buddy-workspace'
 const MAX_CONTEXT_FILE_BYTES = 1024 * 1024
 const MAX_MODEL_INPUT_BYTES = 4 * 1024 * 1024

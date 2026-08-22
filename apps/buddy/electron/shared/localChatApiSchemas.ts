@@ -571,7 +571,7 @@ const workspaceDraftSchema = z.object({
   targetKey: z.string().min(1),
 }).strict()
 
-export const LOCAL_WORKSPACE_STATE_KEY = 'buddy.chat.workspace.v4' as const
+export const LOCAL_WORKSPACE_STATE_KEY = 'buddy.chat.workspace.v1' as const
 
 export const localWorkspaceStateValueSchema = z.object({
   activeConversationId: z.string().nullable(),
