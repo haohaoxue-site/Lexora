@@ -2,7 +2,7 @@ import type { LexoraConfig } from '../shared/desktopApi'
 import type { BuddyServiceSupervisor, BuddyServiceSupervisorState } from './runtime/BuddyServiceSupervisor'
 import { Menu, nativeImage, Tray } from 'electron'
 import { resolveDesktopIconPath } from './desktopIcon'
-import { translateDesktopNative, translateDesktopRuntimeStatus } from './desktopNativeI18n'
+import { translateDesktopNative } from './desktopNativeI18n'
 
 export interface CreateDesktopTrayOptions {
   appPath: string
@@ -26,8 +26,6 @@ export function createDesktopTray(options: CreateDesktopTrayOptions): DesktopTra
   let language = options.language
 
   const rebuildMenu = () => {
-    const runtimeLabel = translateDesktopRuntimeStatus(language, runtimeState.status)
-
     tray.setContextMenu(Menu.buildFromTemplate([
       {
         label: translateDesktopNative(language, 'open'),
@@ -35,11 +33,7 @@ export function createDesktopTray(options: CreateDesktopTrayOptions): DesktopTra
       },
       { type: 'separator' },
       {
-        label: runtimeLabel,
-        enabled: false,
-      },
-      {
-        label: translateDesktopNative(language, 'restartRuntime'),
+        label: translateDesktopNative(language, 'restart'),
         enabled: runtimeState.status !== 'starting'
           && runtimeState.status !== 'stopping'
           && !(runtimeState.status === 'offline' && runtimeState.pid !== null),
