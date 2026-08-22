@@ -78,10 +78,11 @@ jobs:
         run: sudo apt-get install -y ./apps/buddy/.output/artifacts/desktop/Lexora-Buddy-*-linux-amd64.deb
 
       - name: Smoke installed Desktop and native pet
+        timeout-minutes: 2
         env:
           LEXORA_BUDDY_PET_PATH: /opt/lexora-buddy/resources/native-pet/lexora-buddy-pet
           LEXORA_DESKTOP_EXECUTABLE_PATH: /opt/lexora-buddy/lexora-buddy
-        run: node packaging/buddy/ci/run-gui-smoke.mjs
+        run: xvfb-run -a node packaging/buddy/ci/run-gui-smoke.mjs
 
       - name: Verify deb release metadata
         run: node packaging/buddy/release/verify-deb-package.mjs
@@ -98,7 +99,7 @@ jobs:
     container: archlinux:latest
     steps:
       - name: Install Arch build and GUI dependencies
-        run: pacman -Syu --noconfirm base-devel dbus git gtk3 libarchive xorg-server-xvfb xorg-xauth
+        run: pacman -Syu --noconfirm base-devel dbus git gtk3 libarchive libxcrypt-compat xorg-server-xvfb xorg-xauth
 
       - name: Checkout
         uses: actions/checkout@v4
@@ -129,6 +130,7 @@ jobs:
         run: useradd -m buddy
 
       - name: Smoke installed Desktop and native pet
+        timeout-minutes: 2
         env:
           LEXORA_GUI_SMOKE_NO_SANDBOX: '1'
           LEXORA_BUDDY_PET_PATH: /opt/lexora-buddy/resources/native-pet/lexora-buddy-pet
@@ -144,7 +146,7 @@ jobs:
             LEXORA_DESKTOP_EXECUTABLE_PATH="$LEXORA_DESKTOP_EXECUTABLE_PATH" \
             PATH="$PATH" \
             XDG_RUNTIME_DIR="$smoke_root/runtime" \
-            dbus-run-session -- node packaging/buddy/ci/run-gui-smoke.mjs
+            xvfb-run -a dbus-run-session -- node packaging/buddy/ci/run-gui-smoke.mjs
 
       - name: Upload verified Arch package
         uses: actions/upload-artifact@v4

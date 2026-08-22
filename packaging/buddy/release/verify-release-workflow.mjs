@@ -42,13 +42,14 @@ export function verifyBuddyReleaseWorkflow(cwd = repoRoot) {
 
 function verifyUbuntuJob(job, errors) {
   const install = 'sudo apt-get install -y ./apps/buddy/.output/artifacts/desktop/Lexora-Buddy-*-linux-amd64.deb'
-  const smoke = 'node packaging/buddy/ci/run-gui-smoke.mjs'
+  const smoke = 'xvfb-run -a node packaging/buddy/ci/run-gui-smoke.mjs'
 
   requireFragments(job, ['pnpm check:buddy'], errors, 'Ubuntu build job must run the Buddy release gate')
   requireOrder(job, install, smoke, errors, 'Ubuntu build job must install the built Desktop deb before GUI smoke')
   requireFragments(job, [
     'LEXORA_DESKTOP_EXECUTABLE_PATH: /opt/lexora-buddy/lexora-buddy',
     'LEXORA_BUDDY_PET_PATH: /opt/lexora-buddy/resources/native-pet/lexora-buddy-pet',
+    'timeout-minutes: 2',
   ], errors, 'Ubuntu build job must run GUI smoke against the installed Desktop and native pet')
   requireFragments(job, [
     'name: lexora-buddy-ubuntu',
@@ -60,13 +61,14 @@ function verifyUbuntuJob(job, errors) {
 function verifyArchJob(job, errors) {
   const install = 'pacman -U --noconfirm ./apps/buddy/.output/artifacts/arch/Lexora-Buddy-*-arch-x86_64.pkg.tar.zst'
   const petSmoke = '--buddy-native-pet-smoke-check'
-  const guiSmoke = 'dbus-run-session -- node packaging/buddy/ci/run-gui-smoke.mjs'
+  const guiSmoke = 'xvfb-run -a dbus-run-session -- node packaging/buddy/ci/run-gui-smoke.mjs'
   const upload = 'name: lexora-buddy-arch'
 
   requireFragments(job, [
     'container: archlinux:latest',
+    'libxcrypt-compat',
     'pnpm --filter @lexora/buddy package:arch',
-  ], errors, 'Arch verification job must build the first-party pacman package on Arch')
+  ], errors, 'Arch verification job must build the first-party pacman package with the required Arch compatibility libraries')
   if (/needs:\s*build-ubuntu/.test(job) || [
     'name: lexora-buddy-ubuntu',
     'makepkg',
@@ -81,6 +83,7 @@ function verifyArchJob(job, errors) {
   requireFragments(job, [
     'LEXORA_GUI_SMOKE_NO_SANDBOX: \'1\'',
     'apps/buddy/.output/artifacts/arch/*.pkg.tar.zst',
+    'timeout-minutes: 2',
   ], errors, 'Arch build job must smoke and upload the verified pacman package')
   forbidReleaseMutation(job, errors, 'Arch build job')
 }

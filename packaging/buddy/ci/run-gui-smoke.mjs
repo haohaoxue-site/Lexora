@@ -10,7 +10,7 @@ import { resolveBuddyOutputPaths } from '../release/output-paths.mjs'
 
 const repoRoot = resolve(import.meta.dirname, '../../..')
 const outputPaths = resolveBuddyOutputPaths(repoRoot)
-const guiRunner = process.env.LEXORA_GUI_SMOKE_RUNNER ?? 'xvfb-run'
+const nativePetShutdownTimeoutMs = 3_000
 const RECOVERY_FIXTURE = Object.freeze({
   backupId: 'buddy-20260816120000000-deadbeef',
   expectedAction: 'restored_previous_data',
@@ -39,8 +39,14 @@ async function main() {
 
     await runDesktopSmoke(desktopPath, smokeEnv)
     await verifyDesktopRecoverySmokeResult(recoveryFixture)
-    if (!recoveryOnly)
-      await runNativePetSmoke(binaryPath, 12_000, smokeEnv)
+    if (!recoveryOnly) {
+      const petFixture = await prepareStandalonePetSmokeFixture(smokeRoot)
+      await runNativePetSmoke(binaryPath, 12_000, {
+        ...smokeEnv,
+        LEXORA_BUDDY_PET_SOCKET: petFixture.socketPath,
+        LEXORA_HOME: petFixture.lexoraHome,
+      })
+    }
     writeOutput(recoveryOnly
       ? 'Lexora Buddy Desktop recovery GUI smoke passed'
       : 'Lexora Buddy Desktop recovery and standalone pet GUI smoke passed')
@@ -73,6 +79,20 @@ export async function prepareDesktopRecoverySmokeFixture(smokeRoot) {
   return {
     expectedAction: RECOVERY_FIXTURE.expectedAction,
     lexoraHome,
+  }
+}
+
+export async function prepareStandalonePetSmokeFixture(smokeRoot) {
+  const lexoraHome = join(smokeRoot, 'pet-home')
+  await mkdir(lexoraHome, { mode: 0o700, recursive: true })
+  await writeFile(
+    join(lexoraHome, 'config.toml'),
+    '[pet]\nenabled = true\nalways_on_top = false\nremember_position = false\n',
+    { mode: 0o600 },
+  )
+  return {
+    lexoraHome,
+    socketPath: join(smokeRoot, 'standalone-native-pet.sock'),
   }
 }
 
@@ -152,10 +172,13 @@ export function runNativePetSmoke(runtimePath, timeoutMs = 12_000, env = process
     const child = spawnGui(runtimePath, env, ['--native-pet'])
     let settled = false
     let ready = false
+    let terminationError
     let stdout = ''
     let stderr = ''
-    const timeout = setTimeout(() => {
-      finish(new Error(`native pet did not become ready within ${timeoutMs}ms`))
+    let shutdownTimeout
+    const readyTimeout = setTimeout(() => {
+      terminationError = new Error(`native pet did not become ready within ${timeoutMs}ms`)
+      child.kill('SIGKILL')
     }, timeoutMs)
 
     child.stdout.setEncoding('utf8')
@@ -164,7 +187,14 @@ export function runNativePetSmoke(runtimePath, timeoutMs = 12_000, env = process
       stdout = `${stdout}${chunk}`.slice(-8_192)
       if (stdout.includes('event:ready') && !ready) {
         ready = true
+        clearTimeout(readyTimeout)
         child.kill('SIGTERM')
+        shutdownTimeout = setTimeout(() => {
+          terminationError = new Error(
+            `native pet did not exit within ${nativePetShutdownTimeoutMs}ms after readiness`,
+          )
+          child.kill('SIGKILL')
+        }, nativePetShutdownTimeoutMs)
       }
     })
     child.stderr.on('data', (chunk) => {
@@ -173,9 +203,9 @@ export function runNativePetSmoke(runtimePath, timeoutMs = 12_000, env = process
     child.on('error', finish)
     child.on('exit', (code, signal) => {
       if (!settled) {
-        finish(ready
+        finish(terminationError ?? (ready
           ? undefined
-          : new Error(`native pet exited before ready: ${signal ?? code}; ${stderr.trim()}`))
+          : new Error(`native pet exited before ready: ${signal ?? code}; ${stderr.trim()}`)))
       }
     })
 
@@ -184,9 +214,10 @@ export function runNativePetSmoke(runtimePath, timeoutMs = 12_000, env = process
         return
 
       settled = true
-      clearTimeout(timeout)
-      if (!ready)
-        child.kill('SIGTERM')
+      clearTimeout(readyTimeout)
+      clearTimeout(shutdownTimeout)
+      child.stdout.destroy()
+      child.stderr.destroy()
       if (error)
         rejectSmoke(error)
       else
@@ -196,12 +227,7 @@ export function runNativePetSmoke(runtimePath, timeoutMs = 12_000, env = process
 }
 
 function spawnGui(executablePath, env, args = []) {
-  const command = guiRunner === 'direct' ? executablePath : guiRunner
-  const commandArgs = guiRunner === 'direct'
-    ? args
-    : ['-a', executablePath, ...args]
-
-  return spawn(command, commandArgs, {
+  return spawn(executablePath, args, {
     cwd: repoRoot,
     env,
     stdio: ['ignore', 'pipe', 'pipe'],

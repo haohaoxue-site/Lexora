@@ -68,6 +68,7 @@ module.exports = {
       'libuuid1',
       'libsecret-1-0',
       'libgtk-layer-shell0',
+      'webp-pixbuf-loader',
     ],
   },
   pacman: {

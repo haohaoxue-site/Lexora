@@ -30,6 +30,8 @@ const result = spawnSync('pnpm', [
   'electron-builder.config.cjs',
   '--linux',
   target.name,
+  '--publish',
+  'never',
 ], {
   cwd: repoRoot,
   env: process.env,

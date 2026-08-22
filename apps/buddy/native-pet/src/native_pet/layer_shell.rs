@@ -15,6 +15,7 @@ const GTK_LAYER_SHELL_EDGE_TOP: i32 = 2;
 const GTK_LAYER_SHELL_EDGE_BOTTOM: i32 = 3;
 
 type GtkLayerInitForWindow = unsafe extern "C" fn(*mut gtk::ffi::GtkWindow);
+type GtkLayerIsSupported = unsafe extern "C" fn() -> glib::ffi::gboolean;
 type GtkLayerSetLayer = unsafe extern "C" fn(*mut gtk::ffi::GtkWindow, i32);
 type GtkLayerSetMonitor = unsafe extern "C" fn(*mut gtk::ffi::GtkWindow, *mut gdk::ffi::GdkMonitor);
 type GtkLayerSetAnchor = unsafe extern "C" fn(*mut gtk::ffi::GtkWindow, i32, glib::ffi::gboolean);
@@ -60,6 +61,17 @@ impl LayerShellApi {
         // SAFETY: Loading this optional system library only enables Wayland layer-shell support.
         // We keep the Library alive in LayerShellApi for at least as long as the loaded symbols.
         let library = unsafe { Library::new("libgtk-layer-shell.so.0").ok()? };
+        // SAFETY: The symbol name and function signature match the gtk-layer-shell C ABI.
+        let is_supported = unsafe {
+            *library
+                .get::<GtkLayerIsSupported>(b"gtk_layer_is_supported\0")
+                .ok()?
+        };
+        // SAFETY: GTK is initialized before LayerShellApi::load, and the function pointer was
+        // loaded from gtk-layer-shell with its matching ABI signature.
+        if unsafe { is_supported() } == glib::ffi::GFALSE {
+            return None;
+        }
         // SAFETY: The symbol names and function signatures match the gtk-layer-shell C ABI.
         let init_for_window = unsafe {
             *library

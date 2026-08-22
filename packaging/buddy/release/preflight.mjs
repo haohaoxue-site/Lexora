@@ -19,6 +19,7 @@ export function createBuddyReleasePreflightSteps() {
     ['Native pet check', 'cargo', ['check', '--manifest-path', 'apps/buddy/native-pet/Cargo.toml', '--all-targets']],
     ['Native pet clippy', 'cargo', ['clippy', '--manifest-path', 'apps/buddy/native-pet/Cargo.toml', '--all-targets', '--', '-D', 'warnings']],
     ['Native pet tests', 'cargo', ['test', '--manifest-path', 'apps/buddy/native-pet/Cargo.toml']],
+    ['Native pet release build', 'cargo', ['build', '--release', '--manifest-path', 'apps/buddy/native-pet/Cargo.toml']],
     ['Electron build', 'pnpm', ['--filter', '@lexora/buddy', 'exec', 'electron-vite', 'build']],
     ['Electron bundle boundary', 'node', ['packaging/buddy/release/verify-electron-bundle.mjs']],
     ['Desktop deb package', 'node', ['packaging/buddy/release/package-desktop.mjs', '--target', 'deb']],
