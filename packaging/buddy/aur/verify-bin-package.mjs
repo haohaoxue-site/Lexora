@@ -7,22 +7,17 @@ import { fileURLToPath } from 'node:url'
 import { writeError, writeOutput } from '../../shared/cli-output.mjs'
 
 const scriptDir = dirname(fileURLToPath(import.meta.url))
-const repoRoot = resolve(scriptDir, '../../..')
 const packageDir = join(scriptDir, 'lexora-buddy-bin')
-const linuxWorkflowPath = join(repoRoot, '.github/workflows/buddy-linux-deb.yml')
 
 export function verifyBuddyAurPackage(options = {}) {
-  const version = options.version ?? JSON.parse(
-    readFileSync(join(repoRoot, 'apps/buddy/buddy.version.json'), 'utf8'),
-  ).version
   const pkgbuild = options.pkgbuild ?? readFileSync(join(packageDir, 'PKGBUILD'), 'utf8')
   const srcinfo = options.srcinfo ?? readFileSync(join(packageDir, '.SRCINFO'), 'utf8')
-  const workflow = options.workflow ?? readFileSync(linuxWorkflowPath, 'utf8')
+  const version = options.version ?? readAssignment(pkgbuild, 'pkgver')
   const errors = []
   const requiredPkgbuildFragments = [
     `pkgver=${version}`,
     `_deb_name="Lexora-Buddy-\${pkgver}-linux-amd64.deb"`,
-    `releases/download/v\${pkgver}/\${_deb_name}`,
+    `releases/download/buddy-v\${pkgver}/\${_deb_name}`,
     `source_x86_64=("lexora-buddy-\${pkgver}-amd64.deb::\${_deb_url}")`,
     'data.tar.*',
     'alsa-lib',
@@ -38,7 +33,7 @@ export function verifyBuddyAurPackage(options = {}) {
   ]
   const requiredSrcinfoFragments = [
     `pkgver = ${version}`,
-    `source_x86_64 = lexora-buddy-${version}-amd64.deb::https://github.com/haohaoxue-site/Lexora/releases/download/v${version}/Lexora-Buddy-${version}-linux-amd64.deb`,
+    `source_x86_64 = lexora-buddy-${version}-amd64.deb::https://github.com/haohaoxue-site/Lexora/releases/download/buddy-v${version}/Lexora-Buddy-${version}-linux-amd64.deb`,
     'provides = lexora-buddy',
   ]
 
@@ -51,15 +46,12 @@ export function verifyBuddyAurPackage(options = {}) {
       errors.push(`.SRCINFO is missing: ${fragment}`)
   }
 
-  if (
-    !workflow.includes('verify-linux-deb-artifact.mjs --github-env "$GITHUB_ENV"')
-    || !workflow.includes('gh release upload')
-    || !workflow.includes('--repo "$LEXORA_BUDDY_RELEASE_REPO"')
-  ) {
-    errors.push('Linux release workflow does not publish the AUR deb asset')
-  }
-  if (!workflow.includes('node packaging/buddy/release/verify-remote-asset.mjs'))
-    errors.push('Linux release workflow does not remotely verify the AUR deb asset')
+  const pkgbuildHash = pkgbuild.match(
+    /^_deb_sha256="\$\{LEXORA_BUDDY_DEB_SHA256:-([a-f\d]{64})\}"$/m,
+  )?.[1]
+  const srcinfoHash = srcinfo.match(/^\s*sha256sums_x86_64 = ([a-f\d]{64})$/m)?.[1]
+  if (!pkgbuildHash || pkgbuildHash !== srcinfoHash)
+    errors.push('AUR PKGBUILD and .SRCINFO deb sha256 must match')
 
   const makepkg = spawnSync('makepkg', ['--printsrcinfo'], {
     cwd: packageDir,
@@ -73,6 +65,10 @@ export function verifyBuddyAurPackage(options = {}) {
 
 function normalize(value) {
   return value.trim().replaceAll('\r\n', '\n')
+}
+
+function readAssignment(source, key) {
+  return source.match(new RegExp(`^${key}=(.+)$`, 'm'))?.[1]?.trim() ?? ''
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

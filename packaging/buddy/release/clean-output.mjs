@@ -11,10 +11,6 @@ export function cleanBuddyOutput(cwd = repoRoot) {
   const paths = resolveBuddyOutputPaths(cwd)
   const generatedRoots = [
     paths.outputRoot,
-    join(paths.buddyRoot, 'dist'),
-    join(paths.buddyRoot, 'dist-packages'),
-    join(paths.buddyRoot, 'out'),
-    join(paths.buddyRoot, 'native-pet/target'),
     join(paths.buddyRoot, 'node_modules/.tmp'),
     join(paths.buddyRoot, 'node_modules/.vite'),
     join(paths.buddyRoot, 'node_modules/.vite-temp'),

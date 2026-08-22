@@ -3,7 +3,6 @@ pkgbase = lexora-buddy-bin
 	pkgver = 0.1.0
 	pkgrel = 1
 	url = https://github.com/haohaoxue-site/Lexora
-	install = lexora-buddy-bin.install
 	arch = x86_64
 	license = AGPL-3.0-only
 	depends = alsa-lib
@@ -44,7 +43,7 @@ pkgbase = lexora-buddy-bin
 	conflicts = lexora-buddy
 	options = !strip
 	options = !debug
-	source_x86_64 = lexora-buddy-0.1.0-amd64.deb::https://github.com/haohaoxue-site/Lexora/releases/download/v0.1.0/Lexora-Buddy-0.1.0-linux-amd64.deb
-	sha256sums_x86_64 = 54b6b35055cc3c5180929544e2ef6913914a0ffa6d45d7ffc8ca75ddcd6bf7a2
+	source_x86_64 = lexora-buddy-0.1.0-amd64.deb::https://github.com/haohaoxue-site/Lexora/releases/download/buddy-v0.1.0/Lexora-Buddy-0.1.0-linux-amd64.deb
+	sha256sums_x86_64 = d849e41906c830bb851d4f5d05f8159d70f1d055c343dc90fad0ab32a22f9822
 
 pkgname = lexora-buddy-bin

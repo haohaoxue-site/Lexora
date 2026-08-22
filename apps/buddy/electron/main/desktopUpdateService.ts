@@ -12,8 +12,9 @@ interface GithubRelease {
   tag_name: string
 }
 
-const LATEST_RELEASE_API_URL
-  = 'https://api.github.com/repos/haohaoxue-site/Lexora/releases/latest'
+const RELEASES_API_URL
+  = 'https://api.github.com/repos/haohaoxue-site/Lexora/releases?per_page=100'
+const BUDDY_RELEASE_TAG_PREFIX = 'buddy-v'
 const SEMVER_PATTERN = /^(\d+)\.(\d+)\.(\d+)$/
 
 export class DesktopUpdateCheckError extends Error {
@@ -29,7 +30,7 @@ export async function checkForDesktopUpdate(
   options: CheckForDesktopUpdateOptions,
 ): Promise<DesktopUpdateCheckResult> {
   try {
-    const response = await (options.fetchRelease ?? fetch)(LATEST_RELEASE_API_URL, {
+    const response = await (options.fetchRelease ?? fetch)(RELEASES_API_URL, {
       headers: {
         'accept': 'application/vnd.github+json',
         'user-agent': 'Lexora-Buddy',
@@ -38,14 +39,13 @@ export async function checkForDesktopUpdate(
     if (!response.ok)
       throw new Error(`GitHub release request failed with ${response.status}`)
 
-    const release = parseRelease(await response.json())
+    const release = parseLatestBuddyRelease(await response.json())
     const current = parseVersion(options.currentVersion)
-    const latest = parseVersion(release.tag_name.slice(1))
     return {
       currentVersion: options.currentVersion,
-      latestVersion: latest.raw,
-      releaseUrl: release.html_url,
-      status: compareVersions(latest.parts, current.parts) > 0
+      latestVersion: release.version.raw,
+      releaseUrl: release.metadata.html_url,
+      status: compareVersions(release.version.parts, current.parts) > 0
         ? 'update_available'
         : 'up_to_date',
     }
@@ -55,21 +55,44 @@ export async function checkForDesktopUpdate(
   }
 }
 
-function parseRelease(value: unknown): GithubRelease {
-  if (!value || typeof value !== 'object' || Array.isArray(value))
+function parseLatestBuddyRelease(value: unknown): {
+  metadata: GithubRelease
+  version: ReturnType<typeof parseVersion>
+} {
+  if (!Array.isArray(value))
     throw new Error('GitHub release response is invalid')
-  const release = value as Partial<GithubRelease>
-  if (
-    release.draft !== false
-    || release.prerelease !== false
-    || typeof release.tag_name !== 'string'
-    || !release.tag_name.startsWith('v')
-    || typeof release.html_url !== 'string'
-    || !isLexoraReleaseUrl(release.html_url)
-  ) {
+
+  const releases = value.flatMap((candidate) => {
+    if (!candidate || typeof candidate !== 'object' || Array.isArray(candidate))
+      return []
+    const release = candidate as Partial<GithubRelease>
+    if (
+      release.draft !== false
+      || release.prerelease !== false
+      || typeof release.tag_name !== 'string'
+      || !release.tag_name.startsWith(BUDDY_RELEASE_TAG_PREFIX)
+      || typeof release.html_url !== 'string'
+      || !isLexoraReleaseUrl(release.html_url)
+    ) {
+      return []
+    }
+
+    try {
+      return [{
+        metadata: release as GithubRelease,
+        version: parseVersion(release.tag_name.slice(BUDDY_RELEASE_TAG_PREFIX.length)),
+      }]
+    }
+    catch {
+      return []
+    }
+  })
+  if (releases.length === 0)
     throw new Error('GitHub release response is invalid')
-  }
-  return release as GithubRelease
+
+  return releases.reduce((latest, release) => (
+    compareVersions(release.version.parts, latest.version.parts) > 0 ? release : latest
+  ))
 }
 
 function parseVersion(value: string): { parts: readonly number[], raw: string } {
@@ -92,8 +115,13 @@ function compareVersions(left: readonly number[], right: readonly number[]): num
 }
 
 function isLexoraReleaseUrl(value: string): boolean {
-  const url = new URL(value)
-  return url.protocol === 'https:'
-    && url.hostname === 'github.com'
-    && url.pathname.startsWith('/haohaoxue-site/Lexora/releases/')
+  try {
+    const url = new URL(value)
+    return url.protocol === 'https:'
+      && url.hostname === 'github.com'
+      && url.pathname.startsWith('/haohaoxue-site/Lexora/releases/')
+  }
+  catch {
+    return false
+  }
 }

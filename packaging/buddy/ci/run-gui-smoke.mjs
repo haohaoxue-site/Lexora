@@ -42,8 +42,8 @@ async function main() {
     if (!recoveryOnly)
       await runNativePetSmoke(binaryPath, 12_000, smokeEnv)
     writeOutput(recoveryOnly
-      ? 'Lexora Desktop recovery GUI smoke passed'
-      : 'Lexora Desktop recovery and standalone pet GUI smoke passed')
+      ? 'Lexora Buddy Desktop recovery GUI smoke passed'
+      : 'Lexora Buddy Desktop recovery and standalone pet GUI smoke passed')
   }
   finally {
     await rm(smokeRoot, { force: true, recursive: true })
@@ -55,6 +55,7 @@ export async function prepareDesktopRecoverySmokeFixture(smokeRoot) {
   const rollbackPath = join(lexoraHome, '.buddy.restore-rollback')
   const timestamp = '2026-08-16T12:00:00.000Z'
   await mkdir(rollbackPath, { mode: 0o700, recursive: true })
+  await writeFile(join(lexoraHome, 'config.toml'), '[pet]\nenabled = false\n', { mode: 0o600 })
   await writeFile(join(rollbackPath, 'recovery-marker.txt'), 'rollback-data\n', { mode: 0o600 })
   await writeFile(
     join(lexoraHome, '.buddy.restore-journal.json'),
@@ -117,7 +118,7 @@ export function runDesktopSmoke(executablePath, env, timeoutMs = 30_000) {
     const child = spawnGui(executablePath, {
       ...env,
       LEXORA_DESKTOP_SMOKE_TEST: '1',
-    })
+    }, env.LEXORA_GUI_SMOKE_NO_SANDBOX === '1' ? ['--no-sandbox'] : [])
     let stderr = ''
     const timeout = setTimeout(() => {
       child.kill('SIGKILL')
@@ -134,6 +135,8 @@ export function runDesktopSmoke(executablePath, env, timeoutMs = 30_000) {
     })
     child.on('exit', (code, signal) => {
       clearTimeout(timeout)
+      child.stdout.destroy()
+      child.stderr.destroy()
       if (code === 0) {
         resolveSmoke()
         return

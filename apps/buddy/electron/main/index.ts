@@ -308,7 +308,7 @@ else {
       await desktop.open()
     const desktopWindow = desktop.window ?? await desktop.load()
     if (!desktopWindow)
-      throw new Error('Lexora Desktop window is unavailable after loading')
+      throw new Error('Lexora Buddy Desktop window is unavailable after loading')
 
     if (isSmokeTest) {
       const bridgeAvailable = await desktopWindow.webContents.executeJavaScript(
@@ -316,26 +316,26 @@ else {
         true,
       )
       if (bridgeAvailable !== true)
-        throw new Error('Lexora Desktop Preload bridge is unavailable')
+        throw new Error('Lexora Buddy Desktop Preload bridge is unavailable')
 
       const providers = await desktopWindow.webContents.executeJavaScript(
         'globalThis.lexoraDesktop.localChat.providers.list()',
         true,
       )
       if (!Array.isArray(providers))
-        throw new Error('Lexora Desktop Buddy Local Service provider registry is unavailable')
+        throw new Error('Lexora Buddy Desktop Local Service provider registry is unavailable')
 
       const runtimeStatus = await desktopWindow.webContents.executeJavaScript(
         'globalThis.lexoraDesktop.localChat.runtime.getStatus()',
         true,
       )
       if (!runtimeStatus || typeof runtimeStatus !== 'object' || runtimeStatus.status !== 'ready')
-        throw new Error('Lexora Desktop Preload local chat IPC is unavailable')
+        throw new Error('Lexora Buddy Desktop Preload local chat IPC is unavailable')
 
       const expectedRecoveryAction = process.env.LEXORA_DESKTOP_SMOKE_EXPECT_RECOVERY
       if (expectedRecoveryAction) {
         if (expectedRecoveryAction !== 'restored_previous_data')
-          throw new Error('Lexora Desktop smoke recovery action is unsupported')
+          throw new Error('Lexora Buddy Desktop smoke recovery action is unsupported')
 
         const recoveryReceipt = await desktopWindow.webContents.executeJavaScript(
           'globalThis.lexoraDesktop.localChat.runtime.getDataRecoveryReceipt()',
@@ -346,7 +346,7 @@ else {
           || typeof recoveryReceipt !== 'object'
           || recoveryReceipt.action !== expectedRecoveryAction
         ) {
-          throw new Error('Lexora Desktop Preload recovery receipt IPC is unavailable')
+          throw new Error('Lexora Buddy Desktop Preload recovery receipt IPC is unavailable')
         }
 
         const renderedRecoveryAction = await desktopWindow.webContents.executeJavaScript(
@@ -370,13 +370,13 @@ else {
           true,
         )
         if (renderedRecoveryAction !== expectedRecoveryAction)
-          throw new Error('Lexora Desktop Renderer recovery notice is unavailable')
+          throw new Error('Lexora Buddy Desktop Renderer recovery notice is unavailable')
       }
 
       await quitLexora()
     }
   }).catch(async (error) => {
-    console.error('Lexora Desktop failed to start', error)
+    console.error('Lexora Buddy Desktop failed to start', error)
     isQuitting = true
     stopLocalChatIpc?.()
     stopAttachmentProtocol?.()
@@ -433,7 +433,7 @@ function showDesktopWindow(): void {
 }
 
 function writeDesktopDiagnostic(message: string): void {
-  process.stderr.write(`[Lexora Desktop] ${message}\n`)
+  process.stderr.write(`[Lexora Buddy Desktop] ${message}\n`)
   void desktopDiagnostics.write('desktop', message)
 }
 

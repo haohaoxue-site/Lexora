@@ -45,6 +45,6 @@ export function useDesktopShellState(settings: ApplicationSettingsStore) {
 function requireDesktopApi(): LexoraDesktopApi {
   const api = window.lexoraDesktop
   if (!api)
-    throw new Error('Lexora Desktop API is unavailable')
+    throw new Error('Lexora Buddy Desktop API is unavailable')
   return api
 }

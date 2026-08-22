@@ -46,10 +46,9 @@ depends=(
 provides=('lexora-buddy')
 conflicts=('lexora-buddy')
 options=('!strip' '!debug')
-install="${pkgname}.install"
 _deb_name="Lexora-Buddy-${pkgver}-linux-amd64.deb"
-_deb_url="${LEXORA_BUDDY_DEB_URL:-${url}/releases/download/v${pkgver}/${_deb_name}}"
-_deb_sha256="${LEXORA_BUDDY_DEB_SHA256:-54b6b35055cc3c5180929544e2ef6913914a0ffa6d45d7ffc8ca75ddcd6bf7a2}"
+_deb_url="${LEXORA_BUDDY_DEB_URL:-${url}/releases/download/buddy-v${pkgver}/${_deb_name}}"
+_deb_sha256="${LEXORA_BUDDY_DEB_SHA256:-d849e41906c830bb851d4f5d05f8159d70f1d055c343dc90fad0ab32a22f9822}"
 source_x86_64=("lexora-buddy-${pkgver}-amd64.deb::${_deb_url}")
 sha256sums_x86_64=("${_deb_sha256}")
 

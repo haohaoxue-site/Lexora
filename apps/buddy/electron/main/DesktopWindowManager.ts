@@ -56,7 +56,7 @@ export class DesktopWindowManager {
       || !managedWindow.rendererAvailable
       || managedWindow.handle.window.isDestroyed()
     ) {
-      throw new Error('Lexora Desktop renderer exited while loading')
+      throw new Error('Lexora Buddy Desktop renderer exited while loading')
     }
     return managedWindow.handle.window
   }

@@ -75,7 +75,7 @@ export function registerDesktopCommandShortcuts(
     event.preventDefault()
     void executeCommand(command.id).catch((error) => {
       const diagnostic = error instanceof Error ? error.name : 'unknown error'
-      process.stderr.write(`[Lexora Desktop] Command ${command.id} failed: ${diagnostic}\n`)
+      process.stderr.write(`[Lexora Buddy Desktop] Command ${command.id} failed: ${diagnostic}\n`)
     })
   })
 }

@@ -78,7 +78,7 @@ async function executeDesktopCommand(commandId: DesktopCommandId) {
     await handler()
   }
   catch (error) {
-    console.error(`Lexora Desktop command ${commandId} failed`, error)
+    console.error(`Lexora Buddy Desktop command ${commandId} failed`, error)
     message.error(t('desktop.command.failed'))
   }
 }
@@ -149,7 +149,7 @@ function applyWindowState(state: DesktopWindowState) {
 function requireDesktopApi(): LexoraDesktopApi {
   const api = window.lexoraDesktop
   if (!api)
-    throw new Error('Lexora Desktop API is unavailable')
+    throw new Error('Lexora Buddy Desktop API is unavailable')
   return api
 }
 </script>

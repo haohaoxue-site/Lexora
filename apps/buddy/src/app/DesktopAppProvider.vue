@@ -110,7 +110,7 @@ onBeforeUnmount(() => {
 function requireDesktopApi(): LexoraDesktopApi {
   const api = window.lexoraDesktop
   if (!api)
-    throw new Error('Lexora Desktop bridge is unavailable')
+    throw new Error('Lexora Buddy Desktop bridge is unavailable')
   return api
 }
 </script>
