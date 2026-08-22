@@ -41,7 +41,7 @@
   "dependencies": {
     "@earendil-works/pi-ai": "^0.84.1",
     "@earendil-works/pi-coding-agent": "^0.84.1",
-    "@modelcontextprotocol/sdk": "^1.29.0",
+    "@modelcontextprotocol/sdk": "^1.30.0",
     "@tiptap/core": "^3.22.3",
     "@tiptap/extension-placeholder": "^3.22.3",
     "@tiptap/pm": "^3.22.3",
@@ -50,7 +50,7 @@
     "@vicons/fluent": "^0.13.0",
     "@vueuse/core": "^14.3.0",
     "dayjs": "^1.11.21",
-    "dompurify": "^3.4.7",
+    "dompurify": "^3.4.14",
     "marked": "^18.0.5",
     "naive-ui": "^2.44.1",
     "smol-toml": "^1.7.1",
@@ -63,13 +63,13 @@
     "@types/node": "catalog:",
     "@vitejs/plugin-vue": "^6.0.6",
     "@vue/tsconfig": "^0.9.1",
-    "electron": "^43.2.0",
+    "electron": "^43.4.1",
     "electron-builder": "^26.15.3",
     "electron-vite": "^5.0.0",
-    "sass-embedded": "^1.99.0",
+    "sass-embedded": "^1.103.1",
     "typescript": "catalog:",
     "unocss": "^66.6.8",
-    "vite": "^8.0.10",
+    "vite": "^8.2.2",
     "vue-tsc": "^3.2.7"
   }
 }
