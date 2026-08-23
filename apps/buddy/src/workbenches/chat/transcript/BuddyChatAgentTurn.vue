@@ -2,8 +2,9 @@
 import type { ChatAgentTurn } from './chatStreamingMessage'
 import type { BuddyLocale } from '@/i18n/buddyI18n'
 import { ChevronRight20Regular } from '@vicons/fluent'
+import { useIntervalFn } from '@vueuse/core'
 import { NIcon } from 'naive-ui'
-import { computed } from 'vue'
+import { computed, shallowRef, watch } from 'vue'
 import { useBuddyI18n } from '@/i18n/buddyI18n'
 import BuddyChatAgentIdentity from './BuddyChatAgentIdentity.vue'
 import BuddyChatReasoningGroup from './BuddyChatReasoningGroup.vue'
@@ -25,13 +26,31 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useBuddyI18n(() => props.language)
+const isActive = computed(() => props.turn.status === 'queued' || props.turn.status === 'running')
+const now = shallowRef(Date.now())
+const { pause: pauseDuration, resume: resumeDuration } = useIntervalFn(() => {
+  now.value = Date.now()
+}, 1_000, {
+  immediate: false,
+  immediateCallback: true,
+})
+
+watch(isActive, (active) => {
+  if (active) {
+    resumeDuration()
+    return
+  }
+  pauseDuration()
+}, { immediate: true })
+
 const duration = computed(() => {
   const start = Date.parse(props.turn.startedAt)
-  const end = props.turn.completedAt ? Date.parse(props.turn.completedAt) : Date.now()
+  const end = props.turn.completedAt ? Date.parse(props.turn.completedAt) : now.value
   return formatDuration(Math.max(0, end - start))
 })
-const isActive = computed(() => props.turn.status === 'queued' || props.turn.status === 'running')
-const terminalStatusLabel = computed(() => t(`run.status.${props.turn.status}`))
+const statusLabel = computed(() => isActive.value
+  ? t('desktop.chat.runInProgress')
+  : t(`run.status.${props.turn.status}`))
 const rows = computed(() => projectChatAgentTurnRows(props.turn.nodes))
 const notice = computed(() => resolveChatAgentTurnNotice(
   props.turn.status,
@@ -81,8 +100,18 @@ function formatDuration(value: number): string {
   >
     <div class="buddy-chat-agent-turn__heading">
       <BuddyChatAgentIdentity :language="language" />
+      <div
+        v-if="isActive"
+        class="buddy-chat-agent-turn__status is-static"
+      >
+        <span
+          aria-live="polite"
+          class="buddy-chat-agent-turn__status-label"
+        >{{ statusLabel }}</span>
+        <span class="buddy-chat-agent-turn__duration">{{ duration }}</span>
+      </div>
       <button
-        v-if="!isActive"
+        v-else
         :aria-expanded="canToggleProcess ? open : undefined"
         class="buddy-chat-agent-turn__status"
         :disabled="!canToggleProcess"
@@ -92,7 +121,7 @@ function formatDuration(value: number): string {
         <span
           aria-live="polite"
           class="buddy-chat-agent-turn__status-label"
-        >{{ terminalStatusLabel }}</span>
+        >{{ statusLabel }}</span>
         <span class="buddy-chat-agent-turn__duration">{{ duration }}</span>
         <NIcon
           v-if="canToggleProcess"
@@ -166,9 +195,13 @@ function formatDuration(value: number): string {
   padding: 0;
   text-align: left;
 
-  &:not(:disabled):hover,
-  &:not(:disabled):focus-visible {
+  &:not(.is-static):not(:disabled):hover,
+  &:not(.is-static):not(:disabled):focus-visible {
     color: var(--buddy-text-primary);
+  }
+
+  &.is-static {
+    cursor: default;
   }
 
   &:disabled {

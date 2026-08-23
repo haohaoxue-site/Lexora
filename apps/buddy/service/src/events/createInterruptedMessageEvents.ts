@@ -20,6 +20,8 @@ export function createInterruptedMessageEvents(
   for (const event of events) {
     if (event.type !== 'message.delta')
       continue
+    if (readString(event.payload, 'phase') === 'commentary')
+      continue
     const messageId = readString(event.payload, 'messageId')
     const delta = readString(event.payload, 'delta')
     if (!messageId || delta === null || terminalMessageIds.has(messageId))

@@ -23,8 +23,16 @@ const summary = computed(() => {
   if (!node)
     return ''
   const text = node.text.trim()
-  if (!text)
-    return t(node.status === 'running' ? 'desktop.chat.processReasoningRunning' : 'desktop.chat.processReasoningDone')
+  if (!text) {
+    if (node.reasoningKind === 'summary') {
+      return t(node.status === 'running'
+        ? 'desktop.chat.processReasoningSummaryRunning'
+        : 'desktop.chat.processReasoningSummaryDone')
+    }
+    return t(node.status === 'running'
+      ? 'desktop.chat.processReasoningRunning'
+      : 'desktop.chat.processReasoningDone')
+  }
   const lines = text.split(/\n+/).map(line => line.trim()).filter(Boolean)
   return toChatSummaryText(node.status === 'running' ? lines.at(-1) ?? text : lines[0] ?? text)
 })

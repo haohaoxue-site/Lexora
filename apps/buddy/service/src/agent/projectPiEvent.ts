@@ -1,14 +1,17 @@
 import type {
   AssistantMessage,
   AssistantMessageEvent,
+  TextContent,
   ToolResultMessage,
 } from '@earendil-works/pi-ai'
 import type { AgentSessionEvent } from '@earendil-works/pi-coding-agent'
+import type { BuddyAssistantTextPhase } from '../../../shared/assistantTextPhase'
 import type { BuddyRunProgress } from '../../../shared/runProgress'
 import type { ArtifactOperation } from '../storage/artifactRepository'
 import { randomUUID } from 'node:crypto'
 
 import { redactSensitiveText } from '../../../shared/approvalReviewPayload'
+import { buddyAssistantTextPhaseSchema } from '../../../shared/assistantTextPhase'
 import { MAX_BUDDY_MESSAGE_TEXT_LENGTH } from '../../../shared/buddyMessageContent'
 import { resolveBuddyReasoningKind } from '../../../shared/reasoningPresentation'
 import { createBuddyToolPresentation } from './toolPresentation'
@@ -72,6 +75,7 @@ interface ToolCallState {
 export interface PiEventProjectionState {
   assistantMessageId: string | null
   canonicalRoot?: string
+  completedCommentaryBlockIndexes: Set<number>
   progress: BuddyRunProgress | null
   toolCalls: Map<string, ToolCallState>
 }
@@ -86,6 +90,7 @@ export function createPiEventProjectionState(
   return {
     assistantMessageId: null,
     canonicalRoot: options.canonicalRoot,
+    completedCommentaryBlockIndexes: new Set(),
     progress: null,
     toolCalls: new Map(),
   }
@@ -226,6 +231,7 @@ function projectMessageStart(
     return { events: [] }
   const messageId = randomUUID()
   state.assistantMessageId = messageId
+  state.completedCommentaryBlockIndexes.clear()
   return {
     events: [
       {
@@ -308,14 +314,55 @@ function projectMessageUpdate(
       }],
     }
   }
-  if (event.type !== 'text_delta' || !event.delta)
-    return { events: [] }
-  return {
-    events: [{
-      payload: { delta: event.delta.slice(0, MAX_DELTA_LENGTH), messageId },
-      type: 'message.delta',
-    }],
+  if (event.type === 'text_start') {
+    const phase = resolvePiTextPhase(event.partial.content[event.contentIndex])
+    if (phase !== 'commentary')
+      return { events: [] }
+    return {
+      events: [{
+        payload: {
+          contentIndex: event.contentIndex,
+          kind: 'text',
+          messageId,
+          phase,
+        },
+        type: 'message.block.started',
+      }],
+    }
   }
+  if (event.type === 'text_delta' && event.delta) {
+    const phase = resolvePiTextPhase(event.partial.content[event.contentIndex])
+    return {
+      events: [{
+        payload: {
+          contentIndex: event.contentIndex,
+          delta: event.delta.slice(0, MAX_DELTA_LENGTH),
+          messageId,
+          ...(phase ? { phase } : {}),
+        },
+        type: 'message.delta',
+      }],
+    }
+  }
+  if (event.type === 'text_end') {
+    const phase = resolvePiTextPhase(event.partial.content[event.contentIndex])
+    if (phase !== 'commentary')
+      return { events: [] }
+    state.completedCommentaryBlockIndexes.add(event.contentIndex)
+    return {
+      events: [{
+        payload: {
+          content: event.content.slice(0, MAX_BUDDY_MESSAGE_TEXT_LENGTH),
+          contentIndex: event.contentIndex,
+          kind: 'text',
+          messageId,
+          phase,
+        },
+        type: 'message.block.completed',
+      }],
+    }
+  }
+  return { events: [] }
 }
 
 function resolvePiReasoningKind(event: PiThinkingEvent) {
@@ -344,29 +391,100 @@ function projectAssistantMessageEnd(
 ): PiEventProjection {
   const messageId = state.assistantMessageId ?? randomUUID()
   state.assistantMessageId = null
-  const text = message.content
-    .filter(content => content.type === 'text')
-    .map(content => content.text)
-    .join('')
-    .slice(0, MAX_BUDDY_MESSAGE_TEXT_LENGTH)
+  const textBlocks = message.content.flatMap((content, contentIndex) => (
+    content.type === 'text'
+      ? [{ content, contentIndex, phase: resolvePiTextPhase(content) }]
+      : []
+  ))
+  const phase = resolveCompletedTextPhase(textBlocks)
+  const text = selectCompletedText(textBlocks)
+  const missingTextBlockEvents: BuddyProjectedEvent[] = textBlocks.flatMap((block) => {
+    if (
+      block.phase !== 'commentary'
+      || state.completedCommentaryBlockIndexes.has(block.contentIndex)
+    ) {
+      return []
+    }
+    return [{
+      payload: {
+        content: block.content.text.slice(0, MAX_BUDDY_MESSAGE_TEXT_LENGTH),
+        contentIndex: block.contentIndex,
+        kind: 'text',
+        messageId,
+        phase: block.phase,
+      },
+      type: 'message.block.completed' as const,
+    }]
+  })
+  state.completedCommentaryBlockIndexes.clear()
   const modelFailure = message.stopReason === 'error'
     ? normalizeModelRequestFailure(message.errorMessage)
     : null
   const failureCode = modelFailure?.code
     ?? (message.stopReason === 'aborted' ? 'MODEL_REQUEST_ABORTED' : undefined)
   return {
-    events: [{
-      payload: {
-        content: { text },
-        messageId,
-        role: 'assistant',
-        stopReason: normalizeStopReason(message.stopReason),
+    events: [
+      ...missingTextBlockEvents,
+      {
+        payload: {
+          content: { text },
+          messageId,
+          ...(phase ? { phase } : {}),
+          role: 'assistant',
+          stopReason: normalizeStopReason(message.stopReason),
+        },
+        type: 'message.completed',
       },
-      type: 'message.completed',
-    }],
+    ],
     ...(failureCode ? { failureCode } : {}),
     ...(modelFailure?.message ? { failureMessage: modelFailure.message } : {}),
     sourceMessageId: messageId,
+  }
+}
+
+interface ProjectedTextBlock {
+  content: TextContent
+  contentIndex: number
+  phase: BuddyAssistantTextPhase | undefined
+}
+
+function selectCompletedText(blocks: readonly ProjectedTextBlock[]): string {
+  const selected = blocks.some(block => block.phase === 'final_answer')
+    ? blocks.filter(block => block.phase === 'final_answer')
+    : blocks
+  return selected
+    .map(block => block.content.text)
+    .join('')
+    .slice(0, MAX_BUDDY_MESSAGE_TEXT_LENGTH)
+}
+
+function resolveCompletedTextPhase(
+  blocks: readonly ProjectedTextBlock[],
+): BuddyAssistantTextPhase | undefined {
+  if (blocks.some(block => block.phase === 'final_answer'))
+    return 'final_answer'
+  return blocks.length > 0 && blocks.every(block => block.phase === 'commentary')
+    ? 'commentary'
+    : undefined
+}
+
+function resolvePiTextPhase(
+  content: AssistantMessage['content'][number] | undefined,
+): BuddyAssistantTextPhase | undefined {
+  if (content?.type !== 'text' || !content.textSignature)
+    return undefined
+  try {
+    const signature = JSON.parse(content.textSignature) as unknown
+    if (!signature || typeof signature !== 'object' || Array.isArray(signature))
+      return undefined
+    const record = signature as Record<string, unknown>
+    if (record.v !== 1 || typeof record.id !== 'string')
+      return undefined
+    const phase = buddyAssistantTextPhaseSchema.safeParse(record.phase)
+    return phase.success ? phase.data : undefined
+  }
+  catch {
+    return undefined
   }
 }
 

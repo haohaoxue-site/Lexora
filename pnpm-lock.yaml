@@ -36,7 +36,7 @@ overrides:
   undici@^8.0.0: 8.10.0
 
 patchedDependencies:
-  '@earendil-works/pi-ai@0.84.1': 98d6899f1b4658023fd17934b5b7630a9edfe308bb19b06f27c6280ae4741302
+  '@earendil-works/pi-ai@0.84.1': 07a0a1612283de8fbbc0298d8509ebdeaf72655e07f20b303f9dfaf577da9c4b
 
 importers:
 
@@ -247,7 +247,7 @@ importers:
     dependencies:
       '@earendil-works/pi-ai':
         specifier: ^0.84.1
-        version: 0.84.1(patch_hash=98d6899f1b4658023fd17934b5b7630a9edfe308bb19b06f27c6280ae4741302)(@modelcontextprotocol/sdk@1.30.0(@cfworker/json-schema@4.1.1)(zod@4.4.3))(ws@8.21.0)(zod@4.4.3)
+        version: 0.84.1(patch_hash=07a0a1612283de8fbbc0298d8509ebdeaf72655e07f20b303f9dfaf577da9c4b)(@modelcontextprotocol/sdk@1.30.0(@cfworker/json-schema@4.1.1)(zod@4.4.3))(ws@8.21.0)(zod@4.4.3)
       '@earendil-works/pi-coding-agent':
         specifier: ^0.84.1
         version: 0.84.1(@modelcontextprotocol/sdk@1.30.0(@cfworker/json-schema@4.1.1)(zod@4.4.3))(ws@8.21.0)(zod@4.4.3)
@@ -9071,7 +9071,7 @@ snapshots:
 
   '@earendil-works/pi-agent-core@0.84.1(@modelcontextprotocol/sdk@1.30.0(@cfworker/json-schema@4.1.1)(zod@4.4.3))(ws@8.21.0)(zod@4.4.3)':
     dependencies:
-      '@earendil-works/pi-ai': 0.84.1(patch_hash=98d6899f1b4658023fd17934b5b7630a9edfe308bb19b06f27c6280ae4741302)(@modelcontextprotocol/sdk@1.30.0(@cfworker/json-schema@4.1.1)(zod@4.4.3))(ws@8.21.0)(zod@4.4.3)
+      '@earendil-works/pi-ai': 0.84.1(patch_hash=07a0a1612283de8fbbc0298d8509ebdeaf72655e07f20b303f9dfaf577da9c4b)(@modelcontextprotocol/sdk@1.30.0(@cfworker/json-schema@4.1.1)(zod@4.4.3))(ws@8.21.0)(zod@4.4.3)
       '@earendil-works/pi-telemetry': 0.84.1
       diff: 8.0.4
       ignore: 7.0.5
@@ -9085,7 +9085,7 @@ snapshots:
       - ws
       - zod
 
-  '@earendil-works/pi-ai@0.84.1(patch_hash=98d6899f1b4658023fd17934b5b7630a9edfe308bb19b06f27c6280ae4741302)(@modelcontextprotocol/sdk@1.30.0(@cfworker/json-schema@4.1.1)(zod@4.4.3))(ws@8.21.0)(zod@4.4.3)':
+  '@earendil-works/pi-ai@0.84.1(patch_hash=07a0a1612283de8fbbc0298d8509ebdeaf72655e07f20b303f9dfaf577da9c4b)(@modelcontextprotocol/sdk@1.30.0(@cfworker/json-schema@4.1.1)(zod@4.4.3))(ws@8.21.0)(zod@4.4.3)':
     dependencies:
       '@anthropic-ai/sdk': 0.91.1(zod@4.4.3)
       '@aws-sdk/client-bedrock-runtime': 3.1048.0
@@ -9114,7 +9114,7 @@ snapshots:
   '@earendil-works/pi-coding-agent@0.84.1(@modelcontextprotocol/sdk@1.30.0(@cfworker/json-schema@4.1.1)(zod@4.4.3))(ws@8.21.0)(zod@4.4.3)':
     dependencies:
       '@earendil-works/pi-agent-core': 0.84.1(@modelcontextprotocol/sdk@1.30.0(@cfworker/json-schema@4.1.1)(zod@4.4.3))(ws@8.21.0)(zod@4.4.3)
-      '@earendil-works/pi-ai': 0.84.1(patch_hash=98d6899f1b4658023fd17934b5b7630a9edfe308bb19b06f27c6280ae4741302)(@modelcontextprotocol/sdk@1.30.0(@cfworker/json-schema@4.1.1)(zod@4.4.3))(ws@8.21.0)(zod@4.4.3)
+      '@earendil-works/pi-ai': 0.84.1(patch_hash=07a0a1612283de8fbbc0298d8509ebdeaf72655e07f20b303f9dfaf577da9c4b)(@modelcontextprotocol/sdk@1.30.0(@cfworker/json-schema@4.1.1)(zod@4.4.3))(ws@8.21.0)(zod@4.4.3)
       '@earendil-works/pi-client': 0.84.1
       '@earendil-works/pi-protocol': 0.84.1
       '@earendil-works/pi-tui': 0.84.1

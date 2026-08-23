@@ -18,6 +18,7 @@ import {
   approvalReviewPayloadMatchesKind,
   approvalReviewPayloadSchema,
 } from '../../../shared/approvalReviewPayload'
+import { buddyAssistantTextPhaseSchema } from '../../../shared/assistantTextPhase'
 import { MAX_BUDDY_MESSAGE_TEXT_LENGTH } from '../../../shared/buddyMessageContent'
 import { withTransaction } from '../storage/database'
 
@@ -76,6 +77,7 @@ const completedMessagePayloadSchema = z.object({
     text: z.string().max(MAX_BUDDY_MESSAGE_TEXT_LENGTH),
   }).strict(),
   messageId: messageIdSchema,
+  phase: buddyAssistantTextPhaseSchema.optional(),
   role: z.literal('assistant'),
   stopReason: z.enum(['completed', 'deferred', 'failed', 'length', 'tool_use']),
 }).strict()

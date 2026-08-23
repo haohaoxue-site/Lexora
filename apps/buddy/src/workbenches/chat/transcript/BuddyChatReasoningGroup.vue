@@ -3,7 +3,7 @@ import type { ChatAgentReasoningGroup } from './chatStreamingMessage'
 import type { BuddyLocale } from '@/i18n/buddyI18n'
 import { ChevronRight20Regular, Lightbulb20Regular } from '@vicons/fluent'
 import { NIcon } from 'naive-ui'
-import { shallowRef } from 'vue'
+import { computed, shallowRef } from 'vue'
 import { useBuddyI18n } from '@/i18n/buddyI18n'
 import BuddyChatReasoningRow from './BuddyChatReasoningRow.vue'
 
@@ -14,6 +14,9 @@ const props = defineProps<{
 
 const { t } = useBuddyI18n(() => props.language)
 const isOpen = shallowRef(true)
+const title = computed(() => t(props.group.reasoningKind === 'summary'
+  ? 'desktop.chat.processReasoningSummary'
+  : 'desktop.chat.processReasoning'))
 </script>
 
 <template>
@@ -25,7 +28,7 @@ const isOpen = shallowRef(true)
       @click="isOpen = !isOpen"
     >
       <NIcon :component="Lightbulb20Regular" class="buddy-chat-reasoning-group__icon" />
-      <span class="buddy-chat-reasoning-group__title">{{ t('desktop.chat.processReasoning') }}</span>
+      <span class="buddy-chat-reasoning-group__title">{{ title }}</span>
       <NIcon
         :component="ChevronRight20Regular"
         class="buddy-chat-reasoning-group__chevron"

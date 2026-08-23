@@ -5,10 +5,12 @@ import type {
   LocalRunEvent,
 } from '@buddy-electron/shared/localChatApi'
 import type { ApprovalReviewPayload } from '@buddy-shared/approvalReviewPayload'
+import type { BuddyAssistantTextPhase } from '@buddy-shared/assistantTextPhase'
 import type { BuddyReasoningKind } from '@buddy-shared/reasoningPresentation'
 import type { BuddyToolPresentation } from '@buddy-shared/runEventPresentation'
 import type { BuddyRunProgress } from '@buddy-shared/runProgress'
 import { approvalReviewPayloadSchema } from '@buddy-shared/approvalReviewPayload'
+import { buddyAssistantTextPhaseSchema } from '@buddy-shared/assistantTextPhase'
 import {
   buddyReasoningKindSchema,
   resolveBuddyReasoningKind,
@@ -28,9 +30,11 @@ export interface ChatAgentReasoningNode {
 }
 
 export interface ChatAgentNarrationNode {
+  contentIndex?: number
   id: string
   kind: 'text'
   messageId: string
+  phase?: 'commentary'
   text: string
 }
 
@@ -58,6 +62,7 @@ export interface ChatAgentReasoningGroup {
   entries: ChatAgentReasoningEntry[]
   id: string
   kind: 'reasoning-group'
+  reasoningKind: BuddyReasoningKind
 }
 
 export type ChatAgentTurnRow = ChatAgentNarrationNode | ChatAgentReasoningGroup | ChatAgentToolNode
@@ -98,7 +103,7 @@ function projectChatAgentTurn(
   const reasoning = new Map<string, ChatAgentReasoningNode & { order: number }>()
   const tools = new Map<string, ChatAgentToolNode & { order: number }>()
   const approvalTools = new Map<string, string>()
-  const text: Array<ChatAgentNarrationNode & { order: number }> = []
+  const text = new Map<string, ChatAgentNarrationNode & { order: number }>()
   let failureMessage: string | null = null
   let finalMessageId: string | null = null
   let progress: BuddyRunProgress | null = null
@@ -119,7 +124,40 @@ function projectChatAgentTurn(
     if (event.type.startsWith('message.block.')) {
       const messageId = readString(payload.messageId)
       const contentIndex = readNonnegativeInteger(payload.contentIndex)
-      if (!messageId || contentIndex === null || payload.kind !== 'reasoning')
+      if (!messageId || contentIndex === null)
+        continue
+      if (payload.kind === 'text') {
+        const phase = readAssistantTextPhase(payload.phase)
+        if (phase !== 'commentary')
+          continue
+        const id = `process-text:${messageId}:${contentIndex}`
+        const current = text.get(id) ?? {
+          contentIndex,
+          id,
+          kind: 'text' as const,
+          messageId,
+          order: event.sequence,
+          phase: 'commentary' as const,
+          text: '',
+        }
+        if (event.type === 'message.block.delta') {
+          text.set(id, {
+            ...current,
+            text: current.text + readString(payload.delta),
+          })
+        }
+        else if (event.type === 'message.block.completed') {
+          text.set(id, {
+            ...current,
+            text: readString(payload.content),
+          })
+        }
+        else {
+          text.set(id, current)
+        }
+        continue
+      }
+      if (payload.kind !== 'reasoning')
         continue
       const id = `reasoning:${messageId}:${contentIndex}`
       const parsedReasoningKind = buddyReasoningKindSchema.safeParse(payload.reasoningKind)
@@ -155,20 +193,70 @@ function projectChatAgentTurn(
       }
       continue
     }
+    if (event.type === 'message.delta') {
+      const phase = readAssistantTextPhase(payload.phase)
+      const messageId = readString(payload.messageId)
+      const contentIndex = readNonnegativeInteger(payload.contentIndex)
+      if (phase !== 'commentary' || !messageId || contentIndex === null)
+        continue
+      const id = `process-text:${messageId}:${contentIndex}`
+      const current = text.get(id) ?? {
+        contentIndex,
+        id,
+        kind: 'text' as const,
+        messageId,
+        order: event.sequence,
+        phase: 'commentary' as const,
+        text: '',
+      }
+      text.set(id, {
+        ...current,
+        text: current.text + readString(payload.delta),
+      })
+      continue
+    }
     if (event.type === 'message.completed') {
       const messageId = readString(payload.messageId)
       const content = readPayload(payload.content)
       if (!messageId)
         continue
-      if (payload.stopReason === 'tool_use') {
+      const phase = readAssistantTextPhase(payload.phase)
+      if (phase === 'commentary') {
         const value = readString(content?.text)
         const normalized = normalizeProcessNarration(value)
         const duplicatesReasoning = normalized && [...reasoning.values()].some(node => (
           normalizeProcessNarration(node.text) === normalized
         ))
         if (normalized && !duplicatesReasoning) {
-          text.push({
-            id: `process-text:${messageId}`,
+          const existing = [...text.values()].filter(node => node.messageId === messageId)
+          if (existing.length <= 1) {
+            const current = existing[0]
+            const id = current?.id ?? `process-text:${messageId}:message`
+            text.set(id, {
+              ...current,
+              id,
+              kind: 'text',
+              messageId,
+              order: current?.order ?? event.sequence,
+              phase: 'commentary',
+              text: value,
+            })
+          }
+        }
+      }
+      else if (phase === 'final_answer') {
+        finalMessageId = messageId
+      }
+      else if (payload.stopReason === 'tool_use') {
+        const value = readString(content?.text)
+        const normalized = normalizeProcessNarration(value)
+        const duplicatesReasoning = normalized && [...reasoning.values()].some(node => (
+          normalizeProcessNarration(node.text) === normalized
+        ))
+        if (normalized && !duplicatesReasoning) {
+          const id = `process-text:${messageId}:message`
+          text.set(id, {
+            id,
             kind: 'text',
             messageId,
             order: event.sequence,
@@ -244,16 +332,17 @@ function projectChatAgentTurn(
         continue
       const current = tools.get(toolCallId)
       const isError = event.type === 'tool.completed' && payload.isError === true
-      const narration = current ? null : text.at(-1)
+      const narration = current ? null : [...text.values()].at(-1)
+      const toolNarration = narration?.phase === 'commentary' ? null : narration
       const isSystemTool = presentation.data.card === 'system'
       const description = isSystemTool
         ? null
         : current?.description
-          ?? narration?.text
+          ?? toolNarration?.text
           ?? specificToolDescription(presentation.data.description)
           ?? null
-      if (!isSystemTool && narration && description === narration.text)
-        text.pop()
+      if (!isSystemTool && toolNarration && description === toolNarration.text)
+        text.delete(toolNarration.id)
       tools.set(toolCallId, {
         ...(current?.approvalId ? { approvalId: current.approvalId } : {}),
         description,
@@ -272,7 +361,8 @@ function projectChatAgentTurn(
   }
   const terminal = run.status !== 'queued' && run.status !== 'running'
   const reasoningNodes = [...reasoning.values()].filter(node => node.text.trim())
-  const nodes = [...reasoningNodes, ...text, ...tools.values()]
+  const narrationNodes = [...text.values()].filter(node => node.text.trim())
+  const nodes = [...reasoningNodes, ...narrationNodes, ...tools.values()]
     .sort((left, right) => left.order - right.order)
     .map(({ order: _order, ...node }) => {
       if (node.kind === 'text' || !terminal || node.status !== 'running')
@@ -305,6 +395,9 @@ export function projectChatAgentTurnRows(nodes: ReadonlyArray<ChatAgentTurnNode>
       entries: projectReasoningEntries(reasoning),
       id: `reasoning-group:${reasoning[0]!.id}`,
       kind: 'reasoning-group',
+      reasoningKind: reasoning.some(node => node.reasoningKind === 'thinking')
+        ? 'thinking'
+        : 'summary',
     })
     reasoning = []
   }
@@ -505,13 +598,18 @@ export function projectStreamingAssistantMessage(
       continue
     }
     if (event.type === 'message.delta') {
+      if (readAssistantTextPhase(payload.phase) === 'commentary') {
+        candidates.delete(messageId)
+        continue
+      }
       const delta = typeof payload.delta === 'string' ? payload.delta : ''
       const current = candidates.get(messageId) ?? { id: messageId, text: '' }
       candidates.set(messageId, { ...current, text: current.text + delta })
       continue
     }
     if (event.type === 'message.completed') {
-      if (payload.stopReason === 'tool_use') {
+      const phase = readAssistantTextPhase(payload.phase)
+      if (phase === 'commentary' || (!phase && payload.stopReason === 'tool_use')) {
         candidates.delete(messageId)
         continue
       }
@@ -540,6 +638,11 @@ function readNonnegativeInteger(value: unknown): number | null {
   return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0
     ? value
     : null
+}
+
+function readAssistantTextPhase(value: unknown): BuddyAssistantTextPhase | null {
+  const phase = buddyAssistantTextPhaseSchema.safeParse(value)
+  return phase.success ? phase.data : null
 }
 
 function normalizeProcessNarration(value: string): string {

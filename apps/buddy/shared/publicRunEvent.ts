@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { approvalReviewPayloadSchema } from './approvalReviewPayload'
+import { buddyAssistantTextPhaseSchema } from './assistantTextPhase'
 import {
   MAX_BUDDY_MESSAGE_TEXT_LENGTH,
   readBuddyInterruptedMessageContent,
@@ -55,10 +56,10 @@ const SCALAR_PAYLOAD_KEYS = new Map<string, readonly string[]>([
     'toolTokens',
     'totalTokens',
   ]],
-  ['message.delta', ['delta', 'messageId']],
-  ['message.block.completed', ['content', 'contentIndex', 'kind', 'messageId', 'reasoningKind']],
-  ['message.block.delta', ['delta', 'contentIndex', 'kind', 'messageId', 'reasoningKind']],
-  ['message.block.started', ['contentIndex', 'kind', 'messageId', 'reasoningKind']],
+  ['message.delta', ['contentIndex', 'delta', 'messageId', 'phase']],
+  ['message.block.completed', ['content', 'contentIndex', 'kind', 'messageId', 'phase', 'reasoningKind']],
+  ['message.block.delta', ['delta', 'contentIndex', 'kind', 'messageId', 'phase', 'reasoningKind']],
+  ['message.block.started', ['contentIndex', 'kind', 'messageId', 'phase', 'reasoningKind']],
   ['message.started', ['messageId', 'role']],
   ['run.cancelled', ['errorCode']],
   ['run.completed', ['errorCode']],
@@ -167,7 +168,7 @@ function publicInterruptedMessage(source: Record<string, unknown>): Record<strin
 }
 
 function publicCompletedMessage(source: Record<string, unknown>): Record<string, unknown> {
-  const payload = selectScalars(source, ['messageId', 'role', 'stopReason'])
+  const payload = selectScalars(source, ['messageId', 'phase', 'role', 'stopReason'])
   const content = readRecord(source.content)
   if (content && typeof content.text === 'string')
     payload.content = { text: content.text.slice(0, MAX_BUDDY_MESSAGE_TEXT_LENGTH) }
@@ -191,6 +192,10 @@ function toPublicScalar(
   key: string,
   value: unknown,
 ): boolean | null | number | string | undefined {
+  if (key === 'phase') {
+    const phase = buddyAssistantTextPhaseSchema.safeParse(value)
+    return phase.success ? phase.data : undefined
+  }
   if (typeof value === 'string') {
     return value.slice(
       0,

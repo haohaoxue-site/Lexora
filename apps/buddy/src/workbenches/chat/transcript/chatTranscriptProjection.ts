@@ -186,7 +186,7 @@ export function projectPersistedChatTranscriptRows(
   const processMessageIds = new Set<string>()
   for (const turn of turns) {
     for (const node of turn.nodes) {
-      if (node.kind === 'text')
+      if (node.kind === 'text' && node.messageId !== turn.finalMessageId)
         processMessageIds.add(node.messageId)
     }
     if (!shouldShowAgentTurn(turn))

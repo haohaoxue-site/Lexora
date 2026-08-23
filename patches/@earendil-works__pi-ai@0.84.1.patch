@@ -2,7 +2,19 @@ diff --git a/dist/api/openai-responses-shared.js b/dist/api/openai-responses-sha
 index a2049d5a1f633d7a96aa3cf080ded6310df8f97f..cd1f08e0f8300d04cae27662d8815731cd0a7083 100644
 --- a/dist/api/openai-responses-shared.js
 +++ b/dist/api/openai-responses-shared.js
-@@ -465,6 +465,9 @@ export async function processResponsesStream(openaiStream, output, stream, model
+@@ -341,6 +341,10 @@ export async function processResponsesStream(openaiStream, output, stream, model
+         if (item.type === "message") {
+             applyMessagePhaseStopReason(item);
+-            const block = { type: "text", text: "" };
++            const block = {
++                type: "text",
++                text: "",
++                textSignature: encodeTextSignatureV1(item.id, item.phase ?? undefined),
++            };
+             output.content.push(block);
+             const slot = { type: "text", block, contentIndex: output.content.length - 1 };
+             outputSlots.set(outputIndex, slot);
+@@ -465,6 +469,9 @@ export async function processResponsesStream(openaiStream, output, stream, model
              const slot = getSlot(event.output_index, "thinking");
              if (!slot)
                  continue;
@@ -12,7 +24,7 @@ index a2049d5a1f633d7a96aa3cf080ded6310df8f97f..cd1f08e0f8300d04cae27662d8815731
              slot.block.thinking += event.delta;
              stream.push({
                  type: "thinking_delta",
-@@ -477,6 +480,9 @@ export async function processResponsesStream(openaiStream, output, stream, model
+@@ -477,6 +484,9 @@ export async function processResponsesStream(openaiStream, output, stream, model
              const slot = getSlot(event.output_index, "thinking");
              if (!slot)
                  continue;
@@ -22,7 +34,7 @@ index a2049d5a1f633d7a96aa3cf080ded6310df8f97f..cd1f08e0f8300d04cae27662d8815731
              slot.block.thinking += "\n\n";
              stream.push({
                  type: "thinking_delta",
-@@ -489,6 +495,9 @@ export async function processResponsesStream(openaiStream, output, stream, model
+@@ -489,6 +499,9 @@ export async function processResponsesStream(openaiStream, output, stream, model
              const slot = getSlot(event.output_index, "thinking");
              if (!slot)
                  continue;
@@ -32,7 +44,7 @@ index a2049d5a1f633d7a96aa3cf080ded6310df8f97f..cd1f08e0f8300d04cae27662d8815731
              slot.block.thinking += event.delta;
              stream.push({
                  type: "thinking_delta",
-@@ -561,7 +570,8 @@ export async function processResponsesStream(openaiStream, output, stream, model
+@@ -561,7 +574,8 @@ export async function processResponsesStream(openaiStream, output, stream, model
              if (item.type === "reasoning" && slot?.type === "thinking") {
                  const summaryText = item.summary?.map((s) => s.text).join("\n\n") || "";
                  const contentText = item.content?.map((c) => c.text).join("\n\n") || "";

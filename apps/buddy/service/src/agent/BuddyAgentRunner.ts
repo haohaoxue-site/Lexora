@@ -1,5 +1,6 @@
 import type { ImageContent } from '@earendil-works/pi-ai'
 import type { AgentSessionEvent, CompactionResult } from '@earendil-works/pi-coding-agent'
+import type { BuddyAssistantTextPhase } from '../../../shared/assistantTextPhase'
 import type { BuddyServiceTier } from '../../../shared/modelSelection'
 import type { RunEventLog } from '../events/RunEventLog'
 import type { ConversationRepository } from '../storage/conversationRepository'
@@ -19,6 +20,7 @@ import type { BuddyProjectedEvent, ProjectedArtifact } from './projectPiEvent'
 import { createHash, randomUUID } from 'node:crypto'
 
 import { isAbsolute, resolve } from 'node:path'
+import { buddyAssistantTextPhaseSchema } from '../../../shared/assistantTextPhase'
 import { createBuddyInterruptedMessageContent } from '../../../shared/buddyMessageContent'
 import { buddyReasoningKindSchema } from '../../../shared/reasoningPresentation'
 import { createInterruptedMessageEvents } from '../events/createInterruptedMessageEvents'
@@ -961,6 +963,8 @@ function mergeStreamDelta(
     !leftPayload
     || !rightPayload
     || leftPayload.messageId !== rightPayload.messageId
+    || leftPayload.contentIndex !== rightPayload.contentIndex
+    || leftPayload.phase !== rightPayload.phase
     || leftPayload.delta.length + rightPayload.delta.length > 64 * 1024
   ) {
     return null
@@ -968,8 +972,10 @@ function mergeStreamDelta(
   return {
     createdAt: left.createdAt,
     payload: {
+      ...(leftPayload.contentIndex === null ? {} : { contentIndex: leftPayload.contentIndex }),
       delta: leftPayload.delta + rightPayload.delta,
       messageId: leftPayload.messageId,
+      ...(leftPayload.phase ? { phase: leftPayload.phase } : {}),
     },
     type: 'message.delta',
   }
@@ -1004,13 +1010,37 @@ function mergeMessageBlockDelta(
   }
 }
 
-function readMessageDeltaPayload(value: unknown): { delta: string, messageId: string } | null {
+function readMessageDeltaPayload(value: unknown): {
+  contentIndex: number | null
+  delta: string
+  messageId: string
+  phase: BuddyAssistantTextPhase | undefined
+} | null {
   if (!value || typeof value !== 'object' || Array.isArray(value))
     return null
   const payload = value as Record<string, unknown>
-  return typeof payload.delta === 'string' && typeof payload.messageId === 'string'
-    ? { delta: payload.delta, messageId: payload.messageId }
-    : null
+  if (typeof payload.delta !== 'string' || typeof payload.messageId !== 'string')
+    return null
+  const contentIndex = payload.contentIndex === undefined
+    ? null
+    : typeof payload.contentIndex === 'number'
+      && Number.isSafeInteger(payload.contentIndex)
+      && payload.contentIndex >= 0
+      ? payload.contentIndex
+      : undefined
+  if (contentIndex === undefined)
+    return null
+  const phase = payload.phase === undefined
+    ? undefined
+    : buddyAssistantTextPhaseSchema.safeParse(payload.phase)
+  if (phase !== undefined && !phase.success)
+    return null
+  return {
+    contentIndex,
+    delta: payload.delta,
+    messageId: payload.messageId,
+    phase: phase?.data,
+  }
 }
 
 function readMessageBlockDeltaPayload(
