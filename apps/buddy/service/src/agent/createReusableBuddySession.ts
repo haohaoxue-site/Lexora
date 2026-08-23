@@ -7,6 +7,7 @@ import type {
   BuddyAgentSessionLike,
   BuddySessionTurnContext,
 } from './BuddyAgentRunner'
+import type { BuddySessionShutdownReason } from './createBuddySession'
 import type { BuddyRunContext } from './extensions/toolPolicyExtension'
 import {
   findCutPoint,
@@ -29,6 +30,7 @@ export interface CreateReusableBuddySessionOptions {
   ) => Promise<Model<Api>>
   runContext: BuddyRunContextStore
   session: AgentSession
+  shutdown: (reason: BuddySessionShutdownReason) => Promise<void>
 }
 
 export function createReusableBuddySession(
@@ -70,7 +72,7 @@ export function createReusableBuddySession(
           options.runContext.current = null
       }
     },
-    dispose: () => session.dispose(),
+    shutdown: options.shutdown,
     compact: instructions => withPiSessionStorageBoundary(
       session,
       () => session.compact(instructions),

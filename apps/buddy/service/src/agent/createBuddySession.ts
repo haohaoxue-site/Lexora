@@ -4,12 +4,11 @@ import type {
   CreateAgentSessionOptions,
   LoadExtensionsResult,
   ModelRuntime,
-  ToolDefinition,
 } from '@earendil-works/pi-coding-agent'
 import type { BuddyServiceTier } from '../../../shared/modelSelection'
 import type { ShellSandboxAssets } from '../approvals/ShellSandbox'
 import type { BuddySessionResources } from './BuddySessionResources'
-import type { BundledLexoraExtension } from './createBuddyResourceLoader'
+import type { BuddyInProcessExtension } from './createBuddyResourceLoader'
 import type { BoundedContextDiagnostic } from './loadBoundedContextFiles'
 import { chmod, mkdir, realpath } from 'node:fs/promises'
 
@@ -19,8 +18,6 @@ import {
   createAgentSession,
   SessionManager,
 } from '@earendil-works/pi-coding-agent'
-import { createSandboxedFileTools } from '../approvals/FileSandbox'
-import { createSandboxedBashTool } from '../approvals/ShellSandbox'
 import {
   BuddySessionCreationError,
   isMissingBuddySessionFile,
@@ -31,20 +28,20 @@ import {
   createBuddyResourceLoader,
   createBuddySettingsManager,
 } from './createBuddyResourceLoader'
+import { createWorkspaceExtension } from './extensions/workspaceExtension'
 
 const sessionIdentityPattern = /^[A-Z0-9][\w-]{0,127}$/i
 
 export interface CreateBuddySessionOptions {
   agentDir: string
   branchId: string
-  bundledExtensions: readonly BundledLexoraExtension[]
   canonicalRoot: string
   conversationId: string
-  customTools?: readonly ToolDefinition[]
   cwd: string
   getServiceTier?: () => BuddyServiceTier | null
   model?: Model<Api>
   modelRuntime: ModelRuntime
+  inProcessExtensions: readonly BuddyInProcessExtension[]
   piSessionFile?: string
   recoveryMessages?: readonly Message[] | (() => Promise<readonly Message[]>)
   resources: BuddySessionResources
@@ -58,7 +55,10 @@ export interface BuddyAgentSession {
   recoveredFromProductHistory: boolean
   resourceDiagnostics: readonly BoundedContextDiagnostic[]
   session: AgentSession
+  shutdown: (reason: BuddySessionShutdownReason) => Promise<void>
 }
+
+export type BuddySessionShutdownReason = 'evict' | 'invalidate' | 'quit' | 'resource-change'
 
 export type BuddyContextSnapshot = ReturnType<typeof createEstimatedContextUsage>
 
@@ -120,8 +120,9 @@ export async function createBuddySession(
     },
   })
   const piSessionFile = sessionManager.getSessionFile()
+  const shutdown = createSessionShutdown(result.session)
   if (!piSessionFile || !containsPath(canonicalSessionDir, resolve(piSessionFile))) {
-    result.session.dispose()
+    await shutdown('quit')
     throw new BuddySessionCreationError()
   }
 
@@ -131,6 +132,7 @@ export async function createBuddySession(
     recoveredFromProductHistory,
     resourceDiagnostics: options.resources.context.diagnostics,
     session: result.session,
+    shutdown,
   }
 }
 
@@ -186,7 +188,27 @@ export async function createBuddyContextSnapshot(
     })
   }
   finally {
-    result.session.dispose()
+    await createSessionShutdown(result.session)('quit')
+  }
+}
+
+function createSessionShutdown(
+  session: AgentSession,
+): (reason: BuddySessionShutdownReason) => Promise<void> {
+  let shutdown: Promise<void> | null = null
+  return (reason) => {
+    shutdown ??= (async () => {
+      try {
+        await session.extensionRunner.emit({
+          reason: reason === 'resource-change' || reason === 'invalidate' ? 'reload' : 'quit',
+          type: 'session_shutdown',
+        })
+      }
+      finally {
+        session.dispose()
+      }
+    })()
+    return shutdown
   }
 }
 
@@ -208,28 +230,28 @@ async function createConfiguredBuddySession(
     approvedSkillPaths: [...options.resources.approvedSkillPaths],
     agentDir: runtime.agentDir,
     boundedContextFiles: context.agentsFiles,
-    bundledExtensions: [...options.bundledExtensions],
     cwd: runtime.cwd,
+    inProcessExtensions: [
+      createWorkspaceExtension({
+        canonicalRoot: runtime.canonicalRoot,
+        shellSandboxAssets: options.shellSandboxAssets,
+      }),
+      ...options.inProcessExtensions,
+    ],
     projectInstructions: options.resources.projectInstructions,
     settingsManager,
   })
-  const customTools = [
-    createSandboxedBashTool(runtime.canonicalRoot, options.shellSandboxAssets),
-    ...createSandboxedFileTools(runtime.canonicalRoot),
-    ...(options.customTools ?? []),
-  ]
   const result = await createAgentSession({
     agentDir: runtime.agentDir,
-    customTools,
     cwd: runtime.cwd,
     model: options.model,
     modelRuntime: options.modelRuntime,
+    noTools: 'builtin',
     resourceLoader,
     sessionManager: runtime.sessionManager,
     sessionStartEvent: runtime.sessionStartEvent,
     settingsManager,
     thinkingLevel: options.thinkingLevel,
-    tools: customTools.map(tool => tool.name),
   })
   const previousPayloadTransform = result.session.agent.onPayload
   result.session.agent.onPayload = async (payload, model) => {

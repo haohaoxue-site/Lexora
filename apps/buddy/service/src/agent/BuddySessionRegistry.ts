@@ -1,3 +1,5 @@
+import type { BuddySessionShutdownReason } from './createBuddySession'
+
 export interface BuddySessionIdentity {
   branchId: string
   canonicalRoot: string
@@ -16,7 +18,7 @@ export interface BuddySessionBinding<TSession> {
 }
 
 export interface DisposableBuddySession {
-  dispose: () => void
+  shutdown: (reason: BuddySessionShutdownReason) => Promise<void>
 }
 
 interface ActiveRun {
@@ -62,7 +64,7 @@ export class BuddySessionRegistry<TSession extends DisposableBuddySession> {
 
     for (const [candidateKey, candidateIdentity] of [...this.#identities]) {
       if (createBranchKey(candidateIdentity) === branchKey)
-        await this.#disposeSession(candidateKey)
+        await this.#disposeSession(candidateKey, 'resource-change')
     }
     this.#branchRoots.set(branchKey, identity.canonicalRoot)
 
@@ -143,10 +145,9 @@ export class BuddySessionRegistry<TSession extends DisposableBuddySession> {
 
   async dispose(): Promise<void> {
     const bindings = await Promise.allSettled(this.#sessions.values())
-    for (const binding of bindings) {
-      if (binding.status === 'fulfilled')
-        binding.value.session.dispose()
-    }
+    await Promise.allSettled(bindings.flatMap(binding => binding.status === 'fulfilled'
+      ? [binding.value.session.shutdown('quit')]
+      : []))
     this.#activeRuns.clear()
     this.#branchRoots.clear()
     this.#identities.clear()
@@ -167,7 +168,7 @@ export class BuddySessionRegistry<TSession extends DisposableBuddySession> {
         this.#pendingInvalidations.add(sessionKey)
         continue
       }
-      await this.#disposeSession(sessionKey)
+      await this.#disposeSession(sessionKey, 'invalidate')
     }
     return count
   }
@@ -178,11 +179,14 @@ export class BuddySessionRegistry<TSession extends DisposableBuddySession> {
       if (!identity || createBranchKey(identity) !== branchKey)
         continue
       this.#pendingInvalidations.delete(sessionKey)
-      await this.#disposeSession(sessionKey)
+      await this.#disposeSession(sessionKey, 'invalidate')
     }
   }
 
-  async #disposeSession(sessionKey: string): Promise<void> {
+  async #disposeSession(
+    sessionKey: string,
+    reason: BuddySessionShutdownReason,
+  ): Promise<void> {
     const pending = this.#sessions.get(sessionKey)
     const identity = this.#identities.get(sessionKey)
     this.#sessions.delete(sessionKey)
@@ -190,11 +194,15 @@ export class BuddySessionRegistry<TSession extends DisposableBuddySession> {
     this.#lastUsed.delete(sessionKey)
     this.#pendingInvalidations.delete(sessionKey)
     const binding = pending ? await pending.catch(() => null) : null
-    binding?.session.dispose()
-    if (identity) {
-      const branchKey = createBranchKey(identity)
-      if (![...this.#identities.values()].some(candidate => createBranchKey(candidate) === branchKey))
-        this.#branchRoots.delete(branchKey)
+    try {
+      await binding?.session.shutdown(reason)
+    }
+    finally {
+      if (identity) {
+        const branchKey = createBranchKey(identity)
+        if (![...this.#identities.values()].some(candidate => createBranchKey(candidate) === branchKey))
+          this.#branchRoots.delete(branchKey)
+      }
     }
   }
 
@@ -209,7 +217,7 @@ export class BuddySessionRegistry<TSession extends DisposableBuddySession> {
         .sort((left, right) => left[1] - right[1])[0]?.[0]
       if (!candidate)
         return
-      await this.#disposeSession(candidate)
+      await this.#disposeSession(candidate, 'evict')
     }
   }
 

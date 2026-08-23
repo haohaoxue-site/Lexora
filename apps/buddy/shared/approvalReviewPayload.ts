@@ -6,28 +6,63 @@ const MAX_ARGUMENT_NAMES = 32
 const MAX_TARGET_PATHS = 32
 
 const toolNameSchema = z.string().trim().min(1).max(256)
+const systemActionSchema = z.enum([
+  'kill-process',
+  'restart-service',
+  'start-service',
+  'stop-service',
+  'terminate-process',
+])
+const systemActionTargetSchema = z.object({
+  displayName: z.string().trim().min(1).max(256),
+  pid: z.number().int().positive().optional(),
+  startedAt: z.iso.datetime().optional(),
+  unit: z.string().trim().min(1).max(256).optional(),
+}).strict()
 
-export const approvalReviewPayloadSchema = z.union([
+export const approvalReviewPayloadSchema = z.discriminatedUnion('card', [
   z.object({
+    card: z.literal('shell'),
     command: z.string().max(MAX_COMMAND_REVIEW_LENGTH),
     toolName: toolNameSchema,
   }).strict(),
   z.object({
+    card: z.literal('paths'),
     targetPaths: z.array(z.string().min(1).max(4_096)).max(MAX_TARGET_PATHS),
     toolName: toolNameSchema,
   }).strict(),
   z.object({
     argumentNames: z.array(z.string().min(1).max(256)).max(MAX_ARGUMENT_NAMES),
+    card: z.literal('arguments'),
+    toolName: toolNameSchema,
+  }).strict(),
+  z.object({
+    action: systemActionSchema,
+    card: z.literal('system-action'),
+    effect: z.string().trim().min(1).max(512),
+    expiresAt: z.iso.datetime(),
+    interruption: z.enum(['application', 'network', 'none', 'service']),
+    reason: z.string().trim().min(1).max(512),
+    target: systemActionTargetSchema,
     toolName: toolNameSchema,
   }).strict(),
 ])
 
 export type ApprovalReviewPayload = z.infer<typeof approvalReviewPayloadSchema>
 export type ApprovalReviewKind = 'delete' | 'mcp' | 'network' | 'shell' | 'system'
+export type SystemActionApprovalReview = Extract<
+  ApprovalReviewPayload,
+  { card: 'system-action' }
+>
+export type SystemActionApprovalReviewInput = Omit<
+  SystemActionApprovalReview,
+  'card' | 'toolName'
+>
 
 export interface CreateApprovalReviewPayloadInput {
   arguments: unknown
   kind: ApprovalReviewKind
+  systemAction?: SystemActionApprovalReviewInput
   toolName: string
 }
 
@@ -36,18 +71,28 @@ export function createApprovalReviewPayload(
 ): ApprovalReviewPayload {
   if (input.kind === 'shell') {
     return approvalReviewPayloadSchema.parse({
+      card: 'shell',
       command: redactShellCommand(readString(input.arguments, 'command')),
       toolName: input.toolName,
     })
   }
   if (input.kind === 'delete') {
     return approvalReviewPayloadSchema.parse({
+      card: 'paths',
       targetPaths: readTargetPaths(input.arguments),
+      toolName: input.toolName,
+    })
+  }
+  if (input.kind === 'system' && input.systemAction) {
+    return approvalReviewPayloadSchema.parse({
+      ...input.systemAction,
+      card: 'system-action',
       toolName: input.toolName,
     })
   }
   return approvalReviewPayloadSchema.parse({
     argumentNames: readArgumentNames(input.arguments),
+    card: 'arguments',
     toolName: input.toolName,
   })
 }
@@ -57,10 +102,12 @@ export function approvalReviewPayloadMatchesKind(
   kind: ApprovalReviewKind,
 ): boolean {
   if (kind === 'shell')
-    return 'command' in payload
+    return payload.card === 'shell'
   if (kind === 'delete')
-    return 'targetPaths' in payload
-  return 'argumentNames' in payload
+    return payload.card === 'paths'
+  if (kind === 'system')
+    return payload.card === 'arguments' || payload.card === 'system-action'
+  return payload.card === 'arguments'
 }
 
 export function redactShellCommand(command: string): string {
@@ -94,6 +141,7 @@ export function redactSensitiveText(value: string): string {
       /\b((?:api[-_]?key|secret|token|password|credential)\s*[:=]\s*)([^\s,;]+)/gi,
       '$1[redacted]',
     )
+    .replace(/([a-z][a-z0-9+.-]*:\/\/)[^\s/@]+@/gi, '$1[redacted]@')
 }
 
 function isSensitiveName(name: string): boolean {

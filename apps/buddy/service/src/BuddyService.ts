@@ -44,6 +44,9 @@ import {
   createBuddySession,
 } from './agent/createBuddySession'
 import { createReusableBuddySession } from './agent/createReusableBuddySession'
+import { createMcpExtension } from './agent/extensions/mcpExtension'
+import { createPetExtension } from './agent/extensions/petExtension'
+import { classifySystemTool, createSystemExtension } from './agent/extensions/systemExtension'
 import { createToolPolicyExtension } from './agent/extensions/toolPolicyExtension'
 import { inspectCommittedPiCompaction } from './agent/inspectCommittedPiCompaction'
 import {
@@ -70,7 +73,7 @@ import {
   parseMessagePageCursor,
 } from './conversations/messagePageCursor'
 import { AttentionNotificationService } from './notifications/AttentionNotificationService'
-import { createPetTool, PET_TOOL_CLASSIFICATION } from './pet/createPetTool'
+import { PET_TOOL_CLASSIFICATION, PET_TOOL_NAME } from './pet/createPetTool'
 import { PetActionService } from './pet/PetActionService'
 import { ProjectGrantService } from './projects/ProjectGrantService'
 import { resolveGrantedPath } from './projects/resolveGrantedPath'
@@ -94,6 +97,8 @@ import { createRunRepository } from './storage/runRepository'
 import { createTurnRequestRepository } from './storage/turnRequestRepository'
 import { createUsageRepository } from './storage/usageRepository'
 import { createWorkspaceRepository } from './storage/workspaceRepository'
+import { LinuxSystemHost } from './system/LinuxSystemHost'
+import { SystemCapabilityService } from './system/systemCapability'
 import { UsageService } from './usage/UsageService'
 
 const WORKSPACE_STATE_KEY = 'buddy.chat.workspace.v1'
@@ -256,6 +261,7 @@ export async function startBuddyService(
     listModels: () => providersRepository.listModelStates(),
   })
   const shellSandboxAssets = await prepareShellSandbox(agentDirectory)
+  const systemHost = new LinuxSystemHost()
   const sessions = new BuddySessionRegistry<BuddyAgentSessionLike>()
   const connectorService = new McpConnectorService({
     connectors: connectorsRepository,
@@ -304,14 +310,11 @@ export async function startBuddyService(
       )
       const mcp = await connectorService.getTools(input.signal)
       const runContext: { current: BuddyRunContext | null } = { current: null }
+      const systemCapability = new SystemCapabilityService({ host: systemHost })
       const missingRecoveryAttachmentIds = new Set<string>()
       let recoveredImageCount = 0
-      const petTool = createPetTool({
-        getRunId: () => runContext.current?.runId,
-        service: petService,
-      })
       const classifications = new Map<string, BuddyToolClassification>(mcp.classifications)
-      classifications.set(petTool.name, PET_TOOL_CLASSIFICATION)
+      classifications.set(PET_TOOL_NAME, PET_TOOL_CLASSIFICATION)
       const grant = project
         ? {
             canonicalRoot: project.canonicalRoot,
@@ -326,20 +329,31 @@ export async function startBuddyService(
       const session = await createBuddySession({
         agentDir: agentDirectory,
         branchId: input.branchId,
-        bundledExtensions: [createToolPolicyExtension({
-          approvalService,
-          classifyTool: event => classifications.get(event.toolName) ?? {},
-          cwd: input.canonicalRoot,
-          getGrants: () => [grant],
-          getRunContext: () => runContext.current,
-        })],
         canonicalRoot: input.canonicalRoot,
         conversationId: input.conversationId,
-        customTools: [...mcp.tools, petTool],
         cwd: input.canonicalRoot,
         getServiceTier: () => runContext.current?.serviceTier ?? null,
         model: selectedModel,
         modelRuntime: providerService.getSessionRuntime(),
+        inProcessExtensions: [
+          createMcpExtension({ tools: mcp.tools }),
+          createPetExtension({
+            getRunId: () => runContext.current?.runId,
+            service: petService,
+          }),
+          createSystemExtension({ service: systemCapability }),
+          createToolPolicyExtension({
+            approvalService,
+            classifyTool: event => classifySystemTool(
+              systemCapability,
+              event.toolName,
+              event.input,
+            ) ?? classifications.get(event.toolName) ?? {},
+            cwd: input.canonicalRoot,
+            getGrants: () => [grant],
+            getRunContext: () => runContext.current,
+          }),
+        ],
         piSessionFile: input.piSessionFile ?? undefined,
         recoveryMessages: async () => {
           const history = conversations.listBranchMessages(input.conversationId, input.branchId)
@@ -416,6 +430,7 @@ export async function startBuddyService(
           },
           runContext,
           session: session.session,
+          shutdown: session.shutdown,
         }),
       }
     },
@@ -455,6 +470,7 @@ export async function startBuddyService(
     sessions,
     skillService,
     shellSandboxAssets,
+    systemHost,
     usageRepository,
     turnRequests,
     workspace,
@@ -494,6 +510,7 @@ interface RuntimeServices {
   sessions: BuddySessionRegistry<BuddyAgentSessionLike>
   skillService: SkillService
   shellSandboxAssets: Awaited<ReturnType<typeof prepareShellSandbox>>
+  systemHost: LinuxSystemHost
   usageRepository: ReturnType<typeof createUsageRepository>
   turnRequests: ReturnType<typeof createTurnRequestRepository>
   workspace: ReturnType<typeof createWorkspaceRepository>
@@ -786,12 +803,11 @@ function registerRuntimeHandlers(services: RuntimeServices): () => void {
       skills: services.skillService,
     })
     const mcp = await services.connectorService.getTools(new AbortController().signal)
-    const petTool = createPetTool({
-      getRunId: () => undefined,
-      service: services.petService,
+    const systemCapability = new SystemCapabilityService({
+      host: services.systemHost,
     })
     const classifications = new Map<string, BuddyToolClassification>(mcp.classifications)
-    classifications.set(petTool.name, PET_TOOL_CLASSIFICATION)
+    classifications.set(PET_TOOL_NAME, PET_TOOL_CLASSIFICATION)
     const grant = project
       ? {
           canonicalRoot: project.canonicalRoot,
@@ -811,17 +827,28 @@ function registerRuntimeHandlers(services: RuntimeServices): () => void {
     const snapshot = await createBuddyContextSnapshot({
       agentDir: services.agentDirectory,
       branchId,
-      bundledExtensions: [createToolPolicyExtension({
-        approvalService: services.approvalService,
-        classifyTool: event => classifications.get(event.toolName) ?? {},
-        cwd: canonicalRoot,
-        getGrants: () => [grant],
-        getRunContext: () => null,
-      })],
       canonicalRoot,
       conversationId,
-      customTools: [...mcp.tools, petTool],
       cwd: canonicalRoot,
+      inProcessExtensions: [
+        createMcpExtension({ tools: mcp.tools }),
+        createPetExtension({
+          getRunId: () => undefined,
+          service: services.petService,
+        }),
+        createSystemExtension({ service: systemCapability }),
+        createToolPolicyExtension({
+          approvalService: services.approvalService,
+          classifyTool: event => classifySystemTool(
+            systemCapability,
+            event.toolName,
+            event.input,
+          ) ?? classifications.get(event.toolName) ?? {},
+          cwd: canonicalRoot,
+          getGrants: () => [grant],
+          getRunContext: () => null,
+        }),
+      ],
       model: selectedModel,
       modelRuntime: services.providerService.getSessionRuntime(),
       piSessionFile: latestRun?.piSessionFile ?? undefined,

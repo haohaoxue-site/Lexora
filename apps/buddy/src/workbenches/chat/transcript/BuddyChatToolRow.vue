@@ -40,6 +40,9 @@ const title = computed(() => {
       : 'desktop.chat.processToolEdit')
     case 'connector': return t('desktop.chat.processToolConnector')
     case 'pet': return t('desktop.chat.processToolPet')
+    case 'system': return t(props.node.presentation.action === 'inspect'
+      ? 'desktop.chat.processToolSystemInspect'
+      : 'desktop.chat.processToolSystemAction')
     case 'generic': return props.node.toolName
   }
   return props.node.toolName
@@ -54,6 +57,7 @@ const summary = computed(() => {
       case 'diff': return presentation.path
       case 'connector': return `${presentation.connector} · ${presentation.tool}`
       case 'pet': return presentation.macro
+      case 'system': return `${presentation.target} · ${presentation.status ?? presentation.action}`
       case 'generic': return presentation.argumentNames.join(', ')
     }
     return ''
@@ -71,6 +75,7 @@ const leadingIcon = computed(() => {
     case 'diff': return Edit20Regular
     case 'connector': return PlugConnected20Regular
     case 'pet': return Sparkle20Regular
+    case 'system': return Wrench20Regular
     case 'generic': return Wrench20Regular
   }
   return Wrench20Regular

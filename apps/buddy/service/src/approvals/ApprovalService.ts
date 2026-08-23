@@ -1,3 +1,4 @@
+import type { SystemActionApprovalReviewInput } from '../../../shared/approvalReviewPayload'
 import type { AppendBuddyRunEventInput } from '../events/RunEventLog'
 import type {
   ApprovalRecord,
@@ -15,6 +16,7 @@ export interface ApprovalRequest {
   runId: string
   signal: AbortSignal
   summary: string
+  systemAction?: SystemActionApprovalReviewInput
   toolCallId: string
   toolName: string
 }
@@ -57,6 +59,7 @@ export class ApprovalService {
       payload: createApprovalReviewPayload({
         arguments: input.arguments,
         kind: input.kind,
+        systemAction: input.systemAction,
         toolName: input.toolName,
       }),
       resolvedAt: null,

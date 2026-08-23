@@ -51,6 +51,20 @@ export const buddyToolPresentationSchema = z.discriminatedUnion('card', [
     macro: z.string().min(1).max(256),
     status: z.string().min(1).max(256),
   }).strict(),
+  previewSchema.extend({
+    action: z.enum([
+      'inspect',
+      'kill-process',
+      'restart-service',
+      'start-service',
+      'stop-service',
+      'terminate-process',
+    ]),
+    card: z.literal('system'),
+    status: z.string().min(1).max(256).nullable(),
+    target: z.string().min(1).max(256).nullable(),
+    verified: z.boolean().nullable(),
+  }).strict(),
 ])
 
 export type BuddyToolPresentation = z.infer<typeof buddyToolPresentationSchema>

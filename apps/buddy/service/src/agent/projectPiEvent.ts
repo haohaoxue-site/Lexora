@@ -4,6 +4,7 @@ import type {
   ToolResultMessage,
 } from '@earendil-works/pi-ai'
 import type { AgentSessionEvent } from '@earendil-works/pi-coding-agent'
+import type { BuddyRunProgress } from '../../../shared/runProgress'
 import type { ArtifactOperation } from '../storage/artifactRepository'
 import { randomUUID } from 'node:crypto'
 
@@ -29,6 +30,7 @@ export type BuddyProjectedEventType
     | 'message.delta'
     | 'message.started'
     | 'message.tool_result'
+    | 'run.progress'
     | 'tool.completed'
     | 'tool.started'
     | 'tool.updated'
@@ -70,6 +72,7 @@ interface ToolCallState {
 export interface PiEventProjectionState {
   assistantMessageId: string | null
   canonicalRoot?: string
+  progress: BuddyRunProgress | null
   toolCalls: Map<string, ToolCallState>
 }
 
@@ -83,6 +86,7 @@ export function createPiEventProjectionState(
   return {
     assistantMessageId: null,
     canonicalRoot: options.canonicalRoot,
+    progress: null,
     toolCalls: new Map(),
   }
 }
@@ -92,6 +96,13 @@ export function projectPiEvent(
   state: PiEventProjectionState,
 ): PiEventProjection {
   switch (event.type) {
+    case 'agent_start':
+      return progressProjection(state, 'preparing')
+    case 'agent_settled':
+      return progressProjection(state, 'idle')
+    case 'turn_start':
+    case 'auto_retry_start':
+      return progressProjection(state, 'model_requesting')
     case 'compaction_start':
       return {
         events: [{
@@ -113,18 +124,21 @@ export function projectPiEvent(
         toolName: event.toolName,
       })
       return {
-        events: [{
-          payload: {
-            presentation: createBuddyToolPresentation({
-              arguments: event.args,
-              canonicalRoot: state.canonicalRoot,
+        events: [
+          {
+            payload: {
+              presentation: createBuddyToolPresentation({
+                arguments: event.args,
+                canonicalRoot: state.canonicalRoot,
+                toolName: event.toolName,
+              }),
+              toolCallId: event.toolCallId,
               toolName: event.toolName,
-            }),
-            toolCallId: event.toolCallId,
-            toolName: event.toolName,
+            },
+            type: 'tool.started',
           },
-          type: 'tool.started',
-        }],
+          ...progressProjection(state, 'tool_executing', event.toolName).events,
+        ],
       }
     case 'tool_execution_update':
       return {
@@ -213,10 +227,34 @@ function projectMessageStart(
   const messageId = randomUUID()
   state.assistantMessageId = messageId
   return {
-    events: [{
-      payload: { messageId, role: 'assistant' },
-      type: 'message.started',
-    }],
+    events: [
+      {
+        payload: { messageId, role: 'assistant' },
+        type: 'message.started',
+      },
+      ...progressProjection(state, 'model_streaming').events,
+    ],
+  }
+}
+
+function progressProjection(
+  state: PiEventProjectionState,
+  phase: BuddyRunProgress['phase'],
+  toolName: string | null = null,
+): PiEventProjection {
+  const progress: BuddyRunProgress = {
+    phase,
+    toolName: toolName?.slice(0, 256) || null,
+  }
+  if (
+    state.progress?.phase === progress.phase
+    && state.progress.toolName === progress.toolName
+  ) {
+    return { events: [] }
+  }
+  state.progress = progress
+  return {
+    events: [{ payload: progress, type: 'run.progress' }],
   }
 }
 

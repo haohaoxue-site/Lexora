@@ -13,7 +13,7 @@ import type {
 } from './BuddySessionRegistry'
 import type { BuddySessionResources } from './BuddySessionResources'
 import type { BuddyContextUsageBreakdown } from './contextUsageBreakdown'
-import type { CreateBuddySessionOptions } from './createBuddySession'
+import type { BuddySessionShutdownReason, CreateBuddySessionOptions } from './createBuddySession'
 import type { CommittedPiCompactionEvidence } from './inspectCommittedPiCompaction'
 import type { BuddyProjectedEvent, ProjectedArtifact } from './projectPiEvent'
 import { createHash, randomUUID } from 'node:crypto'
@@ -35,7 +35,6 @@ export interface BuddyAgentSessionLike {
   abortCompaction: () => void
   canCompact: () => boolean
   activateTurn: (input: BuddySessionTurnContext) => Promise<() => void>
-  dispose: () => void
   compact: (customInstructions?: string) => Promise<CompactionResult>
   getContextUsageBreakdown?: (
     totalTokens: number,
@@ -46,6 +45,7 @@ export interface BuddyAgentSessionLike {
     source?: 'rpc'
   }) => Promise<void>
   subscribe: (listener: (event: AgentSessionEvent) => void) => () => void
+  shutdown: (reason: BuddySessionShutdownReason) => Promise<void>
   waitForIdle: () => Promise<void>
 }
 

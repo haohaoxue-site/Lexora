@@ -32,9 +32,11 @@ interface PetToolDetails {
 }
 
 export const PET_TOOL_CLASSIFICATION: BuddyToolClassification = {
-  origin: 'bundled',
+  origin: 'first-party',
   risk: 'visual',
 }
+
+export const PET_TOOL_NAME = 'lexora_buddy_pet'
 
 export function createPetTool(options: CreatePetToolOptions): ToolDefinition {
   return defineTool<TSchema, PetToolDetails>({
@@ -69,7 +71,7 @@ export function createPetTool(options: CreatePetToolOptions): ToolDefinition {
       }
     },
     label: 'Lexora Buddy pet',
-    name: 'lexora_buddy_pet',
+    name: PET_TOOL_NAME,
     parameters: petToolParameters,
   })
 }

@@ -2,6 +2,7 @@ import type {
   ToolCallEvent,
   ToolCallEventResult,
 } from '@earendil-works/pi-coding-agent'
+import type { SystemActionApprovalReviewInput } from '../../../../shared/approvalReviewPayload'
 import type { BuddyServiceTier } from '../../../../shared/modelSelection'
 
 import type {
@@ -9,8 +10,10 @@ import type {
   ToolRisk,
 } from '../../approvals/ToolPolicy'
 import type { ProjectGrant } from '../../projects/resolveGrantedPath'
-import type { BundledLexoraExtension } from '../createBuddyResourceLoader'
+import type { BuddyInProcessExtension } from '../createBuddyResourceLoader'
 import { ToolPolicy } from '../../approvals/ToolPolicy'
+import { SystemCapabilityError } from '../../system/systemCapability'
+import { serializeSystemToolFailure } from '../../system/systemToolFailure'
 
 const BUILTIN_TOOLS = new Set(['bash', 'edit', 'find', 'grep', 'ls', 'read', 'write'])
 
@@ -21,13 +24,18 @@ export interface ToolApprovalGateway {
     runId: string
     signal: AbortSignal
     summary: string
+    systemAction?: SystemActionApprovalReviewInput
     toolCallId: string
     toolName: string
   }) => Promise<'approved' | 'denied'>
 }
 
 export interface BuddyToolClassification {
-  origin?: 'builtin' | 'bundled' | 'mcp'
+  approval?: {
+    summary: string
+    systemAction: SystemActionApprovalReviewInput
+  }
+  origin?: 'builtin' | 'first-party' | 'mcp'
   paths?: readonly ToolPolicyPath[]
   resource?: { kind?: 'connector' | 'project', projectId: string, trusted: boolean }
   risk?: ToolRisk
@@ -50,7 +58,7 @@ export interface CreateToolPolicyExtensionOptions {
 
 export function createToolPolicyExtension(
   options: CreateToolPolicyExtensionOptions,
-): BundledLexoraExtension {
+): BuddyInProcessExtension {
   const toolPolicy = options.toolPolicy ?? new ToolPolicy()
   return {
     name: 'lexora-tool-policy',
@@ -90,19 +98,26 @@ async function decideToolCall(
       kind: decision.kind,
       runId: run.runId,
       signal: run.signal,
-      summary: decision.summary,
+      summary: declared.approval?.summary ?? decision.summary,
+      systemAction: declared.approval?.systemAction,
       toolCallId: event.toolCallId,
       toolName: event.toolName,
     })
     return approval === 'approved' ? undefined : block('APPROVAL_DENIED')
   }
   catch (error) {
-    return block(readStableErrorCode(error))
+    return block(readBlockedToolReason(error))
   }
 }
 
 function block(reason: string): ToolCallEventResult {
   return { block: true, reason, terminate: false }
+}
+
+function readBlockedToolReason(error: unknown): string {
+  return error instanceof SystemCapabilityError
+    ? serializeSystemToolFailure(error.code)
+    : readStableErrorCode(error)
 }
 
 function readStableErrorCode(error: unknown): string {
@@ -116,6 +131,11 @@ function readStableErrorCode(error: unknown): string {
     'INVALID_PATH',
     'PATH_NOT_FOUND',
     'PATH_OUTSIDE_GRANTED_DIRECTORY',
+    'SYSTEM_ACTION_INVALID',
+    'SYSTEM_ACTION_NOT_ALLOWED',
+    'SYSTEM_TARGET_CHANGED',
+    'SYSTEM_TARGET_EXPIRED',
+    'SYSTEM_TARGET_UNKNOWN',
     'VALIDATION_FAILED',
   ]).has(code)) {
     return code

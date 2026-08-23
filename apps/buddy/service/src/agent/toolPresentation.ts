@@ -2,6 +2,7 @@ import type { BuddyToolPresentation } from '../../../shared/runEventPresentation
 import { relative, sep } from 'node:path'
 
 import { redactSensitiveText, redactShellCommand } from '../../../shared/approvalReviewPayload'
+import { parseSystemToolFailure } from '../system/systemToolFailure'
 
 const MAX_OUTPUT_LENGTH = 64 * 1024
 
@@ -74,6 +75,33 @@ export function createBuddyToolPresentation(
       status: readOptionalString(details, 'status') ?? (input.result ? 'completed' : 'running'),
     }
   }
+  if (input.toolName === 'lexora_system_inspect') {
+    return {
+      action: 'inspect',
+      card: 'system',
+      description,
+      status: input.result ? 'observed' : 'running',
+      target: readSystemInspectionTarget(input.result),
+      verified: null,
+      ...boundedSystemPreview(input.result, 'inspection'),
+    }
+  }
+  if (input.toolName === 'lexora_system_action') {
+    const receipt = readRecord(readToolDetails(input.result)?.receipt)
+    const target = readRecord(receipt?.target)
+    const failureStatus = readSystemFailureStatus(input.result)
+    return {
+      action: readSystemAction(arguments_, receipt),
+      card: 'system',
+      description: description ?? readOptionalString(arguments_, 'reason'),
+      status: readOptionalString(receipt, 'status')
+        ?? failureStatus
+        ?? (input.result ? 'failed' : 'running'),
+      target: readOptionalString(target, 'displayName'),
+      verified: readBoolean(receipt, 'verified'),
+      ...boundedSystemPreview(input.result, 'receipt'),
+    }
+  }
   if (input.toolName.startsWith('mcp__')) {
     const [, connector = 'connector', ...toolParts] = input.toolName.split('__')
     return {
@@ -93,6 +121,17 @@ export function createBuddyToolPresentation(
   }
 }
 
+function readSystemFailureStatus(value: unknown): string | null {
+  const detailsCode = readOptionalString(readToolDetails(value), 'code')
+  const code = detailsCode ?? parseSystemToolFailure(readToolOutput(value))?.error.code
+  switch (code) {
+    case 'SYSTEM_TARGET_CHANGED': return 'target-changed'
+    case 'SYSTEM_TARGET_EXPIRED': return 'target-expired'
+    case 'SYSTEM_TARGET_UNKNOWN': return 'target-unknown'
+    default: return null
+  }
+}
+
 function boundedPreview(value: string | null): Pick<
   Extract<BuddyToolPresentation, { output: unknown }>,
   'output' | 'truncated'
@@ -103,6 +142,70 @@ function boundedPreview(value: string | null): Pick<
     output: value.slice(0, MAX_OUTPUT_LENGTH),
     truncated: value.length > MAX_OUTPUT_LENGTH,
   }
+}
+
+function boundedSystemPreview(
+  value: unknown,
+  detailKey: 'inspection' | 'receipt',
+): ReturnType<typeof boundedPreview> {
+  if (parseSystemToolFailure(readToolOutput(value)))
+    return boundedPreview(null)
+  const details = readToolDetails(value)
+  const detail = details?.[detailKey]
+  if (detail === undefined)
+    return boundedPreview(readToolOutput(value))
+  try {
+    return boundedPreview(redactSensitiveText(JSON.stringify(
+      removeSystemCapabilityReferences(detail),
+      null,
+      2,
+    )))
+  }
+  catch {
+    return boundedPreview('Lexora Buddy system capability returned an unreadable result')
+  }
+}
+
+function removeSystemCapabilityReferences(value: unknown): unknown {
+  if (Array.isArray(value))
+    return value.map(removeSystemCapabilityReferences)
+  const record = readRecord(value)
+  if (!record)
+    return value
+  return Object.fromEntries(Object.entries(record).flatMap(([key, entry]) => (
+    key === 'expiresAt' || key === 'nextTargetRef' || key === 'targetRef'
+      ? []
+      : [[key, removeSystemCapabilityReferences(entry)]]
+  )))
+}
+
+function readSystemInspectionTarget(value: unknown): string | null {
+  const inspection = readRecord(readToolDetails(value)?.inspection)
+  const facts = readRecord(inspection?.facts)
+  const candidates = [
+    ...readRecords(facts?.processes).flatMap((process) => {
+      const commandName = readOptionalString(process, 'commandName')
+      if (!commandName)
+        return []
+      const pid = readPositiveInteger(process, 'pid')
+      return [pid ? `${commandName} (PID ${pid})` : commandName]
+    }),
+    ...readRecords(facts?.applications).flatMap(application => (
+      readOptionalString(application, 'displayName') ?? []
+    )),
+    ...readRecords(facts?.services).flatMap(service => (
+      readOptionalString(service, 'unit') ?? []
+    )),
+    ...readRecords(facts?.listeners).flatMap((listener) => {
+      const label = readOptionalString(listener, 'processName')
+        ?? readOptionalString(listener, 'localAddress')
+      return label ? [label] : []
+    }),
+  ]
+  const uniqueCandidates = [...new Set(candidates.map(candidate => candidate.trim()).filter(Boolean))]
+  return uniqueCandidates.length === 1
+    ? uniqueCandidates[0]!.slice(0, 256)
+    : null
 }
 
 function readToolOutput(value: unknown): string | null {
@@ -164,6 +267,28 @@ function argumentNames(value: Record<string, unknown> | null): string[] {
   return value ? Object.keys(value).sort().slice(0, 32) : []
 }
 
+function readBoolean(value: Record<string, unknown> | null, key: string): boolean | null {
+  const candidate = value?.[key]
+  return typeof candidate === 'boolean' ? candidate : null
+}
+
+function readSystemAction(
+  arguments_: Record<string, unknown> | null,
+  receipt: Record<string, unknown> | null,
+): Extract<BuddyToolPresentation, { card: 'system' }>['action'] {
+  const action = readOptionalString(receipt, 'action') ?? readOptionalString(arguments_, 'action')
+  switch (action) {
+    case 'kill-process':
+    case 'restart-service':
+    case 'start-service':
+    case 'stop-service':
+    case 'terminate-process':
+      return action
+    default:
+      return 'terminate-process'
+  }
+}
+
 const LANGUAGE_BY_EXTENSION = new Map([
   ['css', 'css'],
   ['html', 'html'],
@@ -209,4 +334,16 @@ function readRecord(value: unknown): Record<string, unknown> | null {
   return value && typeof value === 'object' && !Array.isArray(value)
     ? value as Record<string, unknown>
     : null
+}
+
+function readRecords(value: unknown): Record<string, unknown>[] {
+  if (!Array.isArray(value))
+    return []
+  const records: Record<string, unknown>[] = []
+  for (const entry of value) {
+    const record = readRecord(entry)
+    if (record)
+      records.push(record)
+  }
+  return records
 }

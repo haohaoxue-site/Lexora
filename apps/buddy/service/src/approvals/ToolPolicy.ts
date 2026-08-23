@@ -21,7 +21,7 @@ export interface ToolPolicyRequest {
   arguments: unknown
   cwd: string
   grants: readonly ProjectGrant[]
-  origin?: 'builtin' | 'bundled' | 'mcp'
+  origin?: 'builtin' | 'first-party' | 'mcp'
   paths?: readonly ToolPolicyPath[]
   resource?: { kind?: 'connector' | 'project', projectId: string, trusted: boolean }
   risk?: ToolRisk
@@ -62,6 +62,8 @@ export class ToolPolicy {
       return { type: 'allow' }
     if (request.origin === 'mcp' || request.risk === 'mcp')
       return ask('mcp', 'Use a connected external tool')
+    if (request.origin === 'first-party' && request.risk === 'read')
+      return { type: 'allow' }
 
     switch (request.toolName) {
       case 'read':

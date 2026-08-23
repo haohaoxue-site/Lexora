@@ -336,7 +336,7 @@ function projectReasoningEntries(nodes: ReadonlyArray<ChatAgentReasoningNode>): 
 }
 
 function approvalPresentation(review: ApprovalReviewPayload): BuddyToolPresentation {
-  if ('command' in review) {
+  if (review.card === 'shell') {
     return {
       card: 'terminal',
       command: review.command,
@@ -348,7 +348,19 @@ function approvalPresentation(review: ApprovalReviewPayload): BuddyToolPresentat
       truncated: false,
     }
   }
-  const argumentNames = 'argumentNames' in review
+  if (review.card === 'system-action') {
+    return {
+      action: review.action,
+      card: 'system',
+      description: review.effect,
+      output: null,
+      status: 'awaiting-approval',
+      target: review.target.displayName,
+      truncated: false,
+      verified: null,
+    }
+  }
+  const argumentNames = review.card === 'arguments'
     ? review.argumentNames
     : review.targetPaths.length > 0 ? ['targetPaths'] : []
   if (review.toolName.startsWith('mcp__')) {
