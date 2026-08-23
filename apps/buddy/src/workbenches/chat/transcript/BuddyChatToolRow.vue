@@ -13,7 +13,11 @@ import {
 } from '@vicons/fluent'
 import { NIcon } from 'naive-ui'
 import { computed, shallowRef, watch } from 'vue'
-import { useBuddyI18n } from '@/i18n/buddyI18n'
+import {
+  translateSystemAction,
+  translateSystemToolStatus,
+  useBuddyI18n,
+} from '@/i18n/buddyI18n'
 import BuddyChatToolDetails from './BuddyChatToolDetails.vue'
 
 const props = defineProps<{
@@ -49,6 +53,24 @@ const title = computed(() => {
 })
 const summary = computed(() => {
   const presentation = props.node.presentation
+  if (presentation.card === 'system') {
+    const recoveringTarget = presentation.status === 'target-changed'
+      || presentation.status === 'target-expired'
+      || presentation.status === 'target-unknown'
+    const target = recoveringTarget
+      ? null
+      : presentation.target
+        ?? (presentation.action === 'inspect'
+          ? null
+          : t('desktop.chat.processToolSystemTargetPending'))
+    return [
+      presentation.action === 'inspect'
+        ? null
+        : translateSystemAction(props.language, presentation.action),
+      target,
+      translateSystemToolStatus(props.language, presentation.status),
+    ].filter(Boolean).join(' · ')
+  }
   const detail = (() => {
     switch (presentation.card) {
       case 'terminal': return presentation.command
@@ -57,15 +79,17 @@ const summary = computed(() => {
       case 'diff': return presentation.path
       case 'connector': return `${presentation.connector} · ${presentation.tool}`
       case 'pet': return presentation.macro
-      case 'system': return `${presentation.target} · ${presentation.status ?? presentation.action}`
       case 'generic': return presentation.argumentNames.join(', ')
     }
     return ''
   })()
-  const summary = props.node.description ?? detail
-  return props.node.status === 'awaiting_approval'
-    ? `${t('desktop.chat.processAwaitingApproval')} · ${summary}`
-    : summary
+  const summary = detail || props.node.description
+  return [
+    props.node.status === 'awaiting_approval'
+      ? t('desktop.chat.processAwaitingApproval')
+      : null,
+    summary,
+  ].filter(Boolean).join(' · ')
 })
 const leadingIcon = computed(() => {
   switch (props.node.presentation.card) {

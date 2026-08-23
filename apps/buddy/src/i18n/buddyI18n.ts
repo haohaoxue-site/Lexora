@@ -1,3 +1,4 @@
+import type { SystemActionApprovalReview } from '@buddy-shared/approvalReviewPayload'
 import type { MaybeRefOrGetter } from 'vue'
 import { computed, toValue } from 'vue'
 
@@ -307,6 +308,17 @@ const zhCN = {
   'desktop.chat.processToolSearch': '搜索',
   'desktop.chat.processToolSystemAction': '系统操作',
   'desktop.chat.processToolSystemInspect': '检查当前电脑',
+  'desktop.chat.processToolSystemStatus.awaitingApproval': '等待批准',
+  'desktop.chat.processToolSystemStatus.completed': '已完成',
+  'desktop.chat.processToolSystemStatus.failed': '失败',
+  'desktop.chat.processToolSystemStatus.needsEscalation': '需要进一步操作',
+  'desktop.chat.processToolSystemStatus.observed': '已检查',
+  'desktop.chat.processToolSystemStatus.running': '进行中',
+  'desktop.chat.processToolSystemStatus.targetChanged': '目标已变化，请重新检查',
+  'desktop.chat.processToolSystemStatus.targetExpired': '目标已过期，请重新检查',
+  'desktop.chat.processToolSystemStatus.targetUnknown': '目标引用已失效，请重新检查',
+  'desktop.chat.processToolSystemStatus.unknown': '状态未知',
+  'desktop.chat.processToolSystemTargetPending': '待确认目标',
   'desktop.chat.processToolRunning': '运行中',
   'desktop.chat.processToolSucceeded': '运行成功',
   'desktop.chat.processToolTruncated': '已截断',
@@ -668,6 +680,10 @@ const zhCN = {
   'desktop.chat.messageInterruptedTruncated': '回答因本地运行时重启而中断，仅保留部分生成内容',
   'desktop.chat.recoveryAttachmentsMissing': '恢复上下文时有 {count} 个历史附件已缺失，其余内容已继续使用',
   'desktop.chat.providerRequired': '需要连接 Provider',
+  'desktop.chat.progressModelRequesting': '等待模型响应',
+  'desktop.chat.progressModelStreaming': '生成回复中',
+  'desktop.chat.progressPreparing': '准备中',
+  'desktop.chat.progressToolExecuting': '调用工具中',
   'desktop.connectors.add': '添加 Connector',
   'desktop.connectors.arguments': '参数，每行一个',
   'desktop.connectors.bearerToken': 'Bearer Token（可选）',
@@ -1153,6 +1169,17 @@ const enUS = {
   'desktop.chat.processToolSearch': 'Search',
   'desktop.chat.processToolSystemAction': 'System action',
   'desktop.chat.processToolSystemInspect': 'Inspect this computer',
+  'desktop.chat.processToolSystemStatus.awaitingApproval': 'Awaiting approval',
+  'desktop.chat.processToolSystemStatus.completed': 'Completed',
+  'desktop.chat.processToolSystemStatus.failed': 'Failed',
+  'desktop.chat.processToolSystemStatus.needsEscalation': 'Further action required',
+  'desktop.chat.processToolSystemStatus.observed': 'Inspected',
+  'desktop.chat.processToolSystemStatus.running': 'In progress',
+  'desktop.chat.processToolSystemStatus.targetChanged': 'Target changed; inspect it again',
+  'desktop.chat.processToolSystemStatus.targetExpired': 'Target expired; inspect it again',
+  'desktop.chat.processToolSystemStatus.targetUnknown': 'Target reference is no longer valid; inspect it again',
+  'desktop.chat.processToolSystemStatus.unknown': 'Status unavailable',
+  'desktop.chat.processToolSystemTargetPending': 'Pending target',
   'desktop.chat.processToolRunning': 'Running',
   'desktop.chat.processToolSucceeded': 'Succeeded',
   'desktop.chat.processToolTruncated': 'Truncated',
@@ -1514,6 +1541,10 @@ const enUS = {
   'desktop.chat.messageInterruptedTruncated': 'The response was interrupted by a local runtime restart. Only part of the generated content was kept.',
   'desktop.chat.recoveryAttachmentsMissing': 'Some historical attachments ({count}) were missing while restoring context. The remaining content was kept.',
   'desktop.chat.providerRequired': 'Provider connection required',
+  'desktop.chat.progressModelRequesting': 'Waiting for model',
+  'desktop.chat.progressModelStreaming': 'Generating response',
+  'desktop.chat.progressPreparing': 'Preparing',
+  'desktop.chat.progressToolExecuting': 'Running tool',
   'desktop.connectors.add': 'Add connector',
   'desktop.connectors.arguments': 'Arguments, one per line',
   'desktop.connectors.bearerToken': 'Bearer token (optional)',
@@ -1714,6 +1745,49 @@ export function translateBuddy(
   params: Record<string, string | number> = {},
 ) {
   return formatBuddyMessage(buddyMessages[locale][key], params)
+}
+
+export function translateSystemAction(
+  locale: BuddyLocale,
+  action: SystemActionApprovalReview['action'],
+): string {
+  switch (action) {
+    case 'kill-process': return translateBuddy(locale, 'desktop.approval.systemAction.killProcess')
+    case 'restart-service': return translateBuddy(locale, 'desktop.approval.systemAction.restartService')
+    case 'start-service': return translateBuddy(locale, 'desktop.approval.systemAction.startService')
+    case 'stop-service': return translateBuddy(locale, 'desktop.approval.systemAction.stopService')
+    case 'terminate-process': return translateBuddy(locale, 'desktop.approval.systemAction.terminateProcess')
+  }
+}
+
+export function translateSystemInterruption(
+  locale: BuddyLocale,
+  interruption: SystemActionApprovalReview['interruption'],
+): string {
+  switch (interruption) {
+    case 'application': return translateBuddy(locale, 'desktop.approval.systemInterruption.application')
+    case 'network': return translateBuddy(locale, 'desktop.approval.systemInterruption.network')
+    case 'none': return translateBuddy(locale, 'desktop.approval.systemInterruption.none')
+    case 'service': return translateBuddy(locale, 'desktop.approval.systemInterruption.service')
+  }
+}
+
+export function translateSystemToolStatus(
+  locale: BuddyLocale,
+  status: string | null,
+): string {
+  switch (status) {
+    case 'awaiting-approval': return translateBuddy(locale, 'desktop.chat.processToolSystemStatus.awaitingApproval')
+    case 'completed': return translateBuddy(locale, 'desktop.chat.processToolSystemStatus.completed')
+    case 'failed': return translateBuddy(locale, 'desktop.chat.processToolSystemStatus.failed')
+    case 'needs-escalation': return translateBuddy(locale, 'desktop.chat.processToolSystemStatus.needsEscalation')
+    case 'observed': return translateBuddy(locale, 'desktop.chat.processToolSystemStatus.observed')
+    case 'running': return translateBuddy(locale, 'desktop.chat.processToolSystemStatus.running')
+    case 'target-changed': return translateBuddy(locale, 'desktop.chat.processToolSystemStatus.targetChanged')
+    case 'target-expired': return translateBuddy(locale, 'desktop.chat.processToolSystemStatus.targetExpired')
+    case 'target-unknown': return translateBuddy(locale, 'desktop.chat.processToolSystemStatus.targetUnknown')
+    default: return translateBuddy(locale, 'desktop.chat.processToolSystemStatus.unknown')
+  }
 }
 
 export function useBuddyI18n(language: MaybeRefOrGetter<string>) {

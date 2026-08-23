@@ -34,6 +34,12 @@ export interface ChatTranscriptAgentTurnRow {
   turn: ChatAgentTurn
 }
 
+export interface ChatTranscriptActivityRow {
+  key: string
+  kind: 'activity'
+  turn: ChatAgentTurn
+}
+
 export interface ChatTranscriptRecoveryNoticeRow {
   key: string
   kind: 'recovery-notice'
@@ -47,7 +53,8 @@ export interface ChatTranscriptStreamingRow {
 }
 
 export type ChatTranscriptRow
-  = | ChatTranscriptAgentTurnRow
+  = | ChatTranscriptActivityRow
+    | ChatTranscriptAgentTurnRow
     | ChatTranscriptCompactionRow
     | ChatTranscriptMessageRow
     | ChatTranscriptRecoveryNoticeRow
@@ -116,11 +123,22 @@ export function projectChatTranscript(input: {
       ))
     }
   }
+  const activeAgentTurn = [...rows].reverse().find(
+    (row): row is ChatTranscriptAgentTurnRow => row.kind === 'agent-turn'
+      && (row.turn.status === 'queued' || row.turn.status === 'running'),
+  )?.turn
   if (streamingMessage) {
     rows.push({
       key: `streaming:${streamingMessage.id}`,
       kind: 'streaming',
       message: streamingMessage,
+    })
+  }
+  if (activeAgentTurn) {
+    rows.push({
+      key: `activity:${activeAgentTurn.runId}`,
+      kind: 'activity',
+      turn: activeAgentTurn,
     })
   }
 
@@ -134,10 +152,7 @@ export function projectChatTranscript(input: {
   )))
 
   return {
-    hasActiveProcessIdentity: rows.some(row => (
-      row.kind === 'agent-turn'
-      && (row.turn.status === 'queued' || row.turn.status === 'running')
-    )),
+    hasActiveProcessIdentity: activeAgentTurn !== undefined,
     processIdentityMessageIds,
     processIdentityRunIds,
     rows,

@@ -7,12 +7,14 @@ import type {
 import type { ApprovalReviewPayload } from '@buddy-shared/approvalReviewPayload'
 import type { BuddyReasoningKind } from '@buddy-shared/reasoningPresentation'
 import type { BuddyToolPresentation } from '@buddy-shared/runEventPresentation'
+import type { BuddyRunProgress } from '@buddy-shared/runProgress'
 import { approvalReviewPayloadSchema } from '@buddy-shared/approvalReviewPayload'
 import {
   buddyReasoningKindSchema,
   resolveBuddyReasoningKind,
 } from '@buddy-shared/reasoningPresentation'
 import { buddyToolPresentationSchema } from '@buddy-shared/runEventPresentation'
+import { buddyRunProgressSchema } from '@buddy-shared/runProgress'
 
 export { resolveChatAgentTurnOpen } from './chatAgentTurnDisclosure'
 
@@ -66,6 +68,7 @@ export interface ChatAgentTurn {
   failureMessage?: string | null
   finalMessageId: string | null
   nodes: ChatAgentTurnNode[]
+  progress: BuddyRunProgress | null
   reasoningLevel: string | null
   runId: string
   startedAt: string
@@ -98,12 +101,19 @@ function projectChatAgentTurn(
   const text: Array<ChatAgentNarrationNode & { order: number }> = []
   let failureMessage: string | null = null
   let finalMessageId: string | null = null
+  let progress: BuddyRunProgress | null = null
   for (const event of events) {
     const payload = readPayload(event.payload)
     if (!payload)
       continue
     if (event.type === 'run.failed') {
       failureMessage = readString(payload.errorMessage) || null
+      continue
+    }
+    if (event.type === 'run.progress') {
+      const parsed = buddyRunProgressSchema.safeParse(payload)
+      if (parsed.success)
+        progress = parsed.data.phase === 'idle' ? null : parsed.data
       continue
     }
     if (event.type.startsWith('message.block.')) {
@@ -176,19 +186,32 @@ function projectChatAgentTurn(
       const toolCallId = readString(payload.toolCallId)
       const current = tools.get(toolCallId)
       const review = approvalReviewPayloadSchema.safeParse(payload.review)
-      const base = current ?? (review.success
-        ? {
-            id: `tool:${toolCallId}`,
-            isError: false,
-            kind: 'tool' as const,
-            order: event.sequence,
-            presentation: approvalPresentation(review.data),
-            status: 'running' as const,
-            toolCallId,
-            toolName: review.data.toolName,
-            description: readString(payload.summary) || null,
-          }
-        : null)
+      const systemApprovalPresentation = review.success && review.data.card === 'system-action'
+        ? approvalPresentation(review.data)
+        : null
+      const base = current
+        ? systemApprovalPresentation
+          ? {
+              ...current,
+              description: null,
+              presentation: systemApprovalPresentation,
+            }
+          : current
+        : review.success
+          ? {
+              id: `tool:${toolCallId}`,
+              isError: false,
+              kind: 'tool' as const,
+              order: event.sequence,
+              presentation: approvalPresentation(review.data),
+              status: 'running' as const,
+              toolCallId,
+              toolName: review.data.toolName,
+              description: review.data.card === 'system-action'
+                ? null
+                : readString(payload.summary) || null,
+            }
+          : null
       if (approvalId && toolCallId)
         approvalTools.set(approvalId, toolCallId)
       if (approvalId && toolCallId && base) {
@@ -222,11 +245,14 @@ function projectChatAgentTurn(
       const current = tools.get(toolCallId)
       const isError = event.type === 'tool.completed' && payload.isError === true
       const narration = current ? null : text.at(-1)
-      const description = current?.description
-        ?? narration?.text
-        ?? specificToolDescription(presentation.data.description)
-        ?? null
-      if (narration && description === narration.text)
+      const isSystemTool = presentation.data.card === 'system'
+      const description = isSystemTool
+        ? null
+        : current?.description
+          ?? narration?.text
+          ?? specificToolDescription(presentation.data.description)
+          ?? null
+      if (!isSystemTool && narration && description === narration.text)
         text.pop()
       tools.set(toolCallId, {
         ...(current?.approvalId ? { approvalId: current.approvalId } : {}),
@@ -245,9 +271,7 @@ function projectChatAgentTurn(
     }
   }
   const terminal = run.status !== 'queued' && run.status !== 'running'
-  const reasoningNodes = [...reasoning.values()].filter(node => (
-    node.text.trim() || (!terminal && node.status === 'running')
-  ))
+  const reasoningNodes = [...reasoning.values()].filter(node => node.text.trim())
   const nodes = [...reasoningNodes, ...text, ...tools.values()]
     .sort((left, right) => left.order - right.order)
     .map(({ order: _order, ...node }) => {
@@ -262,6 +286,7 @@ function projectChatAgentTurn(
       : {}),
     finalMessageId,
     nodes,
+    progress: terminal ? null : progress,
     reasoningLevel: run.reasoningLevel,
     runId: run.id,
     startedAt: run.startedAt,
@@ -352,7 +377,7 @@ function approvalPresentation(review: ApprovalReviewPayload): BuddyToolPresentat
     return {
       action: review.action,
       card: 'system',
-      description: review.effect,
+      description: null,
       output: null,
       status: 'awaiting-approval',
       target: review.target.displayName,
@@ -497,7 +522,8 @@ export function projectStreamingAssistantMessage(
       candidates.set(messageId, { id: messageId, text })
     }
   }
-  return [...candidates.values()].at(-1) ?? null
+  const latest = [...candidates.values()].at(-1)
+  return latest?.text.trim() ? latest : null
 }
 
 function readPayload(value: unknown): Record<string, unknown> | null {

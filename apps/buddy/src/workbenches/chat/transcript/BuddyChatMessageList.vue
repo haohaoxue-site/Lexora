@@ -25,6 +25,7 @@ import { useBuddyI18n } from '@/i18n/buddyI18n'
 import BuddyChatAgentIdentity from './BuddyChatAgentIdentity.vue'
 import BuddyChatAgentTurn from './BuddyChatAgentTurn.vue'
 import BuddyChatMessageRow from './BuddyChatMessageRow.vue'
+import BuddyChatRunActivity from './BuddyChatRunActivity.vue'
 import { resolveChatAgentTurnOpen } from './chatAgentTurnDisclosure'
 import {
   projectConversationCompaction,
@@ -401,6 +402,7 @@ function toScrollMetrics(viewport: HTMLElement): ChatMessageScrollMetrics {
         <article
           v-else-if="item.kind === 'streaming'"
           class="buddy-chat-streaming buddy-chat-virtual-row"
+          :class="{ 'has-activity-tail': transcriptProjection.hasActiveProcessIdentity }"
         >
           <BuddyChatAgentIdentity v-if="!transcriptProjection.hasActiveProcessIdentity" :language="language" />
           <div
@@ -408,11 +410,14 @@ function toScrollMetrics(viewport: HTMLElement): ChatMessageScrollMetrics {
             class="buddy-chat-streaming__content"
             v-html="renderChatMarkdown(item.message.text)"
           />
-          <div v-else class="buddy-chat-activity" role="status">
-            <i />
-            <span>{{ t('desktop.chat.activity') }}</span>
-          </div>
         </article>
+
+        <BuddyChatRunActivity
+          v-else-if="item.kind === 'activity'"
+          class="buddy-chat-virtual-row"
+          :language="language"
+          :turn="item.turn"
+        />
 
         <div
           v-else-if="item.kind === 'recovery-notice'"
@@ -495,6 +500,10 @@ function toScrollMetrics(viewport: HTMLElement): ChatMessageScrollMetrics {
   align-items: start;
   gap: var(--buddy-chat-gap-block);
   padding-bottom: var(--buddy-chat-gap-turn);
+
+  &.has-activity-tail {
+    padding-bottom: var(--buddy-chat-gap-block);
+  }
 }
 
 .buddy-chat-streaming__content {
@@ -512,22 +521,6 @@ function toScrollMetrics(viewport: HTMLElement): ChatMessageScrollMetrics {
     margin-bottom: 0;
   }
 
-}
-
-.buddy-chat-activity {
-  display: flex;
-  align-items: center;
-  gap: 0.45rem;
-  color: var(--buddy-text-secondary);
-  font-size: 0.7rem;
-
-  i {
-    width: 0.45rem;
-    height: 0.45rem;
-    border-radius: 50%;
-    background: var(--buddy-accent-primary);
-    animation: buddy-activity-pulse 1.3s ease-in-out infinite;
-  }
 }
 
 .buddy-chat-system-event {
@@ -559,16 +552,6 @@ function toScrollMetrics(viewport: HTMLElement): ChatMessageScrollMetrics {
     &::after {
       background: color-mix(in srgb, var(--buddy-accent-warning) 42%, var(--buddy-border-light));
     }
-  }
-}
-
-@keyframes buddy-activity-pulse {
-  50% { opacity: 0.35; }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .buddy-chat-activity i {
-    animation: none;
   }
 }
 </style>

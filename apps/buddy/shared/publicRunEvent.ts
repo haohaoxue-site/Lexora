@@ -5,6 +5,7 @@ import {
   readBuddyInterruptedMessageContent,
 } from './buddyMessageContent'
 import { buddyToolPresentationSchema } from './runEventPresentation'
+import { buddyRunProgressSchema } from './runProgress'
 
 export interface RunEventLike {
   createdAt: string
@@ -109,12 +110,22 @@ function publicPayload(type: string, value: unknown): Record<string, unknown> {
     return publicCompletedMessage(source)
   if (type === 'message.interrupted')
     return publicInterruptedMessage(source)
+  if (type === 'run.progress')
+    return publicRunProgress(source)
   if (type === 'tool.started' || type === 'tool.updated' || type === 'tool.completed')
     return publicToolEvent(source, type === 'tool.completed')
   const keys = SCALAR_PAYLOAD_KEYS.get(type)
   if (!keys)
     return {}
   return selectScalars(source, keys)
+}
+
+function publicRunProgress(source: Record<string, unknown>): Record<string, unknown> {
+  const progress = buddyRunProgressSchema.safeParse({
+    phase: source.phase,
+    toolName: source.toolName ?? null,
+  })
+  return progress.success ? progress.data : {}
 }
 
 function publicApprovalRequest(source: Record<string, unknown>): Record<string, unknown> {

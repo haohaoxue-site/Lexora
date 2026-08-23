@@ -4,7 +4,11 @@ import type { ApprovalReviewPayload } from '@buddy-shared/approvalReviewPayload'
 import type { BuddyLocale } from '@/i18n/buddyI18n'
 import { approvalReviewPayloadSchema } from '@buddy-shared/approvalReviewPayload'
 import { computed } from 'vue'
-import { useBuddyI18n } from '@/i18n/buddyI18n'
+import {
+  translateSystemAction,
+  translateSystemInterruption,
+  useBuddyI18n,
+} from '@/i18n/buddyI18n'
 
 const props = defineProps<{
   approval: LocalApproval
@@ -20,25 +24,12 @@ const review = computed<ApprovalReviewPayload | null>(() => {
 const systemEffect = computed(() => {
   if (review.value?.card !== 'system-action')
     return ''
-  switch (review.value.action) {
-    case 'terminate-process': return t('desktop.approval.systemAction.terminateProcess')
-    case 'kill-process': return t('desktop.approval.systemAction.killProcess')
-    case 'start-service': return t('desktop.approval.systemAction.startService')
-    case 'stop-service': return t('desktop.approval.systemAction.stopService')
-    case 'restart-service': return t('desktop.approval.systemAction.restartService')
-  }
-  return ''
+  return translateSystemAction(props.language, review.value.action)
 })
 const systemInterruption = computed(() => {
   if (review.value?.card !== 'system-action')
     return ''
-  switch (review.value.interruption) {
-    case 'application': return t('desktop.approval.systemInterruption.application')
-    case 'network': return t('desktop.approval.systemInterruption.network')
-    case 'none': return t('desktop.approval.systemInterruption.none')
-    case 'service': return t('desktop.approval.systemInterruption.service')
-  }
-  return ''
+  return translateSystemInterruption(props.language, review.value.interruption)
 })
 </script>
 

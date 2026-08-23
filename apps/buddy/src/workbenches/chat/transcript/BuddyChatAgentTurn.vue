@@ -2,9 +2,8 @@
 import type { ChatAgentTurn } from './chatStreamingMessage'
 import type { BuddyLocale } from '@/i18n/buddyI18n'
 import { ChevronRight20Regular } from '@vicons/fluent'
-import { useIntervalFn } from '@vueuse/core'
 import { NIcon } from 'naive-ui'
-import { computed, shallowRef, watch } from 'vue'
+import { computed } from 'vue'
 import { useBuddyI18n } from '@/i18n/buddyI18n'
 import BuddyChatAgentIdentity from './BuddyChatAgentIdentity.vue'
 import BuddyChatReasoningGroup from './BuddyChatReasoningGroup.vue'
@@ -26,27 +25,13 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useBuddyI18n(() => props.language)
-const now = shallowRef(Date.now())
-const durationClock = useIntervalFn(() => {
-  now.value = Date.now()
-}, 1_000, {
-  immediate: false,
-  immediateCallback: true,
-})
-
-watch(() => props.turn.status, (status) => {
-  if (status === 'queued' || status === 'running')
-    durationClock.resume()
-  else
-    durationClock.pause()
-}, { immediate: true })
-
 const duration = computed(() => {
   const start = Date.parse(props.turn.startedAt)
-  const end = props.turn.completedAt ? Date.parse(props.turn.completedAt) : now.value
+  const end = props.turn.completedAt ? Date.parse(props.turn.completedAt) : Date.now()
   return formatDuration(Math.max(0, end - start))
 })
-const status = computed(() => `${t(`run.status.${props.turn.status}`)} ${duration.value}`)
+const isActive = computed(() => props.turn.status === 'queued' || props.turn.status === 'running')
+const terminalStatusLabel = computed(() => t(`run.status.${props.turn.status}`))
 const rows = computed(() => projectChatAgentTurnRows(props.turn.nodes))
 const notice = computed(() => resolveChatAgentTurnNotice(
   props.turn.status,
@@ -58,30 +43,25 @@ const failurePresentation = computed(() => notice.value?.kind === 'failure'
       notice.value.message,
     )
   : null)
-const noticeText = computed(() => {
+const resultNoticeText = computed(() => {
   if (!notice.value)
     return null
-  if (notice.value.kind === 'activity')
-    return t('desktop.chat.activity')
+  if (notice.value.placement !== 'result')
+    return null
   if (notice.value.kind === 'cancelled')
     return t('desktop.chat.runCancelled')
   return failurePresentation.value?.message
     ?? t(failurePresentation.value?.messageKey ?? 'desktop.chat.runFailed')
 })
-const processNoticeText = computed(() => notice.value?.placement === 'process'
-  ? noticeText.value
-  : null)
-const resultNoticeText = computed(() => notice.value?.placement === 'result'
-  ? noticeText.value
-  : null)
+
 const failureDetailText = computed(() => failurePresentation.value?.detail ?? null)
-const hasProcessContent = computed(() => (
+const canToggleProcess = computed(() => (
   rows.value.length > 0
-  || processNoticeText.value !== null
+  || failureDetailText.value !== null
 ))
 const hasVisibleProcess = computed(() => (
-  props.open
-  && (hasProcessContent.value || failureDetailText.value !== null)
+  canToggleProcess.value
+  && (isActive.value || props.open)
 ))
 
 function formatDuration(value: number): string {
@@ -102,13 +82,20 @@ function formatDuration(value: number): string {
     <div class="buddy-chat-agent-turn__heading">
       <BuddyChatAgentIdentity :language="language" />
       <button
-        :aria-expanded="open"
+        v-if="!isActive"
+        :aria-expanded="canToggleProcess ? open : undefined"
         class="buddy-chat-agent-turn__status"
+        :disabled="!canToggleProcess"
         type="button"
         @click="emit('toggle')"
       >
-        <span>{{ status }}</span>
+        <span
+          aria-live="polite"
+          class="buddy-chat-agent-turn__status-label"
+        >{{ terminalStatusLabel }}</span>
+        <span class="buddy-chat-agent-turn__duration">{{ duration }}</span>
         <NIcon
+          v-if="canToggleProcess"
           :component="ChevronRight20Regular"
           class="buddy-chat-agent-turn__chevron"
           :class="{ 'is-open': open }"
@@ -134,12 +121,6 @@ function formatDuration(value: number): string {
           {{ row.text }}
         </p>
       </template>
-      <p
-        v-if="processNoticeText && turn.nodes.length === 0"
-        class="buddy-chat-agent-turn__notice"
-      >
-        {{ processNoticeText }}
-      </p>
       <p v-if="failureDetailText" class="buddy-chat-agent-turn__failure-detail">
         <span>{{ t('desktop.chat.failureDetail') }}</span>
         {{ failureDetailText }}
@@ -185,11 +166,25 @@ function formatDuration(value: number): string {
   padding: 0;
   text-align: left;
 
-  &:hover,
-  &:focus-visible {
+  &:not(:disabled):hover,
+  &:not(:disabled):focus-visible {
     color: var(--buddy-text-primary);
   }
 
+  &:disabled {
+    cursor: default;
+  }
+}
+
+.buddy-chat-agent-turn__status-label,
+.buddy-chat-agent-turn__duration {
+  min-width: 0;
+}
+
+.buddy-chat-agent-turn__duration {
+  margin-left: 0.125rem;
+  opacity: 0.78;
+  font-variant-numeric: tabular-nums;
 }
 
 .buddy-chat-agent-turn__chevron {
@@ -217,7 +212,6 @@ function formatDuration(value: number): string {
 }
 
 .buddy-chat-agent-turn__text,
-.buddy-chat-agent-turn__notice,
 .buddy-chat-agent-turn__result {
   margin: 0;
   color: var(--buddy-chat-tool-body-color);
