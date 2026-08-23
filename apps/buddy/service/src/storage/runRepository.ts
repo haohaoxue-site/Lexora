@@ -1,4 +1,5 @@
 import type { DatabaseSync } from 'node:sqlite'
+import type { BuddyExecutionProfile } from '../../../shared/executionProfile'
 
 export type RunStatus = 'queued' | 'running' | 'completed' | 'failed' | 'cancelled'
 
@@ -15,6 +16,7 @@ export interface RunRecord {
   status: RunStatus
   piSessionFile: string | null
   errorCode: string | null
+  executionProfile: BuddyExecutionProfile
   startedAt: string
   completedAt: string | null
 }
@@ -70,6 +72,7 @@ interface RunRow {
   status: RunStatus
   pi_session_file: string | null
   error_code: string | null
+  execution_profile: BuddyExecutionProfile
   started_at: string
   completed_at: string | null
 }
@@ -80,8 +83,8 @@ export function createRunRepository(database: DatabaseSync): RunRepository {
     INSERT INTO runs (
       id, conversation_id, branch_id, triggering_message_id, provider, model,
       context_window, max_tokens, purpose, status, pi_session_file, error_code,
-      started_at, completed_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      started_at, completed_at, execution_profile
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `)
   const list = database.prepare(`
     SELECT * FROM runs
@@ -142,6 +145,7 @@ export function createRunRepository(database: DatabaseSync): RunRepository {
         input.errorCode ?? null,
         input.startedAt,
         input.completedAt ?? null,
+        input.executionProfile,
       )
       return requireRun(find.get(input.id), input.id)
     },
@@ -215,6 +219,7 @@ function toRun(row: RunRow): RunRecord {
     status: row.status,
     piSessionFile: row.pi_session_file,
     errorCode: row.error_code,
+    executionProfile: row.execution_profile,
     startedAt: row.started_at,
     completedAt: row.completed_at,
   }

@@ -174,6 +174,10 @@ const localChatApi = Object.freeze<LocalChatApi>({
       ipcRenderer.invoke(LOCAL_CHAT_IPC_CHANNELS.conversationsListMessages, input),
     rename: (conversationId, title) =>
       ipcRenderer.invoke(LOCAL_CHAT_IPC_CHANNELS.conversationsRename, { conversationId, title }),
+    setExecutionProfile: (conversationId, executionProfile) => ipcRenderer.invoke(
+      LOCAL_CHAT_IPC_CHANNELS.conversationsSetExecutionProfile,
+      { conversationId, executionProfile },
+    ),
     listTimeline: input =>
       ipcRenderer.invoke(LOCAL_CHAT_IPC_CHANNELS.conversationsListTimeline, input),
   }),

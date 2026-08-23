@@ -4,6 +4,7 @@ import type {
   LocalRun,
 } from '@buddy-electron/shared/localChatApi'
 import type { ParsedBuddyChatCommand } from '@buddy-shared/buddyChatCommands'
+import type { BuddyExecutionProfile } from '@buddy-shared/executionProfile'
 import type { BuddyLocale } from '@/i18n/buddyI18n'
 import type { ModelProvidersStore } from '@/stores/useModelProvidersStore'
 import type { RuntimeSupervisorStore } from '@/stores/useRuntimeSupervisorStore'
@@ -31,7 +32,9 @@ interface UseChatTurnExecutionOptions {
   session: ChatSession
   drafts: ReturnType<typeof useChatDrafts>
   draftScopeKey: ValueRef<string>
+  executionProfile: ValueRef<BuddyExecutionProfile>
   getRunTerminationMessage: (errorCode: string | null) => string
+  isUpdatingExecutionProfile: ValueRef<boolean>
   language: ValueRef<BuddyLocale>
   modelProviders: ModelProvidersStore
   persistWorkspaceState: () => Promise<boolean>
@@ -48,7 +51,8 @@ export function useChatTurnExecution(options: UseChatTurnExecutionOptions) {
     options.runtimeSupervisor.runtimeState.value.status === 'ready'
     && options.modelProviders.selectedModel.value !== null
     && !options.activeRun.value
-    && !isSending.value,
+    && !isSending.value
+    && !options.isUpdatingExecutionProfile.value,
   )
 
   async function send(payload: ChatComposerSubmitPayload | string) {
@@ -81,6 +85,7 @@ export function useChatTurnExecution(options: UseChatTurnExecutionOptions) {
       content: content.trim(),
       contextItems: [...contextItems],
       conversationId: options.session.activeConversationId.value,
+      executionProfile: options.executionProfile.value,
       modelSelection,
       projectId: options.session.projectId.value,
     }

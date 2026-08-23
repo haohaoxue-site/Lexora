@@ -181,6 +181,7 @@ export class BuddyAgentRunner {
       branchId: input.branchId,
       canonicalRoot: input.canonicalRoot,
       conversationId: input.conversationId,
+      executionProfile: run.executionProfile,
       resourceRevision: input.resources.revision,
     }
     this.#controllers.set(runId, controller)
@@ -224,6 +225,7 @@ export class BuddyAgentRunner {
       branchId: input.branchId,
       canonicalRoot: input.canonicalRoot,
       conversationId: input.conversationId,
+      executionProfile: run.executionProfile,
       resourceRevision: input.resources.revision,
     }
     this.#controllers.set(run.id, controller)

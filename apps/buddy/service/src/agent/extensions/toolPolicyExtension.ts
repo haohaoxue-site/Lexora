@@ -3,6 +3,7 @@ import type {
   ToolCallEventResult,
 } from '@earendil-works/pi-coding-agent'
 import type { SystemActionApprovalReviewInput } from '../../../../shared/approvalReviewPayload'
+import type { BuddyExecutionProfile } from '../../../../shared/executionProfile'
 import type { BuddyServiceTier } from '../../../../shared/modelSelection'
 
 import type {
@@ -51,6 +52,7 @@ export interface CreateToolPolicyExtensionOptions {
   approvalService: ToolApprovalGateway
   classifyTool?: (event: ToolCallEvent) => BuddyToolClassification
   cwd: string
+  executionProfile: BuddyExecutionProfile
   getGrants: () => readonly ProjectGrant[]
   getRunContext: () => BuddyRunContext | null
   toolPolicy?: ToolPolicy
@@ -74,6 +76,8 @@ async function decideToolCall(
   event: ToolCallEvent,
 ): Promise<ToolCallEventResult | void> {
   try {
+    if (options.executionProfile === 'full_access')
+      return
     const declared = options.classifyTool?.(event) ?? {}
     const decision = await toolPolicy.decide({
       arguments: event.input,

@@ -1,5 +1,6 @@
 import type { LexoraDesktopApi } from '@buddy-electron/shared/desktopApi'
 import type { LocalRun } from '@buddy-electron/shared/localChatApi'
+import type { BuddyExecutionProfile } from '@buddy-shared/executionProfile'
 import type { BuddyLocale } from '@/i18n/buddyI18n'
 import type { ModelProvidersStore } from '@/stores/useModelProvidersStore'
 import type { RuntimeSupervisorStore } from '@/stores/useRuntimeSupervisorStore'
@@ -21,7 +22,9 @@ interface UseChatExecutionOptions {
   session: ChatSession
   drafts: ReturnType<typeof useChatDrafts>
   draftScopeKey: ValueRef<string>
+  executionProfile: ValueRef<BuddyExecutionProfile>
   getRunTerminationMessage: (errorCode: string | null) => string
+  isUpdatingExecutionProfile: ValueRef<boolean>
   language: ValueRef<BuddyLocale>
   modelProviders: ModelProvidersStore
   persistWorkspaceState: () => Promise<boolean>
@@ -40,7 +43,9 @@ export function useChatExecution(options: UseChatExecutionOptions) {
     session: options.session,
     drafts: options.drafts,
     draftScopeKey: options.draftScopeKey,
+    executionProfile: options.executionProfile,
     getRunTerminationMessage: options.getRunTerminationMessage,
+    isUpdatingExecutionProfile: options.isUpdatingExecutionProfile,
     language: options.language,
     modelProviders: options.modelProviders,
     persistWorkspaceState: options.persistWorkspaceState,
@@ -55,6 +60,7 @@ export function useChatExecution(options: UseChatExecutionOptions) {
     chatIndexData: options.chatIndexData,
     session: options.session,
     isSending: turnExecution.isSending,
+    isUpdatingExecutionProfile: options.isUpdatingExecutionProfile,
     language: options.language,
     modelProviders: options.modelProviders,
     refreshBranches: options.refreshBranches,

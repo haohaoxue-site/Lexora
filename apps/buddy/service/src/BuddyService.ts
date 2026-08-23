@@ -28,6 +28,7 @@ import {
   materializeBuddyPromptCommand,
   parseBuddyChatCommand,
 } from '../../shared/buddyChatCommands'
+import { BUDDY_EXECUTION_PROFILES } from '../../shared/executionProfile'
 import {
   BUDDY_SERVICE_TIERS,
   BUDDY_THINKING_LEVELS,
@@ -110,6 +111,7 @@ const idSchema = z.string().trim().min(1).max(256)
 const sessionIdentitySchema = z.string().regex(/^[A-Z0-9][\w-]{0,127}$/i)
 const limitSchema = z.number().int().positive().max(500).optional()
 const eventLimitSchema = z.number().int().positive().max(1_000).optional()
+const executionProfileSchema = z.enum(BUDDY_EXECUTION_PROFILES)
 const emptySchema = z.object({}).strict()
 const connectorConfigSchema = z.discriminatedUnion('transport', [
   z.object({
@@ -143,6 +145,7 @@ const startTurnSchema = z.object({
     value: z.string().min(1),
   }).strict()).max(64),
   conversationId: sessionIdentitySchema.nullable(),
+  executionProfile: executionProfileSchema,
   modelSelection: z.object({
     modelId: idSchema,
     providerId: idSchema,
@@ -188,6 +191,7 @@ const chatCommandSchema = z.object({
 const contextUsageSnapshotRequestSchema = z.object({
   branchId: sessionIdentitySchema.nullable(),
   conversationId: sessionIdentitySchema.nullable(),
+  executionProfile: executionProfileSchema,
   modelSelection: z.object({
     modelId: idSchema,
     providerId: idSchema,
@@ -332,6 +336,7 @@ export async function startBuddyService(
         canonicalRoot: input.canonicalRoot,
         conversationId: input.conversationId,
         cwd: input.canonicalRoot,
+        executionProfile: run.executionProfile,
         getServiceTier: () => runContext.current?.serviceTier ?? null,
         model: selectedModel,
         modelRuntime: providerService.getSessionRuntime(),
@@ -350,6 +355,7 @@ export async function startBuddyService(
               event.input,
             ) ?? classifications.get(event.toolName) ?? {},
             cwd: input.canonicalRoot,
+            executionProfile: run.executionProfile,
             getGrants: () => [grant],
             getRunContext: () => runContext.current,
           }),
@@ -772,6 +778,7 @@ function registerRuntimeHandlers(services: RuntimeServices): () => void {
       conversation
       && (
         conversation.projectId !== input.projectId
+        || conversation.executionProfile !== input.executionProfile
         || !input.branchId
         || !services.conversations.listBranches(conversation.id).some(
           branch => branch.id === input.branchId,
@@ -781,6 +788,7 @@ function registerRuntimeHandlers(services: RuntimeServices): () => void {
       throw new BuddyServiceError('VALIDATION_FAILED')
     }
     const projectId = conversation?.projectId ?? input.projectId
+    const executionProfile = conversation?.executionProfile ?? input.executionProfile
     const project = projectId
       ? requireActiveProject(services.projectsRepository.findById(projectId))
       : null
@@ -830,6 +838,7 @@ function registerRuntimeHandlers(services: RuntimeServices): () => void {
       canonicalRoot,
       conversationId,
       cwd: canonicalRoot,
+      executionProfile,
       inProcessExtensions: [
         createMcpExtension({ tools: mcp.tools }),
         createPetExtension({
@@ -845,6 +854,7 @@ function registerRuntimeHandlers(services: RuntimeServices): () => void {
             event.input,
           ) ?? classifications.get(event.toolName) ?? {},
           cwd: canonicalRoot,
+          executionProfile,
           getGrants: () => [grant],
           getRunContext: () => null,
         }),
@@ -905,6 +915,27 @@ function registerRuntimeHandlers(services: RuntimeServices): () => void {
       title: input.title,
       updatedAt: new Date().toISOString(),
     })
+  })
+  on('conversations.setExecutionProfile', async (params) => {
+    const input = parse(z.object({
+      conversationId: idSchema,
+      executionProfile: executionProfileSchema,
+    }).strict(), params)
+    const current = requireValue(
+      services.conversations.findById(input.conversationId),
+      'VALIDATION_FAILED',
+    )
+    if (current.executionProfile === input.executionProfile)
+      return current
+    const conversation = services.conversations.setExecutionProfile({
+      executionProfile: input.executionProfile,
+      id: input.conversationId,
+      updatedAt: new Date().toISOString(),
+    })
+    if (!conversation)
+      throw new BuddyServiceError('VALIDATION_FAILED')
+    await services.sessions.invalidateConversation(input.conversationId)
+    return conversation
   })
   on('conversations.delete', async (params) => {
     const input = parse(z.object({ conversationId: idSchema }).strict(), params)
@@ -1154,6 +1185,7 @@ function registerRuntimeHandlers(services: RuntimeServices): () => void {
       : services.commandRequests.prepare({
           ...input,
           createdAt: new Date().toISOString(),
+          executionProfile: conversation.executionProfile,
           requestFingerprint,
           runId,
         })
@@ -1210,8 +1242,15 @@ function registerRuntimeHandlers(services: RuntimeServices): () => void {
     const canonicalRoot = project?.canonicalRoot ?? services.workspaceDirectory
     const conversationId = replay?.conversationId ?? input.conversationId ?? randomUUID()
     const existingConversation = services.conversations.findById(conversationId)
-    if (existingConversation && existingConversation.projectId !== (project?.id ?? null))
+    if (
+      existingConversation
+      && (
+        existingConversation.projectId !== (project?.id ?? null)
+        || existingConversation.executionProfile !== input.executionProfile
+      )
+    ) {
       throw new BuddyServiceError('VALIDATION_FAILED')
+    }
     const branchId = replay?.branchId
       ?? input.branchId
       ?? existingConversation?.activeBranchId
@@ -1273,6 +1312,7 @@ function registerRuntimeHandlers(services: RuntimeServices): () => void {
           branchId,
           conversationId,
           createdAt: new Date().toISOString(),
+          executionProfile: input.executionProfile,
           model: selection.modelId,
           modelParameters: selection.contextWindow !== null && selection.maxTokens !== null
             ? { contextWindow: selection.contextWindow, maxTokens: selection.maxTokens }
@@ -1408,6 +1448,7 @@ function registerRuntimeHandlers(services: RuntimeServices): () => void {
           branchId: randomUUID(),
           conversationId: conversation.id,
           createdAt: new Date().toISOString(),
+          executionProfile: conversation.executionProfile,
           forkedFromMessageId,
           model: selection.modelId,
           modelParameters: selection.contextWindow !== null && selection.maxTokens !== null
@@ -1545,6 +1586,7 @@ function registerRuntimeHandlers(services: RuntimeServices): () => void {
           branchId: randomUUID(),
           conversationId: conversation.id,
           createdAt: new Date().toISOString(),
+          executionProfile: conversation.executionProfile,
           forkedFromMessageId: requireValue(sourceRun, 'VALIDATION_FAILED').triggeringMessageId,
           parentBranchId,
           requestFingerprint,
@@ -1876,6 +1918,7 @@ function toPublicRun(run: RunRecord, reasoningLevel: string | null) {
     completedAt: run.completedAt,
     conversationId: run.conversationId,
     errorCode: run.errorCode,
+    executionProfile: run.executionProfile,
     id: run.id,
     modelId: run.model,
     providerId: run.provider,

@@ -1,4 +1,5 @@
 import type { DatabaseSync } from 'node:sqlite'
+import type { BuddyExecutionProfile } from '../../../shared/executionProfile'
 import type { BuddyServiceTier } from '../../../shared/modelSelection'
 import type { RunInputContextItem } from './runInputRepository'
 import { withTransaction } from './database'
@@ -7,6 +8,7 @@ export interface PrepareTurnRequestInput {
   branchId: string
   conversationId: string
   createdAt: string
+  executionProfile: BuddyExecutionProfile
   model: string
   modelParameters?: { contextWindow: number, maxTokens: number }
   projectId: string | null
@@ -45,6 +47,7 @@ export interface RegenerateTurnRequestInput {
   branchId: string
   conversationId: string
   createdAt: string
+  executionProfile: BuddyExecutionProfile
   forkedFromMessageId: string
   parentBranchId: string
   requestFingerprint: string
@@ -70,6 +73,7 @@ interface TurnRequestRow {
 
 interface ConversationBindingRow {
   active_branch_id: string | null
+  execution_profile: BuddyExecutionProfile
   project_id: string | null
 }
 
@@ -77,6 +81,7 @@ interface RetryRunRow {
   branch_id: string
   conversation_id: string
   error_code: string | null
+  execution_profile: BuddyExecutionProfile
   model: string
   context_window: number | null
   max_tokens: number | null
@@ -102,14 +107,15 @@ export interface TurnRequestRepository {
 export function createTurnRequestRepository(database: DatabaseSync): TurnRequestRepository {
   const findRequest = database.prepare('SELECT * FROM turn_requests WHERE request_id = ?')
   const findConversation = database.prepare(`
-    SELECT project_id, active_branch_id FROM conversations WHERE id = ?
+    SELECT project_id, active_branch_id, execution_profile FROM conversations WHERE id = ?
   `)
   const findConversationDeletion = database.prepare(`
     SELECT 1 FROM conversation_deletions WHERE conversation_id = ?
   `)
   const insertConversation = database.prepare(`
-    INSERT INTO conversations (id, project_id, title, active_branch_id, created_at, updated_at)
-    VALUES (?, ?, ?, NULL, ?, ?)
+    INSERT INTO conversations (
+      id, project_id, title, active_branch_id, created_at, updated_at, execution_profile
+    ) VALUES (?, ?, ?, NULL, ?, ?, ?)
   `)
   const insertBranch = database.prepare(`
     INSERT INTO conversation_branches (
@@ -145,8 +151,8 @@ export function createTurnRequestRepository(database: DatabaseSync): TurnRequest
     INSERT INTO runs (
       id, conversation_id, branch_id, triggering_message_id, provider, model,
       context_window, max_tokens, purpose, status, pi_session_file, error_code,
-      started_at, completed_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'chat', 'queued', ?, NULL, ?, NULL)
+      started_at, completed_at, execution_profile
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'chat', 'queued', ?, NULL, ?, NULL, ?)
   `)
   const insertRunInput = database.prepare(`
     INSERT INTO run_inputs (
@@ -211,6 +217,7 @@ export function createTurnRequestRepository(database: DatabaseSync): TurnRequest
           !conversation
           || conversation.project_id !== input.projectId
           || conversation.active_branch_id !== input.parentBranchId
+          || conversation.execution_profile !== input.executionProfile
           || findConversationDeletion.get(input.conversationId)
           || findIncompleteRun.get(input.conversationId)
           || !sourceMessage
@@ -258,6 +265,7 @@ export function createTurnRequestRepository(database: DatabaseSync): TurnRequest
           input.modelParameters?.maxTokens ?? null,
           null,
           input.createdAt,
+          input.executionProfile,
         )
         insertRunInput.run(
           input.runId,
@@ -303,6 +311,7 @@ export function createTurnRequestRepository(database: DatabaseSync): TurnRequest
           if (
             conversation.project_id !== input.projectId
             || conversation.active_branch_id !== input.branchId
+            || conversation.execution_profile !== input.executionProfile
           ) {
             throw new TurnRequestConflictError()
           }
@@ -314,6 +323,7 @@ export function createTurnRequestRepository(database: DatabaseSync): TurnRequest
             input.title,
             input.createdAt,
             input.createdAt,
+            input.executionProfile,
           )
           insertBranch.run(input.branchId, input.conversationId, input.createdAt)
           activateBranch.run(input.branchId, input.createdAt, input.conversationId)
@@ -351,6 +361,7 @@ export function createTurnRequestRepository(database: DatabaseSync): TurnRequest
           input.modelParameters?.maxTokens ?? null,
           previous?.pi_session_file ?? null,
           input.createdAt,
+          input.executionProfile,
         )
         insertRunInput.run(
           input.runId,
@@ -392,6 +403,7 @@ export function createTurnRequestRepository(database: DatabaseSync): TurnRequest
         if (
           !conversation
           || conversation.active_branch_id !== input.parentBranchId
+          || conversation.execution_profile !== input.executionProfile
           || findConversationDeletion.get(input.conversationId)
           || findIncompleteRun.get(input.conversationId)
           || !sourceRun
@@ -421,6 +433,7 @@ export function createTurnRequestRepository(database: DatabaseSync): TurnRequest
           sourceRun.max_tokens,
           null,
           input.createdAt,
+          input.executionProfile,
         )
         if (Number(cloneRunInput.run(input.runId, input.createdAt, input.sourceRunId).changes) !== 1)
           throw new TurnRequestConflictError()
@@ -470,6 +483,7 @@ export function createTurnRequestRepository(database: DatabaseSync): TurnRequest
           run.max_tokens,
           previous?.pi_session_file ?? null,
           input.createdAt,
+          run.execution_profile,
         )
         if (Number(cloneRunInput.run(input.runId, input.createdAt, request.run_id).changes) !== 1)
           throw new TurnRequestConflictError()

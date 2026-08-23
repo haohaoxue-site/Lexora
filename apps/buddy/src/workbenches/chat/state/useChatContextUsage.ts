@@ -5,6 +5,7 @@ import type {
   LocalRunEvent,
   LocalRuntimeModelOption,
 } from '@buddy-electron/shared/localChatApi'
+import type { BuddyExecutionProfile } from '@buddy-shared/executionProfile'
 import type { BuddyServiceTier, BuddyThinkingLevel } from '@buddy-shared/modelSelection'
 import type { Ref } from 'vue'
 import { computed, shallowRef, watch } from 'vue'
@@ -14,6 +15,7 @@ interface UseChatContextUsageOptions {
   activeBranchId: Readonly<Ref<string | null>>
   activeConversationId: Readonly<Ref<string | null>>
   api: LexoraDesktopApi['localChat']['context']
+  executionProfile: Readonly<Ref<BuddyExecutionProfile>>
   models: Readonly<Ref<ReadonlyArray<LocalRuntimeModelOption>>>
   projectId: Readonly<Ref<string | null>>
   runEvents: Readonly<Ref<ReadonlyArray<LocalRunEvent>>>
@@ -43,6 +45,7 @@ export function useChatContextUsage(options: UseChatContextUsageOptions) {
       options.activeConversationId.value,
       options.activeBranchId.value,
       options.projectId.value,
+      options.executionProfile.value,
     ] as const,
     () => void refresh(),
     { immediate: true },
@@ -67,6 +70,7 @@ export function useChatContextUsage(options: UseChatContextUsageOptions) {
       const nextSnapshot = await options.api.getUsageSnapshot({
         branchId,
         conversationId,
+        executionProfile: options.executionProfile.value,
         modelSelection: {
           modelId: selectedModel.modelId,
           providerId: selectedModel.providerId,

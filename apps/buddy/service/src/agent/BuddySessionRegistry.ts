@@ -1,9 +1,11 @@
+import type { BuddyExecutionProfile } from '../../../shared/executionProfile'
 import type { BuddySessionShutdownReason } from './createBuddySession'
 
 export interface BuddySessionIdentity {
   branchId: string
   canonicalRoot: string
   conversationId: string
+  executionProfile: BuddyExecutionProfile
   resourceRevision: string
 }
 
@@ -244,6 +246,7 @@ function createSessionKey(identity: BuddySessionIdentity): string {
   return [
     createBranchKey(identity),
     identity.canonicalRoot,
+    identity.executionProfile,
     identity.resourceRevision,
   ].join('\0')
 }

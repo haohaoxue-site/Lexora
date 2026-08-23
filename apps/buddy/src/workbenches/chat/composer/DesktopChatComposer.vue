@@ -5,6 +5,7 @@ import type {
   LocalRuntimeModelOption,
   LocalWorkspaceDraft,
 } from '@buddy-electron/shared/localChatApi'
+import type { BuddyExecutionProfile } from '@buddy-shared/executionProfile'
 import type {
   BuddyServiceTier,
   BuddyThinkingLevel,
@@ -27,18 +28,22 @@ import { toRef } from 'vue'
 import { useBuddyI18n } from '@/i18n/buddyI18n'
 import DesktopModelSelector from '@/ui/model-selector/DesktopModelSelector.vue'
 import ChatContextUsage from '@/workbenches/chat/composer/ChatContextUsage.vue'
+import DesktopExecutionProfileSelector from '@/workbenches/chat/composer/DesktopExecutionProfileSelector.vue'
 import { useChatComposer } from '@/workbenches/chat/composer/useChatComposer'
 import { resolveBuddyAttachmentPreviewUrl } from '@/workbenches/chat/transcript/chatAttachmentView'
 
 const props = defineProps<{
   attachments: ReadonlyArray<LocalAttachment>
+  canUpdateExecutionProfile: boolean
   canSend: boolean
   composerContent: LocalWorkspaceDraft['composerContent']
   contextUsage: ChatContextUsageValue | null
   draft: string
+  executionProfile: BuddyExecutionProfile
   isRunning: boolean
   isSelectingFiles: boolean
   isSending: boolean
+  isUpdatingExecutionProfile: boolean
   language: BuddyLocale
   loadContextOptions: (fileQuery: string | null) => Promise<ChatComposerContextOptions>
   models: ReadonlyArray<LocalRuntimeModelOption>
@@ -56,6 +61,7 @@ const emit = defineEmits<{
   stop: []
   updateContent: [content: string, value: LocalWorkspaceDraft['composerContent']]
   updateEffort: [value: BuddyThinkingLevel | null]
+  updateExecutionProfile: [value: BuddyExecutionProfile]
   updateModel: [value: string]
   updateServiceTier: [value: BuddyServiceTier | null]
 }>()
@@ -143,17 +149,27 @@ const {
       </div>
 
       <div class="desktop-chat-composer__toolbar">
-        <NButton
-          class="buddy-icon-button"
-          quaternary
-          :aria-label="t('desktop.chat.addAttachment')"
-          :disabled="isSelectingFiles || isSending"
-          @click="emit('attach')"
-        >
-          <template #icon>
-            <NIcon :component="Add20Regular" />
-          </template>
-        </NButton>
+        <div class="desktop-chat-composer__leading-actions">
+          <NButton
+            class="buddy-icon-button"
+            quaternary
+            :aria-label="t('desktop.chat.addAttachment')"
+            :disabled="isSelectingFiles || isSending"
+            @click="emit('attach')"
+          >
+            <template #icon>
+              <NIcon :component="Add20Regular" />
+            </template>
+          </NButton>
+
+          <DesktopExecutionProfileSelector
+            :can-update="canUpdateExecutionProfile"
+            :execution-profile="executionProfile"
+            :is-updating="isUpdatingExecutionProfile"
+            :language="language"
+            @update-execution-profile="emit('updateExecutionProfile', $event)"
+          />
+        </div>
 
         <div class="desktop-chat-composer__actions">
           <ChatContextUsage
@@ -355,6 +371,13 @@ const {
   min-width: 0;
   align-items: center;
   justify-content: flex-end;
+  gap: 0.35rem;
+}
+
+.desktop-chat-composer__leading-actions {
+  display: flex;
+  min-width: 0;
+  align-items: center;
   gap: 0.35rem;
 }
 

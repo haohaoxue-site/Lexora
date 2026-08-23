@@ -27,6 +27,7 @@ interface UseChatBranchMutationsOptions {
   chatIndexData: ChatIndexData
   session: ChatSession
   isSending: ValueRef<boolean>
+  isUpdatingExecutionProfile: ValueRef<boolean>
   language: ValueRef<BuddyLocale>
   modelProviders: ModelProvidersStore
   refreshBranches: () => Promise<void>
@@ -44,7 +45,8 @@ export function useChatBranchMutations(options: UseChatBranchMutationsOptions) {
     && options.session.activeBranchId.value !== null
     && !options.activeRun.value
     && !isMutatingBranch.value
-    && !options.isSending.value,
+    && !options.isSending.value
+    && !options.isUpdatingExecutionProfile.value,
   )
 
   async function activateBranch(branchId: string) {

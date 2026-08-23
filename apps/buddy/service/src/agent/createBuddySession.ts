@@ -5,6 +5,7 @@ import type {
   LoadExtensionsResult,
   ModelRuntime,
 } from '@earendil-works/pi-coding-agent'
+import type { BuddyExecutionProfile } from '../../../shared/executionProfile'
 import type { BuddyServiceTier } from '../../../shared/modelSelection'
 import type { ShellSandboxAssets } from '../approvals/ShellSandbox'
 import type { BuddySessionResources } from './BuddySessionResources'
@@ -38,6 +39,7 @@ export interface CreateBuddySessionOptions {
   canonicalRoot: string
   conversationId: string
   cwd: string
+  executionProfile: BuddyExecutionProfile
   getServiceTier?: () => BuddyServiceTier | null
   model?: Model<Api>
   modelRuntime: ModelRuntime
@@ -234,11 +236,13 @@ async function createConfiguredBuddySession(
     inProcessExtensions: [
       createWorkspaceExtension({
         canonicalRoot: runtime.canonicalRoot,
+        executionProfile: options.executionProfile,
         shellSandboxAssets: options.shellSandboxAssets,
       }),
       ...options.inProcessExtensions,
     ],
     projectInstructions: options.resources.projectInstructions,
+    executionProfile: options.executionProfile,
     settingsManager,
   })
   const result = await createAgentSession({

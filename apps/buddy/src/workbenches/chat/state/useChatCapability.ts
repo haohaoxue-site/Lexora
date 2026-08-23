@@ -1,5 +1,6 @@
 import type { LexoraDesktopApi } from '@buddy-electron/shared/desktopApi'
 import type { LocalRunEvent } from '@buddy-electron/shared/localChatApi'
+import type { BuddyExecutionProfile } from '@buddy-shared/executionProfile'
 import type { ApplicationSettingsStore } from '@/stores/useApplicationSettingsStore'
 import type { LocalCapabilitiesStore } from '@/stores/useLocalCapabilitiesStore'
 import type { ModelProvidersStore } from '@/stores/useModelProvidersStore'
@@ -15,6 +16,7 @@ import { useChatContextUsage } from '@/workbenches/chat/state/useChatContextUsag
 import { useChatConversations } from '@/workbenches/chat/state/useChatConversations'
 import { useChatDrafts } from '@/workbenches/chat/state/useChatDrafts'
 import { useChatExecution } from '@/workbenches/chat/state/useChatExecution'
+import { useChatExecutionProfile } from '@/workbenches/chat/state/useChatExecutionProfile'
 import { useChatIndexData } from '@/workbenches/chat/state/useChatIndexData'
 import { useChatProjects } from '@/workbenches/chat/state/useChatProjects'
 import { useChatRunSync } from '@/workbenches/chat/state/useChatRunSync'
@@ -174,6 +176,16 @@ export function useChatCapability(options: UseChatCapabilityOptions) {
   const currentTitle = computed(() => activeConversation.value?.title?.trim()
     || activeProject.value?.name
     || t('chat.newConversation'))
+  const executionProfileState = useChatExecutionProfile({
+    activeConversation,
+    activeConversationId,
+    activeRun,
+    api: api.localChat.conversations,
+    chatIndexData,
+    drafts,
+    onError: setError,
+    persistWorkspaceState,
+  })
   const { approvalViews, resolveApproval, resolvingApprovalIds } = useChatApprovals({
     api: api.localChat,
     approvals,
@@ -194,6 +206,7 @@ export function useChatCapability(options: UseChatCapabilityOptions) {
     activeBranchId,
     activeConversationId,
     api: api.localChat.context,
+    executionProfile: executionProfileState.executionProfile,
     models: modelProviders.models,
     projectId,
     runEvents,
@@ -210,7 +223,9 @@ export function useChatCapability(options: UseChatCapabilityOptions) {
     session: chatSession,
     drafts,
     draftScopeKey,
+    executionProfile: executionProfileState.executionProfile,
     getRunTerminationMessage,
+    isUpdatingExecutionProfile: executionProfileState.isUpdating,
     language,
     persistWorkspaceState,
     modelProviders,
@@ -231,6 +246,17 @@ export function useChatCapability(options: UseChatCapabilityOptions) {
     regenerateAssistant,
     send,
   } = execution
+  const canUpdateExecutionProfile = computed(() => (
+    executionProfileState.canUpdate.value
+    && !isSending.value
+    && !isMutatingBranch.value
+  ))
+
+  async function setExecutionProfile(value: BuddyExecutionProfile): Promise<boolean> {
+    if (!canUpdateExecutionProfile.value)
+      return false
+    return executionProfileState.setExecutionProfile(value)
+  }
   const stopRunEventListener = api.localChat.chat.onRunEvent(handleRunEvent)
 
   watch(chatBlocker, (value) => {
@@ -354,6 +380,9 @@ export function useChatCapability(options: UseChatCapabilityOptions) {
       composerContent: readonly(composerContent),
       contextUsage: readonly(contextUsage),
       draft: readonly(draft),
+      executionProfile: executionProfileState.executionProfile,
+      canUpdateExecutionProfile: readonly(canUpdateExecutionProfile),
+      isUpdatingExecutionProfile: executionProfileState.isUpdating,
       isSelectingFiles: readonly(isSelectingFiles),
       listContextOptions,
       models: modelProviders.models,
@@ -367,6 +396,7 @@ export function useChatCapability(options: UseChatCapabilityOptions) {
       selectModel: modelProviders.selectModel,
       setSelectedEffort: modelProviders.setSelectedEffort,
       setSelectedServiceTier: modelProviders.setSelectedServiceTier,
+      setExecutionProfile,
       updateComposerContent: drafts.updateComposerContent,
     },
     execution: {

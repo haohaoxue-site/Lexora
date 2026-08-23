@@ -2,7 +2,9 @@ import type {
   LocalAttachment,
   LocalWorkspaceDraft,
 } from '@buddy-electron/shared/localChatApi'
+import type { BuddyExecutionProfile } from '@buddy-shared/executionProfile'
 import type { ComputedRef } from 'vue'
+import { BUDDY_DEFAULT_EXECUTION_PROFILE } from '@buddy-shared/executionProfile'
 import { shallowRef } from 'vue'
 
 interface UseChatDraftsOptions {
@@ -16,6 +18,7 @@ interface ChatDraftState {
   attachments: ReadonlyArray<LocalAttachment>
   composerContent: LocalWorkspaceDraft['composerContent']
   content: string
+  executionProfile: BuddyExecutionProfile
   requestFingerprint: string | null
   requestId: string | null
 }
@@ -28,6 +31,7 @@ export function useChatDrafts(options: UseChatDraftsOptions) {
   const attachments = shallowRef<ReadonlyArray<LocalAttachment>>([])
   const composerContent = shallowRef<LocalWorkspaceDraft['composerContent']>(null)
   const draft = shallowRef('')
+  const executionProfile = shallowRef<BuddyExecutionProfile>(BUDDY_DEFAULT_EXECUTION_PROFILE)
 
   async function appendAttachments(incoming: ReadonlyArray<LocalAttachment>): Promise<number> {
     const accepted = [...attachments.value]
@@ -72,6 +76,7 @@ export function useChatDrafts(options: UseChatDraftsOptions) {
       attachments: attachments.value,
       composerContent: composerContent.value,
       content: draft.value,
+      executionProfile: executionProfile.value,
       requestFingerprint: resetRequestId ? null : current.requestFingerprint,
       requestId: resetRequestId ? null : current.requestId,
     })
@@ -83,6 +88,7 @@ export function useChatDrafts(options: UseChatDraftsOptions) {
     attachments.value = current.attachments
     composerContent.value = current.composerContent
     draft.value = current.content
+    executionProfile.value = current.executionProfile
   }
 
   function load(key: string): ChatDraftState {
@@ -103,6 +109,7 @@ export function useChatDrafts(options: UseChatDraftsOptions) {
       attachments: value.attachments,
       composerContent: value.composerContent,
       content: value.content,
+      executionProfile: value.executionProfile,
       requestFingerprint: value.requestFingerprint,
       requestId: value.requestId,
       targetKey,
@@ -114,12 +121,14 @@ export function useChatDrafts(options: UseChatDraftsOptions) {
           attachments: value.attachments,
           composerContent: value.composerContent,
           content: value.content,
+          executionProfile: value.executionProfile,
           requestFingerprint: value.requestFingerprint,
           requestId: value.requestId,
         })
       }
     },
     load,
+    executionProfile,
     prepareSend(requestFingerprint: string) {
       const current = load(options.targetKey.value)
       const requestId = current.requestFingerprint === requestFingerprint
@@ -144,6 +153,10 @@ export function useChatDrafts(options: UseChatDraftsOptions) {
     removeAttachment,
     restoreCurrentDraft,
     saveCurrentDraft,
+    setExecutionProfile(value: BuddyExecutionProfile) {
+      executionProfile.value = value
+      saveCurrentDraft(true)
+    },
     clear(key: string) {
       draftsByScope.delete(key)
       options.onChange()
@@ -164,6 +177,7 @@ function emptyDraft(): ChatDraftState {
     attachments: [],
     composerContent: null,
     content: '',
+    executionProfile: BUDDY_DEFAULT_EXECUTION_PROFILE,
     requestFingerprint: null,
     requestId: null,
   }

@@ -1,4 +1,5 @@
 import type { DatabaseSync } from 'node:sqlite'
+import type { BuddyExecutionProfile } from '../../../shared/executionProfile'
 import { withTransaction } from './database'
 
 export type BuddyActionCommandName = 'compact'
@@ -9,6 +10,7 @@ export interface PrepareCommandRequestInput {
   command: BuddyActionCommandName
   conversationId: string
   createdAt: string
+  executionProfile: BuddyExecutionProfile
   requestFingerprint: string
   requestId: string
   runId: string
@@ -49,12 +51,14 @@ interface CommandRequestRow {
 
 interface ConversationRow {
   active_branch_id: string | null
+  execution_profile: BuddyExecutionProfile
 }
 
 interface SourceRunRow {
   branch_id: string
   conversation_id: string
   error_code: string | null
+  execution_profile: BuddyExecutionProfile
   model: string
   context_window: number | null
   max_tokens: number | null
@@ -67,7 +71,7 @@ interface SourceRunRow {
 export function createCommandRequestRepository(database: DatabaseSync): CommandRequestRepository {
   const findRequest = database.prepare('SELECT * FROM command_requests WHERE request_id = ?')
   const findConversation = database.prepare(`
-    SELECT active_branch_id FROM conversations WHERE id = ?
+    SELECT active_branch_id, execution_profile FROM conversations WHERE id = ?
   `)
   const findConversationDeletion = database.prepare(`
     SELECT 1 FROM conversation_deletions WHERE conversation_id = ?
@@ -90,8 +94,8 @@ export function createCommandRequestRepository(database: DatabaseSync): CommandR
     INSERT INTO runs (
       id, conversation_id, branch_id, triggering_message_id, provider, model,
       context_window, max_tokens, purpose, status, pi_session_file, error_code,
-      started_at, completed_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'conversation.compaction', 'queued', ?, NULL, ?, NULL)
+      started_at, completed_at, execution_profile
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'conversation.compaction', 'queued', ?, NULL, ?, NULL, ?)
   `)
   const insertRequest = database.prepare(`
     INSERT INTO command_requests (
@@ -122,6 +126,7 @@ export function createCommandRequestRepository(database: DatabaseSync): CommandR
         if (
           !conversation
           || conversation.active_branch_id !== input.branchId
+          || conversation.execution_profile !== input.executionProfile
           || findConversationDeletion.get(input.conversationId)
           || findIncompleteRun.get(input.conversationId)
         ) {
@@ -134,7 +139,13 @@ export function createCommandRequestRepository(database: DatabaseSync): CommandR
         if (!source?.pi_session_file)
           throw new CommandRequestConflictError()
 
-        insertCompactionRun(insertRun, input.runId, input.createdAt, source)
+        insertCompactionRun(
+          insertRun,
+          input.runId,
+          input.createdAt,
+          source,
+          input.executionProfile,
+        )
         insertRequest.run(
           input.requestId,
           input.requestFingerprint,
@@ -172,7 +183,13 @@ export function createCommandRequestRepository(database: DatabaseSync): CommandR
           throw new CommandRequestConflictError()
         }
 
-        insertCompactionRun(insertRun, input.runId, input.createdAt, previous)
+        insertCompactionRun(
+          insertRun,
+          input.runId,
+          input.createdAt,
+          previous,
+          previous.execution_profile,
+        )
         if (Number(updateRequestRun.run(input.runId, input.requestId, request.run_id).changes) !== 1)
           throw new CommandRequestConflictError()
         return {
@@ -198,6 +215,7 @@ function insertCompactionRun(
   runId: string,
   createdAt: string,
   source: SourceRunRow,
+  executionProfile: BuddyExecutionProfile,
 ): void {
   statement.run(
     runId,
@@ -210,6 +228,7 @@ function insertCompactionRun(
     source.max_tokens,
     source.pi_session_file,
     createdAt,
+    executionProfile,
   )
 }
 

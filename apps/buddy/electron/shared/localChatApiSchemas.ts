@@ -4,6 +4,10 @@ import {
   approvalReviewPayloadSchema,
 } from '../../shared/approvalReviewPayload'
 import {
+  BUDDY_DEFAULT_EXECUTION_PROFILE,
+  BUDDY_EXECUTION_PROFILES,
+} from '../../shared/executionProfile'
+import {
   BUDDY_SERVICE_TIERS,
   BUDDY_THINKING_LEVELS,
 } from '../../shared/modelSelection'
@@ -20,6 +24,7 @@ const timestampSchema = z.iso.datetime()
 const nullableTimestampSchema = timestampSchema.nullable()
 const runtimeDataBackupIdSchema = z.string().regex(/^buddy-\d{17}-[0-9a-f]{8}$/)
 const byteCountSchema = z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER)
+const executionProfileSchema = z.enum(BUDDY_EXECUTION_PROFILES)
 
 const runtimeStateSchema = z.object({
   lastError: buddyServiceSupervisorFailureCodeSchema.nullable(),
@@ -469,6 +474,7 @@ const connectorCredentialMutationSchema = z.discriminatedUnion('mode', [
 const conversationSchema = z.object({
   activeBranchId: z.string().nullable(),
   createdAt: timestampSchema,
+  executionProfile: executionProfileSchema,
   id: idSchema,
   projectId: z.string().nullable(),
   title: z.string().nullable(),
@@ -528,6 +534,7 @@ const runSchema = z.object({
   completedAt: nullableTimestampSchema,
   conversationId: idSchema,
   errorCode: z.string().nullable(),
+  executionProfile: executionProfileSchema,
   id: idSchema,
   modelId: idSchema,
   providerId: idSchema,
@@ -566,6 +573,7 @@ const workspaceDraftSchema = z.object({
   attachments: z.array(attachmentSchema).max(16),
   composerContent: z.json().nullable(),
   content: z.string(),
+  executionProfile: executionProfileSchema.default(BUDDY_DEFAULT_EXECUTION_PROFILE),
   requestFingerprint: z.string().min(1).max(1024).nullable(),
   requestId: z.string().min(1).max(128).nullable(),
   targetKey: z.string().min(1),
@@ -769,6 +777,10 @@ export const localChatSchemas = {
     conversationId: idSchema,
     title: z.string().trim().min(1).max(80),
   }).strict(),
+  conversationExecutionProfile: z.object({
+    conversationId: idSchema,
+    executionProfile: executionProfileSchema,
+  }).strict(),
   conversationTimeline: z.object({
     branchId: idSchema.optional(),
     conversationId: idSchema,
@@ -778,6 +790,7 @@ export const localChatSchemas = {
   contextUsageSnapshot: z.object({
     branchId: sessionIdentitySchema.nullable(),
     conversationId: sessionIdentitySchema.nullable(),
+    executionProfile: executionProfileSchema,
     modelSelection: modelSelectionSchema,
     projectId: idSchema.nullable(),
   }).strict().refine(input => (
@@ -893,6 +906,7 @@ export const localChatSchemas = {
     content: z.string().max(2 * 1024 * 1024),
     contextItems: z.array(contextItemSchema).max(64),
     conversationId: sessionIdentitySchema.nullable(),
+    executionProfile: executionProfileSchema,
     modelSelection: modelSelectionSchema.nullable(),
     projectId: idSchema.nullable(),
     requestId: z.string().min(1).max(128),

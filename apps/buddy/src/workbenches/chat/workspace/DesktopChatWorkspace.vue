@@ -163,13 +163,16 @@ function dismissBlocker() {
 
         <DesktopChatComposer
           :attachments="composer.attachments.value"
+          :can-update-execution-profile="composer.canUpdateExecutionProfile.value"
           :can-send="execution.canSend.value"
           :composer-content="composer.composerContent.value"
           :context-usage="composer.contextUsage.value"
           :draft="composer.draft.value"
+          :execution-profile="composer.executionProfile.value"
           :is-running="Boolean(execution.activeRun.value)"
           :is-selecting-files="composer.isSelectingFiles.value"
           :is-sending="execution.isSending.value"
+          :is-updating-execution-profile="composer.isUpdatingExecutionProfile.value"
           :language="workspace.language.value"
           :load-context-options="composer.listContextOptions"
           :models="composer.models.value"
@@ -184,6 +187,7 @@ function dismissBlocker() {
           @stop="execution.cancelActiveRun"
           @update-content="composer.updateComposerContent"
           @update-effort="composer.setSelectedEffort"
+          @update-execution-profile="composer.setExecutionProfile"
           @update-model="composer.selectModel"
           @update-service-tier="composer.setSelectedServiceTier"
         />

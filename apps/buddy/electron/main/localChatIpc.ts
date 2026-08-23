@@ -386,6 +386,11 @@ export function registerLocalChatIpc(options: RegisterLocalChatIpcOptions): () =
     localChatSchemas.conversationRename.parse(input),
     localChatResponseSchemas.conversation,
   ))
+  handle(LOCAL_CHAT_IPC_CHANNELS.conversationsSetExecutionProfile, (_event, input) => request(
+    'conversations.setExecutionProfile',
+    localChatSchemas.conversationExecutionProfile.parse(input),
+    localChatResponseSchemas.conversation,
+  ))
   handle(LOCAL_CHAT_IPC_CHANNELS.conversationsListTimeline, (_event, input) => request(
     'conversations.listTimeline',
     localChatSchemas.conversationTimeline.parse(input),

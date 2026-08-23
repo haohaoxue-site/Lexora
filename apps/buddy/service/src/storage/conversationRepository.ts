@@ -1,4 +1,5 @@
 import type { DatabaseSync } from 'node:sqlite'
+import type { BuddyExecutionProfile } from '../../../shared/executionProfile'
 import { withTransaction } from './database'
 
 export type MessageRole = 'user' | 'assistant' | 'tool'
@@ -9,6 +10,7 @@ export interface ConversationRecord {
   title: string | null
   activeBranchId: string | null
   createdAt: string
+  executionProfile: BuddyExecutionProfile
   updatedAt: string
 }
 
@@ -90,6 +92,7 @@ export interface CreateConversationInput {
   projectId: string | null
   title: string | null
   createdAt: string
+  executionProfile: BuddyExecutionProfile
 }
 
 export interface CreateBranchInput {
@@ -123,6 +126,12 @@ export interface RenameConversationInput {
   updatedAt: string
 }
 
+export interface SetConversationExecutionProfileInput {
+  executionProfile: BuddyExecutionProfile
+  id: string
+  updatedAt: string
+}
+
 export interface ConversationRepository {
   activateBranch: (input: ActivateConversationBranchInput) => ConversationRecord
   create: (input: CreateConversationInput) => ConversationRecord
@@ -150,6 +159,9 @@ export interface ConversationRepository {
   listRecent: (limit?: number) => ConversationSummaryRecord[]
   markDeleting: (id: string, requestedAt: string) => boolean
   rename: (input: RenameConversationInput) => ConversationRecord
+  setExecutionProfile: (
+    input: SetConversationExecutionProfileInput,
+  ) => ConversationRecord | null
 }
 
 interface ConversationRow {
@@ -158,6 +170,7 @@ interface ConversationRow {
   title: string | null
   active_branch_id: string | null
   created_at: string
+  execution_profile: BuddyExecutionProfile
   updated_at: string
 }
 
@@ -209,8 +222,9 @@ export function createConversationRepository(database: DatabaseSync): Conversati
   const findBranch = database.prepare('SELECT * FROM conversation_branches WHERE id = ?')
   const findMessage = database.prepare('SELECT * FROM messages WHERE id = ?')
   const insertConversation = database.prepare(`
-    INSERT INTO conversations (id, project_id, title, active_branch_id, created_at, updated_at)
-    VALUES (?, ?, ?, NULL, ?, ?)
+    INSERT INTO conversations (
+      id, project_id, title, active_branch_id, created_at, updated_at, execution_profile
+    ) VALUES (?, ?, ?, NULL, ?, ?, ?)
   `)
   const insertBranch = database.prepare(`
     INSERT INTO conversation_branches (
@@ -285,6 +299,19 @@ export function createConversationRepository(database: DatabaseSync): Conversati
     UPDATE conversations
     SET title = ?, updated_at = ?
     WHERE id = ?
+      AND NOT EXISTS (
+        SELECT 1 FROM conversation_deletions
+        WHERE conversation_id = conversations.id
+      )
+  `)
+  const setExecutionProfile = database.prepare(`
+    UPDATE conversations
+    SET execution_profile = ?, updated_at = ?
+    WHERE id = ?
+      AND NOT EXISTS (
+        SELECT 1 FROM runs
+        WHERE conversation_id = conversations.id AND status IN ('queued', 'running')
+      )
       AND NOT EXISTS (
         SELECT 1 FROM conversation_deletions
         WHERE conversation_id = conversations.id
@@ -481,7 +508,14 @@ export function createConversationRepository(database: DatabaseSync): Conversati
     },
     create(input) {
       return withTransaction(database, () => {
-        insertConversation.run(input.id, input.projectId, input.title, input.createdAt, input.createdAt)
+        insertConversation.run(
+          input.id,
+          input.projectId,
+          input.title,
+          input.createdAt,
+          input.createdAt,
+          input.executionProfile,
+        )
         insertBranch.run(input.branchId, input.id, null, null, input.createdAt)
         activateBranch.run(input.branchId, input.createdAt, input.id)
         return toConversation(requireRow<ConversationRow>(findConversation.get(input.id), input.id))
@@ -702,6 +736,23 @@ export function createConversationRepository(database: DatabaseSync): Conversati
         throw new ConversationBranchError('cannot be renamed')
       return toConversation(requireRow<ConversationRow>(findConversation.get(input.id), input.id))
     },
+    setExecutionProfile(input) {
+      return withTransaction(database, () => {
+        const current = findConversation.get(input.id) as ConversationRow | undefined
+        if (!current || findDeletion.get(input.id))
+          return null
+        if (current.execution_profile === input.executionProfile)
+          return toConversation(current)
+        if (Number(setExecutionProfile.run(
+          input.executionProfile,
+          input.updatedAt,
+          input.id,
+        ).changes) !== 1) {
+          return null
+        }
+        return toConversation(requireRow<ConversationRow>(findConversation.get(input.id), input.id))
+      })
+    },
   }
 }
 
@@ -727,6 +778,7 @@ function toConversation(row: ConversationRow): ConversationRecord {
     title: row.title,
     activeBranchId: row.active_branch_id,
     createdAt: row.created_at,
+    executionProfile: row.execution_profile,
     updatedAt: row.updated_at,
   }
 }
