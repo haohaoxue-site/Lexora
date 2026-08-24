@@ -18,6 +18,13 @@ export function useNotificationCenterStore(api: LocalChatApi) {
   const isLoading = shallowRef(false)
   const error = shallowRef<unknown>(null)
   let loadPromise: Promise<boolean> | null = null
+  let refreshRequested = false
+  let stopped = false
+  const stopRunEvent = api.chat.onRunEvent((event) => {
+    if (event.type === 'run.completed' || event.type === 'run.failed')
+      void load()
+  })
+  const stopAutomationChanged = api.automations.onChanged(() => void load())
 
   const hasNotifications = computed(() => items.value.length > 0)
 
@@ -27,8 +34,12 @@ export function useNotificationCenterStore(api: LocalChatApi) {
   }
 
   function load(): Promise<boolean> {
-    if (loadPromise)
+    if (stopped)
+      return Promise.resolve(false)
+    if (loadPromise) {
+      refreshRequested = true
       return loadPromise
+    }
     isLoading.value = true
     error.value = null
     loadPromise = api.notifications.list()
@@ -43,6 +54,10 @@ export function useNotificationCenterStore(api: LocalChatApi) {
       .finally(() => {
         isLoading.value = false
         loadPromise = null
+        if (refreshRequested) {
+          refreshRequested = false
+          void load()
+        }
       })
     return loadPromise
   }
@@ -69,8 +84,15 @@ export function useNotificationCenterStore(api: LocalChatApi) {
     }
   }
 
+  function dispose(): void {
+    stopped = true
+    stopAutomationChanged()
+    stopRunEvent()
+  }
+
   return {
     error: readonly(error),
+    dispose,
     hasNotifications: readonly(hasNotifications),
     isLoading: readonly(isLoading),
     items: readonly(items),

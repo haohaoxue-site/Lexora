@@ -17,6 +17,13 @@ const props = defineProps<{
 }>()
 const emit = defineEmits<{ approve: [], deny: [] }>()
 const { t } = useBuddyI18n(() => props.language)
+const automationOperationKeys = {
+  delete: 'desktop.chat.processToolAutomationDelete',
+  pause: 'desktop.chat.processToolAutomationPause',
+  resume: 'desktop.chat.processToolAutomationResume',
+  run_now: 'desktop.chat.processToolAutomationRunNow',
+  upsert: 'desktop.chat.processToolAutomationUpsert',
+} as const
 const review = computed<ApprovalReviewPayload | null>(() => {
   const parsed = approvalReviewPayloadSchema.safeParse(props.approval.payload)
   return parsed.success ? parsed.data : null
@@ -31,6 +38,11 @@ const systemInterruption = computed(() => {
     return ''
   return translateSystemInterruption(props.language, review.value.interruption)
 })
+const automationOperation = computed(() => {
+  if (review.value?.card !== 'automation')
+    return ''
+  return t(automationOperationKeys[review.value.operation])
+})
 </script>
 
 <template>
@@ -39,7 +51,47 @@ const systemInterruption = computed(() => {
       <strong>{{ review?.card === 'system-action' ? systemEffect : approval.summary }}</strong>
       <span>{{ t(`desktop.approval.kind.${approval.kind}`) }}</span>
     </div>
-    <section v-if="review?.card === 'system-action'" class="desktop-approval-card__system">
+    <section v-if="review?.card === 'automation'" class="desktop-approval-card__details">
+      <dl>
+        <div>
+          <dt>{{ t('desktop.approval.automation.operation') }}</dt>
+          <dd>{{ automationOperation }}</dd>
+        </div>
+        <div>
+          <dt>{{ t('desktop.approval.automation.name') }}</dt>
+          <dd>{{ review.name }}</dd>
+        </div>
+        <div>
+          <dt>{{ t('desktop.approval.automation.schedule') }}</dt>
+          <dd>{{ review.scheduleSummary }}</dd>
+        </div>
+        <div>
+          <dt>{{ t('desktop.approval.automation.timezone') }}</dt>
+          <dd>{{ review.timezone }}</dd>
+        </div>
+        <div>
+          <dt>{{ t('desktop.approval.automation.prompt') }}</dt>
+          <dd>{{ review.promptSummary }}</dd>
+        </div>
+        <div>
+          <dt>{{ t('desktop.approval.automation.project') }}</dt>
+          <dd>{{ review.projectId ?? t('desktop.approval.automation.noProject') }}</dd>
+        </div>
+        <div>
+          <dt>{{ t('desktop.approval.automation.model') }}</dt>
+          <dd>{{ review.modelMode }}</dd>
+        </div>
+        <div>
+          <dt>{{ t('desktop.approval.automation.executionProfile') }}</dt>
+          <dd>
+            {{ t(review.executionProfile === 'full_access'
+              ? 'desktop.chat.executionProfileFull'
+              : 'desktop.chat.executionProfileDefault') }}
+          </dd>
+        </div>
+      </dl>
+    </section>
+    <section v-else-if="review?.card === 'system-action'" class="desktop-approval-card__details">
       <dl>
         <div>
           <dt>{{ t('desktop.approval.target') }}</dt>
@@ -130,23 +182,23 @@ const systemInterruption = computed(() => {
   white-space: pre-wrap;
 }
 
-.desktop-approval-card__system dl {
+.desktop-approval-card__details dl {
   display: grid;
   gap: 0.45rem;
   margin: 0;
 }
 
-.desktop-approval-card__system dl > div {
+.desktop-approval-card__details dl > div {
   display: grid;
   grid-template-columns: minmax(5rem, 0.35fr) minmax(0, 1fr);
   gap: 0.6rem;
 }
 
-.desktop-approval-card__system dt {
+.desktop-approval-card__details dt {
   color: var(--buddy-text-secondary);
 }
 
-.desktop-approval-card__system dd {
+.desktop-approval-card__details dd {
   min-width: 0;
   margin: 0;
   overflow-wrap: anywhere;

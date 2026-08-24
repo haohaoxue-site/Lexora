@@ -3,7 +3,7 @@ import type { LocalNotification } from '@buddy-electron/shared/localChatApi'
 import type { BuddyLocale } from '@/i18n/buddyI18n'
 import type { NotificationFilter } from '@/stores/useNotificationCenterStore'
 import { Alert20Regular, CheckmarkCircle20Regular } from '@vicons/fluent'
-import { NButton, NIcon, NSpin, NVirtualList } from 'naive-ui'
+import { NButton, NIcon, NSpin, NTooltip, NVirtualList } from 'naive-ui'
 import { computed, shallowRef } from 'vue'
 import { useBuddyI18n } from '@/i18n/buddyI18n'
 import DesktopNotificationItem from '@/shell/DesktopNotificationItem.vue'
@@ -73,15 +73,22 @@ const emptyTitle = computed(() => t(isUnseenEmpty.value
           </button>
         </div>
 
-        <NButton
-          v-if="unseenCount > 0"
-          class="desktop-notification-center__mark-all"
-          size="tiny"
-          text
-          @click="emit('markAllSeen')"
-        >
+        <NTooltip v-if="unseenCount > 0">
+          <template #trigger>
+            <NButton
+              class="desktop-notification-center__mark-all"
+              size="tiny"
+              quaternary
+              :aria-label="t('desktop.notifications.markAllSeen')"
+              @click="emit('markAllSeen')"
+            >
+              <template #icon>
+                <NIcon :component="CheckmarkCircle20Regular" />
+              </template>
+            </NButton>
+          </template>
           {{ t('desktop.notifications.markAllSeen') }}
-        </NButton>
+        </NTooltip>
       </div>
     </header>
 
@@ -127,12 +134,15 @@ const emptyTitle = computed(() => t(isUnseenEmpty.value
 }
 
 .desktop-notification-center__header {
+  position: relative;
+  z-index: 1;
   display: flex;
   height: 44px;
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  border-bottom: 1px solid var(--buddy-border-light);
+  background: var(--buddy-bg-surface-raised);
+  box-shadow: 0 6px 14px -12px color-mix(in srgb, var(--buddy-text-primary) 24%, transparent);
   padding: 0 12px;
 }
 
@@ -208,8 +218,6 @@ const emptyTitle = computed(() => t(isUnseenEmpty.value
 .desktop-notification-center__mark-all {
   flex: none;
   color: var(--buddy-text-secondary);
-  font-size: 11px;
-  white-space: nowrap;
 }
 
 .desktop-notification-center__mark-all:hover {
@@ -221,6 +229,7 @@ const emptyTitle = computed(() => t(isUnseenEmpty.value
   display: grid;
   min-height: 0;
   place-items: center;
+  background: var(--buddy-bg-surface);
 }
 
 .desktop-notification-center__empty {
@@ -250,6 +259,7 @@ const emptyTitle = computed(() => t(isUnseenEmpty.value
 .desktop-notification-center__list {
   height: 100%;
   min-height: 0;
+  background: var(--buddy-bg-surface);
   overscroll-behavior: contain;
 }
 </style>

@@ -3,7 +3,7 @@ import type { useChatDrafts } from '@/workbenches/chat/state/useChatDrafts'
 import type { ChatIndexData } from '@/workbenches/chat/state/useChatIndexData'
 import type { useChatRunSync } from '@/workbenches/chat/state/useChatRunSync'
 import type { ChatSession } from '@/workbenches/chat/state/useChatSession'
-import { computed, readonly } from 'vue'
+import { computed, readonly, shallowRef } from 'vue'
 
 interface UseChatConversationsOptions {
   api: LexoraDesktopApi['localChat']
@@ -18,9 +18,16 @@ interface UseChatConversationsOptions {
 }
 
 export function useChatConversations(options: UseChatConversationsOptions) {
-  const activeConversation = computed(() => options.chatIndexData.conversations.value.find(
-    conversation => conversation.id === options.session.activeConversationId.value,
-  ) ?? null)
+  const directlyOpenedConversation = shallowRef<Awaited<
+    ReturnType<typeof options.api.conversations.get>
+  > | null>(null)
+  const activeConversation = computed(() => (
+    directlyOpenedConversation.value?.id === options.session.activeConversationId.value
+      ? directlyOpenedConversation.value
+      : options.chatIndexData.conversations.value.find(
+        conversation => conversation.id === options.session.activeConversationId.value,
+      ) ?? null
+  ))
 
   async function refreshBranches() {
     const conversationId = options.session.activeConversationId.value
@@ -35,11 +42,18 @@ export function useChatConversations(options: UseChatConversationsOptions) {
   }
 
   async function openConversation(conversationId: string) {
-    const conversation = options.chatIndexData.conversations.value.find(
+    const indexed = options.chatIndexData.conversations.value.find(
       item => item.id === conversationId,
+    )
+    const conversation = indexed ?? await options.api.conversations.get(conversationId).catch(
+      (error) => {
+        options.onError(error)
+        return null
+      },
     )
     if (!conversation)
       return
+    directlyOpenedConversation.value = indexed ? null : conversation
     options.drafts.saveCurrentDraft()
     options.session.activateConversation(conversation)
     options.drafts.restoreCurrentDraft()
@@ -62,6 +76,8 @@ export function useChatConversations(options: UseChatConversationsOptions) {
       await options.drafts.discard(`conversation:${conversationId}`)
       if (options.session.activeConversationId.value === conversationId)
         activateDraftScope(null, false)
+      if (directlyOpenedConversation.value?.id === conversationId)
+        directlyOpenedConversation.value = null
       await options.chatIndexData.refreshIndex()
       await options.persistWorkspaceState()
     }
@@ -74,6 +90,8 @@ export function useChatConversations(options: UseChatConversationsOptions) {
     try {
       const conversation = await options.api.conversations.rename(conversationId, title)
       options.chatIndexData.applyConversation(conversation)
+      if (directlyOpenedConversation.value?.id === conversationId)
+        directlyOpenedConversation.value = conversation
       return true
     }
     catch (error) {
@@ -120,6 +138,7 @@ export function useChatConversations(options: UseChatConversationsOptions) {
     if (preserveCurrent)
       options.drafts.saveCurrentDraft()
     options.session.activateDraft(projectId)
+    directlyOpenedConversation.value = null
     options.runSync.clearConversationState()
     options.drafts.restoreCurrentDraft()
     options.clearError()

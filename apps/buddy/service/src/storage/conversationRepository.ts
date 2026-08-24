@@ -11,6 +11,8 @@ export interface ConversationRecord {
   activeBranchId: string | null
   createdAt: string
   executionProfile: BuddyExecutionProfile
+  origin: 'automation' | 'interactive'
+  promotedAt: string | null
   updatedAt: string
 }
 
@@ -18,6 +20,11 @@ export type ConversationActivity = 'idle' | 'running' | 'awaiting_approval'
 
 export interface ConversationSummaryRecord extends ConversationRecord {
   activity: ConversationActivity
+  automationOccurrence: {
+    automationId: string
+    occurrenceId: string
+    scheduledFor: string
+  } | null
 }
 
 export interface ConversationBranchRecord {
@@ -93,6 +100,7 @@ export interface CreateConversationInput {
   title: string | null
   createdAt: string
   executionProfile: BuddyExecutionProfile
+  origin?: ConversationRecord['origin']
 }
 
 export interface CreateBranchInput {
@@ -158,6 +166,7 @@ export interface ConversationRepository {
   listMessages: (conversationId: string, branchId: string, limit?: number) => MessageRecord[]
   listRecent: (limit?: number) => ConversationSummaryRecord[]
   markDeleting: (id: string, requestedAt: string) => boolean
+  promote: (id: string, promotedAt: string) => ConversationRecord
   rename: (input: RenameConversationInput) => ConversationRecord
   setExecutionProfile: (
     input: SetConversationExecutionProfileInput,
@@ -171,11 +180,16 @@ interface ConversationRow {
   active_branch_id: string | null
   created_at: string
   execution_profile: BuddyExecutionProfile
+  origin: ConversationRecord['origin']
+  promoted_at: string | null
   updated_at: string
 }
 
 interface ConversationSummaryRow extends ConversationRow {
   activity: ConversationActivity
+  automation_id: string | null
+  automation_occurrence_id: string | null
+  automation_scheduled_for: string | null
 }
 
 interface BranchRow {
@@ -223,8 +237,9 @@ export function createConversationRepository(database: DatabaseSync): Conversati
   const findMessage = database.prepare('SELECT * FROM messages WHERE id = ?')
   const insertConversation = database.prepare(`
     INSERT INTO conversations (
-      id, project_id, title, active_branch_id, created_at, updated_at, execution_profile
-    ) VALUES (?, ?, ?, NULL, ?, ?, ?)
+      id, project_id, title, active_branch_id, created_at, updated_at,
+      execution_profile, origin, promoted_at
+    ) VALUES (?, ?, ?, NULL, ?, ?, ?, ?, NULL)
   `)
   const insertBranch = database.prepare(`
     INSERT INTO conversation_branches (
@@ -271,6 +286,9 @@ export function createConversationRepository(database: DatabaseSync): Conversati
   `)
   const listRecent = database.prepare(`
     SELECT conversations.*,
+      automation_occurrences.id AS automation_occurrence_id,
+      automation_occurrences.automation_id AS automation_id,
+      automation_occurrences.scheduled_for AS automation_scheduled_for,
       CASE
         WHEN EXISTS (
           SELECT 1
@@ -288,11 +306,14 @@ export function createConversationRepository(database: DatabaseSync): Conversati
         ELSE 'idle'
       END AS activity
     FROM conversations
+    LEFT JOIN automation_occurrences
+      ON automation_occurrences.conversation_id = conversations.id
+      AND automation_occurrences.deleted_at IS NULL
     WHERE NOT EXISTS (
       SELECT 1 FROM conversation_deletions
       WHERE conversation_id = conversations.id
     )
-    ORDER BY updated_at DESC, created_at DESC
+    ORDER BY conversations.updated_at DESC, conversations.created_at DESC
     LIMIT ?
   `)
   const renameConversation = database.prepare(`
@@ -312,6 +333,15 @@ export function createConversationRepository(database: DatabaseSync): Conversati
         SELECT 1 FROM runs
         WHERE conversation_id = conversations.id AND status IN ('queued', 'running')
       )
+      AND NOT EXISTS (
+        SELECT 1 FROM conversation_deletions
+        WHERE conversation_id = conversations.id
+      )
+  `)
+  const promoteConversation = database.prepare(`
+    UPDATE conversations
+    SET promoted_at = COALESCE(promoted_at, ?), updated_at = ?
+    WHERE id = ? AND origin = 'automation'
       AND NOT EXISTS (
         SELECT 1 FROM conversation_deletions
         WHERE conversation_id = conversations.id
@@ -515,6 +545,7 @@ export function createConversationRepository(database: DatabaseSync): Conversati
           input.createdAt,
           input.createdAt,
           input.executionProfile,
+          input.origin ?? 'interactive',
         )
         insertBranch.run(input.branchId, input.id, null, null, input.createdAt)
         activateBranch.run(input.branchId, input.createdAt, input.id)
@@ -731,6 +762,11 @@ export function createConversationRepository(database: DatabaseSync): Conversati
       markDeleting.run(requestedAt, id)
       return findDeletion.get(id) !== undefined
     },
+    promote(id, promotedAt) {
+      if (Number(promoteConversation.run(promotedAt, promotedAt, id).changes) !== 1)
+        throw new ConversationBranchError('cannot be promoted')
+      return toConversation(requireRow<ConversationRow>(findConversation.get(id), id))
+    },
     rename(input) {
       if (Number(renameConversation.run(input.title, input.updatedAt, input.id).changes) !== 1)
         throw new ConversationBranchError('cannot be renamed')
@@ -779,6 +815,8 @@ function toConversation(row: ConversationRow): ConversationRecord {
     activeBranchId: row.active_branch_id,
     createdAt: row.created_at,
     executionProfile: row.execution_profile,
+    origin: row.origin,
+    promotedAt: row.promoted_at,
     updatedAt: row.updated_at,
   }
 }
@@ -787,6 +825,15 @@ function toConversationSummary(row: ConversationSummaryRow): ConversationSummary
   return {
     ...toConversation(row),
     activity: row.activity,
+    automationOccurrence: row.automation_occurrence_id
+      && row.automation_id
+      && row.automation_scheduled_for
+      ? {
+          automationId: row.automation_id,
+          occurrenceId: row.automation_occurrence_id,
+          scheduledFor: row.automation_scheduled_for,
+        }
+      : null,
   }
 }
 

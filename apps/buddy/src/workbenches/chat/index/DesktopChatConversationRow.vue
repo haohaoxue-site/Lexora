@@ -21,9 +21,9 @@ const props = defineProps<{
   activity: LocalConversationSummary['activity']
   language: BuddyLocale
   now: number
+  occurredAt: string
   projectConversation?: boolean
   title: string
-  updatedAt: string
 }>()
 
 const emit = defineEmits<{
@@ -36,7 +36,7 @@ dayjs.extend(relativeTime)
 
 const { t } = useBuddyI18n(() => props.language)
 const relativeTimeLabel = computed(() => {
-  const label = dayjs(props.updatedAt)
+  const label = dayjs(props.occurredAt)
     .locale(props.language === 'zh-CN' ? 'zh-cn' : 'en')
     .from(props.now)
   return props.language === 'zh-CN' ? label.replaceAll(' ', '') : label
@@ -86,7 +86,7 @@ function handleAction(action: string | number) {
         <time
           v-if="activity === 'idle'"
           class="desktop-chat-conversation-row__relative-time"
-          :datetime="updatedAt"
+          :datetime="occurredAt"
         >{{ relativeTimeLabel }}</time>
         <span
           v-else

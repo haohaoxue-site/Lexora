@@ -75,6 +75,8 @@ interface ConversationBindingRow {
   active_branch_id: string | null
   execution_profile: BuddyExecutionProfile
   project_id: string | null
+  origin: 'automation' | 'interactive'
+  promoted_at: string | null
 }
 
 interface RetryRunRow {
@@ -107,7 +109,8 @@ export interface TurnRequestRepository {
 export function createTurnRequestRepository(database: DatabaseSync): TurnRequestRepository {
   const findRequest = database.prepare('SELECT * FROM turn_requests WHERE request_id = ?')
   const findConversation = database.prepare(`
-    SELECT project_id, active_branch_id, execution_profile FROM conversations WHERE id = ?
+    SELECT project_id, active_branch_id, execution_profile, origin, promoted_at
+    FROM conversations WHERE id = ?
   `)
   const findConversationDeletion = database.prepare(`
     SELECT 1 FROM conversation_deletions WHERE conversation_id = ?
@@ -129,6 +132,11 @@ export function createTurnRequestRepository(database: DatabaseSync): TurnRequest
   `)
   const activateBranch = database.prepare(`
     UPDATE conversations SET active_branch_id = ?, updated_at = ? WHERE id = ?
+  `)
+  const promoteConversation = database.prepare(`
+    UPDATE conversations
+    SET promoted_at = COALESCE(promoted_at, ?), updated_at = ?
+    WHERE id = ? AND origin = 'automation'
   `)
   const attach = database.prepare(`
     UPDATE attachments SET conversation_id = ?, draft_key = NULL, status = 'attached'
@@ -227,6 +235,8 @@ export function createTurnRequestRepository(database: DatabaseSync): TurnRequest
         ) {
           throw new TurnRequestConflictError()
         }
+        if (conversation.origin === 'automation' && conversation.promoted_at === null)
+          promoteConversation.run(input.createdAt, input.createdAt, input.conversationId)
 
         insertForkBranch.run(
           input.branchId,
@@ -315,6 +325,8 @@ export function createTurnRequestRepository(database: DatabaseSync): TurnRequest
           ) {
             throw new TurnRequestConflictError()
           }
+          if (conversation.origin === 'automation' && conversation.promoted_at === null)
+            promoteConversation.run(input.createdAt, input.createdAt, input.conversationId)
         }
         else {
           insertConversation.run(

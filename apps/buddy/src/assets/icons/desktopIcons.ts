@@ -5,6 +5,7 @@ import messageCopiedUrl from './message-copied.svg'
 import messageCopyUrl from './message-copy.svg'
 import messageEditUrl from './message-edit.svg'
 import messageRetryUrl from './message-retry.svg'
+import navigationAutomationUrl from './navigation-automation.svg'
 import windowCloseUrl from './window-close.svg'
 import windowMaximizeUrl from './window-maximize.svg'
 import windowMinimizeUrl from './window-minimize.svg'
@@ -19,6 +20,7 @@ export const DESKTOP_ICON_URLS = {
   messageCopy: messageCopyUrl,
   messageEdit: messageEditUrl,
   messageRetry: messageRetryUrl,
+  navigationAutomation: navigationAutomationUrl,
   windowClose: windowCloseUrl,
   windowMaximize: windowMaximizeUrl,
   windowMinimize: windowMinimizeUrl,

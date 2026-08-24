@@ -66,7 +66,7 @@ const sections = computed<ToolDetailSection[]>(() => {
       presentation.diff,
     ))
   }
-  if (presentation.card === 'pet')
+  if (presentation.card === 'automation' || presentation.card === 'pet')
     return values
   if (presentation.output !== null) {
     values.push(section(

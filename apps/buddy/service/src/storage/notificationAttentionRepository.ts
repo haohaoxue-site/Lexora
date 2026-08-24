@@ -34,6 +34,7 @@ export interface NotificationAttentionRepository {
   markSeen: (notificationId: string, revision: string, seenAt: string) => boolean
   observe: (input: ObserveNotificationInput) => NotificationAttentionRecord
   pruneResolvedLocalBefore: (before: string) => number
+  remove: (notificationId: string) => boolean
 }
 
 interface NotificationAttentionRow {
@@ -95,6 +96,9 @@ export function createNotificationAttentionRepository(
     DELETE FROM notification_attention_states
     WHERE origin = 'local-runtime' AND resolved_at IS NOT NULL AND resolved_at < ?
   `)
+  const remove = database.prepare(`
+    DELETE FROM notification_attention_states WHERE notification_id = ?
+  `)
 
   return {
     findById(notificationId) {
@@ -129,6 +133,9 @@ export function createNotificationAttentionRepository(
     },
     pruneResolvedLocalBefore(before) {
       return Number(pruneResolvedLocalBefore.run(before).changes)
+    },
+    remove(notificationId) {
+      return Number(remove.run(notificationId).changes) === 1
     },
   }
 }

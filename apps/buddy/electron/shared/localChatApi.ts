@@ -2,6 +2,17 @@ import type { BuddyExecutionProfile } from '../../shared/executionProfile'
 import type {
   LocalApproval,
   LocalAttachment,
+  LocalAutomation,
+  LocalAutomationCreateRequest,
+  LocalAutomationListRequest,
+  LocalAutomationMutationRequest,
+  LocalAutomationOccurrence,
+  LocalAutomationOccurrenceListRequest,
+  LocalAutomationOccurrencePage,
+  LocalAutomationPage,
+  LocalAutomationPreviewRequest,
+  LocalAutomationPreviewResult,
+  LocalAutomationUpdateRequest,
   LocalBuddyServiceSupervisorState,
   LocalChatCommandRequest,
   LocalConnector,
@@ -41,6 +52,9 @@ import type {
 
 export type LocalChatErrorCode
   = | 'APPROVAL_REQUIRED'
+    | 'AUTOMATION_CONFLICT'
+    | 'AUTOMATION_INVALID_SCHEDULE'
+    | 'AUTOMATION_NOT_FOUND'
     | 'AUTHENTICATION_REQUIRED'
     | 'CONNECTOR_UNAVAILABLE'
     | 'CREDENTIAL_STORE_UNAVAILABLE'
@@ -66,6 +80,9 @@ const LOCAL_CHAT_ERROR_MARKER = 'LEXORA_LOCAL_CHAT_ERROR'
 const LOCAL_CHAT_ERROR_PATTERN = /LEXORA_LOCAL_CHAT_ERROR:([A-Z0-9_]+):(0|1)/
 const LOCAL_CHAT_ERROR_CODES = new Set<LocalChatErrorCode>([
   'APPROVAL_REQUIRED',
+  'AUTOMATION_CONFLICT',
+  'AUTOMATION_INVALID_SCHEDULE',
+  'AUTOMATION_NOT_FOUND',
   'AUTHENTICATION_REQUIRED',
   'CONNECTOR_UNAVAILABLE',
   'CREDENTIAL_STORE_UNAVAILABLE',
@@ -101,6 +118,17 @@ export function isLocalChatErrorCode(value: string | undefined): value is LocalC
 export type {
   LocalApproval,
   LocalAttachment,
+  LocalAutomation,
+  LocalAutomationCreateRequest,
+  LocalAutomationListRequest,
+  LocalAutomationMutationRequest,
+  LocalAutomationOccurrence,
+  LocalAutomationOccurrenceListRequest,
+  LocalAutomationOccurrencePage,
+  LocalAutomationPage,
+  LocalAutomationPreviewRequest,
+  LocalAutomationPreviewResult,
+  LocalAutomationUpdateRequest,
   LocalBuddyServiceSupervisorState,
   LocalChatCommandRequest,
   LocalConnector,
@@ -147,6 +175,18 @@ export const LOCAL_CHAT_IPC_CHANNELS = {
   approvalsApprove: 'lexora:buddy:approvals:approve',
   approvalsDeny: 'lexora:buddy:approvals:deny',
   approvalsList: 'lexora:buddy:approvals:list',
+  automationChanged: 'lexora:buddy:automations:changed',
+  automationsCreate: 'lexora:buddy:automations:create',
+  automationsDelete: 'lexora:buddy:automations:delete',
+  automationsDeleteOccurrence: 'lexora:buddy:automations:delete-occurrence',
+  automationsGet: 'lexora:buddy:automations:get',
+  automationsList: 'lexora:buddy:automations:list',
+  automationsListOccurrences: 'lexora:buddy:automations:list-occurrences',
+  automationsPause: 'lexora:buddy:automations:pause',
+  automationsPreview: 'lexora:buddy:automations:preview',
+  automationsResume: 'lexora:buddy:automations:resume',
+  automationsRunNow: 'lexora:buddy:automations:run-now',
+  automationsUpdate: 'lexora:buddy:automations:update',
   attachmentsCleanupDrafts: 'lexora:buddy:attachments:cleanup-drafts',
   attachmentsRelease: 'lexora:buddy:attachments:release',
   attachmentsSelectFiles: 'lexora:buddy:attachments:select-files',
@@ -164,6 +204,7 @@ export const LOCAL_CHAT_IPC_CHANNELS = {
   connectorsUpsert: 'lexora:buddy:connectors:upsert',
   conversationsDelete: 'lexora:buddy:conversations:delete',
   conversationsActivateBranch: 'lexora:buddy:conversations:activate-branch',
+  conversationsGet: 'lexora:buddy:conversations:get',
   conversationsList: 'lexora:buddy:conversations:list',
   conversationsListBranches: 'lexora:buddy:conversations:list-branches',
   conversationsListMessages: 'lexora:buddy:conversations:list-messages',
@@ -228,6 +269,22 @@ interface LocalMutationResult {
 }
 
 export interface LocalChatApi {
+  automations: {
+    create: (input: LocalAutomationCreateRequest) => Promise<LocalAutomation>
+    delete: (input: LocalAutomationMutationRequest) => Promise<LocalAutomation>
+    deleteOccurrence: (occurrenceId: string) => Promise<boolean>
+    get: (automationId: string) => Promise<LocalAutomation>
+    list: (input?: LocalAutomationListRequest) => Promise<LocalAutomationPage>
+    listOccurrences: (
+      input?: LocalAutomationOccurrenceListRequest,
+    ) => Promise<LocalAutomationOccurrencePage>
+    pause: (input: LocalAutomationMutationRequest) => Promise<LocalAutomation>
+    preview: (input: LocalAutomationPreviewRequest) => Promise<LocalAutomationPreviewResult>
+    resume: (input: LocalAutomationMutationRequest) => Promise<LocalAutomation>
+    runNow: (input: LocalAutomationMutationRequest) => Promise<LocalAutomationOccurrence>
+    update: (input: LocalAutomationUpdateRequest) => Promise<LocalAutomation>
+    onChanged: (listener: (automationId: string) => void) => () => void
+  }
   runtime: {
     cancelDataOperation: (operationId: string) => Promise<LocalRuntimeDataOperation>
     deleteDataBackup: (backupId: string) => Promise<{ readonly deletedBackupId: string }>
@@ -337,6 +394,7 @@ export interface LocalChatApi {
   }
   conversations: {
     list: (limit?: number) => Promise<ReadonlyArray<LocalConversationSummary>>
+    get: (conversationId: string) => Promise<LocalConversation>
     delete: (conversationId: string) => Promise<boolean>
     activateBranch: (input: {
       branchId: string

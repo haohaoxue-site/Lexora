@@ -19,18 +19,20 @@ import DesktopAccountAvatar from '@/shell/DesktopAccountAvatar.vue'
 import DesktopAccountDialog from '@/shell/DesktopAccountDialog.vue'
 import DesktopGlobalSearchDialog from '@/shell/DesktopGlobalSearchDialog.vue'
 import DesktopNotificationCenter from '@/shell/DesktopNotificationCenter.vue'
+import DesktopIcon from '@/ui/DesktopIcon.vue'
 
 const props = defineProps<{
   appVersion: string | null
   conversations: ReadonlyArray<LocalConversation>
   language: BuddyLocale
-  mode: 'chat' | 'settings'
+  mode: 'automations' | 'chat' | 'settings'
   notificationItems: ReadonlyArray<LocalNotification>
   notificationLoading: boolean
   notificationUnseenCount: number
   projects: ReadonlyArray<LocalProject>
 }>()
 const emit = defineEmits<{
+  navigateAutomations: []
   navigateChat: []
   navigateSettings: []
   markAllNotificationsSeen: []
@@ -107,6 +109,16 @@ function openProject(projectId: string) {
       >
         <NIcon :component="Chat20Regular" />
         <span>{{ t('desktop.navigation.chat') }}</span>
+      </button>
+      <button
+        class="desktop-app-sidebar__nav-item"
+        :class="{ 'is-active': mode === 'automations' }"
+        :aria-current="mode === 'automations' ? 'page' : undefined"
+        type="button"
+        @click="emit('navigateAutomations')"
+      >
+        <DesktopIcon name="navigationAutomation" />
+        <span>{{ t('desktop.navigation.automations') }}</span>
       </button>
       <button
         class="desktop-app-sidebar__nav-item"
@@ -222,6 +234,7 @@ function openProject(projectId: string) {
   }
 
   strong {
+    color: var(--buddy-text-primary);
     font-size: var(--buddy-sidebar-header-font-size);
     font-weight: var(--buddy-sidebar-header-font-weight);
   }
@@ -341,13 +354,13 @@ function openProject(projectId: string) {
 
 :global(.desktop-notification-popover.n-popover) {
   border: 1px solid var(--buddy-border-light);
-  border-radius: 10px;
+  border-radius: 8px;
   box-shadow: var(--buddy-shadow-raised);
 }
 
 :global(.desktop-notification-popover__content.n-popover__content) {
   overflow: hidden;
-  border-radius: 9px;
+  border-radius: 7px;
   padding: 0;
 }
 </style>

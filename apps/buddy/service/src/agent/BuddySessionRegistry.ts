@@ -1,4 +1,5 @@
 import type { BuddyExecutionProfile } from '../../../shared/executionProfile'
+import type { BuddySessionMode } from '../../../shared/sessionMode'
 import type { BuddySessionShutdownReason } from './createBuddySession'
 
 export interface BuddySessionIdentity {
@@ -7,6 +8,7 @@ export interface BuddySessionIdentity {
   conversationId: string
   executionProfile: BuddyExecutionProfile
   resourceRevision: string
+  sessionMode?: BuddySessionMode
 }
 
 export interface BuddySessionBinding<TSession> {
@@ -247,6 +249,7 @@ function createSessionKey(identity: BuddySessionIdentity): string {
     createBranchKey(identity),
     identity.canonicalRoot,
     identity.executionProfile,
+    identity.sessionMode ?? 'interactive',
     identity.resourceRevision,
   ].join('\0')
 }

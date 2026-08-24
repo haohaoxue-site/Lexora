@@ -6,11 +6,13 @@ import { useRouter } from 'vue-router'
 import { desktopAppContextKey } from '@/app/desktopAppContext'
 import { createDesktopCapabilities } from '@/app/desktopCapabilities'
 import { useDesktopAppState } from '@/app/useDesktopAppState'
+import { resolveBuddyLocale } from '@/i18n/buddyI18n'
 import { desktopRouteLocations } from '@/router'
 import { useDesktopShellState } from '@/shell/useDesktopShellState'
 import { useChatCapability } from '@/workbenches/chat/state/useChatCapability'
 
 const emit = defineEmits<{
+  languageChange: [language: 'zh-CN' | 'en-US']
   themeChange: [theme: 'system' | 'light' | 'dark']
 }>()
 
@@ -52,11 +54,21 @@ const stopRuntimeReadyWatch = watch(
       && state.status === 'ready'
     ) {
       void chat.refreshRuntimeDependentState()
+      void capabilities.automations.refresh()
     }
   },
 )
 const ready = initialize()
 const stopOpenTargetListener = api.app.onOpenTarget(openDesktopTarget)
+
+watch(
+  () => capabilities.applicationSettings.config.value?.desktop.language,
+  (language) => {
+    if (language)
+      emit('languageChange', resolveBuddyLocale(language))
+  },
+  { immediate: true },
+)
 
 watch(
   () => capabilities.applicationSettings.config.value?.desktop.theme,
@@ -82,6 +94,7 @@ function toggleAppSidebar() {
 async function initialize() {
   await appState.initialize()
   await Promise.all([
+    capabilities.automations.initialize(),
     chat.initialize(),
     shell.initialize(),
   ])
@@ -101,6 +114,7 @@ async function openDesktopTarget(target: DesktopOpenTarget) {
 }
 
 onBeforeUnmount(() => {
+  capabilities.automations.dispose()
   chat.dispose()
   appState.dispose()
   stopOpenTargetListener()

@@ -160,6 +160,7 @@ export function classifySystemTool(
   const prepared = service.prepareAction(input as ActionInput)
   return {
     approval: {
+      kind: 'system',
       summary: prepared.summary,
       systemAction: prepared.review,
     },

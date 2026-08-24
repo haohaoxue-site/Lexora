@@ -188,12 +188,21 @@ watch(
   border: 0;
   border-radius: var(--buddy-icon-button-radius);
   background: transparent;
-  color: var(--buddy-text-secondary);
+  color: var(--buddy-text-regular);
   cursor: pointer;
+
+  .n-icon {
+    font-size: 18px;
+  }
 
   &:hover:not(:disabled) {
     background: var(--buddy-fill-base);
     color: var(--buddy-text-primary);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--buddy-accent-primary);
+    outline-offset: -2px;
   }
 
   &:disabled {

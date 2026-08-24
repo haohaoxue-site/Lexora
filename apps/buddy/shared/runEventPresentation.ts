@@ -51,6 +51,16 @@ export const buddyToolPresentationSchema = z.discriminatedUnion('card', [
     macro: z.string().min(1).max(256),
     status: z.string().min(1).max(256),
   }).strict(),
+  z.object({
+    automationId: z.string().min(1).max(256).nullable(),
+    card: z.literal('automation'),
+    itemCount: z.number().int().nonnegative().nullable(),
+    name: z.string().min(1).max(80).nullable(),
+    nextRunAt: z.iso.datetime().nullable(),
+    occurrenceId: z.string().min(1).max(256).nullable(),
+    operation: z.enum(['list', 'get', 'upsert', 'pause', 'resume', 'delete', 'run_now']),
+    status: z.string().min(1).max(256).nullable(),
+  }).strict(),
   previewSchema.extend({
     action: z.enum([
       'inspect',

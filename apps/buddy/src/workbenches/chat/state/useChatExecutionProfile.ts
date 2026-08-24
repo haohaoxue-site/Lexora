@@ -1,6 +1,6 @@
 import type { LexoraDesktopApi } from '@buddy-electron/shared/desktopApi'
 import type {
-  LocalConversationSummary,
+  LocalConversation,
   LocalRun,
 } from '@buddy-electron/shared/localChatApi'
 import type { BuddyExecutionProfile } from '@buddy-shared/executionProfile'
@@ -13,7 +13,7 @@ interface ValueRef<T> {
 }
 
 interface UseChatExecutionProfileOptions {
-  activeConversation: ValueRef<LocalConversationSummary | null>
+  activeConversation: ValueRef<LocalConversation | null>
   activeConversationId: ValueRef<string | null>
   activeRun: ValueRef<LocalRun | null>
   api: LexoraDesktopApi['localChat']['conversations']

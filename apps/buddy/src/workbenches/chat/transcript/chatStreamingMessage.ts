@@ -334,14 +334,17 @@ function projectChatAgentTurn(
       const isError = event.type === 'tool.completed' && payload.isError === true
       const narration = current ? null : [...text.values()].at(-1)
       const toolNarration = narration?.phase === 'commentary' ? null : narration
-      const isSystemTool = presentation.data.card === 'system'
-      const description = isSystemTool
+      const isStructuredTool = presentation.data.card === 'automation'
+        || presentation.data.card === 'system'
+      const description = isStructuredTool
         ? null
         : current?.description
           ?? toolNarration?.text
-          ?? specificToolDescription(presentation.data.description)
+          ?? specificToolDescription(
+            'description' in presentation.data ? presentation.data.description : null,
+          )
           ?? null
-      if (!isSystemTool && toolNarration && description === toolNarration.text)
+      if (!isStructuredTool && toolNarration && description === toolNarration.text)
         text.delete(toolNarration.id)
       tools.set(toolCallId, {
         ...(current?.approvalId ? { approvalId: current.approvalId } : {}),
@@ -476,6 +479,18 @@ function approvalPresentation(review: ApprovalReviewPayload): BuddyToolPresentat
       target: review.target.displayName,
       truncated: false,
       verified: null,
+    }
+  }
+  if (review.card === 'automation') {
+    return {
+      automationId: null,
+      card: 'automation',
+      itemCount: null,
+      name: review.name,
+      nextRunAt: null,
+      occurrenceId: null,
+      operation: review.operation,
+      status: 'awaiting-approval',
     }
   }
   const argumentNames = review.card === 'arguments'

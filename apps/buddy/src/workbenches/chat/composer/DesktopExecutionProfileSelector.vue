@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import type { BuddyExecutionProfile } from '@buddy-shared/executionProfile'
 import type { BuddyLocale } from '@/i18n/buddyI18n'
-import { LockShield20Regular } from '@vicons/fluent'
+import { LockOpen20Regular, LockShield20Regular } from '@vicons/fluent'
 import { NButton, NIcon, NPopover, NSwitch } from 'naive-ui'
-import { computed } from 'vue'
+import { computed, shallowRef } from 'vue'
 import { useBuddyI18n } from '@/i18n/buddyI18n'
+import DesktopFullAccessConfirmationDialog from '@/workbenches/chat/composer/DesktopFullAccessConfirmationDialog.vue'
 
 const props = defineProps<{
   canUpdate: boolean
@@ -19,24 +20,44 @@ const emit = defineEmits<{
 
 const { t } = useBuddyI18n(() => props.language)
 const fullAccess = computed(() => props.executionProfile === 'full_access')
+const executionProfileIcon = computed(() => fullAccess.value ? LockOpen20Regular : LockShield20Regular)
+const confirmationOpen = shallowRef(false)
+const popoverOpen = shallowRef(false)
 
 function updateFullAccess(value: boolean) {
-  emit('updateExecutionProfile', value ? 'full_access' : 'sandboxed')
+  if (!value) {
+    emit('updateExecutionProfile', 'sandboxed')
+    return
+  }
+
+  popoverOpen.value = false
+  confirmationOpen.value = true
+}
+
+function confirmFullAccess() {
+  confirmationOpen.value = false
+  emit('updateExecutionProfile', 'full_access')
 }
 </script>
 
 <template>
-  <NPopover placement="top-start" trigger="click" :show-arrow="false">
+  <NPopover
+    placement="top-start"
+    trigger="click"
+    :show="popoverOpen"
+    :show-arrow="false"
+    @update:show="popoverOpen = $event"
+  >
     <template #trigger>
       <NButton
         class="desktop-execution-profile-selector__trigger"
+        :class="{ 'is-full-access': fullAccess }"
         secondary
         size="small"
-        :loading="isUpdating"
         :aria-label="t('desktop.chat.executionProfileOpen')"
       >
         <template #icon>
-          <NIcon :component="LockShield20Regular" />
+          <NIcon :component="executionProfileIcon" />
         </template>
         {{ t(fullAccess ? 'desktop.chat.executionProfileFull' : 'desktop.chat.executionProfileDefault') }}
       </NButton>
@@ -48,7 +69,10 @@ function updateFullAccess(value: boolean) {
           ? 'desktop.chat.executionProfileFullDescription'
           : 'desktop.chat.executionProfileDefaultDescription') }}
       </p>
-      <div class="desktop-execution-profile-selector__switch-row">
+      <div
+        class="desktop-execution-profile-selector__switch-row"
+        :class="{ 'is-full-access': fullAccess }"
+      >
         <span>
           <strong>{{ t('desktop.chat.executionProfileAllowFull') }}</strong>
           <small v-if="!canUpdate && !isUpdating">
@@ -56,13 +80,23 @@ function updateFullAccess(value: boolean) {
           </small>
         </span>
         <NSwitch
+          class="desktop-execution-profile-selector__switch"
+          :class="{ 'is-full-access': fullAccess }"
           :disabled="!canUpdate"
+          :loading="isUpdating"
           :value="fullAccess"
           @update:value="updateFullAccess"
         />
       </div>
     </div>
   </NPopover>
+
+  <DesktopFullAccessConfirmationDialog
+    :language="language"
+    :show="confirmationOpen"
+    @cancel="confirmationOpen = false"
+    @confirm="confirmFullAccess"
+  />
 </template>
 
 <style scoped lang="scss">
@@ -70,6 +104,22 @@ function updateFullAccess(value: boolean) {
   min-width: 0;
   border-radius: 0.6rem;
   color: var(--buddy-text-secondary);
+
+  &.is-full-access {
+    background-color: color-mix(in srgb, var(--buddy-accent-danger) 9%, transparent);
+    color: var(--buddy-accent-danger);
+  }
+
+  &.is-full-access:hover,
+  &.is-full-access:focus {
+    background-color: color-mix(in srgb, var(--buddy-accent-danger) 13%, transparent);
+    color: var(--buddy-accent-danger);
+  }
+
+  &.is-full-access:active {
+    background-color: color-mix(in srgb, var(--buddy-accent-danger) 17%, transparent);
+    color: var(--buddy-accent-danger);
+  }
 }
 
 .desktop-execution-profile-selector__popover {
@@ -102,10 +152,18 @@ function updateFullAccess(value: boolean) {
     font-size: 0.86rem;
   }
 
+  &.is-full-access strong {
+    color: var(--buddy-accent-danger);
+  }
+
   small {
     color: var(--buddy-text-placeholder);
     font-size: 0.68rem;
     line-height: 1.4;
   }
+}
+
+.desktop-execution-profile-selector__switch.is-full-access {
+  --n-rail-color-active: var(--buddy-accent-danger) !important;
 }
 </style>

@@ -26,7 +26,12 @@ async function openGlobalSearchProject(projectId: string) {
 
 async function openNotification(notification: LocalNotification) {
   await notifications.markSeen(notification)
-  await router.push(desktopRouteLocations.settings('models'))
+  if (notification.action.type === 'open-model-settings') {
+    await router.push(desktopRouteLocations.settings('models'))
+    return
+  }
+  await router.push(desktopRouteLocations.chat())
+  await chatSession.openConversation(notification.action.conversationId)
 }
 </script>
 
@@ -49,6 +54,7 @@ async function openNotification(notification: LocalNotification) {
           :notification-unseen-count="notifications.unseenCount.value"
           :projects="chatIndex.projects.value"
           @navigate-chat="router.push(desktopRouteLocations.chat())"
+          @navigate-automations="router.push(desktopRouteLocations.automations())"
           @navigate-settings="router.push(desktopRouteLocations.settings())"
           @mark-all-notifications-seen="notifications.markAllSeen"
           @open-notification="openNotification"

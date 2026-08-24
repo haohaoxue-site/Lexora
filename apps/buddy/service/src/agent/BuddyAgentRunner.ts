@@ -2,6 +2,7 @@ import type { ImageContent } from '@earendil-works/pi-ai'
 import type { AgentSessionEvent, CompactionResult } from '@earendil-works/pi-coding-agent'
 import type { BuddyAssistantTextPhase } from '../../../shared/assistantTextPhase'
 import type { BuddyServiceTier } from '../../../shared/modelSelection'
+import type { BuddySessionMode } from '../../../shared/sessionMode'
 import type { RunEventLog } from '../events/RunEventLog'
 import type { ConversationRepository } from '../storage/conversationRepository'
 import type { ProjectMemoryScope } from '../storage/projectRepository'
@@ -31,6 +32,8 @@ import {
   createPiEventProjectionState,
   projectPiEvent,
 } from './projectPiEvent'
+
+export const AUTOMATION_SESSION_STARTUP_TIMEOUT_MS = 60_000
 
 export interface BuddyAgentSessionLike {
   abort: () => Promise<void>
@@ -71,6 +74,7 @@ export interface BuddySessionFactoryInput extends BuddySessionIdentity {
 }
 
 export interface BuddyAgentRunnerOptions {
+  automationSessionStartupTimeoutMs?: number
   cancelPendingApprovals?: () => Promise<number>
   conversations: ConversationRepository
   eventLog: RunEventLog
@@ -98,6 +102,7 @@ export interface StartBuddyTurnInput {
   provider: string
   resources: BuddySessionResources
   runId: string
+  sessionMode?: BuddySessionMode
   serviceTier?: BuddyServiceTier | null
   thinkingLevel?: CreateBuddySessionOptions['thinkingLevel']
 }
@@ -136,6 +141,8 @@ interface ActiveRunExecution {
 
 export class BuddyAgentRunner {
   readonly #activeSessions = new Map<string, BuddyAgentSessionLike>()
+  readonly #automationSessionStartupTimeoutMs: number
+  readonly #cancellationCodes = new Map<string, string>()
   readonly #cancelPendingApprovals?: () => Promise<number>
   readonly #controllers = new Map<string, AbortController>()
   readonly #conversations: ConversationRepository
@@ -149,6 +156,8 @@ export class BuddyAgentRunner {
   #lastTimestamp = 0
 
   constructor(options: BuddyAgentRunnerOptions) {
+    this.#automationSessionStartupTimeoutMs = options.automationSessionStartupTimeoutMs
+      ?? AUTOMATION_SESSION_STARTUP_TIMEOUT_MS
     this.#cancelPendingApprovals = options.cancelPendingApprovals
     this.#conversations = options.conversations
     this.#eventLog = options.eventLog
@@ -183,6 +192,7 @@ export class BuddyAgentRunner {
       conversationId: input.conversationId,
       executionProfile: run.executionProfile,
       resourceRevision: input.resources.revision,
+      sessionMode: input.sessionMode ?? 'interactive',
     }
     this.#controllers.set(runId, controller)
     const execution = { controller, identity, input, runId }
@@ -198,6 +208,7 @@ export class BuddyAgentRunner {
       error,
     )).finally(() => {
       this.#activeSessions.delete(runId)
+      this.#cancellationCodes.delete(runId)
       this.#controllers.delete(runId)
       this.#executions.delete(runId)
     })
@@ -227,6 +238,7 @@ export class BuddyAgentRunner {
       conversationId: input.conversationId,
       executionProfile: run.executionProfile,
       resourceRevision: input.resources.revision,
+      sessionMode: 'interactive' as const,
     }
     this.#controllers.set(run.id, controller)
     const completion = this.#sessions.withBranchRun(
@@ -241,6 +253,7 @@ export class BuddyAgentRunner {
       error,
     )).finally(() => {
       this.#activeSessions.delete(run.id)
+      this.#cancellationCodes.delete(run.id)
       this.#controllers.delete(run.id)
       this.#executions.delete(run.id)
     })
@@ -253,10 +266,11 @@ export class BuddyAgentRunner {
     return { completion, runId: run.id }
   }
 
-  async cancel(runId: string): Promise<boolean> {
+  async cancel(runId: string, errorCode = 'RUN_CANCELLED'): Promise<boolean> {
     const execution = this.#executions.get(runId)
     if (!execution)
       return false
+    this.#cancellationCodes.set(runId, errorCode)
     execution.controller.abort()
     const session = this.#activeSessions.get(runId)
     try {
@@ -430,7 +444,7 @@ export class BuddyAgentRunner {
     const current = this.#runs.findById(runId)
     if (!current)
       throw new BuddyAgentRunError('RUN_NOT_FOUND')
-    const binding = await this.#sessions.getOrCreate(identity, () => this.#sessionFactory({
+    const bindingPromise = this.#sessions.getOrCreate(identity, () => this.#sessionFactory({
       ...identity,
       piSessionFile: current.piSessionFile,
       resources: input.resources,
@@ -438,6 +452,13 @@ export class BuddyAgentRunner {
       signal: controller.signal,
       thinkingLevel: input.thinkingLevel,
     }))
+    const binding = identity.sessionMode === 'automation_background'
+      ? await this.#withAutomationSessionStartupTimeout(
+          bindingPromise,
+          runId,
+          controller,
+        )
+      : await bindingPromise
     controller.signal.throwIfAborted()
     if (!this.#runs.bindSession(runId, binding.piSessionFile))
       throw new BuddyAgentRunError('RUN_NOT_FOUND')
@@ -580,8 +601,13 @@ export class BuddyAgentRunner {
       releaseTurn()
     }
 
-    if (controller.signal.aborted || failureCode === 'MODEL_REQUEST_ABORTED')
-      return this.#closeRun(runId, 'cancelled', 'RUN_CANCELLED')
+    if (controller.signal.aborted || failureCode === 'MODEL_REQUEST_ABORTED') {
+      return this.#closeRun(
+        runId,
+        'cancelled',
+        this.#cancellationCodes.get(runId) ?? 'RUN_CANCELLED',
+      )
+    }
     if (failureCode)
       return this.#closeRun(runId, 'failed', failureCode, failureMessage)
     return this.#closeRun(runId, 'completed', null)
@@ -794,8 +820,13 @@ export class BuddyAgentRunner {
         throw new BuddyAgentRunError('RUN_NOT_FOUND')
       return run
     }
-    if (signal.aborted || isAbortError(error))
-      return this.#closeRun(runId, 'cancelled', 'RUN_CANCELLED')
+    if (signal.aborted || isAbortError(error)) {
+      return this.#closeRun(
+        runId,
+        'cancelled',
+        this.#cancellationCodes.get(runId) ?? 'RUN_CANCELLED',
+      )
+    }
     return this.#closeRun(runId, 'failed', readStableRunErrorCode(error))
   }
 
@@ -808,6 +839,29 @@ export class BuddyAgentRunner {
     if (readStableRunErrorCode(error) === 'SESSION_STORAGE_UNAVAILABLE')
       await this.#invalidateSessionContinuity(identity, runId)
     return this.#closeFromError(runId, signal, error)
+  }
+
+  async #withAutomationSessionStartupTimeout<T>(
+    operation: Promise<T>,
+    runId: string,
+    controller: AbortController,
+  ): Promise<T> {
+    let timer: ReturnType<typeof setTimeout> | null = null
+    const timeout = new Promise<never>((_resolve, reject) => {
+      timer = setTimeout(() => {
+        this.#cancellationCodes.set(runId, 'AUTOMATION_RUN_TIMEOUT')
+        controller.abort()
+        reject(new BuddyAgentRunError('AUTOMATION_RUN_TIMEOUT'))
+      }, this.#automationSessionStartupTimeoutMs)
+      timer.unref?.()
+    })
+    try {
+      return await Promise.race([operation, timeout])
+    }
+    finally {
+      if (timer)
+        clearTimeout(timer)
+    }
   }
 
   async #invalidateSessionContinuity(

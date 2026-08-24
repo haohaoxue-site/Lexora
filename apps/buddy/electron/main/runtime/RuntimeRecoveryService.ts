@@ -572,11 +572,20 @@ export class RuntimeRecoveryService {
         status: 'valid' as const,
       }))
       .catch(() => ({ ...safetyBackup, restoreCapacity: null }))
-    return {
+    const restored: RuntimeDataRestore = {
       backupId,
       restoredAt: new Date().toISOString(),
       safetyBackup: refreshedSafetyBackup,
     }
+    const receipt: RuntimeDataRecoveryReceipt = {
+      action: 'kept_restored_data',
+      backupId,
+      completedAt: restored.restoredAt,
+      operationId: control?.operationId ?? null,
+    }
+    await this.#writeDataRecoveryReceipt(receipt)
+    this.#dataRecoveryReceipt = receipt
+    return restored
   }
 
   async openDataDirectory(): Promise<{ ok: true }> {

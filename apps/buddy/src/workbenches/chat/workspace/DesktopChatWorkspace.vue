@@ -61,10 +61,10 @@ function dismissBlocker() {
 </script>
 
 <template>
-  <section class="desktop-chat-page">
+  <section class="desktop-chat-page" :class="{ 'is-empty': isEmpty }">
     <main class="desktop-chat-page__content">
       <section v-if="isEmpty" class="desktop-chat-page__welcome">
-        <img :src="DESKTOP_ASSET_URLS.appIcon" alt="" draggable="false" height="48" width="48">
+        <img :src="DESKTOP_ASSET_URLS.appIcon" alt="" draggable="false">
         <h1>{{ t('desktop.chat.globalHero') }}</h1>
         <p v-if="session.activeProject.value">
           {{ t('desktop.chat.projectContext', { project: session.activeProject.value.name }) }}
@@ -226,9 +226,8 @@ function dismissBlocker() {
   text-align: center;
 
   img {
-    width: 3rem;
-    height: 3rem;
-    border-radius: 0.85rem;
+    width: 12rem;
+    height: 12rem;
   }
 
   h1,
@@ -237,14 +236,37 @@ function dismissBlocker() {
   }
 
   h1 {
-    font-size: clamp(1.55rem, 3vw, 2rem);
-    font-weight: 650;
-    letter-spacing: -0.04em;
+    font-size: clamp(1.5rem, 2.4vw, 1.75rem);
+    font-weight: 500;
+    letter-spacing: -0.025em;
   }
 
   p {
     color: var(--buddy-text-secondary);
-    font-size: 0.78rem;
+    font-size: 0.82rem;
+  }
+}
+
+.desktop-chat-page.is-empty {
+  display: grid;
+  grid-template-rows: minmax(1.5rem, 1fr) auto auto minmax(1.5rem, 1.35fr);
+
+  .desktop-chat-page__content {
+    grid-row: 2;
+    flex: none;
+    overflow: visible;
+  }
+
+  .desktop-chat-page__welcome {
+    flex: none;
+    gap: 0.75rem;
+    padding: 0 1.25rem;
+  }
+
+  .desktop-chat-page__composer-dock {
+    grid-row: 3;
+    padding-top: 1.75rem;
+    padding-bottom: 0;
   }
 }
 

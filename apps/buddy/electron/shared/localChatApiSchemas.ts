@@ -4,6 +4,17 @@ import {
   approvalReviewPayloadSchema,
 } from '../../shared/approvalReviewPayload'
 import {
+  automationChangedNotificationSchema,
+  automationMutationRequestSchemas,
+  automationOccurrencePageSchema,
+  automationOccurrenceSchema,
+  automationPageSchema,
+  automationPreviewRequestSchema,
+  automationPreviewResultSchema,
+  automationRequestSchemas,
+  automationSchema,
+} from '../../shared/automation'
+import {
   BUDDY_DEFAULT_EXECUTION_PROFILE,
   BUDDY_EXECUTION_PROFILES,
 } from '../../shared/executionProfile'
@@ -286,12 +297,38 @@ const notificationBaseShape = {
   resolvedAt: nullableTimestampSchema,
   revision: z.string().min(1),
 }
-const notificationSchema = z.object({
+const modelUpdateNotificationSchema = z.object({
   ...notificationBaseShape,
   action: z.object({ type: z.literal('open-model-settings') }).strict(),
   kind: z.literal('model.source-parameters-updated'),
   payload: z.object({ modelCount: z.number().int().positive() }).strict(),
 }).strict()
+const automationRunNotificationShape = {
+  ...notificationBaseShape,
+  action: z.object({
+    conversationId: idSchema,
+    runId: idSchema,
+    type: z.literal('open-conversation'),
+  }).strict(),
+  lifecycle: z.literal('resolved'),
+  payload: z.object({
+    automationId: idSchema,
+    automationName: z.string().trim().min(1).max(80),
+    errorCode: z.string().max(256).nullable(),
+  }).strict(),
+  resolvedAt: timestampSchema,
+}
+const notificationSchema = z.discriminatedUnion('kind', [
+  modelUpdateNotificationSchema,
+  z.object({
+    ...automationRunNotificationShape,
+    kind: z.literal('automation.run.completed'),
+  }).strict(),
+  z.object({
+    ...automationRunNotificationShape,
+    kind: z.literal('automation.run.failed'),
+  }).strict(),
+])
 const notificationListSchema = z.object({
   items: z.array(notificationSchema),
   unseenCount: z.number().int().nonnegative(),
@@ -476,13 +513,20 @@ const conversationSchema = z.object({
   createdAt: timestampSchema,
   executionProfile: executionProfileSchema,
   id: idSchema,
+  origin: z.enum(['interactive', 'automation']).optional(),
   projectId: z.string().nullable(),
+  promotedAt: nullableTimestampSchema.optional(),
   title: z.string().nullable(),
   updatedAt: timestampSchema,
 }).strict()
 
 const conversationSummarySchema = conversationSchema.extend({
   activity: z.enum(['idle', 'running', 'awaiting_approval']),
+  automationOccurrence: z.object({
+    automationId: idSchema,
+    occurrenceId: idSchema,
+    scheduledFor: timestampSchema,
+  }).strict().nullable(),
 }).strict()
 
 const conversationBranchSchema = z.object({
@@ -557,7 +601,7 @@ const runEventSchema = publicRunEventSchema
 const approvalSchema = z.object({
   createdAt: timestampSchema,
   id: idSchema,
-  kind: z.enum(['delete', 'mcp', 'network', 'shell', 'system']),
+  kind: z.enum(['automation', 'delete', 'mcp', 'network', 'shell', 'system']),
   payload: approvalReviewPayloadSchema,
   resolvedAt: nullableTimestampSchema,
   runId: idSchema,
@@ -686,6 +730,11 @@ const mutationSchema = z.object({ ok: z.literal(true) }).strict()
 export const localChatResponseSchemas = {
   approval: approvalSchema,
   approvals: z.array(approvalSchema),
+  automationPreview: automationPreviewResultSchema,
+  automation: automationSchema,
+  automationOccurrence: automationOccurrenceSchema,
+  automationOccurrencePage: automationOccurrencePageSchema,
+  automationPage: automationPageSchema,
   attachmentPreview: z.object({
     mimeType: z.string().regex(/^image\//),
     path: z.string().refine(isAbsolutePath),
@@ -749,6 +798,18 @@ export const localChatResponseSchemas = {
 
 export const localChatSchemas = {
   approvalId: z.object({ approvalId: idSchema }).strict(),
+  automationChanged: automationChangedNotificationSchema,
+  automationCreate: automationMutationRequestSchemas.create,
+  automationDelete: automationMutationRequestSchemas.delete,
+  automationDeleteOccurrence: automationRequestSchemas.deleteOccurrence,
+  automationGet: automationRequestSchemas.get,
+  automationList: automationRequestSchemas.list,
+  automationListOccurrences: automationRequestSchemas.listOccurrences,
+  automationPause: automationMutationRequestSchemas.pause,
+  automationPreview: automationPreviewRequestSchema,
+  automationResume: automationMutationRequestSchemas.resume,
+  automationRunNow: automationMutationRequestSchemas.runNow,
+  automationUpdate: automationMutationRequestSchemas.update,
   attachmentPreview: z.object({ attachmentId: idSchema }).strict(),
   attachmentRelease: z.object({ attachmentIds: z.array(idSchema).max(16) }).strict(),
   attachmentSelection: z.object({ remainingCount: z.number().int().min(1).max(16) }).strict(),
@@ -925,6 +986,22 @@ type DeepReadonly<T> = T extends ReadonlyArray<infer Item>
 
 export type LocalApproval = DeepReadonly<z.infer<typeof approvalSchema>>
 export type LocalAttachment = DeepReadonly<z.infer<typeof attachmentSchema>>
+export type LocalAutomation = DeepReadonly<z.infer<typeof automationSchema>>
+export type LocalAutomationOccurrence
+  = DeepReadonly<z.infer<typeof automationOccurrenceSchema>>
+export type LocalAutomationOccurrencePage
+  = DeepReadonly<z.infer<typeof automationOccurrencePageSchema>>
+export type LocalAutomationPage = DeepReadonly<z.infer<typeof automationPageSchema>>
+export type LocalAutomationCreateRequest = z.input<typeof localChatSchemas.automationCreate>
+export type LocalAutomationUpdateRequest = z.input<typeof localChatSchemas.automationUpdate>
+export type LocalAutomationMutationRequest = z.input<typeof localChatSchemas.automationPause>
+export type LocalAutomationListRequest = z.input<typeof localChatSchemas.automationList>
+export type LocalAutomationOccurrenceListRequest
+  = z.input<typeof localChatSchemas.automationListOccurrences>
+export type LocalAutomationPreviewRequest
+  = DeepReadonly<z.infer<typeof automationPreviewRequestSchema>>
+export type LocalAutomationPreviewResult
+  = DeepReadonly<z.infer<typeof automationPreviewResultSchema>>
 export type LocalConnector = DeepReadonly<z.infer<typeof connectorSchema>>
 export type LocalConnectorConfig = z.infer<typeof connectorConfigSchema>
 export type LocalConnectorCredential = z.infer<typeof connectorCredentialSchema>

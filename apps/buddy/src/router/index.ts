@@ -8,10 +8,16 @@ import {
   createWebHashHistory,
 } from 'vue-router'
 
-export type DesktopView = 'chat' | 'settings'
+export type DesktopView = 'automations' | 'chat' | 'settings'
+export type DesktopAutomationSection = 'history' | 'tasks'
 export type DesktopSettingsCategory = 'app' | 'models' | 'pet' | 'local' | 'data'
 
 export const DESKTOP_ROUTE_NAMES = {
+  automations: 'desktop.automations',
+  automationsCreate: 'desktop.automations.create',
+  automationsEdit: 'desktop.automations.edit',
+  automationsHistory: 'desktop.automations.history',
+  automationsTasks: 'desktop.automations.tasks',
   chat: 'desktop.chat',
   settingsApp: 'desktop.settings.app',
   settingsData: 'desktop.settings.data',
@@ -20,6 +26,11 @@ export const DESKTOP_ROUTE_NAMES = {
   settingsPet: 'desktop.settings.pet',
   settingsProvider: 'desktop.settings.models.provider',
 } as const
+
+const AUTOMATION_ROUTE_NAMES: Record<DesktopAutomationSection, string> = {
+  history: DESKTOP_ROUTE_NAMES.automationsHistory,
+  tasks: DESKTOP_ROUTE_NAMES.automationsTasks,
+}
 
 const SETTINGS_ROUTE_NAMES: Record<DesktopSettingsCategory, string> = {
   app: DESKTOP_ROUTE_NAMES.settingsApp,
@@ -30,6 +41,16 @@ const SETTINGS_ROUTE_NAMES: Record<DesktopSettingsCategory, string> = {
 }
 
 export const desktopRouteLocations = {
+  automationCreate: (): RouteLocationRaw => ({
+    name: DESKTOP_ROUTE_NAMES.automationsCreate,
+  }),
+  automationEdit: (automationId: string): RouteLocationRaw => ({
+    name: DESKTOP_ROUTE_NAMES.automationsEdit,
+    params: { automationId },
+  }),
+  automations: (section: DesktopAutomationSection = 'tasks'): RouteLocationRaw => ({
+    name: AUTOMATION_ROUTE_NAMES[section],
+  }),
   chat: (): RouteLocationRaw => ({ name: DESKTOP_ROUTE_NAMES.chat }),
   provider: (providerId: string): RouteLocationRaw => ({
     name: DESKTOP_ROUTE_NAMES.settingsProvider,
@@ -50,6 +71,47 @@ const routes: ReadonlyArray<RouteRecordRaw> = [
     name: DESKTOP_ROUTE_NAMES.chat,
     component: () => import('../views/DesktopChatView.vue'),
     meta: { desktopView: 'chat' },
+  },
+  {
+    path: '/automations',
+    name: DESKTOP_ROUTE_NAMES.automations,
+    component: () => import('../views/automations/DesktopAutomationsLayout.vue'),
+    meta: { desktopView: 'automations' },
+    children: [
+      {
+        path: '',
+        component: () => import('../views/automations/DesktopAutomationIndexLayout.vue'),
+        redirect: desktopRouteLocations.automations(),
+        children: [
+          {
+            path: 'tasks',
+            name: DESKTOP_ROUTE_NAMES.automationsTasks,
+            component: () => import('../views/automations/DesktopAutomationTasksView.vue'),
+            meta: { automationSection: 'tasks', desktopView: 'automations' },
+          },
+          {
+            path: 'history',
+            name: DESKTOP_ROUTE_NAMES.automationsHistory,
+            component: () => import('../views/automations/DesktopAutomationHistoryView.vue'),
+            meta: { automationSection: 'history', desktopView: 'automations' },
+          },
+        ],
+      },
+      {
+        path: 'tasks/new',
+        name: DESKTOP_ROUTE_NAMES.automationsCreate,
+        component: () => import('../views/automations/DesktopAutomationEditorView.vue'),
+        props: { automationId: null },
+        meta: { automationSection: 'tasks', desktopView: 'automations' },
+      },
+      {
+        path: 'tasks/:automationId/edit',
+        name: DESKTOP_ROUTE_NAMES.automationsEdit,
+        component: () => import('../views/automations/DesktopAutomationEditorView.vue'),
+        props: true,
+        meta: { automationSection: 'tasks', desktopView: 'automations' },
+      },
+    ],
   },
   {
     path: '/settings',
@@ -108,6 +170,7 @@ export function createDesktopRouter(history: RouterHistory = createWebHashHistor
 
 declare module 'vue-router' {
   interface RouteMeta {
+    automationSection?: DesktopAutomationSection
     desktopView?: DesktopView
     settingsCategory?: DesktopSettingsCategory
   }

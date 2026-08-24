@@ -75,6 +75,27 @@ export function createBuddyToolPresentation(
       status: readOptionalString(details, 'status') ?? (input.result ? 'completed' : 'running'),
     }
   }
+  if (input.toolName === 'lexora_buddy_automation') {
+    const details = readToolDetails(input.result)
+    const automation = readRecord(details?.automation)
+      ?? readRecord(arguments_?.draft)
+    const occurrence = readRecord(details?.occurrence)
+    const page = readRecord(details?.page)
+    return {
+      automationId: readOptionalString(automation, 'id')
+        ?? readOptionalString(occurrence, 'automationId')
+        ?? readOptionalString(arguments_, 'automationId'),
+      card: 'automation',
+      itemCount: readArrayLength(page, 'items'),
+      name: readOptionalString(automation, 'name'),
+      nextRunAt: readOptionalString(automation, 'nextRunAt'),
+      occurrenceId: readOptionalString(occurrence, 'id'),
+      operation: readAutomationOperation(details, arguments_),
+      status: readOptionalString(occurrence, 'status')
+        ?? readOptionalString(automation, 'status')
+        ?? (input.result ? null : 'running'),
+    }
+  }
   if (input.toolName === 'lexora_system_inspect') {
     return {
       action: 'inspect',
@@ -270,6 +291,31 @@ function argumentNames(value: Record<string, unknown> | null): string[] {
 function readBoolean(value: Record<string, unknown> | null, key: string): boolean | null {
   const candidate = value?.[key]
   return typeof candidate === 'boolean' ? candidate : null
+}
+
+function readArrayLength(value: Record<string, unknown> | null, key: string): number | null {
+  const candidate = value?.[key]
+  return Array.isArray(candidate) ? candidate.length : null
+}
+
+function readAutomationOperation(
+  details: Record<string, unknown> | null,
+  arguments_: Record<string, unknown> | null,
+): Extract<BuddyToolPresentation, { card: 'automation' }>['operation'] {
+  const operation = readOptionalString(details, 'operation')
+    ?? readOptionalString(arguments_, 'operation')
+  switch (operation) {
+    case 'list':
+    case 'get':
+    case 'upsert':
+    case 'pause':
+    case 'resume':
+    case 'delete':
+    case 'run_now':
+      return operation
+    default:
+      return 'list'
+  }
 }
 
 function readSystemAction(

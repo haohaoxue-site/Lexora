@@ -4,7 +4,7 @@ import { isAbsolute, resolve } from 'node:path'
 import { GrantedPathError, resolveGrantedPath } from '../projects/resolveGrantedPath'
 import { ShellPolicy } from './ShellPolicy'
 
-export type ToolApprovalKind = 'delete' | 'mcp' | 'network' | 'shell' | 'system'
+export type ToolApprovalKind = 'automation' | 'delete' | 'mcp' | 'network' | 'shell' | 'system'
 export type ToolRisk = 'delete' | 'mcp' | 'network' | 'read' | 'system' | 'visual' | 'write'
 
 export type ToolDecision

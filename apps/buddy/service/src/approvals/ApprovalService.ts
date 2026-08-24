@@ -1,4 +1,7 @@
-import type { SystemActionApprovalReviewInput } from '../../../shared/approvalReviewPayload'
+import type {
+  AutomationApprovalReviewInput,
+  SystemActionApprovalReviewInput,
+} from '../../../shared/approvalReviewPayload'
 import type { AppendBuddyRunEventInput } from '../events/RunEventLog'
 import type {
   ApprovalRecord,
@@ -8,10 +11,13 @@ import type { ToolApprovalKind } from './ToolPolicy'
 import { randomUUID } from 'node:crypto'
 import { createApprovalReviewPayload } from '../../../shared/approvalReviewPayload'
 
+export const APPROVAL_WAIT_TIMEOUT_MS = 30 * 60 * 1_000
+
 export type ApprovalDecision = 'approved' | 'denied'
 
 export interface ApprovalRequest {
   arguments: unknown
+  automation?: AutomationApprovalReviewInput
   kind: ToolApprovalKind
   runId: string
   signal: AbortSignal
@@ -27,7 +33,9 @@ export interface ApprovalResolution {
 }
 
 export interface ApprovalServiceOptions {
+  approvalTimeoutMs?: number
   eventLog: { append: (input: AppendBuddyRunEventInput) => Promise<unknown> }
+  onExpired?: (runId: string) => Promise<void> | void
   repository: ApprovalRepository
 }
 
@@ -38,13 +46,17 @@ interface ApprovalWaiter {
 }
 
 export class ApprovalService {
+  readonly #approvalTimeoutMs: number
   readonly #eventLog: ApprovalServiceOptions['eventLog']
+  readonly #onExpired: NonNullable<ApprovalServiceOptions['onExpired']>
   readonly #repository: ApprovalRepository
   readonly #resolving = new Map<string, Promise<unknown>>()
   readonly #waiters = new Map<string, ApprovalWaiter>()
 
   constructor(options: ApprovalServiceOptions) {
+    this.#approvalTimeoutMs = options.approvalTimeoutMs ?? APPROVAL_WAIT_TIMEOUT_MS
     this.#eventLog = options.eventLog
+    this.#onExpired = options.onExpired ?? (() => {})
     this.#repository = options.repository
   }
 
@@ -58,6 +70,7 @@ export class ApprovalService {
       kind: input.kind,
       payload: createApprovalReviewPayload({
         arguments: input.arguments,
+        automation: input.automation,
         kind: input.kind,
         systemAction: input.systemAction,
         toolName: input.toolName,
@@ -69,9 +82,15 @@ export class ApprovalService {
       toolCallId: input.toolCallId,
     }
     const abort = () => void this.#cancel(approval).catch(() => {})
+    const expire = () => void this.#cancel(approval, true).catch(() => {})
+    let timer: ReturnType<typeof setTimeout> | null = null
     const decision = new Promise<ApprovalDecision>((resolve, reject) => {
       this.#waiters.set(approval.id, {
-        cleanup: () => input.signal.removeEventListener('abort', abort),
+        cleanup: () => {
+          if (timer)
+            clearTimeout(timer)
+          input.signal.removeEventListener('abort', abort)
+        },
         reject,
         resolve,
       })
@@ -81,6 +100,8 @@ export class ApprovalService {
     try {
       await this.#appendRequested(approval)
       this.#requireApproval(approval.id)
+      timer = setTimeout(expire, this.#approvalTimeoutMs)
+      timer.unref?.()
     }
     catch (error) {
       const waiter = this.#waiters.get(approval.id)
@@ -131,24 +152,26 @@ export class ApprovalService {
     return cancelled
   }
 
-  async #cancel(approval: ApprovalRecord): Promise<void> {
+  async #cancel(approval: ApprovalRecord, expired = false): Promise<void> {
     const resolving = this.#resolving.get(approval.id)
     if (resolving) {
       await resolving.catch(() => {})
-      return this.#cancel(approval)
+      return this.#cancel(approval, expired)
     }
     const pending = this.#repository.findById(approval.id)
     if (!pending || pending.status !== 'pending')
       return
-    await this.#trackResolution(approval.id, this.#cancelPending(pending))
+    await this.#trackResolution(approval.id, this.#cancelPending(pending, expired))
+    if (expired)
+      await this.#onExpired(approval.runId)
   }
 
-  async #cancelPending(approval: ApprovalRecord): Promise<void> {
+  async #cancelPending(approval: ApprovalRecord, expired: boolean): Promise<void> {
     const resolvedAt = new Date().toISOString()
     const waiter = this.#waiters.get(approval.id)
     try {
       await this.#appendResolved({ ...approval, resolvedAt, status: 'cancelled' })
-      waiter?.reject(new ApprovalCancelledError())
+      waiter?.reject(expired ? new ApprovalExpiredError() : new ApprovalCancelledError())
     }
     catch (error) {
       waiter?.reject(asError(error))
@@ -203,6 +226,15 @@ export class ApprovalCancelledError extends Error {
   constructor() {
     super('Lexora Buddy approval was cancelled')
     this.name = 'ApprovalCancelledError'
+  }
+}
+
+export class ApprovalExpiredError extends Error {
+  readonly code = 'AUTOMATION_APPROVAL_EXPIRED'
+
+  constructor() {
+    super('Lexora Buddy approval expired')
+    this.name = 'ApprovalExpiredError'
   }
 }
 

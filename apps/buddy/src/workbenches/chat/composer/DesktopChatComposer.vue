@@ -28,6 +28,7 @@ import { toRef } from 'vue'
 import { useBuddyI18n } from '@/i18n/buddyI18n'
 import DesktopModelSelector from '@/ui/model-selector/DesktopModelSelector.vue'
 import ChatContextUsage from '@/workbenches/chat/composer/ChatContextUsage.vue'
+import DesktopChatComposerFrame from '@/workbenches/chat/composer/DesktopChatComposerFrame.vue'
 import DesktopExecutionProfileSelector from '@/workbenches/chat/composer/DesktopExecutionProfileSelector.vue'
 import { useChatComposer } from '@/workbenches/chat/composer/useChatComposer'
 import { resolveBuddyAttachmentPreviewUrl } from '@/workbenches/chat/transcript/chatAttachmentView'
@@ -91,202 +92,143 @@ const {
 </script>
 
 <template>
-  <div class="desktop-chat-composer-wrap">
-    <div v-if="attachments.length" class="desktop-chat-composer__attachments">
-      <div v-for="(attachment, index) in attachments" :key="attachment.attachmentId">
-        <img
-          v-if="attachment.kind === 'image' && resolveBuddyAttachmentPreviewUrl(attachment)"
-          :src="resolveBuddyAttachmentPreviewUrl(attachment) ?? undefined"
-          :alt="attachment.name"
-          height="29"
-          width="29"
-        >
-        <span v-else class="desktop-chat-composer__file-kind">
-          {{ attachment.kind === 'text' ? 'TXT' : 'FILE' }}
-        </span>
-        <span>{{ attachment.name }}</span>
-        <NButton
-          class="buddy-icon-button"
-          quaternary
-          size="tiny"
-          :aria-label="t('desktop.chat.removeAttachment')"
-          @click="emit('removeAttachment', index)"
-        >
-          <template #icon>
-            <NIcon :component="Dismiss16Regular" />
-          </template>
-        </NButton>
-      </div>
-    </div>
-
-    <div class="desktop-chat-composer">
-      <div class="desktop-chat-composer__editor-wrap">
-        <EditorContent v-if="editor" :editor="editor" />
-        <div
-          v-if="suggestions.length || isLoadingContext"
-          class="desktop-chat-composer__suggestions"
-        >
-          <span v-if="isLoadingContext && !suggestions.length" class="desktop-chat-composer__suggestion-empty">
-            {{ t('desktop.chat.loadingContext') }}
-          </span>
-          <button
-            v-for="(suggestion, index) in suggestions"
-            :key="`${suggestion.option.kind}:${suggestion.option.value}:${suggestion.option.path ?? ''}`"
-            class="desktop-chat-composer__suggestion"
-            :class="{ 'is-active': index === activeSuggestionIndex }"
-            type="button"
-            @mousedown.prevent="selectSuggestion(suggestion.option)"
+  <DesktopChatComposerFrame class="desktop-chat-composer-wrap">
+    <template #attachments>
+      <div v-if="attachments.length" class="desktop-chat-composer__attachments">
+        <div v-for="(attachment, index) in attachments" :key="attachment.attachmentId">
+          <img
+            v-if="attachment.kind === 'image' && resolveBuddyAttachmentPreviewUrl(attachment)"
+            :src="resolveBuddyAttachmentPreviewUrl(attachment) ?? undefined"
+            :alt="attachment.name"
+            height="29"
+            width="29"
           >
-            <span class="desktop-chat-composer__suggestion-kind">
-              {{ suggestionKind(suggestion.option) }}
-            </span>
-            <span>
-              <strong>{{ suggestion.option.label }}</strong>
-              <small v-if="suggestion.option.description">{{ suggestion.option.description }}</small>
-            </span>
-          </button>
-        </div>
-      </div>
-
-      <div class="desktop-chat-composer__toolbar">
-        <div class="desktop-chat-composer__leading-actions">
+          <span v-else class="desktop-chat-composer__file-kind">
+            {{ attachment.kind === 'text' ? 'TXT' : 'FILE' }}
+          </span>
+          <span>{{ attachment.name }}</span>
           <NButton
             class="buddy-icon-button"
             quaternary
-            :aria-label="t('desktop.chat.addAttachment')"
-            :disabled="isSelectingFiles || isSending"
-            @click="emit('attach')"
+            size="tiny"
+            :aria-label="t('desktop.chat.removeAttachment')"
+            @click="emit('removeAttachment', index)"
           >
             <template #icon>
-              <NIcon :component="Add20Regular" />
-            </template>
-          </NButton>
-
-          <DesktopExecutionProfileSelector
-            :can-update="canUpdateExecutionProfile"
-            :execution-profile="executionProfile"
-            :is-updating="isUpdatingExecutionProfile"
-            :language="language"
-            @update-execution-profile="emit('updateExecutionProfile', $event)"
-          />
-        </div>
-
-        <div class="desktop-chat-composer__actions">
-          <ChatContextUsage
-            :is-running="isRunning"
-            :language="language"
-            :usage="contextUsage"
-          />
-
-          <DesktopModelSelector
-            :disabled="isSending"
-            :language="language"
-            :models="models"
-            :providers="providers"
-            :selected-effort="selectedEffort"
-            :selected-model="selectedModel"
-            :selected-model-id="selectedModelId"
-            :selected-service-tier="selectedServiceTier"
-            @update-effort="emit('updateEffort', $event)"
-            @update-model="emit('updateModel', $event)"
-            @update-service-tier="emit('updateServiceTier', $event)"
-          />
-
-          <NButton
-            v-if="isRunning"
-            class="buddy-icon-button"
-            secondary
-            type="error"
-            :aria-label="t('desktop.chat.stop')"
-            @click="emit('stop')"
-          >
-            <template #icon>
-              <NIcon :component="Stop20Filled" />
-            </template>
-          </NButton>
-          <NButton
-            v-else
-            class="buddy-icon-button"
-            type="primary"
-            :aria-label="t('desktop.chat.send')"
-            :disabled="!canSubmit"
-            :loading="isSending"
-            @click="submit"
-          >
-            <template #icon>
-              <NIcon :component="ArrowUp20Regular" />
+              <NIcon :component="Dismiss16Regular" />
             </template>
           </NButton>
         </div>
       </div>
-    </div>
-    <p>{{ t('desktop.chat.disclaimer') }}</p>
-  </div>
+    </template>
+
+    <template #editor>
+      <EditorContent v-if="editor" :editor="editor" />
+      <div
+        v-if="suggestions.length || isLoadingContext"
+        class="desktop-chat-composer__suggestions"
+      >
+        <span v-if="isLoadingContext && !suggestions.length" class="desktop-chat-composer__suggestion-empty">
+          {{ t('desktop.chat.loadingContext') }}
+        </span>
+        <button
+          v-for="(suggestion, index) in suggestions"
+          :key="`${suggestion.option.kind}:${suggestion.option.value}:${suggestion.option.path ?? ''}`"
+          class="desktop-chat-composer__suggestion"
+          :class="{ 'is-active': index === activeSuggestionIndex }"
+          type="button"
+          @mousedown.prevent="selectSuggestion(suggestion.option)"
+        >
+          <span class="desktop-chat-composer__suggestion-kind">
+            {{ suggestionKind(suggestion.option) }}
+          </span>
+          <span>
+            <strong>{{ suggestion.option.label }}</strong>
+            <small v-if="suggestion.option.description">{{ suggestion.option.description }}</small>
+          </span>
+        </button>
+      </div>
+    </template>
+
+    <template #leading>
+      <NButton
+        class="buddy-icon-button"
+        quaternary
+        :aria-label="t('desktop.chat.addAttachment')"
+        :disabled="isSelectingFiles || isSending"
+        @click="emit('attach')"
+      >
+        <template #icon>
+          <NIcon :component="Add20Regular" />
+        </template>
+      </NButton>
+
+      <DesktopExecutionProfileSelector
+        :can-update="canUpdateExecutionProfile"
+        :execution-profile="executionProfile"
+        :is-updating="isUpdatingExecutionProfile"
+        :language="language"
+        @update-execution-profile="emit('updateExecutionProfile', $event)"
+      />
+    </template>
+
+    <template #actions>
+      <ChatContextUsage
+        :is-running="isRunning"
+        :language="language"
+        :usage="contextUsage"
+      />
+
+      <DesktopModelSelector
+        :disabled="isSending"
+        :language="language"
+        :models="models"
+        :providers="providers"
+        :selected-effort="selectedEffort"
+        :selected-model="selectedModel"
+        :selected-model-id="selectedModelId"
+        :selected-service-tier="selectedServiceTier"
+        @update-effort="emit('updateEffort', $event)"
+        @update-model="emit('updateModel', $event)"
+        @update-service-tier="emit('updateServiceTier', $event)"
+      />
+
+      <NButton
+        v-if="isRunning"
+        class="buddy-icon-button"
+        secondary
+        type="error"
+        :aria-label="t('desktop.chat.stop')"
+        @click="emit('stop')"
+      >
+        <template #icon>
+          <NIcon :component="Stop20Filled" />
+        </template>
+      </NButton>
+      <NButton
+        v-else
+        class="buddy-icon-button"
+        type="primary"
+        :aria-label="t('desktop.chat.send')"
+        :disabled="!canSubmit"
+        :loading="isSending"
+        @click="submit"
+      >
+        <template #icon>
+          <NIcon :component="ArrowUp20Regular" />
+        </template>
+      </NButton>
+    </template>
+
+    <template #footer>
+      <p class="desktop-chat-composer__disclaimer">
+        {{ t('desktop.chat.disclaimer') }}
+      </p>
+    </template>
+  </DesktopChatComposerFrame>
 </template>
 
 <style scoped lang="scss">
-.desktop-chat-composer-wrap {
-  width: 100%;
-  margin: 0 auto;
-}
-
-.desktop-chat-composer {
-  position: relative;
-  border: 1px solid var(--buddy-border-base);
-  border-radius: 0.75rem;
-  background: var(--buddy-bg-surface);
-  padding: 0.65rem;
-  transition: border-color 120ms ease;
-
-  &:focus-within {
-    border-color: color-mix(in srgb, var(--buddy-accent-primary) 58%, var(--buddy-border-base));
-  }
-}
-
-.desktop-chat-composer__editor-wrap {
-  position: relative;
-}
-
-:deep(.desktop-chat-composer__prosemirror) {
-  min-height: 3.25rem;
-  max-height: 12rem;
-  overflow-y: auto;
-  border: 0;
-  outline: 0;
-  color: var(--buddy-text-primary);
-  font-size: 0.9rem;
-  line-height: 1.58;
-  padding: 0.1rem 0.2rem 0.6rem;
-  white-space: pre-wrap;
-  word-break: break-word;
-
-  p {
-    margin: 0;
-  }
-
-  p.is-editor-empty:first-child::before {
-    content: attr(data-placeholder);
-    float: left;
-    height: 0;
-    color: var(--buddy-text-placeholder);
-    pointer-events: none;
-  }
-}
-
-:deep(.chat-prompt-token-node) {
-  display: inline-flex;
-  align-items: center;
-  max-width: 100%;
-  border: 1px solid color-mix(in srgb, var(--buddy-accent-primary) 30%, var(--buddy-border-light));
-  border-radius: 0.38rem;
-  background: color-mix(in srgb, var(--buddy-accent-primary) 10%, var(--buddy-bg-surface));
-  color: var(--buddy-accent-primary);
-  font-size: 0.78rem;
-  font-weight: 650;
-  line-height: 1.45;
-  padding: 0.05rem 0.35rem;
-}
-
 .desktop-chat-composer__suggestions {
   position: absolute;
   right: 0;
@@ -359,28 +301,6 @@ const {
   padding: 0.7rem;
 }
 
-.desktop-chat-composer__toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.55rem;
-}
-
-.desktop-chat-composer__actions {
-  display: flex;
-  min-width: 0;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 0.35rem;
-}
-
-.desktop-chat-composer__leading-actions {
-  display: flex;
-  min-width: 0;
-  align-items: center;
-  gap: 0.35rem;
-}
-
 .desktop-chat-composer__attachments {
   display: flex;
   gap: 0.45rem;
@@ -426,16 +346,10 @@ const {
   font-weight: 700;
 }
 
-.desktop-chat-composer-wrap > p {
+.desktop-chat-composer__disclaimer {
   margin: 0.45rem 0 0;
   color: var(--buddy-text-placeholder);
   font-size: 0.68rem;
   text-align: center;
-}
-
-@media (max-width: 760px) {
-  .desktop-chat-composer-wrap {
-    width: 100%;
-  }
 }
 </style>

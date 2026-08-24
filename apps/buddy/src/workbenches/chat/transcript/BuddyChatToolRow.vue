@@ -2,6 +2,7 @@
 import type { ChatAgentToolNode } from './chatStreamingMessage'
 import type { BuddyLocale } from '@/i18n/buddyI18n'
 import {
+  CalendarClock20Regular,
   ChevronRight20Regular,
   Document20Regular,
   Edit20Regular,
@@ -31,7 +32,11 @@ const hasManualToggle = shallowRef(false)
 const canExpand = computed(() => {
   const presentation = props.node.presentation
   return presentation.card === 'terminal'
-    || (presentation.card !== 'pet' && Boolean(presentation.output))
+    || (
+      presentation.card !== 'automation'
+      && presentation.card !== 'pet'
+      && Boolean(presentation.output)
+    )
     || (presentation.card === 'diff' && Boolean(presentation.diff))
 })
 const title = computed(() => {
@@ -47,6 +52,7 @@ const title = computed(() => {
     case 'system': return t(props.node.presentation.action === 'inspect'
       ? 'desktop.chat.processToolSystemInspect'
       : 'desktop.chat.processToolSystemAction')
+    case 'automation': return t('desktop.chat.processToolAutomation')
     case 'generic': return props.node.toolName
   }
   return props.node.toolName
@@ -69,6 +75,18 @@ const summary = computed(() => {
         : translateSystemAction(props.language, presentation.action),
       target,
       translateSystemToolStatus(props.language, presentation.status),
+    ].filter(Boolean).join(' · ')
+  }
+  if (presentation.card === 'automation') {
+    return [
+      automationOperationLabel(presentation.operation),
+      presentation.name,
+      presentation.itemCount === null
+        ? null
+        : t('desktop.chat.processToolAutomationCount', { count: presentation.itemCount }),
+      props.node.status === 'awaiting_approval'
+        ? t('desktop.chat.processAwaitingApproval')
+        : presentation.status,
     ].filter(Boolean).join(' · ')
   }
   const detail = (() => {
@@ -100,10 +118,25 @@ const leadingIcon = computed(() => {
     case 'connector': return PlugConnected20Regular
     case 'pet': return Sparkle20Regular
     case 'system': return Wrench20Regular
+    case 'automation': return CalendarClock20Regular
     case 'generic': return Wrench20Regular
   }
   return Wrench20Regular
 })
+
+function automationOperationLabel(
+  operation: Extract<ChatAgentToolNode['presentation'], { card: 'automation' }>['operation'],
+): string {
+  switch (operation) {
+    case 'list': return t('desktop.chat.processToolAutomationList')
+    case 'get': return t('desktop.chat.processToolAutomationGet')
+    case 'upsert': return t('desktop.chat.processToolAutomationUpsert')
+    case 'pause': return t('desktop.chat.processToolAutomationPause')
+    case 'resume': return t('desktop.chat.processToolAutomationResume')
+    case 'delete': return t('desktop.chat.processToolAutomationDelete')
+    case 'run_now': return t('desktop.chat.processToolAutomationRunNow')
+  }
+}
 
 watch(() => props.node.status, () => {
   if (!hasManualToggle.value)

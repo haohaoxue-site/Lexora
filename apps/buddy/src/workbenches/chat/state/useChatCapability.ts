@@ -357,6 +357,7 @@ export function useChatCapability(options: UseChatCapabilityOptions) {
     deleteConversation,
     deleteProject,
     projects: readonly(projects),
+    refresh: refreshChatIndex,
     renameConversation,
     updateProject,
   } as const

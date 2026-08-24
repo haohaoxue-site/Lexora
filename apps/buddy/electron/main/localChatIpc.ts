@@ -149,6 +149,62 @@ export function registerLocalChatIpc(options: RegisterLocalChatIpcOptions): () =
     )
   })
 
+  handle(LOCAL_CHAT_IPC_CHANNELS.automationsPreview, (_event, input) => request(
+    'automations.preview',
+    localChatSchemas.automationPreview.parse(input),
+    localChatResponseSchemas.automationPreview,
+  ))
+  handle(LOCAL_CHAT_IPC_CHANNELS.automationsList, (_event, input) => request(
+    'automations.list',
+    localChatSchemas.automationList.parse(input),
+    localChatResponseSchemas.automationPage,
+  ))
+  handle(LOCAL_CHAT_IPC_CHANNELS.automationsGet, (_event, input) => request(
+    'automations.get',
+    localChatSchemas.automationGet.parse(input),
+    localChatResponseSchemas.automation,
+  ))
+  handle(LOCAL_CHAT_IPC_CHANNELS.automationsCreate, (_event, input) => request(
+    'automations.create',
+    localChatSchemas.automationCreate.parse(input),
+    localChatResponseSchemas.automation,
+  ))
+  handle(LOCAL_CHAT_IPC_CHANNELS.automationsUpdate, (_event, input) => request(
+    'automations.update',
+    localChatSchemas.automationUpdate.parse(input),
+    localChatResponseSchemas.automation,
+  ))
+  handle(LOCAL_CHAT_IPC_CHANNELS.automationsPause, (_event, input) => request(
+    'automations.pause',
+    localChatSchemas.automationPause.parse(input),
+    localChatResponseSchemas.automation,
+  ))
+  handle(LOCAL_CHAT_IPC_CHANNELS.automationsResume, (_event, input) => request(
+    'automations.resume',
+    localChatSchemas.automationResume.parse(input),
+    localChatResponseSchemas.automation,
+  ))
+  handle(LOCAL_CHAT_IPC_CHANNELS.automationsDelete, (_event, input) => request(
+    'automations.delete',
+    localChatSchemas.automationDelete.parse(input),
+    localChatResponseSchemas.automation,
+  ))
+  handle(LOCAL_CHAT_IPC_CHANNELS.automationsDeleteOccurrence, (_event, input) => request(
+    'automations.deleteOccurrence',
+    localChatSchemas.automationDeleteOccurrence.parse(input),
+    localChatResponseSchemas.deleted,
+  ))
+  handle(LOCAL_CHAT_IPC_CHANNELS.automationsRunNow, (_event, input) => request(
+    'automations.runNow',
+    localChatSchemas.automationRunNow.parse(input),
+    localChatResponseSchemas.automationOccurrence,
+  ))
+  handle(LOCAL_CHAT_IPC_CHANNELS.automationsListOccurrences, (_event, input) => request(
+    'automations.listOccurrences',
+    localChatSchemas.automationListOccurrences.parse(input),
+    localChatResponseSchemas.automationOccurrencePage,
+  ))
+
   handle(LOCAL_CHAT_IPC_CHANNELS.providersList, () => request(
     'providers.list',
     {},
@@ -361,6 +417,11 @@ export function registerLocalChatIpc(options: RegisterLocalChatIpcOptions): () =
     localChatSchemas.limit.parse(input),
     localChatResponseSchemas.conversations,
   ))
+  handle(LOCAL_CHAT_IPC_CHANNELS.conversationsGet, (_event, input) => request(
+    'conversations.get',
+    localChatSchemas.conversationId.parse(input),
+    localChatResponseSchemas.conversation,
+  ))
   handle(LOCAL_CHAT_IPC_CHANNELS.conversationsDelete, (_event, input) => request(
     'conversations.delete',
     localChatSchemas.conversationId.parse(input),
@@ -517,6 +578,17 @@ export function registerLocalChatIpc(options: RegisterLocalChatIpcOptions): () =
           options.getWindow(),
           LOCAL_CHAT_IPC_CHANNELS.runEvent,
           toPublicRunEvent(event.data),
+        )
+      }
+      return
+    }
+    if (notification.method === 'automation.changed') {
+      const changed = localChatSchemas.automationChanged.safeParse(notification.params)
+      if (changed.success) {
+        sendToRenderer(
+          options.getWindow(),
+          LOCAL_CHAT_IPC_CHANNELS.automationChanged,
+          changed.data.automationId,
         )
       }
       return

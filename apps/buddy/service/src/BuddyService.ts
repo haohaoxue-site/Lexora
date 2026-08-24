@@ -1,5 +1,10 @@
 import type { DatabaseSync } from 'node:sqlite'
 import type {
+  Automation,
+  AutomationModelTarget,
+  AutomationStartupContext,
+} from '../../shared/automation'
+import type {
   BuddyServiceTier,
   BuddyThinkingLevel,
 } from '../../shared/modelSelection'
@@ -9,21 +14,27 @@ import type {
   BuddyRunContext,
   BuddyToolClassification,
 } from './agent/extensions/toolPolicyExtension'
+import type { ResolvedAutomationModel } from './automations/AutomationDispatcher'
+import type { AutomationClock } from './automations/AutomationScheduleEvaluator'
 import type { BuddyServiceRpcServer } from './rpc/BuddyServiceRpcServer'
 import type { ApprovalRecord, ApprovalStatus } from './storage/approvalRepository'
 import type { AttachmentRecord } from './storage/attachmentRepository'
+import type { AutomationOccurrenceRecord } from './storage/automationRepository'
 import type { McpServerRecord } from './storage/connectorRepository'
 import type { ProjectRecord } from './storage/projectRepository'
 import type { RunRecord } from './storage/runRepository'
 import type { UsageRecord } from './storage/usageRepository'
 import { Buffer } from 'node:buffer'
 import { createHash, randomUUID } from 'node:crypto'
-
 import { mkdir } from 'node:fs/promises'
 import { basename, join } from 'node:path'
-
 import { getSupportedThinkingLevels } from '@earendil-works/pi-ai'
 import { z } from 'zod'
+import {
+  automationMutationRequestSchemas,
+  automationPreviewRequestSchema,
+  automationRequestSchemas,
+} from '../../shared/automation'
 import {
   materializeBuddyPromptCommand,
   parseBuddyChatCommand,
@@ -39,12 +50,14 @@ import { toPublicRunEvent } from '../../shared/publicRunEvent'
 import { BuddyAgentRunner } from './agent/BuddyAgentRunner'
 import { BuddySessionRegistry } from './agent/BuddySessionRegistry'
 import { resolveBuddySessionResources } from './agent/BuddySessionResources'
+import { BuddyTurnLauncher } from './agent/BuddyTurnLauncher'
 import { createBuddyRecoveryMessages } from './agent/createBuddyRecoveryMessages'
 import {
   createBuddyContextSnapshot,
   createBuddySession,
 } from './agent/createBuddySession'
 import { createReusableBuddySession } from './agent/createReusableBuddySession'
+import { createAutomationExtension } from './agent/extensions/automationExtension'
 import { createMcpExtension } from './agent/extensions/mcpExtension'
 import { createPetExtension } from './agent/extensions/petExtension'
 import { classifySystemTool, createSystemExtension } from './agent/extensions/systemExtension'
@@ -59,6 +72,16 @@ import { ApprovalService } from './approvals/ApprovalService'
 import { readSandboxedFile } from './approvals/FileSandbox'
 import { prepareShellSandbox } from './approvals/ShellSandbox'
 import { AttachmentService } from './attachments/AttachmentService'
+import { AutomationDispatcher } from './automations/AutomationDispatcher'
+import { AutomationOccurrenceLifecycleService } from './automations/AutomationOccurrenceLifecycleService'
+import { AutomationProjectBindingService } from './automations/AutomationProjectBindingService'
+import {
+  previewAutomationSchedule,
+  systemAutomationClock,
+} from './automations/AutomationScheduleEvaluator'
+import { AutomationScheduler } from './automations/AutomationScheduler'
+import { AutomationService } from './automations/AutomationService'
+import { classifyAutomationToolCall } from './automations/createAutomationTool'
 import {
   HostConnectorSecretStore,
   McpConnectorService,
@@ -204,6 +227,8 @@ const contextUsageSnapshotRequestSchema = z.object({
 ))
 
 export interface StartBuddyServiceOptions {
+  automationClock?: AutomationClock
+  automationStartupContext?: AutomationStartupContext
   buddyHome: string
   builtinSkillsDirectory: string
   database: DatabaseSync
@@ -240,8 +265,12 @@ export async function startBuddyService(
   const commandRequests = createCommandRequestRepository(options.database)
   const connectorsRepository = createConnectorRepository(options.database)
   const projectService = new ProjectGrantService(projectsRepository, { managedProjectsDirectory })
+  let runner!: BuddyAgentRunner
   const approvalService = new ApprovalService({
     eventLog: options.eventLog,
+    onExpired: async (runId) => {
+      await runner.cancel(runId, 'AUTOMATION_APPROVAL_EXPIRED')
+    },
     repository: approvalsRepository,
   })
   const usageService = new UsageService({
@@ -259,10 +288,6 @@ export async function startBuddyService(
     getActiveRuns: () => runs.listIncomplete(),
     peer: options.rpc,
     providers: providersRepository,
-  })
-  const notificationService = new AttentionNotificationService({
-    attention: createNotificationAttentionRepository(options.database),
-    listModels: () => providersRepository.listModelStates(),
   })
   const shellSandboxAssets = await prepareShellSandbox(agentDirectory)
   const systemHost = new LinuxSystemHost()
@@ -282,7 +307,39 @@ export async function startBuddyService(
     eventSink: event => options.eventLog.append(event),
     peer: options.rpc,
   })
-  const runner = new BuddyAgentRunner({
+  const automationClock = options.automationClock ?? systemAutomationClock
+  const automationService = new AutomationService({
+    clock: automationClock,
+    database: options.database,
+  })
+  const notificationService = new AttentionNotificationService({
+    attention: createNotificationAttentionRepository(options.database),
+    listAutomationRuns: () => automationService.listHistory({ limit: 100 }).items.flatMap(
+      (occurrence) => {
+        if (!occurrence.runId || !occurrence.conversationId)
+          return []
+        const run = runs.findById(occurrence.runId)
+        if (!run?.completedAt || (run.status !== 'completed' && run.status !== 'failed'))
+          return []
+        return [{
+          automationId: occurrence.automationId,
+          automationName: occurrence.executionSnapshot.name,
+          completedAt: run.completedAt,
+          conversationId: occurrence.conversationId,
+          errorCode: run.errorCode,
+          runId: run.id,
+          status: run.status,
+        }]
+      },
+    ),
+    listModels: () => providersRepository.listModelStates(),
+  })
+  let automationScheduler: AutomationScheduler | null = null
+  const notifyAutomationToolChanged = (automationId: string) => {
+    options.rpc.notify('automation.changed', { automationId })
+    void automationScheduler?.wake()
+  }
+  runner = new BuddyAgentRunner({
     cancelPendingApprovals: () => approvalService.cancelPendingApprovals(),
     conversations,
     eventLog: options.eventLog,
@@ -347,9 +404,18 @@ export async function startBuddyService(
             service: petService,
           }),
           createSystemExtension({ service: systemCapability }),
+          ...(input.sessionMode === 'interactive'
+            ? [createAutomationExtension({
+                onChanged: notifyAutomationToolChanged,
+                service: automationService,
+              })]
+            : []),
           createToolPolicyExtension({
             approvalService,
-            classifyTool: event => classifySystemTool(
+            classifyTool: event => classifyAutomationToolCall(
+              automationService,
+              event,
+            ) ?? classifySystemTool(
               systemCapability,
               event.toolName,
               event.input,
@@ -447,8 +513,63 @@ export async function startBuddyService(
     runner,
     sessions,
   })
+  const automationOccurrenceLifecycle = new AutomationOccurrenceLifecycleService({
+    automations: automationService,
+    conversationLifecycle,
+    notifications: notificationService,
+  })
+  const automationProjects = new AutomationProjectBindingService({
+    automations: automationService,
+    createProject: async name => toResolvedAutomationProject(await projectService.create({
+      instructions: '',
+      memoryScope: 'personal_and_project',
+      name,
+      root: null,
+    })),
+    deleteProject: projectId => projectService.delete(projectId),
+    findProject: (projectId) => {
+      const project = projectsRepository.findById(projectId)
+      return project && !project.revokedAt ? toResolvedAutomationProject(project) : null
+    },
+    onChanged: notifyAutomationToolChanged,
+  })
+  const turnLauncher = new BuddyTurnLauncher(runner)
+  const automationDispatcher = new AutomationDispatcher({
+    automationService,
+    cancelRun: (runId, errorCode) => runner.cancel(runId, errorCode),
+    clock: automationClock,
+    database: options.database,
+    launchTurn: input => turnLauncher.startTurn(input),
+    resolveModel: target => resolveAutomationModel(providerService, target),
+    resolveProject: input => automationProjects.resolve(input),
+    resolveResources: ({ canonicalRoot, project }) => resolveBuddySessionResources({
+      canonicalRoot,
+      cwd: canonicalRoot,
+      projectInstructions: project?.instructions,
+      projectId: project?.id ?? null,
+      skills: skillService,
+    }),
+  })
+  const scheduler = new AutomationScheduler({
+    automationService,
+    clock: automationClock,
+    dispatch: async (occurrence) => {
+      await automationDispatcher.dispatch(occurrence)
+      options.rpc.notify('automation.changed', { automationId: occurrence.automationId })
+    },
+    onChanged: automationId => options.rpc.notify('automation.changed', { automationId }),
+    workspace,
+  })
+  automationScheduler = scheduler
 
   await projectService.recoverPendingDeletions()
+  for (const automation of reconcileAutomationDependencies({
+    automationService,
+    projectsRepository,
+    providersRepository,
+  })) {
+    options.rpc.notify('automation.changed', { automationId: automation.id })
+  }
   await conversationLifecycle.recoverPendingDeletions()
   await runner.recoverInterruptedRuns()
   await options.eventLog.compactTerminalRuns()
@@ -458,6 +579,10 @@ export async function startBuddyService(
     approvalService,
     approvalsRepository,
     attachmentService,
+    automationClock,
+    automationOccurrenceLifecycle,
+    automationScheduler: scheduler,
+    automationService,
     connectorService,
     connectorsRepository,
     commandRequests,
@@ -479,11 +604,17 @@ export async function startBuddyService(
     systemHost,
     usageRepository,
     turnRequests,
+    turnLauncher,
     workspace,
     workspaceDirectory,
   })
+  await scheduler.start(options.automationStartupContext ?? {
+    reason: 'normal',
+    restoreToken: null,
+  })
   return {
     async dispose() {
+      await scheduler.dispose()
       unregister()
       await Promise.allSettled([
         runner.dispose(),
@@ -498,6 +629,10 @@ interface RuntimeServices {
   approvalService: ApprovalService
   approvalsRepository: ReturnType<typeof createApprovalRepository>
   attachmentService: AttachmentService
+  automationClock: AutomationClock
+  automationOccurrenceLifecycle: AutomationOccurrenceLifecycleService
+  automationScheduler: AutomationScheduler
+  automationService: AutomationService
   connectorService: McpConnectorService
   connectorsRepository: ReturnType<typeof createConnectorRepository>
   commandRequests: ReturnType<typeof createCommandRequestRepository>
@@ -519,6 +654,7 @@ interface RuntimeServices {
   systemHost: LinuxSystemHost
   usageRepository: ReturnType<typeof createUsageRepository>
   turnRequests: ReturnType<typeof createTurnRequestRepository>
+  turnLauncher: BuddyTurnLauncher
   workspace: ReturnType<typeof createWorkspaceRepository>
   workspaceDirectory: string
 }
@@ -528,6 +664,15 @@ function registerRuntimeHandlers(services: RuntimeServices): () => void {
   const on = (method: string, handler: (params: unknown) => Promise<unknown> | unknown) => {
     disposers.push(services.rpc.onRequest(method, handler))
   }
+  disposers.push(services.rpc.onNotification((method, params) => {
+    if (method !== 'scheduler.wake')
+      return
+    const wake = z.object({
+      reason: z.enum(['resume', 'unlock-screen']),
+    }).strict().safeParse(params)
+    if (wake.success)
+      void services.automationScheduler.wake()
+  }))
   const publicRun = (run: RunRecord) => toPublicRun(
     run,
     services.runInputs.findByRunId(run.id)?.reasoning ?? null,
@@ -540,6 +685,79 @@ function registerRuntimeHandlers(services: RuntimeServices): () => void {
     conversationId: request.conversationId,
     run: publicRun(run),
     runId: request.runId,
+  })
+
+  on('automations.preview', (params) => {
+    const input = parse(automationPreviewRequestSchema, params)
+    return previewAutomationSchedule(input, services.automationClock)
+  })
+  on('automations.list', (params) => {
+    const input = parse(automationRequestSchemas.list, params)
+    return services.automationService.list(input)
+  })
+  on('automations.get', (params) => {
+    const input = parse(automationRequestSchemas.get, params)
+    const automation = services.automationService.get(input.automationId)
+    if (!automation)
+      throw new BuddyServiceError('AUTOMATION_NOT_FOUND')
+    return automation
+  })
+  on('automations.create', (params) => {
+    const automation = services.automationService.create(
+      parse(automationMutationRequestSchemas.create, params),
+    )
+    notifyAutomationChanged(services, automation.id)
+    return automation
+  })
+  on('automations.update', (params) => {
+    const automation = services.automationService.update(
+      parse(automationMutationRequestSchemas.update, params),
+    )
+    notifyAutomationChanged(services, automation.id)
+    return automation
+  })
+  on('automations.pause', (params) => {
+    const automation = services.automationService.pause(
+      parse(automationMutationRequestSchemas.pause, params),
+    )
+    notifyAutomationChanged(services, automation.id)
+    return automation
+  })
+  on('automations.resume', (params) => {
+    const automation = services.automationService.resume(
+      parse(automationMutationRequestSchemas.resume, params),
+    )
+    notifyAutomationChanged(services, automation.id)
+    return automation
+  })
+  on('automations.delete', (params) => {
+    const automation = services.automationService.delete(
+      parse(automationMutationRequestSchemas.delete, params),
+    )
+    notifyAutomationChanged(services, automation.id)
+    return automation
+  })
+  on('automations.runNow', (params) => {
+    const occurrence = services.automationService.runNow(
+      parse(automationMutationRequestSchemas.runNow, params),
+    )
+    notifyAutomationChanged(services, occurrence.automationId)
+    return occurrence
+  })
+  on('automations.listOccurrences', (params) => {
+    const input = parse(automationRequestSchemas.listOccurrences, params)
+    const page = services.automationService.listHistory(input)
+    return {
+      ...page,
+      items: page.items.map(occurrence => toAutomationOccurrenceView(services, occurrence)),
+    }
+  })
+  on('automations.deleteOccurrence', async (params) => {
+    const input = parse(automationRequestSchemas.deleteOccurrence, params)
+    const result = await services.automationOccurrenceLifecycle.deleteOccurrence(input.occurrenceId)
+    if (result.automationId)
+      notifyAutomationChanged(services, result.automationId)
+    return result.deleted
   })
 
   on('providers.list', async (params) => {
@@ -580,18 +798,21 @@ function registerRuntimeHandlers(services: RuntimeServices): () => void {
   on('providers.logout', async (params) => {
     const input = parse(z.object({ providerId: idSchema }).strict(), params)
     await services.providerService.logout(input.providerId)
+    blockPinnedAutomations(services, input.providerId)
     await services.sessions.invalidateAll()
     return ok()
   })
   on('providers.clearCredential', async (params) => {
     const input = parse(z.object({ providerId: idSchema }).strict(), params)
     await services.providerService.clearCredential(input.providerId)
+    blockPinnedAutomations(services, input.providerId)
     await services.sessions.invalidateAll()
     return ok()
   })
   on('providers.remove', async (params) => {
     const input = parse(z.object({ providerId: idSchema }).strict(), params)
     await services.providerService.removeProvider(input.providerId)
+    blockPinnedAutomations(services, input.providerId)
     await services.sessions.invalidateAll()
     return ok()
   })
@@ -601,6 +822,8 @@ function registerRuntimeHandlers(services: RuntimeServices): () => void {
       input.providerId,
       input.enabled,
     )
+    if (!input.enabled)
+      blockPinnedAutomations(services, input.providerId)
     await services.sessions.invalidateAll()
     return provider
   })
@@ -615,6 +838,8 @@ function registerRuntimeHandlers(services: RuntimeServices): () => void {
       input.modelId,
       input.enabled,
     )
+    if (!input.enabled)
+      blockPinnedAutomations(services, input.providerId, input.modelId)
     await services.sessions.invalidateAll()
     return toLocalRuntimeModelOption(services.providerService, model)
   })
@@ -651,6 +876,10 @@ function registerRuntimeHandlers(services: RuntimeServices): () => void {
   on('providers.syncModels', async (params) => {
     const input = parse(z.object({ providerId: idSchema }).strict(), params)
     const models = await services.providerService.syncModels(input.providerId)
+    for (const model of models) {
+      if (!model.enabled || !model.available)
+        blockPinnedAutomations(services, model.providerId, model.id)
+    }
     return models.map(model => toLocalRuntimeModelOption(services.providerService, model))
   })
   on('providers.upsertManualModel', async (params) => {
@@ -712,6 +941,10 @@ function registerRuntimeHandlers(services: RuntimeServices): () => void {
     const input = parse(z.object({ projectId: idSchema }).strict(), params)
     const current = requireActiveProject(services.projectsRepository.findById(input.projectId))
     await services.projectService.delete(input.projectId)
+    notifyAutomationsChanged(
+      services,
+      services.automationService.blockProject(input.projectId),
+    )
     await services.sessions.invalidateRoot(current.canonicalRoot)
     return ok()
   })
@@ -846,9 +1079,16 @@ function registerRuntimeHandlers(services: RuntimeServices): () => void {
           service: services.petService,
         }),
         createSystemExtension({ service: systemCapability }),
+        createAutomationExtension({
+          onChanged: automationId => notifyAutomationChanged(services, automationId),
+          service: services.automationService,
+        }),
         createToolPolicyExtension({
           approvalService: services.approvalService,
-          classifyTool: event => classifySystemTool(
+          classifyTool: event => classifyAutomationToolCall(
+            services.automationService,
+            event,
+          ) ?? classifySystemTool(
             systemCapability,
             event.toolName,
             event.input,
@@ -905,6 +1145,13 @@ function registerRuntimeHandlers(services: RuntimeServices): () => void {
     const input = parse(z.object({ limit: limitSchema }).strict(), params)
     return services.conversations.listRecent(input.limit ?? 100)
   })
+  on('conversations.get', (params) => {
+    const input = parse(z.object({ conversationId: idSchema }).strict(), params)
+    return requireValue(
+      services.conversations.findById(input.conversationId),
+      'VALIDATION_FAILED',
+    )
+  })
   on('conversations.rename', (params) => {
     const input = parse(z.object({
       conversationId: idSchema,
@@ -939,7 +1186,12 @@ function registerRuntimeHandlers(services: RuntimeServices): () => void {
   })
   on('conversations.delete', async (params) => {
     const input = parse(z.object({ conversationId: idSchema }).strict(), params)
-    return services.conversationLifecycle.delete(input.conversationId)
+    const result = await services.automationOccurrenceLifecycle.deleteConversation(
+      input.conversationId,
+    )
+    if (result.automationId)
+      notifyAutomationChanged(services, result.automationId)
+    return result.deleted
   })
   on('conversations.activateBranch', (params) => {
     const input = parse(z.object({
@@ -1344,7 +1596,7 @@ function registerRuntimeHandlers(services: RuntimeServices): () => void {
       )
     }
     const preparedRun = requireValue(services.runs.findById(prepared.runId), 'VALIDATION_FAILED')
-    const turn = services.runner.startTurn({
+    const turn = services.turnLauncher.startTurn({
       branchId: prepared.branchId,
       canonicalRoot,
       conversationId: prepared.conversationId,
@@ -1357,6 +1609,7 @@ function registerRuntimeHandlers(services: RuntimeServices): () => void {
       provider: preparedRun.provider,
       resources,
       runId: prepared.runId,
+      sessionMode: 'interactive',
       serviceTier: replayInput ? replayInput.serviceTier : selection.serviceTier,
       thinkingLevel,
     })
@@ -1486,7 +1739,7 @@ function registerRuntimeHandlers(services: RuntimeServices): () => void {
       services.runs.findById(prepared.runId),
       'VALIDATION_FAILED',
     )
-    const turn = services.runner.startTurn({
+    const turn = services.turnLauncher.startTurn({
       branchId: prepared.branchId,
       canonicalRoot,
       conversationId: prepared.conversationId,
@@ -1499,6 +1752,7 @@ function registerRuntimeHandlers(services: RuntimeServices): () => void {
       provider: preparedRun.provider,
       resources,
       runId: prepared.runId,
+      sessionMode: 'interactive',
       serviceTier: replayInput ? replayInput.serviceTier : selection.serviceTier,
       thinkingLevel,
     })
@@ -1608,7 +1862,7 @@ function registerRuntimeHandlers(services: RuntimeServices): () => void {
       services.runInputs.findByRunId(prepared.runId),
       'VALIDATION_FAILED',
     )
-    const turn = services.runner.startTurn({
+    const turn = services.turnLauncher.startTurn({
       branchId: prepared.branchId,
       canonicalRoot,
       conversationId: prepared.conversationId,
@@ -1621,6 +1875,7 @@ function registerRuntimeHandlers(services: RuntimeServices): () => void {
       provider: preparedRun.provider,
       resources,
       runId: prepared.runId,
+      sessionMode: 'interactive',
       serviceTier: preparedInput.serviceTier,
       thinkingLevel: normalizeThinkingLevel(preparedInput.reasoning),
     })
@@ -1784,6 +2039,53 @@ async function resolveModelSelection(
   throw new BuddyServiceError('AUTHENTICATION_REQUIRED')
 }
 
+async function resolveAutomationModel(
+  providers: Awaited<ReturnType<typeof createProviderService>>,
+  target: AutomationModelTarget,
+): Promise<ResolvedAutomationModel | null> {
+  const selected = target.mode === 'pinned'
+    ? {
+        modelId: target.modelId,
+        providerId: target.providerId,
+        reasoning: target.reasoning,
+      }
+    : await providers.getDefaultModel()
+  if (!selected)
+    return null
+  try {
+    const model = await assertRequestedModelAvailable(
+      providers,
+      await providers.listProviders(),
+      selected,
+    )
+    if (
+      selected.reasoning !== null
+      && !getSupportedThinkingLevels(model).includes(selected.reasoning)
+    ) {
+      return null
+    }
+    return {
+      contextWindow: model.contextWindow,
+      maxTokens: model.maxTokens,
+      modelId: selected.modelId,
+      providerId: selected.providerId,
+      reasoning: selected.reasoning,
+    }
+  }
+  catch {
+    return null
+  }
+}
+
+function toResolvedAutomationProject(project: ProjectRecord) {
+  return {
+    canonicalRoot: project.canonicalRoot,
+    id: project.id,
+    instructions: project.instructions,
+    memoryScope: project.memoryScope,
+  }
+}
+
 async function assertRequestedModelAvailable(
   providers: Awaited<ReturnType<typeof createProviderService>>,
   available: Awaited<ReturnType<typeof providers.listProviders>>,
@@ -1930,8 +2232,124 @@ function toPublicRun(run: RunRecord, reasoningLevel: string | null) {
   }
 }
 
+function notifyAutomationChanged(services: RuntimeServices, automationId: string): void {
+  services.rpc.notify('automation.changed', { automationId })
+  void services.automationScheduler.wake()
+}
+
+function notifyAutomationsChanged(
+  services: RuntimeServices,
+  automations: readonly Automation[],
+): void {
+  if (automations.length === 0)
+    return
+  for (const automation of automations)
+    services.rpc.notify('automation.changed', { automationId: automation.id })
+  void services.automationScheduler.wake()
+}
+
+function blockPinnedAutomations(
+  services: RuntimeServices,
+  providerId: string,
+  modelId?: string,
+): void {
+  notifyAutomationsChanged(
+    services,
+    services.automationService.blockPinnedModel(providerId, modelId),
+  )
+}
+
+function reconcileAutomationDependencies(input: {
+  automationService: AutomationService
+  projectsRepository: ReturnType<typeof createProjectRepository>
+  providersRepository: ReturnType<typeof createProviderRepository>
+}): Automation[] {
+  const active: Automation[] = []
+  let cursor: string | null = null
+  do {
+    const page = input.automationService.list({
+      cursor,
+      limit: 100,
+      statuses: ['active'],
+    })
+    active.push(...page.items)
+    cursor = page.nextCursor
+  } while (cursor)
+
+  const blocked = new Map<string, Automation>()
+  for (const automation of active) {
+    if (automation.projectId) {
+      const project = input.projectsRepository.findById(automation.projectId)
+      if (!project || project.revokedAt) {
+        for (const item of input.automationService.blockProject(automation.projectId))
+          blocked.set(item.id, item)
+        continue
+      }
+    }
+    if (automation.model.mode !== 'pinned')
+      continue
+    const provider = input.providersRepository.findState(automation.model.providerId)
+    const model = input.providersRepository.findModelState(
+      automation.model.providerId,
+      automation.model.modelId,
+    )
+    if (!provider?.enabled || !model?.enabled || !model.available) {
+      for (const item of input.automationService.blockPinnedModel(
+        automation.model.providerId,
+        automation.model.modelId,
+      )) {
+        blocked.set(item.id, item)
+      }
+    }
+  }
+  return [...blocked.values()]
+}
+
+function toAutomationOccurrenceView(
+  services: RuntimeServices,
+  occurrence: AutomationOccurrenceRecord,
+) {
+  const run = occurrence.runId ? services.runs.findById(occurrence.runId) : null
+  const pendingApprovalCount = run
+    ? services.approvalsRepository.listPending(run.id).length
+    : 0
+  const effectiveStatus = run
+    ? pendingApprovalCount > 0 && ['queued', 'running'].includes(run.status)
+      ? 'awaiting_approval' as const
+      : run.status
+    : occurrence.status === 'bound' ? 'queued' : occurrence.status
+  return {
+    automationId: occurrence.automationId,
+    automationName: occurrence.executionSnapshot.name,
+    automationRevision: occurrence.automationRevision,
+    boundAt: occurrence.boundAt,
+    coalescedMissedCount: occurrence.coalescedMissedCount,
+    conversationId: occurrence.conversationId,
+    effectiveStatus,
+    errorCode: occurrence.errorCode,
+    errorSummary: occurrence.errorSummary,
+    finishedAt: occurrence.finishedAt,
+    id: occurrence.id,
+    pendingApprovalCount,
+    queuedAt: occurrence.queuedAt,
+    run: run
+      ? {
+          completedAt: run.completedAt,
+          errorCode: run.errorCode,
+          startedAt: run.startedAt,
+          status: run.status,
+        }
+      : null,
+    runId: occurrence.runId,
+    scheduledFor: occurrence.scheduledFor,
+    status: occurrence.status,
+    triggerKind: occurrence.triggerKind,
+  }
+}
+
 function toPublicApproval(approval: ApprovalRecord) {
-  const kind = new Set(['delete', 'mcp', 'network', 'shell', 'system']).has(approval.kind)
+  const kind = new Set(['automation', 'delete', 'mcp', 'network', 'shell', 'system'])
+    .has(approval.kind)
     ? approval.kind
     : 'system'
   return { ...approval, kind }

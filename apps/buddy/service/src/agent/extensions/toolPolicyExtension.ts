@@ -2,11 +2,15 @@ import type {
   ToolCallEvent,
   ToolCallEventResult,
 } from '@earendil-works/pi-coding-agent'
-import type { SystemActionApprovalReviewInput } from '../../../../shared/approvalReviewPayload'
+import type {
+  AutomationApprovalReviewInput,
+  SystemActionApprovalReviewInput,
+} from '../../../../shared/approvalReviewPayload'
 import type { BuddyExecutionProfile } from '../../../../shared/executionProfile'
 import type { BuddyServiceTier } from '../../../../shared/modelSelection'
 
 import type {
+  ToolApprovalKind,
   ToolPolicyPath,
   ToolRisk,
 } from '../../approvals/ToolPolicy'
@@ -21,7 +25,8 @@ const BUILTIN_TOOLS = new Set(['bash', 'edit', 'find', 'grep', 'ls', 'read', 'wr
 export interface ToolApprovalGateway {
   request: (input: {
     arguments: unknown
-    kind: 'delete' | 'mcp' | 'network' | 'shell' | 'system'
+    automation?: AutomationApprovalReviewInput
+    kind: ToolApprovalKind
     runId: string
     signal: AbortSignal
     summary: string
@@ -33,9 +38,12 @@ export interface ToolApprovalGateway {
 
 export interface BuddyToolClassification {
   approval?: {
+    automation?: AutomationApprovalReviewInput
+    kind?: ToolApprovalKind
     summary: string
-    systemAction: SystemActionApprovalReviewInput
+    systemAction?: SystemActionApprovalReviewInput
   }
+  alwaysConfirm?: boolean
   origin?: 'builtin' | 'first-party' | 'mcp'
   paths?: readonly ToolPolicyPath[]
   resource?: { kind?: 'connector' | 'project', projectId: string, trusted: boolean }
@@ -76,9 +84,20 @@ async function decideToolCall(
   event: ToolCallEvent,
 ): Promise<ToolCallEventResult | void> {
   try {
+    const declared = options.classifyTool?.(event) ?? {}
+    if (declared.alwaysConfirm) {
+      const approval = declared.approval
+      if (!approval?.kind)
+        return block('VALIDATION_FAILED')
+      return requestApproval(options, event, {
+        automation: approval.automation,
+        kind: approval.kind,
+        summary: approval.summary,
+        systemAction: approval.systemAction,
+      })
+    }
     if (options.executionProfile === 'full_access')
       return
-    const declared = options.classifyTool?.(event) ?? {}
     const decision = await toolPolicy.decide({
       arguments: event.input,
       cwd: options.cwd,
@@ -94,24 +113,43 @@ async function decideToolCall(
     if (decision.type === 'deny')
       return block(decision.code)
 
-    const run = options.getRunContext()
-    if (!run)
-      return block('RUN_CONTEXT_UNAVAILABLE')
-    const approval = await options.approvalService.request({
-      arguments: event.input,
+    return requestApproval(options, event, {
+      automation: declared.approval?.automation,
       kind: decision.kind,
-      runId: run.runId,
-      signal: run.signal,
       summary: declared.approval?.summary ?? decision.summary,
       systemAction: declared.approval?.systemAction,
-      toolCallId: event.toolCallId,
-      toolName: event.toolName,
     })
-    return approval === 'approved' ? undefined : block('APPROVAL_DENIED')
   }
   catch (error) {
     return block(readBlockedToolReason(error))
   }
+}
+
+async function requestApproval(
+  options: CreateToolPolicyExtensionOptions,
+  event: ToolCallEvent,
+  review: {
+    automation?: AutomationApprovalReviewInput
+    kind: ToolApprovalKind
+    summary: string
+    systemAction?: SystemActionApprovalReviewInput
+  },
+): Promise<ToolCallEventResult | void> {
+  const run = options.getRunContext()
+  if (!run)
+    return block('RUN_CONTEXT_UNAVAILABLE')
+  const approval = await options.approvalService.request({
+    arguments: event.input,
+    automation: review.automation,
+    kind: review.kind,
+    runId: run.runId,
+    signal: run.signal,
+    summary: review.summary,
+    systemAction: review.systemAction,
+    toolCallId: event.toolCallId,
+    toolName: event.toolName,
+  })
+  return approval === 'approved' ? undefined : block('APPROVAL_DENIED')
 }
 
 function block(reason: string): ToolCallEventResult {
@@ -132,6 +170,10 @@ function readStableErrorCode(error: unknown): string {
     return 'TOOL_POLICY_FAILED'
   if (new Set([
     'APPROVAL_CANCELLED',
+    'AUTOMATION_CONFLICT',
+    'AUTOMATION_APPROVAL_EXPIRED',
+    'AUTOMATION_INVALID_SCHEDULE',
+    'AUTOMATION_NOT_FOUND',
     'INVALID_PATH',
     'PATH_NOT_FOUND',
     'PATH_OUTSIDE_GRANTED_DIRECTORY',

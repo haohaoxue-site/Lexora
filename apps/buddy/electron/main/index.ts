@@ -1,9 +1,20 @@
+import type { AutomationStartupContext } from '../../shared/automation'
 import type { LexoraConfig } from '../shared/desktopApi'
 import { mkdirSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import process from 'node:process'
-import { app, crashReporter, Menu, nativeTheme, net, Notification, screen, shell } from 'electron'
+import {
+  app,
+  crashReporter,
+  Menu,
+  nativeTheme,
+  net,
+  Notification,
+  powerMonitor,
+  screen,
+  shell,
+} from 'electron'
 import buddyPackage from '../../package.json'
 import { DESKTOP_IPC_CHANNELS } from '../shared/desktopApi'
 import { installAttachmentProtocol, registerAttachmentSchemePrivileges } from './attachmentProtocol'
@@ -34,7 +45,10 @@ import {
 } from './pet/NativePetSupervisor'
 import { registerPetHostRpc } from './pet/registerPetHostRpc'
 import { installRendererProtocol, registerRendererSchemePrivileges } from './rendererProtocol'
-import { createBuddyServiceEnvironment } from './runtime/buddyServiceEnvironment'
+import {
+  createBuddyServiceEnvironment,
+  resolveBuddyServiceStartupContext,
+} from './runtime/buddyServiceEnvironment'
 import { forkBuddyServiceProcess } from './runtime/buddyServiceProcess'
 import { BuddyServiceSupervisor } from './runtime/BuddyServiceSupervisor'
 import { RuntimeRecoveryService } from './runtime/RuntimeRecoveryService'
@@ -52,6 +66,8 @@ let runtimeRecoveryService: RuntimeRecoveryService | null = null
 let stopLocalChatIpc: (() => void) | null = null
 let stopBuddyServiceNotification: (() => void) | null = null
 let stopRuntimeStateSubscription: (() => void) | null = null
+let stopRuntimeRecoverySubscription: (() => void) | null = null
+let stopSchedulerWakeSubscription: (() => void) | null = null
 let stopAttachmentProtocol: (() => void) | null = null
 let stopRendererProtocol: (() => void) | null = null
 let desktopTray: ReturnType<typeof createDesktopTray> | null = null
@@ -156,6 +172,10 @@ else {
       ? join(process.resourcesPath, 'service', 'resources', 'skills')
       : join(app.getAppPath(), 'service', 'resources', 'skills')
     let isRuntimeReplacementBlocked = () => false
+    let automationStartupContext: AutomationStartupContext = {
+      reason: 'normal',
+      restoreToken: null,
+    }
     const service = new BuddyServiceSupervisor({
       bindPeer(peer) {
         const disposers = [
@@ -168,7 +188,7 @@ else {
       isReplacementBlocked: () => isRuntimeReplacementBlocked(),
       spawnService: onFatalError => forkBuddyServiceProcess({
         env: {
-          ...createBuddyServiceEnvironment(process.env, buddyHome),
+          ...createBuddyServiceEnvironment(process.env, buddyHome, automationStartupContext),
           LEXORA_BUDDY_SKILLS_DIR: builtinSkillsDirectory,
         },
         onFatalError,
@@ -184,8 +204,24 @@ else {
     })
     runtimeRecoveryService = runtimeRecovery
     isRuntimeReplacementBlocked = () => runtimeRecovery.isDataMutationInProgress
+    stopRuntimeRecoverySubscription = runtimeRecovery.onDataOperationChange((operation) => {
+      if (operation.kind !== 'restore' || operation.status !== 'completed')
+        return
+      automationStartupContext = resolveBuddyServiceStartupContext(
+        runtimeRecovery.getDataRecoveryReceipt(),
+      )
+    })
+    const wakeOnResume = () => service.notify('scheduler.wake', { reason: 'resume' })
+    const wakeOnUnlock = () => service.notify('scheduler.wake', { reason: 'unlock-screen' })
+    powerMonitor.on('resume', wakeOnResume)
+    powerMonitor.on('unlock-screen', wakeOnUnlock)
+    stopSchedulerWakeSubscription = () => {
+      powerMonitor.off('resume', wakeOnResume)
+      powerMonitor.off('unlock-screen', wakeOnUnlock)
+    }
     try {
-      await runtimeRecovery.reconcileInterruptedDataOperations()
+      const recoveryReceipt = await runtimeRecovery.reconcileInterruptedDataOperations()
+      automationStartupContext = resolveBuddyServiceStartupContext(recoveryReceipt)
       service.start()
     }
     catch (error) {
@@ -383,6 +419,8 @@ else {
     stopRendererProtocol?.()
     stopBuddyServiceNotification?.()
     stopRuntimeStateSubscription?.()
+    stopRuntimeRecoverySubscription?.()
+    stopSchedulerWakeSubscription?.()
     await nativePetSupervisor?.stop()
     await runtimeRecoveryService?.shutdown()
     await buddyServiceSupervisor?.stop()
@@ -404,6 +442,10 @@ function quitLexora(): Promise<void> {
     stopBuddyServiceNotification = null
     stopRuntimeStateSubscription?.()
     stopRuntimeStateSubscription = null
+    stopRuntimeRecoverySubscription?.()
+    stopRuntimeRecoverySubscription = null
+    stopSchedulerWakeSubscription?.()
+    stopSchedulerWakeSubscription = null
     stopAttachmentProtocol?.()
     stopAttachmentProtocol = null
     stopRendererProtocol?.()

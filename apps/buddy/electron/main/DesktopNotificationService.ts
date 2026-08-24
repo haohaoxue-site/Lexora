@@ -73,14 +73,13 @@ export class DesktopNotificationService {
     const run = localChatResponseSchemas.run.parse(
       await this.#options.request('runs.get', { runId: event.data.runId }),
     )
-    const conversations = localChatResponseSchemas.conversations.parse(
-      await this.#options.request('conversations.list', { limit: 500 }),
+    const conversation = localChatResponseSchemas.conversation.parse(
+      await this.#options.request('conversations.get', { conversationId: run.conversationId }),
     )
     const labels = BODY_LABELS[this.#options.getLanguage()]
-    const conversation = conversations.find(item => item.id === run.conversationId)
     const systemNotification = this.#options.createNotification({
       body: labels[event.data.type as keyof Omit<typeof labels, 'untitled'>],
-      title: conversation?.title?.trim() || labels.untitled,
+      title: conversation.title?.trim() || labels.untitled,
     })
     systemNotification.onClick(() => {
       void this.#options.openTarget({

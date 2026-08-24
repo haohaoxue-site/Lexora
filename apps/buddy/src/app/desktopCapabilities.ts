@@ -1,13 +1,16 @@
 import type { LexoraDesktopApi } from '@buddy-electron/shared/desktopApi'
 import type { DesktopStores } from '@/app/useDesktopAppState'
+import type { AutomationCapability } from '@/workbenches/automations/useAutomationCapability'
 import type { ChatCapability } from '@/workbenches/chat/state/useChatCapability'
 import type { DesktopDataSettingsCapability } from '@/workbenches/settings/data/desktopDataSettingsCapability'
 import type { DesktopLocalSettingsCapability } from '@/workbenches/settings/local/desktopLocalSettingsCapability'
+import { useAutomationCapability } from '@/workbenches/automations/useAutomationCapability'
 import { createDesktopDataSettingsCapability } from '@/workbenches/settings/data/desktopDataSettingsCapability'
 import { createDesktopLocalSettingsCapability } from '@/workbenches/settings/local/desktopLocalSettingsCapability'
 
 export interface DesktopCapabilities {
   applicationSettings: DesktopStores['applicationSettings']
+  automations: AutomationCapability
   chat: ChatCapability
   dataSettings: DesktopDataSettingsCapability
   localSettings: DesktopLocalSettingsCapability
@@ -27,6 +30,10 @@ export function createDesktopCapabilities(
   const { stores } = input
   return {
     applicationSettings: stores.applicationSettings,
+    automations: useAutomationCapability({
+      api: input.api.localChat,
+      language: stores.applicationSettings.language,
+    }),
     chat: input.chat,
     dataSettings: createDesktopDataSettingsCapability({
       api: input.api.localChat,

@@ -3,6 +3,7 @@ import { join } from 'node:path'
 import process from 'node:process'
 import { toPublicRunEvent } from '../../shared/publicRunEvent'
 import { buddyServiceFailureCodeSchema } from '../../shared/runtimeProtocol'
+import { readAutomationStartupContext } from './automations/automationStartupContext'
 import { startBuddyService } from './BuddyService'
 import { RunEventLog, RunEventLogFatalError } from './events/RunEventLog'
 import {
@@ -106,6 +107,7 @@ async function runBuddyService(): Promise<void> {
     })
     await eventLog.replayAll()
     serviceHandle = await startBuddyService({
+      automationStartupContext: readAutomationStartupContext(process.env),
       buddyHome,
       builtinSkillsDirectory,
       database: openedDatabase,

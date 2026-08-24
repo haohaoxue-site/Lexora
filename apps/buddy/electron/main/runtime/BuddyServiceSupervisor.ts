@@ -154,6 +154,14 @@ export class BuddyServiceSupervisor {
     return () => this.#notificationListeners.delete(listener)
   }
 
+  notify(method: string, params: unknown): boolean {
+    const generation = this.#generation
+    if (!generation?.ready)
+      return false
+    generation.peer.notify(method, params)
+    return true
+  }
+
   async restart(): Promise<void> {
     if (this.#isReplacementBlocked())
       throw new BuddyServiceUnavailableError()

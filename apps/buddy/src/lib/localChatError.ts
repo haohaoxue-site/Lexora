@@ -14,6 +14,9 @@ export function resolveLocalChatErrorMessage(error: unknown, language: BuddyLoca
 
   const keys = {
     APPROVAL_REQUIRED: 'desktop.error.approvalRequired',
+    AUTOMATION_CONFLICT: 'desktop.error.automationConflict',
+    AUTOMATION_INVALID_SCHEDULE: 'desktop.error.automationInvalidSchedule',
+    AUTOMATION_NOT_FOUND: 'desktop.error.automationNotFound',
     AUTHENTICATION_REQUIRED: 'desktop.error.authenticationRequired',
     CONNECTOR_UNAVAILABLE: 'desktop.error.connectorUnavailable',
     CREDENTIAL_STORE_UNAVAILABLE: 'desktop.error.credentialStore',

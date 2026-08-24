@@ -61,6 +61,7 @@ export function useDesktopAppState(options: UseDesktopAppStateOptions) {
 
   function dispose() {
     modelProviders.dispose()
+    notifications.dispose()
     runtimeRecovery.dispose()
     runtimeSupervisor.dispose()
   }

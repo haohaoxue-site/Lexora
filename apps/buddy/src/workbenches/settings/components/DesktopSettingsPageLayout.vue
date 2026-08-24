@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { NScrollbar } from 'naive-ui'
+
 defineSlots<{
   actions?: () => unknown
   default: () => unknown
@@ -21,11 +23,11 @@ defineSlots<{
       </div>
     </header>
 
-    <div class="desktop-settings-page__scroll">
+    <NScrollbar class="desktop-settings-page__scroll">
       <div class="desktop-settings-page__content">
         <slot />
       </div>
-    </div>
+    </NScrollbar>
   </section>
 </template>
 
@@ -84,8 +86,6 @@ defineSlots<{
 .desktop-settings-page__scroll {
   min-height: 0;
   flex: 1;
-  overflow: auto;
-  padding: clamp(1.4rem, 3vw, 2.8rem);
 }
 
 .desktop-settings-page__content {
@@ -93,6 +93,6 @@ defineSlots<{
   width: min(100%, 64rem);
   gap: 1.8rem;
   margin: 0 auto;
-  padding-bottom: 3rem;
+  padding: clamp(1.4rem, 3vw, 2.8rem) clamp(1.4rem, 3vw, 2.8rem) 3rem;
 }
 </style>

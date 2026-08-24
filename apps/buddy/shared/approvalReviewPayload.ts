@@ -1,5 +1,10 @@
 import { z } from 'zod'
 
+import {
+  BUDDY_DEFAULT_EXECUTION_PROFILE,
+  BUDDY_EXECUTION_PROFILES,
+} from './executionProfile'
+
 const MAX_COMMAND_SOURCE_LENGTH = 16 * 1024
 const MAX_COMMAND_REVIEW_LENGTH = 4 * 1024
 const MAX_ARGUMENT_NAMES = 32
@@ -19,6 +24,14 @@ const systemActionTargetSchema = z.object({
   startedAt: z.iso.datetime().optional(),
   unit: z.string().trim().min(1).max(256).optional(),
 }).strict()
+
+const automationOperationSchema = z.enum([
+  'upsert',
+  'pause',
+  'resume',
+  'delete',
+  'run_now',
+])
 
 export const approvalReviewPayloadSchema = z.discriminatedUnion('card', [
   z.object({
@@ -46,10 +59,30 @@ export const approvalReviewPayloadSchema = z.discriminatedUnion('card', [
     target: systemActionTargetSchema,
     toolName: toolNameSchema,
   }).strict(),
+  z.object({
+    card: z.literal('automation'),
+    executionProfile: z.enum(BUDDY_EXECUTION_PROFILES).default(BUDDY_DEFAULT_EXECUTION_PROFILE),
+    modelMode: z.string().trim().min(1).max(512),
+    name: z.string().trim().min(1).max(80),
+    operation: automationOperationSchema,
+    projectId: z.string().trim().min(1).max(256).nullable(),
+    promptSummary: z.string().trim().min(1).max(512),
+    scheduleSummary: z.string().trim().min(1).max(512),
+    timezone: z.string().trim().min(1).max(256),
+    toolName: toolNameSchema,
+  }).strict(),
 ])
 
 export type ApprovalReviewPayload = z.infer<typeof approvalReviewPayloadSchema>
-export type ApprovalReviewKind = 'delete' | 'mcp' | 'network' | 'shell' | 'system'
+export type ApprovalReviewKind = 'automation' | 'delete' | 'mcp' | 'network' | 'shell' | 'system'
+export type AutomationApprovalReview = Extract<
+  ApprovalReviewPayload,
+  { card: 'automation' }
+>
+export type AutomationApprovalReviewInput = Omit<
+  AutomationApprovalReview,
+  'card' | 'toolName'
+>
 export type SystemActionApprovalReview = Extract<
   ApprovalReviewPayload,
   { card: 'system-action' }
@@ -61,6 +94,7 @@ export type SystemActionApprovalReviewInput = Omit<
 
 export interface CreateApprovalReviewPayloadInput {
   arguments: unknown
+  automation?: AutomationApprovalReviewInput
   kind: ApprovalReviewKind
   systemAction?: SystemActionApprovalReviewInput
   toolName: string
@@ -90,6 +124,13 @@ export function createApprovalReviewPayload(
       toolName: input.toolName,
     })
   }
+  if (input.kind === 'automation' && input.automation) {
+    return approvalReviewPayloadSchema.parse({
+      ...input.automation,
+      card: 'automation',
+      toolName: input.toolName,
+    })
+  }
   return approvalReviewPayloadSchema.parse({
     argumentNames: readArgumentNames(input.arguments),
     card: 'arguments',
@@ -107,6 +148,8 @@ export function approvalReviewPayloadMatchesKind(
     return payload.card === 'paths'
   if (kind === 'system')
     return payload.card === 'arguments' || payload.card === 'system-action'
+  if (kind === 'automation')
+    return payload.card === 'automation'
   return payload.card === 'arguments'
 }
 

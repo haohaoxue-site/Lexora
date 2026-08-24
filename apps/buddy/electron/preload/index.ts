@@ -23,6 +23,29 @@ function subscribe<T>(channel: string, listener: (value: T) => void): () => void
 }
 
 const localChatApi = Object.freeze<LocalChatApi>({
+  automations: Object.freeze({
+    create: input => ipcRenderer.invoke(LOCAL_CHAT_IPC_CHANNELS.automationsCreate, input),
+    delete: input => ipcRenderer.invoke(LOCAL_CHAT_IPC_CHANNELS.automationsDelete, input),
+    deleteOccurrence: occurrenceId => ipcRenderer.invoke(
+      LOCAL_CHAT_IPC_CHANNELS.automationsDeleteOccurrence,
+      { occurrenceId },
+    ),
+    get: automationId => ipcRenderer.invoke(
+      LOCAL_CHAT_IPC_CHANNELS.automationsGet,
+      { automationId },
+    ),
+    list: input => ipcRenderer.invoke(LOCAL_CHAT_IPC_CHANNELS.automationsList, input ?? {}),
+    listOccurrences: input => ipcRenderer.invoke(
+      LOCAL_CHAT_IPC_CHANNELS.automationsListOccurrences,
+      input ?? {},
+    ),
+    pause: input => ipcRenderer.invoke(LOCAL_CHAT_IPC_CHANNELS.automationsPause, input),
+    preview: input => ipcRenderer.invoke(LOCAL_CHAT_IPC_CHANNELS.automationsPreview, input),
+    resume: input => ipcRenderer.invoke(LOCAL_CHAT_IPC_CHANNELS.automationsResume, input),
+    runNow: input => ipcRenderer.invoke(LOCAL_CHAT_IPC_CHANNELS.automationsRunNow, input),
+    update: input => ipcRenderer.invoke(LOCAL_CHAT_IPC_CHANNELS.automationsUpdate, input),
+    onChanged: listener => subscribe<string>(LOCAL_CHAT_IPC_CHANNELS.automationChanged, listener),
+  }),
   runtime: Object.freeze({
     cancelDataOperation: operationId => ipcRenderer.invoke(
       LOCAL_CHAT_IPC_CHANNELS.runtimeCancelDataOperation,
@@ -164,6 +187,10 @@ const localChatApi = Object.freeze<LocalChatApi>({
   }),
   conversations: Object.freeze({
     list: limit => ipcRenderer.invoke(LOCAL_CHAT_IPC_CHANNELS.conversationsList, { limit }),
+    get: conversationId => ipcRenderer.invoke(
+      LOCAL_CHAT_IPC_CHANNELS.conversationsGet,
+      { conversationId },
+    ),
     delete: conversationId =>
       ipcRenderer.invoke(LOCAL_CHAT_IPC_CHANNELS.conversationsDelete, { conversationId }),
     activateBranch: input =>
