@@ -1,5 +1,6 @@
 import type { LexoraConfigPatch } from './desktopApi'
 import { z } from 'zod'
+import { DESKTOP_CHAT_WELCOME_VARIANT_IDS } from './desktopApi'
 
 const chatSidebarPinnedItemSchema = z.discriminatedUnion('kind', [
   z.object({ id: z.string().min(1).max(128), kind: z.literal('conversation') }).strict(),
@@ -38,6 +39,7 @@ export const lexoraConfigPatchSchema: z.ZodType<LexoraConfigPatch> = z.object({
     notifyWhenFocused: z.boolean().optional(),
     sidebarCollapsed: z.boolean().optional(),
     theme: z.enum(['system', 'light', 'dark']).optional(),
+    welcomeVariant: z.enum(['random', ...DESKTOP_CHAT_WELCOME_VARIANT_IDS]).optional(),
   }).strict().optional(),
   pet: z.object({
     alwaysOnTop: z.boolean().optional(),

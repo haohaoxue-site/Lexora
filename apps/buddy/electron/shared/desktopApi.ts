@@ -49,6 +49,16 @@ export interface DesktopChatPinnedItem {
   kind: 'conversation' | 'project'
 }
 
+export const DESKTOP_CHAT_WELCOME_VARIANT_IDS = [
+  'writing',
+  'planning',
+  'orchestrating',
+  'listening',
+] as const
+
+export type DesktopChatWelcomeVariantId = typeof DESKTOP_CHAT_WELCOME_VARIANT_IDS[number]
+export type DesktopChatWelcomePreference = 'random' | DesktopChatWelcomeVariantId
+
 export interface LexoraConfig {
   desktop: {
     backgroundCloseNoticeShown: boolean
@@ -60,6 +70,7 @@ export interface LexoraConfig {
     notifyWhenFocused: boolean
     sidebarCollapsed: boolean
     theme: 'system' | 'light' | 'dark'
+    welcomeVariant: DesktopChatWelcomePreference
   }
   pet: {
     alwaysOnTop: boolean

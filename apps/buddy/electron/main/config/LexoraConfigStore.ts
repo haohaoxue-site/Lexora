@@ -6,6 +6,7 @@ import { dirname } from 'node:path'
 import process from 'node:process'
 import { parse, stringify } from 'smol-toml'
 import { z } from 'zod'
+import { DESKTOP_CHAT_WELCOME_VARIANT_IDS } from '../../shared/desktopApi'
 
 const chatSidebarPinnedItemSchema = z.discriminatedUnion('kind', [
   z.object({ id: z.string().min(1).max(128), kind: z.literal('conversation') }).strict(),
@@ -25,6 +26,7 @@ const desktopConfigSchema = z.object({
   notify_when_focused: z.boolean().default(false),
   sidebar_collapsed: z.boolean().default(false),
   theme: z.enum(['system', 'light', 'dark']).default('system'),
+  welcome_variant: z.enum(['random', ...DESKTOP_CHAT_WELCOME_VARIANT_IDS]).default('random'),
 }).passthrough().default({
   background_close_notice_shown: false,
   chat_sidebar_pinned_items: [],
@@ -35,6 +37,7 @@ const desktopConfigSchema = z.object({
   notify_when_focused: false,
   sidebar_collapsed: false,
   theme: 'system',
+  welcome_variant: 'random',
 })
 
 const petConfigSchema = z.object({
@@ -153,6 +156,7 @@ function decodeConfig(value: unknown): LexoraConfig {
       notifyWhenFocused: config.desktop.notify_when_focused,
       sidebarCollapsed: config.desktop.sidebar_collapsed,
       theme: config.desktop.theme,
+      welcomeVariant: config.desktop.welcome_variant,
     },
     pet: {
       alwaysOnTop: config.pet.always_on_top,
@@ -174,6 +178,7 @@ function encodeConfig(config: LexoraConfig) {
       notify_when_focused: config.desktop.notifyWhenFocused,
       sidebar_collapsed: config.desktop.sidebarCollapsed,
       theme: config.desktop.theme,
+      welcome_variant: config.desktop.welcomeVariant,
     },
     pet: {
       always_on_top: config.pet.alwaysOnTop,

@@ -1,3 +1,7 @@
+import type {
+  DesktopChatWelcomePreference,
+  DesktopChatWelcomeVariantId,
+} from '@buddy-electron/shared/desktopApi'
 import type { BuddyI18nKey } from '@/i18n/buddyI18n'
 import listeningIllustrationUrl from '@/assets/chat-welcome/listening.webp'
 import orchestratingIllustrationUrl from '@/assets/chat-welcome/orchestrating.webp'
@@ -9,12 +13,6 @@ export type DesktopChatWelcomeDecoration
     | 'orbit-arc'
     | 'trailing-star'
     | 'underline-star'
-
-export type DesktopChatWelcomeVariantId
-  = | 'listening'
-    | 'orchestrating'
-    | 'planning'
-    | 'writing'
 
 export interface DesktopChatWelcomeVariant {
   decoration: DesktopChatWelcomeDecoration
@@ -50,7 +48,13 @@ export const DESKTOP_CHAT_WELCOME_VARIANTS = [
   },
 ] as const satisfies ReadonlyArray<DesktopChatWelcomeVariant>
 
-export function selectDesktopChatWelcomeVariant(randomUnit = Math.random()) {
+export function selectDesktopChatWelcomeVariant(
+  preference: DesktopChatWelcomePreference,
+  randomUnit = Math.random(),
+) {
+  if (preference !== 'random')
+    return DESKTOP_CHAT_WELCOME_VARIANTS.find(variant => variant.id === preference)!
+
   const boundedUnit = Number.isFinite(randomUnit)
     ? Math.min(1, Math.max(0, randomUnit))
     : 0

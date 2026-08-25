@@ -1,12 +1,17 @@
 <script setup lang="ts">
-import type { DesktopAppInfo, LexoraConfigPatch } from '@buddy-electron/shared/desktopApi'
+import type {
+  DesktopAppInfo,
+  DesktopChatWelcomePreference,
+  LexoraConfigPatch,
+} from '@buddy-electron/shared/desktopApi'
 import type { ApplicationSettingsStore } from '@/stores/useApplicationSettingsStore'
 import { NSelect, NSpin, NSwitch } from 'naive-ui'
 import { computed, shallowRef } from 'vue'
 import { useBuddyI18n } from '@/i18n/buddyI18n'
 import DesktopNotificationsSettings from '@/workbenches/settings/app/DesktopNotificationsSettings.vue'
+import DesktopWelcomePreferencePicker from '@/workbenches/settings/app/DesktopWelcomePreferencePicker.vue'
 
-type GeneralSettingField = 'language' | 'theme' | 'autostart' | 'developerTools'
+type GeneralSettingField = 'language' | 'theme' | 'welcomeVariant' | 'autostart' | 'developerTools'
 
 const props = defineProps<{
   appInfo: DesktopAppInfo | null
@@ -17,17 +22,29 @@ const settings = props.settings
 const { languageOptions, t } = useBuddyI18n(settings.language)
 const pendingFields = shallowRef<ReadonlySet<GeneralSettingField>>(new Set())
 const failedField = shallowRef<GeneralSettingField | null>(null)
+const pendingWelcomePreference = shallowRef<DesktopChatWelcomePreference | null>(null)
 const themeOptions = computed(() => [
   { label: t('desktop.settings.themeSystem'), value: 'system' },
   { label: t('desktop.settings.themeLight'), value: 'light' },
   { label: t('desktop.settings.themeDark'), value: 'dark' },
 ])
+const activeWelcomePreference = computed(() => (
+  pendingWelcomePreference.value
+  ?? settings.config.value?.desktop.welcomeVariant
+  ?? 'random'
+))
 
 async function updateSetting(field: GeneralSettingField, patch: LexoraConfigPatch) {
   pendingFields.value = new Set([...pendingFields.value, field])
   const succeeded = await settings.updateSettings(patch)
   pendingFields.value = new Set([...pendingFields.value].filter(item => item !== field))
   failedField.value = succeeded ? null : field
+}
+
+async function updateWelcomePreference(preference: DesktopChatWelcomePreference) {
+  pendingWelcomePreference.value = preference
+  await updateSetting('welcomeVariant', { desktop: { welcomeVariant: preference } })
+  pendingWelcomePreference.value = null
 }
 </script>
 
@@ -64,6 +81,23 @@ async function updateSetting(field: GeneralSettingField, patch: LexoraConfigPatc
             />
             <NSpin v-if="pendingFields.has('theme')" size="small" />
             <small v-else-if="failedField === 'theme'" class="is-error">
+              {{ settings.settingsError.value ?? t('desktop.settings.saveFailed') }}
+            </small>
+          </div>
+        </div>
+        <div class="desktop-settings-row">
+          <div>
+            <strong>{{ t('desktop.settings.welcome') }}</strong>
+          </div>
+          <div class="desktop-settings-row__control">
+            <DesktopWelcomePreferencePicker
+              :language="settings.language.value"
+              :pending="pendingFields.has('welcomeVariant')"
+              :value="activeWelcomePreference"
+              @select="updateWelcomePreference"
+            />
+            <NSpin v-if="pendingFields.has('welcomeVariant')" size="small" />
+            <small v-else-if="failedField === 'welcomeVariant'" class="is-error">
               {{ settings.settingsError.value ?? t('desktop.settings.saveFailed') }}
             </small>
           </div>
@@ -206,5 +240,6 @@ async function updateSetting(field: GeneralSettingField, patch: LexoraConfigPatc
     gap: 0.7rem;
     padding: 0.9rem 0;
   }
+
 }
 </style>

@@ -75,6 +75,9 @@ export function useChatCapability(options: UseChatCapabilityOptions) {
   let isDisposed = false
 
   const { language } = applicationSettings
+  const welcomePreference = computed(() => (
+    applicationSettings.config.value?.desktop.welcomeVariant ?? 'random'
+  ))
   const { t } = useBuddyI18n(language)
   const getRunTerminationMessage = (errorCode: string | null) =>
     errorCode === 'SESSION_STORAGE_UNAVAILABLE'
@@ -416,6 +419,7 @@ export function useChatCapability(options: UseChatCapabilityOptions) {
     },
     language,
     session,
+    welcomePreference: readonly(welcomePreference),
     status: {
       canRestartRuntime: runtimeRecovery.canRestartRuntime,
       dismissChatBlocker,

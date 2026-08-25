@@ -34,7 +34,7 @@ const messageList = useTemplateRef<BuddyChatMessageListHandle>('messageList')
 const activeSearchMessageId = computed(() => props.activeSearchMessageId)
 const runEventCount = computed(() => transcript.runEvents.value.length)
 const isEmpty = computed(() => session.activeConversationId.value === null)
-const welcomeVariant = shallowRef(selectDesktopChatWelcomeVariant())
+const welcomeVariant = shallowRef(selectDesktopChatWelcomeVariant(workspace.welcomePreference.value))
 const visibleBlocker = computed(() => status.visibleChatBlocker.value)
 const runtimeTransitioning = computed(() => (
   !visibleBlocker.value
@@ -57,13 +57,21 @@ watch(
   () => [
     session.activeConversationId.value,
     session.activeProject.value?.id ?? null,
+    workspace.welcomePreference.value,
   ] as const,
-  ([conversationId, projectId], [previousConversationId, previousProjectId]) => {
+  (
+    [conversationId, projectId, welcomePreference],
+    [previousConversationId, previousProjectId, previousWelcomePreference],
+  ) => {
     if (
       conversationId === null
-      && (previousConversationId !== null || projectId !== previousProjectId)
+      && (
+        previousConversationId !== null
+        || projectId !== previousProjectId
+        || welcomePreference !== previousWelcomePreference
+      )
     ) {
-      welcomeVariant.value = selectDesktopChatWelcomeVariant()
+      welcomeVariant.value = selectDesktopChatWelcomeVariant(welcomePreference)
     }
   },
 )
