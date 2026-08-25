@@ -118,7 +118,6 @@ const icon = computed(() => {
 .desktop-notification-item__copy {
   display: grid;
   min-width: 0;
-  gap: 1px;
 }
 
 .desktop-notification-item__copy strong {
@@ -126,7 +125,7 @@ const icon = computed(() => {
   color: var(--buddy-text-regular);
   font-size: 12px;
   font-weight: 500;
-  line-height: 15px;
+  line-height: 16px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -141,7 +140,7 @@ const icon = computed(() => {
   overflow: hidden;
   color: var(--buddy-text-secondary);
   font-size: 11px;
-  line-height: 14px;
+  line-height: 16px;
   text-overflow: ellipsis;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 1;
@@ -150,12 +149,13 @@ const icon = computed(() => {
 .desktop-notification-item__copy small {
   color: var(--buddy-text-placeholder);
   font-size: 10px;
-  line-height: 12px;
+  line-height: 14px;
+  margin-top: 2px;
 }
 
 .desktop-notification-item > i {
   position: absolute;
-  top: 10px;
+  top: 14px;
   right: 10px;
   width: 6px;
   height: 6px;

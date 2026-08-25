@@ -18,6 +18,7 @@ const desktopConfigSchema = z.object({
     .max(500)
     .refine(items => new Set(items.map(item => `${item.kind}:${item.id}`)).size === items.length)
     .default([]),
+  developer_tools_enabled: z.boolean().default(false),
   language: z.enum(['zh-CN', 'en-US']).default('zh-CN'),
   launch_at_login: z.boolean().default(false),
   notifications_enabled: z.boolean().default(true),
@@ -27,6 +28,7 @@ const desktopConfigSchema = z.object({
 }).passthrough().default({
   background_close_notice_shown: false,
   chat_sidebar_pinned_items: [],
+  developer_tools_enabled: false,
   language: 'zh-CN',
   launch_at_login: false,
   notifications_enabled: true,
@@ -144,6 +146,7 @@ function decodeConfig(value: unknown): LexoraConfig {
     desktop: {
       backgroundCloseNoticeShown: config.desktop.background_close_notice_shown,
       chatSidebarPinnedItems: config.desktop.chat_sidebar_pinned_items,
+      developerToolsEnabled: config.desktop.developer_tools_enabled,
       language: config.desktop.language,
       launchAtLogin: config.desktop.launch_at_login,
       notificationsEnabled: config.desktop.notifications_enabled,
@@ -164,6 +167,7 @@ function encodeConfig(config: LexoraConfig) {
     desktop: {
       background_close_notice_shown: config.desktop.backgroundCloseNoticeShown,
       chat_sidebar_pinned_items: config.desktop.chatSidebarPinnedItems,
+      developer_tools_enabled: config.desktop.developerToolsEnabled,
       language: config.desktop.language,
       launch_at_login: config.desktop.launchAtLogin,
       notifications_enabled: config.desktop.notificationsEnabled,

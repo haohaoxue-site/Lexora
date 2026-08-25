@@ -45,6 +45,7 @@ const commandLabelKeys = {
   'help.openDocumentation': 'desktop.command.help.openDocumentation',
   'help.openLogsDirectory': 'desktop.command.help.openLogsDirectory',
   'window.close': 'desktop.command.window.close',
+  'window.toggleDeveloperTools': 'desktop.command.window.toggleDeveloperTools',
 } satisfies Record<DesktopCommandId, BuddyI18nKey>
 
 function createMenuOptions(menu: DesktopCommandMenu): DropdownOption[] {

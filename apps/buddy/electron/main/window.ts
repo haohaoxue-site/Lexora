@@ -43,6 +43,7 @@ export function createDesktopWindow(options: CreateDesktopWindowOptions): Deskto
     show: false,
     title: 'Lexora Buddy',
     webPreferences: {
+      devTools: true,
       preload: join(__dirname, '../preload/index.cjs'),
       contextIsolation: true,
       sandbox: true,

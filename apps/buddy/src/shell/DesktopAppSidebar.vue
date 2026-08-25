@@ -47,6 +47,7 @@ const versionLabel = computed(() => props.appVersion ? `v${props.appVersion}` : 
 const showAccountDialog = shallowRef(false)
 const showGlobalSearchDialog = shallowRef(false)
 const showNotifications = shallowRef(false)
+const notificationPopoverThemeOverrides = { padding: '0' } as const
 
 function updateNotificationVisibility(show: boolean) {
   showNotifications.value = show
@@ -145,9 +146,12 @@ function openProject(projectId: string) {
         <NPopover
           class="desktop-notification-popover"
           content-class="desktop-notification-popover__content"
+          content-style="padding: 0"
           :show="showNotifications"
           trigger="click"
           placement="top-end"
+          to=".buddy-app"
+          :theme-overrides="notificationPopoverThemeOverrides"
           :width="320"
           @update:show="updateNotificationVisibility"
         >

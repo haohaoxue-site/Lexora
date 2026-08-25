@@ -37,10 +37,10 @@ const themeOverrides = computed<GlobalThemeOverrides>(() => ({
   common: {
     fontFamily: 'var(--buddy-font-ui)',
     fontFamilyMono: '"JetBrains Mono", "SFMono-Regular", Consolas, monospace',
-    primaryColor: prefersDark.value ? '#55a98e' : '#2f7d66',
-    primaryColorHover: prefersDark.value ? '#68b99f' : '#3d8f76',
-    primaryColorPressed: prefersDark.value ? '#428d75' : '#276b58',
-    primaryColorSuppl: prefersDark.value ? '#68b99f' : '#3d8f76',
+    primaryColor: prefersDark.value ? '#4e73b8' : '#315a9e',
+    primaryColorHover: prefersDark.value ? '#5b80c5' : '#3e6caf',
+    primaryColorPressed: prefersDark.value ? '#3f609f' : '#24477f',
+    primaryColorSuppl: prefersDark.value ? '#5b80c5' : '#3e6caf',
   },
 }))
 const naiveLocale = computed(() => language.value === 'en-US' ? enUS : zhCN)

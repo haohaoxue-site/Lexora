@@ -7,11 +7,12 @@ import {
   getDesktopCommand,
   matchesDesktopShortcut,
   resolveDesktopPlatform,
-  resolveDesktopShortcut,
+  resolveDesktopShortcuts,
 } from '../shared/desktopCommands'
 
 export interface DesktopCommandExecutorOptions {
   getWindow: () => BrowserWindow | null
+  isDeveloperToolsEnabled: () => boolean
   logDirectory: string
   openExternal: (url: string) => Promise<unknown>
   openPath: (path: string) => Promise<string>
@@ -39,6 +40,17 @@ export function createDesktopCommandExecutor(
     'window.close': async () => {
       options.getWindow()?.close()
     },
+    'window.toggleDeveloperTools': async () => {
+      const webContents = options.getWindow()?.webContents
+      if (!webContents)
+        return
+      if (!options.isDeveloperToolsEnabled()) {
+        if (webContents.isDevToolsOpened())
+          webContents.closeDevTools()
+        return
+      }
+      webContents.toggleDevTools()
+    },
   } satisfies Partial<Record<DesktopCommandId, () => Promise<void>>>
 
   return async (commandId) => {
@@ -58,7 +70,7 @@ export function registerDesktopCommandShortcuts(
 ): void {
   const platform = resolveDesktopPlatform(process.platform)
   const shortcutCommands = DESKTOP_COMMAND_REGISTRY.filter(command => (
-    command.execution === 'main' && resolveDesktopShortcut(command.id, platform) !== null
+    command.execution === 'main' && resolveDesktopShortcuts(command.id, platform).length > 0
   ))
 
   window.webContents.on('before-input-event', (event: Event, input: Input) => {
@@ -66,8 +78,8 @@ export function registerDesktopCommandShortcuts(
       return
 
     const command = shortcutCommands.find((candidate) => {
-      const shortcut = resolveDesktopShortcut(candidate.id, platform)
-      return shortcut !== null && matchesDesktopShortcut(input, shortcut)
+      const shortcuts = resolveDesktopShortcuts(candidate.id, platform)
+      return shortcuts.some(shortcut => matchesDesktopShortcut(input, shortcut))
     })
     if (!command)
       return

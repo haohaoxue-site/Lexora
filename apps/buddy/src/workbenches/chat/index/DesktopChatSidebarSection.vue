@@ -9,10 +9,10 @@ import {
 import DesktopChatSidebarSectionHeader from '@/workbenches/chat/index/DesktopChatSidebarSectionHeader.vue'
 
 const props = defineProps<{
-  fillRemaining: boolean
   items: ReadonlyArray<T>
   keyField: string
   label: string
+  priority: number
   section: 'pinned' | 'projects' | 'tasks'
   showAdd?: boolean
 }>()
@@ -25,12 +25,13 @@ defineSlots<{
 const expanded = defineModel<boolean>('expanded', { required: true })
 const layout = computed(() => resolveDesktopChatSidebarSectionLayout({
   expanded: expanded.value,
-  fillRemaining: props.fillRemaining,
+  priority: props.priority,
   rowCount: props.items.length,
 }))
 const virtualItems = computed(() => [...props.items])
 const sectionStyle = computed(() => ({
   '--buddy-chat-sidebar-section-natural-size': layout.value.naturalSize,
+  '--buddy-chat-sidebar-section-priority': layout.value.priority,
 }))
 </script>
 
@@ -69,17 +70,9 @@ const sectionStyle = computed(() => ({
   flex-direction: column;
   overflow: hidden;
 
-  &.is-content-shrink {
-    flex: 0 1 var(--buddy-chat-sidebar-section-natural-size);
-  }
-
-  &.is-fill-remaining {
-    flex-grow: 1;
-    flex-shrink: 0;
-    flex-basis: min(
-      var(--buddy-chat-sidebar-section-natural-size),
-      calc(50% - var(--buddy-chat-sidebar-section-half-gap))
-    );
+  &.is-weighted {
+    max-height: var(--buddy-chat-sidebar-section-natural-size);
+    flex: var(--buddy-chat-sidebar-section-priority) 1 0;
   }
 
   &.is-collapsed {

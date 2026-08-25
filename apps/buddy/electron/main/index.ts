@@ -277,6 +277,7 @@ else {
 
     const executeDesktopCommand = createDesktopCommandExecutor({
       getWindow: () => desktopWindowManager?.window ?? null,
+      isDeveloperToolsEnabled: () => desktopConfig?.desktop.developerToolsEnabled ?? false,
       logDirectory,
       openExternal: url => shell.openExternal(url),
       openPath: path => shell.openPath(path),
@@ -509,8 +510,11 @@ async function applyDesktopConfig(config: LexoraConfig): Promise<void> {
   desktopTray?.setLanguage(desktopLanguage)
   nativeTheme.themeSource = config.desktop.theme
   const window = desktopWindowManager?.window
-  if (window)
+  if (window) {
     applyDesktopWindowAppearance(window, nativeTheme.shouldUseDarkColors)
+    if (!config.desktop.developerToolsEnabled && window.webContents.isDevToolsOpened())
+      window.webContents.closeDevTools()
+  }
   await applyNativePetConfig(config.pet)
   if (!app.isPackaged || process.env.LEXORA_DESKTOP_SMOKE_TEST === '1')
     return

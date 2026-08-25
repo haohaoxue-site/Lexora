@@ -6,7 +6,7 @@ import { computed, shallowRef } from 'vue'
 import { useBuddyI18n } from '@/i18n/buddyI18n'
 import DesktopNotificationsSettings from '@/workbenches/settings/app/DesktopNotificationsSettings.vue'
 
-type GeneralSettingField = 'language' | 'theme' | 'autostart'
+type GeneralSettingField = 'language' | 'theme' | 'autostart' | 'developerTools'
 
 const props = defineProps<{
   appInfo: DesktopAppInfo | null
@@ -88,6 +88,22 @@ async function updateSetting(field: GeneralSettingField, patch: LexoraConfigPatc
             />
             <NSpin v-if="pendingFields.has('autostart')" size="small" />
             <small v-else-if="failedField === 'autostart'" class="is-error">
+              {{ settings.settingsError.value ?? t('desktop.settings.saveFailed') }}
+            </small>
+          </div>
+        </div>
+        <div class="desktop-settings-row">
+          <div>
+            <strong>{{ t('desktop.settings.developerTools') }}</strong>
+            <small>{{ t('desktop.settings.developerToolsDescription') }}</small>
+          </div>
+          <div class="desktop-settings-row__control is-compact">
+            <NSwitch
+              :value="settings.config.value.desktop.developerToolsEnabled"
+              @update:value="updateSetting('developerTools', { desktop: { developerToolsEnabled: $event } })"
+            />
+            <NSpin v-if="pendingFields.has('developerTools')" size="small" />
+            <small v-else-if="failedField === 'developerTools'" class="is-error">
               {{ settings.settingsError.value ?? t('desktop.settings.saveFailed') }}
             </small>
           </div>

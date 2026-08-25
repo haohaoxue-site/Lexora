@@ -53,6 +53,7 @@ export interface LexoraConfig {
   desktop: {
     backgroundCloseNoticeShown: boolean
     chatSidebarPinnedItems: DesktopChatPinnedItem[]
+    developerToolsEnabled: boolean
     language: 'zh-CN' | 'en-US'
     launchAtLogin: boolean
     notificationsEnabled: boolean

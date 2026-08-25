@@ -9,12 +9,13 @@ import {
   Warning20Regular,
 } from '@vicons/fluent'
 import { NButton, NIcon } from 'naive-ui'
-import { computed, useTemplateRef } from 'vue'
-import { DESKTOP_ASSET_URLS } from '@/assets/desktopAssetUrls'
+import { computed, shallowRef, useTemplateRef, watch } from 'vue'
 import { useBuddyI18n } from '@/i18n/buddyI18n'
 import DesktopChatComposer from '@/workbenches/chat/composer/DesktopChatComposer.vue'
 import BuddyChatMessageList from '@/workbenches/chat/transcript/BuddyChatMessageList.vue'
 import DesktopApprovalCard from '@/workbenches/chat/workspace/DesktopApprovalCard.vue'
+import DesktopChatWelcome from '@/workbenches/chat/workspace/DesktopChatWelcome.vue'
+import { selectDesktopChatWelcomeVariant } from '@/workbenches/chat/workspace/desktopChatWelcomeVariants'
 import { useChatViewport } from '@/workbenches/chat/workspace/useChatViewport'
 
 const props = defineProps<{
@@ -33,6 +34,7 @@ const messageList = useTemplateRef<BuddyChatMessageListHandle>('messageList')
 const activeSearchMessageId = computed(() => props.activeSearchMessageId)
 const runEventCount = computed(() => transcript.runEvents.value.length)
 const isEmpty = computed(() => session.activeConversationId.value === null)
+const welcomeVariant = shallowRef(selectDesktopChatWelcomeVariant())
 const visibleBlocker = computed(() => status.visibleChatBlocker.value)
 const runtimeTransitioning = computed(() => (
   !visibleBlocker.value
@@ -51,6 +53,21 @@ const viewport = useChatViewport({
   timelineItems: transcript.timelineItems,
 })
 
+watch(
+  () => [
+    session.activeConversationId.value,
+    session.activeProject.value?.id ?? null,
+  ] as const,
+  ([conversationId, projectId], [previousConversationId, previousProjectId]) => {
+    if (
+      conversationId === null
+      && (previousConversationId !== null || projectId !== previousProjectId)
+    ) {
+      welcomeVariant.value = selectDesktopChatWelcomeVariant()
+    }
+  },
+)
+
 async function sendMessage(payload: ChatComposerSubmitPayload) {
   await execution.send(payload)
 }
@@ -63,13 +80,12 @@ function dismissBlocker() {
 <template>
   <section class="desktop-chat-page" :class="{ 'is-empty': isEmpty }">
     <main class="desktop-chat-page__content">
-      <section v-if="isEmpty" class="desktop-chat-page__welcome">
-        <img :src="DESKTOP_ASSET_URLS.appIcon" alt="" draggable="false">
-        <h1>{{ t('desktop.chat.globalHero') }}</h1>
-        <p v-if="session.activeProject.value">
-          {{ t('desktop.chat.projectContext', { project: session.activeProject.value.name }) }}
-        </p>
-      </section>
+      <DesktopChatWelcome
+        v-if="isEmpty"
+        :language="workspace.language.value"
+        :project-name="session.activeProject.value?.name ?? null"
+        :variant="welcomeVariant"
+      />
 
       <div v-else-if="status.isLoading.value" class="desktop-chat-page__loading">
         {{ t('desktop.chat.loading') }}
@@ -214,39 +230,6 @@ function dismissBlocker() {
   overflow: hidden;
 }
 
-.desktop-chat-page__welcome {
-  display: grid;
-  max-width: 34rem;
-  flex: 1;
-  align-content: center;
-  justify-items: center;
-  gap: 0.65rem;
-  margin: 0 auto;
-  padding: 2rem 1.25rem 4rem;
-  text-align: center;
-
-  img {
-    width: 12rem;
-    height: 12rem;
-  }
-
-  h1,
-  p {
-    margin: 0;
-  }
-
-  h1 {
-    font-size: clamp(1.5rem, 2.4vw, 1.75rem);
-    font-weight: 500;
-    letter-spacing: -0.025em;
-  }
-
-  p {
-    color: var(--buddy-text-secondary);
-    font-size: 0.82rem;
-  }
-}
-
 .desktop-chat-page.is-empty {
   display: grid;
   grid-template-rows: minmax(1.5rem, 1fr) auto auto minmax(1.5rem, 1.35fr);
@@ -257,15 +240,9 @@ function dismissBlocker() {
     overflow: visible;
   }
 
-  .desktop-chat-page__welcome {
-    flex: none;
-    gap: 0.75rem;
-    padding: 0 1.25rem;
-  }
-
   .desktop-chat-page__composer-dock {
     grid-row: 3;
-    padding-top: 1.75rem;
+    padding-top: 3rem;
     padding-bottom: 0;
   }
 }

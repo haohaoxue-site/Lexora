@@ -31,6 +31,7 @@ export const lexoraConfigPatchSchema: z.ZodType<LexoraConfigPatch> = z.object({
   desktop: z.object({
     backgroundCloseNoticeShown: z.boolean().optional(),
     chatSidebarPinnedItems: chatSidebarPinnedItemsSchema.optional(),
+    developerToolsEnabled: z.boolean().optional(),
     language: z.enum(['zh-CN', 'en-US']).optional(),
     launchAtLogin: z.boolean().optional(),
     notificationsEnabled: z.boolean().optional(),

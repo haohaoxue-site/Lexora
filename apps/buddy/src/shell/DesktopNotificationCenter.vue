@@ -3,11 +3,12 @@ import type { LocalNotification } from '@buddy-electron/shared/localChatApi'
 import type { BuddyLocale } from '@/i18n/buddyI18n'
 import type { NotificationFilter } from '@/stores/useNotificationCenterStore'
 import { Alert20Regular, CheckmarkCircle20Regular } from '@vicons/fluent'
-import { NButton, NIcon, NSpin, NTooltip, NVirtualList } from 'naive-ui'
+import { NButton, NIcon, NSpin, NVirtualList } from 'naive-ui'
 import { computed, shallowRef } from 'vue'
 import { useBuddyI18n } from '@/i18n/buddyI18n'
 import DesktopNotificationItem from '@/shell/DesktopNotificationItem.vue'
 import { filterNotifications } from '@/stores/useNotificationCenterStore'
+import DesktopIcon from '@/ui/DesktopIcon.vue'
 
 const props = defineProps<{
   items: ReadonlyArray<LocalNotification>
@@ -41,55 +42,49 @@ const emptyTitle = computed(() => t(isUnseenEmpty.value
 </script>
 
 <template>
-  <section class="desktop-notification-center">
-    <header class="desktop-notification-center__header">
-      <strong>{{ t('desktop.notifications.title') }}</strong>
-
-      <div class="desktop-notification-center__header-actions">
-        <div
-          v-if="hasNotifications"
-          class="desktop-notification-center__filters"
-          role="group"
-          :aria-label="t('desktop.notifications.filterLabel')"
+  <section
+    class="desktop-notification-center"
+    :class="{ 'has-header': hasNotifications }"
+  >
+    <header v-if="hasNotifications" class="desktop-notification-center__header">
+      <div
+        class="desktop-notification-center__filters"
+        role="group"
+        :aria-label="t('desktop.notifications.filterLabel')"
+      >
+        <button
+          class="desktop-notification-center__filter"
+          :class="{ 'is-active': activeFilter === 'all' }"
+          type="button"
+          :aria-pressed="activeFilter === 'all'"
+          @click="activeFilter = 'all'"
         >
-          <button
-            class="desktop-notification-center__filter"
-            :class="{ 'is-active': activeFilter === 'all' }"
-            type="button"
-            :aria-pressed="activeFilter === 'all'"
-            @click="activeFilter = 'all'"
-          >
-            {{ t('desktop.notifications.filterAll') }}
-          </button>
-          <button
-            class="desktop-notification-center__filter"
-            :class="{ 'is-active': activeFilter === 'unseen' }"
-            type="button"
-            :aria-pressed="activeFilter === 'unseen'"
-            @click="activeFilter = 'unseen'"
-          >
-            {{ t('desktop.notifications.filterUnseen') }}
-            <span v-if="unseenCount > 0">{{ unseenCount }}</span>
-          </button>
-        </div>
-
-        <NTooltip v-if="unseenCount > 0">
-          <template #trigger>
-            <NButton
-              class="desktop-notification-center__mark-all"
-              size="tiny"
-              quaternary
-              :aria-label="t('desktop.notifications.markAllSeen')"
-              @click="emit('markAllSeen')"
-            >
-              <template #icon>
-                <NIcon :component="CheckmarkCircle20Regular" />
-              </template>
-            </NButton>
-          </template>
-          {{ t('desktop.notifications.markAllSeen') }}
-        </NTooltip>
+          {{ t('desktop.notifications.filterAll') }}
+        </button>
+        <button
+          class="desktop-notification-center__filter"
+          :class="{ 'is-active': activeFilter === 'unseen' }"
+          type="button"
+          :aria-pressed="activeFilter === 'unseen'"
+          @click="activeFilter = 'unseen'"
+        >
+          {{ t('desktop.notifications.filterUnseen') }}
+          <span v-if="unseenCount > 0">{{ unseenCount }}</span>
+        </button>
       </div>
+
+      <NButton
+        v-if="unseenCount > 0"
+        class="buddy-icon-button desktop-notification-center__mark-all"
+        size="small"
+        quaternary
+        :aria-label="t('desktop.notifications.markAllSeen')"
+        @click="emit('markAllSeen')"
+      >
+        <template #icon>
+          <DesktopIcon name="notificationMarkAllRead" />
+        </template>
+      </NButton>
     </header>
 
     <div v-if="loading && items.length === 0" class="desktop-notification-center__loading">
@@ -128,9 +123,13 @@ const emptyTitle = computed(() => t(isUnseenEmpty.value
 .desktop-notification-center {
   display: grid;
   height: min(332px, calc(100dvh - 88px));
-  grid-template-rows: 44px minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
   overflow: hidden;
   background: var(--buddy-bg-surface-raised);
+}
+
+.desktop-notification-center.has-header {
+  grid-template-rows: 44px minmax(0, 1fr);
 }
 
 .desktop-notification-center__header {
@@ -142,23 +141,8 @@ const emptyTitle = computed(() => t(isUnseenEmpty.value
   justify-content: space-between;
   gap: 10px;
   background: var(--buddy-bg-surface-raised);
-  box-shadow: 0 6px 14px -12px color-mix(in srgb, var(--buddy-text-primary) 24%, transparent);
-  padding: 0 12px;
-}
-
-.desktop-notification-center__header > strong {
-  flex: none;
-  color: var(--buddy-text-primary);
-  font-size: 14px;
-  font-weight: 600;
-}
-
-.desktop-notification-center__header-actions {
-  display: flex;
-  min-width: 0;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 9px;
+  box-shadow: 0 8px 18px -10px rgb(31 37 33 / 24%);
+  padding: 0 8px;
 }
 
 .desktop-notification-center__filters {
@@ -179,7 +163,8 @@ const emptyTitle = computed(() => t(isUnseenEmpty.value
   background: transparent;
   color: var(--buddy-text-secondary);
   cursor: pointer;
-  font-size: 11px;
+  font-size: 12px;
+  letter-spacing: 0.04em;
   padding: 0 5px;
 }
 
@@ -210,14 +195,17 @@ const emptyTitle = computed(() => t(isUnseenEmpty.value
 
 .desktop-notification-center__filter span {
   color: var(--buddy-accent-primary);
-  font-size: 10px;
+  font-size: 11px;
+  font-weight: 500;
   font-variant-numeric: tabular-nums;
+  letter-spacing: 0;
   line-height: 1;
 }
 
 .desktop-notification-center__mark-all {
   flex: none;
   color: var(--buddy-text-secondary);
+  font-size: 16px;
 }
 
 .desktop-notification-center__mark-all:hover {
@@ -259,7 +247,6 @@ const emptyTitle = computed(() => t(isUnseenEmpty.value
 .desktop-notification-center__list {
   height: 100%;
   min-height: 0;
-  background: var(--buddy-bg-surface);
   overscroll-behavior: contain;
 }
 </style>

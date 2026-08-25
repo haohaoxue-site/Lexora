@@ -11,6 +11,7 @@ import {
   DESKTOP_CHAT_SIDEBAR_ROW_HEIGHT,
   DESKTOP_CHAT_SIDEBAR_ROW_SIZE,
   DESKTOP_CHAT_SIDEBAR_SECTION_HEADER_SIZE,
+  DESKTOP_CHAT_SIDEBAR_SECTION_PRIORITIES,
 } from '@/workbenches/chat/index/chatSidebarLayout'
 import DesktopChatConversationRow from '@/workbenches/chat/index/DesktopChatConversationRow.vue'
 import DesktopChatProjectRow from '@/workbenches/chat/index/DesktopChatProjectRow.vue'
@@ -124,10 +125,10 @@ const {
         <DesktopChatSidebarSection
           v-if="visiblePinnedItems.length > 0"
           v-model:expanded="pinnedSectionExpanded"
-          :fill-remaining="false"
           :items="pinnedRows"
           key-field="key"
           :label="t('desktop.chat.pinnedSection')"
+          :priority="DESKTOP_CHAT_SIDEBAR_SECTION_PRIORITIES.pinned"
           section="pinned"
         >
           <template #default="{ item }">
@@ -179,10 +180,10 @@ const {
 
         <DesktopChatSidebarSection
           v-model:expanded="projectsSectionExpanded"
-          :fill-remaining="false"
           :items="projectRows"
           key-field="key"
           :label="t('desktop.chat.projectsSection')"
+          :priority="DESKTOP_CHAT_SIDEBAR_SECTION_PRIORITIES.projects"
           section="projects"
           show-add
           @add="openProjectCreator"
@@ -218,10 +219,10 @@ const {
 
         <DesktopChatSidebarSection
           v-model:expanded="tasksSectionExpanded"
-          fill-remaining
           :items="taskConversations"
           key-field="id"
           :label="t('desktop.chat.tasksSection')"
+          :priority="DESKTOP_CHAT_SIDEBAR_SECTION_PRIORITIES.tasks"
           section="tasks"
         >
           <template #default="{ item: conversation }">
@@ -412,7 +413,6 @@ const {
 
 .desktop-chat-sidebar nav {
   --buddy-chat-sidebar-section-gap: 0.7rem;
-  --buddy-chat-sidebar-section-half-gap: 0.35rem;
   --buddy-chat-sidebar-action-gap: 0.125rem;
   --buddy-chat-sidebar-action-inset: 0.25rem;
   --buddy-chat-sidebar-action-size: 1.75rem;

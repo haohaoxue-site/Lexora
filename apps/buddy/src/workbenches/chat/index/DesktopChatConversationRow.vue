@@ -4,7 +4,6 @@ import type { BuddyLocale } from '@/i18n/buddyI18n'
 import type { DesktopChatPinnedDropPosition } from '@/workbenches/chat/index/chatPinnedItems'
 import {
   ApprovalsApp20Regular,
-  Chat20Regular,
   Delete20Regular,
   Edit20Regular,
   MoreHorizontal20Regular,
@@ -139,7 +138,6 @@ function resolveDropPosition(event: DragEvent): DesktopChatPinnedDropPosition {
         type="button"
         @click="emit('open')"
       >
-        <NIcon :component="Chat20Regular" />
         <DesktopOverflowingLabel :paused="dragging" :text="title" />
       </button>
       <div class="desktop-chat-conversation-row__trailing">
@@ -249,17 +247,12 @@ button {
   min-width: 0;
   flex: 1;
   align-items: center;
-  gap: 0.5rem;
   color: var(--buddy-text-regular);
   font-size: var(--buddy-sidebar-item-font-size);
   font-weight: var(--buddy-sidebar-item-font-weight);
   line-height: 20px;
   padding: 0.46rem 0.5rem;
   text-align: left;
-
-  > .n-icon {
-    flex: none;
-  }
 
   .desktop-overflow-label {
     flex: 1;
