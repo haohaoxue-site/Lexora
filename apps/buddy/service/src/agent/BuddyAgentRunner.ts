@@ -31,6 +31,7 @@ import { BuddySessionRegistry } from './BuddySessionRegistry'
 import {
   createPiEventProjectionState,
   projectPiEvent,
+  projectToolExecutionAuthorized,
 } from './projectPiEvent'
 
 export const AUTOMATION_SESSION_STARTUP_TIMEOUT_MS = 60_000
@@ -56,8 +57,14 @@ export interface BuddyAgentSessionLike {
 
 export interface BuddySessionTurnContext {
   contextWindow: number | null
+  flushProjectedEvents: () => Promise<void>
   maxTokens: number | null
   model: string
+  onToolExecutionAuthorized: (event: {
+    arguments: unknown
+    toolCallId: string
+    toolName: string
+  }) => Promise<void>
   provider: string
   runId: string
   serviceTier?: BuddyServiceTier | null
@@ -465,16 +472,6 @@ export class BuddyAgentRunner {
     await this.#recordSessionRecovery(runId, binding)
 
     this.#activeSessions.set(runId, binding.session)
-    const releaseTurn = await binding.session.activateTurn({
-      contextWindow: current.contextWindow,
-      maxTokens: current.maxTokens,
-      model: input.model,
-      provider: input.provider,
-      runId,
-      serviceTier: input.serviceTier ?? null,
-      signal: controller.signal,
-      thinkingLevel: input.thinkingLevel,
-    })
     const projectionState = createPiEventProjectionState({
       canonicalRoot: input.canonicalRoot,
     })
@@ -483,10 +480,32 @@ export class BuddyAgentRunner {
       runId,
       () => this.#timestamp(),
     )
+    let eventTail = Promise.resolve()
+    const flushProjectedEvents = async () => {
+      await eventTail
+      await eventWriter.drain()
+    }
+    const releaseTurn = await binding.session.activateTurn({
+      contextWindow: current.contextWindow,
+      flushProjectedEvents,
+      maxTokens: current.maxTokens,
+      model: input.model,
+      onToolExecutionAuthorized: async (event) => {
+        await flushProjectedEvents()
+        const projected = projectToolExecutionAuthorized(event, projectionState)
+        for (const projectedEvent of projected.events)
+          eventWriter.append(projectedEvent)
+        await eventWriter.drain()
+      },
+      provider: input.provider,
+      runId,
+      serviceTier: input.serviceTier ?? null,
+      signal: controller.signal,
+      thinkingLevel: input.thinkingLevel,
+    })
     let failureCode: string | undefined
     let failureMessage: string | undefined
     let finalAssistantAnswerProjected = false
-    let eventTail = Promise.resolve()
     const unsubscribe = binding.session.subscribe((event) => {
       eventTail = eventTail.then(async () => {
         const projected = projectPiEvent(event, projectionState)
@@ -645,8 +664,10 @@ export class BuddyAgentRunner {
     this.#activeSessions.set(run.id, binding.session)
     const releaseTurn = await binding.session.activateTurn({
       contextWindow: run.contextWindow,
+      flushProjectedEvents: async () => {},
       maxTokens: run.maxTokens,
       model: run.model,
+      onToolExecutionAuthorized: async () => {},
       provider: run.provider,
       runId: run.id,
       serviceTier: null,

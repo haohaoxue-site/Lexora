@@ -1,17 +1,14 @@
 import type { SystemCapabilityErrorCode } from './systemCapability'
 
-export const SYSTEM_INSPECT_TOOL_NAME = 'lexora_system_inspect'
 export const SYSTEM_ACTION_TOOL_NAME = 'lexora_system_action'
 
 export type SystemToolFailureCode
   = SystemCapabilityErrorCode
     | 'SYSTEM_CAPABILITY_FAILED'
-    | 'SYSTEM_INSPECTION_INVALID'
 
 export interface SystemToolFailureRecovery {
   instruction: string
-  reuseTargetRef: false
-  toolName: typeof SYSTEM_INSPECT_TOOL_NAME
+  toolName: typeof SYSTEM_ACTION_TOOL_NAME
 }
 
 export interface SystemToolFailure {
@@ -23,23 +20,32 @@ export interface SystemToolFailure {
 }
 
 const SYSTEM_TOOL_FAILURE_CODES = new Set<SystemToolFailureCode>([
+  'SYSTEM_ACTION_CHANGED',
+  'SYSTEM_ACTION_EXPIRED',
   'SYSTEM_ACTION_INVALID',
   'SYSTEM_ACTION_NOT_ALLOWED',
+  'SYSTEM_ACTION_NOT_PREPARED',
   'SYSTEM_CAPABILITY_FAILED',
-  'SYSTEM_INSPECTION_INVALID',
+  'SYSTEM_TARGET_AMBIGUOUS',
   'SYSTEM_TARGET_CHANGED',
-  'SYSTEM_TARGET_EXPIRED',
-  'SYSTEM_TARGET_UNKNOWN',
+  'SYSTEM_TARGET_NOT_FOUND',
 ])
 
-const TARGET_RECOVERY_CODES = new Set<SystemToolFailureCode>([
+const RETRY_ACTION_CODES = new Set<SystemToolFailureCode>([
+  'SYSTEM_ACTION_EXPIRED',
+  'SYSTEM_ACTION_NOT_PREPARED',
   'SYSTEM_TARGET_CHANGED',
-  'SYSTEM_TARGET_EXPIRED',
-  'SYSTEM_TARGET_UNKNOWN',
+])
+
+const REDISCOVER_TARGET_CODES = new Set<SystemToolFailureCode>([
+  'SYSTEM_TARGET_AMBIGUOUS',
+  'SYSTEM_TARGET_NOT_FOUND',
 ])
 
 export function createSystemToolFailure(code: SystemToolFailureCode): SystemToolFailure {
-  const recoverable = TARGET_RECOVERY_CODES.has(code)
+  const retryAction = RETRY_ACTION_CODES.has(code)
+  const rediscoverTarget = REDISCOVER_TARGET_CODES.has(code)
+  const recoverable = retryAction || rediscoverTarget
   return {
     error: {
       code,
@@ -47,9 +53,10 @@ export function createSystemToolFailure(code: SystemToolFailureCode): SystemTool
       ...(recoverable
         ? {
             recovery: {
-              instruction: 'Inspect the requested subject again, then retry only with the new targetRef.',
-              reuseTargetRef: false as const,
-              toolName: SYSTEM_INSPECT_TOOL_NAME,
+              instruction: retryAction
+                ? 'Retry lexora_system_action so Lexora Buddy can resolve and approve the current target again.'
+                : 'Use Pi bash to identify one exact process or user service, then retry lexora_system_action with a more precise selector.',
+              toolName: SYSTEM_ACTION_TOOL_NAME,
             },
           }
         : {}),

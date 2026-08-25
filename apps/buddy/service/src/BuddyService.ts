@@ -69,8 +69,6 @@ import {
   SkillService,
 } from './agent/SkillService'
 import { ApprovalService } from './approvals/ApprovalService'
-import { readSandboxedFile } from './approvals/FileSandbox'
-import { prepareShellSandbox } from './approvals/ShellSandbox'
 import { AttachmentService } from './attachments/AttachmentService'
 import { AutomationDispatcher } from './automations/AutomationDispatcher'
 import { AutomationOccurrenceLifecycleService } from './automations/AutomationOccurrenceLifecycleService'
@@ -108,6 +106,7 @@ import {
   providerModelInputSchema,
 } from './providers/providerSchemas'
 import { createProviderService } from './providers/ProviderService'
+import { readBoundedFile } from './resources/BoundedFileReader'
 import { createApprovalRepository } from './storage/approvalRepository'
 import { createAttachmentRepository } from './storage/attachmentRepository'
 import { createCommandRequestRepository } from './storage/commandRequestRepository'
@@ -289,7 +288,6 @@ export async function startBuddyService(
     peer: options.rpc,
     providers: providersRepository,
   })
-  const shellSandboxAssets = await prepareShellSandbox(agentDirectory)
   const systemHost = new LinuxSystemHost()
   const sessions = new BuddySessionRegistry<BuddyAgentSessionLike>()
   const connectorService = new McpConnectorService({
@@ -412,13 +410,13 @@ export async function startBuddyService(
             : []),
           createToolPolicyExtension({
             approvalService,
-            classifyTool: event => classifyAutomationToolCall(
+            classifyTool: async (event, activeRun) => classifyAutomationToolCall(
               automationService,
               event,
-            ) ?? classifySystemTool(
+            ) ?? await classifySystemTool(
               systemCapability,
-              event.toolName,
-              event.input,
+              event,
+              activeRun.signal,
             ) ?? classifications.get(event.toolName) ?? {},
             cwd: input.canonicalRoot,
             executionProfile: run.executionProfile,
@@ -477,7 +475,6 @@ export async function startBuddyService(
           })
         },
         resources: input.resources,
-        shellSandboxAssets,
         thinkingLevel: input.thinkingLevel,
       })
       return {
@@ -600,7 +597,6 @@ export async function startBuddyService(
     runInputs,
     sessions,
     skillService,
-    shellSandboxAssets,
     systemHost,
     usageRepository,
     turnRequests,
@@ -650,7 +646,6 @@ interface RuntimeServices {
   runInputs: ReturnType<typeof createRunInputRepository>
   sessions: BuddySessionRegistry<BuddyAgentSessionLike>
   skillService: SkillService
-  shellSandboxAssets: Awaited<ReturnType<typeof prepareShellSandbox>>
   systemHost: LinuxSystemHost
   usageRepository: ReturnType<typeof createUsageRepository>
   turnRequests: ReturnType<typeof createTurnRequestRepository>
@@ -1098,13 +1093,13 @@ function registerRuntimeHandlers(services: RuntimeServices): () => void {
         }),
         createToolPolicyExtension({
           approvalService: services.approvalService,
-          classifyTool: event => classifyAutomationToolCall(
+          classifyTool: async (event, activeRun) => classifyAutomationToolCall(
             services.automationService,
             event,
-          ) ?? classifySystemTool(
+          ) ?? await classifySystemTool(
             systemCapability,
-            event.toolName,
-            event.input,
+            event,
+            activeRun.signal,
           ) ?? classifications.get(event.toolName) ?? {},
           cwd: canonicalRoot,
           executionProfile,
@@ -1128,7 +1123,6 @@ function registerRuntimeHandlers(services: RuntimeServices): () => void {
           })
         : [],
       resources,
-      shellSandboxAssets: services.shellSandboxAssets,
       thinkingLevel: normalizeThinkingLevel(input.modelSelection.reasoning),
     })
     return {
@@ -2188,7 +2182,7 @@ async function materializeContextItems(
       projectId: project.id,
       root: project.root,
     }], join(project.canonicalRoot, item.value), 'existing')
-    const content = await readSandboxedFile(project.canonicalRoot, resolution.canonicalPath)
+    const content = await readBoundedFile(project.canonicalRoot, resolution.canonicalPath)
     if (content.byteLength > MAX_CONTEXT_FILE_BYTES)
       throw new BuddyServiceError('VALIDATION_FAILED')
     sections.push(`上下文文件：${item.value}\n\n${content.toString('utf8')}`)

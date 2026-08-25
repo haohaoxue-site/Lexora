@@ -45,7 +45,7 @@ export interface ChatAgentToolNode {
   isError: boolean
   kind: 'tool'
   presentation: BuddyToolPresentation
-  status: 'awaiting_approval' | 'completed' | 'failed' | 'interrupted' | 'running'
+  status: 'awaiting_approval' | 'completed' | 'failed' | 'interrupted' | 'preparing' | 'running'
   toolCallId: string
   toolName: string
 }
@@ -292,7 +292,7 @@ function projectChatAgentTurn(
               kind: 'tool' as const,
               order: event.sequence,
               presentation: approvalPresentation(review.data),
-              status: 'running' as const,
+              status: 'preparing' as const,
               toolCallId,
               toolName: review.data.toolName,
               description: review.data.card === 'system-action'
@@ -319,12 +319,17 @@ function projectChatAgentTurn(
         tools.set(current.toolCallId, {
           ...current,
           isError: payload.status !== 'approved',
-          status: payload.status === 'approved' ? 'running' : 'failed',
+          status: payload.status === 'approved' ? 'preparing' : 'failed',
         })
       }
       continue
     }
-    if (event.type === 'tool.started' || event.type === 'tool.updated' || event.type === 'tool.completed') {
+    if (
+      event.type === 'tool.preparing'
+      || event.type === 'tool.started'
+      || event.type === 'tool.updated'
+      || event.type === 'tool.completed'
+    ) {
       const toolCallId = readString(payload.toolCallId)
       const toolName = readString(payload.toolName)
       const presentation = buddyToolPresentationSchema.safeParse(payload.presentation)
@@ -356,7 +361,11 @@ function projectChatAgentTurn(
         presentation: presentation.data,
         status: event.type === 'tool.completed'
           ? isError ? 'failed' : 'completed'
-          : 'running',
+          : current?.status === 'awaiting_approval'
+            ? 'awaiting_approval'
+            : event.type === 'tool.preparing'
+              ? 'preparing'
+              : 'running',
         toolCallId,
         toolName,
       })
@@ -365,11 +374,19 @@ function projectChatAgentTurn(
   const terminal = run.status !== 'queued' && run.status !== 'running'
   const reasoningNodes = [...reasoning.values()].filter(node => node.text.trim())
   const narrationNodes = [...text.values()].filter(node => node.text.trim())
+  const awaitingApproval = [...tools.values()]
+    .filter(node => node.status === 'awaiting_approval')
+    .sort((left, right) => right.order - left.order)[0]
   const nodes = [...reasoningNodes, ...narrationNodes, ...tools.values()]
     .sort((left, right) => left.order - right.order)
     .map(({ order: _order, ...node }) => {
-      if (node.kind === 'text' || !terminal || node.status !== 'running')
+      if (
+        node.kind === 'text'
+        || !terminal
+        || (node.status !== 'preparing' && node.status !== 'running')
+      ) {
         return node
+      }
       return { ...node, status: 'interrupted' as const }
     })
   return {
@@ -379,7 +396,11 @@ function projectChatAgentTurn(
       : {}),
     finalMessageId,
     nodes,
-    progress: terminal ? null : progress,
+    progress: terminal
+      ? null
+      : awaitingApproval
+        ? { phase: 'awaiting_approval', toolName: awaitingApproval.toolName }
+        : progress,
     reasoningLevel: run.reasoningLevel,
     runId: run.id,
     startedAt: run.startedAt,

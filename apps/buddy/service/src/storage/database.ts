@@ -56,10 +56,20 @@ function migrateBuddyDatabase(database: DatabaseSync): void {
   for (const migration of BUDDY_SCHEMA_MIGRATIONS) {
     if (migration.version <= currentVersion)
       continue
-    withTransaction(database, () => {
-      database.exec(migration.sql)
-      database.exec(`PRAGMA user_version = ${migration.version}`)
-    })
+    if (migration.disableForeignKeys)
+      database.exec('PRAGMA foreign_keys = OFF')
+    try {
+      withTransaction(database, () => {
+        database.exec(migration.sql)
+        if (migration.disableForeignKeys && database.prepare('PRAGMA foreign_key_check').all().length)
+          throw new BuddyDatabaseMigrationError()
+        database.exec(`PRAGMA user_version = ${migration.version}`)
+      })
+    }
+    finally {
+      if (migration.disableForeignKeys)
+        database.exec('PRAGMA foreign_keys = ON')
+    }
   }
 }
 
@@ -81,6 +91,13 @@ export class BuddyDatabaseVersionError extends Error {
   constructor(reason: string) {
     super(`Lexora Buddy database uses an ${reason}`)
     this.name = 'BuddyDatabaseVersionError'
+  }
+}
+
+class BuddyDatabaseMigrationError extends Error {
+  constructor() {
+    super('Lexora Buddy database migration violated a foreign key constraint')
+    this.name = 'BuddyDatabaseMigrationError'
   }
 }
 

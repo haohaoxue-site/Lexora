@@ -73,6 +73,7 @@ const SCALAR_PAYLOAD_KEYS = new Map<string, readonly string[]>([
     'source',
   ]],
   ['tool.completed', ['isError', 'toolCallId', 'toolName']],
+  ['tool.preparing', ['toolCallId', 'toolName']],
   ['tool.started', ['toolCallId', 'toolName']],
   ['tool.updated', ['macro', 'status', 'toolCallId', 'toolName']],
   ['usage.recording.degraded', ['errorCode', 'purpose']],
@@ -113,8 +114,14 @@ function publicPayload(type: string, value: unknown): Record<string, unknown> {
     return publicInterruptedMessage(source)
   if (type === 'run.progress')
     return publicRunProgress(source)
-  if (type === 'tool.started' || type === 'tool.updated' || type === 'tool.completed')
+  if (
+    type === 'tool.preparing'
+    || type === 'tool.started'
+    || type === 'tool.updated'
+    || type === 'tool.completed'
+  ) {
     return publicToolEvent(source, type === 'tool.completed')
+  }
   const keys = SCALAR_PAYLOAD_KEYS.get(type)
   if (!keys)
     return {}

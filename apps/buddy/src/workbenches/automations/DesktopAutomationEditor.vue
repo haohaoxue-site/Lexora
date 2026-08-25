@@ -276,7 +276,7 @@ function createDefaultForm(): AutomationEditorForm {
     day: start.day,
     dayOfMonth: start.day,
     every: 1,
-    executionProfile: 'sandboxed',
+    executionProfile: 'controlled',
     frequencyMode: 'calendar',
     intervalUnit: 'hour',
     localTime: start.toPlainTime().toString({ smallestUnit: 'minute' }),

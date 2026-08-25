@@ -6,6 +6,7 @@ export const buddyRunProgressSchema = z.object({
     'model_requesting',
     'model_streaming',
     'preparing',
+    'awaiting_approval',
     'tool_executing',
   ]),
   toolName: z.string().min(1).max(256).nullable(),

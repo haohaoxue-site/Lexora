@@ -35,6 +35,7 @@ export type BuddyProjectedEventType
     | 'message.tool_result'
     | 'run.progress'
     | 'tool.completed'
+    | 'tool.preparing'
     | 'tool.started'
     | 'tool.updated'
 
@@ -78,6 +79,12 @@ export interface PiEventProjectionState {
   completedCommentaryBlockIndexes: Set<number>
   progress: BuddyRunProgress | null
   toolCalls: Map<string, ToolCallState>
+}
+
+export interface AuthorizedToolExecution {
+  arguments: unknown
+  toolCallId: string
+  toolName: string
 }
 
 type SessionMessage = Extract<AgentSessionEvent, { type: 'message_end' }>['message']
@@ -140,26 +147,29 @@ export function projectPiEvent(
               toolCallId: event.toolCallId,
               toolName: event.toolName,
             },
-            type: 'tool.started',
+            type: 'tool.preparing',
           },
-          ...progressProjection(state, 'tool_executing', event.toolName).events,
+          ...progressProjection(state, 'preparing', event.toolName).events,
         ],
       }
     case 'tool_execution_update':
       return {
-        events: [{
-          payload: {
-            presentation: createBuddyToolPresentation({
-              arguments: event.args,
-              canonicalRoot: state.canonicalRoot,
-              result: event.partialResult,
+        events: [
+          {
+            payload: {
+              presentation: createBuddyToolPresentation({
+                arguments: event.args,
+                canonicalRoot: state.canonicalRoot,
+                result: event.partialResult,
+                toolName: event.toolName,
+              }),
+              toolCallId: event.toolCallId,
               toolName: event.toolName,
-            }),
-            toolCallId: event.toolCallId,
-            toolName: event.toolName,
+            },
+            type: 'tool.updated',
           },
-          type: 'tool.updated',
-        }],
+          ...progressProjection(state, 'tool_executing', event.toolName).events,
+        ],
       }
     case 'tool_execution_end': {
       const tool = state.toolCalls.get(event.toolCallId)
@@ -185,6 +195,34 @@ export function projectPiEvent(
     }
   }
   return { events: [] }
+}
+
+export function projectToolExecutionAuthorized(
+  event: AuthorizedToolExecution,
+  state: PiEventProjectionState,
+): PiEventProjection {
+  const tool = state.toolCalls.get(event.toolCallId) ?? {
+    arguments: event.arguments,
+    toolName: event.toolName,
+  }
+  state.toolCalls.set(event.toolCallId, tool)
+  return {
+    events: [
+      {
+        payload: {
+          presentation: createBuddyToolPresentation({
+            arguments: tool.arguments,
+            canonicalRoot: state.canonicalRoot,
+            toolName: tool.toolName,
+          }),
+          toolCallId: event.toolCallId,
+          toolName: tool.toolName,
+        },
+        type: 'tool.started',
+      },
+      ...progressProjection(state, 'tool_executing', tool.toolName).events,
+    ],
+  }
 }
 
 function projectCompactionEnd(

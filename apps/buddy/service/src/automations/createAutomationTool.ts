@@ -84,7 +84,7 @@ const schedule = Type.Union([
 
 const draft = Type.Object({
   executionProfile: Type.Optional(Type.Union([
-    Type.Literal('sandboxed'),
+    Type.Literal('controlled'),
     Type.Literal('full_access'),
   ])),
   model: Type.Union([
@@ -194,7 +194,7 @@ export function createAutomationTool(options: CreateAutomationToolOptions) {
       'List, inspect, create, update, pause, resume, delete, or immediately queue Lexora Buddy automations.',
       'Use list/get before mutating an existing automation so expectedRevision is current.',
       'For upsert, omit automationId and expectedRevision to create; provide both to update.',
-      'executionProfile defaults to sandboxed; use full_access only when the user explicitly requests unrestricted local access.',
+      'executionProfile defaults to controlled; use full_access only when the user explicitly requests unrestricted local access.',
       'Calendar schedules support daily, weekly, monthly, and yearly cadences; interval and once schedules are also supported.',
       'Mutations always pause for a product confirmation card. Do not replace that confirmation with a conversational question.',
       'run_now only queues one occurrence and returns immediately.',
@@ -240,8 +240,8 @@ export function classifyAutomationTool(
     throw new ToolPolicyValidationError()
   if (parsed.data.operation === 'list' || parsed.data.operation === 'get') {
     return {
-      origin: 'first-party',
       risk: 'read',
+      source: 'lexora',
     }
   }
   const automation = parsed.data.operation === 'upsert'
@@ -254,7 +254,7 @@ export function classifyAutomationTool(
       kind: 'automation',
       summary: `${automationOperationLabel(parsed.data.operation)} automation ${automation.name}`,
     },
-    origin: 'first-party',
+    source: 'lexora',
   }
 }
 

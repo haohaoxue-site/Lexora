@@ -21,7 +21,7 @@ export interface ToolPolicyRequest {
   arguments: unknown
   cwd: string
   grants: readonly ProjectGrant[]
-  origin?: 'builtin' | 'first-party' | 'mcp'
+  source?: 'lexora' | 'mcp' | 'pi'
   paths?: readonly ToolPolicyPath[]
   resource?: { kind?: 'connector' | 'project', projectId: string, trusted: boolean }
   risk?: ToolRisk
@@ -58,11 +58,11 @@ export class ToolPolicy {
     if (declaredPathDecision)
       return declaredPathDecision
 
-    if (request.origin === 'mcp' && request.risk === 'read' && request.resource?.trusted)
+    if (request.source === 'mcp' && request.risk === 'read' && request.resource?.trusted)
       return { type: 'allow' }
-    if (request.origin === 'mcp' || request.risk === 'mcp')
+    if (request.source === 'mcp' || request.risk === 'mcp')
       return ask('mcp', 'Use a connected external tool')
-    if (request.origin === 'first-party' && request.risk === 'read')
+    if (request.source === 'lexora' && request.risk === 'read')
       return { type: 'allow' }
 
     switch (request.toolName) {

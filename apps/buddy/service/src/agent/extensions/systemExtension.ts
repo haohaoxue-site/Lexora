@@ -1,5 +1,6 @@
-import type { Static, TSchema } from 'typebox'
-import type { SystemCapabilityService } from '../../system/systemCapability'
+import type { ToolCallEvent } from '@earendil-works/pi-coding-agent'
+import type { TSchema } from 'typebox'
+import type { SystemActionRequest, SystemCapabilityService } from '../../system/systemCapability'
 import type {
   SystemToolFailureCode,
   SystemToolFailureRecovery,
@@ -8,48 +9,53 @@ import type { BuddyInProcessExtension } from '../createBuddyResourceLoader'
 import type { BuddyToolClassification } from './toolPolicyExtension'
 import { defineTool } from '@earendil-works/pi-coding-agent'
 import { Type } from 'typebox'
-
 import { Check } from 'typebox/value'
-import {
-  SystemCapabilityError,
-} from '../../system/systemCapability'
+
+import { SystemCapabilityError } from '../../system/systemCapability'
 import {
   createSystemToolFailure,
   serializeSystemToolFailure,
   SYSTEM_ACTION_TOOL_NAME,
-  SYSTEM_INSPECT_TOOL_NAME,
 } from '../../system/systemToolFailure'
 
-export { SYSTEM_ACTION_TOOL_NAME, SYSTEM_INSPECT_TOOL_NAME }
+export { SYSTEM_ACTION_TOOL_NAME }
 
-const inspectInputSchema = Type.Object({
-  detail: Type.Optional(Type.Union([
-    Type.Literal('summary'),
-    Type.Literal('diagnostic'),
-  ])),
-  include: Type.Optional(Type.Array(Type.Union([
-    Type.Literal('applications'),
-    Type.Literal('listeners'),
-    Type.Literal('processes'),
-    Type.Literal('services'),
-  ]), { maxItems: 4, minItems: 1, uniqueItems: true })),
-  subject: Type.String({ maxLength: 256, minLength: 1 }),
+const processTargetSchema = Type.Union([
+  Type.Object({
+    kind: Type.Literal('process'),
+    pid: Type.Integer({ maximum: 2_147_483_647, minimum: 2 }),
+  }, { additionalProperties: false }),
+  Type.Object({
+    kind: Type.Literal('process'),
+    name: Type.String({ maxLength: 256, minLength: 1 }),
+  }, { additionalProperties: false }),
+])
+
+const serviceTargetSchema = Type.Object({
+  kind: Type.Literal('service'),
+  scope: Type.Literal('user'),
+  unit: Type.String({ maxLength: 256, minLength: 9, pattern: '\\.service$' }),
 }, { additionalProperties: false })
 
-const actionInputSchema = Type.Object({
-  action: Type.Union([
-    Type.Literal('kill-process'),
-    Type.Literal('restart-service'),
-    Type.Literal('start-service'),
-    Type.Literal('stop-service'),
-    Type.Literal('terminate-process'),
-  ]),
-  reason: Type.String({ maxLength: 512, minLength: 1 }),
-  targetRef: Type.String({ maxLength: 256, pattern: '^system-target:', minLength: 1 }),
-}, { additionalProperties: false })
-
-type InspectInput = Static<typeof inspectInputSchema>
-type ActionInput = Static<typeof actionInputSchema>
+const actionInputSchema = Type.Union([
+  Type.Object({
+    action: Type.Union([
+      Type.Literal('kill-process'),
+      Type.Literal('terminate-process'),
+    ]),
+    reason: Type.String({ maxLength: 512, minLength: 1 }),
+    target: processTargetSchema,
+  }, { additionalProperties: false }),
+  Type.Object({
+    action: Type.Union([
+      Type.Literal('restart-service'),
+      Type.Literal('start-service'),
+      Type.Literal('stop-service'),
+    ]),
+    reason: Type.String({ maxLength: 512, minLength: 1 }),
+    target: serviceTargetSchema,
+  }, { additionalProperties: false }),
+])
 
 export interface CreateSystemExtensionOptions {
   service: SystemCapabilityService
@@ -57,8 +63,7 @@ export interface CreateSystemExtensionOptions {
 
 interface SystemToolDetails {
   code?: SystemToolFailureCode
-  effectiveEnvironment: 'host-adapter-mutation' | 'host-adapter-readonly'
-  inspection?: unknown
+  effectiveEnvironment: 'host-adapter-mutation'
   receipt?: unknown
   recoverable?: boolean
   recovery?: SystemToolFailureRecovery
@@ -72,52 +77,20 @@ export function createSystemExtension(
     factory(pi) {
       pi.registerTool(defineTool<TSchema, SystemToolDetails>({
         description: [
-          'Inspect real host application, process, service, and listening-port facts.',
-          'Use this instead of workspace shell commands for questions about the current computer.',
-          'Report returned facts separately from your own inferences; partial diagnostics do not prove absence.',
+          'Request one supported host state change using a structured process or user-service selector.',
+          'Use an exact PID, exact process executable name, or exact user service unit; use Pi bash first when diagnosis or target discovery is needed.',
+          'Lexora Buddy resolves one concrete target before approval and verifies the same target identity again after approval.',
+          'Call this tool when the user asks for the change so controlled mode can show the product approval card; do not replace it with conversational confirmation.',
+          'Graceful process termination never escalates to force termination automatically.',
         ].join(' '),
-        async execute(_toolCallId, input, signal) {
-          if (!Check(inspectInputSchema, input))
-            return invalidResult('SYSTEM_INSPECTION_INVALID', 'host-adapter-readonly')
-          const executionSignal = signal ?? new AbortController().signal
-          try {
-            const inspection = await options.service.inspect(
-              input as InspectInput,
-              executionSignal,
-            )
-            return {
-              content: [{ type: 'text', text: JSON.stringify(inspection, null, 2) }],
-              details: {
-                effectiveEnvironment: 'host-adapter-readonly',
-                inspection,
-              },
-            }
-          }
-          catch (error) {
-            executionSignal.throwIfAborted()
-            return errorResult(error, 'host-adapter-readonly')
-          }
-        },
-        label: 'Inspect this computer',
-        name: SYSTEM_INSPECT_TOOL_NAME,
-        parameters: inspectInputSchema,
-      }))
-      pi.registerTool(defineTool<TSchema, SystemToolDetails>({
-        description: [
-          'Request one host action against an opaque targetRef returned by lexora_system_inspect.',
-          'Call this when the user asks for the change; Lexora Buddy will pause execution and show the product approval card.',
-          'Do not ask for a conversational confirmation instead of calling this tool.',
-          'Never accepts a PID, signal, unit name, executable, or shell command directly.',
-          'Graceful termination never escalates to force termination automatically.',
-          'If a failed result is recoverable, follow its recovery instruction and never retry the old targetRef.',
-        ].join(' '),
-        async execute(_toolCallId, input, signal) {
+        async execute(toolCallId, input, signal) {
           if (!Check(actionInputSchema, input))
-            return invalidResult('SYSTEM_ACTION_INVALID', 'host-adapter-mutation')
+            return invalidResult('SYSTEM_ACTION_INVALID')
           const executionSignal = signal ?? new AbortController().signal
           try {
             const receipt = await options.service.act(
-              input as ActionInput,
+              toolCallId,
+              input as SystemActionRequest,
               executionSignal,
             )
             return {
@@ -131,7 +104,7 @@ export function createSystemExtension(
           }
           catch (error) {
             executionSignal.throwIfAborted()
-            return errorResult(error, 'host-adapter-mutation')
+            return errorResult(error)
           }
         },
         label: 'Change this computer',
@@ -142,60 +115,49 @@ export function createSystemExtension(
   }
 }
 
-export function classifySystemTool(
+export async function classifySystemTool(
   service: SystemCapabilityService,
-  toolName: string,
-  input: unknown,
-): BuddyToolClassification | null {
-  if (toolName === SYSTEM_INSPECT_TOOL_NAME) {
-    return {
-      origin: 'first-party',
-      risk: 'read',
-    }
-  }
-  if (toolName !== SYSTEM_ACTION_TOOL_NAME)
+  event: ToolCallEvent,
+  signal: AbortSignal,
+): Promise<BuddyToolClassification | null> {
+  if (event.toolName !== SYSTEM_ACTION_TOOL_NAME)
     return null
-  if (!Check(actionInputSchema, input))
+  if (!Check(actionInputSchema, event.input))
     throw new SystemCapabilityError('SYSTEM_ACTION_INVALID')
-  const prepared = service.prepareAction(input as ActionInput)
+  const prepared = await service.prepareAction(
+    event.toolCallId,
+    event.input as SystemActionRequest,
+    signal,
+  )
   return {
     approval: {
       kind: 'system',
       summary: prepared.summary,
       systemAction: prepared.review,
     },
-    origin: 'first-party',
     risk: 'system',
+    source: 'lexora',
   }
 }
 
-function invalidResult(
-  code: SystemToolFailureCode,
-  effectiveEnvironment: SystemToolDetails['effectiveEnvironment'],
-) {
-  return failureResult(code, effectiveEnvironment)
+function invalidResult(code: SystemToolFailureCode) {
+  return failureResult(code)
 }
 
-function errorResult(
-  error: unknown,
-  effectiveEnvironment: SystemToolDetails['effectiveEnvironment'],
-) {
+function errorResult(error: unknown) {
   const code: SystemToolFailureCode = error instanceof SystemCapabilityError
     ? error.code
     : 'SYSTEM_CAPABILITY_FAILED'
-  return failureResult(code, effectiveEnvironment)
+  return failureResult(code)
 }
 
-function failureResult(
-  code: SystemToolFailureCode,
-  effectiveEnvironment: SystemToolDetails['effectiveEnvironment'],
-) {
+function failureResult(code: SystemToolFailureCode) {
   const failure = createSystemToolFailure(code)
   return {
     content: [{ type: 'text' as const, text: serializeSystemToolFailure(code) }],
     details: {
       code,
-      effectiveEnvironment,
+      effectiveEnvironment: 'host-adapter-mutation' as const,
       recoverable: failure.error.recoverable,
       ...(failure.error.recovery ? { recovery: failure.error.recovery } : {}),
     },

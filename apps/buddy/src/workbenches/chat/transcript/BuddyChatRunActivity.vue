@@ -13,6 +13,8 @@ const { t } = useBuddyI18n(() => props.language)
 
 const activityLabel = computed(() => {
   switch (props.turn.progress?.phase) {
+    case 'awaiting_approval':
+      return t('desktop.chat.processAwaitingApproval')
     case 'preparing':
       return t('desktop.chat.progressPreparing')
     case 'model_requesting':

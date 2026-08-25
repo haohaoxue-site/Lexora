@@ -99,7 +99,7 @@ function classifyTool(
     && tool.annotations.destructiveHint !== true
     && tool.annotations.openWorldHint !== true
   return {
-    origin: 'mcp',
+    source: 'mcp',
     resource: {
       kind: 'connector',
       projectId: serverId,

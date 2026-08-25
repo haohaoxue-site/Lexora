@@ -26,7 +26,7 @@ const popoverOpen = shallowRef(false)
 
 function updateFullAccess(value: boolean) {
   if (!value) {
-    emit('updateExecutionProfile', 'sandboxed')
+    emit('updateExecutionProfile', 'controlled')
     return
   }
 

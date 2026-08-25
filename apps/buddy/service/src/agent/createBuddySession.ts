@@ -7,7 +7,6 @@ import type {
 } from '@earendil-works/pi-coding-agent'
 import type { BuddyExecutionProfile } from '../../../shared/executionProfile'
 import type { BuddyServiceTier } from '../../../shared/modelSelection'
-import type { ShellSandboxAssets } from '../approvals/ShellSandbox'
 import type { BuddySessionResources } from './BuddySessionResources'
 import type { BuddyInProcessExtension } from './createBuddyResourceLoader'
 import type { BoundedContextDiagnostic } from './loadBoundedContextFiles'
@@ -29,7 +28,7 @@ import {
   createBuddyResourceLoader,
   createBuddySettingsManager,
 } from './createBuddyResourceLoader'
-import { createWorkspaceExtension } from './extensions/workspaceExtension'
+import { PI_BUILTIN_TOOL_NAMES } from './piBuiltinTools'
 
 const sessionIdentityPattern = /^[A-Z0-9][\w-]{0,127}$/i
 
@@ -47,7 +46,6 @@ export interface CreateBuddySessionOptions {
   piSessionFile?: string
   recoveryMessages?: readonly Message[] | (() => Promise<readonly Message[]>)
   resources: BuddySessionResources
-  shellSandboxAssets: ShellSandboxAssets
   thinkingLevel?: CreateAgentSessionOptions['thinkingLevel']
 }
 
@@ -112,7 +110,6 @@ export async function createBuddySession(
 
   const result = await createConfiguredBuddySession(options, {
     agentDir,
-    canonicalRoot,
     cwd,
     sessionManager,
     sessionStartEvent: {
@@ -167,7 +164,6 @@ export async function createBuddyContextSnapshot(
 
   const result = await createConfiguredBuddySession(options, {
     agentDir,
-    canonicalRoot,
     cwd,
     sessionManager,
     sessionStartEvent: {
@@ -216,7 +212,6 @@ function createSessionShutdown(
 
 interface ConfiguredBuddySessionRuntime {
   agentDir: string
-  canonicalRoot: string
   cwd: string
   sessionManager: SessionManager
   sessionStartEvent: NonNullable<CreateAgentSessionOptions['sessionStartEvent']>
@@ -233,14 +228,7 @@ async function createConfiguredBuddySession(
     agentDir: runtime.agentDir,
     boundedContextFiles: context.agentsFiles,
     cwd: runtime.cwd,
-    inProcessExtensions: [
-      createWorkspaceExtension({
-        canonicalRoot: runtime.canonicalRoot,
-        executionProfile: options.executionProfile,
-        shellSandboxAssets: options.shellSandboxAssets,
-      }),
-      ...options.inProcessExtensions,
-    ],
+    inProcessExtensions: options.inProcessExtensions,
     projectInstructions: options.resources.projectInstructions,
     executionProfile: options.executionProfile,
     settingsManager,
@@ -250,13 +238,16 @@ async function createConfiguredBuddySession(
     cwd: runtime.cwd,
     model: options.model,
     modelRuntime: options.modelRuntime,
-    noTools: 'builtin',
     resourceLoader,
     sessionManager: runtime.sessionManager,
     sessionStartEvent: runtime.sessionStartEvent,
     settingsManager,
     thinkingLevel: options.thinkingLevel,
   })
+  result.session.setActiveToolsByName([...new Set([
+    ...result.session.getActiveToolNames(),
+    ...PI_BUILTIN_TOOL_NAMES,
+  ])])
   const previousPayloadTransform = result.session.agent.onPayload
   result.session.agent.onPayload = async (payload, model) => {
     const previousPayload = await previousPayloadTransform?.(payload, model)

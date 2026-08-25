@@ -53,6 +53,8 @@ export function createReusableBuddySession(
     async activateTurn(input) {
       input.signal.throwIfAborted()
       options.runContext.current = {
+        flushProjectedEvents: input.flushProjectedEvents,
+        onToolExecutionAuthorized: input.onToolExecutionAuthorized,
         runId: input.runId,
         serviceTier: input.serviceTier ?? null,
         signal: input.signal,

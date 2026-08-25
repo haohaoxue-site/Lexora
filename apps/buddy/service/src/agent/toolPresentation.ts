@@ -96,17 +96,6 @@ export function createBuddyToolPresentation(
         ?? (input.result ? null : 'running'),
     }
   }
-  if (input.toolName === 'lexora_system_inspect') {
-    return {
-      action: 'inspect',
-      card: 'system',
-      description,
-      status: input.result ? 'observed' : 'running',
-      target: readSystemInspectionTarget(input.result),
-      verified: null,
-      ...boundedSystemPreview(input.result, 'inspection'),
-    }
-  }
   if (input.toolName === 'lexora_system_action') {
     const receipt = readRecord(readToolDetails(input.result)?.receipt)
     const target = readRecord(receipt?.target)
@@ -120,7 +109,7 @@ export function createBuddyToolPresentation(
         ?? (input.result ? 'failed' : 'running'),
       target: readOptionalString(target, 'displayName'),
       verified: readBoolean(receipt, 'verified'),
-      ...boundedSystemPreview(input.result, 'receipt'),
+      ...boundedSystemPreview(input.result),
     }
   }
   if (input.toolName.startsWith('mcp__')) {
@@ -146,9 +135,11 @@ function readSystemFailureStatus(value: unknown): string | null {
   const detailsCode = readOptionalString(readToolDetails(value), 'code')
   const code = detailsCode ?? parseSystemToolFailure(readToolOutput(value))?.error.code
   switch (code) {
+    case 'SYSTEM_ACTION_EXPIRED':
+    case 'SYSTEM_ACTION_NOT_PREPARED': return 'action-expired'
+    case 'SYSTEM_TARGET_AMBIGUOUS': return 'target-ambiguous'
     case 'SYSTEM_TARGET_CHANGED': return 'target-changed'
-    case 'SYSTEM_TARGET_EXPIRED': return 'target-expired'
-    case 'SYSTEM_TARGET_UNKNOWN': return 'target-unknown'
+    case 'SYSTEM_TARGET_NOT_FOUND': return 'target-not-found'
     default: return null
   }
 }
@@ -165,68 +156,19 @@ function boundedPreview(value: string | null): Pick<
   }
 }
 
-function boundedSystemPreview(
-  value: unknown,
-  detailKey: 'inspection' | 'receipt',
-): ReturnType<typeof boundedPreview> {
+function boundedSystemPreview(value: unknown): ReturnType<typeof boundedPreview> {
   if (parseSystemToolFailure(readToolOutput(value)))
     return boundedPreview(null)
   const details = readToolDetails(value)
-  const detail = details?.[detailKey]
+  const detail = details?.receipt
   if (detail === undefined)
     return boundedPreview(readToolOutput(value))
   try {
-    return boundedPreview(redactSensitiveText(JSON.stringify(
-      removeSystemCapabilityReferences(detail),
-      null,
-      2,
-    )))
+    return boundedPreview(redactSensitiveText(JSON.stringify(detail, null, 2)))
   }
   catch {
     return boundedPreview('Lexora Buddy system capability returned an unreadable result')
   }
-}
-
-function removeSystemCapabilityReferences(value: unknown): unknown {
-  if (Array.isArray(value))
-    return value.map(removeSystemCapabilityReferences)
-  const record = readRecord(value)
-  if (!record)
-    return value
-  return Object.fromEntries(Object.entries(record).flatMap(([key, entry]) => (
-    key === 'expiresAt' || key === 'nextTargetRef' || key === 'targetRef'
-      ? []
-      : [[key, removeSystemCapabilityReferences(entry)]]
-  )))
-}
-
-function readSystemInspectionTarget(value: unknown): string | null {
-  const inspection = readRecord(readToolDetails(value)?.inspection)
-  const facts = readRecord(inspection?.facts)
-  const candidates = [
-    ...readRecords(facts?.processes).flatMap((process) => {
-      const commandName = readOptionalString(process, 'commandName')
-      if (!commandName)
-        return []
-      const pid = readPositiveInteger(process, 'pid')
-      return [pid ? `${commandName} (PID ${pid})` : commandName]
-    }),
-    ...readRecords(facts?.applications).flatMap(application => (
-      readOptionalString(application, 'displayName') ?? []
-    )),
-    ...readRecords(facts?.services).flatMap(service => (
-      readOptionalString(service, 'unit') ?? []
-    )),
-    ...readRecords(facts?.listeners).flatMap((listener) => {
-      const label = readOptionalString(listener, 'processName')
-        ?? readOptionalString(listener, 'localAddress')
-      return label ? [label] : []
-    }),
-  ]
-  const uniqueCandidates = [...new Set(candidates.map(candidate => candidate.trim()).filter(Boolean))]
-  return uniqueCandidates.length === 1
-    ? uniqueCandidates[0]!.slice(0, 256)
-    : null
 }
 
 function readToolOutput(value: unknown): string | null {
@@ -380,16 +322,4 @@ function readRecord(value: unknown): Record<string, unknown> | null {
   return value && typeof value === 'object' && !Array.isArray(value)
     ? value as Record<string, unknown>
     : null
-}
-
-function readRecords(value: unknown): Record<string, unknown>[] {
-  if (!Array.isArray(value))
-    return []
-  const records: Record<string, unknown>[] = []
-  for (const entry of value) {
-    const record = readRecord(entry)
-    if (record)
-      records.push(record)
-  }
-  return records
 }

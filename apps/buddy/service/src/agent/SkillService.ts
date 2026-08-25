@@ -7,8 +7,8 @@ import { mkdir, realpath } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 
 import { loadSkillsFromDir, stripFrontmatter } from '@earendil-works/pi-coding-agent'
-import { readSandboxedFile } from '../approvals/FileSandbox'
 import { GrantedPathError, resolveGrantedPath } from '../projects/resolveGrantedPath'
+import { readBoundedFile } from '../resources/BoundedFileReader'
 
 const MAX_MATERIALIZED_SKILL_BYTES = 256 * 1024
 
@@ -107,7 +107,7 @@ export class SkillService {
         throw new BuddySkillSelectionError('SKILL_NOT_FOUND')
       let content: Buffer
       try {
-        content = await readSandboxedFile(skill.readRoot, skill.path)
+        content = await readBoundedFile(skill.readRoot, skill.path)
       }
       catch (error) {
         throw new BuddySkillSelectionError('SKILL_UNREADABLE', { cause: error })
@@ -294,7 +294,7 @@ async function loadSource(
       continue
     let content: Buffer
     try {
-      content = await readSandboxedFile(source.directory, path)
+      content = await readBoundedFile(source.directory, path)
     }
     catch {
       diagnostics.push({

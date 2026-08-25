@@ -325,20 +325,20 @@ const zhCN = {
   'desktop.chat.processToolInterrupted': '已中断',
   'desktop.chat.processToolNoOutput': '命令未产生输出',
   'desktop.chat.processToolPet': '桌宠动作',
+  'desktop.chat.processToolPreparing': '准备中',
   'desktop.chat.processToolOutput': '输出',
   'desktop.chat.processToolRead': '读取文件',
   'desktop.chat.processToolSearch': '搜索',
   'desktop.chat.processToolSystemAction': '系统操作',
-  'desktop.chat.processToolSystemInspect': '检查当前电脑',
+  'desktop.chat.processToolSystemStatus.actionExpired': '操作已过期，请重新发起',
   'desktop.chat.processToolSystemStatus.awaitingApproval': '等待批准',
   'desktop.chat.processToolSystemStatus.completed': '已完成',
   'desktop.chat.processToolSystemStatus.failed': '失败',
   'desktop.chat.processToolSystemStatus.needsEscalation': '需要进一步操作',
-  'desktop.chat.processToolSystemStatus.observed': '已检查',
   'desktop.chat.processToolSystemStatus.running': '进行中',
-  'desktop.chat.processToolSystemStatus.targetChanged': '目标已变化，请重新检查',
-  'desktop.chat.processToolSystemStatus.targetExpired': '目标已过期，请重新检查',
-  'desktop.chat.processToolSystemStatus.targetUnknown': '目标引用已失效，请重新检查',
+  'desktop.chat.processToolSystemStatus.targetAmbiguous': '匹配到多个目标，请明确目标',
+  'desktop.chat.processToolSystemStatus.targetChanged': '目标已变化，请重新发起',
+  'desktop.chat.processToolSystemStatus.targetNotFound': '未找到目标，请重新确认',
   'desktop.chat.processToolSystemStatus.unknown': '状态未知',
   'desktop.chat.processToolSystemTargetPending': '待确认目标',
   'desktop.chat.processToolRunning': '运行中',
@@ -1314,20 +1314,20 @@ const enUS = {
   'desktop.chat.processToolInterrupted': 'Interrupted',
   'desktop.chat.processToolNoOutput': 'Command produced no output',
   'desktop.chat.processToolPet': 'Pet action',
+  'desktop.chat.processToolPreparing': 'Preparing',
   'desktop.chat.processToolOutput': 'Output',
   'desktop.chat.processToolRead': 'Read file',
   'desktop.chat.processToolSearch': 'Search',
   'desktop.chat.processToolSystemAction': 'System action',
-  'desktop.chat.processToolSystemInspect': 'Inspect this computer',
+  'desktop.chat.processToolSystemStatus.actionExpired': 'Action expired; retry it',
   'desktop.chat.processToolSystemStatus.awaitingApproval': 'Awaiting approval',
   'desktop.chat.processToolSystemStatus.completed': 'Completed',
   'desktop.chat.processToolSystemStatus.failed': 'Failed',
   'desktop.chat.processToolSystemStatus.needsEscalation': 'Further action required',
-  'desktop.chat.processToolSystemStatus.observed': 'Inspected',
   'desktop.chat.processToolSystemStatus.running': 'In progress',
-  'desktop.chat.processToolSystemStatus.targetChanged': 'Target changed; inspect it again',
-  'desktop.chat.processToolSystemStatus.targetExpired': 'Target expired; inspect it again',
-  'desktop.chat.processToolSystemStatus.targetUnknown': 'Target reference is no longer valid; inspect it again',
+  'desktop.chat.processToolSystemStatus.targetAmbiguous': 'Multiple targets matched; specify one',
+  'desktop.chat.processToolSystemStatus.targetChanged': 'Target changed; retry the action',
+  'desktop.chat.processToolSystemStatus.targetNotFound': 'Target not found; verify it and retry',
   'desktop.chat.processToolSystemStatus.unknown': 'Status unavailable',
   'desktop.chat.processToolSystemTargetPending': 'Pending target',
   'desktop.chat.processToolRunning': 'Running',
@@ -2033,15 +2033,15 @@ export function translateSystemToolStatus(
   status: string | null,
 ): string {
   switch (status) {
+    case 'action-expired': return translateBuddy(locale, 'desktop.chat.processToolSystemStatus.actionExpired')
     case 'awaiting-approval': return translateBuddy(locale, 'desktop.chat.processToolSystemStatus.awaitingApproval')
     case 'completed': return translateBuddy(locale, 'desktop.chat.processToolSystemStatus.completed')
     case 'failed': return translateBuddy(locale, 'desktop.chat.processToolSystemStatus.failed')
     case 'needs-escalation': return translateBuddy(locale, 'desktop.chat.processToolSystemStatus.needsEscalation')
-    case 'observed': return translateBuddy(locale, 'desktop.chat.processToolSystemStatus.observed')
     case 'running': return translateBuddy(locale, 'desktop.chat.processToolSystemStatus.running')
+    case 'target-ambiguous': return translateBuddy(locale, 'desktop.chat.processToolSystemStatus.targetAmbiguous')
     case 'target-changed': return translateBuddy(locale, 'desktop.chat.processToolSystemStatus.targetChanged')
-    case 'target-expired': return translateBuddy(locale, 'desktop.chat.processToolSystemStatus.targetExpired')
-    case 'target-unknown': return translateBuddy(locale, 'desktop.chat.processToolSystemStatus.targetUnknown')
+    case 'target-not-found': return translateBuddy(locale, 'desktop.chat.processToolSystemStatus.targetNotFound')
     default: return translateBuddy(locale, 'desktop.chat.processToolSystemStatus.unknown')
   }
 }

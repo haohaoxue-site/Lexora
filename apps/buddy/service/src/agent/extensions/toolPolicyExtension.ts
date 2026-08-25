@@ -19,8 +19,7 @@ import type { BuddyInProcessExtension } from '../createBuddyResourceLoader'
 import { ToolPolicy } from '../../approvals/ToolPolicy'
 import { SystemCapabilityError } from '../../system/systemCapability'
 import { serializeSystemToolFailure } from '../../system/systemToolFailure'
-
-const BUILTIN_TOOLS = new Set(['bash', 'edit', 'find', 'grep', 'ls', 'read', 'write'])
+import { PI_BUILTIN_TOOL_NAME_SET } from '../piBuiltinTools'
 
 export interface ToolApprovalGateway {
   request: (input: {
@@ -44,13 +43,19 @@ export interface BuddyToolClassification {
     systemAction?: SystemActionApprovalReviewInput
   }
   alwaysConfirm?: boolean
-  origin?: 'builtin' | 'first-party' | 'mcp'
+  source?: 'lexora' | 'mcp' | 'pi'
   paths?: readonly ToolPolicyPath[]
   resource?: { kind?: 'connector' | 'project', projectId: string, trusted: boolean }
   risk?: ToolRisk
 }
 
 export interface BuddyRunContext {
+  flushProjectedEvents: () => Promise<void>
+  onToolExecutionAuthorized: (event: {
+    arguments: unknown
+    toolCallId: string
+    toolName: string
+  }) => Promise<void>
   runId: string
   serviceTier?: BuddyServiceTier | null
   signal: AbortSignal
@@ -58,7 +63,10 @@ export interface BuddyRunContext {
 
 export interface CreateToolPolicyExtensionOptions {
   approvalService: ToolApprovalGateway
-  classifyTool?: (event: ToolCallEvent) => BuddyToolClassification
+  classifyTool?: (
+    event: ToolCallEvent,
+    run: BuddyRunContext,
+  ) => BuddyToolClassification | null | undefined | Promise<BuddyToolClassification | null | undefined>
   cwd: string
   executionProfile: BuddyExecutionProfile
   getGrants: () => readonly ProjectGrant[]
@@ -84,12 +92,16 @@ async function decideToolCall(
   event: ToolCallEvent,
 ): Promise<ToolCallEventResult | void> {
   try {
-    const declared = options.classifyTool?.(event) ?? {}
+    const run = options.getRunContext()
+    if (!run)
+      return block('RUN_CONTEXT_UNAVAILABLE')
+    await run.flushProjectedEvents()
+    const declared = (await options.classifyTool?.(event, run)) ?? {}
     if (declared.alwaysConfirm) {
       const approval = declared.approval
       if (!approval?.kind)
         return block('VALIDATION_FAILED')
-      return requestApproval(options, event, {
+      return requestApproval(options, event, run, {
         automation: approval.automation,
         kind: approval.kind,
         summary: approval.summary,
@@ -97,23 +109,23 @@ async function decideToolCall(
       })
     }
     if (options.executionProfile === 'full_access')
-      return
+      return authorizeToolExecution(run, event)
     const decision = await toolPolicy.decide({
       arguments: event.input,
       cwd: options.cwd,
       grants: options.getGrants(),
-      origin: BUILTIN_TOOLS.has(event.toolName) ? 'builtin' : declared.origin,
       paths: declared.paths,
       resource: declared.resource,
       risk: declared.risk,
+      source: PI_BUILTIN_TOOL_NAME_SET.has(event.toolName) ? 'pi' : declared.source,
       toolName: event.toolName,
     })
     if (decision.type === 'allow')
-      return
+      return authorizeToolExecution(run, event)
     if (decision.type === 'deny')
       return block(decision.code)
 
-    return requestApproval(options, event, {
+    return requestApproval(options, event, run, {
       automation: declared.approval?.automation,
       kind: decision.kind,
       summary: declared.approval?.summary ?? decision.summary,
@@ -128,6 +140,7 @@ async function decideToolCall(
 async function requestApproval(
   options: CreateToolPolicyExtensionOptions,
   event: ToolCallEvent,
+  run: BuddyRunContext,
   review: {
     automation?: AutomationApprovalReviewInput
     kind: ToolApprovalKind
@@ -135,9 +148,6 @@ async function requestApproval(
     systemAction?: SystemActionApprovalReviewInput
   },
 ): Promise<ToolCallEventResult | void> {
-  const run = options.getRunContext()
-  if (!run)
-    return block('RUN_CONTEXT_UNAVAILABLE')
   const approval = await options.approvalService.request({
     arguments: event.input,
     automation: review.automation,
@@ -149,7 +159,20 @@ async function requestApproval(
     toolCallId: event.toolCallId,
     toolName: event.toolName,
   })
-  return approval === 'approved' ? undefined : block('APPROVAL_DENIED')
+  return approval === 'approved'
+    ? authorizeToolExecution(run, event)
+    : block('APPROVAL_DENIED')
+}
+
+async function authorizeToolExecution(
+  run: BuddyRunContext,
+  event: ToolCallEvent,
+): Promise<void> {
+  await run.onToolExecutionAuthorized({
+    arguments: event.input,
+    toolCallId: event.toolCallId,
+    toolName: event.toolName,
+  })
 }
 
 function block(reason: string): ToolCallEventResult {
@@ -177,11 +200,14 @@ function readStableErrorCode(error: unknown): string {
     'INVALID_PATH',
     'PATH_NOT_FOUND',
     'PATH_OUTSIDE_GRANTED_DIRECTORY',
+    'SYSTEM_ACTION_CHANGED',
+    'SYSTEM_ACTION_EXPIRED',
     'SYSTEM_ACTION_INVALID',
     'SYSTEM_ACTION_NOT_ALLOWED',
+    'SYSTEM_ACTION_NOT_PREPARED',
+    'SYSTEM_TARGET_AMBIGUOUS',
     'SYSTEM_TARGET_CHANGED',
-    'SYSTEM_TARGET_EXPIRED',
-    'SYSTEM_TARGET_UNKNOWN',
+    'SYSTEM_TARGET_NOT_FOUND',
     'VALIDATION_FAILED',
   ]).has(code)) {
     return code

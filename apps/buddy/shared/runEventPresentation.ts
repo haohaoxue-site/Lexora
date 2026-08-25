@@ -63,7 +63,6 @@ export const buddyToolPresentationSchema = z.discriminatedUnion('card', [
   }).strict(),
   previewSchema.extend({
     action: z.enum([
-      'inspect',
       'kill-process',
       'restart-service',
       'start-service',

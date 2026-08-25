@@ -40,6 +40,8 @@ const terminalStatus = computed(() => {
         : t('desktop.chat.processToolExitCode', { code: terminal.value.exitCode })
     case 'interrupted':
       return t('desktop.chat.processToolInterrupted')
+    case 'preparing':
+      return t('desktop.chat.processToolPreparing')
     case 'running':
       return t('desktop.chat.processToolRunning')
   }

@@ -1,5 +1,4 @@
 import type { SystemActionApprovalReviewInput } from '../../../shared/approvalReviewPayload'
-import { randomUUID } from 'node:crypto'
 
 export const SYSTEM_ACTION_KINDS = [
   'kill-process',
@@ -10,14 +9,7 @@ export const SYSTEM_ACTION_KINDS = [
 ] as const
 
 export type SystemActionKind = typeof SYSTEM_ACTION_KINDS[number]
-export type SystemInspectionSection = 'applications' | 'listeners' | 'processes' | 'services'
 export type SystemInterruption = 'application' | 'network' | 'none' | 'service'
-
-export interface SystemInspectionRequest {
-  detail?: 'diagnostic' | 'summary'
-  include?: readonly SystemInspectionSection[]
-  subject: string
-}
 
 interface SystemTargetBase {
   allowedActions: readonly SystemActionKind[]
@@ -37,61 +29,39 @@ export interface ServiceSystemTarget extends SystemTargetBase {
   activeState: string
   displayUnit: string
   kind: 'service'
-  scope: 'system' | 'user'
+  scope: 'user'
   unit: string
 }
 
 export type SystemTarget = ProcessSystemTarget | ServiceSystemTarget
 
-export interface HostProcessObservation {
-  commandName: string
-  commandSummary: string | null
-  memoryRssBytes: number | null
-  parentPid: number | null
-  role: 'application' | 'launcher' | 'sidecar' | 'unknown'
-  state: 'running' | 'sleeping' | 'stopped' | 'zombie' | 'unknown'
-  target: ProcessSystemTarget
-}
+export type ProcessSystemTargetSelector
+  = | { kind: 'process', name: string }
+    | { kind: 'process', pid: number }
 
-export interface HostServiceObservation {
-  activeState: string
-  description: string
-  mainPid: number | null
-  scope: 'system' | 'user'
-  subState: string
-  target?: ServiceSystemTarget
+export interface ServiceSystemTargetSelector {
+  kind: 'service'
+  scope: 'user'
   unit: string
 }
 
-export interface HostListenerObservation {
-  localAddress: string
-  pid: number | null
-  processName: string | null
-  protocol: 'tcp' | 'udp'
-  target?: ProcessSystemTarget
+export type SystemTargetSelector = ProcessSystemTargetSelector | ServiceSystemTargetSelector
+
+interface SystemActionRequestBase {
+  reason: string
 }
 
-export interface HostApplicationObservation {
-  displayName: string
-  processIds: readonly number[]
-  status: 'running' | 'stopped' | 'unknown'
-  target?: ProcessSystemTarget | ServiceSystemTarget
+export interface ProcessSystemActionRequest extends SystemActionRequestBase {
+  action: 'kill-process' | 'terminate-process'
+  target: ProcessSystemTargetSelector
 }
 
-export interface SystemProbeDiagnostic {
-  code: string
-  message: string
-  probe: SystemInspectionSection
+export interface ServiceSystemActionRequest extends SystemActionRequestBase {
+  action: 'restart-service' | 'start-service' | 'stop-service'
+  target: ServiceSystemTargetSelector
 }
 
-export interface SystemHostInspection {
-  applications: readonly HostApplicationObservation[]
-  diagnostics: readonly SystemProbeDiagnostic[]
-  listeners: readonly HostListenerObservation[]
-  observedAt: string
-  processes: readonly HostProcessObservation[]
-  services: readonly HostServiceObservation[]
-}
+export type SystemActionRequest = ProcessSystemActionRequest | ServiceSystemActionRequest
 
 export interface SystemHostPort {
   execute: (
@@ -99,225 +69,161 @@ export interface SystemHostPort {
     action: SystemActionKind,
     signal: AbortSignal,
   ) => Promise<void>
-  inspect: (
-    input: SystemInspectionRequest,
-    signal: AbortSignal,
-  ) => Promise<SystemHostInspection>
   readTarget: (
     target: SystemTarget,
     signal: AbortSignal,
   ) => Promise<SystemTarget | null>
-}
-
-export interface SystemActionRequest {
-  action: SystemActionKind
-  reason: string
-  targetRef: string
+  resolveTargets: (
+    selector: SystemTargetSelector,
+    signal: AbortSignal,
+  ) => Promise<readonly SystemTarget[]>
 }
 
 export interface PreparedSystemAction {
   review: SystemActionApprovalReviewInput
   summary: string
-  target: SystemTarget
 }
 
-interface SystemTargetEntry {
+interface PreparedSystemActionEntry {
   expiresAt: number
+  request: SystemActionRequest
   target: SystemTarget
 }
 
-export interface SystemTargetRegistryOptions {
+export interface SystemActionPreparationRegistryOptions {
   maxEntries?: number
   now?: () => number
-  randomId?: () => string
   ttlMs?: number
 }
 
-export class SystemTargetRegistry {
-  readonly #entries = new Map<string, SystemTargetEntry>()
+export class SystemActionPreparationRegistry {
+  readonly #entries = new Map<string, PreparedSystemActionEntry>()
   readonly #maxEntries: number
   readonly #now: () => number
-  readonly #randomId: () => string
   readonly #ttlMs: number
 
-  constructor(options: SystemTargetRegistryOptions = {}) {
+  constructor(options: SystemActionPreparationRegistryOptions = {}) {
     this.#maxEntries = options.maxEntries ?? 512
     this.#now = options.now ?? Date.now
-    this.#randomId = options.randomId ?? randomUUID
     this.#ttlMs = options.ttlMs ?? 5 * 60 * 1_000
   }
 
-  issue(target: SystemTarget): { expiresAt: string, targetRef: string } {
+  prepare(
+    toolCallId: string,
+    request: SystemActionRequest,
+    target: SystemTarget,
+  ): PreparedSystemAction {
     this.#prune()
-    const targetRef = `system-target:${this.#randomId()}`
-    const expiresAt = this.#now() + this.#ttlMs
-    this.#entries.set(targetRef, { expiresAt, target: cloneTarget(target) })
+    const existing = this.#entries.get(toolCallId)
+    if (existing) {
+      if (!sameRequest(existing.request, request) || !sameTargetIdentity(existing.target, target))
+        throw new SystemCapabilityError('SYSTEM_ACTION_CHANGED')
+      return createPreparedSystemAction(existing)
+    }
+    const entry: PreparedSystemActionEntry = {
+      expiresAt: this.#now() + this.#ttlMs,
+      request: cloneRequest(request),
+      target: cloneTarget(target),
+    }
+    this.#entries.set(toolCallId, entry)
     while (this.#entries.size > this.#maxEntries) {
       const oldest = this.#entries.keys().next().value
       if (typeof oldest !== 'string')
         break
       this.#entries.delete(oldest)
     }
-    return { expiresAt: new Date(expiresAt).toISOString(), targetRef }
+    return createPreparedSystemAction(entry)
   }
 
-  prepareAction(input: SystemActionRequest): PreparedSystemAction {
-    const entry = this.#require(input.targetRef)
-    if (!entry.target.allowedActions.includes(input.action))
-      throw new SystemCapabilityError('SYSTEM_ACTION_NOT_ALLOWED')
-    const reason = input.reason.trim()
-    if (!reason || reason.length > 512)
-      throw new SystemCapabilityError('SYSTEM_ACTION_INVALID')
-    return {
-      review: {
-        action: input.action,
-        effect: describeEffect(input.action),
-        expiresAt: new Date(entry.expiresAt).toISOString(),
-        interruption: entry.target.interruption,
-        reason,
-        target: targetReview(entry.target),
-      },
-      summary: describeSummary(input.action, entry.target),
-      target: cloneTarget(entry.target),
-    }
-  }
-
-  #require(targetRef: string): SystemTargetEntry {
-    const entry = this.#entries.get(targetRef)
+  take(toolCallId: string, request: SystemActionRequest): SystemTarget {
+    const entry = this.#entries.get(toolCallId)
     if (!entry)
-      throw new SystemCapabilityError('SYSTEM_TARGET_UNKNOWN')
-    if (entry.expiresAt <= this.#now()) {
-      this.#entries.delete(targetRef)
-      throw new SystemCapabilityError('SYSTEM_TARGET_EXPIRED')
-    }
-    return entry
+      throw new SystemCapabilityError('SYSTEM_ACTION_NOT_PREPARED')
+    this.#entries.delete(toolCallId)
+    if (entry.expiresAt <= this.#now())
+      throw new SystemCapabilityError('SYSTEM_ACTION_EXPIRED')
+    if (!sameRequest(entry.request, request))
+      throw new SystemCapabilityError('SYSTEM_ACTION_CHANGED')
+    return cloneTarget(entry.target)
   }
 
   #prune(): void {
     const now = this.#now()
-    for (const [targetRef, entry] of this.#entries) {
+    for (const [toolCallId, entry] of this.#entries) {
       if (entry.expiresAt <= now)
-        this.#entries.delete(targetRef)
+        this.#entries.delete(toolCallId)
     }
   }
 }
 
 export interface SystemCapabilityServiceOptions {
+  actions?: SystemActionPreparationRegistry
   host: SystemHostPort
-  targets?: SystemTargetRegistry
 }
 
 export class SystemCapabilityService {
+  readonly #actions: SystemActionPreparationRegistry
   readonly #host: SystemHostPort
-  readonly #targets: SystemTargetRegistry
 
   constructor(options: SystemCapabilityServiceOptions) {
+    this.#actions = options.actions ?? new SystemActionPreparationRegistry()
     this.#host = options.host
-    this.#targets = options.targets ?? new SystemTargetRegistry()
   }
 
-  prepareAction(input: SystemActionRequest): PreparedSystemAction {
-    return this.#targets.prepareAction(input)
+  async prepareAction(
+    toolCallId: string,
+    input: SystemActionRequest,
+    signal: AbortSignal,
+  ): Promise<PreparedSystemAction> {
+    signal.throwIfAborted()
+    validateActionRequest(input)
+    const targets = await this.#host.resolveTargets(input.target, signal)
+    if (targets.length === 0)
+      throw new SystemCapabilityError('SYSTEM_TARGET_NOT_FOUND')
+    if (targets.length > 1)
+      throw new SystemCapabilityError('SYSTEM_TARGET_AMBIGUOUS')
+    const target = targets[0]!
+    if (!target.allowedActions.includes(input.action))
+      throw new SystemCapabilityError('SYSTEM_ACTION_NOT_ALLOWED')
+    return this.#actions.prepare(toolCallId, input, target)
   }
 
-  async inspect(
-    input: SystemInspectionRequest,
+  async act(
+    toolCallId: string,
+    input: SystemActionRequest,
     signal: AbortSignal,
   ) {
     signal.throwIfAborted()
-    const snapshot = await this.#host.inspect(input, signal)
-    return {
-      diagnostics: [...snapshot.diagnostics],
-      facts: {
-        applications: snapshot.applications.map(application => ({
-          displayName: application.displayName,
-          processIds: [...application.processIds],
-          status: application.status,
-          ...this.#publicTarget(application.target),
-        })),
-        listeners: snapshot.listeners.map(listener => ({
-          localAddress: listener.localAddress,
-          pid: listener.pid,
-          processName: listener.processName,
-          protocol: listener.protocol,
-          ...this.#publicTarget(listener.target),
-        })),
-        processes: snapshot.processes.map(process => ({
-          commandName: process.commandName,
-          commandSummary: process.commandSummary,
-          memoryRssBytes: process.memoryRssBytes,
-          parentPid: process.parentPid,
-          pid: process.target.pid,
-          role: process.role,
-          startedAt: process.target.startedAt,
-          state: process.state,
-          ...this.#requiredPublicTarget(process.target),
-        })),
-        services: snapshot.services.map(service => ({
-          activeState: service.activeState,
-          description: service.description,
-          mainPid: service.mainPid,
-          scope: service.scope,
-          subState: service.subState,
-          unit: service.unit,
-          ...this.#publicTarget(service.target),
-        })),
-      },
-      observedAt: snapshot.observedAt,
-      subject: input.subject,
-    }
-  }
-
-  async act(input: SystemActionRequest, signal: AbortSignal) {
-    signal.throwIfAborted()
-    const prepared = this.#targets.prepareAction(input)
-    const current = await this.#host.readTarget(prepared.target, signal)
-    if (!current || !sameTargetIdentity(prepared.target, current))
+    validateActionRequest(input)
+    const approvedTarget = this.#actions.take(toolCallId, input)
+    const current = await this.#host.readTarget(approvedTarget, signal)
+    if (!current || !sameTargetIdentity(approvedTarget, current))
       throw new SystemCapabilityError('SYSTEM_TARGET_CHANGED')
+    if (!current.allowedActions.includes(input.action))
+      throw new SystemCapabilityError('SYSTEM_ACTION_NOT_ALLOWED')
     await this.#host.execute(current, input.action, signal)
     const postAction = await this.#host.readTarget(current, signal)
     const outcome = evaluatePostcondition(input.action, current, postAction)
-    const nextTarget = postAction && sameTargetIdentity(current, postAction)
-      ? this.#targets.issue(postAction)
-      : null
     return {
       action: input.action,
       message: outcome.message,
-      nextTargetRef: outcome.status === 'needs-escalation'
-        ? nextTarget?.targetRef ?? null
-        : null,
       observedAt: new Date().toISOString(),
       status: outcome.status,
       target: targetReview(current),
       verified: outcome.verified,
     }
   }
-
-  #requiredPublicTarget(target: SystemTarget) {
-    const allowedActions = [...target.allowedActions]
-    return {
-      allowedActions,
-      ...(allowedActions.length > 0 ? this.#targets.issue(target) : {}),
-    }
-  }
-
-  #publicTarget(target: SystemTarget | undefined): {
-    allowedActions?: SystemActionKind[]
-    expiresAt?: string
-    targetRef?: string
-  } {
-    if (!target)
-      return {}
-    return this.#requiredPublicTarget(target)
-  }
 }
 
 export type SystemCapabilityErrorCode
-  = 'SYSTEM_ACTION_INVALID'
+  = 'SYSTEM_ACTION_CHANGED'
+    | 'SYSTEM_ACTION_EXPIRED'
+    | 'SYSTEM_ACTION_INVALID'
     | 'SYSTEM_ACTION_NOT_ALLOWED'
+    | 'SYSTEM_ACTION_NOT_PREPARED'
+    | 'SYSTEM_TARGET_AMBIGUOUS'
     | 'SYSTEM_TARGET_CHANGED'
-    | 'SYSTEM_TARGET_EXPIRED'
-    | 'SYSTEM_TARGET_UNKNOWN'
+    | 'SYSTEM_TARGET_NOT_FOUND'
 
 export class SystemCapabilityError extends Error {
   readonly code: SystemCapabilityErrorCode
@@ -326,6 +232,35 @@ export class SystemCapabilityError extends Error {
     super('Lexora Buddy system capability could not complete the request')
     this.name = 'SystemCapabilityError'
     this.code = code
+  }
+}
+
+function validateActionRequest(input: SystemActionRequest): void {
+  const reason = input.reason.trim()
+  if (!reason || reason.length > 512)
+    throw new SystemCapabilityError('SYSTEM_ACTION_INVALID')
+  if (input.target.kind === 'process') {
+    if (input.action !== 'terminate-process' && input.action !== 'kill-process')
+      throw new SystemCapabilityError('SYSTEM_ACTION_INVALID')
+    if ('pid' in input.target) {
+      if (!Number.isSafeInteger(input.target.pid) || input.target.pid <= 1)
+        throw new SystemCapabilityError('SYSTEM_ACTION_INVALID')
+      return
+    }
+    if (!input.target.name.trim() || input.target.name.length > 256)
+      throw new SystemCapabilityError('SYSTEM_ACTION_INVALID')
+    return
+  }
+  if (input.action !== 'start-service'
+    && input.action !== 'stop-service'
+    && input.action !== 'restart-service') {
+    throw new SystemCapabilityError('SYSTEM_ACTION_INVALID')
+  }
+  if (input.target.scope !== 'user'
+    || !input.target.unit.trim()
+    || !input.target.unit.endsWith('.service')
+    || input.target.unit.length > 256) {
+    throw new SystemCapabilityError('SYSTEM_ACTION_INVALID')
   }
 }
 
@@ -343,6 +278,25 @@ function sameTargetIdentity(expected: SystemTarget, current: SystemTarget): bool
     && expected.unit === current.unit
 }
 
+function sameRequest(expected: SystemActionRequest, current: SystemActionRequest): boolean {
+  if (expected.action !== current.action || expected.reason !== current.reason)
+    return false
+  if (expected.target.kind !== current.target.kind)
+    return false
+  if (expected.target.kind === 'service' && current.target.kind === 'service') {
+    return expected.target.scope === current.target.scope
+      && expected.target.unit === current.target.unit
+  }
+  if (expected.target.kind !== 'process' || current.target.kind !== 'process')
+    return false
+  if ('pid' in expected.target || 'pid' in current.target) {
+    return 'pid' in expected.target
+      && 'pid' in current.target
+      && expected.target.pid === current.target.pid
+  }
+  return expected.target.name === current.target.name
+}
+
 function evaluatePostcondition(
   action: SystemActionKind,
   target: SystemTarget,
@@ -351,7 +305,7 @@ function evaluatePostcondition(
   if (target.kind === 'process') {
     if (!postAction || !sameTargetIdentity(target, postAction)) {
       return {
-        message: 'The inspected process identity is no longer running',
+        message: 'The approved process identity is no longer running',
         status: 'completed',
         verified: true,
       }
@@ -389,6 +343,20 @@ function evaluatePostcondition(
   }
 }
 
+function createPreparedSystemAction(entry: PreparedSystemActionEntry): PreparedSystemAction {
+  return {
+    review: {
+      action: entry.request.action,
+      effect: describeEffect(entry.request.action),
+      expiresAt: new Date(entry.expiresAt).toISOString(),
+      interruption: entry.target.interruption,
+      reason: entry.request.reason.trim(),
+      target: targetReview(entry.target),
+    },
+    summary: describeSummary(entry.request.action, entry.target),
+  }
+}
+
 function targetReview(target: SystemTarget): SystemActionApprovalReviewInput['target'] {
   return target.kind === 'process'
     ? {
@@ -419,6 +387,18 @@ function describeEffect(action: SystemActionKind): string {
 
 function describeSummary(action: SystemActionKind, target: SystemTarget): string {
   return `${describeEffect(action)}: ${target.displayName}`
+}
+
+function cloneRequest(request: SystemActionRequest): SystemActionRequest {
+  switch (request.action) {
+    case 'kill-process':
+    case 'terminate-process':
+      return { ...request, target: { ...request.target } }
+    case 'restart-service':
+    case 'start-service':
+    case 'stop-service':
+      return { ...request, target: { ...request.target } }
+  }
 }
 
 function cloneTarget(target: SystemTarget): SystemTarget {

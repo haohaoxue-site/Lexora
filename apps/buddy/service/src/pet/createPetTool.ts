@@ -32,7 +32,7 @@ interface PetToolDetails {
 }
 
 export const PET_TOOL_CLASSIFICATION: BuddyToolClassification = {
-  origin: 'first-party',
+  source: 'lexora',
   risk: 'visual',
 }
 

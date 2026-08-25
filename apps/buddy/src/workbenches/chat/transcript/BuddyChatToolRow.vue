@@ -49,9 +49,7 @@ const title = computed(() => {
       : 'desktop.chat.processToolEdit')
     case 'connector': return t('desktop.chat.processToolConnector')
     case 'pet': return t('desktop.chat.processToolPet')
-    case 'system': return t(props.node.presentation.action === 'inspect'
-      ? 'desktop.chat.processToolSystemInspect'
-      : 'desktop.chat.processToolSystemAction')
+    case 'system': return t('desktop.chat.processToolSystemAction')
     case 'automation': return t('desktop.chat.processToolAutomation')
     case 'generic': return props.node.toolName
   }
@@ -59,22 +57,24 @@ const title = computed(() => {
 })
 const summary = computed(() => {
   const presentation = props.node.presentation
+  const lifecycle = props.node.status === 'awaiting_approval'
+    ? t('desktop.chat.processAwaitingApproval')
+    : props.node.status === 'preparing'
+      ? t('desktop.chat.processToolPreparing')
+      : null
   if (presentation.card === 'system') {
-    const recoveringTarget = presentation.status === 'target-changed'
-      || presentation.status === 'target-expired'
-      || presentation.status === 'target-unknown'
-    const target = recoveringTarget
+    const targetUnavailable = presentation.status === 'action-expired'
+      || presentation.status === 'target-ambiguous'
+      || presentation.status === 'target-changed'
+      || presentation.status === 'target-not-found'
+    const target = targetUnavailable
       ? null
       : presentation.target
-        ?? (presentation.action === 'inspect'
-          ? null
-          : t('desktop.chat.processToolSystemTargetPending'))
+        ?? t('desktop.chat.processToolSystemTargetPending')
     return [
-      presentation.action === 'inspect'
-        ? null
-        : translateSystemAction(props.language, presentation.action),
+      translateSystemAction(props.language, presentation.action),
       target,
-      translateSystemToolStatus(props.language, presentation.status),
+      lifecycle ?? translateSystemToolStatus(props.language, presentation.status),
     ].filter(Boolean).join(' · ')
   }
   if (presentation.card === 'automation') {
@@ -84,9 +84,7 @@ const summary = computed(() => {
       presentation.itemCount === null
         ? null
         : t('desktop.chat.processToolAutomationCount', { count: presentation.itemCount }),
-      props.node.status === 'awaiting_approval'
-        ? t('desktop.chat.processAwaitingApproval')
-        : presentation.status,
+      lifecycle ?? presentation.status,
     ].filter(Boolean).join(' · ')
   }
   const detail = (() => {
@@ -103,9 +101,7 @@ const summary = computed(() => {
   })()
   const summary = detail || props.node.description
   return [
-    props.node.status === 'awaiting_approval'
-      ? t('desktop.chat.processAwaitingApproval')
-      : null,
+    lifecycle,
     summary,
   ].filter(Boolean).join(' · ')
 })
@@ -145,7 +141,10 @@ watch(() => props.node.status, () => {
 
 function defaultOpen(): boolean {
   return props.node.status === 'failed'
-    || (props.node.status === 'running' && props.node.presentation.card === 'terminal')
+    || (
+      (props.node.status === 'preparing' || props.node.status === 'running')
+      && props.node.presentation.card === 'terminal'
+    )
 }
 
 function toggle() {

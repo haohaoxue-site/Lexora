@@ -1,23 +1,14 @@
 import type { ToolDecision } from './ToolPolicy'
-
-const READ_ONLY_SHELL_COMMANDS = new Set([
-  'ls',
-  'ls -la',
-  'ls -lah',
-  'pwd',
-  'rg --files',
-  'rg --files .',
-])
+import { isReadOnlyShellCommand } from './readOnlyShellCommand'
 
 export class ShellPolicy {
   decide(command: string): ToolDecision {
-    const normalized = command.trim().replaceAll(/\s+/g, ' ')
-    if (READ_ONLY_SHELL_COMMANDS.has(normalized))
+    if (isReadOnlyShellCommand(command))
       return { type: 'allow' }
     return {
       type: 'ask',
       kind: 'shell',
-      summary: 'Run a shell command in the authorized directory',
+      summary: 'Run a host shell command from the current workspace',
     }
   }
 }
