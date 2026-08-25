@@ -1,41 +1,16 @@
 <script setup lang="ts">
-import type { BuddyLocale } from '@/i18n/buddyI18n'
-import {
-  Add16Regular,
-  ChevronDown20Regular,
-  ChevronRight20Regular,
-  MoreHorizontal20Regular,
-} from '@vicons/fluent'
-import { NDropdown, NIcon } from 'naive-ui'
-import { computed } from 'vue'
-import { useBuddyI18n } from '@/i18n/buddyI18n'
+import { Add16Regular, ChevronDown20Regular, ChevronRight20Regular } from '@vicons/fluent'
+import { NIcon } from 'naive-ui'
 
-const props = defineProps<{
-  canMoveDown: boolean
-  canMoveUp: boolean
+defineProps<{
   expanded: boolean
-  language: BuddyLocale
   label: string
   showAdd?: boolean
 }>()
 const emit = defineEmits<{
   add: []
-  move: [direction: 'up' | 'down']
   toggle: []
 }>()
-const { t } = useBuddyI18n(() => props.language)
-const moveOptions = computed(() => [
-  {
-    disabled: !props.canMoveUp,
-    key: 'up',
-    label: t('desktop.chat.moveSectionUp'),
-  },
-  {
-    disabled: !props.canMoveDown,
-    key: 'down',
-    label: t('desktop.chat.moveSectionDown'),
-  },
-])
 </script>
 
 <template>
@@ -58,15 +33,6 @@ const moveOptions = computed(() => [
       >
         <NIcon :component="Add16Regular" />
       </button>
-      <NDropdown
-        trigger="click"
-        :options="moveOptions"
-        @select="emit('move', $event as 'up' | 'down')"
-      >
-        <button class="desktop-chat-sidebar__section-more" type="button">
-          <NIcon :component="MoreHorizontal20Regular" />
-        </button>
-      </NDropdown>
     </div>
   </div>
 </template>
@@ -83,7 +49,6 @@ const moveOptions = computed(() => [
   margin-right: var(--buddy-chat-sidebar-scrollbar-gutter, 0);
 
   &:hover {
-    background: var(--buddy-fill-base);
     color: var(--buddy-text-primary);
   }
 }
@@ -141,8 +106,7 @@ button {
   pointer-events: auto;
 }
 
-.desktop-chat-sidebar__section-add,
-.desktop-chat-sidebar__section-more {
+.desktop-chat-sidebar__section-add {
   display: grid;
   width: var(--buddy-chat-sidebar-action-size, 1.75rem);
   height: var(--buddy-chat-sidebar-action-size, 1.75rem);
@@ -163,9 +127,5 @@ button {
     outline: 2px solid var(--buddy-accent-primary);
     outline-offset: -2px;
   }
-}
-
-.desktop-chat-sidebar__section-more {
-  color: var(--buddy-text-placeholder);
 }
 </style>

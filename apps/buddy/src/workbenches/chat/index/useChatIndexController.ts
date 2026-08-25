@@ -1,20 +1,20 @@
-import type {
-  DesktopChatSidebarSection,
-  DesktopChatSidebarSectionOrder,
-} from '@buddy-electron/shared/desktopApi'
+import type { DesktopChatPinnedItem } from '@buddy-electron/shared/desktopApi'
 import type {
   LocalConversation,
   LocalConversationSummary,
   LocalProject,
 } from '@buddy-electron/shared/localChatApi'
 import type { Ref } from 'vue'
+import type { DesktopChatPinnedDropPosition } from '@/workbenches/chat/index/chatPinnedItems'
 import type { ChatProjectInput } from '@/workbenches/chat/state/useChatProjects'
 import { useIntervalFn } from '@vueuse/core'
 import { computed, shallowRef, watch } from 'vue'
-
-export type ChatIndexRow
-  = | { key: string, kind: 'project', project: LocalProject }
-    | { conversation: LocalConversationSummary, key: string, kind: 'conversation' }
+import {
+  prependDesktopChatPinnedItem,
+  removeDesktopChatPinnedItem,
+  reorderDesktopChatPinnedItems,
+  resolveChatIndexProjection,
+} from '@/workbenches/chat/index/chatPinnedItems'
 
 interface UseChatIndexControllerOptions {
   conversations: Readonly<Ref<ReadonlyArray<LocalConversationSummary>>>
@@ -23,10 +23,15 @@ interface UseChatIndexControllerOptions {
   onDeleteConversation: (conversationId: string) => void
   onDeleteProject: (projectId: string) => void
   onRenameConversation: (conversationId: string, title: string) => void
-  onReorderSections: (order: DesktopChatSidebarSectionOrder) => void
+  onUpdatePinnedItems: (items: DesktopChatPinnedItem[]) => void
   onUpdateProject: (input: ChatProjectInput & { projectId: string }) => void
+  pinnedItems: Readonly<Ref<ReadonlyArray<DesktopChatPinnedItem>>>
   projects: Readonly<Ref<ReadonlyArray<LocalProject>>>
-  sectionOrder: Readonly<Ref<ReadonlyArray<DesktopChatSidebarSection>>>
+}
+
+interface DesktopChatPinnedDropTarget {
+  key: string
+  position: DesktopChatPinnedDropPosition
 }
 
 export function useChatIndexController(options: UseChatIndexControllerOptions) {
@@ -34,43 +39,28 @@ export function useChatIndexController(options: UseChatIndexControllerOptions) {
   const conversationRenameTarget = shallowRef<LocalConversation | null>(null)
   const conversationDeleteTarget = shallowRef<LocalConversation | null>(null)
   const conversationTitleDraft = shallowRef('')
-  const recentSectionExpanded = shallowRef(true)
+  const pinnedSectionExpanded = shallowRef(true)
   const projectsSectionExpanded = shallowRef(true)
+  const tasksSectionExpanded = shallowRef(true)
   const relativeTimeNow = shallowRef(Date.now())
   const projectDialogOpen = shallowRef(false)
   const projectEditTarget = shallowRef<LocalProject | null>(null)
   const projectDeleteTarget = shallowRef<LocalProject | null>(null)
+  const draggedPinnedItemKey = shallowRef<string | null>(null)
+  const pinnedDropTarget = shallowRef<DesktopChatPinnedDropTarget | null>(null)
   const activeProjects = computed(() => options.projects.value.filter(
     project => project.revokedAt === null,
   ))
-  const globalConversations = computed(() => options.conversations.value.filter(
-    conversation => conversation.projectId === null,
-  ))
-  const projectRows = computed<ChatIndexRow[]>(() => {
-    const conversationsByProject = new Map<string, LocalConversationSummary[]>()
-    for (const conversation of options.conversations.value) {
-      if (!conversation.projectId)
-        continue
-      const conversations = conversationsByProject.get(conversation.projectId) ?? []
-      conversations.push(conversation)
-      conversationsByProject.set(conversation.projectId, conversations)
-    }
-
-    return activeProjects.value.flatMap((project) => {
-      const rows: ChatIndexRow[] = [{
-        key: `project:${project.id}`,
-        kind: 'project',
-        project,
-      }]
-      if (!isProjectExpanded(project.id))
-        return rows
-      return rows.concat((conversationsByProject.get(project.id) ?? []).map(conversation => ({
-        conversation,
-        key: `conversation:${conversation.id}`,
-        kind: 'conversation' as const,
-      })))
-    })
-  })
+  const projection = computed(() => resolveChatIndexProjection({
+    conversations: options.conversations.value,
+    expandedProjectIds: expandedProjectIds.value,
+    pinnedItems: options.pinnedItems.value,
+    projects: options.projects.value,
+  }))
+  const pinnedItems = computed(() => projection.value.pinnedItems)
+  const pinnedRows = computed(() => projection.value.pinnedRows)
+  const projectRows = computed(() => projection.value.projectRows)
+  const taskConversations = computed(() => projection.value.taskConversations)
 
   useIntervalFn(() => {
     relativeTimeNow.value = Date.now()
@@ -131,18 +121,55 @@ export function useChatIndexController(options: UseChatIndexControllerOptions) {
     conversationDeleteTarget.value = null
   }
 
-  function moveSection(section: DesktopChatSidebarSection, direction: 'up' | 'down') {
-    const currentIndex = options.sectionOrder.value.indexOf(section)
-    const nextIndex = currentIndex + (direction === 'up' ? -1 : 1)
-    if (currentIndex < 0 || nextIndex < 0 || nextIndex >= options.sectionOrder.value.length)
-      return
-    const next = [...options.sectionOrder.value]
-    ;[next[currentIndex], next[nextIndex]] = [next[nextIndex], next[currentIndex]]
-    options.onReorderSections(next)
+  function pinProject(projectId: string) {
+    options.onUpdatePinnedItems(prependDesktopChatPinnedItem(
+      pinnedItems.value,
+      { id: projectId, kind: 'project' },
+    ))
   }
 
-  function getSectionIndex(section: DesktopChatSidebarSection) {
-    return options.sectionOrder.value.indexOf(section)
+  function pinConversation(conversationId: string) {
+    options.onUpdatePinnedItems(prependDesktopChatPinnedItem(
+      pinnedItems.value,
+      { id: conversationId, kind: 'conversation' },
+    ))
+  }
+
+  function unpinItem(pinKey: string) {
+    options.onUpdatePinnedItems(removeDesktopChatPinnedItem(pinnedItems.value, pinKey))
+  }
+
+  function beginPinnedDrag(pinKey: string) {
+    draggedPinnedItemKey.value = pinKey
+    pinnedDropTarget.value = null
+  }
+
+  function enterPinnedDropTarget(pinKey: string, position: DesktopChatPinnedDropPosition) {
+    if (draggedPinnedItemKey.value && draggedPinnedItemKey.value !== pinKey)
+      pinnedDropTarget.value = { key: pinKey, position }
+  }
+
+  function getPinnedDropPosition(pinKey: string | undefined) {
+    return pinKey && pinnedDropTarget.value?.key === pinKey
+      ? pinnedDropTarget.value.position
+      : undefined
+  }
+
+  function dropPinnedItem(pinKey: string, position: DesktopChatPinnedDropPosition) {
+    if (!draggedPinnedItemKey.value)
+      return
+    options.onUpdatePinnedItems(reorderDesktopChatPinnedItems(
+      pinnedItems.value,
+      draggedPinnedItemKey.value,
+      pinKey,
+      position,
+    ))
+    endPinnedDrag()
+  }
+
+  function endPinnedDrag() {
+    draggedPinnedItemKey.value = null
+    pinnedDropTarget.value = null
   }
 
   function openProjectCreator() {
@@ -184,23 +211,33 @@ export function useChatIndexController(options: UseChatIndexControllerOptions) {
     conversationDeleteTarget,
     conversationRenameTarget,
     conversationTitleDraft,
+    beginPinnedDrag,
+    draggedPinnedItemKey,
+    dropPinnedItem,
+    endPinnedDrag,
+    enterPinnedDropTarget,
     getConversationTitle,
-    getSectionIndex,
-    globalConversations,
+    getPinnedDropPosition,
     isProjectExpanded,
-    moveSection,
     openProjectCreator,
+    pinConversation,
+    pinProject,
+    pinnedItems,
+    pinnedRows,
+    pinnedSectionExpanded,
     projectDeleteTarget,
     projectDialogOpen,
     projectEditTarget,
     projectRows,
     projectsSectionExpanded,
-    recentSectionExpanded,
     relativeTimeNow,
     requestConversationDelete,
     requestConversationRename,
     saveProject,
     selectProjectMenuAction,
+    taskConversations,
+    tasksSectionExpanded,
     toggleProject,
+    unpinItem,
   }
 }

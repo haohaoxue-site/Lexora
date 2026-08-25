@@ -1,23 +1,11 @@
 <script setup lang="ts">
-import type {
-  DesktopChatSidebarSection as ChatSidebarSection,
-  DesktopChatSidebarSectionOrder,
-} from '@buddy-electron/shared/desktopApi'
+import type { DesktopChatPinnedItem } from '@buddy-electron/shared/desktopApi'
 import type { LocalConversationSummary, LocalProject } from '@buddy-electron/shared/localChatApi'
-import type { DropdownOption } from 'naive-ui'
 import type { BuddyLocale } from '@/i18n/buddyI18n'
 import type { ChatProjectInput } from '@/workbenches/chat/state/useChatProjects'
-import {
-  Add16Regular,
-  Delete20Regular,
-  Edit20Regular,
-  Folder20Regular,
-  FolderOpen20Regular,
-  MoreHorizontal20Regular,
-  PanelLeft20Regular,
-} from '@vicons/fluent'
-import { NAlert, NButton, NDropdown, NIcon, NInput, NModal } from 'naive-ui'
-import { computed, h, toRef } from 'vue'
+import { Add16Regular, PanelLeft20Regular } from '@vicons/fluent'
+import { NAlert, NButton, NIcon, NInput, NModal } from 'naive-ui'
+import { toRef } from 'vue'
 import { useBuddyI18n } from '@/i18n/buddyI18n'
 import {
   DESKTOP_CHAT_SIDEBAR_ROW_HEIGHT,
@@ -25,6 +13,7 @@ import {
   DESKTOP_CHAT_SIDEBAR_SECTION_HEADER_SIZE,
 } from '@/workbenches/chat/index/chatSidebarLayout'
 import DesktopChatConversationRow from '@/workbenches/chat/index/DesktopChatConversationRow.vue'
+import DesktopChatProjectRow from '@/workbenches/chat/index/DesktopChatProjectRow.vue'
 import DesktopChatSidebarSection from '@/workbenches/chat/index/DesktopChatSidebarSection.vue'
 import DesktopProjectDialog from '@/workbenches/chat/index/DesktopProjectDialog.vue'
 import { useChatIndexController } from '@/workbenches/chat/index/useChatIndexController'
@@ -34,8 +23,8 @@ const props = defineProps<{
   appSidebarCollapsed: boolean
   conversations: ReadonlyArray<LocalConversationSummary>
   language: BuddyLocale
+  pinnedItems: ReadonlyArray<DesktopChatPinnedItem>
   projects: ReadonlyArray<LocalProject>
-  sectionOrder: ReadonlyArray<ChatSidebarSection>
 }>()
 const emit = defineEmits<{
   createProject: [input: ChatProjectInput]
@@ -45,8 +34,8 @@ const emit = defineEmits<{
   newProject: [projectId: string]
   openConversation: [conversationId: string]
   renameConversation: [conversationId: string, title: string]
-  reorderSections: [order: DesktopChatSidebarSectionOrder]
   toggleAppSidebar: []
+  updatePinnedItems: [items: DesktopChatPinnedItem[]]
   updateProject: [input: ChatProjectInput & { projectId: string }]
 }>()
 
@@ -56,43 +45,41 @@ const sidebarLayoutStyle = {
   '--buddy-chat-sidebar-row-size': `${DESKTOP_CHAT_SIDEBAR_ROW_SIZE}px`,
   '--buddy-chat-sidebar-section-header-size': `${DESKTOP_CHAT_SIDEBAR_SECTION_HEADER_SIZE}px`,
 }
-const projectMenuOptions = computed<DropdownOption[]>(() => [
-  {
-    icon: () => h(NIcon, { component: Edit20Regular }),
-    key: 'edit',
-    label: t('common.edit'),
-  },
-  {
-    icon: () => h(NIcon, { component: Delete20Regular }),
-    key: 'delete',
-    label: t('common.delete'),
-  },
-])
 const {
+  beginPinnedDrag,
   confirmConversationDelete,
   confirmConversationRename,
   confirmProjectDelete,
   conversationDeleteTarget,
   conversationRenameTarget,
   conversationTitleDraft,
+  draggedPinnedItemKey,
+  dropPinnedItem,
+  endPinnedDrag,
+  enterPinnedDropTarget,
   getConversationTitle,
-  getSectionIndex,
-  globalConversations,
+  getPinnedDropPosition,
   isProjectExpanded,
-  moveSection,
   openProjectCreator,
+  pinConversation,
+  pinProject,
+  pinnedItems: visiblePinnedItems,
+  pinnedRows,
+  pinnedSectionExpanded,
   projectDeleteTarget,
   projectDialogOpen,
   projectEditTarget,
   projectRows,
   projectsSectionExpanded,
-  recentSectionExpanded,
   relativeTimeNow,
   requestConversationDelete,
   requestConversationRename,
   saveProject,
   selectProjectMenuAction,
+  taskConversations,
+  tasksSectionExpanded,
   toggleProject,
+  unpinItem,
 } = useChatIndexController({
   conversations: toRef(props, 'conversations'),
   getUntitledLabel: () => t('desktop.chat.untitled'),
@@ -100,10 +87,10 @@ const {
   onDeleteConversation: conversationId => emit('deleteConversation', conversationId),
   onDeleteProject: projectId => emit('deleteProject', projectId),
   onRenameConversation: (conversationId, title) => emit('renameConversation', conversationId, title),
-  onReorderSections: order => emit('reorderSections', order),
+  onUpdatePinnedItems: items => emit('updatePinnedItems', items),
   onUpdateProject: input => emit('updateProject', input),
+  pinnedItems: toRef(props, 'pinnedItems'),
   projects: toRef(props, 'projects'),
-  sectionOrder: toRef(props, 'sectionOrder'),
 })
 </script>
 
@@ -134,101 +121,125 @@ const {
 
     <div class="desktop-chat-sidebar__content">
       <nav :style="sidebarLayoutStyle">
-        <template v-for="section in sectionOrder" :key="section">
-          <DesktopChatSidebarSection
-            v-if="section === 'recent'"
-            v-model:expanded="recentSectionExpanded"
-            :can-move-down="getSectionIndex('recent') < sectionOrder.length - 1"
-            :can-move-up="getSectionIndex('recent') > 0"
-            :fill-remaining="getSectionIndex('recent') === sectionOrder.length - 1"
-            :items="globalConversations"
-            key-field="id"
-            :label="t('desktop.chat.recentSection')"
-            :language="language"
-            section="recent"
-            @move="moveSection('recent', $event)"
-          >
-            <template #default="{ item: conversation }">
-              <DesktopChatConversationRow
-                :active="conversation.id === activeConversationId"
-                :activity="conversation.activity"
+        <DesktopChatSidebarSection
+          v-if="visiblePinnedItems.length > 0"
+          v-model:expanded="pinnedSectionExpanded"
+          :fill-remaining="false"
+          :items="pinnedRows"
+          key-field="key"
+          :label="t('desktop.chat.pinnedSection')"
+          section="pinned"
+        >
+          <template #default="{ item }">
+            <div v-if="item.kind === 'project'" class="desktop-chat-sidebar__project-item">
+              <DesktopChatProjectRow
+                :dragging="draggedPinnedItemKey === item.pinKey"
+                :drop-position="item.pinnedTopLevel ? getPinnedDropPosition(item.pinKey) : undefined"
+                :expanded="isProjectExpanded(item.project.id)"
                 :language="language"
-                :now="relativeTimeNow"
-                :occurred-at="conversation.automationOccurrence?.scheduledFor ?? conversation.updatedAt"
-                :title="getConversationTitle(conversation)"
-                @delete="requestConversationDelete(conversation)"
-                @open="emit('openConversation', conversation.id)"
-                @rename="requestConversationRename(conversation)"
+                pin-mode="unpin"
+                :project="item.project"
+                :reorderable="item.pinnedTopLevel"
+                reorder-target
+                @drag-end="endPinnedDrag"
+                @drag-over="enterPinnedDropTarget(item.pinKey!, $event)"
+                @drag-start="beginPinnedDrag(item.pinKey!)"
+                @drop="dropPinnedItem(item.pinKey!, $event)"
+                @menu="selectProjectMenuAction(item.project, $event)"
+                @new-conversation="emit('newProject', item.project.id)"
+                @pin="unpinItem(item.pinKey!)"
+                @toggle="toggleProject(item.project.id)"
               />
-            </template>
-          </DesktopChatSidebarSection>
+            </div>
+            <DesktopChatConversationRow
+              v-else
+              :active="item.conversation.id === activeConversationId"
+              :activity="item.conversation.activity"
+              :dragging="item.pinnedTopLevel && draggedPinnedItemKey === item.pinKey"
+              :drop-position="item.pinnedTopLevel ? getPinnedDropPosition(item.pinKey) : undefined"
+              :language="language"
+              :now="relativeTimeNow"
+              :occurred-at="item.conversation.automationOccurrence?.scheduledFor ?? item.conversation.updatedAt"
+              :pin-mode="item.pinnedTopLevel ? 'unpin' : undefined"
+              :project-conversation="item.projectConversation"
+              :reorderable="item.pinnedTopLevel"
+              :reorder-target="item.pinnedTopLevel"
+              :title="getConversationTitle(item.conversation)"
+              @delete="requestConversationDelete(item.conversation)"
+              @drag-end="endPinnedDrag"
+              @drag-over="enterPinnedDropTarget(item.pinKey!, $event)"
+              @drag-start="beginPinnedDrag(item.pinKey!)"
+              @drop="dropPinnedItem(item.pinKey!, $event)"
+              @open="emit('openConversation', item.conversation.id)"
+              @pin="unpinItem(item.pinKey!)"
+              @rename="requestConversationRename(item.conversation)"
+            />
+          </template>
+        </DesktopChatSidebarSection>
 
-          <DesktopChatSidebarSection
-            v-else-if="section === 'projects'"
-            v-model:expanded="projectsSectionExpanded"
-            :can-move-down="getSectionIndex('projects') < sectionOrder.length - 1"
-            :can-move-up="getSectionIndex('projects') > 0"
-            :fill-remaining="getSectionIndex('projects') === sectionOrder.length - 1"
-            :items="projectRows"
-            key-field="key"
-            :label="t('desktop.chat.projectsSection')"
-            :language="language"
-            section="projects"
-            show-add
-            @add="openProjectCreator"
-            @move="moveSection('projects', $event)"
-          >
-            <template #default="{ item }">
-              <div v-if="item.kind === 'project'" class="desktop-chat-sidebar__project-item">
-                <div class="desktop-chat-sidebar__project-row">
-                  <button
-                    class="desktop-chat-sidebar__project-name"
-                    type="button"
-                    :aria-expanded="isProjectExpanded(item.project.id)"
-                    @click="toggleProject(item.project.id)"
-                  >
-                    <NIcon :component="isProjectExpanded(item.project.id) ? FolderOpen20Regular : Folder20Regular" />
-                    <span>{{ item.project.name }}</span>
-                  </button>
-                  <div class="desktop-chat-sidebar__project-actions">
-                    <button
-                      class="desktop-chat-sidebar__project-new"
-                      type="button"
-                      @click="emit('newProject', item.project.id)"
-                    >
-                      <NIcon :component="Add16Regular" />
-                    </button>
-                    <NDropdown
-                      trigger="click"
-                      :options="projectMenuOptions"
-                      @select="selectProjectMenuAction(item.project, $event)"
-                    >
-                      <button
-                        class="desktop-chat-sidebar__project-more"
-                        type="button"
-                      >
-                        <NIcon :component="MoreHorizontal20Regular" />
-                      </button>
-                    </NDropdown>
-                  </div>
-                </div>
-              </div>
-              <DesktopChatConversationRow
-                v-else
-                :active="item.conversation.id === activeConversationId"
-                :activity="item.conversation.activity"
+        <DesktopChatSidebarSection
+          v-model:expanded="projectsSectionExpanded"
+          :fill-remaining="false"
+          :items="projectRows"
+          key-field="key"
+          :label="t('desktop.chat.projectsSection')"
+          section="projects"
+          show-add
+          @add="openProjectCreator"
+        >
+          <template #default="{ item }">
+            <div v-if="item.kind === 'project'" class="desktop-chat-sidebar__project-item">
+              <DesktopChatProjectRow
+                :expanded="isProjectExpanded(item.project.id)"
                 :language="language"
-                :now="relativeTimeNow"
-                :occurred-at="item.conversation.automationOccurrence?.scheduledFor ?? item.conversation.updatedAt"
-                project-conversation
-                :title="getConversationTitle(item.conversation)"
-                @delete="requestConversationDelete(item.conversation)"
-                @open="emit('openConversation', item.conversation.id)"
-                @rename="requestConversationRename(item.conversation)"
+                pin-mode="pin"
+                :project="item.project"
+                @menu="selectProjectMenuAction(item.project, $event)"
+                @new-conversation="emit('newProject', item.project.id)"
+                @pin="pinProject(item.project.id)"
+                @toggle="toggleProject(item.project.id)"
               />
-            </template>
-          </DesktopChatSidebarSection>
-        </template>
+            </div>
+            <DesktopChatConversationRow
+              v-else
+              :active="item.conversation.id === activeConversationId"
+              :activity="item.conversation.activity"
+              :language="language"
+              :now="relativeTimeNow"
+              :occurred-at="item.conversation.automationOccurrence?.scheduledFor ?? item.conversation.updatedAt"
+              project-conversation
+              :title="getConversationTitle(item.conversation)"
+              @delete="requestConversationDelete(item.conversation)"
+              @open="emit('openConversation', item.conversation.id)"
+              @rename="requestConversationRename(item.conversation)"
+            />
+          </template>
+        </DesktopChatSidebarSection>
+
+        <DesktopChatSidebarSection
+          v-model:expanded="tasksSectionExpanded"
+          fill-remaining
+          :items="taskConversations"
+          key-field="id"
+          :label="t('desktop.chat.tasksSection')"
+          section="tasks"
+        >
+          <template #default="{ item: conversation }">
+            <DesktopChatConversationRow
+              :active="conversation.id === activeConversationId"
+              :activity="conversation.activity"
+              :language="language"
+              :now="relativeTimeNow"
+              :occurred-at="conversation.automationOccurrence?.scheduledFor ?? conversation.updatedAt"
+              pin-mode="pin"
+              :title="getConversationTitle(conversation)"
+              @delete="requestConversationDelete(conversation)"
+              @open="emit('openConversation', conversation.id)"
+              @pin="pinConversation(conversation.id)"
+              @rename="requestConversationRename(conversation)"
+            />
+          </template>
+        </DesktopChatSidebarSection>
       </nav>
     </div>
 
@@ -420,95 +431,6 @@ const {
   height: var(--buddy-chat-sidebar-row-size);
   padding-right: var(--buddy-chat-sidebar-scrollbar-gutter);
   padding-bottom: calc(var(--buddy-chat-sidebar-row-size) - var(--buddy-chat-sidebar-row-height));
-}
-
-.desktop-chat-sidebar__project-row {
-  display: flex;
-  height: 100%;
-  min-width: 0;
-  align-items: center;
-  border-radius: var(--buddy-chat-sidebar-state-radius);
-
-  &:hover,
-  &:focus-within {
-    background: var(--buddy-fill-base);
-  }
-}
-
-.desktop-chat-sidebar__project-name,
-.desktop-chat-sidebar__project-new,
-.desktop-chat-sidebar__project-more {
-  border: 0;
-  background: transparent;
-  color: inherit;
-  cursor: pointer;
-}
-
-.desktop-chat-sidebar__project-name {
-  display: flex;
-  min-width: 0;
-  flex: 1;
-  align-items: center;
-  gap: 0.5rem;
-  color: var(--buddy-text-regular);
-  font-size: var(--buddy-sidebar-project-font-size);
-  font-weight: var(--buddy-sidebar-project-font-weight);
-  line-height: 20px;
-  padding: 0.46rem 0.5rem;
-  text-align: left;
-
-  span {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  &:focus-visible {
-    border-radius: 6px;
-    outline: 2px solid var(--buddy-accent-primary);
-    outline-offset: -2px;
-  }
-}
-
-.desktop-chat-sidebar__project-new,
-.desktop-chat-sidebar__project-more {
-  display: grid;
-  width: var(--buddy-chat-sidebar-action-size);
-  height: var(--buddy-chat-sidebar-action-size);
-  flex: none;
-  place-items: center;
-  border-radius: var(--buddy-icon-button-radius);
-  color: var(--buddy-text-secondary);
-
-  .n-icon {
-    font-size: 16px;
-  }
-
-  &:hover {
-    background: var(--buddy-nav-active-bg);
-    color: var(--buddy-text-primary);
-  }
-
-  &:focus-visible {
-    outline: 2px solid var(--buddy-accent-primary);
-    outline-offset: -2px;
-  }
-}
-
-.desktop-chat-sidebar__project-actions {
-  display: flex;
-  flex: none;
-  align-items: center;
-  gap: var(--buddy-chat-sidebar-action-gap);
-  opacity: 0;
-  padding-right: var(--buddy-chat-sidebar-action-inset);
-  pointer-events: none;
-}
-
-.desktop-chat-sidebar__project-row:hover .desktop-chat-sidebar__project-actions,
-.desktop-chat-sidebar__project-row:has(:focus-visible) .desktop-chat-sidebar__project-actions {
-  opacity: 1;
-  pointer-events: auto;
 }
 
 .desktop-chat-sidebar__modal {

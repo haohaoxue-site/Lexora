@@ -1,12 +1,15 @@
 <script setup lang="ts">
 import type { LocalConversationSummary } from '@buddy-electron/shared/localChatApi'
 import type { BuddyLocale } from '@/i18n/buddyI18n'
+import type { DesktopChatPinnedDropPosition } from '@/workbenches/chat/index/chatPinnedItems'
 import {
   ApprovalsApp20Regular,
   Chat20Regular,
   Delete20Regular,
   Edit20Regular,
   MoreHorizontal20Regular,
+  Pin20Regular,
+  PinOff20Regular,
   SpinnerIos20Regular,
 } from '@vicons/fluent'
 import dayjs from 'dayjs'
@@ -14,21 +17,32 @@ import relativeTime from 'dayjs/plugin/relativeTime'
 import { NDropdown, NIcon } from 'naive-ui'
 import { computed, h } from 'vue'
 import { useBuddyI18n } from '@/i18n/buddyI18n'
+import DesktopOverflowingLabel from '@/workbenches/chat/index/DesktopOverflowingLabel.vue'
 import 'dayjs/locale/zh-cn'
 
 const props = defineProps<{
   active: boolean
   activity: LocalConversationSummary['activity']
+  dragging?: boolean
+  dropPosition?: DesktopChatPinnedDropPosition
   language: BuddyLocale
   now: number
   occurredAt: string
+  pinMode?: 'pin' | 'unpin'
   projectConversation?: boolean
+  reorderable?: boolean
+  reorderTarget?: boolean
   title: string
 }>()
 
 const emit = defineEmits<{
   delete: []
+  dragEnd: []
+  dragOver: [position: DesktopChatPinnedDropPosition]
+  dragStart: []
+  drop: [position: DesktopChatPinnedDropPosition]
   open: []
+  pin: []
   rename: []
 }>()
 
@@ -47,6 +61,9 @@ const activityIcon = computed(() => props.activity === 'awaiting_approval'
 const activityLabel = computed(() => props.activity === 'awaiting_approval'
   ? t('activity.approval')
   : t('run.status.running'))
+const pinLabel = computed(() => props.pinMode === 'pin'
+  ? t('desktop.chat.pin')
+  : t('desktop.chat.unpin'))
 const actions = computed(() => [
   { icon: () => hIcon(Edit20Regular), key: 'rename', label: t('chat.renameConversation') },
   { icon: () => hIcon(Delete20Regular), key: 'delete', label: t('chat.deleteConversation') },
@@ -62,12 +79,55 @@ function handleAction(action: string | number) {
   if (action === 'delete')
     emit('delete')
 }
+
+function handleDragStart(event: DragEvent) {
+  if (!props.reorderable) {
+    event.preventDefault()
+    return
+  }
+  event.dataTransfer?.setData('text/plain', 'desktop-chat-pinned-item')
+  if (event.dataTransfer)
+    event.dataTransfer.effectAllowed = 'move'
+  emit('dragStart')
+}
+
+function handleDragOver(event: DragEvent) {
+  if (!props.reorderTarget)
+    return
+  event.preventDefault()
+  if (event.dataTransfer)
+    event.dataTransfer.dropEffect = 'move'
+  emit('dragOver', resolveDropPosition(event))
+}
+
+function handleDrop(event: DragEvent) {
+  if (!props.reorderTarget)
+    return
+  event.preventDefault()
+  emit('drop', resolveDropPosition(event))
+}
+
+function resolveDropPosition(event: DragEvent): DesktopChatPinnedDropPosition {
+  const bounds = (event.currentTarget as HTMLElement).getBoundingClientRect()
+  return event.clientY < bounds.top + bounds.height / 2 ? 'before' : 'after'
+}
 </script>
 
 <template>
   <div
     class="desktop-chat-conversation-row"
-    :class="{ 'is-active': active }"
+    :class="{
+      'is-active': active,
+      'is-dragging': dragging,
+      'is-drop-after': dropPosition === 'after',
+      'is-drop-before': dropPosition === 'before',
+      'is-reorderable': reorderable,
+    }"
+    :draggable="reorderable"
+    @dragend="emit('dragEnd')"
+    @dragover="handleDragOver"
+    @dragstart="handleDragStart"
+    @drop="handleDrop"
   >
     <div
       class="desktop-chat-conversation-row__surface"
@@ -80,7 +140,7 @@ function handleAction(action: string | number) {
         @click="emit('open')"
       >
         <NIcon :component="Chat20Regular" />
-        <span>{{ title }}</span>
+        <DesktopOverflowingLabel :paused="dragging" :text="title" />
       </button>
       <div class="desktop-chat-conversation-row__trailing">
         <time
@@ -106,6 +166,15 @@ function handleAction(action: string | number) {
               <NIcon :component="MoreHorizontal20Regular" />
             </button>
           </NDropdown>
+          <button
+            v-if="pinMode"
+            class="desktop-chat-sidebar__more desktop-chat-sidebar__pin"
+            type="button"
+            :aria-label="pinLabel"
+            @click="emit('pin')"
+          >
+            <NIcon :component="pinMode === 'pin' ? Pin20Regular : PinOff20Regular" />
+          </button>
         </div>
       </div>
     </div>
@@ -114,10 +183,39 @@ function handleAction(action: string | number) {
 
 <style scoped lang="scss">
 .desktop-chat-conversation-row {
+  position: relative;
   height: var(--buddy-chat-sidebar-row-size, 2.5rem);
   min-width: 0;
   padding-right: var(--buddy-chat-sidebar-scrollbar-gutter, 0);
   padding-bottom: calc(var(--buddy-chat-sidebar-row-size, 2.5rem) - var(--buddy-chat-sidebar-row-height, 2.25rem));
+
+  &.is-reorderable {
+    cursor: grab;
+  }
+
+  &.is-dragging {
+    opacity: 0.48;
+  }
+
+  &.is-drop-before::before,
+  &.is-drop-after::after {
+    position: absolute;
+    z-index: 1;
+    right: var(--buddy-chat-sidebar-scrollbar-gutter, 0);
+    left: 0;
+    height: 2px;
+    background: var(--buddy-accent-primary);
+    content: '';
+    pointer-events: none;
+  }
+
+  &.is-drop-before::before {
+    top: 0;
+  }
+
+  &.is-drop-after::after {
+    bottom: 0;
+  }
 }
 
 .desktop-chat-conversation-row__surface {
@@ -159,10 +257,12 @@ button {
   padding: 0.46rem 0.5rem;
   text-align: left;
 
-  span {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+  > .n-icon {
+    flex: none;
+  }
+
+  .desktop-overflow-label {
+    flex: 1;
   }
 
   &.is-active {
@@ -203,7 +303,7 @@ button {
 
 .desktop-chat-conversation-row__trailing {
   display: grid;
-  width: 3.35rem;
+  width: 4rem;
   flex: none;
   align-items: center;
   padding-right: var(--buddy-chat-sidebar-action-inset, 0.25rem);
@@ -214,6 +314,10 @@ button {
 .desktop-chat-conversation-row__actions {
   grid-area: 1 / 1;
   justify-self: end;
+}
+
+.desktop-chat-sidebar__pin {
+  color: var(--buddy-text-placeholder);
 }
 
 .desktop-chat-conversation-row__activity {

@@ -6,17 +6,18 @@ import { dirname } from 'node:path'
 import process from 'node:process'
 import { parse, stringify } from 'smol-toml'
 import { z } from 'zod'
-import {
-  DEFAULT_DESKTOP_CHAT_SIDEBAR_SECTION_ORDER,
-  DESKTOP_CHAT_SIDEBAR_SECTIONS,
-} from '../../shared/desktopApi'
+
+const chatSidebarPinnedItemSchema = z.discriminatedUnion('kind', [
+  z.object({ id: z.string().min(1).max(128), kind: z.literal('conversation') }).strict(),
+  z.object({ id: z.string().min(1).max(128), kind: z.literal('project') }).strict(),
+])
 
 const desktopConfigSchema = z.object({
   background_close_notice_shown: z.boolean().default(false),
-  chat_sidebar_section_order: z.array(z.enum(DESKTOP_CHAT_SIDEBAR_SECTIONS))
-    .length(DESKTOP_CHAT_SIDEBAR_SECTIONS.length)
-    .refine(sections => new Set(sections).size === sections.length)
-    .default([...DEFAULT_DESKTOP_CHAT_SIDEBAR_SECTION_ORDER]),
+  chat_sidebar_pinned_items: z.array(chatSidebarPinnedItemSchema)
+    .max(500)
+    .refine(items => new Set(items.map(item => `${item.kind}:${item.id}`)).size === items.length)
+    .default([]),
   language: z.enum(['zh-CN', 'en-US']).default('zh-CN'),
   launch_at_login: z.boolean().default(false),
   notifications_enabled: z.boolean().default(true),
@@ -25,7 +26,7 @@ const desktopConfigSchema = z.object({
   theme: z.enum(['system', 'light', 'dark']).default('system'),
 }).passthrough().default({
   background_close_notice_shown: false,
-  chat_sidebar_section_order: [...DEFAULT_DESKTOP_CHAT_SIDEBAR_SECTION_ORDER],
+  chat_sidebar_pinned_items: [],
   language: 'zh-CN',
   launch_at_login: false,
   notifications_enabled: true,
@@ -142,7 +143,7 @@ function decodeConfig(value: unknown): LexoraConfig {
   return {
     desktop: {
       backgroundCloseNoticeShown: config.desktop.background_close_notice_shown,
-      chatSidebarSectionOrder: config.desktop.chat_sidebar_section_order,
+      chatSidebarPinnedItems: config.desktop.chat_sidebar_pinned_items,
       language: config.desktop.language,
       launchAtLogin: config.desktop.launch_at_login,
       notificationsEnabled: config.desktop.notifications_enabled,
@@ -162,7 +163,7 @@ function encodeConfig(config: LexoraConfig) {
   return {
     desktop: {
       background_close_notice_shown: config.desktop.backgroundCloseNoticeShown,
-      chat_sidebar_section_order: config.desktop.chatSidebarSectionOrder,
+      chat_sidebar_pinned_items: config.desktop.chatSidebarPinnedItems,
       language: config.desktop.language,
       launch_at_login: config.desktop.launchAtLogin,
       notifications_enabled: config.desktop.notificationsEnabled,
@@ -196,12 +197,14 @@ function mergeConfigFile(file: unknown, config: LexoraConfig): Record<string, un
   const desktop = asRecord(root.desktop)
   const pet = asRecord(root.pet)
   const encoded = encodeConfig(config)
+  const nextDesktop: Record<string, unknown> = {
+    ...desktop,
+    ...encoded.desktop,
+  }
+  delete nextDesktop.chat_sidebar_section_order
   const next: Record<string, unknown> = {
     ...root,
-    desktop: {
-      ...desktop,
-      ...encoded.desktop,
-    },
+    desktop: nextDesktop,
     pet: {
       ...pet,
       ...encoded.pet,

@@ -1,6 +1,4 @@
 <script setup lang="ts" generic="T extends Record<string, unknown>">
-import type { DesktopChatSidebarSection } from '@buddy-electron/shared/desktopApi'
-import type { BuddyLocale } from '@/i18n/buddyI18n'
 import { NVirtualList } from 'naive-ui'
 import { computed } from 'vue'
 import {
@@ -11,19 +9,15 @@ import {
 import DesktopChatSidebarSectionHeader from '@/workbenches/chat/index/DesktopChatSidebarSectionHeader.vue'
 
 const props = defineProps<{
-  canMoveDown: boolean
-  canMoveUp: boolean
   fillRemaining: boolean
   items: ReadonlyArray<T>
   keyField: string
   label: string
-  language: BuddyLocale
-  section: DesktopChatSidebarSection
+  section: 'pinned' | 'projects' | 'tasks'
   showAdd?: boolean
 }>()
 const emit = defineEmits<{
   add: []
-  move: [direction: 'up' | 'down']
 }>()
 defineSlots<{
   default: (props: { item: T }) => unknown
@@ -47,14 +41,10 @@ const sectionStyle = computed(() => ({
     :style="sectionStyle"
   >
     <DesktopChatSidebarSectionHeader
-      :can-move-down="canMoveDown"
-      :can-move-up="canMoveUp"
       :expanded="expanded"
       :label="label"
-      :language="language"
       :show-add="showAdd"
       @add="emit('add')"
-      @move="emit('move', $event)"
       @toggle="expanded = !expanded"
     />
     <NVirtualList
