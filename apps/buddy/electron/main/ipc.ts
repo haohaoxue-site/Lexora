@@ -3,11 +3,12 @@ import type { LexoraConfig } from '../shared/desktopApi'
 import type { LexoraConfigStore } from './config/LexoraConfigStore'
 import type { ExecuteDesktopCommand } from './desktopCommands'
 import process from 'node:process'
-import { app, ipcMain } from 'electron'
+import { app, clipboard, ipcMain } from 'electron'
 import {
   DESKTOP_IPC_CHANNELS,
 } from '../shared/desktopApi'
 import {
+  clipboardWriteTextInputSchema,
   feedbackIssueInputSchema,
   lexoraConfigPatchSchema,
   releasePageInputSchema,
@@ -42,6 +43,12 @@ export function registerDesktopIpc(options: RegisterDesktopIpcOptions): void {
       platform: resolveDesktopPlatform(process.platform),
       version: app.getVersion(),
     }
+  })
+
+  ipcMain.handle(DESKTOP_IPC_CHANNELS.clipboardWriteText, (event, input: unknown) => {
+    assertTrustedSender(event, options.getWindow())
+    const { text } = clipboardWriteTextInputSchema.parse(input)
+    clipboard.writeText(text)
   })
 
   ipcMain.handle(DESKTOP_IPC_CHANNELS.commandExecute, async (event, commandId: unknown) => {

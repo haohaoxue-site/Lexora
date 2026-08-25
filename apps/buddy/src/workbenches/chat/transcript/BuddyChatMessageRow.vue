@@ -5,6 +5,7 @@ import type { BuddyLocale } from '@/i18n/buddyI18n'
 import { useTimeoutFn } from '@vueuse/core'
 import { NButton, NInput, NTooltip, useMessage } from 'naive-ui'
 import { computed, shallowRef, watch } from 'vue'
+import { useDesktopApp } from '@/app/desktopAppContext'
 import { useBuddyI18n } from '@/i18n/buddyI18n'
 import DesktopIcon from '@/ui/DesktopIcon.vue'
 import BuddyChatAgentIdentity from './BuddyChatAgentIdentity.vue'
@@ -36,6 +37,7 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useBuddyI18n(() => props.language)
+const { clipboard } = useDesktopApp()
 const notification = useMessage()
 const editingText = shallowRef('')
 const copied = shallowRef(false)
@@ -73,7 +75,7 @@ async function copyMessage() {
   if (!text)
     return
   try {
-    await navigator.clipboard.writeText(text)
+    await clipboard.writeText(text)
     copied.value = true
     copyReset.stop()
     copyReset.start()
@@ -147,7 +149,8 @@ async function copyMessage() {
       <NTooltip v-if="actions.showCopy" placement="bottom">
         <template #trigger>
           <NButton
-            class="buddy-icon-button"
+            class="buddy-icon-button buddy-chat-message__copy-button"
+            :class="{ 'is-copied': copied }"
             quaternary
             size="tiny"
             :aria-label="t(copied ? 'desktop.chat.copied' : 'desktop.chat.copy')"
@@ -367,6 +370,17 @@ async function copyMessage() {
   > span {
     min-width: 2.25rem;
     text-align: center;
+  }
+}
+
+.buddy-chat-message__copy-button {
+  transition:
+    background-color 160ms ease,
+    color 160ms ease;
+
+  &.is-copied {
+    background: color-mix(in srgb, var(--buddy-accent-primary) 12%, transparent);
+    color: var(--buddy-accent-primary);
   }
 }
 

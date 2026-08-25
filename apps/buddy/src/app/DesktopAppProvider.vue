@@ -81,6 +81,7 @@ watch(
 
 provide(desktopAppContextKey, {
   capabilities,
+  clipboard: api.clipboard,
   notificationTargetMessageId: readonly(notificationTargetMessageId),
   ready,
   shell,

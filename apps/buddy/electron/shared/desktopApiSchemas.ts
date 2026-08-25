@@ -14,6 +14,10 @@ export const feedbackIssueInputSchema = z.object({
   feedback: z.string().max(4_000),
 }).strict()
 
+export const clipboardWriteTextInputSchema = z.object({
+  text: z.string(),
+}).strict()
+
 export const releasePageInputSchema = z.object({
   url: z.url().refine((value) => {
     const url = new URL(value)

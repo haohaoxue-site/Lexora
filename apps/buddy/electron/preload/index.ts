@@ -260,6 +260,12 @@ const desktopApi: LexoraDesktopApi = Object.freeze({
       { url },
     ),
   }),
+  clipboard: Object.freeze({
+    writeText: (text: string) => ipcRenderer.invoke(
+      DESKTOP_IPC_CHANNELS.clipboardWriteText,
+      { text },
+    ),
+  }),
   commands: Object.freeze({
     execute: (commandId: DesktopCommandId) => ipcRenderer.invoke(DESKTOP_IPC_CHANNELS.commandExecute, commandId),
   }),

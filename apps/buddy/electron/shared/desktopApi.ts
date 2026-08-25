@@ -7,6 +7,7 @@ export const DESKTOP_IPC_CHANNELS = {
   appOpenFeedbackIssue: 'lexora:app:open-feedback-issue',
   appOpenReleasePage: 'lexora:app:open-release-page',
   appOpenTarget: 'lexora:app:open-target',
+  clipboardWriteText: 'lexora:clipboard:write-text',
   commandExecute: 'lexora:command:execute',
   settingsGet: 'lexora:settings:get',
   settingsUpdate: 'lexora:settings:update',
@@ -78,6 +79,9 @@ export interface LexoraDesktopApi {
     onOpenTarget: (listener: (target: DesktopOpenTarget) => void) => () => void
     openFeedbackIssue: (feedback: string) => Promise<void>
     openReleasePage: (url: string) => Promise<void>
+  }
+  clipboard: {
+    writeText: (text: string) => Promise<void>
   }
   commands: {
     execute: (commandId: DesktopCommandId) => Promise<void>
