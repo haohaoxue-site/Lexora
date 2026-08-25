@@ -4,6 +4,7 @@ import type {
   AutomationDefinitionDraft,
   AutomationErrorCode,
   AutomationMutationTargetRequest,
+  AutomationRunNowResult,
   CreateAutomationRequest,
   UpdateAutomationRequest,
 } from '../../../shared/automation'
@@ -198,6 +199,12 @@ export class AutomationService {
     return this.#repository.findById(id)
   }
 
+  getActiveOccurrence(automationId: string): AutomationOccurrenceRecord | null {
+    return this.#repository.findActiveOccurrence(
+      z.string().trim().min(1).max(256).parse(automationId),
+    )
+  }
+
   getOccurrence(id: string): AutomationOccurrenceRecord | null {
     return this.#repository.findOccurrenceById(id)
   }
@@ -235,10 +242,6 @@ export class AutomationService {
       ...input,
       finishedAt: this.#now(),
     })
-  }
-
-  hasNonTerminalRun(automationId: string): boolean {
-    return this.#repository.hasNonTerminalRun(automationId)
   }
 
   leaseQueued(input: {
@@ -352,12 +355,12 @@ export class AutomationService {
     }, mutation))
   }
 
-  runNow(input: AutomationMutationTargetRequest): AutomationOccurrenceRecord {
+  runNow(input: AutomationMutationTargetRequest): AutomationRunNowResult {
     const request = automationMutationRequestSchemas.runNow.parse(input)
     const now = this.#now()
     const mutation = mutationIdentity('run_now', request, now)
     const replay = this.#mapRepositoryError(
-      () => this.#repository.replayOccurrenceMutation(mutation),
+      () => this.#repository.replayRunNowMutation(mutation),
     )
     if (replay)
       return replay

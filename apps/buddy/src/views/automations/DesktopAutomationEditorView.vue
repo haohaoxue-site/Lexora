@@ -32,6 +32,7 @@ watch(
   async (automationId, _previousAutomationId, onCleanup) => {
     let active = true
     onCleanup(() => active = false)
+    automations.clearEditorError()
     automation.value = null
     if (!automationId) {
       isLoading.value = false
@@ -68,7 +69,7 @@ async function save(draft: AutomationDefinitionDraft): Promise<void> {
     :app-sidebar-collapsed="shell.appSidebarCollapsed.value"
     :automation="automation"
     :busy="automations.isMutating.value"
-    :error="automations.error.value"
+    :error="automations.editorError.value"
     :language="applicationSettings.language.value"
     :loading="isLoading"
     :mode="mode"

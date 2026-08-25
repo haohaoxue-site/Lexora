@@ -197,7 +197,7 @@ export function registerLocalChatIpc(options: RegisterLocalChatIpcOptions): () =
   handle(LOCAL_CHAT_IPC_CHANNELS.automationsRunNow, (_event, input) => request(
     'automations.runNow',
     localChatSchemas.automationRunNow.parse(input),
-    localChatResponseSchemas.automationOccurrence,
+    localChatResponseSchemas.automationRunNowResult,
   ))
   handle(LOCAL_CHAT_IPC_CHANNELS.automationsListOccurrences, (_event, input) => request(
     'automations.listOccurrences',

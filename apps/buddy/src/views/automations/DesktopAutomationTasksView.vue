@@ -1,6 +1,10 @@
 <script setup lang="ts">
-import type { LocalAutomation } from '@buddy-electron/shared/localChatApi'
-import { NButton, NSpin } from 'naive-ui'
+import type {
+  LocalAutomation,
+  LocalAutomationTask,
+} from '@buddy-electron/shared/localChatApi'
+import type { AutomationActionResult } from '@/workbenches/automations/useAutomationCapability'
+import { NButton, NResult, NSpin, useMessage } from 'naive-ui'
 import { useRouter } from 'vue-router'
 import { useDesktopApp } from '@/app/desktopAppContext'
 import { useBuddyI18n } from '@/i18n/buddyI18n'
@@ -15,11 +19,46 @@ const {
   },
 } = useDesktopApp()
 const { t } = useBuddyI18n(applicationSettings.language)
+const message = useMessage()
 
 function openEditor(automation: LocalAutomation | null): void {
   void router.push(automation
     ? desktopRouteLocations.automationEdit(automation.id)
     : desktopRouteLocations.automationCreate())
+}
+
+async function runNow(automation: LocalAutomationTask): Promise<void> {
+  if (automation.activeOccurrence) {
+    message.info(t('desktop.automations.alreadyRunning'))
+    return
+  }
+  const result = await automations.runNow(automation)
+  if (result.status === 'failed') {
+    message.error(result.error)
+    return
+  }
+  if (
+    result.status === 'busy'
+    || result.value.outcome === 'already_running'
+  ) {
+    message.info(t('desktop.automations.alreadyRunning'))
+  }
+}
+
+async function performAction<T>(result: Promise<AutomationActionResult<T>>): Promise<void> {
+  const outcome = await result
+  if (outcome.status === 'failed')
+    message.error(outcome.error)
+}
+
+async function loadMore(): Promise<void> {
+  if (!await automations.loadMoreAutomations() && automations.loadError.value)
+    message.error(automations.loadError.value)
+}
+
+async function retry(): Promise<void> {
+  if (!await automations.refresh() && automations.loadError.value)
+    message.error(automations.loadError.value)
 }
 </script>
 
@@ -28,23 +67,36 @@ function openEditor(automation: LocalAutomation | null): void {
     class="desktop-automation-route-view"
     :show="automations.isLoading.value && automations.automations.value.items.length === 0"
   >
+    <NResult
+      v-if="automations.loadError.value && automations.automations.value.items.length === 0"
+      status="error"
+      :description="automations.loadError.value"
+      :title="t('desktop.automations.loadFailed')"
+    >
+      <template #footer>
+        <NButton secondary @click="retry">
+          {{ t('desktop.automations.refresh') }}
+        </NButton>
+      </template>
+    </NResult>
     <DesktopAutomationTaskList
+      v-else
       :automations="automations.automations.value.items"
-      :busy="automations.isMutating.value"
       :language="applicationSettings.language.value"
+      :pending-automation-ids="automations.pendingAutomationIds.value"
       @create="openEditor(null)"
-      @delete="automations.remove"
+      @delete="performAction(automations.remove($event))"
       @edit="openEditor"
-      @pause="automations.pause"
-      @resume="automations.resume"
-      @run-now="automations.runNow"
+      @pause="performAction(automations.pause($event))"
+      @resume="performAction(automations.resume($event))"
+      @run-now="runNow"
     />
     <NButton
       v-if="automations.automations.value.nextCursor"
       class="desktop-automation-route-view__more"
       secondary
       :loading="automations.isLoadingMoreAutomations.value"
-      @click="automations.loadMoreAutomations"
+      @click="loadMore"
     >
       {{ t('desktop.automations.loadMore') }}
     </NButton>

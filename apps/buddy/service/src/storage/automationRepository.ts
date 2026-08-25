@@ -5,11 +5,13 @@ import type {
   AutomationErrorCode,
   AutomationExecutionSnapshot,
   AutomationOccurrence,
+  AutomationRunNowResult,
 } from '../../../shared/automation'
 import type { AutomationMutationOperation } from './automationMutationRequestRepository'
 import {
   automationExecutionSnapshotSchema,
   automationOccurrenceSchema,
+  automationRunNowResultSchema,
   automationScheduleSchema,
   automationSchema,
 } from '../../../shared/automation'
@@ -80,7 +82,8 @@ export interface AutomationRepository {
     id: string
     queuedAt: string
     scheduledFor: string
-  }, mutation: AutomationMutationIdentity) => AutomationOccurrenceRecord
+  }, mutation: AutomationMutationIdentity) => AutomationRunNowResult
+  findActiveOccurrence: (automationId: string) => AutomationOccurrenceRecord | null
   findById: (id: string) => Automation | null
   findOccurrenceByConversationId: (conversationId: string) => AutomationOccurrenceRecord | null
   findOccurrenceById: (id: string) => AutomationOccurrenceRecord | null
@@ -103,7 +106,6 @@ export interface AutomationRepository {
     automation: Automation | null
     occurrence: AutomationOccurrenceRecord
   } | null
-  hasNonTerminalRun: (automationId: string) => boolean
   leaseQueued: (input: {
     leaseExpiresAt: string
     limit: number
@@ -125,9 +127,9 @@ export interface AutomationRepository {
   replayAutomationMutation: (
     mutation: AutomationMutationIdentity,
   ) => Automation | null
-  replayOccurrenceMutation: (
+  replayRunNowMutation: (
     mutation: AutomationMutationIdentity,
-  ) => AutomationOccurrenceRecord | null
+  ) => AutomationRunNowResult | null
   settleScheduled: (input: {
     automationId: string
     coalescedMissedCount: number
@@ -268,14 +270,6 @@ export function createAutomationRepository(database: DatabaseSync): AutomationRe
       conversation_id, run_id, error_code, error_summary
     ) VALUES (?, ?, NULL, ?, 'scheduled', ?, ?, ?, ?, ?, NULL, NULL, ?, NULL, ?, NULL, NULL, ?, ?)
   `)
-  const insertManualOverlap = database.prepare(`
-    INSERT INTO automation_occurrences (
-      id, automation_id, request_id, dedupe_key, trigger_kind, scheduled_for,
-      coalesced_missed_count, automation_revision, execution_snapshot_json,
-      status, lease_owner, lease_expires_at, queued_at, bound_at, finished_at,
-      conversation_id, run_id, error_code, error_summary
-    ) VALUES (?, ?, ?, ?, 'manual', ?, 0, ?, ?, 'skipped', NULL, NULL, ?, NULL, ?, NULL, NULL, 'OVERLAP_SKIPPED', NULL)
-  `)
   const advanceAfterClaim = database.prepare(`
     UPDATE automations
     SET status = ?, blocked_reason = NULL, next_run_at = ?, updated_at = ?
@@ -302,13 +296,20 @@ export function createAutomationRepository(database: DatabaseSync): AutomationRe
     WHERE id = ? AND deleted_at IS NULL AND status = 'queued' AND run_id IS NULL
       AND (? IS NULL OR lease_owner = ?)
   `)
-  const findNonTerminalRun = database.prepare(`
-    SELECT 1
+  const findActiveOccurrence = database.prepare(`
+    SELECT automation_occurrences.*
     FROM automation_occurrences
-    INNER JOIN runs ON runs.id = automation_occurrences.run_id
+    LEFT JOIN runs ON runs.id = automation_occurrences.run_id
     WHERE automation_occurrences.automation_id = ?
-      AND automation_occurrences.status = 'bound'
-      AND runs.status IN ('queued', 'running')
+      AND automation_occurrences.deleted_at IS NULL
+      AND (
+        (automation_occurrences.status = 'queued' AND automation_occurrences.run_id IS NULL)
+        OR (
+          automation_occurrences.status = 'bound'
+          AND runs.status IN ('queued', 'running')
+        )
+      )
+    ORDER BY automation_occurrences.queued_at, automation_occurrences.id
     LIMIT 1
   `)
   const findActiveByProject = database.prepare(`
@@ -442,7 +443,7 @@ export function createAutomationRepository(database: DatabaseSync): AutomationRe
           return null
         }
         const snapshot = createExecutionSnapshot(row)
-        if (findNonTerminalRun.get(row.id) !== undefined) {
+        if (findActiveOccurrence.get(row.id) !== undefined) {
           insertTerminalOccurrence.run(
             input.id,
             row.id,
@@ -509,35 +510,24 @@ export function createAutomationRepository(database: DatabaseSync): AutomationRe
     },
     createManualOccurrence(input, mutation) {
       return withTransaction(database, () => {
-        const replay = replayMutation(mutation, automationOccurrenceSchema)
-        if (replay) {
-          return requireOccurrence(
-            findOccurrence.get(replay.id),
-            replay.id,
-          )
-        }
+        const replay = replayMutation(mutation, automationRunNowResultSchema)
+        if (replay)
+          return replay
         const row = findAny.get(input.automationId) as AutomationRow | undefined
         if (!row || row.deleted_at)
           throw new AutomationRepositoryError('not_found')
+        const activeRow = findActiveOccurrence.get(row.id) as AutomationOccurrenceRow | undefined
+        if (activeRow) {
+          const result = automationRunNowResultSchema.parse({
+            occurrence: toPublicOccurrence(toOccurrence(activeRow)),
+            outcome: 'already_running',
+          })
+          saveMutation(row.id, mutation, result)
+          return result
+        }
         if (row.revision !== input.expectedRevision)
           throw new AutomationRepositoryError('conflict')
         const snapshot = createExecutionSnapshot(row)
-        if (findNonTerminalRun.get(row.id) !== undefined) {
-          insertManualOverlap.run(
-            input.id,
-            row.id,
-            mutation.requestId,
-            `manual:${mutation.requestId}`,
-            input.scheduledFor,
-            row.revision,
-            JSON.stringify(snapshot),
-            input.queuedAt,
-            input.queuedAt,
-          )
-          const occurrence = requireOccurrence(findOccurrence.get(input.id), input.id)
-          saveMutation(row.id, mutation, toPublicOccurrence(occurrence))
-          return occurrence
-        }
         insertOccurrence.run(
           input.id,
           row.id,
@@ -551,9 +541,17 @@ export function createAutomationRepository(database: DatabaseSync): AutomationRe
           input.queuedAt,
         )
         const occurrence = requireOccurrence(findOccurrence.get(input.id), input.id)
-        saveMutation(row.id, mutation, toPublicOccurrence(occurrence))
-        return occurrence
+        const result = automationRunNowResultSchema.parse({
+          occurrence: toPublicOccurrence(occurrence),
+          outcome: 'started',
+        })
+        saveMutation(row.id, mutation, result)
+        return result
       })
+    },
+    findActiveOccurrence(automationId) {
+      const row = findActiveOccurrence.get(automationId) as AutomationOccurrenceRow | undefined
+      return row ? toOccurrence(row) : null
     },
     findById(id) {
       const row = findVisible.get(id) as AutomationRow | undefined
@@ -610,9 +608,6 @@ export function createAutomationRepository(database: DatabaseSync): AutomationRe
           occurrence: requireOccurrence(findOccurrence.get(input.id), input.id),
         }
       })
-    },
-    hasNonTerminalRun(automationId) {
-      return findNonTerminalRun.get(automationId) !== undefined
     },
     leaseQueued(input) {
       return withTransaction(database, () => {
@@ -700,9 +695,8 @@ export function createAutomationRepository(database: DatabaseSync): AutomationRe
     replayAutomationMutation(mutation) {
       return replayMutation(mutation, automationSchema)
     },
-    replayOccurrenceMutation(mutation) {
-      const replay = replayMutation(mutation, automationOccurrenceSchema)
-      return replay ? requireOccurrence(findOccurrence.get(replay.id), replay.id) : null
+    replayRunNowMutation(mutation) {
+      return replayMutation(mutation, automationRunNowResultSchema)
     },
     settleScheduled(input) {
       return withTransaction(database, () => {

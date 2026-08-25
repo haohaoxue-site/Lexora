@@ -230,6 +230,17 @@ export const automationOccurrenceSchema = z.object({
   triggerKind: automationTriggerKindSchema,
 }).strict()
 
+export const automationRunNowResultSchema = z.discriminatedUnion('outcome', [
+  z.object({
+    occurrence: automationOccurrenceSchema,
+    outcome: z.literal('started'),
+  }).strict(),
+  z.object({
+    occurrence: automationOccurrenceSchema,
+    outcome: z.literal('already_running'),
+  }).strict(),
+])
+
 export const automationEffectiveStatusSchema = z.enum(AUTOMATION_EFFECTIVE_STATUSES)
 
 export const automationOccurrenceViewSchema = automationOccurrenceSchema.extend({
@@ -242,6 +253,10 @@ export const automationOccurrenceViewSchema = automationOccurrenceSchema.extend(
     startedAt: utcInstantSchema,
     status: z.enum(['queued', 'running', 'completed', 'failed', 'cancelled']),
   }).strict().nullable(),
+}).strict()
+
+export const automationTaskSchema = automationSchema.safeExtend({
+  activeOccurrence: automationOccurrenceViewSchema.nullable(),
 }).strict()
 
 const automationRequestIdSchema = z.string().trim().min(1).max(128)
@@ -282,7 +297,7 @@ export const automationRequestSchemas = {
 } as const
 
 export const automationPageSchema = z.object({
-  items: z.array(automationSchema),
+  items: z.array(automationTaskSchema),
   nextCursor: z.string().regex(/^[\w-]+$/).max(2_048).nullable(),
 }).strict()
 
@@ -358,6 +373,8 @@ export type AutomationExecutionSnapshot = z.infer<typeof automationExecutionSnap
 export type Automation = z.infer<typeof automationSchema>
 export type AutomationOccurrence = z.infer<typeof automationOccurrenceSchema>
 export type AutomationOccurrenceView = z.infer<typeof automationOccurrenceViewSchema>
+export type AutomationRunNowResult = z.infer<typeof automationRunNowResultSchema>
+export type AutomationTask = z.infer<typeof automationTaskSchema>
 export type AutomationEffectiveStatus = z.infer<typeof automationEffectiveStatusSchema>
 export type AutomationErrorCode = z.infer<typeof automationErrorCodeSchema>
 export type AutomationBlockedReason = z.infer<typeof automationBlockedReasonSchema>

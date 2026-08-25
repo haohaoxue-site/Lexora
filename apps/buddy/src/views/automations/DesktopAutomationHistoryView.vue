@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { NButton, NSpin } from 'naive-ui'
+import { NButton, NResult, NSpin, useMessage } from 'naive-ui'
 import { useRouter } from 'vue-router'
 import { useDesktopApp } from '@/app/desktopAppContext'
 import { useBuddyI18n } from '@/i18n/buddyI18n'
@@ -11,6 +11,7 @@ const {
   capabilities: { applicationSettings, automations, chat },
 } = useDesktopApp()
 const { t } = useBuddyI18n(applicationSettings.language)
+const message = useMessage()
 
 async function openConversation(conversationId: string): Promise<void> {
   await router.push(desktopRouteLocations.chat())
@@ -18,8 +19,23 @@ async function openConversation(conversationId: string): Promise<void> {
 }
 
 async function deleteOccurrence(occurrenceId: string): Promise<void> {
-  if (await automations.removeOccurrence(occurrenceId))
+  const result = await automations.removeOccurrence(occurrenceId)
+  if (result.status === 'failed') {
+    message.error(result.error)
+    return
+  }
+  if (result.status === 'succeeded' && result.value)
     await chat.index.refresh()
+}
+
+async function loadMore(): Promise<void> {
+  if (!await automations.loadMoreOccurrences() && automations.loadError.value)
+    message.error(automations.loadError.value)
+}
+
+async function retry(): Promise<void> {
+  if (!await automations.refresh() && automations.loadError.value)
+    message.error(automations.loadError.value)
 }
 </script>
 
@@ -28,7 +44,20 @@ async function deleteOccurrence(occurrenceId: string): Promise<void> {
     class="desktop-automation-route-view"
     :show="automations.isLoading.value && automations.occurrences.value.items.length === 0"
   >
+    <NResult
+      v-if="automations.loadError.value && automations.occurrences.value.items.length === 0"
+      status="error"
+      :description="automations.loadError.value"
+      :title="t('desktop.automations.loadFailed')"
+    >
+      <template #footer>
+        <NButton secondary @click="retry">
+          {{ t('desktop.automations.refresh') }}
+        </NButton>
+      </template>
+    </NResult>
     <DesktopAutomationHistoryList
+      v-else
       :busy="automations.isMutating.value"
       :language="applicationSettings.language.value"
       :occurrences="automations.occurrences.value.items"
@@ -40,7 +69,7 @@ async function deleteOccurrence(occurrenceId: string): Promise<void> {
       class="desktop-automation-route-view__more"
       secondary
       :loading="automations.isLoadingMoreOccurrences.value"
-      @click="automations.loadMoreOccurrences"
+      @click="loadMore"
     >
       {{ t('desktop.automations.loadMore') }}
     </NButton>

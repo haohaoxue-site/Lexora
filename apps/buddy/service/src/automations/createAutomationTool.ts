@@ -5,6 +5,7 @@ import type {
   Automation,
   AutomationDefinitionDraft,
   AutomationOccurrence,
+  AutomationRunNowResult,
   AutomationSchedule,
 } from '../../../shared/automation'
 import type { BuddyToolClassification } from '../agent/extensions/toolPolicyExtension'
@@ -168,6 +169,7 @@ export interface AutomationToolDetails {
   occurrence?: AutomationOccurrence
   operation: AutomationToolOperation | 'invalid'
   page?: AutomationPage<Automation>
+  runNowOutcome?: AutomationRunNowResult['outcome']
 }
 
 export interface CreateAutomationToolOptions {
@@ -206,7 +208,7 @@ export function createAutomationTool(options: CreateAutomationToolOptions) {
       try {
         const result = executeAutomationOperation(options.service, parsed.data)
         const automationId = result.automation?.id ?? result.occurrence?.automationId
-        if (automationId && isMutation(parsed.data.operation))
+        if (automationId && isMutation(parsed.data.operation) && result.changed !== false)
           options.onChanged?.(automationId)
         return {
           content: [{ type: 'text' as const, text: JSON.stringify(result.value) }],
@@ -261,6 +263,7 @@ function executeAutomationOperation(
   input: z.infer<typeof automationToolInputSchema>,
 ): {
   automation?: Automation
+  changed?: boolean
   details: AutomationToolDetails
   occurrence?: AutomationOccurrence
   value: unknown
@@ -303,11 +306,16 @@ function executeAutomationOperation(
     }
     case 'run_now': {
       const { operation: _, ...request } = input
-      const occurrence = service.runNow(request)
+      const result = service.runNow(request)
       return {
-        details: { occurrence, operation: input.operation },
-        occurrence,
-        value: occurrence,
+        changed: result.outcome === 'started',
+        details: {
+          occurrence: result.occurrence,
+          operation: input.operation,
+          runNowOutcome: result.outcome,
+        },
+        occurrence: result.occurrence,
+        value: result,
       }
     }
   }

@@ -693,7 +693,19 @@ function registerRuntimeHandlers(services: RuntimeServices): () => void {
   })
   on('automations.list', (params) => {
     const input = parse(automationRequestSchemas.list, params)
-    return services.automationService.list(input)
+    const page = services.automationService.list(input)
+    return {
+      ...page,
+      items: page.items.map((automation) => {
+        const occurrence = services.automationService.getActiveOccurrence(automation.id)
+        return {
+          ...automation,
+          activeOccurrence: occurrence
+            ? toAutomationOccurrenceView(services, occurrence)
+            : null,
+        }
+      }),
+    }
   })
   on('automations.get', (params) => {
     const input = parse(automationRequestSchemas.get, params)
@@ -738,11 +750,12 @@ function registerRuntimeHandlers(services: RuntimeServices): () => void {
     return automation
   })
   on('automations.runNow', (params) => {
-    const occurrence = services.automationService.runNow(
+    const result = services.automationService.runNow(
       parse(automationMutationRequestSchemas.runNow, params),
     )
-    notifyAutomationChanged(services, occurrence.automationId)
-    return occurrence
+    if (result.outcome === 'started')
+      notifyAutomationChanged(services, result.occurrence.automationId)
+    return result
   })
   on('automations.listOccurrences', (params) => {
     const input = parse(automationRequestSchemas.listOccurrences, params)

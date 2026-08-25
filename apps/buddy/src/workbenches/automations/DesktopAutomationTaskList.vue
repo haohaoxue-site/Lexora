@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { LocalAutomation } from '@buddy-electron/shared/localChatApi'
+import type { LocalAutomationTask } from '@buddy-electron/shared/localChatApi'
 import type { DropdownOption } from 'naive-ui'
 import type { HTMLAttributes } from 'vue'
 import type { BuddyLocale } from '@/i18n/buddyI18n'
@@ -19,26 +19,29 @@ import {
 } from './automationPresentation'
 
 const props = defineProps<{
-  automations: ReadonlyArray<LocalAutomation>
-  busy: boolean
+  automations: ReadonlyArray<LocalAutomationTask>
   language: BuddyLocale
+  pendingAutomationIds: ReadonlySet<string>
 }>()
 const emit = defineEmits<{
   create: []
-  delete: [automation: LocalAutomation]
-  edit: [automation: LocalAutomation]
-  pause: [automation: LocalAutomation]
-  resume: [automation: LocalAutomation]
-  runNow: [automation: LocalAutomation]
+  delete: [automation: LocalAutomationTask]
+  edit: [automation: LocalAutomationTask]
+  pause: [automation: LocalAutomationTask]
+  resume: [automation: LocalAutomationTask]
+  runNow: [automation: LocalAutomationTask]
 }>()
 const { t } = useBuddyI18n(() => props.language)
-const deleteTarget = shallowRef<LocalAutomation | null>(null)
+const deleteTarget = shallowRef<LocalAutomationTask | null>(null)
 const dropdownItemProps: HTMLAttributes = { role: 'menuitem' }
+const deletePending = computed(() => (
+  deleteTarget.value !== null && props.pendingAutomationIds.has(deleteTarget.value.id)
+))
 const deleteMessage = computed(() => t('desktop.automations.deleteMessage', {
   name: deleteTarget.value?.name ?? '',
 }))
 
-function actionOptions(automation: LocalAutomation): DropdownOption[] {
+function actionOptions(automation: LocalAutomationTask): DropdownOption[] {
   const lifecycleAction = automation.status === 'active'
     ? {
         icon: () => h(NIcon, { component: Pause20Regular }),
@@ -65,7 +68,7 @@ function actionOptions(automation: LocalAutomation): DropdownOption[] {
   ]
 }
 
-function handleAction(automation: LocalAutomation, action: string | number): void {
+function handleAction(automation: LocalAutomationTask, action: string | number): void {
   if (action === 'pause')
     emit('pause', automation)
   if (action === 'resume')
@@ -79,6 +82,10 @@ function confirmDelete(): void {
     return
   emit('delete', deleteTarget.value)
   deleteTarget.value = null
+}
+
+function isPending(automation: LocalAutomationTask): boolean {
+  return props.pendingAutomationIds.has(automation.id)
 }
 </script>
 
@@ -123,7 +130,7 @@ function confirmDelete(): void {
             circle
             size="small"
             :aria-label="t('desktop.automations.action.runNow')"
-            :disabled="busy"
+            :loading="isPending(automation)"
             @click.stop="emit('runNow', automation)"
           >
             <template #icon>
@@ -140,7 +147,7 @@ function confirmDelete(): void {
               circle
               size="small"
               :aria-label="t('desktop.automations.action.more')"
-              :disabled="busy"
+              :disabled="isPending(automation)"
             >
               <template #icon>
                 <NIcon :component="MoreHorizontal20Regular" />
@@ -174,7 +181,7 @@ function confirmDelete(): void {
       <NButton @click="deleteTarget = null">
         {{ t('desktop.automations.editor.cancel') }}
       </NButton>
-      <NButton type="error" :loading="busy" @click="confirmDelete">
+      <NButton type="error" :loading="deletePending" @click="confirmDelete">
         {{ t('desktop.automations.action.delete') }}
       </NButton>
     </template>

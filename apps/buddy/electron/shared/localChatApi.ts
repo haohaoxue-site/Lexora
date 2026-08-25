@@ -6,12 +6,12 @@ import type {
   LocalAutomationCreateRequest,
   LocalAutomationListRequest,
   LocalAutomationMutationRequest,
-  LocalAutomationOccurrence,
   LocalAutomationOccurrenceListRequest,
   LocalAutomationOccurrencePage,
   LocalAutomationPage,
   LocalAutomationPreviewRequest,
   LocalAutomationPreviewResult,
+  LocalAutomationRunNowResult,
   LocalAutomationUpdateRequest,
   LocalBuddyServiceSupervisorState,
   LocalChatCommandRequest,
@@ -128,6 +128,8 @@ export type {
   LocalAutomationPage,
   LocalAutomationPreviewRequest,
   LocalAutomationPreviewResult,
+  LocalAutomationRunNowResult,
+  LocalAutomationTask,
   LocalAutomationUpdateRequest,
   LocalBuddyServiceSupervisorState,
   LocalChatCommandRequest,
@@ -281,7 +283,7 @@ export interface LocalChatApi {
     pause: (input: LocalAutomationMutationRequest) => Promise<LocalAutomation>
     preview: (input: LocalAutomationPreviewRequest) => Promise<LocalAutomationPreviewResult>
     resume: (input: LocalAutomationMutationRequest) => Promise<LocalAutomation>
-    runNow: (input: LocalAutomationMutationRequest) => Promise<LocalAutomationOccurrence>
+    runNow: (input: LocalAutomationMutationRequest) => Promise<LocalAutomationRunNowResult>
     update: (input: LocalAutomationUpdateRequest) => Promise<LocalAutomation>
     onChanged: (listener: (automationId: string) => void) => () => void
   }

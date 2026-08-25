@@ -6,7 +6,8 @@ import {
   ArrowClockwise20Regular,
   PanelLeft20Regular,
 } from '@vicons/fluent'
-import { NAlert, NButton, NIcon, NScrollbar } from 'naive-ui'
+import { NButton, NIcon, NScrollbar, useMessage } from 'naive-ui'
+import { shallowRef } from 'vue'
 import { useRoute } from 'vue-router'
 import { useBuddyI18n } from '@/i18n/buddyI18n'
 import { desktopRouteLocations } from '@/router'
@@ -25,6 +26,21 @@ defineSlots<{
 }>()
 const route = useRoute()
 const { t } = useBuddyI18n(() => props.language)
+const message = useMessage()
+const isRefreshing = shallowRef(false)
+
+async function refresh(): Promise<void> {
+  if (isRefreshing.value)
+    return
+  isRefreshing.value = true
+  try {
+    if (!await props.automations.refresh() && props.automations.loadError.value)
+      message.error(props.automations.loadError.value)
+  }
+  finally {
+    isRefreshing.value = false
+  }
+}
 </script>
 
 <template>
@@ -57,7 +73,7 @@ const { t } = useBuddyI18n(() => props.language)
         </nav>
       </div>
       <div class="desktop-automation-workbench__header-actions">
-        <NButton secondary :loading="automations.isLoading.value" @click="automations.refresh">
+        <NButton secondary :loading="isRefreshing" @click="refresh">
           <template #icon>
             <NIcon :component="ArrowClockwise20Regular" />
           </template>
@@ -77,10 +93,6 @@ const { t } = useBuddyI18n(() => props.language)
       content-style="min-height: 100%;"
     >
       <div class="desktop-automation-workbench__content">
-        <NAlert v-if="automations.error.value" type="error" :bordered="false">
-          {{ automations.error.value }}
-        </NAlert>
-
         <slot />
       </div>
     </NScrollbar>
