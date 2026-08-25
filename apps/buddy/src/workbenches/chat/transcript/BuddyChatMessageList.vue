@@ -32,6 +32,10 @@ import {
 } from './chatConversationTimeline'
 import { renderChatMarkdown } from './chatMarkdown'
 import { projectChatMessageBranchNavigators } from './chatMessageBranches'
+import {
+  formatChatDayDividerLabel,
+  projectChatTranscriptDisplayRows,
+} from './chatMessageTime'
 import { resolvePrependedChatScrollTop } from './chatMessageViewport'
 import {
   projectChatTranscript,
@@ -87,8 +91,8 @@ const transcriptProjection = computed(() => projectChatTranscript({
   runs: props.runs ?? [],
   timelineItems: props.timelineItems,
 }))
-const virtualRows = computed<ChatTranscriptRow[]>(
-  () => [...transcriptProjection.value.rows],
+const virtualRows = computed(
+  () => projectChatTranscriptDisplayRows(transcriptProjection.value.rows),
 )
 const branchNavigators = computed(() => projectChatMessageBranchNavigators(
   props.timelineItems,
@@ -372,8 +376,17 @@ function toScrollMetrics(viewport: HTMLElement): ChatMessageScrollMetrics {
       @wheel="cancelTailScroll"
     >
       <template #default="{ item }">
+        <div
+          v-if="item.kind === 'day-divider'"
+          class="buddy-chat-day-divider buddy-chat-virtual-row"
+        >
+          <time :datetime="item.createdAt">
+            {{ formatChatDayDividerLabel(item.createdAt, language) }}
+          </time>
+        </div>
+
         <BuddyChatMessageRow
-          v-if="item.kind === 'message'"
+          v-else-if="item.kind === 'message'"
           :actions-disabled="actionsDisabled ?? false"
           :active-search="item.message.id === activeSearchMessageId"
           :branch-navigator="branchNavigators.get(item.message.id) ?? null"
@@ -489,6 +502,16 @@ function toScrollMetrics(viewport: HTMLElement): ChatMessageScrollMetrics {
 
 .buddy-chat-agent-turn.buddy-chat-virtual-row {
   padding-bottom: var(--buddy-chat-gap-block);
+}
+
+.buddy-chat-day-divider {
+  display: flex;
+  justify-content: center;
+  color: var(--buddy-text-placeholder);
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.25rem;
+  padding-block: 0.75rem 1.25rem;
 }
 
 .buddy-chat-agent-turn.has-visible-process.buddy-chat-virtual-row {

@@ -16,6 +16,7 @@ import {
   getChatMessageInterruption,
   getChatMessageText,
 } from './chatMessageContent'
+import { formatChatMessageTimeLabel } from './chatMessageTime'
 
 const props = defineProps<{
   actionsDisabled: boolean
@@ -53,6 +54,7 @@ const interruptionLabel = computed(() => {
     : 'desktop.chat.messageInterrupted')
 })
 const roleLabel = computed(() => t(`message.role.${props.message.role}`))
+const timeLabel = computed(() => formatChatMessageTimeLabel(props.message.createdAt))
 
 watch(
   [() => props.editing, () => props.message.id],
@@ -146,6 +148,13 @@ async function copyMessage() {
       {{ interruptionLabel }}
     </small>
     <div v-if="!editing" class="buddy-chat-message__actions">
+      <time
+        v-if="message.role === 'user'"
+        class="buddy-chat-message__time"
+        :datetime="message.createdAt"
+      >
+        {{ timeLabel }}
+      </time>
       <NTooltip v-if="actions.showCopy" placement="bottom">
         <template #trigger>
           <NButton
@@ -236,6 +245,13 @@ async function copyMessage() {
           {{ t('desktop.chat.nextBranch') }}
         </NTooltip>
       </div>
+      <time
+        v-if="message.role === 'assistant'"
+        class="buddy-chat-message__time"
+        :datetime="message.createdAt"
+      >
+        {{ timeLabel }}
+      </time>
     </div>
   </article>
 </template>
@@ -371,6 +387,16 @@ async function copyMessage() {
     min-width: 2.25rem;
     text-align: center;
   }
+}
+
+.buddy-chat-message__time {
+  color: var(--buddy-text-placeholder);
+  font-size: 0.68rem;
+  font-variant-numeric: tabular-nums;
+  font-weight: 400;
+  line-height: 1.35rem;
+  padding-inline: 0.2rem;
+  white-space: nowrap;
 }
 
 .buddy-chat-message__copy-button {

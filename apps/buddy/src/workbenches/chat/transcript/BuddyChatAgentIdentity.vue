@@ -19,7 +19,7 @@ const { t } = useBuddyI18n(() => props.language)
       height="25"
       width="25"
     >
-    <strong>{{ t('desktop.chat.agentName') }}</strong>
+    <span>{{ t('desktop.chat.agentName') }}</span>
   </header>
 </template>
 
@@ -38,12 +38,10 @@ const { t } = useBuddyI18n(() => props.language)
     object-fit: contain;
   }
 
-  strong {
+  span {
     min-width: 0;
     color: var(--buddy-text-primary);
-    font-size: 15px;
-    font-weight: 600;
-    line-height: 1.5;
+    font-size: 13px;
   }
 }
 </style>
