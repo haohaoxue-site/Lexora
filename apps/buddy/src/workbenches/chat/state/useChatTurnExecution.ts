@@ -10,9 +10,9 @@ import type { ModelProvidersStore } from '@/stores/useModelProvidersStore'
 import type { RuntimeSupervisorStore } from '@/stores/useRuntimeSupervisorStore'
 import type { ChatComposerSubmitPayload } from '@/workbenches/chat/composer/chatComposerInput'
 import type { useChatDrafts } from '@/workbenches/chat/state/useChatDrafts'
-import type { ChatIndexData } from '@/workbenches/chat/state/useChatIndexData'
 import type { useChatRunSync } from '@/workbenches/chat/state/useChatRunSync'
 import type { ChatSession } from '@/workbenches/chat/state/useChatSession'
+import type { TaskIndexData } from '@/workbenches/tasks/state/useTaskIndexData'
 import { parseBuddyChatCommand } from '@buddy-shared/buddyChatCommands'
 import { computed, readonly, shallowRef } from 'vue'
 import { resolveLocalChatErrorMessage } from '@/lib/localChatError'
@@ -28,7 +28,7 @@ interface ValueRef<T> {
 interface UseChatTurnExecutionOptions {
   activeRun: ValueRef<LocalRun | null>
   api: LexoraDesktopApi['localChat']
-  chatIndexData: ChatIndexData
+  taskIndexData: TaskIndexData
   session: ChatSession
   drafts: ReturnType<typeof useChatDrafts>
   draftScopeKey: ValueRef<string>
@@ -123,14 +123,14 @@ export function useChatTurnExecution(options: UseChatTurnExecutionOptions) {
           options.drafts.restoreCurrentDraft()
           options.setErrorMessage(options.getRunTerminationMessage(result.run.errorCode))
         }
-        refreshChatIndex()
+        refreshTaskIndex()
         void options.persistWorkspaceState()
         return false
       }
       options.drafts.clear(sourceScopeKey)
       if (sourceViewIsCurrent)
         options.drafts.restoreCurrentDraft()
-      refreshChatIndex()
+      refreshTaskIndex()
       void options.persistWorkspaceState()
       return true
     }
@@ -195,7 +195,7 @@ export function useChatTurnExecution(options: UseChatTurnExecutionOptions) {
       options.drafts.clear(sourceScopeKey)
       if (isSourceViewCurrent())
         options.drafts.restoreCurrentDraft()
-      refreshChatIndex()
+      refreshTaskIndex()
       void options.persistWorkspaceState()
       return true
     }
@@ -220,8 +220,8 @@ export function useChatTurnExecution(options: UseChatTurnExecutionOptions) {
     }
   }
 
-  function refreshChatIndex() {
-    void options.chatIndexData.refreshIndex().catch(() => {})
+  function refreshTaskIndex() {
+    void options.taskIndexData.refreshIndex().catch(() => {})
   }
 
   function setNormalizedError(error: unknown) {

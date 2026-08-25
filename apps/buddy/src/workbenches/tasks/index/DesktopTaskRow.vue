@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { LocalConversationSummary } from '@buddy-electron/shared/localChatApi'
 import type { BuddyLocale } from '@/i18n/buddyI18n'
-import type { DesktopChatPinnedDropPosition } from '@/workbenches/chat/index/chatPinnedItems'
+import type { DesktopTaskPinnedDropPosition } from '@/workbenches/tasks/index/taskPinnedItems'
 import {
   ApprovalsApp20Regular,
   Delete20Regular,
@@ -16,19 +16,19 @@ import relativeTime from 'dayjs/plugin/relativeTime'
 import { NDropdown, NIcon } from 'naive-ui'
 import { computed, h } from 'vue'
 import { useBuddyI18n } from '@/i18n/buddyI18n'
-import DesktopOverflowingLabel from '@/workbenches/chat/index/DesktopOverflowingLabel.vue'
+import DesktopOverflowingLabel from '@/workbenches/tasks/index/DesktopOverflowingLabel.vue'
 import 'dayjs/locale/zh-cn'
 
 const props = defineProps<{
   active: boolean
   activity: LocalConversationSummary['activity']
   dragging?: boolean
-  dropPosition?: DesktopChatPinnedDropPosition
+  dropPosition?: DesktopTaskPinnedDropPosition
   language: BuddyLocale
   now: number
   occurredAt: string
   pinMode?: 'pin' | 'unpin'
-  projectConversation?: boolean
+  projectTask?: boolean
   reorderable?: boolean
   reorderTarget?: boolean
   title: string
@@ -37,9 +37,9 @@ const props = defineProps<{
 const emit = defineEmits<{
   delete: []
   dragEnd: []
-  dragOver: [position: DesktopChatPinnedDropPosition]
+  dragOver: [position: DesktopTaskPinnedDropPosition]
   dragStart: []
-  drop: [position: DesktopChatPinnedDropPosition]
+  drop: [position: DesktopTaskPinnedDropPosition]
   open: []
   pin: []
   rename: []
@@ -61,11 +61,11 @@ const activityLabel = computed(() => props.activity === 'awaiting_approval'
   ? t('activity.approval')
   : t('run.status.running'))
 const pinLabel = computed(() => props.pinMode === 'pin'
-  ? t('desktop.chat.pin')
-  : t('desktop.chat.unpin'))
+  ? t('desktop.tasks.pin')
+  : t('desktop.tasks.unpin'))
 const actions = computed(() => [
-  { icon: () => hIcon(Edit20Regular), key: 'rename', label: t('chat.renameConversation') },
-  { icon: () => hIcon(Delete20Regular), key: 'delete', label: t('chat.deleteConversation') },
+  { icon: () => hIcon(Edit20Regular), key: 'rename', label: t('desktop.tasks.renameTask') },
+  { icon: () => hIcon(Delete20Regular), key: 'delete', label: t('desktop.tasks.deleteTask') },
 ])
 
 function hIcon(component: typeof Edit20Regular) {
@@ -84,7 +84,7 @@ function handleDragStart(event: DragEvent) {
     event.preventDefault()
     return
   }
-  event.dataTransfer?.setData('text/plain', 'desktop-chat-pinned-item')
+  event.dataTransfer?.setData('text/plain', 'desktop-task-pinned-item')
   if (event.dataTransfer)
     event.dataTransfer.effectAllowed = 'move'
   emit('dragStart')
@@ -106,7 +106,7 @@ function handleDrop(event: DragEvent) {
   emit('drop', resolveDropPosition(event))
 }
 
-function resolveDropPosition(event: DragEvent): DesktopChatPinnedDropPosition {
+function resolveDropPosition(event: DragEvent): DesktopTaskPinnedDropPosition {
   const bounds = (event.currentTarget as HTMLElement).getBoundingClientRect()
   return event.clientY < bounds.top + bounds.height / 2 ? 'before' : 'after'
 }
@@ -114,7 +114,7 @@ function resolveDropPosition(event: DragEvent): DesktopChatPinnedDropPosition {
 
 <template>
   <div
-    class="desktop-chat-conversation-row"
+    class="desktop-task-row"
     :class="{
       'is-active': active,
       'is-dragging': dragging,
@@ -129,26 +129,26 @@ function resolveDropPosition(event: DragEvent): DesktopChatPinnedDropPosition {
     @drop="handleDrop"
   >
     <div
-      class="desktop-chat-conversation-row__surface"
-      :class="{ 'is-active': active, 'is-project': projectConversation }"
+      class="desktop-task-row__surface"
+      :class="{ 'is-active': active, 'is-project': projectTask }"
     >
       <button
-        class="desktop-chat-sidebar__conversation"
+        class="desktop-task-sidebar__task"
         :class="{ 'is-active': active }"
         type="button"
         @click="emit('open')"
       >
         <DesktopOverflowingLabel :paused="dragging" :text="title" />
       </button>
-      <div class="desktop-chat-conversation-row__trailing">
+      <div class="desktop-task-row__trailing">
         <time
           v-if="activity === 'idle'"
-          class="desktop-chat-conversation-row__relative-time"
+          class="desktop-task-row__relative-time"
           :datetime="occurredAt"
         >{{ relativeTimeLabel }}</time>
         <span
           v-else
-          class="desktop-chat-conversation-row__activity"
+          class="desktop-task-row__activity"
           :class="{
             'is-awaiting-approval': activity === 'awaiting_approval',
             'is-running': activity === 'running',
@@ -158,15 +158,19 @@ function resolveDropPosition(event: DragEvent): DesktopChatPinnedDropPosition {
         >
           <NIcon :component="activityIcon" />
         </span>
-        <div class="desktop-chat-conversation-row__actions">
+        <div class="desktop-task-row__actions">
           <NDropdown trigger="click" :options="actions" @select="handleAction">
-            <button class="desktop-chat-sidebar__more" type="button">
+            <button
+              class="desktop-task-sidebar__more"
+              type="button"
+              :aria-label="t('desktop.tasks.moreActions')"
+            >
               <NIcon :component="MoreHorizontal20Regular" />
             </button>
           </NDropdown>
           <button
             v-if="pinMode"
-            class="desktop-chat-sidebar__more desktop-chat-sidebar__pin"
+            class="desktop-task-sidebar__more desktop-task-sidebar__pin"
             type="button"
             :aria-label="pinLabel"
             @click="emit('pin')"
@@ -180,12 +184,12 @@ function resolveDropPosition(event: DragEvent): DesktopChatPinnedDropPosition {
 </template>
 
 <style scoped lang="scss">
-.desktop-chat-conversation-row {
+.desktop-task-row {
   position: relative;
-  height: var(--buddy-chat-sidebar-row-size, 2.5rem);
+  height: var(--buddy-task-sidebar-row-size, 2.5rem);
   min-width: 0;
-  padding-right: var(--buddy-chat-sidebar-scrollbar-gutter, 0);
-  padding-bottom: calc(var(--buddy-chat-sidebar-row-size, 2.5rem) - var(--buddy-chat-sidebar-row-height, 2.25rem));
+  padding-right: var(--buddy-task-sidebar-scrollbar-gutter, 0);
+  padding-bottom: calc(var(--buddy-task-sidebar-row-size, 2.5rem) - var(--buddy-task-sidebar-row-height, 2.25rem));
 
   &.is-reorderable {
     cursor: grab;
@@ -199,7 +203,7 @@ function resolveDropPosition(event: DragEvent): DesktopChatPinnedDropPosition {
   &.is-drop-after::after {
     position: absolute;
     z-index: 1;
-    right: var(--buddy-chat-sidebar-scrollbar-gutter, 0);
+    right: var(--buddy-task-sidebar-scrollbar-gutter, 0);
     left: 0;
     height: 2px;
     background: var(--buddy-accent-primary);
@@ -216,12 +220,12 @@ function resolveDropPosition(event: DragEvent): DesktopChatPinnedDropPosition {
   }
 }
 
-.desktop-chat-conversation-row__surface {
+.desktop-task-row__surface {
   display: flex;
   height: 100%;
   min-width: 0;
   align-items: center;
-  border-radius: var(--buddy-chat-sidebar-state-radius, 8px);
+  border-radius: var(--buddy-task-sidebar-state-radius, 8px);
   color: var(--buddy-text-regular);
 
   &:hover,
@@ -242,7 +246,7 @@ button {
   cursor: pointer;
 }
 
-.desktop-chat-sidebar__conversation {
+.desktop-task-sidebar__task {
   display: flex;
   min-width: 0;
   flex: 1;
@@ -270,10 +274,10 @@ button {
   }
 }
 
-.desktop-chat-sidebar__more {
+.desktop-task-sidebar__more {
   display: grid;
-  width: var(--buddy-chat-sidebar-action-size, 1.75rem);
-  height: var(--buddy-chat-sidebar-action-size, 1.75rem);
+  width: var(--buddy-task-sidebar-action-size, 1.75rem);
+  height: var(--buddy-task-sidebar-action-size, 1.75rem);
   flex: none;
   place-items: center;
   border-radius: var(--buddy-icon-button-radius);
@@ -294,29 +298,29 @@ button {
   }
 }
 
-.desktop-chat-conversation-row__trailing {
+.desktop-task-row__trailing {
   display: grid;
   width: 4rem;
   flex: none;
   align-items: center;
-  padding-right: var(--buddy-chat-sidebar-action-inset, 0.25rem);
+  padding-right: var(--buddy-task-sidebar-action-inset, 0.25rem);
 }
 
-.desktop-chat-conversation-row__relative-time,
-.desktop-chat-conversation-row__activity,
-.desktop-chat-conversation-row__actions {
+.desktop-task-row__relative-time,
+.desktop-task-row__activity,
+.desktop-task-row__actions {
   grid-area: 1 / 1;
   justify-self: end;
 }
 
-.desktop-chat-sidebar__pin {
+.desktop-task-sidebar__pin {
   color: var(--buddy-text-placeholder);
 }
 
-.desktop-chat-conversation-row__activity {
+.desktop-task-row__activity {
   display: grid;
-  width: var(--buddy-chat-sidebar-action-size, 1.75rem);
-  height: var(--buddy-chat-sidebar-action-size, 1.75rem);
+  width: var(--buddy-task-sidebar-action-size, 1.75rem);
+  height: var(--buddy-task-sidebar-action-size, 1.75rem);
   place-items: center;
   pointer-events: none;
 
@@ -328,7 +332,7 @@ button {
     color: var(--buddy-text-placeholder);
 
     .n-icon {
-      animation: desktop-chat-conversation-row-spin 1s linear infinite;
+      animation: desktop-task-row-spin 1s linear infinite;
     }
   }
 
@@ -337,7 +341,7 @@ button {
   }
 }
 
-.desktop-chat-conversation-row__relative-time {
+.desktop-task-row__relative-time {
   color: var(--buddy-text-placeholder);
   font-size: 0.75rem;
   line-height: 1;
@@ -345,35 +349,35 @@ button {
   white-space: nowrap;
 }
 
-.desktop-chat-conversation-row__actions {
+.desktop-task-row__actions {
   display: flex;
   align-items: center;
-  gap: var(--buddy-chat-sidebar-action-gap, 0.125rem);
+  gap: var(--buddy-task-sidebar-action-gap, 0.125rem);
   opacity: 0;
   pointer-events: none;
 }
 
-.desktop-chat-conversation-row:hover .desktop-chat-conversation-row__relative-time,
-.desktop-chat-conversation-row:has(:focus-visible) .desktop-chat-conversation-row__relative-time,
-.desktop-chat-conversation-row:hover .desktop-chat-conversation-row__activity,
-.desktop-chat-conversation-row:has(:focus-visible) .desktop-chat-conversation-row__activity {
+.desktop-task-row:hover .desktop-task-row__relative-time,
+.desktop-task-row:has(:focus-visible) .desktop-task-row__relative-time,
+.desktop-task-row:hover .desktop-task-row__activity,
+.desktop-task-row:has(:focus-visible) .desktop-task-row__activity {
   opacity: 0;
 }
 
-.desktop-chat-conversation-row:hover .desktop-chat-conversation-row__actions,
-.desktop-chat-conversation-row:has(:focus-visible) .desktop-chat-conversation-row__actions {
+.desktop-task-row:hover .desktop-task-row__actions,
+.desktop-task-row:has(:focus-visible) .desktop-task-row__actions {
   opacity: 1;
   pointer-events: auto;
 }
 
-@keyframes desktop-chat-conversation-row-spin {
+@keyframes desktop-task-row-spin {
   to {
     transform: rotate(360deg);
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .desktop-chat-conversation-row__activity.is-running .n-icon {
+  .desktop-task-row__activity.is-running .n-icon {
     animation: none;
   }
 }

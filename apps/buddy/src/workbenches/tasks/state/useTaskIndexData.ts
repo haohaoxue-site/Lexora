@@ -6,11 +6,11 @@ import type {
 } from '@buddy-electron/shared/localChatApi'
 import { readonly, shallowRef } from 'vue'
 
-interface UseChatIndexDataOptions {
+interface UseTaskIndexDataOptions {
   api: LexoraDesktopApi['localChat']
 }
 
-export function useChatIndexData(options: UseChatIndexDataOptions) {
+export function useTaskIndexData(options: UseTaskIndexDataOptions) {
   const projects = shallowRef<ReadonlyArray<LocalProject>>([])
   const conversations = shallowRef<ReadonlyArray<LocalConversationSummary>>([])
   let conversationListGeneration = 0
@@ -66,4 +66,4 @@ export function useChatIndexData(options: UseChatIndexDataOptions) {
   }
 }
 
-export type ChatIndexData = ReturnType<typeof useChatIndexData>
+export type TaskIndexData = ReturnType<typeof useTaskIndexData>

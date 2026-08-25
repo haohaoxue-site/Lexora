@@ -16,8 +16,8 @@ const {
   capabilities: {
     applicationSettings,
     automations,
-    chat,
     providerSettings,
+    tasks,
   },
   ready,
   shell,
@@ -50,7 +50,7 @@ watch(
 )
 
 function cancel(): void {
-  void router.replace(desktopRouteLocations.automations('tasks'))
+  void router.replace(desktopRouteLocations.automations('plans'))
 }
 
 async function save(draft: AutomationDefinitionDraft): Promise<void> {
@@ -60,7 +60,7 @@ async function save(draft: AutomationDefinitionDraft): Promise<void> {
       ? await automations.update(automation.value, draft)
       : null
   if (result)
-    await router.replace(desktopRouteLocations.automations('tasks'))
+    await router.replace(desktopRouteLocations.automations('plans'))
 }
 </script>
 
@@ -76,7 +76,7 @@ async function save(draft: AutomationDefinitionDraft): Promise<void> {
     :models="providerSettings.models.value"
     :preview="automations.preview"
     :providers="providerSettings.providers.value"
-    :projects="chat.index.projects.value"
+    :projects="tasks.index.projects.value"
     @cancel="cancel"
     @save="save"
     @toggle-app-sidebar="toggleAppSidebar"

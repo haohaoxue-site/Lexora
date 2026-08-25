@@ -10,18 +10,18 @@ import DesktopTitleBar from '@/window/DesktopTitleBar.vue'
 const route = useRoute()
 const router = useRouter()
 const { capabilities, shell, toggleAppSidebar } = useDesktopApp()
-const { chat, notifications } = capabilities
-const { index: chatIndex, session: chatSession } = chat
-const activeView = computed(() => route.meta.desktopView ?? 'chat')
+const { notifications, tasks } = capabilities
+const { index: taskIndex, session: taskSession } = tasks
+const activeView = computed(() => route.meta.desktopView ?? 'tasks')
 
-async function openGlobalSearchConversation(conversationId: string) {
-  await router.push(desktopRouteLocations.chat())
-  await chatSession.openConversation(conversationId)
+async function openGlobalSearchTask(conversationId: string) {
+  await router.push(desktopRouteLocations.tasks())
+  await taskSession.openTask(conversationId)
 }
 
 async function openGlobalSearchProject(projectId: string) {
-  await router.push(desktopRouteLocations.chat())
-  await chatSession.startProjectConversation(projectId)
+  await router.push(desktopRouteLocations.tasks())
+  await taskSession.startTask(projectId)
 }
 
 async function openNotification(notification: LocalNotification) {
@@ -30,8 +30,8 @@ async function openNotification(notification: LocalNotification) {
     await router.push(desktopRouteLocations.settings('models'))
     return
   }
-  await router.push(desktopRouteLocations.chat())
-  await chatSession.openConversation(notification.action.conversationId)
+  await router.push(desktopRouteLocations.tasks())
+  await taskSession.openTask(notification.action.conversationId)
 }
 </script>
 
@@ -39,26 +39,26 @@ async function openNotification(notification: LocalNotification) {
   <div class="desktop-shell">
     <DesktopTitleBar
       :app-info="shell.appInfo.value"
-      :language="chat.language.value"
+      :language="tasks.language.value"
     />
     <div class="desktop-shell__body">
       <Transition name="desktop-app-sidebar">
         <DesktopAppSidebar
           v-if="!shell.appSidebarCollapsed.value"
           :app-version="shell.appInfo.value?.version ?? null"
-          :conversations="chatIndex.conversations.value"
-          :language="chat.language.value"
+          :conversations="taskIndex.tasks.value"
+          :language="tasks.language.value"
           :mode="activeView"
           :notification-items="notifications.items.value"
           :notification-loading="notifications.isLoading.value"
           :notification-unseen-count="notifications.unseenCount.value"
-          :projects="chatIndex.projects.value"
-          @navigate-chat="router.push(desktopRouteLocations.chat())"
+          :projects="taskIndex.projects.value"
+          @navigate-tasks="router.push(desktopRouteLocations.tasks())"
           @navigate-automations="router.push(desktopRouteLocations.automations())"
           @navigate-settings="router.push(desktopRouteLocations.settings())"
           @mark-all-notifications-seen="notifications.markAllSeen"
           @open-notification="openNotification"
-          @open-conversation="openGlobalSearchConversation"
+          @open-task="openGlobalSearchTask"
           @open-project="openGlobalSearchProject"
           @toggle-sidebar="toggleAppSidebar"
           @refresh-notifications="notifications.load"

@@ -5,9 +5,9 @@ import type { BuddyLocale } from '@/i18n/buddyI18n'
 import type { ModelProvidersStore } from '@/stores/useModelProvidersStore'
 import type { RuntimeSupervisorStore } from '@/stores/useRuntimeSupervisorStore'
 import type { useChatDrafts } from '@/workbenches/chat/state/useChatDrafts'
-import type { ChatIndexData } from '@/workbenches/chat/state/useChatIndexData'
 import type { useChatRunSync } from '@/workbenches/chat/state/useChatRunSync'
 import type { ChatSession } from '@/workbenches/chat/state/useChatSession'
+import type { TaskIndexData } from '@/workbenches/tasks/state/useTaskIndexData'
 import { useChatBranchMutations } from '@/workbenches/chat/state/useChatBranchMutations'
 import { useChatTurnExecution } from '@/workbenches/chat/state/useChatTurnExecution'
 
@@ -18,7 +18,7 @@ interface ValueRef<T> {
 interface UseChatExecutionOptions {
   activeRun: ValueRef<LocalRun | null>
   api: LexoraDesktopApi['localChat']
-  chatIndexData: ChatIndexData
+  taskIndexData: TaskIndexData
   session: ChatSession
   drafts: ReturnType<typeof useChatDrafts>
   draftScopeKey: ValueRef<string>
@@ -39,7 +39,7 @@ export function useChatExecution(options: UseChatExecutionOptions) {
   const turnExecution = useChatTurnExecution({
     activeRun: options.activeRun,
     api: options.api,
-    chatIndexData: options.chatIndexData,
+    taskIndexData: options.taskIndexData,
     session: options.session,
     drafts: options.drafts,
     draftScopeKey: options.draftScopeKey,
@@ -57,7 +57,7 @@ export function useChatExecution(options: UseChatExecutionOptions) {
   const branchMutations = useChatBranchMutations({
     activeRun: options.activeRun,
     api: options.api,
-    chatIndexData: options.chatIndexData,
+    taskIndexData: options.taskIndexData,
     session: options.session,
     isSending: turnExecution.isSending,
     isUpdatingExecutionProfile: options.isUpdatingExecutionProfile,

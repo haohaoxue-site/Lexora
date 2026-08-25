@@ -1,6 +1,6 @@
 import type {
   DesktopAppInfo,
-  DesktopChatPinnedItem,
+  DesktopTaskPinnedItem,
   LexoraDesktopApi,
 } from '@buddy-electron/shared/desktopApi'
 import type { ApplicationSettingsStore } from '@/stores/useApplicationSettingsStore'
@@ -10,18 +10,18 @@ export function useDesktopShellState(settings: ApplicationSettingsStore) {
   const api = requireDesktopApi()
   const appInfo = shallowRef<DesktopAppInfo | null>(null)
   const appSidebarCollapsed = computed(() => settings.config.value?.desktop.sidebarCollapsed ?? false)
-  const persistedChatSidebarPinnedItems = computed(() =>
-    settings.config.value?.desktop.chatSidebarPinnedItems ?? [],
+  const persistedTaskSidebarPinnedItems = computed(() =>
+    settings.config.value?.desktop.taskSidebarPinnedItems ?? [],
   )
-  const chatSidebarPinnedItems = shallowRef<ReadonlyArray<DesktopChatPinnedItem>>([])
+  const taskSidebarPinnedItems = shallowRef<ReadonlyArray<DesktopTaskPinnedItem>>([])
   let pendingPinnedItemsWrites = 0
   let pinnedItemsWriteQueue = Promise.resolve()
 
   watch(
-    persistedChatSidebarPinnedItems,
+    persistedTaskSidebarPinnedItems,
     (value) => {
       if (pendingPinnedItemsWrites === 0)
-        chatSidebarPinnedItems.value = cloneDesktopChatPinnedItems(value)
+        taskSidebarPinnedItems.value = cloneDesktopTaskPinnedItems(value)
     },
     { immediate: true },
   )
@@ -30,24 +30,24 @@ export function useDesktopShellState(settings: ApplicationSettingsStore) {
     appInfo.value = await api.app.getInfo().catch(() => null)
   }
 
-  function setChatSidebarPinnedItems(
-    value: DesktopChatPinnedItem[],
+  function setTaskSidebarPinnedItems(
+    value: DesktopTaskPinnedItem[],
   ) {
-    const nextValue = cloneDesktopChatPinnedItems(value)
-    chatSidebarPinnedItems.value = nextValue
+    const nextValue = cloneDesktopTaskPinnedItems(value)
+    taskSidebarPinnedItems.value = nextValue
     pendingPinnedItemsWrites += 1
 
     const update = pinnedItemsWriteQueue.then(() =>
-      settings.updateSettings({ desktop: { chatSidebarPinnedItems: nextValue } }),
+      settings.updateSettings({ desktop: { taskSidebarPinnedItems: nextValue } }),
     )
     const result = update.then((saved) => {
       pendingPinnedItemsWrites -= 1
       if (pendingPinnedItemsWrites === 0) {
-        chatSidebarPinnedItems.value = saved
-          ? cloneDesktopChatPinnedItems(
-              settings.config.value?.desktop.chatSidebarPinnedItems ?? nextValue,
+        taskSidebarPinnedItems.value = saved
+          ? cloneDesktopTaskPinnedItems(
+              settings.config.value?.desktop.taskSidebarPinnedItems ?? nextValue,
             )
-          : cloneDesktopChatPinnedItems(persistedChatSidebarPinnedItems.value)
+          : cloneDesktopTaskPinnedItems(persistedTaskSidebarPinnedItems.value)
       }
       return saved
     })
@@ -64,16 +64,16 @@ export function useDesktopShellState(settings: ApplicationSettingsStore) {
   return {
     appInfo: readonly(appInfo),
     appSidebarCollapsed: readonly(appSidebarCollapsed),
-    chatSidebarPinnedItems: readonly(chatSidebarPinnedItems),
+    taskSidebarPinnedItems: readonly(taskSidebarPinnedItems),
     initialize,
     setAppSidebarCollapsed,
-    setChatSidebarPinnedItems,
+    setTaskSidebarPinnedItems,
   }
 }
 
-function cloneDesktopChatPinnedItems(
-  items: ReadonlyArray<DesktopChatPinnedItem>,
-): DesktopChatPinnedItem[] {
+function cloneDesktopTaskPinnedItems(
+  items: ReadonlyArray<DesktopTaskPinnedItem>,
+): DesktopTaskPinnedItem[] {
   return items.map(item => ({ id: item.id, kind: item.kind }))
 }
 

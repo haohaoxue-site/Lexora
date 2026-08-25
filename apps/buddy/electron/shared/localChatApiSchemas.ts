@@ -996,7 +996,7 @@ export type LocalAutomationOccurrencePage
 export type LocalAutomationPage = DeepReadonly<z.infer<typeof automationPageSchema>>
 export type LocalAutomationRunNowResult
   = DeepReadonly<z.infer<typeof automationRunNowResultSchema>>
-export type LocalAutomationTask = LocalAutomationPage['items'][number]
+export type LocalAutomationListItem = LocalAutomationPage['items'][number]
 export type LocalAutomationCreateRequest = z.input<typeof localChatSchemas.automationCreate>
 export type LocalAutomationUpdateRequest = z.input<typeof localChatSchemas.automationUpdate>
 export type LocalAutomationMutationRequest = z.input<typeof localChatSchemas.automationPause>

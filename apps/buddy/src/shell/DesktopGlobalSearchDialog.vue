@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { LocalConversation, LocalProject } from '@buddy-electron/shared/localChatApi'
 import type { BuddyLocale } from '@/i18n/buddyI18n'
-import { Chat20Regular, Folder20Regular, Search24Regular } from '@vicons/fluent'
+import { Folder20Regular, Search24Regular, TaskListSquareLtr20Regular } from '@vicons/fluent'
 import { useDebounceFn } from '@vueuse/core'
 import { NIcon, NInput, NModal } from 'naive-ui'
 import { computed, shallowRef, watch } from 'vue'
@@ -14,7 +14,7 @@ const props = defineProps<{
   show: boolean
 }>()
 const emit = defineEmits<{
-  'openConversation': [conversationId: string]
+  'openTask': [conversationId: string]
   'openProject': [projectId: string]
   'update:show': [show: boolean]
 }>()
@@ -32,7 +32,7 @@ const matchingConversations = computed(() => {
     const projectName = conversation.projectId === null
       ? ''
       : projectNames.value.get(conversation.projectId) ?? ''
-    return formatConversationTitle(conversation).toLocaleLowerCase().includes(normalizedQuery.value)
+    return formatTaskTitle(conversation).toLocaleLowerCase().includes(normalizedQuery.value)
       || projectName.toLocaleLowerCase().includes(normalizedQuery.value)
   })
 })
@@ -60,13 +60,13 @@ watch(() => props.show, (show) => {
   debouncedQuery.value = ''
 })
 
-function formatConversationTitle(conversation: LocalConversation) {
-  return conversation.title?.trim() || t('desktop.chat.untitled')
+function formatTaskTitle(conversation: LocalConversation) {
+  return conversation.title?.trim() || t('desktop.tasks.untitled')
 }
 
-function conversationContext(conversation: LocalConversation) {
+function taskContext(conversation: LocalConversation) {
   return conversation.projectId === null
-    ? t('desktop.search.recentContext')
+    ? t('desktop.search.taskContext')
     : projectNames.value.get(conversation.projectId) ?? t('desktop.search.projectContext')
 }
 </script>
@@ -102,19 +102,19 @@ function conversationContext(conversation: LocalConversation) {
       <template v-if="hasResults">
         <section v-if="matchingConversations.length" class="desktop-global-search-dialog__section">
           <h3 class="desktop-global-search-dialog__section-title">
-            {{ t('desktop.search.conversationCount', { count: matchingConversations.length }) }}
+            {{ t('desktop.search.taskCount', { count: matchingConversations.length }) }}
           </h3>
           <button
             v-for="conversation in matchingConversations"
             :key="conversation.id"
             class="desktop-global-search-dialog__result"
             type="button"
-            @click="emit('openConversation', conversation.id)"
+            @click="emit('openTask', conversation.id)"
           >
-            <NIcon :component="Chat20Regular" />
+            <NIcon :component="TaskListSquareLtr20Regular" />
             <span>
-              <strong>{{ formatConversationTitle(conversation) }}</strong>
-              <small>{{ conversationContext(conversation) }}</small>
+              <strong>{{ formatTaskTitle(conversation) }}</strong>
+              <small>{{ taskContext(conversation) }}</small>
             </span>
           </button>
         </section>

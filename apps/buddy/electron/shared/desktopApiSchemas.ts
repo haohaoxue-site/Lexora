@@ -2,12 +2,12 @@ import type { LexoraConfigPatch } from './desktopApi'
 import { z } from 'zod'
 import { DESKTOP_CHAT_WELCOME_VARIANT_IDS } from './desktopApi'
 
-const chatSidebarPinnedItemSchema = z.discriminatedUnion('kind', [
+const taskSidebarPinnedItemSchema = z.discriminatedUnion('kind', [
   z.object({ id: z.string().min(1).max(128), kind: z.literal('conversation') }).strict(),
   z.object({ id: z.string().min(1).max(128), kind: z.literal('project') }).strict(),
 ])
 
-const chatSidebarPinnedItemsSchema = z.array(chatSidebarPinnedItemSchema)
+const taskSidebarPinnedItemsSchema = z.array(taskSidebarPinnedItemSchema)
   .max(500)
   .refine(items => new Set(items.map(item => `${item.kind}:${item.id}`)).size === items.length)
 
@@ -31,7 +31,7 @@ export const releasePageInputSchema = z.object({
 export const lexoraConfigPatchSchema: z.ZodType<LexoraConfigPatch> = z.object({
   desktop: z.object({
     backgroundCloseNoticeShown: z.boolean().optional(),
-    chatSidebarPinnedItems: chatSidebarPinnedItemsSchema.optional(),
+    taskSidebarPinnedItems: taskSidebarPinnedItemsSchema.optional(),
     developerToolsEnabled: z.boolean().optional(),
     language: z.enum(['zh-CN', 'en-US']).optional(),
     launchAtLogin: z.boolean().optional(),

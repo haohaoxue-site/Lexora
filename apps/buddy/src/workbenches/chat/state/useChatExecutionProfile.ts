@@ -5,7 +5,7 @@ import type {
 } from '@buddy-electron/shared/localChatApi'
 import type { BuddyExecutionProfile } from '@buddy-shared/executionProfile'
 import type { useChatDrafts } from '@/workbenches/chat/state/useChatDrafts'
-import type { ChatIndexData } from '@/workbenches/chat/state/useChatIndexData'
+import type { TaskIndexData } from '@/workbenches/tasks/state/useTaskIndexData'
 import { computed, readonly, shallowRef } from 'vue'
 
 interface ValueRef<T> {
@@ -17,7 +17,7 @@ interface UseChatExecutionProfileOptions {
   activeConversationId: ValueRef<string | null>
   activeRun: ValueRef<LocalRun | null>
   api: LexoraDesktopApi['localChat']['conversations']
-  chatIndexData: ChatIndexData
+  taskIndexData: TaskIndexData
   drafts: ReturnType<typeof useChatDrafts>
   onError: (error: unknown) => void
   persistWorkspaceState: () => Promise<boolean>
@@ -50,7 +50,7 @@ export function useChatExecutionProfile(options: UseChatExecutionProfileOptions)
     try {
       if (conversation) {
         const updated = await options.api.setExecutionProfile(conversation.id, value)
-        options.chatIndexData.applyConversation(updated)
+        options.taskIndexData.applyConversation(updated)
         return true
       }
 

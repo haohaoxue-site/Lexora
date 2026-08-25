@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { LocalAutomationTask } from '@buddy-electron/shared/localChatApi'
+import type { LocalAutomationListItem } from '@buddy-electron/shared/localChatApi'
 import type { DropdownOption } from 'naive-ui'
 import type { HTMLAttributes } from 'vue'
 import type { BuddyLocale } from '@/i18n/buddyI18n'
@@ -19,20 +19,20 @@ import {
 } from './automationPresentation'
 
 const props = defineProps<{
-  automations: ReadonlyArray<LocalAutomationTask>
+  automations: ReadonlyArray<LocalAutomationListItem>
   language: BuddyLocale
   pendingAutomationIds: ReadonlySet<string>
 }>()
 const emit = defineEmits<{
   create: []
-  delete: [automation: LocalAutomationTask]
-  edit: [automation: LocalAutomationTask]
-  pause: [automation: LocalAutomationTask]
-  resume: [automation: LocalAutomationTask]
-  runNow: [automation: LocalAutomationTask]
+  delete: [automation: LocalAutomationListItem]
+  edit: [automation: LocalAutomationListItem]
+  pause: [automation: LocalAutomationListItem]
+  resume: [automation: LocalAutomationListItem]
+  runNow: [automation: LocalAutomationListItem]
 }>()
 const { t } = useBuddyI18n(() => props.language)
-const deleteTarget = shallowRef<LocalAutomationTask | null>(null)
+const deleteTarget = shallowRef<LocalAutomationListItem | null>(null)
 const dropdownItemProps: HTMLAttributes = { role: 'menuitem' }
 const deletePending = computed(() => (
   deleteTarget.value !== null && props.pendingAutomationIds.has(deleteTarget.value.id)
@@ -41,7 +41,7 @@ const deleteMessage = computed(() => t('desktop.automations.deleteMessage', {
   name: deleteTarget.value?.name ?? '',
 }))
 
-function actionOptions(automation: LocalAutomationTask): DropdownOption[] {
+function actionOptions(automation: LocalAutomationListItem): DropdownOption[] {
   const lifecycleAction = automation.status === 'active'
     ? {
         icon: () => h(NIcon, { component: Pause20Regular }),
@@ -68,7 +68,7 @@ function actionOptions(automation: LocalAutomationTask): DropdownOption[] {
   ]
 }
 
-function handleAction(automation: LocalAutomationTask, action: string | number): void {
+function handleAction(automation: LocalAutomationListItem, action: string | number): void {
   if (action === 'pause')
     emit('pause', automation)
   if (action === 'resume')
@@ -84,47 +84,47 @@ function confirmDelete(): void {
   deleteTarget.value = null
 }
 
-function isPending(automation: LocalAutomationTask): boolean {
+function isPending(automation: LocalAutomationListItem): boolean {
   return props.pendingAutomationIds.has(automation.id)
 }
 </script>
 
 <template>
-  <div v-if="automations.length" class="desktop-automation-task-list">
+  <div v-if="automations.length" class="desktop-automation-plan-list">
     <article
       v-for="automation in automations"
       :key="automation.id"
-      class="desktop-automation-task"
+      class="desktop-automation-plan"
       :class="`is-${automation.status}`"
     >
       <button
-        class="desktop-automation-task__body"
+        class="desktop-automation-plan__body"
         type="button"
         @click="emit('edit', automation)"
       >
-        <span class="desktop-automation-task__summary">
-          <strong class="desktop-automation-task__name">{{ automation.name }}</strong>
-          <span class="desktop-automation-task__schedule">
+        <span class="desktop-automation-plan__summary">
+          <strong class="desktop-automation-plan__name">{{ automation.name }}</strong>
+          <span class="desktop-automation-plan__schedule">
             {{ formatAutomationSchedule(automation, language, t) }}
           </span>
         </span>
         <span
           v-if="automation.status === 'blocked'"
-          class="desktop-automation-task__blocked"
+          class="desktop-automation-plan__blocked"
         >
           {{ t(automationBlockedDescriptionKey(automation)) }}
         </span>
       </button>
 
-      <div class="desktop-automation-task__trailing">
-        <span class="desktop-automation-task__timing">
+      <div class="desktop-automation-plan__trailing">
+        <span class="desktop-automation-plan__timing">
           {{ automation.nextRunAt
             ? t('desktop.automations.meta.nextRun', {
               time: formatAutomationInstant(automation.nextRunAt, language, automation.timing.timezone),
             })
             : t('desktop.automations.meta.noNextRun') }}
         </span>
-        <div class="desktop-automation-task__actions">
+        <div class="desktop-automation-plan__actions">
           <NButton
             quaternary
             circle
@@ -159,7 +159,7 @@ function isPending(automation: LocalAutomationTask): boolean {
     </article>
   </div>
 
-  <NEmpty v-else class="desktop-automation-task-list__empty">
+  <NEmpty v-else class="desktop-automation-plan-list__empty">
     <template #default>
       <strong>{{ t('desktop.automations.empty') }}</strong>
       <p>{{ t('desktop.automations.emptyDescription') }}</p>
@@ -189,12 +189,12 @@ function isPending(automation: LocalAutomationTask): boolean {
 </template>
 
 <style scoped lang="scss">
-.desktop-automation-task-list {
+.desktop-automation-plan-list {
   display: grid;
   gap: 2px;
 }
 
-.desktop-automation-task {
+.desktop-automation-plan {
   display: grid;
   min-height: 46px;
   grid-template-columns: minmax(0, 1fr) minmax(150px, auto);
@@ -209,7 +209,7 @@ function isPending(automation: LocalAutomationTask): boolean {
   }
 }
 
-.desktop-automation-task__body {
+.desktop-automation-plan__body {
   display: grid;
   min-width: 0;
   gap: 3px;
@@ -227,14 +227,14 @@ function isPending(automation: LocalAutomationTask): boolean {
   }
 }
 
-.desktop-automation-task__summary {
+.desktop-automation-plan__summary {
   display: flex;
   min-width: 0;
   align-items: baseline;
   gap: 10px;
 }
 
-.desktop-automation-task__name {
+.desktop-automation-plan__name {
   overflow: hidden;
   flex: none;
   color: var(--buddy-text-primary);
@@ -244,9 +244,9 @@ function isPending(automation: LocalAutomationTask): boolean {
   white-space: nowrap;
 }
 
-.desktop-automation-task__schedule,
-.desktop-automation-task__timing,
-.desktop-automation-task__blocked {
+.desktop-automation-plan__schedule,
+.desktop-automation-plan__timing,
+.desktop-automation-plan__blocked {
   overflow: hidden;
   color: var(--buddy-text-secondary);
   font-size: 12px;
@@ -255,11 +255,11 @@ function isPending(automation: LocalAutomationTask): boolean {
   white-space: nowrap;
 }
 
-.desktop-automation-task__blocked {
+.desktop-automation-plan__blocked {
   color: var(--buddy-accent-warning);
 }
 
-.desktop-automation-task__trailing {
+.desktop-automation-plan__trailing {
   position: relative;
   display: flex;
   min-width: 150px;
@@ -268,11 +268,11 @@ function isPending(automation: LocalAutomationTask): boolean {
   justify-content: flex-end;
 }
 
-.desktop-automation-task__timing {
+.desktop-automation-plan__timing {
   transition: opacity 120ms ease;
 }
 
-.desktop-automation-task__actions {
+.desktop-automation-plan__actions {
   position: absolute;
   right: 0;
   display: flex;
@@ -283,18 +283,18 @@ function isPending(automation: LocalAutomationTask): boolean {
   transition: opacity 120ms ease;
 }
 
-.desktop-automation-task:hover .desktop-automation-task__timing,
-.desktop-automation-task:focus-within .desktop-automation-task__timing {
+.desktop-automation-plan:hover .desktop-automation-plan__timing,
+.desktop-automation-plan:focus-within .desktop-automation-plan__timing {
   opacity: 0;
 }
 
-.desktop-automation-task:hover .desktop-automation-task__actions,
-.desktop-automation-task:focus-within .desktop-automation-task__actions {
+.desktop-automation-plan:hover .desktop-automation-plan__actions,
+.desktop-automation-plan:focus-within .desktop-automation-plan__actions {
   opacity: 1;
   pointer-events: auto;
 }
 
-.desktop-automation-task-list__empty {
+.desktop-automation-plan-list__empty {
   min-height: 360px;
   margin: 0;
   padding-top: clamp(72px, 14vh, 132px);
@@ -319,22 +319,22 @@ function isPending(automation: LocalAutomationTask): boolean {
 }
 
 @media (max-width: 760px) {
-  .desktop-automation-task {
+  .desktop-automation-plan {
     grid-template-columns: minmax(0, 1fr) auto;
   }
 
-  .desktop-automation-task__schedule {
+  .desktop-automation-plan__schedule {
     display: none;
   }
 
-  .desktop-automation-task__trailing {
+  .desktop-automation-plan__trailing {
     min-width: 76px;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .desktop-automation-task__timing,
-  .desktop-automation-task__actions {
+  .desktop-automation-plan__timing,
+  .desktop-automation-plan__actions {
     transition: none;
   }
 }

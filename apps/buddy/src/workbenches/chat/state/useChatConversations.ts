@@ -1,13 +1,13 @@
 import type { LexoraDesktopApi } from '@buddy-electron/shared/desktopApi'
 import type { useChatDrafts } from '@/workbenches/chat/state/useChatDrafts'
-import type { ChatIndexData } from '@/workbenches/chat/state/useChatIndexData'
 import type { useChatRunSync } from '@/workbenches/chat/state/useChatRunSync'
 import type { ChatSession } from '@/workbenches/chat/state/useChatSession'
+import type { TaskIndexData } from '@/workbenches/tasks/state/useTaskIndexData'
 import { computed, readonly, shallowRef } from 'vue'
 
 interface UseChatConversationsOptions {
   api: LexoraDesktopApi['localChat']
-  chatIndexData: ChatIndexData
+  taskIndexData: TaskIndexData
   clearError: () => void
   drafts: ReturnType<typeof useChatDrafts>
   onError: (error: unknown) => void
@@ -24,7 +24,7 @@ export function useChatConversations(options: UseChatConversationsOptions) {
   const activeConversation = computed(() => (
     directlyOpenedConversation.value?.id === options.session.activeConversationId.value
       ? directlyOpenedConversation.value
-      : options.chatIndexData.conversations.value.find(
+      : options.taskIndexData.conversations.value.find(
         conversation => conversation.id === options.session.activeConversationId.value,
       ) ?? null
   ))
@@ -42,7 +42,7 @@ export function useChatConversations(options: UseChatConversationsOptions) {
   }
 
   async function openConversation(conversationId: string) {
-    const indexed = options.chatIndexData.conversations.value.find(
+    const indexed = options.taskIndexData.conversations.value.find(
       item => item.id === conversationId,
     )
     const conversation = indexed ?? await options.api.conversations.get(conversationId).catch(
@@ -64,7 +64,7 @@ export function useChatConversations(options: UseChatConversationsOptions) {
     ])
   }
 
-  async function startGlobalConversation() {
+  async function activateGlobalDraft() {
     activateDraftScope(null)
     options.selectDefaultModel()
     await options.persistWorkspaceState()
@@ -78,7 +78,7 @@ export function useChatConversations(options: UseChatConversationsOptions) {
         activateDraftScope(null, false)
       if (directlyOpenedConversation.value?.id === conversationId)
         directlyOpenedConversation.value = null
-      await options.chatIndexData.refreshIndex()
+      await options.taskIndexData.refreshIndex()
       await options.persistWorkspaceState()
     }
     catch (error) {
@@ -89,7 +89,7 @@ export function useChatConversations(options: UseChatConversationsOptions) {
   async function renameConversation(conversationId: string, title: string) {
     try {
       const conversation = await options.api.conversations.rename(conversationId, title)
-      options.chatIndexData.applyConversation(conversation)
+      options.taskIndexData.applyConversation(conversation)
       if (directlyOpenedConversation.value?.id === conversationId)
         directlyOpenedConversation.value = conversation
       return true
@@ -147,11 +147,11 @@ export function useChatConversations(options: UseChatConversationsOptions) {
   return {
     activateDraftScope,
     activeConversation: readonly(activeConversation),
+    activateGlobalDraft,
     deleteConversation,
     listActiveConversationMessages,
     openConversation,
     refreshBranches,
     renameConversation,
-    startGlobalConversation,
   }
 }

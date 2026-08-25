@@ -7,9 +7,9 @@ import type {
 import type { BuddyLocale } from '@/i18n/buddyI18n'
 import type { ModelProvidersStore } from '@/stores/useModelProvidersStore'
 import type { RuntimeSupervisorStore } from '@/stores/useRuntimeSupervisorStore'
-import type { ChatIndexData } from '@/workbenches/chat/state/useChatIndexData'
 import type { useChatRunSync } from '@/workbenches/chat/state/useChatRunSync'
 import type { ChatSession } from '@/workbenches/chat/state/useChatSession'
+import type { TaskIndexData } from '@/workbenches/tasks/state/useTaskIndexData'
 import { computed, readonly, shallowRef } from 'vue'
 import { resolveLocalChatErrorMessage } from '@/lib/localChatError'
 import {
@@ -24,7 +24,7 @@ interface ValueRef<T> {
 interface UseChatBranchMutationsOptions {
   activeRun: ValueRef<LocalRun | null>
   api: LexoraDesktopApi['localChat']
-  chatIndexData: ChatIndexData
+  taskIndexData: TaskIndexData
   session: ChatSession
   isSending: ValueRef<boolean>
   isUpdatingExecutionProfile: ValueRef<boolean>
@@ -71,10 +71,10 @@ export function useChatBranchMutations(options: UseChatBranchMutationsOptions) {
         conversationId,
       })
       if (!isSourceViewCurrent()) {
-        void options.chatIndexData.refreshIndex().catch(() => {})
+        void options.taskIndexData.refreshIndex().catch(() => {})
         return true
       }
-      options.chatIndexData.applyConversation(conversation)
+      options.taskIndexData.applyConversation(conversation)
       options.session.setActiveBranch(conversation.activeBranchId)
       await refreshAcceptedBranchState(conversationId)
       return true
@@ -142,7 +142,7 @@ export function useChatBranchMutations(options: UseChatBranchMutationsOptions) {
       const turn = await options.api.chat.editUserMessage({ ...request, requestId })
       requestIds.release(operationKey)
       if (!isSourceViewCurrent()) {
-        void options.chatIndexData.refreshIndex().catch(() => {})
+        void options.taskIndexData.refreshIndex().catch(() => {})
         return true
       }
       const branch: LocalConversationBranch = {
@@ -154,7 +154,7 @@ export function useChatBranchMutations(options: UseChatBranchMutationsOptions) {
       }
       options.session.setActiveBranch(turn.branchId)
       options.session.upsertBranch(branch)
-      options.chatIndexData.updateConversationBranch(
+      options.taskIndexData.updateConversationBranch(
         conversationId,
         turn.branchId,
         turn.run.startedAt,
@@ -197,7 +197,7 @@ export function useChatBranchMutations(options: UseChatBranchMutationsOptions) {
       })
       requestIds.release(operationKey)
       if (!isSourceViewCurrent()) {
-        void options.chatIndexData.refreshIndex().catch(() => {})
+        void options.taskIndexData.refreshIndex().catch(() => {})
         return true
       }
       const branch: LocalConversationBranch = {
@@ -209,7 +209,7 @@ export function useChatBranchMutations(options: UseChatBranchMutationsOptions) {
       }
       options.session.setActiveBranch(turn.branchId)
       options.session.upsertBranch(branch)
-      options.chatIndexData.updateConversationBranch(
+      options.taskIndexData.updateConversationBranch(
         conversationId,
         turn.branchId,
         turn.run.startedAt,
@@ -232,7 +232,7 @@ export function useChatBranchMutations(options: UseChatBranchMutationsOptions) {
     const results = await Promise.allSettled([
       options.refreshBranches(),
       options.runSync.refreshActiveConversation(),
-      options.chatIndexData.refreshIndex(),
+      options.taskIndexData.refreshIndex(),
     ])
     const rejected = results.find(result => result.status === 'rejected')
     if (
@@ -246,7 +246,7 @@ export function useChatBranchMutations(options: UseChatBranchMutationsOptions) {
   function refreshBranchStateAfterMutation(conversationId: string) {
     void Promise.all([
       options.refreshBranches(),
-      options.chatIndexData.refreshIndex(),
+      options.taskIndexData.refreshIndex(),
     ]).catch((error) => {
       if (options.session.activeConversationId.value === conversationId)
         setNormalizedError(error)

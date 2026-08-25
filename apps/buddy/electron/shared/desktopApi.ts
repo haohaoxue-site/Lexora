@@ -44,7 +44,7 @@ export interface DesktopAppInfo {
   version: string
 }
 
-export interface DesktopChatPinnedItem {
+export interface DesktopTaskPinnedItem {
   id: string
   kind: 'conversation' | 'project'
 }
@@ -62,7 +62,7 @@ export type DesktopChatWelcomePreference = 'random' | DesktopChatWelcomeVariantI
 export interface LexoraConfig {
   desktop: {
     backgroundCloseNoticeShown: boolean
-    chatSidebarPinnedItems: DesktopChatPinnedItem[]
+    taskSidebarPinnedItems: DesktopTaskPinnedItem[]
     developerToolsEnabled: boolean
     language: 'zh-CN' | 'en-US'
     launchAtLogin: boolean

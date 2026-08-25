@@ -8,14 +8,14 @@ import DesktopAutomationHistoryList from '@/workbenches/automations/DesktopAutom
 
 const router = useRouter()
 const {
-  capabilities: { applicationSettings, automations, chat },
+  capabilities: { applicationSettings, automations, tasks },
 } = useDesktopApp()
 const { t } = useBuddyI18n(applicationSettings.language)
 const message = useMessage()
 
-async function openConversation(conversationId: string): Promise<void> {
-  await router.push(desktopRouteLocations.chat())
-  await chat.session.openConversation(conversationId)
+async function openTask(conversationId: string): Promise<void> {
+  await router.push(desktopRouteLocations.tasks())
+  await tasks.session.openTask(conversationId)
 }
 
 async function deleteOccurrence(occurrenceId: string): Promise<void> {
@@ -25,7 +25,7 @@ async function deleteOccurrence(occurrenceId: string): Promise<void> {
     return
   }
   if (result.status === 'succeeded' && result.value)
-    await chat.index.refresh()
+    await tasks.index.refresh()
 }
 
 async function loadMore(): Promise<void> {
@@ -62,7 +62,7 @@ async function retry(): Promise<void> {
       :language="applicationSettings.language.value"
       :occurrences="automations.occurrences.value.items"
       @delete="deleteOccurrence($event.id)"
-      @open-conversation="openConversation"
+      @open-task="openTask"
     />
     <NButton
       v-if="automations.occurrences.value.nextCursor"

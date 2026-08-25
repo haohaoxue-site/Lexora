@@ -207,7 +207,7 @@ export function useAutomationCapability(options: UseAutomationCapabilityOptions)
   async function runNow(
     automation: LocalAutomation,
   ): Promise<AutomationActionResult<LocalAutomationRunNowResult>> {
-    return mutateTask(
+    return mutateAutomation(
       automation.id,
       () => options.api.automations.runNow(createMutationInput(automation)),
     )
@@ -219,7 +219,7 @@ export function useAutomationCapability(options: UseAutomationCapabilityOptions)
       input: ReturnType<typeof createMutationInput>,
     ) => Promise<LocalAutomation>,
   ): Promise<AutomationActionResult<LocalAutomation>> {
-    return mutateTask(
+    return mutateAutomation(
       automation.id,
       () => operation(createMutationInput(automation)),
     )
@@ -266,7 +266,7 @@ export function useAutomationCapability(options: UseAutomationCapabilityOptions)
     }
   }
 
-  async function mutateTask<T>(
+  async function mutateAutomation<T>(
     automationId: string,
     operation: () => Promise<T>,
   ): Promise<AutomationActionResult<T>> {

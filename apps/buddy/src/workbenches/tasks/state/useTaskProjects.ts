@@ -9,14 +9,14 @@ interface ValueRef<T> {
   readonly value: T
 }
 
-export interface ChatProjectInput {
+export interface TaskProjectInput {
   instructions: string
   memoryScope: 'personal_and_project' | 'project_only'
   name: string
   root: string | null
 }
 
-interface UseChatProjectsOptions {
+interface UseTaskProjectsOptions {
   activateDraftScope: (projectId: string | null, preserveCurrent?: boolean) => void
   api: LexoraDesktopApi['localChat']
   drafts: ReturnType<typeof useChatDrafts>
@@ -29,14 +29,14 @@ interface UseChatProjectsOptions {
   selectDefaultModel: () => void
 }
 
-export function useChatProjects(options: UseChatProjectsOptions) {
+export function useTaskProjects(options: UseTaskProjectsOptions) {
   const activeProject = computed(() => options.projects.value.find(
     project => project.id === options.projectId.value,
   ) ?? null)
   const workingDirectory = computed(() => activeProject.value?.root ?? null)
   const scope = computed(() => activeProject.value ? 'project' as const : 'global' as const)
 
-  async function startProjectConversation(projectId: string) {
+  async function activateProjectDraft(projectId: string) {
     const project = options.projects.value.find(
       item => item.id === projectId && item.revokedAt === null,
     )
@@ -47,11 +47,11 @@ export function useChatProjects(options: UseChatProjectsOptions) {
     await options.persistWorkspaceState()
   }
 
-  async function createProject(input: ChatProjectInput) {
+  async function createProject(input: TaskProjectInput) {
     try {
       const project = await options.api.projects.create(input)
       await options.refreshIndex()
-      await startProjectConversation(project.id)
+      await activateProjectDraft(project.id)
       return true
     }
     catch (error) {
@@ -60,7 +60,7 @@ export function useChatProjects(options: UseChatProjectsOptions) {
     }
   }
 
-  async function updateProject(input: ChatProjectInput & { projectId: string }) {
+  async function updateProject(input: TaskProjectInput & { projectId: string }) {
     try {
       await options.api.projects.update(input)
       await options.refreshIndex()
@@ -121,7 +121,7 @@ export function useChatProjects(options: UseChatProjectsOptions) {
     deleteProject,
     listContextOptions,
     scope: readonly(scope),
-    startProjectConversation,
+    activateProjectDraft,
     updateProject,
     workingDirectory: readonly(workingDirectory),
   }

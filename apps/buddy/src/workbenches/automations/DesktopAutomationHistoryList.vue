@@ -32,7 +32,7 @@ const props = defineProps<{
 }>()
 const emit = defineEmits<{
   delete: [occurrence: AutomationOccurrenceView]
-  openConversation: [conversationId: string]
+  openTask: [conversationId: string]
 }>()
 const { t } = useBuddyI18n(() => props.language)
 const collapsedGroupKeys = shallowRef<ReadonlySet<string>>(new Set())
@@ -107,7 +107,7 @@ function formatTime(occurrence: AutomationOccurrenceView): string {
 
 function openOccurrence(occurrence: AutomationOccurrenceView): void {
   if (occurrence.conversationId)
-    emit('openConversation', occurrence.conversationId)
+    emit('openTask', occurrence.conversationId)
 }
 
 function isGroupCollapsed(key: string): boolean {

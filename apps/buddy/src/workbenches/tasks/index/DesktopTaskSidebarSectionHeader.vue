@@ -14,20 +14,20 @@ const emit = defineEmits<{
 </script>
 
 <template>
-  <div class="desktop-chat-sidebar__section-heading">
+  <div class="desktop-task-sidebar__section-heading">
     <button
-      class="desktop-chat-sidebar__section-toggle"
+      class="desktop-task-sidebar__section-toggle"
       type="button"
       :aria-expanded="expanded"
       @click="emit('toggle')"
     >
       <NIcon :component="expanded ? ChevronDown20Regular : ChevronRight20Regular" />
-      <span class="desktop-chat-sidebar__section-label-text">{{ label }}</span>
+      <span class="desktop-task-sidebar__section-label-text">{{ label }}</span>
     </button>
-    <div class="desktop-chat-sidebar__section-actions">
+    <div class="desktop-task-sidebar__section-actions">
       <button
         v-if="showAdd"
-        class="desktop-chat-sidebar__section-add"
+        class="desktop-task-sidebar__section-add"
         type="button"
         @click="emit('add')"
       >
@@ -38,15 +38,15 @@ const emit = defineEmits<{
 </template>
 
 <style scoped lang="scss">
-.desktop-chat-sidebar__section-heading {
+.desktop-task-sidebar__section-heading {
   display: flex;
-  height: var(--buddy-chat-sidebar-section-header-size, 2rem);
+  height: var(--buddy-task-sidebar-section-header-size, 2rem);
   min-width: 0;
   flex: none;
   align-items: center;
-  border-radius: var(--buddy-chat-sidebar-state-radius, 8px);
+  border-radius: var(--buddy-task-sidebar-state-radius, 8px);
   color: var(--buddy-text-secondary);
-  margin-right: var(--buddy-chat-sidebar-scrollbar-gutter, 0);
+  margin-right: var(--buddy-task-sidebar-scrollbar-gutter, 0);
 
   &:hover {
     color: var(--buddy-text-primary);
@@ -60,7 +60,7 @@ button {
   cursor: pointer;
 }
 
-.desktop-chat-sidebar__section-toggle {
+.desktop-task-sidebar__section-toggle {
   display: flex;
   min-width: 0;
   flex: 1;
@@ -81,7 +81,7 @@ button {
   }
 }
 
-.desktop-chat-sidebar__section-label-text {
+.desktop-task-sidebar__section-label-text {
   overflow: hidden;
   font-size: var(--buddy-sidebar-section-font-size);
   font-weight: var(--buddy-sidebar-section-font-weight);
@@ -90,26 +90,26 @@ button {
   white-space: nowrap;
 }
 
-.desktop-chat-sidebar__section-actions {
+.desktop-task-sidebar__section-actions {
   display: flex;
   flex: none;
   align-items: center;
-  gap: var(--buddy-chat-sidebar-action-gap, 0.125rem);
+  gap: var(--buddy-task-sidebar-action-gap, 0.125rem);
   opacity: 0;
-  padding-right: var(--buddy-chat-sidebar-action-inset, 0.25rem);
+  padding-right: var(--buddy-task-sidebar-action-inset, 0.25rem);
   pointer-events: none;
 }
 
-.desktop-chat-sidebar__section-heading:hover .desktop-chat-sidebar__section-actions,
-.desktop-chat-sidebar__section-heading:has(:focus-visible) .desktop-chat-sidebar__section-actions {
+.desktop-task-sidebar__section-heading:hover .desktop-task-sidebar__section-actions,
+.desktop-task-sidebar__section-heading:has(:focus-visible) .desktop-task-sidebar__section-actions {
   opacity: 1;
   pointer-events: auto;
 }
 
-.desktop-chat-sidebar__section-add {
+.desktop-task-sidebar__section-add {
   display: grid;
-  width: var(--buddy-chat-sidebar-action-size, 1.75rem);
-  height: var(--buddy-chat-sidebar-action-size, 1.75rem);
+  width: var(--buddy-task-sidebar-action-size, 1.75rem);
+  height: var(--buddy-task-sidebar-action-size, 1.75rem);
   place-items: center;
   border-radius: var(--buddy-icon-button-radius);
   color: var(--buddy-text-secondary);

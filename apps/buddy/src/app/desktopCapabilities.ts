@@ -1,9 +1,9 @@
 import type { LexoraDesktopApi } from '@buddy-electron/shared/desktopApi'
 import type { DesktopStores } from '@/app/useDesktopAppState'
 import type { AutomationCapability } from '@/workbenches/automations/useAutomationCapability'
-import type { ChatCapability } from '@/workbenches/chat/state/useChatCapability'
 import type { DesktopDataSettingsCapability } from '@/workbenches/settings/data/desktopDataSettingsCapability'
 import type { DesktopLocalSettingsCapability } from '@/workbenches/settings/local/desktopLocalSettingsCapability'
+import type { TaskCapability } from '@/workbenches/tasks/state/useTaskCapability'
 import { useAutomationCapability } from '@/workbenches/automations/useAutomationCapability'
 import { createDesktopDataSettingsCapability } from '@/workbenches/settings/data/desktopDataSettingsCapability'
 import { createDesktopLocalSettingsCapability } from '@/workbenches/settings/local/desktopLocalSettingsCapability'
@@ -11,17 +11,17 @@ import { createDesktopLocalSettingsCapability } from '@/workbenches/settings/loc
 export interface DesktopCapabilities {
   applicationSettings: DesktopStores['applicationSettings']
   automations: AutomationCapability
-  chat: ChatCapability
   dataSettings: DesktopDataSettingsCapability
   localSettings: DesktopLocalSettingsCapability
   notifications: DesktopStores['notifications']
   providerSettings: DesktopStores['modelProviders']
+  tasks: TaskCapability
 }
 
 interface CreateDesktopCapabilitiesInput {
   api: LexoraDesktopApi
-  chat: ChatCapability
   stores: DesktopStores
+  tasks: TaskCapability
 }
 
 export function createDesktopCapabilities(
@@ -34,7 +34,6 @@ export function createDesktopCapabilities(
       api: input.api.localChat,
       language: stores.applicationSettings.language,
     }),
-    chat: input.chat,
     dataSettings: createDesktopDataSettingsCapability({
       api: input.api.localChat,
       applicationSettings: stores.applicationSettings,
@@ -45,9 +44,10 @@ export function createDesktopCapabilities(
     }),
     localSettings: createDesktopLocalSettingsCapability(
       stores.localCapabilities,
-      input.chat.session.projectId,
+      input.tasks.session.projectId,
     ),
     notifications: stores.notifications,
     providerSettings: stores.modelProviders,
+    tasks: input.tasks,
   }
 }

@@ -9,7 +9,7 @@ import { useDesktopAppState } from '@/app/useDesktopAppState'
 import { resolveBuddyLocale } from '@/i18n/buddyI18n'
 import { desktopRouteLocations } from '@/router'
 import { useDesktopShellState } from '@/shell/useDesktopShellState'
-import { useChatCapability } from '@/workbenches/chat/state/useChatCapability'
+import { useTaskCapability } from '@/workbenches/tasks/state/useTaskCapability'
 
 const emit = defineEmits<{
   languageChange: [language: 'zh-CN' | 'en-US']
@@ -24,7 +24,7 @@ const router = useRouter()
 const api = requireDesktopApi()
 const appState = useDesktopAppState({ api })
 const { stores } = appState
-const chat = useChatCapability({
+const tasks = useTaskCapability({
   api,
   applicationSettings: stores.applicationSettings,
   localCapabilities: stores.localCapabilities,
@@ -34,8 +34,8 @@ const chat = useChatCapability({
 })
 const capabilities = createDesktopCapabilities({
   api,
-  chat,
   stores,
+  tasks,
 })
 const shell = useDesktopShellState(capabilities.applicationSettings)
 const notificationTargetMessageId = shallowRef<string | null>(null)
@@ -53,7 +53,7 @@ const stopRuntimeReadyWatch = watch(
       && previousState.status !== 'ready'
       && state.status === 'ready'
     ) {
-      void chat.refreshRuntimeDependentState()
+      void tasks.refreshRuntimeDependentState()
       void capabilities.automations.refresh()
     }
   },
@@ -96,16 +96,16 @@ async function initialize() {
   await appState.initialize()
   await Promise.all([
     capabilities.automations.initialize(),
-    chat.initialize(),
+    tasks.initialize(),
     shell.initialize(),
   ])
   isApplicationReady = true
 }
 
 async function openDesktopTarget(target: DesktopOpenTarget) {
-  await router.push(desktopRouteLocations.chat())
+  await router.push(desktopRouteLocations.tasks())
   await ready
-  await chat.session.openConversation(target.conversationId)
+  await tasks.session.openTask(target.conversationId)
   const run = await api.localChat.runs.get(target.runId).catch(() => null)
   if (run?.conversationId !== target.conversationId)
     return
@@ -116,7 +116,7 @@ async function openDesktopTarget(target: DesktopOpenTarget) {
 
 onBeforeUnmount(() => {
   capabilities.automations.dispose()
-  chat.dispose()
+  tasks.dispose()
   appState.dispose()
   stopOpenTargetListener()
   stopRuntimeReadyWatch()

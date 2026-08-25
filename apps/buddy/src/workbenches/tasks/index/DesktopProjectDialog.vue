@@ -29,19 +29,19 @@ const instructions = shallowRef('')
 const selectingDirectory = shallowRef(false)
 const memoryOptions = computed(() => [
   {
-    description: t('desktop.chat.projectMemoryDefaultDescription'),
-    label: t('desktop.chat.projectMemoryDefault'),
+    description: t('desktop.tasks.projectMemoryDefaultDescription'),
+    label: t('desktop.tasks.projectMemoryDefault'),
     value: 'personal_and_project',
   },
   {
-    description: t('desktop.chat.projectMemoryIsolatedDescription'),
-    label: t('desktop.chat.projectMemoryIsolated'),
+    description: t('desktop.tasks.projectMemoryIsolatedDescription'),
+    label: t('desktop.tasks.projectMemoryIsolated'),
     value: 'project_only',
   },
 ])
 const dialogTitle = computed(() => props.project
-  ? t('desktop.chat.editProjectTitle')
-  : t('desktop.chat.createProjectTitle'))
+  ? t('desktop.tasks.editProjectTitle')
+  : t('desktop.tasks.createProjectTitle'))
 
 watch(
   [() => props.show, () => props.project],
@@ -110,15 +110,15 @@ function requireDesktopApi() {
     @update:show="emit('update:show', $event)"
   >
     <NForm @submit.prevent="confirm">
-      <NFormItem :label="t('desktop.chat.projectName')" required>
+      <NFormItem :label="t('desktop.tasks.projectName')" required>
         <NInput
           v-model:value="name"
           autofocus
           maxlength="80"
-          :placeholder="t('desktop.chat.projectNamePlaceholder')"
+          :placeholder="t('desktop.tasks.projectNamePlaceholder')"
         />
       </NFormItem>
-      <NFormItem :label="t('desktop.chat.projectMemory')">
+      <NFormItem :label="t('desktop.tasks.projectMemory')">
         <NSelect
           v-model:value="memoryScope"
           :consistent-menu-width="false"
@@ -126,29 +126,29 @@ function requireDesktopApi() {
           :render-label="renderMemoryLabel"
         />
       </NFormItem>
-      <NFormItem :label="t('desktop.chat.projectDirectory')">
+      <NFormItem :label="t('desktop.tasks.projectDirectory')">
         <div class="desktop-project-create-dialog__directory">
           <NInput
             readonly
-            :placeholder="t('desktop.chat.projectDirectoryPlaceholder')"
+            :placeholder="t('desktop.tasks.projectDirectoryPlaceholder')"
             :value="root ?? ''"
           />
           <NButton :loading="selectingDirectory" @click="selectDirectory">
-            {{ t('desktop.chat.selectProjectDirectory') }}
+            {{ t('desktop.tasks.selectProjectDirectory') }}
           </NButton>
           <NButton v-if="root" quaternary @click="root = null">
-            {{ t('desktop.chat.clearProjectDirectory') }}
+            {{ t('desktop.tasks.clearProjectDirectory') }}
           </NButton>
         </div>
       </NFormItem>
       <p class="desktop-project-create-dialog__directory-note">
-        {{ t('desktop.chat.projectDirectoryDescription') }}
+        {{ t('desktop.tasks.projectDirectoryDescription') }}
       </p>
-      <NFormItem :label="t('desktop.chat.projectInstructions')">
+      <NFormItem :label="t('desktop.tasks.projectInstructions')">
         <NInput
           v-model:value="instructions"
           maxlength="8000"
-          :placeholder="t('desktop.chat.projectInstructionsPlaceholder')"
+          :placeholder="t('desktop.tasks.projectInstructionsPlaceholder')"
           :autosize="{ minRows: 4, maxRows: 10 }"
           type="textarea"
         />
@@ -158,7 +158,7 @@ function requireDesktopApi() {
         :show-icon="false"
         type="warning"
       >
-        {{ t('desktop.chat.projectActiveRunUpdateWarning') }}
+        {{ t('desktop.tasks.projectActiveRunUpdateWarning') }}
       </NAlert>
     </NForm>
     <template #footer>

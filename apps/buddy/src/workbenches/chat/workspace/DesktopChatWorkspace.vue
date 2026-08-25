@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import type { DesktopSettingsCategory } from '@/router'
 import type { ChatComposerSubmitPayload } from '@/workbenches/chat/composer/chatComposerInput'
-import type { ChatWorkspace } from '@/workbenches/chat/state/useChatCapability'
 import type { BuddyChatMessageListHandle } from '@/workbenches/chat/transcript/chatMessageViewport'
+import type { TaskChatWorkspace } from '@/workbenches/tasks/state/useTaskCapability'
 import {
   ArrowClockwise20Regular,
   Settings20Regular,
@@ -21,7 +21,7 @@ import { useChatViewport } from '@/workbenches/chat/workspace/useChatViewport'
 const props = defineProps<{
   activeSearchMessageId: string | null
   matchingSearchMessageIds: ReadonlyArray<string>
-  workspace: ChatWorkspace
+  workspace: TaskChatWorkspace
 }>()
 const emit = defineEmits<{
   openSettings: [category: DesktopSettingsCategory]

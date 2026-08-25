@@ -1,44 +1,47 @@
-import type { DesktopChatPinnedItem } from '@buddy-electron/shared/desktopApi'
+import type { DesktopTaskPinnedItem } from '@buddy-electron/shared/desktopApi'
 import type {
   LocalConversation,
   LocalConversationSummary,
   LocalProject,
 } from '@buddy-electron/shared/localChatApi'
 import type { Ref } from 'vue'
-import type { DesktopChatPinnedDropPosition } from '@/workbenches/chat/index/chatPinnedItems'
-import type { ChatProjectInput } from '@/workbenches/chat/state/useChatProjects'
+import type { DesktopTaskPinnedDropPosition } from '@/workbenches/tasks/index/taskPinnedItems'
+import type { TaskProjectInput } from '@/workbenches/tasks/state/useTaskProjects'
 import { useIntervalFn } from '@vueuse/core'
 import { computed, shallowRef, watch } from 'vue'
 import {
-  prependDesktopChatPinnedItem,
-  removeDesktopChatPinnedItem,
-  reorderDesktopChatPinnedItems,
-  resolveChatIndexProjection,
-} from '@/workbenches/chat/index/chatPinnedItems'
+  prependDesktopTaskPinnedItem,
+  removeDesktopTaskPinnedItem,
+  reorderDesktopTaskPinnedItems,
+  resolveTaskIndexProjection,
+} from '@/workbenches/tasks/index/taskPinnedItems'
 
-interface UseChatIndexControllerOptions {
-  conversations: Readonly<Ref<ReadonlyArray<LocalConversationSummary>>>
+export type TaskProjectMenuAction = 'delete' | 'edit' | 'new-task'
+
+interface UseTaskIndexControllerOptions {
   getUntitledLabel: () => string
-  onCreateProject: (input: ChatProjectInput) => void
-  onDeleteConversation: (conversationId: string) => void
+  onCreateProject: (input: TaskProjectInput) => void
+  onDeleteTask: (conversationId: string) => void
   onDeleteProject: (projectId: string) => void
-  onRenameConversation: (conversationId: string, title: string) => void
-  onUpdatePinnedItems: (items: DesktopChatPinnedItem[]) => void
-  onUpdateProject: (input: ChatProjectInput & { projectId: string }) => void
-  pinnedItems: Readonly<Ref<ReadonlyArray<DesktopChatPinnedItem>>>
+  onNewTask: (projectId: string) => void
+  onRenameTask: (conversationId: string, title: string) => void
+  onUpdatePinnedItems: (items: DesktopTaskPinnedItem[]) => void
+  onUpdateProject: (input: TaskProjectInput & { projectId: string }) => void
+  pinnedItems: Readonly<Ref<ReadonlyArray<DesktopTaskPinnedItem>>>
   projects: Readonly<Ref<ReadonlyArray<LocalProject>>>
+  tasks: Readonly<Ref<ReadonlyArray<LocalConversationSummary>>>
 }
 
-interface DesktopChatPinnedDropTarget {
+interface DesktopTaskPinnedDropTarget {
   key: string
-  position: DesktopChatPinnedDropPosition
+  position: DesktopTaskPinnedDropPosition
 }
 
-export function useChatIndexController(options: UseChatIndexControllerOptions) {
+export function useTaskIndexController(options: UseTaskIndexControllerOptions) {
   const expandedProjectIds = shallowRef<ReadonlySet<string>>(new Set())
-  const conversationRenameTarget = shallowRef<LocalConversation | null>(null)
-  const conversationDeleteTarget = shallowRef<LocalConversation | null>(null)
-  const conversationTitleDraft = shallowRef('')
+  const taskRenameTarget = shallowRef<LocalConversation | null>(null)
+  const taskDeleteTarget = shallowRef<LocalConversation | null>(null)
+  const taskTitleDraft = shallowRef('')
   const pinnedSectionExpanded = shallowRef(true)
   const projectsSectionExpanded = shallowRef(true)
   const tasksSectionExpanded = shallowRef(true)
@@ -47,20 +50,20 @@ export function useChatIndexController(options: UseChatIndexControllerOptions) {
   const projectEditTarget = shallowRef<LocalProject | null>(null)
   const projectDeleteTarget = shallowRef<LocalProject | null>(null)
   const draggedPinnedItemKey = shallowRef<string | null>(null)
-  const pinnedDropTarget = shallowRef<DesktopChatPinnedDropTarget | null>(null)
+  const pinnedDropTarget = shallowRef<DesktopTaskPinnedDropTarget | null>(null)
   const activeProjects = computed(() => options.projects.value.filter(
     project => project.revokedAt === null,
   ))
-  const projection = computed(() => resolveChatIndexProjection({
-    conversations: options.conversations.value,
+  const projection = computed(() => resolveTaskIndexProjection({
     expandedProjectIds: expandedProjectIds.value,
     pinnedItems: options.pinnedItems.value,
     projects: options.projects.value,
+    tasks: options.tasks.value,
   }))
   const pinnedItems = computed(() => projection.value.pinnedItems)
   const pinnedRows = computed(() => projection.value.pinnedRows)
   const projectRows = computed(() => projection.value.projectRows)
-  const taskConversations = computed(() => projection.value.taskConversations)
+  const globalTasks = computed(() => projection.value.globalTasks)
 
   useIntervalFn(() => {
     relativeTimeNow.value = Date.now()
@@ -92,51 +95,51 @@ export function useChatIndexController(options: UseChatIndexControllerOptions) {
     expandedProjectIds.value = next
   }
 
-  function getConversationTitle(conversation: LocalConversation) {
+  function getTaskTitle(conversation: LocalConversation) {
     return conversation.title?.trim() || options.getUntitledLabel()
   }
 
-  function requestConversationRename(conversation: LocalConversation) {
-    conversationRenameTarget.value = conversation
-    conversationTitleDraft.value = getConversationTitle(conversation)
+  function requestTaskRename(conversation: LocalConversation) {
+    taskRenameTarget.value = conversation
+    taskTitleDraft.value = getTaskTitle(conversation)
   }
 
-  function requestConversationDelete(conversation: LocalConversation) {
-    conversationDeleteTarget.value = conversation
+  function requestTaskDelete(conversation: LocalConversation) {
+    taskDeleteTarget.value = conversation
   }
 
-  function confirmConversationRename() {
-    const target = conversationRenameTarget.value
-    const title = conversationTitleDraft.value.trim()
+  function confirmTaskRename() {
+    const target = taskRenameTarget.value
+    const title = taskTitleDraft.value.trim()
     if (!target || !title)
       return
-    options.onRenameConversation(target.id, title)
-    conversationRenameTarget.value = null
+    options.onRenameTask(target.id, title)
+    taskRenameTarget.value = null
   }
 
-  function confirmConversationDelete() {
-    if (!conversationDeleteTarget.value)
+  function confirmTaskDelete() {
+    if (!taskDeleteTarget.value)
       return
-    options.onDeleteConversation(conversationDeleteTarget.value.id)
-    conversationDeleteTarget.value = null
+    options.onDeleteTask(taskDeleteTarget.value.id)
+    taskDeleteTarget.value = null
   }
 
   function pinProject(projectId: string) {
-    options.onUpdatePinnedItems(prependDesktopChatPinnedItem(
+    options.onUpdatePinnedItems(prependDesktopTaskPinnedItem(
       pinnedItems.value,
       { id: projectId, kind: 'project' },
     ))
   }
 
-  function pinConversation(conversationId: string) {
-    options.onUpdatePinnedItems(prependDesktopChatPinnedItem(
+  function pinTask(conversationId: string) {
+    options.onUpdatePinnedItems(prependDesktopTaskPinnedItem(
       pinnedItems.value,
       { id: conversationId, kind: 'conversation' },
     ))
   }
 
   function unpinItem(pinKey: string) {
-    options.onUpdatePinnedItems(removeDesktopChatPinnedItem(pinnedItems.value, pinKey))
+    options.onUpdatePinnedItems(removeDesktopTaskPinnedItem(pinnedItems.value, pinKey))
   }
 
   function beginPinnedDrag(pinKey: string) {
@@ -144,7 +147,7 @@ export function useChatIndexController(options: UseChatIndexControllerOptions) {
     pinnedDropTarget.value = null
   }
 
-  function enterPinnedDropTarget(pinKey: string, position: DesktopChatPinnedDropPosition) {
+  function enterPinnedDropTarget(pinKey: string, position: DesktopTaskPinnedDropPosition) {
     if (draggedPinnedItemKey.value && draggedPinnedItemKey.value !== pinKey)
       pinnedDropTarget.value = { key: pinKey, position }
   }
@@ -155,10 +158,10 @@ export function useChatIndexController(options: UseChatIndexControllerOptions) {
       : undefined
   }
 
-  function dropPinnedItem(pinKey: string, position: DesktopChatPinnedDropPosition) {
+  function dropPinnedItem(pinKey: string, position: DesktopTaskPinnedDropPosition) {
     if (!draggedPinnedItemKey.value)
       return
-    options.onUpdatePinnedItems(reorderDesktopChatPinnedItems(
+    options.onUpdatePinnedItems(reorderDesktopTaskPinnedItems(
       pinnedItems.value,
       draggedPinnedItemKey.value,
       pinKey,
@@ -177,7 +180,11 @@ export function useChatIndexController(options: UseChatIndexControllerOptions) {
     projectDialogOpen.value = true
   }
 
-  function selectProjectMenuAction(project: LocalProject, action: string | number) {
+  function selectProjectMenuAction(project: LocalProject, action: TaskProjectMenuAction) {
+    if (action === 'new-task') {
+      options.onNewTask(project.id)
+      return
+    }
     if (action === 'edit') {
       projectEditTarget.value = project
       projectDialogOpen.value = true
@@ -187,7 +194,7 @@ export function useChatIndexController(options: UseChatIndexControllerOptions) {
       projectDeleteTarget.value = project
   }
 
-  function saveProject(input: ChatProjectInput) {
+  function saveProject(input: TaskProjectInput) {
     const project = projectEditTarget.value
     if (project)
       options.onUpdateProject({ ...input, projectId: project.id })
@@ -205,22 +212,19 @@ export function useChatIndexController(options: UseChatIndexControllerOptions) {
   }
 
   return {
-    confirmConversationDelete,
-    confirmConversationRename,
+    confirmTaskDelete,
+    confirmTaskRename,
     confirmProjectDelete,
-    conversationDeleteTarget,
-    conversationRenameTarget,
-    conversationTitleDraft,
     beginPinnedDrag,
     draggedPinnedItemKey,
     dropPinnedItem,
     endPinnedDrag,
     enterPinnedDropTarget,
-    getConversationTitle,
+    getTaskTitle,
     getPinnedDropPosition,
     isProjectExpanded,
     openProjectCreator,
-    pinConversation,
+    pinTask,
     pinProject,
     pinnedItems,
     pinnedRows,
@@ -231,11 +235,14 @@ export function useChatIndexController(options: UseChatIndexControllerOptions) {
     projectRows,
     projectsSectionExpanded,
     relativeTimeNow,
-    requestConversationDelete,
-    requestConversationRename,
+    requestTaskDelete,
+    requestTaskRename,
     saveProject,
     selectProjectMenuAction,
-    taskConversations,
+    globalTasks,
+    taskDeleteTarget,
+    taskRenameTarget,
+    taskTitleDraft,
     tasksSectionExpanded,
     toggleProject,
     unpinItem,

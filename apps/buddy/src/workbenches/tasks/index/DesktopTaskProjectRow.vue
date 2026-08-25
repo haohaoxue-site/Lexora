@@ -2,9 +2,9 @@
 import type { LocalProject } from '@buddy-electron/shared/localChatApi'
 import type { DropdownOption } from 'naive-ui'
 import type { BuddyLocale } from '@/i18n/buddyI18n'
-import type { DesktopChatPinnedDropPosition } from '@/workbenches/chat/index/chatPinnedItems'
+import type { DesktopTaskPinnedDropPosition } from '@/workbenches/tasks/index/taskPinnedItems'
+import type { TaskProjectMenuAction } from '@/workbenches/tasks/index/useTaskIndexController'
 import {
-  Add16Regular,
   Delete20Regular,
   Edit20Regular,
   Folder20Regular,
@@ -16,11 +16,12 @@ import {
 import { NDropdown, NIcon } from 'naive-ui'
 import { computed, h } from 'vue'
 import { useBuddyI18n } from '@/i18n/buddyI18n'
-import DesktopOverflowingLabel from '@/workbenches/chat/index/DesktopOverflowingLabel.vue'
+import DesktopIcon from '@/ui/DesktopIcon.vue'
+import DesktopOverflowingLabel from '@/workbenches/tasks/index/DesktopOverflowingLabel.vue'
 
 const props = defineProps<{
   dragging?: boolean
-  dropPosition?: DesktopChatPinnedDropPosition
+  dropPosition?: DesktopTaskPinnedDropPosition
   expanded: boolean
   language: BuddyLocale
   pinMode: 'pin' | 'unpin'
@@ -30,16 +31,21 @@ const props = defineProps<{
 }>()
 const emit = defineEmits<{
   dragEnd: []
-  dragOver: [position: DesktopChatPinnedDropPosition]
+  dragOver: [position: DesktopTaskPinnedDropPosition]
   dragStart: []
-  drop: [position: DesktopChatPinnedDropPosition]
-  menu: [action: string | number]
-  newConversation: []
+  drop: [position: DesktopTaskPinnedDropPosition]
+  menu: [action: TaskProjectMenuAction]
   pin: []
   toggle: []
 }>()
 const { t } = useBuddyI18n(() => props.language)
 const menuOptions = computed<DropdownOption[]>(() => [
+  {
+    icon: () => h(DesktopIcon, { name: 'navigationTask' }),
+    key: 'new-task',
+    label: t('desktop.tasks.newTask'),
+  },
+  { key: 'task-management-divider', type: 'divider' },
   {
     icon: () => h(NIcon, { component: Edit20Regular }),
     key: 'edit',
@@ -52,15 +58,20 @@ const menuOptions = computed<DropdownOption[]>(() => [
   },
 ])
 const pinLabel = computed(() => props.pinMode === 'pin'
-  ? t('desktop.chat.pin')
-  : t('desktop.chat.unpin'))
+  ? t('desktop.tasks.pin')
+  : t('desktop.tasks.unpin'))
+
+function handleMenuAction(action: string | number): void {
+  if (action === 'new-task' || action === 'edit' || action === 'delete')
+    emit('menu', action)
+}
 
 function handleDragStart(event: DragEvent) {
   if (!props.reorderable) {
     event.preventDefault()
     return
   }
-  event.dataTransfer?.setData('text/plain', 'desktop-chat-pinned-item')
+  event.dataTransfer?.setData('text/plain', 'desktop-task-pinned-item')
   if (event.dataTransfer)
     event.dataTransfer.effectAllowed = 'move'
   emit('dragStart')
@@ -82,7 +93,7 @@ function handleDrop(event: DragEvent) {
   emit('drop', resolveDropPosition(event))
 }
 
-function resolveDropPosition(event: DragEvent): DesktopChatPinnedDropPosition {
+function resolveDropPosition(event: DragEvent): DesktopTaskPinnedDropPosition {
   const bounds = (event.currentTarget as HTMLElement).getBoundingClientRect()
   return event.clientY < bounds.top + bounds.height / 2 ? 'before' : 'after'
 }
@@ -90,7 +101,7 @@ function resolveDropPosition(event: DragEvent): DesktopChatPinnedDropPosition {
 
 <template>
   <div
-    class="desktop-chat-project-row"
+    class="desktop-task-project-row"
     :class="{
       'is-dragging': dragging,
       'is-drop-after': dropPosition === 'after',
@@ -104,7 +115,7 @@ function resolveDropPosition(event: DragEvent): DesktopChatPinnedDropPosition {
     @drop="handleDrop"
   >
     <button
-      class="desktop-chat-project-row__name"
+      class="desktop-task-project-row__name"
       type="button"
       :aria-expanded="expanded"
       @click="emit('toggle')"
@@ -112,25 +123,22 @@ function resolveDropPosition(event: DragEvent): DesktopChatPinnedDropPosition {
       <NIcon :component="expanded ? FolderOpen20Regular : Folder20Regular" />
       <DesktopOverflowingLabel :paused="dragging" :text="project.name" />
     </button>
-    <div class="desktop-chat-project-row__actions">
-      <button
-        class="desktop-chat-project-row__action"
-        type="button"
-        @click="emit('newConversation')"
-      >
-        <NIcon :component="Add16Regular" />
-      </button>
+    <div class="desktop-task-project-row__actions">
       <NDropdown
         trigger="click"
         :options="menuOptions"
-        @select="emit('menu', $event)"
+        @select="handleMenuAction"
       >
-        <button class="desktop-chat-project-row__action" type="button">
+        <button
+          class="desktop-task-project-row__action"
+          type="button"
+          :aria-label="t('desktop.tasks.moreActions')"
+        >
           <NIcon :component="MoreHorizontal20Regular" />
         </button>
       </NDropdown>
       <button
-        class="desktop-chat-project-row__action desktop-chat-project-row__pin"
+        class="desktop-task-project-row__action desktop-task-project-row__pin"
         type="button"
         :aria-label="pinLabel"
         @click="emit('pin')"
@@ -142,13 +150,13 @@ function resolveDropPosition(event: DragEvent): DesktopChatPinnedDropPosition {
 </template>
 
 <style scoped lang="scss">
-.desktop-chat-project-row {
+.desktop-task-project-row {
   position: relative;
   display: flex;
-  height: var(--buddy-chat-sidebar-row-height);
+  height: var(--buddy-task-sidebar-row-height);
   min-width: 0;
   align-items: center;
-  border-radius: var(--buddy-chat-sidebar-state-radius);
+  border-radius: var(--buddy-task-sidebar-state-radius);
 
   &:hover,
   &:focus-within {
@@ -191,7 +199,7 @@ button {
   cursor: pointer;
 }
 
-.desktop-chat-project-row__name {
+.desktop-task-project-row__name {
   display: flex;
   min-width: 0;
   flex: 1;
@@ -219,26 +227,26 @@ button {
   }
 }
 
-.desktop-chat-project-row__actions {
+.desktop-task-project-row__actions {
   display: flex;
   flex: none;
   align-items: center;
-  gap: var(--buddy-chat-sidebar-action-gap);
+  gap: var(--buddy-task-sidebar-action-gap);
   opacity: 0;
-  padding-right: var(--buddy-chat-sidebar-action-inset);
+  padding-right: var(--buddy-task-sidebar-action-inset);
   pointer-events: none;
 }
 
-.desktop-chat-project-row:hover .desktop-chat-project-row__actions,
-.desktop-chat-project-row:has(:focus-visible) .desktop-chat-project-row__actions {
+.desktop-task-project-row:hover .desktop-task-project-row__actions,
+.desktop-task-project-row:has(:focus-visible) .desktop-task-project-row__actions {
   opacity: 1;
   pointer-events: auto;
 }
 
-.desktop-chat-project-row__action {
+.desktop-task-project-row__action {
   display: grid;
-  width: var(--buddy-chat-sidebar-action-size);
-  height: var(--buddy-chat-sidebar-action-size);
+  width: var(--buddy-task-sidebar-action-size);
+  height: var(--buddy-task-sidebar-action-size);
   flex: none;
   place-items: center;
   border-radius: var(--buddy-icon-button-radius);
@@ -259,7 +267,7 @@ button {
   }
 }
 
-.desktop-chat-project-row__pin {
+.desktop-task-project-row__pin {
   color: var(--buddy-text-placeholder);
 }
 </style>

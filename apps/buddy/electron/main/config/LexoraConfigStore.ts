@@ -8,14 +8,14 @@ import { parse, stringify } from 'smol-toml'
 import { z } from 'zod'
 import { DESKTOP_CHAT_WELCOME_VARIANT_IDS } from '../../shared/desktopApi'
 
-const chatSidebarPinnedItemSchema = z.discriminatedUnion('kind', [
+const taskSidebarPinnedItemSchema = z.discriminatedUnion('kind', [
   z.object({ id: z.string().min(1).max(128), kind: z.literal('conversation') }).strict(),
   z.object({ id: z.string().min(1).max(128), kind: z.literal('project') }).strict(),
 ])
 
 const desktopConfigSchema = z.object({
   background_close_notice_shown: z.boolean().default(false),
-  chat_sidebar_pinned_items: z.array(chatSidebarPinnedItemSchema)
+  task_sidebar_pinned_items: z.array(taskSidebarPinnedItemSchema)
     .max(500)
     .refine(items => new Set(items.map(item => `${item.kind}:${item.id}`)).size === items.length)
     .default([]),
@@ -29,7 +29,7 @@ const desktopConfigSchema = z.object({
   welcome_variant: z.enum(['random', ...DESKTOP_CHAT_WELCOME_VARIANT_IDS]).default('random'),
 }).passthrough().default({
   background_close_notice_shown: false,
-  chat_sidebar_pinned_items: [],
+  task_sidebar_pinned_items: [],
   developer_tools_enabled: false,
   language: 'zh-CN',
   launch_at_login: false,
@@ -148,7 +148,7 @@ function decodeConfig(value: unknown): LexoraConfig {
   return {
     desktop: {
       backgroundCloseNoticeShown: config.desktop.background_close_notice_shown,
-      chatSidebarPinnedItems: config.desktop.chat_sidebar_pinned_items,
+      taskSidebarPinnedItems: config.desktop.task_sidebar_pinned_items,
       developerToolsEnabled: config.desktop.developer_tools_enabled,
       language: config.desktop.language,
       launchAtLogin: config.desktop.launch_at_login,
@@ -170,7 +170,7 @@ function encodeConfig(config: LexoraConfig) {
   return {
     desktop: {
       background_close_notice_shown: config.desktop.backgroundCloseNoticeShown,
-      chat_sidebar_pinned_items: config.desktop.chatSidebarPinnedItems,
+      task_sidebar_pinned_items: config.desktop.taskSidebarPinnedItems,
       developer_tools_enabled: config.desktop.developerToolsEnabled,
       language: config.desktop.language,
       launch_at_login: config.desktop.launchAtLogin,
@@ -211,6 +211,7 @@ function mergeConfigFile(file: unknown, config: LexoraConfig): Record<string, un
     ...encoded.desktop,
   }
   delete nextDesktop.chat_sidebar_section_order
+  delete nextDesktop.chat_sidebar_pinned_items
   const next: Record<string, unknown> = {
     ...root,
     desktop: nextDesktop,

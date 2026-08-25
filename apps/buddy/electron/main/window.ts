@@ -144,12 +144,12 @@ export function createDesktopWindow(options: CreateDesktopWindowOptions): Deskto
     async load() {
       if (options.rendererUrl) {
         trustedRendererUrl = new URL('/', options.rendererUrl).toString()
-        await window.loadURL(`${trustedRendererUrl}#/chat`)
+        await window.loadURL(`${trustedRendererUrl}#/tasks`)
         return
       }
 
       trustedRendererUrl = 'lexora-app://renderer/index.html'
-      await window.loadURL(`${trustedRendererUrl}#/chat`)
+      await window.loadURL(`${trustedRendererUrl}#/tasks`)
     },
   }
 }

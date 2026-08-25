@@ -255,7 +255,7 @@ export const automationOccurrenceViewSchema = automationOccurrenceSchema.extend(
   }).strict().nullable(),
 }).strict()
 
-export const automationTaskSchema = automationSchema.safeExtend({
+export const automationListItemSchema = automationSchema.safeExtend({
   activeOccurrence: automationOccurrenceViewSchema.nullable(),
 }).strict()
 
@@ -297,7 +297,7 @@ export const automationRequestSchemas = {
 } as const
 
 export const automationPageSchema = z.object({
-  items: z.array(automationTaskSchema),
+  items: z.array(automationListItemSchema),
   nextCursor: z.string().regex(/^[\w-]+$/).max(2_048).nullable(),
 }).strict()
 
@@ -374,7 +374,7 @@ export type Automation = z.infer<typeof automationSchema>
 export type AutomationOccurrence = z.infer<typeof automationOccurrenceSchema>
 export type AutomationOccurrenceView = z.infer<typeof automationOccurrenceViewSchema>
 export type AutomationRunNowResult = z.infer<typeof automationRunNowResultSchema>
-export type AutomationTask = z.infer<typeof automationTaskSchema>
+export type AutomationListItem = z.infer<typeof automationListItemSchema>
 export type AutomationEffectiveStatus = z.infer<typeof automationEffectiveStatusSchema>
 export type AutomationErrorCode = z.infer<typeof automationErrorCodeSchema>
 export type AutomationBlockedReason = z.infer<typeof automationBlockedReasonSchema>

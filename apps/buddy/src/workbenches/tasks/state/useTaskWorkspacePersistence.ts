@@ -13,7 +13,7 @@ interface ValueRef<T> {
   readonly value: T
 }
 
-interface UseChatWorkspacePersistenceOptions {
+interface UseTaskWorkspacePersistenceOptions {
   api: LexoraDesktopApi['localChat']['workspaceState']
   conversations: ValueRef<ReadonlyArray<LocalConversationSummary>>
   drafts: ReturnType<typeof useChatDrafts>
@@ -22,7 +22,7 @@ interface UseChatWorkspacePersistenceOptions {
   session: ChatSession
 }
 
-export function useChatWorkspacePersistence(options: UseChatWorkspacePersistenceOptions) {
+export function useTaskWorkspacePersistence(options: UseTaskWorkspacePersistenceOptions) {
   let hydrated = false
   let writeQueue = Promise.resolve()
 

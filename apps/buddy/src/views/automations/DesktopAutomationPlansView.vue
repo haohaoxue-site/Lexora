@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type {
   LocalAutomation,
-  LocalAutomationTask,
+  LocalAutomationListItem,
 } from '@buddy-electron/shared/localChatApi'
 import type { AutomationActionResult } from '@/workbenches/automations/useAutomationCapability'
 import { NButton, NResult, NSpin, useMessage } from 'naive-ui'
@@ -9,7 +9,7 @@ import { useRouter } from 'vue-router'
 import { useDesktopApp } from '@/app/desktopAppContext'
 import { useBuddyI18n } from '@/i18n/buddyI18n'
 import { desktopRouteLocations } from '@/router'
-import DesktopAutomationTaskList from '@/workbenches/automations/DesktopAutomationTaskList.vue'
+import DesktopAutomationList from '@/workbenches/automations/DesktopAutomationList.vue'
 
 const router = useRouter()
 const {
@@ -27,7 +27,7 @@ function openEditor(automation: LocalAutomation | null): void {
     : desktopRouteLocations.automationCreate())
 }
 
-async function runNow(automation: LocalAutomationTask): Promise<void> {
+async function runNow(automation: LocalAutomationListItem): Promise<void> {
   if (automation.activeOccurrence) {
     message.info(t('desktop.automations.alreadyRunning'))
     return
@@ -79,7 +79,7 @@ async function retry(): Promise<void> {
         </NButton>
       </template>
     </NResult>
-    <DesktopAutomationTaskList
+    <DesktopAutomationList
       v-else
       :automations="automations.automations.value.items"
       :language="applicationSettings.language.value"

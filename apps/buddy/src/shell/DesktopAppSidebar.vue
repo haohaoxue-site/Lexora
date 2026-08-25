@@ -7,7 +7,6 @@ import type {
 import type { BuddyLocale } from '@/i18n/buddyI18n'
 import {
   Alert20Regular,
-  Chat20Regular,
   PanelLeft20Regular,
   Search20Regular,
   Settings20Regular,
@@ -25,7 +24,7 @@ const props = defineProps<{
   appVersion: string | null
   conversations: ReadonlyArray<LocalConversation>
   language: BuddyLocale
-  mode: 'automations' | 'chat' | 'settings'
+  mode: 'automations' | 'settings' | 'tasks'
   notificationItems: ReadonlyArray<LocalNotification>
   notificationLoading: boolean
   notificationUnseenCount: number
@@ -33,11 +32,11 @@ const props = defineProps<{
 }>()
 const emit = defineEmits<{
   navigateAutomations: []
-  navigateChat: []
+  navigateTasks: []
   navigateSettings: []
   markAllNotificationsSeen: []
   openNotification: [notification: LocalNotification]
-  openConversation: [conversationId: string]
+  openTask: [conversationId: string]
   openProject: [projectId: string]
   toggleSidebar: []
   refreshNotifications: []
@@ -60,9 +59,9 @@ function openNotification(notification: LocalNotification) {
   emit('openNotification', notification)
 }
 
-function openConversation(conversationId: string) {
+function openTask(conversationId: string) {
   showGlobalSearchDialog.value = false
-  emit('openConversation', conversationId)
+  emit('openTask', conversationId)
 }
 
 function openProject(projectId: string) {
@@ -103,13 +102,13 @@ function openProject(projectId: string) {
     <nav class="desktop-app-sidebar__primary">
       <button
         class="desktop-app-sidebar__nav-item"
-        :class="{ 'is-active': mode === 'chat' }"
-        :aria-current="mode === 'chat' ? 'page' : undefined"
+        :class="{ 'is-active': mode === 'tasks' }"
+        :aria-current="mode === 'tasks' ? 'page' : undefined"
         type="button"
-        @click="emit('navigateChat')"
+        @click="emit('navigateTasks')"
       >
-        <NIcon :component="Chat20Regular" />
-        <span>{{ t('desktop.navigation.chat') }}</span>
+        <DesktopIcon name="navigationTask" />
+        <span>{{ t('desktop.navigation.tasks') }}</span>
       </button>
       <button
         class="desktop-app-sidebar__nav-item"
@@ -191,7 +190,7 @@ function openProject(projectId: string) {
       :conversations="conversations"
       :language="language"
       :projects="projects"
-      @open-conversation="openConversation"
+      @open-task="openTask"
       @open-project="openProject"
     />
     <DesktopAccountDialog

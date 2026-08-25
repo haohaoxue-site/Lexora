@@ -59,10 +59,10 @@ async function refresh(): Promise<void> {
         </NButton>
         <nav :aria-label="t('desktop.automations.title')">
           <RouterLink
-            :class="{ 'is-active': route.meta.automationSection === 'tasks' }"
-            :to="desktopRouteLocations.automations('tasks')"
+            :class="{ 'is-active': route.meta.automationSection === 'plans' }"
+            :to="desktopRouteLocations.automations('plans')"
           >
-            {{ t('desktop.automations.tasks') }}
+            {{ t('desktop.automations.plans') }}
           </RouterLink>
           <RouterLink
             :class="{ 'is-active': route.meta.automationSection === 'history' }"

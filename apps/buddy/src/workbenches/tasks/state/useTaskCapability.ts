@@ -17,15 +17,15 @@ import { useChatConversations } from '@/workbenches/chat/state/useChatConversati
 import { useChatDrafts } from '@/workbenches/chat/state/useChatDrafts'
 import { useChatExecution } from '@/workbenches/chat/state/useChatExecution'
 import { useChatExecutionProfile } from '@/workbenches/chat/state/useChatExecutionProfile'
-import { useChatIndexData } from '@/workbenches/chat/state/useChatIndexData'
-import { useChatProjects } from '@/workbenches/chat/state/useChatProjects'
 import { useChatRunSync } from '@/workbenches/chat/state/useChatRunSync'
 import { useChatSession } from '@/workbenches/chat/state/useChatSession'
-import { useChatWorkspacePersistence } from '@/workbenches/chat/state/useChatWorkspacePersistence'
 import {
   reconcileDismissedChatBlocker,
   resolveChatBlocker,
 } from '@/workbenches/chat/workspace/chatBlocker'
+import { useTaskIndexData } from '@/workbenches/tasks/state/useTaskIndexData'
+import { useTaskProjects } from '@/workbenches/tasks/state/useTaskProjects'
+import { useTaskWorkspacePersistence } from '@/workbenches/tasks/state/useTaskWorkspacePersistence'
 
 const CONVERSATION_ACTIVITY_EVENT_TYPES = new Set([
   'approval.requested',
@@ -36,7 +36,7 @@ const CONVERSATION_ACTIVITY_EVENT_TYPES = new Set([
   'run.started',
 ])
 
-export interface UseChatCapabilityOptions {
+export interface UseTaskCapabilityOptions {
   api: LexoraDesktopApi
   applicationSettings: ApplicationSettingsStore
   localCapabilities: LocalCapabilitiesStore
@@ -45,7 +45,7 @@ export interface UseChatCapabilityOptions {
   runtimeSupervisor: RuntimeSupervisorStore
 }
 
-export function useChatCapability(options: UseChatCapabilityOptions) {
+export function useTaskCapability(options: UseTaskCapabilityOptions) {
   const {
     api,
     applicationSettings,
@@ -54,13 +54,13 @@ export function useChatCapability(options: UseChatCapabilityOptions) {
     runtimeRecovery,
     runtimeSupervisor,
   } = options
-  const chatIndexData = useChatIndexData({ api: api.localChat })
+  const taskIndexData = useTaskIndexData({ api: api.localChat })
   const {
     conversations,
     projects,
-    refreshIndex: refreshChatIndex,
+    refreshIndex: refreshTaskIndex,
     refreshConversations,
-  } = chatIndexData
+  } = taskIndexData
   const chatSession = useChatSession()
   const {
     activeBranchId,
@@ -126,7 +126,7 @@ export function useChatCapability(options: UseChatCapabilityOptions) {
     targetKey: draftScopeKey,
   })
   const { attachments, composerContent, draft } = drafts
-  const workspacePersistence = useChatWorkspacePersistence({
+  const workspacePersistence = useTaskWorkspacePersistence({
     api: api.localChat.workspaceState,
     conversations,
     drafts,
@@ -138,16 +138,16 @@ export function useChatCapability(options: UseChatCapabilityOptions) {
   persistDraftChanges = workspacePersistence.persistIfHydrated
   const {
     activateDraftScope,
+    activateGlobalDraft,
     activeConversation,
     deleteConversation,
     listActiveConversationMessages,
     openConversation,
     refreshBranches,
     renameConversation,
-    startGlobalConversation,
   } = useChatConversations({
     api: api.localChat,
-    chatIndexData,
+    taskIndexData,
     clearError: () => errorMessage.value = null,
     drafts,
     onError: setError,
@@ -156,7 +156,7 @@ export function useChatCapability(options: UseChatCapabilityOptions) {
     selectDefaultModel: modelProviders.selectDefaultModel,
     session: chatSession,
   })
-  const chatProjects = useChatProjects({
+  const taskProjects = useTaskProjects({
     activateDraftScope,
     api: api.localChat,
     drafts,
@@ -165,7 +165,7 @@ export function useChatCapability(options: UseChatCapabilityOptions) {
     persistWorkspaceState,
     projectId,
     projects,
-    refreshIndex: refreshChatIndex,
+    refreshIndex: refreshTaskIndex,
     selectDefaultModel: modelProviders.selectDefaultModel,
   })
   const {
@@ -173,18 +173,18 @@ export function useChatCapability(options: UseChatCapabilityOptions) {
     createProject,
     deleteProject,
     listContextOptions,
-    startProjectConversation,
+    activateProjectDraft,
     updateProject,
-  } = chatProjects
+  } = taskProjects
   const currentTitle = computed(() => activeConversation.value?.title?.trim()
     || activeProject.value?.name
-    || t('chat.newConversation'))
+    || t('desktop.tasks.newTask'))
   const executionProfileState = useChatExecutionProfile({
     activeConversation,
     activeConversationId,
     activeRun,
     api: api.localChat.conversations,
-    chatIndexData,
+    taskIndexData,
     drafts,
     onError: setError,
     persistWorkspaceState,
@@ -195,11 +195,11 @@ export function useChatCapability(options: UseChatCapabilityOptions) {
     onError: setError,
     refresh: runSync.refreshActiveConversation,
   })
-  const scheduleChatIndexRefresh = useDebounceFn(async () => {
+  const scheduleTaskIndexRefresh = useDebounceFn(async () => {
     if (isDisposed)
       return
     try {
-      await refreshChatIndex()
+      await refreshTaskIndex()
     }
     catch (error) {
       setError(error)
@@ -222,7 +222,7 @@ export function useChatCapability(options: UseChatCapabilityOptions) {
   const execution = useChatExecution({
     activeRun,
     api: api.localChat,
-    chatIndexData,
+    taskIndexData,
     session: chatSession,
     drafts,
     draftScopeKey,
@@ -278,7 +278,7 @@ export function useChatCapability(options: UseChatCapabilityOptions) {
       workspacePersistence.read(),
     ])
     if (results[0]?.status === 'fulfilled')
-      chatIndexData.replaceProjects(results[0].value)
+      taskIndexData.replaceProjects(results[0].value)
     const workspaceResult = results[2]
     if (workspaceResult?.status === 'fulfilled')
       await workspacePersistence.hydrate(workspaceResult.value)
@@ -297,7 +297,7 @@ export function useChatCapability(options: UseChatCapabilityOptions) {
   async function refreshRuntimeDependentState() {
     await Promise.all([
       modelProviders.loadModelCatalog(true),
-      refreshChatIndex(),
+      refreshTaskIndex(),
     ])
     if (activeConversationId.value) {
       const conversation = conversations.value.find(item => item.id === activeConversationId.value)
@@ -313,7 +313,7 @@ export function useChatCapability(options: UseChatCapabilityOptions) {
     runSync.handleRunEvent(event)
     if (!CONVERSATION_ACTIVITY_EVENT_TYPES.has(event.type))
       return
-    void scheduleChatIndexRefresh()
+    void scheduleTaskIndexRefresh()
   }
 
   async function selectAttachments() {
@@ -354,18 +354,36 @@ export function useChatCapability(options: UseChatCapabilityOptions) {
       dismissedChatBlockerKind.value = visibleChatBlocker.value.kind
   }
 
+  async function startTask(projectId: string | null): Promise<void> {
+    if (projectId === null) {
+      await activateGlobalDraft()
+      return
+    }
+    await activateProjectDraft(projectId)
+  }
+
   const index = {
-    conversations: readonly(conversations),
     createProject,
-    deleteConversation,
     deleteProject,
+    deleteTask: deleteConversation,
     projects: readonly(projects),
-    refresh: refreshChatIndex,
-    renameConversation,
+    refresh: refreshTaskIndex,
+    renameTask: renameConversation,
+    tasks: readonly(conversations),
     updateProject,
   } as const
 
   const session = {
+    activeProject: readonly(activeProject),
+    activeTask: readonly(activeConversation),
+    activeTaskId: readonly(activeConversationId),
+    currentTitle: readonly(currentTitle),
+    openTask: openConversation,
+    projectId: readonly(projectId),
+    startTask,
+  } as const
+
+  const chatWorkspaceSession = {
     activeBranchId: readonly(activeBranchId),
     activeConversation: readonly(activeConversation),
     activeConversationId: readonly(activeConversationId),
@@ -374,8 +392,6 @@ export function useChatCapability(options: UseChatCapabilityOptions) {
     listActiveConversationMessages,
     openConversation,
     projectId: readonly(projectId),
-    startGlobalConversation,
-    startProjectConversation,
   } as const
 
   const workspace = {
@@ -418,7 +434,7 @@ export function useChatCapability(options: UseChatCapabilityOptions) {
       send,
     },
     language,
-    session,
+    session: chatWorkspaceSession,
     welcomePreference: readonly(welcomePreference),
     status: {
       canRestartRuntime: runtimeRecovery.canRestartRuntime,
@@ -454,5 +470,5 @@ export function useChatCapability(options: UseChatCapabilityOptions) {
   }
 }
 
-export type ChatCapability = ReturnType<typeof useChatCapability>
-export type ChatWorkspace = ChatCapability['workspace']
+export type TaskCapability = ReturnType<typeof useTaskCapability>
+export type TaskChatWorkspace = TaskCapability['workspace']
