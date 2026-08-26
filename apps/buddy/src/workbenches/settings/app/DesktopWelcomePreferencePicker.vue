@@ -36,6 +36,7 @@ function selectPreference(preference: DesktopChatWelcomePreference) {
 
 <template>
   <NPopover
+    class="buddy-raw-popover"
     :show="panelOpen"
     trigger="click"
     placement="bottom-end"

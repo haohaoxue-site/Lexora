@@ -25,6 +25,7 @@ const props = defineProps<{
   language: BuddyLocale
   pinnedItems: ReadonlyArray<DesktopTaskPinnedItem>
   projects: ReadonlyArray<LocalProject>
+  selectProjectDirectory: () => Promise<string | null>
   tasks: ReadonlyArray<LocalConversationSummary>
 }>()
 const emit = defineEmits<{
@@ -247,6 +248,7 @@ const {
       v-model:show="projectDialogOpen"
       :language="language"
       :project="projectEditTarget"
+      :select-directory="selectProjectDirectory"
       @save="saveProject"
     />
 

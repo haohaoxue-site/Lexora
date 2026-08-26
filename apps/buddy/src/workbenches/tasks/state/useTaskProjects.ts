@@ -90,6 +90,16 @@ export function useTaskProjects(options: UseTaskProjectsOptions) {
     }
   }
 
+  async function selectProjectDirectory(): Promise<string | null> {
+    try {
+      return await options.api.projects.selectDirectory()
+    }
+    catch (error) {
+      options.onError(error)
+      return null
+    }
+  }
+
   async function listContextOptions(fileQuery: string | null): Promise<ChatComposerContextOptions> {
     await options.localCapabilities.loadSkills(options.projectId.value)
     const files = options.projectId.value
@@ -122,6 +132,7 @@ export function useTaskProjects(options: UseTaskProjectsOptions) {
     listContextOptions,
     scope: readonly(scope),
     activateProjectDraft,
+    selectProjectDirectory,
     updateProject,
     workingDirectory: readonly(workingDirectory),
   }

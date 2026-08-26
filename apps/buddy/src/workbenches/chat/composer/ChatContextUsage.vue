@@ -80,7 +80,7 @@ function formatTokens(value: number): string {
 <template>
   <NPopover
     v-if="usage"
-    class="desktop-context-usage-popover"
+    class="buddy-raw-popover"
     :show="isOpen"
     trigger="click"
     placement="top-end"
@@ -162,12 +162,6 @@ function formatTokens(value: number): string {
 </template>
 
 <style scoped lang="scss">
-:global(.desktop-context-usage-popover.n-popover) {
-  border-radius: 0 !important;
-  background: transparent !important;
-  box-shadow: none !important;
-}
-
 .desktop-context-usage__trigger {
   display: grid;
   width: 2rem;

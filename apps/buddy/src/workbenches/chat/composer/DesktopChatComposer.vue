@@ -66,6 +66,9 @@ const emit = defineEmits<{
   updateModel: [value: string]
   updateServiceTier: [value: BuddyServiceTier | null]
 }>()
+defineSlots<{
+  leadingContext?: () => unknown
+}>()
 
 const { t } = useBuddyI18n(() => props.language)
 const {
@@ -162,6 +165,8 @@ const {
           <NIcon :component="Add20Regular" />
         </template>
       </NButton>
+
+      <slot name="leadingContext" />
 
       <DesktopExecutionProfileSelector
         :can-update="canUpdateExecutionProfile"

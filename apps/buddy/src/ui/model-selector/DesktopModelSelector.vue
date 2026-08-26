@@ -407,9 +407,9 @@ function formatReasoningLabel(value: BuddyThinkingLevel) {
   gap: 0.15rem;
   overflow: hidden;
   border: 1px solid var(--buddy-border-light);
-  border-radius: 0.8rem;
+  border-radius: var(--buddy-menu-radius);
   background: color-mix(in srgb, var(--buddy-bg-surface-raised) 97%, transparent);
-  box-shadow: 0 1rem 2.5rem rgb(23 33 28 / 16%);
+  box-shadow: var(--buddy-shadow-menu);
   padding: 0.5rem;
 }
 
@@ -427,7 +427,7 @@ function formatReasoningLabel(value: BuddyThinkingLevel) {
   justify-content: space-between;
   gap: 0.65rem;
   border: 0;
-  border-radius: 0.55rem;
+  border-radius: var(--buddy-menu-item-radius);
   background: transparent;
   color: var(--buddy-text-primary);
   cursor: pointer;

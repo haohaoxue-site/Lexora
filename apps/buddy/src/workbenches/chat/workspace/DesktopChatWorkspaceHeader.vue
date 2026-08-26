@@ -5,7 +5,6 @@ import {
   ChevronDown20Regular,
   ChevronUp20Regular,
   Dismiss20Regular,
-  Folder20Regular,
   Search20Regular,
 } from '@vicons/fluent'
 import { NIcon, NInput } from 'naive-ui'
@@ -20,7 +19,6 @@ const props = defineProps<{
   conversationSearchQuery: string
   conversationSearchResultCount: number
   language: BuddyLocale
-  projectName: string | null
   title: string
 }>()
 const emit = defineEmits<{
@@ -56,10 +54,6 @@ watch(
   <header class="desktop-chat-workspace-header">
     <div class="desktop-chat-workspace-header__copy">
       <strong>{{ title }}</strong>
-      <span v-if="projectName">
-        <NIcon :component="Folder20Regular" />
-        {{ projectName }}
-      </span>
     </div>
 
     <div class="desktop-chat-workspace-header__actions">
@@ -137,8 +131,7 @@ watch(
   min-width: 5rem;
   gap: 0.05rem;
 
-  strong,
-  span {
+  strong {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -147,14 +140,6 @@ watch(
   strong {
     font-size: 0.88rem;
     font-weight: 660;
-  }
-
-  span {
-    display: flex;
-    align-items: center;
-    gap: 0.25rem;
-    color: var(--buddy-text-secondary);
-    font-size: 0.68rem;
   }
 }
 

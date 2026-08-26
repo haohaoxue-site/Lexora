@@ -6,6 +6,7 @@ import { desktopRouteLocations } from '@/router'
 import DesktopChatWorkspace from '@/workbenches/chat/workspace/DesktopChatWorkspace.vue'
 import DesktopChatWorkspaceHeader from '@/workbenches/chat/workspace/DesktopChatWorkspaceHeader.vue'
 import { useConversationSearch } from '@/workbenches/chat/workspace/useConversationSearch'
+import DesktopTaskProjectSelector from '@/workbenches/tasks/composer/DesktopTaskProjectSelector.vue'
 import DesktopTaskIndex from '@/workbenches/tasks/index/DesktopTaskIndex.vue'
 
 const router = useRouter()
@@ -33,6 +34,7 @@ const conversationSearch = useConversationSearch({
         :language="tasks.language.value"
         :pinned-items="shell.taskSidebarPinnedItems.value"
         :projects="taskIndex.projects.value"
+        :select-project-directory="taskIndex.selectProjectDirectory"
         :tasks="taskIndex.tasks.value"
         @create-project="taskIndex.createProject"
         @delete-project="taskIndex.deleteProject"
@@ -54,7 +56,6 @@ const conversationSearch = useConversationSearch({
       :conversation-search-query="conversationSearch.query.value"
       :conversation-search-result-count="conversationSearch.resultCount.value"
       :language="tasks.language.value"
-      :project-name="taskSession.activeProject.value?.name ?? null"
       :title="taskSession.currentTitle.value"
       @close-conversation-search="conversationSearch.close"
       @next-conversation-search-result="conversationSearch.move(1)"
@@ -67,6 +68,17 @@ const conversationSearch = useConversationSearch({
       :workspace="tasks.workspace"
       :matching-search-message-ids="conversationSearch.matchingMessageIds.value"
       @open-settings="router.push(desktopRouteLocations.settings($event))"
-    />
+    >
+      <template v-if="taskSession.activeTaskId.value === null" #composerLeadingContext>
+        <DesktopTaskProjectSelector
+          :active-project="taskSession.activeProject.value"
+          :language="tasks.language.value"
+          :projects="taskIndex.projects.value"
+          :select-directory="taskIndex.selectProjectDirectory"
+          @create-project="taskIndex.createProject"
+          @select-project="taskSession.startTask"
+        />
+      </template>
+    </DesktopChatWorkspace>
   </DesktopWorkbenchLayout>
 </template>

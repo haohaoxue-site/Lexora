@@ -174,10 +174,10 @@ export function useTaskCapability(options: UseTaskCapabilityOptions) {
     deleteProject,
     listContextOptions,
     activateProjectDraft,
+    selectProjectDirectory,
     updateProject,
   } = taskProjects
   const currentTitle = computed(() => activeConversation.value?.title?.trim()
-    || activeProject.value?.name
     || t('desktop.tasks.newTask'))
   const executionProfileState = useChatExecutionProfile({
     activeConversation,
@@ -369,6 +369,7 @@ export function useTaskCapability(options: UseTaskCapabilityOptions) {
     projects: readonly(projects),
     refresh: refreshTaskIndex,
     renameTask: renameConversation,
+    selectProjectDirectory,
     tasks: readonly(conversations),
     updateProject,
   } as const

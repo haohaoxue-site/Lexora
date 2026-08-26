@@ -9,6 +9,7 @@ import { useBuddyI18n } from '@/i18n/buddyI18n'
 const props = defineProps<{
   language: BuddyLocale
   project: LocalProject | null
+  selectDirectory: () => Promise<string | null>
   show: boolean
 }>()
 const emit = defineEmits<{
@@ -20,7 +21,6 @@ const emit = defineEmits<{
   }]
   'update:show': [show: boolean]
 }>()
-const desktopApi = requireDesktopApi()
 const { t } = useBuddyI18n(() => props.language)
 const name = shallowRef('')
 const memoryScope = shallowRef<'personal_and_project' | 'project_only'>('personal_and_project')
@@ -61,7 +61,7 @@ async function selectDirectory() {
     return
   selectingDirectory.value = true
   try {
-    const selected = await desktopApi.localChat.projects.selectDirectory()
+    const selected = await props.selectDirectory()
     if (selected)
       root.value = selected
   }
@@ -90,13 +90,6 @@ function renderMemoryLabel(option: SelectOption, selected: boolean) {
     h('strong', {}, option.label as string),
     h('small', {}, option.description as string),
   ])
-}
-
-function requireDesktopApi() {
-  const api = window.lexoraDesktop
-  if (!api)
-    throw new Error('Lexora Buddy Desktop bridge is unavailable')
-  return api
 }
 </script>
 

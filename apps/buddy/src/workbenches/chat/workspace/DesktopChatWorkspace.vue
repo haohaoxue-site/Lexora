@@ -26,6 +26,9 @@ const props = defineProps<{
 const emit = defineEmits<{
   openSettings: [category: DesktopSettingsCategory]
 }>()
+defineSlots<{
+  composerLeadingContext?: () => unknown
+}>()
 
 const workspace = props.workspace
 const { composer, execution, session, status, transcript } = workspace
@@ -91,7 +94,6 @@ function dismissBlocker() {
       <DesktopChatWelcome
         v-if="isEmpty"
         :language="workspace.language.value"
-        :project-name="session.activeProject.value?.name ?? null"
         :variant="welcomeVariant"
       />
 
@@ -214,7 +216,11 @@ function dismissBlocker() {
           @update-execution-profile="composer.setExecutionProfile"
           @update-model="composer.selectModel"
           @update-service-tier="composer.setSelectedServiceTier"
-        />
+        >
+          <template #leadingContext>
+            <slot name="composerLeadingContext" />
+          </template>
+        </DesktopChatComposer>
       </div>
     </footer>
   </section>

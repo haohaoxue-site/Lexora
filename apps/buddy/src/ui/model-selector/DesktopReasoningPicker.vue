@@ -74,9 +74,9 @@ const { t } = useBuddyI18n(() => props.language)
   width: 13.5rem;
   max-height: min(24rem, 58vh);
   border: 1px solid var(--buddy-border-light);
-  border-radius: 0.8rem;
+  border-radius: var(--buddy-menu-radius);
   background: color-mix(in srgb, var(--buddy-bg-surface-raised) 97%, transparent);
-  box-shadow: 0 1rem 2.5rem rgb(23 33 28 / 16%);
+  box-shadow: var(--buddy-shadow-menu);
 }
 
 .desktop-reasoning-picker__title {
@@ -109,7 +109,7 @@ const { t } = useBuddyI18n(() => props.language)
   justify-content: space-between;
   gap: 0.65rem;
   border: 0;
-  border-radius: 0.55rem;
+  border-radius: var(--buddy-menu-item-radius);
   background: transparent;
   color: var(--buddy-text-primary);
   cursor: pointer;

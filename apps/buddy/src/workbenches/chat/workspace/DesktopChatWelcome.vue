@@ -6,7 +6,6 @@ import DesktopChatWelcomeDecoration from './DesktopChatWelcomeDecoration.vue'
 
 const props = defineProps<{
   language: BuddyLocale
-  projectName: string | null
   variant: DesktopChatWelcomeVariant
 }>()
 
@@ -28,9 +27,6 @@ const { t } = useBuddyI18n(() => props.language)
       <h1>{{ t(variant.titleKey) }}</h1>
       <DesktopChatWelcomeDecoration :type="variant.decoration" />
     </div>
-    <p v-if="projectName" class="desktop-chat-welcome__context">
-      {{ t('desktop.chat.projectContext', { project: projectName }) }}
-    </p>
   </section>
 </template>
 
@@ -92,12 +88,6 @@ const { t } = useBuddyI18n(() => props.language)
     line-height: 1.3;
     text-rendering: optimizelegibility;
   }
-}
-
-.desktop-chat-welcome__context {
-  margin: 0.05rem 0 0;
-  color: var(--buddy-text-secondary);
-  font-size: 0.78rem;
 }
 
 @media (max-height: 720px) {
