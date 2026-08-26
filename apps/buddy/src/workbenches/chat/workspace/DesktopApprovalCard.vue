@@ -154,9 +154,9 @@ const automationOperation = computed(() => {
 .desktop-approval-card {
   display: grid;
   gap: 0.65rem;
-  border: 1px solid color-mix(in srgb, var(--buddy-accent-warning) 34%, var(--buddy-border-light));
+  border: 1px solid var(--buddy-status-warning-border);
   border-radius: 0.8rem;
-  background: color-mix(in srgb, var(--buddy-accent-warning) 7%, var(--buddy-bg-surface-raised));
+  background: var(--buddy-status-warning-surface);
   padding: 0.75rem;
 }
 
@@ -175,7 +175,7 @@ const automationOperation = computed(() => {
   margin: 0;
   overflow: auto;
   border-radius: 0.55rem;
-  background: var(--buddy-bg-surface);
+  background: var(--buddy-surface-base);
   font-family: var(--buddy-font-mono);
   font-size: 0.7rem;
   padding: 0.6rem;
@@ -216,17 +216,17 @@ const automationOperation = computed(() => {
 }
 
 .desktop-approval-card button {
-  border: 1px solid var(--buddy-border-light);
+  border: 1px solid var(--buddy-border-subtle);
   border-radius: 0.5rem;
-  background: var(--buddy-bg-surface);
-  color: var(--buddy-text-regular);
+  background: var(--buddy-surface-base);
+  color: var(--buddy-text-primary);
   cursor: pointer;
   padding: 0.4rem 0.7rem;
 }
 
 .desktop-approval-card button.is-primary {
-  border-color: var(--buddy-accent-primary);
-  background: var(--buddy-accent-primary);
-  color: white;
+  border-color: var(--buddy-accent-solid);
+  background: var(--buddy-accent-solid);
+  color: var(--buddy-text-on-accent);
 }
 </style>

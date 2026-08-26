@@ -107,7 +107,7 @@ async function refresh(): Promise<void> {
   min-height: 0;
   flex: 1;
   flex-direction: column;
-  background: var(--buddy-bg-surface);
+  background: var(--buddy-surface-base);
 }
 
 .desktop-automation-workbench__header {
@@ -117,7 +117,7 @@ async function refresh(): Promise<void> {
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  border-bottom: 1px solid var(--buddy-border-light);
+  border-bottom: 1px solid var(--buddy-border-subtle);
   padding: 0 18px;
 }
 
@@ -136,7 +136,7 @@ async function refresh(): Promise<void> {
     align-items: center;
     gap: 2px;
     border-radius: 9px;
-    background: var(--buddy-fill-base);
+    background: var(--buddy-surface-subtle);
     padding: 3px;
   }
 
@@ -151,18 +151,18 @@ async function refresh(): Promise<void> {
   }
 
   nav > a:hover {
-    color: var(--buddy-text-primary);
+    color: var(--buddy-text-strong);
   }
 
   nav > a:focus-visible {
-    outline: 2px solid var(--buddy-accent-primary);
+    outline: 2px solid var(--buddy-focus-ring);
     outline-offset: 1px;
   }
 
   nav > a.is-active {
-    background: var(--buddy-bg-surface);
-    box-shadow: 0 1px 3px rgb(0 0 0 / 9%);
-    color: var(--buddy-text-primary);
+    background: var(--buddy-surface-base);
+    box-shadow: var(--buddy-shadow-soft);
+    color: var(--buddy-text-strong);
   }
 }
 

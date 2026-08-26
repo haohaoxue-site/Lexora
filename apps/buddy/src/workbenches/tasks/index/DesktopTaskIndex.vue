@@ -208,7 +208,7 @@ const {
               :language="language"
               :now="relativeTimeNow"
               :occurred-at="item.task.automationOccurrence?.scheduledFor ?? item.task.updatedAt"
-              project-task
+              :project-task="item.projectTask"
               :title="getTaskTitle(item.task)"
               @delete="requestTaskDelete(item.task)"
               @open="emit('openTask', item.task.id)"
@@ -348,8 +348,8 @@ const {
   min-height: 0;
   flex: none;
   flex-direction: column;
-  border-right: 1px solid var(--buddy-border-light);
-  background: var(--buddy-bg-workspace-sidebar);
+  border-right: 1px solid var(--buddy-border-subtle);
+  background: var(--buddy-surface-workspace-sidebar);
 }
 
 .desktop-task-sidebar__header {
@@ -359,7 +359,7 @@ const {
   align-items: center;
   justify-content: space-between;
   gap: 0.5rem;
-  border-bottom: 1px solid var(--buddy-border-light);
+  border-bottom: 1px solid var(--buddy-border-subtle);
   padding: 0 0.75rem 0 0.8rem;
 }
 
@@ -389,18 +389,21 @@ const {
   background: transparent;
   color: var(--buddy-text-secondary);
   cursor: pointer;
+  transition:
+    background-color var(--buddy-motion-state-duration) var(--buddy-motion-state-easing),
+    color var(--buddy-motion-state-duration) var(--buddy-motion-state-easing);
 
   .n-icon {
     font-size: 16px;
   }
 
   &:hover {
-    background: var(--buddy-fill-base);
-    color: var(--buddy-text-primary);
+    background: var(--buddy-nav-hover);
+    color: var(--buddy-text-strong);
   }
 
   &:focus-visible {
-    outline: 2px solid var(--buddy-accent-primary);
+    outline: 2px solid var(--buddy-focus-ring);
     outline-offset: -2px;
   }
 }
@@ -409,16 +412,16 @@ const {
   min-height: 0;
   flex: 1;
   overflow: hidden;
-  padding: 0.8rem 0 0.85rem 0.75rem;
+  padding: 0.5rem 0;
 }
 
 .desktop-task-sidebar nav {
-  --buddy-task-sidebar-section-gap: 0.7rem;
+  --buddy-task-sidebar-section-gap: 0.5rem;
   --buddy-task-sidebar-action-gap: 0.125rem;
-  --buddy-task-sidebar-action-inset: 0.25rem;
+  --buddy-task-sidebar-action-inset: 0.4rem;
   --buddy-task-sidebar-action-size: 1.75rem;
-  --buddy-task-sidebar-scrollbar-gutter: 0.75rem;
-  --buddy-task-sidebar-state-radius: 8px;
+  --buddy-task-sidebar-scrollbar-gutter: 0.5rem;
+  --buddy-task-sidebar-state-radius: 6px;
 
   display: flex;
   height: 100%;
@@ -432,6 +435,7 @@ const {
   height: var(--buddy-task-sidebar-row-size);
   padding-right: var(--buddy-task-sidebar-scrollbar-gutter);
   padding-bottom: calc(var(--buddy-task-sidebar-row-size) - var(--buddy-task-sidebar-row-height));
+  padding-left: var(--buddy-task-sidebar-scrollbar-gutter);
 }
 
 .desktop-task-sidebar__modal {

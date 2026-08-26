@@ -12,6 +12,7 @@ import type {
 } from '@buddy-shared/modelSelection'
 import type { ShallowRef } from 'vue'
 import type { BuddyLocale } from '@/i18n/buddyI18n'
+import { BUDDY_DEFAULT_THINKING_LEVEL } from '@buddy-shared/modelSelection'
 import { computed, readonly, shallowRef } from 'vue'
 import { isProviderLoginCancelled, resolveLocalChatErrorMessage } from '@/lib/localChatError'
 
@@ -43,6 +44,11 @@ export function useModelProvidersStore(options: UseModelProvidersStoreOptions) {
   const selectedModel = computed(() => models.value.find(
     model => modelKey(model) === selectedModelId.value,
   ) ?? null)
+  const selectedModelOption = computed(() => registeredModels.value.find(
+    model => modelKey(model) === selectedModelId.value,
+  ) ?? null)
+  let defaultModelPersistenceRevision = 0
+  let persistDefaultModelQueue = Promise.resolve(true)
   const stopAuthChallenge = options.api.onAuthChallenge((challenge) => {
     authChallenge.value = challenge
   })
@@ -63,7 +69,21 @@ export function useModelProvidersStore(options: UseModelProvidersStoreOptions) {
       providers.value = nextProviders
       registeredModels.value = nextModels
       defaultModelSelection.value = nextDefaultModel
-      reconcileModelSelection()
+      if (!nextDefaultModel && models.value[0]) {
+        const model = models.value[0]
+        const reasoning = resolveConcreteEffort(model, null)
+        selectedModelId.value = modelKey(model)
+        selectedEffort.value = reasoning
+        selectedServiceTier.value = null
+        await persistDefaultModel({
+          modelId: model.modelId,
+          providerId: model.providerId,
+          reasoning,
+        })
+      }
+      else {
+        reconcileModelSelection()
+      }
       options.onCatalogChanged?.()
       return true
     }
@@ -236,17 +256,31 @@ export function useModelProvidersStore(options: UseModelProvidersStoreOptions) {
     modelProviderError.value = null
   }
 
-  function selectModel(value: string) {
+  async function selectModel(value: string) {
     const model = models.value.find(item => modelKey(item) === value)
     if (!model)
-      return
+      return false
     selectedModelId.value = value
-    selectedEffort.value = null
+    selectedEffort.value = resolveConcreteEffort(model, null)
     selectedServiceTier.value = null
+    return persistDefaultModel({
+      modelId: model.modelId,
+      providerId: model.providerId,
+      reasoning: selectedEffort.value,
+    })
   }
 
-  function setSelectedEffort(value: BuddyThinkingLevel | null) {
-    selectedEffort.value = value
+  async function setSelectedEffort(value: BuddyThinkingLevel | null) {
+    const model = selectedModel.value
+    if (!model)
+      return false
+    const reasoning = resolveConcreteEffort(model, value)
+    selectedEffort.value = reasoning
+    return persistDefaultModel({
+      modelId: model.modelId,
+      providerId: model.providerId,
+      reasoning,
+    })
   }
 
   function setSelectedServiceTier(value: BuddyServiceTier | null) {
@@ -277,23 +311,31 @@ export function useModelProvidersStore(options: UseModelProvidersStoreOptions) {
   }
 
   async function persistDefaultModel(value: LocalDefaultModel | null) {
-    try {
-      const stored = await options.api.setDefaultModel(value)
-      defaultModelSelection.value = stored
-      if (!selectedModelId.value && defaultModelId.value)
-        selectModel(defaultModelId.value)
-      return true
+    const revision = ++defaultModelPersistenceRevision
+    defaultModelSelection.value = value
+    const operation = async () => {
+      try {
+        const stored = await options.api.setDefaultModel(value)
+        if (revision === defaultModelPersistenceRevision)
+          defaultModelSelection.value = stored
+        return true
+      }
+      catch (error) {
+        modelProviderError.value = resolveLocalChatErrorMessage(error, options.language.value)
+        return false
+      }
     }
-    catch (error) {
-      modelProviderError.value = resolveLocalChatErrorMessage(error, options.language.value)
-      return false
-    }
+    persistDefaultModelQueue = persistDefaultModelQueue.then(operation, operation)
+    return persistDefaultModelQueue
   }
 
   function selectDefaultModel() {
     if (defaultModelId.value && models.value.some(model => modelKey(model) === defaultModelId.value)) {
       selectedModelId.value = defaultModelId.value
-      selectedEffort.value = defaultEffort.value
+      const model = models.value.find(item => modelKey(item) === defaultModelId.value) ?? null
+      selectedEffort.value = model
+        ? resolveConcreteEffort(model, defaultEffort.value)
+        : null
       selectedServiceTier.value = null
     }
     else {
@@ -303,9 +345,33 @@ export function useModelProvidersStore(options: UseModelProvidersStoreOptions) {
     }
   }
 
+  function restoreConversationModelSelection(value: {
+    modelId: string
+    providerId: string
+    reasoning: BuddyThinkingLevel | null
+    serviceTier: BuddyServiceTier | null
+  } | null) {
+    if (!value) {
+      selectDefaultModel()
+      return
+    }
+    const id = modelKey(value)
+    const model = registeredModels.value.find(item => modelKey(item) === id)
+    selectedModelId.value = id
+    selectedEffort.value = model
+      ? resolveConcreteEffort(model, value.reasoning)
+      : value.reasoning
+    selectedServiceTier.value = model?.serviceTiers.some(
+      option => option.id === value.serviceTier,
+    )
+      ? value.serviceTier
+      : null
+  }
+
   function reconcileModelSelection() {
-    const selected = models.value.find(model => modelKey(model) === selectedModelId.value)
+    const selected = registeredModels.value.find(model => modelKey(model) === selectedModelId.value)
     if (selected) {
+      selectedEffort.value = resolveConcreteEffort(selected, selectedEffort.value)
       if (
         selectedServiceTier.value !== null
         && !selected.serviceTiers.some(option => option.id === selectedServiceTier.value)
@@ -341,9 +407,11 @@ export function useModelProvidersStore(options: UseModelProvidersStoreOptions) {
     removeProvider,
     respondToAuth,
     restoreModelSourceParameters,
+    restoreConversationModelSelection,
     selectDefaultModel,
     selectedEffort: readonly(selectedEffort),
     selectedModel: readonly(selectedModel),
+    selectedModelOption: readonly(selectedModelOption),
     selectedModelId: readonly(selectedModelId),
     selectedServiceTier: readonly(selectedServiceTier),
     selectModel,
@@ -365,6 +433,19 @@ export type ModelProvidersStore = ReturnType<typeof useModelProvidersStore>
 
 function modelKey(model: Pick<LocalRuntimeModelOption, 'modelId' | 'providerId'>): string {
   return `${model.providerId}:${model.modelId}`
+}
+
+function resolveConcreteEffort(
+  model: LocalRuntimeModelOption,
+  requested: BuddyThinkingLevel | null,
+): BuddyThinkingLevel | null {
+  if (!model.reasoningOptions.length)
+    return null
+  if (requested && model.reasoningOptions.includes(requested))
+    return requested
+  if (model.reasoningOptions.includes(BUDDY_DEFAULT_THINKING_LEVEL))
+    return BUDDY_DEFAULT_THINKING_LEVEL
+  return model.reasoningOptions.find(level => level !== 'off') ?? model.reasoningOptions[0] ?? null
 }
 
 export function filterAvailableModels(

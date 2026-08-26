@@ -38,14 +38,14 @@ withDefaults(defineProps<{
 
 .desktop-chat-composer {
   position: relative;
-  border: 1px solid var(--buddy-border-base);
+  border: 1px solid var(--buddy-border-strong);
   border-radius: 0.75rem;
-  background: var(--buddy-bg-surface);
+  background: var(--buddy-surface-base);
   padding: 0.65rem;
   transition: border-color 120ms ease;
 
   &:focus-within {
-    border-color: color-mix(in srgb, var(--buddy-accent-primary) 58%, var(--buddy-border-base));
+    border-color: var(--buddy-focus-ring);
   }
 }
 
@@ -59,7 +59,7 @@ withDefaults(defineProps<{
   overflow-y: auto;
   border: 0;
   outline: 0;
-  color: var(--buddy-text-primary);
+  color: var(--buddy-text-strong);
   font-size: 0.9rem;
   line-height: 1.58;
   padding: 0.1rem 0.2rem 0.6rem;
@@ -74,7 +74,7 @@ withDefaults(defineProps<{
     content: attr(data-placeholder);
     float: left;
     height: 0;
-    color: var(--buddy-text-placeholder);
+    color: var(--buddy-text-muted);
     pointer-events: none;
   }
 }
@@ -88,10 +88,10 @@ withDefaults(defineProps<{
   display: inline-flex;
   align-items: center;
   max-width: 100%;
-  border: 1px solid color-mix(in srgb, var(--buddy-accent-primary) 30%, var(--buddy-border-light));
+  border: 1px solid var(--buddy-accent-border);
   border-radius: 0.38rem;
-  background: color-mix(in srgb, var(--buddy-accent-primary) 10%, var(--buddy-bg-surface));
-  color: var(--buddy-accent-primary);
+  background: var(--buddy-accent-surface);
+  color: var(--buddy-accent-on-surface);
   font-size: 0.78rem;
   font-weight: 650;
   line-height: 1.45;

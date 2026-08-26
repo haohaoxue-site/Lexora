@@ -5,6 +5,8 @@ import type { BuddyLocale } from '@/i18n/buddyI18n'
 import type { DesktopTaskPinnedDropPosition } from '@/workbenches/tasks/index/taskPinnedItems'
 import type { TaskProjectMenuAction } from '@/workbenches/tasks/index/useTaskIndexController'
 import {
+  ChevronDown16Regular,
+  ChevronRight16Regular,
   Delete20Regular,
   Edit20Regular,
   Folder20Regular,
@@ -120,7 +122,14 @@ function resolveDropPosition(event: DragEvent): DesktopTaskPinnedDropPosition {
       :aria-expanded="expanded"
       @click="emit('toggle')"
     >
-      <NIcon :component="expanded ? FolderOpen20Regular : Folder20Regular" />
+      <NIcon
+        class="desktop-task-project-row__chevron"
+        :component="expanded ? ChevronDown16Regular : ChevronRight16Regular"
+      />
+      <NIcon
+        class="desktop-task-project-row__folder"
+        :component="expanded ? FolderOpen20Regular : Folder20Regular"
+      />
       <DesktopOverflowingLabel :paused="dragging" :text="project.name" />
     </button>
     <div class="desktop-task-project-row__actions">
@@ -157,10 +166,10 @@ function resolveDropPosition(event: DragEvent): DesktopTaskPinnedDropPosition {
   min-width: 0;
   align-items: center;
   border-radius: var(--buddy-task-sidebar-state-radius);
+  transition: background-color var(--buddy-motion-state-duration) var(--buddy-motion-state-easing);
 
-  &:hover,
-  &:focus-within {
-    background: var(--buddy-fill-base);
+  &:hover {
+    background: var(--buddy-nav-hover);
   }
 
   &.is-reorderable {
@@ -178,7 +187,7 @@ function resolveDropPosition(event: DragEvent): DesktopTaskPinnedDropPosition {
     right: 0;
     left: 0;
     height: 2px;
-    background: var(--buddy-accent-primary);
+    background: var(--buddy-accent-solid);
     content: '';
     pointer-events: none;
   }
@@ -204,27 +213,37 @@ button {
   min-width: 0;
   flex: 1;
   align-items: center;
-  gap: 0.5rem;
-  color: var(--buddy-text-regular);
+  gap: 0.25rem;
+  color: var(--buddy-text-primary);
   font-size: var(--buddy-sidebar-project-font-size);
   font-weight: var(--buddy-sidebar-project-font-weight);
   line-height: 20px;
-  padding: 0.46rem 0.5rem;
+  padding: 0 0.375rem;
   text-align: left;
-
-  .n-icon {
-    flex: none;
-  }
 
   .desktop-overflow-label {
     flex: 1;
   }
 
   &:focus-visible {
-    border-radius: 6px;
-    outline: 2px solid var(--buddy-accent-primary);
-    outline-offset: -2px;
+    border-radius: var(--buddy-task-sidebar-state-radius);
+    outline: 1px solid var(--buddy-focus-ring);
+    outline-offset: -1px;
   }
+}
+
+.desktop-task-project-row__chevron,
+.desktop-task-project-row__folder {
+  flex: none;
+}
+
+.desktop-task-project-row__chevron {
+  font-size: 14px;
+}
+
+.desktop-task-project-row__folder {
+  font-size: 16px;
+  margin-right: 0.0625rem;
 }
 
 .desktop-task-project-row__actions {
@@ -251,23 +270,26 @@ button {
   place-items: center;
   border-radius: var(--buddy-icon-button-radius);
   color: var(--buddy-text-secondary);
+  transition:
+    background-color var(--buddy-motion-state-duration) var(--buddy-motion-state-easing),
+    color var(--buddy-motion-state-duration) var(--buddy-motion-state-easing);
 
   .n-icon {
     font-size: 16px;
   }
 
   &:hover {
-    background: var(--buddy-nav-active-bg);
-    color: var(--buddy-text-primary);
+    background: var(--buddy-nav-hover);
+    color: var(--buddy-text-strong);
   }
 
   &:focus-visible {
-    outline: 2px solid var(--buddy-accent-primary);
+    outline: 2px solid var(--buddy-focus-ring);
     outline-offset: -2px;
   }
 }
 
 .desktop-task-project-row__pin {
-  color: var(--buddy-text-placeholder);
+  color: var(--buddy-text-muted);
 }
 </style>

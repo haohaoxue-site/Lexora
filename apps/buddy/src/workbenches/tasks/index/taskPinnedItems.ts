@@ -83,7 +83,8 @@ export function resolveTaskIndexProjection(input: {
       }]
       if (!input.expandedProjectIds.has(project.id))
         return rows
-      return rows.concat((tasksByProject.get(project.id) ?? []).map(task => ({
+      const projectTasks = tasksByProject.get(project.id) ?? []
+      return rows.concat(projectTasks.map(task => ({
         task,
         key: `pinned:${pinKey}:conversation:${task.id}`,
         kind: 'task' as const,

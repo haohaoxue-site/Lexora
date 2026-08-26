@@ -39,7 +39,7 @@ defineSlots<{
   min-width: 0;
   min-height: 0;
   flex-direction: column;
-  background: var(--buddy-bg-surface);
+  background: var(--buddy-surface-base);
 }
 
 .desktop-settings-page__header {
@@ -49,7 +49,7 @@ defineSlots<{
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
-  border-bottom: 1px solid var(--buddy-border-light);
+  border-bottom: 1px solid var(--buddy-border-subtle);
   padding: 0 1.1rem;
 }
 

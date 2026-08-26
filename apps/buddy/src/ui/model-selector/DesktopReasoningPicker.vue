@@ -11,14 +11,13 @@ interface ReasoningOption {
 }
 
 const props = defineProps<{
-  canDisable: boolean
   language: BuddyLocale
   options: ReadonlyArray<ReasoningOption>
   selectedEffort: BuddyThinkingLevel | null
 }>()
 
 const emit = defineEmits<{
-  select: [value: BuddyThinkingLevel | null]
+  select: [value: BuddyThinkingLevel]
 }>()
 
 const { t } = useBuddyI18n(() => props.language)
@@ -28,41 +27,22 @@ const { t } = useBuddyI18n(() => props.language)
   <section class="desktop-reasoning-picker" role="menu">
     <span class="desktop-reasoning-picker__title">{{ t('desktop.chat.effort') }}</span>
     <div class="desktop-reasoning-picker__options">
-      <button
-        class="desktop-reasoning-picker__item"
-        type="button"
-        role="menuitemradio"
-        :aria-checked="selectedEffort === null"
-        @click="emit('select', null)"
-      >
-        <strong>{{ t('desktop.chat.defaultEffort') }}</strong>
-        <NIcon v-if="selectedEffort === null" :component="Checkmark16Regular" />
-      </button>
-      <span class="desktop-reasoning-picker__divider" />
-      <button
-        v-if="canDisable"
-        class="desktop-reasoning-picker__item"
-        type="button"
-        role="menuitemradio"
-        :aria-checked="selectedEffort === 'off'"
-        @click="emit('select', 'off')"
-      >
-        <strong>{{ t('desktop.chat.reasoningOff') }}</strong>
-        <NIcon v-if="selectedEffort === 'off'" :component="Checkmark16Regular" />
-      </button>
-      <span v-if="canDisable" class="desktop-reasoning-picker__divider" />
-      <button
-        v-for="option in options"
-        :key="option.value"
-        class="desktop-reasoning-picker__item"
-        type="button"
-        role="menuitemradio"
-        :aria-checked="selectedEffort === option.value"
-        @click="emit('select', option.value)"
-      >
-        <strong>{{ option.label }}</strong>
-        <NIcon v-if="selectedEffort === option.value" :component="Checkmark16Regular" />
-      </button>
+      <template v-for="(option, index) in options" :key="option.value">
+        <button
+          class="desktop-reasoning-picker__item"
+          type="button"
+          role="menuitemradio"
+          :aria-checked="selectedEffort === option.value"
+          @click="emit('select', option.value)"
+        >
+          <strong>{{ option.label }}</strong>
+          <NIcon v-if="selectedEffort === option.value" :component="Checkmark16Regular" />
+        </button>
+        <span
+          v-if="option.value === 'off' && index < options.length - 1"
+          class="desktop-reasoning-picker__divider"
+        />
+      </template>
     </div>
   </section>
 </template>
@@ -73,14 +53,14 @@ const { t } = useBuddyI18n(() => props.language)
   overflow: hidden;
   width: 13.5rem;
   max-height: min(24rem, 58vh);
-  border: 1px solid var(--buddy-border-light);
-  border-radius: var(--buddy-menu-radius);
-  background: color-mix(in srgb, var(--buddy-bg-surface-raised) 97%, transparent);
-  box-shadow: var(--buddy-shadow-menu);
+  border: 1px solid var(--buddy-border-subtle);
+  border-radius: var(--desktop-model-popover-radius, 3px);
+  background: var(--buddy-surface-raised);
+  box-shadow: var(--buddy-shadow-overlay);
 }
 
 .desktop-reasoning-picker__title {
-  color: var(--buddy-text-placeholder);
+  color: var(--buddy-text-muted);
   font-size: 0.7rem;
   line-height: 1.35;
   padding: 0.65rem 1.05rem 0.3rem;
@@ -98,7 +78,7 @@ const { t } = useBuddyI18n(() => props.language)
 .desktop-reasoning-picker__divider {
   height: 1px;
   margin: 0.25rem 0.15rem;
-  background: var(--buddy-border-light);
+  background: var(--buddy-border-subtle);
 }
 
 .desktop-reasoning-picker__item {
@@ -111,7 +91,7 @@ const { t } = useBuddyI18n(() => props.language)
   border: 0;
   border-radius: var(--buddy-menu-item-radius);
   background: transparent;
-  color: var(--buddy-text-primary);
+  color: var(--buddy-text-strong);
   cursor: pointer;
   font: inherit;
   padding: 0.4rem 0.55rem;
@@ -120,7 +100,7 @@ const { t } = useBuddyI18n(() => props.language)
 
 .desktop-reasoning-picker__item:hover,
 .desktop-reasoning-picker__item:focus-visible {
-  background: var(--buddy-fill-base);
+  background: var(--buddy-state-hover);
   outline: 0;
 }
 

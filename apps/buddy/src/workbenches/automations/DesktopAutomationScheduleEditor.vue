@@ -225,7 +225,7 @@ function updateActiveRange(value: string | [string, string] | null): void {
 .desktop-automation-schedule {
   display: grid;
   gap: 12px;
-  border-top: 1px solid var(--buddy-border-light);
+  border-top: 1px solid var(--buddy-border-subtle);
   padding-top: 20px;
 }
 
@@ -239,13 +239,13 @@ function updateActiveRange(value: string | [string, string] | null): void {
   }
 
   h2 {
-    color: var(--buddy-text-primary);
+    color: var(--buddy-text-strong);
     font-size: 14px;
     font-weight: 660;
   }
 
   p {
-    color: var(--buddy-text-placeholder);
+    color: var(--buddy-text-muted);
     font-size: 11px;
     line-height: 1.5;
   }
@@ -312,7 +312,7 @@ function updateActiveRange(value: string | [string, string] | null): void {
 .desktop-automation-schedule__active {
   display: grid;
   gap: 10px;
-  border-top: 1px solid var(--buddy-border-light);
+  border-top: 1px solid var(--buddy-border-subtle);
   margin-top: 6px;
   padding-top: 18px;
 }

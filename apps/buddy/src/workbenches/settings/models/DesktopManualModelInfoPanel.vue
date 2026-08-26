@@ -111,9 +111,9 @@ async function save() {
 <style scoped>
 .desktop-manual-model-info-panel {
   overflow: hidden;
-  border: 1px solid var(--buddy-border-light);
+  border: 1px solid var(--buddy-border-subtle);
   border-radius: 0.65rem;
-  background: var(--buddy-bg-surface);
+  background: var(--buddy-surface-base);
 }
 
 .desktop-manual-model-info-panel__header {
@@ -146,7 +146,7 @@ async function save() {
 .desktop-manual-model-info-panel__values,
 .desktop-manual-model-info-panel__form {
   display: grid;
-  border-top: 1px solid var(--buddy-border-light);
+  border-top: 1px solid var(--buddy-border-subtle);
   margin: 0;
 }
 
@@ -160,7 +160,7 @@ async function save() {
 
 .desktop-manual-model-info-panel__values > div + div,
 .desktop-manual-model-info-panel__checks {
-  border-top: 1px solid var(--buddy-border-light);
+  border-top: 1px solid var(--buddy-border-subtle);
 }
 
 .desktop-manual-model-info-panel__values dt,
@@ -172,7 +172,7 @@ async function save() {
 .desktop-manual-model-info-panel__values dd {
   overflow: hidden;
   margin: 0;
-  color: var(--buddy-text-primary);
+  color: var(--buddy-text-strong);
   font-size: 0.72rem;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -195,7 +195,7 @@ async function save() {
   display: flex;
   justify-content: flex-end;
   gap: 0.5rem;
-  border-top: 1px solid var(--buddy-border-light);
+  border-top: 1px solid var(--buddy-border-subtle);
   padding: 0.7rem 1rem;
 }
 </style>

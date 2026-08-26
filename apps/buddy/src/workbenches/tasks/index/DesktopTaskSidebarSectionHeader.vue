@@ -44,12 +44,20 @@ const emit = defineEmits<{
   min-width: 0;
   flex: none;
   align-items: center;
-  border-radius: var(--buddy-task-sidebar-state-radius, 8px);
+  border-radius: 4px;
   color: var(--buddy-text-secondary);
-  margin-right: var(--buddy-task-sidebar-scrollbar-gutter, 0);
+  margin: 0 var(--buddy-task-sidebar-scrollbar-gutter, 0.5rem);
+  transition:
+    background-color var(--buddy-motion-state-duration) var(--buddy-motion-state-easing),
+    color var(--buddy-motion-state-duration) var(--buddy-motion-state-easing);
 
   &:hover {
-    color: var(--buddy-text-primary);
+    background: var(--buddy-nav-hover);
+  }
+
+  &:hover,
+  &:focus-within {
+    color: var(--buddy-text-strong);
   }
 }
 
@@ -65,8 +73,8 @@ button {
   min-width: 0;
   flex: 1;
   align-items: center;
-  gap: 0.3rem;
-  padding: 0.35rem 0.5rem;
+  gap: 0.25rem;
+  padding: 0 0.375rem;
   text-align: left;
 
   .n-icon {
@@ -75,9 +83,8 @@ button {
   }
 
   &:focus-visible {
-    border-radius: 4px;
-    outline: 2px solid var(--buddy-accent-primary);
-    outline-offset: -2px;
+    outline: 1px solid var(--buddy-focus-ring);
+    outline-offset: -1px;
   }
 }
 
@@ -96,7 +103,7 @@ button {
   align-items: center;
   gap: var(--buddy-task-sidebar-action-gap, 0.125rem);
   opacity: 0;
-  padding-right: var(--buddy-task-sidebar-action-inset, 0.25rem);
+  padding-right: 0.125rem;
   pointer-events: none;
 }
 
@@ -119,12 +126,12 @@ button {
   }
 
   &:hover {
-    background: var(--buddy-nav-active-bg);
-    color: var(--buddy-text-primary);
+    background: var(--buddy-nav-hover);
+    color: var(--buddy-text-strong);
   }
 
   &:focus-visible {
-    outline: 2px solid var(--buddy-accent-primary);
+    outline: 2px solid var(--buddy-focus-ring);
     outline-offset: -2px;
   }
 }

@@ -302,11 +302,11 @@ async function removeProvider() {
 
 .desktop-provider-detail__model-row:hover,
 .desktop-provider-detail__model-row:focus-visible {
-  background: var(--buddy-nav-active-bg);
+  background: var(--buddy-state-selected);
 }
 
 .desktop-provider-detail__model-row:focus-visible {
-  outline: 2px solid var(--buddy-accent-primary);
+  outline: 2px solid var(--buddy-focus-ring);
   outline-offset: -2px;
 }
 
@@ -347,21 +347,21 @@ async function removeProvider() {
 
 .desktop-provider-detail__notice {
   justify-content: space-between;
-  border: 1px solid var(--buddy-border-base);
+  border: 1px solid var(--buddy-border-strong);
   border-radius: 0.65rem;
-  background: var(--buddy-fill-light);
+  background: var(--buddy-surface-subtle);
   padding: 0.8rem 0.9rem;
 }
 
 .desktop-provider-detail__group {
   overflow: hidden;
-  border: 1px solid var(--buddy-border-light);
+  border: 1px solid var(--buddy-border-subtle);
   border-radius: 0.65rem;
 }
 
 .desktop-provider-detail__row {
   min-height: 4rem;
-  border-bottom: 1px solid var(--buddy-border-light);
+  border-bottom: 1px solid var(--buddy-border-subtle);
   padding: 0.7rem 0.9rem;
 }
 
@@ -370,7 +370,7 @@ async function removeProvider() {
 }
 
 .desktop-provider-detail__warning {
-  color: var(--buddy-accent-warning);
+  color: var(--buddy-status-warning-text);
   font-size: 0.68rem;
 }
 

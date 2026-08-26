@@ -509,11 +509,19 @@ const connectorCredentialMutationSchema = z.discriminatedUnion('mode', [
   z.object({ mode: z.literal('replace'), value: connectorCredentialSchema }).strict(),
 ])
 
+const modelSelectionSchema = z.object({
+  modelId: idSchema,
+  providerId: idSchema,
+  reasoning: z.enum(BUDDY_THINKING_LEVELS).nullable(),
+  serviceTier: z.enum(BUDDY_SERVICE_TIERS).nullable(),
+}).strict()
+
 const conversationSchema = z.object({
   activeBranchId: z.string().nullable(),
   createdAt: timestampSchema,
   executionProfile: executionProfileSchema,
   id: idSchema,
+  modelSelection: modelSelectionSchema.nullable(),
   origin: z.enum(['interactive', 'automation']).optional(),
   projectId: z.string().nullable(),
   promotedAt: nullableTimestampSchema.optional(),
@@ -698,13 +706,6 @@ const contextItemSchema = z.object({
   value: z.string().min(1),
 }).strict()
 
-const modelSelectionSchema = z.object({
-  modelId: idSchema,
-  providerId: idSchema,
-  reasoning: z.enum(BUDDY_THINKING_LEVELS).nullable(),
-  serviceTier: z.enum(BUDDY_SERVICE_TIERS).nullable(),
-}).strict()
-
 const defaultModelSelectionSchema = z.object({
   modelId: idSchema,
   providerId: idSchema,
@@ -843,6 +844,10 @@ export const localChatSchemas = {
   conversationExecutionProfile: z.object({
     conversationId: idSchema,
     executionProfile: executionProfileSchema,
+  }).strict(),
+  conversationModelSelection: z.object({
+    conversationId: idSchema,
+    modelSelection: modelSelectionSchema,
   }).strict(),
   conversationTimeline: z.object({
     branchId: idSchema.optional(),

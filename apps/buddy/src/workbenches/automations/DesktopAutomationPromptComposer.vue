@@ -128,7 +128,7 @@ function modelKey(model: Pick<LocalRuntimeModelOption, 'modelId' | 'providerId'>
 <style scoped lang="scss">
 .desktop-automation-prompt-composer {
   :deep(.desktop-chat-composer) {
-    background: var(--buddy-bg-surface-raised);
+    background: var(--buddy-surface-raised);
   }
 }
 </style>

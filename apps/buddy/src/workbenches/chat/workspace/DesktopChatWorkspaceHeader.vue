@@ -121,8 +121,8 @@ watch(
   align-items: center;
   justify-content: space-between;
   gap: 0.85rem;
-  border-bottom: 1px solid var(--buddy-border-light);
-  background: var(--buddy-bg-surface);
+  border-bottom: 1px solid var(--buddy-border-subtle);
+  background: var(--buddy-surface-base);
   padding: 0 0.9rem 0 1.1rem;
 }
 
@@ -173,7 +173,7 @@ watch(
   border: 0;
   border-radius: var(--buddy-icon-button-radius);
   background: transparent;
-  color: var(--buddy-text-regular);
+  color: var(--buddy-text-primary);
   cursor: pointer;
 
   .n-icon {
@@ -181,12 +181,12 @@ watch(
   }
 
   &:hover:not(:disabled) {
-    background: var(--buddy-fill-base);
-    color: var(--buddy-text-primary);
+    background: var(--buddy-state-hover);
+    color: var(--buddy-text-strong);
   }
 
   &:focus-visible {
-    outline: 2px solid var(--buddy-accent-primary);
+    outline: 2px solid var(--buddy-focus-ring);
     outline-offset: -2px;
   }
 

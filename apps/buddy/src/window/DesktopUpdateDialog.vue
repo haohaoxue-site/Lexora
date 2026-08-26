@@ -62,7 +62,7 @@ const { t } = useBuddyI18n(() => props.language)
 <style scoped>
 .desktop-update-dialog__status {
   margin: 0 0 1rem;
-  color: var(--buddy-text-regular);
+  color: var(--buddy-text-primary);
   font-size: 0.86rem;
 }
 
@@ -86,7 +86,7 @@ const { t } = useBuddyI18n(() => props.language)
 
 .desktop-update-dialog__versions dd {
   margin: 0;
-  color: var(--buddy-text-regular);
+  color: var(--buddy-text-primary);
   font-family: var(--buddy-font-mono);
   font-size: 0.76rem;
 }

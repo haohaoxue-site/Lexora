@@ -4,6 +4,7 @@ import { BUDDY_V3_AUTOMATION_SCHEMA_SQL } from './migrations/v3Automation'
 import { BUDDY_V4_AUTOMATION_PROFILE_SCHEMA_SQL } from './migrations/v4AutomationProfile'
 import { BUDDY_V5_AUTOMATION_HISTORY_SCHEMA_SQL } from './migrations/v5AutomationHistory'
 import { BUDDY_V6_CONTROLLED_EXECUTION_SCHEMA_SQL } from './migrations/v6ControlledExecution'
+import { BUDDY_V7_CONVERSATION_MODEL_SCHEMA_SQL } from './migrations/v7ConversationModel'
 
 export interface BuddySchemaMigration {
   disableForeignKeys?: boolean
@@ -11,7 +12,7 @@ export interface BuddySchemaMigration {
   version: number
 }
 
-export const BUDDY_SCHEMA_VERSION = 6 as const
+export const BUDDY_SCHEMA_VERSION = 7 as const
 
 export const BUDDY_SCHEMA_MIGRATIONS: readonly BuddySchemaMigration[] = [
   { sql: BUDDY_V1_INITIAL_SCHEMA_SQL, version: 1 },
@@ -24,4 +25,5 @@ export const BUDDY_SCHEMA_MIGRATIONS: readonly BuddySchemaMigration[] = [
     sql: BUDDY_V6_CONTROLLED_EXECUTION_SCHEMA_SQL,
     version: 6,
   },
+  { sql: BUDDY_V7_CONVERSATION_MODEL_SCHEMA_SQL, version: 7 },
 ]

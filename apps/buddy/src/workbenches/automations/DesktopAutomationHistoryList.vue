@@ -271,7 +271,7 @@ function confirmDelete(): void {
   border: 0;
   border-radius: var(--buddy-radius-micro);
   background: transparent;
-  color: var(--buddy-text-placeholder);
+  color: var(--buddy-text-muted);
   cursor: pointer;
   font: inherit;
   font-size: 12px;
@@ -284,7 +284,7 @@ function confirmDelete(): void {
   }
 
   &:focus-visible {
-    outline: 2px solid var(--buddy-accent-primary);
+    outline: 2px solid var(--buddy-focus-ring);
     outline-offset: -2px;
   }
 
@@ -312,7 +312,7 @@ function confirmDelete(): void {
 
   &:hover,
   &:focus-within {
-    background: var(--buddy-fill-light);
+    background: var(--buddy-surface-subtle);
   }
 }
 
@@ -333,7 +333,7 @@ function confirmDelete(): void {
 
   &:focus-visible {
     border-radius: var(--n-border-radius, 3px);
-    outline: 2px solid var(--buddy-accent-primary);
+    outline: 2px solid var(--buddy-focus-ring);
     outline-offset: -2px;
   }
 }
@@ -346,7 +346,7 @@ function confirmDelete(): void {
 
   strong {
     overflow: hidden;
-    color: var(--buddy-text-primary);
+    color: var(--buddy-text-strong);
     font-size: 14px;
     font-weight: 650;
     text-overflow: ellipsis;
@@ -362,7 +362,7 @@ function confirmDelete(): void {
 
 .desktop-automation-history-item__trailing time,
 .desktop-automation-history-item__result-icon {
-  color: var(--buddy-text-placeholder);
+  color: var(--buddy-text-muted);
 }
 
 .desktop-automation-history-item__trailing {
@@ -407,15 +407,15 @@ function confirmDelete(): void {
   }
 
   &.is-approval {
-    color: var(--buddy-accent-warning);
+    color: var(--buddy-status-warning-text);
   }
 
   &.is-completed {
-    color: var(--buddy-accent-success);
+    color: var(--buddy-status-success-text);
   }
 
   &.is-failed {
-    color: var(--buddy-accent-danger);
+    color: var(--buddy-status-danger-text);
   }
 }
 
@@ -439,7 +439,7 @@ function confirmDelete(): void {
   }
 
   strong {
-    color: var(--buddy-text-primary);
+    color: var(--buddy-text-strong);
     font-size: 16px;
   }
 

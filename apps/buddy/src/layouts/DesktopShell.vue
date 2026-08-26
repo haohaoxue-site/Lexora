@@ -80,7 +80,7 @@ async function openNotification(notification: LocalNotification) {
   min-width: 0;
   min-height: 0;
   flex-direction: column;
-  background: var(--buddy-bg-body);
+  background: var(--buddy-surface-canvas);
 }
 
 .desktop-shell__body,
@@ -92,7 +92,7 @@ async function openNotification(notification: LocalNotification) {
 }
 
 .desktop-shell__workbench {
-  background: var(--buddy-bg-surface);
+  background: var(--buddy-surface-base);
 }
 
 .desktop-app-sidebar-enter-active,

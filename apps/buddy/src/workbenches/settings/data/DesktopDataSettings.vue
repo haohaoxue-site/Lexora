@@ -131,9 +131,9 @@ function formatNumber(value: number) {
 
 .desktop-data-settings__group {
   overflow: hidden;
-  border: 1px solid var(--buddy-border-light);
+  border: 1px solid var(--buddy-border-subtle);
   border-radius: 0.65rem;
-  background: var(--buddy-bg-surface);
+  background: var(--buddy-surface-base);
 }
 
 .desktop-data-settings__row {
@@ -142,7 +142,7 @@ function formatNumber(value: number) {
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
-  border-bottom: 1px solid var(--buddy-border-light);
+  border-bottom: 1px solid var(--buddy-border-subtle);
   padding: 0.75rem 0.9rem;
 
   &:last-child {
@@ -172,7 +172,7 @@ function formatNumber(value: number) {
   > div {
     display: grid;
     gap: 0.25rem;
-    border-right: 1px solid var(--buddy-border-light);
+    border-right: 1px solid var(--buddy-border-subtle);
     padding: 0.9rem;
 
     &:last-child {

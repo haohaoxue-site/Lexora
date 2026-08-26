@@ -178,9 +178,9 @@ async function keepCustomParameters() {
 <style scoped>
 .desktop-model-parameters-panel {
   overflow: hidden;
-  border: 1px solid var(--buddy-border-light);
+  border: 1px solid var(--buddy-border-subtle);
   border-radius: 0.65rem;
-  background: var(--buddy-bg-surface);
+  background: var(--buddy-surface-base);
 }
 
 .desktop-model-parameters-panel__header,
@@ -242,7 +242,7 @@ async function keepCustomParameters() {
 .desktop-model-parameters-panel__form {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  border-top: 1px solid var(--buddy-border-light);
+  border-top: 1px solid var(--buddy-border-subtle);
   margin: 0;
 }
 
@@ -256,7 +256,7 @@ async function keepCustomParameters() {
 
 .desktop-model-parameters-panel__metrics > div + div,
 .desktop-model-parameters-panel__form > label + label {
-  border-left: 1px solid var(--buddy-border-light);
+  border-left: 1px solid var(--buddy-border-subtle);
 }
 
 .desktop-model-parameters-panel__metrics dt,
@@ -267,7 +267,7 @@ async function keepCustomParameters() {
 
 .desktop-model-parameters-panel__metrics dd {
   margin: 0;
-  color: var(--buddy-text-primary);
+  color: var(--buddy-text-strong);
   font-size: 0.9rem;
   font-variant-numeric: tabular-nums;
   font-weight: 620;
@@ -282,13 +282,13 @@ async function keepCustomParameters() {
   grid-column: 1 / -1;
   justify-content: flex-end;
   gap: 0.5rem;
-  border-top: 1px solid var(--buddy-border-light);
+  border-top: 1px solid var(--buddy-border-subtle);
   padding: 0.7rem 1rem;
 }
 
 .desktop-model-parameters-panel__defaults {
-  border-top: 1px solid var(--buddy-border-light);
-  background: var(--buddy-fill-light);
+  border-top: 1px solid var(--buddy-border-subtle);
+  background: var(--buddy-surface-subtle);
   padding: 0.65rem 1rem;
 }
 
@@ -307,7 +307,7 @@ async function keepCustomParameters() {
 
   .desktop-model-parameters-panel__metrics > div + div,
   .desktop-model-parameters-panel__form > label + label {
-    border-top: 1px solid var(--buddy-border-light);
+    border-top: 1px solid var(--buddy-border-subtle);
     border-left: 0;
   }
 }

@@ -24,9 +24,9 @@ withDefaults(defineProps<{
   place-items: center;
   overflow: hidden;
   border-radius: 50%;
-  background: var(--buddy-user-avatar-background);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--buddy-user-avatar-background) 72%, var(--buddy-border-base));
-  color: var(--buddy-user-avatar-foreground);
+  background: var(--buddy-avatar-background);
+  box-shadow: inset 0 0 0 1px var(--buddy-border-strong);
+  color: var(--buddy-avatar-foreground);
 }
 
 .desktop-account-avatar.is-small {

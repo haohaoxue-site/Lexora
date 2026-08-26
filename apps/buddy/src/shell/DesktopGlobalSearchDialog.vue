@@ -169,7 +169,7 @@ function taskContext(conversation: LocalConversation) {
     height: 3rem;
     place-items: center;
     border-radius: 0.75rem;
-    background: var(--buddy-fill-light);
+    background: var(--buddy-surface-subtle);
     color: var(--buddy-text-secondary);
     font-size: 1.4rem;
   }
@@ -235,7 +235,7 @@ function taskContext(conversation: LocalConversation) {
   }
 
   strong {
-    color: var(--buddy-text-primary);
+    color: var(--buddy-text-strong);
     font-size: 0.84rem;
     font-weight: 500;
   }
@@ -246,11 +246,11 @@ function taskContext(conversation: LocalConversation) {
   }
 
   &:hover {
-    background: var(--buddy-nav-active-bg);
+    background: var(--buddy-state-selected);
   }
 
   &:focus-visible {
-    outline: 2px solid var(--buddy-accent-primary);
+    outline: 2px solid var(--buddy-focus-ring);
     outline-offset: -2px;
   }
 }

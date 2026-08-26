@@ -173,9 +173,9 @@ async function updateWelcomePreference(preference: DesktopChatWelcomePreference)
 
 .desktop-general-settings__group {
   overflow: hidden;
-  border: 1px solid var(--buddy-border-light);
+  border: 1px solid var(--buddy-border-subtle);
   border-radius: 0.65rem;
-  background: var(--buddy-bg-surface);
+  background: var(--buddy-surface-base);
 }
 
 .desktop-settings-row {
@@ -184,7 +184,7 @@ async function updateWelcomePreference(preference: DesktopChatWelcomePreference)
   grid-template-columns: minmax(9rem, 1fr) minmax(13rem, 19rem);
   align-items: center;
   gap: 2rem;
-  border-bottom: 1px solid var(--buddy-border-light);
+  border-bottom: 1px solid var(--buddy-border-subtle);
   padding: 0.75rem 0.9rem;
 }
 
@@ -198,7 +198,7 @@ async function updateWelcomePreference(preference: DesktopChatWelcomePreference)
 }
 
 .desktop-settings-row strong {
-  color: var(--buddy-text-regular);
+  color: var(--buddy-text-primary);
   font-size: 0.8rem;
   font-weight: 600;
 }
@@ -223,7 +223,7 @@ async function updateWelcomePreference(preference: DesktopChatWelcomePreference)
 
 .desktop-settings-row__control .is-error {
   grid-column: 1 / -1;
-  color: var(--buddy-accent-danger);
+  color: var(--buddy-status-danger-text);
   text-align: right;
 }
 

@@ -184,7 +184,7 @@ function statusType(status: LocalRuntimeDataBackup['status']) {
   display: grid;
   gap: 0.75rem;
   padding-top: 1rem;
-  border-top: 1px solid var(--buddy-border-light);
+  border-top: 1px solid var(--buddy-border-subtle);
 }
 
 .desktop-runtime-backups__title {
@@ -206,9 +206,9 @@ function statusType(status: LocalRuntimeDataBackup['status']) {
   justify-content: space-between;
   gap: 1rem;
   padding: 0.8rem;
-  border: 1px solid var(--buddy-border-light);
+  border: 1px solid var(--buddy-border-subtle);
   border-radius: 0.75rem;
-  background: var(--buddy-fill-base);
+  background: var(--buddy-surface-subtle);
 }
 
 .desktop-runtime-backups__summary {
@@ -218,7 +218,7 @@ function statusType(status: LocalRuntimeDataBackup['status']) {
 
   code,
   small {
-    color: var(--buddy-text-tertiary);
+    color: var(--buddy-text-muted);
     font-size: 0.72rem;
   }
 
@@ -247,7 +247,7 @@ function statusType(status: LocalRuntimeDataBackup['status']) {
 }
 
 .desktop-runtime-backups__capacity--insufficient {
-  color: var(--buddy-accent-danger);
+  color: var(--buddy-status-danger-text);
 }
 
 .desktop-runtime-backups__confirmation {

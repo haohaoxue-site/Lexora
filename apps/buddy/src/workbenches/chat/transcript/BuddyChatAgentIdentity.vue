@@ -40,7 +40,7 @@ const { t } = useBuddyI18n(() => props.language)
 
   span {
     min-width: 0;
-    color: var(--buddy-text-primary);
+    color: var(--buddy-text-strong);
     font-size: 13px;
   }
 }

@@ -68,12 +68,12 @@ watch(() => props.show, (show) => {
   justify-content: space-between;
   gap: 1rem;
   margin-bottom: 0.9rem;
-  border-bottom: 1px solid var(--buddy-border-light);
+  border-bottom: 1px solid var(--buddy-border-subtle);
   padding-bottom: 0.55rem;
 }
 
 .desktop-feedback-dialog__channels > span {
-  color: var(--buddy-text-primary);
+  color: var(--buddy-text-strong);
   font-size: 0.78rem;
   font-weight: 600;
 }

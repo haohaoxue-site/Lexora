@@ -476,9 +476,9 @@ function toScrollMetrics(viewport: HTMLElement): ChatMessageScrollMetrics {
   z-index: 2;
   top: 0.45rem;
   left: 50%;
-  border: 1px solid var(--buddy-border-light);
+  border: 1px solid var(--buddy-border-subtle);
   border-radius: var(--buddy-radius-micro);
-  background: var(--buddy-bg-surface-raised);
+  background: var(--buddy-surface-raised);
   color: var(--buddy-text-secondary);
   font-size: 0.68rem;
   padding: 0.25rem 0.6rem;
@@ -507,7 +507,7 @@ function toScrollMetrics(viewport: HTMLElement): ChatMessageScrollMetrics {
 .buddy-chat-day-divider {
   display: flex;
   justify-content: center;
-  color: var(--buddy-text-placeholder);
+  color: var(--buddy-text-muted);
   font-size: 0.75rem;
   font-variant-numeric: tabular-nums;
   line-height: 1.25rem;
@@ -531,7 +531,7 @@ function toScrollMetrics(viewport: HTMLElement): ChatMessageScrollMetrics {
 
 .buddy-chat-streaming__content {
   max-width: 100%;
-  color: var(--buddy-text-regular);
+  color: var(--buddy-text-primary);
   line-height: 1.7;
   padding: 0.05rem 0;
   overflow-wrap: anywhere;
@@ -559,21 +559,21 @@ function toScrollMetrics(viewport: HTMLElement): ChatMessageScrollMetrics {
   &::after {
     width: min(4rem, 10vw);
     height: 1px;
-    background: var(--buddy-border-light);
+    background: var(--buddy-border-subtle);
     content: '';
   }
 
   small {
-    color: var(--buddy-text-tertiary);
+    color: var(--buddy-text-muted);
     font-size: 0.65rem;
   }
 
   &.is-warning {
-    color: var(--buddy-accent-warning);
+    color: var(--buddy-status-warning-text);
 
     &::before,
     &::after {
-      background: color-mix(in srgb, var(--buddy-accent-warning) 42%, var(--buddy-border-light));
+      background: var(--buddy-status-warning-border);
     }
   }
 }

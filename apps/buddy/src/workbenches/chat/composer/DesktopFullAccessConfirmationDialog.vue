@@ -74,7 +74,7 @@ function confirm() {
 
 .desktop-full-access-confirmation__acknowledgement {
   margin-top: 1rem;
-  color: var(--buddy-text-regular);
+  color: var(--buddy-text-primary);
   font-size: 0.84rem;
 }
 

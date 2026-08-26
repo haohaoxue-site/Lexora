@@ -1,8 +1,16 @@
 import type { DatabaseSync } from 'node:sqlite'
 import type { BuddyExecutionProfile } from '../../../shared/executionProfile'
+import type { BuddyServiceTier, BuddyThinkingLevel } from '../../../shared/modelSelection'
 import { withTransaction } from './database'
 
 export type MessageRole = 'user' | 'assistant' | 'tool'
+
+export interface ConversationModelSelection {
+  modelId: string
+  providerId: string
+  reasoning: BuddyThinkingLevel | null
+  serviceTier: BuddyServiceTier | null
+}
 
 export interface ConversationRecord {
   id: string
@@ -11,6 +19,7 @@ export interface ConversationRecord {
   activeBranchId: string | null
   createdAt: string
   executionProfile: BuddyExecutionProfile
+  modelSelection: ConversationModelSelection | null
   origin: 'automation' | 'interactive'
   promotedAt: string | null
   updatedAt: string
@@ -140,6 +149,12 @@ export interface SetConversationExecutionProfileInput {
   updatedAt: string
 }
 
+export interface SetConversationModelSelectionInput {
+  id: string
+  modelSelection: ConversationModelSelection
+  updatedAt: string
+}
+
 export interface ConversationRepository {
   activateBranch: (input: ActivateConversationBranchInput) => ConversationRecord
   create: (input: CreateConversationInput) => ConversationRecord
@@ -171,6 +186,9 @@ export interface ConversationRepository {
   setExecutionProfile: (
     input: SetConversationExecutionProfileInput,
   ) => ConversationRecord | null
+  setModelSelection: (
+    input: SetConversationModelSelectionInput,
+  ) => ConversationRecord | null
 }
 
 interface ConversationRow {
@@ -180,6 +198,7 @@ interface ConversationRow {
   active_branch_id: string | null
   created_at: string
   execution_profile: BuddyExecutionProfile
+  model_selection_json: string | null
   origin: ConversationRecord['origin']
   promoted_at: string | null
   updated_at: string
@@ -333,6 +352,15 @@ export function createConversationRepository(database: DatabaseSync): Conversati
         SELECT 1 FROM runs
         WHERE conversation_id = conversations.id AND status IN ('queued', 'running')
       )
+      AND NOT EXISTS (
+        SELECT 1 FROM conversation_deletions
+        WHERE conversation_id = conversations.id
+      )
+  `)
+  const setModelSelection = database.prepare(`
+    UPDATE conversations
+    SET model_selection_json = ?, updated_at = ?
+    WHERE id = ?
       AND NOT EXISTS (
         SELECT 1 FROM conversation_deletions
         WHERE conversation_id = conversations.id
@@ -789,6 +817,16 @@ export function createConversationRepository(database: DatabaseSync): Conversati
         return toConversation(requireRow<ConversationRow>(findConversation.get(input.id), input.id))
       })
     },
+    setModelSelection(input) {
+      if (Number(setModelSelection.run(
+        JSON.stringify(input.modelSelection),
+        input.updatedAt,
+        input.id,
+      ).changes) !== 1) {
+        return null
+      }
+      return toConversation(requireRow<ConversationRow>(findConversation.get(input.id), input.id))
+    },
   }
 }
 
@@ -815,6 +853,9 @@ function toConversation(row: ConversationRow): ConversationRecord {
     activeBranchId: row.active_branch_id,
     createdAt: row.created_at,
     executionProfile: row.execution_profile,
+    modelSelection: row.model_selection_json
+      ? JSON.parse(row.model_selection_json) as ConversationModelSelection
+      : null,
     origin: row.origin,
     promotedAt: row.promoted_at,
     updatedAt: row.updated_at,

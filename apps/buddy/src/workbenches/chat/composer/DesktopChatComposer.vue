@@ -243,9 +243,9 @@ const {
   display: grid;
   max-height: 15rem;
   overflow-y: auto;
-  border: 1px solid var(--buddy-border-light);
+  border: 1px solid var(--buddy-border-subtle);
   border-radius: 0.75rem;
-  background: var(--buddy-bg-surface-raised);
+  background: var(--buddy-surface-raised);
   box-shadow: var(--buddy-shadow-raised);
   padding: 0.35rem;
 }
@@ -258,14 +258,14 @@ const {
   border: 0;
   border-radius: 0.5rem;
   background: transparent;
-  color: var(--buddy-text-primary);
+  color: var(--buddy-text-strong);
   cursor: pointer;
   padding: 0.5rem;
   text-align: left;
 
   &.is-active,
   &:hover {
-    background: var(--buddy-fill-base);
+    background: var(--buddy-state-hover);
   }
 
   > span:last-child {
@@ -295,13 +295,13 @@ const {
   height: 1.55rem;
   place-items: center;
   border-radius: var(--buddy-radius-micro);
-  background: color-mix(in srgb, var(--buddy-accent-primary) 12%, transparent);
-  color: var(--buddy-accent-primary);
+  background: var(--buddy-accent-surface);
+  color: var(--buddy-accent-on-surface);
   font-weight: 750;
 }
 
 .desktop-chat-composer__suggestion-empty {
-  color: var(--buddy-text-placeholder);
+  color: var(--buddy-text-muted);
   font-size: 0.75rem;
   padding: 0.7rem;
 }
@@ -319,9 +319,9 @@ const {
     grid-template-columns: 1.8rem minmax(0, 1fr) auto;
     align-items: center;
     gap: 0.4rem;
-    border: 1px solid var(--buddy-border-light);
+    border: 1px solid var(--buddy-border-subtle);
     border-radius: 0.65rem;
-    background: var(--buddy-bg-surface-raised);
+    background: var(--buddy-surface-raised);
     color: var(--buddy-text-secondary);
     font-size: 0.75rem;
     padding: 0.3rem;
@@ -345,15 +345,15 @@ const {
 .desktop-chat-composer__file-kind {
   display: grid;
   place-items: center;
-  background: var(--buddy-fill-base);
-  color: var(--buddy-accent-primary);
+  background: var(--buddy-accent-surface);
+  color: var(--buddy-accent-on-surface);
   font-size: 0.55rem;
   font-weight: 700;
 }
 
 .desktop-chat-composer__disclaimer {
   margin: 0.45rem 0 0;
-  color: var(--buddy-text-placeholder);
+  color: var(--buddy-text-muted);
   font-size: 0.68rem;
   text-align: center;
 }

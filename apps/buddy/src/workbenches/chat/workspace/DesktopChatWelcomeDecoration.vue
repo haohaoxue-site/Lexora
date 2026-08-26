@@ -46,7 +46,7 @@ defineProps<{
 .desktop-chat-welcome-decoration {
   display: block;
   overflow: visible;
-  color: color-mix(in srgb, var(--buddy-accent-warning) 82%, #d9a13b);
+  color: var(--buddy-brand-gold);
   pointer-events: none;
 }
 

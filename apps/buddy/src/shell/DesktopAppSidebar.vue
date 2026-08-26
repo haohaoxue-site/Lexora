@@ -159,12 +159,15 @@ function openProject(projectId: string) {
               :show="notificationUnseenCount > 0"
               :value="notificationUnseenCount"
               :max="99"
-              :offset="[-4, 5]"
+              :offset="[-3, 3]"
+              type="info"
             >
               <NButton
                 class="buddy-icon-button desktop-app-sidebar__notification-trigger"
+                :class="{ 'is-open': showNotifications }"
                 quaternary
                 :aria-label="t('desktop.notifications.open')"
+                :aria-expanded="showNotifications"
               >
                 <template #icon>
                   <NIcon :component="Alert20Regular" />
@@ -209,8 +212,8 @@ function openProject(projectId: string) {
   flex: none;
   flex-direction: column;
   overflow: hidden;
-  border-right: 1px solid var(--buddy-border-light);
-  background: var(--buddy-bg-app-sidebar);
+  border-right: 1px solid var(--buddy-border-subtle);
+  background: var(--buddy-surface-app-sidebar);
 }
 
 .desktop-app-sidebar__header {
@@ -220,7 +223,7 @@ function openProject(projectId: string) {
   align-items: center;
   justify-content: space-between;
   gap: 0.65rem;
-  border-bottom: 1px solid var(--buddy-border-light);
+  border-bottom: 1px solid var(--buddy-border-subtle);
   padding: 0 0.75rem 0 0.9rem;
 }
 
@@ -237,14 +240,14 @@ function openProject(projectId: string) {
   }
 
   strong {
-    color: var(--buddy-text-primary);
+    color: var(--buddy-text-strong);
     font-size: var(--buddy-sidebar-header-font-size);
     font-weight: var(--buddy-sidebar-header-font-weight);
   }
 
   span {
     min-height: 1em;
-    color: var(--buddy-text-placeholder);
+    color: var(--buddy-text-muted);
     font-size: 0.66rem;
   }
 }
@@ -274,33 +277,49 @@ function openProject(projectId: string) {
   border: 0;
   border-radius: 0.5rem;
   background: transparent;
-  color: var(--buddy-text-regular);
+  color: var(--buddy-text-primary);
   cursor: pointer;
   font-size: var(--buddy-sidebar-item-font-size);
-  font-weight: var(--buddy-sidebar-section-font-weight);
+  font-weight: var(--buddy-sidebar-item-font-weight);
   padding: 0.55rem 0.7rem;
   text-align: left;
+  transition:
+    background-color var(--buddy-motion-state-duration) var(--buddy-motion-state-easing),
+    color var(--buddy-motion-state-duration) var(--buddy-motion-state-easing);
 
   &:hover {
-    background: var(--buddy-nav-active-bg);
-    color: var(--buddy-text-primary);
+    background: var(--buddy-nav-hover);
+    color: var(--buddy-text-strong);
+  }
+
+  &:active {
+    background: var(--buddy-nav-selected);
   }
 
   &:focus-visible {
-    outline: 2px solid var(--buddy-accent-primary);
+    outline: 2px solid var(--buddy-focus-ring);
     outline-offset: -2px;
   }
 
   &.is-active {
-    background: var(--buddy-nav-active-bg);
-    color: var(--buddy-text-primary);
+    background: var(--buddy-nav-hover);
+    color: var(--buddy-nav-foreground);
+    font-weight: var(--buddy-sidebar-item-active-font-weight);
+  }
+
+  &.is-active:hover {
+    background: var(--buddy-nav-selected);
+  }
+
+  &.is-active:active {
+    background: var(--buddy-nav-pressed);
   }
 }
 
 .desktop-app-sidebar__footer {
   display: grid;
   gap: 0.65rem;
-  border-top: 1px solid var(--buddy-border-light);
+  border-top: 1px solid var(--buddy-border-subtle);
   padding: 0.75rem;
 }
 
@@ -327,19 +346,20 @@ function openProject(projectId: string) {
   cursor: pointer;
   padding: 4px 8px;
   text-align: left;
+  transition: background-color var(--buddy-motion-state-duration) var(--buddy-motion-state-easing);
 
   &:hover {
-    background: var(--buddy-nav-active-bg);
+    background: var(--buddy-nav-hover);
   }
 
   &:focus-visible {
-    outline: 2px solid var(--buddy-accent-primary);
+    outline: 2px solid var(--buddy-focus-ring);
     outline-offset: -2px;
   }
 
   strong {
     overflow: hidden;
-    color: var(--buddy-text-regular);
+    color: var(--buddy-text-primary);
     font-size: var(--buddy-sidebar-account-font-size);
     font-weight: var(--buddy-sidebar-account-font-weight);
     text-overflow: ellipsis;
@@ -348,15 +368,39 @@ function openProject(projectId: string) {
 }
 
 .desktop-app-sidebar :deep(.buddy-icon-button.n-button:hover) {
-  background: var(--buddy-nav-active-bg);
+  background: var(--buddy-nav-hover);
 }
 
-.desktop-app-sidebar__notification-trigger {
-  color: var(--buddy-text-regular);
+.desktop-app-sidebar :deep(.desktop-app-sidebar__notification-trigger.n-button) {
+  border: 1px solid var(--buddy-border-subtle);
+  background: transparent;
+  color: var(--buddy-text-primary);
+  transition:
+    background-color var(--buddy-motion-state-duration) var(--buddy-motion-state-easing),
+    border-color var(--buddy-motion-state-duration) var(--buddy-motion-state-easing),
+    color var(--buddy-motion-state-duration) var(--buddy-motion-state-easing);
+}
+
+.desktop-app-sidebar :deep(.desktop-app-sidebar__notification-trigger.n-button:hover) {
+  border-color: var(--buddy-border-strong);
+  color: var(--buddy-text-strong);
+}
+
+.desktop-app-sidebar :deep(.desktop-app-sidebar__notification-trigger.n-button.is-open) {
+  border-color: var(--buddy-accent-border);
+  background: var(--buddy-accent-surface-subtle);
+  color: var(--buddy-nav-foreground);
+}
+
+.desktop-app-sidebar :deep(.n-badge-sup) {
+  min-width: 18px;
+  padding: 0 5px;
+  font-size: 11px;
+  font-weight: 500;
 }
 
 :global(.desktop-notification-popover.n-popover) {
-  border: 1px solid var(--buddy-border-light);
+  border: 1px solid var(--buddy-border-subtle);
   border-radius: 8px;
   box-shadow: var(--buddy-shadow-raised);
 }

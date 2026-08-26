@@ -231,8 +231,9 @@ function dismissBlocker() {
   display: flex;
   min-width: 0;
   min-height: 0;
+  flex: 1;
   flex-direction: column;
-  background: var(--buddy-bg-surface);
+  background: var(--buddy-surface-base);
 }
 
 .desktop-chat-page__content {
@@ -246,16 +247,16 @@ function dismissBlocker() {
 
 .desktop-chat-page.is-empty {
   display: grid;
-  grid-template-rows: minmax(1.5rem, 1fr) auto auto minmax(1.5rem, 1.35fr);
+  grid-template-rows: auto auto;
+  align-content: center;
+  padding-block: 1.5rem;
 
   .desktop-chat-page__content {
-    grid-row: 2;
     flex: none;
     overflow: visible;
   }
 
   .desktop-chat-page__composer-dock {
-    grid-row: 3;
     padding-top: 3rem;
     padding-bottom: 0;
   }
@@ -276,7 +277,7 @@ function dismissBlocker() {
 
 .desktop-chat-page__composer-dock {
   flex: none;
-  background: var(--buddy-bg-surface);
+  background: var(--buddy-surface-base);
   padding: 0 var(--buddy-chat-inline-gutter) 1rem;
 }
 
@@ -292,23 +293,23 @@ function dismissBlocker() {
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   gap: 0.7rem;
-  border: 1px solid color-mix(in srgb, var(--buddy-accent-warning) 34%, var(--buddy-border-light));
+  border: 1px solid var(--buddy-status-warning-border);
   border-radius: 0.65rem;
-  background: color-mix(in srgb, var(--buddy-accent-warning) 8%, var(--buddy-bg-surface));
-  color: var(--buddy-text-regular);
+  background: var(--buddy-status-warning-surface);
+  color: var(--buddy-text-primary);
   padding: 0.65rem 0.75rem;
 
   > .n-icon {
-    color: var(--buddy-accent-warning);
+    color: var(--buddy-status-warning-text);
     font-size: 1.1rem;
   }
 
   &.is-runtime {
-    border-color: color-mix(in srgb, var(--buddy-accent-danger) 35%, var(--buddy-border-light));
-    background: color-mix(in srgb, var(--buddy-accent-danger) 7%, var(--buddy-bg-surface));
+    border-color: var(--buddy-status-danger-border);
+    background: var(--buddy-status-danger-surface);
 
     > .n-icon {
-      color: var(--buddy-accent-danger);
+      color: var(--buddy-status-danger-text);
     }
   }
 
@@ -353,7 +354,7 @@ function dismissBlocker() {
     width: 0.45rem;
     height: 0.45rem;
     border-radius: 50%;
-    background: var(--buddy-accent-warning);
+    background: var(--buddy-status-warning-solid);
     animation: desktop-runtime-pulse 1.2s ease-in-out infinite;
   }
 }

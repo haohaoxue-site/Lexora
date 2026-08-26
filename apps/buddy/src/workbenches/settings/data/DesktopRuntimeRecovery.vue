@@ -260,9 +260,9 @@ function formatBytes(value: number): string {
   display: grid;
   gap: 1rem;
   padding: 1.25rem;
-  border: 1px solid var(--buddy-border-light);
+  border: 1px solid var(--buddy-border-subtle);
   border-radius: 1rem;
-  background: var(--buddy-bg-surface-raised);
+  background: var(--buddy-surface-raised);
 }
 
 .desktop-runtime-recovery__header {
@@ -276,9 +276,9 @@ function formatBytes(value: number): string {
   display: grid;
   gap: 0.55rem;
   padding: 0.8rem;
-  border: 1px solid var(--buddy-border-light);
+  border: 1px solid var(--buddy-border-subtle);
   border-radius: 0.75rem;
-  background: var(--buddy-fill-base);
+  background: var(--buddy-surface-subtle);
 }
 
 .desktop-runtime-recovery__operation-heading {
@@ -317,13 +317,13 @@ function formatBytes(value: number): string {
 }
 
 .desktop-runtime-recovery__diagnostic-label {
-  color: var(--buddy-text-tertiary);
+  color: var(--buddy-text-muted);
   font-size: 0.75rem;
 }
 
 .desktop-runtime-recovery__diagnostic-value {
   margin: 0;
-  color: var(--buddy-text-primary);
+  color: var(--buddy-text-strong);
   font-size: 0.82rem;
 }
 
@@ -347,19 +347,19 @@ function formatBytes(value: number): string {
   display: grid;
   gap: 0.25rem;
   padding: 0.75rem;
-  border: 1px solid var(--buddy-border-light);
+  border: 1px solid var(--buddy-border-subtle);
   border-radius: 0.75rem;
-  background: var(--buddy-fill-base);
+  background: var(--buddy-surface-subtle);
 }
 
 .desktop-runtime-recovery__storage-label {
-  color: var(--buddy-text-tertiary);
+  color: var(--buddy-text-muted);
   font-size: 0.75rem;
 }
 
 .desktop-runtime-recovery__storage-value {
   margin: 0;
-  color: var(--buddy-text-primary);
+  color: var(--buddy-text-strong);
   font-size: 0.82rem;
   line-height: 1.5;
 }
@@ -371,7 +371,7 @@ function formatBytes(value: number): string {
 }
 
 .desktop-runtime-recovery__note {
-  color: var(--buddy-text-tertiary);
+  color: var(--buddy-text-muted);
 }
 
 @media (max-width: 720px) {

@@ -21,10 +21,10 @@ const ringPercentage = computed(() => Math.min(100, Math.max(0, props.usage?.per
 const ringColor = computed(() => {
   const percent = props.usage?.percent ?? 0
   if (percent >= 80)
-    return 'var(--buddy-accent-danger)'
+    return 'var(--buddy-status-danger-text)'
   if (percent >= 60)
-    return 'var(--buddy-accent-warning)'
-  return 'var(--buddy-accent-primary)'
+    return 'var(--buddy-status-warning-text)'
+  return 'var(--buddy-accent-text)'
 })
 const percentLabel = computed(() => props.usage?.percent === null
   ? '—'
@@ -103,10 +103,10 @@ function formatTokens(value: number): string {
           :percentage="ringPercentage"
           :processing="isRunning || usage.status === 'pending'"
           :show-indicator="false"
-          :stroke-width="10"
+          :stroke-width="12"
           :offset-degree="180"
           :color="ringColor"
-          rail-color="var(--buddy-border-base)"
+          rail-color="var(--buddy-border-subtle)"
         />
       </button>
     </template>
@@ -164,38 +164,52 @@ function formatTokens(value: number): string {
 <style scoped lang="scss">
 .desktop-context-usage__trigger {
   display: grid;
-  width: 2rem;
-  height: 2rem;
+  width: var(--buddy-composer-control-height);
+  height: var(--buddy-composer-control-height);
   flex: none;
   place-items: center;
   border: 0;
-  border-radius: var(--buddy-icon-button-radius);
+  border-radius: var(--buddy-composer-control-radius);
   background: transparent;
   cursor: pointer;
   padding: 0;
+  transition:
+    background-color var(--buddy-motion-state-duration) var(--buddy-motion-state-easing),
+    color var(--buddy-motion-state-duration) var(--buddy-motion-state-easing);
 
   &:hover,
-  &:focus-visible,
+  &:focus-visible {
+    background: var(--buddy-accent-surface-subtle);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--buddy-focus-ring);
+    outline-offset: -2px;
+  }
+
   &[aria-expanded='true'] {
-    background: color-mix(in srgb, var(--buddy-accent-primary) 9%, transparent);
-    outline: 0;
+    background: var(--buddy-accent-surface);
   }
 }
 
 .desktop-context-usage__ring {
-  width: 1.45rem;
-  height: 1.45rem;
+  width: 1.125rem;
+  height: 1.125rem;
+
+  :deep(.n-progress-graph-circle svg) {
+    display: block;
+  }
 }
 
 .desktop-context-usage__panel {
   width: min(18rem, calc(100vw - 2rem));
   overflow: hidden;
-  border: 1px solid var(--buddy-border-light);
+  border: 1px solid var(--buddy-border-subtle);
   border-radius: 0.8rem;
-  background: var(--buddy-bg-surface-raised);
+  background: var(--buddy-surface-raised);
   background-clip: padding-box;
-  box-shadow: 0 1rem 2.5rem rgb(23 33 28 / 16%);
-  color: var(--buddy-text-primary);
+  box-shadow: var(--buddy-shadow-overlay);
+  color: var(--buddy-text-strong);
   isolation: isolate;
   padding: 1rem;
 }
@@ -224,7 +238,7 @@ function formatTokens(value: number): string {
 
   small {
     overflow: hidden;
-    color: var(--buddy-text-placeholder);
+    color: var(--buddy-text-muted);
     font-size: 0.7rem;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -254,7 +268,7 @@ function formatTokens(value: number): string {
   margin-top: 0.85rem;
   overflow: hidden;
   border-radius: 999px;
-  background: var(--buddy-fill-base);
+  background: var(--buddy-surface-subtle);
 }
 
 .desktop-context-usage__track-used {
@@ -284,7 +298,7 @@ function formatTokens(value: number): string {
     min-width: 0;
     align-items: center;
     gap: 0.55rem;
-    color: var(--buddy-text-regular);
+    color: var(--buddy-text-primary);
     font-size: 0.8rem;
 
     > span {
@@ -305,22 +319,22 @@ function formatTokens(value: number): string {
 }
 
 .is-systemPrompt {
-  background: var(--buddy-accent-primary);
+  background: var(--buddy-accent-solid);
 }
 
 .is-tools {
-  background: var(--buddy-accent-warning);
+  background: var(--buddy-brand-gold);
 }
 
 .is-skills {
-  background: color-mix(in srgb, var(--buddy-accent-primary) 35%, #8067d8);
+  background: var(--buddy-data-violet);
 }
 
 .is-mcp {
-  background: color-mix(in srgb, var(--buddy-accent-primary) 38%, #35b7cf);
+  background: var(--buddy-data-cyan);
 }
 
 .is-messages {
-  background: color-mix(in srgb, var(--buddy-accent-primary) 68%, #4778eb);
+  background: var(--buddy-data-blue);
 }
 </style>

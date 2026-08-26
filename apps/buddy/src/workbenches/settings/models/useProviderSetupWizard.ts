@@ -58,8 +58,7 @@ export function useProviderSetupWizard(options: UseProviderSetupWizardOptions) {
       || provider.id.toLocaleLowerCase().includes(query)
     ))
   })
-  const requiresDefaultModel = computed(() => providerSettings.defaultModelId.value === null)
-  const stepCount = computed(() => requiresDefaultModel.value ? 4 : 3)
+  const stepCount = computed(() => 3)
   const canContinueCustom = computed(() => Boolean(
     customForm.displayName.trim()
     && customForm.id.trim()
@@ -69,7 +68,6 @@ export function useProviderSetupWizard(options: UseProviderSetupWizardOptions) {
     selectedProvider.value?.storedCredentialType !== null
     && enabledModels.value.length > 0
   ))
-  const defaultModelId = shallowRef<string | null>(null)
 
   watch(show, (visible) => {
     if (!visible) {
@@ -79,7 +77,6 @@ export function useProviderSetupWizard(options: UseProviderSetupWizardOptions) {
     providerSettings.clearModelProviderError()
     selectedProviderId.value = resumeProviderId.value
     showManualModelDialog.value = false
-    defaultModelId.value = null
     const provider = selectedProvider.value
     sourceTab.value = provider?.custom ? 'custom' : 'builtin'
     if (!provider) {
@@ -93,7 +90,7 @@ export function useProviderSetupWizard(options: UseProviderSetupWizardOptions) {
       ? 2
       : provider.enabledModelCount === 0
         ? 3
-        : requiresDefaultModel.value ? 4 : 3
+        : 3
     resetSteps(initialStep)
   })
 
@@ -177,11 +174,6 @@ export function useProviderSetupWizard(options: UseProviderSetupWizardOptions) {
   async function continueFromModels() {
     if (!canComplete.value)
       return
-    if (requiresDefaultModel.value) {
-      defaultModelId.value = `${enabledModels.value[0]!.providerId}:${enabledModels.value[0]!.modelId}`
-      advanceToStep(4)
-      return
-    }
     await finish()
   }
 
@@ -190,8 +182,6 @@ export function useProviderSetupWizard(options: UseProviderSetupWizardOptions) {
     if (!provider || !canComplete.value)
       return
     if (!await providerSettings.setProviderEnabled(provider.id, true))
-      return
-    if (requiresDefaultModel.value && !await providerSettings.setDefaultModel(defaultModelId.value))
       return
     closeDialog()
   }
@@ -249,7 +239,6 @@ export function useProviderSetupWizard(options: UseProviderSetupWizardOptions) {
     createCustom,
     customForm,
     customIdEdited,
-    defaultModelId,
     enabledModels,
     filteredProviders,
     finish,
@@ -261,7 +250,6 @@ export function useProviderSetupWizard(options: UseProviderSetupWizardOptions) {
     openManualModelDialog,
     providerModels,
     providerQuery,
-    requiresDefaultModel,
     saveManualModel,
     savingManualModel,
     selectedProvider,

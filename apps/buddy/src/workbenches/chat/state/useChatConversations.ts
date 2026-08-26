@@ -1,4 +1,5 @@
 import type { LexoraDesktopApi } from '@buddy-electron/shared/desktopApi'
+import type { LocalConversation } from '@buddy-electron/shared/localChatApi'
 import type { useChatDrafts } from '@/workbenches/chat/state/useChatDrafts'
 import type { useChatRunSync } from '@/workbenches/chat/state/useChatRunSync'
 import type { ChatSession } from '@/workbenches/chat/state/useChatSession'
@@ -13,6 +14,9 @@ interface UseChatConversationsOptions {
   onError: (error: unknown) => void
   persistWorkspaceState: () => Promise<boolean>
   runSync: ReturnType<typeof useChatRunSync>
+  restoreConversationModelSelection: (
+    value: LocalConversation['modelSelection'],
+  ) => void
   selectDefaultModel: () => void
   session: ChatSession
 }
@@ -56,6 +60,7 @@ export function useChatConversations(options: UseChatConversationsOptions) {
     directlyOpenedConversation.value = indexed ? null : conversation
     options.drafts.saveCurrentDraft()
     options.session.activateConversation(conversation)
+    options.restoreConversationModelSelection(conversation.modelSelection)
     options.drafts.restoreCurrentDraft()
     await options.persistWorkspaceState()
     await Promise.all([
@@ -74,8 +79,10 @@ export function useChatConversations(options: UseChatConversationsOptions) {
     try {
       await options.api.conversations.delete(conversationId)
       await options.drafts.discard(`conversation:${conversationId}`)
-      if (options.session.activeConversationId.value === conversationId)
+      if (options.session.activeConversationId.value === conversationId) {
         activateDraftScope(null, false)
+        options.selectDefaultModel()
+      }
       if (directlyOpenedConversation.value?.id === conversationId)
         directlyOpenedConversation.value = null
       await options.taskIndexData.refreshIndex()
@@ -89,15 +96,19 @@ export function useChatConversations(options: UseChatConversationsOptions) {
   async function renameConversation(conversationId: string, title: string) {
     try {
       const conversation = await options.api.conversations.rename(conversationId, title)
-      options.taskIndexData.applyConversation(conversation)
-      if (directlyOpenedConversation.value?.id === conversationId)
-        directlyOpenedConversation.value = conversation
+      applyConversation(conversation)
       return true
     }
     catch (error) {
       options.onError(error)
       return false
     }
+  }
+
+  function applyConversation(conversation: LocalConversation) {
+    options.taskIndexData.applyConversation(conversation)
+    if (directlyOpenedConversation.value?.id === conversation.id)
+      directlyOpenedConversation.value = conversation
   }
 
   async function listActiveConversationMessages() {
@@ -148,6 +159,7 @@ export function useChatConversations(options: UseChatConversationsOptions) {
     activateDraftScope,
     activeConversation: readonly(activeConversation),
     activateGlobalDraft,
+    applyConversation,
     deleteConversation,
     listActiveConversationMessages,
     openConversation,

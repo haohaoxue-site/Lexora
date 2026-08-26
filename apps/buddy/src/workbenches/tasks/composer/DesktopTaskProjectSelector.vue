@@ -83,7 +83,7 @@ function openProjectCreator() {
     <template #trigger>
       <NButton
         class="desktop-task-project-selector__trigger"
-        secondary
+        quaternary
         size="small"
         aria-haspopup="dialog"
         :aria-expanded="panelOpen"
@@ -180,8 +180,29 @@ function openProjectCreator() {
 .desktop-task-project-selector__trigger {
   max-width: min(14rem, 28vw);
   min-width: 0;
-  border-radius: var(--buddy-radius-micro);
+  height: var(--buddy-composer-control-height);
+  border-radius: var(--buddy-composer-control-radius);
+  background-color: transparent;
   color: var(--buddy-text-secondary);
+  transition:
+    background-color var(--buddy-motion-state-duration) var(--buddy-motion-state-easing),
+    color var(--buddy-motion-state-duration) var(--buddy-motion-state-easing);
+
+  &.n-button:not(.n-button--disabled):hover,
+  &.n-button:not(.n-button--disabled):focus-visible {
+    background-color: var(--buddy-accent-surface-subtle);
+    color: var(--buddy-text-strong);
+  }
+
+  &.n-button:not(.n-button--disabled)[aria-expanded='true'] {
+    background-color: var(--buddy-accent-surface);
+    color: var(--buddy-text-strong);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--buddy-focus-ring);
+    outline-offset: -2px;
+  }
 
   :deep(.n-button__content) {
     min-width: 0;
@@ -209,11 +230,11 @@ function openProjectCreator() {
 .desktop-task-project-selector__panel {
   width: min(12rem, calc(100vw - 2rem));
   overflow: hidden;
-  border: 1px solid var(--buddy-border-light);
+  border: 1px solid var(--buddy-border-subtle);
   border-radius: var(--buddy-menu-radius);
-  background: var(--buddy-bg-surface-raised);
-  box-shadow: var(--buddy-shadow-menu);
-  color: var(--buddy-text-primary);
+  background: var(--buddy-surface-raised);
+  box-shadow: var(--buddy-shadow-overlay);
+  color: var(--buddy-text-strong);
   padding: 6px;
 }
 
@@ -231,7 +252,7 @@ function openProjectCreator() {
   align-content: start;
   gap: var(--buddy-menu-row-gap);
   overflow-y: auto;
-  scrollbar-color: var(--buddy-border-base) transparent;
+  scrollbar-color: var(--buddy-border-strong) transparent;
   scrollbar-width: thin;
 
   &::-webkit-scrollbar {
@@ -240,7 +261,7 @@ function openProjectCreator() {
 
   &::-webkit-scrollbar-thumb {
     border-radius: 999px;
-    background: var(--buddy-border-base);
+    background: var(--buddy-border-strong);
   }
 
   &::-webkit-scrollbar-track {
@@ -264,12 +285,15 @@ function openProjectCreator() {
   border: 0;
   border-radius: var(--buddy-menu-item-radius);
   background: transparent;
-  color: var(--buddy-text-regular);
+  color: var(--buddy-text-primary);
   cursor: pointer;
   font: inherit;
   font-size: var(--buddy-sidebar-project-font-size);
   padding: 0 7px;
   text-align: left;
+  transition:
+    background-color var(--buddy-motion-state-duration) var(--buddy-motion-state-easing),
+    color var(--buddy-motion-state-duration) var(--buddy-motion-state-easing);
 
   > span {
     overflow: hidden;
@@ -278,18 +302,33 @@ function openProjectCreator() {
     white-space: nowrap;
   }
 
-  &:hover,
+  &:hover {
+    background: var(--buddy-nav-hover);
+    color: var(--buddy-text-strong);
+  }
+
   &:focus-visible {
-    background: var(--buddy-fill-base);
-    color: var(--buddy-text-primary);
-    outline: 0;
+    background: var(--buddy-nav-hover);
+    color: var(--buddy-text-strong);
+    outline: 2px solid var(--buddy-focus-ring);
+    outline-offset: -2px;
   }
 }
 
 .desktop-task-project-selector__project.is-selected {
-  background: color-mix(in srgb, var(--buddy-accent-primary) 9%, transparent);
-  color: var(--buddy-accent-primary);
+  background: var(--buddy-nav-selected);
+  color: var(--buddy-nav-foreground);
   font-weight: 600;
+}
+
+.desktop-task-project-selector__project.is-selected:hover {
+  background: var(--buddy-nav-pressed);
+  color: var(--buddy-nav-foreground);
+}
+
+.desktop-task-project-selector__project.is-selected:focus-visible {
+  background: var(--buddy-nav-selected);
+  color: var(--buddy-nav-foreground);
 }
 
 .desktop-task-project-selector__action {
@@ -304,7 +343,7 @@ function openProjectCreator() {
 
 .desktop-task-project-selector__divider {
   height: 1px;
-  background: var(--buddy-border-light);
+  background: var(--buddy-border-subtle);
   margin: 5px 6px;
 }
 
@@ -312,7 +351,7 @@ function openProjectCreator() {
   display: grid;
   min-height: var(--buddy-menu-row-height);
   place-items: center;
-  color: var(--buddy-text-placeholder);
+  color: var(--buddy-text-muted);
   font-size: 0.72rem;
 }
 </style>

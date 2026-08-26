@@ -158,6 +158,12 @@ const connectorCredentialMutationSchema = z.discriminatedUnion('mode', [
   z.object({ mode: z.literal('clear') }).strict(),
   z.object({ mode: z.literal('replace'), value: connectorCredentialSchema }).strict(),
 ])
+const modelSelectionSchema = z.object({
+  modelId: idSchema,
+  providerId: idSchema,
+  reasoning: z.enum(BUDDY_THINKING_LEVELS).nullable(),
+  serviceTier: z.enum(BUDDY_SERVICE_TIERS).nullable(),
+}).strict()
 const startTurnSchema = z.object({
   attachmentIds: z.array(idSchema).max(16),
   branchId: sessionIdentitySchema.nullable(),
@@ -168,12 +174,7 @@ const startTurnSchema = z.object({
   }).strict()).max(64),
   conversationId: sessionIdentitySchema.nullable(),
   executionProfile: executionProfileSchema,
-  modelSelection: z.object({
-    modelId: idSchema,
-    providerId: idSchema,
-    reasoning: z.enum(BUDDY_THINKING_LEVELS).nullable(),
-    serviceTier: z.enum(BUDDY_SERVICE_TIERS).nullable(),
-  }).strict().nullable(),
+  modelSelection: modelSelectionSchema.nullable(),
   projectId: idSchema.nullable(),
   requestId: z.string().min(1).max(128),
 }).strict().refine(
@@ -192,12 +193,7 @@ const editUserMessageSchema = z.object({
     value: z.string().min(1),
   }).strict()).max(64),
   conversationId: idSchema,
-  modelSelection: z.object({
-    modelId: idSchema,
-    providerId: idSchema,
-    reasoning: z.enum(BUDDY_THINKING_LEVELS).nullable(),
-    serviceTier: z.enum(BUDDY_SERVICE_TIERS).nullable(),
-  }).strict().nullable(),
+  modelSelection: modelSelectionSchema.nullable(),
   requestId: z.string().min(1).max(128),
   userMessageId: idSchema,
 }).strict().refine(
@@ -214,12 +210,7 @@ const contextUsageSnapshotRequestSchema = z.object({
   branchId: sessionIdentitySchema.nullable(),
   conversationId: sessionIdentitySchema.nullable(),
   executionProfile: executionProfileSchema,
-  modelSelection: z.object({
-    modelId: idSchema,
-    providerId: idSchema,
-    reasoning: z.enum(BUDDY_THINKING_LEVELS).nullable(),
-    serviceTier: z.enum(BUDDY_SERVICE_TIERS).nullable(),
-  }).strict(),
+  modelSelection: modelSelectionSchema,
   projectId: idSchema.nullable(),
 }).strict().refine(input => (
   (input.conversationId === null) === (input.branchId === null)
@@ -1190,6 +1181,23 @@ function registerRuntimeHandlers(services: RuntimeServices): () => void {
       throw new BuddyServiceError('VALIDATION_FAILED')
     await services.sessions.invalidateConversation(input.conversationId)
     return conversation
+  })
+  on('conversations.setModelSelection', async (params) => {
+    const input = parse(z.object({
+      conversationId: idSchema,
+      modelSelection: modelSelectionSchema,
+    }).strict(), params)
+    const selection = await resolveModelSelection(services.providerService, input.modelSelection)
+    return requireValue(services.conversations.setModelSelection({
+      id: input.conversationId,
+      modelSelection: {
+        modelId: selection.modelId,
+        providerId: selection.providerId,
+        reasoning: selection.reasoning,
+        serviceTier: selection.serviceTier,
+      },
+      updatedAt: new Date().toISOString(),
+    }), 'VALIDATION_FAILED')
   })
   on('conversations.delete', async (params) => {
     const input = parse(z.object({ conversationId: idSchema }).strict(), params)

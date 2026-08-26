@@ -69,8 +69,8 @@ const categories = [
   min-height: 0;
   flex: none;
   flex-direction: column;
-  border-right: 1px solid var(--buddy-border-light);
-  background: var(--buddy-bg-workspace-sidebar);
+  border-right: 1px solid var(--buddy-border-subtle);
+  background: var(--buddy-surface-workspace-sidebar);
 }
 
 .desktop-settings-sidebar__header {
@@ -79,7 +79,7 @@ const categories = [
   flex: none;
   align-items: center;
   gap: 0.35rem;
-  border-bottom: 1px solid var(--buddy-border-light);
+  border-bottom: 1px solid var(--buddy-border-subtle);
   padding: 0 0.75rem;
 }
 
@@ -109,22 +109,34 @@ const categories = [
   border: 0;
   border-radius: 0.45rem;
   background: transparent;
-  color: var(--buddy-text-regular);
+  color: var(--buddy-text-primary);
   font-size: var(--buddy-sidebar-item-font-size);
   font-weight: var(--buddy-sidebar-item-font-weight);
   line-height: 20px;
   padding: 0.55rem 0.65rem;
   text-align: left;
   text-decoration: none;
+  transition:
+    background-color var(--buddy-motion-state-duration) var(--buddy-motion-state-easing),
+    color var(--buddy-motion-state-duration) var(--buddy-motion-state-easing);
 }
 
 .desktop-settings-sidebar__content > a:hover {
-  background: var(--buddy-fill-base);
+  background: var(--buddy-nav-hover);
+}
+
+.desktop-settings-sidebar__content > a:focus-visible {
+  outline: 2px solid var(--buddy-focus-ring);
+  outline-offset: -2px;
 }
 
 .desktop-settings-sidebar__content > a.is-active {
-  background: var(--buddy-nav-active-bg);
-  color: var(--buddy-text-primary);
+  background: var(--buddy-nav-selected);
+  color: var(--buddy-nav-foreground);
   font-weight: var(--buddy-sidebar-item-active-font-weight);
+}
+
+.desktop-settings-sidebar__content > a.is-active:hover {
+  background: var(--buddy-nav-pressed);
 }
 </style>

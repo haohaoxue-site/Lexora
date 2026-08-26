@@ -143,9 +143,9 @@ function assertNever(value: never): never {
   min-width: 0;
   overflow: hidden;
   border: 0;
-  border-left: 2px solid var(--buddy-border-light);
+  border-left: 2px solid var(--buddy-border-subtle);
   border-radius: 0 var(--buddy-radius-micro) var(--buddy-radius-micro) 0;
-  background: color-mix(in srgb, var(--buddy-text-primary) 2%, transparent);
+  background: var(--buddy-surface-subtle);
 }
 
 .buddy-chat-terminal-card__banner {
@@ -158,7 +158,7 @@ function assertNever(value: never): never {
   padding: 0.15rem 0.625rem 0.1rem;
 
   small {
-    color: var(--buddy-accent-primary);
+    color: var(--buddy-accent-text);
     font-size: inherit;
   }
 }
@@ -209,7 +209,7 @@ function assertNever(value: never): never {
   display: block;
   max-height: 12rem;
   overflow-y: auto;
-  background: color-mix(in srgb, var(--buddy-text-primary) 2%, transparent);
+  background: var(--buddy-state-hover);
   padding: 0.45rem 0.625rem 0.55rem;
 
   > span {
@@ -222,12 +222,12 @@ function assertNever(value: never): never {
 .buddy-chat-terminal-card__divider {
   height: 1px;
   margin: 0 0.625rem;
-  background: var(--buddy-border-light);
+  background: var(--buddy-border-subtle);
 }
 
 .buddy-chat-terminal-card__notice {
   margin: 0;
-  color: var(--buddy-text-placeholder);
+  color: var(--buddy-text-muted);
   font-size: var(--buddy-chat-caption-font-size);
   line-height: var(--buddy-chat-code-line-height);
   padding: 0.45rem 0.625rem 0.55rem;
@@ -235,12 +235,12 @@ function assertNever(value: never): never {
 
 .buddy-chat-terminal-card__truncated {
   display: block;
-  color: var(--buddy-text-placeholder);
+  color: var(--buddy-text-muted);
   padding: 0 0.75rem 0.65rem;
 }
 
 .buddy-chat-tool-details.is-failed .buddy-chat-terminal-card {
-  border-left-color: color-mix(in srgb, var(--buddy-chat-danger-color) 55%, var(--buddy-border-light));
+  border-left-color: var(--buddy-status-danger-border);
 }
 
 .buddy-chat-tool-details.is-failed .buddy-chat-terminal-card__banner small {
@@ -248,33 +248,33 @@ function assertNever(value: never): never {
 }
 
 .buddy-chat-tool-details.is-interrupted .buddy-chat-terminal-card {
-  border-left-color: color-mix(in srgb, var(--buddy-accent-warning) 55%, var(--buddy-border-light));
+  border-left-color: var(--buddy-status-warning-border);
 }
 
 .buddy-chat-tool-details.is-interrupted .buddy-chat-terminal-card__banner small,
 .buddy-chat-tool-details.is-awaiting_approval .buddy-chat-terminal-card__banner small {
-  color: var(--buddy-accent-warning);
+  color: var(--buddy-status-warning-text);
 }
 
 .buddy-chat-tool-details__section {
   min-width: 0;
   overflow: hidden;
-  border: 1px solid var(--buddy-border-light);
+  border: 1px solid var(--buddy-border-subtle);
   border-radius: var(--buddy-radius-micro);
-  background: color-mix(in srgb, var(--buddy-bg-surface-raised) 72%, transparent);
+  background: var(--buddy-surface-raised);
 
   &.is-output {
-    background: color-mix(in srgb, var(--buddy-text-primary) 3%, transparent);
+    background: var(--buddy-surface-subtle);
   }
 
   &.is-empty pre {
-    color: var(--buddy-text-placeholder);
+    color: var(--buddy-text-muted);
     font-family: inherit;
   }
 }
 
 .buddy-chat-tool-details.is-failed .buddy-chat-tool-details__section.is-output {
-  border-color: color-mix(in srgb, var(--buddy-chat-danger-color) 34%, var(--buddy-border-light));
+  border-color: var(--buddy-status-danger-border);
 }
 
 .buddy-chat-tool-details__header {
@@ -282,7 +282,7 @@ function assertNever(value: never): never {
   min-height: 1.7rem;
   align-items: center;
   justify-content: space-between;
-  border-bottom: 1px solid var(--buddy-border-light);
+  border-bottom: 1px solid var(--buddy-border-subtle);
   color: var(--buddy-chat-meta-color);
   font-size: var(--buddy-chat-caption-font-size);
   font-weight: 600;
@@ -290,7 +290,7 @@ function assertNever(value: never): never {
   padding: 0.25rem 0.625rem;
 
   small {
-    color: var(--buddy-text-placeholder);
+    color: var(--buddy-text-muted);
     font-size: inherit;
     font-weight: 400;
   }

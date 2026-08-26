@@ -5,7 +5,6 @@ import { Add20Regular } from '@vicons/fluent'
 import { NAlert, NButton, NEmpty, NIcon, NPopconfirm, NSwitch } from 'naive-ui'
 import { computed, shallowRef } from 'vue'
 import { useBuddyI18n } from '@/i18n/buddyI18n'
-import DesktopModelSelector from '@/ui/model-selector/DesktopModelSelector.vue'
 import DesktopProviderAddDialog from '@/workbenches/settings/models/DesktopProviderAddDialog.vue'
 import DesktopProviderAuthDialog from '@/workbenches/settings/models/DesktopProviderAuthDialog.vue'
 
@@ -19,15 +18,6 @@ const showAddDialog = shallowRef(false)
 const resumeProviderId = shallowRef<string | null>(null)
 
 const addedProviders = computed(() => providerSettings.providers.value.filter(provider => provider.added))
-const defaultModel = computed(() => providerSettings.models.value.find(model => (
-  `${model.providerId}:${model.modelId}` === providerSettings.defaultModelId.value
-)) ?? null)
-const isDefaultModelUnavailable = computed(() => Boolean(
-  providerSettings.defaultModelId.value
-  && !providerSettings.models.value.some(model => (
-    `${model.providerId}:${model.modelId}` === providerSettings.defaultModelId.value
-  )),
-))
 
 function openAddDialog(providerId: string | null = null) {
   providerSettings.clearModelProviderError()
@@ -53,40 +43,6 @@ function providerAuthenticationLabel(type: NonNullable<LocalProvider['storedCred
     >
       {{ providerSettings.modelProviderError.value }}
     </NAlert>
-
-    <section class="desktop-models-settings__section">
-      <div class="desktop-models-settings__heading">
-        <div>
-          <h2>{{ t('desktop.settings.defaultModel') }}</h2>
-          <p>{{ t('desktop.settings.defaultModelDescription') }}</p>
-        </div>
-      </div>
-      <div class="desktop-models-settings__group desktop-models-settings__group--default">
-        <div class="desktop-models-settings__default-row">
-          <DesktopModelSelector
-            clearable
-            :disabled="providerSettings.isLoadingModelCatalog.value"
-            :language="providerSettings.language.value"
-            :models="providerSettings.models.value"
-            placement="bottom-start"
-            :placeholder="t('desktop.providers.noDefaultModel')"
-            :providers="providerSettings.providers.value"
-            :selected-effort="providerSettings.defaultEffort.value"
-            :selected-model="defaultModel"
-            :selected-model-id="providerSettings.defaultModelId.value"
-            :selected-service-tier="null"
-            :show-fast-mode="false"
-            surface="field"
-            @clear-model="providerSettings.setDefaultModel(null)"
-            @update-effort="providerSettings.setDefaultEffort"
-            @update-model="providerSettings.setDefaultModel"
-          />
-          <NAlert v-if="isDefaultModelUnavailable" type="warning" :show-icon="false">
-            {{ t('desktop.providers.defaultModelUnavailable') }}
-          </NAlert>
-        </div>
-      </div>
-    </section>
 
     <section class="desktop-models-settings__section">
       <div class="desktop-models-settings__heading">
@@ -230,24 +186,13 @@ function providerAuthenticationLabel(type: NonNullable<LocalProvider['storedCred
 .desktop-models-settings__group,
 .desktop-models-settings__empty {
   overflow: hidden;
-  border: 1px solid var(--buddy-border-light);
+  border: 1px solid var(--buddy-border-subtle);
   border-radius: 0.65rem;
-  background: var(--buddy-bg-surface);
+  background: var(--buddy-surface-base);
 }
 
-.desktop-models-settings__group--default {
-  overflow: visible;
-}
-
-.desktop-models-settings__default-row,
 .desktop-models-settings__empty {
   padding: 0.9rem;
-}
-
-.desktop-models-settings__default-row {
-  display: grid;
-  width: 100%;
-  gap: 0.7rem;
 }
 
 .desktop-models-settings__empty {
@@ -259,7 +204,7 @@ function providerAuthenticationLabel(type: NonNullable<LocalProvider['storedCred
   min-height: 4.2rem;
   align-items: center;
   gap: 0.75rem;
-  border-bottom: 1px solid var(--buddy-border-light);
+  border-bottom: 1px solid var(--buddy-border-subtle);
   padding: 0.7rem 0.9rem;
 }
 
@@ -291,7 +236,7 @@ function providerAuthenticationLabel(type: NonNullable<LocalProvider['storedCred
 
 .desktop-models-settings__provider-auth {
   flex: none;
-  color: var(--buddy-accent-primary);
+  color: var(--buddy-accent-text);
   font-size: 0.66rem;
   font-weight: 600;
 }
@@ -312,7 +257,7 @@ function providerAuthenticationLabel(type: NonNullable<LocalProvider['storedCred
 
 .desktop-models-settings__provider-separator {
   margin: 0 0.35rem;
-  color: var(--buddy-text-placeholder);
+  color: var(--buddy-text-muted);
 }
 
 .desktop-models-settings__provider-description {

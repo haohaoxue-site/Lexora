@@ -137,9 +137,9 @@ function summarizePayload(payload: unknown) {
   min-height: 22rem;
   grid-template-columns: minmax(14rem, 18rem) minmax(0, 1fr);
   overflow: hidden;
-  border: 1px solid var(--buddy-border-light);
+  border: 1px solid var(--buddy-border-subtle);
   border-radius: 0.85rem;
-  background: var(--buddy-bg-surface-raised);
+  background: var(--buddy-surface-raised);
 
   > aside {
     display: grid;
@@ -147,7 +147,7 @@ function summarizePayload(payload: unknown) {
     gap: 0.25rem;
     max-height: 28rem;
     overflow-y: auto;
-    border-right: 1px solid var(--buddy-border-light);
+    border-right: 1px solid var(--buddy-border-subtle);
     padding: 0.35rem;
 
     > button {
@@ -158,14 +158,14 @@ function summarizePayload(payload: unknown) {
       border: 0;
       border-radius: 0.55rem;
       background: transparent;
-      color: var(--buddy-text-regular);
+      color: var(--buddy-text-primary);
       cursor: pointer;
       padding: 0.65rem;
       text-align: left;
 
       &:hover,
       &.is-active {
-        background: var(--buddy-fill-base);
+        background: var(--buddy-state-hover);
       }
 
       > span {
@@ -209,9 +209,9 @@ function summarizePayload(payload: unknown) {
   li {
     display: grid;
     gap: 0.35rem;
-    border: 1px solid var(--buddy-border-light);
+    border: 1px solid var(--buddy-border-subtle);
     border-radius: 0.55rem;
-    background: var(--buddy-fill-light);
+    background: var(--buddy-surface-subtle);
     padding: 0.6rem;
 
     > div {
@@ -222,7 +222,7 @@ function summarizePayload(payload: unknown) {
     }
 
     time {
-      color: var(--buddy-text-placeholder);
+      color: var(--buddy-text-muted);
     }
 
     code {
@@ -253,7 +253,7 @@ function summarizePayload(payload: unknown) {
 
   code {
     overflow: hidden;
-    color: var(--buddy-text-regular);
+    color: var(--buddy-text-primary);
     text-overflow: ellipsis;
     white-space: nowrap;
   }
@@ -266,7 +266,7 @@ function summarizePayload(payload: unknown) {
     > aside {
       max-height: 14rem;
       border-right: 0;
-      border-bottom: 1px solid var(--buddy-border-light);
+      border-bottom: 1px solid var(--buddy-border-subtle);
     }
   }
 }

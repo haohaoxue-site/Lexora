@@ -36,7 +36,7 @@ const { t } = useBuddyI18n(localSettings.language)
 .desktop-skills-settings p { margin: 0; }
 .desktop-skills-settings header p,
 .desktop-skills-settings article p { margin-top: 0.25rem; color: var(--buddy-text-secondary); font-size: 0.75rem; }
-.desktop-skills-settings__group { overflow: hidden; border: 1px solid var(--buddy-border-light); border-radius: 0.65rem; background: var(--buddy-bg-surface); }
-.desktop-skills-settings article { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; border-bottom: 1px solid var(--buddy-border-light); padding: 0.85rem 0.9rem; }
+.desktop-skills-settings__group { overflow: hidden; border: 1px solid var(--buddy-border-subtle); border-radius: 0.65rem; background: var(--buddy-surface-base); }
+.desktop-skills-settings article { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; border-bottom: 1px solid var(--buddy-border-subtle); padding: 0.85rem 0.9rem; }
 .desktop-skills-settings article:last-child { border-bottom: 0; }
 </style>

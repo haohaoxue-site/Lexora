@@ -106,9 +106,9 @@ function toggle(connector: LocalConnector, enabled: boolean) {
 .desktop-connectors-settings p { margin: 0; }
 .desktop-connectors-settings header p { margin-top: 0.25rem; color: var(--buddy-text-secondary); font-size: 0.75rem; }
 .desktop-connectors-settings__form,
-.desktop-connectors-settings__group { overflow: hidden; border: 1px solid var(--buddy-border-light); border-radius: 0.65rem; background: var(--buddy-bg-surface); }
+.desktop-connectors-settings__group { overflow: hidden; border: 1px solid var(--buddy-border-subtle); border-radius: 0.65rem; background: var(--buddy-surface-base); }
 .desktop-connectors-settings__form { padding: 0.9rem; }
-.desktop-connector-card { display: flex; align-items: center; flex-wrap: wrap; gap: 0.55rem; border-bottom: 1px solid var(--buddy-border-light); padding: 0.8rem 0.9rem; }
+.desktop-connector-card { display: flex; align-items: center; flex-wrap: wrap; gap: 0.55rem; border-bottom: 1px solid var(--buddy-border-subtle); padding: 0.8rem 0.9rem; }
 .desktop-connector-card:last-child { border-bottom: 0; }
 .desktop-connector-card > div { display: grid; min-width: 12rem; flex: 1; }
 .desktop-connector-card small { color: var(--buddy-text-secondary); }

@@ -197,7 +197,7 @@ function formatDuration(value: number): string {
 
   &:not(.is-static):not(:disabled):hover,
   &:not(.is-static):not(:disabled):focus-visible {
-    color: var(--buddy-text-primary);
+    color: var(--buddy-text-strong);
   }
 
   &.is-static {

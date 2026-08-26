@@ -120,6 +120,7 @@ function resolveDropPosition(event: DragEvent): DesktopTaskPinnedDropPosition {
       'is-dragging': dragging,
       'is-drop-after': dropPosition === 'after',
       'is-drop-before': dropPosition === 'before',
+      'is-project-task': projectTask,
       'is-reorderable': reorderable,
     }"
     :draggable="reorderable"
@@ -190,6 +191,11 @@ function resolveDropPosition(event: DragEvent): DesktopTaskPinnedDropPosition {
   min-width: 0;
   padding-right: var(--buddy-task-sidebar-scrollbar-gutter, 0);
   padding-bottom: calc(var(--buddy-task-sidebar-row-size, 2.5rem) - var(--buddy-task-sidebar-row-height, 2.25rem));
+  padding-left: var(--buddy-task-sidebar-scrollbar-gutter, 0);
+
+  &.is-project-task {
+    padding-left: 2.25rem;
+  }
 
   &.is-reorderable {
     cursor: grab;
@@ -204,9 +210,9 @@ function resolveDropPosition(event: DragEvent): DesktopTaskPinnedDropPosition {
     position: absolute;
     z-index: 1;
     right: var(--buddy-task-sidebar-scrollbar-gutter, 0);
-    left: 0;
+    left: var(--buddy-task-sidebar-scrollbar-gutter, 0);
     height: 2px;
-    background: var(--buddy-accent-primary);
+    background: var(--buddy-accent-solid);
     content: '';
     pointer-events: none;
   }
@@ -221,22 +227,32 @@ function resolveDropPosition(event: DragEvent): DesktopTaskPinnedDropPosition {
 }
 
 .desktop-task-row__surface {
+  position: relative;
   display: flex;
   height: 100%;
   min-width: 0;
   align-items: center;
   border-radius: var(--buddy-task-sidebar-state-radius, 8px);
-  color: var(--buddy-text-regular);
+  color: var(--buddy-text-primary);
+  transition: background-color var(--buddy-motion-state-duration) var(--buddy-motion-state-easing);
 
   &:hover,
-  &:focus-within,
+  &:focus-within {
+    background: var(--buddy-nav-hover);
+  }
+
   &.is-active {
-    background: var(--buddy-fill-base);
+    background: var(--buddy-nav-selected);
+  }
+
+  &.is-active:hover {
+    background: var(--buddy-nav-pressed);
   }
 
   &.is-project {
-    padding-left: 1.15rem;
+    padding-left: 0.5rem;
   }
+
 }
 
 button {
@@ -251,11 +267,11 @@ button {
   min-width: 0;
   flex: 1;
   align-items: center;
-  color: var(--buddy-text-regular);
+  color: var(--buddy-text-primary);
   font-size: var(--buddy-sidebar-item-font-size);
   font-weight: var(--buddy-sidebar-item-font-weight);
   line-height: 20px;
-  padding: 0.46rem 0.5rem;
+  padding: 0 0.625rem;
   text-align: left;
 
   .desktop-overflow-label {
@@ -263,13 +279,13 @@ button {
   }
 
   &.is-active {
-    color: var(--buddy-text-primary);
+    color: var(--buddy-nav-foreground);
     font-weight: var(--buddy-sidebar-item-active-font-weight);
   }
 
   &:focus-visible {
     border-radius: 6px;
-    outline: 2px solid var(--buddy-accent-primary);
+    outline: 2px solid var(--buddy-focus-ring);
     outline-offset: -2px;
   }
 }
@@ -281,19 +297,22 @@ button {
   flex: none;
   place-items: center;
   border-radius: var(--buddy-icon-button-radius);
-  color: var(--buddy-text-placeholder);
+  color: var(--buddy-text-muted);
+  transition:
+    background-color var(--buddy-motion-state-duration) var(--buddy-motion-state-easing),
+    color var(--buddy-motion-state-duration) var(--buddy-motion-state-easing);
 
   .n-icon {
     font-size: 16px;
   }
 
   &:hover {
-    background: var(--buddy-nav-active-bg);
-    color: var(--buddy-text-primary);
+    background: var(--buddy-nav-hover);
+    color: var(--buddy-text-strong);
   }
 
   &:focus-visible {
-    outline: 2px solid var(--buddy-accent-primary);
+    outline: 2px solid var(--buddy-focus-ring);
     outline-offset: -2px;
   }
 }
@@ -314,7 +333,7 @@ button {
 }
 
 .desktop-task-sidebar__pin {
-  color: var(--buddy-text-placeholder);
+  color: var(--buddy-text-muted);
 }
 
 .desktop-task-row__activity {
@@ -329,7 +348,7 @@ button {
   }
 
   &.is-running {
-    color: var(--buddy-text-placeholder);
+    color: var(--buddy-text-muted);
 
     .n-icon {
       animation: desktop-task-row-spin 1s linear infinite;
@@ -337,12 +356,12 @@ button {
   }
 
   &.is-awaiting-approval {
-    color: var(--buddy-accent-warning);
+    color: var(--buddy-status-warning-text);
   }
 }
 
 .desktop-task-row__relative-time {
-  color: var(--buddy-text-placeholder);
+  color: var(--buddy-text-muted);
   font-size: 0.75rem;
   line-height: 1;
   pointer-events: none;

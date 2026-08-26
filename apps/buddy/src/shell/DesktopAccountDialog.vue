@@ -48,7 +48,7 @@ const { t } = useBuddyI18n(() => props.language)
 }
 
 .desktop-account-dialog__identity strong {
-  color: var(--buddy-text-primary);
+  color: var(--buddy-text-strong);
   font-size: 0.9rem;
   font-weight: 600;
 }
@@ -56,7 +56,7 @@ const { t } = useBuddyI18n(() => props.language)
 .desktop-account-dialog__local-notice {
   margin: 1rem 0 0;
   border-radius: var(--buddy-radius-micro);
-  background: var(--buddy-fill-light);
+  background: var(--buddy-surface-subtle);
   color: var(--buddy-text-secondary);
   font-size: 0.78rem;
   line-height: 1.6;

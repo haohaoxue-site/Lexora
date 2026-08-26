@@ -91,11 +91,11 @@ const icon = computed(() => {
 
 .desktop-notification-item:hover,
 .desktop-notification-item:focus-visible {
-  background: var(--buddy-fill-light);
+  background: var(--buddy-surface-subtle);
 }
 
 .desktop-notification-item:focus-visible {
-  outline: 2px solid var(--buddy-accent-primary);
+  outline: 2px solid var(--buddy-focus-ring);
   outline-offset: -2px;
 }
 
@@ -105,14 +105,14 @@ const icon = computed(() => {
   height: 28px;
   place-items: center;
   border-radius: 6px;
-  background: color-mix(in srgb, var(--buddy-accent-primary) 10%, transparent);
-  color: var(--buddy-accent-primary);
+  background: var(--buddy-accent-surface);
+  color: var(--buddy-accent-text);
   font-size: 16px;
 }
 
 .desktop-notification-item.is-failed .desktop-notification-item__icon {
-  background: color-mix(in srgb, var(--buddy-accent-danger) 10%, transparent);
-  color: var(--buddy-accent-danger);
+  background: var(--buddy-status-danger-surface);
+  color: var(--buddy-status-danger-text);
 }
 
 .desktop-notification-item__copy {
@@ -122,7 +122,7 @@ const icon = computed(() => {
 
 .desktop-notification-item__copy strong {
   overflow: hidden;
-  color: var(--buddy-text-regular);
+  color: var(--buddy-text-primary);
   font-size: 12px;
   font-weight: 500;
   line-height: 16px;
@@ -131,7 +131,7 @@ const icon = computed(() => {
 }
 
 .desktop-notification-item.is-unseen .desktop-notification-item__copy strong {
-  color: var(--buddy-text-primary);
+  color: var(--buddy-text-strong);
   font-weight: 600;
 }
 
@@ -147,7 +147,7 @@ const icon = computed(() => {
 }
 
 .desktop-notification-item__copy small {
-  color: var(--buddy-text-placeholder);
+  color: var(--buddy-text-muted);
   font-size: 10px;
   line-height: 14px;
   margin-top: 2px;
@@ -160,6 +160,6 @@ const icon = computed(() => {
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: var(--buddy-accent-primary);
+  background: var(--buddy-accent-solid);
 }
 </style>

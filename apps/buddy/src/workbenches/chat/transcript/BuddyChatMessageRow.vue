@@ -289,9 +289,9 @@ async function copyMessage() {
   display: grid;
   width: 100%;
   gap: 0.65rem;
-  border: 1px solid color-mix(in srgb, var(--buddy-accent-primary) 32%, var(--buddy-border-light));
+  border: 1px solid var(--buddy-accent-border);
   border-radius: 0.75rem;
-  background: var(--buddy-bg-surface-raised);
+  background: var(--buddy-surface-raised);
   padding: 0.75rem;
 
   :deep(.n-input) {
@@ -314,19 +314,19 @@ async function copyMessage() {
   width: var(--buddy-chat-avatar-size);
   min-height: var(--buddy-chat-avatar-size);
   place-items: center;
-  color: var(--buddy-text-placeholder);
+  color: var(--buddy-text-muted);
   font-size: 0.65rem;
   font-weight: 650;
 }
 
 .buddy-chat-message.is-search-match :deep(.buddy-chat-message-content__text) {
   border-radius: 0.6rem;
-  background: color-mix(in srgb, var(--buddy-accent-warning) 8%, var(--buddy-bg-surface-raised));
-  box-shadow: inset 2px 0 color-mix(in srgb, var(--buddy-accent-warning) 62%, var(--buddy-border-light));
+  background: var(--buddy-status-warning-surface);
+  box-shadow: inset 2px 0 var(--buddy-status-warning-border);
 }
 
 .buddy-chat-message.is-search-active :deep(.buddy-chat-message-content__text) {
-  outline: 1px solid color-mix(in srgb, var(--buddy-accent-warning) 55%, var(--buddy-border-light));
+  outline: 1px solid var(--buddy-status-warning-border);
   outline-offset: 1px;
 }
 
@@ -390,7 +390,7 @@ async function copyMessage() {
 }
 
 .buddy-chat-message__time {
-  color: var(--buddy-text-placeholder);
+  color: var(--buddy-text-muted);
   font-size: 0.68rem;
   font-variant-numeric: tabular-nums;
   font-weight: 400;
@@ -405,8 +405,8 @@ async function copyMessage() {
     color 160ms ease;
 
   &.is-copied {
-    background: color-mix(in srgb, var(--buddy-accent-primary) 12%, transparent);
-    color: var(--buddy-accent-primary);
+    background: var(--buddy-accent-surface);
+    color: var(--buddy-accent-text);
   }
 }
 

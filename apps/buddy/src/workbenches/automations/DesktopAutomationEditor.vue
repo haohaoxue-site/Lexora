@@ -503,7 +503,7 @@ function modelKey(providerId: string, modelId: string): string {
   min-width: 0;
   min-height: 0;
   flex-direction: column;
-  background: var(--buddy-bg-surface);
+  background: var(--buddy-surface-base);
 }
 
 .desktop-automation-editor__header,
@@ -518,7 +518,7 @@ function modelKey(providerId: string, modelId: string): string {
   flex: none;
   justify-content: space-between;
   gap: 16px;
-  border-bottom: 1px solid var(--buddy-border-light);
+  border-bottom: 1px solid var(--buddy-border-subtle);
   padding: 0 18px;
 }
 
@@ -530,7 +530,7 @@ function modelKey(providerId: string, modelId: string): string {
 
   > .n-icon {
     flex: none;
-    color: var(--buddy-text-regular);
+    color: var(--buddy-text-primary);
     font-size: 18px;
   }
 
@@ -544,18 +544,18 @@ function modelKey(providerId: string, modelId: string): string {
   }
 
   button:not(.n-button):hover {
-    color: var(--buddy-accent-primary);
+    color: var(--buddy-accent-text);
   }
 
   button:not(.n-button):focus-visible {
     border-radius: 4px;
-    outline: 2px solid var(--buddy-accent-primary);
+    outline: 2px solid var(--buddy-focus-ring);
     outline-offset: 2px;
   }
 
   strong {
     overflow: hidden;
-    color: var(--buddy-text-primary);
+    color: var(--buddy-text-strong);
     font-weight: 650;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -600,7 +600,7 @@ function modelKey(providerId: string, modelId: string): string {
 
   p {
     margin: -10px 0 8px;
-    color: var(--buddy-text-placeholder);
+    color: var(--buddy-text-muted);
     font-size: 11px;
     line-height: 1.5;
   }
@@ -612,7 +612,7 @@ function modelKey(providerId: string, modelId: string): string {
 
 .desktop-automation-editor__preview {
   gap: 14px;
-  border-top: 1px solid var(--buddy-border-light);
+  border-top: 1px solid var(--buddy-border-subtle);
   margin-top: 6px;
   padding-top: 22px;
 }
@@ -627,13 +627,13 @@ function modelKey(providerId: string, modelId: string): string {
   }
 
   h2 {
-    color: var(--buddy-text-primary);
+    color: var(--buddy-text-strong);
     font-size: 14px;
     font-weight: 660;
   }
 
   p {
-    color: var(--buddy-text-placeholder);
+    color: var(--buddy-text-muted);
     font-size: 11px;
     line-height: 1.5;
   }

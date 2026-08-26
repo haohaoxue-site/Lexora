@@ -233,7 +233,7 @@ function toggle() {
 
 .buddy-chat-tool__icon {
   margin-right: 6px;
-  color: var(--buddy-accent-primary);
+  color: var(--buddy-accent-text);
 }
 
 .buddy-chat-tool__chevron {
@@ -252,11 +252,11 @@ function toggle() {
 }
 
 .buddy-chat-tool.is-interrupted .buddy-chat-tool__icon {
-  color: var(--buddy-text-placeholder);
+  color: var(--buddy-text-muted);
 }
 
 .buddy-chat-tool.is-awaiting_approval .buddy-chat-tool__icon {
-  color: var(--buddy-accent-warning);
+  color: var(--buddy-status-warning-text);
 }
 
 .buddy-chat-tool__title {

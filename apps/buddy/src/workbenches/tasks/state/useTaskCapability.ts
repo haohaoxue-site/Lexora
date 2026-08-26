@@ -1,5 +1,5 @@
 import type { LexoraDesktopApi } from '@buddy-electron/shared/desktopApi'
-import type { LocalRunEvent } from '@buddy-electron/shared/localChatApi'
+import type { LocalConversation, LocalRunEvent } from '@buddy-electron/shared/localChatApi'
 import type { BuddyExecutionProfile } from '@buddy-shared/executionProfile'
 import type { ApplicationSettingsStore } from '@/stores/useApplicationSettingsStore'
 import type { LocalCapabilitiesStore } from '@/stores/useLocalCapabilitiesStore'
@@ -140,6 +140,7 @@ export function useTaskCapability(options: UseTaskCapabilityOptions) {
     activateDraftScope,
     activateGlobalDraft,
     activeConversation,
+    applyConversation,
     deleteConversation,
     listActiveConversationMessages,
     openConversation,
@@ -152,6 +153,7 @@ export function useTaskCapability(options: UseTaskCapabilityOptions) {
     drafts,
     onError: setError,
     persistWorkspaceState,
+    restoreConversationModelSelection: modelProviders.restoreConversationModelSelection,
     runSync,
     selectDefaultModel: modelProviders.selectDefaultModel,
     session: chatSession,
@@ -255,6 +257,66 @@ export function useTaskCapability(options: UseTaskCapabilityOptions) {
     && !isMutatingBranch.value
   ))
 
+  async function persistConversationModelSelection(
+    conversationId: string | null,
+    modelSelection: NonNullable<LocalConversation['modelSelection']> | null,
+  ): Promise<boolean> {
+    if (!conversationId || !modelSelection)
+      return true
+    try {
+      const conversation = await api.localChat.conversations.setModelSelection(
+        conversationId,
+        modelSelection,
+      )
+      applyConversation(conversation)
+      return true
+    }
+    catch (error) {
+      setError(error)
+      return false
+    }
+  }
+
+  function currentModelSelection(): NonNullable<LocalConversation['modelSelection']> | null {
+    const model = modelProviders.selectedModel.value
+    return model
+      ? {
+          modelId: model.modelId,
+          providerId: model.providerId,
+          reasoning: modelProviders.selectedEffort.value,
+          serviceTier: modelProviders.selectedServiceTier.value,
+        }
+      : null
+  }
+
+  async function selectChatModel(value: string) {
+    const conversationId = activeConversationId.value
+    const persistDefault = modelProviders.selectModel(value)
+    if (modelProviders.selectedModelId.value !== value) {
+      await persistDefault
+      return
+    }
+    const modelSelection = currentModelSelection()
+    await persistDefault
+    await persistConversationModelSelection(conversationId, modelSelection)
+  }
+
+  async function setChatEffort(value: Parameters<ModelProvidersStore['setSelectedEffort']>[0]) {
+    const conversationId = activeConversationId.value
+    const persistDefault = modelProviders.setSelectedEffort(value)
+    const modelSelection = currentModelSelection()
+    await persistDefault
+    await persistConversationModelSelection(conversationId, modelSelection)
+  }
+
+  async function setChatServiceTier(
+    value: Parameters<ModelProvidersStore['setSelectedServiceTier']>[0],
+  ) {
+    const conversationId = activeConversationId.value
+    modelProviders.setSelectedServiceTier(value)
+    await persistConversationModelSelection(conversationId, currentModelSelection())
+  }
+
   async function setExecutionProfile(value: BuddyExecutionProfile): Promise<boolean> {
     if (!canUpdateExecutionProfile.value)
       return false
@@ -283,6 +345,9 @@ export function useTaskCapability(options: UseTaskCapabilityOptions) {
     if (workspaceResult?.status === 'fulfilled')
       await workspacePersistence.hydrate(workspaceResult.value)
     if (activeConversationId.value) {
+      modelProviders.restoreConversationModelSelection(
+        activeConversation.value?.modelSelection ?? null,
+      )
       await Promise.all([
         refreshBranches(),
         runSync.refreshActiveConversation(),
@@ -302,6 +367,7 @@ export function useTaskCapability(options: UseTaskCapabilityOptions) {
     if (activeConversationId.value) {
       const conversation = conversations.value.find(item => item.id === activeConversationId.value)
       chatSession.setActiveBranch(conversation?.activeBranchId ?? null)
+      modelProviders.restoreConversationModelSelection(conversation?.modelSelection ?? null)
       await Promise.all([
         refreshBranches(),
         runSync.refreshActiveConversation(),
@@ -410,13 +476,13 @@ export function useTaskCapability(options: UseTaskCapabilityOptions) {
       providers: modelProviders.providers,
       removeAttachment: drafts.removeAttachment,
       selectedEffort: modelProviders.selectedEffort,
-      selectedModel: modelProviders.selectedModel,
+      selectedModel: modelProviders.selectedModelOption,
       selectedModelId: modelProviders.selectedModelId,
       selectedServiceTier: modelProviders.selectedServiceTier,
       selectAttachments,
-      selectModel: modelProviders.selectModel,
-      setSelectedEffort: modelProviders.setSelectedEffort,
-      setSelectedServiceTier: modelProviders.setSelectedServiceTier,
+      selectModel: selectChatModel,
+      setSelectedEffort: setChatEffort,
+      setSelectedServiceTier: setChatServiceTier,
       setExecutionProfile,
       updateComposerContent: drafts.updateComposerContent,
     },

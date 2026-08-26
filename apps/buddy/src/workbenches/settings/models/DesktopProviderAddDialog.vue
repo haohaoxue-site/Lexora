@@ -45,10 +45,7 @@ const {
   createCustom,
   customForm,
   customIdEdited,
-  defaultModelId,
-  enabledModels,
   filteredProviders,
-  finish,
   furthestStep,
   goToPreviousStep,
   login,
@@ -57,7 +54,6 @@ const {
   openManualModelDialog,
   providerModels,
   providerQuery,
-  requiresDefaultModel,
   saveManualModel,
   savingManualModel,
   selectedProvider,
@@ -104,11 +100,6 @@ const {
         <NStep :title="t('desktop.providers.serviceStep')" />
         <NStep :disabled="furthestStep < 2" :title="t('desktop.providers.connectionStep')" />
         <NStep :disabled="furthestStep < 3" :title="t('desktop.providers.modelsStep')" />
-        <NStep
-          v-if="requiresDefaultModel"
-          :disabled="furthestStep < 4"
-          :title="t('desktop.providers.defaultModelStep')"
-        />
       </NSteps>
 
       <div
@@ -271,17 +262,6 @@ const {
             </div>
           </div>
         </div>
-
-        <div v-else class="desktop-provider-add-dialog__step">
-          <h3>{{ t('desktop.providers.chooseDefaultModel') }}</h3>
-          <NSelect
-            v-model:value="defaultModelId"
-            :options="enabledModels.map(model => ({
-              label: model.displayName,
-              value: `${model.providerId}:${model.modelId}`,
-            }))"
-          />
-        </div>
       </div>
 
       <div v-if="step > 1" class="desktop-provider-add-dialog__footer">
@@ -293,14 +273,6 @@ const {
           type="primary"
           :disabled="!canComplete"
           @click="continueFromModels"
-        >
-          {{ requiresDefaultModel ? t('desktop.providers.continue') : t('desktop.providers.finishAndEnable') }}
-        </NButton>
-        <NButton
-          v-else-if="step === 4"
-          type="primary"
-          :disabled="!defaultModelId"
-          @click="finish"
         >
           {{ t('desktop.providers.finishAndEnable') }}
         </NButton>
@@ -361,7 +333,7 @@ const {
   flex: 0 0 auto;
   align-items: center;
   justify-content: space-between;
-  border-top: 1px solid var(--buddy-border-light);
+  border-top: 1px solid var(--buddy-border-subtle);
   margin-top: 0.8rem;
   padding-top: 0.8rem;
 }
@@ -407,7 +379,7 @@ const {
 
 .desktop-provider-add-dialog__provider-list-frame,
 .desktop-provider-add-dialog__models {
-  border: 1px solid var(--buddy-border-light);
+  border: 1px solid var(--buddy-border-subtle);
   border-radius: 0.65rem;
 }
 
@@ -428,8 +400,8 @@ const {
   min-height: 2.5rem;
   align-items: center;
   justify-content: space-between;
-  border-bottom: 1px solid var(--buddy-border-light);
-  background: var(--buddy-bg-surface);
+  border-bottom: 1px solid var(--buddy-border-subtle);
+  background: var(--buddy-surface-base);
   color: var(--buddy-text-secondary);
   font-size: 0.7rem;
   font-weight: 600;
@@ -439,7 +411,7 @@ const {
 .desktop-provider-add-dialog__provider-row,
 .desktop-provider-add-dialog__model-row {
   min-height: 3.8rem;
-  border-bottom: 1px solid var(--buddy-border-light);
+  border-bottom: 1px solid var(--buddy-border-subtle);
   padding: 0.65rem 0.8rem;
 }
 

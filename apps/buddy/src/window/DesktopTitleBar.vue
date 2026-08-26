@@ -239,9 +239,9 @@ function requireDesktopApi(): LexoraDesktopApi {
   position: relative;
   height: var(--buddy-titlebar-height);
   flex: none;
-  border-bottom: 1px solid var(--buddy-border-light);
-  background: var(--buddy-bg-body);
-  color: var(--buddy-text-primary);
+  border-bottom: 1px solid var(--buddy-border-subtle);
+  background: var(--buddy-surface-canvas);
+  color: var(--buddy-text-strong);
   user-select: none;
   -webkit-app-region: drag;
 }
@@ -275,21 +275,21 @@ function requireDesktopApi(): LexoraDesktopApi {
   cursor: default;
 
   &:hover {
-    background: var(--buddy-fill-base);
-    color: var(--buddy-text-primary);
+    background: var(--buddy-state-hover);
+    color: var(--buddy-text-strong);
   }
 
   &:focus-visible {
-    outline: 2px solid var(--buddy-accent-primary);
+    outline: 2px solid var(--buddy-focus-ring);
     outline-offset: -2px;
   }
 
   &.is-active {
-    color: var(--buddy-accent-primary);
+    color: var(--buddy-accent-text);
   }
 
   &.is-close:hover {
-    background: var(--buddy-accent-danger);
+    background: var(--buddy-status-danger-solid);
     color: var(--buddy-text-on-accent);
   }
 

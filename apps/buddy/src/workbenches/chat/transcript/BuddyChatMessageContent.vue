@@ -201,7 +201,7 @@ function previewLeaveTransition(): Promise<void> {
   scrollbar-width: thin;
 
   &:hover {
-    scrollbar-color: color-mix(in srgb, var(--buddy-text-placeholder) 65%, transparent) transparent;
+    scrollbar-color: var(--buddy-border-strong) transparent;
   }
 
   &::-webkit-scrollbar {
@@ -214,7 +214,7 @@ function previewLeaveTransition(): Promise<void> {
   }
 
   &:hover::-webkit-scrollbar-thumb {
-    background: color-mix(in srgb, var(--buddy-text-placeholder) 65%, transparent);
+    background: var(--buddy-border-strong);
   }
 }
 
@@ -235,9 +235,9 @@ function previewLeaveTransition(): Promise<void> {
     width: 10rem;
     max-width: 100%;
     height: 7rem;
-    border: 1px solid var(--buddy-border-light);
+    border: 1px solid var(--buddy-border-subtle);
     border-radius: 0.65rem;
-    background: var(--buddy-bg-surface-raised);
+    background: var(--buddy-surface-raised);
   }
 
   figcaption {
@@ -273,7 +273,7 @@ function previewLeaveTransition(): Promise<void> {
   }
 
   &:focus-visible {
-    outline: 2px solid var(--buddy-accent-primary);
+    outline: 2px solid var(--buddy-focus-ring);
     outline-offset: 2px;
   }
 }
@@ -288,14 +288,14 @@ function previewLeaveTransition(): Promise<void> {
 
   span {
     overflow: hidden;
-    color: var(--buddy-text-regular);
+    color: var(--buddy-text-primary);
     font-size: var(--buddy-chat-meta-font-size);
     text-overflow: ellipsis;
     white-space: nowrap;
   }
 
   small {
-    color: var(--buddy-text-placeholder);
+    color: var(--buddy-text-muted);
     font-size: 0.62rem;
     font-weight: 700;
   }
@@ -306,15 +306,15 @@ function previewLeaveTransition(): Promise<void> {
   max-width: 100%;
   min-width: 0;
   border-radius: 0.9rem;
-  background: var(--buddy-bg-surface-raised);
-  color: var(--buddy-text-regular);
+  background: var(--buddy-surface-raised);
+  color: var(--buddy-text-primary);
   line-height: 1.7;
   padding: 0.75rem 0.95rem;
   overflow-wrap: anywhere;
 
   .is-user & {
     justify-self: end;
-    background: color-mix(in srgb, var(--buddy-accent-primary) 13%, var(--buddy-bg-surface));
+    background: var(--buddy-accent-surface);
   }
 
   .is-assistant &,
@@ -365,12 +365,10 @@ function previewLeaveTransition(): Promise<void> {
   box-sizing: border-box;
   align-items: center;
   gap: 3px;
-  border: 1px solid rgb(255 255 255 / 14%);
+  border: 1px solid var(--buddy-media-overlay-border);
   border-radius: 10px;
-  background: rgb(29 33 31 / 88%);
-  box-shadow:
-    0 8px 22px rgb(0 0 0 / 18%),
-    0 2px 6px rgb(0 0 0 / 12%);
+  background: var(--buddy-media-overlay-background);
+  box-shadow: var(--buddy-media-overlay-shadow);
   padding: 2px 3px;
   backdrop-filter: blur(12px);
 }
@@ -385,7 +383,7 @@ function previewLeaveTransition(): Promise<void> {
   width: 1px;
   height: 16px;
   flex: none;
-  background: rgb(255 255 255 / 16%);
+  background: var(--buddy-media-overlay-divider);
 }
 
 :global(.buddy-chat-image-preview-toolbar__button) {
@@ -397,7 +395,7 @@ function previewLeaveTransition(): Promise<void> {
   border: 0;
   border-radius: var(--buddy-radius-micro);
   background: transparent;
-  color: rgb(255 255 255 / 82%);
+  color: var(--buddy-media-overlay-text);
   cursor: pointer;
   padding: 0;
   transition:
@@ -406,17 +404,17 @@ function previewLeaveTransition(): Promise<void> {
 }
 
 :global(.buddy-chat-image-preview-toolbar__button:hover) {
-  background: rgb(255 255 255 / 13%);
-  color: #fff;
+  background: var(--buddy-media-overlay-hover);
+  color: var(--buddy-text-on-accent);
 }
 
 :global(.buddy-chat-image-preview-toolbar__button:focus-visible) {
-  outline: 2px solid color-mix(in srgb, var(--buddy-accent-primary) 85%, white);
+  outline: 2px solid var(--buddy-media-overlay-focus);
   outline-offset: 1px;
 }
 
 :global(.buddy-chat-image-preview-toolbar__button.is-close:hover) {
-  background: color-mix(in srgb, var(--buddy-accent-danger) 72%, transparent);
+  background: var(--buddy-media-overlay-danger-hover);
 }
 
 :global(.buddy-chat-image-preview-toolbar__button .n-base-icon) {

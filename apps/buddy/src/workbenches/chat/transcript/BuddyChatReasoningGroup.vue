@@ -101,7 +101,7 @@ const title = computed(() => t(props.group.reasoningKind === 'summary'
   min-width: 0;
   gap: var(--buddy-chat-gap-tight);
   margin-top: var(--buddy-chat-gap-tight);
-  border-left: 2px solid color-mix(in srgb, var(--buddy-border-base) 78%, transparent);
+  border-left: 2px solid var(--buddy-border-strong);
   padding-left: 0.625rem;
 }
 

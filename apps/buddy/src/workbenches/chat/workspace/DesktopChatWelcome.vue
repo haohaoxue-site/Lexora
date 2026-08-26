@@ -80,7 +80,7 @@ const { t } = useBuddyI18n(() => props.language)
 
   h1 {
     margin: 0;
-    color: var(--buddy-text-primary);
+    color: var(--buddy-text-strong);
     font-family: "Noto Serif CJK SC", "Source Han Serif SC", "Songti SC", STSong, SimSun, serif;
     font-size: clamp(1.75rem, 2.5vw, 2.15rem);
     font-weight: 600;

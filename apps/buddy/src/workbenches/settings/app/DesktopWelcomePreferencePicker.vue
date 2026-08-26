@@ -117,10 +117,10 @@ function selectPreference(preference: DesktopChatWelcomePreference) {
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: 0.65rem;
-  border: 1px solid var(--buddy-border-base);
+  border: 1px solid var(--buddy-border-strong);
   border-radius: 0.25rem;
-  background: var(--buddy-bg-surface-raised);
-  color: var(--buddy-text-regular);
+  background: var(--buddy-surface-raised);
+  color: var(--buddy-text-primary);
   padding: 0.35rem 0.65rem;
   font: inherit;
   font-size: 0.8rem;
@@ -136,13 +136,13 @@ function selectPreference(preference: DesktopChatWelcomePreference) {
   }
 
   &:hover {
-    border-color: color-mix(in srgb, var(--buddy-accent-primary) 52%, var(--buddy-border-base));
+    border-color: var(--buddy-accent-border);
   }
 
   &:focus-visible {
-    border-color: var(--buddy-accent-primary);
+    border-color: var(--buddy-focus-ring);
     outline: 0;
-    box-shadow: 0 0 0 2px color-mix(in srgb, var(--buddy-accent-primary) 18%, transparent);
+    box-shadow: 0 0 0 2px var(--buddy-accent-surface-hover);
   }
 }
 
@@ -158,12 +158,10 @@ function selectPreference(preference: DesktopChatWelcomePreference) {
 .desktop-welcome-preference-picker__panel {
   width: min(34rem, calc(100vw - 2rem));
   overflow: hidden;
-  border: 1px solid var(--buddy-border-light);
+  border: 1px solid var(--buddy-border-subtle);
   border-radius: 0.65rem;
-  background: var(--buddy-bg-surface-raised);
-  box-shadow:
-    0 0.25rem 0.7rem rgb(25 30 38 / 10%),
-    0 1.1rem 2.6rem rgb(25 30 38 / 14%);
+  background: var(--buddy-surface-raised);
+  box-shadow: var(--buddy-shadow-overlay);
   padding: 0.8rem;
 }
 
@@ -171,7 +169,7 @@ function selectPreference(preference: DesktopChatWelcomePreference) {
   display: flex;
   align-items: center;
   min-height: 1.8rem;
-  color: var(--buddy-text-primary);
+  color: var(--buddy-text-strong);
 
   strong {
     font-size: 0.82rem;
@@ -182,10 +180,10 @@ function selectPreference(preference: DesktopChatWelcomePreference) {
 .desktop-welcome-preference-picker__random {
   width: 100%;
   min-height: 2.55rem;
-  border: 1px solid var(--buddy-border-light);
+  border: 1px solid var(--buddy-border-subtle);
   border-radius: 0.45rem;
-  background: var(--buddy-bg-surface);
-  color: var(--buddy-text-regular);
+  background: var(--buddy-surface-base);
+  color: var(--buddy-text-primary);
   font: inherit;
   font-size: 0.78rem;
   font-weight: 600;
@@ -199,26 +197,26 @@ function selectPreference(preference: DesktopChatWelcomePreference) {
   }
 
   &:not(:disabled):hover {
-    border-color: color-mix(in srgb, var(--buddy-accent-primary) 46%, var(--buddy-border-light));
-    background: color-mix(in srgb, var(--buddy-accent-primary) 4%, var(--buddy-bg-surface));
+    border-color: var(--buddy-accent-border);
+    background: var(--buddy-accent-surface);
   }
 
   &:focus-visible {
-    outline: 2px solid var(--buddy-accent-primary);
+    outline: 2px solid var(--buddy-focus-ring);
     outline-offset: 2px;
   }
 
   &.is-selected {
-    border-color: color-mix(in srgb, var(--buddy-accent-primary) 72%, var(--buddy-border-light));
-    background: color-mix(in srgb, var(--buddy-accent-primary) 7%, var(--buddy-bg-surface));
-    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--buddy-accent-primary) 18%, transparent);
+    border-color: var(--buddy-focus-ring);
+    background: var(--buddy-accent-surface-hover);
+    color: var(--buddy-accent-on-surface);
   }
 }
 
 .desktop-welcome-preference-picker__specific {
   display: grid;
   gap: 0.55rem;
-  border-top: 1px solid var(--buddy-border-light);
+  border-top: 1px solid var(--buddy-border-subtle);
   margin-top: 0.75rem;
   padding-top: 0.7rem;
 
@@ -236,7 +234,7 @@ function selectPreference(preference: DesktopChatWelcomePreference) {
   overscroll-behavior-inline: contain;
   padding: 0.1rem 0.1rem 0.45rem;
   scroll-snap-type: inline proximity;
-  scrollbar-color: var(--buddy-border-base) transparent;
+  scrollbar-color: var(--buddy-border-strong) transparent;
   scrollbar-width: thin;
 }
 
@@ -247,10 +245,10 @@ function selectPreference(preference: DesktopChatWelcomePreference) {
   grid-template-rows: 7.6rem minmax(2.25rem, auto);
   align-items: center;
   gap: 0.2rem;
-  border: 1px solid var(--buddy-border-light);
+  border: 1px solid var(--buddy-border-subtle);
   border-radius: 0.5rem;
-  background: var(--buddy-bg-surface);
-  color: var(--buddy-text-regular);
+  background: var(--buddy-surface-base);
+  color: var(--buddy-text-primary);
   padding: 0.35rem 0.5rem 0.55rem;
   scroll-snap-align: start;
   text-align: center;
@@ -264,19 +262,19 @@ function selectPreference(preference: DesktopChatWelcomePreference) {
   }
 
   &:not(:disabled):hover {
-    border-color: color-mix(in srgb, var(--buddy-accent-primary) 46%, var(--buddy-border-light));
-    background: color-mix(in srgb, var(--buddy-accent-primary) 4%, var(--buddy-bg-surface));
+    border-color: var(--buddy-accent-border);
+    background: var(--buddy-accent-surface);
   }
 
   &:focus-visible {
-    outline: 2px solid var(--buddy-accent-primary);
+    outline: 2px solid var(--buddy-focus-ring);
     outline-offset: 2px;
   }
 
   &.is-selected {
-    border-color: color-mix(in srgb, var(--buddy-accent-primary) 72%, var(--buddy-border-light));
-    background: color-mix(in srgb, var(--buddy-accent-primary) 7%, var(--buddy-bg-surface));
-    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--buddy-accent-primary) 18%, transparent);
+    border-color: var(--buddy-focus-ring);
+    background: var(--buddy-accent-surface-hover);
+    color: var(--buddy-accent-on-surface);
   }
 
   > span {

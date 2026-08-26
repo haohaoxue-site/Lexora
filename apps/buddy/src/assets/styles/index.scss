@@ -8,11 +8,6 @@
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 
-  --buddy-bg-body: #f5f4f1;
-  --buddy-bg-app-sidebar: #eeede9;
-  --buddy-bg-workspace-sidebar: #f7f6f3;
-  --buddy-bg-surface: #fbfaf8;
-  --buddy-bg-surface-raised: #ffffff;
   --buddy-app-sidebar-width: 14rem;
   --buddy-workspace-sidebar-width: 16rem;
   --buddy-titlebar-height: 2rem;
@@ -37,38 +32,24 @@
   --buddy-sidebar-account-font-weight: 600;
   --buddy-radius-micro: 0.375rem;
   --buddy-icon-button-radius: var(--buddy-radius-micro);
+  --buddy-composer-control-height: 2rem;
+  --buddy-composer-control-radius: 0.5rem;
   --buddy-menu-radius: 6px;
   --buddy-menu-item-radius: 3px;
   --buddy-menu-row-height: 32px;
   --buddy-menu-row-gap: 2px;
   --buddy-menu-icon-size: 16px;
-  --buddy-fill-base: #eceae6;
-  --buddy-fill-light: #f1f0ed;
-  --buddy-nav-active-bg: #e3e2de;
-  --buddy-border-base: #d4d1ca;
-  --buddy-border-light: #e4e1db;
-  --buddy-text-primary: #202521;
-  --buddy-text-regular: #414843;
-  --buddy-text-secondary: #707772;
-  --buddy-text-placeholder: #969c98;
-  --buddy-text-on-accent: #ffffff;
-  --buddy-user-avatar-background: #b8bec7;
-  --buddy-user-avatar-foreground: #fbfaf8;
-  --buddy-accent-primary: #315a9e;
-  --buddy-accent-primary-hover: #3e6caf;
-  --buddy-accent-primary-pressed: #24477f;
-  --buddy-accent-success: #2f9d6a;
-  --buddy-accent-warning: #d68b32;
-  --buddy-accent-danger: #c85252;
+  --buddy-motion-state-duration: 100ms;
+  --buddy-motion-state-easing: cubic-bezier(0.2, 0, 0, 1);
   --buddy-font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
-  --buddy-chat-final-color: var(--buddy-text-regular);
-  --buddy-chat-process-color: color-mix(in srgb, var(--buddy-text-regular) 28%, var(--buddy-text-secondary));
-  --buddy-chat-user-color: var(--buddy-text-regular);
+  --buddy-chat-final-color: var(--buddy-text-primary);
+  --buddy-chat-process-color: var(--buddy-text-secondary);
+  --buddy-chat-user-color: var(--buddy-text-primary);
   --buddy-chat-meta-color: var(--buddy-text-secondary);
-  --buddy-chat-tool-title-color: color-mix(in srgb, var(--buddy-text-regular) 28%, var(--buddy-text-secondary));
+  --buddy-chat-tool-title-color: var(--buddy-text-secondary);
   --buddy-chat-tool-body-color: var(--buddy-text-secondary);
   --buddy-chat-code-color: var(--buddy-text-secondary);
-  --buddy-chat-danger-color: color-mix(in srgb, var(--buddy-accent-danger) 82%, var(--buddy-text-secondary));
+  --buddy-chat-danger-color: var(--buddy-status-danger-text);
   --buddy-chat-final-font-size: 14px;
   --buddy-chat-final-line-height: 1.64;
   --buddy-chat-final-heading-font-size: 14px;
@@ -89,46 +70,16 @@
   --buddy-chat-avatar-size: 25px;
   --buddy-chat-avatar-gap: 8px;
   --buddy-chat-node-icon-size: 16px;
-  --buddy-shadow-raised: 0 10px 28px rgb(31 37 33 / 10%);
-  --buddy-shadow-menu:
-    0 1px 2px rgb(31 37 33 / 8%),
-    0 8px 18px rgb(31 37 33 / 12%);
-  --buddy-shadow-window:
-    inset 0 0 0 1px rgb(255 255 255 / 70%),
-    0 12px 32px rgb(31 37 33 / 10%);
 }
 
-.buddy-app.is-dark {
+:root[data-buddy-theme='dark'] {
   color-scheme: dark;
-  --buddy-bg-body: #171816;
-  --buddy-bg-app-sidebar: #191a18;
-  --buddy-bg-workspace-sidebar: #1d1e1b;
-  --buddy-bg-surface: #20211e;
-  --buddy-bg-surface-raised: #272925;
-  --buddy-fill-base: #2b2e2a;
-  --buddy-fill-light: #20221f;
-  --buddy-nav-active-bg: #2b2e2a;
-  --buddy-border-base: #444741;
-  --buddy-border-light: #343731;
-  --buddy-text-primary: #f0f1ed;
-  --buddy-text-regular: #d6d8d2;
-  --buddy-text-secondary: #a3a79f;
-  --buddy-text-placeholder: #7f847c;
-  --buddy-user-avatar-background: #59616b;
-  --buddy-user-avatar-foreground: #f0f1ed;
-  --buddy-accent-primary: #4e73b8;
-  --buddy-accent-primary-hover: #5b80c5;
-  --buddy-accent-primary-pressed: #3f609f;
-  --buddy-accent-success: #50b77d;
-  --buddy-accent-warning: #e1a257;
-  --buddy-accent-danger: #dd7272;
-  --buddy-shadow-raised: 0 10px 28px rgb(0 0 0 / 28%);
-  --buddy-shadow-menu:
-    0 1px 2px rgb(0 0 0 / 22%),
-    0 8px 18px rgb(0 0 0 / 30%);
-  --buddy-shadow-window:
-    inset 0 0 0 1px rgb(255 255 255 / 5%),
-    0 12px 32px rgb(0 0 0 / 30%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --buddy-motion-state-duration: 0ms;
+  }
 }
 
 .buddy-app {
@@ -158,8 +109,8 @@ body,
 }
 
 body {
-  background: var(--buddy-bg-body);
-  color: var(--buddy-text-primary);
+  background: var(--buddy-surface-canvas, #fafaf8);
+  color: var(--buddy-text-strong, #202522);
 }
 
 button,

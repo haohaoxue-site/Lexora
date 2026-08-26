@@ -125,7 +125,7 @@ const emptyTitle = computed(() => t(isUnseenEmpty.value
   height: min(332px, calc(100dvh - 88px));
   grid-template-rows: minmax(0, 1fr);
   overflow: hidden;
-  background: var(--buddy-bg-surface-raised);
+  background: var(--buddy-surface-raised);
 }
 
 .desktop-notification-center.has-header {
@@ -140,8 +140,8 @@ const emptyTitle = computed(() => t(isUnseenEmpty.value
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  background: var(--buddy-bg-surface-raised);
-  box-shadow: 0 8px 18px -10px rgb(31 37 33 / 24%);
+  background: var(--buddy-surface-raised);
+  box-shadow: var(--buddy-shadow-soft);
   padding: 0 8px;
 }
 
@@ -169,16 +169,16 @@ const emptyTitle = computed(() => t(isUnseenEmpty.value
 }
 
 .desktop-notification-center__filter:hover {
-  color: var(--buddy-text-primary);
+  color: var(--buddy-text-strong);
 }
 
 .desktop-notification-center__filter:focus-visible {
-  outline: 2px solid var(--buddy-accent-primary);
+  outline: 2px solid var(--buddy-focus-ring);
   outline-offset: 1px;
 }
 
 .desktop-notification-center__filter.is-active {
-  color: var(--buddy-accent-primary);
+  color: var(--buddy-accent-text);
   font-weight: 600;
 }
 
@@ -189,12 +189,12 @@ const emptyTitle = computed(() => t(isUnseenEmpty.value
   left: 5px;
   height: 2px;
   border-radius: 1px;
-  background: var(--buddy-accent-primary);
+  background: var(--buddy-accent-solid);
   content: '';
 }
 
 .desktop-notification-center__filter span {
-  color: var(--buddy-accent-primary);
+  color: var(--buddy-accent-text);
   font-size: 11px;
   font-weight: 500;
   font-variant-numeric: tabular-nums;
@@ -209,7 +209,7 @@ const emptyTitle = computed(() => t(isUnseenEmpty.value
 }
 
 .desktop-notification-center__mark-all:hover {
-  color: var(--buddy-accent-primary);
+  color: var(--buddy-accent-text);
 }
 
 .desktop-notification-center__loading,
@@ -217,7 +217,7 @@ const emptyTitle = computed(() => t(isUnseenEmpty.value
   display: grid;
   min-height: 0;
   place-items: center;
-  background: var(--buddy-bg-surface);
+  background: var(--buddy-surface-base);
 }
 
 .desktop-notification-center__empty {
@@ -233,13 +233,13 @@ const emptyTitle = computed(() => t(isUnseenEmpty.value
   height: 32px;
   place-items: center;
   border-radius: 8px;
-  background: var(--buddy-fill-light);
+  background: var(--buddy-surface-subtle);
   color: var(--buddy-text-secondary);
   font-size: 16px;
 }
 
 .desktop-notification-center__empty b {
-  color: var(--buddy-text-primary);
+  color: var(--buddy-text-strong);
   font-size: 14px;
   font-weight: 600;
 }

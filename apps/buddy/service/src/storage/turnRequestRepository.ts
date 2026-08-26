@@ -1,6 +1,6 @@
 import type { DatabaseSync } from 'node:sqlite'
 import type { BuddyExecutionProfile } from '../../../shared/executionProfile'
-import type { BuddyServiceTier } from '../../../shared/modelSelection'
+import type { BuddyServiceTier, BuddyThinkingLevel } from '../../../shared/modelSelection'
 import type { RunInputContextItem } from './runInputRepository'
 import { withTransaction } from './database'
 
@@ -19,7 +19,7 @@ export interface PrepareTurnRequestInput {
     attachmentIds: readonly string[]
     contextItems: readonly RunInputContextItem[]
     prompt: string
-    reasoning: string | null
+    reasoning: BuddyThinkingLevel | null
     serviceTier: BuddyServiceTier | null
   }
   runId: string
@@ -98,6 +98,10 @@ interface MessageBindingRow {
   role: string
 }
 
+interface RunModelSelectionRow {
+  model_selection_json: string
+}
+
 export interface TurnRequestRepository {
   edit: (input: EditTurnRequestInput) => TurnRequestRecord
   findByRequestId: (requestId: string) => TurnRequestRecord | null
@@ -117,8 +121,9 @@ export function createTurnRequestRepository(database: DatabaseSync): TurnRequest
   `)
   const insertConversation = database.prepare(`
     INSERT INTO conversations (
-      id, project_id, title, active_branch_id, created_at, updated_at, execution_profile
-    ) VALUES (?, ?, ?, NULL, ?, ?, ?)
+      id, project_id, title, active_branch_id, created_at, updated_at, execution_profile,
+      model_selection_json
+    ) VALUES (?, ?, ?, NULL, ?, ?, ?, NULL)
   `)
   const insertBranch = database.prepare(`
     INSERT INTO conversation_branches (
@@ -132,6 +137,9 @@ export function createTurnRequestRepository(database: DatabaseSync): TurnRequest
   `)
   const activateBranch = database.prepare(`
     UPDATE conversations SET active_branch_id = ?, updated_at = ? WHERE id = ?
+  `)
+  const updateConversationModel = database.prepare(`
+    UPDATE conversations SET model_selection_json = ?, updated_at = ? WHERE id = ?
   `)
   const promoteConversation = database.prepare(`
     UPDATE conversations
@@ -200,6 +208,17 @@ export function createTurnRequestRepository(database: DatabaseSync): TurnRequest
     SELECT ?, prompt, attachment_ids_json, context_items_json,
       reasoning, service_tier, ?
     FROM run_inputs WHERE run_id = ?
+  `)
+  const findRunModelSelection = database.prepare(`
+    SELECT json_object(
+      'providerId', runs.provider,
+      'modelId', runs.model,
+      'reasoning', run_inputs.reasoning,
+      'serviceTier', run_inputs.service_tier
+    ) AS model_selection_json
+    FROM runs
+    INNER JOIN run_inputs ON run_inputs.run_id = runs.id
+    WHERE runs.id = ?
   `)
 
   const findByRequestId = (requestId: string): TurnRequestRecord | null => {
@@ -285,6 +304,11 @@ export function createTurnRequestRepository(database: DatabaseSync): TurnRequest
           input.runInput.reasoning,
           input.runInput.serviceTier,
           input.createdAt,
+        )
+        updateConversationModel.run(
+          stringifyModelSelection(input),
+          input.createdAt,
+          input.conversationId,
         )
         insertRequest.run(
           input.requestId,
@@ -384,6 +408,11 @@ export function createTurnRequestRepository(database: DatabaseSync): TurnRequest
           input.runInput.serviceTier,
           input.createdAt,
         )
+        updateConversationModel.run(
+          stringifyModelSelection(input),
+          input.createdAt,
+          input.conversationId,
+        )
         insertRequest.run(
           input.requestId,
           input.requestFingerprint,
@@ -449,6 +478,16 @@ export function createTurnRequestRepository(database: DatabaseSync): TurnRequest
         )
         if (Number(cloneRunInput.run(input.runId, input.createdAt, input.sourceRunId).changes) !== 1)
           throw new TurnRequestConflictError()
+        const modelSelection = findRunModelSelection.get(input.runId) as
+          | RunModelSelectionRow
+          | undefined
+        if (!modelSelection)
+          throw new TurnRequestConflictError()
+        updateConversationModel.run(
+          modelSelection.model_selection_json,
+          input.createdAt,
+          input.conversationId,
+        )
         insertRequest.run(
           input.requestId,
           input.requestFingerprint,
@@ -537,4 +576,13 @@ function toRecord(row: TurnRequestRow, created: boolean): TurnRequestRecord {
     requestId: row.request_id,
     runId: row.run_id,
   }
+}
+
+function stringifyModelSelection(input: PrepareTurnRequestInput): string {
+  return JSON.stringify({
+    providerId: input.provider,
+    modelId: input.model,
+    reasoning: input.runInput.reasoning,
+    serviceTier: input.runInput.serviceTier,
+  })
 }

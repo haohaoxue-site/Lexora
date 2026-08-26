@@ -109,12 +109,12 @@ async function leaveProvider() {
 }
 
 .desktop-provider-settings-view__breadcrumb button:hover {
-  color: var(--buddy-accent-primary);
+  color: var(--buddy-accent-text);
 }
 
 .desktop-provider-settings-view__breadcrumb button:focus-visible {
   border-radius: var(--buddy-radius-micro);
-  outline: 2px solid var(--buddy-accent-primary);
+  outline: 2px solid var(--buddy-focus-ring);
   outline-offset: 2px;
 }
 

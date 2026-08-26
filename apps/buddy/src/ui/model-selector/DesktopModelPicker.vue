@@ -147,14 +147,14 @@ function modelKey(model: Pick<LocalRuntimeModelOption, 'modelId' | 'providerId'>
   width: min(29rem, calc(100vw - 18rem));
   min-width: 22rem;
   max-height: min(25rem, 62vh);
-  border: 1px solid var(--buddy-border-light);
-  border-radius: 0.8rem;
-  background: color-mix(in srgb, var(--buddy-bg-surface-raised) 97%, transparent);
-  box-shadow: 0 1rem 2.5rem rgb(23 33 28 / 16%);
+  border: 1px solid var(--buddy-border-subtle);
+  border-radius: var(--desktop-model-popover-radius, 3px);
+  background: var(--buddy-surface-raised);
+  box-shadow: var(--buddy-shadow-overlay);
 }
 
 .desktop-model-picker__search {
-  border-bottom: 1px solid var(--buddy-border-light);
+  border-bottom: 1px solid var(--buddy-border-subtle);
   padding: 0.55rem;
 }
 
@@ -176,16 +176,16 @@ function modelKey(model: Pick<LocalRuntimeModelOption, 'modelId' | 'providerId'>
 }
 
 .desktop-model-picker__providers {
-  border-right: 1px solid var(--buddy-border-light);
-  background: color-mix(in srgb, var(--buddy-fill-base) 48%, transparent);
+  border-right: 1px solid var(--buddy-border-subtle);
+  background: var(--buddy-surface-subtle);
 }
 
 .desktop-model-picker__provider,
 .desktop-model-picker__model {
   border: 0;
-  border-radius: 0.5rem;
+  border-radius: var(--buddy-menu-item-radius);
   background: transparent;
-  color: var(--buddy-text-primary);
+  color: var(--buddy-text-strong);
   cursor: pointer;
   font: inherit;
   text-align: left;
@@ -215,12 +215,13 @@ function modelKey(model: Pick<LocalRuntimeModelOption, 'modelId' | 'providerId'>
 .desktop-model-picker__provider.is-active,
 .desktop-model-picker__model:hover,
 .desktop-model-picker__model:focus-visible {
-  background: var(--buddy-fill-base);
+  background: var(--buddy-state-hover);
   outline: 0;
 }
 
 .desktop-model-picker__provider.is-active {
-  color: var(--buddy-accent-primary);
+  background: var(--buddy-accent-surface);
+  color: var(--buddy-accent-on-surface);
   font-weight: 650;
 }
 
@@ -238,7 +239,7 @@ function modelKey(model: Pick<LocalRuntimeModelOption, 'modelId' | 'providerId'>
 }
 
 .desktop-model-picker__provider small {
-  color: var(--buddy-text-placeholder);
+  color: var(--buddy-text-muted);
   font-size: 0.66rem;
 }
 
@@ -255,13 +256,13 @@ function modelKey(model: Pick<LocalRuntimeModelOption, 'modelId' | 'providerId'>
 }
 
 .desktop-model-picker__model-copy small {
-  color: var(--buddy-text-placeholder);
+  color: var(--buddy-text-muted);
   font-size: 0.66rem;
 }
 
 .desktop-model-picker__empty {
   min-height: 8rem;
-  color: var(--buddy-text-placeholder);
+  color: var(--buddy-text-muted);
   font-size: 0.72rem;
   padding: 2.5rem 1rem;
   text-align: center;

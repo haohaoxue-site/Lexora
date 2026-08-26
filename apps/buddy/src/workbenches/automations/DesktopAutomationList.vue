@@ -205,7 +205,7 @@ function isPending(automation: LocalAutomationListItem): boolean {
 
   &:hover,
   &:focus-within {
-    background: var(--buddy-fill-light);
+    background: var(--buddy-surface-subtle);
   }
 }
 
@@ -222,7 +222,7 @@ function isPending(automation: LocalAutomationListItem): boolean {
 
   &:focus-visible {
     border-radius: var(--n-border-radius, 3px);
-    outline: 2px solid var(--buddy-accent-primary);
+    outline: 2px solid var(--buddy-focus-ring);
     outline-offset: 2px;
   }
 }
@@ -237,7 +237,7 @@ function isPending(automation: LocalAutomationListItem): boolean {
 .desktop-automation-plan__name {
   overflow: hidden;
   flex: none;
-  color: var(--buddy-text-primary);
+  color: var(--buddy-text-strong);
   font-size: 14px;
   font-weight: 650;
   text-overflow: ellipsis;
@@ -256,7 +256,7 @@ function isPending(automation: LocalAutomationListItem): boolean {
 }
 
 .desktop-automation-plan__blocked {
-  color: var(--buddy-accent-warning);
+  color: var(--buddy-status-warning-text);
 }
 
 .desktop-automation-plan__trailing {
@@ -308,7 +308,7 @@ function isPending(automation: LocalAutomationListItem): boolean {
   }
 
   strong {
-    color: var(--buddy-text-primary);
+    color: var(--buddy-text-strong);
     font-size: 16px;
   }
 

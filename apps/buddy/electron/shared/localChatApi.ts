@@ -212,6 +212,7 @@ export const LOCAL_CHAT_IPC_CHANNELS = {
   conversationsListMessages: 'lexora:buddy:conversations:list-messages',
   conversationsRename: 'lexora:buddy:conversations:rename',
   conversationsSetExecutionProfile: 'lexora:buddy:conversations:set-execution-profile',
+  conversationsSetModelSelection: 'lexora:buddy:conversations:set-model-selection',
   conversationsListTimeline: 'lexora:buddy:conversations:list-timeline',
   notificationsList: 'lexora:buddy:notifications:list',
   notificationsMarkAllSeen: 'lexora:buddy:notifications:mark-all-seen',
@@ -413,6 +414,10 @@ export interface LocalChatApi {
     setExecutionProfile: (
       conversationId: string,
       executionProfile: BuddyExecutionProfile,
+    ) => Promise<LocalConversation>
+    setModelSelection: (
+      conversationId: string,
+      modelSelection: NonNullable<LocalConversation['modelSelection']>,
     ) => Promise<LocalConversation>
     listTimeline: (input: {
       branchId?: string

@@ -52,9 +52,10 @@ function confirmFullAccess() {
       <NButton
         class="desktop-execution-profile-selector__trigger"
         :class="{ 'is-full-access': fullAccess }"
-        secondary
+        quaternary
         size="small"
         :aria-label="t('desktop.chat.executionProfileOpen')"
+        :aria-expanded="popoverOpen"
       >
         <template #icon>
           <NIcon :component="executionProfileIcon" />
@@ -102,23 +103,44 @@ function confirmFullAccess() {
 <style scoped lang="scss">
 .desktop-execution-profile-selector__trigger {
   min-width: 0;
-  border-radius: 0.6rem;
+  height: var(--buddy-composer-control-height);
+  border-radius: var(--buddy-composer-control-radius);
+  background-color: transparent;
   color: var(--buddy-text-secondary);
+  transition:
+    background-color var(--buddy-motion-state-duration) var(--buddy-motion-state-easing),
+    color var(--buddy-motion-state-duration) var(--buddy-motion-state-easing);
+
+  &.n-button:not(.n-button--disabled):not(.is-full-access):hover,
+  &.n-button:not(.n-button--disabled):not(.is-full-access):focus-visible {
+    background-color: var(--buddy-accent-surface-subtle);
+    color: var(--buddy-text-strong);
+  }
+
+  &.n-button:not(.n-button--disabled):not(.is-full-access)[aria-expanded='true'] {
+    background-color: var(--buddy-accent-surface);
+    color: var(--buddy-text-strong);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--buddy-focus-ring);
+    outline-offset: -2px;
+  }
 
   &.is-full-access {
-    background-color: color-mix(in srgb, var(--buddy-accent-danger) 9%, transparent);
-    color: var(--buddy-accent-danger);
+    background-color: var(--buddy-status-danger-surface);
+    color: var(--buddy-status-danger-text);
   }
 
   &.is-full-access:hover,
   &.is-full-access:focus {
-    background-color: color-mix(in srgb, var(--buddy-accent-danger) 13%, transparent);
-    color: var(--buddy-accent-danger);
+    background-color: var(--buddy-status-danger-surface-hover);
+    color: var(--buddy-status-danger-text);
   }
 
   &.is-full-access:active {
-    background-color: color-mix(in srgb, var(--buddy-accent-danger) 17%, transparent);
-    color: var(--buddy-accent-danger);
+    background-color: var(--buddy-status-danger-border);
+    color: var(--buddy-status-danger-text);
   }
 }
 
@@ -138,7 +160,7 @@ function confirmFullAccess() {
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
-  border-top: 1px solid var(--buddy-border-light);
+  border-top: 1px solid var(--buddy-border-subtle);
   margin-top: 0.8rem;
   padding-top: 0.8rem;
 
@@ -148,22 +170,22 @@ function confirmFullAccess() {
   }
 
   strong {
-    color: var(--buddy-text-primary);
+    color: var(--buddy-text-strong);
     font-size: 0.86rem;
   }
 
   &.is-full-access strong {
-    color: var(--buddy-accent-danger);
+    color: var(--buddy-status-danger-text);
   }
 
   small {
-    color: var(--buddy-text-placeholder);
+    color: var(--buddy-text-muted);
     font-size: 0.68rem;
     line-height: 1.4;
   }
 }
 
 .desktop-execution-profile-selector__switch.is-full-access {
-  --n-rail-color-active: var(--buddy-accent-danger) !important;
+  --n-rail-color-active: var(--buddy-status-danger-solid) !important;
 }
 </style>

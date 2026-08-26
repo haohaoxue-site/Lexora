@@ -59,7 +59,7 @@ const { t } = useBuddyI18n(() => props.language)
   }
 
   strong {
-    color: var(--buddy-text-primary);
+    color: var(--buddy-text-strong);
     font-family: var(--buddy-font-mono);
     font-size: 1.15rem;
     letter-spacing: 0.03em;
@@ -69,7 +69,7 @@ const { t } = useBuddyI18n(() => props.language)
 .desktop-about-dialog__versions {
   display: grid;
   gap: 0.2rem;
-  border-top: 1px solid var(--buddy-border-light);
+  border-top: 1px solid var(--buddy-border-subtle);
   padding: 1rem 0 0.25rem;
 
   p {

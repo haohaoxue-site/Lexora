@@ -8,17 +8,19 @@ import type {
   BuddyThinkingLevel,
 } from '@buddy-shared/modelSelection'
 import type { BuddyLocale } from '@/i18n/buddyI18n'
-import { BUDDY_FAST_SERVICE_TIER } from '@buddy-shared/modelSelection'
+import { BUDDY_DEFAULT_THINKING_LEVEL, BUDDY_FAST_SERVICE_TIER } from '@buddy-shared/modelSelection'
 import {
+  ChevronLeft16Regular,
   ChevronRight16Regular,
   DismissCircle16Filled,
   Flash20Filled,
 } from '@vicons/fluent'
 import { useEventListener } from '@vueuse/core'
-import { NIcon, NSwitch } from 'naive-ui'
+import { NIcon } from 'naive-ui'
 import { computed, shallowRef, useTemplateRef } from 'vue'
 import { useBuddyI18n } from '@/i18n/buddyI18n'
 import DesktopModelPicker from '@/ui/model-selector/DesktopModelPicker.vue'
+import DesktopReasoningMeter from '@/ui/model-selector/DesktopReasoningMeter.vue'
 import DesktopReasoningPicker from '@/ui/model-selector/DesktopReasoningPicker.vue'
 
 interface ReasoningSelectorOption {
@@ -58,41 +60,40 @@ const emit = defineEmits<{
 const { t } = useBuddyI18n(() => props.language)
 const root = useTemplateRef<HTMLElement>('root')
 const isOpen = shallowRef(false)
-const activePanel = shallowRef<'main' | 'model' | 'reasoning'>('main')
+const activePanel = shallowRef<'advanced' | 'main'>('main')
+const secondaryPanel = shallowRef<'model' | 'reasoning' | null>(null)
+const previewEffort = shallowRef<BuddyThinkingLevel | null>(null)
+const isMeterDragging = shallowRef(false)
 const canClearModel = computed(() => (
   props.clearable
   && props.selectedModelId !== null
   && !props.disabled
 ))
 const canOpen = computed(() => !props.disabled && props.models.length > 0)
-
-const reasoningLevelOptions = computed<ReadonlyArray<ReasoningSelectorOption>>(() => {
-  const model = props.selectedModel
-  if (!model)
-    return []
-
-  return model.reasoningOptions
-    .filter(option => option !== 'off')
-    .map(option => ({
-      label: formatReasoningLabel(option),
-      value: option,
-    }))
+const reasoningLevelOptions = computed<ReadonlyArray<ReasoningSelectorOption>>(() => (
+  props.selectedModel?.reasoningOptions.map(value => ({
+    label: formatReasoningLabel(value),
+    value,
+  })) ?? []
+))
+const selectedEffortValue = computed<BuddyThinkingLevel | null>(() => {
+  const options = props.selectedModel?.reasoningOptions ?? []
+  if (props.selectedEffort && options.includes(props.selectedEffort))
+    return props.selectedEffort
+  if (options.includes(BUDDY_DEFAULT_THINKING_LEVEL))
+    return BUDDY_DEFAULT_THINKING_LEVEL
+  return options.find(level => level !== 'off') ?? options[0] ?? null
 })
-const hasReasoningOptions = computed(() => Boolean(props.selectedModel?.reasoningOptions.length))
-const canDisableReasoning = computed(() => props.selectedModel?.reasoningOptions.includes('off') ?? false)
+const displayedEffort = computed(() => previewEffort.value ?? selectedEffortValue.value)
+const selectedEffortLabel = computed(() => selectedEffortValue.value
+  ? formatReasoningLabel(selectedEffortValue.value)
+  : '')
+const displayedEffortLabel = computed(() => displayedEffort.value
+  ? formatReasoningLabel(displayedEffort.value)
+  : '')
 const supportsFastMode = computed(() => props.showFastMode && Boolean(
   props.selectedModel?.serviceTiers.some(option => option.id === BUDDY_FAST_SERVICE_TIER),
 ))
-
-const selectedEffortLabel = computed(() => {
-  if (!hasReasoningOptions.value)
-    return ''
-
-  return props.selectedEffort
-    ? formatReasoningLabel(props.selectedEffort)
-    : t('desktop.chat.defaultEffort')
-})
-
 const isFastMode = computed(() => supportsFastMode.value
   && props.selectedServiceTier === BUDDY_FAST_SERVICE_TIER)
 
@@ -102,24 +103,40 @@ useEventListener(document, 'keydown', handleDocumentKeydown)
 function toggle() {
   if (!canOpen.value)
     return
-
   isOpen.value = !isOpen.value
   activePanel.value = 'main'
+  secondaryPanel.value = null
 }
 
 function close() {
   isOpen.value = false
   activePanel.value = 'main'
+  secondaryPanel.value = null
+  previewEffort.value = null
+  isMeterDragging.value = false
 }
 
-function selectEffort(value: BuddyThinkingLevel | null) {
+function selectEffort(value: BuddyThinkingLevel) {
   emit('updateEffort', value)
   close()
+}
+
+function selectMeterEffort(value: BuddyThinkingLevel) {
+  emit('updateEffort', value)
+}
+
+function previewMeterEffort(value: BuddyThinkingLevel | null) {
+  previewEffort.value = value
+}
+
+function updateMeterDragging(value: boolean) {
+  isMeterDragging.value = value
 }
 
 function selectModel(modelId: string) {
   emit('updateModel', modelId)
   activePanel.value = 'main'
+  secondaryPanel.value = null
 }
 
 function clearModel() {
@@ -127,15 +144,31 @@ function clearModel() {
   close()
 }
 
-function toggleFastMode(enabled: boolean) {
-  emit('updateServiceTier', enabled ? BUDDY_FAST_SERVICE_TIER : null)
-  close()
+function toggleFastMode() {
+  emit('updateServiceTier', isFastMode.value ? null : BUDDY_FAST_SERVICE_TIER)
+}
+
+function openAdvancedPanel() {
+  activePanel.value = 'advanced'
+  secondaryPanel.value = null
+  previewEffort.value = null
+  isMeterDragging.value = false
+}
+
+function openMainPanel() {
+  activePanel.value = 'main'
+  secondaryPanel.value = null
+  previewEffort.value = null
+  isMeterDragging.value = false
+}
+
+function toggleSecondaryPanel(panel: 'model' | 'reasoning') {
+  secondaryPanel.value = secondaryPanel.value === panel ? null : panel
 }
 
 function handleDocumentPointerDown(event: PointerEvent) {
   if (!isOpen.value || !(event.target instanceof Node) || root.value?.contains(event.target))
     return
-
   close()
 }
 
@@ -144,16 +177,8 @@ function handleDocumentKeydown(event: KeyboardEvent) {
     close()
 }
 
-function formatOptionLabel(value: string) {
-  const normalized = value.trim()
-  if (!normalized)
-    return ''
-
-  return `${normalized.slice(0, 1).toUpperCase()}${normalized.slice(1)}`
-}
-
-function formatReasoningLabel(value: BuddyThinkingLevel) {
-  return value === 'off' ? t('desktop.chat.reasoningOff') : formatOptionLabel(value)
+function formatReasoningLabel(value: BuddyThinkingLevel): string {
+  return `${value.slice(0, 1).toUpperCase()}${value.slice(1)}`
 }
 </script>
 
@@ -185,7 +210,7 @@ function formatReasoningLabel(value: BuddyThinkingLevel) {
         v-if="canClearModel"
         class="desktop-model-selector__clear"
         type="button"
-        :aria-label="t('desktop.providers.clearDefaultModel')"
+        :aria-label="t('desktop.chat.clearModel')"
         @click="clearModel"
       >
         <NIcon :component="DismissCircle16Filled" />
@@ -198,59 +223,116 @@ function formatReasoningLabel(value: BuddyThinkingLevel) {
       :class="`is-${placement}`"
       @pointerdown.stop
     >
-      <section class="desktop-model-selector__menu desktop-model-selector__menu--main" role="menu">
-        <div v-if="supportsFastMode" class="desktop-model-selector__fast-row">
-          <span class="desktop-model-selector__fast-copy">
-            <NIcon class="desktop-model-selector__flash" :component="Flash20Filled" />
-            <strong>{{ t('desktop.chat.fastMode') }}</strong>
-          </span>
-          <NSwitch
-            size="small"
-            :value="isFastMode"
-            @update:value="toggleFastMode"
-          />
-        </div>
-        <span v-if="supportsFastMode" class="desktop-model-selector__divider" />
-        <template v-if="hasReasoningOptions">
+      <section
+        v-if="activePanel === 'main'"
+        class="desktop-model-selector__panel desktop-model-selector__panel--spell"
+      >
+        <div class="desktop-model-selector__panel-heading">
           <button
-            class="desktop-model-selector__item"
-            :class="{ 'is-active': activePanel === 'reasoning' }"
+            class="desktop-model-selector__advanced"
             type="button"
-            @click="activePanel = 'reasoning'"
+            @click="openAdvancedPanel"
           >
-            <span class="desktop-model-selector__item-copy">
-              <small>{{ t('desktop.chat.effort') }}</small>
-              <strong>{{ selectedEffortLabel }}</strong>
-            </span>
+            <span>{{ t('desktop.chat.advanced') }}</span>
             <NIcon :component="ChevronRight16Regular" />
           </button>
-          <span class="desktop-model-selector__divider" />
-        </template>
+          <span class="desktop-model-selector__heading-status">
+            <Transition name="desktop-model-selector__status" mode="out-in">
+              <span
+                v-if="isMeterDragging"
+                key="reasoning-level"
+                class="desktop-model-selector__dragging-effort"
+              >
+                {{ displayedEffortLabel }}
+              </span>
+              <button
+                v-else-if="supportsFastMode"
+                key="fast-toggle"
+                class="desktop-model-selector__fast-toggle"
+                :class="{ 'is-active': isFastMode }"
+                type="button"
+                role="switch"
+                :aria-checked="isFastMode"
+                :aria-label="t('desktop.chat.fastMode')"
+                @click="toggleFastMode"
+              >
+                <NIcon :component="Flash20Filled" />
+              </button>
+            </Transition>
+          </span>
+        </div>
+
+        <div v-if="reasoningLevelOptions.length" class="desktop-model-selector__spell">
+          <DesktopReasoningMeter
+            :label="t('desktop.chat.effort')"
+            :options="reasoningLevelOptions"
+            :selected-effort="selectedEffortValue"
+            @dragging="updateMeterDragging"
+            @preview="previewMeterEffort"
+            @select="selectMeterEffort"
+          />
+        </div>
+        <div v-else class="desktop-model-selector__no-reasoning">
+          {{ t('desktop.chat.noReasoningLevels') }}
+        </div>
+      </section>
+
+      <section
+        v-else-if="activePanel === 'advanced'"
+        class="desktop-model-selector__panel desktop-model-selector__panel--advanced"
+        role="menu"
+      >
+        <button class="desktop-model-selector__back" type="button" @click="openMainPanel">
+          <NIcon :component="ChevronLeft16Regular" />
+          <span>{{ t('desktop.chat.advanced') }}</span>
+        </button>
+        <span class="desktop-model-selector__divider" />
         <button
           class="desktop-model-selector__item"
-          :class="{ 'is-active': activePanel === 'model' }"
+          :class="{ 'is-active': secondaryPanel === 'model' }"
           type="button"
-          @click="activePanel = 'model'"
+          @click="toggleSecondaryPanel('model')"
         >
-          <span class="desktop-model-selector__item-copy">
-            <small>{{ t('desktop.chat.model') }}</small>
-            <strong>{{ selectedModel?.displayName ?? placeholder ?? t('desktop.chat.noModels') }}</strong>
-          </span>
+          <span>{{ t('desktop.chat.model') }}</span>
+          <strong>{{ selectedModel?.displayName ?? placeholder ?? t('desktop.chat.noModels') }}</strong>
           <NIcon :component="ChevronRight16Regular" />
+        </button>
+        <button
+          v-if="reasoningLevelOptions.length"
+          class="desktop-model-selector__item"
+          :class="{ 'is-active': secondaryPanel === 'reasoning' }"
+          type="button"
+          @click="toggleSecondaryPanel('reasoning')"
+        >
+          <span>{{ t('desktop.chat.effort') }}</span>
+          <strong>{{ selectedEffortLabel }}</strong>
+          <NIcon :component="ChevronRight16Regular" />
+        </button>
+        <button
+          v-if="supportsFastMode"
+          class="desktop-model-selector__item"
+          :class="{ 'is-fast': isFastMode }"
+          type="button"
+          role="menuitemcheckbox"
+          :aria-checked="isFastMode"
+          @click="toggleFastMode"
+        >
+          <span>{{ t('desktop.chat.speed') }}</span>
+          <strong>{{ t(isFastMode ? 'desktop.chat.fastMode' : 'desktop.chat.standardSpeed') }}</strong>
+          <NIcon :component="Flash20Filled" />
         </button>
       </section>
 
       <DesktopReasoningPicker
-        v-if="activePanel === 'reasoning'"
-        :can-disable="canDisableReasoning"
+        v-if="activePanel === 'advanced' && secondaryPanel === 'reasoning'"
         :language="language"
         :options="reasoningLevelOptions"
-        :selected-effort="selectedEffort"
+        :selected-effort="selectedEffortValue"
         @select="selectEffort"
       />
 
       <DesktopModelPicker
-        v-else-if="activePanel === 'model'"
+        v-else-if="activePanel === 'advanced' && secondaryPanel === 'model'"
         :language="language"
         :models="models"
         :providers="providers"
@@ -263,6 +345,8 @@ function formatReasoningLabel(value: BuddyThinkingLevel) {
 
 <style scoped lang="scss">
 .desktop-model-selector {
+  --desktop-model-popover-radius: 3px;
+
   position: relative;
   min-width: 0;
 }
@@ -275,12 +359,10 @@ function formatReasoningLabel(value: BuddyThinkingLevel) {
     padding-right: 2rem;
   }
 
-  &.is-clearable:hover,
-  &.is-clearable:has(.desktop-model-selector__clear:focus-visible) {
-    .desktop-model-selector__clear {
-      opacity: 1;
-      pointer-events: auto;
-    }
+  &.is-clearable:hover .desktop-model-selector__clear,
+  &.is-clearable:has(.desktop-model-selector__clear:focus-visible) .desktop-model-selector__clear {
+    opacity: 1;
+    pointer-events: auto;
   }
 }
 
@@ -288,24 +370,35 @@ function formatReasoningLabel(value: BuddyThinkingLevel) {
   display: inline-flex;
   min-width: 0;
   max-width: min(22rem, 44vw);
-  height: 2rem;
+  height: var(--buddy-composer-control-height);
   align-items: center;
   gap: 0.35rem;
   border: 0;
-  border-radius: 0.55rem;
+  border-radius: var(--buddy-composer-control-radius);
   background: transparent;
   color: var(--buddy-text-secondary);
   cursor: pointer;
   font: inherit;
   font-size: 0.78rem;
   padding: 0 0.45rem 0 0.55rem;
+  transition:
+    background-color var(--buddy-motion-state-duration) var(--buddy-motion-state-easing),
+    color var(--buddy-motion-state-duration) var(--buddy-motion-state-easing);
 
-  &:hover,
-  &:focus-visible,
-  &[aria-expanded='true'] {
-    background: color-mix(in srgb, var(--buddy-accent-primary) 9%, transparent);
-    color: var(--buddy-text-primary);
-    outline: 0;
+  &.is-compact:hover,
+  &.is-compact:focus-visible {
+    background: var(--buddy-accent-surface-subtle);
+    color: var(--buddy-text-strong);
+  }
+
+  &.is-compact[aria-expanded='true'] {
+    background: var(--buddy-accent-surface);
+    color: var(--buddy-text-strong);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--buddy-focus-ring);
+    outline-offset: -2px;
   }
 
   &:disabled {
@@ -314,16 +407,16 @@ function formatReasoningLabel(value: BuddyThinkingLevel) {
   }
 
   &.is-fast {
-    color: color-mix(in srgb, var(--buddy-accent-primary) 82%, var(--buddy-text-primary));
+    color: var(--buddy-accent-text);
   }
 
   &.is-field {
     width: 100%;
     max-width: none;
     height: 2.25rem;
-    border: 1px solid var(--buddy-border-light);
+    border: 1px solid var(--buddy-border-subtle);
     border-radius: 0.5rem;
-    background: var(--buddy-bg-surface-raised);
+    background: var(--buddy-surface-raised);
     padding-inline: 0.7rem 0.55rem;
   }
 }
@@ -339,12 +432,12 @@ function formatReasoningLabel(value: BuddyThinkingLevel) {
 .desktop-model-selector__effort,
 .desktop-model-selector__separator {
   flex: none;
-  color: var(--buddy-text-placeholder);
+  color: var(--buddy-text-muted);
 }
 
-.desktop-model-selector__flash,
-.desktop-model-selector__item > :deep(.n-icon) {
+.desktop-model-selector__flash {
   flex: none;
+  color: var(--buddy-brand-gold);
 }
 
 .desktop-model-selector__clear {
@@ -359,7 +452,7 @@ function formatReasoningLabel(value: BuddyThinkingLevel) {
   border: 0;
   border-radius: 0.375rem;
   background: transparent;
-  color: var(--buddy-text-placeholder);
+  color: var(--buddy-text-muted);
   cursor: pointer;
   opacity: 0;
   padding: 0;
@@ -369,15 +462,10 @@ function formatReasoningLabel(value: BuddyThinkingLevel) {
 
   &:hover,
   &:focus-visible {
-    background: var(--buddy-fill-base);
+    background: var(--buddy-state-hover);
     color: var(--buddy-text-secondary);
     outline: 0;
   }
-
-}
-
-.desktop-model-selector__flash {
-  color: color-mix(in srgb, #c99a2e 84%, var(--buddy-accent-primary));
 }
 
 .desktop-model-selector__popover {
@@ -401,94 +489,229 @@ function formatReasoningLabel(value: BuddyThinkingLevel) {
   }
 }
 
-.desktop-model-selector__menu {
-  display: grid;
-  width: 13.5rem;
-  gap: 0.15rem;
+.desktop-model-selector__panel {
+  flex: none;
   overflow: hidden;
-  border: 1px solid var(--buddy-border-light);
-  border-radius: var(--buddy-menu-radius);
-  background: color-mix(in srgb, var(--buddy-bg-surface-raised) 97%, transparent);
-  box-shadow: var(--buddy-shadow-menu);
-  padding: 0.5rem;
+  width: min(21.5rem, calc(100vw - 3rem));
+  border: 1px solid var(--buddy-border-subtle);
+  border-radius: var(--desktop-model-popover-radius);
+  background: var(--buddy-surface-raised);
+  box-shadow: var(--buddy-shadow-overlay);
+}
+
+.desktop-model-selector__panel {
+  padding: 0.85rem;
+}
+
+.desktop-model-selector__panel--spell {
+  --desktop-model-spell-glow:
+    radial-gradient(ellipse at 42% 50%, rgb(217 166 83 / 18%), transparent 43%),
+    radial-gradient(ellipse at 70% 50%, rgb(53 83 165 / 14%), transparent 46%);
+
+  position: relative;
+  background: linear-gradient(145deg, #fff, color-mix(in srgb, var(--buddy-surface-raised) 94%, #f8f6f0));
+  padding: 0.8rem 1rem 1rem;
+}
+
+:global(:root[data-buddy-theme='dark'] .desktop-model-selector__panel--spell) {
+  --desktop-model-spell-glow:
+    radial-gradient(ellipse at 42% 50%, rgb(218 164 78 / 20%), transparent 43%),
+    radial-gradient(ellipse at 72% 50%, rgb(51 80 174 / 24%), transparent 48%);
+
+  border-color: rgb(255 255 255 / 13%);
+  background: linear-gradient(145deg, #20242c, #171a21 76%);
+  box-shadow:
+    0 1px 2px rgb(0 0 0 / 28%),
+    0 10px 24px rgb(0 0 0 / 36%);
+}
+
+.desktop-model-selector__panel--spell::after {
+  position: absolute;
+  right: 1.1rem;
+  bottom: -1.4rem;
+  left: 1.1rem;
+  height: 2.7rem;
+  border-radius: 50%;
+  background: var(--desktop-model-spell-glow);
+  content: '';
+  filter: blur(0.75rem);
+  pointer-events: none;
+}
+
+.desktop-model-selector__panel-heading {
+  display: flex;
+  min-height: 2.1rem;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 0.15rem;
+}
+
+.desktop-model-selector__heading-status {
+  display: grid;
+  min-width: 2rem;
+  min-height: 2rem;
+  align-items: center;
+  justify-items: end;
+}
+
+.desktop-model-selector__dragging-effort {
+  color: var(--buddy-text-secondary);
+  font-size: 0.76rem;
+  line-height: 1;
+  padding-inline: 0.4rem;
+}
+
+.desktop-model-selector__status-enter-active,
+.desktop-model-selector__status-leave-active {
+  transition:
+    opacity 90ms ease,
+    transform 120ms ease;
+}
+
+.desktop-model-selector__status-enter-from {
+  opacity: 0;
+  transform: translateY(0.2rem);
+}
+
+.desktop-model-selector__status-leave-to {
+  opacity: 0;
+  transform: translateY(-0.2rem);
+}
+
+.desktop-model-selector__advanced,
+.desktop-model-selector__back {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  border: 0;
+  border-radius: var(--buddy-menu-item-radius);
+  background: transparent;
+  color: var(--buddy-text-secondary);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.76rem;
+  padding: 0.35rem 0.4rem;
+}
+
+.desktop-model-selector__advanced {
+  line-height: 1;
+}
+
+.desktop-model-selector__advanced :deep(.n-icon) {
+  flex: none;
+  font-size: 1rem;
+  transform: translateY(-0.04rem);
+}
+
+.desktop-model-selector__advanced:hover,
+.desktop-model-selector__advanced:focus-visible,
+.desktop-model-selector__back:hover,
+.desktop-model-selector__back:focus-visible {
+  background: var(--buddy-state-hover);
+  color: var(--buddy-text-strong);
+  outline: 0;
+}
+
+.desktop-model-selector__fast-toggle {
+  display: grid;
+  width: 2rem;
+  height: 2rem;
+  place-items: center;
+  border: 0;
+  border-radius: var(--buddy-icon-button-radius);
+  background: transparent;
+  color: var(--buddy-text-muted);
+  cursor: pointer;
+  padding: 0;
+  transition:
+    background-color var(--buddy-motion-state-duration) var(--buddy-motion-state-easing),
+    color var(--buddy-motion-state-duration) var(--buddy-motion-state-easing);
+}
+
+.desktop-model-selector__fast-toggle:hover,
+.desktop-model-selector__fast-toggle:focus-visible {
+  background: var(--buddy-state-hover);
+  color: var(--buddy-text-strong);
+  outline: 0;
+}
+
+.desktop-model-selector__fast-toggle.is-active {
+  background: color-mix(in srgb, var(--buddy-brand-gold) 14%, transparent);
+  color: var(--buddy-brand-gold);
+  filter: drop-shadow(0 0 0.35rem color-mix(in srgb, var(--buddy-brand-gold) 44%, transparent));
+}
+
+.desktop-model-selector__spell {
+  margin-top: 0.25rem;
+  position: relative;
+  z-index: 1;
+}
+
+.desktop-model-selector__no-reasoning {
+  color: var(--buddy-text-muted);
+  font-size: 0.72rem;
+  padding: 1rem 0.55rem;
+}
+
+.desktop-model-selector__panel--advanced {
+  display: grid;
+  gap: 0.12rem;
+}
+
+.desktop-model-selector__back {
+  min-height: 2rem;
+  justify-self: start;
 }
 
 .desktop-model-selector__divider {
   height: 1px;
-  margin: 0.25rem 0.15rem;
-  background: var(--buddy-border-light);
+  margin: 0.15rem 0.2rem 0.3rem;
+  background: var(--buddy-border-subtle);
 }
 
 .desktop-model-selector__item {
-  display: flex;
+  display: grid;
   min-width: 0;
-  min-height: 2.15rem;
+  min-height: 2.65rem;
+  grid-template-columns: 5rem minmax(0, 1fr) auto;
   align-items: center;
-  justify-content: space-between;
   gap: 0.65rem;
   border: 0;
   border-radius: var(--buddy-menu-item-radius);
   background: transparent;
-  color: var(--buddy-text-primary);
+  color: var(--buddy-text-strong);
   cursor: pointer;
   font: inherit;
-  padding: 0.4rem 0.55rem;
+  padding: 0.45rem 0.55rem;
   text-align: left;
 
   &:hover,
   &:focus-visible,
   &.is-active {
-    background: var(--buddy-fill-base);
+    background: var(--buddy-state-hover);
     outline: 0;
   }
-}
 
-.desktop-model-selector__item-copy {
-  display: grid;
-  min-width: 0;
-  flex: 1;
-  gap: 0.1rem;
+  > span {
+    font-size: 0.76rem;
+  }
 
-  strong,
-  small {
-    min-width: 0;
+  > strong {
     overflow: hidden;
+    color: var(--buddy-text-secondary);
+    font-size: 0.76rem;
+    font-weight: 500;
+    text-align: right;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
 
-  strong {
-    font-size: 0.78rem;
-    font-weight: 650;
+  > :deep(.n-icon) {
+    color: var(--buddy-text-muted);
   }
 
-  small {
-    color: var(--buddy-text-placeholder);
-    font-size: 0.68rem;
-    line-height: 1.3;
-  }
-}
-
-.desktop-model-selector__fast-row,
-.desktop-model-selector__fast-copy {
-  display: flex;
-  min-width: 0;
-  align-items: center;
-}
-
-.desktop-model-selector__fast-row {
-  min-height: 2.15rem;
-  justify-content: space-between;
-  gap: 0.75rem;
-  padding: 0.35rem 0.55rem;
-}
-
-.desktop-model-selector__fast-copy {
-  gap: 0.35rem;
-
-  strong {
-    font-size: 0.78rem;
-    font-weight: 650;
+  &.is-fast > :deep(.n-icon) {
+    color: var(--buddy-brand-gold);
   }
 }
 

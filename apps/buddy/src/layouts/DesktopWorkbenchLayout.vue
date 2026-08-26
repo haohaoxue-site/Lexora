@@ -26,7 +26,7 @@ defineSlots<{
   min-width: 0;
   min-height: 0;
   flex: 1;
-  background: var(--buddy-bg-surface);
+  background: var(--buddy-surface-base);
 }
 
 .desktop-workbench-layout__workspace {
@@ -41,6 +41,6 @@ defineSlots<{
   display: flex;
   min-width: 0;
   min-height: 0;
-  border-left: 1px solid var(--buddy-border-light);
+  border-left: 1px solid var(--buddy-border-subtle);
 }
 </style>

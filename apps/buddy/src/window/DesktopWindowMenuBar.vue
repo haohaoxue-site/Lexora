@@ -150,7 +150,7 @@ const nodeProps: DropdownNodeProps = () => ({
   border: 0;
   border-radius: 0.25rem;
   background: transparent;
-  color: var(--buddy-text-regular);
+  color: var(--buddy-text-primary);
   cursor: default;
   font: inherit;
   font-size: 0.75rem;
@@ -159,12 +159,12 @@ const nodeProps: DropdownNodeProps = () => ({
 
   &:hover,
   &.is-active {
-    background: var(--buddy-fill-base);
-    color: var(--buddy-text-primary);
+    background: var(--buddy-state-hover);
+    color: var(--buddy-text-strong);
   }
 
   &:focus-visible {
-    outline: 1px solid var(--buddy-accent-primary);
+    outline: 1px solid var(--buddy-focus-ring);
     outline-offset: -1px;
   }
 
@@ -189,19 +189,17 @@ const nodeProps: DropdownNodeProps = () => ({
 .desktop-window-menu-popover.n-dropdown-menu {
   --desktop-window-menu-panel-radius: 0.375rem;
   --desktop-window-menu-option-radius: 0.1875rem;
-  --n-option-color-active: var(--buddy-accent-primary-pressed) !important;
-  --n-option-color-hover: var(--buddy-accent-primary) !important;
+  --n-option-color-active: var(--buddy-accent-solid-pressed) !important;
+  --n-option-color-hover: var(--buddy-accent-solid) !important;
   --n-option-text-color-active: var(--buddy-text-on-accent) !important;
   --n-option-text-color-hover: var(--buddy-text-on-accent) !important;
 
   width: 12.5rem;
   min-width: 12.5rem;
   overflow: hidden;
-  border: 1px solid var(--buddy-border-base);
+  border: 1px solid var(--buddy-border-strong);
   border-radius: var(--desktop-window-menu-panel-radius);
-  box-shadow:
-    0 8px 20px -8px rgb(23 33 28 / 24%),
-    0 2px 6px -2px rgb(23 33 28 / 12%);
+  box-shadow: var(--buddy-shadow-overlay);
 }
 
 .desktop-window-menu-option {
@@ -224,14 +222,8 @@ const nodeProps: DropdownNodeProps = () => ({
 }
 
 .desktop-window-menu-option__shortcut {
-  color: var(--buddy-text-tertiary);
+  color: var(--buddy-text-muted);
   font: inherit;
   font-size: 0.72rem;
-}
-
-.buddy-app.is-dark .desktop-window-menu-popover.n-dropdown-menu {
-  box-shadow:
-    0 8px 20px -8px rgb(0 0 0 / 50%),
-    0 2px 6px -2px rgb(0 0 0 / 30%);
 }
 </style>
