@@ -57,6 +57,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   attach: []
+  attachFiles: [files: ReadonlyArray<File>]
   removeAttachment: [index: number]
   send: [payload: ChatComposerSubmitPayload]
   stop: []
@@ -89,13 +90,32 @@ const {
   isSending: toRef(props, 'isSending'),
   language: toRef(props, 'language'),
   loadContextOptions: props.loadContextOptions,
+  onAttachFiles: files => emit('attachFiles', files),
   onSend: payload => emit('send', payload),
   onUpdateContent: (content, value) => emit('updateContent', content, value),
 })
+
+function handleFileDragover(event: DragEvent) {
+  if (event.dataTransfer?.types.includes('Files'))
+    event.preventDefault()
+}
+
+function handleFileDrop(event: DragEvent) {
+  const files = [...(event.dataTransfer?.files ?? [])]
+  if (!files.length)
+    return
+
+  event.preventDefault()
+  emit('attachFiles', files)
+}
 </script>
 
 <template>
-  <DesktopChatComposerFrame class="desktop-chat-composer-wrap">
+  <DesktopChatComposerFrame
+    class="desktop-chat-composer-wrap"
+    @dragover="handleFileDragover"
+    @drop="handleFileDrop"
+  >
     <template #attachments>
       <div v-if="attachments.length" class="desktop-chat-composer__attachments">
         <div v-for="(attachment, index) in attachments" :key="attachment.attachmentId">

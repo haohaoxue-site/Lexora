@@ -3,6 +3,7 @@ import {
   approvalReviewPayloadMatchesKind,
   approvalReviewPayloadSchema,
 } from '../../shared/approvalReviewPayload'
+import { buddyAttachmentImportRequestSchema } from '../../shared/attachmentPolicy'
 import {
   automationChangedNotificationSchema,
   automationMutationRequestSchemas,
@@ -813,6 +814,7 @@ export const localChatSchemas = {
   automationResume: automationMutationRequestSchemas.resume,
   automationRunNow: automationMutationRequestSchemas.runNow,
   automationUpdate: automationMutationRequestSchemas.update,
+  attachmentImport: buddyAttachmentImportRequestSchema,
   attachmentPreview: z.object({ attachmentId: idSchema }).strict(),
   attachmentRelease: z.object({ attachmentIds: z.array(idSchema).max(16) }).strict(),
   attachmentSelection: z.object({ remainingCount: z.number().int().min(1).max(16) }).strict(),

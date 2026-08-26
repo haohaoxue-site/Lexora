@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { NScrollbar } from 'naive-ui'
+
 withDefaults(defineProps<{
   borderRadius?: string
   expanded?: boolean
@@ -13,7 +15,9 @@ withDefaults(defineProps<{
 
     <div class="desktop-chat-composer" :style="{ borderRadius }">
       <div class="desktop-chat-composer__editor-wrap">
-        <slot name="editor" />
+        <NScrollbar class="desktop-chat-composer__editor-scrollbar">
+          <slot name="editor" />
+        </NScrollbar>
       </div>
 
       <div class="desktop-chat-composer__toolbar">
@@ -32,6 +36,9 @@ withDefaults(defineProps<{
 
 <style scoped lang="scss">
 .desktop-chat-composer-frame {
+  --desktop-chat-composer-editor-padding-top: 0.1rem;
+  --desktop-chat-composer-editor-padding-bottom: 0.6rem;
+
   width: 100%;
   margin: 0 auto;
 }
@@ -53,16 +60,21 @@ withDefaults(defineProps<{
   position: relative;
 }
 
+:deep(.desktop-chat-composer__editor-scrollbar) {
+  min-height: calc(3lh + var(--desktop-chat-composer-editor-padding-top) + var(--desktop-chat-composer-editor-padding-bottom));
+  max-height: calc(8lh + var(--desktop-chat-composer-editor-padding-top) + var(--desktop-chat-composer-editor-padding-bottom));
+  font-size: 0.9rem;
+  line-height: 1.58;
+}
+
 :deep(.desktop-chat-composer__prosemirror) {
-  min-height: 3.25rem;
-  max-height: 12rem;
-  overflow-y: auto;
+  min-height: calc(3lh + var(--desktop-chat-composer-editor-padding-top) + var(--desktop-chat-composer-editor-padding-bottom));
   border: 0;
   outline: 0;
   color: var(--buddy-text-strong);
   font-size: 0.9rem;
   line-height: 1.58;
-  padding: 0.1rem 0.2rem 0.6rem;
+  padding: var(--desktop-chat-composer-editor-padding-top) 0.75rem var(--desktop-chat-composer-editor-padding-bottom) 0.2rem;
   white-space: pre-wrap;
   word-break: break-word;
 
@@ -79,8 +91,12 @@ withDefaults(defineProps<{
   }
 }
 
+.is-expanded :deep(.desktop-chat-composer__editor-scrollbar),
 .is-expanded :deep(.desktop-chat-composer__prosemirror) {
   min-height: 9rem;
+}
+
+.is-expanded :deep(.desktop-chat-composer__editor-scrollbar) {
   max-height: 18rem;
 }
 

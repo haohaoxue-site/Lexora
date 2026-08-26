@@ -7,6 +7,7 @@ import type { ModelProvidersStore } from '@/stores/useModelProvidersStore'
 import type { RuntimeRecoveryStore } from '@/stores/useRuntimeRecoveryStore'
 import type { RuntimeSupervisorStore } from '@/stores/useRuntimeSupervisorStore'
 import type { ChatBlockerKind } from '@/workbenches/chat/workspace/chatBlocker'
+import { BUDDY_ATTACHMENT_COUNT_LIMIT } from '@buddy-shared/attachmentPolicy'
 import { useDebounceFn } from '@vueuse/core'
 import { computed, readonly, shallowRef, watch } from 'vue'
 import { useBuddyI18n } from '@/i18n/buddyI18n'
@@ -72,6 +73,11 @@ export function useTaskCapability(options: UseTaskCapabilityOptions) {
   const isSelectingFiles = shallowRef(false)
   const errorMessage = shallowRef<string | null>(null)
   const dismissedChatBlockerKind = shallowRef<ChatBlockerKind | null>(null)
+  let resolveInitialLoad: () => void
+  const initialLoad = new Promise<void>((resolve) => {
+    resolveInitialLoad = resolve
+  })
+  let hasCompletedInitialLoad = false
   let isDisposed = false
 
   const { language } = applicationSettings
@@ -334,29 +340,37 @@ export function useTaskCapability(options: UseTaskCapabilityOptions) {
   async function initialize() {
     isLoading.value = true
     errorMessage.value = null
-    const results = await Promise.allSettled([
-      api.localChat.projects.list(),
-      refreshConversations(),
-      workspacePersistence.read(),
-    ])
-    if (results[0]?.status === 'fulfilled')
-      taskIndexData.replaceProjects(results[0].value)
-    const workspaceResult = results[2]
-    if (workspaceResult?.status === 'fulfilled')
-      await workspacePersistence.hydrate(workspaceResult.value)
-    if (activeConversationId.value) {
-      modelProviders.restoreConversationModelSelection(
-        activeConversation.value?.modelSelection ?? null,
-      )
-      await Promise.all([
-        refreshBranches(),
-        runSync.refreshActiveConversation(),
+    try {
+      const results = await Promise.allSettled([
+        api.localChat.projects.list(),
+        refreshConversations(),
+        workspacePersistence.read(),
       ])
+      if (results[0]?.status === 'fulfilled')
+        taskIndexData.replaceProjects(results[0].value)
+      const workspaceResult = results[2]
+      if (workspaceResult?.status === 'fulfilled')
+        await workspacePersistence.hydrate(workspaceResult.value)
+      if (activeConversationId.value) {
+        modelProviders.restoreConversationModelSelection(
+          activeConversation.value?.modelSelection ?? null,
+        )
+        await Promise.all([
+          refreshBranches(),
+          runSync.refreshActiveConversation(),
+        ])
+      }
+      const rejected = results.find(result => result.status === 'rejected')
+      if (rejected?.status === 'rejected')
+        errorMessage.value = resolveLocalChatErrorMessage(rejected.reason, language.value)
     }
-    const rejected = results.find(result => result.status === 'rejected')
-    if (rejected?.status === 'rejected')
-      errorMessage.value = resolveLocalChatErrorMessage(rejected.reason, language.value)
-    isLoading.value = false
+    finally {
+      isLoading.value = false
+      if (!hasCompletedInitialLoad) {
+        hasCompletedInitialLoad = true
+        resolveInitialLoad()
+      }
+    }
   }
 
   async function refreshRuntimeDependentState() {
@@ -383,7 +397,8 @@ export function useTaskCapability(options: UseTaskCapabilityOptions) {
   }
 
   async function selectAttachments() {
-    const remainingCount = 16 - attachments.value.length
+    await initialLoad
+    const remainingCount = BUDDY_ATTACHMENT_COUNT_LIMIT - attachments.value.length
     if (remainingCount <= 0) {
       errorMessage.value = t('desktop.chat.attachmentLimit')
       return
@@ -394,6 +409,36 @@ export function useTaskCapability(options: UseTaskCapabilityOptions) {
         await api.localChat.attachments.selectFiles({ remainingCount }),
       )
       if (rejected)
+        errorMessage.value = t('desktop.chat.attachmentLimit')
+    }
+    catch (error) {
+      setError(error)
+    }
+    finally {
+      isSelectingFiles.value = false
+    }
+  }
+
+  async function importAttachments(files: ReadonlyArray<File>) {
+    await initialLoad
+    const remainingCount = BUDDY_ATTACHMENT_COUNT_LIMIT - attachments.value.length
+    if (remainingCount <= 0) {
+      errorMessage.value = t('desktop.chat.attachmentLimit')
+      return
+    }
+    isSelectingFiles.value = true
+    try {
+      const selectedFiles = files.slice(0, remainingCount)
+      const rejected = await drafts.appendAttachments(
+        await api.localChat.attachments.importFiles({
+          files: await Promise.all(selectedFiles.map(async file => ({
+            bytes: new Uint8Array(await file.arrayBuffer()),
+            mimeType: file.type,
+            name: file.name,
+          }))),
+        }),
+      )
+      if (selectedFiles.length < files.length || rejected)
         errorMessage.value = t('desktop.chat.attachmentLimit')
     }
     catch (error) {
@@ -471,6 +516,7 @@ export function useTaskCapability(options: UseTaskCapabilityOptions) {
       canUpdateExecutionProfile: readonly(canUpdateExecutionProfile),
       isUpdatingExecutionProfile: executionProfileState.isUpdating,
       isSelectingFiles: readonly(isSelectingFiles),
+      importAttachments,
       listContextOptions,
       models: modelProviders.models,
       providers: modelProviders.providers,

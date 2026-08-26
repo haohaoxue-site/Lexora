@@ -30,6 +30,7 @@ import { mkdir } from 'node:fs/promises'
 import { basename, join } from 'node:path'
 import { getSupportedThinkingLevels } from '@earendil-works/pi-ai'
 import { z } from 'zod'
+import { buddyAttachmentImportRequestSchema } from '../../shared/attachmentPolicy'
 import {
   automationMutationRequestSchemas,
   automationPreviewRequestSchema,
@@ -1378,6 +1379,10 @@ function registerRuntimeHandlers(services: RuntimeServices): () => void {
   on('attachments.registerFiles', async (params) => {
     const input = parse(z.object({ paths: z.array(z.string().min(1)).max(16) }).strict(), params)
     return (await services.attachmentService.registerFiles(input.paths)).map(toPublicAttachment)
+  })
+  on('attachments.registerUploads', async (params) => {
+    const input = parse(buddyAttachmentImportRequestSchema, params)
+    return (await services.attachmentService.registerUploads(input.files)).map(toPublicAttachment)
   })
   on('attachments.resolvePreview', (params) => {
     const input = parse(z.object({ attachmentId: idSchema }).strict(), params)

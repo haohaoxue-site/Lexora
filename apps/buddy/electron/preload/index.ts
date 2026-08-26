@@ -225,6 +225,10 @@ const localChatApi = Object.freeze<LocalChatApi>({
       ipcRenderer.invoke(LOCAL_CHAT_IPC_CHANNELS.approvalsDeny, { approvalId }),
   }),
   attachments: Object.freeze({
+    importFiles: input => ipcRenderer.invoke(
+      LOCAL_CHAT_IPC_CHANNELS.attachmentsImportFiles,
+      input,
+    ),
     selectFiles: input => ipcRenderer.invoke(LOCAL_CHAT_IPC_CHANNELS.attachmentsSelectFiles, input),
     release: attachmentIds =>
       ipcRenderer.invoke(LOCAL_CHAT_IPC_CHANNELS.attachmentsRelease, { attachmentIds }),

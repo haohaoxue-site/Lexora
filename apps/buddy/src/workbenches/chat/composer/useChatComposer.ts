@@ -32,6 +32,7 @@ interface UseChatComposerOptions {
   isSending: Readonly<Ref<boolean>>
   language: Readonly<Ref<BuddyLocale>>
   loadContextOptions: (fileQuery: string | null) => Promise<ChatComposerContextOptions>
+  onAttachFiles: (files: ReadonlyArray<File>) => void
   onSend: (payload: ChatComposerSubmitPayload) => void
   onUpdateContent: (content: string, value: LocalWorkspaceDraft['composerContent']) => void
 }
@@ -82,6 +83,7 @@ export function useChatComposer(options: UseChatComposerOptions) {
         'class': 'desktop-chat-composer__prosemirror',
       },
       handleKeyDown: (_view, event) => handleEditorKeydown(event),
+      handlePaste: (_view, event) => handleEditorPaste(event),
     },
     onSelectionUpdate: refreshActiveTrigger,
     onUpdate: ({ editor }) => {
@@ -156,6 +158,16 @@ export function useChatComposer(options: UseChatComposerOptions) {
 
     event.preventDefault()
     submit()
+    return true
+  }
+
+  function handleEditorPaste(event: ClipboardEvent) {
+    const files = [...(event.clipboardData?.files ?? [])]
+    if (!files.length)
+      return false
+
+    event.preventDefault()
+    options.onAttachFiles(files)
     return true
   }
 

@@ -516,6 +516,11 @@ export function registerLocalChatIpc(options: RegisterLocalChatIpcOptions): () =
       localChatResponseSchemas.attachments,
     )
   })
+  handle(LOCAL_CHAT_IPC_CHANNELS.attachmentsImportFiles, (_event, input) => request(
+    'attachments.registerUploads',
+    localChatSchemas.attachmentImport.parse(input),
+    localChatResponseSchemas.attachments,
+  ))
   handle(LOCAL_CHAT_IPC_CHANNELS.attachmentsRelease, (_event, input) => request(
     'attachments.release',
     localChatSchemas.attachmentRelease.parse(input),

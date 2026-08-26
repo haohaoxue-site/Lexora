@@ -208,6 +208,7 @@ function dismissBlocker() {
           :selected-model-id="composer.selectedModelId.value"
           :selected-service-tier="composer.selectedServiceTier.value"
           @attach="composer.selectAttachments"
+          @attach-files="composer.importAttachments"
           @remove-attachment="composer.removeAttachment"
           @send="sendMessage"
           @stop="execution.cancelActiveRun"

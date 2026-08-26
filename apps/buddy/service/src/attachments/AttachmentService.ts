@@ -1,12 +1,16 @@
 import type { ImageContent } from '@earendil-works/pi-ai'
 import type { Buffer } from 'node:buffer'
+import type { BuddyAttachmentUpload } from '../../../shared/attachmentPolicy'
 import type { AttachmentRecord, AttachmentRepository } from '../storage/attachmentRepository'
 import { randomUUID } from 'node:crypto'
 import { constants } from 'node:fs'
-import { chmod, copyFile, mkdir, readFile, realpath, stat, unlink } from 'node:fs/promises'
+import { chmod, copyFile, mkdir, readFile, realpath, stat, unlink, writeFile } from 'node:fs/promises'
 import { basename, extname, join } from 'node:path'
+import {
+  BUDDY_ATTACHMENT_COUNT_LIMIT,
+  BUDDY_ATTACHMENT_TOTAL_BYTES_LIMIT,
+} from '../../../shared/attachmentPolicy'
 
-const MAX_ATTACHMENT_TOTAL_BYTES = 32 * 1024 * 1024
 const MAX_TEXT_PROMPT_BYTES = 1024 * 1024
 const MIME_TYPES: Readonly<Record<string, string>> = {
   '.csv': 'text/csv',
@@ -24,6 +28,9 @@ const MIME_TYPES: Readonly<Record<string, string>> = {
   '.yaml': 'application/yaml',
   '.yml': 'application/yaml',
 }
+const SUPPORTED_IMAGE_MIME_TYPES = new Set(
+  Object.values(MIME_TYPES).filter(mimeType => mimeType.startsWith('image/')),
+)
 
 export interface AttachmentServiceOptions {
   directory: string
@@ -53,14 +60,14 @@ export class AttachmentService {
   }
 
   async registerFiles(paths: readonly string[]): Promise<AttachmentRecord[]> {
-    if (paths.length > 16)
+    if (paths.length > BUDDY_ATTACHMENT_COUNT_LIMIT)
       throw new AttachmentError('VALIDATION_FAILED')
     const sources = await Promise.all(paths.map(async (selectedPath) => {
       const sourcePath = await realpath(selectedPath).catch(() => null)
       if (!sourcePath)
         throw new AttachmentError('ATTACHMENT_NOT_FOUND')
       const metadata = await stat(sourcePath)
-      if (!metadata.isFile() || metadata.size > MAX_ATTACHMENT_TOTAL_BYTES)
+      if (!metadata.isFile() || metadata.size > BUDDY_ATTACHMENT_TOTAL_BYTES_LIMIT)
         throw new AttachmentError('VALIDATION_FAILED')
       const mimeType = inferMimeType(sourcePath)
       if (!isSupportedAttachment(mimeType, metadata.size))
@@ -89,6 +96,54 @@ export class AttachmentService {
         }
         attempted.push(record)
         await copyFile(sourcePath, storedPath, constants.COPYFILE_EXCL)
+        await chmod(storedPath, 0o600)
+        this.#repository.create(record)
+        records.push(record)
+      }
+    }
+    catch (error) {
+      await this.#rollbackRegistration(attempted)
+      throw error
+    }
+    return records
+  }
+
+  async registerUploads(uploads: readonly BuddyAttachmentUpload[]): Promise<AttachmentRecord[]> {
+    if (uploads.length > BUDDY_ATTACHMENT_COUNT_LIMIT)
+      throw new AttachmentError('VALIDATION_FAILED')
+    const sources = uploads.map((upload) => {
+      const name = basename(upload.name.trim())
+      const mimeType = upload.mimeType.trim() || inferMimeType(name)
+      if (
+        !name
+        || upload.bytes.byteLength > BUDDY_ATTACHMENT_TOTAL_BYTES_LIMIT
+        || !isSupportedAttachment(mimeType, upload.bytes.byteLength)
+      ) {
+        throw new AttachmentError('VALIDATION_FAILED')
+      }
+      return { ...upload, mimeType, name }
+    })
+    validateTotalBytes(sources.map(source => source.bytes.byteLength))
+    await mkdir(this.#directory, { mode: 0o700, recursive: true })
+    const records: AttachmentRecord[] = []
+    const attempted: AttachmentRecord[] = []
+    try {
+      for (const source of sources) {
+        const id = randomUUID()
+        const storedPath = join(this.#directory, `${id}${safeExtension(source.name)}`)
+        const record: AttachmentRecord = {
+          conversationId: null,
+          createdAt: new Date().toISOString(),
+          draftKey: null,
+          id,
+          mimeType: source.mimeType,
+          name: source.name,
+          sizeBytes: source.bytes.byteLength,
+          status: 'draft',
+          storedPath,
+        }
+        attempted.push(record)
+        await writeFile(storedPath, source.bytes, { flag: 'wx', mode: 0o600 })
         await chmod(storedPath, 0o600)
         this.#repository.create(record)
         records.push(record)
@@ -266,7 +321,7 @@ export class AttachmentService {
 }
 
 function validateTotalBytes(sizes: readonly number[]): void {
-  if (sizes.reduce((total, size) => total + size, 0) > MAX_ATTACHMENT_TOTAL_BYTES)
+  if (sizes.reduce((total, size) => total + size, 0) > BUDDY_ATTACHMENT_TOTAL_BYTES_LIMIT)
     throw new AttachmentError('VALIDATION_FAILED')
 }
 
@@ -299,7 +354,7 @@ function isTextMimeType(mimeType: string): boolean {
 }
 
 function isSupportedAttachment(mimeType: string, sizeBytes: number): boolean {
-  if (mimeType.startsWith('image/'))
+  if (SUPPORTED_IMAGE_MIME_TYPES.has(mimeType))
     return true
   return isTextMimeType(mimeType) && sizeBytes <= MAX_TEXT_PROMPT_BYTES
 }

@@ -4,6 +4,10 @@ import type {
 } from '@buddy-electron/shared/localChatApi'
 import type { BuddyExecutionProfile } from '@buddy-shared/executionProfile'
 import type { ComputedRef } from 'vue'
+import {
+  BUDDY_ATTACHMENT_COUNT_LIMIT,
+  BUDDY_ATTACHMENT_TOTAL_BYTES_LIMIT,
+} from '@buddy-shared/attachmentPolicy'
 import { BUDDY_DEFAULT_EXECUTION_PROFILE } from '@buddy-shared/executionProfile'
 import { shallowRef } from 'vue'
 
@@ -23,9 +27,6 @@ interface ChatDraftState {
   requestId: string | null
 }
 
-const ATTACHMENT_COUNT_LIMIT = 16
-const ATTACHMENT_TOTAL_BYTES_LIMIT = 32 * 1024 * 1024
-
 export function useChatDrafts(options: UseChatDraftsOptions) {
   const draftsByScope = new Map<string, ChatDraftState>()
   const attachments = shallowRef<ReadonlyArray<LocalAttachment>>([])
@@ -39,8 +40,8 @@ export function useChatDrafts(options: UseChatDraftsOptions) {
     let totalBytes = accepted.reduce((total, attachment) => total + attachment.sizeBytes, 0)
     for (const attachment of incoming) {
       if (
-        accepted.length >= ATTACHMENT_COUNT_LIMIT
-        || totalBytes + attachment.sizeBytes > ATTACHMENT_TOTAL_BYTES_LIMIT
+        accepted.length >= BUDDY_ATTACHMENT_COUNT_LIMIT
+        || totalBytes + attachment.sizeBytes > BUDDY_ATTACHMENT_TOTAL_BYTES_LIMIT
       ) {
         rejectedIds.push(attachment.attachmentId)
         continue

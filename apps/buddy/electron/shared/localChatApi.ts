@@ -1,3 +1,4 @@
+import type { BuddyAttachmentImportRequest } from '../../shared/attachmentPolicy'
 import type { BuddyExecutionProfile } from '../../shared/executionProfile'
 import type {
   LocalApproval,
@@ -190,6 +191,7 @@ export const LOCAL_CHAT_IPC_CHANNELS = {
   automationsRunNow: 'lexora:buddy:automations:run-now',
   automationsUpdate: 'lexora:buddy:automations:update',
   attachmentsCleanupDrafts: 'lexora:buddy:attachments:cleanup-drafts',
+  attachmentsImportFiles: 'lexora:buddy:attachments:import-files',
   attachmentsRelease: 'lexora:buddy:attachments:release',
   attachmentsSelectFiles: 'lexora:buddy:attachments:select-files',
   chatCancel: 'lexora:buddy:chat:cancel',
@@ -451,6 +453,9 @@ export interface LocalChatApi {
     deny: (approvalId: string) => Promise<LocalApproval>
   }
   attachments: {
+    importFiles: (
+      input: BuddyAttachmentImportRequest,
+    ) => Promise<ReadonlyArray<LocalAttachment>>
     selectFiles: (input: { remainingCount: number }) => Promise<ReadonlyArray<LocalAttachment>>
     release: (
       attachmentIds: ReadonlyArray<string>,
