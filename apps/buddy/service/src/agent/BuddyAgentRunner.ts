@@ -17,16 +17,13 @@ import type { BuddySessionResources } from './BuddySessionResources'
 import type { BuddyContextUsageBreakdown } from './contextUsageBreakdown'
 import type { BuddySessionShutdownReason, CreateBuddySessionOptions } from './createBuddySession'
 import type { CommittedPiCompactionEvidence } from './inspectCommittedPiCompaction'
-import type { BuddyProjectedEvent, ProjectedArtifact } from './projectPiEvent'
-import { createHash, randomUUID } from 'node:crypto'
-
-import { isAbsolute, resolve } from 'node:path'
+import type { BuddyProjectedEvent } from './projectPiEvent'
+import { createHash } from 'node:crypto'
 import { buddyAssistantTextPhaseSchema } from '../../../shared/assistantTextPhase'
 import { createBuddyInterruptedMessageContent } from '../../../shared/buddyMessageContent'
 import { buddyReasoningKindSchema } from '../../../shared/reasoningPresentation'
 import { createInterruptedMessageEvents } from '../events/createInterruptedMessageEvents'
 import { RunEventLogFatalError } from '../events/RunEventLog'
-import { resolveGrantedPath } from '../projects/resolveGrantedPath'
 import { BuddySessionRegistry } from './BuddySessionRegistry'
 import {
   createPiEventProjectionState,
@@ -493,8 +490,7 @@ export class BuddyAgentRunner {
       onToolExecutionAuthorized: async (event) => {
         await flushProjectedEvents()
         const projected = projectToolExecutionAuthorized(event, projectionState)
-        for (const projectedEvent of projected.events)
-          eventWriter.append(projectedEvent)
+        eventWriter.appendBatch(projected.events)
         await eventWriter.drain()
       },
       provider: input.provider,
@@ -517,10 +513,7 @@ export class BuddyAgentRunner {
           finalAssistantAnswerProjected = event.message.stopReason === 'stop'
             && projected.events.some(candidate => candidate.type === 'message.completed')
         }
-        for (const projectedEvent of projected.events)
-          eventWriter.append(projectedEvent)
-        if (projected.artifact)
-          await this.#recordArtifact(runId, input, projected.artifact)
+        eventWriter.appendBatch(projected.events)
         if (event.type === 'message_end' && projected.sourceMessageId) {
           const message = event.message
           const purpose = message.role === 'assistant'
@@ -686,8 +679,7 @@ export class BuddyAgentRunner {
     const unsubscribe = binding.session.subscribe((event) => {
       eventTail = eventTail.then(() => {
         const projected = projectPiEvent(event, projectionState)
-        for (const projectedEvent of projected.events)
-          eventWriter.append(projectedEvent)
+        eventWriter.appendBatch(projected.events)
       })
     })
 
@@ -798,35 +790,6 @@ export class BuddyAgentRunner {
       runId,
       sourceEntryId: `compaction:${result.firstKeptEntryId}`,
       usage: result.usage,
-    })
-  }
-
-  async #recordArtifact(
-    runId: string,
-    input: StartBuddyTurnInput,
-    artifact: ProjectedArtifact,
-  ): Promise<void> {
-    const requestedPath = isAbsolute(artifact.requestedPath)
-      ? artifact.requestedPath
-      : resolve(input.cwd, artifact.requestedPath)
-    const resolution = await resolveGrantedPath([{
-      canonicalRoot: input.canonicalRoot,
-      projectId: input.projectId ?? 'conversation',
-      root: input.canonicalRoot,
-    }], requestedPath, 'existing')
-    const record = {
-      canonicalPath: resolution.canonicalPath,
-      createdAt: this.#timestamp(),
-      id: randomUUID(),
-      mimeType: null,
-      operation: artifact.operation,
-      projectId: input.projectId,
-      runId,
-    }
-    await this.#eventLog.append({
-      payload: record,
-      runId,
-      type: 'artifact.changed',
     })
   }
 
@@ -991,6 +954,27 @@ class BufferedRunEventWriter {
       this.#timer = setTimeout(() => this.#flushPending(), 25)
       this.#timer.unref()
     }
+  }
+
+  appendBatch(events: readonly BuddyProjectedEvent[]): void {
+    if (events.length === 0)
+      return
+    if (
+      events.length === 1
+      || events.some(event => (
+        event.type === 'message.delta'
+        || event.type === 'message.block.delta'
+      ))
+    ) {
+      for (const event of events)
+        this.append(event)
+      return
+    }
+    this.#flushPending()
+    this.#enqueue(events.map(event => ({
+      ...event,
+      createdAt: this.#timestamp(),
+    })))
   }
 
   async drain(): Promise<void> {

@@ -84,8 +84,8 @@ async function runBuddyService(): Promise<void> {
     const openedDatabase = openBuddyDatabase({ buddyHome })
     database = openedDatabase
     eventLog = new RunEventLog({
+      conversationsDirectory: join(buddyHome, 'conversations'),
       database: openedDatabase,
-      eventsDirectory: join(buddyHome, 'events'),
       onEvent: event => serviceServer?.notify('run.event', toPublicRunEvent(event)),
       onEventDeliveryError: (error, event) => {
         process.stderr.write(

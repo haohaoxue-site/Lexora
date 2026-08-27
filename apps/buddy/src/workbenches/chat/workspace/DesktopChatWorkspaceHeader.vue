@@ -5,6 +5,7 @@ import {
   ChevronDown20Regular,
   ChevronUp20Regular,
   Dismiss20Regular,
+  PanelRight20Regular,
   Search20Regular,
 } from '@vicons/fluent'
 import { NIcon, NInput } from 'naive-ui'
@@ -13,11 +14,14 @@ import { useBuddyI18n } from '@/i18n/buddyI18n'
 
 const props = defineProps<{
   activeSearchIndex: number
+  artifactCount: number
+  canOpenContext: boolean
   canSearchConversation: boolean
   conversationSearchLoading: boolean
   conversationSearchOpen: boolean
   conversationSearchQuery: string
   conversationSearchResultCount: number
+  contextOpen: boolean
   language: BuddyLocale
   title: string
 }>()
@@ -26,6 +30,7 @@ const emit = defineEmits<{
   nextConversationSearchResult: []
   openConversationSearch: []
   previousConversationSearchResult: []
+  toggleContext: []
   updateConversationSearch: [query: string]
 }>()
 
@@ -38,6 +43,9 @@ const searchPosition = computed(() => {
     return '0 / 0'
   return `${props.activeSearchIndex + 1} / ${props.conversationSearchResultCount}`
 })
+const contextButtonLabel = computed(() => props.artifactCount
+  ? t('desktop.context.openWithCount', { count: props.artifactCount })
+  : t('desktop.context.open'))
 
 watch(
   () => props.conversationSearchOpen,
@@ -108,6 +116,17 @@ watch(
         @click="emit('openConversationSearch')"
       >
         <NIcon :component="Search20Regular" />
+      </button>
+      <button
+        v-if="!contextOpen"
+        class="desktop-chat-workspace-header__icon-button"
+        data-testid="task-context-toggle"
+        type="button"
+        :aria-label="contextButtonLabel"
+        :disabled="!canOpenContext"
+        @click="emit('toggleContext')"
+      >
+        <NIcon :component="PanelRight20Regular" />
       </button>
     </div>
   </header>

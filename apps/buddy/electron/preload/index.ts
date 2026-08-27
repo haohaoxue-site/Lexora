@@ -232,8 +232,8 @@ const localChatApi = Object.freeze<LocalChatApi>({
     selectFiles: input => ipcRenderer.invoke(LOCAL_CHAT_IPC_CHANNELS.attachmentsSelectFiles, input),
     release: attachmentIds =>
       ipcRenderer.invoke(LOCAL_CHAT_IPC_CHANNELS.attachmentsRelease, { attachmentIds }),
-    cleanupDrafts: retainedAttachmentIds =>
-      ipcRenderer.invoke(LOCAL_CHAT_IPC_CHANNELS.attachmentsCleanupDrafts, { retainedAttachmentIds }),
+    cleanupDrafts: () =>
+      ipcRenderer.invoke(LOCAL_CHAT_IPC_CHANNELS.attachmentsCleanupDrafts, {}),
   }),
   usage: Object.freeze({
     getSnapshot: () => ipcRenderer.invoke(LOCAL_CHAT_IPC_CHANNELS.usageSnapshot),

@@ -16,10 +16,7 @@ import {
   automationRunNowResultSchema,
   automationSchema,
 } from '../../shared/automation'
-import {
-  BUDDY_DEFAULT_EXECUTION_PROFILE,
-  BUDDY_EXECUTION_PROFILES,
-} from '../../shared/executionProfile'
+import { BUDDY_EXECUTION_PROFILES } from '../../shared/executionProfile'
 import {
   BUDDY_SERVICE_TIERS,
   BUDDY_THINKING_LEVELS,
@@ -418,11 +415,8 @@ const projectSchema = z.object({
   activeRunCount: z.number().int().nonnegative(),
   canonicalRoot: z.string().min(1),
   createdAt: timestampSchema,
-  directoryCanonicalRoot: z.string().min(1).nullable(),
-  directoryRoot: z.string().min(1).nullable(),
   id: idSchema,
   instructions: z.string(),
-  managedRoot: z.string().min(1).nullable(),
   memoryScope: z.enum(['personal_and_project', 'project_only']),
   name: z.string().min(1),
   revokedAt: nullableTimestampSchema,
@@ -520,12 +514,12 @@ const modelSelectionSchema = z.object({
 const conversationSchema = z.object({
   activeBranchId: z.string().nullable(),
   createdAt: timestampSchema,
+  deletedAt: nullableTimestampSchema,
   executionProfile: executionProfileSchema,
   id: idSchema,
   modelSelection: modelSelectionSchema.nullable(),
   origin: z.enum(['interactive', 'automation']).optional(),
   projectId: z.string().nullable(),
-  promotedAt: nullableTimestampSchema.optional(),
   title: z.string().nullable(),
   updatedAt: timestampSchema,
 }).strict()
@@ -554,6 +548,19 @@ const attachmentSchema = z.object({
   name: z.string().min(1),
   previewUrl: z.string().nullable(),
   sizeBytes: z.number().int().nonnegative(),
+}).strict()
+
+const artifactSchema = z.object({
+  artifactId: idSchema,
+  conversationId: idSchema,
+  createdAt: timestampSchema,
+  mimeType: z.string().min(1),
+  name: z.string().min(1),
+  previewUrl: z.string().nullable(),
+  runId: idSchema,
+  sizeBytes: z.number().int().nonnegative(),
+  sourceArtifactId: idSchema.nullable(),
+  sourceToolCallId: idSchema,
 }).strict()
 
 const messageSchema = z.object({
@@ -598,6 +605,12 @@ const runSchema = z.object({
   status: runStatusSchema,
   triggeringMessageId: idSchema,
 }).strict()
+const runOutputSchema = z.object({
+  artifacts: z.array(artifactSchema).min(1).max(16),
+  createdAt: timestampSchema,
+  runId: idSchema,
+  sourceToolCallId: idSchema,
+}).strict()
 
 const runEventEnvelopeSchema = z.object({
   createdAt: timestampSchema,
@@ -627,7 +640,8 @@ const workspaceDraftSchema = z.object({
   attachments: z.array(attachmentSchema).max(16),
   composerContent: z.json().nullable(),
   content: z.string(),
-  executionProfile: executionProfileSchema.default(BUDDY_DEFAULT_EXECUTION_PROFILE),
+  draftId: sessionIdentitySchema,
+  executionProfile: executionProfileSchema,
   requestFingerprint: z.string().min(1).max(1024).nullable(),
   requestId: z.string().min(1).max(128).nullable(),
   targetKey: z.string().min(1),
@@ -744,6 +758,10 @@ export const localChatResponseSchemas = {
     path: z.string().refine(isAbsolutePath),
   }).strict(),
   attachments: z.array(attachmentSchema),
+  artifactPreview: z.object({
+    mimeType: z.string().regex(/^image\//),
+    path: z.string().refine(isAbsolutePath),
+  }).strict(),
   connectors: z.array(connectorSchema),
   conversation: conversationSchema,
   conversationBranches: z.array(conversationBranchSchema),
@@ -757,6 +775,7 @@ export const localChatResponseSchemas = {
   timelinePage: z.object({
     items: z.array(conversationTimelineItemSchema),
     nextCursor: z.string().regex(/^[\w-]+$/).max(2_048).nullable(),
+    outputs: z.array(runOutputSchema),
     runEvents: z.array(runEventSchema),
     runs: z.array(runSchema),
   }).strict(),
@@ -802,6 +821,7 @@ export const localChatResponseSchemas = {
 
 export const localChatSchemas = {
   approvalId: z.object({ approvalId: idSchema }).strict(),
+  artifactPreview: z.object({ artifactId: idSchema }).strict(),
   automationChanged: automationChangedNotificationSchema,
   automationCreate: automationMutationRequestSchemas.create,
   automationDelete: automationMutationRequestSchemas.delete,
@@ -817,7 +837,10 @@ export const localChatSchemas = {
   attachmentImport: buddyAttachmentImportRequestSchema,
   attachmentPreview: z.object({ attachmentId: idSchema }).strict(),
   attachmentRelease: z.object({ attachmentIds: z.array(idSchema).max(16) }).strict(),
-  attachmentSelection: z.object({ remainingCount: z.number().int().min(1).max(16) }).strict(),
+  attachmentSelection: z.object({
+    draftId: sessionIdentitySchema,
+    remainingCount: z.number().int().min(1).max(16),
+  }).strict(),
   chatCommand: chatCommandSchema,
   connectorCredential: z.object({
     connectorId: idSchema,
@@ -860,6 +883,7 @@ export const localChatSchemas = {
   contextUsageSnapshot: z.object({
     branchId: sessionIdentitySchema.nullable(),
     conversationId: sessionIdentitySchema.nullable(),
+    draftId: sessionIdentitySchema,
     executionProfile: executionProfileSchema,
     modelSelection: modelSelectionSchema,
     projectId: idSchema.nullable(),
@@ -886,7 +910,7 @@ export const localChatSchemas = {
     instructions: z.string().trim().max(64 * 1024),
     memoryScope: z.enum(['personal_and_project', 'project_only']),
     name: z.string().trim().min(1).max(80),
-    root: z.string().min(1).nullable(),
+    root: z.string().min(1),
   }).strict(),
   projectId: z.object({ projectId: idSchema }).strict(),
   projectUpdate: z.object({
@@ -894,7 +918,7 @@ export const localChatSchemas = {
     memoryScope: z.enum(['personal_and_project', 'project_only']),
     name: z.string().trim().min(1).max(80),
     projectId: idSchema,
-    root: z.string().min(1).nullable(),
+    root: z.string().min(1),
   }).strict(),
   providerAuthCancel: z.object({ challengeId: z.uuid() }).strict(),
   providerAuthResponse: z.object({
@@ -937,6 +961,7 @@ export const localChatSchemas = {
     content: z.string().max(2 * 1024 * 1024),
     contextItems: z.array(contextItemSchema).max(64),
     conversationId: idSchema,
+    draftId: sessionIdentitySchema,
     modelSelection: modelSelectionSchema.nullable(),
     requestId: z.string().min(1).max(128),
     userMessageId: idSchema,
@@ -949,7 +974,7 @@ export const localChatSchemas = {
     conversationId: idSchema,
     requestId: z.string().min(1).max(128),
   }).strict(),
-  retainedAttachments: z.object({ retainedAttachmentIds: z.array(idSchema) }).strict(),
+  cleanupDraftAttachments: z.object({}).strict(),
   runEvents: z.union([
     z.object({
       afterSequence: z.number().int().nonnegative().optional(),
@@ -976,6 +1001,7 @@ export const localChatSchemas = {
     content: z.string().max(2 * 1024 * 1024),
     contextItems: z.array(contextItemSchema).max(64),
     conversationId: sessionIdentitySchema.nullable(),
+    draftId: sessionIdentitySchema,
     executionProfile: executionProfileSchema,
     modelSelection: modelSelectionSchema.nullable(),
     projectId: idSchema.nullable(),
@@ -995,6 +1021,7 @@ type DeepReadonly<T> = T extends ReadonlyArray<infer Item>
 
 export type LocalApproval = DeepReadonly<z.infer<typeof approvalSchema>>
 export type LocalAttachment = DeepReadonly<z.infer<typeof attachmentSchema>>
+export type LocalArtifact = DeepReadonly<z.infer<typeof artifactSchema>>
 export type LocalAutomation = DeepReadonly<z.infer<typeof automationSchema>>
 export type LocalAutomationOccurrence
   = DeepReadonly<z.infer<typeof automationOccurrenceSchema>>
@@ -1039,6 +1066,7 @@ export type LocalProvider = DeepReadonly<z.infer<typeof providerSchema>>
 export type LocalProviderAuthChallenge = DeepReadonly<z.infer<typeof providerAuthChallengeSchema>>
 export type LocalPromptContextItem = z.infer<typeof contextItemSchema>
 export type LocalRun = DeepReadonly<z.infer<typeof runSchema>>
+export type LocalRunOutput = DeepReadonly<z.infer<typeof runOutputSchema>>
 export type LocalRunEvent = DeepReadonly<z.infer<typeof runEventSchema>>
 export type LocalRuntimeModelOption = DeepReadonly<z.infer<typeof modelSchema>>
 export type LocalRuntimeDataBackup = DeepReadonly<z.infer<typeof runtimeDataBackupSchema>>

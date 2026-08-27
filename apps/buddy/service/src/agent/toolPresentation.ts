@@ -2,6 +2,10 @@ import type { BuddyToolPresentation } from '../../../shared/runEventPresentation
 import { relative, sep } from 'node:path'
 
 import { redactSensitiveText, redactShellCommand } from '../../../shared/approvalReviewPayload'
+import {
+  IMAGE_GENERATION_TOOL_NAME,
+  readImageGenerationToolDetails,
+} from '../images/imageGenerationToolContract'
 import { parseSystemToolFailure } from '../system/systemToolFailure'
 
 const MAX_OUTPUT_LENGTH = 64 * 1024
@@ -75,6 +79,22 @@ export function createBuddyToolPresentation(
       status: readOptionalString(details, 'status') ?? (input.result ? 'completed' : 'running'),
     }
   }
+  if (input.toolName === IMAGE_GENERATION_TOOL_NAME) {
+    const details = readImageGenerationToolDetails(input.result)
+    return {
+      artifactIds: details?.artifactIds ?? [],
+      card: 'image',
+      description,
+      generatedCount: details?.artifactIds.length ?? null,
+      prompt: readOptionalString(arguments_, 'prompt'),
+      reference: readImageReference(arguments_),
+      status: input.result === undefined
+        ? 'running'
+        : input.isError
+          ? 'failed'
+          : 'completed',
+    }
+  }
   if (input.toolName === 'lexora_buddy_automation') {
     const details = readToolDetails(input.result)
     const automation = readRecord(details?.automation)
@@ -129,6 +149,25 @@ export function createBuddyToolPresentation(
     description,
     ...preview,
   }
+}
+
+function readImageReference(
+  arguments_: Record<string, unknown> | null,
+): Extract<BuddyToolPresentation, { card: 'image' }>['reference'] {
+  const reference = readRecord(arguments_?.reference)
+  if (reference?.mode === 'latest') {
+    return {
+      mode: 'latest',
+    }
+  }
+  if (reference?.mode !== 'resources' || !Array.isArray(reference.resourceIds))
+    return null
+  const resourceIds = [...new Set(reference.resourceIds.filter(
+    (value): value is string => typeof value === 'string' && Boolean(value),
+  ))].slice(0, 4)
+  return resourceIds.length > 0
+    ? { mode: 'resources', resourceIds }
+    : null
 }
 
 function readSystemFailureStatus(value: unknown): string | null {

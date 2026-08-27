@@ -54,7 +54,7 @@ export function createAutomationTurnRepository(database: DatabaseSync): Automati
   const insertConversation = database.prepare(`
     INSERT INTO conversations (
       id, project_id, title, active_branch_id, created_at, updated_at,
-      execution_profile, origin, promoted_at
+      execution_profile, origin, deleted_at
     ) VALUES (?, ?, ?, ?, ?, ?, ?, 'automation', NULL)
   `)
   const insertBranch = database.prepare(`

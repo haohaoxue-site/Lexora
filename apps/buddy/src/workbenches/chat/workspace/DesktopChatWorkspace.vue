@@ -24,6 +24,7 @@ const props = defineProps<{
   workspace: TaskChatWorkspace
 }>()
 const emit = defineEmits<{
+  openArtifact: [artifactId: string]
   openSettings: [category: DesktopSettingsCategory]
 }>()
 defineSlots<{
@@ -115,9 +116,11 @@ function dismissBlocker() {
         :matching-search-message-ids="matchingSearchMessageIds"
         :timeline-items="transcript.timelineItems.value"
         :run-events="transcript.runEvents.value"
+        :run-outputs="transcript.runOutputs.value"
         :runs="transcript.runs.value"
         @activate-branch="transcript.activateBranch"
         @edit-user-message="execution.editUserMessage"
+        @open-artifact="emit('openArtifact', $event)"
         @regenerate-assistant="execution.regenerateAssistant"
         @scroll="viewport.handleScroll"
         @scroll-position="viewport.handlePosition"

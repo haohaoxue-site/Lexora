@@ -1,7 +1,8 @@
 import type {
   LocalConversationBranch,
-  LocalConversationTimelineItem,
+  LocalMessage,
 } from '@buddy-electron/shared/localChatApi'
+import type { ChatTranscriptRow } from './chatTranscriptProjection'
 
 export interface ChatMessageBranchNavigator {
   activeBranchId: string
@@ -12,13 +13,13 @@ export interface ChatMessageBranchNavigator {
 }
 
 interface BranchGroup {
+  baseBranchId: string | null
   branchIds: string[]
   forkedFromMessageId: string | null
-  parentBranchId: string | null
 }
 
 export function projectChatMessageBranchNavigators(
-  timelineItems: ReadonlyArray<LocalConversationTimelineItem>,
+  rows: ReadonlyArray<ChatTranscriptRow>,
   branches: ReadonlyArray<LocalConversationBranch>,
   activeBranchId: string,
 ): ReadonlyMap<string, ChatMessageBranchNavigator> {
@@ -27,14 +28,11 @@ export function projectChatMessageBranchNavigators(
   if (!activePath.length)
     return new Map()
 
-  const messages = timelineItems.filter(
-    (item): item is Extract<LocalConversationTimelineItem, { kind: 'message' }> =>
-      item.kind === 'message',
-  )
+  const messages = rows.flatMap(row => row.kind === 'message' ? [row.message] : [])
   const activePathIds = new Set(activePath.map(branch => branch.id))
   const navigators = new Map<string, ChatMessageBranchNavigator>()
 
-  for (const group of collectBranchGroups(branches)) {
+  for (const group of collectBranchGroups(branches, messages)) {
     if (group.branchIds.length < 2)
       continue
     const activeGroupBranchId = resolveActiveGroupBranchId(group, activePath, activePathIds)
@@ -75,6 +73,7 @@ function collectActiveBranchPath(
 
 function collectBranchGroups(
   branches: ReadonlyArray<LocalConversationBranch>,
+  messages: ReadonlyArray<LocalMessage>,
 ): BranchGroup[] {
   const ordered = [...branches].sort((left, right) =>
     left.createdAt.localeCompare(right.createdAt) || left.id.localeCompare(right.id),
@@ -85,22 +84,26 @@ function collectBranchGroups(
   const groups = new Map<string, BranchGroup>()
   if (rootBranches.length) {
     groups.set('root', {
+      baseBranchId: null,
       branchIds: rootBranches.map(branch => branch.id),
       forkedFromMessageId: null,
-      parentBranchId: null,
     })
   }
 
+  const messageBranchById = new Map(messages.map(message => [message.id, message.branchId]))
   for (const branch of ordered) {
     if (!branch.parentBranchId || !branch.forkedFromMessageId)
       continue
-    const key = `${branch.parentBranchId}\u0000${branch.forkedFromMessageId}`
+    const key = branch.forkedFromMessageId
     const group = groups.get(key) ?? {
-      branchIds: [branch.parentBranchId],
+      baseBranchId: messageBranchById.get(branch.forkedFromMessageId)
+        ?? branch.parentBranchId,
+      branchIds: [messageBranchById.get(branch.forkedFromMessageId)
+        ?? branch.parentBranchId],
       forkedFromMessageId: branch.forkedFromMessageId,
-      parentBranchId: branch.parentBranchId,
     }
-    group.branchIds.push(branch.id)
+    if (!group.branchIds.includes(branch.id))
+      group.branchIds.push(branch.id)
     groups.set(key, group)
   }
   return [...groups.values()]
@@ -111,24 +114,19 @@ function resolveActiveGroupBranchId(
   activePath: ReadonlyArray<LocalConversationBranch>,
   activePathIds: ReadonlySet<string>,
 ): string | null {
-  if (group.parentBranchId === null)
-    return activePath.find(branch => group.branchIds.includes(branch.id))?.id ?? null
-  if (!activePathIds.has(group.parentBranchId))
+  if (![...group.branchIds].some(branchId => activePathIds.has(branchId)))
     return null
-  return activePath.find(branch =>
-    branch.parentBranchId === group.parentBranchId
-    && branch.forkedFromMessageId === group.forkedFromMessageId,
-  )?.id ?? group.parentBranchId
+  return activePath.findLast(branch => group.branchIds.includes(branch.id))?.id ?? null
 }
 
 function resolveNavigatorMessageId(
   group: BranchGroup,
   activeGroupBranchId: string,
-  messages: ReadonlyArray<Extract<LocalConversationTimelineItem, { kind: 'message' }>>,
+  messages: ReadonlyArray<LocalMessage>,
 ): string | null {
-  if (group.parentBranchId === null)
+  if (group.baseBranchId === null)
     return messages.find(message => message.branchId === activeGroupBranchId)?.id ?? null
-  if (activeGroupBranchId !== group.parentBranchId)
+  if (activeGroupBranchId !== group.baseBranchId)
     return messages.find(message => message.branchId === activeGroupBranchId)?.id ?? null
   const forkIndex = messages.findIndex(message => message.id === group.forkedFromMessageId)
   return forkIndex >= 0 ? messages[forkIndex + 1]?.id ?? null : null

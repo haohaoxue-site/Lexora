@@ -44,12 +44,6 @@ export interface AutomationMutationIdentity {
 }
 
 export interface AutomationRepository {
-  bindProjectIfUnassigned: (input: {
-    automationId: string
-    boundAt: string
-    expectedRevision: number
-    projectId: string
-  }) => Automation | null
   block: (input: {
     automationId: string
     blockedAt: string
@@ -221,11 +215,6 @@ export function createAutomationRepository(database: DatabaseSync): AutomationRe
     SELECT * FROM automation_occurrences
     WHERE conversation_id = ? AND deleted_at IS NULL
   `)
-  const bindProjectIfUnassigned = database.prepare(`
-    UPDATE automations
-    SET project_id = ?, revision = revision + 1, updated_at = ?
-    WHERE id = ? AND revision = ? AND project_id IS NULL AND deleted_at IS NULL
-  `)
   const insertAutomation = database.prepare(`
     INSERT INTO automations (
       id, name, prompt, project_id, execution_profile, model_mode, provider_id, model_id, reasoning,
@@ -379,17 +368,6 @@ export function createAutomationRepository(database: DatabaseSync): AutomationRe
   }
 
   return {
-    bindProjectIfUnassigned(input) {
-      if (Number(bindProjectIfUnassigned.run(
-        input.projectId,
-        input.boundAt,
-        input.automationId,
-        input.expectedRevision,
-      ).changes) !== 1) {
-        return null
-      }
-      return requireAutomation(findAny.get(input.automationId), input.automationId)
-    },
     block(input) {
       return withTransaction(database, () => {
         if (Number(blockAutomation.run(
@@ -660,7 +638,10 @@ export function createAutomationRepository(database: DatabaseSync): AutomationRe
       return (listDue.all(now, limit) as unknown as AutomationRow[]).map(toAutomation)
     },
     listHistory(input) {
-      const clauses: string[] = ['deleted_at IS NULL']
+      const clauses: string[] = [
+        'automation_occurrences.deleted_at IS NULL',
+        '(automation_occurrences.conversation_id IS NULL OR conversations.deleted_at IS NULL)',
+      ]
       const parameters: Array<string | number> = []
       if (input.automationId) {
         clauses.push('automation_id = ?')
@@ -675,7 +656,9 @@ export function createAutomationRepository(database: DatabaseSync): AutomationRe
         )
       }
       const rows = database.prepare(`
-        SELECT * FROM automation_occurrences
+        SELECT automation_occurrences.* FROM automation_occurrences
+        LEFT JOIN conversations
+          ON conversations.id = automation_occurrences.conversation_id
         WHERE ${clauses.join(' AND ')}
         ORDER BY scheduled_for DESC, id DESC
         LIMIT ?

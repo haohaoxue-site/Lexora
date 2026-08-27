@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { LocalMessage } from '@buddy-electron/shared/localChatApi'
 import type { ChatMessageBranchNavigator } from './chatMessageBranches'
+import type { ChatTranscriptTurnOutputs } from './chatTranscriptProjection'
 import type { BuddyLocale } from '@/i18n/buddyI18n'
 import { useTimeoutFn } from '@vueuse/core'
 import { NButton, NInput, NTooltip, useMessage } from 'naive-ui'
@@ -10,6 +11,7 @@ import { useBuddyI18n } from '@/i18n/buddyI18n'
 import DesktopIcon from '@/ui/DesktopIcon.vue'
 import BuddyChatAgentIdentity from './BuddyChatAgentIdentity.vue'
 import BuddyChatMessageContent from './BuddyChatMessageContent.vue'
+import BuddyChatTurnOutputs from './BuddyChatTurnOutputs.vue'
 import { renderChatMarkdown } from './chatMarkdown'
 import { projectChatMessageActions } from './chatMessageActions'
 import {
@@ -23,16 +25,18 @@ const props = defineProps<{
   activeSearch: boolean
   branchNavigator: ChatMessageBranchNavigator | null
   editing: boolean
+  isAgentTurnResult: boolean
   language: BuddyLocale
   message: LocalMessage
   searchMatch: boolean
-  showAssistantIdentity: boolean
+  turnOutputs: ChatTranscriptTurnOutputs | null
 }>()
 
 const emit = defineEmits<{
   activateBranch: [branchId: string]
   cancelEdit: []
   edit: [content: string]
+  openArtifact: [artifactId: string]
   regenerate: []
   startEdit: []
 }>()
@@ -43,7 +47,20 @@ const notification = useMessage()
 const editingText = shallowRef('')
 const copied = shallowRef(false)
 const copyReset = useTimeoutFn(() => copied.value = false, 1_400, { immediate: false })
-const actions = computed(() => projectChatMessageActions(props.message, props.actionsDisabled))
+const actions = computed(() => projectChatMessageActions(
+  props.message,
+  props.actionsDisabled,
+))
+const showAssistantIdentity = computed(() => (
+  props.message.role === 'assistant' && !props.isAgentTurnResult
+))
+const showActions = computed(() => (
+  actions.value.showCopy
+  || actions.value.showEdit
+  || actions.value.showRegenerate
+  || actions.value.showTime
+  || props.branchNavigator !== null
+))
 const html = computed(() => renderChatMarkdown(getChatMessageText(props.message)))
 const interruptionLabel = computed(() => {
   const interruption = getChatMessageInterruption(props.message)
@@ -95,7 +112,7 @@ async function copyMessage() {
       `is-${message.role}`,
       {
         'is-search-active': activeSearch,
-        'is-agent-turn-final': message.role === 'assistant' && !showAssistantIdentity,
+        'is-assistant-turn-result': isAgentTurnResult,
         'is-editing': editing,
         'is-search-match': searchMatch,
       },
@@ -140,6 +157,13 @@ async function copyMessage() {
       :language="language"
       :message="message"
     />
+    <BuddyChatTurnOutputs
+      v-if="turnOutputs"
+      :artifacts="turnOutputs.artifacts"
+      class="buddy-chat-message__outputs"
+      :language="language"
+      @open-artifact="emit('openArtifact', $event)"
+    />
     <small
       v-if="interruptionLabel"
       class="buddy-chat-message__interruption"
@@ -147,9 +171,9 @@ async function copyMessage() {
     >
       {{ interruptionLabel }}
     </small>
-    <div v-if="!editing" class="buddy-chat-message__actions">
+    <div v-if="!editing && showActions" class="buddy-chat-message__actions">
       <time
-        v-if="message.role === 'user'"
+        v-if="actions.showTime && message.role === 'user'"
         class="buddy-chat-message__time"
         :datetime="message.createdAt"
       >
@@ -246,7 +270,7 @@ async function copyMessage() {
         </NTooltip>
       </div>
       <time
-        v-if="message.role === 'assistant'"
+        v-if="actions.showTime && message.role === 'assistant'"
         class="buddy-chat-message__time"
         :datetime="message.createdAt"
       >
@@ -257,7 +281,7 @@ async function copyMessage() {
 </template>
 
 <style scoped lang="scss">
-.buddy-chat-message.is-agent-turn-final {
+.buddy-chat-message.is-assistant-turn-result {
   row-gap: var(--buddy-chat-gap-tight);
 }
 

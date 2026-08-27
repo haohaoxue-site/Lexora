@@ -4,8 +4,8 @@ import type {
   ProjectRepository,
 } from '../storage/projectRepository'
 import { randomUUID } from 'node:crypto'
-import { mkdir, readdir, realpath, rm, stat } from 'node:fs/promises'
-import { dirname, join, relative, resolve } from 'node:path'
+import { readdir, realpath, stat } from 'node:fs/promises'
+import { join, relative, resolve } from 'node:path'
 import { resolveGrantedPath } from './resolveGrantedPath'
 
 const IGNORED_SEARCH_DIRECTORIES = new Set(['.git', 'dist', 'node_modules', 'out', 'target'])
@@ -21,7 +21,7 @@ export interface CreateProjectInput {
   instructions: string
   memoryScope: ProjectMemoryScope
   name: string
-  root: string | null
+  root: string
 }
 
 export interface UpdateProjectInput extends CreateProjectInput {
@@ -29,35 +29,22 @@ export interface UpdateProjectInput extends CreateProjectInput {
 }
 
 export class ProjectGrantService {
-  readonly #managedProjectsDirectory: string | null
   readonly #projects: ProjectRepository
 
-  constructor(projects: ProjectRepository, options: { managedProjectsDirectory?: string } = {}) {
+  constructor(projects: ProjectRepository) {
     this.#projects = projects
-    this.#managedProjectsDirectory = options.managedProjectsDirectory ?? null
   }
 
   async create(input: CreateProjectInput): Promise<ProjectRecord> {
     const name = input.name.trim()
     if (!name)
       throw new ProjectGrantError()
-    if (!this.#managedProjectsDirectory)
-      throw new ProjectGrantError()
-
-    const id = randomUUID()
-    const directory = input.root
-      ? await resolveProjectDirectory(input.root)
-      : null
-    const managedRoot = join(this.#managedProjectsDirectory, id, 'workspace')
-    await mkdir(managedRoot, { mode: 0o700, recursive: true })
-    const canonicalManagedRoot = await resolveDirectoryRoot(managedRoot)
     const authorizedAt = new Date().toISOString()
     return this.#projects.create({
       authorizedAt,
-      directory,
-      id,
+      directory: await resolveProjectDirectory(input.root),
+      id: randomUUID(),
       instructions: input.instructions,
-      managedRoot: canonicalManagedRoot,
       memoryScope: input.memoryScope,
       name,
     })
@@ -68,9 +55,7 @@ export class ProjectGrantService {
     const name = input.name.trim()
     if (!name)
       throw new ProjectGrantError()
-    const directory = input.root
-      ? await resolveProjectDirectory(input.root)
-      : null
+    const directory = await resolveProjectDirectory(input.root)
     const updatedAt = new Date().toISOString()
     return this.#projects.update({
       directory,
@@ -80,19 +65,10 @@ export class ProjectGrantService {
         id: randomUUID(),
         payload: {
           changes: {
-            directory: {
-              from: project.directoryRoot,
-              to: directory?.root ?? null,
-            },
+            directory: { from: project.root, to: directory.root },
             instructions: project.instructions === input.instructions ? 'unchanged' : 'changed',
-            memoryScope: {
-              from: project.memoryScope,
-              to: input.memoryScope,
-            },
-            name: {
-              from: project.name,
-              to: name,
-            },
+            memoryScope: { from: project.memoryScope, to: input.memoryScope },
+            name: { from: project.name, to: name },
           },
         },
         projectId: project.id,
@@ -110,35 +86,17 @@ export class ProjectGrantService {
     if (this.#projects.hasActiveRuns(projectId))
       throw new ProjectHasActiveRunsError()
     const deletedAt = new Date().toISOString()
-    const deleted = this.#projects.delete(projectId, deletedAt, {
+    return this.#projects.delete(projectId, deletedAt, {
       createdAt: deletedAt,
       eventType: 'project.deleted',
       id: randomUUID(),
       payload: {
-        directoryRoot: project.directoryRoot,
         memoryScope: project.memoryScope,
         name: project.name,
+        root: project.root,
       },
       projectId,
     })
-    await this.#deleteManagedProjectData(project)
-    if (!project.managedRoot)
-      return deleted
-    if (!this.#projects.completeDeletion(projectId, new Date().toISOString()))
-      throw new ProjectGrantError()
-    return this.#projects.findById(projectId) ?? deleted
-  }
-
-  async recoverPendingDeletions(): Promise<number> {
-    const projects = this.#projects.list().filter(project => (
-      project.revokedAt !== null && project.managedRoot !== null
-    ))
-    for (const project of projects) {
-      await this.#deleteManagedProjectData(project)
-      if (!this.#projects.completeDeletion(project.id, new Date().toISOString()))
-        throw new ProjectGrantError()
-    }
-    return projects.length
   }
 
   list(): readonly ProjectRecord[] {
@@ -191,16 +149,6 @@ export class ProjectGrantService {
     if (!project || project.revokedAt !== null)
       throw new ProjectGrantError()
     return project
-  }
-
-  async #deleteManagedProjectData(project: ProjectRecord): Promise<void> {
-    if (!project.managedRoot || !this.#managedProjectsDirectory)
-      return
-    const projectDirectory = dirname(project.managedRoot)
-    const expectedDirectory = resolve(this.#managedProjectsDirectory, project.id)
-    if (resolve(projectDirectory) !== expectedDirectory)
-      throw new ProjectGrantError()
-    await rm(projectDirectory, { force: true, recursive: true })
   }
 }
 

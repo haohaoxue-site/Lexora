@@ -10,6 +10,8 @@
 
   --buddy-app-sidebar-width: 14rem;
   --buddy-workspace-sidebar-width: 16rem;
+  --buddy-context-panel-width: clamp(28rem, 44vw, 52rem);
+  --buddy-context-toolbar-height: 2.5rem;
   --buddy-titlebar-height: 2rem;
   --buddy-region-header-height: 3.75rem;
   --buddy-chat-reading-width: 50rem;

@@ -12,7 +12,7 @@ import { BUDDY_DEFAULT_EXECUTION_PROFILE } from '@buddy-shared/executionProfile'
 import { shallowRef } from 'vue'
 
 interface UseChatDraftsOptions {
-  cleanupDraftAttachments: (retainedAttachmentIds: ReadonlyArray<string>) => Promise<unknown>
+  cleanupDraftAttachments: () => Promise<unknown>
   onChange: () => void
   releaseAttachments: (attachmentIds: ReadonlyArray<string>) => Promise<unknown>
   targetKey: ComputedRef<string>
@@ -22,6 +22,7 @@ interface ChatDraftState {
   attachments: ReadonlyArray<LocalAttachment>
   composerContent: LocalWorkspaceDraft['composerContent']
   content: string
+  draftId: string
   executionProfile: BuddyExecutionProfile
   requestFingerprint: string | null
   requestId: string | null
@@ -32,6 +33,7 @@ export function useChatDrafts(options: UseChatDraftsOptions) {
   const attachments = shallowRef<ReadonlyArray<LocalAttachment>>([])
   const composerContent = shallowRef<LocalWorkspaceDraft['composerContent']>(null)
   const draft = shallowRef('')
+  const draftId = shallowRef<string>(crypto.randomUUID())
   const executionProfile = shallowRef<BuddyExecutionProfile>(BUDDY_DEFAULT_EXECUTION_PROFILE)
 
   async function appendAttachments(incoming: ReadonlyArray<LocalAttachment>): Promise<number> {
@@ -77,6 +79,7 @@ export function useChatDrafts(options: UseChatDraftsOptions) {
       attachments: attachments.value,
       composerContent: composerContent.value,
       content: draft.value,
+      draftId: draftId.value,
       executionProfile: executionProfile.value,
       requestFingerprint: resetRequestId ? null : current.requestFingerprint,
       requestId: resetRequestId ? null : current.requestId,
@@ -89,6 +92,7 @@ export function useChatDrafts(options: UseChatDraftsOptions) {
     attachments.value = current.attachments
     composerContent.value = current.composerContent
     draft.value = current.content
+    draftId.value = current.draftId
     executionProfile.value = current.executionProfile
   }
 
@@ -99,17 +103,15 @@ export function useChatDrafts(options: UseChatDraftsOptions) {
   return {
     appendAttachments,
     attachments,
-    cleanupAbandonedAttachments: () => options.cleanupDraftAttachments(
-      [...draftsByScope.values()].flatMap(
-        item => item.attachments.map(attachment => attachment.attachmentId),
-      ),
-    ),
+    cleanupAbandonedAttachments: options.cleanupDraftAttachments,
     composerContent,
     draft,
+    draftId,
     exportDrafts: (): LocalWorkspaceDraft[] => [...draftsByScope.entries()].map(([targetKey, value]) => ({
       attachments: value.attachments,
       composerContent: value.composerContent,
       content: value.content,
+      draftId: value.draftId,
       executionProfile: value.executionProfile,
       requestFingerprint: value.requestFingerprint,
       requestId: value.requestId,
@@ -122,6 +124,7 @@ export function useChatDrafts(options: UseChatDraftsOptions) {
           attachments: value.attachments,
           composerContent: value.composerContent,
           content: value.content,
+          draftId: value.draftId,
           executionProfile: value.executionProfile,
           requestFingerprint: value.requestFingerprint,
           requestId: value.requestId,
@@ -178,6 +181,7 @@ function emptyDraft(): ChatDraftState {
     attachments: [],
     composerContent: null,
     content: '',
+    draftId: crypto.randomUUID(),
     executionProfile: BUDDY_DEFAULT_EXECUTION_PROFILE,
     requestFingerprint: null,
     requestId: null,

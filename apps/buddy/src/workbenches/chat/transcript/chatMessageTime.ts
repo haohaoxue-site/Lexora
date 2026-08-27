@@ -16,14 +16,33 @@ export function projectChatTranscriptDisplayRows(
   rows: ReadonlyArray<ChatTranscriptRow>,
 ): ChatTranscriptDisplayRow[] {
   const displayRows: ChatTranscriptDisplayRow[] = []
+  const agentTurnFinalMessageIds = new Set(rows.flatMap(row => (
+    row.kind === 'agent-turn' && row.turn.finalMessageId
+      ? [row.turn.finalMessageId]
+      : []
+  )))
+  const agentTurnRunIds = new Set(rows.flatMap(row => (
+    row.kind === 'agent-turn' ? [row.turn.runId] : []
+  )))
   let previousDayKey: string | null = null
 
   for (const row of rows) {
-    if (row.kind === 'message') {
-      const dayKey = dayjs(row.message.createdAt).format('YYYY-MM-DD')
+    const assistantMessageBelongsToAgentTurn = row.kind === 'message'
+      && row.message.role === 'assistant'
+      && (
+        agentTurnFinalMessageIds.has(row.message.id)
+        || (row.message.runId !== null && agentTurnRunIds.has(row.message.runId))
+      )
+    const dayAnchorAt = row.kind === 'agent-turn'
+      ? row.turn.startedAt
+      : row.kind === 'message' && !assistantMessageBelongsToAgentTurn
+        ? row.message.createdAt
+        : null
+    if (dayAnchorAt) {
+      const dayKey = dayjs(dayAnchorAt).format('YYYY-MM-DD')
       if (dayKey !== previousDayKey) {
         displayRows.push({
-          createdAt: row.message.createdAt,
+          createdAt: dayAnchorAt,
           key: `day:${dayKey}`,
           kind: 'day-divider',
         })

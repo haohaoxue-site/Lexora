@@ -85,6 +85,7 @@ export function useChatTurnExecution(options: UseChatTurnExecutionOptions) {
       content: content.trim(),
       contextItems: [...contextItems],
       conversationId: options.session.activeConversationId.value,
+      draftId: options.drafts.draftId.value,
       executionProfile: options.executionProfile.value,
       modelSelection,
       projectId: options.session.projectId.value,

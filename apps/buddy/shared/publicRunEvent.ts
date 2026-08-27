@@ -1,11 +1,13 @@
 import { z } from 'zod'
 import { approvalReviewPayloadSchema } from './approvalReviewPayload'
 import { buddyAssistantTextPhaseSchema } from './assistantTextPhase'
+import { BUDDY_ATTACHMENT_COUNT_LIMIT } from './attachmentPolicy'
 import {
   MAX_BUDDY_MESSAGE_TEXT_LENGTH,
   readBuddyInterruptedMessageContent,
 } from './buddyMessageContent'
 import { buddyToolPresentationSchema } from './runEventPresentation'
+import { buddyRunOutputPayloadSchema } from './runOutput'
 import { buddyRunProgressSchema } from './runProgress'
 
 export interface RunEventLike {
@@ -41,7 +43,6 @@ const MAX_MESSAGE_DELTA_LENGTH = 64 * 1024
 const SCALAR_PAYLOAD_KEYS = new Map<string, readonly string[]>([
   ['approval.requested', ['id', 'kind', 'status', 'summary', 'toolCallId']],
   ['approval.resolved', ['id', 'resolvedAt', 'status']],
-  ['artifact.changed', ['id', 'mimeType', 'operation']],
   ['context.compaction.cancelled', ['reason', 'willRetry']],
   ['context.compaction.completed', ['estimatedTokensAfter', 'reason', 'tokensBefore', 'willRetry']],
   ['context.compaction.failed', ['errorCode', 'reason', 'willRetry']],
@@ -114,6 +115,14 @@ function publicPayload(type: string, value: unknown): Record<string, unknown> {
     return publicInterruptedMessage(source)
   if (type === 'run.progress')
     return publicRunProgress(source)
+  if (type === 'output.produced') {
+    const output = buddyRunOutputPayloadSchema.safeParse({
+      artifactIds: source.artifactIds,
+      sourceToolCallId: source.sourceToolCallId,
+      sourceToolName: source.sourceToolName,
+    })
+    return output.success ? output.data : {}
+  }
   if (
     type === 'tool.preparing'
     || type === 'tool.started'
@@ -177,8 +186,17 @@ function publicInterruptedMessage(source: Record<string, unknown>): Record<strin
 function publicCompletedMessage(source: Record<string, unknown>): Record<string, unknown> {
   const payload = selectScalars(source, ['messageId', 'phase', 'role', 'stopReason'])
   const content = readRecord(source.content)
-  if (content && typeof content.text === 'string')
-    payload.content = { text: content.text.slice(0, MAX_BUDDY_MESSAGE_TEXT_LENGTH) }
+  if (content && typeof content.text === 'string') {
+    const attachmentIds = Array.isArray(content.attachmentIds)
+      ? content.attachmentIds
+          .filter((id): id is string => typeof id === 'string' && Boolean(id))
+          .slice(0, BUDDY_ATTACHMENT_COUNT_LIMIT)
+      : []
+    payload.content = {
+      ...(attachmentIds.length > 0 ? { attachmentIds } : {}),
+      text: content.text.slice(0, MAX_BUDDY_MESSAGE_TEXT_LENGTH),
+    }
+  }
   return payload
 }
 

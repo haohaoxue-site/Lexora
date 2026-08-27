@@ -5,6 +5,7 @@ import {
   CalendarClock20Regular,
   ChevronRight20Regular,
   Document20Regular,
+  DrawImage20Regular,
   Edit20Regular,
   PlugConnected20Regular,
   Search20Regular,
@@ -32,11 +33,12 @@ const hasManualToggle = shallowRef(false)
 const canExpand = computed(() => {
   const presentation = props.node.presentation
   return presentation.card === 'terminal'
-    || (
-      presentation.card !== 'automation'
-      && presentation.card !== 'pet'
-      && Boolean(presentation.output)
-    )
+    || (presentation.card === 'image' && Boolean(
+      presentation.prompt
+      || presentation.reference
+      || presentation.artifactIds.length,
+    ))
+    || ('output' in presentation && Boolean(presentation.output))
     || (presentation.card === 'diff' && Boolean(presentation.diff))
 })
 const title = computed(() => {
@@ -48,6 +50,7 @@ const title = computed(() => {
       ? 'desktop.chat.processToolCreate'
       : 'desktop.chat.processToolEdit')
     case 'connector': return t('desktop.chat.processToolConnector')
+    case 'image': return t('desktop.chat.processToolImage')
     case 'pet': return t('desktop.chat.processToolPet')
     case 'system': return t('desktop.chat.processToolSystemAction')
     case 'automation': return t('desktop.chat.processToolAutomation')
@@ -87,6 +90,15 @@ const summary = computed(() => {
       lifecycle ?? presentation.status,
     ].filter(Boolean).join(' · ')
   }
+  if (presentation.card === 'image') {
+    return lifecycle ?? (
+      presentation.status === 'completed' && presentation.generatedCount !== null
+        ? t('desktop.chat.processToolImageCount', { count: presentation.generatedCount })
+        : presentation.status === 'failed'
+          ? t('desktop.chat.processToolFailed')
+          : t('desktop.chat.processToolImageRunning')
+    )
+  }
   const detail = (() => {
     switch (presentation.card) {
       case 'terminal': return presentation.command
@@ -112,6 +124,7 @@ const leadingIcon = computed(() => {
     case 'search': return Search20Regular
     case 'diff': return Edit20Regular
     case 'connector': return PlugConnected20Regular
+    case 'image': return DrawImage20Regular
     case 'pet': return Sparkle20Regular
     case 'system': return Wrench20Regular
     case 'automation': return CalendarClock20Regular

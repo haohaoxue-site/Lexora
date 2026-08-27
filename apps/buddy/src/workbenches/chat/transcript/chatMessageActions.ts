@@ -5,6 +5,7 @@ export interface ChatMessageActions {
   showCopy: boolean
   showEdit: boolean
   showRegenerate: boolean
+  showTime: boolean
 }
 
 export function projectChatMessageActions(
@@ -16,6 +17,7 @@ export function projectChatMessageActions(
     disabled,
     showCopy: lifecycleMessage,
     showEdit: message.role === 'user',
-    showRegenerate: message.role === 'assistant',
+    showRegenerate: message.role === 'assistant' && lifecycleMessage,
+    showTime: lifecycleMessage,
   }
 }

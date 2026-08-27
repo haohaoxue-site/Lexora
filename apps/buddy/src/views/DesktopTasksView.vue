@@ -7,6 +7,8 @@ import DesktopChatWorkspace from '@/workbenches/chat/workspace/DesktopChatWorksp
 import DesktopChatWorkspaceHeader from '@/workbenches/chat/workspace/DesktopChatWorkspaceHeader.vue'
 import { useConversationSearch } from '@/workbenches/chat/workspace/useConversationSearch'
 import DesktopTaskProjectSelector from '@/workbenches/tasks/composer/DesktopTaskProjectSelector.vue'
+import DesktopTaskContextPanel from '@/workbenches/tasks/context/DesktopTaskContextPanel.vue'
+import { useTaskContextPanel } from '@/workbenches/tasks/context/useTaskContextPanel'
 import DesktopTaskIndex from '@/workbenches/tasks/index/DesktopTaskIndex.vue'
 
 const router = useRouter()
@@ -18,6 +20,10 @@ const {
 } = useDesktopApp()
 const { index: taskIndex, session: taskSession } = tasks
 const chatSession = tasks.workspace.session
+const taskContext = useTaskContextPanel({
+  activeConversationId: chatSession.activeConversationId,
+  runOutputs: tasks.workspace.transcript.runOutputs,
+})
 const conversationSearch = useConversationSearch({
   activeBranchId: chatSession.activeBranchId,
   activeConversationId: chatSession.activeConversationId,
@@ -50,17 +56,21 @@ const conversationSearch = useConversationSearch({
 
     <DesktopChatWorkspaceHeader
       :active-search-index="conversationSearch.activeIndex.value"
+      :artifact-count="taskContext.artifactCount.value"
+      :can-open-context="taskSession.activeTaskId.value !== null"
       :can-search-conversation="taskSession.activeTaskId.value !== null"
       :conversation-search-loading="conversationSearch.isLoading.value"
       :conversation-search-open="conversationSearch.isOpen.value"
       :conversation-search-query="conversationSearch.query.value"
       :conversation-search-result-count="conversationSearch.resultCount.value"
+      :context-open="taskContext.isOpen.value"
       :language="tasks.language.value"
       :title="taskSession.currentTitle.value"
       @close-conversation-search="conversationSearch.close"
       @next-conversation-search-result="conversationSearch.move(1)"
       @open-conversation-search="conversationSearch.open"
       @previous-conversation-search-result="conversationSearch.move(-1)"
+      @toggle-context="taskContext.toggle"
       @update-conversation-search="conversationSearch.setQuery"
     />
     <DesktopChatWorkspace
@@ -68,6 +78,7 @@ const conversationSearch = useConversationSearch({
       :workspace="tasks.workspace"
       :matching-search-message-ids="conversationSearch.matchingMessageIds.value"
       @open-settings="router.push(desktopRouteLocations.settings($event))"
+      @open-artifact="taskContext.openArtifact"
     >
       <template v-if="taskSession.activeTaskId.value === null" #composerLeadingContext>
         <DesktopTaskProjectSelector
@@ -80,5 +91,16 @@ const conversationSearch = useConversationSearch({
         />
       </template>
     </DesktopChatWorkspace>
+
+    <template v-if="taskContext.isOpen.value" #context>
+      <DesktopTaskContextPanel
+        :active-tab="taskContext.activeTab.value"
+        :language="tasks.language.value"
+        :tabs="taskContext.tabs.value"
+        @close-tab="taskContext.closeTab"
+        @collapse="taskContext.toggle"
+        @select-tab="taskContext.selectTab"
+      />
+    </template>
   </DesktopWorkbenchLayout>
 </template>

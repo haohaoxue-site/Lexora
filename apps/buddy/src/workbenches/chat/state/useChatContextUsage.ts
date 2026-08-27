@@ -15,6 +15,7 @@ interface UseChatContextUsageOptions {
   activeBranchId: Readonly<Ref<string | null>>
   activeConversationId: Readonly<Ref<string | null>>
   api: LexoraDesktopApi['localChat']['context']
+  draftId: Readonly<Ref<string>>
   executionProfile: Readonly<Ref<BuddyExecutionProfile>>
   models: Readonly<Ref<ReadonlyArray<LocalRuntimeModelOption>>>
   projectId: Readonly<Ref<string | null>>
@@ -46,6 +47,7 @@ export function useChatContextUsage(options: UseChatContextUsageOptions) {
       options.activeBranchId.value,
       options.projectId.value,
       options.executionProfile.value,
+      options.draftId.value,
     ] as const,
     () => void refresh(),
     { immediate: true },
@@ -70,6 +72,7 @@ export function useChatContextUsage(options: UseChatContextUsageOptions) {
       const nextSnapshot = await options.api.getUsageSnapshot({
         branchId,
         conversationId,
+        draftId: options.draftId.value,
         executionProfile: options.executionProfile.value,
         modelSelection: {
           modelId: selectedModel.modelId,

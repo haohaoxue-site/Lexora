@@ -135,19 +135,6 @@ export class AutomationService {
     })
   }
 
-  bindProjectIfUnassigned(input: {
-    automationId: string
-    expectedRevision: number
-    projectId: string
-  }): Automation | null {
-    return this.#repository.bindProjectIfUnassigned({
-      automationId: z.string().trim().min(1).max(256).parse(input.automationId),
-      boundAt: this.#now(),
-      expectedRevision: z.number().int().positive().parse(input.expectedRevision),
-      projectId: z.string().trim().min(1).max(256).parse(input.projectId),
-    })
-  }
-
   create(input: CreateAutomationRequest): Automation {
     const request = automationMutationRequestSchemas.create.parse(input)
     const now = this.#now()

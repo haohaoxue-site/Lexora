@@ -2,6 +2,7 @@ import type { ImageContent } from '@earendil-works/pi-ai'
 import type { Buffer } from 'node:buffer'
 import type { BuddyAttachmentUpload } from '../../../shared/attachmentPolicy'
 import type { AttachmentRecord, AttachmentRepository } from '../storage/attachmentRepository'
+import type { BuddyDataPaths } from '../storage/BuddyDataPaths'
 import { randomUUID } from 'node:crypto'
 import { constants } from 'node:fs'
 import { chmod, copyFile, mkdir, readFile, realpath, stat, unlink, writeFile } from 'node:fs/promises'
@@ -11,6 +12,7 @@ import {
   BUDDY_ATTACHMENT_TOTAL_BYTES_LIMIT,
 } from '../../../shared/attachmentPolicy'
 
+const DRAFT_RETENTION_MS = 7 * 24 * 60 * 60 * 1000
 const MAX_TEXT_PROMPT_BYTES = 1024 * 1024
 const MIME_TYPES: Readonly<Record<string, string>> = {
   '.csv': 'text/csv',
@@ -33,7 +35,7 @@ const SUPPORTED_IMAGE_MIME_TYPES = new Set(
 )
 
 export interface AttachmentServiceOptions {
-  directory: string
+  paths: BuddyDataPaths
   readFile?: AttachmentFileReader
   repository: AttachmentRepository
 }
@@ -48,18 +50,37 @@ export interface AttachmentRecoveryResult {
   missingAttachmentIds: string[]
 }
 
+export interface MessageAttachmentBinding {
+  createdAt: string
+  id: string
+  messageId: string
+  mimeType: string
+  name: string
+  sizeBytes: number
+  sourceAttachmentId: string
+  sourceDraftId: string | null
+  sourceStoredPath: string
+  storedPath: string
+}
+
+export interface PreparedMessageAttachments {
+  bindings: readonly MessageAttachmentBinding[]
+  commit: () => Promise<void>
+  rollback: () => Promise<void>
+}
+
 export class AttachmentService {
-  readonly #directory: string
+  readonly #paths: BuddyDataPaths
   readonly #readFile: AttachmentFileReader
   readonly #repository: AttachmentRepository
 
   constructor(options: AttachmentServiceOptions) {
-    this.#directory = options.directory
+    this.#paths = options.paths
     this.#readFile = options.readFile ?? readFile
     this.#repository = options.repository
   }
 
-  async registerFiles(paths: readonly string[]): Promise<AttachmentRecord[]> {
+  async registerFiles(draftId: string, paths: readonly string[]): Promise<AttachmentRecord[]> {
     if (paths.length > BUDDY_ATTACHMENT_COUNT_LIMIT)
       throw new AttachmentError('VALIDATION_FAILED')
     const sources = await Promise.all(paths.map(async (selectedPath) => {
@@ -75,23 +96,23 @@ export class AttachmentService {
       return { metadata, mimeType, sourcePath }
     }))
     validateTotalBytes(sources.map(source => source.metadata.size))
-    await mkdir(this.#directory, { mode: 0o700, recursive: true })
+    const directory = this.#paths.draftAttachments(draftId)
+    await mkdir(directory, { mode: 0o700, recursive: true })
     const records: AttachmentRecord[] = []
     const attempted: AttachmentRecord[] = []
     try {
       for (const { metadata, mimeType, sourcePath } of sources) {
         const id = randomUUID()
-        const extension = safeExtension(sourcePath)
-        const storedPath = join(this.#directory, `${id}${extension}`)
+        const storedPath = join(directory, `${id}${safeExtension(sourcePath)}`)
         const record: AttachmentRecord = {
           conversationId: null,
           createdAt: new Date().toISOString(),
-          draftKey: null,
+          draftId,
           id,
+          messageId: null,
           mimeType,
           name: basename(sourcePath),
           sizeBytes: metadata.size,
-          status: 'draft',
           storedPath,
         }
         attempted.push(record)
@@ -108,7 +129,10 @@ export class AttachmentService {
     return records
   }
 
-  async registerUploads(uploads: readonly BuddyAttachmentUpload[]): Promise<AttachmentRecord[]> {
+  async registerUploads(
+    draftId: string,
+    uploads: readonly BuddyAttachmentUpload[],
+  ): Promise<AttachmentRecord[]> {
     if (uploads.length > BUDDY_ATTACHMENT_COUNT_LIMIT)
       throw new AttachmentError('VALIDATION_FAILED')
     const sources = uploads.map((upload) => {
@@ -124,22 +148,23 @@ export class AttachmentService {
       return { ...upload, mimeType, name }
     })
     validateTotalBytes(sources.map(source => source.bytes.byteLength))
-    await mkdir(this.#directory, { mode: 0o700, recursive: true })
+    const directory = this.#paths.draftAttachments(draftId)
+    await mkdir(directory, { mode: 0o700, recursive: true })
     const records: AttachmentRecord[] = []
     const attempted: AttachmentRecord[] = []
     try {
       for (const source of sources) {
         const id = randomUUID()
-        const storedPath = join(this.#directory, `${id}${safeExtension(source.name)}`)
+        const storedPath = join(directory, `${id}${safeExtension(source.name)}`)
         const record: AttachmentRecord = {
           conversationId: null,
           createdAt: new Date().toISOString(),
-          draftKey: null,
+          draftId,
           id,
+          messageId: null,
           mimeType: source.mimeType,
           name: source.name,
           sizeBytes: source.bytes.byteLength,
-          status: 'draft',
           storedPath,
         }
         attempted.push(record)
@@ -156,8 +181,65 @@ export class AttachmentService {
     return records
   }
 
+  async prepareMessageAttachments(input: {
+    attachmentIds: readonly string[]
+    conversationId: string
+    draftId: string
+    messageId: string
+  }): Promise<PreparedMessageAttachments> {
+    const records = input.attachmentIds.map(id => this.#requireForPrompt(
+      id,
+      input.conversationId,
+      input.draftId,
+    ))
+    validateTotalBytes(records.map(record => record.sizeBytes))
+    if (records.length === 0) {
+      return {
+        bindings: [],
+        commit: () => Promise.resolve(),
+        rollback: () => Promise.resolve(),
+      }
+    }
+    const directory = this.#paths.messageInputs(input.conversationId, input.messageId)
+    await mkdir(directory, { mode: 0o700, recursive: true })
+    const bindings: MessageAttachmentBinding[] = []
+    try {
+      for (const record of records) {
+        const id = record.draftId === input.draftId ? record.id : randomUUID()
+        const storedPath = join(directory, `${id}${safeExtension(record.name)}`)
+        await copyFile(record.storedPath, storedPath, constants.COPYFILE_EXCL)
+        await chmod(storedPath, 0o600)
+        bindings.push({
+          createdAt: new Date().toISOString(),
+          id,
+          messageId: input.messageId,
+          mimeType: record.mimeType,
+          name: record.name,
+          sizeBytes: record.sizeBytes,
+          sourceAttachmentId: record.id,
+          sourceDraftId: record.draftId,
+          sourceStoredPath: record.storedPath,
+          storedPath,
+        })
+      }
+    }
+    catch (error) {
+      await removeFiles(bindings.map(binding => binding.storedPath))
+      throw error
+    }
+    return {
+      bindings,
+      commit: () => removeFiles(bindings.flatMap(
+        binding => binding.sourceDraftId ? [binding.sourceStoredPath] : [],
+      )),
+      rollback: () => removeFiles(bindings.map(binding => binding.storedPath)),
+    }
+  }
+
   resolvePreview(id: string): { mimeType: string, path: string } {
-    const record = this.#requireAvailable(id)
+    const record = this.#repository.findVisibleById(id)
+    if (!record)
+      throw new AttachmentError('ATTACHMENT_NOT_FOUND')
     if (!record.mimeType.startsWith('image/'))
       throw new AttachmentError('VALIDATION_FAILED')
     return { mimeType: record.mimeType, path: record.storedPath }
@@ -167,48 +249,51 @@ export class AttachmentService {
     const released: string[] = []
     for (const id of ids) {
       const record = this.#repository.findById(id)
-      if (!record || record.status !== 'draft')
+      if (!record?.draftId)
         continue
       await unlinkAvailableFile(record.storedPath)
-      if (this.#repository.release([id]) === 1) {
+      if (this.#repository.removeDraft(id))
         released.push(id)
-      }
     }
     return released
   }
 
-  cleanupDrafts(retainedIds: readonly string[]): Promise<string[]> {
-    const retained = new Set(retainedIds)
-    return this.release(this.#repository.listDrafts()
-      .filter(record => !retained.has(record.id))
-      .map(record => record.id))
-  }
-
-  async deleteForConversation(conversationId: string): Promise<string[]> {
-    const records = this.#repository.listForConversation(conversationId)
-    for (const record of records) {
-      try {
-        await unlink(record.storedPath)
-      }
-      catch (error) {
-        if (!isFileNotFound(error))
-          throw error
-      }
-    }
-    return records.map(record => record.id)
+  cleanupDrafts(now = Date.now()): Promise<string[]> {
+    const cutoff = new Date(now - DRAFT_RETENTION_MS).toISOString()
+    return this.release(this.#repository.listDraftsBefore(cutoff).map(record => record.id))
   }
 
   listForConversation(conversationId: string): AttachmentRecord[] {
     return this.#repository.listForConversation(conversationId)
-      .filter(record => record.status === 'attached')
+  }
+
+  async materializeConversationImages(
+    conversationId: string,
+    ids?: readonly string[],
+  ): Promise<{ images: ImageContent[], records: AttachmentRecord[] }> {
+    const available = this.listForConversation(conversationId)
+      .filter(record => record.mimeType.startsWith('image/'))
+    const selectedIds = ids === undefined
+      ? available.slice(-1).map(record => record.id)
+      : ids
+    if (selectedIds.length === 0)
+      throw new AttachmentError('ATTACHMENT_NOT_FOUND')
+    const materialized = await this.materializePrompt(selectedIds, '', conversationId)
+    if (materialized.images.length !== selectedIds.length)
+      throw new AttachmentError('VALIDATION_FAILED')
+    return {
+      images: materialized.images,
+      records: materialized.records,
+    }
   }
 
   async materializePrompt(
     ids: readonly string[],
     content: string,
     conversationId: string | null = null,
+    draftId: string | null = null,
   ): Promise<{ images: ImageContent[], prompt: string, records: AttachmentRecord[] }> {
-    const records = ids.map(id => this.#requireForPrompt(id, conversationId))
+    const records = ids.map(id => this.#requireForPrompt(id, conversationId, draftId))
     validateTotalBytes(records.map(record => record.sizeBytes))
     const materialized = await Promise.all(records.map(async (record): Promise<{
       image: ImageContent | null
@@ -222,13 +307,16 @@ export class AttachmentService {
               mimeType: record.mimeType,
               type: 'image',
             },
-            section: `附件：${record.name}（图像）`,
+            section: `附件：${record.name}（图像，attachmentId=${record.id}）`,
           }
         }
         if (!isTextAttachment(record) || record.sizeBytes > MAX_TEXT_PROMPT_BYTES)
           throw new AttachmentError('VALIDATION_FAILED')
         const text = await this.#readFile(record.storedPath, 'utf8')
-        return { image: null, section: `附件：${record.name}\n\n${text}` }
+        return {
+          image: null,
+          section: `附件：${record.name}（attachmentId=${record.id}）\n\n${text}`,
+        }
       }
       catch (error) {
         if (error instanceof AttachmentError)
@@ -253,7 +341,7 @@ export class AttachmentService {
   ): Promise<AttachmentRecoveryResult> {
     const resolved = ids.map((id) => {
       try {
-        return { id, record: this.#requireForPrompt(id, conversationId) }
+        return { id, record: this.#requireForPrompt(id, conversationId, null) }
       }
       catch (error) {
         if (error instanceof AttachmentError && error.code === 'ATTACHMENT_NOT_FOUND')
@@ -283,37 +371,34 @@ export class AttachmentService {
     }
   }
 
-  attach(ids: readonly string[], conversationId: string): void {
-    if (ids.length > 0 && this.#repository.attach(ids, conversationId) !== ids.length)
-      throw new AttachmentError('ATTACHMENT_NOT_FOUND')
-  }
-
   #requireAvailable(id: string): AttachmentRecord {
     const record = this.#repository.findById(id)
-    if (!record || record.status === 'released')
+    if (!record)
       throw new AttachmentError('ATTACHMENT_NOT_FOUND')
     return record
   }
 
-  #requireForPrompt(id: string, conversationId: string | null): AttachmentRecord {
+  #requireForPrompt(
+    id: string,
+    conversationId: string | null,
+    draftId: string | null,
+  ): AttachmentRecord {
     const record = this.#requireAvailable(id)
-    if (record.status === 'draft')
-      return record
-    if (record.status === 'attached' && record.conversationId === conversationId)
+    if (record.draftId !== null) {
+      if (record.draftId === draftId)
+        return record
+      throw new AttachmentError('VALIDATION_FAILED')
+    }
+    if (record.messageId !== null && record.conversationId === conversationId)
       return record
     throw new AttachmentError('VALIDATION_FAILED')
   }
 
   async #rollbackRegistration(records: readonly AttachmentRecord[]): Promise<void> {
     for (const record of records.toReversed()) {
+      await unlinkAvailableFile(record.storedPath).catch(() => undefined)
       try {
-        await unlinkAvailableFile(record.storedPath)
-      }
-      catch {
-        continue
-      }
-      try {
-        this.#repository.remove(record.id)
+        this.#repository.removeDraft(record.id)
       }
       catch {}
     }
@@ -376,4 +461,8 @@ async function unlinkAvailableFile(path: string): Promise<void> {
     if (!isFileNotFound(error))
       throw error
   }
+}
+
+async function removeFiles(paths: readonly string[]): Promise<void> {
+  await Promise.all(paths.map(unlinkAvailableFile))
 }

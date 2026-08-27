@@ -37,6 +37,7 @@ const buddyAttachmentUploadSchema = z.object({
 }).strict()
 
 export const buddyAttachmentImportRequestSchema = z.object({
+  draftId: z.string().regex(/^[A-Z0-9][\w-]{0,127}$/i),
   files: z.array(buddyAttachmentUploadSchema).min(1).max(BUDDY_ATTACHMENT_COUNT_LIMIT),
 }).strict().refine(
   input => input.files.reduce((total, file) => total + file.bytes.byteLength, 0)

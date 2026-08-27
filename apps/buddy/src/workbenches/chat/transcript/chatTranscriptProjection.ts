@@ -1,8 +1,10 @@
 import type {
+  LocalArtifact,
   LocalConversationTimelineItem,
   LocalMessage,
   LocalRun,
   LocalRunEvent,
+  LocalRunOutput,
 } from '@buddy-electron/shared/localChatApi'
 import type {
   ChatAgentTurn,
@@ -17,9 +19,16 @@ import {
 } from './chatStreamingMessage'
 
 export interface ChatTranscriptMessageRow {
+  isAgentTurnResult: boolean
   key: string
   kind: 'message'
   message: LocalMessage
+  turnOutputs: ChatTranscriptTurnOutputs | null
+}
+
+export interface ChatTranscriptTurnOutputs {
+  artifacts: ReadonlyArray<LocalArtifact>
+  runId: string
 }
 
 export interface ChatTranscriptCompactionRow {
@@ -62,12 +71,11 @@ export type ChatTranscriptRow
 
 export interface ChatTranscriptProjection {
   hasActiveProcessIdentity: boolean
-  processIdentityMessageIds: ReadonlySet<string>
-  processIdentityRunIds: ReadonlySet<string>
   rows: ReadonlyArray<ChatTranscriptRow>
 }
 
 export function projectChatTranscript(input: {
+  outputs: ReadonlyArray<LocalRunOutput>
   runEvents: ReadonlyArray<LocalRunEvent>
   runs: ReadonlyArray<LocalRun>
   timelineItems: ReadonlyArray<LocalConversationTimelineItem>
@@ -111,7 +119,11 @@ export function projectChatTranscript(input: {
 
   const agentTurnRunIds = new Set(agentTurns.map(turn => turn.runId))
   const rows: ChatTranscriptRow[] = []
-  for (const row of projectPersistedChatTranscriptRows(input.timelineItems, agentTurns)) {
+  for (const row of projectPersistedChatTranscriptRows(
+    input.timelineItems,
+    agentTurns,
+    input.outputs,
+  )) {
     rows.push(row)
     if (row.kind === 'agent-turn') {
       rows.push(...(noticesByRunId.get(row.turn.runId) ?? []))
@@ -142,36 +154,16 @@ export function projectChatTranscript(input: {
     })
   }
 
-  const processIdentityMessageIds = new Set(rows.flatMap(row => (
-    row.kind === 'agent-turn' && row.turn.finalMessageId
-      ? [row.turn.finalMessageId]
-      : []
-  )))
-  const processIdentityRunIds = new Set(rows.flatMap(row => (
-    row.kind === 'agent-turn' ? [row.turn.runId] : []
-  )))
-
   return {
     hasActiveProcessIdentity: activeAgentTurn !== undefined,
-    processIdentityMessageIds,
-    processIdentityRunIds,
     rows,
   }
-}
-
-export function shouldShowAssistantIdentity(
-  message: LocalMessage,
-  projection: ChatTranscriptProjection,
-): boolean {
-  if (message.role !== 'assistant')
-    return false
-  return !projection.processIdentityMessageIds.has(message.id)
-    && (!message.runId || !projection.processIdentityRunIds.has(message.runId))
 }
 
 export function projectPersistedChatTranscriptRows(
   items: ReadonlyArray<LocalConversationTimelineItem>,
   turns: ReadonlyArray<ChatAgentTurn>,
+  outputs: ReadonlyArray<LocalRunOutput> = [],
 ): Array<
   ChatTranscriptAgentTurnRow
   | ChatTranscriptCompactionRow
@@ -183,6 +175,11 @@ export function projectPersistedChatTranscriptRows(
     | ChatTranscriptMessageRow
   > = []
   const turnsByTrigger = new Map<string, ChatAgentTurn[]>()
+  const turnsByRunId = new Map(turns.map(turn => [turn.runId, turn]))
+  const visibleTurnsByRunId = new Map(
+    turns.filter(shouldShowAgentTurn).map(turn => [turn.runId, turn]),
+  )
+  const outputsByRunId = projectTurnOutputs(outputs)
   const processMessageIds = new Set<string>()
   for (const turn of turns) {
     for (const node of turn.nodes) {
@@ -205,9 +202,21 @@ export function projectPersistedChatTranscriptRows(
       })
       continue
     }
-    if (!isVisibleChatMessage(item) || processMessageIds.has(item.id))
+    if (processMessageIds.has(item.id))
       continue
-    rows.push({ key: `message:${item.id}`, kind: 'message', message: item })
+    const isAgentTurnResult = isFinalTurnMessage(item, visibleTurnsByRunId)
+    const turnOutputs = isFinalTurnMessage(item, turnsByRunId) && item.runId
+      ? outputsByRunId.get(item.runId) ?? null
+      : null
+    if (!isVisibleChatMessage(item) && turnOutputs === null)
+      continue
+    rows.push({
+      isAgentTurnResult,
+      key: `message:${item.id}`,
+      kind: 'message',
+      message: item,
+      turnOutputs,
+    })
     rows.push(...(turnsByTrigger.get(item.id) ?? []).map(turn => ({
       key: `agent-turn:${turn.runId}`,
       kind: 'agent-turn' as const,
@@ -215,6 +224,41 @@ export function projectPersistedChatTranscriptRows(
     })))
   }
   return rows
+}
+
+function isFinalTurnMessage(
+  message: LocalMessage,
+  turnsByRunId: ReadonlyMap<string, ChatAgentTurn>,
+): boolean {
+  if (message.role !== 'assistant' || !message.runId)
+    return false
+  const turn = turnsByRunId.get(message.runId)
+  if (!turn)
+    return false
+  return turn.finalMessageId === message.id
+}
+
+function projectTurnOutputs(
+  outputs: ReadonlyArray<LocalRunOutput>,
+): ReadonlyMap<string, ChatTranscriptTurnOutputs> {
+  const artifactsByRunId = new Map<string, LocalArtifact[]>()
+  const artifactIdsByRunId = new Map<string, Set<string>>()
+  for (const output of outputs) {
+    const artifacts = artifactsByRunId.get(output.runId) ?? []
+    const artifactIds = artifactIdsByRunId.get(output.runId) ?? new Set<string>()
+    for (const artifact of output.artifacts) {
+      if (artifactIds.has(artifact.artifactId))
+        continue
+      artifactIds.add(artifact.artifactId)
+      artifacts.push(artifact)
+    }
+    artifactsByRunId.set(output.runId, artifacts)
+    artifactIdsByRunId.set(output.runId, artifactIds)
+  }
+  return new Map([...artifactsByRunId].map(([runId, artifacts]) => [
+    runId,
+    { artifacts, runId },
+  ]))
 }
 
 function shouldShowAgentTurn(turn: ChatAgentTurn): boolean {

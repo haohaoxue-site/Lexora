@@ -9,10 +9,7 @@ import type {
   StartBuddyTurnInput,
 } from '../agent/BuddyAgentRunner'
 import type { BuddySessionResources } from '../agent/BuddySessionResources'
-import type {
-  AutomationProjectBindingInput,
-  ResolvedAutomationProject,
-} from './AutomationProjectBindingService'
+import type { ProjectMemoryScope } from '../storage/projectRepository'
 import type { AutomationClock } from './AutomationScheduleEvaluator'
 import type { AutomationService } from './AutomationService'
 import { randomUUID } from 'node:crypto'
@@ -30,6 +27,13 @@ export interface ResolvedAutomationModel {
   reasoning: BuddyThinkingLevel | null
 }
 
+export interface ResolvedAutomationProject {
+  canonicalRoot: string
+  id: string
+  instructions: string
+  memoryScope: ProjectMemoryScope
+}
+
 export interface AutomationDispatcherOptions {
   automationService: AutomationService
   cancelRun?: (runId: string, errorCode: string) => Promise<boolean>
@@ -37,8 +41,9 @@ export interface AutomationDispatcherOptions {
   createId?: () => string
   database: DatabaseSync
   launchTurn: (input: StartBuddyTurnInput) => BuddyTurnHandle
+  resolveConversationWorkspace: (conversationId: string) => Promise<string>
   resolveModel: (target: AutomationModelTarget) => Promise<ResolvedAutomationModel | null>
-  resolveProject: (input: AutomationProjectBindingInput) => Promise<ResolvedAutomationProject | null>
+  resolveProject: (projectId: string) => Promise<ResolvedAutomationProject | null>
     | ResolvedAutomationProject
     | null
   resolveResources: (input: {
@@ -54,6 +59,7 @@ export class AutomationDispatcher {
   readonly #clock: AutomationClock
   readonly #createId: () => string
   readonly #launchTurn: AutomationDispatcherOptions['launchTurn']
+  readonly #resolveConversationWorkspace: AutomationDispatcherOptions['resolveConversationWorkspace']
   readonly #resolveModel: AutomationDispatcherOptions['resolveModel']
   readonly #resolveProject: AutomationDispatcherOptions['resolveProject']
   readonly #resolveResources: AutomationDispatcherOptions['resolveResources']
@@ -67,6 +73,7 @@ export class AutomationDispatcher {
     this.#clock = options.clock ?? systemAutomationClock
     this.#createId = options.createId ?? randomUUID
     this.#launchTurn = options.launchTurn
+    this.#resolveConversationWorkspace = options.resolveConversationWorkspace
     this.#resolveModel = options.resolveModel
     this.#resolveProject = options.resolveProject
     this.#resolveResources = options.resolveResources
@@ -111,62 +118,56 @@ export class AutomationDispatcher {
       return
     }
 
-    const project = await this.#resolveProject({
-      automationId: occurrence.automationId,
-      projectId: snapshot.projectId,
-    })
-    if (!project) {
-      if (snapshot.projectId) {
-        this.#skipAndBlock(
-          occurrence.id,
-          occurrence.leaseOwner,
-          occurrence.automationId,
-          occurrence.automationRevision,
-          'AUTOMATION_PROJECT_UNAVAILABLE',
-        )
-      }
-      else {
-        this.#automationService.finishQueued({
-          errorCode: 'AUTOMATION_PROJECT_UNAVAILABLE',
-          id: occurrence.id,
-          leaseOwner: occurrence.leaseOwner,
-          status: 'skipped',
-        })
-      }
+    const project = snapshot.projectId
+      ? await this.#resolveProject(snapshot.projectId)
+      : null
+    if (snapshot.projectId && !project) {
+      this.#skipAndBlock(
+        occurrence.id,
+        occurrence.leaseOwner,
+        occurrence.automationId,
+        occurrence.automationRevision,
+        'AUTOMATION_PROJECT_UNAVAILABLE',
+      )
       return
     }
 
-    const canonicalRoot = project.canonicalRoot
-    const resources = await this.#resolveResources({ canonicalRoot, project })
+    const branchId = this.#createId()
+    const conversationId = this.#createId()
+    const messageId = this.#createId()
+    const runId = this.#createId()
     const boundAt = formatInstant(this.#clock.now())
     const binding = this.#turns.bind({
       boundAt,
-      branchId: this.#createId(),
+      branchId,
       contextWindow: model.contextWindow,
-      conversationId: this.#createId(),
+      conversationId,
       leaseOwner: occurrence.leaseOwner,
       maxTokens: model.maxTokens,
-      messageId: this.#createId(),
+      messageId,
       model: model.modelId,
       occurrenceId: occurrence.id,
-      projectId: project.id,
+      projectId: project?.id ?? null,
       provider: model.providerId,
       reasoning: model.reasoning,
-      runId: this.#createId(),
+      runId,
     })
     if (binding.kind === 'overlap_skipped')
       return
     const bound = binding
     let turn: BuddyTurnHandle
     try {
+      const canonicalRoot = project?.canonicalRoot
+        ?? await this.#resolveConversationWorkspace(conversationId)
+      const resources = await this.#resolveResources({ canonicalRoot, project })
       turn = this.#launchTurn({
         branchId: bound.run.branchId,
         canonicalRoot,
         conversationId: bound.conversation.id,
         cwd: canonicalRoot,
-        memoryScope: project.memoryScope,
+        memoryScope: project?.memoryScope ?? null,
         model: bound.run.model,
-        projectId: project.id,
+        projectId: project?.id ?? null,
         prompt: snapshot.prompt,
         provider: bound.run.provider,
         resources,

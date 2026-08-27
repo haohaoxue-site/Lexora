@@ -16,8 +16,8 @@ import {
 const sessionIdentityPattern = /^[A-Z0-9][\w-]{0,127}$/i
 
 export interface InspectCommittedPiCompactionOptions {
-  agentDirectory: string
   branchId: string
+  conversationsDirectory: string
   conversationId: string
   piSessionFile: string
   startedAt: string
@@ -37,9 +37,9 @@ export async function inspectCommittedPiCompaction(
   validateIdentity(options.conversationId)
   validateIdentity(options.branchId)
   const sessionDirectory = resolve(
-    options.agentDirectory,
-    'sessions',
+    options.conversationsDirectory,
     options.conversationId,
+    'session',
     options.branchId,
   )
   if (

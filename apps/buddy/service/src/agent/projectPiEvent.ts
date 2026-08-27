@@ -7,13 +7,16 @@ import type {
 import type { AgentSessionEvent } from '@earendil-works/pi-coding-agent'
 import type { BuddyAssistantTextPhase } from '../../../shared/assistantTextPhase'
 import type { BuddyRunProgress } from '../../../shared/runProgress'
-import type { ArtifactOperation } from '../storage/artifactRepository'
 import { randomUUID } from 'node:crypto'
 
 import { redactSensitiveText } from '../../../shared/approvalReviewPayload'
 import { buddyAssistantTextPhaseSchema } from '../../../shared/assistantTextPhase'
 import { MAX_BUDDY_MESSAGE_TEXT_LENGTH } from '../../../shared/buddyMessageContent'
 import { resolveBuddyReasoningKind } from '../../../shared/reasoningPresentation'
+import {
+  IMAGE_GENERATION_TOOL_NAME,
+  readImageGenerationToolDetails,
+} from '../images/imageGenerationToolContract'
 import { createBuddyToolPresentation } from './toolPresentation'
 
 type PiThinkingEvent
@@ -33,6 +36,7 @@ export type BuddyProjectedEventType
     | 'message.delta'
     | 'message.started'
     | 'message.tool_result'
+    | 'output.produced'
     | 'run.progress'
     | 'tool.completed'
     | 'tool.preparing'
@@ -44,14 +48,7 @@ export interface BuddyProjectedEvent {
   type: BuddyProjectedEventType
 }
 
-export interface ProjectedArtifact {
-  operation: ArtifactOperation
-  requestedPath: string
-  toolCallId: string
-}
-
 export interface PiEventProjection {
-  artifact?: ProjectedArtifact
   events: BuddyProjectedEvent[]
   failureCode?: ModelRequestFailureCode | 'MODEL_REQUEST_ABORTED'
   failureMessage?: string
@@ -174,23 +171,38 @@ export function projectPiEvent(
     case 'tool_execution_end': {
       const tool = state.toolCalls.get(event.toolCallId)
       state.toolCalls.delete(event.toolCallId)
+      const presentation = createBuddyToolPresentation({
+        arguments: tool?.arguments,
+        canonicalRoot: state.canonicalRoot,
+        isError: event.isError,
+        result: event.result,
+        toolName: event.toolName,
+      })
+      const generatedArtifactIds = !event.isError && event.toolName === IMAGE_GENERATION_TOOL_NAME
+        ? readImageGenerationToolDetails(event.result)?.artifactIds ?? []
+        : []
       return {
-        artifact: event.isError ? undefined : detectArtifact(event.toolCallId, tool),
-        events: [{
-          payload: {
-            isError: event.isError,
-            presentation: createBuddyToolPresentation({
-              arguments: tool?.arguments,
-              canonicalRoot: state.canonicalRoot,
+        events: [
+          {
+            payload: {
               isError: event.isError,
-              result: event.result,
+              presentation,
+              toolCallId: event.toolCallId,
               toolName: event.toolName,
-            }),
-            toolCallId: event.toolCallId,
-            toolName: event.toolName,
+            },
+            type: 'tool.completed',
           },
-          type: 'tool.completed',
-        }],
+          ...(generatedArtifactIds.length > 0
+            ? [{
+                payload: {
+                  artifactIds: generatedArtifactIds,
+                  sourceToolCallId: event.toolCallId,
+                  sourceToolName: event.toolName,
+                },
+                type: 'output.produced' as const,
+              }]
+            : []),
+        ],
       }
     }
   }
@@ -460,16 +472,19 @@ function projectAssistantMessageEnd(
     : null
   const failureCode = modelFailure?.code
     ?? (message.stopReason === 'aborted' ? 'MODEL_REQUEST_ABORTED' : undefined)
+  const stopReason = normalizeStopReason(message.stopReason)
   return {
     events: [
       ...missingTextBlockEvents,
       {
         payload: {
-          content: { text },
+          content: {
+            text,
+          },
           messageId,
           ...(phase ? { phase } : {}),
           role: 'assistant',
-          stopReason: normalizeStopReason(message.stopReason),
+          stopReason,
         },
         type: 'message.completed',
       },
@@ -581,29 +596,6 @@ function projectToolMessageEnd(message: ToolResultMessage): PiEventProjection {
     }],
     sourceMessageId: messageId,
   }
-}
-
-function detectArtifact(
-  toolCallId: string,
-  tool: ToolCallState | undefined,
-): ProjectedArtifact | undefined {
-  if (!tool || (tool.toolName !== 'write' && tool.toolName !== 'edit'))
-    return undefined
-  const requestedPath = readPath(tool.arguments)
-  if (!requestedPath)
-    return undefined
-  return {
-    operation: tool.toolName === 'write' ? 'created' : 'edited',
-    requestedPath,
-    toolCallId,
-  }
-}
-
-function readPath(value: unknown): string | null {
-  if (!value || typeof value !== 'object' || Array.isArray(value))
-    return null
-  const path = (value as Record<string, unknown>).path
-  return typeof path === 'string' && path.trim() ? path : null
 }
 
 function normalizeStopReason(reason: AssistantMessage['stopReason']): string {

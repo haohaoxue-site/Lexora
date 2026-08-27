@@ -7,21 +7,27 @@ import {
 } from '../shared/localChatApiSchemas'
 
 const ATTACHMENT_PROTOCOL = 'lexora-attachment'
+const ARTIFACT_PROTOCOL = 'lexora-artifact'
 
 export function registerAttachmentSchemePrivileges(): void {
-  protocol.registerSchemesAsPrivileged([{
-    scheme: ATTACHMENT_PROTOCOL,
+  protocol.registerSchemesAsPrivileged([ATTACHMENT_PROTOCOL, ARTIFACT_PROTOCOL].map(scheme => ({
+    scheme,
     privileges: {
       secure: true,
       standard: true,
       stream: true,
       supportFetchAPI: true,
     },
-  }])
+  })))
 }
 
 export function installAttachmentProtocol(runtime: BuddyServiceSupervisor): () => void {
-  protocol.handle(ATTACHMENT_PROTOCOL, async (request) => {
+  const installPreviewProtocol = (
+    scheme: string,
+    idKey: 'artifactId' | 'attachmentId',
+    method: 'artifacts.resolvePreview' | 'attachments.resolvePreview',
+    schema: typeof localChatSchemas.artifactPreview | typeof localChatSchemas.attachmentPreview,
+  ) => protocol.handle(scheme, async (request) => {
     if (request.method !== 'GET')
       return new Response(null, { status: 405 })
 
@@ -29,14 +35,14 @@ export function installAttachmentProtocol(runtime: BuddyServiceSupervisor): () =
     if (url.hostname !== 'preview')
       return new Response(null, { status: 404 })
 
-    const attachmentId = decodeURIComponent(url.pathname.slice(1))
-    if (!attachmentId || attachmentId.includes('/'))
+    const id = decodeURIComponent(url.pathname.slice(1))
+    if (!id || id.includes('/'))
       return new Response(null, { status: 400 })
 
     try {
-      const input = localChatSchemas.attachmentPreview.parse({ attachmentId })
-      const preview = localChatResponseSchemas.attachmentPreview.parse(
-        await runtime.request('attachments.resolvePreview', input),
+      const input = schema.parse({ [idKey]: id })
+      const preview = localChatResponseSchemas.artifactPreview.parse(
+        await runtime.request(method, input),
       )
       const body = await readFile(preview.path)
       return new Response(body, {
@@ -52,7 +58,21 @@ export function installAttachmentProtocol(runtime: BuddyServiceSupervisor): () =
     }
   })
 
+  void installPreviewProtocol(
+    ATTACHMENT_PROTOCOL,
+    'attachmentId',
+    'attachments.resolvePreview',
+    localChatSchemas.attachmentPreview,
+  )
+  void installPreviewProtocol(
+    ARTIFACT_PROTOCOL,
+    'artifactId',
+    'artifacts.resolvePreview',
+    localChatSchemas.artifactPreview,
+  )
+
   return () => {
     protocol.unhandle(ATTACHMENT_PROTOCOL)
+    protocol.unhandle(ARTIFACT_PROTOCOL)
   }
 }

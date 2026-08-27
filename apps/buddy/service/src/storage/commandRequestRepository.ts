@@ -51,6 +51,7 @@ interface CommandRequestRow {
 
 interface ConversationRow {
   active_branch_id: string | null
+  deleted_at: string | null
   execution_profile: BuddyExecutionProfile
 }
 
@@ -71,10 +72,7 @@ interface SourceRunRow {
 export function createCommandRequestRepository(database: DatabaseSync): CommandRequestRepository {
   const findRequest = database.prepare('SELECT * FROM command_requests WHERE request_id = ?')
   const findConversation = database.prepare(`
-    SELECT active_branch_id, execution_profile FROM conversations WHERE id = ?
-  `)
-  const findConversationDeletion = database.prepare(`
-    SELECT 1 FROM conversation_deletions WHERE conversation_id = ?
+    SELECT active_branch_id, deleted_at, execution_profile FROM conversations WHERE id = ?
   `)
   const findIncompleteRun = database.prepare(`
     SELECT 1 FROM runs
@@ -127,7 +125,7 @@ export function createCommandRequestRepository(database: DatabaseSync): CommandR
           !conversation
           || conversation.active_branch_id !== input.branchId
           || conversation.execution_profile !== input.executionProfile
-          || findConversationDeletion.get(input.conversationId)
+          || conversation.deleted_at !== null
           || findIncompleteRun.get(input.conversationId)
         ) {
           throw new CommandRequestConflictError()
@@ -176,7 +174,7 @@ export function createCommandRequestRepository(database: DatabaseSync): CommandR
         if (
           !conversation
           || conversation.active_branch_id !== request.branch_id
-          || findConversationDeletion.get(request.conversation_id)
+          || conversation.deleted_at !== null
           || findIncompleteRun.get(request.conversation_id)
           || !previous.pi_session_file
         ) {

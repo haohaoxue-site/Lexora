@@ -17,7 +17,7 @@ const emit = defineEmits<{
     instructions: string
     memoryScope: 'personal_and_project' | 'project_only'
     name: string
-    root: string | null
+    root: string
   }]
   'update:show': [show: boolean]
 }>()
@@ -50,7 +50,7 @@ watch(
       return
     name.value = project?.name ?? ''
     memoryScope.value = project?.memoryScope ?? 'personal_and_project'
-    root.value = project?.directoryRoot ?? null
+    root.value = project?.root ?? null
     instructions.value = project?.instructions ?? ''
   },
   { immediate: true },
@@ -72,7 +72,7 @@ async function selectDirectory() {
 
 function confirm() {
   const projectName = name.value.trim()
-  if (!projectName)
+  if (!projectName || !root.value)
     return
   emit('save', {
     instructions: instructions.value.trim(),
@@ -119,7 +119,7 @@ function renderMemoryLabel(option: SelectOption, selected: boolean) {
           :render-label="renderMemoryLabel"
         />
       </NFormItem>
-      <NFormItem :label="t('desktop.tasks.projectDirectory')">
+      <NFormItem :label="t('desktop.tasks.projectDirectory')" required>
         <div class="desktop-project-create-dialog__directory">
           <NInput
             readonly
@@ -128,9 +128,6 @@ function renderMemoryLabel(option: SelectOption, selected: boolean) {
           />
           <NButton :loading="selectingDirectory" @click="selectDirectory">
             {{ t('desktop.tasks.selectProjectDirectory') }}
-          </NButton>
-          <NButton v-if="root" quaternary @click="root = null">
-            {{ t('desktop.tasks.clearProjectDirectory') }}
           </NButton>
         </div>
       </NFormItem>
@@ -159,7 +156,7 @@ function renderMemoryLabel(option: SelectOption, selected: boolean) {
         <NButton @click="emit('update:show', false)">
           {{ t('common.cancel') }}
         </NButton>
-        <NButton type="primary" :disabled="!name.trim()" @click="confirm">
+        <NButton type="primary" :disabled="!name.trim() || !root" @click="confirm">
           {{ project ? t('common.save') : t('common.confirm') }}
         </NButton>
       </div>

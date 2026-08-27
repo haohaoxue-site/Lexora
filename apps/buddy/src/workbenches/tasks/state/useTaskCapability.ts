@@ -101,6 +101,7 @@ export function useTaskCapability(options: UseTaskCapabilityOptions) {
     isLoadingOlderMessages,
     messages,
     runEvents,
+    runOutputs,
     runs,
     timelineItems,
   } = runSync
@@ -125,13 +126,12 @@ export function useTaskCapability(options: UseTaskCapabilityOptions) {
     : projectId.value ? `project:${projectId.value}` : 'global')
   let persistDraftChanges = () => {}
   const drafts = useChatDrafts({
-    cleanupDraftAttachments: retainedAttachmentIds =>
-      api.localChat.attachments.cleanupDrafts(retainedAttachmentIds),
+    cleanupDraftAttachments: () => api.localChat.attachments.cleanupDrafts(),
     onChange: () => persistDraftChanges(),
     releaseAttachments: attachmentIds => api.localChat.attachments.release(attachmentIds),
     targetKey: draftScopeKey,
   })
-  const { attachments, composerContent, draft } = drafts
+  const { attachments, composerContent, draft, draftId } = drafts
   const workspacePersistence = useTaskWorkspacePersistence({
     api: api.localChat.workspaceState,
     conversations,
@@ -217,6 +217,7 @@ export function useTaskCapability(options: UseTaskCapabilityOptions) {
     activeBranchId,
     activeConversationId,
     api: api.localChat.context,
+    draftId,
     executionProfile: executionProfileState.executionProfile,
     models: modelProviders.models,
     projectId,
@@ -406,7 +407,10 @@ export function useTaskCapability(options: UseTaskCapabilityOptions) {
     isSelectingFiles.value = true
     try {
       const rejected = await drafts.appendAttachments(
-        await api.localChat.attachments.selectFiles({ remainingCount }),
+        await api.localChat.attachments.selectFiles({
+          draftId: draftId.value,
+          remainingCount,
+        }),
       )
       if (rejected)
         errorMessage.value = t('desktop.chat.attachmentLimit')
@@ -431,6 +435,7 @@ export function useTaskCapability(options: UseTaskCapabilityOptions) {
       const selectedFiles = files.slice(0, remainingCount)
       const rejected = await drafts.appendAttachments(
         await api.localChat.attachments.importFiles({
+          draftId: draftId.value,
           files: await Promise.all(selectedFiles.map(async file => ({
             bytes: new Uint8Array(await file.arrayBuffer()),
             mimeType: file.type,
@@ -567,6 +572,7 @@ export function useTaskCapability(options: UseTaskCapabilityOptions) {
       loadOlderMessages: runSync.loadOlderMessages,
       messages: readonly(messages),
       runEvents: readonly(runEvents),
+      runOutputs: readonly(runOutputs),
       runs: readonly(runs),
       timelineItems: readonly(timelineItems),
     },

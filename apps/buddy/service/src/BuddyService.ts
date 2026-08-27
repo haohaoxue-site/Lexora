@@ -16,8 +16,11 @@ import type {
 } from './agent/extensions/toolPolicyExtension'
 import type { ResolvedAutomationModel } from './automations/AutomationDispatcher'
 import type { AutomationClock } from './automations/AutomationScheduleEvaluator'
+import type { BuddyRunEvent } from './events/RunEventLog'
+import type { ImageGenerationGateway } from './images/ImageGenerationGateway'
 import type { BuddyServiceRpcServer } from './rpc/BuddyServiceRpcServer'
 import type { ApprovalRecord, ApprovalStatus } from './storage/approvalRepository'
+import type { ArtifactRecord } from './storage/artifactRepository'
 import type { AttachmentRecord } from './storage/attachmentRepository'
 import type { AutomationOccurrenceRecord } from './storage/automationRepository'
 import type { McpServerRecord } from './storage/connectorRepository'
@@ -26,7 +29,7 @@ import type { RunRecord } from './storage/runRepository'
 import type { UsageRecord } from './storage/usageRepository'
 import { Buffer } from 'node:buffer'
 import { createHash, randomUUID } from 'node:crypto'
-import { mkdir } from 'node:fs/promises'
+import { mkdir, realpath } from 'node:fs/promises'
 import { basename, join } from 'node:path'
 import { getSupportedThinkingLevels } from '@earendil-works/pi-ai'
 import { z } from 'zod'
@@ -48,6 +51,7 @@ import {
   resolveBuddyServiceTiers,
 } from '../../shared/modelSelection'
 import { toPublicRunEvent } from '../../shared/publicRunEvent'
+import { buddyRunOutputPayloadSchema } from '../../shared/runOutput'
 import { BuddyAgentRunner } from './agent/BuddyAgentRunner'
 import { BuddySessionRegistry } from './agent/BuddySessionRegistry'
 import { resolveBuddySessionResources } from './agent/BuddySessionResources'
@@ -59,6 +63,11 @@ import {
 } from './agent/createBuddySession'
 import { createReusableBuddySession } from './agent/createReusableBuddySession'
 import { createAutomationExtension } from './agent/extensions/automationExtension'
+import {
+  createImageGenerationExtension,
+  IMAGE_GENERATION_TOOL_CLASSIFICATION,
+  IMAGE_GENERATION_TOOL_NAME,
+} from './agent/extensions/imageGenerationExtension'
 import { createMcpExtension } from './agent/extensions/mcpExtension'
 import { createPetExtension } from './agent/extensions/petExtension'
 import { classifySystemTool, createSystemExtension } from './agent/extensions/systemExtension'
@@ -70,10 +79,10 @@ import {
   SkillService,
 } from './agent/SkillService'
 import { ApprovalService } from './approvals/ApprovalService'
+import { ArtifactService } from './artifacts/ArtifactService'
 import { AttachmentService } from './attachments/AttachmentService'
 import { AutomationDispatcher } from './automations/AutomationDispatcher'
 import { AutomationOccurrenceLifecycleService } from './automations/AutomationOccurrenceLifecycleService'
-import { AutomationProjectBindingService } from './automations/AutomationProjectBindingService'
 import {
   previewAutomationSchedule,
   systemAutomationClock,
@@ -95,6 +104,7 @@ import {
   createMessagePageCursor,
   parseMessagePageCursor,
 } from './conversations/messagePageCursor'
+import { OpenAiImageGenerationService } from './images/OpenAiImageGenerationService'
 import { AttentionNotificationService } from './notifications/AttentionNotificationService'
 import { PET_TOOL_CLASSIFICATION, PET_TOOL_NAME } from './pet/createPetTool'
 import { PetActionService } from './pet/PetActionService'
@@ -109,7 +119,9 @@ import {
 import { createProviderService } from './providers/ProviderService'
 import { readBoundedFile } from './resources/BoundedFileReader'
 import { createApprovalRepository } from './storage/approvalRepository'
+import { createArtifactRepository } from './storage/artifactRepository'
 import { createAttachmentRepository } from './storage/attachmentRepository'
+import { BuddyDataPaths } from './storage/BuddyDataPaths'
 import { createCommandRequestRepository } from './storage/commandRequestRepository'
 import { createConnectorRepository } from './storage/connectorRepository'
 import { createConversationRepository } from './storage/conversationRepository'
@@ -126,7 +138,6 @@ import { SystemCapabilityService } from './system/systemCapability'
 import { UsageService } from './usage/UsageService'
 
 const WORKSPACE_STATE_KEY = 'buddy.chat.workspace.v1'
-const INTERNAL_PROJECT_ID = 'lexora-buddy-workspace'
 const MAX_CONTEXT_FILE_BYTES = 1024 * 1024
 const MAX_MODEL_INPUT_BYTES = 4 * 1024 * 1024
 
@@ -174,6 +185,7 @@ const startTurnSchema = z.object({
     value: z.string().min(1),
   }).strict()).max(64),
   conversationId: sessionIdentitySchema.nullable(),
+  draftId: sessionIdentitySchema,
   executionProfile: executionProfileSchema,
   modelSelection: modelSelectionSchema.nullable(),
   projectId: idSchema.nullable(),
@@ -194,6 +206,7 @@ const editUserMessageSchema = z.object({
     value: z.string().min(1),
   }).strict()).max(64),
   conversationId: idSchema,
+  draftId: sessionIdentitySchema,
   modelSelection: modelSelectionSchema.nullable(),
   requestId: z.string().min(1).max(128),
   userMessageId: idSchema,
@@ -210,6 +223,7 @@ const chatCommandSchema = z.object({
 const contextUsageSnapshotRequestSchema = z.object({
   branchId: sessionIdentitySchema.nullable(),
   conversationId: sessionIdentitySchema.nullable(),
+  draftId: sessionIdentitySchema,
   executionProfile: executionProfileSchema,
   modelSelection: modelSelectionSchema,
   projectId: idSchema.nullable(),
@@ -234,15 +248,12 @@ export interface BuddyServiceHandle {
 export async function startBuddyService(
   options: StartBuddyServiceOptions,
 ): Promise<BuddyServiceHandle> {
+  const paths = new BuddyDataPaths(options.buddyHome)
   const agentDirectory = join(options.buddyHome, 'agent')
-  const attachmentsDirectory = join(options.buddyHome, 'attachments')
-  const managedProjectsDirectory = join(options.buddyHome, 'projects')
-  const workspaceDirectory = join(options.buddyHome, 'workspace')
   await Promise.all([
     mkdir(agentDirectory, { mode: 0o700, recursive: true }),
-    mkdir(attachmentsDirectory, { mode: 0o700, recursive: true }),
-    mkdir(managedProjectsDirectory, { mode: 0o700, recursive: true }),
-    mkdir(workspaceDirectory, { mode: 0o700, recursive: true }),
+    mkdir(paths.conversationsDirectory, { mode: 0o700, recursive: true }),
+    mkdir(paths.draftsDirectory, { mode: 0o700, recursive: true }),
   ])
 
   const projectsRepository = createProjectRepository(options.database)
@@ -255,7 +266,7 @@ export async function startBuddyService(
   const turnRequests = createTurnRequestRepository(options.database)
   const commandRequests = createCommandRequestRepository(options.database)
   const connectorsRepository = createConnectorRepository(options.database)
-  const projectService = new ProjectGrantService(projectsRepository, { managedProjectsDirectory })
+  const projectService = new ProjectGrantService(projectsRepository)
   let runner!: BuddyAgentRunner
   const approvalService = new ApprovalService({
     eventLog: options.eventLog,
@@ -269,9 +280,11 @@ export async function startBuddyService(
     repository: usageRepository,
   })
   const attachmentService = new AttachmentService({
-    directory: attachmentsDirectory,
+    paths,
     repository: createAttachmentRepository(options.database),
   })
+  const artifactsRepository = createArtifactRepository(options.database)
+  const artifactService = new ArtifactService({ paths, repository: artifactsRepository })
   const providersRepository = createProviderRepository(options.database)
   const providerService = await createProviderService({
     agentDirectory,
@@ -279,6 +292,9 @@ export async function startBuddyService(
     getActiveRuns: () => runs.listIncomplete(),
     peer: options.rpc,
     providers: providersRepository,
+  })
+  const imageGenerationGateway = new OpenAiImageGenerationService({
+    modelRuntime: providerService.getSessionRuntime(),
   })
   const systemHost = new LinuxSystemHost()
   const sessions = new BuddySessionRegistry<BuddyAgentSessionLike>()
@@ -334,8 +350,8 @@ export async function startBuddyService(
     conversations,
     eventLog: options.eventLog,
     inspectCommittedCompaction: run => inspectCommittedPiCompaction({
-      agentDirectory,
       branchId: run.branchId,
+      conversationsDirectory: paths.conversationsDirectory,
       conversationId: run.conversationId,
       piSessionFile: requireValue(run.piSessionFile, 'VALIDATION_FAILED'),
       startedAt: run.startedAt,
@@ -349,6 +365,8 @@ export async function startBuddyService(
         conversations.findById(input.conversationId),
         'VALIDATION_FAILED',
       )
+      if (conversation.deletedAt !== null)
+        throw new BuddyServiceError('VALIDATION_FAILED')
       const project = conversation.projectId
         ? requireActiveProject(projectsRepository.findById(conversation.projectId))
         : null
@@ -366,6 +384,7 @@ export async function startBuddyService(
       let recoveredImageCount = 0
       const classifications = new Map<string, BuddyToolClassification>(mcp.classifications)
       classifications.set(PET_TOOL_NAME, PET_TOOL_CLASSIFICATION)
+      classifications.set(IMAGE_GENERATION_TOOL_NAME, IMAGE_GENERATION_TOOL_CLASSIFICATION)
       const grant = project
         ? {
             canonicalRoot: project.canonicalRoot,
@@ -373,14 +392,15 @@ export async function startBuddyService(
             root: project.root,
           }
         : {
-            canonicalRoot: workspaceDirectory,
-            projectId: INTERNAL_PROJECT_ID,
-            root: workspaceDirectory,
+            canonicalRoot: input.canonicalRoot,
+            projectId: input.conversationId,
+            root: input.canonicalRoot,
           }
       const session = await createBuddySession({
         agentDir: agentDirectory,
         branchId: input.branchId,
         canonicalRoot: input.canonicalRoot,
+        conversationsDirectory: paths.conversationsDirectory,
         conversationId: input.conversationId,
         cwd: input.canonicalRoot,
         executionProfile: run.executionProfile,
@@ -389,6 +409,13 @@ export async function startBuddyService(
         modelRuntime: providerService.getSessionRuntime(),
         inProcessExtensions: [
           createMcpExtension({ tools: mcp.tools }),
+          createImageGenerationExtension({
+            artifactService,
+            attachmentService,
+            conversationId: input.conversationId,
+            getRunId: () => runContext.current?.runId,
+            imageGenerationGateway,
+          }),
           createPetExtension({
             getRunId: () => runContext.current?.runId,
             service: petService,
@@ -497,7 +524,6 @@ export async function startBuddyService(
     },
   })
   const conversationLifecycle = new ConversationLifecycleService({
-    agentDirectory,
     conversations,
     runner,
     sessions,
@@ -507,21 +533,6 @@ export async function startBuddyService(
     conversationLifecycle,
     notifications: notificationService,
   })
-  const automationProjects = new AutomationProjectBindingService({
-    automations: automationService,
-    createProject: async name => toResolvedAutomationProject(await projectService.create({
-      instructions: '',
-      memoryScope: 'personal_and_project',
-      name,
-      root: null,
-    })),
-    deleteProject: projectId => projectService.delete(projectId),
-    findProject: (projectId) => {
-      const project = projectsRepository.findById(projectId)
-      return project && !project.revokedAt ? toResolvedAutomationProject(project) : null
-    },
-    onChanged: notifyAutomationToolChanged,
-  })
   const turnLauncher = new BuddyTurnLauncher(runner)
   const automationDispatcher = new AutomationDispatcher({
     automationService,
@@ -529,8 +540,18 @@ export async function startBuddyService(
     clock: automationClock,
     database: options.database,
     launchTurn: input => turnLauncher.startTurn(input),
+    resolveConversationWorkspace: async (conversationId) => {
+      const workspace = paths.conversationWorkspace(conversationId)
+      await mkdir(workspace, { mode: 0o700, recursive: true })
+      return realpath(workspace)
+    },
     resolveModel: target => resolveAutomationModel(providerService, target),
-    resolveProject: input => automationProjects.resolve(input),
+    resolveProject: async (projectId) => {
+      const project = projectsRepository.findById(projectId)
+      return project && project.revokedAt === null
+        ? toResolvedAutomationProject(project)
+        : null
+    },
     resolveResources: ({ canonicalRoot, project }) => resolveBuddySessionResources({
       canonicalRoot,
       cwd: canonicalRoot,
@@ -551,7 +572,6 @@ export async function startBuddyService(
   })
   automationScheduler = scheduler
 
-  await projectService.recoverPendingDeletions()
   for (const automation of reconcileAutomationDependencies({
     automationService,
     projectsRepository,
@@ -567,6 +587,8 @@ export async function startBuddyService(
     agentDirectory,
     approvalService,
     approvalsRepository,
+    artifactService,
+    artifactsRepository,
     attachmentService,
     automationClock,
     automationOccurrenceLifecycle,
@@ -578,7 +600,9 @@ export async function startBuddyService(
     conversations,
     conversationLifecycle,
     eventLog: options.eventLog,
+    imageGenerationGateway,
     notificationService,
+    paths,
     petService,
     projectService,
     projectsRepository,
@@ -594,7 +618,6 @@ export async function startBuddyService(
     turnRequests,
     turnLauncher,
     workspace,
-    workspaceDirectory,
   })
   await scheduler.start(options.automationStartupContext ?? {
     reason: 'normal',
@@ -616,6 +639,8 @@ interface RuntimeServices {
   agentDirectory: string
   approvalService: ApprovalService
   approvalsRepository: ReturnType<typeof createApprovalRepository>
+  artifactService: ArtifactService
+  artifactsRepository: ReturnType<typeof createArtifactRepository>
   attachmentService: AttachmentService
   automationClock: AutomationClock
   automationOccurrenceLifecycle: AutomationOccurrenceLifecycleService
@@ -627,7 +652,9 @@ interface RuntimeServices {
   conversations: ReturnType<typeof createConversationRepository>
   conversationLifecycle: ConversationLifecycleService
   eventLog: import('./events/RunEventLog').RunEventLog
+  imageGenerationGateway: ImageGenerationGateway
   notificationService: AttentionNotificationService
+  paths: BuddyDataPaths
   petService: PetActionService
   projectService: ProjectGrantService
   projectsRepository: ReturnType<typeof createProjectRepository>
@@ -643,7 +670,6 @@ interface RuntimeServices {
   turnRequests: ReturnType<typeof createTurnRequestRepository>
   turnLauncher: BuddyTurnLauncher
   workspace: ReturnType<typeof createWorkspaceRepository>
-  workspaceDirectory: string
 }
 
 function registerRuntimeHandlers(services: RuntimeServices): () => void {
@@ -920,7 +946,7 @@ function registerRuntimeHandlers(services: RuntimeServices): () => void {
       instructions: z.string().trim().max(64 * 1024),
       memoryScope: z.enum(['personal_and_project', 'project_only']),
       name: z.string().trim().min(1).max(80),
-      root: z.string().min(1).nullable(),
+      root: z.string().min(1),
     }).strict(), params)
     return services.projectService.create(input)
   })
@@ -930,7 +956,7 @@ function registerRuntimeHandlers(services: RuntimeServices): () => void {
       memoryScope: z.enum(['personal_and_project', 'project_only']),
       name: z.string().trim().min(1).max(80),
       projectId: idSchema,
-      root: z.string().min(1).nullable(),
+      root: z.string().min(1),
     }).strict(), params)
     const current = requireActiveProject(services.projectsRepository.findById(input.projectId))
     const updated = await services.projectService.update(input)
@@ -1010,7 +1036,8 @@ function registerRuntimeHandlers(services: RuntimeServices): () => void {
     if (
       conversation
       && (
-        conversation.projectId !== input.projectId
+        conversation.deletedAt !== null
+        || conversation.projectId !== input.projectId
         || conversation.executionProfile !== input.executionProfile
         || !input.branchId
         || !services.conversations.listBranches(conversation.id).some(
@@ -1025,7 +1052,11 @@ function registerRuntimeHandlers(services: RuntimeServices): () => void {
     const project = projectId
       ? requireActiveProject(services.projectsRepository.findById(projectId))
       : null
-    const canonicalRoot = project?.canonicalRoot ?? services.workspaceDirectory
+    const canonicalRoot = project?.canonicalRoot
+      ?? (conversation
+        ? services.paths.conversationWorkspace(conversation.id)
+        : services.paths.draftAttachments(input.draftId))
+    await mkdir(canonicalRoot, { mode: 0o700, recursive: true })
     await services.providerService.assertModelAvailable(
       input.modelSelection.providerId,
       input.modelSelection.modelId,
@@ -1049,6 +1080,7 @@ function registerRuntimeHandlers(services: RuntimeServices): () => void {
     })
     const classifications = new Map<string, BuddyToolClassification>(mcp.classifications)
     classifications.set(PET_TOOL_NAME, PET_TOOL_CLASSIFICATION)
+    classifications.set(IMAGE_GENERATION_TOOL_NAME, IMAGE_GENERATION_TOOL_CLASSIFICATION)
     const grant = project
       ? {
           canonicalRoot: project.canonicalRoot,
@@ -1056,12 +1088,12 @@ function registerRuntimeHandlers(services: RuntimeServices): () => void {
           root: project.root,
         }
       : {
-          canonicalRoot: services.workspaceDirectory,
-          projectId: INTERNAL_PROJECT_ID,
-          root: services.workspaceDirectory,
+          canonicalRoot,
+          projectId: conversation?.id ?? input.draftId,
+          root: canonicalRoot,
         }
     const branchId = input.branchId ?? 'context-preview'
-    const conversationId = conversation?.id ?? 'context-preview'
+    const conversationId = conversation?.id ?? input.draftId
     const latestRun = conversation
       ? services.runs.findLatestForBranch(conversation.id, branchId)
       : null
@@ -1069,11 +1101,19 @@ function registerRuntimeHandlers(services: RuntimeServices): () => void {
       agentDir: services.agentDirectory,
       branchId,
       canonicalRoot,
+      conversationsDirectory: services.paths.conversationsDirectory,
       conversationId,
       cwd: canonicalRoot,
       executionProfile,
       inProcessExtensions: [
         createMcpExtension({ tools: mcp.tools }),
+        createImageGenerationExtension({
+          artifactService: services.artifactService,
+          attachmentService: services.attachmentService,
+          conversationId,
+          getRunId: () => undefined,
+          imageGenerationGateway: services.imageGenerationGateway,
+        }),
         createPetExtension({
           getRunId: () => undefined,
           service: services.petService,
@@ -1146,10 +1186,13 @@ function registerRuntimeHandlers(services: RuntimeServices): () => void {
   })
   on('conversations.get', (params) => {
     const input = parse(z.object({ conversationId: idSchema }).strict(), params)
-    return requireValue(
+    const conversation = requireValue(
       services.conversations.findById(input.conversationId),
       'VALIDATION_FAILED',
     )
+    if (conversation.deletedAt !== null)
+      throw new BuddyServiceError('VALIDATION_FAILED')
+    return conversation
   })
   on('conversations.rename', (params) => {
     const input = parse(z.object({
@@ -1171,6 +1214,8 @@ function registerRuntimeHandlers(services: RuntimeServices): () => void {
       services.conversations.findById(input.conversationId),
       'VALIDATION_FAILED',
     )
+    if (current.deletedAt !== null)
+      throw new BuddyServiceError('VALIDATION_FAILED')
     if (current.executionProfile === input.executionProfile)
       return current
     const conversation = services.conversations.setExecutionProfile({
@@ -1188,6 +1233,12 @@ function registerRuntimeHandlers(services: RuntimeServices): () => void {
       conversationId: idSchema,
       modelSelection: modelSelectionSchema,
     }).strict(), params)
+    const current = requireValue(
+      services.conversations.findById(input.conversationId),
+      'VALIDATION_FAILED',
+    )
+    if (current.deletedAt !== null)
+      throw new BuddyServiceError('VALIDATION_FAILED')
     const selection = await resolveModelSelection(services.providerService, input.modelSelection)
     return requireValue(services.conversations.setModelSelection({
       id: input.conversationId,
@@ -1222,7 +1273,7 @@ function registerRuntimeHandlers(services: RuntimeServices): () => void {
   on('conversations.listBranches', (params) => {
     const input = parse(z.object({ conversationId: idSchema }).strict(), params)
     requireValue(services.conversations.findById(input.conversationId), 'VALIDATION_FAILED')
-    if (services.conversations.isDeleting(input.conversationId))
+    if (services.conversationLifecycle.isDeleting(input.conversationId))
       throw new BuddyServiceError('VALIDATION_FAILED')
     return services.conversations.listBranches(input.conversationId)
   })
@@ -1237,6 +1288,8 @@ function registerRuntimeHandlers(services: RuntimeServices): () => void {
       services.conversations.findById(input.conversationId),
       'VALIDATION_FAILED',
     )
+    if (conversation.deletedAt !== null)
+      throw new BuddyServiceError('VALIDATION_FAILED')
     const branchId = input.branchId ?? requireValue(conversation.activeBranchId, 'VALIDATION_FAILED')
     const page = services.conversations.listMessagePage(
       input.conversationId,
@@ -1273,6 +1326,8 @@ function registerRuntimeHandlers(services: RuntimeServices): () => void {
       services.conversations.findById(input.conversationId),
       'VALIDATION_FAILED',
     )
+    if (conversation.deletedAt !== null)
+      throw new BuddyServiceError('VALIDATION_FAILED')
     const branchId = input.branchId ?? requireValue(conversation.activeBranchId, 'VALIDATION_FAILED')
     const page = services.conversations.listTimelinePage(
       input.conversationId,
@@ -1287,10 +1342,9 @@ function registerRuntimeHandlers(services: RuntimeServices): () => void {
         limit: input.limit ?? 100,
       },
     )
-    const items = withMessageAttachments(
-      page.items,
-      services.attachmentService.listForConversation(input.conversationId),
-    )
+    const conversationAttachments
+      = services.attachmentService.listForConversation(input.conversationId)
+    const items = withMessageAttachments(page.items, conversationAttachments)
     const messageItems = items.filter(item => item.kind === 'message')
     const runs = services.runs.listForTimeline(
       input.conversationId,
@@ -1298,6 +1352,7 @@ function registerRuntimeHandlers(services: RuntimeServices): () => void {
       messageItems.filter(item => item.role === 'user').map(item => item.id),
       messageItems.flatMap(item => item.runId ? [item.runId] : []),
     )
+    const runEvents = services.eventLog.listForRuns(runs.map(run => run.id))
     return {
       items,
       nextCursor: page.nextBefore
@@ -1307,9 +1362,18 @@ function registerRuntimeHandlers(services: RuntimeServices): () => void {
             conversationId: input.conversationId,
           })
         : null,
-      runEvents: services.eventLog.listForRuns(runs.map(run => run.id)).map(toPublicRunEvent),
+      outputs: projectRunOutputs(
+        runEvents,
+        services.artifactsRepository.listForConversation(input.conversationId),
+      ),
+      runEvents: runEvents.map(toPublicRunEvent),
       runs: runs.map(publicRun),
     }
+  })
+
+  on('artifacts.resolvePreview', (params) => {
+    const input = parse(z.object({ artifactId: idSchema }).strict(), params)
+    return services.artifactService.resolvePreview(input.artifactId)
   })
 
   on('runs.list', (params) => {
@@ -1377,12 +1441,17 @@ function registerRuntimeHandlers(services: RuntimeServices): () => void {
   })
 
   on('attachments.registerFiles', async (params) => {
-    const input = parse(z.object({ paths: z.array(z.string().min(1)).max(16) }).strict(), params)
-    return (await services.attachmentService.registerFiles(input.paths)).map(toPublicAttachment)
+    const input = parse(z.object({
+      draftId: sessionIdentitySchema,
+      paths: z.array(z.string().min(1)).max(16),
+    }).strict(), params)
+    return (await services.attachmentService.registerFiles(input.draftId, input.paths))
+      .map(toPublicAttachment)
   })
   on('attachments.registerUploads', async (params) => {
     const input = parse(buddyAttachmentImportRequestSchema, params)
-    return (await services.attachmentService.registerUploads(input.files)).map(toPublicAttachment)
+    return (await services.attachmentService.registerUploads(input.draftId, input.files))
+      .map(toPublicAttachment)
   })
   on('attachments.resolvePreview', (params) => {
     const input = parse(z.object({ attachmentId: idSchema }).strict(), params)
@@ -1393,11 +1462,9 @@ function registerRuntimeHandlers(services: RuntimeServices): () => void {
     return { releasedAttachmentIds: await services.attachmentService.release(input.attachmentIds) }
   })
   on('attachments.cleanupDrafts', async (params) => {
-    const input = parse(z.object({ retainedAttachmentIds: z.array(idSchema) }).strict(), params)
+    parse(emptySchema, params)
     return {
-      releasedAttachmentIds: await services.attachmentService.cleanupDrafts(
-        input.retainedAttachmentIds,
-      ),
+      releasedAttachmentIds: await services.attachmentService.cleanupDrafts(),
     }
   })
 
@@ -1439,7 +1506,9 @@ function registerRuntimeHandlers(services: RuntimeServices): () => void {
     const project = conversation.projectId
       ? requireActiveProject(services.projectsRepository.findById(conversation.projectId))
       : null
-    const canonicalRoot = project?.canonicalRoot ?? services.workspaceDirectory
+    const canonicalRoot = project?.canonicalRoot
+      ?? services.paths.conversationWorkspace(conversation.id)
+    await mkdir(canonicalRoot, { mode: 0o700, recursive: true })
     const resources = await resolveBuddySessionResources({
       canonicalRoot,
       cwd: canonicalRoot,
@@ -1511,8 +1580,10 @@ function registerRuntimeHandlers(services: RuntimeServices): () => void {
     const project = input.projectId
       ? requireActiveProject(services.projectsRepository.findById(input.projectId))
       : null
-    const canonicalRoot = project?.canonicalRoot ?? services.workspaceDirectory
     const conversationId = replay?.conversationId ?? input.conversationId ?? randomUUID()
+    const canonicalRoot = project?.canonicalRoot
+      ?? services.paths.conversationWorkspace(conversationId)
+    await mkdir(canonicalRoot, { mode: 0o700, recursive: true })
     const existingConversation = services.conversations.findById(conversationId)
     if (
       existingConversation
@@ -1538,6 +1609,7 @@ function registerRuntimeHandlers(services: RuntimeServices): () => void {
       replayInput?.attachmentIds ?? input.attachmentIds,
       replayInput || promptCommand ? '' : input.content,
       conversationId,
+      replayInput ? null : input.draftId,
     )
     const context = replayInput
       ? ''
@@ -1574,41 +1646,62 @@ function registerRuntimeHandlers(services: RuntimeServices): () => void {
       replayInput ? replayInput.reasoning : selection.reasoning,
     )
     const runId = randomUUID()
-    const prepared = replay
-      ? services.turnRequests.retryInterrupted({
-          createdAt: new Date().toISOString(),
-          requestId: input.requestId,
-          runId,
-        })
-      : services.turnRequests.prepare({
-          branchId,
+    const userMessageId = randomUUID()
+    const stagedAttachments = replay
+      ? null
+      : await services.attachmentService.prepareMessageAttachments({
+          attachmentIds: input.attachmentIds,
           conversationId,
-          createdAt: new Date().toISOString(),
-          executionProfile: input.executionProfile,
-          model: selection.modelId,
-          modelParameters: selection.contextWindow !== null && selection.maxTokens !== null
-            ? { contextWindow: selection.contextWindow, maxTokens: selection.maxTokens }
-            : undefined,
-          projectId: project?.id ?? null,
-          provider: selection.providerId,
-          requestFingerprint,
-          requestId: input.requestId,
-          runInput: {
-            attachmentIds: input.attachmentIds,
-            contextItems: input.contextItems,
-            prompt,
-            reasoning: thinkingLevel ?? null,
-            serviceTier: replayInput ? replayInput.serviceTier : selection.serviceTier,
-          },
-          runId,
-          title: createConversationTitle(input.content, attachmentPrompt.records),
-          userMessageContent: {
-            attachmentIds: input.attachmentIds,
-            contextItems: input.contextItems,
-            text: input.content,
-          },
-          userMessageId: randomUUID(),
+          draftId: input.draftId,
+          messageId: userMessageId,
         })
+    const persistedAttachmentIds = replayInput?.attachmentIds
+      ?? stagedAttachments?.bindings.map(binding => binding.id)
+      ?? []
+    let prepared
+    try {
+      prepared = replay
+        ? services.turnRequests.retryInterrupted({
+            createdAt: new Date().toISOString(),
+            requestId: input.requestId,
+            runId,
+          })
+        : services.turnRequests.prepare({
+            attachmentBindings: stagedAttachments?.bindings ?? [],
+            branchId,
+            conversationId,
+            createdAt: new Date().toISOString(),
+            executionProfile: input.executionProfile,
+            model: selection.modelId,
+            modelParameters: selection.contextWindow !== null && selection.maxTokens !== null
+              ? { contextWindow: selection.contextWindow, maxTokens: selection.maxTokens }
+              : undefined,
+            projectId: project?.id ?? null,
+            provider: selection.providerId,
+            requestFingerprint,
+            requestId: input.requestId,
+            runInput: {
+              attachmentIds: persistedAttachmentIds,
+              contextItems: input.contextItems,
+              prompt,
+              reasoning: thinkingLevel ?? null,
+              serviceTier: replayInput ? replayInput.serviceTier : selection.serviceTier,
+            },
+            runId,
+            title: createConversationTitle(input.content, attachmentPrompt.records),
+            userMessageContent: {
+              attachmentIds: persistedAttachmentIds,
+              contextItems: input.contextItems,
+              text: input.content,
+            },
+            userMessageId,
+          })
+    }
+    catch (error) {
+      await stagedAttachments?.rollback()
+      throw error
+    }
+    await stagedAttachments?.commit().catch(() => undefined)
     if (!prepared.created) {
       return turnStart(
         prepared,
@@ -1673,7 +1766,9 @@ function registerRuntimeHandlers(services: RuntimeServices): () => void {
     const project = conversation.projectId
       ? requireActiveProject(services.projectsRepository.findById(conversation.projectId))
       : null
-    const canonicalRoot = project?.canonicalRoot ?? services.workspaceDirectory
+    const canonicalRoot = project?.canonicalRoot
+      ?? services.paths.conversationWorkspace(conversation.id)
+    await mkdir(canonicalRoot, { mode: 0o700, recursive: true })
     const replayInput = replayRun ? services.runInputs.findByRunId(replayRun.id) : null
     if (replayRun && !replayInput)
       throw new BuddyServiceError('VALIDATION_FAILED')
@@ -1682,6 +1777,7 @@ function registerRuntimeHandlers(services: RuntimeServices): () => void {
       attachmentIds,
       replayInput ? '' : input.content,
       conversation.id,
+      replayInput ? null : input.draftId,
     )
     const context = replayInput
       ? ''
@@ -1711,44 +1807,65 @@ function registerRuntimeHandlers(services: RuntimeServices): () => void {
       replayInput ? replayInput.reasoning : selection.reasoning,
     )
     const runId = randomUUID()
-    const prepared = replay
-      ? services.turnRequests.retryInterrupted({
-          createdAt: new Date().toISOString(),
-          requestId: input.requestId,
-          runId,
-        })
-      : services.turnRequests.edit({
-          branchId: randomUUID(),
+    const userMessageId = randomUUID()
+    const stagedAttachments = replay
+      ? null
+      : await services.attachmentService.prepareMessageAttachments({
+          attachmentIds: input.attachmentIds,
           conversationId: conversation.id,
-          createdAt: new Date().toISOString(),
-          executionProfile: conversation.executionProfile,
-          forkedFromMessageId,
-          model: selection.modelId,
-          modelParameters: selection.contextWindow !== null && selection.maxTokens !== null
-            ? { contextWindow: selection.contextWindow, maxTokens: selection.maxTokens }
-            : undefined,
-          parentBranchId,
-          projectId: project?.id ?? null,
-          provider: selection.providerId,
-          requestFingerprint,
-          requestId: input.requestId,
-          runId,
-          runInput: {
-            attachmentIds: input.attachmentIds,
-            contextItems: input.contextItems,
-            prompt,
-            reasoning: thinkingLevel ?? null,
-            serviceTier: replayInput ? replayInput.serviceTier : selection.serviceTier,
-          },
-          sourceUserMessageId: input.userMessageId,
-          title: null,
-          userMessageContent: {
-            attachmentIds: input.attachmentIds,
-            contextItems: input.contextItems,
-            text: input.content,
-          },
-          userMessageId: randomUUID(),
+          draftId: input.draftId,
+          messageId: userMessageId,
         })
+    const persistedAttachmentIds = replayInput?.attachmentIds
+      ?? stagedAttachments?.bindings.map(binding => binding.id)
+      ?? []
+    let prepared
+    try {
+      prepared = replay
+        ? services.turnRequests.retryInterrupted({
+            createdAt: new Date().toISOString(),
+            requestId: input.requestId,
+            runId,
+          })
+        : services.turnRequests.edit({
+            attachmentBindings: stagedAttachments?.bindings ?? [],
+            branchId: randomUUID(),
+            conversationId: conversation.id,
+            createdAt: new Date().toISOString(),
+            executionProfile: conversation.executionProfile,
+            forkedFromMessageId,
+            model: selection.modelId,
+            modelParameters: selection.contextWindow !== null && selection.maxTokens !== null
+              ? { contextWindow: selection.contextWindow, maxTokens: selection.maxTokens }
+              : undefined,
+            parentBranchId,
+            projectId: project?.id ?? null,
+            provider: selection.providerId,
+            requestFingerprint,
+            requestId: input.requestId,
+            runId,
+            runInput: {
+              attachmentIds: persistedAttachmentIds,
+              contextItems: input.contextItems,
+              prompt,
+              reasoning: thinkingLevel ?? null,
+              serviceTier: replayInput ? replayInput.serviceTier : selection.serviceTier,
+            },
+            sourceUserMessageId: input.userMessageId,
+            title: null,
+            userMessageContent: {
+              attachmentIds: persistedAttachmentIds,
+              contextItems: input.contextItems,
+              text: input.content,
+            },
+            userMessageId,
+          })
+    }
+    catch (error) {
+      await stagedAttachments?.rollback()
+      throw error
+    }
+    await stagedAttachments?.commit().catch(() => undefined)
     if (!prepared.created) {
       return turnStart(
         prepared,
@@ -1810,7 +1927,9 @@ function registerRuntimeHandlers(services: RuntimeServices): () => void {
     const project = conversation.projectId
       ? requireActiveProject(services.projectsRepository.findById(conversation.projectId))
       : null
-    const canonicalRoot = project?.canonicalRoot ?? services.workspaceDirectory
+    const canonicalRoot = project?.canonicalRoot
+      ?? services.paths.conversationWorkspace(conversation.id)
+    await mkdir(canonicalRoot, { mode: 0o700, recursive: true })
     let sourceRun: RunRecord | null = null
     if (!replay) {
       const history = services.conversations.listBranchMessages(conversation.id, parentBranchId)
@@ -2406,6 +2525,53 @@ function toPublicAttachment(record: AttachmentRecord) {
     previewUrl: null,
     sizeBytes: record.sizeBytes,
   }
+}
+
+function toPublicArtifact(record: ArtifactRecord) {
+  return {
+    artifactId: record.id,
+    conversationId: record.conversationId,
+    createdAt: record.createdAt,
+    mimeType: record.mimeType,
+    name: record.name,
+    previewUrl: null,
+    runId: record.runId,
+    sizeBytes: record.sizeBytes,
+    sourceArtifactId: record.sourceArtifactId,
+    sourceToolCallId: record.sourceToolCallId,
+  }
+}
+
+function projectRunOutputs(
+  events: readonly BuddyRunEvent[],
+  artifacts: readonly ArtifactRecord[],
+) {
+  const artifactsById = new Map(artifacts.map(record => [record.id, record]))
+  const projectedArtifactIds = new Set<string>()
+  return events.flatMap((event) => {
+    if (event.type !== 'output.produced')
+      return []
+    const output = buddyRunOutputPayloadSchema.safeParse(event.payload)
+    if (!output.success)
+      return []
+    const projectedArtifacts = output.data.artifactIds.flatMap((artifactId) => {
+      if (projectedArtifactIds.has(artifactId))
+        return []
+      const artifact = artifactsById.get(artifactId)
+      if (!artifact)
+        return []
+      projectedArtifactIds.add(artifactId)
+      return [toPublicArtifact(artifact)]
+    })
+    return projectedArtifacts.length > 0
+      ? [{
+          artifacts: projectedArtifacts,
+          createdAt: event.createdAt,
+          runId: event.runId,
+          sourceToolCallId: output.data.sourceToolCallId,
+        }]
+      : []
+  })
 }
 
 function withMessageAttachments<

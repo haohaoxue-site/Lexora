@@ -19,6 +19,7 @@ import {
   approvalReviewPayloadSchema,
 } from '../../../shared/approvalReviewPayload'
 import { buddyAssistantTextPhaseSchema } from '../../../shared/assistantTextPhase'
+import { BUDDY_ATTACHMENT_COUNT_LIMIT } from '../../../shared/attachmentPolicy'
 import { MAX_BUDDY_MESSAGE_TEXT_LENGTH } from '../../../shared/buddyMessageContent'
 import { withTransaction } from '../storage/database'
 
@@ -45,15 +46,6 @@ const approvalResolutionPayloadSchema = z.object({
   resolvedAt: z.iso.datetime(),
   status: z.enum(['approved', 'denied', 'cancelled']),
 }).strict()
-const artifactPayloadSchema = z.object({
-  canonicalPath: z.string().min(1),
-  createdAt: z.iso.datetime(),
-  id: z.string().min(1),
-  mimeType: z.string().nullable(),
-  operation: z.enum(['created', 'deleted', 'edited']),
-  projectId: z.string().nullable(),
-  runId: runIdSchema,
-}).strict()
 const usageEventPayloadSchema = z.object({
   cacheReadCost: z.number().nonnegative(),
   cacheReadTokens: z.number().int().nonnegative(),
@@ -74,6 +66,7 @@ const usageEventPayloadSchema = z.object({
 }).strict()
 const completedMessagePayloadSchema = z.object({
   content: z.object({
+    attachmentIds: z.array(messageIdSchema).max(BUDDY_ATTACHMENT_COUNT_LIMIT).optional(),
     text: z.string().max(MAX_BUDDY_MESSAGE_TEXT_LENGTH),
   }).strict(),
   messageId: messageIdSchema,
@@ -119,8 +112,8 @@ export interface AppendBuddyRunEventInput {
 }
 
 export interface RunEventLogOptions {
+  conversationsDirectory: string
   database: DatabaseSync
-  eventsDirectory: string
   onEvent?: (event: BuddyRunEvent) => void
   onEventDeliveryError?: (error: Error, event: BuddyRunEvent) => void
   onFatalFailure?: (error: RunEventLogFatalError) => void
@@ -218,8 +211,8 @@ export class RunEventLogClosedError extends Error {
 }
 
 export class RunEventLog {
+  readonly #conversationsDirectory: string
   readonly #database: DatabaseSync
-  readonly #eventsDirectory: string
   readonly #nextSequences = new Map<string, number>()
   readonly #onEvent?: (event: BuddyRunEvent) => void
   readonly #onEventDeliveryError?: (error: Error, event: BuddyRunEvent) => void
@@ -230,8 +223,8 @@ export class RunEventLog {
   #fatalFailure: RunEventLogFatalError | null = null
 
   constructor(options: RunEventLogOptions) {
+    this.#conversationsDirectory = options.conversationsDirectory
     this.#database = options.database
-    this.#eventsDirectory = options.eventsDirectory
     this.#onEvent = options.onEvent
     this.#onEventDeliveryError = options.onEventDeliveryError
     this.#onFatalFailure = options.onFatalFailure
@@ -374,80 +367,37 @@ export class RunEventLog {
 
   async replayAll(): Promise<number> {
     this.#assertOpen()
-    let entries: string[]
-    try {
-      entries = await readdir(this.#eventsDirectory)
-    }
-    catch (error) {
-      if (isFileNotFound(error))
-        return 0
-      throw error
-    }
-    await syncDirectory(this.#eventsDirectory)
-    await syncDirectory(dirname(this.#eventsDirectory))
-    const staleTemporaryFiles = entries.filter(entry => eventTemporaryFilePattern.test(entry))
-    if (staleTemporaryFiles.length > 0) {
-      for (const entry of staleTemporaryFiles)
-        await removeFileIfExists(join(this.#eventsDirectory, entry))
-      await syncDirectory(this.#eventsDirectory)
-    }
-
+    const runs = this.#database.prepare(`
+      SELECT id, conversation_id FROM runs ORDER BY started_at, id
+    `).all() as unknown as Array<{ conversation_id: string, id: string }>
+    const entriesByDirectory = new Map<string, Set<string>>()
     let replayed = 0
-    for (const entry of entries.sort()) {
-      if (!entry.endsWith('.jsonl'))
-        continue
-      const runId = entry.slice(0, -'.jsonl'.length)
-      if (!this.#runExists(runId)) {
-        await this.deleteRuns([runId])
-        continue
+    for (const run of runs) {
+      const directory = this.#eventDirectory(run.id)
+      let entries = entriesByDirectory.get(directory)
+      if (!entries) {
+        let names: string[]
+        try {
+          names = await readdir(directory)
+        }
+        catch (error) {
+          if (isFileNotFound(error))
+            continue
+          throw error
+        }
+        const staleTemporaryFiles = names.filter(entry => eventTemporaryFilePattern.test(entry))
+        for (const entry of staleTemporaryFiles)
+          await removeFileIfExists(join(directory, entry))
+        if (staleTemporaryFiles.length > 0)
+          await syncDirectory(directory)
+        entries = new Set(names)
+        entriesByDirectory.set(directory, entries)
       }
-      replayed += await this.replay(runId)
+      if (!entries.has(`${run.id}.jsonl`))
+        continue
+      replayed += await this.replay(run.id)
     }
     return replayed
-  }
-
-  async deleteRuns(runIds: readonly string[]): Promise<number> {
-    this.#assertOpen()
-    if (this.#fatalFailure)
-      throw this.#fatalFailure
-    let deleted = 0
-    for (const runId of runIds) {
-      await this.#enqueue(runId, async () => {
-        if (this.#fatalFailure)
-          throw this.#fatalFailure
-        try {
-          await unlink(this.#eventPath(runId))
-        }
-        catch (cause) {
-          if (isFileNotFound(cause)) {
-            this.#nextSequences.delete(runId)
-            return
-          }
-          this.#fail(new RunEventStorageError(
-            runEventFailureScope(runId),
-            'delete',
-            'unlink',
-            'unknown',
-            { cause },
-          ))
-        }
-        try {
-          await syncDirectory(this.#eventsDirectory)
-        }
-        catch (cause) {
-          this.#fail(new RunEventStorageError(
-            runEventFailureScope(runId),
-            'delete',
-            'directory',
-            'unknown',
-            { cause },
-          ))
-        }
-        deleted += 1
-        this.#nextSequences.delete(runId)
-      })
-    }
-    return deleted
   }
 
   close(): Promise<void> {
@@ -464,16 +414,27 @@ export class RunEventLog {
   }
 
   #eventPath(runId: string): string {
-    return join(this.#eventsDirectory, `${runIdSchema.parse(runId)}.jsonl`)
+    return join(this.#eventDirectory(runId), `${runIdSchema.parse(runId)}.jsonl`)
+  }
+
+  #eventDirectory(runId: string): string {
+    const row = this.#database.prepare(`
+      SELECT conversation_id FROM runs WHERE id = ?
+    `).get(runId) as { conversation_id: string } | undefined
+    if (!row)
+      throw new Error(`Lexora Buddy run was not found: ${runId}`)
+    return join(
+      this.#conversationsDirectory,
+      runIdSchema.parse(row.conversation_id),
+      'events',
+    )
   }
 
   async #appendAndSync(events: readonly BuddyRunEvent[]): Promise<void> {
     const scope = runEventFailureScope(events[0]!.runId, events)
     const content = `${events.map(event => JSON.stringify(event)).join('\n')}\n`
-    const createdDirectory = await mkdir(
-      this.#eventsDirectory,
-      { mode: 0o700, recursive: true },
-    )
+    const eventDirectory = this.#eventDirectory(events[0]!.runId)
+    const createdDirectory = await mkdir(eventDirectory, { mode: 0o700, recursive: true })
     const { created, file } = await this.#openEventFile(events[0]!.runId)
     let failure: RunEventStorageError | null = null
     let stage: RunEventStorageError['stage'] = 'write'
@@ -503,9 +464,9 @@ export class RunEventLog {
       this.#fail(failure)
     if (created) {
       try {
-        await syncDirectory(this.#eventsDirectory)
+        await syncDirectory(eventDirectory)
         if (createdDirectory)
-          await syncDirectory(dirname(this.#eventsDirectory))
+          await syncDirectory(dirname(eventDirectory))
       }
       catch (cause) {
         this.#fail(new RunEventStorageError(
@@ -606,10 +567,11 @@ export class RunEventLog {
     events: readonly BuddyRunEvent[],
     replacedEvents: readonly BuddyRunEvent[],
   ): Promise<void> {
-    await mkdir(this.#eventsDirectory, { mode: 0o700, recursive: true })
+    const eventDirectory = this.#eventDirectory(runId)
+    await mkdir(eventDirectory, { mode: 0o700, recursive: true })
     const path = this.#eventPath(runId)
     const temporaryPath = join(
-      this.#eventsDirectory,
+      eventDirectory,
       `.${runId}.${process.pid}.${randomUUID()}.tmp`,
     )
     const scope = runEventFailureScope(runId, replacedEvents)
@@ -637,7 +599,7 @@ export class RunEventLog {
       ))
     }
     try {
-      await syncDirectory(this.#eventsDirectory)
+      await syncDirectory(eventDirectory)
     }
     catch (cause) {
       this.#fail(new RunEventStorageError(
@@ -707,7 +669,6 @@ export class RunEventLog {
         WHERE run_id = ? AND role IN ('assistant', 'tool')
       `).run(runId)
       this.#database.prepare('DELETE FROM approvals WHERE run_id = ?').run(runId)
-      this.#database.prepare('DELETE FROM artifacts WHERE run_id = ?').run(runId)
       this.#database.prepare('DELETE FROM usage_records WHERE run_id = ?').run(runId)
       return events.reduce(
         (count, event) => count + this.#project(event),
@@ -723,15 +684,12 @@ export class RunEventLog {
 
     const messageIds = new Set<string>()
     const approvalStates = new Map<string, ApprovalFactState>()
-    const artifactIds = new Set<string>()
     const usageRecordIds = new Set<string>()
     const usageSourceKeys = new Set<string>()
     const findMessage = this.#database.prepare('SELECT 1 FROM messages WHERE id = ?')
     const findApproval = this.#database.prepare(`
       SELECT run_id AS runId, status FROM approvals WHERE id = ?
     `)
-    const findArtifact = this.#database.prepare('SELECT 1 FROM artifacts WHERE id = ?')
-    const findProject = this.#database.prepare('SELECT 1 FROM projects WHERE id = ?')
     const findUsageById = this.#database.prepare('SELECT 1 FROM usage_records WHERE id = ?')
     const findUsageBySource = this.#database.prepare(`
       SELECT 1 FROM usage_records
@@ -768,15 +726,6 @@ export class RunEventLog {
         approvalStates.set(resolution.id, { runId, status: resolution.status })
       }
 
-      const artifact = parseArtifact(event)
-      if (artifact) {
-        if (artifactIds.has(artifact.id) || findArtifact.get(artifact.id))
-          throw artifactConflict(artifact.id)
-        if (artifact.projectId && !findProject.get(artifact.projectId))
-          throw artifactConflict(artifact.id)
-        artifactIds.add(artifact.id)
-      }
-
       const usage = parseUsage(event)
       if (usage) {
         const sourceKey = JSON.stringify([runId, usage.sourceEntryId, usage.purpose])
@@ -810,7 +759,6 @@ export class RunEventLog {
     projectProductMessage(this.#database, event)
     projectApprovalRequest(this.#database, event)
     projectApprovalResolution(this.#database, event)
-    projectArtifact(this.#database, event)
     projectUsage(this.#database, event)
     return Number(result.changes)
   }
@@ -1110,7 +1058,6 @@ function parseProductMessage(event: BuddyRunEvent): ProductMessageProjection | n
 
 type ApprovalRequestProjection = z.infer<typeof approvalRequestPayloadSchema>
 type ApprovalResolutionProjection = z.infer<typeof approvalResolutionPayloadSchema>
-type ArtifactProjection = z.infer<typeof artifactPayloadSchema>
 type UsageProjection = z.infer<typeof usageEventPayloadSchema>
 
 interface ApprovalFactState {
@@ -1133,15 +1080,6 @@ function parseApprovalResolution(event: BuddyRunEvent): ApprovalResolutionProjec
     : null
 }
 
-function parseArtifact(event: BuddyRunEvent): ArtifactProjection | null {
-  if (event.type !== 'artifact.changed')
-    return null
-  const artifact = artifactPayloadSchema.parse(event.payload)
-  if (artifact.runId !== event.runId)
-    throw new Error(`Lexora Buddy artifact event is invalid: ${event.runId}`)
-  return artifact
-}
-
 function parseUsage(event: BuddyRunEvent): UsageProjection | null {
   return event.type === 'usage.recorded'
     ? usageEventPayloadSchema.parse(event.payload)
@@ -1150,10 +1088,6 @@ function parseUsage(event: BuddyRunEvent): UsageProjection | null {
 
 function approvalConflict(id: string): Error {
   return new Error(`Lexora Buddy approval event conflicts with storage: ${id}`)
-}
-
-function artifactConflict(id: string): Error {
-  return new Error(`Lexora Buddy artifact event conflicts with storage: ${id}`)
 }
 
 function usageConflict(id: string): Error {
@@ -1197,29 +1131,6 @@ function projectApprovalRequest(database: DatabaseSync, event: BuddyRunEvent): v
   if (Number(result.changes) === 1)
     return
   throw approvalConflict(approval.id)
-}
-
-function projectArtifact(database: DatabaseSync, event: BuddyRunEvent): void {
-  const artifact = parseArtifact(event)
-  if (!artifact)
-    return
-  const result = database.prepare(`
-    INSERT INTO artifacts (
-      id, run_id, project_id, canonical_path, operation, mime_type, created_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?)
-    ON CONFLICT (id) DO NOTHING
-  `).run(
-    artifact.id,
-    artifact.runId,
-    artifact.projectId,
-    artifact.canonicalPath,
-    artifact.operation,
-    artifact.mimeType,
-    artifact.createdAt,
-  )
-  if (Number(result.changes) === 1)
-    return
-  throw artifactConflict(artifact.id)
 }
 
 function projectUsage(database: DatabaseSync, event: BuddyRunEvent): void {

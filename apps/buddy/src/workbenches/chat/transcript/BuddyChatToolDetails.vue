@@ -4,6 +4,7 @@ import type { ChatAgentToolNode } from './chatStreamingMessage'
 import type { BuddyLocale } from '@/i18n/buddyI18n'
 import { computed } from 'vue'
 import { useBuddyI18n } from '@/i18n/buddyI18n'
+import BuddyChatImageToolDetails from './BuddyChatImageToolDetails.vue'
 
 interface ToolDetailSection {
   content: string
@@ -21,6 +22,9 @@ const props = defineProps<{
 
 const { t } = useBuddyI18n(() => props.language)
 const terminal = computed(() => props.presentation.card === 'terminal'
+  ? props.presentation
+  : null)
+const image = computed(() => props.presentation.card === 'image'
   ? props.presentation
   : null)
 const terminalLabel = computed(() => terminal.value?.cwd && terminal.value.cwd !== '.'
@@ -68,8 +72,13 @@ const sections = computed<ToolDetailSection[]>(() => {
       presentation.diff,
     ))
   }
-  if (presentation.card === 'automation' || presentation.card === 'pet')
+  if (
+    presentation.card === 'automation'
+    || presentation.card === 'image'
+    || presentation.card === 'pet'
+  ) {
     return values
+  }
   if (presentation.output !== null) {
     values.push(section(
       'output',
@@ -97,6 +106,11 @@ function assertNever(value: never): never {
 
 <template>
   <div class="buddy-chat-tool-details" :class="`is-${status}`">
+    <BuddyChatImageToolDetails
+      v-if="image"
+      :language="language"
+      :presentation="image"
+    />
     <section v-if="terminal" class="buddy-chat-terminal-card">
       <header class="buddy-chat-terminal-card__banner">
         <span>{{ terminalLabel }}</span>

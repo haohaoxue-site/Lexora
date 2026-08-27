@@ -13,7 +13,7 @@ export interface TaskProjectInput {
   instructions: string
   memoryScope: 'personal_and_project' | 'project_only'
   name: string
-  root: string | null
+  root: string
 }
 
 interface UseTaskProjectsOptions {

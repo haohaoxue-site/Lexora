@@ -5,6 +5,7 @@ import type {
   LocalMessage,
   LocalRun,
   LocalRunEvent,
+  LocalRunOutput,
   LocalTurnStart,
 } from '@buddy-electron/shared/localChatApi'
 import type { Ref } from 'vue'
@@ -28,6 +29,7 @@ export function useChatRunSync(options: UseChatRunSyncOptions) {
   ))
   const runs = shallowRef<ReadonlyArray<LocalRun>>([])
   const runEvents = shallowRef<ReadonlyArray<LocalRunEvent>>([])
+  const runOutputs = shallowRef<ReadonlyArray<LocalRunOutput>>([])
   const approvals = shallowRef<ReadonlyArray<LocalApproval>>([])
   const isLoadingOlderMessages = shallowRef(false)
   const timelineCursor = shallowRef<string | null>(null)
@@ -84,6 +86,7 @@ export function useChatRunSync(options: UseChatRunSyncOptions) {
         timelinePage.runEvents,
         timelinePage.runs,
       )
+      runOutputs.value = mergeRunOutputs(runOutputs.value, timelinePage.outputs)
       const runIds = new Set(runs.value.map(run => run.id))
       approvals.value = pendingApprovals.filter(approval => runIds.has(approval.runId))
     }
@@ -129,6 +132,7 @@ export function useChatRunSync(options: UseChatRunSyncOptions) {
       timelineItems.value = mergeOlderTimelineItems(timelineItems.value, page.items)
       upsertRuns(page.runs)
       runEvents.value = mergeTimelineEvents(runEvents.value, page.runEvents, page.runs)
+      runOutputs.value = mergeRunOutputs(runOutputs.value, page.outputs)
       timelineCursor.value = page.nextCursor
       return prepended
     }
@@ -231,6 +235,7 @@ export function useChatRunSync(options: UseChatRunSyncOptions) {
     timelineItems.value = []
     runs.value = []
     runEvents.value = []
+    runOutputs.value = []
     approvals.value = []
     knownRunIds.clear()
   }
@@ -263,10 +268,24 @@ export function useChatRunSync(options: UseChatRunSyncOptions) {
     messages,
     refreshActiveConversation,
     runEvents,
+    runOutputs,
     runs,
     timelineItems,
     upsertRuns,
   }
+}
+
+function mergeRunOutputs(
+  current: ReadonlyArray<LocalRunOutput>,
+  incoming: ReadonlyArray<LocalRunOutput>,
+): ReadonlyArray<LocalRunOutput> {
+  const byId = new Map(current.map(output => [
+    `${output.runId}:${output.sourceToolCallId}`,
+    output,
+  ]))
+  for (const output of incoming)
+    byId.set(`${output.runId}:${output.sourceToolCallId}`, output)
+  return [...byId.values()].sort((left, right) => left.createdAt.localeCompare(right.createdAt))
 }
 
 function mergeTailTimelineItems(

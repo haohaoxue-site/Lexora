@@ -21,7 +21,7 @@ export interface ConversationRecord {
   executionProfile: BuddyExecutionProfile
   modelSelection: ConversationModelSelection | null
   origin: 'automation' | 'interactive'
-  promotedAt: string | null
+  deletedAt: string | null
   updatedAt: string
 }
 
@@ -160,14 +160,11 @@ export interface ConversationRepository {
   create: (input: CreateConversationInput) => ConversationRecord
   createBranch: (input: CreateBranchInput) => ConversationBranchRecord
   createMessage: (input: CreateMessageInput) => MessageRecord
-  completeDeletion: (id: string, completedAt: string) => boolean
   findById: (id: string) => ConversationRecord | null
   findMessageById: (id: string) => MessageRecord | null
   isDeleted: (id: string) => boolean
-  isDeleting: (id: string) => boolean
   listBranchMessages: (conversationId: string, branchId: string) => MessageRecord[]
   listBranches: (conversationId: string) => ConversationBranchRecord[]
-  listDeleting: () => string[]
   listMessagePage: (
     conversationId: string,
     branchId: string,
@@ -180,8 +177,7 @@ export interface ConversationRepository {
   ) => ConversationTimelinePageRecord
   listMessages: (conversationId: string, branchId: string, limit?: number) => MessageRecord[]
   listRecent: (limit?: number) => ConversationSummaryRecord[]
-  markDeleting: (id: string, requestedAt: string) => boolean
-  promote: (id: string, promotedAt: string) => ConversationRecord
+  markDeleted: (id: string, deletedAt: string) => boolean
   rename: (input: RenameConversationInput) => ConversationRecord
   setExecutionProfile: (
     input: SetConversationExecutionProfileInput,
@@ -200,7 +196,7 @@ interface ConversationRow {
   execution_profile: BuddyExecutionProfile
   model_selection_json: string | null
   origin: ConversationRecord['origin']
-  promoted_at: string | null
+  deleted_at: string | null
   updated_at: string
 }
 
@@ -257,7 +253,7 @@ export function createConversationRepository(database: DatabaseSync): Conversati
   const insertConversation = database.prepare(`
     INSERT INTO conversations (
       id, project_id, title, active_branch_id, created_at, updated_at,
-      execution_profile, origin, promoted_at
+      execution_profile, origin, deleted_at
     ) VALUES (?, ?, ?, NULL, ?, ?, ?, ?, NULL)
   `)
   const insertBranch = database.prepare(`
@@ -328,21 +324,14 @@ export function createConversationRepository(database: DatabaseSync): Conversati
     LEFT JOIN automation_occurrences
       ON automation_occurrences.conversation_id = conversations.id
       AND automation_occurrences.deleted_at IS NULL
-    WHERE NOT EXISTS (
-      SELECT 1 FROM conversation_deletions
-      WHERE conversation_id = conversations.id
-    )
+    WHERE conversations.deleted_at IS NULL
     ORDER BY conversations.updated_at DESC, conversations.created_at DESC
     LIMIT ?
   `)
   const renameConversation = database.prepare(`
     UPDATE conversations
     SET title = ?, updated_at = ?
-    WHERE id = ?
-      AND NOT EXISTS (
-        SELECT 1 FROM conversation_deletions
-        WHERE conversation_id = conversations.id
-      )
+    WHERE id = ? AND deleted_at IS NULL
   `)
   const setExecutionProfile = database.prepare(`
     UPDATE conversations
@@ -352,50 +341,17 @@ export function createConversationRepository(database: DatabaseSync): Conversati
         SELECT 1 FROM runs
         WHERE conversation_id = conversations.id AND status IN ('queued', 'running')
       )
-      AND NOT EXISTS (
-        SELECT 1 FROM conversation_deletions
-        WHERE conversation_id = conversations.id
-      )
+      AND deleted_at IS NULL
   `)
   const setModelSelection = database.prepare(`
     UPDATE conversations
     SET model_selection_json = ?, updated_at = ?
-    WHERE id = ?
-      AND NOT EXISTS (
-        SELECT 1 FROM conversation_deletions
-        WHERE conversation_id = conversations.id
-      )
+    WHERE id = ? AND deleted_at IS NULL
   `)
-  const promoteConversation = database.prepare(`
+  const markDeleted = database.prepare(`
     UPDATE conversations
-    SET promoted_at = COALESCE(promoted_at, ?), updated_at = ?
-    WHERE id = ? AND origin = 'automation'
-      AND NOT EXISTS (
-        SELECT 1 FROM conversation_deletions
-        WHERE conversation_id = conversations.id
-      )
-  `)
-  const markDeleting = database.prepare(`
-    INSERT INTO conversation_deletions (conversation_id, requested_at, completed_at)
-    SELECT id, ?, NULL FROM conversations WHERE id = ?
-    ON CONFLICT (conversation_id) DO NOTHING
-  `)
-  const findDeletion = database.prepare(`
-    SELECT 1 FROM conversation_deletions WHERE conversation_id = ?
-  `)
-  const findPendingDeletion = database.prepare(`
-    SELECT 1 FROM conversation_deletions
-    WHERE conversation_id = ? AND completed_at IS NULL
-  `)
-  const listDeletions = database.prepare(`
-    SELECT conversation_id FROM conversation_deletions
-    WHERE completed_at IS NULL
-    ORDER BY requested_at, conversation_id
-  `)
-  const completeDeletion = database.prepare(`
-    UPDATE conversation_deletions
-    SET completed_at = ?
-    WHERE conversation_id = ? AND completed_at IS NULL
+    SET deleted_at = ?, updated_at = ?
+    WHERE id = ? AND deleted_at IS NULL
   `)
   const findIncompleteRun = database.prepare(`
     SELECT 1 FROM runs
@@ -547,7 +503,7 @@ export function createConversationRepository(database: DatabaseSync): Conversati
         const branch = findBranch.get(input.branchId) as BranchRow | undefined
         if (
           !conversation
-          || findDeletion.get(input.conversationId)
+          || conversation.deleted_at !== null
           || !branch
           || branch.conversation_id !== input.conversationId
         ) {
@@ -619,9 +575,6 @@ export function createConversationRepository(database: DatabaseSync): Conversati
       )
       return toMessage(requireRow<MessageRow>(findMessage.get(input.id), input.id))
     },
-    completeDeletion(id, completedAt) {
-      return Number(completeDeletion.run(completedAt, id).changes) === 1
-    },
     findById(id) {
       const row = findConversation.get(id) as ConversationRow | undefined
       return row ? toConversation(row) : null
@@ -631,20 +584,14 @@ export function createConversationRepository(database: DatabaseSync): Conversati
       return row ? toMessage(row) : null
     },
     isDeleted(id) {
-      return findDeletion.get(id) !== undefined
-    },
-    isDeleting(id) {
-      return findPendingDeletion.get(id) !== undefined
+      const row = findConversation.get(id) as ConversationRow | undefined
+      return row?.deleted_at !== null && row?.deleted_at !== undefined
     },
     listBranchMessages(conversationId, branchId) {
       return collectBranchMessages(conversationId, branchId)
     },
     listBranches(conversationId) {
       return (listBranches.all(conversationId) as unknown as BranchRow[]).map(toBranch)
-    },
-    listDeleting() {
-      return (listDeletions.all() as unknown as Array<{ conversation_id: string }>)
-        .map(row => row.conversation_id)
     },
     listMessagePage(conversationId, branchId, options) {
       if (options.limit <= 0)
@@ -786,14 +733,8 @@ export function createConversationRepository(database: DatabaseSync): Conversati
       return (listRecent.all(limit) as unknown as ConversationSummaryRow[])
         .map(toConversationSummary)
     },
-    markDeleting(id, requestedAt) {
-      markDeleting.run(requestedAt, id)
-      return findDeletion.get(id) !== undefined
-    },
-    promote(id, promotedAt) {
-      if (Number(promoteConversation.run(promotedAt, promotedAt, id).changes) !== 1)
-        throw new ConversationBranchError('cannot be promoted')
-      return toConversation(requireRow<ConversationRow>(findConversation.get(id), id))
+    markDeleted(id, deletedAt) {
+      return Number(markDeleted.run(deletedAt, deletedAt, id).changes) === 1
     },
     rename(input) {
       if (Number(renameConversation.run(input.title, input.updatedAt, input.id).changes) !== 1)
@@ -803,7 +744,7 @@ export function createConversationRepository(database: DatabaseSync): Conversati
     setExecutionProfile(input) {
       return withTransaction(database, () => {
         const current = findConversation.get(input.id) as ConversationRow | undefined
-        if (!current || findDeletion.get(input.id))
+        if (!current || current.deleted_at !== null)
           return null
         if (current.execution_profile === input.executionProfile)
           return toConversation(current)
@@ -857,7 +798,7 @@ function toConversation(row: ConversationRow): ConversationRecord {
       ? JSON.parse(row.model_selection_json) as ConversationModelSelection
       : null,
     origin: row.origin,
-    promotedAt: row.promoted_at,
+    deletedAt: row.deleted_at,
     updatedAt: row.updated_at,
   }
 }

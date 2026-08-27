@@ -499,7 +499,7 @@ export function registerLocalChatIpc(options: RegisterLocalChatIpcOptions): () =
   ))
 
   handle(LOCAL_CHAT_IPC_CHANNELS.attachmentsSelectFiles, async (_event, input) => {
-    const { remainingCount } = localChatSchemas.attachmentSelection.parse(input)
+    const { draftId, remainingCount } = localChatSchemas.attachmentSelection.parse(input)
     const paths = await selectPaths(options.getWindow(), {
       filters: [{
         extensions: [...BUDDY_ATTACHMENT_DIALOG_EXTENSIONS],
@@ -512,7 +512,7 @@ export function registerLocalChatIpc(options: RegisterLocalChatIpcOptions): () =
       return []
     return request(
       'attachments.registerFiles',
-      { paths: paths.slice(0, remainingCount) },
+      { draftId, paths: paths.slice(0, remainingCount) },
       localChatResponseSchemas.attachments,
     )
   })
@@ -528,7 +528,7 @@ export function registerLocalChatIpc(options: RegisterLocalChatIpcOptions): () =
   ))
   handle(LOCAL_CHAT_IPC_CHANNELS.attachmentsCleanupDrafts, (_event, input) => request(
     'attachments.cleanupDrafts',
-    localChatSchemas.retainedAttachments.parse(input),
+    localChatSchemas.cleanupDraftAttachments.parse(input),
     localChatResponseSchemas.releasedAttachments,
   ))
 

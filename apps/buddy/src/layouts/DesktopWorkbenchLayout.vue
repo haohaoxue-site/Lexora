@@ -39,8 +39,10 @@ defineSlots<{
 
 .desktop-workbench-layout__context {
   display: flex;
+  width: var(--buddy-context-panel-width);
   min-width: 0;
   min-height: 0;
+  flex: none;
   border-left: 1px solid var(--buddy-border-subtle);
 }
 </style>

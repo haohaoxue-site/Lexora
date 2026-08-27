@@ -182,20 +182,6 @@ export class SkillService {
       .filter(project => projectId === undefined || project.id === projectId)
       .sort((left, right) => left.canonicalRoot.localeCompare(right.canonicalRoot))
     for (const project of projects) {
-      if (!project.managedRoot)
-        continue
-      const projectDirectory = dirname(project.managedRoot)
-      const source = await resolveSourceDirectory(
-        projectDirectory,
-        join(projectDirectory, 'skills'),
-        'project',
-        diagnostics,
-        true,
-      )
-      if (source)
-        sources.push(source)
-    }
-    for (const project of projects) {
       for (const relativePath of [['.agents', 'skills'], ['.pi', 'skills']] as const) {
         const source = await resolveSourceDirectory(
           project.canonicalRoot,

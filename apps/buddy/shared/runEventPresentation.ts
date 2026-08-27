@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { BUDDY_ATTACHMENT_COUNT_LIMIT } from './attachmentPolicy'
 
 const previewSchema = z.object({
   description: z.string().min(1).max(4 * 1024).nullable(),
@@ -44,6 +45,23 @@ export const buddyToolPresentationSchema = z.discriminatedUnion('card', [
     card: z.literal('connector'),
     connector: z.string().min(1).max(256),
     tool: z.string().min(1).max(256),
+  }).strict(),
+  z.object({
+    artifactIds: z.array(z.string().min(1).max(256)).max(BUDDY_ATTACHMENT_COUNT_LIMIT),
+    card: z.literal('image'),
+    description: z.string().min(1).max(4 * 1024).nullable(),
+    generatedCount: z.number().int().nonnegative().nullable(),
+    prompt: z.string().min(1).max(32 * 1024).nullable(),
+    reference: z.discriminatedUnion('mode', [
+      z.object({
+        resourceIds: z.array(z.string().min(1).max(256)).max(4),
+        mode: z.literal('resources'),
+      }).strict(),
+      z.object({
+        mode: z.literal('latest'),
+      }).strict(),
+    ]).nullable(),
+    status: z.enum(['completed', 'failed', 'running']),
   }).strict(),
   z.object({
     card: z.literal('pet'),

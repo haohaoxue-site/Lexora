@@ -1,11 +1,8 @@
 import type { ConversationRepository } from '../storage/conversationRepository'
-import { rm } from 'node:fs/promises'
-import { join } from 'node:path'
 
-const sessionIdentityPattern = /^[A-Z0-9][\w-]{0,127}$/i
+const conversationIdentityPattern = /^[A-Z0-9][\w-]{0,127}$/i
 
 export interface ConversationLifecycleServiceOptions {
-  agentDirectory: string
   conversations: ConversationRepository
   runner: {
     cancelAndWaitForConversation: (conversationId: string) => Promise<number>
@@ -16,44 +13,34 @@ export interface ConversationLifecycleServiceOptions {
 }
 
 export class ConversationLifecycleService {
-  readonly #agentDirectory: string
   readonly #conversations: ConversationRepository
   readonly #deleting = new Set<string>()
   readonly #runner: ConversationLifecycleServiceOptions['runner']
   readonly #sessions: ConversationLifecycleServiceOptions['sessions']
 
   constructor(options: ConversationLifecycleServiceOptions) {
-    this.#agentDirectory = options.agentDirectory
     this.#conversations = options.conversations
     this.#runner = options.runner
     this.#sessions = options.sessions
   }
 
   async delete(conversationId: string): Promise<boolean> {
-    if (!this.#conversations.findById(conversationId))
-      return false
-    if (!sessionIdentityPattern.test(conversationId))
+    if (!conversationIdentityPattern.test(conversationId))
       throw new ConversationLifecycleError()
+    const conversation = this.#conversations.findById(conversationId)
+    if (!conversation || conversation.deletedAt !== null)
+      return false
     if (this.#deleting.has(conversationId))
       throw new ConversationLifecycleError()
-    if (this.#conversations.isDeleted(conversationId) && !this.#conversations.isDeleting(conversationId))
-      return false
 
     this.#deleting.add(conversationId)
     try {
-      if (
-        !this.#conversations.isDeleting(conversationId)
-        && !this.#conversations.markDeleting(conversationId, new Date().toISOString())
-      ) {
+      const deletedAt = new Date().toISOString()
+      if (!this.#conversations.markDeleted(conversationId, deletedAt))
         return false
-      }
       await this.#runner.cancelAndWaitForConversation(conversationId)
       await this.#sessions.invalidateConversation(conversationId)
-      await rm(join(this.#agentDirectory, 'sessions', conversationId), {
-        force: true,
-        recursive: true,
-      })
-      return this.#conversations.completeDeletion(conversationId, new Date().toISOString())
+      return true
     }
     finally {
       this.#deleting.delete(conversationId)
@@ -64,11 +51,8 @@ export class ConversationLifecycleService {
     return this.#deleting.has(conversationId) || this.#conversations.isDeleted(conversationId)
   }
 
-  async recoverPendingDeletions(): Promise<number> {
-    const conversationIds = this.#conversations.listDeleting()
-    for (const conversationId of conversationIds)
-      await this.delete(conversationId)
-    return conversationIds.length
+  recoverPendingDeletions(): Promise<number> {
+    return Promise.resolve(0)
   }
 }
 

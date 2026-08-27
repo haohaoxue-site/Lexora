@@ -118,6 +118,7 @@ export function isLocalChatErrorCode(value: string | undefined): value is LocalC
 
 export type {
   LocalApproval,
+  LocalArtifact,
   LocalAttachment,
   LocalAutomation,
   LocalAutomationCreateRequest,
@@ -159,6 +160,7 @@ export type {
   LocalProviderAuthChallenge,
   LocalRun,
   LocalRunEvent,
+  LocalRunOutput,
   LocalRuntimeDataBackup,
   LocalRuntimeDataBackupStorage,
   LocalRuntimeDataOperation,
@@ -357,7 +359,7 @@ export interface LocalChatApi {
       instructions: string
       memoryScope: 'personal_and_project' | 'project_only'
       name: string
-      root: string | null
+      root: string
     }) => Promise<LocalProject>
     delete: (projectId: string) => Promise<LocalMutationResult>
     list: (limit?: number) => Promise<ReadonlyArray<LocalProject>>
@@ -368,7 +370,7 @@ export interface LocalChatApi {
       memoryScope: 'personal_and_project' | 'project_only'
       name: string
       projectId: string
-      root: string | null
+      root: string
     }) => Promise<LocalProject>
   }
   skills: {
@@ -456,13 +458,14 @@ export interface LocalChatApi {
     importFiles: (
       input: BuddyAttachmentImportRequest,
     ) => Promise<ReadonlyArray<LocalAttachment>>
-    selectFiles: (input: { remainingCount: number }) => Promise<ReadonlyArray<LocalAttachment>>
+    selectFiles: (input: {
+      draftId: string
+      remainingCount: number
+    }) => Promise<ReadonlyArray<LocalAttachment>>
     release: (
       attachmentIds: ReadonlyArray<string>,
     ) => Promise<{ releasedAttachmentIds: ReadonlyArray<string> }>
-    cleanupDrafts: (
-      retainedAttachmentIds: ReadonlyArray<string>,
-    ) => Promise<{ releasedAttachmentIds: ReadonlyArray<string> }>
+    cleanupDrafts: () => Promise<{ releasedAttachmentIds: ReadonlyArray<string> }>
   }
   usage: {
     getSnapshot: () => Promise<LocalUsageSnapshot>
@@ -473,6 +476,7 @@ export interface LocalChatApi {
       content: string
       contextItems: ReadonlyArray<LocalPromptContextItem>
       conversationId: string
+      draftId: string
       modelSelection: LocalStartTurnRequest['modelSelection']
       requestId: string
       userMessageId: string

@@ -5,6 +5,7 @@ import type { RunInputContextItem } from './runInputRepository'
 import { withTransaction } from './database'
 
 export interface PrepareTurnRequestInput {
+  attachmentBindings: readonly TurnAttachmentBinding[]
   branchId: string
   conversationId: string
   createdAt: string
@@ -26,6 +27,15 @@ export interface PrepareTurnRequestInput {
   title: string | null
   userMessageContent: unknown
   userMessageId: string
+}
+
+export interface TurnAttachmentBinding {
+  createdAt: string
+  id: string
+  messageId: string
+  sourceAttachmentId: string
+  sourceDraftId: string | null
+  storedPath: string
 }
 
 export interface TurnRequestRecord {
@@ -73,10 +83,10 @@ interface TurnRequestRow {
 
 interface ConversationBindingRow {
   active_branch_id: string | null
+  deleted_at: string | null
   execution_profile: BuddyExecutionProfile
   project_id: string | null
   origin: 'automation' | 'interactive'
-  promoted_at: string | null
 }
 
 interface RetryRunRow {
@@ -113,11 +123,8 @@ export interface TurnRequestRepository {
 export function createTurnRequestRepository(database: DatabaseSync): TurnRequestRepository {
   const findRequest = database.prepare('SELECT * FROM turn_requests WHERE request_id = ?')
   const findConversation = database.prepare(`
-    SELECT project_id, active_branch_id, execution_profile, origin, promoted_at
+    SELECT project_id, active_branch_id, execution_profile, origin, deleted_at
     FROM conversations WHERE id = ?
-  `)
-  const findConversationDeletion = database.prepare(`
-    SELECT 1 FROM conversation_deletions WHERE conversation_id = ?
   `)
   const insertConversation = database.prepare(`
     INSERT INTO conversations (
@@ -141,16 +148,20 @@ export function createTurnRequestRepository(database: DatabaseSync): TurnRequest
   const updateConversationModel = database.prepare(`
     UPDATE conversations SET model_selection_json = ?, updated_at = ? WHERE id = ?
   `)
-  const promoteConversation = database.prepare(`
-    UPDATE conversations
-    SET promoted_at = COALESCE(promoted_at, ?), updated_at = ?
-    WHERE id = ? AND origin = 'automation'
+  const bindDraftAttachment = database.prepare(`
+    UPDATE attachments
+    SET draft_id = NULL, message_id = ?, stored_path = ?
+    WHERE id = ? AND draft_id = ? AND message_id IS NULL
   `)
-  const attach = database.prepare(`
-    UPDATE attachments SET conversation_id = ?, draft_key = NULL, status = 'attached'
-    WHERE id = ? AND (
-      status = 'draft' OR (status = 'attached' AND conversation_id = ?)
+  const cloneMessageAttachment = database.prepare(`
+    INSERT INTO attachments (
+      id, draft_id, message_id, stored_path, name, mime_type, size_bytes, created_at
     )
+    SELECT ?, NULL, ?, ?, attachments.name, attachments.mime_type,
+      attachments.size_bytes, ?
+    FROM attachments
+    INNER JOIN messages ON messages.id = attachments.message_id
+    WHERE attachments.id = ? AND messages.conversation_id = ?
   `)
   const insertMessage = database.prepare(`
     INSERT INTO messages (
@@ -245,7 +256,7 @@ export function createTurnRequestRepository(database: DatabaseSync): TurnRequest
           || conversation.project_id !== input.projectId
           || conversation.active_branch_id !== input.parentBranchId
           || conversation.execution_profile !== input.executionProfile
-          || findConversationDeletion.get(input.conversationId)
+          || conversation.deleted_at !== null
           || findIncompleteRun.get(input.conversationId)
           || !sourceMessage
           || sourceMessage.conversation_id !== input.conversationId
@@ -254,9 +265,6 @@ export function createTurnRequestRepository(database: DatabaseSync): TurnRequest
         ) {
           throw new TurnRequestConflictError()
         }
-        if (conversation.origin === 'automation' && conversation.promoted_at === null)
-          promoteConversation.run(input.createdAt, input.createdAt, input.conversationId)
-
         insertForkBranch.run(
           input.branchId,
           input.conversationId,
@@ -266,22 +274,17 @@ export function createTurnRequestRepository(database: DatabaseSync): TurnRequest
         )
         activateBranch.run(input.branchId, input.createdAt, input.conversationId)
 
-        for (const attachmentId of input.runInput.attachmentIds) {
-          if (Number(attach.run(
-            input.conversationId,
-            attachmentId,
-            input.conversationId,
-          ).changes) !== 1) {
-            throw new TurnRequestAttachmentError()
-          }
-        }
-
         insertMessage.run(
           input.userMessageId,
           input.conversationId,
           input.branchId,
           JSON.stringify(input.userMessageContent),
           input.createdAt,
+        )
+        bindAttachments(
+          input,
+          bindDraftAttachment,
+          cloneMessageAttachment,
         )
         insertRun.run(
           input.runId,
@@ -337,20 +340,16 @@ export function createTurnRequestRepository(database: DatabaseSync): TurnRequest
             throw new TurnRequestConflictError()
           return toRecord(existing, false)
         }
-        if (findConversationDeletion.get(input.conversationId))
-          throw new TurnRequestConflictError()
-
         const conversation = findConversation.get(input.conversationId) as ConversationBindingRow | undefined
         if (conversation) {
           if (
             conversation.project_id !== input.projectId
             || conversation.active_branch_id !== input.branchId
             || conversation.execution_profile !== input.executionProfile
+            || conversation.deleted_at !== null
           ) {
             throw new TurnRequestConflictError()
           }
-          if (conversation.origin === 'automation' && conversation.promoted_at === null)
-            promoteConversation.run(input.createdAt, input.createdAt, input.conversationId)
         }
         else {
           insertConversation.run(
@@ -365,16 +364,6 @@ export function createTurnRequestRepository(database: DatabaseSync): TurnRequest
           activateBranch.run(input.branchId, input.createdAt, input.conversationId)
         }
 
-        for (const attachmentId of input.runInput.attachmentIds) {
-          if (Number(attach.run(
-            input.conversationId,
-            attachmentId,
-            input.conversationId,
-          ).changes) !== 1) {
-            throw new TurnRequestAttachmentError()
-          }
-        }
-
         const previous = findPreviousSession.get(
           input.conversationId,
           input.branchId,
@@ -385,6 +374,11 @@ export function createTurnRequestRepository(database: DatabaseSync): TurnRequest
           input.branchId,
           JSON.stringify(input.userMessageContent),
           input.createdAt,
+        )
+        bindAttachments(
+          input,
+          bindDraftAttachment,
+          cloneMessageAttachment,
         )
         insertRun.run(
           input.runId,
@@ -445,7 +439,7 @@ export function createTurnRequestRepository(database: DatabaseSync): TurnRequest
           !conversation
           || conversation.active_branch_id !== input.parentBranchId
           || conversation.execution_profile !== input.executionProfile
-          || findConversationDeletion.get(input.conversationId)
+          || conversation.deleted_at !== null
           || findIncompleteRun.get(input.conversationId)
           || !sourceRun
           || sourceRun.conversation_id !== input.conversationId
@@ -514,7 +508,8 @@ export function createTurnRequestRepository(database: DatabaseSync): TurnRequest
         const run = findRun.get(request.run_id) as RetryRunRow | undefined
         if (!run)
           throw new TurnRequestConflictError()
-        if (findConversationDeletion.get(run.conversation_id))
+        const conversation = findConversation.get(run.conversation_id) as ConversationBindingRow | undefined
+        if (!conversation || conversation.deleted_at !== null)
           throw new TurnRequestConflictError()
         if (run.status !== 'failed' || run.error_code !== 'RUNTIME_RESTARTED')
           return toRecord(request, false)
@@ -585,4 +580,41 @@ function stringifyModelSelection(input: PrepareTurnRequestInput): string {
     reasoning: input.runInput.reasoning,
     serviceTier: input.runInput.serviceTier,
   })
+}
+
+function bindAttachments(
+  input: PrepareTurnRequestInput,
+  bindDraftAttachment: ReturnType<DatabaseSync['prepare']>,
+  cloneMessageAttachment: ReturnType<DatabaseSync['prepare']>,
+): void {
+  if (
+    input.attachmentBindings.length !== input.runInput.attachmentIds.length
+    || input.attachmentBindings.some((binding, index) => (
+      binding.id !== input.runInput.attachmentIds[index]
+      || binding.messageId !== input.userMessageId
+    ))
+  ) {
+    throw new TurnRequestAttachmentError()
+  }
+  for (const binding of input.attachmentBindings) {
+    const changes = binding.sourceDraftId !== null
+      ? binding.id === binding.sourceAttachmentId
+        ? Number(bindDraftAttachment.run(
+            binding.messageId,
+            binding.storedPath,
+            binding.sourceAttachmentId,
+            binding.sourceDraftId,
+          ).changes)
+        : 0
+      : Number(cloneMessageAttachment.run(
+          binding.id,
+          binding.messageId,
+          binding.storedPath,
+          binding.createdAt,
+          binding.sourceAttachmentId,
+          input.conversationId,
+        ).changes)
+    if (changes !== 1)
+      throw new TurnRequestAttachmentError()
+  }
 }

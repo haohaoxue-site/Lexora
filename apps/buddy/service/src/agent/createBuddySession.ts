@@ -36,6 +36,7 @@ export interface CreateBuddySessionOptions {
   agentDir: string
   branchId: string
   canonicalRoot: string
+  conversationsDirectory: string
   conversationId: string
   cwd: string
   executionProfile: BuddyExecutionProfile
@@ -76,7 +77,12 @@ export async function createBuddySession(
     throw new BuddySessionCreationError()
 
   const agentDir = resolve(options.agentDir)
-  const sessionDir = join(agentDir, 'sessions', options.conversationId, options.branchId)
+  const sessionDir = join(
+    resolve(options.conversationsDirectory),
+    options.conversationId,
+    'session',
+    options.branchId,
+  )
   let canonicalSessionDir: string
   try {
     await mkdir(sessionDir, { mode: 0o700, recursive: true })
@@ -149,7 +155,12 @@ export async function createBuddyContextSnapshot(
     throw new BuddySessionCreationError()
 
   const agentDir = resolve(options.agentDir)
-  const persistedSessionDir = join(agentDir, 'sessions', options.conversationId, options.branchId)
+  const persistedSessionDir = join(
+    resolve(options.conversationsDirectory),
+    options.conversationId,
+    'session',
+    options.branchId,
+  )
   const persistedSession = options.piSessionFile
     ? await openExistingSession(options.piSessionFile, persistedSessionDir, cwd)
     : null

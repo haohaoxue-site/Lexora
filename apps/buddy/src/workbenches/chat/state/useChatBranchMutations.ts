@@ -121,7 +121,7 @@ export function useChatBranchMutations(options: UseChatBranchMutationsOptions) {
       conversationId,
       parentBranchId,
     )
-    const request = {
+    const requestInput = {
       attachmentIds,
       content: trimmedContent,
       contextItems,
@@ -134,8 +134,9 @@ export function useChatBranchMutations(options: UseChatBranchMutationsOptions) {
       },
       userMessageId,
     }
-    const operationKey = `edit:${await createRequestFingerprint(request)}`
+    const operationKey = `edit:${await createRequestFingerprint(requestInput)}`
     const requestId = requestIds.resolve(operationKey)
+    const request = { ...requestInput, draftId: requestId }
     isMutatingBranch.value = true
     options.setErrorMessage(null)
     try {

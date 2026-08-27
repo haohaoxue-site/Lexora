@@ -5,6 +5,7 @@ import type {
   LocalMessage,
   LocalRun,
   LocalRunEvent,
+  LocalRunOutput,
 } from '@buddy-electron/shared/localChatApi'
 import type {
   projectConversationCompactionState,
@@ -37,10 +38,7 @@ import {
   projectChatTranscriptDisplayRows,
 } from './chatMessageTime'
 import { resolvePrependedChatScrollTop } from './chatMessageViewport'
-import {
-  projectChatTranscript,
-  shouldShowAssistantIdentity,
-} from './chatTranscriptProjection'
+import { projectChatTranscript } from './chatTranscriptProjection'
 
 const props = defineProps<{
   activeSearchMessageId?: string | null
@@ -53,12 +51,14 @@ const props = defineProps<{
   matchingSearchMessageIds?: ReadonlyArray<string>
   timelineItems: ReadonlyArray<LocalConversationTimelineItem>
   runEvents?: ReadonlyArray<LocalRunEvent>
+  runOutputs?: ReadonlyArray<LocalRunOutput>
   runs?: ReadonlyArray<LocalRun>
 }>()
 
 const emit = defineEmits<{
   activateBranch: [branchId: string]
   editUserMessage: [messageId: string, content: string]
+  openArtifact: [artifactId: string]
   regenerateAssistant: [messageId: string]
   scroll: [metrics: ChatMessageScrollMetrics, tailScrollSettling: boolean]
   scrollPosition: [metrics: ChatMessageScrollMetrics, tailScrollSettling: boolean]
@@ -87,6 +87,7 @@ let tailScrollGeneration = 0
 const matchingSearchMessageIds = computed(() => new Set(props.matchingSearchMessageIds ?? []))
 const conversationId = computed(() => props.timelineItems[0]?.conversationId ?? null)
 const transcriptProjection = computed(() => projectChatTranscript({
+  outputs: props.runOutputs ?? [],
   runEvents: props.runEvents ?? [],
   runs: props.runs ?? [],
   timelineItems: props.timelineItems,
@@ -95,7 +96,7 @@ const virtualRows = computed(
   () => projectChatTranscriptDisplayRows(transcriptProjection.value.rows),
 )
 const branchNavigators = computed(() => projectChatMessageBranchNavigators(
-  props.timelineItems,
+  transcriptProjection.value.rows,
   props.branches,
   props.activeBranchId,
 ))
@@ -115,10 +116,6 @@ function toggleAgentTurn(turn: ChatAgentTurn) {
   const next = new Map(agentTurnOpenOverrides.value)
   next.set(turn.runId, !isAgentTurnOpen(turn))
   agentTurnOpenOverrides.value = next
-}
-
-function showAssistantIdentity(message: LocalMessage): boolean {
-  return shouldShowAssistantIdentity(message, transcriptProjection.value)
 }
 
 function isEditingMessage(message: LocalMessage): boolean {
@@ -392,13 +389,15 @@ function toScrollMetrics(viewport: HTMLElement): ChatMessageScrollMetrics {
           :branch-navigator="branchNavigators.get(item.message.id) ?? null"
           class="buddy-chat-virtual-row"
           :editing="isEditingMessage(item.message)"
+          :is-agent-turn-result="item.isAgentTurnResult"
           :language="language"
           :message="item.message"
           :search-match="matchingSearchMessageIds.has(item.message.id)"
-          :show-assistant-identity="showAssistantIdentity(item.message)"
+          :turn-outputs="item.turnOutputs"
           @activate-branch="emit('activateBranch', $event)"
           @cancel-edit="cancelEditingMessage"
           @edit="submitEditedMessage(item.message, $event)"
+          @open-artifact="emit('openArtifact', $event)"
           @regenerate="emit('regenerateAssistant', item.message.id)"
           @start-edit="startEditingMessage(item.message)"
         />
