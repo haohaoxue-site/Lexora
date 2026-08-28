@@ -170,7 +170,9 @@ export function createTurnRequestRepository(database: DatabaseSync): TurnRequest
   `)
   const findPreviousSession = database.prepare(`
     SELECT pi_session_file FROM runs
-    WHERE conversation_id = ? AND branch_id = ? AND pi_session_file IS NOT NULL
+    WHERE conversation_id = ? AND branch_id = ?
+      AND status IN ('completed', 'failed', 'cancelled')
+      AND pi_session_file IS NOT NULL
     ORDER BY started_at DESC, id DESC
     LIMIT 1
   `)
@@ -347,6 +349,7 @@ export function createTurnRequestRepository(database: DatabaseSync): TurnRequest
             || conversation.active_branch_id !== input.branchId
             || conversation.execution_profile !== input.executionProfile
             || conversation.deleted_at !== null
+            || findIncompleteRun.get(input.conversationId)
           ) {
             throw new TurnRequestConflictError()
           }
@@ -513,6 +516,8 @@ export function createTurnRequestRepository(database: DatabaseSync): TurnRequest
           throw new TurnRequestConflictError()
         if (run.status !== 'failed' || run.error_code !== 'RUNTIME_RESTARTED')
           return toRecord(request, false)
+        if (findIncompleteRun.get(run.conversation_id))
+          throw new TurnRequestConflictError()
 
         const previous = findPreviousCompletedSession.get(
           run.conversation_id,

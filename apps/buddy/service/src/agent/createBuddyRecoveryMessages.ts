@@ -5,7 +5,7 @@ import type {
   Model,
   UserMessage,
 } from '@earendil-works/pi-ai'
-import type { MessageRecord } from '../storage/conversationRepository'
+import type { MessageRecord } from '../storage/conversationHistoryRepository'
 import { readBuddyInterruptedMessageContent } from '../../../shared/buddyMessageContent'
 
 export interface CreateBuddyRecoveryMessagesOptions {

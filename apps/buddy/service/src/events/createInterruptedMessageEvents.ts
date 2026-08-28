@@ -1,4 +1,4 @@
-import type { BuddyRunEvent } from './RunEventLog'
+import type { BuddyRunEvent } from './BuddyRunEvent'
 import { MAX_BUDDY_MESSAGE_TEXT_LENGTH } from '../../../shared/buddyMessageContent'
 
 export interface InterruptedMessageSnapshot {

@@ -11,17 +11,20 @@ export interface AutomationOccurrenceLifecycleServiceOptions {
   automations: AutomationService
   conversationLifecycle: Pick<ConversationLifecycleService, 'delete'>
   notifications: Pick<AttentionNotificationService, 'removeAutomationRun'>
+  onChanged?: (automationId: string) => void
 }
 
 export class AutomationOccurrenceLifecycleService {
   readonly #automations: AutomationService
   readonly #conversationLifecycle: AutomationOccurrenceLifecycleServiceOptions['conversationLifecycle']
   readonly #notifications: AutomationOccurrenceLifecycleServiceOptions['notifications']
+  readonly #onChanged: NonNullable<AutomationOccurrenceLifecycleServiceOptions['onChanged']>
 
   constructor(options: AutomationOccurrenceLifecycleServiceOptions) {
     this.#automations = options.automations
     this.#conversationLifecycle = options.conversationLifecycle
     this.#notifications = options.notifications
+    this.#onChanged = options.onChanged ?? (() => {})
   }
 
   async deleteConversation(conversationId: string): Promise<AutomationOccurrenceDeletionResult> {
@@ -30,6 +33,8 @@ export class AutomationOccurrenceLifecycleService {
       ? this.#deleteOccurrenceRecord(occurrence.id, occurrence.runId)
       : false
     const conversationDeleted = await this.#conversationLifecycle.delete(conversationId)
+    if (occurrence)
+      this.#onChanged(occurrence.automationId)
     return {
       automationId: occurrence?.automationId ?? null,
       deleted: occurrenceDeleted || conversationDeleted,
@@ -44,6 +49,7 @@ export class AutomationOccurrenceLifecycleService {
     const conversationDeleted = occurrence.conversationId
       ? await this.#conversationLifecycle.delete(occurrence.conversationId)
       : false
+    this.#onChanged(occurrence.automationId)
     return {
       automationId: occurrence.automationId,
       deleted: occurrenceDeleted || conversationDeleted,

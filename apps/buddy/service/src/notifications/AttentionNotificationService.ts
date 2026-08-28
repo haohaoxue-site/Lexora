@@ -2,7 +2,7 @@ import type {
   NotificationAttentionRecord,
   NotificationAttentionRepository,
 } from '../storage/notificationAttentionRepository'
-import type { ProviderModelStateRecord } from '../storage/providerRepository'
+import type { ProviderModelStateRecord } from '../storage/providerModelStateRepository'
 
 const MODEL_UPDATE_NOTIFICATION_ID = 'local:model-source-parameters-updated'
 const RETENTION_MILLISECONDS = 7 * 24 * 60 * 60 * 1000

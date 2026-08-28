@@ -1,4 +1,4 @@
-import type { ConversationTimelineBoundaryRecord } from '../storage/conversationRepository'
+import type { ConversationTimelineBoundaryRecord } from '../storage/conversationTimelineRepository'
 import { Buffer } from 'node:buffer'
 
 import { z } from 'zod'

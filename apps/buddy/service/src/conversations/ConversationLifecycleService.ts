@@ -3,7 +3,7 @@ import type { ConversationRepository } from '../storage/conversationRepository'
 const conversationIdentityPattern = /^[A-Z0-9][\w-]{0,127}$/i
 
 export interface ConversationLifecycleServiceOptions {
-  conversations: ConversationRepository
+  conversations: Pick<ConversationRepository, 'findById' | 'isDeleted' | 'markDeleted'>
   runner: {
     cancelAndWaitForConversation: (conversationId: string) => Promise<number>
   }
@@ -13,7 +13,7 @@ export interface ConversationLifecycleServiceOptions {
 }
 
 export class ConversationLifecycleService {
-  readonly #conversations: ConversationRepository
+  readonly #conversations: ConversationLifecycleServiceOptions['conversations']
   readonly #deleting = new Set<string>()
   readonly #runner: ConversationLifecycleServiceOptions['runner']
   readonly #sessions: ConversationLifecycleServiceOptions['sessions']

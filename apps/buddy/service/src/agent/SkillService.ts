@@ -1,16 +1,21 @@
 import type { Skill } from '@earendil-works/pi-coding-agent'
 import type { Buffer } from 'node:buffer'
-import type { RuntimeRequestHandler } from '../../../shared/runtimeRpcPeer'
+import type { RuntimeRequestRegistrar } from '../rpc/runtimeRequest'
 import type { ProjectRepository } from '../storage/projectRepository'
 import { createHash } from 'node:crypto'
 import { mkdir, realpath } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
-
 import { loadSkillsFromDir, stripFrontmatter } from '@earendil-works/pi-coding-agent'
+
+import { z } from 'zod'
 import { GrantedPathError, resolveGrantedPath } from '../projects/resolveGrantedPath'
 import { readBoundedFile } from '../resources/BoundedFileReader'
+import { parse } from '../rpc/runtimeRequest'
 
 const MAX_MATERIALIZED_SKILL_BYTES = 256 * 1024
+const skillScopeSchema = z.object({
+  projectId: z.string().trim().min(1).max(256).nullable(),
+}).strict()
 
 export type BuddySkillSource = 'builtin' | 'directory' | 'global' | 'project'
 
@@ -206,16 +211,13 @@ export class SkillService {
   }
 }
 
-export interface SkillRpcRegistrar {
-  onRequest: (method: string, handler: RuntimeRequestHandler) => () => void
-}
-
 export function registerSkillServiceRpc(
-  rpc: SkillRpcRegistrar,
+  rpc: RuntimeRequestRegistrar,
   service: SkillService,
 ): () => void {
-  return rpc.onRequest('skills.list', async () => {
-    const result = await service.load()
+  return rpc.onRequest('skills.list', async (params) => {
+    const input = parse(skillScopeSchema, params)
+    const result = await service.loadForProject(input.projectId)
     return {
       diagnostics: result.diagnostics,
       skills: result.skills,

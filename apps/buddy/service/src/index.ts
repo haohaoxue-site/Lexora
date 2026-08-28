@@ -5,7 +5,8 @@ import { toPublicRunEvent } from '../../shared/publicRunEvent'
 import { buddyServiceFailureCodeSchema } from '../../shared/runtimeProtocol'
 import { readAutomationStartupContext } from './automations/automationStartupContext'
 import { startBuddyService } from './BuddyService'
-import { RunEventLog, RunEventLogFatalError } from './events/RunEventLog'
+import { createRunEventLog } from './events/createRunEventLog'
+import { RunEventLogFatalError } from './events/RunEventFailure'
 import {
   createBuddyService,
   notifyBuddyServiceFailure,
@@ -47,7 +48,7 @@ async function runBuddyService(): Promise<void> {
     database.close()
   }
   let serviceHandle: Awaited<ReturnType<typeof startBuddyService>> | null = null
-  let eventLog: RunEventLog | null = null
+  let eventLog: ReturnType<typeof createRunEventLog> | null = null
   let isShuttingDown = false
   const notifyFailure = (code: BuddyServiceFailureCode) => {
     if (!serviceServer || serviceFailureNotified)
@@ -83,7 +84,7 @@ async function runBuddyService(): Promise<void> {
   try {
     const openedDatabase = openBuddyDatabase({ buddyHome })
     database = openedDatabase
-    eventLog = new RunEventLog({
+    eventLog = createRunEventLog({
       conversationsDirectory: join(buddyHome, 'conversations'),
       database: openedDatabase,
       onEvent: event => serviceServer?.notify('run.event', toPublicRunEvent(event)),

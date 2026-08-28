@@ -1,20 +1,13 @@
-import type { DatabaseSync } from 'node:sqlite'
 import type {
   AutomationModelTarget,
   AutomationOccurrence,
 } from '../../../shared/automation'
 import type { BuddyThinkingLevel } from '../../../shared/modelSelection'
-import type {
-  BuddyTurnHandle,
-  StartBuddyTurnInput,
-} from '../agent/BuddyAgentRunner'
-import type { BuddySessionResources } from '../agent/BuddySessionResources'
-import type { ProjectMemoryScope } from '../storage/projectRepository'
+import type { BuddyTurnHandle } from '../agent/BuddyAgentRun'
+import type { AutomationTurnRepository } from '../storage/automationTurnRepository'
 import type { AutomationClock } from './AutomationScheduleEvaluator'
 import type { AutomationService } from './AutomationService'
 import { randomUUID } from 'node:crypto'
-import { createAutomationTurnRepository } from '../storage/automationTurnRepository'
-import { createRunRepository } from '../storage/runRepository'
 import { systemAutomationClock } from './AutomationScheduleEvaluator'
 
 export const AUTOMATION_RUN_TIMEOUT_MS = 90 * 60 * 1_000
@@ -28,10 +21,7 @@ export interface ResolvedAutomationModel {
 }
 
 export interface ResolvedAutomationProject {
-  canonicalRoot: string
   id: string
-  instructions: string
-  memoryScope: ProjectMemoryScope
 }
 
 export interface AutomationDispatcherOptions {
@@ -39,18 +29,13 @@ export interface AutomationDispatcherOptions {
   cancelRun?: (runId: string, errorCode: string) => Promise<boolean>
   clock?: AutomationClock
   createId?: () => string
-  database: DatabaseSync
-  launchTurn: (input: StartBuddyTurnInput) => BuddyTurnHandle
-  resolveConversationWorkspace: (conversationId: string) => Promise<string>
+  launchTurn: (runId: string) => Promise<BuddyTurnHandle>
   resolveModel: (target: AutomationModelTarget) => Promise<ResolvedAutomationModel | null>
   resolveProject: (projectId: string) => Promise<ResolvedAutomationProject | null>
     | ResolvedAutomationProject
     | null
-  resolveResources: (input: {
-    canonicalRoot: string
-    project: ResolvedAutomationProject | null
-  }) => Promise<BuddySessionResources>
   runTimeoutMs?: number
+  turns: AutomationTurnRepository
 }
 
 export class AutomationDispatcher {
@@ -59,13 +44,10 @@ export class AutomationDispatcher {
   readonly #clock: AutomationClock
   readonly #createId: () => string
   readonly #launchTurn: AutomationDispatcherOptions['launchTurn']
-  readonly #resolveConversationWorkspace: AutomationDispatcherOptions['resolveConversationWorkspace']
   readonly #resolveModel: AutomationDispatcherOptions['resolveModel']
   readonly #resolveProject: AutomationDispatcherOptions['resolveProject']
-  readonly #resolveResources: AutomationDispatcherOptions['resolveResources']
   readonly #runTimeoutMs: number
-  readonly #runs: ReturnType<typeof createRunRepository>
-  readonly #turns: ReturnType<typeof createAutomationTurnRepository>
+  readonly #turns: AutomationTurnRepository
 
   constructor(options: AutomationDispatcherOptions) {
     this.#automationService = options.automationService
@@ -73,13 +55,10 @@ export class AutomationDispatcher {
     this.#clock = options.clock ?? systemAutomationClock
     this.#createId = options.createId ?? randomUUID
     this.#launchTurn = options.launchTurn
-    this.#resolveConversationWorkspace = options.resolveConversationWorkspace
     this.#resolveModel = options.resolveModel
     this.#resolveProject = options.resolveProject
-    this.#resolveResources = options.resolveResources
     this.#runTimeoutMs = options.runTimeoutMs ?? AUTOMATION_RUN_TIMEOUT_MS
-    this.#runs = createRunRepository(options.database)
-    this.#turns = createAutomationTurnRepository(options.database)
+    this.#turns = options.turns
   }
 
   async dispatch(candidate: AutomationOccurrence): Promise<void> {
@@ -155,31 +134,7 @@ export class AutomationDispatcher {
     if (binding.kind === 'overlap_skipped')
       return
     const bound = binding
-    let turn: BuddyTurnHandle
-    try {
-      const canonicalRoot = project?.canonicalRoot
-        ?? await this.#resolveConversationWorkspace(conversationId)
-      const resources = await this.#resolveResources({ canonicalRoot, project })
-      turn = this.#launchTurn({
-        branchId: bound.run.branchId,
-        canonicalRoot,
-        conversationId: bound.conversation.id,
-        cwd: canonicalRoot,
-        memoryScope: project?.memoryScope ?? null,
-        model: bound.run.model,
-        projectId: project?.id ?? null,
-        prompt: snapshot.prompt,
-        provider: bound.run.provider,
-        resources,
-        runId: bound.run.id,
-        sessionMode: 'automation_background',
-        thinkingLevel: model.reasoning ?? undefined,
-      })
-    }
-    catch (error) {
-      this.#runs.updateStatus(bound.run.id, 'failed', boundAt, 'RUNTIME_RESTARTED')
-      throw error
-    }
+    const turn = await this.#launchTurn(bound.run.id)
     await this.#waitForTurn(turn)
   }
 

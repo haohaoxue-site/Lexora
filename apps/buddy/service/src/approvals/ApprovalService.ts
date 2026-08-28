@@ -2,12 +2,12 @@ import type {
   AutomationApprovalReviewInput,
   SystemActionApprovalReviewInput,
 } from '../../../shared/approvalReviewPayload'
-import type { AppendBuddyRunEventInput } from '../events/RunEventLog'
+import type { AppendBuddyRunEventInput } from '../events/BuddyRunEvent'
 import type {
   ApprovalRecord,
   ApprovalRepository,
 } from '../storage/approvalRepository'
-import type { ToolApprovalKind } from './ToolPolicy'
+import type { ToolApprovalKind, ToolCallBlockingError } from './toolPolicyContract'
 import { randomUUID } from 'node:crypto'
 import { createApprovalReviewPayload } from '../../../shared/approvalReviewPayload'
 
@@ -100,8 +100,10 @@ export class ApprovalService {
     try {
       await this.#appendRequested(approval)
       this.#requireApproval(approval.id)
-      timer = setTimeout(expire, this.#approvalTimeoutMs)
-      timer.unref?.()
+      if (!input.signal.aborted) {
+        timer = setTimeout(expire, this.#approvalTimeoutMs)
+        timer.unref?.()
+      }
     }
     catch (error) {
       const waiter = this.#waiters.get(approval.id)
@@ -220,8 +222,9 @@ export class ApprovalService {
   }
 }
 
-export class ApprovalCancelledError extends Error {
+export class ApprovalCancelledError extends Error implements ToolCallBlockingError {
   readonly code = 'APPROVAL_CANCELLED'
+  readonly toolCallBlockReason = this.code
 
   constructor() {
     super('Lexora Buddy approval was cancelled')
@@ -229,8 +232,9 @@ export class ApprovalCancelledError extends Error {
   }
 }
 
-export class ApprovalExpiredError extends Error {
+export class ApprovalExpiredError extends Error implements ToolCallBlockingError {
   readonly code = 'AUTOMATION_APPROVAL_EXPIRED'
+  readonly toolCallBlockReason = this.code
 
   constructor() {
     super('Lexora Buddy approval expired')

@@ -1,5 +1,5 @@
 import type { Automation } from '../../../shared/automation'
-import type { AutomationOccurrenceRecord } from '../storage/automationRepository'
+import type { AutomationOccurrenceRecord } from '../storage/automationOccurrenceRecord'
 import type { WorkspaceRepository } from '../storage/workspaceRepository'
 import type { AutomationClock } from './AutomationScheduleEvaluator'
 import type { AutomationService } from './AutomationService'

@@ -1,13 +1,75 @@
+import type { ToolCallEvent } from '@earendil-works/pi-coding-agent'
+import type { BuddyToolPresentation } from '../../../shared/runEventPresentation'
+import type { BuddyRunOutputPayload } from '../../../shared/runOutput'
+import type { BuddyToolClassification } from '../approvals/toolClassification'
+import type { CreateBuddyToolPresentationInput } from '../events/toolPresentationSupport'
 import type { ImageGenerationErrorDiagnostic } from './ImageGenerationGateway'
 import { BUDDY_ATTACHMENT_COUNT_LIMIT } from '../../../shared/attachmentPolicy'
+import {
+  readOptionalString,
+  readRecord,
+} from '../events/toolPresentationSupport'
 
 export const IMAGE_GENERATION_TOOL_NAME = 'lexora_image_generate'
+
+const IMAGE_GENERATION_TOOL_CLASSIFICATION: BuddyToolClassification = {
+  risk: 'visual',
+  source: 'lexora',
+}
 
 export interface ImageGenerationToolDetails {
   artifactIds: string[]
   code?: string
   diagnostic?: ImageGenerationErrorDiagnostic
   responseId: string | null
+}
+
+export function classifyImageGenerationTool(
+  event: Pick<ToolCallEvent, 'toolName'>,
+): BuddyToolClassification | null {
+  return event.toolName === IMAGE_GENERATION_TOOL_NAME
+    ? IMAGE_GENERATION_TOOL_CLASSIFICATION
+    : null
+}
+
+export function createImageGenerationRunOutput(
+  input: Pick<
+    CreateBuddyToolPresentationInput,
+    'isError' | 'result' | 'toolName'
+  > & { toolCallId: string },
+): BuddyRunOutputPayload | null {
+  if (input.isError || input.toolName !== IMAGE_GENERATION_TOOL_NAME)
+    return null
+  const artifactIds = readImageGenerationToolDetails(input.result)?.artifactIds ?? []
+  return artifactIds.length > 0
+    ? {
+        artifactIds,
+        sourceToolCallId: input.toolCallId,
+        sourceToolName: input.toolName,
+      }
+    : null
+}
+
+export function createImageGenerationToolPresentation(
+  input: CreateBuddyToolPresentationInput,
+): Extract<BuddyToolPresentation, { card: 'image' }> | null {
+  if (input.toolName !== IMAGE_GENERATION_TOOL_NAME)
+    return null
+  const arguments_ = readRecord(input.arguments)
+  const details = readImageGenerationToolDetails(input.result)
+  return {
+    artifactIds: details?.artifactIds ?? [],
+    card: 'image',
+    description: readOptionalString(arguments_, 'description'),
+    generatedCount: details?.artifactIds.length ?? null,
+    prompt: readOptionalString(arguments_, 'prompt'),
+    reference: readImageReference(arguments_),
+    status: input.result === undefined
+      ? 'running'
+      : input.isError
+        ? 'failed'
+        : 'completed',
+  }
 }
 
 export function readImageGenerationToolDetails(value: unknown): ImageGenerationToolDetails | null {
@@ -47,6 +109,25 @@ function readDiagnostic(value: unknown): ImageGenerationErrorDiagnostic | null {
   }
 }
 
+function readImageReference(
+  arguments_: Record<string, unknown> | null,
+): Extract<BuddyToolPresentation, { card: 'image' }>['reference'] {
+  const reference = readRecord(arguments_?.reference)
+  if (reference?.mode === 'latest') {
+    return {
+      mode: 'latest',
+    }
+  }
+  if (reference?.mode !== 'resources' || !Array.isArray(reference.resourceIds))
+    return null
+  const resourceIds = [...new Set(reference.resourceIds.filter(
+    (value): value is string => typeof value === 'string' && Boolean(value),
+  ))].slice(0, 4)
+  return resourceIds.length > 0
+    ? { mode: 'resources', resourceIds }
+    : null
+}
+
 function readBoundedString(value: unknown): string | null {
   if (typeof value !== 'string')
     return null
@@ -59,10 +140,4 @@ function readBoundedString(value: unknown): string | null {
 function isDiagnosticToken(value: string): boolean {
   const allowedCharacters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789._-[]:/'
   return [...value].every(character => allowedCharacters.includes(character))
-}
-
-function readRecord(value: unknown): Record<string, unknown> | null {
-  return value && typeof value === 'object' && !Array.isArray(value)
-    ? value as Record<string, unknown>
-    : null
 }

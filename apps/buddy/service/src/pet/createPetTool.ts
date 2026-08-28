@@ -1,11 +1,12 @@
 import type { ToolDefinition } from '@earendil-works/pi-coding-agent'
 import type { TSchema } from 'typebox'
-import type { BuddyToolClassification } from '../agent/extensions/toolPolicyExtension'
 import type { PetActionService } from './PetActionService'
+import type { PetToolDetails } from './petToolContract'
 import { defineTool } from '@earendil-works/pi-coding-agent'
 import { z } from 'zod'
 
 import { PET_MACRO_IDS } from './petMacroCatalog'
+import { PET_TOOL_NAME } from './petToolContract'
 
 const petToolInputSchema = z.object({
   macro: z.enum(PET_MACRO_IDS),
@@ -24,19 +25,6 @@ export interface CreatePetToolOptions {
   getRunId?: () => string | undefined
   service: PetActionService
 }
-
-interface PetToolDetails {
-  code?: string
-  macro: string
-  status: string
-}
-
-export const PET_TOOL_CLASSIFICATION: BuddyToolClassification = {
-  source: 'lexora',
-  risk: 'visual',
-}
-
-export const PET_TOOL_NAME = 'lexora_buddy_pet'
 
 export function createPetTool(options: CreatePetToolOptions): ToolDefinition {
   return defineTool<TSchema, PetToolDetails>({

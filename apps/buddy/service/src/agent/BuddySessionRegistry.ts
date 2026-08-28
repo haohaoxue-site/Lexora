@@ -1,15 +1,7 @@
-import type { BuddyExecutionProfile } from '../../../shared/executionProfile'
-import type { BuddySessionMode } from '../../../shared/sessionMode'
+import type { BuddySessionIdentity } from './BuddySessionBlueprint'
 import type { BuddySessionShutdownReason } from './createBuddySession'
 
-export interface BuddySessionIdentity {
-  branchId: string
-  canonicalRoot: string
-  conversationId: string
-  executionProfile: BuddyExecutionProfile
-  resourceRevision: string
-  sessionMode?: BuddySessionMode
-}
+export type { BuddySessionIdentity } from './BuddySessionBlueprint'
 
 export interface BuddySessionBinding<TSession> {
   piSessionFile: string
@@ -23,6 +15,16 @@ export interface BuddySessionBinding<TSession> {
 
 export interface DisposableBuddySession {
   shutdown: (reason: BuddySessionShutdownReason) => Promise<void>
+}
+
+interface BuddySessionEntry<TSession> {
+  binding: BuddySessionBinding<TSession> | null
+  promise: Promise<BuddySessionBinding<TSession>>
+  requestedPiSessionFile: string | null
+  reject: (reason: unknown) => void
+  resolve: (binding: BuddySessionBinding<TSession>) => void
+  shutdownReason: BuddySessionShutdownReason | null
+  status: 'disposed' | 'failed' | 'pending' | 'ready'
 }
 
 interface ActiveRun {
@@ -40,7 +42,7 @@ export class BuddySessionRegistry<TSession extends DisposableBuddySession> {
   readonly #identities = new Map<string, BuddySessionIdentity>()
   readonly #pendingInvalidations = new Set<string>()
   readonly #runTails = new Map<string, Promise<void>>()
-  readonly #sessions = new Map<string, Promise<BuddySessionBinding<TSession>>>()
+  readonly #sessions = new Map<string, BuddySessionEntry<TSession>>()
   readonly #lastUsed = new Map<string, number>()
   readonly #maxSessions: number
   #accessSequence = 0
@@ -51,6 +53,7 @@ export class BuddySessionRegistry<TSession extends DisposableBuddySession> {
 
   async getOrCreate(
     identity: BuddySessionIdentity,
+    piSessionFile: string | null,
     factory: () => Promise<BuddySessionBinding<TSession>>,
   ): Promise<BuddySessionBinding<TSession>> {
     const branchKey = createBranchKey(identity)
@@ -62,31 +65,40 @@ export class BuddySessionRegistry<TSession extends DisposableBuddySession> {
     const sessionKey = createSessionKey(identity)
     const existing = this.#sessions.get(sessionKey)
     if (existing) {
+      if (!matchesPiSessionBinding(existing, piSessionFile)) {
+        await this.#settleSessionDisposal(sessionKey, 'invalidate', existing)
+        throw new BuddySessionBindingError()
+      }
       this.#touch(sessionKey)
-      return existing
+      return existing.promise
     }
 
     for (const [candidateKey, candidateIdentity] of [...this.#identities]) {
-      if (createBranchKey(candidateIdentity) === branchKey)
-        await this.#disposeSession(candidateKey, 'resource-change')
+      const candidate = this.#sessions.get(candidateKey)
+      if (candidate && createBranchKey(candidateIdentity) === branchKey)
+        await this.#settleSessionDisposal(candidateKey, 'resource-change', candidate)
     }
     this.#branchRoots.set(branchKey, identity.canonicalRoot)
 
-    const pending = factory()
-    this.#sessions.set(sessionKey, pending)
+    const entry = this.#createEntry(piSessionFile, factory)
+    this.#sessions.set(sessionKey, entry)
     this.#identities.set(sessionKey, identity)
     try {
-      const binding = await pending
+      const binding = await entry.promise
+      if (this.#sessions.get(sessionKey) !== entry)
+        throw new BuddySessionLifecycleAbortError()
       this.#touch(sessionKey)
       await this.#evictIdleSessions(sessionKey)
       return binding
     }
     catch (error) {
-      this.#sessions.delete(sessionKey)
-      this.#identities.delete(sessionKey)
-      this.#lastUsed.delete(sessionKey)
-      if (![...this.#sessions.keys()].some(key => key.startsWith(`${branchKey}\0`)))
-        this.#branchRoots.delete(branchKey)
+      if (this.#sessions.get(sessionKey) === entry) {
+        this.#sessions.delete(sessionKey)
+        this.#identities.delete(sessionKey)
+        this.#lastUsed.delete(sessionKey)
+        if (![...this.#identities.values()].some(candidate => createBranchKey(candidate) === branchKey))
+          this.#branchRoots.delete(branchKey)
+      }
       throw error
     }
   }
@@ -148,10 +160,8 @@ export class BuddySessionRegistry<TSession extends DisposableBuddySession> {
   }
 
   async dispose(): Promise<void> {
-    const bindings = await Promise.allSettled(this.#sessions.values())
-    await Promise.allSettled(bindings.flatMap(binding => binding.status === 'fulfilled'
-      ? [binding.value.session.shutdown('quit')]
-      : []))
+    await Promise.allSettled([...this.#sessions.entries()].map(([sessionKey, entry]) =>
+      this.#disposeSession(sessionKey, 'quit', entry)))
     this.#activeRuns.clear()
     this.#branchRoots.clear()
     this.#identities.clear()
@@ -163,7 +173,13 @@ export class BuddySessionRegistry<TSession extends DisposableBuddySession> {
 
   async #invalidate(predicate: (identity: BuddySessionIdentity) => boolean): Promise<number> {
     let count = 0
-    for (const [sessionKey, identity] of this.#identities) {
+    const candidates = [...this.#identities]
+      .map(([sessionKey, identity]) => ({
+        entry: this.#sessions.get(sessionKey),
+        identity,
+        sessionKey,
+      }))
+    for (const { entry, identity, sessionKey } of candidates) {
       if (!predicate(identity))
         continue
       count += 1
@@ -172,7 +188,8 @@ export class BuddySessionRegistry<TSession extends DisposableBuddySession> {
         this.#pendingInvalidations.add(sessionKey)
         continue
       }
-      await this.#disposeSession(sessionKey, 'invalidate')
+      if (entry)
+        await this.#settleSessionDisposal(sessionKey, 'invalidate', entry)
     }
     return count
   }
@@ -183,23 +200,27 @@ export class BuddySessionRegistry<TSession extends DisposableBuddySession> {
       if (!identity || createBranchKey(identity) !== branchKey)
         continue
       this.#pendingInvalidations.delete(sessionKey)
-      await this.#disposeSession(sessionKey, 'invalidate')
+      const entry = this.#sessions.get(sessionKey)
+      if (entry)
+        await this.#settleSessionDisposal(sessionKey, 'invalidate', entry)
     }
   }
 
   async #disposeSession(
     sessionKey: string,
     reason: BuddySessionShutdownReason,
+    expectedEntry: BuddySessionEntry<TSession>,
   ): Promise<void> {
-    const pending = this.#sessions.get(sessionKey)
+    const entry = this.#sessions.get(sessionKey)
+    if (entry !== expectedEntry)
+      return
     const identity = this.#identities.get(sessionKey)
     this.#sessions.delete(sessionKey)
     this.#identities.delete(sessionKey)
     this.#lastUsed.delete(sessionKey)
     this.#pendingInvalidations.delete(sessionKey)
-    const binding = pending ? await pending.catch(() => null) : null
     try {
-      await binding?.session.shutdown(reason)
+      await this.#disposeEntry(entry, reason)
     }
     finally {
       if (identity) {
@@ -221,8 +242,84 @@ export class BuddySessionRegistry<TSession extends DisposableBuddySession> {
         .sort((left, right) => left[1] - right[1])[0]?.[0]
       if (!candidate)
         return
-      await this.#disposeSession(candidate, 'evict')
+      const entry = this.#sessions.get(candidate)
+      if (entry)
+        await this.#settleSessionDisposal(candidate, 'evict', entry)
     }
+  }
+
+  async #settleSessionDisposal(
+    sessionKey: string,
+    reason: BuddySessionShutdownReason,
+    entry: BuddySessionEntry<TSession>,
+  ): Promise<void> {
+    await this.#disposeSession(sessionKey, reason, entry).catch(() => {})
+  }
+
+  #createEntry(
+    requestedPiSessionFile: string | null,
+    factory: () => Promise<BuddySessionBinding<TSession>>,
+  ): BuddySessionEntry<TSession> {
+    let reject!: (reason: unknown) => void
+    let resolve!: (binding: BuddySessionBinding<TSession>) => void
+    const promise = new Promise<BuddySessionBinding<TSession>>((resolvePromise, rejectPromise) => {
+      reject = rejectPromise
+      resolve = resolvePromise
+    })
+    const entry: BuddySessionEntry<TSession> = {
+      binding: null,
+      promise,
+      requestedPiSessionFile,
+      reject,
+      resolve,
+      shutdownReason: null,
+      status: 'pending',
+    }
+    let factoryPromise: Promise<BuddySessionBinding<TSession>>
+    try {
+      factoryPromise = factory()
+    }
+    catch (error) {
+      factoryPromise = Promise.reject(error)
+    }
+    void factoryPromise.then(
+      (binding) => {
+        if (entry.status === 'disposed') {
+          const reason = entry.shutdownReason ?? 'invalidate'
+          void (async () => binding.session.shutdown(reason))().catch(() => {})
+          return
+        }
+        entry.binding = binding
+        entry.status = 'ready'
+        entry.resolve(binding)
+      },
+      (error) => {
+        if (entry.status !== 'pending')
+          return
+        entry.status = 'failed'
+        entry.reject(error)
+      },
+    )
+    return entry
+  }
+
+  async #disposeEntry(
+    entry: BuddySessionEntry<TSession>,
+    reason: BuddySessionShutdownReason,
+  ): Promise<void> {
+    if (entry.status === 'disposed')
+      return
+    if (entry.status === 'pending') {
+      entry.status = 'disposed'
+      entry.shutdownReason = reason
+      entry.reject(new BuddySessionLifecycleAbortError())
+      return
+    }
+    const binding = entry.binding
+    entry.status = 'disposed'
+    entry.shutdownReason = reason
+    if (binding)
+      await binding.session.shutdown(reason)
   }
 
   #touch(sessionKey: string): void {
@@ -235,8 +332,15 @@ export class BuddySessionBindingError extends Error {
   readonly code = 'SESSION_BINDING_MISMATCH'
 
   constructor() {
-    super('Lexora Buddy conversation branch is bound to another directory')
+    super('Lexora Buddy session binding does not match the conversation branch')
     this.name = 'BuddySessionBindingError'
+  }
+}
+
+class BuddySessionLifecycleAbortError extends Error {
+  constructor() {
+    super('Lexora Buddy session lifecycle ended before startup completed')
+    this.name = 'AbortError'
   }
 }
 
@@ -249,7 +353,16 @@ function createSessionKey(identity: BuddySessionIdentity): string {
     createBranchKey(identity),
     identity.canonicalRoot,
     identity.executionProfile,
-    identity.sessionMode ?? 'interactive',
+    identity.sessionMode,
     identity.resourceRevision,
   ].join('\0')
+}
+
+function matchesPiSessionBinding<TSession>(
+  entry: BuddySessionEntry<TSession>,
+  piSessionFile: string | null,
+): boolean {
+  return entry.status === 'ready'
+    ? entry.binding?.piSessionFile === piSessionFile
+    : entry.requestedPiSessionFile === piSessionFile
 }

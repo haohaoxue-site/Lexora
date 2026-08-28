@@ -1,4 +1,3 @@
-import type { DatabaseSync } from 'node:sqlite'
 import type {
   Automation,
   AutomationDefinitionDraft,
@@ -9,11 +8,9 @@ import type {
   UpdateAutomationRequest,
 } from '../../../shared/automation'
 import type { AutomationMutationOperation } from '../storage/automationMutationRequestRepository'
-import type {
-  AutomationCursor,
-  AutomationOccurrenceRecord,
-  AutomationPageRecord,
-} from '../storage/automationRepository'
+import type { AutomationOccurrenceRecord } from '../storage/automationOccurrenceRecord'
+import type { AutomationCursor, AutomationPageRecord } from '../storage/automationPage'
+import type { AutomationRepositories } from '../storage/automationRepository'
 import type { AutomationClock } from './AutomationScheduleEvaluator'
 import { Buffer } from 'node:buffer'
 import { createHash, randomUUID } from 'node:crypto'
@@ -23,10 +20,7 @@ import {
   automationLifecycleStatusSchema,
   automationMutationRequestSchemas,
 } from '../../../shared/automation'
-import {
-  AutomationRepositoryError,
-  createAutomationRepository,
-} from '../storage/automationRepository'
+import { AutomationRepositoryError } from '../storage/automationRepositoryError'
 import {
   findNextAutomationOccurrence,
   previewAutomationSchedule,
@@ -46,7 +40,7 @@ export interface AutomationPage<T> {
 export interface AutomationServiceOptions {
   clock?: AutomationClock
   createId?: () => string
-  database: DatabaseSync
+  repositories: AutomationRepositories
 }
 
 export class AutomationServiceError extends Error {
@@ -62,12 +56,16 @@ export class AutomationServiceError extends Error {
 export class AutomationService {
   readonly #clock: AutomationClock
   readonly #createId: () => string
-  readonly #repository: ReturnType<typeof createAutomationRepository>
+  readonly #definitions: AutomationRepositories['definitions']
+  readonly #mutations: AutomationRepositories['mutations']
+  readonly #occurrences: AutomationRepositories['occurrences']
 
   constructor(options: AutomationServiceOptions) {
     this.#clock = options.clock ?? systemAutomationClock
     this.#createId = options.createId ?? randomUUID
-    this.#repository = createAutomationRepository(options.database)
+    this.#definitions = options.repositories.definitions
+    this.#mutations = options.repositories.mutations
+    this.#occurrences = options.repositories.occurrences
   }
 
   claimScheduled(input: {
@@ -78,7 +76,7 @@ export class AutomationService {
     expectedRevision: number
     scheduledFor: string
   }): AutomationOccurrenceRecord | null {
-    const automation = this.#repository.findById(input.automationId)
+    const automation = this.#definitions.findById(input.automationId)
     const expectedNextRunAt = normalizeInstant(input.expectedNextRunAt ?? input.scheduledFor)
     if (
       !automation
@@ -93,7 +91,7 @@ export class AutomationService {
       automation.timing,
       Temporal.Instant.from(advanceAfter),
     )
-    return this.#repository.claimScheduled({
+    return this.#occurrences.claimScheduled({
       automationId: automation.id,
       coalescedMissedCount: input.coalescedMissedCount,
       expectedNextRunAt,
@@ -110,7 +108,7 @@ export class AutomationService {
     expectedRevision: number
     reason: NonNullable<Automation['blockedReason']>
   }): Automation | null {
-    return this.#repository.block({
+    return this.#definitions.block({
       automationId: input.automationId,
       blockedAt: this.#now(),
       expectedRevision: input.expectedRevision,
@@ -119,7 +117,7 @@ export class AutomationService {
   }
 
   blockPinnedModel(providerId: string, modelId?: string): Automation[] {
-    return this.#repository.blockActiveByPinnedModel({
+    return this.#definitions.blockActiveByPinnedModel({
       blockedAt: this.#now(),
       modelId: modelId
         ? z.string().trim().min(1).max(256).parse(modelId)
@@ -129,7 +127,7 @@ export class AutomationService {
   }
 
   blockProject(projectId: string): Automation[] {
-    return this.#repository.blockActiveByProject({
+    return this.#definitions.blockActiveByProject({
       blockedAt: this.#now(),
       projectId: z.string().trim().min(1).max(256).parse(projectId),
     })
@@ -140,7 +138,7 @@ export class AutomationService {
     const now = this.#now()
     const mutation = mutationIdentity('create', request, now)
     const replay = this.#mapRepositoryError(
-      () => this.#repository.replayAutomationMutation(mutation),
+      () => this.#mutations.replayAutomationMutation(mutation),
     )
     if (replay)
       return replay
@@ -152,7 +150,7 @@ export class AutomationService {
       revision: 1,
       updatedAt: now,
     })
-    return this.#mapRepositoryError(() => this.#repository.create(
+    return this.#mapRepositoryError(() => this.#definitions.create(
       automation,
       mutation,
     ))
@@ -163,12 +161,12 @@ export class AutomationService {
     const now = this.#now()
     const mutation = mutationIdentity('delete', request, now)
     const replay = this.#mapRepositoryError(
-      () => this.#repository.replayAutomationMutation(mutation),
+      () => this.#mutations.replayAutomationMutation(mutation),
     )
     if (replay)
       return replay
     const existing = this.#requireAutomation(request.automationId)
-    return this.#mapRepositoryError(() => this.#repository.replace({
+    return this.#mapRepositoryError(() => this.#definitions.replace({
       automation: {
         ...existing,
         blockedReason: null,
@@ -183,21 +181,21 @@ export class AutomationService {
   }
 
   get(id: string): Automation | null {
-    return this.#repository.findById(id)
+    return this.#definitions.findById(id)
   }
 
   getActiveOccurrence(automationId: string): AutomationOccurrenceRecord | null {
-    return this.#repository.findActiveOccurrence(
+    return this.#occurrences.findActiveOccurrence(
       z.string().trim().min(1).max(256).parse(automationId),
     )
   }
 
   getOccurrence(id: string): AutomationOccurrenceRecord | null {
-    return this.#repository.findOccurrenceById(id)
+    return this.#occurrences.findOccurrenceById(id)
   }
 
   getOccurrenceByConversationId(conversationId: string): AutomationOccurrenceRecord | null {
-    return this.#repository.findOccurrenceByConversationId(
+    return this.#occurrences.findOccurrenceByConversationId(
       z.string().trim().min(1).max(256).parse(conversationId),
     )
   }
@@ -209,7 +207,7 @@ export class AutomationService {
     leaseOwner?: string | null
     status: 'cancelled' | 'expired' | 'skipped'
   }): AutomationOccurrenceRecord | null {
-    return this.#repository.finishQueued({
+    return this.#occurrences.finishQueued({
       ...input,
       finishedAt: this.#now(),
     })
@@ -225,7 +223,7 @@ export class AutomationService {
     automation: Automation | null
     occurrence: AutomationOccurrenceRecord
   } | null {
-    return this.#repository.finishQueuedAndBlock({
+    return this.#occurrences.finishQueuedAndBlock({
       ...input,
       finishedAt: this.#now(),
     })
@@ -247,7 +245,7 @@ export class AutomationService {
     ) <= 0) {
       throw new AutomationServiceError('AUTOMATION_CONFLICT')
     }
-    return this.#repository.leaseQueued({ leaseExpiresAt, limit, now, owner })
+    return this.#occurrences.leaseQueued({ leaseExpiresAt, limit, now, owner })
   }
 
   list(input: {
@@ -257,7 +255,7 @@ export class AutomationService {
   } = {}): AutomationPage<Automation> {
     const limit = z.number().int().min(1).max(100).parse(input.limit ?? 50)
     const statuses = input.statuses?.map(status => automationLifecycleStatusSchema.parse(status))
-    return encodePage(this.#repository.list({
+    return encodePage(this.#definitions.list({
       before: decodeCursor(input.cursor),
       limit,
       statuses,
@@ -265,7 +263,7 @@ export class AutomationService {
   }
 
   listDue(now: string, limit = 100): Automation[] {
-    return this.#repository.listDue(
+    return this.#definitions.listDue(
       normalizeInstant(now),
       z.number().int().min(1).max(500).parse(limit),
     )
@@ -277,7 +275,7 @@ export class AutomationService {
     limit?: number
   }): AutomationPage<AutomationOccurrenceRecord> {
     const limit = z.number().int().min(1).max(100).parse(input.limit ?? 50)
-    return encodePage(this.#repository.listHistory({
+    return encodePage(this.#occurrences.listHistory({
       automationId: input.automationId
         ? z.string().trim().min(1).max(256).parse(input.automationId)
         : null,
@@ -287,7 +285,7 @@ export class AutomationService {
   }
 
   markOccurrenceDeleted(id: string): boolean {
-    return this.#repository.markOccurrenceDeleted(
+    return this.#occurrences.markOccurrenceDeleted(
       z.string().trim().min(1).max(256).parse(id),
       this.#now(),
     )
@@ -298,12 +296,12 @@ export class AutomationService {
     const now = this.#now()
     const mutation = mutationIdentity('pause', request, now)
     const replay = this.#mapRepositoryError(
-      () => this.#repository.replayAutomationMutation(mutation),
+      () => this.#mutations.replayAutomationMutation(mutation),
     )
     if (replay)
       return replay
     const existing = this.#requireAutomation(request.automationId)
-    return this.#mapRepositoryError(() => this.#repository.replace({
+    return this.#mapRepositoryError(() => this.#definitions.replace({
       automation: {
         ...existing,
         blockedReason: null,
@@ -322,7 +320,7 @@ export class AutomationService {
     const now = this.#now()
     const mutation = mutationIdentity('resume', request, now)
     const replay = this.#mapRepositoryError(
-      () => this.#repository.replayAutomationMutation(mutation),
+      () => this.#mutations.replayAutomationMutation(mutation),
     )
     if (replay)
       return replay
@@ -335,7 +333,7 @@ export class AutomationService {
       revision: existing.revision + 1,
       updatedAt: now,
     })
-    return this.#mapRepositoryError(() => this.#repository.replace({
+    return this.#mapRepositoryError(() => this.#definitions.replace({
       automation: resumed,
       cancelQueued: false,
       expectedRevision: request.expectedRevision,
@@ -347,11 +345,11 @@ export class AutomationService {
     const now = this.#now()
     const mutation = mutationIdentity('run_now', request, now)
     const replay = this.#mapRepositoryError(
-      () => this.#repository.replayRunNowMutation(mutation),
+      () => this.#mutations.replayRunNowMutation(mutation),
     )
     if (replay)
       return replay
-    return this.#mapRepositoryError(() => this.#repository.createManualOccurrence({
+    return this.#mapRepositoryError(() => this.#occurrences.createManualOccurrence({
       automationId: request.automationId,
       expectedRevision: request.expectedRevision,
       id: this.#createId(),
@@ -371,7 +369,7 @@ export class AutomationService {
     scheduledFor: string
     status: 'expired' | 'skipped'
   }): AutomationOccurrenceRecord | null {
-    const automation = this.#repository.findById(input.automationId)
+    const automation = this.#definitions.findById(input.automationId)
     if (
       !automation
       || automation.revision !== input.expectedRevision
@@ -384,7 +382,7 @@ export class AutomationService {
       automation.timing,
       Temporal.Instant.from(normalizeInstant(input.advanceAfter)),
     )
-    return this.#repository.settleScheduled({
+    return this.#occurrences.settleScheduled({
       automationId: automation.id,
       coalescedMissedCount: input.coalescedMissedCount,
       errorCode: input.errorCode,
@@ -404,7 +402,7 @@ export class AutomationService {
     const now = this.#now()
     const mutation = mutationIdentity('update', request, now)
     const replay = this.#mapRepositoryError(
-      () => this.#repository.replayAutomationMutation(mutation),
+      () => this.#mutations.replayAutomationMutation(mutation),
     )
     if (replay)
       return replay
@@ -417,7 +415,7 @@ export class AutomationService {
       revision: existing.revision + 1,
       updatedAt: now,
     })
-    return this.#mapRepositoryError(() => this.#repository.replace({
+    return this.#mapRepositoryError(() => this.#definitions.replace({
       automation: updated,
       cancelQueued: false,
       expectedRevision: request.expectedRevision,
@@ -472,7 +470,7 @@ export class AutomationService {
   }
 
   #requireAutomation(id: string): Automation {
-    const automation = this.#repository.findById(id)
+    const automation = this.#definitions.findById(id)
     if (!automation)
       throw new AutomationServiceError('AUTOMATION_NOT_FOUND')
     return automation

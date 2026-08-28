@@ -34,6 +34,7 @@ export interface CommandRequestRecord {
 }
 
 export interface CommandRequestRepository {
+  findByRunId: (runId: string) => CommandRequestRecord | null
   findByRequestId: (requestId: string) => CommandRequestRecord | null
   prepare: (input: PrepareCommandRequestInput) => CommandRequestRecord
   retryInterrupted: (input: RetryInterruptedCommandRequestInput) => CommandRequestRecord
@@ -71,6 +72,7 @@ interface SourceRunRow {
 
 export function createCommandRequestRepository(database: DatabaseSync): CommandRequestRepository {
   const findRequest = database.prepare('SELECT * FROM command_requests WHERE request_id = ?')
+  const findRequestByRun = database.prepare('SELECT * FROM command_requests WHERE run_id = ?')
   const findConversation = database.prepare(`
     SELECT active_branch_id, deleted_at, execution_profile FROM conversations WHERE id = ?
   `)
@@ -111,6 +113,10 @@ export function createCommandRequestRepository(database: DatabaseSync): CommandR
   }
 
   return {
+    findByRunId(runId) {
+      const row = findRequestByRun.get(runId) as CommandRequestRow | undefined
+      return row ? toRecord(row, false) : null
+    },
     findByRequestId,
     prepare(input) {
       return withTransaction(database, () => {

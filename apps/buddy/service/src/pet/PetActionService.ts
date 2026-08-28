@@ -1,5 +1,5 @@
 import type { RuntimeRpcPeerContract } from '../../../shared/runtimeRpcPeer'
-import type { AppendBuddyRunEventInput } from '../events/RunEventLog'
+import type { AppendBuddyRunEventInput } from '../events/BuddyRunEvent'
 import type { PetMacroId } from './petMacroCatalog'
 import { randomUUID } from 'node:crypto'
 
@@ -8,6 +8,7 @@ import {
   petExecuteSequenceResultSchema,
 } from '../../../shared/petProtocol'
 import { compilePetMacro } from './petMacroCatalog'
+import { createPetToolPresentation, PET_TOOL_NAME } from './petToolContract'
 
 const PET_HOST_TIMEOUT_MS = 20_000
 
@@ -60,15 +61,14 @@ export class PetActionService {
       await this.#eventSink({
         payload: {
           macro: input.macro,
-          presentation: {
-            card: 'pet',
-            description: null,
-            macro: input.macro,
-            status: result.status,
-          },
+          presentation: createPetToolPresentation({
+            arguments: { macro: input.macro },
+            result: { details: { macro: input.macro, status: result.status } },
+            toolName: PET_TOOL_NAME,
+          }),
           status: result.status,
           toolCallId: input.toolCallId,
-          toolName: 'lexora_buddy_pet',
+          toolName: PET_TOOL_NAME,
         },
         runId: input.runId,
         type: 'tool.updated',

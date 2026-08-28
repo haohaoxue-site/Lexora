@@ -1,72 +1,23 @@
-import type { ToolCallEvent } from '@earendil-works/pi-coding-agent'
 import type { TSchema } from 'typebox'
 import type { SystemActionRequest, SystemCapabilityService } from '../../system/systemCapability'
-import type {
-  SystemToolFailureCode,
-  SystemToolFailureRecovery,
-} from '../../system/systemToolFailure'
+import type { SystemToolDetails } from '../../system/systemToolContract'
+import type { SystemToolFailureCode } from '../../system/systemToolFailure'
 import type { BuddyInProcessExtension } from '../createBuddyResourceLoader'
-import type { BuddyToolClassification } from './toolPolicyExtension'
 import { defineTool } from '@earendil-works/pi-coding-agent'
-import { Type } from 'typebox'
 import { Check } from 'typebox/value'
 
 import { SystemCapabilityError } from '../../system/systemCapability'
 import {
+  SYSTEM_ACTION_TOOL_NAME,
+  systemActionInputSchema,
+} from '../../system/systemToolContract'
+import {
   createSystemToolFailure,
   serializeSystemToolFailure,
-  SYSTEM_ACTION_TOOL_NAME,
 } from '../../system/systemToolFailure'
-
-export { SYSTEM_ACTION_TOOL_NAME }
-
-const processTargetSchema = Type.Union([
-  Type.Object({
-    kind: Type.Literal('process'),
-    pid: Type.Integer({ maximum: 2_147_483_647, minimum: 2 }),
-  }, { additionalProperties: false }),
-  Type.Object({
-    kind: Type.Literal('process'),
-    name: Type.String({ maxLength: 256, minLength: 1 }),
-  }, { additionalProperties: false }),
-])
-
-const serviceTargetSchema = Type.Object({
-  kind: Type.Literal('service'),
-  scope: Type.Literal('user'),
-  unit: Type.String({ maxLength: 256, minLength: 9, pattern: '\\.service$' }),
-}, { additionalProperties: false })
-
-const actionInputSchema = Type.Union([
-  Type.Object({
-    action: Type.Union([
-      Type.Literal('kill-process'),
-      Type.Literal('terminate-process'),
-    ]),
-    reason: Type.String({ maxLength: 512, minLength: 1 }),
-    target: processTargetSchema,
-  }, { additionalProperties: false }),
-  Type.Object({
-    action: Type.Union([
-      Type.Literal('restart-service'),
-      Type.Literal('start-service'),
-      Type.Literal('stop-service'),
-    ]),
-    reason: Type.String({ maxLength: 512, minLength: 1 }),
-    target: serviceTargetSchema,
-  }, { additionalProperties: false }),
-])
 
 export interface CreateSystemExtensionOptions {
   service: SystemCapabilityService
-}
-
-interface SystemToolDetails {
-  code?: SystemToolFailureCode
-  effectiveEnvironment: 'host-adapter-mutation'
-  receipt?: unknown
-  recoverable?: boolean
-  recovery?: SystemToolFailureRecovery
 }
 
 export function createSystemExtension(
@@ -84,7 +35,7 @@ export function createSystemExtension(
           'Graceful process termination never escalates to force termination automatically.',
         ].join(' '),
         async execute(toolCallId, input, signal) {
-          if (!Check(actionInputSchema, input))
+          if (!Check(systemActionInputSchema, input))
             return invalidResult('SYSTEM_ACTION_INVALID')
           const executionSignal = signal ?? new AbortController().signal
           try {
@@ -109,34 +60,9 @@ export function createSystemExtension(
         },
         label: 'Change this computer',
         name: SYSTEM_ACTION_TOOL_NAME,
-        parameters: actionInputSchema,
+        parameters: systemActionInputSchema,
       }))
     },
-  }
-}
-
-export async function classifySystemTool(
-  service: SystemCapabilityService,
-  event: ToolCallEvent,
-  signal: AbortSignal,
-): Promise<BuddyToolClassification | null> {
-  if (event.toolName !== SYSTEM_ACTION_TOOL_NAME)
-    return null
-  if (!Check(actionInputSchema, event.input))
-    throw new SystemCapabilityError('SYSTEM_ACTION_INVALID')
-  const prepared = await service.prepareAction(
-    event.toolCallId,
-    event.input as SystemActionRequest,
-    signal,
-  )
-  return {
-    approval: {
-      kind: 'system',
-      summary: prepared.summary,
-      systemAction: prepared.review,
-    },
-    risk: 'system',
-    source: 'lexora',
   }
 }
 

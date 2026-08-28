@@ -8,7 +8,6 @@ import type {
 } from '../../images/ImageGenerationGateway'
 import type { ImageGenerationToolDetails } from '../../images/imageGenerationToolContract'
 import type { BuddyInProcessExtension } from '../createBuddyResourceLoader'
-import type { BuddyToolClassification } from './toolPolicyExtension'
 import { defineTool } from '@earendil-works/pi-coding-agent'
 import { Type } from 'typebox'
 import { Check } from 'typebox/value'
@@ -70,11 +69,6 @@ export interface CreateImageGenerationExtensionOptions {
   conversationId: string
   getRunId: () => string | undefined
   imageGenerationGateway: ImageGenerationGateway
-}
-
-export const IMAGE_GENERATION_TOOL_CLASSIFICATION: BuddyToolClassification = {
-  risk: 'visual',
-  source: 'lexora',
 }
 
 export function createImageGenerationExtension(

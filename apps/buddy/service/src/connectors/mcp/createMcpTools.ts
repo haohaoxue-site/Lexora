@@ -1,6 +1,6 @@
 import type { ToolDefinition } from '@earendil-works/pi-coding-agent'
 import type { TSchema } from 'typebox'
-import type { BuddyToolClassification } from '../../agent/extensions/toolPolicyExtension'
+import type { BuddyToolClassification } from '../../approvals/toolClassification'
 import type { McpRemoteTool } from './McpClientSession'
 import { Buffer } from 'node:buffer'
 import { defineTool } from '@earendil-works/pi-coding-agent'

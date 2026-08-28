@@ -3,12 +3,12 @@ import type {
   AgentSession,
   SessionEntry,
 } from '@earendil-works/pi-coding-agent'
+import type { BuddySessionShutdownReason } from './createBuddySession'
+import type { BuddyRunContext } from './extensions/toolPolicyExtension'
 import type {
   BuddyAgentSessionLike,
   BuddySessionTurnContext,
-} from './BuddyAgentRunner'
-import type { BuddySessionShutdownReason } from './createBuddySession'
-import type { BuddyRunContext } from './extensions/toolPolicyExtension'
+} from './PiTurnExecutor'
 import {
   findCutPoint,
   sessionEntryToContextMessages,

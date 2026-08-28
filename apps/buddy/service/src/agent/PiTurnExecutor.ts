@@ -1,0 +1,396 @@
+import type { ImageContent } from '@earendil-works/pi-ai'
+import type { CompactionResult } from '@earendil-works/pi-coding-agent'
+import type { BuddyServiceTier, BuddyThinkingLevel } from '../../../shared/modelSelection'
+import type { RunEventWriter } from '../events/RunEventPorts'
+import type { RunRecord } from '../storage/runRecord'
+import type { RunRepository } from '../storage/runRepository'
+import type {
+  StartBuddyCompactionInput,
+  StartBuddyTurnInput,
+} from './BuddyAgentRun'
+import type {
+  BuddySessionIdentity,
+} from './BuddySessionBlueprint'
+import type { BuddySessionFactoryInput } from './BuddySessionFactory'
+import type {
+  BuddySessionBinding,
+  BuddySessionRegistry,
+} from './BuddySessionRegistry'
+import type { BuddySessionShutdownReason } from './createBuddySession'
+import type {
+  PiEventBridge,
+  PiEventBridgeSession,
+  PiEventBridgeSettlement,
+} from './PiEventBridge'
+import { RunEventLogFatalError } from '../events/RunEventFailure'
+import { BuddyAgentRunError, readStableRunErrorCode } from '../runs/runError'
+
+export const AUTOMATION_SESSION_STARTUP_TIMEOUT_MS = 60_000
+
+export interface BuddyAgentSessionLike extends PiEventBridgeSession {
+  abort: () => Promise<void>
+  abortCompaction: () => void
+  activateTurn: (input: BuddySessionTurnContext) => Promise<() => void>
+  canCompact: () => boolean
+  compact: (customInstructions?: string) => Promise<CompactionResult>
+  prompt: (text: string, options?: {
+    expandPromptTemplates?: boolean
+    images?: ImageContent[]
+    source?: 'rpc'
+  }) => Promise<void>
+  shutdown: (reason: BuddySessionShutdownReason) => Promise<void>
+  waitForIdle: () => Promise<void>
+}
+
+export interface BuddySessionTurnContext {
+  contextWindow: number | null
+  flushProjectedEvents: () => Promise<void>
+  maxTokens: number | null
+  model: string
+  onToolExecutionAuthorized: (event: {
+    arguments: unknown
+    toolCallId: string
+    toolName: string
+  }) => Promise<void>
+  provider: string
+  runId: string
+  serviceTier?: BuddyServiceTier | null
+  signal: AbortSignal
+  thinkingLevel?: BuddyThinkingLevel
+}
+
+export type PiExecutionOutcome
+  = | { status: 'completed' }
+    | { errorCode: string | null, status: 'cancelled' }
+    | { errorCode: string, errorMessage?: string, status: 'failed' }
+
+type PiTurnSessions = Pick<
+  BuddySessionRegistry<BuddyAgentSessionLike>,
+  'getOrCreate' | 'invalidateSession'
+>
+
+export interface PiTurnExecutorOptions {
+  automationSessionStartupTimeoutMs?: number
+  eventLog: RunEventWriter
+  piEvents: Pick<PiEventBridge, 'createCompaction' | 'createTurn'>
+  runs: Pick<RunRepository, 'bindSession' | 'clearSessionBindings' | 'findById'>
+  sessionFactory: (
+    input: BuddySessionFactoryInput,
+  ) => Promise<BuddySessionBinding<BuddyAgentSessionLike>>
+  sessions: PiTurnSessions
+}
+
+interface ExecutePiTurnInput {
+  identity: BuddySessionIdentity
+  input: StartBuddyTurnInput
+  onSessionActivated: (session: BuddyAgentSessionLike) => void
+  onSessionStartupTimeout: () => void
+  run: RunRecord
+  signal: AbortSignal
+  timestamp: () => string
+}
+
+interface ExecutePiCompactionInput {
+  identity: BuddySessionIdentity
+  input: StartBuddyCompactionInput
+  onSessionActivated: (session: BuddyAgentSessionLike) => void
+  run: RunRecord
+  signal: AbortSignal
+  timestamp: () => string
+}
+
+export interface InvalidatePiSessionContinuityInput {
+  error: unknown
+  identity: BuddySessionIdentity
+  runId: string
+}
+
+export class PiTurnExecutor {
+  readonly #automationSessionStartupTimeoutMs: number
+  readonly #eventLog: PiTurnExecutorOptions['eventLog']
+  readonly #piEvents: PiTurnExecutorOptions['piEvents']
+  readonly #runs: PiTurnExecutorOptions['runs']
+  readonly #sessionFactory: PiTurnExecutorOptions['sessionFactory']
+  readonly #sessions: PiTurnSessions
+
+  constructor(options: PiTurnExecutorOptions) {
+    this.#automationSessionStartupTimeoutMs = options.automationSessionStartupTimeoutMs
+      ?? AUTOMATION_SESSION_STARTUP_TIMEOUT_MS
+    this.#eventLog = options.eventLog
+    this.#piEvents = options.piEvents
+    this.#runs = options.runs
+    this.#sessionFactory = options.sessionFactory
+    this.#sessions = options.sessions
+  }
+
+  async executeTurn(execution: ExecutePiTurnInput): Promise<PiExecutionOutcome> {
+    const { identity, input, run, signal } = execution
+    const bindingPromise = this.#sessions.getOrCreate(
+      identity,
+      run.piSessionFile,
+      () => this.#sessionFactory({
+        blueprint: input.session,
+        piSessionFile: run.piSessionFile,
+        runId: run.id,
+        signal,
+        thinkingLevel: input.thinkingLevel,
+      }),
+    )
+    const binding = identity.sessionMode === 'automation_background'
+      ? await this.#withAutomationSessionStartupTimeout(
+          bindingPromise,
+          execution.onSessionStartupTimeout,
+        )
+      : await bindingPromise
+    signal.throwIfAborted()
+    if (!this.#runs.bindSession(run.id, binding.piSessionFile))
+      throw new BuddyAgentRunError('RUN_NOT_FOUND')
+    await this.#recordSessionRecovery(run.id, binding)
+    signal.throwIfAborted()
+
+    execution.onSessionActivated(binding.session)
+    const piEvents = this.#piEvents.createTurn({
+      canonicalRoot: input.session.canonicalRoot,
+      model: run.model,
+      provider: run.provider,
+      runId: run.id,
+      session: binding.session,
+      timestamp: execution.timestamp,
+    })
+    const releaseTurn = await binding.session.activateTurn({
+      contextWindow: run.contextWindow,
+      flushProjectedEvents: () => piEvents.flush(),
+      maxTokens: run.maxTokens,
+      model: run.model,
+      onToolExecutionAuthorized: event => piEvents.projectToolExecutionAuthorized(event),
+      provider: run.provider,
+      runId: run.id,
+      serviceTier: input.serviceTier ?? null,
+      signal,
+      thinkingLevel: input.thinkingLevel,
+    })
+    const unsubscribe = piEvents.subscribe()
+
+    try {
+      signal.throwIfAborted()
+      await binding.session.prompt(input.prompt, {
+        expandPromptTemplates: false,
+        images: input.images,
+        source: 'rpc',
+      })
+      await binding.session.waitForIdle()
+      await piEvents.flush()
+    }
+    catch (error) {
+      const { eventError, writerError } = await settlePiEventsAfterFailure(
+        error,
+        piEvents,
+      )
+      const outcome = piEvents.outcome
+      if (
+        readStableRunErrorCode(error) === 'SESSION_STORAGE_UNAVAILABLE'
+        && !signal.aborted
+        && !outcome.failureCode
+        && outcome.finalAssistantAnswerProjected
+        && eventError === null
+        && writerError === null
+      ) {
+        await this.#eventLog.append({
+          payload: {
+            errorCode: 'SESSION_STORAGE_UNAVAILABLE',
+            source: 'pi_session',
+          },
+          runId: run.id,
+          type: 'session.continuity.degraded',
+        })
+        await this.#invalidateSessionContinuity(identity, run.id)
+        return { status: 'completed' }
+      }
+      throw error
+    }
+    finally {
+      unsubscribe()
+      releaseTurn()
+    }
+
+    const { failureCode, failureMessage } = piEvents.outcome
+    if (signal.aborted || failureCode === 'MODEL_REQUEST_ABORTED')
+      return { errorCode: null, status: 'cancelled' }
+    if (failureCode) {
+      return {
+        errorCode: failureCode,
+        errorMessage: failureMessage,
+        status: 'failed',
+      }
+    }
+    return { status: 'completed' }
+  }
+
+  async executeCompaction(
+    execution: ExecutePiCompactionInput,
+  ): Promise<PiExecutionOutcome> {
+    const { identity, input, run, signal } = execution
+    const binding = await this.#sessions.getOrCreate(
+      identity,
+      run.piSessionFile,
+      () => this.#sessionFactory({
+        blueprint: input.session,
+        piSessionFile: run.piSessionFile,
+        runId: run.id,
+        signal,
+        thinkingLevel: input.thinkingLevel,
+      }),
+    )
+    signal.throwIfAborted()
+    if (!this.#runs.bindSession(run.id, binding.piSessionFile))
+      throw new BuddyAgentRunError('RUN_NOT_FOUND')
+    await this.#recordSessionRecovery(run.id, binding)
+    signal.throwIfAborted()
+
+    if (!binding.session.canCompact())
+      throw new BuddyAgentRunError('CONTEXT_COMPACTION_NOT_NEEDED')
+
+    execution.onSessionActivated(binding.session)
+    const releaseTurn = await binding.session.activateTurn({
+      contextWindow: run.contextWindow,
+      flushProjectedEvents: async () => {},
+      maxTokens: run.maxTokens,
+      model: run.model,
+      onToolExecutionAuthorized: async () => {},
+      provider: run.provider,
+      runId: run.id,
+      serviceTier: null,
+      signal,
+      thinkingLevel: input.thinkingLevel,
+    })
+    const piEvents = this.#piEvents.createCompaction({
+      canonicalRoot: input.session.canonicalRoot,
+      model: run.model,
+      provider: run.provider,
+      runId: run.id,
+      session: binding.session,
+      timestamp: execution.timestamp,
+    })
+    const unsubscribe = piEvents.subscribe()
+
+    try {
+      signal.throwIfAborted()
+      const result = await binding.session.compact(
+        input.customInstructions?.trim() || undefined,
+      )
+      await piEvents.flush()
+      await piEvents.recordCompactionResult(result)
+    }
+    catch (error) {
+      await settlePiEventsAfterFailure(error, piEvents)
+      if (signal.aborted || isAbortError(error))
+        throw error
+      if (readStableRunErrorCode(error) === 'SESSION_STORAGE_UNAVAILABLE')
+        throw error
+      throw new BuddyAgentRunError('COMPACTION_FAILED')
+    }
+    finally {
+      unsubscribe()
+      releaseTurn()
+    }
+
+    if (signal.aborted)
+      return { errorCode: 'RUN_CANCELLED', status: 'cancelled' }
+    return { status: 'completed' }
+  }
+
+  async invalidateSessionContinuityAfterFailure(
+    input: InvalidatePiSessionContinuityInput,
+  ): Promise<void> {
+    const errorCode = readStableRunErrorCode(input.error)
+    if (errorCode === 'SESSION_STORAGE_UNAVAILABLE')
+      await this.#invalidateSessionContinuity(input.identity, input.runId)
+    else if (errorCode === 'AUTOMATION_RUN_TIMEOUT')
+      await this.#sessions.invalidateSession(input.identity)
+  }
+
+  async #recordSessionRecovery(
+    runId: string,
+    binding: BuddySessionBinding<BuddyAgentSessionLike>,
+  ): Promise<void> {
+    if (!binding.recoveredFromProductHistory)
+      return
+    const degradation = binding.recoveryDegradation
+    await this.#eventLog.appendBatch([
+      {
+        payload: { source: 'sqlite' },
+        runId,
+        type: 'session.recovered',
+      },
+      ...(degradation
+        ? [{
+            payload: {
+              missingAttachmentCount: degradation.missingAttachmentIds.length,
+              missingAttachmentIds: degradation.missingAttachmentIds,
+              recoveredImageCount: degradation.recoveredImageCount,
+              source: 'sqlite',
+            },
+            runId,
+            type: 'session.recovery.degraded',
+          }]
+        : []),
+    ])
+    binding.recoveredFromProductHistory = false
+    binding.recoveryDegradation = undefined
+  }
+
+  async #withAutomationSessionStartupTimeout<T>(
+    operation: Promise<T>,
+    onTimeout: () => void,
+  ): Promise<T> {
+    let timer: ReturnType<typeof setTimeout> | null = null
+    const timeout = new Promise<never>((_resolve, reject) => {
+      timer = setTimeout(() => {
+        onTimeout()
+        reject(new BuddyAgentRunError('AUTOMATION_RUN_TIMEOUT'))
+      }, this.#automationSessionStartupTimeoutMs)
+      timer.unref?.()
+    })
+    try {
+      return await Promise.race([operation, timeout])
+    }
+    finally {
+      if (timer)
+        clearTimeout(timer)
+    }
+  }
+
+  async #invalidateSessionContinuity(
+    identity: BuddySessionIdentity,
+    runId: string,
+  ): Promise<void> {
+    const run = this.#runs.findById(runId)
+    if (run?.piSessionFile) {
+      this.#runs.clearSessionBindings(
+        run.conversationId,
+        run.branchId,
+        run.piSessionFile,
+      )
+    }
+    await this.#sessions.invalidateSession(identity)
+  }
+}
+
+async function settlePiEventsAfterFailure(
+  executionError: unknown,
+  channel: { settle: () => Promise<PiEventBridgeSettlement> },
+): Promise<PiEventBridgeSettlement> {
+  const settlement = await channel.settle()
+  const fatalError = [
+    executionError,
+    settlement.eventError,
+    settlement.writerError,
+  ].find(candidate => candidate instanceof RunEventLogFatalError)
+  if (fatalError)
+    throw fatalError
+  return settlement
+}
+
+function isAbortError(error: unknown): boolean {
+  return error instanceof Error && error.name === 'AbortError'
+}

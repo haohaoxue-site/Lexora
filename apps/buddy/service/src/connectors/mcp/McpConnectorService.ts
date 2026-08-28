@@ -1,6 +1,6 @@
 import type { ToolDefinition } from '@earendil-works/pi-coding-agent'
 import type { RuntimeRpcPeerContract } from '../../../../shared/runtimeRpcPeer'
-import type { BuddyToolClassification } from '../../agent/extensions/toolPolicyExtension'
+import type { BuddyToolClassification } from '../../approvals/toolClassification'
 import type {
   ConnectorRepository,
   McpServerRecord,

@@ -16,7 +16,7 @@ export interface ResolveBuddySessionResourcesOptions {
   cwd: string
   projectInstructions?: string
   projectId: string | null
-  skills: SkillService
+  skills: Pick<SkillService, 'loadForProject'>
 }
 
 export async function resolveBuddySessionResources(

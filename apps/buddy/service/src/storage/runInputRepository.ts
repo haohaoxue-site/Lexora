@@ -1,7 +1,7 @@
 import type { DatabaseSync } from 'node:sqlite'
-import type { BuddyServiceTier } from '../../../shared/modelSelection'
+import type { BuddyServiceTier, BuddyThinkingLevel } from '../../../shared/modelSelection'
 import { z } from 'zod'
-import { BUDDY_SERVICE_TIERS } from '../../../shared/modelSelection'
+import { BUDDY_SERVICE_TIERS, BUDDY_THINKING_LEVELS } from '../../../shared/modelSelection'
 
 const contextItemSchema = z.object({
   kind: z.enum(['file', 'skill', 'slashCommand']),
@@ -10,6 +10,7 @@ const contextItemSchema = z.object({
 
 const attachmentIdsSchema = z.array(z.string().min(1)).max(16)
 const contextItemsSchema = z.array(contextItemSchema).max(64)
+const reasoningSchema = z.enum(BUDDY_THINKING_LEVELS).nullable()
 const serviceTierSchema = z.enum(BUDDY_SERVICE_TIERS).nullable()
 
 export type RunInputContextItem = z.infer<typeof contextItemSchema>
@@ -19,7 +20,7 @@ export interface RunInputRecord {
   contextItems: RunInputContextItem[]
   createdAt: string
   prompt: string
-  reasoning: string | null
+  reasoning: BuddyThinkingLevel | null
   runId: string
   serviceTier: BuddyServiceTier | null
 }
@@ -69,7 +70,7 @@ function toRecord(value: unknown): RunInputRecord | null {
     contextItems: contextItemsSchema.parse(JSON.parse(row.context_items_json)),
     createdAt: row.created_at,
     prompt: row.prompt,
-    reasoning: row.reasoning,
+    reasoning: reasoningSchema.parse(row.reasoning),
     runId: row.run_id,
     serviceTier: serviceTierSchema.parse(row.service_tier),
   }

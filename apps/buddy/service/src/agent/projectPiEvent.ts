@@ -14,10 +14,9 @@ import { buddyAssistantTextPhaseSchema } from '../../../shared/assistantTextPhas
 import { MAX_BUDDY_MESSAGE_TEXT_LENGTH } from '../../../shared/buddyMessageContent'
 import { resolveBuddyReasoningKind } from '../../../shared/reasoningPresentation'
 import {
-  IMAGE_GENERATION_TOOL_NAME,
-  readImageGenerationToolDetails,
-} from '../images/imageGenerationToolContract'
-import { createBuddyToolPresentation } from './toolPresentation'
+  createBuddyRunOutputs,
+  createBuddyToolPresentation,
+} from './toolPresentation'
 
 type PiThinkingEvent
   = Extract<AssistantMessageEvent, { type: 'thinking_start' }>
@@ -178,9 +177,14 @@ export function projectPiEvent(
         result: event.result,
         toolName: event.toolName,
       })
-      const generatedArtifactIds = !event.isError && event.toolName === IMAGE_GENERATION_TOOL_NAME
-        ? readImageGenerationToolDetails(event.result)?.artifactIds ?? []
-        : []
+      const outputs = createBuddyRunOutputs({
+        arguments: tool?.arguments,
+        canonicalRoot: state.canonicalRoot,
+        isError: event.isError,
+        result: event.result,
+        toolCallId: event.toolCallId,
+        toolName: event.toolName,
+      })
       return {
         events: [
           {
@@ -192,16 +196,10 @@ export function projectPiEvent(
             },
             type: 'tool.completed',
           },
-          ...(generatedArtifactIds.length > 0
-            ? [{
-                payload: {
-                  artifactIds: generatedArtifactIds,
-                  sourceToolCallId: event.toolCallId,
-                  sourceToolName: event.toolName,
-                },
-                type: 'output.produced' as const,
-              }]
-            : []),
+          ...outputs.map(payload => ({
+            payload,
+            type: 'output.produced' as const,
+          })),
         ],
       }
     }

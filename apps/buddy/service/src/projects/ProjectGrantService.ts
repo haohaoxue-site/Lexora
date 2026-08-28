@@ -56,6 +56,12 @@ export class ProjectGrantService {
     if (!name)
       throw new ProjectGrantError()
     const directory = await resolveProjectDirectory(input.root)
+    if (
+      directory.canonicalRoot !== project.canonicalRoot
+      && this.#projects.hasActiveRuns(project.id)
+    ) {
+      throw new ProjectHasActiveRunsError()
+    }
     const updatedAt = new Date().toISOString()
     return this.#projects.update({
       directory,
@@ -186,7 +192,7 @@ export class ProjectHasActiveRunsError extends Error {
   readonly code = 'PROJECT_HAS_ACTIVE_RUNS'
 
   constructor() {
-    super('Lexora Buddy cannot delete a project with active runs')
+    super('Lexora Buddy cannot change a project directory or delete a project with active runs')
     this.name = 'ProjectHasActiveRunsError'
   }
 }

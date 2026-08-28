@@ -1,0 +1,174 @@
+import type { DatabaseSync } from 'node:sqlite'
+
+export type ProviderModelSource = 'builtin' | 'manual' | 'synced'
+
+export interface ProviderModelStateRecord {
+  providerId: string
+  modelId: string
+  displayName: string
+  api: string
+  input: Array<'text' | 'image'>
+  reasoning: boolean
+  cost: { input: number, output: number, cacheRead: number, cacheWrite: number }
+  sourceContextWindow: number
+  sourceMaxTokens: number
+  overrideContextWindow: number | null
+  overrideMaxTokens: number | null
+  sourceRevision: string
+  acknowledgedSourceRevision: string | null
+  source: ProviderModelSource
+  enabled: boolean
+  available: boolean
+  lastSeenAt: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export interface ProviderModelStateRepository {
+  find: (providerId: string, modelId: string) => ProviderModelStateRecord | null
+  list: (providerId?: string) => ProviderModelStateRecord[]
+  remove: (providerId: string, modelId: string) => boolean
+  removeForProvider: (providerId: string) => number
+  upsert: (record: ProviderModelStateRecord) => ProviderModelStateRecord
+}
+
+interface ProviderModelStateRow {
+  provider_id: string
+  model_id: string
+  display_name: string
+  api: string
+  input_json: string
+  reasoning: number
+  cost_json: string
+  context_window: number
+  max_tokens: number
+  override_context_window: number | null
+  override_max_tokens: number | null
+  source_revision: string
+  acknowledged_source_revision: string | null
+  source: ProviderModelSource
+  enabled: number
+  available: number
+  last_seen_at: string | null
+  created_at: string
+  updated_at: string
+}
+
+export function createProviderModelStateRepository(
+  database: DatabaseSync,
+): ProviderModelStateRepository {
+  const find = database.prepare(`
+    SELECT * FROM provider_model_states WHERE provider_id = ? AND model_id = ?
+  `)
+  const listAll = database.prepare(`
+    SELECT * FROM provider_model_states ORDER BY provider_id, display_name, model_id
+  `)
+  const listForProvider = database.prepare(`
+    SELECT * FROM provider_model_states
+    WHERE provider_id = ?
+    ORDER BY display_name, model_id
+  `)
+  const remove = database.prepare(`
+    DELETE FROM provider_model_states WHERE provider_id = ? AND model_id = ?
+  `)
+  const removeForProvider = database.prepare(`
+    DELETE FROM provider_model_states WHERE provider_id = ?
+  `)
+  const upsert = database.prepare(`
+    INSERT INTO provider_model_states (
+      provider_id, model_id, display_name, api, input_json, reasoning, cost_json,
+      context_window, max_tokens, override_context_window, override_max_tokens,
+      source_revision, acknowledged_source_revision, source, enabled, available,
+      last_seen_at, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT (provider_id, model_id) DO UPDATE SET
+      display_name = excluded.display_name,
+      api = excluded.api,
+      input_json = excluded.input_json,
+      reasoning = excluded.reasoning,
+      cost_json = excluded.cost_json,
+      context_window = excluded.context_window,
+      max_tokens = excluded.max_tokens,
+      override_context_window = excluded.override_context_window,
+      override_max_tokens = excluded.override_max_tokens,
+      source_revision = excluded.source_revision,
+      acknowledged_source_revision = excluded.acknowledged_source_revision,
+      source = excluded.source,
+      enabled = excluded.enabled,
+      available = excluded.available,
+      last_seen_at = excluded.last_seen_at,
+      updated_at = excluded.updated_at
+  `)
+
+  return {
+    find(providerId, modelId) {
+      const row = find.get(providerId, modelId) as ProviderModelStateRow | undefined
+      return row ? toProviderModelState(row) : null
+    },
+    list(providerId) {
+      const rows = providerId ? listForProvider.all(providerId) : listAll.all()
+      return (rows as unknown as ProviderModelStateRow[]).map(toProviderModelState)
+    },
+    remove(providerId, modelId) {
+      return Number(remove.run(providerId, modelId).changes) === 1
+    },
+    removeForProvider(providerId) {
+      return Number(removeForProvider.run(providerId).changes)
+    },
+    upsert(record) {
+      upsert.run(
+        record.providerId,
+        record.modelId,
+        record.displayName,
+        record.api,
+        JSON.stringify(record.input),
+        Number(record.reasoning),
+        JSON.stringify(record.cost),
+        record.sourceContextWindow,
+        record.sourceMaxTokens,
+        record.overrideContextWindow,
+        record.overrideMaxTokens,
+        record.sourceRevision,
+        record.acknowledgedSourceRevision,
+        record.source,
+        Number(record.enabled),
+        Number(record.available),
+        record.lastSeenAt,
+        record.createdAt,
+        record.updatedAt,
+      )
+      return requireProviderModelState(find.get(record.providerId, record.modelId))
+    },
+  }
+}
+
+function requireProviderModelState(value: unknown): ProviderModelStateRecord {
+  const row = value as ProviderModelStateRow | undefined
+  if (!row)
+    throw new Error('Lexora Buddy provider model state was not persisted')
+  return toProviderModelState(row)
+}
+
+function toProviderModelState(row: ProviderModelStateRow): ProviderModelStateRecord {
+  return {
+    providerId: row.provider_id,
+    modelId: row.model_id,
+    displayName: row.display_name,
+    api: row.api,
+    input: JSON.parse(row.input_json) as Array<'text' | 'image'>,
+    reasoning: row.reasoning === 1,
+    cost: JSON.parse(row.cost_json) as ProviderModelStateRecord['cost'],
+    sourceContextWindow: row.context_window,
+    sourceMaxTokens: row.max_tokens,
+    overrideContextWindow: row.override_context_window,
+    overrideMaxTokens: row.override_max_tokens,
+    sourceRevision: row.source_revision,
+    acknowledgedSourceRevision: row.acknowledged_source_revision,
+    source: row.source,
+    enabled: row.enabled === 1,
+    available: row.available === 1,
+    lastSeenAt: row.last_seen_at,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  }
+}

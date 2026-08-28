@@ -1,12 +1,18 @@
 import type { DatabaseSync } from 'node:sqlite'
 import type { BuddyThinkingLevel } from '../../../shared/modelSelection'
-import type { AutomationOccurrenceRecord } from './automationRepository'
-import type { ConversationRecord } from './conversationRepository'
-import type { RunRecord } from './runRepository'
-import { createAutomationRepository } from './automationRepository'
-import { createConversationRepository } from './conversationRepository'
+import type {
+  AutomationOccurrenceRecord,
+  AutomationOccurrenceRow,
+} from './automationOccurrenceRecord'
+import type { ConversationRecord } from './conversationRecord'
+import type { RunRecord } from './runRecord'
+import {
+  requireAutomationOccurrenceRecord,
+  toAutomationOccurrenceRecord,
+} from './automationOccurrenceRecord'
+import { requireConversationRecord } from './conversationRecord'
 import { withTransaction } from './database'
-import { createRunRepository } from './runRepository'
+import { requireRunRecord } from './runRecord'
 
 export interface BindAutomationTurnInput {
   boundAt: string
@@ -48,9 +54,11 @@ export class AutomationTurnBindingError extends Error {
 }
 
 export function createAutomationTurnRepository(database: DatabaseSync): AutomationTurnRepository {
-  const automations = createAutomationRepository(database)
-  const conversations = createConversationRepository(database)
-  const runs = createRunRepository(database)
+  const findOccurrence = database.prepare(`
+    SELECT * FROM automation_occurrences WHERE id = ? AND deleted_at IS NULL
+  `)
+  const findConversation = database.prepare('SELECT * FROM conversations WHERE id = ?')
+  const findRun = database.prepare('SELECT * FROM runs WHERE id = ?')
   const insertConversation = database.prepare(`
     INSERT INTO conversations (
       id, project_id, title, active_branch_id, created_at, updated_at,
@@ -109,8 +117,8 @@ export function createAutomationTurnRepository(database: DatabaseSync): Automati
 
   return {
     bind(input) {
-      const outcome = withTransaction(database, () => {
-        const occurrence = automations.findOccurrenceById(input.occurrenceId)
+      return withTransaction(database, () => {
+        const occurrence = findOccurrenceRecord(input.occurrenceId)
         if (
           !occurrence
           || occurrence.status !== 'queued'
@@ -130,7 +138,10 @@ export function createAutomationTurnRepository(database: DatabaseSync): Automati
           ).changes) !== 1) {
             throw new AutomationTurnBindingError()
           }
-          return 'overlap_skipped' as const
+          return {
+            kind: 'overlap_skipped',
+            occurrence: requireOccurrenceRecord(occurrence.id),
+          }
         }
         const snapshot = occurrence.executionSnapshot
         insertConversation.run(
@@ -179,18 +190,25 @@ export function createAutomationTurnRepository(database: DatabaseSync): Automati
           throw new AutomationTurnBindingError()
         }
         updateLastRun.run(input.boundAt, input.boundAt, occurrence.automationId)
-        return 'bound' as const
+        return {
+          conversation: requireConversationRecord(
+            findConversation.get(input.conversationId),
+            input.conversationId,
+          ),
+          kind: 'bound',
+          occurrence: requireOccurrenceRecord(occurrence.id),
+          run: requireRunRecord(findRun.get(input.runId), input.runId),
+        }
       })
-      const occurrence = automations.findOccurrenceById(input.occurrenceId)
-      if (!occurrence)
-        throw new Error('Lexora Buddy automation occurrence was not persisted')
-      if (outcome === 'overlap_skipped')
-        return { kind: outcome, occurrence }
-      const conversation = conversations.findById(input.conversationId)
-      const run = runs.findById(input.runId)
-      if (!conversation || !run)
-        throw new Error('Lexora Buddy automation turn was not persisted')
-      return { conversation, kind: outcome, occurrence, run }
     },
+  }
+
+  function findOccurrenceRecord(id: string): AutomationOccurrenceRecord | null {
+    const row = findOccurrence.get(id) as AutomationOccurrenceRow | undefined
+    return row ? toAutomationOccurrenceRecord(row) : null
+  }
+
+  function requireOccurrenceRecord(id: string): AutomationOccurrenceRecord {
+    return requireAutomationOccurrenceRecord(findOccurrence.get(id), id)
   }
 }

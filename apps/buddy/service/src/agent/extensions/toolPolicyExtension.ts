@@ -9,16 +9,13 @@ import type {
 import type { BuddyExecutionProfile } from '../../../../shared/executionProfile'
 import type { BuddyServiceTier } from '../../../../shared/modelSelection'
 
-import type {
-  ToolApprovalKind,
-  ToolPolicyPath,
-  ToolRisk,
-} from '../../approvals/ToolPolicy'
+import type { BuddyToolClassificationResult } from '../../approvals/toolClassification'
+import type { ToolApprovalKind } from '../../approvals/toolPolicyContract'
 import type { ProjectGrant } from '../../projects/resolveGrantedPath'
 import type { BuddyInProcessExtension } from '../createBuddyResourceLoader'
+import { isToolClassificationFailure } from '../../approvals/toolClassification'
 import { ToolPolicy } from '../../approvals/ToolPolicy'
-import { SystemCapabilityError } from '../../system/systemCapability'
-import { serializeSystemToolFailure } from '../../system/systemToolFailure'
+import { readToolCallBlockReason } from '../../approvals/toolPolicyContract'
 import { PI_BUILTIN_TOOL_NAME_SET } from '../piBuiltinTools'
 
 export interface ToolApprovalGateway {
@@ -33,20 +30,6 @@ export interface ToolApprovalGateway {
     toolCallId: string
     toolName: string
   }) => Promise<'approved' | 'denied'>
-}
-
-export interface BuddyToolClassification {
-  approval?: {
-    automation?: AutomationApprovalReviewInput
-    kind?: ToolApprovalKind
-    summary: string
-    systemAction?: SystemActionApprovalReviewInput
-  }
-  alwaysConfirm?: boolean
-  source?: 'lexora' | 'mcp' | 'pi'
-  paths?: readonly ToolPolicyPath[]
-  resource?: { kind?: 'connector' | 'project', projectId: string, trusted: boolean }
-  risk?: ToolRisk
 }
 
 export interface BuddyRunContext {
@@ -66,7 +49,7 @@ export interface CreateToolPolicyExtensionOptions {
   classifyTool?: (
     event: ToolCallEvent,
     run: BuddyRunContext,
-  ) => BuddyToolClassification | null | undefined | Promise<BuddyToolClassification | null | undefined>
+  ) => BuddyToolClassificationResult | null | undefined | Promise<BuddyToolClassificationResult | null | undefined>
   cwd: string
   executionProfile: BuddyExecutionProfile
   getGrants: () => readonly ProjectGrant[]
@@ -96,12 +79,15 @@ async function decideToolCall(
     if (!run)
       return block('RUN_CONTEXT_UNAVAILABLE')
     await run.flushProjectedEvents()
-    const declared = (await options.classifyTool?.(event, run)) ?? {}
+    const classification = await options.classifyTool?.(event, run)
+    if (classification && isToolClassificationFailure(classification))
+      return block(classification.reason)
+    const declared = classification ?? {}
     if (declared.alwaysConfirm) {
       const approval = declared.approval
       if (!approval?.kind)
         return block('VALIDATION_FAILED')
-      return requestApproval(options, event, run, {
+      return await requestApproval(options, event, run, {
         automation: approval.automation,
         kind: approval.kind,
         summary: approval.summary,
@@ -125,7 +111,7 @@ async function decideToolCall(
     if (decision.type === 'deny')
       return block(decision.code)
 
-    return requestApproval(options, event, run, {
+    return await requestApproval(options, event, run, {
       automation: declared.approval?.automation,
       kind: decision.kind,
       summary: declared.approval?.summary ?? decision.summary,
@@ -133,7 +119,7 @@ async function decideToolCall(
     })
   }
   catch (error) {
-    return block(readBlockedToolReason(error))
+    return block(readToolCallBlockReason(error) ?? 'TOOL_POLICY_FAILED')
   }
 }
 
@@ -177,40 +163,4 @@ async function authorizeToolExecution(
 
 function block(reason: string): ToolCallEventResult {
   return { block: true, reason, terminate: false }
-}
-
-function readBlockedToolReason(error: unknown): string {
-  return error instanceof SystemCapabilityError
-    ? serializeSystemToolFailure(error.code)
-    : readStableErrorCode(error)
-}
-
-function readStableErrorCode(error: unknown): string {
-  if (!error || typeof error !== 'object' || !('code' in error))
-    return 'TOOL_POLICY_FAILED'
-  const code = (error as { code?: unknown }).code
-  if (typeof code !== 'string')
-    return 'TOOL_POLICY_FAILED'
-  if (new Set([
-    'APPROVAL_CANCELLED',
-    'AUTOMATION_CONFLICT',
-    'AUTOMATION_APPROVAL_EXPIRED',
-    'AUTOMATION_INVALID_SCHEDULE',
-    'AUTOMATION_NOT_FOUND',
-    'INVALID_PATH',
-    'PATH_NOT_FOUND',
-    'PATH_OUTSIDE_GRANTED_DIRECTORY',
-    'SYSTEM_ACTION_CHANGED',
-    'SYSTEM_ACTION_EXPIRED',
-    'SYSTEM_ACTION_INVALID',
-    'SYSTEM_ACTION_NOT_ALLOWED',
-    'SYSTEM_ACTION_NOT_PREPARED',
-    'SYSTEM_TARGET_AMBIGUOUS',
-    'SYSTEM_TARGET_CHANGED',
-    'SYSTEM_TARGET_NOT_FOUND',
-    'VALIDATION_FAILED',
-  ]).has(code)) {
-    return code
-  }
-  return 'TOOL_POLICY_FAILED'
 }

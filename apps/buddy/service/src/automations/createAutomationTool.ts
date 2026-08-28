@@ -5,11 +5,14 @@ import type {
   Automation,
   AutomationDefinitionDraft,
   AutomationOccurrence,
-  AutomationRunNowResult,
   AutomationSchedule,
 } from '../../../shared/automation'
-import type { BuddyToolClassification } from '../agent/extensions/toolPolicyExtension'
-import type { AutomationPage, AutomationService } from './AutomationService'
+import type { BuddyToolClassificationResult } from '../approvals/toolClassification'
+import type { AutomationService } from './AutomationService'
+import type {
+  AutomationToolDetails,
+  AutomationToolOperation,
+} from './automationToolContract'
 import { defineTool } from '@earendil-works/pi-coding-agent'
 import { Type } from 'typebox'
 import { Check } from 'typebox/value'
@@ -20,10 +23,9 @@ import {
   automationMutationRequestSchemas,
   automationRequestSchemas,
 } from '../../../shared/automation'
-import { ToolPolicyValidationError } from '../approvals/ToolPolicy'
+import { createToolClassificationFailure } from '../approvals/toolClassification'
 import { AutomationServiceError } from './AutomationService'
-
-export const AUTOMATION_TOOL_NAME = 'lexora_buddy_automation'
+import { AUTOMATION_TOOL_NAME } from './automationToolContract'
 
 const id = Type.String({ maxLength: 256, minLength: 1 })
 const requestId = Type.String({ maxLength: 128, minLength: 1 })
@@ -154,24 +156,6 @@ export const automationToolParameters = Type.Union([
   }, { additionalProperties: false })),
 ])
 
-type AutomationToolOperation
-  = | 'list'
-    | 'get'
-    | 'upsert'
-    | 'pause'
-    | 'resume'
-    | 'delete'
-    | 'run_now'
-
-export interface AutomationToolDetails {
-  automation?: Automation
-  code?: string
-  occurrence?: AutomationOccurrence
-  operation: AutomationToolOperation | 'invalid'
-  page?: AutomationPage<Automation>
-  runNowOutcome?: AutomationRunNowResult['outcome']
-}
-
 export interface CreateAutomationToolOptions {
   onChanged?: (automationId: string) => void
   service: AutomationService
@@ -230,14 +214,14 @@ export function classifyAutomationTool(
   service: AutomationService,
   toolName: string,
   input: unknown,
-): BuddyToolClassification | null {
+): BuddyToolClassificationResult | null {
   if (toolName !== AUTOMATION_TOOL_NAME)
     return null
   if (!Check(automationToolParameters, input))
-    throw new ToolPolicyValidationError()
+    return createToolClassificationFailure('VALIDATION_FAILED')
   const parsed = automationToolInputSchema.safeParse(input)
   if (!parsed.success)
-    throw new ToolPolicyValidationError()
+    return createToolClassificationFailure('VALIDATION_FAILED')
   if (parsed.data.operation === 'list' || parsed.data.operation === 'get') {
     return {
       risk: 'read',
@@ -246,7 +230,9 @@ export function classifyAutomationTool(
   }
   const automation = parsed.data.operation === 'upsert'
     ? automationDefinitionDraftSchema.parse(parsed.data.draft)
-    : requireAutomation(service, parsed.data.automationId)
+    : service.get(parsed.data.automationId)
+  if (!automation)
+    return createToolClassificationFailure('AUTOMATION_NOT_FOUND')
   return {
     alwaysConfirm: true,
     approval: {
@@ -417,6 +403,6 @@ function isMutation(operation: AutomationToolOperation): boolean {
 export function classifyAutomationToolCall(
   service: AutomationService,
   event: ToolCallEvent,
-): BuddyToolClassification | null {
+): BuddyToolClassificationResult | null {
   return classifyAutomationTool(service, event.toolName, event.input)
 }

@@ -1,6 +1,6 @@
 import type { Usage } from '@earendil-works/pi-ai'
 import type { AgentSessionEvent } from '@earendil-works/pi-coding-agent'
-import type { RunEventLog } from '../events/RunEventLog'
+import type { RunEventWriter } from '../events/RunEventPorts'
 import type { UsageRecord, UsageRepository } from '../storage/usageRepository'
 import type { BuddyUsagePurpose } from './recordPiUsage'
 import { randomUUID } from 'node:crypto'
@@ -8,7 +8,7 @@ import { randomUUID } from 'node:crypto'
 import { recordPiUsage } from './recordPiUsage'
 
 export interface UsageServiceOptions {
-  eventLog: Pick<RunEventLog, 'append'>
+  eventLog: Pick<RunEventWriter, 'append'>
   repository: UsageRepository
 }
 
@@ -32,7 +32,7 @@ export interface RecordPiMessageUsageInput {
 }
 
 export class UsageService {
-  readonly #eventLog: Pick<RunEventLog, 'append'>
+  readonly #eventLog: Pick<RunEventWriter, 'append'>
   readonly #repository: UsageRepository
 
   constructor(options: UsageServiceOptions) {

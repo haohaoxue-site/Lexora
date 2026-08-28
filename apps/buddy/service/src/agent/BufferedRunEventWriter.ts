@@ -1,0 +1,214 @@
+import type { BuddyAssistantTextPhase } from '../../../shared/assistantTextPhase'
+import type { RunEventWriter } from '../events/RunEventPorts'
+import type { BuddyProjectedEvent } from './projectPiEvent'
+import { buddyAssistantTextPhaseSchema } from '../../../shared/assistantTextPhase'
+import { buddyReasoningKindSchema } from '../../../shared/reasoningPresentation'
+
+export class BufferedRunEventWriter {
+  readonly #eventLog: Pick<RunEventWriter, 'appendBatch'>
+  readonly #runId: string
+  readonly #timestamp: () => string
+  #pending: TimestampedBuddyProjectedEvent[] = []
+  #tail = Promise.resolve()
+  #timer: NodeJS.Timeout | undefined
+
+  constructor(
+    eventLog: Pick<RunEventWriter, 'appendBatch'>,
+    runId: string,
+    timestamp: () => string,
+  ) {
+    this.#eventLog = eventLog
+    this.#runId = runId
+    this.#timestamp = timestamp
+  }
+
+  append(event: BuddyProjectedEvent): void {
+    const timestamped = { ...event, createdAt: this.#timestamp() }
+    if (timestamped.type !== 'message.delta' && timestamped.type !== 'message.block.delta') {
+      this.#flushPending()
+      this.#enqueue([timestamped])
+      return
+    }
+
+    const previous = this.#pending.at(-1)
+    const merged = previous ? mergeStreamDelta(previous, timestamped) : null
+    if (merged)
+      this.#pending[this.#pending.length - 1] = merged
+    else
+      this.#pending.push(timestamped)
+    if (!this.#timer) {
+      this.#timer = setTimeout(() => this.#flushPending(), 25)
+      this.#timer.unref()
+    }
+  }
+
+  appendBatch(events: readonly BuddyProjectedEvent[]): void {
+    if (events.length === 0)
+      return
+    if (
+      events.length === 1
+      || events.some(event => (
+        event.type === 'message.delta'
+        || event.type === 'message.block.delta'
+      ))
+    ) {
+      for (const event of events)
+        this.append(event)
+      return
+    }
+    this.#flushPending()
+    this.#enqueue(events.map(event => ({
+      ...event,
+      createdAt: this.#timestamp(),
+    })))
+  }
+
+  async drain(): Promise<void> {
+    this.#flushPending()
+    await this.#tail
+  }
+
+  #enqueue(events: readonly TimestampedBuddyProjectedEvent[]): void {
+    const write = this.#eventLog.appendBatch(events.map(event => ({
+      createdAt: event.createdAt,
+      payload: event.payload,
+      runId: this.#runId,
+      type: event.type,
+    })))
+    this.#tail = Promise.all([this.#tail, write]).then(() => undefined)
+    void this.#tail.catch(() => {})
+  }
+
+  #flushPending(): void {
+    if (this.#timer) {
+      clearTimeout(this.#timer)
+      this.#timer = undefined
+    }
+    if (this.#pending.length === 0)
+      return
+    const events = this.#pending
+    this.#pending = []
+    this.#enqueue(events)
+  }
+}
+
+interface TimestampedBuddyProjectedEvent extends BuddyProjectedEvent {
+  createdAt: string
+}
+
+function mergeStreamDelta(
+  left: TimestampedBuddyProjectedEvent,
+  right: TimestampedBuddyProjectedEvent,
+): TimestampedBuddyProjectedEvent | null {
+  if (left.type === 'message.block.delta' && right.type === 'message.block.delta')
+    return mergeMessageBlockDelta(left, right)
+  if (left.type !== 'message.delta' || right.type !== 'message.delta')
+    return null
+  const leftPayload = readMessageDeltaPayload(left.payload)
+  const rightPayload = readMessageDeltaPayload(right.payload)
+  if (
+    !leftPayload
+    || !rightPayload
+    || leftPayload.messageId !== rightPayload.messageId
+    || leftPayload.contentIndex !== rightPayload.contentIndex
+    || leftPayload.phase !== rightPayload.phase
+    || leftPayload.delta.length + rightPayload.delta.length > 64 * 1024
+  ) {
+    return null
+  }
+  return {
+    createdAt: left.createdAt,
+    payload: {
+      ...(leftPayload.contentIndex === null ? {} : { contentIndex: leftPayload.contentIndex }),
+      delta: leftPayload.delta + rightPayload.delta,
+      messageId: leftPayload.messageId,
+      ...(leftPayload.phase ? { phase: leftPayload.phase } : {}),
+    },
+    type: 'message.delta',
+  }
+}
+
+function mergeMessageBlockDelta(
+  left: TimestampedBuddyProjectedEvent,
+  right: TimestampedBuddyProjectedEvent,
+): TimestampedBuddyProjectedEvent | null {
+  const leftPayload = readMessageBlockDeltaPayload(left.payload)
+  const rightPayload = readMessageBlockDeltaPayload(right.payload)
+  if (
+    !leftPayload
+    || !rightPayload
+    || leftPayload.messageId !== rightPayload.messageId
+    || leftPayload.contentIndex !== rightPayload.contentIndex
+    || leftPayload.reasoningKind !== rightPayload.reasoningKind
+    || leftPayload.delta.length + rightPayload.delta.length > 64 * 1024
+  ) {
+    return null
+  }
+  return {
+    createdAt: left.createdAt,
+    payload: {
+      contentIndex: leftPayload.contentIndex,
+      delta: leftPayload.delta + rightPayload.delta,
+      kind: 'reasoning',
+      messageId: leftPayload.messageId,
+      reasoningKind: leftPayload.reasoningKind,
+    },
+    type: 'message.block.delta',
+  }
+}
+
+function readMessageDeltaPayload(value: unknown): {
+  contentIndex: number | null
+  delta: string
+  messageId: string
+  phase: BuddyAssistantTextPhase | undefined
+} | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value))
+    return null
+  const payload = value as Record<string, unknown>
+  if (typeof payload.delta !== 'string' || typeof payload.messageId !== 'string')
+    return null
+  const contentIndex = payload.contentIndex === undefined
+    ? null
+    : typeof payload.contentIndex === 'number'
+      && Number.isSafeInteger(payload.contentIndex)
+      && payload.contentIndex >= 0
+      ? payload.contentIndex
+      : undefined
+  if (contentIndex === undefined)
+    return null
+  const phase = payload.phase === undefined
+    ? undefined
+    : buddyAssistantTextPhaseSchema.safeParse(payload.phase)
+  if (phase !== undefined && !phase.success)
+    return null
+  return {
+    contentIndex,
+    delta: payload.delta,
+    messageId: payload.messageId,
+    phase: phase?.data,
+  }
+}
+
+function readMessageBlockDeltaPayload(
+  value: unknown,
+): { contentIndex: number, delta: string, messageId: string, reasoningKind: 'summary' | 'thinking' } | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value))
+    return null
+  const payload = value as Record<string, unknown>
+  const reasoningKind = buddyReasoningKindSchema.safeParse(payload.reasoningKind)
+  return payload.kind === 'reasoning'
+    && typeof payload.delta === 'string'
+    && typeof payload.messageId === 'string'
+    && reasoningKind.success
+    && typeof payload.contentIndex === 'number'
+    && Number.isSafeInteger(payload.contentIndex)
+    && payload.contentIndex >= 0
+    ? {
+        contentIndex: payload.contentIndex,
+        delta: payload.delta,
+        messageId: payload.messageId,
+        reasoningKind: reasoningKind.data,
+      }
+    : null
+}

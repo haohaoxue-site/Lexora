@@ -1,25 +1,6 @@
 import type { DatabaseSync } from 'node:sqlite'
-import type { BuddyExecutionProfile } from '../../../shared/executionProfile'
-
-export type RunStatus = 'queued' | 'running' | 'completed' | 'failed' | 'cancelled'
-
-export interface RunRecord {
-  id: string
-  conversationId: string
-  branchId: string
-  triggeringMessageId: string
-  provider: string
-  model: string
-  contextWindow: number | null
-  maxTokens: number | null
-  purpose: string
-  status: RunStatus
-  piSessionFile: string | null
-  errorCode: string | null
-  executionProfile: BuddyExecutionProfile
-  startedAt: string
-  completedAt: string | null
-}
+import type { RunRecord, RunRow, RunStatus } from './runRecord'
+import { requireRunRecord, toRunRecord } from './runRecord'
 
 export interface CreateRunInput extends Omit<
   RunRecord,
@@ -51,30 +32,13 @@ export interface RunRepository {
     runIds: readonly string[],
   ) => RunRecord[]
   listIdsForConversation: (conversationId: string) => string[]
-  updateStatus: (
+  markRunning: (id: string, startedAt: string) => boolean
+  reconcileTerminal: (
     id: string,
-    status: RunStatus,
-    completedAt?: string | null,
-    errorCode?: string | null,
+    status: Extract<RunStatus, 'cancelled' | 'completed' | 'failed'>,
+    completedAt: string,
+    errorCode: string | null,
   ) => boolean
-}
-
-interface RunRow {
-  id: string
-  conversation_id: string
-  branch_id: string
-  triggering_message_id: string
-  provider: string
-  model: string
-  context_window: number | null
-  max_tokens: number | null
-  purpose: string
-  status: RunStatus
-  pi_session_file: string | null
-  error_code: string | null
-  execution_profile: BuddyExecutionProfile
-  started_at: string
-  completed_at: string | null
 }
 
 export function createRunRepository(database: DatabaseSync): RunRepository {
@@ -107,8 +71,14 @@ export function createRunRepository(database: DatabaseSync): RunRepository {
     ORDER BY started_at DESC, id DESC
     LIMIT 1
   `)
-  const update = database.prepare(`
-    UPDATE runs SET status = ?, completed_at = ?, error_code = ? WHERE id = ?
+  const markRunning = database.prepare(`
+    UPDATE runs
+    SET status = 'running', started_at = ?, completed_at = NULL, error_code = NULL
+    WHERE id = ? AND status = 'queued'
+  `)
+  const reconcileTerminal = database.prepare(`
+    UPDATE runs SET status = ?, completed_at = ?, error_code = ?
+    WHERE id = ? AND status IN ('queued', 'running', ?)
   `)
   const bindSession = database.prepare(`
     UPDATE runs SET pi_session_file = ? WHERE id = ?
@@ -147,18 +117,18 @@ export function createRunRepository(database: DatabaseSync): RunRepository {
         input.completedAt ?? null,
         input.executionProfile,
       )
-      return requireRun(find.get(input.id), input.id)
+      return requireRunRecord(find.get(input.id), input.id)
     },
     findById(id) {
       const row = find.get(id) as RunRow | undefined
-      return row ? toRun(row) : null
+      return row ? toRunRecord(row) : null
     },
     findLatestForBranch(conversationId, branchId) {
       const row = findLatestForBranch.get(conversationId, branchId) as RunRow | undefined
-      return row ? toRun(row) : null
+      return row ? toRunRecord(row) : null
     },
     listForConversation(conversationId, limit = 100) {
-      return (list.all(conversationId, limit) as unknown as RunRow[]).map(toRun)
+      return (list.all(conversationId, limit) as unknown as RunRow[]).map(toRunRecord)
     },
     listForTimeline(conversationId, activeBranchId, triggeringMessageIds, runIds) {
       const clauses: string[] = []
@@ -181,46 +151,28 @@ export function createRunRepository(database: DatabaseSync): RunRepository {
         WHERE conversation_id = ? AND (${clauses.join(' OR ')})
         ORDER BY started_at, id
       `).all(...parameters) as unknown as RunRow[]
-      return rows.map(toRun)
+      return rows.map(toRunRecord)
     },
     listIdsForConversation(conversationId) {
       return (listIds.all(conversationId) as unknown as Array<{ id: string }>).map(row => row.id)
     },
     listIncomplete() {
-      return (listIncomplete.all() as unknown as RunRow[]).map(toRun)
+      return (listIncomplete.all() as unknown as RunRow[]).map(toRunRecord)
     },
     listRecent(limit = 100) {
-      return (listRecent.all(limit) as unknown as RunRow[]).map(toRun)
+      return (listRecent.all(limit) as unknown as RunRow[]).map(toRunRecord)
     },
-    updateStatus(id, status, completedAt = null, errorCode = null) {
-      return Number(update.run(status, completedAt, errorCode, id).changes) === 1
+    markRunning(id, startedAt) {
+      return Number(markRunning.run(startedAt, id).changes) === 1
     },
-  }
-}
-
-function requireRun(value: unknown, id: string): RunRecord {
-  const row = value as RunRow | undefined
-  if (!row)
-    throw new Error(`Lexora Buddy run was not persisted: ${id}`)
-  return toRun(row)
-}
-
-function toRun(row: RunRow): RunRecord {
-  return {
-    id: row.id,
-    conversationId: row.conversation_id,
-    branchId: row.branch_id,
-    triggeringMessageId: row.triggering_message_id,
-    provider: row.provider,
-    model: row.model,
-    contextWindow: row.context_window,
-    maxTokens: row.max_tokens,
-    purpose: row.purpose,
-    status: row.status,
-    piSessionFile: row.pi_session_file,
-    errorCode: row.error_code,
-    executionProfile: row.execution_profile,
-    startedAt: row.started_at,
-    completedAt: row.completed_at,
+    reconcileTerminal(id, status, completedAt, errorCode) {
+      return Number(reconcileTerminal.run(
+        status,
+        completedAt,
+        errorCode,
+        id,
+        status,
+      ).changes) === 1
+    },
   }
 }

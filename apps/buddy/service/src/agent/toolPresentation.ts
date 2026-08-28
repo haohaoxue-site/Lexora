@@ -1,36 +1,63 @@
 import type { BuddyToolPresentation } from '../../../shared/runEventPresentation'
+import type { BuddyRunOutputPayload } from '../../../shared/runOutput'
+import type { CreateBuddyToolPresentationInput } from '../events/toolPresentationSupport'
 import { relative, sep } from 'node:path'
 
 import { redactSensitiveText, redactShellCommand } from '../../../shared/approvalReviewPayload'
+import { createAutomationToolPresentation } from '../automations/automationToolContract'
+import { createMcpToolPresentation } from '../connectors/mcp/mcpToolContract'
 import {
-  IMAGE_GENERATION_TOOL_NAME,
-  readImageGenerationToolDetails,
+  argumentNames,
+  boundedToolPreview,
+  MAX_TOOL_PRESENTATION_OUTPUT_LENGTH,
+  readOptionalString,
+  readRecord,
+  readToolDetails,
+  readToolOutput,
+} from '../events/toolPresentationSupport'
+import {
+  createImageGenerationRunOutput,
+  createImageGenerationToolPresentation,
 } from '../images/imageGenerationToolContract'
-import { parseSystemToolFailure } from '../system/systemToolFailure'
+import { createPetToolPresentation } from '../pet/petToolContract'
+import { createSystemToolPresentation } from '../system/systemToolContract'
 
-const MAX_OUTPUT_LENGTH = 64 * 1024
+export type { CreateBuddyToolPresentationInput } from '../events/toolPresentationSupport'
 
-export interface CreateBuddyToolPresentationInput {
-  arguments: unknown
-  canonicalRoot?: string
-  isError?: boolean
-  result?: unknown
-  toolName: string
+export function createBuddyRunOutputs(
+  input: CreateBuddyToolPresentationInput & { toolCallId: string },
+): BuddyRunOutputPayload[] {
+  const imageOutput = createImageGenerationRunOutput(input)
+  return imageOutput ? [imageOutput] : []
 }
 
 export function createBuddyToolPresentation(
   input: CreateBuddyToolPresentationInput,
 ): BuddyToolPresentation {
+  return createPiToolPresentation(input)
+    ?? createPetToolPresentation(input)
+    ?? createImageGenerationToolPresentation(input)
+    ?? createAutomationToolPresentation(input)
+    ?? createSystemToolPresentation(input)
+    ?? createMcpToolPresentation(input)
+    ?? createGenericToolPresentation(input)
+}
+
+function createPiToolPresentation(
+  input: CreateBuddyToolPresentationInput,
+): BuddyToolPresentation | null {
   const arguments_ = readRecord(input.arguments)
   const output = readToolOutput(input.result)
-  const preview = boundedPreview(output)
+  const preview = boundedToolPreview(output)
   const description = readOptionalString(arguments_, 'description')
 
   if (input.toolName === 'bash') {
     return {
       card: 'terminal',
       command: redactShellCommand(readString(arguments_, 'command')),
-      cwd: input.canonicalRoot ? '.' : displayOptionalPath(readOptionalString(arguments_, 'cwd'), input.canonicalRoot),
+      cwd: input.canonicalRoot
+        ? '.'
+        : displayOptionalPath(readOptionalString(arguments_, 'cwd'), input.canonicalRoot),
       description,
       exitCode: readExitCode(input.result, input.isError),
       signal: readSignal(input.result),
@@ -68,169 +95,26 @@ export function createBuddyToolPresentation(
       ...preview,
     }
   }
-  if (input.toolName === 'lexora_buddy_pet') {
-    const details = readToolDetails(input.result)
-    return {
-      card: 'pet',
-      description,
-      macro: readOptionalString(details, 'macro')
-        ?? readOptionalString(arguments_, 'macro')
-        ?? 'unknown',
-      status: readOptionalString(details, 'status') ?? (input.result ? 'completed' : 'running'),
-    }
-  }
-  if (input.toolName === IMAGE_GENERATION_TOOL_NAME) {
-    const details = readImageGenerationToolDetails(input.result)
-    return {
-      artifactIds: details?.artifactIds ?? [],
-      card: 'image',
-      description,
-      generatedCount: details?.artifactIds.length ?? null,
-      prompt: readOptionalString(arguments_, 'prompt'),
-      reference: readImageReference(arguments_),
-      status: input.result === undefined
-        ? 'running'
-        : input.isError
-          ? 'failed'
-          : 'completed',
-    }
-  }
-  if (input.toolName === 'lexora_buddy_automation') {
-    const details = readToolDetails(input.result)
-    const automation = readRecord(details?.automation)
-      ?? readRecord(arguments_?.draft)
-    const occurrence = readRecord(details?.occurrence)
-    const page = readRecord(details?.page)
-    return {
-      automationId: readOptionalString(automation, 'id')
-        ?? readOptionalString(occurrence, 'automationId')
-        ?? readOptionalString(arguments_, 'automationId'),
-      card: 'automation',
-      itemCount: readArrayLength(page, 'items'),
-      name: readOptionalString(automation, 'name'),
-      nextRunAt: readOptionalString(automation, 'nextRunAt'),
-      occurrenceId: readOptionalString(occurrence, 'id'),
-      operation: readAutomationOperation(details, arguments_),
-      status: readOptionalString(occurrence, 'status')
-        ?? readOptionalString(automation, 'status')
-        ?? (input.result ? null : 'running'),
-    }
-  }
-  if (input.toolName === 'lexora_system_action') {
-    const receipt = readRecord(readToolDetails(input.result)?.receipt)
-    const target = readRecord(receipt?.target)
-    const failureStatus = readSystemFailureStatus(input.result)
-    return {
-      action: readSystemAction(arguments_, receipt),
-      card: 'system',
-      description: description ?? readOptionalString(arguments_, 'reason'),
-      status: readOptionalString(receipt, 'status')
-        ?? failureStatus
-        ?? (input.result ? 'failed' : 'running'),
-      target: readOptionalString(target, 'displayName'),
-      verified: readBoolean(receipt, 'verified'),
-      ...boundedSystemPreview(input.result),
-    }
-  }
-  if (input.toolName.startsWith('mcp__')) {
-    const [, connector = 'connector', ...toolParts] = input.toolName.split('__')
-    return {
-      argumentNames: argumentNames(arguments_),
-      card: 'connector',
-      connector,
-      description,
-      tool: toolParts.join('__') || input.toolName,
-      ...preview,
-    }
-  }
+  return null
+}
+
+function createGenericToolPresentation(
+  input: CreateBuddyToolPresentationInput,
+): Extract<BuddyToolPresentation, { card: 'generic' }> {
+  const arguments_ = readRecord(input.arguments)
   return {
     argumentNames: argumentNames(arguments_),
     card: 'generic',
-    description,
-    ...preview,
+    description: readOptionalString(arguments_, 'description'),
+    ...boundedToolPreview(readToolOutput(input.result)),
   }
-}
-
-function readImageReference(
-  arguments_: Record<string, unknown> | null,
-): Extract<BuddyToolPresentation, { card: 'image' }>['reference'] {
-  const reference = readRecord(arguments_?.reference)
-  if (reference?.mode === 'latest') {
-    return {
-      mode: 'latest',
-    }
-  }
-  if (reference?.mode !== 'resources' || !Array.isArray(reference.resourceIds))
-    return null
-  const resourceIds = [...new Set(reference.resourceIds.filter(
-    (value): value is string => typeof value === 'string' && Boolean(value),
-  ))].slice(0, 4)
-  return resourceIds.length > 0
-    ? { mode: 'resources', resourceIds }
-    : null
-}
-
-function readSystemFailureStatus(value: unknown): string | null {
-  const detailsCode = readOptionalString(readToolDetails(value), 'code')
-  const code = detailsCode ?? parseSystemToolFailure(readToolOutput(value))?.error.code
-  switch (code) {
-    case 'SYSTEM_ACTION_EXPIRED':
-    case 'SYSTEM_ACTION_NOT_PREPARED': return 'action-expired'
-    case 'SYSTEM_TARGET_AMBIGUOUS': return 'target-ambiguous'
-    case 'SYSTEM_TARGET_CHANGED': return 'target-changed'
-    case 'SYSTEM_TARGET_NOT_FOUND': return 'target-not-found'
-    default: return null
-  }
-}
-
-function boundedPreview(value: string | null): Pick<
-  Extract<BuddyToolPresentation, { output: unknown }>,
-  'output' | 'truncated'
-> {
-  if (value === null)
-    return { output: null, truncated: false }
-  return {
-    output: value.slice(0, MAX_OUTPUT_LENGTH),
-    truncated: value.length > MAX_OUTPUT_LENGTH,
-  }
-}
-
-function boundedSystemPreview(value: unknown): ReturnType<typeof boundedPreview> {
-  if (parseSystemToolFailure(readToolOutput(value)))
-    return boundedPreview(null)
-  const details = readToolDetails(value)
-  const detail = details?.receipt
-  if (detail === undefined)
-    return boundedPreview(readToolOutput(value))
-  try {
-    return boundedPreview(redactSensitiveText(JSON.stringify(detail, null, 2)))
-  }
-  catch {
-    return boundedPreview('Lexora Buddy system capability returned an unreadable result')
-  }
-}
-
-function readToolOutput(value: unknown): string | null {
-  const result = readRecord(value)
-  if (!result || !Array.isArray(result.content))
-    return null
-  const text = result.content.flatMap((part) => {
-    const content = readRecord(part)
-    return content?.type === 'text' && typeof content.text === 'string'
-      ? [content.text]
-      : []
-  }).join('\n')
-  return text ? redactSensitiveText(text) : null
 }
 
 function readDiff(value: unknown): string | null {
-  const details = readToolDetails(value)
-  const diff = readOptionalString(details, 'diff')
-  return diff ? redactSensitiveText(diff).slice(0, MAX_OUTPUT_LENGTH) : null
-}
-
-function readToolDetails(value: unknown): Record<string, unknown> | null {
-  return readRecord(readRecord(value)?.details)
+  const diff = readOptionalString(readToolDetails(value), 'diff')
+  return diff
+    ? redactSensitiveText(diff).slice(0, MAX_TOOL_PRESENTATION_OUTPUT_LENGTH)
+    : null
 }
 
 function readExitCode(value: unknown, isError: boolean | undefined): number | null {
@@ -240,14 +124,13 @@ function readExitCode(value: unknown, isError: boolean | undefined): number | nu
     return 0
   if (isError === undefined)
     return null
-  const output = readToolOutput(value)
-  const match = output?.match(/Command exited with code (\d+)/)
+  const match = readToolOutput(value)?.match(/Command exited with code (\d+)/)
   return match ? Number.parseInt(match[1]!, 10) : null
 }
 
 function readSignal(value: unknown): string | null {
-  const output = readToolOutput(value)
-  const match = output?.match(/Command (?:terminated by signal|killed by) ([A-Z][A-Z0-9]+)/i)
+  const match = readToolOutput(value)
+    ?.match(/Command (?:terminated by signal|killed by) ([A-Z][A-Z0-9]+)/i)
   return match?.[1]?.toUpperCase() ?? null
 }
 
@@ -263,57 +146,6 @@ function displayOptionalPath(
   canonicalRoot: string | undefined,
 ): string | null {
   return path === null ? null : displayPath(path, canonicalRoot)
-}
-
-function argumentNames(value: Record<string, unknown> | null): string[] {
-  return value ? Object.keys(value).sort().slice(0, 32) : []
-}
-
-function readBoolean(value: Record<string, unknown> | null, key: string): boolean | null {
-  const candidate = value?.[key]
-  return typeof candidate === 'boolean' ? candidate : null
-}
-
-function readArrayLength(value: Record<string, unknown> | null, key: string): number | null {
-  const candidate = value?.[key]
-  return Array.isArray(candidate) ? candidate.length : null
-}
-
-function readAutomationOperation(
-  details: Record<string, unknown> | null,
-  arguments_: Record<string, unknown> | null,
-): Extract<BuddyToolPresentation, { card: 'automation' }>['operation'] {
-  const operation = readOptionalString(details, 'operation')
-    ?? readOptionalString(arguments_, 'operation')
-  switch (operation) {
-    case 'list':
-    case 'get':
-    case 'upsert':
-    case 'pause':
-    case 'resume':
-    case 'delete':
-    case 'run_now':
-      return operation
-    default:
-      return 'list'
-  }
-}
-
-function readSystemAction(
-  arguments_: Record<string, unknown> | null,
-  receipt: Record<string, unknown> | null,
-): Extract<BuddyToolPresentation, { card: 'system' }>['action'] {
-  const action = readOptionalString(receipt, 'action') ?? readOptionalString(arguments_, 'action')
-  switch (action) {
-    case 'kill-process':
-    case 'restart-service':
-    case 'start-service':
-    case 'stop-service':
-    case 'terminate-process':
-      return action
-    default:
-      return 'terminate-process'
-  }
 }
 
 const LANGUAGE_BY_EXTENSION = new Map([
@@ -347,18 +179,4 @@ function readPositiveInteger(
 
 function readString(value: Record<string, unknown> | null, key: string): string {
   return readOptionalString(value, key) ?? ''
-}
-
-function readOptionalString(
-  value: Record<string, unknown> | null,
-  key: string,
-): string | null {
-  const candidate = value?.[key]
-  return typeof candidate === 'string' && candidate.trim() ? candidate : null
-}
-
-function readRecord(value: unknown): Record<string, unknown> | null {
-  return value && typeof value === 'object' && !Array.isArray(value)
-    ? value as Record<string, unknown>
-    : null
 }

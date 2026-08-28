@@ -1,45 +1,39 @@
 import type { GrantedPathMode, ProjectGrant } from '../projects/resolveGrantedPath'
+import type {
+  ShellCommandPolicy,
+  ToolApprovalKind,
+  ToolDecision,
+  ToolPolicyPath,
+  ToolPolicyRequest,
+} from './toolPolicyContract'
 import { isAbsolute, resolve } from 'node:path'
 
 import { GrantedPathError, resolveGrantedPath } from '../projects/resolveGrantedPath'
 import { ShellPolicy } from './ShellPolicy'
 
-export type ToolApprovalKind = 'automation' | 'delete' | 'mcp' | 'network' | 'shell' | 'system'
-export type ToolRisk = 'delete' | 'mcp' | 'network' | 'read' | 'system' | 'visual' | 'write'
-
-export type ToolDecision
-  = { type: 'allow' }
-    | { type: 'deny', code: 'PATH_OUTSIDE_GRANTED_DIRECTORY' | 'UNTRUSTED_RESOURCE' }
-    | { type: 'ask', kind: ToolApprovalKind, summary: string }
-
-export interface ToolPolicyPath {
-  mode: GrantedPathMode
-  path: string
-}
-
-export interface ToolPolicyRequest {
-  arguments: unknown
-  cwd: string
-  grants: readonly ProjectGrant[]
-  source?: 'lexora' | 'mcp' | 'pi'
-  paths?: readonly ToolPolicyPath[]
-  resource?: { kind?: 'connector' | 'project', projectId: string, trusted: boolean }
-  risk?: ToolRisk
-  toolName: string
-}
-
 export interface ToolPolicyOptions {
-  shellPolicy?: ShellPolicy
+  shellPolicy?: ShellCommandPolicy
 }
 
 export class ToolPolicy {
-  readonly #shellPolicy: ShellPolicy
+  readonly #shellPolicy: ShellCommandPolicy
 
   constructor(options: ToolPolicyOptions = {}) {
     this.#shellPolicy = options.shellPolicy ?? new ShellPolicy()
   }
 
   async decide(request: ToolPolicyRequest): Promise<ToolDecision> {
+    try {
+      return await this.#decide(request)
+    }
+    catch (error) {
+      if (error instanceof ToolPolicyValidationError)
+        return { type: 'deny', code: 'VALIDATION_FAILED' }
+      throw error
+    }
+  }
+
+  async #decide(request: ToolPolicyRequest): Promise<ToolDecision> {
     if (request.resource && !request.resource.trusted && request.resource.kind !== 'connector')
       return { type: 'deny', code: 'UNTRUSTED_RESOURCE' }
 
@@ -127,8 +121,8 @@ export class ToolPolicy {
         await resolveGrantedPath(grants, absolutePath, path.mode)
       }
       catch (error) {
-        if (error instanceof GrantedPathError && error.code === 'PATH_OUTSIDE_GRANTED_DIRECTORY')
-          return { type: 'deny', code: 'PATH_OUTSIDE_GRANTED_DIRECTORY' }
+        if (error instanceof GrantedPathError)
+          return { type: 'deny', code: error.code }
         throw error
       }
     }
@@ -136,9 +130,7 @@ export class ToolPolicy {
   }
 }
 
-export class ToolPolicyValidationError extends Error {
-  readonly code = 'VALIDATION_FAILED'
-
+class ToolPolicyValidationError extends Error {
   constructor() {
     super('Lexora Buddy tool input is invalid')
     this.name = 'ToolPolicyValidationError'

@@ -1,7 +1,7 @@
-import type { ToolDecision } from './ToolPolicy'
+import type { ShellCommandPolicy, ToolDecision } from './toolPolicyContract'
 import { isReadOnlyShellCommand } from './readOnlyShellCommand'
 
-export class ShellPolicy {
+export class ShellPolicy implements ShellCommandPolicy {
   decide(command: string): ToolDecision {
     if (isReadOnlyShellCommand(command))
       return { type: 'allow' }
