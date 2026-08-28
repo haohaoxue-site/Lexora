@@ -70,6 +70,7 @@ export function useChatComposer(options: UseChatComposerOptions) {
         codeBlock: false,
         heading: false,
         horizontalRule: false,
+        link: false,
         listItem: false,
         orderedList: false,
         strike: false,
@@ -81,6 +82,7 @@ export function useChatComposer(options: UseChatComposerOptions) {
       attributes: {
         'aria-label': t('desktop.chat.messageInput'),
         'class': 'desktop-chat-composer__prosemirror',
+        'spellcheck': 'false',
       },
       handleKeyDown: (_view, event) => handleEditorKeydown(event),
       handlePaste: (_view, event) => handleEditorPaste(event),

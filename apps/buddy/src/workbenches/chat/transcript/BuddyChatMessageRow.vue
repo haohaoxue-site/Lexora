@@ -13,7 +13,6 @@ import BuddyChatAgentIdentity from './BuddyChatAgentIdentity.vue'
 import BuddyChatMessageContent from './BuddyChatMessageContent.vue'
 import BuddyChatTurnChanges from './BuddyChatTurnChanges.vue'
 import BuddyChatTurnOutputs from './BuddyChatTurnOutputs.vue'
-import { renderChatMarkdown } from './chatMarkdown'
 import { projectChatMessageActions } from './chatMessageActions'
 import {
   getChatMessageInterruption,
@@ -64,7 +63,6 @@ const showActions = computed(() => (
   || actions.value.showTime
   || props.branchNavigator !== null
 ))
-const html = computed(() => renderChatMarkdown(getChatMessageText(props.message)))
 const interruptionLabel = computed(() => {
   const interruption = getChatMessageInterruption(props.message)
   if (!interruption)
@@ -156,7 +154,6 @@ async function copyMessage() {
     <BuddyChatMessageContent
       v-else
       class="buddy-chat-message__body"
-      :html="html"
       :language="language"
       :message="message"
     />

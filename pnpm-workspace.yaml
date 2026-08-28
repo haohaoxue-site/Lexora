@@ -44,3 +44,6 @@ allowBuilds:
   tree-sitter-bash: false
 patchedDependencies:
   '@earendil-works/pi-ai@0.84.1': patches/@earendil-works__pi-ai@0.84.1.patch
+minimumReleaseAgeExclude:
+  - markstream-core@2.0.6
+  - markstream-vue@2.0.6

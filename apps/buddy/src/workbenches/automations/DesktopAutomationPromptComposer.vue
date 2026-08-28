@@ -51,6 +51,7 @@ const editor = useEditor({
       codeBlock: false,
       heading: false,
       horizontalRule: false,
+      link: false,
       listItem: false,
       orderedList: false,
       strike: false,
@@ -60,6 +61,7 @@ const editor = useEditor({
     attributes: {
       'aria-label': t('desktop.automations.editor.prompt'),
       'class': 'desktop-chat-composer__prosemirror',
+      'spellcheck': 'false',
     },
   },
   onUpdate: ({ editor }) => {

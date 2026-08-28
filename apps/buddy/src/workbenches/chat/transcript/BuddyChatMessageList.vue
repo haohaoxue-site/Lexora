@@ -28,11 +28,11 @@ import BuddyChatAgentIdentity from './BuddyChatAgentIdentity.vue'
 import BuddyChatAgentTurn from './BuddyChatAgentTurn.vue'
 import BuddyChatMessageRow from './BuddyChatMessageRow.vue'
 import BuddyChatRunActivity from './BuddyChatRunActivity.vue'
+import BuddyChatStreamingContent from './BuddyChatStreamingContent.vue'
 import { resolveChatAgentTurnOpen } from './chatAgentTurnDisclosure'
 import {
   projectConversationCompaction,
 } from './chatConversationTimeline'
-import { renderChatMarkdown } from './chatMarkdown'
 import { projectChatMessageBranchNavigators } from './chatMessageBranches'
 import {
   formatChatDayDividerLabel,
@@ -423,10 +423,10 @@ function toScrollMetrics(viewport: HTMLElement): ChatMessageScrollMetrics {
           :class="{ 'has-activity-tail': transcriptProjection.hasActiveProcessIdentity }"
         >
           <BuddyChatAgentIdentity v-if="!transcriptProjection.hasActiveProcessIdentity" :language="language" />
-          <div
+          <BuddyChatStreamingContent
             v-if="item.message.text"
             class="buddy-chat-streaming__content"
-            v-html="renderChatMarkdown(item.message.text)"
+            :message="item.message"
           />
         </article>
 

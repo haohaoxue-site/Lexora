@@ -6,11 +6,11 @@ import { NIcon } from 'naive-ui'
 import { computed, nextTick, shallowRef, useTemplateRef } from 'vue'
 import { useBuddyI18n } from '@/i18n/buddyI18n'
 import BuddyImagePreview from '@/ui/media/BuddyImagePreview.vue'
+import BuddyChatMarkdownContent from './BuddyChatMarkdownContent.vue'
 import { resolveBuddyAttachmentPreviewUrl } from './chatAttachmentView'
 import { getChatMessageText } from './chatMessageContent'
 
 const props = defineProps<{
-  html: string
   language: BuddyLocale
   message: LocalMessage
 }>()
@@ -21,7 +21,8 @@ const failedAttachmentIds = shallowRef<ReadonlySet<string>>(new Set())
 const previewIndex = shallowRef(0)
 const previewOpen = shallowRef(false)
 let previewTrackScrollLeft = 0
-const hasText = computed(() => getChatMessageText(props.message).trim().length > 0)
+const text = computed(() => getChatMessageText(props.message))
+const hasText = computed(() => text.value.trim().length > 0)
 const attachmentViews = computed(() => props.message.attachments.map(attachment => ({
   attachment,
   previewUrl: resolveBuddyAttachmentPreviewUrl(attachment),
@@ -113,9 +114,15 @@ function previewLeaveTransition(): Promise<void> {
       </figure>
     </div>
     <div
-      v-if="hasText"
+      v-if="hasText && message.role === 'user'"
+      class="buddy-chat-message-content__text is-plain-text"
+    >
+      {{ text }}
+    </div>
+    <BuddyChatMarkdownContent
+      v-else-if="hasText"
       class="buddy-chat-message-content__text"
-      v-html="html"
+      :content="text"
     />
   </div>
 </template>
@@ -265,6 +272,10 @@ function previewLeaveTransition(): Promise<void> {
   line-height: 1.7;
   padding: 0.75rem 0.95rem;
   overflow-wrap: anywhere;
+
+  &.is-plain-text {
+    white-space: pre-wrap;
+  }
 
   .is-user & {
     justify-self: end;
