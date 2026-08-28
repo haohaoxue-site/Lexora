@@ -18,6 +18,7 @@ const props = defineProps<{
   language: BuddyLocale
   presentation: BuddyToolPresentation
   status: ChatAgentToolNode['status']
+  toolName: string
 }>()
 
 const { t } = useBuddyI18n(() => props.language)
@@ -27,9 +28,12 @@ const terminal = computed(() => props.presentation.card === 'terminal'
 const image = computed(() => props.presentation.card === 'image'
   ? props.presentation
   : null)
-const terminalLabel = computed(() => terminal.value?.cwd && terminal.value.cwd !== '.'
-  ? `bash · ${terminal.value.cwd}`
-  : 'bash')
+const terminalLabel = computed(() => {
+  const shellName = props.toolName === 'powershell' ? 'PowerShell' : 'bash'
+  return terminal.value?.cwd && terminal.value.cwd !== '.'
+    ? `${shellName} · ${terminal.value.cwd}`
+    : shellName
+})
 const terminalStatus = computed(() => {
   if (!terminal.value)
     return ''

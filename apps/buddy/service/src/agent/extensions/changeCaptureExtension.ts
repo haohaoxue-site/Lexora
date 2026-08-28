@@ -1,6 +1,7 @@
 import type { ToolCallEvent, ToolResultEvent } from '@earendil-works/pi-coding-agent'
 import type { BuddyInProcessExtension } from '../createBuddyResourceLoader'
 import type { BuddyRunContext } from './toolPolicyExtension'
+import { isPiShellToolName } from '../piBuiltinTools'
 
 export interface ChangeCaptureGateway {
   beginFileTool: (input: {
@@ -61,7 +62,7 @@ async function captureBeforeTool(
   const run = options.getRunContext()
   if (!run)
     return
-  if (event.toolName === 'bash') {
+  if (isPiShellToolName(event.toolName)) {
     await ignoreCaptureError(() => options.service.markPartial({
       conversationId: options.conversationId,
       runId: run.runId,

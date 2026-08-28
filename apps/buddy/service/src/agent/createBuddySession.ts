@@ -13,6 +13,7 @@ import type { BoundedContextDiagnostic } from './loadBoundedContextFiles'
 import { chmod, mkdir, realpath } from 'node:fs/promises'
 
 import { isAbsolute, join, relative, resolve, sep } from 'node:path'
+import process from 'node:process'
 import {
   convertToLlm,
   createAgentSession,
@@ -28,7 +29,10 @@ import {
   createBuddyResourceLoader,
   createBuddySettingsManager,
 } from './createBuddyResourceLoader'
-import { PI_BUILTIN_TOOL_NAMES } from './piBuiltinTools'
+import {
+  getActivePiBuiltinToolNames,
+  isPiShellToolName,
+} from './piBuiltinTools'
 
 const sessionIdentityPattern = /^[A-Z0-9][\w-]{0,127}$/i
 
@@ -43,6 +47,7 @@ export interface CreateBuddySessionOptions {
   getServiceTier?: () => BuddyServiceTier | null
   model?: Model<Api>
   modelRuntime: ModelRuntime
+  platform?: NodeJS.Platform
   inProcessExtensions: readonly BuddyInProcessExtension[]
   piSessionFile?: string
   recoveryMessages?: readonly Message[] | (() => Promise<readonly Message[]>)
@@ -242,6 +247,7 @@ async function createConfiguredBuddySession(
     inProcessExtensions: options.inProcessExtensions,
     projectInstructions: options.resources.projectInstructions,
     executionProfile: options.executionProfile,
+    platform: options.platform,
     settingsManager,
   })
   const result = await createAgentSession({
@@ -255,9 +261,10 @@ async function createConfiguredBuddySession(
     settingsManager,
     thinkingLevel: options.thinkingLevel,
   })
+  const platform = options.platform ?? process.platform
   result.session.setActiveToolsByName([...new Set([
-    ...result.session.getActiveToolNames(),
-    ...PI_BUILTIN_TOOL_NAMES,
+    ...result.session.getActiveToolNames().filter(toolName => !isPiShellToolName(toolName)),
+    ...getActivePiBuiltinToolNames(platform),
   ])])
   const previousPayloadTransform = result.session.agent.onPayload
   result.session.agent.onPayload = async (payload, model) => {

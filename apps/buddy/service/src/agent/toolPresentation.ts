@@ -22,6 +22,7 @@ import {
 } from '../images/imageGenerationToolContract'
 import { createPetToolPresentation } from '../pet/petToolContract'
 import { createSystemToolPresentation } from '../system/systemToolContract'
+import { isPiShellToolName } from './piBuiltinTools'
 
 export type { CreateBuddyToolPresentationInput } from '../events/toolPresentationSupport'
 
@@ -53,7 +54,7 @@ function createPiToolPresentation(
   const preview = boundedToolPreview(output)
   const description = readOptionalString(arguments_, 'description')
 
-  if (input.toolName === 'bash') {
+  if (isPiShellToolName(input.toolName)) {
     return {
       card: 'terminal',
       command: redactShellCommand(readString(arguments_, 'command')),

@@ -7,19 +7,28 @@ import type {
   ToolPolicyRequest,
 } from './toolPolicyContract'
 import { isAbsolute, resolve } from 'node:path'
+import process from 'node:process'
 
 import { GrantedPathError, resolveGrantedPath } from '../projects/resolveGrantedPath'
 import { ShellPolicy } from './ShellPolicy'
 
 export interface ToolPolicyOptions {
-  shellPolicy?: ShellCommandPolicy
+  platform?: NodeJS.Platform
+  shellPolicies?: Partial<Record<ShellToolName, ShellCommandPolicy>>
 }
 
+type ShellToolName = 'bash' | 'powershell'
+
 export class ToolPolicy {
-  readonly #shellPolicy: ShellCommandPolicy
+  readonly #shellPolicies: Readonly<Record<ShellToolName, ShellCommandPolicy>>
 
   constructor(options: ToolPolicyOptions = {}) {
-    this.#shellPolicy = options.shellPolicy ?? new ShellPolicy()
+    const platform = options.platform ?? process.platform
+    this.#shellPolicies = {
+      bash: options.shellPolicies?.bash ?? new ShellPolicy({ dialect: 'bash', platform }),
+      powershell: options.shellPolicies?.powershell
+        ?? new ShellPolicy({ dialect: 'powershell', platform }),
+    }
   }
 
   async decide(request: ToolPolicyRequest): Promise<ToolDecision> {
@@ -71,7 +80,10 @@ export class ToolPolicy {
       case 'ls':
         return this.#decideOptionalPathTool(request)
       case 'bash':
-        return this.#shellPolicy.decide(readStringProperty(request.arguments, 'command'))
+      case 'powershell':
+        return this.#shellPolicies[request.toolName].decide(
+          readStringProperty(request.arguments, 'command'),
+        )
     }
 
     switch (request.risk) {

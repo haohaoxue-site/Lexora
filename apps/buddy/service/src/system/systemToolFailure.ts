@@ -55,7 +55,7 @@ export function createSystemToolFailure(code: SystemToolFailureCode): SystemTool
             recovery: {
               instruction: retryAction
                 ? 'Retry lexora_system_action so Lexora Buddy can resolve and approve the current target again.'
-                : 'Use Pi bash to identify one exact process or user service, then retry lexora_system_action with a more precise selector.',
+                : 'Use the active Pi shell to identify one exact process or user service, then retry lexora_system_action with a more precise selector.',
               toolName: SYSTEM_ACTION_TOOL_NAME,
             },
           }

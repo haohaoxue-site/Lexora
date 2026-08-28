@@ -1,9 +1,24 @@
+import type { ShellDialect } from './shell/classifyShellCommand'
 import type { ShellCommandPolicy, ToolDecision } from './toolPolicyContract'
-import { isReadOnlyShellCommand } from './readOnlyShellCommand'
+import process from 'node:process'
+import { classifyShellCommand } from './shell/classifyShellCommand'
+
+export interface ShellPolicyOptions {
+  dialect: ShellDialect
+  platform?: NodeJS.Platform
+}
 
 export class ShellPolicy implements ShellCommandPolicy {
+  readonly #dialect: ShellDialect
+  readonly #platform: NodeJS.Platform
+
+  constructor(options: ShellPolicyOptions) {
+    this.#dialect = options.dialect
+    this.#platform = options.platform ?? process.platform
+  }
+
   decide(command: string): ToolDecision {
-    if (isReadOnlyShellCommand(command))
+    if (classifyShellCommand(this.#dialect, command, this.#platform).type === 'auto-approve')
       return { type: 'allow' }
     return {
       type: 'ask',

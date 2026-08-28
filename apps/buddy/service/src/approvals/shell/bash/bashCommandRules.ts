@@ -1,3 +1,5 @@
+import type { ShellCommandApprovalReason } from '../shellCommandClassification'
+
 type CommandValidator = (arguments_: readonly string[]) => boolean
 
 const allowedEnvironment = new Map<string, RegExp>([
@@ -8,42 +10,53 @@ const allowedEnvironment = new Map<string, RegExp>([
   ['TZ', /^(?:UTC|Etc\/UTC)$/],
 ])
 
-const commandValidators = new Map<string, CommandValidator>([
+const commonCommandValidators = new Map<string, CommandValidator>([
   ['awk', validateAwk],
   ['df', validateDf],
   ['echo', allowLiteralArguments],
-  ['free', allowLiteralArguments],
   ['grep', validateGrep],
   ['head', validateHead],
   ['hostname', validateHostname],
   ['id', allowLiteralArguments],
-  ['iostat', allowLiteralArguments],
   ['ls', validateLs],
+  ['pgrep', validatePgrep],
+  ['printf', validatePrintf],
+  ['ps', allowLiteralArguments],
+  ['pwd', allowLiteralArguments],
+  ['rg', validateRg],
+  ['sort', validateSort],
+  ['tail', validateTail],
+  ['tr', validateTr],
+  ['uname', allowLiteralArguments],
+  ['uniq', validateOptionsOnly],
+  ['uptime', allowLiteralArguments],
+  ['wc', validateWc],
+  ['which', validateCommandNames],
+  ['xmllint', validateXmllint],
+])
+
+const linuxCommandValidators = new Map<string, CommandValidator>([
+  ['free', allowLiteralArguments],
+  ['iostat', allowLiteralArguments],
   ['lsblk', allowLiteralArguments],
   ['lscpu', allowLiteralArguments],
   ['lsmem', allowLiteralArguments],
   ['mpstat', allowLiteralArguments],
   ['nproc', allowLiteralArguments],
-  ['pgrep', validatePgrep],
   ['pidof', allowLiteralArguments],
-  ['printf', validatePrintf],
-  ['ps', allowLiteralArguments],
-  ['pwd', allowLiteralArguments],
-  ['rg', validateRg],
   ['sensors', validateSensors],
-  ['sort', validateSort],
   ['ss', validateSs],
   ['systemctl', validateSystemctl],
-  ['tail', validateTail],
-  ['top', validateTop],
-  ['tr', validateTr],
-  ['uname', allowLiteralArguments],
-  ['uniq', validateOptionsOnly],
-  ['uptime', allowLiteralArguments],
+  ['top', validateLinuxTop],
   ['vmstat', allowLiteralArguments],
-  ['wc', validateWc],
-  ['which', validateCommandNames],
-  ['xmllint', validateXmllint],
+])
+
+const darwinCommandValidators = new Map<string, CommandValidator>([
+  ['pmset', validatePmset],
+  ['sw_vers', validateSwVers],
+  ['sysctl', validateSysctl],
+  ['top', validateDarwinTop],
+  ['vm_stat', validateVmStat],
 ])
 
 const readOnlySystemctlOperations = new Set([
@@ -66,128 +79,31 @@ const readOnlyXmllintOptions = new Set([
   '--strict-namespace',
 ])
 
-export function isReadOnlyShellCommand(command: string): boolean {
-  const commands = tokenizeCommandList(command)
-  return commands !== null
-    && commands.length > 0
-    && commands.every(validateSimpleCommand)
-}
-
-function tokenizeCommandList(command: string): string[][] | null {
-  const commands: string[][] = []
-  let currentCommand: string[] = []
-  let currentWord = ''
-  let quote: 'double' | 'single' | null = null
-  let wordStarted = false
-
-  const flushWord = () => {
-    if (!wordStarted)
-      return
-    currentCommand.push(currentWord)
-    currentWord = ''
-    wordStarted = false
-  }
-  const flushCommand = (): boolean => {
-    flushWord()
-    if (currentCommand.length === 0)
-      return false
-    commands.push(currentCommand)
-    currentCommand = []
-    return true
-  }
-
-  for (let index = 0; index < command.length; index += 1) {
-    const character = command[index]!
-    if (quote === 'single') {
-      if (character === '\'')
-        quote = null
-      else
-        currentWord += character
-      continue
-    }
-    if (quote === 'double') {
-      if (character === '"') {
-        quote = null
-        continue
-      }
-      if (character === '\\') {
-        const next = command[index + 1]
-        if (next === undefined)
-          return null
-        currentWord += next
-        index += 1
-        continue
-      }
-      if (character === '$' || character === '`')
-        return null
-      currentWord += character
-      continue
-    }
-    if (character === '\'' || character === '"') {
-      quote = character === '\'' ? 'single' : 'double'
-      wordStarted = true
-      continue
-    }
-    if (character === '\\') {
-      const next = command[index + 1]
-      if (next === undefined)
-        return null
-      currentWord += next
-      wordStarted = true
-      index += 1
-      continue
-    }
-    if (character === ' ' || character === '\t' || character === '\r') {
-      flushWord()
-      continue
-    }
-    if (character === '\n')
-      return null
-    if (character === '|' || character === '&') {
-      const next = command[index + 1]
-      if (character === '&' && next !== '&')
-        return null
-      if (character === '|' && next === '&')
-        return null
-      if (!flushCommand())
-        return null
-      if (next === character)
-        index += 1
-      continue
-    }
-    if (character === ';') {
-      if (!flushCommand() || command[index + 1] === ';')
-        return null
-      continue
-    }
-    if ('<>(){}'.includes(character))
-      return null
-    if (character === '$' || character === '`')
-      return null
-    if ('*?['.includes(character) || character === ']')
-      return null
-    if (character === '#' && !wordStarted)
-      return null
-    if (character === '~' && !wordStarted)
-      return null
-    currentWord += character
-    wordStarted = true
-  }
-
-  if (quote || !flushCommand())
-    return null
-  return commands
-}
-
-function validateSimpleCommand(words: readonly string[]): boolean {
+export function classifyBashSimpleCommand(
+  words: readonly string[],
+  platform: NodeJS.Platform,
+): ShellCommandApprovalReason | null {
   let commandIndex = 0
   while (commandIndex < words.length && isAllowedEnvironmentAssignment(words[commandIndex]!))
     commandIndex += 1
   const command = words[commandIndex]
   if (!command || !/^[\w.+-]+$/.test(command))
-    return false
-  const validator = commandValidators.get(command)
-  return validator?.(words.slice(commandIndex + 1)) ?? false
+    return 'unsupported-syntax'
+  const validator = platformCommandValidators(platform).get(command)
+    ?? commonCommandValidators.get(command)
+  if (!validator)
+    return 'unknown-command'
+  return validator(words.slice(commandIndex + 1)) ? null : 'unsafe-arguments'
+}
+
+function platformCommandValidators(
+  platform: NodeJS.Platform,
+): ReadonlyMap<string, CommandValidator> {
+  if (platform === 'linux')
+    return linuxCommandValidators
+  if (platform === 'darwin')
+    return darwinCommandValidators
+  return new Map()
 }
 
 function isAllowedEnvironmentAssignment(word: string): boolean {
@@ -292,9 +208,7 @@ function validatePrintf(arguments_: readonly string[]): boolean {
 }
 
 function validatePgrep(arguments_: readonly string[]): boolean {
-  return !arguments_.some(argument => (
-    /^(?:--mrelease|--signal)(?:$|=)/.test(argument)
-  ))
+  return !arguments_.some(argument => /^(?:--mrelease|--signal)(?:$|=)/.test(argument))
 }
 
 function validateRg(arguments_: readonly string[]): boolean {
@@ -335,7 +249,7 @@ function validateSystemctl(arguments_: readonly string[]): boolean {
   return operation !== undefined && readOnlySystemctlOperations.has(operation)
 }
 
-function validateTop(arguments_: readonly string[]): boolean {
+function validateLinuxTop(arguments_: readonly string[]): boolean {
   const batch = hasShortOption(arguments_, 'b')
     || arguments_.includes('--batch-mode')
   const bounded = arguments_.some((argument, index) => (
@@ -347,6 +261,13 @@ function validateTop(arguments_: readonly string[]): boolean {
     )
   ))
   return batch && bounded
+}
+
+function validateDarwinTop(arguments_: readonly string[]): boolean {
+  return arguments_.some((argument, index) => (
+    /^-l\d+$/.test(argument)
+    || (argument === '-l' && /^\d+$/.test(arguments_[index + 1] ?? ''))
+  ))
 }
 
 function validateTr(arguments_: readonly string[]): boolean {
@@ -366,6 +287,33 @@ function validateXmllint(arguments_: readonly string[]): boolean {
     && arguments_.every(argument => (
       readOnlyXmllintOptions.has(argument) || isLocalRelativePath(argument)
     ))
+}
+
+function validateSwVers(arguments_: readonly string[]): boolean {
+  const options = new Set([
+    '-buildVersion',
+    '-productName',
+    '-productVersion',
+    '-productVersionExtra',
+  ])
+  return arguments_.every(argument => options.has(argument))
+}
+
+function validateSysctl(arguments_: readonly string[]): boolean {
+  const options = new Set(['-a', '-b', '-e', '-n'])
+  return arguments_.length > 0
+    && arguments_.every(argument => (
+      options.has(argument) || /^[\w.-]+$/.test(argument)
+    ))
+}
+
+function validateVmStat(arguments_: readonly string[]): boolean {
+  return arguments_.length === 0
+    || (arguments_.length === 2 && arguments_.every(argument => /^\d+$/.test(argument)))
+}
+
+function validatePmset(arguments_: readonly string[]): boolean {
+  return arguments_.length > 0 && arguments_[0] === '-g'
 }
 
 function isLocalRelativePath(value: string): boolean {

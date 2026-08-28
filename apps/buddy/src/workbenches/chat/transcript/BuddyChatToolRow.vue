@@ -193,6 +193,7 @@ function toggle() {
       :language="language"
       :presentation="node.presentation"
       :status="node.status"
+      :tool-name="node.toolName"
     />
   </section>
 </template>

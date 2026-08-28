@@ -22,6 +22,7 @@ export interface CreateBuddyResourceLoaderOptions {
   cwd: string
   executionProfile: BuddyExecutionProfile
   inProcessExtensions: readonly BuddyInProcessExtension[]
+  platform?: NodeJS.Platform
   projectInstructions?: string
   settingsManager?: SettingsManager
 }
@@ -44,6 +45,7 @@ export async function createBuddyResourceLoader(
   validateInProcessExtensions(options.inProcessExtensions)
   const systemPrompt = createBuddySystemPrompt({
     executionProfile: options.executionProfile,
+    platform: options.platform,
     projectInstructions: options.projectInstructions,
   })
   const loader = new DefaultResourceLoader({
