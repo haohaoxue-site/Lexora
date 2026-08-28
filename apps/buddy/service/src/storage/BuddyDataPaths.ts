@@ -40,6 +40,26 @@ export class BuddyDataPaths {
     )
   }
 
+  conversationChangesDirectory(conversationId: string, runId: string): string {
+    return resolve(
+      this.conversationDirectory(conversationId),
+      'changes',
+      requireIdentity(runId),
+    )
+  }
+
+  changeSnapshot(
+    conversationId: string,
+    runId: string,
+    captureId: string,
+    side: 'after' | 'before',
+  ): string {
+    return resolve(
+      this.conversationChangesDirectory(conversationId, runId),
+      `${requireIdentity(captureId)}-${side}.txt`,
+    )
+  }
+
   conversationEvents(conversationId: string): string {
     return resolve(this.conversationDirectory(conversationId), 'events')
   }

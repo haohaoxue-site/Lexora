@@ -13,6 +13,7 @@ import { readStableRunErrorCode } from './runError'
 
 export interface RunRecoveryServiceOptions {
   cancelPendingApprovals?: () => Promise<number>
+  captureInterruptedChanges?: (runId: string) => Promise<void>
   conversations: Pick<ConversationHistoryRepository, 'findMessageById'>
   eventLog: Pick<RunEventReader, 'read'> & Pick<RunEventWriter, 'append'>
   inspectCommittedCompaction?: (
@@ -35,6 +36,7 @@ export class RunRecoveryService {
     await this.#options.cancelPendingApprovals?.()
     const interrupted = this.#options.repository.listIncomplete()
     for (const run of interrupted) {
+      await this.#options.captureInterruptedChanges?.(run.id)
       if (await this.#recoverInterruptedCompaction(run))
         continue
       const events = await this.#options.eventLog.read(run.id)

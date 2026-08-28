@@ -2,6 +2,7 @@ import type { BuddyAttachmentImportRequest } from '../../shared/attachmentPolicy
 import type { BuddyExecutionProfile } from '../../shared/executionProfile'
 import type {
   LocalApproval,
+  LocalArtifactText,
   LocalAttachment,
   LocalAutomation,
   LocalAutomationCreateRequest,
@@ -15,6 +16,7 @@ import type {
   LocalAutomationRunNowResult,
   LocalAutomationUpdateRequest,
   LocalBuddyServiceSupervisorState,
+  LocalChangeSetDetail,
   LocalChatCommandRequest,
   LocalConnector,
   LocalConnectorConfig,
@@ -119,6 +121,7 @@ export function isLocalChatErrorCode(value: string | undefined): value is LocalC
 export type {
   LocalApproval,
   LocalArtifact,
+  LocalArtifactText,
   LocalAttachment,
   LocalAutomation,
   LocalAutomationCreateRequest,
@@ -134,6 +137,8 @@ export type {
   LocalAutomationRunNowResult,
   LocalAutomationUpdateRequest,
   LocalBuddyServiceSupervisorState,
+  LocalChangeSetDetail,
+  LocalChangeSetSummary,
   LocalChatCommandRequest,
   LocalConnector,
   LocalConnectorConfig,
@@ -149,6 +154,7 @@ export type {
   LocalCustomProvider,
   LocalCustomProviderModel,
   LocalDefaultModel,
+  LocalFileChangeDetail,
   LocalMessage,
   LocalMessagePage,
   LocalNotification,
@@ -180,6 +186,7 @@ export const LOCAL_CHAT_IPC_CHANNELS = {
   approvalsApprove: 'lexora:buddy:approvals:approve',
   approvalsDeny: 'lexora:buddy:approvals:deny',
   approvalsList: 'lexora:buddy:approvals:list',
+  artifactsReadText: 'lexora:buddy:artifacts:read-text',
   automationChanged: 'lexora:buddy:automations:changed',
   automationsCreate: 'lexora:buddy:automations:create',
   automationsDelete: 'lexora:buddy:automations:delete',
@@ -201,6 +208,7 @@ export const LOCAL_CHAT_IPC_CHANNELS = {
   chatExecuteCommand: 'lexora:buddy:chat:execute-command',
   chatRegenerateAssistant: 'lexora:buddy:chat:regenerate-assistant',
   chatStartTurn: 'lexora:buddy:chat:start-turn',
+  changesGet: 'lexora:buddy:changes:get',
   contextUsageSnapshot: 'lexora:buddy:context:usage-snapshot',
   connectorsClearCredential: 'lexora:buddy:connectors:clear-credential',
   connectorsList: 'lexora:buddy:connectors:list',
@@ -276,6 +284,9 @@ interface LocalMutationResult {
 }
 
 export interface LocalChatApi {
+  artifacts: {
+    readText: (artifactId: string) => Promise<LocalArtifactText>
+  }
   automations: {
     create: (input: LocalAutomationCreateRequest) => Promise<LocalAutomation>
     delete: (input: LocalAutomationMutationRequest) => Promise<LocalAutomation>
@@ -429,6 +440,9 @@ export interface LocalChatApi {
       cursor?: string
       limit?: number
     }) => Promise<LocalConversationTimelinePage>
+  }
+  changes: {
+    get: (changeSetId: string) => Promise<LocalChangeSetDetail>
   }
   runs: {
     list: (input?: {

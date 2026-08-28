@@ -1,5 +1,6 @@
 import type {
   LocalArtifact,
+  LocalChangeSetSummary,
   LocalConversationTimelineItem,
   LocalMessage,
   LocalRun,
@@ -23,6 +24,7 @@ export interface ChatTranscriptMessageRow {
   key: string
   kind: 'message'
   message: LocalMessage
+  turnChanges?: LocalChangeSetSummary
   turnOutputs: ChatTranscriptTurnOutputs | null
 }
 
@@ -75,6 +77,7 @@ export interface ChatTranscriptProjection {
 }
 
 export function projectChatTranscript(input: {
+  changeSets?: ReadonlyArray<LocalChangeSetSummary>
   outputs: ReadonlyArray<LocalRunOutput>
   runEvents: ReadonlyArray<LocalRunEvent>
   runs: ReadonlyArray<LocalRun>
@@ -123,6 +126,7 @@ export function projectChatTranscript(input: {
     input.timelineItems,
     agentTurns,
     input.outputs,
+    input.changeSets ?? [],
   )) {
     rows.push(row)
     if (row.kind === 'agent-turn') {
@@ -164,6 +168,7 @@ export function projectPersistedChatTranscriptRows(
   items: ReadonlyArray<LocalConversationTimelineItem>,
   turns: ReadonlyArray<ChatAgentTurn>,
   outputs: ReadonlyArray<LocalRunOutput> = [],
+  changeSets: ReadonlyArray<LocalChangeSetSummary> = [],
 ): Array<
   ChatTranscriptAgentTurnRow
   | ChatTranscriptCompactionRow
@@ -180,6 +185,7 @@ export function projectPersistedChatTranscriptRows(
     turns.filter(shouldShowAgentTurn).map(turn => [turn.runId, turn]),
   )
   const outputsByRunId = projectTurnOutputs(outputs)
+  const changesByRunId = new Map(changeSets.map(changeSet => [changeSet.runId, changeSet]))
   const processMessageIds = new Set<string>()
   for (const turn of turns) {
     for (const node of turn.nodes) {
@@ -208,15 +214,21 @@ export function projectPersistedChatTranscriptRows(
     const turnOutputs = isFinalTurnMessage(item, turnsByRunId) && item.runId
       ? outputsByRunId.get(item.runId) ?? null
       : null
-    if (!isVisibleChatMessage(item) && turnOutputs === null)
+    const turnChanges = isFinalTurnMessage(item, turnsByRunId) && item.runId
+      ? changesByRunId.get(item.runId) ?? null
+      : null
+    if (!isVisibleChatMessage(item) && turnOutputs === null && turnChanges === null)
       continue
-    rows.push({
+    const row: ChatTranscriptMessageRow = {
       isAgentTurnResult,
       key: `message:${item.id}`,
       kind: 'message',
       message: item,
       turnOutputs,
-    })
+    }
+    if (turnChanges)
+      row.turnChanges = turnChanges
+    rows.push(row)
     rows.push(...(turnsByTrigger.get(item.id) ?? []).map(turn => ({
       key: `agent-turn:${turn.runId}`,
       kind: 'agent-turn' as const,

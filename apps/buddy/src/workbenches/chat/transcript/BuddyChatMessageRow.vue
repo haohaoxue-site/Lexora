@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { LocalMessage } from '@buddy-electron/shared/localChatApi'
+import type { LocalChangeSetSummary, LocalMessage } from '@buddy-electron/shared/localChatApi'
 import type { ChatMessageBranchNavigator } from './chatMessageBranches'
 import type { ChatTranscriptTurnOutputs } from './chatTranscriptProjection'
 import type { BuddyLocale } from '@/i18n/buddyI18n'
@@ -11,6 +11,7 @@ import { useBuddyI18n } from '@/i18n/buddyI18n'
 import DesktopIcon from '@/ui/DesktopIcon.vue'
 import BuddyChatAgentIdentity from './BuddyChatAgentIdentity.vue'
 import BuddyChatMessageContent from './BuddyChatMessageContent.vue'
+import BuddyChatTurnChanges from './BuddyChatTurnChanges.vue'
 import BuddyChatTurnOutputs from './BuddyChatTurnOutputs.vue'
 import { renderChatMarkdown } from './chatMarkdown'
 import { projectChatMessageActions } from './chatMessageActions'
@@ -29,6 +30,7 @@ const props = defineProps<{
   language: BuddyLocale
   message: LocalMessage
   searchMatch: boolean
+  turnChanges?: LocalChangeSetSummary | null
   turnOutputs: ChatTranscriptTurnOutputs | null
 }>()
 
@@ -37,6 +39,7 @@ const emit = defineEmits<{
   cancelEdit: []
   edit: [content: string]
   openArtifact: [artifactId: string]
+  openChanges: [changeSetId: string]
   regenerate: []
   startEdit: []
 }>()
@@ -163,6 +166,13 @@ async function copyMessage() {
       class="buddy-chat-message__outputs"
       :language="language"
       @open-artifact="emit('openArtifact', $event)"
+    />
+    <BuddyChatTurnChanges
+      v-if="turnChanges"
+      :change-set="turnChanges"
+      class="buddy-chat-message__changes"
+      :language="language"
+      @open-changes="emit('openChanges', $event)"
     />
     <small
       v-if="interruptionLabel"

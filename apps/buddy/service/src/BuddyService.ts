@@ -40,6 +40,9 @@ import { AutomationScheduler } from './automations/AutomationScheduler'
 import { AutomationService } from './automations/AutomationService'
 import { registerAutomationRpc } from './automations/registerAutomationRpc'
 import { resolveAutomationModelSelection } from './automations/resolveAutomationModelSelection'
+import { ChangeCaptureService } from './changes/ChangeCaptureService'
+import { createChangeSetRepository } from './changes/changeSetRepository'
+import { registerChangeRpc } from './changes/registerChangeRpc'
 import { ChatCommandService } from './chat/ChatCommandService'
 import { ChatTurnService } from './chat/ChatTurnService'
 import { registerChatRpc } from './chat/registerChatRpc'
@@ -145,8 +148,15 @@ export async function startBuddyService(
     eventLog: options.eventLog,
     repository: runs,
   })
+  const changeCaptureService = new ChangeCaptureService({
+    paths,
+    repository: createChangeSetRepository(options.database),
+  })
   const runRecoveryService = new RunRecoveryService({
     cancelPendingApprovals: () => approvalService.cancelPendingApprovals(),
+    captureInterruptedChanges: async (runId) => {
+      await changeCaptureService.markInterrupted(runId)
+    },
     conversations,
     eventLog: options.eventLog,
     lifecycle: runLifecycleService,
@@ -246,6 +256,7 @@ export async function startBuddyService(
     artifactService,
     attachmentService,
     automationService,
+    changeCaptureService,
     connectorService,
     imageGenerationGateway,
     onAutomationChanged: automationId => automationChanges.publish(automationId),
@@ -389,6 +400,10 @@ export async function startBuddyService(
       rpc: options.rpc,
       service: artifactService,
     }),
+    registerChangeRpc({
+      rpc: options.rpc,
+      service: changeCaptureService,
+    }),
     registerRunRpc({
       eventLog: options.eventLog,
       inputs: runInputs,
@@ -416,6 +431,7 @@ export async function startBuddyService(
     registerConversationRpc({
       artifacts: artifactsRepository,
       attachments: attachmentService,
+      changes: changeCaptureService,
       conversations,
       deleteConversation: async (conversationId) => {
         const result = await automationOccurrenceLifecycle.deleteConversation(conversationId)

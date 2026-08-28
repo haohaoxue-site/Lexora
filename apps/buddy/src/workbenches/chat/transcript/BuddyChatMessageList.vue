@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type {
+  LocalChangeSetSummary,
   LocalConversationBranch,
   LocalConversationTimelineItem,
   LocalMessage,
@@ -45,6 +46,7 @@ const props = defineProps<{
   activeBranchId: string
   actionsDisabled?: boolean
   branches: ReadonlyArray<LocalConversationBranch>
+  changeSets?: ReadonlyArray<LocalChangeSetSummary>
   hasOlderMessages?: boolean
   isLoadingOlderMessages?: boolean
   language: BuddyLocale
@@ -59,6 +61,7 @@ const emit = defineEmits<{
   activateBranch: [branchId: string]
   editUserMessage: [messageId: string, content: string]
   openArtifact: [artifactId: string]
+  openChanges: [changeSetId: string]
   regenerateAssistant: [messageId: string]
   scroll: [metrics: ChatMessageScrollMetrics, tailScrollSettling: boolean]
   scrollPosition: [metrics: ChatMessageScrollMetrics, tailScrollSettling: boolean]
@@ -87,6 +90,7 @@ let tailScrollGeneration = 0
 const matchingSearchMessageIds = computed(() => new Set(props.matchingSearchMessageIds ?? []))
 const conversationId = computed(() => props.timelineItems[0]?.conversationId ?? null)
 const transcriptProjection = computed(() => projectChatTranscript({
+  changeSets: props.changeSets ?? [],
   outputs: props.runOutputs ?? [],
   runEvents: props.runEvents ?? [],
   runs: props.runs ?? [],
@@ -394,10 +398,12 @@ function toScrollMetrics(viewport: HTMLElement): ChatMessageScrollMetrics {
           :message="item.message"
           :search-match="matchingSearchMessageIds.has(item.message.id)"
           :turn-outputs="item.turnOutputs"
+          :turn-changes="item.turnChanges"
           @activate-branch="emit('activateBranch', $event)"
           @cancel-edit="cancelEditingMessage"
           @edit="submitEditedMessage(item.message, $event)"
           @open-artifact="emit('openArtifact', $event)"
+          @open-changes="emit('openChanges', $event)"
           @regenerate="emit('regenerateAssistant', item.message.id)"
           @start-edit="startEditingMessage(item.message)"
         />

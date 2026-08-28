@@ -149,6 +149,12 @@ export function registerLocalChatIpc(options: RegisterLocalChatIpcOptions): () =
     )
   })
 
+  handle(LOCAL_CHAT_IPC_CHANNELS.artifactsReadText, (_event, input) => request(
+    'artifacts.readText',
+    localChatSchemas.artifactText.parse(input),
+    localChatResponseSchemas.artifactText,
+  ))
+
   handle(LOCAL_CHAT_IPC_CHANNELS.automationsPreview, (_event, input) => request(
     'automations.preview',
     localChatSchemas.automationPreview.parse(input),
@@ -461,6 +467,12 @@ export function registerLocalChatIpc(options: RegisterLocalChatIpcOptions): () =
     'conversations.listTimeline',
     localChatSchemas.conversationTimeline.parse(input),
     localChatResponseSchemas.timelinePage,
+  ))
+
+  handle(LOCAL_CHAT_IPC_CHANNELS.changesGet, (_event, input) => request(
+    'changes.get',
+    localChatSchemas.changeSet.parse(input),
+    localChatResponseSchemas.changeSet,
   ))
 
   handle(LOCAL_CHAT_IPC_CHANNELS.runsList, (_event, input) => request(

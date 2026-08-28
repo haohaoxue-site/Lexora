@@ -22,6 +22,7 @@ const { index: taskIndex, session: taskSession } = tasks
 const chatSession = tasks.workspace.session
 const taskContext = useTaskContextPanel({
   activeConversationId: chatSession.activeConversationId,
+  changeSets: tasks.workspace.transcript.changeSets,
   runOutputs: tasks.workspace.transcript.runOutputs,
 })
 const conversationSearch = useConversationSearch({
@@ -79,6 +80,7 @@ const conversationSearch = useConversationSearch({
       :matching-search-message-ids="conversationSearch.matchingMessageIds.value"
       @open-settings="router.push(desktopRouteLocations.settings($event))"
       @open-artifact="taskContext.openArtifact"
+      @open-changes="taskContext.openChanges"
     >
       <template v-if="taskSession.activeTaskId.value === null" #composerLeadingContext>
         <DesktopTaskProjectSelector
@@ -95,7 +97,9 @@ const conversationSearch = useConversationSearch({
     <template v-if="taskContext.isOpen.value" #context>
       <DesktopTaskContextPanel
         :active-tab="taskContext.activeTab.value"
+        :get-change-set="tasks.workspace.context.getChangeSet"
         :language="tasks.language.value"
+        :read-artifact-text="tasks.workspace.context.readArtifactText"
         :tabs="taskContext.tabs.value"
         @close-tab="taskContext.closeTab"
         @collapse="taskContext.toggle"

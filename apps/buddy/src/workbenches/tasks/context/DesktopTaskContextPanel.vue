@@ -1,19 +1,25 @@
 <script setup lang="ts">
+import type { LocalArtifactText, LocalChangeSetDetail } from '@buddy-electron/shared/localChatApi'
 import type { TaskContextTab } from './taskContextPanel'
 import type { BuddyLocale } from '@/i18n/buddyI18n'
 import {
+  Code16Regular,
   Dismiss16Regular,
   PanelRight20Regular,
 } from '@vicons/fluent'
 import { NEmpty, NIcon } from 'naive-ui'
-import { computed } from 'vue'
+import { computed, shallowRef } from 'vue'
 import { useBuddyI18n } from '@/i18n/buddyI18n'
 import DesktopArtifactContextSurface from './DesktopArtifactContextSurface.vue'
 import DesktopArtifactFileIcon from './DesktopArtifactFileIcon.vue'
+import DesktopChangeContextSurface from './DesktopChangeContextSurface.vue'
+import { changeTabId } from './taskContextPanel'
 
 const props = defineProps<{
   activeTab: TaskContextTab | null
+  getChangeSet: (changeSetId: string) => Promise<LocalChangeSetDetail>
   language: BuddyLocale
+  readArtifactText: (artifactId: string) => Promise<LocalArtifactText>
   tabs: ReadonlyArray<TaskContextTab>
 }>()
 const emit = defineEmits<{
@@ -24,6 +30,23 @@ const emit = defineEmits<{
 
 const { t } = useBuddyI18n(() => props.language)
 const tabCountLabel = computed(() => t('desktop.context.tabCount', { count: props.tabs.length }))
+const changeFileLabels = shallowRef<Readonly<Record<string, string>>>({})
+
+function tabLabel(tab: TaskContextTab): string {
+  return tab.kind === 'changes'
+    ? changeFileLabels.value[tab.id] ?? t('desktop.context.changes')
+    : tab.label
+}
+
+function updateChangeFileLabel(payload: { changeSetId: string, fileName: string | null }): void {
+  const tabId = changeTabId(payload.changeSetId)
+  const labels = { ...changeFileLabels.value }
+  if (payload.fileName)
+    labels[tabId] = payload.fileName
+  else
+    delete labels[tabId]
+  changeFileLabels.value = labels
+}
 </script>
 
 <template>
@@ -52,12 +75,13 @@ const tabCountLabel = computed(() => t('desktop.context.tabCount', { count: prop
               :mime-type="tab.artifact.mimeType"
               :name="tab.artifact.name"
             />
-            <span>{{ tab.label }}</span>
+            <NIcon v-else :component="Code16Regular" />
+            <span>{{ tabLabel(tab) }}</span>
           </button>
           <button
             class="desktop-task-context-panel__tab-close"
             type="button"
-            :aria-label="t('desktop.context.closeTab', { name: tab.label })"
+            :aria-label="t('desktop.context.closeTab', { name: tabLabel(tab) })"
             @click="emit('closeTab', tab.id)"
           >
             <NIcon :component="Dismiss16Regular" />
@@ -79,6 +103,14 @@ const tabCountLabel = computed(() => t('desktop.context.tabCount', { count: prop
       v-if="activeTab?.kind === 'artifact'"
       :artifact="activeTab.artifact"
       :language="language"
+      :read-artifact-text="readArtifactText"
+    />
+    <DesktopChangeContextSurface
+      v-else-if="activeTab?.kind === 'changes'"
+      :change-set="activeTab.changeSet"
+      :get-change-set="getChangeSet"
+      :language="language"
+      @active-file-change="updateChangeFileLabel"
     />
     <div v-else class="desktop-task-context-panel__empty">
       <NEmpty :description="t('desktop.context.empty')" />

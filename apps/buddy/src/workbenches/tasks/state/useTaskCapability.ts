@@ -97,6 +97,7 @@ export function useTaskCapability(options: UseTaskCapabilityOptions) {
   })
   const {
     approvals,
+    changeSets,
     hasOlderMessages,
     isLoadingOlderMessages,
     messages,
@@ -512,6 +513,10 @@ export function useTaskCapability(options: UseTaskCapabilityOptions) {
   } as const
 
   const workspace = {
+    context: {
+      getChangeSet: api.localChat.changes.get,
+      readArtifactText: api.localChat.artifacts.readText,
+    },
     composer: {
       attachments: readonly(attachments),
       composerContent: readonly(composerContent),
@@ -567,6 +572,7 @@ export function useTaskCapability(options: UseTaskCapabilityOptions) {
     transcript: {
       activateBranch,
       branches: readonly(branches),
+      changeSets: readonly(changeSets),
       hasOlderMessages: readonly(hasOlderMessages),
       isLoadingOlderMessages: readonly(isLoadingOlderMessages),
       loadOlderMessages: runSync.loadOlderMessages,

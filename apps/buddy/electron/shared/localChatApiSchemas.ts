@@ -563,6 +563,39 @@ const artifactSchema = z.object({
   sourceToolCallId: idSchema,
 }).strict()
 
+const changeSetSummarySchema = z.object({
+  changeSetId: idSchema,
+  conversationId: idSchema,
+  coverage: z.enum(['complete', 'partial']),
+  fileCount: z.number().int().nonnegative(),
+  runId: idSchema,
+  status: z.enum(['capturing', 'completed']),
+  updatedAt: timestampSchema,
+}).strict()
+
+const fileChangeDetailSchema = z.object({
+  afterSizeBytes: z.number().int().nonnegative().nullable(),
+  afterText: z.string().max(1024 * 1024).nullable(),
+  beforeSizeBytes: z.number().int().nonnegative().nullable(),
+  beforeText: z.string().max(1024 * 1024).nullable(),
+  changeType: z.enum(['created', 'deleted', 'modified']),
+  id: idSchema,
+  language: z.string().max(64).nullable(),
+  path: z.string().min(1).max(4096),
+  preview: z.enum(['binary', 'oversized', 'sensitive', 'text', 'unavailable']),
+  redacted: z.boolean(),
+}).strict()
+
+const changeSetDetailSchema = changeSetSummarySchema.extend({
+  files: z.array(fileChangeDetailSchema).max(512),
+}).strict()
+
+const artifactTextSchema = z.object({
+  artifactId: idSchema,
+  language: z.string().max(64).nullable(),
+  text: z.string().max(2 * 1024 * 1024),
+}).strict()
+
 const messageSchema = z.object({
   attachments: z.array(attachmentSchema).max(16),
   branchId: idSchema,
@@ -762,6 +795,8 @@ export const localChatResponseSchemas = {
     mimeType: z.string().regex(/^image\//),
     path: z.string().refine(isAbsolutePath),
   }).strict(),
+  artifactText: artifactTextSchema,
+  changeSet: changeSetDetailSchema,
   connectors: z.array(connectorSchema),
   conversation: conversationSchema,
   conversationBranches: z.array(conversationBranchSchema),
@@ -773,6 +808,7 @@ export const localChatResponseSchemas = {
     nextCursor: z.string().regex(/^[\w-]+$/).max(2_048).nullable(),
   }).strict(),
   timelinePage: z.object({
+    changeSets: z.array(changeSetSummarySchema),
     items: z.array(conversationTimelineItemSchema),
     nextCursor: z.string().regex(/^[\w-]+$/).max(2_048).nullable(),
     outputs: z.array(runOutputSchema),
@@ -822,6 +858,7 @@ export const localChatResponseSchemas = {
 export const localChatSchemas = {
   approvalId: z.object({ approvalId: idSchema }).strict(),
   artifactPreview: z.object({ artifactId: idSchema }).strict(),
+  artifactText: z.object({ artifactId: idSchema }).strict(),
   automationChanged: automationChangedNotificationSchema,
   automationCreate: automationMutationRequestSchemas.create,
   automationDelete: automationMutationRequestSchemas.delete,
@@ -842,6 +879,7 @@ export const localChatSchemas = {
     remainingCount: z.number().int().min(1).max(16),
   }).strict(),
   chatCommand: chatCommandSchema,
+  changeSet: z.object({ changeSetId: idSchema }).strict(),
   connectorCredential: z.object({
     connectorId: idSchema,
     credential: connectorCredentialSchema,
@@ -1022,6 +1060,7 @@ type DeepReadonly<T> = T extends ReadonlyArray<infer Item>
 export type LocalApproval = DeepReadonly<z.infer<typeof approvalSchema>>
 export type LocalAttachment = DeepReadonly<z.infer<typeof attachmentSchema>>
 export type LocalArtifact = DeepReadonly<z.infer<typeof artifactSchema>>
+export type LocalArtifactText = DeepReadonly<z.infer<typeof artifactTextSchema>>
 export type LocalAutomation = DeepReadonly<z.infer<typeof automationSchema>>
 export type LocalAutomationOccurrence
   = DeepReadonly<z.infer<typeof automationOccurrenceSchema>>
@@ -1049,6 +1088,9 @@ export type LocalConversation = DeepReadonly<z.infer<typeof conversationSchema>>
 export type LocalConversationSummary = DeepReadonly<z.infer<typeof conversationSummarySchema>>
 export type LocalConversationBranch = DeepReadonly<z.infer<typeof conversationBranchSchema>>
 export type LocalChatCommandRequest = z.infer<typeof chatCommandSchema>
+export type LocalChangeSetDetail = DeepReadonly<z.infer<typeof changeSetDetailSchema>>
+export type LocalChangeSetSummary = DeepReadonly<z.infer<typeof changeSetSummarySchema>>
+export type LocalFileChangeDetail = DeepReadonly<z.infer<typeof fileChangeDetailSchema>>
 export type LocalCustomProvider = z.input<typeof customProviderSchema>
 export type LocalCustomProviderModel = z.input<typeof customProviderModelSchema>
 export type LocalMessage = DeepReadonly<z.infer<typeof messageSchema>>

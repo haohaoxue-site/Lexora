@@ -43,6 +43,7 @@ const commandValidators = new Map<string, CommandValidator>([
   ['vmstat', allowLiteralArguments],
   ['wc', validateWc],
   ['which', validateCommandNames],
+  ['xmllint', validateXmllint],
 ])
 
 const readOnlySystemctlOperations = new Set([
@@ -54,6 +55,15 @@ const readOnlySystemctlOperations = new Set([
   'list-units',
   'show',
   'status',
+])
+
+const readOnlyXmllintOptions = new Set([
+  '--nocatalogs',
+  '--nonet',
+  '--noout',
+  '--nowarning',
+  '--quiet',
+  '--strict-namespace',
 ])
 
 export function isReadOnlyShellCommand(command: string): boolean {
@@ -348,6 +358,22 @@ function validateWc(arguments_: readonly string[]): boolean {
   return arguments_.every(argument => (
     argument.startsWith('-') && !/^--files0-from(?:$|=)/.test(argument)
   ))
+}
+
+function validateXmllint(arguments_: readonly string[]): boolean {
+  return arguments_.includes('--noout')
+    && arguments_.some(isLocalRelativePath)
+    && arguments_.every(argument => (
+      readOnlyXmllintOptions.has(argument) || isLocalRelativePath(argument)
+    ))
+}
+
+function isLocalRelativePath(value: string): boolean {
+  return value.length > 0
+    && !value.startsWith('-')
+    && !value.startsWith('/')
+    && !value.includes(':')
+    && !value.split('/').includes('..')
 }
 
 function validateOptionsOnly(arguments_: readonly string[]): boolean {

@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import type { LocalArtifact } from '@buddy-electron/shared/localChatApi'
+import type { LocalArtifact, LocalArtifactText } from '@buddy-electron/shared/localChatApi'
 import type { BuddyLocale } from '@/i18n/buddyI18n'
 import { Document20Regular } from '@vicons/fluent'
-import { NIcon } from 'naive-ui'
+import { NIcon, NSpin } from 'naive-ui'
 import { computed, shallowRef, watch } from 'vue'
 import { useBuddyI18n } from '@/i18n/buddyI18n'
 import BuddyImagePreview from '@/ui/media/BuddyImagePreview.vue'
@@ -10,18 +10,24 @@ import BuddyImagePreview from '@/ui/media/BuddyImagePreview.vue'
 const props = defineProps<{
   artifact: LocalArtifact
   language: BuddyLocale
+  readArtifactText: (artifactId: string) => Promise<LocalArtifactText>
 }>()
 
 const { t } = useBuddyI18n(() => props.language)
 const previewFailed = shallowRef(false)
 const previewIndex = shallowRef(0)
 const previewOpen = shallowRef(false)
+const textPreview = shallowRef<LocalArtifactText | null>(null)
+const textPreviewFailed = shallowRef(false)
+const textPreviewLoading = shallowRef(false)
+let textLoadGeneration = 0
 const previewUrl = computed(() => (
   props.artifact.mimeType.startsWith('image/') && !previewFailed.value
     ? `lexora-artifact://preview/${encodeURIComponent(props.artifact.artifactId)}`
     : null
 ))
 const previewSources = computed(() => previewUrl.value ? [previewUrl.value] : [])
+const textPreviewable = computed(() => isTextMimeType(props.artifact.mimeType))
 const detail = computed(() => [
   resolveFileType(props.artifact),
   formatFileSize(props.artifact.sizeBytes),
@@ -30,11 +36,32 @@ const detail = computed(() => [
 
 watch(
   () => props.artifact.artifactId,
-  () => {
+  async (artifactId) => {
     previewFailed.value = false
     previewIndex.value = 0
     previewOpen.value = false
+    textPreview.value = null
+    textPreviewFailed.value = false
+    textPreviewLoading.value = false
+    const generation = ++textLoadGeneration
+    if (!textPreviewable.value)
+      return
+    textPreviewLoading.value = true
+    try {
+      const result = await props.readArtifactText(artifactId)
+      if (generation === textLoadGeneration)
+        textPreview.value = result
+    }
+    catch {
+      if (generation === textLoadGeneration)
+        textPreviewFailed.value = true
+    }
+    finally {
+      if (generation === textLoadGeneration)
+        textPreviewLoading.value = false
+    }
   },
+  { immediate: true },
 )
 
 function openPreview() {
@@ -70,6 +97,15 @@ function formatDate(value: string, locale: BuddyLocale): string {
     timeStyle: 'short',
   }).format(new Date(value))
 }
+
+function isTextMimeType(mimeType: string): boolean {
+  return mimeType.startsWith('text/') || [
+    'application/json',
+    'application/toml',
+    'application/xml',
+    'application/yaml',
+  ].includes(mimeType)
+}
 </script>
 
 <template>
@@ -98,10 +134,18 @@ function formatDate(value: string, locale: BuddyLocale): string {
           @error="previewFailed = true"
         >
       </button>
+      <div v-else-if="textPreviewLoading" class="desktop-artifact-context-surface__fallback">
+        <NSpin size="small" />
+        <span>{{ t('common.loading') }}</span>
+      </div>
+      <pre
+        v-else-if="textPreview"
+        class="desktop-artifact-context-surface__text"
+      ><code>{{ textPreview.text }}</code></pre>
       <div v-else class="desktop-artifact-context-surface__fallback">
         <NIcon :component="Document20Regular" />
         <strong>{{ artifact.name }}</strong>
-        <span>{{ t('desktop.context.previewUnavailable') }}</span>
+        <span>{{ t(textPreviewFailed ? 'desktop.context.previewLoadFailed' : 'desktop.context.previewUnavailable') }}</span>
       </div>
     </div>
   </section>
@@ -199,5 +243,23 @@ function formatDate(value: string, locale: BuddyLocale): string {
 
 .desktop-artifact-context-surface__fallback span {
   font-size: 0.75rem;
+}
+
+.desktop-artifact-context-surface__text {
+  align-self: stretch;
+  justify-self: stretch;
+  min-width: 0;
+  margin: 0;
+  overflow: auto;
+  border: 1px solid var(--buddy-border-subtle);
+  border-radius: var(--buddy-radius-micro);
+  background: var(--buddy-surface-base);
+  color: var(--buddy-text-primary);
+  font-family: var(--buddy-font-mono, ui-monospace, monospace);
+  font-size: 0.75rem;
+  line-height: 1.65;
+  padding: 0.875rem;
+  tab-size: 2;
+  white-space: pre;
 }
 </style>

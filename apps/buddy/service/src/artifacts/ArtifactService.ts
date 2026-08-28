@@ -3,8 +3,13 @@ import type { ArtifactRecord, ArtifactRepository } from '../storage/artifactRepo
 import type { BuddyDataPaths } from '../storage/BuddyDataPaths'
 import { Buffer } from 'node:buffer'
 import { randomUUID } from 'node:crypto'
-import { chmod, mkdir, readFile, unlink, writeFile } from 'node:fs/promises'
-import { basename, extname, join } from 'node:path'
+import { chmod, mkdir, readFile, stat, unlink, writeFile } from 'node:fs/promises'
+import { basename, extname, isAbsolute, join, resolve } from 'node:path'
+import { resolveGrantedPath } from '../projects/resolveGrantedPath'
+
+export const BUDDY_ARTIFACT_COUNT_LIMIT = 16
+export const BUDDY_ARTIFACT_TOTAL_BYTES_LIMIT = 32 * 1024 * 1024
+export const BUDDY_ARTIFACT_TEXT_BYTES_LIMIT = 2 * 1024 * 1024
 
 export interface ArtifactUpload {
   bytes: Uint8Array
@@ -28,33 +33,99 @@ export class ArtifactService {
     sourceArtifactId: string | null
     sourceToolCallId: string
   }): Promise<ArtifactRecord[]> {
+    if (input.images.some(image => !image.mimeType.startsWith('image/')))
+      throw new ArtifactError('VALIDATION_FAILED')
+    return this.#registerUploads({
+      ...input,
+      allowEmpty: false,
+      uploads: input.images,
+    })
+  }
+
+  async registerFiles(input: {
+    canonicalRoot: string
+    conversationId: string
+    files: readonly { outputName: string, path: string }[]
+    runId: string
+    sourceToolCallId: string
+  }): Promise<ArtifactRecord[]> {
+    if (input.files.length === 0 || input.files.length > BUDDY_ARTIFACT_COUNT_LIMIT)
+      throw new ArtifactError('VALIDATION_FAILED')
+    const uploads: ArtifactUpload[] = []
+    let totalBytes = 0
+    for (const file of input.files) {
+      const requestedPath = isAbsolute(file.path)
+        ? file.path
+        : resolve(input.canonicalRoot, file.path)
+      const resolution = await resolveGrantedPath([{
+        canonicalRoot: input.canonicalRoot,
+        projectId: input.conversationId,
+        root: input.canonicalRoot,
+      }], requestedPath, 'existing')
+      const metadata = await stat(resolution.canonicalPath)
+      if (!metadata.isFile())
+        throw new ArtifactError('VALIDATION_FAILED')
+      totalBytes += metadata.size
+      if (totalBytes > BUDDY_ARTIFACT_TOTAL_BYTES_LIMIT)
+        throw new ArtifactError('ARTIFACT_SIZE_LIMIT')
+      const outputName = requireArtifactOutputName(file.outputName, resolution.canonicalPath)
+      uploads.push({
+        bytes: await readFile(resolution.canonicalPath),
+        mimeType: mimeTypeFromPath(resolution.canonicalPath),
+        name: outputName,
+      })
+    }
+    return this.#registerUploads({
+      allowEmpty: true,
+      conversationId: input.conversationId,
+      runId: input.runId,
+      sourceArtifactId: null,
+      sourceToolCallId: input.sourceToolCallId,
+      uploads,
+    })
+  }
+
+  async #registerUploads(input: {
+    allowEmpty: boolean
+    conversationId: string
+    runId: string
+    sourceArtifactId: string | null
+    sourceToolCallId: string
+    uploads: readonly ArtifactUpload[]
+  }): Promise<ArtifactRecord[]> {
+    if (input.uploads.length === 0 || input.uploads.length > BUDDY_ARTIFACT_COUNT_LIMIT)
+      throw new ArtifactError('VALIDATION_FAILED')
+    const totalBytes = input.uploads.reduce((total, upload) => total + upload.bytes.byteLength, 0)
+    if (totalBytes > BUDDY_ARTIFACT_TOTAL_BYTES_LIMIT)
+      throw new ArtifactError('ARTIFACT_SIZE_LIMIT')
     const records: ArtifactRecord[] = []
     const attemptedPaths: string[] = []
     try {
-      for (const image of input.images) {
-        if (!image.mimeType.startsWith('image/') || image.bytes.byteLength === 0)
+      for (const upload of input.uploads) {
+        if ((!input.allowEmpty && upload.bytes.byteLength === 0) || !upload.mimeType.trim())
           throw new ArtifactError('VALIDATION_FAILED')
         const id = randomUUID()
-        const name = basename(image.name.trim())
-        if (!name)
+        const requestedName = upload.name.trim()
+        if (!requestedName || basename(requestedName) !== requestedName)
           throw new ArtifactError('VALIDATION_FAILED')
+        const name = normalizeArtifactName(requestedName, upload.mimeType)
         const directory = this.#paths.conversationArtifactsDirectory(input.conversationId)
-        const storedPath = join(directory, createArtifactStorageName(id, name, image.mimeType))
+        const storedPath = join(directory, createArtifactStorageName(id, name, upload.mimeType))
         attemptedPaths.push(storedPath)
         const record: ArtifactRecord = {
           conversationId: input.conversationId,
           createdAt: new Date().toISOString(),
           id,
-          mimeType: image.mimeType,
+          mimeType: upload.mimeType,
           name,
           runId: input.runId,
-          sizeBytes: image.bytes.byteLength,
+          sizeBytes: upload.bytes.byteLength,
           sourceArtifactId: input.sourceArtifactId,
           sourceToolCallId: input.sourceToolCallId,
           storedPath,
         }
         await mkdir(directory, { mode: 0o700, recursive: true })
-        await writeFile(storedPath, image.bytes, { flag: 'wx', mode: 0o600 })
+        await writeFile(storedPath, upload.bytes, { flag: 'wx', mode: 0o600 })
         await chmod(storedPath, 0o600)
         this.#repository.create(record)
         records.push(record)
@@ -62,6 +133,7 @@ export class ArtifactService {
       return records
     }
     catch (error) {
+      this.#repository.deleteByIds(records.map(record => record.id))
       await Promise.all(attemptedPaths.map(path => unlink(path).catch(() => undefined)))
       throw error
     }
@@ -72,6 +144,32 @@ export class ArtifactService {
     if (!artifact || !artifact.mimeType.startsWith('image/'))
       throw new ArtifactError('VALIDATION_FAILED')
     return { mimeType: artifact.mimeType, path: artifact.storedPath }
+  }
+
+  async readText(id: string): Promise<{ artifactId: string, language: string | null, text: string }> {
+    const artifact = this.#repository.findVisibleById(id)
+    if (
+      !artifact
+      || !isTextArtifact(artifact.mimeType)
+      || artifact.sizeBytes > BUDDY_ARTIFACT_TEXT_BYTES_LIMIT
+    ) {
+      throw new ArtifactError('VALIDATION_FAILED')
+    }
+    const bytes = await readFile(artifact.storedPath)
+    if (bytes.byteLength > BUDDY_ARTIFACT_TEXT_BYTES_LIMIT)
+      throw new ArtifactError('ARTIFACT_SIZE_LIMIT')
+    let text: string
+    try {
+      text = new TextDecoder('utf-8', { fatal: true }).decode(bytes)
+    }
+    catch {
+      throw new ArtifactError('VALIDATION_FAILED')
+    }
+    return {
+      artifactId: artifact.id,
+      language: languageFromArtifactName(artifact.name),
+      text,
+    }
   }
 
   async materializeConversationImages(
@@ -110,6 +208,19 @@ export class ArtifactError extends Error {
     this.name = 'ArtifactError'
     this.code = code
   }
+}
+
+function requireArtifactOutputName(outputName: string, sourcePath: string): string {
+  const trimmed = outputName.trim()
+  if (!trimmed || basename(trimmed) !== trimmed || trimmed === '.' || trimmed === '..')
+    throw new ArtifactError('VALIDATION_FAILED')
+  const outputExtension = safeExtension(trimmed)
+  const sourceExtension = safeExtension(basename(sourcePath))
+  if (outputExtension && sourceExtension && outputExtension !== sourceExtension)
+    throw new ArtifactError('VALIDATION_FAILED')
+  if (outputExtension)
+    return trimmed
+  return `${trimmed}${sourceExtension}`
 }
 
 function normalizeArtifactName(name: string, mimeType: string): string {
@@ -152,7 +263,68 @@ function extensionForMimeType(mimeType: string): string {
     ['image/jpeg', '.jpg'],
     ['image/png', '.png'],
     ['image/webp', '.webp'],
+    ['image/svg+xml', '.svg'],
   ]).get(mimeType) ?? ''
+}
+
+function mimeTypeFromPath(path: string): string {
+  return new Map([
+    ['.css', 'text/css'],
+    ['.csv', 'text/csv'],
+    ['.gif', 'image/gif'],
+    ['.html', 'text/html'],
+    ['.jpeg', 'image/jpeg'],
+    ['.jpg', 'image/jpeg'],
+    ['.js', 'text/javascript'],
+    ['.json', 'application/json'],
+    ['.md', 'text/markdown'],
+    ['.pdf', 'application/pdf'],
+    ['.png', 'image/png'],
+    ['.py', 'text/x-python'],
+    ['.rs', 'text/x-rust'],
+    ['.scss', 'text/x-scss'],
+    ['.svg', 'image/svg+xml'],
+    ['.toml', 'application/toml'],
+    ['.ts', 'text/typescript'],
+    ['.tsx', 'text/typescript-jsx'],
+    ['.tsv', 'text/tab-separated-values'],
+    ['.txt', 'text/plain'],
+    ['.vue', 'text/x-vue'],
+    ['.webp', 'image/webp'],
+    ['.xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'],
+    ['.xml', 'application/xml'],
+    ['.yaml', 'application/yaml'],
+    ['.yml', 'application/yaml'],
+    ['.zip', 'application/zip'],
+  ]).get(extname(path).toLowerCase()) ?? 'application/octet-stream'
+}
+
+function isTextArtifact(mimeType: string): boolean {
+  return mimeType.startsWith('text/') || [
+    'application/json',
+    'application/toml',
+    'application/xml',
+    'application/yaml',
+  ].includes(mimeType)
+}
+
+function languageFromArtifactName(name: string): string | null {
+  return new Map([
+    ['css', 'css'],
+    ['html', 'html'],
+    ['js', 'javascript'],
+    ['json', 'javascript'],
+    ['md', 'markdown'],
+    ['py', 'python'],
+    ['rs', 'rust'],
+    ['scss', 'scss'],
+    ['ts', 'typescript'],
+    ['tsx', 'typescript'],
+    ['vue', 'html'],
+    ['xml', 'xml'],
+    ['yaml', 'yaml'],
+    ['yml', 'yaml'],
+  ]).get(name.split('.').at(-1)?.toLowerCase() ?? '') ?? null
 }
 
 function truncateUtf8(value: string, maxBytes: number): string {

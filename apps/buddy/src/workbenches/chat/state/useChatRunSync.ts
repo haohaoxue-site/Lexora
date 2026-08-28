@@ -1,5 +1,6 @@
 import type {
   LocalApproval,
+  LocalChangeSetSummary,
   LocalChatApi,
   LocalConversationTimelineItem,
   LocalMessage,
@@ -30,6 +31,7 @@ export function useChatRunSync(options: UseChatRunSyncOptions) {
   const runs = shallowRef<ReadonlyArray<LocalRun>>([])
   const runEvents = shallowRef<ReadonlyArray<LocalRunEvent>>([])
   const runOutputs = shallowRef<ReadonlyArray<LocalRunOutput>>([])
+  const changeSets = shallowRef<ReadonlyArray<LocalChangeSetSummary>>([])
   const approvals = shallowRef<ReadonlyArray<LocalApproval>>([])
   const isLoadingOlderMessages = shallowRef(false)
   const timelineCursor = shallowRef<string | null>(null)
@@ -87,6 +89,7 @@ export function useChatRunSync(options: UseChatRunSyncOptions) {
         timelinePage.runs,
       )
       runOutputs.value = mergeRunOutputs(runOutputs.value, timelinePage.outputs)
+      changeSets.value = mergeChangeSets(changeSets.value, timelinePage.changeSets)
       const runIds = new Set(runs.value.map(run => run.id))
       approvals.value = pendingApprovals.filter(approval => runIds.has(approval.runId))
     }
@@ -133,6 +136,7 @@ export function useChatRunSync(options: UseChatRunSyncOptions) {
       upsertRuns(page.runs)
       runEvents.value = mergeTimelineEvents(runEvents.value, page.runEvents, page.runs)
       runOutputs.value = mergeRunOutputs(runOutputs.value, page.outputs)
+      changeSets.value = mergeChangeSets(changeSets.value, page.changeSets)
       timelineCursor.value = page.nextCursor
       return prepended
     }
@@ -236,6 +240,7 @@ export function useChatRunSync(options: UseChatRunSyncOptions) {
     runs.value = []
     runEvents.value = []
     runOutputs.value = []
+    changeSets.value = []
     approvals.value = []
     knownRunIds.clear()
   }
@@ -253,6 +258,7 @@ export function useChatRunSync(options: UseChatRunSyncOptions) {
 
   return {
     approvals,
+    changeSets,
     applyEditedTurn,
     applyRegeneratedTurn,
     applyRunStart,
@@ -273,6 +279,16 @@ export function useChatRunSync(options: UseChatRunSyncOptions) {
     timelineItems,
     upsertRuns,
   }
+}
+
+function mergeChangeSets(
+  current: ReadonlyArray<LocalChangeSetSummary>,
+  incoming: ReadonlyArray<LocalChangeSetSummary>,
+): ReadonlyArray<LocalChangeSetSummary> {
+  const byId = new Map(current.map(changeSet => [changeSet.changeSetId, changeSet]))
+  for (const changeSet of incoming)
+    byId.set(changeSet.changeSetId, changeSet)
+  return [...byId.values()].sort((left, right) => left.updatedAt.localeCompare(right.updatedAt))
 }
 
 function mergeRunOutputs(

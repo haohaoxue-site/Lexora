@@ -15,6 +15,7 @@ export interface ArtifactRecord {
 
 export interface ArtifactRepository {
   create: (record: ArtifactRecord) => ArtifactRecord
+  deleteByIds: (ids: readonly string[]) => void
   findById: (id: string) => ArtifactRecord | null
   findVisibleById: (id: string) => ArtifactRecord | null
   listForConversation: (conversationId: string) => ArtifactRecord[]
@@ -36,6 +37,7 @@ interface ArtifactRow {
 
 export function createArtifactRepository(database: DatabaseSync): ArtifactRepository {
   const find = database.prepare('SELECT * FROM artifacts WHERE id = ?')
+  const deleteArtifact = database.prepare('DELETE FROM artifacts WHERE id = ?')
   const findVisible = database.prepare(`
     SELECT artifacts.*
     FROM artifacts
@@ -92,6 +94,10 @@ export function createArtifactRepository(database: DatabaseSync): ArtifactReposi
         record.createdAt,
       )
       return requireArtifact(find.get(record.id), record.id)
+    },
+    deleteByIds(ids) {
+      for (const id of ids)
+        deleteArtifact.run(id)
     },
     findById(id) {
       const row = find.get(id) as ArtifactRow | undefined

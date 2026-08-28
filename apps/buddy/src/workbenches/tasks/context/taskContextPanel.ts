@@ -1,4 +1,8 @@
-import type { LocalArtifact, LocalRunOutput } from '@buddy-electron/shared/localChatApi'
+import type {
+  LocalArtifact,
+  LocalChangeSetSummary,
+  LocalRunOutput,
+} from '@buddy-electron/shared/localChatApi'
 
 export interface TaskArtifactContextTab {
   artifact: LocalArtifact
@@ -7,7 +11,14 @@ export interface TaskArtifactContextTab {
   label: string
 }
 
-export type TaskContextTab = TaskArtifactContextTab
+export interface TaskChangesContextTab {
+  changeSet: LocalChangeSetSummary
+  id: string
+  kind: 'changes'
+  label: string
+}
+
+export type TaskContextTab = TaskArtifactContextTab | TaskChangesContextTab
 
 export function projectTaskArtifactTabs(
   outputs: ReadonlyArray<LocalRunOutput>,
@@ -27,4 +38,19 @@ export function projectTaskArtifactTabs(
 
 export function artifactTabId(artifactId: string): string {
   return `artifact:${artifactId}`
+}
+
+export function projectTaskChangeTabs(
+  changeSets: ReadonlyArray<LocalChangeSetSummary>,
+): ReadonlyArray<TaskChangesContextTab> {
+  return changeSets.map(changeSet => ({
+    changeSet,
+    id: changeTabId(changeSet.changeSetId),
+    kind: 'changes',
+    label: `Changes (${changeSet.fileCount})`,
+  }))
+}
+
+export function changeTabId(changeSetId: string): string {
+  return `changes:${changeSetId}`
 }

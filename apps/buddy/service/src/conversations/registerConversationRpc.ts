@@ -1,4 +1,5 @@
 import type { AttachmentService } from '../attachments/AttachmentService'
+import type { ChangeCaptureService } from '../changes/ChangeCaptureService'
 import type { BuddyRunEvent } from '../events/BuddyRunEvent'
 import type { RuntimeRequestRegistrar } from '../rpc/runtimeRequest'
 import type { ArtifactRecord, ArtifactRepository } from '../storage/artifactRepository'
@@ -67,6 +68,7 @@ type ConversationRpcRepository = Pick<
 export interface RegisterConversationRpcOptions {
   artifacts: Pick<ArtifactRepository, 'listForConversation'>
   attachments: Pick<AttachmentService, 'listForConversation'>
+  changes: Pick<ChangeCaptureService, 'listSummariesForRuns'>
   conversations: ConversationRpcRepository
   deleteConversation: (conversationId: string) => Promise<boolean>
   eventLog: { listForRuns: (runIds: readonly string[]) => BuddyRunEvent[] }
@@ -223,6 +225,7 @@ export function registerConversationRpc(options: RegisterConversationRpcOptions)
     )
     const runEvents = options.eventLog.listForRuns(runs.map(run => run.id))
     return {
+      changeSets: options.changes.listSummariesForRuns(runs.map(run => run.id)),
       items,
       nextCursor: page.nextBefore
         ? createConversationTimelineCursor({

@@ -57,7 +57,7 @@ function formatFileSize(sizeBytes: number): string {
 <template>
   <section class="buddy-chat-turn-outputs" data-testid="chat-turn-outputs">
     <header class="buddy-chat-turn-outputs__heading">
-      <span>{{ t('desktop.chat.turnOutputs') }}</span>
+      <strong>{{ t('desktop.chat.turnOutputs') }}</strong>
       <small>{{ artifacts.length }}</small>
     </header>
     <div class="buddy-chat-turn-outputs__grid">
@@ -68,7 +68,10 @@ function formatFileSize(sizeBytes: number): string {
         type="button"
         @click="emit('openArtifact', view.artifact.artifactId)"
       >
-        <div class="buddy-chat-turn-output__preview">
+        <div
+          class="buddy-chat-turn-output__preview"
+          :class="{ 'is-contain': view.artifact.mimeType === 'image/svg+xml' }"
+        >
           <img
             v-if="view.previewable"
             :alt="view.artifact.name"
@@ -101,12 +104,16 @@ function formatFileSize(sizeBytes: number): string {
   display: flex;
   align-items: center;
   gap: 0.4rem;
-  color: var(--buddy-chat-meta-color);
-  font-size: var(--buddy-chat-caption-font-size);
-  font-weight: 600;
+
+  strong {
+    color: var(--buddy-text-strong);
+    font-size: var(--buddy-chat-meta-font-size);
+    font-weight: 650;
+  }
 
   small {
-    font-size: inherit;
+    color: var(--buddy-text-muted);
+    font-size: var(--buddy-chat-caption-font-size);
     font-weight: 400;
   }
 }
@@ -114,7 +121,7 @@ function formatFileSize(sizeBytes: number): string {
 .buddy-chat-turn-outputs__grid {
   display: grid;
   min-width: 0;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(13rem, 100%), 1fr));
   gap: 0.625rem;
 }
 
@@ -122,9 +129,10 @@ function formatFileSize(sizeBytes: number): string {
   display: grid;
   overflow: hidden;
   min-width: 0;
-  border: 1px solid var(--buddy-border-subtle);
+  border: 1px solid var(--buddy-accent-border);
   border-radius: var(--buddy-radius-micro);
   background: var(--buddy-surface-raised);
+  box-shadow: var(--buddy-shadow-soft);
   color: inherit;
   font: inherit;
   padding: 0;
@@ -133,8 +141,9 @@ function formatFileSize(sizeBytes: number): string {
   cursor: pointer;
 
   &:hover {
-    border-color: var(--buddy-border-strong);
-    background: var(--buddy-state-hover);
+    border-color: var(--buddy-accent-solid);
+    background: var(--buddy-accent-surface-subtle);
+    box-shadow: var(--buddy-shadow-raised);
   }
 
   &:focus-visible {
@@ -149,7 +158,7 @@ function formatFileSize(sizeBytes: number): string {
   place-items: center;
   overflow: hidden;
   border-bottom: 1px solid var(--buddy-border-subtle);
-  background: var(--buddy-surface-subtle);
+  background: var(--buddy-accent-surface-subtle);
   color: var(--buddy-text-muted);
 
   img {
@@ -157,6 +166,11 @@ function formatFileSize(sizeBytes: number): string {
     width: 100%;
     height: 100%;
     object-fit: cover;
+  }
+
+  &.is-contain img {
+    object-fit: contain;
+    padding: 0.5rem;
   }
 
   :deep(.n-icon) {
@@ -198,17 +212,5 @@ function formatFileSize(sizeBytes: number): string {
   width: 1rem;
   height: 1rem;
   color: var(--buddy-chat-meta-color);
-}
-
-@media (max-width: 920px) {
-  .buddy-chat-turn-outputs__grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
-@media (max-width: 620px) {
-  .buddy-chat-turn-outputs__grid {
-    grid-template-columns: minmax(0, 1fr);
-  }
 }
 </style>

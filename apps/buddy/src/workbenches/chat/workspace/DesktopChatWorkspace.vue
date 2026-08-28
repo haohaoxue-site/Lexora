@@ -25,6 +25,7 @@ const props = defineProps<{
 }>()
 const emit = defineEmits<{
   openArtifact: [artifactId: string]
+  openChanges: [changeSetId: string]
   openSettings: [category: DesktopSettingsCategory]
 }>()
 defineSlots<{
@@ -109,6 +110,7 @@ function dismissBlocker() {
         :active-search-message-id="activeSearchMessageId"
         :actions-disabled="!execution.canMutateBranch.value"
         :branches="transcript.branches.value"
+        :change-sets="transcript.changeSets.value"
         class="desktop-chat-page__messages"
         :has-older-messages="transcript.hasOlderMessages.value"
         :is-loading-older-messages="transcript.isLoadingOlderMessages.value"
@@ -121,6 +123,7 @@ function dismissBlocker() {
         @activate-branch="transcript.activateBranch"
         @edit-user-message="execution.editUserMessage"
         @open-artifact="emit('openArtifact', $event)"
+        @open-changes="emit('openChanges', $event)"
         @regenerate-assistant="execution.regenerateAssistant"
         @scroll="viewport.handleScroll"
         @scroll-position="viewport.handlePosition"

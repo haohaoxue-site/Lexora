@@ -1,13 +1,16 @@
-import type { LocalRunOutput } from '@buddy-electron/shared/localChatApi'
+import type { LocalChangeSetSummary, LocalRunOutput } from '@buddy-electron/shared/localChatApi'
 import type { Ref } from 'vue'
 import { computed, readonly, shallowRef, watch } from 'vue'
 import {
   artifactTabId,
+  changeTabId,
   projectTaskArtifactTabs,
+  projectTaskChangeTabs,
 } from './taskContextPanel'
 
 interface UseTaskContextPanelOptions {
   activeConversationId: Readonly<Ref<string | null>>
+  changeSets: Readonly<Ref<ReadonlyArray<LocalChangeSetSummary>>>
   runOutputs: Readonly<Ref<ReadonlyArray<LocalRunOutput>>>
 }
 
@@ -15,9 +18,14 @@ export function useTaskContextPanel(options: UseTaskContextPanelOptions) {
   const isOpen = shallowRef(false)
   const activeTabId = shallowRef<string | null>(null)
   const openTabIds = shallowRef<ReadonlyArray<string>>([])
-  const availableTabs = computed(() => projectTaskArtifactTabs(options.runOutputs.value).filter(
-    tab => tab.artifact.conversationId === options.activeConversationId.value,
-  ))
+  const availableTabs = computed(() => [
+    ...projectTaskArtifactTabs(options.runOutputs.value),
+    ...projectTaskChangeTabs(options.changeSets.value),
+  ].filter(tab => (
+    tab.kind === 'artifact'
+      ? tab.artifact.conversationId
+      : tab.changeSet.conversationId
+  ) === options.activeConversationId.value))
   const availableTabsById = computed(() => new Map(
     availableTabs.value.map(tab => [tab.id, tab]),
   ))
@@ -27,7 +35,9 @@ export function useTaskContextPanel(options: UseTaskContextPanelOptions) {
   const activeTab = computed(() => (
     tabs.value.find(tab => tab.id === activeTabId.value) ?? null
   ))
-  const artifactCount = computed(() => availableTabs.value.length)
+  const artifactCount = computed(() => availableTabs.value.filter(
+    tab => tab.kind === 'artifact',
+  ).length)
 
   let currentConversationId: string | null = null
   watch(
@@ -71,6 +81,16 @@ export function useTaskContextPanel(options: UseTaskContextPanelOptions) {
     isOpen.value = true
   }
 
+  function openChanges(changeSetId: string) {
+    const tabId = changeTabId(changeSetId)
+    if (!availableTabsById.value.has(tabId))
+      return
+    if (!openTabIds.value.includes(tabId))
+      openTabIds.value = [...openTabIds.value, tabId]
+    activeTabId.value = tabId
+    isOpen.value = true
+  }
+
   function selectTab(tabId: string) {
     if (openTabIds.value.includes(tabId))
       activeTabId.value = tabId
@@ -93,6 +113,7 @@ export function useTaskContextPanel(options: UseTaskContextPanelOptions) {
     closeTab,
     isOpen: readonly(isOpen),
     openArtifact,
+    openChanges,
     selectTab,
     tabs: readonly(tabs),
     toggle,

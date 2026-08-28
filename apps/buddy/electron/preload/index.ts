@@ -23,6 +23,12 @@ function subscribe<T>(channel: string, listener: (value: T) => void): () => void
 }
 
 const localChatApi = Object.freeze<LocalChatApi>({
+  artifacts: Object.freeze({
+    readText: artifactId => ipcRenderer.invoke(
+      LOCAL_CHAT_IPC_CHANNELS.artifactsReadText,
+      { artifactId },
+    ),
+  }),
   automations: Object.freeze({
     create: input => ipcRenderer.invoke(LOCAL_CHAT_IPC_CHANNELS.automationsCreate, input),
     delete: input => ipcRenderer.invoke(LOCAL_CHAT_IPC_CHANNELS.automationsDelete, input),
@@ -211,6 +217,9 @@ const localChatApi = Object.freeze<LocalChatApi>({
     ),
     listTimeline: input =>
       ipcRenderer.invoke(LOCAL_CHAT_IPC_CHANNELS.conversationsListTimeline, input),
+  }),
+  changes: Object.freeze({
+    get: changeSetId => ipcRenderer.invoke(LOCAL_CHAT_IPC_CHANNELS.changesGet, { changeSetId }),
   }),
   runs: Object.freeze({
     list: input => ipcRenderer.invoke(LOCAL_CHAT_IPC_CHANNELS.runsList, input ?? {}),
