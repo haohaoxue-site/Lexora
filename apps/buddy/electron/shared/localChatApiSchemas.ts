@@ -1008,9 +1008,9 @@ export const localChatSchemas = {
     { message: 'An edited turn requires text or an attachment' },
   ),
   regenerateAssistant: z.object({
-    assistantMessageId: idSchema,
     conversationId: idSchema,
     requestId: z.string().min(1).max(128),
+    sourceRunId: idSchema,
   }).strict(),
   cleanupDraftAttachments: z.object({}).strict(),
   runEvents: z.union([

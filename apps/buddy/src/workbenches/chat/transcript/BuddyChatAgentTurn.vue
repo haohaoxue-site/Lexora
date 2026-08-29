@@ -1,11 +1,12 @@
 <script setup lang="ts">
+import type { ChatMessageBranchNavigator } from './chatMessageBranches'
 import type { ChatAgentTurn } from './chatStreamingMessage'
 import type { BuddyLocale } from '@/i18n/buddyI18n'
 import { ChevronRight20Regular } from '@vicons/fluent'
-import { useIntervalFn } from '@vueuse/core'
 import { NIcon } from 'naive-ui'
-import { computed, shallowRef, watch } from 'vue'
+import { computed } from 'vue'
 import { useBuddyI18n } from '@/i18n/buddyI18n'
+import BuddyChatActionToolbar from './BuddyChatActionToolbar.vue'
 import BuddyChatAgentIdentity from './BuddyChatAgentIdentity.vue'
 import BuddyChatReasoningGroup from './BuddyChatReasoningGroup.vue'
 import BuddyChatToolRow from './BuddyChatToolRow.vue'
@@ -13,44 +14,33 @@ import {
   resolveChatAgentTurnFailurePresentation,
   resolveChatAgentTurnNotice,
 } from './chatAgentTurnDisclosure'
+import { projectChatAgentTurnActions } from './chatMessageActions'
+import { formatChatRunDuration } from './chatRunDuration'
 import { projectChatAgentTurnRows } from './chatStreamingMessage'
 
 const props = defineProps<{
+  actionsDisabled?: boolean
+  branchNavigator?: ChatMessageBranchNavigator | null
   language: BuddyLocale
   open: boolean
+  ownsResultActions?: boolean
   turn: ChatAgentTurn
 }>()
 
 const emit = defineEmits<{
+  activateBranch: [branchId: string]
+  regenerate: []
   toggle: []
 }>()
 
 const { t } = useBuddyI18n(() => props.language)
 const isActive = computed(() => props.turn.status === 'queued' || props.turn.status === 'running')
-const now = shallowRef(Date.now())
-const { pause: pauseDuration, resume: resumeDuration } = useIntervalFn(() => {
-  now.value = Date.now()
-}, 1_000, {
-  immediate: false,
-  immediateCallback: true,
-})
-
-watch(isActive, (active) => {
-  if (active) {
-    resumeDuration()
-    return
-  }
-  pauseDuration()
-}, { immediate: true })
-
-const duration = computed(() => {
-  const start = Date.parse(props.turn.startedAt)
-  const end = props.turn.completedAt ? Date.parse(props.turn.completedAt) : now.value
-  return formatDuration(Math.max(0, end - start))
-})
-const statusLabel = computed(() => isActive.value
-  ? t('desktop.chat.runInProgress')
-  : t(`run.status.${props.turn.status}`))
+const duration = computed(() => formatChatRunDuration(
+  props.turn.startedAt,
+  props.turn.completedAt,
+  Date.now(),
+))
+const statusLabel = computed(() => t(`run.status.${props.turn.status}`))
 const rows = computed(() => projectChatAgentTurnRows(props.turn.nodes))
 const notice = computed(() => resolveChatAgentTurnNotice(
   props.turn.status,
@@ -82,15 +72,18 @@ const hasVisibleProcess = computed(() => (
   canToggleProcess.value
   && (isActive.value || props.open)
 ))
-
-function formatDuration(value: number): string {
-  const seconds = Math.max(1, Math.round(value / 1_000))
-  if (seconds < 60)
-    return `${seconds}s`
-  const minutes = Math.floor(seconds / 60)
-  const remainder = seconds % 60
-  return remainder ? `${minutes}m ${remainder}s` : `${minutes}m`
-}
+const actions = computed(() => projectChatAgentTurnActions(
+  props.turn,
+  props.actionsDisabled ?? false,
+  props.ownsResultActions ?? false,
+))
+const showActions = computed(() => (
+  actions.value.showCopy
+  || actions.value.showRegenerate
+  || actions.value.showTime
+  || props.branchNavigator != null
+))
+const actionCopyText = computed(() => resultNoticeText.value ?? statusLabel.value)
 </script>
 
 <template>
@@ -100,18 +93,8 @@ function formatDuration(value: number): string {
   >
     <div class="buddy-chat-agent-turn__heading">
       <BuddyChatAgentIdentity :language="language" />
-      <div
-        v-if="isActive"
-        class="buddy-chat-agent-turn__status is-static"
-      >
-        <span
-          aria-live="polite"
-          class="buddy-chat-agent-turn__status-label"
-        >{{ statusLabel }}</span>
-        <span class="buddy-chat-agent-turn__duration">{{ duration }}</span>
-      </div>
       <button
-        v-else
+        v-if="!isActive"
         :aria-expanded="canToggleProcess ? open : undefined"
         class="buddy-chat-agent-turn__status"
         :disabled="!canToggleProcess"
@@ -162,6 +145,19 @@ function formatDuration(value: number): string {
     >
       {{ resultNoticeText }}
     </p>
+    <BuddyChatActionToolbar
+      v-if="showActions"
+      :actions="actions"
+      :branch-navigator="branchNavigator ?? null"
+      class="buddy-chat-agent-turn__actions"
+      :copy-text="actionCopyText"
+      :created-at="turn.completedAt ?? turn.startedAt"
+      :language="language"
+      role="assistant"
+      :target-key="`run-${turn.runId}`"
+      @activate-branch="emit('activateBranch', $event)"
+      @regenerate="emit('regenerate')"
+    />
   </section>
 </template>
 
@@ -176,7 +172,7 @@ function formatDuration(value: number): string {
 .buddy-chat-agent-turn__heading {
   display: grid;
   min-width: 0;
-  gap: 0.375rem;
+  gap: 0.5rem;
 }
 
 .buddy-chat-agent-turn__status {
@@ -195,13 +191,9 @@ function formatDuration(value: number): string {
   padding: 0;
   text-align: left;
 
-  &:not(.is-static):not(:disabled):hover,
-  &:not(.is-static):not(:disabled):focus-visible {
+  &:not(:disabled):hover,
+  &:not(:disabled):focus-visible {
     color: var(--buddy-text-strong);
-  }
-
-  &.is-static {
-    cursor: default;
   }
 
   &:disabled {
@@ -275,9 +267,28 @@ function formatDuration(value: number): string {
   }
 }
 
+.buddy-chat-agent-turn__actions {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 120ms ease;
+
+  .buddy-chat-agent-turn:hover &,
+  .buddy-chat-agent-turn:focus-within & {
+    opacity: 1;
+    pointer-events: auto;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .buddy-chat-agent-turn__chevron {
     transition: none;
+  }
+}
+
+@media (hover: none) {
+  .buddy-chat-agent-turn__actions {
+    opacity: 1;
+    pointer-events: auto;
   }
 }
 </style>

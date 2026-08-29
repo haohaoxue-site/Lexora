@@ -2,6 +2,7 @@ import type {
   LocalConversationBranch,
   LocalMessage,
 } from '@buddy-electron/shared/localChatApi'
+import type { ChatAgentTurn } from './chatStreamingMessage'
 import type { ChatTranscriptRow } from './chatTranscriptProjection'
 
 export interface ChatMessageBranchNavigator {
@@ -29,6 +30,9 @@ export function projectChatMessageBranchNavigators(
     return new Map()
 
   const messages = rows.flatMap(row => row.kind === 'message' ? [row.message] : [])
+  const actionTurns = rows.flatMap(row => (
+    row.kind === 'agent-turn' && row.ownsResultActions ? [row.turn] : []
+  ))
   const activePathIds = new Set(activePath.map(branch => branch.id))
   const navigators = new Map<string, ChatMessageBranchNavigator>()
 
@@ -38,13 +42,13 @@ export function projectChatMessageBranchNavigators(
     const activeGroupBranchId = resolveActiveGroupBranchId(group, activePath, activePathIds)
     if (!activeGroupBranchId)
       continue
-    const messageId = resolveNavigatorMessageId(group, activeGroupBranchId, messages)
-    if (!messageId)
+    const targetId = resolveNavigatorTargetId(group, activeGroupBranchId, messages, actionTurns)
+    if (!targetId)
       continue
     const index = group.branchIds.indexOf(activeGroupBranchId)
     if (index < 0)
       continue
-    navigators.set(messageId, {
+    navigators.set(targetId, {
       activeBranchId: activeGroupBranchId,
       count: group.branchIds.length,
       index: index + 1,
@@ -119,15 +123,38 @@ function resolveActiveGroupBranchId(
   return activePath.findLast(branch => group.branchIds.includes(branch.id))?.id ?? null
 }
 
-function resolveNavigatorMessageId(
+function resolveNavigatorTargetId(
   group: BranchGroup,
   activeGroupBranchId: string,
   messages: ReadonlyArray<LocalMessage>,
+  actionTurns: ReadonlyArray<ChatAgentTurn>,
 ): string | null {
   if (group.baseBranchId === null)
     return messages.find(message => message.branchId === activeGroupBranchId)?.id ?? null
-  if (activeGroupBranchId !== group.baseBranchId)
-    return messages.find(message => message.branchId === activeGroupBranchId)?.id ?? null
+  const forkMessage = messages.find(message => message.id === group.forkedFromMessageId)
+  const terminalTurnTarget = forkMessage?.role === 'user'
+    ? resolveTerminalTurnTarget(activeGroupBranchId, forkMessage.id, actionTurns)
+    : null
+  if (activeGroupBranchId !== group.baseBranchId) {
+    return terminalTurnTarget
+      ?? messages.find(message => message.branchId === activeGroupBranchId)?.id
+      ?? null
+  }
+  if (terminalTurnTarget)
+    return terminalTurnTarget
   const forkIndex = messages.findIndex(message => message.id === group.forkedFromMessageId)
   return forkIndex >= 0 ? messages[forkIndex + 1]?.id ?? null : null
+}
+
+function resolveTerminalTurnTarget(
+  branchId: string,
+  triggeringMessageId: string,
+  actionTurns: ReadonlyArray<ChatAgentTurn>,
+): string | null {
+  return actionTurns.find(turn => (
+    turn.branchId === branchId
+    && turn.triggeringMessageId === triggeringMessageId
+    && turn.status !== 'queued'
+    && turn.status !== 'running'
+  ))?.runId ?? null
 }

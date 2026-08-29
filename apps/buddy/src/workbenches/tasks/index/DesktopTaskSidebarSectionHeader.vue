@@ -57,7 +57,7 @@ const emit = defineEmits<{
 
   &:hover,
   &:focus-within {
-    color: var(--buddy-text-strong);
+    color: var(--buddy-nav-foreground);
   }
 }
 
@@ -90,7 +90,7 @@ button {
 
 .desktop-task-sidebar__section-label-text {
   overflow: hidden;
-  font-size: var(--buddy-sidebar-section-font-size);
+  font-size: var(--buddy-task-sidebar-section-font-size, var(--buddy-sidebar-section-font-size));
   font-weight: var(--buddy-sidebar-section-font-weight);
   line-height: 20px;
   text-overflow: ellipsis;

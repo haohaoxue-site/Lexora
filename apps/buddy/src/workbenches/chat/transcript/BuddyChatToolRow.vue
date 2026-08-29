@@ -20,6 +20,7 @@ import {
   translateSystemToolStatus,
   useBuddyI18n,
 } from '@/i18n/buddyI18n'
+import BuddyChatShimmerText from './BuddyChatShimmerText.vue'
 import BuddyChatToolDetails from './BuddyChatToolDetails.vue'
 
 const props = defineProps<{
@@ -30,6 +31,17 @@ const props = defineProps<{
 const { t } = useBuddyI18n(() => props.language)
 const isOpen = shallowRef(defaultOpen())
 const hasManualToggle = shallowRef(false)
+const shimmerMode = computed<'continuous' | 'static'>(() => {
+  switch (props.node.status) {
+    case 'completed':
+    case 'denied':
+    case 'failed':
+    case 'interrupted':
+      return 'static'
+    default:
+      return 'continuous'
+  }
+})
 const canExpand = computed(() => {
   const presentation = props.node.presentation
   return presentation.card === 'terminal'
@@ -38,11 +50,16 @@ const canExpand = computed(() => {
       || presentation.reference
       || presentation.artifactIds.length,
     ))
-    || ('output' in presentation && Boolean(presentation.output))
+    || (
+      props.node.status !== 'denied'
+      && 'output' in presentation
+      && Boolean(presentation.output)
+    )
     || (presentation.card === 'diff' && Boolean(presentation.diff))
 })
 const title = computed(() => {
   switch (props.node.presentation.card) {
+    case 'artifact': return t('desktop.chat.processToolArtifact')
     case 'terminal': return t('desktop.chat.processToolCommand')
     case 'read': return t('desktop.chat.processToolRead')
     case 'search': return t('desktop.chat.processToolSearch')
@@ -64,7 +81,24 @@ const summary = computed(() => {
     ? t('desktop.chat.processAwaitingApproval')
     : props.node.status === 'preparing'
       ? t('desktop.chat.processToolPreparing')
-      : null
+      : props.node.status === 'denied'
+        ? t('desktop.chat.processToolApprovalDenied')
+        : null
+  if (presentation.card === 'artifact') {
+    return lifecycle ?? (
+      presentation.status === 'completed' && presentation.presentedCount !== null
+        ? t('desktop.chat.processToolArtifactCount', { count: presentation.presentedCount })
+        : presentation.status === 'failed'
+          ? t('desktop.chat.processToolArtifactFailed')
+          : t('desktop.chat.processToolArtifactRunning')
+    )
+  }
+  if (presentation.card === 'terminal') {
+    return [
+      terminalStatusLabel(presentation),
+      presentation.command,
+    ].filter(Boolean).join(' · ')
+  }
   if (presentation.card === 'system') {
     const targetUnavailable = presentation.status === 'action-expired'
       || presentation.status === 'target-ambiguous'
@@ -101,7 +135,6 @@ const summary = computed(() => {
   }
   const detail = (() => {
     switch (presentation.card) {
-      case 'terminal': return presentation.command
       case 'read': return presentation.path
       case 'search': return [presentation.query, presentation.path].filter(Boolean).join(' · ')
       case 'diff': return presentation.path
@@ -119,6 +152,7 @@ const summary = computed(() => {
 })
 const leadingIcon = computed(() => {
   switch (props.node.presentation.card) {
+    case 'artifact': return Document20Regular
     case 'terminal': return WindowConsole20Regular
     case 'read': return Document20Regular
     case 'search': return Search20Regular
@@ -132,6 +166,22 @@ const leadingIcon = computed(() => {
   }
   return Wrench20Regular
 })
+
+function terminalStatusLabel(
+  presentation: Extract<ChatAgentToolNode['presentation'], { card: 'terminal' }>,
+): string {
+  switch (props.node.status) {
+    case 'awaiting_approval': return t('desktop.chat.processAwaitingApproval')
+    case 'completed': return t('desktop.chat.processToolSucceeded')
+    case 'denied': return t('desktop.chat.processToolApprovalDenied')
+    case 'failed': return presentation.exitCode === null
+      ? t('desktop.chat.processToolFailed')
+      : t('desktop.chat.processToolExitCode', { code: presentation.exitCode })
+    case 'interrupted': return t('desktop.chat.processToolInterrupted')
+    case 'preparing': return t('desktop.chat.processToolPreparing')
+    case 'running': return t('desktop.chat.processToolRunning')
+  }
+}
 
 function automationOperationLabel(
   operation: Extract<ChatAgentToolNode['presentation'], { card: 'automation' }>['operation'],
@@ -153,7 +203,8 @@ watch(() => props.node.status, () => {
 })
 
 function defaultOpen(): boolean {
-  return props.node.status === 'failed'
+  return props.node.status === 'denied'
+    || props.node.status === 'failed'
     || (
       (props.node.status === 'preparing' || props.node.status === 'running')
       && props.node.presentation.card === 'terminal'
@@ -179,7 +230,12 @@ function toggle() {
       @click="toggle"
     >
       <NIcon :component="leadingIcon" class="buddy-chat-tool__icon" />
-      <span class="buddy-chat-tool__title">{{ title }}</span>
+      <BuddyChatShimmerText
+        class="buddy-chat-tool__title"
+        :mode="shimmerMode"
+      >
+        {{ title }}
+      </BuddyChatShimmerText>
       <code class="buddy-chat-tool__summary">{{ summary }}</code>
       <NIcon
         v-if="canExpand"
@@ -190,6 +246,7 @@ function toggle() {
     </button>
     <BuddyChatToolDetails
       v-show="isOpen && canExpand"
+      :expanded="isOpen && canExpand"
       :language="language"
       :presentation="node.presentation"
       :status="node.status"
@@ -200,6 +257,8 @@ function toggle() {
 
 <style scoped lang="scss">
 .buddy-chat-tool {
+  --buddy-shimmer-duration: 1.35s;
+  --buddy-shimmer-highlight: var(--buddy-text-strong);
   display: grid;
   min-width: 0;
 }
@@ -253,12 +312,19 @@ function toggle() {
 .buddy-chat-tool__chevron {
   margin-left: 6px;
   color: var(--buddy-chat-meta-color);
-  opacity: 1;
-  transition: transform 120ms ease;
+  opacity: 0;
+  transition:
+    opacity var(--buddy-motion-state-duration) var(--buddy-motion-state-easing),
+    transform 120ms ease;
 
   &.is-open {
     transform: rotate(90deg) translateX(0.5px);
   }
+}
+
+.buddy-chat-tool:hover .buddy-chat-tool__chevron,
+.buddy-chat-tool__header:focus-visible .buddy-chat-tool__chevron {
+  opacity: 1;
 }
 
 .buddy-chat-tool.is-failed .buddy-chat-tool__icon {
@@ -269,11 +335,14 @@ function toggle() {
   color: var(--buddy-text-muted);
 }
 
+.buddy-chat-tool.is-denied .buddy-chat-tool__icon,
 .buddy-chat-tool.is-awaiting_approval .buddy-chat-tool__icon {
   color: var(--buddy-status-warning-text);
 }
 
 .buddy-chat-tool__title {
+  --buddy-shimmer-base: var(--buddy-chat-tool-title-color);
+
   font-weight: 550;
   font-size: 14px;
   line-height: 24px;

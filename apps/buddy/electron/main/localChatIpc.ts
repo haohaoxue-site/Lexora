@@ -504,6 +504,11 @@ export function registerLocalChatIpc(options: RegisterLocalChatIpcOptions): () =
     localChatSchemas.approvalId.parse(input),
     localChatResponseSchemas.approval,
   ))
+  handle(LOCAL_CHAT_IPC_CHANNELS.approvalsApproveForTurn, (_event, input) => request(
+    'approvals.approveForTurn',
+    localChatSchemas.approvalId.parse(input),
+    localChatResponseSchemas.approval,
+  ))
   handle(LOCAL_CHAT_IPC_CHANNELS.approvalsDeny, (_event, input) => request(
     'approvals.deny',
     localChatSchemas.approvalId.parse(input),

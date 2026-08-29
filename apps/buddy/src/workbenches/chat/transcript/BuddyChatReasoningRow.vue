@@ -24,11 +24,6 @@ const summary = computed(() => {
     return ''
   const text = node.text.trim()
   if (!text) {
-    if (node.reasoningKind === 'summary') {
-      return t(node.status === 'running'
-        ? 'desktop.chat.processReasoningSummaryRunning'
-        : 'desktop.chat.processReasoningSummaryDone')
-    }
     return t(node.status === 'running'
       ? 'desktop.chat.processReasoningRunning'
       : 'desktop.chat.processReasoningDone')
@@ -98,11 +93,19 @@ const bodyHtml = computed(() => renderChatMarkdown(
   flex: 0 0 auto;
   margin-left: 6px;
   color: var(--buddy-chat-meta-color);
-  transition: transform 120ms ease;
+  opacity: 0;
+  transition:
+    opacity var(--buddy-motion-state-duration) var(--buddy-motion-state-easing),
+    transform 120ms ease;
 
   &.is-open {
     transform: rotate(90deg) translateX(0.5px);
   }
+}
+
+.buddy-chat-reasoning-entry:hover .buddy-chat-reasoning-entry__chevron,
+.buddy-chat-reasoning-entry__header:focus-visible .buddy-chat-reasoning-entry__chevron {
+  opacity: 1;
 }
 
 .buddy-chat-reasoning-entry__summary {

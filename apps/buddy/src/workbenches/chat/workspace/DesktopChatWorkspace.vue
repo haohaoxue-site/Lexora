@@ -37,7 +37,6 @@ const { composer, execution, session, status, transcript } = workspace
 const { t } = useBuddyI18n(workspace.language)
 const messageList = useTemplateRef<BuddyChatMessageListHandle>('messageList')
 const activeSearchMessageId = computed(() => props.activeSearchMessageId)
-const runEventCount = computed(() => transcript.runEvents.value.length)
 const isEmpty = computed(() => session.activeConversationId.value === null)
 const welcomeVariant = shallowRef(selectDesktopChatWelcomeVariant(workspace.welcomePreference.value))
 const visibleBlocker = computed(() => status.visibleChatBlocker.value)
@@ -54,7 +53,6 @@ const viewport = useChatViewport({
   isLoadingOlderMessages: transcript.isLoadingOlderMessages,
   list: messageList,
   loadOlderMessages: transcript.loadOlderMessages,
-  runEventCount,
   timelineItems: transcript.timelineItems,
 })
 
@@ -120,13 +118,16 @@ function dismissBlocker() {
         :run-events="transcript.runEvents.value"
         :run-outputs="transcript.runOutputs.value"
         :runs="transcript.runs.value"
+        :show-return-to-latest="viewport.showReturnToLatest.value"
         @activate-branch="transcript.activateBranch"
+        @content-resize="viewport.handleContentResize"
         @edit-user-message="execution.editUserMessage"
         @open-artifact="emit('openArtifact', $event)"
         @open-changes="emit('openChanges', $event)"
+        @reader-layout-intent="viewport.handleReaderLayoutIntent"
         @regenerate-assistant="execution.regenerateAssistant"
+        @return-to-latest="viewport.returnToLatest"
         @scroll="viewport.handleScroll"
-        @scroll-position="viewport.handlePosition"
       />
     </main>
 
@@ -187,8 +188,9 @@ function dismissBlocker() {
             :key="approval.id"
             :approval="approval"
             :language="workspace.language.value"
-            :resolving="execution.resolvingApprovalIds.value.has(approval.id)"
+            :resolving-action="execution.resolvingApprovalActions.value.get(approval.id) ?? null"
             @approve="execution.resolveApproval(approval.id, 'approve')"
+            @approve-turn="execution.resolveApproval(approval.id, 'approveForTurn')"
             @deny="execution.resolveApproval(approval.id, 'deny')"
           />
         </div>

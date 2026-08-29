@@ -184,6 +184,7 @@ export type {
 
 export const LOCAL_CHAT_IPC_CHANNELS = {
   approvalsApprove: 'lexora:buddy:approvals:approve',
+  approvalsApproveForTurn: 'lexora:buddy:approvals:approve-for-turn',
   approvalsDeny: 'lexora:buddy:approvals:deny',
   approvalsList: 'lexora:buddy:approvals:list',
   artifactsReadText: 'lexora:buddy:artifacts:read-text',
@@ -466,6 +467,7 @@ export interface LocalChatApi {
       status?: 'pending' | 'approved' | 'denied' | 'cancelled' | null
     }) => Promise<ReadonlyArray<LocalApproval>>
     approve: (approvalId: string) => Promise<LocalApproval>
+    approveForTurn: (approvalId: string) => Promise<LocalApproval>
     deny: (approvalId: string) => Promise<LocalApproval>
   }
   attachments: {
@@ -498,9 +500,9 @@ export interface LocalChatApi {
     executeCommand: (request: LocalChatCommandRequest) => Promise<LocalTurnStart>
     startTurn: (request: LocalStartTurnRequest) => Promise<LocalTurnStart>
     regenerateAssistant: (input: {
-      assistantMessageId: string
       conversationId: string
       requestId: string
+      sourceRunId: string
     }) => Promise<LocalTurnStart>
     cancel: (runId: string) => Promise<LocalRun>
     onRunEvent: (listener: (event: LocalRunEvent) => void) => () => void

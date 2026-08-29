@@ -12,14 +12,18 @@ const { t } = useBuddyI18n(() => props.language)
 
 <template>
   <header class="buddy-chat-agent-identity">
-    <img
-      :src="DESKTOP_ASSET_URLS.appIcon"
-      alt=""
-      draggable="false"
-      height="25"
-      width="25"
-    >
-    <span>{{ t('desktop.chat.agentName') }}</span>
+    <span class="buddy-chat-agent-identity__avatar">
+      <img
+        :src="DESKTOP_ASSET_URLS.appIcon"
+        alt=""
+        draggable="false"
+        height="37"
+        width="37"
+      >
+    </span>
+    <span class="buddy-chat-agent-identity__name">
+      {{ t('desktop.chat.agentName') }}
+    </span>
   </header>
 </template>
 
@@ -29,19 +33,36 @@ const { t } = useBuddyI18n(() => props.language)
   width: fit-content;
   min-width: 0;
   align-items: center;
-  gap: var(--buddy-chat-gap-block);
+  gap: var(--buddy-chat-avatar-gap);
+}
 
-  img {
-    width: var(--buddy-chat-avatar-size);
-    height: var(--buddy-chat-avatar-size);
-    flex: 0 0 auto;
-    object-fit: contain;
-  }
+.buddy-chat-agent-identity__avatar {
+  position: relative;
+  width: var(--buddy-chat-avatar-size);
+  height: var(--buddy-chat-avatar-size);
+  flex: 0 0 auto;
+  overflow: hidden;
+  border: 1px solid var(--buddy-border-subtle);
+  border-radius: 50%;
+  background: var(--buddy-surface-subtle);
+}
 
-  span {
-    min-width: 0;
-    color: var(--buddy-text-strong);
-    font-size: 13px;
-  }
+.buddy-chat-agent-identity__avatar img {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: calc(var(--buddy-chat-avatar-size) + 5px);
+  height: calc(var(--buddy-chat-avatar-size) + 5px);
+  object-fit: contain;
+  transform: translate(-50%, -47%);
+}
+
+.buddy-chat-agent-identity__name {
+  min-width: 0;
+  color: var(--buddy-chat-agent-name-color);
+  font-family: var(--buddy-font-brand);
+  font-size: var(--buddy-brand-name-font-size);
+  font-weight: var(--buddy-brand-name-font-weight);
+  line-height: var(--buddy-brand-name-line-height);
 }
 </style>

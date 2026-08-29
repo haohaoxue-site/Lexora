@@ -14,8 +14,10 @@ import { createApprovalReviewPayload } from '../../../shared/approvalReviewPaylo
 export const APPROVAL_WAIT_TIMEOUT_MS = 30 * 60 * 1_000
 
 export type ApprovalDecision = 'approved' | 'denied'
+export type ApprovalResolutionDecision = ApprovalDecision | 'approved_for_turn'
 
 export interface ApprovalRequest {
+  allowForTurn: boolean
   arguments: unknown
   automation?: AutomationApprovalReviewInput
   kind: ToolApprovalKind
@@ -28,7 +30,7 @@ export interface ApprovalRequest {
 }
 
 export interface ApprovalResolution {
-  decision: ApprovalDecision
+  decision: ApprovalResolutionDecision
   id: string
 }
 
@@ -40,9 +42,11 @@ export interface ApprovalServiceOptions {
 }
 
 interface ApprovalWaiter {
+  allowForTurn: boolean
   cleanup: () => void
   reject: (error: Error) => void
   resolve: (decision: ApprovalDecision) => void
+  signal: AbortSignal
 }
 
 export class ApprovalService {
@@ -50,6 +54,7 @@ export class ApprovalService {
   readonly #eventLog: ApprovalServiceOptions['eventLog']
   readonly #onExpired: NonNullable<ApprovalServiceOptions['onExpired']>
   readonly #repository: ApprovalRepository
+  readonly #approvedTurnSignals = new WeakSet<AbortSignal>()
   readonly #resolving = new Map<string, Promise<unknown>>()
   readonly #waiters = new Map<string, ApprovalWaiter>()
 
@@ -63,12 +68,15 @@ export class ApprovalService {
   async request(input: ApprovalRequest): Promise<ApprovalDecision> {
     if (input.signal.aborted)
       throw new ApprovalCancelledError()
+    if (input.allowForTurn && this.#approvedTurnSignals.has(input.signal))
+      return 'approved'
 
     const approval: ApprovalRecord = {
       createdAt: new Date().toISOString(),
       id: randomUUID(),
       kind: input.kind,
       payload: createApprovalReviewPayload({
+        allowForTurn: input.allowForTurn,
         arguments: input.arguments,
         automation: input.automation,
         kind: input.kind,
@@ -86,6 +94,7 @@ export class ApprovalService {
     let timer: ReturnType<typeof setTimeout> | null = null
     const decision = new Promise<ApprovalDecision>((resolve, reject) => {
       this.#waiters.set(approval.id, {
+        allowForTurn: input.allowForTurn,
         cleanup: () => {
           if (timer)
             clearTimeout(timer)
@@ -93,6 +102,7 @@ export class ApprovalService {
         },
         reject,
         resolve,
+        signal: input.signal,
       })
     })
     void decision.catch(() => {})
@@ -129,17 +139,27 @@ export class ApprovalService {
     const pending = this.#requireApproval(input.id)
     if (pending.status !== 'pending')
       throw new ApprovalResolutionError()
-    const resolvedAt = new Date().toISOString()
     const waiter = this.#waiters.get(input.id)
+    if (input.decision === 'approved_for_turn' && !waiter?.allowForTurn)
+      throw new ApprovalResolutionError()
+    const approvedTurnSignal = input.decision === 'approved_for_turn'
+      ? waiter?.signal ?? null
+      : null
+    const decision: ApprovalDecision = input.decision === 'approved_for_turn'
+      ? 'approved'
+      : input.decision
+    const resolvedAt = new Date().toISOString()
     await this.#appendResolved({
       ...pending,
       resolvedAt,
-      status: input.decision,
+      status: decision,
     })
     const approval = this.#requireApproval(input.id)
-    if (approval.status !== input.decision)
+    if (approval.status !== decision)
       throw new ApprovalResolutionError()
-    waiter?.resolve(input.decision)
+    if (approvedTurnSignal)
+      this.#approvedTurnSignals.add(approvedTurnSignal)
+    waiter?.resolve(decision)
     waiter?.cleanup()
     this.#waiters.delete(input.id)
     return approval

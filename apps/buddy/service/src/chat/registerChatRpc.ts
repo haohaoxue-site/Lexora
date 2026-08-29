@@ -51,9 +51,9 @@ const editUserMessageSchema = z.object({
   value => value.content.trim().length > 0 || value.attachmentIds.length > 0,
 ).refine(value => new Set(value.attachmentIds).size === value.attachmentIds.length)
 const regenerateAssistantSchema = z.object({
-  assistantMessageId: idSchema,
   conversationId: idSchema,
   requestId: requestIdSchema,
+  sourceRunId: idSchema,
 }).strict()
 const chatCommandSchema = z.object({
   arguments: z.string().max(4_096),

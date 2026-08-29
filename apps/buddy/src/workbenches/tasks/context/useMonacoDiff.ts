@@ -1,13 +1,10 @@
 import type * as Monaco from 'monaco-editor/editor/editor.api.js'
 import type { Ref } from 'vue'
-import EditorWorker from 'monaco-editor/editor/editor.worker.js?worker'
 import { onBeforeUnmount, shallowRef, watch } from 'vue'
-
-interface MonacoEnvironmentGlobal {
-  MonacoEnvironment?: {
-    getWorker: () => Worker
-  }
-}
+import {
+  loadDesktopMonaco,
+  observeDesktopMonacoTheme,
+} from '@/ui/monaco/desktopMonaco'
 
 interface UseMonacoDiffOptions {
   container: Readonly<Ref<HTMLElement | null>>
@@ -17,15 +14,13 @@ interface UseMonacoDiffOptions {
   path: Readonly<Ref<string>>
 }
 
-let monacoPromise: Promise<typeof Monaco> | null = null
-
 export function useMonacoDiff(options: UseMonacoDiffOptions) {
   const loading = shallowRef(true)
   const failed = shallowRef(false)
   let editor: Monaco.editor.IStandaloneDiffEditor | null = null
   let originalModel: Monaco.editor.ITextModel | null = null
   let modifiedModel: Monaco.editor.ITextModel | null = null
-  let themeObserver: MutationObserver | null = null
+  let stopThemeSync: (() => void) | null = null
   let generation = 0
 
   const stopContainerWatch = watch(options.container, async (container) => {
@@ -36,7 +31,7 @@ export function useMonacoDiff(options: UseMonacoDiffOptions) {
       return
     const currentGeneration = ++generation
     try {
-      const monaco = await loadMonaco()
+      const monaco = await loadDesktopMonaco()
       if (currentGeneration !== generation || options.container.value !== container)
         return
       const modelId = crypto.randomUUID()
@@ -78,12 +73,7 @@ export function useMonacoDiff(options: UseMonacoDiffOptions) {
         stickyScroll: { enabled: false },
       })
       editor.setModel({ modified: modifiedModel, original: originalModel })
-      syncTheme(monaco)
-      themeObserver = new MutationObserver(() => syncTheme(monaco))
-      themeObserver.observe(document.documentElement, {
-        attributeFilter: ['data-buddy-theme'],
-        attributes: true,
-      })
+      stopThemeSync = observeDesktopMonacoTheme(monaco)
       loading.value = false
     }
     catch {
@@ -101,7 +91,7 @@ export function useMonacoDiff(options: UseMonacoDiffOptions) {
         return
       originalModel.setValue(original)
       modifiedModel.setValue(modified)
-      void loadMonaco().then((monaco) => {
+      void loadDesktopMonaco().then((monaco) => {
         if (!originalModel || !modifiedModel)
           return
         monaco.editor.setModelLanguage(originalModel, language ?? 'plaintext')
@@ -112,8 +102,8 @@ export function useMonacoDiff(options: UseMonacoDiffOptions) {
 
   function disposeEditor() {
     generation += 1
-    themeObserver?.disconnect()
-    themeObserver = null
+    stopThemeSync?.()
+    stopThemeSync = null
     editor?.dispose()
     editor = null
     originalModel?.dispose()
@@ -129,32 +119,4 @@ export function useMonacoDiff(options: UseMonacoDiffOptions) {
   })
 
   return { failed, loading }
-}
-
-function loadMonaco(): Promise<typeof Monaco> {
-  if (!monacoPromise) {
-    const global = globalThis as typeof globalThis & MonacoEnvironmentGlobal
-    global.MonacoEnvironment = { getWorker: () => new EditorWorker() }
-    monacoPromise = Promise.all([
-      import('monaco-editor/editor/editor.api.js'),
-      import('monaco-editor/features/codicon/register.js'),
-      import('monaco-editor/languages/definitions/css/register.js'),
-      import('monaco-editor/languages/definitions/html/register.js'),
-      import('monaco-editor/languages/definitions/javascript/register.js'),
-      import('monaco-editor/languages/definitions/markdown/register.js'),
-      import('monaco-editor/languages/definitions/python/register.js'),
-      import('monaco-editor/languages/definitions/rust/register.js'),
-      import('monaco-editor/languages/definitions/scss/register.js'),
-      import('monaco-editor/languages/definitions/typescript/register.js'),
-      import('monaco-editor/languages/definitions/xml/register.js'),
-      import('monaco-editor/languages/definitions/yaml/register.js'),
-    ]).then(([monaco]) => monaco)
-  }
-  return monacoPromise
-}
-
-function syncTheme(monaco: typeof Monaco): void {
-  monaco.editor.setTheme(
-    document.documentElement.dataset.buddyTheme === 'dark' ? 'vs-dark' : 'vs',
-  )
 }

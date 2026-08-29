@@ -174,7 +174,7 @@ export function useChatBranchMutations(options: UseChatBranchMutationsOptions) {
     }
   }
 
-  async function regenerateAssistant(assistantMessageId: string) {
+  async function regenerateAssistant(sourceRunId: string) {
     const conversationId = options.session.activeConversationId.value
     const parentBranchId = options.session.activeBranchId.value
     if (!conversationId || !parentBranchId || !canMutateBranch.value)
@@ -186,15 +186,15 @@ export function useChatBranchMutations(options: UseChatBranchMutationsOptions) {
       conversationId,
       parentBranchId,
     )
-    const operationKey = `regenerate:${conversationId}:${parentBranchId}:${assistantMessageId}`
+    const operationKey = `regenerate:${conversationId}:${parentBranchId}:${sourceRunId}`
     const requestId = requestIds.resolve(operationKey)
     isMutatingBranch.value = true
     options.setErrorMessage(null)
     try {
       const turn = await options.api.chat.regenerateAssistant({
-        assistantMessageId,
         conversationId,
         requestId,
+        sourceRunId,
       })
       requestIds.release(operationKey)
       if (!isSourceViewCurrent()) {
@@ -215,7 +215,7 @@ export function useChatBranchMutations(options: UseChatBranchMutationsOptions) {
         turn.branchId,
         turn.run.startedAt,
       )
-      options.runSync.applyRegeneratedTurn(turn, assistantMessageId)
+      options.runSync.applyRegeneratedTurn(turn)
       refreshBranchStateAfterMutation(conversationId)
       return true
     }

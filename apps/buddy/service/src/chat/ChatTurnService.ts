@@ -68,9 +68,9 @@ export interface EditChatUserMessageInput {
 }
 
 export interface RegenerateChatAssistantInput {
-  assistantMessageId: string
   conversationId: string
   requestId: string
+  sourceRunId: string
 }
 
 export interface ChatTurnServiceOptions {
@@ -330,23 +330,24 @@ export class ChatTurnService {
     const parentBranchId = requireValue(conversation.activeBranchId)
     let sourceRun: RunRecord | null = null
     if (!replay) {
+      sourceRun = this.#options.runs.findById(input.sourceRunId)
       const history = this.#options.conversations.listBranchMessages(
         conversation.id,
         parentBranchId,
       )
-      const assistantIndex = history.findIndex(message => message.id === input.assistantMessageId)
-      const assistantMessage = assistantIndex >= 0 ? history[assistantIndex] : null
-      sourceRun = assistantMessage?.role === 'assistant' && assistantMessage.runId
-        ? this.#options.runs.findById(assistantMessage.runId)
-        : null
       const triggerIndex = history.findIndex(
         message => message.id === sourceRun?.triggeringMessageId,
       )
+      const assistantIndex = history.findIndex(
+        message => message.role === 'assistant' && message.runId === sourceRun?.id,
+      )
+      const visibleOnActiveBranch = sourceRun?.branchId === parentBranchId
+        || (triggerIndex >= 0 && assistantIndex > triggerIndex)
       if (
         !sourceRun
         || sourceRun.conversationId !== conversation.id
         || triggerIndex < 0
-        || triggerIndex >= assistantIndex
+        || !visibleOnActiveBranch
       ) {
         throw new BuddyServiceError('VALIDATION_FAILED')
       }
@@ -511,9 +512,9 @@ function createEditUserMessageFingerprint(input: EditChatUserMessageInput): stri
 
 function createRegenerationFingerprint(input: RegenerateChatAssistantInput): string {
   return fingerprint({
-    assistantMessageId: input.assistantMessageId,
     conversationId: input.conversationId,
     operation: 'regenerate-assistant',
+    sourceRunId: input.sourceRunId,
   })
 }
 

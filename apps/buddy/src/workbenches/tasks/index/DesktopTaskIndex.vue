@@ -3,10 +3,11 @@ import type { DesktopTaskPinnedItem } from '@buddy-electron/shared/desktopApi'
 import type { LocalConversationSummary, LocalProject } from '@buddy-electron/shared/localChatApi'
 import type { BuddyLocale } from '@/i18n/buddyI18n'
 import type { TaskProjectInput } from '@/workbenches/tasks/state/useTaskProjects'
-import { Add16Regular, PanelLeft20Regular } from '@vicons/fluent'
+import { Add16Regular } from '@vicons/fluent'
 import { NAlert, NButton, NIcon, NInput, NModal } from 'naive-ui'
 import { toRef } from 'vue'
 import { useBuddyI18n } from '@/i18n/buddyI18n'
+import DesktopWorkspaceSidebarIdentity from '@/layouts/DesktopWorkspaceSidebarIdentity.vue'
 import DesktopProjectDialog from '@/workbenches/tasks/index/DesktopProjectDialog.vue'
 import DesktopTaskProjectRow from '@/workbenches/tasks/index/DesktopTaskProjectRow.vue'
 import DesktopTaskRow from '@/workbenches/tasks/index/DesktopTaskRow.vue'
@@ -99,19 +100,11 @@ const {
 <template>
   <aside class="desktop-task-sidebar">
     <header class="desktop-task-sidebar__header">
-      <div class="desktop-task-sidebar__header-title">
-        <NButton
-          v-if="appSidebarCollapsed"
-          class="buddy-icon-button desktop-task-sidebar__expand-trigger"
-          quaternary
-          @click="emit('toggleAppSidebar')"
-        >
-          <template #icon>
-            <NIcon :component="PanelLeft20Regular" />
-          </template>
-        </NButton>
-        <strong>{{ t('desktop.navigation.tasks') }}</strong>
-      </div>
+      <DesktopWorkspaceSidebarIdentity
+        :label="t('desktop.navigation.tasks')"
+        :visible="appSidebarCollapsed"
+        @restore="emit('toggleAppSidebar')"
+      />
       <button
         class="desktop-task-sidebar__new-trigger"
         type="button"
@@ -363,21 +356,6 @@ const {
   padding: 0 0.75rem 0 0.8rem;
 }
 
-.desktop-task-sidebar__header-title {
-  display: flex;
-  min-width: 0;
-  align-items: center;
-  gap: 0.35rem;
-
-  strong {
-    overflow: hidden;
-    font-size: var(--buddy-sidebar-header-font-size);
-    font-weight: var(--buddy-sidebar-header-font-weight);
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-}
-
 .desktop-task-sidebar__new-trigger {
   display: grid;
   width: 1.75rem;
@@ -416,7 +394,9 @@ const {
 }
 
 .desktop-task-sidebar nav {
-  --buddy-task-sidebar-section-gap: 0.5rem;
+  --buddy-task-sidebar-section-gap: 0.25rem;
+  --buddy-task-sidebar-section-font-size: 13px;
+  --buddy-task-sidebar-item-font-size: 13px;
   --buddy-task-sidebar-action-gap: 0.125rem;
   --buddy-task-sidebar-action-inset: 0.4rem;
   --buddy-task-sidebar-action-size: 1.75rem;

@@ -1,0 +1,63 @@
+.buddy-shimmer-text {
+  --buddy-shimmer-resolved-base: var(
+    --buddy-shimmer-base,
+    currentcolor
+  );
+  --buddy-shimmer-resolved-highlight: var(
+    --buddy-shimmer-highlight,
+    color-mix(
+      in srgb,
+      var(--buddy-surface-base) 90%,
+      var(--buddy-shimmer-resolved-base) 10%
+    )
+  );
+
+  display: inline-block;
+  width: fit-content;
+}
+
+.buddy-shimmer-text--continuous {
+  @supports ((background-clip: text) or (-webkit-background-clip: text)) {
+    animation: buddy-shimmer-text-continuous var(--buddy-shimmer-duration, 1.8s) linear infinite;
+    background: linear-gradient(
+      60deg,
+      var(--buddy-shimmer-resolved-base) 0%,
+      var(--buddy-shimmer-resolved-base) 28%,
+      color-mix(in srgb, var(--buddy-shimmer-resolved-highlight) 9%, var(--buddy-shimmer-resolved-base) 91%) 33%,
+      color-mix(in srgb, var(--buddy-shimmer-resolved-highlight) 31%, var(--buddy-shimmer-resolved-base) 69%) 38%,
+      color-mix(in srgb, var(--buddy-shimmer-resolved-highlight) 59%, var(--buddy-shimmer-resolved-base) 41%) 44%,
+      var(--buddy-shimmer-resolved-highlight) 50%,
+      color-mix(in srgb, var(--buddy-shimmer-resolved-highlight) 59%, var(--buddy-shimmer-resolved-base) 41%) 56%,
+      color-mix(in srgb, var(--buddy-shimmer-resolved-highlight) 31%, var(--buddy-shimmer-resolved-base) 69%) 62%,
+      color-mix(in srgb, var(--buddy-shimmer-resolved-highlight) 9%, var(--buddy-shimmer-resolved-base) 91%) 67%,
+      var(--buddy-shimmer-resolved-base) 72%,
+      var(--buddy-shimmer-resolved-base) 100%
+    );
+    background-clip: text;
+    background-position: 100% 0;
+    background-repeat: no-repeat;
+    background-size: 240% 100%;
+    color: transparent;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+}
+
+@keyframes buddy-shimmer-text-continuous {
+  from {
+    background-position: 100% 0;
+  }
+
+  to {
+    background-position: 0% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .buddy-shimmer-text--continuous {
+    animation: none;
+    background: none;
+    color: var(--buddy-shimmer-resolved-base);
+    -webkit-text-fill-color: currentcolor;
+  }
+}

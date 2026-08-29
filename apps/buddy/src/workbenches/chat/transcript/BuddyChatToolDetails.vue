@@ -5,6 +5,7 @@ import type { BuddyLocale } from '@/i18n/buddyI18n'
 import { computed } from 'vue'
 import { useBuddyI18n } from '@/i18n/buddyI18n'
 import BuddyChatImageToolDetails from './BuddyChatImageToolDetails.vue'
+import DesktopTerminalTranscript from './DesktopTerminalTranscript.vue'
 
 interface ToolDetailSection {
   content: string
@@ -15,6 +16,7 @@ interface ToolDetailSection {
 }
 
 const props = defineProps<{
+  expanded: boolean
   language: BuddyLocale
   presentation: BuddyToolPresentation
   status: ChatAgentToolNode['status']
@@ -28,33 +30,10 @@ const terminal = computed(() => props.presentation.card === 'terminal'
 const image = computed(() => props.presentation.card === 'image'
   ? props.presentation
   : null)
-const terminalLabel = computed(() => {
-  const shellName = props.toolName === 'powershell' ? 'PowerShell' : 'bash'
-  return terminal.value?.cwd && terminal.value.cwd !== '.'
-    ? `${shellName} · ${terminal.value.cwd}`
-    : shellName
-})
-const terminalStatus = computed(() => {
-  if (!terminal.value)
-    return ''
-  switch (props.status) {
-    case 'awaiting_approval':
-      return t('desktop.chat.processAwaitingApproval')
-    case 'completed':
-      return t('desktop.chat.processToolSucceeded')
-    case 'failed':
-      return terminal.value.exitCode === null
-        ? t('desktop.chat.processToolFailed')
-        : t('desktop.chat.processToolExitCode', { code: terminal.value.exitCode })
-    case 'interrupted':
-      return t('desktop.chat.processToolInterrupted')
-    case 'preparing':
-      return t('desktop.chat.processToolPreparing')
-    case 'running':
-      return t('desktop.chat.processToolRunning')
-  }
-  return assertNever(props.status)
-})
+const terminalShell = computed(() => props.toolName === 'powershell' ? 'powershell' : 'bash')
+const terminalOutput = computed(() => props.status === 'denied'
+  ? null
+  : terminal.value?.output ?? null)
 const terminalNotice = computed(() => {
   if (!terminal.value || terminal.value.output)
     return null
@@ -77,13 +56,14 @@ const sections = computed<ToolDetailSection[]>(() => {
     ))
   }
   if (
-    presentation.card === 'automation'
+    presentation.card === 'artifact'
+    || presentation.card === 'automation'
     || presentation.card === 'image'
     || presentation.card === 'pet'
   ) {
     return values
   }
-  if (presentation.output !== null) {
+  if (props.status !== 'denied' && presentation.output !== null) {
     values.push(section(
       'output',
       t('desktop.chat.processToolOutput'),
@@ -102,10 +82,6 @@ function section(
 ): ToolDetailSection {
   return { content, empty: false, key, label, truncated }
 }
-
-function assertNever(value: never): never {
-  throw new Error(`Unexpected terminal status: ${value}`)
-}
 </script>
 
 <template>
@@ -115,20 +91,13 @@ function assertNever(value: never): never {
       :language="language"
       :presentation="image"
     />
-    <section v-if="terminal" class="buddy-chat-terminal-card">
-      <header class="buddy-chat-terminal-card__banner">
-        <span>{{ terminalLabel }}</span>
-        <small>{{ terminalStatus }}</small>
-      </header>
-      <div class="buddy-chat-terminal-card__section is-command">
-        <pre><code>{{ terminal.command }}</code></pre>
-      </div>
-      <div v-if="terminal.output || terminalNotice" class="buddy-chat-terminal-card__divider" />
-      <div v-if="terminal.output" class="buddy-chat-terminal-card__section is-output">
-        <span>{{ t('desktop.chat.processToolOutput') }}</span>
-        <pre><code>{{ terminal.output }}</code></pre>
-      </div>
-      <p v-else-if="terminalNotice" class="buddy-chat-terminal-card__notice">
+    <section v-if="terminal && expanded" class="buddy-chat-terminal-card">
+      <DesktopTerminalTranscript
+        :command="terminal.command"
+        :output="terminalOutput"
+        :shell="terminalShell"
+      />
+      <p v-if="terminalNotice" class="buddy-chat-terminal-card__notice">
         {{ terminalNotice }}
       </p>
       <small v-if="terminal.truncated" class="buddy-chat-terminal-card__truncated">
@@ -160,87 +129,8 @@ function assertNever(value: never): never {
 .buddy-chat-terminal-card {
   min-width: 0;
   overflow: hidden;
-  border: 0;
-  border-left: 2px solid var(--buddy-border-subtle);
-  border-radius: 0 var(--buddy-radius-micro) var(--buddy-radius-micro) 0;
+  border-radius: var(--buddy-radius-micro);
   background: var(--buddy-surface-subtle);
-}
-
-.buddy-chat-terminal-card__banner {
-  display: flex;
-  min-height: 1.625rem;
-  align-items: center;
-  justify-content: space-between;
-  color: var(--buddy-chat-meta-color);
-  font-size: var(--buddy-chat-caption-font-size);
-  padding: 0.15rem 0.625rem 0.1rem;
-
-  small {
-    color: var(--buddy-accent-text);
-    font-size: inherit;
-  }
-}
-
-.buddy-chat-terminal-card__section {
-  display: grid;
-  grid-template-columns: max-content minmax(0, 1fr);
-  align-items: start;
-  gap: 0.875rem;
-  color: var(--buddy-chat-meta-color);
-  font-size: var(--buddy-chat-caption-font-size);
-  padding: 0.375rem 0.625rem 0.5rem;
-
-  > span {
-    position: sticky;
-    top: 0;
-  }
-
-  pre {
-    margin: 0;
-    color: var(--buddy-chat-code-color);
-    font-family: var(--buddy-font-mono);
-    font-variant-ligatures: none;
-    font-size: var(--buddy-chat-code-font-size);
-    line-height: var(--buddy-chat-code-line-height);
-    tab-size: 2;
-    white-space: pre-wrap;
-    overflow-wrap: anywhere;
-  }
-}
-
-.buddy-chat-terminal-card__section.is-command {
-  display: block;
-  overflow: visible;
-
-  pre {
-    min-width: 0;
-    max-width: 100%;
-    overflow-x: auto;
-    overflow-y: hidden;
-    color: var(--buddy-chat-tool-body-color);
-    white-space: pre;
-    overflow-wrap: normal;
-  }
-}
-
-.buddy-chat-terminal-card__section.is-output {
-  display: block;
-  max-height: 12rem;
-  overflow-y: auto;
-  background: var(--buddy-state-hover);
-  padding: 0.45rem 0.625rem 0.55rem;
-
-  > span {
-    position: static;
-    display: block;
-    margin-bottom: 0.25rem;
-  }
-}
-
-.buddy-chat-terminal-card__divider {
-  height: 1px;
-  margin: 0 0.625rem;
-  background: var(--buddy-border-subtle);
 }
 
 .buddy-chat-terminal-card__notice {
@@ -261,17 +151,9 @@ function assertNever(value: never): never {
   border-left-color: var(--buddy-status-danger-border);
 }
 
-.buddy-chat-tool-details.is-failed .buddy-chat-terminal-card__banner small {
-  color: var(--buddy-chat-danger-color);
-}
-
+.buddy-chat-tool-details.is-denied .buddy-chat-terminal-card,
 .buddy-chat-tool-details.is-interrupted .buddy-chat-terminal-card {
   border-left-color: var(--buddy-status-warning-border);
-}
-
-.buddy-chat-tool-details.is-interrupted .buddy-chat-terminal-card__banner small,
-.buddy-chat-tool-details.is-awaiting_approval .buddy-chat-terminal-card__banner small {
-  color: var(--buddy-status-warning-text);
 }
 
 .buddy-chat-tool-details__section {

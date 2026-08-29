@@ -268,7 +268,7 @@ button {
   flex: 1;
   align-items: center;
   color: var(--buddy-text-primary);
-  font-size: var(--buddy-sidebar-item-font-size);
+  font-size: var(--buddy-task-sidebar-item-font-size, var(--buddy-sidebar-item-font-size));
   font-weight: var(--buddy-sidebar-item-font-weight);
   line-height: 20px;
   padding: 0 0.625rem;

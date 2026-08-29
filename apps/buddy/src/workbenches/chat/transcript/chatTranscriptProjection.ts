@@ -10,7 +10,6 @@ import type {
 import type {
   ChatAgentTurn,
   ChatRecoveryNotice,
-  StreamingAssistantMessage,
 } from './chatStreamingMessage'
 import { isVisibleChatMessage } from './chatMessageContent'
 import {
@@ -24,6 +23,7 @@ export interface ChatTranscriptMessageRow {
   key: string
   kind: 'message'
   message: LocalMessage
+  streaming?: true
   turnChanges?: LocalChangeSetSummary
   turnOutputs: ChatTranscriptTurnOutputs | null
 }
@@ -42,6 +42,7 @@ export interface ChatTranscriptCompactionRow {
 export interface ChatTranscriptAgentTurnRow {
   key: string
   kind: 'agent-turn'
+  ownsResultActions?: true
   turn: ChatAgentTurn
 }
 
@@ -57,22 +58,14 @@ export interface ChatTranscriptRecoveryNoticeRow {
   notice: ChatRecoveryNotice
 }
 
-export interface ChatTranscriptStreamingRow {
-  key: string
-  kind: 'streaming'
-  message: StreamingAssistantMessage
-}
-
 export type ChatTranscriptRow
   = | ChatTranscriptActivityRow
     | ChatTranscriptAgentTurnRow
     | ChatTranscriptCompactionRow
     | ChatTranscriptMessageRow
     | ChatTranscriptRecoveryNoticeRow
-    | ChatTranscriptStreamingRow
 
 export interface ChatTranscriptProjection {
-  hasActiveProcessIdentity: boolean
   rows: ReadonlyArray<ChatTranscriptRow>
 }
 
@@ -98,6 +91,14 @@ export function projectChatTranscript(input: {
     input.runEvents,
     input.runs,
   )
+  const streamingLocalMessage = streamingMessage
+    ? projectStreamingLocalMessage(
+        streamingMessage.id,
+        streamingMessage.text,
+        input.runEvents,
+        input.runs,
+      )
+    : null
   const triggeringMessageIdByRunId = new Map(
     input.runs.map(run => [run.id, run.triggeringMessageId]),
   )
@@ -143,11 +144,14 @@ export function projectChatTranscript(input: {
     (row): row is ChatTranscriptAgentTurnRow => row.kind === 'agent-turn'
       && (row.turn.status === 'queued' || row.turn.status === 'running'),
   )?.turn
-  if (streamingMessage) {
+  if (streamingLocalMessage) {
     rows.push({
-      key: `streaming:${streamingMessage.id}`,
-      kind: 'streaming',
-      message: streamingMessage,
+      isAgentTurnResult: agentTurnRunIds.has(streamingLocalMessage.runId ?? ''),
+      key: `message:${streamingLocalMessage.id}`,
+      kind: 'message',
+      message: streamingLocalMessage,
+      streaming: true,
+      turnOutputs: null,
     })
   }
   if (activeAgentTurn) {
@@ -158,10 +162,45 @@ export function projectChatTranscript(input: {
     })
   }
 
+  return { rows }
+}
+
+function projectStreamingLocalMessage(
+  messageId: string,
+  text: string,
+  events: ReadonlyArray<LocalRunEvent>,
+  runs: ReadonlyArray<LocalRun>,
+): LocalMessage | null {
+  const sourceEvent = [...events].reverse().find(event => (
+    readMessageId(event.payload) === messageId
+  ))
+  if (!sourceEvent)
+    return null
+  const run = runs.find(item => item.id === sourceEvent.runId)
+  if (!run)
+    return null
+  const startedAt = events.find(event => (
+    event.runId === run.id
+    && event.type === 'message.started'
+    && readMessageId(event.payload) === messageId
+  ))?.createdAt ?? sourceEvent.createdAt
   return {
-    hasActiveProcessIdentity: activeAgentTurn !== undefined,
-    rows,
+    attachments: [],
+    branchId: run.branchId,
+    content: { text },
+    conversationId: run.conversationId,
+    createdAt: startedAt,
+    id: messageId,
+    role: 'assistant',
+    runId: run.id,
   }
+}
+
+function readMessageId(payload: unknown): string | null {
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload))
+    return null
+  const messageId = (payload as Record<string, unknown>).messageId
+  return typeof messageId === 'string' ? messageId : null
 }
 
 export function projectPersistedChatTranscriptRows(
@@ -185,7 +224,24 @@ export function projectPersistedChatTranscriptRows(
     turns.filter(shouldShowAgentTurn).map(turn => [turn.runId, turn]),
   )
   const outputsByRunId = projectTurnOutputs(outputs)
-  const changesByRunId = new Map(changeSets.map(changeSet => [changeSet.runId, changeSet]))
+  const changesByRunId = new Map(changeSets
+    .filter(changeSet => changeSet.fileCount > 0)
+    .map(changeSet => [changeSet.runId, changeSet]))
+  const renderedResultRunIds = new Set(items.flatMap((item) => {
+    if (
+      item.kind !== 'message'
+      || !item.runId
+      || !isFinalTurnMessage(item, turnsByRunId)
+      || (
+        !isVisibleChatMessage(item)
+        && !outputsByRunId.has(item.runId)
+        && !changesByRunId.has(item.runId)
+      )
+    ) {
+      return []
+    }
+    return [item.runId]
+  }))
   const processMessageIds = new Set<string>()
   for (const turn of turns) {
     for (const node of turn.nodes) {
@@ -229,11 +285,18 @@ export function projectPersistedChatTranscriptRows(
     if (turnChanges)
       row.turnChanges = turnChanges
     rows.push(row)
-    rows.push(...(turnsByTrigger.get(item.id) ?? []).map(turn => ({
-      key: `agent-turn:${turn.runId}`,
-      kind: 'agent-turn' as const,
-      turn,
-    })))
+    rows.push(...(turnsByTrigger.get(item.id) ?? []).map((turn) => {
+      const ownsResultActions = (
+        turn.status === 'failed'
+        || turn.status === 'cancelled'
+      ) && !renderedResultRunIds.has(turn.runId)
+      return {
+        ...(ownsResultActions ? { ownsResultActions: true as const } : {}),
+        key: `agent-turn:${turn.runId}`,
+        kind: 'agent-turn' as const,
+        turn,
+      }
+    }))
   }
   return rows
 }

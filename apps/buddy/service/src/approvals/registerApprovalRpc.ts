@@ -40,6 +40,13 @@ export function registerApprovalRpc(options: RegisterApprovalRpcOptions): () => 
       id: input.approvalId,
     }))
   })
+  on('approvals.approveForTurn', async (params) => {
+    const input = parse(approvalIdSchema, params)
+    return toPublicApproval(await options.service.resolve({
+      decision: 'approved_for_turn',
+      id: input.approvalId,
+    }))
+  })
   on('approvals.deny', async (params) => {
     const input = parse(approvalIdSchema, params)
     return toPublicApproval(await options.service.resolve({

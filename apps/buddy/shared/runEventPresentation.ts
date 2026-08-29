@@ -10,6 +10,11 @@ const previewSchema = z.object({
 const pathSchema = z.string().min(1).max(4_096)
 
 export const buddyToolPresentationSchema = z.discriminatedUnion('card', [
+  z.object({
+    card: z.literal('artifact'),
+    presentedCount: z.number().int().nonnegative().nullable(),
+    status: z.enum(['completed', 'failed', 'running']),
+  }).strict(),
   previewSchema.extend({
     argumentNames: z.array(z.string().min(1).max(256)).max(32),
     card: z.literal('generic'),

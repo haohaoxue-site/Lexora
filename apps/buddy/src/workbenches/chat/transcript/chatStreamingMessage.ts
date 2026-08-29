@@ -45,7 +45,7 @@ export interface ChatAgentToolNode {
   isError: boolean
   kind: 'tool'
   presentation: BuddyToolPresentation
-  status: 'awaiting_approval' | 'completed' | 'failed' | 'interrupted' | 'preparing' | 'running'
+  status: 'awaiting_approval' | 'completed' | 'denied' | 'failed' | 'interrupted' | 'preparing' | 'running'
   toolCallId: string
   toolName: string
 }
@@ -68,6 +68,7 @@ export interface ChatAgentReasoningGroup {
 export type ChatAgentTurnRow = ChatAgentNarrationNode | ChatAgentReasoningGroup | ChatAgentToolNode
 
 export interface ChatAgentTurn {
+  branchId: string
   completedAt: string | null
   failureCode?: string | null
   failureMessage?: string | null
@@ -316,10 +317,15 @@ function projectChatAgentTurn(
       const toolCallId = approvalTools.get(approvalId)
       const current = toolCallId ? tools.get(toolCallId) : undefined
       if (current?.status === 'awaiting_approval') {
+        const status = payload.status === 'approved'
+          ? 'preparing'
+          : payload.status === 'denied'
+            ? 'denied'
+            : 'interrupted'
         tools.set(current.toolCallId, {
           ...current,
           isError: payload.status !== 'approved',
-          status: payload.status === 'approved' ? 'preparing' : 'failed',
+          status,
         })
       }
       continue
@@ -359,13 +365,15 @@ function projectChatAgentTurn(
         kind: 'tool',
         order: current?.order ?? event.sequence,
         presentation: presentation.data,
-        status: event.type === 'tool.completed'
-          ? isError ? 'failed' : 'completed'
-          : current?.status === 'awaiting_approval'
-            ? 'awaiting_approval'
-            : event.type === 'tool.preparing'
-              ? 'preparing'
-              : 'running',
+        status: current?.status === 'denied' || current?.status === 'interrupted'
+          ? current.status
+          : event.type === 'tool.completed'
+            ? isError ? 'failed' : 'completed'
+            : current?.status === 'awaiting_approval'
+              ? 'awaiting_approval'
+              : event.type === 'tool.preparing'
+                ? 'preparing'
+                : 'running',
         toolCallId,
         toolName,
       })
@@ -390,6 +398,7 @@ function projectChatAgentTurn(
       return { ...node, status: 'interrupted' as const }
     })
   return {
+    branchId: run.branchId,
     completedAt: run.completedAt,
     ...(run.status === 'failed'
       ? { failureCode: run.errorCode, failureMessage }

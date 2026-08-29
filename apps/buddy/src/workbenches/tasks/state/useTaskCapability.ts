@@ -198,7 +198,12 @@ export function useTaskCapability(options: UseTaskCapabilityOptions) {
     onError: setError,
     persistWorkspaceState,
   })
-  const { approvalViews, resolveApproval, resolvingApprovalIds } = useChatApprovals({
+  const {
+    approvalViews,
+    resolveApproval,
+    resolvingApprovalActions,
+    resolvingApprovalIds,
+  } = useChatApprovals({
     api: api.localChat,
     approvals,
     onError: setError,
@@ -553,6 +558,7 @@ export function useTaskCapability(options: UseTaskCapabilityOptions) {
       isSending: readonly(isSending),
       regenerateAssistant,
       resolveApproval,
+      resolvingApprovalActions: readonly(resolvingApprovalActions),
       resolvingApprovalIds: readonly(resolvingApprovalIds),
       send,
     },

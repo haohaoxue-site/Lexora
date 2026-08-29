@@ -4,7 +4,10 @@ import type { CreateBuddyToolPresentationInput } from '../events/toolPresentatio
 import { relative, sep } from 'node:path'
 
 import { redactSensitiveText, redactShellCommand } from '../../../shared/approvalReviewPayload'
-import { createArtifactPresentRunOutput } from '../artifacts/artifactToolContract'
+import {
+  createArtifactPresentRunOutput,
+  createArtifactPresentToolPresentation,
+} from '../artifacts/artifactToolContract'
 import { createAutomationToolPresentation } from '../automations/automationToolContract'
 import { createMcpToolPresentation } from '../connectors/mcp/mcpToolContract'
 import {
@@ -38,6 +41,7 @@ export function createBuddyToolPresentation(
   input: CreateBuddyToolPresentationInput,
 ): BuddyToolPresentation {
   return createPiToolPresentation(input)
+    ?? createArtifactPresentToolPresentation(input)
     ?? createPetToolPresentation(input)
     ?? createImageGenerationToolPresentation(input)
     ?? createAutomationToolPresentation(input)

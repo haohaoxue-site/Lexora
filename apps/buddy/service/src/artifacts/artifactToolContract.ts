@@ -1,4 +1,5 @@
 import type { ToolCallEvent } from '@earendil-works/pi-coding-agent'
+import type { BuddyToolPresentation } from '../../../shared/runEventPresentation'
 import type { BuddyRunOutputPayload } from '../../../shared/runOutput'
 import type { BuddyToolClassificationResult } from '../approvals/toolClassification'
 import type { CreateBuddyToolPresentationInput } from '../events/toolPresentationSupport'
@@ -8,6 +9,24 @@ import { readRecord } from '../events/toolPresentationSupport'
 import { artifactPresentParameters } from './artifactToolParameters'
 
 export const ARTIFACT_PRESENT_TOOL_NAME = 'lexora_artifact_present'
+
+export function createArtifactPresentToolPresentation(
+  input: CreateBuddyToolPresentationInput,
+): Extract<BuddyToolPresentation, { card: 'artifact' }> | null {
+  if (input.toolName !== ARTIFACT_PRESENT_TOOL_NAME)
+    return null
+  const details = readRecord(readRecord(input.result)?.details)
+  const artifactIds = readArtifactIds(input.result)
+  return {
+    card: 'artifact',
+    presentedCount: input.result === undefined ? null : artifactIds.length,
+    status: input.result === undefined
+      ? 'running'
+      : input.isError || typeof details?.code === 'string'
+        ? 'failed'
+        : 'completed',
+  }
+}
 
 export function classifyArtifactPresentTool(
   event: ToolCallEvent,

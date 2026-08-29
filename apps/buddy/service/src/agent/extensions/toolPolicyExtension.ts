@@ -20,6 +20,7 @@ import { PI_BUILTIN_TOOL_NAME_SET } from '../piBuiltinTools'
 
 export interface ToolApprovalGateway {
   request: (input: {
+    allowForTurn: boolean
     arguments: unknown
     automation?: AutomationApprovalReviewInput
     kind: ToolApprovalKind
@@ -88,6 +89,7 @@ async function decideToolCall(
       if (!approval?.kind)
         return block('VALIDATION_FAILED')
       return await requestApproval(options, event, run, {
+        allowForTurn: false,
         automation: approval.automation,
         kind: approval.kind,
         summary: approval.summary,
@@ -112,6 +114,7 @@ async function decideToolCall(
       return block(decision.code)
 
     return await requestApproval(options, event, run, {
+      allowForTurn: true,
       automation: declared.approval?.automation,
       kind: decision.kind,
       summary: declared.approval?.summary ?? decision.summary,
@@ -128,6 +131,7 @@ async function requestApproval(
   event: ToolCallEvent,
   run: BuddyRunContext,
   review: {
+    allowForTurn: boolean
     automation?: AutomationApprovalReviewInput
     kind: ToolApprovalKind
     summary: string
@@ -135,6 +139,7 @@ async function requestApproval(
   },
 ): Promise<ToolCallEventResult | void> {
   const approval = await options.approvalService.request({
+    allowForTurn: review.allowForTurn,
     arguments: event.input,
     automation: review.automation,
     kind: review.kind,

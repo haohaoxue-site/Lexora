@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { SmoothMarkdownStreamOptions } from 'markstream-vue'
 import { usePreferredReducedMotion } from '@vueuse/core'
 import MarkdownRender from 'markstream-vue'
 import { computed } from 'vue'
@@ -10,6 +11,17 @@ const props = withDefaults(defineProps<{
 }>(), {
   final: true,
 })
+
+const smoothStreamingOptions = {
+  minCharsPerSecond: 30,
+  maxCharsPerSecond: 180,
+  targetLatencyMs: 1_200,
+  catchUpLatencyMs: 800,
+  catchUpThreshold: 480,
+  maxCommitFps: 30,
+  startDelayMs: 40,
+  maxCharsPerCommit: 6,
+} satisfies SmoothMarkdownStreamOptions
 
 const reducedMotion = usePreferredReducedMotion()
 const animateStreaming = computed(() => (
@@ -27,12 +39,14 @@ const animateStreaming = computed(() => (
     html-policy="escape"
     :max-live-nodes="animateStreaming ? 0 : undefined"
     mode="chat"
+    :parse-coalesce-ms="32"
     :render-batch-budget-ms="4"
     :render-batch-delay="8"
     :render-batch-size="16"
     :render-code-blocks-as-pre="true"
     :smooth-streaming="animateStreaming ? 'auto' : false"
-    :typewriter="animateStreaming ? 'precise' : false"
+    :smooth-streaming-options="smoothStreamingOptions"
+    :typewriter="animateStreaming ? 'simple' : false"
   />
 </template>
 
@@ -89,9 +103,9 @@ const animateStreaming = computed(() => (
   --code-bg: var(--buddy-surface-raised);
   --code-fg: var(--buddy-chat-code-color);
   --code-border: var(--buddy-border-subtle);
-  --inline-code-bg: var(--buddy-surface-raised);
-  --inline-code-fg: var(--buddy-chat-code-color);
-  --inline-code-border: var(--buddy-border-subtle);
+  --inline-code-bg: var(--buddy-accent-surface);
+  --inline-code-fg: var(--buddy-accent-on-surface);
+  --inline-code-border: var(--buddy-accent-border);
   --blockquote-border: var(--buddy-border-subtle);
   --table-border: var(--buddy-border-subtle);
   --table-header-bg: var(--buddy-surface-subtle);
@@ -117,5 +131,9 @@ const animateStreaming = computed(() => (
 
 :global(.buddy-chat-markdown > .node-slot:last-of-type .node-content > :last-child) {
   margin-bottom: 0;
+}
+
+:global(.buddy-chat-markdown.typewriter-simple-cursor .typewriter-simple-cursor-target::after) {
+  display: none;
 }
 </style>

@@ -6,11 +6,11 @@ import {
   Bot20Regular,
   DataUsage20Regular,
   Folder20Regular,
-  PanelLeft20Regular,
 } from '@vicons/fluent'
-import { NButton, NIcon } from 'naive-ui'
+import { NIcon } from 'naive-ui'
 import { useRoute } from 'vue-router'
 import { useBuddyI18n } from '@/i18n/buddyI18n'
+import DesktopWorkspaceSidebarIdentity from '@/layouts/DesktopWorkspaceSidebarIdentity.vue'
 import { desktopRouteLocations } from '@/router'
 
 const props = defineProps<{
@@ -34,17 +34,11 @@ const categories = [
 <template>
   <nav class="desktop-settings-sidebar">
     <header class="desktop-settings-sidebar__header">
-      <NButton
-        v-if="appSidebarCollapsed"
-        class="buddy-icon-button"
-        quaternary
-        @click="emit('toggleAppSidebar')"
-      >
-        <template #icon>
-          <NIcon :component="PanelLeft20Regular" />
-        </template>
-      </NButton>
-      <strong>{{ t('desktop.navigation.settings') }}</strong>
+      <DesktopWorkspaceSidebarIdentity
+        :label="t('desktop.navigation.settings')"
+        :visible="appSidebarCollapsed"
+        @restore="emit('toggleAppSidebar')"
+      />
     </header>
 
     <div class="desktop-settings-sidebar__content">
@@ -81,14 +75,6 @@ const categories = [
   gap: 0.35rem;
   border-bottom: 1px solid var(--buddy-border-subtle);
   padding: 0 0.75rem;
-}
-
-.desktop-settings-sidebar__header strong {
-  overflow: hidden;
-  font-size: var(--buddy-sidebar-header-font-size);
-  font-weight: var(--buddy-sidebar-header-font-weight);
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .desktop-settings-sidebar__content {

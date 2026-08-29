@@ -28,6 +28,8 @@ interface ReasoningSelectorOption {
   value: BuddyThinkingLevel
 }
 
+type EffortTransitionDirection = 'decreasing' | 'increasing'
+
 const props = withDefaults(defineProps<{
   clearable?: boolean
   disabled: boolean
@@ -64,6 +66,7 @@ const activePanel = shallowRef<'advanced' | 'main'>('main')
 const secondaryPanel = shallowRef<'model' | 'reasoning' | null>(null)
 const previewEffort = shallowRef<BuddyThinkingLevel | null>(null)
 const isMeterDragging = shallowRef(false)
+const effortTransitionDirection = shallowRef<EffortTransitionDirection>('increasing')
 const canClearModel = computed(() => (
   props.clearable
   && props.selectedModelId !== null
@@ -126,6 +129,12 @@ function selectMeterEffort(value: BuddyThinkingLevel) {
 }
 
 function previewMeterEffort(value: BuddyThinkingLevel | null) {
+  if (value) {
+    const currentIndex = reasoningLevelOptions.value.findIndex(option => option.value === displayedEffort.value)
+    const nextIndex = reasoningLevelOptions.value.findIndex(option => option.value === value)
+    if (currentIndex >= 0 && nextIndex >= 0 && currentIndex !== nextIndex)
+      effortTransitionDirection.value = nextIndex > currentIndex ? 'increasing' : 'decreasing'
+  }
   previewEffort.value = value
 }
 
@@ -242,8 +251,16 @@ function formatReasoningLabel(value: BuddyThinkingLevel): string {
                 v-if="isMeterDragging"
                 key="reasoning-level"
                 class="desktop-model-selector__dragging-effort"
+                :class="`is-${effortTransitionDirection}`"
               >
-                {{ displayedEffortLabel }}
+                <Transition :name="`desktop-model-selector__effort-${effortTransitionDirection}`">
+                  <span
+                    :key="displayedEffort ?? 'none'"
+                    class="desktop-model-selector__dragging-effort-label"
+                  >
+                    {{ displayedEffortLabel }}
+                  </span>
+                </Transition>
               </span>
               <button
                 v-else-if="supportsFastMode"
@@ -345,7 +362,7 @@ function formatReasoningLabel(value: BuddyThinkingLevel): string {
 
 <style scoped lang="scss">
 .desktop-model-selector {
-  --desktop-model-popover-radius: 3px;
+  --desktop-model-popover-radius: var(--buddy-menu-radius);
 
   position: relative;
   min-width: 0;
@@ -492,15 +509,12 @@ function formatReasoningLabel(value: BuddyThinkingLevel): string {
 .desktop-model-selector__panel {
   flex: none;
   overflow: hidden;
-  width: min(21.5rem, calc(100vw - 3rem));
+  width: min(17rem, calc(100vw - 2rem));
   border: 1px solid var(--buddy-border-subtle);
   border-radius: var(--desktop-model-popover-radius);
   background: var(--buddy-surface-raised);
   box-shadow: var(--buddy-shadow-overlay);
-}
-
-.desktop-model-selector__panel {
-  padding: 0.85rem;
+  padding: 0.375rem;
 }
 
 .desktop-model-selector__panel--spell {
@@ -510,7 +524,7 @@ function formatReasoningLabel(value: BuddyThinkingLevel): string {
 
   position: relative;
   background: linear-gradient(145deg, #fff, color-mix(in srgb, var(--buddy-surface-raised) 94%, #f8f6f0));
-  padding: 0.8rem 1rem 1rem;
+  padding: 0.375rem 0.5rem 0.5rem;
 }
 
 :global(:root[data-buddy-theme='dark'] .desktop-model-selector__panel--spell) {
@@ -527,9 +541,9 @@ function formatReasoningLabel(value: BuddyThinkingLevel): string {
 
 .desktop-model-selector__panel--spell::after {
   position: absolute;
-  right: 1.1rem;
+  right: 0.75rem;
   bottom: -1.4rem;
-  left: 1.1rem;
+  left: 0.75rem;
   height: 2.7rem;
   border-radius: 50%;
   background: var(--desktop-model-spell-glow);
@@ -540,25 +554,56 @@ function formatReasoningLabel(value: BuddyThinkingLevel): string {
 
 .desktop-model-selector__panel-heading {
   display: flex;
-  min-height: 2.1rem;
+  min-height: var(--buddy-menu-row-height);
   align-items: center;
   justify-content: space-between;
-  padding-bottom: 0.15rem;
 }
 
 .desktop-model-selector__heading-status {
   display: grid;
-  min-width: 2rem;
-  min-height: 2rem;
+  min-width: 1.75rem;
+  min-height: 1.75rem;
   align-items: center;
   justify-items: end;
 }
 
 .desktop-model-selector__dragging-effort {
+  display: grid;
   color: var(--buddy-text-secondary);
   font-size: 0.76rem;
   line-height: 1;
   padding-inline: 0.4rem;
+}
+
+.desktop-model-selector__dragging-effort-label {
+  grid-area: 1 / 1;
+  justify-self: end;
+  white-space: nowrap;
+}
+
+.desktop-model-selector__effort-increasing-enter-active,
+.desktop-model-selector__effort-increasing-leave-active,
+.desktop-model-selector__effort-decreasing-enter-active,
+.desktop-model-selector__effort-decreasing-leave-active {
+  transition:
+    filter 100ms ease,
+    opacity 90ms ease,
+    transform 120ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  will-change: filter, opacity, transform;
+}
+
+.desktop-model-selector__effort-increasing-enter-from,
+.desktop-model-selector__effort-decreasing-leave-to {
+  filter: blur(1px);
+  opacity: 0;
+  transform: translateX(-0.22rem);
+}
+
+.desktop-model-selector__effort-increasing-leave-to,
+.desktop-model-selector__effort-decreasing-enter-from {
+  filter: blur(1px);
+  opacity: 0;
+  transform: translateX(0.22rem);
 }
 
 .desktop-model-selector__status-enter-active,
@@ -578,28 +623,39 @@ function formatReasoningLabel(value: BuddyThinkingLevel): string {
   transform: translateY(-0.2rem);
 }
 
+@media (prefers-reduced-motion: reduce) {
+  .desktop-model-selector__effort-increasing-enter-active,
+  .desktop-model-selector__effort-increasing-leave-active,
+  .desktop-model-selector__effort-decreasing-enter-active,
+  .desktop-model-selector__effort-decreasing-leave-active {
+    transition: none;
+  }
+}
+
 .desktop-model-selector__advanced,
 .desktop-model-selector__back {
   display: inline-flex;
+  min-width: 3rem;
+  height: 1.75rem;
   align-items: center;
-  gap: 0.2rem;
+  justify-content: center;
+  gap: 0;
   border: 0;
   border-radius: var(--buddy-menu-item-radius);
   background: transparent;
   color: var(--buddy-text-secondary);
   cursor: pointer;
   font: inherit;
-  font-size: 0.76rem;
-  padding: 0.35rem 0.4rem;
-}
-
-.desktop-model-selector__advanced {
+  font-size: 0.74rem;
   line-height: 1;
+  padding: 0.25rem 0.3rem;
 }
 
-.desktop-model-selector__advanced :deep(.n-icon) {
+.desktop-model-selector__advanced :deep(.n-icon),
+.desktop-model-selector__back :deep(.n-icon) {
   flex: none;
   font-size: 1rem;
+  margin-inline: -0.125rem;
   transform: translateY(-0.04rem);
 }
 
@@ -614,8 +670,8 @@ function formatReasoningLabel(value: BuddyThinkingLevel): string {
 
 .desktop-model-selector__fast-toggle {
   display: grid;
-  width: 2rem;
-  height: 2rem;
+  width: 1.75rem;
+  height: 1.75rem;
   place-items: center;
   border: 0;
   border-radius: var(--buddy-icon-button-radius);
@@ -642,7 +698,6 @@ function formatReasoningLabel(value: BuddyThinkingLevel): string {
 }
 
 .desktop-model-selector__spell {
-  margin-top: 0.25rem;
   position: relative;
   z-index: 1;
 }
@@ -650,39 +705,40 @@ function formatReasoningLabel(value: BuddyThinkingLevel): string {
 .desktop-model-selector__no-reasoning {
   color: var(--buddy-text-muted);
   font-size: 0.72rem;
-  padding: 1rem 0.55rem;
+  padding: 0.55rem 0.35rem 0.45rem;
 }
 
 .desktop-model-selector__panel--advanced {
   display: grid;
-  gap: 0.12rem;
+  gap: var(--buddy-menu-row-gap);
 }
 
 .desktop-model-selector__back {
-  min-height: 2rem;
+  justify-content: flex-start;
   justify-self: start;
+  padding-inline: 0.15rem 0.45rem;
 }
 
 .desktop-model-selector__divider {
   height: 1px;
-  margin: 0.15rem 0.2rem 0.3rem;
+  margin: 0 0.2rem 0.125rem;
   background: var(--buddy-border-subtle);
 }
 
 .desktop-model-selector__item {
   display: grid;
   min-width: 0;
-  min-height: 2.65rem;
-  grid-template-columns: 5rem minmax(0, 1fr) auto;
+  min-height: var(--buddy-menu-row-height);
+  grid-template-columns: 4.5rem minmax(0, 1fr) auto;
   align-items: center;
-  gap: 0.65rem;
+  gap: 0.5rem;
   border: 0;
   border-radius: var(--buddy-menu-item-radius);
   background: transparent;
   color: var(--buddy-text-strong);
   cursor: pointer;
   font: inherit;
-  padding: 0.45rem 0.55rem;
+  padding: 0.3rem 0.5rem;
   text-align: left;
 
   &:hover,

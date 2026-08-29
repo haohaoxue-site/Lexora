@@ -21,14 +21,12 @@ import type {
 } from './chatStreamingMessage'
 import type { ChatTranscriptRow } from './chatTranscriptProjection'
 import type { BuddyLocale } from '@/i18n/buddyI18n'
-import { NVirtualList } from 'naive-ui'
-import { computed, nextTick, onBeforeUnmount, shallowRef, useTemplateRef, watch } from 'vue'
+import { computed, shallowRef, useTemplateRef, watch } from 'vue'
 import { useBuddyI18n } from '@/i18n/buddyI18n'
-import BuddyChatAgentIdentity from './BuddyChatAgentIdentity.vue'
 import BuddyChatAgentTurn from './BuddyChatAgentTurn.vue'
 import BuddyChatMessageRow from './BuddyChatMessageRow.vue'
 import BuddyChatRunActivity from './BuddyChatRunActivity.vue'
-import BuddyChatStreamingContent from './BuddyChatStreamingContent.vue'
+import BuddyChatTranscriptViewport from './BuddyChatTranscriptViewport.vue'
 import { resolveChatAgentTurnOpen } from './chatAgentTurnDisclosure'
 import {
   projectConversationCompaction,
@@ -38,7 +36,6 @@ import {
   formatChatDayDividerLabel,
   projectChatTranscriptDisplayRows,
 } from './chatMessageTime'
-import { resolvePrependedChatScrollTop } from './chatMessageViewport'
 import { projectChatTranscript } from './chatTranscriptProjection'
 
 const props = defineProps<{
@@ -55,6 +52,7 @@ const props = defineProps<{
   runEvents?: ReadonlyArray<LocalRunEvent>
   runOutputs?: ReadonlyArray<LocalRunOutput>
   runs?: ReadonlyArray<LocalRun>
+  showReturnToLatest?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -62,31 +60,17 @@ const emit = defineEmits<{
   editUserMessage: [messageId: string, content: string]
   openArtifact: [artifactId: string]
   openChanges: [changeSetId: string]
-  regenerateAssistant: [messageId: string]
-  scroll: [metrics: ChatMessageScrollMetrics, tailScrollSettling: boolean]
-  scrollPosition: [metrics: ChatMessageScrollMetrics, tailScrollSettling: boolean]
+  readerLayoutIntent: []
+  regenerateAssistant: [sourceRunId: string]
+  returnToLatest: []
+  scroll: [metrics: ChatMessageScrollMetrics]
+  contentResize: [metrics: ChatMessageScrollMetrics]
 }>()
 
-interface VirtualListHandle {
-  scrollTo: (options: {
-    debounce?: boolean
-    key?: string
-    position?: 'top' | 'bottom'
-    top?: number
-  }) => void
-}
-
-type VirtualScrollOptions = Parameters<VirtualListHandle['scrollTo']>[0]
-
 const { t } = useBuddyI18n(() => props.language)
-const root = useTemplateRef<HTMLDivElement>('root')
-const virtualList = useTemplateRef<VirtualListHandle>('virtualList')
-const scrollViewport = shallowRef<HTMLElement | null>(null)
+const transcriptViewport = useTemplateRef<BuddyChatMessageListHandle>('transcriptViewport')
 const agentTurnOpenOverrides = shallowRef<ReadonlyMap<string, boolean>>(new Map())
 const editingMessageId = shallowRef<string | null>(null)
-let scrollFrame: number | null = null
-let activeTailScrollGeneration: number | null = null
-let tailScrollGeneration = 0
 const matchingSearchMessageIds = computed(() => new Set(props.matchingSearchMessageIds ?? []))
 const conversationId = computed(() => props.timelineItems[0]?.conversationId ?? null)
 const transcriptProjection = computed(() => projectChatTranscript({
@@ -96,7 +80,7 @@ const transcriptProjection = computed(() => projectChatTranscript({
   runs: props.runs ?? [],
   timelineItems: props.timelineItems,
 }))
-const virtualRows = computed(
+const displayRows = computed(
   () => projectChatTranscriptDisplayRows(transcriptProjection.value.rows),
 )
 const branchNavigators = computed(() => projectChatMessageBranchNavigators(
@@ -120,6 +104,11 @@ function toggleAgentTurn(turn: ChatAgentTurn) {
   const next = new Map(agentTurnOpenOverrides.value)
   next.set(turn.runId, !isAgentTurnOpen(turn))
   agentTurnOpenOverrides.value = next
+}
+
+function regenerateMessage(message: LocalMessage) {
+  if (message.runId)
+    emit('regenerateAssistant', message.runId)
 }
 
 function isEditingMessage(message: LocalMessage): boolean {
@@ -190,172 +179,45 @@ function compactionTokenLabel(
   })
 }
 
-function handleVirtualScroll(event: Event) {
-  if (!(event.currentTarget instanceof HTMLElement))
-    return
-  scrollViewport.value = event.currentTarget
-  emit(
-    'scrollPosition',
-    toScrollMetrics(event.currentTarget),
-    activeTailScrollGeneration !== null,
-  )
-  if (scrollFrame !== null)
-    return
-  scrollFrame = requestAnimationFrame(() => {
-    scrollFrame = requestAnimationFrame(() => {
-      scrollFrame = null
-      const viewport = getScrollViewport()
-      if (viewport)
-        emit('scroll', toScrollMetrics(viewport), activeTailScrollGeneration !== null)
-    })
-  })
-}
-
-function getScrollViewport(): HTMLElement | null {
-  return scrollViewport.value ?? root.value?.querySelector<HTMLElement>('.v-vl') ?? null
-}
-
 function readScrollMetrics(): ChatMessageScrollMetrics | null {
-  const viewport = getScrollViewport()
-  return viewport ? toScrollMetrics(viewport) : null
+  return transcriptViewport.value?.readScrollMetrics() ?? null
 }
 
 function captureScrollAnchor(): ChatMessageScrollAnchor | null {
-  const viewport = getScrollViewport()
-  const metrics = readScrollMetrics()
-  if (!viewport || !metrics)
-    return null
-  const viewportTop = viewport.getBoundingClientRect().top
-  const message = [...root.value?.querySelectorAll<HTMLElement>('[data-message-id]') ?? []]
-    .find(element => element.getBoundingClientRect().bottom > viewportTop)
-  if (!message?.dataset.messageId)
-    return null
-  return {
-    messageId: message.dataset.messageId,
-    messageOffsetTop: message.getBoundingClientRect().top - viewportTop,
-    metrics,
-  }
+  return transcriptViewport.value?.captureScrollAnchor() ?? null
 }
 
-async function restoreScrollAnchor(anchor: ChatMessageScrollAnchor): Promise<void> {
-  cancelTailScroll()
-  let foundAnchor = false
-  let stableFrames = 0
-  for (let pass = 0; pass < 24; pass += 1) {
-    const viewport = getScrollViewport()
-    const anchorMessage = [...root.value?.querySelectorAll<HTMLElement>('[data-message-id]') ?? []]
-      .find(element => element.dataset.messageId === anchor.messageId)
-      ?? null
-    if (viewport && anchorMessage) {
-      foundAnchor = true
-      const currentOffset = anchorMessage.getBoundingClientRect().top
-        - viewport.getBoundingClientRect().top
-      const offsetDelta = currentOffset - anchor.messageOffsetTop
-      if (Math.abs(offsetDelta) <= 1) {
-        stableFrames += 1
-        if (stableFrames >= 3)
-          return
-      }
-      else {
-        stableFrames = 0
-        applyVirtualScroll({
-          debounce: false,
-          top: viewport.scrollTop + offsetDelta,
-        })
-      }
-    }
-    else {
-      stableFrames = 0
-      applyVirtualScroll({ debounce: false, key: `message:${anchor.messageId}` })
-    }
-    await nextTick()
-    await new Promise<void>(resolve => requestAnimationFrame(() => resolve()))
-  }
-  if (!foundAnchor) {
-    const metrics = readScrollMetrics()
-    if (metrics)
-      applyVirtualScroll({ debounce: false, top: resolvePrependedChatScrollTop(anchor.metrics, metrics) })
-  }
+function restoreScrollAnchor(anchor: ChatMessageScrollAnchor): ChatMessageScrollMetrics | null {
+  return transcriptViewport.value?.restoreScrollAnchor(anchor) ?? null
 }
 
-async function scrollToTail(): Promise<void> {
-  const generation = ++tailScrollGeneration
-  activeTailScrollGeneration = generation
-  let previousScrollHeight = -1
-  let stableFrames = 0
-  try {
-    for (let pass = 0; pass < 18; pass += 1) {
-      if (generation !== tailScrollGeneration)
-        return
-      applyVirtualScroll({ debounce: false, position: 'bottom' })
-      await nextTick()
-      await new Promise<void>(resolve => requestAnimationFrame(() => resolve()))
-      const metrics = readScrollMetrics()
-      if (!metrics)
-        return
-      const isStable = metrics.scrollHeight === previousScrollHeight
-        && metrics.scrollHeight - metrics.scrollTop - metrics.clientHeight <= 1
-      stableFrames = isStable ? stableFrames + 1 : 0
-      if (stableFrames >= 2)
-        return
-      previousScrollHeight = metrics.scrollHeight
-    }
-  }
-  finally {
-    if (activeTailScrollGeneration === generation)
-      activeTailScrollGeneration = null
-  }
+function scrollToTail(): ChatMessageScrollMetrics | null {
+  return transcriptViewport.value?.scrollToTail() ?? null
 }
 
-async function scrollToMessage(messageId: string): Promise<void> {
-  cancelTailScroll()
-  applyVirtualScroll({
-    debounce: false,
-    key: `message:${messageId}`,
-    position: 'top',
-  })
-  await nextTick()
+function scrollToMessage(messageId: string): ChatMessageScrollMetrics | null {
+  return transcriptViewport.value?.scrollToMessage(messageId) ?? null
 }
 
-function cancelTailScroll() {
-  tailScrollGeneration += 1
-  activeTailScrollGeneration = null
-}
-
-function applyVirtualScroll(options: VirtualScrollOptions) {
-  virtualList.value?.scrollTo(options)
-  getScrollViewport()?.dispatchEvent(new Event('scroll'))
+function handleReaderLayoutIntent(event: MouseEvent) {
+  if (event.target instanceof Element && event.target.closest('button[aria-expanded]'))
+    emit('readerLayoutIntent')
 }
 
 defineExpose<BuddyChatMessageListHandle>({
-  cancelTailScroll,
   captureScrollAnchor,
+  readScrollMetrics,
   restoreScrollAnchor,
   scrollToMessage,
   scrollToTail,
 })
-
-onBeforeUnmount(() => {
-  if (scrollFrame !== null)
-    cancelAnimationFrame(scrollFrame)
-})
-
-function toScrollMetrics(viewport: HTMLElement): ChatMessageScrollMetrics {
-  return {
-    clientHeight: viewport.clientHeight,
-    scrollHeight: viewport.scrollHeight,
-    scrollTop: viewport.scrollTop,
-  }
-}
 </script>
 
 <template>
   <div
-    ref="root"
-    aria-live="polite"
     class="buddy-chat-message-list"
     role="log"
-    @pointerdown="cancelTailScroll"
+    @click.capture="handleReaderLayoutIntent"
   >
     <div
       v-if="isLoadingOlderMessages"
@@ -364,22 +226,19 @@ function toScrollMetrics(viewport: HTMLElement): ChatMessageScrollMetrics {
     >
       {{ t('desktop.chat.loadingOlder') }}
     </div>
-    <NVirtualList
-      ref="virtualList"
-      class="buddy-chat-message-list__virtual"
-      :item-size="96"
-      item-resizable
-      :items="virtualRows"
-      key-field="key"
-      :padding-bottom="16"
-      :padding-top="hasOlderMessages ? 32 : 24"
-      @scroll="handleVirtualScroll"
-      @wheel="cancelTailScroll"
+    <BuddyChatTranscriptViewport
+      ref="transcriptViewport"
+      :has-older-messages="hasOlderMessages ?? false"
+      :return-to-latest-label="t('desktop.chat.returnToLatest')"
+      :show-return-to-latest="showReturnToLatest ?? false"
+      @content-resize="emit('contentResize', $event)"
+      @return-to-latest="emit('returnToLatest')"
+      @scroll="emit('scroll', $event)"
     >
-      <template #default="{ item }">
+      <template v-for="item in displayRows" :key="item.key">
         <div
           v-if="item.kind === 'day-divider'"
-          class="buddy-chat-day-divider buddy-chat-virtual-row"
+          class="buddy-chat-day-divider buddy-chat-transcript-row"
         >
           <time :datetime="item.createdAt">
             {{ formatChatDayDividerLabel(item.createdAt, language) }}
@@ -391,12 +250,13 @@ function toScrollMetrics(viewport: HTMLElement): ChatMessageScrollMetrics {
           :actions-disabled="actionsDisabled ?? false"
           :active-search="item.message.id === activeSearchMessageId"
           :branch-navigator="branchNavigators.get(item.message.id) ?? null"
-          class="buddy-chat-virtual-row"
+          class="buddy-chat-transcript-row"
           :editing="isEditingMessage(item.message)"
           :is-agent-turn-result="item.isAgentTurnResult"
           :language="language"
           :message="item.message"
           :search-match="matchingSearchMessageIds.has(item.message.id)"
+          :streaming="item.streaming === true"
           :turn-outputs="item.turnOutputs"
           :turn-changes="item.turnChanges"
           @activate-branch="emit('activateBranch', $event)"
@@ -404,42 +264,34 @@ function toScrollMetrics(viewport: HTMLElement): ChatMessageScrollMetrics {
           @edit="submitEditedMessage(item.message, $event)"
           @open-artifact="emit('openArtifact', $event)"
           @open-changes="emit('openChanges', $event)"
-          @regenerate="emit('regenerateAssistant', item.message.id)"
+          @regenerate="regenerateMessage(item.message)"
           @start-edit="startEditingMessage(item.message)"
         />
 
         <BuddyChatAgentTurn
           v-else-if="item.kind === 'agent-turn'"
-          class="buddy-chat-virtual-row"
+          :actions-disabled="actionsDisabled ?? false"
+          :branch-navigator="branchNavigators.get(item.turn.runId) ?? null"
+          class="buddy-chat-transcript-row"
           :language="language"
           :open="isAgentTurnOpen(item.turn)"
+          :owns-result-actions="item.ownsResultActions === true"
           :turn="item.turn"
+          @activate-branch="emit('activateBranch', $event)"
+          @regenerate="emit('regenerateAssistant', item.turn.runId)"
           @toggle="toggleAgentTurn(item.turn)"
         />
 
-        <article
-          v-else-if="item.kind === 'streaming'"
-          class="buddy-chat-streaming buddy-chat-virtual-row"
-          :class="{ 'has-activity-tail': transcriptProjection.hasActiveProcessIdentity }"
-        >
-          <BuddyChatAgentIdentity v-if="!transcriptProjection.hasActiveProcessIdentity" :language="language" />
-          <BuddyChatStreamingContent
-            v-if="item.message.text"
-            class="buddy-chat-streaming__content"
-            :message="item.message"
-          />
-        </article>
-
         <BuddyChatRunActivity
           v-else-if="item.kind === 'activity'"
-          class="buddy-chat-virtual-row"
+          class="buddy-chat-transcript-row"
           :language="language"
           :turn="item.turn"
         />
 
         <div
           v-else-if="item.kind === 'recovery-notice'"
-          class="buddy-chat-system-event buddy-chat-virtual-row is-warning"
+          class="buddy-chat-system-event buddy-chat-transcript-row is-warning"
           role="status"
         >
           <span>{{ recoveryNoticeLabel(item.notice) }}</span>
@@ -447,7 +299,7 @@ function toScrollMetrics(viewport: HTMLElement): ChatMessageScrollMetrics {
 
         <div
           v-else-if="item.kind === 'compaction'"
-          class="buddy-chat-system-event buddy-chat-virtual-row"
+          class="buddy-chat-system-event buddy-chat-transcript-row"
           :data-compaction-id="item.compaction.id"
         >
           <span>{{ compactionLabel(item.compaction) }}</span>
@@ -456,24 +308,16 @@ function toScrollMetrics(viewport: HTMLElement): ChatMessageScrollMetrics {
           </small>
         </div>
       </template>
-    </NVirtualList>
+    </BuddyChatTranscriptViewport>
   </div>
 </template>
 
 <style scoped lang="scss">
 .buddy-chat-message-list {
   position: relative;
+  height: 100%;
   min-width: 0;
   min-height: 0;
-}
-
-.buddy-chat-message-list__virtual {
-  height: 100%;
-
-  :deep(.v-vl) {
-    overscroll-behavior: contain;
-    scrollbar-gutter: stable;
-  }
 }
 
 .buddy-chat-message-list__history-status {
@@ -491,7 +335,7 @@ function toScrollMetrics(viewport: HTMLElement): ChatMessageScrollMetrics {
   transform: translateX(-50%);
 }
 
-.buddy-chat-virtual-row {
+.buddy-chat-transcript-row {
   box-sizing: border-box;
   width: min(
     calc(
@@ -505,7 +349,7 @@ function toScrollMetrics(viewport: HTMLElement): ChatMessageScrollMetrics {
   padding-inline: var(--buddy-chat-inline-gutter);
 }
 
-.buddy-chat-agent-turn.buddy-chat-virtual-row {
+.buddy-chat-agent-turn.buddy-chat-transcript-row {
   padding-bottom: var(--buddy-chat-gap-block);
 }
 
@@ -519,36 +363,8 @@ function toScrollMetrics(viewport: HTMLElement): ChatMessageScrollMetrics {
   padding-block: 0.75rem 1.25rem;
 }
 
-.buddy-chat-agent-turn.has-visible-process.buddy-chat-virtual-row {
+.buddy-chat-agent-turn.has-visible-process.buddy-chat-transcript-row {
   padding-bottom: var(--buddy-chat-gap-section);
-}
-
-.buddy-chat-streaming {
-  display: grid;
-  align-items: start;
-  gap: var(--buddy-chat-gap-block);
-  padding-bottom: var(--buddy-chat-gap-turn);
-
-  &.has-activity-tail {
-    padding-bottom: var(--buddy-chat-gap-block);
-  }
-}
-
-.buddy-chat-streaming__content {
-  max-width: 100%;
-  color: var(--buddy-text-primary);
-  line-height: 1.7;
-  padding: 0.05rem 0;
-  overflow-wrap: anywhere;
-
-  :deep(> :first-child) {
-    margin-top: 0;
-  }
-
-  :deep(> :last-child) {
-    margin-bottom: 0;
-  }
-
 }
 
 .buddy-chat-system-event {

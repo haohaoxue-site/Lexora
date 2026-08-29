@@ -1,6 +1,10 @@
+@use './animation';
+@use './fonts';
+
 :root {
   color-scheme: light;
   --buddy-font-ui: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", "Noto Sans", "Noto Sans CJK SC", "Source Han Sans SC", "Microsoft YaHei", sans-serif;
+  --buddy-font-brand: "LXGW WenKai", "Kaiti SC", STKaiti, KaiTi, "Noto Serif CJK SC", serif;
 
   font-family: var(--buddy-font-ui);
   font-synthesis: none;
@@ -32,6 +36,9 @@
   --buddy-sidebar-project-font-weight: 400;
   --buddy-sidebar-account-font-size: 12px;
   --buddy-sidebar-account-font-weight: 600;
+  --buddy-brand-name-font-size: 15px;
+  --buddy-brand-name-font-weight: 500;
+  --buddy-brand-name-line-height: 1.35;
   --buddy-radius-micro: 0.375rem;
   --buddy-icon-button-radius: var(--buddy-radius-micro);
   --buddy-composer-control-height: 2rem;
@@ -45,6 +52,7 @@
   --buddy-motion-state-easing: cubic-bezier(0.2, 0, 0, 1);
   --buddy-font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
   --buddy-chat-final-color: var(--buddy-text-primary);
+  --buddy-chat-agent-name-color: color-mix(in srgb, var(--buddy-text-strong) 50%, var(--buddy-text-secondary) 50%);
   --buddy-chat-process-color: var(--buddy-text-secondary);
   --buddy-chat-user-color: var(--buddy-text-primary);
   --buddy-chat-meta-color: var(--buddy-text-secondary);
@@ -69,7 +77,7 @@
   --buddy-chat-caption-line-height: 1.4;
   --buddy-chat-code-font-size: 12px;
   --buddy-chat-code-line-height: 1.6;
-  --buddy-chat-avatar-size: 25px;
+  --buddy-chat-avatar-size: 32px;
   --buddy-chat-avatar-gap: 8px;
   --buddy-chat-node-icon-size: 16px;
 }

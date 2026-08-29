@@ -10,10 +10,13 @@ import BuddyChatMarkdownContent from './BuddyChatMarkdownContent.vue'
 import { resolveBuddyAttachmentPreviewUrl } from './chatAttachmentView'
 import { getChatMessageText } from './chatMessageContent'
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
+  final?: boolean
   language: BuddyLocale
   message: LocalMessage
-}>()
+}>(), {
+  final: true,
+})
 
 const { t } = useBuddyI18n(() => props.language)
 const attachmentTrack = useTemplateRef<HTMLDivElement>('attachmentTrack')
@@ -123,6 +126,7 @@ function previewLeaveTransition(): Promise<void> {
       v-else-if="hasText"
       class="buddy-chat-message-content__text"
       :content="text"
+      :final="final"
     />
   </div>
 </template>

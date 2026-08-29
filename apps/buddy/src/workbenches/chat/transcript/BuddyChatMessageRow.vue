@@ -3,12 +3,10 @@ import type { LocalChangeSetSummary, LocalMessage } from '@buddy-electron/shared
 import type { ChatMessageBranchNavigator } from './chatMessageBranches'
 import type { ChatTranscriptTurnOutputs } from './chatTranscriptProjection'
 import type { BuddyLocale } from '@/i18n/buddyI18n'
-import { useTimeoutFn } from '@vueuse/core'
-import { NButton, NInput, NTooltip, useMessage } from 'naive-ui'
+import { NButton, NInput } from 'naive-ui'
 import { computed, shallowRef, watch } from 'vue'
-import { useDesktopApp } from '@/app/desktopAppContext'
 import { useBuddyI18n } from '@/i18n/buddyI18n'
-import DesktopIcon from '@/ui/DesktopIcon.vue'
+import BuddyChatActionToolbar from './BuddyChatActionToolbar.vue'
 import BuddyChatAgentIdentity from './BuddyChatAgentIdentity.vue'
 import BuddyChatMessageContent from './BuddyChatMessageContent.vue'
 import BuddyChatTurnChanges from './BuddyChatTurnChanges.vue'
@@ -18,7 +16,6 @@ import {
   getChatMessageInterruption,
   getChatMessageText,
 } from './chatMessageContent'
-import { formatChatMessageTimeLabel } from './chatMessageTime'
 
 const props = defineProps<{
   actionsDisabled: boolean
@@ -29,6 +26,7 @@ const props = defineProps<{
   language: BuddyLocale
   message: LocalMessage
   searchMatch: boolean
+  streaming?: boolean
   turnChanges?: LocalChangeSetSummary | null
   turnOutputs: ChatTranscriptTurnOutputs | null
 }>()
@@ -44,11 +42,7 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useBuddyI18n(() => props.language)
-const { clipboard } = useDesktopApp()
-const notification = useMessage()
 const editingText = shallowRef('')
-const copied = shallowRef(false)
-const copyReset = useTimeoutFn(() => copied.value = false, 1_400, { immediate: false })
 const actions = computed(() => projectChatMessageActions(
   props.message,
   props.actionsDisabled,
@@ -57,11 +51,14 @@ const showAssistantIdentity = computed(() => (
   props.message.role === 'assistant' && !props.isAgentTurnResult
 ))
 const showActions = computed(() => (
-  actions.value.showCopy
-  || actions.value.showEdit
-  || actions.value.showRegenerate
-  || actions.value.showTime
-  || props.branchNavigator !== null
+  !props.streaming
+  && (
+    actions.value.showCopy
+    || actions.value.showEdit
+    || actions.value.showRegenerate
+    || actions.value.showTime
+    || props.branchNavigator !== null
+  )
 ))
 const interruptionLabel = computed(() => {
   const interruption = getChatMessageInterruption(props.message)
@@ -72,7 +69,7 @@ const interruptionLabel = computed(() => {
     : 'desktop.chat.messageInterrupted')
 })
 const roleLabel = computed(() => t(`message.role.${props.message.role}`))
-const timeLabel = computed(() => formatChatMessageTimeLabel(props.message.createdAt))
+const messageText = computed(() => getChatMessageText(props.message))
 
 watch(
   [() => props.editing, () => props.message.id],
@@ -89,21 +86,6 @@ function submitEdit() {
     return
   emit('edit', content)
 }
-
-async function copyMessage() {
-  const text = getChatMessageText(props.message)
-  if (!text)
-    return
-  try {
-    await clipboard.writeText(text)
-    copied.value = true
-    copyReset.stop()
-    copyReset.start()
-  }
-  catch {
-    notification.error(t('desktop.chat.copyFailed'))
-  }
-}
 </script>
 
 <template>
@@ -116,6 +98,7 @@ async function copyMessage() {
         'is-assistant-turn-result': isAgentTurnResult,
         'is-editing': editing,
         'is-search-match': searchMatch,
+        'is-streaming': streaming,
       },
     ]"
     :data-message-id="message.id"
@@ -154,6 +137,7 @@ async function copyMessage() {
     <BuddyChatMessageContent
       v-else
       class="buddy-chat-message__body"
+      :final="!streaming"
       :language="language"
       :message="message"
     />
@@ -178,118 +162,30 @@ async function copyMessage() {
     >
       {{ interruptionLabel }}
     </small>
-    <div v-if="!editing && showActions" class="buddy-chat-message__actions">
-      <time
-        v-if="actions.showTime && message.role === 'user'"
-        class="buddy-chat-message__time"
-        :datetime="message.createdAt"
-      >
-        {{ timeLabel }}
-      </time>
-      <NTooltip v-if="actions.showCopy" placement="bottom">
-        <template #trigger>
-          <NButton
-            class="buddy-icon-button buddy-chat-message__copy-button"
-            :class="{ 'is-copied': copied }"
-            quaternary
-            size="tiny"
-            :aria-label="t(copied ? 'desktop.chat.copied' : 'desktop.chat.copy')"
-            @click="copyMessage"
-          >
-            <template #icon>
-              <DesktopIcon :name="copied ? 'messageCopied' : 'messageCopy'" />
-            </template>
-          </NButton>
-        </template>
-        {{ t(copied ? 'desktop.chat.copied' : 'desktop.chat.copy') }}
-      </NTooltip>
-      <NTooltip v-if="actions.showEdit" placement="bottom">
-        <template #trigger>
-          <NButton
-            :data-testid="`edit-message-${message.id}`"
-            :disabled="actions.disabled"
-            class="buddy-icon-button"
-            quaternary
-            size="tiny"
-            :aria-label="t('desktop.chat.editMessage')"
-            @click="emit('startEdit')"
-          >
-            <template #icon>
-              <DesktopIcon name="messageEdit" />
-            </template>
-          </NButton>
-        </template>
-        {{ t('desktop.chat.editMessage') }}
-      </NTooltip>
-      <NTooltip v-if="actions.showRegenerate" placement="bottom">
-        <template #trigger>
-          <NButton
-            :data-testid="`regenerate-message-${message.id}`"
-            :disabled="actions.disabled"
-            class="buddy-icon-button"
-            quaternary
-            size="tiny"
-            :aria-label="t('desktop.chat.regenerate')"
-            @click="emit('regenerate')"
-          >
-            <template #icon>
-              <DesktopIcon name="messageRetry" />
-            </template>
-          </NButton>
-        </template>
-        {{ t('desktop.chat.regenerate') }}
-      </NTooltip>
-      <div v-if="branchNavigator" class="buddy-chat-message__branch">
-        <NTooltip placement="bottom">
-          <template #trigger>
-            <NButton
-              :disabled="actions.disabled || !branchNavigator.previousBranchId"
-              class="buddy-icon-button buddy-chat-message__branch-button"
-              quaternary
-              size="tiny"
-              :aria-label="t('desktop.chat.previousBranch')"
-              @click="emit('activateBranch', branchNavigator.previousBranchId!)"
-            >
-              <template #icon>
-                <DesktopIcon name="messageBranchPrevious" />
-              </template>
-            </NButton>
-          </template>
-          {{ t('desktop.chat.previousBranch') }}
-        </NTooltip>
-        <span>{{ branchNavigator.index }} / {{ branchNavigator.count }}</span>
-        <NTooltip placement="bottom">
-          <template #trigger>
-            <NButton
-              :disabled="actions.disabled || !branchNavigator.nextBranchId"
-              class="buddy-icon-button buddy-chat-message__branch-button"
-              quaternary
-              size="tiny"
-              :aria-label="t('desktop.chat.nextBranch')"
-              @click="emit('activateBranch', branchNavigator.nextBranchId!)"
-            >
-              <template #icon>
-                <DesktopIcon name="messageBranchNext" />
-              </template>
-            </NButton>
-          </template>
-          {{ t('desktop.chat.nextBranch') }}
-        </NTooltip>
-      </div>
-      <time
-        v-if="actions.showTime && message.role === 'assistant'"
-        class="buddy-chat-message__time"
-        :datetime="message.createdAt"
-      >
-        {{ timeLabel }}
-      </time>
-    </div>
+    <BuddyChatActionToolbar
+      v-if="!editing && showActions"
+      :actions="actions"
+      :branch-navigator="branchNavigator"
+      class="buddy-chat-message__actions"
+      :copy-text="messageText"
+      :created-at="message.createdAt"
+      :language="language"
+      :role="message.role"
+      :target-key="`message-${message.id}`"
+      @activate-branch="emit('activateBranch', $event)"
+      @regenerate="emit('regenerate')"
+      @start-edit="emit('startEdit')"
+    />
   </article>
 </template>
 
 <style scoped lang="scss">
 .buddy-chat-message.is-assistant-turn-result {
   row-gap: var(--buddy-chat-gap-tight);
+}
+
+.buddy-chat-message.is-streaming.is-assistant-turn-result {
+  padding-bottom: var(--buddy-chat-gap-block);
 }
 
 .buddy-chat-message {
@@ -379,10 +275,6 @@ async function copyMessage() {
   position: absolute;
   bottom: var(--buddy-chat-gap-tight);
   left: var(--buddy-chat-inline-gutter);
-  display: flex;
-  min-height: 1.5rem;
-  align-items: center;
-  gap: 0.15rem;
   opacity: 0;
   pointer-events: none;
   transition: opacity 120ms ease;
@@ -399,58 +291,6 @@ async function copyMessage() {
     justify-content: flex-end;
   }
 
-  :deep(.n-button) {
-    color: var(--buddy-text-secondary);
-    font-size: 0.68rem;
-  }
-}
-
-.buddy-chat-message__branch {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.05rem;
-  margin-left: 0.1rem;
-  color: var(--buddy-text-secondary);
-  font-size: 0.7rem;
-  font-variant-numeric: tabular-nums;
-
-  > span {
-    min-width: 2.25rem;
-    text-align: center;
-  }
-}
-
-.buddy-chat-message__time {
-  color: var(--buddy-text-muted);
-  font-size: 0.68rem;
-  font-variant-numeric: tabular-nums;
-  font-weight: 400;
-  line-height: 1.35rem;
-  padding-inline: 0.2rem;
-  white-space: nowrap;
-}
-
-.buddy-chat-message__copy-button {
-  transition:
-    background-color 160ms ease,
-    color 160ms ease;
-
-  &.is-copied {
-    background: var(--buddy-accent-surface);
-    color: var(--buddy-accent-text);
-  }
-}
-
-.buddy-chat-message__branch-button {
-  width: 1.35rem;
-  min-width: 1.35rem;
-  height: 1.35rem;
-  border-radius: var(--buddy-icon-button-radius);
-  padding: 0;
-
-  :deep(.n-button__icon) {
-    font-size: 1rem;
-  }
 }
 
 @media (hover: none) {

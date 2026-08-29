@@ -1,6 +1,8 @@
 import type { LocalApproval, LocalChatApi } from '@buddy-electron/shared/localChatApi'
 import type { Ref } from 'vue'
-import { readonly, shallowRef } from 'vue'
+import { computed, readonly, shallowRef } from 'vue'
+
+export type ChatApprovalDecision = 'approve' | 'approveForTurn' | 'deny'
 
 interface UseChatApprovalsOptions {
   api: LocalChatApi
@@ -10,19 +12,30 @@ interface UseChatApprovalsOptions {
 }
 
 export function useChatApprovals(options: UseChatApprovalsOptions) {
-  const resolvingApprovalIds = shallowRef<ReadonlySet<string>>(new Set())
+  const resolvingApprovalActions = shallowRef<ReadonlyMap<string, ChatApprovalDecision>>(new Map())
+  const resolvingApprovalIds = computed<ReadonlySet<string>>(
+    () => new Set(resolvingApprovalActions.value.keys()),
+  )
 
-  async function resolveApproval(approvalId: string, decision: 'approve' | 'deny') {
-    if (resolvingApprovalIds.value.has(approvalId))
+  async function resolveApproval(
+    approvalId: string,
+    decision: ChatApprovalDecision,
+  ) {
+    if (resolvingApprovalActions.value.has(approvalId))
       return
     const approval = options.approvals.value.find(item => item.id === approvalId)
     if (!approval || approval.status !== 'pending')
       return
 
-    resolvingApprovalIds.value = new Set([...resolvingApprovalIds.value, approvalId])
+    resolvingApprovalActions.value = new Map([
+      ...resolvingApprovalActions.value,
+      [approvalId, decision],
+    ])
     try {
       if (decision === 'approve')
         await options.api.approvals.approve(approvalId)
+      else if (decision === 'approveForTurn')
+        await options.api.approvals.approveForTurn(approvalId)
       else
         await options.api.approvals.deny(approvalId)
       await options.refresh()
@@ -31,15 +44,16 @@ export function useChatApprovals(options: UseChatApprovalsOptions) {
       options.onError(error)
     }
     finally {
-      const next = new Set(resolvingApprovalIds.value)
+      const next = new Map(resolvingApprovalActions.value)
       next.delete(approvalId)
-      resolvingApprovalIds.value = next
+      resolvingApprovalActions.value = next
     }
   }
 
   return {
     approvalViews: options.approvals,
     resolveApproval,
-    resolvingApprovalIds: readonly(resolvingApprovalIds),
+    resolvingApprovalActions: readonly(resolvingApprovalActions),
+    resolvingApprovalIds,
   }
 }

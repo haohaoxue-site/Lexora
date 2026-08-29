@@ -134,14 +134,14 @@ function readSliderIndex(event: Event): number {
     0 0 0.72rem rgb(213 165 87 / 22%),
     0 0.28rem 0.68rem rgb(40 49 65 / 12%);
   --reasoning-track-hover-border: rgb(91 104 127 / 34%);
-  --reasoning-track-inset: 0.875rem;
+  --reasoning-track-inset: 0.75rem;
   --reasoning-track-shadow:
     inset 0 1px 0 rgb(255 255 255 / 94%),
     inset 0 -1px 0 rgb(91 104 127 / 12%),
-    0 0.22rem 0.56rem rgb(40 49 65 / 10%);
+    0 0.12rem 0.3rem rgb(40 49 65 / 9%);
 
   position: relative;
-  height: 2.95rem;
+  height: 2rem;
   isolation: isolate;
   user-select: none;
 }
@@ -172,7 +172,7 @@ function readSliderIndex(event: Event): number {
 
 .desktop-reasoning-meter__stage {
   position: absolute;
-  inset: 0.2rem 0.1rem;
+  inset: 0.125rem 0.05rem;
 }
 
 .desktop-reasoning-meter__track {
@@ -180,7 +180,7 @@ function readSliderIndex(event: Event): number {
   top: 50%;
   right: 0;
   left: 0;
-  height: 2.55rem;
+  height: 1.75rem;
   overflow: hidden;
   border: 1px solid var(--reasoning-track-border);
   border-radius: 999px;
@@ -219,8 +219,8 @@ function readSliderIndex(event: Event): number {
 
 .desktop-reasoning-meter__node {
   display: block;
-  width: 0.31rem;
-  height: 0.31rem;
+  width: 0.27rem;
+  height: 0.27rem;
   border: 1px solid var(--reasoning-node-border);
   border-radius: 0.07rem;
   background: var(--reasoning-node-background);
@@ -241,10 +241,10 @@ function readSliderIndex(event: Event): number {
 
 .desktop-reasoning-meter__control {
   position: absolute;
-  inset: 0.2rem 0.1rem;
+  inset: 0.125rem 0.05rem;
   z-index: 7;
-  width: calc(100% - 0.2rem);
-  height: 2.55rem;
+  width: calc(100% - 0.1rem);
+  height: 1.75rem;
   margin: 0;
   appearance: none;
   background: transparent;
@@ -254,15 +254,15 @@ function readSliderIndex(event: Event): number {
 }
 
 .desktop-reasoning-meter__control::-webkit-slider-runnable-track {
-  height: 2.55rem;
+  height: 1.75rem;
   border: 0;
   background: transparent;
 }
 
 .desktop-reasoning-meter__control::-webkit-slider-thumb {
-  width: 1.75rem;
-  height: 2.08rem;
-  margin-top: 0.235rem;
+  width: 1.5rem;
+  height: 1.5rem;
+  margin-top: 0.125rem;
   appearance: none;
   border: 0;
   background: transparent;

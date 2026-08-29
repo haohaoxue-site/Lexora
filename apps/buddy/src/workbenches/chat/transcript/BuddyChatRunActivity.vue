@@ -1,8 +1,12 @@
 <script setup lang="ts">
 import type { ChatAgentTurn } from './chatStreamingMessage'
 import type { BuddyLocale } from '@/i18n/buddyI18n'
-import { computed } from 'vue'
+import { useIntervalFn } from '@vueuse/core'
+import { computed, shallowRef } from 'vue'
 import { useBuddyI18n } from '@/i18n/buddyI18n'
+import BuddyChatActivityLoader from './BuddyChatActivityLoader.vue'
+import BuddyChatShimmerText from './BuddyChatShimmerText.vue'
+import { formatChatRunDuration } from './chatRunDuration'
 
 const props = defineProps<{
   language: BuddyLocale
@@ -10,6 +14,18 @@ const props = defineProps<{
 }>()
 
 const { t } = useBuddyI18n(() => props.language)
+const now = shallowRef(Date.now())
+useIntervalFn(() => {
+  now.value = Date.now()
+}, 1_000, {
+  immediateCallback: true,
+})
+
+const duration = computed(() => formatChatRunDuration(
+  props.turn.startedAt,
+  props.turn.completedAt,
+  now.value,
+))
 
 const activityLabel = computed(() => {
   switch (props.turn.progress?.phase) {
@@ -31,27 +47,26 @@ const activityLabel = computed(() => {
 
 <template>
   <div class="buddy-chat-run-activity">
-    <span
+    <BuddyChatActivityLoader />
+    <BuddyChatShimmerText
       aria-live="polite"
       class="buddy-chat-run-activity__label"
-    >{{ activityLabel }}</span>
-    <span
-      aria-hidden="true"
-      class="buddy-chat-run-activity__dots"
+      mode="continuous"
     >
-      <i class="buddy-chat-run-activity__dot">.</i>
-      <i class="buddy-chat-run-activity__dot">.</i>
-      <i class="buddy-chat-run-activity__dot">.</i>
-    </span>
+      {{ activityLabel }}
+    </BuddyChatShimmerText>
+    <span class="buddy-chat-run-activity__duration">{{ duration }}</span>
   </div>
 </template>
 
 <style scoped lang="scss">
 .buddy-chat-run-activity {
   display: flex;
+  box-sizing: border-box;
   min-width: 0;
+  min-height: calc(1.4em + var(--buddy-chat-gap-turn));
   align-items: center;
-  gap: 0.25rem;
+  gap: 0.4rem;
   color: var(--buddy-chat-meta-color);
   font-size: var(--buddy-chat-meta-font-size);
   line-height: var(--buddy-chat-meta-line-height);
@@ -59,42 +74,23 @@ const activityLabel = computed(() => {
 }
 
 .buddy-chat-run-activity__label {
+  --buddy-shimmer-base: var(--buddy-chat-meta-color);
+
+  position: relative;
   min-width: 0;
+  flex: 0 1 auto;
+  overflow: hidden;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.buddy-chat-run-activity__dots {
-  display: inline-flex;
-  margin-left: 0.125rem;
-}
-
-.buddy-chat-run-activity__dot {
-  animation: buddy-chat-run-activity-dot 1.2s infinite both;
-  font-style: normal;
-
-  &:nth-child(2) {
-    animation-delay: 120ms;
-  }
-
-  &:nth-child(3) {
-    animation-delay: 240ms;
-  }
-}
-
-@keyframes buddy-chat-run-activity-dot {
-  0%,
-  80%,
-  100% {
-    opacity: 0.28;
-  }
-
-  40% {
-    opacity: 1;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .buddy-chat-run-activity__dot {
-    animation: none;
-  }
+.buddy-chat-run-activity__duration {
+  min-width: 3.5ch;
+  flex: 0 0 3.5ch;
+  opacity: 0.78;
+  font-variant-numeric: tabular-nums;
+  text-align: left;
+  white-space: nowrap;
 }
 </style>

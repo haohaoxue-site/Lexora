@@ -230,6 +230,8 @@ const localChatApi = Object.freeze<LocalChatApi>({
     list: input => ipcRenderer.invoke(LOCAL_CHAT_IPC_CHANNELS.approvalsList, input ?? {}),
     approve: approvalId =>
       ipcRenderer.invoke(LOCAL_CHAT_IPC_CHANNELS.approvalsApprove, { approvalId }),
+    approveForTurn: approvalId =>
+      ipcRenderer.invoke(LOCAL_CHAT_IPC_CHANNELS.approvalsApproveForTurn, { approvalId }),
     deny: approvalId =>
       ipcRenderer.invoke(LOCAL_CHAT_IPC_CHANNELS.approvalsDeny, { approvalId }),
   }),

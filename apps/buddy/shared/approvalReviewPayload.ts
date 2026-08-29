@@ -35,22 +35,26 @@ const automationOperationSchema = z.enum([
 
 export const approvalReviewPayloadSchema = z.discriminatedUnion('card', [
   z.object({
+    allowForTurn: z.boolean().default(true),
     card: z.literal('shell'),
     command: z.string().max(MAX_COMMAND_REVIEW_LENGTH),
     toolName: toolNameSchema,
   }).strict(),
   z.object({
+    allowForTurn: z.boolean().default(true),
     card: z.literal('paths'),
     targetPaths: z.array(z.string().min(1).max(4_096)).max(MAX_TARGET_PATHS),
     toolName: toolNameSchema,
   }).strict(),
   z.object({
+    allowForTurn: z.boolean().default(true),
     argumentNames: z.array(z.string().min(1).max(256)).max(MAX_ARGUMENT_NAMES),
     card: z.literal('arguments'),
     toolName: toolNameSchema,
   }).strict(),
   z.object({
     action: systemActionSchema,
+    allowForTurn: z.boolean().default(true),
     card: z.literal('system-action'),
     effect: z.string().trim().min(1).max(512),
     expiresAt: z.iso.datetime(),
@@ -60,6 +64,7 @@ export const approvalReviewPayloadSchema = z.discriminatedUnion('card', [
     toolName: toolNameSchema,
   }).strict(),
   z.object({
+    allowForTurn: z.boolean().default(false),
     card: z.literal('automation'),
     executionProfile: z.enum(BUDDY_EXECUTION_PROFILES).default(BUDDY_DEFAULT_EXECUTION_PROFILE),
     modelMode: z.string().trim().min(1).max(512),
@@ -81,7 +86,7 @@ export type AutomationApprovalReview = Extract<
 >
 export type AutomationApprovalReviewInput = Omit<
   AutomationApprovalReview,
-  'card' | 'toolName'
+  'allowForTurn' | 'card' | 'toolName'
 >
 export type SystemActionApprovalReview = Extract<
   ApprovalReviewPayload,
@@ -89,10 +94,11 @@ export type SystemActionApprovalReview = Extract<
 >
 export type SystemActionApprovalReviewInput = Omit<
   SystemActionApprovalReview,
-  'card' | 'toolName'
+  'allowForTurn' | 'card' | 'toolName'
 >
 
 export interface CreateApprovalReviewPayloadInput {
+  allowForTurn: boolean
   arguments: unknown
   automation?: AutomationApprovalReviewInput
   kind: ApprovalReviewKind
@@ -105,6 +111,7 @@ export function createApprovalReviewPayload(
 ): ApprovalReviewPayload {
   if (input.kind === 'shell') {
     return approvalReviewPayloadSchema.parse({
+      allowForTurn: input.allowForTurn,
       card: 'shell',
       command: redactShellCommand(readString(input.arguments, 'command')),
       toolName: input.toolName,
@@ -112,6 +119,7 @@ export function createApprovalReviewPayload(
   }
   if (input.kind === 'delete') {
     return approvalReviewPayloadSchema.parse({
+      allowForTurn: input.allowForTurn,
       card: 'paths',
       targetPaths: readTargetPaths(input.arguments),
       toolName: input.toolName,
@@ -120,6 +128,7 @@ export function createApprovalReviewPayload(
   if (input.kind === 'system' && input.systemAction) {
     return approvalReviewPayloadSchema.parse({
       ...input.systemAction,
+      allowForTurn: input.allowForTurn,
       card: 'system-action',
       toolName: input.toolName,
     })
@@ -127,11 +136,13 @@ export function createApprovalReviewPayload(
   if (input.kind === 'automation' && input.automation) {
     return approvalReviewPayloadSchema.parse({
       ...input.automation,
+      allowForTurn: input.allowForTurn,
       card: 'automation',
       toolName: input.toolName,
     })
   }
   return approvalReviewPayloadSchema.parse({
+    allowForTurn: input.allowForTurn,
     argumentNames: readArgumentNames(input.arguments),
     card: 'arguments',
     toolName: input.toolName,

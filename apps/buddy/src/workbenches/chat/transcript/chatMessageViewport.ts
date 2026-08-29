@@ -11,11 +11,11 @@ export interface ChatMessageScrollAnchor {
 }
 
 export interface BuddyChatMessageListHandle {
-  cancelTailScroll: () => void
   captureScrollAnchor: () => ChatMessageScrollAnchor | null
-  restoreScrollAnchor: (anchor: ChatMessageScrollAnchor) => Promise<void>
-  scrollToMessage: (messageId: string) => Promise<void>
-  scrollToTail: () => Promise<void>
+  readScrollMetrics: () => ChatMessageScrollMetrics | null
+  restoreScrollAnchor: (anchor: ChatMessageScrollAnchor) => ChatMessageScrollMetrics | null
+  scrollToMessage: (messageId: string) => ChatMessageScrollMetrics | null
+  scrollToTail: () => ChatMessageScrollMetrics | null
 }
 
 const CHAT_TAIL_TOLERANCE_PX = 48

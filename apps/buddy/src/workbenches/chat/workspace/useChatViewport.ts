@@ -1,6 +1,12 @@
 import type { BuddyChatMessageListHandle, ChatMessageScrollMetrics } from '@/workbenches/chat/transcript/chatMessageViewport'
-import { nextTick, shallowRef, watch } from 'vue'
-import { isNearChatTail } from '@/workbenches/chat/workspace/chatScroll'
+import { computed, nextTick, shallowRef, watch } from 'vue'
+import {
+  beginReturningToChatTail,
+  createChatScrollState,
+  detachChatScroll,
+  observeChatScroll,
+  recordProgrammaticChatScroll,
+} from '@/workbenches/chat/workspace/chatScroll'
 
 interface ValueRef<T> {
   readonly value: T
@@ -20,19 +26,19 @@ interface UseChatViewportOptions {
   isLoadingOlderMessages: ValueRef<boolean>
   list: ValueRef<BuddyChatMessageListHandle | null>
   loadOlderMessages: () => Promise<boolean>
-  runEventCount: ValueRef<number>
   timelineItems: ValueRef<ReadonlyArray<ChatViewportTimelineItem>>
 }
 
 export function useChatViewport(options: UseChatViewportOptions) {
-  const followsChatTail = shallowRef(true)
+  const scrollState = shallowRef(createChatScrollState())
   const isRestoringHistoryAnchor = shallowRef(false)
+  const showReturnToLatest = computed(() => scrollState.value.ownership === 'detached')
   let searchRevealGeneration = 0
 
   watch(
     () => [options.activeConversationId.value, options.activeBranchId.value],
     () => {
-      followsChatTail.value = true
+      scrollState.value = createChatScrollState()
       void scrollToTailAfterRender()
     },
   )
@@ -43,28 +49,16 @@ export function useChatViewport(options: UseChatViewportOptions) {
   watch(
     [
       () => options.isLoading.value,
-      () => options.timelineItems.value.length,
-      () => options.runEventCount.value,
+      () => options.list.value,
     ],
     () => {
-      if (followsChatTail.value)
+      if (scrollState.value.ownership === 'following')
         void scrollToTailAfterRender()
     },
   )
 
-  function handlePosition(metrics: ChatMessageScrollMetrics, tailScrollSettling: boolean) {
-    const tailDistance = metrics.scrollHeight - metrics.scrollTop - metrics.clientHeight
-    if (tailScrollSettling && tailDistance <= metrics.clientHeight * 2) {
-      followsChatTail.value = true
-      return
-    }
-    followsChatTail.value = isNearChatTail(metrics)
-    if (!followsChatTail.value)
-      options.list.value?.cancelTailScroll()
-  }
-
-  function handleScroll(metrics: ChatMessageScrollMetrics, tailScrollSettling: boolean) {
-    handlePosition(metrics, tailScrollSettling)
+  function handleScroll(metrics: ChatMessageScrollMetrics) {
+    scrollState.value = observeChatScroll(scrollState.value, metrics).state
     if (
       metrics.scrollTop <= 64
       && options.hasOlderMessages.value
@@ -75,9 +69,31 @@ export function useChatViewport(options: UseChatViewportOptions) {
     }
   }
 
+  function handleContentResize(_metrics: ChatMessageScrollMetrics) {
+    if (scrollState.value.ownership !== 'detached')
+      writeTailPosition()
+  }
+
+  function handleReaderLayoutIntent() {
+    scrollState.value = detachChatScroll(scrollState.value)
+  }
+
+  async function returnToLatest() {
+    scrollState.value = beginReturningToChatTail(scrollState.value)
+    await nextTick()
+    writeTailPosition()
+  }
+
   async function scrollToTailAfterRender() {
     await nextTick()
-    await options.list.value?.scrollToTail()
+    if (scrollState.value.ownership !== 'detached')
+      writeTailPosition()
+  }
+
+  function writeTailPosition() {
+    const metrics = options.list.value?.scrollToTail()
+    if (metrics)
+      scrollState.value = recordProgrammaticChatScroll(scrollState.value, metrics)
   }
 
   async function loadOlderMessagesWithAnchor() {
@@ -85,14 +101,16 @@ export function useChatViewport(options: UseChatViewportOptions) {
     const anchor = list?.captureScrollAnchor()
     if (!list || !anchor)
       return
+    scrollState.value = detachChatScroll(scrollState.value)
     const loaded = await options.loadOlderMessages()
     if (!loaded)
       return
     isRestoringHistoryAnchor.value = true
-    followsChatTail.value = false
     try {
       await nextTick()
-      await list.restoreScrollAnchor(anchor)
+      const metrics = list.restoreScrollAnchor(anchor)
+      if (metrics)
+        scrollState.value = recordProgrammaticChatScroll(scrollState.value, metrics)
     }
     finally {
       isRestoringHistoryAnchor.value = false
@@ -115,7 +133,10 @@ export function useChatViewport(options: UseChatViewportOptions) {
       return
     }
     await nextTick()
-    await options.list.value?.scrollToMessage(messageId)
+    scrollState.value = detachChatScroll(scrollState.value)
+    const metrics = options.list.value?.scrollToMessage(messageId)
+    if (metrics)
+      scrollState.value = recordProgrammaticChatScroll(scrollState.value, metrics)
   }
 
   function shouldLoadOlderSearchMessage(messageId: string, generation: number) {
@@ -127,7 +148,10 @@ export function useChatViewport(options: UseChatViewportOptions) {
   }
 
   return {
-    handlePosition,
+    handleContentResize,
+    handleReaderLayoutIntent,
     handleScroll,
+    returnToLatest,
+    showReturnToLatest,
   }
 }

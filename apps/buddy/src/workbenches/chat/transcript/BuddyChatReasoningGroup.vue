@@ -6,6 +6,7 @@ import { NIcon } from 'naive-ui'
 import { computed, shallowRef } from 'vue'
 import { useBuddyI18n } from '@/i18n/buddyI18n'
 import BuddyChatReasoningRow from './BuddyChatReasoningRow.vue'
+import BuddyChatShimmerText from './BuddyChatShimmerText.vue'
 
 const props = defineProps<{
   group: ChatAgentReasoningGroup
@@ -14,9 +15,10 @@ const props = defineProps<{
 
 const { t } = useBuddyI18n(() => props.language)
 const isOpen = shallowRef(true)
-const title = computed(() => t(props.group.reasoningKind === 'summary'
-  ? 'desktop.chat.processReasoningSummary'
-  : 'desktop.chat.processReasoning'))
+const isActive = computed(() => props.group.entries.some(entry => (
+  entry.summary?.status === 'running' || entry.detail?.status === 'running'
+)))
+const title = computed(() => t('desktop.chat.processReasoning'))
 </script>
 
 <template>
@@ -28,7 +30,12 @@ const title = computed(() => t(props.group.reasoningKind === 'summary'
       @click="isOpen = !isOpen"
     >
       <NIcon :component="Lightbulb20Regular" class="buddy-chat-reasoning-group__icon" />
-      <span class="buddy-chat-reasoning-group__title">{{ title }}</span>
+      <BuddyChatShimmerText
+        class="buddy-chat-reasoning-group__title"
+        :mode="isActive ? 'continuous' : 'static'"
+      >
+        {{ title }}
+      </BuddyChatShimmerText>
       <NIcon
         :component="ChevronRight20Regular"
         class="buddy-chat-reasoning-group__chevron"
@@ -80,6 +87,8 @@ const title = computed(() => t(props.group.reasoningKind === 'summary'
 }
 
 .buddy-chat-reasoning-group__title {
+  --buddy-shimmer-base: var(--buddy-chat-tool-title-color);
+
   font-size: 14px;
   font-weight: 550;
   line-height: 24px;
@@ -89,11 +98,19 @@ const title = computed(() => t(props.group.reasoningKind === 'summary'
 .buddy-chat-reasoning-group__chevron {
   margin-left: 6px;
   color: var(--buddy-chat-meta-color);
-  transition: transform 120ms ease;
+  opacity: 0;
+  transition:
+    opacity var(--buddy-motion-state-duration) var(--buddy-motion-state-easing),
+    transform 120ms ease;
 
   &.is-open {
     transform: rotate(90deg) translateX(0.5px);
   }
+}
+
+.buddy-chat-reasoning-group:hover .buddy-chat-reasoning-group__chevron,
+.buddy-chat-reasoning-group__header:focus-visible .buddy-chat-reasoning-group__chevron {
+  opacity: 1;
 }
 
 .buddy-chat-reasoning-group__content {

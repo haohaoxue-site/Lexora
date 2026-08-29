@@ -195,15 +195,19 @@ export function useChatRunSync(options: UseChatRunSyncOptions) {
     scheduleRefresh()
   }
 
-  function applyRegeneratedTurn(turn: LocalTurnStart, assistantMessageId: string) {
-    applyReplacementTurn(turn, assistantMessageId)
+  function applyRegeneratedTurn(turn: LocalTurnStart) {
+    applyReplacementTurn(turn, turn.run.triggeringMessageId, true)
   }
 
   function applyEditedTurn(turn: LocalTurnStart, userMessageId: string) {
     applyReplacementTurn(turn, userMessageId)
   }
 
-  function applyReplacementTurn(turn: LocalTurnStart, replacedMessageId: string) {
+  function applyReplacementTurn(
+    turn: LocalTurnStart,
+    replacedMessageId: string,
+    retainReplacedMessage = false,
+  ) {
     if (
       turn.branchId !== options.activeBranchId.value
       || turn.conversationId !== options.activeConversationId.value
@@ -213,7 +217,9 @@ export function useChatRunSync(options: UseChatRunSyncOptions) {
     const replacedIndex = timelineItems.value.findIndex(item =>
       item.kind === 'message' && item.id === replacedMessageId,
     )
-    const retainedTimeline = replacedIndex < 0 ? [] : timelineItems.value.slice(0, replacedIndex)
+    const retainedTimeline = replacedIndex < 0
+      ? []
+      : timelineItems.value.slice(0, replacedIndex + (retainReplacedMessage ? 1 : 0))
     resetConversationProjection()
     loadedConversationId = turn.conversationId
     loadedBranchId = turn.branchId
