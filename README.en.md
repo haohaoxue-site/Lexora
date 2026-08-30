@@ -9,52 +9,67 @@
 </p>
 
 <p align="center">
-  Documents and AI in a focused, self-hostable personal workspace.
+  Let words be where work, creativity, and everyday life begin.
 </p>
 
 <p align="center">
+  <img alt="Pi" src="https://img.shields.io/badge/Pi-Agent-6f42c1">
   <a href="https://github.com/haohaoxue-site/Lexora/blob/master/LICENSE"><img alt="License" src="https://img.shields.io/badge/license-AGPL--3.0--only-2f6f68"></a>
   <img alt="Vue" src="https://img.shields.io/badge/Vue-3-42b883">
   <img alt="NestJS" src="https://img.shields.io/badge/NestJS-11-e0234e">
   <img alt="LangGraph" src="https://img.shields.io/badge/LangGraph-Agent-1f6feb">
-  <img alt="Tiptap" src="https://img.shields.io/badge/Tiptap-Editor-f7b955">
 </p>
 
-Lexora is a document-driven AI workspace for individuals. It brings document writing, AI chat, document AI, version history, and public publishing into one workspace, so knowledge capture and AI-assisted creation happen in the same personal context.
+<p align="center">
+  <a href="https://github.com/haohaoxue-site/Lexora/releases/latest">Download Lexora Desktop</a>
+  ·
+  <a href="https://docs.haohaoxue.site/">Website</a>
+</p>
 
-> This project is still under active development. Protocols, data structures, and product behavior may continue to change.
+Lexora is a personal AI workspace built around Desktop. Within the access you grant, it uses local files and tools to think alongside you and act on your intent.
 
-![Lexora interface preview](apps/docs/src/public/ui.png)
+## Desktop
 
-## Core Capabilities
+Desktop runs locally and is organized around tasks, bringing conversations, local context, tool execution, automations, and artifacts together in one workspace.
 
-Lexora consists of a document-driven web workspace and a standalone Buddy desktop product. Both are designed for individuals and keep independent runtime and data boundaries.
+![Lexora Desktop preview](apps/docs/src/public/buddy-ui.png)
 
-### Web Workspace
-
-A document-centered AI workspace that can be self-hosted.
-
-| Capability | Description |
-| --- | --- |
-| Documents and Knowledge | Page trees, rich-text editing, tables, code blocks, math, autosave, and trash. |
-| AI Chat and Document AI | Model selection, streaming replies, message branches, retries, and document-aware continuation and rewriting. |
-| History and Publishing | Version snapshots, history restore, single-page publishing, and site publishing. |
-| Models and Deployment | BYOK, platform-level and user-level model providers, and Docker Compose self-hosting. |
-
-### Lexora Buddy
-
-A standalone personal AI companion that runs locally.
+### Core Capabilities
 
 | Capability | Description |
 | --- | --- |
-| Local Conversations | Connect multiple model providers and keep conversation and run history on the local machine. |
-| Project Context | Understand and work with documents, files, and code in authorized directories. |
-| Controlled Execution | Use Skills, MCP, and local tools while requesting confirmation for sensitive operations. |
-| Desktop Companion | Present runtime status through notifications, progress feedback, and a native desktop pet. |
+| Task Workspace | Start tasks in natural language and keep execution progress, run history, and generated artifacts together. |
+| Local Context | Understand and work with documents, images, files, and code in authorized directories. |
+| Tools and Control | Connect multiple models, use Skills, MCP, and local tools, and request confirmation before sensitive operations. |
+| Automations | Create scheduled and recurring tasks while retaining the process and result of each run. |
+| Desktop Feedback | Present task status through notifications and a native desktop pet. |
 
-## Tech Stack
+### Tech Stack
 
-### Web Workspace and Services
+| Layer | Technology |
+| --- | --- |
+| Desktop | Electron, Vue 3, TypeScript, Vite, Naive UI, UnoCSS |
+| Agent Runtime | Pi SDK, MCP SDK, Node.js, SQLite, JSONL |
+| Native Pet | Rust, GTK, Cairo, GDK Pixbuf |
+
+### Local Development
+
+```bash
+pnpm install
+pnpm dev:buddy
+```
+
+## Web
+
+Web will gradually become Desktop's content extension for document editing, knowledge capture, and public publishing. It currently runs independently and supports self-hosting.
+
+![Lexora Web preview](apps/docs/src/public/ui.png)
+
+### Core Capabilities
+
+Page trees, rich-text editing, document AI, version history, single-page publishing, and site publishing.
+
+### Tech Stack
 
 | Layer | Technology |
 | --- | --- |
@@ -64,33 +79,7 @@ A standalone personal AI companion that runs locally.
 | Agent | LangGraph, LangChain, PostgreSQL Checkpointer, Redis Streams |
 | Infrastructure | Docker Compose, Nginx, RustFS |
 
-### Lexora Buddy
-
-| Layer | Technology |
-| --- | --- |
-| Desktop | Electron, Vue 3, TypeScript, Vite, Naive UI, UnoCSS |
-| Agent Runtime | Pi SDK, MCP SDK, Node.js, SQLite, JSONL |
-| Native Pet | Rust, GTK, Cairo, GDK Pixbuf |
-
-## Project Structure
-
-```txt
-lexora/
-├── apps/
-│   ├── web/         # Vue 3 frontend app
-│   ├── api/         # NestJS API service
-│   ├── agent/       # LangGraph AI runtime service
-│   ├── buddy/       # Local personal AI companion and desktop pet
-│   └── docs/        # Product documentation site
-├── packages/
-│   ├── contracts/   # Shared schemas, endpoints, constants, and domain types
-│   └── shared/      # Shared utility functions
-└── infrastructure/  # Docker and environment configuration
-```
-
-## Local Development
-
-Lexora uses pnpm workspace.
+### Local Development
 
 ```bash
 pnpm install
@@ -101,6 +90,23 @@ pnpm dev
 ```
 
 `infrastructure/.env` is the local configuration source of truth. `pnpm dev` generates the API and Agent environment files from its allowlist.
+
+## Project Structure
+
+```txt
+lexora/
+├── apps/
+│   ├── web/         # Vue 3 frontend app
+│   ├── api/         # NestJS API service
+│   ├── agent/       # LangGraph AI runtime service
+│   ├── buddy/       # Lexora Desktop
+│   └── docs/        # Product documentation site
+├── packages/
+│   ├── assets/      # Cross-app brand and runtime assets
+│   ├── contracts/   # Shared schemas, endpoints, constants, and domain types
+│   └── shared/      # Shared utility functions
+└── infrastructure/  # Docker and environment configuration
+```
 
 ## License
 
