@@ -16,12 +16,12 @@ import {
   shell,
 } from 'electron'
 import buddyPackage from '../../package.json'
+import desktopIconPath from '../../resources/icons/app-icon.png?asset'
 import { DESKTOP_IPC_CHANNELS } from '../shared/desktopApi'
 import { installAttachmentProtocol, registerAttachmentSchemePrivileges } from './attachmentProtocol'
 import { LexoraConfigStore } from './config/LexoraConfigStore'
 import { createDesktopCommandExecutor } from './desktopCommands'
 import { DesktopDiagnosticLogger } from './desktopDiagnostics'
-import { resolveDesktopIconPath } from './desktopIcon'
 import { translateDesktopNative } from './desktopNativeI18n'
 import { DesktopNotificationService } from './DesktopNotificationService'
 import { checkForDesktopUpdate } from './desktopUpdateService'
@@ -236,14 +236,12 @@ else {
     stopRendererProtocol = installRendererProtocol()
 
     desktopTray = createDesktopTray({
-      appPath: app.getAppPath(),
-      isPackaged: app.isPackaged,
+      iconPath: desktopIconPath,
       language: desktopLanguage,
       onOpenDesktop: showDesktopWindow,
       onQuit() {
         void quitLexora()
       },
-      resourcesPath: process.resourcesPath,
       runtime: service,
     })
     stopRuntimeStateSubscription = service.onStateChange((state) => {
@@ -316,11 +314,7 @@ else {
       createWindow: () => {
         const handle = createDesktopWindow({
           executeCommand: executeDesktopCommand,
-          iconPath: resolveDesktopIconPath({
-            appPath: app.getAppPath(),
-            isPackaged: app.isPackaged,
-            resourcesPath: process.resourcesPath,
-          }),
+          iconPath: desktopIconPath,
           isQuitting: () => isQuitting,
           onHidden() {
             void showBackgroundCloseNotice(configStore)

@@ -11,7 +11,6 @@ import { assertPetBinaryBoundary } from './pet-binary-contract.mjs'
 const repoRoot = resolve(import.meta.dirname, '../../..')
 const artifactBufferLimit = 512 * 1024 * 1024
 const requiredDependencies = ['bubblewrap', 'git', 'gtk-layer-shell', 'gtk3']
-const iconSizes = [16, 24, 32, 48, 64, 96, 128, 256, 512]
 
 export function readBuddyPacmanReleaseMetadata(cwd = repoRoot) {
   const version = String(JSON.parse(
@@ -46,7 +45,7 @@ export function verifyBuddyPacmanPackage(options = {}) {
     petEntry,
     appAsarEntry,
     desktopEntry,
-    ...iconSizes.map(size => `usr/share/icons/hicolor/${size}x${size}/apps/lexora-buddy.png`),
+    'usr/share/icons/hicolor/512x512/apps/lexora-buddy.png',
   ]
   for (const entry of requiredEntries) {
     if (!entries.has(entry))

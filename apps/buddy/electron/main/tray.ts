@@ -1,16 +1,13 @@
 import type { LexoraConfig } from '../shared/desktopApi'
 import type { BuddyServiceSupervisor, BuddyServiceSupervisorState } from './runtime/BuddyServiceSupervisor'
 import { Menu, nativeImage, Tray } from 'electron'
-import { resolveDesktopIconPath } from './desktopIcon'
 import { translateDesktopNative } from './desktopNativeI18n'
 
 export interface CreateDesktopTrayOptions {
-  appPath: string
-  isPackaged: boolean
+  iconPath: string
   language: LexoraConfig['desktop']['language']
   onOpenDesktop: () => void
   onQuit: () => void
-  resourcesPath: string
   runtime: BuddyServiceSupervisor
 }
 
@@ -21,7 +18,7 @@ export interface DesktopTrayController {
 }
 
 export function createDesktopTray(options: CreateDesktopTrayOptions): DesktopTrayController {
-  const tray = new Tray(nativeImage.createFromPath(resolveDesktopIconPath(options)))
+  const tray = new Tray(nativeImage.createFromPath(options.iconPath))
   let runtimeState = options.runtime.state
   let language = options.language
 

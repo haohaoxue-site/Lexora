@@ -25,15 +25,12 @@ module.exports = {
   files: [
     '.output/build/electron/**/*',
     'package.json',
+    'resources/icons/app-icon.png',
   ],
   extraResources: [
     {
       from: join('.output', 'build', 'native-pet', 'release', 'lexora-buddy-pet'),
       to: join('native-pet', 'lexora-buddy-pet'),
-    },
-    {
-      from: join('resources', 'icons'),
-      to: 'icons',
     },
     {
       from: join('service', 'resources'),
@@ -48,7 +45,7 @@ module.exports = {
       },
     },
     executableName: 'lexora-buddy',
-    icon: 'resources/icons/app',
+    icon: 'resources/icons/app-icon.png',
     synopsis: 'Lexora Buddy local personal AI companion and native desktop pet',
     syncDesktopName: true,
     target: ['deb'],

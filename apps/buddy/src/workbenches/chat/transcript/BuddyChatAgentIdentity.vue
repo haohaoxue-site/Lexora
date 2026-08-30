@@ -14,11 +14,9 @@ const { t } = useBuddyI18n(() => props.language)
   <header class="buddy-chat-agent-identity">
     <span class="buddy-chat-agent-identity__avatar">
       <img
-        :src="DESKTOP_ASSET_URLS.appIcon"
+        :src="DESKTOP_ASSET_URLS.chatAvatar"
         alt=""
         draggable="false"
-        height="37"
-        width="37"
       >
     </span>
     <span class="buddy-chat-agent-identity__name">
@@ -42,19 +40,14 @@ const { t } = useBuddyI18n(() => props.language)
   height: var(--buddy-chat-avatar-size);
   flex: 0 0 auto;
   overflow: hidden;
-  border: 1px solid var(--buddy-border-subtle);
   border-radius: 50%;
-  background: var(--buddy-surface-subtle);
 }
 
 .buddy-chat-agent-identity__avatar img {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: calc(var(--buddy-chat-avatar-size) + 5px);
-  height: calc(var(--buddy-chat-avatar-size) + 5px);
-  object-fit: contain;
-  transform: translate(-50%, -47%);
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .buddy-chat-agent-identity__name {

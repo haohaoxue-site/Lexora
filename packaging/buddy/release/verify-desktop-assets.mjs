@@ -5,39 +5,53 @@ import process from 'node:process'
 import { writeOutput } from '../../shared/cli-output.mjs'
 
 const repoRoot = resolve(import.meta.dirname, '../../..')
-const appSizes = [16, 24, 32, 48, 64, 96, 128, 256, 512]
+const desktopPngs = [
+  ['packages/assets/brand/app-icon.png', 512],
+  ['packages/assets/brand/lexora-avatar.png', 1254],
+  ['apps/buddy/resources/icons/app-icon.png', 512],
+  ['apps/buddy/resources/brand/lexora-avatar.png', 1254],
+]
+const mirroredPngs = [
+  [
+    'packages/assets/brand/app-icon.png',
+    'apps/buddy/resources/icons/app-icon.png',
+  ],
+  [
+    'packages/assets/brand/lexora-avatar.png',
+    'apps/buddy/resources/brand/lexora-avatar.png',
+  ],
+]
 
 export function verifyDesktopAssets(cwd = repoRoot) {
   const errors = []
-  const appSource = 'packages/assets/brand/app-icon.png'
-  requireFile(cwd, appSource, errors)
-  if (existsSync(join(cwd, appSource)))
-    verifyPng(cwd, appSource, 512, errors)
+  for (const [path, size] of desktopPngs)
+    verifyPng(cwd, path, size, errors)
 
-  for (const size of appSizes) {
-    verifyPng(
-      cwd,
-      `apps/buddy/resources/icons/app/${size}x${size}.png`,
-      size,
-      errors,
-    )
+  for (const [source, runtime] of mirroredPngs) {
+    const sourcePath = join(cwd, source)
+    const runtimePath = join(cwd, runtime)
+    if (
+      existsSync(sourcePath)
+      && existsSync(runtimePath)
+      && !readFileSync(sourcePath).equals(readFileSync(runtimePath))
+    ) {
+      errors.push(`${runtime} must match ${source}`)
+    }
   }
 
   for (const legacy of [
+    'apps/buddy/resources/icons/app',
     'apps/buddy/resources/icons/icon.png',
     'apps/buddy/resources/icons/128x128.png',
     'apps/buddy/resources/icons/128x128@2x.png',
     'apps/buddy/resources/icons/32x32.png',
+    'packages/assets/brand/buddy-avatar.png',
+    'packages/assets/sources/buddy-portrait-reference.png',
   ]) {
     if (existsSync(join(cwd, legacy)))
-      errors.push(`${legacy} is a legacy icon output`)
+      errors.push(`${legacy} is a legacy desktop asset`)
   }
   return errors
-}
-
-function requireFile(cwd, relativePath, errors) {
-  if (!existsSync(join(cwd, relativePath)))
-    errors.push(`${relativePath} is missing`)
 }
 
 function verifyPng(cwd, relativePath, expectedSize, errors) {

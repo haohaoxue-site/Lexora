@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="apps/docs/src/public/logo.png" width="88" alt="Lexora Logo" />
+  <img src="packages/assets/brand/lexora-avatar.png" width="160" alt="Lexora Logo" />
 </p>
 
 <h1 align="center">Lexora 文灵</h1>

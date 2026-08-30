@@ -29,13 +29,13 @@ rmSync(outputRoot, { force: true, recursive: true })
 assertPetBinaryBoundary(readFileSync(petSource))
 mkdirSync(join(packageRoot, 'bin'), { recursive: true })
 mkdirSync(join(packageRoot, 'share/applications'), { recursive: true })
-mkdirSync(join(packageRoot, 'share/icons/hicolor/256x256/apps'), { recursive: true })
+mkdirSync(join(packageRoot, 'share/icons/hicolor/512x512/apps'), { recursive: true })
 
 cpSync(petSource, petTarget)
 chmodSync(petTarget, 0o755)
 cpSync(
-  join(buddyRoot, 'resources/icons/app/256x256.png'),
-  join(packageRoot, 'share/icons/hicolor/256x256/apps/lexora-buddy.png'),
+  join(buddyRoot, 'resources/icons/app-icon.png'),
+  join(packageRoot, 'share/icons/hicolor/512x512/apps/lexora-buddy.png'),
 )
 writeFileSync(
   join(packageRoot, 'share/applications/lexora-buddy.desktop'),

@@ -26,7 +26,6 @@ const requiredDependencies = [
   'libgtk-layer-shell0',
   'webp-pixbuf-loader',
 ]
-const iconSizes = [16, 24, 32, 48, 64, 96, 128, 256, 512]
 
 export function readBuddyDebReleaseMetadata(cwd = repoRoot) {
   const packageMetadata = JSON.parse(readFileSync(join(cwd, 'apps/buddy/package.json'), 'utf8'))
@@ -86,7 +85,7 @@ export function verifyBuddyDebPackage(options = {}) {
       petEntry,
       appAsarEntry,
       desktopEntry,
-      ...iconSizes.map(size => `./usr/share/icons/hicolor/${size}x${size}/apps/lexora-buddy.png`),
+      './usr/share/icons/hicolor/512x512/apps/lexora-buddy.png',
     ]
     verifyPackageEntries(entries, requiredEntries, 'Deb')
 

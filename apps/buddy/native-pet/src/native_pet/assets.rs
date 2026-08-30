@@ -25,7 +25,7 @@ const DEFAULT_PET_SPRITESHEET: &[u8] =
     include_bytes!("../../../../../packages/assets/buddy/pets/default/spritesheet.webp");
 const DEFAULT_PET_MANIFEST: &str =
     include_str!("../../../../../packages/assets/buddy/pets/default/manifest.json");
-const DEFAULT_APP_ICON: &[u8] = include_bytes!("../../../../../packages/assets/brand/app-icon.png");
+const DEFAULT_APP_ICON: &[u8] = include_bytes!("../../../resources/icons/app-icon.png");
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
