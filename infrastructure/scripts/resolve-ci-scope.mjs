@@ -6,24 +6,45 @@ import process from 'node:process'
 const repoRoot = resolve(import.meta.dirname, '../..')
 const globalBuddyInputs = new Set([
   '.node-version',
-  'infrastructure/scripts/resolve-ci-scope.mjs',
-  'package.json',
-  'pnpm-lock.yaml',
   'pnpm-workspace.yaml',
+])
+const buddyWorkflowInputs = new Set([
+  '.github/workflows/buddy-build.yml',
+])
+const contractInputs = new Set([
+  '.github/workflows/ci.yml',
+  '.github/workflows/release.yml',
+  'infrastructure/scripts/resolve-ci-scope.mjs',
+  'packaging/buddy/release/verify-release-workflow.mjs',
+  'packaging/release/status.mjs',
+  'packaging/release/version.mjs',
+  'packaging/shared/cli-output.mjs',
 ])
 const websiteInputs = new Set([
   '.github/workflows/website-pages.yml',
+  'packaging/website/release/verify-pages-workflow.mjs',
+])
+const ignoredInputs = new Set([
+  'README.en.md',
+  'README.md',
+  'apps/buddy/README.md',
+  'packaging/buddy/README.md',
 ])
 const websitePrefixes = [
+  'apps/docs/',
   'apps/website/',
-  'packaging/website/',
 ]
 const buddyPrefixes = [
-  '.github/workflows/',
   'apps/buddy/',
   'packages/assets/',
-  'packaging/',
+  'packaging/buddy/',
   'patches/',
+]
+const conservativeContractPrefixes = [
+  '.github/workflows/',
+  'packaging/release/',
+  'packaging/shared/',
+  'packaging/website/',
 ]
 const qualityPrefixes = [
   '.github/',
@@ -42,19 +63,55 @@ export function classifyCiScope(files) {
     return fullScope()
 
   let buddy = false
+  let contracts = false
   let website = false
   let quality = false
 
   for (const input of files) {
     const path = normalizePath(input)
 
+    if (ignoredInputs.has(path))
+      continue
+
     if (websiteInputs.has(path) || websitePrefixes.some(prefix => path.startsWith(prefix))) {
       website = true
       continue
     }
 
+    if (path === 'pnpm-lock.yaml') {
+      buddy = true
+      quality = true
+      continue
+    }
+
+    if (path === 'package.json') {
+      buddy = true
+      contracts = true
+      quality = true
+      continue
+    }
+
+    if (buddyWorkflowInputs.has(path)) {
+      buddy = true
+      contracts = true
+      quality = true
+      continue
+    }
+
+    if (contractInputs.has(path)) {
+      contracts = true
+      continue
+    }
+
     if (globalBuddyInputs.has(path) || buddyPrefixes.some(prefix => path.startsWith(prefix))) {
       buddy = true
+      quality = true
+      continue
+    }
+
+    if (conservativeContractPrefixes.some(prefix => path.startsWith(prefix))) {
+      buddy = true
+      contracts = true
       quality = true
       continue
     }
@@ -68,20 +125,16 @@ export function classifyCiScope(files) {
     quality = true
   }
 
-  return { buddy, website, quality }
+  return { buddy, contracts, website, quality }
 }
 
-export function listChangedFiles(base, head, mode, cwd = repoRoot) {
-  const separator = mode === 'pull-request' ? '...' : '..'
-  if (mode !== 'pull-request' && mode !== 'push')
-    throw new Error(`Unsupported CI comparison mode: ${mode}`)
-
+export function listChangedFiles(base, head, cwd = repoRoot) {
   const output = execFileSync('git', [
     'diff',
     '--name-only',
     '--no-renames',
     '--diff-filter=ACMRD',
-    `${base}${separator}${head}`,
+    `${base}...${head}`,
   ], {
     cwd,
     encoding: 'utf8',
@@ -90,9 +143,14 @@ export function listChangedFiles(base, head, mode, cwd = repoRoot) {
   return output.split('\n').filter(Boolean)
 }
 
+export function resolveCiScope(base, head, cwd = repoRoot) {
+  return classifyCiScope(listChangedFiles(base, head, cwd))
+}
+
 function fullScope() {
   return {
     buddy: true,
+    contracts: true,
     website: false,
     quality: true,
   }
@@ -115,7 +173,7 @@ function parseOptions(args) {
     options[name.slice(2)] = value
   }
 
-  for (const name of ['base', 'head', 'mode']) {
+  for (const name of ['base', 'head']) {
     if (!options[name])
       throw new Error(`Missing required CI scope option: --${name}`)
   }
@@ -136,12 +194,10 @@ function writeScope(scope, githubOutput) {
 
 function run() {
   const options = parseOptions(process.argv.slice(2))
-  const files = options.files ?? listChangedFiles(
-    options.base,
-    options.head,
-    options.mode,
-  )
-  writeScope(classifyCiScope(files), options['github-output'])
+  const scope = options.files
+    ? classifyCiScope(options.files)
+    : resolveCiScope(options.base, options.head)
+  writeScope(scope, options['github-output'])
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === new URL(import.meta.url).pathname)

@@ -3,14 +3,12 @@ name: Lexora CI
 on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
-  push:
-    branches: [master]
 
 permissions:
   contents: read
 
 concurrency:
-  group: lexora-ci-${{ github.event.pull_request.number || github.ref }}
+  group: lexora-ci-${{ github.event.pull_request.number }}
   cancel-in-progress: true
 
 jobs:
@@ -20,6 +18,7 @@ jobs:
     timeout-minutes: 5
     outputs:
       buddy: ${{ steps.resolve.outputs.buddy }}
+      contracts: ${{ steps.resolve.outputs.contracts }}
       website: ${{ steps.resolve.outputs.website }}
       quality: ${{ steps.resolve.outputs.quality }}
     steps:
@@ -37,14 +36,12 @@ jobs:
       - name: Resolve change scope
         id: resolve
         env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
-          MODE: ${{ github.event_name == 'pull_request' && 'pull-request' || 'push' }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: >-
           node infrastructure/scripts/resolve-ci-scope.mjs
           --base "$BASE_SHA"
           --head "$HEAD_SHA"
-          --mode "$MODE"
           --github-output "$GITHUB_OUTPUT"
 
   website-quality:
@@ -121,19 +118,43 @@ jobs:
       - name: Build workspace applications
         run: pnpm --filter '!@lexora/buddy' --filter '!@haohaoxue/lexora-website' --recursive --if-present build
 
+  release-contracts:
+    name: Release contracts
+    needs: scope
+    if: needs.scope.outputs.contracts == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .node-version
+
+      - name: Verify release contracts
+        run: |
+          node packaging/release/version.mjs --check
+          node packaging/release/status.mjs
+          node packaging/buddy/release/verify-release-workflow.mjs
+          node packaging/website/release/verify-pages-workflow.mjs
+
   buddy-packages:
     name: Buddy packages
-    needs: [scope, quality]
+    needs: scope
     if: >-
       needs.scope.outputs.buddy == 'true'
-      && (github.event_name != 'pull_request' || github.event.pull_request.draft == false)
+      && github.event.pull_request.draft == false
     uses: ./.github/workflows/buddy-build.yml
     with:
       upload-artifacts: false
 
   ci-gate:
     name: CI Gate
-    needs: [scope, website-quality, quality, buddy-packages]
+    needs: [scope, website-quality, quality, release-contracts, buddy-packages]
     if: always()
     runs-on: ubuntu-24.04
     timeout-minutes: 5
@@ -142,8 +163,10 @@ jobs:
         env:
           BUDDY_REQUIRED: >-
             ${{ needs.scope.outputs.buddy == 'true'
-                && (github.event_name != 'pull_request' || github.event.pull_request.draft == false) }}
+                && github.event.pull_request.draft == false }}
           BUDDY_RESULT: ${{ needs.buddy-packages.result }}
+          CONTRACTS_REQUIRED: ${{ needs.scope.outputs.contracts }}
+          CONTRACTS_RESULT: ${{ needs.release-contracts.result }}
           WEBSITE_REQUIRED: ${{ needs.scope.outputs.website }}
           WEBSITE_RESULT: ${{ needs.website-quality.result }}
           QUALITY_REQUIRED: ${{ needs.scope.outputs.quality }}
@@ -167,4 +190,5 @@ jobs:
 
           require_success "Website quality" "$WEBSITE_REQUIRED" "$WEBSITE_RESULT"
           require_success "Quality" "$QUALITY_REQUIRED" "$QUALITY_RESULT"
+          require_success "Release contracts" "$CONTRACTS_REQUIRED" "$CONTRACTS_RESULT"
           require_success "Buddy packages" "$BUDDY_REQUIRED" "$BUDDY_RESULT"

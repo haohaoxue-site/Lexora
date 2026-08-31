@@ -26,13 +26,14 @@ export function verifyWebsitePagesWorkflow(cwd = repoRoot) {
 
 function verifyCiScope(errors) {
   const cases = [
-    [['apps/website/src/index.md'], { buddy: false, website: true, quality: false }],
-    [['.github/workflows/website-pages.yml'], { buddy: false, website: true, quality: false }],
-    [['packaging/website/release/verify-pages-workflow.mjs'], { buddy: false, website: true, quality: false }],
-    [['apps/web/src/main.ts'], { buddy: false, website: false, quality: true }],
-    [['apps/buddy/electron/main/index.ts'], { buddy: true, website: false, quality: true }],
-    [['pnpm-lock.yaml'], { buddy: true, website: false, quality: true }],
-    [['README.md'], { buddy: true, website: false, quality: true }],
+    [['apps/website/src/index.md'], { buddy: false, contracts: false, website: true, quality: false }],
+    [['apps/docs/src/index.md'], { buddy: false, contracts: false, website: true, quality: false }],
+    [['.github/workflows/website-pages.yml'], { buddy: false, contracts: false, website: true, quality: false }],
+    [['packaging/website/release/verify-pages-workflow.mjs'], { buddy: false, contracts: false, website: true, quality: false }],
+    [['apps/web/src/main.ts'], { buddy: false, contracts: false, website: false, quality: true }],
+    [['apps/buddy/electron/main/index.ts'], { buddy: true, contracts: false, website: false, quality: true }],
+    [['pnpm-lock.yaml'], { buddy: true, contracts: false, website: false, quality: true }],
+    [['README.md'], { buddy: false, contracts: false, website: false, quality: false }],
   ]
 
   if (cases.some(([files, expected]) => (
