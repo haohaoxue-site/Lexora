@@ -145,6 +145,7 @@ vite.config.ts.timestamp-*
 .vite/
 auto-imports.d.ts
 components.d.ts
+!apps/web/components.d.ts
 
 # me
 .agents

@@ -4,9 +4,7 @@
     "noEmit": true
   },
   "include": [
-    "src/**/*.spec.ts",
-    "src/**/*.test.ts",
-    "src/**/__tests__/**/*.ts"
+    "src/**/*.ts"
   ],
   "exclude": [
     "node_modules",

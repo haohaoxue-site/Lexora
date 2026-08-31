@@ -11,7 +11,6 @@
     "src/**/*.vue",
     "__tests__/**/*.ts",
     "__tests__/**/*.tsx",
-    "auto-imports.d.ts",
     "components.d.ts"
   ]
 }
