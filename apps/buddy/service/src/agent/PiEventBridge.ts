@@ -184,6 +184,10 @@ class ActivePiEventChannel implements PiCompactionEventChannel, PiTurnEventChann
       this.#failureCode = projected.failureCode
       this.#failureMessage = projected.failureMessage
     }
+    if (event.type === 'auto_retry_end' && event.success) {
+      this.#failureCode = undefined
+      this.#failureMessage = undefined
+    }
     if (event.type === 'message_end' && event.message.role === 'assistant') {
       this.#finalAssistantAnswerProjected = event.message.stopReason === 'stop'
         && projected.events.some(candidate => candidate.type === 'message.completed')
