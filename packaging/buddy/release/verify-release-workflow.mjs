@@ -11,6 +11,7 @@ const workflowPaths = {
   ci: '.github/workflows/ci.yml',
   release: '.github/workflows/release.yml',
 }
+const githubExpression = value => `\${{ ${value} }}`
 
 export function verifyBuddyReleaseWorkflow(cwd = repoRoot) {
   const workflows = Object.fromEntries(
@@ -32,25 +33,37 @@ function verifyCiWorkflow(workflow, errors) {
     'name: Lexora CI',
     'pull_request:',
     'ready_for_review',
-    'push:',
-    'branches: [master]',
     'contents: read',
     'cancel-in-progress: true',
-  ], errors, 'Lexora CI must run read-only for pull requests and master pushes')
-  requireGlobalReadOnly(workflow, errors, 'Lexora CI')
+  ], errors, 'Lexora CI must run read-only for every pull request')
+  if (!/^permissions:\n {2}contents: read$/m.test(workflow))
+    errors.push('Lexora CI must only read repository contents')
   forbidFragments(workflow, [
+    'push:',
     'workflow_dispatch:',
     'tags:',
     'paths:',
+    'actions: read',
+    'actions: write',
     'contents: write',
+    'pull-requests: read',
+    'pull-requests: write',
   ], errors, 'Lexora CI must cover every pull request without a publication path')
 
   const scope = readJob(workflow, 'scope')
   requireFragments(scope, [
     'fetch-depth: 0',
+    `BASE_SHA: ${githubExpression('github.event.pull_request.base.sha')}`,
+    `HEAD_SHA: ${githubExpression('github.event.pull_request.head.sha')}`,
     'node infrastructure/scripts/resolve-ci-scope.mjs',
     '--github-output "$GITHUB_OUTPUT"',
-  ], errors, 'Lexora CI must resolve cumulative change scope from the full comparison history')
+  ], errors, 'Lexora CI must resolve cumulative pull request scope without package installation')
+  forbidFragments(scope, [
+    'resolve-ci-reuse.mjs',
+    'pnpm/action-setup@',
+    'github.event.before',
+    '--mode',
+  ], errors, 'Lexora CI scope resolution must remain a local read-only classifier')
 
   requireFragments(
     readFileSync(resolve(repoRoot, 'infrastructure/scripts/resolve-ci-scope.mjs'), 'utf8'),
@@ -81,46 +94,75 @@ function verifyCiWorkflow(workflow, errors) {
     'pnpm --filter \'!@lexora/buddy\' --filter \'!@haohaoxue/lexora-website\' --recursive --if-present build',
   ], errors, 'Lexora CI quality job must lint, type-check, test and build the workspace')
 
+  const contracts = readJob(workflow, 'release-contracts')
+  requireFragments(contracts, [
+    'needs: scope',
+    'needs.scope.outputs.contracts == \'true\'',
+    'node packaging/release/version.mjs --check',
+    'node packaging/release/status.mjs',
+    'node packaging/buddy/release/verify-release-workflow.mjs',
+    'node packaging/website/release/verify-pages-workflow.mjs',
+  ], errors, 'Lexora CI must execute each allowlisted release entrypoint without building Buddy packages')
+
   const packages = readJob(workflow, 'buddy-packages')
   requireFragments(packages, [
-    'needs: [scope, quality]',
+    'needs: scope',
     'needs.scope.outputs.buddy == \'true\'',
     'github.event.pull_request.draft == false',
     'uses: ./.github/workflows/buddy-build.yml',
     'upload-artifacts: false',
-  ], errors, 'Lexora CI must run Buddy package verification only for affected ready changes without uploading artifacts')
+  ], errors, 'Lexora CI must run affected Buddy package verification in parallel with quality without uploading artifacts')
 
   const gate = readJob(workflow, 'ci-gate')
   requireFragments(gate, [
-    'needs: [scope, website-quality, quality, buddy-packages]',
+    'needs: [scope, website-quality, quality, release-contracts, buddy-packages]',
     'if: always()',
     'needs.scope.result',
     'needs.quality.result',
     'needs.buddy-packages.result',
+    'needs.release-contracts.result',
     'needs.website-quality.result',
-  ], errors, 'Lexora CI must expose one stable gate that requires every selected check to succeed')
+  ], errors, 'Lexora CI must expose one stable gate for all selected pull request checks')
+  forbidFragments(gate, [
+    'REUSED:',
+    'SOURCE_RUN_URL:',
+    'resolve-ci-reuse.mjs',
+    'actions/upload-artifact@',
+  ], errors, 'Lexora CI gate must not maintain a second proof protocol')
 }
 
 function verifyCiScopeClassification(errors) {
   const cases = [
-    [['apps/website/src/index.md'], { buddy: false, website: true, quality: false }],
-    [['.github/workflows/website-pages.yml'], { buddy: false, website: true, quality: false }],
-    [['packaging/website/release/verify-pages-workflow.mjs'], { buddy: false, website: true, quality: false }],
-    [['apps/web/src/main.ts'], { buddy: false, website: false, quality: true }],
-    [['apps/website/src/index.md', 'packages/contracts/src/index.ts'], { buddy: false, website: true, quality: true }],
-    [['apps/buddy/electron/main/index.ts'], { buddy: true, website: false, quality: true }],
-    [['packages/assets/brand/app-icon.png'], { buddy: true, website: false, quality: true }],
-    [['packages/assets/buddy/pets/default/manifest.json'], { buddy: true, website: false, quality: true }],
-    [['pnpm-lock.yaml'], { buddy: true, website: false, quality: true }],
-    [['infrastructure/scripts/resolve-ci-scope.mjs'], { buddy: true, website: false, quality: true }],
-    [['future/product/input.txt'], { buddy: true, website: false, quality: true }],
-    [[], { buddy: true, website: false, quality: true }],
+    [['apps/website/src/index.md'], { buddy: false, contracts: false, website: true, quality: false }],
+    [['apps/docs/src/index.md'], { buddy: false, contracts: false, website: true, quality: false }],
+    [['.github/workflows/website-pages.yml'], { buddy: false, contracts: false, website: true, quality: false }],
+    [['packaging/website/release/verify-pages-workflow.mjs'], { buddy: false, contracts: false, website: true, quality: false }],
+    [['README.md'], { buddy: false, contracts: false, website: false, quality: false }],
+    [['apps/web/src/main.ts'], { buddy: false, contracts: false, website: false, quality: true }],
+    [['.github/workflows/ci.yml'], { buddy: false, contracts: true, website: false, quality: false }],
+    [['packaging/release/status.mjs'], { buddy: false, contracts: true, website: false, quality: false }],
+    [['.github/workflows/buddy-build.yml'], { buddy: true, contracts: true, website: false, quality: true }],
+    [['package.json'], { buddy: true, contracts: true, website: false, quality: true }],
+    [['pnpm-lock.yaml'], { buddy: true, contracts: false, website: false, quality: true }],
+    [['.github/workflows/future.yml'], { buddy: true, contracts: true, website: false, quality: true }],
+    [['packaging/release/future.mjs'], { buddy: true, contracts: true, website: false, quality: true }],
+    [[
+      '.github/workflows/ci.yml',
+      'README.md',
+      'apps/docs/package.json',
+      'package.json',
+      'pnpm-lock.yaml',
+    ], { buddy: true, contracts: true, website: true, quality: true }],
+    [['apps/buddy/electron/main/index.ts'], { buddy: true, contracts: false, website: false, quality: true }],
+    [['pnpm-workspace.yaml'], { buddy: true, contracts: false, website: false, quality: true }],
+    [['future/product/input.txt'], { buddy: true, contracts: false, website: false, quality: true }],
+    [[], { buddy: true, contracts: true, website: false, quality: true }],
   ]
 
   if (cases.some(([files, expected]) => (
     JSON.stringify(classifyCiScope(files)) !== JSON.stringify(expected)
   ))) {
-    errors.push('Lexora CI scope classification must keep Website isolated and unknown build inputs conservative')
+    errors.push('Lexora CI scope classification must isolate Website and release contracts while keeping Buddy dependency changes conservative')
   }
 }
 
