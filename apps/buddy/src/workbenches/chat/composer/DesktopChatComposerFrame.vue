@@ -14,6 +14,8 @@ withDefaults(defineProps<{
     <slot name="attachments" />
 
     <div class="desktop-chat-composer" :style="{ borderRadius }">
+      <slot name="overlay" />
+
       <div class="desktop-chat-composer__editor-wrap">
         <NScrollbar class="desktop-chat-composer__editor-scrollbar">
           <slot name="editor" />

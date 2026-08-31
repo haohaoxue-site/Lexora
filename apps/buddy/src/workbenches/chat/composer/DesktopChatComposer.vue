@@ -145,8 +145,7 @@ function handleFileDrop(event: DragEvent) {
       </div>
     </template>
 
-    <template #editor>
-      <EditorContent v-if="editor" :editor="editor" />
+    <template #overlay>
       <div
         v-if="suggestions.length || isLoadingContext"
         class="desktop-chat-composer__suggestions"
@@ -171,6 +170,10 @@ function handleFileDrop(event: DragEvent) {
           </span>
         </button>
       </div>
+    </template>
+
+    <template #editor>
+      <EditorContent v-if="editor" :editor="editor" />
     </template>
 
     <template #leading>
