@@ -21,6 +21,8 @@
 </p>
 
 <p align="center">
+  <a href="https://haohaoxue-site.github.io/Lexora/">文档</a>
+  ·
   <a href="https://github.com/haohaoxue-site/Lexora/releases/latest">下载 Lexora 桌面版</a>
   ·
   <a href="https://docs.haohaoxue.site/">网站</a>
@@ -32,7 +34,7 @@ Lexora 是一个以 Desktop 为核心的个人 AI 工作台。在你授权的范
 
 Desktop 在本地运行，以任务为中心，将对话、本地上下文、工具执行、自动化和产物集中在同一个工作台中。
 
-![Lexora Desktop 界面预览](apps/docs/src/public/buddy-ui.png)
+![Lexora Desktop 界面预览](apps/website/src/public/buddy-ui.png)
 
 ### 核心能力
 
@@ -63,7 +65,7 @@ pnpm dev:buddy
 
 Web 将逐步成为 Desktop 在文档编辑、知识沉淀与公开发布方面的内容延伸。目前仍独立运行，并支持自部署。
 
-![Lexora Web 界面预览](apps/docs/src/public/ui.png)
+![Lexora Web 界面预览](apps/website/src/public/ui.png)
 
 ### 核心能力
 
@@ -100,7 +102,7 @@ lexora/
 │   ├── api/         # NestJS API 服务
 │   ├── agent/       # LangGraph AI 运行服务
 │   ├── buddy/       # Lexora Desktop
-│   └── docs/        # 产品文档站点
+│   └── website/     # 产品落地页与文档站点
 ├── packages/
 │   ├── assets/      # 跨应用品牌与运行时资产
 │   ├── contracts/   # 共享契约层：schema、endpoint、常量、领域类型

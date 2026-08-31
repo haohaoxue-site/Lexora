@@ -1,4 +1,9 @@
+import process from 'node:process'
+
 import { defineConfig } from 'vitepress'
+
+const websiteBasePath = (process.env.WEBSITE_BASE_PATH ?? '').replace(/^\/+|\/+$/g, '')
+const websiteBase = websiteBasePath ? `/${websiteBasePath}/` : '/'
 
 const zhGuideSidebar = [
   {
@@ -86,13 +91,16 @@ const enSelfHostSidebar = [
 
 export default defineConfig({
   title: 'Lexora',
-  description: '文档与 AI 汇入一个专注的个人工作台',
+  description: 'Lexora 是一个以 Desktop 为核心的个人 AI 工作台，在授权范围内使用本地文件与工具，想你所想，行你所行。',
+  base: websiteBase,
   cleanUrls: true,
   outDir: '../dist',
   cacheDir: '../.vitepress/cache',
   head: [
-    ['link', { rel: 'icon', type: 'image/png', href: '/logo.png' }],
-    ['link', { rel: 'shortcut icon', type: 'image/png', href: '/logo.png' }],
+    ['link', { rel: 'icon', type: 'image/png', href: `${websiteBase}logo.png` }],
+    ['link', { rel: 'shortcut icon', type: 'image/png', href: `${websiteBase}logo.png` }],
+    ['meta', { name: 'theme-color', content: '#fafaf8', media: '(prefers-color-scheme: light)' }],
+    ['meta', { name: 'theme-color', content: '#202422', media: '(prefers-color-scheme: dark)' }],
   ],
   locales: {
     root: {
@@ -100,7 +108,14 @@ export default defineConfig({
       lang: 'zh-CN',
       themeConfig: {
         nav: [
-          { text: '首页', link: '/' },
+          {
+            text: '产品',
+            items: [
+              { text: '工作方式', link: '/#workflow' },
+              { text: '核心能力', link: '/#capabilities' },
+              { text: 'Web 工作台', link: '/#web-workspace' },
+            ],
+          },
           { text: '指南', link: '/guide/what-is-lexora' },
           { text: '自部署', link: '/self-host/docker-compose' },
         ],
@@ -113,10 +128,17 @@ export default defineConfig({
     en: {
       label: 'English',
       lang: 'en-US',
-      description: 'Documents and AI in a focused personal workspace',
+      description: 'A personal AI workspace built around Desktop that uses local files and tools within the access you grant to act on your intent',
       themeConfig: {
         nav: [
-          { text: 'Home', link: '/en/' },
+          {
+            text: 'Product',
+            items: [
+              { text: 'How it works', link: '/en/#workflow' },
+              { text: 'Capabilities', link: '/en/#capabilities' },
+              { text: 'Web workspace', link: '/en/#web-workspace' },
+            ],
+          },
           { text: 'Guide', link: '/en/guide/what-is-lexora' },
           { text: 'Self-hosting', link: '/en/self-host/docker-compose' },
         ],
@@ -132,5 +154,8 @@ export default defineConfig({
     search: {
       provider: 'local',
     },
+    socialLinks: [
+      { icon: 'github', link: 'https://github.com/haohaoxue-site/Lexora' },
+    ],
   },
 })

@@ -11,6 +11,13 @@ const globalBuddyInputs = new Set([
   'pnpm-lock.yaml',
   'pnpm-workspace.yaml',
 ])
+const websiteInputs = new Set([
+  '.github/workflows/website-pages.yml',
+])
+const websitePrefixes = [
+  'apps/website/',
+  'packaging/website/',
+]
 const buddyPrefixes = [
   '.github/workflows/',
   'apps/buddy/',
@@ -35,14 +42,14 @@ export function classifyCiScope(files) {
     return fullScope()
 
   let buddy = false
-  let docs = false
+  let website = false
   let quality = false
 
   for (const input of files) {
     const path = normalizePath(input)
 
-    if (path.startsWith('apps/docs/')) {
-      docs = true
+    if (websiteInputs.has(path) || websitePrefixes.some(prefix => path.startsWith(prefix))) {
+      website = true
       continue
     }
 
@@ -61,7 +68,7 @@ export function classifyCiScope(files) {
     quality = true
   }
 
-  return { buddy, docs, quality }
+  return { buddy, website, quality }
 }
 
 export function listChangedFiles(base, head, mode, cwd = repoRoot) {
@@ -86,7 +93,7 @@ export function listChangedFiles(base, head, mode, cwd = repoRoot) {
 function fullScope() {
   return {
     buddy: true,
-    docs: false,
+    website: false,
     quality: true,
   }
 }

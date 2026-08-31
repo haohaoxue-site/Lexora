@@ -16,7 +16,7 @@ const applicationPackagePaths = {
   web: 'apps/web/package.json',
 }
 const versionlessPackagePaths = [
-  'apps/docs/package.json',
+  'apps/website/package.json',
   'packages/contracts/package.json',
   'packages/shared/package.json',
 ]

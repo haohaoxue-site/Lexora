@@ -59,14 +59,15 @@ function verifyCiWorkflow(workflow, errors) {
     'Lexora CI scope resolution must classify both sides of renamed paths',
   )
 
-  const docs = readJob(workflow, 'docs-quality')
-  requireFragments(docs, [
+  const website = readJob(workflow, 'website-quality')
+  requireFragments(website, [
     'needs: scope',
-    'needs.scope.outputs.docs == \'true\'',
-    'pnpm --filter @haohaoxue/lexora --filter @haohaoxue/lexora-docs install --frozen-lockfile',
-    'pnpm --filter @haohaoxue/lexora-docs lint',
-    'pnpm --filter @haohaoxue/lexora-docs build',
-  ], errors, 'Lexora CI must lint and build Docs only when documentation changes')
+    'needs.scope.outputs.website == \'true\'',
+    'pnpm --filter @haohaoxue/lexora --filter @haohaoxue/lexora-website install --frozen-lockfile',
+    'node packaging/website/release/verify-pages-workflow.mjs',
+    'pnpm --filter @haohaoxue/lexora-website lint',
+    'pnpm --filter @haohaoxue/lexora-website build',
+  ], errors, 'Lexora CI must lint and build Website only when website changes')
 
   const quality = readJob(workflow, 'quality')
   requireFragments(quality, [
@@ -77,7 +78,7 @@ function verifyCiWorkflow(workflow, errors) {
     'run: pnpm lint',
     'run: pnpm type-check',
     'run: pnpm test',
-    'pnpm --filter \'!@lexora/buddy\' --filter \'!@haohaoxue/lexora-docs\' --recursive --if-present build',
+    'pnpm --filter \'!@lexora/buddy\' --filter \'!@haohaoxue/lexora-website\' --recursive --if-present build',
   ], errors, 'Lexora CI quality job must lint, type-check, test and build the workspace')
 
   const packages = readJob(workflow, 'buddy-packages')
@@ -91,33 +92,35 @@ function verifyCiWorkflow(workflow, errors) {
 
   const gate = readJob(workflow, 'ci-gate')
   requireFragments(gate, [
-    'needs: [scope, docs-quality, quality, buddy-packages]',
+    'needs: [scope, website-quality, quality, buddy-packages]',
     'if: always()',
     'needs.scope.result',
-    'needs.docs-quality.result',
     'needs.quality.result',
     'needs.buddy-packages.result',
+    'needs.website-quality.result',
   ], errors, 'Lexora CI must expose one stable gate that requires every selected check to succeed')
 }
 
 function verifyCiScopeClassification(errors) {
   const cases = [
-    [['apps/docs/src/index.md'], { buddy: false, docs: true, quality: false }],
-    [['apps/web/src/main.ts'], { buddy: false, docs: false, quality: true }],
-    [['apps/docs/src/index.md', 'packages/contracts/src/index.ts'], { buddy: false, docs: true, quality: true }],
-    [['apps/buddy/electron/main/index.ts'], { buddy: true, docs: false, quality: true }],
-    [['packages/assets/brand/app-icon.png'], { buddy: true, docs: false, quality: true }],
-    [['packages/assets/buddy/pets/default/manifest.json'], { buddy: true, docs: false, quality: true }],
-    [['pnpm-lock.yaml'], { buddy: true, docs: false, quality: true }],
-    [['infrastructure/scripts/resolve-ci-scope.mjs'], { buddy: true, docs: false, quality: true }],
-    [['future/product/input.txt'], { buddy: true, docs: false, quality: true }],
-    [[], { buddy: true, docs: false, quality: true }],
+    [['apps/website/src/index.md'], { buddy: false, website: true, quality: false }],
+    [['.github/workflows/website-pages.yml'], { buddy: false, website: true, quality: false }],
+    [['packaging/website/release/verify-pages-workflow.mjs'], { buddy: false, website: true, quality: false }],
+    [['apps/web/src/main.ts'], { buddy: false, website: false, quality: true }],
+    [['apps/website/src/index.md', 'packages/contracts/src/index.ts'], { buddy: false, website: true, quality: true }],
+    [['apps/buddy/electron/main/index.ts'], { buddy: true, website: false, quality: true }],
+    [['packages/assets/brand/app-icon.png'], { buddy: true, website: false, quality: true }],
+    [['packages/assets/buddy/pets/default/manifest.json'], { buddy: true, website: false, quality: true }],
+    [['pnpm-lock.yaml'], { buddy: true, website: false, quality: true }],
+    [['infrastructure/scripts/resolve-ci-scope.mjs'], { buddy: true, website: false, quality: true }],
+    [['future/product/input.txt'], { buddy: true, website: false, quality: true }],
+    [[], { buddy: true, website: false, quality: true }],
   ]
 
   if (cases.some(([files, expected]) => (
     JSON.stringify(classifyCiScope(files)) !== JSON.stringify(expected)
   ))) {
-    errors.push('Lexora CI scope classification must keep Docs isolated and unknown build inputs conservative')
+    errors.push('Lexora CI scope classification must keep Website isolated and unknown build inputs conservative')
   }
 }
 
