@@ -14,7 +14,7 @@ interface GithubRelease {
 
 const RELEASES_API_URL
   = 'https://api.github.com/repos/haohaoxue-site/Lexora/releases?per_page=100'
-const BUDDY_RELEASE_TAG_PREFIX = 'buddy-v'
+const RELEASE_TAG_PREFIX = 'v'
 const SEMVER_PATTERN = /^(\d+)\.(\d+)\.(\d+)$/
 
 export class DesktopUpdateCheckError extends Error {
@@ -70,7 +70,7 @@ function parseLatestBuddyRelease(value: unknown): {
       release.draft !== false
       || release.prerelease !== false
       || typeof release.tag_name !== 'string'
-      || !release.tag_name.startsWith(BUDDY_RELEASE_TAG_PREFIX)
+      || !release.tag_name.startsWith(RELEASE_TAG_PREFIX)
       || typeof release.html_url !== 'string'
       || !isLexoraReleaseUrl(release.html_url)
     ) {
@@ -80,7 +80,7 @@ function parseLatestBuddyRelease(value: unknown): {
     try {
       return [{
         metadata: release as GithubRelease,
-        version: parseVersion(release.tag_name.slice(BUDDY_RELEASE_TAG_PREFIX.length)),
+        version: parseVersion(release.tag_name.slice(RELEASE_TAG_PREFIX.length)),
       }]
     }
     catch {

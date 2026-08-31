@@ -1,0 +1,200 @@
+name: Lexora Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: lexora-release-${{ github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  validate-release:
+    name: Validate release
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Setup Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .node-version
+
+      - name: Match tag to product version
+        run: node packaging/buddy/release/buddy-version.mjs --check-tag "$GITHUB_REF_NAME"
+
+      - name: Require a master commit
+        run: |
+          git fetch --no-tags origin '+refs/heads/master:refs/remotes/origin/master'
+          release_commit="$(git rev-parse "$GITHUB_SHA^{commit}")"
+          if ! git merge-base --is-ancestor "$release_commit" origin/master; then
+            echo "Release tag must reference a commit contained in master" >&2
+            exit 1
+          fi
+
+      - name: Require a new Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          lookup_error="$RUNNER_TEMP/lexora-release-lookup.error"
+          if gh api "repos/$GITHUB_REPOSITORY/releases/tags/$GITHUB_REF_NAME" \
+            >/dev/null 2>"$lookup_error"; then
+            echo "Release $GITHUB_REF_NAME already exists" >&2
+            exit 1
+          fi
+          if ! grep -q 'HTTP 404' "$lookup_error"; then
+            cat "$lookup_error" >&2
+            exit 1
+          fi
+
+  buddy-packages:
+    name: Buddy packages
+    needs: validate-release
+    uses: ./.github/workflows/buddy-build.yml
+
+  publish-release:
+    name: Publish Release
+    needs: buddy-packages
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      actions: read
+      attestations: write
+      artifact-metadata: write
+      contents: write
+      id-token: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .node-version
+
+      - name: Download verified Ubuntu package
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: lexora-buddy-ubuntu
+          path: apps/buddy/.output/artifacts/desktop
+
+      - name: Download verified Arch package
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: lexora-buddy-arch
+          path: apps/buddy/.output/artifacts/arch
+
+      - name: Reconstruct release metadata and checksums
+        run: |
+          node packaging/buddy/release/verify-release-artifacts.mjs \
+            --github-env "$GITHUB_ENV" \
+            --checksum-output "$GITHUB_WORKSPACE/apps/buddy/.output/artifacts/SHA256SUMS.txt"
+
+      - name: Bind artifacts to trigger tag
+        run: |
+          if [[ "$LEXORA_BUDDY_RELEASE_TAG" != "$GITHUB_REF_NAME" ]]; then
+            echo "Artifact version does not match release tag" >&2
+            exit 1
+          fi
+
+      - name: Attest release assets
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-path: |
+            ${{ github.workspace }}/apps/buddy/.output/artifacts/desktop/*.deb
+            ${{ github.workspace }}/apps/buddy/.output/artifacts/arch/*.pkg.tar.zst
+            ${{ github.workspace }}/apps/buddy/.output/artifacts/SHA256SUMS.txt
+
+      - name: Create draft Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$LEXORA_BUDDY_RELEASE_TAG" \
+            --repo "$LEXORA_BUDDY_RELEASE_REPO" \
+            --verify-tag \
+            --title "Lexora $LEXORA_BUDDY_VERSION" \
+            --generate-notes \
+            --draft
+
+      - name: Upload immutable release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release upload "$LEXORA_BUDDY_RELEASE_TAG" \
+            "$LEXORA_BUDDY_DEB_PATH#$LEXORA_BUDDY_RELEASE_ASSET_NAME" \
+            "$LEXORA_BUDDY_ARCH_PATH#$LEXORA_BUDDY_ARCH_ASSET_NAME" \
+            "$LEXORA_BUDDY_CHECKSUM_PATH#$LEXORA_BUDDY_CHECKSUM_ASSET_NAME" \
+            --repo "$LEXORA_BUDDY_RELEASE_REPO"
+
+      - name: Publish Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release edit "$LEXORA_BUDDY_RELEASE_TAG" \
+            --repo "$LEXORA_BUDDY_RELEASE_REPO" \
+            --draft=false
+
+  verify-public-assets:
+    name: Verify public assets
+    needs: publish-release
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      attestations: read
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .node-version
+
+      - name: Download verified Ubuntu package
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: lexora-buddy-ubuntu
+          path: apps/buddy/.output/artifacts/desktop
+
+      - name: Download verified Arch package
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: lexora-buddy-arch
+          path: apps/buddy/.output/artifacts/arch
+
+      - name: Reconstruct expected public asset metadata
+        run: |
+          node packaging/buddy/release/verify-release-artifacts.mjs \
+            --github-env "$GITHUB_ENV" \
+            --checksum-output "$GITHUB_WORKSPACE/apps/buddy/.output/artifacts/SHA256SUMS.txt"
+
+      - name: Verify artifact attestations
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh attestation verify "$LEXORA_BUDDY_DEB_PATH" --repo "$GITHUB_REPOSITORY"
+          gh attestation verify "$LEXORA_BUDDY_ARCH_PATH" --repo "$GITHUB_REPOSITORY"
+          gh attestation verify "$LEXORA_BUDDY_CHECKSUM_PATH" --repo "$GITHUB_REPOSITORY"
+
+      - name: Verify public Ubuntu package
+        run: node packaging/buddy/release/verify-remote-asset.mjs --asset deb
+
+      - name: Verify public Arch package
+        run: node packaging/buddy/release/verify-remote-asset.mjs --asset arch
+
+      - name: Verify public checksum manifest
+        run: node packaging/buddy/release/verify-remote-asset.mjs --asset checksums

@@ -43,7 +43,7 @@ pkgbase = lexora-buddy-bin
 	conflicts = lexora-buddy
 	options = !strip
 	options = !debug
-	source_x86_64 = lexora-buddy-0.1.0-amd64.deb::https://github.com/haohaoxue-site/Lexora/releases/download/buddy-v0.1.0/Lexora-Buddy-0.1.0-linux-amd64.deb
+	source_x86_64 = lexora-buddy-0.1.0-amd64.deb::https://github.com/haohaoxue-site/Lexora/releases/download/v0.1.0/Lexora-Buddy-0.1.0-linux-amd64.deb
 	sha256sums_x86_64 = d849e41906c830bb851d4f5d05f8159d70f1d055c343dc90fad0ab32a22f9822
 
 pkgname = lexora-buddy-bin

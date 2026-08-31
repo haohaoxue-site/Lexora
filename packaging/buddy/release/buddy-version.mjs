@@ -6,6 +6,7 @@ import { writeOutput } from '../../shared/cli-output.mjs'
 
 const repoRoot = resolve(import.meta.dirname, '../../..')
 const versionPattern = /^\d+\.\d+\.\d+$/
+const releaseTagPattern = /^v(\d+\.\d+\.\d+)$/
 
 export function readBuddyVersionState(cwd = repoRoot) {
   const buddyVersionPath = join(cwd, 'apps/buddy/buddy.version.json')
@@ -31,6 +32,15 @@ export function validateBuddyVersionState(state) {
   if (state.cargoVersion !== state.productVersion)
     errors.push(`apps/buddy/native-pet/Cargo.toml version ${state.cargoVersion} does not match ${state.productVersion}`)
   return errors
+}
+
+export function validateLexoraReleaseTag(tag, productVersion) {
+  const version = releaseTagPattern.exec(tag)?.[1]
+  if (!version)
+    throw new Error(`Lexora release tag must use vX.Y.Z format: ${tag}`)
+  if (version !== productVersion)
+    throw new Error(`Lexora release tag ${tag} does not match Buddy version ${productVersion}`)
+  return { tag, version }
 }
 
 export function writeBuddyVersion(cwd, version) {
@@ -66,6 +76,14 @@ else if (command === '--check') {
   if (errors.length)
     throw new Error(errors.join('\n'))
   writeOutput(`Buddy version check passed: ${state.productVersion}`)
+}
+else if (command === '--check-tag') {
+  const state = readBuddyVersionState()
+  const errors = validateBuddyVersionState(state)
+  if (errors.length)
+    throw new Error(errors.join('\n'))
+  const release = validateLexoraReleaseTag(value ?? '', state.productVersion)
+  writeOutput(`Lexora release tag check passed: ${release.tag}`)
 }
 
 function readJsonVersion(path) {

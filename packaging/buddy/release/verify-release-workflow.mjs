@@ -1,50 +1,133 @@
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import process from 'node:process'
 
 import { writeOutput } from '../../shared/cli-output.mjs'
 
 const repoRoot = resolve(import.meta.dirname, '../../..')
-const releaseWorkflowPath = '.github/workflows/buddy-release.yml'
+const workflowPaths = {
+  build: '.github/workflows/buddy-build.yml',
+  ci: '.github/workflows/ci.yml',
+  release: '.github/workflows/release.yml',
+}
 
 export function verifyBuddyReleaseWorkflow(cwd = repoRoot) {
-  const workflow = readFileSync(resolve(cwd, releaseWorkflowPath), 'utf8')
-  const jobs = {
-    arch: readJob(workflow, 'build-arch'),
-    publicAssets: readJob(workflow, 'verify-public-assets'),
-    publish: readJob(workflow, 'publish-release'),
-    ubuntu: readJob(workflow, 'build-ubuntu'),
-  }
+  const workflows = Object.fromEntries(
+    Object.entries(workflowPaths).map(([name, path]) => [name, readWorkflow(cwd, path)]),
+  )
   const errors = []
 
+  verifyCiWorkflow(workflows.ci, errors)
+  verifyBuildWorkflow(workflows.build, errors)
+  verifyReleaseWorkflow(workflows.release, errors)
+  verifyPinnedActions(Object.values(workflows).join('\n'), errors)
+
+  return errors
+}
+
+function verifyCiWorkflow(workflow, errors) {
   requireFragments(workflow, [
-    'name: Lexora Buddy Release',
+    'name: Lexora CI',
     'pull_request:',
     'push:',
     'branches: [master]',
+    'contents: read',
+    'cancel-in-progress: true',
+  ], errors, 'Lexora CI must run read-only for pull requests and master pushes')
+  requireGlobalReadOnly(workflow, errors, 'Lexora CI')
+  forbidFragments(workflow, [
+    'workflow_dispatch:',
+    'tags:',
+    'paths:',
+    'contents: write',
+  ], errors, 'Lexora CI must cover every pull request without a publication path')
+
+  const quality = readJob(workflow, 'quality')
+  requireFragments(quality, [
+    'timeout-minutes: 30',
+    'pnpm install --frozen-lockfile',
+    'run: pnpm lint',
+    'run: pnpm type-check',
+    'run: pnpm test',
+    'pnpm --filter \'!@lexora/buddy\' --recursive --if-present build',
+  ], errors, 'Lexora CI quality job must lint, type-check, test and build the workspace')
+
+  const packages = readJob(workflow, 'buddy-packages')
+  requireFragments(packages, [
+    'needs: quality',
+    'uses: ./.github/workflows/buddy-build.yml',
+  ], errors, 'Lexora CI must run the reusable Buddy package verification after quality checks')
+}
+
+function verifyBuildWorkflow(workflow, errors) {
+  requireFragments(workflow, [
+    'name: Buddy Package Verification',
+    'workflow_call:',
+    'contents: read',
+  ], errors, 'Buddy package verification must be a reusable read-only workflow')
+  requireGlobalReadOnly(workflow, errors, 'Buddy package verification')
+  forbidFragments(workflow, [
+    'pull_request:',
+    'workflow_dispatch:',
+    'contents: write',
+  ], errors, 'Buddy package verification must only run through a caller and remain read-only')
+
+  verifyUbuntuJob(readJob(workflow, 'build-ubuntu'), errors)
+  verifyArchJob(readJob(workflow, 'build-arch'), errors)
+}
+
+function verifyReleaseWorkflow(workflow, errors) {
+  requireFragments(workflow, [
+    'name: Lexora Release',
+    'push:',
+    'tags:',
+    '- \'v*\'',
+    'contents: read',
+    'cancel-in-progress: false',
+  ], errors, 'Lexora Release must run automatically and read-only by default for v* tags')
+  requireGlobalReadOnly(workflow, errors, 'Lexora Release')
+  forbidFragments(workflow, [
+    'pull_request:',
+    'branches:',
     'workflow_dispatch:',
     'publish_release:',
-  ], errors, 'Buddy release workflow must verify changes automatically and publish only through an explicit input')
-  if (!/^permissions:\n {2}contents: read$/m.test(workflow))
-    errors.push('Buddy release workflow must default to read-only repository contents')
+    '--clobber',
+  ], errors, 'Lexora Release must not expose branch, manual or overwrite publication paths')
   if ((workflow.match(/contents: write/g) ?? []).length !== 1)
     errors.push('Only the release publication job may have contents write permission')
-  if (workflow.includes('--clobber'))
-    errors.push('Buddy release workflow must not overwrite immutable release assets')
 
-  verifyUbuntuJob(jobs.ubuntu, errors)
-  verifyArchJob(jobs.arch, errors)
-  verifyPublishJob(jobs.publish, errors)
-  verifyPublicAssetsJob(jobs.publicAssets, errors)
+  verifyReleaseValidationJob(readJob(workflow, 'validate-release'), errors)
 
-  return errors
+  const packages = readJob(workflow, 'buddy-packages')
+  requireFragments(packages, [
+    'needs: validate-release',
+    'uses: ./.github/workflows/buddy-build.yml',
+  ], errors, 'Lexora Release must build packages only after tag validation')
+
+  verifyPublishJob(readJob(workflow, 'publish-release'), errors)
+  verifyPublicAssetsJob(readJob(workflow, 'verify-public-assets'), errors)
+}
+
+function verifyReleaseValidationJob(job, errors) {
+  requireFragments(job, [
+    'timeout-minutes: 10',
+    'fetch-depth: 0',
+    'node packaging/buddy/release/buddy-version.mjs --check-tag "$GITHUB_REF_NAME"',
+    '+refs/heads/master:refs/remotes/origin/master',
+    'git merge-base --is-ancestor "$release_commit" origin/master',
+    'gh api "repos/$GITHUB_REPOSITORY/releases/tags/$GITHUB_REF_NAME"',
+    'HTTP 404',
+  ], errors, 'Release validation must bind a strict version tag to a master commit and reject an existing Release')
 }
 
 function verifyUbuntuJob(job, errors) {
   const install = 'sudo apt-get install -y ./apps/buddy/.output/artifacts/desktop/Lexora-Buddy-*-linux-amd64.deb'
   const smoke = 'xvfb-run -a node packaging/buddy/ci/run-gui-smoke.mjs'
 
-  requireFragments(job, ['pnpm check:buddy'], errors, 'Ubuntu build job must run the Buddy release gate')
+  requireFragments(job, [
+    'timeout-minutes: 60',
+    'pnpm check:buddy',
+  ], errors, 'Ubuntu build job must run the Buddy release gate with a bounded timeout')
   requireOrder(job, install, smoke, errors, 'Ubuntu build job must install the built Desktop deb before GUI smoke')
   requireFragments(job, [
     'LEXORA_DESKTOP_EXECUTABLE_PATH: /opt/lexora-buddy/lexora-buddy',
@@ -54,7 +137,10 @@ function verifyUbuntuJob(job, errors) {
   requireFragments(job, [
     'name: lexora-buddy-ubuntu',
     'apps/buddy/.output/artifacts/desktop/*.deb',
-  ], errors, 'Ubuntu build job must upload the verified deb artifact')
+    'include-hidden-files: true',
+    'compression-level: 0',
+    'retention-days: 7',
+  ], errors, 'Ubuntu build job must upload the verified deb artifact with bounded retention')
   forbidReleaseMutation(job, errors, 'Ubuntu build job')
 }
 
@@ -65,6 +151,7 @@ function verifyArchJob(job, errors) {
   const upload = 'name: lexora-buddy-arch'
 
   requireFragments(job, [
+    'timeout-minutes: 60',
     'container: archlinux:latest',
     'libxcrypt-compat',
     'pnpm --filter @lexora/buddy package:arch',
@@ -84,56 +171,89 @@ function verifyArchJob(job, errors) {
     'LEXORA_GUI_SMOKE_NO_SANDBOX: \'1\'',
     'apps/buddy/.output/artifacts/arch/*.pkg.tar.zst',
     'timeout-minutes: 2',
-  ], errors, 'Arch build job must smoke and upload the verified pacman package')
+    'include-hidden-files: true',
+    'compression-level: 0',
+    'retention-days: 7',
+  ], errors, 'Arch build job must smoke and upload the verified pacman package with bounded retention')
   forbidReleaseMutation(job, errors, 'Arch build job')
 }
 
 function verifyPublishJob(job, errors) {
-  const publicationGuard = 'if: $'
-    + '{{ github.event_name == \'workflow_dispatch\' && inputs.publish_release && github.ref == \'refs/heads/master\' }}'
-  if (!job.includes(publicationGuard))
-    errors.push('Release publication must require an explicit workflow dispatch from master')
-  if (!/needs:\s*\[build-ubuntu, build-arch\]/.test(job))
-    errors.push('Release publication must depend on both Ubuntu and Arch verification jobs')
   requireFragments(job, [
-    'name: buddy-release',
+    'needs: buddy-packages',
+    'timeout-minutes: 15',
+    'actions: read',
+    'attestations: write',
+    'artifact-metadata: write',
     'contents: write',
+    'id-token: write',
     'name: lexora-buddy-ubuntu',
     'name: lexora-buddy-arch',
     'node packaging/buddy/release/verify-release-artifacts.mjs',
-  ], errors, 'Release publication must use the protected Environment and both verified platform artifacts')
+    '"$LEXORA_BUDDY_RELEASE_TAG" != "$GITHUB_REF_NAME"',
+  ], errors, 'Release publication must use both verified platform artifacts with minimal publication permissions')
   if (/package:(?:arch|deb)|package-desktop\.mjs|pnpm check:buddy/.test(job))
     errors.push('Release publication must not rebuild platform packages')
 
+  requireOrder(job, 'actions/attest@', 'gh release create', errors, 'Release publication must attest artifacts before creating a Release')
   requireOrder(job, 'gh release create', 'gh release upload', errors, 'Release publication must create a draft before uploading immutable assets')
   requireOrder(job, 'gh release upload', 'gh release edit', errors, 'Release publication must publish only after immutable assets are uploaded')
   requireFragments(job, [
-    'gh release view',
+    'actions/attest@',
+    '--verify-tag',
+    '--generate-notes',
     '--draft',
     '--draft=false',
-    '--title "Lexora Buddy $LEXORA_BUDDY_VERSION"',
+    '--title "Lexora $LEXORA_BUDDY_VERSION"',
     '"$LEXORA_BUDDY_DEB_PATH#$LEXORA_BUDDY_RELEASE_ASSET_NAME"',
     '"$LEXORA_BUDDY_ARCH_PATH#$LEXORA_BUDDY_ARCH_ASSET_NAME"',
     '"$LEXORA_BUDDY_CHECKSUM_PATH#$LEXORA_BUDDY_CHECKSUM_ASSET_NAME"',
-  ], errors, 'Release publication must upload the deb, pacman package and checksum manifest')
+  ], errors, 'Release publication must attest and upload both packages and the checksum manifest under a Lexora title')
 }
 
 function verifyPublicAssetsJob(job, errors) {
   requireFragments(job, [
     'needs: publish-release',
+    'timeout-minutes: 15',
+    'attestations: read',
     'name: lexora-buddy-ubuntu',
     'name: lexora-buddy-arch',
     'node packaging/buddy/release/verify-release-artifacts.mjs',
+    'gh attestation verify "$LEXORA_BUDDY_DEB_PATH"',
+    'gh attestation verify "$LEXORA_BUDDY_ARCH_PATH"',
+    'gh attestation verify "$LEXORA_BUDDY_CHECKSUM_PATH"',
     'verify-remote-asset.mjs --asset deb',
     'verify-remote-asset.mjs --asset arch',
     'verify-remote-asset.mjs --asset checksums',
-  ], errors, 'Public asset verification must remotely verify both packages and the checksum manifest')
+  ], errors, 'Public asset verification must remotely verify both packages, their attestations and the checksum manifest')
   if (job.includes('contents: write') || /gh release (?:create|upload|edit)/.test(job))
     errors.push('Public asset verification must remain read-only')
 }
 
+function verifyPinnedActions(workflows, errors) {
+  const actions = workflows.matchAll(/^\s*uses:\s+([^\s#]+)(?:\s+#.*)?$/gm)
+  for (const [, action] of actions) {
+    if (action.startsWith('./'))
+      continue
+    const separator = action.lastIndexOf('@')
+    const reference = separator >= 0 ? action.slice(separator + 1) : ''
+    if (!/^[a-f\d]{40}$/.test(reference))
+      errors.push(`GitHub Action must use an immutable commit SHA: ${action}`)
+  }
+}
+
+function requireGlobalReadOnly(workflow, errors, label) {
+  if (!/^permissions:\n {2}contents: read$/m.test(workflow))
+    errors.push(`${label} must default to read-only repository contents`)
+}
+
 function requireFragments(input, fragments, errors, message) {
   if (fragments.some(fragment => !input.includes(fragment)))
+    errors.push(message)
+}
+
+function forbidFragments(input, fragments, errors, message) {
+  if (fragments.some(fragment => input.includes(fragment)))
     errors.push(message)
 }
 
@@ -160,6 +280,11 @@ function readJob(workflow, name) {
   const nextJob = remainder.match(/\n {2}[a-z][\w-]*:\n/)
   const end = nextJob ? start + marker.length + nextJob.index : workflow.length
   return workflow.slice(contentStart, end)
+}
+
+function readWorkflow(cwd, path) {
+  const absolutePath = resolve(cwd, path)
+  return existsSync(absolutePath) ? readFileSync(absolutePath, 'utf8') : ''
 }
 
 if (process.argv[1] === new URL(import.meta.url).pathname) {

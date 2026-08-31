@@ -17,7 +17,7 @@ export function verifyBuddyAurPackage(options = {}) {
   const requiredPkgbuildFragments = [
     `pkgver=${version}`,
     `_deb_name="Lexora-Buddy-\${pkgver}-linux-amd64.deb"`,
-    `releases/download/buddy-v\${pkgver}/\${_deb_name}`,
+    `releases/download/v\${pkgver}/\${_deb_name}`,
     `source_x86_64=("lexora-buddy-\${pkgver}-amd64.deb::\${_deb_url}")`,
     'data.tar.*',
     'alsa-lib',
@@ -33,7 +33,7 @@ export function verifyBuddyAurPackage(options = {}) {
   ]
   const requiredSrcinfoFragments = [
     `pkgver = ${version}`,
-    `source_x86_64 = lexora-buddy-${version}-amd64.deb::https://github.com/haohaoxue-site/Lexora/releases/download/buddy-v${version}/Lexora-Buddy-${version}-linux-amd64.deb`,
+    `source_x86_64 = lexora-buddy-${version}-amd64.deb::https://github.com/haohaoxue-site/Lexora/releases/download/v${version}/Lexora-Buddy-${version}-linux-amd64.deb`,
     'provides = lexora-buddy',
   ]
 

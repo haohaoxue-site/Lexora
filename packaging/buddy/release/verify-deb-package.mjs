@@ -37,7 +37,7 @@ export function readBuddyDebReleaseMetadata(cwd = repoRoot) {
     throw new Error('Buddy package homepage must identify its GitHub repository')
 
   const releaseAssetName = `Lexora-Buddy-${version}-linux-amd64.deb`
-  const releaseTag = `buddy-v${version}`
+  const releaseTag = `v${version}`
 
   return {
     debPath: join(resolveBuddyOutputPaths(cwd).artifacts.desktop, releaseAssetName),

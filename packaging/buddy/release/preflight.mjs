@@ -15,6 +15,7 @@ export function createBuddyReleasePreflightSteps() {
     ['Release workflow', 'node', ['packaging/buddy/release/verify-release-workflow.mjs']],
     ['Desktop source lint', 'pnpm', ['exec', 'eslint', 'apps/buddy', 'packaging/buddy']],
     ['Desktop type-check', 'pnpm', ['--filter', '@lexora/buddy', 'type-check']],
+    ['Desktop tests', 'pnpm', ['--filter', '@lexora/buddy', 'test']],
     ['Native pet format', 'cargo', ['fmt', '--manifest-path', 'apps/buddy/native-pet/Cargo.toml', '--', '--check']],
     ['Native pet check', 'cargo', ['check', '--manifest-path', 'apps/buddy/native-pet/Cargo.toml', '--all-targets']],
     ['Native pet clippy', 'cargo', ['clippy', '--manifest-path', 'apps/buddy/native-pet/Cargo.toml', '--all-targets', '--', '-D', 'warnings']],
