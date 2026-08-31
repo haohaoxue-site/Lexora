@@ -10,6 +10,7 @@ import { createDesktopContextMenuTemplate } from './desktopContextMenu'
 import { isAllowedExternalUrl, isAllowedRendererNavigation } from './security/navigationPolicy'
 
 export interface CreateDesktopWindowOptions {
+  appName: string
   iconPath: string
   isQuitting: () => boolean
   executeCommand: ExecuteDesktopCommand
@@ -41,7 +42,7 @@ export function createDesktopWindow(options: CreateDesktopWindowOptions): Deskto
     frame: false,
     icon: options.iconPath,
     show: false,
-    title: 'Lexora Buddy',
+    title: options.appName,
     webPreferences: {
       devTools: true,
       preload: join(__dirname, '../preload/index.cjs'),
@@ -53,6 +54,10 @@ export function createDesktopWindow(options: CreateDesktopWindowOptions): Deskto
     },
   }
   const window = new BrowserWindow(windowOptions)
+  window.on('page-title-updated', (event) => {
+    event.preventDefault()
+    window.setTitle(options.appName)
+  })
   window.webContents.session.setPermissionCheckHandler(() => false)
   window.webContents.session.setPermissionRequestHandler((_webContents, _permission, callback) => {
     callback(false)

@@ -1,8 +1,8 @@
 import type { AutomationStartupContext } from '../../shared/automation'
 import type { LexoraConfig } from '../shared/desktopApi'
 import { mkdirSync } from 'node:fs'
-import { homedir } from 'node:os'
-import { join } from 'node:path'
+import { homedir, tmpdir } from 'node:os'
+import { dirname, join } from 'node:path'
 import process from 'node:process'
 import {
   app,
@@ -16,7 +16,9 @@ import {
   shell,
 } from 'electron'
 import buddyPackage from '../../package.json'
-import desktopIconPath from '../../resources/icons/app-icon.png?asset'
+import developmentDesktopIconPath from '../../resources/icons/app-icon-dev.png?asset'
+import stableDesktopIconPath from '../../resources/icons/app-icon.png?asset'
+import developmentTrayIconPath from '../../resources/icons/tray-icon-dev.png?asset'
 import { DESKTOP_IPC_CHANNELS } from '../shared/desktopApi'
 import { installAttachmentProtocol, registerAttachmentSchemePrivileges } from './attachmentProtocol'
 import { LexoraConfigStore } from './config/LexoraConfigStore'
@@ -34,7 +36,7 @@ import { createFeedbackIssueUrl } from './feedbackIssue'
 import { registerDesktopIpc } from './ipc'
 import { resolveLinuxConfigDirectory, syncLinuxAutostart } from './linuxAutostart'
 import { registerLocalChatIpc } from './localChatIpc'
-import { resolveDesktopStoragePaths, resolveLexoraHome } from './paths'
+import { resolveBuddyRuntimePaths } from './paths'
 import {
   probeNativePetControlSocket,
   reloadNativePetConfig,
@@ -77,22 +79,55 @@ let quitPromise: Promise<void> | null = null
 let desktopLanguage: LexoraConfig['desktop']['language'] = 'zh-CN'
 let desktopConfig: LexoraConfig | null = null
 
-const desktopStoragePaths = resolveDesktopStoragePaths({
+const commandLineUserData = app.commandLine.hasSwitch('user-data-dir')
+  ? app.commandLine.getSwitchValue('user-data-dir')
+  : undefined
+const runtimePaths = resolveBuddyRuntimePaths({
+  defaultUserData: app.getPath('userData'),
+  desktopName: buddyPackage.desktopName,
+  isPackaged: app.isPackaged,
+  lexoraHomeOverride: process.env.LEXORA_HOME,
+  nativePetSocketOverride: process.env.LEXORA_BUDDY_PET_SOCKET,
+  nativePetStateOverride: process.env.LEXORA_BUDDY_PET_STATE_PATH,
+  profileOverride: process.env.LEXORA_BUDDY_PROFILE,
+  smokeTest: process.env.LEXORA_DESKTOP_SMOKE_TEST === '1',
+  temporaryDirectory: tmpdir(),
+  userDataOverride: commandLineUserData,
   userHome: homedir(),
+  userId: process.geteuid?.() ?? 0,
   xdgCacheHome: process.env.XDG_CACHE_HOME,
+  xdgConfigHome: process.env.XDG_CONFIG_HOME,
+  xdgRuntimeDirectory: process.env.XDG_RUNTIME_DIR,
   xdgStateHome: process.env.XDG_STATE_HOME,
 })
-for (const path of Object.values(desktopStoragePaths))
+const desktopIconPath = runtimePaths.iconVariant === 'development'
+  ? developmentDesktopIconPath
+  : stableDesktopIconPath
+const trayIconPath = runtimePaths.iconVariant === 'development'
+  ? developmentTrayIconPath
+  : stableDesktopIconPath
+for (const path of new Set([
+  runtimePaths.crashDumps,
+  runtimePaths.logs,
+  runtimePaths.sessionData,
+  runtimePaths.userData,
+  dirname(runtimePaths.nativePetSocket),
+  dirname(runtimePaths.nativePetState),
+  dirname(runtimePaths.windowState),
+])) {
   mkdirSync(path, { mode: 0o700, recursive: true })
-app.setPath('sessionData', desktopStoragePaths.sessionData)
-app.setPath('crashDumps', desktopStoragePaths.crashDumps)
-app.setAppLogsPath(desktopStoragePaths.logs)
+}
+app.setName(runtimePaths.appName)
+app.setPath('userData', runtimePaths.userData)
+app.setPath('sessionData', runtimePaths.sessionData)
+app.setPath('crashDumps', runtimePaths.crashDumps)
+app.setAppLogsPath(runtimePaths.logs)
 crashReporter.start({
-  productName: 'Lexora Buddy',
+  productName: runtimePaths.appName,
   uploadToServer: false,
 })
 const desktopDiagnostics = new DesktopDiagnosticLogger({
-  directory: desktopStoragePaths.logs,
+  directory: runtimePaths.logs,
   userHome: homedir(),
 })
 const localServiceDiagnosticOutput = desktopDiagnostics.createWritable(
@@ -100,6 +135,12 @@ const localServiceDiagnosticOutput = desktopDiagnostics.createWritable(
   process.stderr,
 )
 const nativePetDiagnosticOutput = desktopDiagnostics.createWritable('native-pet', process.stderr)
+const nativePetEnvironment: NodeJS.ProcessEnv = {
+  ...process.env,
+  LEXORA_BUDDY_PET_SOCKET: runtimePaths.nativePetSocket,
+  LEXORA_BUDDY_PET_STATE_PATH: runtimePaths.nativePetState,
+  LEXORA_HOME: runtimePaths.lexoraHome,
+}
 nativeTheme.on('updated', () => {
   const window = desktopWindowManager?.window
   if (window)
@@ -109,11 +150,8 @@ nativeTheme.on('updated', () => {
 registerAttachmentSchemePrivileges()
 registerRendererSchemePrivileges()
 const initialLaunchIntent = resolveDesktopLaunchIntent(process.argv)
-const desktopName = app.isPackaged
-  ? buddyPackage.desktopName
-  : `${buddyPackage.desktopName}.Development`
 if (process.platform === 'linux')
-  app.setDesktopName(desktopName)
+  app.setDesktopName(runtimePaths.desktopName)
 
 if (!app.requestSingleInstanceLock()) {
   writeDesktopDiagnostic('Existing instance detected; activating it')
@@ -141,15 +179,13 @@ else {
   app.on('window-all-closed', () => {})
 
   void app.whenReady().then(async () => {
-    app.setName('Lexora Buddy')
-    app.setAppUserModelId(desktopName)
+    app.setAppUserModelId(runtimePaths.desktopName)
     Menu.setApplicationMenu(null)
 
     const isSmokeTest = process.env.LEXORA_DESKTOP_SMOKE_TEST === '1'
-    const lexoraHome = resolveLexoraHome()
-    const buddyHome = join(lexoraHome, 'buddy')
-    const logDirectory = desktopStoragePaths.logs
-    const configPath = join(lexoraHome, 'config.toml')
+    const buddyHome = runtimePaths.buddyHome
+    const logDirectory = runtimePaths.logs
+    const configPath = runtimePaths.configPath
     const configStore = new LexoraConfigStore({ configPath })
     const credentialVault = createCredentialVault({ buddyHome })
     const initialConfig = await configStore.read()
@@ -159,7 +195,7 @@ else {
       onOpenDesktop: showDesktopWindow,
       spawnPet: createNativePetProcessFactory({
         appPath: app.getAppPath(),
-        env: process.env,
+        env: nativePetEnvironment,
         isPackaged: app.isPackaged,
         petPathOverride: process.env.LEXORA_BUDDY_PET_PATH,
         resourcesPath: process.resourcesPath,
@@ -197,7 +233,7 @@ else {
     })
     buddyServiceSupervisor = service
     const runtimeRecovery = new RuntimeRecoveryService({
-      backupsDirectory: join(lexoraHome, 'backups', 'buddy'),
+      backupsDirectory: runtimePaths.backupsDirectory,
       buddyHome,
       getRuntimeState: () => service.state,
       openPath: path => shell.openPath(path),
@@ -236,7 +272,8 @@ else {
     stopRendererProtocol = installRendererProtocol()
 
     desktopTray = createDesktopTray({
-      iconPath: desktopIconPath,
+      appName: runtimePaths.appName,
+      iconPath: trayIconPath,
       language: desktopLanguage,
       onOpenDesktop: showDesktopWindow,
       onQuit() {
@@ -304,7 +341,7 @@ else {
     })
 
     const windowStateStore = new DesktopWindowStateStore({
-      path: join(desktopStoragePaths.logs, '..', 'window-state.json'),
+      path: runtimePaths.windowState,
     })
     let windowPlacement = resolveVisibleWindowPlacement(
       await windowStateStore.read(),
@@ -313,6 +350,7 @@ else {
     const desktop = new DesktopWindowManager({
       createWindow: () => {
         const handle = createDesktopWindow({
+          appName: runtimePaths.appName,
           executeCommand: executeDesktopCommand,
           iconPath: desktopIconPath,
           isQuitting: () => isQuitting,
@@ -545,7 +583,7 @@ async function applyNativePetConfig(config: LexoraConfig['pet']): Promise<void> 
 
 async function safelyProbeNativePet(): Promise<boolean> {
   try {
-    return await probeNativePetControlSocket()
+    return await probeNativePetControlSocket(nativePetEnvironment)
   }
   catch (error) {
     writeDesktopDiagnostic(`Native pet probe failed: ${diagnosticName(error)}`)
@@ -555,7 +593,7 @@ async function safelyProbeNativePet(): Promise<boolean> {
 
 async function safelyReloadNativePetConfig(): Promise<boolean> {
   try {
-    return await reloadNativePetConfig()
+    return await reloadNativePetConfig(nativePetEnvironment)
   }
   catch (error) {
     writeDesktopDiagnostic(`Native pet config reload failed: ${diagnosticName(error)}`)

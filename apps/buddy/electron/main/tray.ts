@@ -4,6 +4,7 @@ import { Menu, nativeImage, Tray } from 'electron'
 import { translateDesktopNative } from './desktopNativeI18n'
 
 export interface CreateDesktopTrayOptions {
+  appName: string
   iconPath: string
   language: LexoraConfig['desktop']['language']
   onOpenDesktop: () => void
@@ -44,7 +45,7 @@ export function createDesktopTray(options: CreateDesktopTrayOptions): DesktopTra
     ]))
   }
 
-  tray.setToolTip('Lexora Buddy')
+  tray.setToolTip(options.appName)
   tray.on('click', options.onOpenDesktop)
   rebuildMenu()
 
