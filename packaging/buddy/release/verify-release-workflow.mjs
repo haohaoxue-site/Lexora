@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import process from 'node:process'
 
+import { classifyCiScope } from '../../../infrastructure/scripts/resolve-ci-scope.mjs'
 import { writeOutput } from '../../shared/cli-output.mjs'
 
 const repoRoot = resolve(import.meta.dirname, '../../..')
@@ -18,6 +19,7 @@ export function verifyBuddyReleaseWorkflow(cwd = repoRoot) {
   const errors = []
 
   verifyCiWorkflow(workflows.ci, errors)
+  verifyCiScopeClassification(errors)
   verifyBuildWorkflow(workflows.build, errors)
   verifyReleaseWorkflow(workflows.release, errors)
   verifyPinnedActions(Object.values(workflows).join('\n'), errors)
@@ -29,6 +31,7 @@ function verifyCiWorkflow(workflow, errors) {
   requireFragments(workflow, [
     'name: Lexora CI',
     'pull_request:',
+    'ready_for_review',
     'push:',
     'branches: [master]',
     'contents: read',
@@ -42,27 +45,89 @@ function verifyCiWorkflow(workflow, errors) {
     'contents: write',
   ], errors, 'Lexora CI must cover every pull request without a publication path')
 
+  const scope = readJob(workflow, 'scope')
+  requireFragments(scope, [
+    'fetch-depth: 0',
+    'node infrastructure/scripts/resolve-ci-scope.mjs',
+    '--github-output "$GITHUB_OUTPUT"',
+  ], errors, 'Lexora CI must resolve cumulative change scope from the full comparison history')
+
+  requireFragments(
+    readFileSync(resolve(repoRoot, 'infrastructure/scripts/resolve-ci-scope.mjs'), 'utf8'),
+    ['--no-renames'],
+    errors,
+    'Lexora CI scope resolution must classify both sides of renamed paths',
+  )
+
+  const docs = readJob(workflow, 'docs-quality')
+  requireFragments(docs, [
+    'needs: scope',
+    'needs.scope.outputs.docs == \'true\'',
+    'pnpm --filter @haohaoxue/lexora --filter @haohaoxue/lexora-docs install --frozen-lockfile',
+    'pnpm --filter @haohaoxue/lexora-docs lint',
+    'pnpm --filter @haohaoxue/lexora-docs build',
+  ], errors, 'Lexora CI must lint and build Docs only when documentation changes')
+
   const quality = readJob(workflow, 'quality')
   requireFragments(quality, [
+    'needs: scope',
+    'needs.scope.outputs.quality == \'true\'',
     'timeout-minutes: 30',
     'pnpm install --frozen-lockfile',
     'run: pnpm lint',
     'run: pnpm type-check',
     'run: pnpm test',
-    'pnpm --filter \'!@lexora/buddy\' --recursive --if-present build',
+    'pnpm --filter \'!@lexora/buddy\' --filter \'!@haohaoxue/lexora-docs\' --recursive --if-present build',
   ], errors, 'Lexora CI quality job must lint, type-check, test and build the workspace')
 
   const packages = readJob(workflow, 'buddy-packages')
   requireFragments(packages, [
-    'needs: quality',
+    'needs: [scope, quality]',
+    'needs.scope.outputs.buddy == \'true\'',
+    'github.event.pull_request.draft == false',
     'uses: ./.github/workflows/buddy-build.yml',
-  ], errors, 'Lexora CI must run the reusable Buddy package verification after quality checks')
+    'upload-artifacts: false',
+  ], errors, 'Lexora CI must run Buddy package verification only for affected ready changes without uploading artifacts')
+
+  const gate = readJob(workflow, 'ci-gate')
+  requireFragments(gate, [
+    'needs: [scope, docs-quality, quality, buddy-packages]',
+    'if: always()',
+    'needs.scope.result',
+    'needs.docs-quality.result',
+    'needs.quality.result',
+    'needs.buddy-packages.result',
+  ], errors, 'Lexora CI must expose one stable gate that requires every selected check to succeed')
+}
+
+function verifyCiScopeClassification(errors) {
+  const cases = [
+    [['apps/docs/src/index.md'], { buddy: false, docs: true, quality: false }],
+    [['apps/web/src/main.ts'], { buddy: false, docs: false, quality: true }],
+    [['apps/docs/src/index.md', 'packages/contracts/src/index.ts'], { buddy: false, docs: true, quality: true }],
+    [['apps/buddy/electron/main/index.ts'], { buddy: true, docs: false, quality: true }],
+    [['packages/assets/brand/app-icon.png'], { buddy: true, docs: false, quality: true }],
+    [['packages/assets/buddy/pets/default/manifest.json'], { buddy: true, docs: false, quality: true }],
+    [['pnpm-lock.yaml'], { buddy: true, docs: false, quality: true }],
+    [['infrastructure/scripts/resolve-ci-scope.mjs'], { buddy: true, docs: false, quality: true }],
+    [['future/product/input.txt'], { buddy: true, docs: false, quality: true }],
+    [[], { buddy: true, docs: false, quality: true }],
+  ]
+
+  if (cases.some(([files, expected]) => (
+    JSON.stringify(classifyCiScope(files)) !== JSON.stringify(expected)
+  ))) {
+    errors.push('Lexora CI scope classification must keep Docs isolated and unknown build inputs conservative')
+  }
 }
 
 function verifyBuildWorkflow(workflow, errors) {
   requireFragments(workflow, [
     'name: Buddy Package Verification',
     'workflow_call:',
+    'upload-artifacts:',
+    'type: boolean',
+    'default: false',
     'contents: read',
   ], errors, 'Buddy package verification must be a reusable read-only workflow')
   requireGlobalReadOnly(workflow, errors, 'Buddy package verification')
@@ -102,6 +167,7 @@ function verifyReleaseWorkflow(workflow, errors) {
   requireFragments(packages, [
     'needs: validate-release',
     'uses: ./.github/workflows/buddy-build.yml',
+    'upload-artifacts: true',
   ], errors, 'Lexora Release must build packages only after tag validation')
 
   verifyPublishJob(readJob(workflow, 'publish-release'), errors)
@@ -140,6 +206,7 @@ function verifyUbuntuJob(job, errors) {
     'include-hidden-files: true',
     'compression-level: 0',
     'retention-days: 7',
+    'if: inputs.upload-artifacts',
   ], errors, 'Ubuntu build job must upload the verified deb artifact with bounded retention')
   forbidReleaseMutation(job, errors, 'Ubuntu build job')
 }
@@ -174,6 +241,7 @@ function verifyArchJob(job, errors) {
     'include-hidden-files: true',
     'compression-level: 0',
     'retention-days: 7',
+    'if: inputs.upload-artifacts',
   ], errors, 'Arch build job must smoke and upload the verified pacman package with bounded retention')
   forbidReleaseMutation(job, errors, 'Arch build job')
 }
