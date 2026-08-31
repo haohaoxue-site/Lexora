@@ -30,7 +30,7 @@ jobs:
           node-version-file: .node-version
 
       - name: Match tag to product version
-        run: node packaging/buddy/release/buddy-version.mjs --check-tag "$GITHUB_REF_NAME"
+        run: node packaging/release/version.mjs --check-tag "$GITHUB_REF_NAME"
 
       - name: Require a master commit
         run: |

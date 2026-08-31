@@ -10,10 +10,10 @@ const repoRoot = resolve(import.meta.dirname, '../../..')
 
 export function createBuddyReleasePreflightSteps() {
   return [
-    ['Version consistency', 'node', ['packaging/buddy/release/buddy-version.mjs', '--check']],
+    ['Version consistency', 'node', ['packaging/release/version.mjs', '--check']],
     ['Desktop assets', 'node', ['packaging/buddy/release/verify-desktop-assets.mjs']],
     ['Release workflow', 'node', ['packaging/buddy/release/verify-release-workflow.mjs']],
-    ['Desktop source lint', 'pnpm', ['exec', 'eslint', 'apps/buddy', 'packaging/buddy']],
+    ['Desktop source lint', 'pnpm', ['exec', 'eslint', 'apps/buddy', 'packaging/buddy', 'packaging/release']],
     ['Desktop type-check', 'pnpm', ['--filter', '@lexora/buddy', 'type-check']],
     ['Desktop tests', 'pnpm', ['--filter', '@lexora/buddy', 'test']],
     ['Native pet format', 'cargo', ['fmt', '--manifest-path', 'apps/buddy/native-pet/Cargo.toml', '--', '--check']],

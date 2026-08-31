@@ -1,8 +1,8 @@
 {
   "name": "@haohaoxue/lexora",
   "type": "module",
-  "version": "1.0.0",
-  "private": "true",
+  "version": "0.1.0",
+  "private": true,
   "packageManager": "pnpm@11.5.0",
   "license": "AGPL-3.0-only",
   "engines": {
@@ -28,8 +28,9 @@
     "build": "pnpm -r --if-present build",
     "package:buddy:deb": "RUST_MIN_STACK=16777216 pnpm --filter @lexora/buddy package:deb",
     "build:buddy:pet": "RUST_MIN_STACK=16777216 pnpm --filter @lexora/buddy package:pet",
-    "buddy:version:check": "node packaging/buddy/release/buddy-version.mjs --check",
-    "buddy:version:set": "node packaging/buddy/release/buddy-version.mjs --set",
+    "release:version:check": "node packaging/release/version.mjs --check",
+    "release:version:set": "node packaging/release/version.mjs --set",
+    "release:status": "node packaging/release/status.mjs",
     "check:buddy": "node packaging/buddy/release/preflight.mjs",
     "test": "pnpm -r test",
     "test:watch": "pnpm -r --parallel --if-present test:watch",

@@ -112,7 +112,7 @@ function verifyReleaseValidationJob(job, errors) {
   requireFragments(job, [
     'timeout-minutes: 10',
     'fetch-depth: 0',
-    'node packaging/buddy/release/buddy-version.mjs --check-tag "$GITHUB_REF_NAME"',
+    'node packaging/release/version.mjs --check-tag "$GITHUB_REF_NAME"',
     '+refs/heads/master:refs/remotes/origin/master',
     'git merge-base --is-ancestor "$release_commit" origin/master',
     'gh api "repos/$GITHUB_REPOSITORY/releases/tags/$GITHUB_REF_NAME"',

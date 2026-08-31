@@ -1,7 +1,6 @@
 {
   "name": "@haohaoxue/lexora-docs",
   "type": "module",
-  "version": "1.0.0",
   "private": true,
   "scripts": {
     "docs:dev": "vitepress dev src",

@@ -19,6 +19,6 @@ pnpm --filter @lexora/buddy package:pet
 ## 校验
 
 ```bash
-pnpm buddy:version:check
+pnpm release:version:check
 pnpm check:buddy
 ```

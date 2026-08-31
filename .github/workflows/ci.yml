@@ -33,6 +33,9 @@ jobs:
           cache: pnpm
           cache-dependency-path: pnpm-lock.yaml
 
+      - name: Check product versions
+        run: node packaging/release/version.mjs --check
+
       - name: Install workspace dependencies
         run: pnpm install --frozen-lockfile
 
