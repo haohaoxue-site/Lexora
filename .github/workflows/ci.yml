@@ -20,7 +20,7 @@ jobs:
     timeout-minutes: 5
     outputs:
       buddy: ${{ steps.resolve.outputs.buddy }}
-      docs: ${{ steps.resolve.outputs.docs }}
+      website: ${{ steps.resolve.outputs.website }}
       quality: ${{ steps.resolve.outputs.quality }}
     steps:
       - name: Checkout
@@ -47,10 +47,10 @@ jobs:
           --mode "$MODE"
           --github-output "$GITHUB_OUTPUT"
 
-  docs-quality:
-    name: Docs quality
+  website-quality:
+    name: Website quality
     needs: scope
-    if: needs.scope.outputs.docs == 'true'
+    if: needs.scope.outputs.website == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
@@ -69,14 +69,17 @@ jobs:
           cache: pnpm
           cache-dependency-path: pnpm-lock.yaml
 
-      - name: Install Docs dependencies
-        run: pnpm --filter @haohaoxue/lexora --filter @haohaoxue/lexora-docs install --frozen-lockfile
+      - name: Install Website dependencies
+        run: pnpm --filter @haohaoxue/lexora --filter @haohaoxue/lexora-website install --frozen-lockfile
 
-      - name: Lint Docs
-        run: pnpm --filter @haohaoxue/lexora-docs lint
+      - name: Verify Website Pages workflow
+        run: node packaging/website/release/verify-pages-workflow.mjs
 
-      - name: Build Docs
-        run: pnpm --filter @haohaoxue/lexora-docs build
+      - name: Lint Website
+        run: pnpm --filter @haohaoxue/lexora-website lint
+
+      - name: Build Website
+        run: pnpm --filter @haohaoxue/lexora-website build
 
   quality:
     name: Quality
@@ -116,7 +119,7 @@ jobs:
         run: pnpm test
 
       - name: Build workspace applications
-        run: pnpm --filter '!@lexora/buddy' --filter '!@haohaoxue/lexora-docs' --recursive --if-present build
+        run: pnpm --filter '!@lexora/buddy' --filter '!@haohaoxue/lexora-website' --recursive --if-present build
 
   buddy-packages:
     name: Buddy packages
@@ -130,7 +133,7 @@ jobs:
 
   ci-gate:
     name: CI Gate
-    needs: [scope, docs-quality, quality, buddy-packages]
+    needs: [scope, website-quality, quality, buddy-packages]
     if: always()
     runs-on: ubuntu-24.04
     timeout-minutes: 5
@@ -141,8 +144,8 @@ jobs:
             ${{ needs.scope.outputs.buddy == 'true'
                 && (github.event_name != 'pull_request' || github.event.pull_request.draft == false) }}
           BUDDY_RESULT: ${{ needs.buddy-packages.result }}
-          DOCS_REQUIRED: ${{ needs.scope.outputs.docs }}
-          DOCS_RESULT: ${{ needs.docs-quality.result }}
+          WEBSITE_REQUIRED: ${{ needs.scope.outputs.website }}
+          WEBSITE_RESULT: ${{ needs.website-quality.result }}
           QUALITY_REQUIRED: ${{ needs.scope.outputs.quality }}
           QUALITY_RESULT: ${{ needs.quality.result }}
           SCOPE_RESULT: ${{ needs.scope.result }}
@@ -162,6 +165,6 @@ jobs:
             exit 1
           fi
 
-          require_success "Docs quality" "$DOCS_REQUIRED" "$DOCS_RESULT"
+          require_success "Website quality" "$WEBSITE_REQUIRED" "$WEBSITE_RESULT"
           require_success "Quality" "$QUALITY_REQUIRED" "$QUALITY_RESULT"
           require_success "Buddy packages" "$BUDDY_REQUIRED" "$BUDDY_RESULT"

@@ -1,0 +1,22 @@
+{
+  "name": "@haohaoxue/lexora-website",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "vitepress dev src",
+    "build": "vitepress build src",
+    "preview": "vitepress preview src",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "type-check": "vue-tsc -p tsconfig.json --noEmit --pretty false"
+  },
+  "dependencies": {
+    "vitepress": "2.0.0-alpha.17",
+    "vue": "^3.5.33"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vue-tsc": "^3.2.7"
+  }
+}

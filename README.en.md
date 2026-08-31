@@ -21,6 +21,8 @@
 </p>
 
 <p align="center">
+  <a href="https://haohaoxue-site.github.io/Lexora/en/">Documentation</a>
+  ·
   <a href="https://github.com/haohaoxue-site/Lexora/releases/latest">Download Lexora Desktop</a>
   ·
   <a href="https://docs.haohaoxue.site/">Website</a>
@@ -32,7 +34,7 @@ Lexora is a personal AI workspace built around Desktop. Within the access you gr
 
 Desktop runs locally and is organized around tasks, bringing conversations, local context, tool execution, automations, and artifacts together in one workspace.
 
-![Lexora Desktop preview](apps/docs/src/public/buddy-ui.png)
+![Lexora Desktop preview](apps/website/src/public/buddy-ui.png)
 
 ### Core Capabilities
 
@@ -63,7 +65,7 @@ pnpm dev:buddy
 
 Web will gradually become Desktop's content extension for document editing, knowledge capture, and public publishing. It currently runs independently and supports self-hosting.
 
-![Lexora Web preview](apps/docs/src/public/ui.png)
+![Lexora Web preview](apps/website/src/public/ui.png)
 
 ### Core Capabilities
 
@@ -100,7 +102,7 @@ lexora/
 │   ├── api/         # NestJS API service
 │   ├── agent/       # LangGraph AI runtime service
 │   ├── buddy/       # Lexora Desktop
-│   └── docs/        # Product documentation site
+│   └── website/     # Product landing and documentation site
 ├── packages/
 │   ├── assets/      # Cross-app brand and runtime assets
 │   ├── contracts/   # Shared schemas, endpoints, constants, and domain types
