@@ -9,10 +9,14 @@ import type {
 import type { BuddyExecutionProfile } from '../../../../shared/executionProfile'
 import type { BuddyServiceTier } from '../../../../shared/modelSelection'
 
-import type { BuddyToolClassificationResult } from '../../approvals/toolClassification'
+import type {
+  BuddyToolClassification,
+  BuddyToolClassificationResult,
+} from '../../approvals/toolClassification'
 import type { ToolApprovalKind } from '../../approvals/toolPolicyContract'
 import type { ProjectGrant } from '../../projects/resolveGrantedPath'
 import type { BuddyInProcessExtension } from '../createBuddyResourceLoader'
+import { createToolApprovalScopeKey } from '../../approvals/toolApprovalScope'
 import { isToolClassificationFailure } from '../../approvals/toolClassification'
 import { ToolPolicy } from '../../approvals/ToolPolicy'
 import { readToolCallBlockReason } from '../../approvals/toolPolicyContract'
@@ -25,6 +29,7 @@ export interface ToolApprovalGateway {
     automation?: AutomationApprovalReviewInput
     kind: ToolApprovalKind
     runId: string
+    scopeKey: string
     signal: AbortSignal
     summary: string
     systemAction?: SystemActionApprovalReviewInput
@@ -92,6 +97,9 @@ async function decideToolCall(
         allowForTurn: false,
         automation: approval.automation,
         kind: approval.kind,
+        paths: declared.paths,
+        resource: declared.resource,
+        risk: declared.risk,
         summary: approval.summary,
         systemAction: approval.systemAction,
       })
@@ -117,6 +125,9 @@ async function decideToolCall(
       allowForTurn: true,
       automation: declared.approval?.automation,
       kind: decision.kind,
+      paths: declared.paths,
+      resource: declared.resource,
+      risk: declared.risk,
       summary: declared.approval?.summary ?? decision.summary,
       systemAction: declared.approval?.systemAction,
     })
@@ -134,6 +145,9 @@ async function requestApproval(
     allowForTurn: boolean
     automation?: AutomationApprovalReviewInput
     kind: ToolApprovalKind
+    paths?: BuddyToolClassification['paths']
+    resource?: BuddyToolClassification['resource']
+    risk?: BuddyToolClassification['risk']
     summary: string
     systemAction?: SystemActionApprovalReviewInput
   },
@@ -144,6 +158,14 @@ async function requestApproval(
     automation: review.automation,
     kind: review.kind,
     runId: run.runId,
+    scopeKey: createToolApprovalScopeKey({
+      arguments: event.input,
+      kind: review.kind,
+      paths: review.paths,
+      resource: review.resource,
+      risk: review.risk,
+      toolName: event.toolName,
+    }),
     signal: run.signal,
     summary: review.summary,
     systemAction: review.systemAction,

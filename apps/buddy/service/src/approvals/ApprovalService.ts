@@ -22,6 +22,7 @@ export interface ApprovalRequest {
   automation?: AutomationApprovalReviewInput
   kind: ToolApprovalKind
   runId: string
+  scopeKey: string
   signal: AbortSignal
   summary: string
   systemAction?: SystemActionApprovalReviewInput
@@ -46,6 +47,7 @@ interface ApprovalWaiter {
   cleanup: () => void
   reject: (error: Error) => void
   resolve: (decision: ApprovalDecision) => void
+  scopeKey: string
   signal: AbortSignal
 }
 
@@ -54,7 +56,7 @@ export class ApprovalService {
   readonly #eventLog: ApprovalServiceOptions['eventLog']
   readonly #onExpired: NonNullable<ApprovalServiceOptions['onExpired']>
   readonly #repository: ApprovalRepository
-  readonly #approvedTurnSignals = new WeakSet<AbortSignal>()
+  readonly #approvedTurnScopes = new WeakMap<AbortSignal, Set<string>>()
   readonly #resolving = new Map<string, Promise<unknown>>()
   readonly #waiters = new Map<string, ApprovalWaiter>()
 
@@ -68,8 +70,12 @@ export class ApprovalService {
   async request(input: ApprovalRequest): Promise<ApprovalDecision> {
     if (input.signal.aborted)
       throw new ApprovalCancelledError()
-    if (input.allowForTurn && this.#approvedTurnSignals.has(input.signal))
+    if (
+      input.allowForTurn
+      && this.#approvedTurnScopes.get(input.signal)?.has(input.scopeKey)
+    ) {
       return 'approved'
+    }
 
     const approval: ApprovalRecord = {
       createdAt: new Date().toISOString(),
@@ -102,6 +108,7 @@ export class ApprovalService {
         },
         reject,
         resolve,
+        scopeKey: input.scopeKey,
         signal: input.signal,
       })
     })
@@ -142,8 +149,8 @@ export class ApprovalService {
     const waiter = this.#waiters.get(input.id)
     if (input.decision === 'approved_for_turn' && !waiter?.allowForTurn)
       throw new ApprovalResolutionError()
-    const approvedTurnSignal = input.decision === 'approved_for_turn'
-      ? waiter?.signal ?? null
+    const approvedTurnScope = input.decision === 'approved_for_turn' && waiter
+      ? { scopeKey: waiter.scopeKey, signal: waiter.signal }
       : null
     const decision: ApprovalDecision = input.decision === 'approved_for_turn'
       ? 'approved'
@@ -157,8 +164,11 @@ export class ApprovalService {
     const approval = this.#requireApproval(input.id)
     if (approval.status !== decision)
       throw new ApprovalResolutionError()
-    if (approvedTurnSignal)
-      this.#approvedTurnSignals.add(approvedTurnSignal)
+    if (approvedTurnScope) {
+      const scopes = this.#approvedTurnScopes.get(approvedTurnScope.signal) ?? new Set<string>()
+      scopes.add(approvedTurnScope.scopeKey)
+      this.#approvedTurnScopes.set(approvedTurnScope.signal, scopes)
+    }
     waiter?.resolve(decision)
     waiter?.cleanup()
     this.#waiters.delete(input.id)

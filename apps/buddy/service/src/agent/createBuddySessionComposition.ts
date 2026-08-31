@@ -14,15 +14,17 @@ import type { BuddyRunContextStore } from './createReusableBuddySession'
 import type { CreateArtifactExtensionOptions } from './extensions/artifactExtension'
 import type { ChangeCaptureGateway } from './extensions/changeCaptureExtension'
 import type { CreateImageGenerationExtensionOptions } from './extensions/imageGenerationExtension'
+import type { CreateImageTransformExtensionOptions } from './extensions/imageTransformExtension'
 import type {
   BuddyRunContext,
   CreateToolPolicyExtensionOptions,
   ToolApprovalGateway,
 } from './extensions/toolPolicyExtension'
-import { classifyArtifactPresentTool } from '../artifacts/artifactToolContract'
+import { classifyArtifactTool } from '../artifacts/artifactToolContract'
 import { classifyAutomationToolCall } from '../automations/createAutomationTool'
 import { classifyMcpTool } from '../connectors/mcp/mcpToolContract'
 import { classifyImageGenerationTool } from '../images/imageGenerationToolContract'
+import { classifyImageTransformTool } from '../images/imageTransformToolContract'
 import { classifyPetTool } from '../pet/petToolContract'
 import { SystemCapabilityService } from '../system/systemCapability'
 import { classifySystemTool } from '../system/systemToolContract'
@@ -30,9 +32,11 @@ import { createArtifactExtension } from './extensions/artifactExtension'
 import { createAutomationExtension } from './extensions/automationExtension'
 import { createChangeCaptureExtension } from './extensions/changeCaptureExtension'
 import { createImageGenerationExtension } from './extensions/imageGenerationExtension'
+import { createImageTransformExtension } from './extensions/imageTransformExtension'
 import { createMcpExtension } from './extensions/mcpExtension'
 import { createPetExtension } from './extensions/petExtension'
 import { createSystemExtension } from './extensions/systemExtension'
+import { createSystemPromptExtension } from './extensions/systemPromptExtension'
 import { createToolPolicyExtension } from './extensions/toolPolicyExtension'
 
 interface BuddySessionConnectorSource {
@@ -48,6 +52,7 @@ export interface BuddySessionCompositionServices {
   changeCaptureService: ChangeCaptureGateway
   connectorService: BuddySessionConnectorSource
   imageGenerationGateway: ImageGenerationGateway
+  imageTransformService: CreateImageTransformExtensionOptions['service']
   onAutomationChanged: (automationId: string) => void
   petService: CreatePetToolOptions['service']
   systemHost: SystemHostPort
@@ -57,7 +62,8 @@ export interface CreateBuddySessionCompositionOptions {
   canonicalRoot: string
   conversationId: string
   executionProfile: BuddyExecutionProfile
-  grant: ProjectGrant
+  grants: readonly ProjectGrant[]
+  scratchRoot: string
   sessionMode: BuddySessionMode
   signal: AbortSignal
   services: BuddySessionCompositionServices
@@ -73,6 +79,11 @@ export async function createBuddySessionComposition(
   options: CreateBuddySessionCompositionOptions,
 ): Promise<BuddySessionComposition> {
   const { services } = options
+  const scratchGrant = options.grants.find(
+    grant => grant.canonicalRoot === options.scratchRoot,
+  )
+  if (!scratchGrant)
+    throw new Error('Lexora Buddy scratch grant is unavailable')
   const mcp = await services.connectorService.getTools(options.signal)
   const runContext: BuddyRunContextStore = { current: null }
   const systemCapability = new SystemCapabilityService({ host: services.systemHost })
@@ -90,11 +101,18 @@ export async function createBuddySessionComposition(
       getRunId: () => runContext.current?.runId,
       imageGenerationGateway: services.imageGenerationGateway,
     }),
-    createArtifactExtension({
-      artifactService: services.artifactService,
-      canonicalRoot: options.canonicalRoot,
+    createImageTransformExtension({
       conversationId: options.conversationId,
       getRunId: () => runContext.current?.runId,
+      service: services.imageTransformService,
+    }),
+    createArtifactExtension({
+      artifactService: services.artifactService,
+      conversationId: options.conversationId,
+      cwd: options.canonicalRoot,
+      getRunId: () => runContext.current?.runId,
+      grants: options.grants,
+      scratchGrant,
     }),
     createPetExtension({
       getRunId: () => runContext.current?.runId,
@@ -116,7 +134,7 @@ export async function createBuddySessionComposition(
       classifyTool,
       cwd: options.canonicalRoot,
       executionProfile: options.executionProfile,
-      getGrants: () => [options.grant],
+      getGrants: () => options.grants,
       getRunContext: () => runContext.current,
     }),
     createChangeCaptureExtension({
@@ -126,6 +144,10 @@ export async function createBuddySessionComposition(
       service: services.changeCaptureService,
     }),
   )
+  inProcessExtensions.push(createSystemPromptExtension({
+    artifactService: services.artifactService,
+    conversationId: options.conversationId,
+  }))
 
   return {
     getServiceTier: () => runContext.current?.serviceTier ?? null,
@@ -151,9 +173,13 @@ function createBuddyToolClassifier(
     if (automation)
       return automation
 
-    const artifact = classifyArtifactPresentTool(event)
+    const artifact = classifyArtifactTool(event)
     if (artifact)
       return artifact
+
+    const imageTransform = classifyImageTransformTool(event)
+    if (imageTransform)
+      return imageTransform
 
     const system = await classifySystemTool(
       options.systemCapability,

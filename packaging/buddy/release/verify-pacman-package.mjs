@@ -114,6 +114,10 @@ function verifyAppAsar(appAsar) {
     throw new Error('Pacman app.asar is missing the Buddy Local Service')
   if (!appAsar.includes(Buffer.from('ModelRuntime')))
     throw new Error('Pacman app.asar is missing the bundled Pi runtime')
+  for (const entry of ['photon_rs.js', 'photon_rs_bg.wasm']) {
+    if (!appAsar.includes(Buffer.from(entry)))
+      throw new Error(`Pacman app.asar is missing the Photon runtime entry: ${entry}`)
+  }
 }
 
 function verifyDesktopEntry(desktopFile) {

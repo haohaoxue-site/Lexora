@@ -20,6 +20,7 @@ export interface BuddySessionIdentity {
   conversationId: string
   executionProfile: BuddyExecutionProfile
   resourceRevision: string
+  scratchRoot: string
   sessionMode: BuddySessionMode
 }
 
@@ -33,9 +34,10 @@ export interface BuddySessionBlueprint {
   canonicalRoot: string
   conversationId: string
   executionProfile: BuddyExecutionProfile
-  grant: ProjectGrant
+  grants: readonly ProjectGrant[]
   project: BuddySessionProjectSnapshot | null
   resources: BuddySessionResources
+  scratchRoot: string
   sessionMode: BuddySessionMode
 }
 
@@ -92,9 +94,10 @@ export class BuddySessionBlueprintService {
     const project = input.projectId
       ? requireGrantedProject(this.#options.projects.findById(input.projectId))
       : null
+    const scratchRoot = await resolveOwnedRoot(input.ownedRoot)
     const canonicalRoot = project
       ? await resolveGrantedProjectRoot(project)
-      : await resolveOwnedRoot(input.ownedRoot)
+      : scratchRoot
     const resources = await resolveBuddySessionResources({
       canonicalRoot,
       cwd: canonicalRoot,
@@ -103,26 +106,35 @@ export class BuddySessionBlueprintService {
       skills: this.#options.skills,
     })
 
+    const primaryGrant: ProjectGrant = project
+      ? {
+          canonicalRoot: project.canonicalRoot,
+          projectId: project.id,
+          root: project.root,
+        }
+      : {
+          canonicalRoot,
+          projectId: input.conversationId,
+          root: canonicalRoot,
+        }
+
     return {
       branchId: input.branchId,
       canonicalRoot,
       conversationId: input.conversationId,
       executionProfile: input.executionProfile,
-      grant: project
-        ? {
-            canonicalRoot: project.canonicalRoot,
-            projectId: project.id,
-            root: project.root,
-          }
-        : {
-            canonicalRoot,
+      grants: canonicalRoot === scratchRoot
+        ? [primaryGrant]
+        : [primaryGrant, {
+            canonicalRoot: scratchRoot,
             projectId: input.conversationId,
-            root: canonicalRoot,
-          },
+            root: scratchRoot,
+          }],
       project: project
         ? { id: project.id, memoryScope: project.memoryScope }
         : null,
       resources,
+      scratchRoot,
       sessionMode: input.sessionMode,
     }
   }
@@ -137,6 +149,7 @@ export function toBuddySessionIdentity(
     conversationId: blueprint.conversationId,
     executionProfile: blueprint.executionProfile,
     resourceRevision: blueprint.resources.revision,
+    scratchRoot: blueprint.scratchRoot,
     sessionMode: blueprint.sessionMode,
   }
 }
