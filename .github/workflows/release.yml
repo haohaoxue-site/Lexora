@@ -60,6 +60,8 @@ jobs:
     name: Buddy packages
     needs: validate-release
     uses: ./.github/workflows/buddy-build.yml
+    with:
+      upload-artifacts: true
 
   publish-release:
     name: Publish Release

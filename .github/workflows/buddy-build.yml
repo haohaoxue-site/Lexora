@@ -2,6 +2,12 @@ name: Buddy Package Verification
 
 on:
   workflow_call:
+    inputs:
+      upload-artifacts:
+        description: Upload verified packages for downstream release jobs
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -61,6 +67,7 @@ jobs:
         run: xvfb-run -a node packaging/buddy/ci/run-gui-smoke.mjs
 
       - name: Upload verified Ubuntu package
+        if: inputs.upload-artifacts
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: lexora-buddy-ubuntu
@@ -131,6 +138,7 @@ jobs:
             xvfb-run -a dbus-run-session -- node packaging/buddy/ci/run-gui-smoke.mjs
 
       - name: Upload verified Arch package
+        if: inputs.upload-artifacts
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: lexora-buddy-arch
