@@ -6,8 +6,16 @@ import type { CreateBuddyToolPresentationInput } from '../events/toolPresentatio
 import { Check } from 'typebox/value'
 import { createToolClassificationFailure } from '../approvals/toolClassification'
 import { readRecord } from '../events/toolPresentationSupport'
-import { artifactPresentParameters } from './artifactToolParameters'
+import {
+  artifactCheckoutParameters,
+  artifactGetParameters,
+  artifactListParameters,
+  artifactPresentParameters,
+} from './artifactToolParameters'
 
+export const ARTIFACT_LIST_TOOL_NAME = 'lexora_artifact_list'
+export const ARTIFACT_GET_TOOL_NAME = 'lexora_artifact_get'
+export const ARTIFACT_CHECKOUT_TOOL_NAME = 'lexora_artifact_checkout'
 export const ARTIFACT_PRESENT_TOOL_NAME = 'lexora_artifact_present'
 
 export function createArtifactPresentToolPresentation(
@@ -28,19 +36,39 @@ export function createArtifactPresentToolPresentation(
   }
 }
 
-export function classifyArtifactPresentTool(
+export function classifyArtifactTool(
   event: ToolCallEvent,
 ): BuddyToolClassificationResult | null {
-  if (event.toolName !== ARTIFACT_PRESENT_TOOL_NAME)
-    return null
-  if (!Check(artifactPresentParameters, event.input))
-    return createToolClassificationFailure('VALIDATION_FAILED')
-  return {
-    paths: event.input.files.map(file => ({ mode: 'existing' as const, path: file.path })),
-    risk: 'read',
-    source: 'lexora',
+  switch (event.toolName) {
+    case ARTIFACT_LIST_TOOL_NAME:
+      return Check(artifactListParameters, event.input)
+        ? { risk: 'read', source: 'lexora' }
+        : createToolClassificationFailure('VALIDATION_FAILED')
+    case ARTIFACT_GET_TOOL_NAME:
+      return Check(artifactGetParameters, event.input)
+        ? { risk: 'read', source: 'lexora' }
+        : createToolClassificationFailure('VALIDATION_FAILED')
+    case ARTIFACT_CHECKOUT_TOOL_NAME:
+      return Check(artifactCheckoutParameters, event.input)
+        ? { risk: 'read', source: 'lexora' }
+        : createToolClassificationFailure('VALIDATION_FAILED')
+    case ARTIFACT_PRESENT_TOOL_NAME:
+      return Check(artifactPresentParameters, event.input)
+        ? {
+            paths: event.input.files.map(file => ({
+              mode: 'existing' as const,
+              path: file.path,
+            })),
+            risk: 'read',
+            source: 'lexora',
+          }
+        : createToolClassificationFailure('VALIDATION_FAILED')
+    default:
+      return null
   }
 }
+
+export const classifyArtifactPresentTool = classifyArtifactTool
 
 export function createArtifactPresentRunOutput(
   input: Pick<CreateBuddyToolPresentationInput, 'isError' | 'result' | 'toolName'> & {

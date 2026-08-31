@@ -23,6 +23,10 @@ import {
   createImageGenerationRunOutput,
   createImageGenerationToolPresentation,
 } from '../images/imageGenerationToolContract'
+import {
+  createImageTransformRunOutput,
+  createImageTransformToolPresentation,
+} from '../images/imageTransformToolContract'
 import { createPetToolPresentation } from '../pet/petToolContract'
 import { createSystemToolPresentation } from '../system/systemToolContract'
 import { isPiShellToolName } from './piBuiltinTools'
@@ -33,6 +37,7 @@ export function createBuddyRunOutputs(
   input: CreateBuddyToolPresentationInput & { toolCallId: string },
 ): BuddyRunOutputPayload[] {
   const output = createImageGenerationRunOutput(input)
+    ?? createImageTransformRunOutput(input)
     ?? createArtifactPresentRunOutput(input)
   return output ? [output] : []
 }
@@ -44,6 +49,7 @@ export function createBuddyToolPresentation(
     ?? createArtifactPresentToolPresentation(input)
     ?? createPetToolPresentation(input)
     ?? createImageGenerationToolPresentation(input)
+    ?? createImageTransformToolPresentation(input)
     ?? createAutomationToolPresentation(input)
     ?? createSystemToolPresentation(input)
     ?? createMcpToolPresentation(input)

@@ -42,6 +42,7 @@
     "@earendil-works/pi-ai": "^0.84.3",
     "@earendil-works/pi-coding-agent": "^0.84.3",
     "@modelcontextprotocol/sdk": "^1.30.0",
+    "@silvia-odwyer/photon-node": "0.3.4",
     "@tiptap/core": "^3.22.3",
     "@tiptap/extension-placeholder": "^3.22.3",
     "@tiptap/pm": "^3.22.3",

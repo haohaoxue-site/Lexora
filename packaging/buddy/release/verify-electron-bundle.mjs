@@ -20,6 +20,10 @@ const forbiddenFragments = [
   'node_modules/electron/index.js',
   'out/main/install.js',
 ]
+const photonExternalReferencePattern
+  = /(?:from\s|import\(|require\()\s*['"]@silvia-odwyer\/photon-node['"]/
+const bundledPhotonRuntimePattern
+  = /\.join\(\s*__dirname\s*,\s*['"]photon_rs_bg\.wasm['"]\s*\)/
 
 export function verifyElectronBundle(cwd = repoRoot) {
   const errors = []
@@ -63,6 +67,18 @@ export function verifyElectronBundle(cwd = repoRoot) {
   }
   if (!buddyService.includes('Select OpenAI Codex login method:'))
     errors.push('Buddy Local Service bundle is missing statically registered Provider OAuth flows')
+  if (!buddyService.includes('lexora_image_chroma_key'))
+    errors.push('Buddy Local Service bundle is missing the deterministic image transform tool')
+  if (!photonExternalReferencePattern.test(buddyService)) {
+    errors.push(
+      'Buddy Local Service bundle must keep Photon as a runtime external',
+    )
+  }
+  if (bundledPhotonRuntimePattern.test(buddyService)) {
+    errors.push(
+      'Buddy Local Service bundle contains the Photon CommonJS runtime inside an ESM entrypoint',
+    )
+  }
   for (const fragment of ['lexora-buddy-runtime', 'codex exec', 'apps/buddy/runtime']) {
     if (buddyService.includes(fragment))
       errors.push(`Buddy Local Service bundle contains removed Rust runtime marker: ${fragment}`)

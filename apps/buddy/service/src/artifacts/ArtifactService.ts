@@ -1,9 +1,19 @@
 import type { ImageContent } from '@earendil-works/pi-ai'
+import type { ProjectGrant } from '../projects/resolveGrantedPath'
 import type { ArtifactRecord, ArtifactRepository } from '../storage/artifactRepository'
 import type { BuddyDataPaths } from '../storage/BuddyDataPaths'
 import { Buffer } from 'node:buffer'
 import { randomUUID } from 'node:crypto'
-import { chmod, mkdir, readFile, stat, unlink, writeFile } from 'node:fs/promises'
+import { constants } from 'node:fs'
+import {
+  chmod,
+  copyFile,
+  mkdir,
+  readFile,
+  stat,
+  unlink,
+  writeFile,
+} from 'node:fs/promises'
 import { basename, extname, isAbsolute, join, resolve } from 'node:path'
 import { resolveGrantedPath } from '../projects/resolveGrantedPath'
 
@@ -15,6 +25,12 @@ export interface ArtifactUpload {
   bytes: Uint8Array
   mimeType: string
   name: string
+}
+
+export type ArtifactResource = Omit<ArtifactRecord, 'storedPath'>
+
+interface ArtifactRegistrationUpload extends ArtifactUpload {
+  sourceArtifactId: string | null
 }
 
 export class ArtifactService {
@@ -36,35 +52,44 @@ export class ArtifactService {
     if (input.images.some(image => !image.mimeType.startsWith('image/')))
       throw new ArtifactError('VALIDATION_FAILED')
     return this.#registerUploads({
-      ...input,
       allowEmpty: false,
-      uploads: input.images,
+      conversationId: input.conversationId,
+      runId: input.runId,
+      sourceToolCallId: input.sourceToolCallId,
+      uploads: input.images.map(image => ({
+        ...image,
+        sourceArtifactId: input.sourceArtifactId,
+      })),
     })
   }
 
   async registerFiles(input: {
-    canonicalRoot: string
     conversationId: string
-    files: readonly { outputName: string, path: string }[]
+    cwd: string
+    files: readonly {
+      outputName: string
+      path: string
+      sourceArtifactId?: string
+    }[]
+    grants: readonly ProjectGrant[]
     runId: string
     sourceToolCallId: string
   }): Promise<ArtifactRecord[]> {
     if (input.files.length === 0 || input.files.length > BUDDY_ARTIFACT_COUNT_LIMIT)
       throw new ArtifactError('VALIDATION_FAILED')
-    const uploads: ArtifactUpload[] = []
+    const uploads: ArtifactRegistrationUpload[] = []
     let totalBytes = 0
     for (const file of input.files) {
       const requestedPath = isAbsolute(file.path)
         ? file.path
-        : resolve(input.canonicalRoot, file.path)
-      const resolution = await resolveGrantedPath([{
-        canonicalRoot: input.canonicalRoot,
-        projectId: input.conversationId,
-        root: input.canonicalRoot,
-      }], requestedPath, 'existing')
+        : resolve(input.cwd, file.path)
+      const resolution = await resolveGrantedPath(input.grants, requestedPath, 'existing')
       const metadata = await stat(resolution.canonicalPath)
       if (!metadata.isFile())
         throw new ArtifactError('VALIDATION_FAILED')
+      const sourceArtifactId = file.sourceArtifactId?.trim() || null
+      if (sourceArtifactId)
+        this.#requireConversationArtifact(input.conversationId, sourceArtifactId)
       totalBytes += metadata.size
       if (totalBytes > BUDDY_ARTIFACT_TOTAL_BYTES_LIMIT)
         throw new ArtifactError('ARTIFACT_SIZE_LIMIT')
@@ -73,25 +98,82 @@ export class ArtifactService {
         bytes: await readFile(resolution.canonicalPath),
         mimeType: mimeTypeFromPath(resolution.canonicalPath),
         name: outputName,
+        sourceArtifactId,
       })
     }
     return this.#registerUploads({
       allowEmpty: true,
       conversationId: input.conversationId,
       runId: input.runId,
-      sourceArtifactId: null,
       sourceToolCallId: input.sourceToolCallId,
       uploads,
     })
+  }
+
+  listConversationArtifacts(
+    conversationId: string,
+    limit = BUDDY_ARTIFACT_COUNT_LIMIT,
+  ): ArtifactResource[] {
+    if (!Number.isSafeInteger(limit) || limit < 1 || limit > BUDDY_ARTIFACT_COUNT_LIMIT)
+      throw new ArtifactError('VALIDATION_FAILED')
+    return this.#repository.listForConversation(conversationId)
+      .slice(-limit)
+      .reverse()
+      .map(toArtifactResource)
+  }
+
+  async materializeConversationArtifact(
+    conversationId: string,
+    artifactId: string,
+  ): Promise<{ bytes: Buffer, resource: ArtifactResource }> {
+    const artifact = this.#requireConversationArtifact(conversationId, artifactId)
+    return {
+      bytes: await readFile(artifact.storedPath),
+      resource: toArtifactResource(artifact),
+    }
+  }
+
+  async checkoutConversationArtifact(input: {
+    artifactId: string
+    conversationId: string
+    scratchGrant: ProjectGrant
+  }): Promise<{ path: string, resource: ArtifactResource }> {
+    const artifact = this.#requireConversationArtifact(
+      input.conversationId,
+      input.artifactId,
+    )
+    const directory = join(input.scratchGrant.canonicalRoot, '.artifacts')
+    await mkdir(directory, { mode: 0o700, recursive: true })
+    const requestedPath = join(directory, `${randomUUID()}-${artifact.name}`)
+    const resolution = await resolveGrantedPath(
+      [input.scratchGrant],
+      requestedPath,
+      'create',
+    )
+    try {
+      await copyFile(
+        artifact.storedPath,
+        resolution.canonicalPath,
+        constants.COPYFILE_EXCL,
+      )
+      await chmod(resolution.canonicalPath, 0o600)
+    }
+    catch (error) {
+      await unlink(resolution.canonicalPath).catch(() => undefined)
+      throw error
+    }
+    return {
+      path: resolution.canonicalPath,
+      resource: toArtifactResource(artifact),
+    }
   }
 
   async #registerUploads(input: {
     allowEmpty: boolean
     conversationId: string
     runId: string
-    sourceArtifactId: string | null
     sourceToolCallId: string
-    uploads: readonly ArtifactUpload[]
+    uploads: readonly ArtifactRegistrationUpload[]
   }): Promise<ArtifactRecord[]> {
     if (input.uploads.length === 0 || input.uploads.length > BUDDY_ARTIFACT_COUNT_LIMIT)
       throw new ArtifactError('VALIDATION_FAILED')
@@ -120,7 +202,7 @@ export class ArtifactService {
           name,
           runId: input.runId,
           sizeBytes: upload.bytes.byteLength,
-          sourceArtifactId: input.sourceArtifactId,
+          sourceArtifactId: upload.sourceArtifactId,
           sourceToolCallId: input.sourceToolCallId,
           storedPath,
         }
@@ -197,6 +279,13 @@ export class ArtifactService {
       type: 'image',
     })))
     return { images, records: selected }
+  }
+
+  #requireConversationArtifact(conversationId: string, artifactId: string): ArtifactRecord {
+    const artifact = this.#repository.findVisibleById(artifactId)
+    if (!artifact || artifact.conversationId !== conversationId)
+      throw new ArtifactError('ARTIFACT_NOT_FOUND')
+    return artifact
   }
 }
 
@@ -335,4 +424,9 @@ function truncateUtf8(value: string, maxBytes: number): string {
     result += character
   }
   return result
+}
+
+function toArtifactResource(record: ArtifactRecord): ArtifactResource {
+  const { storedPath: _, ...resource } = record
+  return resource
 }

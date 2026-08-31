@@ -58,8 +58,9 @@ export class BuddySessionFactory {
       || run.branchId !== blueprint.branchId
       || run.executionProfile !== blueprint.executionProfile
       || run.piSessionFile !== input.piSessionFile
-      || blueprint.grant.canonicalRoot !== blueprint.canonicalRoot
-      || blueprint.grant.projectId !== (blueprint.project?.id ?? blueprint.conversationId)
+      || blueprint.grants[0]?.canonicalRoot !== blueprint.canonicalRoot
+      || blueprint.grants[0]?.projectId !== (blueprint.project?.id ?? blueprint.conversationId)
+      || !blueprint.grants.some(grant => grant.canonicalRoot === blueprint.scratchRoot)
       || blueprint.sessionMode !== expectedSessionMode
     ) {
       throw new BuddyAgentRunError('CONVERSATION_BINDING_MISMATCH')
@@ -75,7 +76,8 @@ export class BuddySessionFactory {
       canonicalRoot: blueprint.canonicalRoot,
       conversationId: blueprint.conversationId,
       executionProfile: blueprint.executionProfile,
-      grant: blueprint.grant,
+      grants: blueprint.grants,
+      scratchRoot: blueprint.scratchRoot,
       sessionMode: blueprint.sessionMode,
       signal: input.signal,
       services: this.#options.services,

@@ -37,7 +37,7 @@ export default defineConfig({
     build: {
       outDir: join(electronOutputRoot, 'main'),
       rollupOptions: {
-        external: ['electron'],
+        external: ['electron', '@silvia-odwyer/photon-node'],
         input: {
           'index': fileURLToPath(new URL('./electron/main/index.ts', import.meta.url)),
           'buddy-service': fileURLToPath(new URL('./service/src/index.ts', import.meta.url)),

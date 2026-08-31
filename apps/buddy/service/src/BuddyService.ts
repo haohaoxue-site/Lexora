@@ -55,6 +55,7 @@ import { ContextUsageSnapshotService } from './context/ContextUsageSnapshotServi
 import { registerContextRpc } from './context/registerContextRpc'
 import { ConversationLifecycleService } from './conversations/ConversationLifecycleService'
 import { registerConversationRpc } from './conversations/registerConversationRpc'
+import { ImageTransformService } from './images/ImageTransformService'
 import { OpenAiImageGenerationService } from './images/OpenAiImageGenerationService'
 import { AttentionNotificationService } from './notifications/AttentionNotificationService'
 import { registerNotificationRpc } from './notifications/registerNotificationRpc'
@@ -176,6 +177,7 @@ export async function startBuddyService(
   })
   const artifactsRepository = createArtifactRepository(options.database)
   const artifactService = new ArtifactService({ paths, repository: artifactsRepository })
+  const imageTransformService = new ImageTransformService({ artifacts: artifactService })
   const providersRepository = createProviderRepository(options.database)
   const providerService = await createProviderService({
     agentDirectory,
@@ -259,6 +261,7 @@ export async function startBuddyService(
     changeCaptureService,
     connectorService,
     imageGenerationGateway,
+    imageTransformService,
     onAutomationChanged: automationId => automationChanges.publish(automationId),
     petService,
     systemHost,

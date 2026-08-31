@@ -164,9 +164,9 @@ function createImageGenerationTool(
     name: IMAGE_GENERATION_TOOL_NAME,
     parameters: imageGenerationParameters,
     promptGuidelines: [
-      'When the user asks to create or edit an image, use this tool instead of shell scripts or drawing libraries.',
-      'When the user refers to an image already in the conversation, use reference.mode=resources with its attachmentId or artifactId, or reference.mode=latest.',
-      'Set outputName to a concise semantic name in the user language without a path or file extension. Use a separate call when different images need different names.',
+      'When the user asks to create or generatively edit an image, use lexora_image_generate instead of shell scripts or drawing libraries.',
+      'With lexora_image_generate, when the user refers to an image already in the conversation, use reference.mode=resources with its attachmentId or artifactId, or reference.mode=latest.',
+      'With lexora_image_generate, set outputName to a concise semantic name in the user language without a path or file extension; use a separate call when different images need different names.',
     ],
   })
 }
