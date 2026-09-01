@@ -2,8 +2,8 @@
 import type { LocalArtifact } from '@buddy-electron/shared/localChatApi'
 import type { BuddyLocale } from '@/i18n/buddyI18n'
 import { Document20Regular, Open20Regular } from '@vicons/fluent'
-import { NIcon } from 'naive-ui'
-import { computed, shallowRef } from 'vue'
+import { NIcon, NScrollbar } from 'naive-ui'
+import { computed, shallowRef, useTemplateRef } from 'vue'
 import { useBuddyI18n } from '@/i18n/buddyI18n'
 
 const props = defineProps<{
@@ -15,6 +15,7 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useBuddyI18n(() => props.language)
+const scrollRoot = useTemplateRef<HTMLElement>('scrollRoot')
 const failedArtifactIds = shallowRef<ReadonlySet<string>>(new Set())
 const outputViews = computed(() => props.artifacts.map(artifact => ({
   artifact,
@@ -28,6 +29,36 @@ const outputViews = computed(() => props.artifacts.map(artifact => ({
 })))
 function markPreviewFailed(artifactId: string) {
   failedArtifactIds.value = new Set([...failedArtifactIds.value, artifactId])
+}
+
+function handleWheel(event: WheelEvent) {
+  if (event.ctrlKey || Math.abs(event.deltaX) >= Math.abs(event.deltaY))
+    return
+  const scrollport = findHorizontalScrollport()
+  if (!scrollport)
+    return
+  const multiplier = event.deltaMode === WheelEvent.DOM_DELTA_LINE
+    ? 16
+    : event.deltaMode === WheelEvent.DOM_DELTA_PAGE
+      ? scrollport.clientWidth
+      : 1
+  const nextLeft = Math.min(
+    Math.max(0, scrollport.scrollLeft + event.deltaY * multiplier),
+    scrollport.scrollWidth - scrollport.clientWidth,
+  )
+  if (Math.abs(nextLeft - scrollport.scrollLeft) < 1)
+    return
+  event.preventDefault()
+  scrollport.scrollLeft = nextLeft
+}
+
+function findHorizontalScrollport(): HTMLElement | null {
+  return [...scrollRoot.value?.querySelectorAll<HTMLElement>('*') ?? []]
+    .find((element) => {
+      const overflowX = getComputedStyle(element).overflowX
+      return element.scrollWidth > element.clientWidth + 1
+        && (overflowX === 'auto' || overflowX === 'scroll')
+    }) ?? null
 }
 
 function resolveFileType(artifact: LocalArtifact): string {
@@ -60,34 +91,46 @@ function formatFileSize(sizeBytes: number): string {
       <strong>{{ t('desktop.chat.turnOutputs') }}</strong>
       <small>{{ artifacts.length }}</small>
     </header>
-    <div class="buddy-chat-turn-outputs__grid">
-      <button
-        v-for="view in outputViews"
-        :key="view.artifact.artifactId"
-        class="buddy-chat-turn-output"
-        type="button"
-        @click="emit('openArtifact', view.artifact.artifactId)"
+    <div
+      ref="scrollRoot"
+      class="buddy-chat-turn-outputs__scroll"
+      @wheel="handleWheel"
+    >
+      <NScrollbar
+        class="buddy-chat-turn-outputs__scrollbar"
+        trigger="hover"
+        x-scrollable
       >
-        <div
-          class="buddy-chat-turn-output__preview"
-          :class="{ 'is-contain': view.artifact.mimeType === 'image/svg+xml' }"
-        >
-          <img
-            v-if="view.previewable"
-            :alt="view.artifact.name"
-            loading="lazy"
-            :src="view.previewUrl ?? undefined"
-            @error="markPreviewFailed(view.artifact.artifactId)"
+        <div class="buddy-chat-turn-outputs__grid">
+          <button
+            v-for="view in outputViews"
+            :key="view.artifact.artifactId"
+            class="buddy-chat-turn-output"
+            type="button"
+            @click="emit('openArtifact', view.artifact.artifactId)"
           >
-          <NIcon v-else :component="Document20Regular" />
+            <div
+              class="buddy-chat-turn-output__preview"
+              :class="{ 'is-contain': view.artifact.mimeType === 'image/svg+xml' }"
+            >
+              <img
+                v-if="view.previewable"
+                :alt="view.artifact.name"
+                loading="lazy"
+                :src="view.previewUrl ?? undefined"
+                @error="markPreviewFailed(view.artifact.artifactId)"
+              >
+              <NIcon v-else :component="Document20Regular" />
+            </div>
+            <div class="buddy-chat-turn-output__meta">
+              <span class="buddy-chat-turn-output__type">{{ view.fileType }}</span>
+              <span class="buddy-chat-turn-output__name">{{ view.artifact.name }}</span>
+              <span class="buddy-chat-turn-output__size">{{ view.size }}</span>
+              <NIcon :component="Open20Regular" class="buddy-chat-turn-output__open" />
+            </div>
+          </button>
         </div>
-        <div class="buddy-chat-turn-output__meta">
-          <span class="buddy-chat-turn-output__type">{{ view.fileType }}</span>
-          <span class="buddy-chat-turn-output__name">{{ view.artifact.name }}</span>
-          <span class="buddy-chat-turn-output__size">{{ view.size }}</span>
-          <NIcon :component="Open20Regular" class="buddy-chat-turn-output__open" />
-        </div>
-      </button>
+      </NScrollbar>
     </div>
   </section>
 </template>
@@ -118,11 +161,22 @@ function formatFileSize(sizeBytes: number): string {
   }
 }
 
+.buddy-chat-turn-outputs__scroll {
+  min-width: 0;
+  overflow: hidden;
+}
+
+:deep(.buddy-chat-turn-outputs__scrollbar) {
+  width: 100%;
+}
+
 .buddy-chat-turn-outputs__grid {
   display: grid;
-  min-width: 0;
-  grid-template-columns: repeat(auto-fill, minmax(min(13rem, 100%), 1fr));
+  width: max-content;
+  grid-auto-columns: 17rem;
+  grid-auto-flow: column;
   gap: 0.625rem;
+  padding: 0.125rem 0.125rem 0.5rem;
 }
 
 .buddy-chat-turn-output {
