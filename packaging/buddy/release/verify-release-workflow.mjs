@@ -182,8 +182,12 @@ function verifyBuildWorkflow(workflow, errors) {
     'contents: write',
   ], errors, 'Buddy package verification must only run through a caller and remain read-only')
 
+  verifySourceJob(readJob(workflow, 'verify-source'), errors)
   verifyUbuntuJob(readJob(workflow, 'build-ubuntu'), errors)
   verifyArchJob(readJob(workflow, 'build-arch'), errors)
+  forbidFragments(workflow, [
+    'needs:',
+  ], errors, 'Buddy source and platform package jobs must start independently')
 }
 
 function verifyReleaseWorkflow(workflow, errors) {
@@ -231,14 +235,32 @@ function verifyReleaseValidationJob(job, errors) {
   ], errors, 'Release validation must bind a strict version tag to a master commit and reject an existing Release')
 }
 
+function verifySourceJob(job, errors) {
+  requireFragments(job, [
+    'timeout-minutes: 30',
+    'components: clippy, rustfmt',
+    'pnpm install --frozen-lockfile',
+    'pnpm check:buddy:source',
+  ], errors, 'Buddy source gate must run independently with the required Node and Rust checks')
+  forbidFragments(job, [
+    'package:deb',
+    'package:arch',
+    'package-desktop.mjs',
+    'actions/upload-artifact@',
+  ], errors, 'Buddy source gate must not build or upload platform packages')
+  forbidReleaseMutation(job, errors, 'Buddy source gate')
+}
+
 function verifyUbuntuJob(job, errors) {
   const install = 'sudo apt-get install -y ./apps/buddy/.output/artifacts/desktop/Lexora-Buddy-*-linux-amd64.deb'
   const smoke = 'xvfb-run -a node packaging/buddy/ci/run-gui-smoke.mjs'
 
   requireFragments(job, [
     'timeout-minutes: 60',
-    'pnpm check:buddy',
-  ], errors, 'Ubuntu build job must run the Buddy release gate with a bounded timeout')
+    'pnpm --filter @lexora/buddy package:deb',
+  ], errors, 'Ubuntu build job must build the canonical deb package with a bounded timeout')
+  if (/run:\s*pnpm check:buddy\s*$/m.test(job))
+    errors.push('Ubuntu build job must not repeat the Buddy source gate')
   requireOrder(job, install, smoke, errors, 'Ubuntu build job must install the built Desktop deb before GUI smoke')
   requireFragments(job, [
     'LEXORA_DESKTOP_EXECUTABLE_PATH: /opt/lexora-buddy/lexora-buddy',

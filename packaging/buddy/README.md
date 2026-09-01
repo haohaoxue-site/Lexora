@@ -20,5 +20,8 @@ pnpm --filter @lexora/buddy package:pet
 
 ```bash
 pnpm release:version:check
+pnpm check:buddy:source
 pnpm check:buddy
 ```
+
+`check:buddy:source` 只校验源码与发布契约；`check:buddy` 继续执行源码校验和 Ubuntu deb 构建。
