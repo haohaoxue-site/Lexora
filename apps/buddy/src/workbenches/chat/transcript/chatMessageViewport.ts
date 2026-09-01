@@ -10,12 +10,20 @@ export interface ChatMessageScrollAnchor {
   metrics: ChatMessageScrollMetrics
 }
 
-export interface BuddyChatMessageListHandle {
+interface ChatMessageViewportHandle {
   captureScrollAnchor: () => ChatMessageScrollAnchor | null
   readScrollMetrics: () => ChatMessageScrollMetrics | null
   restoreScrollAnchor: (anchor: ChatMessageScrollAnchor) => ChatMessageScrollMetrics | null
-  scrollToMessage: (messageId: string) => ChatMessageScrollMetrics | null
+  scrollToMessage: (messageId: string, behavior?: ScrollBehavior) => ChatMessageScrollMetrics | null
   scrollToTail: () => ChatMessageScrollMetrics | null
+}
+
+export interface BuddyChatMessageListHandle extends ChatMessageViewportHandle {
+  highlightMessage: (messageId: string) => void
+}
+
+export interface BuddyChatTranscriptViewportHandle extends ChatMessageViewportHandle {
+  scrollBy: (deltaY: number) => void
 }
 
 const CHAT_TAIL_TOLERANCE_PX = 48

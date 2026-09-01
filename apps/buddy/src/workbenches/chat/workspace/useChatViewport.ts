@@ -29,11 +29,16 @@ interface UseChatViewportOptions {
   timelineItems: ValueRef<ReadonlyArray<ChatViewportTimelineItem>>
 }
 
+interface RevealMessageOptions {
+  behavior?: ScrollBehavior
+  highlight?: boolean
+}
+
 export function useChatViewport(options: UseChatViewportOptions) {
   const scrollState = shallowRef(createChatScrollState())
   const isRestoringHistoryAnchor = shallowRef(false)
   const showReturnToLatest = computed(() => scrollState.value.ownership === 'detached')
-  let searchRevealGeneration = 0
+  let revealGeneration = 0
 
   watch(
     () => [options.activeConversationId.value, options.activeBranchId.value],
@@ -44,7 +49,7 @@ export function useChatViewport(options: UseChatViewportOptions) {
   )
   watch(() => options.activeSearchMessageId.value, (messageId) => {
     if (messageId)
-      void revealSearchMessage(messageId)
+      void revealMessage(messageId, () => options.activeSearchMessageId.value === messageId)
   })
   watch(
     [
@@ -117,30 +122,40 @@ export function useChatViewport(options: UseChatViewportOptions) {
     }
   }
 
-  async function revealSearchMessage(messageId: string) {
-    const generation = ++searchRevealGeneration
-    let needsOlderMessages = shouldLoadOlderSearchMessage(messageId, generation)
+  async function revealMessage(
+    messageId: string,
+    isCurrent: () => boolean = () => true,
+    revealOptions: RevealMessageOptions = {},
+  ) {
+    const generation = ++revealGeneration
+    let needsOlderMessages = shouldLoadOlderMessage(messageId, generation)
     while (needsOlderMessages) {
       const loaded = await options.loadOlderMessages()
       if (!loaded)
         break
-      needsOlderMessages = shouldLoadOlderSearchMessage(messageId, generation)
+      needsOlderMessages = shouldLoadOlderMessage(messageId, generation)
     }
-    if (
-      generation !== searchRevealGeneration
-      || options.activeSearchMessageId.value !== messageId
-    ) {
+    if (generation !== revealGeneration || !isCurrent()) {
       return
     }
     await nextTick()
     scrollState.value = detachChatScroll(scrollState.value)
-    const metrics = options.list.value?.scrollToMessage(messageId)
+    if (revealOptions.highlight)
+      options.list.value?.highlightMessage(messageId)
+    const metrics = options.list.value?.scrollToMessage(messageId, revealOptions.behavior)
     if (metrics)
       scrollState.value = recordProgrammaticChatScroll(scrollState.value, metrics)
   }
 
-  function shouldLoadOlderSearchMessage(messageId: string, generation: number) {
-    return generation === searchRevealGeneration
+  function revealOutlineMessage(messageId: string) {
+    return revealMessage(messageId, () => true, {
+      behavior: 'smooth',
+      highlight: true,
+    })
+  }
+
+  function shouldLoadOlderMessage(messageId: string, generation: number) {
+    return generation === revealGeneration
       && options.hasOlderMessages.value
       && !options.timelineItems.value.some(
         item => item.kind === 'message' && item.id === messageId,
@@ -151,6 +166,8 @@ export function useChatViewport(options: UseChatViewportOptions) {
     handleContentResize,
     handleReaderLayoutIntent,
     handleScroll,
+    revealOutlineMessage,
+    revealMessage,
     returnToLatest,
     showReturnToLatest,
   }
