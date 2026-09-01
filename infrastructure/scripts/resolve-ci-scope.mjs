@@ -12,6 +12,7 @@ const buddyWorkflowInputs = new Set([
   '.github/workflows/buddy-build.yml',
 ])
 const contractInputs = new Set([
+  '.github/release.yml',
   '.github/workflows/ci.yml',
   '.github/workflows/prepare-release.yml',
   '.github/workflows/release.yml',

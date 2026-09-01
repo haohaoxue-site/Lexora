@@ -18,6 +18,7 @@ const workflowPaths = {
   prepare: '.github/workflows/prepare-release.yml',
   release: '.github/workflows/release.yml',
 }
+const releaseNotesPath = '.github/release.yml'
 const githubExpression = value => `\${{ ${value} }}`
 
 export function verifyBuddyReleaseWorkflow(cwd = repoRoot) {
@@ -30,6 +31,7 @@ export function verifyBuddyReleaseWorkflow(cwd = repoRoot) {
   verifyCiScopeClassification(errors)
   verifyReleaseTransitionContract(errors)
   verifyBuildWorkflow(workflows.build, errors)
+  verifyReleaseNotesConfig(readWorkflow(cwd, releaseNotesPath), errors)
   verifyPrepareWorkflow(workflows.prepare, errors)
   verifyReleaseWorkflow(workflows.release, errors)
   verifyPinnedActions(Object.values(workflows).join('\n'), errors)
@@ -149,6 +151,7 @@ function verifyCiScopeClassification(errors) {
     [['README.md'], { buddy: false, contracts: false, website: false, quality: false }],
     [['apps/web/src/main.ts'], { buddy: false, contracts: false, website: false, quality: true }],
     [['.github/workflows/ci.yml'], { buddy: false, contracts: true, website: false, quality: false }],
+    [['.github/release.yml'], { buddy: false, contracts: true, website: false, quality: false }],
     [['.github/workflows/prepare-release.yml'], { buddy: false, contracts: true, website: false, quality: false }],
     [['packaging/release/status.mjs'], { buddy: false, contracts: true, website: false, quality: false }],
     [['packaging/release/transition.mjs'], { buddy: false, contracts: true, website: false, quality: false }],
@@ -332,6 +335,15 @@ function createVersionState(version, sourceDateEpoch) {
   }
 }
 
+function verifyReleaseNotesConfig(config, errors) {
+  requireFragments(config, [
+    'changelog:',
+    'exclude:',
+    'labels:',
+    '- skip-changelog',
+  ], errors, 'GitHub release notes must exclude pull requests labeled skip-changelog')
+}
+
 function verifyPrepareWorkflow(workflow, errors) {
   requireFragments(workflow, [
     'name: Prepare Lexora Release',
@@ -383,6 +395,7 @@ function verifyPrepareWorkflow(workflow, errors) {
     'git/refs/heads/$RELEASE_BRANCH',
     '--base master',
     '--head "$RELEASE_BRANCH"',
+    '--label "skip-changelog"',
   ], errors, 'Release preparation must create one validated version-only pull request from master')
 }
 
