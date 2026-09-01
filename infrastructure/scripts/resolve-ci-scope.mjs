@@ -13,10 +13,12 @@ const buddyWorkflowInputs = new Set([
 ])
 const contractInputs = new Set([
   '.github/workflows/ci.yml',
+  '.github/workflows/prepare-release.yml',
   '.github/workflows/release.yml',
   'infrastructure/scripts/resolve-ci-scope.mjs',
   'packaging/buddy/release/verify-release-workflow.mjs',
   'packaging/release/status.mjs',
+  'packaging/release/transition.mjs',
   'packaging/release/version.mjs',
   'packaging/shared/cli-output.mjs',
 ])

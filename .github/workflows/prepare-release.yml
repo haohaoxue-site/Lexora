@@ -1,0 +1,163 @@
+name: Prepare Lexora Release
+run-name: Prepare Lexora v${{ inputs.version }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Next Lexora version (x.y.z)
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: lexora-prepare-release
+  cancel-in-progress: false
+
+jobs:
+  prepare-release:
+    name: Prepare release pull request
+    if: github.ref_name == 'master'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Checkout master
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: master
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Setup Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .node-version
+
+      - name: Require unused release identity
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          node packaging/release/version.mjs --check-next "$VERSION"
+
+          release_branch="chore/release-v$VERSION"
+          release_tag="v$VERSION"
+
+          existing_release_pull_request="$(
+            gh pr list \
+              --repo "$GITHUB_REPOSITORY" \
+              --base master \
+              --state open \
+              --json headRefName,url \
+              --jq '[.[] | select(.headRefName | startswith("chore/release-v"))][0].url // ""'
+          )"
+          if [[ -n "$existing_release_pull_request" ]]; then
+            echo "An open release pull request already exists: $existing_release_pull_request" >&2
+            exit 1
+          fi
+
+          require_missing() {
+            local label="$1"
+            local endpoint="$2"
+            local lookup_error="$RUNNER_TEMP/lexora-$label-lookup.error"
+            if gh api "$endpoint" >/dev/null 2>"$lookup_error"; then
+              echo "Release $label already exists" >&2
+              exit 1
+            fi
+            if ! grep -q 'HTTP 404' "$lookup_error"; then
+              cat "$lookup_error" >&2
+              exit 1
+            fi
+          }
+
+          require_missing branch "repos/$GITHUB_REPOSITORY/git/ref/heads/$release_branch"
+          require_missing tag "repos/$GITHUB_REPOSITORY/git/ref/tags/$release_tag"
+          require_missing release "repos/$GITHUB_REPOSITORY/releases/tags/$release_tag"
+
+      - name: Create validated version commit
+        id: version
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          BASE_SHA="$(git rev-parse HEAD)"
+          release_branch="chore/release-v$VERSION"
+
+          node packaging/release/version.mjs --set "$VERSION"
+          node packaging/release/version.mjs --check
+
+          git switch --create "$release_branch"
+          git config user.name 'github-actions[bot]'
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add -- \
+            package.json \
+            apps/agent/package.json \
+            apps/api/package.json \
+            apps/buddy/package.json \
+            apps/web/package.json \
+            apps/buddy/buddy.version.json \
+            apps/buddy/native-pet/Cargo.toml \
+            apps/buddy/native-pet/Cargo.lock
+
+          if git diff --cached --quiet; then
+            echo "Version $VERSION must be greater than the current product version" >&2
+            exit 1
+          fi
+
+          git commit -m "chore(release): 准备 v$VERSION"
+          HEAD_SHA="$(git rev-parse HEAD)"
+          node packaging/release/transition.mjs --check "$BASE_SHA" "$HEAD_SHA"
+
+          echo "branch=$release_branch" >> "$GITHUB_OUTPUT"
+          echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Push release branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_BRANCH: ${{ steps.version.outputs.branch }}
+        run: |
+          basic_auth="$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)"
+          GIT_CONFIG_COUNT=1 \
+            GIT_CONFIG_KEY_0=http.https://github.com/.extraheader \
+            GIT_CONFIG_VALUE_0="AUTHORIZATION: basic $basic_auth" \
+            git push origin "HEAD:refs/heads/$RELEASE_BRANCH"
+
+      - name: Open release pull request
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_BRANCH: ${{ steps.version.outputs.branch }}
+          RELEASE_TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          if pull_request_url="$(
+            gh pr create \
+              --repo "$GITHUB_REPOSITORY" \
+              --base master \
+              --head "$RELEASE_BRANCH" \
+              --title "chore(release): 准备 $RELEASE_TAG" \
+              --body "此 PR 仅同步 Lexora 产品族版本。合并后，发布流程会重新验证版本迁移、构建并验证 Buddy 安装包，再等待发布环境审批后创建 tag 与 GitHub Release。"
+          )"; then
+            echo "Created $pull_request_url"
+            exit 0
+          fi
+
+          pull_request_url="$(
+            gh pr list \
+              --repo "$GITHUB_REPOSITORY" \
+              --head "$RELEASE_BRANCH" \
+              --state open \
+              --json url \
+              --jq '.[0].url // ""'
+          )"
+          if [[ -n "$pull_request_url" ]]; then
+            echo "Created $pull_request_url"
+            exit 0
+          fi
+
+          gh api --method DELETE \
+            "repos/$GITHUB_REPOSITORY/git/refs/heads/$RELEASE_BRANCH"
+          echo "Pull request creation failed; removed generated branch $RELEASE_BRANCH" >&2
+          exit 1

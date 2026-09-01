@@ -3,12 +3,19 @@ import { resolve } from 'node:path'
 import process from 'node:process'
 
 import { classifyCiScope } from '../../../infrastructure/scripts/resolve-ci-scope.mjs'
+import {
+  lexoraReleaseTransitionPaths,
+  validateLexoraReleaseSources,
+  validateLexoraReleaseTransition,
+} from '../../release/transition.mjs'
+import { createLexoraVersionSources } from '../../release/version.mjs'
 import { writeOutput } from '../../shared/cli-output.mjs'
 
 const repoRoot = resolve(import.meta.dirname, '../../..')
 const workflowPaths = {
   build: '.github/workflows/buddy-build.yml',
   ci: '.github/workflows/ci.yml',
+  prepare: '.github/workflows/prepare-release.yml',
   release: '.github/workflows/release.yml',
 }
 const githubExpression = value => `\${{ ${value} }}`
@@ -21,7 +28,9 @@ export function verifyBuddyReleaseWorkflow(cwd = repoRoot) {
 
   verifyCiWorkflow(workflows.ci, errors)
   verifyCiScopeClassification(errors)
+  verifyReleaseTransitionContract(errors)
   verifyBuildWorkflow(workflows.build, errors)
+  verifyPrepareWorkflow(workflows.prepare, errors)
   verifyReleaseWorkflow(workflows.release, errors)
   verifyPinnedActions(Object.values(workflows).join('\n'), errors)
 
@@ -140,7 +149,9 @@ function verifyCiScopeClassification(errors) {
     [['README.md'], { buddy: false, contracts: false, website: false, quality: false }],
     [['apps/web/src/main.ts'], { buddy: false, contracts: false, website: false, quality: true }],
     [['.github/workflows/ci.yml'], { buddy: false, contracts: true, website: false, quality: false }],
+    [['.github/workflows/prepare-release.yml'], { buddy: false, contracts: true, website: false, quality: false }],
     [['packaging/release/status.mjs'], { buddy: false, contracts: true, website: false, quality: false }],
+    [['packaging/release/transition.mjs'], { buddy: false, contracts: true, website: false, quality: false }],
     [['.github/workflows/buddy-build.yml'], { buddy: true, contracts: true, website: false, quality: true }],
     [['package.json'], { buddy: true, contracts: true, website: false, quality: true }],
     [['pnpm-lock.yaml'], { buddy: true, contracts: false, website: false, quality: true }],
@@ -190,23 +201,210 @@ function verifyBuildWorkflow(workflow, errors) {
   ], errors, 'Buddy source and platform package jobs must start independently')
 }
 
+function verifyReleaseTransitionContract(errors) {
+  requireFragments(
+    readFileSync(resolve(repoRoot, 'packaging/release/transition.mjs'), 'utf8'),
+    ['--summary'],
+    errors,
+    'Lexora release transition must reject file structure and mode changes',
+  )
+
+  const before = createVersionState('0.1.1', 1_700_000_000)
+  const after = createVersionState('0.1.2', 1_700_000_001)
+  const beforeSources = createVersionSources('0.1.1', 1_700_000_000)
+  const monotonicEpoch = createLexoraVersionSources(
+    beforeSources,
+    '0.1.2',
+    { now: () => 1 },
+  ).sourceDateEpoch
+  const afterSources = createLexoraVersionSources(
+    beforeSources,
+    '0.1.2',
+    { sourceDateEpoch: 1_700_000_001 },
+  ).sources
+  const validSourceErrors = validateLexoraReleaseSources({
+    after,
+    afterSources,
+    beforeSources,
+  })
+  const tamperedSources = {
+    ...afterSources,
+    'apps/buddy/package.json': afterSources['apps/buddy/package.json'].replace(
+      '"private": true',
+      '"private": true,\n  "description": "unexpected"',
+    ),
+  }
+  const tamperedSourceErrors = validateLexoraReleaseSources({
+    after,
+    afterSources: tamperedSources,
+    beforeSources,
+  })
+  const validErrors = validateLexoraReleaseTransition({
+    after,
+    before,
+    changedPaths: lexoraReleaseTransitionPaths,
+  })
+  const unchangedVersionErrors = validateLexoraReleaseTransition({
+    after: createVersionState('0.1.1', 1_700_000_001),
+    before,
+    changedPaths: lexoraReleaseTransitionPaths,
+  })
+  const staleEpochErrors = validateLexoraReleaseTransition({
+    after: createVersionState('0.1.2', 1_700_000_000),
+    before,
+    changedPaths: lexoraReleaseTransitionPaths,
+  })
+  const missingPathErrors = validateLexoraReleaseTransition({
+    after,
+    before,
+    changedPaths: lexoraReleaseTransitionPaths.slice(1),
+  })
+  const extraPathErrors = validateLexoraReleaseTransition({
+    after,
+    before,
+    changedPaths: [...lexoraReleaseTransitionPaths, 'apps/buddy/electron/main/index.ts'],
+  })
+
+  if (
+    validErrors.length
+    || monotonicEpoch !== 1_700_000_001
+    || validSourceErrors.length
+    || !tamperedSourceErrors.some(error => error.includes('non-generated changes'))
+    || !unchangedVersionErrors.some(error => error.includes('product version must increase'))
+    || !staleEpochErrors.some(error => error.includes('sourceDateEpoch must increase'))
+    || !missingPathErrors.some(error => error.includes('missing version files'))
+    || !extraPathErrors.some(error => error.includes('non-version files'))
+  ) {
+    errors.push('Lexora release transition must require one increasing, version-only product-family commit')
+  }
+}
+
+function createVersionSources(version, sourceDateEpoch) {
+  const applicationPaths = [
+    'package.json',
+    'apps/agent/package.json',
+    'apps/api/package.json',
+    'apps/buddy/package.json',
+    'apps/web/package.json',
+  ]
+  return {
+    ...Object.fromEntries(applicationPaths.map(path => [
+      path,
+      `${JSON.stringify({ name: path, version, private: true }, null, 2)}\n`,
+    ])),
+    'apps/website/package.json': `${JSON.stringify({ name: 'website', private: true }, null, 2)}\n`,
+    'packages/contracts/package.json': `${JSON.stringify({ name: 'contracts', private: true }, null, 2)}\n`,
+    'packages/shared/package.json': `${JSON.stringify({ name: 'shared', private: true }, null, 2)}\n`,
+    'apps/buddy/buddy.version.json': `${JSON.stringify({ version, sourceDateEpoch }, null, 2)}\n`,
+    'apps/buddy/native-pet/Cargo.toml': `[package]\nname = "lexora-buddy-pet"\nversion = "${version}"\n`,
+    'apps/buddy/native-pet/Cargo.lock': `version = 4\n\n[[package]]\nname = "lexora-buddy-pet"\nversion = "${version}"\n`,
+  }
+}
+
+function createVersionState(version, sourceDateEpoch) {
+  return {
+    applicationVersions: {
+      agent: version,
+      api: version,
+      buddy: version,
+      web: version,
+    },
+    buddyMetadataVersion: version,
+    cargoLockVersion: version,
+    cargoVersion: version,
+    packagePrivacy: {
+      'package.json': true,
+      'apps/agent/package.json': true,
+      'apps/api/package.json': true,
+      'apps/buddy/package.json': true,
+      'apps/web/package.json': true,
+      'apps/website/package.json': true,
+      'packages/contracts/package.json': true,
+      'packages/shared/package.json': true,
+    },
+    productVersion: version,
+    sourceDateEpoch,
+    versionlessPackageVersions: {
+      'apps/website/package.json': undefined,
+      'packages/contracts/package.json': undefined,
+      'packages/shared/package.json': undefined,
+    },
+  }
+}
+
+function verifyPrepareWorkflow(workflow, errors) {
+  requireFragments(workflow, [
+    'name: Prepare Lexora Release',
+    'workflow_dispatch:',
+    'version:',
+    'required: true',
+    'type: string',
+    'contents: read',
+    'group: lexora-prepare-release',
+    'cancel-in-progress: false',
+  ], errors, 'Release preparation must be a manual, serialized, read-only workflow by default')
+  requireGlobalReadOnly(workflow, errors, 'Release preparation')
+  forbidFragments(workflow, [
+    'pull_request:',
+    'push:',
+    'secrets.',
+    '--force',
+    'gh release create',
+    'refs/tags/$RELEASE_TAG',
+  ], errors, 'Release preparation must not expose automatic triggers, broad workflow permissions, secrets or force updates')
+  if ((workflow.match(/contents: write/g) ?? []).length !== 1)
+    errors.push('Only the release preparation job may have contents write permission')
+  if ((workflow.match(/pull-requests: write/g) ?? []).length !== 1)
+    errors.push('Only the release preparation job may have pull request write permission')
+
+  const prepare = readJob(workflow, 'prepare-release')
+  requireFragments(prepare, [
+    'if: github.ref_name == \'master\'',
+    'contents: write',
+    'pull-requests: write',
+    'ref: master',
+    'fetch-depth: 0',
+    'persist-credentials: false',
+    `VERSION: ${githubExpression('inputs.version')}`,
+    'node packaging/release/version.mjs --check-next "$VERSION"',
+    'node packaging/release/version.mjs --set "$VERSION"',
+    'node packaging/release/version.mjs --check',
+    'startswith("chore/release-v")',
+    'repos/$GITHUB_REPOSITORY/git/ref/heads/$release_branch',
+    'repos/$GITHUB_REPOSITORY/git/ref/tags/$release_tag',
+    'repos/$GITHUB_REPOSITORY/releases/tags/$release_tag',
+    'HTTP 404',
+    'node packaging/release/transition.mjs --check "$BASE_SHA" "$HEAD_SHA"',
+    'GIT_CONFIG_KEY_0=http.https://github.com/.extraheader',
+    'git push origin "HEAD:refs/heads/$RELEASE_BRANCH"',
+    'gh pr create',
+    'gh pr list',
+    'gh api --method DELETE',
+    'git/refs/heads/$RELEASE_BRANCH',
+    '--base master',
+    '--head "$RELEASE_BRANCH"',
+  ], errors, 'Release preparation must create one validated version-only pull request from master')
+}
+
 function verifyReleaseWorkflow(workflow, errors) {
   requireFragments(workflow, [
     'name: Lexora Release',
     'push:',
-    'tags:',
-    '- \'v*\'',
+    'branches:',
+    '- master',
+    'paths:',
+    '- apps/buddy/buddy.version.json',
     'contents: read',
     'cancel-in-progress: false',
-  ], errors, 'Lexora Release must run automatically and read-only by default for v* tags')
+  ], errors, 'Lexora Release must run automatically and read-only by default after a version transition reaches master')
   requireGlobalReadOnly(workflow, errors, 'Lexora Release')
   forbidFragments(workflow, [
     'pull_request:',
-    'branches:',
+    'tags:',
     'workflow_dispatch:',
     'publish_release:',
     '--clobber',
-  ], errors, 'Lexora Release must not expose branch, manual or overwrite publication paths')
+  ], errors, 'Lexora Release must not expose tag, manual or overwrite publication paths')
   if ((workflow.match(/contents: write/g) ?? []).length !== 1)
     errors.push('Only the release publication job may have contents write permission')
 
@@ -217,7 +415,7 @@ function verifyReleaseWorkflow(workflow, errors) {
     'needs: validate-release',
     'uses: ./.github/workflows/buddy-build.yml',
     'upload-artifacts: true',
-  ], errors, 'Lexora Release must build packages only after tag validation')
+  ], errors, 'Lexora Release must build packages only after version transition validation')
 
   verifyPublishJob(readJob(workflow, 'publish-release'), errors)
   verifyPublicAssetsJob(readJob(workflow, 'verify-public-assets'), errors)
@@ -227,12 +425,18 @@ function verifyReleaseValidationJob(job, errors) {
   requireFragments(job, [
     'timeout-minutes: 10',
     'fetch-depth: 0',
-    'node packaging/release/version.mjs --check-tag "$GITHUB_REF_NAME"',
-    '+refs/heads/master:refs/remotes/origin/master',
-    'git merge-base --is-ancestor "$release_commit" origin/master',
-    'gh api "repos/$GITHUB_REPOSITORY/releases/tags/$GITHUB_REF_NAME"',
+    `BEFORE_SHA: ${githubExpression('github.event.before')}`,
+    `AFTER_SHA: ${githubExpression('github.sha')}`,
+    `commit: ${githubExpression('steps.transition.outputs.commit')}`,
+    `tag: ${githubExpression('steps.transition.outputs.tag')}`,
+    `version: ${githubExpression('steps.transition.outputs.version')}`,
+    'node packaging/release/transition.mjs',
+    '--check "$BEFORE_SHA" "$AFTER_SHA"',
+    '--github-output "$GITHUB_OUTPUT"',
+    'repos/$GITHUB_REPOSITORY/git/ref/tags/$TAG',
+    'repos/$GITHUB_REPOSITORY/releases/tags/$TAG',
     'HTTP 404',
-  ], errors, 'Release validation must bind a strict version tag to a master commit and reject an existing Release')
+  ], errors, 'Release validation must bind a strict version-only master transition and reject an existing tag or Release')
 }
 
 function verifySourceJob(job, errors) {
@@ -315,8 +519,9 @@ function verifyArchJob(job, errors) {
 
 function verifyPublishJob(job, errors) {
   requireFragments(job, [
-    'needs: buddy-packages',
+    'needs: [validate-release, buddy-packages]',
     'timeout-minutes: 15',
+    'environment: buddy-release',
     'actions: read',
     'attestations: write',
     'artifact-metadata: write',
@@ -325,12 +530,21 @@ function verifyPublishJob(job, errors) {
     'name: lexora-buddy-ubuntu',
     'name: lexora-buddy-arch',
     'node packaging/buddy/release/verify-release-artifacts.mjs',
-    '"$LEXORA_BUDDY_RELEASE_TAG" != "$GITHUB_REF_NAME"',
-  ], errors, 'Release publication must use both verified platform artifacts with minimal publication permissions')
+    `EXPECTED_COMMIT: ${githubExpression('needs.validate-release.outputs.commit')}`,
+    `EXPECTED_TAG: ${githubExpression('needs.validate-release.outputs.tag')}`,
+    `EXPECTED_VERSION: ${githubExpression('needs.validate-release.outputs.version')}`,
+    '"$LEXORA_BUDDY_RELEASE_TAG" != "$EXPECTED_TAG"',
+    '"$LEXORA_BUDDY_VERSION" != "$EXPECTED_VERSION"',
+    '"$(git rev-parse HEAD)" != "$EXPECTED_COMMIT"',
+    'gh api --method POST "repos/$GITHUB_REPOSITORY/git/refs"',
+    '-f ref="refs/tags/$RELEASE_TAG"',
+    '-f sha="$RELEASE_COMMIT"',
+  ], errors, 'Release publication must use both verified platform artifacts and the validated transition with minimal publication permissions')
   if (/package:(?:arch|deb)|package-desktop\.mjs|pnpm check:buddy/.test(job))
     errors.push('Release publication must not rebuild platform packages')
 
-  requireOrder(job, 'actions/attest@', 'gh release create', errors, 'Release publication must attest artifacts before creating a Release')
+  requireOrder(job, 'actions/attest@', 'gh api --method POST', errors, 'Release publication must attest artifacts before creating the immutable tag')
+  requireOrder(job, 'gh api --method POST', 'gh release create', errors, 'Release publication must create the immutable tag before creating a Release')
   requireOrder(job, 'gh release create', 'gh release upload', errors, 'Release publication must create a draft before uploading immutable assets')
   requireOrder(job, 'gh release upload', 'gh release edit', errors, 'Release publication must publish only after immutable assets are uploaded')
   requireFragments(job, [
