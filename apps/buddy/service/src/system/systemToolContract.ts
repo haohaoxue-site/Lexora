@@ -64,7 +64,7 @@ export const systemActionInputSchema = Type.Union([
     reason: Type.String({ maxLength: 512, minLength: 1 }),
     target: serviceTargetSchema,
   }, { additionalProperties: false }),
-])
+], { type: 'object' })
 
 export interface SystemToolDetails {
   code?: SystemToolFailureCode
