@@ -7,8 +7,8 @@ import {
   Dismiss16Regular,
   PanelRight20Regular,
 } from '@vicons/fluent'
-import { NEmpty, NIcon } from 'naive-ui'
-import { computed, shallowRef } from 'vue'
+import { NEmpty, NIcon, NScrollbar } from 'naive-ui'
+import { computed, shallowRef, useTemplateRef } from 'vue'
 import { useBuddyI18n } from '@/i18n/buddyI18n'
 import DesktopArtifactContextSurface from './DesktopArtifactContextSurface.vue'
 import DesktopArtifactFileIcon from './DesktopArtifactFileIcon.vue'
@@ -29,6 +29,7 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useBuddyI18n(() => props.language)
+const tabsScrollRoot = useTemplateRef<HTMLElement>('tabsScrollRoot')
 const tabCountLabel = computed(() => t('desktop.context.tabCount', { count: props.tabs.length }))
 const changeFileLabels = shallowRef<Readonly<Record<string, string>>>({})
 
@@ -47,46 +48,85 @@ function updateChangeFileLabel(payload: { changeSetId: string, fileName: string 
     delete labels[tabId]
   changeFileLabels.value = labels
 }
+
+function handleTabsWheel(event: WheelEvent) {
+  if (event.ctrlKey || Math.abs(event.deltaX) >= Math.abs(event.deltaY))
+    return
+  event.preventDefault()
+  const scrollport = findTabsScrollport()
+  if (!scrollport)
+    return
+  const multiplier = event.deltaMode === WheelEvent.DOM_DELTA_LINE
+    ? 16
+    : event.deltaMode === WheelEvent.DOM_DELTA_PAGE
+      ? scrollport.clientWidth
+      : 1
+  scrollport.scrollLeft = Math.min(
+    Math.max(0, scrollport.scrollLeft + event.deltaY * multiplier),
+    scrollport.scrollWidth - scrollport.clientWidth,
+  )
+}
+
+function findTabsScrollport(): HTMLElement | null {
+  return [...tabsScrollRoot.value?.querySelectorAll<HTMLElement>('*') ?? []]
+    .find((element) => {
+      const overflowX = getComputedStyle(element).overflowX
+      return element.scrollWidth > element.clientWidth + 1
+        && (overflowX === 'auto' || overflowX === 'scroll')
+    }) ?? null
+}
 </script>
 
 <template>
   <section class="desktop-task-context-panel" data-testid="task-context-panel">
     <header class="desktop-task-context-panel__header">
       <div
-        class="desktop-task-context-panel__tabs"
-        role="tablist"
-        :aria-label="tabCountLabel"
+        ref="tabsScrollRoot"
+        class="desktop-task-context-panel__tabs-scroll"
+        @wheel="handleTabsWheel"
       >
-        <div
-          v-for="tab in tabs"
-          :key="tab.id"
-          class="desktop-task-context-panel__tab"
-          :class="{ 'is-active': tab.id === activeTab?.id }"
+        <NScrollbar
+          class="desktop-task-context-panel__tabs-scrollbar"
+          trigger="hover"
+          x-scrollable
         >
-          <button
-            class="desktop-task-context-panel__tab-select"
-            role="tab"
-            type="button"
-            :aria-selected="tab.id === activeTab?.id"
-            @click="emit('selectTab', tab.id)"
+          <div
+            class="desktop-task-context-panel__tabs"
+            role="tablist"
+            :aria-label="tabCountLabel"
           >
-            <DesktopArtifactFileIcon
-              v-if="tab.kind === 'artifact'"
-              :mime-type="tab.artifact.mimeType"
-              :name="tab.artifact.name"
-            />
-            <NIcon v-else :component="Code16Regular" />
-            <span>{{ tabLabel(tab) }}</span>
-          </button>
-          <button
-            class="desktop-task-context-panel__tab-close"
-            type="button"
-            :aria-label="t('desktop.context.closeTab', { name: tabLabel(tab) })"
-            @click="emit('closeTab', tab.id)"
-          >
-            <NIcon :component="Dismiss16Regular" />
-          </button>
-        </div>
+            <div
+              v-for="tab in tabs"
+              :key="tab.id"
+              class="desktop-task-context-panel__tab"
+              :class="{ 'is-active': tab.id === activeTab?.id }"
+            >
+              <button
+                class="desktop-task-context-panel__tab-select"
+                role="tab"
+                type="button"
+                :aria-selected="tab.id === activeTab?.id"
+                @click="emit('selectTab', tab.id)"
+              >
+                <DesktopArtifactFileIcon
+                  v-if="tab.kind === 'artifact'"
+                  :mime-type="tab.artifact.mimeType"
+                  :name="tab.artifact.name"
+                />
+                <NIcon v-else :component="Code16Regular" />
+                <span>{{ tabLabel(tab) }}</span>
+              </button>
+              <button
+                class="desktop-task-context-panel__tab-close"
+                type="button"
+                :aria-label="t('desktop.context.closeTab', { name: tabLabel(tab) })"
+                @click="emit('closeTab', tab.id)"
+              >
+                <NIcon :component="Dismiss16Regular" />
+              </button>
+            </div>
+          </div>
+        </NScrollbar>
       </div>
       <button
         class="desktop-task-context-panel__collapse"
@@ -139,16 +179,24 @@ function updateChangeFileLabel(payload: { changeSetId: string, fileName: string 
   background: var(--buddy-surface-base);
 }
 
-.desktop-task-context-panel__tabs {
-  display: flex;
+.desktop-task-context-panel__tabs-scroll {
   min-width: 0;
   flex: 1;
+  overflow: hidden;
+}
+
+:deep(.desktop-task-context-panel__tabs-scrollbar) {
+  width: 100%;
+  height: 100%;
+}
+
+.desktop-task-context-panel__tabs {
+  display: flex;
+  width: max-content;
+  height: 100%;
   align-items: stretch;
   gap: 0.25rem;
-  overflow-x: auto;
-  overflow-y: hidden;
   padding: 0.5625rem 0.25rem;
-  scrollbar-width: thin;
 }
 
 .desktop-task-context-panel__tab {
