@@ -2,14 +2,16 @@ name: Lexora Release
 
 on:
   push:
-    tags:
-      - 'v*'
+    branches:
+      - master
+    paths:
+      - apps/buddy/buddy.version.json
 
 permissions:
   contents: read
 
 concurrency:
-  group: lexora-release-${{ github.ref_name }}
+  group: lexora-release
   cancel-in-progress: false
 
 jobs:
@@ -17,6 +19,10 @@ jobs:
     name: Validate release
     runs-on: ubuntu-24.04
     timeout-minutes: 10
+    outputs:
+      commit: ${{ steps.transition.outputs.commit }}
+      tag: ${{ steps.transition.outputs.tag }}
+      version: ${{ steps.transition.outputs.version }}
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -29,32 +35,37 @@ jobs:
         with:
           node-version-file: .node-version
 
-      - name: Match tag to product version
-        run: node packaging/release/version.mjs --check-tag "$GITHUB_REF_NAME"
-
-      - name: Require a master commit
+      - name: Validate version-only transition
+        id: transition
+        env:
+          AFTER_SHA: ${{ github.sha }}
+          BEFORE_SHA: ${{ github.event.before }}
         run: |
-          git fetch --no-tags origin '+refs/heads/master:refs/remotes/origin/master'
-          release_commit="$(git rev-parse "$GITHUB_SHA^{commit}")"
-          if ! git merge-base --is-ancestor "$release_commit" origin/master; then
-            echo "Release tag must reference a commit contained in master" >&2
-            exit 1
-          fi
+          node packaging/release/transition.mjs \
+            --check "$BEFORE_SHA" "$AFTER_SHA" \
+            --github-output "$GITHUB_OUTPUT"
 
-      - name: Require a new Release
+      - name: Require unused release identity
         env:
           GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.transition.outputs.tag }}
         run: |
-          lookup_error="$RUNNER_TEMP/lexora-release-lookup.error"
-          if gh api "repos/$GITHUB_REPOSITORY/releases/tags/$GITHUB_REF_NAME" \
-            >/dev/null 2>"$lookup_error"; then
-            echo "Release $GITHUB_REF_NAME already exists" >&2
-            exit 1
-          fi
-          if ! grep -q 'HTTP 404' "$lookup_error"; then
-            cat "$lookup_error" >&2
-            exit 1
-          fi
+          require_missing() {
+            local label="$1"
+            local endpoint="$2"
+            local lookup_error="$RUNNER_TEMP/lexora-$label-lookup.error"
+            if gh api "$endpoint" >/dev/null 2>"$lookup_error"; then
+              echo "Release $label already exists for $TAG" >&2
+              exit 1
+            fi
+            if ! grep -q 'HTTP 404' "$lookup_error"; then
+              cat "$lookup_error" >&2
+              exit 1
+            fi
+          }
+
+          require_missing tag "repos/$GITHUB_REPOSITORY/git/ref/tags/$TAG"
+          require_missing release "repos/$GITHUB_REPOSITORY/releases/tags/$TAG"
 
   buddy-packages:
     name: Buddy packages
@@ -65,9 +76,10 @@ jobs:
 
   publish-release:
     name: Publish Release
-    needs: buddy-packages
+    needs: [validate-release, buddy-packages]
     runs-on: ubuntu-24.04
     timeout-minutes: 15
+    environment: buddy-release
     permissions:
       actions: read
       attestations: write
@@ -103,10 +115,22 @@ jobs:
             --github-env "$GITHUB_ENV" \
             --checksum-output "$GITHUB_WORKSPACE/apps/buddy/.output/artifacts/SHA256SUMS.txt"
 
-      - name: Bind artifacts to trigger tag
+      - name: Bind artifacts to validated transition
+        env:
+          EXPECTED_COMMIT: ${{ needs.validate-release.outputs.commit }}
+          EXPECTED_TAG: ${{ needs.validate-release.outputs.tag }}
+          EXPECTED_VERSION: ${{ needs.validate-release.outputs.version }}
         run: |
-          if [[ "$LEXORA_BUDDY_RELEASE_TAG" != "$GITHUB_REF_NAME" ]]; then
-            echo "Artifact version does not match release tag" >&2
+          if [[ "$LEXORA_BUDDY_RELEASE_TAG" != "$EXPECTED_TAG" ]]; then
+            echo "Artifact tag does not match validated release transition" >&2
+            exit 1
+          fi
+          if [[ "$LEXORA_BUDDY_VERSION" != "$EXPECTED_VERSION" ]]; then
+            echo "Artifact version does not match validated release transition" >&2
+            exit 1
+          fi
+          if [[ "$(git rev-parse HEAD)" != "$EXPECTED_COMMIT" ]]; then
+            echo "Publication checkout does not match validated release commit" >&2
             exit 1
           fi
 
@@ -117,6 +141,33 @@ jobs:
             ${{ github.workspace }}/apps/buddy/.output/artifacts/desktop/*.deb
             ${{ github.workspace }}/apps/buddy/.output/artifacts/arch/*.pkg.tar.zst
             ${{ github.workspace }}/apps/buddy/.output/artifacts/SHA256SUMS.txt
+
+      - name: Create immutable release tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_COMMIT: ${{ needs.validate-release.outputs.commit }}
+          RELEASE_TAG: ${{ needs.validate-release.outputs.tag }}
+        run: |
+          lookup_error="$RUNNER_TEMP/lexora-tag-create.error"
+          if existing_commit="$(
+            gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$RELEASE_TAG" \
+              --jq '.object.sha' 2>"$lookup_error"
+          )"; then
+            if [[ "$existing_commit" != "$RELEASE_COMMIT" ]]; then
+              echo "Release tag $RELEASE_TAG already references another object" >&2
+              exit 1
+            fi
+            echo "Release tag $RELEASE_TAG already references the validated commit"
+            exit 0
+          fi
+          if ! grep -q 'HTTP 404' "$lookup_error"; then
+            cat "$lookup_error" >&2
+            exit 1
+          fi
+
+          gh api --method POST "repos/$GITHUB_REPOSITORY/git/refs" \
+            -f ref="refs/tags/$RELEASE_TAG" \
+            -f sha="$RELEASE_COMMIT"
 
       - name: Create draft Release
         env:

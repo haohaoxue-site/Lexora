@@ -24,17 +24,30 @@ const buddyMetadataPath = 'apps/buddy/buddy.version.json'
 const cargoManifestPath = 'apps/buddy/native-pet/Cargo.toml'
 const cargoLockPath = 'apps/buddy/native-pet/Cargo.lock'
 
+export const lexoraVersionStatePaths = Object.freeze([
+  'package.json',
+  ...Object.values(applicationPackagePaths),
+  ...versionlessPackagePaths,
+  buddyMetadataPath,
+  cargoManifestPath,
+  cargoLockPath,
+])
+
 export function readLexoraVersionState(cwd = repoRoot) {
-  const rootPackage = readJson(cwd, 'package.json')
+  return readLexoraVersionStateFromSources(readManagedSources(cwd))
+}
+
+export function readLexoraVersionStateFromSources(sources) {
+  const rootPackage = parseJson(sources['package.json'], 'package.json')
   const applicationPackages = Object.fromEntries(
-    Object.entries(applicationPackagePaths).map(([name, path]) => [name, readJson(cwd, path)]),
+    Object.entries(applicationPackagePaths).map(([name, path]) => [name, parseJson(sources[path], path)]),
   )
   const versionlessPackages = Object.fromEntries(
-    versionlessPackagePaths.map(path => [path, readJson(cwd, path)]),
+    versionlessPackagePaths.map(path => [path, parseJson(sources[path], path)]),
   )
-  const buddyMetadata = readJson(cwd, buddyMetadataPath)
-  const cargoManifest = readSource(cwd, cargoManifestPath)
-  const cargoLock = readSource(cwd, cargoLockPath)
+  const buddyMetadata = parseJson(sources[buddyMetadataPath], buddyMetadataPath)
+  const cargoManifest = sources[cargoManifestPath]
+  const cargoLock = sources[cargoLockPath]
 
   return {
     applicationVersions: Object.fromEntries(
@@ -107,10 +120,23 @@ export function validateLexoraReleaseTag(tag, productVersion) {
 }
 
 export function setLexoraVersion(cwd, version, options = {}) {
+  const sources = readManagedSources(cwd)
+  const result = createLexoraVersionSources(sources, version, options)
+
+  for (const path of result.changedPaths)
+    writeFileSync(join(cwd, path), result.sources[path])
+
+  return {
+    changedPaths: result.changedPaths,
+    sourceDateEpoch: result.sourceDateEpoch,
+    version: result.version,
+  }
+}
+
+export function createLexoraVersionSources(sources, version, options = {}) {
   if (!versionPattern.test(version))
     throw new Error(`version must use x.y.z format without leading zeroes: ${version}`)
 
-  const sources = readManagedSources(cwd)
   const parsed = {
     rootPackage: parseJson(sources['package.json'], 'package.json'),
     applicationPackages: Object.fromEntries(
@@ -125,17 +151,26 @@ export function setLexoraVersion(cwd, version, options = {}) {
   if (!versionPattern.test(currentVersion))
     throw new Error(`package.json has invalid product version: ${currentVersion}`)
 
-  const comparison = compareVersions(version, currentVersion)
+  const comparison = compareLexoraVersions(version, currentVersion)
   if (comparison < 0)
     throw new Error(`version ${version} is lower than current product version ${currentVersion}`)
 
   validateWritableStructure(parsed, sources)
 
+  const currentSourceDateEpoch = Number(parsed.buddyMetadata.sourceDateEpoch)
   const sourceDateEpoch = comparison > 0
-    ? Math.floor((options.now?.() ?? Date.now()) / 1000)
-    : Number(parsed.buddyMetadata.sourceDateEpoch)
+    ? options.sourceDateEpoch ?? Math.max(
+      Math.floor((options.now?.() ?? Date.now()) / 1000),
+      currentSourceDateEpoch + 1,
+    )
+    : currentSourceDateEpoch
   if (!Number.isSafeInteger(sourceDateEpoch) || sourceDateEpoch <= 0)
     throw new Error(`invalid sourceDateEpoch: ${sourceDateEpoch}`)
+  if (comparison > 0 && sourceDateEpoch <= currentSourceDateEpoch) {
+    throw new Error(
+      `sourceDateEpoch ${sourceDateEpoch} must be greater than ${currentSourceDateEpoch}`,
+    )
+  }
 
   const nextSources = { ...sources }
   nextSources['package.json'] = updateJson(sources['package.json'], parsed.rootPackage, (value) => {
@@ -162,11 +197,15 @@ export function setLexoraVersion(cwd, version, options = {}) {
   for (const [path, source] of Object.entries(nextSources)) {
     if (source === sources[path])
       continue
-    writeFileSync(join(cwd, path), source)
     changedPaths.push(path)
   }
 
-  return { changedPaths, sourceDateEpoch, version }
+  return {
+    changedPaths,
+    sourceDateEpoch,
+    sources: nextSources,
+    version,
+  }
 }
 
 function validateWritableStructure(parsed, sources) {
@@ -191,18 +230,9 @@ function validateWritableStructure(parsed, sources) {
 }
 
 function readManagedSources(cwd) {
-  return Object.fromEntries([
-    'package.json',
-    ...Object.values(applicationPackagePaths),
-    ...versionlessPackagePaths,
-    buddyMetadataPath,
-    cargoManifestPath,
-    cargoLockPath,
-  ].map(path => [path, readSource(cwd, path)]))
-}
-
-function readJson(cwd, path) {
-  return parseJson(readSource(cwd, path), path)
+  return Object.fromEntries(
+    lexoraVersionStatePaths.map(path => [path, readSource(cwd, path)]),
+  )
 }
 
 function readSource(cwd, path) {
@@ -262,7 +292,7 @@ function replaceExactlyOnce(source, pattern, replacement, path) {
   return source.replace(pattern, replacement)
 }
 
-function compareVersions(left, right) {
+export function compareLexoraVersions(left, right) {
   const leftParts = left.split('.').map(BigInt)
   const rightParts = right.split('.').map(BigInt)
   for (let index = 0; index < leftParts.length; index += 1) {
@@ -295,13 +325,28 @@ function main() {
     writeOutput(`Lexora version check passed: ${state.productVersion}`)
     return
   }
+  if (command === '--check-next') {
+    const state = checkVersionState()
+    const version = value ?? ''
+    if (!versionPattern.test(version))
+      throw new Error(`version must use x.y.z format without leading zeroes: ${version}`)
+    if (compareLexoraVersions(version, state.productVersion) <= 0) {
+      throw new Error(
+        `version ${version} must be greater than current product version ${state.productVersion}`,
+      )
+    }
+    writeOutput(`Lexora next version check passed: ${version}`)
+    return
+  }
   if (command === '--check-tag') {
     const state = checkVersionState()
     const release = validateLexoraReleaseTag(value ?? '', state.productVersion)
     writeOutput(`Lexora release tag check passed: ${release.tag}`)
     return
   }
-  throw new Error('usage: version.mjs --set <x.y.z> | --check | --check-tag <vX.Y.Z>')
+  throw new Error(
+    'usage: version.mjs --set <x.y.z> | --check | --check-next <x.y.z> | --check-tag <vX.Y.Z>',
+  )
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
