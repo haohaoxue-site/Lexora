@@ -76,7 +76,7 @@ async function save(draft: AutomationDefinitionDraft): Promise<void> {
     :models="providerSettings.models.value"
     :preview="automations.preview"
     :providers="providerSettings.providers.value"
-    :projects="tasks.index.projects.value"
+    :spaces="tasks.index.spaces.value"
     @cancel="cancel"
     @save="save"
     @toggle-app-sidebar="toggleAppSidebar"

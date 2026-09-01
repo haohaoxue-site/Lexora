@@ -1,4 +1,4 @@
-import type { GrantedPathMode, ProjectGrant } from '../projects/resolveGrantedPath'
+import type { DirectoryGrant, GrantedPathMode } from '../directories/resolveGrantedPath'
 import type {
   ShellCommandPolicy,
   ToolApprovalKind,
@@ -9,7 +9,7 @@ import type {
 import { isAbsolute, resolve } from 'node:path'
 import process from 'node:process'
 
-import { GrantedPathError, resolveGrantedPath } from '../projects/resolveGrantedPath'
+import { GrantedPathError, resolveGrantedPath } from '../directories/resolveGrantedPath'
 import { ShellPolicy } from './ShellPolicy'
 
 export interface ToolPolicyOptions {
@@ -65,6 +65,11 @@ export class ToolPolicy {
       return { type: 'allow' }
     if (request.source === 'mcp' || request.risk === 'mcp')
       return ask('mcp', 'Use a connected external tool')
+    if (request.risk === 'authorization') {
+      return request.source === 'lexora'
+        ? { type: 'allow' }
+        : { type: 'deny', code: 'VALIDATION_FAILED' }
+    }
     if (request.source === 'lexora' && request.risk === 'read')
       return { type: 'allow' }
 
@@ -123,7 +128,7 @@ export class ToolPolicy {
   }
 
   async #validatePaths(
-    grants: readonly ProjectGrant[],
+    grants: readonly DirectoryGrant[],
     cwd: string,
     paths: readonly ToolPolicyPath[],
   ): Promise<Extract<ToolDecision, { type: 'deny' }> | null> {

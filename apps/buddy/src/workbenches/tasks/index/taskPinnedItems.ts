@@ -1,13 +1,13 @@
 import type { DesktopTaskPinnedItem } from '@buddy-electron/shared/desktopApi'
-import type { LocalConversationSummary, LocalProject } from '@buddy-electron/shared/localChatApi'
+import type { LocalConversationSummary, LocalSpace } from '@buddy-electron/shared/localChatApi'
 
 export type TaskIndexRow
   = | {
     key: string
-    kind: 'project'
+    kind: 'space'
     pinKey?: string
     pinnedTopLevel?: boolean
-    project: LocalProject
+    space: LocalSpace
   }
   | {
     task: LocalConversationSummary
@@ -15,45 +15,45 @@ export type TaskIndexRow
     kind: 'task'
     pinKey?: string
     pinnedTopLevel?: boolean
-    projectTask?: boolean
+    spaceTask?: boolean
   }
 
 export interface TaskIndexProjection {
   pinnedItems: DesktopTaskPinnedItem[]
   pinnedRows: TaskIndexRow[]
-  projectRows: TaskIndexRow[]
+  spaceRows: TaskIndexRow[]
   globalTasks: LocalConversationSummary[]
 }
 
 export type DesktopTaskPinnedDropPosition = 'after' | 'before'
 
 export function resolveTaskIndexProjection(input: {
-  expandedProjectIds: ReadonlySet<string>
+  expandedSpaceIds: ReadonlySet<string>
   pinnedItems: ReadonlyArray<DesktopTaskPinnedItem>
-  projects: ReadonlyArray<LocalProject>
+  spaces: ReadonlyArray<LocalSpace>
   tasks: ReadonlyArray<LocalConversationSummary>
 }): TaskIndexProjection {
-  const activeProjects = input.projects.filter(project => project.revokedAt === null)
-  const projectsById = new Map(activeProjects.map(project => [project.id, project]))
-  const globalTasks = input.tasks.filter(task => task.projectId === null)
+  const activeSpaces = input.spaces.filter(space => space.revokedAt === null)
+  const spacesById = new Map(activeSpaces.map(space => [space.id, space]))
+  const globalTasks = input.tasks.filter(task => task.spaceId === null)
   const globalTasksById = new Map(globalTasks.map(task => [task.id, task]))
-  const tasksByProject = new Map<string, LocalConversationSummary[]>()
+  const tasksBySpace = new Map<string, LocalConversationSummary[]>()
 
   for (const task of input.tasks) {
-    if (!task.projectId)
+    if (!task.spaceId)
       continue
-    const tasks = tasksByProject.get(task.projectId) ?? []
+    const tasks = tasksBySpace.get(task.spaceId) ?? []
     tasks.push(task)
-    tasksByProject.set(task.projectId, tasks)
+    tasksBySpace.set(task.spaceId, tasks)
   }
 
   const pinnedItems = resolveVisiblePinnedItems({
     items: input.pinnedItems,
-    projectsById,
+    spacesById,
     tasksById: globalTasksById,
   })
-  const pinnedProjectIds = new Set(pinnedItems
-    .filter(item => item.kind === 'project')
+  const pinnedSpaceIds = new Set(pinnedItems
+    .filter(item => item.kind === 'space')
     .map(item => item.id))
   const pinnedConversationIds = new Set(pinnedItems
     .filter(item => item.kind === 'conversation')
@@ -73,31 +73,31 @@ export function resolveTaskIndexProjection(input: {
         }]
       }
 
-      const project = projectsById.get(item.id)!
+      const space = spacesById.get(item.id)!
       const rows: TaskIndexRow[] = [{
         key: `pinned:${pinKey}`,
-        kind: 'project',
+        kind: 'space',
         pinKey,
         pinnedTopLevel: true,
-        project,
+        space,
       }]
-      if (!input.expandedProjectIds.has(project.id))
+      if (!input.expandedSpaceIds.has(space.id))
         return rows
-      const projectTasks = tasksByProject.get(project.id) ?? []
-      return rows.concat(projectTasks.map(task => ({
+      const spaceTasks = tasksBySpace.get(space.id) ?? []
+      return rows.concat(spaceTasks.map(task => ({
         task,
         key: `pinned:${pinKey}:conversation:${task.id}`,
         kind: 'task' as const,
         pinKey,
-        projectTask: true,
+        spaceTask: true,
       })))
     }),
-    projectRows: activeProjects
-      .filter(project => !pinnedProjectIds.has(project.id))
-      .flatMap(project => createProjectRows(
-        project,
-        tasksByProject.get(project.id) ?? [],
-        input.expandedProjectIds.has(project.id),
+    spaceRows: activeSpaces
+      .filter(space => !pinnedSpaceIds.has(space.id))
+      .flatMap(space => createSpaceRows(
+        space,
+        tasksBySpace.get(space.id) ?? [],
+        input.expandedSpaceIds.has(space.id),
       )),
     globalTasks: globalTasks.filter(task => !pinnedConversationIds.has(task.id)),
   }
@@ -144,29 +144,29 @@ export function getDesktopTaskPinnedItemKey(item: DesktopTaskPinnedItem): string
   return `${item.kind}:${item.id}`
 }
 
-function createProjectRows(
-  project: LocalProject,
+function createSpaceRows(
+  space: LocalSpace,
   tasks: ReadonlyArray<LocalConversationSummary>,
   expanded: boolean,
 ): TaskIndexRow[] {
   const rows: TaskIndexRow[] = [{
-    key: `project:${project.id}`,
-    kind: 'project',
-    project,
+    key: `space:${space.id}`,
+    kind: 'space',
+    space,
   }]
   if (!expanded)
     return rows
   return rows.concat(tasks.map(task => ({
     task,
-    key: `project:${project.id}:conversation:${task.id}`,
+    key: `space:${space.id}:conversation:${task.id}`,
     kind: 'task' as const,
-    projectTask: true,
+    spaceTask: true,
   })))
 }
 
 function resolveVisiblePinnedItems(input: {
   items: ReadonlyArray<DesktopTaskPinnedItem>
-  projectsById: ReadonlyMap<string, LocalProject>
+  spacesById: ReadonlyMap<string, LocalSpace>
   tasksById: ReadonlyMap<string, LocalConversationSummary>
 }): DesktopTaskPinnedItem[] {
   const keys = new Set<string>()
@@ -174,8 +174,8 @@ function resolveVisiblePinnedItems(input: {
     const key = getDesktopTaskPinnedItemKey(item)
     if (keys.has(key))
       return false
-    const exists = item.kind === 'project'
-      ? input.projectsById.has(item.id)
+    const exists = item.kind === 'space'
+      ? input.spacesById.has(item.id)
       : input.tasksById.has(item.id)
     if (exists)
       keys.add(key)

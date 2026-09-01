@@ -7,20 +7,20 @@ import { readonly, shallowRef } from 'vue'
 interface HydrateChatSessionInput {
   activeBranchId: string | null
   activeConversationId: string | null
-  projectId: string | null
+  spaceId: string | null
 }
 
 export function useChatSession() {
   const activeConversationId = shallowRef<string | null>(null)
   const activeBranchId = shallowRef<string | null>(null)
-  const projectId = shallowRef<string | null>(null)
+  const spaceId = shallowRef<string | null>(null)
   const branches = shallowRef<ReadonlyArray<LocalConversationBranch>>([])
   let navigationGeneration = 0
 
   function hydrate(input: HydrateChatSessionInput) {
     activeConversationId.value = input.activeConversationId
     activeBranchId.value = input.activeBranchId
-    projectId.value = input.projectId
+    spaceId.value = input.spaceId
     branches.value = []
   }
 
@@ -28,15 +28,15 @@ export function useChatSession() {
     navigationGeneration += 1
     activeConversationId.value = conversation.id
     activeBranchId.value = conversation.activeBranchId
-    projectId.value = conversation.projectId
+    spaceId.value = conversation.spaceId
     branches.value = []
   }
 
-  function activateDraft(nextProjectId: string | null) {
+  function activateDraft(nextSpaceId: string | null) {
     navigationGeneration += 1
     activeConversationId.value = null
     activeBranchId.value = null
-    projectId.value = nextProjectId
+    spaceId.value = nextSpaceId
     branches.value = []
   }
 
@@ -85,7 +85,7 @@ export function useChatSession() {
     generation,
     hydrate,
     isCurrent,
-    projectId: readonly(projectId),
+    spaceId: readonly(spaceId),
     replaceBranches,
     setActiveBranch,
     upsertBranch,

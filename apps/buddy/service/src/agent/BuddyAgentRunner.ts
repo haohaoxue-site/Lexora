@@ -12,7 +12,6 @@ import type {
   PiExecutionOutcome,
   PiTurnExecutor,
 } from './PiTurnExecutor'
-import { createHash } from 'node:crypto'
 import { RunEventLogFatalError } from '../events/RunEventFailure'
 import { BuddyAgentRunError, readStableRunErrorCode } from '../runs/runError'
 import { ActiveRunRegistry } from './ActiveRunRegistry'
@@ -243,17 +242,17 @@ function createRunStartedPayload(
   input: StartBuddyTurnInput | StartBuddyCompactionInput,
 ): Record<string, unknown> {
   const { session } = input
-  if (!session.project)
+  if (!session.space)
     return {}
 
   return {
-    projectSnapshot: {
+    spaceSnapshot: {
+      additionalDirectoryBindings: session.space.additionalDirectoryBindings,
       canonicalRoot: session.canonicalRoot,
-      instructionsHash: createHash('sha256')
-        .update(session.resources.projectInstructions)
-        .digest('hex'),
-      memoryScope: session.project.memoryScope,
-      projectId: session.project.id,
+      grantRevision: session.grantRevision,
+      memoryScope: session.space.memoryScope,
+      primaryDirectoryBinding: session.space.primaryDirectoryBinding,
+      spaceId: session.space.id,
       resourceRevision: session.resources.revision,
     },
   }

@@ -33,7 +33,7 @@ const startTurnSchema = z.object({
   draftId: sessionIdentitySchema,
   executionProfile: z.enum(BUDDY_EXECUTION_PROFILES),
   modelSelection: modelSelectionSchema.nullable(),
-  projectId: idSchema.nullable(),
+  spaceId: idSchema.nullable(),
   requestId: requestIdSchema,
 }).strict().refine(
   value => value.content.trim().length > 0 || value.attachmentIds.length > 0,

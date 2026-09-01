@@ -4,22 +4,24 @@ type DesktopLanguage = LexoraConfig['desktop']['language']
 
 const messages = {
   'en-US': {
+    authorizeAdditionalDirectory: 'Authorize an additional directory for this Space',
     backgroundCloseBody: 'Lexora Buddy is still running in the background.',
     backgroundCloseTitle: 'Lexora Buddy remains available',
     open: 'Open',
     quit: 'Quit',
     restart: 'Restart',
     selectAttachments: 'Select attachments',
-    selectProjectDirectory: 'Select project directory',
+    selectSpaceDirectory: 'Select space directory',
   },
   'zh-CN': {
+    authorizeAdditionalDirectory: '授权当前空间访问一个附加目录',
     backgroundCloseBody: 'Lexora Buddy 仍在后台运行。',
     backgroundCloseTitle: 'Lexora Buddy 仍可随时使用',
     open: '打开',
     quit: '退出',
     restart: '重启',
     selectAttachments: '选择附件',
-    selectProjectDirectory: '选择项目目录',
+    selectSpaceDirectory: '选择空间目录',
   },
 } as const
 

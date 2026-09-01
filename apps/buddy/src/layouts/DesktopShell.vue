@@ -19,9 +19,9 @@ async function openGlobalSearchTask(conversationId: string) {
   await taskSession.openTask(conversationId)
 }
 
-async function openGlobalSearchProject(projectId: string) {
+async function openGlobalSearchSpace(spaceId: string) {
   await router.push(desktopRouteLocations.tasks())
-  await taskSession.startTask(projectId)
+  await taskSession.startTask(spaceId)
 }
 
 async function openNotification(notification: LocalNotification) {
@@ -52,14 +52,14 @@ async function openNotification(notification: LocalNotification) {
           :notification-items="notifications.items.value"
           :notification-loading="notifications.isLoading.value"
           :notification-unseen-count="notifications.unseenCount.value"
-          :projects="taskIndex.projects.value"
+          :spaces="taskIndex.spaces.value"
           @navigate-tasks="router.push(desktopRouteLocations.tasks())"
           @navigate-automations="router.push(desktopRouteLocations.automations())"
           @navigate-settings="router.push(desktopRouteLocations.settings())"
           @mark-all-notifications-seen="notifications.markAllSeen"
           @open-notification="openNotification"
           @open-task="openGlobalSearchTask"
-          @open-project="openGlobalSearchProject"
+          @open-space="openGlobalSearchSpace"
           @toggle-sidebar="toggleAppSidebar"
           @refresh-notifications="notifications.load"
         />

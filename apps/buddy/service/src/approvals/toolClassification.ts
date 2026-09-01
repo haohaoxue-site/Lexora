@@ -17,7 +17,7 @@ export interface BuddyToolClassification {
   }
   alwaysConfirm?: boolean
   paths?: readonly ToolPolicyPath[]
-  resource?: { kind?: 'connector' | 'project', projectId: string, trusted: boolean }
+  resource?: { id: string, kind?: 'connector' | 'space', trusted: boolean }
   risk?: ToolRisk
   source?: 'lexora' | 'mcp' | 'pi'
 }

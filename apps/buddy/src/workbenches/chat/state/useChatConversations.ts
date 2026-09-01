@@ -145,10 +145,10 @@ export function useChatConversations(options: UseChatConversationsOptions) {
     }
   }
 
-  function activateDraftScope(projectId: string | null, preserveCurrent = true) {
+  function activateDraftScope(spaceId: string | null, preserveCurrent = true) {
     if (preserveCurrent)
       options.drafts.saveCurrentDraft()
-    options.session.activateDraft(projectId)
+    options.session.activateDraft(spaceId)
     directlyOpenedConversation.value = null
     options.runSync.clearConversationState()
     options.drafts.restoreCurrentDraft()

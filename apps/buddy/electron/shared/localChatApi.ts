@@ -33,8 +33,6 @@ import type {
   LocalDefaultModel,
   LocalMessagePage,
   LocalNotificationList,
-  LocalProject,
-  LocalProjectFile,
   LocalPromptContextItem,
   LocalProvider,
   LocalProviderAuthChallenge,
@@ -46,6 +44,10 @@ import type {
   LocalRuntimeDataRecoveryReceipt,
   LocalRuntimeModelOption,
   LocalSkillCatalog,
+  LocalSpace,
+  LocalSpaceCreateInput,
+  LocalSpaceFile,
+  LocalSpaceUpdateInput,
   LocalStartTurnRequest,
   LocalTurnStart,
   LocalUsageSnapshot,
@@ -66,7 +68,8 @@ export type LocalChatErrorCode
     | 'MODEL_SYNC_FAILED'
     | 'MODEL_SYNC_UNSUPPORTED'
     | 'PATH_OUTSIDE_GRANTED_DIRECTORY'
-    | 'PROJECT_HAS_ACTIVE_RUNS'
+    | 'SPACE_HAS_ACTIVE_RUNS'
+    | 'SPACE_UNAVAILABLE'
     | 'PROVIDER_HAS_ACTIVE_RUNS'
     | 'PROVIDER_LOGIN_CANCELLED'
     | 'PROVIDER_UNAVAILABLE'
@@ -94,7 +97,8 @@ const LOCAL_CHAT_ERROR_CODES = new Set<LocalChatErrorCode>([
   'MODEL_SYNC_FAILED',
   'MODEL_SYNC_UNSUPPORTED',
   'PATH_OUTSIDE_GRANTED_DIRECTORY',
-  'PROJECT_HAS_ACTIVE_RUNS',
+  'SPACE_HAS_ACTIVE_RUNS',
+  'SPACE_UNAVAILABLE',
   'PROVIDER_HAS_ACTIVE_RUNS',
   'PROVIDER_LOGIN_CANCELLED',
   'PROVIDER_UNAVAILABLE',
@@ -159,8 +163,6 @@ export type {
   LocalMessagePage,
   LocalNotification,
   LocalNotificationList,
-  LocalProject,
-  LocalProjectFile,
   LocalPromptContextItem,
   LocalProvider,
   LocalProviderAuthChallenge,
@@ -174,6 +176,12 @@ export type {
   LocalRuntimeDataRestore,
   LocalRuntimeModelOption,
   LocalSkillCatalog,
+  LocalSpace,
+  LocalSpaceAdditionalDirectory,
+  LocalSpaceCreateInput,
+  LocalSpaceFile,
+  LocalSpacePrimaryDirectory,
+  LocalSpaceUpdateInput,
   LocalStartTurnRequest,
   LocalTurnStart,
   LocalUsageSnapshot,
@@ -230,12 +238,12 @@ export const LOCAL_CHAT_IPC_CHANNELS = {
   notificationsList: 'lexora:buddy:notifications:list',
   notificationsMarkAllSeen: 'lexora:buddy:notifications:mark-all-seen',
   notificationsMarkSeen: 'lexora:buddy:notifications:mark-seen',
-  projectsCreate: 'lexora:buddy:projects:create',
-  projectsDelete: 'lexora:buddy:projects:delete',
-  projectsList: 'lexora:buddy:projects:list',
-  projectsSearchFiles: 'lexora:buddy:projects:search-files',
-  projectsSelectDirectory: 'lexora:buddy:projects:select-directory',
-  projectsUpdate: 'lexora:buddy:projects:update',
+  spacesCreate: 'lexora:buddy:spaces:create',
+  spacesDelete: 'lexora:buddy:spaces:delete',
+  spacesList: 'lexora:buddy:spaces:list',
+  spacesSearchFiles: 'lexora:buddy:spaces:search-files',
+  spacesSelectDirectory: 'lexora:buddy:spaces:select-directory',
+  spacesUpdate: 'lexora:buddy:spaces:update',
   providerAuthChallenge: 'lexora:buddy:providers:auth-challenge',
   providersCancelAuth: 'lexora:buddy:providers:cancel-auth',
   providersAdd: 'lexora:buddy:providers:add',
@@ -366,27 +374,16 @@ export interface LocalChatApi {
     markAllSeen: () => Promise<LocalNotificationList>
     markSeen: (notificationId: string, revision: string) => Promise<LocalNotificationList>
   }
-  projects: {
-    create: (input: {
-      instructions: string
-      memoryScope: 'personal_and_project' | 'project_only'
-      name: string
-      root: string
-    }) => Promise<LocalProject>
-    delete: (projectId: string) => Promise<LocalMutationResult>
-    list: (limit?: number) => Promise<ReadonlyArray<LocalProject>>
-    searchFiles: (projectId: string, query: string) => Promise<ReadonlyArray<LocalProjectFile>>
+  spaces: {
+    create: (input: LocalSpaceCreateInput) => Promise<LocalSpace>
+    delete: (spaceId: string) => Promise<LocalMutationResult>
+    list: (limit?: number) => Promise<ReadonlyArray<LocalSpace>>
+    searchFiles: (spaceId: string, query: string) => Promise<ReadonlyArray<LocalSpaceFile>>
     selectDirectory: () => Promise<string | null>
-    update: (input: {
-      instructions: string
-      memoryScope: 'personal_and_project' | 'project_only'
-      name: string
-      projectId: string
-      root: string
-    }) => Promise<LocalProject>
+    update: (input: LocalSpaceUpdateInput) => Promise<LocalSpace>
   }
   skills: {
-    list: (projectId?: string | null) => Promise<LocalSkillCatalog>
+    list: (spaceId?: string | null) => Promise<LocalSkillCatalog>
   }
   connectors: {
     list: () => Promise<ReadonlyArray<LocalConnector>>

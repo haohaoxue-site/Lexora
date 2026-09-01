@@ -25,7 +25,7 @@ import {
   resolveChatBlocker,
 } from '@/workbenches/chat/workspace/chatBlocker'
 import { useTaskIndexData } from '@/workbenches/tasks/state/useTaskIndexData'
-import { useTaskProjects } from '@/workbenches/tasks/state/useTaskProjects'
+import { useTaskSpaces } from '@/workbenches/tasks/state/useTaskSpaces'
 import { useTaskWorkspacePersistence } from '@/workbenches/tasks/state/useTaskWorkspacePersistence'
 
 const CONVERSATION_ACTIVITY_EVENT_TYPES = new Set([
@@ -58,7 +58,7 @@ export function useTaskCapability(options: UseTaskCapabilityOptions) {
   const taskIndexData = useTaskIndexData({ api: api.localChat })
   const {
     conversations,
-    projects,
+    spaces,
     refreshIndex: refreshTaskIndex,
     refreshConversations,
   } = taskIndexData
@@ -67,7 +67,7 @@ export function useTaskCapability(options: UseTaskCapabilityOptions) {
     activeBranchId,
     activeConversationId,
     branches,
-    projectId,
+    spaceId,
   } = chatSession
   const isLoading = shallowRef(true)
   const isSelectingFiles = shallowRef(false)
@@ -124,7 +124,7 @@ export function useTaskCapability(options: UseTaskCapabilityOptions) {
   ))
   const draftScopeKey = computed(() => activeConversationId.value
     ? `conversation:${activeConversationId.value}`
-    : projectId.value ? `project:${projectId.value}` : 'global')
+    : spaceId.value ? `space:${spaceId.value}` : 'global')
   let persistDraftChanges = () => {}
   const drafts = useChatDrafts({
     cleanupDraftAttachments: () => api.localChat.attachments.cleanupDrafts(),
@@ -138,7 +138,7 @@ export function useTaskCapability(options: UseTaskCapabilityOptions) {
     conversations,
     drafts,
     onError: setError,
-    projects,
+    spaces,
     session: chatSession,
   })
   const persistWorkspaceState = workspacePersistence.persist
@@ -165,27 +165,27 @@ export function useTaskCapability(options: UseTaskCapabilityOptions) {
     selectDefaultModel: modelProviders.selectDefaultModel,
     session: chatSession,
   })
-  const taskProjects = useTaskProjects({
+  const taskSpaces = useTaskSpaces({
     activateDraftScope,
     api: api.localChat,
     drafts,
     localCapabilities,
     onError: setError,
     persistWorkspaceState,
-    projectId,
-    projects,
+    spaceId,
+    spaces,
     refreshIndex: refreshTaskIndex,
     selectDefaultModel: modelProviders.selectDefaultModel,
   })
   const {
-    activeProject,
-    createProject,
-    deleteProject,
+    activeSpace,
+    createSpace,
+    deleteSpace,
     listContextOptions,
-    activateProjectDraft,
-    selectProjectDirectory,
-    updateProject,
-  } = taskProjects
+    activateSpaceDraft,
+    selectSpaceDirectory,
+    updateSpace,
+  } = taskSpaces
   const currentTitle = computed(() => activeConversation.value?.title?.trim()
     || t('desktop.tasks.newTask'))
   const executionProfileState = useChatExecutionProfile({
@@ -226,7 +226,7 @@ export function useTaskCapability(options: UseTaskCapabilityOptions) {
     draftId,
     executionProfile: executionProfileState.executionProfile,
     models: modelProviders.models,
-    projectId,
+    spaceId,
     runEvents,
     runtimeState: runtimeSupervisor.runtimeState,
     selectedEffort: modelProviders.selectedEffort,
@@ -349,12 +349,12 @@ export function useTaskCapability(options: UseTaskCapabilityOptions) {
     errorMessage.value = null
     try {
       const results = await Promise.allSettled([
-        api.localChat.projects.list(),
+        api.localChat.spaces.list(),
         refreshConversations(),
         workspacePersistence.read(),
       ])
       if (results[0]?.status === 'fulfilled')
-        taskIndexData.replaceProjects(results[0].value)
+        taskIndexData.replaceSpaces(results[0].value)
       const workspaceResult = results[2]
       if (workspaceResult?.status === 'fulfilled')
         await workspacePersistence.hydrate(workspaceResult.value)
@@ -476,33 +476,33 @@ export function useTaskCapability(options: UseTaskCapabilityOptions) {
       dismissedChatBlockerKind.value = visibleChatBlocker.value.kind
   }
 
-  async function startTask(projectId: string | null): Promise<void> {
-    if (projectId === null) {
+  async function startTask(spaceId: string | null): Promise<void> {
+    if (spaceId === null) {
       await activateGlobalDraft()
       return
     }
-    await activateProjectDraft(projectId)
+    await activateSpaceDraft(spaceId)
   }
 
   const index = {
-    createProject,
-    deleteProject,
+    createSpace,
+    deleteSpace,
     deleteTask: deleteConversation,
-    projects: readonly(projects),
+    spaces: readonly(spaces),
     refresh: refreshTaskIndex,
     renameTask: renameConversation,
-    selectProjectDirectory,
+    selectSpaceDirectory,
     tasks: readonly(conversations),
-    updateProject,
+    updateSpace,
   } as const
 
   const session = {
-    activeProject: readonly(activeProject),
+    activeSpace: readonly(activeSpace),
     activeTask: readonly(activeConversation),
     activeTaskId: readonly(activeConversationId),
     currentTitle: readonly(currentTitle),
     openTask: openConversation,
-    projectId: readonly(projectId),
+    spaceId: readonly(spaceId),
     startTask,
   } as const
 
@@ -510,11 +510,11 @@ export function useTaskCapability(options: UseTaskCapabilityOptions) {
     activeBranchId: readonly(activeBranchId),
     activeConversation: readonly(activeConversation),
     activeConversationId: readonly(activeConversationId),
-    activeProject: readonly(activeProject),
+    activeSpace: readonly(activeSpace),
     currentTitle: readonly(currentTitle),
     listActiveConversationMessages,
     openConversation,
-    projectId: readonly(projectId),
+    spaceId: readonly(spaceId),
   } as const
 
   const workspace = {

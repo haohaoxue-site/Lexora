@@ -6,6 +6,7 @@ import type {
   AutomationMutationStore,
 } from './automationMutationStore'
 import type { AutomationRow } from './automationRecord'
+import { toStorageBlockedReason } from './automationRecord'
 import { AutomationRepositoryError } from './automationRepositoryError'
 import { withTransaction } from './database'
 
@@ -23,9 +24,9 @@ export interface AutomationDefinitionCommandRepository {
     modelId?: string
     providerId: string
   }) => Automation[]
-  blockActiveByProject: (input: {
+  blockActiveBySpace: (input: {
     blockedAt: string
-    projectId: string
+    spaceId: string
   }) => Automation[]
   create: (automation: Automation, mutation: AutomationMutationIdentity) => Automation
   replace: (input: {
@@ -48,7 +49,7 @@ export function createAutomationDefinitionCommandStore(
 ): AutomationDefinitionCommandStore {
   const insertAutomation = database.prepare(`
     INSERT INTO automations (
-      id, name, prompt, project_id, execution_profile, model_mode, provider_id, model_id, reasoning,
+      id, name, prompt, space_id, execution_profile, model_mode, provider_id, model_id, reasoning,
       schedule_kind, schedule_json, timezone, active_from, active_until,
       status, blocked_reason, next_run_at, last_run_at, deleted_at, revision,
       created_at, updated_at
@@ -56,7 +57,7 @@ export function createAutomationDefinitionCommandStore(
   `)
   const replaceAutomation = database.prepare(`
     UPDATE automations SET
-      name = ?, prompt = ?, project_id = ?, execution_profile = ?, model_mode = ?, provider_id = ?,
+      name = ?, prompt = ?, space_id = ?, execution_profile = ?, model_mode = ?, provider_id = ?,
       model_id = ?, reasoning = ?, schedule_kind = ?, schedule_json = ?,
       timezone = ?, active_from = ?, active_until = ?, status = ?,
       blocked_reason = ?, next_run_at = ?, deleted_at = ?, revision = ?, updated_at = ?
@@ -74,9 +75,9 @@ export function createAutomationDefinitionCommandStore(
         revision = revision + 1, updated_at = ?
     WHERE id = ? AND revision = ? AND deleted_at IS NULL
   `)
-  const findActiveByProject = database.prepare(`
+  const findActiveBySpace = database.prepare(`
     SELECT * FROM automations
-    WHERE deleted_at IS NULL AND status = 'active' AND project_id = ?
+    WHERE deleted_at IS NULL AND status = 'active' AND space_id = ?
     ORDER BY id
   `)
   const findActiveByPinnedProvider = database.prepare(`
@@ -97,7 +98,7 @@ export function createAutomationDefinitionCommandStore(
   }
   const tryBlock = (input: BlockAutomationInput): boolean => {
     return Number(blockAutomation.run(
-      input.reason,
+      toStorageBlockedReason(input.reason),
       input.blockedAt,
       input.automationId,
       input.expectedRevision,
@@ -147,11 +148,11 @@ export function createAutomationDefinitionCommandStore(
           input.blockedAt,
         )
       },
-      blockActiveByProject(input) {
-        const rows = findActiveByProject.all(input.projectId) as unknown as AutomationRow[]
+      blockActiveBySpace(input) {
+        const rows = findActiveBySpace.all(input.spaceId) as unknown as AutomationRow[]
         return blockActiveRows(
           rows,
-          'AUTOMATION_PROJECT_UNAVAILABLE',
+          'AUTOMATION_SPACE_UNAVAILABLE',
           input.blockedAt,
         )
       },
@@ -179,7 +180,7 @@ export function createAutomationDefinitionCommandStore(
           if (Number(replaceAutomation.run(
             input.automation.name,
             input.automation.prompt,
-            input.automation.projectId,
+            input.automation.spaceId,
             input.automation.executionProfile,
             input.automation.model.mode,
             input.automation.model.mode === 'pinned' ? input.automation.model.providerId : null,
@@ -191,7 +192,7 @@ export function createAutomationDefinitionCommandStore(
             input.automation.timing.activeFrom,
             input.automation.timing.activeUntil,
             input.automation.status,
-            input.automation.blockedReason,
+            toStorageBlockedReason(input.automation.blockedReason),
             input.automation.nextRunAt,
             mutation.operation === 'delete' ? input.automation.updatedAt : null,
             input.automation.revision,
@@ -225,7 +226,7 @@ function persistAutomation(
     automation.id,
     automation.name,
     automation.prompt,
-    automation.projectId,
+    automation.spaceId,
     automation.executionProfile,
     automation.model.mode,
     automation.model.mode === 'pinned' ? automation.model.providerId : null,
@@ -237,7 +238,7 @@ function persistAutomation(
     automation.timing.activeFrom,
     automation.timing.activeUntil,
     automation.status,
-    automation.blockedReason,
+    toStorageBlockedReason(automation.blockedReason),
     automation.nextRunAt,
     automation.lastRunAt,
     automation.revision,

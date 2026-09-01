@@ -3,7 +3,7 @@ import type { WorkspaceRepository } from '../storage/workspaceRepository'
 import { z } from 'zod'
 import { BuddyServiceError, parse } from '../rpc/runtimeRequest'
 
-const WORKSPACE_STATE_KEY = 'buddy.chat.workspace.v1'
+const WORKSPACE_STATE_KEY = 'buddy.chat.workspace.v2'
 const workspaceStateKeySchema = z.literal(WORKSPACE_STATE_KEY)
 
 export interface RegisterWorkspaceStateRpcOptions {

@@ -2,7 +2,7 @@ import type { LexoraDesktopApi } from '@buddy-electron/shared/desktopApi'
 import type {
   LocalConversation,
   LocalConversationSummary,
-  LocalProject,
+  LocalSpace,
 } from '@buddy-electron/shared/localChatApi'
 import { readonly, shallowRef } from 'vue'
 
@@ -11,16 +11,16 @@ interface UseTaskIndexDataOptions {
 }
 
 export function useTaskIndexData(options: UseTaskIndexDataOptions) {
-  const projects = shallowRef<ReadonlyArray<LocalProject>>([])
+  const spaces = shallowRef<ReadonlyArray<LocalSpace>>([])
   const conversations = shallowRef<ReadonlyArray<LocalConversationSummary>>([])
   let conversationListGeneration = 0
 
   async function refreshIndex() {
-    const [nextProjects] = await Promise.all([
-      options.api.projects.list(),
+    const [nextSpaces] = await Promise.all([
+      options.api.spaces.list(),
       refreshConversations(),
     ])
-    projects.value = nextProjects
+    spaces.value = nextSpaces
   }
 
   async function refreshConversations() {
@@ -30,8 +30,8 @@ export function useTaskIndexData(options: UseTaskIndexDataOptions) {
       conversations.value = nextConversations
   }
 
-  function replaceProjects(value: ReadonlyArray<LocalProject>) {
-    projects.value = value
+  function replaceSpaces(value: ReadonlyArray<LocalSpace>) {
+    spaces.value = value
   }
 
   function applyConversation(conversation: LocalConversation) {
@@ -58,10 +58,10 @@ export function useTaskIndexData(options: UseTaskIndexDataOptions) {
   return {
     applyConversation,
     conversations: readonly(conversations),
-    projects: readonly(projects),
+    spaces: readonly(spaces),
     refreshIndex,
     refreshConversations,
-    replaceProjects,
+    replaceSpaces,
     updateConversationBranch,
   }
 }

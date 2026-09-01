@@ -14,7 +14,7 @@ import type {
   BuddyToolClassificationResult,
 } from '../../approvals/toolClassification'
 import type { ToolApprovalKind } from '../../approvals/toolPolicyContract'
-import type { ProjectGrant } from '../../projects/resolveGrantedPath'
+import type { DirectoryGrant } from '../../directories/resolveGrantedPath'
 import type { BuddyInProcessExtension } from '../createBuddyResourceLoader'
 import { createToolApprovalScopeKey } from '../../approvals/toolApprovalScope'
 import { isToolClassificationFailure } from '../../approvals/toolClassification'
@@ -58,7 +58,7 @@ export interface CreateToolPolicyExtensionOptions {
   ) => BuddyToolClassificationResult | null | undefined | Promise<BuddyToolClassificationResult | null | undefined>
   cwd: string
   executionProfile: BuddyExecutionProfile
-  getGrants: () => readonly ProjectGrant[]
+  getGrants: () => readonly DirectoryGrant[]
   getRunContext: () => BuddyRunContext | null
   toolPolicy?: ToolPolicy
 }

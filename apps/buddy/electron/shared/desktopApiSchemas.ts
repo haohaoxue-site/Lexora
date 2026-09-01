@@ -4,7 +4,7 @@ import { DESKTOP_CHAT_WELCOME_VARIANT_IDS } from './desktopApi'
 
 const taskSidebarPinnedItemSchema = z.discriminatedUnion('kind', [
   z.object({ id: z.string().min(1).max(128), kind: z.literal('conversation') }).strict(),
-  z.object({ id: z.string().min(1).max(128), kind: z.literal('project') }).strict(),
+  z.object({ id: z.string().min(1).max(128), kind: z.literal('space') }).strict(),
 ])
 
 const taskSidebarPinnedItemsSchema = z.array(taskSidebarPinnedItemSchema)

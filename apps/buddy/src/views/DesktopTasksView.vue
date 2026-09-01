@@ -6,7 +6,7 @@ import { desktopRouteLocations } from '@/router'
 import DesktopChatWorkspace from '@/workbenches/chat/workspace/DesktopChatWorkspace.vue'
 import DesktopChatWorkspaceHeader from '@/workbenches/chat/workspace/DesktopChatWorkspaceHeader.vue'
 import { useConversationSearch } from '@/workbenches/chat/workspace/useConversationSearch'
-import DesktopTaskProjectSelector from '@/workbenches/tasks/composer/DesktopTaskProjectSelector.vue'
+import DesktopTaskSpaceSelector from '@/workbenches/tasks/composer/DesktopTaskSpaceSelector.vue'
 import DesktopTaskContextPanel from '@/workbenches/tasks/context/DesktopTaskContextPanel.vue'
 import { useTaskContextPanel } from '@/workbenches/tasks/context/useTaskContextPanel'
 import DesktopTaskIndex from '@/workbenches/tasks/index/DesktopTaskIndex.vue'
@@ -40,18 +40,18 @@ const conversationSearch = useConversationSearch({
         :app-sidebar-collapsed="shell.appSidebarCollapsed.value"
         :language="tasks.language.value"
         :pinned-items="shell.taskSidebarPinnedItems.value"
-        :projects="taskIndex.projects.value"
-        :select-project-directory="taskIndex.selectProjectDirectory"
+        :spaces="taskIndex.spaces.value"
+        :select-space-directory="taskIndex.selectSpaceDirectory"
         :tasks="taskIndex.tasks.value"
-        @create-project="taskIndex.createProject"
-        @delete-project="taskIndex.deleteProject"
+        @create-space="taskIndex.createSpace"
+        @delete-space="taskIndex.deleteSpace"
         @delete-task="taskIndex.deleteTask"
         @new-task="taskSession.startTask"
         @open-task="taskSession.openTask"
         @rename-task="taskIndex.renameTask"
         @update-pinned-items="shell.setTaskSidebarPinnedItems"
         @toggle-app-sidebar="toggleAppSidebar"
-        @update-project="taskIndex.updateProject"
+        @update-space="taskIndex.updateSpace"
       />
     </template>
 
@@ -83,13 +83,13 @@ const conversationSearch = useConversationSearch({
       @open-changes="taskContext.openChanges"
     >
       <template v-if="taskSession.activeTaskId.value === null" #composerLeadingContext>
-        <DesktopTaskProjectSelector
-          :active-project="taskSession.activeProject.value"
+        <DesktopTaskSpaceSelector
+          :active-space="taskSession.activeSpace.value"
           :language="tasks.language.value"
-          :projects="taskIndex.projects.value"
-          :select-directory="taskIndex.selectProjectDirectory"
-          @create-project="taskIndex.createProject"
-          @select-project="taskSession.startTask"
+          :spaces="taskIndex.spaces.value"
+          :select-directory="taskIndex.selectSpaceDirectory"
+          @create-space="taskIndex.createSpace"
+          @select-space="taskSession.startTask"
         />
       </template>
     </DesktopChatWorkspace>

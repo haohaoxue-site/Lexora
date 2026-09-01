@@ -3,13 +3,13 @@ import type { AutomationService } from './AutomationService'
 
 export interface AutomationChangeCoordinatorOptions {
   notify: (automationId: string) => void
-  service: Pick<AutomationService, 'blockPinnedModel' | 'blockProject' | 'list'>
+  service: Pick<AutomationService, 'blockPinnedModel' | 'blockSpace' | 'list'>
   wakeScheduler: () => Promise<void> | void | undefined
 }
 
 export interface AutomationDependencyAvailability {
   isPinnedModelAvailable: (providerId: string, modelId: string) => boolean
-  isProjectAvailable: (projectId: string) => boolean
+  isSpaceAvailable: (spaceId: string) => boolean
 }
 
 export class AutomationChangeCoordinator {
@@ -27,8 +27,8 @@ export class AutomationChangeCoordinator {
     return this.#publishAll(this.#service.blockPinnedModel(providerId, modelId))
   }
 
-  blockProject(projectId: string): Automation[] {
-    return this.#publishAll(this.#service.blockProject(projectId))
+  blockSpace(spaceId: string): Automation[] {
+    return this.#publishAll(this.#service.blockSpace(spaceId))
   }
 
   publish(automationId: string): void {
@@ -43,17 +43,17 @@ export class AutomationChangeCoordinator {
   reconcileDependencies(availability: AutomationDependencyAvailability): Automation[] {
     const active = this.#listActive()
     const blocked = new Map<string, Automation>()
-    const blockedProjects = new Set<string>()
+    const blockedSpaces = new Set<string>()
     const blockedModels = new Set<string>()
 
     for (const automation of active) {
       if (
-        automation.projectId
-        && !availability.isProjectAvailable(automation.projectId)
-        && !blockedProjects.has(automation.projectId)
+        automation.spaceId
+        && !availability.isSpaceAvailable(automation.spaceId)
+        && !blockedSpaces.has(automation.spaceId)
       ) {
-        blockedProjects.add(automation.projectId)
-        for (const item of this.#service.blockProject(automation.projectId))
+        blockedSpaces.add(automation.spaceId)
+        for (const item of this.#service.blockSpace(automation.spaceId))
           blocked.set(item.id, item)
         continue
       }

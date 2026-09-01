@@ -1,4 +1,6 @@
 import type { BuddyExecutionProfile } from '../../../shared/executionProfile'
+import type { SpaceExecutionContext } from '../../../shared/space'
+import { spaceExecutionContextSchema } from '../../../shared/space'
 
 export type RunStatus = 'queued' | 'running' | 'completed' | 'failed' | 'cancelled'
 export type RunPurpose = 'automation' | 'chat' | 'conversation.compaction'
@@ -16,6 +18,7 @@ export interface RunRecord {
   status: RunStatus
   piSessionFile: string | null
   errorCode: string | null
+  executionContext: SpaceExecutionContext | null
   executionProfile: BuddyExecutionProfile
   startedAt: string
   completedAt: string | null
@@ -34,6 +37,7 @@ export interface RunRow {
   status: RunStatus
   pi_session_file: string | null
   error_code: string | null
+  execution_context_json: string | null
   execution_profile: BuddyExecutionProfile
   started_at: string
   completed_at: string | null
@@ -60,6 +64,9 @@ export function toRunRecord(row: RunRow): RunRecord {
     status: row.status,
     piSessionFile: row.pi_session_file,
     errorCode: row.error_code,
+    executionContext: row.execution_context_json
+      ? spaceExecutionContextSchema.parse(JSON.parse(row.execution_context_json))
+      : null,
     executionProfile: row.execution_profile,
     startedAt: row.started_at,
     completedAt: row.completed_at,

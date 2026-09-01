@@ -1,7 +1,7 @@
 import type { LexoraDesktopApi } from '@buddy-electron/shared/desktopApi'
 import type {
   LocalConversationSummary,
-  LocalProject,
+  LocalSpace,
   LocalWorkspaceSetting,
   LocalWorkspaceStateValue,
 } from '@buddy-electron/shared/localChatApi'
@@ -18,7 +18,7 @@ interface UseTaskWorkspacePersistenceOptions {
   conversations: ValueRef<ReadonlyArray<LocalConversationSummary>>
   drafts: ReturnType<typeof useChatDrafts>
   onError: (error: unknown) => void
-  projects: ValueRef<ReadonlyArray<LocalProject>>
+  spaces: ValueRef<ReadonlyArray<LocalSpace>>
   session: ChatSession
 }
 
@@ -39,17 +39,17 @@ export function useTaskWorkspacePersistence(options: UseTaskWorkspacePersistence
       )
         ? parsed.data.activeConversationId
         : null
-      const projectId = options.projects.value.some(
-        project => project.id === parsed.data.projectId && project.revokedAt === null,
+      const spaceId = options.spaces.value.some(
+        space => space.id === parsed.data.spaceId && space.revokedAt === null,
       )
-        ? parsed.data.projectId
+        ? parsed.data.spaceId
         : null
       options.session.hydrate({
         activeBranchId: options.conversations.value.find(
           conversation => conversation.id === activeConversationId,
         )?.activeBranchId ?? null,
         activeConversationId,
-        projectId,
+        spaceId,
       })
     }
     else if (setting === null) {
@@ -70,7 +70,7 @@ export function useTaskWorkspacePersistence(options: UseTaskWorkspacePersistence
     const value: LocalWorkspaceStateValue = {
       activeConversationId: options.session.activeConversationId.value,
       drafts: options.drafts.exportDrafts(),
-      projectId: options.session.projectId.value,
+      spaceId: options.session.spaceId.value,
     }
     const write = writeQueue.then(async () => {
       await options.api.write(value)

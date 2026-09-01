@@ -2,7 +2,7 @@ import { Buffer } from 'node:buffer'
 import { readFile, realpath, stat } from 'node:fs/promises'
 import { join, relative, sep } from 'node:path'
 
-import { GrantedPathError, resolveGrantedPath } from '../projects/resolveGrantedPath'
+import { GrantedPathError, resolveGrantedPath } from '../directories/resolveGrantedPath'
 
 const MAX_CONTEXT_FILE_BYTES = 64 * 1024
 const MAX_CONTEXT_TOTAL_BYTES = 256 * 1024
@@ -58,7 +58,7 @@ export async function loadBoundedContextFiles(
     try {
       const resolution = await resolveGrantedPath([{
         canonicalRoot,
-        projectId: 'context',
+        grantId: 'context',
         root: canonicalRoot,
       }], path, 'existing')
       const metadata = await stat(resolution.canonicalPath)

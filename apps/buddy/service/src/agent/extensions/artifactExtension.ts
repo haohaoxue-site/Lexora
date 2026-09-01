@@ -1,7 +1,7 @@
 import type { Buffer } from 'node:buffer'
 import type { Static, TSchema } from 'typebox'
 import type { ArtifactResource } from '../../artifacts/ArtifactService'
-import type { ProjectGrant } from '../../projects/resolveGrantedPath'
+import type { DirectoryGrant } from '../../directories/resolveGrantedPath'
 import type { BuddyInProcessExtension } from '../createBuddyResourceLoader'
 import { defineTool } from '@earendil-works/pi-coding-agent'
 import { Check } from 'typebox/value'
@@ -37,7 +37,7 @@ export interface CreateArtifactExtensionOptions {
     checkoutConversationArtifact: (input: {
       artifactId: string
       conversationId: string
-      scratchGrant: ProjectGrant
+      scratchGrant: DirectoryGrant
     }) => Promise<{ path: string, resource: ArtifactResource }>
     listConversationArtifacts: (conversationId: string, limit?: number) => ArtifactResource[]
     materializeConversationArtifact: (
@@ -52,7 +52,7 @@ export interface CreateArtifactExtensionOptions {
         path: string
         sourceArtifactId?: string
       }[]
-      grants: readonly ProjectGrant[]
+      grants: readonly DirectoryGrant[]
       runId: string
       sourceToolCallId: string
     }) => Promise<Array<{ id: string }>>
@@ -60,8 +60,8 @@ export interface CreateArtifactExtensionOptions {
   conversationId: string
   cwd: string
   getRunId: () => string | undefined
-  grants: readonly ProjectGrant[]
-  scratchGrant: ProjectGrant
+  grants: readonly DirectoryGrant[]
+  scratchGrant: DirectoryGrant
 }
 
 export function createArtifactExtension(

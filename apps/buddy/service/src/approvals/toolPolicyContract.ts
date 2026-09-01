@@ -1,8 +1,9 @@
 import type { ApprovalReviewKind } from '../../../shared/approvalReviewPayload'
-import type { GrantedPathMode, ProjectGrant } from '../projects/resolveGrantedPath'
+import type { DirectoryGrant, GrantedPathMode } from '../directories/resolveGrantedPath'
 
 export type ToolApprovalKind = ApprovalReviewKind
-export type ToolRisk = 'delete' | 'mcp' | 'network' | 'read' | 'system' | 'visual' | 'write'
+export type ToolRisk
+  = 'authorization' | 'delete' | 'mcp' | 'network' | 'read' | 'system' | 'visual' | 'write'
 export type ToolPolicyDenialCode
   = 'INVALID_PATH'
     | 'PATH_NOT_FOUND'
@@ -23,9 +24,9 @@ export interface ToolPolicyPath {
 export interface ToolPolicyRequest {
   arguments: unknown
   cwd: string
-  grants: readonly ProjectGrant[]
+  grants: readonly DirectoryGrant[]
   paths?: readonly ToolPolicyPath[]
-  resource?: { kind?: 'connector' | 'project', projectId: string, trusted: boolean }
+  resource?: { id: string, kind?: 'connector' | 'space', trusted: boolean }
   risk?: ToolRisk
   source?: 'lexora' | 'mcp' | 'pi'
   toolName: string

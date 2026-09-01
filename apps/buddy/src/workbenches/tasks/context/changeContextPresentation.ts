@@ -72,14 +72,14 @@ export function buildChangeFileTree(
     }
     directory.files.push(file)
   }
-  return projectDirectoryChildren(root)
+  return buildDirectoryChildren(root)
 }
 
-function projectDirectoryChildren(directory: DirectoryNode): ChangeFileTreeNode[] {
+function buildDirectoryChildren(directory: DirectoryNode): ChangeFileTreeNode[] {
   const directories = [...directory.directories.values()]
     .sort((left, right) => left.name.localeCompare(right.name))
     .map(child => ({
-      children: projectDirectoryChildren(child),
+      children: buildDirectoryChildren(child),
       key: `directory:${child.path}`,
       kind: 'directory' as const,
       label: child.name,

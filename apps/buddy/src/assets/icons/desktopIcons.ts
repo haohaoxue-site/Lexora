@@ -8,7 +8,7 @@ import messageRetryUrl from './message-retry.svg'
 import navigationAutomationUrl from './navigation-automation.svg'
 import navigationTaskUrl from './navigation-task.svg'
 import notificationMarkAllReadUrl from './notification-mark-all-read.svg'
-import projectNoneUrl from './project-none.svg'
+import spaceNoneUrl from './space-none.svg'
 import windowCloseUrl from './window-close.svg'
 import windowMaximizeUrl from './window-maximize.svg'
 import windowMinimizeUrl from './window-minimize.svg'
@@ -26,7 +26,7 @@ export const DESKTOP_ICON_URLS = {
   navigationAutomation: navigationAutomationUrl,
   navigationTask: navigationTaskUrl,
   notificationMarkAllRead: notificationMarkAllReadUrl,
-  projectNone: projectNoneUrl,
+  spaceNone: spaceNoneUrl,
   windowClose: windowCloseUrl,
   windowMaximize: windowMaximizeUrl,
   windowMinimize: windowMinimizeUrl,

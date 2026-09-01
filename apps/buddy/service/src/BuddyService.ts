@@ -60,16 +60,18 @@ import { OpenAiImageGenerationService } from './images/OpenAiImageGenerationServ
 import { AttentionNotificationService } from './notifications/AttentionNotificationService'
 import { registerNotificationRpc } from './notifications/registerNotificationRpc'
 import { PetActionService } from './pet/PetActionService'
-import { ProjectGrantService } from './projects/ProjectGrantService'
-import { registerProjectRpc } from './projects/registerProjectRpc'
 import { createProviderService } from './providers/createProviderService'
 import { registerProviderRpc } from './providers/registerProviderRpc'
 import { resolveInteractiveModelSelection } from './providers/resolveInteractiveModelSelection'
-
 import { BuddyServiceError } from './rpc/runtimeRequest'
 import { registerRunRpc } from './runs/registerRunRpc'
 import { RunLifecycleService } from './runs/RunLifecycleService'
+
 import { RunRecoveryService } from './runs/RunRecoveryService'
+import { registerSpaceRpc } from './spaces/registerSpaceRpc'
+import { SpaceDirectoryAuthorizationService } from './spaces/SpaceDirectoryAuthorizationService'
+import { matchesSpaceExecutionContext } from './spaces/spaceExecutionContext'
+import { SpaceService } from './spaces/SpaceService'
 import { createApprovalRepository } from './storage/approvalRepository'
 import { createArtifactRepository } from './storage/artifactRepository'
 import { createAttachmentRepository } from './storage/attachmentRepository'
@@ -80,10 +82,10 @@ import { createCommandRequestRepository } from './storage/commandRequestReposito
 import { createConnectorRepository } from './storage/connectorRepository'
 import { createConversationRepository } from './storage/conversationRepository'
 import { createNotificationAttentionRepository } from './storage/notificationAttentionRepository'
-import { createProjectRepository } from './storage/projectRepository'
 import { createProviderRepository } from './storage/providerRepository'
 import { createRunInputRepository } from './storage/runInputRepository'
 import { createRunRepository } from './storage/runRepository'
+import { createSpaceRepository } from './storage/spaceRepository'
 import { createTurnRequestRepository } from './storage/turnRequestRepository'
 import { createUsageRepository } from './storage/usageRepository'
 import { createWorkspaceRepository } from './storage/workspaceRepository'
@@ -118,7 +120,7 @@ export async function startBuddyService(
     mkdir(paths.draftsDirectory, { mode: 0o700, recursive: true }),
   ])
 
-  const projectsRepository = createProjectRepository(options.database)
+  const spacesRepository = createSpaceRepository(options.database)
   const conversations = createConversationRepository(options.database)
   const runs = createRunRepository(options.database)
   const runInputs = createRunInputRepository(options.database)
@@ -128,7 +130,7 @@ export async function startBuddyService(
   const turnRequests = createTurnRequestRepository(options.database)
   const commandRequests = createCommandRequestRepository(options.database)
   const connectorsRepository = createConnectorRepository(options.database)
-  const projectService = new ProjectGrantService(projectsRepository)
+  const spaceService = new SpaceService(spacesRepository)
   let runner!: BuddyAgentRunner
   const approvalService = new ApprovalService({
     eventLog: options.eventLog,
@@ -192,6 +194,11 @@ export async function startBuddyService(
   })
   const systemHost = new LinuxSystemHost()
   const sessions = new BuddySessionRegistry<BuddyAgentSessionLike>()
+  const directoryAuthorization = new SpaceDirectoryAuthorizationService({
+    host: options.rpc,
+    onGranted: spaceId => sessions.invalidateSpace(spaceId),
+    spaces: spaceService,
+  })
   const connectorService = new McpConnectorService({
     connectors: connectorsRepository,
     invalidateSessions: () => sessions.invalidateAll(),
@@ -201,7 +208,7 @@ export async function startBuddyService(
   const skillService = new SkillService({
     agentDirectory,
     builtinSkillsDirectory: options.builtinSkillsDirectory,
-    projects: projectsRepository,
+    spaces: spacesRepository,
   })
   const petService = new PetActionService({
     eventSink: event => options.eventLog.append(event),
@@ -248,9 +255,9 @@ export async function startBuddyService(
       const model = providersRepository.models.find(providerId, modelId)
       return Boolean(provider?.enabled && model?.enabled && model.available)
     },
-    isProjectAvailable(projectId) {
-      const project = projectsRepository.findById(projectId)
-      return Boolean(project && project.revokedAt === null)
+    isSpaceAvailable(spaceId) {
+      const space = spacesRepository.findById(spaceId)
+      return Boolean(space && space.revokedAt === null)
     },
   })
   const sessionCompositionServices: BuddySessionCompositionServices = {
@@ -260,6 +267,7 @@ export async function startBuddyService(
     automationService,
     changeCaptureService,
     connectorService,
+    directoryAuthorization,
     imageGenerationGateway,
     imageTransformService,
     onAutomationChanged: automationId => automationChanges.publish(automationId),
@@ -268,7 +276,7 @@ export async function startBuddyService(
   }
   const sessionBlueprints = new BuddySessionBlueprintService({
     paths,
-    projects: projectsRepository,
+    spaces: spacesRepository,
     skills: skillService,
   })
   const sessionRecovery = new BuddySessionRecoveryService({
@@ -327,7 +335,7 @@ export async function startBuddyService(
     commands: commandRequests,
     conversationLifecycle,
     conversations,
-    projects: projectsRepository,
+    spaces: spacesRepository,
     runs,
     turnLauncher,
   })
@@ -335,7 +343,7 @@ export async function startBuddyService(
     attachments: attachmentService,
     conversationLifecycle,
     conversations,
-    projects: projectsRepository,
+    spaces: spacesRepository,
     providers: providerService,
     runInputs,
     runner,
@@ -366,11 +374,13 @@ export async function startBuddyService(
       defaults: providerService,
       models: executionModels,
     }, target),
-    resolveProject: async (projectId) => {
-      const project = projectsRepository.findById(projectId)
-      return project && project.revokedAt === null
-        ? { id: project.id }
-        : null
+    resolveSpace: async (spaceId, executionContext) => {
+      const space = spacesRepository.findById(spaceId)
+      if (!space || space.revokedAt !== null)
+        return null
+      if (!matchesSpaceExecutionContext(space, executionContext))
+        return { status: 'context_changed' }
+      return { executionContext, id: space.id, status: 'ready' }
     },
     turns: automationTurns,
   })
@@ -466,11 +476,11 @@ export async function startBuddyService(
       service: automationService,
     }),
     registerMcpConnectorRpc(options.rpc, connectorService),
-    registerProjectRpc({
+    registerSpaceRpc({
       automations: automationChanges,
-      projects: projectsRepository,
+      spaces: spacesRepository,
       rpc: options.rpc,
-      service: projectService,
+      service: spaceService,
       sessions,
     }),
     registerProviderRpc({

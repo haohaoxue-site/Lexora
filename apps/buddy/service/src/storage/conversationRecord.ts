@@ -10,7 +10,7 @@ export interface ConversationModelSelection {
 
 export interface ConversationRecord {
   id: string
-  projectId: string | null
+  spaceId: string | null
   title: string | null
   activeBranchId: string | null
   createdAt: string
@@ -23,7 +23,7 @@ export interface ConversationRecord {
 
 export interface ConversationRow {
   id: string
-  project_id: string | null
+  space_id: string | null
   title: string | null
   active_branch_id: string | null
   created_at: string
@@ -44,7 +44,7 @@ export function requireConversationRecord(value: unknown, id: string): Conversat
 export function toConversationRecord(row: ConversationRow): ConversationRecord {
   return {
     id: row.id,
-    projectId: row.project_id,
+    spaceId: row.space_id,
     title: row.title,
     activeBranchId: row.active_branch_id,
     createdAt: row.created_at,

@@ -59,18 +59,18 @@ const viewport = useChatViewport({
 watch(
   () => [
     session.activeConversationId.value,
-    session.activeProject.value?.id ?? null,
+    session.activeSpace.value?.id ?? null,
     workspace.welcomePreference.value,
   ] as const,
   (
-    [conversationId, projectId, welcomePreference],
-    [previousConversationId, previousProjectId, previousWelcomePreference],
+    [conversationId, spaceId, welcomePreference],
+    [previousConversationId, previousSpaceId, previousWelcomePreference],
   ) => {
     if (
       conversationId === null
       && (
         previousConversationId !== null
-        || projectId !== previousProjectId
+        || spaceId !== previousSpaceId
         || welcomePreference !== previousWelcomePreference
       )
     ) {

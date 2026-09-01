@@ -29,7 +29,7 @@ export interface ContextUsageSnapshotInput {
   draftId: string
   executionProfile: BuddyExecutionProfile
   modelSelection: ContextUsageModelSelection
-  projectId: string | null
+  spaceId: string | null
 }
 
 export interface ContextUsageSnapshotServiceOptions {
@@ -75,7 +75,7 @@ export class ContextUsageSnapshotService implements ContextUsageSnapshotReader {
       conversation
       && (
         conversation.deletedAt !== null
-        || conversation.projectId !== input.projectId
+        || conversation.spaceId !== input.spaceId
         || conversation.executionProfile !== input.executionProfile
         || !input.branchId
         || !this.#options.conversations.listBranches(conversation.id).some(
@@ -102,13 +102,13 @@ export class ContextUsageSnapshotService implements ContextUsageSnapshotReader {
           branchId,
           conversationId: conversation.id,
           executionProfile,
-          projectId: conversation.projectId,
+          spaceId: conversation.spaceId,
           sessionMode: 'interactive',
         })
       : await this.#options.blueprints.createForDraft({
           draftId: input.draftId,
           executionProfile,
-          projectId: input.projectId,
+          spaceId: input.spaceId,
         })
     const composition = await createBuddySessionComposition({
       canonicalRoot: blueprint.canonicalRoot,
@@ -118,6 +118,7 @@ export class ContextUsageSnapshotService implements ContextUsageSnapshotReader {
       scratchRoot: blueprint.scratchRoot,
       sessionMode: blueprint.sessionMode,
       signal: new AbortController().signal,
+      spaceId: blueprint.space?.id ?? null,
       services: this.#options.sessionCompositionServices,
     })
     const snapshot = await createBuddyContextSnapshot({

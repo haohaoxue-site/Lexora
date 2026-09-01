@@ -5,6 +5,7 @@ import {
   BUDDY_EXECUTION_PROFILES,
 } from './executionProfile'
 import { BUDDY_THINKING_LEVELS } from './modelSelection'
+import { spaceExecutionContextSchema } from './space'
 
 export const AUTOMATION_LIFECYCLE_STATUSES = [
   'active',
@@ -25,7 +26,7 @@ export const AUTOMATION_TRIGGER_KINDS = ['scheduled', 'manual'] as const
 export const AUTOMATION_STARTUP_REASONS = ['normal', 'data_restore'] as const
 
 export const AUTOMATION_BLOCKED_REASONS = [
-  'AUTOMATION_PROJECT_UNAVAILABLE',
+  'AUTOMATION_SPACE_UNAVAILABLE',
   'AUTOMATION_PINNED_MODEL_UNAVAILABLE',
 ] as const
 
@@ -33,7 +34,7 @@ export const AUTOMATION_ERROR_CODES = [
   'AUTOMATION_CONFLICT',
   'AUTOMATION_NOT_FOUND',
   'AUTOMATION_INVALID_SCHEDULE',
-  'AUTOMATION_PROJECT_UNAVAILABLE',
+  'AUTOMATION_SPACE_UNAVAILABLE',
   'AUTOMATION_PINNED_MODEL_UNAVAILABLE',
   'AUTOMATION_DEFAULT_MODEL_UNAVAILABLE',
   'AUTOMATION_APPROVAL_EXPIRED',
@@ -168,7 +169,7 @@ const automationDefinitionShape = {
   executionProfile: z.enum(BUDDY_EXECUTION_PROFILES).default(BUDDY_DEFAULT_EXECUTION_PROFILE),
   model: automationModelTargetSchema,
   name: automationNameSchema,
-  projectId: idSchema.nullable(),
+  spaceId: idSchema.nullable(),
   prompt: z.string().trim().refine(value => (
     value.length > 0 && new TextEncoder().encode(value).byteLength <= AUTOMATION_PROMPT_MAX_BYTES
   )),
@@ -177,10 +178,26 @@ const automationDefinitionShape = {
 
 export const automationDefinitionDraftSchema = z.object(automationDefinitionShape).strict()
 
-export const automationExecutionSnapshotSchema = z.object(automationDefinitionShape).strict().refine(value => (
-  new TextEncoder().encode(JSON.stringify(value)).byteLength
-    <= AUTOMATION_EXECUTION_SNAPSHOT_MAX_BYTES
-))
+export const automationExecutionSnapshotSchema = z.object({
+  ...automationDefinitionShape,
+  spaceContext: spaceExecutionContextSchema.nullable(),
+}).strict().superRefine((value, context) => {
+  if (
+    value.spaceContext !== null
+    && value.spaceContext.spaceId !== value.spaceId
+  ) {
+    context.addIssue({
+      code: 'custom',
+      path: ['spaceContext'],
+    })
+  }
+  if (
+    new TextEncoder().encode(JSON.stringify(value)).byteLength
+      > AUTOMATION_EXECUTION_SNAPSHOT_MAX_BYTES
+  ) {
+    context.addIssue({ code: 'custom' })
+  }
+})
 
 export const automationLifecycleStatusSchema = z.enum(AUTOMATION_LIFECYCLE_STATUSES)
 export const automationOccurrenceStatusSchema = z.enum(AUTOMATION_OCCURRENCE_STATUSES)

@@ -105,8 +105,8 @@ const turnConfirmationButtonProps = { type: 'error' } as const
           <dd>{{ review.promptSummary }}</dd>
         </div>
         <div>
-          <dt>{{ t('desktop.approval.automation.project') }}</dt>
-          <dd>{{ review.projectId ?? t('desktop.approval.automation.noProject') }}</dd>
+          <dt>{{ t('desktop.approval.automation.space') }}</dt>
+          <dd>{{ review.spaceId ?? t('desktop.approval.automation.noSpace') }}</dd>
         </div>
         <div>
           <dt>{{ t('desktop.approval.automation.model') }}</dt>

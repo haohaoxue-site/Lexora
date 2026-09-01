@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import type { LocalProject } from '@buddy-electron/shared/localChatApi'
+import type { LocalSpace } from '@buddy-electron/shared/localChatApi'
 import type { DropdownOption } from 'naive-ui'
 import type { BuddyLocale } from '@/i18n/buddyI18n'
 import type { DesktopTaskPinnedDropPosition } from '@/workbenches/tasks/index/taskPinnedItems'
-import type { TaskProjectMenuAction } from '@/workbenches/tasks/index/useTaskIndexController'
+import type { TaskSpaceMenuAction } from '@/workbenches/tasks/index/useTaskIndexController'
 import {
   ChevronDown16Regular,
   ChevronRight16Regular,
@@ -27,7 +27,7 @@ const props = defineProps<{
   expanded: boolean
   language: BuddyLocale
   pinMode: 'pin' | 'unpin'
-  project: LocalProject
+  space: LocalSpace
   reorderable?: boolean
   reorderTarget?: boolean
 }>()
@@ -36,7 +36,7 @@ const emit = defineEmits<{
   dragOver: [position: DesktopTaskPinnedDropPosition]
   dragStart: []
   drop: [position: DesktopTaskPinnedDropPosition]
-  menu: [action: TaskProjectMenuAction]
+  menu: [action: TaskSpaceMenuAction]
   pin: []
   toggle: []
 }>()
@@ -103,7 +103,7 @@ function resolveDropPosition(event: DragEvent): DesktopTaskPinnedDropPosition {
 
 <template>
   <div
-    class="desktop-task-project-row"
+    class="desktop-task-space-row"
     :class="{
       'is-dragging': dragging,
       'is-drop-after': dropPosition === 'after',
@@ -117,29 +117,29 @@ function resolveDropPosition(event: DragEvent): DesktopTaskPinnedDropPosition {
     @drop="handleDrop"
   >
     <button
-      class="desktop-task-project-row__name"
+      class="desktop-task-space-row__name"
       type="button"
       :aria-expanded="expanded"
       @click="emit('toggle')"
     >
       <NIcon
-        class="desktop-task-project-row__chevron"
+        class="desktop-task-space-row__chevron"
         :component="expanded ? ChevronDown16Regular : ChevronRight16Regular"
       />
       <NIcon
-        class="desktop-task-project-row__folder"
+        class="desktop-task-space-row__folder"
         :component="expanded ? FolderOpen20Regular : Folder20Regular"
       />
-      <DesktopOverflowingLabel :paused="dragging" :text="project.name" />
+      <DesktopOverflowingLabel :paused="dragging" :text="space.name" />
     </button>
-    <div class="desktop-task-project-row__actions">
+    <div class="desktop-task-space-row__actions">
       <NDropdown
         trigger="click"
         :options="menuOptions"
         @select="handleMenuAction"
       >
         <button
-          class="desktop-task-project-row__action"
+          class="desktop-task-space-row__action"
           type="button"
           :aria-label="t('desktop.tasks.moreActions')"
         >
@@ -147,7 +147,7 @@ function resolveDropPosition(event: DragEvent): DesktopTaskPinnedDropPosition {
         </button>
       </NDropdown>
       <button
-        class="desktop-task-project-row__action desktop-task-project-row__pin"
+        class="desktop-task-space-row__action desktop-task-space-row__pin"
         type="button"
         :aria-label="pinLabel"
         @click="emit('pin')"
@@ -159,7 +159,7 @@ function resolveDropPosition(event: DragEvent): DesktopTaskPinnedDropPosition {
 </template>
 
 <style scoped lang="scss">
-.desktop-task-project-row {
+.desktop-task-space-row {
   position: relative;
   display: flex;
   height: var(--buddy-task-sidebar-row-height);
@@ -208,15 +208,15 @@ button {
   cursor: pointer;
 }
 
-.desktop-task-project-row__name {
+.desktop-task-space-row__name {
   display: flex;
   min-width: 0;
   flex: 1;
   align-items: center;
   gap: 0.25rem;
   color: var(--buddy-text-primary);
-  font-size: var(--buddy-sidebar-project-font-size);
-  font-weight: var(--buddy-sidebar-project-font-weight);
+  font-size: var(--buddy-sidebar-space-font-size);
+  font-weight: var(--buddy-sidebar-space-font-weight);
   line-height: 20px;
   padding: 0 0.375rem;
   text-align: left;
@@ -232,21 +232,21 @@ button {
   }
 }
 
-.desktop-task-project-row__chevron,
-.desktop-task-project-row__folder {
+.desktop-task-space-row__chevron,
+.desktop-task-space-row__folder {
   flex: none;
 }
 
-.desktop-task-project-row__chevron {
+.desktop-task-space-row__chevron {
   font-size: 14px;
 }
 
-.desktop-task-project-row__folder {
+.desktop-task-space-row__folder {
   font-size: 16px;
   margin-right: 0.0625rem;
 }
 
-.desktop-task-project-row__actions {
+.desktop-task-space-row__actions {
   display: flex;
   flex: none;
   align-items: center;
@@ -256,13 +256,13 @@ button {
   pointer-events: none;
 }
 
-.desktop-task-project-row:hover .desktop-task-project-row__actions,
-.desktop-task-project-row:has(:focus-visible) .desktop-task-project-row__actions {
+.desktop-task-space-row:hover .desktop-task-space-row__actions,
+.desktop-task-space-row:has(:focus-visible) .desktop-task-space-row__actions {
   opacity: 1;
   pointer-events: auto;
 }
 
-.desktop-task-project-row__action {
+.desktop-task-space-row__action {
   display: grid;
   width: var(--buddy-task-sidebar-action-size);
   height: var(--buddy-task-sidebar-action-size);
@@ -289,7 +289,7 @@ button {
   }
 }
 
-.desktop-task-project-row__pin {
+.desktop-task-space-row__pin {
   color: var(--buddy-text-muted);
 }
 </style>

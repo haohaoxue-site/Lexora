@@ -19,20 +19,20 @@ import type { AttachmentRecord } from '../storage/attachmentRepository'
 import type { ConversationHistoryRepository } from '../storage/conversationHistoryRepository'
 import type { ConversationRecord } from '../storage/conversationRecord'
 import type { ConversationRepository } from '../storage/conversationRepository'
-import type { ProjectRecord, ProjectRepository } from '../storage/projectRepository'
 import type {
   RunInputRecord,
   RunInputRepository,
 } from '../storage/runInputRepository'
 import type { RunRecord } from '../storage/runRecord'
 import type { RunRepository } from '../storage/runRepository'
+import type { SpaceRecord, SpaceRepository } from '../storage/spaceRepository'
 import type {
   TurnRequestRecord,
   TurnRequestRepository,
 } from '../storage/turnRequestRepository'
 import { Buffer } from 'node:buffer'
 import { createHash, randomUUID } from 'node:crypto'
-import { basename, join } from 'node:path'
+import { basename, isAbsolute, join } from 'node:path'
 import {
   materializeBuddyPromptCommand,
   parseBuddyChatCommand,
@@ -42,12 +42,12 @@ import {
   BuddySkillSelectionError,
   formatBuddySkillPrompt,
 } from '../agent/SkillService'
-import { requireGrantedProject } from '../projects/requireGrantedProject'
-import { resolveGrantedPath } from '../projects/resolveGrantedPath'
+import { resolveGrantedPath } from '../directories/resolveGrantedPath'
 import { resolveInteractiveModelSelection } from '../providers/resolveInteractiveModelSelection'
 import { readBoundedFile } from '../resources/BoundedFileReader'
 import { BuddyServiceError } from '../rpc/runtimeRequest'
 import { toPublicRun } from '../runs/publicRun'
+import { requireActiveSpace } from '../spaces/requireActiveSpace'
 import { persistPreparedTurn } from './persistPreparedTurn'
 
 const MAX_CONTEXT_FILE_BYTES = 1024 * 1024
@@ -81,12 +81,12 @@ export interface ChatTurnServiceOptions {
   conversationLifecycle: Pick<ConversationLifecycleService, 'isDeleting'>
   conversations: Pick<ConversationRepository, 'findById'>
     & Pick<ConversationHistoryRepository, 'listBranchMessages'>
-  projects: Pick<ProjectRepository, 'findById'>
+  spaces: Pick<SpaceRepository, 'findById'>
   providers: RuntimeModelProvider
   runInputs: Pick<RunInputRepository, 'findByRunId'>
   runner: Pick<BuddyAgentRunner, 'cancel'>
   runs: Pick<RunRepository, 'findById'>
-  skills: Pick<SkillService, 'materializeForProject'>
+  skills: Pick<SkillService, 'materializeForSpace'>
   turnLauncher: Pick<BuddyTurnLauncher, 'launch'>
   turnRequests: TurnRequestRepository
 }
@@ -109,7 +109,7 @@ interface PrepareTurnMaterializationInput {
   contextSuffix?: string
   conversationId: string
   draftId: string
-  project: ProjectRecord | null
+  space: SpaceRecord | null
   replay: TurnReplay | null
   requestedModel: InteractiveModelSelection | null
 }
@@ -132,8 +132,8 @@ export class ChatTurnService {
     if (input.conversationId && this.#options.conversationLifecycle.isDeleting(input.conversationId))
       throw new BuddyServiceError('VALIDATION_FAILED')
 
-    const project = input.projectId
-      ? requireGrantedProject(this.#options.projects.findById(input.projectId))
+    const space = input.spaceId
+      ? requireActiveSpace(this.#options.spaces.findById(input.spaceId))
       : null
     const conversationId = replay?.request.conversationId
       ?? input.conversationId
@@ -142,7 +142,7 @@ export class ChatTurnService {
     if (
       existingConversation
       && (
-        existingConversation.projectId !== (project?.id ?? null)
+        existingConversation.spaceId !== (space?.id ?? null)
         || existingConversation.executionProfile !== input.executionProfile
       )
     ) {
@@ -170,7 +170,7 @@ export class ChatTurnService {
       contextSuffix: promptCommand ? materializeBuddyPromptCommand(promptCommand) : '',
       conversationId,
       draftId: input.draftId,
-      project,
+      space,
       replay,
       requestedModel: input.modelSelection,
     })
@@ -202,7 +202,7 @@ export class ChatTurnService {
             executionProfile: input.executionProfile,
             model: selection.modelId,
             modelParameters: toModelParameters(selection),
-            projectId: project?.id ?? null,
+            spaceId: space?.id ?? null,
             provider: selection.providerId,
             requestFingerprint: createStartTurnFingerprint(input),
             requestId: input.requestId,
@@ -246,7 +246,7 @@ export class ChatTurnService {
     if (sourceMessage?.role !== 'user')
       throw new BuddyServiceError('VALIDATION_FAILED')
     const forkedFromMessageId = sourceIndex > 0 ? history[sourceIndex - 1]?.id ?? null : null
-    const project = this.#resolveConversationProject(conversation)
+    const space = this.#resolveConversationSpace(conversation)
     const {
       prompt,
       replayInput,
@@ -258,7 +258,7 @@ export class ChatTurnService {
       contextItems: input.contextItems,
       conversationId: conversation.id,
       draftId: input.draftId,
-      project,
+      space,
       replay,
       requestedModel: input.modelSelection,
     })
@@ -292,7 +292,7 @@ export class ChatTurnService {
             model: selection.modelId,
             modelParameters: toModelParameters(selection),
             parentBranchId,
-            projectId: project?.id ?? null,
+            spaceId: space?.id ?? null,
             provider: selection.providerId,
             requestFingerprint: createEditUserMessageFingerprint(input),
             requestId: input.requestId,
@@ -439,7 +439,7 @@ export class ChatTurnService {
       : [
           await materializeContextItems(
             input.contextItems,
-            input.project,
+            input.space,
             this.#options.skills,
           ),
           input.contextSuffix ?? '',
@@ -464,9 +464,9 @@ export class ChatTurnService {
     }
   }
 
-  #resolveConversationProject(conversation: ConversationRecord): ProjectRecord | null {
-    return conversation.projectId
-      ? requireGrantedProject(this.#options.projects.findById(conversation.projectId))
+  #resolveConversationSpace(conversation: ConversationRecord): SpaceRecord | null {
+    return conversation.spaceId
+      ? requireActiveSpace(this.#options.spaces.findById(conversation.spaceId))
       : null
   }
 
@@ -537,13 +537,13 @@ function stableSerialize(value: unknown): string {
 
 async function materializeContextItems(
   items: readonly ChatContextItem[],
-  project: ProjectRecord | null,
-  skills: Pick<SkillService, 'materializeForProject'>,
+  space: SpaceRecord | null,
+  skills: Pick<SkillService, 'materializeForSpace'>,
 ): Promise<string> {
-  let selectedSkills: Awaited<ReturnType<SkillService['materializeForProject']>>
+  let selectedSkills: Awaited<ReturnType<SkillService['materializeForSpace']>>
   try {
-    selectedSkills = await skills.materializeForProject(
-      project?.id ?? null,
+    selectedSkills = await skills.materializeForSpace(
+      space?.id ?? null,
       items.filter(item => item.kind === 'skill').map(item => item.value),
     )
   }
@@ -564,14 +564,27 @@ async function materializeContextItems(
     }
     if (item.kind === 'slashCommand')
       continue
-    if (!project)
+    if (!space)
       throw new BuddyServiceError('DIRECTORY_NOT_AUTHORIZED')
-    const resolution = await resolveGrantedPath([{
-      canonicalRoot: project.canonicalRoot,
-      projectId: project.id,
-      root: project.root,
-    }], join(project.canonicalRoot, item.value), 'existing')
-    const content = await readBoundedFile(project.canonicalRoot, resolution.canonicalPath)
+    const primaryDirectory = space.primaryDirectory
+    const directories = [
+      ...(primaryDirectory ? [primaryDirectory] : []),
+      ...space.additionalDirectories,
+    ]
+    const requestedPath = isAbsolute(item.value)
+      ? item.value
+      : primaryDirectory ? join(primaryDirectory.canonicalRoot, item.value) : null
+    if (!requestedPath)
+      throw new BuddyServiceError('DIRECTORY_NOT_AUTHORIZED')
+    const resolution = await resolveGrantedPath(directories.map(directory => ({
+      canonicalRoot: directory.canonicalRoot,
+      grantId: directory.id,
+      root: directory.root,
+    })), requestedPath, 'existing')
+    const directory = directories.find(item => item.id === resolution.grantId)
+    if (!directory)
+      throw new BuddyServiceError('DIRECTORY_NOT_AUTHORIZED')
+    const content = await readBoundedFile(directory.canonicalRoot, resolution.canonicalPath)
     if (content.byteLength > MAX_CONTEXT_FILE_BYTES)
       throw new BuddyServiceError('VALIDATION_FAILED')
     sections.push(`上下文文件：${item.value}\n\n${content.toString('utf8')}`)

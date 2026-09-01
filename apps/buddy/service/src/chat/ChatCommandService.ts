@@ -5,13 +5,13 @@ import type {
   CommandRequestRepository,
 } from '../storage/commandRequestRepository'
 import type { ConversationRepository } from '../storage/conversationRepository'
-import type { ProjectRepository } from '../storage/projectRepository'
 import type { RunRecord } from '../storage/runRecord'
 import type { RunRepository } from '../storage/runRepository'
+import type { SpaceRepository } from '../storage/spaceRepository'
 import { createHash, randomUUID } from 'node:crypto'
-import { requireGrantedProject } from '../projects/requireGrantedProject'
 import { BuddyServiceError } from '../rpc/runtimeRequest'
 import { toPublicRun } from '../runs/publicRun'
+import { requireActiveSpace } from '../spaces/requireActiveSpace'
 
 export interface ExecuteChatCommandInput {
   arguments: string
@@ -25,7 +25,7 @@ export interface ChatCommandServiceOptions {
   commands: CommandRequestRepository
   conversationLifecycle: Pick<ConversationLifecycleService, 'isDeleting'>
   conversations: Pick<ConversationRepository, 'findById'>
-  projects: Pick<ProjectRepository, 'findById'>
+  spaces: Pick<SpaceRepository, 'findById'>
   runs: Pick<RunRepository, 'findById'>
   turnLauncher: Pick<BuddyTurnLauncher, 'launch'>
 }
@@ -56,8 +56,8 @@ export class ChatCommandService {
     ) {
       throw new BuddyServiceError('VALIDATION_FAILED')
     }
-    if (conversation.projectId)
-      requireGrantedProject(this.#options.projects.findById(conversation.projectId))
+    if (conversation.spaceId)
+      requireActiveSpace(this.#options.spaces.findById(conversation.spaceId))
     const runId = randomUUID()
     const prepared = replay
       ? this.#options.commands.retryInterrupted({

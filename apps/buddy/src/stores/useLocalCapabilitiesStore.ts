@@ -25,21 +25,21 @@ export function useLocalCapabilitiesStore(options: UseLocalCapabilitiesStoreOpti
   const isLoadingConnectors = shallowRef(false)
   const skillsError = shallowRef<string | null>(null)
   const connectorsError = shallowRef<string | null>(null)
-  let loadedSkillsProjectId: string | null | undefined
+  let loadedSkillsSpaceId: string | null | undefined
   let skillLoadGeneration = 0
 
-  async function loadSkills(projectId: string | null = null): Promise<boolean> {
-    if (loadedSkillsProjectId !== undefined && loadedSkillsProjectId === projectId)
+  async function loadSkills(spaceId: string | null = null): Promise<boolean> {
+    if (loadedSkillsSpaceId !== undefined && loadedSkillsSpaceId === spaceId)
       return true
     const generation = ++skillLoadGeneration
     isLoadingSkills.value = true
     skillsError.value = null
     try {
-      const catalog = await options.api.skills.list(projectId)
+      const catalog = await options.api.skills.list(spaceId)
       if (generation !== skillLoadGeneration)
         return false
       skills.value = catalog
-      loadedSkillsProjectId = projectId
+      loadedSkillsSpaceId = spaceId
       return true
     }
     catch (error) {

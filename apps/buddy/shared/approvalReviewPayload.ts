@@ -70,7 +70,7 @@ export const approvalReviewPayloadSchema = z.discriminatedUnion('card', [
     modelMode: z.string().trim().min(1).max(512),
     name: z.string().trim().min(1).max(80),
     operation: automationOperationSchema,
-    projectId: z.string().trim().min(1).max(256).nullable(),
+    spaceId: z.string().trim().min(1).max(256).nullable(),
     promptSummary: z.string().trim().min(1).max(512),
     scheduleSummary: z.string().trim().min(1).max(512),
     timezone: z.string().trim().min(1).max(256),

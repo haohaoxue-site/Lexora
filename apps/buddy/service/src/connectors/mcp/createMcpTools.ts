@@ -102,7 +102,7 @@ function classifyTool(
     source: 'mcp',
     resource: {
       kind: 'connector',
-      projectId: serverId,
+      id: serverId,
       trusted,
     },
     risk: readOnly ? 'read' : 'mcp',

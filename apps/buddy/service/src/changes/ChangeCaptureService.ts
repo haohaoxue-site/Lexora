@@ -1,3 +1,4 @@
+import type { DirectoryGrant } from '../directories/resolveGrantedPath'
 import type { BuddyDataPaths } from '../storage/BuddyDataPaths'
 import type {
   CapturedFileStateRecord,
@@ -9,14 +10,15 @@ import { createHash, randomUUID } from 'node:crypto'
 import { mkdir, readFile, stat, writeFile } from 'node:fs/promises'
 import { basename, extname, isAbsolute, relative, resolve, sep } from 'node:path'
 import { redactSensitiveText } from '../../../shared/approvalReviewPayload'
-import { resolveGrantedPath } from '../projects/resolveGrantedPath'
+import { resolveGrantedPath } from '../directories/resolveGrantedPath'
 
 const MAX_CHANGE_TEXT_BYTES = 1024 * 1024
 const MAX_CHANGE_HASH_BYTES = 32 * 1024 * 1024
 
 interface FileToolInput {
-  canonicalRoot: string
   conversationId: string
+  cwd: string
+  grants: readonly DirectoryGrant[]
   runId: string
   toolCallId: string
   toolName: 'edit' | 'write'
@@ -62,14 +64,15 @@ export class ChangeCaptureService {
     const requestedPath = readToolPath(input.arguments)
     const absolutePath = isAbsolute(requestedPath)
       ? requestedPath
-      : resolve(input.canonicalRoot, requestedPath)
-    const resolution = await resolveGrantedPath([{
-      canonicalRoot: input.canonicalRoot,
-      projectId: input.conversationId,
-      root: input.canonicalRoot,
-    }], absolutePath, input.toolName === 'write' ? 'create' : 'existing')
+      : resolve(input.cwd, requestedPath)
+    const resolution = await resolveGrantedPath(
+      input.grants,
+      absolutePath,
+      input.toolName === 'write' ? 'create' : 'existing',
+    )
+    const grant = requireGrant(input.grants, resolution.grantId)
     const captureId = randomUUID()
-    const relativePath = displayRelativePath(input.canonicalRoot, resolution.canonicalPath)
+    const relativePath = displayGrantedPath(input.cwd, grant, resolution.canonicalPath)
     const before = await this.#captureState({
       absolutePath: resolution.canonicalPath,
       captureId,
@@ -83,9 +86,11 @@ export class ChangeCaptureService {
     this.#repository.createCapture({
       after: null,
       before,
+      canonicalPath: resolution.canonicalPath,
       changeSetId: input.runId,
       completedAt: null,
       createdAt: now,
+      directoryGrantId: resolution.grantId,
       id: captureId,
       relativePath,
       status: 'pending',
@@ -99,12 +104,11 @@ export class ChangeCaptureService {
     const capture = this.#repository.findCaptureByToolCallId(input.toolCallId)
     if (!capture || capture.changeSetId !== input.runId)
       return
-    const requestedPath = resolve(input.canonicalRoot, capture.relativePath)
-    const resolution = await resolveGrantedPath([{
-      canonicalRoot: input.canonicalRoot,
-      projectId: input.conversationId,
-      root: input.canonicalRoot,
-    }], requestedPath, 'create')
+    if (!capture.canonicalPath || !capture.directoryGrantId)
+      throw new ChangeCaptureError('VALIDATION_FAILED')
+    const resolution = await resolveGrantedPath(input.grants, capture.canonicalPath, 'create')
+    if (resolution.grantId !== capture.directoryGrantId)
+      throw new ChangeCaptureError('PATH_OUTSIDE_GRANTED_DIRECTORY')
     const after = await this.#captureState({
       absolutePath: resolution.canonicalPath,
       captureId: capture.id,
@@ -278,11 +282,12 @@ interface AggregatedChange {
 function aggregateCaptures(captures: readonly FileChangeCaptureRecord[]): AggregatedChange[] {
   const groups = new Map<string, FileChangeCaptureRecord[]>()
   for (const capture of captures) {
-    const group = groups.get(capture.relativePath) ?? []
+    const key = `${capture.directoryGrantId ?? ''}\0${capture.canonicalPath ?? capture.relativePath}`
+    const group = groups.get(key) ?? []
     group.push(capture)
-    groups.set(capture.relativePath, group)
+    groups.set(key, group)
   }
-  return [...groups].flatMap(([relativePath, group]) => {
+  return [...groups].flatMap(([, group]) => {
     const first = group[0]
     const last = group.at(-1)
     if (!first || !last)
@@ -290,7 +295,7 @@ function aggregateCaptures(captures: readonly FileChangeCaptureRecord[]): Aggreg
     const after = last.after ?? emptyState('unavailable')
     if (sameState(first.before, after))
       return []
-    return [{ after, before: first.before, first, relativePath }]
+    return [{ after, before: first.before, first, relativePath: first.relativePath }]
   })
 }
 
@@ -306,11 +311,23 @@ function emptyState(kind: 'missing' | 'unavailable'): CapturedFileStateRecord {
   return { hash: null, kind, redacted: false, sizeBytes: null, snapshotPath: null }
 }
 
-function displayRelativePath(canonicalRoot: string, path: string): string {
-  const result = relative(canonicalRoot, path)
+function displayGrantedPath(
+  cwd: string,
+  grant: DirectoryGrant,
+  path: string,
+): string {
+  const result = relative(grant.canonicalRoot, path)
   if (!result || result === '..' || result.startsWith(`..${sep}`))
     throw new ChangeCaptureError('PATH_OUTSIDE_GRANTED_DIRECTORY')
-  return result.split(sep).join('/')
+  const normalized = result.split(sep).join('/')
+  return grant.canonicalRoot === cwd ? normalized : `${basename(grant.root)}/${normalized}`
+}
+
+function requireGrant(grants: readonly DirectoryGrant[], grantId: string): DirectoryGrant {
+  const grant = grants.find(candidate => candidate.grantId === grantId)
+  if (!grant)
+    throw new ChangeCaptureError('PATH_OUTSIDE_GRANTED_DIRECTORY')
+  return grant
 }
 
 function readToolPath(value: unknown): string {

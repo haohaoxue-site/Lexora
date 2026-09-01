@@ -9,7 +9,7 @@ export interface ToolApprovalScopeInput {
   arguments: unknown
   kind: ToolApprovalKind
   paths?: readonly ToolPolicyPath[]
-  resource?: { kind?: 'connector' | 'project', projectId: string, trusted: boolean }
+  resource?: { id: string, kind?: 'connector' | 'space', trusted: boolean }
   risk?: ToolRisk
   toolName: string
 }

@@ -84,8 +84,8 @@ export function automationHistoryStatusIcon(
 }
 
 export function automationBlockedDescriptionKey(automation: LocalAutomation) {
-  return automation.blockedReason === 'AUTOMATION_PROJECT_UNAVAILABLE'
-    ? 'desktop.automations.blocked.project' as const
+  return automation.blockedReason === 'AUTOMATION_SPACE_UNAVAILABLE'
+    ? 'desktop.automations.blocked.space' as const
     : 'desktop.automations.blocked.model' as const
 }
 

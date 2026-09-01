@@ -13,7 +13,7 @@ const props = defineProps<{
   keyField: string
   label: string
   priority: number
-  section: 'pinned' | 'projects' | 'tasks'
+  section: 'pinned' | 'spaces' | 'tasks'
   showAdd?: boolean
 }>()
 const emit = defineEmits<{

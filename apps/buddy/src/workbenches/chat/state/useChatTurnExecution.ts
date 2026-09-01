@@ -88,7 +88,7 @@ export function useChatTurnExecution(options: UseChatTurnExecutionOptions) {
       draftId: options.drafts.draftId.value,
       executionProfile: options.executionProfile.value,
       modelSelection,
-      projectId: options.session.projectId.value,
+      spaceId: options.session.spaceId.value,
     }
     const preparedDraft = options.drafts.prepareSend(
       await createRequestFingerprint(turnRequest),

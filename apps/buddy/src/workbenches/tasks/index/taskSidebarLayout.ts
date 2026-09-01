@@ -5,7 +5,7 @@ export const DESKTOP_TASK_SIDEBAR_SECTION_HEADER_SIZE = 30
 
 export const DESKTOP_TASK_SIDEBAR_SECTION_PRIORITIES = {
   pinned: 2,
-  projects: 1,
+  spaces: 1,
   tasks: 1,
 } as const
 

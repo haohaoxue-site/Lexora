@@ -1,4 +1,5 @@
 import type { ToolCallEvent, ToolResultEvent } from '@earendil-works/pi-coding-agent'
+import type { DirectoryGrant } from '../../directories/resolveGrantedPath'
 import type { BuddyInProcessExtension } from '../createBuddyResourceLoader'
 import type { BuddyRunContext } from './toolPolicyExtension'
 import { isPiShellToolName } from '../piBuiltinTools'
@@ -6,16 +7,18 @@ import { isPiShellToolName } from '../piBuiltinTools'
 export interface ChangeCaptureGateway {
   beginFileTool: (input: {
     arguments: unknown
-    canonicalRoot: string
     conversationId: string
+    cwd: string
+    grants: readonly DirectoryGrant[]
     runId: string
     toolCallId: string
     toolName: 'edit' | 'write'
   }) => Promise<void>
   finalizeRun: (runId: string) => Promise<void>
   finishFileTool: (input: {
-    canonicalRoot: string
     conversationId: string
+    cwd: string
+    grants: readonly DirectoryGrant[]
     isError: boolean
     runId: string
     toolCallId: string
@@ -25,9 +28,10 @@ export interface ChangeCaptureGateway {
 }
 
 export interface CreateChangeCaptureExtensionOptions {
-  canonicalRoot: string
   conversationId: string
+  cwd: string
   getRunContext: () => BuddyRunContext | null
+  grants: readonly DirectoryGrant[]
   service: ChangeCaptureGateway
 }
 
@@ -75,8 +79,9 @@ async function captureBeforeTool(
   await safelyCapture(
     () => options.service.beginFileTool({
       arguments: event.input,
-      canonicalRoot: options.canonicalRoot,
       conversationId: options.conversationId,
+      cwd: options.cwd,
+      grants: options.grants,
       runId: run.runId,
       toolCallId: event.toolCallId,
       toolName,
@@ -98,8 +103,9 @@ async function captureAfterTool(
   const toolName = event.toolName === 'edit' ? 'edit' : 'write'
   await safelyCapture(
     () => options.service.finishFileTool({
-      canonicalRoot: options.canonicalRoot,
       conversationId: options.conversationId,
+      cwd: options.cwd,
+      grants: options.grants,
       isError: event.isError,
       runId: run.runId,
       toolCallId: event.toolCallId,

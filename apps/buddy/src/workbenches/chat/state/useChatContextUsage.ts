@@ -18,7 +18,7 @@ interface UseChatContextUsageOptions {
   draftId: Readonly<Ref<string>>
   executionProfile: Readonly<Ref<BuddyExecutionProfile>>
   models: Readonly<Ref<ReadonlyArray<LocalRuntimeModelOption>>>
-  projectId: Readonly<Ref<string | null>>
+  spaceId: Readonly<Ref<string | null>>
   runEvents: Readonly<Ref<ReadonlyArray<LocalRunEvent>>>
   runtimeState: Readonly<Ref<LocalBuddyServiceSupervisorState>>
   selectedEffort: Readonly<Ref<BuddyThinkingLevel | null>>
@@ -45,7 +45,7 @@ export function useChatContextUsage(options: UseChatContextUsageOptions) {
       options.selectedServiceTier.value,
       options.activeConversationId.value,
       options.activeBranchId.value,
-      options.projectId.value,
+      options.spaceId.value,
       options.executionProfile.value,
       options.draftId.value,
     ] as const,
@@ -80,7 +80,7 @@ export function useChatContextUsage(options: UseChatContextUsageOptions) {
           reasoning: options.selectedEffort.value,
           serviceTier: options.selectedServiceTier.value,
         },
-        projectId: options.projectId.value,
+        spaceId: options.spaceId.value,
       })
       if (currentRequestId === requestId)
         snapshot.value = nextSnapshot

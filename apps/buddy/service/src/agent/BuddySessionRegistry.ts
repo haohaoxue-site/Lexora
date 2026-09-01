@@ -115,6 +115,10 @@ export class BuddySessionRegistry<TSession extends DisposableBuddySession> {
     return this.#invalidate(identity => identity.canonicalRoot === canonicalRoot)
   }
 
+  invalidateSpace(spaceId: string): Promise<number> {
+    return this.#invalidate(identity => identity.spaceId === spaceId)
+  }
+
   invalidateConversation(conversationId: string): Promise<number> {
     return this.#invalidate(identity => identity.conversationId === conversationId)
   }
@@ -354,6 +358,7 @@ function createSessionKey(identity: BuddySessionIdentity): string {
     identity.canonicalRoot,
     identity.executionProfile,
     identity.sessionMode,
+    identity.grantRevision,
     identity.resourceRevision,
   ].join('\0')
 }

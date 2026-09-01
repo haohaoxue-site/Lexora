@@ -22,7 +22,7 @@ const contextUsageSnapshotRequestSchema = z.object({
   draftId: sessionIdentitySchema,
   executionProfile: z.enum(BUDDY_EXECUTION_PROFILES),
   modelSelection: modelSelectionSchema,
-  projectId: idSchema.nullable(),
+  spaceId: idSchema.nullable(),
 }).strict().refine(input => (
   (input.conversationId === null) === (input.branchId === null)
 ))
