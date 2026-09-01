@@ -1,17 +1,17 @@
 <script setup lang="ts">
 import type { DesktopTaskPinnedItem } from '@buddy-electron/shared/desktopApi'
-import type { LocalConversationSummary, LocalProject } from '@buddy-electron/shared/localChatApi'
+import type { LocalConversationSummary, LocalSpace } from '@buddy-electron/shared/localChatApi'
 import type { BuddyLocale } from '@/i18n/buddyI18n'
-import type { TaskProjectInput } from '@/workbenches/tasks/state/useTaskProjects'
+import type { TaskSpaceInput } from '@/workbenches/tasks/state/useTaskSpaces'
 import { Add16Regular } from '@vicons/fluent'
 import { NAlert, NButton, NIcon, NInput, NModal } from 'naive-ui'
 import { toRef } from 'vue'
 import { useBuddyI18n } from '@/i18n/buddyI18n'
 import DesktopWorkspaceSidebarIdentity from '@/layouts/DesktopWorkspaceSidebarIdentity.vue'
-import DesktopProjectDialog from '@/workbenches/tasks/index/DesktopProjectDialog.vue'
-import DesktopTaskProjectRow from '@/workbenches/tasks/index/DesktopTaskProjectRow.vue'
+import DesktopSpaceDialog from '@/workbenches/tasks/index/DesktopSpaceDialog.vue'
 import DesktopTaskRow from '@/workbenches/tasks/index/DesktopTaskRow.vue'
 import DesktopTaskSidebarSection from '@/workbenches/tasks/index/DesktopTaskSidebarSection.vue'
+import DesktopTaskSpaceRow from '@/workbenches/tasks/index/DesktopTaskSpaceRow.vue'
 import {
   DESKTOP_TASK_SIDEBAR_ROW_HEIGHT,
   DESKTOP_TASK_SIDEBAR_ROW_SIZE,
@@ -25,20 +25,20 @@ const props = defineProps<{
   appSidebarCollapsed: boolean
   language: BuddyLocale
   pinnedItems: ReadonlyArray<DesktopTaskPinnedItem>
-  projects: ReadonlyArray<LocalProject>
-  selectProjectDirectory: () => Promise<string | null>
+  spaces: ReadonlyArray<LocalSpace>
+  selectSpaceDirectory: () => Promise<string | null>
   tasks: ReadonlyArray<LocalConversationSummary>
 }>()
 const emit = defineEmits<{
-  createProject: [input: TaskProjectInput]
-  deleteProject: [projectId: string]
+  createSpace: [input: TaskSpaceInput]
+  deleteSpace: [spaceId: string]
   deleteTask: [conversationId: string]
-  newTask: [projectId: string | null]
+  newTask: [spaceId: string | null]
   openTask: [conversationId: string]
   renameTask: [conversationId: string, title: string]
   toggleAppSidebar: []
   updatePinnedItems: [items: DesktopTaskPinnedItem[]]
-  updateProject: [input: TaskProjectInput & { projectId: string }]
+  updateSpace: [input: TaskSpaceInput & { spaceId: string }]
 }>()
 
 const { t } = useBuddyI18n(() => props.language)
@@ -51,48 +51,48 @@ const {
   beginPinnedDrag,
   confirmTaskDelete,
   confirmTaskRename,
-  confirmProjectDelete,
+  confirmSpaceDelete,
   draggedPinnedItemKey,
   dropPinnedItem,
   endPinnedDrag,
   enterPinnedDropTarget,
   getTaskTitle,
   getPinnedDropPosition,
-  isProjectExpanded,
-  openProjectCreator,
+  isSpaceExpanded,
+  openSpaceCreator,
   pinTask,
-  pinProject,
+  pinSpace,
   pinnedItems: visiblePinnedItems,
   pinnedRows,
   pinnedSectionExpanded,
-  projectDeleteTarget,
-  projectDialogOpen,
-  projectEditTarget,
-  projectRows,
-  projectsSectionExpanded,
+  spaceDeleteTarget,
+  spaceDialogOpen,
+  spaceEditTarget,
+  spaceRows,
+  spacesSectionExpanded,
   relativeTimeNow,
   requestTaskDelete,
   requestTaskRename,
-  saveProject,
-  selectProjectMenuAction,
+  saveSpace,
+  selectSpaceMenuAction,
   globalTasks,
   taskDeleteTarget,
   taskRenameTarget,
   taskTitleDraft,
   tasksSectionExpanded,
-  toggleProject,
+  toggleSpace,
   unpinItem,
 } = useTaskIndexController({
   getUntitledLabel: () => t('desktop.tasks.untitled'),
-  onCreateProject: input => emit('createProject', input),
+  onCreateSpace: input => emit('createSpace', input),
   onDeleteTask: conversationId => emit('deleteTask', conversationId),
-  onDeleteProject: projectId => emit('deleteProject', projectId),
-  onNewTask: projectId => emit('newTask', projectId),
+  onDeleteSpace: spaceId => emit('deleteSpace', spaceId),
+  onNewTask: spaceId => emit('newTask', spaceId),
   onRenameTask: (conversationId, title) => emit('renameTask', conversationId, title),
   onUpdatePinnedItems: items => emit('updatePinnedItems', items),
-  onUpdateProject: input => emit('updateProject', input),
+  onUpdateSpace: input => emit('updateSpace', input),
   pinnedItems: toRef(props, 'pinnedItems'),
-  projects: toRef(props, 'projects'),
+  spaces: toRef(props, 'spaces'),
   tasks: toRef(props, 'tasks'),
 })
 </script>
@@ -127,23 +127,23 @@ const {
           section="pinned"
         >
           <template #default="{ item }">
-            <div v-if="item.kind === 'project'" class="desktop-task-sidebar__project-item">
-              <DesktopTaskProjectRow
+            <div v-if="item.kind === 'space'" class="desktop-task-sidebar__space-item">
+              <DesktopTaskSpaceRow
                 :dragging="draggedPinnedItemKey === item.pinKey"
                 :drop-position="item.pinnedTopLevel ? getPinnedDropPosition(item.pinKey) : undefined"
-                :expanded="isProjectExpanded(item.project.id)"
+                :expanded="isSpaceExpanded(item.space.id)"
                 :language="language"
                 pin-mode="unpin"
-                :project="item.project"
+                :space="item.space"
                 :reorderable="item.pinnedTopLevel"
                 reorder-target
                 @drag-end="endPinnedDrag"
                 @drag-over="enterPinnedDropTarget(item.pinKey!, $event)"
                 @drag-start="beginPinnedDrag(item.pinKey!)"
                 @drop="dropPinnedItem(item.pinKey!, $event)"
-                @menu="selectProjectMenuAction(item.project, $event)"
+                @menu="selectSpaceMenuAction(item.space, $event)"
                 @pin="unpinItem(item.pinKey!)"
-                @toggle="toggleProject(item.project.id)"
+                @toggle="toggleSpace(item.space.id)"
               />
             </div>
             <DesktopTaskRow
@@ -156,7 +156,7 @@ const {
               :now="relativeTimeNow"
               :occurred-at="item.task.automationOccurrence?.scheduledFor ?? item.task.updatedAt"
               :pin-mode="item.pinnedTopLevel ? 'unpin' : undefined"
-              :project-task="item.projectTask"
+              :space-task="item.spaceTask"
               :reorderable="item.pinnedTopLevel"
               :reorder-target="item.pinnedTopLevel"
               :title="getTaskTitle(item.task)"
@@ -173,25 +173,25 @@ const {
         </DesktopTaskSidebarSection>
 
         <DesktopTaskSidebarSection
-          v-model:expanded="projectsSectionExpanded"
-          :items="projectRows"
+          v-model:expanded="spacesSectionExpanded"
+          :items="spaceRows"
           key-field="key"
-          :label="t('desktop.tasks.projectsSection')"
-          :priority="DESKTOP_TASK_SIDEBAR_SECTION_PRIORITIES.projects"
-          section="projects"
+          :label="t('desktop.tasks.spacesSection')"
+          :priority="DESKTOP_TASK_SIDEBAR_SECTION_PRIORITIES.spaces"
+          section="spaces"
           show-add
-          @add="openProjectCreator"
+          @add="openSpaceCreator"
         >
           <template #default="{ item }">
-            <div v-if="item.kind === 'project'" class="desktop-task-sidebar__project-item">
-              <DesktopTaskProjectRow
-                :expanded="isProjectExpanded(item.project.id)"
+            <div v-if="item.kind === 'space'" class="desktop-task-sidebar__space-item">
+              <DesktopTaskSpaceRow
+                :expanded="isSpaceExpanded(item.space.id)"
                 :language="language"
                 pin-mode="pin"
-                :project="item.project"
-                @menu="selectProjectMenuAction(item.project, $event)"
-                @pin="pinProject(item.project.id)"
-                @toggle="toggleProject(item.project.id)"
+                :space="item.space"
+                @menu="selectSpaceMenuAction(item.space, $event)"
+                @pin="pinSpace(item.space.id)"
+                @toggle="toggleSpace(item.space.id)"
               />
             </div>
             <DesktopTaskRow
@@ -201,7 +201,7 @@ const {
               :language="language"
               :now="relativeTimeNow"
               :occurred-at="item.task.automationOccurrence?.scheduledFor ?? item.task.updatedAt"
-              :project-task="item.projectTask"
+              :space-task="item.spaceTask"
               :title="getTaskTitle(item.task)"
               @delete="requestTaskDelete(item.task)"
               @open="emit('openTask', item.task.id)"
@@ -237,45 +237,45 @@ const {
       </nav>
     </div>
 
-    <DesktopProjectDialog
-      v-model:show="projectDialogOpen"
+    <DesktopSpaceDialog
+      v-model:show="spaceDialogOpen"
       :language="language"
-      :project="projectEditTarget"
-      :select-directory="selectProjectDirectory"
-      @save="saveProject"
+      :space="spaceEditTarget"
+      :select-directory="selectSpaceDirectory"
+      @save="saveSpace"
     />
 
     <NModal
-      :show="projectDeleteTarget !== null"
+      :show="spaceDeleteTarget !== null"
       preset="card"
       class="desktop-task-sidebar__modal"
-      :title="t('desktop.tasks.deleteProjectTitle')"
-      @update:show="!$event && (projectDeleteTarget = null)"
+      :title="t('desktop.tasks.deleteSpaceTitle')"
+      @update:show="!$event && (spaceDeleteTarget = null)"
     >
-      <div class="desktop-task-sidebar__delete-project-content">
+      <div class="desktop-task-sidebar__delete-space-content">
         <p>
-          {{ t('desktop.tasks.deleteProjectMessage', { name: projectDeleteTarget?.name ?? '' }) }}
+          {{ t('desktop.tasks.deleteSpaceMessage', { name: spaceDeleteTarget?.name ?? '' }) }}
         </p>
         <NAlert
-          v-if="projectDeleteTarget && projectDeleteTarget.activeRunCount > 0"
+          v-if="spaceDeleteTarget && spaceDeleteTarget.activeRunCount > 0"
           :show-icon="false"
           type="warning"
         >
-          {{ t('desktop.tasks.deleteProjectActiveRunWarning', { count: projectDeleteTarget.activeRunCount }) }}
+          {{ t('desktop.tasks.deleteSpaceActiveRunWarning', { count: spaceDeleteTarget.activeRunCount }) }}
         </NAlert>
-        <p v-else class="desktop-task-sidebar__delete-project-retention">
-          {{ t('desktop.tasks.deleteProjectRetention') }}
+        <p v-else class="desktop-task-sidebar__delete-space-retention">
+          {{ t('desktop.tasks.deleteSpaceRetention') }}
         </p>
       </div>
       <template #footer>
         <div class="desktop-task-sidebar__modal-actions">
-          <NButton @click="projectDeleteTarget = null">
-            {{ projectDeleteTarget && projectDeleteTarget.activeRunCount > 0 ? t('common.close') : t('common.cancel') }}
+          <NButton @click="spaceDeleteTarget = null">
+            {{ spaceDeleteTarget && spaceDeleteTarget.activeRunCount > 0 ? t('common.close') : t('common.cancel') }}
           </NButton>
           <NButton
-            v-if="projectDeleteTarget && projectDeleteTarget.activeRunCount === 0"
+            v-if="spaceDeleteTarget && spaceDeleteTarget.activeRunCount === 0"
             type="error"
-            @click="confirmProjectDelete"
+            @click="confirmSpaceDelete"
           >
             {{ t('common.delete') }}
           </NButton>
@@ -411,7 +411,7 @@ const {
   overflow: hidden;
 }
 
-.desktop-task-sidebar__project-item {
+.desktop-task-sidebar__space-item {
   height: var(--buddy-task-sidebar-row-size);
   padding-right: var(--buddy-task-sidebar-scrollbar-gutter);
   padding-bottom: calc(var(--buddy-task-sidebar-row-size) - var(--buddy-task-sidebar-row-height));
@@ -428,17 +428,17 @@ const {
   gap: 0.5rem;
 }
 
-.desktop-task-sidebar__delete-project-content {
+.desktop-task-sidebar__delete-space-content {
   display: grid;
   gap: 0.85rem;
 }
 
-.desktop-task-sidebar__delete-project-content p {
+.desktop-task-sidebar__delete-space-content p {
   margin: 0;
   line-height: 1.65;
 }
 
-.desktop-task-sidebar__delete-project-retention {
+.desktop-task-sidebar__delete-space-retention {
   color: var(--buddy-text-secondary);
   font-size: 0.75rem;
 }

@@ -20,10 +20,10 @@ export interface CreateBuddyResourceLoaderOptions {
   agentDir: string
   boundedContextFiles: readonly BoundedContextFile[]
   cwd: string
+  directoryContext: string
   executionProfile: BuddyExecutionProfile
   inProcessExtensions: readonly BuddyInProcessExtension[]
   platform?: NodeJS.Platform
-  projectInstructions?: string
   settingsManager?: SettingsManager
 }
 
@@ -44,9 +44,9 @@ export async function createBuddyResourceLoader(
 ): Promise<DefaultResourceLoader> {
   validateInProcessExtensions(options.inProcessExtensions)
   const systemPrompt = createBuddySystemPrompt({
+    directoryContext: options.directoryContext,
     executionProfile: options.executionProfile,
     platform: options.platform,
-    projectInstructions: options.projectInstructions,
   })
   const loader = new DefaultResourceLoader({
     additionalExtensionPaths: [],

@@ -126,10 +126,10 @@ export class AutomationService {
     })
   }
 
-  blockProject(projectId: string): Automation[] {
-    return this.#definitions.blockActiveByProject({
+  blockSpace(spaceId: string): Automation[] {
+    return this.#definitions.blockActiveBySpace({
       blockedAt: this.#now(),
-      projectId: z.string().trim().min(1).max(256).parse(projectId),
+      spaceId: z.string().trim().min(1).max(256).parse(spaceId),
     })
   }
 
@@ -443,7 +443,7 @@ export class AutomationService {
       model: draft.model,
       name: draft.name,
       nextRunAt: preview.nextRunAt,
-      projectId: draft.projectId,
+      spaceId: draft.spaceId,
       prompt: draft.prompt,
       revision: input.revision,
       status: preview.nextRunAt ? 'active' : 'completed',
@@ -537,7 +537,7 @@ function toDefinitionDraft(automation: Automation): AutomationDefinitionDraft {
     executionProfile: automation.executionProfile,
     model: automation.model,
     name: automation.name,
-    projectId: automation.projectId,
+    spaceId: automation.spaceId,
     prompt: automation.prompt,
     timing: automation.timing,
   }

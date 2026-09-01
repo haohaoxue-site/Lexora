@@ -12,7 +12,7 @@ export interface PrepareTurnRequestInput {
   executionProfile: BuddyExecutionProfile
   model: string
   modelParameters?: { contextWindow: number, maxTokens: number }
-  projectId: string | null
+  spaceId: string | null
   provider: string
   requestFingerprint: string
   requestId: string
@@ -85,7 +85,7 @@ interface ConversationBindingRow {
   active_branch_id: string | null
   deleted_at: string | null
   execution_profile: BuddyExecutionProfile
-  project_id: string | null
+  space_id: string | null
   origin: 'automation' | 'interactive'
 }
 
@@ -123,12 +123,12 @@ export interface TurnRequestRepository {
 export function createTurnRequestRepository(database: DatabaseSync): TurnRequestRepository {
   const findRequest = database.prepare('SELECT * FROM turn_requests WHERE request_id = ?')
   const findConversation = database.prepare(`
-    SELECT project_id, active_branch_id, execution_profile, origin, deleted_at
+    SELECT space_id, active_branch_id, execution_profile, origin, deleted_at
     FROM conversations WHERE id = ?
   `)
   const insertConversation = database.prepare(`
     INSERT INTO conversations (
-      id, project_id, title, active_branch_id, created_at, updated_at, execution_profile,
+      id, space_id, title, active_branch_id, created_at, updated_at, execution_profile,
       model_selection_json
     ) VALUES (?, ?, ?, NULL, ?, ?, ?, NULL)
   `)
@@ -255,7 +255,7 @@ export function createTurnRequestRepository(database: DatabaseSync): TurnRequest
           : null
         if (
           !conversation
-          || conversation.project_id !== input.projectId
+          || conversation.space_id !== input.spaceId
           || conversation.active_branch_id !== input.parentBranchId
           || conversation.execution_profile !== input.executionProfile
           || conversation.deleted_at !== null
@@ -345,7 +345,7 @@ export function createTurnRequestRepository(database: DatabaseSync): TurnRequest
         const conversation = findConversation.get(input.conversationId) as ConversationBindingRow | undefined
         if (conversation) {
           if (
-            conversation.project_id !== input.projectId
+            conversation.space_id !== input.spaceId
             || conversation.active_branch_id !== input.branchId
             || conversation.execution_profile !== input.executionProfile
             || conversation.deleted_at !== null
@@ -357,7 +357,7 @@ export function createTurnRequestRepository(database: DatabaseSync): TurnRequest
         else {
           insertConversation.run(
             input.conversationId,
-            input.projectId,
+            input.spaceId,
             input.title,
             input.createdAt,
             input.createdAt,

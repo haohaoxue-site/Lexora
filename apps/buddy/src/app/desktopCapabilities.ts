@@ -44,7 +44,7 @@ export function createDesktopCapabilities(
     }),
     localSettings: createDesktopLocalSettingsCapability(
       stores.localCapabilities,
-      input.tasks.session.projectId,
+      input.tasks.session.spaceId,
     ),
     notifications: stores.notifications,
     providerSettings: stores.modelProviders,

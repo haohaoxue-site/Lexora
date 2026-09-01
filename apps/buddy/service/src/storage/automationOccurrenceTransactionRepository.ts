@@ -5,6 +5,7 @@ import type {
   AutomationOccurrence,
   AutomationRunNowResult,
 } from '../../../shared/automation'
+import type { SpaceExecutionContext } from '../../../shared/space'
 import type { AutomationDefinitionCommandStore } from './automationDefinitionCommandRepository'
 import type { AutomationDefinitionIndexStore } from './automationDefinitionIndexRepository'
 import type {
@@ -19,6 +20,7 @@ import {
   automationOccurrenceSchema,
   automationRunNowResultSchema,
 } from '../../../shared/automation'
+import { spaceExecutionContextSchema } from '../../../shared/space'
 import { createAutomationExecutionSnapshot } from './automationRecord'
 import { AutomationRepositoryError } from './automationRepositoryError'
 import { withTransaction } from './database'
@@ -107,6 +109,37 @@ export function createAutomationOccurrenceTransactionRepository(
     WHERE id = ? AND revision = ? AND status = 'active'
       AND deleted_at IS NULL AND next_run_at = ?
   `)
+  const findActiveSpace = options.database.prepare(`
+    SELECT id FROM spaces WHERE id = ? AND revoked_at IS NULL
+  `)
+  const listSpaceDirectories = options.database.prepare(`
+    SELECT id, revision, is_primary
+    FROM space_directory_bindings
+    WHERE space_id = ? AND revoked_at IS NULL
+    ORDER BY is_primary DESC, id
+  `)
+
+  const resolveSpaceContext = (spaceId: string | null): SpaceExecutionContext | null => {
+    if (!spaceId || !findActiveSpace.get(spaceId))
+      return null
+    const directories = listSpaceDirectories.all(spaceId) as unknown as Array<{
+      id: string
+      is_primary: number
+      revision: number
+    }>
+    return spaceExecutionContextSchema.parse({
+      additionalDirectoryBindings: directories
+        .filter(directory => directory.is_primary !== 1)
+        .map(directory => ({
+          id: directory.id,
+          revision: directory.revision,
+        })),
+      primaryDirectoryBinding: directories
+        .filter(directory => directory.is_primary === 1)
+        .map(directory => ({ id: directory.id, revision: directory.revision }))[0] ?? null,
+      spaceId,
+    })
+  }
 
   const findClaimableAutomation = (input: {
     automationId: string
@@ -150,7 +183,10 @@ export function createAutomationOccurrenceTransactionRepository(
         const row = findClaimableAutomation(input)
         if (!row)
           return null
-        const snapshot = createAutomationExecutionSnapshot(row)
+        const snapshot = createAutomationExecutionSnapshot(
+          row,
+          resolveSpaceContext(row.space_id),
+        )
         if (options.occurrences.hasActiveOccurrence(row.id)) {
           insertTerminalOccurrence.run(
             input.id,
@@ -209,7 +245,10 @@ export function createAutomationOccurrenceTransactionRepository(
         }
         if (row.revision !== input.expectedRevision)
           throw new AutomationRepositoryError('conflict')
-        const snapshot = createAutomationExecutionSnapshot(row)
+        const snapshot = createAutomationExecutionSnapshot(
+          row,
+          resolveSpaceContext(row.space_id),
+        )
         insertOccurrence.run(
           input.id,
           row.id,
@@ -268,7 +307,10 @@ export function createAutomationOccurrenceTransactionRepository(
         const row = findClaimableAutomation(input)
         if (!row)
           return null
-        const snapshot = createAutomationExecutionSnapshot(row)
+        const snapshot = createAutomationExecutionSnapshot(
+          row,
+          resolveSpaceContext(row.space_id),
+        )
         insertTerminalOccurrence.run(
           input.id,
           row.id,

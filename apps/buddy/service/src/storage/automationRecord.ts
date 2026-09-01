@@ -2,6 +2,7 @@ import type {
   Automation,
   AutomationExecutionSnapshot,
 } from '../../../shared/automation'
+import type { SpaceExecutionContext } from '../../../shared/space'
 import {
   automationExecutionSnapshotSchema,
   automationScheduleSchema,
@@ -11,7 +12,7 @@ import {
 export interface AutomationRow {
   active_from: string | null
   active_until: string | null
-  blocked_reason: Automation['blockedReason']
+  blocked_reason: Automation['blockedReason'] | 'AUTOMATION_PROJECT_UNAVAILABLE'
   created_at: string
   deleted_at: string | null
   execution_profile: Automation['executionProfile']
@@ -21,7 +22,7 @@ export interface AutomationRow {
   model_mode: Automation['model']['mode']
   name: string
   next_run_at: string | null
-  project_id: string | null
+  space_id: string | null
   prompt: string
   provider_id: string | null
   reasoning: Extract<Automation['model'], { mode: 'pinned' }>['reasoning'] | null
@@ -35,13 +36,15 @@ export interface AutomationRow {
 
 export function createAutomationExecutionSnapshot(
   row: AutomationRow,
+  spaceContext: SpaceExecutionContext | null,
 ): AutomationExecutionSnapshot {
   const automation = toAutomationRecord(row)
   return automationExecutionSnapshotSchema.parse({
     executionProfile: automation.executionProfile,
     model: automation.model,
     name: automation.name,
-    projectId: automation.projectId,
+    spaceId: automation.spaceId,
+    spaceContext,
     prompt: automation.prompt,
     timing: automation.timing,
   })
@@ -56,7 +59,7 @@ export function requireAutomationRecord(value: unknown, id: string): Automation 
 
 export function toAutomationRecord(row: AutomationRow): Automation {
   return automationSchema.parse({
-    blockedReason: row.blocked_reason,
+    blockedReason: fromStorageBlockedReason(row.blocked_reason),
     createdAt: row.created_at,
     executionProfile: row.execution_profile,
     id: row.id,
@@ -71,7 +74,7 @@ export function toAutomationRecord(row: AutomationRow): Automation {
         },
     name: row.name,
     nextRunAt: row.next_run_at,
-    projectId: row.project_id,
+    spaceId: row.space_id,
     prompt: row.prompt,
     revision: row.revision,
     status: row.status,
@@ -83,4 +86,20 @@ export function toAutomationRecord(row: AutomationRow): Automation {
     },
     updatedAt: row.updated_at,
   })
+}
+
+export function toStorageBlockedReason(
+  reason: Automation['blockedReason'],
+): AutomationRow['blocked_reason'] {
+  return reason === 'AUTOMATION_SPACE_UNAVAILABLE'
+    ? 'AUTOMATION_PROJECT_UNAVAILABLE'
+    : reason
+}
+
+function fromStorageBlockedReason(
+  reason: AutomationRow['blocked_reason'],
+): Automation['blockedReason'] {
+  return reason === 'AUTOMATION_PROJECT_UNAVAILABLE'
+    ? 'AUTOMATION_SPACE_UNAVAILABLE'
+    : reason
 }

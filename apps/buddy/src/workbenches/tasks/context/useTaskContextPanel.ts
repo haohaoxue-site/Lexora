@@ -4,8 +4,8 @@ import { computed, readonly, shallowRef, watch } from 'vue'
 import {
   artifactTabId,
   changeTabId,
-  projectTaskArtifactTabs,
-  projectTaskChangeTabs,
+  spaceTaskArtifactTabs,
+  spaceTaskChangeTabs,
 } from './taskContextPanel'
 
 interface UseTaskContextPanelOptions {
@@ -19,8 +19,8 @@ export function useTaskContextPanel(options: UseTaskContextPanelOptions) {
   const activeTabId = shallowRef<string | null>(null)
   const openTabIds = shallowRef<ReadonlyArray<string>>([])
   const availableTabs = computed(() => [
-    ...projectTaskArtifactTabs(options.runOutputs.value),
-    ...projectTaskChangeTabs(options.changeSets.value),
+    ...spaceTaskArtifactTabs(options.runOutputs.value),
+    ...spaceTaskChangeTabs(options.changeSets.value),
   ].filter(tab => (
     tab.kind === 'artifact'
       ? tab.artifact.conversationId

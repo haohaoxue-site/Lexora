@@ -4,11 +4,12 @@ import { requireRunRecord, toRunRecord } from './runRecord'
 
 export interface CreateRunInput extends Omit<
   RunRecord,
-  'completedAt' | 'contextWindow' | 'errorCode' | 'maxTokens'
+  'completedAt' | 'contextWindow' | 'errorCode' | 'executionContext' | 'maxTokens'
 > {
   completedAt?: string | null
   contextWindow?: number | null
   errorCode?: string | null
+  executionContext?: RunRecord['executionContext']
   maxTokens?: number | null
 }
 
@@ -47,8 +48,8 @@ export function createRunRepository(database: DatabaseSync): RunRepository {
     INSERT INTO runs (
       id, conversation_id, branch_id, triggering_message_id, provider, model,
       context_window, max_tokens, purpose, status, pi_session_file, error_code,
-      started_at, completed_at, execution_profile
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      started_at, completed_at, execution_profile, execution_context_json
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `)
   const list = database.prepare(`
     SELECT * FROM runs
@@ -116,6 +117,7 @@ export function createRunRepository(database: DatabaseSync): RunRepository {
         input.startedAt,
         input.completedAt ?? null,
         input.executionProfile,
+        input.executionContext ? JSON.stringify(input.executionContext) : null,
       )
       return requireRunRecord(find.get(input.id), input.id)
     },

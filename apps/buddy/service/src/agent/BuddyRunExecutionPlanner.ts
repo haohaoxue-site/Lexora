@@ -49,7 +49,8 @@ export class BuddyRunExecutionPlanner {
       branchId: run.branchId,
       conversationId: run.conversationId,
       executionProfile: run.executionProfile,
-      projectId: conversation.projectId,
+      executionContext: run.executionContext,
+      spaceId: conversation.spaceId,
       sessionMode: run.purpose === 'automation'
         ? 'automation_background'
         : 'interactive',

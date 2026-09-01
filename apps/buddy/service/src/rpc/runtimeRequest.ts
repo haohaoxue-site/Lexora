@@ -11,6 +11,7 @@ export interface RuntimeRpcRegistrar extends RuntimeRequestRegistrar {
 
 export type BuddyServiceErrorCode
   = | 'DIRECTORY_NOT_AUTHORIZED'
+    | 'SPACE_UNAVAILABLE'
     | 'VALIDATION_FAILED'
 
 export class BuddyServiceError extends Error {

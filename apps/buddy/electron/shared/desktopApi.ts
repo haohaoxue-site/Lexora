@@ -46,7 +46,7 @@ export interface DesktopAppInfo {
 
 export interface DesktopTaskPinnedItem {
   id: string
-  kind: 'conversation' | 'project'
+  kind: 'conversation' | 'space'
 }
 
 export const DESKTOP_CHAT_WELCOME_VARIANT_IDS = [

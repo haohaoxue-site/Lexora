@@ -3,6 +3,7 @@ import type {
   AutomationOccurrence,
 } from '../../../shared/automation'
 import type { BuddyThinkingLevel } from '../../../shared/modelSelection'
+import type { SpaceExecutionContext } from '../../../shared/space'
 import type { BuddyTurnHandle } from '../agent/BuddyAgentRun'
 import type { AutomationTurnRepository } from '../storage/automationTurnRepository'
 import type { AutomationClock } from './AutomationScheduleEvaluator'
@@ -20,8 +21,14 @@ export interface ResolvedAutomationModel {
   reasoning: BuddyThinkingLevel | null
 }
 
-export interface ResolvedAutomationProject {
+export interface ResolvedAutomationSpace {
+  executionContext: SpaceExecutionContext
   id: string
+  status: 'ready'
+}
+
+export interface ChangedAutomationSpace {
+  status: 'context_changed'
 }
 
 export interface AutomationDispatcherOptions {
@@ -31,8 +38,12 @@ export interface AutomationDispatcherOptions {
   createId?: () => string
   launchTurn: (runId: string) => Promise<BuddyTurnHandle>
   resolveModel: (target: AutomationModelTarget) => Promise<ResolvedAutomationModel | null>
-  resolveProject: (projectId: string) => Promise<ResolvedAutomationProject | null>
-    | ResolvedAutomationProject
+  resolveSpace: (
+    spaceId: string,
+    executionContext: SpaceExecutionContext,
+  ) => Promise<ChangedAutomationSpace | ResolvedAutomationSpace | null>
+    | ChangedAutomationSpace
+    | ResolvedAutomationSpace
     | null
   runTimeoutMs?: number
   turns: AutomationTurnRepository
@@ -45,7 +56,7 @@ export class AutomationDispatcher {
   readonly #createId: () => string
   readonly #launchTurn: AutomationDispatcherOptions['launchTurn']
   readonly #resolveModel: AutomationDispatcherOptions['resolveModel']
-  readonly #resolveProject: AutomationDispatcherOptions['resolveProject']
+  readonly #resolveSpace: AutomationDispatcherOptions['resolveSpace']
   readonly #runTimeoutMs: number
   readonly #turns: AutomationTurnRepository
 
@@ -56,7 +67,7 @@ export class AutomationDispatcher {
     this.#createId = options.createId ?? randomUUID
     this.#launchTurn = options.launchTurn
     this.#resolveModel = options.resolveModel
-    this.#resolveProject = options.resolveProject
+    this.#resolveSpace = options.resolveSpace
     this.#runTimeoutMs = options.runTimeoutMs ?? AUTOMATION_RUN_TIMEOUT_MS
     this.#turns = options.turns
   }
@@ -97,19 +108,29 @@ export class AutomationDispatcher {
       return
     }
 
-    const project = snapshot.projectId
-      ? await this.#resolveProject(snapshot.projectId)
+    const spaceResolution = snapshot.spaceId && snapshot.spaceContext
+      ? await this.#resolveSpace(snapshot.spaceId, snapshot.spaceContext)
       : null
-    if (snapshot.projectId && !project) {
+    if (snapshot.spaceId && !spaceResolution) {
       this.#skipAndBlock(
         occurrence.id,
         occurrence.leaseOwner,
         occurrence.automationId,
         occurrence.automationRevision,
-        'AUTOMATION_PROJECT_UNAVAILABLE',
+        'AUTOMATION_SPACE_UNAVAILABLE',
       )
       return
     }
+    if (spaceResolution?.status === 'context_changed') {
+      this.#automationService.finishQueued({
+        errorCode: 'AUTOMATION_SPACE_UNAVAILABLE',
+        id: occurrence.id,
+        leaseOwner: occurrence.leaseOwner,
+        status: 'skipped',
+      })
+      return
+    }
+    const space = spaceResolution?.status === 'ready' ? spaceResolution : null
 
     const branchId = this.#createId()
     const conversationId = this.#createId()
@@ -126,13 +147,33 @@ export class AutomationDispatcher {
       messageId,
       model: model.modelId,
       occurrenceId: occurrence.id,
-      projectId: project?.id ?? null,
+      executionContext: space?.executionContext ?? null,
+      spaceId: space?.id ?? null,
       provider: model.providerId,
       reasoning: model.reasoning,
       runId,
     })
     if (binding.kind === 'overlap_skipped')
       return
+    if (binding.kind === 'space_context_changed') {
+      this.#automationService.finishQueued({
+        errorCode: 'AUTOMATION_SPACE_UNAVAILABLE',
+        id: occurrence.id,
+        leaseOwner: occurrence.leaseOwner,
+        status: 'skipped',
+      })
+      return
+    }
+    if (binding.kind === 'space_unavailable') {
+      this.#skipAndBlock(
+        occurrence.id,
+        occurrence.leaseOwner,
+        occurrence.automationId,
+        occurrence.automationRevision,
+        'AUTOMATION_SPACE_UNAVAILABLE',
+      )
+      return
+    }
     const bound = binding
     const turn = await this.#launchTurn(bound.run.id)
     await this.#waitForTurn(turn)
@@ -165,7 +206,7 @@ export class AutomationDispatcher {
     leaseOwner: string,
     automationId: string,
     expectedRevision: number,
-    reason: 'AUTOMATION_PROJECT_UNAVAILABLE',
+    reason: 'AUTOMATION_SPACE_UNAVAILABLE',
   ): void {
     this.#automationService.finishQueuedAndBlock({
       automationId,

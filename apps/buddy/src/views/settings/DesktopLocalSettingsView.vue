@@ -11,7 +11,7 @@ const { t } = useBuddyI18n(localSettings.language)
 
 onMounted(() => {
   void ready.then(() => Promise.all([
-    localSettings.loadSkills(localSettings.projectId.value),
+    localSettings.loadSkills(localSettings.spaceId.value),
     localSettings.loadConnectors(),
   ]))
 })

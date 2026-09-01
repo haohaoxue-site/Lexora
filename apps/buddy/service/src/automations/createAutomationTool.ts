@@ -108,7 +108,7 @@ const draft = Type.Object({
     }, { additionalProperties: false }),
   ]),
   name: Type.String({ maxLength: 80, minLength: 1 }),
-  projectId: Type.Union([id, Type.Null()]),
+  spaceId: Type.Union([id, Type.Null()]),
   prompt: Type.String({ maxLength: 32 * 1024, minLength: 1 }),
   timing: Type.Object({
     activeFrom: Type.Union([localDate, Type.Null()]),
@@ -318,7 +318,7 @@ function createAutomationReview(
       : `pinned: ${automation.model.providerId}/${automation.model.modelId}`,
     name: automation.name,
     operation,
-    projectId: automation.projectId,
+    spaceId: automation.spaceId,
     promptSummary: summarize(automation.prompt, 512),
     scheduleSummary: summarizeSchedule(automation.timing.schedule),
     timezone: automation.timing.timezone,

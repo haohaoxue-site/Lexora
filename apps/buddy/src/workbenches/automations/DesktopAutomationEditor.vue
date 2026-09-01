@@ -2,9 +2,9 @@
 import type {
   LocalAutomation,
   LocalAutomationPreviewResult,
-  LocalProject,
   LocalProvider,
   LocalRuntimeModelOption,
+  LocalSpace,
 } from '@buddy-electron/shared/localChatApi'
 import type {
   AutomationDefinitionDraft,
@@ -49,7 +49,7 @@ const props = defineProps<{
     sampleCount?: number
     timing: unknown
   }) => Promise<LocalAutomationPreviewResult>
-  projects: ReadonlyArray<LocalProject>
+  spaces: ReadonlyArray<LocalSpace>
 }>()
 
 const emit = defineEmits<{
@@ -63,7 +63,7 @@ interface AutomationEditorForm extends AutomationScheduleForm {
   modelMode: 'default' | 'pinned'
   name: string
   pinnedModelKey: string | null
-  projectId: string | null
+  spaceId: string | null
   prompt: string
   reasoning: BuddyThinkingLevel | null
 }
@@ -84,19 +84,19 @@ const canSave = computed(() => (
 ))
 const pageTitle = computed(() => form.name.trim() || t('desktop.automations.editor.createTitle'))
 const availableModels = computed(() => props.models.filter(model => model.available && model.enabled))
-const projectOptions = computed(() => {
-  const options = props.projects
-    .filter(project => project.revokedAt === null)
-    .map(project => ({ label: project.name, value: project.id }))
-  if (!form.projectId || options.some(option => option.value === form.projectId))
+const spaceOptions = computed(() => {
+  const options = props.spaces
+    .filter(space => space.revokedAt === null)
+    .map(space => ({ label: space.name, value: space.id }))
+  if (!form.spaceId || options.some(option => option.value === form.spaceId))
     return options
-  const project = props.projects.find(candidate => candidate.id === form.projectId)
+  const space = props.spaces.find(candidate => candidate.id === form.spaceId)
   return [{
     disabled: true,
-    label: project
-      ? t('desktop.automations.editor.unavailableProject', { name: project.name })
-      : t('desktop.automations.editor.unknownProject'),
-    value: form.projectId,
+    label: space
+      ? t('desktop.automations.editor.unavailableSpace', { name: space.name })
+      : t('desktop.automations.editor.unknownSpace'),
+    value: form.spaceId,
   }, ...options]
 })
 
@@ -177,7 +177,7 @@ function buildDraft(value: AutomationEditorForm): AutomationDefinitionDraft | nu
     executionProfile: value.executionProfile,
     model,
     name: value.name,
-    projectId: value.projectId,
+    spaceId: value.spaceId,
     prompt: value.prompt,
     timing,
   })
@@ -285,7 +285,7 @@ function createDefaultForm(): AutomationEditorForm {
     name: '',
     onceLocal: formatWallTime(start),
     pinnedModelKey: null,
-    projectId: null,
+    spaceId: null,
     prompt: '',
     reasoning: null,
     timezone,
@@ -300,7 +300,7 @@ function formFromAutomation(automation: LocalAutomation): AutomationEditorForm {
   next.executionProfile = automation.executionProfile
   next.modelMode = automation.model.mode
   next.name = automation.name
-  next.projectId = automation.projectId
+  next.spaceId = automation.spaceId
   next.prompt = automation.prompt
   next.timezone = localTimezone()
   if (automation.model.mode === 'pinned') {
@@ -425,17 +425,17 @@ function modelKey(providerId: string, modelId: string): string {
               />
             </NFormItem>
 
-            <div class="desktop-automation-editor__project-field">
-              <NFormItem :label="t('desktop.automations.editor.project')">
+            <div class="desktop-automation-editor__space-field">
+              <NFormItem :label="t('desktop.automations.editor.space')">
                 <NSelect
-                  v-model:value="form.projectId"
+                  v-model:value="form.spaceId"
                   clearable
                   filterable
-                  :options="projectOptions"
-                  :placeholder="t('desktop.automations.editor.projectPlaceholder')"
+                  :options="spaceOptions"
+                  :placeholder="t('desktop.automations.editor.spacePlaceholder')"
                 />
               </NFormItem>
-              <p>{{ t('desktop.automations.editor.projectHint') }}</p>
+              <p>{{ t('desktop.automations.editor.spaceHint') }}</p>
             </div>
 
             <NFormItem :label="t('desktop.automations.editor.prompt')" required>
@@ -594,7 +594,7 @@ function modelKey(providerId: string, modelId: string): string {
   display: grid;
 }
 
-.desktop-automation-editor__project-field {
+.desktop-automation-editor__space-field {
   display: grid;
   gap: 4px;
 

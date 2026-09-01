@@ -17,12 +17,24 @@ export class BuddyDataPaths {
     return resolve(this.root, 'drafts')
   }
 
+  get spacesDirectory(): string {
+    return resolve(this.root, 'spaces')
+  }
+
   conversationDirectory(conversationId: string): string {
     return resolve(this.conversationsDirectory, requireIdentity(conversationId))
   }
 
   conversationWorkspace(conversationId: string): string {
     return resolve(this.conversationDirectory(conversationId), 'workspace')
+  }
+
+  spaceDirectory(spaceId: string): string {
+    return resolve(this.spacesDirectory, requireIdentity(spaceId))
+  }
+
+  spaceWorkspace(spaceId: string): string {
+    return resolve(this.spaceDirectory(spaceId), 'workspace')
   }
 
   messageInputs(conversationId: string, messageId: string): string {

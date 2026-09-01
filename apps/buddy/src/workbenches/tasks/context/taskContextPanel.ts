@@ -20,7 +20,7 @@ export interface TaskChangesContextTab {
 
 export type TaskContextTab = TaskArtifactContextTab | TaskChangesContextTab
 
-export function projectTaskArtifactTabs(
+export function spaceTaskArtifactTabs(
   outputs: ReadonlyArray<LocalRunOutput>,
 ): ReadonlyArray<TaskArtifactContextTab> {
   const artifacts = new Map<string, LocalArtifact>()
@@ -40,7 +40,7 @@ export function artifactTabId(artifactId: string): string {
   return `artifact:${artifactId}`
 }
 
-export function projectTaskChangeTabs(
+export function spaceTaskChangeTabs(
   changeSets: ReadonlyArray<LocalChangeSetSummary>,
 ): ReadonlyArray<TaskChangesContextTab> {
   return changeSets.map(changeSet => ({

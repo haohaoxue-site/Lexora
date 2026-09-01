@@ -3,11 +3,11 @@ import type { LocalCapabilitiesStore } from '@/stores/useLocalCapabilitiesStore'
 
 export function createDesktopLocalSettingsCapability(
   store: LocalCapabilitiesStore,
-  projectId: Readonly<Ref<string | null>>,
+  spaceId: Readonly<Ref<string | null>>,
 ) {
   return {
     ...store,
-    projectId,
+    spaceId,
   }
 }
 

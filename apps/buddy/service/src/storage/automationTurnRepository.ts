@@ -1,11 +1,13 @@
 import type { DatabaseSync } from 'node:sqlite'
 import type { BuddyThinkingLevel } from '../../../shared/modelSelection'
+import type { SpaceExecutionContext } from '../../../shared/space'
 import type {
   AutomationOccurrenceRecord,
   AutomationOccurrenceRow,
 } from './automationOccurrenceRecord'
 import type { ConversationRecord } from './conversationRecord'
 import type { RunRecord } from './runRecord'
+import { spaceExecutionContextSchema } from '../../../shared/space'
 import {
   requireAutomationOccurrenceRecord,
   toAutomationOccurrenceRecord,
@@ -24,7 +26,8 @@ export interface BindAutomationTurnInput {
   messageId: string
   model: string
   occurrenceId: string
-  projectId: string | null
+  executionContext: SpaceExecutionContext | null
+  spaceId: string | null
   provider: string
   reasoning: BuddyThinkingLevel | null
   runId: string
@@ -42,8 +45,22 @@ export interface SkippedAutomationTurn {
   occurrence: AutomationOccurrenceRecord
 }
 
+export interface ChangedSpaceAutomationTurn {
+  kind: 'space_context_changed'
+  occurrence: AutomationOccurrenceRecord
+}
+
+export interface UnavailableSpaceAutomationTurn {
+  kind: 'space_unavailable'
+  occurrence: AutomationOccurrenceRecord
+}
+
 export interface AutomationTurnRepository {
-  bind: (input: BindAutomationTurnInput) => BoundAutomationTurn | SkippedAutomationTurn
+  bind: (input: BindAutomationTurnInput) =>
+    | BoundAutomationTurn
+    | ChangedSpaceAutomationTurn
+    | SkippedAutomationTurn
+    | UnavailableSpaceAutomationTurn
 }
 
 export class AutomationTurnBindingError extends Error {
@@ -59,9 +76,18 @@ export function createAutomationTurnRepository(database: DatabaseSync): Automati
   `)
   const findConversation = database.prepare('SELECT * FROM conversations WHERE id = ?')
   const findRun = database.prepare('SELECT * FROM runs WHERE id = ?')
+  const findActiveSpace = database.prepare(`
+    SELECT id FROM spaces WHERE id = ? AND revoked_at IS NULL
+  `)
+  const listSpaceDirectories = database.prepare(`
+    SELECT id, revision, is_primary
+    FROM space_directory_bindings
+    WHERE space_id = ? AND revoked_at IS NULL
+    ORDER BY is_primary DESC, id
+  `)
   const insertConversation = database.prepare(`
     INSERT INTO conversations (
-      id, project_id, title, active_branch_id, created_at, updated_at,
+      id, space_id, title, active_branch_id, created_at, updated_at,
       execution_profile, origin, deleted_at
     ) VALUES (?, ?, ?, ?, ?, ?, ?, 'automation', NULL)
   `)
@@ -79,8 +105,8 @@ export function createAutomationTurnRepository(database: DatabaseSync): Automati
     INSERT INTO runs (
       id, conversation_id, branch_id, triggering_message_id, provider, model,
       context_window, max_tokens, purpose, status, pi_session_file, error_code,
-      started_at, completed_at, execution_profile
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'automation', 'queued', NULL, NULL, ?, NULL, ?)
+      started_at, completed_at, execution_profile, execution_context_json
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'automation', 'queued', NULL, NULL, ?, NULL, ?, ?)
   `)
   const insertRunInput = database.prepare(`
     INSERT INTO run_inputs (
@@ -144,9 +170,30 @@ export function createAutomationTurnRepository(database: DatabaseSync): Automati
           }
         }
         const snapshot = occurrence.executionSnapshot
+        if (
+          snapshot.spaceId !== input.spaceId
+          || JSON.stringify(snapshot.spaceContext) !== JSON.stringify(input.executionContext)
+        ) {
+          throw new AutomationTurnBindingError()
+        }
+        if (snapshot.spaceId) {
+          if (!snapshot.spaceContext || !findActiveSpace.get(snapshot.spaceId)) {
+            return {
+              kind: 'space_unavailable',
+              occurrence,
+            }
+          }
+          const currentContext = readSpaceExecutionContext(snapshot.spaceId)
+          if (JSON.stringify(currentContext) !== JSON.stringify(snapshot.spaceContext)) {
+            return {
+              kind: 'space_context_changed',
+              occurrence,
+            }
+          }
+        }
         insertConversation.run(
           input.conversationId,
-          input.projectId,
+          input.spaceId,
           snapshot.name,
           input.branchId,
           input.boundAt,
@@ -177,6 +224,7 @@ export function createAutomationTurnRepository(database: DatabaseSync): Automati
           input.maxTokens,
           input.boundAt,
           snapshot.executionProfile,
+          input.executionContext ? JSON.stringify(input.executionContext) : null,
         )
         insertRunInput.run(input.runId, snapshot.prompt, input.reasoning, input.boundAt)
         if (Number(bindOccurrence.run(
@@ -210,5 +258,25 @@ export function createAutomationTurnRepository(database: DatabaseSync): Automati
 
   function requireOccurrenceRecord(id: string): AutomationOccurrenceRecord {
     return requireAutomationOccurrenceRecord(findOccurrence.get(id), id)
+  }
+
+  function readSpaceExecutionContext(spaceId: string): SpaceExecutionContext {
+    const directories = listSpaceDirectories.all(spaceId) as unknown as Array<{
+      id: string
+      is_primary: number
+      revision: number
+    }>
+    return spaceExecutionContextSchema.parse({
+      additionalDirectoryBindings: directories
+        .filter(directory => directory.is_primary !== 1)
+        .map(directory => ({
+          id: directory.id,
+          revision: directory.revision,
+        })),
+      primaryDirectoryBinding: directories
+        .filter(directory => directory.is_primary === 1)
+        .map(directory => ({ id: directory.id, revision: directory.revision }))[0] ?? null,
+      spaceId,
+    })
   }
 }

@@ -16,9 +16,11 @@ export interface CapturedFileStateRecord {
 export interface FileChangeCaptureRecord {
   after: CapturedFileStateRecord | null
   before: CapturedFileStateRecord
+  canonicalPath: string | null
   changeSetId: string
   completedAt: string | null
   createdAt: string
+  directoryGrantId: string | null
   id: string
   relativePath: string
   status: 'completed' | 'pending'
@@ -79,9 +81,11 @@ interface FileCaptureRow {
   before_redacted: number
   before_size_bytes: number | null
   before_snapshot_path: string | null
+  canonical_path: string | null
   change_set_id: string
   completed_at: string | null
   created_at: string
+  directory_grant_id: string | null
   id: string
   relative_path: string
   status: 'completed' | 'pending'
@@ -113,6 +117,7 @@ export function createChangeSetRepository(database: DatabaseSync): ChangeSetRepo
   const insertCapture = database.prepare(`
     INSERT INTO run_file_change_captures (
       id, change_set_id, sequence, tool_call_id, tool_name, relative_path,
+      directory_grant_id, canonical_path,
       before_kind, before_size_bytes, before_hash, before_snapshot_path,
       before_redacted,
       after_kind, after_size_bytes, after_hash, after_snapshot_path, after_redacted,
@@ -122,7 +127,7 @@ export function createChangeSetRepository(database: DatabaseSync): ChangeSetRepo
       (SELECT COALESCE(MAX(sequence), 0) + 1
        FROM run_file_change_captures
        WHERE change_set_id = ?),
-      ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+      ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
     )
   `)
   const findCapture = database.prepare(`
@@ -174,6 +179,8 @@ export function createChangeSetRepository(database: DatabaseSync): ChangeSetRepo
         record.toolCallId,
         record.toolName,
         record.relativePath,
+        record.directoryGrantId,
+        record.canonicalPath,
         record.before.kind,
         record.before.sizeBytes,
         record.before.hash,
@@ -289,8 +296,10 @@ function toFileCapture(row: FileCaptureRow): FileChangeCaptureRecord {
       snapshotPath: row.before_snapshot_path,
     },
     changeSetId: row.change_set_id,
+    canonicalPath: row.canonical_path,
     completedAt: row.completed_at,
     createdAt: row.created_at,
+    directoryGrantId: row.directory_grant_id,
     id: row.id,
     relativePath: row.relative_path,
     status: row.status,

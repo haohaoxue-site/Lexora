@@ -1,5 +1,5 @@
 import type { ImageContent } from '@earendil-works/pi-ai'
-import type { ProjectGrant } from '../projects/resolveGrantedPath'
+import type { DirectoryGrant } from '../directories/resolveGrantedPath'
 import type { ArtifactRecord, ArtifactRepository } from '../storage/artifactRepository'
 import type { BuddyDataPaths } from '../storage/BuddyDataPaths'
 import { Buffer } from 'node:buffer'
@@ -15,7 +15,7 @@ import {
   writeFile,
 } from 'node:fs/promises'
 import { basename, extname, isAbsolute, join, resolve } from 'node:path'
-import { resolveGrantedPath } from '../projects/resolveGrantedPath'
+import { resolveGrantedPath } from '../directories/resolveGrantedPath'
 
 export const BUDDY_ARTIFACT_COUNT_LIMIT = 16
 export const BUDDY_ARTIFACT_TOTAL_BYTES_LIMIT = 32 * 1024 * 1024
@@ -71,7 +71,7 @@ export class ArtifactService {
       path: string
       sourceArtifactId?: string
     }[]
-    grants: readonly ProjectGrant[]
+    grants: readonly DirectoryGrant[]
     runId: string
     sourceToolCallId: string
   }): Promise<ArtifactRecord[]> {
@@ -136,7 +136,7 @@ export class ArtifactService {
   async checkoutConversationArtifact(input: {
     artifactId: string
     conversationId: string
-    scratchGrant: ProjectGrant
+    scratchGrant: DirectoryGrant
   }): Promise<{ path: string, resource: ArtifactResource }> {
     const artifact = this.#requireConversationArtifact(
       input.conversationId,

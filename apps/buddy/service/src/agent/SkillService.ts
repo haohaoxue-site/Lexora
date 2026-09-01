@@ -1,23 +1,23 @@
 import type { Skill } from '@earendil-works/pi-coding-agent'
 import type { Buffer } from 'node:buffer'
 import type { RuntimeRequestRegistrar } from '../rpc/runtimeRequest'
-import type { ProjectRepository } from '../storage/projectRepository'
+import type { SpaceRepository } from '../storage/spaceRepository'
 import { createHash } from 'node:crypto'
 import { mkdir, realpath } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { loadSkillsFromDir, stripFrontmatter } from '@earendil-works/pi-coding-agent'
 
 import { z } from 'zod'
-import { GrantedPathError, resolveGrantedPath } from '../projects/resolveGrantedPath'
+import { GrantedPathError, resolveGrantedPath } from '../directories/resolveGrantedPath'
 import { readBoundedFile } from '../resources/BoundedFileReader'
 import { parse } from '../rpc/runtimeRequest'
 
 const MAX_MATERIALIZED_SKILL_BYTES = 256 * 1024
 const skillScopeSchema = z.object({
-  projectId: z.string().trim().min(1).max(256).nullable(),
+  spaceId: z.string().trim().min(1).max(256).nullable(),
 }).strict()
 
-export type BuddySkillSource = 'builtin' | 'directory' | 'global' | 'project'
+export type BuddySkillSource = 'builtin' | 'directory' | 'global' | 'space'
 
 export interface BuddySkillCatalogEntry {
   description: string
@@ -58,7 +58,7 @@ export function formatBuddySkillPrompt(skill: BuddyMaterializedSkill): string {
 export interface SkillServiceOptions {
   agentDirectory: string
   builtinSkillsDirectory: string
-  projects: ProjectRepository
+  spaces: SpaceRepository
 }
 
 interface SkillSourceDirectory {
@@ -81,29 +81,29 @@ interface LoadedBuddySkillResolution {
 export class SkillService {
   readonly #agentDirectory: string
   readonly #builtinSkillsDirectory: string
-  readonly #projects: ProjectRepository
+  readonly #spaces: SpaceRepository
 
   constructor(options: SkillServiceOptions) {
     this.#agentDirectory = options.agentDirectory
     this.#builtinSkillsDirectory = options.builtinSkillsDirectory
-    this.#projects = options.projects
+    this.#spaces = options.spaces
   }
 
   async load(): Promise<BuddySkillResolution> {
     return this.#loadResolved(undefined)
   }
 
-  async loadForProject(projectId: string | null): Promise<BuddySkillResolution> {
-    return this.#loadResolved(projectId)
+  async loadForSpace(spaceId: string | null): Promise<BuddySkillResolution> {
+    return this.#loadResolved(spaceId)
   }
 
-  async materializeForProject(
-    projectId: string | null,
+  async materializeForSpace(
+    spaceId: string | null,
     names: readonly string[],
   ): Promise<BuddyMaterializedSkill[]> {
     if (names.length === 0)
       return []
-    const resolution = await this.#loadSelected(projectId)
+    const resolution = await this.#loadSelected(spaceId)
     const byName = new Map(resolution.skills.map(skill => [skill.catalog.name, skill]))
     const selected: BuddyMaterializedSkill[] = []
     for (const name of new Set(names)) {
@@ -129,8 +129,8 @@ export class SkillService {
     return selected
   }
 
-  async #loadResolved(projectId: string | null | undefined): Promise<BuddySkillResolution> {
-    const resolution = await this.#loadSelected(projectId)
+  async #loadResolved(spaceId: string | null | undefined): Promise<BuddySkillResolution> {
+    const resolution = await this.#loadSelected(spaceId)
     return {
       diagnostics: resolution.diagnostics,
       paths: resolution.skills.map(skill => skill.path),
@@ -139,9 +139,9 @@ export class SkillService {
     }
   }
 
-  async #loadSelected(projectId: string | null | undefined): Promise<LoadedBuddySkillResolution> {
+  async #loadSelected(spaceId: string | null | undefined): Promise<LoadedBuddySkillResolution> {
     const diagnostics: BuddySkillDiagnostic[] = []
-    const sources = await this.#resolveSources(diagnostics, projectId)
+    const sources = await this.#resolveSources(diagnostics, spaceId)
     const loaded: LoadedBuddySkill[] = []
     for (const source of sources)
       loaded.push(...await loadSource(source, diagnostics))
@@ -168,7 +168,7 @@ export class SkillService {
 
   async #resolveSources(
     diagnostics: BuddySkillDiagnostic[],
-    projectId: string | null | undefined,
+    spaceId: string | null | undefined,
   ): Promise<SkillSourceDirectory[]> {
     await mkdir(this.#agentDirectory, { mode: 0o700, recursive: true })
     const globalSkillsDirectory = join(this.#agentDirectory, 'skills')
@@ -182,15 +182,20 @@ export class SkillService {
     )
     if (builtin)
       sources.push(builtin)
-    const projects = this.#projects.list()
-      .filter(project => project.revokedAt === null)
-      .filter(project => projectId === undefined || project.id === projectId)
+    const directories = this.#spaces.list()
+      .filter(space => space.revokedAt === null)
+      .filter(space => spaceId === undefined || space.id === spaceId)
+      .flatMap(space => (
+        space.primaryDirectory?.resourcesTrustedAt
+          ? [space.primaryDirectory]
+          : []
+      ))
       .sort((left, right) => left.canonicalRoot.localeCompare(right.canonicalRoot))
-    for (const project of projects) {
+    for (const directory of directories) {
       for (const relativePath of [['.agents', 'skills'], ['.pi', 'skills']] as const) {
         const source = await resolveSourceDirectory(
-          project.canonicalRoot,
-          join(project.canonicalRoot, ...relativePath),
+          directory.canonicalRoot,
+          join(directory.canonicalRoot, ...relativePath),
           'directory',
           diagnostics,
           true,
@@ -217,7 +222,7 @@ export function registerSkillServiceRpc(
 ): () => void {
   return rpc.onRequest('skills.list', async (params) => {
     const input = parse(skillScopeSchema, params)
-    const result = await service.loadForProject(input.projectId)
+    const result = await service.loadForSpace(input.spaceId)
     return {
       diagnostics: result.diagnostics,
       skills: result.skills,
@@ -236,7 +241,7 @@ async function resolveSourceDirectory(
     const canonicalAllowedRoot = await realpath(allowedRoot)
     const resolution = await resolveGrantedPath([{
       canonicalRoot: canonicalAllowedRoot,
-      projectId: source,
+      grantId: source,
       root: canonicalAllowedRoot,
     }], directory, 'existing')
     return {
@@ -347,7 +352,7 @@ async function validateSkillPath(
   try {
     const resolution = await resolveGrantedPath([{
       canonicalRoot: source.directory,
-      projectId: source.source,
+      grantId: source.source,
       root: source.directory,
     }], skill.filePath, 'existing')
     return resolution.canonicalPath

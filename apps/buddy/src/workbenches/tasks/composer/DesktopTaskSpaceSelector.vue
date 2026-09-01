@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import type { LocalProject } from '@buddy-electron/shared/localChatApi'
+import type { LocalSpace } from '@buddy-electron/shared/localChatApi'
 import type { InputInst } from 'naive-ui'
 import type { BuddyLocale } from '@/i18n/buddyI18n'
-import type { TaskProjectInput } from '@/workbenches/tasks/state/useTaskProjects'
+import type { TaskSpaceInput } from '@/workbenches/tasks/state/useTaskSpaces'
 import {
   Checkmark16Regular,
   ChevronDown16Regular,
@@ -14,35 +14,35 @@ import { NButton, NIcon, NInput, NPopover } from 'naive-ui'
 import { computed, nextTick, shallowRef, useTemplateRef, watch } from 'vue'
 import { useBuddyI18n } from '@/i18n/buddyI18n'
 import DesktopIcon from '@/ui/DesktopIcon.vue'
-import DesktopProjectDialog from '@/workbenches/tasks/index/DesktopProjectDialog.vue'
+import DesktopSpaceDialog from '@/workbenches/tasks/index/DesktopSpaceDialog.vue'
 
 const props = defineProps<{
-  activeProject: LocalProject | null
+  activeSpace: LocalSpace | null
   language: BuddyLocale
-  projects: ReadonlyArray<LocalProject>
+  spaces: ReadonlyArray<LocalSpace>
   selectDirectory: () => Promise<string | null>
 }>()
 
 const emit = defineEmits<{
-  createProject: [input: TaskProjectInput]
-  selectProject: [projectId: string | null]
+  createSpace: [input: TaskSpaceInput]
+  selectSpace: [spaceId: string | null]
 }>()
 
 const { t } = useBuddyI18n(() => props.language)
 const panelOpen = shallowRef(false)
-const projectDialogOpen = shallowRef(false)
+const spaceDialogOpen = shallowRef(false)
 const query = shallowRef('')
 const searchInput = useTemplateRef<InputInst>('searchInput')
-const activeProjects = computed(() => props.projects.filter(project => project.revokedAt === null))
-const visibleProjects = computed(() => {
+const activeSpaces = computed(() => props.spaces.filter(space => space.revokedAt === null))
+const visibleSpaces = computed(() => {
   const normalizedQuery = query.value.trim().toLocaleLowerCase()
   if (!normalizedQuery)
-    return activeProjects.value
-  return activeProjects.value.filter(project => (
-    project.name.toLocaleLowerCase().includes(normalizedQuery)
+    return activeSpaces.value
+  return activeSpaces.value.filter(space => (
+    space.name.toLocaleLowerCase().includes(normalizedQuery)
   ))
 })
-const triggerLabel = computed(() => props.activeProject?.name ?? t('desktop.tasks.projectSelect'))
+const triggerLabel = computed(() => props.activeSpace?.name ?? t('desktop.tasks.spaceSelect'))
 
 watch(panelOpen, async (open) => {
   if (!open)
@@ -52,20 +52,20 @@ watch(panelOpen, async (open) => {
   searchInput.value?.focus()
 })
 
-function selectProject(projectId: string) {
+function selectSpace(spaceId: string) {
   panelOpen.value = false
-  if (projectId !== props.activeProject?.id)
-    emit('selectProject', projectId)
+  if (spaceId !== props.activeSpace?.id)
+    emit('selectSpace', spaceId)
 }
 
-function clearProject() {
+function clearSpace() {
   panelOpen.value = false
-  emit('selectProject', null)
+  emit('selectSpace', null)
 }
 
-function openProjectCreator() {
+function openSpaceCreator() {
   panelOpen.value = false
-  projectDialogOpen.value = true
+  spaceDialogOpen.value = true
 }
 </script>
 
@@ -82,16 +82,16 @@ function openProjectCreator() {
   >
     <template #trigger>
       <NButton
-        class="desktop-task-project-selector__trigger"
+        class="desktop-task-space-selector__trigger"
         quaternary
         size="small"
         aria-haspopup="dialog"
         :aria-expanded="panelOpen"
       >
-        <NIcon class="desktop-task-project-selector__icon" :component="Folder16Regular" :size="16" />
+        <NIcon class="desktop-task-space-selector__icon" :component="Folder16Regular" :size="16" />
         <span>{{ triggerLabel }}</span>
         <NIcon
-          class="desktop-task-project-selector__chevron"
+          class="desktop-task-space-selector__chevron"
           :class="{ 'is-open': panelOpen }"
           :component="ChevronDown16Regular"
           :size="16"
@@ -100,84 +100,84 @@ function openProjectCreator() {
     </template>
 
     <section
-      class="desktop-task-project-selector__panel"
+      class="desktop-task-space-selector__panel"
       role="dialog"
-      :aria-label="t('desktop.tasks.projectSelect')"
+      :aria-label="t('desktop.tasks.spaceSelect')"
     >
-      <div class="desktop-task-project-selector__search">
+      <div class="desktop-task-space-selector__search">
         <NInput
           ref="searchInput"
           v-model:value="query"
           clearable
           size="small"
-          :placeholder="t('desktop.tasks.projectSearch')"
+          :placeholder="t('desktop.tasks.spaceSearch')"
         >
           <template #prefix>
-            <NIcon class="desktop-task-project-selector__icon" :component="Search16Regular" :size="16" />
+            <NIcon class="desktop-task-space-selector__icon" :component="Search16Regular" :size="16" />
           </template>
         </NInput>
       </div>
 
-      <div class="desktop-task-project-selector__projects" role="listbox">
+      <div class="desktop-task-space-selector__spaces" role="listbox">
         <button
-          v-for="project in visibleProjects"
-          :key="project.id"
-          class="desktop-task-project-selector__project"
-          :class="{ 'is-selected': activeProject?.id === project.id }"
+          v-for="space in visibleSpaces"
+          :key="space.id"
+          class="desktop-task-space-selector__space"
+          :class="{ 'is-selected': activeSpace?.id === space.id }"
           type="button"
           role="option"
-          :aria-selected="activeProject?.id === project.id"
-          @click="selectProject(project.id)"
+          :aria-selected="activeSpace?.id === space.id"
+          @click="selectSpace(space.id)"
         >
-          <NIcon class="desktop-task-project-selector__icon" :component="Folder16Regular" :size="16" />
-          <span>{{ project.name }}</span>
+          <NIcon class="desktop-task-space-selector__icon" :component="Folder16Regular" :size="16" />
+          <span>{{ space.name }}</span>
           <NIcon
-            v-if="activeProject?.id === project.id"
-            class="desktop-task-project-selector__icon"
+            v-if="activeSpace?.id === space.id"
+            class="desktop-task-space-selector__icon"
             :component="Checkmark16Regular"
             :size="16"
           />
         </button>
-        <span v-if="!visibleProjects.length" class="desktop-task-project-selector__empty">
-          {{ t('desktop.tasks.projectSearchEmpty') }}
+        <span v-if="!visibleSpaces.length" class="desktop-task-space-selector__empty">
+          {{ t('desktop.tasks.spaceSearchEmpty') }}
         </span>
       </div>
 
-      <div class="desktop-task-project-selector__divider" role="separator" />
+      <div class="desktop-task-space-selector__divider" role="separator" />
       <button
-        class="desktop-task-project-selector__action desktop-task-project-selector__create"
+        class="desktop-task-space-selector__action desktop-task-space-selector__create"
         type="button"
-        @click="openProjectCreator"
+        @click="openSpaceCreator"
       >
-        <NIcon class="desktop-task-project-selector__icon" :component="FolderAdd16Regular" :size="16" />
-        <span>{{ t('desktop.tasks.createProjectTitle') }}</span>
+        <NIcon class="desktop-task-space-selector__icon" :component="FolderAdd16Regular" :size="16" />
+        <span>{{ t('desktop.tasks.createSpaceTitle') }}</span>
       </button>
 
-      <template v-if="activeProject">
-        <div class="desktop-task-project-selector__divider" role="separator" />
+      <template v-if="activeSpace">
+        <div class="desktop-task-space-selector__divider" role="separator" />
         <button
-          class="desktop-task-project-selector__action desktop-task-project-selector__clear"
+          class="desktop-task-space-selector__action desktop-task-space-selector__clear"
           type="button"
-          @click="clearProject"
+          @click="clearSpace"
         >
-          <DesktopIcon class="desktop-task-project-selector__icon" name="projectNone" />
-          <span>{{ t('desktop.tasks.projectNone') }}</span>
+          <DesktopIcon class="desktop-task-space-selector__icon" name="spaceNone" />
+          <span>{{ t('desktop.tasks.spaceNone') }}</span>
         </button>
       </template>
     </section>
   </NPopover>
 
-  <DesktopProjectDialog
-    v-model:show="projectDialogOpen"
+  <DesktopSpaceDialog
+    v-model:show="spaceDialogOpen"
     :language="language"
-    :project="null"
+    :space="null"
     :select-directory="selectDirectory"
-    @save="emit('createProject', $event)"
+    @save="emit('createSpace', $event)"
   />
 </template>
 
 <style scoped lang="scss">
-.desktop-task-project-selector__trigger {
+.desktop-task-space-selector__trigger {
   max-width: min(14rem, 28vw);
   min-width: 0;
   height: var(--buddy-composer-control-height);
@@ -217,7 +217,7 @@ function openProjectCreator() {
   }
 }
 
-.desktop-task-project-selector__chevron {
+.desktop-task-space-selector__chevron {
   flex: none;
   font-size: 14px;
   transition: transform 120ms ease;
@@ -227,7 +227,7 @@ function openProjectCreator() {
   }
 }
 
-.desktop-task-project-selector__panel {
+.desktop-task-space-selector__panel {
   width: min(12rem, calc(100vw - 2rem));
   overflow: hidden;
   border: 1px solid var(--buddy-border-subtle);
@@ -238,15 +238,15 @@ function openProjectCreator() {
   padding: 6px;
 }
 
-.desktop-task-project-selector__search {
+.desktop-task-space-selector__search {
   padding-bottom: 5px;
 }
 
-.desktop-task-project-selector__search :deep(.n-input) {
+.desktop-task-space-selector__search :deep(.n-input) {
   border-radius: var(--buddy-radius-micro);
 }
 
-.desktop-task-project-selector__projects {
+.desktop-task-space-selector__spaces {
   display: grid;
   max-height: calc(var(--buddy-menu-row-height) * 5 + var(--buddy-menu-row-gap) * 4);
   align-content: start;
@@ -273,8 +273,8 @@ function openProjectCreator() {
   }
 }
 
-.desktop-task-project-selector__project,
-.desktop-task-project-selector__action {
+.desktop-task-space-selector__space,
+.desktop-task-space-selector__action {
   display: grid;
   width: 100%;
   min-width: 0;
@@ -288,7 +288,7 @@ function openProjectCreator() {
   color: var(--buddy-text-primary);
   cursor: pointer;
   font: inherit;
-  font-size: var(--buddy-sidebar-project-font-size);
+  font-size: var(--buddy-sidebar-space-font-size);
   padding: 0 7px;
   text-align: left;
   transition:
@@ -315,39 +315,39 @@ function openProjectCreator() {
   }
 }
 
-.desktop-task-project-selector__project.is-selected {
+.desktop-task-space-selector__space.is-selected {
   background: var(--buddy-nav-selected);
   color: var(--buddy-nav-foreground);
   font-weight: 600;
 }
 
-.desktop-task-project-selector__project.is-selected:hover {
+.desktop-task-space-selector__space.is-selected:hover {
   background: var(--buddy-nav-pressed);
   color: var(--buddy-nav-foreground);
 }
 
-.desktop-task-project-selector__project.is-selected:focus-visible {
+.desktop-task-space-selector__space.is-selected:focus-visible {
   background: var(--buddy-nav-selected);
   color: var(--buddy-nav-foreground);
 }
 
-.desktop-task-project-selector__action {
+.desktop-task-space-selector__action {
   grid-template-columns: var(--buddy-menu-icon-size) minmax(0, 1fr);
 }
 
-.desktop-task-project-selector__icon {
+.desktop-task-space-selector__icon {
   width: var(--buddy-menu-icon-size);
   height: var(--buddy-menu-icon-size);
   font-size: var(--buddy-menu-icon-size);
 }
 
-.desktop-task-project-selector__divider {
+.desktop-task-space-selector__divider {
   height: 1px;
   background: var(--buddy-border-subtle);
   margin: 5px 6px;
 }
 
-.desktop-task-project-selector__empty {
+.desktop-task-space-selector__empty {
   display: grid;
   min-height: var(--buddy-menu-row-height);
   place-items: center;

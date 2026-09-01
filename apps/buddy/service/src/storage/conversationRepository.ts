@@ -20,7 +20,7 @@ import { withTransaction } from './database'
 export interface CreateConversationInput {
   id: string
   branchId: string
-  projectId: string | null
+  spaceId: string | null
   title: string | null
   createdAt: string
   executionProfile: BuddyExecutionProfile
@@ -65,7 +65,7 @@ export function createConversationRepository(database: DatabaseSync): Conversati
   const findConversation = database.prepare('SELECT * FROM conversations WHERE id = ?')
   const insertConversation = database.prepare(`
     INSERT INTO conversations (
-      id, project_id, title, active_branch_id, created_at, updated_at,
+      id, space_id, title, active_branch_id, created_at, updated_at,
       execution_profile, origin, deleted_at
     ) VALUES (?, ?, ?, NULL, ?, ?, ?, ?, NULL)
   `)
@@ -112,7 +112,7 @@ export function createConversationRepository(database: DatabaseSync): Conversati
       return withTransaction(database, () => {
         insertConversation.run(
           input.id,
-          input.projectId,
+          input.spaceId,
           input.title,
           input.createdAt,
           input.createdAt,

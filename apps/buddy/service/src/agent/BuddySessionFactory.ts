@@ -53,13 +53,12 @@ export class BuddySessionFactory {
       || conversation.deletedAt !== null
       || conversation.activeBranchId !== blueprint.branchId
       || conversation.id !== run.conversationId
-      || conversation.projectId !== (blueprint.project?.id ?? null)
+      || conversation.spaceId !== (blueprint.space?.id ?? null)
       || conversation.executionProfile !== blueprint.executionProfile
       || run.branchId !== blueprint.branchId
       || run.executionProfile !== blueprint.executionProfile
       || run.piSessionFile !== input.piSessionFile
-      || blueprint.grants[0]?.canonicalRoot !== blueprint.canonicalRoot
-      || blueprint.grants[0]?.projectId !== (blueprint.project?.id ?? blueprint.conversationId)
+      || !blueprint.grants.some(grant => grant.canonicalRoot === blueprint.canonicalRoot)
       || !blueprint.grants.some(grant => grant.canonicalRoot === blueprint.scratchRoot)
       || blueprint.sessionMode !== expectedSessionMode
     ) {
@@ -80,6 +79,7 @@ export class BuddySessionFactory {
       scratchRoot: blueprint.scratchRoot,
       sessionMode: blueprint.sessionMode,
       signal: input.signal,
+      spaceId: blueprint.space?.id ?? null,
       services: this.#options.services,
     })
     const recoveryState: {

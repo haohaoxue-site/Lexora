@@ -7,33 +7,43 @@ import { loadBoundedContextFiles } from './loadBoundedContextFiles'
 export interface BuddySessionResources {
   approvedSkillPaths: readonly string[]
   context: BoundedContextFilesResult
-  projectInstructions: string
+  directoryContext: string
   revision: string
 }
 
 export interface ResolveBuddySessionResourcesOptions {
+  additionalDirectories: readonly {
+    canonicalRoot: string
+  }[]
   canonicalRoot: string
   cwd: string
-  projectInstructions?: string
-  projectId: string | null
-  skills: Pick<SkillService, 'loadForProject'>
+  loadDirectoryContext: boolean
+  primaryDirectory: { canonicalRoot: string } | null
+  spaceId: string | null
+  skills: Pick<SkillService, 'loadForSpace'>
 }
 
 export async function resolveBuddySessionResources(
   options: ResolveBuddySessionResourcesOptions,
 ): Promise<BuddySessionResources> {
   const [skills, context] = await Promise.all([
-    options.skills.loadForProject(options.projectId),
-    loadBoundedContextFiles({
-      canonicalRoot: options.canonicalRoot,
-      cwd: options.cwd,
-    }),
+    options.skills.loadForSpace(options.spaceId),
+    options.loadDirectoryContext
+      ? loadBoundedContextFiles({
+          canonicalRoot: options.canonicalRoot,
+          cwd: options.cwd,
+        })
+      : Promise.resolve({ agentsFiles: [], diagnostics: [] }),
   ])
   const hash = createHash('sha256')
-  const projectInstructions = options.projectInstructions?.trim() ?? ''
+  const directoryContext = createDirectoryContext(
+    options.cwd,
+    options.primaryDirectory,
+    options.additionalDirectories,
+  )
   hash.update(skills.revision)
   hash.update('\0')
-  hash.update(projectInstructions)
+  hash.update(directoryContext)
   hash.update('\0')
   for (const file of context.agentsFiles) {
     hash.update(file.path)
@@ -44,7 +54,27 @@ export async function resolveBuddySessionResources(
   return {
     approvedSkillPaths: skills.paths,
     context,
-    projectInstructions,
+    directoryContext,
     revision: hash.digest('hex'),
   }
+}
+
+function createDirectoryContext(
+  workingDirectory: string,
+  primaryDirectory: ResolveBuddySessionResourcesOptions['primaryDirectory'],
+  additionalDirectories: ResolveBuddySessionResourcesOptions['additionalDirectories'],
+): string {
+  return [
+    `Working directory: ${workingDirectory}`,
+    primaryDirectory
+      ? `Primary Space directory: ${primaryDirectory.canonicalRoot}`
+      : 'Primary Space directory: managed workspace.',
+    ...(additionalDirectories.length > 0
+      ? [
+          'Additional authorized directories (access only; not preloaded as context):',
+          ...additionalDirectories.map(directory => `- ${directory.canonicalRoot}`),
+          'Inspect an additional directory only when the task requires files from it.',
+        ]
+      : ['Additional authorized directories: none.']),
+  ].join('\n')
 }

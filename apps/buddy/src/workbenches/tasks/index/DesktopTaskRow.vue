@@ -28,7 +28,7 @@ const props = defineProps<{
   now: number
   occurredAt: string
   pinMode?: 'pin' | 'unpin'
-  projectTask?: boolean
+  spaceTask?: boolean
   reorderable?: boolean
   reorderTarget?: boolean
   title: string
@@ -120,7 +120,7 @@ function resolveDropPosition(event: DragEvent): DesktopTaskPinnedDropPosition {
       'is-dragging': dragging,
       'is-drop-after': dropPosition === 'after',
       'is-drop-before': dropPosition === 'before',
-      'is-project-task': projectTask,
+      'is-space-task': spaceTask,
       'is-reorderable': reorderable,
     }"
     :draggable="reorderable"
@@ -131,7 +131,7 @@ function resolveDropPosition(event: DragEvent): DesktopTaskPinnedDropPosition {
   >
     <div
       class="desktop-task-row__surface"
-      :class="{ 'is-active': active, 'is-project': projectTask }"
+      :class="{ 'is-active': active, 'is-space': spaceTask }"
     >
       <button
         class="desktop-task-sidebar__task"
@@ -193,7 +193,7 @@ function resolveDropPosition(event: DragEvent): DesktopTaskPinnedDropPosition {
   padding-bottom: calc(var(--buddy-task-sidebar-row-size, 2.5rem) - var(--buddy-task-sidebar-row-height, 2.25rem));
   padding-left: var(--buddy-task-sidebar-scrollbar-gutter, 0);
 
-  &.is-project-task {
+  &.is-space-task {
     padding-left: 2.25rem;
   }
 
@@ -249,7 +249,7 @@ function resolveDropPosition(event: DragEvent): DesktopTaskPinnedDropPosition {
     background: var(--buddy-nav-pressed);
   }
 
-  &.is-project {
+  &.is-space {
     padding-left: 0.5rem;
   }
 

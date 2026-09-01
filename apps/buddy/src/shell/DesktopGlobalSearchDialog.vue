@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { LocalConversation, LocalProject } from '@buddy-electron/shared/localChatApi'
+import type { LocalConversation, LocalSpace } from '@buddy-electron/shared/localChatApi'
 import type { BuddyLocale } from '@/i18n/buddyI18n'
 import { Folder20Regular, Search24Regular, TaskListSquareLtr20Regular } from '@vicons/fluent'
 import { useDebounceFn } from '@vueuse/core'
@@ -10,41 +10,44 @@ import { useBuddyI18n } from '@/i18n/buddyI18n'
 const props = defineProps<{
   conversations: ReadonlyArray<LocalConversation>
   language: BuddyLocale
-  projects: ReadonlyArray<LocalProject>
+  spaces: ReadonlyArray<LocalSpace>
   show: boolean
 }>()
 const emit = defineEmits<{
   'openTask': [conversationId: string]
-  'openProject': [projectId: string]
+  'openSpace': [spaceId: string]
   'update:show': [show: boolean]
 }>()
 
 const query = shallowRef('')
 const debouncedQuery = shallowRef('')
 const { t } = useBuddyI18n(() => props.language)
-const activeProjects = computed(() => props.projects.filter(project => project.revokedAt === null))
-const projectNames = computed(() => new Map(activeProjects.value.map(project => [project.id, project.name])))
+const activeSpaces = computed(() => props.spaces.filter(space => space.revokedAt === null))
+const spaceNames = computed(() => new Map(activeSpaces.value.map(space => [space.id, space.name])))
 const normalizedQuery = computed(() => debouncedQuery.value.trim().toLocaleLowerCase())
 const matchingConversations = computed(() => {
   if (!normalizedQuery.value)
     return []
   return props.conversations.filter((conversation) => {
-    const projectName = conversation.projectId === null
+    const spaceName = conversation.spaceId === null
       ? ''
-      : projectNames.value.get(conversation.projectId) ?? ''
+      : spaceNames.value.get(conversation.spaceId) ?? ''
     return formatTaskTitle(conversation).toLocaleLowerCase().includes(normalizedQuery.value)
-      || projectName.toLocaleLowerCase().includes(normalizedQuery.value)
+      || spaceName.toLocaleLowerCase().includes(normalizedQuery.value)
   })
 })
-const matchingProjects = computed(() => {
+const matchingSpaces = computed(() => {
   if (!normalizedQuery.value)
     return []
-  return activeProjects.value.filter(project => (
-    project.name.toLocaleLowerCase().includes(normalizedQuery.value)
-    || project.root.toLocaleLowerCase().includes(normalizedQuery.value)
+  return activeSpaces.value.filter(space => (
+    space.name.toLocaleLowerCase().includes(normalizedQuery.value)
+    || space.primaryDirectory?.root.toLocaleLowerCase().includes(normalizedQuery.value)
+    || space.additionalDirectories.some(directory => (
+      directory.root.toLocaleLowerCase().includes(normalizedQuery.value)
+    ))
   ))
 })
-const hasResults = computed(() => matchingConversations.value.length > 0 || matchingProjects.value.length > 0)
+const hasResults = computed(() => matchingConversations.value.length > 0 || matchingSpaces.value.length > 0)
 const updateDebouncedQuery = useDebounceFn((value: string) => {
   debouncedQuery.value = value
 }, 220)
@@ -65,9 +68,9 @@ function formatTaskTitle(conversation: LocalConversation) {
 }
 
 function taskContext(conversation: LocalConversation) {
-  return conversation.projectId === null
+  return conversation.spaceId === null
     ? t('desktop.search.taskContext')
-    : projectNames.value.get(conversation.projectId) ?? t('desktop.search.projectContext')
+    : spaceNames.value.get(conversation.spaceId) ?? t('desktop.search.spaceContext')
 }
 </script>
 
@@ -119,21 +122,21 @@ function taskContext(conversation: LocalConversation) {
           </button>
         </section>
 
-        <section v-if="matchingProjects.length" class="desktop-global-search-dialog__section">
+        <section v-if="matchingSpaces.length" class="desktop-global-search-dialog__section">
           <h3 class="desktop-global-search-dialog__section-title">
-            {{ t('desktop.search.projectCount', { count: matchingProjects.length }) }}
+            {{ t('desktop.search.spaceCount', { count: matchingSpaces.length }) }}
           </h3>
           <button
-            v-for="project in matchingProjects"
-            :key="project.id"
+            v-for="space in matchingSpaces"
+            :key="space.id"
             class="desktop-global-search-dialog__result"
             type="button"
-            @click="emit('openProject', project.id)"
+            @click="emit('openSpace', space.id)"
           >
             <NIcon :component="Folder20Regular" />
             <span>
-              <strong>{{ project.name }}</strong>
-              <small>{{ project.root }}</small>
+              <strong>{{ space.name }}</strong>
+              <small>{{ space.primaryDirectory?.root ?? t('desktop.tasks.spaceDirectoryEmpty') }}</small>
             </span>
           </button>
         </section>

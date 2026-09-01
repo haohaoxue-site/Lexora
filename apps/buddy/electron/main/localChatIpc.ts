@@ -19,6 +19,7 @@ import {
 } from '../shared/localChatApiSchemas'
 import { translateDesktopNative } from './desktopNativeI18n'
 import { assertTrustedSender } from './ipc'
+import { SpaceDirectorySelectionLedger } from './spaceDirectorySelections'
 
 const DEFAULT_REQUEST_TIMEOUT_MS = 30_000
 const PROVIDER_LOGIN_TIMEOUT_MS = 10 * 60_000
@@ -60,6 +61,7 @@ export interface RegisterLocalChatIpcOptions {
 
 export function registerLocalChatIpc(options: RegisterLocalChatIpcOptions): () => void {
   const registeredChannels: string[] = []
+  const spaceDirectorySelections = new SpaceDirectorySelectionLedger()
   const handle = <T>(
     channel: string,
     handler: (event: IpcMainInvokeEvent, input: T) => unknown,
@@ -323,38 +325,47 @@ export function registerLocalChatIpc(options: RegisterLocalChatIpcOptions): () =
     localChatResponseSchemas.notificationList,
   ))
 
-  handle(LOCAL_CHAT_IPC_CHANNELS.projectsCreate, (_event, input) => request(
-    'projects.create',
-    localChatSchemas.projectCreate.parse(input),
-    localChatResponseSchemas.project,
-  ))
-  handle(LOCAL_CHAT_IPC_CHANNELS.projectsDelete, (_event, input) => request(
-    'projects.delete',
-    localChatSchemas.projectId.parse(input),
+  handle(LOCAL_CHAT_IPC_CHANNELS.spacesCreate, (_event, input) => {
+    const parsed = localChatSchemas.spaceCreate.parse(input)
+    return request(
+      'spaces.create',
+      withSpaceDirectorySelection(parsed, spaceDirectorySelections),
+      localChatResponseSchemas.space,
+    )
+  })
+  handle(LOCAL_CHAT_IPC_CHANNELS.spacesDelete, (_event, input) => request(
+    'spaces.delete',
+    localChatSchemas.spaceId.parse(input),
     localChatResponseSchemas.mutation,
   ))
-  handle(LOCAL_CHAT_IPC_CHANNELS.projectsList, (_event, input) => request(
-    'projects.list',
+  handle(LOCAL_CHAT_IPC_CHANNELS.spacesList, (_event, input) => request(
+    'spaces.list',
     localChatSchemas.limit.parse(input),
-    localChatResponseSchemas.projects,
+    localChatResponseSchemas.spaces,
   ))
-  handle(LOCAL_CHAT_IPC_CHANNELS.projectsSearchFiles, (_event, input) => request(
-    'projects.searchFiles',
-    localChatSchemas.projectFileSearch.parse(input),
-    localChatResponseSchemas.projectFiles,
+  handle(LOCAL_CHAT_IPC_CHANNELS.spacesSearchFiles, (_event, input) => request(
+    'spaces.searchFiles',
+    localChatSchemas.spaceFileSearch.parse(input),
+    localChatResponseSchemas.spaceFiles,
   ))
-  handle(LOCAL_CHAT_IPC_CHANNELS.projectsSelectDirectory, async () => {
+  handle(LOCAL_CHAT_IPC_CHANNELS.spacesSelectDirectory, async () => {
     const paths = await selectPaths(options.getWindow(), {
       properties: ['openDirectory'],
-      title: translateDesktopNative(options.getLanguage(), 'selectProjectDirectory'),
+      title: translateDesktopNative(options.getLanguage(), 'selectSpaceDirectory'),
     })
-    return paths[0] ?? null
+    const selected = paths[0] ?? null
+    if (selected)
+      spaceDirectorySelections.issue(selected)
+    return selected
   })
-  handle(LOCAL_CHAT_IPC_CHANNELS.projectsUpdate, (_event, input) => request(
-    'projects.update',
-    localChatSchemas.projectUpdate.parse(input),
-    localChatResponseSchemas.project,
-  ))
+  handle(LOCAL_CHAT_IPC_CHANNELS.spacesUpdate, (_event, input) => {
+    const parsed = localChatSchemas.spaceUpdate.parse(input)
+    return request(
+      'spaces.update',
+      withSpaceDirectorySelection(parsed, spaceDirectorySelections),
+      localChatResponseSchemas.space,
+    )
+  })
 
   handle(LOCAL_CHAT_IPC_CHANNELS.skillsList, (_event, input) => request(
     'skills.list',
@@ -679,6 +690,20 @@ function publicError(code: LocalChatErrorCode, retryable: boolean): Error {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value)
+}
+
+function withSpaceDirectorySelection<SpaceInput extends {
+  primaryDirectory: { root: string } | null
+}>(
+  input: SpaceInput,
+  selections: SpaceDirectorySelectionLedger,
+): SpaceInput & { primaryDirectorySelectionVerified: boolean } {
+  return {
+    ...input,
+    primaryDirectorySelectionVerified: input.primaryDirectory
+      ? selections.consume(input.primaryDirectory.root)
+      : false,
+  }
 }
 
 async function selectPaths(

@@ -26,7 +26,7 @@ export interface BuddyStartTurnInput {
   draftId: string
   executionProfile: BuddyExecutionProfile
   modelSelection: BuddyTurnModelSelection | null
-  projectId: string | null
+  spaceId: string | null
   requestId: string
 }
 

@@ -2,7 +2,7 @@
 import type {
   LocalConversation,
   LocalNotification,
-  LocalProject,
+  LocalSpace,
 } from '@buddy-electron/shared/localChatApi'
 import type { BuddyLocale } from '@/i18n/buddyI18n'
 import {
@@ -28,7 +28,7 @@ const props = defineProps<{
   notificationItems: ReadonlyArray<LocalNotification>
   notificationLoading: boolean
   notificationUnseenCount: number
-  projects: ReadonlyArray<LocalProject>
+  spaces: ReadonlyArray<LocalSpace>
 }>()
 const emit = defineEmits<{
   navigateAutomations: []
@@ -37,7 +37,7 @@ const emit = defineEmits<{
   markAllNotificationsSeen: []
   openNotification: [notification: LocalNotification]
   openTask: [conversationId: string]
-  openProject: [projectId: string]
+  openSpace: [spaceId: string]
   toggleSidebar: []
   refreshNotifications: []
 }>()
@@ -64,9 +64,9 @@ function openTask(conversationId: string) {
   emit('openTask', conversationId)
 }
 
-function openProject(projectId: string) {
+function openSpace(spaceId: string) {
   showGlobalSearchDialog.value = false
-  emit('openProject', projectId)
+  emit('openSpace', spaceId)
 }
 </script>
 
@@ -192,9 +192,9 @@ function openProject(projectId: string) {
       v-model:show="showGlobalSearchDialog"
       :conversations="conversations"
       :language="language"
-      :projects="projects"
+      :spaces="spaces"
       @open-task="openTask"
-      @open-project="openProject"
+      @open-space="openSpace"
     />
     <DesktopAccountDialog
       v-model:show="showAccountDialog"

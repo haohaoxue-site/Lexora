@@ -411,29 +411,56 @@ const providerAuthChallengeSchema = z.object({
   verificationUri: z.url().optional(),
 }).strict()
 
-const projectSchema = z.object({
-  activeRunCount: z.number().int().nonnegative(),
+const spaceDirectorySchema = z.object({
+  accessGrantedAt: timestampSchema,
   canonicalRoot: z.string().min(1),
   createdAt: timestampSchema,
   id: idSchema,
-  instructions: z.string(),
-  memoryScope: z.enum(['personal_and_project', 'project_only']),
-  name: z.string().min(1),
+  revision: z.number().int().positive(),
   revokedAt: nullableTimestampSchema,
   root: z.string().min(1),
+  spaceId: idSchema,
   updatedAt: timestampSchema,
 }).strict()
 
-const projectFileSchema = z.object({
-  name: z.string().min(1),
-  relativePath: z.string().min(1),
+const spacePrimaryDirectorySchema = spaceDirectorySchema.safeExtend({
+  resourcesTrustedAt: timestampSchema,
 }).strict()
+
+const spaceSchema = z.object({
+  activeRunCount: z.number().int().nonnegative(),
+  additionalDirectories: z.array(spaceDirectorySchema).max(32),
+  createdAt: timestampSchema,
+  id: idSchema,
+  memoryScope: z.enum(['personal_and_space', 'space_only']),
+  name: z.string().min(1),
+  primaryDirectory: spacePrimaryDirectorySchema.nullable(),
+  revokedAt: nullableTimestampSchema,
+  updatedAt: timestampSchema,
+}).strict().refine(space => (
+  space.additionalDirectories.length + Number(Boolean(space.primaryDirectory)) <= 32
+), { path: ['additionalDirectories'] })
+
+const spaceFileSchema = z.object({
+  directoryId: idSchema,
+  name: z.string().min(1),
+  path: z.string().min(1),
+  relativePath: z.string().min(1),
+  root: z.string().min(1),
+}).strict()
+
+const spaceDirectoryInputSchema = z.object({
+  id: idSchema.nullable(),
+  root: z.string().min(1),
+}).strict()
+
+const spacePrimaryDirectoryInputSchema = spaceDirectoryInputSchema
 
 const skillSchema = z.object({
   description: z.string(),
   enabled: z.boolean(),
   name: z.string().min(1),
-  source: z.enum(['builtin', 'directory', 'global', 'project']),
+  source: z.enum(['builtin', 'directory', 'global', 'space']),
 }).strict()
 
 const skillDiagnosticSchema = z.object({
@@ -519,7 +546,7 @@ const conversationSchema = z.object({
   id: idSchema,
   modelSelection: modelSelectionSchema.nullable(),
   origin: z.enum(['interactive', 'automation']).optional(),
-  projectId: z.string().nullable(),
+  spaceId: z.string().nullable(),
   title: z.string().nullable(),
   updatedAt: timestampSchema,
 }).strict()
@@ -680,12 +707,12 @@ const workspaceDraftSchema = z.object({
   targetKey: z.string().min(1),
 }).strict()
 
-export const LOCAL_WORKSPACE_STATE_KEY = 'buddy.chat.workspace.v1' as const
+export const LOCAL_WORKSPACE_STATE_KEY = 'buddy.chat.workspace.v2' as const
 
 export const localWorkspaceStateValueSchema = z.object({
   activeConversationId: z.string().nullable(),
   drafts: z.array(workspaceDraftSchema),
-  projectId: z.string().nullable(),
+  spaceId: z.string().nullable(),
 }).strict()
 
 const workspaceSettingSchema = z.object({
@@ -819,12 +846,12 @@ export const localChatResponseSchemas = {
   models: z.array(modelSchema),
   notificationList: notificationListSchema,
   mutation: mutationSchema,
-  optionalProject: projectSchema.nullable(),
+  optionalSpace: spaceSchema.nullable(),
   optionalDefaultModel: defaultModelSelectionSchema.nullable(),
   optionalWorkspaceSetting: workspaceSettingSchema.nullable(),
-  project: projectSchema,
-  projectFiles: z.array(projectFileSchema),
-  projects: z.array(projectSchema),
+  space: spaceSchema,
+  spaceFiles: z.array(spaceFileSchema),
+  spaces: z.array(spaceSchema),
   provider: providerSchema,
   providerAuthChallenge: providerAuthChallengeSchema,
   providers: z.array(providerSchema),
@@ -924,7 +951,7 @@ export const localChatSchemas = {
     draftId: sessionIdentitySchema,
     executionProfile: executionProfileSchema,
     modelSelection: modelSelectionSchema,
-    projectId: idSchema.nullable(),
+    spaceId: idSchema.nullable(),
   }).strict().refine(input => (
     (input.conversationId === null) === (input.branchId === null)
   ), { path: ['branchId'] }),
@@ -940,23 +967,21 @@ export const localChatSchemas = {
     conversationId: z.string().nullable().optional(),
     limit: optionalLimitSchema,
   }).strict(),
-  projectFileSearch: z.object({
-    projectId: idSchema,
+  spaceFileSearch: z.object({
+    spaceId: idSchema,
     query: z.string().max(512),
   }).strict(),
-  projectCreate: z.object({
-    instructions: z.string().trim().max(64 * 1024),
-    memoryScope: z.enum(['personal_and_project', 'project_only']),
+  spaceCreate: z.object({
+    memoryScope: z.enum(['personal_and_space', 'space_only']),
     name: z.string().trim().min(1).max(80),
-    root: z.string().min(1),
+    primaryDirectory: spacePrimaryDirectoryInputSchema.nullable(),
   }).strict(),
-  projectId: z.object({ projectId: idSchema }).strict(),
-  projectUpdate: z.object({
-    instructions: z.string().trim().max(64 * 1024),
-    memoryScope: z.enum(['personal_and_project', 'project_only']),
+  spaceId: z.object({ spaceId: idSchema }).strict(),
+  spaceUpdate: z.object({
+    memoryScope: z.enum(['personal_and_space', 'space_only']),
     name: z.string().trim().min(1).max(80),
-    projectId: idSchema,
-    root: z.string().min(1),
+    primaryDirectory: spacePrimaryDirectoryInputSchema.nullable(),
+    spaceId: idSchema,
   }).strict(),
   providerAuthCancel: z.object({ challengeId: z.uuid() }).strict(),
   providerAuthResponse: z.object({
@@ -1031,7 +1056,7 @@ export const localChatSchemas = {
   }).strict(),
   runtimeDataBackupId: z.object({ backupId: runtimeDataBackupIdSchema }).strict(),
   runtimeDataOperationId: z.object({ operationId: z.uuid() }).strict(),
-  skillScope: z.object({ projectId: idSchema.nullable() }).strict(),
+  skillScope: z.object({ spaceId: idSchema.nullable() }).strict(),
   runStateEvent: runEventEnvelopeSchema,
   startTurn: z.object({
     attachmentIds: z.array(idSchema).max(16),
@@ -1042,7 +1067,7 @@ export const localChatSchemas = {
     draftId: sessionIdentitySchema,
     executionProfile: executionProfileSchema,
     modelSelection: modelSelectionSchema.nullable(),
-    projectId: idSchema.nullable(),
+    spaceId: idSchema.nullable(),
     requestId: z.string().min(1).max(128),
   }).strict().refine(
     request => request.content.trim().length > 0 || request.attachmentIds.length > 0,
@@ -1102,8 +1127,12 @@ export type LocalConversationTimelinePage = DeepReadonly<z.infer<typeof localCha
 export type LocalContextUsageSnapshot = DeepReadonly<z.infer<typeof contextUsageSnapshotSchema>>
 export type LocalContextUsageSnapshotRequest = z.infer<typeof localChatSchemas.contextUsageSnapshot>
 export type LocalDefaultModel = DeepReadonly<z.infer<typeof defaultModelSelectionSchema>>
-export type LocalProject = DeepReadonly<z.infer<typeof projectSchema>>
-export type LocalProjectFile = DeepReadonly<z.infer<typeof projectFileSchema>>
+export type LocalSpace = DeepReadonly<z.infer<typeof spaceSchema>>
+export type LocalSpaceAdditionalDirectory = DeepReadonly<z.infer<typeof spaceDirectorySchema>>
+export type LocalSpaceCreateInput = z.infer<typeof localChatSchemas.spaceCreate>
+export type LocalSpaceFile = DeepReadonly<z.infer<typeof spaceFileSchema>>
+export type LocalSpacePrimaryDirectory = DeepReadonly<z.infer<typeof spacePrimaryDirectorySchema>>
+export type LocalSpaceUpdateInput = z.infer<typeof localChatSchemas.spaceUpdate>
 export type LocalProvider = DeepReadonly<z.infer<typeof providerSchema>>
 export type LocalProviderAuthChallenge = DeepReadonly<z.infer<typeof providerAuthChallengeSchema>>
 export type LocalPromptContextItem = z.infer<typeof contextItemSchema>

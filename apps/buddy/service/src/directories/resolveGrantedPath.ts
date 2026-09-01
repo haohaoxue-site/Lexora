@@ -7,15 +7,15 @@ import {
   sep,
 } from 'node:path'
 
-export interface ProjectGrant {
+export interface DirectoryGrant {
   canonicalRoot: string
-  projectId: string
+  grantId: string
   root: string
 }
 
 export interface GrantedPathResolution {
   canonicalPath: string
-  projectId: string
+  grantId: string
   root: string
 }
 
@@ -32,7 +32,7 @@ export class GrantedPathError extends Error {
 }
 
 export async function resolveGrantedPath(
-  grants: readonly ProjectGrant[],
+  grants: readonly DirectoryGrant[],
   requestedPath: string,
   mode: GrantedPathMode,
 ): Promise<GrantedPathResolution> {
@@ -61,7 +61,7 @@ export async function resolveGrantedPath(
 
   return {
     canonicalPath,
-    projectId: grant.projectId,
+    grantId: grant.grantId,
     root: grant.root,
   }
 }

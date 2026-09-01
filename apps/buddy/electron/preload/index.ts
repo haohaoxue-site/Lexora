@@ -155,17 +155,17 @@ const localChatApi = Object.freeze<LocalChatApi>({
       { notificationId, revision },
     ),
   }),
-  projects: Object.freeze({
-    create: input => ipcRenderer.invoke(LOCAL_CHAT_IPC_CHANNELS.projectsCreate, input),
-    delete: projectId => ipcRenderer.invoke(LOCAL_CHAT_IPC_CHANNELS.projectsDelete, { projectId }),
-    list: limit => ipcRenderer.invoke(LOCAL_CHAT_IPC_CHANNELS.projectsList, { limit }),
-    searchFiles: (projectId, query) =>
-      ipcRenderer.invoke(LOCAL_CHAT_IPC_CHANNELS.projectsSearchFiles, { projectId, query }),
-    selectDirectory: () => ipcRenderer.invoke(LOCAL_CHAT_IPC_CHANNELS.projectsSelectDirectory),
-    update: input => ipcRenderer.invoke(LOCAL_CHAT_IPC_CHANNELS.projectsUpdate, input),
+  spaces: Object.freeze({
+    create: input => ipcRenderer.invoke(LOCAL_CHAT_IPC_CHANNELS.spacesCreate, input),
+    delete: spaceId => ipcRenderer.invoke(LOCAL_CHAT_IPC_CHANNELS.spacesDelete, { spaceId }),
+    list: limit => ipcRenderer.invoke(LOCAL_CHAT_IPC_CHANNELS.spacesList, { limit }),
+    searchFiles: (spaceId, query) =>
+      ipcRenderer.invoke(LOCAL_CHAT_IPC_CHANNELS.spacesSearchFiles, { spaceId, query }),
+    selectDirectory: () => ipcRenderer.invoke(LOCAL_CHAT_IPC_CHANNELS.spacesSelectDirectory),
+    update: input => ipcRenderer.invoke(LOCAL_CHAT_IPC_CHANNELS.spacesUpdate, input),
   }),
   skills: Object.freeze({
-    list: projectId => ipcRenderer.invoke(LOCAL_CHAT_IPC_CHANNELS.skillsList, { projectId: projectId ?? null }),
+    list: spaceId => ipcRenderer.invoke(LOCAL_CHAT_IPC_CHANNELS.skillsList, { spaceId: spaceId ?? null }),
   }),
   connectors: Object.freeze({
     list: () => ipcRenderer.invoke(LOCAL_CHAT_IPC_CHANNELS.connectorsList),

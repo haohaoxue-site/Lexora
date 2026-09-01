@@ -2,11 +2,11 @@ import type { DesktopTaskPinnedItem } from '@buddy-electron/shared/desktopApi'
 import type {
   LocalConversation,
   LocalConversationSummary,
-  LocalProject,
+  LocalSpace,
 } from '@buddy-electron/shared/localChatApi'
 import type { Ref } from 'vue'
 import type { DesktopTaskPinnedDropPosition } from '@/workbenches/tasks/index/taskPinnedItems'
-import type { TaskProjectInput } from '@/workbenches/tasks/state/useTaskProjects'
+import type { TaskSpaceInput } from '@/workbenches/tasks/state/useTaskSpaces'
 import { useIntervalFn } from '@vueuse/core'
 import { computed, shallowRef, watch } from 'vue'
 import {
@@ -16,19 +16,19 @@ import {
   resolveTaskIndexProjection,
 } from '@/workbenches/tasks/index/taskPinnedItems'
 
-export type TaskProjectMenuAction = 'delete' | 'edit' | 'new-task'
+export type TaskSpaceMenuAction = 'delete' | 'edit' | 'new-task'
 
 interface UseTaskIndexControllerOptions {
   getUntitledLabel: () => string
-  onCreateProject: (input: TaskProjectInput) => void
+  onCreateSpace: (input: TaskSpaceInput) => void
   onDeleteTask: (conversationId: string) => void
-  onDeleteProject: (projectId: string) => void
-  onNewTask: (projectId: string) => void
+  onDeleteSpace: (spaceId: string) => void
+  onNewTask: (spaceId: string) => void
   onRenameTask: (conversationId: string, title: string) => void
   onUpdatePinnedItems: (items: DesktopTaskPinnedItem[]) => void
-  onUpdateProject: (input: TaskProjectInput & { projectId: string }) => void
+  onUpdateSpace: (input: TaskSpaceInput & { spaceId: string }) => void
   pinnedItems: Readonly<Ref<ReadonlyArray<DesktopTaskPinnedItem>>>
-  projects: Readonly<Ref<ReadonlyArray<LocalProject>>>
+  spaces: Readonly<Ref<ReadonlyArray<LocalSpace>>>
   tasks: Readonly<Ref<ReadonlyArray<LocalConversationSummary>>>
 }
 
@@ -38,31 +38,31 @@ interface DesktopTaskPinnedDropTarget {
 }
 
 export function useTaskIndexController(options: UseTaskIndexControllerOptions) {
-  const expandedProjectIds = shallowRef<ReadonlySet<string>>(new Set())
+  const expandedSpaceIds = shallowRef<ReadonlySet<string>>(new Set())
   const taskRenameTarget = shallowRef<LocalConversation | null>(null)
   const taskDeleteTarget = shallowRef<LocalConversation | null>(null)
   const taskTitleDraft = shallowRef('')
   const pinnedSectionExpanded = shallowRef(true)
-  const projectsSectionExpanded = shallowRef(true)
+  const spacesSectionExpanded = shallowRef(true)
   const tasksSectionExpanded = shallowRef(true)
   const relativeTimeNow = shallowRef(Date.now())
-  const projectDialogOpen = shallowRef(false)
-  const projectEditTarget = shallowRef<LocalProject | null>(null)
-  const projectDeleteTarget = shallowRef<LocalProject | null>(null)
+  const spaceDialogOpen = shallowRef(false)
+  const spaceEditTarget = shallowRef<LocalSpace | null>(null)
+  const spaceDeleteTarget = shallowRef<LocalSpace | null>(null)
   const draggedPinnedItemKey = shallowRef<string | null>(null)
   const pinnedDropTarget = shallowRef<DesktopTaskPinnedDropTarget | null>(null)
-  const activeProjects = computed(() => options.projects.value.filter(
-    project => project.revokedAt === null,
+  const activeSpaces = computed(() => options.spaces.value.filter(
+    space => space.revokedAt === null,
   ))
   const projection = computed(() => resolveTaskIndexProjection({
-    expandedProjectIds: expandedProjectIds.value,
+    expandedSpaceIds: expandedSpaceIds.value,
     pinnedItems: options.pinnedItems.value,
-    projects: options.projects.value,
+    spaces: options.spaces.value,
     tasks: options.tasks.value,
   }))
   const pinnedItems = computed(() => projection.value.pinnedItems)
   const pinnedRows = computed(() => projection.value.pinnedRows)
-  const projectRows = computed(() => projection.value.projectRows)
+  const spaceRows = computed(() => projection.value.spaceRows)
   const globalTasks = computed(() => projection.value.globalTasks)
 
   useIntervalFn(() => {
@@ -72,27 +72,27 @@ export function useTaskIndexController(options: UseTaskIndexControllerOptions) {
   })
 
   watch(
-    activeProjects,
-    (projects) => {
-      expandedProjectIds.value = new Set([
-        ...expandedProjectIds.value,
-        ...projects.map(project => project.id),
+    activeSpaces,
+    (spaces) => {
+      expandedSpaceIds.value = new Set([
+        ...expandedSpaceIds.value,
+        ...spaces.map(space => space.id),
       ])
     },
     { immediate: true },
   )
 
-  function isProjectExpanded(projectId: string) {
-    return expandedProjectIds.value.has(projectId)
+  function isSpaceExpanded(spaceId: string) {
+    return expandedSpaceIds.value.has(spaceId)
   }
 
-  function toggleProject(projectId: string) {
-    const next = new Set(expandedProjectIds.value)
-    if (next.has(projectId))
-      next.delete(projectId)
+  function toggleSpace(spaceId: string) {
+    const next = new Set(expandedSpaceIds.value)
+    if (next.has(spaceId))
+      next.delete(spaceId)
     else
-      next.add(projectId)
-    expandedProjectIds.value = next
+      next.add(spaceId)
+    expandedSpaceIds.value = next
   }
 
   function getTaskTitle(conversation: LocalConversation) {
@@ -124,10 +124,10 @@ export function useTaskIndexController(options: UseTaskIndexControllerOptions) {
     taskDeleteTarget.value = null
   }
 
-  function pinProject(projectId: string) {
+  function pinSpace(spaceId: string) {
     options.onUpdatePinnedItems(prependDesktopTaskPinnedItem(
       pinnedItems.value,
-      { id: projectId, kind: 'project' },
+      { id: spaceId, kind: 'space' },
     ))
   }
 
@@ -175,46 +175,46 @@ export function useTaskIndexController(options: UseTaskIndexControllerOptions) {
     pinnedDropTarget.value = null
   }
 
-  function openProjectCreator() {
-    projectEditTarget.value = null
-    projectDialogOpen.value = true
+  function openSpaceCreator() {
+    spaceEditTarget.value = null
+    spaceDialogOpen.value = true
   }
 
-  function selectProjectMenuAction(project: LocalProject, action: TaskProjectMenuAction) {
+  function selectSpaceMenuAction(space: LocalSpace, action: TaskSpaceMenuAction) {
     if (action === 'new-task') {
-      options.onNewTask(project.id)
+      options.onNewTask(space.id)
       return
     }
     if (action === 'edit') {
-      projectEditTarget.value = project
-      projectDialogOpen.value = true
+      spaceEditTarget.value = space
+      spaceDialogOpen.value = true
       return
     }
     if (action === 'delete')
-      projectDeleteTarget.value = project
+      spaceDeleteTarget.value = space
   }
 
-  function saveProject(input: TaskProjectInput) {
-    const project = projectEditTarget.value
-    if (project)
-      options.onUpdateProject({ ...input, projectId: project.id })
+  function saveSpace(input: TaskSpaceInput) {
+    const space = spaceEditTarget.value
+    if (space)
+      options.onUpdateSpace({ ...input, spaceId: space.id })
     else
-      options.onCreateProject(input)
-    projectEditTarget.value = null
+      options.onCreateSpace(input)
+    spaceEditTarget.value = null
   }
 
-  function confirmProjectDelete() {
-    const project = projectDeleteTarget.value
-    if (!project || project.activeRunCount > 0)
+  function confirmSpaceDelete() {
+    const space = spaceDeleteTarget.value
+    if (!space || space.activeRunCount > 0)
       return
-    options.onDeleteProject(project.id)
-    projectDeleteTarget.value = null
+    options.onDeleteSpace(space.id)
+    spaceDeleteTarget.value = null
   }
 
   return {
     confirmTaskDelete,
     confirmTaskRename,
-    confirmProjectDelete,
+    confirmSpaceDelete,
     beginPinnedDrag,
     draggedPinnedItemKey,
     dropPinnedItem,
@@ -222,29 +222,29 @@ export function useTaskIndexController(options: UseTaskIndexControllerOptions) {
     enterPinnedDropTarget,
     getTaskTitle,
     getPinnedDropPosition,
-    isProjectExpanded,
-    openProjectCreator,
+    isSpaceExpanded,
+    openSpaceCreator,
     pinTask,
-    pinProject,
+    pinSpace,
     pinnedItems,
     pinnedRows,
     pinnedSectionExpanded,
-    projectDeleteTarget,
-    projectDialogOpen,
-    projectEditTarget,
-    projectRows,
-    projectsSectionExpanded,
+    spaceDeleteTarget,
+    spaceDialogOpen,
+    spaceEditTarget,
+    spaceRows,
+    spacesSectionExpanded,
     relativeTimeNow,
     requestTaskDelete,
     requestTaskRename,
-    saveProject,
-    selectProjectMenuAction,
+    saveSpace,
+    selectSpaceMenuAction,
     globalTasks,
     taskDeleteTarget,
     taskRenameTarget,
     taskTitleDraft,
     tasksSectionExpanded,
-    toggleProject,
+    toggleSpace,
     unpinItem,
   }
 }

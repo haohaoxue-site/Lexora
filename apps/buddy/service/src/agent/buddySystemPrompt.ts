@@ -11,23 +11,23 @@ const LEXORA_BUDDY_BASE_SYSTEM_PROMPT = [
 ].join('\n')
 
 export interface CreateBuddySystemPromptOptions {
+  directoryContext?: string
   executionProfile: BuddyExecutionProfile
   platform?: NodeJS.Platform
-  projectInstructions?: string
 }
 
 export function createBuddySystemPrompt(options: CreateBuddySystemPromptOptions): string {
   const shellName = getPiShellToolName(options.platform ?? process.platform) === 'powershell'
     ? 'PowerShell'
     : 'bash'
-  const systemPrompt = [
+  const sections = [
     LEXORA_BUDDY_BASE_SYSTEM_PROMPT,
     createExecutionProfilePrompt(options.executionProfile, shellName),
-  ].join('\n')
-  const instructions = options.projectInstructions?.trim()
-  return instructions
-    ? [systemPrompt, 'Project instructions:', instructions].join('\n\n')
-    : systemPrompt
+  ]
+  const directoryContext = options.directoryContext?.trim()
+  if (directoryContext)
+    sections.push(['Directory context:', directoryContext].join('\n'))
+  return sections.join('\n\n')
 }
 
 function createExecutionProfilePrompt(
@@ -48,6 +48,7 @@ function createExecutionProfilePrompt(
     'Pi built-in tools keep their native names; Lexora-owned tools use lexora_ prefixed names.',
     'Host tools run with the Lexora Buddy service user\'s operating-system permissions. Buddy policy may allow, block, or request product approval before execution.',
     `Respect Lexora Buddy directory grants, approvals, and tool results; a directory grant does not limit Pi ${shellName} to workspace-only system observation.`,
+    'When lexora_request_directory_access is available and the task needs user files outside the authorized directories, call it before using file or shell tools; only a directory selected by the user becomes an additional access directory.',
     `Use Pi built-in tools, including ${shellName}, for general host inspection, diagnosis, and target discovery; use lexora_system_action for supported structured host state changes.`,
   ].join('\n')
 }
