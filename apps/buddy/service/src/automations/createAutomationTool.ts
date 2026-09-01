@@ -154,7 +154,7 @@ export const automationToolParameters = Type.Union([
     ...target,
     operation: Type.Literal(operation),
   }, { additionalProperties: false })),
-])
+], { type: 'object' })
 
 export interface CreateAutomationToolOptions {
   onChanged?: (automationId: string) => void
