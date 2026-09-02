@@ -4,6 +4,7 @@ import type {
 } from '@earendil-works/pi-coding-agent'
 import type {
   AutomationApprovalReviewInput,
+  BrowserApprovalReviewInput,
   SystemActionApprovalReviewInput,
 } from '../../../../shared/approvalReviewPayload'
 import type { BuddyExecutionProfile } from '../../../../shared/executionProfile'
@@ -11,6 +12,7 @@ import type { BuddyServiceTier } from '../../../../shared/modelSelection'
 
 import type {
   BuddyToolClassification,
+  BuddyToolClassificationFailure,
   BuddyToolClassificationResult,
 } from '../../approvals/toolClassification'
 import type { ToolApprovalKind } from '../../approvals/toolPolicyContract'
@@ -27,6 +29,7 @@ export interface ToolApprovalGateway {
     allowForTurn: boolean
     arguments: unknown
     automation?: AutomationApprovalReviewInput
+    browser?: BrowserApprovalReviewInput
     kind: ToolApprovalKind
     runId: string
     scopeKey: string
@@ -96,12 +99,14 @@ async function decideToolCall(
       return await requestApproval(options, event, run, {
         allowForTurn: false,
         automation: approval.automation,
+        browser: approval.browser,
         kind: approval.kind,
         paths: declared.paths,
         resource: declared.resource,
         risk: declared.risk,
         summary: approval.summary,
         systemAction: approval.systemAction,
+        validateBeforeExecution: declared.validateBeforeExecution,
       })
     }
     if (options.executionProfile === 'full_access')
@@ -124,12 +129,14 @@ async function decideToolCall(
     return await requestApproval(options, event, run, {
       allowForTurn: true,
       automation: declared.approval?.automation,
+      browser: declared.approval?.browser,
       kind: decision.kind,
       paths: declared.paths,
       resource: declared.resource,
       risk: declared.risk,
       summary: declared.approval?.summary ?? decision.summary,
       systemAction: declared.approval?.systemAction,
+      validateBeforeExecution: declared.validateBeforeExecution,
     })
   }
   catch (error) {
@@ -144,18 +151,21 @@ async function requestApproval(
   review: {
     allowForTurn: boolean
     automation?: AutomationApprovalReviewInput
+    browser?: BrowserApprovalReviewInput
     kind: ToolApprovalKind
     paths?: BuddyToolClassification['paths']
     resource?: BuddyToolClassification['resource']
     risk?: BuddyToolClassification['risk']
     summary: string
     systemAction?: SystemActionApprovalReviewInput
+    validateBeforeExecution?: () => Promise<BuddyToolClassificationFailure | null>
   },
 ): Promise<ToolCallEventResult | void> {
   const approval = await options.approvalService.request({
     allowForTurn: review.allowForTurn,
     arguments: event.input,
     automation: review.automation,
+    browser: review.browser,
     kind: review.kind,
     runId: run.runId,
     scopeKey: createToolApprovalScopeKey({
@@ -172,9 +182,12 @@ async function requestApproval(
     toolCallId: event.toolCallId,
     toolName: event.toolName,
   })
-  return approval === 'approved'
-    ? authorizeToolExecution(run, event)
-    : block('APPROVAL_DENIED')
+  if (approval !== 'approved')
+    return block('APPROVAL_DENIED')
+  const validation = await review.validateBeforeExecution?.()
+  if (validation)
+    return block(validation.reason)
+  return authorizeToolExecution(run, event)
 }
 
 async function authorizeToolExecution(

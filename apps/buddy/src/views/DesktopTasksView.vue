@@ -13,6 +13,7 @@ import DesktopTaskIndex from '@/workbenches/tasks/index/DesktopTaskIndex.vue'
 
 const router = useRouter()
 const {
+  browser,
   capabilities: { tasks },
   notificationTargetMessageId,
   shell,
@@ -30,6 +31,15 @@ const conversationSearch = useConversationSearch({
   activeConversationId: chatSession.activeConversationId,
   loadMessages: chatSession.listActiveConversationMessages,
 })
+
+async function closeContextTab(tabId: string): Promise<void> {
+  const tab = taskContext.tabs.value.find(item => item.id === tabId)
+  if (tab?.kind === 'browser') {
+    const state = await browser.ensureSession(tab.conversationId)
+    await browser.close(state.sessionId)
+  }
+  taskContext.closeTab(tabId)
+}
 </script>
 
 <template>
@@ -101,8 +111,9 @@ const conversationSearch = useConversationSearch({
         :language="tasks.language.value"
         :read-artifact-text="tasks.workspace.context.readArtifactText"
         :tabs="taskContext.tabs.value"
-        @close-tab="taskContext.closeTab"
+        @close-tab="closeContextTab"
         @collapse="taskContext.toggle"
+        @open-browser="taskContext.openBrowser"
         @select-tab="taskContext.selectTab"
       />
     </template>

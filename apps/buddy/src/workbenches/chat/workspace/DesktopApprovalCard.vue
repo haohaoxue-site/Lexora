@@ -27,6 +27,15 @@ const automationOperationKeys = {
   run_now: 'desktop.chat.processToolAutomationRunNow',
   upsert: 'desktop.chat.processToolAutomationUpsert',
 } as const
+const browserEffectKeys = {
+  'account-change': 'desktop.approval.browser.effect.accountChange',
+  'authorize': 'desktop.approval.browser.effect.authorize',
+  'delete': 'desktop.approval.browser.effect.delete',
+  'publish': 'desktop.approval.browser.effect.publish',
+  'purchase': 'desktop.approval.browser.effect.purchase',
+  'send': 'desktop.approval.browser.effect.send',
+  'submit': 'desktop.approval.browser.effect.submit',
+} as const
 const review = computed<ApprovalReviewPayload | null>(() => {
   const parsed = approvalReviewPayloadSchema.safeParse(props.approval.payload)
   return parsed.success ? parsed.data : null
@@ -46,8 +55,28 @@ const automationOperation = computed(() => {
     return ''
   return t(automationOperationKeys[review.value.operation])
 })
+const browserEffect = computed(() => {
+  if (review.value?.card !== 'browser-action')
+    return ''
+  return review.value.effect
+    ? t(browserEffectKeys[review.value.effect])
+    : t('desktop.approval.browser.effect.unknown')
+})
+const browserAction = computed(() => {
+  if (review.value?.card !== 'browser-action')
+    return ''
+  if (review.value.action === 'click')
+    return t('desktop.approval.browser.action.click')
+  if (review.value.key === 'Enter')
+    return t('desktop.approval.browser.action.pressEnter')
+  if (review.value.key === 'Space')
+    return t('desktop.approval.browser.action.pressSpace')
+  return t('desktop.approval.browser.action.press')
+})
 const approvalOperation = computed(() => (
-  systemEffect.value || t(`desktop.approval.kind.${props.approval.kind}`)
+  systemEffect.value
+  || browserEffect.value
+  || t(`desktop.approval.kind.${props.approval.kind}`)
 ))
 const approvalTitle = computed(() => t('desktop.approval.title', {
   operation: approvalOperation.value,
@@ -55,7 +84,9 @@ const approvalTitle = computed(() => t('desktop.approval.title', {
 const approvalDescription = computed(() => (
   review.value?.card === 'shell'
     ? t('desktop.approval.currentWorkspace')
-    : t('desktop.approval.scopeReview')
+    : review.value?.card === 'browser-action'
+      ? t('desktop.approval.browser.scopeReview')
+      : t('desktop.approval.scopeReview')
 ))
 const headingId = computed(() => `desktop-approval-${props.approval.id}-title`)
 const isResolving = computed(() => props.resolvingAction !== null)
@@ -158,6 +189,33 @@ const turnConfirmationButtonProps = { type: 'error' } as const
         <div>
           <dt>{{ t('desktop.approval.expiresAt') }}</dt>
           <dd>{{ review.expiresAt }}</dd>
+        </div>
+      </dl>
+    </section>
+    <section
+      v-else-if="review?.card === 'browser-action'"
+      class="desktop-approval-card__details desktop-approval-card__review"
+    >
+      <dl>
+        <div>
+          <dt>{{ t('desktop.approval.browser.origin') }}</dt>
+          <dd><code>{{ review.origin }}</code></dd>
+        </div>
+        <div>
+          <dt>{{ t('desktop.approval.effect') }}</dt>
+          <dd>{{ browserEffect }}</dd>
+        </div>
+        <div v-if="review.targetName">
+          <dt>{{ t('desktop.approval.browser.pageTarget') }}</dt>
+          <dd>{{ review.targetName }}</dd>
+        </div>
+        <div v-if="review.targetRole">
+          <dt>{{ t('desktop.approval.browser.role') }}</dt>
+          <dd>{{ review.targetRole }}</dd>
+        </div>
+        <div>
+          <dt>{{ t('desktop.approval.browser.action') }}</dt>
+          <dd>{{ browserAction }}</dd>
         </div>
       </dl>
     </section>

@@ -1,10 +1,13 @@
 import type { LocalChangeSetSummary, LocalRunOutput } from '@buddy-electron/shared/localChatApi'
 import type { Ref } from 'vue'
+import type { TaskContextTab } from './taskContextPanel'
 import { computed, readonly, shallowRef, watch } from 'vue'
 import {
   artifactTabId,
+  browserTabId,
   changeTabId,
   spaceTaskArtifactTabs,
+  spaceTaskBrowserTab,
   spaceTaskChangeTabs,
 } from './taskContextPanel'
 
@@ -18,14 +21,15 @@ export function useTaskContextPanel(options: UseTaskContextPanelOptions) {
   const isOpen = shallowRef(false)
   const activeTabId = shallowRef<string | null>(null)
   const openTabIds = shallowRef<ReadonlyArray<string>>([])
-  const availableTabs = computed(() => [
-    ...spaceTaskArtifactTabs(options.runOutputs.value),
-    ...spaceTaskChangeTabs(options.changeSets.value),
-  ].filter(tab => (
-    tab.kind === 'artifact'
-      ? tab.artifact.conversationId
-      : tab.changeSet.conversationId
-  ) === options.activeConversationId.value))
+  const visibleBrowserConversationIds = new Set<string>()
+  const availableTabs = computed(() => {
+    const browserTab = spaceTaskBrowserTab(options.activeConversationId.value)
+    return [
+      ...(browserTab ? [browserTab] : []),
+      ...spaceTaskArtifactTabs(options.runOutputs.value),
+      ...spaceTaskChangeTabs(options.changeSets.value),
+    ].filter(tab => contextTabConversationId(tab) === options.activeConversationId.value)
+  })
   const availableTabsById = computed(() => new Map(
     availableTabs.value.map(tab => [tab.id, tab]),
   ))
@@ -44,11 +48,30 @@ export function useTaskContextPanel(options: UseTaskContextPanelOptions) {
     [options.activeConversationId, availableTabs],
     ([conversationId, nextAvailableTabs]) => {
       const conversationChanged = conversationId !== currentConversationId
+      if (conversationChanged && currentConversationId) {
+        const currentBrowserTabId = browserTabId(currentConversationId)
+        if (isOpen.value && activeTabId.value === currentBrowserTabId)
+          visibleBrowserConversationIds.add(currentConversationId)
+        else
+          visibleBrowserConversationIds.delete(currentConversationId)
+      }
       currentConversationId = conversationId
-      if (!conversationId || conversationChanged) {
-        isOpen.value = false
-        activeTabId.value = null
-        openTabIds.value = []
+      if (!conversationId) {
+        resetPanel()
+        return
+      }
+      if (conversationChanged) {
+        const nextBrowserTabId = browserTabId(conversationId)
+        const canRestoreBrowser = visibleBrowserConversationIds.has(conversationId)
+          && nextAvailableTabs.some(tab => tab.id === nextBrowserTabId)
+        if (!canRestoreBrowser) {
+          visibleBrowserConversationIds.delete(conversationId)
+          resetPanel()
+          return
+        }
+        openTabIds.value = [nextBrowserTabId]
+        activeTabId.value = nextBrowserTabId
+        isOpen.value = true
         return
       }
       const availableIds = nextAvailableTabs.map(tab => tab.id)
@@ -60,6 +83,12 @@ export function useTaskContextPanel(options: UseTaskContextPanelOptions) {
     },
     { immediate: true },
   )
+
+  function resetPanel() {
+    isOpen.value = false
+    activeTabId.value = null
+    openTabIds.value = []
+  }
 
   function toggle() {
     if (!options.activeConversationId.value)
@@ -73,6 +102,19 @@ export function useTaskContextPanel(options: UseTaskContextPanelOptions) {
 
   function openArtifact(artifactId: string) {
     const tabId = artifactTabId(artifactId)
+    if (!availableTabsById.value.has(tabId))
+      return
+    if (!openTabIds.value.includes(tabId))
+      openTabIds.value = [...openTabIds.value, tabId]
+    activeTabId.value = tabId
+    isOpen.value = true
+  }
+
+  function openBrowser() {
+    const conversationId = options.activeConversationId.value
+    if (!conversationId)
+      return
+    const tabId = browserTabId(conversationId)
     if (!availableTabsById.value.has(tabId))
       return
     if (!openTabIds.value.includes(tabId))
@@ -113,6 +155,7 @@ export function useTaskContextPanel(options: UseTaskContextPanelOptions) {
     closeTab,
     isOpen: readonly(isOpen),
     openArtifact,
+    openBrowser,
     openChanges,
     selectTab,
     tabs: readonly(tabs),
@@ -121,3 +164,11 @@ export function useTaskContextPanel(options: UseTaskContextPanelOptions) {
 }
 
 export type TaskContextPanel = ReturnType<typeof useTaskContextPanel>
+
+function contextTabConversationId(tab: TaskContextTab): string {
+  if (tab.kind === 'artifact')
+    return tab.artifact.conversationId
+  if (tab.kind === 'changes')
+    return tab.changeSet.conversationId
+  return tab.conversationId
+}

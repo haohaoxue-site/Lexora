@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { BUDDY_ATTACHMENT_COUNT_LIMIT } from './attachmentPolicy'
+import { BROWSER_ACTION_KINDS } from './browserProtocol'
 
 const previewSchema = z.object({
   description: z.string().min(1).max(4 * 1024).nullable(),
@@ -84,6 +85,101 @@ export const buddyToolPresentationSchema = z.discriminatedUnion('card', [
     operation: z.enum(['list', 'get', 'upsert', 'pause', 'resume', 'delete', 'run_now']),
     status: z.string().min(1).max(256).nullable(),
   }).strict(),
+  z.object({
+    actionKind: z.enum(BROWSER_ACTION_KINDS).nullable(),
+    card: z.literal('browser'),
+    description: z.null(),
+    documentRevision: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER).nullable(),
+    elementCount: z.number().int().nonnegative().max(400).nullable(),
+    errorCode: z.string().regex(/^[A-Z][A-Z0-9_]{0,127}$/).nullable(),
+    fieldType: z.enum(['selection', 'text']).nullable(),
+    inputLength: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER).nullable(),
+    observationTruncated: z.boolean().nullable(),
+    operation: z.enum(['act', 'open', 'observe']),
+    origin: z.string().min(1).max(4_096).refine((value) => {
+      try {
+        const url = new URL(value)
+        return (url.protocol === 'http:' || url.protocol === 'https:')
+          && url.origin === value
+      }
+      catch {
+        return false
+      }
+    }).nullable(),
+    output: z.null(),
+    pageId: z.uuid().nullable(),
+    pageStatus: z.enum(['error', 'idle', 'loading', 'ready']).nullable(),
+    pathname: z.enum(['/', '/[redacted]', '/preview/[redacted]']).nullable(),
+    sessionId: z.uuid().nullable(),
+    status: z.enum(['completed', 'failed', 'running']),
+    truncated: z.literal(false),
+  }).strict().superRefine((presentation, context) => {
+    if ((presentation.origin === null) !== (presentation.pathname === null)) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Browser origin and pathname must be projected together',
+        path: ['pathname'],
+      })
+    }
+    if ((presentation.sessionId === null) !== (presentation.pageId === null)) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Browser session and page identity must be projected together',
+        path: ['pageId'],
+      })
+    }
+    if ((presentation.status === 'failed') !== (presentation.errorCode !== null)) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Browser failures must include one stable error code',
+        path: ['errorCode'],
+      })
+    }
+    if (
+      presentation.operation !== 'observe'
+      && (
+        presentation.documentRevision !== null
+        || presentation.elementCount !== null
+        || presentation.observationTruncated !== null
+      )
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Only browser observe events can include observation metadata',
+        path: ['operation'],
+      })
+    }
+    if (presentation.operation !== 'act') {
+      if (
+        presentation.actionKind !== null
+        || presentation.fieldType !== null
+        || presentation.inputLength !== null
+      ) {
+        context.addIssue({
+          code: 'custom',
+          message: 'Only browser act events can include action metadata',
+          path: ['operation'],
+        })
+      }
+      return
+    }
+    const expectedFieldType = presentation.actionKind === 'fill'
+      || presentation.actionKind === 'type'
+      ? 'text'
+      : presentation.actionKind === 'select'
+        ? 'selection'
+        : null
+    if (
+      presentation.fieldType !== expectedFieldType
+      || (expectedFieldType === null) !== (presentation.inputLength === null)
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Browser input metadata must match the action kind',
+        path: ['fieldType'],
+      })
+    }
+  }),
   previewSchema.extend({
     action: z.enum([
       'kill-process',

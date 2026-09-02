@@ -4,6 +4,7 @@ import type { BuddyServiceTier } from '../../../shared/modelSelection'
 import type { BuddySessionMode } from '../../../shared/sessionMode'
 import type { BuddyToolClassificationResult } from '../approvals/toolClassification'
 import type { CreateAutomationToolOptions } from '../automations/createAutomationTool'
+import type { BrowserCapabilityHost } from '../browser/BrowserCapabilityService'
 import type { BuddyMcpTools } from '../connectors/mcp/McpConnectorService'
 import type { DirectoryGrant } from '../directories/resolveGrantedPath'
 import type { ImageGenerationGateway } from '../images/ImageGenerationGateway'
@@ -23,6 +24,8 @@ import type {
 } from './extensions/toolPolicyExtension'
 import { classifyArtifactTool } from '../artifacts/artifactToolContract'
 import { classifyAutomationToolCall } from '../automations/createAutomationTool'
+import { BrowserCapabilityService } from '../browser/BrowserCapabilityService'
+import { classifyBrowserTool } from '../browser/browserToolContract'
 import { classifyMcpTool } from '../connectors/mcp/mcpToolContract'
 import { classifyImageGenerationTool } from '../images/imageGenerationToolContract'
 import { classifyImageTransformTool } from '../images/imageTransformToolContract'
@@ -31,6 +34,7 @@ import { SystemCapabilityService } from '../system/systemCapability'
 import { classifySystemTool } from '../system/systemToolContract'
 import { createArtifactExtension } from './extensions/artifactExtension'
 import { createAutomationExtension } from './extensions/automationExtension'
+import { createBrowserExtension } from './extensions/browserExtension'
 import { createChangeCaptureExtension } from './extensions/changeCaptureExtension'
 import { createImageGenerationExtension } from './extensions/imageGenerationExtension'
 import { createImageTransformExtension } from './extensions/imageTransformExtension'
@@ -54,6 +58,7 @@ export interface BuddySessionCompositionServices {
     & CreateArtifactExtensionOptions['artifactService']
   attachmentService: CreateImageGenerationExtensionOptions['attachmentService']
   automationService: CreateAutomationToolOptions['service']
+  browserHost: BrowserCapabilityHost
   changeCaptureService: ChangeCaptureGateway
   connectorService: BuddySessionConnectorSource
   directoryAuthorization: SpaceDirectoryAuthorizationGateway
@@ -94,14 +99,21 @@ export async function createBuddySessionComposition(
     throw new Error('Lexora Buddy scratch grant is unavailable')
   const mcp = await services.connectorService.getTools(options.signal)
   const runContext: BuddyRunContextStore = { current: null }
+  const browserCapability = new BrowserCapabilityService({
+    conversationId: options.conversationId,
+    getGrants: () => grants,
+    host: services.browserHost,
+  })
   const systemCapability = new SystemCapabilityService({ host: services.systemHost })
   const classifyTool = createBuddyToolClassifier({
     automationService: services.automationService,
+    browserCapability,
     mcpClassifications: mcp.classifications,
     systemCapability,
   })
   const inProcessExtensions: BuddyInProcessExtension[] = [
     createMcpExtension({ tools: mcp.tools }),
+    createBrowserExtension({ service: browserCapability }),
     createImageGenerationExtension({
       artifactService: services.artifactService,
       attachmentService: services.attachmentService,
@@ -182,6 +194,10 @@ export async function createBuddySessionComposition(
 
 interface BuddyToolClassifierOptions {
   automationService: CreateAutomationToolOptions['service']
+  browserCapability: Pick<
+    BrowserCapabilityService,
+    'classifyAction' | 'validateActionApproval'
+  >
   mcpClassifications: BuddyMcpTools['classifications']
   systemCapability: SystemCapabilityService
 }
@@ -208,6 +224,10 @@ function createBuddyToolClassifier(
     const imageTransform = classifyImageTransformTool(event)
     if (imageTransform)
       return imageTransform
+
+    const browser = classifyBrowserTool(event, options.browserCapability)
+    if (browser)
+      return browser
 
     const system = await classifySystemTool(
       options.systemCapability,

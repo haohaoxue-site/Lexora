@@ -5,6 +5,7 @@ import type { useDesktopShellState } from '@/shell/useDesktopShellState'
 import { inject } from 'vue'
 
 export interface DesktopAppContext {
+  browser: LexoraDesktopApi['browser']
   capabilities: DesktopCapabilities
   clipboard: LexoraDesktopApi['clipboard']
   notificationTargetMessageId: Readonly<ShallowRef<string | null>>

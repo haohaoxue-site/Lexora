@@ -1,5 +1,8 @@
 import type {
   DesktopAppInfo,
+  DesktopBrowserSetSurfaceInput,
+  DesktopBrowserState,
+  DesktopBrowserToolbarFocusRequest,
   DesktopOpenTarget,
   DesktopWindowState,
   LexoraConfigPatch,
@@ -277,6 +280,67 @@ const desktopApi: LexoraDesktopApi = Object.freeze({
     openReleasePage: (url: string) => ipcRenderer.invoke(
       DESKTOP_IPC_CHANNELS.appOpenReleasePage,
       { url },
+    ),
+  }),
+  browser: Object.freeze({
+    close: (sessionId: string) => ipcRenderer.invoke(
+      DESKTOP_IPC_CHANNELS.browserClose,
+      { sessionId },
+    ),
+    enablePersonalProfile: (sessionId: string): Promise<DesktopBrowserState> => ipcRenderer.invoke(
+      DESKTOP_IPC_CHANNELS.browserEnablePersonalProfile,
+      { sessionId },
+    ),
+    ensureSession: (conversationId: string): Promise<DesktopBrowserState> => ipcRenderer.invoke(
+      DESKTOP_IPC_CHANNELS.browserEnsureSession,
+      { conversationId },
+    ),
+    focusPage: (sessionId: string) => ipcRenderer.invoke(
+      DESKTOP_IPC_CHANNELS.browserFocusPage,
+      { sessionId },
+    ),
+    goBack: (sessionId: string) => ipcRenderer.invoke(
+      DESKTOP_IPC_CHANNELS.browserGoBack,
+      { sessionId },
+    ),
+    goForward: (sessionId: string) => ipcRenderer.invoke(
+      DESKTOP_IPC_CHANNELS.browserGoForward,
+      { sessionId },
+    ),
+    navigate: (sessionId: string, url: string): Promise<DesktopBrowserState> => ipcRenderer.invoke(
+      DESKTOP_IPC_CHANNELS.browserNavigate,
+      { sessionId, url },
+    ),
+    onStateChanged: (listener: (state: DesktopBrowserState) => void) =>
+      subscribe(DESKTOP_IPC_CHANNELS.browserStateChanged, listener),
+    onToolbarFocusRequested: (
+      listener: (request: DesktopBrowserToolbarFocusRequest) => void,
+    ) => subscribe(DESKTOP_IPC_CHANNELS.browserToolbarFocusRequested, listener),
+    openLocalFile: (sessionId: string): Promise<DesktopBrowserState | null> => ipcRenderer.invoke(
+      DESKTOP_IPC_CHANNELS.browserOpenLocalFile,
+      { sessionId },
+    ),
+    reload: (sessionId: string) => ipcRenderer.invoke(
+      DESKTOP_IPC_CHANNELS.browserReload,
+      { sessionId },
+    ),
+    resetPersonalProfile: (sessionId: string): Promise<DesktopBrowserState> => ipcRenderer.invoke(
+      DESKTOP_IPC_CHANNELS.browserResetPersonalProfile,
+      { sessionId },
+    ),
+    setSurface: (input: DesktopBrowserSetSurfaceInput) => ipcRenderer.invoke(
+      DESKTOP_IPC_CHANNELS.browserSetSurface,
+      input.visible
+        ? { bounds: { ...input.bounds }, sessionId: input.sessionId, visible: true }
+        : { sessionId: input.sessionId, visible: false },
+    ),
+    stop: (sessionId: string) => ipcRenderer.invoke(
+      DESKTOP_IPC_CHANNELS.browserStop,
+      { sessionId },
+    ),
+    takeControl: (sessionId: string): Promise<DesktopBrowserState> => ipcRenderer.invoke(
+      DESKTOP_IPC_CHANNELS.browserTakeControl,
+      { sessionId },
     ),
   }),
   clipboard: Object.freeze({

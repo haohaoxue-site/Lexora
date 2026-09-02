@@ -18,7 +18,15 @@ export interface TaskChangesContextTab {
   label: string
 }
 
-export type TaskContextTab = TaskArtifactContextTab | TaskChangesContextTab
+export interface TaskBrowserContextTab {
+  conversationId: string
+  id: string
+  kind: 'browser'
+}
+
+export type TaskContextTab = TaskArtifactContextTab
+  | TaskBrowserContextTab
+  | TaskChangesContextTab
 
 export function spaceTaskArtifactTabs(
   outputs: ReadonlyArray<LocalRunOutput>,
@@ -38,6 +46,22 @@ export function spaceTaskArtifactTabs(
 
 export function artifactTabId(artifactId: string): string {
   return `artifact:${artifactId}`
+}
+
+export function spaceTaskBrowserTab(
+  conversationId: string | null,
+): TaskBrowserContextTab | null {
+  return conversationId
+    ? {
+        conversationId,
+        id: browserTabId(conversationId),
+        kind: 'browser',
+      }
+    : null
+}
+
+export function browserTabId(conversationId: string): string {
+  return `browser:${conversationId}`
 }
 
 export function spaceTaskChangeTabs(

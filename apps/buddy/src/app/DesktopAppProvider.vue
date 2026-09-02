@@ -80,6 +80,7 @@ watch(
 )
 
 provide(desktopAppContextKey, {
+  browser: api.browser,
   capabilities,
   clipboard: api.clipboard,
   notificationTargetMessageId: readonly(notificationTargetMessageId),

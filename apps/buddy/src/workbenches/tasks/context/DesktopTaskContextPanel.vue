@@ -5,13 +5,15 @@ import type { BuddyLocale } from '@/i18n/buddyI18n'
 import {
   Code16Regular,
   Dismiss16Regular,
+  Globe16Regular,
   PanelRight20Regular,
 } from '@vicons/fluent'
-import { NEmpty, NIcon, NScrollbar } from 'naive-ui'
+import { NButton, NEmpty, NIcon, NScrollbar } from 'naive-ui'
 import { computed, shallowRef, useTemplateRef } from 'vue'
 import { useBuddyI18n } from '@/i18n/buddyI18n'
 import DesktopArtifactContextSurface from './DesktopArtifactContextSurface.vue'
 import DesktopArtifactFileIcon from './DesktopArtifactFileIcon.vue'
+import DesktopBrowserContextSurface from './DesktopBrowserContextSurface.vue'
 import DesktopChangeContextSurface from './DesktopChangeContextSurface.vue'
 import { changeTabId } from './taskContextPanel'
 
@@ -25,6 +27,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   closeTab: [tabId: string]
   collapse: []
+  openBrowser: []
   selectTab: [tabId: string]
 }>()
 
@@ -34,9 +37,11 @@ const tabCountLabel = computed(() => t('desktop.context.tabCount', { count: prop
 const changeFileLabels = shallowRef<Readonly<Record<string, string>>>({})
 
 function tabLabel(tab: TaskContextTab): string {
-  return tab.kind === 'changes'
-    ? changeFileLabels.value[tab.id] ?? t('desktop.context.changes')
-    : tab.label
+  if (tab.kind === 'changes')
+    return changeFileLabels.value[tab.id] ?? t('desktop.context.changes')
+  if (tab.kind === 'browser')
+    return t('desktop.context.browser')
+  return tab.label
 }
 
 function updateChangeFileLabel(payload: { changeSetId: string, fileName: string | null }): void {
@@ -113,7 +118,10 @@ function findTabsScrollport(): HTMLElement | null {
                   :mime-type="tab.artifact.mimeType"
                   :name="tab.artifact.name"
                 />
-                <NIcon v-else :component="Code16Regular" />
+                <NIcon
+                  v-else
+                  :component="tab.kind === 'browser' ? Globe16Regular : Code16Regular"
+                />
                 <span>{{ tabLabel(tab) }}</span>
               </button>
               <button
@@ -152,8 +160,23 @@ function findTabsScrollport(): HTMLElement | null {
       :language="language"
       @active-file-change="updateChangeFileLabel"
     />
+    <DesktopBrowserContextSurface
+      v-else-if="activeTab?.kind === 'browser'"
+      :key="activeTab.id"
+      :conversation-id="activeTab.conversationId"
+      :language="language"
+    />
     <div v-else class="desktop-task-context-panel__empty">
-      <NEmpty :description="t('desktop.context.empty')" />
+      <NEmpty :description="t('desktop.context.empty')">
+        <template #extra>
+          <NButton data-testid="task-context-open-browser" @click="emit('openBrowser')">
+            <template #icon>
+              <NIcon :component="Globe16Regular" />
+            </template>
+            {{ t('desktop.context.openBrowser') }}
+          </NButton>
+        </template>
+      </NEmpty>
     </div>
   </section>
 </template>

@@ -684,7 +684,7 @@ const runEventSchema = publicRunEventSchema
 const approvalSchema = z.object({
   createdAt: timestampSchema,
   id: idSchema,
-  kind: z.enum(['automation', 'delete', 'mcp', 'network', 'shell', 'system']),
+  kind: z.enum(['automation', 'browser', 'delete', 'mcp', 'network', 'shell', 'system']),
   payload: approvalReviewPayloadSchema,
   resolvedAt: nullableTimestampSchema,
   runId: idSchema,

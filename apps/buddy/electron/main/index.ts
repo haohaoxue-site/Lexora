@@ -21,6 +21,12 @@ import stableDesktopIconPath from '../../resources/icons/app-icon.png?asset'
 import developmentTrayIconPath from '../../resources/icons/tray-icon-dev.png?asset'
 import { DESKTOP_IPC_CHANNELS } from '../shared/desktopApi'
 import { installAttachmentProtocol, registerAttachmentSchemePrivileges } from './attachmentProtocol'
+import { BrowserAdapterServer } from './browser/BrowserAdapterServer'
+import { BrowserAdapterTestLeasePublisher } from './browser/BrowserAdapterTestLeasePublisher'
+import { BrowserHost } from './browser/BrowserHost'
+import { BrowserPreviewServer } from './browser/BrowserPreviewServer'
+import { registerBrowserDesktopIpc } from './browser/registerBrowserDesktopIpc'
+import { registerBrowserHostRpc } from './browser/registerBrowserHostRpc'
 import { LexoraConfigStore } from './config/LexoraConfigStore'
 import { createDesktopCommandExecutor } from './desktopCommands'
 import { DesktopDiagnosticLogger } from './desktopDiagnostics'
@@ -63,10 +69,15 @@ import { createDesktopTray } from './tray'
 import { applyDesktopWindowAppearance, createDesktopWindow } from './window'
 
 let desktopWindowManager: DesktopWindowManager | null = null
+let browserAdapterServer: BrowserAdapterServer | null = null
+let browserAdapterTestLeasePublisher: BrowserAdapterTestLeasePublisher | null = null
+let browserHost: BrowserHost | null = null
+let browserPreviewServer: BrowserPreviewServer | null = null
 let nativePetSupervisor: NativePetSupervisor | null = null
 let buddyServiceSupervisor: BuddyServiceSupervisor | null = null
 let runtimeRecoveryService: RuntimeRecoveryService | null = null
 let stopLocalChatIpc: (() => void) | null = null
+let stopBrowserDesktopIpc: (() => void) | null = null
 let stopBuddyServiceNotification: (() => void) | null = null
 let stopRuntimeStateSubscription: (() => void) | null = null
 let stopRuntimeRecoverySubscription: (() => void) | null = null
@@ -112,6 +123,7 @@ for (const path of new Set([
   runtimePaths.logs,
   runtimePaths.sessionData,
   runtimePaths.userData,
+  dirname(runtimePaths.browserAdapterSocket),
   dirname(runtimePaths.nativePetSocket),
   dirname(runtimePaths.nativePetState),
   dirname(runtimePaths.windowState),
@@ -182,6 +194,23 @@ else {
   void app.whenReady().then(async () => {
     app.setAppUserModelId(runtimePaths.desktopName)
     Menu.setApplicationMenu(null)
+    const previewServer = new BrowserPreviewServer()
+    browserPreviewServer = previewServer
+    const adapterServer = new BrowserAdapterServer({
+      getHost: () => browserHost,
+      socketPath: runtimePaths.browserAdapterSocket,
+    })
+    await adapterServer.start()
+    browserAdapterServer = adapterServer
+    const adapterTestBrokerSocket = runtimePaths.profile === 'test'
+      ? process.env.LEXORA_BUDDY_BROWSER_ADAPTER_TEST_BROKER_SOCKET
+      : undefined
+    if (adapterTestBrokerSocket) {
+      browserAdapterTestLeasePublisher = new BrowserAdapterTestLeasePublisher({
+        brokerSocketPath: adapterTestBrokerSocket,
+        issueLease: input => adapterServer.issueLease(input),
+      })
+    }
 
     const isSmokeTest = process.env.LEXORA_DESKTOP_SMOKE_TEST === '1'
     const buddyHome = runtimePaths.buddyHome
@@ -216,6 +245,10 @@ else {
     const service = new BuddyServiceSupervisor({
       bindPeer(peer) {
         const disposers = [
+          registerBrowserHostRpc(peer, {
+            createAdapterLease: input => adapterServer.issueLease(input),
+            getHost: () => browserHost,
+          }),
           registerCredentialHostRpc(peer, credentialVault),
           registerPetHostRpc(peer, petSupervisor),
           registerSpaceDirectoryHostRpc(peer, {
@@ -338,6 +371,10 @@ else {
       openFeedbackIssue: feedback => shell.openExternal(createFeedbackIssueUrl(feedback)),
       openReleasePage: url => shell.openExternal(url),
     })
+    stopBrowserDesktopIpc = registerBrowserDesktopIpc({
+      getHost: () => browserHost,
+      getWindow: () => desktopWindowManager?.window ?? null,
+    })
     stopLocalChatIpc = registerLocalChatIpc({
       getLanguage: () => desktopLanguage,
       getWindow: () => desktopWindowManager?.window ?? null,
@@ -374,6 +411,31 @@ else {
           showOnReady: false,
         })
         applyDesktopWindowAppearance(handle.window, nativeTheme.shouldUseDarkColors)
+        browserHost?.dispose()
+        browserHost = new BrowserHost({
+          onSessionClosed(state) {
+            browserAdapterServer?.revokeSession(state.sessionId)
+          },
+          onStateChanged(state) {
+            browserAdapterTestLeasePublisher?.publish(state)
+            if (!handle.window.isDestroyed()) {
+              handle.window.webContents.send(
+                DESKTOP_IPC_CHANNELS.browserStateChanged,
+                state,
+              )
+            }
+          },
+          onToolbarFocusRequested(request) {
+            if (!handle.window.isDestroyed()) {
+              handle.window.webContents.send(
+                DESKTOP_IPC_CHANNELS.browserToolbarFocusRequested,
+                request,
+              )
+            }
+          },
+          previewServer,
+          window: handle.window,
+        })
         return handle
       },
     })
@@ -452,6 +514,14 @@ else {
   }).catch(async (error) => {
     console.error('Lexora Buddy Desktop failed to start', error)
     isQuitting = true
+    stopBrowserDesktopIpc?.()
+    browserAdapterTestLeasePublisher?.dispose()
+    browserAdapterTestLeasePublisher = null
+    await browserAdapterServer?.dispose()
+    browserAdapterServer = null
+    browserHost?.dispose()
+    await browserPreviewServer?.dispose()
+    browserPreviewServer = null
     stopLocalChatIpc?.()
     stopAttachmentProtocol?.()
     stopRendererProtocol?.()
@@ -474,6 +544,16 @@ function quitLexora(): Promise<void> {
     return quitPromise
 
   quitPromise = (async () => {
+    stopBrowserDesktopIpc?.()
+    stopBrowserDesktopIpc = null
+    browserAdapterTestLeasePublisher?.dispose()
+    browserAdapterTestLeasePublisher = null
+    await browserAdapterServer?.dispose()
+    browserAdapterServer = null
+    browserHost?.dispose()
+    browserHost = null
+    await browserPreviewServer?.dispose()
+    browserPreviewServer = null
     stopLocalChatIpc?.()
     stopLocalChatIpc = null
     stopBuddyServiceNotification?.()

@@ -9,6 +9,7 @@ import {
   createArtifactPresentToolPresentation,
 } from '../artifacts/artifactToolContract'
 import { createAutomationToolPresentation } from '../automations/automationToolContract'
+import { createBrowserToolPresentation } from '../browser/browserToolPresentation'
 import { createMcpToolPresentation } from '../connectors/mcp/mcpToolContract'
 import {
   argumentNames,
@@ -51,6 +52,7 @@ export function createBuddyToolPresentation(
     ?? createImageGenerationToolPresentation(input)
     ?? createImageTransformToolPresentation(input)
     ?? createAutomationToolPresentation(input)
+    ?? createBrowserToolPresentation(input)
     ?? createSystemToolPresentation(input)
     ?? createMcpToolPresentation(input)
     ?? createGenericToolPresentation(input)
