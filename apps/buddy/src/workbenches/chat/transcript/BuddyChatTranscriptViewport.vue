@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type {
-  BuddyChatMessageListHandle,
+  BuddyChatTranscriptViewportHandle,
   ChatMessageScrollAnchor,
   ChatMessageScrollMetrics,
 } from './chatMessageViewport'
@@ -15,6 +15,7 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{
+  activeMessageChange: [messageId: string | null]
   contentResize: [metrics: ChatMessageScrollMetrics]
   returnToLatest: []
   scroll: [metrics: ChatMessageScrollMetrics]
@@ -23,6 +24,7 @@ const emit = defineEmits<{
 const viewport = useTemplateRef<HTMLElement>('viewport')
 const content = useTemplateRef<HTMLElement>('content')
 let resizeObserver: ResizeObserver | null = null
+let activeMessageFrame: number | null = null
 
 function readScrollMetrics(): ChatMessageScrollMetrics | null {
   return viewport.value ? toScrollMetrics(viewport.value) : null
@@ -64,14 +66,34 @@ function restoreScrollAnchor(anchor: ChatMessageScrollAnchor): ChatMessageScroll
   return toScrollMetrics(scrollport)
 }
 
-function scrollToMessage(messageId: string): ChatMessageScrollMetrics | null {
+function scrollToMessage(
+  messageId: string,
+  behavior: ScrollBehavior = 'auto',
+): ChatMessageScrollMetrics | null {
   const scrollport = viewport.value
   const message = findMessage(messageId)
   if (!scrollport || !message)
     return null
-  scrollport.scrollTop += message.getBoundingClientRect().top
-    - scrollport.getBoundingClientRect().top
-  return toScrollMetrics(scrollport)
+  const metrics = toScrollMetrics(scrollport)
+  const nextTop = Math.min(
+    Math.max(
+      0,
+      scrollport.scrollTop
+      + message.getBoundingClientRect().top
+      - scrollport.getBoundingClientRect().top,
+    ),
+    Math.max(0, scrollport.scrollHeight - scrollport.clientHeight),
+  )
+  const reducedMotion = behavior === 'smooth'
+    && window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  scrollport.scrollTo({
+    behavior: reducedMotion ? 'auto' : behavior,
+    top: nextTop,
+  })
+  return {
+    ...metrics,
+    scrollTop: nextTop,
+  }
 }
 
 function scrollToTail(): ChatMessageScrollMetrics | null {
@@ -82,16 +104,44 @@ function scrollToTail(): ChatMessageScrollMetrics | null {
   return toScrollMetrics(scrollport)
 }
 
+function scrollBy(deltaY: number) {
+  if (viewport.value)
+    viewport.value.scrollTop += deltaY
+}
+
 function findMessage(messageId: string): HTMLElement | null {
   return [...viewport.value?.querySelectorAll<HTMLElement>('[data-message-id]') ?? []]
     .find(element => element.dataset.messageId === messageId)
     ?? null
 }
 
+function readActiveMessageId(): string | null {
+  const scrollport = viewport.value
+  if (!scrollport)
+    return null
+  const bounds = scrollport.getBoundingClientRect()
+  const message = [...scrollport.querySelectorAll<HTMLElement>('[data-message-id]')]
+    .find((element) => {
+      const messageBounds = element.getBoundingClientRect()
+      return messageBounds.bottom > bounds.top && messageBounds.top < bounds.bottom
+    })
+  return message?.dataset.messageId ?? null
+}
+
+function scheduleActiveMessageChange() {
+  if (activeMessageFrame !== null)
+    return
+  activeMessageFrame = requestAnimationFrame(() => {
+    activeMessageFrame = null
+    emit('activeMessageChange', readActiveMessageId())
+  })
+}
+
 function handleScroll() {
   const metrics = readScrollMetrics()
   if (metrics)
     emit('scroll', metrics)
+  scheduleActiveMessageChange()
 }
 
 onMounted(() => {
@@ -101,16 +151,23 @@ onMounted(() => {
     const metrics = readScrollMetrics()
     if (metrics)
       emit('contentResize', metrics)
+    scheduleActiveMessageChange()
   })
   resizeObserver.observe(content.value)
+  scheduleActiveMessageChange()
 })
 
-onBeforeUnmount(() => resizeObserver?.disconnect())
+onBeforeUnmount(() => {
+  resizeObserver?.disconnect()
+  if (activeMessageFrame !== null)
+    cancelAnimationFrame(activeMessageFrame)
+})
 
-defineExpose<BuddyChatMessageListHandle>({
+defineExpose<BuddyChatTranscriptViewportHandle>({
   captureScrollAnchor,
   readScrollMetrics,
   restoreScrollAnchor,
+  scrollBy,
   scrollToMessage,
   scrollToTail,
 })
@@ -169,8 +226,7 @@ function toScrollMetrics(element: HTMLElement): ChatMessageScrollMetrics {
   scrollbar-gutter: stable;
 
   &:focus-visible {
-    outline: 1px solid var(--buddy-focus-ring);
-    outline-offset: -1px;
+    outline: 0;
   }
 }
 

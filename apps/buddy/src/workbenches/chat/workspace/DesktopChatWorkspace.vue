@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { LocalMessage } from '@buddy-electron/shared/localChatApi'
 import type { DesktopSettingsCategory } from '@/router'
 import type { ChatComposerSubmitPayload } from '@/workbenches/chat/composer/chatComposerInput'
 import type { BuddyChatMessageListHandle } from '@/workbenches/chat/transcript/chatMessageViewport'
@@ -13,10 +14,12 @@ import { computed, shallowRef, useTemplateRef, watch } from 'vue'
 import { useBuddyI18n } from '@/i18n/buddyI18n'
 import DesktopChatComposer from '@/workbenches/chat/composer/DesktopChatComposer.vue'
 import BuddyChatMessageList from '@/workbenches/chat/transcript/BuddyChatMessageList.vue'
+import { projectChatTranscript } from '@/workbenches/chat/transcript/chatTranscriptProjection'
 import DesktopApprovalCard from '@/workbenches/chat/workspace/DesktopApprovalCard.vue'
 import DesktopChatWelcome from '@/workbenches/chat/workspace/DesktopChatWelcome.vue'
 import { selectDesktopChatWelcomeVariant } from '@/workbenches/chat/workspace/desktopChatWelcomeVariants'
 import { useChatViewport } from '@/workbenches/chat/workspace/useChatViewport'
+import { useConversationOutline } from '@/workbenches/chat/workspace/useConversationOutline'
 
 const props = defineProps<{
   activeSearchMessageId: string | null
@@ -44,6 +47,27 @@ const runtimeTransitioning = computed(() => (
   !visibleBlocker.value
   && ['stopped', 'starting', 'restarting', 'stopping'].includes(status.runtimeState.value.status)
 ))
+const currentOutlineMessages = computed<ReadonlyArray<LocalMessage>>(() => {
+  const messages: LocalMessage[] = []
+  const projection = projectChatTranscript({
+    changeSets: transcript.changeSets.value,
+    outputs: transcript.runOutputs.value,
+    runEvents: transcript.runEvents.value,
+    runs: transcript.runs.value,
+    timelineItems: transcript.timelineItems.value,
+  })
+  for (const row of projection.rows) {
+    if (row.kind === 'message')
+      messages.push(row.message)
+  }
+  return messages
+})
+const conversationOutline = useConversationOutline({
+  activeBranchId: session.activeBranchId,
+  activeConversationId: session.activeConversationId,
+  currentMessages: currentOutlineMessages,
+  loadMessages: session.listActiveConversationMessages,
+})
 const viewport = useChatViewport({
   activeBranchId: session.activeBranchId,
   activeConversationId: session.activeConversationId,
@@ -114,6 +138,8 @@ function dismissBlocker() {
         :is-loading-older-messages="transcript.isLoadingOlderMessages.value"
         :language="workspace.language.value"
         :matching-search-message-ids="matchingSearchMessageIds"
+        :outline-items="conversationOutline.items.value"
+        :outline-loading="conversationOutline.isLoading.value"
         :timeline-items="transcript.timelineItems.value"
         :run-events="transcript.runEvents.value"
         :run-outputs="transcript.runOutputs.value"
@@ -124,9 +150,11 @@ function dismissBlocker() {
         @edit-user-message="execution.editUserMessage"
         @open-artifact="emit('openArtifact', $event)"
         @open-changes="emit('openChanges', $event)"
+        @prepare-outline="conversationOutline.prepare"
         @reader-layout-intent="viewport.handleReaderLayoutIntent"
         @regenerate-assistant="execution.regenerateAssistant"
         @return-to-latest="viewport.returnToLatest"
+        @select-outline-message="viewport.revealOutlineMessage"
         @scroll="viewport.handleScroll"
       />
     </main>

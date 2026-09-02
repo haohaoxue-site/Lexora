@@ -13,18 +13,21 @@ import type {
 } from './chatConversationTimeline'
 import type {
   BuddyChatMessageListHandle,
+  BuddyChatTranscriptViewportHandle,
   ChatMessageScrollAnchor,
   ChatMessageScrollMetrics,
 } from './chatMessageViewport'
+import type { ChatOutlineItem } from './chatOutline'
 import type {
   ChatAgentTurn,
 } from './chatStreamingMessage'
 import type { ChatTranscriptRow } from './chatTranscriptProjection'
 import type { BuddyLocale } from '@/i18n/buddyI18n'
-import { computed, shallowRef, useTemplateRef, watch } from 'vue'
+import { computed, onBeforeUnmount, shallowRef, useTemplateRef, watch } from 'vue'
 import { useBuddyI18n } from '@/i18n/buddyI18n'
 import BuddyChatAgentTurn from './BuddyChatAgentTurn.vue'
 import BuddyChatMessageRow from './BuddyChatMessageRow.vue'
+import BuddyChatOutline from './BuddyChatOutline.vue'
 import BuddyChatRunActivity from './BuddyChatRunActivity.vue'
 import BuddyChatTranscriptViewport from './BuddyChatTranscriptViewport.vue'
 import { resolveChatAgentTurnOpen } from './chatAgentTurnDisclosure'
@@ -48,6 +51,8 @@ const props = defineProps<{
   isLoadingOlderMessages?: boolean
   language: BuddyLocale
   matchingSearchMessageIds?: ReadonlyArray<string>
+  outlineItems: ReadonlyArray<ChatOutlineItem>
+  outlineLoading: boolean
   timelineItems: ReadonlyArray<LocalConversationTimelineItem>
   runEvents?: ReadonlyArray<LocalRunEvent>
   runOutputs?: ReadonlyArray<LocalRunOutput>
@@ -60,17 +65,23 @@ const emit = defineEmits<{
   editUserMessage: [messageId: string, content: string]
   openArtifact: [artifactId: string]
   openChanges: [changeSetId: string]
+  prepareOutline: []
   readerLayoutIntent: []
   regenerateAssistant: [sourceRunId: string]
   returnToLatest: []
+  selectOutlineMessage: [messageId: string]
   scroll: [metrics: ChatMessageScrollMetrics]
   contentResize: [metrics: ChatMessageScrollMetrics]
 }>()
 
 const { t } = useBuddyI18n(() => props.language)
-const transcriptViewport = useTemplateRef<BuddyChatMessageListHandle>('transcriptViewport')
+const transcriptViewport = useTemplateRef<BuddyChatTranscriptViewportHandle>('transcriptViewport')
+const OUTLINE_HIGHLIGHT_DURATION_MS = 1_200
 const agentTurnOpenOverrides = shallowRef<ReadonlyMap<string, boolean>>(new Map())
 const editingMessageId = shallowRef<string | null>(null)
+const activeOutlineMessageId = shallowRef<string | null>(null)
+const highlightedOutlineMessageId = shallowRef<string | null>(null)
+let outlineHighlightTimer: ReturnType<typeof setTimeout> | null = null
 const matchingSearchMessageIds = computed(() => new Set(props.matchingSearchMessageIds ?? []))
 const conversationId = computed(() => props.timelineItems[0]?.conversationId ?? null)
 const transcriptProjection = computed(() => projectChatTranscript({
@@ -89,8 +100,10 @@ const branchNavigators = computed(() => projectChatMessageBranchNavigators(
   props.activeBranchId,
 ))
 
-watch(conversationId, () => {
+watch([conversationId, () => props.activeBranchId], () => {
   agentTurnOpenOverrides.value = new Map()
+  activeOutlineMessageId.value = null
+  clearOutlineHighlight()
 })
 
 function isAgentTurnOpen(turn: ChatAgentTurn): boolean {
@@ -195,8 +208,31 @@ function scrollToTail(): ChatMessageScrollMetrics | null {
   return transcriptViewport.value?.scrollToTail() ?? null
 }
 
-function scrollToMessage(messageId: string): ChatMessageScrollMetrics | null {
-  return transcriptViewport.value?.scrollToMessage(messageId) ?? null
+function scrollToMessage(
+  messageId: string,
+  behavior?: ScrollBehavior,
+): ChatMessageScrollMetrics | null {
+  return transcriptViewport.value?.scrollToMessage(messageId, behavior) ?? null
+}
+
+function highlightMessage(messageId: string) {
+  clearOutlineHighlight()
+  highlightedOutlineMessageId.value = messageId
+  outlineHighlightTimer = window.setTimeout(() => {
+    highlightedOutlineMessageId.value = null
+    outlineHighlightTimer = null
+  }, OUTLINE_HIGHLIGHT_DURATION_MS)
+}
+
+function clearOutlineHighlight() {
+  if (outlineHighlightTimer !== null)
+    window.clearTimeout(outlineHighlightTimer)
+  outlineHighlightTimer = null
+  highlightedOutlineMessageId.value = null
+}
+
+function scrollTranscript(deltaY: number) {
+  transcriptViewport.value?.scrollBy(deltaY)
 }
 
 function handleReaderLayoutIntent(event: MouseEvent) {
@@ -206,11 +242,14 @@ function handleReaderLayoutIntent(event: MouseEvent) {
 
 defineExpose<BuddyChatMessageListHandle>({
   captureScrollAnchor,
+  highlightMessage,
   readScrollMetrics,
   restoreScrollAnchor,
   scrollToMessage,
   scrollToTail,
 })
+
+onBeforeUnmount(clearOutlineHighlight)
 </script>
 
 <template>
@@ -226,11 +265,21 @@ defineExpose<BuddyChatMessageListHandle>({
     >
       {{ t('desktop.chat.loadingOlder') }}
     </div>
+    <BuddyChatOutline
+      :active-message-id="activeOutlineMessageId"
+      :is-loading="outlineLoading"
+      :items="outlineItems"
+      :language="language"
+      @prepare="emit('prepareOutline')"
+      @select="emit('selectOutlineMessage', $event)"
+      @scroll-transcript="scrollTranscript"
+    />
     <BuddyChatTranscriptViewport
       ref="transcriptViewport"
       :has-older-messages="hasOlderMessages ?? false"
       :return-to-latest-label="t('desktop.chat.returnToLatest')"
       :show-return-to-latest="showReturnToLatest ?? false"
+      @active-message-change="activeOutlineMessageId = $event"
       @content-resize="emit('contentResize', $event)"
       @return-to-latest="emit('returnToLatest')"
       @scroll="emit('scroll', $event)"
@@ -250,7 +299,9 @@ defineExpose<BuddyChatMessageListHandle>({
           :actions-disabled="actionsDisabled ?? false"
           :active-search="item.message.id === activeSearchMessageId"
           :branch-navigator="branchNavigators.get(item.message.id) ?? null"
-          class="buddy-chat-transcript-row"
+          class="buddy-chat-transcript-row" :class="[
+            { 'is-outline-highlighted': item.message.id === highlightedOutlineMessageId },
+          ]"
           :editing="isEditingMessage(item.message)"
           :is-agent-turn-result="item.isAgentTurnResult"
           :language="language"
@@ -353,6 +404,17 @@ defineExpose<BuddyChatMessageListHandle>({
   padding-bottom: var(--buddy-chat-gap-block);
 }
 
+.buddy-chat-message.buddy-chat-transcript-row {
+  border-radius: var(--buddy-radius-micro);
+  outline: 1px solid transparent;
+  outline-offset: -1px;
+  transition: outline-color 180ms ease-out;
+
+  &.is-outline-highlighted {
+    outline-color: var(--buddy-accent-border);
+  }
+}
+
 .buddy-chat-day-divider {
   display: flex;
   justify-content: center;
@@ -396,6 +458,12 @@ defineExpose<BuddyChatMessageListHandle>({
     &::after {
       background: var(--buddy-status-warning-border);
     }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .buddy-chat-message.buddy-chat-transcript-row {
+    transition: none;
   }
 }
 </style>
