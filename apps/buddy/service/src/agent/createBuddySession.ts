@@ -15,8 +15,10 @@ import { chmod, mkdir, realpath } from 'node:fs/promises'
 import { isAbsolute, join, relative, resolve, sep } from 'node:path'
 import process from 'node:process'
 import {
+  calculateContextTokens,
   convertToLlm,
   createAgentSession,
+  getLatestCompactionEntry,
   SessionManager,
 } from '@earendil-works/pi-coding-agent'
 import {
@@ -66,7 +68,7 @@ export interface BuddyAgentSession {
 
 export type BuddySessionShutdownReason = 'evict' | 'invalidate' | 'quit' | 'resource-change'
 
-export type BuddyContextSnapshot = ReturnType<typeof createEstimatedContextUsage>
+export type BuddyContextSnapshot = ReturnType<typeof createEstimatedContextUsage> | null
 
 export async function createBuddySession(
   options: CreateBuddySessionOptions,
@@ -169,6 +171,9 @@ export async function createBuddyContextSnapshot(
   const persistedSession = options.piSessionFile
     ? await openExistingSession(options.piSessionFile, persistedSessionDir, cwd)
     : null
+  const persistedContextUsageUnknown = persistedSession
+    ? hasUnknownPostCompactionUsage(persistedSession)
+    : false
   const recoveryMessages = persistedSession
     ? convertToLlm(persistedSession.buildSessionContext().messages)
     : typeof options.recoveryMessages === 'function'
@@ -189,6 +194,9 @@ export async function createBuddyContextSnapshot(
     },
   })
   try {
+    if (persistedContextUsageUnknown)
+      return null
+
     const tools = result.session.getActiveToolNames().flatMap((name) => {
       const tool = result.session.getToolDefinition(name)
       return tool
@@ -204,6 +212,23 @@ export async function createBuddyContextSnapshot(
   finally {
     await createSessionShutdown(result.session)('quit')
   }
+}
+
+function hasUnknownPostCompactionUsage(sessionManager: SessionManager): boolean {
+  const branch = sessionManager.getBranch()
+  const latestCompaction = getLatestCompactionEntry(branch)
+  if (!latestCompaction)
+    return false
+
+  const compactionIndex = branch.lastIndexOf(latestCompaction)
+  return !branch.slice(compactionIndex + 1).some((entry) => {
+    if (entry.type !== 'message' || entry.message.role !== 'assistant')
+      return false
+    const message = entry.message
+    return message.stopReason !== 'aborted'
+      && message.stopReason !== 'error'
+      && calculateContextTokens(message.usage) > 0
+  })
 }
 
 function createSessionShutdown(

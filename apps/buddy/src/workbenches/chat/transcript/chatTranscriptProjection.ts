@@ -11,6 +11,7 @@ import type {
   ChatAgentTurn,
   ChatRecoveryNotice,
 } from './chatStreamingMessage'
+import { projectConversationCompactionState } from './chatConversationTimeline'
 import { isVisibleChatMessage } from './chatMessageContent'
 import {
   projectChatAgentTurns,
@@ -257,6 +258,8 @@ export function projectPersistedChatTranscriptRows(
 
   for (const item of items) {
     if (item.kind === 'compaction') {
+      if (projectConversationCompactionState(item.status, item.errorCode) === 'not_needed')
+        continue
       rows.push({
         compaction: item,
         key: `compaction:${item.id}`,

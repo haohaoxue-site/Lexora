@@ -15,6 +15,7 @@ import type {
   ChatComposerContextOptions,
   ChatComposerSubmitPayload,
 } from '@/workbenches/chat/composer/chatComposerInput'
+import type { ChatComposerInteraction } from '@/workbenches/chat/composer/chatComposerInteraction'
 import type { ChatContextUsage as ChatContextUsageValue } from '@/workbenches/chat/composer/chatContextUsage'
 import { EditorContent } from '@tiptap/vue-3'
 import {
@@ -29,6 +30,7 @@ import { useBuddyI18n } from '@/i18n/buddyI18n'
 import DesktopModelSelector from '@/ui/model-selector/DesktopModelSelector.vue'
 import ChatContextUsage from '@/workbenches/chat/composer/ChatContextUsage.vue'
 import DesktopChatComposerFrame from '@/workbenches/chat/composer/DesktopChatComposerFrame.vue'
+import DesktopChatComposerInteractionHost from '@/workbenches/chat/composer/DesktopChatComposerInteractionHost.vue'
 import DesktopExecutionProfileSelector from '@/workbenches/chat/composer/DesktopExecutionProfileSelector.vue'
 import { useChatComposer } from '@/workbenches/chat/composer/useChatComposer'
 import { resolveBuddyAttachmentPreviewUrl } from '@/workbenches/chat/transcript/chatAttachmentView'
@@ -45,6 +47,7 @@ const props = defineProps<{
   isSelectingFiles: boolean
   isSending: boolean
   isUpdatingExecutionProfile: boolean
+  interaction: ChatComposerInteraction | null
   language: BuddyLocale
   loadContextOptions: (fileQuery: string | null) => Promise<ChatComposerContextOptions>
   models: ReadonlyArray<LocalRuntimeModelOption>
@@ -58,6 +61,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   attach: []
   attachFiles: [files: ReadonlyArray<File>]
+  dismissInteraction: [id: string]
   removeAttachment: [index: number]
   send: [payload: ChatComposerSubmitPayload]
   stop: []
@@ -146,30 +150,36 @@ function handleFileDrop(event: DragEvent) {
     </template>
 
     <template #overlay>
-      <div
-        v-if="suggestions.length || isLoadingContext"
-        class="desktop-chat-composer__suggestions"
+      <DesktopChatComposerInteractionHost
+        :chooser-visible="Boolean(suggestions.length || isLoadingContext)"
+        :interaction="interaction"
+        :language="language"
+        @dismiss="emit('dismissInteraction', $event)"
       >
-        <span v-if="isLoadingContext && !suggestions.length" class="desktop-chat-composer__suggestion-empty">
-          {{ t('desktop.chat.loadingContext') }}
-        </span>
-        <button
-          v-for="(suggestion, index) in suggestions"
-          :key="`${suggestion.option.kind}:${suggestion.option.value}:${suggestion.option.path ?? ''}`"
-          class="desktop-chat-composer__suggestion"
-          :class="{ 'is-active': index === activeSuggestionIndex }"
-          type="button"
-          @mousedown.prevent="selectSuggestion(suggestion.option)"
-        >
-          <span class="desktop-chat-composer__suggestion-kind">
-            {{ suggestionKind(suggestion.option) }}
-          </span>
-          <span>
-            <strong>{{ suggestion.option.label }}</strong>
-            <small v-if="suggestion.option.description">{{ suggestion.option.description }}</small>
-          </span>
-        </button>
-      </div>
+        <template #chooser>
+          <div class="desktop-chat-composer__suggestions">
+            <span v-if="isLoadingContext && !suggestions.length" class="desktop-chat-composer__suggestion-empty">
+              {{ t('desktop.chat.loadingContext') }}
+            </span>
+            <button
+              v-for="(suggestion, index) in suggestions"
+              :key="`${suggestion.option.kind}:${suggestion.option.value}:${suggestion.option.path ?? ''}`"
+              class="desktop-chat-composer__suggestion"
+              :class="{ 'is-active': index === activeSuggestionIndex }"
+              type="button"
+              @mousedown.prevent="selectSuggestion(suggestion.option)"
+            >
+              <span class="desktop-chat-composer__suggestion-kind">
+                {{ suggestionKind(suggestion.option) }}
+              </span>
+              <span>
+                <strong>{{ suggestion.option.label }}</strong>
+                <small v-if="suggestion.option.description">{{ suggestion.option.description }}</small>
+              </span>
+            </button>
+          </div>
+        </template>
+      </DesktopChatComposerInteractionHost>
     </template>
 
     <template #editor>
@@ -279,11 +289,6 @@ function handleFileDrop(event: DragEvent) {
 }
 
 .desktop-chat-composer__suggestions {
-  position: absolute;
-  right: 0;
-  bottom: calc(100% + 0.65rem);
-  left: 0;
-  z-index: 20;
   display: grid;
   max-height: 15rem;
   overflow-y: auto;

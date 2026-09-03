@@ -59,63 +59,46 @@ export function createChatContextUsage(
 ): ChatContextUsage | null {
   const recorded = latestAttributedContextUsage(input.events)
   const snapshot = readContextUsageSnapshot(input.snapshot)
-  const model = recorded
+  const pendingSnapshot = input.snapshot?.status === 'pending' ? input.snapshot : null
+  const latestCompaction = input.events
+    .filter(event => event.type === 'context.compaction.completed')
+    .sort(compareEvents)
+    .at(-1)
+  const usage = pendingSnapshot
+    ? null
+    : latestCompaction
+      ? recorded && compareEvents(recorded.event, latestCompaction) > 0
+        ? recorded
+        : null
+      : snapshot && (!recorded || snapshot.createdAt >= recorded.event.createdAt)
+        ? snapshot
+        : recorded
+  const usageModel = usage ?? pendingSnapshot
+  const model = usageModel
     ? input.models.find(candidate => (
-      candidate.providerId === recorded.providerId
-      && candidate.modelId === recorded.modelId
+      candidate.providerId === usageModel.providerId
+      && candidate.modelId === usageModel.modelId
     )) ?? input.selectedModel
     : input.selectedModel
   if (!model)
     return null
 
-  if (!recorded && snapshot) {
-    const snapshotModel = input.models.find(candidate => (
-      candidate.providerId === snapshot.providerId
-      && candidate.modelId === snapshot.modelId
-    )) ?? model
-    return readyContextUsage(snapshot, snapshotModel, snapshot.createdAt)
-  }
-
-  if (!recorded) {
+  if (!usage) {
     return {
       contextWindow: model.contextWindow,
       modelName: model.displayName,
       modelId: model.modelId,
       percent: null,
       providerId: model.providerId,
-      recordedAt: null,
+      recordedAt: pendingSnapshot?.createdAt ?? null,
       segments: EMPTY_SEGMENTS,
       status: 'pending',
       totalTokens: null,
     }
   }
 
-  const latestCompaction = input.events
-    .filter(event => event.type === 'context.compaction.completed')
-    .sort(compareEvents)
-    .at(-1)
-  if (latestCompaction && compareEvents(latestCompaction, recorded.event) > 0) {
-    if (snapshot && snapshot.createdAt >= latestCompaction.createdAt) {
-      const snapshotModel = input.models.find(candidate => (
-        candidate.providerId === snapshot.providerId
-        && candidate.modelId === snapshot.modelId
-      )) ?? model
-      return readyContextUsage(snapshot, snapshotModel, snapshot.createdAt)
-    }
-    return {
-      contextWindow: model.contextWindow,
-      modelName: model.displayName,
-      modelId: model.modelId,
-      percent: null,
-      providerId: model.providerId,
-      recordedAt: recorded.event.createdAt,
-      segments: EMPTY_SEGMENTS,
-      status: 'pending',
-      totalTokens: null,
-    }
-  }
-
-  return readyContextUsage(recorded, model, recorded.event.createdAt)
+  const recordedAt = 'event' in usage ? usage.event.createdAt : usage.createdAt
+  return readyContextUsage(usage, model, recordedAt)
 }
 
 function readyContextUsage(
@@ -148,7 +131,7 @@ function readContextUsageSnapshot(
   contextWindow: number
   createdAt: string
 }) | null {
-  if (!snapshot || snapshot.totalTokens <= 0)
+  if (!snapshot || snapshot.status !== 'ready' || snapshot.totalTokens <= 0)
     return null
   return snapshot
 }

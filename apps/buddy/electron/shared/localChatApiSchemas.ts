@@ -764,24 +764,33 @@ const usageSnapshotSchema = z.object({
   totals: usageTotalsSchema,
 }).strict()
 
-const contextUsageSnapshotSchema = z.object({
+const contextUsageSnapshotIdentitySchema = z.object({
   contextWindow: z.number().int().positive(),
   createdAt: timestampSchema,
-  mcpTokens: z.number().int().nonnegative(),
-  messageTokens: z.number().int().nonnegative(),
   modelId: idSchema,
   providerId: idSchema,
-  skillTokens: z.number().int().nonnegative(),
-  systemPromptTokens: z.number().int().nonnegative(),
-  toolTokens: z.number().int().nonnegative(),
-  totalTokens: z.number().int().positive(),
-}).strict().refine(snapshot => (
-  snapshot.mcpTokens
-  + snapshot.messageTokens
-  + snapshot.skillTokens
-  + snapshot.systemPromptTokens
-  + snapshot.toolTokens === snapshot.totalTokens
-), { path: ['totalTokens'] })
+})
+
+const contextUsageSnapshotSchema = z.discriminatedUnion('status', [
+  contextUsageSnapshotIdentitySchema.extend({
+    status: z.literal('pending'),
+  }).strict(),
+  contextUsageSnapshotIdentitySchema.extend({
+    mcpTokens: z.number().int().nonnegative(),
+    messageTokens: z.number().int().nonnegative(),
+    skillTokens: z.number().int().nonnegative(),
+    status: z.literal('ready'),
+    systemPromptTokens: z.number().int().nonnegative(),
+    toolTokens: z.number().int().nonnegative(),
+    totalTokens: z.number().int().positive(),
+  }).strict().refine(snapshot => (
+    snapshot.mcpTokens
+    + snapshot.messageTokens
+    + snapshot.skillTokens
+    + snapshot.systemPromptTokens
+    + snapshot.toolTokens === snapshot.totalTokens
+  ), { path: ['totalTokens'] }),
+])
 
 const contextItemSchema = z.object({
   kind: z.enum(['file', 'skill', 'slashCommand']),

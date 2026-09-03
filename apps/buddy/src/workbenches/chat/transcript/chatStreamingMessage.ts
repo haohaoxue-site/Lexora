@@ -29,6 +29,14 @@ export interface ChatAgentReasoningNode {
   text: string
 }
 
+export interface ChatAgentCompactionNode {
+  estimatedTokensAfter: number | null
+  id: string
+  kind: 'compaction'
+  status: 'cancelled' | 'completed' | 'failed' | 'interrupted' | 'running'
+  tokensBefore: number | null
+}
+
 export interface ChatAgentNarrationNode {
   contentIndex?: number
   id: string
@@ -50,7 +58,11 @@ export interface ChatAgentToolNode {
   toolName: string
 }
 
-export type ChatAgentTurnNode = ChatAgentNarrationNode | ChatAgentReasoningNode | ChatAgentToolNode
+export type ChatAgentTurnNode
+  = | ChatAgentCompactionNode
+    | ChatAgentNarrationNode
+    | ChatAgentReasoningNode
+    | ChatAgentToolNode
 
 export interface ChatAgentReasoningEntry {
   detail: ChatAgentReasoningNode | null
@@ -65,7 +77,11 @@ export interface ChatAgentReasoningGroup {
   reasoningKind: BuddyReasoningKind
 }
 
-export type ChatAgentTurnRow = ChatAgentNarrationNode | ChatAgentReasoningGroup | ChatAgentToolNode
+export type ChatAgentTurnRow
+  = | ChatAgentCompactionNode
+    | ChatAgentNarrationNode
+    | ChatAgentReasoningGroup
+    | ChatAgentToolNode
 
 export interface ChatAgentTurn {
   branchId: string
@@ -101,10 +117,12 @@ function projectChatAgentTurn(
   run: LocalRun,
   events: ReadonlyArray<LocalRunEvent>,
 ): ChatAgentTurn {
+  const compactions = new Map<string, ChatAgentCompactionNode & { order: number }>()
   const reasoning = new Map<string, ChatAgentReasoningNode & { order: number }>()
   const tools = new Map<string, ChatAgentToolNode & { order: number }>()
   const approvalTools = new Map<string, string>()
   const text = new Map<string, ChatAgentNarrationNode & { order: number }>()
+  let activeCompactionId: string | null = null
   let failureMessage: string | null = null
   let finalMessageId: string | null = null
   let progress: BuddyRunProgress | null = null
@@ -120,6 +138,44 @@ function projectChatAgentTurn(
       const parsed = buddyRunProgressSchema.safeParse(payload)
       if (parsed.success)
         progress = parsed.data.phase === 'idle' ? null : parsed.data
+      continue
+    }
+    if (event.type === 'context.compaction.started') {
+      activeCompactionId = `compaction:${run.id}:${event.sequence}`
+      compactions.set(activeCompactionId, {
+        estimatedTokensAfter: null,
+        id: activeCompactionId,
+        kind: 'compaction',
+        order: event.sequence,
+        status: 'running',
+        tokensBefore: null,
+      })
+      continue
+    }
+    if (
+      event.type === 'context.compaction.completed'
+      || event.type === 'context.compaction.failed'
+      || event.type === 'context.compaction.cancelled'
+    ) {
+      const id = activeCompactionId ?? `compaction:${run.id}:${event.sequence}`
+      const current = compactions.get(id)
+      compactions.set(id, {
+        estimatedTokensAfter: event.type === 'context.compaction.completed'
+          ? readNonnegativeInteger(payload.estimatedTokensAfter)
+          : null,
+        id,
+        kind: 'compaction',
+        order: current?.order ?? event.sequence,
+        status: event.type === 'context.compaction.completed'
+          ? 'completed'
+          : event.type === 'context.compaction.failed'
+            ? 'failed'
+            : 'cancelled',
+        tokensBefore: event.type === 'context.compaction.completed'
+          ? readNonnegativeInteger(payload.tokensBefore)
+          : null,
+      })
+      activeCompactionId = null
       continue
     }
     if (event.type.startsWith('message.block.')) {
@@ -385,7 +441,7 @@ function projectChatAgentTurn(
   const awaitingApproval = [...tools.values()]
     .filter(node => node.status === 'awaiting_approval')
     .sort((left, right) => right.order - left.order)[0]
-  const nodes = [...reasoningNodes, ...narrationNodes, ...tools.values()]
+  const nodes = [...reasoningNodes, ...narrationNodes, ...tools.values(), ...compactions.values()]
     .sort((left, right) => left.order - right.order)
     .map(({ order: _order, ...node }) => {
       if (

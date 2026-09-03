@@ -221,19 +221,18 @@ class ActivePiEventChannel implements PiCompactionEventChannel, PiTurnEventChann
           })
         ))
         if (purpose === 'turn' && usageRecord) {
-          const totalTokens = usageRecord.totalTokens
-            || usageRecord.inputTokens
-            + usageRecord.outputTokens
+          const contextTokens = usageRecord.inputTokens
             + usageRecord.cacheReadTokens
             + usageRecord.cacheWriteTokens
-          const breakdown = await this.#session.getContextUsageBreakdown?.(totalTokens)
+            || Math.max(0, usageRecord.totalTokens - usageRecord.outputTokens)
+          const breakdown = await this.#session.getContextUsageBreakdown?.(contextTokens)
           if (breakdown) {
             await this.#eventLog.append({
               payload: {
                 ...breakdown,
                 model: usageRecord.model,
                 provider: usageRecord.provider,
-                totalTokens,
+                totalTokens: contextTokens,
               },
               runId: this.#runId,
               type: 'context.usage.updated',
