@@ -5,10 +5,10 @@ import { relative, sep } from 'node:path'
 
 import { redactSensitiveText, redactShellCommand } from '../../../shared/approvalReviewPayload'
 import {
-  createArtifactPresentRunOutput,
-  createArtifactPresentToolPresentation,
+  createTrackedFileRunOutput,
 } from '../artifacts/artifactToolContract'
 import { createAutomationToolPresentation } from '../automations/automationToolContract'
+import { createBrowserToolPresentation } from '../browser/browserToolPresentation'
 import { createMcpToolPresentation } from '../connectors/mcp/mcpToolContract'
 import {
   argumentNames,
@@ -38,7 +38,7 @@ export function createBuddyRunOutputs(
 ): BuddyRunOutputPayload[] {
   const output = createImageGenerationRunOutput(input)
     ?? createImageTransformRunOutput(input)
-    ?? createArtifactPresentRunOutput(input)
+    ?? createTrackedFileRunOutput(input)
   return output ? [output] : []
 }
 
@@ -46,11 +46,11 @@ export function createBuddyToolPresentation(
   input: CreateBuddyToolPresentationInput,
 ): BuddyToolPresentation {
   return createPiToolPresentation(input)
-    ?? createArtifactPresentToolPresentation(input)
     ?? createPetToolPresentation(input)
     ?? createImageGenerationToolPresentation(input)
     ?? createImageTransformToolPresentation(input)
     ?? createAutomationToolPresentation(input)
+    ?? createBrowserToolPresentation(input)
     ?? createSystemToolPresentation(input)
     ?? createMcpToolPresentation(input)
     ?? createGenericToolPresentation(input)

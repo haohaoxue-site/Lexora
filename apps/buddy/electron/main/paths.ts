@@ -1,3 +1,5 @@
+import { Buffer } from 'node:buffer'
+import { createHash } from 'node:crypto'
 import { isAbsolute, join, normalize } from 'node:path'
 
 export type BuddyRuntimeProfile = 'development' | 'stable' | 'test'
@@ -24,6 +26,7 @@ export interface BuddyRuntimePathOptions {
 export interface BuddyRuntimePaths {
   appName: string
   backupsDirectory: string
+  browserAdapterSocket: string
   buddyHome: string
   configPath: string
   crashDumps: string
@@ -53,6 +56,7 @@ const BUDDY_RUNTIME_PROFILES = new Set<BuddyRuntimeProfile>([
   'stable',
   'test',
 ])
+const MAX_UNIX_SOCKET_PATH_BYTES = 100
 
 export function resolveBuddyRuntimePaths(
   options: BuddyRuntimePathOptions,
@@ -76,6 +80,7 @@ export function resolveBuddyRuntimePaths(
   return {
     ...identity,
     backupsDirectory: join(lexoraHome, 'backups', 'buddy'),
+    browserAdapterSocket: runtimeDirectories.browserAdapterSocket,
     buddyHome: join(lexoraHome, 'buddy'),
     configPath: join(lexoraHome, 'config.toml'),
     crashDumps: join(runtimeDirectories.stateRoot, 'crashes'),
@@ -149,6 +154,7 @@ function resolveRuntimeDirectories(
   lexoraHome: string,
   options: BuddyRuntimePathOptions,
 ): {
+  browserAdapterSocket: string
   nativePetSocket: string
   sessionData: string
   stateRoot: string
@@ -156,8 +162,10 @@ function resolveRuntimeDirectories(
 } {
   if (identity.profile === 'test') {
     const runtimeRoot = join(lexoraHome, '.runtime')
+    const socketRoot = resolveTestSocketRoot(identity, lexoraHome, options)
     return {
-      nativePetSocket: join(runtimeRoot, 'native-pet.sock'),
+      browserAdapterSocket: join(socketRoot, 'browser-adapter.sock'),
+      nativePetSocket: join(socketRoot, 'native-pet.sock'),
       sessionData: join(runtimeRoot, 'cache', 'chromium'),
       stateRoot: join(runtimeRoot, 'state'),
       userData: join(runtimeRoot, 'electron'),
@@ -181,6 +189,9 @@ function resolveRuntimeDirectories(
     join(options.temporaryDirectory, `${identity.namespace}-uid-${options.userId}`),
   )
   return {
+    browserAdapterSocket: options.xdgRuntimeDirectory && isAbsolute(options.xdgRuntimeDirectory)
+      ? join(runtimeDirectory, identity.namespace, 'browser-adapter.sock')
+      : join(runtimeDirectory, 'browser-adapter.sock'),
     nativePetSocket: options.xdgRuntimeDirectory && isAbsolute(options.xdgRuntimeDirectory)
       ? join(runtimeDirectory, identity.namespace, 'native-pet.sock')
       : join(runtimeDirectory, 'native-pet.sock'),
@@ -190,6 +201,22 @@ function resolveRuntimeDirectories(
       ? requireAbsolutePath(options.defaultUserData, 'Electron userData')
       : join(configHome, identity.namespace, 'electron'),
   }
+}
+
+function resolveTestSocketRoot(
+  identity: BuddyRuntimeIdentity,
+  lexoraHome: string,
+  options: BuddyRuntimePathOptions,
+): string {
+  const localRuntimeRoot = join(lexoraHome, '.runtime')
+  const longestSocketPath = join(localRuntimeRoot, 'browser-adapter.sock')
+  if (Buffer.byteLength(longestSocketPath, 'utf8') <= MAX_UNIX_SOCKET_PATH_BYTES)
+    return localRuntimeRoot
+  const digest = createHash('sha256').update(lexoraHome).digest('hex').slice(0, 16)
+  return join(
+    requireAbsolutePath(options.temporaryDirectory, 'temporary directory'),
+    `${identity.namespace}-${digest}`,
+  )
 }
 
 function resolveAbsoluteOverride(value: string | undefined, name: string): string | undefined {

@@ -1,21 +1,22 @@
 <script setup lang="ts">
-import type { LocalMessage } from '@buddy-electron/shared/localChatApi'
+import type { LocalArtifact, LocalMessage } from '@buddy-electron/shared/localChatApi'
 import type { BuddyLocale } from '@/i18n/buddyI18n'
-import { Document20Regular } from '@vicons/fluent'
-import { NIcon } from 'naive-ui'
 import { computed, nextTick, shallowRef, useTemplateRef } from 'vue'
 import { useBuddyI18n } from '@/i18n/buddyI18n'
+import BuddyFileIcon from '@/ui/files/BuddyFileIcon.vue'
 import BuddyImagePreview from '@/ui/media/BuddyImagePreview.vue'
 import BuddyChatMarkdownContent from './BuddyChatMarkdownContent.vue'
 import { resolveBuddyAttachmentPreviewUrl } from './chatAttachmentView'
-import { getChatMessageText } from './chatMessageContent'
+import { getChatMessageDisplayText } from './chatMessageContent'
 
 const props = withDefaults(defineProps<{
   final?: boolean
+  hiddenArtifacts?: readonly LocalArtifact[]
   language: BuddyLocale
   message: LocalMessage
 }>(), {
   final: true,
+  hiddenArtifacts: () => [],
 })
 
 const { t } = useBuddyI18n(() => props.language)
@@ -24,7 +25,10 @@ const failedAttachmentIds = shallowRef<ReadonlySet<string>>(new Set())
 const previewIndex = shallowRef(0)
 const previewOpen = shallowRef(false)
 let previewTrackScrollLeft = 0
-const text = computed(() => getChatMessageText(props.message))
+const text = computed(() => getChatMessageDisplayText(
+  props.message,
+  props.hiddenArtifacts,
+))
 const hasText = computed(() => text.value.trim().length > 0)
 const attachmentViews = computed(() => props.message.attachments.map(attachment => ({
   attachment,
@@ -105,7 +109,7 @@ function previewLeaveTransition(): Promise<void> {
           >
         </button>
         <div v-else class="buddy-chat-message-content__file">
-          <NIcon :component="Document20Regular" />
+          <BuddyFileIcon :name="view.attachment.name" size="preview" />
           <span>{{ view.attachment.name }}</span>
           <small>{{ view.attachment.kind === 'text' ? 'TXT' : 'FILE' }}</small>
         </div>

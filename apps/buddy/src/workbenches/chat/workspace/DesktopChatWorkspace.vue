@@ -271,6 +271,7 @@ function dismissBlocker() {
   flex: 1;
   flex-direction: column;
   background: var(--buddy-surface-base);
+  container: desktop-chat-page / inline-size;
 }
 
 .desktop-chat-page__content {
@@ -313,6 +314,8 @@ function dismissBlocker() {
 }
 
 .desktop-chat-page__composer-dock {
+  position: relative;
+  z-index: 2;
   flex: none;
   background: var(--buddy-surface-base);
   padding: 0 var(--buddy-chat-inline-gutter) 1rem;
@@ -400,7 +403,7 @@ function dismissBlocker() {
   50% { opacity: 0.35; }
 }
 
-@media (max-width: 760px) {
+@container desktop-chat-page (max-width: 34rem) {
   .desktop-chat-page__alert {
     grid-template-columns: auto minmax(0, 1fr);
   }

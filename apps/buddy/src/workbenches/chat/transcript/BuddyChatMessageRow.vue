@@ -13,6 +13,7 @@ import BuddyChatTurnChanges from './BuddyChatTurnChanges.vue'
 import BuddyChatTurnOutputs from './BuddyChatTurnOutputs.vue'
 import { projectChatMessageActions } from './chatMessageActions'
 import {
+  getChatMessageDisplayText,
   getChatMessageInterruption,
   getChatMessageText,
 } from './chatMessageContent'
@@ -69,7 +70,11 @@ const interruptionLabel = computed(() => {
     : 'desktop.chat.messageInterrupted')
 })
 const roleLabel = computed(() => t(`message.role.${props.message.role}`))
-const messageText = computed(() => getChatMessageText(props.message))
+const presentedArtifacts = computed(() => props.turnOutputs?.artifacts ?? [])
+const messageText = computed(() => getChatMessageDisplayText(
+  props.message,
+  presentedArtifacts.value,
+))
 
 watch(
   [() => props.editing, () => props.message.id],
@@ -138,6 +143,7 @@ function submitEdit() {
       v-else
       class="buddy-chat-message__body"
       :final="!streaming"
+      :hidden-artifacts="presentedArtifacts"
       :language="language"
       :message="message"
     />

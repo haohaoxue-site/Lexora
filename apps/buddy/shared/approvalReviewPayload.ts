@@ -33,6 +33,29 @@ const automationOperationSchema = z.enum([
   'run_now',
 ])
 
+const browserApprovalEffectSchema = z.enum([
+  'account-change',
+  'authorize',
+  'delete',
+  'publish',
+  'purchase',
+  'send',
+  'submit',
+])
+const browserApprovalOriginSchema = z.union([
+  z.literal('about:blank'),
+  z.string().trim().min(1).max(4_096).refine((value) => {
+    try {
+      const url = new URL(value)
+      return (url.protocol === 'http:' || url.protocol === 'https:')
+        && url.origin === value
+    }
+    catch {
+      return false
+    }
+  }),
+])
+
 export const approvalReviewPayloadSchema = z.discriminatedUnion('card', [
   z.object({
     allowForTurn: z.boolean().default(true),
@@ -76,16 +99,56 @@ export const approvalReviewPayloadSchema = z.discriminatedUnion('card', [
     timezone: z.string().trim().min(1).max(256),
     toolName: toolNameSchema,
   }).strict(),
+  z.object({
+    action: z.enum(['click', 'press']),
+    actionDigest: z.string().regex(/^[a-f0-9]{64}$/),
+    allowForTurn: z.literal(false),
+    card: z.literal('browser-action'),
+    documentRevision: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
+    effect: browserApprovalEffectSchema.nullable(),
+    key: z.enum(['Enter', 'Space']).nullable(),
+    observationId: z.uuid(),
+    origin: browserApprovalOriginSchema,
+    pageId: z.uuid(),
+    risk: z.enum(['commit-like', 'unknown-commit-like']),
+    sessionId: z.uuid(),
+    targetName: z.string().max(1_024).nullable(),
+    targetRole: z.string().trim().min(1).max(1_024).nullable(),
+    toolName: toolNameSchema,
+  }).strict().superRefine((review, context) => {
+    if ((review.risk === 'commit-like') !== (review.effect !== null)) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Known browser commitments require one stable effect',
+        path: ['effect'],
+      })
+    }
+    if ((review.action === 'click') !== (review.key === null)) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Browser approval keys must match the action kind',
+        path: ['key'],
+      })
+    }
+  }),
 ])
 
 export type ApprovalReviewPayload = z.infer<typeof approvalReviewPayloadSchema>
-export type ApprovalReviewKind = 'automation' | 'delete' | 'mcp' | 'network' | 'shell' | 'system'
+export type ApprovalReviewKind = 'automation' | 'browser' | 'delete' | 'mcp' | 'network' | 'shell' | 'system'
 export type AutomationApprovalReview = Extract<
   ApprovalReviewPayload,
   { card: 'automation' }
 >
 export type AutomationApprovalReviewInput = Omit<
   AutomationApprovalReview,
+  'allowForTurn' | 'card' | 'toolName'
+>
+export type BrowserApprovalReview = Extract<
+  ApprovalReviewPayload,
+  { card: 'browser-action' }
+>
+export type BrowserApprovalReviewInput = Omit<
+  BrowserApprovalReview,
   'allowForTurn' | 'card' | 'toolName'
 >
 export type SystemActionApprovalReview = Extract<
@@ -101,6 +164,7 @@ export interface CreateApprovalReviewPayloadInput {
   allowForTurn: boolean
   arguments: unknown
   automation?: AutomationApprovalReviewInput
+  browser?: BrowserApprovalReviewInput
   kind: ApprovalReviewKind
   systemAction?: SystemActionApprovalReviewInput
   toolName: string
@@ -141,6 +205,14 @@ export function createApprovalReviewPayload(
       toolName: input.toolName,
     })
   }
+  if (input.kind === 'browser') {
+    return approvalReviewPayloadSchema.parse({
+      ...input.browser,
+      allowForTurn: input.allowForTurn,
+      card: 'browser-action',
+      toolName: input.toolName,
+    })
+  }
   return approvalReviewPayloadSchema.parse({
     allowForTurn: input.allowForTurn,
     argumentNames: readArgumentNames(input.arguments),
@@ -161,6 +233,8 @@ export function approvalReviewPayloadMatchesKind(
     return payload.card === 'arguments' || payload.card === 'system-action'
   if (kind === 'automation')
     return payload.card === 'automation'
+  if (kind === 'browser')
+    return payload.card === 'browser-action'
   return payload.card === 'arguments'
 }
 

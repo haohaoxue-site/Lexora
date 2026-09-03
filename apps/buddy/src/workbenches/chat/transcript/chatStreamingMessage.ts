@@ -523,6 +523,15 @@ function approvalPresentation(review: ApprovalReviewPayload): BuddyToolPresentat
       status: 'awaiting-approval',
     }
   }
+  if (review.card === 'browser-action') {
+    return {
+      argumentNames: [],
+      card: 'generic',
+      description: null,
+      output: null,
+      truncated: false,
+    }
+  }
   const argumentNames = review.card === 'arguments'
     ? review.argumentNames
     : review.targetPaths.length > 0 ? ['targetPaths'] : []

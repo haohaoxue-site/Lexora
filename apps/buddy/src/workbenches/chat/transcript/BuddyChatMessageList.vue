@@ -81,7 +81,7 @@ const agentTurnOpenOverrides = shallowRef<ReadonlyMap<string, boolean>>(new Map(
 const editingMessageId = shallowRef<string | null>(null)
 const activeOutlineMessageId = shallowRef<string | null>(null)
 const highlightedOutlineMessageId = shallowRef<string | null>(null)
-let outlineHighlightTimer: ReturnType<typeof setTimeout> | null = null
+let outlineHighlightTimer: number | null = null
 const matchingSearchMessageIds = computed(() => new Set(props.matchingSearchMessageIds ?? []))
 const conversationId = computed(() => props.timelineItems[0]?.conversationId ?? null)
 const transcriptProjection = computed(() => projectChatTranscript({

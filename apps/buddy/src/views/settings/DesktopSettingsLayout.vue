@@ -12,7 +12,7 @@ const {
 </script>
 
 <template>
-  <DesktopWorkbenchLayout>
+  <DesktopWorkbenchLayout :language="applicationSettings.language.value">
     <template #sidebar>
       <DesktopSettingsSidebar
         :app-sidebar-collapsed="shell.appSidebarCollapsed.value"

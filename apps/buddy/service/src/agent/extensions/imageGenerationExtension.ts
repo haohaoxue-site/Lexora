@@ -1,6 +1,7 @@
 import type { ImageContent } from '@earendil-works/pi-ai'
 import type { ToolDefinition } from '@earendil-works/pi-coding-agent'
 import type { Static, TSchema } from 'typebox'
+import type { DirectoryGrant } from '../../directories/resolveGrantedPath'
 import type {
   ImageGenerationErrorCode,
   ImageGenerationErrorDiagnostic,
@@ -22,11 +23,11 @@ import {
 export { IMAGE_GENERATION_TOOL_NAME } from '../../images/imageGenerationToolContract'
 
 const imageGenerationParameters = Type.Object({
-  outputName: Type.String({
-    description: 'Short semantic output name without a path or file extension.',
-    maxLength: 64,
+  outputPath: Type.String({
+    description: 'Output file path in the current workspace. The image extension is optional.',
+    maxLength: 4096,
     minLength: 1,
-    pattern: '^[^/\\\\]+$',
+    pattern: '\\S',
   }),
   prompt: Type.String({ maxLength: 32 * 1024, minLength: 1, pattern: '\\S' }),
   reference: Type.Optional(Type.Union([
@@ -54,7 +55,10 @@ export interface CreateImageGenerationExtensionOptions {
     ) => Promise<{ images: ImageContent[], records: Array<{ id: string }> }>
     registerGeneratedImages: (input: {
       conversationId: string
-      images: readonly { bytes: Uint8Array, mimeType: string, name: string }[]
+      cwd: string
+      grants: readonly DirectoryGrant[]
+      images: readonly { bytes: Uint8Array, mimeType: string }[]
+      outputPath: string
       runId: string
       sourceArtifactId: string | null
       sourceToolCallId: string
@@ -67,7 +71,9 @@ export interface CreateImageGenerationExtensionOptions {
     ) => Promise<{ images: ImageContent[], records: Array<{ id: string }> }>
   }
   conversationId: string
+  cwd: string
   getRunId: () => string | undefined
+  grants: readonly DirectoryGrant[]
   imageGenerationGateway: ImageGenerationGateway
 }
 
@@ -108,8 +114,8 @@ function createImageGenerationTool(
       if (!Check(imageGenerationParameters, parameters))
         return imageToolFailure('VALIDATION_FAILED')
       const input = parameters as ImageGenerationParameters
-      const outputName = input.outputName.trim()
-      if (!outputName || outputName === '.' || outputName === '..')
+      const outputPath = input.outputPath.trim()
+      if (!outputPath || outputPath === '.' || outputPath === '..')
         return imageToolFailure('VALIDATION_FAILED')
       const model = context.model
       if (!model || !options.imageGenerationGateway.supports(model))
@@ -130,11 +136,13 @@ function createImageGenerationTool(
         })
         const artifacts = await options.artifactService.registerGeneratedImages({
           conversationId: options.conversationId,
-          images: generated.images.map((image, index) => ({
+          cwd: options.cwd,
+          grants: options.grants,
+          images: generated.images.map(image => ({
             bytes: Uint8Array.from(image.bytes),
             mimeType: image.mimeType,
-            name: createGeneratedImageName(outputName, index, image.mimeType),
           })),
+          outputPath,
           runId,
           sourceArtifactId: references.artifactIds.at(-1) ?? null,
           sourceToolCallId: toolCallId,
@@ -166,23 +174,9 @@ function createImageGenerationTool(
     promptGuidelines: [
       'When the user asks to create or generatively edit an image, use lexora_image_generate instead of shell scripts or drawing libraries.',
       'With lexora_image_generate, when the user refers to an image already in the conversation, use reference.mode=resources with its attachmentId or artifactId, or reference.mode=latest.',
-      'With lexora_image_generate, set outputName to a concise semantic name in the user language without a path or file extension; use a separate call when different images need different names.',
+      'With lexora_image_generate, set outputPath to the intended path in the current workspace. The tool appends the image extension when omitted and numeric suffixes when one call returns multiple images.',
     ],
   })
-}
-
-function createGeneratedImageName(outputName: string, index: number, mimeType: string): string {
-  const suffix = index === 0 ? '' : `-${index + 1}`
-  return `${outputName}${suffix}${extensionForImageMimeType(mimeType)}`
-}
-
-function extensionForImageMimeType(mimeType: string): string {
-  return new Map([
-    ['image/gif', '.gif'],
-    ['image/jpeg', '.jpg'],
-    ['image/png', '.png'],
-    ['image/webp', '.webp'],
-  ]).get(mimeType) ?? '.img'
 }
 
 async function materializeReferences(

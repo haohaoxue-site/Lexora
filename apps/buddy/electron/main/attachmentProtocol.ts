@@ -47,7 +47,9 @@ export function installAttachmentProtocol(runtime: BuddyServiceSupervisor): () =
       const body = await readFile(preview.path)
       return new Response(body, {
         headers: {
-          'cache-control': 'private, max-age=300',
+          'cache-control': scheme === ARTIFACT_PROTOCOL
+            ? 'private, no-store'
+            : 'private, max-age=300',
           'content-type': preview.mimeType,
           'x-content-type-options': 'nosniff',
         },

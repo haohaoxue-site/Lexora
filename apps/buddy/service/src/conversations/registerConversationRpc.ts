@@ -2,7 +2,11 @@ import type { AttachmentService } from '../attachments/AttachmentService'
 import type { ChangeCaptureService } from '../changes/ChangeCaptureService'
 import type { BuddyRunEvent } from '../events/BuddyRunEvent'
 import type { RuntimeRequestRegistrar } from '../rpc/runtimeRequest'
-import type { ArtifactRecord, ArtifactRepository } from '../storage/artifactRepository'
+import type {
+  ArtifactChangeRecord,
+  ArtifactRecord,
+  ArtifactRepository,
+} from '../storage/artifactRepository'
 import type { ConversationHistoryRepository } from '../storage/conversationHistoryRepository'
 import type { ConversationIndexRepository } from '../storage/conversationIndexRepository'
 import type { ConversationModelSelection } from '../storage/conversationRecord'
@@ -66,7 +70,7 @@ type ConversationRpcRepository = Pick<
 > & ConversationIndexRepository & ConversationTimelineRepository
 
 export interface RegisterConversationRpcOptions {
-  artifacts: Pick<ArtifactRepository, 'listForConversation'>
+  artifacts: Pick<ArtifactRepository, 'listChangesForRuns' | 'listForConversation'>
   attachments: Pick<AttachmentService, 'listForConversation'>
   changes: Pick<ChangeCaptureService, 'listSummariesForRuns'>
   conversations: ConversationRpcRepository
@@ -224,8 +228,9 @@ export function registerConversationRpc(options: RegisterConversationRpcOptions)
       messageItems.flatMap(item => item.runId ? [item.runId] : []),
     )
     const runEvents = options.eventLog.listForRuns(runs.map(run => run.id))
+    const runIds = runs.map(run => run.id)
     return {
-      changeSets: options.changes.listSummariesForRuns(runs.map(run => run.id)),
+      changeSets: options.changes.listSummariesForRuns(runIds),
       items,
       nextCursor: page.nextBefore
         ? createConversationTimelineCursor({
@@ -237,6 +242,7 @@ export function registerConversationRpc(options: RegisterConversationRpcOptions)
       outputs: projectRunOutputs(
         runEvents,
         options.artifacts.listForConversation(input.conversationId),
+        options.artifacts.listChangesForRuns(runIds),
       ),
       runEvents: runEvents.map(toPublicRunEvent),
       runs: runs.map(run => toPublicRun(
@@ -268,23 +274,29 @@ function requireValue<T>(value: T | null): T {
 function projectRunOutputs(
   events: readonly BuddyRunEvent[],
   artifacts: readonly ArtifactRecord[],
+  changes: readonly ArtifactChangeRecord[],
 ) {
   const artifactsById = new Map(artifacts.map(record => [record.id, record]))
-  const projectedArtifactIds = new Set<string>()
+  const changesBySource = new Map(changes.map(change => [
+    artifactChangeSourceKey(change.artifactId, change.runId, change.sourceToolCallId),
+    change,
+  ]))
   return events.flatMap((event) => {
     if (event.type !== 'output.produced')
       return []
     const output = buddyRunOutputPayloadSchema.safeParse(event.payload)
     if (!output.success)
       return []
-    const projectedArtifacts = output.data.artifactIds.flatMap((artifactId) => {
-      if (projectedArtifactIds.has(artifactId))
-        return []
+    const projectedArtifacts = [...new Set(output.data.artifactIds)].flatMap((artifactId) => {
       const artifact = artifactsById.get(artifactId)
-      if (!artifact)
+      const change = changesBySource.get(artifactChangeSourceKey(
+        artifactId,
+        event.runId,
+        output.data.sourceToolCallId,
+      ))
+      if (!artifact || !change)
         return []
-      projectedArtifactIds.add(artifactId)
-      return [toPublicArtifact(artifact)]
+      return [toPublicArtifact(artifact, change)]
     })
     return projectedArtifacts.length > 0
       ? [{
@@ -297,17 +309,32 @@ function projectRunOutputs(
   })
 }
 
-function toPublicArtifact(record: ArtifactRecord) {
+function artifactChangeSourceKey(
+  artifactId: string,
+  runId: string,
+  sourceToolCallId: string,
+): string {
+  return `${artifactId}\0${runId}\0${sourceToolCallId}`
+}
+
+function toPublicArtifact(record: ArtifactRecord, change: ArtifactChangeRecord) {
   return {
     artifactId: record.id,
+    changeType: change.changeType,
     conversationId: record.conversationId,
     createdAt: record.createdAt,
+    createdRunId: record.createdRunId,
+    deletedAt: record.deletedAt,
+    lastChangedRunId: record.lastChangedRunId,
     mimeType: record.mimeType,
     name: record.name,
+    previousRelativePath: change.previousRelativePath,
     previewUrl: null,
-    runId: record.runId,
+    relativePath: record.relativePath,
+    runId: change.runId,
     sizeBytes: record.sizeBytes,
     sourceArtifactId: record.sourceArtifactId,
-    sourceToolCallId: record.sourceToolCallId,
+    sourceToolCallId: change.sourceToolCallId,
+    updatedAt: record.updatedAt,
   }
 }

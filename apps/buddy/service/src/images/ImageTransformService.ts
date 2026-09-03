@@ -1,4 +1,5 @@
 import type { ArtifactService } from '../artifacts/ArtifactService'
+import type { DirectoryGrant } from '../directories/resolveGrantedPath'
 import type { ArtifactRecord } from '../storage/artifactRepository'
 import { PhotonImage } from '@silvia-odwyer/photon-node'
 
@@ -8,8 +9,10 @@ const PNG_SIGNATURE = Uint8Array.from([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A,
 export interface RemoveChromaInput {
   color: string
   conversationId: string
+  cwd: string
   despill: number
-  outputName: string
+  grants: readonly DirectoryGrant[]
+  outputPath: string
   runId: string
   softness: number
   sourceArtifactId: string
@@ -68,11 +71,13 @@ export class ImageTransformService {
       }
       const [artifact] = await this.#artifacts.registerGeneratedImages({
         conversationId: input.conversationId,
+        cwd: input.cwd,
+        grants: input.grants,
         images: [{
           bytes,
           mimeType: 'image/png',
-          name: normalizePngName(input.outputName),
         }],
+        outputPath: input.outputPath,
         runId: input.runId,
         sourceArtifactId: input.sourceArtifactId,
         sourceToolCallId: input.sourceToolCallId,
@@ -148,7 +153,7 @@ function parseHexColor(value: string): readonly [number, number, number] {
 
 function validateTransformInput(input: RemoveChromaInput): void {
   if (
-    !input.outputName.trim()
+    !input.outputPath.trim()
     || !Number.isFinite(input.tolerance)
     || input.tolerance < 0
     || input.tolerance > 442
@@ -161,11 +166,6 @@ function validateTransformInput(input: RemoveChromaInput): void {
   ) {
     throw new ImageTransformError('VALIDATION_FAILED')
   }
-}
-
-function normalizePngName(outputName: string): string {
-  const name = outputName.trim()
-  return name.toLowerCase().endsWith('.png') ? name : `${name}.png`
 }
 
 function readPngDimensions(bytes: Uint8Array): { height: number, width: number } | null {

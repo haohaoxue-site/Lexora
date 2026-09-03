@@ -56,8 +56,7 @@ const sections = computed<ToolDetailSection[]>(() => {
     ))
   }
   if (
-    presentation.card === 'artifact'
-    || presentation.card === 'automation'
+    presentation.card === 'automation'
     || presentation.card === 'image'
     || presentation.card === 'pet'
   ) {

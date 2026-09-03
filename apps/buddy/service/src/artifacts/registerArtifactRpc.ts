@@ -7,11 +7,18 @@ const idSchema = z.string().trim().min(1).max(256)
 
 export interface RegisterArtifactRpcOptions {
   rpc: RuntimeRequestRegistrar
-  service: Pick<ArtifactService, 'readText' | 'resolvePreview'>
+  service: Pick<ArtifactService, 'readText' | 'resolveBrowserEntry' | 'resolvePreview'>
 }
 
 export function registerArtifactRpc(options: RegisterArtifactRpcOptions): () => void {
   const disposers = [
+    options.rpc.onRequest('artifacts.resolveBrowserEntry', (params) => {
+      const input = parse(z.object({
+        artifactId: idSchema,
+        conversationId: z.string().trim().min(1).max(128),
+      }).strict(), params)
+      return options.service.resolveBrowserEntry(input.conversationId, input.artifactId)
+    }),
     options.rpc.onRequest('artifacts.resolvePreview', (params) => {
       const input = parse(z.object({ artifactId: idSchema }).strict(), params)
       return options.service.resolvePreview(input.artifactId)

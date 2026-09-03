@@ -70,8 +70,12 @@ export class ToolPolicy {
         ? { type: 'allow' }
         : { type: 'deny', code: 'VALIDATION_FAILED' }
     }
-    if (request.source === 'lexora' && request.risk === 'read')
+    if (
+      request.source === 'lexora'
+      && (request.risk === 'interaction' || request.risk === 'read')
+    ) {
       return { type: 'allow' }
+    }
 
     switch (request.toolName) {
       case 'read':
@@ -94,6 +98,8 @@ export class ToolPolicy {
     switch (request.risk) {
       case 'visual':
         return { type: 'allow' }
+      case 'interaction':
+        return ask('system', 'Interact with application content')
       case 'read':
       case 'write':
         if (!request.paths?.length)

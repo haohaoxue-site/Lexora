@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import type { DesktopOpenTarget, LexoraDesktopApi } from '@buddy-electron/shared/desktopApi'
 import { useTimeoutFn } from '@vueuse/core'
-import { onBeforeUnmount, provide, readonly, shallowRef, watch } from 'vue'
+import { onBeforeUnmount, provide, readonly, shallowRef, useTemplateRef, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { desktopAppContextKey } from '@/app/desktopAppContext'
 import { createDesktopCapabilities } from '@/app/desktopCapabilities'
 import { useDesktopAppState } from '@/app/useDesktopAppState'
+import DesktopBrowserGuestHost from '@/browser/DesktopBrowserGuestHost.vue'
 import { resolveBuddyLocale } from '@/i18n/buddyI18n'
 import { desktopRouteLocations } from '@/router'
 import { useDesktopShellState } from '@/shell/useDesktopShellState'
@@ -39,6 +40,10 @@ const capabilities = createDesktopCapabilities({
 })
 const shell = useDesktopShellState(capabilities.applicationSettings)
 const notificationTargetMessageId = shallowRef<string | null>(null)
+const browserGuestHost = useTemplateRef<InstanceType<typeof DesktopBrowserGuestHost>>(
+  'browserGuestHost',
+)
+const activeBrowserSurface = shallowRef<{ element: HTMLElement, sessionId: string } | null>(null)
 const notificationTargetTimer = useTimeoutFn(
   () => notificationTargetMessageId.value = null,
   3_000,
@@ -80,6 +85,11 @@ watch(
 )
 
 provide(desktopAppContextKey, {
+  browser: api.browser,
+  browserGuests: {
+    hide: hideBrowserGuest,
+    show: showBrowserGuest,
+  },
   capabilities,
   clipboard: api.clipboard,
   notificationTargetMessageId: readonly(notificationTargetMessageId),
@@ -87,6 +97,29 @@ provide(desktopAppContextKey, {
   shell,
   toggleAppSidebar,
 })
+
+watch(browserGuestHost, (host) => {
+  const surface = activeBrowserSurface.value
+  if (host && surface)
+    host.show(surface.sessionId, surface.element)
+})
+
+function showBrowserGuest(sessionId: string, element: HTMLElement): void {
+  activeBrowserSurface.value = { element, sessionId }
+  browserGuestHost.value?.show(sessionId, element)
+}
+
+function hideBrowserGuest(sessionId: string, element?: HTMLElement): void {
+  const surface = activeBrowserSurface.value
+  if (
+    surface?.sessionId !== sessionId
+    || (element && surface.element !== element)
+  ) {
+    return
+  }
+  activeBrowserSurface.value = null
+  browserGuestHost.value?.hide(sessionId, element)
+}
 
 function toggleAppSidebar() {
   void shell.setAppSidebarCollapsed(!shell.appSidebarCollapsed.value)
@@ -131,5 +164,6 @@ function requireDesktopApi(): LexoraDesktopApi {
 </script>
 
 <template>
+  <DesktopBrowserGuestHost ref="browserGuestHost" :api="api.browser" />
   <slot />
 </template>

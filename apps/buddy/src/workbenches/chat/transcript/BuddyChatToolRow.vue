@@ -7,6 +7,7 @@ import {
   Document20Regular,
   DrawImage20Regular,
   Edit20Regular,
+  Globe20Regular,
   PlugConnected20Regular,
   Search20Regular,
   Sparkle20Regular,
@@ -59,7 +60,7 @@ const canExpand = computed(() => {
 })
 const title = computed(() => {
   switch (props.node.presentation.card) {
-    case 'artifact': return t('desktop.chat.processToolArtifact')
+    case 'browser': return browserOperationLabel(props.node.presentation.operation)
     case 'terminal': return t('desktop.chat.processToolCommand')
     case 'read': return t('desktop.chat.processToolRead')
     case 'search': return t('desktop.chat.processToolSearch')
@@ -84,14 +85,18 @@ const summary = computed(() => {
       : props.node.status === 'denied'
         ? t('desktop.chat.processToolApprovalDenied')
         : null
-  if (presentation.card === 'artifact') {
-    return lifecycle ?? (
-      presentation.status === 'completed' && presentation.presentedCount !== null
-        ? t('desktop.chat.processToolArtifactCount', { count: presentation.presentedCount })
-        : presentation.status === 'failed'
-          ? t('desktop.chat.processToolArtifactFailed')
-          : t('desktop.chat.processToolArtifactRunning')
-    )
+  if (presentation.card === 'browser') {
+    return [
+      lifecycle ?? (presentation.status === 'failed'
+        ? t('desktop.chat.processToolFailed')
+        : null),
+      presentation.origin,
+      presentation.operation === 'snapshot' && presentation.elementCount !== null
+        ? t('desktop.chat.processToolBrowserElementCount', {
+            count: presentation.elementCount,
+          })
+        : null,
+    ].filter(Boolean).join(' · ')
   }
   if (presentation.card === 'terminal') {
     return [
@@ -152,7 +157,7 @@ const summary = computed(() => {
 })
 const leadingIcon = computed(() => {
   switch (props.node.presentation.card) {
-    case 'artifact': return Document20Regular
+    case 'browser': return Globe20Regular
     case 'terminal': return WindowConsole20Regular
     case 'read': return Document20Regular
     case 'search': return Search20Regular
@@ -166,6 +171,16 @@ const leadingIcon = computed(() => {
   }
   return Wrench20Regular
 })
+
+function browserOperationLabel(
+  operation: Extract<ChatAgentToolNode['presentation'], { card: 'browser' }>['operation'],
+): string {
+  switch (operation) {
+    case 'act': return t('desktop.chat.processToolBrowserAct')
+    case 'open': return t('desktop.chat.processToolBrowserOpen')
+    case 'snapshot': return t('desktop.chat.processToolBrowserSnapshot')
+  }
+}
 
 function terminalStatusLabel(
   presentation: Extract<ChatAgentToolNode['presentation'], { card: 'terminal' }>,

@@ -579,15 +579,22 @@ const attachmentSchema = z.object({
 
 const artifactSchema = z.object({
   artifactId: idSchema,
+  changeType: z.enum(['created', 'updated', 'deleted', 'renamed']),
   conversationId: idSchema,
   createdAt: timestampSchema,
+  createdRunId: idSchema,
+  deletedAt: timestampSchema.nullable(),
+  lastChangedRunId: idSchema,
   mimeType: z.string().min(1),
   name: z.string().min(1),
+  previousRelativePath: z.string().min(1).max(32_768).nullable(),
   previewUrl: z.string().nullable(),
+  relativePath: z.string().min(1).max(32_768),
   runId: idSchema,
   sizeBytes: z.number().int().nonnegative(),
   sourceArtifactId: idSchema.nullable(),
   sourceToolCallId: idSchema,
+  updatedAt: timestampSchema,
 }).strict()
 
 const changeSetSummarySchema = z.object({
@@ -666,7 +673,7 @@ const runSchema = z.object({
   triggeringMessageId: idSchema,
 }).strict()
 const runOutputSchema = z.object({
-  artifacts: z.array(artifactSchema).min(1).max(16),
+  artifacts: z.array(artifactSchema).min(1).max(512),
   createdAt: timestampSchema,
   runId: idSchema,
   sourceToolCallId: idSchema,
@@ -684,7 +691,7 @@ const runEventSchema = publicRunEventSchema
 const approvalSchema = z.object({
   createdAt: timestampSchema,
   id: idSchema,
-  kind: z.enum(['automation', 'delete', 'mcp', 'network', 'shell', 'system']),
+  kind: z.enum(['automation', 'browser', 'delete', 'mcp', 'network', 'shell', 'system']),
   payload: approvalReviewPayloadSchema,
   resolvedAt: nullableTimestampSchema,
   runId: idSchema,
