@@ -18,7 +18,6 @@ import type {
 import type { ToolApprovalKind } from '../../approvals/toolPolicyContract'
 import type { DirectoryGrant } from '../../directories/resolveGrantedPath'
 import type { BuddyInProcessExtension } from '../createBuddyResourceLoader'
-import { createToolApprovalScopeKey } from '../../approvals/toolApprovalScope'
 import { isToolClassificationFailure } from '../../approvals/toolClassification'
 import { ToolPolicy } from '../../approvals/ToolPolicy'
 import { readToolCallBlockReason } from '../../approvals/toolPolicyContract'
@@ -32,7 +31,6 @@ export interface ToolApprovalGateway {
     browser?: BrowserApprovalReviewInput
     kind: ToolApprovalKind
     runId: string
-    scopeKey: string
     signal: AbortSignal
     summary: string
     systemAction?: SystemActionApprovalReviewInput
@@ -168,14 +166,6 @@ async function requestApproval(
     browser: review.browser,
     kind: review.kind,
     runId: run.runId,
-    scopeKey: createToolApprovalScopeKey({
-      arguments: event.input,
-      kind: review.kind,
-      paths: review.paths,
-      resource: review.resource,
-      risk: review.risk,
-      toolName: event.toolName,
-    }),
     signal: run.signal,
     summary: review.summary,
     systemAction: review.systemAction,
