@@ -191,35 +191,50 @@ function handleFileDrop(event: DragEvent) {
 
       <slot name="leadingContext" />
 
-      <DesktopExecutionProfileSelector
-        :can-update="canUpdateExecutionProfile"
-        :execution-profile="executionProfile"
-        :is-updating="isUpdatingExecutionProfile"
-        :language="language"
-        @update-execution-profile="emit('updateExecutionProfile', $event)"
-      />
+      <div
+        class="desktop-chat-composer__execution-profile"
+        data-testid="composer-execution-profile"
+      >
+        <DesktopExecutionProfileSelector
+          :can-update="canUpdateExecutionProfile"
+          :execution-profile="executionProfile"
+          :is-updating="isUpdatingExecutionProfile"
+          :language="language"
+          @update-execution-profile="emit('updateExecutionProfile', $event)"
+        />
+      </div>
     </template>
 
     <template #actions>
-      <ChatContextUsage
-        :is-running="isRunning"
-        :language="language"
-        :usage="contextUsage"
-      />
+      <div
+        class="desktop-chat-composer__context-usage"
+        data-testid="composer-context-usage"
+      >
+        <ChatContextUsage
+          :is-running="isRunning"
+          :language="language"
+          :usage="contextUsage"
+        />
+      </div>
 
-      <DesktopModelSelector
-        :disabled="isSending"
-        :language="language"
-        :models="models"
-        :providers="providers"
-        :selected-effort="selectedEffort"
-        :selected-model="selectedModel"
-        :selected-model-id="selectedModelId"
-        :selected-service-tier="selectedServiceTier"
-        @update-effort="emit('updateEffort', $event)"
-        @update-model="emit('updateModel', $event)"
-        @update-service-tier="emit('updateServiceTier', $event)"
-      />
+      <div
+        class="desktop-chat-composer__model-selector"
+        data-testid="composer-model-selector"
+      >
+        <DesktopModelSelector
+          :disabled="isSending"
+          :language="language"
+          :models="models"
+          :providers="providers"
+          :selected-effort="selectedEffort"
+          :selected-model="selectedModel"
+          :selected-model-id="selectedModelId"
+          :selected-service-tier="selectedServiceTier"
+          @update-effort="emit('updateEffort', $event)"
+          @update-model="emit('updateModel', $event)"
+          @update-service-tier="emit('updateServiceTier', $event)"
+        />
+      </div>
 
       <NButton
         v-if="isRunning"
@@ -257,6 +272,12 @@ function handleFileDrop(event: DragEvent) {
 </template>
 
 <style scoped lang="scss">
+.desktop-chat-composer__context-usage,
+.desktop-chat-composer__execution-profile,
+.desktop-chat-composer__model-selector {
+  display: contents;
+}
+
 .desktop-chat-composer__suggestions {
   position: absolute;
   right: 0;
@@ -379,5 +400,33 @@ function handleFileDrop(event: DragEvent) {
   color: var(--buddy-text-muted);
   font-size: 0.68rem;
   text-align: center;
+}
+
+@container desktop-chat-composer (max-width: 26rem) {
+  .desktop-chat-composer__context-usage {
+    display: none;
+  }
+}
+
+@container desktop-chat-composer (max-width: 24rem) {
+  .desktop-chat-composer__model-selector {
+    display: none;
+  }
+}
+
+@container desktop-chat-composer (max-width: 20rem) {
+  .desktop-chat-composer__execution-profile :deep(.desktop-execution-profile-selector__trigger) {
+    width: var(--buddy-composer-control-height);
+    min-width: var(--buddy-composer-control-height);
+    padding: 0;
+  }
+
+  .desktop-chat-composer__execution-profile :deep(.desktop-execution-profile-selector__label) {
+    display: none;
+  }
+
+  .desktop-chat-composer__execution-profile :deep(.n-button__icon) {
+    margin: 0;
+  }
 }
 </style>

@@ -1,4 +1,5 @@
 import type { Static, TSchema } from 'typebox'
+import type { DirectoryGrant } from '../../directories/resolveGrantedPath'
 import type { ImageTransformService } from '../../images/ImageTransformService'
 import type { ImageTransformToolDetails } from '../../images/imageTransformToolContract'
 import type { BuddyInProcessExtension } from '../createBuddyResourceLoader'
@@ -14,7 +15,9 @@ type ImageTransformParameters = Static<typeof imageTransformParameters>
 
 export interface CreateImageTransformExtensionOptions {
   conversationId: string
+  cwd: string
   getRunId: () => string | undefined
+  grants: readonly DirectoryGrant[]
   service: Pick<ImageTransformService, 'removeChroma'>
 }
 
@@ -40,8 +43,10 @@ export function createImageTransformExtension(
             const artifact = await options.service.removeChroma({
               color: input.keyColor ?? '#00ff00',
               conversationId: options.conversationId,
+              cwd: options.cwd,
               despill: input.despill ?? 1,
-              outputName: input.outputName,
+              grants: options.grants,
+              outputPath: input.outputPath,
               runId,
               softness: input.softness ?? 80,
               sourceArtifactId: input.sourceArtifactId,
@@ -65,7 +70,7 @@ export function createImageTransformExtension(
         parameters: imageTransformParameters,
         promptGuidelines: [
           'When a PNG conversation artifact has a solid green-screen or other chroma background, use lexora_image_chroma_key with its artifactId instead of shell commands, interpreters, or host image packages.',
-          'Set outputName to a concise semantic name without a path or extension; use keyColor, tolerance, softness, and despill only when the defaults do not match the source.',
+          'Set outputPath to the intended PNG path in the current workspace; use keyColor, tolerance, softness, and despill only when the defaults do not match the source.',
         ],
       }))
       pi.on('tool_result', (event) => {

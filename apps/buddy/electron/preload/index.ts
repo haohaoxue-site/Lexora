@@ -1,5 +1,9 @@
 import type {
   DesktopAppInfo,
+  DesktopBrowserGuestDescriptor,
+  DesktopBrowserProfileMode,
+  DesktopBrowserSetSurfaceInput,
+  DesktopBrowserState,
   DesktopOpenTarget,
   DesktopWindowState,
   LexoraConfigPatch,
@@ -277,6 +281,83 @@ const desktopApi: LexoraDesktopApi = Object.freeze({
     openReleasePage: (url: string) => ipcRenderer.invoke(
       DESKTOP_IPC_CHANNELS.appOpenReleasePage,
       { url },
+    ),
+  }),
+  browser: Object.freeze({
+    attachGuest: (sessionId: string, webContentsId: number) => ipcRenderer.invoke(
+      DESKTOP_IPC_CHANNELS.browserAttachGuest,
+      { sessionId, webContentsId },
+    ),
+    captureScreenshot: (sessionId: string): Promise<boolean> => ipcRenderer.invoke(
+      DESKTOP_IPC_CHANNELS.browserCaptureScreenshot,
+      { sessionId },
+    ),
+    close: (sessionId: string) => ipcRenderer.invoke(
+      DESKTOP_IPC_CHANNELS.browserClose,
+      { sessionId },
+    ),
+    ensureSession: (conversationId: string): Promise<DesktopBrowserState> => ipcRenderer.invoke(
+      DESKTOP_IPC_CHANNELS.browserEnsureSession,
+      { conversationId },
+    ),
+    goBack: (sessionId: string) => ipcRenderer.invoke(
+      DESKTOP_IPC_CHANNELS.browserGoBack,
+      { sessionId },
+    ),
+    goForward: (sessionId: string) => ipcRenderer.invoke(
+      DESKTOP_IPC_CHANNELS.browserGoForward,
+      { sessionId },
+    ),
+    listGuests: (): Promise<DesktopBrowserGuestDescriptor[]> => ipcRenderer.invoke(
+      DESKTOP_IPC_CHANNELS.browserListGuests,
+    ),
+    navigate: (sessionId: string, url: string): Promise<DesktopBrowserState> => ipcRenderer.invoke(
+      DESKTOP_IPC_CHANNELS.browserNavigate,
+      { sessionId, url },
+    ),
+    onStateChanged: (listener: (state: DesktopBrowserState) => void) =>
+      subscribe(DESKTOP_IPC_CHANNELS.browserStateChanged, listener),
+    onGuestsChanged: (listener: () => void) => subscribe<void>(
+      DESKTOP_IPC_CHANNELS.browserGuestsChanged,
+      listener,
+    ),
+    openArtifact: (
+      sessionId: string,
+      artifactId: string,
+    ): Promise<DesktopBrowserState> => ipcRenderer.invoke(
+      DESKTOP_IPC_CHANNELS.browserOpenArtifact,
+      { artifactId, sessionId },
+    ),
+    openExternal: (sessionId: string): Promise<boolean> => ipcRenderer.invoke(
+      DESKTOP_IPC_CHANNELS.browserOpenExternal,
+      { sessionId },
+    ),
+    reload: (sessionId: string) => ipcRenderer.invoke(
+      DESKTOP_IPC_CHANNELS.browserReload,
+      { sessionId },
+    ),
+    setProfileMode: (
+      sessionId: string,
+      profileMode: DesktopBrowserProfileMode,
+    ): Promise<DesktopBrowserState> => ipcRenderer.invoke(
+      DESKTOP_IPC_CHANNELS.browserSetProfileMode,
+      { profileMode, sessionId },
+    ),
+    setSurface: (input: DesktopBrowserSetSurfaceInput) => ipcRenderer.invoke(
+      DESKTOP_IPC_CHANNELS.browserSetSurface,
+      { sessionId: input.sessionId, visible: input.visible },
+    ),
+    stop: (sessionId: string) => ipcRenderer.invoke(
+      DESKTOP_IPC_CHANNELS.browserStop,
+      { sessionId },
+    ),
+    showFileInFolder: (sessionId: string): Promise<boolean> => ipcRenderer.invoke(
+      DESKTOP_IPC_CHANNELS.browserShowFileInFolder,
+      { sessionId },
+    ),
+    takeControl: (sessionId: string): Promise<DesktopBrowserState> => ipcRenderer.invoke(
+      DESKTOP_IPC_CHANNELS.browserTakeControl,
+      { sessionId },
     ),
   }),
   clipboard: Object.freeze({

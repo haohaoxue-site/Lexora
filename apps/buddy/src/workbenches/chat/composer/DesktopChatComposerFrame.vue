@@ -42,11 +42,15 @@ withDefaults(defineProps<{
   --desktop-chat-composer-editor-padding-bottom: 0.6rem;
 
   width: 100%;
+  min-width: 0;
   margin: 0 auto;
+  container: desktop-chat-composer / inline-size;
 }
 
 .desktop-chat-composer {
   position: relative;
+  width: 100%;
+  min-width: 0;
   border: 1px solid var(--buddy-border-strong);
   border-radius: 0.75rem;
   background: var(--buddy-surface-base);

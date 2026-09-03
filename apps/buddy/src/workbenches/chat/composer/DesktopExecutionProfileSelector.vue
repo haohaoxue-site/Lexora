@@ -60,7 +60,9 @@ function confirmFullAccess() {
         <template #icon>
           <NIcon :component="executionProfileIcon" />
         </template>
-        {{ t(fullAccess ? 'desktop.chat.executionProfileFull' : 'desktop.chat.executionProfileDefault') }}
+        <span class="desktop-execution-profile-selector__label">
+          {{ t(fullAccess ? 'desktop.chat.executionProfileFull' : 'desktop.chat.executionProfileDefault') }}
+        </span>
       </NButton>
     </template>
 

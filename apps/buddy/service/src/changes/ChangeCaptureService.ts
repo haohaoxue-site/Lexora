@@ -7,13 +7,26 @@ import type {
   FileChangeCaptureRecord,
 } from './changeSetRepository'
 import { createHash, randomUUID } from 'node:crypto'
-import { mkdir, readFile, stat, writeFile } from 'node:fs/promises'
+import { mkdir, readdir, readFile, stat, writeFile } from 'node:fs/promises'
 import { basename, extname, isAbsolute, relative, resolve, sep } from 'node:path'
 import { redactSensitiveText } from '../../../shared/approvalReviewPayload'
 import { resolveGrantedPath } from '../directories/resolveGrantedPath'
 
 const MAX_CHANGE_TEXT_BYTES = 1024 * 1024
 const MAX_CHANGE_HASH_BYTES = 32 * 1024 * 1024
+const MAX_SHELL_SNAPSHOT_BYTES = 256 * 1024 * 1024
+const MAX_SHELL_SNAPSHOT_FILES = 4096
+const IGNORED_SHELL_DIRECTORIES = new Set([
+  '.git',
+  '.hg',
+  '.pnpm',
+  '.svn',
+  '.venv',
+  '.yarn',
+  'node_modules',
+  'target',
+  'venv',
+])
 
 interface FileToolInput {
   conversationId: string
@@ -51,9 +64,42 @@ export interface LocalChangeSetDetail extends LocalChangeSetSummary {
   files: LocalFileChangeDetail[]
 }
 
+export interface CapturedFileChange {
+  canonicalPath: string
+  changeType: 'created' | 'deleted' | 'updated'
+}
+
+export interface CapturedFileMove {
+  changeType: 'renamed'
+  fromPath: string
+  toPath: string
+}
+
+export type CapturedWorkspaceChange = CapturedFileChange | CapturedFileMove
+
+interface ShellSnapshotState {
+  canonicalPath: string
+  directoryGrantId: string
+  hash: string
+  relativePath: string
+  sizeBytes: number
+}
+
+interface ShellSnapshot {
+  complete: boolean
+  files: Map<string, ShellSnapshotState>
+}
+
+interface PendingShellCapture {
+  conversationId: string
+  runId: string
+  snapshot: ShellSnapshot
+}
+
 export class ChangeCaptureService {
   readonly #paths: BuddyDataPaths
   readonly #repository: ChangeSetRepository
+  readonly #shellCaptures = new Map<string, PendingShellCapture>()
 
   constructor(options: { paths: BuddyDataPaths, repository: ChangeSetRepository }) {
     this.#paths = options.paths
@@ -100,10 +146,12 @@ export class ChangeCaptureService {
     })
   }
 
-  async finishFileTool(input: FileToolInput & { isError: boolean }): Promise<void> {
+  async finishFileTool(
+    input: FileToolInput & { isError: boolean },
+  ): Promise<CapturedFileChange | null> {
     const capture = this.#repository.findCaptureByToolCallId(input.toolCallId)
     if (!capture || capture.changeSetId !== input.runId)
-      return
+      return null
     if (!capture.canonicalPath || !capture.directoryGrantId)
       throw new ChangeCaptureError('VALIDATION_FAILED')
     const resolution = await resolveGrantedPath(input.grants, capture.canonicalPath, 'create')
@@ -120,6 +168,61 @@ export class ChangeCaptureService {
     const now = new Date().toISOString()
     this.#repository.completeCapture(capture.id, after, input.isError, now)
     this.#refreshFileCount(input.runId, now)
+    if (sameState(capture.before, after))
+      return null
+    if (capture.before.kind === 'missing' && isTrackableFileState(after)) {
+      return {
+        canonicalPath: resolution.canonicalPath,
+        changeType: 'created',
+      }
+    }
+    if (isTrackableFileState(capture.before) && after.kind === 'missing') {
+      return {
+        canonicalPath: resolution.canonicalPath,
+        changeType: 'deleted',
+      }
+    }
+    return isTrackableFileState(capture.before) && isTrackableFileState(after)
+      ? {
+          canonicalPath: resolution.canonicalPath,
+          changeType: 'updated',
+        }
+      : null
+  }
+
+  async beginShellTool(input: {
+    conversationId: string
+    grants: readonly DirectoryGrant[]
+    runId: string
+    toolCallId: string
+  }): Promise<void> {
+    this.#shellCaptures.set(input.toolCallId, {
+      conversationId: input.conversationId,
+      runId: input.runId,
+      snapshot: await captureShellSnapshot(input.grants),
+    })
+  }
+
+  async finishShellTool(input: {
+    conversationId: string
+    grants: readonly DirectoryGrant[]
+    runId: string
+    toolCallId: string
+  }): Promise<{ changes: CapturedWorkspaceChange[], complete: boolean }> {
+    const before = this.#shellCaptures.get(input.toolCallId)
+    this.#shellCaptures.delete(input.toolCallId)
+    if (
+      !before
+      || before.conversationId !== input.conversationId
+      || before.runId !== input.runId
+    ) {
+      throw new ChangeCaptureError('VALIDATION_FAILED')
+    }
+    const after = await captureShellSnapshot(input.grants)
+    return {
+      changes: diffShellSnapshots(before.snapshot.files, after.files),
+      complete: before.snapshot.complete && after.complete,
+    }
   }
 
   async markPartial(input: { conversationId: string, runId: string }): Promise<void> {
@@ -129,6 +232,7 @@ export class ChangeCaptureService {
   }
 
   async markInterrupted(runId: string): Promise<void> {
+    this.#discardShellCaptures(runId)
     const changeSet = this.#repository.findSetById(runId)
     if (!changeSet)
       return
@@ -139,6 +243,7 @@ export class ChangeCaptureService {
   }
 
   async finalizeRun(runId: string): Promise<void> {
+    this.#discardShellCaptures(runId)
     const changeSet = this.#repository.findSetById(runId)
     if (!changeSet)
       return
@@ -270,6 +375,13 @@ export class ChangeCaptureService {
       redacted: change.before.redacted || change.after.redacted,
     }
   }
+
+  #discardShellCaptures(runId: string): void {
+    for (const [toolCallId, capture] of this.#shellCaptures) {
+      if (capture.runId === runId)
+        this.#shellCaptures.delete(toolCallId)
+    }
+  }
 }
 
 interface AggregatedChange {
@@ -305,6 +417,190 @@ function sameState(left: CapturedFileStateRecord, right: CapturedFileStateRecord
   if (left.kind === 'missing')
     return true
   return left.hash !== null && left.hash === right.hash
+}
+
+function isTrackableFileState(state: CapturedFileStateRecord): boolean {
+  return state.hash !== null
+    && state.kind !== 'missing'
+    && state.kind !== 'sensitive'
+    && state.kind !== 'unavailable'
+}
+
+async function captureShellSnapshot(
+  grants: readonly DirectoryGrant[],
+): Promise<ShellSnapshot> {
+  const files = new Map<string, ShellSnapshotState>()
+  const seenPaths = new Set<string>()
+  const budget = {
+    bytes: 0,
+    complete: true,
+    files: 0,
+  }
+  const uniqueGrants = [...new Map(
+    grants.map(grant => [grant.grantId, grant]),
+  ).values()].sort((left, right) => right.canonicalRoot.length - left.canonicalRoot.length)
+
+  for (const grant of uniqueGrants) {
+    if (budget.files >= MAX_SHELL_SNAPSHOT_FILES)
+      break
+    try {
+      const metadata = await stat(grant.canonicalRoot)
+      if (!metadata.isDirectory()) {
+        budget.complete = false
+        continue
+      }
+      await scanGrantDirectory(grant, grant.canonicalRoot, files, seenPaths, budget)
+    }
+    catch {
+      budget.complete = false
+    }
+  }
+  return { complete: budget.complete, files }
+}
+
+async function scanGrantDirectory(
+  grant: DirectoryGrant,
+  directory: string,
+  files: Map<string, ShellSnapshotState>,
+  seenPaths: Set<string>,
+  budget: { bytes: number, complete: boolean, files: number },
+): Promise<void> {
+  let entries
+  try {
+    entries = await readdir(directory, { withFileTypes: true })
+  }
+  catch {
+    budget.complete = false
+    return
+  }
+  entries.sort((left, right) => left.name.localeCompare(right.name))
+  for (const entry of entries) {
+    if (budget.files >= MAX_SHELL_SNAPSHOT_FILES) {
+      budget.complete = false
+      return
+    }
+    const path = resolve(directory, entry.name)
+    if (entry.isDirectory()) {
+      if (!IGNORED_SHELL_DIRECTORIES.has(entry.name))
+        await scanGrantDirectory(grant, path, files, seenPaths, budget)
+      continue
+    }
+    if (!entry.isFile() || seenPaths.has(path))
+      continue
+    const relativePath = relative(grant.canonicalRoot, path).split(sep).join('/')
+    if (!relativePath || isSensitivePath(relativePath))
+      continue
+    try {
+      const metadata = await stat(path)
+      if (
+        !metadata.isFile()
+        || metadata.size > MAX_CHANGE_HASH_BYTES
+        || budget.bytes + metadata.size > MAX_SHELL_SNAPSHOT_BYTES
+      ) {
+        budget.complete = false
+        continue
+      }
+      const bytes = await readFile(path)
+      const state: ShellSnapshotState = {
+        canonicalPath: path,
+        directoryGrantId: grant.grantId,
+        hash: createHash('sha256').update(bytes).digest('hex'),
+        relativePath,
+        sizeBytes: bytes.byteLength,
+      }
+      files.set(shellSnapshotKey(state), state)
+      seenPaths.add(path)
+      budget.bytes += bytes.byteLength
+      budget.files += 1
+    }
+    catch {
+      budget.complete = false
+    }
+  }
+}
+
+function diffShellSnapshots(
+  before: ReadonlyMap<string, ShellSnapshotState>,
+  after: ReadonlyMap<string, ShellSnapshotState>,
+): CapturedWorkspaceChange[] {
+  const changes: CapturedWorkspaceChange[] = []
+  const deleted: ShellSnapshotState[] = []
+  const created: ShellSnapshotState[] = []
+
+  for (const [key, previous] of before) {
+    const current = after.get(key)
+    if (!current) {
+      deleted.push(previous)
+      continue
+    }
+    if (current.hash !== previous.hash || current.sizeBytes !== previous.sizeBytes) {
+      changes.push({
+        canonicalPath: current.canonicalPath,
+        changeType: 'updated',
+      })
+    }
+  }
+  for (const [key, current] of after) {
+    if (!before.has(key))
+      created.push(current)
+  }
+
+  const deletedByFingerprint = groupShellStatesByFingerprint(deleted)
+  const createdByFingerprint = groupShellStatesByFingerprint(created)
+  const movedFrom = new Set<string>()
+  const movedTo = new Set<string>()
+  for (const [fingerprint, previous] of deletedByFingerprint) {
+    const current = createdByFingerprint.get(fingerprint)
+    if (previous.length !== 1 || current?.length !== 1)
+      continue
+    const [from] = previous
+    const [to] = current
+    if (!from || !to)
+      continue
+    movedFrom.add(shellSnapshotKey(from))
+    movedTo.add(shellSnapshotKey(to))
+    changes.push({
+      changeType: 'renamed',
+      fromPath: from.canonicalPath,
+      toPath: to.canonicalPath,
+    })
+  }
+  changes.push(...deleted
+    .filter(state => !movedFrom.has(shellSnapshotKey(state)))
+    .map(state => ({
+      canonicalPath: state.canonicalPath,
+      changeType: 'deleted' as const,
+    })))
+  changes.push(...created
+    .filter(state => !movedTo.has(shellSnapshotKey(state)))
+    .map(state => ({
+      canonicalPath: state.canonicalPath,
+      changeType: 'created' as const,
+    })))
+  return changes.sort((left, right) => (
+    workspaceChangePath(left).localeCompare(workspaceChangePath(right))
+  ))
+}
+
+function groupShellStatesByFingerprint(
+  states: readonly ShellSnapshotState[],
+): Map<string, ShellSnapshotState[]> {
+  const groups = new Map<string, ShellSnapshotState[]>()
+  for (const state of states) {
+    const key = `${state.hash}\0${state.sizeBytes}`
+    const group = groups.get(key) ?? []
+    group.push(state)
+    groups.set(key, group)
+  }
+  return groups
+}
+
+function shellSnapshotKey(state: ShellSnapshotState): string {
+  return `${state.directoryGrantId}\0${state.relativePath}`
+}
+
+function workspaceChangePath(change: CapturedWorkspaceChange): string {
+  return change.changeType === 'renamed' ? change.toPath : change.canonicalPath
 }
 
 function emptyState(kind: 'missing' | 'unavailable'): CapturedFileStateRecord {

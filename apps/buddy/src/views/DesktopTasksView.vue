@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useDesktopApp } from '@/app/desktopAppContext'
 import DesktopWorkbenchLayout from '@/layouts/DesktopWorkbenchLayout.vue'
@@ -8,11 +9,13 @@ import DesktopChatWorkspaceHeader from '@/workbenches/chat/workspace/DesktopChat
 import { useConversationSearch } from '@/workbenches/chat/workspace/useConversationSearch'
 import DesktopTaskSpaceSelector from '@/workbenches/tasks/composer/DesktopTaskSpaceSelector.vue'
 import DesktopTaskContextPanel from '@/workbenches/tasks/context/DesktopTaskContextPanel.vue'
+import { isBrowserArtifact } from '@/workbenches/tasks/context/taskContextPanel'
 import { useTaskContextPanel } from '@/workbenches/tasks/context/useTaskContextPanel'
 import DesktopTaskIndex from '@/workbenches/tasks/index/DesktopTaskIndex.vue'
 
 const router = useRouter()
 const {
+  browser,
   capabilities: { tasks },
   notificationTargetMessageId,
   shell,
@@ -20,9 +23,12 @@ const {
 } = useDesktopApp()
 const { index: taskIndex, session: taskSession } = tasks
 const chatSession = tasks.workspace.session
+const activeRunId = computed(() => tasks.workspace.execution.activeRun.value?.id ?? null)
 const taskContext = useTaskContextPanel({
   activeConversationId: chatSession.activeConversationId,
+  activeRunId,
   changeSets: tasks.workspace.transcript.changeSets,
+  runEvents: tasks.workspace.transcript.runEvents,
   runOutputs: tasks.workspace.transcript.runOutputs,
 })
 const conversationSearch = useConversationSearch({
@@ -30,10 +36,44 @@ const conversationSearch = useConversationSearch({
   activeConversationId: chatSession.activeConversationId,
   loadMessages: chatSession.listActiveConversationMessages,
 })
+
+async function closeContextTab(tabId: string): Promise<void> {
+  const tab = taskContext.tabs.value.find(item => item.id === tabId)
+  if (tab?.kind === 'browser') {
+    const state = await browser.ensureSession(tab.conversationId)
+    await browser.close(state.sessionId)
+  }
+  taskContext.closeTab(tabId)
+}
+
+async function openArtifact(artifactId: string): Promise<void> {
+  const artifact = tasks.workspace.transcript.runOutputs.value
+    .flatMap(output => output.artifacts)
+    .find(item => item.artifactId === artifactId)
+  if (!artifact || artifact.deletedAt !== null)
+    return
+  if (!isBrowserArtifact(artifact)) {
+    taskContext.openArtifact(artifactId)
+    return
+  }
+  const conversationId = chatSession.activeConversationId.value
+  if (!conversationId || artifact.conversationId !== conversationId)
+    return
+  taskContext.openBrowser()
+  try {
+    const state = await browser.ensureSession(conversationId)
+    if (chatSession.activeConversationId.value !== conversationId)
+      return
+    await browser.openArtifact(state.sessionId, artifactId)
+  }
+  catch {
+    taskContext.openArtifact(artifactId)
+  }
+}
 </script>
 
 <template>
-  <DesktopWorkbenchLayout>
+  <DesktopWorkbenchLayout :language="tasks.language.value" sidebar-resizable>
     <template #sidebar>
       <DesktopTaskIndex
         :active-conversation-id="taskSession.activeTaskId.value"
@@ -79,7 +119,7 @@ const conversationSearch = useConversationSearch({
       :workspace="tasks.workspace"
       :matching-search-message-ids="conversationSearch.matchingMessageIds.value"
       @open-settings="router.push(desktopRouteLocations.settings($event))"
-      @open-artifact="taskContext.openArtifact"
+      @open-artifact="openArtifact"
       @open-changes="taskContext.openChanges"
     >
       <template v-if="taskSession.activeTaskId.value === null" #composerLeadingContext>
@@ -101,8 +141,9 @@ const conversationSearch = useConversationSearch({
         :language="tasks.language.value"
         :read-artifact-text="tasks.workspace.context.readArtifactText"
         :tabs="taskContext.tabs.value"
-        @close-tab="taskContext.closeTab"
+        @close-tab="closeContextTab"
         @collapse="taskContext.toggle"
+        @open-browser="taskContext.openBrowser"
         @select-tab="taskContext.selectTab"
       />
     </template>

@@ -40,6 +40,7 @@ import { AutomationScheduler } from './automations/AutomationScheduler'
 import { AutomationService } from './automations/AutomationService'
 import { registerAutomationRpc } from './automations/registerAutomationRpc'
 import { resolveAutomationModelSelection } from './automations/resolveAutomationModelSelection'
+import { BrowserHostClient } from './browser/BrowserHostClient'
 import { ChangeCaptureService } from './changes/ChangeCaptureService'
 import { createChangeSetRepository } from './changes/changeSetRepository'
 import { registerChangeRpc } from './changes/registerChangeRpc'
@@ -178,7 +179,7 @@ export async function startBuddyService(
     repository: createAttachmentRepository(options.database),
   })
   const artifactsRepository = createArtifactRepository(options.database)
-  const artifactService = new ArtifactService({ paths, repository: artifactsRepository })
+  const artifactService = new ArtifactService({ repository: artifactsRepository })
   const imageTransformService = new ImageTransformService({ artifacts: artifactService })
   const providersRepository = createProviderRepository(options.database)
   const providerService = await createProviderService({
@@ -214,6 +215,7 @@ export async function startBuddyService(
     eventSink: event => options.eventLog.append(event),
     peer: options.rpc,
   })
+  const browserHost = new BrowserHostClient(options.rpc)
   const automationClock = options.automationClock ?? systemAutomationClock
   const automationRepositories = createAutomationRepositories(options.database)
   const automationTurns = createAutomationTurnRepository(options.database)
@@ -265,6 +267,7 @@ export async function startBuddyService(
     artifactService,
     attachmentService,
     automationService,
+    browserHost,
     changeCaptureService,
     connectorService,
     directoryAuthorization,

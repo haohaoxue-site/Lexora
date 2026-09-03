@@ -1,5 +1,6 @@
 import type {
   AutomationApprovalReviewInput,
+  BrowserApprovalReviewInput,
   SystemActionApprovalReviewInput,
 } from '../../../shared/approvalReviewPayload'
 import type {
@@ -11,6 +12,7 @@ import type {
 export interface BuddyToolClassification {
   approval?: {
     automation?: AutomationApprovalReviewInput
+    browser?: BrowserApprovalReviewInput
     kind?: ToolApprovalKind
     summary: string
     systemAction?: SystemActionApprovalReviewInput
@@ -20,6 +22,7 @@ export interface BuddyToolClassification {
   resource?: { id: string, kind?: 'connector' | 'space', trusted: boolean }
   risk?: ToolRisk
   source?: 'lexora' | 'mcp' | 'pi'
+  validateBeforeExecution?: () => Promise<BuddyToolClassificationFailure | null>
 }
 
 export interface BuddyToolClassificationFailure {

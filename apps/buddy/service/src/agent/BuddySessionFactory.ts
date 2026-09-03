@@ -76,7 +76,6 @@ export class BuddySessionFactory {
       conversationId: blueprint.conversationId,
       executionProfile: blueprint.executionProfile,
       grants: blueprint.grants,
-      scratchRoot: blueprint.scratchRoot,
       sessionMode: blueprint.sessionMode,
       signal: input.signal,
       spaceId: blueprint.space?.id ?? null,

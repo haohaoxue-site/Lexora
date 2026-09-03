@@ -322,10 +322,13 @@ function projectTurnOutputs(
     const artifacts = artifactsByRunId.get(output.runId) ?? []
     const artifactIds = artifactIdsByRunId.get(output.runId) ?? new Set<string>()
     for (const artifact of output.artifacts) {
-      if (artifactIds.has(artifact.artifactId))
-        continue
-      artifactIds.add(artifact.artifactId)
-      artifacts.push(artifact)
+      if (artifactIds.has(artifact.artifactId)) {
+        artifacts[artifacts.findIndex(item => item.artifactId === artifact.artifactId)] = artifact
+      }
+      else {
+        artifactIds.add(artifact.artifactId)
+        artifacts.push(artifact)
+      }
     }
     artifactsByRunId.set(output.runId, artifacts)
     artifactIdsByRunId.set(output.runId, artifactIds)

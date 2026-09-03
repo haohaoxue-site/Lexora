@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import type { LocalArtifact, LocalArtifactText } from '@buddy-electron/shared/localChatApi'
 import type { BuddyLocale } from '@/i18n/buddyI18n'
-import { Document20Regular } from '@vicons/fluent'
-import { NIcon, NSpin } from 'naive-ui'
+import { NSpin } from 'naive-ui'
 import { computed, shallowRef, watch } from 'vue'
 import { useBuddyI18n } from '@/i18n/buddyI18n'
+import BuddyFileIcon from '@/ui/files/BuddyFileIcon.vue'
 import BuddyImagePreview from '@/ui/media/BuddyImagePreview.vue'
 
 const props = defineProps<{
@@ -23,7 +23,7 @@ const textPreviewLoading = shallowRef(false)
 let textLoadGeneration = 0
 const previewUrl = computed(() => (
   props.artifact.mimeType.startsWith('image/') && !previewFailed.value
-    ? `lexora-artifact://preview/${encodeURIComponent(props.artifact.artifactId)}`
+    ? `lexora-artifact://preview/${encodeURIComponent(props.artifact.artifactId)}?v=${encodeURIComponent(props.artifact.updatedAt)}`
     : null
 ))
 const previewSources = computed(() => previewUrl.value ? [previewUrl.value] : [])
@@ -31,12 +31,12 @@ const textPreviewable = computed(() => isTextMimeType(props.artifact.mimeType))
 const detail = computed(() => [
   resolveFileType(props.artifact),
   formatFileSize(props.artifact.sizeBytes),
-  formatDate(props.artifact.createdAt, props.language),
+  formatDate(props.artifact.updatedAt, props.language),
 ].join(' · '))
 
 watch(
-  () => props.artifact.artifactId,
-  async (artifactId) => {
+  () => [props.artifact.artifactId, props.artifact.updatedAt] as const,
+  async ([artifactId]) => {
     previewFailed.value = false
     previewIndex.value = 0
     previewOpen.value = false
@@ -143,7 +143,7 @@ function isTextMimeType(mimeType: string): boolean {
         class="desktop-artifact-context-surface__text"
       ><code>{{ textPreview.text }}</code></pre>
       <div v-else class="desktop-artifact-context-surface__fallback">
-        <NIcon :component="Document20Regular" />
+        <BuddyFileIcon :name="artifact.name" size="preview" />
         <strong>{{ artifact.name }}</strong>
         <span>{{ t(textPreviewFailed ? 'desktop.context.previewLoadFailed' : 'desktop.context.previewUnavailable') }}</span>
       </div>
@@ -229,11 +229,6 @@ function isTextMimeType(mimeType: string): boolean {
   gap: 0.5rem;
   color: var(--buddy-text-muted);
   text-align: center;
-}
-
-.desktop-artifact-context-surface__fallback :deep(.n-icon) {
-  width: 2rem;
-  height: 2rem;
 }
 
 .desktop-artifact-context-surface__fallback strong {

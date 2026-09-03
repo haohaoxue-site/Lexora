@@ -7,7 +7,7 @@ import type { ApprovalService } from './ApprovalService'
 import { z } from 'zod'
 import { parse } from '../rpc/runtimeRequest'
 
-const approvalKinds = ['automation', 'delete', 'mcp', 'network', 'shell', 'system'] as const
+const approvalKinds = ['automation', 'browser', 'delete', 'mcp', 'network', 'shell', 'system'] as const
 const approvalStatuses = ['pending', 'approved', 'denied', 'cancelled'] as const
 const idSchema = z.string().trim().min(1).max(256)
 const approvalIdSchema = z.object({ approvalId: idSchema }).strict()

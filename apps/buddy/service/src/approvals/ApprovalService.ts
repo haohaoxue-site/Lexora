@@ -1,5 +1,6 @@
 import type {
   AutomationApprovalReviewInput,
+  BrowserApprovalReviewInput,
   SystemActionApprovalReviewInput,
 } from '../../../shared/approvalReviewPayload'
 import type { AppendBuddyRunEventInput } from '../events/BuddyRunEvent'
@@ -20,6 +21,7 @@ export interface ApprovalRequest {
   allowForTurn: boolean
   arguments: unknown
   automation?: AutomationApprovalReviewInput
+  browser?: BrowserApprovalReviewInput
   kind: ToolApprovalKind
   runId: string
   scopeKey: string
@@ -85,6 +87,7 @@ export class ApprovalService {
         allowForTurn: input.allowForTurn,
         arguments: input.arguments,
         automation: input.automation,
+        browser: input.browser,
         kind: input.kind,
         systemAction: input.systemAction,
         toolName: input.toolName,

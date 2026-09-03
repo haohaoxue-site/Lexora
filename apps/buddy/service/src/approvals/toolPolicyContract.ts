@@ -3,7 +3,15 @@ import type { DirectoryGrant, GrantedPathMode } from '../directories/resolveGran
 
 export type ToolApprovalKind = ApprovalReviewKind
 export type ToolRisk
-  = 'authorization' | 'delete' | 'mcp' | 'network' | 'read' | 'system' | 'visual' | 'write'
+  = 'authorization'
+    | 'delete'
+    | 'interaction'
+    | 'mcp'
+    | 'network'
+    | 'read'
+    | 'system'
+    | 'visual'
+    | 'write'
 export type ToolPolicyDenialCode
   = 'INVALID_PATH'
     | 'PATH_NOT_FOUND'

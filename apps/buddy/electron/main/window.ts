@@ -50,6 +50,7 @@ export function createDesktopWindow(options: CreateDesktopWindowOptions): Deskto
       sandbox: true,
       nodeIntegration: false,
       webSecurity: true,
+      webviewTag: true,
       allowRunningInsecureContent: false,
     },
   }

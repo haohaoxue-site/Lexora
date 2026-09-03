@@ -15,7 +15,7 @@ const messageIdSchema = z.string().min(1).max(256)
 const approvalRequestPayloadSchema = z.object({
   createdAt: z.iso.datetime(),
   id: z.string().min(1),
-  kind: z.enum(['automation', 'delete', 'mcp', 'network', 'shell', 'system']),
+  kind: z.enum(['automation', 'browser', 'delete', 'mcp', 'network', 'shell', 'system']),
   payload: approvalReviewPayloadSchema,
   resolvedAt: z.null(),
   runId: buddyRunIdSchema,
