@@ -12,6 +12,7 @@ import { useDebounceFn } from '@vueuse/core'
 import { computed, readonly, shallowRef, watch } from 'vue'
 import { useBuddyI18n } from '@/i18n/buddyI18n'
 import { resolveLocalChatErrorMessage } from '@/lib/localChatError'
+import { useChatComposerInteractions } from '@/workbenches/chat/composer/useChatComposerInteractions'
 import { useChatApprovals } from '@/workbenches/chat/state/useChatApprovals'
 import { useChatContextUsage } from '@/workbenches/chat/state/useChatContextUsage'
 import { useChatConversations } from '@/workbenches/chat/state/useChatConversations'
@@ -234,6 +235,7 @@ export function useTaskCapability(options: UseTaskCapabilityOptions) {
     selectedServiceTier: modelProviders.selectedServiceTier,
   })
   const { contextUsage } = contextUsageTracker
+  const composerInteractions = useChatComposerInteractions({ runs })
   const execution = useChatExecution({
     activeRun,
     api: api.localChat,
@@ -247,6 +249,7 @@ export function useTaskCapability(options: UseTaskCapabilityOptions) {
     language,
     persistWorkspaceState,
     modelProviders,
+    onActionCommandRunStarted: composerInteractions.trackActionCommand,
     refreshBranches,
     runSync,
     setErrorMessage: message => errorMessage.value = message,
@@ -526,12 +529,14 @@ export function useTaskCapability(options: UseTaskCapabilityOptions) {
       attachments: readonly(attachments),
       composerContent: readonly(composerContent),
       contextUsage: readonly(contextUsage),
+      dismissInteraction: composerInteractions.dismissInteraction,
       draft: readonly(draft),
       executionProfile: executionProfileState.executionProfile,
       canUpdateExecutionProfile: readonly(canUpdateExecutionProfile),
       isUpdatingExecutionProfile: executionProfileState.isUpdating,
       isSelectingFiles: readonly(isSelectingFiles),
       importAttachments,
+      interaction: composerInteractions.interaction,
       listContextOptions,
       models: modelProviders.models,
       providers: modelProviders.providers,

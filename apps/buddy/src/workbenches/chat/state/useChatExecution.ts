@@ -27,6 +27,7 @@ interface UseChatExecutionOptions {
   isUpdatingExecutionProfile: ValueRef<boolean>
   language: ValueRef<BuddyLocale>
   modelProviders: ModelProvidersStore
+  onActionCommandRunStarted: (runId: string) => void
   persistWorkspaceState: () => Promise<boolean>
   refreshBranches: () => Promise<void>
   runSync: ReturnType<typeof useChatRunSync>
@@ -48,6 +49,7 @@ export function useChatExecution(options: UseChatExecutionOptions) {
     isUpdatingExecutionProfile: options.isUpdatingExecutionProfile,
     language: options.language,
     modelProviders: options.modelProviders,
+    onActionCommandRunStarted: options.onActionCommandRunStarted,
     persistWorkspaceState: options.persistWorkspaceState,
     runSync: options.runSync,
     runtimeSupervisor: options.runtimeSupervisor,

@@ -37,6 +37,7 @@ interface UseChatTurnExecutionOptions {
   isUpdatingExecutionProfile: ValueRef<boolean>
   language: ValueRef<BuddyLocale>
   modelProviders: ModelProvidersStore
+  onActionCommandRunStarted: (runId: string) => void
   persistWorkspaceState: () => Promise<boolean>
   runSync: ReturnType<typeof useChatRunSync>
   runtimeSupervisor: RuntimeSupervisorStore
@@ -186,11 +187,17 @@ export function useChatTurnExecution(options: UseChatTurnExecutionOptions) {
         requestId,
       })
       requestIds.release(operationKey)
-      if (isSourceViewCurrent())
+      if (isSourceViewCurrent()) {
+        options.onActionCommandRunStarted(result.runId)
         options.runSync.applyRunStart(result)
+      }
       if (result.run.status === 'failed' || result.run.status === 'cancelled') {
-        if (isSourceViewCurrent())
+        if (
+          isSourceViewCurrent()
+          && result.run.errorCode !== 'CONTEXT_COMPACTION_NOT_NEEDED'
+        ) {
           options.setErrorMessage(options.getRunTerminationMessage(result.run.errorCode))
+        }
         return false
       }
       options.drafts.clear(sourceScopeKey)

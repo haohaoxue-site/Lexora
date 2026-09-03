@@ -47,12 +47,17 @@ export interface ContextUsageSnapshotServiceOptions {
   sessionCompositionServices: BuddySessionCompositionServices
 }
 
-export type ContextUsageSnapshot = BuddyContextSnapshot & {
+type ReadyBuddyContextSnapshot = Exclude<BuddyContextSnapshot, null>
+
+export type ContextUsageSnapshot = {
   contextWindow: number
   createdAt: string
   modelId: string
   providerId: string
-}
+} & (
+  | { status: 'pending' }
+  | ReadyBuddyContextSnapshot & { status: 'ready' }
+)
 
 export interface ContextUsageSnapshotReader {
   getSnapshot: (input: ContextUsageSnapshotInput) => Promise<ContextUsageSnapshot>
@@ -144,12 +149,19 @@ export class ContextUsageSnapshotService implements ContextUsageSnapshotReader {
       resources: blueprint.resources,
       thinkingLevel: input.modelSelection.reasoning ?? undefined,
     })
-    return {
-      ...snapshot,
+    const identity = {
       contextWindow: selected.model.contextWindow,
       createdAt: new Date().toISOString(),
       modelId: selected.model.id,
       providerId: selected.model.provider,
+    }
+    if (!snapshot)
+      return { ...identity, status: 'pending' }
+
+    return {
+      ...snapshot,
+      ...identity,
+      status: 'ready',
     }
   }
 }

@@ -8,6 +8,7 @@ import { computed } from 'vue'
 import { useBuddyI18n } from '@/i18n/buddyI18n'
 import BuddyChatActionToolbar from './BuddyChatActionToolbar.vue'
 import BuddyChatAgentIdentity from './BuddyChatAgentIdentity.vue'
+import BuddyChatCompactionRow from './BuddyChatCompactionRow.vue'
 import BuddyChatReasoningGroup from './BuddyChatReasoningGroup.vue'
 import BuddyChatToolRow from './BuddyChatToolRow.vue'
 import {
@@ -123,6 +124,11 @@ const actionCopyText = computed(() => resultNoticeText.value ?? statusLabel.valu
           v-if="row.kind === 'reasoning-group'"
           :group="row"
           :language="language"
+        />
+        <BuddyChatCompactionRow
+          v-else-if="row.kind === 'compaction'"
+          :language="language"
+          :node="row"
         />
         <BuddyChatToolRow
           v-else-if="row.kind === 'tool'"
