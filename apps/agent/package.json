@@ -1,7 +1,7 @@
 {
   "name": "@haohaoxue/lexora-agent",
   "type": "module",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "private": true,
   "scripts": {
     "dev": "node --watch --import dotenv/config --import @swc-node/register/esm-register src/main.ts",
