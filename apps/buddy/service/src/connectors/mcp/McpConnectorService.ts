@@ -228,7 +228,6 @@ export class McpConnectorService {
       try {
         const session = await this.#getSession(connector)
         const result = createMcpTools({
-          serverId: connector.id,
           serverName: connector.name,
           session,
           tools: await session.listTools(signal),

@@ -3,6 +3,7 @@ import type { RuntimeRequestRegistrar } from '../rpc/runtimeRequest'
 import type { ChatCommandService } from './ChatCommandService'
 import type { ChatTurnService } from './ChatTurnService'
 import { z } from 'zod'
+import { BUDDY_APPROVAL_POLICIES } from '../../../shared/approvalPolicy'
 import { BUDDY_EXECUTION_PROFILES } from '../../../shared/executionProfile'
 import {
   BUDDY_SERVICE_TIERS,
@@ -25,6 +26,7 @@ const modelSelectionSchema = z.object({
   serviceTier: z.enum(BUDDY_SERVICE_TIERS).nullable(),
 }).strict()
 const startTurnSchema = z.object({
+  approvalPolicy: z.enum(BUDDY_APPROVAL_POLICIES),
   attachmentIds: attachmentIdsSchema,
   branchId: sessionIdentitySchema.nullable(),
   content: z.string().max(2 * 1024 * 1024),

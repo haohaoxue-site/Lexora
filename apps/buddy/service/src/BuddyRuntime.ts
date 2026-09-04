@@ -1,3 +1,4 @@
+import type { BuddyApprovalPolicy } from '../../shared/approvalPolicy'
 import type { BuddyExecutionProfile } from '../../shared/executionProfile'
 import type {
   BuddyServiceTier,
@@ -18,6 +19,7 @@ export interface BuddyTurnModelSelection {
 }
 
 export interface BuddyStartTurnInput {
+  approvalPolicy: BuddyApprovalPolicy
   attachmentIds: readonly string[]
   branchId: string | null
   content: string

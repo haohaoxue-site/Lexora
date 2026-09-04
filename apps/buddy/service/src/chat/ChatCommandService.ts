@@ -67,6 +67,7 @@ export class ChatCommandService {
         })
       : this.#options.commands.prepare({
           ...input,
+          approvalPolicy: conversation.approvalPolicy,
           createdAt: new Date().toISOString(),
           executionProfile: conversation.executionProfile,
           requestFingerprint,

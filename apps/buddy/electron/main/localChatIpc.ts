@@ -464,9 +464,9 @@ export function registerLocalChatIpc(options: RegisterLocalChatIpcOptions): () =
     localChatSchemas.conversationRename.parse(input),
     localChatResponseSchemas.conversation,
   ))
-  handle(LOCAL_CHAT_IPC_CHANNELS.conversationsSetExecutionProfile, (_event, input) => request(
-    'conversations.setExecutionProfile',
-    localChatSchemas.conversationExecutionProfile.parse(input),
+  handle(LOCAL_CHAT_IPC_CHANNELS.conversationsSetPermissionSettings, (_event, input) => request(
+    'conversations.setPermissionSettings',
+    localChatSchemas.conversationPermissionSettings.parse(input),
     localChatResponseSchemas.conversation,
   ))
   handle(LOCAL_CHAT_IPC_CHANNELS.conversationsSetModelSelection, (_event, input) => request(

@@ -38,6 +38,7 @@ export type BuddyProjectedEventType
     | 'output.produced'
     | 'run.progress'
     | 'tool.completed'
+    | 'tool.denied'
     | 'tool.preparing'
     | 'tool.started'
     | 'tool.updated'
@@ -79,6 +80,12 @@ export interface PiEventProjectionState {
 
 export interface AuthorizedToolExecution {
   arguments: unknown
+  toolCallId: string
+  toolName: string
+}
+
+export interface DeniedToolExecution {
+  denialCode: string
   toolCallId: string
   toolName: string
 }
@@ -232,6 +239,21 @@ export function projectToolExecutionAuthorized(
       },
       ...progressProjection(state, 'tool_executing', tool.toolName).events,
     ],
+  }
+}
+
+export function projectToolExecutionDenied(
+  event: DeniedToolExecution,
+): PiEventProjection {
+  return {
+    events: [{
+      payload: {
+        denialCode: event.denialCode,
+        toolCallId: event.toolCallId,
+        toolName: event.toolName,
+      },
+      type: 'tool.denied',
+    }],
   }
 }
 

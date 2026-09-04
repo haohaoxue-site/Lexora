@@ -3,6 +3,7 @@ import type {
   LocalPromptContextItem,
   LocalRun,
 } from '@buddy-electron/shared/localChatApi'
+import type { BuddyApprovalPolicy } from '@buddy-shared/approvalPolicy'
 import type { ParsedBuddyChatCommand } from '@buddy-shared/buddyChatCommands'
 import type { BuddyExecutionProfile } from '@buddy-shared/executionProfile'
 import type { BuddyLocale } from '@/i18n/buddyI18n'
@@ -27,6 +28,7 @@ interface ValueRef<T> {
 
 interface UseChatTurnExecutionOptions {
   activeRun: ValueRef<LocalRun | null>
+  approvalPolicy: ValueRef<BuddyApprovalPolicy>
   api: LexoraDesktopApi['localChat']
   taskIndexData: TaskIndexData
   session: ChatSession
@@ -34,7 +36,7 @@ interface UseChatTurnExecutionOptions {
   draftScopeKey: ValueRef<string>
   executionProfile: ValueRef<BuddyExecutionProfile>
   getRunTerminationMessage: (errorCode: string | null) => string
-  isUpdatingExecutionProfile: ValueRef<boolean>
+  isUpdatingPermissionSettings: ValueRef<boolean>
   language: ValueRef<BuddyLocale>
   modelProviders: ModelProvidersStore
   onActionCommandRunStarted: (runId: string) => void
@@ -53,7 +55,7 @@ export function useChatTurnExecution(options: UseChatTurnExecutionOptions) {
     && options.modelProviders.selectedModel.value !== null
     && !options.activeRun.value
     && !isSending.value
-    && !options.isUpdatingExecutionProfile.value,
+    && !options.isUpdatingPermissionSettings.value,
   )
 
   async function send(payload: ChatComposerSubmitPayload | string) {
@@ -81,6 +83,7 @@ export function useChatTurnExecution(options: UseChatTurnExecutionOptions) {
         }
       : null
     const turnRequest = {
+      approvalPolicy: options.approvalPolicy.value,
       attachmentIds: options.drafts.attachments.value.map(item => item.attachmentId),
       branchId: options.session.activeBranchId.value,
       content: content.trim(),

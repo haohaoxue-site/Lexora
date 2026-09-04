@@ -18,8 +18,7 @@ export interface PetToolDetails {
 export const PET_TOOL_NAME = 'lexora_buddy_pet'
 
 const PET_TOOL_CLASSIFICATION: BuddyToolClassification = {
-  risk: 'visual',
-  source: 'lexora',
+  access: 'visual',
 }
 
 export function classifyPetTool(

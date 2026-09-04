@@ -1,14 +1,16 @@
 import type {
+  ApprovalReviewKind,
   AutomationApprovalReviewInput,
   BrowserApprovalReviewInput,
+  PathApprovalReviewInput,
   SystemActionApprovalReviewInput,
 } from '../../../shared/approvalReviewPayload'
 import type { AppendBuddyRunEventInput } from '../events/BuddyRunEvent'
+import type { ToolCallBlockingError } from '../permissions/permissionContract'
 import type {
   ApprovalRecord,
   ApprovalRepository,
 } from '../storage/approvalRepository'
-import type { ToolApprovalKind, ToolCallBlockingError } from './toolPolicyContract'
 import { randomUUID } from 'node:crypto'
 import { createApprovalReviewPayload } from '../../../shared/approvalReviewPayload'
 
@@ -16,13 +18,17 @@ export const APPROVAL_WAIT_TIMEOUT_MS = 30 * 60 * 1_000
 
 export type ApprovalDecision = 'approved' | 'denied'
 export type ApprovalResolutionDecision = ApprovalDecision | 'approved_for_turn'
+export type ApprovalRequestResult
+  = { approvalId: string, decision: 'approved_once' | 'approved_for_turn' | 'denied' }
+    | { decision: 'approved_by_turn', sourceApprovalId: string }
 
 export interface ApprovalRequest {
   allowForTurn: boolean
   arguments: unknown
   automation?: AutomationApprovalReviewInput
   browser?: BrowserApprovalReviewInput
-  kind: ToolApprovalKind
+  kind: ApprovalReviewKind
+  paths?: PathApprovalReviewInput
   runId: string
   signal: AbortSignal
   summary: string
@@ -47,7 +53,7 @@ interface ApprovalWaiter {
   allowForTurn: boolean
   cleanup: () => void
   reject: (error: Error) => void
-  resolve: (decision: ApprovalDecision) => void
+  resolve: (decision: ApprovalRequestResult) => void
   signal: AbortSignal
 }
 
@@ -56,7 +62,10 @@ export class ApprovalService {
   readonly #eventLog: ApprovalServiceOptions['eventLog']
   readonly #onExpired: NonNullable<ApprovalServiceOptions['onExpired']>
   readonly #repository: ApprovalRepository
-  readonly #approvedTurns = new WeakSet<AbortSignal>()
+  readonly #approvedTurns = new Map<string, {
+    sourceApprovalId: string
+  }>()
+
   readonly #resolving = new Map<string, Promise<unknown>>()
   readonly #waiters = new Map<string, ApprovalWaiter>()
 
@@ -67,11 +76,25 @@ export class ApprovalService {
     this.#repository = options.repository
   }
 
-  async request(input: ApprovalRequest): Promise<ApprovalDecision> {
+  async request(input: ApprovalRequest): Promise<ApprovalRequestResult> {
     if (input.signal.aborted)
       throw new ApprovalCancelledError()
-    if (input.allowForTurn && this.#approvedTurns.has(input.signal))
-      return 'approved'
+    const turnAuthorization = this.#approvedTurns.get(input.runId)
+    if (input.allowForTurn && turnAuthorization) {
+      await this.#eventLog.append({
+        runId: input.runId,
+        type: 'approval.turn_reused',
+        payload: {
+          sourceApprovalId: turnAuthorization.sourceApprovalId,
+          toolCallId: input.toolCallId,
+          toolName: input.toolName,
+        },
+      })
+      return {
+        decision: 'approved_by_turn',
+        sourceApprovalId: turnAuthorization.sourceApprovalId,
+      }
+    }
 
     const approval: ApprovalRecord = {
       createdAt: new Date().toISOString(),
@@ -83,6 +106,7 @@ export class ApprovalService {
         automation: input.automation,
         browser: input.browser,
         kind: input.kind,
+        paths: input.paths,
         systemAction: input.systemAction,
         toolName: input.toolName,
       }),
@@ -95,7 +119,7 @@ export class ApprovalService {
     const abort = () => void this.#cancel(approval).catch(() => {})
     const expire = () => void this.#cancel(approval, true).catch(() => {})
     let timer: ReturnType<typeof setTimeout> | null = null
-    const decision = new Promise<ApprovalDecision>((resolve, reject) => {
+    const decision = new Promise<ApprovalRequestResult>((resolve, reject) => {
       this.#waiters.set(approval.id, {
         allowForTurn: input.allowForTurn,
         cleanup: () => {
@@ -138,6 +162,10 @@ export class ApprovalService {
     return this.#trackResolution(input.id, this.#resolvePending(input))
   }
 
+  clearTurnAuthorization(runId: string): void {
+    this.#approvedTurns.delete(runId)
+  }
+
   async #resolvePending(input: ApprovalResolution): Promise<ApprovalRecord> {
     const pending = this.#requireApproval(input.id)
     if (pending.status !== 'pending')
@@ -156,13 +184,28 @@ export class ApprovalService {
       ...pending,
       resolvedAt,
       status: decision,
+      resolution: input.decision,
     })
     const approval = this.#requireApproval(input.id)
     if (approval.status !== decision)
       throw new ApprovalResolutionError()
-    if (approvedTurnSignal)
-      this.#approvedTurns.add(approvedTurnSignal)
-    waiter?.resolve(decision)
+    if (approvedTurnSignal && !approvedTurnSignal.aborted) {
+      this.#approvedTurns.set(pending.runId, {
+        sourceApprovalId: pending.id,
+      })
+      approvedTurnSignal.addEventListener('abort', () => {
+        if (this.#approvedTurns.get(pending.runId)?.sourceApprovalId === pending.id)
+          this.#approvedTurns.delete(pending.runId)
+      }, { once: true })
+    }
+    waiter?.resolve({
+      approvalId: pending.id,
+      decision: input.decision === 'approved_for_turn'
+        ? 'approved_for_turn'
+        : decision === 'approved'
+          ? 'approved_once'
+          : 'denied',
+    })
     waiter?.cleanup()
     this.#waiters.delete(input.id)
     return approval
@@ -195,7 +238,12 @@ export class ApprovalService {
     const resolvedAt = new Date().toISOString()
     const waiter = this.#waiters.get(approval.id)
     try {
-      await this.#appendResolved({ ...approval, resolvedAt, status: 'cancelled' })
+      await this.#appendResolved({
+        ...approval,
+        resolvedAt,
+        status: 'cancelled',
+        resolution: 'cancelled',
+      })
       waiter?.reject(expired ? new ApprovalExpiredError() : new ApprovalCancelledError())
     }
     catch (error) {
@@ -225,12 +273,15 @@ export class ApprovalService {
     })
   }
 
-  #appendResolved(approval: ApprovalRecord): Promise<unknown> {
+  #appendResolved(
+    approval: ApprovalRecord & { resolution: ApprovalResolutionDecision | 'cancelled' },
+  ): Promise<unknown> {
     return this.#eventLog.append({
       runId: approval.runId,
       type: 'approval.resolved',
       payload: {
         id: approval.id,
+        resolution: approval.resolution,
         status: approval.status,
         resolvedAt: approval.resolvedAt,
       },

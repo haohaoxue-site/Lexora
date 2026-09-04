@@ -1,5 +1,6 @@
 import type { LexoraDesktopApi } from '@buddy-electron/shared/desktopApi'
 import type { LocalRun } from '@buddy-electron/shared/localChatApi'
+import type { BuddyApprovalPolicy } from '@buddy-shared/approvalPolicy'
 import type { BuddyExecutionProfile } from '@buddy-shared/executionProfile'
 import type { BuddyLocale } from '@/i18n/buddyI18n'
 import type { ModelProvidersStore } from '@/stores/useModelProvidersStore'
@@ -17,6 +18,7 @@ interface ValueRef<T> {
 
 interface UseChatExecutionOptions {
   activeRun: ValueRef<LocalRun | null>
+  approvalPolicy: ValueRef<BuddyApprovalPolicy>
   api: LexoraDesktopApi['localChat']
   taskIndexData: TaskIndexData
   session: ChatSession
@@ -24,7 +26,7 @@ interface UseChatExecutionOptions {
   draftScopeKey: ValueRef<string>
   executionProfile: ValueRef<BuddyExecutionProfile>
   getRunTerminationMessage: (errorCode: string | null) => string
-  isUpdatingExecutionProfile: ValueRef<boolean>
+  isUpdatingPermissionSettings: ValueRef<boolean>
   language: ValueRef<BuddyLocale>
   modelProviders: ModelProvidersStore
   onActionCommandRunStarted: (runId: string) => void
@@ -39,6 +41,7 @@ interface UseChatExecutionOptions {
 export function useChatExecution(options: UseChatExecutionOptions) {
   const turnExecution = useChatTurnExecution({
     activeRun: options.activeRun,
+    approvalPolicy: options.approvalPolicy,
     api: options.api,
     taskIndexData: options.taskIndexData,
     session: options.session,
@@ -46,7 +49,7 @@ export function useChatExecution(options: UseChatExecutionOptions) {
     draftScopeKey: options.draftScopeKey,
     executionProfile: options.executionProfile,
     getRunTerminationMessage: options.getRunTerminationMessage,
-    isUpdatingExecutionProfile: options.isUpdatingExecutionProfile,
+    isUpdatingPermissionSettings: options.isUpdatingPermissionSettings,
     language: options.language,
     modelProviders: options.modelProviders,
     onActionCommandRunStarted: options.onActionCommandRunStarted,
@@ -62,7 +65,7 @@ export function useChatExecution(options: UseChatExecutionOptions) {
     taskIndexData: options.taskIndexData,
     session: options.session,
     isSending: turnExecution.isSending,
-    isUpdatingExecutionProfile: options.isUpdatingExecutionProfile,
+    isUpdatingPermissionSettings: options.isUpdatingPermissionSettings,
     language: options.language,
     modelProviders: options.modelProviders,
     refreshBranches: options.refreshBranches,

@@ -356,6 +356,7 @@ function createSessionKey(identity: BuddySessionIdentity): string {
   return [
     createBranchKey(identity),
     identity.canonicalRoot,
+    identity.approvalPolicy,
     identity.executionProfile,
     identity.sessionMode,
     identity.grantRevision,

@@ -1,5 +1,7 @@
 import { z } from 'zod'
+import { BUDDY_APPROVAL_POLICIES } from '../../shared/approvalPolicy'
 import {
+  APPROVAL_REVIEW_KINDS,
   approvalReviewPayloadMatchesKind,
   approvalReviewPayloadSchema,
 } from '../../shared/approvalReviewPayload'
@@ -35,6 +37,7 @@ const nullableTimestampSchema = timestampSchema.nullable()
 const runtimeDataBackupIdSchema = z.string().regex(/^buddy-\d{17}-[0-9a-f]{8}$/)
 const byteCountSchema = z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER)
 const executionProfileSchema = z.enum(BUDDY_EXECUTION_PROFILES)
+const approvalPolicySchema = z.enum(BUDDY_APPROVAL_POLICIES)
 
 const runtimeStateSchema = z.object({
   lastError: buddyServiceSupervisorFailureCodeSchema.nullable(),
@@ -540,6 +543,7 @@ const modelSelectionSchema = z.object({
 
 const conversationSchema = z.object({
   activeBranchId: z.string().nullable(),
+  approvalPolicy: approvalPolicySchema,
   createdAt: timestampSchema,
   deletedAt: nullableTimestampSchema,
   executionProfile: executionProfileSchema,
@@ -658,6 +662,7 @@ const conversationTimelineItemSchema = z.discriminatedUnion('kind', [
   }).strict(),
 ])
 const runSchema = z.object({
+  approvalPolicy: approvalPolicySchema,
   branchId: idSchema,
   completedAt: nullableTimestampSchema,
   conversationId: idSchema,
@@ -691,7 +696,7 @@ const runEventSchema = publicRunEventSchema
 const approvalSchema = z.object({
   createdAt: timestampSchema,
   id: idSchema,
-  kind: z.enum(['automation', 'browser', 'delete', 'mcp', 'network', 'shell', 'system']),
+  kind: z.enum(APPROVAL_REVIEW_KINDS),
   payload: approvalReviewPayloadSchema,
   resolvedAt: nullableTimestampSchema,
   runId: idSchema,
@@ -704,6 +709,7 @@ const approvalSchema = z.object({
 )
 
 const workspaceDraftSchema = z.object({
+  approvalPolicy: approvalPolicySchema,
   attachments: z.array(attachmentSchema).max(16),
   composerContent: z.json().nullable(),
   content: z.string(),
@@ -947,7 +953,8 @@ export const localChatSchemas = {
     conversationId: idSchema,
     title: z.string().trim().min(1).max(80),
   }).strict(),
-  conversationExecutionProfile: z.object({
+  conversationPermissionSettings: z.object({
+    approvalPolicy: approvalPolicySchema,
     conversationId: idSchema,
     executionProfile: executionProfileSchema,
   }).strict(),
@@ -962,6 +969,7 @@ export const localChatSchemas = {
     limit: optionalLimitSchema,
   }).strict(),
   contextUsageSnapshot: z.object({
+    approvalPolicy: approvalPolicySchema,
     branchId: sessionIdentitySchema.nullable(),
     conversationId: sessionIdentitySchema.nullable(),
     draftId: sessionIdentitySchema,
@@ -1075,6 +1083,7 @@ export const localChatSchemas = {
   skillScope: z.object({ spaceId: idSchema.nullable() }).strict(),
   runStateEvent: runEventEnvelopeSchema,
   startTurn: z.object({
+    approvalPolicy: approvalPolicySchema,
     attachmentIds: z.array(idSchema).max(16),
     branchId: sessionIdentitySchema.nullable(),
     content: z.string().max(2 * 1024 * 1024),

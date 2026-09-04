@@ -1,4 +1,5 @@
 import type { InlineExtension, SettingsManager } from '@earendil-works/pi-coding-agent'
+import type { BuddyApprovalPolicy } from '../../../shared/approvalPolicy'
 import type { BuddyExecutionProfile } from '../../../shared/executionProfile'
 import type { BoundedContextFile } from './loadBoundedContextFiles'
 
@@ -18,6 +19,7 @@ export interface BuddyInProcessExtension {
 export interface CreateBuddyResourceLoaderOptions {
   approvedSkillPaths: readonly string[]
   agentDir: string
+  approvalPolicy: BuddyApprovalPolicy
   boundedContextFiles: readonly BoundedContextFile[]
   cwd: string
   directoryContext: string
@@ -44,6 +46,7 @@ export async function createBuddyResourceLoader(
 ): Promise<DefaultResourceLoader> {
   validateInProcessExtensions(options.inProcessExtensions)
   const systemPrompt = createBuddySystemPrompt({
+    approvalPolicy: options.approvalPolicy,
     directoryContext: options.directoryContext,
     executionProfile: options.executionProfile,
     platform: options.platform,

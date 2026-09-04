@@ -309,15 +309,15 @@ export function classifyBrowserTool(
           summary: 'Confirm an ambiguous browser action',
         })
       case 'read':
-        return { risk: 'read', source: 'lexora' }
+        return { access: 'read' }
       case 'navigation':
       case 'reversible-edit':
-        return { risk: 'interaction', source: 'lexora' }
+        return { access: 'interaction' }
     }
   }
   if (event.toolName === BROWSER_SNAPSHOT_TOOL_NAME) {
     return isBrowserSnapshotToolInput(event.input)
-      ? { risk: 'read', source: 'lexora' }
+      ? { access: 'read' }
       : createToolClassificationFailure('VALIDATION_FAILED')
   }
   if (event.toolName !== BROWSER_OPEN_TOOL_NAME)
@@ -325,11 +325,10 @@ export function classifyBrowserTool(
   if (!isBrowserOpenToolInput(event.input))
     return createToolClassificationFailure('VALIDATION_FAILED')
   return event.input.kind === 'url'
-    ? { risk: 'network', source: 'lexora' }
+    ? { access: 'network' }
     : {
+        access: 'render',
         paths: [{ mode: 'existing', path: event.input.entryPath }],
-        risk: 'read',
-        source: 'lexora',
       }
 }
 
@@ -352,13 +351,12 @@ function browserApprovalClassification(input: {
   }
   const review = input.review
   return {
-    alwaysConfirm: true,
+    forceAsk: true,
     approval: {
       browser: review,
       kind: 'browser',
       summary: input.summary,
     },
-    source: 'lexora',
     validateBeforeExecution: () => actionClassifier.validateActionApproval!(input.input, review),
   }
 }

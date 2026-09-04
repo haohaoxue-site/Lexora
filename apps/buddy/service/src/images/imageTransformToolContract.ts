@@ -21,7 +21,10 @@ export function classifyImageTransformTool(
   if (event.toolName !== IMAGE_TRANSFORM_TOOL_NAME)
     return null
   return Check(imageTransformParameters, event.input)
-    ? { risk: 'visual', source: 'lexora' }
+    ? {
+        access: 'write',
+        paths: [{ mode: 'create', path: event.input.outputPath }],
+      }
     : createToolClassificationFailure('VALIDATION_FAILED')
 }
 

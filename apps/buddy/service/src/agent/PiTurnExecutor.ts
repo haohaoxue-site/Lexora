@@ -52,6 +52,11 @@ export interface BuddySessionTurnContext {
     toolCallId: string
     toolName: string
   }) => Promise<void>
+  onToolExecutionDenied: (event: {
+    denialCode: string
+    toolCallId: string
+    toolName: string
+  }) => Promise<void>
   provider: string
   runId: string
   serviceTier?: BuddyServiceTier | null
@@ -163,6 +168,7 @@ export class PiTurnExecutor {
       maxTokens: run.maxTokens,
       model: run.model,
       onToolExecutionAuthorized: event => piEvents.projectToolExecutionAuthorized(event),
+      onToolExecutionDenied: event => piEvents.projectToolExecutionDenied(event),
       provider: run.provider,
       runId: run.id,
       serviceTier: input.serviceTier ?? null,
@@ -257,6 +263,7 @@ export class PiTurnExecutor {
       maxTokens: run.maxTokens,
       model: run.model,
       onToolExecutionAuthorized: async () => {},
+      onToolExecutionDenied: async () => {},
       provider: run.provider,
       runId: run.id,
       serviceTier: null,

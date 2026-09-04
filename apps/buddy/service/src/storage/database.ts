@@ -1,4 +1,5 @@
 import type { DatabaseSync } from 'node:sqlite'
+import type { BuddySchemaMigration } from './schema'
 import { mkdirSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
@@ -56,11 +57,32 @@ function migrateBuddyDatabase(database: DatabaseSync): void {
   for (const migration of BUDDY_SCHEMA_MIGRATIONS) {
     if (migration.version <= currentVersion)
       continue
+    applyMigration(database, migration)
+  }
+}
+
+function applyMigration(database: DatabaseSync, migration: BuddySchemaMigration): void {
+  const suspendForeignKeys = migration.foreignKeys === 'off'
+  if (suspendForeignKeys)
+    database.exec('PRAGMA foreign_keys = OFF')
+  try {
     withTransaction(database, () => {
       database.exec(migration.sql)
+      if (suspendForeignKeys)
+        assertForeignKeysIntact(database)
       database.exec(`PRAGMA user_version = ${migration.version}`)
     })
   }
+  finally {
+    if (suspendForeignKeys)
+      database.exec('PRAGMA foreign_keys = ON')
+  }
+}
+
+function assertForeignKeysIntact(database: DatabaseSync): void {
+  const violations = database.prepare('PRAGMA foreign_key_check').all()
+  if (violations.length > 0)
+    throw new BuddyDatabaseVersionError('inconsistent schema after migration')
 }
 
 function readSchemaVersion(database: DatabaseSync): number {

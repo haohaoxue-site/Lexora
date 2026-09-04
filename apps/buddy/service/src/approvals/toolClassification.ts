@@ -1,27 +1,24 @@
 import type {
+  ApprovalReviewKind,
   AutomationApprovalReviewInput,
   BrowserApprovalReviewInput,
+  PathApprovalReviewInput,
   SystemActionApprovalReviewInput,
 } from '../../../shared/approvalReviewPayload'
-import type {
-  ToolApprovalKind,
-  ToolPolicyPath,
-  ToolRisk,
-} from './toolPolicyContract'
+import type { AccessKind, PermissionPath } from '../permissions/permissionContract'
 
 export interface BuddyToolClassification {
+  access?: AccessKind
   approval?: {
     automation?: AutomationApprovalReviewInput
     browser?: BrowserApprovalReviewInput
-    kind?: ToolApprovalKind
+    kind?: ApprovalReviewKind
+    paths?: PathApprovalReviewInput
     summary: string
     systemAction?: SystemActionApprovalReviewInput
   }
-  alwaysConfirm?: boolean
-  paths?: readonly ToolPolicyPath[]
-  resource?: { id: string, kind?: 'connector' | 'space', trusted: boolean }
-  risk?: ToolRisk
-  source?: 'lexora' | 'mcp' | 'pi'
+  forceAsk?: boolean
+  paths?: readonly PermissionPath[]
   validateBeforeExecution?: () => Promise<BuddyToolClassificationFailure | null>
 }
 

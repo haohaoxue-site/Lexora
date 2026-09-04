@@ -1,5 +1,5 @@
 import type { BuddyAttachmentImportRequest } from '../../shared/attachmentPolicy'
-import type { BuddyExecutionProfile } from '../../shared/executionProfile'
+import type { BuddyPermissionSettings } from '../../shared/permissionMode'
 import type {
   LocalApproval,
   LocalArtifactText,
@@ -232,7 +232,7 @@ export const LOCAL_CHAT_IPC_CHANNELS = {
   conversationsListBranches: 'lexora:buddy:conversations:list-branches',
   conversationsListMessages: 'lexora:buddy:conversations:list-messages',
   conversationsRename: 'lexora:buddy:conversations:rename',
-  conversationsSetExecutionProfile: 'lexora:buddy:conversations:set-execution-profile',
+  conversationsSetPermissionSettings: 'lexora:buddy:conversations:set-permission-settings',
   conversationsSetModelSelection: 'lexora:buddy:conversations:set-model-selection',
   conversationsListTimeline: 'lexora:buddy:conversations:list-timeline',
   notificationsList: 'lexora:buddy:notifications:list',
@@ -424,9 +424,9 @@ export interface LocalChatApi {
       limit?: number
     }) => Promise<LocalMessagePage>
     rename: (conversationId: string, title: string) => Promise<LocalConversation>
-    setExecutionProfile: (
+    setPermissionSettings: (
       conversationId: string,
-      executionProfile: BuddyExecutionProfile,
+      settings: BuddyPermissionSettings,
     ) => Promise<LocalConversation>
     setModelSelection: (
       conversationId: string,

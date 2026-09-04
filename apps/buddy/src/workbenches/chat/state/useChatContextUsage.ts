@@ -5,6 +5,7 @@ import type {
   LocalRunEvent,
   LocalRuntimeModelOption,
 } from '@buddy-electron/shared/localChatApi'
+import type { BuddyApprovalPolicy } from '@buddy-shared/approvalPolicy'
 import type { BuddyExecutionProfile } from '@buddy-shared/executionProfile'
 import type { BuddyServiceTier, BuddyThinkingLevel } from '@buddy-shared/modelSelection'
 import type { Ref } from 'vue'
@@ -14,6 +15,7 @@ import { createChatContextUsage } from '@/workbenches/chat/composer/chatContextU
 interface UseChatContextUsageOptions {
   activeBranchId: Readonly<Ref<string | null>>
   activeConversationId: Readonly<Ref<string | null>>
+  approvalPolicy: Readonly<Ref<BuddyApprovalPolicy>>
   api: LexoraDesktopApi['localChat']['context']
   draftId: Readonly<Ref<string>>
   executionProfile: Readonly<Ref<BuddyExecutionProfile>>
@@ -46,6 +48,7 @@ export function useChatContextUsage(options: UseChatContextUsageOptions) {
       options.activeConversationId.value,
       options.activeBranchId.value,
       options.spaceId.value,
+      options.approvalPolicy.value,
       options.executionProfile.value,
       options.draftId.value,
     ] as const,
@@ -70,6 +73,7 @@ export function useChatContextUsage(options: UseChatContextUsageOptions) {
     snapshot.value = null
     try {
       const nextSnapshot = await options.api.getUsageSnapshot({
+        approvalPolicy: options.approvalPolicy.value,
         branchId,
         conversationId,
         draftId: options.draftId.value,

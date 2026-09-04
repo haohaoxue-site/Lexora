@@ -1,4 +1,3 @@
-import type { ToolCallEvent } from '@earendil-works/pi-coding-agent'
 import type { BuddyToolPresentation } from '../../../shared/runEventPresentation'
 import type { BuddyToolClassificationResult } from '../approvals/toolClassification'
 import type { CreateBuddyToolPresentationInput } from '../events/toolPresentationSupport'
@@ -74,9 +73,16 @@ export interface SystemToolDetails {
   recovery?: SystemToolFailureRecovery
 }
 
+interface SystemToolCallEvent {
+  input: unknown
+  toolCallId: string
+  toolName: string
+  type?: 'tool_call'
+}
+
 export async function classifySystemTool(
   service: SystemCapabilityService,
-  event: ToolCallEvent,
+  event: SystemToolCallEvent,
   signal: AbortSignal,
 ): Promise<BuddyToolClassificationResult | null> {
   if (event.toolName !== SYSTEM_ACTION_TOOL_NAME)
@@ -95,8 +101,8 @@ export async function classifySystemTool(
         summary: prepared.summary,
         systemAction: prepared.review,
       },
-      risk: 'system',
-      source: 'lexora',
+      access: 'execute',
+      forceAsk: true,
     }
   }
   catch (error) {

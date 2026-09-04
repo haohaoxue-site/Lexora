@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import type { BuddyExecutionProfile } from '@buddy-shared/executionProfile'
 import type { BuddyLocale } from '@/i18n/buddyI18n'
-import { LockOpen20Regular, LockShield20Regular } from '@vicons/fluent'
-import { NButton, NIcon, NPopover, NSwitch } from 'naive-ui'
+import { LockClosed20Regular, LockOpen20Regular, LockShield20Regular } from '@vicons/fluent'
+import { NButton, NIcon, NPopover, NRadioButton, NRadioGroup } from 'naive-ui'
 import { computed, shallowRef } from 'vue'
 import { useBuddyI18n } from '@/i18n/buddyI18n'
 import DesktopFullAccessConfirmationDialog from '@/workbenches/chat/composer/DesktopFullAccessConfirmationDialog.vue'
@@ -20,16 +20,36 @@ const emit = defineEmits<{
 
 const { t } = useBuddyI18n(() => props.language)
 const fullAccess = computed(() => props.executionProfile === 'full_access')
-const executionProfileIcon = computed(() => fullAccess.value ? LockOpen20Regular : LockShield20Regular)
+const readOnly = computed(() => props.executionProfile === 'read_only')
+const executionProfileIcon = computed(() => {
+  if (fullAccess.value)
+    return LockOpen20Regular
+  return readOnly.value ? LockClosed20Regular : LockShield20Regular
+})
+const profileLabelKey = computed(() => {
+  if (fullAccess.value)
+    return 'desktop.chat.executionProfileFull' as const
+  return readOnly.value
+    ? 'desktop.chat.executionProfileReadOnly' as const
+    : 'desktop.chat.executionProfileDefault' as const
+})
+const profileDescriptionKey = computed(() => {
+  if (fullAccess.value)
+    return 'desktop.chat.executionProfileFullDescription' as const
+  return readOnly.value
+    ? 'desktop.chat.executionProfileReadOnlyDescription' as const
+    : 'desktop.chat.executionProfileDefaultDescription' as const
+})
 const confirmationOpen = shallowRef(false)
 const popoverOpen = shallowRef(false)
 
-function updateFullAccess(value: boolean) {
-  if (!value) {
-    emit('updateExecutionProfile', 'controlled')
+function selectProfile(value: BuddyExecutionProfile) {
+  if (value === props.executionProfile)
+    return
+  if (value !== 'full_access') {
+    emit('updateExecutionProfile', value)
     return
   }
-
   popoverOpen.value = false
   confirmationOpen.value = true
 }
@@ -61,36 +81,34 @@ function confirmFullAccess() {
           <NIcon :component="executionProfileIcon" />
         </template>
         <span class="desktop-execution-profile-selector__label">
-          {{ t(fullAccess ? 'desktop.chat.executionProfileFull' : 'desktop.chat.executionProfileDefault') }}
+          {{ t(profileLabelKey) }}
         </span>
       </NButton>
     </template>
 
     <div class="desktop-execution-profile-selector__popover">
-      <p>
-        {{ t(fullAccess
-          ? 'desktop.chat.executionProfileFullDescription'
-          : 'desktop.chat.executionProfileDefaultDescription') }}
-      </p>
-      <div
-        class="desktop-execution-profile-selector__switch-row"
+      <p>{{ t(profileDescriptionKey) }}</p>
+      <NRadioGroup
+        class="desktop-execution-profile-selector__group"
         :class="{ 'is-full-access': fullAccess }"
+        :disabled="!canUpdate || isUpdating"
+        :value="executionProfile"
+        size="small"
+        @update:value="selectProfile"
       >
-        <span>
-          <strong>{{ t('desktop.chat.executionProfileAllowFull') }}</strong>
-          <small v-if="!canUpdate && !isUpdating">
-            {{ t('desktop.chat.executionProfileRunLocked') }}
-          </small>
-        </span>
-        <NSwitch
-          class="desktop-execution-profile-selector__switch"
-          :class="{ 'is-full-access': fullAccess }"
-          :disabled="!canUpdate"
-          :loading="isUpdating"
-          :value="fullAccess"
-          @update:value="updateFullAccess"
-        />
-      </div>
+        <NRadioButton value="read_only">
+          {{ t('desktop.chat.executionProfileReadOnly') }}
+        </NRadioButton>
+        <NRadioButton value="workspace_write">
+          {{ t('desktop.chat.executionProfileDefault') }}
+        </NRadioButton>
+        <NRadioButton value="full_access">
+          {{ t('desktop.chat.executionProfileFull') }}
+        </NRadioButton>
+      </NRadioGroup>
+      <small v-if="!canUpdate && !isUpdating">
+        {{ t('desktop.chat.executionProfileRunLocked') }}
+      </small>
     </div>
   </NPopover>
 
@@ -147,7 +165,7 @@ function confirmFullAccess() {
 }
 
 .desktop-execution-profile-selector__popover {
-  width: min(19rem, calc(100vw - 2rem));
+  width: min(21rem, calc(100vw - 2rem));
 
   > p {
     margin: 0;
@@ -155,39 +173,24 @@ function confirmFullAccess() {
     font-size: 0.78rem;
     line-height: 1.65;
   }
-}
 
-.desktop-execution-profile-selector__switch-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  border-top: 1px solid var(--buddy-border-subtle);
-  margin-top: 0.8rem;
-  padding-top: 0.8rem;
-
-  > span {
-    display: grid;
-    gap: 0.2rem;
-  }
-
-  strong {
-    color: var(--buddy-text-strong);
-    font-size: 0.86rem;
-  }
-
-  &.is-full-access strong {
-    color: var(--buddy-status-danger-text);
-  }
-
-  small {
+  > small {
+    display: block;
+    margin-top: 0.5rem;
     color: var(--buddy-text-muted);
     font-size: 0.68rem;
     line-height: 1.4;
   }
 }
 
-.desktop-execution-profile-selector__switch.is-full-access {
-  --n-rail-color-active: var(--buddy-status-danger-solid) !important;
+.desktop-execution-profile-selector__group {
+  display: flex;
+  border-top: 1px solid var(--buddy-border-subtle);
+  margin-top: 0.8rem;
+  padding-top: 0.8rem;
+
+  &.is-full-access :deep(.n-radio-button--checked) {
+    color: var(--buddy-status-danger-text);
+  }
 }
 </style>

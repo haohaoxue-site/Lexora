@@ -48,6 +48,7 @@ export interface ChatAgentNarrationNode {
 
 export interface ChatAgentToolNode {
   approvalId?: string
+  denialCode?: string
   description: string | null
   id: string
   isError: boolean
@@ -331,15 +332,16 @@ function projectChatAgentTurn(
       const toolCallId = readString(payload.toolCallId)
       const current = tools.get(toolCallId)
       const review = approvalReviewPayloadSchema.safeParse(payload.review)
-      const systemApprovalPresentation = review.success && review.data.card === 'system-action'
+      const structuredApprovalPresentation = review.success
+        && review.data.card === 'system-action'
         ? approvalPresentation(review.data)
         : null
       const base = current
-        ? systemApprovalPresentation
+        ? structuredApprovalPresentation
           ? {
               ...current,
               description: null,
-              presentation: systemApprovalPresentation,
+              presentation: structuredApprovalPresentation,
             }
           : current
         : review.success
@@ -386,6 +388,20 @@ function projectChatAgentTurn(
       }
       continue
     }
+    if (event.type === 'tool.denied') {
+      const toolCallId = readString(payload.toolCallId)
+      const current = toolCallId ? tools.get(toolCallId) : undefined
+      const denialCode = readString(payload.denialCode)
+      if (current) {
+        tools.set(current.toolCallId, {
+          ...current,
+          ...(denialCode ? { denialCode } : {}),
+          isError: true,
+          status: 'denied',
+        })
+      }
+      continue
+    }
     if (
       event.type === 'tool.preparing'
       || event.type === 'tool.started'
@@ -402,6 +418,7 @@ function projectChatAgentTurn(
       const narration = current ? null : [...text.values()].at(-1)
       const toolNarration = narration?.phase === 'commentary' ? null : narration
       const isStructuredTool = presentation.data.card === 'automation'
+        || presentation.data.card === 'directory-authorization'
         || presentation.data.card === 'system'
       const description = isStructuredTool
         ? null
@@ -415,9 +432,10 @@ function projectChatAgentTurn(
         text.delete(toolNarration.id)
       tools.set(toolCallId, {
         ...(current?.approvalId ? { approvalId: current.approvalId } : {}),
+        ...(current?.denialCode ? { denialCode: current.denialCode } : {}),
         description,
         id: `tool:${toolCallId}`,
-        isError,
+        isError: isError || Boolean(current?.denialCode),
         kind: 'tool',
         order: current?.order ?? event.sequence,
         presentation: presentation.data,
@@ -590,7 +608,7 @@ function approvalPresentation(review: ApprovalReviewPayload): BuddyToolPresentat
   }
   const argumentNames = review.card === 'arguments'
     ? review.argumentNames
-    : review.targetPaths.length > 0 ? ['targetPaths'] : []
+    : review.targets.length > 0 ? ['targets'] : []
   if (review.toolName.startsWith('mcp__')) {
     const [, connector = 'connector', ...toolParts] = review.toolName.split('__')
     return {

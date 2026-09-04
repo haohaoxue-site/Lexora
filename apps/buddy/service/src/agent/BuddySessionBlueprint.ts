@@ -1,8 +1,13 @@
+import type { BuddyApprovalPolicy } from '../../../shared/approvalPolicy'
 import type { BuddyExecutionProfile } from '../../../shared/executionProfile'
 import type { BuddySessionMode } from '../../../shared/sessionMode'
 import type { SpaceExecutionContext } from '../../../shared/space'
 import type { DirectoryGrant } from '../directories/resolveGrantedPath'
 import type { BuddyDataPaths } from '../storage/BuddyDataPaths'
+import type {
+  ConversationDirectoryGrantRecord,
+  ConversationDirectoryGrantRepository,
+} from '../storage/conversationDirectoryGrantRepository'
 import type {
   SpaceAdditionalDirectoryBindingRecord,
   SpaceMemoryScope,
@@ -23,6 +28,7 @@ import {
 import { resolveBuddySessionResources } from './BuddySessionResources'
 
 export interface BuddySessionIdentity {
+  approvalPolicy: BuddyApprovalPolicy
   branchId: string
   canonicalRoot: string
   conversationId: string
@@ -42,6 +48,7 @@ export interface BuddySessionSpaceSnapshot {
 }
 
 export interface BuddySessionBlueprint {
+  approvalPolicy: BuddyApprovalPolicy
   branchId: string
   canonicalRoot: string
   conversationId: string
@@ -55,6 +62,7 @@ export interface BuddySessionBlueprint {
 }
 
 export interface CreateConversationSessionBlueprintInput {
+  approvalPolicy: BuddyApprovalPolicy
   branchId: string
   conversationId: string
   executionProfile: BuddyExecutionProfile
@@ -64,12 +72,14 @@ export interface CreateConversationSessionBlueprintInput {
 }
 
 export interface CreateDraftSessionBlueprintInput {
+  approvalPolicy: BuddyApprovalPolicy
   draftId: string
   executionProfile: BuddyExecutionProfile
   spaceId: string | null
 }
 
 export interface BuddySessionBlueprintServiceOptions {
+  conversationGrants: Pick<ConversationDirectoryGrantRepository, 'listActive'>
   paths: Pick<BuddyDataPaths, 'conversationWorkspace' | 'draftAttachments' | 'spaceWorkspace'>
   skills: Pick<SkillService, 'loadForSpace'>
   spaces: Pick<SpaceRepository, 'findById'>
@@ -87,6 +97,9 @@ export class BuddySessionBlueprintService {
   ): Promise<BuddySessionBlueprint> {
     return this.#create({
       ...input,
+      conversationDirectories: input.spaceId
+        ? []
+        : this.#options.conversationGrants.listActive(input.conversationId),
       ownedRoot: input.spaceId
         ? this.#options.paths.spaceWorkspace(input.spaceId)
         : this.#options.paths.conversationWorkspace(input.conversationId),
@@ -96,6 +109,8 @@ export class BuddySessionBlueprintService {
   createForDraft(input: CreateDraftSessionBlueprintInput): Promise<BuddySessionBlueprint> {
     return this.#create({
       branchId: 'context-preview',
+      approvalPolicy: input.approvalPolicy,
+      conversationDirectories: [],
       conversationId: input.draftId,
       executionProfile: input.executionProfile,
       ownedRoot: input.spaceId
@@ -107,6 +122,7 @@ export class BuddySessionBlueprintService {
   }
 
   async #create(input: CreateConversationSessionBlueprintInput & {
+    conversationDirectories: readonly ConversationDirectoryGrantRecord[]
     ownedRoot: string
   }): Promise<BuddySessionBlueprint> {
     const space = input.spaceId
@@ -120,13 +136,18 @@ export class BuddySessionBlueprintService {
     }
     const directories = space
       ? await resolveSpaceDirectories(space)
-      : { additionalDirectories: [], primaryDirectory: null }
+      : {
+          additionalDirectories: await resolveConversationDirectories(
+            input.conversationDirectories,
+          ),
+          primaryDirectory: null,
+        }
     const primaryDirectory = directories.primaryDirectory
     const scratchRoot = await resolveOwnedRoot(input.ownedRoot)
     const canonicalRoot = primaryDirectory?.canonicalRoot ?? scratchRoot
     const workingGrants = primaryDirectory
       ? [
-          toDirectoryGrant(primaryDirectory),
+          toPrimaryDirectoryGrant(primaryDirectory),
           ...directories.additionalDirectories.map(toDirectoryGrant),
         ]
       : [
@@ -154,6 +175,7 @@ export class BuddySessionBlueprintService {
     ])
 
     return {
+      approvalPolicy: input.approvalPolicy,
       branchId: input.branchId,
       canonicalRoot,
       conversationId: input.conversationId,
@@ -182,6 +204,7 @@ export function toBuddySessionIdentity(
   blueprint: BuddySessionBlueprint,
 ): BuddySessionIdentity {
   return {
+    approvalPolicy: blueprint.approvalPolicy,
     branchId: blueprint.branchId,
     canonicalRoot: blueprint.canonicalRoot,
     conversationId: blueprint.conversationId,
@@ -226,21 +249,34 @@ async function resolveOwnedRoot(root: string): Promise<string> {
   return realpath(root)
 }
 
-function toDirectoryGrant(directory: SpaceAdditionalDirectoryBindingRecord): DirectoryGrant {
+function toDirectoryGrant(directory: {
+  canonicalRoot: string
+  id: string
+  root: string
+}): DirectoryGrant {
   return {
     canonicalRoot: directory.canonicalRoot,
     grantId: directory.id,
+    kind: 'granted',
     root: directory.root,
   }
 }
 
+function toPrimaryDirectoryGrant(directory: {
+  canonicalRoot: string
+  id: string
+  root: string
+}): DirectoryGrant {
+  return { ...toDirectoryGrant(directory), kind: 'workspace' }
+}
+
 function toOwnedDirectoryGrant(root: string, ownerId: string): DirectoryGrant {
-  return { canonicalRoot: root, grantId: ownerId, root }
+  return { canonicalRoot: root, grantId: ownerId, kind: 'workspace', root }
 }
 
 function createGrantRevision(
   grants: readonly DirectoryGrant[],
-  directories: readonly SpaceAdditionalDirectoryBindingRecord[],
+  directories: readonly { id: string, revision?: number }[],
 ): string {
   const revisions = new Map(directories.map(directory => [directory.id, directory.revision]))
   const hash = createHash('sha256')
@@ -253,4 +289,24 @@ function createGrantRevision(
     hash.update('\0')
   }
   return hash.digest('hex')
+}
+
+async function resolveConversationDirectories(
+  directories: readonly ConversationDirectoryGrantRecord[],
+): Promise<ConversationDirectoryGrantRecord[]> {
+  const resolved = await Promise.all(directories.map(async (directory) => {
+    try {
+      const canonicalRoot = await realpath(directory.root)
+      const metadata = await stat(canonicalRoot)
+      return canonicalRoot === directory.canonicalRoot && metadata.isDirectory()
+        ? directory
+        : null
+    }
+    catch {
+      return null
+    }
+  }))
+  return resolved.filter((directory): directory is ConversationDirectoryGrantRecord => (
+    directory !== null
+  ))
 }

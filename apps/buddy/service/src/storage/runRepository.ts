@@ -48,8 +48,8 @@ export function createRunRepository(database: DatabaseSync): RunRepository {
     INSERT INTO runs (
       id, conversation_id, branch_id, triggering_message_id, provider, model,
       context_window, max_tokens, purpose, status, pi_session_file, error_code,
-      started_at, completed_at, execution_profile, execution_context_json
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      started_at, completed_at, approval_policy, execution_profile, execution_context_json
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `)
   const list = database.prepare(`
     SELECT * FROM runs
@@ -116,6 +116,7 @@ export function createRunRepository(database: DatabaseSync): RunRepository {
         input.errorCode ?? null,
         input.startedAt,
         input.completedAt ?? null,
+        input.approvalPolicy,
         input.executionProfile,
         input.executionContext ? JSON.stringify(input.executionContext) : null,
       )

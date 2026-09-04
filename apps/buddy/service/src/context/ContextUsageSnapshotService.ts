@@ -1,3 +1,4 @@
+import type { BuddyApprovalPolicy } from '../../../shared/approvalPolicy'
 import type { BuddyExecutionProfile } from '../../../shared/executionProfile'
 import type {
   BuddyServiceTier,
@@ -24,6 +25,7 @@ export interface ContextUsageModelSelection {
 }
 
 export interface ContextUsageSnapshotInput {
+  approvalPolicy: BuddyApprovalPolicy
   branchId: string | null
   conversationId: string | null
   draftId: string
@@ -81,6 +83,7 @@ export class ContextUsageSnapshotService implements ContextUsageSnapshotReader {
       && (
         conversation.deletedAt !== null
         || conversation.spaceId !== input.spaceId
+        || conversation.approvalPolicy !== input.approvalPolicy
         || conversation.executionProfile !== input.executionProfile
         || !input.branchId
         || !this.#options.conversations.listBranches(conversation.id).some(
@@ -91,6 +94,7 @@ export class ContextUsageSnapshotService implements ContextUsageSnapshotReader {
       throw new BuddyServiceError('VALIDATION_FAILED')
     }
 
+    const approvalPolicy = conversation?.approvalPolicy ?? input.approvalPolicy
     const executionProfile = conversation?.executionProfile ?? input.executionProfile
     const selected = await this.#options.models.resolveSession({
       contextWindow: null,
@@ -104,6 +108,7 @@ export class ContextUsageSnapshotService implements ContextUsageSnapshotReader {
       : null
     const blueprint = conversation
       ? await this.#options.blueprints.createForConversation({
+          approvalPolicy,
           branchId,
           conversationId: conversation.id,
           executionProfile,
@@ -111,11 +116,13 @@ export class ContextUsageSnapshotService implements ContextUsageSnapshotReader {
           sessionMode: 'interactive',
         })
       : await this.#options.blueprints.createForDraft({
+          approvalPolicy,
           draftId: input.draftId,
           executionProfile,
           spaceId: input.spaceId,
         })
     const composition = await createBuddySessionComposition({
+      approvalPolicy: blueprint.approvalPolicy,
       canonicalRoot: blueprint.canonicalRoot,
       conversationId: blueprint.conversationId,
       executionProfile: blueprint.executionProfile,
@@ -127,6 +134,7 @@ export class ContextUsageSnapshotService implements ContextUsageSnapshotReader {
     })
     const snapshot = await createBuddyContextSnapshot({
       agentDir: this.#options.agentDirectory,
+      approvalPolicy: blueprint.approvalPolicy,
       branchId: blueprint.branchId,
       canonicalRoot: blueprint.canonicalRoot,
       conversationsDirectory: this.#options.paths.conversationsDirectory,

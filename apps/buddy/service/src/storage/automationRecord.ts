@@ -12,7 +12,7 @@ import {
 export interface AutomationRow {
   active_from: string | null
   active_until: string | null
-  blocked_reason: Automation['blockedReason'] | 'AUTOMATION_PROJECT_UNAVAILABLE'
+  blocked_reason: Automation['blockedReason']
   created_at: string
   deleted_at: string | null
   execution_profile: Automation['executionProfile']
@@ -59,7 +59,7 @@ export function requireAutomationRecord(value: unknown, id: string): Automation 
 
 export function toAutomationRecord(row: AutomationRow): Automation {
   return automationSchema.parse({
-    blockedReason: fromStorageBlockedReason(row.blocked_reason),
+    blockedReason: row.blocked_reason,
     createdAt: row.created_at,
     executionProfile: row.execution_profile,
     id: row.id,
@@ -91,15 +91,5 @@ export function toAutomationRecord(row: AutomationRow): Automation {
 export function toStorageBlockedReason(
   reason: Automation['blockedReason'],
 ): AutomationRow['blocked_reason'] {
-  return reason === 'AUTOMATION_SPACE_UNAVAILABLE'
-    ? 'AUTOMATION_PROJECT_UNAVAILABLE'
-    : reason
-}
-
-function fromStorageBlockedReason(
-  reason: AutomationRow['blocked_reason'],
-): Automation['blockedReason'] {
-  return reason === 'AUTOMATION_PROJECT_UNAVAILABLE'
-    ? 'AUTOMATION_SPACE_UNAVAILABLE'
-    : reason
+  return reason
 }

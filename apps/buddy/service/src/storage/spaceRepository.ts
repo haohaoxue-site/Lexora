@@ -86,7 +86,7 @@ interface SpaceRow {
   active_run_count: number
   created_at: string
   id: string
-  memory_scope: 'personal_and_project' | 'project_only'
+  memory_scope: SpaceMemoryScope
   name: string
   revoked_at: string | null
   updated_at: string
@@ -362,7 +362,7 @@ function toSpace(
       .map(toSpaceAdditionalDirectoryBinding),
     createdAt: row.created_at,
     id: row.id,
-    memoryScope: row.memory_scope === 'project_only' ? 'space_only' : 'personal_and_space',
+    memoryScope: row.memory_scope,
     name: row.name,
     primaryDirectory: primaryDirectory
       ? toSpacePrimaryDirectoryBinding(primaryDirectory)
@@ -392,8 +392,17 @@ function toSpacePrimaryDirectoryBinding(
 function toSpaceAdditionalDirectoryBinding(
   row: SpaceDirectoryBindingRow,
 ): SpaceAdditionalDirectoryBindingRecord {
-  const { resourcesTrustedAt: _, ...directory } = toSpacePrimaryDirectoryBinding(row)
-  return directory
+  return {
+    accessGrantedAt: row.access_granted_at,
+    canonicalRoot: row.canonical_root,
+    createdAt: row.created_at,
+    id: row.id,
+    revision: row.revision,
+    revokedAt: row.revoked_at,
+    root: row.root,
+    spaceId: row.space_id,
+    updatedAt: row.updated_at,
+  }
 }
 
 function requirePrimaryDirectoryTrust(row: SpaceDirectoryBindingRow): string {
@@ -421,5 +430,5 @@ function withDirectoryRoles(
 function toStorageMemoryScope(
   scope: SpaceMemoryScope,
 ): SpaceRow['memory_scope'] {
-  return scope === 'space_only' ? 'project_only' : 'personal_and_project'
+  return scope
 }

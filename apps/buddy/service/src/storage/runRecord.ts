@@ -1,3 +1,4 @@
+import type { BuddyApprovalPolicy } from '../../../shared/approvalPolicy'
 import type { BuddyExecutionProfile } from '../../../shared/executionProfile'
 import type { SpaceExecutionContext } from '../../../shared/space'
 import { spaceExecutionContextSchema } from '../../../shared/space'
@@ -6,6 +7,7 @@ export type RunStatus = 'queued' | 'running' | 'completed' | 'failed' | 'cancell
 export type RunPurpose = 'automation' | 'chat' | 'conversation.compaction'
 
 export interface RunRecord {
+  approvalPolicy: BuddyApprovalPolicy
   id: string
   conversationId: string
   branchId: string
@@ -25,6 +27,7 @@ export interface RunRecord {
 }
 
 export interface RunRow {
+  approval_policy: BuddyApprovalPolicy
   id: string
   conversation_id: string
   branch_id: string
@@ -52,6 +55,7 @@ export function requireRunRecord(value: unknown, id: string): RunRecord {
 
 export function toRunRecord(row: RunRow): RunRecord {
   return {
+    approvalPolicy: row.approval_policy,
     id: row.id,
     conversationId: row.conversation_id,
     branchId: row.branch_id,

@@ -12,11 +12,6 @@ import {
 
 export const IMAGE_GENERATION_TOOL_NAME = 'lexora_image_generate'
 
-const IMAGE_GENERATION_TOOL_CLASSIFICATION: BuddyToolClassification = {
-  risk: 'visual',
-  source: 'lexora',
-}
-
 export interface ImageGenerationToolDetails {
   artifactIds: string[]
   code?: string
@@ -25,11 +20,17 @@ export interface ImageGenerationToolDetails {
 }
 
 export function classifyImageGenerationTool(
-  event: Pick<ToolCallEvent, 'toolName'>,
+  event: Pick<ToolCallEvent, 'input' | 'toolName'>,
 ): BuddyToolClassification | null {
-  return event.toolName === IMAGE_GENERATION_TOOL_NAME
-    ? IMAGE_GENERATION_TOOL_CLASSIFICATION
-    : null
+  if (event.toolName !== IMAGE_GENERATION_TOOL_NAME)
+    return null
+  const outputPath = readRecord(event.input)?.outputPath
+  return {
+    access: 'write',
+    paths: typeof outputPath === 'string'
+      ? [{ mode: 'create', path: outputPath }]
+      : [],
+  }
 }
 
 export function createImageGenerationRunOutput(

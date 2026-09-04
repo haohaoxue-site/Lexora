@@ -1,3 +1,4 @@
+import type { BuddyApprovalPolicy } from '../../../shared/approvalPolicy'
 import type { BuddyExecutionProfile } from '../../../shared/executionProfile'
 import type { BuddyServiceTier, BuddyThinkingLevel } from '../../../shared/modelSelection'
 
@@ -9,6 +10,7 @@ export interface ConversationModelSelection {
 }
 
 export interface ConversationRecord {
+  approvalPolicy: BuddyApprovalPolicy
   id: string
   spaceId: string | null
   title: string | null
@@ -22,6 +24,7 @@ export interface ConversationRecord {
 }
 
 export interface ConversationRow {
+  approval_policy: BuddyApprovalPolicy
   id: string
   space_id: string | null
   title: string | null
@@ -43,6 +46,7 @@ export function requireConversationRecord(value: unknown, id: string): Conversat
 
 export function toConversationRecord(row: ConversationRow): ConversationRecord {
   return {
+    approvalPolicy: row.approval_policy,
     id: row.id,
     spaceId: row.space_id,
     title: row.title,

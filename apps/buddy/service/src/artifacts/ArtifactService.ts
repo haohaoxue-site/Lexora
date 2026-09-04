@@ -58,6 +58,9 @@ export class ArtifactService {
       input.conversationId,
       location.grant.grantId,
       location.relativePath,
+    ) ?? this.#repository.findByCurrentPath(
+      input.conversationId,
+      location.canonicalPath,
     )
     if (input.changeType === 'deleted' && !existing)
       throw new ArtifactError('ARTIFACT_NOT_FOUND')
@@ -125,6 +128,9 @@ export class ArtifactService {
       input.conversationId,
       from.grant.grantId,
       from.relativePath,
+    ) ?? this.#repository.findByCurrentPath(
+      input.conversationId,
+      from.canonicalPath,
     )
     if (!existing) {
       return this.recordFileChange({

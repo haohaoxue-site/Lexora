@@ -2,8 +2,11 @@ import type {
   LocalAttachment,
   LocalWorkspaceDraft,
 } from '@buddy-electron/shared/localChatApi'
+import type { BuddyApprovalPolicy } from '@buddy-shared/approvalPolicy'
 import type { BuddyExecutionProfile } from '@buddy-shared/executionProfile'
+import type { BuddyPermissionSettings } from '@buddy-shared/permissionMode'
 import type { ComputedRef } from 'vue'
+import { BUDDY_DEFAULT_APPROVAL_POLICY } from '@buddy-shared/approvalPolicy'
 import {
   BUDDY_ATTACHMENT_COUNT_LIMIT,
   BUDDY_ATTACHMENT_TOTAL_BYTES_LIMIT,
@@ -19,6 +22,7 @@ interface UseChatDraftsOptions {
 }
 
 interface ChatDraftState {
+  approvalPolicy: BuddyApprovalPolicy
   attachments: ReadonlyArray<LocalAttachment>
   composerContent: LocalWorkspaceDraft['composerContent']
   content: string
@@ -34,6 +38,7 @@ export function useChatDrafts(options: UseChatDraftsOptions) {
   const composerContent = shallowRef<LocalWorkspaceDraft['composerContent']>(null)
   const draft = shallowRef('')
   const draftId = shallowRef<string>(crypto.randomUUID())
+  const approvalPolicy = shallowRef<BuddyApprovalPolicy>(BUDDY_DEFAULT_APPROVAL_POLICY)
   const executionProfile = shallowRef<BuddyExecutionProfile>(BUDDY_DEFAULT_EXECUTION_PROFILE)
 
   async function appendAttachments(incoming: ReadonlyArray<LocalAttachment>): Promise<number> {
@@ -76,6 +81,7 @@ export function useChatDrafts(options: UseChatDraftsOptions) {
   function saveCurrentDraft(resetRequestId = false) {
     const current = load(options.targetKey.value)
     draftsByScope.set(options.targetKey.value, {
+      approvalPolicy: approvalPolicy.value,
       attachments: attachments.value,
       composerContent: composerContent.value,
       content: draft.value,
@@ -93,6 +99,7 @@ export function useChatDrafts(options: UseChatDraftsOptions) {
     composerContent.value = current.composerContent
     draft.value = current.content
     draftId.value = current.draftId
+    approvalPolicy.value = current.approvalPolicy
     executionProfile.value = current.executionProfile
   }
 
@@ -101,6 +108,7 @@ export function useChatDrafts(options: UseChatDraftsOptions) {
   }
 
   return {
+    approvalPolicy,
     appendAttachments,
     attachments,
     cleanupAbandonedAttachments: options.cleanupDraftAttachments,
@@ -108,6 +116,7 @@ export function useChatDrafts(options: UseChatDraftsOptions) {
     draft,
     draftId,
     exportDrafts: (): LocalWorkspaceDraft[] => [...draftsByScope.entries()].map(([targetKey, value]) => ({
+      approvalPolicy: value.approvalPolicy,
       attachments: value.attachments,
       composerContent: value.composerContent,
       content: value.content,
@@ -121,6 +130,7 @@ export function useChatDrafts(options: UseChatDraftsOptions) {
       draftsByScope.clear()
       for (const value of drafts) {
         draftsByScope.set(value.targetKey, {
+          approvalPolicy: value.approvalPolicy,
           attachments: value.attachments,
           composerContent: value.composerContent,
           content: value.content,
@@ -157,8 +167,9 @@ export function useChatDrafts(options: UseChatDraftsOptions) {
     removeAttachment,
     restoreCurrentDraft,
     saveCurrentDraft,
-    setExecutionProfile(value: BuddyExecutionProfile) {
-      executionProfile.value = value
+    setPermissionSettings(settings: BuddyPermissionSettings) {
+      approvalPolicy.value = settings.approvalPolicy
+      executionProfile.value = settings.executionProfile
       saveCurrentDraft(true)
     },
     clear(key: string) {
@@ -178,6 +189,7 @@ export function useChatDrafts(options: UseChatDraftsOptions) {
 
 function emptyDraft(): ChatDraftState {
   return {
+    approvalPolicy: BUDDY_DEFAULT_APPROVAL_POLICY,
     attachments: [],
     composerContent: null,
     content: '',

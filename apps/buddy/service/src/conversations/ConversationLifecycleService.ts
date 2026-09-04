@@ -4,6 +4,9 @@ const conversationIdentityPattern = /^[A-Z0-9][\w-]{0,127}$/i
 
 export interface ConversationLifecycleServiceOptions {
   conversations: Pick<ConversationRepository, 'findById' | 'isDeleted' | 'markDeleted'>
+  directoryGrants: {
+    revokeAll: (conversationId: string, revokedAt: string) => number
+  }
   runner: {
     cancelAndWaitForConversation: (conversationId: string) => Promise<number>
   }
@@ -15,11 +18,13 @@ export interface ConversationLifecycleServiceOptions {
 export class ConversationLifecycleService {
   readonly #conversations: ConversationLifecycleServiceOptions['conversations']
   readonly #deleting = new Set<string>()
+  readonly #directoryGrants: ConversationLifecycleServiceOptions['directoryGrants']
   readonly #runner: ConversationLifecycleServiceOptions['runner']
   readonly #sessions: ConversationLifecycleServiceOptions['sessions']
 
   constructor(options: ConversationLifecycleServiceOptions) {
     this.#conversations = options.conversations
+    this.#directoryGrants = options.directoryGrants
     this.#runner = options.runner
     this.#sessions = options.sessions
   }
@@ -38,6 +43,7 @@ export class ConversationLifecycleService {
       const deletedAt = new Date().toISOString()
       if (!this.#conversations.markDeleted(conversationId, deletedAt))
         return false
+      this.#directoryGrants.revokeAll(conversationId, deletedAt)
       await this.#runner.cancelAndWaitForConversation(conversationId)
       await this.#sessions.invalidateConversation(conversationId)
       return true

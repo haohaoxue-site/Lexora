@@ -1,4 +1,5 @@
 import type { ToolCallEvent } from '@earendil-works/pi-coding-agent'
+import type { BuddyApprovalPolicy } from '../../../shared/approvalPolicy'
 import type { BuddyExecutionProfile } from '../../../shared/executionProfile'
 import type { BuddyServiceTier } from '../../../shared/modelSelection'
 import type { BuddySessionMode } from '../../../shared/sessionMode'
@@ -6,6 +7,10 @@ import type { BuddyToolClassificationResult } from '../approvals/toolClassificat
 import type { CreateAutomationToolOptions } from '../automations/createAutomationTool'
 import type { BrowserCapabilityHost } from '../browser/BrowserCapabilityService'
 import type { BuddyMcpTools } from '../connectors/mcp/McpConnectorService'
+import type {
+  DirectoryGrantMutation,
+  DirectoryGrantService,
+} from '../directories/DirectoryGrantService'
 import type { DirectoryGrant } from '../directories/resolveGrantedPath'
 import type { ImageGenerationGateway } from '../images/ImageGenerationGateway'
 import type { CreatePetToolOptions } from '../pet/createPetTool'
@@ -18,7 +23,6 @@ import type {
 } from './extensions/changeCaptureExtension'
 import type { CreateImageGenerationExtensionOptions } from './extensions/imageGenerationExtension'
 import type { CreateImageTransformExtensionOptions } from './extensions/imageTransformExtension'
-import type { SpaceDirectoryAuthorizationGateway } from './extensions/spaceDirectoryAuthorizationExtension'
 import type {
   BuddyRunContext,
   CreateToolPolicyExtensionOptions,
@@ -40,13 +44,11 @@ import { createImageGenerationExtension } from './extensions/imageGenerationExte
 import { createImageTransformExtension } from './extensions/imageTransformExtension'
 import { createMcpExtension } from './extensions/mcpExtension'
 import { createPetExtension } from './extensions/petExtension'
-import {
-  classifySpaceDirectoryAuthorizationTool,
-  createSpaceDirectoryAuthorizationExtension,
-} from './extensions/spaceDirectoryAuthorizationExtension'
 import { createSystemExtension } from './extensions/systemExtension'
 import { createSystemPromptExtension } from './extensions/systemPromptExtension'
 import { createToolPolicyExtension } from './extensions/toolPolicyExtension'
+
+type DirectoryGrantGateway = Pick<DirectoryGrantService, 'grant'>
 
 interface BuddySessionConnectorSource {
   getTools: (signal?: AbortSignal) => Promise<BuddyMcpTools>
@@ -61,7 +63,7 @@ export interface BuddySessionCompositionServices {
   browserHost: BrowserCapabilityHost
   changeCaptureService: ChangeCaptureGateway
   connectorService: BuddySessionConnectorSource
-  directoryAuthorization: SpaceDirectoryAuthorizationGateway
+  directoryGrants: DirectoryGrantGateway
   imageGenerationGateway: ImageGenerationGateway
   imageTransformService: CreateImageTransformExtensionOptions['service']
   onAutomationChanged: (automationId: string) => void
@@ -70,6 +72,7 @@ export interface BuddySessionCompositionServices {
 }
 
 export interface CreateBuddySessionCompositionOptions {
+  approvalPolicy: BuddyApprovalPolicy
   canonicalRoot: string
   conversationId: string
   executionProfile: BuddyExecutionProfile
@@ -132,21 +135,6 @@ export async function createBuddySessionComposition(
   ]
 
   if (options.sessionMode === 'interactive') {
-    if (options.spaceId) {
-      inProcessExtensions.push(createSpaceDirectoryAuthorizationExtension({
-        onAuthorized(directory) {
-          if (grants.some(grant => grant.grantId === directory.id))
-            return
-          grants.push({
-            canonicalRoot: directory.canonicalRoot,
-            grantId: directory.id,
-            root: directory.root,
-          })
-        },
-        service: services.directoryAuthorization,
-        spaceId: options.spaceId,
-      }))
-    }
     inProcessExtensions.push(createAutomationExtension({
       onChanged: services.onAutomationChanged,
       service: services.automationService,
@@ -155,12 +143,21 @@ export async function createBuddySessionComposition(
 
   inProcessExtensions.push(
     createToolPolicyExtension({
+      applyGrant: async (proposal) => {
+        const mutation = await services.directoryGrants.grant(proposal)
+        applyGrantToSession(grants, mutation)
+      },
+      approvalAvailable: options.sessionMode === 'interactive',
+      approvalPolicy: options.approvalPolicy,
       approvalService: services.approvalService,
       classifyTool,
       cwd: options.canonicalRoot,
       executionProfile: options.executionProfile,
       getGrants: () => grants,
       getRunContext: () => runContext.current,
+      owner: options.spaceId
+        ? { id: options.spaceId, kind: 'space' }
+        : { id: options.conversationId, kind: 'conversation' },
     }),
     createChangeCaptureExtension({
       artifactService: services.artifactService,
@@ -180,6 +177,25 @@ export async function createBuddySessionComposition(
   }
 }
 
+function applyGrantToSession(
+  grants: DirectoryGrant[],
+  mutation: DirectoryGrantMutation,
+): void {
+  const covered = new Set(mutation.coveredGrantIds)
+  for (let index = grants.length - 1; index >= 0; index -= 1) {
+    if (covered.has(grants[index]!.grantId))
+      grants.splice(index, 1)
+  }
+  if (grants.some(grant => grant.grantId === mutation.grant.id))
+    return
+  grants.push({
+    canonicalRoot: mutation.grant.canonicalRoot,
+    grantId: mutation.grant.id,
+    kind: 'granted',
+    root: mutation.grant.root,
+  })
+}
+
 interface BuddyToolClassifierOptions {
   automationService: CreateAutomationToolOptions['service']
   browserCapability: Pick<
@@ -197,10 +213,6 @@ function createBuddyToolClassifier(
     event: ToolCallEvent,
     activeRun: BuddyRunContext,
   ): Promise<BuddyToolClassificationResult> => {
-    const directoryAuthorization = classifySpaceDirectoryAuthorizationTool(event)
-    if (directoryAuthorization)
-      return directoryAuthorization
-
     const automation = classifyAutomationToolCall(options.automationService, event)
     if (automation)
       return automation

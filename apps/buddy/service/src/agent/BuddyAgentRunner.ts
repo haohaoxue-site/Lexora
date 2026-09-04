@@ -23,6 +23,7 @@ export interface BuddyAgentRunnerOptions {
     'executeCompaction' | 'executeTurn' | 'invalidateSessionContinuityAfterFailure'
   >
   lifecycle: Pick<RunLifecycleService, 'finalize' | 'find' | 'start'>
+  onRunSettled?: (runId: string) => void
   sessions: BuddySessionRegistry<BuddyAgentSessionLike>
 }
 
@@ -30,12 +31,14 @@ export class BuddyAgentRunner {
   readonly #activeRuns = new ActiveRunRegistry()
   readonly #executor: BuddyAgentRunnerOptions['executor']
   readonly #lifecycle: BuddyAgentRunnerOptions['lifecycle']
+  readonly #onRunSettled: NonNullable<BuddyAgentRunnerOptions['onRunSettled']>
   readonly #sessions: BuddySessionRegistry<BuddyAgentSessionLike>
   #lastTimestamp = 0
 
   constructor(options: BuddyAgentRunnerOptions) {
     this.#executor = options.executor
     this.#lifecycle = options.lifecycle
+    this.#onRunSettled = options.onRunSettled ?? (() => {})
     this.#sessions = options.sessions
   }
 
@@ -52,6 +55,7 @@ export class BuddyAgentRunner {
       || (run.purpose !== 'chat' && run.purpose !== 'automation')
       || run.conversationId !== session.conversationId
       || run.branchId !== session.branchId
+      || run.approvalPolicy !== session.approvalPolicy
       || run.executionProfile !== session.executionProfile
       || session.sessionMode !== (run.purpose === 'automation'
         ? 'automation_background'
@@ -67,7 +71,7 @@ export class BuddyAgentRunner {
         execution.runId,
         execution.signal,
         () => this.#executeTurn(input, execution),
-      ).catch(error => this.#closeExecutionFromError(execution, error)),
+      ).catch(error => this.#closeExecutionFromError(execution, error)).finally(() => this.#onRunSettled(execution.runId)),
       identity,
       runId,
     })
@@ -81,6 +85,7 @@ export class BuddyAgentRunner {
       || run.status !== 'queued'
       || run.conversationId !== session.conversationId
       || run.branchId !== session.branchId
+      || run.approvalPolicy !== session.approvalPolicy
       || run.executionProfile !== session.executionProfile
       || run.purpose !== 'conversation.compaction'
       || !run.piSessionFile
@@ -96,7 +101,7 @@ export class BuddyAgentRunner {
         execution.runId,
         execution.signal,
         () => this.#executeCompaction(input, run, execution),
-      ).catch(error => this.#closeExecutionFromError(execution, error)),
+      ).catch(error => this.#closeExecutionFromError(execution, error)).finally(() => this.#onRunSettled(execution.runId)),
       identity,
       runId: run.id,
     })
