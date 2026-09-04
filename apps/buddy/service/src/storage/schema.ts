@@ -4,6 +4,7 @@ import { BUDDY_V3_SPACE_SCHEMA_SQL } from './migrations/v3Space'
 import { BUDDY_V4_SPACE_SCHEMA_SQL } from './migrations/v4Space'
 import { BUDDY_V5_ARTIFACT_SCHEMA_SQL } from './migrations/v5Artifact'
 import { BUDDY_V6_PERMISSION_SCHEMA_SQL } from './migrations/v6Permission'
+import { BUDDY_V7_ARTIFACT_OUTPUT_SCHEMA_SQL } from './migrations/v7ArtifactOutput'
 
 export interface BuddySchemaMigration {
   foreignKeys?: 'off'
@@ -11,7 +12,7 @@ export interface BuddySchemaMigration {
   version: number
 }
 
-export const BUDDY_SCHEMA_VERSION = 6 as const
+export const BUDDY_SCHEMA_VERSION = 7 as const
 
 export const BUDDY_SCHEMA_MIGRATIONS: readonly BuddySchemaMigration[] = [
   { sql: BUDDY_V1_INITIAL_SCHEMA_SQL, version: 1 },
@@ -20,4 +21,5 @@ export const BUDDY_SCHEMA_MIGRATIONS: readonly BuddySchemaMigration[] = [
   { sql: BUDDY_V4_SPACE_SCHEMA_SQL, version: 4 },
   { sql: BUDDY_V5_ARTIFACT_SCHEMA_SQL, version: 5 },
   { foreignKeys: 'off', sql: BUDDY_V6_PERMISSION_SCHEMA_SQL, version: 6 },
+  { foreignKeys: 'off', sql: BUDDY_V7_ARTIFACT_OUTPUT_SCHEMA_SQL, version: 7 },
 ]

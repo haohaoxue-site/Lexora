@@ -59,9 +59,7 @@ export interface CreateImageGenerationExtensionOptions {
       grants: readonly DirectoryGrant[]
       images: readonly { bytes: Uint8Array, mimeType: string }[]
       outputPath: string
-      runId: string
       sourceArtifactId: string | null
-      sourceToolCallId: string
     }) => Promise<Array<{ id: string }>>
   }
   attachmentService: {
@@ -110,7 +108,7 @@ function createImageGenerationTool(
       'Use reference.mode=resources for exact attachment or artifact ids, or reference.mode=latest for the latest image in this conversation.',
       'Generated images are saved and shown in the Lexora Buddy conversation immediately.',
     ].join(' '),
-    execute: async (toolCallId, parameters, signal, _onUpdate, context) => {
+    execute: async (_toolCallId, parameters, signal, _onUpdate, context) => {
       if (!Check(imageGenerationParameters, parameters))
         return imageToolFailure('VALIDATION_FAILED')
       const input = parameters as ImageGenerationParameters
@@ -143,9 +141,7 @@ function createImageGenerationTool(
             mimeType: image.mimeType,
           })),
           outputPath,
-          runId,
           sourceArtifactId: references.artifactIds.at(-1) ?? null,
-          sourceToolCallId: toolCallId,
         })
         const artifactIds = artifacts.map(artifact => artifact.id)
         return {

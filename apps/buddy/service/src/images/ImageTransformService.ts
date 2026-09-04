@@ -13,10 +13,8 @@ export interface RemoveChromaInput {
   despill: number
   grants: readonly DirectoryGrant[]
   outputPath: string
-  runId: string
   softness: number
   sourceArtifactId: string
-  sourceToolCallId: string
   tolerance: number
 }
 
@@ -78,9 +76,7 @@ export class ImageTransformService {
           mimeType: 'image/png',
         }],
         outputPath: input.outputPath,
-        runId: input.runId,
         sourceArtifactId: input.sourceArtifactId,
-        sourceToolCallId: input.sourceToolCallId,
       })
       if (!artifact)
         throw new ImageTransformError('IMAGE_TRANSFORM_FAILED')

@@ -1,11 +1,9 @@
 import type { ToolCallEvent, ToolResultEvent } from '@earendil-works/pi-coding-agent'
-import type {
-  CapturedFileChange,
-  CapturedWorkspaceChange,
-} from '../../changes/ChangeCaptureService'
 import type { DirectoryGrant } from '../../directories/resolveGrantedPath'
 import type { BuddyInProcessExtension } from '../createBuddyResourceLoader'
 import type { BuddyRunContext } from './toolPolicyExtension'
+import { IMAGE_GENERATION_TOOL_NAME } from '../../images/imageGenerationToolContract'
+import { IMAGE_TRANSFORM_TOOL_NAME } from '../../images/imageTransformToolContract'
 import { isPiShellToolName } from '../piBuiltinTools'
 
 export interface ChangeCaptureGateway {
@@ -18,8 +16,9 @@ export interface ChangeCaptureGateway {
     toolCallId: string
     toolName: 'edit' | 'write'
   }) => Promise<void>
-  beginShellTool: (input: {
+  beginWorkspaceTool: (input: {
     conversationId: string
+    cwd: string
     grants: readonly DirectoryGrant[]
     runId: string
     toolCallId: string
@@ -33,35 +32,20 @@ export interface ChangeCaptureGateway {
     runId: string
     toolCallId: string
     toolName: 'edit' | 'write'
-  }) => Promise<CapturedFileChange | null>
-  finishShellTool: (input: {
+  }) => Promise<void>
+  finishWorkspaceTool: (input: {
     conversationId: string
+    cwd: string
     grants: readonly DirectoryGrant[]
+    isError: boolean
     runId: string
     toolCallId: string
-  }) => Promise<{ changes: CapturedWorkspaceChange[], complete: boolean }>
+    toolName: string
+  }) => Promise<{ complete: boolean }>
   markPartial: (input: { conversationId: string, runId: string }) => Promise<void>
 }
 
 export interface CreateChangeCaptureExtensionOptions {
-  artifactService: {
-    recordFileChange: (input: {
-      changeType: 'created' | 'deleted' | 'updated'
-      conversationId: string
-      grants: readonly DirectoryGrant[]
-      path: string
-      runId: string
-      sourceToolCallId: string
-    }) => Promise<{ id: string }>
-    recordFileMove: (input: {
-      conversationId: string
-      fromPath: string
-      grants: readonly DirectoryGrant[]
-      runId: string
-      sourceToolCallId: string
-      toPath: string
-    }) => Promise<{ id: string }>
-  }
   conversationId: string
   cwd: string
   getRunContext: () => BuddyRunContext | null
@@ -100,10 +84,11 @@ async function captureBeforeTool(
   const run = options.getRunContext()
   if (!run)
     return
-  if (isPiShellToolName(event.toolName)) {
+  if (capturesWorkspaceChanges(event.toolName)) {
     await safelyCapture(
-      () => options.service.beginShellTool({
+      () => options.service.beginWorkspaceTool({
         conversationId: options.conversationId,
+        cwd: options.cwd,
         grants: options.grants,
         runId: run.runId,
         toolCallId: event.toolCallId,
@@ -132,18 +117,34 @@ async function captureBeforeTool(
 async function captureAfterTool(
   options: CreateChangeCaptureExtensionOptions,
   event: ToolResultEvent,
-): Promise<{ details: Record<string, unknown> } | void> {
+): Promise<void> {
   const run = options.getRunContext()
   if (!run)
     return
-  if (isPiShellToolName(event.toolName))
-    return captureAfterShellTool(options, event, run.runId)
+  if (capturesWorkspaceChanges(event.toolName)) {
+    try {
+      const capture = await options.service.finishWorkspaceTool({
+        conversationId: options.conversationId,
+        cwd: options.cwd,
+        grants: options.grants,
+        isError: event.isError,
+        runId: run.runId,
+        toolCallId: event.toolCallId,
+        toolName: event.toolName,
+      })
+      if (!capture.complete)
+        await ignoreCaptureError(() => markPartial(options, run.runId))
+    }
+    catch {
+      await ignoreCaptureError(() => markPartial(options, run.runId))
+    }
+    return
+  }
   if (event.toolName !== 'edit' && event.toolName !== 'write')
     return
   const toolName = event.toolName === 'edit' ? 'edit' : 'write'
-  let change: CapturedFileChange | null
-  try {
-    change = await options.service.finishFileTool({
+  await safelyCapture(
+    () => options.service.finishFileTool({
       conversationId: options.conversationId,
       cwd: options.cwd,
       grants: options.grants,
@@ -151,113 +152,15 @@ async function captureAfterTool(
       runId: run.runId,
       toolCallId: event.toolCallId,
       toolName,
-    })
-  }
-  catch {
-    await ignoreCaptureError(() => markPartial(options, run.runId))
-    return
-  }
-  if (!change)
-    return
-  const artifactIds = await recordWorkspaceArtifacts(
-    options,
-    [change],
-    run.runId,
-    event.toolCallId,
+    }),
+    () => markPartial(options, run.runId),
   )
-  return withArtifactDetails(event.details, artifactIds)
 }
 
-async function captureAfterShellTool(
-  options: CreateChangeCaptureExtensionOptions,
-  event: ToolResultEvent,
-  runId: string,
-): Promise<{ details: Record<string, unknown> } | void> {
-  let capture: { changes: CapturedWorkspaceChange[], complete: boolean }
-  try {
-    capture = await options.service.finishShellTool({
-      conversationId: options.conversationId,
-      grants: options.grants,
-      runId,
-      toolCallId: event.toolCallId,
-    })
-  }
-  catch {
-    await ignoreCaptureError(() => markPartial(options, runId))
-    return
-  }
-  if (!capture.complete)
-    await ignoreCaptureError(() => markPartial(options, runId))
-  const artifactIds = await recordWorkspaceArtifacts(
-    options,
-    capture.changes,
-    runId,
-    event.toolCallId,
-  )
-  return withArtifactDetails(event.details, artifactIds)
-}
-
-async function recordWorkspaceArtifacts(
-  options: CreateChangeCaptureExtensionOptions,
-  changes: readonly CapturedWorkspaceChange[],
-  runId: string,
-  sourceToolCallId: string,
-): Promise<string[]> {
-  const artifactIds: string[] = []
-  for (const change of changes) {
-    try {
-      const artifact = change.changeType === 'renamed'
-        ? await options.artifactService.recordFileMove({
-            conversationId: options.conversationId,
-            fromPath: change.fromPath,
-            grants: options.grants,
-            runId,
-            sourceToolCallId,
-            toPath: change.toPath,
-          })
-        : await options.artifactService.recordFileChange({
-            changeType: change.changeType,
-            conversationId: options.conversationId,
-            grants: options.grants,
-            path: change.canonicalPath,
-            runId,
-            sourceToolCallId,
-          })
-      artifactIds.push(artifact.id)
-    }
-    catch {
-      await ignoreCaptureError(() => markPartial(options, runId))
-    }
-  }
-  return [...new Set(artifactIds)]
-}
-
-function withArtifactDetails(
-  details: unknown,
-  artifactIds: readonly string[],
-): { details: Record<string, unknown> } | void {
-  if (artifactIds.length === 0)
-    return
-  return {
-    details: {
-      ...readDetails(details),
-      artifactIds: mergeArtifactIds(details, artifactIds),
-    },
-  }
-}
-
-function readDetails(value: unknown): Record<string, unknown> {
-  return value && typeof value === 'object' && !Array.isArray(value)
-    ? value as Record<string, unknown>
-    : {}
-}
-
-function mergeArtifactIds(value: unknown, artifactIds: readonly string[]): string[] {
-  const currentArtifactIds = readDetails(value).artifactIds
-  const existing = Array.isArray(currentArtifactIds)
-    ? currentArtifactIds.filter((id): id is string => typeof id === 'string' && Boolean(id))
-    : []
-  return [...new Set([...existing, ...artifactIds])]
+function capturesWorkspaceChanges(toolName: string): boolean {
+  return isPiShellToolName(toolName)
+    || toolName === IMAGE_GENERATION_TOOL_NAME
+    || toolName === IMAGE_TRANSFORM_TOOL_NAME
 }
 
 function markPartial(

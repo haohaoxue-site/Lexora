@@ -1,10 +1,8 @@
 <script setup lang="ts">
 import type { LocalArtifact } from '@buddy-electron/shared/localChatApi'
 import type { BuddyLocale } from '@/i18n/buddyI18n'
-import { computed } from 'vue'
 import { useBuddyI18n } from '@/i18n/buddyI18n'
-import BuddyArtifactGallery from './BuddyArtifactGallery.vue'
-import BuddyArtifactTree from './BuddyArtifactTree.vue'
+import BuddyArtifactCollection from '@/ui/artifacts/BuddyArtifactCollection.vue'
 
 const props = defineProps<{
   artifacts: ReadonlyArray<LocalArtifact>
@@ -15,9 +13,6 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useBuddyI18n(() => props.language)
-const hasNestedPaths = computed(() => props.artifacts.some(
-  artifact => artifact.relativePath.includes('/'),
-))
 </script>
 
 <template>
@@ -26,14 +21,7 @@ const hasNestedPaths = computed(() => props.artifacts.some(
       <strong>{{ t('desktop.chat.turnOutputs') }}</strong>
       <small>{{ artifacts.length }}</small>
     </header>
-    <BuddyArtifactTree
-      v-if="hasNestedPaths"
-      :artifacts="artifacts"
-      :language="language"
-      @open-artifact="emit('openArtifact', $event)"
-    />
-    <BuddyArtifactGallery
-      v-else
+    <BuddyArtifactCollection
       :artifacts="artifacts"
       :language="language"
       @open-artifact="emit('openArtifact', $event)"

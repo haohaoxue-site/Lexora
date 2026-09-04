@@ -3,7 +3,6 @@ import type { ChangeCaptureService } from '../changes/ChangeCaptureService'
 import type { BuddyRunEvent } from '../events/BuddyRunEvent'
 import type { RuntimeRequestRegistrar } from '../rpc/runtimeRequest'
 import type {
-  ArtifactChangeRecord,
   ArtifactRecord,
   ArtifactRepository,
 } from '../storage/artifactRepository'
@@ -71,7 +70,7 @@ type ConversationRpcRepository = Pick<
 > & ConversationIndexRepository & ConversationTimelineRepository
 
 export interface RegisterConversationRpcOptions {
-  artifacts: Pick<ArtifactRepository, 'listChangesForRuns' | 'listForConversation'>
+  artifacts: Pick<ArtifactRepository, 'listForConversation'>
   attachments: Pick<AttachmentService, 'listForConversation'>
   changes: Pick<ChangeCaptureService, 'listSummariesForRuns'>
   conversations: ConversationRpcRepository
@@ -249,7 +248,6 @@ export function registerConversationRpc(options: RegisterConversationRpcOptions)
       outputs: projectRunOutputs(
         runEvents,
         options.artifacts.listForConversation(input.conversationId),
-        options.artifacts.listChangesForRuns(runIds),
       ),
       runEvents: runEvents.map(toPublicRunEvent),
       runs: runs.map(run => toPublicRun(
@@ -281,13 +279,8 @@ function requireValue<T>(value: T | null): T {
 function projectRunOutputs(
   events: readonly BuddyRunEvent[],
   artifacts: readonly ArtifactRecord[],
-  changes: readonly ArtifactChangeRecord[],
 ) {
   const artifactsById = new Map(artifacts.map(record => [record.id, record]))
-  const changesBySource = new Map(changes.map(change => [
-    artifactChangeSourceKey(change.artifactId, change.runId, change.sourceToolCallId),
-    change,
-  ]))
   return events.flatMap((event) => {
     if (event.type !== 'output.produced')
       return []
@@ -296,14 +289,9 @@ function projectRunOutputs(
       return []
     const projectedArtifacts = [...new Set(output.data.artifactIds)].flatMap((artifactId) => {
       const artifact = artifactsById.get(artifactId)
-      const change = changesBySource.get(artifactChangeSourceKey(
-        artifactId,
-        event.runId,
-        output.data.sourceToolCallId,
-      ))
-      if (!artifact || !change)
-        return []
-      return [toPublicArtifact(artifact, change)]
+      return artifact
+        ? [toPublicArtifact(artifact, event.runId, output.data.sourceToolCallId)]
+        : []
     })
     return projectedArtifacts.length > 0
       ? [{
@@ -316,32 +304,24 @@ function projectRunOutputs(
   })
 }
 
-function artifactChangeSourceKey(
-  artifactId: string,
+function toPublicArtifact(
+  record: ArtifactRecord,
   runId: string,
   sourceToolCallId: string,
-): string {
-  return `${artifactId}\0${runId}\0${sourceToolCallId}`
-}
-
-function toPublicArtifact(record: ArtifactRecord, change: ArtifactChangeRecord) {
+) {
   return {
     artifactId: record.id,
-    changeType: change.changeType,
     conversationId: record.conversationId,
     createdAt: record.createdAt,
-    createdRunId: record.createdRunId,
-    deletedAt: record.deletedAt,
-    lastChangedRunId: record.lastChangedRunId,
+    kind: record.kind,
     mimeType: record.mimeType,
     name: record.name,
-    previousRelativePath: change.previousRelativePath,
+    path: record.currentPath,
     previewUrl: null,
-    relativePath: record.relativePath,
-    runId: change.runId,
+    runId,
     sizeBytes: record.sizeBytes,
     sourceArtifactId: record.sourceArtifactId,
-    sourceToolCallId: change.sourceToolCallId,
+    sourceToolCallId,
     updatedAt: record.updatedAt,
   }
 }

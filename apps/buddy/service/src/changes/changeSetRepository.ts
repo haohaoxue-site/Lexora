@@ -25,7 +25,7 @@ export interface FileChangeCaptureRecord {
   relativePath: string
   status: 'completed' | 'pending'
   toolCallId: string
-  toolName: 'edit' | 'write'
+  toolName: string
   toolReportedError: boolean | null
 }
 
@@ -90,7 +90,7 @@ interface FileCaptureRow {
   relative_path: string
   status: 'completed' | 'pending'
   tool_call_id: string
-  tool_name: 'edit' | 'write'
+  tool_name: string
   tool_reported_error: number | null
 }
 
@@ -131,7 +131,10 @@ export function createChangeSetRepository(database: DatabaseSync): ChangeSetRepo
     )
   `)
   const findCapture = database.prepare(`
-    SELECT * FROM run_file_change_captures WHERE tool_call_id = ?
+    SELECT * FROM run_file_change_captures
+    WHERE tool_call_id = ? AND status = 'pending'
+    ORDER BY sequence
+    LIMIT 1
   `)
   const completeCapture = database.prepare(`
     UPDATE run_file_change_captures

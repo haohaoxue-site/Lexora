@@ -4,6 +4,7 @@ import type {
   CapturedFileStateRecord,
   ChangeSetRecord,
   ChangeSetRepository,
+  FileCaptureKind,
   FileChangeCaptureRecord,
 } from './changeSetRepository'
 import { createHash, randomUUID } from 'node:crypto'
@@ -14,9 +15,9 @@ import { resolveGrantedPath } from '../directories/resolveGrantedPath'
 
 const MAX_CHANGE_TEXT_BYTES = 1024 * 1024
 const MAX_CHANGE_HASH_BYTES = 32 * 1024 * 1024
-const MAX_SHELL_SNAPSHOT_BYTES = 256 * 1024 * 1024
-const MAX_SHELL_SNAPSHOT_FILES = 4096
-const IGNORED_SHELL_DIRECTORIES = new Set([
+const MAX_WORKSPACE_SNAPSHOT_BYTES = 256 * 1024 * 1024
+const MAX_WORKSPACE_SNAPSHOT_FILES = 4096
+const IGNORED_WORKSPACE_DIRECTORIES = new Set([
   '.git',
   '.hg',
   '.pnpm',
@@ -64,42 +65,32 @@ export interface LocalChangeSetDetail extends LocalChangeSetSummary {
   files: LocalFileChangeDetail[]
 }
 
-export interface CapturedFileChange {
-  canonicalPath: string
-  changeType: 'created' | 'deleted' | 'updated'
-}
-
-export interface CapturedFileMove {
-  changeType: 'renamed'
-  fromPath: string
-  toPath: string
-}
-
-export type CapturedWorkspaceChange = CapturedFileChange | CapturedFileMove
-
-interface ShellSnapshotState {
+interface WorkspaceSnapshotState {
   canonicalPath: string
   directoryGrantId: string
   hash: string
+  kind: Exclude<FileCaptureKind, 'missing' | 'unavailable'>
+  redacted: boolean
   relativePath: string
   sizeBytes: number
+  snapshotText: string | null
 }
 
-interface ShellSnapshot {
+interface WorkspaceSnapshot {
   complete: boolean
-  files: Map<string, ShellSnapshotState>
+  files: Map<string, WorkspaceSnapshotState>
 }
 
-interface PendingShellCapture {
+interface PendingWorkspaceCapture {
   conversationId: string
   runId: string
-  snapshot: ShellSnapshot
+  snapshot: WorkspaceSnapshot
 }
 
 export class ChangeCaptureService {
   readonly #paths: BuddyDataPaths
   readonly #repository: ChangeSetRepository
-  readonly #shellCaptures = new Map<string, PendingShellCapture>()
+  readonly #workspaceCaptures = new Map<string, PendingWorkspaceCapture>()
 
   constructor(options: { paths: BuddyDataPaths, repository: ChangeSetRepository }) {
     this.#paths = options.paths
@@ -148,10 +139,10 @@ export class ChangeCaptureService {
 
   async finishFileTool(
     input: FileToolInput & { isError: boolean },
-  ): Promise<CapturedFileChange | null> {
+  ): Promise<void> {
     const capture = this.#repository.findCaptureByToolCallId(input.toolCallId)
     if (!capture || capture.changeSetId !== input.runId)
-      return null
+      return
     if (!capture.canonicalPath || !capture.directoryGrantId)
       throw new ChangeCaptureError('VALIDATION_FAILED')
     const resolution = await resolveGrantedPath(input.grants, capture.canonicalPath, 'create')
@@ -168,49 +159,33 @@ export class ChangeCaptureService {
     const now = new Date().toISOString()
     this.#repository.completeCapture(capture.id, after, input.isError, now)
     this.#refreshFileCount(input.runId, now)
-    if (sameState(capture.before, after))
-      return null
-    if (capture.before.kind === 'missing' && isTrackableFileState(after)) {
-      return {
-        canonicalPath: resolution.canonicalPath,
-        changeType: 'created',
-      }
-    }
-    if (isTrackableFileState(capture.before) && after.kind === 'missing') {
-      return {
-        canonicalPath: resolution.canonicalPath,
-        changeType: 'deleted',
-      }
-    }
-    return isTrackableFileState(capture.before) && isTrackableFileState(after)
-      ? {
-          canonicalPath: resolution.canonicalPath,
-          changeType: 'updated',
-        }
-      : null
   }
 
-  async beginShellTool(input: {
+  async beginWorkspaceTool(input: {
     conversationId: string
+    cwd: string
     grants: readonly DirectoryGrant[]
     runId: string
     toolCallId: string
   }): Promise<void> {
-    this.#shellCaptures.set(input.toolCallId, {
+    this.#workspaceCaptures.set(input.toolCallId, {
       conversationId: input.conversationId,
       runId: input.runId,
-      snapshot: await captureShellSnapshot(input.grants),
+      snapshot: await captureWorkspaceSnapshot(input.grants, input.cwd),
     })
   }
 
-  async finishShellTool(input: {
+  async finishWorkspaceTool(input: {
     conversationId: string
+    cwd: string
     grants: readonly DirectoryGrant[]
+    isError: boolean
     runId: string
     toolCallId: string
-  }): Promise<{ changes: CapturedWorkspaceChange[], complete: boolean }> {
-    const before = this.#shellCaptures.get(input.toolCallId)
-    this.#shellCaptures.delete(input.toolCallId)
+    toolName: string
+  }): Promise<{ complete: boolean }> {
+    const before = this.#workspaceCaptures.get(input.toolCallId)
+    this.#workspaceCaptures.delete(input.toolCallId)
     if (
       !before
       || before.conversationId !== input.conversationId
@@ -218,11 +193,17 @@ export class ChangeCaptureService {
     ) {
       throw new ChangeCaptureError('VALIDATION_FAILED')
     }
-    const after = await captureShellSnapshot(input.grants)
-    return {
-      changes: diffShellSnapshots(before.snapshot.files, after.files),
-      complete: before.snapshot.complete && after.complete,
-    }
+    const after = await captureWorkspaceSnapshot(input.grants, input.cwd)
+    await this.#persistWorkspaceChanges({
+      after: after.files,
+      before: before.snapshot.files,
+      conversationId: input.conversationId,
+      isError: input.isError,
+      runId: input.runId,
+      toolCallId: input.toolCallId,
+      toolName: input.toolName,
+    })
+    return { complete: before.snapshot.complete && after.complete }
   }
 
   async markPartial(input: { conversationId: string, runId: string }): Promise<void> {
@@ -232,7 +213,7 @@ export class ChangeCaptureService {
   }
 
   async markInterrupted(runId: string): Promise<void> {
-    this.#discardShellCaptures(runId)
+    this.#discardWorkspaceCaptures(runId)
     const changeSet = this.#repository.findSetById(runId)
     if (!changeSet)
       return
@@ -243,7 +224,7 @@ export class ChangeCaptureService {
   }
 
   async finalizeRun(runId: string): Promise<void> {
-    this.#discardShellCaptures(runId)
+    this.#discardWorkspaceCaptures(runId)
     const changeSet = this.#repository.findSetById(runId)
     if (!changeSet)
       return
@@ -286,6 +267,98 @@ export class ChangeCaptureService {
   #refreshFileCount(changeSetId: string, now: string): void {
     const count = aggregateCaptures(this.#repository.listCaptures(changeSetId)).length
     this.#repository.updateFileCount(changeSetId, count, now)
+  }
+
+  async #persistWorkspaceChanges(input: {
+    after: ReadonlyMap<string, WorkspaceSnapshotState>
+    before: ReadonlyMap<string, WorkspaceSnapshotState>
+    conversationId: string
+    isError: boolean
+    runId: string
+    toolCallId: string
+    toolName: string
+  }): Promise<void> {
+    const changedKeys = [...new Set([...input.before.keys(), ...input.after.keys()])]
+      .filter(key => !sameWorkspaceState(input.before.get(key), input.after.get(key)))
+      .sort()
+    if (changedKeys.length === 0)
+      return
+    const now = new Date().toISOString()
+    this.#ensureSet(input.runId, input.conversationId, now)
+    for (const key of changedKeys) {
+      const before = input.before.get(key)
+      const after = input.after.get(key)
+      const state = after ?? before
+      if (!state)
+        continue
+      const captureId = randomUUID()
+      this.#repository.createCapture({
+        after: await this.#materializeWorkspaceState({
+          captureId,
+          conversationId: input.conversationId,
+          runId: input.runId,
+          side: 'after',
+          state: after,
+        }),
+        before: await this.#materializeWorkspaceState({
+          captureId,
+          conversationId: input.conversationId,
+          runId: input.runId,
+          side: 'before',
+          state: before,
+        }),
+        canonicalPath: state.canonicalPath,
+        changeSetId: input.runId,
+        completedAt: now,
+        createdAt: now,
+        directoryGrantId: state.directoryGrantId,
+        id: captureId,
+        relativePath: state.relativePath,
+        status: 'completed',
+        toolCallId: input.toolCallId,
+        toolName: input.toolName,
+        toolReportedError: input.isError,
+      })
+    }
+    this.#refreshFileCount(input.runId, now)
+  }
+
+  async #materializeWorkspaceState(input: {
+    captureId: string
+    conversationId: string
+    runId: string
+    side: 'after' | 'before'
+    state: WorkspaceSnapshotState | undefined
+  }): Promise<CapturedFileStateRecord> {
+    if (!input.state)
+      return emptyState('missing')
+    if (input.state.kind !== 'text' || input.state.snapshotText === null) {
+      return {
+        hash: input.state.hash,
+        kind: input.state.kind,
+        redacted: input.state.redacted,
+        sizeBytes: input.state.sizeBytes,
+        snapshotPath: null,
+      }
+    }
+    const snapshotPath = this.#paths.changeSnapshot(
+      input.conversationId,
+      input.runId,
+      input.captureId,
+      input.side,
+    )
+    await mkdir(this.#paths.conversationChangesDirectory(input.conversationId, input.runId), {
+      mode: 0o700,
+      recursive: true,
+    })
+    await writeFile(snapshotPath, input.state.snapshotText, { flag: 'wx', mode: 0o600 })
+    return {
+      hash: input.state.hash,
+      kind: input.state.kind,
+      redacted: input.state.redacted,
+      sizeBytes: input.state.sizeBytes,
+      snapshotPath,
+    }
   }
 
   async #captureState(input: {
@@ -376,10 +449,10 @@ export class ChangeCaptureService {
     }
   }
 
-  #discardShellCaptures(runId: string): void {
-    for (const [toolCallId, capture] of this.#shellCaptures) {
+  #discardWorkspaceCaptures(runId: string): void {
+    for (const [toolCallId, capture] of this.#workspaceCaptures) {
       if (capture.runId === runId)
-        this.#shellCaptures.delete(toolCallId)
+        this.#workspaceCaptures.delete(toolCallId)
     }
   }
 }
@@ -419,17 +492,11 @@ function sameState(left: CapturedFileStateRecord, right: CapturedFileStateRecord
   return left.hash !== null && left.hash === right.hash
 }
 
-function isTrackableFileState(state: CapturedFileStateRecord): boolean {
-  return state.hash !== null
-    && state.kind !== 'missing'
-    && state.kind !== 'sensitive'
-    && state.kind !== 'unavailable'
-}
-
-async function captureShellSnapshot(
+async function captureWorkspaceSnapshot(
   grants: readonly DirectoryGrant[],
-): Promise<ShellSnapshot> {
-  const files = new Map<string, ShellSnapshotState>()
+  cwd: string,
+): Promise<WorkspaceSnapshot> {
+  const files = new Map<string, WorkspaceSnapshotState>()
   const seenPaths = new Set<string>()
   const budget = {
     bytes: 0,
@@ -441,7 +508,7 @@ async function captureShellSnapshot(
   ).values()].sort((left, right) => right.canonicalRoot.length - left.canonicalRoot.length)
 
   for (const grant of uniqueGrants) {
-    if (budget.files >= MAX_SHELL_SNAPSHOT_FILES)
+    if (budget.files >= MAX_WORKSPACE_SNAPSHOT_FILES)
       break
     try {
       const metadata = await stat(grant.canonicalRoot)
@@ -449,7 +516,7 @@ async function captureShellSnapshot(
         budget.complete = false
         continue
       }
-      await scanGrantDirectory(grant, grant.canonicalRoot, files, seenPaths, budget)
+      await scanGrantDirectory(grant, grant.canonicalRoot, cwd, files, seenPaths, budget)
     }
     catch {
       budget.complete = false
@@ -461,7 +528,8 @@ async function captureShellSnapshot(
 async function scanGrantDirectory(
   grant: DirectoryGrant,
   directory: string,
-  files: Map<string, ShellSnapshotState>,
+  cwd: string,
+  files: Map<string, WorkspaceSnapshotState>,
   seenPaths: Set<string>,
   budget: { bytes: number, complete: boolean, files: number },
 ): Promise<void> {
@@ -475,40 +543,51 @@ async function scanGrantDirectory(
   }
   entries.sort((left, right) => left.name.localeCompare(right.name))
   for (const entry of entries) {
-    if (budget.files >= MAX_SHELL_SNAPSHOT_FILES) {
+    if (budget.files >= MAX_WORKSPACE_SNAPSHOT_FILES) {
       budget.complete = false
       return
     }
     const path = resolve(directory, entry.name)
     if (entry.isDirectory()) {
-      if (!IGNORED_SHELL_DIRECTORIES.has(entry.name))
-        await scanGrantDirectory(grant, path, files, seenPaths, budget)
+      if (!IGNORED_WORKSPACE_DIRECTORIES.has(entry.name))
+        await scanGrantDirectory(grant, path, cwd, files, seenPaths, budget)
       continue
     }
     if (!entry.isFile() || seenPaths.has(path))
       continue
     const relativePath = relative(grant.canonicalRoot, path).split(sep).join('/')
-    if (!relativePath || isSensitivePath(relativePath))
+    if (!relativePath)
       continue
     try {
       const metadata = await stat(path)
       if (
         !metadata.isFile()
         || metadata.size > MAX_CHANGE_HASH_BYTES
-        || budget.bytes + metadata.size > MAX_SHELL_SNAPSHOT_BYTES
+        || budget.bytes + metadata.size > MAX_WORKSPACE_SNAPSHOT_BYTES
       ) {
         budget.complete = false
         continue
       }
       const bytes = await readFile(path)
-      const state: ShellSnapshotState = {
+      const text = metadata.size <= MAX_CHANGE_TEXT_BYTES ? decodeText(bytes) : null
+      const redactedText = text === null ? null : redactSensitiveText(text)
+      const state: WorkspaceSnapshotState = {
         canonicalPath: path,
         directoryGrantId: grant.grantId,
         hash: createHash('sha256').update(bytes).digest('hex'),
-        relativePath,
+        kind: isSensitivePath(relativePath)
+          ? 'sensitive'
+          : metadata.size > MAX_CHANGE_TEXT_BYTES
+            ? 'oversized'
+            : text === null
+              ? 'binary'
+              : 'text',
+        redacted: redactedText !== null && redactedText !== text,
+        relativePath: displayGrantedPath(cwd, grant, path),
         sizeBytes: bytes.byteLength,
+        snapshotText: isSensitivePath(relativePath) ? null : redactedText,
       }
-      files.set(shellSnapshotKey(state), state)
+      files.set(workspaceSnapshotKey(state), state)
       seenPaths.add(path)
       budget.bytes += bytes.byteLength
       budget.files += 1
@@ -519,88 +598,17 @@ async function scanGrantDirectory(
   }
 }
 
-function diffShellSnapshots(
-  before: ReadonlyMap<string, ShellSnapshotState>,
-  after: ReadonlyMap<string, ShellSnapshotState>,
-): CapturedWorkspaceChange[] {
-  const changes: CapturedWorkspaceChange[] = []
-  const deleted: ShellSnapshotState[] = []
-  const created: ShellSnapshotState[] = []
-
-  for (const [key, previous] of before) {
-    const current = after.get(key)
-    if (!current) {
-      deleted.push(previous)
-      continue
-    }
-    if (current.hash !== previous.hash || current.sizeBytes !== previous.sizeBytes) {
-      changes.push({
-        canonicalPath: current.canonicalPath,
-        changeType: 'updated',
-      })
-    }
-  }
-  for (const [key, current] of after) {
-    if (!before.has(key))
-      created.push(current)
-  }
-
-  const deletedByFingerprint = groupShellStatesByFingerprint(deleted)
-  const createdByFingerprint = groupShellStatesByFingerprint(created)
-  const movedFrom = new Set<string>()
-  const movedTo = new Set<string>()
-  for (const [fingerprint, previous] of deletedByFingerprint) {
-    const current = createdByFingerprint.get(fingerprint)
-    if (previous.length !== 1 || current?.length !== 1)
-      continue
-    const [from] = previous
-    const [to] = current
-    if (!from || !to)
-      continue
-    movedFrom.add(shellSnapshotKey(from))
-    movedTo.add(shellSnapshotKey(to))
-    changes.push({
-      changeType: 'renamed',
-      fromPath: from.canonicalPath,
-      toPath: to.canonicalPath,
-    })
-  }
-  changes.push(...deleted
-    .filter(state => !movedFrom.has(shellSnapshotKey(state)))
-    .map(state => ({
-      canonicalPath: state.canonicalPath,
-      changeType: 'deleted' as const,
-    })))
-  changes.push(...created
-    .filter(state => !movedTo.has(shellSnapshotKey(state)))
-    .map(state => ({
-      canonicalPath: state.canonicalPath,
-      changeType: 'created' as const,
-    })))
-  return changes.sort((left, right) => (
-    workspaceChangePath(left).localeCompare(workspaceChangePath(right))
-  ))
-}
-
-function groupShellStatesByFingerprint(
-  states: readonly ShellSnapshotState[],
-): Map<string, ShellSnapshotState[]> {
-  const groups = new Map<string, ShellSnapshotState[]>()
-  for (const state of states) {
-    const key = `${state.hash}\0${state.sizeBytes}`
-    const group = groups.get(key) ?? []
-    group.push(state)
-    groups.set(key, group)
-  }
-  return groups
-}
-
-function shellSnapshotKey(state: ShellSnapshotState): string {
+function workspaceSnapshotKey(state: WorkspaceSnapshotState): string {
   return `${state.directoryGrantId}\0${state.relativePath}`
 }
 
-function workspaceChangePath(change: CapturedWorkspaceChange): string {
-  return change.changeType === 'renamed' ? change.toPath : change.canonicalPath
+function sameWorkspaceState(
+  left: WorkspaceSnapshotState | undefined,
+  right: WorkspaceSnapshotState | undefined,
+): boolean {
+  if (!left || !right)
+    return left === right
+  return left.hash === right.hash && left.sizeBytes === right.sizeBytes
 }
 
 function emptyState(kind: 'missing' | 'unavailable'): CapturedFileStateRecord {
@@ -647,12 +655,14 @@ function decodeText(bytes: Uint8Array): string | null {
 }
 
 function isSensitivePath(path: string): boolean {
-  const name = basename(path).toLowerCase()
-  const extension = extname(name)
-  return name === '.env'
-    || name.startsWith('.env.')
-    || ['.credential', '.key', '.p12', '.pem'].includes(extension)
-    || ['id_dsa', 'id_ecdsa', 'id_ed25519', 'id_rsa'].includes(name)
+  return path.split('/').some((segment) => {
+    const name = segment.toLowerCase()
+    const extension = extname(name)
+    return name === '.env'
+      || name.startsWith('.env.')
+      || ['.credential', '.key', '.p12', '.pem'].includes(extension)
+      || ['id_dsa', 'id_ecdsa', 'id_ed25519', 'id_rsa'].includes(name)
+  })
 }
 
 function resolvePreview(
