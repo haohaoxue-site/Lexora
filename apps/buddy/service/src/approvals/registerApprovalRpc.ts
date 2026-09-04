@@ -5,9 +5,9 @@ import type {
 } from '../storage/approvalRepository'
 import type { ApprovalService } from './ApprovalService'
 import { z } from 'zod'
+import { APPROVAL_REVIEW_KINDS } from '../../../shared/approvalReviewPayload'
 import { parse } from '../rpc/runtimeRequest'
 
-const approvalKinds = ['automation', 'browser', 'delete', 'mcp', 'network', 'shell', 'system'] as const
 const approvalStatuses = ['pending', 'approved', 'denied', 'cancelled'] as const
 const idSchema = z.string().trim().min(1).max(256)
 const approvalIdSchema = z.object({ approvalId: idSchema }).strict()
@@ -65,6 +65,6 @@ function toPublicApproval(approval: ApprovalRecord) {
   }
 }
 
-function isApprovalKind(value: string): value is typeof approvalKinds[number] {
-  return (approvalKinds as readonly string[]).includes(value)
+function isApprovalKind(value: string): value is typeof APPROVAL_REVIEW_KINDS[number] {
+  return (APPROVAL_REVIEW_KINDS as readonly string[]).includes(value)
 }

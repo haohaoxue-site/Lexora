@@ -1,4 +1,5 @@
 import type { DatabaseSync } from 'node:sqlite'
+import type { BuddyApprovalPolicy } from '../../../shared/approvalPolicy'
 import type { BuddyExecutionProfile } from '../../../shared/executionProfile'
 import type {
   ActivateConversationBranchInput,
@@ -18,6 +19,7 @@ import { createConversationTimelineRepository } from './conversationTimelineRepo
 import { withTransaction } from './database'
 
 export interface CreateConversationInput {
+  approvalPolicy: BuddyApprovalPolicy
   id: string
   branchId: string
   spaceId: string | null
@@ -33,7 +35,8 @@ export interface RenameConversationInput {
   updatedAt: string
 }
 
-export interface SetConversationExecutionProfileInput {
+export interface SetConversationPermissionSettingsInput {
+  approvalPolicy: BuddyApprovalPolicy
   executionProfile: BuddyExecutionProfile
   id: string
   updatedAt: string
@@ -53,8 +56,8 @@ export interface ConversationRepository
   isDeleted: (id: string) => boolean
   markDeleted: (id: string, deletedAt: string) => boolean
   rename: (input: RenameConversationInput) => ConversationRecord
-  setExecutionProfile: (
-    input: SetConversationExecutionProfileInput,
+  setPermissionSettings: (
+    input: SetConversationPermissionSettingsInput,
   ) => ConversationRecord | null
   setModelSelection: (
     input: SetConversationModelSelectionInput,
@@ -66,17 +69,17 @@ export function createConversationRepository(database: DatabaseSync): Conversati
   const insertConversation = database.prepare(`
     INSERT INTO conversations (
       id, space_id, title, active_branch_id, created_at, updated_at,
-      execution_profile, origin, deleted_at
-    ) VALUES (?, ?, ?, NULL, ?, ?, ?, ?, NULL)
+      approval_policy, execution_profile, origin, deleted_at
+    ) VALUES (?, ?, ?, NULL, ?, ?, ?, ?, ?, NULL)
   `)
   const renameConversation = database.prepare(`
     UPDATE conversations
     SET title = ?, updated_at = ?
     WHERE id = ? AND deleted_at IS NULL
   `)
-  const setExecutionProfile = database.prepare(`
+  const setPermissionSettings = database.prepare(`
     UPDATE conversations
-    SET execution_profile = ?, updated_at = ?
+    SET approval_policy = ?, execution_profile = ?, updated_at = ?
     WHERE id = ?
       AND NOT EXISTS (
         SELECT 1 FROM runs
@@ -116,6 +119,7 @@ export function createConversationRepository(database: DatabaseSync): Conversati
           input.title,
           input.createdAt,
           input.createdAt,
+          input.approvalPolicy,
           input.executionProfile,
           input.origin ?? 'interactive',
         )
@@ -158,14 +162,19 @@ export function createConversationRepository(database: DatabaseSync): Conversati
         input.id,
       )
     },
-    setExecutionProfile(input) {
+    setPermissionSettings(input) {
       return withTransaction(database, () => {
         const current = findConversation.get(input.id) as ConversationRow | undefined
         if (!current || current.deleted_at !== null)
           return null
-        if (current.execution_profile === input.executionProfile)
+        if (
+          current.approval_policy === input.approvalPolicy
+          && current.execution_profile === input.executionProfile
+        ) {
           return toConversationRecord(current)
-        if (Number(setExecutionProfile.run(
+        }
+        if (Number(setPermissionSettings.run(
+          input.approvalPolicy,
           input.executionProfile,
           input.updatedAt,
           input.id,

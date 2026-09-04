@@ -1,3 +1,4 @@
+import type { DirectoryGrantMutation } from '../directories/DirectoryGrantService'
 import type {
   PersistedSpaceAdditionalDirectoryInput,
   PersistedSpacePrimaryDirectoryInput,
@@ -7,8 +8,8 @@ import type {
   SpaceRepository,
 } from '../storage/spaceRepository'
 import { randomUUID } from 'node:crypto'
-import { readdir, realpath, stat } from 'node:fs/promises'
-import { join, relative, resolve } from 'node:path'
+import { mkdir, readdir, realpath, stat } from 'node:fs/promises'
+import { join, relative, resolve, sep } from 'node:path'
 import { resolveGrantedPath } from '../directories/resolveGrantedPath'
 import { requireActiveSpace } from './requireActiveSpace'
 
@@ -40,16 +41,6 @@ export interface CreateSpaceInput {
 
 export interface UpdateSpaceInput extends CreateSpaceInput {
   spaceId: string
-}
-
-export interface SpaceDirectoryAuthorizationResult {
-  created: boolean
-  directory: {
-    canonicalRoot: string
-    id: string
-    role: 'additional' | 'primary'
-    root: string
-  }
 }
 
 interface ResolvedSpaceDirectoryConfiguration {
@@ -139,22 +130,31 @@ export class SpaceService {
   async grantAdditionalDirectory(input: {
     root: string
     spaceId: string
-  }): Promise<SpaceDirectoryAuthorizationResult> {
+  }): Promise<DirectoryGrantMutation> {
+    requireActiveSpace(this.#spaces.findById(input.spaceId))
+    const resolved = await resolveSpaceDirectory(input.root, { create: true })
     const space = requireActiveSpace(this.#spaces.findById(input.spaceId))
-    const resolved = await resolveSpaceDirectory(input.root)
-    const existing = getSpaceDirectories(space).find(
-      directory => directory.canonicalRoot === resolved.canonicalRoot,
-    )
+
+    const existing = [...getSpaceDirectories(space)]
+      .sort((left, right) => right.canonicalRoot.length - left.canonicalRoot.length)
+      .find(directory => containsDirectory(directory.canonicalRoot, resolved.canonicalRoot))
     if (existing) {
       return {
-        created: false,
-        directory: toAuthorizedDirectory(
-          existing,
-          space.primaryDirectory?.id === existing.id ? 'primary' : 'additional',
-        ),
+        changed: false,
+        coveredGrantIds: [],
+        grant: {
+          canonicalRoot: existing.canonicalRoot,
+          id: existing.id,
+          root: existing.root,
+        },
       }
     }
-    if (getSpaceDirectories(space).length >= 32)
+
+    const coveredDirectories = space.additionalDirectories.filter(directory => (
+      containsDirectory(resolved.canonicalRoot, directory.canonicalRoot)
+    ))
+    const nextDirectoryCount = getSpaceDirectories(space).length - coveredDirectories.length + 1
+    if (nextDirectoryCount > 32)
       throw new SpaceDirectoryError()
 
     const updatedAt = new Date().toISOString()
@@ -164,9 +164,12 @@ export class SpaceService {
       id: randomUUID(),
       root: resolved.root,
     }
+    const coveredDirectoryIds = new Set(coveredDirectories.map(directory => directory.id))
     const directories: ResolvedSpaceDirectoryConfiguration = {
       additionalDirectories: [
-        ...space.additionalDirectories.map(toPersistedAdditionalDirectory),
+        ...space.additionalDirectories
+          .filter(directory => !coveredDirectoryIds.has(directory.id))
+          .map(toPersistedAdditionalDirectory),
         grantedDirectory,
       ],
       primaryDirectory: space.primaryDirectory
@@ -180,6 +183,10 @@ export class SpaceService {
         eventType: 'space.config.updated',
         id: randomUUID(),
         payload: {
+          authorization: {
+            coveredGrantIds: [...coveredDirectoryIds],
+            root: resolved.root,
+          },
           changes: {
             directories: summarizeDirectoryChanges(space, directories),
             memoryScope: { from: space.memoryScope, to: space.memoryScope },
@@ -200,8 +207,13 @@ export class SpaceService {
     if (!directory)
       throw new SpaceDirectoryError()
     return {
-      created: true,
-      directory: toAuthorizedDirectory(directory, 'additional'),
+      changed: true,
+      coveredGrantIds: [...coveredDirectoryIds],
+      grant: {
+        canonicalRoot: directory.canonicalRoot,
+        id: directory.id,
+        root: directory.root,
+      },
     }
   }
 
@@ -235,6 +247,7 @@ export class SpaceService {
     const grants = directories.map(directory => ({
       canonicalRoot: directory.canonicalRoot,
       grantId: directory.id,
+      kind: 'workspace' as const,
       root: directory.root,
     }))
     const pending = directories.map(directory => ({
@@ -450,16 +463,9 @@ function toPersistedPrimaryDirectory(
   }
 }
 
-function toAuthorizedDirectory(
-  directory: Pick<SpaceAdditionalDirectoryBindingRecord, 'canonicalRoot' | 'id' | 'root'>,
-  role: SpaceDirectoryAuthorizationResult['directory']['role'],
-): SpaceDirectoryAuthorizationResult['directory'] {
-  return {
-    canonicalRoot: directory.canonicalRoot,
-    id: directory.id,
-    role,
-    root: directory.root,
-  }
+function containsDirectory(root: string, candidate: string): boolean {
+  const prefix = root.endsWith(sep) ? root : `${root}${sep}`
+  return candidate === root || candidate.startsWith(prefix)
 }
 
 function requireSpaceName(value: string): string {
@@ -469,10 +475,17 @@ function requireSpaceName(value: string): string {
   return name
 }
 
-async function resolveSpaceDirectory(root: string) {
+async function resolveSpaceDirectory(
+  root: string,
+  options: { create?: boolean } = {},
+) {
   const absoluteRoot = resolve(root)
   try {
+    if (options.create)
+      await mkdir(absoluteRoot, { recursive: true })
     const canonicalRoot = await realpath(absoluteRoot)
+    if (options.create && canonicalRoot !== absoluteRoot)
+      throw new Error('Directory identity changed')
     const metadata = await stat(canonicalRoot)
     if (!metadata.isDirectory())
       throw new Error('Not a directory')

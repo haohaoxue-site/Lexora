@@ -38,7 +38,7 @@ function confirm() {
     preset="dialog"
     type="error"
     class="desktop-full-access-confirmation"
-    :style="{ width: 'min(31rem, calc(100vw - 2rem))' }"
+    :style="{ width: 'min(25rem, calc(100vw - 2rem))' }"
     :closable="false"
     :mask-closable="false"
     :title="t('desktop.chat.executionProfileFullConfirmTitle')"

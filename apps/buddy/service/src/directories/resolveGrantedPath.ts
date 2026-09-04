@@ -10,6 +10,7 @@ import {
 export interface DirectoryGrant {
   canonicalRoot: string
   grantId: string
+  kind: 'granted' | 'workspace'
   root: string
 }
 

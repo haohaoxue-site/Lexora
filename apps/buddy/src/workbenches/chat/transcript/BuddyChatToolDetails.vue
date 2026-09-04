@@ -30,6 +30,20 @@ const terminal = computed(() => props.presentation.card === 'terminal'
 const image = computed(() => props.presentation.card === 'image'
   ? props.presentation
   : null)
+const directoryAuthorization = computed(() => (
+  props.presentation.card === 'directory-authorization'
+    ? props.presentation
+    : null
+))
+const directoryRelation = computed(() => {
+  switch (directoryAuthorization.value?.relation) {
+    case 'exact': return t('desktop.chat.processToolDirectoryRelationExact')
+    case 'ancestor': return t('desktop.chat.processToolDirectoryRelationBroader')
+    case 'descendant': return t('desktop.chat.processToolDirectoryRelationNarrower')
+    case 'unrelated': return t('desktop.chat.processToolDirectoryRelationUnrelated')
+    default: return null
+  }
+})
 const terminalShell = computed(() => props.toolName === 'powershell' ? 'powershell' : 'bash')
 const terminalOutput = computed(() => props.status === 'denied'
   ? null
@@ -57,6 +71,7 @@ const sections = computed<ToolDetailSection[]>(() => {
   }
   if (
     presentation.card === 'automation'
+    || presentation.card === 'directory-authorization'
     || presentation.card === 'image'
     || presentation.card === 'pet'
   ) {
@@ -90,6 +105,41 @@ function section(
       :language="language"
       :presentation="image"
     />
+    <section
+      v-if="directoryAuthorization"
+      class="buddy-chat-tool-details__section buddy-chat-directory-authorization"
+    >
+      <dl>
+        <div v-if="directoryAuthorization.requestedRoot">
+          <dt>{{ t('desktop.chat.processToolDirectoryRequestedRoot') }}</dt>
+          <dd><code>{{ directoryAuthorization.requestedRoot }}</code></dd>
+        </div>
+        <div v-if="directoryAuthorization.selectedRoot">
+          <dt>{{ t('desktop.chat.processToolDirectorySelectedRoot') }}</dt>
+          <dd><code>{{ directoryAuthorization.selectedRoot }}</code></dd>
+        </div>
+        <div v-if="directoryRelation">
+          <dt>{{ t('desktop.chat.processToolDirectoryScopeRelation') }}</dt>
+          <dd>{{ directoryRelation }}</dd>
+        </div>
+        <div v-if="directoryAuthorization.requestSatisfied !== null">
+          <dt>{{ t('desktop.chat.processToolDirectoryRequestSatisfied') }}</dt>
+          <dd>
+            {{ t(directoryAuthorization.requestSatisfied
+              ? 'desktop.approval.directory.satisfied'
+              : 'desktop.approval.directory.unsatisfied') }}
+          </dd>
+        </div>
+        <div v-if="directoryAuthorization.coveredDirectoryCount > 0">
+          <dt>{{ t('desktop.chat.processToolDirectoryExpanded') }}</dt>
+          <dd>
+            {{ t('desktop.chat.processToolDirectoryCoveredCount', {
+              count: directoryAuthorization.coveredDirectoryCount,
+            }) }}
+          </dd>
+        </div>
+      </dl>
+    </section>
     <section v-if="terminal && expanded" class="buddy-chat-terminal-card">
       <DesktopTerminalTranscript
         :command="terminal.command"
@@ -192,6 +242,45 @@ function section(
     color: var(--buddy-text-muted);
     font-size: inherit;
     font-weight: 400;
+  }
+}
+
+.buddy-chat-directory-authorization {
+  padding: 0.65rem 0.7rem;
+
+  dl {
+    display: grid;
+    gap: 0.45rem;
+    margin: 0;
+  }
+
+  dl > div {
+    display: grid;
+    grid-template-columns: minmax(6rem, 0.3fr) minmax(0, 1fr);
+    gap: 0.6rem;
+  }
+
+  dt,
+  dd {
+    margin: 0;
+    font-size: var(--buddy-chat-caption-font-size);
+    line-height: var(--buddy-chat-caption-line-height);
+  }
+
+  dt {
+    color: var(--buddy-text-secondary);
+  }
+
+  dd {
+    min-width: 0;
+    color: var(--buddy-text-primary);
+    overflow-wrap: anywhere;
+  }
+
+  code {
+    color: var(--buddy-chat-code-color);
+    font-family: var(--buddy-font-mono);
+    font-size: var(--buddy-chat-code-font-size);
   }
 }
 

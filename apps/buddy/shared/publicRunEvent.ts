@@ -42,7 +42,8 @@ const MAX_PUBLIC_STRING_LENGTH = 4 * 1024
 const MAX_MESSAGE_DELTA_LENGTH = 64 * 1024
 const SCALAR_PAYLOAD_KEYS = new Map<string, readonly string[]>([
   ['approval.requested', ['id', 'kind', 'status', 'summary', 'toolCallId']],
-  ['approval.resolved', ['id', 'resolvedAt', 'status']],
+  ['approval.resolved', ['id', 'resolution', 'resolvedAt', 'status']],
+  ['approval.turn_reused', ['sourceApprovalId', 'toolCallId', 'toolName']],
   ['context.compaction.cancelled', ['reason', 'willRetry']],
   ['context.compaction.completed', ['estimatedTokensAfter', 'reason', 'tokensBefore', 'willRetry']],
   ['context.compaction.failed', ['errorCode', 'reason', 'willRetry']],
@@ -74,6 +75,7 @@ const SCALAR_PAYLOAD_KEYS = new Map<string, readonly string[]>([
     'source',
   ]],
   ['tool.completed', ['isError', 'toolCallId', 'toolName']],
+  ['tool.denied', ['toolCallId', 'toolName']],
   ['tool.preparing', ['toolCallId', 'toolName']],
   ['tool.started', ['toolCallId', 'toolName']],
   ['tool.updated', ['macro', 'status', 'toolCallId', 'toolName']],
@@ -123,6 +125,8 @@ function publicPayload(type: string, value: unknown): Record<string, unknown> {
     })
     return output.success ? output.data : {}
   }
+  if (type === 'tool.denied')
+    return publicToolDenial(source)
   if (
     type === 'tool.preparing'
     || type === 'tool.started'
@@ -135,6 +139,26 @@ function publicPayload(type: string, value: unknown): Record<string, unknown> {
   if (!keys)
     return {}
   return selectScalars(source, keys)
+}
+
+const PUBLIC_DENIAL_CODES = new Set([
+  'APPROVAL_DENIED',
+  'APPROVAL_UNAVAILABLE_IN_BACKGROUND',
+  'DIRECTORY_GRANT_FAILED',
+  'INVALID_PATH',
+  'PATH_NOT_FOUND',
+  'MULTIPLE_DIRECTORY_GRANTS_REQUIRED',
+  'READ_ONLY_PROFILE',
+  'SENSITIVE_PATH',
+  'VALIDATION_FAILED',
+])
+
+function publicToolDenial(source: Record<string, unknown>): Record<string, unknown> {
+  const published = selectScalars(source, ['toolCallId', 'toolName'])
+  const code = source.denialCode
+  if (typeof code === 'string' && PUBLIC_DENIAL_CODES.has(code))
+    published.denialCode = code
+  return published
 }
 
 function publicRunProgress(source: Record<string, unknown>): Record<string, unknown> {

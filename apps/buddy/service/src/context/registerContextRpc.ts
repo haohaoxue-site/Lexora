@@ -1,6 +1,7 @@
 import type { RuntimeRequestRegistrar } from '../rpc/runtimeRequest'
 import type { ContextUsageSnapshotReader } from './ContextUsageSnapshotService'
 import { z } from 'zod'
+import { BUDDY_APPROVAL_POLICIES } from '../../../shared/approvalPolicy'
 import { BUDDY_EXECUTION_PROFILES } from '../../../shared/executionProfile'
 import {
   BUDDY_SERVICE_TIERS,
@@ -17,6 +18,7 @@ const modelSelectionSchema = z.object({
   serviceTier: z.enum(BUDDY_SERVICE_TIERS).nullable(),
 }).strict()
 const contextUsageSnapshotRequestSchema = z.object({
+  approvalPolicy: z.enum(BUDDY_APPROVAL_POLICIES),
   branchId: sessionIdentitySchema.nullable(),
   conversationId: sessionIdentitySchema.nullable(),
   draftId: sessionIdentitySchema,

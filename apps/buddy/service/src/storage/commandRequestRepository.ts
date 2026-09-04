@@ -1,10 +1,12 @@
 import type { DatabaseSync } from 'node:sqlite'
+import type { BuddyApprovalPolicy } from '../../../shared/approvalPolicy'
 import type { BuddyExecutionProfile } from '../../../shared/executionProfile'
 import { withTransaction } from './database'
 
 export type BuddyActionCommandName = 'compact'
 
 export interface PrepareCommandRequestInput {
+  approvalPolicy: BuddyApprovalPolicy
   arguments: string
   branchId: string
   command: BuddyActionCommandName
@@ -52,11 +54,13 @@ interface CommandRequestRow {
 
 interface ConversationRow {
   active_branch_id: string | null
+  approval_policy: BuddyApprovalPolicy
   deleted_at: string | null
   execution_profile: BuddyExecutionProfile
 }
 
 interface SourceRunRow {
+  approval_policy: BuddyApprovalPolicy
   branch_id: string
   conversation_id: string
   error_code: string | null
@@ -74,7 +78,8 @@ export function createCommandRequestRepository(database: DatabaseSync): CommandR
   const findRequest = database.prepare('SELECT * FROM command_requests WHERE request_id = ?')
   const findRequestByRun = database.prepare('SELECT * FROM command_requests WHERE run_id = ?')
   const findConversation = database.prepare(`
-    SELECT active_branch_id, deleted_at, execution_profile FROM conversations WHERE id = ?
+    SELECT active_branch_id, approval_policy, deleted_at, execution_profile
+    FROM conversations WHERE id = ?
   `)
   const findIncompleteRun = database.prepare(`
     SELECT 1 FROM runs
@@ -94,8 +99,8 @@ export function createCommandRequestRepository(database: DatabaseSync): CommandR
     INSERT INTO runs (
       id, conversation_id, branch_id, triggering_message_id, provider, model,
       context_window, max_tokens, purpose, status, pi_session_file, error_code,
-      started_at, completed_at, execution_profile
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'conversation.compaction', 'queued', ?, NULL, ?, NULL, ?)
+      started_at, completed_at, approval_policy, execution_profile
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'conversation.compaction', 'queued', ?, NULL, ?, NULL, ?, ?)
   `)
   const insertRequest = database.prepare(`
     INSERT INTO command_requests (
@@ -130,6 +135,7 @@ export function createCommandRequestRepository(database: DatabaseSync): CommandR
         if (
           !conversation
           || conversation.active_branch_id !== input.branchId
+          || conversation.approval_policy !== input.approvalPolicy
           || conversation.execution_profile !== input.executionProfile
           || conversation.deleted_at !== null
           || findIncompleteRun.get(input.conversationId)
@@ -148,6 +154,7 @@ export function createCommandRequestRepository(database: DatabaseSync): CommandR
           input.runId,
           input.createdAt,
           source,
+          input.approvalPolicy,
           input.executionProfile,
         )
         insertRequest.run(
@@ -192,6 +199,7 @@ export function createCommandRequestRepository(database: DatabaseSync): CommandR
           input.runId,
           input.createdAt,
           previous,
+          previous.approval_policy,
           previous.execution_profile,
         )
         if (Number(updateRequestRun.run(input.runId, input.requestId, request.run_id).changes) !== 1)
@@ -219,6 +227,7 @@ function insertCompactionRun(
   runId: string,
   createdAt: string,
   source: SourceRunRow,
+  approvalPolicy: BuddyApprovalPolicy,
   executionProfile: BuddyExecutionProfile,
 ): void {
   statement.run(
@@ -232,6 +241,7 @@ function insertCompactionRun(
     source.max_tokens,
     source.pi_session_file,
     createdAt,
+    approvalPolicy,
     executionProfile,
   )
 }

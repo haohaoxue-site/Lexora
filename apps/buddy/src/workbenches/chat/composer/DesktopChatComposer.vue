@@ -5,11 +5,11 @@ import type {
   LocalRuntimeModelOption,
   LocalWorkspaceDraft,
 } from '@buddy-electron/shared/localChatApi'
-import type { BuddyExecutionProfile } from '@buddy-shared/executionProfile'
 import type {
   BuddyServiceTier,
   BuddyThinkingLevel,
 } from '@buddy-shared/modelSelection'
+import type { BuddyPermissionMode } from '@buddy-shared/permissionMode'
 import type { BuddyLocale } from '@/i18n/buddyI18n'
 import type {
   ChatComposerContextOptions,
@@ -31,26 +31,26 @@ import DesktopModelSelector from '@/ui/model-selector/DesktopModelSelector.vue'
 import ChatContextUsage from '@/workbenches/chat/composer/ChatContextUsage.vue'
 import DesktopChatComposerFrame from '@/workbenches/chat/composer/DesktopChatComposerFrame.vue'
 import DesktopChatComposerInteractionHost from '@/workbenches/chat/composer/DesktopChatComposerInteractionHost.vue'
-import DesktopExecutionProfileSelector from '@/workbenches/chat/composer/DesktopExecutionProfileSelector.vue'
+import DesktopPermissionModeSelector from '@/workbenches/chat/composer/DesktopPermissionModeSelector.vue'
 import { useChatComposer } from '@/workbenches/chat/composer/useChatComposer'
 import { resolveBuddyAttachmentPreviewUrl } from '@/workbenches/chat/transcript/chatAttachmentView'
 
 const props = defineProps<{
   attachments: ReadonlyArray<LocalAttachment>
-  canUpdateExecutionProfile: boolean
+  canUpdatePermissionSettings: boolean
   canSend: boolean
   composerContent: LocalWorkspaceDraft['composerContent']
   contextUsage: ChatContextUsageValue | null
   draft: string
-  executionProfile: BuddyExecutionProfile
   isRunning: boolean
   isSelectingFiles: boolean
   isSending: boolean
-  isUpdatingExecutionProfile: boolean
+  isUpdatingPermissionSettings: boolean
   interaction: ChatComposerInteraction | null
   language: BuddyLocale
   loadContextOptions: (fileQuery: string | null) => Promise<ChatComposerContextOptions>
   models: ReadonlyArray<LocalRuntimeModelOption>
+  permissionMode: BuddyPermissionMode
   providers: ReadonlyArray<LocalProvider>
   selectedEffort: BuddyThinkingLevel | null
   selectedModel: LocalRuntimeModelOption | null
@@ -67,7 +67,7 @@ const emit = defineEmits<{
   stop: []
   updateContent: [content: string, value: LocalWorkspaceDraft['composerContent']]
   updateEffort: [value: BuddyThinkingLevel | null]
-  updateExecutionProfile: [value: BuddyExecutionProfile]
+  updatePermissionMode: [value: BuddyPermissionMode]
   updateModel: [value: string]
   updateServiceTier: [value: BuddyServiceTier | null]
 }>()
@@ -202,15 +202,15 @@ function handleFileDrop(event: DragEvent) {
       <slot name="leadingContext" />
 
       <div
-        class="desktop-chat-composer__execution-profile"
-        data-testid="composer-execution-profile"
+        class="desktop-chat-composer__permission-mode"
+        data-testid="composer-permission-mode"
       >
-        <DesktopExecutionProfileSelector
-          :can-update="canUpdateExecutionProfile"
-          :execution-profile="executionProfile"
-          :is-updating="isUpdatingExecutionProfile"
+        <DesktopPermissionModeSelector
+          :can-update="canUpdatePermissionSettings"
+          :is-updating="isUpdatingPermissionSettings"
           :language="language"
-          @update-execution-profile="emit('updateExecutionProfile', $event)"
+          :permission-mode="permissionMode"
+          @update-permission-mode="emit('updatePermissionMode', $event)"
         />
       </div>
     </template>
@@ -283,7 +283,7 @@ function handleFileDrop(event: DragEvent) {
 
 <style scoped lang="scss">
 .desktop-chat-composer__context-usage,
-.desktop-chat-composer__execution-profile,
+.desktop-chat-composer__permission-mode,
 .desktop-chat-composer__model-selector {
   display: contents;
 }
@@ -420,17 +420,17 @@ function handleFileDrop(event: DragEvent) {
 }
 
 @container desktop-chat-composer (max-width: 20rem) {
-  .desktop-chat-composer__execution-profile :deep(.desktop-execution-profile-selector__trigger) {
+  .desktop-chat-composer__permission-mode :deep(.desktop-permission-mode-selector__trigger) {
     width: var(--buddy-composer-control-height);
     min-width: var(--buddy-composer-control-height);
     padding: 0;
   }
 
-  .desktop-chat-composer__execution-profile :deep(.desktop-execution-profile-selector__label) {
+  .desktop-chat-composer__permission-mode :deep(.desktop-permission-mode-selector__trigger-label) {
     display: none;
   }
 
-  .desktop-chat-composer__execution-profile :deep(.n-button__icon) {
+  .desktop-chat-composer__permission-mode :deep(.n-button__icon) {
     margin: 0;
   }
 }

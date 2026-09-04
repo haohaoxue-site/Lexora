@@ -7,6 +7,7 @@ import {
   Document20Regular,
   DrawImage20Regular,
   Edit20Regular,
+  FolderAdd20Regular,
   Globe20Regular,
   PlugConnected20Regular,
   Search20Regular,
@@ -29,6 +30,8 @@ const props = defineProps<{
   node: ChatAgentToolNode
 }>()
 
+const readOnlyDenial = computed(() => props.node.denialCode === 'READ_ONLY_PROFILE')
+
 const { t } = useBuddyI18n(() => props.language)
 const isOpen = shallowRef(defaultOpen())
 const hasManualToggle = shallowRef(false)
@@ -46,6 +49,9 @@ const shimmerMode = computed<'continuous' | 'static'>(() => {
 const canExpand = computed(() => {
   const presentation = props.node.presentation
   return presentation.card === 'terminal'
+    || (presentation.card === 'directory-authorization' && Boolean(
+      presentation.requestedRoot || presentation.selectedRoot,
+    ))
     || (presentation.card === 'image' && Boolean(
       presentation.prompt
       || presentation.reference
@@ -67,6 +73,7 @@ const title = computed(() => {
     case 'diff': return t(props.node.presentation.operation === 'created'
       ? 'desktop.chat.processToolCreate'
       : 'desktop.chat.processToolEdit')
+    case 'directory-authorization': return t('desktop.chat.processToolDirectoryAuthorization')
     case 'connector': return t('desktop.chat.processToolConnector')
     case 'image': return t('desktop.chat.processToolImage')
     case 'pet': return t('desktop.chat.processToolPet')
@@ -104,6 +111,8 @@ const summary = computed(() => {
       presentation.command,
     ].filter(Boolean).join(' · ')
   }
+  if (presentation.card === 'directory-authorization')
+    return directoryAuthorizationSummary(presentation)
   if (presentation.card === 'system') {
     const targetUnavailable = presentation.status === 'action-expired'
       || presentation.status === 'target-ambiguous'
@@ -162,6 +171,7 @@ const leadingIcon = computed(() => {
     case 'read': return Document20Regular
     case 'search': return Search20Regular
     case 'diff': return Edit20Regular
+    case 'directory-authorization': return FolderAdd20Regular
     case 'connector': return PlugConnected20Regular
     case 'image': return DrawImage20Regular
     case 'pet': return Sparkle20Regular
@@ -171,6 +181,43 @@ const leadingIcon = computed(() => {
   }
   return Wrench20Regular
 })
+
+function directoryAuthorizationSummary(
+  presentation: Extract<ChatAgentToolNode['presentation'], { card: 'directory-authorization' }>,
+): string {
+  if (props.node.status === 'denied')
+    return t('desktop.chat.processToolApprovalDenied')
+  if (
+    props.node.status === 'awaiting_approval'
+    || props.node.status === 'preparing'
+    || props.node.status === 'running'
+  ) {
+    return t('desktop.chat.processToolDirectoryAuthorizationPending')
+  }
+  if (presentation.status === 'failed')
+    return t('desktop.chat.processToolDirectoryAuthorizationFailed')
+  if (presentation.status === 'cancelled')
+    return t('desktop.chat.processToolDirectoryAuthorizationCancelled')
+
+  const root = presentation.authorizedRoot
+    ?? presentation.selectedRoot
+    ?? presentation.requestedRoot
+  const status = presentation.grantStatus === 'expanded'
+    ? t('desktop.chat.processToolDirectoryExpanded')
+    : presentation.grantStatus === 'already_authorized'
+      || presentation.grantStatus === 'already_covered'
+      ? t('desktop.chat.processToolDirectoryAlreadyAuthorized')
+      : presentation.status === 'scope-changed'
+        ? t('desktop.chat.processToolDirectoryScopeChanged')
+        : t('desktop.chat.processToolDirectoryAuthorized')
+  return [
+    status,
+    root,
+    presentation.requestSatisfied === false
+      ? t('desktop.chat.processToolDirectoryRequestUnsatisfied')
+      : null,
+  ].filter(Boolean).join(' · ')
+}
 
 function browserOperationLabel(
   operation: Extract<ChatAgentToolNode['presentation'], { card: 'browser' }>['operation'],
@@ -259,6 +306,9 @@ function toggle() {
         :class="{ 'is-open': isOpen }"
       />
     </button>
+    <p v-if="readOnlyDenial" class="buddy-chat-tool__denial">
+      {{ t('desktop.chat.toolDeniedReadOnly') }}
+    </p>
     <BuddyChatToolDetails
       v-show="isOpen && canExpand"
       :expanded="isOpen && canExpand"
@@ -362,6 +412,13 @@ function toggle() {
   font-size: 14px;
   line-height: 24px;
   white-space: nowrap;
+}
+
+.buddy-chat-tool__denial {
+  margin: 2px 0 0 calc(var(--buddy-chat-node-icon-size) + 6px);
+  color: var(--buddy-status-warning-text);
+  font-size: var(--buddy-chat-caption-font-size);
+  line-height: var(--buddy-chat-caption-line-height);
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { LocalApproval } from '@buddy-electron/shared/localChatApi'
 import type { ApprovalReviewPayload } from '@buddy-shared/approvalReviewPayload'
+import type { BuddyExecutionProfile } from '@buddy-shared/executionProfile'
 import type { BuddyLocale } from '@/i18n/buddyI18n'
 import type { ChatApprovalDecision } from '@/workbenches/chat/state/useChatApprovals'
 import { approvalReviewPayloadSchema } from '@buddy-shared/approvalReviewPayload'
@@ -36,6 +37,11 @@ const browserEffectKeys = {
   'send': 'desktop.approval.browser.effect.send',
   'submit': 'desktop.approval.browser.effect.submit',
 } as const
+const executionProfileKeys: Record<BuddyExecutionProfile, 'desktop.chat.executionProfileDefault' | 'desktop.chat.executionProfileFull' | 'desktop.chat.executionProfileReadOnly'> = {
+  full_access: 'desktop.chat.executionProfileFull',
+  read_only: 'desktop.chat.executionProfileReadOnly',
+  workspace_write: 'desktop.chat.executionProfileDefault',
+}
 const review = computed<ApprovalReviewPayload | null>(() => {
   const parsed = approvalReviewPayloadSchema.safeParse(props.approval.payload)
   return parsed.success ? parsed.data : null
@@ -62,6 +68,17 @@ const browserEffect = computed(() => {
     ? t(browserEffectKeys[review.value.effect])
     : t('desktop.approval.browser.effect.unknown')
 })
+const pathGrant = computed(() => (
+  review.value?.card === 'paths' ? review.value.grant : null
+))
+const grantNotice = computed(() => {
+  const grant = pathGrant.value
+  if (!grant)
+    return ''
+  return t(grant.owner === 'space'
+    ? 'desktop.approval.paths.grantSpace'
+    : 'desktop.approval.paths.grantConversation', { root: grant.root })
+})
 const browserAction = computed(() => {
   if (review.value?.card !== 'browser-action')
     return ''
@@ -86,7 +103,16 @@ const approvalDescription = computed(() => (
     ? t('desktop.approval.currentWorkspace')
     : review.value?.card === 'browser-action'
       ? t('desktop.approval.browser.scopeReview')
-      : t('desktop.approval.scopeReview')
+      : review.value?.card === 'paths' && review.value.access === 'render'
+        ? t('desktop.approval.paths.renderDescription')
+        : review.value?.card === 'paths' && review.value.grant
+          ? t('desktop.approval.paths.grantDescription')
+          : t('desktop.approval.scopeReview')
+))
+const approveActionLabel = computed(() => (
+  review.value?.card === 'paths' && review.value.grant
+    ? t('desktop.approval.paths.approveAndGrantAction')
+    : t('approvalAction.approve')
 ))
 const headingId = computed(() => `desktop-approval-${props.approval.id}-title`)
 const isResolving = computed(() => props.resolvingAction !== null)
@@ -146,9 +172,7 @@ const turnConfirmationButtonProps = { type: 'error' } as const
         <div>
           <dt>{{ t('desktop.approval.automation.executionProfile') }}</dt>
           <dd>
-            {{ t(review.executionProfile === 'full_access'
-              ? 'desktop.chat.executionProfileFull'
-              : 'desktop.chat.executionProfileDefault') }}
+            {{ t(executionProfileKeys[review.executionProfile]) }}
           </dd>
         </div>
       </dl>
@@ -220,11 +244,22 @@ const turnConfirmationButtonProps = { type: 'error' } as const
       </dl>
     </section>
     <pre v-else-if="review?.card === 'shell'" class="desktop-approval-card__review">{{ review.command }}</pre>
-    <ul v-else-if="review?.card === 'paths'" class="desktop-approval-card__review">
-      <li v-for="path in review.targetPaths" :key="path">
-        <code>{{ path }}</code>
-      </li>
-    </ul>
+    <div v-else-if="review?.card === 'paths'" class="desktop-approval-card__review">
+      <ul class="desktop-approval-card__paths">
+        <li v-for="target in review.targets" :key="target.path">
+          <code>{{ target.path }}</code>
+          <small v-if="target.zone === 'sensitive'" class="is-sensitive">
+            {{ t('desktop.approval.paths.zoneSensitive') }}
+          </small>
+          <small v-else-if="target.zone === 'outside'">
+            {{ t('desktop.approval.paths.zoneOutside') }}
+          </small>
+        </li>
+      </ul>
+      <p v-if="grantNotice" class="desktop-approval-card__grant">
+        {{ grantNotice }}
+      </p>
+    </div>
     <p v-else-if="review?.card === 'arguments'" class="desktop-approval-card__review">
       {{ review.argumentNames.join(', ') }}
     </p>
@@ -288,7 +323,7 @@ const turnConfirmationButtonProps = { type: 'error' } as const
           :loading="resolvingAction === 'approve'"
           @click="emit('approve')"
         >
-          {{ t('approvalAction.approve') }}
+          {{ approveActionLabel }}
         </NButton>
       </div>
     </footer>

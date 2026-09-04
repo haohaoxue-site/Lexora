@@ -2,6 +2,13 @@ import { z } from 'zod'
 import { BUDDY_ATTACHMENT_COUNT_LIMIT } from './attachmentPolicy'
 import { BROWSER_ACTION_KINDS } from './browserProtocol'
 
+const legacyDirectoryScopeRelationSchema = z.enum([
+  'ancestor',
+  'descendant',
+  'exact',
+  'unrelated',
+])
+
 const previewSchema = z.object({
   description: z.string().min(1).max(4 * 1024).nullable(),
   output: z.string().max(64 * 1024).nullable(),
@@ -177,6 +184,29 @@ export const buddyToolPresentationSchema = z.discriminatedUnion('card', [
       })
     }
   }),
+  z.object({
+    authorizedRoot: pathSchema.nullable(),
+    card: z.literal('directory-authorization'),
+    coveredDirectoryCount: z.number().int().nonnegative().max(32),
+    errorCode: z.string().regex(/^[A-Z][A-Z0-9_]{0,127}$/).nullable(),
+    grantStatus: z.enum([
+      'already_authorized',
+      'already_covered',
+      'expanded',
+      'granted',
+    ]).nullable(),
+    relation: legacyDirectoryScopeRelationSchema.nullable(),
+    requestSatisfied: z.boolean().nullable(),
+    requestedRoot: pathSchema.nullable(),
+    selectedRoot: pathSchema.nullable(),
+    status: z.enum([
+      'authorized',
+      'awaiting-authorization',
+      'cancelled',
+      'failed',
+      'scope-changed',
+    ]),
+  }).strict(),
   previewSchema.extend({
     action: z.enum([
       'kill-process',

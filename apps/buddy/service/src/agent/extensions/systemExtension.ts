@@ -31,7 +31,7 @@ export function createSystemExtension(
           'Request one supported host state change using a structured process or user-service selector.',
           'Use an exact PID, exact process executable name, or exact user service unit; use the active Pi shell first when diagnosis or target discovery is needed.',
           'Lexora Buddy resolves one concrete target before approval and verifies the same target identity again after approval.',
-          'Call this tool when the user asks for the change so controlled mode can show the product approval card; do not replace it with conversational confirmation.',
+          'Call this tool when the user asks for the change so Buddy can show the product approval card; do not replace it with conversational confirmation.',
           'Graceful process termination never escalates to force termination automatically.',
         ].join(' '),
         async execute(toolCallId, input, signal) {

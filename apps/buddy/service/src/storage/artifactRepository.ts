@@ -42,6 +42,7 @@ export interface ArtifactChangeRecord {
 
 export interface ArtifactRepository {
   findById: (id: string) => ArtifactRecord | null
+  findByCurrentPath: (conversationId: string, currentPath: string) => ArtifactRecord | null
   findByLocation: (
     conversationId: string,
     directoryGrantId: string,
@@ -88,6 +89,12 @@ interface ArtifactChangeRow {
 
 export function createArtifactRepository(database: DatabaseSync): ArtifactRepository {
   const find = database.prepare('SELECT * FROM artifacts WHERE id = ?')
+  const findByCurrentPath = database.prepare(`
+    SELECT * FROM artifacts
+    WHERE conversation_id = ? AND current_path = ?
+    ORDER BY deleted_at IS NULL DESC, updated_at DESC, id DESC
+    LIMIT 1
+  `)
   const findByLocation = database.prepare(`
     SELECT * FROM artifacts
     WHERE conversation_id = ? AND directory_grant_id = ? AND relative_path = ?
@@ -137,6 +144,10 @@ export function createArtifactRepository(database: DatabaseSync): ArtifactReposi
   return {
     findById(id) {
       const row = find.get(id) as ArtifactRow | undefined
+      return row ? toArtifact(row) : null
+    },
+    findByCurrentPath(conversationId, currentPath) {
+      const row = findByCurrentPath.get(conversationId, currentPath) as ArtifactRow | undefined
       return row ? toArtifact(row) : null
     },
     findByLocation(conversationId, directoryGrantId, relativePath) {

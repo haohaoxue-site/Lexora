@@ -2,26 +2,31 @@ import type {
   ToolCallEvent,
   ToolCallEventResult,
 } from '@earendil-works/pi-coding-agent'
+import type { BuddyApprovalPolicy } from '../../../../shared/approvalPolicy'
 import type {
+  ApprovalReviewKind,
   AutomationApprovalReviewInput,
   BrowserApprovalReviewInput,
+  PathApprovalReviewInput,
   SystemActionApprovalReviewInput,
 } from '../../../../shared/approvalReviewPayload'
 import type { BuddyExecutionProfile } from '../../../../shared/executionProfile'
 import type { BuddyServiceTier } from '../../../../shared/modelSelection'
-
+import type { ApprovalRequestResult } from '../../approvals/ApprovalService'
 import type {
   BuddyToolClassification,
-  BuddyToolClassificationFailure,
   BuddyToolClassificationResult,
 } from '../../approvals/toolClassification'
-import type { ToolApprovalKind } from '../../approvals/toolPolicyContract'
 import type { DirectoryGrant } from '../../directories/resolveGrantedPath'
+import type {
+  GrantOwner,
+  GrantProposal,
+  PermissionDecision,
+} from '../../permissions/permissionContract'
 import type { BuddyInProcessExtension } from '../createBuddyResourceLoader'
 import { isToolClassificationFailure } from '../../approvals/toolClassification'
-import { ToolPolicy } from '../../approvals/ToolPolicy'
-import { readToolCallBlockReason } from '../../approvals/toolPolicyContract'
-import { PI_BUILTIN_TOOL_NAME_SET } from '../piBuiltinTools'
+import { readToolCallBlockReason } from '../../permissions/permissionContract'
+import { PermissionEngine } from '../../permissions/PermissionEngine'
 
 export interface ToolApprovalGateway {
   request: (input: {
@@ -29,20 +34,26 @@ export interface ToolApprovalGateway {
     arguments: unknown
     automation?: AutomationApprovalReviewInput
     browser?: BrowserApprovalReviewInput
-    kind: ToolApprovalKind
+    kind: ApprovalReviewKind
+    paths?: PathApprovalReviewInput
     runId: string
     signal: AbortSignal
     summary: string
     systemAction?: SystemActionApprovalReviewInput
     toolCallId: string
     toolName: string
-  }) => Promise<'approved' | 'denied'>
+  }) => Promise<ApprovalRequestResult>
 }
 
 export interface BuddyRunContext {
   flushProjectedEvents: () => Promise<void>
   onToolExecutionAuthorized: (event: {
     arguments: unknown
+    toolCallId: string
+    toolName: string
+  }) => Promise<void>
+  onToolExecutionDenied?: (event: {
+    denialCode: string
     toolCallId: string
     toolName: string
   }) => Promise<void>
@@ -58,27 +69,31 @@ export interface CreateToolPolicyExtensionOptions {
     run: BuddyRunContext,
   ) => BuddyToolClassificationResult | null | undefined | Promise<BuddyToolClassificationResult | null | undefined>
   cwd: string
+  applyGrant?: (grant: GrantProposal) => Promise<void> | void
+  approvalAvailable: boolean
+  approvalPolicy: BuddyApprovalPolicy
+  engine?: PermissionEngine
   executionProfile: BuddyExecutionProfile
   getGrants: () => readonly DirectoryGrant[]
   getRunContext: () => BuddyRunContext | null
-  toolPolicy?: ToolPolicy
+  owner: GrantOwner
 }
 
 export function createToolPolicyExtension(
   options: CreateToolPolicyExtensionOptions,
 ): BuddyInProcessExtension {
-  const toolPolicy = options.toolPolicy ?? new ToolPolicy()
+  const engine = options.engine ?? new PermissionEngine()
   return {
     name: 'lexora-tool-policy',
     factory(pi) {
-      pi.on('tool_call', async event => decideToolCall(options, toolPolicy, event))
+      pi.on('tool_call', async event => decideToolCall(options, engine, event))
     },
   }
 }
 
 async function decideToolCall(
   options: CreateToolPolicyExtensionOptions,
-  toolPolicy: ToolPolicy,
+  engine: PermissionEngine,
   event: ToolCallEvent,
 ): Promise<ToolCallEventResult | void> {
   try {
@@ -86,56 +101,34 @@ async function decideToolCall(
     if (!run)
       return block('RUN_CONTEXT_UNAVAILABLE')
     await run.flushProjectedEvents()
+
     const classification = await options.classifyTool?.(event, run)
     if (classification && isToolClassificationFailure(classification))
-      return block(classification.reason)
-    const declared = classification ?? {}
-    if (declared.alwaysConfirm) {
-      const approval = declared.approval
-      if (!approval?.kind)
-        return block('VALIDATION_FAILED')
-      return await requestApproval(options, event, run, {
-        allowForTurn: false,
-        automation: approval.automation,
-        browser: approval.browser,
-        kind: approval.kind,
-        paths: declared.paths,
-        resource: declared.resource,
-        risk: declared.risk,
-        summary: approval.summary,
-        systemAction: approval.systemAction,
-        validateBeforeExecution: declared.validateBeforeExecution,
-      })
-    }
-    if (options.executionProfile === 'full_access')
-      return authorizeToolExecution(run, event)
-    const decision = await toolPolicy.decide({
+      return await deny(run, event, classification.reason)
+    const declared: BuddyToolClassification = classification ?? {}
+
+    const decision = await engine.decide({
+      access: declared.access,
+      approvalAvailable: options.approvalAvailable,
+      approvalPolicy: options.approvalPolicy,
+      approval: declared.approval
+        ? { kind: declared.approval.kind, summary: declared.approval.summary }
+        : undefined,
       arguments: event.input,
       cwd: options.cwd,
+      forceAsk: declared.forceAsk,
       grants: options.getGrants(),
+      owner: options.owner,
       paths: declared.paths,
-      resource: declared.resource,
-      risk: declared.risk,
-      source: PI_BUILTIN_TOOL_NAME_SET.has(event.toolName) ? 'pi' : declared.source,
+      profile: options.executionProfile,
       toolName: event.toolName,
     })
+
+    if (decision.type === 'deny')
+      return await deny(run, event, decision.code)
     if (decision.type === 'allow')
       return authorizeToolExecution(run, event)
-    if (decision.type === 'deny')
-      return block(decision.code)
-
-    return await requestApproval(options, event, run, {
-      allowForTurn: true,
-      automation: declared.approval?.automation,
-      browser: declared.approval?.browser,
-      kind: decision.kind,
-      paths: declared.paths,
-      resource: declared.resource,
-      risk: declared.risk,
-      summary: declared.approval?.summary ?? decision.summary,
-      systemAction: declared.approval?.systemAction,
-      validateBeforeExecution: declared.validateBeforeExecution,
-    })
+    return await requestApproval(options, event, run, decision, declared)
   }
   catch (error) {
     return block(readToolCallBlockReason(error) ?? 'TOOL_POLICY_FAILED')
@@ -146,38 +139,61 @@ async function requestApproval(
   options: CreateToolPolicyExtensionOptions,
   event: ToolCallEvent,
   run: BuddyRunContext,
-  review: {
-    allowForTurn: boolean
-    automation?: AutomationApprovalReviewInput
-    browser?: BrowserApprovalReviewInput
-    kind: ToolApprovalKind
-    paths?: BuddyToolClassification['paths']
-    resource?: BuddyToolClassification['resource']
-    risk?: BuddyToolClassification['risk']
-    summary: string
-    systemAction?: SystemActionApprovalReviewInput
-    validateBeforeExecution?: () => Promise<BuddyToolClassificationFailure | null>
-  },
+  decision: Extract<PermissionDecision, { type: 'ask' }>,
+  declared: BuddyToolClassification,
 ): Promise<ToolCallEventResult | void> {
   const approval = await options.approvalService.request({
-    allowForTurn: review.allowForTurn,
+    allowForTurn: decision.allowForTurn,
     arguments: event.input,
-    automation: review.automation,
-    browser: review.browser,
-    kind: review.kind,
+    automation: declared.approval?.automation,
+    browser: declared.approval?.browser,
+    kind: decision.kind,
+    paths: declared.approval?.paths ?? toPathReview(decision),
     runId: run.runId,
     signal: run.signal,
-    summary: review.summary,
-    systemAction: review.systemAction,
+    summary: decision.summary,
+    systemAction: declared.approval?.systemAction,
     toolCallId: event.toolCallId,
     toolName: event.toolName,
   })
-  if (approval !== 'approved')
-    return block('APPROVAL_DENIED')
-  const validation = await review.validateBeforeExecution?.()
+  if (approval.decision === 'denied')
+    return await deny(run, event, 'APPROVAL_DENIED')
+
+  if (decision.grant && approval.decision === 'approved_once') {
+    try {
+      if (!options.applyGrant)
+        throw new Error('Directory grant service is unavailable')
+      await options.applyGrant(decision.grant)
+    }
+    catch {
+      return await deny(run, event, 'DIRECTORY_GRANT_FAILED')
+    }
+  }
+
+  const validation = await declared.validateBeforeExecution?.()
   if (validation)
-    return block(validation.reason)
+    return await deny(run, event, validation.reason)
   return authorizeToolExecution(run, event)
+}
+
+function toPathReview(
+  decision: Extract<PermissionDecision, { type: 'ask' }>,
+): PathApprovalReviewInput | undefined {
+  if (!decision.paths?.length)
+    return undefined
+  if (
+    decision.kind !== 'delete'
+    && decision.kind !== 'read'
+    && decision.kind !== 'render'
+    && decision.kind !== 'write'
+  ) {
+    return undefined
+  }
+  return {
+    access: decision.kind,
+    grant: decision.grant ? { owner: decision.grant.owner.kind, root: decision.grant.root } : null,
+    targets: decision.paths.map(entry => ({ path: entry.path, zone: entry.zone })),
+  }
 }
 
 async function authorizeToolExecution(
@@ -189,6 +205,19 @@ async function authorizeToolExecution(
     toolCallId: event.toolCallId,
     toolName: event.toolName,
   })
+}
+
+async function deny(
+  run: BuddyRunContext,
+  event: ToolCallEvent,
+  denialCode: string,
+): Promise<ToolCallEventResult> {
+  await run.onToolExecutionDenied?.({
+    denialCode,
+    toolCallId: event.toolCallId,
+    toolName: event.toolName,
+  })
+  return block(denialCode)
 }
 
 function block(reason: string): ToolCallEventResult {

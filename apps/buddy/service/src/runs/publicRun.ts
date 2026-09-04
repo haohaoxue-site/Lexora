@@ -2,6 +2,7 @@ import type { RunRecord } from '../storage/runRecord'
 
 export function toPublicRun(run: RunRecord, reasoningLevel: string | null) {
   return {
+    approvalPolicy: run.approvalPolicy,
     branchId: run.branchId,
     completedAt: run.completedAt,
     conversationId: run.conversationId,

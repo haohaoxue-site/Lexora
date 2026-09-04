@@ -9,6 +9,7 @@ import {
   createPiEventProjectionState,
   projectPiEvent,
   projectToolExecutionAuthorized,
+  projectToolExecutionDenied,
 } from './projectPiEvent'
 
 type PiEventLog = RunEventWriter
@@ -36,6 +37,12 @@ export interface PiToolExecutionAuthorizedEvent {
   toolName: string
 }
 
+export interface PiToolExecutionDeniedEvent {
+  denialCode: string
+  toolCallId: string
+  toolName: string
+}
+
 export interface PiEventBridgeSettlement {
   eventError: unknown | null
   writerError: unknown | null
@@ -57,6 +64,9 @@ export interface PiTurnEventChannel extends PiEventChannel {
   readonly outcome: PiTurnEventOutcome
   projectToolExecutionAuthorized: (
     event: PiToolExecutionAuthorizedEvent,
+  ) => Promise<void>
+  projectToolExecutionDenied: (
+    event: PiToolExecutionDeniedEvent,
   ) => Promise<void>
 }
 
@@ -157,6 +167,14 @@ class ActivePiEventChannel implements PiCompactionEventChannel, PiTurnEventChann
     await this.flush()
     const projected = projectToolExecutionAuthorized(event, this.#projectionState)
     this.#eventWriter.appendBatch(projected.events)
+    await this.#eventWriter.drain()
+  }
+
+  async projectToolExecutionDenied(
+    event: PiToolExecutionDeniedEvent,
+  ): Promise<void> {
+    await this.flush()
+    this.#eventWriter.appendBatch(projectToolExecutionDenied(event).events)
     await this.#eventWriter.drain()
   }
 

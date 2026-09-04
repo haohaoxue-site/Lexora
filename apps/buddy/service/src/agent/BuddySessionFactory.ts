@@ -54,8 +54,10 @@ export class BuddySessionFactory {
       || conversation.activeBranchId !== blueprint.branchId
       || conversation.id !== run.conversationId
       || conversation.spaceId !== (blueprint.space?.id ?? null)
+      || conversation.approvalPolicy !== blueprint.approvalPolicy
       || conversation.executionProfile !== blueprint.executionProfile
       || run.branchId !== blueprint.branchId
+      || run.approvalPolicy !== blueprint.approvalPolicy
       || run.executionProfile !== blueprint.executionProfile
       || run.piSessionFile !== input.piSessionFile
       || !blueprint.grants.some(grant => grant.canonicalRoot === blueprint.canonicalRoot)
@@ -72,6 +74,7 @@ export class BuddySessionFactory {
       providerId: run.provider,
     })
     const composition = await createBuddySessionComposition({
+      approvalPolicy: blueprint.approvalPolicy,
       canonicalRoot: blueprint.canonicalRoot,
       conversationId: blueprint.conversationId,
       executionProfile: blueprint.executionProfile,
@@ -86,6 +89,7 @@ export class BuddySessionFactory {
     } = { result: null }
     const session = await createBuddySession({
       agentDir: this.#options.agentDirectory,
+      approvalPolicy: blueprint.approvalPolicy,
       branchId: blueprint.branchId,
       canonicalRoot: blueprint.canonicalRoot,
       conversationsDirectory: this.#options.conversationsDirectory,

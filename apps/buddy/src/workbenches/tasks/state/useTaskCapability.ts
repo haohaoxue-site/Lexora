@@ -1,6 +1,6 @@
 import type { LexoraDesktopApi } from '@buddy-electron/shared/desktopApi'
 import type { LocalConversation, LocalRunEvent } from '@buddy-electron/shared/localChatApi'
-import type { BuddyExecutionProfile } from '@buddy-shared/executionProfile'
+import type { BuddyPermissionMode } from '@buddy-shared/permissionMode'
 import type { ApplicationSettingsStore } from '@/stores/useApplicationSettingsStore'
 import type { LocalCapabilitiesStore } from '@/stores/useLocalCapabilitiesStore'
 import type { ModelProvidersStore } from '@/stores/useModelProvidersStore'
@@ -18,7 +18,7 @@ import { useChatContextUsage } from '@/workbenches/chat/state/useChatContextUsag
 import { useChatConversations } from '@/workbenches/chat/state/useChatConversations'
 import { useChatDrafts } from '@/workbenches/chat/state/useChatDrafts'
 import { useChatExecution } from '@/workbenches/chat/state/useChatExecution'
-import { useChatExecutionProfile } from '@/workbenches/chat/state/useChatExecutionProfile'
+import { useChatPermissionSettings } from '@/workbenches/chat/state/useChatPermissionSettings'
 import { useChatRunSync } from '@/workbenches/chat/state/useChatRunSync'
 import { useChatSession } from '@/workbenches/chat/state/useChatSession'
 import {
@@ -189,7 +189,7 @@ export function useTaskCapability(options: UseTaskCapabilityOptions) {
   } = taskSpaces
   const currentTitle = computed(() => activeConversation.value?.title?.trim()
     || t('desktop.tasks.newTask'))
-  const executionProfileState = useChatExecutionProfile({
+  const permissionSettingsState = useChatPermissionSettings({
     activeConversation,
     activeConversationId,
     activeRun,
@@ -223,9 +223,10 @@ export function useTaskCapability(options: UseTaskCapabilityOptions) {
   const contextUsageTracker = useChatContextUsage({
     activeBranchId,
     activeConversationId,
+    approvalPolicy: permissionSettingsState.approvalPolicy,
     api: api.localChat.context,
     draftId,
-    executionProfile: executionProfileState.executionProfile,
+    executionProfile: permissionSettingsState.executionProfile,
     models: modelProviders.models,
     spaceId,
     runEvents,
@@ -238,14 +239,15 @@ export function useTaskCapability(options: UseTaskCapabilityOptions) {
   const composerInteractions = useChatComposerInteractions({ runs })
   const execution = useChatExecution({
     activeRun,
+    approvalPolicy: permissionSettingsState.approvalPolicy,
     api: api.localChat,
     taskIndexData,
     session: chatSession,
     drafts,
     draftScopeKey,
-    executionProfile: executionProfileState.executionProfile,
+    executionProfile: permissionSettingsState.executionProfile,
     getRunTerminationMessage,
-    isUpdatingExecutionProfile: executionProfileState.isUpdating,
+    isUpdatingPermissionSettings: permissionSettingsState.isUpdating,
     language,
     persistWorkspaceState,
     modelProviders,
@@ -267,8 +269,8 @@ export function useTaskCapability(options: UseTaskCapabilityOptions) {
     regenerateAssistant,
     send,
   } = execution
-  const canUpdateExecutionProfile = computed(() => (
-    executionProfileState.canUpdate.value
+  const canUpdatePermissionSettings = computed(() => (
+    permissionSettingsState.canUpdate.value
     && !isSending.value
     && !isMutatingBranch.value
   ))
@@ -333,10 +335,10 @@ export function useTaskCapability(options: UseTaskCapabilityOptions) {
     await persistConversationModelSelection(conversationId, currentModelSelection())
   }
 
-  async function setExecutionProfile(value: BuddyExecutionProfile): Promise<boolean> {
-    if (!canUpdateExecutionProfile.value)
+  async function setPermissionMode(value: BuddyPermissionMode): Promise<boolean> {
+    if (!canUpdatePermissionSettings.value)
       return false
-    return executionProfileState.setExecutionProfile(value)
+    return permissionSettingsState.setPermissionMode(value)
   }
   const stopRunEventListener = api.localChat.chat.onRunEvent(handleRunEvent)
 
@@ -531,9 +533,8 @@ export function useTaskCapability(options: UseTaskCapabilityOptions) {
       contextUsage: readonly(contextUsage),
       dismissInteraction: composerInteractions.dismissInteraction,
       draft: readonly(draft),
-      executionProfile: executionProfileState.executionProfile,
-      canUpdateExecutionProfile: readonly(canUpdateExecutionProfile),
-      isUpdatingExecutionProfile: executionProfileState.isUpdating,
+      canUpdatePermissionSettings: readonly(canUpdatePermissionSettings),
+      isUpdatingPermissionSettings: permissionSettingsState.isUpdating,
       isSelectingFiles: readonly(isSelectingFiles),
       importAttachments,
       interaction: composerInteractions.interaction,
@@ -549,7 +550,8 @@ export function useTaskCapability(options: UseTaskCapabilityOptions) {
       selectModel: selectChatModel,
       setSelectedEffort: setChatEffort,
       setSelectedServiceTier: setChatServiceTier,
-      setExecutionProfile,
+      permissionMode: permissionSettingsState.permissionMode,
+      setPermissionMode,
       updateComposerContent: drafts.updateComposerContent,
     },
     execution: {

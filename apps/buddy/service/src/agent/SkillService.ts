@@ -242,6 +242,7 @@ async function resolveSourceDirectory(
     const resolution = await resolveGrantedPath([{
       canonicalRoot: canonicalAllowedRoot,
       grantId: source,
+      kind: 'workspace',
       root: canonicalAllowedRoot,
     }], directory, 'existing')
     return {
@@ -353,6 +354,7 @@ async function validateSkillPath(
     const resolution = await resolveGrantedPath([{
       canonicalRoot: source.directory,
       grantId: source.source,
+      kind: 'workspace',
       root: source.directory,
     }], skill.filePath, 'existing')
     return resolution.canonicalPath

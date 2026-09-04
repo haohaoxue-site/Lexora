@@ -15,6 +15,7 @@ import type { ConversationTimelineRepository } from '../storage/conversationTime
 import type { RunInputRepository } from '../storage/runInputRepository'
 import type { RunRepository } from '../storage/runRepository'
 import { z } from 'zod'
+import { BUDDY_APPROVAL_POLICIES } from '../../../shared/approvalPolicy'
 import { BUDDY_EXECUTION_PROFILES } from '../../../shared/executionProfile'
 import {
   BUDDY_SERVICE_TIERS,
@@ -62,7 +63,7 @@ type ConversationRpcRepository = Pick<
   | 'activateBranch'
   | 'findById'
   | 'rename'
-  | 'setExecutionProfile'
+  | 'setPermissionSettings'
   | 'setModelSelection'
 > & Pick<
   ConversationHistoryRepository,
@@ -111,15 +112,21 @@ export function registerConversationRpc(options: RegisterConversationRpcOptions)
       updatedAt: new Date().toISOString(),
     })
   })
-  on('conversations.setExecutionProfile', async (params) => {
+  on('conversations.setPermissionSettings', async (params) => {
     const input = parse(z.object({
+      approvalPolicy: z.enum(BUDDY_APPROVAL_POLICIES),
       conversationId: idSchema,
       executionProfile: executionProfileSchema,
     }).strict(), params)
     const current = requireActiveConversation(options, input.conversationId)
-    if (current.executionProfile === input.executionProfile)
+    if (
+      current.approvalPolicy === input.approvalPolicy
+      && current.executionProfile === input.executionProfile
+    ) {
       return current
-    const conversation = options.conversations.setExecutionProfile({
+    }
+    const conversation = options.conversations.setPermissionSettings({
+      approvalPolicy: input.approvalPolicy,
       executionProfile: input.executionProfile,
       id: input.conversationId,
       updatedAt: new Date().toISOString(),

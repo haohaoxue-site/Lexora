@@ -2,6 +2,7 @@ import type { DatabaseSync } from 'node:sqlite'
 import type { BuddyRunEvent } from './BuddyRunEvent'
 import { z } from 'zod'
 import {
+  APPROVAL_REVIEW_KINDS,
   approvalReviewPayloadMatchesKind,
   approvalReviewPayloadSchema,
 } from '../../../shared/approvalReviewPayload'
@@ -15,7 +16,7 @@ const messageIdSchema = z.string().min(1).max(256)
 const approvalRequestPayloadSchema = z.object({
   createdAt: z.iso.datetime(),
   id: z.string().min(1),
-  kind: z.enum(['automation', 'browser', 'delete', 'mcp', 'network', 'shell', 'system']),
+  kind: z.enum(APPROVAL_REVIEW_KINDS),
   payload: approvalReviewPayloadSchema,
   resolvedAt: z.null(),
   runId: buddyRunIdSchema,
@@ -28,6 +29,7 @@ const approvalRequestPayloadSchema = z.object({
 )
 const approvalResolutionPayloadSchema = z.object({
   id: z.string().min(1),
+  resolution: z.enum(['approved', 'approved_for_turn', 'cancelled', 'denied']).optional(),
   resolvedAt: z.iso.datetime(),
   status: z.enum(['approved', 'denied', 'cancelled']),
 }).strict()

@@ -143,6 +143,7 @@ export class ChatTurnService {
       existingConversation
       && (
         existingConversation.spaceId !== (space?.id ?? null)
+        || existingConversation.approvalPolicy !== input.approvalPolicy
         || existingConversation.executionProfile !== input.executionProfile
       )
     ) {
@@ -195,6 +196,7 @@ export class ChatTurnService {
             runId,
           })
         : this.#options.turnRequests.prepare({
+            approvalPolicy: input.approvalPolicy,
             attachmentBindings: stagedAttachments?.bindings ?? [],
             branchId,
             conversationId,
@@ -283,6 +285,7 @@ export class ChatTurnService {
             runId,
           })
         : this.#options.turnRequests.edit({
+            approvalPolicy: conversation.approvalPolicy,
             attachmentBindings: stagedAttachments?.bindings ?? [],
             branchId: randomUUID(),
             conversationId: conversation.id,
@@ -363,6 +366,7 @@ export class ChatTurnService {
           runId,
         })
       : this.#options.turnRequests.regenerate({
+          approvalPolicy: conversation.approvalPolicy,
           branchId: randomUUID(),
           conversationId: conversation.id,
           createdAt: new Date().toISOString(),
@@ -579,6 +583,7 @@ async function materializeContextItems(
     const resolution = await resolveGrantedPath(directories.map(directory => ({
       canonicalRoot: directory.canonicalRoot,
       grantId: directory.id,
+      kind: 'workspace' as const,
       root: directory.root,
     })), requestedPath, 'existing')
     const directory = directories.find(item => item.id === resolution.grantId)

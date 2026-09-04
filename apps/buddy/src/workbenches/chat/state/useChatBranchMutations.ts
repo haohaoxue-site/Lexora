@@ -27,7 +27,7 @@ interface UseChatBranchMutationsOptions {
   taskIndexData: TaskIndexData
   session: ChatSession
   isSending: ValueRef<boolean>
-  isUpdatingExecutionProfile: ValueRef<boolean>
+  isUpdatingPermissionSettings: ValueRef<boolean>
   language: ValueRef<BuddyLocale>
   modelProviders: ModelProvidersStore
   refreshBranches: () => Promise<void>
@@ -46,7 +46,7 @@ export function useChatBranchMutations(options: UseChatBranchMutationsOptions) {
     && !options.activeRun.value
     && !isMutatingBranch.value
     && !options.isSending.value
-    && !options.isUpdatingExecutionProfile.value,
+    && !options.isUpdatingPermissionSettings.value,
   )
 
   async function activateBranch(branchId: string) {

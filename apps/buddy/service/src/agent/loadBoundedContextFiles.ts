@@ -59,6 +59,7 @@ export async function loadBoundedContextFiles(
       const resolution = await resolveGrantedPath([{
         canonicalRoot,
         grantId: 'context',
+        kind: 'workspace',
         root: canonicalRoot,
       }], path, 'existing')
       const metadata = await stat(resolution.canonicalPath)

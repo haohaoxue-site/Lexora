@@ -52,7 +52,6 @@ import {
   NativePetSupervisor,
 } from './pet/NativePetSupervisor'
 import { registerPetHostRpc } from './pet/registerPetHostRpc'
-import { registerSpaceDirectoryHostRpc } from './registerSpaceDirectoryHostRpc'
 import { installRendererProtocol, registerRendererSchemePrivileges } from './rendererProtocol'
 import {
   createBuddyServiceEnvironment,
@@ -253,10 +252,6 @@ else {
           }),
           registerCredentialHostRpc(peer, credentialVault),
           registerPetHostRpc(peer, petSupervisor),
-          registerSpaceDirectoryHostRpc(peer, {
-            getLanguage: () => desktopLanguage,
-            getWindow: () => desktopWindowManager?.window ?? null,
-          }),
         ]
         return () => disposers.forEach(dispose => dispose())
       },

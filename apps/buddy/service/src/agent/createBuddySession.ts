@@ -5,6 +5,7 @@ import type {
   LoadExtensionsResult,
   ModelRuntime,
 } from '@earendil-works/pi-coding-agent'
+import type { BuddyApprovalPolicy } from '../../../shared/approvalPolicy'
 import type { BuddyExecutionProfile } from '../../../shared/executionProfile'
 import type { BuddyServiceTier } from '../../../shared/modelSelection'
 import type { BuddySessionResources } from './BuddySessionResources'
@@ -40,6 +41,7 @@ const sessionIdentityPattern = /^[A-Z0-9][\w-]{0,127}$/i
 
 export interface CreateBuddySessionOptions {
   agentDir: string
+  approvalPolicy: BuddyApprovalPolicy
   branchId: string
   canonicalRoot: string
   conversationsDirectory: string
@@ -267,6 +269,7 @@ async function createConfiguredBuddySession(
   const resourceLoader = await createBuddyResourceLoader({
     approvedSkillPaths: [...options.resources.approvedSkillPaths],
     agentDir: runtime.agentDir,
+    approvalPolicy: options.approvalPolicy,
     boundedContextFiles: context.agentsFiles,
     cwd: runtime.cwd,
     directoryContext: options.resources.directoryContext,

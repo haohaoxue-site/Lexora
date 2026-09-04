@@ -1,7 +1,10 @@
 import type { ShellDialect } from './shell/classifyShellCommand'
 import type { ShellCommandPolicy, ToolDecision } from './toolPolicyContract'
 import process from 'node:process'
-import { classifyShellCommand } from './shell/classifyShellCommand'
+import {
+  classifyShellCommand,
+  isRecognizableSystemMutation,
+} from './shell/classifyShellCommand'
 
 export interface ShellPolicyOptions {
   dialect: ShellDialect
@@ -21,6 +24,7 @@ export class ShellPolicy implements ShellCommandPolicy {
     if (classifyShellCommand(this.#dialect, command, this.#platform).type === 'auto-approve')
       return { type: 'allow' }
     return {
+      forceAsk: isRecognizableSystemMutation(this.#dialect, command),
       type: 'ask',
       kind: 'shell',
       summary: 'Run a host shell command from the current workspace',

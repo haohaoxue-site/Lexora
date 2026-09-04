@@ -14,7 +14,6 @@ export interface McpToolSession {
 }
 
 export interface CreateMcpToolsOptions {
-  serverId: string
   serverName: string
   session: McpToolSession
   tools: readonly McpRemoteTool[]
@@ -49,7 +48,7 @@ export function createMcpTools(options: CreateMcpToolsOptions): McpToolsResult {
     }
     names.add(name)
     tools.push(createToolDefinition(name, remoteTool, options.session))
-    classifications.set(name, classifyTool(options.serverId, options.trusted, remoteTool))
+    classifications.set(name, classifyTool(options.trusted, remoteTool))
   }
   return { classifications, diagnostics, tools }
 }
@@ -90,7 +89,6 @@ function createToolDefinition(
 }
 
 function classifyTool(
-  serverId: string,
   trusted: boolean,
   tool: McpRemoteTool,
 ): BuddyToolClassification {
@@ -98,14 +96,15 @@ function classifyTool(
     && tool.annotations?.readOnlyHint === true
     && tool.annotations.destructiveHint !== true
     && tool.annotations.openWorldHint !== true
+  if (readOnly && trusted) {
+    return {
+      access: 'read',
+    }
+  }
   return {
-    source: 'mcp',
-    resource: {
-      kind: 'connector',
-      id: serverId,
-      trusted,
-    },
-    risk: readOnly ? 'read' : 'mcp',
+    access: 'network',
+    approval: { kind: 'mcp', summary: 'Use a connected external tool' },
+    forceAsk: tool.annotations?.destructiveHint === true,
   }
 }
 

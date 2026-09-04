@@ -10,6 +10,19 @@ const MAX_COMMAND_REVIEW_LENGTH = 4 * 1024
 const MAX_ARGUMENT_NAMES = 32
 const MAX_TARGET_PATHS = 32
 
+export const APPROVAL_REVIEW_KINDS = [
+  'read',
+  'render',
+  'write',
+  'delete',
+  'shell',
+  'system',
+  'network',
+  'browser',
+  'mcp',
+  'automation',
+] as const
+
 const toolNameSchema = z.string().trim().min(1).max(256)
 const systemActionSchema = z.enum([
   'kill-process',
@@ -64,9 +77,17 @@ export const approvalReviewPayloadSchema = z.discriminatedUnion('card', [
     toolName: toolNameSchema,
   }).strict(),
   z.object({
+    access: z.enum(['delete', 'read', 'render', 'write']),
     allowForTurn: z.boolean().default(true),
     card: z.literal('paths'),
-    targetPaths: z.array(z.string().min(1).max(4_096)).max(MAX_TARGET_PATHS),
+    grant: z.object({
+      owner: z.enum(['conversation', 'space']),
+      root: z.string().trim().min(1).max(4_096),
+    }).strict().nullable(),
+    targets: z.array(z.object({
+      path: z.string().trim().min(1).max(4_096),
+      zone: z.enum(['granted', 'outside', 'sensitive', 'workspace']),
+    }).strict()).min(1).max(MAX_TARGET_PATHS),
     toolName: toolNameSchema,
   }).strict(),
   z.object({
@@ -134,7 +155,7 @@ export const approvalReviewPayloadSchema = z.discriminatedUnion('card', [
 ])
 
 export type ApprovalReviewPayload = z.infer<typeof approvalReviewPayloadSchema>
-export type ApprovalReviewKind = 'automation' | 'browser' | 'delete' | 'mcp' | 'network' | 'shell' | 'system'
+export type ApprovalReviewKind = typeof APPROVAL_REVIEW_KINDS[number]
 export type AutomationApprovalReview = Extract<
   ApprovalReviewPayload,
   { card: 'automation' }
@@ -149,6 +170,14 @@ export type BrowserApprovalReview = Extract<
 >
 export type BrowserApprovalReviewInput = Omit<
   BrowserApprovalReview,
+  'allowForTurn' | 'card' | 'toolName'
+>
+export type PathApprovalReview = Extract<
+  ApprovalReviewPayload,
+  { card: 'paths' }
+>
+export type PathApprovalReviewInput = Omit<
+  PathApprovalReview,
   'allowForTurn' | 'card' | 'toolName'
 >
 export type SystemActionApprovalReview = Extract<
@@ -166,6 +195,7 @@ export interface CreateApprovalReviewPayloadInput {
   automation?: AutomationApprovalReviewInput
   browser?: BrowserApprovalReviewInput
   kind: ApprovalReviewKind
+  paths?: PathApprovalReviewInput
   systemAction?: SystemActionApprovalReviewInput
   toolName: string
 }
@@ -181,11 +211,16 @@ export function createApprovalReviewPayload(
       toolName: input.toolName,
     })
   }
-  if (input.kind === 'delete') {
+  if (
+    input.kind === 'delete'
+    || input.kind === 'read'
+    || input.kind === 'render'
+    || input.kind === 'write'
+  ) {
     return approvalReviewPayloadSchema.parse({
+      ...input.paths,
       allowForTurn: input.allowForTurn,
       card: 'paths',
-      targetPaths: readTargetPaths(input.arguments),
       toolName: input.toolName,
     })
   }
@@ -227,7 +262,7 @@ export function approvalReviewPayloadMatchesKind(
 ): boolean {
   if (kind === 'shell')
     return payload.card === 'shell'
-  if (kind === 'delete')
+  if (kind === 'delete' || kind === 'read' || kind === 'render' || kind === 'write')
     return payload.card === 'paths'
   if (kind === 'system')
     return payload.card === 'arguments' || payload.card === 'system-action'
@@ -281,21 +316,6 @@ function readArgumentNames(value: unknown): string[] {
   return record
     ? Object.keys(record).filter(Boolean).sort().slice(0, MAX_ARGUMENT_NAMES)
     : []
-}
-
-function readTargetPaths(value: unknown): string[] {
-  const record = readRecord(value)
-  if (!record)
-    return []
-  const paths = [record.path, record.target]
-  for (const key of ['paths', 'targets']) {
-    const values = record[key]
-    if (Array.isArray(values))
-      paths.push(...values)
-  }
-  return [...new Set(paths.filter((path): path is string =>
-    typeof path === 'string' && path.trim().length > 0,
-  ).map(path => path.slice(0, 4_096)))].slice(0, MAX_TARGET_PATHS)
 }
 
 function readString(value: unknown, key: string): string {

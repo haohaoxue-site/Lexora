@@ -46,6 +46,7 @@ export class BuddyRunExecutionPlanner {
       throw new BuddyAgentRunError('CONVERSATION_BINDING_MISMATCH')
     }
     const session = await this.#options.sessions.createForConversation({
+      approvalPolicy: run.approvalPolicy,
       branchId: run.branchId,
       conversationId: run.conversationId,
       executionProfile: run.executionProfile,

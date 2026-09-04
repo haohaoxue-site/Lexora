@@ -55,6 +55,7 @@ export function createReusableBuddySession(
       options.runContext.current = {
         flushProjectedEvents: input.flushProjectedEvents,
         onToolExecutionAuthorized: input.onToolExecutionAuthorized,
+        onToolExecutionDenied: input.onToolExecutionDenied,
         runId: input.runId,
         serviceTier: input.serviceTier ?? null,
         signal: input.signal,

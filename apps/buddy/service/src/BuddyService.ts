@@ -56,6 +56,7 @@ import { ContextUsageSnapshotService } from './context/ContextUsageSnapshotServi
 import { registerContextRpc } from './context/registerContextRpc'
 import { ConversationLifecycleService } from './conversations/ConversationLifecycleService'
 import { registerConversationRpc } from './conversations/registerConversationRpc'
+import { DirectoryGrantService } from './directories/DirectoryGrantService'
 import { ImageTransformService } from './images/ImageTransformService'
 import { OpenAiImageGenerationService } from './images/OpenAiImageGenerationService'
 import { AttentionNotificationService } from './notifications/AttentionNotificationService'
@@ -70,7 +71,6 @@ import { RunLifecycleService } from './runs/RunLifecycleService'
 
 import { RunRecoveryService } from './runs/RunRecoveryService'
 import { registerSpaceRpc } from './spaces/registerSpaceRpc'
-import { SpaceDirectoryAuthorizationService } from './spaces/SpaceDirectoryAuthorizationService'
 import { matchesSpaceExecutionContext } from './spaces/spaceExecutionContext'
 import { SpaceService } from './spaces/SpaceService'
 import { createApprovalRepository } from './storage/approvalRepository'
@@ -81,6 +81,7 @@ import { createAutomationTurnRepository } from './storage/automationTurnReposito
 import { BuddyDataPaths } from './storage/BuddyDataPaths'
 import { createCommandRequestRepository } from './storage/commandRequestRepository'
 import { createConnectorRepository } from './storage/connectorRepository'
+import { createConversationDirectoryGrantRepository } from './storage/conversationDirectoryGrantRepository'
 import { createConversationRepository } from './storage/conversationRepository'
 import { createNotificationAttentionRepository } from './storage/notificationAttentionRepository'
 import { createProviderRepository } from './storage/providerRepository'
@@ -124,6 +125,7 @@ export async function startBuddyService(
   const spacesRepository = createSpaceRepository(options.database)
   const conversations = createConversationRepository(options.database)
   const runs = createRunRepository(options.database)
+  const conversationDirectoryGrants = createConversationDirectoryGrantRepository(options.database)
   const runInputs = createRunInputRepository(options.database)
   const approvalsRepository = createApprovalRepository(options.database)
   const usageRepository = createUsageRepository(options.database)
@@ -195,9 +197,9 @@ export async function startBuddyService(
   })
   const systemHost = new LinuxSystemHost()
   const sessions = new BuddySessionRegistry<BuddyAgentSessionLike>()
-  const directoryAuthorization = new SpaceDirectoryAuthorizationService({
-    host: options.rpc,
-    onGranted: spaceId => sessions.invalidateSpace(spaceId),
+  const directoryGrants = new DirectoryGrantService({
+    conversationGrants: conversationDirectoryGrants,
+    conversations,
     spaces: spaceService,
   })
   const connectorService = new McpConnectorService({
@@ -270,7 +272,7 @@ export async function startBuddyService(
     browserHost,
     changeCaptureService,
     connectorService,
-    directoryAuthorization,
+    directoryGrants,
     imageGenerationGateway,
     imageTransformService,
     onAutomationChanged: automationId => automationChanges.publish(automationId),
@@ -278,6 +280,7 @@ export async function startBuddyService(
     systemHost,
   }
   const sessionBlueprints = new BuddySessionBlueprintService({
+    conversationGrants: conversationDirectoryGrants,
     paths,
     spaces: spacesRepository,
     skills: skillService,
@@ -308,10 +311,12 @@ export async function startBuddyService(
   runner = new BuddyAgentRunner({
     executor: piTurnExecutor,
     lifecycle: runLifecycleService,
+    onRunSettled: runId => approvalService.clearTurnAuthorization(runId),
     sessions,
   })
   const conversationLifecycle = new ConversationLifecycleService({
     conversations,
+    directoryGrants: conversationDirectoryGrants,
     runner,
     sessions,
   })
