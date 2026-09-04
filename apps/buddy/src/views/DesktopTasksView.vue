@@ -50,7 +50,7 @@ async function openArtifact(artifactId: string): Promise<void> {
   const artifact = tasks.workspace.transcript.runOutputs.value
     .flatMap(output => output.artifacts)
     .find(item => item.artifactId === artifactId)
-  if (!artifact || artifact.deletedAt !== null)
+  if (!artifact)
     return
   if (!isBrowserArtifact(artifact)) {
     taskContext.openArtifact(artifactId)

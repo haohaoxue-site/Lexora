@@ -32,7 +32,7 @@ export function createImageTransformExtension(
           'Deterministically remove a solid chroma background from a PNG conversation artifact.',
           'Creates a new transparent PNG artifact with source lineage and preserves the original canvas.',
         ].join(' '),
-        execute: async (toolCallId, parameters) => {
+        execute: async (_toolCallId, parameters) => {
           if (!Check(imageTransformParameters, parameters))
             return imageTransformFailure('VALIDATION_FAILED')
           const runId = options.getRunId()
@@ -47,10 +47,8 @@ export function createImageTransformExtension(
               despill: input.despill ?? 1,
               grants: options.grants,
               outputPath: input.outputPath,
-              runId,
               softness: input.softness ?? 80,
               sourceArtifactId: input.sourceArtifactId,
-              sourceToolCallId: toolCallId,
               tolerance: input.tolerance ?? 60,
             })
             return {

@@ -19,15 +19,16 @@ import type { BuddyInProcessExtension } from './createBuddyResourceLoader'
 import type { BuddyRunContextStore } from './createReusableBuddySession'
 import type {
   ChangeCaptureGateway,
-  CreateChangeCaptureExtensionOptions,
 } from './extensions/changeCaptureExtension'
 import type { CreateImageGenerationExtensionOptions } from './extensions/imageGenerationExtension'
 import type { CreateImageTransformExtensionOptions } from './extensions/imageTransformExtension'
+import type { CreateOutputPresentationExtensionOptions } from './extensions/outputPresentationExtension'
 import type {
   BuddyRunContext,
   CreateToolPolicyExtensionOptions,
   ToolApprovalGateway,
 } from './extensions/toolPolicyExtension'
+import { classifyOutputPresentTool } from '../artifacts/artifactToolContract'
 import { classifyAutomationToolCall } from '../automations/createAutomationTool'
 import { BrowserCapabilityService } from '../browser/BrowserCapabilityService'
 import { classifyBrowserTool } from '../browser/browserToolContract'
@@ -43,6 +44,7 @@ import { createChangeCaptureExtension } from './extensions/changeCaptureExtensio
 import { createImageGenerationExtension } from './extensions/imageGenerationExtension'
 import { createImageTransformExtension } from './extensions/imageTransformExtension'
 import { createMcpExtension } from './extensions/mcpExtension'
+import { createOutputPresentationExtension } from './extensions/outputPresentationExtension'
 import { createPetExtension } from './extensions/petExtension'
 import { createSystemExtension } from './extensions/systemExtension'
 import { createSystemPromptExtension } from './extensions/systemPromptExtension'
@@ -57,7 +59,7 @@ interface BuddySessionConnectorSource {
 export interface BuddySessionCompositionServices {
   approvalService: ToolApprovalGateway
   artifactService: CreateImageGenerationExtensionOptions['artifactService']
-    & CreateChangeCaptureExtensionOptions['artifactService']
+    & CreateOutputPresentationExtensionOptions['artifactService']
   attachmentService: CreateImageGenerationExtensionOptions['attachmentService']
   automationService: CreateAutomationToolOptions['service']
   browserHost: BrowserCapabilityHost
@@ -127,6 +129,13 @@ export async function createBuddySessionComposition(
       grants,
       service: services.imageTransformService,
     }),
+    createOutputPresentationExtension({
+      artifactService: services.artifactService,
+      conversationId: options.conversationId,
+      cwd: options.canonicalRoot,
+      getRunId: () => runContext.current?.runId,
+      grants,
+    }),
     createPetExtension({
       getRunId: () => runContext.current?.runId,
       service: services.petService,
@@ -160,7 +169,6 @@ export async function createBuddySessionComposition(
         : { id: options.conversationId, kind: 'conversation' },
     }),
     createChangeCaptureExtension({
-      artifactService: services.artifactService,
       conversationId: options.conversationId,
       cwd: options.canonicalRoot,
       getRunContext: () => runContext.current,
@@ -220,6 +228,10 @@ function createBuddyToolClassifier(
     const imageTransform = classifyImageTransformTool(event)
     if (imageTransform)
       return imageTransform
+
+    const outputPresentation = classifyOutputPresentTool(event)
+    if (outputPresentation)
+      return outputPresentation
 
     const browser = classifyBrowserTool(event, options.browserCapability)
     if (browser)

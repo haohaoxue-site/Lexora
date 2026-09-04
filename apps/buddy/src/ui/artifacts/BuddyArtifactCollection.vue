@@ -4,14 +4,18 @@ import type { BuddyLocale } from '@/i18n/buddyI18n'
 import { Open20Regular } from '@vicons/fluent'
 import { NIcon, NScrollbar } from 'naive-ui'
 import { computed, shallowRef, useTemplateRef } from 'vue'
+import { materialFolderIconUrls } from '@/assets/file-icons/materialFileIcons'
 import { useBuddyI18n } from '@/i18n/buddyI18n'
 import BuddyFileIcon from '@/ui/files/BuddyFileIcon.vue'
-import { formatArtifactFileSize, resolveArtifactFileType } from './artifactPresentation'
+import { formatArtifactFileSize, resolveArtifactFileType } from '@/workbenches/chat/transcript/artifactPresentation'
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   artifacts: ReadonlyArray<LocalArtifact>
   language: BuddyLocale
-}>()
+  layout?: 'grid' | 'strip'
+}>(), {
+  layout: 'strip',
+})
 const emit = defineEmits<{
   openArtifact: [artifactId: string]
 }>()
@@ -19,18 +23,18 @@ const emit = defineEmits<{
 const { t } = useBuddyI18n(() => props.language)
 const scrollRoot = useTemplateRef<HTMLElement>('scrollRoot')
 const failedArtifactIds = shallowRef<ReadonlySet<string>>(new Set())
-const outputViews = computed(() => props.artifacts.map((artifact) => {
-  const deleted = artifact.deletedAt !== null
-  const image = artifact.mimeType.startsWith('image/')
+const artifactViews = computed(() => props.artifacts.map((artifact) => {
+  const image = artifact.kind === 'file' && artifact.mimeType.startsWith('image/')
   return {
     artifact,
-    deleted,
-    detail: deleted
-      ? t('desktop.chat.artifactDeleted')
-      : formatArtifactFileSize(artifact.sizeBytes),
-    fileType: resolveArtifactFileType(artifact),
-    previewable: image && !deleted && !failedArtifactIds.value.has(artifact.artifactId),
-    previewUrl: image && !deleted
+    detail: artifact.kind === 'directory'
+      ? artifact.path
+      : `${formatArtifactFileSize(artifact.sizeBytes)} · ${artifact.path}`,
+    fileType: artifact.kind === 'directory'
+      ? t('desktop.context.directory')
+      : resolveArtifactFileType(artifact),
+    previewable: image && !failedArtifactIds.value.has(artifact.artifactId),
+    previewUrl: image
       ? `lexora-artifact://preview/${encodeURIComponent(artifact.artifactId)}?v=${encodeURIComponent(artifact.updatedAt)}`
       : null,
   }
@@ -41,8 +45,13 @@ function markPreviewFailed(artifactId: string) {
 }
 
 function handleWheel(event: WheelEvent) {
-  if (event.ctrlKey || Math.abs(event.deltaX) >= Math.abs(event.deltaY))
+  if (
+    props.layout !== 'strip'
+    || event.ctrlKey
+    || Math.abs(event.deltaX) >= Math.abs(event.deltaY)
+  ) {
     return
+  }
   const scrollport = findHorizontalScrollport()
   if (!scrollport)
     return
@@ -74,27 +83,35 @@ function findHorizontalScrollport(): HTMLElement | null {
 <template>
   <div
     ref="scrollRoot"
-    class="buddy-artifact-gallery__scroll"
+    class="buddy-artifact-collection__scroll"
+    :class="`is-${layout}`"
     @wheel="handleWheel"
   >
-    <NScrollbar class="buddy-artifact-gallery__scrollbar" trigger="hover" x-scrollable>
-      <div class="buddy-artifact-gallery__grid">
+    <NScrollbar class="buddy-artifact-collection__scrollbar" trigger="hover" x-scrollable>
+      <div class="buddy-artifact-collection__items" :class="`is-${layout}`">
         <button
-          v-for="view in outputViews"
+          v-for="view in artifactViews"
           :key="view.artifact.artifactId"
-          class="buddy-artifact-gallery__item"
-          :class="{ 'is-deleted': view.deleted }"
-          :data-change-type="view.artifact.changeType"
-          :disabled="view.deleted"
+          class="buddy-artifact-collection__item"
+          :class="{ 'is-directory': view.artifact.kind === 'directory' }"
           type="button"
           @click="emit('openArtifact', view.artifact.artifactId)"
         >
           <div
-            class="buddy-artifact-gallery__preview"
-            :class="{ 'is-contain': view.artifact.mimeType === 'image/svg+xml' }"
+            class="buddy-artifact-collection__preview"
+            :class="{
+              'is-contain': view.artifact.mimeType === 'image/svg+xml',
+            }"
           >
             <img
-              v-if="view.previewable"
+              v-if="view.artifact.kind === 'directory'"
+              alt=""
+              class="buddy-artifact-collection__directory-icon"
+              draggable="false"
+              :src="materialFolderIconUrls.collapsed"
+            >
+            <img
+              v-else-if="view.previewable"
               :alt="view.artifact.name"
               loading="lazy"
               :src="view.previewUrl ?? undefined"
@@ -102,15 +119,11 @@ function findHorizontalScrollport(): HTMLElement | null {
             >
             <BuddyFileIcon v-else :name="view.artifact.name" size="preview" />
           </div>
-          <div class="buddy-artifact-gallery__meta">
-            <span class="buddy-artifact-gallery__type">{{ view.fileType }}</span>
-            <span class="buddy-artifact-gallery__name">{{ view.artifact.name }}</span>
-            <span class="buddy-artifact-gallery__detail">{{ view.detail }}</span>
-            <NIcon
-              v-if="!view.deleted"
-              :component="Open20Regular"
-              class="buddy-artifact-gallery__open"
-            />
+          <div class="buddy-artifact-collection__meta">
+            <span class="buddy-artifact-collection__type">{{ view.fileType }}</span>
+            <span class="buddy-artifact-collection__name">{{ view.artifact.name }}</span>
+            <span class="buddy-artifact-collection__detail">{{ view.detail }}</span>
+            <NIcon :component="Open20Regular" class="buddy-artifact-collection__open" />
           </div>
         </button>
       </div>
@@ -119,25 +132,34 @@ function findHorizontalScrollport(): HTMLElement | null {
 </template>
 
 <style scoped lang="scss">
-.buddy-artifact-gallery__scroll {
+.buddy-artifact-collection__scroll {
   min-width: 0;
   overflow: hidden;
 }
 
-:deep(.buddy-artifact-gallery__scrollbar) {
+:deep(.buddy-artifact-collection__scrollbar) {
   width: 100%;
 }
 
-.buddy-artifact-gallery__grid {
+.buddy-artifact-collection__items {
   display: grid;
-  width: max-content;
-  grid-auto-columns: 17rem;
-  grid-auto-flow: column;
   gap: 0.625rem;
-  padding: 0.125rem 0.125rem 0.5rem;
+  padding: 0.125rem;
+
+  &.is-strip {
+    width: max-content;
+    grid-auto-columns: 17rem;
+    grid-auto-flow: column;
+    padding-bottom: 0.5rem;
+  }
+
+  &.is-grid {
+    width: 100%;
+    grid-template-columns: repeat(auto-fill, minmax(min(15rem, 100%), 1fr));
+  }
 }
 
-.buddy-artifact-gallery__item {
+.buddy-artifact-collection__item {
   display: grid;
   overflow: hidden;
   min-width: 0;
@@ -161,16 +183,9 @@ function findHorizontalScrollport(): HTMLElement | null {
     outline: 2px solid var(--buddy-focus-ring);
     outline-offset: 2px;
   }
-
-  &.is-deleted {
-    border-color: var(--buddy-border-subtle);
-    box-shadow: none;
-    cursor: default;
-    opacity: 0.62;
-  }
 }
 
-.buddy-artifact-gallery__preview {
+.buddy-artifact-collection__preview {
   display: grid;
   height: 7rem;
   place-items: center;
@@ -179,7 +194,7 @@ function findHorizontalScrollport(): HTMLElement | null {
   background: var(--buddy-accent-surface-subtle);
   color: var(--buddy-text-muted);
 
-  img {
+  img:not(.buddy-artifact-collection__directory-icon) {
     display: block;
     width: 100%;
     height: 100%;
@@ -192,42 +207,54 @@ function findHorizontalScrollport(): HTMLElement | null {
   }
 }
 
-.buddy-artifact-gallery__meta {
+.buddy-artifact-collection__directory-icon {
+  width: 3.25rem;
+  height: 3.25rem;
+  object-fit: contain;
+}
+
+.buddy-artifact-collection__meta {
   display: grid;
   min-width: 0;
-  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-areas:
+    'type name open'
+    'detail detail open';
   align-items: center;
-  gap: 0.45rem;
+  gap: 0.2rem 0.45rem;
   padding: 0.5rem 0.625rem;
 }
 
-.buddy-artifact-gallery__type {
+.buddy-artifact-collection__type {
+  grid-area: type;
   color: var(--buddy-accent-text);
   font-size: var(--buddy-chat-caption-font-size);
   font-weight: 650;
 }
 
-.buddy-artifact-gallery__name {
+.buddy-artifact-collection__name {
   overflow: hidden;
+  grid-area: name;
   color: var(--buddy-text-strong);
   font-size: var(--buddy-chat-caption-font-size);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.is-deleted .buddy-artifact-gallery__name {
-  text-decoration: line-through;
-}
-
-.buddy-artifact-gallery__detail {
+.buddy-artifact-collection__detail {
+  overflow: hidden;
+  grid-area: detail;
   color: var(--buddy-text-muted);
+  font-family: var(--buddy-font-mono, ui-monospace, monospace);
   font-size: var(--buddy-chat-caption-font-size);
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.buddy-artifact-gallery__open {
+.buddy-artifact-collection__open {
   width: 1rem;
   height: 1rem;
+  grid-area: open;
   color: var(--buddy-chat-meta-color);
 }
 </style>

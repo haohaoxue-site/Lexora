@@ -4,9 +4,7 @@ import type { CreateBuddyToolPresentationInput } from '../events/toolPresentatio
 import { relative, sep } from 'node:path'
 
 import { redactSensitiveText, redactShellCommand } from '../../../shared/approvalReviewPayload'
-import {
-  createTrackedFileRunOutput,
-} from '../artifacts/artifactToolContract'
+import { createOutputPresentRunOutput } from '../artifacts/artifactToolContract'
 import { createAutomationToolPresentation } from '../automations/automationToolContract'
 import { createBrowserToolPresentation } from '../browser/browserToolPresentation'
 import { createMcpToolPresentation } from '../connectors/mcp/mcpToolContract'
@@ -38,7 +36,7 @@ export function createBuddyRunOutputs(
 ): BuddyRunOutputPayload[] {
   const output = createImageGenerationRunOutput(input)
     ?? createImageTransformRunOutput(input)
-    ?? createTrackedFileRunOutput(input)
+    ?? createOutputPresentRunOutput(input)
   return output ? [output] : []
 }
 

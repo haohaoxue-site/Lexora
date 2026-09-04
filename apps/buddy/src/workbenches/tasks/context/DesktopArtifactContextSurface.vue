@@ -3,15 +3,19 @@ import type { LocalArtifact, LocalArtifactText } from '@buddy-electron/shared/lo
 import type { BuddyLocale } from '@/i18n/buddyI18n'
 import { NSpin } from 'naive-ui'
 import { computed, shallowRef, watch } from 'vue'
+import { materialFolderIconUrls } from '@/assets/file-icons/materialFileIcons'
 import { useBuddyI18n } from '@/i18n/buddyI18n'
 import BuddyFileIcon from '@/ui/files/BuddyFileIcon.vue'
 import BuddyImagePreview from '@/ui/media/BuddyImagePreview.vue'
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   artifact: LocalArtifact
   language: BuddyLocale
   readArtifactText: (artifactId: string) => Promise<LocalArtifactText>
-}>()
+  showToolbar?: boolean
+}>(), {
+  showToolbar: true,
+})
 
 const { t } = useBuddyI18n(() => props.language)
 const previewFailed = shallowRef(false)
@@ -22,17 +26,23 @@ const textPreviewFailed = shallowRef(false)
 const textPreviewLoading = shallowRef(false)
 let textLoadGeneration = 0
 const previewUrl = computed(() => (
-  props.artifact.mimeType.startsWith('image/') && !previewFailed.value
+  props.artifact.kind === 'file'
+  && props.artifact.mimeType.startsWith('image/')
+  && !previewFailed.value
     ? `lexora-artifact://preview/${encodeURIComponent(props.artifact.artifactId)}?v=${encodeURIComponent(props.artifact.updatedAt)}`
     : null
 ))
 const previewSources = computed(() => previewUrl.value ? [previewUrl.value] : [])
-const textPreviewable = computed(() => isTextMimeType(props.artifact.mimeType))
-const detail = computed(() => [
-  resolveFileType(props.artifact),
-  formatFileSize(props.artifact.sizeBytes),
-  formatDate(props.artifact.updatedAt, props.language),
-].join(' · '))
+const textPreviewable = computed(() => (
+  props.artifact.kind === 'file' && isTextMimeType(props.artifact.mimeType)
+))
+const detail = computed(() => props.artifact.kind === 'directory'
+  ? t('desktop.context.directory')
+  : [
+      resolveFileType(props.artifact),
+      formatFileSize(props.artifact.sizeBytes),
+      formatDate(props.artifact.updatedAt, props.language),
+    ].join(' · '))
 
 watch(
   () => [props.artifact.artifactId, props.artifact.updatedAt] as const,
@@ -116,8 +126,11 @@ function isTextMimeType(mimeType: string): boolean {
       :language="language"
       :sources="previewSources"
     />
-    <header class="desktop-artifact-context-surface__toolbar">
-      <strong>{{ artifact.name }}</strong>
+    <header v-if="showToolbar" class="desktop-artifact-context-surface__toolbar">
+      <div>
+        <strong>{{ artifact.name }}</strong>
+        <small>{{ artifact.path }}</small>
+      </div>
       <span>{{ detail }}</span>
     </header>
     <div class="desktop-artifact-context-surface__viewport">
@@ -143,9 +156,19 @@ function isTextMimeType(mimeType: string): boolean {
         class="desktop-artifact-context-surface__text"
       ><code>{{ textPreview.text }}</code></pre>
       <div v-else class="desktop-artifact-context-surface__fallback">
-        <BuddyFileIcon :name="artifact.name" size="preview" />
+        <img
+          v-if="artifact.kind === 'directory'"
+          alt=""
+          class="desktop-artifact-context-surface__folder-icon"
+          draggable="false"
+          :src="materialFolderIconUrls.collapsed"
+        >
+        <BuddyFileIcon v-else :name="artifact.name" size="preview" />
         <strong>{{ artifact.name }}</strong>
-        <span>{{ t(textPreviewFailed ? 'desktop.context.previewLoadFailed' : 'desktop.context.previewUnavailable') }}</span>
+        <span v-if="artifact.kind === 'directory'" class="desktop-artifact-context-surface__path">
+          {{ artifact.path }}
+        </span>
+        <span v-else>{{ t(textPreviewFailed ? 'desktop.context.previewLoadFailed' : 'desktop.context.previewUnavailable') }}</span>
       </div>
     </div>
   </section>
@@ -172,13 +195,29 @@ function isTextMimeType(mimeType: string): boolean {
   padding: 0 0.75rem;
 }
 
-.desktop-artifact-context-surface__toolbar strong {
+.desktop-artifact-context-surface__toolbar div {
+  display: grid;
+  min-width: 0;
+  gap: 0.1rem;
+}
+
+.desktop-artifact-context-surface__toolbar strong,
+.desktop-artifact-context-surface__toolbar small {
   overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.desktop-artifact-context-surface__toolbar strong {
   color: var(--buddy-text-strong);
   font-size: 0.8rem;
   font-weight: 600;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+}
+
+.desktop-artifact-context-surface__toolbar small {
+  color: var(--buddy-text-muted);
+  font-family: var(--buddy-font-mono, ui-monospace, monospace);
+  font-size: 0.68rem;
 }
 
 .desktop-artifact-context-surface__toolbar span {
@@ -215,6 +254,12 @@ function isTextMimeType(mimeType: string): boolean {
   outline-offset: 3px;
 }
 
+.desktop-artifact-context-surface__folder-icon {
+  width: 4rem;
+  height: 4rem;
+  object-fit: contain;
+}
+
 .desktop-artifact-context-surface__preview-trigger img {
   display: block;
   max-width: 100%;
@@ -238,6 +283,12 @@ function isTextMimeType(mimeType: string): boolean {
 
 .desktop-artifact-context-surface__fallback span {
   font-size: 0.75rem;
+}
+
+.desktop-artifact-context-surface__fallback .desktop-artifact-context-surface__path {
+  max-width: 100%;
+  font-family: var(--buddy-font-mono, ui-monospace, monospace);
+  overflow-wrap: anywhere;
 }
 
 .desktop-artifact-context-surface__text {

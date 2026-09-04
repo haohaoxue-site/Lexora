@@ -8,7 +8,7 @@ export interface ChatMessageInterruption {
 export interface PresentedArtifactReference {
   artifactId: string
   name: string
-  relativePath: string
+  path: string
 }
 
 export function getChatMessageInterruption(
@@ -41,7 +41,7 @@ export function getChatMessageDisplayText(
     typeof artifact === 'string' ? [artifact] : [artifact.artifactId]
   )).filter(Boolean))]
   const artifactPaths = presentedArtifacts.flatMap(artifact => (
-    typeof artifact === 'string' ? [] : [artifact.name, artifact.relativePath]
+    typeof artifact === 'string' ? [] : [artifact.name, artifact.path]
   ))
   const withoutPresentedLinks = artifactIds.length > 0
     ? text.replace(new RegExp(

@@ -10,6 +10,7 @@ import {
 } from '@vicons/fluent'
 import { NButton, NEmpty, NIcon, NScrollbar } from 'naive-ui'
 import { computed, shallowRef, useTemplateRef } from 'vue'
+import { materialFolderIconUrls } from '@/assets/file-icons/materialFileIcons'
 import { useBuddyI18n } from '@/i18n/buddyI18n'
 import BuddyFileIcon from '@/ui/files/BuddyFileIcon.vue'
 import DesktopArtifactContextSurface from './DesktopArtifactContextSurface.vue'
@@ -114,9 +115,16 @@ function findTabsScrollport(): HTMLElement | null {
                 @click="emit('selectTab', tab.id)"
               >
                 <BuddyFileIcon
-                  v-if="tab.kind === 'artifact'"
+                  v-if="tab.kind === 'artifact' && tab.artifact.kind === 'file'"
                   :name="tab.artifact.name"
                 />
+                <img
+                  v-else-if="tab.kind === 'artifact'"
+                  alt=""
+                  class="desktop-task-context-panel__folder-icon"
+                  draggable="false"
+                  :src="materialFolderIconUrls.collapsed"
+                >
                 <NIcon
                   v-else
                   :component="tab.kind === 'browser' ? Globe16Regular : Code16Regular"
@@ -271,6 +279,12 @@ function findTabsScrollport(): HTMLElement | null {
   cursor: pointer;
   padding: 0 0.2rem 0 0.625rem;
   text-align: left;
+}
+
+.desktop-task-context-panel__folder-icon {
+  width: 1rem;
+  height: 1rem;
+  flex: none;
 }
 
 .desktop-task-context-panel__tab-select span {

@@ -34,10 +34,7 @@ export function spaceTaskArtifactTabs(
   const artifacts = new Map<string, LocalArtifact>()
   for (const output of outputs) {
     for (const artifact of output.artifacts) {
-      if (artifact.deletedAt === null)
-        artifacts.set(artifact.artifactId, artifact)
-      else
-        artifacts.delete(artifact.artifactId)
+      artifacts.set(artifact.artifactId, artifact)
     }
   }
   return [...artifacts.values()].map(artifact => ({
@@ -53,9 +50,11 @@ export function artifactTabId(artifactId: string): string {
 }
 
 export function isBrowserArtifact(
-  artifact: Pick<LocalArtifact, 'mimeType' | 'name'>,
+  artifact: Pick<LocalArtifact, 'kind' | 'mimeType' | 'name'>,
 ): boolean {
-  return artifact.mimeType === 'text/html' && /\.html?$/i.test(artifact.name)
+  return artifact.kind === 'file'
+    && artifact.mimeType === 'text/html'
+    && /\.html?$/i.test(artifact.name)
 }
 
 export function spaceTaskBrowserTab(

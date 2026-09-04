@@ -2,7 +2,6 @@ import type { ImageContent } from '@earendil-works/pi-ai'
 import type { Buffer } from 'node:buffer'
 import type { DirectoryGrant } from '../directories/resolveGrantedPath'
 import type {
-  ArtifactChangeType,
   ArtifactRecord,
   ArtifactRepository,
 } from '../storage/artifactRepository'
@@ -37,143 +36,71 @@ export class ArtifactService {
     this.#repository = options.repository
   }
 
-  async recordFileChange(input: {
-    changeType: Exclude<ArtifactChangeType, 'renamed'>
+  async presentOutputs(input: {
     conversationId: string
+    cwd: string
     grants: readonly DirectoryGrant[]
-    path: string
-    runId: string
+    paths: readonly string[]
     sourceArtifactId?: string | null
-    sourceToolCallId: string
-  }): Promise<ArtifactRecord> {
-    const location = await resolveArtifactLocation(
-      input.grants,
-      input.path,
-      input.changeType === 'deleted' ? 'create' : 'existing',
-    )
-    if (isSensitivePath(location.relativePath))
-      throw new ArtifactError('ARTIFACT_SENSITIVE_PATH')
-
-    const existing = this.#repository.findByLocation(
-      input.conversationId,
-      location.grant.grantId,
-      location.relativePath,
-    ) ?? this.#repository.findByCurrentPath(
-      input.conversationId,
-      location.canonicalPath,
-    )
-    if (input.changeType === 'deleted' && !existing)
-      throw new ArtifactError('ARTIFACT_NOT_FOUND')
-    const requestedSourceArtifactId = input.sourceArtifactId === undefined
-      ? existing?.sourceArtifactId ?? null
-      : input.sourceArtifactId
-    if (requestedSourceArtifactId)
-      this.#requireConversationArtifact(input.conversationId, requestedSourceArtifactId)
-    const sourceArtifactId = requestedSourceArtifactId === existing?.id
-      ? existing.sourceArtifactId
-      : requestedSourceArtifactId
-
-    const now = new Date().toISOString()
-    const metadata = input.changeType === 'deleted'
-      ? null
-      : await stat(location.canonicalPath)
-    if (metadata && !metadata.isFile())
+  }): Promise<ArtifactRecord[]> {
+    if (
+      input.paths.length === 0
+      || input.paths.length > BUDDY_ARTIFACT_COUNT_LIMIT
+      || input.paths.some(path => !path.trim())
+    ) {
       throw new ArtifactError('VALIDATION_FAILED')
-    const record: ArtifactRecord = {
-      conversationId: input.conversationId,
-      createdAt: existing?.createdAt ?? now,
-      createdRunId: existing?.createdRunId ?? input.runId,
-      currentPath: location.canonicalPath,
-      deletedAt: input.changeType === 'deleted' ? now : null,
-      directoryGrantId: location.grant.grantId,
-      directoryRoot: location.grant.canonicalRoot,
-      id: existing?.id ?? randomUUID(),
-      lastChangedRunId: input.runId,
-      mimeType: metadata ? mimeTypeFromPath(location.canonicalPath) : existing!.mimeType,
-      name: basename(location.canonicalPath),
-      relativePath: location.relativePath,
-      sizeBytes: metadata?.size ?? existing!.sizeBytes,
-      sourceArtifactId,
-      sourceToolCallId: input.sourceToolCallId,
-      updatedAt: now,
     }
-    return this.#repository.saveChange({
-      change: {
-        artifactId: record.id,
-        changeType: input.changeType,
-        createdAt: now,
-        id: randomUUID(),
-        previousRelativePath: null,
-        relativePath: record.relativePath,
-        runId: input.runId,
-        sourceToolCallId: input.sourceToolCallId,
-      },
-      record,
-    })
-  }
+    const sourceArtifactId = input.sourceArtifactId ?? null
+    if (sourceArtifactId)
+      this.#requireConversationArtifact(input.conversationId, sourceArtifactId)
 
-  async recordFileMove(input: {
-    conversationId: string
-    fromPath: string
-    grants: readonly DirectoryGrant[]
-    runId: string
-    sourceToolCallId: string
-    toPath: string
-  }): Promise<ArtifactRecord> {
-    const [from, to] = await Promise.all([
-      resolveArtifactLocation(input.grants, input.fromPath, 'create'),
-      resolveArtifactLocation(input.grants, input.toPath, 'existing'),
-    ])
-    const existing = this.#repository.findByLocation(
-      input.conversationId,
-      from.grant.grantId,
-      from.relativePath,
-    ) ?? this.#repository.findByCurrentPath(
-      input.conversationId,
-      from.canonicalPath,
-    )
-    if (!existing) {
-      return this.recordFileChange({
-        changeType: 'created',
+    const candidates = await Promise.all(input.paths.map(async (requestedPath) => {
+      const absolutePath = isAbsolute(requestedPath)
+        ? requestedPath
+        : resolve(input.cwd, requestedPath)
+      const location = await resolveArtifactLocation(input.grants, absolutePath)
+      if (isSensitivePath(location.relativePath))
+        throw new ArtifactError('ARTIFACT_SENSITIVE_PATH')
+      const metadata = await stat(location.canonicalPath)
+      if (!metadata.isFile() && !metadata.isDirectory())
+        throw new ArtifactError('VALIDATION_FAILED')
+      return {
+        kind: metadata.isDirectory() ? 'directory' as const : 'file' as const,
+        location,
+        mimeType: metadata.isDirectory()
+          ? 'inode/directory'
+          : mimeTypeFromPath(location.canonicalPath),
+        sizeBytes: metadata.isFile() ? metadata.size : 0,
+      }
+    }))
+    const uniqueCandidates = [...new Map(
+      candidates.map(candidate => [candidate.location.canonicalPath, candidate]),
+    ).values()]
+
+    return uniqueCandidates.map((candidate) => {
+      const existing = this.#repository.findByCurrentPath(
+        input.conversationId,
+        candidate.location.canonicalPath,
+      )
+      const normalizedSourceArtifactId = sourceArtifactId === existing?.id
+        ? existing.sourceArtifactId
+        : sourceArtifactId || existing?.sourceArtifactId || null
+      const now = new Date().toISOString()
+      return this.#repository.save({
         conversationId: input.conversationId,
-        grants: input.grants,
-        path: input.toPath,
-        runId: input.runId,
-        sourceToolCallId: input.sourceToolCallId,
+        createdAt: existing?.createdAt ?? now,
+        currentPath: candidate.location.canonicalPath,
+        directoryGrantId: candidate.location.grant.grantId,
+        directoryRoot: candidate.location.grant.canonicalRoot,
+        id: existing?.id ?? randomUUID(),
+        kind: candidate.kind,
+        mimeType: candidate.mimeType,
+        name: basename(candidate.location.canonicalPath),
+        relativePath: candidate.location.relativePath,
+        sizeBytes: candidate.sizeBytes,
+        sourceArtifactId: normalizedSourceArtifactId,
+        updatedAt: now,
       })
-    }
-    if (isSensitivePath(to.relativePath))
-      throw new ArtifactError('ARTIFACT_SENSITIVE_PATH')
-    const metadata = await stat(to.canonicalPath)
-    if (!metadata.isFile())
-      throw new ArtifactError('VALIDATION_FAILED')
-    const now = new Date().toISOString()
-    const record: ArtifactRecord = {
-      ...existing,
-      currentPath: to.canonicalPath,
-      deletedAt: null,
-      directoryGrantId: to.grant.grantId,
-      directoryRoot: to.grant.canonicalRoot,
-      lastChangedRunId: input.runId,
-      mimeType: mimeTypeFromPath(to.canonicalPath),
-      name: basename(to.canonicalPath),
-      relativePath: to.relativePath,
-      sizeBytes: metadata.size,
-      sourceToolCallId: input.sourceToolCallId,
-      updatedAt: now,
-    }
-    return this.#repository.saveChange({
-      change: {
-        artifactId: record.id,
-        changeType: 'renamed',
-        createdAt: now,
-        id: randomUUID(),
-        previousRelativePath: existing.relativePath,
-        relativePath: record.relativePath,
-        runId: input.runId,
-        sourceToolCallId: input.sourceToolCallId,
-      },
-      record,
     })
   }
 
@@ -183,9 +110,7 @@ export class ArtifactService {
     grants: readonly DirectoryGrant[]
     images: readonly GeneratedArtifactImage[]
     outputPath: string
-    runId: string
     sourceArtifactId: string | null
-    sourceToolCallId: string
   }): Promise<ArtifactRecord[]> {
     if (
       input.images.length === 0
@@ -217,26 +142,21 @@ export class ArtifactService {
     if (new Set(outputPaths).size !== outputPaths.length)
       throw new ArtifactError('VALIDATION_FAILED')
 
-    const records: ArtifactRecord[] = []
     for (const [index, image] of input.images.entries()) {
       const outputPath = outputPaths[index]!
       const location = await resolveArtifactLocation(input.grants, outputPath, 'create')
       if (isSensitivePath(location.relativePath))
         throw new ArtifactError('ARTIFACT_SENSITIVE_PATH')
-      const existed = await isFile(location.canonicalPath)
       await mkdir(dirname(location.canonicalPath), { mode: 0o700, recursive: true })
       await writeFile(location.canonicalPath, image.bytes, { mode: 0o600 })
-      records.push(await this.recordFileChange({
-        changeType: existed ? 'updated' : 'created',
-        conversationId: input.conversationId,
-        grants: input.grants,
-        path: location.canonicalPath,
-        runId: input.runId,
-        sourceArtifactId: input.sourceArtifactId,
-        sourceToolCallId: input.sourceToolCallId,
-      }))
     }
-    return records
+    return this.presentOutputs({
+      conversationId: input.conversationId,
+      cwd: input.cwd,
+      grants: input.grants,
+      paths: outputPaths,
+      sourceArtifactId: input.sourceArtifactId,
+    })
   }
 
   listConversationArtifacts(
@@ -246,7 +166,6 @@ export class ArtifactService {
     if (!Number.isSafeInteger(limit) || limit < 1 || limit > BUDDY_ARTIFACT_COUNT_LIMIT)
       throw new ArtifactError('VALIDATION_FAILED')
     return this.#repository.listForConversation(conversationId)
-      .filter(record => record.deletedAt === null)
       .slice(-limit)
       .reverse()
       .map(toArtifactResource)
@@ -257,6 +176,8 @@ export class ArtifactService {
     artifactId: string,
   ): Promise<{ bytes: Buffer, resource: ArtifactResource }> {
     const artifact = this.#requireConversationArtifact(conversationId, artifactId)
+    if (artifact.kind !== 'file')
+      throw new ArtifactError('VALIDATION_FAILED')
     return {
       bytes: await readFile(artifact.currentPath),
       resource: toArtifactResource(artifact),
@@ -270,7 +191,8 @@ export class ArtifactService {
     const artifact = this.#requireConversationArtifact(conversationId, artifactId)
     const extension = extname(artifact.name).toLowerCase()
     if (
-      artifact.mimeType !== 'text/html'
+      artifact.kind !== 'file'
+      || artifact.mimeType !== 'text/html'
       || (extension !== '.htm' && extension !== '.html')
     ) {
       throw new ArtifactError('VALIDATION_FAILED')
@@ -285,7 +207,7 @@ export class ArtifactService {
 
   resolvePreview(id: string): { mimeType: string, path: string } {
     const artifact = this.#requireVisibleArtifact(id)
-    if (!artifact.mimeType.startsWith('image/'))
+    if (artifact.kind !== 'file' || !artifact.mimeType.startsWith('image/'))
       throw new ArtifactError('VALIDATION_FAILED')
     return { mimeType: artifact.mimeType, path: artifact.currentPath }
   }
@@ -297,7 +219,8 @@ export class ArtifactService {
   }> {
     const artifact = this.#requireVisibleArtifact(id)
     if (
-      !isTextArtifact(artifact.mimeType)
+      artifact.kind !== 'file'
+      || !isTextArtifact(artifact.mimeType)
       || artifact.sizeBytes > BUDDY_ARTIFACT_TEXT_BYTES_LIMIT
     ) {
       throw new ArtifactError('VALIDATION_FAILED')
@@ -324,12 +247,12 @@ export class ArtifactService {
     ids?: readonly string[],
   ): Promise<{ images: ImageContent[], records: ArtifactRecord[] }> {
     const available = this.#repository.listForConversation(conversationId)
-      .filter(record => record.deletedAt === null && record.mimeType.startsWith('image/'))
+      .filter(record => record.kind === 'file' && record.mimeType.startsWith('image/'))
     const selected = ids === undefined
       ? available.slice(-1)
       : ids.map(id => this.#requireConversationArtifact(conversationId, id))
           .filter((artifact) => {
-            if (!artifact.mimeType.startsWith('image/'))
+            if (artifact.kind !== 'file' || !artifact.mimeType.startsWith('image/'))
               throw new ArtifactError('ARTIFACT_NOT_FOUND')
             return true
           })
@@ -345,8 +268,6 @@ export class ArtifactService {
     const artifact = this.#repository.findVisibleById(id)
     if (!artifact)
       throw new ArtifactError('ARTIFACT_NOT_FOUND')
-    if (artifact.deletedAt !== null)
-      throw new ArtifactError('ARTIFACT_DELETED')
     return artifact
   }
 
@@ -377,7 +298,7 @@ interface ArtifactLocation {
 async function resolveArtifactLocation(
   grants: readonly DirectoryGrant[],
   path: string,
-  mode: 'create' | 'existing',
+  mode: 'create' | 'existing' = 'existing',
 ): Promise<ArtifactLocation> {
   if (!isAbsolute(path))
     throw new ArtifactError('VALIDATION_FAILED')
@@ -386,12 +307,12 @@ async function resolveArtifactLocation(
   if (!grant)
     throw new ArtifactError('PATH_OUTSIDE_GRANTED_DIRECTORY')
   const child = relative(grant.canonicalRoot, resolution.canonicalPath)
-  if (!child || child === '..' || child.startsWith(`..${sep}`))
+  if (child === '..' || child.startsWith(`..${sep}`))
     throw new ArtifactError('PATH_OUTSIDE_GRANTED_DIRECTORY')
   return {
     canonicalPath: resolution.canonicalPath,
     grant,
-    relativePath: child.split(sep).join('/'),
+    relativePath: child ? child.split(sep).join('/') : '.',
   }
 }
 
@@ -422,24 +343,15 @@ function extensionForImageMimeType(mimeType: string): string {
   return extension
 }
 
-async function isFile(path: string): Promise<boolean> {
-  try {
-    return (await stat(path)).isFile()
-  }
-  catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'ENOENT')
-      return false
-    throw error
-  }
-}
-
 function isSensitivePath(path: string): boolean {
-  const name = basename(path).toLowerCase()
-  const extension = extname(name)
-  return name === '.env'
-    || name.startsWith('.env.')
-    || ['.credential', '.key', '.p12', '.pem'].includes(extension)
-    || ['id_dsa', 'id_ecdsa', 'id_ed25519', 'id_rsa'].includes(name)
+  return path.split('/').some((segment) => {
+    const name = segment.toLowerCase()
+    const extension = extname(name)
+    return name === '.env'
+      || name.startsWith('.env.')
+      || ['.credential', '.key', '.p12', '.pem'].includes(extension)
+      || ['id_dsa', 'id_ecdsa', 'id_ed25519', 'id_rsa'].includes(name)
+  })
 }
 
 function mimeTypeFromPath(path: string): string {
