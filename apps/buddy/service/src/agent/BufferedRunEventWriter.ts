@@ -3,6 +3,7 @@ import type { RunEventWriter } from '../events/RunEventPorts'
 import type { BuddyProjectedEvent } from './projectPiEvent'
 import { buddyAssistantTextPhaseSchema } from '../../../shared/assistantTextPhase'
 import { buddyReasoningKindSchema } from '../../../shared/reasoningPresentation'
+import { buddyToolPresentationDeltaSchema } from '../../../shared/runEventPresentation'
 
 export class BufferedRunEventWriter {
   readonly #eventLog: Pick<RunEventWriter, 'appendBatch'>
@@ -24,7 +25,7 @@ export class BufferedRunEventWriter {
 
   append(event: BuddyProjectedEvent): void {
     const timestamped = { ...event, createdAt: this.#timestamp() }
-    if (timestamped.type !== 'message.delta' && timestamped.type !== 'message.block.delta') {
+    if (!isBufferedStreamEvent(timestamped)) {
       this.#flushPending()
       this.#enqueue([timestamped])
       return
@@ -47,10 +48,7 @@ export class BufferedRunEventWriter {
       return
     if (
       events.length === 1
-      || events.some(event => (
-        event.type === 'message.delta'
-        || event.type === 'message.block.delta'
-      ))
+      || events.some(isBufferedStreamEvent)
     ) {
       for (const event of events)
         this.append(event)
@@ -100,6 +98,8 @@ function mergeStreamDelta(
   left: TimestampedBuddyProjectedEvent,
   right: TimestampedBuddyProjectedEvent,
 ): TimestampedBuddyProjectedEvent | null {
+  if (left.type === 'tool.updated' && right.type === 'tool.updated')
+    return mergeToolPresentationDelta(left, right)
   if (left.type === 'message.block.delta' && right.type === 'message.block.delta')
     return mergeMessageBlockDelta(left, right)
   if (left.type !== 'message.delta' || right.type !== 'message.delta')
@@ -126,6 +126,60 @@ function mergeStreamDelta(
     },
     type: 'message.delta',
   }
+}
+
+function mergeToolPresentationDelta(
+  left: TimestampedBuddyProjectedEvent,
+  right: TimestampedBuddyProjectedEvent,
+): TimestampedBuddyProjectedEvent | null {
+  const leftPayload = readToolPresentationDeltaPayload(left.payload)
+  const rightPayload = readToolPresentationDeltaPayload(right.payload)
+  if (
+    !leftPayload
+    || !rightPayload
+    || leftPayload.toolCallId !== rightPayload.toolCallId
+    || leftPayload.toolName !== rightPayload.toolName
+    || leftPayload.delta.outputStart + leftPayload.delta.outputDelta.length
+    !== rightPayload.delta.outputStart
+    || leftPayload.delta.outputDelta.length + rightPayload.delta.outputDelta.length > 64 * 1024
+  ) {
+    return null
+  }
+  return {
+    createdAt: left.createdAt,
+    payload: {
+      presentationDelta: {
+        ...rightPayload.delta,
+        outputDelta: leftPayload.delta.outputDelta + rightPayload.delta.outputDelta,
+        outputStart: leftPayload.delta.outputStart,
+      },
+      toolCallId: leftPayload.toolCallId,
+      toolName: leftPayload.toolName,
+    },
+    type: 'tool.updated',
+  }
+}
+
+function isBufferedStreamEvent(event: BuddyProjectedEvent): boolean {
+  return event.type === 'message.delta'
+    || event.type === 'message.block.delta'
+    || (event.type === 'tool.updated' && readToolPresentationDeltaPayload(event.payload) !== null)
+}
+
+function readToolPresentationDeltaPayload(value: unknown) {
+  if (!value || typeof value !== 'object' || Array.isArray(value))
+    return null
+  const payload = value as Record<string, unknown>
+  const delta = buddyToolPresentationDeltaSchema.safeParse(payload.presentationDelta)
+  return delta.success
+    && typeof payload.toolCallId === 'string'
+    && typeof payload.toolName === 'string'
+    ? {
+        delta: delta.data,
+        toolCallId: payload.toolCallId,
+        toolName: payload.toolName,
+      }
+    : null
 }
 
 function mergeMessageBlockDelta(

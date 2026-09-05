@@ -7,6 +7,7 @@ import type {
   LocalRunEvent,
   LocalRunOutput,
 } from '@buddy-electron/shared/localChatApi'
+import type { ChatRunTranscriptProjection } from './chatRunTranscriptProjector'
 import type {
   ChatAgentTurn,
   ChatRecoveryNotice,
@@ -17,6 +18,8 @@ import {
   projectChatAgentTurns,
   projectChatRecoveryNotices,
   projectStreamingAssistantMessage,
+  selectChatRecoveryNotices,
+  selectChatStreamingMessage,
 } from './chatStreamingMessage'
 
 export interface ChatTranscriptMessageRow {
@@ -68,38 +71,75 @@ export type ChatTranscriptRow
 
 export interface ChatTranscriptProjection {
   rows: ReadonlyArray<ChatTranscriptRow>
+  update: ChatTranscriptProjectionUpdate
 }
 
-export function projectChatTranscript(input: {
+export interface ChatTranscriptRowPatch {
+  deleteCount: 0 | 1
+  index: number
+  rows: ReadonlyArray<ChatTranscriptRow>
+}
+
+export type ChatTranscriptProjectionUpdate
+  = | { kind: 'replace' }
+    | {
+      kind: 'patch'
+      patches: ReadonlyArray<ChatTranscriptRowPatch>
+      previousRows: ReadonlyArray<ChatTranscriptRow>
+    }
+
+export interface ChatTranscriptProjectionInput {
+  agentTurns?: ReadonlyArray<ChatAgentTurn>
   changeSets?: ReadonlyArray<LocalChangeSetSummary>
   outputs: ReadonlyArray<LocalRunOutput>
-  runEvents: ReadonlyArray<LocalRunEvent>
+  runEvents?: ReadonlyArray<LocalRunEvent>
+  runProjections?: ReadonlyArray<ChatRunTranscriptProjection>
   runs: ReadonlyArray<LocalRun>
   timelineItems: ReadonlyArray<LocalConversationTimelineItem>
-}): ChatTranscriptProjection {
+}
+
+interface CachedChatTranscriptProjection {
+  activityRowIndex: number | null
+  activeRunId: string | null
+  agentTurnRowIndexByRunId: ReadonlyMap<string, number>
+  changeSets: ReadonlyArray<LocalChangeSetSummary>
+  messages: ReadonlyArray<LocalMessage>
+  outputs: ReadonlyArray<LocalRunOutput>
+  projection: ChatTranscriptProjection
+  runProjectionIds: ReadonlySet<string>
+  runProjections: ReadonlyArray<ChatRunTranscriptProjection> | null
+  runs: ReadonlyArray<LocalRun>
+  streamingRowIndex: number | null
+  timelineItems: ReadonlyArray<LocalConversationTimelineItem>
+}
+
+const EMPTY_CHANGE_SETS: ReadonlyArray<LocalChangeSetSummary> = []
+
+export function projectChatTranscript(
+  input: ChatTranscriptProjectionInput,
+): ChatTranscriptProjection {
   const messages = input.timelineItems.filter(
     (item): item is Extract<LocalConversationTimelineItem, { kind: 'message' }> =>
       item.kind === 'message',
   )
-  const agentTurns = projectChatAgentTurns(input.runEvents, input.runs)
-  const recoveryNotices = projectChatRecoveryNotices(
-    input.timelineItems,
-    input.runEvents,
-    input.runs,
-  )
-  const streamingMessage = projectStreamingAssistantMessage(
-    messages,
-    input.runEvents,
-    input.runs,
-  )
-  const streamingLocalMessage = streamingMessage
-    ? projectStreamingLocalMessage(
-        streamingMessage.id,
-        streamingMessage.text,
-        input.runEvents,
+  const runEvents = input.runEvents ?? []
+  const agentTurns = input.runProjections?.map(projection => projection.turn)
+    ?? input.agentTurns
+    ?? projectChatAgentTurns(runEvents, input.runs)
+  const recoveryNotices = input.runProjections
+    ? selectChatRecoveryNotices(
+        input.timelineItems,
+        input.runProjections.flatMap(projection => projection.recoveryNotices),
         input.runs,
       )
-    : null
+    : projectChatRecoveryNotices(input.timelineItems, runEvents, input.runs)
+  const streamingLocalMessage = input.runProjections
+    ? selectChatStreamingMessage(
+      messages,
+      input.runProjections.flatMap(projection => projection.streamingMessages),
+      input.runs,
+    )?.message ?? null
+    : projectLegacyStreamingLocalMessage(messages, runEvents, input.runs)
   const triggeringMessageIdByRunId = new Map(
     input.runs.map(run => [run.id, run.triggeringMessageId]),
   )
@@ -163,7 +203,261 @@ export function projectChatTranscript(input: {
     })
   }
 
-  return { rows }
+  return { rows, update: { kind: 'replace' } }
+}
+
+export function createChatTranscriptProjector() {
+  let cached: CachedChatTranscriptProjection | null = null
+
+  return {
+    project(input: ChatTranscriptProjectionInput): ChatTranscriptProjection {
+      const incremental = cached && projectIncrementalChatTranscript(cached, input)
+      if (incremental) {
+        cached = incremental.cache
+        return incremental.projection
+      }
+      const projection = projectChatTranscript(input)
+      cached = createChatTranscriptProjectionCache(input, projection)
+      return projection
+    },
+  }
+}
+
+function projectIncrementalChatTranscript(
+  cached: CachedChatTranscriptProjection,
+  input: ChatTranscriptProjectionInput,
+): {
+  cache: CachedChatTranscriptProjection
+  projection: ChatTranscriptProjection
+} | null {
+  const runProjections = input.runProjections
+  if (
+    !runProjections
+    || !cached.runProjections
+    || cached.timelineItems !== input.timelineItems
+    || cached.runs !== input.runs
+    || cached.outputs !== input.outputs
+    || cached.changeSets !== (input.changeSets ?? EMPTY_CHANGE_SETS)
+    || cached.runProjections.length !== runProjections.length
+  ) {
+    return null
+  }
+
+  const changed: Array<{
+    next: ChatRunTranscriptProjection
+    previous: ChatRunTranscriptProjection
+  }> = []
+  for (let index = 0; index < runProjections.length; index += 1) {
+    const previous = cached.runProjections[index]!
+    const next = runProjections[index]!
+    if (previous.turn.runId !== next.turn.runId)
+      return null
+    if (previous === next)
+      continue
+    if (
+      !hasSameRecoveryNotices(previous, next)
+      || !hasSameTurnRowStructure(previous.turn, next.turn)
+    ) {
+      return null
+    }
+    changed.push({ next, previous })
+  }
+
+  if (changed.length === 0) {
+    return {
+      cache: { ...cached, runProjections },
+      projection: cached.projection,
+    }
+  }
+
+  let rows: ChatTranscriptRow[] | null = null
+  const patches: ChatTranscriptRowPatch[] = []
+  const editableRows = () => rows ??= [...cached.projection.rows]
+  const patchRows = (patch: ChatTranscriptRowPatch) => {
+    editableRows().splice(patch.index, patch.deleteCount, ...patch.rows)
+    patches.push(patch)
+  }
+  for (const { next, previous } of changed) {
+    if (next.turn === previous.turn)
+      continue
+    const rowIndex = cached.agentTurnRowIndexByRunId.get(next.turn.runId)
+    if (rowIndex === undefined)
+      continue
+    const row = cached.projection.rows[rowIndex]
+    if (row?.kind !== 'agent-turn')
+      return null
+    patchRows({
+      deleteCount: 1,
+      index: rowIndex,
+      rows: [{ ...row, turn: next.turn }],
+    })
+  }
+
+  const streamingMessage = selectChatStreamingMessage(
+    cached.messages,
+    runProjections.flatMap(projection => projection.streamingMessages),
+    input.runs,
+  )?.message ?? null
+  let streamingRowIndex = cached.streamingRowIndex
+  let activityRowIndex = cached.activityRowIndex
+  if (streamingMessage) {
+    const nextStreamingRow: ChatTranscriptMessageRow = {
+      isAgentTurnResult: cached.runProjectionIds.has(streamingMessage.runId ?? ''),
+      key: `message:${streamingMessage.id}`,
+      kind: 'message',
+      message: streamingMessage,
+      streaming: true,
+      turnOutputs: null,
+    }
+    if (streamingRowIndex === null) {
+      streamingRowIndex = activityRowIndex ?? cached.projection.rows.length
+      patchRows({
+        deleteCount: 0,
+        index: streamingRowIndex,
+        rows: [nextStreamingRow],
+      })
+      if (activityRowIndex !== null)
+        activityRowIndex += 1
+    }
+    else {
+      patchRows({
+        deleteCount: 1,
+        index: streamingRowIndex,
+        rows: [nextStreamingRow],
+      })
+    }
+  }
+  else if (streamingRowIndex !== null) {
+    patchRows({
+      deleteCount: 1,
+      index: streamingRowIndex,
+      rows: [],
+    })
+    if (activityRowIndex !== null && activityRowIndex > streamingRowIndex)
+      activityRowIndex -= 1
+    streamingRowIndex = null
+  }
+
+  if (activityRowIndex !== null && cached.activeRunId) {
+    const nextActiveTurn = runProjections.find(
+      projection => projection.turn.runId === cached.activeRunId,
+    )?.turn
+    const row = (rows ?? cached.projection.rows)[activityRowIndex]
+    if (!nextActiveTurn || row?.kind !== 'activity')
+      return null
+    if (row.turn !== nextActiveTurn) {
+      patchRows({
+        deleteCount: 1,
+        index: activityRowIndex,
+        rows: [{ ...row, turn: nextActiveTurn }],
+      })
+    }
+  }
+
+  const projection: ChatTranscriptProjection = rows
+    ? {
+        rows,
+        update: {
+          kind: 'patch',
+          patches,
+          previousRows: cached.projection.rows,
+        },
+      }
+    : cached.projection
+  return {
+    cache: {
+      ...cached,
+      activityRowIndex,
+      projection,
+      runProjections,
+      streamingRowIndex,
+    },
+    projection,
+  }
+}
+
+function createChatTranscriptProjectionCache(
+  input: ChatTranscriptProjectionInput,
+  projection: ChatTranscriptProjection,
+): CachedChatTranscriptProjection {
+  const agentTurnRowIndexByRunId = new Map<string, number>()
+  let activityRowIndex: number | null = null
+  let activeRunId: string | null = null
+  let streamingRowIndex: number | null = null
+  projection.rows.forEach((row, index) => {
+    if (row.kind === 'agent-turn') {
+      agentTurnRowIndexByRunId.set(row.turn.runId, index)
+    }
+    else if (row.kind === 'activity') {
+      activityRowIndex = index
+      activeRunId = row.turn.runId
+    }
+    else if (row.kind === 'message' && row.streaming) {
+      streamingRowIndex = index
+    }
+  })
+  const runProjections = input.runProjections ?? null
+  return {
+    activityRowIndex,
+    activeRunId,
+    agentTurnRowIndexByRunId,
+    changeSets: input.changeSets ?? EMPTY_CHANGE_SETS,
+    messages: input.timelineItems.filter(
+      (item): item is Extract<LocalConversationTimelineItem, { kind: 'message' }> =>
+        item.kind === 'message',
+    ),
+    outputs: input.outputs,
+    projection,
+    runProjectionIds: new Set(runProjections?.map(item => item.turn.runId) ?? []),
+    runProjections,
+    runs: input.runs,
+    streamingRowIndex,
+    timelineItems: input.timelineItems,
+  }
+}
+
+function hasSameRecoveryNotices(
+  previous: ChatRunTranscriptProjection,
+  next: ChatRunTranscriptProjection,
+): boolean {
+  return previous.recoveryNotices === next.recoveryNotices
+    || (
+      previous.recoveryNotices.length === next.recoveryNotices.length
+      && previous.recoveryNotices.every((notice, index) => next.recoveryNotices[index] === notice)
+    )
+}
+
+function hasSameTurnRowStructure(previous: ChatAgentTurn, next: ChatAgentTurn): boolean {
+  return previous.runId === next.runId
+    && previous.branchId === next.branchId
+    && previous.triggeringMessageId === next.triggeringMessageId
+    && previous.finalMessageId === next.finalMessageId
+    && previous.startedAt === next.startedAt
+    && previous.status === next.status
+    && shouldShowAgentTurn(previous) === shouldShowAgentTurn(next)
+    && hasSameProcessMessageIds(previous, next)
+}
+
+function hasSameProcessMessageIds(previous: ChatAgentTurn, next: ChatAgentTurn): boolean {
+  const previousIds = previous.nodes.flatMap(node => (
+    node.kind === 'text' && node.messageId !== previous.finalMessageId ? [node.messageId] : []
+  ))
+  const nextIds = next.nodes.flatMap(node => (
+    node.kind === 'text' && node.messageId !== next.finalMessageId ? [node.messageId] : []
+  ))
+  return previousIds.length === nextIds.length
+    && previousIds.every((messageId, index) => nextIds[index] === messageId)
+}
+
+function projectLegacyStreamingLocalMessage(
+  messages: ReadonlyArray<LocalMessage>,
+  events: ReadonlyArray<LocalRunEvent>,
+  runs: ReadonlyArray<LocalRun>,
+): LocalMessage | null {
+  const streamingMessage = projectStreamingAssistantMessage(messages, events, runs)
+  return streamingMessage
+    ? projectStreamingLocalMessage(streamingMessage.id, streamingMessage.text, events, runs)
+    : null
 }
 
 function projectStreamingLocalMessage(

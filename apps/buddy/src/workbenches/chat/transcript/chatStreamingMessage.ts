@@ -7,7 +7,10 @@ import type {
 import type { ApprovalReviewPayload } from '@buddy-shared/approvalReviewPayload'
 import type { BuddyAssistantTextPhase } from '@buddy-shared/assistantTextPhase'
 import type { BuddyReasoningKind } from '@buddy-shared/reasoningPresentation'
-import type { BuddyToolPresentation } from '@buddy-shared/runEventPresentation'
+import type {
+  BuddyToolPresentation,
+  BuddyToolPresentationDelta,
+} from '@buddy-shared/runEventPresentation'
 import type { BuddyRunProgress } from '@buddy-shared/runProgress'
 import { approvalReviewPayloadSchema } from '@buddy-shared/approvalReviewPayload'
 import { buddyAssistantTextPhaseSchema } from '@buddy-shared/assistantTextPhase'
@@ -15,7 +18,10 @@ import {
   buddyReasoningKindSchema,
   resolveBuddyReasoningKind,
 } from '@buddy-shared/reasoningPresentation'
-import { buddyToolPresentationSchema } from '@buddy-shared/runEventPresentation'
+import {
+  buddyToolPresentationDeltaSchema,
+  buddyToolPresentationSchema,
+} from '@buddy-shared/runEventPresentation'
 import { buddyRunProgressSchema } from '@buddy-shared/runProgress'
 
 export { resolveChatAgentTurnOpen } from './chatAgentTurnDisclosure'
@@ -99,6 +105,11 @@ export interface ChatAgentTurn {
   triggeringMessageId: string
 }
 
+export interface ChatProjectionReducer<T> {
+  append: (events: ReadonlyArray<LocalRunEvent>) => void
+  project: () => T
+}
+
 export function projectChatAgentTurns(
   events: ReadonlyArray<LocalRunEvent>,
   runs: ReadonlyArray<LocalRun>,
@@ -114,44 +125,63 @@ export function projectChatAgentTurns(
     .map(run => projectChatAgentTurn(run, eventsByRunId.get(run.id) ?? []))
 }
 
-function projectChatAgentTurn(
+export function projectChatAgentTurn(
   run: LocalRun,
   events: ReadonlyArray<LocalRunEvent>,
 ): ChatAgentTurn {
-  const compactions = new Map<string, ChatAgentCompactionNode & { order: number }>()
-  const reasoning = new Map<string, ChatAgentReasoningNode & { order: number }>()
-  const tools = new Map<string, ChatAgentToolNode & { order: number }>()
+  const reducer = createChatAgentTurnReducer(run)
+  reducer.append(events)
+  return reducer.project()
+}
+
+export function createChatAgentTurnReducer(
+  run: LocalRun,
+): ChatProjectionReducer<ChatAgentTurn> {
+  const compactions = new Map<string, ChatAgentCompactionNode>()
+  const reasoning = new Map<string, ChatAgentReasoningNode>()
+  const tools = new Map<string, ChatAgentToolNode>()
   const approvalTools = new Map<string, string>()
-  const text = new Map<string, ChatAgentNarrationNode & { order: number }>()
+  const text = new Map<string, ChatAgentNarrationNode>()
+  const nodeOrder = new Map<string, number>()
   let activeCompactionId: string | null = null
   let failureMessage: string | null = null
   let finalMessageId: string | null = null
   let progress: BuddyRunProgress | null = null
-  for (const event of events) {
+  let projection: ChatAgentTurn | null = null
+
+  function append(events: ReadonlyArray<LocalRunEvent>) {
+    for (const event of events) {
+      if (canAffectChatAgentTurn(event))
+        projection = null
+      apply(event)
+    }
+  }
+
+  function apply(event: LocalRunEvent) {
     const payload = readPayload(event.payload)
     if (!payload)
-      continue
+      return
     if (event.type === 'run.failed') {
       failureMessage = readString(payload.errorMessage) || null
-      continue
+      return
     }
     if (event.type === 'run.progress') {
       const parsed = buddyRunProgressSchema.safeParse(payload)
       if (parsed.success)
         progress = parsed.data.phase === 'idle' ? null : parsed.data
-      continue
+      return
     }
     if (event.type === 'context.compaction.started') {
       activeCompactionId = `compaction:${run.id}:${event.sequence}`
+      nodeOrder.set(activeCompactionId, event.sequence)
       compactions.set(activeCompactionId, {
         estimatedTokensAfter: null,
         id: activeCompactionId,
         kind: 'compaction',
-        order: event.sequence,
         status: 'running',
         tokensBefore: null,
       })
-      continue
+      return
     }
     if (
       event.type === 'context.compaction.completed'
@@ -160,13 +190,14 @@ function projectChatAgentTurn(
     ) {
       const id = activeCompactionId ?? `compaction:${run.id}:${event.sequence}`
       const current = compactions.get(id)
+      if (!current)
+        nodeOrder.set(id, event.sequence)
       compactions.set(id, {
         estimatedTokensAfter: event.type === 'context.compaction.completed'
           ? readNonnegativeInteger(payload.estimatedTokensAfter)
           : null,
         id,
         kind: 'compaction',
-        order: current?.order ?? event.sequence,
         status: event.type === 'context.compaction.completed'
           ? 'completed'
           : event.type === 'context.compaction.failed'
@@ -177,107 +208,113 @@ function projectChatAgentTurn(
           : null,
       })
       activeCompactionId = null
-      continue
+      return
     }
     if (event.type.startsWith('message.block.')) {
       const messageId = readString(payload.messageId)
       const contentIndex = readNonnegativeInteger(payload.contentIndex)
       if (!messageId || contentIndex === null)
-        continue
+        return
       if (payload.kind === 'text') {
         const phase = readAssistantTextPhase(payload.phase)
         if (phase !== 'commentary')
-          continue
+          return
         const id = `process-text:${messageId}:${contentIndex}`
-        const current = text.get(id) ?? {
+        const current = text.get(id)
+        if (!current)
+          nodeOrder.set(id, event.sequence)
+        const node = current ?? {
           contentIndex,
           id,
           kind: 'text' as const,
           messageId,
-          order: event.sequence,
           phase: 'commentary' as const,
           text: '',
         }
         if (event.type === 'message.block.delta') {
           text.set(id, {
-            ...current,
-            text: current.text + readString(payload.delta),
+            ...node,
+            text: node.text + readString(payload.delta),
           })
         }
         else if (event.type === 'message.block.completed') {
           text.set(id, {
-            ...current,
+            ...node,
             text: readString(payload.content),
           })
         }
         else {
-          text.set(id, current)
+          text.set(id, node)
         }
-        continue
+        return
       }
       if (payload.kind !== 'reasoning')
-        continue
+        return
       const id = `reasoning:${messageId}:${contentIndex}`
       const parsedReasoningKind = buddyReasoningKindSchema.safeParse(payload.reasoningKind)
+      const current = reasoning.get(id)
       const reasoningKind = parsedReasoningKind.success
         ? parsedReasoningKind.data
-        : reasoning.get(id)?.reasoningKind ?? resolveBuddyReasoningKind({ provider: run.providerId })
-      const current = reasoning.get(id) ?? {
+        : current?.reasoningKind ?? resolveBuddyReasoningKind({ provider: run.providerId })
+      if (!current)
+        nodeOrder.set(id, event.sequence)
+      const node = current ?? {
         contentIndex,
         id,
         kind: 'reasoning' as const,
-        order: event.sequence,
         reasoningKind,
         status: 'running' as const,
         text: '',
       }
       if (event.type === 'message.block.delta') {
         reasoning.set(id, {
-          ...current,
+          ...node,
           reasoningKind,
-          text: current.text + readString(payload.delta),
+          text: node.text + readString(payload.delta),
         })
       }
       else if (event.type === 'message.block.completed') {
         reasoning.set(id, {
-          ...current,
+          ...node,
           reasoningKind,
           status: 'completed',
           text: readString(payload.content),
         })
       }
       else {
-        reasoning.set(id, current)
+        reasoning.set(id, node)
       }
-      continue
+      return
     }
     if (event.type === 'message.delta') {
       const phase = readAssistantTextPhase(payload.phase)
       const messageId = readString(payload.messageId)
       const contentIndex = readNonnegativeInteger(payload.contentIndex)
       if (phase !== 'commentary' || !messageId || contentIndex === null)
-        continue
+        return
       const id = `process-text:${messageId}:${contentIndex}`
-      const current = text.get(id) ?? {
+      const current = text.get(id)
+      if (!current)
+        nodeOrder.set(id, event.sequence)
+      const node = current ?? {
         contentIndex,
         id,
         kind: 'text' as const,
         messageId,
-        order: event.sequence,
         phase: 'commentary' as const,
         text: '',
       }
       text.set(id, {
-        ...current,
-        text: current.text + readString(payload.delta),
+        ...node,
+        text: node.text + readString(payload.delta),
       })
-      continue
+      return
     }
     if (event.type === 'message.completed') {
       const messageId = readString(payload.messageId)
       const content = readPayload(payload.content)
       if (!messageId)
-        continue
+        return
       const phase = readAssistantTextPhase(payload.phase)
       if (phase === 'commentary') {
         const value = readString(content?.text)
@@ -290,12 +327,13 @@ function projectChatAgentTurn(
           if (existing.length <= 1) {
             const current = existing[0]
             const id = current?.id ?? `process-text:${messageId}:message`
+            if (!current)
+              nodeOrder.set(id, event.sequence)
             text.set(id, {
               ...current,
               id,
               kind: 'text',
               messageId,
-              order: current?.order ?? event.sequence,
               phase: 'commentary',
               text: value,
             })
@@ -313,11 +351,11 @@ function projectChatAgentTurn(
         ))
         if (normalized && !duplicatesReasoning) {
           const id = `process-text:${messageId}:message`
+          nodeOrder.set(id, event.sequence)
           text.set(id, {
             id,
             kind: 'text',
             messageId,
-            order: event.sequence,
             text: value,
           })
         }
@@ -325,7 +363,7 @@ function projectChatAgentTurn(
       else {
         finalMessageId = messageId
       }
-      continue
+      return
     }
     if (event.type === 'approval.requested') {
       const approvalId = readString(payload.id)
@@ -349,7 +387,6 @@ function projectChatAgentTurn(
               id: `tool:${toolCallId}`,
               isError: false,
               kind: 'tool' as const,
-              order: event.sequence,
               presentation: approvalPresentation(review.data),
               status: 'preparing' as const,
               toolCallId,
@@ -362,13 +399,15 @@ function projectChatAgentTurn(
       if (approvalId && toolCallId)
         approvalTools.set(approvalId, toolCallId)
       if (approvalId && toolCallId && base) {
+        if (!current)
+          nodeOrder.set(base.id, event.sequence)
         tools.set(toolCallId, {
           ...base,
           approvalId,
           status: 'awaiting_approval',
         })
       }
-      continue
+      return
     }
     if (event.type === 'approval.resolved') {
       const approvalId = readString(payload.id)
@@ -386,7 +425,7 @@ function projectChatAgentTurn(
           status,
         })
       }
-      continue
+      return
     }
     if (event.type === 'tool.denied') {
       const toolCallId = readString(payload.toolCallId)
@@ -400,7 +439,7 @@ function projectChatAgentTurn(
           status: 'denied',
         })
       }
-      continue
+      return
     }
     if (
       event.type === 'tool.preparing'
@@ -410,26 +449,30 @@ function projectChatAgentTurn(
     ) {
       const toolCallId = readString(payload.toolCallId)
       const toolName = readString(payload.toolName)
-      const presentation = buddyToolPresentationSchema.safeParse(payload.presentation)
-      if (!toolCallId || !toolName || !presentation.success)
-        continue
+      if (!toolCallId || !toolName)
+        return
       const current = tools.get(toolCallId)
+      const presentation = readToolPresentationUpdate(payload, current?.presentation)
+      if (!presentation)
+        return
       const isError = event.type === 'tool.completed' && payload.isError === true
       const narration = current ? null : [...text.values()].at(-1)
       const toolNarration = narration?.phase === 'commentary' ? null : narration
-      const isStructuredTool = presentation.data.card === 'automation'
-        || presentation.data.card === 'directory-authorization'
-        || presentation.data.card === 'system'
+      const isStructuredTool = presentation.card === 'automation'
+        || presentation.card === 'directory-authorization'
+        || presentation.card === 'system'
       const description = isStructuredTool
         ? null
         : current?.description
           ?? toolNarration?.text
           ?? specificToolDescription(
-            'description' in presentation.data ? presentation.data.description : null,
+            'description' in presentation ? presentation.description : null,
           )
           ?? null
       if (!isStructuredTool && toolNarration && description === toolNarration.text)
         text.delete(toolNarration.id)
+      if (!current)
+        nodeOrder.set(`tool:${toolCallId}`, event.sequence)
       tools.set(toolCallId, {
         ...(current?.approvalId ? { approvalId: current.approvalId } : {}),
         ...(current?.denialCode ? { denialCode: current.denialCode } : {}),
@@ -437,8 +480,7 @@ function projectChatAgentTurn(
         id: `tool:${toolCallId}`,
         isError: isError || Boolean(current?.denialCode),
         kind: 'tool',
-        order: current?.order ?? event.sequence,
-        presentation: presentation.data,
+        presentation,
         status: current?.status === 'denied' || current?.status === 'interrupted'
           ? current.status
           : event.type === 'tool.completed'
@@ -453,42 +495,100 @@ function projectChatAgentTurn(
       })
     }
   }
-  const terminal = run.status !== 'queued' && run.status !== 'running'
-  const reasoningNodes = [...reasoning.values()].filter(node => node.text.trim())
-  const narrationNodes = [...text.values()].filter(node => node.text.trim())
-  const awaitingApproval = [...tools.values()]
-    .filter(node => node.status === 'awaiting_approval')
-    .sort((left, right) => right.order - left.order)[0]
-  const nodes = [...reasoningNodes, ...narrationNodes, ...tools.values(), ...compactions.values()]
-    .sort((left, right) => left.order - right.order)
-    .map(({ order: _order, ...node }) => {
-      if (
-        node.kind === 'text'
-        || !terminal
-        || (node.status !== 'preparing' && node.status !== 'running')
-      ) {
-        return node
-      }
-      return { ...node, status: 'interrupted' as const }
-    })
+
+  function readToolPresentationUpdate(
+    payload: Record<string, unknown>,
+    current: BuddyToolPresentation | undefined,
+  ): BuddyToolPresentation | null {
+    const presentation = buddyToolPresentationSchema.safeParse(payload.presentation)
+    if (presentation.success)
+      return presentation.data
+    const delta = buddyToolPresentationDeltaSchema.safeParse(payload.presentationDelta)
+    if (!delta.success || current?.card !== 'terminal')
+      return null
+    return appendTerminalPresentationDelta(current, delta.data)
+  }
+
+  function readNodeOrder(node: ChatAgentTurnNode): number {
+    return nodeOrder.get(node.id) ?? Number.MAX_SAFE_INTEGER
+  }
+
+  function project(): ChatAgentTurn {
+    if (projection)
+      return projection
+    const terminal = run.status !== 'queued' && run.status !== 'running'
+    const reasoningNodes = [...reasoning.values()].filter(node => node.text.trim())
+    const narrationNodes = [...text.values()].filter(node => node.text.trim())
+    const awaitingApproval = [...tools.values()]
+      .filter(node => node.status === 'awaiting_approval')
+      .sort((left, right) => readNodeOrder(right) - readNodeOrder(left))[0]
+    const nodes = [...reasoningNodes, ...narrationNodes, ...tools.values(), ...compactions.values()]
+      .sort((left, right) => readNodeOrder(left) - readNodeOrder(right))
+      .map((node) => {
+        if (
+          node.kind === 'text'
+          || !terminal
+          || (node.status !== 'preparing' && node.status !== 'running')
+        ) {
+          return node
+        }
+        return { ...node, status: 'interrupted' as const }
+      })
+    projection = {
+      branchId: run.branchId,
+      completedAt: run.completedAt,
+      ...(run.status === 'failed'
+        ? { failureCode: run.errorCode, failureMessage }
+        : {}),
+      finalMessageId,
+      nodes,
+      progress: terminal
+        ? null
+        : awaitingApproval
+          ? { phase: 'awaiting_approval', toolName: awaitingApproval.toolName }
+          : progress,
+      reasoningLevel: run.reasoningLevel,
+      runId: run.id,
+      startedAt: run.startedAt,
+      status: run.status,
+      triggeringMessageId: run.triggeringMessageId,
+    }
+    return projection
+  }
+
+  return { append, project }
+}
+
+function canAffectChatAgentTurn(event: LocalRunEvent): boolean {
+  const payload = readPayload(event.payload)
+  if (!payload)
+    return false
+  if (event.type === 'message.delta')
+    return readAssistantTextPhase(payload.phase) === 'commentary'
+  if (event.type.startsWith('message.block.')) {
+    return payload.kind === 'reasoning'
+      || (payload.kind === 'text' && readAssistantTextPhase(payload.phase) === 'commentary')
+  }
+  return event.type === 'run.failed'
+    || event.type === 'run.progress'
+    || event.type.startsWith('context.compaction.')
+    || event.type === 'message.completed'
+    || event.type.startsWith('approval.')
+    || event.type.startsWith('tool.')
+}
+
+function appendTerminalPresentationDelta(
+  current: Extract<BuddyToolPresentation, { card: 'terminal' }>,
+  delta: BuddyToolPresentationDelta,
+): BuddyToolPresentation | null {
+  const output = current.output ?? ''
+  if (output.length !== delta.outputStart)
+    return null
+  const nextOutput = output + delta.outputDelta
   return {
-    branchId: run.branchId,
-    completedAt: run.completedAt,
-    ...(run.status === 'failed'
-      ? { failureCode: run.errorCode, failureMessage }
-      : {}),
-    finalMessageId,
-    nodes,
-    progress: terminal
-      ? null
-      : awaitingApproval
-        ? { phase: 'awaiting_approval', toolName: awaitingApproval.toolName }
-        : progress,
-    reasoningLevel: run.reasoningLevel,
-    runId: run.id,
-    startedAt: run.startedAt,
-    status: run.status,
-    triggeringMessageId: run.triggeringMessageId,
+    ...current,
+    output: nextOutput || null,
+    truncated: delta.truncated,
   }
 }
 
@@ -519,6 +619,44 @@ export function projectChatAgentTurnRows(nodes: ReadonlyArray<ChatAgentTurnNode>
   }
   flushReasoning()
   return rows
+}
+
+export function createChatAgentTurnRowProjector() {
+  let source: ReadonlyArray<ChatAgentTurnNode> | null = null
+  let rows: ReadonlyArray<ChatAgentTurnRow> = []
+
+  function project(nodes: ReadonlyArray<ChatAgentTurnNode>): ReadonlyArray<ChatAgentTurnRow> {
+    if (nodes === source)
+      return rows
+    const previousById = new Map(rows.map(row => [row.id, row]))
+    rows = projectChatAgentTurnRows(nodes).map((row) => {
+      const previous = previousById.get(row.id)
+      return previous && isSameChatAgentTurnRow(previous, row) ? previous : row
+    })
+    source = nodes
+    return rows
+  }
+
+  return { project }
+}
+
+function isSameChatAgentTurnRow(
+  previous: ChatAgentTurnRow,
+  current: ChatAgentTurnRow,
+): boolean {
+  if (previous === current)
+    return true
+  if (previous.kind !== 'reasoning-group' || current.kind !== 'reasoning-group')
+    return false
+  return previous.reasoningKind === current.reasoningKind
+    && previous.entries.length === current.entries.length
+    && previous.entries.every((entry, index) => {
+      const currentEntry = current.entries[index]
+      return currentEntry !== undefined
+        && entry.id === currentEntry.id
+        && entry.summary === currentEntry.summary
+        && entry.detail === currentEntry.detail
+    })
 }
 
 const GENERIC_TOOL_DESCRIPTIONS = new Set([
@@ -642,6 +780,13 @@ export interface StreamingAssistantMessage {
   text: string
 }
 
+export interface ChatRunStreamingMessage {
+  message: LocalMessage
+  orderCreatedAt: string
+  orderSequence: number
+  text: string
+}
+
 export function projectLatestRunActivity(
   events: ReadonlyArray<LocalRunEvent>,
   runs: ReadonlyArray<LocalRun>,
@@ -668,35 +813,69 @@ export function projectChatRecoveryNotices(
   events: ReadonlyArray<LocalRunEvent>,
   runs: ReadonlyArray<LocalRun>,
 ): ReadonlyArray<ChatRecoveryNotice> {
-  const loadedMessageIds = new Set(timelineItems.flatMap(item =>
-    item.kind === 'message' ? [item.id] : [],
-  ))
-  const runById = new Map(runs.map(run => [run.id, run]))
-
-  return events.flatMap((event): ChatRecoveryNotice[] => {
-    if (event.type !== 'session.recovery.degraded')
-      return []
-    const run = runById.get(event.runId)
-    if (!run || !loadedMessageIds.has(run.triggeringMessageId))
-      return []
-    const payload = readPayload(event.payload)
-    const missingAttachmentCount = payload?.missingAttachmentCount
-    if (
-      typeof missingAttachmentCount !== 'number'
-      || !Number.isSafeInteger(missingAttachmentCount)
-      || missingAttachmentCount <= 0
-    ) {
-      return []
-    }
-    return [{
-      createdAt: event.createdAt,
-      missingAttachmentCount,
-      runId: event.runId,
-      sequence: event.sequence,
-    }]
-  }).sort((left, right) =>
-    left.createdAt.localeCompare(right.createdAt) || left.sequence - right.sequence,
+  return selectChatRecoveryNotices(
+    timelineItems,
+    projectChatRunRecoveryNotices(events),
+    runs,
   )
+}
+
+export function projectChatRunRecoveryNotices(
+  events: ReadonlyArray<LocalRunEvent>,
+): ReadonlyArray<ChatRecoveryNotice> {
+  const reducer = createChatRunRecoveryNoticeReducer()
+  reducer.append(events)
+  return reducer.project()
+}
+
+export function createChatRunRecoveryNoticeReducer(): ChatProjectionReducer<ReadonlyArray<ChatRecoveryNotice>> {
+  let notices: ReadonlyArray<ChatRecoveryNotice> = []
+
+  function append(events: ReadonlyArray<LocalRunEvent>) {
+    const appended = events.flatMap((event): ChatRecoveryNotice[] => {
+      if (event.type !== 'session.recovery.degraded')
+        return []
+      const payload = readPayload(event.payload)
+      const missingAttachmentCount = payload?.missingAttachmentCount
+      if (
+        typeof missingAttachmentCount !== 'number'
+        || !Number.isSafeInteger(missingAttachmentCount)
+        || missingAttachmentCount <= 0
+      ) {
+        return []
+      }
+      return [{
+        createdAt: event.createdAt,
+        missingAttachmentCount,
+        runId: event.runId,
+        sequence: event.sequence,
+      }]
+    })
+    if (appended.length > 0)
+      notices = [...notices, ...appended]
+  }
+
+  return {
+    append,
+    project: () => notices,
+  }
+}
+
+export function selectChatRecoveryNotices(
+  timelineItems: ReadonlyArray<LocalConversationTimelineItem>,
+  notices: ReadonlyArray<ChatRecoveryNotice>,
+  runs: ReadonlyArray<LocalRun>,
+): ReadonlyArray<ChatRecoveryNotice> {
+  const loadedMessageIds = new Set(timelineItems.flatMap(item => (
+    item.kind === 'message' ? [item.id] : []
+  )))
+  const runById = new Map(runs.map(run => [run.id, run]))
+  return notices.filter((notice) => {
+    const run = runById.get(notice.runId)
+    return !!run && loadedMessageIds.has(run.triggeringMessageId)
+  }).sort((left, right) => (
+    left.createdAt.localeCompare(right.createdAt) || left.sequence - right.sequence
+  ))
 }
 
 export function projectStreamingAssistantMessage(
@@ -704,52 +883,158 @@ export function projectStreamingAssistantMessage(
   events: ReadonlyArray<LocalRunEvent>,
   runs: ReadonlyArray<LocalRun>,
 ): StreamingAssistantMessage | null {
-  const persistedIds = new Set(messages.map(message => message.id))
-  const runById = new Map(runs.map(run => [run.id, run]))
-  const candidates = new Map<string, StreamingAssistantMessage>()
+  const eventsByRunId = new Map<string, LocalRunEvent[]>()
   for (const event of events) {
-    const run = runById.get(event.runId)
-    const isActive = run?.status === 'queued' || run?.status === 'running'
-    const isPendingPersistedFinal = event.type === 'message.completed'
-      && !!run
-      && persistedIds.has(run.triggeringMessageId)
-    if (!isActive && !isPendingPersistedFinal)
-      continue
-    const payload = readPayload(event.payload)
-    if (!payload)
-      continue
-    const messageId = typeof payload?.messageId === 'string' ? payload.messageId : null
-    if (!messageId || persistedIds.has(messageId))
-      continue
-    if (event.type === 'message.started') {
-      candidates.set(messageId, { id: messageId, text: '' })
-      continue
-    }
-    if (event.type === 'message.delta') {
-      if (readAssistantTextPhase(payload.phase) === 'commentary') {
-        candidates.delete(messageId)
+    const runEvents = eventsByRunId.get(event.runId) ?? []
+    runEvents.push(event)
+    eventsByRunId.set(event.runId, runEvents)
+  }
+  const latest = selectChatStreamingMessage(
+    messages,
+    runs.flatMap(run => projectChatRunStreamingMessages(
+      run,
+      eventsByRunId.get(run.id) ?? [],
+    )),
+    runs,
+  )
+  return latest
+    ? { id: latest.message.id, text: latest.text }
+    : null
+}
+
+export function projectChatRunStreamingMessages(
+  run: LocalRun,
+  events: ReadonlyArray<LocalRunEvent>,
+): ReadonlyArray<ChatRunStreamingMessage> {
+  const reducer = createChatRunStreamingMessageReducer(run)
+  reducer.append(events)
+  return reducer.project()
+}
+
+export function createChatRunStreamingMessageReducer(
+  run: LocalRun,
+): ChatProjectionReducer<ReadonlyArray<ChatRunStreamingMessage>> {
+  const isActive = run.status === 'queued' || run.status === 'running'
+  const messageStartedAtById = new Map<string, string>()
+  const candidates = new Map<string, {
+    orderCreatedAt: string
+    orderSequence: number
+    sourceCreatedAt: string
+    text: string
+  }>()
+
+  function append(events: ReadonlyArray<LocalRunEvent>) {
+    for (const event of events) {
+      const payload = readPayload(event.payload)
+      if (!payload)
+        continue
+      const messageId = typeof payload.messageId === 'string' ? payload.messageId : null
+      if (!messageId)
+        continue
+      if (event.type === 'message.started') {
+        if (!messageStartedAtById.has(messageId))
+          messageStartedAtById.set(messageId, event.createdAt)
+        if (!isActive)
+          continue
+        const current = candidates.get(messageId)
+        candidates.set(messageId, {
+          orderCreatedAt: current?.orderCreatedAt ?? event.createdAt,
+          orderSequence: current?.orderSequence ?? event.sequence,
+          sourceCreatedAt: event.createdAt,
+          text: '',
+        })
         continue
       }
-      const delta = typeof payload.delta === 'string' ? payload.delta : ''
-      const current = candidates.get(messageId) ?? { id: messageId, text: '' }
-      candidates.set(messageId, { ...current, text: current.text + delta })
-      continue
-    }
-    if (event.type === 'message.completed') {
-      const phase = readAssistantTextPhase(payload.phase)
-      if (phase === 'commentary' || (!phase && payload.stopReason === 'tool_use')) {
-        candidates.delete(messageId)
+      if (!isActive && event.type !== 'message.completed')
+        continue
+      if (event.type === 'message.delta') {
+        if (readAssistantTextPhase(payload.phase) === 'commentary') {
+          candidates.delete(messageId)
+          continue
+        }
+        const delta = typeof payload.delta === 'string' ? payload.delta : ''
+        const current = candidates.get(messageId)
+        candidates.set(messageId, {
+          orderCreatedAt: current?.orderCreatedAt ?? event.createdAt,
+          orderSequence: current?.orderSequence ?? event.sequence,
+          sourceCreatedAt: event.createdAt,
+          text: (current?.text ?? '') + delta,
+        })
         continue
       }
-      const content = readPayload(payload.content)
-      const text = typeof content?.text === 'string'
-        ? content.text
-        : candidates.get(messageId)?.text ?? ''
-      candidates.set(messageId, { id: messageId, text })
+      if (event.type === 'message.completed') {
+        const phase = readAssistantTextPhase(payload.phase)
+        if (phase === 'commentary' || (!phase && payload.stopReason === 'tool_use')) {
+          candidates.delete(messageId)
+          continue
+        }
+        const content = readPayload(payload.content)
+        const text = typeof content?.text === 'string'
+          ? content.text
+          : candidates.get(messageId)?.text ?? ''
+        const current = candidates.get(messageId)
+        candidates.set(messageId, {
+          orderCreatedAt: current?.orderCreatedAt ?? event.createdAt,
+          orderSequence: current?.orderSequence ?? event.sequence,
+          sourceCreatedAt: event.createdAt,
+          text,
+        })
+      }
     }
   }
-  const latest = [...candidates.values()].at(-1)
-  return latest?.text.trim() ? latest : null
+
+  function project(): ReadonlyArray<ChatRunStreamingMessage> {
+    return [...candidates.entries()].flatMap(([messageId, candidate]): ChatRunStreamingMessage[] => {
+      if (!candidate.text.trim())
+        return []
+      return [{
+        message: {
+          attachments: [],
+          branchId: run.branchId,
+          content: { text: candidate.text },
+          conversationId: run.conversationId,
+          createdAt: messageStartedAtById.get(messageId) ?? candidate.sourceCreatedAt,
+          id: messageId,
+          role: 'assistant',
+          runId: run.id,
+        },
+        orderCreatedAt: candidate.orderCreatedAt,
+        orderSequence: candidate.orderSequence,
+        text: candidate.text,
+      }]
+    })
+  }
+
+  return { append, project }
+}
+
+export function selectChatStreamingMessage(
+  messages: ReadonlyArray<LocalMessage>,
+  candidates: ReadonlyArray<ChatRunStreamingMessage>,
+  runs: ReadonlyArray<LocalRun>,
+): ChatRunStreamingMessage | null {
+  const persistedMessageIds = new Set(messages.map(message => message.id))
+  const loadedMessageIds = new Set(persistedMessageIds)
+  const runById = new Map(runs.map(run => [run.id, run]))
+  const latest = candidates.filter((candidate) => {
+    if (persistedMessageIds.has(candidate.message.id) || !candidate.message.runId)
+      return false
+    const run = runById.get(candidate.message.runId)
+    return !!run && (
+      run.status === 'queued'
+      || run.status === 'running'
+      || loadedMessageIds.has(run.triggeringMessageId)
+    )
+  }).sort(compareRunStreamingMessages).at(-1)
+  return latest ?? null
+}
+
+function compareRunStreamingMessages(
+  left: ChatRunStreamingMessage,
+  right: ChatRunStreamingMessage,
+): number {
+  return left.orderCreatedAt.localeCompare(right.orderCreatedAt)
+    || left.orderSequence - right.orderSequence
 }
 
 function readPayload(value: unknown): Record<string, unknown> | null {

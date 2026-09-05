@@ -8,16 +8,13 @@ import { computed } from 'vue'
 import { useBuddyI18n } from '@/i18n/buddyI18n'
 import BuddyChatActionToolbar from './BuddyChatActionToolbar.vue'
 import BuddyChatAgentIdentity from './BuddyChatAgentIdentity.vue'
-import BuddyChatCompactionRow from './BuddyChatCompactionRow.vue'
-import BuddyChatReasoningGroup from './BuddyChatReasoningGroup.vue'
-import BuddyChatToolRow from './BuddyChatToolRow.vue'
+import BuddyChatAgentTurnFlow from './BuddyChatAgentTurnFlow.vue'
 import {
   resolveChatAgentTurnFailurePresentation,
   resolveChatAgentTurnNotice,
 } from './chatAgentTurnDisclosure'
 import { projectChatAgentTurnActions } from './chatMessageActions'
 import { formatChatRunDuration } from './chatRunDuration'
-import { projectChatAgentTurnRows } from './chatStreamingMessage'
 
 const props = defineProps<{
   actionsDisabled?: boolean
@@ -42,7 +39,6 @@ const duration = computed(() => formatChatRunDuration(
   Date.now(),
 ))
 const statusLabel = computed(() => t(`run.status.${props.turn.status}`))
-const rows = computed(() => projectChatAgentTurnRows(props.turn.nodes))
 const notice = computed(() => resolveChatAgentTurnNotice(
   props.turn.status,
   props.turn.failureMessage ?? null,
@@ -66,7 +62,7 @@ const resultNoticeText = computed(() => {
 
 const failureDetailText = computed(() => failurePresentation.value?.detail ?? null)
 const canToggleProcess = computed(() => (
-  rows.value.length > 0
+  props.turn.nodes.length > 0
   || failureDetailText.value !== null
 ))
 const hasVisibleProcess = computed(() => (
@@ -115,35 +111,12 @@ const actionCopyText = computed(() => resultNoticeText.value ?? statusLabel.valu
         />
       </button>
     </div>
-    <div
-      v-show="hasVisibleProcess"
-      class="buddy-chat-agent-turn__flow"
-    >
-      <template v-for="row in rows" :key="row.id">
-        <BuddyChatReasoningGroup
-          v-if="row.kind === 'reasoning-group'"
-          :group="row"
-          :language="language"
-        />
-        <BuddyChatCompactionRow
-          v-else-if="row.kind === 'compaction'"
-          :language="language"
-          :node="row"
-        />
-        <BuddyChatToolRow
-          v-else-if="row.kind === 'tool'"
-          :language="language"
-          :node="row"
-        />
-        <p v-else class="buddy-chat-agent-turn__text">
-          {{ row.text }}
-        </p>
-      </template>
-      <p v-if="failureDetailText" class="buddy-chat-agent-turn__failure-detail">
-        <span>{{ t('desktop.chat.failureDetail') }}</span>
-        {{ failureDetailText }}
-      </p>
-    </div>
+    <BuddyChatAgentTurnFlow
+      v-if="hasVisibleProcess"
+      :failure-detail-text="failureDetailText"
+      :language="language"
+      :nodes="turn.nodes"
+    />
     <p
       v-if="resultNoticeText"
       class="buddy-chat-agent-turn__result"
@@ -235,38 +208,12 @@ const actionCopyText = computed(() => resultNoticeText.value ?? statusLabel.valu
   color: var(--buddy-chat-danger-color);
 }
 
-.buddy-chat-agent-turn__flow {
-  display: grid;
-  min-width: 0;
-  gap: var(--buddy-chat-process-row-gap);
-  margin-top: var(--buddy-chat-gap-block);
-}
-
-.buddy-chat-agent-turn__text,
 .buddy-chat-agent-turn__result {
-  margin: 0;
+  margin: var(--buddy-chat-gap-section) 0 0;
   color: var(--buddy-chat-tool-body-color);
   font-size: 14px;
   line-height: 1.6;
   white-space: pre-wrap;
-}
-
-.buddy-chat-agent-turn__failure-detail {
-  margin: 0;
-  color: var(--buddy-chat-meta-color);
-  font-size: var(--buddy-chat-meta-font-size);
-  line-height: var(--buddy-chat-meta-line-height);
-  overflow-wrap: anywhere;
-  white-space: pre-wrap;
-
-  span {
-    color: var(--buddy-chat-process-color);
-    font-weight: 600;
-  }
-}
-
-.buddy-chat-agent-turn__result {
-  margin-top: var(--buddy-chat-gap-section);
 
   &.is-failure {
     color: var(--buddy-chat-danger-color);

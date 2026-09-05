@@ -16,7 +16,6 @@ interface ToolDetailSection {
 }
 
 const props = defineProps<{
-  expanded: boolean
   language: BuddyLocale
   presentation: BuddyToolPresentation
   status: ChatAgentToolNode['status']
@@ -140,7 +139,7 @@ function section(
         </div>
       </dl>
     </section>
-    <section v-if="terminal && expanded" class="buddy-chat-terminal-card">
+    <section v-if="terminal" class="buddy-chat-terminal-card">
       <DesktopTerminalTranscript
         :command="terminal.command"
         :output="terminalOutput"

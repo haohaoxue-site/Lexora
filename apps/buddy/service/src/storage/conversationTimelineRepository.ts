@@ -79,6 +79,13 @@ interface ConversationTimelineRow {
   sort_rank: number
 }
 
+interface ConversationTimelineRowsPage {
+  descending: ConversationTimelineRow[]
+  hasMore: boolean
+}
+
+const MAX_TIMELINE_PAGE_ITEM_COUNT = 1_000
+
 export function createConversationTimelineRepository(
   database: DatabaseSync,
   branches: ConversationBranchLineage,
@@ -87,6 +94,11 @@ export function createConversationTimelineRepository(
   const findCompactionRun = database.prepare(`
     SELECT * FROM runs
     WHERE id = ? AND purpose = 'conversation.compaction'
+  `)
+  const findTriggeringMessageForRun = database.prepare(`
+    SELECT messages.* FROM runs
+    INNER JOIN messages ON messages.id = runs.triggering_message_id
+    WHERE runs.id = ?
   `)
   const timelineProjection = `
     SELECT
@@ -158,6 +170,57 @@ export function createConversationTimelineRepository(
     LIMIT ?
   `)
 
+  const listTimelineRowsPage = (
+    conversationId: string,
+    segments: VisibleConversationBranchSegment[],
+    boundary: ConversationTimelineRow | null,
+    limit: number,
+  ): ConversationTimelineRowsPage => {
+    const segmentIndex = boundary
+      ? segments.findIndex(segment => segment.branchId === boundary.branch_id)
+      : segments.length - 1
+    const descending: ConversationTimelineRow[] = []
+    for (let index = segmentIndex; index >= 0 && descending.length <= limit; index -= 1) {
+      const segment = segments[index]!
+      const remaining = limit + 1 - descending.length
+      const common = [
+        conversationId,
+        segment.branchId,
+        conversationId,
+        segment.branchId,
+      ] as const
+      const rows = boundary && index === segmentIndex
+        ? listTimelineForBranchBefore.all(
+          ...common,
+          boundary.occurred_at,
+          boundary.occurred_at,
+          boundary.sort_rank,
+          boundary.sort_rank,
+          boundary.id,
+          remaining,
+        ) as unknown as ConversationTimelineRow[]
+        : segment.throughMessage
+          ? listTimelineForBranchThrough.all(
+            ...common,
+            segment.throughMessage.createdAt,
+            segment.throughMessage.createdAt,
+            0,
+            0,
+            segment.throughMessage.id,
+            remaining,
+          ) as unknown as ConversationTimelineRow[]
+          : listNewestTimelineForBranch.all(
+            ...common,
+            remaining,
+          ) as unknown as ConversationTimelineRow[]
+      descending.push(...rows)
+    }
+    return {
+      descending: descending.slice(0, limit),
+      hasMore: descending.length > limit,
+    }
+  }
+
   return {
     listTimelinePage(conversationId, branchId, options) {
       if (options.limit <= 0)
@@ -166,9 +229,8 @@ export function createConversationTimelineRepository(
       const boundary = options.before
         ? resolveTimelineBoundary(options.before, findMessage, findCompactionRun)
         : null
-      let segmentIndex = segments.length - 1
       if (options.before) {
-        segmentIndex = boundary
+        const segmentIndex = boundary
           ? segments.findIndex(segment => segment.branchId === boundary.branch_id)
           : -1
         const segment = segmentIndex >= 0 ? segments[segmentIndex] : null
@@ -184,44 +246,51 @@ export function createConversationTimelineRepository(
           throw new ConversationTimelineRepositoryError()
         }
       }
-      const descending: ConversationTimelineRow[] = []
-      for (let index = segmentIndex; index >= 0 && descending.length <= options.limit; index -= 1) {
-        const segment = segments[index]!
-        const remaining = options.limit + 1 - descending.length
-        const common = [
+      const initialPage = listTimelineRowsPage(
+        conversationId,
+        segments,
+        boundary,
+        options.limit,
+      )
+      let selected = initialPage.descending.reverse()
+      assertTimelinePageExpansionCapacity(selected.length)
+      let hasMore = initialPage.hasMore
+      const segmentIndexes = new Map(segments.map((segment, index) => [segment.branchId, index]))
+      const triggeringMessages = new Map<string, MessageRow>()
+      while (selected[0]) {
+        const triggeringMessage = findEarliestMissingTriggeringMessage(
+          selected,
           conversationId,
-          segment.branchId,
+          segments,
+          segmentIndexes,
+          triggeringMessages,
+          findTriggeringMessageForRun,
+        )
+        if (!triggeringMessage)
+          break
+        const olderPage = listTimelineRowsPage(
           conversationId,
-          segment.branchId,
-        ] as const
-        const rows = boundary && index === segmentIndex
-          ? listTimelineForBranchBefore.all(
-            ...common,
-            boundary.occurred_at,
-            boundary.occurred_at,
-            boundary.sort_rank,
-            boundary.sort_rank,
-            boundary.id,
-            remaining,
-          ) as unknown as ConversationTimelineRow[]
-          : segment.throughMessage
-            ? listTimelineForBranchThrough.all(
-              ...common,
-              segment.throughMessage.createdAt,
-              segment.throughMessage.createdAt,
-              0,
-              0,
-              segment.throughMessage.id,
-              remaining,
-            ) as unknown as ConversationTimelineRow[]
-            : listNewestTimelineForBranch.all(
-              ...common,
-              remaining,
-            ) as unknown as ConversationTimelineRow[]
-        descending.push(...rows)
+          segments,
+          selected[0],
+          options.limit,
+        )
+        const olderAscending = olderPage.descending.reverse()
+        const triggerIndex = olderAscending.findIndex(row => (
+          row.kind === 'message' && row.id === triggeringMessage.id
+        ))
+        if (triggerIndex >= 0) {
+          const extension = olderAscending.slice(triggerIndex)
+          assertTimelinePageExpansionCapacity(selected.length + extension.length)
+          selected = [...extension, ...selected]
+          hasMore = olderPage.hasMore || triggerIndex > 0
+          continue
+        }
+        if (!olderAscending.length || !olderPage.hasMore)
+          throw new ConversationTimelineRepositoryError('run binding is invalid')
+        assertTimelinePageExpansionCapacity(selected.length + olderAscending.length)
+        selected = [...olderAscending, ...selected]
+        hasMore = true
       }
-      const hasMore = descending.length > options.limit
-      const selected = descending.slice(0, options.limit).reverse()
       return {
         items: selected.map(toTimelineItem),
         nextBefore: hasMore && selected[0]
@@ -232,13 +301,94 @@ export function createConversationTimelineRepository(
   }
 }
 
+function assertTimelinePageExpansionCapacity(itemCount: number): void {
+  if (itemCount > MAX_TIMELINE_PAGE_ITEM_COUNT)
+    throw new ConversationTimelineRepositoryError('turn exceeds timeline page limit')
+}
+
 class ConversationTimelineRepositoryError extends Error {
   readonly code = 'VALIDATION_FAILED'
 
-  constructor() {
-    super('Lexora Buddy conversation timeline cursor is invalid')
+  constructor(reason = 'cursor is invalid') {
+    super(`Lexora Buddy conversation timeline ${reason}`)
     this.name = 'ConversationTimelineRepositoryError'
   }
+}
+
+function findEarliestMissingTriggeringMessage(
+  rows: ConversationTimelineRow[],
+  conversationId: string,
+  segments: VisibleConversationBranchSegment[],
+  segmentIndexes: Map<string, number>,
+  triggeringMessages: Map<string, MessageRow>,
+  findTriggeringMessageForRun: ReturnType<DatabaseSync['prepare']>,
+): MessageRow | null {
+  const selectedMessageIds = new Set(rows.flatMap(row => (
+    row.kind === 'message' ? [row.id] : []
+  )))
+  let earliest: MessageRow | null = null
+  for (const row of rows) {
+    if (row.kind !== 'message' || !row.run_id)
+      continue
+    let triggeringMessage = triggeringMessages.get(row.run_id)
+    if (!triggeringMessage) {
+      triggeringMessage = findTriggeringMessageForRun.get(row.run_id) as MessageRow | undefined
+      if (!triggeringMessage)
+        throw new ConversationTimelineRepositoryError('run binding is invalid')
+      triggeringMessages.set(row.run_id, triggeringMessage)
+    }
+    assertVisibleTriggeringMessage(triggeringMessage, conversationId, segments, segmentIndexes)
+    if (selectedMessageIds.has(triggeringMessage.id))
+      continue
+    if (!earliest || compareVisibleTimelineOrder(
+      toMessageTimelineRow(triggeringMessage),
+      toMessageTimelineRow(earliest),
+      segmentIndexes,
+    ) < 0) {
+      earliest = triggeringMessage
+    }
+  }
+  if (
+    earliest
+    && rows[0]
+    && compareVisibleTimelineOrder(
+      toMessageTimelineRow(earliest),
+      rows[0],
+      segmentIndexes,
+    ) >= 0
+  ) {
+    throw new ConversationTimelineRepositoryError('run binding is invalid')
+  }
+  return earliest
+}
+
+function assertVisibleTriggeringMessage(
+  message: MessageRow,
+  conversationId: string,
+  segments: VisibleConversationBranchSegment[],
+  segmentIndexes: Map<string, number>,
+): void {
+  const segmentIndex = segmentIndexes.get(message.branch_id)
+  const segment = segmentIndex === undefined ? null : segments[segmentIndex]
+  if (
+    message.conversation_id !== conversationId
+    || !segment
+    || (segment.throughMessage && compareTimelineOrder(
+      toMessageTimelineRow(message),
+      toMessageTimelineBoundary(segment.throughMessage),
+    ) > 0)
+  ) {
+    throw new ConversationTimelineRepositoryError('run binding is invalid')
+  }
+}
+
+function compareVisibleTimelineOrder(
+  left: ConversationTimelineRow,
+  right: ConversationTimelineRow,
+  segmentIndexes: Map<string, number>,
+): number {
+  return (segmentIndexes.get(left.branch_id) ?? -1) - (segmentIndexes.get(right.branch_id) ?? -1)
+    || compareTimelineOrder(left, right)
 }
 
 function resolveTimelineBoundary(

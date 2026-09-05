@@ -5,6 +5,7 @@ import type { UsageService } from '../usage/UsageService'
 import type { BuddyContextUsageBreakdown } from './contextUsageBreakdown'
 import { RunEventLogFatalError } from '../events/RunEventFailure'
 import { BufferedRunEventWriter } from './BufferedRunEventWriter'
+import { isPiShellToolName } from './piBuiltinTools'
 import {
   createPiEventProjectionState,
   projectPiEvent,
@@ -14,6 +15,9 @@ import {
 
 type PiEventLog = RunEventWriter
 type PiUsageService = Pick<UsageService, 'record' | 'recordMessage'>
+type PiToolExecutionUpdateEvent = Extract<AgentSessionEvent, { type: 'tool_execution_update' }>
+
+const TERMINAL_TOOL_UPDATE_WINDOW_MS = 25
 
 export interface PiEventBridgeSession {
   getContextUsageBreakdown?: (
@@ -128,6 +132,8 @@ class ActivePiEventChannel implements PiCompactionEventChannel, PiTurnEventChann
   #failureCode: string | undefined
   #failureMessage: string | undefined
   #finalAssistantAnswerProjected = false
+  #pendingTerminalToolUpdates = new Map<string, PiToolExecutionUpdateEvent>()
+  #terminalToolUpdateTimer: NodeJS.Timeout | undefined
 
   constructor(options: ActivePiEventChannelOptions) {
     this.#eventLog = options.eventLog
@@ -157,6 +163,7 @@ class ActivePiEventChannel implements PiCompactionEventChannel, PiTurnEventChann
   }
 
   async flush(): Promise<void> {
+    this.#flushPendingTerminalToolUpdates()
     await this.#eventTail
     await this.#eventWriter.drain()
   }
@@ -185,6 +192,7 @@ class ActivePiEventChannel implements PiCompactionEventChannel, PiTurnEventChann
   }
 
   async settle(): Promise<PiEventBridgeSettlement> {
+    this.#flushPendingTerminalToolUpdates()
     const eventError = await settledError(this.#eventTail)
     const writerError = await settledError(this.#eventWriter.drain())
     return { eventError, writerError }
@@ -192,8 +200,42 @@ class ActivePiEventChannel implements PiCompactionEventChannel, PiTurnEventChann
 
   subscribe(): () => void {
     return this.#session.subscribe((event) => {
-      this.#eventTail = this.#eventTail.then(() => this.#handleEvent(event))
+      if (isTerminalToolExecutionUpdate(event)) {
+        this.#queueTerminalToolUpdate(event)
+        return
+      }
+      this.#flushPendingTerminalToolUpdates()
+      this.#enqueueEvent(event)
     })
+  }
+
+  #enqueueEvent(event: AgentSessionEvent): void {
+    this.#eventTail = this.#eventTail.then(() => this.#handleEvent(event))
+  }
+
+  #flushPendingTerminalToolUpdates(): void {
+    if (this.#terminalToolUpdateTimer) {
+      clearTimeout(this.#terminalToolUpdateTimer)
+      this.#terminalToolUpdateTimer = undefined
+    }
+    if (this.#pendingTerminalToolUpdates.size === 0)
+      return
+    const updates = [...this.#pendingTerminalToolUpdates.values()]
+    this.#pendingTerminalToolUpdates.clear()
+    for (const event of updates)
+      this.#enqueueEvent(event)
+  }
+
+  #queueTerminalToolUpdate(event: PiToolExecutionUpdateEvent): void {
+    this.#pendingTerminalToolUpdates.delete(event.toolCallId)
+    this.#pendingTerminalToolUpdates.set(event.toolCallId, event)
+    if (this.#terminalToolUpdateTimer)
+      return
+    this.#terminalToolUpdateTimer = setTimeout(
+      () => this.#flushPendingTerminalToolUpdates(),
+      TERMINAL_TOOL_UPDATE_WINDOW_MS,
+    )
+    this.#terminalToolUpdateTimer.unref()
   }
 
   async #handleEvent(event: AgentSessionEvent): Promise<void> {
@@ -307,6 +349,12 @@ class ActivePiEventChannel implements PiCompactionEventChannel, PiTurnEventChann
       usage: result.usage,
     })
   }
+}
+
+function isTerminalToolExecutionUpdate(
+  event: AgentSessionEvent,
+): event is PiToolExecutionUpdateEvent {
+  return event.type === 'tool_execution_update' && isPiShellToolName(event.toolName)
 }
 
 async function settledError(promise: Promise<unknown>): Promise<unknown> {

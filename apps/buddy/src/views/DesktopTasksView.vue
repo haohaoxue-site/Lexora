@@ -28,7 +28,7 @@ const taskContext = useTaskContextPanel({
   activeConversationId: chatSession.activeConversationId,
   activeRunId,
   changeSets: tasks.workspace.transcript.changeSets,
-  runEvents: tasks.workspace.transcript.runEvents,
+  runSignalEvents: tasks.workspace.transcript.runSignalEvents,
   runOutputs: tasks.workspace.transcript.runOutputs,
 })
 const conversationSearch = useConversationSearch({

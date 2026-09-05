@@ -9,7 +9,7 @@ interface RunEventCompactionFacts {
   readonly completedBlockKeys: ReadonlySet<string>
   readonly completedMessageIds: ReadonlySet<string>
   readonly completedToolCallIds: ReadonlySet<string>
-  readonly latestToolUpdateSequences: ReadonlyMap<string, number>
+  readonly latestToolReplacementSequences: ReadonlyMap<string, number>
 }
 
 export function createRunEventCompactionPlan(
@@ -33,19 +33,19 @@ export function createRunEventCompactionPlan(
     const toolCallId = readToolCallId(event.payload)
     return toolCallId ? [toolCallId] : []
   }))
-  const latestToolUpdateSequences = new Map<string, number>()
+  const latestToolReplacementSequences = new Map<string, number>()
   for (const event of events) {
-    if (event.type !== 'tool.updated')
+    if (event.type !== 'tool.updated' || isToolPresentationDelta(event.payload))
       continue
     const toolCallId = readToolCallId(event.payload)
     if (toolCallId)
-      latestToolUpdateSequences.set(toolCallId, event.sequence)
+      latestToolReplacementSequences.set(toolCallId, event.sequence)
   }
   const removed = events.filter(event => shouldRemoveRunEvent(event, {
     completedBlockKeys,
     completedMessageIds,
     completedToolCallIds,
-    latestToolUpdateSequences,
+    latestToolReplacementSequences,
   }))
   const removedSequences = new Set(removed.map(event => event.sequence))
   return {
@@ -65,8 +65,17 @@ function shouldRemoveRunEvent(
   if (event.type !== 'tool.updated')
     return false
   const toolCallId = readToolCallId(event.payload) ?? ''
-  return facts.completedToolCallIds.has(toolCallId)
-    || facts.latestToolUpdateSequences.get(toolCallId) !== event.sequence
+  if (facts.completedToolCallIds.has(toolCallId))
+    return true
+  const latestReplacementSequence = facts.latestToolReplacementSequences.get(toolCallId)
+  return isToolPresentationDelta(event.payload)
+    ? latestReplacementSequence !== undefined && event.sequence < latestReplacementSequence
+    : latestReplacementSequence !== event.sequence
+}
+
+function isToolPresentationDelta(value: unknown): boolean {
+  const payload = readRecord(value)
+  return readRecord(payload?.presentationDelta) !== null
 }
 
 function readMessageId(value: unknown): string | null {

@@ -21,7 +21,7 @@ interface UseChatContextUsageOptions {
   executionProfile: Readonly<Ref<BuddyExecutionProfile>>
   models: Readonly<Ref<ReadonlyArray<LocalRuntimeModelOption>>>
   spaceId: Readonly<Ref<string | null>>
-  runEvents: Readonly<Ref<ReadonlyArray<LocalRunEvent>>>
+  runSignalEvents: Readonly<Ref<ReadonlyArray<LocalRunEvent>>>
   runtimeState: Readonly<Ref<LocalBuddyServiceSupervisorState>>
   selectedEffort: Readonly<Ref<BuddyThinkingLevel | null>>
   selectedModel: Readonly<Ref<LocalRuntimeModelOption | null>>
@@ -33,7 +33,7 @@ export function useChatContextUsage(options: UseChatContextUsageOptions) {
   let requestId = 0
 
   const contextUsage = computed(() => createChatContextUsage({
-    events: options.runEvents.value,
+    events: options.runSignalEvents.value,
     models: options.models.value,
     selectedModel: options.selectedModel.value,
     snapshot: snapshot.value,

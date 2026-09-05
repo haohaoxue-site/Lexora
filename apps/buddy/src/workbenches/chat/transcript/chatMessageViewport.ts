@@ -26,6 +26,31 @@ export interface BuddyChatTranscriptViewportHandle extends ChatMessageViewportHa
   scrollBy: (deltaY: number) => void
 }
 
+export function createChatFrameTask(
+  task: () => void,
+  requestFrame: (callback: FrameRequestCallback) => number,
+  cancelFrame: (frameId: number) => void,
+) {
+  let frameId: number | null = null
+
+  return {
+    cancel() {
+      if (frameId === null)
+        return
+      cancelFrame(frameId)
+      frameId = null
+    },
+    schedule() {
+      if (frameId !== null)
+        return
+      frameId = requestFrame(() => {
+        frameId = null
+        task()
+      })
+    },
+  }
+}
+
 const CHAT_TAIL_TOLERANCE_PX = 48
 
 export function isNearChatTail(metrics: ChatMessageScrollMetrics): boolean {

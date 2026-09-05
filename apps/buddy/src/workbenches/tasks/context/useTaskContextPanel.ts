@@ -19,7 +19,7 @@ interface UseTaskContextPanelOptions {
   activeConversationId: Readonly<Ref<string | null>>
   activeRunId: Readonly<Ref<string | null>>
   changeSets: Readonly<Ref<ReadonlyArray<LocalChangeSetSummary>>>
-  runEvents: Readonly<Ref<ReadonlyArray<LocalRunEvent>>>
+  runSignalEvents: Readonly<Ref<ReadonlyArray<LocalRunEvent>>>
   runOutputs: Readonly<Ref<ReadonlyArray<LocalRunOutput>>>
 }
 
@@ -92,11 +92,11 @@ export function useTaskContextPanel(options: UseTaskContextPanelOptions) {
     { immediate: true },
   )
   watch(
-    [options.activeConversationId, options.activeRunId, options.runEvents],
-    ([conversationId, activeRunId, runEvents]) => {
+    [options.activeConversationId, options.activeRunId, options.runSignalEvents],
+    ([conversationId, activeRunId, runSignalEvents]) => {
       if (!conversationId || !activeRunId)
         return
-      for (const event of runEvents) {
+      for (const event of runSignalEvents) {
         const toolCallId = browserOpenToolCallId(event, activeRunId)
         const eventKey = toolCallId ? `${activeRunId}:${toolCallId}` : null
         if (!eventKey || handledBrowserOpenKeys.has(eventKey))
