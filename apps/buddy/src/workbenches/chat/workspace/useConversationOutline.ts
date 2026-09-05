@@ -1,22 +1,23 @@
 import type { LocalMessage } from '@buddy-electron/shared/localChatApi'
 import type { Ref } from 'vue'
+import type { ChatTranscriptProjection } from '@/workbenches/chat/transcript/chatTranscriptProjection'
 import { computed, readonly, shallowRef, watch } from 'vue'
-import {
-  mergeChatOutlineMessages,
-  projectChatOutlineItems,
-} from '@/workbenches/chat/transcript/chatOutline'
+import { createChatOutlineProjector } from '@/workbenches/chat/transcript/chatOutline'
 
 interface UseConversationOutlineOptions {
   activeBranchId: Readonly<Ref<string | null>>
   activeConversationId: Readonly<Ref<string | null>>
-  currentMessages: Readonly<Ref<ReadonlyArray<LocalMessage>>>
   loadMessages: () => Promise<ReadonlyArray<LocalMessage>>
+  transcriptProjection: Readonly<Ref<ChatTranscriptProjection>>
 }
+
+const EMPTY_MESSAGES: ReadonlyArray<LocalMessage> = []
 
 export function useConversationOutline(options: UseConversationOutlineOptions) {
   const isLoading = shallowRef(false)
   const loadedMessages = shallowRef<ReadonlyArray<LocalMessage>>([])
   const loadedScopeKey = shallowRef<string | null>(null)
+  const outlineProjector = createChatOutlineProjector()
   let loadGeneration = 0
 
   const scopeKey = computed(() => {
@@ -24,12 +25,10 @@ export function useConversationOutline(options: UseConversationOutlineOptions) {
     const branchId = options.activeBranchId.value
     return conversationId && branchId ? `${conversationId}:${branchId}` : null
   })
-  const messages = computed(() => (
-    loadedScopeKey.value === scopeKey.value
-      ? mergeChatOutlineMessages(loadedMessages.value, options.currentMessages.value)
-      : options.currentMessages.value
+  const items = computed(() => outlineProjector.project(
+    options.transcriptProjection.value,
+    loadedScopeKey.value === scopeKey.value ? loadedMessages.value : EMPTY_MESSAGES,
   ))
-  const items = computed(() => projectChatOutlineItems(messages.value))
 
   watch(scopeKey, () => reset())
 

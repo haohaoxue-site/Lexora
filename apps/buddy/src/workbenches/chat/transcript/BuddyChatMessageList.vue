@@ -1,16 +1,13 @@
 <script setup lang="ts">
 import type {
-  LocalChangeSetSummary,
-  LocalConversationBranch,
   LocalConversationTimelineItem,
   LocalMessage,
-  LocalRun,
-  LocalRunEvent,
-  LocalRunOutput,
 } from '@buddy-electron/shared/localChatApi'
 import type {
   projectConversationCompactionState,
 } from './chatConversationTimeline'
+import type { ChatMessageBranchNavigator } from './chatMessageBranches'
+import type { ChatTranscriptDisplayRow } from './chatMessageTime'
 import type {
   BuddyChatMessageListHandle,
   BuddyChatTranscriptViewportHandle,
@@ -34,29 +31,23 @@ import { resolveChatAgentTurnOpen } from './chatAgentTurnDisclosure'
 import {
   projectConversationCompaction,
 } from './chatConversationTimeline'
-import { projectChatMessageBranchNavigators } from './chatMessageBranches'
 import {
   formatChatDayDividerLabel,
-  projectChatTranscriptDisplayRows,
 } from './chatMessageTime'
-import { projectChatTranscript } from './chatTranscriptProjection'
 
 const props = defineProps<{
   activeSearchMessageId?: string | null
   activeBranchId: string
   actionsDisabled?: boolean
-  branches: ReadonlyArray<LocalConversationBranch>
-  changeSets?: ReadonlyArray<LocalChangeSetSummary>
+  branchNavigators: ReadonlyMap<string, ChatMessageBranchNavigator>
+  conversationId: string
+  displayRows: ReadonlyArray<ChatTranscriptDisplayRow>
   hasOlderMessages?: boolean
   isLoadingOlderMessages?: boolean
   language: BuddyLocale
   matchingSearchMessageIds?: ReadonlyArray<string>
   outlineItems: ReadonlyArray<ChatOutlineItem>
   outlineLoading: boolean
-  timelineItems: ReadonlyArray<LocalConversationTimelineItem>
-  runEvents?: ReadonlyArray<LocalRunEvent>
-  runOutputs?: ReadonlyArray<LocalRunOutput>
-  runs?: ReadonlyArray<LocalRun>
   showReturnToLatest?: boolean
 }>()
 
@@ -83,24 +74,7 @@ const activeOutlineMessageId = shallowRef<string | null>(null)
 const highlightedOutlineMessageId = shallowRef<string | null>(null)
 let outlineHighlightTimer: number | null = null
 const matchingSearchMessageIds = computed(() => new Set(props.matchingSearchMessageIds ?? []))
-const conversationId = computed(() => props.timelineItems[0]?.conversationId ?? null)
-const transcriptProjection = computed(() => projectChatTranscript({
-  changeSets: props.changeSets ?? [],
-  outputs: props.runOutputs ?? [],
-  runEvents: props.runEvents ?? [],
-  runs: props.runs ?? [],
-  timelineItems: props.timelineItems,
-}))
-const displayRows = computed(
-  () => projectChatTranscriptDisplayRows(transcriptProjection.value.rows),
-)
-const branchNavigators = computed(() => projectChatMessageBranchNavigators(
-  transcriptProjection.value.rows,
-  props.branches,
-  props.activeBranchId,
-))
-
-watch([conversationId, () => props.activeBranchId], () => {
+watch([() => props.conversationId, () => props.activeBranchId], () => {
   agentTurnOpenOverrides.value = new Map()
   activeOutlineMessageId.value = null
   clearOutlineHighlight()

@@ -3,7 +3,11 @@ import type {
   LocalMessage,
 } from '@buddy-electron/shared/localChatApi'
 import type { ChatAgentTurn } from './chatStreamingMessage'
-import type { ChatTranscriptRow } from './chatTranscriptProjection'
+import type {
+  ChatTranscriptProjection,
+  ChatTranscriptRow,
+  ChatTranscriptRowPatch,
+} from './chatTranscriptProjection'
 
 export interface ChatMessageBranchNavigator {
   activeBranchId: string
@@ -17,6 +21,56 @@ interface BranchGroup {
   baseBranchId: string | null
   branchIds: string[]
   forkedFromMessageId: string | null
+}
+
+interface CachedChatMessageBranchNavigators {
+  activeBranchId: string
+  branches: ReadonlyArray<LocalConversationBranch>
+  navigators: ReadonlyMap<string, ChatMessageBranchNavigator>
+  rows: ReadonlyArray<ChatTranscriptRow>
+}
+
+export function createChatMessageBranchNavigatorProjector() {
+  let cached: CachedChatMessageBranchNavigators | null = null
+
+  return {
+    project(
+      projection: ChatTranscriptProjection,
+      branches: ReadonlyArray<LocalConversationBranch>,
+      activeBranchId: string,
+    ): ReadonlyMap<string, ChatMessageBranchNavigator> {
+      const previous = cached
+      if (
+        previous
+        && previous.branches === branches
+        && previous.activeBranchId === activeBranchId
+        && (
+          previous.rows === projection.rows
+          || (
+            projection.update.kind === 'patch'
+            && projection.update.previousRows === previous.rows
+            && projection.update.patches.every(patch => preservesBranchNavigation(previous.rows, patch))
+          )
+        )
+      ) {
+        cached = { ...previous, rows: projection.rows }
+        return cached.navigators
+      }
+
+      const navigators = projectChatMessageBranchNavigators(
+        projection.rows,
+        branches,
+        activeBranchId,
+      )
+      cached = {
+        activeBranchId,
+        branches,
+        navigators,
+        rows: projection.rows,
+      }
+      return navigators
+    },
+  }
 }
 
 export function projectChatMessageBranchNavigators(
@@ -58,6 +112,35 @@ export function projectChatMessageBranchNavigators(
   }
 
   return navigators
+}
+
+function preservesBranchNavigation(
+  rows: ReadonlyArray<ChatTranscriptRow>,
+  patch: ChatTranscriptRowPatch,
+): boolean {
+  if (patch.deleteCount !== 1 || patch.rows.length !== 1)
+    return false
+  const previous = rows[patch.index]
+  const next = patch.rows[0]
+  if (!previous || !next || previous.kind !== next.kind || previous.key !== next.key)
+    return false
+  if (previous.kind === 'message' && next.kind === 'message') {
+    return previous.message.id === next.message.id
+      && previous.message.branchId === next.message.branchId
+      && previous.message.role === next.message.role
+      && previous.message.runId === next.message.runId
+  }
+  if (previous.kind === 'agent-turn' && next.kind === 'agent-turn') {
+    if (previous.ownsResultActions !== next.ownsResultActions)
+      return false
+    if (!previous.ownsResultActions)
+      return true
+    return previous.turn.runId === next.turn.runId
+      && previous.turn.branchId === next.turn.branchId
+      && previous.turn.status === next.turn.status
+      && previous.turn.triggeringMessageId === next.turn.triggeringMessageId
+  }
+  return true
 }
 
 function collectActiveBranchPath(

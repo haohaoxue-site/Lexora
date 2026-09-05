@@ -6,7 +6,10 @@ import {
   MAX_BUDDY_MESSAGE_TEXT_LENGTH,
   readBuddyInterruptedMessageContent,
 } from './buddyMessageContent'
-import { buddyToolPresentationSchema } from './runEventPresentation'
+import {
+  buddyToolPresentationDeltaSchema,
+  buddyToolPresentationSchema,
+} from './runEventPresentation'
 import { buddyRunOutputPayloadSchema } from './runOutput'
 import { buddyRunProgressSchema } from './runProgress'
 
@@ -133,7 +136,7 @@ function publicPayload(type: string, value: unknown): Record<string, unknown> {
     || type === 'tool.updated'
     || type === 'tool.completed'
   ) {
-    return publicToolEvent(source, type === 'tool.completed')
+    return publicToolEvent(source, type)
   }
   const keys = SCALAR_PAYLOAD_KEYS.get(type)
   if (!keys)
@@ -179,16 +182,28 @@ function publicApprovalRequest(source: Record<string, unknown>): Record<string, 
 
 function publicToolEvent(
   source: Record<string, unknown>,
-  includeError: boolean,
+  type: 'tool.completed' | 'tool.preparing' | 'tool.started' | 'tool.updated',
 ): Record<string, unknown> {
   const presentation = buddyToolPresentationSchema.safeParse(source.presentation)
   const payload = selectScalars(source, [
-    ...(includeError ? ['isError'] : []),
+    ...(type === 'tool.completed' ? ['isError'] : []),
     'toolCallId',
     'toolName',
   ])
-  if (presentation.success)
+  if (presentation.success) {
     payload.presentation = presentation.data
+  }
+  else if (type === 'tool.updated') {
+    const sourceDelta = readRecord(source.presentationDelta)
+    const presentationDelta = buddyToolPresentationDeltaSchema.safeParse({
+      card: sourceDelta?.card,
+      outputDelta: sourceDelta?.outputDelta,
+      outputStart: sourceDelta?.outputStart,
+      truncated: sourceDelta?.truncated,
+    })
+    if (presentationDelta.success)
+      payload.presentationDelta = presentationDelta.data
+  }
   return payload
 }
 

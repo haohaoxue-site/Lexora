@@ -1,4 +1,8 @@
-import type { ChatTranscriptRow } from './chatTranscriptProjection'
+import type {
+  ChatTranscriptProjection,
+  ChatTranscriptRow,
+  ChatTranscriptRowPatch,
+} from './chatTranscriptProjection'
 import type { BuddyLocale } from '@/i18n/buddyI18n'
 import dayjs from 'dayjs'
 import { translateBuddy } from '@/i18n/buddyI18n'
@@ -11,6 +15,33 @@ export interface ChatTranscriptDayDividerRow {
 }
 
 export type ChatTranscriptDisplayRow = ChatTranscriptDayDividerRow | ChatTranscriptRow
+
+interface CachedChatTranscriptDisplayRows {
+  displayIndexByRowIndex: ReadonlyArray<number>
+  displayRows: ReadonlyArray<ChatTranscriptDisplayRow>
+  rows: ReadonlyArray<ChatTranscriptRow>
+}
+
+export function createChatTranscriptDisplayRowProjector() {
+  let cached: CachedChatTranscriptDisplayRows | null = null
+
+  return {
+    project(projection: ChatTranscriptProjection): ReadonlyArray<ChatTranscriptDisplayRow> {
+      const updated = cached && patchChatTranscriptDisplayRows(cached, projection)
+      if (updated) {
+        cached = updated
+        return updated.displayRows
+      }
+      const displayRows = projectChatTranscriptDisplayRows(projection.rows)
+      cached = {
+        displayIndexByRowIndex: indexChatTranscriptDisplayRows(displayRows),
+        displayRows,
+        rows: projection.rows,
+      }
+      return displayRows
+    },
+  }
+}
 
 export function projectChatTranscriptDisplayRows(
   rows: ReadonlyArray<ChatTranscriptRow>,
@@ -53,6 +84,68 @@ export function projectChatTranscriptDisplayRows(
   }
 
   return displayRows
+}
+
+function patchChatTranscriptDisplayRows(
+  cached: CachedChatTranscriptDisplayRows,
+  projection: ChatTranscriptProjection,
+): CachedChatTranscriptDisplayRows | null {
+  if (
+    projection.update.kind !== 'patch'
+    || projection.update.previousRows !== cached.rows
+    || projection.update.patches.some(patch => !preservesDisplayRowTopology(cached.rows, patch))
+  ) {
+    return null
+  }
+
+  const displayRows = [...cached.displayRows]
+  for (const patch of projection.update.patches) {
+    const displayIndex = cached.displayIndexByRowIndex[patch.index]
+    const row = patch.rows[0]
+    if (displayIndex === undefined || !row)
+      return null
+    displayRows[displayIndex] = row
+  }
+  return {
+    ...cached,
+    displayRows,
+    rows: projection.rows,
+  }
+}
+
+function preservesDisplayRowTopology(
+  rows: ReadonlyArray<ChatTranscriptRow>,
+  patch: ChatTranscriptRowPatch,
+): boolean {
+  if (patch.deleteCount !== 1 || patch.rows.length !== 1)
+    return false
+  const previous = rows[patch.index]
+  const next = patch.rows[0]
+  if (!previous || !next || previous.kind !== next.kind || previous.key !== next.key)
+    return false
+  if (previous.kind === 'agent-turn' && next.kind === 'agent-turn') {
+    return previous.turn.startedAt === next.turn.startedAt
+      && previous.turn.finalMessageId === next.turn.finalMessageId
+      && previous.turn.runId === next.turn.runId
+  }
+  if (previous.kind === 'message' && next.kind === 'message') {
+    return previous.message.createdAt === next.message.createdAt
+      && previous.message.id === next.message.id
+      && previous.message.role === next.message.role
+      && previous.message.runId === next.message.runId
+  }
+  return true
+}
+
+function indexChatTranscriptDisplayRows(
+  displayRows: ReadonlyArray<ChatTranscriptDisplayRow>,
+): number[] {
+  const displayIndexByRowIndex: number[] = []
+  for (let displayIndex = 0; displayIndex < displayRows.length; displayIndex += 1) {
+    if (displayRows[displayIndex]?.kind !== 'day-divider')
+      displayIndexByRowIndex.push(displayIndex)
+  }
+  return displayIndexByRowIndex
 }
 
 export function formatChatDayDividerLabel(

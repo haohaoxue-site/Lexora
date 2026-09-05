@@ -6,7 +6,7 @@ import type {
 } from './chatMessageViewport'
 import { onBeforeUnmount, onMounted, useTemplateRef } from 'vue'
 import BuddyChatReturnToLatest from './BuddyChatReturnToLatest.vue'
-import { resolvePrependedChatScrollTop } from './chatMessageViewport'
+import { createChatFrameTask, resolvePrependedChatScrollTop } from './chatMessageViewport'
 
 const props = defineProps<{
   hasOlderMessages: boolean
@@ -24,7 +24,8 @@ const emit = defineEmits<{
 const viewport = useTemplateRef<HTMLElement>('viewport')
 const content = useTemplateRef<HTMLElement>('content')
 let resizeObserver: ResizeObserver | null = null
-let activeMessageFrame: number | null = null
+let contentResizePending = false
+let viewportFrameTask: ReturnType<typeof createChatFrameTask> | null = null
 
 function readScrollMetrics(): ChatMessageScrollMetrics | null {
   return viewport.value ? toScrollMetrics(viewport.value) : null
@@ -129,12 +130,7 @@ function readActiveMessageId(): string | null {
 }
 
 function scheduleActiveMessageChange() {
-  if (activeMessageFrame !== null)
-    return
-  activeMessageFrame = requestAnimationFrame(() => {
-    activeMessageFrame = null
-    emit('activeMessageChange', readActiveMessageId())
-  })
+  viewportFrameTask?.schedule()
 }
 
 function handleScroll() {
@@ -145,13 +141,24 @@ function handleScroll() {
 }
 
 onMounted(() => {
+  viewportFrameTask = createChatFrameTask(
+    () => {
+      if (contentResizePending) {
+        contentResizePending = false
+        const metrics = readScrollMetrics()
+        if (metrics)
+          emit('contentResize', metrics)
+      }
+      emit('activeMessageChange', readActiveMessageId())
+    },
+    requestAnimationFrame,
+    cancelAnimationFrame,
+  )
   if (!content.value || typeof ResizeObserver === 'undefined')
     return
   resizeObserver = new ResizeObserver(() => {
-    const metrics = readScrollMetrics()
-    if (metrics)
-      emit('contentResize', metrics)
-    scheduleActiveMessageChange()
+    contentResizePending = true
+    viewportFrameTask?.schedule()
   })
   resizeObserver.observe(content.value)
   scheduleActiveMessageChange()
@@ -159,8 +166,7 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   resizeObserver?.disconnect()
-  if (activeMessageFrame !== null)
-    cancelAnimationFrame(activeMessageFrame)
+  viewportFrameTask?.cancel()
 })
 
 defineExpose<BuddyChatTranscriptViewportHandle>({

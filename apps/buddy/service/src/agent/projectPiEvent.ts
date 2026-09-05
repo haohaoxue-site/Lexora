@@ -6,6 +6,7 @@ import type {
 } from '@earendil-works/pi-ai'
 import type { AgentSessionEvent } from '@earendil-works/pi-coding-agent'
 import type { BuddyAssistantTextPhase } from '../../../shared/assistantTextPhase'
+import type { BuddyToolPresentation } from '../../../shared/runEventPresentation'
 import type { BuddyRunProgress } from '../../../shared/runProgress'
 import { randomUUID } from 'node:crypto'
 
@@ -67,6 +68,7 @@ type ModelRequestFailureCode
 
 interface ToolCallState {
   arguments: unknown
+  presentation: BuddyToolPresentation
   toolName: string
 }
 
@@ -94,6 +96,7 @@ type SessionMessage = Extract<AgentSessionEvent, { type: 'message_end' }>['messa
 
 const MAX_DELTA_LENGTH = 64 * 1024
 const MAX_FAILURE_MESSAGE_LENGTH = 4 * 1024
+const TERMINAL_PRESENTATION_CHECKPOINT_INTERVAL = 16 * 1024
 export function createPiEventProjectionState(
   options: { canonicalRoot?: string } = {},
 ): PiEventProjectionState {
@@ -133,20 +136,22 @@ export function projectPiEvent(
       return projectMessageUpdate(event.assistantMessageEvent, state)
     case 'message_end':
       return projectMessageEnd(event.message, state)
-    case 'tool_execution_start':
+    case 'tool_execution_start': {
+      const presentation = createBuddyToolPresentation({
+        arguments: event.args,
+        canonicalRoot: state.canonicalRoot,
+        toolName: event.toolName,
+      })
       state.toolCalls.set(event.toolCallId, {
         arguments: event.args,
+        presentation,
         toolName: event.toolName,
       })
       return {
         events: [
           {
             payload: {
-              presentation: createBuddyToolPresentation({
-                arguments: event.args,
-                canonicalRoot: state.canonicalRoot,
-                toolName: event.toolName,
-              }),
+              presentation,
               toolCallId: event.toolCallId,
               toolName: event.toolName,
             },
@@ -155,25 +160,40 @@ export function projectPiEvent(
           ...progressProjection(state, 'preparing', event.toolName).events,
         ],
       }
-    case 'tool_execution_update':
+    }
+    case 'tool_execution_update': {
+      const previous = state.toolCalls.get(event.toolCallId)
+      const presentation = createBuddyToolPresentation({
+        arguments: event.args,
+        canonicalRoot: state.canonicalRoot,
+        result: event.partialResult,
+        toolName: event.toolName,
+      })
+      state.toolCalls.set(event.toolCallId, {
+        arguments: previous?.arguments ?? event.args,
+        presentation,
+        toolName: event.toolName,
+      })
+      const presentationUpdate = projectToolPresentationUpdate(
+        previous?.presentation,
+        presentation,
+      )
       return {
         events: [
-          {
-            payload: {
-              presentation: createBuddyToolPresentation({
-                arguments: event.args,
-                canonicalRoot: state.canonicalRoot,
-                result: event.partialResult,
-                toolName: event.toolName,
-              }),
-              toolCallId: event.toolCallId,
-              toolName: event.toolName,
-            },
-            type: 'tool.updated',
-          },
+          ...(presentationUpdate
+            ? [{
+                payload: {
+                  ...presentationUpdate,
+                  toolCallId: event.toolCallId,
+                  toolName: event.toolName,
+                },
+                type: 'tool.updated' as const,
+              }]
+            : []),
           ...progressProjection(state, 'tool_executing', event.toolName).events,
         ],
       }
+    }
     case 'tool_execution_end': {
       const tool = state.toolCalls.get(event.toolCallId)
       state.toolCalls.delete(event.toolCallId)
@@ -218,20 +238,13 @@ export function projectToolExecutionAuthorized(
   event: AuthorizedToolExecution,
   state: PiEventProjectionState,
 ): PiEventProjection {
-  const tool = state.toolCalls.get(event.toolCallId) ?? {
-    arguments: event.arguments,
-    toolName: event.toolName,
-  }
+  const tool = state.toolCalls.get(event.toolCallId) ?? createToolCallState(event, state)
   state.toolCalls.set(event.toolCallId, tool)
   return {
     events: [
       {
         payload: {
-          presentation: createBuddyToolPresentation({
-            arguments: tool.arguments,
-            canonicalRoot: state.canonicalRoot,
-            toolName: tool.toolName,
-          }),
+          presentation: tool.presentation,
           toolCallId: event.toolCallId,
           toolName: tool.toolName,
         },
@@ -255,6 +268,57 @@ export function projectToolExecutionDenied(
       type: 'tool.denied',
     }],
   }
+}
+
+function createToolCallState(
+  event: AuthorizedToolExecution,
+  state: PiEventProjectionState,
+): ToolCallState {
+  return {
+    arguments: event.arguments,
+    presentation: createBuddyToolPresentation({
+      arguments: event.arguments,
+      canonicalRoot: state.canonicalRoot,
+      toolName: event.toolName,
+    }),
+    toolName: event.toolName,
+  }
+}
+
+function projectToolPresentationUpdate(
+  previous: BuddyToolPresentation | undefined,
+  current: BuddyToolPresentation,
+): Record<string, unknown> | null {
+  if (
+    previous?.card !== 'terminal'
+    || current.card !== 'terminal'
+    || previous.output === null
+    || current.output === null
+    || previous.command !== current.command
+    || previous.cwd !== current.cwd
+    || previous.description !== current.description
+    || previous.exitCode !== current.exitCode
+    || previous.signal !== current.signal
+    || !current.output.startsWith(previous.output)
+    || crossesTerminalPresentationCheckpoint(previous.output.length, current.output.length)
+  ) {
+    return { presentation: current }
+  }
+  if (previous.output === current.output && previous.truncated === current.truncated)
+    return null
+  return {
+    presentationDelta: {
+      card: 'terminal',
+      outputDelta: current.output.slice(previous.output.length),
+      outputStart: previous.output.length,
+      truncated: current.truncated,
+    },
+  }
+}
+
+function crossesTerminalPresentationCheckpoint(previousLength: number, currentLength: number): boolean {
+  return Math.floor(previousLength / TERMINAL_PRESENTATION_CHECKPOINT_INTERVAL)
+    < Math.floor(currentLength / TERMINAL_PRESENTATION_CHECKPOINT_INTERVAL)
 }
 
 function projectCompactionEnd(

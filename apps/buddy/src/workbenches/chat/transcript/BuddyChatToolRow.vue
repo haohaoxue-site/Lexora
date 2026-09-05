@@ -310,8 +310,7 @@ function toggle() {
       {{ t('desktop.chat.toolDeniedReadOnly') }}
     </p>
     <BuddyChatToolDetails
-      v-show="isOpen && canExpand"
-      :expanded="isOpen && canExpand"
+      v-if="isOpen && canExpand"
       :language="language"
       :presentation="node.presentation"
       :status="node.status"

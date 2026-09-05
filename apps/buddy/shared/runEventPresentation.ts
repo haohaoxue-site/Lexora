@@ -222,4 +222,12 @@ export const buddyToolPresentationSchema = z.discriminatedUnion('card', [
   }).strict(),
 ])
 
+export const buddyToolPresentationDeltaSchema = z.object({
+  card: z.literal('terminal'),
+  outputDelta: z.string().max(64 * 1024),
+  outputStart: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
+  truncated: z.boolean(),
+}).strict()
+
 export type BuddyToolPresentation = z.infer<typeof buddyToolPresentationSchema>
+export type BuddyToolPresentationDelta = z.infer<typeof buddyToolPresentationDeltaSchema>

@@ -19,6 +19,11 @@ export interface DesktopTerminalTranscriptProjection {
   text: string
 }
 
+export type DesktopTerminalTranscriptModelUpdate
+  = | { kind: 'unchanged' }
+    | { commandChanged: boolean, kind: 'replace' }
+    | { commandChanged: false, kind: 'append', text: string }
+
 interface UseDesktopTerminalTranscriptOptions {
   container: Readonly<Ref<HTMLElement | null>>
   transcript: Readonly<Ref<DesktopTerminalTranscriptProjection>>
@@ -52,15 +57,61 @@ export function projectDesktopTerminalTranscript(input: {
   }
 }
 
+export function projectDesktopTerminalTranscriptModelUpdate(
+  previous: DesktopTerminalTranscriptProjection,
+  current: DesktopTerminalTranscriptProjection,
+): DesktopTerminalTranscriptModelUpdate {
+  const commandChanged = !hasSameTerminalCommand(previous, current)
+  if (
+    !commandChanged
+    && previous.text === current.text
+    && previous.outputStartLine === current.outputStartLine
+  ) {
+    return { kind: 'unchanged' }
+  }
+  if (!commandChanged && current.text.startsWith(previous.text)) {
+    return {
+      commandChanged: false,
+      kind: 'append',
+      text: current.text.slice(previous.text.length),
+    }
+  }
+  return { commandChanged, kind: 'replace' }
+}
+
+function hasSameTerminalCommand(
+  previous: DesktopTerminalTranscriptProjection,
+  current: DesktopTerminalTranscriptProjection,
+): boolean {
+  if (
+    previous.language !== current.language
+    || previous.promptRanges.length !== current.promptRanges.length
+  ) {
+    return false
+  }
+  const commandLineCount = previous.promptRanges.length
+  return previous.text.split('\n', commandLineCount).join('\n')
+    === current.text.split('\n', commandLineCount).join('\n')
+    && previous.promptRanges.every((range, index) => {
+      const currentRange = current.promptRanges[index]
+      return currentRange !== undefined
+        && range.lineNumber === currentRange.lineNumber
+        && range.endColumn === currentRange.endColumn
+    })
+}
+
 export function useDesktopTerminalTranscript(
   options: UseDesktopTerminalTranscriptOptions,
 ) {
   const contentHeight = shallowRef<number | null>(null)
   const loading = shallowRef(true)
   const failed = shallowRef(false)
+  let appliedTranscript: DesktopTerminalTranscriptProjection | null = null
+  let monacoInstance: typeof Monaco | null = null
   let editor: Monaco.editor.IStandaloneCodeEditor | null = null
   let model: Monaco.editor.ITextModel | null = null
-  let decorationIds: string[] = []
+  let commandDecorationIds: string[] = []
+  let outputDecorationIds: string[] = []
   let contentSizeListener: Monaco.IDisposable | null = null
   let stopThemeSync: (() => void) | null = null
   let generation = 0
@@ -77,6 +128,7 @@ export function useDesktopTerminalTranscript(
       if (currentGeneration !== generation || options.container.value !== container)
         return
       const transcript = options.transcript.value
+      monacoInstance = monaco
       model = monaco.editor.createModel(
         transcript.text,
         transcript.language,
@@ -141,7 +193,21 @@ export function useDesktopTerminalTranscript(
       contentSizeListener = editor.onDidContentSizeChange((event) => {
         contentHeight.value = event.contentHeight
       })
-      decorationIds = updateDecorations(monaco, editor, model, transcript, decorationIds)
+      commandDecorationIds = updateCommandDecorations(
+        monaco,
+        editor,
+        model,
+        transcript,
+        commandDecorationIds,
+      )
+      outputDecorationIds = updateOutputDecoration(
+        monaco,
+        editor,
+        model,
+        transcript,
+        outputDecorationIds,
+      )
+      appliedTranscript = transcript
       stopThemeSync = observeDesktopMonacoTheme(monaco)
       loading.value = false
     }
@@ -153,17 +219,44 @@ export function useDesktopTerminalTranscript(
     }
   }, { immediate: true })
 
-  const stopTranscriptWatch = watch(options.transcript, async (transcript) => {
-    if (!editor || !model)
+  const stopTranscriptWatch = watch(options.transcript, (transcript) => {
+    if (!editor || !model || !monacoInstance || !appliedTranscript)
       return
-    const monaco = await loadDesktopMonaco()
-    if (!editor || !model)
+    const update = projectDesktopTerminalTranscriptModelUpdate(appliedTranscript, transcript)
+    if (update.kind === 'unchanged')
       return
+    const monaco = monacoInstance
     if (model.getLanguageId() !== transcript.language)
       monaco.editor.setModelLanguage(model, transcript.language)
-    if (model.getValue() !== transcript.text)
+    if (update.kind === 'append') {
+      const lineNumber = model.getLineCount()
+      const column = model.getLineMaxColumn(lineNumber)
+      model.applyEdits([{
+        forceMoveMarkers: true,
+        range: new monaco.Range(lineNumber, column, lineNumber, column),
+        text: update.text,
+      }])
+    }
+    else if (model.getValue() !== transcript.text) {
       model.setValue(transcript.text)
-    decorationIds = updateDecorations(monaco, editor, model, transcript, decorationIds)
+    }
+    if (update.kind === 'replace') {
+      commandDecorationIds = updateCommandDecorations(
+        monaco,
+        editor,
+        model,
+        transcript,
+        commandDecorationIds,
+      )
+    }
+    outputDecorationIds = updateOutputDecoration(
+      monaco,
+      editor,
+      model,
+      transcript,
+      outputDecorationIds,
+    )
+    appliedTranscript = transcript
   })
 
   function disposeEditor() {
@@ -173,7 +266,10 @@ export function useDesktopTerminalTranscript(
     contentHeight.value = null
     stopThemeSync?.()
     stopThemeSync = null
-    decorationIds = []
+    appliedTranscript = null
+    monacoInstance = null
+    commandDecorationIds = []
+    outputDecorationIds = []
     editor?.dispose()
     editor = null
     model?.dispose()
@@ -189,7 +285,7 @@ export function useDesktopTerminalTranscript(
   return { contentHeight, failed, loading }
 }
 
-function updateDecorations(
+function updateCommandDecorations(
   monaco: typeof Monaco,
   editor: Monaco.editor.IStandaloneCodeEditor,
   model: Monaco.editor.ITextModel,
@@ -263,19 +359,28 @@ function updateDecorations(
       ),
     })
   }
-  if (transcript.outputStartLine !== null) {
-    const lastLine = model.getLineCount()
-    decorations.push({
-      options: { inlineClassName: 'desktop-terminal-transcript__output' },
-      range: new monaco.Range(
-        transcript.outputStartLine,
-        1,
-        lastLine,
-        model.getLineMaxColumn(lastLine),
-      ),
-    })
-  }
   return editor.deltaDecorations(previousIds, decorations)
+}
+
+function updateOutputDecoration(
+  monaco: typeof Monaco,
+  editor: Monaco.editor.IStandaloneCodeEditor,
+  model: Monaco.editor.ITextModel,
+  transcript: DesktopTerminalTranscriptProjection,
+  previousIds: string[],
+): string[] {
+  if (transcript.outputStartLine === null)
+    return editor.deltaDecorations(previousIds, [])
+  const lastLine = model.getLineCount()
+  return editor.deltaDecorations(previousIds, [{
+    options: { inlineClassName: 'desktop-terminal-transcript__output' },
+    range: new monaco.Range(
+      transcript.outputStartLine,
+      1,
+      lastLine,
+      model.getLineMaxColumn(lastLine),
+    ),
+  }])
 }
 
 function terminalTokenClassName(type: string): string | null {

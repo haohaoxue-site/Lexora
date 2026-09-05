@@ -10,15 +10,39 @@ import type {
   LocalTurnStart,
 } from '@buddy-electron/shared/localChatApi'
 import type { Ref } from 'vue'
+import type { ChatRunEventBuckets } from './chatRunEventBuckets'
 import { computed, shallowRef } from 'vue'
+import {
+  compactChatRunEventSnapshots,
+  hasChatRunEventSequenceGap,
+  mergeChatRunEventBuckets,
+  mergeChatRunEvents,
+  replaceChatRunEventBuckets,
+} from './chatRunEventBuckets'
 
 const TIMELINE_PAGE_SIZE = 100
+const SNAPSHOT_RECONCILIATION_EVENT_TYPES = new Set([
+  'approval.requested',
+  'approval.resolved',
+  'output.produced',
+  'run.cancelled',
+  'run.completed',
+  'run.failed',
+])
 
 interface UseChatRunSyncOptions {
   activeBranchId: Ref<string | null>
   activeConversationId: Ref<string | null>
   api: LocalChatApi
   onError: (error: unknown) => void
+}
+
+interface RefreshFlight {
+  branchId: string
+  conversationId: string
+  dirty: boolean
+  promise: Promise<void>
+  projectionGeneration: number
 }
 
 export function useChatRunSync(options: UseChatRunSyncOptions) {
@@ -29,7 +53,8 @@ export function useChatRunSync(options: UseChatRunSyncOptions) {
       item.kind === 'message',
   ))
   const runs = shallowRef<ReadonlyArray<LocalRun>>([])
-  const runEvents = shallowRef<ReadonlyArray<LocalRunEvent>>([])
+  const runSignalEvents = shallowRef<ReadonlyArray<LocalRunEvent>>([])
+  const runEventBuckets = shallowRef<ChatRunEventBuckets>(new Map())
   const runOutputs = shallowRef<ReadonlyArray<LocalRunOutput>>([])
   const changeSets = shallowRef<ReadonlyArray<LocalChangeSetSummary>>([])
   const approvals = shallowRef<ReadonlyArray<LocalApproval>>([])
@@ -41,8 +66,10 @@ export function useChatRunSync(options: UseChatRunSyncOptions) {
   let loadedConversationId: string | null = null
   let olderLoadGeneration = 0
   let projectionGeneration = 0
-  let refreshGeneration = 0
+  let refreshFlight: RefreshFlight | null = null
   let refreshTimer: number | null = null
+  let runEventCommitFrame: number | null = null
+  let pendingRunEvents: LocalRunEvent[] = []
 
   async function refreshActiveConversation() {
     const conversationId = options.activeConversationId.value
@@ -56,7 +83,64 @@ export function useChatRunSync(options: UseChatRunSyncOptions) {
       loadedConversationId = conversationId
       loadedBranchId = branchId
     }
-    const generation = ++refreshGeneration
+    if (
+      refreshFlight?.conversationId === conversationId
+      && refreshFlight.branchId === branchId
+      && refreshFlight.projectionGeneration === projectionGeneration
+    ) {
+      refreshFlight.dirty = true
+      return refreshFlight.promise
+    }
+    const sourceProjectionGeneration = projectionGeneration
+    const flight: RefreshFlight = {
+      branchId,
+      conversationId,
+      dirty: false,
+      promise: Promise.resolve(),
+      projectionGeneration: sourceProjectionGeneration,
+    }
+    flight.promise = drainRefreshFlight(
+      flight,
+      conversationId,
+      branchId,
+      sourceProjectionGeneration,
+    ).finally(() => {
+      if (refreshFlight === flight)
+        refreshFlight = null
+    })
+    refreshFlight = flight
+    return flight.promise
+  }
+
+  async function drainRefreshFlight(
+    flight: RefreshFlight,
+    conversationId: string,
+    branchId: string,
+    sourceProjectionGeneration: number,
+  ): Promise<void> {
+    while (true) {
+      flight.dirty = false
+      await refreshConversationSnapshot(
+        conversationId,
+        branchId,
+        sourceProjectionGeneration,
+      )
+      if (
+        !flight.dirty
+        || sourceProjectionGeneration !== projectionGeneration
+        || conversationId !== options.activeConversationId.value
+        || branchId !== options.activeBranchId.value
+      ) {
+        return
+      }
+    }
+  }
+
+  async function refreshConversationSnapshot(
+    conversationId: string,
+    branchId: string,
+    sourceProjectionGeneration: number,
+  ): Promise<void> {
     const isInitialTimelinePage = !hasLoadedTimelinePage
     try {
       const [timelinePage, pendingApprovals] = await Promise.all([
@@ -68,7 +152,7 @@ export function useChatRunSync(options: UseChatRunSyncOptions) {
         options.api.approvals.list({ limit: 100, status: 'pending' }),
       ])
       if (
-        generation !== refreshGeneration
+        sourceProjectionGeneration !== projectionGeneration
         || branchId !== options.activeBranchId.value
         || conversationId !== options.activeConversationId.value
       ) {
@@ -83,18 +167,24 @@ export function useChatRunSync(options: UseChatRunSyncOptions) {
         timelineItems.value = mergeTailTimelineItems(timelineItems.value, timelinePage.items)
       }
       upsertRuns(timelinePage.runs)
-      runEvents.value = mergeTimelineEvents(
-        runEvents.value,
+      replaceRunEvents(mergeTimelineEvents(
+        flattenRunEventBuckets(runEventBuckets.value),
         timelinePage.runEvents,
         timelinePage.runs,
-      )
+      ))
       runOutputs.value = mergeRunOutputs(runOutputs.value, timelinePage.outputs)
       changeSets.value = mergeChangeSets(changeSets.value, timelinePage.changeSets)
       const runIds = new Set(runs.value.map(run => run.id))
       approvals.value = pendingApprovals.filter(approval => runIds.has(approval.runId))
     }
     catch (error) {
-      options.onError(error)
+      if (
+        sourceProjectionGeneration === projectionGeneration
+        && conversationId === options.activeConversationId.value
+        && branchId === options.activeBranchId.value
+      ) {
+        options.onError(error)
+      }
     }
   }
 
@@ -134,7 +224,11 @@ export function useChatRunSync(options: UseChatRunSyncOptions) {
       const prepended = page.items.some(item => !currentIds.has(timelineItemKey(item)))
       timelineItems.value = mergeOlderTimelineItems(timelineItems.value, page.items)
       upsertRuns(page.runs)
-      runEvents.value = mergeTimelineEvents(runEvents.value, page.runEvents, page.runs)
+      replaceRunEvents(mergeTimelineEvents(
+        flattenRunEventBuckets(runEventBuckets.value),
+        page.runEvents,
+        page.runs,
+      ))
       runOutputs.value = mergeRunOutputs(runOutputs.value, page.outputs)
       changeSets.value = mergeChangeSets(changeSets.value, page.changeSets)
       timelineCursor.value = page.nextCursor
@@ -164,8 +258,45 @@ export function useChatRunSync(options: UseChatRunSyncOptions) {
     ) {
       return
     }
-    runEvents.value = mergeEvents(runEvents.value, [event])
-    scheduleRefresh()
+    pendingRunEvents.push(event)
+    if (SNAPSHOT_RECONCILIATION_EVENT_TYPES.has(event.type)) {
+      commitPendingRunEventsImmediately()
+      scheduleRefresh()
+      return
+    }
+    scheduleRunEventCommit()
+  }
+
+  function scheduleRunEventCommit() {
+    if (runEventCommitFrame !== null)
+      return
+    runEventCommitFrame = window.requestAnimationFrame(() => {
+      runEventCommitFrame = null
+      commitPendingRunEvents()
+    })
+  }
+
+  function commitPendingRunEventsImmediately() {
+    if (runEventCommitFrame !== null) {
+      window.cancelAnimationFrame(runEventCommitFrame)
+      runEventCommitFrame = null
+    }
+    commitPendingRunEvents()
+  }
+
+  function commitPendingRunEvents() {
+    if (pendingRunEvents.length === 0)
+      return
+    const incoming = pendingRunEvents
+    pendingRunEvents = []
+    const sequenceGapDetected = hasChatRunEventSequenceGap(runEventBuckets.value, incoming)
+    const signalEvents = incoming.filter(isRunSignalEvent)
+    if (signalEvents.length > 0) {
+      runSignalEvents.value = mergeChatRunEvents(runSignalEvents.value, signalEvents)
+    }
+    runEventBuckets.value = mergeChatRunEventBuckets(runEventBuckets.value, incoming)
+    if (sequenceGapDetected)
+      scheduleRefresh()
   }
 
   function scheduleRefresh() {
@@ -236,7 +367,7 @@ export function useChatRunSync(options: UseChatRunSyncOptions) {
   }
 
   function resetConversationProjection() {
-    refreshGeneration += 1
+    discardPendingRunEvents()
     projectionGeneration += 1
     olderLoadGeneration += 1
     hasLoadedTimelinePage = false
@@ -244,11 +375,20 @@ export function useChatRunSync(options: UseChatRunSyncOptions) {
     isLoadingOlderMessages.value = false
     timelineItems.value = []
     runs.value = []
-    runEvents.value = []
+    runSignalEvents.value = []
+    runEventBuckets.value = new Map()
     runOutputs.value = []
     changeSets.value = []
     approvals.value = []
     knownRunIds.clear()
+  }
+
+  function discardPendingRunEvents() {
+    pendingRunEvents = []
+    if (runEventCommitFrame === null)
+      return
+    window.cancelAnimationFrame(runEventCommitFrame)
+    runEventCommitFrame = null
   }
 
   function upsertRuns(incoming: ReadonlyArray<LocalRun>) {
@@ -262,6 +402,11 @@ export function useChatRunSync(options: UseChatRunSyncOptions) {
     )
   }
 
+  function replaceRunEvents(events: ReadonlyArray<LocalRunEvent>) {
+    runSignalEvents.value = events.filter(isRunSignalEvent)
+    runEventBuckets.value = replaceChatRunEventBuckets(events)
+  }
+
   return {
     approvals,
     changeSets,
@@ -272,6 +417,7 @@ export function useChatRunSync(options: UseChatRunSyncOptions) {
     dispose() {
       if (refreshTimer !== null)
         window.clearTimeout(refreshTimer)
+      discardPendingRunEvents()
     },
     handleRunEvent,
     hasOlderMessages,
@@ -279,7 +425,8 @@ export function useChatRunSync(options: UseChatRunSyncOptions) {
     loadOlderMessages,
     messages,
     refreshActiveConversation,
-    runEvents,
+    runSignalEvents,
+    runEventBuckets,
     runOutputs,
     runs,
     timelineItems,
@@ -337,18 +484,6 @@ function timelineItemKey(item: LocalConversationTimelineItem): string {
   return `${item.kind}:${item.id}`
 }
 
-function mergeEvents(
-  current: ReadonlyArray<LocalRunEvent>,
-  incoming: ReadonlyArray<LocalRunEvent>,
-): ReadonlyArray<LocalRunEvent> {
-  const byId = new Map(current.map(event => [`${event.runId}:${event.sequence}`, event]))
-  for (const event of incoming)
-    byId.set(`${event.runId}:${event.sequence}`, event)
-  return [...byId.values()]
-    .sort((left, right) => left.createdAt.localeCompare(right.createdAt)
-      || left.sequence - right.sequence)
-}
-
 function mergeTimelineEvents(
   current: ReadonlyArray<LocalRunEvent>,
   incoming: ReadonlyArray<LocalRunEvent>,
@@ -357,8 +492,36 @@ function mergeTimelineEvents(
   const terminalRunIds = new Set(runs.flatMap(run => (
     run.status === 'queued' || run.status === 'running' ? [] : [run.id]
   )))
-  return mergeEvents(
-    current.filter(event => !terminalRunIds.has(event.runId)),
-    incoming,
+  return compactChatRunEventSnapshots(
+    mergeChatRunEvents(
+      current.filter(event => !terminalRunIds.has(event.runId)),
+      incoming,
+    ),
+  )
+}
+
+function flattenRunEventBuckets(
+  buckets: ChatRunEventBuckets,
+): ReadonlyArray<LocalRunEvent> {
+  return [...buckets.values()].flatMap(bucket => bucket.events)
+}
+
+function isRunSignalEvent(event: LocalRunEvent): boolean {
+  if (
+    event.type === 'context.compaction.completed'
+    || event.type === 'context.usage.updated'
+  ) {
+    return true
+  }
+  if (event.type !== 'tool.started')
+    return false
+  const presentation = event.payload.presentation
+  return Boolean(
+    presentation
+    && typeof presentation === 'object'
+    && 'card' in presentation
+    && presentation.card === 'browser'
+    && 'operation' in presentation
+    && presentation.operation === 'open',
   )
 }
