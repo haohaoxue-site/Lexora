@@ -6,6 +6,7 @@ import { dialog, ipcMain } from 'electron'
 import { z, ZodError } from 'zod'
 import { BUDDY_ATTACHMENT_DIALOG_EXTENSIONS } from '../../shared/attachmentPolicy'
 import { toPublicRunEvent } from '../../shared/publicRunEvent'
+import { webCredentialInputSchema, webSettingsSchema, webSettingsSnapshotSchema } from '../../shared/webProtocol'
 
 import {
   formatLocalChatPublicError,
@@ -55,6 +56,7 @@ export interface DesktopRuntimeRecoveryGateway {
 export interface RegisterLocalChatIpcOptions {
   getLanguage: () => LexoraConfig['desktop']['language']
   getWindow: () => BrowserWindow | null
+  readWebCredential: () => Promise<unknown>
   runtime: DesktopRuntimeGateway
   runtimeRecovery: DesktopRuntimeRecoveryGateway
 }
@@ -420,6 +422,10 @@ export function registerLocalChatIpc(options: RegisterLocalChatIpcOptions): () =
     { key: LOCAL_WORKSPACE_STATE_KEY },
     localChatResponseSchemas.optionalWorkspaceSetting,
   ))
+  handle(LOCAL_CHAT_IPC_CHANNELS.webSettingsRead, () => request('web.settings', {}, webSettingsSnapshotSchema))
+  handle(LOCAL_CHAT_IPC_CHANNELS.webCredentialReveal, async () => z.string().nullable().parse(await options.readWebCredential()))
+  handle(LOCAL_CHAT_IPC_CHANNELS.webSettingsSave, (_event, input) => request('web.saveSettings', webSettingsSchema.parse(input), webSettingsSnapshotSchema))
+  handle(LOCAL_CHAT_IPC_CHANNELS.webCredentialSave, (_event, input) => request('web.saveCredential', webCredentialInputSchema.parse(input), webSettingsSnapshotSchema))
   handle(LOCAL_CHAT_IPC_CHANNELS.workspaceStateWrite, (_event, input) => {
     const { value } = localChatSchemas.workspaceValue.parse(input)
     return request(

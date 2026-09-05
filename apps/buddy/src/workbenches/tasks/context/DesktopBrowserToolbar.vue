@@ -39,7 +39,6 @@ const emit = defineEmits<{
   menu: [action: BrowserToolbarMenuActionKey]
   navigate: []
   reload: []
-  restoreAddress: []
   stop: []
 }>()
 const address = defineModel<string>('address', { required: true })
@@ -189,7 +188,6 @@ function selectAddress(event: FocusEvent): void {
         :placeholder="t('desktop.context.browserAddressPlaceholder')"
         spellcheck="false"
         type="text"
-        @blur="emit('restoreAddress')"
         @focus="selectAddress"
       >
     </div>

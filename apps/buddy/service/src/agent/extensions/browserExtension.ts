@@ -123,7 +123,7 @@ function createBrowserActTool(service: BrowserExtensionService) {
 
 function createBrowserOpenTool(service: BrowserExtensionService) {
   return defineTool<TSchema, BrowserToolDetails>({
-    description: `Open an HTTPS, localhost, or granted local HTML page in the browser visible to the user. Use until to wait for semantic content on SPA pages. ${browserUntrustedDataNotice}`,
+    description: `Open an HTTP(S) or granted local HTML page in the browser visible to the user. Use until to wait for semantic content on SPA pages. ${browserUntrustedDataNotice}`,
     async execute(_toolCallId, input, signal) {
       if (!isBrowserOpenToolInput(input))
         return failureResult('open', 'VALIDATION_FAILED', null)

@@ -1,5 +1,6 @@
 import type { BuddyAttachmentImportRequest } from '../../shared/attachmentPolicy'
 import type { BuddyPermissionSettings } from '../../shared/permissionMode'
+import type { WebSettings, WebSettingsSnapshot } from '../../shared/webProtocol'
 import type {
   LocalApproval,
   LocalArtifactText,
@@ -191,6 +192,10 @@ export type {
 } from './localChatApiSchemas'
 
 export const LOCAL_CHAT_IPC_CHANNELS = {
+  webSettingsRead: 'lexora:buddy:web:settings',
+  webSettingsSave: 'lexora:buddy:web:save-settings',
+  webCredentialSave: 'lexora:buddy:web:save-credential',
+  webCredentialReveal: 'lexora:buddy:web:reveal-credential',
   approvalsApprove: 'lexora:buddy:approvals:approve',
   approvalsApproveForTurn: 'lexora:buddy:approvals:approve-for-turn',
   approvalsDeny: 'lexora:buddy:approvals:deny',
@@ -403,6 +408,12 @@ export interface LocalChatApi {
     getUsageSnapshot: (
       input: LocalContextUsageSnapshotRequest,
     ) => Promise<LocalContextUsageSnapshot>
+  }
+  web: {
+    read: () => Promise<WebSettingsSnapshot>
+    save: (settings: WebSettings) => Promise<WebSettingsSnapshot>
+    saveCredential: (key: string | null) => Promise<WebSettingsSnapshot>
+    revealCredential: () => Promise<string | null>
   }
   workspaceState: {
     read: () => Promise<LocalWorkspaceSetting | null>

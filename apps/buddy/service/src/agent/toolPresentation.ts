@@ -27,6 +27,7 @@ import {
 } from '../images/imageTransformToolContract'
 import { createPetToolPresentation } from '../pet/petToolContract'
 import { createSystemToolPresentation } from '../system/systemToolContract'
+import { createWebToolPresentation } from '../web/webToolPresentation'
 import { isPiShellToolName } from './piBuiltinTools'
 
 export type { CreateBuddyToolPresentationInput } from '../events/toolPresentationSupport'
@@ -44,6 +45,7 @@ export function createBuddyToolPresentation(
   input: CreateBuddyToolPresentationInput,
 ): BuddyToolPresentation {
   return createPiToolPresentation(input)
+    ?? createWebToolPresentation(input)
     ?? createPetToolPresentation(input)
     ?? createImageGenerationToolPresentation(input)
     ?? createImageTransformToolPresentation(input)

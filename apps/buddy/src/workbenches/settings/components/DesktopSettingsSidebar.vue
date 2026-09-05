@@ -6,6 +6,7 @@ import {
   Bot20Regular,
   DataUsage20Regular,
   Folder20Regular,
+  Globe20Regular,
 } from '@vicons/fluent'
 import { NIcon } from 'naive-ui'
 import { useRoute } from 'vue-router'
@@ -25,6 +26,7 @@ const { t } = useBuddyI18n(() => props.language)
 const categories = [
   { icon: Apps20Regular, key: 'app' as const },
   { icon: Bot20Regular, key: 'models' as const },
+  { icon: Globe20Regular, key: 'web' as const },
   { icon: AnimalCat20Regular, key: 'pet' as const },
   { icon: Folder20Regular, key: 'local' as const },
   { icon: DataUsage20Regular, key: 'data' as const },

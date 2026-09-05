@@ -178,6 +178,25 @@ const turnConfirmationButtonProps = { type: 'error' } as const
       </dl>
     </section>
     <section
+      v-else-if="review?.card === 'web'"
+      class="desktop-approval-card__details desktop-approval-card__review"
+    >
+      <dl>
+        <div>
+          <dt>
+            {{ t(review.operation === 'search'
+              ? 'desktop.approval.web.query'
+              : 'desktop.approval.web.url') }}
+          </dt>
+          <dd>{{ review.target }}</dd>
+        </div>
+        <div>
+          <dt>{{ t('desktop.approval.web.provider') }}</dt>
+          <dd>{{ review.provider ?? t('desktop.approval.web.providerAuto') }}</dd>
+        </div>
+      </dl>
+    </section>
+    <section
       v-else-if="review?.card === 'system-action'"
       class="desktop-approval-card__details desktop-approval-card__review"
     >

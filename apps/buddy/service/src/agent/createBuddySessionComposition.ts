@@ -15,6 +15,7 @@ import type { DirectoryGrant } from '../directories/resolveGrantedPath'
 import type { ImageGenerationGateway } from '../images/ImageGenerationGateway'
 import type { CreatePetToolOptions } from '../pet/createPetTool'
 import type { SystemHostPort } from '../system/systemCapability'
+import type { WebCapabilityService } from '../web/WebCapabilityService'
 import type { BuddyInProcessExtension } from './createBuddyResourceLoader'
 import type { BuddyRunContextStore } from './createReusableBuddySession'
 import type {
@@ -49,6 +50,7 @@ import { createPetExtension } from './extensions/petExtension'
 import { createSystemExtension } from './extensions/systemExtension'
 import { createSystemPromptExtension } from './extensions/systemPromptExtension'
 import { createToolPolicyExtension } from './extensions/toolPolicyExtension'
+import { createWebExtension } from './extensions/webExtension'
 
 type DirectoryGrantGateway = Pick<DirectoryGrantService, 'grant'>
 
@@ -71,6 +73,7 @@ export interface BuddySessionCompositionServices {
   onAutomationChanged: (automationId: string) => void
   petService: CreatePetToolOptions['service']
   systemHost: SystemHostPort
+  webService: WebCapabilityService
 }
 
 export interface CreateBuddySessionCompositionOptions {
@@ -113,6 +116,7 @@ export async function createBuddySessionComposition(
   const inProcessExtensions: BuddyInProcessExtension[] = [
     createMcpExtension({ tools: mcp.tools }),
     createBrowserExtension({ service: browserCapability }),
+    createWebExtension({ service: services.webService, conversationId: options.conversationId }),
     createImageGenerationExtension({
       artifactService: services.artifactService,
       attachmentService: services.attachmentService,
@@ -221,6 +225,8 @@ function createBuddyToolClassifier(
     event: ToolCallEvent,
     activeRun: BuddyRunContext,
   ): Promise<BuddyToolClassificationResult> => {
+    if (event.toolName === 'lexora_web_search' || event.toolName === 'lexora_web_fetch')
+      return { access: 'network', paths: [] }
     const automation = classifyAutomationToolCall(options.automationService, event)
     if (automation)
       return automation

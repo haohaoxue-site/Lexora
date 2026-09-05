@@ -94,6 +94,9 @@ import { createWorkspaceRepository } from './storage/workspaceRepository'
 import { LinuxSystemHost } from './system/LinuxSystemHost'
 import { registerUsageRpc } from './usage/registerUsageRpc'
 import { UsageService } from './usage/UsageService'
+import { WebCapabilityService } from './web/WebCapabilityService'
+import { WebHostClient } from './web/WebHostClient'
+import { registerWebSettingsRpc, WebSettingsService } from './web/WebSettingsService'
 import { registerWorkspaceStateRpc } from './workspace/registerWorkspaceStateRpc'
 
 export interface StartBuddyServiceOptions {
@@ -218,6 +221,13 @@ export async function startBuddyService(
     peer: options.rpc,
   })
   const browserHost = new BrowserHostClient(options.rpc)
+  const webSettings = new WebSettingsService(workspace, options.rpc)
+  const webService = new WebCapabilityService({
+    host: new WebHostClient(options.rpc),
+    models: executionModels.getRuntime(),
+    paths,
+    settings: webSettings,
+  })
   const automationClock = options.automationClock ?? systemAutomationClock
   const automationRepositories = createAutomationRepositories(options.database)
   const automationTurns = createAutomationTurnRepository(options.database)
@@ -278,6 +288,7 @@ export async function startBuddyService(
     onAutomationChanged: automationId => automationChanges.publish(automationId),
     petService,
     systemHost,
+    webService,
   }
   const sessionBlueprints = new BuddySessionBlueprintService({
     conversationGrants: conversationDirectoryGrants,
@@ -409,6 +420,7 @@ export async function startBuddyService(
   await options.eventLog.compactTerminalRuns()
 
   const unregister = combineDisposers(
+    registerWebSettingsRpc(options.rpc, webSettings),
     registerNotificationRpc({
       rpc: options.rpc,
       service: notificationService,
@@ -503,6 +515,7 @@ export async function startBuddyService(
   const dispose = () => {
     disposal ??= (async () => {
       unregister()
+      webService.dispose()
       await Promise.allSettled([
         scheduler.dispose(),
         runner.dispose(),

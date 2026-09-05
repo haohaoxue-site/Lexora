@@ -478,7 +478,6 @@ function recoveryFor(code: BrowserAdapterFailureCode) {
     case 'BROWSER_CONTROL_REQUIRED':
     case 'BROWSER_DIALOG_PENDING':
     case 'BROWSER_HUMAN_INPUT_REQUIRED': return 'request_human_control' as const
-    case 'BROWSER_LOCAL_SERVER_UNREACHABLE': return 'start_local_server' as const
     case 'BROWSER_PAGE_CRASHED':
     case 'BROWSER_SESSION_EVICTED':
     case 'BROWSER_SESSION_NOT_FOUND': return 'open_again' as const

@@ -4,7 +4,6 @@ import type {
 } from '../../../shared/browserAdapterProtocol'
 import type {
   BrowserErrorCode,
-  BrowserFailureReason,
   BrowserObservation,
   BrowserRecoveryAction,
   BrowserWaitSpec,
@@ -213,7 +212,6 @@ export function projectBrowserState(state: DesktopBrowserState) {
           recovery: browserRecovery(
             state.error.code,
             'read_again',
-            state.error.reason ?? null,
           ),
         }
       : null,
@@ -242,7 +240,7 @@ function browserFailure(
     error: {
       code,
       reason,
-      recovery: browserRecovery(code, fallbackRecovery, reason),
+      recovery: browserRecovery(code, fallbackRecovery),
     },
     ok: false,
   } as const
@@ -251,15 +249,12 @@ function browserFailure(
 function browserRecovery(
   code: BrowserErrorCode,
   fallback: BrowserRecoveryAction | null,
-  reason: BrowserFailureReason | null = null,
 ): BrowserRecoveryAction | null {
   switch (code) {
     case 'BROWSER_CONTROL_REQUIRED':
     case 'BROWSER_DIALOG_PENDING':
     case 'BROWSER_HUMAN_INPUT_REQUIRED':
       return 'request_human_control'
-    case 'BROWSER_LOCAL_SERVER_UNREACHABLE':
-      return 'start_local_server'
     case 'BROWSER_PAGE_CRASHED':
     case 'BROWSER_SESSION_EVICTED':
     case 'BROWSER_SESSION_NOT_FOUND':
@@ -268,14 +263,7 @@ function browserRecovery(
     case 'BROWSER_TARGET_STALE':
       return 'read_again'
     case 'BROWSER_NAVIGATION_BLOCKED':
-      if (
-        reason === 'DNS_RESOLUTION_FAILED'
-        || reason === 'NETWORK_POLICY_BLOCKED'
-        || reason === 'NON_PUBLIC_RESOLUTION'
-      ) {
-        return 'diagnose_network'
-      }
-      return reason === 'HTTPS_REQUIRED' ? 'open_again' : null
+      return null
     case 'BROWSER_PAGE_FAILED':
       return fallback
     default:
