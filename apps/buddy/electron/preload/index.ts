@@ -195,6 +195,12 @@ const localChatApi = Object.freeze<LocalChatApi>({
     read: () => ipcRenderer.invoke(LOCAL_CHAT_IPC_CHANNELS.workspaceStateRead),
     write: value => ipcRenderer.invoke(LOCAL_CHAT_IPC_CHANNELS.workspaceStateWrite, { value }),
   }),
+  web: Object.freeze({
+    read: () => ipcRenderer.invoke(LOCAL_CHAT_IPC_CHANNELS.webSettingsRead),
+    save: settings => ipcRenderer.invoke(LOCAL_CHAT_IPC_CHANNELS.webSettingsSave, settings),
+    saveCredential: key => ipcRenderer.invoke(LOCAL_CHAT_IPC_CHANNELS.webCredentialSave, { key }),
+    revealCredential: () => ipcRenderer.invoke(LOCAL_CHAT_IPC_CHANNELS.webCredentialReveal),
+  }),
   conversations: Object.freeze({
     list: limit => ipcRenderer.invoke(LOCAL_CHAT_IPC_CHANNELS.conversationsList, { limit }),
     get: conversationId => ipcRenderer.invoke(

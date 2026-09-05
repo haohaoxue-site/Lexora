@@ -27,7 +27,6 @@ import type { BrowserSessionTeardownReason } from './BrowserSessionRegistry'
 import type { SemanticBrowserScreenshot, SemanticBrowserScreenshotReference } from './SemanticBrowserDriver'
 import { randomUUID } from 'node:crypto'
 import { BROWSER_WAIT_DEFAULT_QUIET_MS } from '../../../shared/browserProtocol'
-import { probeBrowserLocalServer } from './BrowserLocalServerProbe'
 import {
   BrowserSecurityPolicy,
   BrowserSecurityPolicyError,
@@ -44,14 +43,11 @@ import {
 
 export const BROWSER_DEFAULT_PARTITION = 'persist:buddy-browser-default-v1'
 const BROWSER_GUEST_ATTACH_TIMEOUT_MS = 10_000
+const BROWSER_FAILED_NAVIGATION_SETTLE_MS = 200
 const BROWSER_NAVIGATION_SETTLE_TIMEOUT_MS = 15_000
 const BROWSER_ACTION_NAVIGATION_DETECTION_MS = 50
 const BROWSER_WAIT_STATE_INTERVAL_MS = 50
 const BROWSER_WAIT_PROBE_INTERVAL_MS = 150
-const BROWSER_TRANSIENT_LOAD_RETRY_DELAY_MS = 1_000
-const BROWSER_TRANSIENT_LOAD_MAX_ATTEMPTS = 2
-const BROWSER_TRANSIENT_LOAD_ERROR_PATTERN
-  = /\bERR_(?:TIMED_OUT|CONNECTION_(?:RESET|CLOSED|REFUSED|ABORTED|FAILED|TIMED_OUT)|NETWORK_CHANGED|EMPTY_RESPONSE|NAME_NOT_RESOLVED|INTERNET_DISCONNECTED)\b/
 
 interface BrowserHostOptions {
   createId?: () => string
@@ -62,8 +58,6 @@ interface BrowserHostOptions {
     reason: BrowserSessionTeardownReason,
   ) => void
   onStateChanged?: (state: DesktopBrowserState) => void
-  probeLocalUrl?: (url: string) => Promise<boolean>
-  transientLoadRetryDelayMs?: number
   window: BrowserWindow
 }
 
@@ -170,9 +164,7 @@ export class BrowserHost {
 
   readonly #onStateChanged: (state: DesktopBrowserState) => void
   readonly #onGuestSetChanged: () => void
-  readonly #probeLocalUrl: (url: string) => Promise<boolean>
   readonly #sessions: BrowserSessionRegistry<BrowserSession>
-  readonly #transientLoadRetryDelayMs: number
   readonly #window: BrowserWindow
   readonly #windowClosedListener: () => void
   readonly #willAttachWebviewListener: (
@@ -188,13 +180,10 @@ export class BrowserHost {
     this.#onGuestSetChanged = options.onGuestSetChanged ?? (() => {})
     this.#onSessionClosed = options.onSessionClosed ?? (() => {})
     this.#onStateChanged = options.onStateChanged ?? (() => {})
-    this.#probeLocalUrl = options.probeLocalUrl ?? probeBrowserLocalServer
     this.#sessions = new BrowserSessionRegistry({
       createId: this.#createId,
       maxSessions: 4,
     })
-    this.#transientLoadRetryDelayMs = options.transientLoadRetryDelayMs
-      ?? BROWSER_TRANSIENT_LOAD_RETRY_DELAY_MS
     this.#window = options.window
     this.#windowClosedListener = () => this.dispose()
     this.#willAttachWebviewListener = (event, webPreferences, params) => {
@@ -539,22 +528,6 @@ export class BrowserHost {
     }
     if (!this.#shouldContinuePageAction(session, navigationSequence))
       return snapshot(session.state)
-    if (isLoopbackBrowserUrl(url)) {
-      const isReady = await this.#probeLocalUrl(url).catch(() => false)
-      if (!this.#shouldContinuePageAction(session, navigationSequence))
-        return snapshot(session.state)
-      if (!isReady) {
-        const message = 'Local browser server is unreachable'
-        session.state.error = {
-          code: 'BROWSER_LOCAL_SERVER_UNREACHABLE',
-          message,
-        }
-        session.state.status = 'error'
-        this.#finishPageAction(session, navigationSequence)
-        this.#publish(session)
-        throw new BrowserHostError('BROWSER_LOCAL_SERVER_UNREACHABLE', message)
-      }
-    }
 
     return this.#loadPage(sessionId, session, navigationSequence, url)
   }
@@ -564,7 +537,6 @@ export class BrowserHost {
     session: BrowserSession,
     navigationSequence: number,
     url: string,
-    attempt = 1,
   ): Promise<DesktopBrowserState> {
     session.state.url = url
     this.#publish(session)
@@ -599,31 +571,12 @@ export class BrowserHost {
         this.#publish(session)
         return snapshot(session.state)
       }
-      try {
-        return await this.#waitForNavigationSettlement(
-          sessionId,
-          session,
-          navigationSequence,
-          error,
-        )
-      }
-      catch (settlementError) {
-        if (
-          attempt >= BROWSER_TRANSIENT_LOAD_MAX_ATTEMPTS
-          || !isTransientLoadFailure(settlementError)
-        ) {
-          throw settlementError
-        }
-        await wait(this.#transientLoadRetryDelayMs)
-        if (this.#sessions.get(sessionId) !== session)
-          throw this.#sessionNotFound(sessionId)
-        if (!this.#shouldContinuePageAction(session, navigationSequence))
-          return snapshot(session.state)
-        session.activeNavigationSequence = navigationSequence
-        session.state.error = null
-        session.state.status = 'loading'
-        return this.#loadPage(sessionId, session, navigationSequence, url, attempt + 1)
-      }
+      return this.#waitForNavigationSettlement(
+        sessionId,
+        session,
+        navigationSequence,
+        error,
+      )
     }
   }
 
@@ -635,6 +588,10 @@ export class BrowserHost {
   ): Promise<DesktopBrowserState> {
     const deadline = Date.now() + BROWSER_NAVIGATION_SETTLE_TIMEOUT_MS
     const isAbortedLoad = isNavigationAborted(loadError)
+    const loadFailureDeadline = isAbortedLoad
+      ? null
+      : Math.min(deadline, Date.now() + BROWSER_FAILED_NAVIGATION_SETTLE_MS)
+    let pageFailureDeadline: number | null = null
     while (true) {
       if (this.#sessions.get(sessionId) !== session)
         throw this.#sessionNotFound(sessionId)
@@ -650,15 +607,28 @@ export class BrowserHost {
         return snapshot(session.state)
       }
       const hasReplacementCommit = session.mainFrameCommitSequence === navigationSequence
+      const pageFailure = session.state.error
+      if (pageFailure) {
+        pageFailureDeadline ??= Math.min(
+          deadline,
+          Date.now() + BROWSER_FAILED_NAVIGATION_SETTLE_MS,
+        )
+      }
+      else {
+        pageFailureDeadline = null
+      }
       if (
-        session.state.error
-        && session.activeNavigationSequence !== navigationSequence
+        pageFailure
+        && (
+          session.activeNavigationSequence !== navigationSequence
+          || Date.now() >= (pageFailureDeadline ?? deadline)
+        )
       ) {
         this.#finishPageAction(session, navigationSequence)
         throw new BrowserHostError(
-          session.state.error.code,
-          session.state.error.message,
-          session.state.error.reason ?? null,
+          pageFailure.code,
+          pageFailure.message,
+          pageFailure.reason ?? null,
         )
       }
       if (
@@ -667,7 +637,18 @@ export class BrowserHost {
       ) {
         return snapshot(session.state)
       }
-      const remainingMs = deadline - Date.now()
+      if (loadFailureDeadline !== null && Date.now() >= loadFailureDeadline) {
+        const message = browserLoadErrorMessage(loadError)
+        this.#finishPageAction(session, navigationSequence)
+        session.state.error = { code: 'BROWSER_PAGE_FAILED', message }
+        session.state.status = 'error'
+        this.#publish(session)
+        throw new BrowserHostError('BROWSER_PAGE_FAILED', message)
+      }
+      const remainingMs = Math.min(
+        pageFailureDeadline ?? deadline,
+        loadFailureDeadline ?? deadline,
+      ) - Date.now()
       if (remainingMs <= 0) {
         const message = 'Browser navigation did not settle after the initial load was replaced'
         this.#finishPageAction(session, navigationSequence)
@@ -1112,14 +1093,17 @@ export class BrowserHost {
       },
     )
     this.#listen(session, page, 'did-start-loading', () => {
-      if (session.activeNavigationSequence === null) {
+      const isIndependentNavigation = session.activeNavigationSequence === null
+      if (isIndependentNavigation) {
         session.navigationSequence += 1
         session.activeNavigationSequence = session.navigationSequence
         session.semanticDriver?.invalidateDocument()
         session.stoppedNavigationSequence = null
       }
-      session.state.error = null
-      session.state.status = 'loading'
+      if (isIndependentNavigation)
+        session.state.error = null
+      if (!session.state.error)
+        session.state.status = 'loading'
       this.#refreshPageState(session)
       this.#publish(session)
     })
@@ -1533,10 +1517,10 @@ function isNavigationAborted(error: unknown): boolean {
     && /^ERR_ABORTED(?: \(-3\))?(?: |$)/.test(error.message)
 }
 
-function isTransientLoadFailure(error: unknown): boolean {
-  return error instanceof BrowserHostError
-    && error.code === 'BROWSER_PAGE_FAILED'
-    && BROWSER_TRANSIENT_LOAD_ERROR_PATTERN.test(error.message)
+function browserLoadErrorMessage(error: unknown): string {
+  if (error instanceof Error && error.message.trim())
+    return error.message.slice(0, 1_024)
+  return 'Browser page failed to load'
 }
 
 function swallowDriverProbeFailure(error: unknown): false {

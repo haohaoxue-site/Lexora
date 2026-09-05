@@ -26,7 +26,6 @@ export const BROWSER_ADAPTER_RECOVERY_ACTIONS = [
   'request_buddy_approval',
   'request_human_control',
   'request_new_adapter_lease',
-  'start_local_server',
 ] as const
 
 const browserAdapterConversationIdSchema = z.string().trim().min(1).max(128)

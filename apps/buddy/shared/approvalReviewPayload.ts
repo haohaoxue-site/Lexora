@@ -97,6 +97,14 @@ export const approvalReviewPayloadSchema = z.discriminatedUnion('card', [
     toolName: toolNameSchema,
   }).strict(),
   z.object({
+    allowForTurn: z.boolean().default(true),
+    card: z.literal('web'),
+    operation: z.enum(['search', 'fetch']),
+    provider: z.string().trim().min(1).max(256).nullable(),
+    target: z.string().trim().min(1).max(4_096),
+    toolName: z.enum(['lexora_web_search', 'lexora_web_fetch']),
+  }).strict(),
+  z.object({
     action: systemActionSchema,
     allowForTurn: z.boolean().default(true),
     card: z.literal('system-action'),
@@ -248,6 +256,20 @@ export function createApprovalReviewPayload(
       toolName: input.toolName,
     })
   }
+  if (
+    input.kind === 'network'
+    && (input.toolName === 'lexora_web_search' || input.toolName === 'lexora_web_fetch')
+  ) {
+    const operation = input.toolName === 'lexora_web_search' ? 'search' : 'fetch'
+    return approvalReviewPayloadSchema.parse({
+      allowForTurn: input.allowForTurn,
+      card: 'web',
+      operation,
+      provider: readString(input.arguments, 'provider') || null,
+      target: readString(input.arguments, operation === 'search' ? 'query' : 'url'),
+      toolName: input.toolName,
+    })
+  }
   return approvalReviewPayloadSchema.parse({
     allowForTurn: input.allowForTurn,
     argumentNames: readArgumentNames(input.arguments),
@@ -270,7 +292,9 @@ export function approvalReviewPayloadMatchesKind(
     return payload.card === 'automation'
   if (kind === 'browser')
     return payload.card === 'browser-action'
-  return payload.card === 'arguments'
+  return kind === 'network'
+    ? payload.card === 'arguments' || payload.card === 'web'
+    : payload.card === 'arguments'
 }
 
 export function redactShellCommand(command: string): string {

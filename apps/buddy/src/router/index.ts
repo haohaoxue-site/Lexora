@@ -10,7 +10,7 @@ import {
 
 export type DesktopView = 'automations' | 'settings' | 'tasks'
 export type DesktopAutomationSection = 'history' | 'plans'
-export type DesktopSettingsCategory = 'app' | 'models' | 'pet' | 'local' | 'data'
+export type DesktopSettingsCategory = 'app' | 'models' | 'pet' | 'local' | 'data' | 'web'
 
 export const DESKTOP_ROUTE_NAMES = {
   automations: 'desktop.automations',
@@ -21,6 +21,7 @@ export const DESKTOP_ROUTE_NAMES = {
   settingsApp: 'desktop.settings.app',
   settingsData: 'desktop.settings.data',
   settingsLocal: 'desktop.settings.local',
+  settingsWeb: 'desktop.settings.web',
   settingsModels: 'desktop.settings.models',
   settingsPet: 'desktop.settings.pet',
   settingsProvider: 'desktop.settings.models.provider',
@@ -36,6 +37,7 @@ const SETTINGS_ROUTE_NAMES: Record<DesktopSettingsCategory, string> = {
   app: DESKTOP_ROUTE_NAMES.settingsApp,
   data: DESKTOP_ROUTE_NAMES.settingsData,
   local: DESKTOP_ROUTE_NAMES.settingsLocal,
+  web: DESKTOP_ROUTE_NAMES.settingsWeb,
   models: DESKTOP_ROUTE_NAMES.settingsModels,
   pet: DESKTOP_ROUTE_NAMES.settingsPet,
 }
@@ -119,6 +121,12 @@ const routes: ReadonlyArray<RouteRecordRaw> = [
     meta: { desktopView: 'settings' },
     redirect: desktopRouteLocations.settings(),
     children: [
+      {
+        path: 'web',
+        name: DESKTOP_ROUTE_NAMES.settingsWeb,
+        component: () => import('../views/settings/DesktopWebSettingsView.vue'),
+        meta: { desktopView: 'settings', settingsCategory: 'web' },
+      },
       {
         path: 'app',
         name: DESKTOP_ROUTE_NAMES.settingsApp,

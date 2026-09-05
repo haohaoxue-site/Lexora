@@ -744,6 +744,17 @@ function approvalPresentation(review: ApprovalReviewPayload): BuddyToolPresentat
       truncated: false,
     }
   }
+  if (review.card === 'web') {
+    return {
+      card: 'web',
+      description: null,
+      operation: review.operation,
+      output: null,
+      provider: review.provider,
+      target: review.target,
+      truncated: false,
+    }
+  }
   const argumentNames = review.card === 'arguments'
     ? review.argumentNames
     : review.targets.length > 0 ? ['targets'] : []

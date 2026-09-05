@@ -66,6 +66,7 @@ const canExpand = computed(() => {
 })
 const title = computed(() => {
   switch (props.node.presentation.card) {
+    case 'web': return t(props.node.presentation.operation === 'search' ? 'desktop.chat.processToolWebSearch' : 'desktop.chat.processToolWebFetch')
     case 'browser': return browserOperationLabel(props.node.presentation.operation)
     case 'terminal': return t('desktop.chat.processToolCommand')
     case 'read': return t('desktop.chat.processToolRead')
@@ -149,6 +150,7 @@ const summary = computed(() => {
   }
   const detail = (() => {
     switch (presentation.card) {
+      case 'web': return [presentation.target, presentation.provider].filter(Boolean).join(' · ')
       case 'read': return presentation.path
       case 'search': return [presentation.query, presentation.path].filter(Boolean).join(' · ')
       case 'diff': return presentation.path
@@ -166,6 +168,7 @@ const summary = computed(() => {
 })
 const leadingIcon = computed(() => {
   switch (props.node.presentation.card) {
+    case 'web': return props.node.presentation.operation === 'search' ? Search20Regular : Globe20Regular
     case 'browser': return Globe20Regular
     case 'terminal': return WindowConsole20Regular
     case 'read': return Document20Regular

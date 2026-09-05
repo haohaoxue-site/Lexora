@@ -21,6 +21,7 @@ const { browser, browserGuests } = useDesktopApp()
 const { t } = useBuddyI18n(() => props.language)
 const surfaceElement = useTemplateRef<HTMLElement>('surfaceElement')
 const address = shallowRef('')
+const isAddressDirty = shallowRef(false)
 const {
   captureScreenshot,
   goBack,
@@ -63,13 +64,12 @@ const controlAnnouncement = computed(() => controlAnnouncementKey.value
 watch(
   [() => state.value?.sessionId, () => state.value?.url],
   ([sessionId, url], [previousSessionId]) => {
-    if (url === 'about:blank' && sessionId !== previousSessionId) {
-      address.value = ''
+    if (sessionId !== previousSessionId) {
+      isAddressDirty.value = false
+      address.value = url && url !== 'about:blank' ? url : ''
       return
     }
-    const isEditingAddress = document.activeElement instanceof HTMLElement
-      && document.activeElement.dataset.testid === 'browser-address'
-    if (url && url !== 'about:blank' && !isEditingAddress)
+    if (url && url !== 'about:blank' && !isAddressDirty.value)
       address.value = url
   },
 )
@@ -86,13 +86,18 @@ watch(
   },
 )
 
-function openAddress(): void {
-  void navigate(address.value)
+async function openAddress(): Promise<void> {
+  const opened = await navigate(address.value)
+  if (!opened)
+    return
+  isAddressDirty.value = false
+  const url = state.value?.url
+  address.value = url && url !== 'about:blank' ? url : address.value
 }
 
-function restoreCurrentAddress(): void {
-  const url = state.value?.url
-  address.value = url && url !== 'about:blank' ? url : ''
+function updateAddress(value: string): void {
+  address.value = value
+  isAddressDirty.value = true
 }
 
 function handleMenuAction(action: BrowserToolbarMenuActionKey): void {
@@ -119,7 +124,7 @@ function handleMenuAction(action: BrowserToolbarMenuActionKey): void {
 <template>
   <section class="desktop-browser-context-surface" data-testid="browser-context-surface">
     <DesktopBrowserToolbar
-      v-model:address="address"
+      :address="address"
       :busy-action="busyAction"
       :language="language"
       :state="state"
@@ -128,8 +133,8 @@ function handleMenuAction(action: BrowserToolbarMenuActionKey): void {
       @menu="handleMenuAction"
       @navigate="openAddress"
       @reload="reload"
-      @restore-address="restoreCurrentAddress"
       @stop="stop"
+      @update:address="updateAddress"
     />
     <div
       v-if="state?.controller === 'agent'"
@@ -191,9 +196,6 @@ function handleMenuAction(action: BrowserToolbarMenuActionKey): void {
 .desktop-browser-context-surface__control {
   position: relative;
   z-index: 2;
-}
-
-.desktop-browser-context-surface__control {
   display: flex;
   min-width: 0;
   min-height: 2.375rem;

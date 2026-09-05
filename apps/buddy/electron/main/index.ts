@@ -42,6 +42,7 @@ import { createFeedbackIssueUrl } from './feedbackIssue'
 import { registerDesktopIpc } from './ipc'
 import { resolveLinuxConfigDirectory, syncLinuxAutostart } from './linuxAutostart'
 import { registerLocalChatIpc } from './localChatIpc'
+import { registerWebHostRpc } from './network/registerWebHostRpc'
 import { resolveBuddyRuntimePaths } from './paths'
 import {
   probeNativePetControlSocket,
@@ -246,6 +247,7 @@ else {
     const service = new BuddyServiceSupervisor({
       bindPeer(peer) {
         const disposers = [
+          registerWebHostRpc(peer),
           registerBrowserHostRpc(peer, {
             createAdapterLease: input => adapterServer.issueLease(input),
             getHost: () => browserHost,
@@ -376,6 +378,7 @@ else {
       ),
     })
     stopLocalChatIpc = registerLocalChatIpc({
+      readWebCredential: () => credentialVault.read('web', 'tavily'),
       getLanguage: () => desktopLanguage,
       getWindow: () => desktopWindowManager?.window ?? null,
       runtime: service,

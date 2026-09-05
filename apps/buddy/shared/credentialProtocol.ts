@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-export const credentialNamespaceSchema = z.enum(['providers', 'connectors'])
+export const credentialNamespaceSchema = z.enum(['providers', 'connectors', 'web'])
 export const credentialTypeSchema = z.enum(['api_key', 'oauth'])
 
 export const credentialHostErrorCodeSchema = z.enum([

@@ -7,6 +7,7 @@ import type { TaskCapability } from '@/workbenches/tasks/state/useTaskCapability
 import { useAutomationCapability } from '@/workbenches/automations/useAutomationCapability'
 import { createDesktopDataSettingsCapability } from '@/workbenches/settings/data/desktopDataSettingsCapability'
 import { createDesktopLocalSettingsCapability } from '@/workbenches/settings/local/desktopLocalSettingsCapability'
+import { useWebSettingsCapability } from '@/workbenches/settings/web/useWebSettingsCapability'
 
 export interface DesktopCapabilities {
   applicationSettings: DesktopStores['applicationSettings']
@@ -16,6 +17,7 @@ export interface DesktopCapabilities {
   notifications: DesktopStores['notifications']
   providerSettings: DesktopStores['modelProviders']
   tasks: TaskCapability
+  webSettings: ReturnType<typeof useWebSettingsCapability>
 }
 
 interface CreateDesktopCapabilitiesInput {
@@ -49,5 +51,6 @@ export function createDesktopCapabilities(
     notifications: stores.notifications,
     providerSettings: stores.modelProviders,
     tasks: input.tasks,
+    webSettings: useWebSettingsCapability({ api: input.api.localChat.web, language: stores.applicationSettings.language }),
   }
 }

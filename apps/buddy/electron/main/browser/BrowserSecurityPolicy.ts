@@ -27,10 +27,6 @@ export interface BrowserSecuritySession {
   flushStorageData: () => void
   off: ((event: 'certificate-error', listener: CertificateErrorListener) => unknown) & ((event: 'will-download', listener: DownloadListener) => unknown)
   on: ((event: 'certificate-error', listener: CertificateErrorListener) => unknown) & ((event: 'will-download', listener: DownloadListener) => unknown)
-  resolveHost: (
-    hostname: string,
-    options: { cacheUsage: 'allowed' | 'disallowed' },
-  ) => Promise<{ endpoints: Array<{ address: string }> }>
   setPermissionCheckHandler: (
     handler: null | ((...args: never[]) => boolean),
   ) => void
@@ -92,11 +88,6 @@ type BeforeRequestListener = (
   details: BrowserRequestDetails,
   callback: (response: { cancel: boolean }) => void,
 ) => void
-
-interface ResolutionCacheEntry {
-  allowed: boolean
-  expiresAt: number
-}
 
 interface BrowserSecurityRoute {
   isRequestAllowed: (details: BrowserRequestDetails) => Promise<boolean>
@@ -207,34 +198,6 @@ function readWebContentsId(value: unknown): number {
   return -1
 }
 
-const PUBLIC_RESOLUTION_TTL_MS = 30_000
-const METADATA_HOSTNAMES = new Set([
-  'instance-data.ec2.internal',
-  'metadata.azure.internal',
-  'metadata.google.internal',
-  'metadata.oraclecloud.com',
-])
-const BLOCKED_IPV4_CIDRS = [
-  ['0.0.0.0', 8],
-  ['10.0.0.0', 8],
-  ['100.64.0.0', 10],
-  ['127.0.0.0', 8],
-  ['169.254.0.0', 16],
-  ['172.16.0.0', 12],
-  ['192.0.0.0', 24],
-  ['192.0.2.0', 24],
-  ['192.88.99.0', 24],
-  ['192.168.0.0', 16],
-  ['198.18.0.0', 15],
-  ['198.51.100.0', 24],
-  ['203.0.113.0', 24],
-  ['224.0.0.0', 4],
-  ['240.0.0.0', 4],
-] as const
-const KNOWN_SYNTHETIC_DNS_IPV4_CIDRS = [
-  ['198.18.0.0', 15],
-] as const
-
 export class BrowserSecurityPolicyError extends Error {
   readonly code: DesktopBrowserErrorCode = 'BROWSER_NAVIGATION_BLOCKED'
   readonly reason: BrowserFailureReason
@@ -251,12 +214,10 @@ export class BrowserSecurityPolicy {
   readonly #onPermissionDenied: () => void
   readonly #onRequestBlocked: (details: BrowserRequestDetails) => void
   readonly #page: BrowserSecurityPage
-  readonly #resolutionCache = new Map<string, ResolutionCacheEntry>()
   readonly #releaseSessionPolicy: () => void
   readonly #session: BrowserSecuritySession
   #disposed = false
   #fileChooserGuardPromise: Promise<void> | null = null
-  #localAuthority: string | null = null
   #localFileRoot: string | null = null
   #ownsDebugger = false
 
@@ -290,16 +251,6 @@ export class BrowserSecurityPolicy {
       )
     }
 
-    if (isLoopbackUrl(url)) {
-      this.#localAuthority = url.host
-      this.#localFileRoot = null
-      return url.toString()
-    }
-    if (url.protocol !== 'https:')
-      throw new BrowserSecurityPolicyError('HTTPS_REQUIRED', 'Browser navigation requires HTTPS')
-    await this.#assertAllowedHostname(url.hostname)
-
-    this.#localAuthority = null
     this.#localFileRoot = null
     return url.toString()
   }
@@ -334,7 +285,6 @@ export class BrowserSecurityPolicy {
         'Browser local file target is invalid',
       )
     }
-    this.#localAuthority = null
     this.#localFileRoot = root
     return pathToFileURL(entry).toString()
   }
@@ -347,7 +297,6 @@ export class BrowserSecurityPolicy {
     if (this.#ownsDebugger && this.#page.debugger.isAttached())
       this.#page.debugger.detach()
     this.#ownsDebugger = false
-    this.#resolutionCache.clear()
     this.#localFileRoot = null
   }
 
@@ -387,69 +336,6 @@ export class BrowserSecurityPolicy {
     )
   }
 
-  async #assertAllowedHostname(rawHostname: string): Promise<void> {
-    const hostname = normalizeHostname(rawHostname)
-    if (!hostname || isBlockedHostname(hostname)) {
-      throw new BrowserSecurityPolicyError(
-        'BLOCKED_HOSTNAME',
-        'Browser navigation target is blocked by hostname policy',
-      )
-    }
-
-    const addressKind = isIP(hostname)
-    if (addressKind > 0) {
-      if (isPublicIpAddress(hostname))
-        return
-      throw new BrowserSecurityPolicyError(
-        'NON_PUBLIC_IP_LITERAL',
-        'Browser navigation target is not a public IP address',
-      )
-    }
-
-    const cached = this.#resolutionCache.get(hostname)
-    if (cached && cached.expiresAt > Date.now()) {
-      if (cached.allowed)
-        return
-      throw new BrowserSecurityPolicyError(
-        'NON_PUBLIC_RESOLUTION',
-        'Browser hostname resolved to a non-public address',
-      )
-    }
-
-    let resolution: Awaited<ReturnType<BrowserSecuritySession['resolveHost']>>
-    try {
-      resolution = await this.#session.resolveHost(hostname, {
-        cacheUsage: cached ? 'disallowed' : 'allowed',
-      })
-    }
-    catch {
-      throw new BrowserSecurityPolicyError(
-        'DNS_RESOLUTION_FAILED',
-        'Browser hostname could not be resolved',
-      )
-    }
-    const addresses = resolution.endpoints.map(endpoint => endpoint.address)
-    if (addresses.length === 0) {
-      throw new BrowserSecurityPolicyError(
-        'DNS_RESOLUTION_FAILED',
-        'Browser hostname did not resolve to an address',
-      )
-    }
-    const allowed = addresses.every(address => (
-      isPublicIpAddress(address) || isKnownSyntheticDnsAddress(address)
-    ))
-    this.#resolutionCache.set(hostname, {
-      allowed,
-      expiresAt: Date.now() + PUBLIC_RESOLUTION_TTL_MS,
-    })
-    if (!allowed) {
-      throw new BrowserSecurityPolicyError(
-        'NON_PUBLIC_RESOLUTION',
-        'Browser hostname resolved to a non-public address',
-      )
-    }
-  }
-
   async #isRequestAllowed(details: BrowserRequestDetails): Promise<boolean> {
     if (this.#disposed)
       return false
@@ -466,21 +352,9 @@ export class BrowserSecurityPolicy {
     if (this.#localFileRoot !== null && details.resourceType !== 'mainFrame')
       return false
 
-    if (isLoopbackUrl(url)) {
-      const allowed = this.#localAuthority === url.host
-      if (allowed && details.resourceType === 'mainFrame')
-        this.#localAuthority = url.host
-      if (allowed && details.resourceType === 'mainFrame')
-        this.#localFileRoot = null
-      return allowed
-    }
-
-    const isSecureWebRequest = url.protocol === 'https:' || url.protocol === 'wss:'
-    if (!isSecureWebRequest)
+    const isWebRequest = ['http:', 'https:', 'ws:', 'wss:'].includes(url.protocol)
+    if (!isWebRequest || url.username || url.password)
       return false
-    await this.#assertAllowedHostname(url.hostname)
-    if (details.resourceType === 'mainFrame')
-      this.#localAuthority = null
     if (details.resourceType === 'mainFrame')
       this.#localFileRoot = null
     return true
@@ -502,14 +376,6 @@ export class BrowserSecurityPolicy {
 function containsPath(root: string, path: string): boolean {
   const child = relative(root, path)
   return child === '' || (child !== '..' && !child.startsWith(`..${sep}`))
-}
-
-function isBlockedHostname(hostname: string): boolean {
-  return hostname.endsWith('.home.arpa')
-    || hostname.endsWith('.internal')
-    || hostname.endsWith('.lan')
-    || hostname.endsWith('.local')
-    || METADATA_HOSTNAMES.has(hostname)
 }
 
 function isLoopbackUrl(url: URL): boolean {
@@ -534,42 +400,6 @@ function isLoopbackIpAddress(rawAddress: string): boolean {
     return false
   const mappedIpv4 = readMappedIpv4(address)
   return mappedIpv4 ? isLoopbackIpAddress(mappedIpv4) : address === '::1'
-}
-
-function isPublicIpAddress(rawAddress: string): boolean {
-  const address = normalizeHostname(rawAddress)
-  const family = isIP(address)
-  if (family === 4)
-    return isPublicIpv4Address(address)
-  if (family !== 6)
-    return false
-
-  const mappedIpv4 = readMappedIpv4(address)
-  if (mappedIpv4)
-    return isPublicIpv4Address(mappedIpv4)
-  if (address === '::' || address === '::1' || address.startsWith('2001:db8:'))
-    return false
-  const firstHextet = Number.parseInt(address.split(':', 1)[0] || '0', 16)
-  return (firstHextet & 0xE000) === 0x2000
-}
-
-function isPublicIpv4Address(address: string): boolean {
-  return !BLOCKED_IPV4_CIDRS.some(([network, prefix]) => (
-    isIpv4InCidr(address, network, prefix)
-  ))
-}
-
-function isKnownSyntheticDnsAddress(rawAddress: string): boolean {
-  const address = normalizeHostname(rawAddress)
-  if (isIP(address) === 4) {
-    return KNOWN_SYNTHETIC_DNS_IPV4_CIDRS.some(([network, prefix]) => (
-      isIpv4InCidr(address, network, prefix)
-    ))
-  }
-  if (isIP(address) !== 6)
-    return false
-  const mappedIpv4 = readMappedIpv4(address)
-  return mappedIpv4 ? isKnownSyntheticDnsAddress(mappedIpv4) : false
 }
 
 function normalizeHostname(hostname: string): string {
@@ -599,17 +429,4 @@ function readMappedIpv4(address: string): string | null {
   const high = Number.parseInt(hexadecimal[1], 16)
   const low = Number.parseInt(hexadecimal[2], 16)
   return `${high >>> 8}.${high & 0xFF}.${low >>> 8}.${low & 0xFF}`
-}
-
-function isIpv4InCidr(address: string, network: string, prefix: number): boolean {
-  const addressValue = readIpv4(address)
-  const networkValue = readIpv4(network)
-  const mask = (0xFFFFFFFF << (32 - prefix)) >>> 0
-  return (addressValue & mask) >>> 0 === (networkValue & mask) >>> 0
-}
-
-function readIpv4(address: string): number {
-  return address.split('.').reduce((value, octet) => (
-    ((value << 8) | Number(octet)) >>> 0
-  ), 0)
 }
