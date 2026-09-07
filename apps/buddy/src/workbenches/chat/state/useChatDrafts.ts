@@ -1,201 +1,388 @@
 import type {
-  LocalAttachment,
+  LocalComposerDraft,
   LocalWorkspaceDraft,
 } from '@buddy-electron/shared/localChatApi'
-import type { BuddyApprovalPolicy } from '@buddy-shared/approvalPolicy'
-import type { BuddyExecutionProfile } from '@buddy-shared/executionProfile'
+import type { BuddyUserContentV1 } from '@buddy-shared/buddyUserContent'
 import type { BuddyPermissionSettings } from '@buddy-shared/permissionMode'
+import type { JSONContent } from '@tiptap/core'
 import type { ComputedRef } from 'vue'
 import { BUDDY_DEFAULT_APPROVAL_POLICY } from '@buddy-shared/approvalPolicy'
-import {
-  BUDDY_ATTACHMENT_COUNT_LIMIT,
-  BUDDY_ATTACHMENT_TOTAL_BYTES_LIMIT,
-} from '@buddy-shared/attachmentPolicy'
+import { buddyUserContentToText, createBuddyUserContent } from '@buddy-shared/buddyUserContent'
 import { BUDDY_DEFAULT_EXECUTION_PROFILE } from '@buddy-shared/executionProfile'
-import { shallowRef } from 'vue'
+import { computed, shallowReactive, shallowRef, watch } from 'vue'
+import {
+  chatComposerDocumentToUserContent,
+  userContentToChatComposerDocument,
+} from '../composer/chatComposerDocument'
+import { createChatComposerContentFromText } from '../composer/chatComposerInput'
+import {
+  getChatComposerResourceIds,
+  pruneChatComposerResources,
+} from '../composer/chatComposerResourceReferences'
 
 interface UseChatDraftsOptions {
-  cleanupDraftAttachments: () => Promise<unknown>
   onChange: () => void
-  releaseAttachments: (attachmentIds: ReadonlyArray<string>) => Promise<unknown>
   targetKey: ComputedRef<string>
 }
 
 interface ChatDraftState {
-  approvalPolicy: BuddyApprovalPolicy
-  attachments: ReadonlyArray<LocalAttachment>
-  composerContent: LocalWorkspaceDraft['composerContent']
-  content: string
+  approvalPolicy: LocalComposerDraft['executionConfig']['approvalPolicy']
+  confirmedSnapshot: string | null
+  content: BuddyUserContentV1
   draftId: string
-  executionProfile: BuddyExecutionProfile
-  requestFingerprint: string | null
-  requestId: string | null
+  editorSessionId: string
+  editVersion: number
+  executionProfile: LocalComposerDraft['executionConfig']['executionProfile']
+  modelSelection: LocalComposerDraft['modelSelection']
+  revision: number | null
+}
+
+export interface ChatDraftSnapshot extends ChatDraftState {
+  targetKey: string
 }
 
 export function useChatDrafts(options: UseChatDraftsOptions) {
-  const draftsByScope = new Map<string, ChatDraftState>()
-  const attachments = shallowRef<ReadonlyArray<LocalAttachment>>([])
-  const composerContent = shallowRef<LocalWorkspaceDraft['composerContent']>(null)
-  const draft = shallowRef('')
-  const draftId = shallowRef<string>(crypto.randomUUID())
-  const approvalPolicy = shallowRef<BuddyApprovalPolicy>(BUDDY_DEFAULT_APPROVAL_POLICY)
-  const executionProfile = shallowRef<BuddyExecutionProfile>(BUDDY_DEFAULT_EXECUTION_PROFILE)
+  const draftsByScope = shallowReactive(new Map<string, ChatDraftState>())
+  const isolatedDraft = shallowRef<{ sourceKey: string, targetKey: string } | null>(null)
+  watch(
+    () => [options.targetKey.value, draftsByScope.has(options.targetKey.value)] as const,
+    ([key, exists]) => {
+      if (!exists)
+        draftsByScope.set(key, emptyDraft())
+    },
+    { flush: 'sync', immediate: true },
+  )
+  const activeTargetKey = computed(() => (
+    isolatedDraft.value?.sourceKey === options.targetKey.value
+      ? isolatedDraft.value.targetKey
+      : options.targetKey.value
+  ))
+  const currentDraft = computed(() => load(activeTargetKey.value))
+  const composerContent = computed(() => userContentToChatComposerDocument(currentDraft.value.content))
+  const draft = computed(() => buddyUserContentToText(currentDraft.value.content))
+  const draftId = computed(() => currentDraft.value.draftId)
+  const editorKey = computed(() => currentDraft.value.editorSessionId)
+  const approvalPolicy = computed(() => currentDraft.value.approvalPolicy)
+  const executionProfile = computed(() => currentDraft.value.executionProfile)
 
-  async function appendAttachments(incoming: ReadonlyArray<LocalAttachment>): Promise<number> {
-    const accepted = [...attachments.value]
-    const rejectedIds: string[] = []
-    let totalBytes = accepted.reduce((total, attachment) => total + attachment.sizeBytes, 0)
-    for (const attachment of incoming) {
-      if (
-        accepted.length >= BUDDY_ATTACHMENT_COUNT_LIMIT
-        || totalBytes + attachment.sizeBytes > BUDDY_ATTACHMENT_TOTAL_BYTES_LIMIT
-      ) {
-        rejectedIds.push(attachment.attachmentId)
-        continue
-      }
-      accepted.push(attachment)
-      totalBytes += attachment.sizeBytes
-    }
-    attachments.value = accepted
-    saveCurrentDraft(true)
-    if (rejectedIds.length)
-      await options.releaseAttachments(rejectedIds)
-    return rejectedIds.length
+  function updateComposerContent(text: string, value: JSONContent | null) {
+    const document = value ?? createChatComposerContentFromText(text)
+    updateCurrentDraft({ content: chatComposerDocumentToUserContent(document) })
   }
 
-  async function removeAttachment(index: number) {
-    const removed = attachments.value[index]
-    if (!removed)
-      return
-    attachments.value = attachments.value.filter((_item, itemIndex) => itemIndex !== index)
-    saveCurrentDraft(true)
-    await options.releaseAttachments([removed.attachmentId])
-  }
-
-  function updateComposerContent(content: string, value: LocalWorkspaceDraft['composerContent']) {
-    draft.value = content
-    composerContent.value = value
-    saveCurrentDraft(true)
-  }
-
-  function saveCurrentDraft(resetRequestId = false) {
-    const current = load(options.targetKey.value)
-    draftsByScope.set(options.targetKey.value, {
-      approvalPolicy: approvalPolicy.value,
-      attachments: attachments.value,
-      composerContent: composerContent.value,
-      content: draft.value,
-      draftId: draftId.value,
-      executionProfile: executionProfile.value,
-      requestFingerprint: resetRequestId ? null : current.requestFingerprint,
-      requestId: resetRequestId ? null : current.requestId,
+  function updateCurrentDraft(value: Partial<ChatDraftState>) {
+    draftsByScope.set(activeTargetKey.value, {
+      ...currentDraft.value,
+      ...value,
+      editVersion: currentDraft.value.editVersion + 1,
     })
     options.onChange()
   }
 
-  function restoreCurrentDraft() {
-    const current = load(options.targetKey.value)
-    attachments.value = current.attachments
-    composerContent.value = current.composerContent
-    draft.value = current.content
-    draftId.value = current.draftId
-    approvalPolicy.value = current.approvalPolicy
-    executionProfile.value = current.executionProfile
+  function load(key: string): ChatDraftState {
+    const existing = draftsByScope.get(key)
+    if (existing)
+      return existing
+    const value = emptyDraft()
+    draftsByScope.set(key, value)
+    return value
   }
 
-  function load(key: string): ChatDraftState {
-    return draftsByScope.get(key) ?? emptyDraft()
+  function findDraft(draftId: string) {
+    return [...draftsByScope.entries()].find(([, value]) => value.draftId === draftId)
+  }
+
+  function updateSourceDocument(draftId: string, transform: (document: JSONContent) => JSONContent) {
+    const source = findDraft(draftId)
+    if (!source)
+      return
+    const [key, current] = source
+    const content = chatComposerDocumentToUserContent(
+      transform(userContentToChatComposerDocument(current.content)),
+    )
+    if (JSON.stringify(content) === JSON.stringify(current.content))
+      return
+    draftsByScope.set(key, {
+      ...current,
+      content,
+      editVersion: current.editVersion + 1,
+    })
+    options.onChange()
+  }
+
+  function snapshot(targetKey: string): ChatDraftSnapshot {
+    return cloneSnapshot(targetKey, load(targetKey))
+  }
+
+  function confirmRemote(
+    submitted: ChatDraftSnapshot,
+    remote: LocalComposerDraft,
+    replaceContent: boolean,
+  ) {
+    const source = findDraft(submitted.draftId)
+    if (!source)
+      return false
+    const [key, current] = source
+    const unchanged = current.editorSessionId === submitted.editorSessionId
+      && current.editVersion === submitted.editVersion
+    draftsByScope.set(key, {
+      ...current,
+      ...(replaceContent && unchanged
+        ? {
+            approvalPolicy: remote.executionConfig.approvalPolicy,
+            content: cloneContent(remote.content),
+            executionProfile: remote.executionConfig.executionProfile,
+            modelSelection: remote.modelSelection,
+          }
+        : {}),
+      confirmedSnapshot: draftValueFingerprint(remote),
+      draftId: remote.draftId,
+      revision: remote.revision,
+    })
+    return true
   }
 
   return {
-    approvalPolicy,
-    appendAttachments,
-    attachments,
-    cleanupAbandonedAttachments: options.cleanupDraftAttachments,
-    composerContent,
-    draft,
-    draftId,
-    exportDrafts: (): LocalWorkspaceDraft[] => [...draftsByScope.entries()].map(([targetKey, value]) => ({
-      approvalPolicy: value.approvalPolicy,
-      attachments: value.attachments,
-      composerContent: value.composerContent,
-      content: value.content,
-      draftId: value.draftId,
-      executionProfile: value.executionProfile,
-      requestFingerprint: value.requestFingerprint,
-      requestId: value.requestId,
-      targetKey,
-    })),
-    hydrate(drafts: ReadonlyArray<LocalWorkspaceDraft>) {
-      draftsByScope.clear()
-      for (const value of drafts) {
-        draftsByScope.set(value.targetKey, {
-          approvalPolicy: value.approvalPolicy,
-          attachments: value.attachments,
-          composerContent: value.composerContent,
-          content: value.content,
-          draftId: value.draftId,
-          executionProfile: value.executionProfile,
-          requestFingerprint: value.requestFingerprint,
-          requestId: value.requestId,
-        })
-      }
-    },
-    load,
-    executionProfile,
-    prepareSend(requestFingerprint: string) {
-      const current = load(options.targetKey.value)
-      const requestId = current.requestFingerprint === requestFingerprint
-        ? current.requestId ?? crypto.randomUUID()
-        : crypto.randomUUID()
-      const value = { ...load(options.targetKey.value), requestFingerprint, requestId }
-      draftsByScope.set(options.targetKey.value, value)
-      options.onChange()
-      return value
-    },
-    retarget(sourceKey: string, targetKey: string) {
-      const value = load(sourceKey)
-      if (sourceKey !== targetKey)
+    acknowledgeSend(receipt: ComposerDraftReceipt, targetKey: string) {
+      const source = findDraft(receipt.draftId)
+      if (!source)
+        return false
+      const [sourceKey, current] = source
+      if (current.revision !== receipt.sourceRevision)
+        return current.revision === receipt.committedRevision
+      const wasConfirmed = current.confirmedSnapshot === stateValueFingerprint(current)
+      const empty = createBuddyUserContent()
+      const destination = draftsByScope.get(targetKey)
+      const key = destination && destination.draftId !== current.draftId ? sourceKey : targetKey
+      if (sourceKey !== key)
         draftsByScope.delete(sourceKey)
+      const next = {
+        ...current,
+        confirmedSnapshot: stateValueFingerprint({ ...current, content: empty }),
+        content: wasConfirmed ? empty : current.content,
+        editorSessionId: crypto.randomUUID(),
+        editVersion: current.editVersion + (wasConfirmed ? 1 : 0),
+        revision: receipt.committedRevision,
+      }
+      draftsByScope.set(key, next)
+      if (!wasConfirmed)
+        options.onChange()
+      return wasConfirmed
+    },
+    appendResourcePanel(draftId: string, resourceIds: readonly string[], editorSessionId?: string) {
+      if (editorSessionId && findDraft(draftId)?.[1].editorSessionId !== editorSessionId)
+        return
+      updateSourceDocument(draftId, document => ({
+        ...document,
+        attrs: {
+          ...document.attrs,
+          panelResourceIds: [
+            ...new Set([...(document.attrs?.panelResourceIds ?? []), ...resourceIds]),
+          ],
+        },
+      }))
+    },
+    approvalPolicy,
+    composerContent,
+    beginIsolated(targetKey: string, content: BuddyUserContentV1) {
+      if (isolatedDraft.value)
+        return false
+      const current = currentDraft.value
+      const existing = load(targetKey)
       draftsByScope.set(targetKey, {
-        ...value,
-        requestFingerprint: null,
-        requestId: null,
+        ...existing,
+        approvalPolicy: current.approvalPolicy,
+        content: cloneContent(content),
+        editorSessionId: crypto.randomUUID(),
+        editVersion: existing.editVersion + 1,
+        executionProfile: current.executionProfile,
+        modelSelection: current.modelSelection,
       })
+      isolatedDraft.value = { sourceKey: options.targetKey.value, targetKey }
       options.onChange()
+      return true
     },
-    removeAttachment,
-    restoreCurrentDraft,
-    saveCurrentDraft,
-    setPermissionSettings(settings: BuddyPermissionSettings) {
-      approvalPolicy.value = settings.approvalPolicy
-      executionProfile.value = settings.executionProfile
-      saveCurrentDraft(true)
+    cancelIsolated(targetKey: string) {
+      if (isolatedDraft.value?.targetKey !== targetKey)
+        return false
+      isolatedDraft.value = null
+      return true
     },
-    clear(key: string) {
-      draftsByScope.delete(key)
+    completeIsolated(receipt: ComposerDraftReceipt, targetKey: string, sourceKey: string) {
+      const current = draftsByScope.get(sourceKey)
+      if (
+        isolatedDraft.value?.targetKey !== sourceKey
+        || !current
+        || current.draftId !== receipt.draftId
+        || current.revision !== receipt.sourceRevision
+      ) {
+        return false
+      }
+      const wasConfirmed = current.confirmedSnapshot === stateValueFingerprint(current)
+      const empty = createBuddyUserContent()
+      draftsByScope.delete(sourceKey)
+      draftsByScope.set(targetKey, {
+        ...current,
+        confirmedSnapshot: stateValueFingerprint({ ...current, content: empty }),
+        content: wasConfirmed ? empty : current.content,
+        editorSessionId: crypto.randomUUID(),
+        editVersion: current.editVersion + (wasConfirmed ? 1 : 0),
+        revision: receipt.committedRevision,
+      })
+      isolatedDraft.value = null
       options.onChange()
+      return true
+    },
+    confirmOpen(
+      submitted: ChatDraftSnapshot,
+      remote: LocalComposerDraft,
+      preserveLocalContent = false,
+    ) {
+      return confirmRemote(submitted, remote, !preserveLocalContent)
+    },
+    confirmSave(submitted: ChatDraftSnapshot, remote: LocalComposerDraft) {
+      return confirmRemote(submitted, remote, false)
     },
     async discard(key: string) {
-      const value = load(key)
       draftsByScope.delete(key)
       options.onChange()
-      if (value.attachments.length)
-        await options.releaseAttachments(value.attachments.map(item => item.attachmentId))
     },
+    async discardConversation(conversationId: string) {
+      const keys = [...draftsByScope.keys()].filter(
+        key => key.startsWith(`conversation:${conversationId}:`)
+          || key.startsWith(`message-edit:${conversationId}:`),
+      )
+      for (const key of keys)
+        draftsByScope.delete(key)
+      options.onChange()
+    },
+    draft,
+    draftId,
+    editorKey,
+    executionProfile,
+    hydrate(values: ReadonlyArray<{ draft: LocalComposerDraft, targetKey: string }>) {
+      draftsByScope.clear()
+      for (const value of values)
+        draftsByScope.set(value.targetKey, fromRemote(value.draft))
+      load(options.targetKey.value)
+    },
+    importLegacy(targetKey: string, value: LocalWorkspaceDraft) {
+      const document = value.composerContent as JSONContent | null
+        ?? createChatComposerContentFromText(value.content)
+      draftsByScope.set(targetKey, {
+        ...emptyDraft(),
+        approvalPolicy: value.approvalPolicy,
+        content: chatComposerDocumentToUserContent(document),
+        draftId: value.draftId,
+        executionProfile: value.executionProfile,
+      })
+    },
+    isEditorSessionCurrent(value: Pick<ChatDraftState, 'draftId' | 'editorSessionId'>) {
+      return findDraft(value.draftId)?.[1].editorSessionId === value.editorSessionId
+    },
+    isPersisted(value: ChatDraftSnapshot) {
+      return value.revision !== null && value.confirmedSnapshot === stateValueFingerprint(value)
+    },
+    isUnchanged(value: ChatDraftSnapshot) {
+      const current = findDraft(value.draftId)?.[1]
+      return current?.editorSessionId === value.editorSessionId
+        && current.editVersion === value.editVersion
+    },
+    listSnapshots: () => [...draftsByScope.keys()].map(snapshot),
+    load,
+    modelSelection: computed(() => currentDraft.value.modelSelection),
+    rejectResources(draftId: string, resourceIds: readonly string[]) {
+      updateSourceDocument(
+        draftId,
+        document => pruneChatComposerResources(document, new Set(resourceIds)),
+      )
+    },
+    resourceIdsForDraft(draftId: string) {
+      const value = findDraft(draftId)?.[1]
+      return getChatComposerResourceIds(
+        value ? userContentToChatComposerDocument(value.content) : null,
+      )
+    },
+    setModelSelection(modelSelection: LocalComposerDraft['modelSelection']) {
+      updateCurrentDraft({ modelSelection })
+    },
+    setUserContent(content: BuddyUserContentV1) {
+      if (JSON.stringify(content) === JSON.stringify(currentDraft.value.content))
+        return
+      updateCurrentDraft({ content: cloneContent(content) })
+    },
+    setPermissionSettings(settings: BuddyPermissionSettings) {
+      updateCurrentDraft(settings)
+    },
+    snapshot,
     updateComposerContent,
   }
+}
+
+interface ComposerDraftReceipt {
+  committedRevision: number
+  draftId: string
+  sourceRevision: number
 }
 
 function emptyDraft(): ChatDraftState {
   return {
     approvalPolicy: BUDDY_DEFAULT_APPROVAL_POLICY,
-    attachments: [],
-    composerContent: null,
-    content: '',
+    confirmedSnapshot: null,
+    content: createBuddyUserContent(),
     draftId: crypto.randomUUID(),
+    editorSessionId: crypto.randomUUID(),
+    editVersion: 0,
     executionProfile: BUDDY_DEFAULT_EXECUTION_PROFILE,
-    requestFingerprint: null,
-    requestId: null,
+    modelSelection: null,
+    revision: null,
   }
+}
+
+function fromRemote(draft: LocalComposerDraft): ChatDraftState {
+  return {
+    approvalPolicy: draft.executionConfig.approvalPolicy,
+    confirmedSnapshot: draftValueFingerprint(draft),
+    content: cloneContent(draft.content),
+    draftId: draft.draftId,
+    editorSessionId: crypto.randomUUID(),
+    editVersion: 0,
+    executionProfile: draft.executionConfig.executionProfile,
+    modelSelection: draft.modelSelection,
+    revision: draft.revision,
+  }
+}
+
+function cloneSnapshot(targetKey: string, draft: ChatDraftState): ChatDraftSnapshot {
+  return {
+    ...draft,
+    content: cloneContent(draft.content),
+    targetKey,
+  }
+}
+
+function cloneContent(content: BuddyUserContentV1): BuddyUserContentV1 {
+  return JSON.parse(JSON.stringify(content)) as BuddyUserContentV1
+}
+
+function draftValueFingerprint(draft: LocalComposerDraft): string {
+  return JSON.stringify({
+    content: draft.content,
+    executionConfig: draft.executionConfig,
+    modelSelection: draft.modelSelection,
+  })
+}
+
+function stateValueFingerprint(draft: Pick<
+  ChatDraftState,
+  'approvalPolicy' | 'content' | 'executionProfile' | 'modelSelection'
+>): string {
+  return JSON.stringify({
+    content: draft.content,
+    executionConfig: {
+      approvalPolicy: draft.approvalPolicy,
+      executionProfile: draft.executionProfile,
+    },
+    modelSelection: draft.modelSelection,
+  })
 }

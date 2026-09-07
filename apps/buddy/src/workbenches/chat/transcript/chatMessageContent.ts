@@ -1,5 +1,6 @@
 import type { LocalMessage } from '@buddy-electron/shared/localChatApi'
 import { readBuddyInterruptedMessageContent } from '@buddy-shared/buddyMessageContent'
+import { buddyUserContentToText, readBuddyUserMessageContent } from '@buddy-shared/buddyUserContent'
 
 export interface ChatMessageInterruption {
   truncated: boolean
@@ -21,12 +22,34 @@ export function getChatMessageInterruption(
 }
 
 export function getChatMessageText(message: LocalMessage): string {
+  const structured = getChatMessageUserContent(message)
+  if (structured) {
+    const attachmentNames = new Map(
+      message.attachments.map(attachment => [attachment.attachmentId, attachment.name]),
+    )
+    const resourceLabels = new Map(
+      structured.resourceSnapshots.map(snapshot => [
+        snapshot.resourceId,
+        attachmentNames.get(snapshot.attachmentId) ?? 'file',
+      ]),
+    )
+    return buddyUserContentToText(
+      structured.userContent,
+      resourceId => `@${resourceLabels.get(resourceId) ?? 'file'}`,
+    )
+  }
   if (typeof message.content === 'string')
     return message.content
   if (!message.content || typeof message.content !== 'object' || Array.isArray(message.content))
     return ''
   const text = (message.content as Record<string, unknown>).text
   return typeof text === 'string' ? text : ''
+}
+
+export function getChatMessageUserContent(message: LocalMessage) {
+  if (message.role !== 'user')
+    return null
+  return readBuddyUserMessageContent(message.content)
 }
 
 export function getChatMessageDisplayText(

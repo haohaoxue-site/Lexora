@@ -42,6 +42,7 @@ const props = defineProps<{
   branchNavigators: ReadonlyMap<string, ChatMessageBranchNavigator>
   conversationId: string
   displayRows: ReadonlyArray<ChatTranscriptDisplayRow>
+  editingMessageId?: string | null
   hasOlderMessages?: boolean
   isLoadingOlderMessages?: boolean
   language: BuddyLocale
@@ -53,7 +54,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   activateBranch: [branchId: string]
-  editUserMessage: [messageId: string, content: string]
+  editUserMessage: [messageId: string]
   openArtifact: [artifactId: string]
   openChanges: [changeSetId: string]
   prepareOutline: []
@@ -69,7 +70,6 @@ const { t } = useBuddyI18n(() => props.language)
 const transcriptViewport = useTemplateRef<BuddyChatTranscriptViewportHandle>('transcriptViewport')
 const OUTLINE_HIGHLIGHT_DURATION_MS = 1_200
 const agentTurnOpenOverrides = shallowRef<ReadonlyMap<string, boolean>>(new Map())
-const editingMessageId = shallowRef<string | null>(null)
 const activeOutlineMessageId = shallowRef<string | null>(null)
 const highlightedOutlineMessageId = shallowRef<string | null>(null)
 let outlineHighlightTimer: number | null = null
@@ -96,23 +96,6 @@ function toggleAgentTurn(turn: ChatAgentTurn) {
 function regenerateMessage(message: LocalMessage) {
   if (message.runId)
     emit('regenerateAssistant', message.runId)
-}
-
-function isEditingMessage(message: LocalMessage): boolean {
-  return editingMessageId.value === message.id
-}
-
-function startEditingMessage(message: LocalMessage) {
-  editingMessageId.value = message.id
-}
-
-function cancelEditingMessage() {
-  editingMessageId.value = null
-}
-
-function submitEditedMessage(message: LocalMessage, content: string) {
-  emit('editUserMessage', message.id, content)
-  cancelEditingMessage()
 }
 
 function recoveryNoticeLabel(
@@ -276,8 +259,8 @@ onBeforeUnmount(clearOutlineHighlight)
           class="buddy-chat-transcript-row" :class="[
             { 'is-outline-highlighted': item.message.id === highlightedOutlineMessageId },
           ]"
-          :editing="isEditingMessage(item.message)"
           :is-agent-turn-result="item.isAgentTurnResult"
+          :editing="item.message.id === editingMessageId"
           :language="language"
           :message="item.message"
           :search-match="matchingSearchMessageIds.has(item.message.id)"
@@ -285,12 +268,10 @@ onBeforeUnmount(clearOutlineHighlight)
           :turn-outputs="item.turnOutputs"
           :turn-changes="item.turnChanges"
           @activate-branch="emit('activateBranch', $event)"
-          @cancel-edit="cancelEditingMessage"
-          @edit="submitEditedMessage(item.message, $event)"
           @open-artifact="emit('openArtifact', $event)"
           @open-changes="emit('openChanges', $event)"
           @regenerate="regenerateMessage(item.message)"
-          @start-edit="startEditingMessage(item.message)"
+          @start-edit="emit('editUserMessage', item.message.id)"
         />
 
         <BuddyChatAgentTurn

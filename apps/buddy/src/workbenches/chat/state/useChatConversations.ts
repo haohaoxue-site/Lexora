@@ -58,10 +58,8 @@ export function useChatConversations(options: UseChatConversationsOptions) {
     if (!conversation)
       return
     directlyOpenedConversation.value = indexed ? null : conversation
-    options.drafts.saveCurrentDraft()
     options.session.activateConversation(conversation)
     options.restoreConversationModelSelection(conversation.modelSelection)
-    options.drafts.restoreCurrentDraft()
     await options.persistWorkspaceState()
     await Promise.all([
       refreshBranches(),
@@ -78,9 +76,9 @@ export function useChatConversations(options: UseChatConversationsOptions) {
   async function deleteConversation(conversationId: string) {
     try {
       await options.api.conversations.delete(conversationId)
-      await options.drafts.discard(`conversation:${conversationId}`)
+      await options.drafts.discardConversation(conversationId)
       if (options.session.activeConversationId.value === conversationId) {
-        activateDraftScope(null, false)
+        activateDraftScope(null)
         options.selectDefaultModel()
       }
       if (directlyOpenedConversation.value?.id === conversationId)
@@ -145,13 +143,10 @@ export function useChatConversations(options: UseChatConversationsOptions) {
     }
   }
 
-  function activateDraftScope(spaceId: string | null, preserveCurrent = true) {
-    if (preserveCurrent)
-      options.drafts.saveCurrentDraft()
+  function activateDraftScope(spaceId: string | null) {
     options.session.activateDraft(spaceId)
     directlyOpenedConversation.value = null
     options.runSync.clearConversationState()
-    options.drafts.restoreCurrentDraft()
     options.clearError()
   }
 

@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { fileURLToPath, URL } from 'node:url'
 import vue from '@vitejs/plugin-vue'
 import UnoCSS from 'unocss/vite'
-import { defineConfig } from 'vite'
+import { defineConfig } from 'vitest/config'
 
 const buddyVersion = JSON.parse(
   readFileSync(new URL('./buddy.version.json', import.meta.url), 'utf8'),
@@ -31,5 +31,8 @@ export default defineConfig({
   build: {
     outDir: fileURLToPath(new URL('./.output/build/renderer-preview', import.meta.url)),
     target: 'esnext',
+  },
+  test: {
+    setupFiles: './vitest.setup.ts',
   },
 })

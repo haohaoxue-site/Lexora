@@ -1,15 +1,14 @@
-import type { ImageContent } from '@earendil-works/pi-ai'
 import type { BuddyServiceTier, BuddyThinkingLevel } from '../../../shared/modelSelection'
 import type { RunRecord } from '../storage/runRecord'
+import type { BuddyInputReferenceV1 } from './BuddyInputReference'
 import type { BuddySessionBlueprint } from './BuddySessionBlueprint'
 
 export interface StartBuddyTurnInput {
-  images?: ImageContent[]
-  prompt: string
   runId: string
   serviceTier?: BuddyServiceTier | null
   session: BuddySessionBlueprint
   thinkingLevel?: BuddyThinkingLevel
+  userInput: BuddyInputReferenceV1
 }
 
 export interface StartBuddyCompactionInput {

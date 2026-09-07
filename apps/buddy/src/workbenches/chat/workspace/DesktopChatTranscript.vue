@@ -29,6 +29,7 @@ const props = defineProps<{
   branches: ReadonlyArray<LocalConversationBranch>
   changeSets: ReadonlyArray<LocalChangeSetSummary>
   conversationId: string
+  editingMessageId: string | null
   hasOlderMessages: boolean
   isLoadingOlderMessages: boolean
   language: BuddyLocale
@@ -44,7 +45,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   activateBranch: [branchId: string]
   contentResize: [metrics: ChatMessageScrollMetrics]
-  editUserMessage: [messageId: string, content: string]
+  editUserMessage: [messageId: string]
   openArtifact: [artifactId: string]
   openChanges: [changeSetId: string]
   readerLayoutIntent: []
@@ -131,6 +132,7 @@ defineExpose<BuddyChatMessageListHandle>({
     :branch-navigators="branchNavigators"
     :conversation-id="conversationId"
     :display-rows="displayRows"
+    :editing-message-id="editingMessageId"
     :has-older-messages="hasOlderMessages"
     :is-loading-older-messages="isLoadingOlderMessages"
     :language="language"
@@ -140,7 +142,7 @@ defineExpose<BuddyChatMessageListHandle>({
     :show-return-to-latest="showReturnToLatest"
     @activate-branch="emit('activateBranch', $event)"
     @content-resize="emit('contentResize', $event)"
-    @edit-user-message="(messageId, content) => emit('editUserMessage', messageId, content)"
+    @edit-user-message="emit('editUserMessage', $event)"
     @open-artifact="emit('openArtifact', $event)"
     @open-changes="emit('openChanges', $event)"
     @prepare-outline="conversationOutline.prepare"

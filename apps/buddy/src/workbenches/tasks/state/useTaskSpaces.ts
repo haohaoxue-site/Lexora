@@ -21,9 +21,12 @@ export interface TaskSpacePrimaryDirectoryInput {
 }
 
 interface UseTaskSpacesOptions {
-  activateDraftScope: (spaceId: string | null, preserveCurrent?: boolean) => void
+  activateDraftScope: (spaceId: string | null) => void
+  activeBranchId: ValueRef<string | null>
+  activeConversationId: ValueRef<string | null>
   api: LexoraDesktopApi['localChat']
   drafts: ReturnType<typeof useChatDrafts>
+  draftId: ValueRef<string>
   localCapabilities: LocalCapabilitiesStore
   onError: (error: unknown) => void
   persistWorkspaceState: () => Promise<boolean>
@@ -83,7 +86,7 @@ export function useTaskSpaces(options: UseTaskSpacesOptions) {
       await options.api.spaces.delete(spaceId)
       await options.drafts.discard(`space:${spaceId}`)
       if (options.spaceId.value === spaceId)
-        options.activateDraftScope(null, false)
+        options.activateDraftScope(null)
       await options.refreshIndex()
       await options.persistWorkspaceState()
       return true
@@ -105,17 +108,24 @@ export function useTaskSpaces(options: UseTaskSpacesOptions) {
   }
 
   async function listContextOptions(fileQuery: string | null): Promise<ChatComposerContextOptions> {
-    await options.localCapabilities.loadSkills(options.spaceId.value)
-    const files = options.spaceId.value
-      ? await options.api.spaces.searchFiles(options.spaceId.value, fileQuery ?? '')
-      : []
+    const spaceId = options.spaceId.value
+    await options.localCapabilities.loadSkills(spaceId)
+    const { files } = await options.api.composerResources.listSources({
+      branchId: options.activeBranchId.value,
+      conversationId: options.activeConversationId.value,
+      draftId: options.draftId.value,
+      query: fileQuery ?? '',
+      spaceId,
+    })
     return {
       files: files.map(file => ({
-        description: `${file.root} · ${file.relativePath}`,
+        category: file.category,
+        description: file.description,
         kind: 'file' as const,
         label: file.name,
         path: file.path,
-        value: file.path,
+        value: JSON.stringify(file.source),
+        source: file.source,
       })),
       skills: options.localCapabilities.skills.value.skills
         .filter(skill => skill.enabled)

@@ -1,4 +1,5 @@
 import type { AttachmentService } from '../attachments/AttachmentService'
+import type { ProviderExecutionModelResolver } from '../providers/ProviderExecutionModelResolver'
 import type { CommandRequestRepository } from '../storage/commandRequestRepository'
 import type { ConversationRepository } from '../storage/conversationRepository'
 import type { RunInputRepository } from '../storage/runInputRepository'
@@ -9,15 +10,17 @@ import type {
 } from './BuddyAgentRun'
 import type { BuddySessionBlueprintService } from './BuddySessionBlueprint'
 import { BuddyAgentRunError } from '../runs/runError'
+import { createBuddyInputReference } from './BuddyInputReference'
 
 export type BuddyRunExecutionPlan
   = | { input: StartBuddyTurnInput, kind: 'turn' }
     | { input: StartBuddyCompactionInput, kind: 'compaction' }
 
 export interface BuddyRunExecutionPlannerOptions {
-  attachments: Pick<AttachmentService, 'materializePrompt'>
+  attachments: Pick<AttachmentService, 'resolvePiInputImageReferences'>
   commands: Pick<CommandRequestRepository, 'findByRunId'>
   conversations: Pick<ConversationRepository, 'findById'>
+  models: Pick<ProviderExecutionModelResolver, 'resolveAvailable'>
   runInputs: Pick<RunInputRepository, 'findByRunId'>
   runs: Pick<RunRepository, 'findById'>
   sessions: Pick<BuddySessionBlueprintService, 'createForConversation'>
@@ -84,18 +87,28 @@ export class BuddyRunExecutionPlanner {
     const input = this.#options.runInputs.findByRunId(run.id)
     if (!input?.prompt.trim())
       throw new BuddyAgentRunError('RUN_INPUT_NOT_FOUND')
-    const attachments = await this.#options.attachments.materializePrompt(
+    const images = await this.#options.attachments.resolvePiInputImageReferences(
       input.attachmentIds,
-      '',
       run.conversationId,
     )
+    const model = await this.#options.models.resolveAvailable({
+      contextWindow: run.contextWindow,
+      maxTokens: run.maxTokens,
+      modelId: run.model,
+      providerId: run.provider,
+    })
+    if (images.length > 0 && !model.input.includes('image'))
+      throw new BuddyAgentRunError('MODEL_INPUT_UNSUPPORTED')
     return {
       input: {
         ...common,
-        images: attachments.images,
-        prompt: input.prompt,
         serviceTier: input.serviceTier,
         thinkingLevel: input.reasoning ?? undefined,
+        userInput: createBuddyInputReference({
+          images,
+          messageId: run.triggeringMessageId,
+          prompt: input.prompt,
+        }),
       },
       kind: 'turn',
     }

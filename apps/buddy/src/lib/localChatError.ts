@@ -14,6 +14,7 @@ export function resolveLocalChatErrorMessage(error: unknown, language: BuddyLoca
 
   const keys = {
     APPROVAL_REQUIRED: 'desktop.error.approvalRequired',
+    ATTACHMENT_LIMIT_EXCEEDED: 'desktop.chat.attachmentLimit',
     AUTOMATION_CONFLICT: 'desktop.error.automationConflict',
     AUTOMATION_INVALID_SCHEDULE: 'desktop.error.automationInvalidSchedule',
     AUTOMATION_NOT_FOUND: 'desktop.error.automationNotFound',
@@ -21,9 +22,11 @@ export function resolveLocalChatErrorMessage(error: unknown, language: BuddyLoca
     CONNECTOR_UNAVAILABLE: 'desktop.error.connectorUnavailable',
     CREDENTIAL_STORE_UNAVAILABLE: 'desktop.error.credentialStore',
     DIRECTORY_NOT_AUTHORIZED: 'desktop.error.directoryNotAuthorized',
+    DRAFT_CONFLICT: 'desktop.chat.draftChanged',
     LOCAL_CHAT_OPERATION_FAILED: 'desktop.chat.unknownError',
     MODEL_SYNC_FAILED: 'desktop.error.modelSyncFailed',
     MODEL_SYNC_UNSUPPORTED: 'desktop.error.modelSyncUnsupported',
+    MODEL_INPUT_UNSUPPORTED: 'desktop.chat.modelImageUnsupported',
     PATH_OUTSIDE_GRANTED_DIRECTORY: 'desktop.error.pathOutsideDirectory',
     SPACE_HAS_ACTIVE_RUNS: 'desktop.error.spaceHasActiveRuns',
     SPACE_UNAVAILABLE: 'desktop.error.spaceUnavailable',

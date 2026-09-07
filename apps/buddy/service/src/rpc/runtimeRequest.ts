@@ -10,7 +10,9 @@ export interface RuntimeRpcRegistrar extends RuntimeRequestRegistrar {
 }
 
 export type BuddyServiceErrorCode
-  = | 'DIRECTORY_NOT_AUTHORIZED'
+  = | 'DRAFT_CONFLICT'
+    | 'DIRECTORY_NOT_AUTHORIZED'
+    | 'MODEL_INPUT_UNSUPPORTED'
     | 'SPACE_UNAVAILABLE'
     | 'VALIDATION_FAILED'
 

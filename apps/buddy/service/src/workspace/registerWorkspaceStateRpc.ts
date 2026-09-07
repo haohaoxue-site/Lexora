@@ -7,6 +7,7 @@ const WORKSPACE_STATE_KEY = 'buddy.chat.workspace.v2'
 const workspaceStateKeySchema = z.literal(WORKSPACE_STATE_KEY)
 
 export interface RegisterWorkspaceStateRpcOptions {
+  normalize?: (value: unknown) => Promise<unknown>
   repository: Pick<WorkspaceRepository, 'getRecord' | 'set'>
   rpc: RuntimeRequestRegistrar
 }
@@ -15,9 +16,10 @@ export function registerWorkspaceStateRpc(
   options: RegisterWorkspaceStateRpcOptions,
 ): () => void {
   const disposers = [
-    options.rpc.onRequest('workspaceState.read', (params) => {
+    options.rpc.onRequest('workspaceState.read', async (params) => {
       const input = parse(z.object({ key: workspaceStateKeySchema }).strict(), params)
-      return options.repository.getRecord(input.key)
+      const record = options.repository.getRecord(input.key)
+      return record && options.normalize ? { ...record, value: await options.normalize(record.value) } : record
     }),
     options.rpc.onRequest('workspaceState.write', (params) => {
       const input = parse(z.object({

@@ -3,6 +3,7 @@ import type { BuddyApprovalPolicy } from '../../../shared/approvalPolicy'
 import type { BuddyExecutionProfile } from '../../../shared/executionProfile'
 import type { BuddyServiceTier, BuddyThinkingLevel } from '../../../shared/modelSelection'
 import type { RunInputContextItem } from './runInputRepository'
+import { createComposerDraftCommitter } from './commitComposerDraft'
 import { withTransaction } from './database'
 
 export interface PrepareTurnRequestInput {
@@ -11,6 +12,10 @@ export interface PrepareTurnRequestInput {
   branchId: string
   conversationId: string
   createdAt: string
+  draft: {
+    draftId: string
+    expectedRevision: number
+  }
   executionProfile: BuddyExecutionProfile
   model: string
   modelParameters?: { contextWindow: number, maxTokens: number }
@@ -44,6 +49,11 @@ export interface TurnRequestRecord {
   branchId: string
   conversationId: string
   created: boolean
+  draftReceipt: {
+    committedRevision: number
+    draftId: string
+    sourceRevision: number
+  } | null
   requestFingerprint: string
   requestId: string
   runId: string
@@ -79,6 +89,9 @@ interface TurnRequestRow {
   branch_id: string
   conversation_id: string
   created_at: string
+  committed_draft_revision: number | null
+  draft_id: string | null
+  draft_revision: number | null
   request_fingerprint: string
   request_id: string
   run_id: string
@@ -199,6 +212,13 @@ export function createTurnRequestRepository(database: DatabaseSync): TurnRequest
       request_id, request_fingerprint, conversation_id, branch_id, run_id, created_at
     ) VALUES (?, ?, ?, ?, ?, ?)
   `)
+  const insertDraftRequest = database.prepare(`
+    INSERT INTO turn_requests (
+      request_id, request_fingerprint, conversation_id, branch_id, run_id, created_at,
+      draft_id, draft_revision, committed_draft_revision
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `)
+  const commitDraft = createComposerDraftCommitter(database)
   const findRun = database.prepare('SELECT * FROM runs WHERE id = ?')
   const findMessage = database.prepare(`
     SELECT conversation_id, role FROM messages WHERE id = ?
@@ -322,18 +342,34 @@ export function createTurnRequestRepository(database: DatabaseSync): TurnRequest
           input.createdAt,
           input.conversationId,
         )
-        insertRequest.run(
+        const draftReceipt = commitDraft({
+          approvalPolicy: input.approvalPolicy,
+          branchId: input.branchId,
+          conversationId: input.conversationId,
+          draftId: input.draft.draftId,
+          executionProfile: input.executionProfile,
+          expectedBranchId: input.parentBranchId,
+          expectedRevision: input.draft.expectedRevision,
+          expectedSourceMessageId: input.sourceUserMessageId,
+          spaceId: input.spaceId,
+          updatedAt: input.createdAt,
+        })
+        insertDraftRequest.run(
           input.requestId,
           input.requestFingerprint,
           input.conversationId,
           input.branchId,
           input.runId,
           input.createdAt,
+          input.draft.draftId,
+          input.draft.expectedRevision,
+          draftReceipt.committedRevision,
         )
         return {
           branchId: input.branchId,
           conversationId: input.conversationId,
           created: true,
+          draftReceipt,
           requestFingerprint: input.requestFingerprint,
           requestId: input.requestId,
           runId: input.runId,
@@ -420,18 +456,33 @@ export function createTurnRequestRepository(database: DatabaseSync): TurnRequest
           input.createdAt,
           input.conversationId,
         )
-        insertRequest.run(
+        const committedDraftRevision = input.draft.expectedRevision + 1
+        insertDraftRequest.run(
           input.requestId,
           input.requestFingerprint,
           input.conversationId,
           input.branchId,
           input.runId,
           input.createdAt,
+          input.draft.draftId,
+          input.draft.expectedRevision,
+          committedDraftRevision,
         )
+        const draftReceipt = commitDraft({
+          approvalPolicy: input.approvalPolicy,
+          branchId: input.branchId,
+          conversationId: input.conversationId,
+          draftId: input.draft.draftId,
+          executionProfile: input.executionProfile,
+          expectedRevision: input.draft.expectedRevision,
+          spaceId: input.spaceId,
+          updatedAt: input.createdAt,
+        })
         return {
           branchId: input.branchId,
           conversationId: input.conversationId,
           created: true,
+          draftReceipt,
           requestFingerprint: input.requestFingerprint,
           requestId: input.requestId,
           runId: input.runId,
@@ -509,6 +560,7 @@ export function createTurnRequestRepository(database: DatabaseSync): TurnRequest
           branchId: input.branchId,
           conversationId: input.conversationId,
           created: true,
+          draftReceipt: null,
           requestFingerprint: input.requestFingerprint,
           requestId: input.requestId,
           runId: input.runId,
@@ -585,13 +637,22 @@ function toRecord(row: TurnRequestRow, created: boolean): TurnRequestRecord {
     branchId: row.branch_id,
     conversationId: row.conversation_id,
     created,
+    draftReceipt: row.draft_id !== null
+      && row.draft_revision !== null
+      && row.committed_draft_revision !== null
+      ? {
+          committedRevision: row.committed_draft_revision,
+          draftId: row.draft_id,
+          sourceRevision: row.draft_revision,
+        }
+      : null,
     requestFingerprint: row.request_fingerprint,
     requestId: row.request_id,
     runId: row.run_id,
   }
 }
 
-function stringifyModelSelection(input: PrepareTurnRequestInput): string {
+function stringifyModelSelection(input: Omit<PrepareTurnRequestInput, 'draft'>): string {
   return JSON.stringify({
     providerId: input.provider,
     modelId: input.model,
@@ -601,7 +662,7 @@ function stringifyModelSelection(input: PrepareTurnRequestInput): string {
 }
 
 function bindAttachments(
-  input: PrepareTurnRequestInput,
+  input: Omit<PrepareTurnRequestInput, 'draft'>,
   bindDraftAttachment: ReturnType<DatabaseSync['prepare']>,
   cloneMessageAttachment: ReturnType<DatabaseSync['prepare']>,
 ): void {

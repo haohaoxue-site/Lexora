@@ -15,9 +15,7 @@ const props = defineProps<{
 
 const { t } = useBuddyI18n(() => props.language)
 const isOpen = shallowRef(true)
-const isActive = computed(() => props.group.entries.some(entry => (
-  entry.summary?.status === 'running' || entry.detail?.status === 'running'
-)))
+const isActive = computed(() => props.group.entries.some(entry => entry.status === 'running'))
 const title = computed(() => t('desktop.chat.processReasoning'))
 </script>
 
@@ -46,8 +44,7 @@ const title = computed(() => t('desktop.chat.processReasoning'))
       <BuddyChatReasoningRow
         v-for="entry in group.entries"
         :key="entry.id"
-        :entry="entry"
-        :language="language"
+        :node="entry"
       />
     </div>
   </section>

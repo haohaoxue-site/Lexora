@@ -69,6 +69,13 @@ export class DesktopWindowManager {
     window.focus()
   }
 
+  dispose(): void {
+    const managedWindow = this.#managedWindow
+    this.#managedWindow = null
+    if (managedWindow && !managedWindow.handle.window.isDestroyed())
+      managedWindow.handle.window.destroy()
+  }
+
   #replaceWindow(): ManagedDesktopWindow {
     const previousWindow = this.#managedWindow
     this.#managedWindow = null

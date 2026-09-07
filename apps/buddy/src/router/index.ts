@@ -168,7 +168,7 @@ const routes: ReadonlyArray<RouteRecordRaw> = [
   },
   {
     path: '/:pathMatch(.*)*',
-    redirect: desktopRouteLocations.tasks(),
+    redirect: '/tasks',
   },
 ]
 

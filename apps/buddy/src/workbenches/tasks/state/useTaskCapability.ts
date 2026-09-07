@@ -1,18 +1,21 @@
 import type { LexoraDesktopApi } from '@buddy-electron/shared/desktopApi'
 import type { LocalConversation, LocalRunEvent } from '@buddy-electron/shared/localChatApi'
 import type { BuddyPermissionMode } from '@buddy-shared/permissionMode'
+import type { JSONContent } from '@tiptap/core'
 import type { ApplicationSettingsStore } from '@/stores/useApplicationSettingsStore'
 import type { LocalCapabilitiesStore } from '@/stores/useLocalCapabilitiesStore'
 import type { ModelProvidersStore } from '@/stores/useModelProvidersStore'
 import type { RuntimeRecoveryStore } from '@/stores/useRuntimeRecoveryStore'
 import type { RuntimeSupervisorStore } from '@/stores/useRuntimeSupervisorStore'
 import type { ChatBlockerKind } from '@/workbenches/chat/workspace/chatBlocker'
-import { BUDDY_ATTACHMENT_COUNT_LIMIT } from '@buddy-shared/attachmentPolicy'
 import { useDebounceFn } from '@vueuse/core'
 import { computed, readonly, shallowRef, watch } from 'vue'
 import { useBuddyI18n } from '@/i18n/buddyI18n'
 import { resolveLocalChatErrorMessage } from '@/lib/localChatError'
+import { resolveChatComposerModelInputIssue } from '@/workbenches/chat/composer/chatComposerModelCapability'
+import { getChatComposerResourceIds } from '@/workbenches/chat/composer/chatComposerResourceReferences'
 import { useChatComposerInteractions } from '@/workbenches/chat/composer/useChatComposerInteractions'
+import { useComposerResources } from '@/workbenches/chat/composer/useComposerResources'
 import { useChatApprovals } from '@/workbenches/chat/state/useChatApprovals'
 import { useChatContextUsage } from '@/workbenches/chat/state/useChatContextUsage'
 import { useChatConversations } from '@/workbenches/chat/state/useChatConversations'
@@ -124,19 +127,30 @@ export function useTaskCapability(options: UseTaskCapabilityOptions) {
   const visibleChatBlocker = computed(() => (
     chatBlocker.value?.kind === dismissedChatBlockerKind.value ? null : chatBlocker.value
   ))
-  const draftScopeKey = computed(() => activeConversationId.value
-    ? `conversation:${activeConversationId.value}`
+  const draftScopeKey = computed(() => activeConversationId.value && activeBranchId.value
+    ? `conversation:${activeConversationId.value}:${activeBranchId.value}`
     : spaceId.value ? `space:${spaceId.value}` : 'global')
   let persistDraftChanges = () => {}
   const drafts = useChatDrafts({
-    cleanupDraftAttachments: () => api.localChat.attachments.cleanupDrafts(),
     onChange: () => persistDraftChanges(),
-    releaseAttachments: attachmentIds => api.localChat.attachments.release(attachmentIds),
     targetKey: draftScopeKey,
   })
-  const { attachments, composerContent, draft, draftId } = drafts
+  const { composerContent, draft, draftId } = drafts
+  const composerResources = useComposerResources({
+    api: api.localChat.composerResources,
+    draftId,
+    getReferencedIds: drafts.resourceIdsForDraft,
+    onError: setError,
+    onLimitExceeded: () => errorMessage.value = t('desktop.chat.attachmentLimit'),
+    onRejected: drafts.rejectResources,
+  })
+  watch(draftId, (id) => {
+    if (getChatComposerResourceIds(composerContent.value as JSONContent | null).length)
+      void composerResources.restore(id).catch(setError)
+  }, { immediate: true })
   const workspacePersistence = useTaskWorkspacePersistence({
-    api: api.localChat.workspaceState,
+    beforePersist: composerResources.whenAccepted,
+    api: api.localChat,
     conversations,
     drafts,
     onError: setError,
@@ -169,8 +183,11 @@ export function useTaskCapability(options: UseTaskCapabilityOptions) {
   })
   const taskSpaces = useTaskSpaces({
     activateDraftScope,
+    activeBranchId,
+    activeConversationId,
     api: api.localChat,
     drafts,
+    draftId,
     localCapabilities,
     onError: setError,
     persistWorkspaceState,
@@ -237,15 +254,22 @@ export function useTaskCapability(options: UseTaskCapabilityOptions) {
     selectedServiceTier: modelProviders.selectedServiceTier,
   })
   const { contextUsage } = contextUsageTracker
+  const composerModelInputIssue = computed(() => resolveChatComposerModelInputIssue({
+    model: modelProviders.selectedModelOption.value,
+    resourceIds: getChatComposerResourceIds(composerContent.value as JSONContent),
+    resources: composerResources.resources.value,
+  }))
   const composerInteractions = useChatComposerInteractions({ runs })
   const execution = useChatExecution({
     activeRun,
     approvalPolicy: permissionSettingsState.approvalPolicy,
     api: api.localChat,
+    canSendDraft: computed(() => composerModelInputIssue.value === null),
     taskIndexData,
     session: chatSession,
     drafts,
     draftScopeKey,
+    draftChangedMessage: () => t('desktop.chat.draftChanged'),
     executionProfile: permissionSettingsState.executionProfile,
     getRunTerminationMessage,
     isUpdatingPermissionSettings: permissionSettingsState.isUpdating,
@@ -254,6 +278,7 @@ export function useTaskCapability(options: UseTaskCapabilityOptions) {
     modelProviders,
     onActionCommandRunStarted: composerInteractions.trackActionCommand,
     refreshBranches,
+    selectComposerSource: composerResources.selectSource,
     runSync,
     setErrorMessage: message => errorMessage.value = message,
     runtimeSupervisor,
@@ -264,36 +289,51 @@ export function useTaskCapability(options: UseTaskCapabilityOptions) {
     canMutateBranch,
     canSend,
     cancelActiveRun,
+    cancelEditUserMessage,
     editUserMessage,
+    editingMessageId,
     isMutatingBranch,
     isSending,
     regenerateAssistant,
     send,
+    submitEditedMessage,
   } = execution
   const canUpdatePermissionSettings = computed(() => (
     permissionSettingsState.canUpdate.value
     && !isSending.value
     && !isMutatingBranch.value
   ))
+  let conversationModelPersistenceRevision = 0
+  let conversationModelPersistenceQueue = Promise.resolve(true)
 
-  async function persistConversationModelSelection(
+  function persistConversationModelSelection(
     conversationId: string | null,
     modelSelection: NonNullable<LocalConversation['modelSelection']> | null,
   ): Promise<boolean> {
     if (!conversationId || !modelSelection)
-      return true
-    try {
-      const conversation = await api.localChat.conversations.setModelSelection(
-        conversationId,
-        modelSelection,
-      )
-      applyConversation(conversation)
-      return true
+      return Promise.resolve(true)
+    const revision = ++conversationModelPersistenceRevision
+    const operation = async () => {
+      try {
+        const conversation = await api.localChat.conversations.setModelSelection(
+          conversationId,
+          modelSelection,
+        )
+        if (revision === conversationModelPersistenceRevision)
+          applyConversation(conversation)
+        return true
+      }
+      catch (error) {
+        if (revision === conversationModelPersistenceRevision)
+          setError(error)
+        return false
+      }
     }
-    catch (error) {
-      setError(error)
-      return false
-    }
+    conversationModelPersistenceQueue = conversationModelPersistenceQueue.then(
+      operation,
+      operation,
+    )
+    return conversationModelPersistenceQueue
   }
 
   function currentModelSelection(): NonNullable<LocalConversation['modelSelection']> | null {
@@ -307,6 +347,17 @@ export function useTaskCapability(options: UseTaskCapabilityOptions) {
         }
       : null
   }
+
+  watch(
+    () => [
+      modelProviders.selectedModel.value?.providerId ?? null,
+      modelProviders.selectedModel.value?.modelId ?? null,
+      modelProviders.selectedEffort.value,
+      modelProviders.selectedServiceTier.value,
+    ] as const,
+    () => drafts.setModelSelection(currentModelSelection()),
+    { flush: 'sync', immediate: true },
+  )
 
   async function selectChatModel(value: string) {
     const conversationId = activeConversationId.value
@@ -410,53 +461,15 @@ export function useTaskCapability(options: UseTaskCapabilityOptions) {
   }
 
   async function selectAttachments() {
+    const source = drafts.load(draftScopeKey.value)
     await initialLoad
-    const remainingCount = BUDDY_ATTACHMENT_COUNT_LIMIT - attachments.value.length
-    if (remainingCount <= 0) {
-      errorMessage.value = t('desktop.chat.attachmentLimit')
+    if (draftId.value !== source.draftId || !drafts.isEditorSessionCurrent(source))
       return
-    }
     isSelectingFiles.value = true
     try {
-      const rejected = await drafts.appendAttachments(
-        await api.localChat.attachments.selectFiles({
-          draftId: draftId.value,
-          remainingCount,
-        }),
-      )
-      if (rejected)
-        errorMessage.value = t('desktop.chat.attachmentLimit')
-    }
-    catch (error) {
-      setError(error)
-    }
-    finally {
-      isSelectingFiles.value = false
-    }
-  }
-
-  async function importAttachments(files: ReadonlyArray<File>) {
-    await initialLoad
-    const remainingCount = BUDDY_ATTACHMENT_COUNT_LIMIT - attachments.value.length
-    if (remainingCount <= 0) {
-      errorMessage.value = t('desktop.chat.attachmentLimit')
-      return
-    }
-    isSelectingFiles.value = true
-    try {
-      const selectedFiles = files.slice(0, remainingCount)
-      const rejected = await drafts.appendAttachments(
-        await api.localChat.attachments.importFiles({
-          draftId: draftId.value,
-          files: await Promise.all(selectedFiles.map(async file => ({
-            bytes: new Uint8Array(await file.arrayBuffer()),
-            mimeType: file.type,
-            name: file.name,
-          }))),
-        }),
-      )
-      if (selectedFiles.length < files.length || rejected)
-        errorMessage.value = t('desktop.chat.attachmentLimit')
+      const resourceIds = await composerResources.selectFiles(source.draftId)
+      if (resourceIds.length)
+        drafts.appendResourcePanel(source.draftId, resourceIds, source.editorSessionId)
     }
     catch (error) {
       setError(error)
@@ -472,9 +485,14 @@ export function useTaskCapability(options: UseTaskCapabilityOptions) {
 
   function dispose() {
     isDisposed = true
+    workspacePersistence.dispose()
     contextUsageTracker.dispose()
     stopRunEventListener()
     runSync.dispose()
+  }
+
+  function flushDrafts(): Promise<boolean> {
+    return workspacePersistence.flushPending()
   }
 
   function dismissChatBlocker() {
@@ -529,20 +547,24 @@ export function useTaskCapability(options: UseTaskCapabilityOptions) {
       readArtifactText: api.localChat.artifacts.readText,
     },
     composer: {
-      attachments: readonly(attachments),
-      composerContent: readonly(composerContent),
+      composerContent,
       contextUsage: readonly(contextUsage),
       dismissInteraction: composerInteractions.dismissInteraction,
       draft: readonly(draft),
+      draftId: readonly(draftId),
+      editorKey: readonly(drafts.editorKey),
+      resources: composerResources.resources,
+      rejectedResourceIds: composerResources.rejectedIds,
+      beginImport: (files: readonly File[]) => hasCompletedInitialLoad ? composerResources.begin(files) : [],
+      selectSource: composerResources.selectSource,
+      retryResource: composerResources.retry,
       canUpdatePermissionSettings: readonly(canUpdatePermissionSettings),
       isUpdatingPermissionSettings: permissionSettingsState.isUpdating,
       isSelectingFiles: readonly(isSelectingFiles),
-      importAttachments,
       interaction: composerInteractions.interaction,
       listContextOptions,
       models: modelProviders.models,
       providers: modelProviders.providers,
-      removeAttachment: drafts.removeAttachment,
       selectedEffort: modelProviders.selectedEffort,
       selectedModel: modelProviders.selectedModelOption,
       selectedModelId: modelProviders.selectedModelId,
@@ -561,7 +583,9 @@ export function useTaskCapability(options: UseTaskCapabilityOptions) {
       canMutateBranch: readonly(canMutateBranch),
       canSend: readonly(canSend),
       cancelActiveRun,
+      cancelEditUserMessage,
       editUserMessage,
+      editingMessageId,
       isMutatingBranch: readonly(isMutatingBranch),
       isSending: readonly(isSending),
       regenerateAssistant,
@@ -569,6 +593,7 @@ export function useTaskCapability(options: UseTaskCapabilityOptions) {
       resolvingApprovalActions: readonly(resolvingApprovalActions),
       resolvingApprovalIds: readonly(resolvingApprovalIds),
       send,
+      submitEditedMessage,
     },
     language,
     session: chatWorkspaceSession,
@@ -601,6 +626,7 @@ export function useTaskCapability(options: UseTaskCapabilityOptions) {
 
   return {
     dispose,
+    flushDrafts,
     index,
     initialize,
     language,

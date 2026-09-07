@@ -8,6 +8,7 @@ import type {
   StartBuddyCompactionInput,
   StartBuddyTurnInput,
 } from './BuddyAgentRun'
+import type { BuddyInputReferenceV1 } from './BuddyInputReference'
 import type {
   BuddySessionIdentity,
 } from './BuddySessionBlueprint'
@@ -36,6 +37,7 @@ export interface BuddyAgentSessionLike extends PiEventBridgeSession {
   prompt: (text: string, options?: {
     expandPromptTemplates?: boolean
     images?: ImageContent[]
+    inputReference?: BuddyInputReferenceV1
     source?: 'rpc'
   }) => Promise<void>
   shutdown: (reason: BuddySessionShutdownReason) => Promise<void>
@@ -179,9 +181,14 @@ export class PiTurnExecutor {
 
     try {
       signal.throwIfAborted()
-      await binding.session.prompt(input.prompt, {
+      await binding.session.prompt(input.userInput.prompt, {
         expandPromptTemplates: false,
-        images: input.images,
+        images: input.userInput.images.map(image => ({
+          data: '',
+          mimeType: image.mimeType,
+          type: 'image',
+        })),
+        inputReference: input.userInput,
         source: 'rpc',
       })
       await binding.session.waitForIdle()

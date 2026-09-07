@@ -5,7 +5,7 @@ import {
   approvalReviewPayloadMatchesKind,
   approvalReviewPayloadSchema,
 } from '../../shared/approvalReviewPayload'
-import { buddyAttachmentImportRequestSchema } from '../../shared/attachmentPolicy'
+import { BUDDY_ATTACHMENT_COUNT_LIMIT } from '../../shared/attachmentPolicy'
 import {
   automationChangedNotificationSchema,
   automationMutationRequestSchemas,
@@ -18,6 +18,23 @@ import {
   automationRunNowResultSchema,
   automationSchema,
 } from '../../shared/automation'
+
+import {
+  buddyComposerDraftOpenSchema,
+  buddyComposerDraftSaveSchema,
+  buddyComposerDraftSchema,
+  buddyComposerDraftSendSchema,
+  buddyComposerDraftTargetSchema,
+} from '../../shared/composerDraft'
+import {
+  buddyComposerResourceAcceptSchema,
+  buddyComposerResourceCompleteSchema,
+  buddyComposerResourceSchema,
+  buddyComposerResourceTargetSchema,
+  buddyComposerSourceListResponseSchema,
+  buddyComposerSourceSelectSchema,
+  buddyComposerSpaceFileSelectSchema,
+} from '../../shared/composerResource'
 import { BUDDY_EXECUTION_PROFILES } from '../../shared/executionProfile'
 import {
   BUDDY_SERVICE_TIERS,
@@ -38,6 +55,9 @@ const runtimeDataBackupIdSchema = z.string().regex(/^buddy-\d{17}-[0-9a-f]{8}$/)
 const byteCountSchema = z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER)
 const executionProfileSchema = z.enum(BUDDY_EXECUTION_PROFILES)
 const approvalPolicySchema = z.enum(BUDDY_APPROVAL_POLICIES)
+const composerResourceIdsSchema = z.array(sessionIdentitySchema)
+  .max(BUDDY_ATTACHMENT_COUNT_LIMIT)
+  .refine(ids => new Set(ids).size === ids.length)
 
 const runtimeStateSchema = z.object({
   lastError: buddyServiceSupervisorFailureCodeSchema.nullable(),
@@ -631,7 +651,7 @@ const artifactTextSchema = z.object({
 }).strict()
 
 const messageSchema = z.object({
-  attachments: z.array(attachmentSchema).max(16),
+  attachments: z.array(attachmentSchema),
   branchId: idSchema,
   content: z.json(),
   conversationId: idSchema,
@@ -706,7 +726,7 @@ const approvalSchema = z.object({
 
 const workspaceDraftSchema = z.object({
   approvalPolicy: approvalPolicySchema,
-  attachments: z.array(attachmentSchema).max(16),
+  attachments: z.array(attachmentSchema),
   composerContent: z.json().nullable(),
   content: z.string(),
   draftId: sessionIdentitySchema,
@@ -718,16 +738,21 @@ const workspaceDraftSchema = z.object({
 
 export const LOCAL_WORKSPACE_STATE_KEY = 'buddy.chat.workspace.v2' as const
 
-export const localWorkspaceStateValueSchema = z.object({
+const legacyWorkspaceStateValueSchema = z.object({
   activeConversationId: z.string().nullable(),
   drafts: z.array(workspaceDraftSchema),
+  spaceId: z.string().nullable(),
+}).strict()
+
+export const localWorkspaceStateValueSchema = z.object({
+  activeConversationId: z.string().nullable(),
   spaceId: z.string().nullable(),
 }).strict()
 
 const workspaceSettingSchema = z.object({
   key: z.literal(LOCAL_WORKSPACE_STATE_KEY),
   updatedAt: timestampSchema,
-  value: localWorkspaceStateValueSchema,
+  value: z.union([localWorkspaceStateValueSchema, legacyWorkspaceStateValueSchema]),
 }).strict()
 
 const usageRecordSchema = z.object({
@@ -794,7 +819,7 @@ const contextUsageSnapshotSchema = z.discriminatedUnion('status', [
   ), { path: ['totalTokens'] }),
 ])
 
-const contextItemSchema = z.object({
+const _contextItemSchema = z.object({
   kind: z.enum(['file', 'skill', 'slashCommand']),
   value: z.string().min(1),
 }).strict()
@@ -808,21 +833,24 @@ const defaultModelSelectionSchema = z.object({
 const turnStartSchema = z.object({
   branchId: idSchema,
   conversationId: idSchema,
+  draftReceipt: z.object({
+    committedRevision: z.number().int().positive(),
+    draftId: sessionIdentitySchema,
+    sourceRevision: z.number().int().nonnegative(),
+  }).strict().nullable(),
   run: runSchema,
   runId: idSchema,
 }).strict()
 
-const chatCommandSchema = z.object({
-  arguments: z.string().max(4_096),
-  branchId: sessionIdentitySchema,
-  command: z.literal('compact'),
-  conversationId: sessionIdentitySchema,
-  requestId: z.string().min(1).max(128),
-}).strict()
+const chatCommandSchema = buddyComposerDraftSendSchema
 
 const mutationSchema = z.object({ ok: z.literal(true) }).strict()
 
 export const localChatResponseSchemas = {
+  composerDraft: buddyComposerDraftSchema,
+  composerResource: buddyComposerResourceSchema,
+  composerResources: z.array(buddyComposerResourceSchema),
+  composerSourceList: buddyComposerSourceListResponseSchema,
   approval: approvalSchema,
   approvals: z.array(approvalSchema),
   automationPreview: automationPreviewResultSchema,
@@ -873,9 +901,6 @@ export const localChatResponseSchemas = {
   provider: providerSchema,
   providerAuthChallenge: providerAuthChallengeSchema,
   providers: z.array(providerSchema),
-  releasedAttachments: z.object({
-    releasedAttachmentIds: z.array(idSchema),
-  }).strict(),
   run: runSchema,
   runEvents: z.array(runEventSchema),
   runs: z.array(runSchema),
@@ -901,6 +926,23 @@ export const localChatResponseSchemas = {
 } as const
 
 export const localChatSchemas = {
+  composerDraftOpen: buddyComposerDraftOpenSchema,
+  composerDraftSave: buddyComposerDraftSaveSchema,
+  composerDraftTarget: buddyComposerDraftTargetSchema,
+  composerResourceAccept: buddyComposerResourceAcceptSchema,
+  composerResourceComplete: buddyComposerResourceCompleteSchema,
+  composerResourceDraft: z.object({ draftId: sessionIdentitySchema }).strict(),
+  composerResourceFileSelect: z.object({
+    draftId: sessionIdentitySchema,
+    referencedResourceIds: composerResourceIdsSchema.default([]),
+  }).strict(),
+  composerResourceTarget: buddyComposerResourceTargetSchema,
+  composerSourceSelect: buddyComposerSourceSelectSchema.extend({
+    referencedResourceIds: composerResourceIdsSchema.default([]),
+  }).strict(),
+  composerSpaceFileSelect: buddyComposerSpaceFileSelectSchema.extend({
+    referencedResourceIds: composerResourceIdsSchema.default([]),
+  }).strict(),
   approvalId: z.object({ approvalId: idSchema }).strict(),
   artifactPreview: z.object({ artifactId: idSchema }).strict(),
   artifactText: z.object({ artifactId: idSchema }).strict(),
@@ -916,13 +958,7 @@ export const localChatSchemas = {
   automationResume: automationMutationRequestSchemas.resume,
   automationRunNow: automationMutationRequestSchemas.runNow,
   automationUpdate: automationMutationRequestSchemas.update,
-  attachmentImport: buddyAttachmentImportRequestSchema,
   attachmentPreview: z.object({ attachmentId: idSchema }).strict(),
-  attachmentRelease: z.object({ attachmentIds: z.array(idSchema).max(16) }).strict(),
-  attachmentSelection: z.object({
-    draftId: sessionIdentitySchema,
-    remainingCount: z.number().int().min(1).max(16),
-  }).strict(),
   chatCommand: chatCommandSchema,
   changeSet: z.object({ changeSetId: idSchema }).strict(),
   connectorCredential: z.object({
@@ -1040,24 +1076,17 @@ export const localChatSchemas = {
     model: defaultModelSelectionSchema.nullable(),
   }).strict(),
   editUserMessage: z.object({
-    attachmentIds: z.array(idSchema).max(16),
-    content: z.string().max(2 * 1024 * 1024),
-    contextItems: z.array(contextItemSchema).max(64),
     conversationId: idSchema,
     draftId: sessionIdentitySchema,
-    modelSelection: modelSelectionSchema.nullable(),
+    expectedRevision: z.number().int().nonnegative(),
     requestId: z.string().min(1).max(128),
     userMessageId: idSchema,
-  }).strict().refine(
-    request => request.content.trim().length > 0 || request.attachmentIds.length > 0,
-    { message: 'An edited turn requires text or an attachment' },
-  ),
+  }).strict(),
   regenerateAssistant: z.object({
     conversationId: idSchema,
     requestId: z.string().min(1).max(128),
     sourceRunId: idSchema,
   }).strict(),
-  cleanupDraftAttachments: z.object({}).strict(),
   runEvents: z.union([
     z.object({
       afterSequence: z.number().int().nonnegative().optional(),
@@ -1078,22 +1107,7 @@ export const localChatSchemas = {
   runtimeDataOperationId: z.object({ operationId: z.uuid() }).strict(),
   skillScope: z.object({ spaceId: idSchema.nullable() }).strict(),
   runStateEvent: runEventEnvelopeSchema,
-  startTurn: z.object({
-    approvalPolicy: approvalPolicySchema,
-    attachmentIds: z.array(idSchema).max(16),
-    branchId: sessionIdentitySchema.nullable(),
-    content: z.string().max(2 * 1024 * 1024),
-    contextItems: z.array(contextItemSchema).max(64),
-    conversationId: sessionIdentitySchema.nullable(),
-    draftId: sessionIdentitySchema,
-    executionProfile: executionProfileSchema,
-    modelSelection: modelSelectionSchema.nullable(),
-    spaceId: idSchema.nullable(),
-    requestId: z.string().min(1).max(128),
-  }).strict().refine(
-    request => request.content.trim().length > 0 || request.attachmentIds.length > 0,
-    { message: 'A turn requires text or an attachment' },
-  ),
+  startTurn: buddyComposerDraftSendSchema,
   workspaceValue: z.object({ value: localWorkspaceStateValueSchema }).strict(),
 } as const
 
@@ -1130,6 +1144,9 @@ export type LocalConnector = DeepReadonly<z.infer<typeof connectorSchema>>
 export type LocalConnectorConfig = z.infer<typeof connectorConfigSchema>
 export type LocalConnectorCredential = z.infer<typeof connectorCredentialSchema>
 export type LocalConnectorCredentialMutation = z.infer<typeof connectorCredentialMutationSchema>
+export type LocalComposerDraft = DeepReadonly<z.infer<typeof buddyComposerDraftSchema>>
+export type LocalComposerDraftOpen = z.input<typeof buddyComposerDraftOpenSchema>
+export type LocalComposerDraftSave = z.input<typeof buddyComposerDraftSaveSchema>
 export type LocalConversation = DeepReadonly<z.infer<typeof conversationSchema>>
 export type LocalConversationSummary = DeepReadonly<z.infer<typeof conversationSummarySchema>>
 export type LocalConversationBranch = DeepReadonly<z.infer<typeof conversationBranchSchema>>
@@ -1156,7 +1173,7 @@ export type LocalSpacePrimaryDirectory = DeepReadonly<z.infer<typeof spacePrimar
 export type LocalSpaceUpdateInput = z.infer<typeof localChatSchemas.spaceUpdate>
 export type LocalProvider = DeepReadonly<z.infer<typeof providerSchema>>
 export type LocalProviderAuthChallenge = DeepReadonly<z.infer<typeof providerAuthChallengeSchema>>
-export type LocalPromptContextItem = z.infer<typeof contextItemSchema>
+export type LocalPromptContextItem = z.infer<typeof _contextItemSchema>
 export type LocalRun = DeepReadonly<z.infer<typeof runSchema>>
 export type LocalRunOutput = DeepReadonly<z.infer<typeof runOutputSchema>>
 export type LocalRunEvent = DeepReadonly<z.infer<typeof runEventSchema>>

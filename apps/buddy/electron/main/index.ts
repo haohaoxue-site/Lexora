@@ -7,6 +7,8 @@ import process from 'node:process'
 import {
   app,
   crashReporter,
+  dialog,
+  ipcMain,
   Menu,
   nativeTheme,
   net,
@@ -53,6 +55,7 @@ import {
   NativePetSupervisor,
 } from './pet/NativePetSupervisor'
 import { registerPetHostRpc } from './pet/registerPetHostRpc'
+import { confirmDraftFlushBeforeQuit, requestRendererDraftFlush } from './rendererDraftLifecycle'
 import { installRendererProtocol, registerRendererSchemePrivileges } from './rendererProtocol'
 import {
   createBuddyServiceEnvironment,
@@ -175,8 +178,14 @@ if (!app.requestSingleInstanceLock()) {
   app.quit()
 }
 else {
+  process.once('SIGINT', () => {
+    void quitLexora({ discardDraftsOnFailure: true }).catch((error) => {
+      console.error('Lexora Buddy Desktop failed to stop after SIGINT', error)
+      app.exit(1)
+    })
+  })
+
   app.on('before-quit', (event) => {
-    isQuitting = true
     if (quitCommitted)
       return
 
@@ -400,6 +409,8 @@ else {
           iconPath: desktopIconPath,
           isQuitting: () => isQuitting,
           onHidden() {
+            if (!handle.window.webContents.isDestroyed())
+              handle.window.webContents.send(DESKTOP_IPC_CHANNELS.appHidden)
             void showBackgroundCloseNotice(configStore)
           },
           onPlacementChanged(placement) {
@@ -514,7 +525,6 @@ else {
     }
   }).catch(async (error) => {
     console.error('Lexora Buddy Desktop failed to start', error)
-    isQuitting = true
     stopBrowserDesktopIpc?.()
     browserAdapterTestLeasePublisher?.dispose()
     browserAdapterTestLeasePublisher = null
@@ -537,20 +547,50 @@ else {
   })
 }
 
-function quitLexora(): Promise<void> {
-  isQuitting = true
+function quitLexora(options: { discardDraftsOnFailure?: boolean } = {}): Promise<void> {
   if (quitPromise)
     return quitPromise
 
   quitPromise = (async () => {
+    const shouldQuit = await confirmDraftFlushBeforeQuit(
+      () => requestRendererDraftFlush(desktopWindowManager?.window ?? null, ipcMain),
+      options.discardDraftsOnFailure
+        ? async () => 'discard'
+        : async () => {
+          const options: Electron.MessageBoxOptions = {
+            buttons: [
+              translateDesktopNative(desktopLanguage, 'retrySave'),
+              translateDesktopNative(desktopLanguage, 'cancel'),
+              translateDesktopNative(desktopLanguage, 'quitWithoutSaving'),
+            ],
+            cancelId: 1,
+            defaultId: 0,
+            detail: translateDesktopNative(desktopLanguage, 'saveBeforeQuitBody'),
+            message: translateDesktopNative(desktopLanguage, 'saveBeforeQuitTitle'),
+            noLink: true,
+            type: 'warning',
+          }
+          const window = desktopWindowManager?.window
+          const result = await (window
+            ? dialog.showMessageBox(window, options)
+            : dialog.showMessageBox(options))
+          return result.response === 0 ? 'retry' : result.response === 1 ? 'cancel' : 'discard'
+        },
+    )
+    if (!shouldQuit) {
+      quitPromise = null
+      return
+    }
+    isQuitting = true
+    browserHost?.dispose()
+    browserHost = null
+    desktopWindowManager?.dispose()
     stopBrowserDesktopIpc?.()
     stopBrowserDesktopIpc = null
     browserAdapterTestLeasePublisher?.dispose()
     browserAdapterTestLeasePublisher = null
     await browserAdapterServer?.dispose()
     browserAdapterServer = null
-    browserHost?.dispose()
-    browserHost = null
     stopLocalChatIpc?.()
     stopLocalChatIpc = null
     stopBuddyServiceNotification?.()

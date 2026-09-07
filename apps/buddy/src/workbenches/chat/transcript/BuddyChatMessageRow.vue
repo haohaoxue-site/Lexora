@@ -3,9 +3,9 @@ import type { LocalChangeSetSummary, LocalMessage } from '@buddy-electron/shared
 import type { ChatMessageBranchNavigator } from './chatMessageBranches'
 import type { ChatTranscriptTurnOutputs } from './chatTranscriptProjection'
 import type { BuddyLocale } from '@/i18n/buddyI18n'
-import { NButton, NInput } from 'naive-ui'
-import { computed, shallowRef, watch } from 'vue'
+import { computed } from 'vue'
 import { useBuddyI18n } from '@/i18n/buddyI18n'
+import DesktopIcon from '@/ui/DesktopIcon.vue'
 import BuddyChatActionToolbar from './BuddyChatActionToolbar.vue'
 import BuddyChatAgentIdentity from './BuddyChatAgentIdentity.vue'
 import BuddyChatMessageContent from './BuddyChatMessageContent.vue'
@@ -15,7 +15,6 @@ import { projectChatMessageActions } from './chatMessageActions'
 import {
   getChatMessageDisplayText,
   getChatMessageInterruption,
-  getChatMessageText,
 } from './chatMessageContent'
 
 const props = defineProps<{
@@ -34,8 +33,6 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   activateBranch: [branchId: string]
-  cancelEdit: []
-  edit: [content: string]
   openArtifact: [artifactId: string]
   openChanges: [changeSetId: string]
   regenerate: []
@@ -43,7 +40,6 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useBuddyI18n(() => props.language)
-const editingText = shallowRef('')
 const actions = computed(() => projectChatMessageActions(
   props.message,
   props.actionsDisabled,
@@ -75,22 +71,6 @@ const messageText = computed(() => getChatMessageDisplayText(
   props.message,
   presentedArtifacts.value,
 ))
-
-watch(
-  [() => props.editing, () => props.message.id],
-  ([editing]) => {
-    if (editing)
-      editingText.value = getChatMessageText(props.message)
-  },
-  { immediate: true },
-)
-
-function submitEdit() {
-  const content = editingText.value.trim()
-  if (!content && !props.message.attachments.length)
-    return
-  emit('edit', content)
-}
 </script>
 
 <template>
@@ -118,29 +98,11 @@ function submitEdit() {
     >
       {{ roleLabel }}
     </span>
-    <div v-if="editing" class="buddy-chat-message__editor">
-      <NInput
-        v-model:value="editingText"
-        :autosize="{ minRows: 2, maxRows: 10 }"
-        :disabled="actions.disabled"
-        type="textarea"
-      />
-      <div class="buddy-chat-message__editor-actions">
-        <NButton size="small" @click="emit('cancelEdit')">
-          {{ t('common.cancel') }}
-        </NButton>
-        <NButton
-          :disabled="(!editingText.trim() && !message.attachments.length) || actions.disabled"
-          size="small"
-          type="primary"
-          @click="submitEdit"
-        >
-          {{ t('desktop.chat.saveEdit') }}
-        </NButton>
-      </div>
+    <div v-if="editing" class="buddy-chat-message__editing-state" role="status">
+      <DesktopIcon name="messageEdit" />
+      <span>{{ t('desktop.chat.editingMessage') }}</span>
     </div>
     <BuddyChatMessageContent
-      v-else
       class="buddy-chat-message__body"
       :final="!streaming"
       :hidden-artifacts="presentedArtifacts"
@@ -169,7 +131,7 @@ function submitEdit() {
       {{ interruptionLabel }}
     </small>
     <BuddyChatActionToolbar
-      v-if="!editing && showActions"
+      v-if="showActions"
       :actions="actions"
       :branch-navigator="branchNavigator"
       class="buddy-chat-message__actions"
@@ -204,10 +166,6 @@ function submitEdit() {
     justify-items: end;
   }
 
-  &.is-editing {
-    justify-items: stretch;
-  }
-
   &.is-assistant {
     align-items: start;
   }
@@ -218,30 +176,6 @@ function submitEdit() {
   }
 }
 
-.buddy-chat-message__editor {
-  display: grid;
-  width: 100%;
-  gap: 0.65rem;
-  border: 1px solid var(--buddy-accent-border);
-  border-radius: 0.75rem;
-  background: var(--buddy-surface-raised);
-  padding: 0.75rem;
-
-  :deep(.n-input) {
-    --n-border: 0 !important;
-    --n-border-hover: 0 !important;
-    --n-border-focus: 0 !important;
-    --n-box-shadow-focus: none !important;
-    background: transparent;
-  }
-}
-
-.buddy-chat-message__editor-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 0.45rem;
-}
-
 .buddy-chat-message__role {
   display: grid;
   width: var(--buddy-chat-avatar-size);
@@ -250,6 +184,21 @@ function submitEdit() {
   color: var(--buddy-text-muted);
   font-size: 0.65rem;
   font-weight: 650;
+}
+
+.buddy-chat-message__editing-state {
+  display: inline-flex;
+  align-items: center;
+  justify-self: end;
+  gap: 0.3rem;
+  color: var(--buddy-accent-text);
+  font-size: 0.68rem;
+  font-weight: 600;
+  line-height: 1.35;
+
+  .desktop-icon {
+    font-size: 0.9rem;
+  }
 }
 
 .buddy-chat-message.is-search-match :deep(.buddy-chat-message-content__text) {

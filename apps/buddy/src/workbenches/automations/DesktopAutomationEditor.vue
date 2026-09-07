@@ -15,6 +15,7 @@ import type { BuddyThinkingLevel } from '@buddy-shared/modelSelection'
 import type { AutomationScheduleForm } from './automationEditorForm'
 import type { BuddyLocale } from '@/i18n/buddyI18n'
 import { automationDefinitionDraftSchema, automationTimingSchema } from '@buddy-shared/automation'
+import { Temporal } from '@buddy-shared/temporal'
 import { PanelLeft20Regular } from '@vicons/fluent'
 import { useDebounceFn } from '@vueuse/core'
 import {

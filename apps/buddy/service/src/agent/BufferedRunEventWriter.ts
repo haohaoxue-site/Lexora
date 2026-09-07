@@ -2,7 +2,6 @@ import type { BuddyAssistantTextPhase } from '../../../shared/assistantTextPhase
 import type { RunEventWriter } from '../events/RunEventPorts'
 import type { BuddyProjectedEvent } from './projectPiEvent'
 import { buddyAssistantTextPhaseSchema } from '../../../shared/assistantTextPhase'
-import { buddyReasoningKindSchema } from '../../../shared/reasoningPresentation'
 import { buddyToolPresentationDeltaSchema } from '../../../shared/runEventPresentation'
 
 export class BufferedRunEventWriter {
@@ -193,7 +192,6 @@ function mergeMessageBlockDelta(
     || !rightPayload
     || leftPayload.messageId !== rightPayload.messageId
     || leftPayload.contentIndex !== rightPayload.contentIndex
-    || leftPayload.reasoningKind !== rightPayload.reasoningKind
     || leftPayload.delta.length + rightPayload.delta.length > 64 * 1024
   ) {
     return null
@@ -205,7 +203,6 @@ function mergeMessageBlockDelta(
       delta: leftPayload.delta + rightPayload.delta,
       kind: 'reasoning',
       messageId: leftPayload.messageId,
-      reasoningKind: leftPayload.reasoningKind,
     },
     type: 'message.block.delta',
   }
@@ -246,15 +243,13 @@ function readMessageDeltaPayload(value: unknown): {
 
 function readMessageBlockDeltaPayload(
   value: unknown,
-): { contentIndex: number, delta: string, messageId: string, reasoningKind: 'summary' | 'thinking' } | null {
+): { contentIndex: number, delta: string, messageId: string } | null {
   if (!value || typeof value !== 'object' || Array.isArray(value))
     return null
   const payload = value as Record<string, unknown>
-  const reasoningKind = buddyReasoningKindSchema.safeParse(payload.reasoningKind)
   return payload.kind === 'reasoning'
     && typeof payload.delta === 'string'
     && typeof payload.messageId === 'string'
-    && reasoningKind.success
     && typeof payload.contentIndex === 'number'
     && Number.isSafeInteger(payload.contentIndex)
     && payload.contentIndex >= 0
@@ -262,7 +257,6 @@ function readMessageBlockDeltaPayload(
         contentIndex: payload.contentIndex,
         delta: payload.delta,
         messageId: payload.messageId,
-        reasoningKind: reasoningKind.data,
       }
     : null
 }

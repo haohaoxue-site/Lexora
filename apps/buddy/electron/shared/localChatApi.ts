@@ -1,10 +1,18 @@
-import type { BuddyAttachmentImportRequest } from '../../shared/attachmentPolicy'
+import type {
+  BuddyComposerResource,
+  BuddyComposerResourceAccept,
+  BuddyComposerResourceComplete,
+  BuddyComposerResourceTarget,
+  BuddyComposerSourceList,
+  BuddyComposerSourceListResponse,
+  BuddyComposerSourceSelect,
+  BuddyComposerSpaceFileSelect,
+} from '../../shared/composerResource'
 import type { BuddyPermissionSettings } from '../../shared/permissionMode'
 import type { WebSettings, WebSettingsSnapshot } from '../../shared/webProtocol'
 import type {
   LocalApproval,
   LocalArtifactText,
-  LocalAttachment,
   LocalAutomation,
   LocalAutomationCreateRequest,
   LocalAutomationListRequest,
@@ -19,6 +27,9 @@ import type {
   LocalBuddyServiceSupervisorState,
   LocalChangeSetDetail,
   LocalChatCommandRequest,
+  LocalComposerDraft,
+  LocalComposerDraftOpen,
+  LocalComposerDraftSave,
   LocalConnector,
   LocalConnectorConfig,
   LocalConnectorCredential,
@@ -34,7 +45,6 @@ import type {
   LocalDefaultModel,
   LocalMessagePage,
   LocalNotificationList,
-  LocalPromptContextItem,
   LocalProvider,
   LocalProviderAuthChallenge,
   LocalRun,
@@ -58,6 +68,7 @@ import type {
 
 export type LocalChatErrorCode
   = | 'APPROVAL_REQUIRED'
+    | 'ATTACHMENT_LIMIT_EXCEEDED'
     | 'AUTOMATION_CONFLICT'
     | 'AUTOMATION_INVALID_SCHEDULE'
     | 'AUTOMATION_NOT_FOUND'
@@ -65,9 +76,11 @@ export type LocalChatErrorCode
     | 'CONNECTOR_UNAVAILABLE'
     | 'CREDENTIAL_STORE_UNAVAILABLE'
     | 'DIRECTORY_NOT_AUTHORIZED'
+    | 'DRAFT_CONFLICT'
     | 'LOCAL_CHAT_OPERATION_FAILED'
     | 'MODEL_SYNC_FAILED'
     | 'MODEL_SYNC_UNSUPPORTED'
+    | 'MODEL_INPUT_UNSUPPORTED'
     | 'PATH_OUTSIDE_GRANTED_DIRECTORY'
     | 'SPACE_HAS_ACTIVE_RUNS'
     | 'SPACE_UNAVAILABLE'
@@ -87,6 +100,7 @@ const LOCAL_CHAT_ERROR_MARKER = 'LEXORA_LOCAL_CHAT_ERROR'
 const LOCAL_CHAT_ERROR_PATTERN = /LEXORA_LOCAL_CHAT_ERROR:([A-Z0-9_]+):(0|1)/
 const LOCAL_CHAT_ERROR_CODES = new Set<LocalChatErrorCode>([
   'APPROVAL_REQUIRED',
+  'ATTACHMENT_LIMIT_EXCEEDED',
   'AUTOMATION_CONFLICT',
   'AUTOMATION_INVALID_SCHEDULE',
   'AUTOMATION_NOT_FOUND',
@@ -94,9 +108,11 @@ const LOCAL_CHAT_ERROR_CODES = new Set<LocalChatErrorCode>([
   'CONNECTOR_UNAVAILABLE',
   'CREDENTIAL_STORE_UNAVAILABLE',
   'DIRECTORY_NOT_AUTHORIZED',
+  'DRAFT_CONFLICT',
   'LOCAL_CHAT_OPERATION_FAILED',
   'MODEL_SYNC_FAILED',
   'MODEL_SYNC_UNSUPPORTED',
+  'MODEL_INPUT_UNSUPPORTED',
   'PATH_OUTSIDE_GRANTED_DIRECTORY',
   'SPACE_HAS_ACTIVE_RUNS',
   'SPACE_UNAVAILABLE',
@@ -145,6 +161,9 @@ export type {
   LocalChangeSetDetail,
   LocalChangeSetSummary,
   LocalChatCommandRequest,
+  LocalComposerDraft,
+  LocalComposerDraftOpen,
+  LocalComposerDraftSave,
   LocalConnector,
   LocalConnectorConfig,
   LocalConnectorCredential,
@@ -213,10 +232,18 @@ export const LOCAL_CHAT_IPC_CHANNELS = {
   automationsResume: 'lexora:buddy:automations:resume',
   automationsRunNow: 'lexora:buddy:automations:run-now',
   automationsUpdate: 'lexora:buddy:automations:update',
-  attachmentsCleanupDrafts: 'lexora:buddy:attachments:cleanup-drafts',
-  attachmentsImportFiles: 'lexora:buddy:attachments:import-files',
-  attachmentsRelease: 'lexora:buddy:attachments:release',
-  attachmentsSelectFiles: 'lexora:buddy:attachments:select-files',
+  composerResourcesAccept: 'lexora:buddy:composer-resources:accept',
+  composerResourcesComplete: 'lexora:buddy:composer-resources:complete',
+  composerResourcesFail: 'lexora:buddy:composer-resources:fail',
+  composerResourcesList: 'lexora:buddy:composer-resources:list',
+  composerResourcesListSources: 'lexora:buddy:composer-resources:list-sources',
+  composerResourcesRetry: 'lexora:buddy:composer-resources:retry',
+  composerResourcesSelectFiles: 'lexora:buddy:composer-resources:select-files',
+  composerResourcesSelectSource: 'lexora:buddy:composer-resources:select-source',
+  composerResourcesSelectSpaceFile: 'lexora:buddy:composer-resources:select-space-file',
+  composerDraftsGet: 'lexora:buddy:composer-drafts:get',
+  composerDraftsOpen: 'lexora:buddy:composer-drafts:open',
+  composerDraftsSave: 'lexora:buddy:composer-drafts:save',
   chatCancel: 'lexora:buddy:chat:cancel',
   chatEditUserMessage: 'lexora:buddy:chat:edit-user-message',
   chatExecuteCommand: 'lexora:buddy:chat:execute-command',
@@ -298,6 +325,11 @@ interface LocalMutationResult {
 }
 
 export interface LocalChatApi {
+  composerDrafts: {
+    get: (draftId: string) => Promise<LocalComposerDraft>
+    open: (input: LocalComposerDraftOpen) => Promise<LocalComposerDraft>
+    save: (input: LocalComposerDraftSave) => Promise<LocalComposerDraft>
+  }
   artifacts: {
     readText: (artifactId: string) => Promise<LocalArtifactText>
   }
@@ -478,30 +510,25 @@ export interface LocalChatApi {
     approveForTurn: (approvalId: string) => Promise<LocalApproval>
     deny: (approvalId: string) => Promise<LocalApproval>
   }
-  attachments: {
-    importFiles: (
-      input: BuddyAttachmentImportRequest,
-    ) => Promise<ReadonlyArray<LocalAttachment>>
-    selectFiles: (input: {
-      draftId: string
-      remainingCount: number
-    }) => Promise<ReadonlyArray<LocalAttachment>>
-    release: (
-      attachmentIds: ReadonlyArray<string>,
-    ) => Promise<{ releasedAttachmentIds: ReadonlyArray<string> }>
-    cleanupDrafts: () => Promise<{ releasedAttachmentIds: ReadonlyArray<string> }>
+  composerResources: {
+    accept: (input: BuddyComposerResourceAccept) => Promise<readonly BuddyComposerResource[]>
+    complete: (input: BuddyComposerResourceComplete) => Promise<BuddyComposerResource>
+    fail: (input: BuddyComposerResourceTarget) => Promise<BuddyComposerResource>
+    list: (draftId: string) => Promise<readonly BuddyComposerResource[]>
+    listSources: (input: BuddyComposerSourceList) => Promise<BuddyComposerSourceListResponse>
+    retry: (input: BuddyComposerResourceTarget) => Promise<BuddyComposerResource>
+    selectFiles: (draftId: string, referencedResourceIds?: readonly string[]) => Promise<readonly BuddyComposerResource[]>
+    selectSource: (input: BuddyComposerSourceSelect, referencedResourceIds?: readonly string[]) => Promise<BuddyComposerResource>
+    selectSpaceFile: (input: BuddyComposerSpaceFileSelect, referencedResourceIds?: readonly string[]) => Promise<BuddyComposerResource>
   }
   usage: {
     getSnapshot: () => Promise<LocalUsageSnapshot>
   }
   chat: {
     editUserMessage: (input: {
-      attachmentIds: ReadonlyArray<string>
-      content: string
-      contextItems: ReadonlyArray<LocalPromptContextItem>
       conversationId: string
       draftId: string
-      modelSelection: LocalStartTurnRequest['modelSelection']
+      expectedRevision: number
       requestId: string
       userMessageId: string
     }) => Promise<LocalTurnStart>

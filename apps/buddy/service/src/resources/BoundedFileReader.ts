@@ -13,8 +13,8 @@ interface BoundedProcessResult {
   stdout: Buffer
 }
 
-export async function readBoundedFile(canonicalRoot: string, path: string): Promise<Buffer> {
-  const result = await runBoundedProcess(canonicalRoot, '/usr/bin/cat', ['--', path])
+export async function readBoundedFile(canonicalRoot: string, path: string, maxBytes = MAX_PROCESS_OUTPUT_BYTES): Promise<Buffer> {
+  const result = await runBoundedProcess(canonicalRoot, '/usr/bin/cat', ['--', path], maxBytes)
   if (result.exitCode !== 0) {
     const detail = result.stderr.toString('utf8').trim()
     throw new BoundedFileReadError('BOUNDED_FILE_READ_FAILED', undefined, detail)
@@ -26,6 +26,7 @@ async function runBoundedProcess(
   canonicalRoot: string,
   executable: string,
   args: readonly string[],
+  maxBytes: number,
 ): Promise<BoundedProcessResult> {
   assertExecutable(BWRAP_PATH)
   const sandboxArgs = [
@@ -87,7 +88,7 @@ async function runBoundedProcess(
     }
     const collect = (target: Buffer[]) => (chunk: Buffer) => {
       outputBytes += chunk.length
-      if (outputBytes > MAX_PROCESS_OUTPUT_BYTES) {
+      if (outputBytes > maxBytes) {
         child.kill('SIGTERM')
         finish(() => reject(new BoundedFileReadError('BOUNDED_FILE_OUTPUT_LIMIT')))
         return

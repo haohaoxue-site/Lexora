@@ -38,8 +38,8 @@ withDefaults(defineProps<{
 
 <style scoped lang="scss">
 .desktop-chat-composer-frame {
-  --desktop-chat-composer-editor-padding-top: 0.1rem;
-  --desktop-chat-composer-editor-padding-bottom: 0.6rem;
+  --desktop-chat-composer-editor-padding-top: 0.35rem;
+  --desktop-chat-composer-editor-padding-bottom: 0.35rem;
 
   width: 100%;
   min-width: 0;
@@ -67,14 +67,14 @@ withDefaults(defineProps<{
 }
 
 :deep(.desktop-chat-composer__editor-scrollbar) {
-  min-height: calc(3lh + var(--desktop-chat-composer-editor-padding-top) + var(--desktop-chat-composer-editor-padding-bottom));
+  min-height: calc(2lh + var(--desktop-chat-composer-editor-padding-top) + var(--desktop-chat-composer-editor-padding-bottom));
   max-height: calc(8lh + var(--desktop-chat-composer-editor-padding-top) + var(--desktop-chat-composer-editor-padding-bottom));
   font-size: 0.9rem;
   line-height: 1.58;
 }
 
 :deep(.desktop-chat-composer__prosemirror) {
-  min-height: calc(3lh + var(--desktop-chat-composer-editor-padding-top) + var(--desktop-chat-composer-editor-padding-bottom));
+  min-height: calc(2lh + var(--desktop-chat-composer-editor-padding-top) + var(--desktop-chat-composer-editor-padding-bottom));
   border: 0;
   outline: 0;
   color: var(--buddy-text-strong);
@@ -110,6 +110,7 @@ withDefaults(defineProps<{
   display: inline-flex;
   align-items: center;
   max-width: 100%;
+  margin-inline: 0.2rem;
   border: 1px solid var(--buddy-accent-border);
   border-radius: 0.38rem;
   background: var(--buddy-accent-surface);
@@ -118,6 +119,37 @@ withDefaults(defineProps<{
   font-weight: 650;
   line-height: 1.45;
   padding: 0.05rem 0.35rem;
+}
+
+:deep([data-type='chat-resource-reference']) {
+  gap: 0.28rem;
+  border-color: color-mix(in srgb, var(--buddy-border-strong) 88%, var(--buddy-surface-raised));
+  border-radius: 0.28rem;
+  background: var(--buddy-surface-raised);
+  box-shadow: none;
+  color: var(--buddy-text-secondary);
+  font-weight: 600;
+}
+
+:deep([data-type='chat-resource-reference'].ProseMirror-selectednode) {
+  border-color: var(--buddy-focus-ring);
+  background: color-mix(in srgb, var(--buddy-accent-surface) 32%, var(--buddy-surface-raised));
+  box-shadow: none;
+  color: var(--buddy-accent-on-surface);
+}
+
+:deep(.chat-resource-reference__icon) {
+  display: block;
+  width: 0.9rem;
+  height: 0.9rem;
+  flex: none;
+  object-fit: contain;
+}
+
+:deep(.chat-resource-reference__label) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .desktop-chat-composer__toolbar,
@@ -129,6 +161,7 @@ withDefaults(defineProps<{
 }
 
 .desktop-chat-composer__toolbar {
+  min-height: var(--buddy-composer-control-height);
   justify-content: space-between;
   gap: 0.55rem;
 }

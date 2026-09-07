@@ -1,19 +1,23 @@
 import type {
   Api,
   AssistantMessage,
-  ImageContent,
   Model,
   UserMessage,
 } from '@earendil-works/pi-ai'
+import type { AttachmentImageReference } from '../attachments/AttachmentImageReference'
 import type { MessageRecord } from '../storage/conversationHistoryRepository'
 import { readBuddyInterruptedMessageContent } from '../../../shared/buddyMessageContent'
+import {
+  createBuddyInputReference,
+  createBuddyInputReferenceMessage,
+} from './BuddyInputReference'
 
 export interface CreateBuddyRecoveryMessagesOptions {
   fallbackModel: Model<Api>
   messages: readonly MessageRecord[]
   resolveRunModel: (runId: string) => Model<Api> | null
   resolveUserInput: (messageId: string) => {
-    images: readonly ImageContent[]
+    images: readonly AttachmentImageReference[]
     prompt: string
   } | null
   triggeringMessageId: string | null
@@ -37,13 +41,13 @@ export function createBuddyRecoveryMessages(
       const prompt = input?.prompt.trim() || text
       if (!prompt && !input?.images.length)
         continue
-      recovered.push({
-        content: input?.images.length
-          ? [{ text: prompt, type: 'text' }, ...input.images]
-          : prompt,
-        role: 'user',
-        timestamp,
-      })
+      recovered.push(input
+        ? createBuddyInputReferenceMessage(createBuddyInputReference({
+            images: [...input.images],
+            messageId: message.id,
+            prompt,
+          }), timestamp)
+        : { content: prompt, role: 'user', timestamp })
       continue
     }
     if (!text)

@@ -65,6 +65,18 @@ const stopRuntimeReadyWatch = watch(
 )
 const ready = initialize()
 const stopOpenTargetListener = api.app.onOpenTarget(openDesktopTarget)
+const stopHiddenListener = api.app.onHidden(() => {
+  void ready.then(() => tasks.flushDrafts()).catch(() => undefined)
+})
+const stopBeforeQuitListener = api.app.onBeforeQuit(async () => {
+  try {
+    await ready
+    return await tasks.flushDrafts()
+  }
+  catch {
+    return false
+  }
+})
 
 watch(
   () => capabilities.applicationSettings.config.value?.desktop.language,
@@ -152,6 +164,8 @@ onBeforeUnmount(() => {
   tasks.dispose()
   appState.dispose()
   stopOpenTargetListener()
+  stopHiddenListener()
+  stopBeforeQuitListener()
   stopRuntimeReadyWatch()
 })
 

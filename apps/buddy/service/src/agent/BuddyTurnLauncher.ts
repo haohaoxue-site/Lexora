@@ -27,8 +27,16 @@ export class BuddyTurnLauncher {
         throw error
       return { completion: Promise.resolve(failed), runId }
     }
-    return plan.kind === 'turn'
-      ? this.#options.runner.startTurn(plan.input)
-      : this.#options.runner.startCompaction(plan.input)
+    try {
+      return plan.kind === 'turn'
+        ? this.#options.runner.startTurn(plan.input)
+        : this.#options.runner.startCompaction(plan.input)
+    }
+    catch (error) {
+      const failed = await this.#options.lifecycle.failBeforeStart(runId, error)
+      if (!failed)
+        throw error
+      return { completion: Promise.resolve(failed), runId }
+    }
   }
 }

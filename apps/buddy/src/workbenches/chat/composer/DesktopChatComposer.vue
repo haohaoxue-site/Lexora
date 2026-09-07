@@ -1,31 +1,37 @@
 <script setup lang="ts">
 import type {
-  LocalAttachment,
   LocalProvider,
   LocalRuntimeModelOption,
-  LocalWorkspaceDraft,
 } from '@buddy-electron/shared/localChatApi'
+import type { BuddyComposerSource } from '@buddy-shared/composerResource'
 import type {
   BuddyServiceTier,
   BuddyThinkingLevel,
 } from '@buddy-shared/modelSelection'
 import type { BuddyPermissionMode } from '@buddy-shared/permissionMode'
+import type { JSONContent } from '@tiptap/core'
+import type { ComponentPublicInstance } from 'vue'
+import type { ComposerResourceView } from './useComposerResources'
 import type { BuddyLocale } from '@/i18n/buddyI18n'
 import type {
   ChatComposerContextOptions,
   ChatComposerSubmitPayload,
+  ChatPromptContextOption,
 } from '@/workbenches/chat/composer/chatComposerInput'
 import type { ChatComposerInteraction } from '@/workbenches/chat/composer/chatComposerInteraction'
 import type { ChatContextUsage as ChatContextUsageValue } from '@/workbenches/chat/composer/chatContextUsage'
 import { EditorContent } from '@tiptap/vue-3'
 import {
   Add20Regular,
+  ArrowLeft16Regular,
   ArrowUp20Regular,
-  Dismiss16Regular,
+  ArrowUpload20Regular,
+  ChatMultiple20Regular,
   Stop20Filled,
 } from '@vicons/fluent'
-import { NButton, NIcon } from 'naive-ui'
-import { toRef } from 'vue'
+import { useEventListener } from '@vueuse/core'
+import { NButton, NIcon, NInput, NPopover, NTooltip } from 'naive-ui'
+import { computed, nextTick, shallowRef, toRef, useTemplateRef } from 'vue'
 import { useBuddyI18n } from '@/i18n/buddyI18n'
 import DesktopModelSelector from '@/ui/model-selector/DesktopModelSelector.vue'
 import ChatContextUsage from '@/workbenches/chat/composer/ChatContextUsage.vue'
@@ -33,15 +39,20 @@ import DesktopChatComposerFrame from '@/workbenches/chat/composer/DesktopChatCom
 import DesktopChatComposerInteractionHost from '@/workbenches/chat/composer/DesktopChatComposerInteractionHost.vue'
 import DesktopPermissionModeSelector from '@/workbenches/chat/composer/DesktopPermissionModeSelector.vue'
 import { useChatComposer } from '@/workbenches/chat/composer/useChatComposer'
-import { resolveBuddyAttachmentPreviewUrl } from '@/workbenches/chat/transcript/chatAttachmentView'
+import ChatComposerSourcePicker from './ChatComposerSourcePicker.vue'
+import ComposerResourceStrip from './ComposerResourceStrip.vue'
 
 const props = defineProps<{
-  attachments: ReadonlyArray<LocalAttachment>
   canUpdatePermissionSettings: boolean
   canSend: boolean
-  composerContent: LocalWorkspaceDraft['composerContent']
+  composerContent: JSONContent
   contextUsage: ChatContextUsageValue | null
   draft: string
+  draftId: string
+  resources: readonly ComposerResourceView[]
+  rejectedResourceIds: ReadonlySet<string>
+  beginImport: (files: readonly File[]) => readonly string[]
+  selectSource: (source: BuddyComposerSource) => Promise<string | null>
   isRunning: boolean
   isSelectingFiles: boolean
   isSending: boolean
@@ -60,12 +71,11 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   attach: []
-  attachFiles: [files: ReadonlyArray<File>]
+  retryResource: [resourceId: string]
   dismissInteraction: [id: string]
-  removeAttachment: [index: number]
   send: [payload: ChatComposerSubmitPayload]
   stop: []
-  updateContent: [content: string, value: LocalWorkspaceDraft['composerContent']]
+  updateContent: [content: string, value: JSONContent]
   updateEffort: [value: BuddyThinkingLevel | null]
   updatePermissionMode: [value: BuddyPermissionMode]
   updateModel: [value: string]
@@ -78,26 +88,49 @@ defineSlots<{
 const { t } = useBuddyI18n(() => props.language)
 const {
   activeSuggestionIndex,
+  activeTrigger,
+  attachFiles,
   canSubmit,
+  closeSuggestions,
   editor,
   isLoadingContext,
+  loadContextOptions,
+  modelInputIssue,
+  resourceStripResources,
+  removeResource,
+  selectPanelSource: selectPanelResource,
   selectSuggestion,
   submit,
-  suggestionKind,
+  sourceOptions,
   suggestions,
 } = useChatComposer({
-  attachments: toRef(props, 'attachments'),
   canSend: toRef(props, 'canSend'),
   composerContent: toRef(props, 'composerContent'),
   draft: toRef(props, 'draft'),
+  draftId: toRef(props, 'draftId'),
+  resources: toRef(props, 'resources'),
+  selectedModel: toRef(props, 'selectedModel'),
+  rejectedResourceIds: props.rejectedResourceIds,
   isRunning: toRef(props, 'isRunning'),
   isSending: toRef(props, 'isSending'),
   language: toRef(props, 'language'),
   loadContextOptions: props.loadContextOptions,
-  onAttachFiles: files => emit('attachFiles', files),
+  beginImport: props.beginImport,
+  selectSource: props.selectSource,
   onSend: payload => emit('send', payload),
   onUpdateContent: (content, value) => emit('updateContent', content, value),
 })
+
+const sourceMenuOpen = shallowRef(false)
+const sourceMenuView = shallowRef<'menu' | 'files'>('menu')
+const sourcePickerQuery = shallowRef('')
+const sourcePopoverThemeOverrides = { padding: '8px 14px' } as const
+const sourceTrigger = useTemplateRef<ComponentPublicInstance>('sourceTrigger')
+const suggestionOptions = computed(() => suggestions.value.map(({ option }) => option))
+const chooserVisible = computed(() => !sourceMenuOpen.value && Boolean(
+  activeTrigger.value && (suggestions.value.length || isLoadingContext.value),
+))
+useEventListener(document, 'keydown', handleDocumentKeydown)
 
 function handleFileDragover(event: DragEvent) {
   if (event.dataTransfer?.types.includes('Files'))
@@ -110,7 +143,48 @@ function handleFileDrop(event: DragEvent) {
     return
 
   event.preventDefault()
-  emit('attachFiles', files)
+  attachFiles(files, 'panel')
+}
+
+function chooseLocalFiles() {
+  sourceMenuOpen.value = false
+  emit('attach')
+}
+
+async function openConversationFilePicker() {
+  sourceMenuView.value = 'files'
+  sourcePickerQuery.value = ''
+  await loadContextOptions('')
+}
+
+async function selectConversationFile(option: ChatPromptContextOption) {
+  if (await selectPanelResource(option))
+    sourceMenuOpen.value = false
+}
+
+function handleSourceMenuVisibility(show: boolean) {
+  if (show) {
+    closeSuggestions()
+    sourceMenuView.value = 'menu'
+    sourcePickerQuery.value = ''
+  }
+  sourceMenuOpen.value = show
+  if (!show)
+    sourceMenuView.value = 'menu'
+}
+
+function handleDocumentKeydown(event: KeyboardEvent) {
+  if (event.key !== 'Escape' || !sourceMenuOpen.value)
+    return
+
+  event.preventDefault()
+  sourceMenuOpen.value = false
+  sourceMenuView.value = 'menu'
+  sourcePickerQuery.value = ''
+  void nextTick(() => {
+    const trigger = sourceTrigger.value?.$el as HTMLButtonElement | undefined
+    trigger?.focus()
+  })
 }
 </script>
 
@@ -121,63 +195,33 @@ function handleFileDrop(event: DragEvent) {
     @drop="handleFileDrop"
   >
     <template #attachments>
-      <div v-if="attachments.length" class="desktop-chat-composer__attachments">
-        <div v-for="(attachment, index) in attachments" :key="attachment.attachmentId">
-          <img
-            v-if="attachment.kind === 'image' && resolveBuddyAttachmentPreviewUrl(attachment)"
-            :src="resolveBuddyAttachmentPreviewUrl(attachment) ?? undefined"
-            :alt="attachment.name"
-            height="29"
-            width="29"
-          >
-          <span v-else class="desktop-chat-composer__file-kind">
-            {{ attachment.kind === 'text' ? 'TXT' : 'FILE' }}
-          </span>
-          <span>{{ attachment.name }}</span>
-          <NButton
-            class="buddy-icon-button"
-            quaternary
-            size="tiny"
-            :aria-label="t('desktop.chat.removeAttachment')"
-            @click="emit('removeAttachment', index)"
-          >
-            <template #icon>
-              <NIcon :component="Dismiss16Regular" />
-            </template>
-          </NButton>
-        </div>
-      </div>
+      <ComposerResourceStrip
+        :resources="resourceStripResources"
+        :language="language"
+        :disabled="isSending"
+        @remove="removeResource"
+        @retry="emit('retryResource', $event)"
+      />
     </template>
 
     <template #overlay>
       <DesktopChatComposerInteractionHost
-        :chooser-visible="Boolean(suggestions.length || isLoadingContext)"
+        :chooser-visible="chooserVisible"
         :interaction="interaction"
         :language="language"
         @dismiss="emit('dismissInteraction', $event)"
       >
         <template #chooser>
-          <div class="desktop-chat-composer__suggestions">
-            <span v-if="isLoadingContext && !suggestions.length" class="desktop-chat-composer__suggestion-empty">
-              {{ t('desktop.chat.loadingContext') }}
-            </span>
-            <button
-              v-for="(suggestion, index) in suggestions"
-              :key="`${suggestion.option.kind}:${suggestion.option.value}:${suggestion.option.path ?? ''}`"
-              class="desktop-chat-composer__suggestion"
-              :class="{ 'is-active': index === activeSuggestionIndex }"
-              type="button"
-              @mousedown.prevent="selectSuggestion(suggestion.option)"
-            >
-              <span class="desktop-chat-composer__suggestion-kind">
-                {{ suggestionKind(suggestion.option) }}
-              </span>
-              <span>
-                <strong>{{ suggestion.option.label }}</strong>
-                <small v-if="suggestion.option.description">{{ suggestion.option.description }}</small>
-              </span>
-            </button>
-          </div>
+          <ChatComposerSourcePicker
+            :active-index="activeSuggestionIndex"
+            :accessible-label="t('desktop.chat.sourcePickerSuggestions')"
+            :empty-label="t('desktop.chat.sourcePickerEmpty')"
+            :language="language"
+            :loading="isLoadingContext"
+            :loading-label="t('desktop.chat.loadingContext')"
+            :options="suggestionOptions"
+            @select="selectSuggestion"
+          />
         </template>
       </DesktopChatComposerInteractionHost>
     </template>
@@ -187,17 +231,85 @@ function handleFileDrop(event: DragEvent) {
     </template>
 
     <template #leading>
-      <NButton
-        class="buddy-icon-button"
-        quaternary
-        :aria-label="t('desktop.chat.addAttachment')"
-        :disabled="isSelectingFiles || isSending"
-        @click="emit('attach')"
+      <NPopover
+        placement="top-start"
+        :show="sourceMenuOpen"
+        :show-arrow="false"
+        :theme-overrides="sourcePopoverThemeOverrides"
+        trigger="click"
+        @update:show="handleSourceMenuVisibility"
       >
-        <template #icon>
-          <NIcon :component="Add20Regular" />
+        <template #trigger>
+          <NButton
+            ref="sourceTrigger"
+            class="buddy-icon-button desktop-chat-composer__source-trigger"
+            :class="{ 'is-open': sourceMenuOpen }"
+            quaternary
+            :aria-expanded="sourceMenuOpen"
+            aria-haspopup="menu"
+            :aria-label="t(sourceMenuOpen ? 'desktop.chat.closeAttachmentMenu' : 'desktop.chat.addAttachment')"
+            :disabled="isSelectingFiles || isSending"
+          >
+            <template #icon>
+              <NIcon class="desktop-chat-composer__source-trigger-icon" :component="Add20Regular" />
+            </template>
+          </NButton>
         </template>
-      </NButton>
+
+        <div
+          v-if="sourceMenuOpen"
+          class="desktop-chat-composer__source-menu"
+          :class="{ 'is-files': sourceMenuView === 'files' }"
+        >
+          <template v-if="sourceMenuView === 'menu'">
+            <button
+              class="desktop-chat-composer__source-action"
+              type="button"
+              @click="chooseLocalFiles"
+            >
+              <NIcon class="desktop-chat-composer__source-action-icon" :component="ArrowUpload20Regular" />
+              <span>{{ t('desktop.chat.addLocalFile') }}</span>
+            </button>
+            <button
+              class="desktop-chat-composer__source-action"
+              type="button"
+              @click="openConversationFilePicker"
+            >
+              <NIcon class="desktop-chat-composer__source-action-icon" :component="ChatMultiple20Regular" />
+              <span>{{ t('desktop.chat.selectConversationFile') }}</span>
+            </button>
+          </template>
+          <template v-else>
+            <div class="desktop-chat-composer__source-header">
+              <button
+                class="desktop-chat-composer__source-back"
+                type="button"
+                @click="sourceMenuView = 'menu'"
+              >
+                <NIcon :component="ArrowLeft16Regular" />
+                <span>{{ t('desktop.chat.sourcePickerBack') }}</span>
+              </button>
+            </div>
+            <NInput
+              v-model:value="sourcePickerQuery"
+              clearable
+              size="small"
+              :placeholder="t('desktop.chat.sourcePickerSearch')"
+              @update:value="loadContextOptions"
+            />
+            <ChatComposerSourcePicker
+              :accessible-label="t('desktop.chat.sourcePickerTitle')"
+              :empty-label="t('desktop.chat.sourcePickerEmpty')"
+              :files-only="true"
+              :language="language"
+              :loading="isLoadingContext"
+              :loading-label="t('desktop.chat.loadingContext')"
+              :options="sourceOptions"
+              @select="selectConversationFile"
+            />
+          </template>
+        </div>
+      </NPopover>
 
       <slot name="leadingContext" />
 
@@ -248,7 +360,7 @@ function handleFileDrop(event: DragEvent) {
 
       <NButton
         v-if="isRunning"
-        class="buddy-icon-button"
+        class="buddy-icon-button desktop-chat-composer__send-action"
         secondary
         type="error"
         :aria-label="t('desktop.chat.stop')"
@@ -258,19 +370,25 @@ function handleFileDrop(event: DragEvent) {
           <NIcon :component="Stop20Filled" />
         </template>
       </NButton>
-      <NButton
-        v-else
-        class="buddy-icon-button"
-        type="primary"
-        :aria-label="t('desktop.chat.send')"
-        :disabled="!canSubmit"
-        :loading="isSending"
-        @click="submit"
-      >
-        <template #icon>
-          <NIcon :component="ArrowUp20Regular" />
+      <NTooltip v-else :disabled="modelInputIssue === null">
+        <template #trigger>
+          <span class="desktop-chat-composer__send-trigger">
+            <NButton
+              class="buddy-icon-button desktop-chat-composer__send-action"
+              type="primary"
+              :aria-label="t('desktop.chat.send')"
+              :disabled="!canSubmit"
+              :loading="isSending"
+              @click="submit"
+            >
+              <template #icon>
+                <NIcon :component="ArrowUp20Regular" />
+              </template>
+            </NButton>
+          </span>
         </template>
-      </NButton>
+        {{ t('desktop.chat.modelImageUnsupported') }}
+      </NTooltip>
     </template>
 
     <template #footer>
@@ -288,116 +406,102 @@ function handleFileDrop(event: DragEvent) {
   display: contents;
 }
 
-.desktop-chat-composer__suggestions {
-  display: grid;
-  max-height: 15rem;
-  overflow-y: auto;
-  border: 1px solid var(--buddy-border-subtle);
-  border-radius: 0.75rem;
-  background: var(--buddy-surface-raised);
-  box-shadow: var(--buddy-shadow-raised);
-  padding: 0.35rem;
+.desktop-chat-composer__send-trigger {
+  display: inline-flex;
 }
 
-.desktop-chat-composer__suggestion {
-  display: grid;
-  grid-template-columns: 1.7rem minmax(0, 1fr);
-  align-items: center;
-  gap: 0.55rem;
-  border: 0;
-  border-radius: 0.5rem;
-  background: transparent;
-  color: var(--buddy-text-strong);
-  cursor: pointer;
-  padding: 0.5rem;
-  text-align: left;
+.desktop-chat-composer__source-trigger,
+.desktop-chat-composer__send-action {
+  --n-height: var(--buddy-composer-control-height);
 
-  &.is-active,
-  &:hover {
+  width: var(--buddy-composer-control-height);
+  min-width: var(--buddy-composer-control-height);
+  height: var(--buddy-composer-control-height);
+}
+
+.desktop-chat-composer__source-trigger.is-open {
+  background: var(--buddy-accent-surface-subtle);
+  color: var(--buddy-text-strong);
+}
+
+.desktop-chat-composer__source-trigger-icon {
+  transform-origin: center;
+  transition: transform 150ms var(--buddy-motion-state-easing);
+}
+
+.desktop-chat-composer__source-trigger.is-open .desktop-chat-composer__source-trigger-icon {
+  transform: rotate(45deg);
+}
+
+.desktop-chat-composer__source-menu {
+  display: grid;
+  width: fit-content;
+  min-width: min(9.5rem, calc(100vw - 2rem));
+  max-width: min(13rem, calc(100vw - 2rem));
+  gap: 0.125rem;
+  interpolate-size: allow-keywords;
+  overflow: hidden;
+  transition: width 160ms var(--buddy-motion-state-easing);
+
+  &.is-files {
+    width: min(22rem, calc(100vw - 2rem));
+    min-width: min(22rem, calc(100vw - 2rem));
+    max-width: min(22rem, calc(100vw - 2rem));
+    gap: 0.35rem;
+  }
+}
+
+.desktop-chat-composer__source-action,
+.desktop-chat-composer__source-back {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  border: 0;
+  border-radius: var(--buddy-menu-item-radius);
+  background: transparent;
+  color: var(--buddy-text-primary);
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+  white-space: nowrap;
+
+  &:hover,
+  &:focus-visible {
     background: var(--buddy-state-hover);
   }
 
-  > span:last-child {
-    display: grid;
-    min-width: 0;
-  }
-
-  strong {
-    overflow: hidden;
-    font-size: 0.8rem;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  small {
-    overflow: hidden;
-    color: var(--buddy-text-secondary);
-    font-size: 0.7rem;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+  &:focus-visible {
+    outline: 2px solid var(--buddy-focus-ring);
+    outline-offset: -2px;
   }
 }
 
-.desktop-chat-composer__suggestion-kind {
+.desktop-chat-composer__source-action {
   display: grid;
-  width: 1.55rem;
-  height: 1.55rem;
-  place-items: center;
-  border-radius: var(--buddy-radius-micro);
-  background: var(--buddy-accent-surface);
-  color: var(--buddy-accent-on-surface);
-  font-weight: 750;
+  width: 100%;
+  grid-template-columns: 1.1rem minmax(0, 1fr);
+  padding: 0.36rem 0.35rem;
+  column-gap: 0.5rem;
+  font-size: 0.8rem;
+  font-weight: 580;
+  line-height: 1.35;
 }
 
-.desktop-chat-composer__suggestion-empty {
-  color: var(--buddy-text-muted);
-  font-size: 0.75rem;
-  padding: 0.7rem;
+.desktop-chat-composer__source-action-icon {
+  flex: none;
+  color: var(--buddy-text-secondary);
+  font-size: 1.05rem;
 }
 
-.desktop-chat-composer__attachments {
+.desktop-chat-composer__source-header {
   display: flex;
-  gap: 0.45rem;
-  margin-bottom: 0.5rem;
-  overflow-x: auto;
-
-  > div {
-    display: grid;
-    max-width: 15rem;
-    flex: none;
-    grid-template-columns: 1.8rem minmax(0, 1fr) auto;
-    align-items: center;
-    gap: 0.4rem;
-    border: 1px solid var(--buddy-border-subtle);
-    border-radius: 0.65rem;
-    background: var(--buddy-surface-raised);
-    color: var(--buddy-text-secondary);
-    font-size: 0.75rem;
-    padding: 0.3rem;
-  }
-
-  img,
-  .desktop-chat-composer__file-kind {
-    width: 1.8rem;
-    height: 1.8rem;
-    border-radius: 0.45rem;
-    object-fit: cover;
-  }
-
-  > div > span:nth-child(2) {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
+  align-items: center;
 }
 
-.desktop-chat-composer__file-kind {
-  display: grid;
-  place-items: center;
-  background: var(--buddy-accent-surface);
-  color: var(--buddy-accent-on-surface);
-  font-size: 0.55rem;
-  font-weight: 700;
+.desktop-chat-composer__source-back {
+  padding: 0.25rem 0.35rem;
+  color: var(--buddy-text-secondary);
+  font-size: 0.75rem;
 }
 
 .desktop-chat-composer__disclaimer {
@@ -405,6 +509,13 @@ function handleFileDrop(event: DragEvent) {
   color: var(--buddy-text-muted);
   font-size: 0.68rem;
   text-align: center;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .desktop-chat-composer__source-trigger-icon,
+  .desktop-chat-composer__source-menu {
+    transition-duration: 0ms;
+  }
 }
 
 @container desktop-chat-composer (max-width: 26rem) {

@@ -4,6 +4,7 @@ import type { WorkspaceRepository } from '../storage/workspaceRepository'
 import type { AutomationClock } from './AutomationScheduleEvaluator'
 import type { AutomationService } from './AutomationService'
 import { randomUUID } from 'node:crypto'
+import { Temporal } from '../../../shared/temporal'
 import { findNextAutomationOccurrence, systemAutomationClock } from './AutomationScheduleEvaluator'
 
 export const AUTOMATION_POLL_INTERVAL_MS = 30_000

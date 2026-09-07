@@ -16,6 +16,7 @@ export interface AttachmentRepository {
   create: (record: AttachmentRecord) => AttachmentRecord
   findById: (id: string) => AttachmentRecord | null
   findVisibleById: (id: string) => AttachmentRecord | null
+  listAll: () => AttachmentRecord[]
   listDraftsBefore: (createdBefore: string) => AttachmentRecord[]
   listForConversation: (conversationId: string) => AttachmentRecord[]
   removeDraft: (id: string) => boolean
@@ -52,6 +53,7 @@ export function createAttachmentRepository(database: DatabaseSync): AttachmentRe
       id, draft_id, message_id, stored_path, name, mime_type, size_bytes, created_at
     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
   `)
+  const listAll = database.prepare(`${selection} ORDER BY attachments.created_at, attachments.id`)
   const listDraftsBefore = database.prepare(`
     ${selection}
     WHERE attachments.draft_id IS NOT NULL AND attachments.created_at < ?
@@ -87,6 +89,9 @@ export function createAttachmentRepository(database: DatabaseSync): AttachmentRe
     findVisibleById(id) {
       const row = findVisible.get(id) as AttachmentRow | undefined
       return row ? toAttachment(row) : null
+    },
+    listAll() {
+      return (listAll.all() as unknown as AttachmentRow[]).map(toAttachment)
     },
     listDraftsBefore(createdBefore) {
       return (listDraftsBefore.all(createdBefore) as unknown as AttachmentRow[])
