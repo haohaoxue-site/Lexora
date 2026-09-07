@@ -29,9 +29,12 @@ import {
 import { ApprovalService } from './approvals/ApprovalService'
 import { registerApprovalRpc } from './approvals/registerApprovalRpc'
 import { ArtifactService } from './artifacts/ArtifactService'
+import { reconcileLegacyArtifactOutputs } from './artifacts/LegacyArtifactRecovery'
 import { registerArtifactRpc } from './artifacts/registerArtifactRpc'
 import { AttachmentService } from './attachments/AttachmentService'
+import { ComposerResourceService } from './attachments/ComposerResourceService'
 import { registerAttachmentRpc } from './attachments/registerAttachmentRpc'
+import { registerComposerResourceRpc } from './attachments/registerComposerResourceRpc'
 import { AutomationChangeCoordinator } from './automations/AutomationChangeCoordinator'
 import { AutomationDispatcher } from './automations/AutomationDispatcher'
 import { AutomationOccurrenceLifecycleService } from './automations/AutomationOccurrenceLifecycleService'
@@ -46,7 +49,9 @@ import { createChangeSetRepository } from './changes/changeSetRepository'
 import { registerChangeRpc } from './changes/registerChangeRpc'
 import { ChatCommandService } from './chat/ChatCommandService'
 import { ChatTurnService } from './chat/ChatTurnService'
+import { ComposerDraftService } from './chat/ComposerDraftService'
 import { registerChatRpc } from './chat/registerChatRpc'
+import { registerComposerDraftRpc } from './chat/registerComposerDraftRpc'
 import {
   HostConnectorSecretStore,
   McpConnectorService,
@@ -80,6 +85,8 @@ import { createAutomationRepositories } from './storage/automationRepository'
 import { createAutomationTurnRepository } from './storage/automationTurnRepository'
 import { BuddyDataPaths } from './storage/BuddyDataPaths'
 import { createCommandRequestRepository } from './storage/commandRequestRepository'
+import { createComposerDraftRepository } from './storage/composerDraftRepository'
+import { createComposerResourceRepository } from './storage/composerResourceRepository'
 import { createConnectorRepository } from './storage/connectorRepository'
 import { createConversationDirectoryGrantRepository } from './storage/conversationDirectoryGrantRepository'
 import { createConversationRepository } from './storage/conversationRepository'
@@ -97,6 +104,7 @@ import { UsageService } from './usage/UsageService'
 import { WebCapabilityService } from './web/WebCapabilityService'
 import { WebHostClient } from './web/WebHostClient'
 import { registerWebSettingsRpc, WebSettingsService } from './web/WebSettingsService'
+import { normalizeComposerWorkspace } from './workspace/normalizeComposerWorkspace'
 import { registerWorkspaceStateRpc } from './workspace/registerWorkspaceStateRpc'
 
 export interface StartBuddyServiceOptions {
@@ -134,6 +142,7 @@ export async function startBuddyService(
   const usageRepository = createUsageRepository(options.database)
   const workspace = createWorkspaceRepository(options.database)
   const turnRequests = createTurnRequestRepository(options.database)
+  const composerDrafts = createComposerDraftRepository(options.database)
   const commandRequests = createCommandRequestRepository(options.database)
   const connectorsRepository = createConnectorRepository(options.database)
   const spaceService = new SpaceService(spacesRepository)
@@ -185,6 +194,29 @@ export async function startBuddyService(
   })
   const artifactsRepository = createArtifactRepository(options.database)
   const artifactService = new ArtifactService({ repository: artifactsRepository })
+  await reconcileLegacyArtifactOutputs({
+    artifacts: artifactsRepository,
+    conversations,
+    eventLog: options.eventLog,
+    paths,
+  })
+  const composerResourceService = new ComposerResourceService({
+    artifacts: artifactService,
+    attachments: attachmentService,
+    conversationGrants: conversationDirectoryGrants,
+    conversations,
+    drafts: composerDrafts,
+    eventLog: options.eventLog,
+    repository: createComposerResourceRepository(options.database),
+    spaceFiles: spaceService,
+    spaces: spacesRepository,
+  })
+  const attachmentRecovery = await attachmentService.reconcileStorage()
+  composerResourceService.recoverInterruptedImports([
+    ...attachmentRecovery.invalidAttachmentIds,
+    ...attachmentRecovery.missingAttachmentIds,
+  ])
+  await composerResourceService.cleanupDrafts()
   const imageTransformService = new ImageTransformService({ artifacts: artifactService })
   const providersRepository = createProviderRepository(options.database)
   const providerService = await createProviderService({
@@ -341,6 +373,7 @@ export async function startBuddyService(
     attachments: attachmentService,
     commands: commandRequests,
     conversations,
+    models: executionModels,
     runInputs,
     runs,
     sessions: sessionBlueprints,
@@ -354,11 +387,15 @@ export async function startBuddyService(
     commands: commandRequests,
     conversationLifecycle,
     conversations,
+    drafts: composerDrafts,
     spaces: spacesRepository,
     runs,
     turnLauncher,
   })
+  const composerDraftService = new ComposerDraftService(composerDrafts)
   const chatTurnService = new ChatTurnService({
+    composerResources: composerResourceService,
+    drafts: composerDrafts,
     attachments: attachmentService,
     conversationLifecycle,
     conversations,
@@ -426,6 +463,7 @@ export async function startBuddyService(
       service: notificationService,
     }),
     registerWorkspaceStateRpc({
+      normalize: value => normalizeComposerWorkspace(value, { conversations, resources: composerResourceService }),
       repository: workspace,
       rpc: options.rpc,
     }),
@@ -446,6 +484,14 @@ export async function startBuddyService(
     registerAttachmentRpc({
       rpc: options.rpc,
       service: attachmentService,
+    }),
+    registerComposerResourceRpc({
+      rpc: options.rpc,
+      service: composerResourceService,
+    }),
+    registerComposerDraftRpc({
+      rpc: options.rpc,
+      service: composerDraftService,
     }),
     registerUsageRpc({
       repository: usageRepository,

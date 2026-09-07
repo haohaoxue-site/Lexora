@@ -92,7 +92,7 @@ export const browserOpenToolParameters = Type.Union([
     kind: Type.Literal('local-file'),
     until: Type.Optional(browserOpenWaitSpec),
   }, { additionalProperties: false }),
-])
+], { type: 'object' })
 
 export const browserSnapshotToolParameters = Type.Object({
   maxElements: Type.Optional(Type.Integer({
@@ -198,7 +198,7 @@ export const browserActToolParameters = Type.Union([
     })),
     timeoutMs: browserWaitTimeoutMs,
   }),
-])
+], { type: 'object' })
 
 function targetedBrowserAction(action: Record<string, TSchema>) {
   return Type.Object({

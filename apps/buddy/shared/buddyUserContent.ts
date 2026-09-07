@@ -1,0 +1,134 @@
+import { z } from 'zod'
+
+export const buddyResourceIdSchema = z.string().regex(/^[A-Z0-9][\w-]{0,127}$/i)
+
+const skillDirectiveSchema = z.object({
+  directive: z.literal('skill'),
+  type: z.literal('prompt_directive'),
+  value: z.string().min(1),
+}).strict().readonly()
+
+const slashDirectiveSchema = z.object({
+  commandMode: z.enum(['prompt', 'action']),
+  directive: z.literal('slash_command'),
+  type: z.literal('prompt_directive'),
+  value: z.string().min(1),
+}).strict().readonly()
+
+export const buddyPromptDirectiveSchema = z.union([
+  skillDirectiveSchema,
+  slashDirectiveSchema,
+])
+
+export const buddyInlineNodeV1Schema = z.union([
+  z.object({ text: z.string().min(1), type: z.literal('text') }).strict().readonly(),
+  z.object({ type: z.literal('hard_break') }).strict().readonly(),
+  z.object({ resourceId: buddyResourceIdSchema, type: z.literal('resource_ref') }).strict().readonly(),
+  buddyPromptDirectiveSchema,
+])
+
+export const buddyUserContentV1Schema = z.object({
+  body: z.array(z.object({
+    content: z.array(buddyInlineNodeV1Schema).readonly(),
+    type: z.literal('paragraph'),
+  }).strict().readonly()).min(1).readonly(),
+  panelResourceIds: z.array(buddyResourceIdSchema).refine(
+    ids => new Set(ids).size === ids.length,
+    'Duplicate panel resource',
+  ).readonly(),
+  version: z.literal(1),
+}).strict().readonly()
+
+export type BuddyUserContentV1 = z.infer<typeof buddyUserContentV1Schema>
+export type BuddyInlineNodeV1 = z.infer<typeof buddyInlineNodeV1Schema>
+export type BuddyPromptDirective = z.infer<typeof buddyPromptDirectiveSchema>
+
+export const buddyUserMessageResourceSnapshotSchema = z.object({
+  attachmentId: buddyResourceIdSchema,
+  resourceId: buddyResourceIdSchema,
+}).strict().readonly()
+
+export const buddyUserMessageContentV1Schema = z.object({
+  resourceSnapshots: z.array(buddyUserMessageResourceSnapshotSchema).readonly(),
+  userContent: buddyUserContentV1Schema,
+}).strict().superRefine((message, context) => {
+  const contentResourceIds = getBuddyUserContentResourceIds(message.userContent)
+  const snapshotResourceIds = message.resourceSnapshots.map(snapshot => snapshot.resourceId)
+  const snapshotIdSet = new Set(snapshotResourceIds)
+
+  if (snapshotIdSet.size !== snapshotResourceIds.length) {
+    context.addIssue({
+      code: 'custom',
+      message: 'Duplicate message resource snapshot',
+      path: ['resourceSnapshots'],
+    })
+  }
+  for (const resourceId of contentResourceIds) {
+    if (!snapshotIdSet.has(resourceId)) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Missing message resource snapshot',
+        path: ['resourceSnapshots'],
+      })
+    }
+  }
+  const contentResourceIdSet = new Set(contentResourceIds)
+  for (const resourceId of snapshotResourceIds) {
+    if (!contentResourceIdSet.has(resourceId)) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Orphaned message resource snapshot',
+        path: ['resourceSnapshots'],
+      })
+    }
+  }
+})
+
+export type BuddyUserMessageContentV1 = z.infer<typeof buddyUserMessageContentV1Schema>
+export type BuddyUserMessageResourceSnapshot = z.infer<typeof buddyUserMessageResourceSnapshotSchema>
+
+export function readBuddyUserMessageContent(value: unknown): BuddyUserMessageContentV1 | null {
+  const parsed = buddyUserMessageContentV1Schema.safeParse(value)
+  return parsed.success ? parsed.data : null
+}
+
+export function createBuddyUserContent(text = ''): BuddyUserContentV1 {
+  return {
+    body: text.split('\n').map(line => ({
+      content: line ? [{ text: line, type: 'text' }] : [],
+      type: 'paragraph',
+    })),
+    panelResourceIds: [],
+    version: 1,
+  }
+}
+
+export function getBuddyUserContentResourceIds(content: BuddyUserContentV1): string[] {
+  const inlineIds = content.body.flatMap(paragraph => paragraph.content.flatMap(
+    node => node.type === 'resource_ref' ? [node.resourceId] : [],
+  ))
+  const inlineSet = new Set(inlineIds)
+  return [...new Set([
+    ...content.panelResourceIds.filter(id => !inlineSet.has(id)),
+    ...inlineIds,
+  ])]
+}
+
+export function buddyUserContentToText(
+  content: BuddyUserContentV1,
+  resourceLabel: (resourceId: string) => string = () => '@file',
+): string {
+  return content.body.map(paragraph => paragraph.content.map((node) => {
+    switch (node.type) {
+      case 'text': return node.text
+      case 'hard_break': return '\n'
+      case 'resource_ref': return resourceLabel(node.resourceId)
+      case 'prompt_directive': return buddyPromptDirectiveToText(node)
+      default: throw new Error('Unsupported Composer inline node')
+    }
+  }).join('')).join('\n')
+}
+
+export function buddyPromptDirectiveToText(directive: BuddyPromptDirective): string {
+  return directive.directive === 'skill' ? `$${directive.value}` : directive.value
+}

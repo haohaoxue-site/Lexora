@@ -532,39 +532,76 @@ export function registerLocalChatIpc(options: RegisterLocalChatIpcOptions): () =
     localChatResponseSchemas.approval,
   ))
 
-  handle(LOCAL_CHAT_IPC_CHANNELS.attachmentsSelectFiles, async (_event, input) => {
-    const { draftId, remainingCount } = localChatSchemas.attachmentSelection.parse(input)
+  handle(LOCAL_CHAT_IPC_CHANNELS.composerResourcesAccept, (_event, input) => request(
+    'composerResources.accept',
+    localChatSchemas.composerResourceAccept.parse(input),
+    localChatResponseSchemas.composerResources,
+  ))
+  handle(LOCAL_CHAT_IPC_CHANNELS.composerDraftsOpen, (_event, input) => request(
+    'composerDrafts.open',
+    localChatSchemas.composerDraftOpen.parse(input),
+    localChatResponseSchemas.composerDraft,
+  ))
+  handle(LOCAL_CHAT_IPC_CHANNELS.composerDraftsGet, (_event, input) => request(
+    'composerDrafts.get',
+    localChatSchemas.composerDraftTarget.parse(input),
+    localChatResponseSchemas.composerDraft,
+  ))
+  handle(LOCAL_CHAT_IPC_CHANNELS.composerDraftsSave, (_event, input) => request(
+    'composerDrafts.save',
+    localChatSchemas.composerDraftSave.parse(input),
+    localChatResponseSchemas.composerDraft,
+  ))
+  handle(LOCAL_CHAT_IPC_CHANNELS.composerResourcesComplete, (_event, input) => request(
+    'composerResources.complete',
+    localChatSchemas.composerResourceComplete.parse(input),
+    localChatResponseSchemas.composerResource,
+  ))
+  handle(LOCAL_CHAT_IPC_CHANNELS.composerResourcesFail, (_event, input) => request(
+    'composerResources.fail',
+    localChatSchemas.composerResourceTarget.parse(input),
+    localChatResponseSchemas.composerResource,
+  ))
+  handle(LOCAL_CHAT_IPC_CHANNELS.composerResourcesRetry, (_event, input) => request(
+    'composerResources.retry',
+    localChatSchemas.composerResourceTarget.parse(input),
+    localChatResponseSchemas.composerResource,
+  ))
+  handle(LOCAL_CHAT_IPC_CHANNELS.composerResourcesList, (_event, input) => request(
+    'composerResources.list',
+    localChatSchemas.composerResourceDraft.parse(input),
+    localChatResponseSchemas.composerResources,
+  ))
+  handle(LOCAL_CHAT_IPC_CHANNELS.composerResourcesListSources, (_event, input) => request(
+    'composerResources.listSources',
+    input,
+    localChatResponseSchemas.composerSourceList,
+  ))
+  handle(LOCAL_CHAT_IPC_CHANNELS.composerResourcesSelectSpaceFile, (_event, input) => request(
+    'composerResources.selectSpaceFile',
+    localChatSchemas.composerSpaceFileSelect.parse(input),
+    localChatResponseSchemas.composerResource,
+  ))
+  handle(LOCAL_CHAT_IPC_CHANNELS.composerResourcesSelectSource, (_event, input) => request(
+    'composerResources.selectSource',
+    localChatSchemas.composerSourceSelect.parse(input),
+    localChatResponseSchemas.composerResource,
+  ))
+  handle(LOCAL_CHAT_IPC_CHANNELS.composerResourcesSelectFiles, async (_event, input) => {
+    const { draftId, referencedResourceIds } = localChatSchemas.composerResourceFileSelect.parse(input)
     const paths = await selectPaths(options.getWindow(), {
-      filters: [{
-        extensions: [...BUDDY_ATTACHMENT_DIALOG_EXTENSIONS],
-        name: 'Lexora Buddy',
-      }],
+      filters: [{ extensions: [...BUDDY_ATTACHMENT_DIALOG_EXTENSIONS], name: 'Lexora Buddy' }],
       properties: ['openFile', 'multiSelections'],
       title: translateDesktopNative(options.getLanguage(), 'selectAttachments'),
     })
-    if (paths.length === 0)
-      return []
-    return request(
-      'attachments.registerFiles',
-      { draftId, paths: paths.slice(0, remainingCount) },
-      localChatResponseSchemas.attachments,
-    )
+    return paths.length === 0
+      ? []
+      : request(
+          'composerResources.registerFiles',
+          { draftId, paths, referencedResourceIds },
+          localChatResponseSchemas.composerResources,
+        )
   })
-  handle(LOCAL_CHAT_IPC_CHANNELS.attachmentsImportFiles, (_event, input) => request(
-    'attachments.registerUploads',
-    localChatSchemas.attachmentImport.parse(input),
-    localChatResponseSchemas.attachments,
-  ))
-  handle(LOCAL_CHAT_IPC_CHANNELS.attachmentsRelease, (_event, input) => request(
-    'attachments.release',
-    localChatSchemas.attachmentRelease.parse(input),
-    localChatResponseSchemas.releasedAttachments,
-  ))
-  handle(LOCAL_CHAT_IPC_CHANNELS.attachmentsCleanupDrafts, (_event, input) => request(
-    'attachments.cleanupDrafts',
-    localChatSchemas.cleanupDraftAttachments.parse(input),
-    localChatResponseSchemas.releasedAttachments,
-  ))
 
   handle(LOCAL_CHAT_IPC_CHANNELS.usageSnapshot, () => request(
     'usage.snapshot',

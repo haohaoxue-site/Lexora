@@ -5,6 +5,7 @@ import type {
 } from '@buddy-electron/shared/localChatApi'
 import type { BuddyApprovalPolicy } from '@buddy-shared/approvalPolicy'
 import type { ParsedBuddyChatCommand } from '@buddy-shared/buddyChatCommands'
+import type { BuddyUserContentV1 } from '@buddy-shared/buddyUserContent'
 import type { BuddyExecutionProfile } from '@buddy-shared/executionProfile'
 import type { BuddyLocale } from '@/i18n/buddyI18n'
 import type { ModelProvidersStore } from '@/stores/useModelProvidersStore'
@@ -15,12 +16,10 @@ import type { useChatRunSync } from '@/workbenches/chat/state/useChatRunSync'
 import type { ChatSession } from '@/workbenches/chat/state/useChatSession'
 import type { TaskIndexData } from '@/workbenches/tasks/state/useTaskIndexData'
 import { parseBuddyChatCommand } from '@buddy-shared/buddyChatCommands'
+import { getBuddyUserContentResourceIds } from '@buddy-shared/buddyUserContent'
 import { computed, readonly, shallowRef } from 'vue'
 import { resolveLocalChatErrorMessage } from '@/lib/localChatError'
-import {
-  createRequestFingerprint,
-  createRequestIdRegistry,
-} from '@/workbenches/chat/state/chatRequestIdentity'
+import { createRequestIdRegistry } from '@/workbenches/chat/state/chatRequestIdentity'
 
 interface ValueRef<T> {
   readonly value: T
@@ -30,10 +29,12 @@ interface UseChatTurnExecutionOptions {
   activeRun: ValueRef<LocalRun | null>
   approvalPolicy: ValueRef<BuddyApprovalPolicy>
   api: LexoraDesktopApi['localChat']
+  canSendDraft: ValueRef<boolean>
   taskIndexData: TaskIndexData
   session: ChatSession
   drafts: ReturnType<typeof useChatDrafts>
   draftScopeKey: ValueRef<string>
+  draftChangedMessage: () => string
   executionProfile: ValueRef<BuddyExecutionProfile>
   getRunTerminationMessage: (errorCode: string | null) => string
   isUpdatingPermissionSettings: ValueRef<boolean>
@@ -52,6 +53,7 @@ export function useChatTurnExecution(options: UseChatTurnExecutionOptions) {
   const requestIds = createRequestIdRegistry()
   const canSend = computed(() =>
     options.runtimeSupervisor.runtimeState.value.status === 'ready'
+    && options.canSendDraft.value
     && options.modelProviders.selectedModel.value !== null
     && !options.activeRun.value
     && !isSending.value
@@ -59,55 +61,58 @@ export function useChatTurnExecution(options: UseChatTurnExecutionOptions) {
   )
 
   async function send(payload: ChatComposerSubmitPayload | string) {
+    const userContent = typeof payload === 'string' ? undefined : payload.userContent
     const content = typeof payload === 'string' ? payload : payload.content
-    const contextItems: ReadonlyArray<LocalPromptContextItem> = typeof payload === 'string'
-      ? []
-      : payload.contextItems
-    if ((!content.trim() && !options.drafts.attachments.value.length) || !canSend.value)
+    if (userContent)
+      options.drafts.setUserContent(userContent)
+    const resourceIds = userContent
+      ? getBuddyUserContentResourceIds(userContent)
+      : options.drafts.resourceIdsForDraft(options.drafts.draftId.value)
+    const contextItems: ReadonlyArray<LocalPromptContextItem> = userContent
+      ? userContent.body.flatMap(paragraph => paragraph.content.flatMap(node => node.type === 'prompt_directive' ? [{ kind: node.directive === 'skill' ? 'skill' as const : 'slashCommand' as const, value: node.value }] : []))
+      : []
+    if ((!content.trim() && !resourceIds.length) || !canSend.value)
       return false
     const command = parseBuddyChatCommand(content)
-    if (command?.kind === 'action')
+    if (command?.kind === 'action' && resourceIds.length) {
+      options.setErrorMessage(options.unavailableCommandMessage())
+      return false
+    }
+    if (command?.kind === 'action') {
+      options.drafts.setUserContent(createActionCommandContent(command))
       return executeActionCommand(command, contextItems)
+    }
 
     const sourceScopeKey = options.draftScopeKey.value
     const navigationVersion = options.session.generation()
     const isSourceViewCurrent = () => options.session.isCurrent(navigationVersion)
       && options.draftScopeKey.value === sourceScopeKey
-    const selectedModel = options.modelProviders.selectedModel.value
-    const modelSelection = selectedModel
-      ? {
-          modelId: selectedModel.modelId,
-          providerId: selectedModel.providerId,
-          reasoning: options.modelProviders.selectedEffort.value,
-          serviceTier: options.modelProviders.selectedServiceTier.value,
-        }
-      : null
-    const turnRequest = {
-      approvalPolicy: options.approvalPolicy.value,
-      attachmentIds: options.drafts.attachments.value.map(item => item.attachmentId),
-      branchId: options.session.activeBranchId.value,
-      content: content.trim(),
-      contextItems: [...contextItems],
-      conversationId: options.session.activeConversationId.value,
-      draftId: options.drafts.draftId.value,
-      executionProfile: options.executionProfile.value,
-      modelSelection,
-      spaceId: options.session.spaceId.value,
-    }
-    const preparedDraft = options.drafts.prepareSend(
-      await createRequestFingerprint(turnRequest),
-    )
     isSending.value = true
     options.setErrorMessage(null)
     try {
       if (!await options.persistWorkspaceState())
         return false
+      const confirmedDraft = options.drafts.snapshot(sourceScopeKey)
+      if (!options.drafts.isPersisted(confirmedDraft)) {
+        if (isSourceViewCurrent())
+          options.setErrorMessage(options.draftChangedMessage())
+        return false
+      }
+      const expectedRevision = confirmedDraft.revision!
+      const operationKey = `turn:${confirmedDraft.draftId}:${expectedRevision}`
+      const requestId = requestIds.resolve(operationKey)
       const result = await options.api.chat.startTurn({
-        ...turnRequest,
-        requestId: preparedDraft.requestId,
+        draftId: confirmedDraft.draftId,
+        expectedRevision,
+        requestId,
       })
+      if (!result.draftReceipt)
+        throw new Error('Turn did not commit its Composer draft')
+      requestIds.release(operationKey)
       const sourceViewIsCurrent = isSourceViewCurrent()
-      if (sourceViewIsCurrent) {
+      const targetScopeKey = `conversation:${result.conversationId}:${result.branchId}`
+      const acknowledged = options.drafts.acknowledgeSend(result.draftReceipt, targetScopeKey)
+      if (sourceViewIsCurrent && (acknowledged || sourceScopeKey === targetScopeKey)) {
         options.session.acceptTurn(result.conversationId, result.branchId)
         if (!options.session.branches.value.some(
           branch => branch.id === result.branchId,
@@ -123,18 +128,10 @@ export function useChatTurnExecution(options: UseChatTurnExecutionOptions) {
         options.runSync.applyRunStart(result)
       }
       if (result.run.status === 'failed' || result.run.status === 'cancelled') {
-        options.drafts.retarget(sourceScopeKey, `conversation:${result.conversationId}`)
         if (sourceViewIsCurrent) {
-          options.drafts.restoreCurrentDraft()
           options.setErrorMessage(options.getRunTerminationMessage(result.run.errorCode))
         }
-        refreshTaskIndex()
-        void options.persistWorkspaceState()
-        return false
       }
-      options.drafts.clear(sourceScopeKey)
-      if (sourceViewIsCurrent)
-        options.drafts.restoreCurrentDraft()
       refreshTaskIndex()
       void options.persistWorkspaceState()
       return true
@@ -159,7 +156,6 @@ export function useChatTurnExecution(options: UseChatTurnExecutionOptions) {
     if (
       !conversationId
       || !branchId
-      || options.drafts.attachments.value.length > 0
       || contextItems.some(item => item.kind !== 'slashCommand')
       || commandItems.length > 1
       || (commandItems[0] && commandItems[0].value !== `/${command.name}`)
@@ -175,21 +171,29 @@ export function useChatTurnExecution(options: UseChatTurnExecutionOptions) {
       conversationId,
       branchId,
     )
-    const operationKey = `command:${conversationId}:${branchId}:${command.name}:${command.arguments}`
-    const requestId = requestIds.resolve(operationKey)
     isSending.value = true
     options.setErrorMessage(null)
     try {
       if (!await options.persistWorkspaceState())
         return false
+      const confirmedDraft = options.drafts.snapshot(sourceScopeKey)
+      if (!options.drafts.isPersisted(confirmedDraft)) {
+        if (isSourceViewCurrent())
+          options.setErrorMessage(options.draftChangedMessage())
+        return false
+      }
+      const expectedRevision = confirmedDraft.revision!
+      const operationKey = `command:${confirmedDraft.draftId}:${expectedRevision}`
+      const requestId = requestIds.resolve(operationKey)
       const result = await options.api.chat.executeCommand({
-        arguments: command.arguments,
-        branchId,
-        command: command.name,
-        conversationId,
+        draftId: confirmedDraft.draftId,
+        expectedRevision,
         requestId,
       })
+      if (!result.draftReceipt)
+        throw new Error('Command did not commit its Composer draft')
       requestIds.release(operationKey)
+      options.drafts.acknowledgeSend(result.draftReceipt, sourceScopeKey)
       if (isSourceViewCurrent()) {
         options.onActionCommandRunStarted(result.runId)
         options.runSync.applyRunStart(result)
@@ -201,11 +205,7 @@ export function useChatTurnExecution(options: UseChatTurnExecutionOptions) {
         ) {
           options.setErrorMessage(options.getRunTerminationMessage(result.run.errorCode))
         }
-        return false
       }
-      options.drafts.clear(sourceScopeKey)
-      if (isSourceViewCurrent())
-        options.drafts.restoreCurrentDraft()
       refreshTaskIndex()
       void options.persistWorkspaceState()
       return true
@@ -244,5 +244,28 @@ export function useChatTurnExecution(options: UseChatTurnExecutionOptions) {
     cancelActiveRun,
     isSending: readonly(isSending),
     send,
+  }
+}
+
+function createActionCommandContent(
+  command: Extract<ParsedBuddyChatCommand, { kind: 'action' }>,
+): BuddyUserContentV1 {
+  return {
+    body: [{
+      content: [
+        {
+          commandMode: 'action',
+          directive: 'slash_command',
+          type: 'prompt_directive',
+          value: `/${command.name}`,
+        },
+        ...(command.arguments
+          ? [{ text: ` ${command.arguments}`, type: 'text' as const }]
+          : []),
+      ],
+      type: 'paragraph',
+    }],
+    panelResourceIds: [],
+    version: 1,
   }
 }

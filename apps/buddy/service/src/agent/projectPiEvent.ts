@@ -13,16 +13,10 @@ import { randomUUID } from 'node:crypto'
 import { redactSensitiveText } from '../../../shared/approvalReviewPayload'
 import { buddyAssistantTextPhaseSchema } from '../../../shared/assistantTextPhase'
 import { MAX_BUDDY_MESSAGE_TEXT_LENGTH } from '../../../shared/buddyMessageContent'
-import { resolveBuddyReasoningKind } from '../../../shared/reasoningPresentation'
 import {
   createBuddyRunOutputs,
   createBuddyToolPresentation,
 } from './toolPresentation'
-
-type PiThinkingEvent
-  = Extract<AssistantMessageEvent, { type: 'thinking_start' }>
-    | Extract<AssistantMessageEvent, { type: 'thinking_delta' }>
-    | Extract<AssistantMessageEvent, { type: 'thinking_end' }>
 
 export type BuddyProjectedEventType
   = 'context.compaction.cancelled'
@@ -405,21 +399,18 @@ function projectMessageUpdate(
   const messageId = state.assistantMessageId ?? randomUUID()
   state.assistantMessageId = messageId
   if (event.type === 'thinking_start') {
-    const reasoningKind = resolvePiReasoningKind(event)
     return {
       events: [{
         payload: {
           contentIndex: event.contentIndex,
           kind: 'reasoning',
           messageId,
-          reasoningKind,
         },
         type: 'message.block.started',
       }],
     }
   }
   if (event.type === 'thinking_delta' && event.delta) {
-    const reasoningKind = resolvePiReasoningKind(event)
     return {
       events: [{
         payload: {
@@ -427,14 +418,12 @@ function projectMessageUpdate(
           delta: event.delta.slice(0, MAX_DELTA_LENGTH),
           kind: 'reasoning',
           messageId,
-          reasoningKind,
         },
         type: 'message.block.delta',
       }],
     }
   }
   if (event.type === 'thinking_end') {
-    const reasoningKind = resolvePiReasoningKind(event)
     return {
       events: [{
         payload: {
@@ -442,7 +431,6 @@ function projectMessageUpdate(
           contentIndex: event.contentIndex,
           kind: 'reasoning',
           messageId,
-          reasoningKind,
         },
         type: 'message.block.completed',
       }],
@@ -497,15 +485,6 @@ function projectMessageUpdate(
     }
   }
   return { events: [] }
-}
-
-function resolvePiReasoningKind(event: PiThinkingEvent) {
-  const content = event.partial.content[event.contentIndex]
-  return resolveBuddyReasoningKind({
-    api: event.partial.api,
-    provider: event.partial.provider,
-    reasoningKind: content?.type === 'thinking' ? content.reasoningKind : undefined,
-  })
 }
 
 function projectMessageEnd(

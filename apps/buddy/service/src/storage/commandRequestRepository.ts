@@ -1,6 +1,8 @@
 import type { DatabaseSync } from 'node:sqlite'
 import type { BuddyApprovalPolicy } from '../../../shared/approvalPolicy'
 import type { BuddyExecutionProfile } from '../../../shared/executionProfile'
+import type { ComposerDraftCommitReceipt } from './commitComposerDraft'
+import { createComposerDraftCommitter } from './commitComposerDraft'
 import { withTransaction } from './database'
 
 export type BuddyActionCommandName = 'compact'
@@ -12,14 +14,12 @@ export interface PrepareCommandRequestInput {
   command: BuddyActionCommandName
   conversationId: string
   createdAt: string
+  draft: {
+    draftId: string
+    expectedRevision: number
+  }
   executionProfile: BuddyExecutionProfile
   requestFingerprint: string
-  requestId: string
-  runId: string
-}
-
-export interface RetryInterruptedCommandRequestInput {
-  createdAt: string
   requestId: string
   runId: string
 }
@@ -30,6 +30,7 @@ export interface CommandRequestRecord {
   command: BuddyActionCommandName
   conversationId: string
   created: boolean
+  draftReceipt: ComposerDraftCommitReceipt
   requestFingerprint: string
   requestId: string
   runId: string
@@ -39,7 +40,6 @@ export interface CommandRequestRepository {
   findByRunId: (runId: string) => CommandRequestRecord | null
   findByRequestId: (requestId: string) => CommandRequestRecord | null
   prepare: (input: PrepareCommandRequestInput) => CommandRequestRecord
-  retryInterrupted: (input: RetryInterruptedCommandRequestInput) => CommandRequestRecord
 }
 
 interface CommandRequestRow {
@@ -47,6 +47,9 @@ interface CommandRequestRow {
   branch_id: string
   command: BuddyActionCommandName
   conversation_id: string
+  committed_draft_revision: number | null
+  draft_id: string | null
+  draft_revision: number | null
   request_fingerprint: string
   request_id: string
   run_id: string
@@ -94,7 +97,7 @@ export function createCommandRequestRepository(database: DatabaseSync): CommandR
     ORDER BY started_at DESC, id DESC
     LIMIT 1
   `)
-  const findRun = database.prepare('SELECT * FROM runs WHERE id = ?')
+  const commitDraft = createComposerDraftCommitter(database)
   const insertRun = database.prepare(`
     INSERT INTO runs (
       id, conversation_id, branch_id, triggering_message_id, provider, model,
@@ -105,11 +108,9 @@ export function createCommandRequestRepository(database: DatabaseSync): CommandR
   const insertRequest = database.prepare(`
     INSERT INTO command_requests (
       request_id, request_fingerprint, conversation_id, branch_id,
-      run_id, command, arguments, created_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-  `)
-  const updateRequestRun = database.prepare(`
-    UPDATE command_requests SET run_id = ? WHERE request_id = ? AND run_id = ?
+      run_id, command, arguments, created_at, draft_id, draft_revision,
+      committed_draft_revision
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `)
 
   const findByRequestId = (requestId: string): CommandRequestRecord | null => {
@@ -166,47 +167,24 @@ export function createCommandRequestRepository(database: DatabaseSync): CommandR
           input.command,
           input.arguments,
           input.createdAt,
+          input.draft.draftId,
+          input.draft.expectedRevision,
+          input.draft.expectedRevision + 1,
         )
+        const draftReceipt = commitDraft({
+          approvalPolicy: input.approvalPolicy,
+          branchId: input.branchId,
+          conversationId: input.conversationId,
+          draftId: input.draft.draftId,
+          executionProfile: input.executionProfile,
+          expectedRevision: input.draft.expectedRevision,
+          spaceId: null,
+          updatedAt: input.createdAt,
+        })
         return {
           ...input,
           created: true,
-        }
-      })
-    },
-    retryInterrupted(input) {
-      return withTransaction(database, () => {
-        const request = findRequest.get(input.requestId) as CommandRequestRow | undefined
-        if (!request)
-          throw new CommandRequestConflictError()
-        const previous = findRun.get(request.run_id) as SourceRunRow | undefined
-        if (!previous)
-          throw new CommandRequestConflictError()
-        if (previous.status !== 'failed' || previous.error_code !== 'RUNTIME_RESTARTED')
-          return toRecord(request, false)
-        const conversation = findConversation.get(request.conversation_id) as ConversationRow | undefined
-        if (
-          !conversation
-          || conversation.active_branch_id !== request.branch_id
-          || conversation.deleted_at !== null
-          || findIncompleteRun.get(request.conversation_id)
-          || !previous.pi_session_file
-        ) {
-          throw new CommandRequestConflictError()
-        }
-
-        insertCompactionRun(
-          insertRun,
-          input.runId,
-          input.createdAt,
-          previous,
-          previous.approval_policy,
-          previous.execution_profile,
-        )
-        if (Number(updateRequestRun.run(input.runId, input.requestId, request.run_id).changes) !== 1)
-          throw new CommandRequestConflictError()
-        return {
-          ...toRecord(request, true),
-          runId: input.runId,
+          draftReceipt,
         }
       })
     },
@@ -247,12 +225,24 @@ function insertCompactionRun(
 }
 
 function toRecord(row: CommandRequestRow, created: boolean): CommandRequestRecord {
+  if (
+    row.draft_id === null
+    || row.draft_revision === null
+    || row.committed_draft_revision === null
+  ) {
+    throw new CommandRequestConflictError()
+  }
   return {
     arguments: row.arguments,
     branchId: row.branch_id,
     command: row.command,
     conversationId: row.conversation_id,
     created,
+    draftReceipt: {
+      committedRevision: row.committed_draft_revision,
+      draftId: row.draft_id,
+      sourceRevision: row.draft_revision,
+    },
     requestFingerprint: row.request_fingerprint,
     requestId: row.request_id,
     runId: row.run_id,

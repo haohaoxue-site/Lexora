@@ -1,19 +1,31 @@
 import type { LocalPromptContextItem } from '@buddy-electron/shared/localChatApi'
 import type { BuddyChatCommandDescriptionKey } from '@buddy-shared/buddyChatCommands'
+import type { BuddyUserContentV1 } from '@buddy-shared/buddyUserContent'
+import type { BuddyComposerSource } from '@buddy-shared/composerResource'
 import type { JSONContent } from '@tiptap/core'
 import { BUDDY_CHAT_COMMANDS } from '@buddy-shared/buddyChatCommands'
-
-export const CHAT_PROMPT_TOKEN_NODE_NAME = 'chatPromptToken'
+import { buddyUserContentToText } from '@buddy-shared/buddyUserContent'
+import { chatComposerDocumentToUserContent } from './chatComposerDocument'
 
 export interface ChatPromptContextOption extends LocalPromptContextItem {
   description: string | null
+  category?: 'artifact' | 'history' | 'space'
   label: string
   path: string | null
+  source?: BuddyComposerSource
 }
 
 export interface ChatComposerContextOptions {
   files: ReadonlyArray<ChatPromptContextOption>
   skills: ReadonlyArray<ChatPromptContextOption>
+}
+
+export function createChatComposerSourceOptions(
+  options: ReadonlyArray<ChatPromptContextOption>,
+  query = '',
+): ReadonlyArray<ChatPromptContextOption> {
+  return filterChatComposerOptions(options, query)
+    .filter(option => option.kind === 'file')
 }
 
 export interface ChatComposerTrigger {
@@ -23,15 +35,7 @@ export interface ChatComposerTrigger {
 
 export interface ChatComposerSubmitPayload {
   content: string
-  contextItems: ReadonlyArray<LocalPromptContextItem>
-}
-
-export interface ChatPromptTokenAttrs {
-  description: string | null
-  kind: LocalPromptContextItem['kind']
-  label: string
-  path: string | null
-  value: string
+  userContent?: BuddyUserContentV1
 }
 
 const TRIGGER_BOUNDARY_PATTERN = /[\s([{，。！？；：、"'`]$/u
@@ -51,10 +55,8 @@ export function createChatComposerContentFromText(text: string): JSONContent {
 }
 
 export function serializeChatComposerContent(content: JSONContent): ChatComposerSubmitPayload {
-  const contextItems: LocalPromptContextItem[] = []
-  let text = ''
-  serializeNode(content, value => text += value, contextItems)
-  return { content: text.trim(), contextItems }
+  const userContent = chatComposerDocumentToUserContent(content)
+  return { content: buddyUserContentToText(userContent).trim(), userContent }
 }
 
 export function findChatComposerTrigger(textBeforeCursor: string): ChatComposerTrigger | null {
@@ -70,7 +72,7 @@ export function findChatComposerTrigger(textBeforeCursor: string): ChatComposerT
     return null
 
   const query = textBeforeCursor.slice(triggerIndex + 1)
-  if (query.includes('\n'))
+  if (/\s/u.test(query))
     return null
   const trigger = textBeforeCursor[triggerIndex]
   return {
@@ -94,14 +96,9 @@ export function createChatComposerSuggestions(
         path: null,
         value: `/${command.name}`,
       }))
-    : trigger.kind === 'skill' ? options.skills : options.files
+    : trigger.kind === 'skill' ? options.skills : createChatComposerSourceOptions(options.files, trigger.query)
   const query = trigger.query.trim().toLowerCase()
-  return candidates
-    .filter(option => [option.label, option.value, option.path, option.description]
-      .filter(Boolean)
-      .join(' ')
-      .toLowerCase()
-      .includes(query))
+  return (trigger.kind === 'mention' ? candidates : filterChatComposerOptions(candidates, query))
     .slice(0, 8)
     .map(option => ({ option }))
 }
@@ -117,63 +114,21 @@ export function shouldSubmitChatComposerKey(
     && !event.metaKey
 }
 
-export function createChatPromptTokenAttrs(
-  option: ChatPromptContextOption,
-): ChatPromptTokenAttrs {
-  return { ...option }
-}
-
-export function createChatPromptTokenText(attrs: ChatPromptTokenAttrs): string {
-  if (attrs.kind === 'skill')
-    return `$${attrs.label || attrs.value}`
-  if (attrs.kind === 'slashCommand')
-    return attrs.value
-  return `@${attrs.label || attrs.value}`
-}
-
-function serializeNode(
-  node: JSONContent,
-  append: (value: string) => void,
-  contextItems: LocalPromptContextItem[],
-): void {
-  if (node.type === 'text') {
-    append(node.text ?? '')
-    return
-  }
-  if (node.type === 'hardBreak') {
-    append('\n')
-    return
-  }
-  if (node.type === CHAT_PROMPT_TOKEN_NODE_NAME) {
-    const attrs = readPromptTokenAttrs(node.attrs)
-    append(createChatPromptTokenText(attrs))
-    contextItems.push({ kind: attrs.kind, value: attrs.value })
-    return
-  }
-  node.content?.forEach((child, index) => {
-    serializeNode(child, append, contextItems)
-    if (node.type === 'doc' && index < node.content!.length - 1)
-      append('\n')
-  })
-}
-
-function readPromptTokenAttrs(attrs: JSONContent['attrs']): ChatPromptTokenAttrs {
-  const value = typeof attrs?.value === 'string' ? attrs.value : ''
-  const kind = attrs?.kind === 'skill' || attrs?.kind === 'slashCommand'
-    ? attrs.kind
-    : 'file'
-  return {
-    description: typeof attrs?.description === 'string' ? attrs.description : null,
-    kind,
-    label: typeof attrs?.label === 'string' ? attrs.label : value,
-    path: typeof attrs?.path === 'string' ? attrs.path : null,
-    value,
-  }
-}
-
 function findTriggerStart(value: string, trigger: '/' | '$' | '@'): number {
   const index = value.lastIndexOf(trigger)
   if (index < 0 || (index > 0 && !TRIGGER_BOUNDARY_PATTERN.test(value[index - 1] ?? '')))
     return -1
   return index
+}
+
+function filterChatComposerOptions(
+  options: ReadonlyArray<ChatPromptContextOption>,
+  query: string,
+): ReadonlyArray<ChatPromptContextOption> {
+  const normalizedQuery = query.trim().toLowerCase()
+  return options.filter(option => [option.label, option.value, option.path, option.description]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase()
+    .includes(normalizedQuery))
 }

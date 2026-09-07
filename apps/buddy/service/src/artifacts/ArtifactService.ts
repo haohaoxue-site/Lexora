@@ -29,6 +29,12 @@ export interface GeneratedArtifactImage {
 
 export type ArtifactResource = Omit<ArtifactRecord, 'currentPath' | 'directoryRoot'>
 
+export interface ConversationArtifactLocation {
+  canonicalPath: string
+  canonicalRoot: string
+  resource: ArtifactResource
+}
+
 export class ArtifactService {
   readonly #repository: ArtifactRepository
 
@@ -69,7 +75,7 @@ export class ArtifactService {
         location,
         mimeType: metadata.isDirectory()
           ? 'inode/directory'
-          : mimeTypeFromPath(location.canonicalPath),
+          : inferArtifactMimeType(location.canonicalPath),
         sizeBytes: metadata.isFile() ? metadata.size : 0,
       }
     }))
@@ -171,6 +177,18 @@ export class ArtifactService {
       .map(toArtifactResource)
   }
 
+  resolveConversationArtifactLocation(
+    conversationId: string,
+    artifactId: string,
+  ): ConversationArtifactLocation {
+    const artifact = this.#requireConversationArtifact(conversationId, artifactId)
+    return {
+      canonicalPath: artifact.currentPath,
+      canonicalRoot: artifact.directoryRoot,
+      resource: toArtifactResource(artifact),
+    }
+  }
+
   async materializeConversationArtifact(
     conversationId: string,
     artifactId: string,
@@ -178,8 +196,14 @@ export class ArtifactService {
     const artifact = this.#requireConversationArtifact(conversationId, artifactId)
     if (artifact.kind !== 'file')
       throw new ArtifactError('VALIDATION_FAILED')
+    const metadata = await stat(artifact.currentPath)
+    if (metadata.size > BUDDY_ARTIFACT_TOTAL_BYTES_LIMIT)
+      throw new ArtifactError('ARTIFACT_SIZE_LIMIT')
+    const bytes = await readFile(artifact.currentPath)
+    if (bytes.byteLength > BUDDY_ARTIFACT_TOTAL_BYTES_LIMIT)
+      throw new ArtifactError('ARTIFACT_SIZE_LIMIT')
     return {
-      bytes: await readFile(artifact.currentPath),
+      bytes,
       resource: toArtifactResource(artifact),
     }
   }
@@ -354,7 +378,7 @@ function isSensitivePath(path: string): boolean {
   })
 }
 
-function mimeTypeFromPath(path: string): string {
+export function inferArtifactMimeType(path: string): string {
   return new Map([
     ['.css', 'text/css'],
     ['.csv', 'text/csv'],

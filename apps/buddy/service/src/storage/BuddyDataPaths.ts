@@ -45,6 +45,10 @@ export class BuddyDataPaths {
     )
   }
 
+  conversationArtifactsDirectory(conversationId: string): string {
+    return resolve(this.conversationDirectory(conversationId), 'artifacts')
+  }
+
   conversationChangesDirectory(conversationId: string, runId: string): string {
     return resolve(
       this.conversationDirectory(conversationId),

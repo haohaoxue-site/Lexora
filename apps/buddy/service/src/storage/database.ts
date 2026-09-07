@@ -17,6 +17,30 @@ export interface OpenBuddyDatabaseOptions {
   databasePath?: string
 }
 
+const BUDDY_CURRENT_SCHEMA_COLUMNS = {
+  command_requests: ['draft_id', 'draft_revision', 'committed_draft_revision'],
+  composer_drafts: [
+    'id',
+    'scope_kind',
+    'source_message_id',
+    'revision',
+    'content_json',
+    'model_selection_json',
+    'approval_policy',
+    'execution_profile',
+  ],
+  composer_resources: [
+    'id',
+    'draft_id',
+    'state',
+    'attachment_id',
+    'content_hash',
+    'source_json',
+    'error_code',
+  ],
+  turn_requests: ['draft_id', 'draft_revision', 'committed_draft_revision'],
+} as const
+
 export function resolveBuddyHome(homeDirectory = homedir()): string {
   return join(homeDirectory, '.lexora', 'buddy')
 }
@@ -58,6 +82,17 @@ function migrateBuddyDatabase(database: DatabaseSync): void {
     if (migration.version <= currentVersion)
       continue
     applyMigration(database, migration)
+  }
+  assertCurrentSchema(database)
+}
+
+function assertCurrentSchema(database: DatabaseSync): void {
+  for (const [table, requiredColumns] of Object.entries(BUDDY_CURRENT_SCHEMA_COLUMNS)) {
+    const columns = new Set((database.prepare(`PRAGMA table_info(${table})`).all() as Array<{
+      name: string
+    }>).map(column => column.name))
+    if (requiredColumns.some(column => !columns.has(column)))
+      throw new BuddyDatabaseVersionError('incomplete schema version')
   }
 }
 

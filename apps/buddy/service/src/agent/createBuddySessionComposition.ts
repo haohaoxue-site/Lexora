@@ -4,6 +4,7 @@ import type { BuddyExecutionProfile } from '../../../shared/executionProfile'
 import type { BuddyServiceTier } from '../../../shared/modelSelection'
 import type { BuddySessionMode } from '../../../shared/sessionMode'
 import type { BuddyToolClassificationResult } from '../approvals/toolClassification'
+import type { AttachmentService } from '../attachments/AttachmentService'
 import type { CreateAutomationToolOptions } from '../automations/createAutomationTool'
 import type { BrowserCapabilityHost } from '../browser/BrowserCapabilityService'
 import type { BuddyMcpTools } from '../connectors/mcp/McpConnectorService'
@@ -16,6 +17,7 @@ import type { ImageGenerationGateway } from '../images/ImageGenerationGateway'
 import type { CreatePetToolOptions } from '../pet/createPetTool'
 import type { SystemHostPort } from '../system/systemCapability'
 import type { WebCapabilityService } from '../web/WebCapabilityService'
+import type { BuddyInputReferenceStore } from './BuddyInputReference'
 import type { BuddyInProcessExtension } from './createBuddyResourceLoader'
 import type { BuddyRunContextStore } from './createReusableBuddySession'
 import type {
@@ -44,6 +46,7 @@ import { createBrowserExtension } from './extensions/browserExtension'
 import { createChangeCaptureExtension } from './extensions/changeCaptureExtension'
 import { createImageGenerationExtension } from './extensions/imageGenerationExtension'
 import { createImageTransformExtension } from './extensions/imageTransformExtension'
+import { createInputReferenceExtension } from './extensions/inputReferenceExtension'
 import { createMcpExtension } from './extensions/mcpExtension'
 import { createOutputPresentationExtension } from './extensions/outputPresentationExtension'
 import { createPetExtension } from './extensions/petExtension'
@@ -63,6 +66,7 @@ export interface BuddySessionCompositionServices {
   artifactService: CreateImageGenerationExtensionOptions['artifactService']
     & CreateOutputPresentationExtensionOptions['artifactService']
   attachmentService: CreateImageGenerationExtensionOptions['attachmentService']
+    & Pick<AttachmentService, 'materializePiInputImages'>
   automationService: CreateAutomationToolOptions['service']
   browserHost: BrowserCapabilityHost
   changeCaptureService: ChangeCaptureGateway
@@ -90,6 +94,7 @@ export interface CreateBuddySessionCompositionOptions {
 
 export interface BuddySessionComposition {
   getServiceTier: () => BuddyServiceTier | null
+  inputReferences: BuddyInputReferenceStore
   inProcessExtensions: readonly BuddyInProcessExtension[]
   runContext: BuddyRunContextStore
 }
@@ -101,6 +106,7 @@ export async function createBuddySessionComposition(
   const grants = [...options.grants]
   const mcp = await services.connectorService.getTools(options.signal)
   const runContext: BuddyRunContextStore = { current: null }
+  const inputReferences: BuddyInputReferenceStore = { pending: null }
   const browserCapability = new BrowserCapabilityService({
     conversationId: options.conversationId,
     getGrants: () => grants,
@@ -114,6 +120,7 @@ export async function createBuddySessionComposition(
     systemCapability,
   })
   const inProcessExtensions: BuddyInProcessExtension[] = [
+    createInputReferenceExtension(inputReferences),
     createMcpExtension({ tools: mcp.tools }),
     createBrowserExtension({ service: browserCapability }),
     createWebExtension({ service: services.webService, conversationId: options.conversationId }),
@@ -184,6 +191,7 @@ export async function createBuddySessionComposition(
 
   return {
     getServiceTier: () => runContext.current?.serviceTier ?? null,
+    inputReferences,
     inProcessExtensions,
     runContext,
   }

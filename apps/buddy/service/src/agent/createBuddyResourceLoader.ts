@@ -98,8 +98,17 @@ function validateLoadedExtensions(loader: DefaultResourceLoader): void {
       || (!toolName.startsWith('lexora_') && !toolName.startsWith('mcp__'))
     ))
   ))
-  if (result.errors.length || hasInvalidToolName)
+  const hasInvalidToolSchema = result.extensions.some(extension => (
+    [...extension.tools.values()].some(tool => !isObjectRootToolSchema(tool.definition.parameters))
+  ))
+  if (result.errors.length || hasInvalidToolName || hasInvalidToolSchema)
     throw new BuddyResourceLoadError('BUDDY_EXTENSION_LOAD_FAILED')
   if (result.extensions.some(extension => !extension.path.startsWith('<inline:lexora-')))
     throw new BuddyResourceLoadError('UNTRUSTED_EXTENSION_LOADED')
+}
+
+function isObjectRootToolSchema(schema: unknown): boolean {
+  return typeof schema === 'object'
+    && schema !== null
+    && (schema as { type?: unknown }).type === 'object'
 }

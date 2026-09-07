@@ -43,7 +43,7 @@ export class BuddyAgentRunner {
   }
 
   startTurn(input: StartBuddyTurnInput): BuddyTurnHandle {
-    if (!input.prompt.trim())
+    if (!input.userInput.prompt.trim())
       throw new BuddyAgentRunError('VALIDATION_FAILED')
 
     const runId = input.runId

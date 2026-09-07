@@ -1,13 +1,16 @@
 <script setup lang="ts">
 import type { LocalArtifact, LocalMessage } from '@buddy-electron/shared/localChatApi'
+import type { BuddyPromptDirective } from '@buddy-shared/buddyUserContent'
 import type { BuddyLocale } from '@/i18n/buddyI18n'
+import { buddyPromptDirectiveToText } from '@buddy-shared/buddyUserContent'
 import { computed, nextTick, shallowRef, useTemplateRef } from 'vue'
 import { useBuddyI18n } from '@/i18n/buddyI18n'
 import BuddyFileIcon from '@/ui/files/BuddyFileIcon.vue'
 import BuddyImagePreview from '@/ui/media/BuddyImagePreview.vue'
 import BuddyChatMarkdownContent from './BuddyChatMarkdownContent.vue'
+import BuddyChatResourceReference from './BuddyChatResourceReference.vue'
 import { resolveBuddyAttachmentPreviewUrl } from './chatAttachmentView'
-import { getChatMessageDisplayText } from './chatMessageContent'
+import { getChatMessageDisplayText, getChatMessageUserContent } from './chatMessageContent'
 
 const props = withDefaults(defineProps<{
   final?: boolean
@@ -30,11 +33,43 @@ const text = computed(() => getChatMessageDisplayText(
   props.hiddenArtifacts,
 ))
 const hasText = computed(() => text.value.trim().length > 0)
-const attachmentViews = computed(() => props.message.attachments.map(attachment => ({
+const structuredUserContent = computed(() => getChatMessageUserContent(props.message))
+const allAttachmentViews = computed(() => props.message.attachments.map(attachment => ({
   attachment,
   previewUrl: resolveBuddyAttachmentPreviewUrl(attachment),
 })))
-const previewableAttachmentViews = computed(() => attachmentViews.value.filter(view => (
+const attachmentByResourceId = computed(() => {
+  const attachmentsById = new Map(
+    props.message.attachments.map(attachment => [attachment.attachmentId, attachment]),
+  )
+  return new Map(structuredUserContent.value?.resourceSnapshots.flatMap((snapshot) => {
+    const attachment = attachmentsById.get(snapshot.attachmentId)
+    return attachment ? [[snapshot.resourceId, attachment] as const] : []
+  }) ?? [])
+})
+const attachmentViews = computed(() => {
+  const structured = structuredUserContent.value
+  if (!structured)
+    return allAttachmentViews.value
+  return structured.userContent.panelResourceIds.flatMap((resourceId) => {
+    const attachment = attachmentByResourceId.value.get(resourceId)
+    return attachment
+      ? [{ attachment, previewUrl: resolveBuddyAttachmentPreviewUrl(attachment) }]
+      : []
+  })
+})
+const resourceReferenceViews = computed(() => new Map(
+  [...attachmentByResourceId.value].map(([resourceId, attachment]) => [
+    resourceId,
+    {
+      attachment,
+      previewUrl: failedAttachmentIds.value.has(attachment.attachmentId)
+        ? null
+        : resolveBuddyAttachmentPreviewUrl(attachment),
+    },
+  ]),
+))
+const previewableAttachmentViews = computed(() => allAttachmentViews.value.filter(view => (
   view.previewUrl && !failedAttachmentIds.value.has(view.attachment.attachmentId)
 )))
 const previewSources = computed(() => previewableAttachmentViews.value.flatMap(
@@ -54,6 +89,10 @@ function openPreview(attachmentId: string) {
   previewTrackScrollLeft = attachmentTrack.value?.scrollLeft ?? 0
   previewIndex.value = index
   previewOpen.value = true
+}
+
+function directiveText(directive: BuddyPromptDirective): string {
+  return buddyPromptDirectiveToText(directive)
 }
 
 async function updatePreviewOpen(open: boolean) {
@@ -121,7 +160,34 @@ function previewLeaveTransition(): Promise<void> {
       </figure>
     </div>
     <div
-      v-if="hasText && message.role === 'user'"
+      v-if="structuredUserContent"
+      class="buddy-chat-message-content__text buddy-chat-message-content__structured-body"
+    >
+      <p
+        v-for="(paragraph, paragraphIndex) in structuredUserContent.userContent.body"
+        :key="paragraphIndex"
+      >
+        <template v-for="(node, nodeIndex) in paragraph.content" :key="nodeIndex">
+          <span v-if="node.type === 'text'">{{ node.text }}</span>
+          <br v-else-if="node.type === 'hard_break'">
+          <span
+            v-else-if="node.type === 'prompt_directive'"
+            class="buddy-chat-message-content__directive"
+          >{{ directiveText(node) }}</span>
+          <BuddyChatResourceReference
+            v-else-if="resourceReferenceViews.get(node.resourceId)"
+            :attachment="resourceReferenceViews.get(node.resourceId)!.attachment"
+            :language="language"
+            :preview-url="resourceReferenceViews.get(node.resourceId)!.previewUrl"
+            :resource-id="node.resourceId"
+            @preview="openPreview"
+            @preview-error="markPreviewFailed"
+          />
+        </template>
+      </p>
+    </div>
+    <div
+      v-else-if="hasText && message.role === 'user'"
       class="buddy-chat-message-content__text is-plain-text"
     >
       {{ text }}
@@ -310,6 +376,33 @@ function previewLeaveTransition(): Promise<void> {
   :deep(> :last-child) {
     margin-bottom: 0;
   }
+}
+
+.buddy-chat-message-content__structured-body {
+  p {
+    margin: 0;
+    white-space: pre-wrap;
+
+    & + p {
+      margin-top: 0.35rem;
+    }
+  }
+}
+
+.buddy-chat-message-content__directive {
+  display: inline-flex;
+  max-width: 100%;
+  align-items: center;
+  gap: 0.25rem;
+  border: 0;
+  border-radius: var(--buddy-radius-micro);
+  background: color-mix(in srgb, var(--buddy-accent-on-surface) 10%, transparent);
+  color: inherit;
+  font: inherit;
+  line-height: 1.35;
+  margin: 0 0.12rem;
+  padding: 0.08rem 0.3rem;
+  vertical-align: baseline;
 }
 
 @media (prefers-reduced-motion: reduce) {

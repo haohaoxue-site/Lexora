@@ -245,16 +245,30 @@ const localChatApi = Object.freeze<LocalChatApi>({
     deny: approvalId =>
       ipcRenderer.invoke(LOCAL_CHAT_IPC_CHANNELS.approvalsDeny, { approvalId }),
   }),
-  attachments: Object.freeze({
-    importFiles: input => ipcRenderer.invoke(
-      LOCAL_CHAT_IPC_CHANNELS.attachmentsImportFiles,
-      input,
+  composerResources: Object.freeze({
+    accept: input => ipcRenderer.invoke(LOCAL_CHAT_IPC_CHANNELS.composerResourcesAccept, input),
+    complete: input => ipcRenderer.invoke(LOCAL_CHAT_IPC_CHANNELS.composerResourcesComplete, input),
+    fail: input => ipcRenderer.invoke(LOCAL_CHAT_IPC_CHANNELS.composerResourcesFail, input),
+    list: draftId => ipcRenderer.invoke(LOCAL_CHAT_IPC_CHANNELS.composerResourcesList, { draftId }),
+    listSources: input => ipcRenderer.invoke(LOCAL_CHAT_IPC_CHANNELS.composerResourcesListSources, input),
+    retry: input => ipcRenderer.invoke(LOCAL_CHAT_IPC_CHANNELS.composerResourcesRetry, input),
+    selectFiles: (draftId, referencedResourceIds = []) => ipcRenderer.invoke(
+      LOCAL_CHAT_IPC_CHANNELS.composerResourcesSelectFiles,
+      { draftId, referencedResourceIds: [...referencedResourceIds] },
     ),
-    selectFiles: input => ipcRenderer.invoke(LOCAL_CHAT_IPC_CHANNELS.attachmentsSelectFiles, input),
-    release: attachmentIds =>
-      ipcRenderer.invoke(LOCAL_CHAT_IPC_CHANNELS.attachmentsRelease, { attachmentIds }),
-    cleanupDrafts: () =>
-      ipcRenderer.invoke(LOCAL_CHAT_IPC_CHANNELS.attachmentsCleanupDrafts, {}),
+    selectSource: (input, referencedResourceIds = []) => ipcRenderer.invoke(
+      LOCAL_CHAT_IPC_CHANNELS.composerResourcesSelectSource,
+      { ...input, referencedResourceIds: [...referencedResourceIds] },
+    ),
+    selectSpaceFile: (input, referencedResourceIds = []) => ipcRenderer.invoke(
+      LOCAL_CHAT_IPC_CHANNELS.composerResourcesSelectSpaceFile,
+      { ...input, referencedResourceIds: [...referencedResourceIds] },
+    ),
+  }),
+  composerDrafts: Object.freeze({
+    get: draftId => ipcRenderer.invoke(LOCAL_CHAT_IPC_CHANNELS.composerDraftsGet, { draftId }),
+    open: input => ipcRenderer.invoke(LOCAL_CHAT_IPC_CHANNELS.composerDraftsOpen, input),
+    save: input => ipcRenderer.invoke(LOCAL_CHAT_IPC_CHANNELS.composerDraftsSave, input),
   }),
   usage: Object.freeze({
     getSnapshot: () => ipcRenderer.invoke(LOCAL_CHAT_IPC_CHANNELS.usageSnapshot),
@@ -277,9 +291,25 @@ const desktopApi: LexoraDesktopApi = Object.freeze({
   app: Object.freeze({
     checkForUpdates: () => ipcRenderer.invoke(DESKTOP_IPC_CHANNELS.appCheckForUpdates),
     getInfo: (): Promise<DesktopAppInfo> => ipcRenderer.invoke(DESKTOP_IPC_CHANNELS.appGetInfo),
+    onBeforeQuit: (listener: () => Promise<boolean>) => {
+      const handler = (_event: Electron.IpcRendererEvent, input: { requestId?: unknown }) => {
+        const requestId = typeof input?.requestId === 'string' ? input.requestId : ''
+        if (!requestId)
+          return
+        void Promise.resolve()
+          .then(() => listener())
+          .catch(() => false)
+          .then((saved) => {
+            ipcRenderer.send(DESKTOP_IPC_CHANNELS.appPrepareQuitAck, { requestId, saved })
+          })
+      }
+      ipcRenderer.on(DESKTOP_IPC_CHANNELS.appPrepareQuit, handler)
+      return () => ipcRenderer.off(DESKTOP_IPC_CHANNELS.appPrepareQuit, handler)
+    },
     onOpenTarget: (listener: (target: DesktopOpenTarget) => void) => (
       subscribe(DESKTOP_IPC_CHANNELS.appOpenTarget, listener)
     ),
+    onHidden: (listener: () => void) => subscribe(DESKTOP_IPC_CHANNELS.appHidden, listener),
     openFeedbackIssue: (feedback: string) => ipcRenderer.invoke(
       DESKTOP_IPC_CHANNELS.appOpenFeedbackIssue,
       { feedback },

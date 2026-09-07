@@ -6,7 +6,6 @@ import type {
 } from '@buddy-electron/shared/localChatApi'
 import type { ApprovalReviewPayload } from '@buddy-shared/approvalReviewPayload'
 import type { BuddyAssistantTextPhase } from '@buddy-shared/assistantTextPhase'
-import type { BuddyReasoningKind } from '@buddy-shared/reasoningPresentation'
 import type {
   BuddyToolPresentation,
   BuddyToolPresentationDelta,
@@ -14,10 +13,6 @@ import type {
 import type { BuddyRunProgress } from '@buddy-shared/runProgress'
 import { approvalReviewPayloadSchema } from '@buddy-shared/approvalReviewPayload'
 import { buddyAssistantTextPhaseSchema } from '@buddy-shared/assistantTextPhase'
-import {
-  buddyReasoningKindSchema,
-  resolveBuddyReasoningKind,
-} from '@buddy-shared/reasoningPresentation'
 import {
   buddyToolPresentationDeltaSchema,
   buddyToolPresentationSchema,
@@ -30,7 +25,6 @@ export interface ChatAgentReasoningNode {
   contentIndex: number
   id: string
   kind: 'reasoning'
-  reasoningKind: BuddyReasoningKind
   status: 'completed' | 'interrupted' | 'running'
   text: string
 }
@@ -71,17 +65,10 @@ export type ChatAgentTurnNode
     | ChatAgentReasoningNode
     | ChatAgentToolNode
 
-export interface ChatAgentReasoningEntry {
-  detail: ChatAgentReasoningNode | null
-  id: string
-  summary: ChatAgentReasoningNode | null
-}
-
 export interface ChatAgentReasoningGroup {
-  entries: ChatAgentReasoningEntry[]
+  entries: ChatAgentReasoningNode[]
   id: string
   kind: 'reasoning-group'
-  reasoningKind: BuddyReasoningKind
 }
 
 export type ChatAgentTurnRow
@@ -251,32 +238,25 @@ export function createChatAgentTurnReducer(
       if (payload.kind !== 'reasoning')
         return
       const id = `reasoning:${messageId}:${contentIndex}`
-      const parsedReasoningKind = buddyReasoningKindSchema.safeParse(payload.reasoningKind)
       const current = reasoning.get(id)
-      const reasoningKind = parsedReasoningKind.success
-        ? parsedReasoningKind.data
-        : current?.reasoningKind ?? resolveBuddyReasoningKind({ provider: run.providerId })
       if (!current)
         nodeOrder.set(id, event.sequence)
       const node = current ?? {
         contentIndex,
         id,
         kind: 'reasoning' as const,
-        reasoningKind,
         status: 'running' as const,
         text: '',
       }
       if (event.type === 'message.block.delta') {
         reasoning.set(id, {
           ...node,
-          reasoningKind,
           text: node.text + readString(payload.delta),
         })
       }
       else if (event.type === 'message.block.completed') {
         reasoning.set(id, {
           ...node,
-          reasoningKind,
           status: 'completed',
           text: readString(payload.content),
         })
@@ -599,12 +579,9 @@ export function projectChatAgentTurnRows(nodes: ReadonlyArray<ChatAgentTurnNode>
     if (reasoning.length === 0)
       return
     rows.push({
-      entries: projectReasoningEntries(reasoning),
+      entries: reasoning,
       id: `reasoning-group:${reasoning[0]!.id}`,
       kind: 'reasoning-group',
-      reasoningKind: reasoning.some(node => node.reasoningKind === 'thinking')
-        ? 'thinking'
-        : 'summary',
     })
     reasoning = []
   }
@@ -648,15 +625,8 @@ function isSameChatAgentTurnRow(
     return true
   if (previous.kind !== 'reasoning-group' || current.kind !== 'reasoning-group')
     return false
-  return previous.reasoningKind === current.reasoningKind
-    && previous.entries.length === current.entries.length
-    && previous.entries.every((entry, index) => {
-      const currentEntry = current.entries[index]
-      return currentEntry !== undefined
-        && entry.id === currentEntry.id
-        && entry.summary === currentEntry.summary
-        && entry.detail === currentEntry.detail
-    })
+  return previous.entries.length === current.entries.length
+    && previous.entries.every((entry, index) => entry === current.entries[index])
 }
 
 const GENERIC_TOOL_DESCRIPTIONS = new Set([
@@ -671,31 +641,6 @@ function specificToolDescription(value: string | null): string | null {
   return GENERIC_TOOL_DESCRIPTIONS.has(normalizeProcessNarration(value).toLowerCase())
     ? null
     : value
-}
-
-function projectReasoningEntries(nodes: ReadonlyArray<ChatAgentReasoningNode>): ChatAgentReasoningEntry[] {
-  const entries: ChatAgentReasoningEntry[] = []
-  for (const node of nodes) {
-    if (node.reasoningKind === 'summary') {
-      entries.push({
-        detail: null,
-        id: `reasoning-entry:${node.id}`,
-        summary: node,
-      })
-      continue
-    }
-    const previous = entries.at(-1)
-    if (previous?.summary && !previous.detail) {
-      previous.detail = node
-      continue
-    }
-    entries.push({
-      detail: node,
-      id: `reasoning-entry:${node.id}`,
-      summary: null,
-    })
-  }
-  return entries
 }
 
 function approvalPresentation(review: ApprovalReviewPayload): BuddyToolPresentation {

@@ -137,6 +137,14 @@ export class BuddySessionFactory {
         runContext: composition.runContext,
         session: session.session,
         shutdown: session.shutdown,
+        inputReferences: composition.inputReferences,
+        materializeInput: async input => [
+          { text: input.prompt, type: 'text' as const },
+          ...await this.#options.services.attachmentService.materializePiInputImages(
+            input.images,
+            blueprint.conversationId,
+          ),
+        ],
       }),
     }
   }

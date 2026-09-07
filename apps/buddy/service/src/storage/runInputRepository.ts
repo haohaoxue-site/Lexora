@@ -8,7 +8,7 @@ const contextItemSchema = z.object({
   value: z.string().min(1),
 }).strict()
 
-const attachmentIdsSchema = z.array(z.string().min(1)).max(16)
+const attachmentIdsSchema = z.array(z.string().min(1))
 const contextItemsSchema = z.array(contextItemSchema).max(64)
 const reasoningSchema = z.enum(BUDDY_THINKING_LEVELS).nullable()
 const serviceTierSchema = z.enum(BUDDY_SERVICE_TIERS).nullable()

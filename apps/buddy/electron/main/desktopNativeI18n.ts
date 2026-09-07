@@ -11,6 +11,11 @@ const messages = {
     restart: 'Restart',
     selectAttachments: 'Select attachments',
     selectSpaceDirectory: 'Select space directory',
+    saveBeforeQuitBody: 'Some changes could not be saved before quitting.',
+    saveBeforeQuitTitle: 'Save changes before quitting?',
+    retrySave: 'Retry',
+    quitWithoutSaving: 'Quit without saving',
+    cancel: 'Cancel',
   },
   'zh-CN': {
     backgroundCloseBody: 'Lexora Buddy 仍在后台运行。',
@@ -20,6 +25,11 @@ const messages = {
     restart: '重启',
     selectAttachments: '选择附件',
     selectSpaceDirectory: '选择空间目录',
+    saveBeforeQuitBody: '退出前有些更改未能保存。',
+    saveBeforeQuitTitle: '退出前保存更改？',
+    retrySave: '重试',
+    quitWithoutSaving: '放弃保存并退出',
+    cancel: '取消',
   },
 } as const
 

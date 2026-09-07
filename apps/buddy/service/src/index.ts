@@ -21,6 +21,8 @@ if (!parentPort) {
   process.exitCode = 1
 }
 else {
+  process.once('SIGINT', () => {})
+
   void runBuddyService().catch((error: unknown) => {
     const failureCode = readBuddyServiceFailureCode(error)
     process.stderr.write(

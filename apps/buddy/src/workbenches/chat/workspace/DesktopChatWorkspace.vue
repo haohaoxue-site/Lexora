@@ -5,12 +5,14 @@ import type { BuddyChatMessageListHandle } from '@/workbenches/chat/transcript/c
 import type { TaskChatWorkspace } from '@/workbenches/tasks/state/useTaskCapability'
 import {
   ArrowClockwise20Regular,
+  Dismiss16Regular,
   Settings20Regular,
   Warning20Regular,
 } from '@vicons/fluent'
 import { NButton, NIcon } from 'naive-ui'
 import { computed, shallowRef, useTemplateRef, watch } from 'vue'
 import { useBuddyI18n } from '@/i18n/buddyI18n'
+import DesktopIcon from '@/ui/DesktopIcon.vue'
 import DesktopChatComposer from '@/workbenches/chat/composer/DesktopChatComposer.vue'
 import DesktopApprovalCard from '@/workbenches/chat/workspace/DesktopApprovalCard.vue'
 import DesktopChatTranscript from '@/workbenches/chat/workspace/DesktopChatTranscript.vue'
@@ -80,7 +82,9 @@ watch(
 )
 
 async function sendMessage(payload: ChatComposerSubmitPayload) {
-  await execution.send(payload)
+  await (execution.editingMessageId.value
+    ? execution.submitEditedMessage(payload)
+    : execution.send(payload))
 }
 
 function dismissBlocker() {
@@ -111,6 +115,7 @@ function dismissBlocker() {
         :change-sets="transcript.changeSets.value"
         class="desktop-chat-page__messages"
         :conversation-id="session.activeConversationId.value!"
+        :editing-message-id="execution.editingMessageId.value"
         :has-older-messages="transcript.hasOlderMessages.value"
         :is-loading-older-messages="transcript.isLoadingOlderMessages.value"
         :language="workspace.language.value"
@@ -185,6 +190,22 @@ function dismissBlocker() {
           <i />{{ t('desktop.chat.runtimeStarting') }}
         </div>
 
+        <article v-if="execution.editingMessageId.value" class="desktop-chat-page__editing" role="status">
+          <DesktopIcon class="desktop-chat-page__editing-icon" name="messageEdit" />
+          <strong>{{ t('desktop.chat.editingHistoryMessage') }}</strong>
+          <NButton
+            class="buddy-icon-button"
+            quaternary
+            size="tiny"
+            :aria-label="t('common.cancel')"
+            @click="execution.cancelEditUserMessage"
+          >
+            <template #icon>
+              <NIcon :component="Dismiss16Regular" />
+            </template>
+          </NButton>
+        </article>
+
         <div v-if="execution.approvalViews.value.length" class="desktop-chat-page__approvals">
           <DesktopApprovalCard
             v-for="approval in execution.approvalViews.value"
@@ -199,15 +220,20 @@ function dismissBlocker() {
         </div>
 
         <DesktopChatComposer
-          :attachments="composer.attachments.value"
+          :key="composer.editorKey.value"
           :can-update-permission-settings="composer.canUpdatePermissionSettings.value"
-          :can-send="execution.canSend.value"
+          :can-send="execution.canSend.value && !execution.isMutatingBranch.value"
           :composer-content="composer.composerContent.value"
           :context-usage="composer.contextUsage.value"
           :draft="composer.draft.value"
+          :draft-id="composer.draftId.value"
+          :resources="composer.resources.value"
+          :rejected-resource-ids="composer.rejectedResourceIds"
+          :begin-import="composer.beginImport"
+          :select-source="composer.selectSource"
           :is-running="Boolean(execution.activeRun.value)"
           :is-selecting-files="composer.isSelectingFiles.value"
-          :is-sending="execution.isSending.value"
+          :is-sending="execution.isSending.value || execution.isMutatingBranch.value"
           :is-updating-permission-settings="composer.isUpdatingPermissionSettings.value"
           :interaction="composer.interaction.value"
           :language="workspace.language.value"
@@ -220,9 +246,8 @@ function dismissBlocker() {
           :selected-model-id="composer.selectedModelId.value"
           :selected-service-tier="composer.selectedServiceTier.value"
           @attach="composer.selectAttachments"
-          @attach-files="composer.importAttachments"
+          @retry-resource="composer.retryResource"
           @dismiss-interaction="composer.dismissInteraction"
-          @remove-attachment="composer.removeAttachment"
           @send="sendMessage"
           @stop="execution.cancelActiveRun"
           @update-content="composer.updateComposerContent"
@@ -374,6 +399,36 @@ function dismissBlocker() {
     background: var(--buddy-status-warning-solid);
     animation: desktop-runtime-pulse 1.2s ease-in-out infinite;
   }
+}
+
+.desktop-chat-page__editing {
+  display: grid;
+  min-height: 2.75rem;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.55rem;
+  border: 1px solid var(--buddy-accent-border);
+  border-radius: 0.625rem;
+  background: var(--buddy-accent-surface);
+  color: var(--buddy-accent-on-surface);
+  padding: 0.4rem 0.45rem 0.4rem 0.65rem;
+
+  strong {
+    font-size: 0.82rem;
+    font-weight: 650;
+    line-height: 1.4;
+  }
+
+  .buddy-icon-button {
+    width: 1.75rem;
+    height: 1.75rem;
+    color: var(--buddy-accent-text);
+  }
+}
+
+.desktop-chat-page__editing-icon {
+  color: var(--buddy-accent-text);
+  font-size: 1.1rem;
 }
 
 @keyframes desktop-runtime-pulse {

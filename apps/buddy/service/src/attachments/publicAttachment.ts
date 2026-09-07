@@ -1,4 +1,5 @@
 import type { AttachmentRecord } from '../storage/attachmentRepository'
+import { readBuddyUserMessageContent } from '../../../shared/buddyUserContent'
 
 export function toPublicAttachment(record: AttachmentRecord) {
   return {
@@ -30,6 +31,9 @@ export function withMessageAttachments<
 }
 
 function readMessageAttachmentIds(content: unknown): string[] {
+  const structured = readBuddyUserMessageContent(content)
+  if (structured)
+    return structured.resourceSnapshots.map(snapshot => snapshot.attachmentId)
   if (!content || typeof content !== 'object' || Array.isArray(content))
     return []
   const attachmentIds = (content as Record<string, unknown>).attachmentIds

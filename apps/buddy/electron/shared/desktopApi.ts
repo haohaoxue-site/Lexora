@@ -8,6 +8,9 @@ export const DESKTOP_IPC_CHANNELS = {
   appOpenFeedbackIssue: 'lexora:app:open-feedback-issue',
   appOpenReleasePage: 'lexora:app:open-release-page',
   appOpenTarget: 'lexora:app:open-target',
+  appHidden: 'lexora:app:hidden',
+  appPrepareQuit: 'lexora:app:prepare-quit',
+  appPrepareQuitAck: 'lexora:app:prepare-quit-ack',
   browserAttachGuest: 'lexora:browser:attach-guest',
   browserCaptureScreenshot: 'lexora:browser:capture-screenshot',
   browserClose: 'lexora:browser:close',
@@ -227,6 +230,8 @@ export interface LexoraDesktopApi {
   app: {
     checkForUpdates: () => Promise<DesktopUpdateCheckResult>
     getInfo: () => Promise<DesktopAppInfo>
+    onBeforeQuit: (listener: () => Promise<boolean>) => () => void
+    onHidden: (listener: () => void) => () => void
     onOpenTarget: (listener: (target: DesktopOpenTarget) => void) => () => void
     openFeedbackIssue: (feedback: string) => Promise<void>
     openReleasePage: (url: string) => Promise<void>

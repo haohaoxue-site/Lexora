@@ -19,6 +19,7 @@ export interface InteractiveModelSelection {
 
 export interface ResolvedInteractiveModelSelection extends InteractiveModelSelection {
   contextWindow: number
+  input: Array<'text' | 'image'>
   maxTokens: number
 }
 
@@ -53,6 +54,7 @@ export async function resolveInteractiveModelSelection(
   return {
     ...selected,
     contextWindow: model.contextWindow,
+    input: model.input,
     maxTokens: model.maxTokens,
     serviceTier,
   }

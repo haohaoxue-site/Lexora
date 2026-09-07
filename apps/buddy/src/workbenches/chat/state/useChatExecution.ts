@@ -1,6 +1,7 @@
 import type { LexoraDesktopApi } from '@buddy-electron/shared/desktopApi'
 import type { LocalRun } from '@buddy-electron/shared/localChatApi'
 import type { BuddyApprovalPolicy } from '@buddy-shared/approvalPolicy'
+import type { BuddyComposerSource } from '@buddy-shared/composerResource'
 import type { BuddyExecutionProfile } from '@buddy-shared/executionProfile'
 import type { BuddyLocale } from '@/i18n/buddyI18n'
 import type { ModelProvidersStore } from '@/stores/useModelProvidersStore'
@@ -20,10 +21,12 @@ interface UseChatExecutionOptions {
   activeRun: ValueRef<LocalRun | null>
   approvalPolicy: ValueRef<BuddyApprovalPolicy>
   api: LexoraDesktopApi['localChat']
+  canSendDraft: ValueRef<boolean>
   taskIndexData: TaskIndexData
   session: ChatSession
   drafts: ReturnType<typeof useChatDrafts>
   draftScopeKey: ValueRef<string>
+  draftChangedMessage: () => string
   executionProfile: ValueRef<BuddyExecutionProfile>
   getRunTerminationMessage: (errorCode: string | null) => string
   isUpdatingPermissionSettings: ValueRef<boolean>
@@ -31,6 +34,7 @@ interface UseChatExecutionOptions {
   modelProviders: ModelProvidersStore
   onActionCommandRunStarted: (runId: string) => void
   persistWorkspaceState: () => Promise<boolean>
+  selectComposerSource: (source: BuddyComposerSource, draftId?: string) => Promise<string | null>
   refreshBranches: () => Promise<void>
   runSync: ReturnType<typeof useChatRunSync>
   runtimeSupervisor: RuntimeSupervisorStore
@@ -43,10 +47,12 @@ export function useChatExecution(options: UseChatExecutionOptions) {
     activeRun: options.activeRun,
     approvalPolicy: options.approvalPolicy,
     api: options.api,
+    canSendDraft: options.canSendDraft,
     taskIndexData: options.taskIndexData,
     session: options.session,
     drafts: options.drafts,
     draftScopeKey: options.draftScopeKey,
+    draftChangedMessage: options.draftChangedMessage,
     executionProfile: options.executionProfile,
     getRunTerminationMessage: options.getRunTerminationMessage,
     isUpdatingPermissionSettings: options.isUpdatingPermissionSettings,
@@ -62,6 +68,8 @@ export function useChatExecution(options: UseChatExecutionOptions) {
   const branchMutations = useChatBranchMutations({
     activeRun: options.activeRun,
     api: options.api,
+    canSendDraft: options.canSendDraft,
+    drafts: options.drafts,
     taskIndexData: options.taskIndexData,
     session: options.session,
     isSending: turnExecution.isSending,
@@ -69,6 +77,8 @@ export function useChatExecution(options: UseChatExecutionOptions) {
     language: options.language,
     modelProviders: options.modelProviders,
     refreshBranches: options.refreshBranches,
+    persistWorkspaceState: options.persistWorkspaceState,
+    selectComposerSource: options.selectComposerSource,
     runSync: options.runSync,
     runtimeSupervisor: options.runtimeSupervisor,
     setErrorMessage: options.setErrorMessage,

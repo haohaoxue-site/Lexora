@@ -20,6 +20,7 @@ import {
   automationLifecycleStatusSchema,
   automationMutationRequestSchemas,
 } from '../../../shared/automation'
+import { Temporal } from '../../../shared/temporal'
 import { AutomationRepositoryError } from '../storage/automationRepositoryError'
 import {
   findNextAutomationOccurrence,

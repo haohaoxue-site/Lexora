@@ -1,30 +1,29 @@
+import type { BuddyComposerDraftSend } from '../../../shared/composerDraft'
 import type { BuddyTurnLauncher } from '../agent/BuddyTurnLauncher'
 import type { ConversationLifecycleService } from '../conversations/ConversationLifecycleService'
 import type {
   CommandRequestRecord,
   CommandRequestRepository,
 } from '../storage/commandRequestRepository'
+import type { ComposerDraftRepository } from '../storage/composerDraftRepository'
 import type { ConversationRepository } from '../storage/conversationRepository'
 import type { RunRecord } from '../storage/runRecord'
 import type { RunRepository } from '../storage/runRepository'
 import type { SpaceRepository } from '../storage/spaceRepository'
-import { createHash, randomUUID } from 'node:crypto'
+import { randomUUID } from 'node:crypto'
+import { parseBuddyChatCommand } from '../../../shared/buddyChatCommands'
+import { buddyUserContentToText, getBuddyUserContentResourceIds } from '../../../shared/buddyUserContent'
 import { BuddyServiceError } from '../rpc/runtimeRequest'
 import { toPublicRun } from '../runs/publicRun'
 import { requireActiveSpace } from '../spaces/requireActiveSpace'
 
-export interface ExecuteChatCommandInput {
-  arguments: string
-  branchId: string
-  command: 'compact'
-  conversationId: string
-  requestId: string
-}
+export type ExecuteChatCommandInput = BuddyComposerDraftSend
 
 export interface ChatCommandServiceOptions {
   commands: CommandRequestRepository
   conversationLifecycle: Pick<ConversationLifecycleService, 'isDeleting'>
   conversations: Pick<ConversationRepository, 'findById'>
+  drafts: Pick<ComposerDraftRepository, 'findById'>
   spaces: Pick<SpaceRepository, 'findById'>
   runs: Pick<RunRepository, 'findById'>
   turnLauncher: Pick<BuddyTurnLauncher, 'launch'>
@@ -44,14 +43,37 @@ export class ChatCommandService {
     if (replay) {
       if (replay.requestFingerprint !== requestFingerprint)
         throw new BuddyServiceError('VALIDATION_FAILED')
-      const run = requireValue(replayRun)
-      if (run.status !== 'failed' || run.errorCode !== 'RUNTIME_RESTARTED')
-        return toTurnStart(replay, run)
+      return toTurnStart(replay, requireValue(replayRun))
     }
 
-    const conversation = requireValue(this.#options.conversations.findById(input.conversationId))
+    const draft = requireValue(this.#options.drafts.findById(input.draftId), 'DRAFT_CONFLICT')
+    if (draft.revision !== input.expectedRevision)
+      throw new BuddyServiceError('DRAFT_CONFLICT')
+    if (draft.scope.kind !== 'conversation_branch')
+      throw new BuddyServiceError('VALIDATION_FAILED')
+    const content = buddyUserContentToText(draft.content).trim()
+    const command = parseBuddyChatCommand(content)
+    const directives = draft.content.body.flatMap(paragraph => paragraph.content.filter(
+      node => node.type === 'prompt_directive' && node.directive === 'slash_command',
+    ))
     if (
-      conversation.activeBranchId !== input.branchId
+      !command
+      || command.kind !== 'action'
+      || command.name !== 'compact'
+      || getBuddyUserContentResourceIds(draft.content).length
+      || directives.length !== 1
+      || directives[0]?.commandMode !== 'action'
+      || directives[0].value !== `/${command.name}`
+    ) {
+      throw new BuddyServiceError('VALIDATION_FAILED')
+    }
+    const conversation = requireValue(
+      this.#options.conversations.findById(draft.scope.conversationId),
+    )
+    if (
+      conversation.activeBranchId !== draft.scope.branchId
+      || conversation.approvalPolicy !== draft.executionConfig.approvalPolicy
+      || conversation.executionProfile !== draft.executionConfig.executionProfile
       || this.#options.conversationLifecycle.isDeleting(conversation.id)
     ) {
       throw new BuddyServiceError('VALIDATION_FAILED')
@@ -59,20 +81,19 @@ export class ChatCommandService {
     if (conversation.spaceId)
       requireActiveSpace(this.#options.spaces.findById(conversation.spaceId))
     const runId = randomUUID()
-    const prepared = replay
-      ? this.#options.commands.retryInterrupted({
-          createdAt: new Date().toISOString(),
-          requestId: input.requestId,
-          runId,
-        })
-      : this.#options.commands.prepare({
-          ...input,
-          approvalPolicy: conversation.approvalPolicy,
-          createdAt: new Date().toISOString(),
-          executionProfile: conversation.executionProfile,
-          requestFingerprint,
-          runId,
-        })
+    const prepared = this.#options.commands.prepare({
+      approvalPolicy: conversation.approvalPolicy,
+      arguments: command.arguments,
+      branchId: draft.scope.branchId,
+      command: command.name,
+      conversationId: conversation.id,
+      createdAt: new Date().toISOString(),
+      draft: { draftId: draft.draftId, expectedRevision: input.expectedRevision },
+      executionProfile: conversation.executionProfile,
+      requestFingerprint,
+      requestId: input.requestId,
+      runId,
+    })
     if (!prepared.created)
       return toTurnStart(prepared, this.#requireRun(prepared.runId))
 
@@ -87,25 +108,21 @@ export class ChatCommandService {
 }
 
 function createCommandFingerprint(input: ExecuteChatCommandInput): string {
-  return createHash('sha256').update(JSON.stringify({
-    arguments: input.arguments.trim(),
-    branchId: input.branchId,
-    command: input.command,
-    conversationId: input.conversationId,
-  })).digest('hex')
+  return `${input.draftId}:${input.expectedRevision}`
 }
 
 function toTurnStart(request: CommandRequestRecord, run: RunRecord) {
   return {
     branchId: request.branchId,
     conversationId: request.conversationId,
+    draftReceipt: request.draftReceipt,
     run: toPublicRun(run, null),
     runId: request.runId,
   }
 }
 
-function requireValue<T>(value: T | null): T {
+function requireValue<T>(value: T | null, code: 'DRAFT_CONFLICT' | 'VALIDATION_FAILED' = 'VALIDATION_FAILED'): T {
   if (value === null)
-    throw new BuddyServiceError('VALIDATION_FAILED')
+    throw new BuddyServiceError(code)
   return value
 }

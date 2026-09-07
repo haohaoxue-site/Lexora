@@ -1,9 +1,4 @@
-import type { BuddyApprovalPolicy } from '../../shared/approvalPolicy'
-import type { BuddyExecutionProfile } from '../../shared/executionProfile'
-import type {
-  BuddyServiceTier,
-  BuddyThinkingLevel,
-} from '../../shared/modelSelection'
+import type { BuddyComposerDraftSend } from '../../shared/composerDraft'
 import type { toPublicRun } from './runs/publicRun'
 
 export interface BuddyTurnContextItem {
@@ -11,30 +6,16 @@ export interface BuddyTurnContextItem {
   value: string
 }
 
-export interface BuddyTurnModelSelection {
-  modelId: string
-  providerId: string
-  reasoning: BuddyThinkingLevel | null
-  serviceTier: BuddyServiceTier | null
-}
-
-export interface BuddyStartTurnInput {
-  approvalPolicy: BuddyApprovalPolicy
-  attachmentIds: readonly string[]
-  branchId: string | null
-  content: string
-  contextItems: readonly BuddyTurnContextItem[]
-  conversationId: string | null
-  draftId: string
-  executionProfile: BuddyExecutionProfile
-  modelSelection: BuddyTurnModelSelection | null
-  spaceId: string | null
-  requestId: string
-}
+export type BuddyStartTurnInput = BuddyComposerDraftSend
 
 export interface BuddyTurnStart {
   branchId: string
   conversationId: string
+  draftReceipt: {
+    committedRevision: number
+    draftId: string
+    sourceRevision: number
+  } | null
   run: ReturnType<typeof toPublicRun>
   runId: string
 }

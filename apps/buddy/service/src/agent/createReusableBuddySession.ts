@@ -1,19 +1,25 @@
-import type { Api, Context, Model } from '@earendil-works/pi-ai'
+import type { Api, Context, Model, UserMessage } from '@earendil-works/pi-ai'
 import type {
   AgentSession,
   SessionEntry,
 } from '@earendil-works/pi-coding-agent'
+import type {
+  BuddyInputReferenceStore,
+  BuddyInputReferenceV1,
+} from './BuddyInputReference'
 import type { BuddySessionShutdownReason } from './createBuddySession'
 import type { BuddyRunContext } from './extensions/toolPolicyExtension'
 import type {
   BuddyAgentSessionLike,
   BuddySessionTurnContext,
 } from './PiTurnExecutor'
+import { createAssistantMessageEventStream } from '@earendil-works/pi-ai'
 import {
   findCutPoint,
   sessionEntryToContextMessages,
 } from '@earendil-works/pi-coding-agent'
 import { BUDDY_DEFAULT_THINKING_LEVEL } from '../../../shared/modelSelection'
+import { readBuddyInputReference } from './BuddyInputReference'
 import { toBuddySessionStorageError } from './BuddySessionErrors'
 import { createContextUsageBreakdown } from './contextUsageBreakdown'
 
@@ -28,6 +34,8 @@ export interface CreateReusableBuddySessionOptions {
     contextWindow: number | null,
     maxTokens: number | null,
   ) => Promise<Model<Api>>
+  inputReferences: BuddyInputReferenceStore
+  materializeInput: (input: BuddyInputReferenceV1) => Promise<UserMessage['content']>
   runContext: BuddyRunContextStore
   session: AgentSession
   shutdown: (reason: BuddySessionShutdownReason) => Promise<void>
@@ -37,9 +45,38 @@ export function createReusableBuddySession(
   options: CreateReusableBuddySessionOptions,
 ): BuddyAgentSessionLike {
   const { session } = options
+  const convertToLlm = session.agent.convertToLlm
   const streamFunction = session.agent.streamFunction
   let latestContext: Context | null = null
+  let inputMaterializationFailed = false
+  session.agent.convertToLlm = async (messages) => {
+    inputMaterializationFailed = false
+    const materialized = []
+    for (const message of messages) {
+      try {
+        const input = readBuddyInputReference(message)
+        if (!input) {
+          materialized.push(message)
+          continue
+        }
+        const content = await options.materializeInput(input)
+        if (
+          !Array.isArray(content)
+          || content.some(block => block.type === 'image' && !block.data)
+        ) {
+          throw new Error('Empty image input')
+        }
+        materialized.push({ content, role: 'user' as const, timestamp: message.timestamp })
+      }
+      catch {
+        inputMaterializationFailed = true
+      }
+    }
+    return convertToLlm(materialized)
+  }
   session.agent.streamFunction = (model, context, streamOptions) => {
+    if (inputMaterializationFailed)
+      return createInputMaterializationFailure(model)
     latestContext = context
     return streamFunction(model, context, streamOptions)
   }
@@ -83,13 +120,49 @@ export function createReusableBuddySession(
     getContextUsageBreakdown: totalTokens => latestContext
       ? createContextUsageBreakdown(latestContext, totalTokens)
       : null,
-    prompt: (text, promptOptions) => withPiSessionStorageBoundary(
-      session,
-      () => session.prompt(text, promptOptions),
-    ),
+    prompt: (text, promptOptions) => {
+      const { inputReference, ...piPromptOptions } = promptOptions ?? {}
+      options.inputReferences.pending = inputReference ?? null
+      return withPiSessionStorageBoundary(
+        session,
+        () => session.prompt(text, piPromptOptions),
+      ).finally(() => {
+        if (options.inputReferences.pending === inputReference)
+          options.inputReferences.pending = null
+      })
+    },
     subscribe: listener => session.subscribe(listener),
     waitForIdle: () => session.waitForIdle(),
   }
+}
+
+function createInputMaterializationFailure(model: Model<Api>) {
+  const stream = createAssistantMessageEventStream()
+  queueMicrotask(() => {
+    stream.push({
+      error: {
+        api: model.api,
+        content: [],
+        errorMessage: 'RESOURCE_MATERIALIZATION_FAILED',
+        model: model.id,
+        provider: model.provider,
+        role: 'assistant',
+        stopReason: 'error',
+        timestamp: Date.now(),
+        usage: {
+          cacheRead: 0,
+          cacheWrite: 0,
+          cost: { cacheRead: 0, cacheWrite: 0, input: 0, output: 0, total: 0 },
+          input: 0,
+          output: 0,
+          totalTokens: 0,
+        },
+      },
+      reason: 'error',
+      type: 'error',
+    })
+  })
+  return stream
 }
 
 async function withPiSessionStorageBoundary<TResult>(

@@ -1,5 +1,3 @@
-import { z } from 'zod'
-
 export const BUDDY_ATTACHMENT_COUNT_LIMIT = 16
 export const BUDDY_ATTACHMENT_TOTAL_BYTES_LIMIT = 32 * 1024 * 1024
 
@@ -12,15 +10,46 @@ export const BUDDY_IMAGE_ATTACHMENT_EXTENSIONS = [
 ] as const
 
 export const BUDDY_TEXT_ATTACHMENT_EXTENSIONS = [
+  'bash',
+  'c',
+  'cjs',
+  'conf',
+  'cpp',
+  'cs',
+  'css',
   'csv',
+  'go',
+  'graphql',
+  'h',
+  'hpp',
+  'html',
+  'ini',
+  'java',
+  'js',
   'json',
+  'jsonc',
+  'jsx',
+  'kt',
+  'log',
   'md',
+  'mjs',
+  'py',
+  'rs',
+  'rst',
+  'scss',
+  'sh',
+  'sql',
+  'swift',
   'toml',
+  'ts',
+  'tsx',
   'tsv',
   'txt',
+  'vue',
   'xml',
   'yaml',
   'yml',
+  'zsh',
 ] as const
 
 export const BUDDY_ATTACHMENT_DIALOG_EXTENSIONS = [
@@ -28,21 +57,8 @@ export const BUDDY_ATTACHMENT_DIALOG_EXTENSIONS = [
   ...BUDDY_TEXT_ATTACHMENT_EXTENSIONS,
 ]
 
-const buddyAttachmentUploadSchema = z.object({
-  bytes: z.instanceof(Uint8Array).refine(
-    value => value.byteLength <= BUDDY_ATTACHMENT_TOTAL_BYTES_LIMIT,
-  ),
-  mimeType: z.string().trim().max(255),
-  name: z.string().trim().min(1).max(255),
-}).strict()
-
-export const buddyAttachmentImportRequestSchema = z.object({
-  draftId: z.string().regex(/^[A-Z0-9][\w-]{0,127}$/i),
-  files: z.array(buddyAttachmentUploadSchema).min(1).max(BUDDY_ATTACHMENT_COUNT_LIMIT),
-}).strict().refine(
-  input => input.files.reduce((total, file) => total + file.bytes.byteLength, 0)
-    <= BUDDY_ATTACHMENT_TOTAL_BYTES_LIMIT,
-)
-
-export type BuddyAttachmentImportRequest = z.infer<typeof buddyAttachmentImportRequestSchema>
-export type BuddyAttachmentUpload = z.infer<typeof buddyAttachmentUploadSchema>
+export interface BuddyAttachmentUpload {
+  bytes: Uint8Array
+  mimeType: string
+  name: string
+}

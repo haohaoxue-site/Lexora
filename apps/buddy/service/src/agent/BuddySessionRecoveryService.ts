@@ -31,7 +31,7 @@ export interface CreateBuddySessionRecoveryInput {
 }
 
 export interface BuddySessionRecoveryServiceOptions {
-  attachments: Pick<AttachmentService, 'materializeRecoveryImages'>
+  attachments: Pick<AttachmentService, 'resolveRecoveryInputImageReferences'>
   conversations: Pick<ConversationHistoryRepository, 'listBranchMessages'>
   models: Pick<ProviderExecutionModelResolver, 'resolve'>
   runInputs: Pick<RunInputRepository, 'findByTriggeringMessageId'>
@@ -69,7 +69,7 @@ export class BuddySessionRecoveryService {
 
     const missingAttachmentIds = new Set<string>()
     const recoveredUserInputs = new Map<string, {
-      images: Awaited<ReturnType<AttachmentService['materializeRecoveryImages']>>['images']
+      images: Awaited<ReturnType<AttachmentService['resolveRecoveryInputImageReferences']>>['images']
       prompt: string
     }>()
     let recoveredImageCount = 0
@@ -79,7 +79,7 @@ export class BuddySessionRecoveryService {
       const storedInput = this.#options.runInputs.findByTriggeringMessageId(message.id)
       if (!storedInput)
         continue
-      const recovery = await this.#options.attachments.materializeRecoveryImages(
+      const recovery = await this.#options.attachments.resolveRecoveryInputImageReferences(
         storedInput.attachmentIds,
         input.conversationId,
       )
