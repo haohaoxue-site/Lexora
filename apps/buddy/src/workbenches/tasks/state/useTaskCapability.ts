@@ -5,7 +5,6 @@ import type { JSONContent } from '@tiptap/core'
 import type { ApplicationSettingsStore } from '@/stores/useApplicationSettingsStore'
 import type { LocalCapabilitiesStore } from '@/stores/useLocalCapabilitiesStore'
 import type { ModelProvidersStore } from '@/stores/useModelProvidersStore'
-import type { RuntimeRecoveryStore } from '@/stores/useRuntimeRecoveryStore'
 import type { RuntimeSupervisorStore } from '@/stores/useRuntimeSupervisorStore'
 import type { ChatBlockerKind } from '@/workbenches/chat/workspace/chatBlocker'
 import { useDebounceFn } from '@vueuse/core'
@@ -46,7 +45,6 @@ export interface UseTaskCapabilityOptions {
   applicationSettings: ApplicationSettingsStore
   localCapabilities: LocalCapabilitiesStore
   modelProviders: ModelProvidersStore
-  runtimeRecovery: RuntimeRecoveryStore
   runtimeSupervisor: RuntimeSupervisorStore
 }
 
@@ -56,7 +54,6 @@ export function useTaskCapability(options: UseTaskCapabilityOptions) {
     applicationSettings,
     localCapabilities,
     modelProviders,
-    runtimeRecovery,
     runtimeSupervisor,
   } = options
   const taskIndexData = useTaskIndexData({ api: api.localChat })
@@ -148,17 +145,6 @@ export function useTaskCapability(options: UseTaskCapabilityOptions) {
     if (getChatComposerResourceIds(composerContent.value as JSONContent | null).length)
       void composerResources.restore(id).catch(setError)
   }, { immediate: true })
-  const workspacePersistence = useTaskWorkspacePersistence({
-    beforePersist: composerResources.whenAccepted,
-    api: api.localChat,
-    conversations,
-    drafts,
-    onError: setError,
-    spaces,
-    session: chatSession,
-  })
-  const persistWorkspaceState = workspacePersistence.persist
-  persistDraftChanges = workspacePersistence.persistIfHydrated
   const {
     activateDraftScope,
     activateGlobalDraft,
@@ -181,6 +167,22 @@ export function useTaskCapability(options: UseTaskCapabilityOptions) {
     selectDefaultModel: modelProviders.selectDefaultModel,
     session: chatSession,
   })
+  const workspacePersistence = useTaskWorkspacePersistence({
+    beforePersist: composerResources.whenAccepted,
+    api: api.localChat,
+    conversations,
+    drafts,
+    getConversation: id => activeConversation.value?.id === id
+      ? activeConversation.value
+      : conversations.value.find(conversation => conversation.id === id) ?? null,
+    onError: setError,
+    spaces,
+    session: chatSession,
+  })
+  persistDraftChanges = workspacePersistence.persistIfHydrated
+  function persistWorkspaceState() {
+    return workspacePersistence.persist()
+  }
   const taskSpaces = useTaskSpaces({
     activateDraftScope,
     activeBranchId,
@@ -211,8 +213,8 @@ export function useTaskCapability(options: UseTaskCapabilityOptions) {
     activeConversation,
     activeConversationId,
     activeRun,
+    applyConversation,
     api: api.localChat.conversations,
-    taskIndexData,
     drafts,
     onError: setError,
     persistWorkspaceState,
@@ -599,7 +601,7 @@ export function useTaskCapability(options: UseTaskCapabilityOptions) {
     session: chatWorkspaceSession,
     welcomePreference: readonly(welcomePreference),
     status: {
-      canRestartRuntime: runtimeRecovery.canRestartRuntime,
+      canRestartRuntime: runtimeSupervisor.canRestartRuntime,
       dismissChatBlocker,
       errorMessage: readonly(errorMessage),
       isLoading: readonly(isLoading),

@@ -168,7 +168,7 @@ const darkTheme: BuddyColorTheme = {
     muted: 'rgb(255 255 255 / 5%)',
   },
   state: {
-    hover: 'rgb(255 255 255 / 7%)',
+    hover: 'rgba(255, 255, 255, 0.07)',
     pressed: 'rgb(255 255 255 / 13%)',
     selected: 'rgb(255 255 255 / 10%)',
   },

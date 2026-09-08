@@ -7,6 +7,7 @@ import {
   browserObservationSchema,
   browserStateSnapshotSchema,
 } from './browserProtocol'
+import { isLocalNamedPipe } from './localEndpoint'
 
 export const BROWSER_ADAPTER_PROTOCOL_VERSION = 1 as const
 export const BROWSER_ADAPTER_DEFAULT_LEASE_TTL_MS = 60_000
@@ -31,7 +32,7 @@ export const BROWSER_ADAPTER_RECOVERY_ACTIONS = [
 const browserAdapterConversationIdSchema = z.string().trim().min(1).max(128)
 const browserAdapterIdSchema = z.string().min(1).max(128).regex(/^[\w.-]+$/)
 const browserAdapterTokenSchema = z.string().regex(/^[\da-f]{64}$/)
-const browserAdapterSocketPathSchema = z.string().min(1).max(4_096).regex(/^\//)
+const browserAdapterSocketPathSchema = z.string().min(1).max(4_096).refine(path => path.startsWith('/') || isLocalNamedPipe(path))
 const emptyParamsSchema = z.object({}).strict()
 
 export const browserAdapterFailureCodeSchema = z.union([

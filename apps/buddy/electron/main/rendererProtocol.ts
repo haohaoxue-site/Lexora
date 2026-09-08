@@ -1,6 +1,7 @@
 import { readFile } from 'node:fs/promises'
-import { extname, join, relative, resolve } from 'node:path'
+import { extname, join } from 'node:path'
 import { protocol } from 'electron'
+import { containsCanonicalPath, filePaths } from '../../platform/filePaths'
 
 const RENDERER_PROTOCOL = 'lexora-app'
 const MIME_TYPES: Record<string, string> = {
@@ -50,7 +51,7 @@ export function resolveRendererAssetPath(urlValue: string, rendererRoot: string)
   let url: URL
   try {
     const decodedValue = decodeURIComponent(urlValue)
-    if (decodedValue.split('/').includes('..'))
+    if (decodedValue.split(/[\\/]/).includes('..'))
       return null
     url = new URL(urlValue)
   }
@@ -59,10 +60,12 @@ export function resolveRendererAssetPath(urlValue: string, rendererRoot: string)
   }
   if (url.protocol !== `${RENDERER_PROTOCOL}:` || url.hostname !== 'renderer')
     return null
-  const root = resolve(rendererRoot)
-  const path = resolve(root, url.pathname.replace(/^\/+/, ''))
-  const pathFromRoot = relative(root, path)
-  if (pathFromRoot.startsWith('..') || pathFromRoot.includes('/../'))
+  try {
+    const root = filePaths.resolveInput(rendererRoot)
+    const path = filePaths.resolveInput(decodeURIComponent(url.pathname).replace(/^\/+/, ''), root)
+    return containsCanonicalPath(root, path) ? path : null
+  }
+  catch {
     return null
-  return path
+  }
 }

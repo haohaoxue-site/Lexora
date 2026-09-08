@@ -7,6 +7,7 @@ import {
   createRouter,
   createWebHashHistory,
 } from 'vue-router'
+import { loadDesktopAppInfo, supportsSettingsCategory } from '@/platform/desktopCapabilities'
 
 export type DesktopView = 'automations' | 'settings' | 'tasks'
 export type DesktopAutomationSection = 'history' | 'plans'
@@ -173,7 +174,15 @@ const routes: ReadonlyArray<RouteRecordRaw> = [
 ]
 
 export function createDesktopRouter(history: RouterHistory = createWebHashHistory()) {
-  return createRouter({ history, routes })
+  const router = createRouter({ history, routes })
+  router.beforeEach(async (to) => {
+    const category = to.meta.settingsCategory
+    if (!category || supportsSettingsCategory(null, category))
+      return true
+    const info = await loadDesktopAppInfo()
+    return supportsSettingsCategory(info.capabilities, category) ? true : desktopRouteLocations.settings()
+  })
+  return router
 }
 
 declare module 'vue-router' {

@@ -1,9 +1,10 @@
 import type { BrowserFailureReason } from '../../../shared/browserProtocol'
 import type { DesktopBrowserErrorCode } from '../../shared/desktopApi'
-import { realpath, stat } from 'node:fs/promises'
 import { isIP } from 'node:net'
-import { extname, relative, sep } from 'node:path'
+import { extname } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
+import { containsCanonicalPath } from '../../../platform/filePaths'
+import { resolveFilePath } from '../../../platform/resolveFilePath'
 
 export interface BrowserSecurityPage {
   id: number
@@ -261,20 +262,18 @@ export class BrowserSecurityPolicy {
     let entry: string
     let root: string
     try {
-      [entry, root] = await Promise.all([
-        realpath(entryPath),
-        realpath(rootPath),
+      const [entryResolution, rootResolution] = await Promise.all([
+        resolveFilePath(entryPath, 'existing'),
+        resolveFilePath(rootPath, 'existing'),
       ])
-      const [entryMetadata, rootMetadata] = await Promise.all([
-        stat(entry),
-        stat(root),
-      ])
+      entry = entryResolution.canonicalPath
+      root = rootResolution.canonicalPath
       const extension = extname(entry).toLowerCase()
       if (
-        !entryMetadata.isFile()
-        || !rootMetadata.isDirectory()
+        !entryResolution.isFile
+        || !rootResolution.isDirectory
         || (extension !== '.html' && extension !== '.htm')
-        || !containsPath(root, entry)
+        || !containsCanonicalPath(root, entry)
       ) {
         throw new Error('invalid local file')
       }
@@ -364,18 +363,13 @@ export class BrowserSecurityPolicy {
     if (!this.#localFileRoot)
       return false
     try {
-      const path = await realpath(fileURLToPath(url))
-      return containsPath(this.#localFileRoot, path)
+      const path = await resolveFilePath(fileURLToPath(url), 'existing')
+      return path.isFile && containsCanonicalPath(this.#localFileRoot, path.canonicalPath)
     }
     catch {
       return false
     }
   }
-}
-
-function containsPath(root: string, path: string): boolean {
-  const child = relative(root, path)
-  return child === '' || (child !== '..' && !child.startsWith(`..${sep}`))
 }
 
 function isLoopbackUrl(url: URL): boolean {

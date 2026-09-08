@@ -34,6 +34,9 @@ export function useRuntimeSupervisorStore(options: UseRuntimeSupervisorStoreOpti
   const restartError = shallowRef<string | null>(null)
   let stateGeneration = 0
 
+  const canRestartRuntime = computed(() => (
+    runtimeState.value.status === 'offline' && runtimeState.value.pid === null
+  ))
   const runtimeError = computed(() => {
     const code = runtimeState.value.lastError
     return code ? translateBuddy(options.language.value, RUNTIME_FAILURE_MESSAGE_KEYS[code]) : null
@@ -70,6 +73,7 @@ export function useRuntimeSupervisorStore(options: UseRuntimeSupervisorStoreOpti
   }
 
   return {
+    canRestartRuntime,
     clearRestartError,
     dispose: stopRuntimeState,
     loadStatus,

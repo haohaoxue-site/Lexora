@@ -12,10 +12,10 @@ import {
   dirname,
   extname,
   isAbsolute,
-  relative,
   resolve,
   sep,
 } from 'node:path'
+import { relativeCanonicalPath } from '../../../platform/filePaths'
 import { resolveGrantedPath } from '../directories/resolveGrantedPath'
 
 export const BUDDY_ARTIFACT_COUNT_LIMIT = 512
@@ -330,8 +330,8 @@ async function resolveArtifactLocation(
   const grant = grants.find(candidate => candidate.grantId === resolution.grantId)
   if (!grant)
     throw new ArtifactError('PATH_OUTSIDE_GRANTED_DIRECTORY')
-  const child = relative(grant.canonicalRoot, resolution.canonicalPath)
-  if (child === '..' || child.startsWith(`..${sep}`))
+  const child = relativeCanonicalPath(grant.canonicalRoot, resolution.canonicalPath)
+  if (child === null)
     throw new ArtifactError('PATH_OUTSIDE_GRANTED_DIRECTORY')
   return {
     canonicalPath: resolution.canonicalPath,

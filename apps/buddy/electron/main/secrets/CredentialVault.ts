@@ -140,11 +140,12 @@ export function createCredentialVault(
 }
 
 export function createSafeStorageCipher(): SecretCipher {
+  const platform = process.platform
   return {
     available: () => isSafeStorageBackendSecure({
-      backend: safeStorage.getSelectedStorageBackend(),
+      backend: platform === 'linux' ? safeStorage.getSelectedStorageBackend() : 'unknown',
       encryptionAvailable: safeStorage.isEncryptionAvailable(),
-      platform: process.platform,
+      platform,
     }),
     decrypt: value => safeStorage.decryptString(value),
     encrypt: value => safeStorage.encryptString(value),

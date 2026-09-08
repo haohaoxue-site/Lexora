@@ -4,6 +4,8 @@ import type { LexoraConfigStore } from './config/LexoraConfigStore'
 import type { ExecuteDesktopCommand } from './desktopCommands'
 import process from 'node:process'
 import { app, clipboard, ipcMain } from 'electron'
+import { currentPlatform } from '../../platform/currentPlatform'
+import { describeBuddyCapabilities } from '../../shared/platform'
 import {
   DESKTOP_IPC_CHANNELS,
 } from '../shared/desktopApi'
@@ -13,7 +15,7 @@ import {
   lexoraConfigPatchSchema,
   releasePageInputSchema,
 } from '../shared/desktopApiSchemas'
-import { getDesktopCommand, isDesktopCommandId, resolveDesktopPlatform } from '../shared/desktopCommands'
+import { getDesktopCommand, isDesktopCommandId } from '../shared/desktopCommands'
 import { readDesktopWindowState } from './window'
 
 export interface RegisterDesktopIpcOptions {
@@ -36,11 +38,12 @@ export function registerDesktopIpc(options: RegisterDesktopIpcOptions): void {
   ipcMain.handle(DESKTOP_IPC_CHANNELS.appGetInfo, (event) => {
     assertTrustedSender(event, options.getWindow())
     return {
+      capabilities: describeBuddyCapabilities(currentPlatform),
       chromiumVersion: process.versions.chrome,
       configPath: options.configPath,
       electronVersion: process.versions.electron,
       nodeVersion: process.versions.node,
-      platform: resolveDesktopPlatform(process.platform),
+      platform: currentPlatform.id,
       version: app.getVersion(),
     }
   })

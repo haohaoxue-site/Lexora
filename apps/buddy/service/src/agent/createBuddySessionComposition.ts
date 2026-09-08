@@ -1,83 +1,27 @@
-import type { ToolCallEvent } from '@earendil-works/pi-coding-agent'
 import type { BuddyApprovalPolicy } from '../../../shared/approvalPolicy'
 import type { BuddyExecutionProfile } from '../../../shared/executionProfile'
 import type { BuddyServiceTier } from '../../../shared/modelSelection'
 import type { BuddySessionMode } from '../../../shared/sessionMode'
-import type { BuddyToolClassificationResult } from '../approvals/toolClassification'
+import type { ApprovalService } from '../approvals/ApprovalService'
 import type { AttachmentService } from '../attachments/AttachmentService'
-import type { CreateAutomationToolOptions } from '../automations/createAutomationTool'
-import type { BrowserCapabilityHost } from '../browser/BrowserCapabilityService'
-import type { BuddyMcpTools } from '../connectors/mcp/McpConnectorService'
-import type {
-  DirectoryGrantMutation,
-  DirectoryGrantService,
-} from '../directories/DirectoryGrantService'
+import type { ChangeCaptureService } from '../changes/ChangeCaptureService'
+import type { DirectoryGrantMutation, DirectoryGrantService } from '../directories/DirectoryGrantService'
 import type { DirectoryGrant } from '../directories/resolveGrantedPath'
-import type { ImageGenerationGateway } from '../images/ImageGenerationGateway'
-import type { CreatePetToolOptions } from '../pet/createPetTool'
-import type { SystemHostPort } from '../system/systemCapability'
-import type { WebCapabilityService } from '../web/WebCapabilityService'
 import type { BuddyInputReferenceStore } from './BuddyInputReference'
+import type { BuddyRunContextStore } from './BuddyRunContext'
+import type { BuddySessionCapabilityFactory } from './BuddySessionCapability'
 import type { BuddyInProcessExtension } from './createBuddyResourceLoader'
-import type { BuddyRunContextStore } from './createReusableBuddySession'
-import type {
-  ChangeCaptureGateway,
-} from './extensions/changeCaptureExtension'
-import type { CreateImageGenerationExtensionOptions } from './extensions/imageGenerationExtension'
-import type { CreateImageTransformExtensionOptions } from './extensions/imageTransformExtension'
-import type { CreateOutputPresentationExtensionOptions } from './extensions/outputPresentationExtension'
-import type {
-  BuddyRunContext,
-  CreateToolPolicyExtensionOptions,
-  ToolApprovalGateway,
-} from './extensions/toolPolicyExtension'
-import { classifyOutputPresentTool } from '../artifacts/artifactToolContract'
-import { classifyAutomationToolCall } from '../automations/createAutomationTool'
-import { BrowserCapabilityService } from '../browser/BrowserCapabilityService'
-import { classifyBrowserTool } from '../browser/browserToolContract'
-import { classifyMcpTool } from '../connectors/mcp/mcpToolContract'
-import { classifyImageGenerationTool } from '../images/imageGenerationToolContract'
-import { classifyImageTransformTool } from '../images/imageTransformToolContract'
-import { classifyPetTool } from '../pet/petToolContract'
-import { SystemCapabilityService } from '../system/systemCapability'
-import { classifySystemTool } from '../system/systemToolContract'
-import { createAutomationExtension } from './extensions/automationExtension'
-import { createBrowserExtension } from './extensions/browserExtension'
-import { createChangeCaptureExtension } from './extensions/changeCaptureExtension'
-import { createImageGenerationExtension } from './extensions/imageGenerationExtension'
-import { createImageTransformExtension } from './extensions/imageTransformExtension'
-import { createInputReferenceExtension } from './extensions/inputReferenceExtension'
-import { createMcpExtension } from './extensions/mcpExtension'
-import { createOutputPresentationExtension } from './extensions/outputPresentationExtension'
-import { createPetExtension } from './extensions/petExtension'
-import { createSystemExtension } from './extensions/systemExtension'
-import { createSystemPromptExtension } from './extensions/systemPromptExtension'
-import { createToolPolicyExtension } from './extensions/toolPolicyExtension'
-import { createWebExtension } from './extensions/webExtension'
-
-type DirectoryGrantGateway = Pick<DirectoryGrantService, 'grant'>
-
-interface BuddySessionConnectorSource {
-  getTools: (signal?: AbortSignal) => Promise<BuddyMcpTools>
-}
+import { createToolDiscoveryCapability } from './discovery/toolDiscoveryExtension'
+import { createChangeCaptureExtension } from './hooks/changeCaptureExtension'
+import { createInputReferenceExtension } from './hooks/inputReferenceExtension'
+import { createToolPolicyExtension } from './hooks/toolPolicyExtension'
 
 export interface BuddySessionCompositionServices {
-  approvalService: ToolApprovalGateway
-  artifactService: CreateImageGenerationExtensionOptions['artifactService']
-    & CreateOutputPresentationExtensionOptions['artifactService']
-  attachmentService: CreateImageGenerationExtensionOptions['attachmentService']
-    & Pick<AttachmentService, 'materializePiInputImages'>
-  automationService: CreateAutomationToolOptions['service']
-  browserHost: BrowserCapabilityHost
-  changeCaptureService: ChangeCaptureGateway
-  connectorService: BuddySessionConnectorSource
-  directoryGrants: DirectoryGrantGateway
-  imageGenerationGateway: ImageGenerationGateway
-  imageTransformService: CreateImageTransformExtensionOptions['service']
-  onAutomationChanged: (automationId: string) => void
-  petService: CreatePetToolOptions['service']
-  systemHost: SystemHostPort
-  webService: WebCapabilityService
+  approvalService: Pick<ApprovalService, 'request'>
+  attachmentService: Pick<AttachmentService, 'materializePiInputImages'>
+  changeCaptureService: Pick<ChangeCaptureService, 'beginFileTool' | 'beginWorkspaceTool' | 'finalizeRun' | 'finishFileTool' | 'finishWorkspaceTool' | 'markPartial'>
+  createCapabilities: BuddySessionCapabilityFactory
+  directoryGrants: Pick<DirectoryGrantService, 'grant'>
 }
 
 export interface CreateBuddySessionCompositionOptions {
@@ -104,64 +48,22 @@ export async function createBuddySessionComposition(
 ): Promise<BuddySessionComposition> {
   const { services } = options
   const grants = [...options.grants]
-  const mcp = await services.connectorService.getTools(options.signal)
   const runContext: BuddyRunContextStore = { current: null }
   const inputReferences: BuddyInputReferenceStore = { pending: null }
-  const browserCapability = new BrowserCapabilityService({
+  const capabilities = await services.createCapabilities({
     conversationId: options.conversationId,
-    getGrants: () => grants,
-    host: services.browserHost,
+    cwd: options.canonicalRoot,
+    getRunId: () => runContext.current?.runId,
+    grants,
+    sessionMode: options.sessionMode,
+    signal: options.signal,
   })
-  const systemCapability = new SystemCapabilityService({ host: services.systemHost })
-  const classifyTool = createBuddyToolClassifier({
-    automationService: services.automationService,
-    browserCapability,
-    mcpClassifications: mcp.classifications,
-    systemCapability,
-  })
+  options.signal.throwIfAborted()
+  const discovery = createToolDiscoveryCapability(capabilities.flatMap(capability => capability.disclosure ? [capability.disclosure] : []))
+  const sessionCapabilities = [...capabilities, discovery]
   const inProcessExtensions: BuddyInProcessExtension[] = [
     createInputReferenceExtension(inputReferences),
-    createMcpExtension({ tools: mcp.tools }),
-    createBrowserExtension({ service: browserCapability }),
-    createWebExtension({ service: services.webService, conversationId: options.conversationId }),
-    createImageGenerationExtension({
-      artifactService: services.artifactService,
-      attachmentService: services.attachmentService,
-      conversationId: options.conversationId,
-      cwd: options.canonicalRoot,
-      getRunId: () => runContext.current?.runId,
-      grants,
-      imageGenerationGateway: services.imageGenerationGateway,
-    }),
-    createImageTransformExtension({
-      conversationId: options.conversationId,
-      cwd: options.canonicalRoot,
-      getRunId: () => runContext.current?.runId,
-      grants,
-      service: services.imageTransformService,
-    }),
-    createOutputPresentationExtension({
-      artifactService: services.artifactService,
-      conversationId: options.conversationId,
-      cwd: options.canonicalRoot,
-      getRunId: () => runContext.current?.runId,
-      grants,
-    }),
-    createPetExtension({
-      getRunId: () => runContext.current?.runId,
-      service: services.petService,
-    }),
-    createSystemExtension({ service: systemCapability }),
-  ]
-
-  if (options.sessionMode === 'interactive') {
-    inProcessExtensions.push(createAutomationExtension({
-      onChanged: services.onAutomationChanged,
-      service: services.automationService,
-    }))
-  }
-
-  inProcessExtensions.push(
+    ...sessionCapabilities.map(capability => capability.extension),
     createToolPolicyExtension({
       applyGrant: async (proposal) => {
         const mutation = await services.directoryGrants.grant(proposal)
@@ -170,7 +72,14 @@ export async function createBuddySessionComposition(
       approvalAvailable: options.sessionMode === 'interactive',
       approvalPolicy: options.approvalPolicy,
       approvalService: services.approvalService,
-      classifyTool,
+      classifyTool: async (event, run) => {
+        for (const capability of sessionCapabilities) {
+          const classification = await capability.classify(event, run.signal)
+          if (classification)
+            return classification
+        }
+        return {}
+      },
       cwd: options.canonicalRoot,
       executionProfile: options.executionProfile,
       getGrants: () => grants,
@@ -185,9 +94,9 @@ export async function createBuddySessionComposition(
       getRunContext: () => runContext.current,
       grants,
       service: services.changeCaptureService,
+      workspaceMutationTools: capabilities.flatMap(capability => capability.workspaceMutationTools ?? []),
     }),
-  )
-  inProcessExtensions.push(createSystemPromptExtension())
+  ]
 
   return {
     getServiceTier: () => runContext.current?.serviceTier ?? null,
@@ -197,10 +106,7 @@ export async function createBuddySessionComposition(
   }
 }
 
-function applyGrantToSession(
-  grants: DirectoryGrant[],
-  mutation: DirectoryGrantMutation,
-): void {
+function applyGrantToSession(grants: DirectoryGrant[], mutation: DirectoryGrantMutation): void {
   const covered = new Set(mutation.coveredGrantIds)
   for (let index = grants.length - 1; index >= 0; index -= 1) {
     if (covered.has(grants[index]!.grantId))
@@ -214,63 +120,4 @@ function applyGrantToSession(
     kind: 'granted',
     root: mutation.grant.root,
   })
-}
-
-interface BuddyToolClassifierOptions {
-  automationService: CreateAutomationToolOptions['service']
-  browserCapability: Pick<
-    BrowserCapabilityService,
-    'classifyAction' | 'validateActionApproval'
-  >
-  mcpClassifications: BuddyMcpTools['classifications']
-  systemCapability: SystemCapabilityService
-}
-
-function createBuddyToolClassifier(
-  options: BuddyToolClassifierOptions,
-): NonNullable<CreateToolPolicyExtensionOptions['classifyTool']> {
-  return async (
-    event: ToolCallEvent,
-    activeRun: BuddyRunContext,
-  ): Promise<BuddyToolClassificationResult> => {
-    if (event.toolName === 'lexora_web_search' || event.toolName === 'lexora_web_fetch')
-      return { access: 'network', paths: [] }
-    const automation = classifyAutomationToolCall(options.automationService, event)
-    if (automation)
-      return automation
-
-    const imageTransform = classifyImageTransformTool(event)
-    if (imageTransform)
-      return imageTransform
-
-    const outputPresentation = classifyOutputPresentTool(event)
-    if (outputPresentation)
-      return outputPresentation
-
-    const browser = classifyBrowserTool(event, options.browserCapability)
-    if (browser)
-      return browser
-
-    const system = await classifySystemTool(
-      options.systemCapability,
-      event,
-      activeRun.signal,
-    )
-    if (system)
-      return system
-
-    const imageGeneration = classifyImageGenerationTool(event)
-    if (imageGeneration)
-      return imageGeneration
-
-    const pet = classifyPetTool(event)
-    if (pet)
-      return pet
-
-    const mcp = classifyMcpTool(options.mcpClassifications, event)
-    if (mcp)
-      return mcp
-
-    return {}
-  }
 }

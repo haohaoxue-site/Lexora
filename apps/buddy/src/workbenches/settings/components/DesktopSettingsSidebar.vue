@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { BuddyCapabilities } from '@buddy-shared/platform'
 import type { BuddyLocale } from '@/i18n/buddyI18n'
 import {
   AnimalCat20Regular,
@@ -9,14 +10,17 @@ import {
   Globe20Regular,
 } from '@vicons/fluent'
 import { NIcon } from 'naive-ui'
+import { computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { useBuddyI18n } from '@/i18n/buddyI18n'
 import DesktopWorkspaceSidebarIdentity from '@/layouts/DesktopWorkspaceSidebarIdentity.vue'
+import { supportsSettingsCategory } from '@/platform/desktopCapabilities'
 import { desktopRouteLocations } from '@/router'
 
 const props = defineProps<{
   appSidebarCollapsed: boolean
   language: BuddyLocale
+  capabilities: BuddyCapabilities | null
 }>()
 const emit = defineEmits<{
   toggleAppSidebar: []
@@ -31,6 +35,7 @@ const categories = [
   { icon: Folder20Regular, key: 'local' as const },
   { icon: DataUsage20Regular, key: 'data' as const },
 ]
+const visibleCategories = computed(() => categories.filter(category => supportsSettingsCategory(props.capabilities, category.key)))
 </script>
 
 <template>
@@ -45,7 +50,7 @@ const categories = [
 
     <div class="desktop-settings-sidebar__content">
       <RouterLink
-        v-for="category in categories"
+        v-for="category in visibleCategories"
         :key="category.key"
         :class="{ 'is-active': route.meta.settingsCategory === category.key }"
         :to="desktopRouteLocations.settings(category.key)"

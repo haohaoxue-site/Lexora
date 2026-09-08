@@ -71,10 +71,15 @@ export function useChatDrafts(options: UseChatDraftsOptions) {
   }
 
   function updateCurrentDraft(value: Partial<ChatDraftState>) {
-    draftsByScope.set(activeTargetKey.value, {
-      ...currentDraft.value,
+    updateDraft(activeTargetKey.value, value)
+  }
+
+  function updateDraft(targetKey: string, value: Partial<ChatDraftState>) {
+    const current = load(targetKey)
+    draftsByScope.set(targetKey, {
+      ...current,
       ...value,
-      editVersion: currentDraft.value.editVersion + 1,
+      editVersion: current.editVersion + 1,
     })
     options.onChange()
   }
@@ -311,10 +316,14 @@ export function useChatDrafts(options: UseChatDraftsOptions) {
         return
       updateCurrentDraft({ content: cloneContent(content) })
     },
-    setPermissionSettings(settings: BuddyPermissionSettings) {
-      updateCurrentDraft(settings)
+    setPermissionSettings(settings: BuddyPermissionSettings, targetKey = activeTargetKey.value) {
+      const current = load(targetKey)
+      if (current.approvalPolicy === settings.approvalPolicy && current.executionProfile === settings.executionProfile)
+        return
+      updateDraft(targetKey, settings)
     },
     snapshot,
+    targetKey: activeTargetKey,
     updateComposerContent,
   }
 }

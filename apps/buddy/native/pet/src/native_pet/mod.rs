@@ -1,0 +1,44 @@
+mod active_window;
+mod animation;
+mod animation_key;
+mod assets;
+mod bounds;
+mod config;
+mod control_runtime;
+mod control_state;
+mod coordinates;
+mod dpi;
+mod drag_motion;
+#[cfg(test)]
+#[path = "__tests__/drag_replay_check.rs"]
+mod drag_replay;
+mod drag_runtime;
+mod drag_state;
+mod edge_runout;
+mod frame_timing;
+mod geometry;
+mod layer_shell;
+mod lifecycle;
+mod monitor_layout;
+mod physics;
+mod physics_params;
+mod pointer_interaction;
+mod pointer_samples;
+mod position_state;
+mod preset_behavior;
+mod process;
+mod renderer;
+mod scripted_walk;
+mod step_runtime;
+mod window;
+mod window_anchor;
+mod window_cursor;
+mod window_events;
+mod window_layer;
+mod window_movement;
+mod window_state;
+mod window_tick;
+
+pub(crate) use animation_key::native_pet_manifest_animation_key_is_valid;
+pub use process::run_native_pet_sidecar_from_env;
+pub(crate) use process::step_protocol;

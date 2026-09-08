@@ -23,7 +23,6 @@ export const AUTOMATION_OCCURRENCE_STATUSES = [
 ] as const
 
 export const AUTOMATION_TRIGGER_KINDS = ['scheduled', 'manual'] as const
-export const AUTOMATION_STARTUP_REASONS = ['normal', 'data_restore'] as const
 
 export const AUTOMATION_BLOCKED_REASONS = [
   'AUTOMATION_SPACE_UNAVAILABLE',
@@ -327,14 +326,6 @@ export const automationChangedNotificationSchema = z.object({
   automationId: idSchema,
 }).strict()
 
-export const automationStartupContextSchema = z.discriminatedUnion('reason', [
-  z.object({ reason: z.literal('normal'), restoreToken: z.null() }).strict(),
-  z.object({
-    reason: z.literal('data_restore'),
-    restoreToken: z.string().trim().min(1).max(512),
-  }).strict(),
-])
-
 const calendarFrequencySchemas = [
   dailyScheduleSchema.extend({ timezone: timezoneSchema }),
   weeklyScheduleSchema.extend({ timezone: timezoneSchema }),
@@ -398,7 +389,6 @@ export type AutomationBlockedReason = z.infer<typeof automationBlockedReasonSche
 export type AutomationFrequency = z.infer<typeof automationFrequencySchema>
 export type AutomationPreviewRequest = z.infer<typeof automationPreviewRequestSchema>
 export type AutomationPreviewResult = z.infer<typeof automationPreviewResultSchema>
-export type AutomationStartupContext = z.infer<typeof automationStartupContextSchema>
 export type CreateAutomationRequest = z.infer<typeof automationMutationRequestSchemas.create>
 export type UpdateAutomationRequest = z.infer<typeof automationMutationRequestSchemas.update>
 export type AutomationMutationTargetRequest

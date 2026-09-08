@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import process from 'node:process'
 
-import { classifyCiScope } from '../../../infrastructure/scripts/resolve-ci-scope.mjs'
+import { classifyCiScope } from '../../../.github/scripts/resolve-ci-scope.mjs'
 import { writeOutput } from '../../shared/cli-output.mjs'
 
 const repoRoot = resolve(import.meta.dirname, '../../..')
@@ -31,7 +31,7 @@ function verifyCiScope(errors) {
     [['.github/workflows/website-pages.yml'], { buddy: false, contracts: false, website: true, quality: false }],
     [['packaging/website/release/verify-pages-workflow.mjs'], { buddy: false, contracts: false, website: true, quality: false }],
     [['apps/web/src/main.ts'], { buddy: false, contracts: false, website: false, quality: true }],
-    [['apps/buddy/electron/main/index.ts'], { buddy: true, contracts: false, website: false, quality: true }],
+    [['apps/buddy/electron/main/index.ts'], { buddy: true, contracts: false, website: false, quality: false }],
     [['pnpm-lock.yaml'], { buddy: true, contracts: false, website: false, quality: true }],
     [['README.md'], { buddy: false, contracts: false, website: false, quality: false }],
   ]
@@ -39,7 +39,7 @@ function verifyCiScope(errors) {
   if (cases.some(([files, expected]) => (
     JSON.stringify(classifyCiScope(files)) !== JSON.stringify(expected)
   ))) {
-    errors.push('CI 必须仅为 Website 输入启用 Website 构建')
+    errors.push('CI 必须为 Website 输入选择独立的质量检查')
   }
 }
 

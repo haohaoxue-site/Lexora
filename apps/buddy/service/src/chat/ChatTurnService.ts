@@ -41,6 +41,7 @@ import type {
 import { Buffer } from 'node:buffer'
 import { createHash, randomUUID } from 'node:crypto'
 import { basename, isAbsolute, join } from 'node:path'
+import { readBoundedFile } from '../../../platform/boundedFile'
 import {
   materializeBuddyPromptCommand,
   parseBuddyChatCommand,
@@ -56,7 +57,6 @@ import {
 } from '../agent/SkillService'
 import { resolveGrantedPath } from '../directories/resolveGrantedPath'
 import { resolveInteractiveModelSelection } from '../providers/resolveInteractiveModelSelection'
-import { readBoundedFile } from '../resources/BoundedFileReader'
 import { BuddyServiceError } from '../rpc/runtimeRequest'
 import { toPublicRun } from '../runs/publicRun'
 import { requireActiveSpace } from '../spaces/requireActiveSpace'

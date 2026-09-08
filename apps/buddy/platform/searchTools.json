@@ -1,0 +1,43 @@
+{
+  "resource": { "from": ".output/build/search-tools", "to": "search-tools" },
+  "tools": {
+    "fd": {
+      "version": "10.5.0",
+      "release": "https://github.com/sharkdp/fd/releases/download/v10.5.0",
+      "licenses": ["LICENSE-APACHE", "LICENSE-MIT"],
+      "targets": {
+        "linux-x64": {
+          "archive": "fd-v10.5.0-x86_64-unknown-linux-musl.tar.gz",
+          "sha256": "761c72dc8e120d85b22292063be8a796e2eeb20eb3e4f38b8fa2343ccf3514a7",
+          "binary": "fd",
+          "binarySha256": "e79642a479d2816c887047476bbe6ad229465f30de031033574dee2a095e0037"
+        },
+        "win32-x64": {
+          "archive": "fd-v10.5.0-x86_64-pc-windows-msvc.zip",
+          "sha256": "a227701b8551c35a9931d9f6da75503cf86d88e182d71fb849a70864c5d57cd7",
+          "binary": "fd.exe",
+          "binarySha256": "d67d27a8e375ed7e9bca2b506a9dd5082bc24547aeba908b863f6f8b8ab0c3b9"
+        }
+      }
+    },
+    "rg": {
+      "version": "15.2.0",
+      "release": "https://github.com/BurntSushi/ripgrep/releases/download/15.2.0",
+      "licenses": ["LICENSE-MIT", "UNLICENSE", "COPYING"],
+      "targets": {
+        "linux-x64": {
+          "archive": "ripgrep-15.2.0-x86_64-unknown-linux-musl.tar.gz",
+          "sha256": "33e15bcf1624b25cdd2a55813a47a2f95dbe126268203e76aa6a585d1e7b149c",
+          "binary": "rg",
+          "binarySha256": "e62198eb19b136b88c330af83647b5a962cb99b6b1f066758568f12de1974849"
+        },
+        "win32-x64": {
+          "archive": "ripgrep-15.2.0-x86_64-pc-windows-msvc.zip",
+          "sha256": "71b2fef860abe467217a538ff31de02f5258807c0129f771846f87bd029aafc5",
+          "binary": "rg.exe",
+          "binarySha256": "14231169855ec5205cf5a1b6f1db358ff4aed4247c86b69ce8aae647c77f6680"
+        }
+      }
+    }
+  }
+}

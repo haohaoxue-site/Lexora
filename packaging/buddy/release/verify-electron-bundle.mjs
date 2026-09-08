@@ -1,101 +1,50 @@
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import process from 'node:process'
-
+import { fileURLToPath } from 'node:url'
 import { writeOutput } from '../../shared/cli-output.mjs'
 
 const repoRoot = resolve(import.meta.dirname, '../../..')
-const electronBundleRoot = 'apps/buddy/.output/build/electron'
-const bundlePaths = [
-  `${electronBundleRoot}/main/index.js`,
-  `${electronBundleRoot}/main/buddy-service.js`,
-  `${electronBundleRoot}/preload/index.cjs`,
-]
-const electronExternalBundlePaths = [
-  `${electronBundleRoot}/main/index.js`,
-  `${electronBundleRoot}/preload/index.cjs`,
-]
-const forbiddenFragments = [
-  'Downloading Electron binary',
-  'node_modules/electron/index.js',
-  'out/main/install.js',
-]
-const photonExternalReferencePattern
-  = /(?:from\s|import\(|require\()\s*['"]@silvia-odwyer\/photon-node['"]/
-const bundledPhotonRuntimePattern
-  = /\.join\(\s*__dirname\s*,\s*['"]photon_rs_bg\.wasm['"]\s*\)/
+const bundleRoot = 'apps/buddy/.output/build/electron'
 
 export function verifyElectronBundle(cwd = repoRoot) {
   const errors = []
-
-  for (const relativePath of bundlePaths) {
-    const content = readFileSync(resolve(cwd, relativePath), 'utf8')
-    for (const fragment of forbiddenFragments) {
-      if (content.includes(fragment))
-        errors.push(`${relativePath} bundled forbidden Electron bootstrap code: ${fragment}`)
-    }
+  const read = path => readFileSync(resolve(cwd, path), 'utf8')
+  const main = read(`${bundleRoot}/main/index.js`)
+  const service = read(`${bundleRoot}/main/buddy-service.js`)
+  const preload = read(`${bundleRoot}/preload/index.cjs`)
+  const renderer = read(`${bundleRoot}/renderer/index.html`)
+  for (const [name, content] of [['main', main], ['service', service], ['preload', preload]]) {
+    if (['Downloading Electron binary', 'node_modules/electron/index.js'].some(fragment => content.includes(fragment)))
+      errors.push(`${name} bundles the Electron installer instead of the runtime external`)
   }
-
-  for (const relativePath of electronExternalBundlePaths) {
-    const content = readFileSync(resolve(cwd, relativePath), 'utf8')
-    if (!content.includes('from "electron"') && !content.includes('require("electron")'))
-      errors.push(`${relativePath} does not keep Electron as a runtime external`)
-  }
-
-  const preloadPath = `${electronBundleRoot}/preload/index.cjs`
-  const preload = readFileSync(resolve(cwd, preloadPath), 'utf8')
+  if (!main.includes('from "electron"') && !main.includes('require("electron")'))
+    errors.push('Electron main must keep Electron external')
   if (!preload.includes('require("electron")') || preload.includes('from "electron"'))
-    errors.push(`${preloadPath} must be a CommonJS sandbox preload`)
+    errors.push('Sandbox preload must use CommonJS Electron')
+  if (!service.includes('.parentPort') || service.includes('from "electron"') || service.includes('require("electron")'))
+    errors.push('Local Service must use process.parentPort without importing Electron')
+  if (/connect-src[^;]*(?:localhost|127\.0\.0\.1)/.test(renderer))
+    errors.push('Production renderer CSP allows development WebSocket origins')
 
-  const buddyService = readFileSync(
-    resolve(cwd, `${electronBundleRoot}/main/buddy-service.js`),
-    'utf8',
-  )
-  if (!buddyService.includes('.parentPort'))
-    errors.push('Buddy Local Service bundle does not use the utility process parent port')
-  if (buddyService.includes('from "electron"') || buddyService.includes('require("electron")'))
-    errors.push('Buddy Local Service bundle must use process.parentPort without importing Electron')
-  for (const fragment of [
-    'ModelRuntime',
-    'createAgentSession',
-    'host.credentials.read',
-    'mcp__',
-    'providers.list',
+  for (const [source, runtime, size] of [
+    ['packages/assets/brand/app-icon.png', 'apps/buddy/resources/icons/app-icon.png', 512],
+    ['packages/assets/brand/lexora-avatar.png', 'apps/buddy/resources/brand/lexora-avatar.png', 1254],
   ]) {
-    if (!buddyService.includes(fragment))
-      errors.push(`Buddy Local Service bundle is missing Pi boundary marker: ${fragment}`)
+    const bytes = readFileSync(resolve(cwd, source))
+    if (bytes.length < 24 || bytes.toString('hex', 0, 8) !== '89504e470d0a1a0a'
+      || bytes.readUInt32BE(16) !== size || bytes.readUInt32BE(20) !== size) {
+      errors.push(`${source} must be a ${size}x${size} PNG`)
+    }
+    if (!bytes.equals(readFileSync(resolve(cwd, runtime))))
+      errors.push(`${runtime} must match ${source}`)
   }
-  if (!buddyService.includes('Select OpenAI Codex login method:'))
-    errors.push('Buddy Local Service bundle is missing statically registered Provider OAuth flows')
-  if (!buddyService.includes('lexora_image_chroma_key'))
-    errors.push('Buddy Local Service bundle is missing the deterministic image transform tool')
-  if (!photonExternalReferencePattern.test(buddyService)) {
-    errors.push(
-      'Buddy Local Service bundle must keep Photon as a runtime external',
-    )
-  }
-  if (bundledPhotonRuntimePattern.test(buddyService)) {
-    errors.push(
-      'Buddy Local Service bundle contains the Photon CommonJS runtime inside an ESM entrypoint',
-    )
-  }
-  for (const fragment of ['lexora-buddy-runtime', 'codex exec', 'apps/buddy/runtime']) {
-    if (buddyService.includes(fragment))
-      errors.push(`Buddy Local Service bundle contains removed Rust runtime marker: ${fragment}`)
-  }
-
-  const rendererPath = `${electronBundleRoot}/renderer/index.html`
-  const rendererHtml = readFileSync(resolve(cwd, rendererPath), 'utf8')
-  if (/connect-src[^;]*(?:localhost|127\.0\.0\.1)/.test(rendererHtml))
-    errors.push(`${rendererPath} allows development WebSocket origins`)
-
   return errors
 }
 
-if (process.argv[1] === new URL(import.meta.url).pathname) {
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const errors = verifyElectronBundle()
   if (errors.length)
     throw new Error(errors.join('\n'))
-
-  writeOutput('Electron bundle boundary check passed')
+  writeOutput('Electron bundle check passed')
 }

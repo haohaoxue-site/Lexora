@@ -1,5 +1,5 @@
-const { join } = require('node:path')
 const process = require('node:process')
+const { platformResources, resolvePackagingPlatform } = require('../../packaging/buddy/release/platform-definition.mjs')
 const { sourceDateEpoch } = require('./buddy.version.json')
 const { desktopName, productName: displayName } = require('./package.json')
 
@@ -26,18 +26,26 @@ module.exports = {
     '.output/build/electron/**/*',
     'package.json',
     'resources/icons/app-icon.png',
+    '!**/__tests__/**',
   ],
-  extraResources: [
-    {
-      from: join('.output', 'build', 'native-pet', 'release', 'lexora-buddy-pet'),
-      to: join('native-pet', 'lexora-buddy-pet'),
-    },
-    {
-      from: join('service', 'resources'),
-      to: join('service', 'resources'),
-    },
-  ],
+  win: {
+    extraResources: platformResources(resolvePackagingPlatform('win32')),
+    artifactName: `Lexora-Buddy-${macro('version')}-windows-x64.exe`,
+    executableName: displayName,
+    icon: 'resources/icons/app-icon.png',
+    target: [{ target: 'nsis', arch: ['x64'] }],
+  },
+  nsis: {
+    include: '../../packaging/buddy/windows/installer.nsh',
+    oneClick: true,
+    perMachine: false,
+    runAfterFinish: false,
+    shortcutName: displayName,
+    uninstallDisplayName: displayName,
+    deleteAppDataOnUninstall: false,
+  },
   linux: {
+    extraResources: platformResources(resolvePackagingPlatform('linux')),
     category: 'Utility',
     desktop: {
       entry: {
@@ -53,7 +61,6 @@ module.exports = {
   deb: {
     packageName: 'lexora-buddy',
     depends: [
-      'bubblewrap',
       'git',
       'libgtk-3-0',
       'libnotify4',
@@ -75,7 +82,6 @@ module.exports = {
     depends: [
       'alsa-lib',
       'at-spi2-core',
-      'bubblewrap',
       'cairo',
       'dbus',
       'desktop-file-utils',

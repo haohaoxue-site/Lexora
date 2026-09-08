@@ -8,8 +8,8 @@ import { dirname, join } from 'node:path'
 import { loadSkillsFromDir, stripFrontmatter } from '@earendil-works/pi-coding-agent'
 
 import { z } from 'zod'
+import { readBoundedFile } from '../../../platform/boundedFile'
 import { GrantedPathError, resolveGrantedPath } from '../directories/resolveGrantedPath'
-import { readBoundedFile } from '../resources/BoundedFileReader'
 import { parse } from '../rpc/runtimeRequest'
 
 const MAX_MATERIALIZED_SKILL_BYTES = 256 * 1024
@@ -57,7 +57,7 @@ export function formatBuddySkillPrompt(skill: BuddyMaterializedSkill): string {
 
 export interface SkillServiceOptions {
   agentDirectory: string
-  builtinSkillsDirectory: string
+  builtinSkillsDirectories?: readonly string[]
   spaces: SpaceRepository
 }
 
@@ -80,12 +80,12 @@ interface LoadedBuddySkillResolution {
 
 export class SkillService {
   readonly #agentDirectory: string
-  readonly #builtinSkillsDirectory: string
+  readonly #builtinSkillsDirectories: readonly string[]
   readonly #spaces: SpaceRepository
 
   constructor(options: SkillServiceOptions) {
     this.#agentDirectory = options.agentDirectory
-    this.#builtinSkillsDirectory = options.builtinSkillsDirectory
+    this.#builtinSkillsDirectories = options.builtinSkillsDirectories ?? []
     this.#spaces = options.spaces
   }
 
@@ -174,14 +174,11 @@ export class SkillService {
     const globalSkillsDirectory = join(this.#agentDirectory, 'skills')
     await mkdir(globalSkillsDirectory, { mode: 0o700, recursive: true })
     const sources: SkillSourceDirectory[] = []
-    const builtin = await resolveSourceDirectory(
-      this.#builtinSkillsDirectory,
-      this.#builtinSkillsDirectory,
-      'builtin',
-      diagnostics,
-    )
-    if (builtin)
-      sources.push(builtin)
+    for (const directory of this.#builtinSkillsDirectories) {
+      const builtin = await resolveSourceDirectory(directory, directory, 'builtin', diagnostics)
+      if (builtin)
+        sources.push(builtin)
+    }
     const directories = this.#spaces.list()
       .filter(space => space.revokedAt === null)
       .filter(space => spaceId === undefined || space.id === spaceId)

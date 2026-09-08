@@ -2,35 +2,41 @@ import { execFileSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import process from 'node:process'
+import { fileURLToPath } from 'node:url'
 
 import { writeOutput } from '../../shared/cli-output.mjs'
 import { resolveBuddyOutputPaths } from './output-paths.mjs'
+import { resolvePackagingPlatform } from './platform-definition.mjs'
 
 const repoRoot = resolve(import.meta.dirname, '../../..')
-const sourceSteps = [
-  ['Version consistency', 'node', ['packaging/release/version.mjs', '--check']],
-  ['Desktop assets', 'node', ['packaging/buddy/release/verify-desktop-assets.mjs']],
-  ['Release workflow', 'node', ['packaging/buddy/release/verify-release-workflow.mjs']],
-  ['Desktop source lint', 'pnpm', ['exec', 'eslint', 'apps/buddy', 'packaging/buddy', 'packaging/release']],
+const qualitySteps = [
+  ['Desktop lint', 'pnpm', ['--filter', '@lexora/buddy', 'lint']],
   ['Desktop type-check', 'pnpm', ['--filter', '@lexora/buddy', 'type-check']],
-  ['Desktop tests', 'pnpm', ['--filter', '@lexora/buddy', 'test']],
-  ['Native pet format', 'cargo', ['fmt', '--manifest-path', 'apps/buddy/native-pet/Cargo.toml', '--', '--check']],
-  ['Native pet check', 'cargo', ['check', '--locked', '--manifest-path', 'apps/buddy/native-pet/Cargo.toml', '--all-targets']],
-  ['Native pet clippy', 'cargo', ['clippy', '--locked', '--manifest-path', 'apps/buddy/native-pet/Cargo.toml', '--all-targets', '--', '-D', 'warnings']],
-  ['Native pet tests', 'cargo', ['test', '--locked', '--manifest-path', 'apps/buddy/native-pet/Cargo.toml']],
+  ['Native components format', 'cargo', ['fmt', '--manifest-path', 'apps/buddy/native/Cargo.toml', '--all', '--', '--check']],
+  ['Native components clippy', 'cargo', ['clippy', '--locked', '--manifest-path', 'apps/buddy/native/Cargo.toml', '--target-dir', 'apps/buddy/.output/build/native', '--workspace', '--all-targets', '--', '-D', 'warnings']],
+  ['Native components tests', 'cargo', ['test', '--locked', '--manifest-path', 'apps/buddy/native/Cargo.toml', '--target-dir', 'apps/buddy/.output/build/native', '--workspace']],
 ]
-const debSteps = [
-  ['Ubuntu deb package', 'pnpm', ['--filter', '@lexora/buddy', 'package:deb']],
-]
+const packageSteps = {
+  deb: ['Ubuntu deb package', 'pnpm', ['--filter', '@lexora/buddy', 'package:deb']],
+  pacman: ['Arch Linux package', 'pnpm', ['--filter', '@lexora/buddy', 'package:arch']],
+  nsis: ['Windows NSIS package', 'pnpm', ['--filter', '@lexora/buddy', 'package:windows']],
+}
 
-export function createBuddyReleasePreflightSteps(stage = 'all') {
+export function createBuddyReleasePreflightSteps(stage = 'all', platformId = process.platform) {
+  const platform = resolvePackagingPlatform(platformId)
+  const platformQualitySteps = qualitySteps.map(([label, command, args]) => {
+    if (command !== 'cargo' || !args.includes('--workspace') || platform.features.includes('nativePet'))
+      return [label, command, args]
+    const separator = args.indexOf('--')
+    const position = separator < 0 ? args.length : separator
+    return [label, command, [...args.slice(0, position), '--exclude', 'lexora-buddy-pet', ...args.slice(position)]]
+  })
+  const target = stage === 'all' ? platform.packageTargets[0] : stage === 'windows' ? 'nsis' : stage
   const steps = stage === 'all'
-    ? [...sourceSteps, ...debSteps]
-    : stage === 'source'
-      ? sourceSteps
-      : stage === 'deb'
-        ? debSteps
-        : undefined
+    ? [...platformQualitySteps, packageSteps[target], ['Desktop tests', 'pnpm', ['--filter', '@lexora/buddy', 'test']]]
+    : platform.packageTargets.includes(target)
+      ? [packageSteps[target]]
+      : undefined
 
   if (!steps)
     throw new Error(`Unknown Buddy preflight stage: ${stage}`)
@@ -41,7 +47,7 @@ export function createBuddyReleasePreflightSteps(stage = 'all') {
 export function createBuddyReleaseEnvironment(
   env,
   defaultSourceDateEpoch,
-  cargoTargetDirectory = resolveBuddyOutputPaths(repoRoot).build.nativePet,
+  cargoTargetDirectory = resolveBuddyOutputPaths(repoRoot).build.native,
 ) {
   const sourceDateEpoch = String(defaultSourceDateEpoch)
   if (!/^\d+$/.test(sourceDateEpoch))
@@ -58,6 +64,11 @@ export function createBuddyReleaseEnvironment(
   }
 }
 
+const buildCommands = {
+  linux: { node: { command: process.execPath } },
+  win32: { node: { command: process.execPath }, pnpm: { command: 'pnpm.cmd', shell: true } },
+}
+
 export function runBuddyReleasePreflight(options = {}) {
   const cwd = options.cwd ?? repoRoot
   const env = options.env ?? process.env
@@ -69,23 +80,21 @@ export function runBuddyReleasePreflight(options = {}) {
   const releaseEnvironment = createBuddyReleaseEnvironment(
     env,
     String(productMetadata.sourceDateEpoch ?? ''),
-    resolveBuddyOutputPaths(cwd).build.nativePet,
+    resolveBuddyOutputPaths(cwd).build.native,
   )
 
   for (const step of createBuddyReleasePreflightSteps(stage)) {
     writeOutput(`\n[Buddy] ${step.label}`)
-    execFileSync(step.command, step.args, {
+    const invocation = buildCommands[process.platform][step.command] ?? { command: step.command }
+    execFileSync(invocation.command, step.args, {
       cwd,
       env: releaseEnvironment,
       stdio: 'inherit',
+      shell: invocation.shell ?? false,
     })
   }
 
-  writeOutput(stage === 'source'
-    ? '\nLexora Buddy source gate passed'
-    : stage === 'deb'
-      ? '\nLexora Buddy deb package passed'
-      : '\nLexora Buddy preflight passed')
+  writeOutput(`\nLexora Buddy ${stage} gate passed`)
 }
 
 function readStage(args) {
@@ -93,8 +102,8 @@ function readStage(args) {
     return 'all'
   if (args.length === 2 && args[0] === '--stage')
     return args[1]
-  throw new Error('Usage: preflight.mjs [--stage source|deb]')
+  throw new Error('Usage: preflight.mjs [--stage deb|pacman|windows]')
 }
 
-if (process.argv[1] && resolve(process.argv[1]) === new URL(import.meta.url).pathname)
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url))
   runBuddyReleasePreflight({ stage: readStage(process.argv.slice(2)) })

@@ -391,7 +391,7 @@ export function resolveNativePetExecutable(options: NativePetExecutableOptions):
     options.appPath,
     '.output',
     'build',
-    'native-pet',
+    'native',
     'debug',
     'lexora-buddy-pet',
   )

@@ -17,6 +17,7 @@ const {
       <DesktopSettingsSidebar
         :app-sidebar-collapsed="shell.appSidebarCollapsed.value"
         :language="applicationSettings.language.value"
+        :capabilities="shell.platformCapabilities.value"
         @toggle-app-sidebar="toggleAppSidebar"
       />
     </template>

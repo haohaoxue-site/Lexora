@@ -3,7 +3,6 @@ import { useApplicationSettingsStore } from '@/stores/useApplicationSettingsStor
 import { useLocalCapabilitiesStore } from '@/stores/useLocalCapabilitiesStore'
 import { useModelProvidersStore } from '@/stores/useModelProvidersStore'
 import { useNotificationCenterStore } from '@/stores/useNotificationCenterStore'
-import { useRuntimeRecoveryStore } from '@/stores/useRuntimeRecoveryStore'
 import { useRuntimeSupervisorStore } from '@/stores/useRuntimeSupervisorStore'
 import { useUsageStore } from '@/stores/useUsageStore'
 
@@ -23,11 +22,6 @@ export function useDesktopAppState(options: UseDesktopAppStateOptions) {
     api: options.api.localChat.runtime,
     language: applicationSettings.language,
   })
-  const runtimeRecovery = useRuntimeRecoveryStore({
-    api: options.api.localChat.runtime,
-    language: applicationSettings.language,
-    runtimeState: runtimeSupervisor.runtimeState,
-  })
   const localCapabilities = useLocalCapabilitiesStore({
     api: options.api.localChat,
     language: applicationSettings.language,
@@ -41,7 +35,6 @@ export function useDesktopAppState(options: UseDesktopAppStateOptions) {
     localCapabilities,
     modelProviders,
     notifications,
-    runtimeRecovery,
     runtimeSupervisor,
     usage,
   } as const
@@ -52,17 +45,13 @@ export function useDesktopAppState(options: UseDesktopAppStateOptions) {
       runtimeSupervisor.loadStatus(),
       modelProviders.loadModelCatalog(true),
       notifications.load(),
-      runtimeRecovery.loadInitialOperation(),
-      runtimeRecovery.loadRecoveryReceipt(),
     ])
-    await runtimeRecovery.markInitialized()
     return results.every(result => result.status === 'fulfilled')
   }
 
   function dispose() {
     modelProviders.dispose()
     notifications.dispose()
-    runtimeRecovery.dispose()
     runtimeSupervisor.dispose()
   }
 

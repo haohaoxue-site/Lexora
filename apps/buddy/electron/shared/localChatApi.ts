@@ -49,10 +49,6 @@ import type {
   LocalProviderAuthChallenge,
   LocalRun,
   LocalRunEvent,
-  LocalRuntimeDataBackup,
-  LocalRuntimeDataBackupStorage,
-  LocalRuntimeDataOperation,
-  LocalRuntimeDataRecoveryReceipt,
   LocalRuntimeModelOption,
   LocalSkillCatalog,
   LocalSpace,
@@ -189,11 +185,6 @@ export type {
   LocalRun,
   LocalRunEvent,
   LocalRunOutput,
-  LocalRuntimeDataBackup,
-  LocalRuntimeDataBackupStorage,
-  LocalRuntimeDataOperation,
-  LocalRuntimeDataRecoveryReceipt,
-  LocalRuntimeDataRestore,
   LocalRuntimeModelOption,
   LocalSkillCatalog,
   LocalSpace,
@@ -300,20 +291,9 @@ export const LOCAL_CHAT_IPC_CHANNELS = {
   runsGet: 'lexora:buddy:runs:get',
   runsList: 'lexora:buddy:runs:list',
   runsListEvents: 'lexora:buddy:runs:list-events',
-  runtimeCancelDataOperation: 'lexora:buddy:runtime:cancel-data-operation',
-  runtimeDataOperationChanged: 'lexora:buddy:runtime:data-operation-changed',
-  runtimeDeleteDataBackup: 'lexora:buddy:runtime:delete-data-backup',
-  runtimeGetDataBackupStorage: 'lexora:buddy:runtime:get-data-backup-storage',
-  runtimeGetDataRecoveryReceipt: 'lexora:buddy:runtime:get-data-recovery-receipt',
-  runtimeGetDataOperation: 'lexora:buddy:runtime:get-data-operation',
-  runtimeListDataBackups: 'lexora:buddy:runtime:list-data-backups',
-  runtimeOpenDataDirectory: 'lexora:buddy:runtime:open-data-directory',
   runtimeRestart: 'lexora:buddy:runtime:restart',
-  runtimeStartDataBackup: 'lexora:buddy:runtime:start-data-backup',
-  runtimeStartDataRestore: 'lexora:buddy:runtime:start-data-restore',
   runtimeStateChanged: 'lexora:buddy:runtime:state-changed',
   runtimeStatus: 'lexora:buddy:runtime:status',
-  runtimeValidateDataBackup: 'lexora:buddy:runtime:validate-data-backup',
   skillsList: 'lexora:buddy:skills:list',
   usageSnapshot: 'lexora:buddy:usage:snapshot',
   workspaceStateRead: 'lexora:buddy:workspace-state:read',
@@ -350,19 +330,8 @@ export interface LocalChatApi {
     onChanged: (listener: (automationId: string) => void) => () => void
   }
   runtime: {
-    cancelDataOperation: (operationId: string) => Promise<LocalRuntimeDataOperation>
-    deleteDataBackup: (backupId: string) => Promise<{ readonly deletedBackupId: string }>
-    getDataBackupStorage: () => Promise<LocalRuntimeDataBackupStorage>
-    getDataRecoveryReceipt: () => Promise<LocalRuntimeDataRecoveryReceipt | null>
-    getDataOperation: () => Promise<LocalRuntimeDataOperation | null>
     getStatus: () => Promise<LocalBuddyServiceSupervisorState>
-    listDataBackups: () => Promise<ReadonlyArray<LocalRuntimeDataBackup>>
-    openDataDirectory: () => Promise<LocalMutationResult>
     restart: () => Promise<LocalBuddyServiceSupervisorState>
-    startDataBackup: () => Promise<LocalRuntimeDataOperation>
-    startDataRestore: (backupId: string) => Promise<LocalRuntimeDataOperation>
-    validateDataBackup: (backupId: string) => Promise<LocalRuntimeDataBackup>
-    onDataOperationChanged: (listener: (operation: LocalRuntimeDataOperation) => void) => () => void
     onStateChanged: (listener: (state: LocalBuddyServiceSupervisorState) => void) => () => void
   }
   providers: {

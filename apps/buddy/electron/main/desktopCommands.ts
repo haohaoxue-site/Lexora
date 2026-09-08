@@ -2,11 +2,11 @@ import type { BrowserWindow, Event, Input } from 'electron'
 import type { DesktopCommandId } from '../shared/desktopCommands'
 import { mkdir } from 'node:fs/promises'
 import process from 'node:process'
+import { currentPlatform } from '../../platform/currentPlatform'
 import {
   DESKTOP_COMMAND_REGISTRY,
   getDesktopCommand,
   matchesDesktopShortcut,
-  resolveDesktopPlatform,
   resolveDesktopShortcuts,
 } from '../shared/desktopCommands'
 
@@ -68,7 +68,7 @@ export function registerDesktopCommandShortcuts(
   window: BrowserWindow,
   executeCommand: ExecuteDesktopCommand,
 ): void {
-  const platform = resolveDesktopPlatform(process.platform)
+  const platform = currentPlatform.id
   const shortcutCommands = DESKTOP_COMMAND_REGISTRY.filter(command => (
     command.execution === 'main' && resolveDesktopShortcuts(command.id, platform).length > 0
   ))

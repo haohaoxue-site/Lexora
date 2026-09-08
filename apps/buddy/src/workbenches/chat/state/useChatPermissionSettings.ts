@@ -7,7 +7,6 @@ import type { BuddyApprovalPolicy } from '@buddy-shared/approvalPolicy'
 import type { BuddyExecutionProfile } from '@buddy-shared/executionProfile'
 import type { BuddyPermissionMode } from '@buddy-shared/permissionMode'
 import type { useChatDrafts } from '@/workbenches/chat/state/useChatDrafts'
-import type { TaskIndexData } from '@/workbenches/tasks/state/useTaskIndexData'
 import {
   resolveBuddyPermissionMode,
   resolveBuddyPermissionSettings,
@@ -22,8 +21,8 @@ interface UseChatPermissionSettingsOptions {
   activeConversation: ValueRef<LocalConversation | null>
   activeConversationId: ValueRef<string | null>
   activeRun: ValueRef<LocalRun | null>
-  api: LexoraDesktopApi['localChat']['conversations']
-  taskIndexData: TaskIndexData
+  applyConversation: (conversation: LocalConversation) => void
+  api: Pick<LexoraDesktopApi['localChat']['conversations'], 'setPermissionSettings'>
   drafts: ReturnType<typeof useChatDrafts>
   onError: (error: unknown) => void
   persistWorkspaceState: () => Promise<boolean>
@@ -66,10 +65,11 @@ export function useChatPermissionSettings(options: UseChatPermissionSettingsOpti
     try {
       if (conversation) {
         const updated = await options.api.setPermissionSettings(conversation.id, settings)
-        options.taskIndexData.applyConversation(updated)
-        return true
+        options.applyConversation(updated)
+        return await options.persistWorkspaceState()
       }
 
+      const targetKey = options.drafts.targetKey.value
       const previous = {
         approvalPolicy: options.drafts.approvalPolicy.value,
         executionProfile: options.drafts.executionProfile.value,
@@ -77,7 +77,7 @@ export function useChatPermissionSettings(options: UseChatPermissionSettingsOpti
       options.drafts.setPermissionSettings(settings)
       if (await options.persistWorkspaceState())
         return true
-      options.drafts.setPermissionSettings(previous)
+      options.drafts.setPermissionSettings(previous, targetKey)
       return false
     }
     catch (error) {

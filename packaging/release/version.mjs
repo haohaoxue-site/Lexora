@@ -21,8 +21,8 @@ const versionlessPackagePaths = [
   'packages/shared/package.json',
 ]
 const buddyMetadataPath = 'apps/buddy/buddy.version.json'
-const cargoManifestPath = 'apps/buddy/native-pet/Cargo.toml'
-const cargoLockPath = 'apps/buddy/native-pet/Cargo.lock'
+const cargoManifestPath = 'apps/buddy/native/pet/Cargo.toml'
+const cargoLockPath = 'apps/buddy/native/Cargo.lock'
 
 export const lexoraVersionStatePaths = Object.freeze([
   'package.json',

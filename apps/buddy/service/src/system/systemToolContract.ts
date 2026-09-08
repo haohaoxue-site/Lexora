@@ -41,8 +41,8 @@ const processTargetSchema = Type.Union([
 
 const serviceTargetSchema = Type.Object({
   kind: Type.Literal('service'),
-  scope: Type.Literal('user'),
-  unit: Type.String({ maxLength: 256, minLength: 9, pattern: '\\.service$' }),
+  scope: Type.Union([Type.Literal('user'), Type.Literal('system')]),
+  serviceId: Type.String({ maxLength: 256, minLength: 1 }),
 }, { additionalProperties: false })
 
 export const systemActionInputSchema = Type.Union([

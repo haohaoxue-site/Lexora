@@ -1,8 +1,7 @@
 import type { BuddyToolPresentation } from '../../../shared/runEventPresentation'
 import type { BuddyRunOutputPayload } from '../../../shared/runOutput'
 import type { CreateBuddyToolPresentationInput } from '../events/toolPresentationSupport'
-import { relative, sep } from 'node:path'
-
+import { filePaths, relativeCanonicalPath } from '../../../platform/filePaths'
 import { redactSensitiveText, redactShellCommand } from '../../../shared/approvalReviewPayload'
 import { createOutputPresentRunOutput } from '../artifacts/artifactToolContract'
 import { createAutomationToolPresentation } from '../automations/automationToolContract'
@@ -28,6 +27,7 @@ import {
 import { createPetToolPresentation } from '../pet/petToolContract'
 import { createSystemToolPresentation } from '../system/systemToolContract'
 import { createWebToolPresentation } from '../web/webToolPresentation'
+import { TOOL_SEARCH_NAME } from './discovery/toolDiscoveryContract'
 import { isPiShellToolName } from './piBuiltinTools'
 
 export type { CreateBuddyToolPresentationInput } from '../events/toolPresentationSupport'
@@ -115,6 +115,17 @@ function createGenericToolPresentation(
   input: CreateBuddyToolPresentationInput,
 ): Extract<BuddyToolPresentation, { card: 'generic' }> {
   const arguments_ = readRecord(input.arguments)
+  if (input.toolName === TOOL_SEARCH_NAME) {
+    const details = readToolDetails(input.result)
+    const tools = Array.isArray(details?.tools) ? details.tools : []
+    const names = tools.flatMap(tool => typeof tool?.name === 'string' ? [tool.name] : [])
+    return {
+      argumentNames: argumentNames(arguments_),
+      card: 'generic',
+      description: '查找可用工具',
+      ...boundedToolPreview(names.length > 0 ? names.join('\n') : readToolOutput(input.result)),
+    }
+  }
   return {
     argumentNames: argumentNames(arguments_),
     card: 'generic',
@@ -148,10 +159,16 @@ function readSignal(value: unknown): string | null {
 }
 
 function displayPath(path: string, canonicalRoot: string | undefined): string {
-  if (!canonicalRoot || !path.startsWith(sep))
+  if (!canonicalRoot)
     return path || '.'
-  const child = relative(canonicalRoot, path)
-  return child && child !== '..' && !child.startsWith(`..${sep}`) ? child : '.'
+  try {
+    const absolutePath = filePaths.resolveInput(path, canonicalRoot)
+    const child = relativeCanonicalPath(canonicalRoot, absolutePath)
+    return child === null ? absolutePath : child.split(filePaths.path.sep).join('/') || '.'
+  }
+  catch {
+    return path || '.'
+  }
 }
 
 function displayOptionalPath(

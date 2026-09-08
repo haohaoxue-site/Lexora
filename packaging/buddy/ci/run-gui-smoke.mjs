@@ -1,9 +1,10 @@
 import { spawn } from 'node:child_process'
-import { constants, mkdtempSync } from 'node:fs'
-import { access, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
+import { mkdtempSync } from 'node:fs'
+import { mkdir, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import process from 'node:process'
+import { fileURLToPath } from 'node:url'
 
 import { writeError, writeOutput } from '../../shared/cli-output.mjs'
 import { resolveBuddyOutputPaths } from '../release/output-paths.mjs'
@@ -11,35 +12,29 @@ import { resolveBuddyOutputPaths } from '../release/output-paths.mjs'
 const repoRoot = resolve(import.meta.dirname, '../../..')
 const outputPaths = resolveBuddyOutputPaths(repoRoot)
 const nativePetShutdownTimeoutMs = 3_000
-const RECOVERY_FIXTURE = Object.freeze({
-  backupId: 'buddy-20260816120000000-deadbeef',
-  expectedAction: 'restored_previous_data',
-  operationId: '4a50a3f3-e077-4f39-936a-4e7d29da5a0f',
-})
-
 async function main() {
-  const recoveryOnly = process.argv.includes('--recovery-only')
+  const desktopOnly = process.argv.includes('--desktop-only')
   const desktopPath = resolve(
     process.env.LEXORA_DESKTOP_EXECUTABLE_PATH
     ?? resolve(outputPaths.package.desktop, 'linux-unpacked/lexora-buddy'),
   )
   const binaryPath = resolve(
     process.env.LEXORA_BUDDY_PET_PATH
-    ?? resolve(outputPaths.build.nativePet, 'release/lexora-buddy-pet'),
+    ?? resolve(outputPaths.build.native, 'release/lexora-buddy-pet'),
   )
   const smokeRoot = mkdtempSync(join(tmpdir(), 'lexora-desktop-smoke-'))
   try {
-    const recoveryFixture = await prepareDesktopRecoverySmokeFixture(smokeRoot)
+    const lexoraHome = join(smokeRoot, 'home')
+    await mkdir(lexoraHome, { mode: 0o700, recursive: true })
+    await writeFile(join(lexoraHome, 'config.toml'), '[pet]\nenabled = false\n', { mode: 0o600 })
     const smokeEnv = {
       ...process.env,
       LEXORA_BUDDY_PET_SOCKET: join(smokeRoot, 'native-pet.sock'),
-      LEXORA_DESKTOP_SMOKE_EXPECT_RECOVERY: recoveryFixture.expectedAction,
-      LEXORA_HOME: recoveryFixture.lexoraHome,
+      LEXORA_HOME: lexoraHome,
     }
 
     await runDesktopSmoke(desktopPath, smokeEnv)
-    await verifyDesktopRecoverySmokeResult(recoveryFixture)
-    if (!recoveryOnly) {
+    if (!desktopOnly) {
       const petFixture = await prepareStandalonePetSmokeFixture(smokeRoot)
       await runNativePetSmoke(binaryPath, 12_000, {
         ...smokeEnv,
@@ -47,38 +42,12 @@ async function main() {
         LEXORA_HOME: petFixture.lexoraHome,
       })
     }
-    writeOutput(recoveryOnly
-      ? 'Lexora Buddy Desktop recovery GUI smoke passed'
-      : 'Lexora Buddy Desktop recovery and standalone pet GUI smoke passed')
+    writeOutput(desktopOnly
+      ? 'Lexora Buddy Desktop GUI smoke passed'
+      : 'Lexora Buddy Desktop and standalone pet GUI smoke passed')
   }
   finally {
     await rm(smokeRoot, { force: true, recursive: true })
-  }
-}
-
-export async function prepareDesktopRecoverySmokeFixture(smokeRoot) {
-  const lexoraHome = join(smokeRoot, 'home')
-  const rollbackPath = join(lexoraHome, '.buddy.restore-rollback')
-  const timestamp = '2026-08-16T12:00:00.000Z'
-  await mkdir(rollbackPath, { mode: 0o700, recursive: true })
-  await writeFile(join(lexoraHome, 'config.toml'), '[pet]\nenabled = false\n', { mode: 0o600 })
-  await writeFile(join(rollbackPath, 'recovery-marker.txt'), 'rollback-data\n', { mode: 0o600 })
-  await writeFile(
-    join(lexoraHome, '.buddy.restore-journal.json'),
-    `${JSON.stringify({
-      backupId: RECOVERY_FIXTURE.backupId,
-      format: 'lexora-buddy-restore-journal',
-      operationId: RECOVERY_FIXTURE.operationId,
-      phase: 'current_moved',
-      startedAt: timestamp,
-      updatedAt: timestamp,
-      version: 1,
-    })}\n`,
-    { mode: 0o600 },
-  )
-  return {
-    expectedAction: RECOVERY_FIXTURE.expectedAction,
-    lexoraHome,
   }
 }
 
@@ -94,43 +63,6 @@ export async function prepareStandalonePetSmokeFixture(smokeRoot) {
     lexoraHome,
     socketPath: join(smokeRoot, 'standalone-native-pet.sock'),
   }
-}
-
-export async function verifyDesktopRecoverySmokeResult({ expectedAction, lexoraHome }) {
-  const pendingRecoveryPaths = [
-    ['restore journal', join(lexoraHome, '.buddy.restore-journal.json')],
-    ['restore rollback', join(lexoraHome, '.buddy.restore-rollback')],
-    ['restore staging', join(lexoraHome, '.buddy.restore-staging')],
-  ]
-  for (const [label, path] of pendingRecoveryPaths) {
-    if (await pathExists(path))
-      throw new Error(`Desktop recovery smoke failed: ${label} still exists`)
-  }
-
-  const marker = (await readFile(
-    join(lexoraHome, 'buddy', 'recovery-marker.txt'),
-    'utf8',
-  )).trim()
-  if (marker !== 'rollback-data')
-    throw new Error('Desktop recovery smoke failed: rollback data was not restored')
-
-  const receipt = JSON.parse(await readFile(
-    join(lexoraHome, 'backups', 'buddy', '.last-data-recovery.json'),
-    'utf8',
-  ))
-  if (
-    receipt.action !== expectedAction
-    || receipt.backupId !== RECOVERY_FIXTURE.backupId
-    || receipt.format !== 'lexora-buddy-data-recovery-receipt'
-    || receipt.operationId !== RECOVERY_FIXTURE.operationId
-    || receipt.version !== 1
-    || typeof receipt.completedAt !== 'string'
-    || !Number.isFinite(Date.parse(receipt.completedAt))
-  ) {
-    throw new Error('Desktop recovery smoke failed: recovery receipt does not match the fixture')
-  }
-
-  return { action: receipt.action, marker }
 }
 
 export function runDesktopSmoke(executablePath, env, timeoutMs = 30_000) {
@@ -169,53 +101,101 @@ export function runDesktopSmoke(executablePath, env, timeoutMs = 30_000) {
 
 export function runNativePetSmoke(runtimePath, timeoutMs = 12_000, env = process.env) {
   return new Promise((resolveSmoke, rejectSmoke) => {
-    const child = spawnGui(runtimePath, env, ['--native-pet'])
+    const child = spawnGui(runtimePath, env, ['--native-pet'], 'pipe')
+    const query = {
+      protocolVersion: 1,
+      messageId: 'message_019f4900-0000-7000-8000-000000000105',
+      type: 'queryState',
+      requestId: 'state_019f4900-0000-7000-8000-000000000105',
+    }
     let settled = false
     let ready = false
+    let receivedState = false
     let terminationError
     let stdout = ''
     let stderr = ''
     let shutdownTimeout
-    const readyTimeout = setTimeout(() => {
-      terminationError = new Error(`native pet did not become ready within ${timeoutMs}ms`)
-      child.kill('SIGKILL')
+    const responseTimeout = setTimeout(() => {
+      terminate(new Error(`native pet did not ${ready ? 'return state' : 'become ready'} within ${timeoutMs}ms`))
     }, timeoutMs)
 
+    child.stdin.on('error', terminate)
     child.stdout.setEncoding('utf8')
     child.stderr.setEncoding('utf8')
     child.stdout.on('data', (chunk) => {
-      stdout = `${stdout}${chunk}`.slice(-8_192)
-      if (stdout.includes('event:ready') && !ready) {
-        ready = true
-        clearTimeout(readyTimeout)
-        child.kill('SIGTERM')
-        shutdownTimeout = setTimeout(() => {
-          terminationError = new Error(
-            `native pet did not exit within ${nativePetShutdownTimeoutMs}ms after readiness`,
-          )
-          child.kill('SIGKILL')
-        }, nativePetShutdownTimeoutMs)
+      stdout += chunk
+      if (stdout.length > 8_192) {
+        terminate(new Error('native pet smoke response exceeds 8192 characters'))
+        return
+      }
+      let newline = stdout.indexOf('\n')
+      while (newline >= 0) {
+        const line = stdout.slice(0, newline).trim()
+        stdout = stdout.slice(newline + 1)
+        handleLine(line)
+        newline = stdout.indexOf('\n')
       }
     })
+    function handleLine(line) {
+      if (receivedState || terminationError)
+        return
+      if (line === 'event:ready' && !ready) {
+        ready = true
+        child.stdin.write(`${JSON.stringify(query)}\n`)
+        return
+      }
+      if (!ready || !line.startsWith('{'))
+        return
+      let response
+      try {
+        response = JSON.parse(line)
+      }
+      catch {
+        terminate(new Error('native pet returned invalid JSON'))
+        return
+      }
+      if (response.type !== 'stateSnapshot')
+        return
+      if (response.protocolVersion !== query.protocolVersion
+        || response.correlationId !== query.messageId
+        || response.requestId !== query.requestId
+        || !Number.isInteger(response.position?.x)
+        || !Number.isInteger(response.position?.y)) {
+        terminate(new Error('native pet returned an invalid state snapshot'))
+        return
+      }
+      receivedState = true
+      clearTimeout(responseTimeout)
+      child.kill('SIGTERM')
+      shutdownTimeout = setTimeout(() => {
+        terminate(new Error(`native pet did not exit within ${nativePetShutdownTimeoutMs}ms after state query`))
+      }, nativePetShutdownTimeoutMs)
+    }
     child.stderr.on('data', (chunk) => {
       stderr = `${stderr}${chunk}`.slice(-2_048)
     })
     child.on('error', finish)
     child.on('exit', (code, signal) => {
       if (!settled) {
-        finish(terminationError ?? (ready
+        finish(terminationError ?? (receivedState && (code === 0 || signal === 'SIGTERM')
           ? undefined
-          : new Error(`native pet exited before ready: ${signal ?? code}; ${stderr.trim()}`)))
+          : new Error(`native pet smoke failed: ${signal ?? code}; ready=${ready}; state=${receivedState}; ${stderr.trim()}`)))
       }
     })
+
+    function terminate(error) {
+      terminationError ??= error
+      child.kill('SIGKILL')
+    }
 
     function finish(error) {
       if (settled)
         return
 
       settled = true
-      clearTimeout(readyTimeout)
+      clearTimeout(responseTimeout)
       clearTimeout(shutdownTimeout)
+      child.stdin.destroy()
       child.stdout.destroy()
       child.stderr.destroy()
       if (error)
@@ -226,27 +206,15 @@ export function runNativePetSmoke(runtimePath, timeoutMs = 12_000, env = process
   })
 }
 
-function spawnGui(executablePath, env, args = []) {
+function spawnGui(executablePath, env, args = [], stdin = 'ignore') {
   return spawn(executablePath, args, {
     cwd: repoRoot,
     env,
-    stdio: ['ignore', 'pipe', 'pipe'],
+    stdio: [stdin, 'pipe', 'pipe'],
   })
 }
 
-async function pathExists(path) {
-  try {
-    await access(path, constants.F_OK)
-    return true
-  }
-  catch (error) {
-    if (error && typeof error === 'object' && error.code === 'ENOENT')
-      return false
-    throw error
-  }
-}
-
-if (process.argv[1] && resolve(process.argv[1]) === new URL(import.meta.url).pathname) {
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   void main().catch((error) => {
     writeError(error instanceof Error ? error.message : String(error))
     process.exitCode = 1

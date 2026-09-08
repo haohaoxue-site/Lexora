@@ -1,3 +1,5 @@
+import { resolveBuddyPlatform } from '../../../shared/platform'
+
 const PI_FILE_TOOL_NAMES = [
   'edit',
   'find',
@@ -19,7 +21,7 @@ export const PI_BUILTIN_TOOL_NAME_SET: ReadonlySet<string> = new Set(PI_BUILTIN_
 export type PiShellToolName = typeof PI_SHELL_TOOL_NAMES[number]
 
 export function getPiShellToolName(platform: NodeJS.Platform): PiShellToolName {
-  return platform === 'win32' ? 'powershell' : 'bash'
+  return resolveBuddyPlatform(platform).shell
 }
 
 export function getActivePiBuiltinToolNames(

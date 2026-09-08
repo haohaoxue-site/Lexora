@@ -51,8 +51,6 @@ const optionalEventLimitSchema = z.number().int().positive().max(1_000).optional
 const optionalCursorSchema = z.string().regex(/^[\w-]+$/).max(2_048).optional()
 const timestampSchema = z.iso.datetime()
 const nullableTimestampSchema = timestampSchema.nullable()
-const runtimeDataBackupIdSchema = z.string().regex(/^buddy-\d{17}-[0-9a-f]{8}$/)
-const byteCountSchema = z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER)
 const executionProfileSchema = z.enum(BUDDY_EXECUTION_PROFILES)
 const approvalPolicySchema = z.enum(BUDDY_APPROVAL_POLICIES)
 const composerResourceIdsSchema = z.array(sessionIdentitySchema)
@@ -65,170 +63,6 @@ const runtimeStateSchema = z.object({
   restartAttempt: z.number().int().nonnegative(),
   status: z.enum(['stopped', 'starting', 'ready', 'restarting', 'offline', 'stopping']),
 }).strict()
-
-const runtimeStorageRequirementSchema = z.object({
-  availableBytes: byteCountSchema,
-  requiredBytes: byteCountSchema,
-  scope: z.enum(['backups', 'buddy', 'shared']),
-  sufficient: z.boolean(),
-}).strict()
-
-const runtimeDataRestoreCapacitySchema = z.object({
-  checkedAt: timestampSchema,
-  currentDataBytes: byteCountSchema,
-  requirements: z.array(runtimeStorageRequirementSchema).min(1).max(2),
-  sufficient: z.boolean(),
-  targetDataBytes: byteCountSchema,
-}).strict()
-
-const runtimeDataBackupSchema = z.object({
-  createdAt: timestampSchema.nullable(),
-  fileCount: z.number().int().nonnegative(),
-  id: runtimeDataBackupIdSchema,
-  path: z.string().refine(isAbsolutePath),
-  purpose: z.enum(['manual', 'pre_restore']).nullable(),
-  restoreCapacity: runtimeDataRestoreCapacitySchema.nullable(),
-  status: z.enum(['invalid', 'unverified', 'valid']),
-  totalBytes: byteCountSchema,
-}).strict()
-
-const runtimeDataBackupStorageSchema = z.object({
-  availableBytes: byteCountSchema,
-  backupBytes: byteCountSchema,
-  backupCount: z.number().int().nonnegative(),
-  canCreateBackup: z.boolean(),
-  checkedAt: timestampSchema,
-  createBackupRequiredBytes: byteCountSchema,
-  currentDataBytes: byteCountSchema,
-}).strict()
-
-const runtimeDataRestoreSchema = z.object({
-  backupId: runtimeDataBackupIdSchema,
-  restoredAt: timestampSchema,
-  safetyBackup: runtimeDataBackupSchema,
-}).strict()
-
-const runtimeDataRecoveryReceiptSchema = z.object({
-  action: z.enum([
-    'discarded_incomplete_backup',
-    'discarded_restore_candidate',
-    'kept_restored_data',
-    'restored_previous_data',
-  ]),
-  backupId: runtimeDataBackupIdSchema.nullable(),
-  completedAt: timestampSchema,
-  operationId: z.uuid().nullable(),
-}).strict().superRefine((receipt, context) => {
-  if (
-    receipt.action === 'discarded_incomplete_backup'
-    && (receipt.backupId !== null || receipt.operationId !== null)
-  ) {
-    context.addIssue({
-      code: 'custom',
-      message: 'Interrupted backup receipts cannot identify an unpublished operation',
-      path: ['backupId'],
-    })
-  }
-})
-
-const runtimeDataOperationSchema = z.object({
-  backupId: runtimeDataBackupIdSchema.nullable(),
-  cancellable: z.boolean(),
-  completedAt: timestampSchema.nullable(),
-  completedBytes: byteCountSchema,
-  kind: z.enum(['backup', 'restore']),
-  operationId: z.uuid(),
-  result: z.union([runtimeDataBackupSchema, runtimeDataRestoreSchema]).nullable(),
-  stage: z.enum([
-    'cleaning_up',
-    'completed',
-    'copying_backup',
-    'copying_restore',
-    'creating_safety_backup',
-    'moving_current_data',
-    'preparing',
-    'publishing',
-    'publishing_restored_data',
-    'verifying_backup',
-    'verifying_restore',
-  ]),
-  startedAt: timestampSchema,
-  status: z.enum(['cancelled', 'cancelling', 'completed', 'failed', 'running']),
-  totalBytes: byteCountSchema.nullable(),
-}).strict().superRefine((operation, context) => {
-  const terminal = ['cancelled', 'completed', 'failed'].includes(operation.status)
-  if (operation.totalBytes !== null && operation.completedBytes > operation.totalBytes) {
-    context.addIssue({
-      code: 'custom',
-      message: 'Completed bytes cannot exceed total bytes',
-      path: ['completedBytes'],
-    })
-  }
-  if (operation.cancellable && operation.status !== 'running') {
-    context.addIssue({
-      code: 'custom',
-      message: 'Only running operations can be cancellable',
-      path: ['cancellable'],
-    })
-  }
-  if (operation.cancellable && [
-    'cleaning_up',
-    'moving_current_data',
-    'publishing',
-    'publishing_restored_data',
-  ].includes(operation.stage)) {
-    context.addIssue({
-      code: 'custom',
-      message: 'Commit stages cannot be cancellable',
-      path: ['cancellable'],
-    })
-  }
-  if (terminal !== (operation.completedAt !== null)) {
-    context.addIssue({
-      code: 'custom',
-      message: 'Terminal operations require a completion timestamp',
-      path: ['completedAt'],
-    })
-  }
-  if (operation.status === 'completed') {
-    if (operation.stage !== 'completed' || operation.result === null) {
-      context.addIssue({
-        code: 'custom',
-        message: 'Completed operations require a completed stage and result',
-        path: ['result'],
-      })
-    }
-  }
-  else if (operation.result !== null || operation.stage === 'completed') {
-    context.addIssue({
-      code: 'custom',
-      message: 'Incomplete operations cannot expose a result',
-      path: ['result'],
-    })
-  }
-  if (operation.kind === 'backup') {
-    if (operation.backupId !== null || (
-      operation.result !== null
-      && !runtimeDataBackupSchema.safeParse(operation.result).success
-    )) {
-      context.addIssue({
-        code: 'custom',
-        message: 'Backup operations must use the backup result contract',
-        path: ['result'],
-      })
-    }
-  }
-  else if (operation.backupId === null || (
-    operation.result !== null
-    && !runtimeDataRestoreSchema.safeParse(operation.result).success
-  )) {
-    context.addIssue({
-      code: 'custom',
-      message: 'Restore operations must identify and return a restore contract',
-      path: ['result'],
-    })
-  }
-})
 
 const providerSchema = z.object({
   activeRunCount: z.number().int().nonnegative(),
@@ -904,17 +738,6 @@ export const localChatResponseSchemas = {
   run: runSchema,
   runEvents: z.array(runEventSchema),
   runs: z.array(runSchema),
-  runtimeDataBackup: runtimeDataBackupSchema,
-  runtimeDataBackupDeletion: z.object({
-    deletedBackupId: runtimeDataBackupIdSchema,
-  }).strict(),
-  runtimeDataBackupStorage: runtimeDataBackupStorageSchema,
-  runtimeDataBackups: z.array(runtimeDataBackupSchema),
-  runtimeDataOperation: runtimeDataOperationSchema,
-  runtimeDataRecoveryReceipt: runtimeDataRecoveryReceiptSchema,
-  runtimeDataRestore: runtimeDataRestoreSchema,
-  optionalRuntimeDataOperation: runtimeDataOperationSchema.nullable(),
-  optionalRuntimeDataRecoveryReceipt: runtimeDataRecoveryReceiptSchema.nullable(),
   runtimeState: runtimeStateSchema,
   skills: z.object({
     diagnostics: z.array(skillDiagnosticSchema),
@@ -1103,8 +926,6 @@ export const localChatSchemas = {
     notificationId: idSchema,
     revision: z.string().min(1).max(512),
   }).strict(),
-  runtimeDataBackupId: z.object({ backupId: runtimeDataBackupIdSchema }).strict(),
-  runtimeDataOperationId: z.object({ operationId: z.uuid() }).strict(),
   skillScope: z.object({ spaceId: idSchema.nullable() }).strict(),
   runStateEvent: runEventEnvelopeSchema,
   startTurn: buddyComposerDraftSendSchema,
@@ -1178,13 +999,6 @@ export type LocalRun = DeepReadonly<z.infer<typeof runSchema>>
 export type LocalRunOutput = DeepReadonly<z.infer<typeof runOutputSchema>>
 export type LocalRunEvent = DeepReadonly<z.infer<typeof runEventSchema>>
 export type LocalRuntimeModelOption = DeepReadonly<z.infer<typeof modelSchema>>
-export type LocalRuntimeDataBackup = DeepReadonly<z.infer<typeof runtimeDataBackupSchema>>
-export type LocalRuntimeDataBackupStorage
-  = DeepReadonly<z.infer<typeof runtimeDataBackupStorageSchema>>
-export type LocalRuntimeDataOperation = DeepReadonly<z.infer<typeof runtimeDataOperationSchema>>
-export type LocalRuntimeDataRecoveryReceipt
-  = DeepReadonly<z.infer<typeof runtimeDataRecoveryReceiptSchema>>
-export type LocalRuntimeDataRestore = DeepReadonly<z.infer<typeof runtimeDataRestoreSchema>>
 export type LocalBuddyServiceSupervisorState = DeepReadonly<z.infer<typeof runtimeStateSchema>>
 export type LocalSkillCatalog = DeepReadonly<z.infer<typeof localChatResponseSchemas.skills>>
 export type LocalStartTurnRequest = z.infer<typeof localChatSchemas.startTurn>

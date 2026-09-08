@@ -1,9 +1,10 @@
 import type { BuddyServiceFailureCode } from '../../shared/runtimeProtocol'
 import { join } from 'node:path'
 import process from 'node:process'
+import { z } from 'zod'
+import { establishWindowsRuntimeGuard } from '../../platform/windows/runtimeGuard'
 import { toPublicRunEvent } from '../../shared/publicRunEvent'
 import { buddyServiceFailureCodeSchema } from '../../shared/runtimeProtocol'
-import { readAutomationStartupContext } from './automations/automationStartupContext'
 import { startBuddyService } from './BuddyService'
 import { createRunEventLog } from './events/createRunEventLog'
 import { RunEventLogFatalError } from './events/RunEventFailure'
@@ -36,9 +37,13 @@ async function runBuddyService(): Promise<void> {
   if (!parentPort)
     return
 
+  if (process.platform === 'win32')
+    await establishWindowsRuntimeGuard()
+
   const buddyHome = process.env.LEXORA_BUDDY_HOME ?? resolveBuddyHome()
-  const builtinSkillsDirectory = process.env.LEXORA_BUDDY_SKILLS_DIR
-    ?? join(process.cwd(), 'service', 'resources', 'skills')
+  const builtinSkillsDirectories = z.array(z.string().min(1)).parse(
+    JSON.parse(process.env.LEXORA_BUDDY_SKILLS_DIRS ?? '[]'),
+  )
   let database: ReturnType<typeof openBuddyDatabase> | null = null
   let serviceServer: ReturnType<typeof createBuddyService> | null = null
   let serviceFailureNotified = false
@@ -110,9 +115,8 @@ async function runBuddyService(): Promise<void> {
     })
     await eventLog.replayAll()
     serviceHandle = await startBuddyService({
-      automationStartupContext: readAutomationStartupContext(process.env),
       buddyHome,
-      builtinSkillsDirectory,
+      builtinSkillsDirectories,
       database: openedDatabase,
       eventLog,
       rpc: serviceServer,

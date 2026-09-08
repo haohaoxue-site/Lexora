@@ -39,26 +39,11 @@ export interface DesktopRuntimeGateway {
   restart: () => Promise<void>
 }
 
-export interface DesktopRuntimeRecoveryGateway {
-  cancelDataOperation: (operationId: string) => unknown
-  deleteDataBackup: (backupId: string) => Promise<unknown>
-  getDataBackupStorage: () => Promise<unknown>
-  getDataRecoveryReceipt: () => unknown
-  getDataOperation: () => unknown
-  listDataBackups: () => Promise<unknown>
-  onDataOperationChange: (listener: (operation: unknown) => void) => () => void
-  openDataDirectory: () => Promise<unknown>
-  startDataBackup: () => unknown
-  startDataRestore: (backupId: string) => unknown
-  validateDataBackup: (backupId: string) => Promise<unknown>
-}
-
 export interface RegisterLocalChatIpcOptions {
   getLanguage: () => LexoraConfig['desktop']['language']
   getWindow: () => BrowserWindow | null
   readWebCredential: () => Promise<unknown>
   runtime: DesktopRuntimeGateway
-  runtimeRecovery: DesktopRuntimeRecoveryGateway
 }
 
 export function registerLocalChatIpc(options: RegisterLocalChatIpcOptions): () => void {
@@ -98,61 +83,6 @@ export function registerLocalChatIpc(options: RegisterLocalChatIpcOptions): () =
     await options.runtime.restart()
     return localChatResponseSchemas.runtimeState.parse(options.runtime.state)
   })
-  handle(LOCAL_CHAT_IPC_CHANNELS.runtimeStartDataBackup, () => (
-    localChatResponseSchemas.runtimeDataOperation.parse(
-      options.runtimeRecovery.startDataBackup(),
-    )
-  ))
-  handle(LOCAL_CHAT_IPC_CHANNELS.runtimeCancelDataOperation, (_event, input) => {
-    const { operationId } = localChatSchemas.runtimeDataOperationId.parse(input)
-    return localChatResponseSchemas.runtimeDataOperation.parse(
-      options.runtimeRecovery.cancelDataOperation(operationId),
-    )
-  })
-  handle(LOCAL_CHAT_IPC_CHANNELS.runtimeDeleteDataBackup, async (_event, input) => {
-    const { backupId } = localChatSchemas.runtimeDataBackupId.parse(input)
-    return localChatResponseSchemas.runtimeDataBackupDeletion.parse(
-      await options.runtimeRecovery.deleteDataBackup(backupId),
-    )
-  })
-  handle(LOCAL_CHAT_IPC_CHANNELS.runtimeGetDataBackupStorage, async () => (
-    localChatResponseSchemas.runtimeDataBackupStorage.parse(
-      await options.runtimeRecovery.getDataBackupStorage(),
-    )
-  ))
-  handle(LOCAL_CHAT_IPC_CHANNELS.runtimeGetDataRecoveryReceipt, () => (
-    localChatResponseSchemas.optionalRuntimeDataRecoveryReceipt.parse(
-      options.runtimeRecovery.getDataRecoveryReceipt(),
-    )
-  ))
-  handle(LOCAL_CHAT_IPC_CHANNELS.runtimeGetDataOperation, () => (
-    localChatResponseSchemas.optionalRuntimeDataOperation.parse(
-      options.runtimeRecovery.getDataOperation(),
-    )
-  ))
-  handle(LOCAL_CHAT_IPC_CHANNELS.runtimeListDataBackups, async () => (
-    localChatResponseSchemas.runtimeDataBackups.parse(
-      await options.runtimeRecovery.listDataBackups(),
-    )
-  ))
-  handle(LOCAL_CHAT_IPC_CHANNELS.runtimeOpenDataDirectory, async () => (
-    localChatResponseSchemas.mutation.parse(
-      await options.runtimeRecovery.openDataDirectory(),
-    )
-  ))
-  handle(LOCAL_CHAT_IPC_CHANNELS.runtimeStartDataRestore, (_event, input) => {
-    const { backupId } = localChatSchemas.runtimeDataBackupId.parse(input)
-    return localChatResponseSchemas.runtimeDataOperation.parse(
-      options.runtimeRecovery.startDataRestore(backupId),
-    )
-  })
-  handle(LOCAL_CHAT_IPC_CHANNELS.runtimeValidateDataBackup, async (_event, input) => {
-    const { backupId } = localChatSchemas.runtimeDataBackupId.parse(input)
-    return localChatResponseSchemas.runtimeDataBackup.parse(
-      await options.runtimeRecovery.validateDataBackup(backupId),
-    )
-  })
-
   handle(LOCAL_CHAT_IPC_CHANNELS.artifactsReadText, (_event, input) => request(
     'artifacts.readText',
     localChatSchemas.artifactText.parse(input),
@@ -639,18 +569,6 @@ export function registerLocalChatIpc(options: RegisterLocalChatIpcOptions): () =
     if (parsed.success)
       sendToRenderer(options.getWindow(), LOCAL_CHAT_IPC_CHANNELS.runtimeStateChanged, parsed.data)
   })
-  const stopDataOperationSubscription = options.runtimeRecovery.onDataOperationChange(
-    (operation) => {
-      const parsed = localChatResponseSchemas.runtimeDataOperation.safeParse(operation)
-      if (parsed.success) {
-        sendToRenderer(
-          options.getWindow(),
-          LOCAL_CHAT_IPC_CHANNELS.runtimeDataOperationChanged,
-          parsed.data,
-        )
-      }
-    },
-  )
   const stopNotificationSubscription = options.runtime.onNotification((notification) => {
     if (notification.method === 'run.event') {
       const event = localChatSchemas.runStateEvent.safeParse(notification.params)
@@ -687,7 +605,6 @@ export function registerLocalChatIpc(options: RegisterLocalChatIpcOptions): () =
   })
 
   return () => {
-    stopDataOperationSubscription()
     stopNotificationSubscription()
     stopStateSubscription()
     for (const channel of registeredChannels)

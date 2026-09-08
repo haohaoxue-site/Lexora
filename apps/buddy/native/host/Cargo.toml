@@ -1,0 +1,88 @@
+[package]
+name = "lexora-buddy-host"
+
+version.workspace = true
+
+edition.workspace = true
+
+publish.workspace = true
+
+autotests = false
+autobins = false
+
+[[bin]]
+name = "lexora-buddy-file-reader"
+path = "src/bin/file_reader.rs"
+
+[[bin]]
+name = "lexora-buddy-service-control"
+path = "src/bin/service_control.rs"
+
+[[bin]]
+name = "lexora-buddy-process-control"
+path = "src/bin/process_control.rs"
+
+[[bin]]
+name = "lexora-buddy-private-directories"
+path = "src/bin/private_directories.rs"
+
+[[bin]]
+name = "lexora-buddy-runtime-guard"
+path = "src/bin/runtime_guard.rs"
+
+[[test]]
+name = "bounded-file"
+path = "__tests__/bounded_file.rs"
+
+[[test]]
+name = "bounded-file-linux"
+path = "__tests__/bounded_file_linux.rs"
+
+[[test]]
+name = "process-control-linux"
+path = "__tests__/process_control_linux.rs"
+
+[dev-dependencies]
+tempfile = "3"
+
+[target.'cfg(target_os = "linux")'.dependencies]
+rustix = { version = "1.1", features = [
+  "fs",
+  "process",
+  "event",
+  "system",
+  "time",
+  "param"
+] }
+chrono = { version = "0.4", default-features = false, features = [ "std" ] }
+
+[dependencies]
+serde.workspace = true
+
+serde_json.workspace = true
+
+thiserror.workspace = true
+
+[lints]
+workspace = true
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { workspace = true, features = [
+  "Wdk_Foundation",
+  "Wdk_Storage_FileSystem",
+  "Win32_Foundation",
+  "Win32_Globalization",
+  "Win32_Storage_FileSystem",
+  "Win32_Security",
+  "Win32_Security_Authorization",
+  "Win32_System_IO",
+  "Win32_System_JobObjects",
+  "Win32_System_SystemServices",
+  "Win32_System_WindowsProgramming",
+  "Win32_System_Services",
+  "Win32_System_Diagnostics_ToolHelp",
+  "Win32_System_Threading",
+  "Win32_System_Time",
+  "Win32_UI_Input_KeyboardAndMouse",
+  "Win32_UI_WindowsAndMessaging"
+] }

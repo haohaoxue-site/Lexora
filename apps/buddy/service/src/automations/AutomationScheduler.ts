@@ -1,6 +1,5 @@
 import type { Automation } from '../../../shared/automation'
 import type { AutomationOccurrenceRecord } from '../storage/automationOccurrenceRecord'
-import type { WorkspaceRepository } from '../storage/workspaceRepository'
 import type { AutomationClock } from './AutomationScheduleEvaluator'
 import type { AutomationService } from './AutomationService'
 import { randomUUID } from 'node:crypto'
@@ -10,18 +9,10 @@ import { findNextAutomationOccurrence, systemAutomationClock } from './Automatio
 export const AUTOMATION_POLL_INTERVAL_MS = 30_000
 export const AUTOMATION_CATCH_UP_WINDOW_HOURS = 24
 export const AUTOMATION_GLOBAL_CONCURRENCY = 2
-export const AUTOMATION_RESTORE_WATERMARK_KEY = 'buddy.automations.restore-watermark.v1'
 
 const AUTOMATION_LEASE_DURATION_MINUTES = 1
 const AUTOMATION_DUE_BATCH_SIZE = 100
 const MAX_RECENT_CANDIDATES = 48
-
-export type AutomationStartupReason = 'normal' | 'data_restore'
-
-export interface AutomationStartupContext {
-  reason: AutomationStartupReason
-  restoreToken: string | null
-}
 
 export interface AutomationSchedulerOptions {
   automationService: AutomationService
@@ -29,7 +20,6 @@ export interface AutomationSchedulerOptions {
   createOwnerId?: () => string
   dispatch: (occurrence: AutomationOccurrenceRecord) => Promise<void>
   onChanged?: (automationId: string) => void
-  workspace: WorkspaceRepository
 }
 
 export class AutomationScheduler {
@@ -38,7 +28,6 @@ export class AutomationScheduler {
   readonly #dispatch: AutomationSchedulerOptions['dispatch']
   readonly #onChanged: NonNullable<AutomationSchedulerOptions['onChanged']>
   readonly #owner: string
-  readonly #workspace: WorkspaceRepository
   readonly #activeDispatches = new Map<string, Promise<void>>()
   #disposed = false
   #pollTimer: ReturnType<typeof setInterval> | null = null
@@ -51,7 +40,6 @@ export class AutomationScheduler {
     this.#dispatch = options.dispatch
     this.#onChanged = options.onChanged ?? (() => {})
     this.#owner = (options.createOwnerId ?? randomUUID)()
-    this.#workspace = options.workspace
   }
 
   async dispose(): Promise<void> {
@@ -63,19 +51,11 @@ export class AutomationScheduler {
     await this.#scan
   }
 
-  async start(context: AutomationStartupContext): Promise<void> {
+  async start(): Promise<void> {
     if (this.#started)
       return
     this.#started = true
-    const startup = resolveStartupContext(context, this.#workspace)
-    await this.#requestScan(startup.reason)
-    if (startup.reason === 'data_restore') {
-      this.#workspace.set(
-        AUTOMATION_RESTORE_WATERMARK_KEY,
-        { restoreToken: startup.restoreToken },
-        formatInstant(this.#clock.now()),
-      )
-    }
+    await this.#requestScan()
     if (this.#disposed)
       return
     this.#pollTimer = setInterval(() => {
@@ -86,13 +66,13 @@ export class AutomationScheduler {
   wake(): Promise<void> {
     if (this.#disposed)
       return Promise.resolve()
-    return this.#requestScan('normal')
+    return this.#requestScan()
   }
 
-  #requestScan(reason: AutomationStartupReason): Promise<void> {
+  #requestScan(): Promise<void> {
     if (this.#scan)
       return this.#scan
-    const scan = this.#runScan(reason).finally(() => {
+    const scan = this.#runScan().finally(() => {
       if (this.#scan === scan)
         this.#scan = null
     })
@@ -100,7 +80,7 @@ export class AutomationScheduler {
     return scan
   }
 
-  async #runScan(reason: AutomationStartupReason): Promise<void> {
+  async #runScan(): Promise<void> {
     if (this.#disposed)
       return
     const now = this.#clock.now()
@@ -112,7 +92,7 @@ export class AutomationScheduler {
       for (const automation of due) {
         if (this.#disposed)
           break
-        this.#processDueAutomation(automation, now, reason)
+        this.#processDueAutomation(automation, now)
       }
       if (due.length < AUTOMATION_DUE_BATCH_SIZE)
         break
@@ -124,22 +104,12 @@ export class AutomationScheduler {
   #processDueAutomation(
     automation: Automation,
     now: Temporal.Instant,
-    reason: AutomationStartupReason,
   ): void {
     if (!automation.nextRunAt)
       return
     const earliest = Temporal.Instant.from(automation.nextRunAt)
     const isOnce = automation.timing.schedule.kind === 'once'
     const cutoff = now.subtract({ hours: AUTOMATION_CATCH_UP_WINDOW_HOURS })
-    if (reason === 'data_restore') {
-      this.#settleMissed(
-        automation,
-        now,
-        isOnce ? 'expired' : 'skipped',
-        'DATA_RESTORE_SKIPPED',
-      )
-      return
-    }
     if (Temporal.Instant.compare(earliest, cutoff) < 0) {
       this.#settleMissed(
         automation,
@@ -171,7 +141,7 @@ export class AutomationScheduler {
     automation: Automation,
     now: Temporal.Instant,
     status: 'expired' | 'skipped',
-    errorCode: 'DATA_RESTORE_SKIPPED' | 'MISSED_WINDOW_EXCEEDED',
+    errorCode: 'MISSED_WINDOW_EXCEEDED',
   ): void {
     if (!automation.nextRunAt)
       return
@@ -222,20 +192,6 @@ export class AutomationScheduler {
       this.#activeDispatches.set(occurrence.id, dispatch)
     }
   }
-}
-
-function resolveStartupContext(
-  context: AutomationStartupContext,
-  workspace: WorkspaceRepository,
-): AutomationStartupContext {
-  if (context.reason === 'normal')
-    return { reason: 'normal', restoreToken: null }
-  if (!context.restoreToken)
-    throw new Error('Lexora Buddy data restore startup requires a restore token')
-  const watermark = workspace.get<{ restoreToken?: unknown }>(AUTOMATION_RESTORE_WATERMARK_KEY)
-  return watermark?.restoreToken === context.restoreToken
-    ? { reason: 'normal', restoreToken: null }
-    : context
 }
 
 function collectDueCandidates(
