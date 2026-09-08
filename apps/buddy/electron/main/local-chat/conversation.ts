@@ -1,0 +1,51 @@
+import type { LocalChatIpcContext } from './registrar'
+import { chatRequestSchemas, chatRpc } from '../../../shared/conversation/chatApi'
+import { contextRequestSchemas, contextRpc } from '../../../shared/conversation/contextApi'
+import { conversationRequestSchemas, conversationsRpc } from '../../../shared/conversation/conversationApi'
+import { LOCAL_WORKSPACE_STATE_KEY, workspaceRequestSchemas, workspaceStateRpc } from '../../../shared/conversation/workspaceApi'
+import { runsRequestSchemas } from '../../../shared/runs/runApi'
+import { validationRequestSchemas } from '../../../shared/runtime/apiValidation'
+import { LOCAL_CHAT_IPC_CHANNELS } from '../../shared/localChatApi'
+
+export function registerConversationIpc(context: LocalChatIpcContext): void {
+  const { handle, request } = context
+
+  handle(LOCAL_CHAT_IPC_CHANNELS.contextUsageSnapshot, (_event, input) => request(contextRpc.usageSnapshot, contextRequestSchemas.contextUsageSnapshot.parse(input)))
+
+  handle(LOCAL_CHAT_IPC_CHANNELS.workspaceStateRead, () => request(workspaceStateRpc.read, { key: LOCAL_WORKSPACE_STATE_KEY }))
+
+  handle(LOCAL_CHAT_IPC_CHANNELS.workspaceStateWrite, (_event, input) => {
+    const { value } = workspaceRequestSchemas.workspaceValue.parse(input)
+    return request(workspaceStateRpc.write, { key: LOCAL_WORKSPACE_STATE_KEY, value })
+  })
+
+  handle(LOCAL_CHAT_IPC_CHANNELS.conversationsList, (_event, input) => request(conversationsRpc.list, validationRequestSchemas.limit.parse(input)))
+
+  handle(LOCAL_CHAT_IPC_CHANNELS.conversationsGet, (_event, input) => request(conversationsRpc.get, conversationRequestSchemas.conversationId.parse(input)))
+
+  handle(LOCAL_CHAT_IPC_CHANNELS.conversationsDelete, (_event, input) => request(conversationsRpc.delete, conversationRequestSchemas.conversationId.parse(input)))
+
+  handle(LOCAL_CHAT_IPC_CHANNELS.conversationsActivateBranch, (_event, input) => request(conversationsRpc.activateBranch, conversationRequestSchemas.conversationBranchActivation.parse(input)))
+
+  handle(LOCAL_CHAT_IPC_CHANNELS.conversationsListBranches, (_event, input) => request(conversationsRpc.listBranches, conversationRequestSchemas.conversationId.parse(input)))
+
+  handle(LOCAL_CHAT_IPC_CHANNELS.conversationsListMessages, (_event, input) => request(conversationsRpc.listMessages, conversationRequestSchemas.conversationMessages.parse(input)))
+
+  handle(LOCAL_CHAT_IPC_CHANNELS.conversationsRename, (_event, input) => request(conversationsRpc.rename, conversationRequestSchemas.conversationRename.parse(input)))
+
+  handle(LOCAL_CHAT_IPC_CHANNELS.conversationsSetPermissionSettings, (_event, input) => request(conversationsRpc.setPermissionSettings, conversationRequestSchemas.conversationPermissionSettings.parse(input)))
+
+  handle(LOCAL_CHAT_IPC_CHANNELS.conversationsSetModelSelection, (_event, input) => request(conversationsRpc.setModelSelection, conversationRequestSchemas.conversationModelSelection.parse(input)))
+
+  handle(LOCAL_CHAT_IPC_CHANNELS.conversationsListTimeline, (_event, input) => request(conversationsRpc.listTimeline, conversationRequestSchemas.conversationTimeline.parse(input)))
+
+  handle(LOCAL_CHAT_IPC_CHANNELS.chatStartTurn, (_event, input) => request(chatRpc.startTurn, chatRequestSchemas.startTurn.parse(input)))
+
+  handle(LOCAL_CHAT_IPC_CHANNELS.chatEditUserMessage, (_event, input) => request(chatRpc.editUserMessage, chatRequestSchemas.editUserMessage.parse(input)))
+
+  handle(LOCAL_CHAT_IPC_CHANNELS.chatExecuteCommand, (_event, input) => request(chatRpc.executeCommand, chatRequestSchemas.chatCommand.parse(input)))
+
+  handle(LOCAL_CHAT_IPC_CHANNELS.chatRegenerateAssistant, (_event, input) => request(chatRpc.regenerateAssistant, chatRequestSchemas.regenerateAssistant.parse(input)))
+
+  handle(LOCAL_CHAT_IPC_CHANNELS.chatCancel, (_event, input) => request(chatRpc.cancel, runsRequestSchemas.runId.parse(input)))
+}

@@ -1,5 +1,5 @@
 import type { Buffer } from 'node:buffer'
-import type { CredentialNamespace } from '../../../shared/credentialProtocol'
+import type { CredentialNamespace } from '../../../shared/runtime/credentialProtocol'
 import { createHash, randomUUID } from 'node:crypto'
 import {
   chmod,

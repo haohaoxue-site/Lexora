@@ -5,7 +5,7 @@ import type { BuddyDataPaths } from '../storage/BuddyDataPaths'
 import type { ConversationRepository } from '../storage/conversationRepository'
 import { readdir, realpath, stat } from 'node:fs/promises'
 import { basename, join } from 'node:path'
-import { buddyRunOutputPayloadSchema } from '../../../shared/runOutput'
+import { buddyRunOutputPayloadSchema } from '../../../shared/runs/runOutput'
 import { inferArtifactMimeType } from './ArtifactService'
 
 const legacyOutputTools = new Set([

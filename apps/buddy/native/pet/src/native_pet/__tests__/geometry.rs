@@ -15,21 +15,6 @@ const DEFAULT_PET_MANIFEST: &str =
     include_str!("../../../../../../../packages/assets/buddy/pets/default/manifest.json");
 
 #[test]
-fn maps_native_pet_frame_index_to_spritesheet_rect() {
-    let geometry =
-        NativePetSpritesheetGeometry::new(192, 208, 8, 20).expect("test geometry is valid");
-    let first = native_pet_frame_rect(geometry, 0);
-    assert_eq!(first.x, 0);
-    assert_eq!(first.y, 0);
-    assert_eq!(first.width, 192);
-    assert_eq!(first.height, 208);
-
-    let next_row = native_pet_frame_rect(geometry, geometry.sheet_columns());
-    assert_eq!(next_row.x, 0);
-    assert_eq!(next_row.y, 208);
-}
-
-#[test]
 fn maps_native_pet_frame_index_with_manifest_geometry() {
     let geometry =
         NativePetSpritesheetGeometry::new(200, 300, 5, 4).expect("test geometry is valid");

@@ -1,10 +1,8 @@
 import type { BuddyServiceSupervisor } from './runtime/BuddyServiceSupervisor'
 import { readFile } from 'node:fs/promises'
 import { protocol } from 'electron'
-import {
-  localChatResponseSchemas,
-  localChatSchemas,
-} from '../shared/localChatApiSchemas'
+import { artifactsRequestSchemas, artifactsResponseSchemas } from '../../shared/artifacts/artifactApi'
+import { attachmentsRequestSchemas } from '../../shared/conversation/attachmentApi'
 
 const ATTACHMENT_PROTOCOL = 'lexora-attachment'
 const ARTIFACT_PROTOCOL = 'lexora-artifact'
@@ -26,7 +24,7 @@ export function installAttachmentProtocol(runtime: BuddyServiceSupervisor): () =
     scheme: string,
     idKey: 'artifactId' | 'attachmentId',
     method: 'artifacts.resolvePreview' | 'attachments.resolvePreview',
-    schema: typeof localChatSchemas.artifactPreview | typeof localChatSchemas.attachmentPreview,
+    schema: typeof artifactsRequestSchemas.artifactPreview | typeof attachmentsRequestSchemas.attachmentPreview,
   ) => protocol.handle(scheme, async (request) => {
     if (request.method !== 'GET')
       return new Response(null, { status: 405 })
@@ -41,7 +39,7 @@ export function installAttachmentProtocol(runtime: BuddyServiceSupervisor): () =
 
     try {
       const input = schema.parse({ [idKey]: id })
-      const preview = localChatResponseSchemas.artifactPreview.parse(
+      const preview = artifactsResponseSchemas.artifactPreview.parse(
         await runtime.request(method, input),
       )
       const body = await readFile(preview.path)
@@ -64,13 +62,13 @@ export function installAttachmentProtocol(runtime: BuddyServiceSupervisor): () =
     ATTACHMENT_PROTOCOL,
     'attachmentId',
     'attachments.resolvePreview',
-    localChatSchemas.attachmentPreview,
+    attachmentsRequestSchemas.attachmentPreview,
   )
   void installPreviewProtocol(
     ARTIFACT_PROTOCOL,
     'artifactId',
     'artifacts.resolvePreview',
-    localChatSchemas.artifactPreview,
+    artifactsRequestSchemas.artifactPreview,
   )
 
   return () => {

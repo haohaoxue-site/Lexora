@@ -1,12 +1,12 @@
 import type { ToolCallEvent } from '@earendil-works/pi-coding-agent'
 import type { TSchema } from 'typebox'
-import type { AutomationApprovalReviewInput } from '../../../shared/approvalReviewPayload'
 import type {
   Automation,
   AutomationDefinitionDraft,
   AutomationOccurrence,
   AutomationSchedule,
 } from '../../../shared/automation'
+import type { AutomationApprovalReviewInput } from '../../../shared/permissions/approvalReviewPayload'
 import type { BuddyToolClassificationResult } from '../approvals/toolClassification'
 import type { AutomationService } from './AutomationService'
 import type {

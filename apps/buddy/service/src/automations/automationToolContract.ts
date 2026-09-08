@@ -3,7 +3,7 @@ import type {
   AutomationOccurrence,
   AutomationRunNowResult,
 } from '../../../shared/automation'
-import type { BuddyToolPresentation } from '../../../shared/runEventPresentation'
+import type { BuddyToolPresentation } from '../../../shared/runs/runEventPresentation'
 import type { CreateBuddyToolPresentationInput } from '../events/toolPresentationSupport'
 import type { AutomationPage } from './AutomationService'
 

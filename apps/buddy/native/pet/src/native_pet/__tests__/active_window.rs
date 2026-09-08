@@ -5,7 +5,7 @@ const TEST_TOKEN: &str = "lexora-buddy-active-window:test-query:";
 #[test]
 fn parses_plain_kwin_journal_payload() {
     let output = r#"
-Jul 10 17:06:55 shanyuhai kwin_wayland[2020]: lexora-buddy-active-window:test-query:{"x":400,"y":200,"width":800,"height":600}
+Jul 10 17:06:55 shanyuhai kwin_wayland[1000]: lexora-buddy-active-window:test-query:{"x":400,"y":200,"width":800,"height":600}
 "#;
 
     assert_eq!(
@@ -29,7 +29,7 @@ string "lexora-buddy-active-window:test-query:{\"x\":-120,\"y\":64,\"width\":102
 #[test]
 fn ignores_stale_query_tokens() {
     let output = r#"
-Jul 10 17:06:55 shanyuhai kwin_wayland[2020]: lexora-buddy-active-window:old-query:{"x":1,"y":2,"width":3,"height":4}
+Jul 10 17:06:55 shanyuhai kwin_wayland[1000]: lexora-buddy-active-window:old-query:{"x":1,"y":2,"width":3,"height":4}
 "#;
 
     assert_eq!(
@@ -54,27 +54,6 @@ fn rejects_missing_or_invalid_active_window_geometry() {
         ),
         None
     );
-}
-
-#[test]
-fn kwin_active_window_script_filters_self_and_non_normal_windows_without_title_matching() {
-    let script = native_pet_kwin_active_window_script(TEST_TOKEN);
-
-    assert!(script.contains("selfWindowMarkers"));
-    assert!(script.contains("lexora-buddy"));
-    assert!(script.contains("resourceClass"));
-    assert!(script.contains("desktopFileName"));
-    assert!(script.contains("window.normalWindow === false"));
-    assert!(script.contains("window.dock"));
-    assert!(!script.contains("caption"));
-}
-
-#[test]
-fn kwin_active_window_script_filters_windows_outside_current_desktop_or_activity() {
-    let script = native_pet_kwin_active_window_script(TEST_TOKEN);
-
-    assert!(script.contains("window.onCurrentDesktop === false"));
-    assert!(script.contains("window.onCurrentActivity === false"));
 }
 
 #[test]

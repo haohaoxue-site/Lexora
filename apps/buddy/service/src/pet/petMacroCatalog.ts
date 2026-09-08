@@ -1,5 +1,5 @@
-import type { PetExecuteSequenceParams, PetPrimitiveStep } from '../../../shared/petProtocol'
-import { petExecuteSequenceParamsSchema } from '../../../shared/petProtocol'
+import type { PetExecuteSequenceParams, PetPrimitiveStep } from '../../../shared/runtime/petProtocol'
+import { petExecuteSequenceParamsSchema } from '../../../shared/runtime/petProtocol'
 
 export const PET_MACRO_IDS = [
   'thinking',

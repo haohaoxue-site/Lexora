@@ -1,31 +1,20 @@
-import type { LexoraDesktopApi } from '@buddy-electron/shared/desktopApi'
-import type { InjectionKey, ShallowRef } from 'vue'
-import type { DesktopCapabilities } from '@/app/desktopCapabilities'
-import type { useDesktopShellState } from '@/shell/useDesktopShellState'
-import { inject } from 'vue'
+import type { DesktopAppInfo } from '@buddy-electron/shared/desktopApi'
+import type { Ref } from 'vue'
+import type { DesktopNavigation } from './bootstrap/useDesktopNavigation'
+import type { BuddyLocale } from '@/i18n/buddyI18n'
+import type { NotificationCenterStore } from '@/modules/notifications'
+import type { TaskIndex } from '@/modules/tasks/contracts'
+import { createInjectionContext } from '@/shared/composables/createInjectionContext'
 
 export interface DesktopAppContext {
-  browser: LexoraDesktopApi['browser']
-  browserGuests: DesktopBrowserGuestSurfaceHost
-  capabilities: DesktopCapabilities
-  clipboard: LexoraDesktopApi['clipboard']
-  notificationTargetMessageId: Readonly<ShallowRef<string | null>>
-  ready: Promise<void>
-  shell: ReturnType<typeof useDesktopShellState>
+  appInfo: Readonly<Ref<DesktopAppInfo | null>>
+  appSidebarCollapsed: Readonly<Ref<boolean>>
+  language: Readonly<Ref<BuddyLocale>>
+  navigation: Pick<DesktopNavigation, 'navigate' | 'openNotification' | 'openSpace' | 'openTask'>
+  notifications: Pick<NotificationCenterStore, 'items' | 'isLoading' | 'unseenCount' | 'load' | 'markAllSeen'>
+  taskIndex: Pick<TaskIndex, 'spaces' | 'tasks'>
   toggleAppSidebar: () => void
 }
 
-export interface DesktopBrowserGuestSurfaceHost {
-  hide: (sessionId: string, element?: HTMLElement) => void
-  show: (sessionId: string, element: HTMLElement) => void
-}
-
-export const desktopAppContextKey: InjectionKey<DesktopAppContext>
-  = Symbol('desktop-app-context')
-
-export function useDesktopApp(): DesktopAppContext {
-  const context = inject(desktopAppContextKey)
-  if (!context)
-    throw new Error('Desktop app context is unavailable')
-  return context
-}
+export const { key: desktopAppContextKey, useContext: useDesktopApp }
+  = createInjectionContext<DesktopAppContext>('Desktop app')

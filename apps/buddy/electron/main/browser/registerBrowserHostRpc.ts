@@ -1,20 +1,16 @@
 import type {
-  BrowserAdapterIssueLeaseParams,
-  BrowserAdapterLease,
-} from '../../../shared/browserAdapterProtocol'
-import type {
   BrowserErrorCode,
   BrowserObservation,
   BrowserRecoveryAction,
   BrowserWaitSpec,
-} from '../../../shared/browserProtocol'
-import type { RuntimeRpcPeerContract } from '../../../shared/runtimeRpcPeer'
+} from '../../../shared/browser'
+import type {
+  BrowserAdapterIssueLeaseParams,
+  BrowserAdapterLease,
+} from '../../../shared/browser/browserAdapterProtocol'
+import type { RuntimeRpcPeerContract } from '../../../shared/runtime/rpcPeer'
 import type { DesktopBrowserState } from '../../shared/desktopApi'
 import type { BrowserHost } from './BrowserHost'
-import {
-  browserAdapterIssueLeaseParamsSchema,
-  browserAdapterLeaseSchema,
-} from '../../../shared/browserAdapterProtocol'
 import {
   BROWSER_WAIT_DEFAULT_QUIET_MS,
   browserAcquireControlParamsSchema,
@@ -36,7 +32,11 @@ import {
   browserStateSnapshotSchema,
   browserValidateActionParamsSchema,
   browserValidateActionResultSchema,
-} from '../../../shared/browserProtocol'
+} from '../../../shared/browser'
+import {
+  browserAdapterIssueLeaseParamsSchema,
+  browserAdapterLeaseSchema,
+} from '../../../shared/browser/browserAdapterProtocol'
 import { redactBrowserRuntimeUrl } from './browserPrivacy'
 
 interface BrowserResultSchema {

@@ -1,5 +1,5 @@
 import process from 'node:process'
-import { runNativeCommand } from '../nativeCommand'
+import { runNativeCommand } from '../native/nativeCommand'
 import { validateWindowsFilePath } from './filePath'
 
 export async function ensureWindowsPrivateDirectories(paths: string[], executable?: string): Promise<void> {

@@ -2,11 +2,11 @@ import type { Socket } from 'node:net'
 import type {
   BrowserAdapterIssueLeaseParams,
   BrowserAdapterLease,
-} from '../../../shared/browserAdapterProtocol'
+} from '../../../shared/browser/browserAdapterProtocol'
 import type { DesktopBrowserState } from '../../shared/desktopApi'
 import { createConnection } from 'node:net'
 import { isAbsolute } from 'node:path'
-import { BROWSER_ADAPTER_MAX_LEASE_TTL_MS } from '../../../shared/browserAdapterProtocol'
+import { BROWSER_ADAPTER_MAX_LEASE_TTL_MS } from '../../../shared/browser/browserAdapterProtocol'
 
 interface BrowserAdapterTestLeasePublisherOptions {
   brokerSocketPath: string

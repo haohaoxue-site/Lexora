@@ -1,5 +1,5 @@
 import type { ToolCallEvent } from '@earendil-works/pi-coding-agent'
-import type { BuddyRunOutputPayload } from '../../../shared/runOutput'
+import type { BuddyRunOutputPayload } from '../../../shared/runs/runOutput'
 import type { BuddyToolClassificationResult } from '../approvals/toolClassification'
 import type { CreateBuddyToolPresentationInput } from '../events/toolPresentationSupport'
 import { Type } from 'typebox'

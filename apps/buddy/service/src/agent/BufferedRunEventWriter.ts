@@ -1,8 +1,8 @@
-import type { BuddyAssistantTextPhase } from '../../../shared/assistantTextPhase'
+import type { BuddyAssistantTextPhase } from '../../../shared/runs/assistantTextPhase'
 import type { RunEventWriter } from '../events/RunEventPorts'
 import type { BuddyProjectedEvent } from './projectPiEvent'
-import { buddyAssistantTextPhaseSchema } from '../../../shared/assistantTextPhase'
-import { buddyToolPresentationDeltaSchema } from '../../../shared/runEventPresentation'
+import { buddyAssistantTextPhaseSchema } from '../../../shared/runs/assistantTextPhase'
+import { buddyToolPresentationDeltaSchema } from '../../../shared/runs/runEventPresentation'
 
 export class BufferedRunEventWriter {
   readonly #eventLog: Pick<RunEventWriter, 'appendBatch'>

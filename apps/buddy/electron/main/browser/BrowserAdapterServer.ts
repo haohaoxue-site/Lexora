@@ -1,13 +1,5 @@
 import type { Server, Socket } from 'node:net'
-import type { LocalEndpoint } from '../../../platform/localTransport'
-import type {
-  BrowserAdapterFailureCode,
-  BrowserAdapterIssueLeaseParams,
-  BrowserAdapterLease,
-  BrowserAdapterRequest,
-  BrowserAdapterResponse,
-  BrowserAdapterSuccessResult,
-} from '../../../shared/browserAdapterProtocol'
+import type { LocalEndpoint } from '../../../platform/ipc/localTransport'
 import type {
   BrowserAcquireControlParams,
   BrowserAction,
@@ -17,12 +9,21 @@ import type {
   BrowserObservation,
   BrowserObserveParams,
   BrowserValidateActionParams,
-} from '../../../shared/browserProtocol'
+} from '../../../shared/browser'
+import type {
+  BrowserAdapterFailureCode,
+  BrowserAdapterIssueLeaseParams,
+  BrowserAdapterLease,
+  BrowserAdapterRequest,
+  BrowserAdapterResponse,
+  BrowserAdapterSuccessResult,
+} from '../../../shared/browser/browserAdapterProtocol'
 import type { DesktopBrowserState } from '../../shared/desktopApi'
 import type { BrowserHostActionResult } from './BrowserHost'
 import { Buffer } from 'node:buffer'
 import { createHash, randomBytes } from 'node:crypto'
 import { createServer } from 'node:net'
+import { browserObservationSchema } from '../../../shared/browser'
 import {
   BROWSER_ADAPTER_DEFAULT_LEASE_TTL_MS,
   BROWSER_ADAPTER_MAX_REQUEST_BYTES,
@@ -32,8 +33,7 @@ import {
   browserAdapterLeaseSchema,
   browserAdapterRequestSchema,
   browserAdapterResponseSchema,
-} from '../../../shared/browserAdapterProtocol'
-import { browserObservationSchema } from '../../../shared/browserProtocol'
+} from '../../../shared/browser/browserAdapterProtocol'
 import { redactBrowserRuntimeUrl } from './browserPrivacy'
 import { projectBrowserState } from './registerBrowserHostRpc'
 

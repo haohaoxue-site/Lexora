@@ -5,7 +5,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, w
 import { join, resolve } from 'node:path'
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
-import searchTools from '../../../apps/buddy/platform/searchTools.json' with { type: 'json' }
+import searchTools from '../../../apps/buddy/platform/native/searchTools.json' with { type: 'json' }
 import { writeError, writeOutput } from '../../shared/cli-output.mjs'
 import { resolveBuddyOutputPaths } from './output-paths.mjs'
 

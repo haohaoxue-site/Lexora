@@ -1,9 +1,9 @@
-import type { BuddyApprovalPolicy } from '../../../shared/approvalPolicy'
-import type { BuddyExecutionProfile } from '../../../shared/executionProfile'
 import type {
   BuddyServiceTier,
   BuddyThinkingLevel,
-} from '../../../shared/modelSelection'
+} from '../../../shared/conversation/modelSelection'
+import type { BuddyApprovalPolicy } from '../../../shared/permissions/approvalPolicy'
+import type { BuddyExecutionProfile } from '../../../shared/permissions/executionProfile'
 import type { BuddySessionBlueprintService } from '../agent/BuddySessionBlueprint'
 import type { BuddySessionRecoveryService } from '../agent/BuddySessionRecoveryService'
 import type { BuddyContextSnapshot } from '../agent/createBuddySession'

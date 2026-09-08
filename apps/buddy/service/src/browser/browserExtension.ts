@@ -6,7 +6,7 @@ import type {
   BrowserObservation,
   BrowserStateSnapshot,
   BrowserWaitOutcome,
-} from '../../../shared/browserProtocol'
+} from '../../../shared/browser'
 import type { BuddySessionCapability } from '../agent/BuddySessionCapability'
 import type { BuddyInProcessExtension } from '../agent/createBuddyResourceLoader'
 import type { BrowserCapabilityServiceOptions } from './BrowserCapabilityService'
@@ -16,7 +16,7 @@ import type {
   BrowserToolOperation,
 } from './browserToolContract'
 import { defineTool } from '@earendil-works/pi-coding-agent'
-import { BROWSER_ERROR_CODES } from '../../../shared/browserProtocol'
+import { BROWSER_ERROR_CODES } from '../../../shared/browser'
 import { GrantedPathError } from '../directories/resolveGrantedPath'
 import { BrowserCapabilityService } from './BrowserCapabilityService'
 import {

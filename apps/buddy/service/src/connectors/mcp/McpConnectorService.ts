@@ -1,20 +1,19 @@
 import type { ToolDefinition } from '@earendil-works/pi-coding-agent'
-import type { RuntimeRpcPeerContract } from '../../../../shared/runtimeRpcPeer'
+import type { ConnectorCredential } from '../../../../shared/connectors/connectorCredentials'
+import type { RuntimeRpcPeerContract } from '../../../../shared/runtime/rpcPeer'
 import type { BuddyToolClassification } from '../../approvals/toolClassification'
 import type {
   ConnectorRepository,
   McpServerRecord,
 } from '../../storage/connectorRepository'
 import type { McpClientErrorCode } from './McpClientSession'
-import type { ConnectorCredential, McpServerConfig } from './mcpSchemas'
-import { credentialMutationResultSchema, credentialReadResultSchema } from '../../../../shared/credentialProtocol'
+import type { McpServerConfig } from './mcpSchemas'
+import { connectorCredentialSchema } from '../../../../shared/connectors/connectorCredentials'
+import { credentialMutationResultSchema, credentialReadResultSchema } from '../../../../shared/runtime/credentialProtocol'
 
 import { createMcpTools } from './createMcpTools'
 import { McpClientError, McpClientSession } from './McpClientSession'
-import {
-  connectorCredentialSchema,
-  mcpServerConfigSchema,
-} from './mcpSchemas'
+import { mcpServerConfigSchema } from './mcpSchemas'
 
 export interface ConnectorSecretStore {
   delete: (id: string) => Promise<void>

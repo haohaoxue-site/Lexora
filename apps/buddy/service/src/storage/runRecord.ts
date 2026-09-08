@@ -1,7 +1,7 @@
-import type { BuddyApprovalPolicy } from '../../../shared/approvalPolicy'
-import type { BuddyExecutionProfile } from '../../../shared/executionProfile'
-import type { SpaceExecutionContext } from '../../../shared/space'
-import { spaceExecutionContextSchema } from '../../../shared/space'
+import type { SpaceExecutionContext } from '../../../shared/conversation/space'
+import type { BuddyApprovalPolicy } from '../../../shared/permissions/approvalPolicy'
+import type { BuddyExecutionProfile } from '../../../shared/permissions/executionProfile'
+import { spaceExecutionContextSchema } from '../../../shared/conversation/space'
 
 export type RunStatus = 'queued' | 'running' | 'completed' | 'failed' | 'cancelled'
 export type RunPurpose = 'automation' | 'chat' | 'conversation.compaction'

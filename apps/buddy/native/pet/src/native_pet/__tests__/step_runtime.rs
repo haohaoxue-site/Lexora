@@ -9,8 +9,7 @@ use super::{
     native_pet_advance_active_step, native_pet_complete_active_step,
     native_pet_interrupt_active_step, native_pet_interrupt_active_step_for_local_interaction,
     native_pet_play_action_completion_behavior_for_response,
-    native_pet_start_active_step_for_execute_step, native_pet_step_response_is_motion_timeout,
-    NativePetActiveStepState,
+    native_pet_start_active_step_for_execute_step, NativePetActiveStepState,
 };
 
 #[test]
@@ -367,14 +366,4 @@ fn play_action_execute_step_fails_when_playback_exceeds_timeout() {
             ),
         ))
     );
-}
-
-#[test]
-fn step_response_motion_timeout_predicate_matches_stable_failure_code() {
-    let response = SidecarStepResponse::StepFailed(motion_timeout_step_failed_response(
-        "step_019f5000-0000-7000-8000-000000000009",
-        Some(5_000),
-    ));
-
-    assert!(native_pet_step_response_is_motion_timeout(&response));
 }

@@ -3,6 +3,7 @@ import type {
   Provider,
 } from '@earendil-works/pi-ai'
 import type { ModelRuntime } from '@earendil-works/pi-coding-agent'
+import type { BuddyDefaultModel, CustomProviderInput, ProviderModelInput } from '../../../shared/providers/providerInput'
 import type { DefaultModelRepository } from '../storage/defaultModelRepository'
 import type {
   ProviderConfigRecord,
@@ -16,15 +17,9 @@ import type {
   ProviderModelCatalogRuntime,
 } from './ProviderModelCatalog'
 import type { ProviderModelDiscovery } from './ProviderModelDiscovery'
-import type {
-  BuddyDefaultModel,
-  BuddyModel,
-  BuddyProvider,
-  CustomProviderInput,
-  ModelParametersOverride,
-  ProviderModelInput,
-} from './providerSchemas'
+import type { BuddyModel, BuddyProvider, ModelParametersOverride } from './providerSchemas'
 import { getSupportedThinkingLevels } from '@earendil-works/pi-ai'
+import { customProviderInputSchema, defaultModelSchema } from '../../../shared/providers/providerInput'
 import { ProviderExecutionModelResolver } from './ProviderExecutionModelResolver'
 import {
   ProviderAuthenticationRequiredError,
@@ -34,11 +29,7 @@ import {
   ProviderValidationError,
 } from './ProviderFailure'
 import { ProviderModelCatalog } from './ProviderModelCatalog'
-import {
-  buddyProviderSchema,
-  customProviderInputSchema,
-  defaultModelSchema,
-} from './providerSchemas'
+import { buddyProviderSchema } from './providerSchemas'
 
 export interface ProviderModelRuntime extends ProviderModelCatalogRuntime {
   getProvider: (providerId: string) => Provider | undefined

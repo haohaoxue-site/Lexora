@@ -1,4 +1,4 @@
-import type { BuddyExecutionProfile } from '../../../shared/executionProfile'
+import type { BuddyExecutionProfile } from '../../../shared/permissions/executionProfile'
 import type { AccessKind, PathZone } from './permissionContract'
 
 export type PermissionOutcome

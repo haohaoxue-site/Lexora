@@ -5,8 +5,8 @@ import type {
 } from './permissionContract'
 import type { SensitivePathMatcher } from './sensitivePaths'
 import { dirname } from 'node:path'
-import { containsCanonicalPath } from '../../../platform/filePaths'
-import { FilePathResolutionError, resolveFilePath } from '../../../platform/resolveFilePath'
+import { containsCanonicalPath } from '../../../platform/filesystem/filePaths'
+import { FilePathResolutionError, resolveFilePath } from '../../../platform/filesystem/resolveFilePath'
 
 export type PathClassificationErrorCode = 'INVALID_PATH' | 'PATH_NOT_FOUND'
 

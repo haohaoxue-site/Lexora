@@ -1,14 +1,14 @@
 import type { DatabaseSync } from 'node:sqlite'
 import type { BuddyRunEvent } from './BuddyRunEvent'
 import { z } from 'zod'
+import { BUDDY_ATTACHMENT_COUNT_LIMIT } from '../../../shared/conversation/attachmentPolicy'
+import { MAX_BUDDY_MESSAGE_TEXT_LENGTH } from '../../../shared/conversation/buddyMessageContent'
 import {
   APPROVAL_REVIEW_KINDS,
   approvalReviewPayloadMatchesKind,
   approvalReviewPayloadSchema,
-} from '../../../shared/approvalReviewPayload'
-import { buddyAssistantTextPhaseSchema } from '../../../shared/assistantTextPhase'
-import { BUDDY_ATTACHMENT_COUNT_LIMIT } from '../../../shared/attachmentPolicy'
-import { MAX_BUDDY_MESSAGE_TEXT_LENGTH } from '../../../shared/buddyMessageContent'
+} from '../../../shared/permissions/approvalReviewPayload'
+import { buddyAssistantTextPhaseSchema } from '../../../shared/runs/assistantTextPhase'
 import { withTransaction } from '../storage/database'
 import { buddyRunIdSchema, terminalRunStatus } from './BuddyRunEvent'
 

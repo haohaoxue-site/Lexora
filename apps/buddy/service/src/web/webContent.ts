@@ -1,10 +1,10 @@
-import type { WebResource } from '../../../shared/network/publicWebTransport'
+import type { WebResource } from '../../../shared/network/webTransport'
 import { Buffer } from 'node:buffer'
 import { Readability } from '@mozilla/readability'
 import { parseHTML } from 'linkedom'
 import TurndownService from 'turndown'
-import { requireWebSuccess } from '../../../shared/network/publicWebTransport'
-import { WebError } from '../../../shared/webProtocol'
+import { WebError } from '../../../shared/network/webProtocol'
+import { requireWebSuccess } from '../../../shared/network/webTransport'
 
 export interface WebDocument {
   url: string

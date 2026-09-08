@@ -1,7 +1,7 @@
 import type { ImageContent } from '@earendil-works/pi-ai'
 import type { Buffer } from 'node:buffer'
-import type { BuddyAttachmentUpload } from '../../../shared/attachmentPolicy'
-import type { BuddyPromptDirective, BuddyUserContentV1 } from '../../../shared/buddyUserContent'
+import type { BuddyAttachmentUpload } from '../../../shared/conversation/attachmentPolicy'
+import type { BuddyPromptDirective, BuddyUserContentV1 } from '../../../shared/conversation/buddyUserContent'
 import type { AttachmentRecord, AttachmentRepository } from '../storage/attachmentRepository'
 import type { BuddyDataPaths } from '../storage/BuddyDataPaths'
 import type { AttachmentImageReference } from './AttachmentImageReference'
@@ -9,13 +9,13 @@ import { randomUUID } from 'node:crypto'
 import { constants } from 'node:fs'
 import { chmod, copyFile, mkdir, open, readdir, readFile, realpath, stat, unlink, writeFile } from 'node:fs/promises'
 import { basename, dirname, extname, join, normalize } from 'node:path'
-import { fileStorage } from '../../../platform/fileStorage'
+import { fileStorage } from '../../../platform/filesystem/fileStorage'
 import {
   BUDDY_ATTACHMENT_COUNT_LIMIT,
   BUDDY_ATTACHMENT_TOTAL_BYTES_LIMIT,
   BUDDY_TEXT_ATTACHMENT_EXTENSIONS,
-} from '../../../shared/attachmentPolicy'
-import { projectBuddyUserContent } from '../../../shared/buddyUserContentProjection'
+} from '../../../shared/conversation/attachmentPolicy'
+import { projectBuddyUserContent } from '../../../shared/conversation/buddyUserContentProjection'
 
 export const DRAFT_ATTACHMENT_RETENTION_MS = 7 * 24 * 60 * 60 * 1000
 const { replace: rename, syncDirectory } = fileStorage

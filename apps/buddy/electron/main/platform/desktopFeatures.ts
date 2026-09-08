@@ -1,5 +1,5 @@
 import type { BuddyFeatureId, BuddyPlatform } from '../../../shared/platform'
-import type { RuntimeRpcPeerContract } from '../../../shared/runtimeRpcPeer'
+import type { RuntimeRpcPeerContract } from '../../../shared/runtime/rpcPeer'
 import type { LexoraConfig } from '../../shared/desktopApi'
 import type { DesktopDiagnosticLogger } from '../desktopDiagnostics'
 import type { BuddyRuntimePaths } from '../paths'

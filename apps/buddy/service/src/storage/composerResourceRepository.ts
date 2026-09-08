@@ -1,6 +1,6 @@
 import type { DatabaseSync } from 'node:sqlite'
-import type { BuddyComposerResourceMetadata, BuddyComposerSourceOrigin, BuddySpaceFileOrigin } from '../../../shared/composerResource'
-import { buddyComposerSourceOriginSchema } from '../../../shared/composerResource'
+import type { BuddyComposerResourceMetadata, BuddyComposerSourceOrigin, BuddySpaceFileOrigin } from '../../../shared/conversation/composerResource'
+import { buddyComposerSourceOriginSchema } from '../../../shared/conversation/composerResource'
 import { withTransaction } from './database'
 
 export interface ComposerResourceRecord extends BuddyComposerResourceMetadata {

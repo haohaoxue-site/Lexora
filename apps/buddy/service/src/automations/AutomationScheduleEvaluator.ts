@@ -9,7 +9,7 @@ import {
   automationPreviewRequestSchema,
   automationTimingSchema,
 } from '../../../shared/automation'
-import { Temporal } from '../../../shared/temporal'
+import { Temporal } from '../../../shared/automation/temporal'
 
 const NANOSECONDS_PER_HOUR = 3_600_000_000_000n
 

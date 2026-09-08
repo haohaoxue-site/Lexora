@@ -1,7 +1,7 @@
 import { Buffer } from 'node:buffer'
 import { readFile, realpath, stat } from 'node:fs/promises'
 import { join, relative, sep } from 'node:path'
-import { containsCanonicalPath } from '../../../platform/filePaths'
+import { containsCanonicalPath } from '../../../platform/filesystem/filePaths'
 
 import { GrantedPathError, resolveGrantedPath } from '../directories/resolveGrantedPath'
 

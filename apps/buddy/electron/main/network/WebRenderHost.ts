@@ -1,8 +1,9 @@
 import type { HostWebNetwork } from './HostWebNetwork'
 import { randomUUID } from 'node:crypto'
 import { BrowserWindow, session } from 'electron'
-import { readResponseBytes, requireWebSuccess } from '../../../shared/network/publicWebTransport'
-import { WebError } from '../../../shared/webProtocol'
+import { readResponseBytes } from '../../../platform/network/publicWebTransport'
+import { WebError } from '../../../shared/network/webProtocol'
+import { requireWebSuccess } from '../../../shared/network/webTransport'
 
 const SNAPSHOT_SCRIPT = `new Promise(resolve => {
   let timer;

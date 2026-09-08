@@ -1,0 +1,499 @@
+<script setup lang="ts">
+import type { LocalApproval } from '@buddy-shared/permissions/approvalApi'
+
+import type { ApprovalReviewPayload } from '@buddy-shared/permissions/approvalReviewPayload'
+import type { BuddyExecutionProfile } from '@buddy-shared/permissions/executionProfile'
+import type { BuddyLocale } from '@/i18n/buddyI18n'
+import type { ChatApprovalDecision } from '@/modules/tasks/model/runs/typing'
+import { approvalReviewPayloadSchema } from '@buddy-shared/permissions/approvalReviewPayload'
+import { ShieldError20Regular, Warning20Regular } from '@vicons/fluent'
+import { NButton, NPopconfirm } from 'naive-ui'
+import { computed } from 'vue'
+import { useBuddyI18n } from '@/i18n/buddyI18n'
+import DesktopIcon from '@/shared/ui/icon/DesktopIcon.vue'
+import { translateSystemAction, translateSystemInterruption } from '../../model/approvals/systemActionPresentation'
+
+const props = defineProps<{
+  approval: LocalApproval
+  language: BuddyLocale
+  resolvingAction: ChatApprovalDecision | null
+}>()
+const emit = defineEmits<{ approve: [], approveTurn: [], deny: [] }>()
+const { t } = useBuddyI18n(() => props.language)
+const automationOperationKeys = {
+  delete: 'desktop.chat.processToolAutomationDelete',
+  pause: 'desktop.chat.processToolAutomationPause',
+  resume: 'desktop.chat.processToolAutomationResume',
+  run_now: 'desktop.chat.processToolAutomationRunNow',
+  upsert: 'desktop.chat.processToolAutomationUpsert',
+} as const
+const browserEffectKeys = {
+  'account-change': 'desktop.approval.browser.effect.accountChange',
+  'authorize': 'desktop.approval.browser.effect.authorize',
+  'delete': 'desktop.approval.browser.effect.delete',
+  'publish': 'desktop.approval.browser.effect.publish',
+  'purchase': 'desktop.approval.browser.effect.purchase',
+  'send': 'desktop.approval.browser.effect.send',
+  'submit': 'desktop.approval.browser.effect.submit',
+} as const
+const executionProfileKeys: Record<BuddyExecutionProfile, 'desktop.chat.permissionModePolicy' | 'desktop.chat.executionProfileFull' | 'desktop.chat.executionProfileReadOnly'> = {
+  full_access: 'desktop.chat.executionProfileFull',
+  read_only: 'desktop.chat.executionProfileReadOnly',
+  workspace_write: 'desktop.chat.permissionModePolicy',
+}
+const review = computed<ApprovalReviewPayload | null>(() => {
+  const parsed = approvalReviewPayloadSchema.safeParse(props.approval.payload)
+  return parsed.success ? parsed.data : null
+})
+const systemEffect = computed(() => {
+  if (review.value?.card !== 'system-action')
+    return ''
+  return translateSystemAction(props.language, review.value.action)
+})
+const systemInterruption = computed(() => {
+  if (review.value?.card !== 'system-action')
+    return ''
+  return translateSystemInterruption(props.language, review.value.interruption)
+})
+const automationOperation = computed(() => {
+  if (review.value?.card !== 'automation')
+    return ''
+  return t(automationOperationKeys[review.value.operation])
+})
+const browserEffect = computed(() => {
+  if (review.value?.card !== 'browser-action')
+    return ''
+  return review.value.effect
+    ? t(browserEffectKeys[review.value.effect])
+    : t('desktop.approval.browser.effect.unknown')
+})
+const pathGrant = computed(() => (
+  review.value?.card === 'paths' ? review.value.grant : null
+))
+const grantNotice = computed(() => {
+  const grant = pathGrant.value
+  if (!grant)
+    return ''
+  return t(grant.owner === 'space'
+    ? 'desktop.approval.paths.grantSpace'
+    : 'desktop.approval.paths.grantConversation', { root: grant.root })
+})
+const browserAction = computed(() => {
+  if (review.value?.card !== 'browser-action')
+    return ''
+  if (review.value.action === 'click')
+    return t('desktop.approval.browser.action.click')
+  if (review.value.key === 'Enter')
+    return t('desktop.approval.browser.action.pressEnter')
+  if (review.value.key === 'Space')
+    return t('desktop.approval.browser.action.pressSpace')
+  return t('desktop.approval.browser.action.press')
+})
+const approvalOperation = computed(() => (
+  systemEffect.value
+  || browserEffect.value
+  || t(`desktop.approval.kind.${props.approval.kind}`)
+))
+const approvalTitle = computed(() => t('desktop.approval.title', {
+  operation: approvalOperation.value,
+}))
+const approvalDescription = computed(() => (
+  review.value?.card === 'shell'
+    ? t('desktop.approval.currentWorkspace')
+    : review.value?.card === 'browser-action'
+      ? t('desktop.approval.browser.scopeReview')
+      : review.value?.card === 'paths' && review.value.access === 'render'
+        ? t('desktop.approval.paths.renderDescription')
+        : review.value?.card === 'paths' && review.value.grant
+          ? t('desktop.approval.paths.grantDescription')
+          : t('desktop.approval.scopeReview')
+))
+const approveActionLabel = computed(() => (
+  review.value?.card === 'paths' && review.value.grant
+    ? t('desktop.approval.paths.approveAndGrantAction')
+    : t('approvalAction.approve')
+))
+const headingId = computed(() => `desktop-approval-${props.approval.id}-title`)
+const isResolving = computed(() => props.resolvingAction !== null)
+const turnConfirmationButtonProps = { type: 'error' } as const
+</script>
+
+<template>
+  <article
+    class="desktop-approval-card"
+    :aria-busy="isResolving"
+    :aria-labelledby="headingId"
+  >
+    <header class="desktop-approval-card__header">
+      <DesktopIcon class="desktop-approval-card__pending-icon" :component="Warning20Regular" />
+      <div class="desktop-approval-card__heading">
+        <strong :id="headingId" class="desktop-approval-card__title">
+          {{ approvalTitle }}
+        </strong>
+        <span class="desktop-approval-card__description">
+          {{ approvalDescription }}
+        </span>
+      </div>
+    </header>
+    <section
+      v-if="review?.card === 'automation'"
+      class="desktop-approval-card__details desktop-approval-card__review"
+    >
+      <dl>
+        <div>
+          <dt>{{ t('desktop.approval.automation.operation') }}</dt>
+          <dd>{{ automationOperation }}</dd>
+        </div>
+        <div>
+          <dt>{{ t('desktop.approval.automation.name') }}</dt>
+          <dd>{{ review.name }}</dd>
+        </div>
+        <div>
+          <dt>{{ t('desktop.approval.automation.schedule') }}</dt>
+          <dd>{{ review.scheduleSummary }}</dd>
+        </div>
+        <div>
+          <dt>{{ t('desktop.approval.automation.timezone') }}</dt>
+          <dd>{{ review.timezone }}</dd>
+        </div>
+        <div>
+          <dt>{{ t('desktop.approval.automation.prompt') }}</dt>
+          <dd>{{ review.promptSummary }}</dd>
+        </div>
+        <div>
+          <dt>{{ t('desktop.approval.automation.space') }}</dt>
+          <dd>{{ review.spaceId ?? t('desktop.approval.automation.noSpace') }}</dd>
+        </div>
+        <div>
+          <dt>{{ t('desktop.approval.automation.model') }}</dt>
+          <dd>{{ review.modelMode }}</dd>
+        </div>
+        <div>
+          <dt>{{ t('desktop.approval.automation.executionProfile') }}</dt>
+          <dd>
+            {{ t(executionProfileKeys[review.executionProfile]) }}
+          </dd>
+        </div>
+      </dl>
+    </section>
+    <section
+      v-else-if="review?.card === 'web'"
+      class="desktop-approval-card__details desktop-approval-card__review"
+    >
+      <dl>
+        <div>
+          <dt>
+            {{ t(review.operation === 'search'
+              ? 'desktop.approval.web.query'
+              : 'desktop.approval.web.url') }}
+          </dt>
+          <dd>{{ review.target }}</dd>
+        </div>
+        <div>
+          <dt>{{ t('desktop.approval.web.provider') }}</dt>
+          <dd>{{ review.provider ?? t('desktop.approval.web.providerAuto') }}</dd>
+        </div>
+      </dl>
+    </section>
+    <section
+      v-else-if="review?.card === 'system-action'"
+      class="desktop-approval-card__details desktop-approval-card__review"
+    >
+      <dl>
+        <div>
+          <dt>{{ t('desktop.approval.target') }}</dt>
+          <dd>{{ review.target.displayName }}</dd>
+        </div>
+        <div v-if="review.target.pid">
+          <dt>PID</dt>
+          <dd>{{ review.target.pid }}</dd>
+        </div>
+        <div v-if="review.target.serviceId">
+          <dt>{{ t('desktop.approval.systemUnit') }}</dt>
+          <dd>{{ review.target.serviceId }}</dd>
+        </div>
+        <div v-if="review.target.startedAt">
+          <dt>{{ t('desktop.approval.processStartedAt') }}</dt>
+          <dd>{{ review.target.startedAt }}</dd>
+        </div>
+        <div>
+          <dt>{{ t('desktop.approval.effect') }}</dt>
+          <dd>{{ systemEffect }}</dd>
+        </div>
+        <div>
+          <dt>{{ t('desktop.approval.reason') }}</dt>
+          <dd>{{ review.reason }}</dd>
+        </div>
+        <div>
+          <dt>{{ t('desktop.approval.interruption') }}</dt>
+          <dd>{{ systemInterruption }}</dd>
+        </div>
+        <div>
+          <dt>{{ t('desktop.approval.expiresAt') }}</dt>
+          <dd>{{ review.expiresAt }}</dd>
+        </div>
+      </dl>
+    </section>
+    <section
+      v-else-if="review?.card === 'browser-action'"
+      class="desktop-approval-card__details desktop-approval-card__review"
+    >
+      <dl>
+        <div>
+          <dt>{{ t('desktop.approval.browser.origin') }}</dt>
+          <dd><code>{{ review.origin }}</code></dd>
+        </div>
+        <div>
+          <dt>{{ t('desktop.approval.effect') }}</dt>
+          <dd>{{ browserEffect }}</dd>
+        </div>
+        <div v-if="review.targetName">
+          <dt>{{ t('desktop.approval.browser.pageTarget') }}</dt>
+          <dd>{{ review.targetName }}</dd>
+        </div>
+        <div v-if="review.targetRole">
+          <dt>{{ t('desktop.approval.browser.role') }}</dt>
+          <dd>{{ review.targetRole }}</dd>
+        </div>
+        <div>
+          <dt>{{ t('desktop.approval.browser.action') }}</dt>
+          <dd>{{ browserAction }}</dd>
+        </div>
+      </dl>
+    </section>
+    <pre v-else-if="review?.card === 'shell'" class="desktop-approval-card__review">{{ review.command }}</pre>
+    <div v-else-if="review?.card === 'paths'" class="desktop-approval-card__review">
+      <ul class="desktop-approval-card__paths">
+        <li v-for="target in review.targets" :key="target.path">
+          <code>{{ target.path }}</code>
+          <small v-if="target.zone === 'sensitive'" class="is-sensitive">
+            {{ t('desktop.approval.paths.zoneSensitive') }}
+          </small>
+          <small v-else-if="target.zone === 'outside'">
+            {{ t('desktop.approval.paths.zoneOutside') }}
+          </small>
+        </li>
+      </ul>
+      <p v-if="grantNotice" class="desktop-approval-card__grant">
+        {{ grantNotice }}
+      </p>
+    </div>
+    <p v-else-if="review?.card === 'arguments'" class="desktop-approval-card__review">
+      {{ review.argumentNames.join(', ') }}
+    </p>
+    <p v-else class="desktop-approval-card__review">
+      {{ t('desktop.approval.unsupported') }}
+    </p>
+    <footer class="desktop-approval-card__footer">
+      <NButton
+        size="small"
+        :disabled="isResolving"
+        :loading="resolvingAction === 'deny'"
+        @click="emit('deny')"
+      >
+        {{ t('approvalAction.deny') }}
+      </NButton>
+      <div class="desktop-approval-card__actions">
+        <NPopconfirm
+          v-if="review?.allowForTurn"
+          :disabled="isResolving"
+          :negative-text="t('common.cancel')"
+          placement="top-end"
+          :positive-button-props="turnConfirmationButtonProps"
+          :positive-text="t('desktop.approval.turnConfirmAction')"
+          @positive-click="emit('approveTurn')"
+        >
+          <template #icon>
+            <DesktopIcon
+              class="desktop-approval-card__turn-confirmation-icon"
+              :component="ShieldError20Regular"
+            />
+          </template>
+          <template #trigger>
+            <NButton
+              class="desktop-approval-card__turn-button"
+              secondary
+              size="small"
+              type="error"
+              :disabled="isResolving"
+              :loading="resolvingAction === 'approveForTurn'"
+            >
+              <template #icon>
+                <DesktopIcon :component="ShieldError20Regular" />
+              </template>
+              {{ t('approvalAction.approveForTurn') }}
+            </NButton>
+          </template>
+          <div class="desktop-approval-card__turn-confirmation-copy">
+            <strong class="desktop-approval-card__turn-confirmation-title">
+              {{ t('desktop.approval.turnConfirmTitle') }}
+            </strong>
+            <span class="desktop-approval-card__turn-confirmation-description">
+              {{ t('desktop.approval.turnConfirmDescription') }}
+            </span>
+          </div>
+        </NPopconfirm>
+        <NButton
+          class="desktop-approval-card__approve-button"
+          size="small"
+          type="primary"
+          :disabled="isResolving"
+          :loading="resolvingAction === 'approve'"
+          @click="emit('approve')"
+        >
+          {{ approveActionLabel }}
+        </NButton>
+      </div>
+    </footer>
+  </article>
+</template>
+
+<style scoped>
+.desktop-approval-card {
+  display: grid;
+  gap: 0.7rem;
+  border: 1px solid var(--buddy-border-subtle);
+  border-radius: 0.65rem;
+  background: var(--buddy-surface-raised);
+  padding: 0.8rem 0.85rem;
+}
+
+.desktop-approval-card__header {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.desktop-approval-card__pending-icon {
+  align-self: start;
+  color: var(--buddy-status-warning-text);
+  font-size: 1.05rem;
+  margin-top: 0.05rem;
+}
+
+.desktop-approval-card__heading {
+  display: grid;
+  gap: 0.12rem;
+}
+
+.desktop-approval-card__title {
+  color: var(--buddy-text-strong);
+  font-size: 0.84rem;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.desktop-approval-card__description {
+  color: var(--buddy-text-secondary);
+  font-size: var(--buddy-chat-caption-font-size);
+  line-height: var(--buddy-chat-caption-line-height);
+}
+
+.desktop-approval-card__review {
+  border: 1px solid var(--buddy-border-subtle);
+  border-radius: 0.5rem;
+  background: var(--buddy-surface-subtle);
+  padding: 0.65rem 0.7rem;
+}
+
+.desktop-approval-card pre {
+  max-height: 9rem;
+  margin: 0;
+  overflow: auto;
+  color: var(--buddy-chat-code-color);
+  font-family: var(--buddy-font-mono);
+  font-size: var(--buddy-chat-code-font-size);
+  line-height: var(--buddy-chat-code-line-height);
+  white-space: pre-wrap;
+}
+
+.desktop-approval-card__details dl {
+  display: grid;
+  gap: 0.45rem;
+  margin: 0;
+}
+
+.desktop-approval-card__details dl > div {
+  display: grid;
+  grid-template-columns: minmax(5rem, 0.35fr) minmax(0, 1fr);
+  gap: 0.6rem;
+}
+
+.desktop-approval-card__details dt {
+  color: var(--buddy-text-secondary);
+  font-size: var(--buddy-chat-caption-font-size);
+  line-height: var(--buddy-chat-caption-line-height);
+}
+
+.desktop-approval-card__details dd {
+  min-width: 0;
+  margin: 0;
+  color: var(--buddy-text-primary);
+  font-size: var(--buddy-chat-caption-font-size);
+  line-height: var(--buddy-chat-caption-line-height);
+  overflow-wrap: anywhere;
+}
+
+.desktop-approval-card ul,
+.desktop-approval-card p {
+  margin: 0;
+}
+
+.desktop-approval-card ul {
+  padding-left: 1.8rem;
+}
+
+.desktop-approval-card code {
+  color: var(--buddy-chat-code-color);
+  font-family: var(--buddy-font-mono);
+  font-size: var(--buddy-chat-code-font-size);
+}
+
+.desktop-approval-card__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+}
+
+.desktop-approval-card__actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+.desktop-approval-card__turn-confirmation-icon {
+  color: var(--buddy-status-danger-text);
+}
+
+.desktop-approval-card__turn-confirmation-copy {
+  display: grid;
+  max-width: 18rem;
+  gap: 0.2rem;
+}
+
+.desktop-approval-card__turn-confirmation-title {
+  color: var(--buddy-text-strong);
+  font-size: 0.78rem;
+  line-height: 1.4;
+}
+
+.desktop-approval-card__turn-confirmation-description {
+  color: var(--buddy-text-secondary);
+  font-size: var(--buddy-chat-caption-font-size);
+  line-height: 1.5;
+}
+
+@media (max-width: 560px) {
+  .desktop-approval-card__footer {
+    align-items: stretch;
+    flex-direction: column-reverse;
+  }
+
+  .desktop-approval-card__footer > .n-button {
+    align-self: flex-start;
+  }
+}
+</style>

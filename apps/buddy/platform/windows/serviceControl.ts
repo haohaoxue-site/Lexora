@@ -1,6 +1,6 @@
-import type { NativeCommandResult } from '../nativeCommand'
+import type { NativeCommandResult } from '../native/nativeCommand'
 import process from 'node:process'
-import { runNativeCommand } from '../nativeCommand'
+import { runNativeCommand } from '../native/nativeCommand'
 import { validateWindowsFilePath } from './filePath'
 
 interface ServiceControlRequest {

@@ -1,8 +1,4 @@
 import type {
-  BrowserAdapterIssueLeaseParams,
-  BrowserAdapterLease,
-} from '../../../shared/browserAdapterProtocol'
-import type {
   BrowserAcquireControlParams,
   BrowserAcquireControlResult,
   BrowserActParams,
@@ -17,13 +13,13 @@ import type {
   BrowserValidateActionParams,
   BrowserValidateActionResult,
   BrowserWaitSpec,
-} from '../../../shared/browserProtocol'
-import type { RuntimeRpcPeerContract } from '../../../shared/runtimeRpcPeer'
+} from '../../../shared/browser'
+import type {
+  BrowserAdapterIssueLeaseParams,
+  BrowserAdapterLease,
+} from '../../../shared/browser/browserAdapterProtocol'
+import type { RuntimeRpcPeerContract } from '../../../shared/runtime/rpcPeer'
 import type { DirectoryGrant } from '../directories/resolveGrantedPath'
-import {
-  browserAdapterIssueLeaseParamsSchema,
-  browserAdapterLeaseSchema,
-} from '../../../shared/browserAdapterProtocol'
 import {
   browserAcquireControlParamsSchema,
   browserAcquireControlResultSchema,
@@ -40,7 +36,11 @@ import {
   browserStateResultSchema,
   browserValidateActionParamsSchema,
   browserValidateActionResultSchema,
-} from '../../../shared/browserProtocol'
+} from '../../../shared/browser'
+import {
+  browserAdapterIssueLeaseParamsSchema,
+  browserAdapterLeaseSchema,
+} from '../../../shared/browser/browserAdapterProtocol'
 import { GrantedPathError, resolveGrantedPath } from '../directories/resolveGrantedPath'
 
 export interface OpenBrowserUrlInput {

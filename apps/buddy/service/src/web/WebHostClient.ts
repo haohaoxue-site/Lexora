@@ -1,11 +1,11 @@
-import type { ProviderWebFetch, PublicWebGet } from '../../../shared/network/publicWebTransport'
-import type { RuntimeRpcPeerContract } from '../../../shared/runtimeRpcPeer'
-import type { WebNetworkRequest, WebRenderResult } from '../../../shared/webProtocol'
+import type { WebNetworkRequest, WebRenderResult } from '../../../shared/network/webProtocol'
+import type { ProviderWebFetch, PublicWebGet } from '../../../shared/network/webTransport'
+import type { RuntimeRpcPeerContract } from '../../../shared/runtime/rpcPeer'
 import { Buffer } from 'node:buffer'
 import { randomUUID } from 'node:crypto'
 import { z } from 'zod'
-import { readResponseBytes } from '../../../shared/network/publicWebTransport'
-import { WebError, webNetworkChunkSchema, webNetworkHeadSchema, webRenderResultSchema } from '../../../shared/webProtocol'
+import { readResponseBytes } from '../../../platform/network/publicWebTransport'
+import { WebError, webNetworkChunkSchema, webNetworkHeadSchema, webRenderResultSchema } from '../../../shared/network/webProtocol'
 
 export class WebHostClient {
   readonly peer: Pick<RuntimeRpcPeerContract, 'request' | 'notify' | 'onNotification'>

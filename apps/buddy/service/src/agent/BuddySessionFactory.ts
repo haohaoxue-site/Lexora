@@ -1,4 +1,4 @@
-import type { BuddyThinkingLevel } from '../../../shared/modelSelection'
+import type { BuddyThinkingLevel } from '../../../shared/conversation/modelSelection'
 import type { ProviderExecutionModelResolver } from '../providers/ProviderExecutionModelResolver'
 import type { ConversationRepository } from '../storage/conversationRepository'
 import type { RunRepository } from '../storage/runRepository'

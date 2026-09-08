@@ -4,12 +4,12 @@ import type {
   CredentialInfo,
   CredentialStore,
 } from '@earendil-works/pi-ai'
-import type { RuntimeRpcPeerContract } from '../../../shared/runtimeRpcPeer'
+import type { RuntimeRpcPeerContract } from '../../../shared/runtime/rpcPeer'
 import {
   credentialMutationResultSchema,
   credentialProviderListResultSchema,
   credentialReadResultSchema,
-} from '../../../shared/credentialProtocol'
+} from '../../../shared/runtime/credentialProtocol'
 
 import { credentialSchema } from './providerSchemas'
 

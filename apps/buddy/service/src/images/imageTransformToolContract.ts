@@ -1,6 +1,6 @@
 import type { ToolCallEvent } from '@earendil-works/pi-coding-agent'
-import type { BuddyToolPresentation } from '../../../shared/runEventPresentation'
-import type { BuddyRunOutputPayload } from '../../../shared/runOutput'
+import type { BuddyToolPresentation } from '../../../shared/runs/runEventPresentation'
+import type { BuddyRunOutputPayload } from '../../../shared/runs/runOutput'
 import type { BuddyToolClassificationResult } from '../approvals/toolClassification'
 import type { CreateBuddyToolPresentationInput } from '../events/toolPresentationSupport'
 import { Check } from 'typebox/value'

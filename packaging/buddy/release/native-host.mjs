@@ -2,7 +2,7 @@ import { execFileSync } from 'node:child_process'
 import { resolve } from 'node:path'
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
-import nativeHost from '../../../apps/buddy/platform/nativeHost.json' with { type: 'json' }
+import nativeHost from '../../../apps/buddy/platform/native/nativeHost.json' with { type: 'json' }
 
 const buddyRoot = fileURLToPath(new URL('../../../apps/buddy/', import.meta.url))
 

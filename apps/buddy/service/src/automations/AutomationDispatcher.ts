@@ -2,8 +2,8 @@ import type {
   AutomationModelTarget,
   AutomationOccurrence,
 } from '../../../shared/automation'
-import type { BuddyThinkingLevel } from '../../../shared/modelSelection'
-import type { SpaceExecutionContext } from '../../../shared/space'
+import type { BuddyThinkingLevel } from '../../../shared/conversation/modelSelection'
+import type { SpaceExecutionContext } from '../../../shared/conversation/space'
 import type { BuddyTurnHandle } from '../agent/BuddyAgentRun'
 import type { AutomationTurnRepository } from '../storage/automationTurnRepository'
 import type { AutomationClock } from './AutomationScheduleEvaluator'

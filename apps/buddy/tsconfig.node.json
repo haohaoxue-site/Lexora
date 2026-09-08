@@ -7,7 +7,8 @@
     "module": "ESNext",
     "moduleResolution": "bundler",
     "paths": {
-      "@buddy-shared/*": ["./shared/*"]
+      "@buddy-shared/*": ["./shared/*"],
+      "@buddy-tests/*": ["./__tests__/*"]
     },
     "resolveJsonModule": true,
     "types": ["node", "electron-vite/node"],

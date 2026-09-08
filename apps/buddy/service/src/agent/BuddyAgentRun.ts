@@ -1,4 +1,4 @@
-import type { BuddyServiceTier, BuddyThinkingLevel } from '../../../shared/modelSelection'
+import type { BuddyServiceTier, BuddyThinkingLevel } from '../../../shared/conversation/modelSelection'
 import type { RunRecord } from '../storage/runRecord'
 import type { BuddyInputReferenceV1 } from './BuddyInputReference'
 import type { BuddySessionBlueprint } from './BuddySessionBlueprint'

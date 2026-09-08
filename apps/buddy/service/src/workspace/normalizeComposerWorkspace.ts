@@ -1,6 +1,6 @@
 import type { ComposerResourceService } from '../attachments/ComposerResourceService'
 import type { ConversationRepository } from '../storage/conversationRepository'
-import { parseBuddyChatCommand } from '../../../shared/buddyChatCommands'
+import { parseBuddyChatCommand } from '../../../shared/conversation/buddyChatCommands'
 import { BuddyServiceError } from '../rpc/runtimeRequest'
 
 export async function normalizeComposerWorkspace(value: unknown, options: {

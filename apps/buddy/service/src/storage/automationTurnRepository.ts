@@ -1,13 +1,13 @@
 import type { DatabaseSync } from 'node:sqlite'
-import type { BuddyThinkingLevel } from '../../../shared/modelSelection'
-import type { SpaceExecutionContext } from '../../../shared/space'
+import type { BuddyThinkingLevel } from '../../../shared/conversation/modelSelection'
+import type { SpaceExecutionContext } from '../../../shared/conversation/space'
 import type {
   AutomationOccurrenceRecord,
   AutomationOccurrenceRow,
 } from './automationOccurrenceRecord'
 import type { ConversationRecord } from './conversationRecord'
 import type { RunRecord } from './runRecord'
-import { spaceExecutionContextSchema } from '../../../shared/space'
+import { spaceExecutionContextSchema } from '../../../shared/conversation/space'
 import {
   requireAutomationOccurrenceRecord,
   toAutomationOccurrenceRecord,

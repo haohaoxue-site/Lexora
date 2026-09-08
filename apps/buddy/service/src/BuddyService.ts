@@ -1,6 +1,6 @@
 import type { DatabaseSync } from 'node:sqlite'
-
 import type { BuddySessionCompositionServices } from './agent/createBuddySessionComposition'
+
 import type { BuddyAgentSessionLike } from './agent/PiTurnExecutor'
 import type { AutomationClock } from './automations/AutomationScheduleEvaluator'
 import type { BuddyRuntime } from './BuddyRuntime'
@@ -12,6 +12,7 @@ import { join } from 'node:path'
 import process from 'node:process'
 import { currentPlatform } from '../../platform/currentPlatform'
 import { resolveWindowsPowerShell } from '../../platform/windows/powerShell'
+import { automationNotifications } from '../../shared/automation/automationApi'
 import { BuddyAgentRunner } from './agent/BuddyAgentRunner'
 import { BuddyRunExecutionPlanner } from './agent/BuddyRunExecutionPlanner'
 import { BuddySessionBlueprintService } from './agent/BuddySessionBlueprint'
@@ -286,7 +287,7 @@ export async function startBuddyService(
   })
   let automationScheduler: AutomationScheduler | null = null
   const automationChanges = new AutomationChangeCoordinator({
-    notify: automationId => options.rpc.notify('automation.changed', { automationId }),
+    notify: automationId => options.rpc.notify(automationNotifications.changed.method, { automationId }),
     service: automationService,
     wakeScheduler: () => automationScheduler?.wake(),
   })

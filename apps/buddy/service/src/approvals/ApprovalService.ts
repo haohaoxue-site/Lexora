@@ -4,7 +4,7 @@ import type {
   BrowserApprovalReviewInput,
   PathApprovalReviewInput,
   SystemActionApprovalReviewInput,
-} from '../../../shared/approvalReviewPayload'
+} from '../../../shared/permissions/approvalReviewPayload'
 import type { AppendBuddyRunEventInput } from '../events/BuddyRunEvent'
 import type { ToolCallBlockingError } from '../permissions/permissionContract'
 import type {
@@ -12,7 +12,7 @@ import type {
   ApprovalRepository,
 } from '../storage/approvalRepository'
 import { randomUUID } from 'node:crypto'
-import { createApprovalReviewPayload } from '../../../shared/approvalReviewPayload'
+import { createApprovalReviewPayload } from '../../../shared/permissions/approvalReviewPayload'
 
 export const APPROVAL_WAIT_TIMEOUT_MS = 30 * 60 * 1_000
 

@@ -1,5 +1,5 @@
-import definitions from '../../../apps/buddy/platform/definitions.json' with { type: 'json' }
-import searchTools from '../../../apps/buddy/platform/searchTools.json' with { type: 'json' }
+import searchTools from '../../../apps/buddy/platform/native/searchTools.json' with { type: 'json' }
+import definitions from '../../../apps/buddy/shared/platform/definitions.json' with { type: 'json' }
 import { nativeHostResources } from './native-host.mjs'
 
 export function resolvePackagingPlatform(id) {

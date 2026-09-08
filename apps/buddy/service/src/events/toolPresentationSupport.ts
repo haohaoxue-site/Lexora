@@ -1,6 +1,6 @@
-import type { BuddyToolPresentation } from '../../../shared/runEventPresentation'
+import type { BuddyToolPresentation } from '../../../shared/runs/runEventPresentation'
 
-import { redactSensitiveText } from '../../../shared/approvalReviewPayload'
+import { redactSensitiveText } from '../../../shared/permissions/approvalReviewPayload'
 
 export const MAX_TOOL_PRESENTATION_OUTPUT_LENGTH = 64 * 1024
 

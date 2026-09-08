@@ -1,5 +1,5 @@
 import type { DatabaseSync } from 'node:sqlite'
-import type { BuddyThinkingLevel } from '../../../shared/modelSelection'
+import type { BuddyThinkingLevel } from '../../../shared/conversation/modelSelection'
 
 export interface DefaultModelRecord {
   providerId: string

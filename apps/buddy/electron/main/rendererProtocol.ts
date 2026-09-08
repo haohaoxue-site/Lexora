@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises'
 import { extname, join } from 'node:path'
 import { protocol } from 'electron'
-import { containsCanonicalPath, filePaths } from '../../platform/filePaths'
+import { containsCanonicalPath, filePaths } from '../../platform/filesystem/filePaths'
 
 const RENDERER_PROTOCOL = 'lexora-app'
 const MIME_TYPES: Record<string, string> = {

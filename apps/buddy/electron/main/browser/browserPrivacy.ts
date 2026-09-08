@@ -1,4 +1,4 @@
-import type { BrowserObservedElement } from '../../../shared/browserProtocol'
+import type { BrowserObservedElement } from '../../../shared/browser'
 
 type BrowserObservedValue = Pick<
   BrowserObservedElement,

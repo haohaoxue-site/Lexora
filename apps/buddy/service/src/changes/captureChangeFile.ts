@@ -3,7 +3,7 @@ import { Buffer } from 'node:buffer'
 import { createHash } from 'node:crypto'
 import { constants } from 'node:fs'
 import { lstat, open, realpath } from 'node:fs/promises'
-import { redactSensitiveText } from '../../../shared/approvalReviewPayload'
+import { redactSensitiveText } from '../../../shared/permissions/approvalReviewPayload'
 import { decodeText, isSensitivePath, MAX_CHANGE_HASH_BYTES, MAX_CHANGE_TEXT_BYTES } from './changeFileContent'
 
 interface ChangeFileContent {

@@ -2,9 +2,9 @@ import type {
   BuddyPromptDirective,
   BuddyUserContentV1,
   BuddyUserMessageResourceSnapshot,
-} from '../../../shared/buddyUserContent'
-import type { BuddyComposerDraftScope } from '../../../shared/composerDraft'
-import type { BuddyThinkingLevel } from '../../../shared/modelSelection'
+} from '../../../shared/conversation/buddyUserContent'
+import type { BuddyComposerDraftScope } from '../../../shared/conversation/composerDraft'
+import type { BuddyThinkingLevel } from '../../../shared/conversation/modelSelection'
 import type { BuddyAgentRunner } from '../agent/BuddyAgentRunner'
 import type { BuddyTurnLauncher } from '../agent/BuddyTurnLauncher'
 import type { SkillService } from '../agent/SkillService'
@@ -41,16 +41,16 @@ import type {
 import { Buffer } from 'node:buffer'
 import { createHash, randomUUID } from 'node:crypto'
 import { basename, isAbsolute, join } from 'node:path'
-import { readBoundedFile } from '../../../platform/boundedFile'
+import { readBoundedFile } from '../../../platform/filesystem/boundedFile'
 import {
   materializeBuddyPromptCommand,
   parseBuddyChatCommand,
-} from '../../../shared/buddyChatCommands'
+} from '../../../shared/conversation/buddyChatCommands'
 import {
   buddyUserContentToText,
   buddyUserMessageContentV1Schema,
-} from '../../../shared/buddyUserContent'
-import { isBuddyThinkingLevel } from '../../../shared/modelSelection'
+} from '../../../shared/conversation/buddyUserContent'
+import { isBuddyThinkingLevel } from '../../../shared/conversation/modelSelection'
 import {
   BuddySkillSelectionError,
   formatBuddySkillPrompt,

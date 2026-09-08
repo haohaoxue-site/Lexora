@@ -4,8 +4,8 @@ import type {
   BuddyComposerDraftOpen,
   BuddyComposerDraftSave,
   BuddyComposerDraftScope,
-} from '../../../shared/composerDraft'
-import { buddyComposerDraftSchema } from '../../../shared/composerDraft'
+} from '../../../shared/conversation/composerDraft'
+import { buddyComposerDraftSchema } from '../../../shared/conversation/composerDraft'
 import { withTransaction } from './database'
 
 interface ComposerDraftRow {

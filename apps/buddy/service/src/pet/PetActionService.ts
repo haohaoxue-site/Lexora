@@ -1,4 +1,4 @@
-import type { RuntimeRpcPeerContract } from '../../../shared/runtimeRpcPeer'
+import type { RuntimeRpcPeerContract } from '../../../shared/runtime/rpcPeer'
 import type { AppendBuddyRunEventInput } from '../events/BuddyRunEvent'
 import type { PetMacroId } from './petMacroCatalog'
 import { randomUUID } from 'node:crypto'
@@ -6,7 +6,7 @@ import { randomUUID } from 'node:crypto'
 import {
   petExecuteSequenceParamsSchema,
   petExecuteSequenceResultSchema,
-} from '../../../shared/petProtocol'
+} from '../../../shared/runtime/petProtocol'
 import { compilePetMacro } from './petMacroCatalog'
 import { createPetToolPresentation, PET_TOOL_NAME } from './petToolContract'
 

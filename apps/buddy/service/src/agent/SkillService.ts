@@ -6,16 +6,13 @@ import { createHash } from 'node:crypto'
 import { mkdir, realpath } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { loadSkillsFromDir, stripFrontmatter } from '@earendil-works/pi-coding-agent'
+import { readBoundedFile } from '../../../platform/filesystem/boundedFile'
 
-import { z } from 'zod'
-import { readBoundedFile } from '../../../platform/boundedFile'
+import { skillsRpc } from '../../../shared/skills/skillApi'
 import { GrantedPathError, resolveGrantedPath } from '../directories/resolveGrantedPath'
-import { parse } from '../rpc/runtimeRequest'
+import { registerRuntimeRequest } from '../rpc/runtimeRequest'
 
 const MAX_MATERIALIZED_SKILL_BYTES = 256 * 1024
-const skillScopeSchema = z.object({
-  spaceId: z.string().trim().min(1).max(256).nullable(),
-}).strict()
 
 export type BuddySkillSource = 'builtin' | 'directory' | 'global' | 'space'
 
@@ -217,8 +214,7 @@ export function registerSkillServiceRpc(
   rpc: RuntimeRequestRegistrar,
   service: SkillService,
 ): () => void {
-  return rpc.onRequest('skills.list', async (params) => {
-    const input = parse(skillScopeSchema, params)
+  return registerRuntimeRequest(rpc, skillsRpc.list, async (input) => {
     const result = await service.loadForSpace(input.spaceId)
     return {
       diagnostics: result.diagnostics,

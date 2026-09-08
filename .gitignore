@@ -158,6 +158,8 @@ CLAUDE.md
 skills-lock.json
 todos/
 __tests__
+!/apps/buddy/**/__tests__/
+!/apps/buddy/**/__tests__/**
 !/apps/buddy/native/**
 /apps/buddy/native/target/
 infrastructure/_scripts

@@ -1,4 +1,4 @@
-import type { BuddyServiceTier } from '../../../shared/modelSelection'
+import type { BuddyServiceTier } from '../../../shared/conversation/modelSelection'
 
 export interface BuddyRunContext {
   flushProjectedEvents: () => Promise<void>

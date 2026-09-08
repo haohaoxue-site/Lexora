@@ -1,10 +1,10 @@
-import type { RuntimeRpcPeerContract } from '../../../shared/runtimeRpcPeer'
+import type { RuntimeRpcPeerContract } from '../../../shared/runtime/rpcPeer'
 import type { NativePetSupervisor } from './NativePetSupervisor'
 
 import {
   petExecuteSequenceParamsSchema,
   petExecuteSequenceResultSchema,
-} from '../../../shared/petProtocol'
+} from '../../../shared/runtime/petProtocol'
 
 export function registerPetHostRpc(
   peer: RuntimeRpcPeerContract,

@@ -1,4 +1,4 @@
-import type { BuddyToolPresentation } from '../../../shared/runEventPresentation'
+import type { BuddyToolPresentation } from '../../../shared/runs/runEventPresentation'
 import type { CreateBuddyToolPresentationInput } from '../events/toolPresentationSupport'
 import { boundedToolPreview, readOptionalString, readRecord, readToolDetails, readToolOutput } from '../events/toolPresentationSupport'
 

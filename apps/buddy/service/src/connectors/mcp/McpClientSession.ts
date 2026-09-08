@@ -1,4 +1,5 @@
-import type { ConnectorCredential, McpServerConfig } from './mcpSchemas'
+import type { ConnectorCredential } from '../../../../shared/connectors/connectorCredentials'
+import type { McpServerConfig } from './mcpSchemas'
 import { Client } from '@modelcontextprotocol/sdk/client/index.js'
 import { createMcpTransport } from './createMcpTransport'
 

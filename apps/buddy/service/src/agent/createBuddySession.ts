@@ -5,9 +5,9 @@ import type {
   LoadExtensionsResult,
   ModelRuntime,
 } from '@earendil-works/pi-coding-agent'
-import type { BuddyApprovalPolicy } from '../../../shared/approvalPolicy'
-import type { BuddyExecutionProfile } from '../../../shared/executionProfile'
-import type { BuddyServiceTier } from '../../../shared/modelSelection'
+import type { BuddyServiceTier } from '../../../shared/conversation/modelSelection'
+import type { BuddyApprovalPolicy } from '../../../shared/permissions/approvalPolicy'
+import type { BuddyExecutionProfile } from '../../../shared/permissions/executionProfile'
 import type { BuddySessionResources } from './BuddySessionResources'
 import type { BuddyInProcessExtension } from './createBuddyResourceLoader'
 import type { BoundedContextDiagnostic } from './loadBoundedContextFiles'
@@ -22,7 +22,7 @@ import {
   getLatestCompactionEntry,
   SessionManager,
 } from '@earendil-works/pi-coding-agent'
-import { containsCanonicalPath } from '../../../platform/filePaths'
+import { containsCanonicalPath } from '../../../platform/filesystem/filePaths'
 import {
   BuddySessionCreationError,
   isMissingBuddySessionFile,

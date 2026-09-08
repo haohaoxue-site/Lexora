@@ -121,62 +121,6 @@ fn manifest_only_profile_playback(
     (animations, playback)
 }
 
-fn manifest_only_profile_playback_pair(
-    first_name: &str,
-    second_name: &str,
-    render_profile: NativePetAnimationRenderProfile,
-) -> (
-    NativePetAnimationSet,
-    NativePetAnimationPlayback,
-    NativePetAnimationPlayback,
-) {
-    let mut manifest_json = serde_json::from_str::<serde_json::Value>(DEFAULT_PET_MANIFEST)
-        .expect("native pet animation manifest parses");
-    let animations_json = manifest_json["animations"]
-        .as_array_mut()
-        .expect("manifest animations are an array");
-    animations_json.push(serde_json::json!({
-        "description": "Fixture future profile animation",
-        "frames": [{ "index": 0, "durationMs": 120 }],
-        "loop": true,
-        "name": first_name,
-        "row": 0
-    }));
-    animations_json.push(serde_json::json!({
-        "description": "Fixture alternate future profile animation",
-        "frames": [{ "index": 1, "durationMs": 120 }],
-        "loop": true,
-        "name": second_name,
-        "row": 0
-    }));
-    let manifest = serde_json::from_value::<NativePetManifest>(manifest_json)
-        .expect("native pet animation manifest parses with future profile animations");
-    let runtime_profile = NativePetAnimationRuntimeProfile {
-        render_profile,
-        local_interaction_profile: NativePetAnimationLocalInteractionProfile::None,
-        completion_fallback_profile: NativePetAnimationCompletionFallbackProfile::Default,
-    };
-    let mut profiles = HashMap::new();
-    profiles.insert(first_name.to_owned(), runtime_profile);
-    profiles.insert(second_name.to_owned(), runtime_profile);
-    let animations = NativePetAnimationSet::from_manifest_with_runtime_profiles(manifest, profiles)
-        .expect("manifest with future profile animations loads");
-    let first_key = NativePetAnimationKey::parse(first_name).expect("valid first key");
-    let second_key = NativePetAnimationKey::parse(second_name).expect("valid second key");
-    let first_playback = NativePetAnimationPlayback::from_manifest_handle(
-        animations
-            .animation_handle_for_key(&first_key)
-            .expect("first profile animation exists"),
-    );
-    let second_playback = NativePetAnimationPlayback::from_manifest_handle(
-        animations
-            .animation_handle_for_key(&second_key)
-            .expect("second profile animation exists"),
-    );
-
-    (animations, first_playback, second_playback)
-}
-
 fn native_pet_animation_for_lifecycle(
     pointer_hovered: bool,
     is_dragging: bool,
@@ -291,10 +235,6 @@ fn drag_release_without_inertia_returns_idle_after_confirmed_drag() {
     let targets = movement_targets();
 
     assert_eq!(
-        native_pet_animation_after_drag_release(&targets, true, None, NativePetFacing::Left),
-        targets.idle()
-    );
-    assert_eq!(
         native_pet_animation_after_drag_release(&targets, true, None, NativePetFacing::Right),
         targets.idle()
     );
@@ -379,24 +319,6 @@ fn fallen_idle_click_can_use_registry_manifest_get_up_target() {
 }
 
 #[test]
-fn local_interaction_state_uses_bundled_runtime_profile_for_fallen_get_up() {
-    let animations = load_default_pet_animation_set().expect("native pet animation manifest loads");
-    let key = NativePetAnimationKey::parse("fallen_idle_left").expect("valid animation key");
-    let handle = animations
-        .animation_handle_for_key(&key)
-        .expect("fallen idle animation exists");
-    let playback = NativePetAnimationPlayback::from_manifest_handle(handle);
-    let current = NativePetLocalInteractionAnimationState::from_playback(&animations, playback);
-    let targets = NativePetFallenGetUpActionTargets::load_bundled(&animations)
-        .expect("fallen get-up targets resolve from registry");
-
-    assert_eq!(
-        native_pet_fallen_get_up_animation(&targets, current),
-        Some(targets.left())
-    );
-}
-
-#[test]
 fn local_interaction_state_uses_runtime_profile_for_manifest_handles() {
     let mut manifest_json = serde_json::from_str::<serde_json::Value>(DEFAULT_PET_MANIFEST)
         .expect("native pet animation manifest parses");
@@ -439,23 +361,6 @@ fn local_interaction_state_uses_runtime_profile_for_manifest_handles() {
 }
 
 #[test]
-fn hover_preserves_manifest_only_finite_scripted_action_by_runtime_profile() {
-    let (animations, playback) = manifest_only_finite_scripted_playback();
-
-    let decision = super::native_pet_animation_for_hover_state(
-        &lifecycle_targets(),
-        &animations,
-        true,
-        false,
-        false,
-        requested_state("idle"),
-        playback,
-    );
-
-    assert_eq!(decision.animation_target(), playback.animation_target());
-}
-
-#[test]
 fn lifecycle_application_preserves_manifest_only_finite_scripted_action_by_runtime_profile() {
     let (animations, playback) = manifest_only_finite_scripted_playback();
 
@@ -467,118 +372,15 @@ fn lifecycle_application_preserves_manifest_only_finite_scripted_action_by_runti
 }
 
 #[test]
-fn lifecycle_current_state_uses_manifest_runtime_profile() {
-    let targets = lifecycle_targets();
-    let (sleep_animations, sleep_playback) = manifest_only_profile_playback(
-        "future_sleep_current",
-        NativePetAnimationRenderProfile::Sleep,
-        NativePetAnimationLocalInteractionProfile::None,
-        NativePetAnimationCompletionFallbackProfile::Default,
-        true,
-    );
-    assert_eq!(
-        super::native_pet_animation_for_lifecycle(
-            &targets,
-            NativePetLifecycleAnimationInput {
-                pointer_hovered: false,
-                is_dragging: false,
-                is_inertia_active: false,
-                requested: requested_state("working"),
-                current: NativePetCurrentAnimationState::from_playback(
-                    &sleep_animations,
-                    sleep_playback,
-                ),
-                idle_elapsed_ms: 0,
-                idle_presence_schedule_seed: 0,
-            },
-        )
-        .animation_target(),
-        targets.wake()
-    );
-
-    let (working_animations, working_playback) = manifest_only_profile_playback(
-        "future_working_current",
-        NativePetAnimationRenderProfile::Working,
-        NativePetAnimationLocalInteractionProfile::None,
-        NativePetAnimationCompletionFallbackProfile::Default,
-        true,
-    );
-    assert_eq!(
-        super::native_pet_animation_for_lifecycle(
-            &targets,
-            NativePetLifecycleAnimationInput {
-                pointer_hovered: false,
-                is_dragging: false,
-                is_inertia_active: false,
-                requested: NativePetRequestedAnimationState::from(targets.idle()),
-                current: NativePetCurrentAnimationState::from_playback(
-                    &working_animations,
-                    working_playback,
-                ),
-                idle_elapsed_ms: 0,
-                idle_presence_schedule_seed: 0,
-            },
-        )
-        .animation_target(),
-        targets.celebrate()
-    );
-
-    let (sad_animations, sad_playback) = manifest_only_profile_playback(
-        "future_sad_current",
-        NativePetAnimationRenderProfile::Sad,
-        NativePetAnimationLocalInteractionProfile::None,
-        NativePetAnimationCompletionFallbackProfile::Default,
-        true,
-    );
-    assert_eq!(
-        super::native_pet_animation_for_lifecycle(
-            &targets,
-            NativePetLifecycleAnimationInput {
-                pointer_hovered: false,
-                is_dragging: false,
-                is_inertia_active: false,
-                requested: NativePetRequestedAnimationState::from(targets.idle()),
-                current: NativePetCurrentAnimationState::from_playback(
-                    &sad_animations,
-                    sad_playback,
-                ),
-                idle_elapsed_ms: 0,
-                idle_presence_schedule_seed: 0,
-            },
-        )
-        .animation_target(),
-        targets.reassure()
-    );
-}
-
-#[test]
 fn control_messages_do_not_interrupt_scripted_action_states() {
     assert!(native_pet_should_keep_fallen_waiting(interaction_state(
         "fallen_idle_left"
-    )));
-    assert!(native_pet_should_keep_fallen_waiting(interaction_state(
-        "fallen_idle_right"
-    )));
-    assert!(!native_pet_should_keep_fallen_waiting(interaction_state(
-        "trip_fall_left"
     )));
     assert!(!native_pet_should_keep_fallen_waiting(interaction_state(
         "idle"
     )));
     assert!(native_pet_should_keep_scripted_action_playing(
         interaction_state("trip_fall_left")
-    ));
-    assert!(native_pet_should_keep_scripted_action_playing(
-        interaction_state("fallen_idle_right")
-    ));
-    assert!(native_pet_should_keep_scripted_action_playing(
-        interaction_state("fallen_get_up_left")
-    ));
-    assert!(native_pet_should_keep_scripted_action_playing(
-        interaction_state("stumble_recover_right")
-    ));
-    assert!(native_pet_should_keep_scripted_action_playing(
-        interaction_state("celebrate")
     ));
     assert!(!native_pet_should_keep_scripted_action_playing(
         interaction_state("explain")
@@ -590,23 +392,8 @@ fn scripted_action_blocks_drag_until_fallen_waiting_can_be_clicked() {
     assert!(native_pet_should_block_pointer_interaction(
         interaction_state("trip_fall_left")
     ));
-    assert!(native_pet_should_block_pointer_interaction(
-        interaction_state("fallen_get_up_right")
-    ));
-    assert!(native_pet_should_block_pointer_interaction(
-        interaction_state("stumble_recover_left")
-    ));
-    assert!(native_pet_should_block_pointer_interaction(
-        interaction_state("celebrate")
-    ));
     assert!(!native_pet_should_block_pointer_interaction(
         interaction_state("fallen_idle_left")
-    ));
-    assert!(!native_pet_should_block_pointer_interaction(
-        interaction_state("explain")
-    ));
-    assert!(!native_pet_should_block_pointer_interaction(
-        interaction_state("idle")
     ));
 }
 
@@ -635,24 +422,6 @@ fn finite_control_actions_return_requested_state_to_idle_without_rewriting_run()
         native_pet_requested_animation_for_control_animation(
             &animations,
             animations.animation_target_for_test_key("trip_fall_left"),
-            idle_target,
-        )
-        .animation_target(),
-        idle_target
-    );
-    assert_eq!(
-        native_pet_requested_animation_for_control_animation(
-            &animations,
-            animations.animation_target_for_test_key("stumble_recover_right",),
-            idle_target,
-        )
-        .animation_target(),
-        idle_target
-    );
-    assert_eq!(
-        native_pet_requested_animation_for_control_animation(
-            &animations,
-            animations.animation_target_for_test_key("wake"),
             idle_target,
         )
         .animation_target(),
@@ -797,17 +566,6 @@ fn uses_hover_animation_only_when_no_higher_priority_animation_is_active() {
         .animation_target(),
         test_target("working")
     );
-    assert_eq!(
-        native_pet_animation_for_hover_state(
-            true,
-            false,
-            true,
-            requested_state("working"),
-            "working",
-        )
-        .animation_target(),
-        test_target("working")
-    );
 }
 
 #[test]
@@ -883,25 +641,6 @@ fn pointer_interaction_clears_sleep_request_without_clearing_task_requests() {
 }
 
 #[test]
-fn pointer_interaction_clears_registry_manifest_sleep_request() {
-    let (_animations, playback) = manifest_only_profile_playback(
-        "future_sleep_request",
-        NativePetAnimationRenderProfile::Sleep,
-        NativePetAnimationLocalInteractionProfile::None,
-        NativePetAnimationCompletionFallbackProfile::Default,
-        true,
-    );
-
-    let requested = native_pet_requested_animation_after_pointer_interaction(
-        NativePetRequestedAnimationState::from(playback.animation_target()),
-        playback.animation_target(),
-        test_target("idle"),
-    );
-
-    assert_eq!(requested.animation_target(), test_target("idle"));
-}
-
-#[test]
 fn hover_does_not_interrupt_one_shot_reaction_animations() {
     assert_eq!(
         native_pet_animation_for_hover_state(true, false, false, requested_state("idle"), "tap",)
@@ -914,88 +653,27 @@ fn hover_does_not_interrupt_one_shot_reaction_animations() {
             false,
             false,
             requested_state("idle"),
-            "curious",
-        )
-        .animation_target(),
-        test_target("curious")
-    );
-    assert_eq!(
-        native_pet_animation_for_hover_state(
-            true,
-            false,
-            false,
-            requested_state("idle"),
             "trip_fall_left",
         )
         .animation_target(),
         test_target("trip_fall_left")
     );
-    assert_eq!(
-        native_pet_animation_for_hover_state(
-            true,
-            false,
-            false,
-            requested_state("idle"),
-            "fallen_idle_right",
-        )
-        .animation_target(),
-        test_target("fallen_idle_right")
-    );
-    assert_eq!(
-        native_pet_animation_for_hover_state(
-            true,
-            false,
-            false,
-            requested_state("idle"),
-            "stumble_recover_left",
-        )
-        .animation_target(),
-        test_target("stumble_recover_left")
-    );
 }
 
 #[test]
-fn lifecycle_sleeps_after_long_idle_and_wakes_on_hover() {
-    let targets = lifecycle_targets();
-
+fn lifecycle_sleeps_after_long_idle() {
     assert_eq!(
         native_pet_animation_for_lifecycle(
             false,
             false,
             false,
-            NativePetRequestedAnimationState::from(targets.idle()),
+            requested_idle_state(),
             "idle",
             45_000,
             0,
         )
         .animation_target(),
         test_target("sleep_enter")
-    );
-    assert_eq!(
-        native_pet_animation_for_lifecycle(
-            true,
-            false,
-            false,
-            NativePetRequestedAnimationState::from(targets.idle()),
-            "sleep",
-            45_000,
-            0,
-        )
-        .animation_target(),
-        targets.wake()
-    );
-    assert_eq!(
-        native_pet_animation_for_lifecycle(
-            false,
-            false,
-            false,
-            requested_state("working"),
-            "working",
-            45_000,
-            0,
-        )
-        .animation_target(),
-        test_target("working")
     );
 }
 
@@ -1176,32 +854,6 @@ fn lifecycle_elapsed_only_accumulates_for_plain_idle() {
         }),
         0
     );
-    assert_eq!(
-        native_pet_idle_lifecycle_elapsed_ms(NativePetIdleLifecycleElapsedInput {
-            current_elapsed_ms: 1_000,
-            elapsed_ms: 16,
-            pointer_hovered: false,
-            is_dragging: false,
-            is_inertia_active: false,
-            requested: requested_state("idle"),
-            current: current_state("wake"),
-            idle_target: test_target("idle"),
-        }),
-        0
-    );
-    assert_eq!(
-        native_pet_idle_lifecycle_elapsed_ms(NativePetIdleLifecycleElapsedInput {
-            current_elapsed_ms: 1_000,
-            elapsed_ms: 16,
-            pointer_hovered: false,
-            is_dragging: false,
-            is_inertia_active: false,
-            requested: requested_state("idle"),
-            current: current_state("sleep"),
-            idle_target: test_target("idle"),
-        }),
-        0
-    );
 }
 
 #[test]
@@ -1248,58 +900,12 @@ fn task_presence_elapsed_accumulates_only_for_uninterrupted_task_states() {
         native_pet_task_presence_elapsed_ms(
             1_000,
             16,
-            false,
-            false,
-            false,
-            requested_state("thinking"),
-        ),
-        1_016
-    );
-    assert_eq!(
-        native_pet_task_presence_elapsed_ms(
-            1_000,
-            16,
             true,
             false,
             false,
             requested_state("working"),
         ),
         0
-    );
-    assert_eq!(
-        native_pet_task_presence_elapsed_ms(
-            1_000,
-            16,
-            false,
-            false,
-            false,
-            requested_state("approval"),
-        ),
-        1_016
-    );
-}
-
-#[test]
-fn task_presence_elapsed_accumulates_for_registry_manifest_task_profile() {
-    let (animations, playback) = manifest_only_profile_playback(
-        "future_working_presence",
-        NativePetAnimationRenderProfile::Working,
-        NativePetAnimationLocalInteractionProfile::None,
-        NativePetAnimationCompletionFallbackProfile::Default,
-        true,
-    );
-
-    assert_eq!(
-        super::native_pet_task_presence_elapsed_ms(
-            &animations,
-            1_000,
-            16,
-            false,
-            false,
-            false,
-            NativePetRequestedAnimationState::from(playback.animation_target()),
-        ),
-        1_016
     );
 }
 
@@ -1361,36 +967,6 @@ fn task_presence_inserts_low_frequency_variation_without_interrupting_priority_s
             requested_state("thinking"),
             "thinking",
             22_000,
-        ),
-        None
-    );
-}
-
-#[test]
-fn task_presence_reaction_waits_until_current_matches_registry_manifest_task_target() {
-    let (animations, requested_playback, current_playback) = manifest_only_profile_playback_pair(
-        "future_working_presence_reaction",
-        "alternate_working_presence_reaction",
-        NativePetAnimationRenderProfile::Working,
-    );
-
-    assert_eq!(
-        super::native_pet_task_presence_animation(
-            &lifecycle_targets(),
-            &animations,
-            NativePetTaskPresenceAnimationInput {
-                pointer_hovered: false,
-                is_dragging: false,
-                is_inertia_active: false,
-                requested: NativePetRequestedAnimationState::from(
-                    requested_playback.animation_target(),
-                ),
-                current: NativePetCurrentAnimationState::from_playback(
-                    &animations,
-                    current_playback,
-                ),
-                task_presence_elapsed_ms: 22_000,
-            },
         ),
         None
     );

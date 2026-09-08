@@ -1,4 +1,4 @@
-import type { SystemActionApprovalReviewInput } from '../../../shared/approvalReviewPayload'
+import type { SystemActionApprovalReviewInput } from '../../../shared/permissions/approvalReviewPayload'
 
 export const SYSTEM_ACTION_KINDS = [
   'kill-process',

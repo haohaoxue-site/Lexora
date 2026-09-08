@@ -1,8 +1,8 @@
-import type { RuntimeRpcPeerContract } from '../../../shared/runtimeRpcPeer'
+import type { RuntimeRpcPeerContract } from '../../../shared/runtime/rpcPeer'
 import { Buffer } from 'node:buffer'
 import { randomUUID } from 'node:crypto'
 import { session } from 'electron'
-import { WebError, webError, webNetworkRequestSchema, webRenderCancelSchema, webRenderInputSchema } from '../../../shared/webProtocol'
+import { WebError, webError, webNetworkRequestSchema, webRenderCancelSchema, webRenderInputSchema } from '../../../shared/network/webProtocol'
 import { HostWebNetwork } from './HostWebNetwork'
 import { renderWebDocument } from './WebRenderHost'
 

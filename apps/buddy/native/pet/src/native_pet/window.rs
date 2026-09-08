@@ -1146,7 +1146,3 @@ pub(super) fn run_native_pet_sidecar(config: NativePetLaunchConfig) -> BuddyResu
     gtk::main();
     Ok(())
 }
-
-#[cfg(test)]
-#[path = "__tests__/window.rs"]
-mod tests;

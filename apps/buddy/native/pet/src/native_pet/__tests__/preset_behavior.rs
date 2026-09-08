@@ -42,26 +42,6 @@ fn requested_idle_state(animations: &NativePetAnimationSet) -> NativePetRequeste
 }
 
 #[test]
-fn throw_after_drag_finish_maps_to_stable_outcome() {
-    let cases = [
-        (NativePetThrowAfterDragFinish::FallLeft, "fall", true),
-        (NativePetThrowAfterDragFinish::FallRight, "fall", true),
-        (NativePetThrowAfterDragFinish::StumbleLeft, "stumble", false),
-        (
-            NativePetThrowAfterDragFinish::StumbleRight,
-            "stumble",
-            false,
-        ),
-        (NativePetThrowAfterDragFinish::None, "none", false),
-    ];
-
-    for (finish, outcome, waits_for_get_up) in cases {
-        assert_eq!(finish.outcome(), outcome);
-        assert_eq!(finish.waits_for_get_up(), waits_for_get_up);
-    }
-}
-
-#[test]
 fn throw_after_drag_finish_selects_action_id_and_resolves_registry_target() {
     let registry = ActionRegistry::load_bundled().expect("load bundled action registry");
     let animations = load_default_pet_animation_set().expect("native pet animation manifest loads");

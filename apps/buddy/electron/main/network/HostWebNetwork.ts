@@ -1,7 +1,7 @@
 import type { Session } from 'electron'
-import type { WebNetworkRequest } from '../../../shared/webProtocol'
-import { publicWebUrl } from '../../../shared/network/publicWebTransport'
-import { WebError } from '../../../shared/webProtocol'
+import type { WebNetworkRequest } from '../../../shared/network/webProtocol'
+import { publicWebUrl } from '../../../platform/network/publicWebTransport'
+import { WebError } from '../../../shared/network/webProtocol'
 import { requestThroughHost } from './requestThroughHost'
 
 export class HostWebNetwork {

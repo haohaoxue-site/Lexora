@@ -18,7 +18,7 @@ import {
   findCutPoint,
   sessionEntryToContextMessages,
 } from '@earendil-works/pi-coding-agent'
-import { BUDDY_DEFAULT_THINKING_LEVEL } from '../../../shared/modelSelection'
+import { BUDDY_DEFAULT_THINKING_LEVEL } from '../../../shared/conversation/modelSelection'
 import { readBuddyInputReference } from './BuddyInputReference'
 import { toBuddySessionStorageError } from './BuddySessionErrors'
 import { buildBuddyRequestContext } from './buildBuddyRequestContext'

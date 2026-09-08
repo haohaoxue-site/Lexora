@@ -1,4 +1,4 @@
-import type { BuddyComposerDraftSend } from '../../shared/composerDraft'
+import type { BuddyComposerDraftSend } from '../../shared/conversation/composerDraft'
 import type { toPublicRun } from './runs/publicRun'
 
 export interface BuddyTurnContextItem {

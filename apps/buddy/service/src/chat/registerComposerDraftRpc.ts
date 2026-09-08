@@ -1,26 +1,23 @@
 import type { RuntimeRequestRegistrar } from '../rpc/runtimeRequest'
 import type { ComposerDraftService } from './ComposerDraftService'
-import {
-  buddyComposerDraftOpenSchema,
-  buddyComposerDraftSaveSchema,
-  buddyComposerDraftTargetSchema,
-} from '../../../shared/composerDraft'
-import { parse } from '../rpc/runtimeRequest'
+import { composerDraftsRpc } from '../../../shared/conversation/composerApi'
+
+import { registerRuntimeRequest } from '../rpc/runtimeRequest'
 
 export function registerComposerDraftRpc(options: {
   rpc: RuntimeRequestRegistrar
   service: ComposerDraftService
 }): () => void {
   const disposers = [
-    options.rpc.onRequest('composerDrafts.open', params => options.service.open(
-      parse(buddyComposerDraftOpenSchema, params),
+    registerRuntimeRequest(options.rpc, composerDraftsRpc.open, params => options.service.open(
+      params,
     )),
-    options.rpc.onRequest('composerDrafts.get', (params) => {
-      const { draftId } = parse(buddyComposerDraftTargetSchema, params)
+    registerRuntimeRequest(options.rpc, composerDraftsRpc.get, (params) => {
+      const { draftId } = params
       return options.service.get(draftId)
     }),
-    options.rpc.onRequest('composerDrafts.save', params => options.service.save(
-      parse(buddyComposerDraftSaveSchema, params),
+    registerRuntimeRequest(options.rpc, composerDraftsRpc.save, params => options.service.save(
+      params,
     )),
   ]
   return () => disposers.splice(0).forEach(dispose => dispose())

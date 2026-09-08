@@ -1,4 +1,4 @@
-import type { BuddyToolPresentation } from '../../../shared/runEventPresentation'
+import type { BuddyToolPresentation } from '../../../shared/runs/runEventPresentation'
 import type { BuddyToolClassificationResult } from '../approvals/toolClassification'
 import type { CreateBuddyToolPresentationInput } from '../events/toolPresentationSupport'
 import type { SystemActionRequest, SystemCapabilityService } from './systemCapability'
@@ -9,7 +9,7 @@ import type {
 import { Type } from 'typebox'
 import { Check } from 'typebox/value'
 
-import { redactSensitiveText } from '../../../shared/approvalReviewPayload'
+import { redactSensitiveText } from '../../../shared/permissions/approvalReviewPayload'
 import { createToolClassificationFailure } from '../approvals/toolClassification'
 import {
   boundedToolPreview,
