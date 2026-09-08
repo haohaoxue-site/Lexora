@@ -19,7 +19,11 @@ import DesktopIcon from '@/shared/ui/icon/DesktopIcon.vue'
 
 const props = defineProps<{
   appInfo: DesktopAppInfo | null
+  appSidebarCollapsed: boolean
   language: BuddyLocale
+}>()
+const emit = defineEmits<{
+  toggleAppSidebar: []
 }>()
 
 const desktopApi = requireDesktopApi()
@@ -151,9 +155,11 @@ function applyWindowState(state: DesktopWindowState) {
   <header class="desktop-title-bar" @dblclick="toggleMaximize">
     <div class="desktop-title-bar__safe-area">
       <DesktopWindowMenuBar
+        :app-sidebar-collapsed="appSidebarCollapsed"
         :language="language"
         :platform="platform"
         @command="executeDesktopCommand"
+        @toggle-app-sidebar="emit('toggleAppSidebar')"
       />
 
       <div

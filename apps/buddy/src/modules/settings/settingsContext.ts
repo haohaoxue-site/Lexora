@@ -17,7 +17,6 @@ export interface SettingsContext {
   platformCapabilities: Readonly<Ref<BuddyCapabilities | null>>
   providerSettings: ModelProvidersStore
   ready: Promise<void>
-  toggleAppSidebar: () => void
   webSettings: WebSettingsCapability
 }
 

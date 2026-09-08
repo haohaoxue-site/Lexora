@@ -12,7 +12,6 @@ export type AutomationPreviewState
     | { status: 'failed' }
 
 export interface AutomationEditorProps {
-  appSidebarCollapsed: boolean
   automation: LocalAutomation | null
   busy: boolean
   error: string | null
@@ -28,5 +27,4 @@ export interface AutomationEditorProps {
 export interface AutomationEditorEmits {
   cancel: []
   save: [draft: AutomationDefinitionDraft]
-  toggleAppSidebar: []
 }

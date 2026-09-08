@@ -21,6 +21,7 @@ interface UseDesktopWorkbenchResizeOptions {
   context: Readonly<Ref<HTMLElement | null>>
   sidebar: Readonly<Ref<HTMLElement | null>>
   sidebarResizable: () => boolean
+  sidebarVisible: () => boolean
 }
 
 const KEYBOARD_RESIZE_STEP = 16
@@ -31,8 +32,10 @@ export function useDesktopWorkbenchResize(options: UseDesktopWorkbenchResizeOpti
   const containerWidth = shallowRef(0)
   const preferredContextWidth = shallowRef<number | null>(null)
   const preferredSidebarWidth = shallowRef<number | null>(null)
+  const renderedSidebarWidth = shallowRef<number | null>(null)
   let resizeObserver: ResizeObserver | null = null
   let activePointerId: number | null = null
+  let activePointerTarget: HTMLElement | null = null
 
   const contextVisible = computed(() => options.context.value !== null)
   const widths = computed(() => resolveDesktopWorkbenchWidths({
@@ -42,13 +45,14 @@ export function useDesktopWorkbenchResize(options: UseDesktopWorkbenchResizeOpti
       ?? DESKTOP_WORKBENCH_WIDTH_LIMITS.context.minimum,
     preferredSidebarWidth: preferredSidebarWidth.value
       ?? DESKTOP_WORKBENCH_WIDTH_LIMITS.sidebar.minimum,
+    sidebarVisible: options.sidebarVisible(),
   }))
   const sidebarRange = computed(() => resolvePanelRange('sidebar'))
   const contextRange = computed(() => resolvePanelRange('context'))
   const layoutStyle = computed<Record<string, string>>(() => {
     const style: Record<string, string> = {}
     if (preferredSidebarWidth.value !== null && options.sidebarResizable())
-      style['--buddy-workspace-sidebar-width'] = `${widths.value.sidebarWidth}px`
+      style['--buddy-workspace-sidebar-width'] = `${renderedSidebarWidth.value ?? widths.value.sidebarWidth}px`
     if (preferredContextWidth.value !== null && contextVisible.value)
       style['--buddy-context-panel-width'] = `${widths.value.contextWidth}px`
     return style
@@ -72,6 +76,7 @@ export function useDesktopWorkbenchResize(options: UseDesktopWorkbenchResizeOpti
       contextVisible: contextVisible.value,
       contextWidth: widths.value.contextWidth,
       sidebarWidth: widths.value.sidebarWidth,
+      sidebarVisible: options.sidebarVisible(),
     })
   }
 
@@ -103,6 +108,10 @@ export function useDesktopWorkbenchResize(options: UseDesktopWorkbenchResizeOpti
       ?? preferredContextWidth.value
     activePanel.value = panel
     activePointerId = event.pointerId
+    activePointerTarget = event.currentTarget instanceof HTMLElement
+      ? event.currentTarget
+      : null
+    activePointerTarget?.setPointerCapture(event.pointerId)
     resizeFromClientX(panel, event.clientX)
     window.addEventListener('blur', finishResize)
     window.addEventListener('pointercancel', handlePointerEnd)
@@ -124,8 +133,15 @@ export function useDesktopWorkbenchResize(options: UseDesktopWorkbenchResizeOpti
   }
 
   function finishResize(): void {
+    if (
+      activePointerId !== null
+      && activePointerTarget?.hasPointerCapture(activePointerId)
+    ) {
+      activePointerTarget.releasePointerCapture(activePointerId)
+    }
     activePanel.value = null
     activePointerId = null
+    activePointerTarget = null
     window.removeEventListener('blur', finishResize)
     window.removeEventListener('pointercancel', handlePointerEnd)
     window.removeEventListener('pointermove', handlePointerMove)
@@ -171,6 +187,11 @@ export function useDesktopWorkbenchResize(options: UseDesktopWorkbenchResizeOpti
     await nextTick()
     measureLayout()
   }, { flush: 'post' })
+
+  watch(widths, (nextWidths) => {
+    if (options.sidebarVisible())
+      renderedSidebarWidth.value = nextWidths.sidebarWidth
+  }, { immediate: true })
 
   onBeforeUnmount(() => {
     resizeObserver?.disconnect()

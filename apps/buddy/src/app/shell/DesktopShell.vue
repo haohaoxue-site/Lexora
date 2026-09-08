@@ -23,7 +23,9 @@ const activeView = computed(() => route.meta.desktopView ?? 'tasks')
   <div class="desktop-shell">
     <DesktopTitleBar
       :app-info="appInfo"
+      :app-sidebar-collapsed="appSidebarCollapsed"
       :language="language"
+      @toggle-app-sidebar="toggleAppSidebar"
     />
     <div class="desktop-shell__body">
       <Transition name="desktop-app-sidebar">
@@ -44,7 +46,6 @@ const activeView = computed(() => route.meta.desktopView ?? 'tasks')
           @open-notification="navigation.openNotification"
           @open-task="navigation.openTask"
           @open-space="navigation.openSpace"
-          @toggle-sidebar="toggleAppSidebar"
           @refresh-notifications="loadNotifications"
         />
       </Transition>

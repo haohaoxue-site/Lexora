@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, shallowRef } from 'vue'
 import { useRouter } from 'vue-router'
 import { useTaskContext } from '@/modules/tasks/taskContext'
 import DesktopTaskSpaceSelector from '@/modules/tasks/widgets/composer/DesktopTaskSpaceSelector.vue'
@@ -18,13 +18,13 @@ const {
   tasks,
   notificationTargetMessageId,
   appSidebarCollapsed,
-  toggleAppSidebar,
 } = useTaskContext()
 const { language, workspace } = tasks
 const { pinnedItems, spaces, tasks: taskItems, ...indexActions } = tasks.index
 const { activeSpace, activeTaskId, currentTitle, openTask, startTask } = tasks.session
 const { getChangeSet, readArtifactText } = workspace.context
 const chatSession = workspace.session
+const taskSidebarCollapsed = shallowRef(false)
 const {
   activeTab,
   artifactCount,
@@ -56,7 +56,12 @@ const {
 </script>
 
 <template>
-  <DesktopWorkbenchLayout :language="language" sidebar-resizable>
+  <DesktopWorkbenchLayout
+    v-model:sidebar-collapsed="taskSidebarCollapsed"
+    :language="language"
+    sidebar-collapsible
+    sidebar-resizable
+  >
     <template #sidebar>
       <DesktopTaskIndex
         :active-conversation-id="activeTaskId"
@@ -74,7 +79,6 @@ const {
         @open-task="openTask"
         @rename-task="indexActions.renameTask"
         @update-pinned-items="indexActions.setPinnedItems"
-        @toggle-app-sidebar="toggleAppSidebar"
       />
     </template>
 

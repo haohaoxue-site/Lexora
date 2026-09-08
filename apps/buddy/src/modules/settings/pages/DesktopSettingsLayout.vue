@@ -8,7 +8,6 @@ const {
   applicationSettings,
   appSidebarCollapsed,
   platformCapabilities,
-  toggleAppSidebar,
 } = useSettingsContext()
 const { language } = applicationSettings
 </script>
@@ -20,7 +19,6 @@ const { language } = applicationSettings
         :app-sidebar-collapsed="appSidebarCollapsed"
         :language="language"
         :capabilities="platformCapabilities"
-        @toggle-app-sidebar="toggleAppSidebar"
       />
     </template>
     <RouterView />

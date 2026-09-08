@@ -11,7 +11,6 @@ export interface TaskContext {
   clipboard: LexoraDesktopApi['clipboard']
   notificationTargetMessageId: Readonly<Ref<string | null>>
   tasks: TaskCapability
-  toggleAppSidebar: () => void
 }
 
 export const { key: taskContextKey, useContext: useTaskContext }

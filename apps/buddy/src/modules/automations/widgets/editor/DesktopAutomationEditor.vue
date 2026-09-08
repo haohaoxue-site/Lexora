@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import type { AutomationEditorEmits, AutomationEditorProps } from './typing'
-import { PanelLeft20Regular } from '@vicons/fluent'
 import { NAlert, NButton, NForm, NFormItem, NInput, NScrollbar, NSelect, NSpin } from 'naive-ui'
 import { shallowRef } from 'vue'
 import { useBuddyI18n } from '@/i18n/buddyI18n'
@@ -31,16 +30,6 @@ function close(): void {
   <section class="desktop-automation-editor">
     <header class="desktop-automation-editor__header">
       <div class="desktop-automation-editor__breadcrumb">
-        <NButton
-          v-if="appSidebarCollapsed"
-          class="buddy-icon-button"
-          quaternary
-          @click="emit('toggleAppSidebar')"
-        >
-          <template #icon>
-            <DesktopIcon :component="PanelLeft20Regular" />
-          </template>
-        </NButton>
         <DesktopIcon name="navigationAutomation" />
         <button type="button" @click="close">
           {{ t('desktop.automations.title') }}

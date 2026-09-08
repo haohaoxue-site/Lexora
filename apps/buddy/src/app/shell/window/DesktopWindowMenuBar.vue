@@ -11,17 +11,23 @@ import {
   isDesktopCommandId,
   resolveDesktopShortcut,
 } from '@buddy-electron/shared/desktopCommands'
+import {
+  PanelLeft20Regular,
+} from '@vicons/fluent'
 import { NDropdown } from 'naive-ui'
 import { computed, h, shallowRef } from 'vue'
 import { useBuddyI18n } from '@/i18n/buddyI18n'
 import { BRAND_ASSET_URLS } from '@/shared/branding/brandAssets'
+import DesktopIcon from '@/shared/ui/icon/DesktopIcon.vue'
 
 const props = defineProps<{
+  appSidebarCollapsed: boolean
   language: BuddyLocale
   platform: DesktopPlatform
 }>()
 const emit = defineEmits<{
   command: [commandId: DesktopCommandId]
+  toggleAppSidebar: []
 }>()
 
 const activeMenu = shallowRef<DesktopCommandMenu | null>(null)
@@ -104,6 +110,16 @@ const nodeProps: DropdownNodeProps = () => ({
     @mousedown.stop
     @pointerdown.stop
   >
+    <button
+      type="button"
+      class="desktop-window-menu__sidebar-trigger"
+      :aria-label="t(appSidebarCollapsed ? 'desktop.layout.expandAppSidebar' : 'desktop.layout.collapseAppSidebar')"
+      :aria-expanded="!appSidebarCollapsed"
+      aria-controls="desktop-app-sidebar"
+      @click="emit('toggleAppSidebar')"
+    >
+      <DesktopIcon :component="PanelLeft20Regular" />
+    </button>
     <NDropdown
       v-for="menu in menuTriggers"
       :key="menu.id"
@@ -140,6 +156,37 @@ const nodeProps: DropdownNodeProps = () => ({
   align-items: center;
   padding-left: 0.25rem;
   -webkit-app-region: no-drag;
+}
+
+.desktop-window-menu__sidebar-trigger {
+  display: grid;
+  width: 1.5rem;
+  height: 1.5rem;
+  flex: none;
+  place-items: center;
+  border: 0;
+  border-radius: var(--buddy-radius-micro);
+  background: transparent;
+  color: var(--buddy-text-secondary);
+  cursor: default;
+  margin-right: 0.125rem;
+  padding: 0;
+  transition: background-color 80ms ease, color 80ms ease;
+
+  &:hover {
+    background: var(--buddy-state-hover);
+    color: var(--buddy-text-strong);
+  }
+
+  &:focus-visible {
+    outline: 1px solid var(--buddy-focus-ring);
+    outline-offset: -1px;
+  }
+
+  .desktop-icon {
+    width: 1rem;
+    height: 1rem;
+  }
 }
 
 .desktop-window-menu__trigger {

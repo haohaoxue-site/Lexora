@@ -41,7 +41,6 @@ const emit = defineEmits<{
   newTask: [spaceId: string | null]
   openTask: [conversationId: string]
   renameTask: [conversationId: string, title: string]
-  toggleAppSidebar: []
   updatePinnedItems: [items: DesktopTaskPinnedItem[]]
 }>()
 
@@ -107,7 +106,6 @@ const {
       <DesktopWorkspaceSidebarIdentity
         :label="t('desktop.navigation.tasks')"
         :visible="appSidebarCollapsed"
-        @restore="emit('toggleAppSidebar')"
       />
       <button
         class="desktop-task-sidebar__new-trigger"
