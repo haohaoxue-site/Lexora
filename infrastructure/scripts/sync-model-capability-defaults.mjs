@@ -267,7 +267,7 @@ async function skippedSource(key) {
 async function fetchJson(url) {
   const response = await fetch(url, {
     headers: {
-      accept: 'application/json',
+      'accept': 'application/json',
       'user-agent': 'Lexora model capability defaults sync',
     },
     signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),

@@ -76,7 +76,7 @@ const canPreview = computed(() => props.previewUrl !== null)
   line-height: 1.35;
   margin: 0 0.12rem;
   padding: 0.1rem 0.34rem;
-  vertical-align: baseline;
+  vertical-align: calc(-0.1rem - 1px);
 
   > span {
     overflow: hidden;

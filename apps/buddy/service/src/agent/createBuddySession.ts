@@ -13,7 +13,7 @@ import type { BuddyInProcessExtension } from './createBuddyResourceLoader'
 import type { BoundedContextDiagnostic } from './loadBoundedContextFiles'
 import { chmod, mkdir, realpath } from 'node:fs/promises'
 
-import { isAbsolute, join, relative, resolve, sep } from 'node:path'
+import { isAbsolute, join, resolve } from 'node:path'
 import process from 'node:process'
 import {
   calculateContextTokens,
@@ -22,11 +22,13 @@ import {
   getLatestCompactionEntry,
   SessionManager,
 } from '@earendil-works/pi-coding-agent'
+import { containsCanonicalPath } from '../../../platform/filePaths'
 import {
   BuddySessionCreationError,
   isMissingBuddySessionFile,
   toBuddySessionStorageError,
 } from './BuddySessionErrors'
+import { buildBuddyRequestContext } from './buildBuddyRequestContext'
 import { createEstimatedContextUsage } from './contextUsageBreakdown'
 import {
   createBuddyResourceLoader,
@@ -82,7 +84,7 @@ export async function createBuddySession(
     realpath(options.canonicalRoot),
     realpath(options.cwd),
   ])
-  if (!containsPath(canonicalRoot, cwd))
+  if (!containsCanonicalPath(canonicalRoot, cwd))
     throw new BuddySessionCreationError()
 
   const agentDir = resolve(options.agentDir)
@@ -135,7 +137,7 @@ export async function createBuddySession(
   })
   const piSessionFile = sessionManager.getSessionFile()
   const shutdown = createSessionShutdown(result.session)
-  if (!piSessionFile || !containsPath(canonicalSessionDir, resolve(piSessionFile))) {
+  if (!piSessionFile || !containsCanonicalPath(canonicalSessionDir, resolve(piSessionFile))) {
     await shutdown('quit')
     throw new BuddySessionCreationError()
   }
@@ -160,7 +162,7 @@ export async function createBuddyContextSnapshot(
     realpath(options.canonicalRoot),
     realpath(options.cwd),
   ])
-  if (!containsPath(canonicalRoot, cwd))
+  if (!containsCanonicalPath(canonicalRoot, cwd))
     throw new BuddySessionCreationError()
 
   const agentDir = resolve(options.agentDir)
@@ -205,11 +207,11 @@ export async function createBuddyContextSnapshot(
         ? [{ description: tool.description, name: tool.name, parameters: tool.parameters }]
         : []
     })
-    return createEstimatedContextUsage({
+    return createEstimatedContextUsage(buildBuddyRequestContext({
       messages: convertToLlm(result.session.messages),
       systemPrompt: result.session.systemPrompt,
       tools,
-    })
+    }, result.session.getAllTools()))
   }
   finally {
     await createSessionShutdown(result.session)('quit')
@@ -294,7 +296,20 @@ async function createConfiguredBuddySession(
     ...result.session.getActiveToolNames().filter(toolName => !isPiShellToolName(toolName)),
     ...getActivePiBuiltinToolNames(platform),
   ])])
+  try {
+    await result.session.bindExtensions({ mode: 'rpc' })
+  }
+  catch (error) {
+    await createSessionShutdown(result.session)('quit')
+    throw error
+  }
   const previousPayloadTransform = result.session.agent.onPayload
+  const stream = result.session.agent.streamFunction
+  result.session.agent.streamFunction = (model, context, streamOptions) => stream(
+    model,
+    buildBuddyRequestContext(context, result.session.getAllTools()),
+    streamOptions,
+  )
   result.session.agent.onPayload = async (payload, model) => {
     const previousPayload = await previousPayloadTransform?.(payload, model)
     return applyBuddyOpenAiRequestOptions(
@@ -314,11 +329,11 @@ async function openExistingSession(
   if (!isAbsolute(sessionFile) || !sessionFile.endsWith('.jsonl'))
     throw new BuddySessionCreationError()
   const resolvedSessionFile = resolve(sessionFile)
-  if (!containsPath(sessionDir, resolvedSessionFile))
+  if (!containsCanonicalPath(sessionDir, resolvedSessionFile))
     throw new BuddySessionCreationError()
   try {
     const canonicalSessionFile = await realpath(sessionFile)
-    if (!containsPath(sessionDir, canonicalSessionFile))
+    if (!containsCanonicalPath(sessionDir, canonicalSessionFile))
       throw new BuddySessionCreationError()
     const manager = SessionManager.open(canonicalSessionFile, sessionDir, cwd)
     manager.buildSessionContext()
@@ -370,9 +385,4 @@ function applyBuddyOpenAiRequestOptions(
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
-}
-
-function containsPath(root: string, path: string): boolean {
-  const child = relative(root, path)
-  return child === '' || (child !== '..' && !child.startsWith(`..${sep}`) && !isAbsolute(child))
 }

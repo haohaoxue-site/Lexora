@@ -11,11 +11,12 @@ export function resolveBuddyOutputPaths(cwd = repoRoot) {
       arch: join(outputRoot, 'artifacts/arch'),
       desktop: join(outputRoot, 'artifacts/desktop'),
       pet: join(outputRoot, 'artifacts/pet'),
+      windows: join(outputRoot, 'artifacts/windows'),
     },
     buddyRoot,
     build: {
       electron: join(outputRoot, 'build/electron'),
-      nativePet: join(outputRoot, 'build/native-pet'),
+      native: join(outputRoot, 'build/native'),
     },
     outputRoot,
     package: {

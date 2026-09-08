@@ -35,7 +35,7 @@ const systemActionTargetSchema = z.object({
   displayName: z.string().trim().min(1).max(256),
   pid: z.number().int().positive().optional(),
   startedAt: z.iso.datetime().optional(),
-  unit: z.string().trim().min(1).max(256).optional(),
+  serviceId: z.string().trim().min(1).max(256).optional(),
 }).strict()
 
 const automationOperationSchema = z.enum([

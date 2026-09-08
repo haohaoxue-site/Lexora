@@ -35,7 +35,6 @@
     "release:version:set": "node packaging/release/version.mjs --set",
     "release:status": "node packaging/release/status.mjs",
     "check:buddy": "node packaging/buddy/release/preflight.mjs",
-    "check:buddy:source": "node packaging/buddy/release/preflight.mjs --stage source",
     "check:website": "node packaging/website/release/verify-pages-workflow.mjs && pnpm --filter @haohaoxue/lexora-website lint && pnpm --filter @haohaoxue/lexora-website build",
     "test": "pnpm -r test",
     "test:watch": "pnpm -r --parallel --if-present test:watch",
@@ -47,6 +46,7 @@
     "@antfu/eslint-config": "^8.2.0",
     "eslint": "^10.2.1",
     "typescript": "catalog:",
-    "vitest": "^4.1.5"
+    "vitest": "^4.1.5",
+    "yaml": "^2.9.0"
   }
 }

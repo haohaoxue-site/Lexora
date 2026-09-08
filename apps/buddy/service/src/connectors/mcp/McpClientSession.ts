@@ -1,10 +1,6 @@
 import type { ConnectorCredential, McpServerConfig } from './mcpSchemas'
 import { Client } from '@modelcontextprotocol/sdk/client/index.js'
-import {
-  getDefaultEnvironment,
-  StdioClientTransport,
-} from '@modelcontextprotocol/sdk/client/stdio.js'
-import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js'
+import { createMcpTransport } from './createMcpTransport'
 
 const MAX_TOOL_PAGES = 20
 
@@ -39,6 +35,7 @@ export class McpClientSession {
   readonly #onUnavailable?: (code: McpClientErrorCode) => void
   #client: Client | null = null
   #closing = false
+  #closePromise: Promise<void> | null = null
   #connectPromise: Promise<void> | null = null
   #consecutiveFailures = 0
   #connected = false
@@ -91,7 +88,7 @@ export class McpClientSession {
 
     this.#client = client
     try {
-      await client.connect(createTransport(this.#config, this.#credential), { timeout: 10_000 })
+      await client.connect(createMcpTransport(this.#config, this.#credential), { timeout: 10_000 })
       if (this.#closing || this.#client !== client)
         throw new McpClientError('MCP_SERVER_UNAVAILABLE')
       this.#connected = true
@@ -157,7 +154,11 @@ export class McpClientSession {
     }
   }
 
-  async close(): Promise<void> {
+  close(): Promise<void> {
+    return this.#closePromise ??= this.#close()
+  }
+
+  async #close(): Promise<void> {
     this.#closing = true
     this.#connected = false
     const client = this.#client
@@ -181,32 +182,6 @@ export class McpClientError extends Error {
     this.name = 'McpClientError'
     this.code = code
   }
-}
-
-function createTransport(config: McpServerConfig, credential: ConnectorCredential | null) {
-  if (config.transport === 'stdio') {
-    const secretEnvironment = credential?.type === 'stdio' ? credential.env : {}
-    return new StdioClientTransport({
-      args: config.args,
-      command: config.command,
-      cwd: config.cwd ?? undefined,
-      env: { ...getDefaultEnvironment(), ...secretEnvironment },
-      stderr: 'pipe',
-    })
-  }
-
-  const headers = new Headers(credential?.type === 'http' ? credential.headers : undefined)
-  if (credential?.type === 'http' && credential.bearerToken)
-    headers.set('authorization', `Bearer ${credential.bearerToken}`)
-  return new StreamableHTTPClientTransport(new URL(config.url), {
-    reconnectionOptions: {
-      initialReconnectionDelay: 500,
-      maxReconnectionDelay: 5_000,
-      maxRetries: 2,
-      reconnectionDelayGrowFactor: 2,
-    },
-    requestInit: { headers },
-  })
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

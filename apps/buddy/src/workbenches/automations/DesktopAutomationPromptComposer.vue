@@ -6,6 +6,7 @@ import type {
 import type { BuddyExecutionProfile } from '@buddy-shared/executionProfile'
 import type { BuddyThinkingLevel } from '@buddy-shared/modelSelection'
 import type { BuddyLocale } from '@/i18n/buddyI18n'
+import { resolveBuddyPermissionMode, resolveBuddyPermissionSettings } from '@buddy-shared/permissionMode'
 import StarterKit from '@tiptap/starter-kit'
 import { EditorContent, useEditor } from '@tiptap/vue-3'
 import { useThemeVars } from 'naive-ui'
@@ -14,7 +15,7 @@ import { useBuddyI18n } from '@/i18n/buddyI18n'
 import DesktopModelSelector from '@/ui/model-selector/DesktopModelSelector.vue'
 import { createChatComposerContentFromText } from '@/workbenches/chat/composer/chatComposerInput'
 import DesktopChatComposerFrame from '@/workbenches/chat/composer/DesktopChatComposerFrame.vue'
-import DesktopExecutionProfileSelector from '@/workbenches/chat/composer/DesktopExecutionProfileSelector.vue'
+import DesktopPermissionModeSelector from '@/workbenches/chat/composer/DesktopPermissionModeSelector.vue'
 
 const props = defineProps<{
   executionProfile: BuddyExecutionProfile
@@ -35,6 +36,10 @@ const emit = defineEmits<{
 
 const { t } = useBuddyI18n(() => props.language)
 const themeVars = useThemeVars()
+const permissionMode = computed(() => resolveBuddyPermissionMode({
+  approvalPolicy: 'policy',
+  executionProfile: props.executionProfile,
+}))
 const availableModels = computed(() => props.models.filter(model => model.available && model.enabled))
 const selectedModel = computed(() => availableModels.value.find(
   model => modelKey(model) === props.selectedModelId,
@@ -97,12 +102,13 @@ function modelKey(model: Pick<LocalRuntimeModelOption, 'modelId' | 'providerId'>
     </template>
 
     <template #leading>
-      <DesktopExecutionProfileSelector
+      <DesktopPermissionModeSelector
         can-update
-        :execution-profile="executionProfile"
         :is-updating="false"
         :language="language"
-        @update-execution-profile="emit('updateExecutionProfile', $event)"
+        :permission-mode="permissionMode"
+        session-mode="automation_background"
+        @update-permission-mode="emit('updateExecutionProfile', resolveBuddyPermissionSettings($event).executionProfile)"
       />
     </template>
 

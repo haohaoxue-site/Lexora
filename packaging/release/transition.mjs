@@ -23,8 +23,8 @@ export const lexoraReleaseTransitionPaths = Object.freeze([
   'apps/buddy/package.json',
   'apps/web/package.json',
   'apps/buddy/buddy.version.json',
-  'apps/buddy/native-pet/Cargo.toml',
-  'apps/buddy/native-pet/Cargo.lock',
+  'apps/buddy/native/pet/Cargo.toml',
+  'apps/buddy/native/Cargo.lock',
 ])
 
 export function validateLexoraReleaseTransition({ before, after, changedPaths }) {

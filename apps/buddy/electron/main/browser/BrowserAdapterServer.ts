@@ -1,4 +1,5 @@
 import type { Server, Socket } from 'node:net'
+import type { LocalEndpoint } from '../../../platform/localTransport'
 import type {
   BrowserAdapterFailureCode,
   BrowserAdapterIssueLeaseParams,
@@ -21,9 +22,7 @@ import type { DesktopBrowserState } from '../../shared/desktopApi'
 import type { BrowserHostActionResult } from './BrowserHost'
 import { Buffer } from 'node:buffer'
 import { createHash, randomBytes } from 'node:crypto'
-import { chmod, lstat, mkdir, unlink } from 'node:fs/promises'
 import { createServer } from 'node:net'
-import { dirname } from 'node:path'
 import {
   BROWSER_ADAPTER_DEFAULT_LEASE_TTL_MS,
   BROWSER_ADAPTER_MAX_REQUEST_BYTES,
@@ -52,7 +51,7 @@ interface BrowserAdapterServerOptions {
   createToken?: () => string
   getHost: () => BrowserAdapterHostPort | null
   now?: () => number
-  socketPath: string
+  endpoint: LocalEndpoint
 }
 
 interface AdapterLeaseRecord {
@@ -80,6 +79,7 @@ export class BrowserAdapterServer {
   readonly #getHost: () => BrowserAdapterHostPort | null
   readonly #leases = new Map<string, AdapterLeaseRecord>()
   readonly #now: () => number
+  readonly #endpoint: LocalEndpoint
   readonly #socketPath: string
   readonly #sockets = new Set<Socket>()
   #server: Server | null = null
@@ -88,13 +88,14 @@ export class BrowserAdapterServer {
     this.#createToken = options.createToken ?? (() => randomBytes(32).toString('hex'))
     this.#getHost = options.getHost
     this.#now = options.now ?? Date.now
-    this.#socketPath = options.socketPath
+    this.#endpoint = options.endpoint
+    this.#socketPath = options.endpoint.address
   }
 
   async start(): Promise<void> {
     if (this.#server)
       return
-    await prepareSocketPath(this.#socketPath)
+    await this.#endpoint.prepare()
     const server = createServer(socket => this.#accept(socket))
     try {
       await new Promise<void>((resolve, reject) => {
@@ -110,12 +111,12 @@ export class BrowserAdapterServer {
         server.once('listening', onListening)
         server.listen(this.#socketPath)
       })
-      await chmod(this.#socketPath, 0o600)
+      await this.#endpoint.secure()
       this.#server = server
     }
     catch (error) {
       server.close()
-      await removeSocket(this.#socketPath)
+      await this.#endpoint.dispose()
       throw error
     }
   }
@@ -173,7 +174,7 @@ export class BrowserAdapterServer {
         server.close(() => resolve())
       })
     }
-    await removeSocket(this.#socketPath)
+    await this.#endpoint.dispose()
   }
 
   #accept(socket: Socket): void {
@@ -513,38 +514,4 @@ async function safelyRelease(
     host?.releaseControl(lease)
   }
   catch {}
-}
-
-async function prepareSocketPath(socketPath: string): Promise<void> {
-  await mkdir(dirname(socketPath), { mode: 0o700, recursive: true })
-  let metadata
-  try {
-    metadata = await lstat(socketPath)
-  }
-  catch (error) {
-    if (isMissingPath(error))
-      return
-    throw error
-  }
-  if (!metadata.isSocket())
-    throw new Error('Browser adapter socket path is occupied by a non-socket file')
-  await unlink(socketPath)
-}
-
-async function removeSocket(socketPath: string): Promise<void> {
-  try {
-    const metadata = await lstat(socketPath)
-    if (metadata.isSocket())
-      await unlink(socketPath)
-  }
-  catch (error) {
-    if (!isMissingPath(error))
-      throw error
-  }
-}
-
-function isMissingPath(error: unknown): boolean {
-  return error instanceof Error
-    && 'code' in error
-    && error.code === 'ENOENT'
 }

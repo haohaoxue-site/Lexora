@@ -30,7 +30,6 @@ const tasks = useTaskCapability({
   applicationSettings: stores.applicationSettings,
   localCapabilities: stores.localCapabilities,
   modelProviders: stores.modelProviders,
-  runtimeRecovery: stores.runtimeRecovery,
   runtimeSupervisor: stores.runtimeSupervisor,
 })
 const capabilities = createDesktopCapabilities({

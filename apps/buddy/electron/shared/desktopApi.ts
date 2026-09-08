@@ -1,4 +1,5 @@
 import type { BrowserFailureReason } from '../../shared/browserProtocol'
+import type { BuddyCapabilities } from '../../shared/platform'
 import type { DesktopCommandId, DesktopPlatform } from './desktopCommands'
 import type { LocalChatApi } from './localChatApi'
 
@@ -178,6 +179,7 @@ export interface DesktopWindowState {
 }
 
 export interface DesktopAppInfo {
+  capabilities: BuddyCapabilities
   chromiumVersion: string
   configPath: string
   electronVersion: string

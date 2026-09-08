@@ -6,6 +6,9 @@
     "moduleDetection": "force",
     "module": "ESNext",
     "moduleResolution": "bundler",
+    "paths": {
+      "@buddy-shared/*": ["./shared/*"]
+    },
     "resolveJsonModule": true,
     "types": ["node", "electron-vite/node"],
     "allowImportingTsExtensions": true,
@@ -24,6 +27,7 @@
     "service/**/*.ts",
     "electron/**/*.ts",
     "shared/**/*.ts",
+    "vitest.setup.ts",
     "vite.config.ts",
     "uno.config.ts"
   ]

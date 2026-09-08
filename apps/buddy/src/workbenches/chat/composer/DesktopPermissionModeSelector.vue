@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { BuddyPermissionMode } from '@buddy-shared/permissionMode'
+import type { BuddySessionMode } from '@buddy-shared/sessionMode'
 import type { BuddyLocale } from '@/i18n/buddyI18n'
 import {
   HandLeft20Regular,
@@ -17,6 +18,7 @@ const props = defineProps<{
   isUpdating: boolean
   language: BuddyLocale
   permissionMode: BuddyPermissionMode
+  sessionMode?: BuddySessionMode
 }>()
 
 const emit = defineEmits<{
@@ -51,6 +53,10 @@ const permissionOptions = [
 ] as const
 
 const { t } = useBuddyI18n(() => props.language)
+const isBackground = computed(() => props.sessionMode === 'automation_background')
+const availableOptions = computed(() => permissionOptions.filter(
+  option => !isBackground.value || option.value !== 'manual_approval',
+))
 const confirmationOpen = shallowRef(false)
 const popoverOpen = shallowRef(false)
 const selected = computed(() => permissionOptions.find(
@@ -110,7 +116,7 @@ function confirmFullAccess() {
       </header>
       <div class="desktop-permission-mode-selector__options" role="menu">
         <button
-          v-for="option in permissionOptions"
+          v-for="option in availableOptions"
           :key="option.value"
           class="desktop-permission-mode-selector__option"
           :class="{

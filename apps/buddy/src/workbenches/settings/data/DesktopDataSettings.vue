@@ -1,12 +1,10 @@
 <script setup lang="ts">
 import type { DesktopDataSettingsCapability } from '@/workbenches/settings/data/desktopDataSettingsCapability'
-import { NAlert, NTag } from 'naive-ui'
+import { NAlert, NButton, NTag } from 'naive-ui'
 import { computed } from 'vue'
 import { useBuddyI18n } from '@/i18n/buddyI18n'
 import { createDesktopAgentUsage } from '@/workbenches/settings/data/desktopAgentUsage'
 import DesktopRunLogSection from '@/workbenches/settings/data/DesktopRunLogSection.vue'
-import DesktopRuntimeRecovery from '@/workbenches/settings/data/DesktopRuntimeRecovery.vue'
-import DesktopRuntimeRecoveryNotice from '@/workbenches/settings/data/DesktopRuntimeRecoveryNotice.vue'
 
 const props = defineProps<{ dataSettings: DesktopDataSettingsCapability }>()
 const dataSettings = props.dataSettings
@@ -27,16 +25,10 @@ function formatNumber(value: number) {
       {{ dataSettings.runtimeRestartError.value ?? dataSettings.usageError.value }}
     </NAlert>
 
-    <DesktopRuntimeRecoveryNotice
-      v-if="dataSettings.runtimeDataRecoveryReceipt.value"
-      :language="dataSettings.language.value"
-      :receipt="dataSettings.runtimeDataRecoveryReceipt.value"
-    />
-
     <section class="desktop-data-settings__section">
       <div class="desktop-data-settings__heading">
-        <h2>{{ t('desktop.settings.runtimeAndRecovery') }}</h2>
-        <p>{{ t('desktop.settings.runtimeAndRecoveryDescription') }}</p>
+        <h2>{{ t('desktop.settings.runtime') }}</h2>
+        <p>{{ t('desktop.settings.runtimeDescription') }}</p>
       </div>
       <div class="desktop-data-settings__group">
         <div class="desktop-data-settings__row">
@@ -50,36 +42,20 @@ function formatNumber(value: number) {
           <span>{{ dataSettings.selectedModel.value?.displayName ?? t('desktop.agent.noModel') }}</span>
         </div>
       </div>
-      <DesktopRuntimeRecovery
-        v-if="dataSettings.runtimeState.value.status === 'offline'"
-        :backups="dataSettings.runtimeDataBackups.value"
-        :backup-storage="dataSettings.runtimeDataBackupStorage.value"
-        :can-cancel-data-operation="dataSettings.canCancelRuntimeDataOperation.value"
-        :can-create-backup="dataSettings.canCreateRuntimeBackup.value"
-        :can-open-data-directory="dataSettings.canOpenRuntimeDataDirectory.value"
-        :can-restart="dataSettings.canRestartRuntime.value"
-        :failure-code="dataSettings.runtimeState.value.lastError"
-        :failure-message="dataSettings.runtimeError.value ?? t('desktop.agent.runtimeUnknownFailure')"
-        :is-creating-backup="dataSettings.isCreatingRuntimeBackup.value"
-        :deleting-backup-id="dataSettings.deletingRuntimeBackupId.value"
-        :is-loading-backups="dataSettings.isLoadingRuntimeBackups.value"
-        :is-opening-data-directory="dataSettings.isOpeningRuntimeDataDirectory.value"
-        :language="dataSettings.language.value"
-        :latest-backup-path="dataSettings.latestRuntimeBackupPath.value"
-        :latest-restore-safety-backup-path="dataSettings.latestRuntimeRestore.value?.safetyBackup.path ?? null"
-        :data-operation="dataSettings.runtimeDataOperation.value"
-        :pid="dataSettings.runtimeState.value.pid"
-        :recovery-error="dataSettings.runtimeRecoveryError.value"
-        :restoring-backup-id="dataSettings.restoringRuntimeBackupId.value"
-        :validating-backup-id="dataSettings.validatingRuntimeBackupId.value"
-        @create-backup="dataSettings.createRuntimeDataBackup"
-        @cancel-data-operation="dataSettings.cancelRuntimeDataOperation"
-        @delete-backup="dataSettings.deleteRuntimeDataBackup"
-        @open-data-directory="dataSettings.openRuntimeDataDirectory"
-        @restart="dataSettings.restartRuntime"
-        @restore-backup="dataSettings.restoreRuntimeDataBackup"
-        @validate-backup="dataSettings.validateRuntimeDataBackup"
-      />
+      <NAlert v-if="dataSettings.runtimeState.value.status === 'offline'" type="error" :show-icon="false">
+        <p>{{ dataSettings.runtimeError.value ?? t('desktop.agent.runtimeUnknownFailure') }}</p>
+        <p v-if="dataSettings.runtimeState.value.pid !== null">
+          {{ t('desktop.agent.runtimeProcessStillRunning', { pid: dataSettings.runtimeState.value.pid }) }}
+        </p>
+        <NButton
+          v-else
+          secondary
+          :disabled="!dataSettings.canRestartRuntime.value"
+          @click="dataSettings.restartRuntime"
+        >
+          {{ t('desktop.agent.runtimeRestart') }}
+        </NButton>
+      </NAlert>
     </section>
 
     <section class="desktop-data-settings__section">
@@ -95,8 +71,8 @@ function formatNumber(value: number) {
 
     <section class="desktop-data-settings__section">
       <div class="desktop-data-settings__heading">
-        <h2>{{ t('desktop.settings.logsAndDiagnostics') }}</h2>
-        <p>{{ t('desktop.settings.logsAndDiagnosticsDescription') }}</p>
+        <h2>{{ t('desktop.settings.runLogs') }}</h2>
+        <p>{{ t('desktop.settings.runLogsDescription') }}</p>
       </div>
       <DesktopRunLogSection :data-settings="dataSettings" />
     </section>

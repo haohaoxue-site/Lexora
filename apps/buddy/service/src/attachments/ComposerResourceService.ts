@@ -30,18 +30,18 @@ import { Buffer } from 'node:buffer'
 import { createHash, randomUUID } from 'node:crypto'
 import { open, stat } from 'node:fs/promises'
 import { basename, isAbsolute, join, relative } from 'node:path'
-import { PhotonImage } from '@silvia-odwyer/photon-node'
+import { readBoundedFile } from '../../../platform/boundedFile'
 import { BUDDY_ATTACHMENT_COUNT_LIMIT, BUDDY_ATTACHMENT_TOTAL_BYTES_LIMIT } from '../../../shared/attachmentPolicy'
 import { getBuddyUserContentResourceIds } from '../../../shared/buddyUserContent'
 import { buddyComposerResourceAcceptSchema, buddyComposerSourceListSchema, buddyComposerSourceSelectSchema, buddyComposerSpaceFileSelectSchema } from '../../../shared/composerResource'
 import { buddyRunOutputPayloadSchema } from '../../../shared/runOutput'
 import { resolveGrantedPath } from '../directories/resolveGrantedPath'
 import { createSensitivePathMatcher } from '../permissions/sensitivePaths'
-import { readBoundedFile } from '../resources/BoundedFileReader'
 import { BuddyServiceError } from '../rpc/runtimeRequest'
 import { requireActiveSpace } from '../spaces/requireActiveSpace'
 import { ComposerResourceConflictError } from '../storage/composerResourceRepository'
 import { AttachmentError, DRAFT_ATTACHMENT_RETENTION_MS, normalizeAttachmentMetadata } from './AttachmentService'
+import { validateResourceBytes } from './validateResourceBytes'
 
 export interface ComposerResourceServiceOptions {
   artifacts?: Pick<ArtifactService, 'listConversationArtifacts' | 'resolveConversationArtifactLocation'>
@@ -183,7 +183,7 @@ export class ComposerResourceService {
         result.push({ attachmentId: resolved.attachmentId, resourceId: resource.resourceId })
       }
       else {
-        validateResourceBytes(resolved.metadata, resolved.bytes)
+        await validateResourceBytes(resolved.metadata, resolved.bytes)
         const [attachment] = await this.#attachments.registerUploads(draftId, [{ ...resolved.metadata, bytes: Uint8Array.from(resolved.bytes) }])
         if (!attachment)
           throw new AttachmentError('ATTACHMENT_NOT_FOUND')
@@ -480,7 +480,7 @@ export class ComposerResourceService {
 
     this.#importing.add(input.resourceId)
     try {
-      validateResourceBytes(resource, input.bytes)
+      await validateResourceBytes(resource, input.bytes)
       const [attachment] = await this.#attachments.registerUploads(input.draftId, [{
         bytes: input.bytes,
         mimeType: resource.mimeType,
@@ -605,7 +605,7 @@ export class ComposerResourceService {
     finally {
       await file.close()
     }
-    validateResourceBytes(resource, bytes)
+    await validateResourceBytes(resource, bytes)
     this.#repository.finish({
       attachmentId: attachment.id,
       contentHash: createHash('sha256').update(bytes).digest('hex'),
@@ -678,45 +678,5 @@ function toPublicResource(resource: ComposerResourceRecord): BuddyComposerResour
         }
     case 'failed': return { ...base, errorCode: resource.errorCode!, state: 'failed' }
     case 'importing': return { ...base, state: 'importing' }
-  }
-}
-
-function validateResourceBytes(resource: { mimeType: string, sizeBytes: number }, bytes: Uint8Array): void {
-  if (bytes.byteLength !== resource.sizeBytes)
-    throw new AttachmentError('VALIDATION_FAILED')
-  if (!resource.mimeType.startsWith('image/')) {
-    try {
-      new TextDecoder('utf-8', { fatal: true }).decode(bytes)
-    }
-    catch (error) {
-      throw new AttachmentError('VALIDATION_FAILED', { cause: error })
-    }
-    return
-  }
-  const header = Buffer.from(bytes.subarray(0, 12))
-  const mimeType = header.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))
-    ? 'image/png'
-    : header[0] === 255 && header[1] === 216 && header[2] === 255
-      ? 'image/jpeg'
-      : /^GIF8[79]a/.test(header.toString('ascii'))
-        ? 'image/gif'
-        : header.toString('ascii', 0, 4) === 'RIFF' && header.toString('ascii', 8, 12) === 'WEBP'
-          ? 'image/webp'
-          : null
-  if (mimeType !== resource.mimeType)
-    throw new AttachmentError('VALIDATION_FAILED')
-  let image: PhotonImage
-  try {
-    image = PhotonImage.new_from_byteslice(bytes)
-  }
-  catch (error) {
-    throw new AttachmentError('VALIDATION_FAILED', { cause: error })
-  }
-  try {
-    if (!image.get_width() || !image.get_height())
-      throw new AttachmentError('VALIDATION_FAILED')
-  }
-  finally {
-    image.free()
   }
 }

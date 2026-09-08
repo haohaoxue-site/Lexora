@@ -22,15 +22,15 @@ export interface ProcessSystemTarget extends SystemTargetBase {
   kind: 'process'
   pid: number
   startedAt: string
-  startTicks: string
+  instanceId: string
 }
 
 export interface ServiceSystemTarget extends SystemTargetBase {
   activeState: string
-  displayUnit: string
+  displayId: string
   kind: 'service'
-  scope: 'user'
-  unit: string
+  scope: 'user' | 'system'
+  serviceId: string
 }
 
 export type SystemTarget = ProcessSystemTarget | ServiceSystemTarget
@@ -41,8 +41,8 @@ export type ProcessSystemTargetSelector
 
 export interface ServiceSystemTargetSelector {
   kind: 'service'
-  scope: 'user'
-  unit: string
+  scope: 'user' | 'system'
+  serviceId: string
 }
 
 export type SystemTargetSelector = ProcessSystemTargetSelector | ServiceSystemTargetSelector
@@ -216,7 +216,8 @@ export class SystemCapabilityService {
 }
 
 export type SystemCapabilityErrorCode
-  = 'SYSTEM_ACTION_CHANGED'
+  = 'SYSTEM_ACCESS_DENIED'
+    | 'SYSTEM_ACTION_CHANGED'
     | 'SYSTEM_ACTION_EXPIRED'
     | 'SYSTEM_ACTION_INVALID'
     | 'SYSTEM_ACTION_NOT_ALLOWED'
@@ -256,10 +257,10 @@ function validateActionRequest(input: SystemActionRequest): void {
     && input.action !== 'restart-service') {
     throw new SystemCapabilityError('SYSTEM_ACTION_INVALID')
   }
-  if (input.target.scope !== 'user'
-    || !input.target.unit.trim()
-    || !input.target.unit.endsWith('.service')
-    || input.target.unit.length > 256) {
+  if (!['user', 'system'].includes(input.target.scope)
+    || !input.target.serviceId.trim()
+    || [...input.target.serviceId].some(character => character.charCodeAt(0) < 32)
+    || input.target.serviceId.length > 256) {
     throw new SystemCapabilityError('SYSTEM_ACTION_INVALID')
   }
 }
@@ -269,13 +270,13 @@ function sameTargetIdentity(expected: SystemTarget, current: SystemTarget): bool
     return false
   if (expected.kind === 'process' && current.kind === 'process') {
     return expected.pid === current.pid
-      && expected.startTicks === current.startTicks
+      && expected.instanceId === current.instanceId
       && expected.executable === current.executable
   }
   return expected.kind === 'service'
     && current.kind === 'service'
     && expected.scope === current.scope
-    && expected.unit === current.unit
+    && expected.serviceId === current.serviceId
 }
 
 function sameRequest(expected: SystemActionRequest, current: SystemActionRequest): boolean {
@@ -285,7 +286,7 @@ function sameRequest(expected: SystemActionRequest, current: SystemActionRequest
     return false
   if (expected.target.kind === 'service' && current.target.kind === 'service') {
     return expected.target.scope === current.target.scope
-      && expected.target.unit === current.target.unit
+      && expected.target.serviceId === current.target.serviceId
   }
   if (expected.target.kind !== 'process' || current.target.kind !== 'process')
     return false
@@ -366,7 +367,7 @@ function targetReview(target: SystemTarget): SystemActionApprovalReviewInput['ta
       }
     : {
         displayName: target.displayName,
-        unit: target.displayUnit,
+        serviceId: target.displayId,
       }
 }
 
@@ -377,11 +378,11 @@ function describeEffect(action: SystemActionKind): string {
     case 'kill-process':
       return 'Force the process to stop immediately'
     case 'restart-service':
-      return 'Stop and start the user service'
+      return 'Stop and start the service'
     case 'start-service':
-      return 'Start the user service'
+      return 'Start the service'
     case 'stop-service':
-      return 'Stop the user service'
+      return 'Stop the service'
   }
 }
 

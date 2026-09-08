@@ -37,10 +37,10 @@ const browserEffectKeys = {
   'send': 'desktop.approval.browser.effect.send',
   'submit': 'desktop.approval.browser.effect.submit',
 } as const
-const executionProfileKeys: Record<BuddyExecutionProfile, 'desktop.chat.executionProfileDefault' | 'desktop.chat.executionProfileFull' | 'desktop.chat.executionProfileReadOnly'> = {
+const executionProfileKeys: Record<BuddyExecutionProfile, 'desktop.chat.permissionModePolicy' | 'desktop.chat.executionProfileFull' | 'desktop.chat.executionProfileReadOnly'> = {
   full_access: 'desktop.chat.executionProfileFull',
   read_only: 'desktop.chat.executionProfileReadOnly',
-  workspace_write: 'desktop.chat.executionProfileDefault',
+  workspace_write: 'desktop.chat.permissionModePolicy',
 }
 const review = computed<ApprovalReviewPayload | null>(() => {
   const parsed = approvalReviewPayloadSchema.safeParse(props.approval.payload)
@@ -209,9 +209,9 @@ const turnConfirmationButtonProps = { type: 'error' } as const
           <dt>PID</dt>
           <dd>{{ review.target.pid }}</dd>
         </div>
-        <div v-if="review.target.unit">
+        <div v-if="review.target.serviceId">
           <dt>{{ t('desktop.approval.systemUnit') }}</dt>
-          <dd>{{ review.target.unit }}</dd>
+          <dd>{{ review.target.serviceId }}</dd>
         </div>
         <div v-if="review.target.startedAt">
           <dt>{{ t('desktop.approval.processStartedAt') }}</dt>

@@ -57,40 +57,8 @@ const localChatApi = Object.freeze<LocalChatApi>({
     onChanged: listener => subscribe<string>(LOCAL_CHAT_IPC_CHANNELS.automationChanged, listener),
   }),
   runtime: Object.freeze({
-    cancelDataOperation: operationId => ipcRenderer.invoke(
-      LOCAL_CHAT_IPC_CHANNELS.runtimeCancelDataOperation,
-      { operationId },
-    ),
-    deleteDataBackup: backupId => ipcRenderer.invoke(
-      LOCAL_CHAT_IPC_CHANNELS.runtimeDeleteDataBackup,
-      { backupId },
-    ),
-    getDataBackupStorage: () => ipcRenderer.invoke(
-      LOCAL_CHAT_IPC_CHANNELS.runtimeGetDataBackupStorage,
-    ),
-    getDataRecoveryReceipt: () => ipcRenderer.invoke(
-      LOCAL_CHAT_IPC_CHANNELS.runtimeGetDataRecoveryReceipt,
-    ),
-    getDataOperation: () => ipcRenderer.invoke(
-      LOCAL_CHAT_IPC_CHANNELS.runtimeGetDataOperation,
-    ),
     getStatus: () => ipcRenderer.invoke(LOCAL_CHAT_IPC_CHANNELS.runtimeStatus),
-    listDataBackups: () => ipcRenderer.invoke(LOCAL_CHAT_IPC_CHANNELS.runtimeListDataBackups),
-    openDataDirectory: () => ipcRenderer.invoke(LOCAL_CHAT_IPC_CHANNELS.runtimeOpenDataDirectory),
     restart: () => ipcRenderer.invoke(LOCAL_CHAT_IPC_CHANNELS.runtimeRestart),
-    startDataBackup: () => ipcRenderer.invoke(LOCAL_CHAT_IPC_CHANNELS.runtimeStartDataBackup),
-    startDataRestore: backupId => ipcRenderer.invoke(
-      LOCAL_CHAT_IPC_CHANNELS.runtimeStartDataRestore,
-      { backupId },
-    ),
-    validateDataBackup: backupId => ipcRenderer.invoke(
-      LOCAL_CHAT_IPC_CHANNELS.runtimeValidateDataBackup,
-      { backupId },
-    ),
-    onDataOperationChanged: listener => subscribe(
-      LOCAL_CHAT_IPC_CHANNELS.runtimeDataOperationChanged,
-      listener,
-    ),
     onStateChanged: (listener: (state: LocalBuddyServiceSupervisorState) => void) =>
       subscribe(LOCAL_CHAT_IPC_CHANNELS.runtimeStateChanged, listener),
   }),

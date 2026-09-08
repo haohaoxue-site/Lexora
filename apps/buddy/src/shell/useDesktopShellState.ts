@@ -5,6 +5,7 @@ import type {
 } from '@buddy-electron/shared/desktopApi'
 import type { ApplicationSettingsStore } from '@/stores/useApplicationSettingsStore'
 import { computed, readonly, shallowRef, watch } from 'vue'
+import { loadDesktopAppInfo } from '@/platform/desktopCapabilities'
 
 export function useDesktopShellState(settings: ApplicationSettingsStore) {
   const api = requireDesktopApi()
@@ -27,7 +28,7 @@ export function useDesktopShellState(settings: ApplicationSettingsStore) {
   )
 
   async function initialize() {
-    appInfo.value = await api.app.getInfo().catch(() => null)
+    appInfo.value = await loadDesktopAppInfo(api)
   }
 
   function setTaskSidebarPinnedItems(
@@ -62,6 +63,7 @@ export function useDesktopShellState(settings: ApplicationSettingsStore) {
   }
 
   return {
+    platformCapabilities: computed(() => appInfo.value?.capabilities ?? null),
     appInfo: readonly(appInfo),
     appSidebarCollapsed: readonly(appSidebarCollapsed),
     taskSidebarPinnedItems: readonly(taskSidebarPinnedItems),

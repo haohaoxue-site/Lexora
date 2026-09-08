@@ -1,27 +1,26 @@
 # Lexora Buddy Packaging
 
-本目录维护 Lexora Buddy 的 Linux 安装包与独立桌宠产物。产品说明见 [`apps/buddy/README.md`](../../apps/buddy/README.md)。
+本目录提供 Lexora Buddy 桌面安装包与独立桌宠的构建入口。产品说明见 [`apps/buddy/README.md`](../../apps/buddy/README.md)。
 
 ## 构建
 
-- `package:deb`：Ubuntu deb；
-- `package:arch`：Arch Linux pacman 包；
-- `package:pet`：独立桌宠 tar 包。
+| 产物 | 命令 |
+| --- | --- |
+| Ubuntu deb | `pnpm --filter @lexora/buddy package:deb` |
+| Arch Linux pacman | `pnpm --filter @lexora/buddy package:arch` |
+| Windows x64 NSIS | `pnpm --filter @lexora/buddy package:windows` |
+| Linux 独立桌宠 | `pnpm --filter @lexora/buddy package:pet` |
 
-```bash
-pnpm --filter @lexora/buddy package:deb
-pnpm --filter @lexora/buddy package:arch
-pnpm --filter @lexora/buddy package:pet
-```
-
-产物统一写入 `apps/buddy/.output/artifacts/`。
+产物写入 `apps/buddy/.output/artifacts/`。桌面安装包内置 fd、ripgrep 与原生组件。构建需要 Rust 工具链，Linux 包校验需要 `bsdtar`；Windows 构建还需要 MSVC C++ Build Tools 与 Windows SDK。各平台安装包在对应系统构建和验证。
 
 ## 校验
 
 ```bash
 pnpm release:version:check
-pnpm check:buddy:source
+pnpm --filter @lexora/buddy lint
+pnpm --filter @lexora/buddy type-check
+pnpm --filter @lexora/buddy test
 pnpm check:buddy
 ```
 
-`check:buddy:source` 只校验源码与发布契约；`check:buddy` 继续执行源码校验和 Ubuntu deb 构建。
+`check:buddy` 是本地完整预检，包含质量检查与当前平台安装包构建。PR 只做 lint、类型检查和测试；发布流程构建并验证 Ubuntu、Arch Linux 与 Windows 产物。

@@ -1,3 +1,5 @@
+import type { BuddyPlatformId } from '../../shared/platform'
+
 export const DESKTOP_COMMAND_IDS = [
   'app.about',
   'app.checkUpdates',
@@ -13,7 +15,7 @@ export type DesktopCommandId = typeof DESKTOP_COMMAND_IDS[number]
 export type DesktopCommandExecution = 'main' | 'renderer'
 export type DesktopCommandMenu = 'application' | 'window' | 'help'
 export type DesktopCommandScope = 'application' | 'window'
-export type DesktopPlatform = 'darwin' | 'linux' | 'win32'
+export type DesktopPlatform = BuddyPlatformId
 
 export interface DesktopShortcutBinding {
   alt: boolean
@@ -47,26 +49,20 @@ export interface DesktopShortcutInput {
 }
 
 const ALT_F4 = shortcut('F4', 'Alt+F4', { alt: true })
-const COMMAND_Q = shortcut('q', '⌘Q', { meta: true })
-const COMMAND_OPTION_I = shortcut('i', '⌘⌥I', { alt: true, meta: true })
 const CONTROL_SHIFT_I = shortcut('i', 'Ctrl+Shift+I', { control: true, shift: true })
 const CONTROL_W = shortcut('w', 'Ctrl+W', { control: true })
-const COMMAND_W = shortcut('w', '⌘W', { meta: true })
 const F12 = shortcut('F12', 'F12', {})
 
 export const DESKTOP_COMMAND_REGISTRY = [
   command('app.about', 'application', 0, 'renderer', 'application'),
   command('app.checkUpdates', 'application', 0, 'renderer', 'application'),
   command('app.quit', 'application', 1, 'main', 'application', {
-    darwin: COMMAND_Q,
     default: ALT_F4,
   }),
   command('window.close', 'window', 0, 'main', 'window', {
-    darwin: COMMAND_W,
     default: CONTROL_W,
   }),
   command('window.toggleDeveloperTools', 'window', 1, 'main', 'window', {
-    darwin: [COMMAND_OPTION_I, F12],
     default: [CONTROL_SHIFT_I, F12],
   }, false),
   command('help.openDocumentation', 'help', 0, 'main', 'application'),
@@ -118,12 +114,6 @@ export function resolveDesktopShortcuts(
   if (!resolved)
     return []
   return isDesktopShortcutBinding(resolved) ? [resolved] : resolved
-}
-
-export function resolveDesktopPlatform(platform: string): DesktopPlatform {
-  if (platform === 'darwin' || platform === 'win32')
-    return platform
-  return 'linux'
 }
 
 function command(

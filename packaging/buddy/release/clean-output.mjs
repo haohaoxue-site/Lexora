@@ -1,6 +1,7 @@
 import { rmSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import process from 'node:process'
+import { fileURLToPath } from 'node:url'
 
 import { writeOutput } from '../../shared/cli-output.mjs'
 import { resolveBuddyOutputPaths } from './output-paths.mjs'
@@ -22,7 +23,7 @@ export function cleanBuddyOutput(cwd = repoRoot) {
   return generatedRoots
 }
 
-if (process.argv[1] && resolve(process.argv[1]) === new URL(import.meta.url).pathname) {
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   cleanBuddyOutput()
   writeOutput('Buddy generated output cleaned')
 }

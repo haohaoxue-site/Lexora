@@ -9,10 +9,7 @@ const { capabilities: { dataSettings }, ready } = useDesktopApp()
 const { t } = useBuddyI18n(dataSettings.language)
 
 onMounted(() => {
-  void ready.then(() => Promise.all([
-    dataSettings.loadUsage(),
-    dataSettings.loadRuntimeDataBackups(),
-  ]))
+  void ready.then(() => dataSettings.loadUsage())
 })
 </script>
 

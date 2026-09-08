@@ -1,11 +1,12 @@
 import type { Usage } from '@earendil-works/pi-ai'
 import { realpath } from 'node:fs/promises'
-import { isAbsolute, relative, resolve, sep } from 'node:path'
+import { isAbsolute, resolve } from 'node:path'
 import {
   estimateTokens,
   getLatestCompactionEntry,
   SessionManager,
 } from '@earendil-works/pi-coding-agent'
+import { containsCanonicalPath } from '../../../platform/filePaths'
 
 import {
   BuddySessionCreationError,
@@ -45,7 +46,7 @@ export async function inspectCommittedPiCompaction(
   if (
     !isAbsolute(options.piSessionFile)
     || !options.piSessionFile.endsWith('.jsonl')
-    || !containsPath(sessionDirectory, resolve(options.piSessionFile))
+    || !containsCanonicalPath(sessionDirectory, resolve(options.piSessionFile))
   ) {
     throw new BuddySessionCreationError()
   }
@@ -55,7 +56,7 @@ export async function inspectCommittedPiCompaction(
       realpath(sessionDirectory),
       realpath(options.piSessionFile),
     ])
-    if (!containsPath(canonicalSessionDirectory, canonicalSessionFile))
+    if (!containsCanonicalPath(canonicalSessionDirectory, canonicalSessionFile))
       throw new BuddySessionCreationError()
     const manager = SessionManager.open(canonicalSessionFile, canonicalSessionDirectory)
     const compaction = getLatestCompactionEntry(manager.getBranch())
@@ -90,9 +91,4 @@ export async function inspectCommittedPiCompaction(
 function validateIdentity(value: string): void {
   if (!sessionIdentityPattern.test(value))
     throw new BuddySessionCreationError()
-}
-
-function containsPath(root: string, path: string): boolean {
-  const child = relative(root, path)
-  return child === '' || (child !== '..' && !child.startsWith(`..${sep}`) && !isAbsolute(child))
 }

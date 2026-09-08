@@ -7,8 +7,9 @@ import type { BuddyDataPaths } from '../storage/BuddyDataPaths'
 import type { AttachmentImageReference } from './AttachmentImageReference'
 import { randomUUID } from 'node:crypto'
 import { constants } from 'node:fs'
-import { chmod, copyFile, mkdir, open, readdir, readFile, realpath, rename, stat, unlink, writeFile } from 'node:fs/promises'
+import { chmod, copyFile, mkdir, open, readdir, readFile, realpath, stat, unlink, writeFile } from 'node:fs/promises'
 import { basename, dirname, extname, join, normalize } from 'node:path'
+import { fileStorage } from '../../../platform/fileStorage'
 import {
   BUDDY_ATTACHMENT_COUNT_LIMIT,
   BUDDY_ATTACHMENT_TOTAL_BYTES_LIMIT,
@@ -17,6 +18,7 @@ import {
 import { projectBuddyUserContent } from '../../../shared/buddyUserContentProjection'
 
 export const DRAFT_ATTACHMENT_RETENTION_MS = 7 * 24 * 60 * 60 * 1000
+const { replace: rename, syncDirectory } = fileStorage
 const MAX_TEXT_PROMPT_BYTES = 1024 * 1024
 const MIME_TYPES: Readonly<Record<string, string>> = {
   '.csv': 'text/csv',
@@ -651,7 +653,7 @@ async function publishFile(sourcePath: string, storedPath: string): Promise<void
   try {
     await copyFile(sourcePath, temporaryPath, constants.COPYFILE_EXCL)
     await chmod(temporaryPath, 0o600)
-    const file = await open(temporaryPath, 'r')
+    const file = await open(temporaryPath, 'r+')
     try {
       await file.sync()
     }
@@ -664,27 +666,6 @@ async function publishFile(sourcePath: string, storedPath: string): Promise<void
   finally {
     await unlinkAvailableFile(temporaryPath)
   }
-}
-
-async function syncDirectory(path: string): Promise<void> {
-  let directory
-  try {
-    directory = await open(path, 'r')
-    await directory.sync()
-  }
-  catch (error) {
-    if (!isUnsupportedDirectorySync(error))
-      throw error
-  }
-  finally {
-    await directory?.close()
-  }
-}
-
-function isUnsupportedDirectorySync(error: unknown): boolean {
-  return new Set(['EISDIR', 'EINVAL', 'ENOTSUP', 'EPERM']).has(
-    (error as NodeJS.ErrnoException | undefined)?.code ?? '',
-  )
 }
 
 async function listDirectories(root: string): Promise<string[]> {

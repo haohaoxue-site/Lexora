@@ -129,6 +129,7 @@ withDefaults(defineProps<{
   box-shadow: none;
   color: var(--buddy-text-secondary);
   font-weight: 600;
+  vertical-align: calc(-0.05rem - 1px);
 }
 
 :deep([data-type='chat-resource-reference'].ProseMirror-selectednode) {

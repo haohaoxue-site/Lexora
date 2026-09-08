@@ -7,8 +7,8 @@ import type {
   BuddyInputReferenceStore,
   BuddyInputReferenceV1,
 } from './BuddyInputReference'
+import type { BuddyRunContextStore } from './BuddyRunContext'
 import type { BuddySessionShutdownReason } from './createBuddySession'
-import type { BuddyRunContext } from './extensions/toolPolicyExtension'
 import type {
   BuddyAgentSessionLike,
   BuddySessionTurnContext,
@@ -21,11 +21,8 @@ import {
 import { BUDDY_DEFAULT_THINKING_LEVEL } from '../../../shared/modelSelection'
 import { readBuddyInputReference } from './BuddyInputReference'
 import { toBuddySessionStorageError } from './BuddySessionErrors'
+import { buildBuddyRequestContext } from './buildBuddyRequestContext'
 import { createContextUsageBreakdown } from './contextUsageBreakdown'
-
-export interface BuddyRunContextStore {
-  current: BuddyRunContext | null
-}
 
 export interface CreateReusableBuddySessionOptions {
   assertModelAccess: (
@@ -77,7 +74,7 @@ export function createReusableBuddySession(
   session.agent.streamFunction = (model, context, streamOptions) => {
     if (inputMaterializationFailed)
       return createInputMaterializationFailure(model)
-    latestContext = context
+    latestContext = buildBuddyRequestContext(context, session.getAllTools())
     return streamFunction(model, context, streamOptions)
   }
   return {

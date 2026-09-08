@@ -100,8 +100,8 @@ jobs:
             apps/buddy/package.json \
             apps/web/package.json \
             apps/buddy/buddy.version.json \
-            apps/buddy/native-pet/Cargo.toml \
-            apps/buddy/native-pet/Cargo.lock
+            apps/buddy/native/pet/Cargo.toml \
+            apps/buddy/native/Cargo.lock
 
           if git diff --cached --quiet; then
             echo "Version $VERSION must be greater than the current product version" >&2

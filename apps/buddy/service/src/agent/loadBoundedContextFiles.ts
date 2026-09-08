@@ -1,6 +1,7 @@
 import { Buffer } from 'node:buffer'
 import { readFile, realpath, stat } from 'node:fs/promises'
 import { join, relative, sep } from 'node:path'
+import { containsCanonicalPath } from '../../../platform/filePaths'
 
 import { GrantedPathError, resolveGrantedPath } from '../directories/resolveGrantedPath'
 
@@ -35,7 +36,7 @@ export async function loadBoundedContextFiles(
     realpath(options.canonicalRoot),
     realpath(options.cwd),
   ])
-  if (!containsPath(canonicalRoot, canonicalCwd))
+  if (!containsCanonicalPath(canonicalRoot, canonicalCwd))
     throw new GrantedPathError('PATH_OUTSIDE_GRANTED_DIRECTORY')
 
   const directories = directoriesFromRoot(canonicalRoot, canonicalCwd)
@@ -104,11 +105,6 @@ function directoriesFromRoot(root: string, cwd: string): string[] {
     directories.push(cursor)
   }
   return directories
-}
-
-function containsPath(root: string, path: string): boolean {
-  const prefix = root.endsWith(sep) ? root : `${root}${sep}`
-  return path === root || path.startsWith(prefix)
 }
 
 function isMissingPathError(error: unknown): boolean {

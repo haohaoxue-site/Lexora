@@ -1,0 +1,37 @@
+[package]
+name = "lexora-buddy-image-transform"
+
+version.workspace = true
+
+edition.workspace = true
+
+publish.workspace = true
+
+autotests = false
+
+[[test]]
+name = "image-transform"
+path = "__tests__/image_transform.rs"
+
+[[test]]
+name = "image-validation"
+path = "__tests__/image_validation.rs"
+
+[dependencies]
+image = { version = "0.25.10", default-features = false, features = [
+  "png",
+  "jpeg",
+  "gif",
+  "webp"
+] }
+
+png.workspace = true
+
+serde.workspace = true
+
+serde_json.workspace = true
+
+thiserror.workspace = true
+
+[lints]
+workspace = true

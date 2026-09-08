@@ -1,8 +1,8 @@
-import type { AutomationStartupContext } from '../../shared/automation'
 import type { LexoraConfig } from '../shared/desktopApi'
+import type { DesktopFeature } from './platform/desktopFeatures'
 import { mkdirSync } from 'node:fs'
 import { homedir, tmpdir } from 'node:os'
-import { dirname, join } from 'node:path'
+import { dirname } from 'node:path'
 import process from 'node:process'
 import {
   app,
@@ -19,6 +19,11 @@ import {
 } from 'electron'
 import { z } from 'zod'
 import buddyPackage from '../../package.json'
+import { currentPlatform } from '../../platform/currentPlatform'
+import { localTransports } from '../../platform/localTransport'
+import { createBuddyNativeEnvironment, resolveBuddyPrivateDirectories } from '../../platform/nativeHost'
+import { ensurePrivateDirectories } from '../../platform/privateDirectories'
+import { PowerShellUnavailableError, resolveWindowsPowerShell } from '../../platform/windows/powerShell'
 import developmentDesktopIconPath from '../../resources/icons/app-icon-dev.png?asset'
 import stableDesktopIconPath from '../../resources/icons/app-icon.png?asset'
 import developmentTrayIconPath from '../../resources/icons/tray-icon-dev.png?asset'
@@ -42,28 +47,19 @@ import {
 } from './desktopWindowState'
 import { createFeedbackIssueUrl } from './feedbackIssue'
 import { registerDesktopIpc } from './ipc'
-import { resolveLinuxConfigDirectory, syncLinuxAutostart } from './linuxAutostart'
 import { registerLocalChatIpc } from './localChatIpc'
 import { registerWebHostRpc } from './network/registerWebHostRpc'
 import { resolveBuddyRuntimePaths } from './paths'
-import {
-  probeNativePetControlSocket,
-  reloadNativePetConfig,
-} from './pet/nativePetControlSocket'
-import {
-  createNativePetProcessFactory,
-  NativePetSupervisor,
-} from './pet/NativePetSupervisor'
-import { registerPetHostRpc } from './pet/registerPetHostRpc'
+import { createDesktopFeatures } from './platform/desktopFeatures'
+import { desktopHosts } from './platform/desktopHost'
 import { confirmDraftFlushBeforeQuit, requestRendererDraftFlush } from './rendererDraftLifecycle'
 import { installRendererProtocol, registerRendererSchemePrivileges } from './rendererProtocol'
 import {
   createBuddyServiceEnvironment,
-  resolveBuddyServiceStartupContext,
+  resolveBuddySearchToolsDirectory,
 } from './runtime/buddyServiceEnvironment'
 import { forkBuddyServiceProcess } from './runtime/buddyServiceProcess'
 import { BuddyServiceSupervisor } from './runtime/BuddyServiceSupervisor'
-import { RuntimeRecoveryService } from './runtime/RuntimeRecoveryService'
 import { createCredentialVault } from './secrets/CredentialVault'
 import { registerCredentialHostRpc } from './secrets/registerCredentialHostRpc'
 import { resolveDevelopmentRendererUrl } from './security/navigationPolicy'
@@ -75,14 +71,12 @@ let desktopWindowManager: DesktopWindowManager | null = null
 let browserAdapterServer: BrowserAdapterServer | null = null
 let browserAdapterTestLeasePublisher: BrowserAdapterTestLeasePublisher | null = null
 let browserHost: BrowserHost | null = null
-let nativePetSupervisor: NativePetSupervisor | null = null
+let desktopFeatures: DesktopFeature[] = []
 let buddyServiceSupervisor: BuddyServiceSupervisor | null = null
-let runtimeRecoveryService: RuntimeRecoveryService | null = null
 let stopLocalChatIpc: (() => void) | null = null
 let stopBrowserDesktopIpc: (() => void) | null = null
 let stopBuddyServiceNotification: (() => void) | null = null
 let stopRuntimeStateSubscription: (() => void) | null = null
-let stopRuntimeRecoverySubscription: (() => void) | null = null
 let stopSchedulerWakeSubscription: (() => void) | null = null
 let stopAttachmentProtocol: (() => void) | null = null
 let stopRendererProtocol: (() => void) | null = null
@@ -101,10 +95,12 @@ let desktopConfig: LexoraConfig | null = null
 const commandLineUserData = app.commandLine.hasSwitch('user-data-dir')
   ? app.commandLine.getSwitchValue('user-data-dir')
   : undefined
+const desktopHost = desktopHosts[currentPlatform.id]
 const runtimePaths = resolveBuddyRuntimePaths({
   defaultUserData: app.getPath('userData'),
   desktopName: buddyPackage.desktopName,
   isPackaged: app.isPackaged,
+  localAppData: process.env.LOCALAPPDATA,
   lexoraHomeOverride: process.env.LEXORA_HOME,
   nativePetSocketOverride: process.env.LEXORA_BUDDY_PET_SOCKET,
   nativePetStateOverride: process.env.LEXORA_BUDDY_PET_STATE_PATH,
@@ -130,9 +126,6 @@ for (const path of new Set([
   runtimePaths.logs,
   runtimePaths.sessionData,
   runtimePaths.userData,
-  dirname(runtimePaths.browserAdapterSocket),
-  dirname(runtimePaths.nativePetSocket),
-  dirname(runtimePaths.nativePetState),
   dirname(runtimePaths.windowState),
 ])) {
   mkdirSync(path, { mode: 0o700, recursive: true })
@@ -154,13 +147,6 @@ const localServiceDiagnosticOutput = desktopDiagnostics.createWritable(
   'local-service',
   process.stderr,
 )
-const nativePetDiagnosticOutput = desktopDiagnostics.createWritable('native-pet', process.stderr)
-const nativePetEnvironment: NodeJS.ProcessEnv = {
-  ...process.env,
-  LEXORA_BUDDY_PET_SOCKET: runtimePaths.nativePetSocket,
-  LEXORA_BUDDY_PET_STATE_PATH: runtimePaths.nativePetState,
-  LEXORA_HOME: runtimePaths.lexoraHome,
-}
 nativeTheme.on('updated', () => {
   const window = desktopWindowManager?.window
   if (window)
@@ -170,8 +156,7 @@ nativeTheme.on('updated', () => {
 registerAttachmentSchemePrivileges()
 registerRendererSchemePrivileges()
 const initialLaunchIntent = resolveDesktopLaunchIntent(process.argv)
-if (process.platform === 'linux')
-  app.setDesktopName(runtimePaths.desktopName)
+desktopHost.setIdentity(runtimePaths.desktopName)
 
 if (!app.requestSingleInstanceLock()) {
   writeDesktopDiagnostic('Existing instance detected; activating it')
@@ -205,11 +190,22 @@ else {
   app.on('window-all-closed', () => {})
 
   void app.whenReady().then(async () => {
+    const nativePaths = {
+      appPath: app.getAppPath(),
+      isPackaged: app.isPackaged,
+      resourcesPath: process.resourcesPath,
+    }
+    await ensurePrivateDirectories([
+      runtimePaths.lexoraHome,
+      runtimePaths.userData,
+      runtimePaths.sessionData,
+      dirname(runtimePaths.windowState),
+    ], resolveBuddyPrivateDirectories(nativePaths))
     app.setAppUserModelId(runtimePaths.desktopName)
     Menu.setApplicationMenu(null)
     const adapterServer = new BrowserAdapterServer({
       getHost: () => browserHost,
-      socketPath: runtimePaths.browserAdapterSocket,
+      endpoint: localTransports[currentPlatform.transport](runtimePaths.browserAdapterSocket),
     })
     await adapterServer.start()
     browserAdapterServer = adapterServer
@@ -230,29 +226,21 @@ else {
     const configStore = new LexoraConfigStore({ configPath })
     const credentialVault = createCredentialVault({ buddyHome })
     const initialConfig = await configStore.read()
-    await applyDesktopConfig(initialConfig)
-    nativePetSupervisor = new NativePetSupervisor({
-      diagnosticOutput: nativePetDiagnosticOutput,
+    desktopLanguage = initialConfig.desktop.language
+    const windowsPowerShell = currentPlatform.shell === 'powershell'
+      ? await resolveWindowsPowerShell()
+      : undefined
+    const featureComposition = createDesktopFeatures(currentPlatform, {
+      appPath: app.getAppPath(),
+      diagnostics: desktopDiagnostics,
+      isPackaged: app.isPackaged,
       onOpenDesktop: showDesktopWindow,
-      spawnPet: createNativePetProcessFactory({
-        appPath: app.getAppPath(),
-        env: nativePetEnvironment,
-        isPackaged: app.isPackaged,
-        petPathOverride: process.env.LEXORA_BUDDY_PET_PATH,
-        resourcesPath: process.resourcesPath,
-      }),
+      paths: runtimePaths,
+      resourcesPath: process.resourcesPath,
+      writeDiagnostic: writeDesktopDiagnostic,
     })
-    if (initialConfig.pet.enabled && !(await safelyProbeNativePet()))
-      nativePetSupervisor.start()
-    const petSupervisor = nativePetSupervisor
-    const builtinSkillsDirectory = app.isPackaged
-      ? join(process.resourcesPath, 'service', 'resources', 'skills')
-      : join(app.getAppPath(), 'service', 'resources', 'skills')
-    let isRuntimeReplacementBlocked = () => false
-    let automationStartupContext: AutomationStartupContext = {
-      reason: 'normal',
-      restoreToken: null,
-    }
+    desktopFeatures = featureComposition.features
+    await applyDesktopConfig(initialConfig)
     const service = new BuddyServiceSupervisor({
       bindPeer(peer) {
         const disposers = [
@@ -262,37 +250,28 @@ else {
             getHost: () => browserHost,
           }),
           registerCredentialHostRpc(peer, credentialVault),
-          registerPetHostRpc(peer, petSupervisor),
+          ...desktopFeatures.map(feature => feature.bindPeer(peer)),
         ]
         return () => disposers.forEach(dispose => dispose())
       },
       diagnosticOutput: localServiceDiagnosticOutput,
-      isReplacementBlocked: () => isRuntimeReplacementBlocked(),
       spawnService: onFatalError => forkBuddyServiceProcess({
         env: {
-          ...createBuddyServiceEnvironment(process.env, buddyHome, automationStartupContext),
-          LEXORA_BUDDY_SKILLS_DIR: builtinSkillsDirectory,
+          ...createBuddyServiceEnvironment(process.env, buddyHome),
+          ...createBuddyNativeEnvironment(nativePaths),
+          ...(windowsPowerShell ? { PI_POWERSHELL_PATH: windowsPowerShell } : {}),
+          PI_TOOLS_DIR: resolveBuddySearchToolsDirectory({
+            appPath: app.getAppPath(),
+            isPackaged: app.isPackaged,
+            resourcesPath: process.resourcesPath,
+          }),
+          LEXORA_BUDDY_SKILLS_DIRS: JSON.stringify(featureComposition.builtinSkillsDirectories),
         },
         onFatalError,
         diagnosticOutput: localServiceDiagnosticOutput,
       }),
     })
     buddyServiceSupervisor = service
-    const runtimeRecovery = new RuntimeRecoveryService({
-      backupsDirectory: runtimePaths.backupsDirectory,
-      buddyHome,
-      getRuntimeState: () => service.state,
-      openPath: path => shell.openPath(path),
-    })
-    runtimeRecoveryService = runtimeRecovery
-    isRuntimeReplacementBlocked = () => runtimeRecovery.isDataMutationInProgress
-    stopRuntimeRecoverySubscription = runtimeRecovery.onDataOperationChange((operation) => {
-      if (operation.kind !== 'restore' || operation.status !== 'completed')
-        return
-      automationStartupContext = resolveBuddyServiceStartupContext(
-        runtimeRecovery.getDataRecoveryReceipt(),
-      )
-    })
     const wakeOnResume = () => service.notify('scheduler.wake', { reason: 'resume' })
     const wakeOnUnlock = () => service.notify('scheduler.wake', { reason: 'unlock-screen' })
     powerMonitor.on('resume', wakeOnResume)
@@ -301,19 +280,7 @@ else {
       powerMonitor.off('resume', wakeOnResume)
       powerMonitor.off('unlock-screen', wakeOnUnlock)
     }
-    try {
-      const recoveryReceipt = await runtimeRecovery.reconcileInterruptedDataOperations()
-      automationStartupContext = resolveBuddyServiceStartupContext(recoveryReceipt)
-      service.start()
-    }
-    catch (error) {
-      const diagnostic = error instanceof Error ? error.name : 'unknown error'
-      void desktopDiagnostics.write(
-        'local-service',
-        `Data restore reconciliation failed: ${diagnostic}`,
-      )
-      service.reportStartupFailure('EVENT_STORAGE_FAILED')
-    }
+    service.start()
     stopAttachmentProtocol = installAttachmentProtocol(service)
     stopRendererProtocol = installRendererProtocol()
 
@@ -391,7 +358,6 @@ else {
       getLanguage: () => desktopLanguage,
       getWindow: () => desktopWindowManager?.window ?? null,
       runtime: service,
-      runtimeRecovery,
     })
 
     const windowStateStore = new DesktopWindowStateStore({
@@ -458,6 +424,30 @@ else {
     if (!desktopWindow)
       throw new Error('Lexora Buddy Desktop window is unavailable after loading')
 
+    if (windowsPowerShell?.endsWith('\\powershell.exe') && !isSmokeTest) {
+      const showLegacyShellNotice = () => {
+        void dialog.showMessageBox(desktopWindow, {
+          type: 'warning',
+          title: 'Lexora Buddy',
+          message: translateDesktopNative(desktopLanguage, 'powerShellLegacyNotice'),
+          buttons: [
+            translateDesktopNative(desktopLanguage, 'continueWithLegacyPowerShell'),
+            translateDesktopNative(desktopLanguage, 'viewPowerShellInstallGuide'),
+          ],
+          defaultId: 0,
+          cancelId: 0,
+          noLink: true,
+        }).then(async ({ response }) => {
+          if (response === 1)
+            await shell.openExternal('https://learn.microsoft.com/powershell/scripting/install/install-powershell-on-windows')
+        }).catch(() => writeDesktopDiagnostic('PowerShell notice could not be displayed'))
+      }
+      if (desktopWindow.isVisible())
+        showLegacyShellNotice()
+      else
+        desktopWindow.once('show', showLegacyShellNotice)
+    }
+
     if (isSmokeTest) {
       const bridgeAvailable = await desktopWindow.webContents.executeJavaScript(
         'typeof globalThis.lexoraDesktop === "object"',
@@ -480,51 +470,12 @@ else {
       if (!runtimeStatus || typeof runtimeStatus !== 'object' || runtimeStatus.status !== 'ready')
         throw new Error('Lexora Buddy Desktop Preload local chat IPC is unavailable')
 
-      const expectedRecoveryAction = process.env.LEXORA_DESKTOP_SMOKE_EXPECT_RECOVERY
-      if (expectedRecoveryAction) {
-        if (expectedRecoveryAction !== 'restored_previous_data')
-          throw new Error('Lexora Buddy Desktop smoke recovery action is unsupported')
-
-        const recoveryReceipt = await desktopWindow.webContents.executeJavaScript(
-          'globalThis.lexoraDesktop.localChat.runtime.getDataRecoveryReceipt()',
-          true,
-        )
-        if (
-          !recoveryReceipt
-          || typeof recoveryReceipt !== 'object'
-          || recoveryReceipt.action !== expectedRecoveryAction
-        ) {
-          throw new Error('Lexora Buddy Desktop Preload recovery receipt IPC is unavailable')
-        }
-
-        const renderedRecoveryAction = await desktopWindow.webContents.executeJavaScript(
-          `new Promise((resolve) => {
-            globalThis.location.hash = '/settings/data'
-            const deadline = Date.now() + 10_000
-            const inspect = () => {
-              const notice = globalThis.document.querySelector('[data-runtime-recovery-action]')
-              if (notice) {
-                resolve(notice.getAttribute('data-runtime-recovery-action'))
-                return
-              }
-              if (Date.now() >= deadline) {
-                resolve(null)
-                return
-              }
-              globalThis.setTimeout(inspect, 25)
-            }
-            inspect()
-          })`,
-          true,
-        )
-        if (renderedRecoveryAction !== expectedRecoveryAction)
-          throw new Error('Lexora Buddy Desktop Renderer recovery notice is unavailable')
-      }
-
       await quitLexora()
     }
   }).catch(async (error) => {
     console.error('Lexora Buddy Desktop failed to start', error)
+    if (error instanceof PowerShellUnavailableError)
+      dialog.showErrorBox('Lexora Buddy', translateDesktopNative(desktopLanguage, 'powerShellUnavailable'))
     stopBrowserDesktopIpc?.()
     browserAdapterTestLeasePublisher?.dispose()
     browserAdapterTestLeasePublisher = null
@@ -536,10 +487,8 @@ else {
     stopRendererProtocol?.()
     stopBuddyServiceNotification?.()
     stopRuntimeStateSubscription?.()
-    stopRuntimeRecoverySubscription?.()
     stopSchedulerWakeSubscription?.()
-    await nativePetSupervisor?.stop()
-    await runtimeRecoveryService?.shutdown()
+    await Promise.all(desktopFeatures.map(feature => feature.stop()))
     await buddyServiceSupervisor?.stop()
     desktopTray?.destroy()
     await desktopDiagnostics.close()
@@ -597,16 +546,13 @@ function quitLexora(options: { discardDraftsOnFailure?: boolean } = {}): Promise
     stopBuddyServiceNotification = null
     stopRuntimeStateSubscription?.()
     stopRuntimeStateSubscription = null
-    stopRuntimeRecoverySubscription?.()
-    stopRuntimeRecoverySubscription = null
     stopSchedulerWakeSubscription?.()
     stopSchedulerWakeSubscription = null
     stopAttachmentProtocol?.()
     stopAttachmentProtocol = null
     stopRendererProtocol?.()
     stopRendererProtocol = null
-    await nativePetSupervisor?.stop()
-    await runtimeRecoveryService?.shutdown()
+    await Promise.all(desktopFeatures.map(feature => feature.stop()))
     await buddyServiceSupervisor?.stop()
     desktopTray?.destroy()
     desktopTray = null
@@ -669,60 +615,9 @@ async function applyDesktopConfig(config: LexoraConfig): Promise<void> {
     if (!config.desktop.developerToolsEnabled && window.webContents.isDevToolsOpened())
       window.webContents.closeDevTools()
   }
-  await applyNativePetConfig(config.pet)
+  await Promise.all(desktopFeatures.map(feature => feature.applyConfig(config)))
   if (!app.isPackaged || process.env.LEXORA_DESKTOP_SMOKE_TEST === '1')
     return
 
-  if (process.platform === 'linux') {
-    await syncLinuxAutostart({
-      configDirectory: resolveLinuxConfigDirectory(
-        app.getPath('home'),
-        process.env.XDG_CONFIG_HOME,
-      ),
-      enabled: config.desktop.launchAtLogin,
-      executablePath: process.execPath,
-    })
-    return
-  }
-
-  app.setLoginItemSettings({
-    openAtLogin: config.desktop.launchAtLogin,
-  })
-}
-
-async function applyNativePetConfig(config: LexoraConfig['pet']): Promise<void> {
-  if (!config.enabled) {
-    await safelyReloadNativePetConfig()
-    await nativePetSupervisor?.stop()
-    return
-  }
-
-  if (nativePetSupervisor?.reloadConfig())
-    return
-  if (!(await safelyReloadNativePetConfig()))
-    nativePetSupervisor?.start()
-}
-
-async function safelyProbeNativePet(): Promise<boolean> {
-  try {
-    return await probeNativePetControlSocket(nativePetEnvironment)
-  }
-  catch (error) {
-    writeDesktopDiagnostic(`Native pet probe failed: ${diagnosticName(error)}`)
-    return false
-  }
-}
-
-async function safelyReloadNativePetConfig(): Promise<boolean> {
-  try {
-    return await reloadNativePetConfig(nativePetEnvironment)
-  }
-  catch (error) {
-    writeDesktopDiagnostic(`Native pet config reload failed: ${diagnosticName(error)}`)
-    return false
-  }
-}
-
-function diagnosticName(error: unknown): string {
-  return error instanceof Error ? `${error.name}: ${error.message}` : 'unknown error'
+  await desktopHost.setAutostart(config.desktop.launchAtLogin)
 }

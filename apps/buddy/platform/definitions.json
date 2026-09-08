@@ -1,0 +1,43 @@
+{
+  "features": {
+    "nativePet": {
+      "tools": ["lexora_buddy_pet"],
+      "settingsCategory": "pet",
+      "skills": ["lexora-buddy-animation"],
+      "resources": [
+        { "from": ".output/build/native/release/lexora-buddy-pet", "to": "native-pet/lexora-buddy-pet" },
+        { "from": "service/resources/skills/lexora-buddy-animation", "to": "service/resources/skills/lexora-buddy-animation" }
+      ]
+    },
+    "systemActions": {
+      "tools": ["lexora_system_action"],
+      "settingsCategory": null,
+      "skills": [],
+      "resources": []
+    }
+  },
+  "platforms": {
+    "linux": {
+      "features": ["nativePet", "systemActions"],
+      "shell": "bash",
+      "transport": "unix",
+      "builderPlatform": "linux",
+      "packageTargets": ["deb", "pacman"],
+      "environment": {
+        "caseSensitive": true,
+        "names": ["LANG", "LC_ALL", "PATH", "TMPDIR", "TZ", "XDG_CONFIG_HOME", "XDG_DATA_HOME", "http_proxy", "https_proxy", "NO_PROXY", "no_proxy"]
+      }
+    },
+    "win32": {
+      "features": ["systemActions"],
+      "shell": "powershell",
+      "transport": "namedPipe",
+      "builderPlatform": "win",
+      "packageTargets": ["nsis"],
+      "environment": {
+        "caseSensitive": false,
+        "names": ["LANG", "LC_ALL", "PATH", "TZ", "http_proxy", "https_proxy", "no_proxy", "SystemRoot", "SystemDrive", "ProgramFiles", "ComSpec", "PATHEXT", "TEMP", "TMP", "USERPROFILE", "APPDATA", "LOCALAPPDATA"]
+      }
+    }
+  }
+}

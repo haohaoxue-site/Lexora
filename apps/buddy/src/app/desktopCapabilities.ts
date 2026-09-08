@@ -40,7 +40,6 @@ export function createDesktopCapabilities(
       api: input.api.localChat,
       applicationSettings: stores.applicationSettings,
       modelProviders: stores.modelProviders,
-      runtimeRecovery: stores.runtimeRecovery,
       runtimeSupervisor: stores.runtimeSupervisor,
       usage: stores.usage,
     }),

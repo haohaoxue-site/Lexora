@@ -1,6 +1,7 @@
 import type { LexoraDesktopApi } from '@buddy-electron/shared/desktopApi'
 import type {
   LocalComposerDraft,
+  LocalConversation,
   LocalConversationSummary,
   LocalSpace,
   LocalWorkspaceDraft,
@@ -20,6 +21,7 @@ interface UseTaskWorkspacePersistenceOptions {
   api: Pick<LexoraDesktopApi['localChat'], 'composerDrafts' | 'workspaceState'>
   conversations: ValueRef<ReadonlyArray<LocalConversationSummary>>
   drafts: ReturnType<typeof useChatDrafts>
+  getConversation: (conversationId: string) => LocalConversation | null
   onError: (error: unknown) => void
   spaces: ValueRef<ReadonlyArray<LocalSpace>>
   session: ChatSession
@@ -146,9 +148,20 @@ export function useTaskWorkspacePersistence(options: UseTaskWorkspacePersistence
   }
 
   async function persistSnapshot(submitted: ChatDraftSnapshot): Promise<void> {
-    const snapshot = submitted.revision === null
+    let snapshot = submitted.revision === null
       ? await ensureDraft(submitted.targetKey)
       : submitted
+    const scope = parseTargetKey(snapshot.targetKey)
+    if ('conversationId' in scope) {
+      const conversation = options.getConversation(scope.conversationId)
+      if (conversation) {
+        options.drafts.setPermissionSettings({
+          approvalPolicy: conversation.approvalPolicy,
+          executionProfile: conversation.executionProfile,
+        }, snapshot.targetKey)
+        snapshot = options.drafts.snapshot(snapshot.targetKey)
+      }
+    }
     if (options.drafts.isPersisted(snapshot))
       return
     const expectedRevision = requireRevision(snapshot.revision)

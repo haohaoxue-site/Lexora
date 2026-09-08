@@ -8,11 +8,11 @@ import {
   open,
   readdir,
   readFile,
-  rename,
   unlink,
 } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import process from 'node:process'
+import { fileStorage } from '../../../platform/fileStorage'
 import { buddyRunEventSchema, buddyRunIdSchema } from './BuddyRunEvent'
 import {
   RunEventCorruptionError,
@@ -20,6 +20,7 @@ import {
   RunEventStorageError,
 } from './RunEventFailure'
 
+const { replace: rename, syncDirectory } = fileStorage
 const eventTemporaryFilePattern
   = /^\.[A-Z0-9][\w-]{0,127}\.[1-9]\d*\.[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}\.tmp$/i
 
@@ -438,16 +439,6 @@ async function runStorageStage<T>(
       commitState,
       { cause },
     )
-  }
-}
-
-async function syncDirectory(path: string): Promise<void> {
-  const directory = await open(path, 'r')
-  try {
-    await directory.sync()
-  }
-  finally {
-    await directory.close()
   }
 }
 

@@ -36,7 +36,6 @@ export interface BuddyServiceSupervisorOptions {
   bindPeer?: (peer: BuddyServicePeer) => (() => void) | void
   diagnosticOutput?: Writable
   forceKillTimeoutMs?: number
-  isReplacementBlocked?: () => boolean
   readinessTimeoutMs?: number
   restartDelaysMs?: number[]
   shutdownTimeoutMs?: number
@@ -72,7 +71,6 @@ export class BuddyServiceSupervisor {
   readonly #bindPeer?: BuddyServiceSupervisorOptions['bindPeer']
   readonly #diagnosticOutput: Writable
   readonly #forceKillTimeoutMs: number
-  readonly #isExternalReplacementBlocked: () => boolean
   readonly #notificationListeners = new Set<(notification: BuddyServiceNotification) => void>()
   readonly #readinessTimeoutMs: number
   readonly #restartDelaysMs: number[]
@@ -100,7 +98,6 @@ export class BuddyServiceSupervisor {
     this.#bindPeer = options.bindPeer
     this.#diagnosticOutput = options.diagnosticOutput ?? process.stderr
     this.#forceKillTimeoutMs = options.forceKillTimeoutMs ?? DEFAULT_FORCE_KILL_TIMEOUT_MS
-    this.#isExternalReplacementBlocked = options.isReplacementBlocked ?? (() => false)
     this.#readinessTimeoutMs = options.readinessTimeoutMs ?? DEFAULT_READINESS_TIMEOUT_MS
     this.#restartDelaysMs = options.restartDelaysMs ?? DEFAULT_RESTART_DELAYS_MS
     this.#shutdownTimeoutMs = options.shutdownTimeoutMs ?? DEFAULT_SHUTDOWN_TIMEOUT_MS
@@ -110,13 +107,6 @@ export class BuddyServiceSupervisor {
 
   get state(): BuddyServiceSupervisorState {
     return this.#state
-  }
-
-  reportStartupFailure(failure: BuddyServiceSupervisorFailureCode): void {
-    if (this.#desiredRunning || this.#generation)
-      throw new Error('Buddy Local Service startup failure can only be reported before startup')
-    this.#clearTimers()
-    this.#setState({ lastError: failure, pid: null, restartAttempt: 0, status: 'offline' })
   }
 
   start(): void {
@@ -479,8 +469,7 @@ export class BuddyServiceSupervisor {
   }
 
   #isReplacementBlocked(): boolean {
-    return this.#isExternalReplacementBlocked()
-      || (this.#state.status === 'offline' && this.#state.pid !== null)
+    return this.#state.status === 'offline' && this.#state.pid !== null
   }
 
   #clearTimers(): void {

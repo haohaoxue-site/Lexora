@@ -39,7 +39,7 @@ jobs:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: >-
-          node infrastructure/scripts/resolve-ci-scope.mjs
+          node .github/scripts/resolve-ci-scope.mjs
           --base "$BASE_SHA"
           --head "$HEAD_SHA"
           --github-output "$GITHUB_OUTPUT"
@@ -75,8 +75,8 @@ jobs:
       - name: Lint Website
         run: pnpm --filter @haohaoxue/lexora-website lint
 
-      - name: Build Website
-        run: pnpm --filter @haohaoxue/lexora-website build
+      - name: Type-check Website
+        run: pnpm --filter @haohaoxue/lexora-website type-check
 
   quality:
     name: Quality
@@ -107,16 +107,13 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Lint
-        run: pnpm lint
+        run: pnpm exec eslint apps/agent apps/api apps/web packages
 
       - name: Type-check
-        run: pnpm type-check
+        run: pnpm --filter '!@lexora/buddy' --filter '!@haohaoxue/lexora-website' --recursive --if-present type-check
 
       - name: Test
-        run: pnpm test
-
-      - name: Build workspace applications
-        run: pnpm --filter '!@lexora/buddy' --filter '!@haohaoxue/lexora-website' --recursive --if-present build
+        run: pnpm --filter '!@lexora/buddy' --filter '!@haohaoxue/lexora-website' --recursive --if-present test
 
   release-contracts:
     name: Release contracts
@@ -130,41 +127,115 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+
       - name: Setup Node
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version-file: .node-version
 
+      - name: Install contract dependencies
+        run: pnpm --filter @haohaoxue/lexora install --frozen-lockfile --ignore-scripts
+
       - name: Verify release contracts
         run: |
+          pnpm exec eslint .github/scripts packaging infrastructure/scripts
           node packaging/release/version.mjs --check
           node packaging/release/status.mjs
-          node packaging/buddy/release/verify-release-workflow.mjs
+          node .github/scripts/verify-workflows.mjs
           node packaging/website/release/verify-pages-workflow.mjs
 
-  buddy-packages:
-    name: Buddy packages
+  buddy-tests:
+    name: Buddy tests
     needs: scope
-    if: >-
-      needs.scope.outputs.buddy == 'true'
-      && github.event.pull_request.draft == false
-    uses: ./.github/workflows/buddy-build.yml
-    with:
-      upload-artifacts: false
+    if: needs.scope.outputs.buddy == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+
+      - name: Setup Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@4360b52568e2003a75bf9bc1d59f33a8e3fc893c # stable
+        with:
+          toolchain: 1.98.0
+          components: clippy, rustfmt
+
+      - name: Install Buddy test dependencies
+        run: sudo apt-get update && sudo apt-get install -y build-essential libgtk-3-dev libgtk-layer-shell-dev libxdo-dev
+
+      - name: Install workspace dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint Buddy
+        run: pnpm --filter @lexora/buddy lint
+
+      - name: Type-check Buddy
+        run: pnpm --filter @lexora/buddy type-check
+
+      - name: Test Buddy
+        run: pnpm --filter @lexora/buddy test
+
+      - name: Check Rust formatting
+        run: cargo fmt --manifest-path apps/buddy/native/Cargo.toml --all -- --check
+
+      - name: Lint native components
+        run: cargo clippy --locked --manifest-path apps/buddy/native/Cargo.toml --target-dir apps/buddy/.output/build/native --workspace --all-targets -- -D warnings
+
+      - name: Test native components
+        run: cargo test --locked --manifest-path apps/buddy/native/Cargo.toml --target-dir apps/buddy/.output/build/native --workspace
+
+  buddy-native-windows:
+    name: Buddy Windows native tests
+    needs: scope
+    if: needs.scope.outputs.buddy == 'true'
+    runs-on: windows-2025
+    timeout-minutes: 20
+    env:
+      CARGO_TARGET_DIR: ${{ github.workspace }}/apps/buddy/.output/build/native
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@4360b52568e2003a75bf9bc1d59f33a8e3fc893c # stable
+        with:
+          toolchain: 1.98.0
+          components: clippy
+
+      - name: Lint native components
+        run: cargo clippy --locked --manifest-path apps/buddy/native/Cargo.toml --workspace --exclude lexora-buddy-pet --all-targets -- -D warnings
+
+      - name: Test native components
+        run: cargo test --locked --manifest-path apps/buddy/native/Cargo.toml --workspace --exclude lexora-buddy-pet
 
   ci-gate:
     name: CI Gate
-    needs: [scope, website-quality, quality, release-contracts, buddy-packages]
+    needs: [scope, website-quality, quality, release-contracts, buddy-tests, buddy-native-windows]
     if: always()
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
       - name: Require selected checks
         env:
-          BUDDY_REQUIRED: >-
-            ${{ needs.scope.outputs.buddy == 'true'
-                && github.event.pull_request.draft == false }}
-          BUDDY_RESULT: ${{ needs.buddy-packages.result }}
+          BUDDY_REQUIRED: ${{ needs.scope.outputs.buddy }}
+          BUDDY_RESULT: ${{ needs.buddy-tests.result }}
+          WINDOWS_RESULT: ${{ needs.buddy-native-windows.result }}
           CONTRACTS_REQUIRED: ${{ needs.scope.outputs.contracts }}
           CONTRACTS_RESULT: ${{ needs.release-contracts.result }}
           WEBSITE_REQUIRED: ${{ needs.scope.outputs.website }}
@@ -191,4 +262,5 @@ jobs:
           require_success "Website quality" "$WEBSITE_REQUIRED" "$WEBSITE_RESULT"
           require_success "Quality" "$QUALITY_REQUIRED" "$QUALITY_RESULT"
           require_success "Release contracts" "$CONTRACTS_REQUIRED" "$CONTRACTS_RESULT"
-          require_success "Buddy packages" "$BUDDY_REQUIRED" "$BUDDY_RESULT"
+          require_success "Buddy tests" "$BUDDY_REQUIRED" "$BUDDY_RESULT"
+          require_success "Buddy Windows native tests" "$BUDDY_REQUIRED" "$WINDOWS_RESULT"

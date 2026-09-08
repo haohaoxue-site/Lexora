@@ -37,6 +37,7 @@ overrides:
 
 patchedDependencies:
   '@earendil-works/pi-ai@0.85.1': c201469e6279c7db549b9f168719fea664b4fd65e6cc06ab689c3c8f29ed00b1
+  '@earendil-works/pi-coding-agent@0.85.1': aeb1d0976c9bee06023ddc36c53f8c95e67bb7572f94c11d1e37ab24e015b653
 
 importers:
 
@@ -54,6 +55,10 @@ importers:
       vitest:
         specifier: ^4.1.5
         version: 4.1.7(@types/node@25.9.1)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.2.2(@types/node@25.9.1)(esbuild@0.28.2)(jiti@2.7.0)(sass-embedded@1.103.1)(sass@1.103.1)(yaml@2.9.0))
+
+      yaml:
+        specifier: ^2.9.0
+        version: 2.9.0
 
   apps/agent:
     dependencies:
@@ -256,7 +261,7 @@ importers:
         version: 0.85.1(patch_hash=c201469e6279c7db549b9f168719fea664b4fd65e6cc06ab689c3c8f29ed00b1)(@modelcontextprotocol/sdk@1.30.0(@cfworker/json-schema@4.1.1)(zod@4.4.3))(ws@8.21.0)(zod@4.4.3)
       '@earendil-works/pi-coding-agent':
         specifier: ^0.85.1
-        version: 0.85.1(@modelcontextprotocol/sdk@1.30.0(@cfworker/json-schema@4.1.1)(zod@4.4.3))(ws@8.21.0)(zod@4.4.3)
+        version: 0.85.1(patch_hash=aeb1d0976c9bee06023ddc36c53f8c95e67bb7572f94c11d1e37ab24e015b653)(@modelcontextprotocol/sdk@1.30.0(@cfworker/json-schema@4.1.1)(zod@4.4.3))(ws@8.21.0)(zod@4.4.3)
       '@js-temporal/polyfill':
         specifier: ^0.5.1
         version: 0.5.1
@@ -308,6 +313,9 @@ importers:
       markstream-vue:
         specifier: ^2.0.6
         version: 2.0.6(katex@0.16.47)(vue-i18n@11.4.5(vue@3.5.35(typescript@6.0.3)))(vue@3.5.35(typescript@6.0.3))
+      minisearch:
+        specifier: 7.2.0
+        version: 7.2.0
       monaco-editor:
         specifier: ^0.56.0
         version: 0.56.0
@@ -9328,7 +9336,7 @@ snapshots:
       - ws
       - zod
 
-  '@earendil-works/pi-coding-agent@0.85.1(@modelcontextprotocol/sdk@1.30.0(@cfworker/json-schema@4.1.1)(zod@4.4.3))(ws@8.21.0)(zod@4.4.3)':
+  '@earendil-works/pi-coding-agent@0.85.1(patch_hash=aeb1d0976c9bee06023ddc36c53f8c95e67bb7572f94c11d1e37ab24e015b653)(@modelcontextprotocol/sdk@1.30.0(@cfworker/json-schema@4.1.1)(zod@4.4.3))(ws@8.21.0)(zod@4.4.3)':
     dependencies:
       '@earendil-works/chord': 0.85.1
       '@earendil-works/pi-agent-core': 0.85.1(@modelcontextprotocol/sdk@1.30.0(@cfworker/json-schema@4.1.1)(zod@4.4.3))(ws@8.21.0)(zod@4.4.3)

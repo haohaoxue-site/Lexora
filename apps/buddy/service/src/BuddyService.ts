@@ -1,7 +1,4 @@
 import type { DatabaseSync } from 'node:sqlite'
-import type {
-  AutomationStartupContext,
-} from '../../shared/automation'
 
 import type { BuddySessionCompositionServices } from './agent/createBuddySessionComposition'
 import type { BuddyAgentSessionLike } from './agent/PiTurnExecutor'
@@ -12,6 +9,9 @@ import type { BuddyServiceRpcServer } from './rpc/BuddyServiceRpcServer'
 import type { BuddyServiceErrorCode } from './rpc/runtimeRequest'
 import { mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
+import process from 'node:process'
+import { currentPlatform } from '../../platform/currentPlatform'
+import { resolveWindowsPowerShell } from '../../platform/windows/powerShell'
 import { BuddyAgentRunner } from './agent/BuddyAgentRunner'
 import { BuddyRunExecutionPlanner } from './agent/BuddyRunExecutionPlanner'
 import { BuddySessionBlueprintService } from './agent/BuddySessionBlueprint'
@@ -61,19 +61,19 @@ import { ContextUsageSnapshotService } from './context/ContextUsageSnapshotServi
 import { registerContextRpc } from './context/registerContextRpc'
 import { ConversationLifecycleService } from './conversations/ConversationLifecycleService'
 import { registerConversationRpc } from './conversations/registerConversationRpc'
+import { createBuddyCapabilityFactory } from './createBuddyCapabilityFactory'
 import { DirectoryGrantService } from './directories/DirectoryGrantService'
 import { ImageTransformService } from './images/ImageTransformService'
 import { OpenAiImageGenerationService } from './images/OpenAiImageGenerationService'
 import { AttentionNotificationService } from './notifications/AttentionNotificationService'
 import { registerNotificationRpc } from './notifications/registerNotificationRpc'
-import { PetActionService } from './pet/PetActionService'
 import { createProviderService } from './providers/createProviderService'
 import { registerProviderRpc } from './providers/registerProviderRpc'
 import { resolveInteractiveModelSelection } from './providers/resolveInteractiveModelSelection'
 import { BuddyServiceError } from './rpc/runtimeRequest'
 import { registerRunRpc } from './runs/registerRunRpc'
-import { RunLifecycleService } from './runs/RunLifecycleService'
 
+import { RunLifecycleService } from './runs/RunLifecycleService'
 import { RunRecoveryService } from './runs/RunRecoveryService'
 import { registerSpaceRpc } from './spaces/registerSpaceRpc'
 import { matchesSpaceExecutionContext } from './spaces/spaceExecutionContext'
@@ -98,7 +98,6 @@ import { createSpaceRepository } from './storage/spaceRepository'
 import { createTurnRequestRepository } from './storage/turnRequestRepository'
 import { createUsageRepository } from './storage/usageRepository'
 import { createWorkspaceRepository } from './storage/workspaceRepository'
-import { LinuxSystemHost } from './system/LinuxSystemHost'
 import { registerUsageRpc } from './usage/registerUsageRpc'
 import { UsageService } from './usage/UsageService'
 import { WebCapabilityService } from './web/WebCapabilityService'
@@ -109,9 +108,8 @@ import { registerWorkspaceStateRpc } from './workspace/registerWorkspaceStateRpc
 
 export interface StartBuddyServiceOptions {
   automationClock?: AutomationClock
-  automationStartupContext?: AutomationStartupContext
   buddyHome: string
-  builtinSkillsDirectory: string
+  builtinSkillsDirectories?: readonly string[]
   database: DatabaseSync
   rpc: BuddyServiceRpcServer
   eventLog: RunEventLogPort
@@ -125,6 +123,8 @@ export interface BuddyServiceHandle {
 export async function startBuddyService(
   options: StartBuddyServiceOptions,
 ): Promise<BuddyServiceHandle> {
+  if (currentPlatform.shell === 'powershell')
+    process.env.PI_POWERSHELL_PATH ??= await resolveWindowsPowerShell()
   const paths = new BuddyDataPaths(options.buddyHome)
   const agentDirectory = join(options.buddyHome, 'agent')
   await Promise.all([
@@ -230,7 +230,6 @@ export async function startBuddyService(
   const imageGenerationGateway = new OpenAiImageGenerationService({
     modelRuntime: executionModels.getRuntime(),
   })
-  const systemHost = new LinuxSystemHost()
   const sessions = new BuddySessionRegistry<BuddyAgentSessionLike>()
   const directoryGrants = new DirectoryGrantService({
     conversationGrants: conversationDirectoryGrants,
@@ -245,12 +244,8 @@ export async function startBuddyService(
   })
   const skillService = new SkillService({
     agentDirectory,
-    builtinSkillsDirectory: options.builtinSkillsDirectory,
+    builtinSkillsDirectories: options.builtinSkillsDirectories,
     spaces: spacesRepository,
-  })
-  const petService = new PetActionService({
-    eventSink: event => options.eventLog.append(event),
-    peer: options.rpc,
   })
   const browserHost = new BrowserHostClient(options.rpc)
   const webSettings = new WebSettingsService(workspace, options.rpc)
@@ -308,19 +303,23 @@ export async function startBuddyService(
   })
   const sessionCompositionServices: BuddySessionCompositionServices = {
     approvalService,
-    artifactService,
     attachmentService,
-    automationService,
-    browserHost,
     changeCaptureService,
-    connectorService,
     directoryGrants,
-    imageGenerationGateway,
-    imageTransformService,
-    onAutomationChanged: automationId => automationChanges.publish(automationId),
-    petService,
-    systemHost,
-    webService,
+    createCapabilities: createBuddyCapabilityFactory(currentPlatform, {
+      artifactService,
+      attachmentService,
+      automationService,
+      browserHost,
+      connectorService,
+      imageGenerationGateway,
+      imageTransformService,
+      onAutomationChanged: automationId => automationChanges.publish(automationId),
+      webService,
+    }, {
+      eventSink: event => options.eventLog.append(event),
+      peer: options.rpc,
+    }),
   }
   const sessionBlueprints = new BuddySessionBlueprintService({
     conversationGrants: conversationDirectoryGrants,
@@ -448,7 +447,6 @@ export async function startBuddyService(
       automationChanges.publishSchedulerChange(occurrence.automationId)
     },
     onChanged: automationId => automationChanges.publishSchedulerChange(automationId),
-    workspace,
   })
   automationScheduler = scheduler
 
@@ -571,10 +569,7 @@ export async function startBuddyService(
     return disposal
   }
   try {
-    await scheduler.start(options.automationStartupContext ?? {
-      reason: 'normal',
-      restoreToken: null,
-    })
+    await scheduler.start()
   }
   catch (error) {
     await dispose()
