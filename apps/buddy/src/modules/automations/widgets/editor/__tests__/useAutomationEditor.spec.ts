@@ -33,7 +33,6 @@ describe('automation editor input ownership', () => {
     vi.useFakeTimers()
     const scope = effectScope()
     const props = reactive<AutomationEditorProps>({
-      appSidebarCollapsed: false,
       automation: null,
       busy: false,
       error: null,

@@ -7,7 +7,6 @@ import type { ModelProvidersStore } from '@/modules/models'
 import { createInjectionContext } from '@/shared/composables/createInjectionContext'
 
 export interface AutomationContext {
-  appSidebarCollapsed: Readonly<Ref<boolean>>
   automations: AutomationCapability
   language: Readonly<Ref<BuddyLocale>>
   openTask: (conversationId: string) => Promise<void>
@@ -15,7 +14,6 @@ export interface AutomationContext {
   ready: Promise<void>
   refreshTasks: () => Promise<void>
   spaces: Readonly<Ref<ReadonlyArray<LocalSpace>>>
-  toggleAppSidebar: () => void
 }
 
 export const { key: automationContextKey, useContext: useAutomationContext }

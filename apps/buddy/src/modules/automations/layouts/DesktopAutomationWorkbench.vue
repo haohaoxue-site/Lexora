@@ -5,7 +5,6 @@ import type { BuddyLocale } from '@/i18n/buddyI18n'
 import {
   Add20Regular,
   ArrowClockwise20Regular,
-  PanelLeft20Regular,
 } from '@vicons/fluent'
 import { NButton, NScrollbar, useMessage } from 'naive-ui'
 import { shallowRef } from 'vue'
@@ -15,13 +14,11 @@ import { desktopRouteLocations } from '@/shared/navigation/desktopRoutes'
 import DesktopIcon from '@/shared/ui/icon/DesktopIcon.vue'
 
 const props = defineProps<{
-  appSidebarCollapsed: boolean
   automations: AutomationCapability
   language: BuddyLocale
 }>()
 const emit = defineEmits<{
   add: []
-  toggleAppSidebar: []
 }>()
 defineSlots<{
   default: () => unknown
@@ -49,16 +46,6 @@ async function refresh(): Promise<void> {
   <section class="desktop-automation-workbench">
     <header class="desktop-automation-workbench__header">
       <div class="desktop-automation-workbench__primary">
-        <NButton
-          v-if="appSidebarCollapsed"
-          class="buddy-icon-button"
-          quaternary
-          @click="emit('toggleAppSidebar')"
-        >
-          <template #icon>
-            <DesktopIcon :component="PanelLeft20Regular" />
-          </template>
-        </NButton>
         <nav :aria-label="t('desktop.automations.title')">
           <RouterLink
             :class="{ 'is-active': route.meta.automationSection === 'plans' }"

@@ -8,18 +8,14 @@ const router = useRouter()
 const {
   language,
   automations,
-  appSidebarCollapsed,
-  toggleAppSidebar,
 } = useAutomationContext()
 </script>
 
 <template>
   <DesktopAutomationWorkbench
-    :app-sidebar-collapsed="appSidebarCollapsed"
     :automations="automations"
     :language="language"
     @add="router.push(desktopRouteLocations.automationCreate())"
-    @toggle-app-sidebar="toggleAppSidebar"
   >
     <RouterView />
   </DesktopAutomationWorkbench>

@@ -1,14 +1,7 @@
 <script setup lang="ts">
-import { PanelLeft20Regular } from '@vicons/fluent'
-import { NButton } from 'naive-ui'
-import DesktopIcon from '@/shared/ui/icon/DesktopIcon.vue'
-
 defineProps<{
   label: string
   visible: boolean
-}>()
-const emit = defineEmits<{
-  restore: []
 }>()
 </script>
 
@@ -16,15 +9,6 @@ const emit = defineEmits<{
   <div class="desktop-workspace-sidebar-identity">
     <Transition name="desktop-workspace-sidebar-identity">
       <div v-if="visible" class="desktop-workspace-sidebar-identity__content">
-        <NButton
-          class="buddy-icon-button desktop-workspace-sidebar-identity__restore"
-          quaternary
-          @click="emit('restore')"
-        >
-          <template #icon>
-            <DesktopIcon :component="PanelLeft20Regular" />
-          </template>
-        </NButton>
         <strong class="desktop-workspace-sidebar-identity__label">{{ label }}</strong>
       </div>
     </Transition>
@@ -44,15 +28,10 @@ const emit = defineEmits<{
   min-width: 0;
   align-items: center;
   color: var(--buddy-nav-foreground);
-  gap: 0.35rem;
   transition:
     opacity 220ms ease-out,
     transform 360ms cubic-bezier(0.16, 1, 0.3, 1);
   transition-delay: 70ms;
-}
-
-.desktop-workspace-sidebar-identity__restore.n-button {
-  color: var(--buddy-nav-foreground);
 }
 
 .desktop-workspace-sidebar-identity__label {

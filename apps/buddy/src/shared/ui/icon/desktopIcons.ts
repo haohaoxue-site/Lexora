@@ -8,6 +8,7 @@ import messageRetryUrl from './assets/message-retry.svg'
 import navigationAutomationUrl from './assets/navigation-automation.svg'
 import navigationTaskUrl from './assets/navigation-task.svg'
 import notificationMarkAllReadUrl from './assets/notification-mark-all-read.svg'
+import sidebarChevronUrl from './assets/sidebar-chevron.svg'
 import spaceNoneUrl from './assets/space-none.svg'
 import windowCloseUrl from './assets/window-close.svg'
 import windowMaximizeUrl from './assets/window-maximize.svg'
@@ -26,6 +27,7 @@ export const DESKTOP_ICON_URLS = {
   navigationAutomation: navigationAutomationUrl,
   navigationTask: navigationTaskUrl,
   notificationMarkAllRead: notificationMarkAllReadUrl,
+  sidebarChevron: sidebarChevronUrl,
   spaceNone: spaceNoneUrl,
   windowClose: windowCloseUrl,
   windowMaximize: windowMaximizeUrl,

@@ -24,9 +24,6 @@ const props = defineProps<{
   language: BuddyLocale
   capabilities: BuddyCapabilities | null
 }>()
-const emit = defineEmits<{
-  toggleAppSidebar: []
-}>()
 const route = useRoute()
 const { t } = useBuddyI18n(() => props.language)
 const categories = [
@@ -46,7 +43,6 @@ const visibleCategories = computed(() => categories.filter(category => supportsS
       <DesktopWorkspaceSidebarIdentity
         :label="t('desktop.navigation.settings')"
         :visible="appSidebarCollapsed"
-        @restore="emit('toggleAppSidebar')"
       />
     </header>
 

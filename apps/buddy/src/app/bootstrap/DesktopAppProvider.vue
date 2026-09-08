@@ -73,7 +73,6 @@ provide(taskContextKey, {
   clipboard: api.clipboard,
   notificationTargetMessageId,
   tasks,
-  toggleAppSidebar,
 })
 provide(settingsContextKey, {
   applicationSettings: stores.applicationSettings,
@@ -84,11 +83,9 @@ provide(settingsContextKey, {
   platformCapabilities: shell.platformCapabilities,
   providerSettings: stores.modelProviders,
   ready,
-  toggleAppSidebar,
   webSettings: capabilities.webSettings,
 })
 provide(automationContextKey, {
-  appSidebarCollapsed: shell.appSidebarCollapsed,
   automations: capabilities.automations,
   language: stores.applicationSettings.language,
   openTask: async (id) => { await tasks.session.openTask(id) },
@@ -96,7 +93,6 @@ provide(automationContextKey, {
   ready,
   refreshTasks: async () => { await tasks.index.refresh() },
   spaces: tasks.index.spaces,
-  toggleAppSidebar,
 })
 
 watch(() => stores.applicationSettings.config.value?.desktop.language, (language) => {

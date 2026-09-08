@@ -16,8 +16,6 @@ const {
   providerSettings,
   spaces,
   ready,
-  appSidebarCollapsed,
-  toggleAppSidebar,
 } = useAutomationContext()
 const { automation, error, isLoading, isSaving, mode, save } = useAutomationEditorRoute({
   automationId: () => props.automationId,
@@ -36,7 +34,6 @@ const { models, providers } = providerSettings
 
 <template>
   <DesktopAutomationEditor
-    :app-sidebar-collapsed="appSidebarCollapsed"
     :automation="automation"
     :busy="isSaving || isMutating"
     :error="error"
@@ -49,6 +46,5 @@ const { models, providers } = providerSettings
     :spaces="spaces"
     @cancel="cancel"
     @save="save"
-    @toggle-app-sidebar="toggleAppSidebar"
   />
 </template>

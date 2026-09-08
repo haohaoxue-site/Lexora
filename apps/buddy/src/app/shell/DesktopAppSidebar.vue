@@ -6,7 +6,6 @@ import type { LocalSpace } from '@buddy-shared/spaces/spaceApi'
 import type { BuddyLocale } from '@/i18n/buddyI18n'
 import {
   Alert20Regular,
-  PanelLeft20Regular,
   Search20Regular,
   Settings20Regular,
 } from '@vicons/fluent'
@@ -37,7 +36,6 @@ const emit = defineEmits<{
   openNotification: [notification: LocalNotification]
   openTask: [conversationId: string]
   openSpace: [spaceId: string]
-  toggleSidebar: []
   refreshNotifications: []
 }>()
 const { t } = useBuddyI18n(() => props.language)
@@ -70,7 +68,7 @@ function openSpace(spaceId: string) {
 </script>
 
 <template>
-  <aside class="desktop-app-sidebar">
+  <aside id="desktop-app-sidebar" class="desktop-app-sidebar">
     <header class="desktop-app-sidebar__header">
       <div class="desktop-app-sidebar__identity">
         <strong>Lexora Buddy</strong>
@@ -84,15 +82,6 @@ function openSpace(spaceId: string) {
         >
           <template #icon>
             <DesktopIcon :component="Search20Regular" />
-          </template>
-        </NButton>
-        <NButton
-          class="buddy-icon-button desktop-app-sidebar__collapse-trigger"
-          quaternary
-          @click="emit('toggleSidebar')"
-        >
-          <template #icon>
-            <DesktopIcon :component="PanelLeft20Regular" />
           </template>
         </NButton>
       </div>
