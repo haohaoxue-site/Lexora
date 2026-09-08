@@ -2,7 +2,7 @@ import type {
   Automation,
   AutomationExecutionSnapshot,
 } from '../../../shared/automation'
-import type { SpaceExecutionContext } from '../../../shared/space'
+import type { SpaceExecutionContext } from '../../../shared/conversation/space'
 import {
   automationExecutionSnapshotSchema,
   automationScheduleSchema,

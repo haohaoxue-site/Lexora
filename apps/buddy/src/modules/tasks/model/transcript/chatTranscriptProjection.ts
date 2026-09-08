@@ -1,0 +1,188 @@
+import type { LocalConversationTimelineItem, LocalMessage } from '@buddy-shared/conversation/conversationApi'
+import type { LocalRun, LocalRunEvent } from '@buddy-shared/runs/runApi'
+
+import type { CachedChatTranscriptProjection } from './chatIncrementalTranscript'
+import type {
+  ChatTranscriptAgentTurnRow,
+  ChatTranscriptProjection,
+  ChatTranscriptProjectionInput,
+  ChatTranscriptRecoveryNoticeRow,
+  ChatTranscriptRow,
+} from './chatTranscriptTypes'
+import { projectChatAgentTurns } from './chatAgentTurn'
+import { createChatTranscriptProjectionCache, projectIncrementalChatTranscript } from './chatIncrementalTranscript'
+import { projectPersistedChatTranscriptRows } from './chatPersistedTranscriptRows'
+import { projectChatRecoveryNotices, selectChatRecoveryNotices } from './chatRunRecovery'
+import { projectStreamingAssistantMessage, selectChatStreamingMessage } from './chatRunStreamingMessages'
+
+export { projectPersistedChatTranscriptRows } from './chatPersistedTranscriptRows'
+export type {
+  ChatTranscriptActivityRow,
+  ChatTranscriptAgentTurnRow,
+  ChatTranscriptCompactionRow,
+  ChatTranscriptMessageRow,
+  ChatTranscriptProjection,
+  ChatTranscriptProjectionInput,
+  ChatTranscriptProjectionUpdate,
+  ChatTranscriptRecoveryNoticeRow,
+  ChatTranscriptRow,
+  ChatTranscriptRowPatch,
+  ChatTranscriptTurnOutputs,
+} from './chatTranscriptTypes'
+
+export function projectChatTranscript(
+  input: ChatTranscriptProjectionInput,
+): ChatTranscriptProjection {
+  const messages = input.timelineItems.filter(
+    (item): item is Extract<LocalConversationTimelineItem, { kind: 'message' }> =>
+      item.kind === 'message',
+  )
+  const runEvents = input.runEvents ?? []
+  const agentTurns = input.runProjections?.map(projection => projection.turn)
+    ?? input.agentTurns
+    ?? projectChatAgentTurns(runEvents, input.runs)
+  const recoveryNotices = input.runProjections
+    ? selectChatRecoveryNotices(
+        input.timelineItems,
+        input.runProjections.flatMap(projection => projection.recoveryNotices),
+        input.runs,
+      )
+    : projectChatRecoveryNotices(input.timelineItems, runEvents, input.runs)
+  const streamingLocalMessage = input.runProjections
+    ? selectChatStreamingMessage(
+      messages,
+      input.runProjections.flatMap(projection => projection.streamingMessages),
+      input.runs,
+    )?.message ?? null
+    : projectLegacyStreamingLocalMessage(messages, runEvents, input.runs)
+  const triggeringMessageIdByRunId = new Map(
+    input.runs.map(run => [run.id, run.triggeringMessageId]),
+  )
+  const noticesByMessageId = new Map<string, ChatTranscriptRecoveryNoticeRow[]>()
+  const noticesByRunId = new Map<string, ChatTranscriptRecoveryNoticeRow[]>()
+  for (const notice of recoveryNotices) {
+    const messageId = triggeringMessageIdByRunId.get(notice.runId)
+    if (!messageId)
+      continue
+    const row: ChatTranscriptRecoveryNoticeRow = {
+      key: `recovery-notice:${notice.runId}:${notice.sequence}`,
+      kind: 'recovery-notice',
+      notice,
+    }
+    const messageRows = noticesByMessageId.get(messageId) ?? []
+    messageRows.push(row)
+    noticesByMessageId.set(messageId, messageRows)
+    const runRows = noticesByRunId.get(notice.runId) ?? []
+    runRows.push(row)
+    noticesByRunId.set(notice.runId, runRows)
+  }
+
+  const agentTurnRunIds = new Set(agentTurns.map(turn => turn.runId))
+  const rows: ChatTranscriptRow[] = []
+  for (const row of projectPersistedChatTranscriptRows(
+    input.timelineItems,
+    agentTurns,
+    input.outputs,
+    input.changeSets ?? [],
+  )) {
+    rows.push(row)
+    if (row.kind === 'agent-turn') {
+      rows.push(...(noticesByRunId.get(row.turn.runId) ?? []))
+      continue
+    }
+    if (row.kind === 'message') {
+      rows.push(...(noticesByMessageId.get(row.message.id) ?? []).filter(
+        notice => !agentTurnRunIds.has(notice.notice.runId),
+      ))
+    }
+  }
+  const activeAgentTurn = [...rows].reverse().find(
+    (row): row is ChatTranscriptAgentTurnRow => row.kind === 'agent-turn'
+      && (row.turn.status === 'queued' || row.turn.status === 'running'),
+  )?.turn
+  if (streamingLocalMessage) {
+    rows.push({
+      isAgentTurnResult: agentTurnRunIds.has(streamingLocalMessage.runId ?? ''),
+      key: `message:${streamingLocalMessage.id}`,
+      kind: 'message',
+      message: streamingLocalMessage,
+      streaming: true,
+      turnOutputs: null,
+    })
+  }
+  if (activeAgentTurn) {
+    rows.push({
+      key: `activity:${activeAgentTurn.runId}`,
+      kind: 'activity',
+      turn: activeAgentTurn,
+    })
+  }
+
+  return { rows, update: { kind: 'replace' } }
+}
+
+export function createChatTranscriptProjector() {
+  let cached: CachedChatTranscriptProjection | null = null
+
+  return {
+    project(input: ChatTranscriptProjectionInput): ChatTranscriptProjection {
+      const incremental = cached && projectIncrementalChatTranscript(cached, input)
+      if (incremental) {
+        cached = incremental.cache
+        return incremental.projection
+      }
+      const projection = projectChatTranscript(input)
+      cached = createChatTranscriptProjectionCache(input, projection)
+      return projection
+    },
+  }
+}
+
+function projectLegacyStreamingLocalMessage(
+  messages: ReadonlyArray<LocalMessage>,
+  events: ReadonlyArray<LocalRunEvent>,
+  runs: ReadonlyArray<LocalRun>,
+): LocalMessage | null {
+  const streamingMessage = projectStreamingAssistantMessage(messages, events, runs)
+  return streamingMessage
+    ? projectStreamingLocalMessage(streamingMessage.id, streamingMessage.text, events, runs)
+    : null
+}
+
+function projectStreamingLocalMessage(
+  messageId: string,
+  text: string,
+  events: ReadonlyArray<LocalRunEvent>,
+  runs: ReadonlyArray<LocalRun>,
+): LocalMessage | null {
+  const sourceEvent = [...events].reverse().find(event => (
+    readMessageId(event.payload) === messageId
+  ))
+  if (!sourceEvent)
+    return null
+  const run = runs.find(item => item.id === sourceEvent.runId)
+  if (!run)
+    return null
+  const startedAt = events.find(event => (
+    event.runId === run.id
+    && event.type === 'message.started'
+    && readMessageId(event.payload) === messageId
+  ))?.createdAt ?? sourceEvent.createdAt
+  return {
+    attachments: [],
+    branchId: run.branchId,
+    content: { text },
+    conversationId: run.conversationId,
+    createdAt: startedAt,
+    id: messageId,
+    role: 'assistant',
+    runId: run.id,
+  }
+}
+
+function readMessageId(payload: unknown): string | null {
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload))
+    return null
+  const messageId = (payload as Record<string, unknown>).messageId
+  return typeof messageId === 'string' ? messageId : null
+}

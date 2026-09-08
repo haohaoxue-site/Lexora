@@ -5,14 +5,14 @@ import type {
   ToolResultMessage,
 } from '@earendil-works/pi-ai'
 import type { AgentSessionEvent } from '@earendil-works/pi-coding-agent'
-import type { BuddyAssistantTextPhase } from '../../../shared/assistantTextPhase'
-import type { BuddyToolPresentation } from '../../../shared/runEventPresentation'
-import type { BuddyRunProgress } from '../../../shared/runProgress'
+import type { BuddyAssistantTextPhase } from '../../../shared/runs/assistantTextPhase'
+import type { BuddyToolPresentation } from '../../../shared/runs/runEventPresentation'
+import type { BuddyRunProgress } from '../../../shared/runs/runProgress'
 import { randomUUID } from 'node:crypto'
 
-import { redactSensitiveText } from '../../../shared/approvalReviewPayload'
-import { buddyAssistantTextPhaseSchema } from '../../../shared/assistantTextPhase'
-import { MAX_BUDDY_MESSAGE_TEXT_LENGTH } from '../../../shared/buddyMessageContent'
+import { MAX_BUDDY_MESSAGE_TEXT_LENGTH } from '../../../shared/conversation/buddyMessageContent'
+import { redactSensitiveText } from '../../../shared/permissions/approvalReviewPayload'
+import { buddyAssistantTextPhaseSchema } from '../../../shared/runs/assistantTextPhase'
 import {
   createBuddyRunOutputs,
   createBuddyToolPresentation,

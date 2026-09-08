@@ -1,5 +1,5 @@
 import type { DatabaseSync } from 'node:sqlite'
-import type { RuntimeRpcPeerContract } from '../../../shared/runtimeRpcPeer'
+import type { RuntimeRpcPeerContract } from '../../../shared/runtime/rpcPeer'
 import type { ProviderRepository } from '../storage/providerRepository'
 import { chmod, mkdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'

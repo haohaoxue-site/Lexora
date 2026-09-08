@@ -12,7 +12,7 @@ import type {
   LexoraConfigPatch,
 } from './desktopApi'
 import { z } from 'zod'
-import { BROWSER_FAILURE_REASONS } from '../../shared/browserProtocol'
+import { BROWSER_FAILURE_REASONS } from '../../shared/browser'
 import {
   DESKTOP_BROWSER_ERROR_CODES,
   DESKTOP_BROWSER_PROFILE_MODES,

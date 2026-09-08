@@ -1,0 +1,139 @@
+import type { LocalChatApi } from '@buddy-electron/shared/localChatApi'
+import type { LocalNotification, LocalNotificationList } from '@buddy-shared/notifications/notificationApi'
+import { computed, readonly, shallowRef } from 'vue'
+
+export type NotificationFilter = 'all' | 'unseen'
+
+export function filterNotifications(
+  items: ReadonlyArray<LocalNotification>,
+  filter: NotificationFilter,
+): ReadonlyArray<LocalNotification> {
+  return filter === 'unseen'
+    ? items.filter(item => item.attention === 'unseen')
+    : items
+}
+
+export function useNotificationCenterStore(api: {
+  notifications: LocalChatApi['notifications']
+  chat: Pick<LocalChatApi['chat'], 'onRunEvent'>
+  automations: Pick<LocalChatApi['automations'], 'onChanged'>
+}) {
+  const items = shallowRef<ReadonlyArray<LocalNotification>>([])
+  const unseenCount = shallowRef(0)
+  const isLoading = shallowRef(false)
+  const error = shallowRef<unknown>(null)
+  let loadPromise: Promise<boolean> | null = null
+  let refreshRequested = false
+  let stopped = false
+  let generation = 0
+  let pendingMutations = 0
+  let mutationQueue = Promise.resolve(true)
+  const stopRunEvent = api.chat.onRunEvent((event) => {
+    if (event.type === 'run.completed' || event.type === 'run.failed')
+      void load()
+  })
+  const stopAutomationChanged = api.automations.onChanged(() => void load())
+
+  const hasNotifications = computed(() => items.value.length > 0)
+
+  function apply(value: LocalNotificationList) {
+    items.value = value.items
+    unseenCount.value = value.unseenCount
+  }
+
+  function load(): Promise<boolean> {
+    if (stopped)
+      return Promise.resolve(false)
+    if (loadPromise) {
+      refreshRequested = true
+      return loadPromise
+    }
+    isLoading.value = true
+    error.value = null
+    const current = generation
+    loadPromise = api.notifications.list()
+      .then((value) => {
+        if (stopped || current !== generation || pendingMutations > 0)
+          return false
+        apply(value)
+        return true
+      })
+      .catch((loadError) => {
+        if (!stopped && current === generation)
+          error.value = loadError
+        return false
+      })
+      .finally(() => {
+        if (!stopped)
+          isLoading.value = false
+        loadPromise = null
+        if (refreshRequested) {
+          refreshRequested = false
+          void load()
+        }
+      })
+    return loadPromise
+  }
+
+  function mutate(operation: () => Promise<LocalNotificationList>): Promise<boolean> {
+    if (stopped)
+      return Promise.resolve(false)
+    generation += 1
+    pendingMutations += 1
+    const mutation = mutationQueue.then(async () => {
+      if (stopped)
+        return false
+      error.value = null
+      try {
+        const value = await operation()
+        if (stopped)
+          return false
+        apply(value)
+        return true
+      }
+      catch (markError) {
+        if (!stopped)
+          error.value = markError
+        return false
+      }
+      finally {
+        generation += 1
+        pendingMutations -= 1
+      }
+    })
+    mutationQueue = mutation
+    return mutation
+  }
+
+  function markSeen(notification: LocalNotification) {
+    return mutate(() => api.notifications.markSeen(notification.id, notification.revision))
+  }
+
+  function markAllSeen() {
+    return mutate(() => api.notifications.markAllSeen())
+  }
+
+  function dispose(): void {
+    if (stopped)
+      return
+    stopped = true
+    generation += 1
+    refreshRequested = false
+    stopAutomationChanged()
+    stopRunEvent()
+  }
+
+  return {
+    error: readonly(error),
+    dispose,
+    hasNotifications: readonly(hasNotifications),
+    isLoading: readonly(isLoading),
+    items: readonly(items),
+    load,
+    markAllSeen,
+    markSeen,
+    unseenCount: readonly(unseenCount),
+  }
+}
+
+export type NotificationCenterStore = ReturnType<typeof useNotificationCenterStore>

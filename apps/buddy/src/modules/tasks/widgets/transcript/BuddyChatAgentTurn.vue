@@ -1,0 +1,249 @@
+<script setup lang="ts">
+import type { ChatMessageBranchNavigator } from '../../model/transcript/chatMessageBranches'
+
+import type { ChatAgentTurn } from '../../model/transcript/chatStreamingMessage'
+import type { BuddyLocale } from '@/i18n/buddyI18n'
+import { ChevronRight20Regular } from '@vicons/fluent'
+import { computed } from 'vue'
+
+import { useBuddyI18n } from '@/i18n/buddyI18n'
+import DesktopIcon from '@/shared/ui/icon/DesktopIcon.vue'
+import {
+  resolveChatAgentTurnFailurePresentation,
+  resolveChatAgentTurnNotice,
+} from '../../model/transcript/chatAgentTurnDisclosure'
+import { projectChatAgentTurnActions } from '../../model/transcript/chatMessageActions'
+import { formatChatRunDuration } from '../../model/transcript/chatRunDuration'
+import BuddyChatActionToolbar from './BuddyChatActionToolbar.vue'
+import BuddyChatAgentIdentity from './BuddyChatAgentIdentity.vue'
+import BuddyChatAgentTurnFlow from './BuddyChatAgentTurnFlow.vue'
+
+const props = defineProps<{
+  actionsDisabled?: boolean
+  branchNavigator?: ChatMessageBranchNavigator | null
+  language: BuddyLocale
+  open: boolean
+  ownsResultActions?: boolean
+  turn: ChatAgentTurn
+}>()
+
+const emit = defineEmits<{
+  activateBranch: [branchId: string]
+  regenerate: []
+  toggle: []
+}>()
+
+const { t } = useBuddyI18n(() => props.language)
+const isActive = computed(() => props.turn.status === 'queued' || props.turn.status === 'running')
+const duration = computed(() => formatChatRunDuration(
+  props.turn.startedAt,
+  props.turn.completedAt,
+  Date.now(),
+))
+const statusLabel = computed(() => t(`run.status.${props.turn.status}`))
+const notice = computed(() => resolveChatAgentTurnNotice(
+  props.turn.status,
+  props.turn.failureMessage ?? null,
+))
+const failurePresentation = computed(() => notice.value?.kind === 'failure'
+  ? resolveChatAgentTurnFailurePresentation(
+      props.turn.failureCode ?? null,
+      notice.value.message,
+    )
+  : null)
+const resultNoticeText = computed(() => {
+  if (!notice.value)
+    return null
+  if (notice.value.placement !== 'result')
+    return null
+  if (notice.value.kind === 'cancelled')
+    return t('desktop.chat.runCancelled')
+  return failurePresentation.value?.message
+    ?? t(failurePresentation.value?.messageKey ?? 'desktop.chat.runFailed')
+})
+
+const failureDetailText = computed(() => failurePresentation.value?.detail ?? null)
+const canToggleProcess = computed(() => (
+  props.turn.nodes.length > 0
+  || failureDetailText.value !== null
+))
+const hasVisibleProcess = computed(() => (
+  canToggleProcess.value
+  && (isActive.value || props.open)
+))
+const actions = computed(() => projectChatAgentTurnActions(
+  props.turn,
+  props.actionsDisabled ?? false,
+  props.ownsResultActions ?? false,
+))
+const showActions = computed(() => (
+  actions.value.showCopy
+  || actions.value.showRegenerate
+  || actions.value.showTime
+  || props.branchNavigator != null
+))
+const actionCopyText = computed(() => resultNoticeText.value ?? statusLabel.value)
+</script>
+
+<template>
+  <section
+    class="buddy-chat-agent-turn"
+    :class="[`is-${turn.status}`, { 'has-visible-process': hasVisibleProcess }]"
+  >
+    <div class="buddy-chat-agent-turn__heading">
+      <BuddyChatAgentIdentity :language="language" />
+      <button
+        v-if="!isActive"
+        :aria-expanded="canToggleProcess ? open : undefined"
+        class="buddy-chat-agent-turn__status"
+        :disabled="!canToggleProcess"
+        type="button"
+        @click="emit('toggle')"
+      >
+        <span
+          aria-live="polite"
+          class="buddy-chat-agent-turn__status-label"
+        >{{ statusLabel }}</span>
+        <span class="buddy-chat-agent-turn__duration">{{ duration }}</span>
+        <DesktopIcon
+          v-if="canToggleProcess"
+          :component="ChevronRight20Regular"
+          class="buddy-chat-agent-turn__chevron"
+          :class="{ 'is-open': open }"
+        />
+      </button>
+    </div>
+    <BuddyChatAgentTurnFlow
+      v-if="hasVisibleProcess"
+      :failure-detail-text="failureDetailText"
+      :language="language"
+      :nodes="turn.nodes"
+    />
+    <p
+      v-if="resultNoticeText"
+      class="buddy-chat-agent-turn__result"
+      :class="{ 'is-failure': notice?.kind === 'failure' }"
+    >
+      {{ resultNoticeText }}
+    </p>
+    <BuddyChatActionToolbar
+      v-if="showActions"
+      :actions="actions"
+      :branch-navigator="branchNavigator ?? null"
+      class="buddy-chat-agent-turn__actions"
+      :copy-text="actionCopyText"
+      :created-at="turn.completedAt ?? turn.startedAt"
+      :language="language"
+      role="assistant"
+      :target-key="`run-${turn.runId}`"
+      @activate-branch="emit('activateBranch', $event)"
+      @regenerate="emit('regenerate')"
+    />
+  </section>
+</template>
+
+<style scoped lang="scss">
+.buddy-chat-agent-turn {
+  display: grid;
+  min-width: 0;
+  align-items: start;
+  color: var(--buddy-chat-process-color);
+}
+
+.buddy-chat-agent-turn__heading {
+  display: grid;
+  min-width: 0;
+  gap: 0.5rem;
+}
+
+.buddy-chat-agent-turn__status {
+  display: inline-flex;
+  width: 100%;
+  max-width: 100%;
+  align-items: center;
+  gap: 0.25rem;
+  border: 0;
+  background: transparent;
+  color: var(--buddy-chat-meta-color);
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--buddy-chat-meta-font-size);
+  line-height: var(--buddy-chat-meta-line-height);
+  padding: 0;
+  text-align: left;
+
+  &:not(:disabled):hover,
+  &:not(:disabled):focus-visible {
+    color: var(--buddy-text-strong);
+  }
+
+  &:disabled {
+    cursor: default;
+  }
+}
+
+.buddy-chat-agent-turn__status-label,
+.buddy-chat-agent-turn__duration {
+  min-width: 0;
+}
+
+.buddy-chat-agent-turn__duration {
+  margin-left: 0.125rem;
+  opacity: 0.78;
+  font-variant-numeric: tabular-nums;
+}
+
+.buddy-chat-agent-turn__chevron {
+  width: 14px;
+  height: 14px;
+  flex: 0 0 auto;
+  margin-left: 0.35rem;
+  opacity: 1;
+  transition: transform 120ms ease;
+
+  &.is-open {
+    transform: rotate(90deg) translateX(0.5px);
+  }
+}
+
+.buddy-chat-agent-turn.is-failed .buddy-chat-agent-turn__status {
+  color: var(--buddy-chat-danger-color);
+}
+
+.buddy-chat-agent-turn__result {
+  margin: var(--buddy-chat-gap-section) 0 0;
+  color: var(--buddy-chat-tool-body-color);
+  font-size: 14px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+
+  &.is-failure {
+    color: var(--buddy-chat-danger-color);
+  }
+}
+
+.buddy-chat-agent-turn__actions {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 120ms ease;
+
+  .buddy-chat-agent-turn:hover &,
+  .buddy-chat-agent-turn:focus-within & {
+    opacity: 1;
+    pointer-events: auto;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .buddy-chat-agent-turn__chevron {
+    transition: none;
+  }
+}
+
+@media (hover: none) {
+  .buddy-chat-agent-turn__actions {
+    opacity: 1;
+    pointer-events: auto;
+  }
+}
+</style>

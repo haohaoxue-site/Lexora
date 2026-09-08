@@ -1,6 +1,6 @@
 import type { ImageContent } from '@earendil-works/pi-ai'
 import type { CompactionResult } from '@earendil-works/pi-coding-agent'
-import type { BuddyServiceTier, BuddyThinkingLevel } from '../../../shared/modelSelection'
+import type { BuddyServiceTier, BuddyThinkingLevel } from '../../../shared/conversation/modelSelection'
 import type { RunEventWriter } from '../events/RunEventPorts'
 import type { RunRecord } from '../storage/runRecord'
 import type { RunRepository } from '../storage/runRepository'

@@ -87,7 +87,3 @@ fn native_pet_bounds_changed(
         || bounds.placement.position != current_position
         || bounds.placement.monitor_index != current_monitor_index
 }
-
-#[cfg(test)]
-#[path = "__tests__/window_movement.rs"]
-mod tests;

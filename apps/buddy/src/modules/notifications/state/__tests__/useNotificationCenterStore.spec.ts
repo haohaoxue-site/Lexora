@@ -1,0 +1,88 @@
+import type { LocalNotification, LocalNotificationList } from '@buddy-shared/notifications/notificationApi'
+import { deferred } from '@buddy-tests/deferred'
+import { describe, expect, it, vi } from 'vitest'
+import { useNotificationCenterStore } from '../useNotificationCenterStore'
+
+function list(seen = false): LocalNotificationList {
+  const item: LocalNotification = { id: 'catalog', revision: '1', attention: seen ? 'seen' : 'unseen', audience: 'device', lifecycle: 'active', occurredAt: '2026-09-08T00:00:00.000Z', origin: 'local-runtime', resolvedAt: null, action: { type: 'open-model-settings' }, kind: 'model.source-parameters-updated', payload: { modelCount: 1 } }
+  return { items: [item], unseenCount: seen ? 0 : 1 }
+}
+function fixture() {
+  let listeners = 0
+  const subscribe = () => {
+    listeners += 1
+    return () => {
+      listeners -= 1
+    }
+  }
+  const api = {
+    notifications: { list: vi.fn(async () => list()), markSeen: vi.fn(async () => list(true)), markAllSeen: vi.fn(async () => list(true)) },
+    chat: { onRunEvent: subscribe },
+    automations: { onChanged: subscribe },
+  }
+  const store = useNotificationCenterStore(api)
+  return { api, store, listeners: () => listeners }
+}
+
+describe('notification state ownership', () => {
+  it('keeps a seen mutation when a pre-mutation list response arrives late', async () => {
+    const f = fixture()
+    const loading = deferred<LocalNotificationList>()
+    f.api.notifications.list.mockReturnValueOnce(loading.promise)
+    const load = f.store.load()
+    await f.store.markSeen(list().items[0]!)
+    loading.resolve(list())
+    await load
+    expect(f.store.unseenCount.value).toBe(0)
+    expect(f.store.items.value[0]?.attention).toBe('seen')
+    f.store.dispose()
+  })
+
+  it('serializes attention mutations so both persisted results remain represented', async () => {
+    const f = fixture()
+    const first = deferred<LocalNotificationList>()
+    const seen = list(true).items[0]!
+    const unseen = { ...list().items[0]!, id: 'second' }
+    f.api.notifications.markSeen.mockReturnValueOnce(first.promise)
+    f.api.notifications.markAllSeen.mockResolvedValueOnce({ items: [seen, { ...unseen, attention: 'seen' }], unseenCount: 0 })
+    const a = f.store.markSeen(list().items[0]!)
+    const b = f.store.markAllSeen()
+    first.resolve({ items: [seen, unseen], unseenCount: 1 })
+    expect(await Promise.all([a, b])).toEqual([true, true])
+    expect(f.store.unseenCount.value).toBe(0)
+    expect(f.store.items.value.every(item => item.attention === 'seen')).toBe(true)
+    f.store.dispose()
+  })
+
+  it.each(['resolve', 'reject'])('ignores a late list %s and unsubscribes once after disposal', async (result) => {
+    const f = fixture()
+    const pending = deferred<LocalNotificationList>()
+    f.api.notifications.list.mockReturnValueOnce(pending.promise)
+    const loading = f.store.load()
+    void f.store.load()
+    f.store.dispose()
+    f.store.dispose()
+    if (result === 'resolve')
+      pending.resolve(list())
+    else
+      pending.reject(new Error('late response'))
+    await loading
+    expect(f.store.items.value).toEqual([])
+    expect(f.store.error.value).toBeNull()
+    expect(f.listeners()).toBe(0)
+    expect(await f.store.load()).toBe(false)
+  })
+
+  it('does not apply a mutation response after disposal', async () => {
+    const f = fixture()
+    await f.store.load()
+    const pending = deferred<LocalNotificationList>()
+    f.api.notifications.markSeen.mockReturnValueOnce(pending.promise)
+    const marking = f.store.markSeen(list().items[0]!)
+    await Promise.resolve()
+    f.store.dispose()
+    pending.resolve(list(true))
+    expect(await marking).toBe(false)
+    expect(f.store.unseenCount.value).toBe(1)
+  })
+})

@@ -22,6 +22,7 @@ export default defineConfig({
       '@': fileURLToPath(new URL('./src', import.meta.url)),
       '@buddy-electron': fileURLToPath(new URL('./electron', import.meta.url)),
       '@buddy-shared': fileURLToPath(new URL('./shared', import.meta.url)),
+      '@buddy-tests': fileURLToPath(new URL('./__tests__', import.meta.url)),
     },
   },
   server: {
@@ -33,6 +34,33 @@ export default defineConfig({
     target: 'esnext',
   },
   test: {
+    clearMocks: true,
+    projects: [
+      {
+        extends: true,
+        test: {
+          name: 'unit',
+          include: ['{src,shared,eslint,__tests__}/**/*.{test,spec}.?(c|m)[jt]s?(x)'],
+        },
+      },
+      {
+        extends: true,
+        test: {
+          name: 'runtime',
+          include: ['{service,electron}/**/*.{test,spec}.?(c|m)[jt]s?(x)'],
+        },
+      },
+      {
+        extends: true,
+        test: {
+          name: 'platform',
+          include: ['platform/**/*.{test,spec}.?(c|m)[jt]s?(x)'],
+        },
+      },
+    ],
+    restoreMocks: true,
     setupFiles: './vitest.setup.ts',
+    unstubEnvs: true,
+    unstubGlobals: true,
   },
 })

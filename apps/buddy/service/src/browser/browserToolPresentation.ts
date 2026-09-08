@@ -1,12 +1,12 @@
-import type { BrowserAction } from '../../../shared/browserProtocol'
-import type { BuddyToolPresentation } from '../../../shared/runEventPresentation'
+import type { BrowserAction } from '../../../shared/browser'
+import type { BuddyToolPresentation } from '../../../shared/runs/runEventPresentation'
 import type { CreateBuddyToolPresentationInput } from '../events/toolPresentationSupport'
 import type { BrowserToolFailureCode, BrowserToolOperation } from './browserToolContract'
 import {
   BROWSER_ACTION_KINDS,
   BROWSER_ERROR_CODES,
   BROWSER_MAX_OBSERVATION_ELEMENT_LIMIT,
-} from '../../../shared/browserProtocol'
+} from '../../../shared/browser'
 import {
   readBoolean,
   readOptionalString,

@@ -1,6 +1,8 @@
 import type { LexoraConfig } from '../shared/desktopApi'
 import type { DesktopRuntimeGateway } from './localChatIpc'
-import { localChatResponseSchemas, localChatSchemas } from '../shared/localChatApiSchemas'
+import { conversationResponseSchemas } from '../../shared/conversation/conversationApi'
+import { runsRequestSchemas, runsResponseSchemas } from '../../shared/runs/runApi'
+
 import { shouldShowDesktopNotification } from './desktopNotificationPolicy'
 
 export interface DesktopNotificationInput {
@@ -56,7 +58,7 @@ export class DesktopNotificationService {
   async handle(notification: { method: string, params: unknown }): Promise<void> {
     if (notification.method !== 'run.event')
       return
-    const event = localChatSchemas.runStateEvent.safeParse(notification.params)
+    const event = runsRequestSchemas.runStateEvent.safeParse(notification.params)
     if (!event.success)
       return
     const eventKey = `${event.data.runId}:${event.data.sequence}:${event.data.type}`
@@ -70,10 +72,10 @@ export class DesktopNotificationService {
       return
     }
 
-    const run = localChatResponseSchemas.run.parse(
+    const run = runsResponseSchemas.run.parse(
       await this.#options.request('runs.get', { runId: event.data.runId }),
     )
-    const conversation = localChatResponseSchemas.conversation.parse(
+    const conversation = conversationResponseSchemas.conversation.parse(
       await this.#options.request('conversations.get', { conversationId: run.conversationId }),
     )
     const labels = BODY_LABELS[this.#options.getLanguage()]

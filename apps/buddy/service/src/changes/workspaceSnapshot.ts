@@ -2,7 +2,7 @@ import type { DirectoryGrant } from '../directories/resolveGrantedPath'
 import type { FileCaptureKind } from './changeSetRepository'
 import { opendir, stat } from 'node:fs/promises'
 import { resolve, sep } from 'node:path'
-import { relativeCanonicalPath } from '../../../platform/filePaths'
+import { relativeCanonicalPath } from '../../../platform/filesystem/filePaths'
 import { captureChangeFile } from './captureChangeFile'
 import { displayGrantedPath, MAX_CHANGE_HASH_BYTES } from './changeFileContent'
 

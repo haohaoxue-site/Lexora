@@ -15,7 +15,7 @@ import {
   resolve,
   sep,
 } from 'node:path'
-import { relativeCanonicalPath } from '../../../platform/filePaths'
+import { relativeCanonicalPath } from '../../../platform/filesystem/filePaths'
 import { resolveGrantedPath } from '../directories/resolveGrantedPath'
 
 export const BUDDY_ARTIFACT_COUNT_LIMIT = 512

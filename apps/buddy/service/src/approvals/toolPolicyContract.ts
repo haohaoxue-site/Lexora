@@ -1,4 +1,4 @@
-import type { ApprovalReviewKind } from '../../../shared/approvalReviewPayload'
+import type { ApprovalReviewKind } from '../../../shared/permissions/approvalReviewPayload'
 
 export type ToolDecision
   = { type: 'allow' }

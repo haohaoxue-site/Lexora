@@ -4,7 +4,7 @@ import type {
   BrowserApprovalReviewInput,
   PathApprovalReviewInput,
   SystemActionApprovalReviewInput,
-} from '../../../shared/approvalReviewPayload'
+} from '../../../shared/permissions/approvalReviewPayload'
 import type { AccessKind, PermissionPath } from '../permissions/permissionContract'
 
 export interface BuddyToolClassification {

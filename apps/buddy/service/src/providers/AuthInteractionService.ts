@@ -4,12 +4,10 @@ import type {
   AuthPrompt,
 } from '@earendil-works/pi-ai'
 import type { ProviderAuthChallenge } from './providerSchemas'
-
 import { randomUUID } from 'node:crypto'
-import {
 
-  providerAuthChallengeSchema,
-} from './providerSchemas'
+import { providerNotifications } from '../../../shared/providers/providerApi'
+import { providerAuthChallengeSchema } from './providerSchemas'
 
 export interface AuthInteractionServiceOptions {
   notify: (method: string, params: unknown) => void
@@ -141,7 +139,7 @@ export class AuthInteractionService {
   }
 
   #emitChallenge(challenge: ProviderAuthChallenge): void {
-    this.#notify('providers.authChallenge', challenge)
+    this.#notify(providerNotifications.authChallenge.method, challenge)
   }
 
   #registerChallenge(loginId: string, session: LoginSession): string {

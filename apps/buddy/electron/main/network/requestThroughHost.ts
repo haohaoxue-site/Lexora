@@ -1,6 +1,6 @@
 import type { Session } from 'electron'
-import type { WebNetworkRequest } from '../../../shared/webProtocol'
-import { WebError } from '../../../shared/webProtocol'
+import type { WebNetworkRequest } from '../../../shared/network/webProtocol'
+import { WebError } from '../../../shared/network/webProtocol'
 
 export async function requestThroughHost(session: Session, input: Pick<WebNetworkRequest, 'body' | 'headers' | 'method' | 'url'>, signal: AbortSignal): Promise<Response> {
   const { net } = await import('electron')

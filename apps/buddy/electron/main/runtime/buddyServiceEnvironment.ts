@@ -1,7 +1,7 @@
 import process from 'node:process'
-import { createChildProcessEnvironment } from '../../../platform/childProcessEnvironment'
-import { filePathAdapters } from '../../../platform/filePaths'
-import searchTools from '../../../platform/searchTools.json'
+import { filePathAdapters } from '../../../platform/filesystem/filePaths'
+import searchTools from '../../../platform/native/searchTools.json'
+import { createChildProcessEnvironment } from '../../../platform/process/childProcessEnvironment'
 import { resolveBuddyPlatform } from '../../../shared/platform'
 
 export function resolveBuddySearchToolsDirectory(options: {

@@ -13,19 +13,14 @@ import type { ConversationRepository } from '../storage/conversationRepository'
 import type { ConversationTimelineRepository } from '../storage/conversationTimelineRepository'
 import type { RunInputRepository } from '../storage/runInputRepository'
 import type { RunRepository } from '../storage/runRepository'
-import { z } from 'zod'
-import { BUDDY_APPROVAL_POLICIES } from '../../../shared/approvalPolicy'
-import { BUDDY_EXECUTION_PROFILES } from '../../../shared/executionProfile'
-import {
-  BUDDY_SERVICE_TIERS,
-  BUDDY_THINKING_LEVELS,
-} from '../../../shared/modelSelection'
-import { toPublicRunEvent } from '../../../shared/publicRunEvent'
-import { buddyRunOutputPayloadSchema } from '../../../shared/runOutput'
+import { conversationsRpc } from '../../../shared/conversation/conversationApi'
+
+import { toPublicRunEvent } from '../../../shared/runs/publicRunEvent'
+import { buddyRunOutputPayloadSchema } from '../../../shared/runs/runOutput'
 import {
   withMessageAttachments,
 } from '../attachments/publicAttachment'
-import { BuddyServiceError, parse } from '../rpc/runtimeRequest'
+import { BuddyServiceError, registerRuntimeRequest } from '../rpc/runtimeRequest'
 import { toPublicRun } from '../runs/publicRun'
 import {
   createConversationTimelineCursor,
@@ -35,23 +30,6 @@ import {
   createMessagePageCursor,
   parseMessagePageCursor,
 } from './messagePageCursor'
-
-const idSchema = z.string().trim().min(1).max(256)
-const limitSchema = z.number().int().positive().max(500).optional()
-const executionProfileSchema = z.enum(BUDDY_EXECUTION_PROFILES)
-const modelSelectionSchema = z.object({
-  modelId: idSchema,
-  providerId: idSchema,
-  reasoning: z.enum(BUDDY_THINKING_LEVELS).nullable(),
-  serviceTier: z.enum(BUDDY_SERVICE_TIERS).nullable(),
-}).strict()
-const conversationIdSchema = z.object({ conversationId: idSchema }).strict()
-const conversationPageSchema = z.object({
-  branchId: idSchema.optional(),
-  conversationId: idSchema,
-  cursor: z.string().regex(/^[\w-]+$/).max(2_048).optional(),
-  limit: limitSchema,
-}).strict()
 
 export interface ConversationSessionInvalidator {
   invalidateConversation: (conversationId: string) => Promise<unknown>
@@ -88,35 +66,21 @@ export interface RegisterConversationRpcOptions {
 
 export function registerConversationRpc(options: RegisterConversationRpcOptions): () => void {
   const disposers: Array<() => void> = []
-  const on = (method: string, handler: (params: unknown) => Promise<unknown> | unknown) => {
-    disposers.push(options.rpc.onRequest(method, handler))
-  }
 
-  on('conversations.list', (params) => {
-    const input = parse(z.object({ limit: limitSchema }).strict(), params)
+  disposers.push(registerRuntimeRequest(options.rpc, conversationsRpc.list, (input) => {
     return options.conversations.listRecent(input.limit ?? 100)
-  })
-  on('conversations.get', (params) => {
-    const input = parse(conversationIdSchema, params)
+  }))
+  disposers.push(registerRuntimeRequest(options.rpc, conversationsRpc.get, (input) => {
     return requireActiveConversation(options, input.conversationId)
-  })
-  on('conversations.rename', (params) => {
-    const input = parse(z.object({
-      conversationId: idSchema,
-      title: z.string().trim().min(1).max(80),
-    }).strict(), params)
+  }))
+  disposers.push(registerRuntimeRequest(options.rpc, conversationsRpc.rename, (input) => {
     return options.conversations.rename({
       id: input.conversationId,
       title: input.title,
       updatedAt: new Date().toISOString(),
     })
-  })
-  on('conversations.setPermissionSettings', async (params) => {
-    const input = parse(z.object({
-      approvalPolicy: z.enum(BUDDY_APPROVAL_POLICIES),
-      conversationId: idSchema,
-      executionProfile: executionProfileSchema,
-    }).strict(), params)
+  }))
+  disposers.push(registerRuntimeRequest(options.rpc, conversationsRpc.setPermissionSettings, async (input) => {
     const current = requireActiveConversation(options, input.conversationId)
     if (
       current.approvalPolicy === input.approvalPolicy
@@ -134,12 +98,8 @@ export function registerConversationRpc(options: RegisterConversationRpcOptions)
       throw new BuddyServiceError('VALIDATION_FAILED')
     await options.sessions.invalidateConversation(input.conversationId)
     return conversation
-  })
-  on('conversations.setModelSelection', async (params) => {
-    const input = parse(z.object({
-      conversationId: idSchema,
-      modelSelection: modelSelectionSchema,
-    }).strict(), params)
+  }))
+  disposers.push(registerRuntimeRequest(options.rpc, conversationsRpc.setModelSelection, async (input) => {
     requireActiveConversation(options, input.conversationId)
     const selection = await options.resolveModelSelection(input.modelSelection)
     return requireValue(options.conversations.setModelSelection({
@@ -152,30 +112,23 @@ export function registerConversationRpc(options: RegisterConversationRpcOptions)
       },
       updatedAt: new Date().toISOString(),
     }))
-  })
-  on('conversations.delete', async (params) => {
-    const input = parse(conversationIdSchema, params)
+  }))
+  disposers.push(registerRuntimeRequest(options.rpc, conversationsRpc.delete, async (input) => {
     return options.deleteConversation(input.conversationId)
-  })
-  on('conversations.activateBranch', (params) => {
-    const input = parse(z.object({
-      branchId: idSchema,
-      conversationId: idSchema,
-    }).strict(), params)
+  }))
+  disposers.push(registerRuntimeRequest(options.rpc, conversationsRpc.activateBranch, (input) => {
     return options.conversations.activateBranch({
       ...input,
       updatedAt: new Date().toISOString(),
     })
-  })
-  on('conversations.listBranches', (params) => {
-    const input = parse(conversationIdSchema, params)
+  }))
+  disposers.push(registerRuntimeRequest(options.rpc, conversationsRpc.listBranches, (input) => {
     requireValue(options.conversations.findById(input.conversationId))
     if (options.isDeleting(input.conversationId))
       throw new BuddyServiceError('VALIDATION_FAILED')
     return options.conversations.listBranches(input.conversationId)
-  })
-  on('conversations.listMessages', (params) => {
-    const input = parse(conversationPageSchema, params)
+  }))
+  disposers.push(registerRuntimeRequest(options.rpc, conversationsRpc.listMessages, (input) => {
     const conversation = requireActiveConversation(options, input.conversationId)
     const branchId = input.branchId ?? requireValue(conversation.activeBranchId)
     const page = options.conversations.listMessagePage(
@@ -204,9 +157,8 @@ export function registerConversationRpc(options: RegisterConversationRpcOptions)
           })
         : null,
     }
-  })
-  on('conversations.listTimeline', (params) => {
-    const input = parse(conversationPageSchema, params)
+  }))
+  disposers.push(registerRuntimeRequest(options.rpc, conversationsRpc.listTimeline, (input) => {
     const conversation = requireActiveConversation(options, input.conversationId)
     const branchId = input.branchId ?? requireValue(conversation.activeBranchId)
     const page = options.conversations.listTimelinePage(
@@ -255,7 +207,7 @@ export function registerConversationRpc(options: RegisterConversationRpcOptions)
         options.runInputs.findByRunId(run.id)?.reasoning ?? null,
       )),
     }
-  })
+  }))
 
   return () => disposers.splice(0).forEach(dispose => dispose())
 }

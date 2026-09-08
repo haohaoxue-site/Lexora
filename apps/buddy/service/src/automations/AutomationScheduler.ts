@@ -3,7 +3,7 @@ import type { AutomationOccurrenceRecord } from '../storage/automationOccurrence
 import type { AutomationClock } from './AutomationScheduleEvaluator'
 import type { AutomationService } from './AutomationService'
 import { randomUUID } from 'node:crypto'
-import { Temporal } from '../../../shared/temporal'
+import { Temporal } from '../../../shared/automation/temporal'
 import { findNextAutomationOccurrence, systemAutomationClock } from './AutomationScheduleEvaluator'
 
 export const AUTOMATION_POLL_INTERVAL_MS = 30_000

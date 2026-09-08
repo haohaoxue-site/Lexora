@@ -1,4 +1,5 @@
 import type { Api, Model } from '@earendil-works/pi-ai'
+import type { ParsedCustomProviderInput, ProviderModelInput } from '../../../shared/providers/providerInput'
 import type {
   ProviderConfigRecord,
   ProviderConfigRepository,
@@ -7,20 +8,10 @@ import type {
   ProviderModelStateRecord,
   ProviderModelStateRepository,
 } from '../storage/providerModelStateRepository'
-import type {
-  BuddyModel,
-  ModelParametersOverride,
-  ParsedCustomProviderInput,
-  ProviderModelInput,
-} from './providerSchemas'
+import type { BuddyModel, ModelParametersOverride } from './providerSchemas'
+import { customProviderInputSchema, customProviderModelSchema, providerModelInputSchema } from '../../../shared/providers/providerInput'
 import { ProviderUnavailableError, ProviderValidationError } from './ProviderFailure'
-import {
-  buddyModelSchema,
-  customProviderInputSchema,
-  customProviderModelSchema,
-  modelParametersOverrideSchema,
-  providerModelInputSchema,
-} from './providerSchemas'
+import { buddyModelSchema, modelParametersOverrideSchema } from './providerSchemas'
 
 export interface ProviderRegistration {
   api: string

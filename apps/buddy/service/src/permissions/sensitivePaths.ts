@@ -1,7 +1,7 @@
 import { homedir } from 'node:os'
 import process from 'node:process'
-import { containsCanonicalPath, filePaths } from '../../../platform/filePaths'
-import { resolveSensitiveLocations } from '../../../platform/sensitiveLocations'
+import { containsCanonicalPath, filePaths } from '../../../platform/filesystem/filePaths'
+import { resolveSensitiveLocations } from '../../../platform/filesystem/sensitiveLocations'
 
 const HOME_RELATIVE_ROOTS = [
   '.aws',

@@ -1,5 +1,5 @@
-import type { RuntimeRequestHandler, RuntimeRpcPeerContract } from '../../../shared/runtimeRpcPeer'
-import { RuntimeRpcPeer } from '../../../shared/runtimeRpcPeer'
+import type { RuntimeRequestHandler, RuntimeRpcPeerContract } from '../../../shared/runtime/rpcPeer'
+import { RuntimeRpcPeer } from '../../../platform/ipc/runtimeRpcPeer'
 
 export interface BuddyServiceMessageProcess {
   postMessage: (message: unknown) => void

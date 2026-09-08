@@ -3,14 +3,14 @@ import type {
   PetExecuteSequenceParams,
   PetExecuteSequenceResult,
   PetPrimitiveStep,
-} from '../../../shared/petProtocol'
+} from '../../../shared/runtime/petProtocol'
 import { spawn } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
 import { existsSync } from 'node:fs'
 import { isAbsolute, join } from 'node:path'
 import process from 'node:process'
 
-import { petExecuteSequenceParamsSchema } from '../../../shared/petProtocol'
+import { petExecuteSequenceParamsSchema } from '../../../shared/runtime/petProtocol'
 import {
   NativePetProtocolError,
   NativePetRpcClient,

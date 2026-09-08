@@ -6,7 +6,7 @@ import {
   getLatestCompactionEntry,
   SessionManager,
 } from '@earendil-works/pi-coding-agent'
-import { containsCanonicalPath } from '../../../platform/filePaths'
+import { containsCanonicalPath } from '../../../platform/filesystem/filePaths'
 
 import {
   BuddySessionCreationError,

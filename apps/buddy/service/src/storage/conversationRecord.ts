@@ -1,6 +1,6 @@
-import type { BuddyApprovalPolicy } from '../../../shared/approvalPolicy'
-import type { BuddyExecutionProfile } from '../../../shared/executionProfile'
-import type { BuddyServiceTier, BuddyThinkingLevel } from '../../../shared/modelSelection'
+import type { BuddyServiceTier, BuddyThinkingLevel } from '../../../shared/conversation/modelSelection'
+import type { BuddyApprovalPolicy } from '../../../shared/permissions/approvalPolicy'
+import type { BuddyExecutionProfile } from '../../../shared/permissions/executionProfile'
 
 export interface ConversationModelSelection {
   modelId: string

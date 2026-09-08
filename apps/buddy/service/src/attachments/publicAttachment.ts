@@ -1,5 +1,5 @@
 import type { AttachmentRecord } from '../storage/attachmentRepository'
-import { readBuddyUserMessageContent } from '../../../shared/buddyUserContent'
+import { readBuddyUserMessageContent } from '../../../shared/conversation/buddyUserContent'
 
 export function toPublicAttachment(record: AttachmentRecord) {
   return {

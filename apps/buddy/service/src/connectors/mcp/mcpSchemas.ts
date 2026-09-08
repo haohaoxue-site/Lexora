@@ -1,6 +1,6 @@
 import { isAbsolute } from 'node:path'
 import { z } from 'zod'
-import { isSecureOrLoopbackHttpUrl } from '../../../../shared/networkSecurity'
+import { isSecureOrLoopbackHttpUrl } from '../../../../shared/network/networkSecurity'
 
 const connectorIdSchema = z.string().trim().regex(/^[a-z0-9][a-z0-9_-]{0,63}$/)
 const connectorNameSchema = z.string().trim().min(1).max(128)
@@ -31,27 +31,4 @@ export const mcpServerConfigSchema = z.discriminatedUnion('transport', [
   streamableHttpServerSchema,
 ])
 
-export const stdioConnectorCredentialSchema = z.object({
-  env: z.record(
-    z.string().regex(/^[A-Z_]\w*$/i),
-    z.string().max(16 * 1024),
-  ),
-  type: z.literal('stdio'),
-}).strict()
-
-export const httpConnectorCredentialSchema = z.object({
-  bearerToken: z.string().min(1).max(64 * 1024).optional(),
-  headers: z.record(
-    z.string().trim().regex(/^[!#$%&'*+.^\w`|~-]+$/),
-    z.string().max(16 * 1024),
-  ).optional(),
-  type: z.literal('http'),
-}).strict()
-
-export const connectorCredentialSchema = z.discriminatedUnion('type', [
-  stdioConnectorCredentialSchema,
-  httpConnectorCredentialSchema,
-])
-
 export type McpServerConfig = z.infer<typeof mcpServerConfigSchema>
-export type ConnectorCredential = z.infer<typeof connectorCredentialSchema>

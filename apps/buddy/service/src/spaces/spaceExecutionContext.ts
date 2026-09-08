@@ -1,6 +1,6 @@
-import type { SpaceExecutionContext } from '../../../shared/space'
+import type { SpaceExecutionContext } from '../../../shared/conversation/space'
 import type { SpaceRecord } from '../storage/spaceRepository'
-import { spaceExecutionContextSchema } from '../../../shared/space'
+import { spaceExecutionContextSchema } from '../../../shared/conversation/space'
 
 export function createSpaceExecutionContext(
   space: Pick<SpaceRecord, 'additionalDirectories' | 'id' | 'primaryDirectory'>,

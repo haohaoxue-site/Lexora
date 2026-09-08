@@ -1,10 +1,11 @@
-import type { RuntimeRpcPeerContract } from '../../../shared/runtimeRpcPeer'
-import type { WebSettings, WebSettingsSnapshot } from '../../../shared/webProtocol'
+import type { WebSettings, WebSettingsSnapshot } from '../../../shared/network/webProtocol'
+import type { RuntimeRpcPeerContract } from '../../../shared/runtime/rpcPeer'
 import type { WorkspaceRepository } from '../storage/workspaceRepository'
-import { credentialMutationResultSchema, credentialReadResultSchema } from '../../../shared/credentialProtocol'
-import { DEFAULT_WEB_SETTINGS, webCredentialInputSchema, webSearchSourceSchema, webSettingsSchema } from '../../../shared/webProtocol'
+import { webRpc } from '../../../shared/network/webApi'
+import { DEFAULT_WEB_SETTINGS, webCredentialInputSchema, webSearchSourceSchema, webSettingsSchema } from '../../../shared/network/webProtocol'
+import { credentialMutationResultSchema, credentialReadResultSchema } from '../../../shared/runtime/credentialProtocol'
 import { HostCredentialStoreError } from '../providers/HostCredentialStore'
-import { BuddyServiceError, parse } from '../rpc/runtimeRequest'
+import { BuddyServiceError, parse, registerRuntimeRequest } from '../rpc/runtimeRequest'
 
 const SETTINGS_KEY = 'buddy.web'
 const storedSettingsSchema = webSettingsSchema.extend({
@@ -85,9 +86,9 @@ export class WebSettingsService {
 
 export function registerWebSettingsRpc(rpc: Pick<RuntimeRpcPeerContract, 'onRequest'>, service: WebSettingsService): () => void {
   const disposers = [
-    rpc.onRequest('web.settings', () => service.snapshot()),
-    rpc.onRequest('web.saveSettings', input => service.save(input)),
-    rpc.onRequest('web.saveCredential', input => service.saveCredential(input)),
+    registerRuntimeRequest(rpc, webRpc.settings, () => service.snapshot()),
+    registerRuntimeRequest(rpc, webRpc.saveSettings, input => service.save(input)),
+    registerRuntimeRequest(rpc, webRpc.saveCredential, input => service.saveCredential(input)),
   ]
   return () => disposers.forEach(dispose => dispose())
 }

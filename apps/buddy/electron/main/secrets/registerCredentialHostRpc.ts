@@ -1,4 +1,4 @@
-import type { RuntimeRpcPeerContract } from '../../../shared/runtimeRpcPeer'
+import type { RuntimeRpcPeerContract } from '../../../shared/runtime/rpcPeer'
 import type { CredentialVault } from './CredentialVault'
 import { shell } from 'electron'
 import {
@@ -11,7 +11,7 @@ import {
   openExternalResultSchema,
   providerCredentialParamsSchema,
   providerCredentialWriteParamsSchema,
-} from '../../../shared/credentialProtocol'
+} from '../../../shared/runtime/credentialProtocol'
 
 import { CredentialStoreUnavailableError } from './CredentialVault'
 

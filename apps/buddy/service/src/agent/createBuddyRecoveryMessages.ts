@@ -6,7 +6,7 @@ import type {
 } from '@earendil-works/pi-ai'
 import type { AttachmentImageReference } from '../attachments/AttachmentImageReference'
 import type { MessageRecord } from '../storage/conversationHistoryRepository'
-import { readBuddyInterruptedMessageContent } from '../../../shared/buddyMessageContent'
+import { readBuddyInterruptedMessageContent } from '../../../shared/conversation/buddyMessageContent'
 import {
   createBuddyInputReference,
   createBuddyInputReferenceMessage,

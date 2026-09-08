@@ -64,20 +64,6 @@ fn projects_manifest_handles_to_renderer_profiles_once() {
 }
 
 #[test]
-fn projects_manifest_handle_playback_to_renderer_profile_by_runtime_profile() {
-    let animations = load_default_pet_animation_set().expect("native pet animation manifest loads");
-    let key = NativePetAnimationKey::parse("run_right").expect("valid animation key");
-    let handle = animations
-        .animation_handle_for_key(&key)
-        .expect("run_right animation exists");
-    let playback = NativePetAnimationPlayback::from_manifest_handle(handle);
-
-    let profile = NativePetRenderProfile::from_playback(&animations, playback);
-
-    assert_eq!(profile.kind(), NativePetRenderProfileKind::RunRight);
-}
-
-#[test]
 fn projects_manifest_handle_playback_to_renderer_profile_from_runtime_profile() {
     let mut manifest_json = serde_json::from_str::<serde_json::Value>(DEFAULT_PET_MANIFEST)
         .expect("native pet animation manifest parses");

@@ -2,7 +2,7 @@ import type {
   BuddyComposerDraft,
   BuddyComposerDraftOpen,
   BuddyComposerDraftSave,
-} from '../../../shared/composerDraft'
+} from '../../../shared/conversation/composerDraft'
 import type { ComposerDraftRepository } from '../storage/composerDraftRepository'
 import { BuddyServiceError } from '../rpc/runtimeRequest'
 

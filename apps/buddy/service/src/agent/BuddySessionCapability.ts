@@ -1,5 +1,5 @@
 import type { ToolCallEvent } from '@earendil-works/pi-coding-agent'
-import type { BuddySessionMode } from '../../../shared/sessionMode'
+import type { BuddySessionMode } from '../../../shared/permissions/sessionMode'
 import type { BuddyToolClassificationResult } from '../approvals/toolClassification'
 import type { DirectoryGrant } from '../directories/resolveGrantedPath'
 import type { BuddyInProcessExtension } from './createBuddyResourceLoader'

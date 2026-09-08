@@ -1,10 +1,10 @@
-import type { BrowserFailureReason } from '../../../shared/browserProtocol'
+import type { BrowserFailureReason } from '../../../shared/browser'
 import type { DesktopBrowserErrorCode } from '../../shared/desktopApi'
 import { isIP } from 'node:net'
 import { extname } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
-import { containsCanonicalPath } from '../../../platform/filePaths'
-import { resolveFilePath } from '../../../platform/resolveFilePath'
+import { containsCanonicalPath } from '../../../platform/filesystem/filePaths'
+import { resolveFilePath } from '../../../platform/filesystem/resolveFilePath'
 
 export interface BrowserSecurityPage {
   id: number

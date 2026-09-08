@@ -1,6 +1,6 @@
 import type { DirectoryGrant } from '../directories/resolveGrantedPath'
 import { basename, extname, sep } from 'node:path'
-import { relativeCanonicalPath } from '../../../platform/filePaths'
+import { relativeCanonicalPath } from '../../../platform/filesystem/filePaths'
 
 export const MAX_CHANGE_TEXT_BYTES = 1024 * 1024
 export const MAX_CHANGE_HASH_BYTES = 32 * 1024 * 1024

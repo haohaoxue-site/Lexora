@@ -11,8 +11,8 @@ import {
   zhCN,
 } from 'naive-ui'
 import { computed, shallowRef, watchEffect } from 'vue'
-import DesktopAppProvider from '@/app/DesktopAppProvider.vue'
-import DesktopShell from '@/layouts/DesktopShell.vue'
+import DesktopAppProvider from '@/app/bootstrap/DesktopAppProvider.vue'
+import DesktopShell from '@/app/shell/DesktopShell.vue'
 import {
   buddyColorThemes,
   createBuddyColorVariables,

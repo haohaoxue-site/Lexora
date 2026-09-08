@@ -1,7 +1,7 @@
 import type { Buffer } from 'node:buffer'
 import { spawn } from 'node:child_process'
 import process from 'node:process'
-import { createChildProcessEnvironment } from '../childProcessEnvironment'
+import { createChildProcessEnvironment } from '../process/childProcessEnvironment'
 
 export async function establishWindowsRuntimeGuard(): Promise<void> {
   const executable = process.env.LEXORA_BUDDY_RUNTIME_GUARD

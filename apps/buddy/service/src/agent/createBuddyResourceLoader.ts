@@ -1,6 +1,6 @@
 import type { InlineExtension, SettingsManager } from '@earendil-works/pi-coding-agent'
-import type { BuddyApprovalPolicy } from '../../../shared/approvalPolicy'
-import type { BuddyExecutionProfile } from '../../../shared/executionProfile'
+import type { BuddyApprovalPolicy } from '../../../shared/permissions/approvalPolicy'
+import type { BuddyExecutionProfile } from '../../../shared/permissions/executionProfile'
 import type { BoundedContextFile } from './loadBoundedContextFiles'
 
 import {

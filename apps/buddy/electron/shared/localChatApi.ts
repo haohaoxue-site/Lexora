@@ -1,3 +1,9 @@
+import type { LocalArtifactText } from '../../shared/artifacts/artifactApi'
+import type { LocalAutomation, LocalAutomationCreateRequest, LocalAutomationListRequest, LocalAutomationMutationRequest, LocalAutomationOccurrenceListRequest, LocalAutomationOccurrencePage, LocalAutomationPage, LocalAutomationPreviewRequest, LocalAutomationPreviewResult, LocalAutomationRunNowResult, LocalAutomationUpdateRequest } from '../../shared/automation/automationApi'
+import type { LocalChangeSetDetail } from '../../shared/changes/changeApi'
+import type { LocalConnector, LocalConnectorConfig, LocalConnectorCredential, LocalConnectorCredentialMutation } from '../../shared/connectors/connectorApi'
+import type { LocalChatCommandRequest, LocalStartTurnRequest, LocalTurnStart } from '../../shared/conversation/chatApi'
+import type { LocalComposerDraft, LocalComposerDraftOpen, LocalComposerDraftSave } from '../../shared/conversation/composerApi'
 import type {
   BuddyComposerResource,
   BuddyComposerResourceAccept,
@@ -7,199 +13,22 @@ import type {
   BuddyComposerSourceListResponse,
   BuddyComposerSourceSelect,
   BuddyComposerSpaceFileSelect,
-} from '../../shared/composerResource'
-import type { BuddyPermissionSettings } from '../../shared/permissionMode'
-import type { WebSettings, WebSettingsSnapshot } from '../../shared/webProtocol'
-import type {
-  LocalApproval,
-  LocalArtifactText,
-  LocalAutomation,
-  LocalAutomationCreateRequest,
-  LocalAutomationListRequest,
-  LocalAutomationMutationRequest,
-  LocalAutomationOccurrenceListRequest,
-  LocalAutomationOccurrencePage,
-  LocalAutomationPage,
-  LocalAutomationPreviewRequest,
-  LocalAutomationPreviewResult,
-  LocalAutomationRunNowResult,
-  LocalAutomationUpdateRequest,
-  LocalBuddyServiceSupervisorState,
-  LocalChangeSetDetail,
-  LocalChatCommandRequest,
-  LocalComposerDraft,
-  LocalComposerDraftOpen,
-  LocalComposerDraftSave,
-  LocalConnector,
-  LocalConnectorConfig,
-  LocalConnectorCredential,
-  LocalConnectorCredentialMutation,
-  LocalContextUsageSnapshot,
-  LocalContextUsageSnapshotRequest,
-  LocalConversation,
-  LocalConversationBranch,
-  LocalConversationSummary,
-  LocalConversationTimelinePage,
-  LocalCustomProvider,
-  LocalCustomProviderModel,
-  LocalDefaultModel,
-  LocalMessagePage,
-  LocalNotificationList,
-  LocalProvider,
-  LocalProviderAuthChallenge,
-  LocalRun,
-  LocalRunEvent,
-  LocalRuntimeModelOption,
-  LocalSkillCatalog,
-  LocalSpace,
-  LocalSpaceCreateInput,
-  LocalSpaceFile,
-  LocalSpaceUpdateInput,
-  LocalStartTurnRequest,
-  LocalTurnStart,
-  LocalUsageSnapshot,
-  LocalWorkspaceSetting,
-  LocalWorkspaceStateValue,
-} from './localChatApiSchemas'
+} from '../../shared/conversation/composerResource'
+import type { LocalContextUsageSnapshot, LocalContextUsageSnapshotRequest } from '../../shared/conversation/contextApi'
+import type { LocalConversation, LocalConversationBranch, LocalConversationSummary, LocalConversationTimelinePage, LocalMessagePage } from '../../shared/conversation/conversationApi'
+import type { LocalWorkspaceSetting, LocalWorkspaceStateValue } from '../../shared/conversation/workspaceApi'
+import type { WebSettings, WebSettingsSnapshot } from '../../shared/network/webProtocol'
+import type { LocalNotificationList } from '../../shared/notifications/notificationApi'
+import type { LocalApproval } from '../../shared/permissions/approvalApi'
+import type { BuddyPermissionSettings } from '../../shared/permissions/permissionMode'
+import type { LocalCustomProvider, LocalCustomProviderModel, LocalDefaultModel, LocalProvider, LocalProviderAuthChallenge, LocalRuntimeModelOption } from '../../shared/providers/providerApi'
+import type { LocalRun, LocalRunEvent } from '../../shared/runs/runApi'
+import type { LocalBuddyServiceSupervisorState } from '../../shared/runtime/serviceState'
+import type { LocalSkillCatalog } from '../../shared/skills/skillApi'
 
-export type LocalChatErrorCode
-  = | 'APPROVAL_REQUIRED'
-    | 'ATTACHMENT_LIMIT_EXCEEDED'
-    | 'AUTOMATION_CONFLICT'
-    | 'AUTOMATION_INVALID_SCHEDULE'
-    | 'AUTOMATION_NOT_FOUND'
-    | 'AUTHENTICATION_REQUIRED'
-    | 'CONNECTOR_UNAVAILABLE'
-    | 'CREDENTIAL_STORE_UNAVAILABLE'
-    | 'DIRECTORY_NOT_AUTHORIZED'
-    | 'DRAFT_CONFLICT'
-    | 'LOCAL_CHAT_OPERATION_FAILED'
-    | 'MODEL_SYNC_FAILED'
-    | 'MODEL_SYNC_UNSUPPORTED'
-    | 'MODEL_INPUT_UNSUPPORTED'
-    | 'PATH_OUTSIDE_GRANTED_DIRECTORY'
-    | 'SPACE_HAS_ACTIVE_RUNS'
-    | 'SPACE_UNAVAILABLE'
-    | 'PROVIDER_HAS_ACTIVE_RUNS'
-    | 'PROVIDER_LOGIN_CANCELLED'
-    | 'PROVIDER_UNAVAILABLE'
-    | 'RUNTIME_PROTOCOL_ERROR'
-    | 'RUNTIME_UNAVAILABLE'
-    | 'VALIDATION_FAILED'
+import type { LocalSpace, LocalSpaceCreateInput, LocalSpaceFile, LocalSpaceUpdateInput } from '../../shared/spaces/spaceApi'
 
-export interface LocalChatPublicError {
-  code: LocalChatErrorCode
-  retryable: boolean
-}
-
-const LOCAL_CHAT_ERROR_MARKER = 'LEXORA_LOCAL_CHAT_ERROR'
-const LOCAL_CHAT_ERROR_PATTERN = /LEXORA_LOCAL_CHAT_ERROR:([A-Z0-9_]+):(0|1)/
-const LOCAL_CHAT_ERROR_CODES = new Set<LocalChatErrorCode>([
-  'APPROVAL_REQUIRED',
-  'ATTACHMENT_LIMIT_EXCEEDED',
-  'AUTOMATION_CONFLICT',
-  'AUTOMATION_INVALID_SCHEDULE',
-  'AUTOMATION_NOT_FOUND',
-  'AUTHENTICATION_REQUIRED',
-  'CONNECTOR_UNAVAILABLE',
-  'CREDENTIAL_STORE_UNAVAILABLE',
-  'DIRECTORY_NOT_AUTHORIZED',
-  'DRAFT_CONFLICT',
-  'LOCAL_CHAT_OPERATION_FAILED',
-  'MODEL_SYNC_FAILED',
-  'MODEL_SYNC_UNSUPPORTED',
-  'MODEL_INPUT_UNSUPPORTED',
-  'PATH_OUTSIDE_GRANTED_DIRECTORY',
-  'SPACE_HAS_ACTIVE_RUNS',
-  'SPACE_UNAVAILABLE',
-  'PROVIDER_HAS_ACTIVE_RUNS',
-  'PROVIDER_LOGIN_CANCELLED',
-  'PROVIDER_UNAVAILABLE',
-  'RUNTIME_PROTOCOL_ERROR',
-  'RUNTIME_UNAVAILABLE',
-  'VALIDATION_FAILED',
-])
-
-export function formatLocalChatPublicError(error: LocalChatPublicError): string {
-  return `${LOCAL_CHAT_ERROR_MARKER}:${error.code}:${error.retryable ? '1' : '0'}`
-}
-
-export function parseLocalChatPublicError(message: string): LocalChatPublicError | null {
-  const match = LOCAL_CHAT_ERROR_PATTERN.exec(message)
-  if (!match || !isLocalChatErrorCode(match[1]))
-    return null
-  return { code: match[1], retryable: match[2] === '1' }
-}
-
-export function isLocalChatErrorCode(value: string | undefined): value is LocalChatErrorCode {
-  return Boolean(value && LOCAL_CHAT_ERROR_CODES.has(value as LocalChatErrorCode))
-}
-
-export type {
-  LocalApproval,
-  LocalArtifact,
-  LocalArtifactText,
-  LocalAttachment,
-  LocalAutomation,
-  LocalAutomationCreateRequest,
-  LocalAutomationListItem,
-  LocalAutomationListRequest,
-  LocalAutomationMutationRequest,
-  LocalAutomationOccurrence,
-  LocalAutomationOccurrenceListRequest,
-  LocalAutomationOccurrencePage,
-  LocalAutomationPage,
-  LocalAutomationPreviewRequest,
-  LocalAutomationPreviewResult,
-  LocalAutomationRunNowResult,
-  LocalAutomationUpdateRequest,
-  LocalBuddyServiceSupervisorState,
-  LocalChangeSetDetail,
-  LocalChangeSetSummary,
-  LocalChatCommandRequest,
-  LocalComposerDraft,
-  LocalComposerDraftOpen,
-  LocalComposerDraftSave,
-  LocalConnector,
-  LocalConnectorConfig,
-  LocalConnectorCredential,
-  LocalConnectorCredentialMutation,
-  LocalContextUsageSnapshot,
-  LocalContextUsageSnapshotRequest,
-  LocalConversation,
-  LocalConversationBranch,
-  LocalConversationSummary,
-  LocalConversationTimelineItem,
-  LocalConversationTimelinePage,
-  LocalCustomProvider,
-  LocalCustomProviderModel,
-  LocalDefaultModel,
-  LocalFileChangeDetail,
-  LocalMessage,
-  LocalMessagePage,
-  LocalNotification,
-  LocalNotificationList,
-  LocalPromptContextItem,
-  LocalProvider,
-  LocalProviderAuthChallenge,
-  LocalRun,
-  LocalRunEvent,
-  LocalRunOutput,
-  LocalRuntimeModelOption,
-  LocalSkillCatalog,
-  LocalSpace,
-  LocalSpaceAdditionalDirectory,
-  LocalSpaceCreateInput,
-  LocalSpaceFile,
-  LocalSpacePrimaryDirectory,
-  LocalSpaceUpdateInput,
-  LocalStartTurnRequest,
-  LocalTurnStart,
-  LocalUsageSnapshot,
-  LocalWorkspaceDraft,
-  LocalWorkspaceSetting,
-  LocalWorkspaceStateValue,
-} from './localChatApiSchemas'
+import type { LocalUsageSnapshot } from '../../shared/usage/usageApi'
 
 export const LOCAL_CHAT_IPC_CHANNELS = {
   webSettingsRead: 'lexora:buddy:web:settings',

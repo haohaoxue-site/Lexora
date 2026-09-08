@@ -1,10 +1,10 @@
 import type {
   BuddyServiceTier,
   BuddyThinkingLevel,
-} from '../../../shared/modelSelection'
+} from '../../../shared/conversation/modelSelection'
 import type { ProviderExecutionModelResolver } from './ProviderExecutionModelResolver'
 import type { ProviderService } from './ProviderService'
-import { resolveBuddyServiceTiers } from '../../../shared/modelSelection'
+import { resolveBuddyServiceTiers } from '../../../shared/conversation/modelSelection'
 import {
   ProviderAuthenticationRequiredError,
   ProviderValidationError,

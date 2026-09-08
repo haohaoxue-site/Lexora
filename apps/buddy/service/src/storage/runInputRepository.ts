@@ -1,7 +1,7 @@
 import type { DatabaseSync } from 'node:sqlite'
-import type { BuddyServiceTier, BuddyThinkingLevel } from '../../../shared/modelSelection'
+import type { BuddyServiceTier, BuddyThinkingLevel } from '../../../shared/conversation/modelSelection'
 import { z } from 'zod'
-import { BUDDY_SERVICE_TIERS, BUDDY_THINKING_LEVELS } from '../../../shared/modelSelection'
+import { BUDDY_SERVICE_TIERS, BUDDY_THINKING_LEVELS } from '../../../shared/conversation/modelSelection'
 
 const contextItemSchema = z.object({
   kind: z.enum(['file', 'skill', 'slashCommand']),

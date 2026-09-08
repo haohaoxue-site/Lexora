@@ -6,7 +6,7 @@ import type {
   BrowserObservationTruncation,
   BrowserObservedElement,
   BrowserScreenshotRef,
-} from '../../../shared/browserProtocol'
+} from '../../../shared/browser'
 import { randomUUID } from 'node:crypto'
 import { platform } from 'node:process'
 import { z } from 'zod'
@@ -18,7 +18,7 @@ import {
   browserObservationSchema,
   getBrowserActionRef,
   getBrowserObservationTextByteLength,
-} from '../../../shared/browserProtocol'
+} from '../../../shared/browser'
 import {
   isBrowserValueRole,
   projectBrowserObservedValue,

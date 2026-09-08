@@ -1,12 +1,12 @@
 import type { Writable } from 'node:stream'
-import type { BuddyServiceSupervisorFailureCode } from '../../../shared/runtimeProtocol'
+import type { BuddyServiceSupervisorFailureCode } from '../../../shared/runtime/runtimeProtocol'
 import type { BuddyServicePeer } from './BuddyServicePeer'
 import type { BuddyServiceProcessHandle, BuddyServiceProcessInstance } from './buddyServiceProcess'
 import process from 'node:process'
 import {
   BUDDY_SERVICE_PROTOCOL_VERSION,
   buddyServiceFailureNotificationSchema,
-} from '../../../shared/runtimeProtocol'
+} from '../../../shared/runtime/runtimeProtocol'
 
 export type BuddyServiceSupervisorStatus
   = | 'stopped'

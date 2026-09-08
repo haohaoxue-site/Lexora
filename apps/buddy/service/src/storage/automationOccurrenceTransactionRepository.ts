@@ -5,7 +5,7 @@ import type {
   AutomationOccurrence,
   AutomationRunNowResult,
 } from '../../../shared/automation'
-import type { SpaceExecutionContext } from '../../../shared/space'
+import type { SpaceExecutionContext } from '../../../shared/conversation/space'
 import type { AutomationDefinitionCommandStore } from './automationDefinitionCommandRepository'
 import type { AutomationDefinitionIndexStore } from './automationDefinitionIndexRepository'
 import type {
@@ -20,7 +20,7 @@ import {
   automationOccurrenceSchema,
   automationRunNowResultSchema,
 } from '../../../shared/automation'
-import { spaceExecutionContextSchema } from '../../../shared/space'
+import { spaceExecutionContextSchema } from '../../../shared/conversation/space'
 import { createAutomationExecutionSnapshot } from './automationRecord'
 import { AutomationRepositoryError } from './automationRepositoryError'
 import { withTransaction } from './database'

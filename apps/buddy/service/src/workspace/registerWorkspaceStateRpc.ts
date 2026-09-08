@@ -1,10 +1,7 @@
 import type { RuntimeRequestRegistrar } from '../rpc/runtimeRequest'
 import type { WorkspaceRepository } from '../storage/workspaceRepository'
-import { z } from 'zod'
-import { BuddyServiceError, parse } from '../rpc/runtimeRequest'
-
-const WORKSPACE_STATE_KEY = 'buddy.chat.workspace.v2'
-const workspaceStateKeySchema = z.literal(WORKSPACE_STATE_KEY)
+import { workspaceStateRpc } from '../../../shared/conversation/workspaceApi'
+import { BuddyServiceError, registerRuntimeRequest } from '../rpc/runtimeRequest'
 
 export interface RegisterWorkspaceStateRpcOptions {
   normalize?: (value: unknown) => Promise<unknown>
@@ -16,16 +13,11 @@ export function registerWorkspaceStateRpc(
   options: RegisterWorkspaceStateRpcOptions,
 ): () => void {
   const disposers = [
-    options.rpc.onRequest('workspaceState.read', async (params) => {
-      const input = parse(z.object({ key: workspaceStateKeySchema }).strict(), params)
+    registerRuntimeRequest(options.rpc, workspaceStateRpc.read, async (input) => {
       const record = options.repository.getRecord(input.key)
       return record && options.normalize ? { ...record, value: await options.normalize(record.value) } : record
     }),
-    options.rpc.onRequest('workspaceState.write', (params) => {
-      const input = parse(z.object({
-        key: workspaceStateKeySchema,
-        value: z.unknown(),
-      }).strict(), params)
+    registerRuntimeRequest(options.rpc, workspaceStateRpc.write, (input) => {
       options.repository.set(input.key, input.value, new Date().toISOString())
       const record = options.repository.getRecord(input.key)
       if (!record)

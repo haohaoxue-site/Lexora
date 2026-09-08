@@ -6,7 +6,8 @@
     "paths": {
       "@/*": ["./src/*"],
       "@buddy-electron/*": ["./electron/*"],
-      "@buddy-shared/*": ["./shared/*"]
+      "@buddy-shared/*": ["./shared/*"],
+      "@buddy-tests/*": ["./__tests__/*"]
     },
     "types": ["vite/client"],
     "strict": true,

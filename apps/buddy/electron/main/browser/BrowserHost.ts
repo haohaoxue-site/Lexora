@@ -12,7 +12,7 @@ import type {
   BrowserValidateActionParams,
   BrowserWaitOutcome,
   BrowserWaitSpec,
-} from '../../../shared/browserProtocol'
+} from '../../../shared/browser'
 import type {
   DesktopBrowserGuestDescriptor,
   DesktopBrowserProfileMode,
@@ -26,7 +26,7 @@ import type {
 import type { BrowserSessionTeardownReason } from './BrowserSessionRegistry'
 import type { SemanticBrowserScreenshot, SemanticBrowserScreenshotReference } from './SemanticBrowserDriver'
 import { randomUUID } from 'node:crypto'
-import { BROWSER_WAIT_DEFAULT_QUIET_MS } from '../../../shared/browserProtocol'
+import { BROWSER_WAIT_DEFAULT_QUIET_MS } from '../../../shared/browser'
 import {
   BrowserSecurityPolicy,
   BrowserSecurityPolicyError,

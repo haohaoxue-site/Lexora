@@ -1,7 +1,7 @@
 import type {
   BrowserAction,
   BrowserObservedElement,
-} from '../../../../shared/browserProtocol'
+} from '../../../../shared/browser'
 
 export type BrowserActionRisk
   = 'commit-like'

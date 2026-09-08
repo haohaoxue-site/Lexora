@@ -1,6 +1,5 @@
 import type { ToolCallEvent } from '@earendil-works/pi-coding-agent'
 import type { Static, TSchema } from 'typebox'
-import type { BrowserApprovalReviewInput } from '../../../shared/approvalReviewPayload'
 import type {
   BrowserAction,
   BrowserCapabilityActParams,
@@ -9,7 +8,8 @@ import type {
   BrowserObservation,
   BrowserRecoveryAction,
   BrowserStateSnapshot,
-} from '../../../shared/browserProtocol'
+} from '../../../shared/browser'
+import type { BrowserApprovalReviewInput } from '../../../shared/permissions/approvalReviewPayload'
 import type { BrowserCommitEffect } from '../approvals/browser/classifyBrowserAction'
 import type { BuddyToolClassificationResult } from '../approvals/toolClassification'
 import type { GrantedPathError } from '../directories/resolveGrantedPath'
@@ -28,7 +28,7 @@ import {
   BROWSER_WAIT_MAX_QUIET_MS,
   BROWSER_WAIT_TEXT_MAX_LENGTH,
   browserCapabilityActParamsSchema,
-} from '../../../shared/browserProtocol'
+} from '../../../shared/browser'
 import { createToolClassificationFailure } from '../approvals/toolClassification'
 
 export const BROWSER_ACT_TOOL_NAME = 'lexora_browser_act'

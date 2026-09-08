@@ -1,70 +1,43 @@
 import type { RuntimeRequestRegistrar } from '../rpc/runtimeRequest'
 import type { ComposerResourceService } from './ComposerResourceService'
-import { z } from 'zod'
-import { BUDDY_ATTACHMENT_COUNT_LIMIT } from '../../../shared/attachmentPolicy'
-import { buddyResourceIdSchema } from '../../../shared/buddyUserContent'
-import {
-  buddyComposerResourceAcceptSchema,
-  buddyComposerResourceCompleteSchema,
-  buddyComposerResourceTargetSchema,
-  buddyComposerSourceListSchema,
-  buddyComposerSourceSelectSchema,
-  buddyComposerSpaceFileSelectSchema,
-} from '../../../shared/composerResource'
-import { parse } from '../rpc/runtimeRequest'
+import { composerResourcesRpc } from '../../../shared/conversation/composerApi'
 
-const referencedResourceIdsSchema = z.array(buddyResourceIdSchema)
-  .max(BUDDY_ATTACHMENT_COUNT_LIMIT)
-  .refine(ids => new Set(ids).size === ids.length)
-
-const sourceSelectSchema = buddyComposerSourceSelectSchema.extend({
-  referencedResourceIds: referencedResourceIdsSchema.default([]),
-}).strict()
-
-const spaceFileSelectSchema = buddyComposerSpaceFileSelectSchema.extend({
-  referencedResourceIds: referencedResourceIdsSchema.default([]),
-}).strict()
-
-const fileSelectSchema = z.object({
-  draftId: buddyResourceIdSchema,
-  paths: z.array(z.string().min(1)).max(BUDDY_ATTACHMENT_COUNT_LIMIT),
-  referencedResourceIds: referencedResourceIdsSchema.default([]),
-}).strict()
+import { registerRuntimeRequest } from '../rpc/runtimeRequest'
 
 export function registerComposerResourceRpc(options: {
   rpc: RuntimeRequestRegistrar
   service: ComposerResourceService
 }): () => void {
   const disposers = [
-    options.rpc.onRequest('composerResources.listSources', params => options.service.listSources(
-      parse(buddyComposerSourceListSchema, params),
+    registerRuntimeRequest(options.rpc, composerResourcesRpc.listSources, params => options.service.listSources(
+      params,
     )),
-    options.rpc.onRequest('composerResources.selectSource', (params) => {
-      const { referencedResourceIds, ...input } = parse(sourceSelectSchema, params)
+    registerRuntimeRequest(options.rpc, composerResourcesRpc.selectSource, (params) => {
+      const { referencedResourceIds, ...input } = params
       return options.service.selectSource(input, referencedResourceIds)
     }),
-    options.rpc.onRequest('composerResources.selectSpaceFile', (params) => {
-      const { referencedResourceIds, ...input } = parse(spaceFileSelectSchema, params)
+    registerRuntimeRequest(options.rpc, composerResourcesRpc.selectSpaceFile, (params) => {
+      const { referencedResourceIds, ...input } = params
       return options.service.selectSpaceFile(input, referencedResourceIds)
     }),
-    options.rpc.onRequest('composerResources.accept', params => options.service.accept(
-      parse(buddyComposerResourceAcceptSchema, params),
+    registerRuntimeRequest(options.rpc, composerResourcesRpc.accept, params => options.service.accept(
+      params,
     )),
-    options.rpc.onRequest('composerResources.complete', params => options.service.complete(
-      parse(buddyComposerResourceCompleteSchema, params),
+    registerRuntimeRequest(options.rpc, composerResourcesRpc.complete, params => options.service.complete(
+      params,
     )),
-    options.rpc.onRequest('composerResources.fail', params => options.service.fail(
-      parse(buddyComposerResourceTargetSchema, params),
+    registerRuntimeRequest(options.rpc, composerResourcesRpc.fail, params => options.service.fail(
+      params,
     )),
-    options.rpc.onRequest('composerResources.retry', params => options.service.retry(
-      parse(buddyComposerResourceTargetSchema, params),
+    registerRuntimeRequest(options.rpc, composerResourcesRpc.retry, params => options.service.retry(
+      params,
     )),
-    options.rpc.onRequest('composerResources.list', (params) => {
-      const { draftId } = parse(z.object({ draftId: buddyResourceIdSchema }).strict(), params)
+    registerRuntimeRequest(options.rpc, composerResourcesRpc.list, (params) => {
+      const { draftId } = params
       return options.service.list(draftId)
     }),
-    options.rpc.onRequest('composerResources.registerFiles', (params) => {
-      const { draftId, paths, referencedResourceIds } = parse(fileSelectSchema, params)
+    registerRuntimeRequest(options.rpc, composerResourcesRpc.registerFiles, (params) => {
+      const { draftId, paths, referencedResourceIds } = params
       return options.service.registerFiles({ draftId, paths, referencedResourceIds })
     }),
   ]

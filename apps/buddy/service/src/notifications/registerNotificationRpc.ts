@@ -1,10 +1,7 @@
 import type { RuntimeRequestRegistrar } from '../rpc/runtimeRequest'
 import type { AttentionNotificationService } from './AttentionNotificationService'
-import { z } from 'zod'
-import { parse } from '../rpc/runtimeRequest'
-
-const emptySchema = z.object({}).strict()
-const idSchema = z.string().trim().min(1).max(256)
+import { notificationsRpc } from '../../../shared/notifications/notificationApi'
+import { registerRuntimeRequest } from '../rpc/runtimeRequest'
 
 export interface RegisterNotificationRpcOptions {
   rpc: RuntimeRequestRegistrar
@@ -16,19 +13,13 @@ export interface RegisterNotificationRpcOptions {
 
 export function registerNotificationRpc(options: RegisterNotificationRpcOptions): () => void {
   const disposers = [
-    options.rpc.onRequest('notifications.list', (params) => {
-      parse(emptySchema, params)
+    registerRuntimeRequest(options.rpc, notificationsRpc.list, () => {
       return options.service.list()
     }),
-    options.rpc.onRequest('notifications.markSeen', (params) => {
-      const input = parse(z.object({
-        notificationId: idSchema,
-        revision: z.string().min(1).max(512),
-      }).strict(), params)
+    registerRuntimeRequest(options.rpc, notificationsRpc.markSeen, (input) => {
       return options.service.markSeen(input.notificationId, input.revision)
     }),
-    options.rpc.onRequest('notifications.markAllSeen', (params) => {
-      parse(emptySchema, params)
+    registerRuntimeRequest(options.rpc, notificationsRpc.markAllSeen, () => {
       return options.service.markAllSeen()
     }),
   ]

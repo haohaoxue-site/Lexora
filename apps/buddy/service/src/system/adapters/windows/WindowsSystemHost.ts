@@ -1,7 +1,7 @@
-import type { NativeCommandResult } from '../../../../../platform/nativeCommand'
+import type { NativeCommandResult } from '../../../../../platform/native/nativeCommand'
 import type { SystemActionKind, SystemHostPort, SystemTarget, SystemTargetSelector } from '../../systemCapability'
 import process from 'node:process'
-import { runNativeProcessControl } from '../../../../../platform/processControl'
+import { runNativeProcessControl } from '../../../../../platform/process/processControl'
 import { runWindowsServiceControl } from '../../../../../platform/windows/serviceControl'
 import { SystemCapabilityError } from '../../systemCapability'
 

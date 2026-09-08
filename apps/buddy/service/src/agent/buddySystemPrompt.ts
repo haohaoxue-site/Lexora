@@ -1,5 +1,5 @@
-import type { BuddyApprovalPolicy } from '../../../shared/approvalPolicy'
-import type { BuddyExecutionProfile } from '../../../shared/executionProfile'
+import type { BuddyApprovalPolicy } from '../../../shared/permissions/approvalPolicy'
+import type { BuddyExecutionProfile } from '../../../shared/permissions/executionProfile'
 import process from 'node:process'
 import { getPiShellToolName } from './piBuiltinTools'
 

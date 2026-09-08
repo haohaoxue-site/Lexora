@@ -1,9 +1,9 @@
-import type { PublicWebGet } from '../../../shared/network/publicWebTransport'
+import type { PublicWebGet } from '../../../shared/network/webTransport'
 import type { WebDocument } from './webContent'
 import { Buffer } from 'node:buffer'
 import { z } from 'zod'
-import { requireWebSuccess } from '../../../shared/network/publicWebTransport'
-import { WebError } from '../../../shared/webProtocol'
+import { WebError } from '../../../shared/network/webProtocol'
+import { requireWebSuccess } from '../../../shared/network/webTransport'
 
 const contentSchema = z.object({ type: z.string().optional(), content: z.string(), encoding: z.literal('base64'), size: z.number() })
 const issueSchema = z.object({ title: z.string(), body: z.string().nullable(), comments: z.number(), state: z.string(), user: z.object({ login: z.string() }) })

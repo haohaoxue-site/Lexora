@@ -10,19 +10,11 @@ import type { AutomationChangeCoordinator } from './AutomationChangeCoordinator'
 import type { AutomationOccurrenceLifecycleService } from './AutomationOccurrenceLifecycleService'
 import type { AutomationClock } from './AutomationScheduleEvaluator'
 import type { AutomationService } from './AutomationService'
-import { z } from 'zod'
-import {
-  automationMutationRequestSchemas,
-  automationPreviewRequestSchema,
-  automationRequestSchemas,
-} from '../../../shared/automation'
-import { parse } from '../rpc/runtimeRequest'
+
+import { automationNotifications, automationsRpc } from '../../../shared/automation/automationApi'
+import { registerRuntimeRequest } from '../rpc/runtimeRequest'
 import { previewAutomationSchedule } from './AutomationScheduleEvaluator'
 import { AutomationServiceError } from './AutomationService'
-
-const schedulerWakeSchema = z.object({
-  reason: z.enum(['resume', 'unlock-screen']),
-}).strict()
 
 export interface RegisterAutomationRpcOptions {
   approvals: Pick<ApprovalRepository, 'listPending'>
@@ -36,23 +28,19 @@ export interface RegisterAutomationRpcOptions {
 
 export function registerAutomationRpc(options: RegisterAutomationRpcOptions): () => void {
   const disposers: Array<() => void> = []
-  const on = (method: string, handler: (params: unknown) => Promise<unknown> | unknown) => {
-    disposers.push(options.rpc.onRequest(method, handler))
-  }
 
   disposers.push(options.rpc.onNotification((method, params) => {
-    if (method !== 'scheduler.wake')
+    if (method !== automationNotifications.wake.method)
       return
-    if (schedulerWakeSchema.safeParse(params).success)
+    if (automationNotifications.wake.params.safeParse(params).success)
       options.changes.wakeScheduler()
   }))
 
-  on('automations.preview', (params) => {
-    const input = parse(automationPreviewRequestSchema, params)
+  disposers.push(registerRuntimeRequest(options.rpc, automationsRpc.preview, (input) => {
     return previewAutomationSchedule(input, options.clock)
-  })
-  on('automations.list', (params) => {
-    const page = options.service.list(parse(automationRequestSchemas.list, params))
+  }))
+  disposers.push(registerRuntimeRequest(options.rpc, automationsRpc.list, (params) => {
+    const page = options.service.list(params)
     return {
       ...page,
       items: page.items.map((automation) => {
@@ -65,70 +53,68 @@ export function registerAutomationRpc(options: RegisterAutomationRpcOptions): ()
         }
       }),
     }
-  })
-  on('automations.get', (params) => {
-    const input = parse(automationRequestSchemas.get, params)
+  }))
+  disposers.push(registerRuntimeRequest(options.rpc, automationsRpc.get, (input) => {
     const automation = options.service.get(input.automationId)
     if (!automation)
       throw new AutomationServiceError('AUTOMATION_NOT_FOUND')
     return automation
-  })
-  on('automations.create', (params) => {
+  }))
+  disposers.push(registerRuntimeRequest(options.rpc, automationsRpc.create, (params) => {
     const automation = options.service.create(
-      parse(automationMutationRequestSchemas.create, params),
+      params,
     )
     options.changes.publish(automation.id)
     return automation
-  })
-  on('automations.update', (params) => {
+  }))
+  disposers.push(registerRuntimeRequest(options.rpc, automationsRpc.update, (params) => {
     const automation = options.service.update(
-      parse(automationMutationRequestSchemas.update, params),
+      params,
     )
     options.changes.publish(automation.id)
     return automation
-  })
-  on('automations.pause', (params) => {
+  }))
+  disposers.push(registerRuntimeRequest(options.rpc, automationsRpc.pause, (params) => {
     const automation = options.service.pause(
-      parse(automationMutationRequestSchemas.pause, params),
+      params,
     )
     options.changes.publish(automation.id)
     return automation
-  })
-  on('automations.resume', (params) => {
+  }))
+  disposers.push(registerRuntimeRequest(options.rpc, automationsRpc.resume, (params) => {
     const automation = options.service.resume(
-      parse(automationMutationRequestSchemas.resume, params),
+      params,
     )
     options.changes.publish(automation.id)
     return automation
-  })
-  on('automations.delete', (params) => {
+  }))
+  disposers.push(registerRuntimeRequest(options.rpc, automationsRpc.delete, (params) => {
     const automation = options.service.delete(
-      parse(automationMutationRequestSchemas.delete, params),
+      params,
     )
     options.changes.publish(automation.id)
     return automation
-  })
-  on('automations.runNow', (params) => {
+  }))
+  disposers.push(registerRuntimeRequest(options.rpc, automationsRpc.runNow, (params) => {
     const result = options.service.runNow(
-      parse(automationMutationRequestSchemas.runNow, params),
+      params,
     )
     if (result.outcome === 'started')
       options.changes.publish(result.occurrence.automationId)
     return toAutomationRunNowResult(result)
-  })
-  on('automations.listOccurrences', (params) => {
+  }))
+  disposers.push(registerRuntimeRequest(options.rpc, automationsRpc.listOccurrences, (params) => {
     const page = options.service.listHistory(
-      parse(automationRequestSchemas.listOccurrences, params),
+      params,
     )
     return {
       ...page,
       items: page.items.map(occurrence => toAutomationOccurrenceView(options, occurrence)),
     }
-  })
-  on('automations.deleteOccurrence', async (params) => {
-    const input = parse(automationRequestSchemas.deleteOccurrence, params)
+  }))
+  disposers.push(registerRuntimeRequest(options.rpc, automationsRpc.deleteOccurrence, async (input) => {
     return (await options.lifecycle.deleteOccurrence(input.occurrenceId)).deleted
-  })
+  }))
 
   return () => disposers.splice(0).forEach(dispose => dispose())
 }

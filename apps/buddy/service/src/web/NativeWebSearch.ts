@@ -1,10 +1,10 @@
 import type { Api, AuthResult, Model, Usage } from '@earendil-works/pi-ai'
-import type { ProviderWebFetch } from '../../../shared/network/publicWebTransport'
+import type { ProviderWebFetch } from '../../../shared/network/webTransport'
 import type { WebSearchResponse, WebSearchSource } from './webSearchBackends'
 import { Buffer } from 'node:buffer'
 import { calculateCost } from '@earendil-works/pi-ai'
-import { requireWebSuccess } from '../../../shared/network/publicWebTransport'
-import { WebError } from '../../../shared/webProtocol'
+import { WebError } from '../../../shared/network/webProtocol'
+import { requireWebSuccess } from '../../../shared/network/webTransport'
 import { searchSourceUrl } from './webSearchBackends'
 
 export interface NativeSearchModels {

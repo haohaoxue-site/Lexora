@@ -1,8 +1,9 @@
-import type { ConnectorCredential, McpServerConfig } from './mcpSchemas'
+import type { ConnectorCredential } from '../../../../shared/connectors/connectorCredentials'
+import type { McpServerConfig } from './mcpSchemas'
 import process from 'node:process'
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js'
-import { createChildProcessEnvironment } from '../../../../platform/childProcessEnvironment'
+import { createChildProcessEnvironment } from '../../../../platform/process/childProcessEnvironment'
 
 export function createMcpTransport(config: McpServerConfig, credential: ConnectorCredential | null) {
   if (config.transport === 'stdio') {

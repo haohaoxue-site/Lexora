@@ -1,10 +1,11 @@
-import type { BuddyServiceFailureCode } from '../../shared/runtimeProtocol'
+import type { BuddyServiceFailureCode } from '../../shared/runtime/runtimeProtocol'
 import { join } from 'node:path'
 import process from 'node:process'
 import { z } from 'zod'
 import { establishWindowsRuntimeGuard } from '../../platform/windows/runtimeGuard'
-import { toPublicRunEvent } from '../../shared/publicRunEvent'
-import { buddyServiceFailureCodeSchema } from '../../shared/runtimeProtocol'
+import { toPublicRunEvent } from '../../shared/runs/publicRunEvent'
+import { runNotifications } from '../../shared/runs/runApi'
+import { buddyServiceFailureCodeSchema } from '../../shared/runtime/runtimeProtocol'
 import { startBuddyService } from './BuddyService'
 import { createRunEventLog } from './events/createRunEventLog'
 import { RunEventLogFatalError } from './events/RunEventFailure'
@@ -94,7 +95,7 @@ async function runBuddyService(): Promise<void> {
     eventLog = createRunEventLog({
       conversationsDirectory: join(buddyHome, 'conversations'),
       database: openedDatabase,
-      onEvent: event => serviceServer?.notify('run.event', toPublicRunEvent(event)),
+      onEvent: event => serviceServer?.notify(runNotifications.event.method, toPublicRunEvent(event)),
       onEventDeliveryError: (error, event) => {
         process.stderr.write(
           `Lexora Buddy run event notification failed: ${error.name} ${event.runId}#${event.sequence}\n`,

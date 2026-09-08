@@ -1,4 +1,5 @@
 import antfu from '@antfu/eslint-config'
+import buddyDependencyBoundaries from './apps/buddy/eslint/dependency-boundaries.js'
 
 export default antfu({
   pnpm: {
@@ -10,6 +11,18 @@ export default antfu({
     '**/.output/**',
     '**/native-pet/target/**',
   ],
+}, {
+  files: ['apps/buddy/{src,shared,platform}/**/*.{ts,tsx,mts,cts,js,jsx,mjs,cjs,vue}'],
+  plugins: {
+    buddy: {
+      rules: {
+        'dependency-boundaries': buddyDependencyBoundaries,
+      },
+    },
+  },
+  rules: {
+    'buddy/dependency-boundaries': 'error',
+  },
 }, {
   files: ['apps/api/src/**/*.ts'],
   rules: {

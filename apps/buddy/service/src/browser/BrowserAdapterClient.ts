@@ -1,16 +1,16 @@
 import type {
+  BrowserCapabilityActParams,
+  BrowserObservation,
+  BrowserStateSnapshot,
+} from '../../../shared/browser'
+import type {
   BrowserAdapterFailureCode,
   BrowserAdapterLease,
   BrowserAdapterRecoveryAction,
   BrowserAdapterRequest,
   BrowserAdapterResponse,
   BrowserAdapterSuccessResult,
-} from '../../../shared/browserAdapterProtocol'
-import type {
-  BrowserCapabilityActParams,
-  BrowserObservation,
-  BrowserStateSnapshot,
-} from '../../../shared/browserProtocol'
+} from '../../../shared/browser/browserAdapterProtocol'
 import { Buffer } from 'node:buffer'
 import { randomUUID } from 'node:crypto'
 import { createConnection } from 'node:net'
@@ -20,7 +20,7 @@ import {
   browserAdapterLeaseSchema,
   browserAdapterRequestSchema,
   browserAdapterResponseSchema,
-} from '../../../shared/browserAdapterProtocol'
+} from '../../../shared/browser/browserAdapterProtocol'
 
 type BrowserAdapterSnapshotParams = Extract<
   BrowserAdapterRequest,

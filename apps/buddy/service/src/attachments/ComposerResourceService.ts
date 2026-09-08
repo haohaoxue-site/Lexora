@@ -1,4 +1,4 @@
-import type { BuddyUserContentV1 } from '../../../shared/buddyUserContent'
+import type { BuddyUserContentV1 } from '../../../shared/conversation/buddyUserContent'
 import type {
   BuddyArtifactSource,
   BuddyComposerResource,
@@ -15,7 +15,7 @@ import type {
   BuddyMessageInputSource,
   BuddySpaceFileOrigin,
   BuddySpaceFileSource,
-} from '../../../shared/composerResource'
+} from '../../../shared/conversation/composerResource'
 import type { ArtifactResource, ArtifactService } from '../artifacts/ArtifactService'
 import type { RunEventReader } from '../events/RunEventPorts'
 import type { SpaceService } from '../spaces/SpaceService'
@@ -30,11 +30,11 @@ import { Buffer } from 'node:buffer'
 import { createHash, randomUUID } from 'node:crypto'
 import { open, stat } from 'node:fs/promises'
 import { basename, isAbsolute, join, relative } from 'node:path'
-import { readBoundedFile } from '../../../platform/boundedFile'
-import { BUDDY_ATTACHMENT_COUNT_LIMIT, BUDDY_ATTACHMENT_TOTAL_BYTES_LIMIT } from '../../../shared/attachmentPolicy'
-import { getBuddyUserContentResourceIds } from '../../../shared/buddyUserContent'
-import { buddyComposerResourceAcceptSchema, buddyComposerSourceListSchema, buddyComposerSourceSelectSchema, buddyComposerSpaceFileSelectSchema } from '../../../shared/composerResource'
-import { buddyRunOutputPayloadSchema } from '../../../shared/runOutput'
+import { readBoundedFile } from '../../../platform/filesystem/boundedFile'
+import { BUDDY_ATTACHMENT_COUNT_LIMIT, BUDDY_ATTACHMENT_TOTAL_BYTES_LIMIT } from '../../../shared/conversation/attachmentPolicy'
+import { getBuddyUserContentResourceIds } from '../../../shared/conversation/buddyUserContent'
+import { buddyComposerResourceAcceptSchema, buddyComposerSourceListSchema, buddyComposerSourceSelectSchema, buddyComposerSpaceFileSelectSchema } from '../../../shared/conversation/composerResource'
+import { buddyRunOutputPayloadSchema } from '../../../shared/runs/runOutput'
 import { resolveGrantedPath } from '../directories/resolveGrantedPath'
 import { createSensitivePathMatcher } from '../permissions/sensitivePaths'
 import { BuddyServiceError } from '../rpc/runtimeRequest'

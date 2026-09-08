@@ -4,18 +4,9 @@ import type {
   ApprovalRepository,
 } from '../storage/approvalRepository'
 import type { ApprovalService } from './ApprovalService'
-import { z } from 'zod'
-import { APPROVAL_REVIEW_KINDS } from '../../../shared/approvalReviewPayload'
-import { parse } from '../rpc/runtimeRequest'
-
-const approvalStatuses = ['pending', 'approved', 'denied', 'cancelled'] as const
-const idSchema = z.string().trim().min(1).max(256)
-const approvalIdSchema = z.object({ approvalId: idSchema }).strict()
-const approvalListSchema = z.object({
-  limit: z.number().int().positive().max(500).optional(),
-  runId: idSchema.nullable().optional(),
-  status: z.enum(approvalStatuses).nullable().optional(),
-}).strict()
+import { approvalsRpc } from '../../../shared/permissions/approvalApi'
+import { APPROVAL_REVIEW_KINDS } from '../../../shared/permissions/approvalReviewPayload'
+import { registerRuntimeRequest } from '../rpc/runtimeRequest'
 
 export interface RegisterApprovalRpcOptions {
   repository: Pick<ApprovalRepository, 'list'>
@@ -25,35 +16,28 @@ export interface RegisterApprovalRpcOptions {
 
 export function registerApprovalRpc(options: RegisterApprovalRpcOptions): () => void {
   const disposers: Array<() => void> = []
-  const on = (method: string, handler: (params: unknown) => Promise<unknown> | unknown) => {
-    disposers.push(options.rpc.onRequest(method, handler))
-  }
 
-  on('approvals.list', (params) => {
-    const input = parse(approvalListSchema, params)
+  disposers.push(registerRuntimeRequest(options.rpc, approvalsRpc.list, (input) => {
     return options.repository.list(input).map(toPublicApproval)
-  })
-  on('approvals.approve', async (params) => {
-    const input = parse(approvalIdSchema, params)
+  }))
+  disposers.push(registerRuntimeRequest(options.rpc, approvalsRpc.approve, async (input) => {
     return toPublicApproval(await options.service.resolve({
       decision: 'approved',
       id: input.approvalId,
     }))
-  })
-  on('approvals.approveForTurn', async (params) => {
-    const input = parse(approvalIdSchema, params)
+  }))
+  disposers.push(registerRuntimeRequest(options.rpc, approvalsRpc.approveForTurn, async (input) => {
     return toPublicApproval(await options.service.resolve({
       decision: 'approved_for_turn',
       id: input.approvalId,
     }))
-  })
-  on('approvals.deny', async (params) => {
-    const input = parse(approvalIdSchema, params)
+  }))
+  disposers.push(registerRuntimeRequest(options.rpc, approvalsRpc.deny, async (input) => {
     return toPublicApproval(await options.service.resolve({
       decision: 'denied',
       id: input.approvalId,
     }))
-  })
+  }))
 
   return () => disposers.splice(0).forEach(dispose => dispose())
 }

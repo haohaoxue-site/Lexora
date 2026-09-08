@@ -12,7 +12,7 @@ import {
 } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import process from 'node:process'
-import { fileStorage } from '../../../platform/fileStorage'
+import { fileStorage } from '../../../platform/filesystem/fileStorage'
 import { buddyRunEventSchema, buddyRunIdSchema } from './BuddyRunEvent'
 import {
   RunEventCorruptionError,

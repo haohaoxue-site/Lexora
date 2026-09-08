@@ -1,4 +1,3 @@
-import type { BrowserApprovalReviewInput } from '../../../shared/approvalReviewPayload'
 import type {
   BrowserAcquireControlParams,
   BrowserAcquireControlResult,
@@ -18,7 +17,8 @@ import type {
   BrowserValidateActionParams,
   BrowserValidateActionResult,
   BrowserWaitSpec,
-} from '../../../shared/browserProtocol'
+} from '../../../shared/browser'
+import type { BrowserApprovalReviewInput } from '../../../shared/permissions/approvalReviewPayload'
 import type { BrowserActionClassification } from '../approvals/browser/classifyBrowserAction'
 import type { DirectoryGrant } from '../directories/resolveGrantedPath'
 import type {
@@ -26,7 +26,7 @@ import type {
   OpenBrowserUrlInput,
 } from './BrowserHostClient'
 import { createHash } from 'node:crypto'
-import { getBrowserActionRef } from '../../../shared/browserProtocol'
+import { getBrowserActionRef } from '../../../shared/browser'
 import { classifyBrowserAction } from '../approvals/browser/classifyBrowserAction'
 
 export type BrowserCapabilityOpenTarget = {

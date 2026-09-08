@@ -1,6 +1,6 @@
-import type { BuddyApprovalPolicy } from '../../../shared/approvalPolicy'
-import type { ApprovalReviewKind } from '../../../shared/approvalReviewPayload'
-import type { BuddyExecutionProfile } from '../../../shared/executionProfile'
+import type { BuddyApprovalPolicy } from '../../../shared/permissions/approvalPolicy'
+import type { ApprovalReviewKind } from '../../../shared/permissions/approvalReviewPayload'
+import type { BuddyExecutionProfile } from '../../../shared/permissions/executionProfile'
 
 export type AccessKind
   = 'delete'

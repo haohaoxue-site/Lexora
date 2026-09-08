@@ -148,6 +148,9 @@ jobs:
       - name: Type-check Buddy
         run: pnpm --filter @lexora/buddy type-check
 
+      - name: Prepare Buddy test runtime
+        run: pnpm --filter @lexora/buddy prepare:test-runtime
+
       - name: Test Buddy
         run: pnpm --filter @lexora/buddy test
 

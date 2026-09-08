@@ -1,7 +1,7 @@
-import type { ProcessControlRequest } from '../../../../platform/processControl'
+import type { ProcessControlRequest } from '../../../../platform/process/processControl'
 import type { ProcessSystemTarget, SystemActionKind, SystemTargetSelector } from '../systemCapability'
 import process from 'node:process'
-import { runNativeProcessControl } from '../../../../platform/processControl'
+import { runNativeProcessControl } from '../../../../platform/process/processControl'
 import { SystemCapabilityError } from '../systemCapability'
 import { processTargetSchema } from './systemTargetSchema'
 

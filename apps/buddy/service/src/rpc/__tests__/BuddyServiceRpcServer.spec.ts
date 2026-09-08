@@ -1,0 +1,149 @@
+import { EventEmitter } from 'node:events'
+import { describe, expect, it, vi } from 'vitest'
+import { BUDDY_SERVICE_PROTOCOL_VERSION } from '../../../../shared/runtime/runtimeProtocol'
+
+import {
+  createBuddyService,
+  notifyBuddyServiceFailure,
+  notifyBuddyServiceReady,
+} from '../BuddyServiceRpcServer'
+
+class FakeParentPort extends EventEmitter {
+  readonly sent: unknown[] = []
+
+  postMessage(message: unknown): void {
+    this.sent.push(message)
+  }
+
+  receive(message: unknown): void {
+    this.emit('message', { data: message })
+  }
+}
+
+describe('runtimeRpcServer', () => {
+  it('emits only the stable failure code before readiness', () => {
+    const port = new FakeParentPort()
+    const server = createBuddyService({ announceReady: false, port })
+
+    notifyBuddyServiceFailure(server, 'EVENT_LOG_CORRUPTED')
+
+    expect(port.sent).toEqual([{
+      jsonrpc: '2.0',
+      method: 'runtime.failed',
+      params: { code: 'EVENT_LOG_CORRUPTED' },
+    }])
+  })
+
+  it('does not report readiness before startup recovery completes', async () => {
+    const port = new FakeParentPort()
+    const server = createBuddyService({ announceReady: false, port })
+
+    port.receive({
+      jsonrpc: '2.0',
+      id: 'status-starting',
+      method: 'runtime.status',
+      params: {},
+    })
+    port.receive({
+      jsonrpc: '2.0',
+      id: 'state-starting',
+      method: 'runtime.localState',
+      params: {},
+    })
+    await new Promise(resolve => setImmediate(resolve))
+
+    expect(port.sent).toEqual([
+      {
+        jsonrpc: '2.0',
+        id: 'status-starting',
+        result: {
+          name: 'lexora-buddy-service',
+          protocolVersion: BUDDY_SERVICE_PROTOCOL_VERSION,
+          ready: false,
+        },
+      },
+      {
+        jsonrpc: '2.0',
+        id: 'state-starting',
+        result: { status: 'starting' },
+      },
+    ])
+
+    notifyBuddyServiceReady(server)
+
+    port.receive({
+      jsonrpc: '2.0',
+      id: 'status-ready',
+      method: 'runtime.status',
+      params: {},
+    })
+    await new Promise(resolve => setImmediate(resolve))
+
+    expect(port.sent.at(-1)).toEqual({
+      jsonrpc: '2.0',
+      id: 'status-ready',
+      result: {
+        name: 'lexora-buddy-service',
+        protocolVersion: BUDDY_SERVICE_PROTOCOL_VERSION,
+        ready: true,
+      },
+    })
+  })
+
+  it('serves status and local state through bidirectional RPC', async () => {
+    const port = new FakeParentPort()
+    createBuddyService({ port })
+
+    port.receive({
+      jsonrpc: '2.0',
+      id: 'status-1',
+      method: 'runtime.status',
+      params: {},
+    })
+    port.receive({
+      jsonrpc: '2.0',
+      id: 'state-1',
+      method: 'runtime.localState',
+      params: {},
+    })
+    await new Promise(resolve => setImmediate(resolve))
+
+    expect(port.sent.slice(1)).toEqual([
+      {
+        jsonrpc: '2.0',
+        id: 'status-1',
+        result: {
+          name: 'lexora-buddy-service',
+          protocolVersion: BUDDY_SERVICE_PROTOCOL_VERSION,
+          ready: true,
+        },
+      },
+      {
+        jsonrpc: '2.0',
+        id: 'state-1',
+        result: { status: 'ready' },
+      },
+    ])
+  })
+
+  it('acknowledges shutdown before scheduling process exit', async () => {
+    const port = new FakeParentPort()
+    const scheduleShutdown = vi.fn()
+    createBuddyService({ port, scheduleShutdown })
+
+    port.receive({
+      jsonrpc: '2.0',
+      id: 'shutdown-1',
+      method: 'runtime.shutdown',
+      params: {},
+    })
+    await new Promise(resolve => setImmediate(resolve))
+
+    expect(port.sent[1]).toEqual({
+      jsonrpc: '2.0',
+      id: 'shutdown-1',
+      result: { accepted: true },
+    })
+    expect(scheduleShutdown).toHaveBeenCalledOnce()
+  })
+})

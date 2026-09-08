@@ -1,4 +1,4 @@
-import type { BrowserFailureReason } from '../../shared/browserProtocol'
+import type { BrowserFailureReason } from '../../shared/browser'
 import type { BuddyCapabilities } from '../../shared/platform'
 import type { DesktopCommandId, DesktopPlatform } from './desktopCommands'
 import type { LocalChatApi } from './localChatApi'

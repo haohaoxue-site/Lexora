@@ -2,9 +2,9 @@ import type {
   ToolCallEvent,
   ToolCallEventResult,
 } from '@earendil-works/pi-coding-agent'
-import type { BuddyApprovalPolicy } from '../../../../shared/approvalPolicy'
-import type { PathApprovalReviewInput } from '../../../../shared/approvalReviewPayload'
-import type { BuddyExecutionProfile } from '../../../../shared/executionProfile'
+import type { BuddyApprovalPolicy } from '../../../../shared/permissions/approvalPolicy'
+import type { PathApprovalReviewInput } from '../../../../shared/permissions/approvalReviewPayload'
+import type { BuddyExecutionProfile } from '../../../../shared/permissions/executionProfile'
 import type { ApprovalService } from '../../approvals/ApprovalService'
 import type {
   BuddyToolClassification,

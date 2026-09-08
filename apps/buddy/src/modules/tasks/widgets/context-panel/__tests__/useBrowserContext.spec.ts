@@ -1,0 +1,127 @@
+// @vitest-environment jsdom
+import type { DesktopBrowserApi, DesktopBrowserState } from '@buddy-electron/shared/desktopApi'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { createApp, effectScope, h, nextTick, shallowRef } from 'vue'
+import { deferred } from '../../../../../../__tests__/deferred'
+import { useBrowserAddress } from '../useBrowserAddress'
+import { useBrowserContextSurface } from '../useBrowserContextSurface'
+import { useBrowserSurface } from '../useBrowserSurface'
+
+const cleanups: (() => void)[] = []
+afterEach(() => cleanups.splice(0).forEach(cleanup => cleanup()))
+
+function browserState(url = 'https://example.com/'): DesktopBrowserState {
+  return { canGoBack: false, canGoForward: false, controller: 'human', controlEpoch: 0, conversationId: 'conversation', error: null, pageId: 'page', profileMode: 'default', security: { kind: 'blank', origin: null }, sessionId: 'session', status: 'ready', title: '', url, visible: true }
+}
+
+function mountBrowser() {
+  let listener: ((state: DesktopBrowserState) => void) | null = null
+  let hook!: ReturnType<typeof useBrowserContextSurface>
+  const api = {
+    ensureSession: vi.fn().mockResolvedValue(browserState()),
+    onStateChanged: (next: typeof listener) => {
+      listener = next
+      return () => {
+        listener = null
+      }
+    },
+    navigate: vi.fn(),
+    takeControl: vi.fn(),
+    setProfileMode: vi.fn(),
+    setSurface: vi.fn().mockResolvedValue(undefined),
+  }
+  const app = createApp({ setup() {
+    hook = useBrowserContextSurface({ api: api as unknown as DesktopBrowserApi, conversationId: shallowRef('conversation'), guestHost: { show() {}, hide() {} }, surfaceElement: shallowRef(document.createElement('div')) })
+    return () => h('div')
+  } })
+  app.mount(document.createElement('div'))
+  let stopped = false
+  const stop = () => {
+    if (!stopped) {
+      stopped = true
+      app.unmount()
+    }
+  }
+  cleanups.push(stop)
+  return { api, hook, stop, publish: (state: DesktopBrowserState) => listener?.(state) }
+}
+
+describe('browser context ownership', () => {
+  it('keeps the newest navigation result when commands finish out of order', async () => {
+    const { api, hook } = mountBrowser()
+    await nextTick()
+    const first = deferred<DesktopBrowserState>()
+    const second = deferred<DesktopBrowserState>()
+    api.navigate.mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise)
+    const a = hook.navigate('a.example')
+    const b = hook.navigate('b.example')
+    second.resolve(browserState('https://b.example/'))
+    expect(await b).toBe(true)
+    first.resolve(browserState('https://a.example/'))
+    expect(await a).toBe(false)
+    expect(hook.state.value?.url).toBe('https://b.example/')
+  })
+
+  it('does not overwrite a published host state or write after unmount', async () => {
+    const { api, hook, publish, stop } = mountBrowser()
+    await nextTick()
+    const pending = deferred<DesktopBrowserState>()
+    api.navigate.mockReturnValueOnce(pending.promise)
+    const action = hook.navigate('requested.example')
+    publish(browserState('https://redirected.example/'))
+    pending.resolve(browserState('https://requested.example/'))
+    await action
+    expect(hook.state.value?.url).toBe('https://redirected.example/')
+    const last = deferred<DesktopBrowserState>()
+    api.navigate.mockReturnValueOnce(last.promise)
+    const lastAction = hook.navigate('disposed.example')
+    stop()
+    last.resolve(browserState('https://disposed.example/'))
+    expect(await lastAction).toBe(false)
+    expect(hook.state.value?.url).toBe('https://redirected.example/')
+  })
+
+  it('keeps input entered while navigation is pending, including A to B to A edits', async () => {
+    const scope = effectScope()
+    cleanups.push(() => scope.stop())
+    const state = shallowRef<DesktopBrowserState | null>(browserState())
+    const pending = deferred<boolean>()
+    const address = scope.run(() => useBrowserAddress(state, () => pending.promise))!
+    address.updateAddress('a.example')
+    const opening = address.openAddress()
+    address.updateAddress('b.example')
+    address.updateAddress('a.example')
+    state.value = browserState('https://navigated.example/')
+    pending.resolve(true)
+    await opening
+    expect(address.address.value).toBe('a.example')
+  })
+
+  it('does not hide a new binding when an earlier presentation fails', async () => {
+    const scope = effectScope()
+    cleanups.push(() => scope.stop())
+    const sessionId = shallowRef<string | null>('session')
+    const element = shallowRef<HTMLElement | null>(document.createElement('div'))
+    const pending = deferred<void>()
+    const shown = new Map<string, HTMLElement>()
+    const host = {
+      show: (id: string, target: HTMLElement) => {
+        shown.set(id, target)
+      },
+      hide: (id: string, target?: HTMLElement) => {
+        if (shown.get(id) === target)
+          shown.delete(id)
+      },
+    }
+    const api = { setSurface: vi.fn().mockReturnValueOnce(pending.promise).mockResolvedValue(undefined) }
+    scope.run(() => useBrowserSurface({ api, guestHost: host, sessionId, element }))
+    await nextTick()
+    element.value = document.createElement('div')
+    await nextTick()
+    pending.reject(new Error('old surface failed'))
+    await nextTick()
+    expect(shown.get('session')).toBe(element.value)
+    scope.stop()
+    expect(shown.size).toBe(0)
+  })
+})

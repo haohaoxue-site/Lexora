@@ -108,19 +108,3 @@ fn rejects_non_finite_window_local_pointer_position() {
 
     assert_eq!(position, None);
 }
-
-#[test]
-fn maps_pointer_hit_and_drag_state_to_cursor_feedback() {
-    let cases = [
-        (false, false, None),
-        (true, false, Some("grab")),
-        (true, true, Some("grabbing")),
-    ];
-
-    for (pointer_hits_visible_pet, is_dragging, expected) in cases {
-        assert_eq!(
-            native_pet_pointer_cursor_name(pointer_hits_visible_pet, is_dragging),
-            expected
-        );
-    }
-}

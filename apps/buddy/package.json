@@ -38,8 +38,12 @@
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "type-check": "vue-tsc -b --pretty false",
-    "test": "vitest run --maxWorkers=4 --passWithNoTests",
-    "test:watch": "vitest --passWithNoTests"
+    "prepare:test-runtime": "node ../../packaging/buddy/release/search-tools.mjs && node ../../packaging/buddy/release/native-host.mjs",
+    "test": "vitest run --maxWorkers=4",
+    "test:unit": "pnpm test --project=unit",
+    "test:runtime": "pnpm test --project=runtime",
+    "test:platform": "pnpm test --project=platform",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@dnd-kit/abstract": "^0.5.0",

@@ -1,6 +1,6 @@
 import type { DatabaseSync } from 'node:sqlite'
-import type { BuddyApprovalPolicy } from '../../../shared/approvalPolicy'
-import type { BuddyExecutionProfile } from '../../../shared/executionProfile'
+import type { BuddyApprovalPolicy } from '../../../shared/permissions/approvalPolicy'
+import type { BuddyExecutionProfile } from '../../../shared/permissions/executionProfile'
 import type { ComposerDraftCommitReceipt } from './commitComposerDraft'
 import { createComposerDraftCommitter } from './commitComposerDraft'
 import { withTransaction } from './database'

@@ -1,11 +1,11 @@
-import type { BuddyServiceFailureCode } from '../../../shared/runtimeProtocol'
-import type { RuntimeRequestHandler, RuntimeRpcPeerContract } from '../../../shared/runtimeRpcPeer'
+import type { RuntimeRequestHandler, RuntimeRpcPeerContract } from '../../../shared/runtime/rpcPeer'
+import type { BuddyServiceFailureCode } from '../../../shared/runtime/runtimeProtocol'
 import process from 'node:process'
+import { RuntimeRpcPeer } from '../../../platform/ipc/runtimeRpcPeer'
 import {
   BUDDY_SERVICE_PROTOCOL_VERSION,
   buddyServiceFailureNotificationSchema,
-} from '../../../shared/runtimeProtocol'
-import { RuntimeRpcPeer } from '../../../shared/runtimeRpcPeer'
+} from '../../../shared/runtime/runtimeProtocol'
 
 const SERVICE_NAME = 'lexora-buddy-service'
 

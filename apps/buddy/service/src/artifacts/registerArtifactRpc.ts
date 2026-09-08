@@ -1,7 +1,8 @@
 import type { RuntimeRequestRegistrar } from '../rpc/runtimeRequest'
 import type { ArtifactService } from './ArtifactService'
 import { z } from 'zod'
-import { parse } from '../rpc/runtimeRequest'
+import { artifactsRpc } from '../../../shared/artifacts/artifactApi'
+import { parse, registerRuntimeRequest } from '../rpc/runtimeRequest'
 
 const idSchema = z.string().trim().min(1).max(256)
 
@@ -23,8 +24,7 @@ export function registerArtifactRpc(options: RegisterArtifactRpcOptions): () => 
       const input = parse(z.object({ artifactId: idSchema }).strict(), params)
       return options.service.resolvePreview(input.artifactId)
     }),
-    options.rpc.onRequest('artifacts.readText', (params) => {
-      const input = parse(z.object({ artifactId: idSchema }).strict(), params)
+    registerRuntimeRequest(options.rpc, artifactsRpc.readText, (input) => {
       return options.service.readText(input.artifactId)
     }),
   ]

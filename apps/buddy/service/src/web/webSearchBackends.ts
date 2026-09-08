@@ -1,10 +1,11 @@
-import type { ProviderWebFetch, PublicWebGet } from '../../../shared/network/publicWebTransport'
-import type { WebSearchProvider } from '../../../shared/webProtocol'
+import type { WebSearchProvider } from '../../../shared/network/webProtocol'
+import type { ProviderWebFetch, PublicWebGet } from '../../../shared/network/webTransport'
 import { Buffer } from 'node:buffer'
 import { parseHTML } from 'linkedom'
 import { z } from 'zod'
-import { publicWebUrl, readResponseBytes, requireWebSuccess } from '../../../shared/network/publicWebTransport'
-import { WebError } from '../../../shared/webProtocol'
+import { publicWebUrl, readResponseBytes } from '../../../platform/network/publicWebTransport'
+import { WebError } from '../../../shared/network/webProtocol'
+import { requireWebSuccess } from '../../../shared/network/webTransport'
 import { decodeWebText } from './webContent'
 
 export interface WebSearchSource {

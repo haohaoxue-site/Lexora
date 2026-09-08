@@ -1,0 +1,258 @@
+import type {
+  DesktopBrowserApi,
+  DesktopBrowserProfileMode,
+  DesktopBrowserState,
+} from '@buddy-electron/shared/desktopApi'
+import type { Ref } from 'vue'
+import type { DesktopBrowserGuestSurfaceHost } from '@/platform/browser/browserGuestSurface'
+import { computed, onBeforeUnmount, onMounted, readonly, shallowRef, watch } from 'vue'
+import { normalizeBrowserAddress } from './browserAddress'
+import { useBrowserSurface } from './useBrowserSurface'
+
+interface UseBrowserContextSurfaceOptions {
+  api: DesktopBrowserApi
+  conversationId: Readonly<Ref<string>>
+  guestHost: DesktopBrowserGuestSurfaceHost
+  surfaceElement: Readonly<Ref<HTMLElement | null>>
+}
+
+export function useBrowserContextSurface(options: UseBrowserContextSurfaceOptions) {
+  const state = shallowRef<DesktopBrowserState | null>(null)
+  const isLoading = computed(() => state.value?.status === 'loading')
+  const isCapturingScreenshot = shallowRef(false)
+  const isOpeningExternal = shallowRef(false)
+  const isShowingFileInFolder = shallowRef(false)
+  const isSwitchingProfile = shallowRef(false)
+  const isTakingControl = shallowRef(false)
+  let lifecycle = 0
+  let mounted = false
+  let stateRequest = 0
+  let stateVersion = 0
+  let stopStateChanged: (() => void) | null = null
+
+  onMounted(() => {
+    mounted = true
+    const currentLifecycle = ++lifecycle
+    stopStateChanged = options.api.onStateChanged((nextState) => {
+      if (!mounted || nextState.conversationId !== options.conversationId.value)
+        return
+      stateVersion += 1
+      state.value = nextState
+    })
+    void ensureSession(currentLifecycle)
+  })
+
+  onBeforeUnmount(() => {
+    mounted = false
+    lifecycle += 1
+    stopStateChanged?.()
+    stopStateChanged = null
+  })
+
+  useBrowserSurface({
+    api: options.api,
+    element: options.surfaceElement,
+    guestHost: options.guestHost,
+    sessionId: computed(() => state.value?.sessionId ?? null),
+  })
+  watch(options.conversationId, () => {
+    lifecycle += 1
+    state.value = null
+    isCapturingScreenshot.value = false
+    isOpeningExternal.value = false
+    isShowingFileInFolder.value = false
+    isSwitchingProfile.value = false
+    isTakingControl.value = false
+    if (mounted)
+      void ensureSession(lifecycle)
+  }, { flush: 'sync' })
+
+  async function ensureSession(currentLifecycle: number): Promise<void> {
+    const version = stateVersion
+    try {
+      const nextState = await options.api.ensureSession(options.conversationId.value)
+      if (!mounted || lifecycle !== currentLifecycle)
+        return
+      if (stateVersion === version)
+        state.value = nextState
+    }
+    catch {}
+  }
+
+  async function navigate(rawAddress: string): Promise<boolean> {
+    const sessionId = state.value?.sessionId
+    const url = normalizeBrowserAddress(rawAddress)
+    if (!url)
+      return false
+    if (!sessionId)
+      return false
+    try {
+      return await updateSessionState(sessionId, () => options.api.navigate(sessionId, url))
+    }
+    catch {
+      return false
+    }
+  }
+
+  async function captureScreenshot(): Promise<boolean> {
+    const sessionId = state.value?.sessionId
+    if (!sessionId || isCapturingScreenshot.value)
+      return false
+    const currentLifecycle = lifecycle
+    isCapturingScreenshot.value = true
+    try {
+      const saved = await options.api.captureScreenshot(sessionId)
+      return mounted && lifecycle === currentLifecycle && saved
+    }
+    catch {
+      return false
+    }
+    finally {
+      if (mounted && lifecycle === currentLifecycle)
+        isCapturingScreenshot.value = false
+    }
+  }
+
+  async function openExternal(): Promise<boolean> {
+    const sessionId = state.value?.sessionId
+    if (!sessionId || isOpeningExternal.value)
+      return false
+    const currentLifecycle = lifecycle
+    isOpeningExternal.value = true
+    try {
+      const opened = await options.api.openExternal(sessionId)
+      return mounted && lifecycle === currentLifecycle && opened
+    }
+    catch {
+      return false
+    }
+    finally {
+      if (mounted && lifecycle === currentLifecycle)
+        isOpeningExternal.value = false
+    }
+  }
+
+  async function setProfileMode(profileMode: DesktopBrowserProfileMode): Promise<boolean> {
+    const sessionId = state.value?.sessionId
+    if (
+      !sessionId
+      || state.value?.profileMode === profileMode
+      || isSwitchingProfile.value
+    ) {
+      return false
+    }
+    const currentLifecycle = lifecycle
+    isSwitchingProfile.value = true
+    try {
+      return await updateSessionState(sessionId, () => options.api.setProfileMode(sessionId, profileMode))
+    }
+    catch {
+      return false
+    }
+    finally {
+      if (mounted && lifecycle === currentLifecycle)
+        isSwitchingProfile.value = false
+    }
+  }
+
+  async function showFileInFolder(): Promise<boolean> {
+    const sessionId = state.value?.sessionId
+    if (!sessionId || isShowingFileInFolder.value)
+      return false
+    const currentLifecycle = lifecycle
+    isShowingFileInFolder.value = true
+    try {
+      const opened = await options.api.showFileInFolder(sessionId)
+      return mounted && lifecycle === currentLifecycle && opened
+    }
+    catch {
+      return false
+    }
+    finally {
+      if (mounted && lifecycle === currentLifecycle)
+        isShowingFileInFolder.value = false
+    }
+  }
+
+  function goBack(): Promise<boolean> {
+    return runSessionCommand(sessionId => options.api.goBack(sessionId))
+  }
+
+  function goForward(): Promise<boolean> {
+    return runSessionCommand(sessionId => options.api.goForward(sessionId))
+  }
+
+  function reload(): Promise<boolean> {
+    return runSessionCommand(sessionId => options.api.reload(sessionId))
+  }
+
+  function stop(): Promise<boolean> {
+    return runSessionCommand(sessionId => options.api.stop(sessionId))
+  }
+
+  async function takeControl(): Promise<boolean> {
+    const sessionId = state.value?.sessionId
+    if (!sessionId || state.value?.controller !== 'agent' || isTakingControl.value)
+      return false
+    const currentLifecycle = lifecycle
+    isTakingControl.value = true
+    try {
+      return await updateSessionState(sessionId, () => options.api.takeControl(sessionId))
+    }
+    catch {
+      return false
+    }
+    finally {
+      if (mounted && lifecycle === currentLifecycle)
+        isTakingControl.value = false
+    }
+  }
+
+  async function runSessionCommand(
+    command: (sessionId: string) => Promise<void>,
+  ): Promise<boolean> {
+    const sessionId = state.value?.sessionId
+    if (!mounted || !sessionId)
+      return false
+    const currentLifecycle = lifecycle
+    try {
+      await command(sessionId)
+      return mounted && lifecycle === currentLifecycle
+    }
+    catch {
+      return false
+    }
+  }
+
+  async function updateSessionState(sessionId: string, command: () => Promise<DesktopBrowserState>): Promise<boolean> {
+    const currentLifecycle = lifecycle
+    const request = ++stateRequest
+    const version = stateVersion
+    const nextState = await command()
+    if (!mounted || lifecycle !== currentLifecycle || request !== stateRequest || state.value?.sessionId !== sessionId)
+      return false
+    if (version === stateVersion)
+      state.value = nextState
+    return true
+  }
+
+  return {
+    captureScreenshot,
+    goBack,
+    goForward,
+    isCapturingScreenshot: readonly(isCapturingScreenshot),
+    isLoading: readonly(isLoading),
+    isOpeningExternal: readonly(isOpeningExternal),
+    isShowingFileInFolder: readonly(isShowingFileInFolder),
+    isSwitchingProfile: readonly(isSwitchingProfile),
+    isTakingControl: readonly(isTakingControl),
+    navigate,
+    openExternal,
+    reload,
+    setProfileMode,
+    showFileInFolder,
+    state: readonly(state),
+    stop,
+    takeControl,
+  }
+}

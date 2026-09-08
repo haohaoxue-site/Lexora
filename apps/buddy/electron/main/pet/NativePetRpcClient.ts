@@ -1,10 +1,10 @@
 import type { Readable, Writable } from 'node:stream'
-import type { PetPrimitiveStep } from '../../../shared/petProtocol'
+import type { PetPrimitiveStep } from '../../../shared/runtime/petProtocol'
 import { Buffer } from 'node:buffer'
 import { randomUUID } from 'node:crypto'
 import { z } from 'zod'
 
-import { petPrimitiveStepSchema } from '../../../shared/petProtocol'
+import { petPrimitiveStepSchema } from '../../../shared/runtime/petProtocol'
 
 const SIDECAR_PROTOCOL_VERSION = 1
 const DEFAULT_MAX_LINE_BYTES = 256 * 1024

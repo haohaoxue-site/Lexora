@@ -1,7 +1,7 @@
-import type { BuddyApprovalPolicy } from '../../../shared/approvalPolicy'
-import type { BuddyExecutionProfile } from '../../../shared/executionProfile'
-import type { BuddySessionMode } from '../../../shared/sessionMode'
-import type { SpaceExecutionContext } from '../../../shared/space'
+import type { SpaceExecutionContext } from '../../../shared/conversation/space'
+import type { BuddyApprovalPolicy } from '../../../shared/permissions/approvalPolicy'
+import type { BuddyExecutionProfile } from '../../../shared/permissions/executionProfile'
+import type { BuddySessionMode } from '../../../shared/permissions/sessionMode'
 import type { DirectoryGrant } from '../directories/resolveGrantedPath'
 import type { BuddyDataPaths } from '../storage/BuddyDataPaths'
 import type {

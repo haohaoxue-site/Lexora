@@ -1,5 +1,5 @@
-import { containsCanonicalPath } from '../../../platform/filePaths'
-import { FilePathResolutionError, resolveFilePath } from '../../../platform/resolveFilePath'
+import { containsCanonicalPath } from '../../../platform/filesystem/filePaths'
+import { FilePathResolutionError, resolveFilePath } from '../../../platform/filesystem/resolveFilePath'
 
 export interface DirectoryGrant {
   canonicalRoot: string
