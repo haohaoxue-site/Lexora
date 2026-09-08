@@ -52,7 +52,7 @@ withDefaults(defineProps<{
   width: 100%;
   min-width: 0;
   border: 1px solid var(--buddy-border-strong);
-  border-radius: 0.75rem;
+  border-radius: 6px;
   background: var(--buddy-surface-base);
   padding: 0.65rem;
   transition: border-color 120ms ease;
@@ -80,7 +80,6 @@ withDefaults(defineProps<{
   color: var(--buddy-text-strong);
   font-size: 0.9rem;
   line-height: 1.58;
-  padding: var(--desktop-chat-composer-editor-padding-top) 0.75rem var(--desktop-chat-composer-editor-padding-bottom) 0.2rem;
   white-space: pre-wrap;
   word-break: break-word;
 

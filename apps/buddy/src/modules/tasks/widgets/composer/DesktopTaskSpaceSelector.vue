@@ -236,7 +236,7 @@ function openSpaceCreator() {
   background: var(--buddy-surface-raised);
   box-shadow: var(--buddy-shadow-overlay);
   color: var(--buddy-text-strong);
-  padding: 6px;
+  padding: 8px;
 }
 
 .desktop-task-space-selector__search {
