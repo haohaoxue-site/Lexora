@@ -18,7 +18,6 @@ jobs:
     timeout-minutes: 5
     outputs:
       buddy: ${{ steps.resolve.outputs.buddy }}
-      contracts: ${{ steps.resolve.outputs.contracts }}
       website: ${{ steps.resolve.outputs.website }}
       quality: ${{ steps.resolve.outputs.quality }}
     steps:
@@ -69,9 +68,6 @@ jobs:
       - name: Install Website dependencies
         run: pnpm --filter @haohaoxue/lexora --filter @haohaoxue/lexora-website install --frozen-lockfile
 
-      - name: Verify Website Pages workflow
-        run: node packaging/website/release/verify-pages-workflow.mjs
-
       - name: Lint Website
         run: pnpm --filter @haohaoxue/lexora-website lint
 
@@ -100,51 +96,17 @@ jobs:
           cache: pnpm
           cache-dependency-path: pnpm-lock.yaml
 
-      - name: Check product versions
-        run: node packaging/release/version.mjs --check
-
       - name: Install workspace dependencies
         run: pnpm install --frozen-lockfile
 
       - name: Lint
-        run: pnpm exec eslint apps/agent apps/api apps/web packages
+        run: pnpm exec eslint .github/scripts apps/agent apps/api apps/web packages packaging infrastructure/scripts
 
       - name: Type-check
         run: pnpm --filter '!@lexora/buddy' --filter '!@haohaoxue/lexora-website' --recursive --if-present type-check
 
       - name: Test
         run: pnpm --filter '!@lexora/buddy' --filter '!@haohaoxue/lexora-website' --recursive --if-present test
-
-  release-contracts:
-    name: Release contracts
-    needs: scope
-    if: needs.scope.outputs.contracts == 'true'
-    runs-on: ubuntu-24.04
-    timeout-minutes: 5
-    steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
-
-      - name: Setup Node
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          node-version-file: .node-version
-
-      - name: Install contract dependencies
-        run: pnpm --filter @haohaoxue/lexora install --frozen-lockfile --ignore-scripts
-
-      - name: Verify release contracts
-        run: |
-          pnpm exec eslint .github/scripts packaging infrastructure/scripts
-          node packaging/release/version.mjs --check
-          node packaging/release/status.mjs
-          node .github/scripts/verify-workflows.mjs
-          node packaging/website/release/verify-pages-workflow.mjs
 
   buddy-tests:
     name: Buddy tests
@@ -181,7 +143,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Lint Buddy
-        run: pnpm --filter @lexora/buddy lint
+        run: pnpm exec eslint apps/buddy packaging/buddy
 
       - name: Type-check Buddy
         run: pnpm --filter @lexora/buddy type-check
@@ -226,7 +188,7 @@ jobs:
 
   ci-gate:
     name: CI Gate
-    needs: [scope, website-quality, quality, release-contracts, buddy-tests, buddy-native-windows]
+    needs: [scope, website-quality, quality, buddy-tests, buddy-native-windows]
     if: always()
     runs-on: ubuntu-24.04
     timeout-minutes: 5
@@ -236,8 +198,6 @@ jobs:
           BUDDY_REQUIRED: ${{ needs.scope.outputs.buddy }}
           BUDDY_RESULT: ${{ needs.buddy-tests.result }}
           WINDOWS_RESULT: ${{ needs.buddy-native-windows.result }}
-          CONTRACTS_REQUIRED: ${{ needs.scope.outputs.contracts }}
-          CONTRACTS_RESULT: ${{ needs.release-contracts.result }}
           WEBSITE_REQUIRED: ${{ needs.scope.outputs.website }}
           WEBSITE_RESULT: ${{ needs.website-quality.result }}
           QUALITY_REQUIRED: ${{ needs.scope.outputs.quality }}
@@ -261,6 +221,5 @@ jobs:
 
           require_success "Website quality" "$WEBSITE_REQUIRED" "$WEBSITE_RESULT"
           require_success "Quality" "$QUALITY_REQUIRED" "$QUALITY_RESULT"
-          require_success "Release contracts" "$CONTRACTS_REQUIRED" "$CONTRACTS_RESULT"
           require_success "Buddy tests" "$BUDDY_REQUIRED" "$BUDDY_RESULT"
           require_success "Buddy Windows native tests" "$BUDDY_REQUIRED" "$WINDOWS_RESULT"

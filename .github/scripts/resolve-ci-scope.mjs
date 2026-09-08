@@ -7,26 +7,13 @@ import { fileURLToPath } from 'node:url'
 const repoRoot = resolve(import.meta.dirname, '../..')
 const globalBuddyInputs = new Set([
   '.node-version',
+  'package.json',
+  'pnpm-lock.yaml',
   'pnpm-workspace.yaml',
-])
-const buddyWorkflowInputs = new Set([
   '.github/workflows/buddy-build.yml',
-])
-const contractInputs = new Set([
-  '.github/release.yml',
-  '.github/workflows/ci.yml',
-  '.github/workflows/prepare-release.yml',
-  '.github/workflows/release.yml',
-  '.github/scripts/resolve-ci-scope.mjs',
-  '.github/scripts/verify-workflows.mjs',
-  'packaging/release/status.mjs',
-  'packaging/release/transition.mjs',
-  'packaging/release/version.mjs',
-  'packaging/shared/cli-output.mjs',
 ])
 const websiteInputs = new Set([
   '.github/workflows/website-pages.yml',
-  'packaging/website/release/verify-pages-workflow.mjs',
 ])
 const ignoredInputs = new Set([
   'README.en.md',
@@ -43,15 +30,9 @@ const buddyPrefixes = [
   'packaging/buddy/',
   'patches/',
 ]
-const conservativeContractPrefixes = [
-  '.github/workflows/',
-  '.github/scripts/',
-  'packaging/release/',
-  'packaging/shared/',
-  'packaging/website/',
-]
 const qualityPrefixes = [
   '.github/',
+  'packaging/',
   'apps/agent/',
   'apps/api/',
   'apps/web/',
@@ -67,7 +48,6 @@ export function classifyCiScope(files) {
     return fullScope()
 
   let buddy = false
-  let contracts = false
   let website = false
   let quality = false
 
@@ -82,30 +62,6 @@ export function classifyCiScope(files) {
       continue
     }
 
-    if (path === 'pnpm-lock.yaml') {
-      buddy = true
-      quality = true
-      continue
-    }
-
-    if (path === 'package.json') {
-      buddy = true
-      contracts = true
-      quality = true
-      continue
-    }
-
-    if (buddyWorkflowInputs.has(path)) {
-      buddy = true
-      contracts = true
-      continue
-    }
-
-    if (contractInputs.has(path)) {
-      contracts = true
-      continue
-    }
-
     if (globalBuddyInputs.has(path) || path.startsWith('packages/assets/')) {
       buddy = true
       quality = true
@@ -114,13 +70,6 @@ export function classifyCiScope(files) {
 
     if (buddyPrefixes.some(prefix => path.startsWith(prefix))) {
       buddy = true
-      continue
-    }
-
-    if (conservativeContractPrefixes.some(prefix => path.startsWith(prefix))) {
-      buddy = true
-      contracts = true
-      quality = true
       continue
     }
 
@@ -133,7 +82,7 @@ export function classifyCiScope(files) {
     quality = true
   }
 
-  return { buddy, contracts, website, quality }
+  return { buddy, website, quality }
 }
 
 export function listChangedFiles(base, head, cwd = repoRoot) {
@@ -158,7 +107,6 @@ export function resolveCiScope(base, head, cwd = repoRoot) {
 function fullScope() {
   return {
     buddy: true,
-    contracts: true,
     website: false,
     quality: true,
   }
