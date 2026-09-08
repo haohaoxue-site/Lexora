@@ -3,7 +3,6 @@ import type {
   DesktopChatWelcomeVariantId,
 } from '@buddy-electron/shared/desktopApi'
 import type { BuddyI18nKey } from '@/i18n/buddyI18n'
-import listeningIllustrationUrl from './assets/listening.webp'
 import orchestratingIllustrationUrl from './assets/orchestrating.webp'
 import planningIllustrationUrl from './assets/planning.webp'
 import writingIllustrationUrl from './assets/writing.webp'
@@ -11,7 +10,6 @@ import writingIllustrationUrl from './assets/writing.webp'
 export type DesktopChatWelcomeDecoration
   = | 'none'
     | 'orbit-arc'
-    | 'trailing-star'
     | 'underline-star'
 
 export interface DesktopChatWelcomeVariant {
@@ -39,12 +37,6 @@ export const DESKTOP_CHAT_WELCOME_VARIANTS = [
     id: 'orchestrating',
     illustrationUrl: orchestratingIllustrationUrl,
     titleKey: 'desktop.chat.welcome.orchestrating',
-  },
-  {
-    decoration: 'trailing-star',
-    id: 'listening',
-    illustrationUrl: listeningIllustrationUrl,
-    titleKey: 'desktop.chat.welcome.listening',
   },
 ] as const satisfies ReadonlyArray<DesktopChatWelcomeVariant>
 

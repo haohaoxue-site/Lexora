@@ -99,6 +99,19 @@ describe('lexoraConfigStore', () => {
     expect(content).toContain('id = "conversation-a"')
   })
 
+  it('normalizes an unavailable welcome variant to random', async () => {
+    const { configPath, store } = await createConfigStore()
+    await mkdir(dirname(configPath), { recursive: true })
+    await writeFile(configPath, '[desktop]\nwelcome_variant = "listening"\n')
+
+    await expect(store.read()).resolves.toMatchObject({
+      desktop: { welcomeVariant: 'random' },
+    })
+
+    await store.update({ desktop: { theme: 'dark' } })
+    expect(await readFile(configPath, 'utf8')).toContain('welcome_variant = "random"')
+  })
+
   it('preserves config sections owned by future or remote capabilities', async () => {
     const { configPath, store } = await createConfigStore()
     await mkdir(dirname(configPath), { recursive: true })

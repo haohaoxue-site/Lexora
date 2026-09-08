@@ -26,7 +26,7 @@ const desktopConfigSchema = z.object({
   notify_when_focused: z.boolean().default(false),
   sidebar_collapsed: z.boolean().default(false),
   theme: z.enum(['system', 'light', 'dark']).default('system'),
-  welcome_variant: z.enum(['random', ...DESKTOP_CHAT_WELCOME_VARIANT_IDS]).default('random'),
+  welcome_variant: z.enum(['random', ...DESKTOP_CHAT_WELCOME_VARIANT_IDS]).catch('random'),
 }).passthrough().default({
   background_close_notice_shown: false,
   task_sidebar_pinned_items: [],
