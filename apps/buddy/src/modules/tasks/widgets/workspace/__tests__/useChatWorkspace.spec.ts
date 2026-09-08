@@ -1,10 +1,12 @@
+import type { DesktopChatWelcomePreference } from '@buddy-electron/shared/desktopApi'
 import type { LocalBuddyServiceSupervisorState } from '@buddy-shared/runtime/serviceState'
+import type { LocalSpace } from '@buddy-shared/spaces/spaceApi'
 import type { TaskChatWorkspace } from '../../../contracts'
 import type { ChatApprovalDecision } from '../../../model/runs/typing'
 import type { ChatWorkspaceProps } from '../typing'
 import type { BuddyLocale } from '@/i18n/buddyI18n'
 import type { ChatComposerSubmitPayload } from '@/modules/prompt-input'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { computed, effectScope, nextTick, shallowReactive, shallowRef, watchEffect } from 'vue'
 import { createChatComposerContentFromText } from '@/modules/prompt-input'
 import { useChatWorkspace } from '../useChatWorkspace'
@@ -75,12 +77,12 @@ function createOwner(name: string) {
       },
     },
     language: shallowRef<BuddyLocale>('zh-CN'),
-    welcomePreference: shallowRef('writing' as const),
+    welcomePreference: shallowRef<DesktopChatWelcomePreference>('writing'),
     session: {
       activeBranchId: shallowRef<string | null>(null),
       activeConversation: shallowRef(null),
       activeConversationId: shallowRef<string | null>(null),
-      activeSpace: shallowRef(null),
+      activeSpace: shallowRef<LocalSpace | null>(null),
       currentTitle: shallowRef(name),
       spaceId: shallowRef(null),
       listActiveConversationMessages: async () => [],
@@ -122,6 +124,20 @@ function createOwner(name: string) {
     },
   } satisfies TaskChatWorkspace
   return { delivered, workspace }
+}
+
+function createSpace(id: string): LocalSpace {
+  return {
+    activeRunCount: 0,
+    additionalDirectories: [],
+    createdAt: '2026-09-08T00:00:00.000Z',
+    id,
+    memoryScope: 'space_only',
+    name: id,
+    primaryDirectory: null,
+    revokedAt: null,
+    updatedAt: '2026-09-08T00:00:00.000Z',
+  }
 }
 
 function bindWorkspace(owner: ReturnType<typeof createOwner>) {
@@ -221,5 +237,29 @@ describe('useChatWorkspace', () => {
     ])
     expect(next.workspace.composer.draft.value).toBe('')
     expect(previous.delivered).toEqual([])
+  })
+
+  it('keeps a random welcome stable while switching spaces', async () => {
+    const random = vi.spyOn(Math, 'random')
+      .mockReturnValueOnce(0)
+      .mockReturnValueOnce(0.99)
+    cleanups.push(() => random.mockRestore())
+    const owner = createOwner('first')
+    owner.workspace.welcomePreference.value = 'random'
+    const { view } = bindWorkspace(owner)
+
+    expect(view.welcomeVariant.value.id).toBe('writing')
+
+    owner.workspace.session.activeSpace.value = createSpace('space-a')
+    await nextTick()
+
+    expect(view.welcomeVariant.value.id).toBe('writing')
+
+    owner.workspace.session.activeConversationId.value = 'conversation-first'
+    await nextTick()
+    owner.workspace.session.activeConversationId.value = null
+    await nextTick()
+
+    expect(view.welcomeVariant.value.id).toBe('orchestrating')
   })
 })

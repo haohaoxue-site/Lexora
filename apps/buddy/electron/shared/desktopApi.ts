@@ -197,7 +197,6 @@ export const DESKTOP_CHAT_WELCOME_VARIANT_IDS = [
   'writing',
   'planning',
   'orchestrating',
-  'listening',
 ] as const
 
 export type DesktopChatWelcomeVariantId = typeof DESKTOP_CHAT_WELCOME_VARIANT_IDS[number]

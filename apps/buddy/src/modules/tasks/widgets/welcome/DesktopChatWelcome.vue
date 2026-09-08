@@ -43,11 +43,6 @@ const { t } = useBuddyI18n(() => props.language)
   text-align: center;
 }
 
-.desktop-chat-welcome[data-variant='listening'] {
-  --desktop-chat-welcome-illustration-offset-x: -4.8%;
-  --desktop-chat-welcome-illustration-offset-bottom: -1.3rem;
-}
-
 .desktop-chat-welcome[data-variant='orchestrating'] {
   --desktop-chat-welcome-illustration-offset-x: -3.7%;
   --desktop-chat-welcome-illustration-offset-bottom: -1.4rem;
@@ -95,7 +90,6 @@ const { t } = useBuddyI18n(() => props.language)
     gap: 0.35rem;
   }
 
-  .desktop-chat-welcome[data-variant='listening'],
   .desktop-chat-welcome[data-variant='orchestrating'] {
     --desktop-chat-welcome-illustration-offset-bottom: -1rem;
   }

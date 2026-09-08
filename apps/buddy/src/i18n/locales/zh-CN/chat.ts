@@ -241,7 +241,6 @@ export default {
   'desktop.chat.turnOutputs': '本轮产出',
   'desktop.chat.turnChanges': '已变更 {count} 个文件',
   'desktop.chat.unknownError': '本地任务操作失败',
-  'desktop.chat.welcome.listening': '说说你现在的想法',
   'desktop.chat.welcome.orchestrating': '让一切开始运转',
   'desktop.chat.welcome.planning': '今天想从哪里开始？',
   'desktop.chat.welcome.writing': '今天想一起完成什么？',

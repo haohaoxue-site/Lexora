@@ -243,7 +243,6 @@ export default {
   'desktop.chat.turnOutputs': 'Turn outputs',
   'desktop.chat.turnChanges': '{count} files changed',
   'desktop.chat.unknownError': 'Local task operation failed',
-  'desktop.chat.welcome.listening': 'Tell me what\'s on your mind',
   'desktop.chat.welcome.orchestrating': 'Let\'s set everything in motion',
   'desktop.chat.welcome.planning': 'Where would you like to begin?',
   'desktop.chat.welcome.writing': 'What shall we accomplish together?',

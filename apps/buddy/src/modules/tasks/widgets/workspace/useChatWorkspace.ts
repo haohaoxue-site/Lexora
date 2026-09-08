@@ -31,11 +31,10 @@ export function useChatWorkspace(
 
   watch(() => [
     session.value.activeConversationId.value,
-    session.value.activeSpace.value?.id ?? null,
     workspace.value.welcomePreference.value,
-  ] as const, ([conversationId, spaceId, preference], [previousId, previousSpaceId, previousPreference]) => {
+  ] as const, ([conversationId, preference], [previousId, previousPreference]) => {
     if (conversationId === null
-      && (previousId !== null || spaceId !== previousSpaceId || preference !== previousPreference)) {
+      && (previousId !== null || preference !== previousPreference)) {
       welcomeVariant.value = selectDesktopChatWelcomeVariant(preference)
     }
   })

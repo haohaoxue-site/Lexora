@@ -29,17 +29,6 @@ defineProps<{
     <circle cx="331" cy="21" r="2.2" />
     <path class="desktop-chat-welcome-decoration__star" d="M342 14C342.9 17.7 344.8 19.6 348.5 20.5C344.8 21.4 342.9 23.3 342 27C341.1 23.3 339.2 21.4 335.5 20.5C339.2 19.6 341.1 17.7 342 14Z" />
   </svg>
-
-  <svg
-    v-else-if="type === 'trailing-star'"
-    class="desktop-chat-welcome-decoration is-trailing-star"
-    viewBox="0 0 24 24"
-    aria-hidden="true"
-    focusable="false"
-  >
-    <path class="desktop-chat-welcome-decoration__star" d="M11.5 1.5C12.8 7 15.5 9.7 21 11C15.5 12.3 12.8 15 11.5 20.5C10.2 15 7.5 12.3 2 11C7.5 9.7 10.2 7 11.5 1.5Z" />
-    <circle cx="20.5" cy="4" r="1.4" />
-  </svg>
 </template>
 
 <style scoped lang="scss">
@@ -73,14 +62,5 @@ circle {
 
 .is-orbit-arc {
   margin-top: 0;
-}
-
-.is-trailing-star {
-  position: absolute;
-  top: 50%;
-  left: calc(100% + 0.55rem);
-  width: 1.2rem;
-  height: 1.2rem;
-  transform: translateY(-50%);
 }
 </style>
