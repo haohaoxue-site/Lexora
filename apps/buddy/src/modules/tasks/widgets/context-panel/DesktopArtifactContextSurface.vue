@@ -3,34 +3,22 @@ import type { LocalArtifact, LocalArtifactText } from '@buddy-shared/artifacts/a
 
 import type { BuddyLocale } from '@/i18n/buddyI18n'
 import { NSpin } from 'naive-ui'
-import { computed } from 'vue'
 import { useBuddyI18n } from '@/i18n/buddyI18n'
 import { FileIcon, FolderIcon } from '@/shared/ui/file-icon'
 import BuddyImagePreview from '@/shared/ui/media/BuddyImagePreview.vue'
-import { formatDate, formatFileSize, resolveFileType } from './artifactContextPresentation'
 import { useArtifactPreview } from './useArtifactPreview'
 
-const props = withDefaults(defineProps<{
+const props = defineProps<{
   artifact: LocalArtifact
   language: BuddyLocale
   readArtifactText: (artifactId: string) => Promise<LocalArtifactText>
-  showToolbar?: boolean
-}>(), {
-  showToolbar: true,
-})
+}>()
 
 const { t } = useBuddyI18n(() => props.language)
 const { failImage, openPreview, previewIndex, previewOpen, previewSources, previewUrl, textPreview, textPreviewFailed, textPreviewLoading } = useArtifactPreview({
   artifact: () => props.artifact,
   readText: () => props.readArtifactText,
 })
-const detail = computed(() => props.artifact.kind === 'directory'
-  ? t('desktop.context.directory')
-  : [
-      resolveFileType(props.artifact),
-      formatFileSize(props.artifact.sizeBytes),
-      formatDate(props.artifact.updatedAt, props.language),
-    ].join(' · '))
 </script>
 
 <template>
@@ -41,13 +29,7 @@ const detail = computed(() => props.artifact.kind === 'directory'
       :language="language"
       :sources="previewSources"
     />
-    <header v-if="showToolbar" class="desktop-artifact-context-surface__toolbar">
-      <div>
-        <strong>{{ artifact.name }}</strong>
-        <small>{{ artifact.path }}</small>
-      </div>
-      <span>{{ detail }}</span>
-    </header>
+
     <div class="desktop-artifact-context-surface__viewport">
       <button
         v-if="previewUrl"
@@ -95,49 +77,6 @@ const detail = computed(() => props.artifact.kind === 'directory'
   flex: 1;
   flex-direction: column;
   background: var(--buddy-surface-base);
-}
-
-.desktop-artifact-context-surface__toolbar {
-  display: flex;
-  height: var(--buddy-context-toolbar-height);
-  flex: none;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  border-bottom: 1px solid var(--buddy-border-subtle);
-  padding: 0 0.75rem;
-}
-
-.desktop-artifact-context-surface__toolbar div {
-  display: grid;
-  min-width: 0;
-  gap: 0.1rem;
-}
-
-.desktop-artifact-context-surface__toolbar strong,
-.desktop-artifact-context-surface__toolbar small {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.desktop-artifact-context-surface__toolbar strong {
-  color: var(--buddy-text-strong);
-  font-size: 0.8rem;
-  font-weight: 600;
-}
-
-.desktop-artifact-context-surface__toolbar small {
-  color: var(--buddy-text-muted);
-  font-family: var(--buddy-font-mono, ui-monospace, monospace);
-  font-size: 0.68rem;
-}
-
-.desktop-artifact-context-surface__toolbar span {
-  flex: none;
-  color: var(--buddy-text-muted);
-  font-size: 0.7rem;
-  white-space: nowrap;
 }
 
 .desktop-artifact-context-surface__viewport {

@@ -159,6 +159,8 @@ export interface TaskChatWorkspace {
   tree: TaskConversationTree
   restoration: TaskDraftRestoration
   context: {
+    getChangeOverview: LocalChatApi['changes']['overview']
+    files: Pick<LocalChatApi['spaces'], 'listDirectory' | 'readFile' | 'revealFile'>
     getNodeDetail: LocalChatApi['conversations']['getNodeDetail']
     getChangeSet: LocalChatApi['changes']['get']
     readArtifactText: LocalChatApi['artifacts']['readText']

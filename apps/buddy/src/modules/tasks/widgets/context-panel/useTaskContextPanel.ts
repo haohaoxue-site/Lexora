@@ -9,23 +9,24 @@ import {
   changeTabId,
   spaceTaskArtifactTabs,
   spaceTaskBrowserTab,
-  spaceTaskChangeTabs,
 } from './taskContextPanel'
 
 export function useTaskContextPanel(options: UseTaskContextPanelOptions) {
   const isOpen = shallowRef(false)
   const activeTabId = shallowRef<string | null>(null)
   const openTabIds = shallowRef<ReadonlyArray<string>>([])
+  const resourceTabs = shallowRef<ReadonlyArray<TaskContextTab>>([])
   const handledBrowserOpenKeys = new Set<string>()
   const suppressedBrowserRunIds = new Set<string>()
-  const visibleBrowserConversationIds = new Set<string>()
+  const panels = new Map<string, { tabs: ReadonlyArray<TaskContextTab>, ids: ReadonlyArray<string>, activeId: string | null, open: boolean }>()
   const availableTabs = computed(() => {
     const browserTab = spaceTaskBrowserTab(options.activeConversationId.value)
-    return [
-      ...(browserTab ? [browserTab] : []),
+    const candidates = [
+      ...resourceTabs.value.filter(isAvailable),
       ...spaceTaskArtifactTabs(options.runOutputs.value),
-      ...spaceTaskChangeTabs(options.changeSets.value),
+      ...(browserTab ? [browserTab] : []),
     ].filter(tab => contextTabConversationId(tab) === options.activeConversationId.value)
+    return [...new Map(candidates.map(tab => [tab.id, tab])).values()]
   })
   const availableTabsById = computed(() => new Map(
     availableTabs.value.map(tab => [tab.id, tab]),
@@ -45,30 +46,23 @@ export function useTaskContextPanel(options: UseTaskContextPanelOptions) {
     [options.activeConversationId, availableTabs],
     ([conversationId, nextAvailableTabs]) => {
       const conversationChanged = conversationId !== currentConversationId
-      if (conversationChanged && currentConversationId) {
-        const currentBrowserTabId = browserTabId(currentConversationId)
-        if (isOpen.value && activeTabId.value === currentBrowserTabId)
-          visibleBrowserConversationIds.add(currentConversationId)
-        else
-          visibleBrowserConversationIds.delete(currentConversationId)
-      }
+      if (conversationChanged && currentConversationId)
+        panels.set(currentConversationId, { tabs: resourceTabs.value, ids: openTabIds.value, activeId: activeTabId.value, open: isOpen.value })
       currentConversationId = conversationId
       if (!conversationId) {
         resetPanel()
         return
       }
       if (conversationChanged) {
-        const nextBrowserTabId = browserTabId(conversationId)
-        const canRestoreBrowser = visibleBrowserConversationIds.has(conversationId)
-          && nextAvailableTabs.some(tab => tab.id === nextBrowserTabId)
-        if (!canRestoreBrowser) {
-          visibleBrowserConversationIds.delete(conversationId)
+        const previous = panels.get(conversationId)
+        if (!previous?.ids.length) {
           resetPanel()
           return
         }
-        openTabIds.value = [nextBrowserTabId]
-        activeTabId.value = nextBrowserTabId
-        isOpen.value = true
+        resourceTabs.value = previous.tabs.filter(isAvailable)
+        openTabIds.value = previous.ids
+        activeTabId.value = previous.activeId
+        isOpen.value = previous.open
         return
       }
       const availableIds = nextAvailableTabs.map(tab => tab.id)
@@ -98,10 +92,16 @@ export function useTaskContextPanel(options: UseTaskContextPanelOptions) {
     { immediate: true },
   )
 
+  function hasTab(id: string) {
+    return openTabIds.value.includes(id) || [...panels.entries()].some(([conversationId, panel]) => conversationId !== currentConversationId && panel.ids.includes(id))
+  }
+
   function resetPanel() {
     isOpen.value = false
     activeTabId.value = null
     openTabIds.value = []
+    if (resourceTabs.value.length)
+      resourceTabs.value = []
   }
 
   function toggle() {
@@ -119,6 +119,8 @@ export function useTaskContextPanel(options: UseTaskContextPanelOptions) {
     const tabId = artifactTabId(artifactId)
     if (!availableTabsById.value.has(tabId))
       return
+    const artifactTab = availableTabsById.value.get(tabId)!
+    resourceTabs.value = [...resourceTabs.value.filter(tab => tab.id !== tabId), artifactTab]
     if (!openTabIds.value.includes(tabId))
       openTabIds.value = [...openTabIds.value, tabId]
     suppressBrowserForActiveRun()
@@ -150,15 +152,84 @@ export function useTaskContextPanel(options: UseTaskContextPanelOptions) {
     isOpen.value = true
   }
 
-  function openChanges(changeSetId: string) {
-    const tabId = changeTabId(changeSetId)
-    if (!availableTabsById.value.has(tabId))
+  function openChanges(changeSetId?: string) {
+    const conversationId = options.activeConversationId.value
+    if (!conversationId)
       return
+    const changeSet = changeSetId
+      ? options.changeSets.value.find(set => set.changeSetId === changeSetId && set.conversationId === conversationId)
+      : null
+    if (changeSetId && !changeSet)
+      return
+    const tabId = changeTabId(conversationId)
+    resourceTabs.value = [...resourceTabs.value.filter(tab => tab.id !== tabId), {
+      id: tabId,
+      kind: 'changes',
+      conversationId,
+      changeSet: changeSet ?? null,
+    }]
     if (!openTabIds.value.includes(tabId))
       openTabIds.value = [...openTabIds.value, tabId]
     suppressBrowserForActiveRun()
     activeTabId.value = tabId
     isOpen.value = true
+  }
+
+  function addBrowser() {
+    const conversationId = options.activeConversationId.value
+    if (!conversationId)
+      return
+    const browserKey = crypto.randomUUID()
+    const id = `browser:${conversationId}:${browserKey}`
+    resourceTabs.value = [...resourceTabs.value, { id, kind: 'browser', conversationId, browserKey }]
+    openTabIds.value = [...openTabIds.value, id]
+    activeTabId.value = id
+    isOpen.value = true
+  }
+
+  function openFiles() {
+    const space = options.activeSpace?.value
+    const directory = space?.primaryDirectory
+    const conversationId = options.activeConversationId.value
+    if (!space || !directory || !conversationId)
+      return
+    const id = `files:${crypto.randomUUID()}`
+    resourceTabs.value = [...resourceTabs.value, {
+      id,
+      kind: 'files',
+      conversationId,
+      rootName: directory.root.split(/[\\/]/).filter(Boolean).at(-1) ?? directory.root,
+      target: { spaceId: space.id, directoryId: directory.id, revision: directory.revision, path: '' },
+    }]
+    openTabIds.value = [...openTabIds.value, id]
+    suppressBrowserForActiveRun()
+    activeTabId.value = id
+    isOpen.value = true
+  }
+
+  function selectFile(tabId: string, path: string) {
+    resourceTabs.value = resourceTabs.value.map(tab => tab.id === tabId && tab.kind === 'files'
+      ? { ...tab, target: { ...tab.target, path } }
+      : tab)
+  }
+
+  function isAvailable(tab: TaskContextTab): boolean {
+    if (tab.kind !== 'files')
+      return true
+    const space = options.activeSpace?.value
+    const directory = space?.primaryDirectory
+    return tab.target.spaceId === space?.id && tab.target.directoryId === directory?.id
+      && tab.target.revision === directory.revision
+  }
+
+  function restoreTab(tab: TaskContextTab) {
+    if (contextTabConversationId(tab) !== options.activeConversationId.value || !isAvailable(tab))
+      return
+    resourceTabs.value = [...resourceTabs.value.filter(item => item.id !== tab.id), tab]
+    if (!openTabIds.value.includes(tab.id))
+      openTabIds.value = [...openTabIds.value, tab.id]
+    if (!activeTabId.value)
+      activeTabId.value = tab.id
   }
 
   function selectTab(tabId: string) {
@@ -177,6 +248,7 @@ export function useTaskContextPanel(options: UseTaskContextPanelOptions) {
       suppressBrowserForActiveRun()
     const nextIds = openTabIds.value.filter(id => id !== tabId)
     openTabIds.value = nextIds
+    resourceTabs.value = resourceTabs.value.filter(tab => tab.id !== tabId)
     if (activeTabId.value !== tabId)
       return
     activeTabId.value = nextIds[Math.min(index, nextIds.length - 1)] ?? null
@@ -196,12 +268,17 @@ export function useTaskContextPanel(options: UseTaskContextPanelOptions) {
 
   return {
     activeTab: readonly(activeTab),
+    addBrowser,
     artifactCount: readonly(artifactCount),
     closeTab,
     isOpen: readonly(isOpen),
+    hasTab,
     openArtifact,
     openBrowser,
     openChanges,
+    openFiles,
+    selectFile,
+    restoreTab,
     selectTab,
     tabs: readonly(tabs),
     toggle,
@@ -214,7 +291,7 @@ function contextTabConversationId(tab: TaskContextTab): string {
   if (tab.kind === 'artifact')
     return tab.artifact.conversationId
   if (tab.kind === 'changes')
-    return tab.changeSet.conversationId
+    return tab.conversationId
   return tab.conversationId
 }
 

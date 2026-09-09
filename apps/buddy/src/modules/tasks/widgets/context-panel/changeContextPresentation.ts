@@ -12,6 +12,23 @@ export interface LineChangeCounts {
   deleted: number
 }
 
+export interface ChangeFilePresentation extends LocalFileChangeDetail {
+  lineCounts: LineChangeCounts | null
+}
+
+export function presentChangeFiles(files: readonly LocalFileChangeDetail[], previous: readonly ChangeFilePresentation[]): ChangeFilePresentation[] {
+  const previousFiles = new Map(previous.map(file => [file.id, file]))
+  return files.map((file) => {
+    const cached = previousFiles.get(file.id)
+    const lineCounts = file.preview !== 'text'
+      ? null
+      : cached?.preview === 'text' && cached.beforeText === file.beforeText && cached.afterText === file.afterText
+        ? cached.lineCounts
+        : countChangedLines(file.beforeText ?? '', file.afterText ?? '')
+    return { ...file, lineCounts }
+  })
+}
+
 export interface ChangeFileTreeNode extends TreeOption {
   changeType?: FileChangeType
   fileId?: string
@@ -22,7 +39,7 @@ export interface ChangeFileTreeNode extends TreeOption {
 
 interface DirectoryNode {
   directories: Map<string, DirectoryNode>
-  files: LocalFileChangeDetail[]
+  files: ChangeFilePresentation[]
   name: string
   path: string
 }
@@ -46,7 +63,7 @@ export function fileNameFromPath(path: string): string {
 export const fileIconNameFromPath = resolveFileIcon
 
 export function buildChangeFileTree(
-  files: ReadonlyArray<LocalFileChangeDetail>,
+  files: ReadonlyArray<ChangeFilePresentation>,
 ): TreeOption[] {
   const root: DirectoryNode = {
     directories: new Map(),
@@ -95,9 +112,7 @@ function buildDirectoryChildren(directory: DirectoryNode): ChangeFileTreeNode[] 
       key: file.id,
       kind: 'file' as const,
       label: fileNameFromPath(file.path),
-      lineCounts: file.preview === 'text'
-        ? countChangedLines(file.beforeText ?? '', file.afterText ?? '')
-        : undefined,
+      lineCounts: file.lineCounts ?? undefined,
     }))
   return [...directories, ...files]
 }

@@ -1,6 +1,6 @@
 import type { LocalArtifactText } from '../../shared/artifacts/artifactApi'
 import type { LocalAutomation, LocalAutomationCreateRequest, LocalAutomationListRequest, LocalAutomationMutationRequest, LocalAutomationOccurrenceListRequest, LocalAutomationOccurrencePage, LocalAutomationPage, LocalAutomationPreviewRequest, LocalAutomationPreviewResult, LocalAutomationRunNowResult, LocalAutomationUpdateRequest } from '../../shared/automation/automationApi'
-import type { LocalChangeSetDetail } from '../../shared/changes/changeApi'
+import type { ChangeOverviewRequest, LocalChangeOverview, LocalChangeSetDetail } from '../../shared/changes/changeApi'
 import type { LocalConnector, LocalConnectorConfig, LocalConnectorCredential, LocalConnectorCredentialMutation } from '../../shared/connectors/connectorApi'
 import type { LocalChatCommandRequest, LocalStartTurnRequest, LocalTurnStart } from '../../shared/conversation/chatApi'
 import type { LocalComposerDraft, LocalComposerDraftOpen, LocalComposerDraftSave } from '../../shared/conversation/composerApi'
@@ -28,10 +28,15 @@ import type { LocalBuddyServiceSupervisorState } from '../../shared/runtime/serv
 import type { LocalSkillCatalog } from '../../shared/skills/skillApi'
 
 import type { LocalSpace, LocalSpaceCreateInput, LocalSpaceFile, LocalSpaceUpdateInput } from '../../shared/spaces/spaceApi'
+import type { LocalSpaceDirectoryPage, LocalSpaceFilePreview, SpaceDirectoryRequest, SpaceFileTarget } from '../../shared/spaces/spaceFileApi'
 
 import type { LocalUsageSnapshot } from '../../shared/usage/usageApi'
 
 export const LOCAL_CHAT_IPC_CHANNELS = {
+  changesOverview: 'lexora:buddy:changes:overview',
+  spaceFilesList: 'lexora:buddy:space-files:list',
+  spaceFilesRead: 'lexora:buddy:space-files:read',
+  spaceFilesReveal: 'lexora:buddy:space-files:reveal',
   webSettingsRead: 'lexora:buddy:web:settings',
   webSettingsSave: 'lexora:buddy:web:save-settings',
   webCredentialSave: 'lexora:buddy:web:save-credential',
@@ -213,6 +218,9 @@ export interface LocalChatApi {
     markSeen: (notificationId: string, revision: string) => Promise<LocalNotificationList>
   }
   spaces: {
+    listDirectory: (input: SpaceDirectoryRequest) => Promise<LocalSpaceDirectoryPage>
+    readFile: (input: SpaceFileTarget) => Promise<LocalSpaceFilePreview>
+    revealFile: (input: SpaceFileTarget) => Promise<void>
     create: (input: LocalSpaceCreateInput) => Promise<LocalSpace>
     delete: (spaceId: string) => Promise<LocalMutationResult>
     list: (limit?: number) => Promise<ReadonlyArray<LocalSpace>>
@@ -286,6 +294,7 @@ export interface LocalChatApi {
     }) => Promise<LocalConversationTimelinePage>
   }
   changes: {
+    overview: (input: ChangeOverviewRequest) => Promise<LocalChangeOverview>
     get: (changeSetId: string) => Promise<LocalChangeSetDetail>
   }
   runs: {

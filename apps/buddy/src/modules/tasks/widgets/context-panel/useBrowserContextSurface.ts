@@ -10,6 +10,11 @@ import { normalizeBrowserAddress } from './browserAddress'
 import { useBrowserSurface } from './useBrowserSurface'
 
 interface UseBrowserContextSurfaceOptions {
+  sessionReady?: (state: DesktopBrowserState, tabId?: string) => void
+  state?: Readonly<Ref<DesktopBrowserState | null>>
+  updateState?: (state: DesktopBrowserState) => void
+  enabled?: Readonly<Ref<boolean>>
+  tabId?: Readonly<Ref<string | undefined>>
   api: DesktopBrowserApi
   conversationId: Readonly<Ref<string>>
   guestHost: DesktopBrowserGuestSurfaceHost
@@ -17,7 +22,20 @@ interface UseBrowserContextSurfaceOptions {
 }
 
 export function useBrowserContextSurface(options: UseBrowserContextSurfaceOptions) {
-  const state = shallowRef<DesktopBrowserState | null>(null)
+  const localState = shallowRef<DesktopBrowserState | null>(null)
+  const state = computed({
+    get: () => options.state?.value ?? localState.value,
+    set: (value: DesktopBrowserState | null) => {
+      if (options.state) {
+        if (value)
+          options.updateState?.(value)
+      }
+      else {
+        localState.value = value
+      }
+    },
+  })
+  const failed = shallowRef(false)
   const isLoading = computed(() => state.value?.status === 'loading')
   const isCapturingScreenshot = shallowRef(false)
   const isOpeningExternal = shallowRef(false)
@@ -34,7 +52,7 @@ export function useBrowserContextSurface(options: UseBrowserContextSurfaceOption
     mounted = true
     const currentLifecycle = ++lifecycle
     stopStateChanged = options.api.onStateChanged((nextState) => {
-      if (!mounted || nextState.conversationId !== options.conversationId.value)
+      if (!mounted || nextState.sessionId !== state.value?.sessionId)
         return
       stateVersion += 1
       state.value = nextState
@@ -55,7 +73,7 @@ export function useBrowserContextSurface(options: UseBrowserContextSurfaceOption
     guestHost: options.guestHost,
     sessionId: computed(() => state.value?.sessionId ?? null),
   })
-  watch(options.conversationId, () => {
+  watch([options.conversationId, () => options.tabId?.value, () => options.enabled?.value], () => {
     lifecycle += 1
     state.value = null
     isCapturingScreenshot.value = false
@@ -68,15 +86,23 @@ export function useBrowserContextSurface(options: UseBrowserContextSurfaceOption
   }, { flush: 'sync' })
 
   async function ensureSession(currentLifecycle: number): Promise<void> {
+    if (options.enabled?.value === false)
+      return
+    failed.value = false
     const version = stateVersion
+    const tabId = options.tabId?.value
     try {
-      const nextState = await options.api.ensureSession(options.conversationId.value)
+      const nextState = await options.api.ensureSession(options.conversationId.value, tabId)
+      options.sessionReady?.(nextState, tabId)
       if (!mounted || lifecycle !== currentLifecycle)
         return
       if (stateVersion === version)
         state.value = nextState
     }
-    catch {}
+    catch {
+      if (mounted && lifecycle === currentLifecycle)
+        failed.value = true
+    }
   }
 
   async function navigate(rawAddress: string): Promise<boolean> {
@@ -228,7 +254,10 @@ export function useBrowserContextSurface(options: UseBrowserContextSurfaceOption
     const currentLifecycle = lifecycle
     const request = ++stateRequest
     const version = stateVersion
+    const tabId = options.tabId?.value
     const nextState = await command()
+    if (nextState.sessionId !== sessionId)
+      options.sessionReady?.(nextState, tabId)
     if (!mounted || lifecycle !== currentLifecycle || request !== stateRequest || state.value?.sessionId !== sessionId)
       return false
     if (version === stateVersion)
@@ -238,6 +267,7 @@ export function useBrowserContextSurface(options: UseBrowserContextSurfaceOption
 
   return {
     captureScreenshot,
+    failed: readonly(failed),
     goBack,
     goForward,
     isCapturingScreenshot: readonly(isCapturingScreenshot),

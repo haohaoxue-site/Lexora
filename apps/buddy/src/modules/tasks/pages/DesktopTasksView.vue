@@ -6,7 +6,7 @@ import { computed, shallowRef, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useTaskContext } from '@/modules/tasks/taskContext'
 import DesktopTaskSpaceSelector from '@/modules/tasks/widgets/composer/DesktopTaskSpaceSelector.vue'
-import DesktopTaskContextPanel from '@/modules/tasks/widgets/context-panel/DesktopTaskContextPanel.vue'
+import DesktopTaskResourcePanel from '@/modules/tasks/widgets/context-panel/DesktopTaskResourcePanel.vue'
 import { useTaskResourcePanel } from '@/modules/tasks/widgets/context-panel/useTaskResourcePanel'
 import DesktopTaskIndex from '@/modules/tasks/widgets/task-index/DesktopTaskIndex.vue'
 import DesktopChatWorkspace from '@/modules/tasks/widgets/workspace/DesktopChatWorkspace.vue'
@@ -25,7 +25,6 @@ const {
 const { language, workspace } = tasks
 const { pinnedItems, spaces, tasks: taskItems, ...indexActions } = tasks.index
 const { activeSpace, activeTaskId, currentTitle, openTask, startTask } = tasks.session
-const { getChangeSet, readArtifactText } = workspace.context
 const chatSession = workspace.session
 const taskSidebarCollapsed = shallowRef(false)
 const viewMode = shallowRef<'chat' | 'canvas'>('chat')
@@ -43,20 +42,17 @@ watch(chatSession.activeConversationId, () => {
   retainedOutputs.value = []
   retainedChanges.value = []
 })
-const {
-  activeTab,
-  artifactCount,
-  isOpen: contextOpen,
-  tabs: contextTabs,
-  ...contextActions
-} = useTaskResourcePanel({
+const contextActions = useTaskResourcePanel({
   activeConversationId: workspace.session.activeConversationId,
+  activeSpace,
   activeRunId: computed(() => workspace.execution.activeRun.value?.id ?? null),
   browser,
   changeSets: panelChanges,
   runSignalEvents: workspace.transcript.runSignalEvents,
   runOutputs: panelOutputs,
 })
+const { artifactCount, isOpen: contextOpen } = contextActions
+const changeRevision = computed(() => panelChanges.value.map(set => `${set.changeSetId}:${set.updatedAt}`).join('|'))
 function openArtifact(id: string) {
   void contextActions.openArtifact(id)
 }
@@ -156,16 +152,13 @@ const {
     </DesktopChatWorkspace>
 
     <template v-if="contextOpen" #context>
-      <DesktopTaskContextPanel
-        :active-tab="activeTab"
-        :get-change-set="getChangeSet"
+      <DesktopTaskResourcePanel
+        :panel="contextActions"
+        :context="workspace.context"
+        :branch-id="chatSession.activeBranchId.value"
+        :change-revision="changeRevision"
+        :can-open-files="Boolean(activeSpace?.primaryDirectory)"
         :language="language"
-        :read-artifact-text="readArtifactText"
-        :tabs="contextTabs"
-        @close-tab="contextActions.closeTab"
-        @collapse="contextActions.toggle"
-        @open-browser="contextActions.openBrowser"
-        @select-tab="contextActions.selectTab"
       />
     </template>
   </DesktopWorkbenchLayout>

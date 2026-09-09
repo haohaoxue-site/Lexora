@@ -182,6 +182,7 @@ function selectAddress(event: FocusEvent): void {
       <input
         :id="addressId"
         v-model="address"
+        :disabled="!state"
         class="desktop-browser-toolbar__address"
         data-testid="browser-address"
         autocomplete="off"
@@ -251,11 +252,11 @@ function selectAddress(event: FocusEvent): void {
   z-index: 2;
   display: flex;
   min-width: 0;
+  width: 100%;
   height: 3.25rem;
   flex: none;
   align-items: center;
   gap: 0.375rem;
-  border-bottom: 1px solid var(--buddy-border-subtle);
   background: var(--buddy-surface-base);
   padding: 0.5rem;
 }

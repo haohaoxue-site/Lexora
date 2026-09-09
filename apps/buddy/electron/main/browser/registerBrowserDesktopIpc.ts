@@ -73,8 +73,8 @@ export function registerBrowserDesktopIpc(
     return true
   })
   handle(DESKTOP_IPC_CHANNELS.browserEnsureSession, (host, input) => {
-    const { conversationId } = browserEnsureSessionInputSchema.parse(input)
-    return desktopBrowserStateSchema.parse(host.ensureSession(conversationId))
+    const { conversationId, tabId } = browserEnsureSessionInputSchema.parse(input)
+    return desktopBrowserStateSchema.parse(host.ensureSession(conversationId, tabId))
   })
   handle(DESKTOP_IPC_CHANNELS.browserGoBack, (host, input) => {
     const { sessionId } = browserSessionInputSchema.parse(input)

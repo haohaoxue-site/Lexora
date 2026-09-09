@@ -438,6 +438,8 @@ export function useTaskCapability(options: UseTaskCapabilityOptions): TaskCapabi
   const workspace = {
     tree,
     context: {
+      getChangeOverview: api.localChat.changes.overview,
+      files: { listDirectory: api.localChat.spaces.listDirectory, readFile: api.localChat.spaces.readFile, revealFile: api.localChat.spaces.revealFile },
       getNodeDetail: api.localChat.conversations.getNodeDetail,
       getChangeSet: api.localChat.changes.get,
       readArtifactText: api.localChat.artifacts.readText,

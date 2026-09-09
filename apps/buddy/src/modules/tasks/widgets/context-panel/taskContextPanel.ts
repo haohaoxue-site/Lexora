@@ -1,6 +1,7 @@
 import type { LocalArtifact } from '@buddy-shared/artifacts/artifactApi'
 import type { LocalChangeSetSummary } from '@buddy-shared/changes/changeApi'
 import type { LocalRunOutput } from '@buddy-shared/runs/runApi'
+import type { SpaceFileTarget } from '@buddy-shared/spaces/spaceFileApi'
 
 export interface TaskArtifactContextTab {
   artifact: LocalArtifact
@@ -10,21 +11,38 @@ export interface TaskArtifactContextTab {
 }
 
 export interface TaskChangesContextTab {
-  changeSet: LocalChangeSetSummary
+  changeSet: LocalChangeSetSummary | null
+  conversationId: string
   id: string
   kind: 'changes'
-  label: string
 }
 
 export interface TaskBrowserContextTab {
   conversationId: string
   id: string
   kind: 'browser'
+  browserKey?: string
+}
+
+export interface TaskFilesContextTab {
+  conversationId: string
+  id: string
+  kind: 'files'
+  target: SpaceFileTarget
+  rootName: string
+}
+
+export interface ContextPanelTab {
+  id: string
+  title: string
+  icon: 'file' | 'folder' | 'changes' | 'browser'
+  fileName?: string
 }
 
 export type TaskContextTab = TaskArtifactContextTab
   | TaskBrowserContextTab
   | TaskChangesContextTab
+  | TaskFilesContextTab
 
 export function spaceTaskArtifactTabs(
   outputs: ReadonlyArray<LocalRunOutput>,
@@ -71,17 +89,6 @@ export function browserTabId(conversationId: string): string {
   return `browser:${conversationId}`
 }
 
-export function spaceTaskChangeTabs(
-  changeSets: ReadonlyArray<LocalChangeSetSummary>,
-): ReadonlyArray<TaskChangesContextTab> {
-  return changeSets.map(changeSet => ({
-    changeSet,
-    id: changeTabId(changeSet.changeSetId),
-    kind: 'changes',
-    label: `Changes (${changeSet.fileCount})`,
-  }))
-}
-
-export function changeTabId(changeSetId: string): string {
-  return `changes:${changeSetId}`
+export function changeTabId(conversationId: string): string {
+  return `changes:${conversationId}`
 }

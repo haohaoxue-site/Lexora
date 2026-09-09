@@ -45,6 +45,19 @@ describe('browserHost sessions and navigation', () => {
     expect(first.security).toEqual({ kind: 'blank', origin: null })
   })
 
+  it('switches one browser tab profile without replacing the agent or other tabs', async () => {
+    const fixture = createFixture()
+    const agent = fixture.host.ensureSession('conversation')
+    const first = fixture.host.ensureSession('conversation', 'first')
+    const second = fixture.host.ensureSession('conversation', 'second')
+    const privateTab = await fixture.host.setProfileMode(first.sessionId, 'incognito')
+    expect(fixture.host.ensureSession('conversation')).toEqual(agent)
+    expect(fixture.host.ensureSession('conversation', 'second')).toEqual(second)
+    expect(fixture.host.ensureSession('conversation', 'first')).toEqual(privateTab)
+    expect(privateTab.profileMode).toBe('incognito')
+    expect(() => fixture.host.getState(first.sessionId)).toThrow()
+  })
+
   it('switches between default and incognito without clearing saved browser data', async () => {
     const fixture = createFixture()
     const initial = fixture.host.ensureSession('conversation-1')

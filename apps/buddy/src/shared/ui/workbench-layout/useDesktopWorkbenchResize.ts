@@ -36,6 +36,9 @@ export function useDesktopWorkbenchResize(options: UseDesktopWorkbenchResizeOpti
   let resizeObserver: ResizeObserver | null = null
   let activePointerId: number | null = null
   let activePointerTarget: HTMLElement | null = null
+  let resizeBounds: Pick<DOMRect, 'left' | 'right'> | null = null
+  let pendingClientX: number | null = null
+  let resizeFrame: number | null = null
 
   const contextVisible = computed(() => options.context.value !== null)
   const widths = computed(() => resolveDesktopWorkbenchWidths({
@@ -53,17 +56,21 @@ export function useDesktopWorkbenchResize(options: UseDesktopWorkbenchResizeOpti
     const style: Record<string, string> = {}
     if (preferredSidebarWidth.value !== null && options.sidebarResizable())
       style['--buddy-workspace-sidebar-width'] = `${renderedSidebarWidth.value ?? widths.value.sidebarWidth}px`
-    if (preferredContextWidth.value !== null && contextVisible.value)
-      style['--buddy-context-panel-width'] = `${widths.value.contextWidth}px`
     return style
   })
+  const contextStyle = computed(() => preferredContextWidth.value !== null && contextVisible.value
+    ? { width: `${widths.value.contextWidth}px` }
+    : undefined)
 
   function measureLayout(): void {
     const container = options.container.value
     if (!container)
       return
 
-    containerWidth.value = container.getBoundingClientRect().width
+    const bounds = container.getBoundingClientRect()
+    containerWidth.value = bounds.width
+    if (activePanel.value)
+      resizeBounds = bounds
     if (preferredSidebarWidth.value === null && options.sidebar.value)
       preferredSidebarWidth.value = options.sidebar.value.getBoundingClientRect().width
     if (preferredContextWidth.value === null && options.context.value)
@@ -89,13 +96,20 @@ export function useDesktopWorkbenchResize(options: UseDesktopWorkbenchResizeOpti
   }
 
   function resizeFromClientX(panel: DesktopWorkbenchResizablePanel, clientX: number): void {
-    const bounds = options.container.value?.getBoundingClientRect()
+    const bounds = resizeBounds
     if (!bounds)
       return
     setPanelWidth(
       panel,
       panel === 'sidebar' ? clientX - bounds.left : bounds.right - clientX,
     )
+  }
+
+  function flushResize(): void {
+    resizeFrame = null
+    if (activePanel.value && pendingClientX !== null)
+      resizeFromClientX(activePanel.value, pendingClientX)
+    pendingClientX = null
   }
 
   function beginResize(panel: DesktopWorkbenchResizablePanel, event: PointerEvent): void {
@@ -107,6 +121,7 @@ export function useDesktopWorkbenchResize(options: UseDesktopWorkbenchResizeOpti
     preferredContextWidth.value = options.context.value?.getBoundingClientRect().width
       ?? preferredContextWidth.value
     activePanel.value = panel
+    resizeBounds = options.container.value?.getBoundingClientRect() ?? null
     activePointerId = event.pointerId
     activePointerTarget = event.currentTarget instanceof HTMLElement
       ? event.currentTarget
@@ -123,16 +138,24 @@ export function useDesktopWorkbenchResize(options: UseDesktopWorkbenchResizeOpti
   function handlePointerMove(event: PointerEvent): void {
     if (event.pointerId !== activePointerId || !activePanel.value)
       return
-    resizeFromClientX(activePanel.value, event.clientX)
+    pendingClientX = event.clientX
+    if (resizeFrame === null)
+      resizeFrame = requestAnimationFrame(flushResize)
     event.preventDefault()
   }
 
   function handlePointerEnd(event: PointerEvent): void {
-    if (event.pointerId === activePointerId)
+    if (event.pointerId === activePointerId) {
+      if (event.type === 'pointerup')
+        pendingClientX = event.clientX
       finishResize()
+    }
   }
 
   function finishResize(): void {
+    if (resizeFrame !== null)
+      cancelAnimationFrame(resizeFrame)
+    flushResize()
     if (
       activePointerId !== null
       && activePointerTarget?.hasPointerCapture(activePointerId)
@@ -142,6 +165,7 @@ export function useDesktopWorkbenchResize(options: UseDesktopWorkbenchResizeOpti
     activePanel.value = null
     activePointerId = null
     activePointerTarget = null
+    resizeBounds = null
     window.removeEventListener('blur', finishResize)
     window.removeEventListener('pointercancel', handlePointerEnd)
     window.removeEventListener('pointermove', handlePointerMove)
@@ -201,6 +225,7 @@ export function useDesktopWorkbenchResize(options: UseDesktopWorkbenchResizeOpti
   return {
     activePanel: readonly(activePanel),
     contextRange,
+    contextStyle,
     contextWidth: computed(() => widths.value.contextWidth),
     layoutStyle,
     sidebarRange,

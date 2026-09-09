@@ -19,6 +19,7 @@ export function createActivityApi(): Pick<LocalChatApi, 'artifacts' | 'notificat
       ),
     }),
     changes: Object.freeze({
+      overview: input => ipcRenderer.invoke(LOCAL_CHAT_IPC_CHANNELS.changesOverview, { ...input }),
       get: changeSetId => ipcRenderer.invoke(LOCAL_CHAT_IPC_CHANNELS.changesGet, { changeSetId }),
     }),
     runs: Object.freeze({

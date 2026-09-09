@@ -244,6 +244,31 @@ describe('changeCaptureService', () => {
     })
   })
 
+  it('aggregates only the requested runs and drops net-zero changes across turns', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'buddy-branch-changes-'))
+    directories.push(root)
+    const workspace = join(root, 'workspace')
+    await mkdir(workspace)
+    const path = join(workspace, 'value.txt')
+    await writeFile(path, 'initial')
+    const database = openBuddyDatabase({ databasePath: ':memory:' })
+    databases.push(database)
+    const service = new ChangeCaptureService({ paths: new BuddyDataPaths(root), repository: createChangeSetRepository(database) })
+    for (const [index, text] of ['middle', 'final', 'initial'].entries()) {
+      seedRun(database, index + 1)
+      const input = { conversationId: 'conversation-1', cwd: workspace, runId: `run-${index + 1}`, toolCallId: `tool-${index}`, toolName: 'write' as const, grants: [{ root: workspace, canonicalRoot: workspace, grantId: 'workspace', kind: 'workspace' as const }] }
+      await service.beginFileTool({ ...input, arguments: { path } })
+      await writeFile(path, text)
+      await service.finishFileTool({ ...input, isError: false })
+      await service.finalizeRun(input.runId)
+      database.prepare('UPDATE runs SET status = \'completed\' WHERE id = ?').run(input.runId)
+    }
+    expect(await service.getForRuns(['run-1', 'run-2'])).toMatchObject({ files: [{ beforeText: 'initial', afterText: 'final' }] })
+    expect(await service.getForRuns(['run-2'])).toMatchObject({ files: [{ beforeText: 'middle', afterText: 'final' }] })
+    expect(await service.getForRuns(['run-1', 'run-2', 'run-3'])).toMatchObject({ files: [] })
+    expect(await service.getForRuns([])).toMatchObject({ coverage: 'complete', files: [], status: 'completed' })
+  })
+
   it('marks bash coverage as partial without parsing its command', async () => {
     const database = openBuddyDatabase({ databasePath: ':memory:' })
     databases.push(database)
@@ -319,7 +344,7 @@ describe('changeCaptureService', () => {
   })
 })
 
-function seedRun(database: DatabaseSync): void {
+function seedRun(database: DatabaseSync, index = 1): void {
   prepareTestTurnRequest(database, {
     attachmentBindings: [],
     branchId: 'branch-1',
@@ -331,8 +356,8 @@ function seedRun(database: DatabaseSync): void {
     spaceId: null,
     provider: 'provider-1',
     requestFingerprint: 'fingerprint-1',
-    requestId: 'request-1',
-    runId: 'run-1',
+    requestId: `request-${index}`,
+    runId: `run-${index}`,
     runInput: {
       attachmentIds: [],
       contextItems: [],
@@ -342,6 +367,6 @@ function seedRun(database: DatabaseSync): void {
     },
     title: 'Conversation',
     userMessageContent: { attachmentIds: [], text: 'hello' },
-    userMessageId: 'message-1',
+    userMessageId: `message-${index}`,
   })
 }

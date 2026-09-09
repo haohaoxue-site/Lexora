@@ -18,9 +18,9 @@ export function createBrowserApi(): Pick<LexoraDesktopApi, 'browser'> {
         DESKTOP_IPC_CHANNELS.browserClose,
         { sessionId },
       ),
-      ensureSession: (conversationId: string): Promise<DesktopBrowserState> => ipcRenderer.invoke(
+      ensureSession: (conversationId: string, tabId?: string): Promise<DesktopBrowserState> => ipcRenderer.invoke(
         DESKTOP_IPC_CHANNELS.browserEnsureSession,
-        { conversationId },
+        { conversationId, ...(tabId ? { tabId } : {}) },
       ),
       goBack: (sessionId: string) => ipcRenderer.invoke(
         DESKTOP_IPC_CHANNELS.browserGoBack,

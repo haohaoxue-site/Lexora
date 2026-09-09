@@ -36,6 +36,21 @@ export type LocalChangeSetSummary = DeepReadonly<z.infer<typeof changeSetSummary
 
 export type LocalFileChangeDetail = DeepReadonly<z.infer<typeof fileChangeDetailSchema>>
 
+export const changeOverviewSchema = z.object({
+  coverage: z.enum(['complete', 'partial']),
+  files: z.array(fileChangeDetailSchema).max(4096),
+  status: z.enum(['capturing', 'completed']),
+  updatedAt: timestampSchema.nullable(),
+}).strict()
+
+export const changeOverviewRequestSchema = z.object({
+  conversationId: idSchema,
+  branchId: idSchema,
+}).strict()
+
+export type LocalChangeOverview = DeepReadonly<z.infer<typeof changeOverviewSchema>>
+export type ChangeOverviewRequest = z.infer<typeof changeOverviewRequestSchema>
+
 export const changesRequestSchemas = {
   changeSet: z.object({ changeSetId: idSchema }).strict(),
 } as const
@@ -45,5 +60,6 @@ export const changesResponseSchemas = {
 } as const
 
 export const changesRpc = {
+  overview: { method: 'changes.overview', input: changeOverviewRequestSchema, response: changeOverviewSchema },
   get: { method: 'changes.get', input: changesRequestSchemas.changeSet, response: changesResponseSchemas.changeSet },
 } as const satisfies Record<string, RuntimeRequestContract>

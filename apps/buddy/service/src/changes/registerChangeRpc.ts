@@ -1,4 +1,6 @@
 import type { RuntimeRequestRegistrar } from '../rpc/runtimeRequest'
+import type { ConversationRepository } from '../storage/conversationRepository'
+import type { RunRepository } from '../storage/runRepository'
 import type { ChangeCaptureService } from './ChangeCaptureService'
 import { changesRpc } from '../../../shared/changes/changeApi'
 import { BuddyServiceError, registerRuntimeRequest } from '../rpc/runtimeRequest'
@@ -6,9 +8,11 @@ import { ChangeCaptureError } from './ChangeCaptureService'
 
 export function registerChangeRpc(options: {
   rpc: RuntimeRequestRegistrar
-  service: Pick<ChangeCaptureService, 'getVisibleDetail'>
+  service: Pick<ChangeCaptureService, 'getVisibleDetail' | 'getForRuns'>
+  conversations: Pick<ConversationRepository, 'findById' | 'listBranchMessages'>
+  runs: Pick<RunRepository, 'listForTimeline'>
 }): () => void {
-  return registerRuntimeRequest(options.rpc, changesRpc.get, async (input) => {
+  const get = registerRuntimeRequest(options.rpc, changesRpc.get, async (input) => {
     try {
       return await options.service.getVisibleDetail(input.changeSetId)
     }
@@ -18,4 +22,24 @@ export function registerChangeRpc(options: {
       throw error
     }
   })
+  const overview = registerRuntimeRequest(options.rpc, changesRpc.overview, async (input) => {
+    const conversation = options.conversations.findById(input.conversationId)
+    if (!conversation || conversation.deletedAt)
+      throw new BuddyServiceError('VALIDATION_FAILED')
+    const messages = options.conversations.listBranchMessages(input.conversationId, input.branchId)
+    const runs = options.runs.listForTimeline(
+      input.conversationId,
+      input.branchId,
+      messages.filter(message => message.role === 'user').map(message => message.id),
+      messages.flatMap(message => message.runId ? [message.runId] : []),
+    )
+    const result = await options.service.getForRuns(runs.map(run => run.id))
+    if (options.conversations.findById(input.conversationId)?.deletedAt !== null)
+      throw new BuddyServiceError('VALIDATION_FAILED')
+    return result
+  })
+  return () => {
+    get()
+    overview()
+  }
 }

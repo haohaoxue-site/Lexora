@@ -223,6 +223,22 @@ export class ChangeCaptureService {
     return { ...toSummary(changeSet), files }
   }
 
+  async getForRuns(runIds: readonly string[]) {
+    const sets = this.#repository.listSetsForRuns(runIds)
+    const setsByRun = new Map(sets.map(set => [set.runId, set]))
+    const captures = runIds.flatMap((runId) => {
+      const set = setsByRun.get(runId)
+      return set ? this.#repository.listCaptures(set.id) : []
+    })
+    const files = await Promise.all(aggregateCaptures(captures).map(change => this.#toFileDetail(change)))
+    return {
+      coverage: sets.some(set => set.coverage === 'partial') ? 'partial' as const : 'complete' as const,
+      status: sets.some(set => set.status === 'capturing') ? 'capturing' as const : 'completed' as const,
+      updatedAt: sets.map(set => set.updatedAt).sort().at(-1) ?? null,
+      files,
+    }
+  }
+
   #ensureSet(runId: string, conversationId: string, now: string): ChangeSetRecord {
     return this.#repository.ensureSet({
       conversationId,
