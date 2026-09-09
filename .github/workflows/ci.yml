@@ -42,7 +42,8 @@ jobs:
       buddy: ${{ steps.resolve.outputs.buddy }}
       buddyRust: ${{ steps.resolve.outputs.buddyRust }}
       website: ${{ steps.resolve.outputs.website }}
-      quality: ${{ steps.resolve.outputs.quality }}
+      webStack: ${{ steps.resolve.outputs.webStack }}
+      repository: ${{ steps.resolve.outputs.repository }}
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -97,10 +98,10 @@ jobs:
       - name: Type-check Website
         run: pnpm --filter @haohaoxue/lexora-website type-check
 
-  quality:
-    name: Quality
+  web-stack-checks:
+    name: Web stack checks
     needs: scope
-    if: github.event_name == 'pull_request' && needs.scope.outputs.quality == 'true'
+    if: github.event_name == 'pull_request' && needs.scope.outputs.webStack == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
@@ -119,17 +120,60 @@ jobs:
           cache: pnpm
           cache-dependency-path: pnpm-lock.yaml
 
-      - name: Install workspace dependencies
-        run: pnpm install --frozen-lockfile
+      - name: Install Web stack dependencies
+        run: >-
+          pnpm --filter @haohaoxue/lexora
+          --filter '@haohaoxue/lexora-web...'
+          --filter '@haohaoxue/lexora-api...'
+          --filter '@haohaoxue/lexora-agent...'
+          install --frozen-lockfile
 
-      - name: Lint
-        run: pnpm exec eslint .github/scripts apps/agent apps/api apps/web packages packaging infrastructure/scripts
+      - name: Lint Web stack
+        run: pnpm exec eslint apps/agent apps/api apps/web packages/contracts packages/shared
 
-      - name: Type-check
-        run: pnpm --filter '!@lexora/buddy' --filter '!@haohaoxue/lexora-website' --recursive --if-present type-check
+      - name: Type-check Web stack
+        run: >-
+          pnpm --filter '@haohaoxue/lexora-web...'
+          --filter '@haohaoxue/lexora-api...'
+          --filter '@haohaoxue/lexora-agent...'
+          --recursive --if-present type-check
 
-      - name: Test
-        run: pnpm --filter '!@lexora/buddy' --filter '!@haohaoxue/lexora-website' --recursive --if-present test
+      - name: Test Web stack
+        run: >-
+          pnpm --filter '@haohaoxue/lexora-web...'
+          --filter '@haohaoxue/lexora-api...'
+          --filter '@haohaoxue/lexora-agent...'
+          --recursive --if-present test
+
+  repository-checks:
+    name: Repository checks
+    needs: scope
+    if: github.event_name == 'pull_request' && needs.scope.outputs.repository == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+
+      - name: Setup Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install repository dependencies
+        run: pnpm --filter @haohaoxue/lexora install --frozen-lockfile
+
+      - name: Lint repository
+        run: >-
+          pnpm exec eslint eslint.config.js .github/scripts packages/assets packaging infrastructure/scripts
+          --ignore-pattern 'packaging/buddy/**'
 
   buddy-tests:
     name: Buddy tests
@@ -303,7 +347,7 @@ jobs:
 
   ci-gate:
     name: CI Gate
-    needs: [scope, website-quality, quality, buddy-test-runtime, buddy-tests, buddy-rust-tests]
+    needs: [scope, website-quality, web-stack-checks, repository-checks, buddy-test-runtime, buddy-tests, buddy-rust-tests]
     if: always() && github.event_name == 'pull_request'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
@@ -317,8 +361,10 @@ jobs:
           RUST_RESULT: ${{ needs.buddy-rust-tests.result }}
           WEBSITE_REQUIRED: ${{ needs.scope.outputs.website }}
           WEBSITE_RESULT: ${{ needs.website-quality.result }}
-          QUALITY_REQUIRED: ${{ needs.scope.outputs.quality }}
-          QUALITY_RESULT: ${{ needs.quality.result }}
+          WEB_STACK_REQUIRED: ${{ needs.scope.outputs.webStack }}
+          WEB_STACK_RESULT: ${{ needs.web-stack-checks.result }}
+          REPOSITORY_REQUIRED: ${{ needs.scope.outputs.repository }}
+          REPOSITORY_RESULT: ${{ needs.repository-checks.result }}
           SCOPE_RESULT: ${{ needs.scope.result }}
         run: |
           require_success() {
@@ -337,7 +383,8 @@ jobs:
           fi
 
           require_success "Website quality" "$WEBSITE_REQUIRED" "$WEBSITE_RESULT"
-          require_success "Quality" "$QUALITY_REQUIRED" "$QUALITY_RESULT"
+          require_success "Web stack checks" "$WEB_STACK_REQUIRED" "$WEB_STACK_RESULT"
+          require_success "Repository checks" "$REPOSITORY_REQUIRED" "$REPOSITORY_RESULT"
           require_success "Buddy tests" "$BUDDY_REQUIRED" "$BUDDY_RESULT"
           require_success "Buddy test runtime" "$BUDDY_REQUIRED" "$RUNTIME_RESULT"
           require_success "Buddy Rust tests" "$RUST_REQUIRED" "$RUST_RESULT"
