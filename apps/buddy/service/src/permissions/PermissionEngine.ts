@@ -1,4 +1,5 @@
-import type { ShellCommandPolicy } from '../approvals/toolPolicyContract'
+import type { ShellApprovalReason } from '../../../shared/permissions/approvalReviewPayload'
+import type { ShellCommandPolicy, ToolDecision } from '../approvals/toolPolicyContract'
 import type { PathClassification } from './classifyPath'
 import type { PermissionOutcome } from './decisionTable'
 import type {
@@ -90,17 +91,61 @@ export class PermissionEngine {
       return finalizeDecision(request, this.#unknownAccess(request, classifications))
 
     const worst = this.#worstOutcome(request, access, classifications)
+    const shell = access === 'execute' ? await this.#classifyShell(request) : undefined
     const decision = this.#toDecision(
       request,
       access,
       worst.outcome,
       worst.classification,
       classifications,
+      shell,
     )
     return finalizeDecision(
       request,
       applyApprovalPolicy(request, access, classifications, decision),
     )
+  }
+
+  async #classifyShell(request: PermissionRequest): Promise<ToolDecision | undefined> {
+    const policy = this.#shellPolicies[request.toolName as ShellToolName]
+    if (!policy)
+      return undefined
+    const decision = await policy.decide(readStringProperty(request.arguments, 'command'), request.cwd)
+    if (decision.type === 'deny')
+      return decision
+    let needsFileReview = false
+    for (const path of new Set([...decision.readPaths ?? [], ...decision.readFiles ?? []])) {
+      const fileOnly = decision.readFiles?.includes(path) ?? false
+      let classification: PathClassification
+      try {
+        classification = await classifyPath({
+          cwd: request.cwd,
+          grants: request.grants,
+          mode: 'create',
+          path,
+          sensitive: this.#sensitive,
+        })
+      }
+      catch (error) {
+        if (!(error instanceof PathClassificationError) || error.code !== 'PATH_NOT_FOUND')
+          throw error
+        needsFileReview = true
+        continue
+      }
+      if (classification.zone === 'sensitive') {
+        return {
+          forceAsk: true,
+          kind: 'shell',
+          reason: 'sensitive-path',
+          summary: 'Read a sensitive location from the shell',
+          type: 'ask',
+        }
+      }
+      needsFileReview ||= fileOnly && classification.isDirectory
+    }
+    return needsFileReview && decision.type === 'allow'
+      ? { kind: 'shell', reason: 'unsafe-arguments', summary: 'Review shell file targets', type: 'ask' }
+      : decision
   }
 
   #unknownAccess(
@@ -143,10 +188,11 @@ export class PermissionEngine {
     outcome: PermissionOutcome,
     classification: PathClassification | null,
     classifications: readonly PathClassification[],
+    shell: ToolDecision | undefined,
   ): PermissionDecision {
     const forceAsk = Boolean(request.forceAsk)
       || (access === 'read' && classifications.some(entry => entry.zone === 'sensitive'))
-      || this.#requiresForcedShellApproval(request, access)
+      || (shell?.type === 'ask' && shell.forceAsk === true)
     switch (outcome) {
       case 'deny_sensitive':
         return deny('SENSITIVE_PATH', 'sensitive')
@@ -154,8 +200,10 @@ export class PermissionEngine {
         return deny('READ_ONLY_PROFILE', 'profile')
       case 'delegate':
       case 'delegate_allowlist':
-        return this.#decideShell(request, outcome)
+        return this.#decideShell(request, outcome, shell)
       case 'allow':
+        if (forceAsk && shell)
+          return this.#forcedShellAsk(request, shell.type === 'ask' ? shell.reason : undefined)
         return forceAsk
           ? ask({
               allowForTurn: false,
@@ -202,9 +250,9 @@ export class PermissionEngine {
   #decideShell(
     request: PermissionRequest,
     outcome: 'delegate' | 'delegate_allowlist',
+    decision: ToolDecision | undefined,
   ): PermissionDecision {
-    const policy = this.#shellPolicies[request.toolName as ShellToolName]
-    if (!policy) {
+    if (!decision) {
       if (outcome === 'delegate_allowlist')
         return deny('READ_ONLY_PROFILE', 'profile')
       return request.profile === 'full_access' && !request.forceAsk
@@ -215,13 +263,12 @@ export class PermissionEngine {
             summary: request.approval?.summary ?? summaryFor('execute'),
           })
     }
-    const decision = policy.decide(readStringProperty(request.arguments, 'command'))
     if (decision.type === 'allow')
       return request.forceAsk ? this.#forcedShellAsk(request) : allow()
     if (decision.type !== 'ask')
       return deny('VALIDATION_FAILED', 'invalid')
     if (decision.forceAsk)
-      return this.#forcedShellAsk(request)
+      return this.#forcedShellAsk(request, decision.reason)
     if (outcome === 'delegate_allowlist')
       return deny('READ_ONLY_PROFILE', 'profile')
     if (request.profile === 'full_access' && !request.forceAsk)
@@ -229,29 +276,18 @@ export class PermissionEngine {
     return ask({
       allowForTurn: !request.forceAsk,
       kind: 'shell',
+      shell: { cwd: request.cwd, reason: request.forceAsk ? 'forced-confirmation' : decision.reason ?? 'unknown-command' },
       summary: request.approval?.summary ?? 'Run a host shell command',
     })
   }
 
-  #forcedShellAsk(request: PermissionRequest): PermissionDecision {
+  #forcedShellAsk(request: PermissionRequest, reason: ShellApprovalReason = 'forced-confirmation'): PermissionDecision {
     return ask({
       allowForTurn: false,
       kind: 'shell',
+      shell: { cwd: request.cwd, reason },
       summary: request.approval?.summary ?? 'Run a host shell command',
     })
-  }
-
-  #requiresForcedShellApproval(
-    request: PermissionRequest,
-    access: AccessKind,
-  ): boolean {
-    if (access !== 'execute')
-      return false
-    const policy = this.#shellPolicies[request.toolName as ShellToolName]
-    if (!policy)
-      return false
-    const decision = policy.decide(readStringProperty(request.arguments, 'command'))
-    return decision.type === 'ask' && decision.forceAsk === true
   }
 }
 
@@ -271,6 +307,9 @@ function applyApprovalPolicy(
   return ask({
     kind: request.approval?.kind ?? approvalKindFor(access),
     paths: toDecisionPaths(classifications),
+    ...(['bash', 'powershell'].includes(request.toolName)
+      ? { shell: { cwd: request.cwd, reason: 'manual-policy' as const } }
+      : {}),
     summary: request.approval?.summary ?? manualApprovalSummaryFor(access),
   })
 }

@@ -3,6 +3,7 @@ import type {
   AutomationApprovalReviewInput,
   BrowserApprovalReviewInput,
   PathApprovalReviewInput,
+  ShellApprovalContext,
   SystemActionApprovalReviewInput,
 } from '../../../shared/permissions/approvalReviewPayload'
 import type { AppendBuddyRunEventInput } from '../events/BuddyRunEvent'
@@ -29,6 +30,7 @@ export interface ApprovalRequest {
   browser?: BrowserApprovalReviewInput
   kind: ApprovalReviewKind
   paths?: PathApprovalReviewInput
+  shell?: ShellApprovalContext
   runId: string
   signal: AbortSignal
   summary: string
@@ -107,6 +109,7 @@ export class ApprovalService {
         browser: input.browser,
         kind: input.kind,
         paths: input.paths,
+        shell: input.shell,
         systemAction: input.systemAction,
         toolName: input.toolName,
       }),

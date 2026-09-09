@@ -10,6 +10,25 @@ const MAX_COMMAND_REVIEW_LENGTH = 4 * 1024
 const MAX_ARGUMENT_NAMES = 32
 const MAX_TARGET_PATHS = 32
 
+export const SHELL_APPROVAL_REASONS = [
+  'unknown-command',
+  'unsupported-syntax',
+  'unsafe-arguments',
+  'git-external-program',
+  'git-config-unavailable',
+  'sensitive-path',
+  'system-mutation',
+  'forced-confirmation',
+  'manual-policy',
+] as const
+export type ShellApprovalReason = typeof SHELL_APPROVAL_REASONS[number]
+
+const shellApprovalContextSchema = z.object({
+  cwd: z.string().min(1).max(4_096),
+  reason: z.enum(SHELL_APPROVAL_REASONS),
+}).strict()
+export type ShellApprovalContext = z.infer<typeof shellApprovalContextSchema>
+
 export const APPROVAL_REVIEW_KINDS = [
   'read',
   'render',
@@ -74,6 +93,7 @@ export const approvalReviewPayloadSchema = z.discriminatedUnion('card', [
     allowForTurn: z.boolean().default(true),
     card: z.literal('shell'),
     command: z.string().max(MAX_COMMAND_REVIEW_LENGTH),
+    context: shellApprovalContextSchema.optional(),
     toolName: toolNameSchema,
   }).strict(),
   z.object({
@@ -204,6 +224,7 @@ export interface CreateApprovalReviewPayloadInput {
   browser?: BrowserApprovalReviewInput
   kind: ApprovalReviewKind
   paths?: PathApprovalReviewInput
+  shell?: ShellApprovalContext
   systemAction?: SystemActionApprovalReviewInput
   toolName: string
 }
@@ -216,6 +237,7 @@ export function createApprovalReviewPayload(
       allowForTurn: input.allowForTurn,
       card: 'shell',
       command: redactShellCommand(readString(input.arguments, 'command')),
+      ...(input.shell ? { context: input.shell } : {}),
       toolName: input.toolName,
     })
   }

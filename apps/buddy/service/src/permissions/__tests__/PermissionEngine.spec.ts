@@ -1,19 +1,168 @@
 import type { PermissionGrant, PermissionRequest } from '../permissionContract'
-import { mkdir, mkdtemp, realpath, rm, writeFile } from 'node:fs/promises'
+import { execFile } from 'node:child_process'
+import { access, mkdir, mkdtemp, realpath, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, describe, expect, it } from 'vitest'
+import { promisify } from 'node:util'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { PermissionEngine } from '../PermissionEngine'
 import { createSensitivePathMatcher } from '../sensitivePaths'
 
 const roots: string[] = []
+const executeFile = promisify(execFile)
 
 afterEach(async () => {
   await Promise.all(roots.splice(0).map(root => rm(root, { force: true, recursive: true })))
 })
 
 describe('permissionEngine', () => {
+  it('allows verified Git queries across profiles and backgrounds, while preserving manual approval', async () => {
+    const fixture = await createGitFixture()
+    const engine = createEngine(fixture.home)
+    for (const profile of ['read_only', 'workspace_write', 'full_access'] as const) {
+      await expect(engine.decide(request(fixture, {
+        approvalAvailable: false,
+        arguments: { command: 'git status --short && git diff --check' },
+        profile,
+        toolName: 'bash',
+      }))).resolves.toEqual({ type: 'allow' })
+    }
+    await expect(engine.decide(request(fixture, {
+      approvalPolicy: 'manual',
+      arguments: { command: 'git status --short && git diff --check' },
+      toolName: 'bash',
+    }))).resolves.toMatchObject({
+      allowForTurn: true,
+      shell: { cwd: fixture.workspace, reason: 'manual-policy' },
+      type: 'ask',
+    })
+    await expect(engine.decide(request(fixture, {
+      arguments: { command: 'git status --short && git reset --hard' },
+      toolName: 'bash',
+    }))).resolves.toMatchObject({ shell: { reason: 'unsafe-arguments' }, type: 'ask' })
+  })
+
+  it('checks effective Git configuration on every query without executing configured programs', async () => {
+    const fixture = await createGitFixture()
+    const engine = createEngine(fixture.home)
+    const query = request(fixture, { arguments: { command: 'git status --short' }, toolName: 'bash' })
+    await expect(engine.decide(query)).resolves.toEqual({ type: 'allow' })
+
+    const marker = join(fixture.workspace, 'must-not-exist')
+    vi.stubEnv('GIT_CONFIG', join(fixture.home, '.gitconfig'))
+    await expect(engine.decide(query)).resolves.toMatchObject({ shell: { reason: 'git-config-unavailable' }, type: 'ask' })
+    vi.stubEnv('GIT_CONFIG', undefined)
+    await executeFile('git', ['config', 'core.fsmonitor', `touch ${marker}`], { cwd: fixture.workspace })
+    await expect(engine.decide(query)).resolves.toMatchObject({
+      shell: { reason: 'git-external-program' },
+      type: 'ask',
+    })
+    await expect(engine.decide({ ...query, profile: 'read_only' })).resolves.toMatchObject({ code: 'READ_ONLY_PROFILE', type: 'deny' })
+    await expect(engine.decide({ ...query, approvalAvailable: false })).resolves.toMatchObject({ code: 'APPROVAL_UNAVAILABLE_IN_BACKGROUND', type: 'deny' })
+    await expect(access(marker)).rejects.toMatchObject({ code: 'ENOENT' })
+
+    await executeFile('git', ['config', 'core.fsmonitor', 'false'], { cwd: fixture.workspace })
+    await expect(engine.decide(query)).resolves.toEqual({ type: 'allow' })
+    const includedConfig = join(fixture.home, 'included.gitconfig')
+    await writeFile(includedConfig, '[diff "document"]\n\ttextconv = test-converter\n')
+    await executeFile('git', ['config', 'include.path', includedConfig], { cwd: fixture.workspace })
+    await expect(engine.decide(query)).resolves.toMatchObject({ shell: { reason: 'git-external-program' }, type: 'ask' })
+    await writeFile(includedConfig, 'invalid config [')
+    await expect(engine.decide(query)).resolves.toMatchObject({ shell: { reason: 'git-config-unavailable' }, type: 'ask' })
+  })
+
+  it('uses canonical sensitive-path checks for shell reads and explicit Git content diffs', async () => {
+    const fixture = await createGitFixture()
+    const engine = createEngine(fixture.home)
+    await writeFile(join(fixture.workspace, 'package.json'), '{}')
+    await writeFile(join(fixture.workspace, '.env'), 'TEST_SECRET=not-a-real-secret')
+    await executeFile('git', ['add', '--', '.env', 'package.json'], { cwd: fixture.workspace })
+    await symlink(join(fixture.workspace, '.env'), join(fixture.workspace, 'public.txt'))
+    await expect(engine.decide(request(fixture, {
+      arguments: { command: 'ls -la . && cat package.json && git diff -- package.json' },
+      toolName: 'bash',
+    }))).resolves.toEqual({ type: 'allow' })
+    for (const command of ['cat .env', 'cat public.txt', 'git diff -- .env', 'git diff -- public.txt', 'cat .env | python transform.py']) {
+      for (const profile of ['read_only', 'workspace_write', 'full_access'] as const) {
+        await expect(engine.decide(request(fixture, {
+          arguments: { command },
+          profile,
+          toolName: 'bash',
+        })), command).resolves.toMatchObject({
+          allowForTurn: false,
+          shell: { reason: 'sensitive-path' },
+          type: 'ask',
+        })
+      }
+    }
+    for (const command of ['git diff --cached', 'git diff --cached --check', 'git diff --cached -- .']) {
+      await expect(engine.decide(request(fixture, {
+        arguments: { command },
+        toolName: 'bash',
+      })), command).resolves.toMatchObject({ allowForTurn: false, shell: { reason: 'sensitive-path' }, type: 'ask' })
+    }
+    await expect(engine.decide(request(fixture, {
+      arguments: { command: 'git diff --cached -- package.json' },
+      toolName: 'bash',
+    }))).resolves.toEqual({ type: 'allow' })
+  })
+
+  it('keeps Git filters, index hooks, lazy fetching, and submodule execution behind approval', async () => {
+    const fixture = await createGitFixture()
+    const engine = createEngine(fixture.home)
+    const query = request(fixture, { arguments: { command: 'git status --short' }, toolName: 'bash' })
+    await executeFile('git', ['config', 'filter.example.clean', 'test-filter'], { cwd: fixture.workspace })
+    await expect(engine.decide(query)).resolves.toMatchObject({ shell: { reason: 'git-external-program' }, type: 'ask' })
+    await executeFile('git', ['config', '--unset', 'filter.example.clean'], { cwd: fixture.workspace })
+
+    const hooks = join(fixture.workspace, '.custom-hooks')
+    await mkdir(hooks)
+    await executeFile('git', ['config', 'core.hooksPath', '.custom-hooks'], { cwd: fixture.workspace })
+    await expect(engine.decide(query)).resolves.toEqual({ type: 'allow' })
+    const hook = join(hooks, 'post-index-change')
+    await writeFile(hook, 'exit 1\n')
+    await expect(engine.decide(query)).resolves.toMatchObject({ shell: { reason: 'git-external-program' }, type: 'ask' })
+    const nested = join(fixture.workspace, 'subdirectory')
+    await mkdir(nested)
+    await expect(engine.decide({ ...query, cwd: nested })).resolves.toMatchObject({ shell: { reason: 'git-external-program' }, type: 'ask' })
+    await rm(hook)
+
+    await executeFile('git', ['config', 'remote.origin.promisor', 'true'], { cwd: fixture.workspace })
+    await expect(engine.decide(query)).resolves.toMatchObject({ shell: { reason: 'git-config-unavailable' }, type: 'ask' })
+    await executeFile('git', ['config', '--unset', 'remote.origin.promisor'], { cwd: fixture.workspace })
+    await executeFile('git', ['update-index', '--add', '--cacheinfo', `160000,${'a'.repeat(40)},nested`], { cwd: fixture.workspace })
+    await expect(engine.decide(query)).resolves.toMatchObject({ shell: { reason: 'git-config-unavailable' }, type: 'ask' })
+    await expect(engine.decide({ ...query, cwd: nested })).resolves.toMatchObject({ shell: { reason: 'git-config-unavailable' }, type: 'ask' })
+  })
+
+  it('resolves historical and renamed diff targets before permitting their contents', async () => {
+    const fixture = await createGitFixture()
+    const engine = createEngine(fixture.home)
+    await writeFile(join(fixture.workspace, '.env'), 'TEST_SECRET=placeholder\n')
+    await writeFile(join(fixture.workspace, 'notes.md'), 'before\n')
+    await executeFile('git', ['add', '.'], { cwd: fixture.workspace })
+    await executeFile('git', ['-c', 'user.name=Permission Test', '-c', 'user.email=test@example.invalid', '-c', 'commit.gpgsign=false', 'commit', '--quiet', '-m', 'fixture'], { cwd: fixture.workspace })
+    await executeFile('git', ['mv', '.env', 'public.txt'], { cwd: fixture.workspace })
+    await writeFile(join(fixture.workspace, 'notes.md'), 'after\n')
+    await mkdir(join(fixture.workspace, 'subdirectory'))
+
+    await expect(engine.decide(request(fixture, {
+      arguments: { command: 'git diff --cached HEAD' },
+      cwd: join(fixture.workspace, 'subdirectory'),
+      toolName: 'bash',
+    }))).resolves.toMatchObject({ allowForTurn: false, shell: { reason: 'sensitive-path' }, type: 'ask' })
+    await expect(engine.decide(request(fixture, {
+      arguments: { command: 'git diff HEAD -- notes.md' },
+      toolName: 'bash',
+    }))).resolves.toEqual({ type: 'allow' })
+    const { stdout: blob } = await executeFile('git', ['rev-parse', 'HEAD:notes.md'], { cwd: fixture.workspace })
+    await expect(engine.decide(request(fixture, {
+      arguments: { command: `git diff ${blob.trim()} ${blob.trim()}` },
+      toolName: 'bash',
+    }))).resolves.toMatchObject({ shell: { reason: 'git-config-unavailable' }, type: 'ask' })
+  })
+
   it('allows outside reads and asks once to grant an outside write', async () => {
     const fixture = await createFixture()
     const engine = createEngine(fixture.home)
@@ -239,4 +388,16 @@ async function createFixture() {
     root: workspace,
   }]
   return { grants, home, otherOutside, outside, workspace }
+}
+
+async function createGitFixture() {
+  const fixture = await createFixture()
+  const globalConfig = join(fixture.home, '.gitconfig')
+  await writeFile(globalConfig, '')
+  vi.stubEnv('GIT_CONFIG_GLOBAL', globalConfig)
+  vi.stubEnv('GIT_CONFIG_NOSYSTEM', '1')
+  for (const key of ['GIT_CONFIG', 'GIT_EXTERNAL_DIFF', 'GIT_DIR', 'GIT_WORK_TREE', 'GIT_COMMON_DIR', 'GIT_INDEX_FILE', 'GIT_OBJECT_DIRECTORY', 'GIT_ALTERNATE_OBJECT_DIRECTORIES', 'GIT_CONFIG_COUNT', 'GIT_CONFIG_PARAMETERS'])
+    vi.stubEnv(key, undefined)
+  await executeFile('git', ['init', '--quiet', '--template=', fixture.workspace])
+  return fixture
 }

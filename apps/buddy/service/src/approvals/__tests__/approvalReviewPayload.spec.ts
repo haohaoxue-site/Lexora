@@ -1,10 +1,35 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  approvalReviewPayloadSchema,
   createApprovalReviewPayload,
 } from '../../../../shared/permissions/approvalReviewPayload'
 
 describe('createApprovalReviewPayload', () => {
+  it('persists shell reasons without breaking historical payloads or command redaction', () => {
+    const context = { cwd: '/workspace', reason: 'unknown-command' as const }
+    const payload = createApprovalReviewPayload({
+      allowForTurn: true,
+      arguments: { command: 'deploy --token test-secret' },
+      kind: 'shell',
+      shell: context,
+      toolName: 'bash',
+    })
+    expect(approvalReviewPayloadSchema.parse(JSON.parse(JSON.stringify(payload)))).toEqual({
+      allowForTurn: true,
+      card: 'shell',
+      command: 'deploy --token=[redacted]',
+      context,
+      toolName: 'bash',
+    })
+    expect(approvalReviewPayloadSchema.parse({ card: 'shell', command: 'git status', toolName: 'bash' })).toEqual({
+      allowForTurn: true,
+      card: 'shell',
+      command: 'git status',
+      toolName: 'bash',
+    })
+    expect(approvalReviewPayloadSchema.safeParse({ ...payload, context: { ...context, reason: 'invented-risk' } }).success).toBe(false)
+  })
   it('keeps ordinary shell commands reviewable and redacts credential forms', () => {
     expect(createApprovalReviewPayload({
       allowForTurn: true,

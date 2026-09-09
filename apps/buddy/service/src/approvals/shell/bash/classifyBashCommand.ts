@@ -10,10 +10,20 @@ export function classifyBashCommand(
   const commands = parseBashCommandList(command)
   if (!commands?.length)
     return requireShellApproval('unsupported-syntax')
+  const result: Extract<ShellCommandClassification, { type: 'auto-approve' }> = { type: 'auto-approve' }
+  let required: Extract<ShellCommandClassification, { type: 'approval-required' }> | undefined
   for (const words of commands) {
-    const reason = classifyBashSimpleCommand(words, platform)
-    if (reason)
-      return requireShellApproval(reason)
+    const classification = classifyBashSimpleCommand(words, platform)
+    if (classification.type === 'approval-required')
+      required ??= classification
+    if (classification.type === 'auto-approve' && classification.git)
+      result.git = true
+    if (classification.readPaths?.length)
+      result.readPaths = [...new Set([...result.readPaths ?? [], ...classification.readPaths])]
+    if (classification.type === 'auto-approve' && classification.gitDiffs?.length)
+      result.gitDiffs = [...result.gitDiffs ?? [], ...classification.gitDiffs]
   }
-  return { type: 'auto-approve' }
+  return required
+    ? { ...required, ...(result.readPaths?.length ? { readPaths: result.readPaths } : {}) }
+    : result
 }
