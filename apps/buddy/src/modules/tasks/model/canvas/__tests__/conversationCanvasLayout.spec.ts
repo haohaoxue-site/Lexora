@@ -5,7 +5,7 @@ import { conversationNodeSize, layoutConversationCanvas } from '../conversationC
 
 describe('conversation canvas layout', () => {
   it.each<ConversationCanvasDirection>(['horizontal', 'vertical'])('keeps branching cards apart in %s layout, including running cards', (direction) => {
-    const nodes = [{ ...node('q', null), attachmentCount: 1 }, { ...node('a1', 'q'), status: 'running' as const, artifactCount: 2 }, node('a2', 'q'), { ...node('q2', 'a1'), attachmentCount: 3 }, node('a3', 'q2')]
+    const nodes = [{ ...node('q', null), attachmentCount: 1 }, { ...node('a1', 'q'), status: 'running' as const, artifactCount: 2 }, node('a2', 'q'), { ...node('q2', 'a1'), attachmentCount: 3, quoteCount: 4 }, node('a3', 'q2')]
     const positions = layoutConversationCanvas(nodes, direction)
     for (const left of nodes) {
       const first = positions.get(left.id)!
@@ -24,7 +24,7 @@ describe('conversation canvas layout', () => {
 
   it.each<ConversationCanvasDirection>(['horizontal', 'vertical'])('connects card boundaries and includes inline resources in %s layout', (direction) => {
     const source = { ...node('a', null), artifactCount: 3 }
-    const target = { ...node('q', 'a'), attachmentCount: 1 }
+    const target = { ...node('q', 'a'), attachmentCount: 1, quoteCount: 1 }
     const positions = layoutConversationCanvas([source, target], direction)
     const from = conversationNodeSize(source)
     const to = conversationNodeSize(target)
@@ -56,5 +56,5 @@ describe('conversation canvas layout', () => {
 })
 
 function node(id: string, parentId: string | null): ConversationCanvasNode {
-  return { id, parentId, branchId: 'branch', kind: id.startsWith('q') ? 'question' : 'answer', messageId: id, runId: null, text: 'preview', attachments: [], attachmentCount: 0, artifacts: [], artifactCount: 0, metadata: null, status: null, active: false, toolCount: 0, attempts: [] }
+  return { id, parentId, branchId: 'branch', kind: id.startsWith('q') ? 'question' : 'answer', messageId: id, runId: null, text: 'preview', quotes: [], quoteCount: 0, attachments: [], attachmentCount: 0, artifacts: [], artifactCount: 0, metadata: null, status: null, active: false, toolCount: 0, attempts: [] }
 }

@@ -202,6 +202,12 @@ onBeforeUnmount(() => {
   --image-placeholder-bg: var(--buddy-surface-subtle);
 }
 
+.buddy-chat-markdown-host :deep(.code-block-header),
+.buddy-chat-markdown-host :deep(.line-numbers),
+.buddy-chat-markdown-host :deep(.line-number) {
+  user-select: none;
+}
+
 .buddy-chat-markdown-host :deep(.blockquote) {
   margin-inline: 0;
 }

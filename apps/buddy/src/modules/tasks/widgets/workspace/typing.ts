@@ -12,6 +12,7 @@ export interface ChatWorkspaceProps {
 }
 
 export interface ChatWorkspaceEmits {
+  showCanvas: []
   openNodeArtifact: [artifact: LocalArtifact]
   openNodeChanges: [changes: LocalChangeSetSummary]
   openArtifact: [artifactId: string]

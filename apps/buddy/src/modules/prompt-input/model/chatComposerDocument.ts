@@ -7,7 +7,7 @@ export const CHAT_PROMPT_DIRECTIVE_NODE_NAME = 'chatPromptDirective'
 
 export function userContentToChatComposerDocument(content: BuddyUserContentV1): JSONContent {
   return {
-    attrs: { panelResourceIds: [...content.panelResourceIds] },
+    attrs: { panelResourceIds: [...content.panelResourceIds], ...(content.quotes?.length ? { quotes: content.quotes } : {}) },
     content: content.body.map(paragraph => ({
       content: paragraph.content.map(inlineNodeToEditorNode),
       type: 'paragraph',
@@ -30,6 +30,7 @@ export function chatComposerDocumentToUserContent(document: JSONContent): BuddyU
       }
     }),
     panelResourceIds: document.attrs?.panelResourceIds ?? [],
+    ...(document.attrs?.quotes?.length ? { quotes: document.attrs.quotes } : {}),
     version: 1,
   })
 }

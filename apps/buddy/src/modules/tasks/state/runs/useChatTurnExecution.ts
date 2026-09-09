@@ -91,10 +91,11 @@ export function useChatTurnExecution(options: UseChatTurnExecutionOptions) {
     const contextItems: ReadonlyArray<LocalPromptContextItem> = userContent
       ? userContent.body.flatMap(paragraph => paragraph.content.flatMap(node => node.type === 'prompt_directive' ? [{ kind: node.directive === 'skill' ? 'skill' as const : 'slashCommand' as const, value: node.value }] : []))
       : []
-    if ((!content.trim() && !resourceIds.length) || !canSend.value)
+    const hasQuotes = Boolean((userContent ?? options.drafts.snapshot(options.draftScopeKey.value).content).quotes?.length)
+    if ((!content.trim() && !resourceIds.length && !hasQuotes) || !canSend.value)
       return false
     const command = parseBuddyChatCommand(content)
-    if (command?.kind === 'action' && (resourceIds.length || options.composerTarget.current.value.kind === 'message_followup')) {
+    if (command?.kind === 'action' && (resourceIds.length || hasQuotes || options.composerTarget.current.value.kind === 'message_followup')) {
       options.setErrorMessage(options.unavailableCommandMessage())
       return false
     }

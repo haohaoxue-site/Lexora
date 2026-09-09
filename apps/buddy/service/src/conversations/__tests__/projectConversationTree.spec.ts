@@ -1,9 +1,34 @@
 import type { MessageRecord } from '../../storage/conversationHistoryRepository'
 import type { RunRecord } from '../../storage/runRecord'
 import { describe, expect, it } from 'vitest'
+import { createBuddyUserContent } from '../../../../shared/conversation/buddyUserContent'
+import { CONVERSATION_QUOTE_PREVIEW_LENGTH, conversationTreeSchema } from '../../../../shared/conversation/conversationTree'
 import { projectConversationTree } from '../projectConversationTree'
 
 describe('conversation tree projection', () => {
+  it('projects bounded quote cards separately from question text, retaining full snapshots in message content', () => {
+    const quotes = Array.from({ length: 4 }, (_, index) => ({
+      id: `quote-${index}`,
+      text: `excerpt ${index} ${'original text '.repeat(40)}`,
+      textOffset: index * 10,
+      source: { conversationId: 'conversation', branchId: 'main', messageId: 'source', runId: 'source-run', role: 'assistant' as const },
+    }))
+    const messages = ['question', ''].map((text, index) => ({
+      ...message(`q${index}`, 'main', 'user', null, String(index)),
+      content: { userContent: { ...createBuddyUserContent(text), quotes }, resourceSnapshots: [] },
+    }))
+    const tree = conversationTreeSchema.parse(projectConversationTree({ conversationId: 'conversation', activeBranchId: 'main', branches: [], messages, runs: [] }))
+    expect(tree.nodes.map(node => node.text)).toEqual(['question', ''])
+    for (const node of tree.nodes) {
+      expect(node.quoteCount).toBe(4)
+      expect(node.quotes).toHaveLength(3)
+      expect(node.quotes[0]).toMatchObject({ id: quotes[0]!.id, source: quotes[0]!.source, textOffset: 0 })
+      expect(node.quotes[0]!.text).toHaveLength(CONVERSATION_QUOTE_PREVIEW_LENGTH)
+      expect(node.quotes[0]!.text.endsWith('…')).toBe(true)
+    }
+    expect(messages[0]!.content.userContent.quotes[0]!.text).toContain('original text '.repeat(40))
+  })
+
   it('shares retried questions, places followups at the selected answer and retains failed attempts in one slot', () => {
     const branches = [
       { id: 'main', parentBranchId: null, forkedFromMessageId: null },

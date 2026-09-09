@@ -15,6 +15,17 @@ afterEach(() => {
 })
 
 describe('composerDraftRepository', () => {
+  it('restores quote snapshots from SQLite without rewriting a legacy draft', () => {
+    const database = createDatabase()
+    const repository = createComposerDraftRepository(database)
+    const initial = repository.open(createOpenInput())
+    const quote = { id: 'quote-1', text: '    enabled: true\n', source: { conversationId: 'conversation-1', branchId: 'branch-1', messageId: 'message-1', role: 'assistant' as const, runId: 'run-1' } }
+    const saved = repository.save({ ...initial, content: { ...initial.content, quotes: [quote] }, expectedRevision: 0, now: '2026-09-06T00:00:01.000Z' })
+    expect(createComposerDraftRepository(database).findById(initial.draftId)).toEqual(saved)
+    expect(saved.content.quotes).toEqual([quote])
+    expect(initial.content).toEqual(createBuddyUserContent('Hello'))
+  })
+
   it('opens one canonical draft per scope and persists the complete initial snapshot', () => {
     const database = createDatabase()
     seedSpace(database)

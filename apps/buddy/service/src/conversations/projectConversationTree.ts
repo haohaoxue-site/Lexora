@@ -5,6 +5,7 @@ import type { AttachmentRecord } from '../storage/attachmentRepository'
 import type { ConversationBranchRecord, MessageRecord } from '../storage/conversationHistoryRepository'
 import type { RunRecord } from '../storage/runRecord'
 import { buddyUserContentToText, readBuddyUserMessageContent } from '../../../shared/conversation/buddyUserContent'
+import { CONVERSATION_QUOTE_PREVIEW_LENGTH } from '../../../shared/conversation/conversationTree'
 import { conversationTreePreview } from '../../../shared/conversation/conversationTreePreview'
 import { createMessageAttachmentReader } from '../attachments/publicAttachment'
 
@@ -60,6 +61,7 @@ export function projectConversationTree(input: {
     if (message.role !== 'user')
       continue
     const attachments = readAttachments(message.content)
+    const quotes = readBuddyUserMessageContent(message.content)?.userContent.quotes ?? []
     add({
       id: `question:${message.id}`,
       parentId: null,
@@ -68,6 +70,11 @@ export function projectConversationTree(input: {
       messageId: message.id,
       runId: null,
       text: conversationTreePreview(readText(message.content, input.attachments)),
+      quotes: quotes.slice(0, 3).map(quote => ({
+        ...quote,
+        text: quote.text.length > CONVERSATION_QUOTE_PREVIEW_LENGTH ? `${quote.text.slice(0, CONVERSATION_QUOTE_PREVIEW_LENGTH - 1)}…` : quote.text,
+      })),
+      quoteCount: quotes.length,
       attachments: attachments.slice(0, 3),
       attachmentCount: attachments.length,
       artifacts: [],
@@ -93,6 +100,8 @@ export function projectConversationTree(input: {
       messageId: answers.at(-1)?.id ?? null,
       runId: latest.id,
       text: conversationTreePreview(answers.map(message => readText(message.content)).filter(Boolean).join('\n\n')),
+      quotes: [],
+      quoteCount: 0,
       attachments: [],
       attachmentCount: 0,
       artifacts: artifacts.slice(0, 3),

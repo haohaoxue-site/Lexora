@@ -8,7 +8,7 @@ import { NodeSelection, TextSelection } from '@tiptap/pm/state'
 import { EditorContent } from '@tiptap/vue-3'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createApp, defineComponent, h, nextTick, shallowRef } from 'vue'
-import { getChatComposerResourceIds, pruneChatComposerResources } from '@/modules/prompt-input'
+import { chatComposerDocumentToUserContent, getChatComposerResourceIds, pruneChatComposerResources, userContentToChatComposerDocument } from '@/modules/prompt-input'
 import { moveChatComposerResourceSelection } from '@/modules/prompt-input/ui'
 import { useComposerResources } from '../../../state/composer/useComposerResources'
 import ComposerResourceStrip from '../ComposerResourceStrip.vue'
@@ -155,6 +155,56 @@ async function mountFlow() {
 }
 
 describe('composer resource flow', () => {
+  it('keeps identical excerpts from distinct positions while deduplicating the same selection', async () => {
+    const flow = await mountFlow()
+    const quote = { id: 'first', text: 'Repeat', textOffset: 0, source: { conversationId: 'conversation-1', branchId: 'branch-1', messageId: 'message-1', role: 'assistant' as const, runId: 'run-1' } }
+    expect(flow.composer.addQuote(quote)).toBe('added')
+    expect(flow.composer.addQuote({ ...quote, id: 'second', textOffset: 20 })).toBe('added')
+    expect(flow.composer.addQuote({ ...quote, id: 'duplicate' })).toBe('duplicate')
+    expect(flow.composer.quotes.value.map(item => item.textOffset)).toEqual([0, 20])
+  })
+
+  it('rejects overflowing quotes without altering the editor or accepted snapshots', async () => {
+    const flow = await mountFlow()
+    const source = { conversationId: 'conversation-1', branchId: 'branch-1', messageId: 'message-1', role: 'assistant' as const, runId: 'run-1' }
+    for (let index = 0; index < 16; index++)
+      expect(flow.composer.addQuote({ id: `quote-${index}`, source, text: `snapshot ${index}` })).toBe('added')
+    const document = flow.editor.getJSON()
+    expect(flow.composer.addQuote({ id: 'overflow', source, text: 'new snapshot' })).toBe('limit')
+    expect(flow.editor.getJSON()).toEqual(document)
+    flow.composer.removeQuote('quote-0')
+    const afterRemoval = flow.editor.getJSON()
+    expect(flow.composer.addQuote({ id: 'oversized', source, text: 'a'.repeat(32_769) })).toBe('limit')
+    expect(flow.editor.getJSON()).toEqual(afterRemoval)
+    expect(flow.records.size).toBe(0)
+  })
+
+  it('preserves quote whitespace through editing, hydration and undo without creating files', async () => {
+    const flow = await mountFlow()
+    const quote = { id: 'quote-1', text: '    enabled: true\n\n', source: { conversationId: 'conversation-1', branchId: 'branch-1', messageId: 'message-1', role: 'assistant' as const, runId: 'run-1' } }
+    expect(flow.composer.addQuote(quote)).toBe('added')
+    await nextTick()
+    expect(flow.composer.canSubmit.value).toBe(true)
+    expect(flow.composer.addQuote({ ...quote, id: 'quote-2' })).toBe('duplicate')
+    expect(flow.editor.getText()).toBe('')
+    expect(flow.records.size).toBe(0)
+    const saved = chatComposerDocumentToUserContent(flow.content.value)
+    expect(saved.quotes).toEqual([quote])
+    flow.editor.commands.insertContent('question')
+    flow.editor.commands.undo()
+    expect(chatComposerDocumentToUserContent(flow.editor.getJSON()).quotes).toEqual([quote])
+    flow.composer.removeQuote(quote.id)
+    expect(flow.composer.quotes.value).toEqual([])
+    flow.editor.commands.undo()
+    expect(flow.composer.quotes.value).toEqual([quote])
+    flow.content.value = userContentToChatComposerDocument({ ...saved, quotes: [{ ...quote, id: 'restored' }] })
+    await nextTick()
+    expect(flow.composer.quotes.value[0]?.id).toBe('restored')
+    flow.editor.setEditable(false)
+    expect(flow.composer.addQuote({ ...quote, text: 'new quote' })).toBe('unavailable')
+    expect(flow.composer.quotes.value).toHaveLength(1)
+  })
+
   it('shows both references and cards immediately; completion never changes selection or undo history', async () => {
     const flow = await mountFlow()
     flow.pasteImages()

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { BuddyMessageQuote } from '@buddy-shared/conversation/buddyUserContent'
 import type { BuddyServiceTier, BuddyThinkingLevel } from '@buddy-shared/conversation/modelSelection'
 import type { BuddyPermissionMode } from '@buddy-shared/permissions/permissionMode'
 import type { JSONContent } from '@tiptap/core'
@@ -18,6 +19,7 @@ import ChatContextUsage from '@/modules/tasks/widgets/composer/ChatContextUsage.
 import DesktopChatComposerInteractionHost from '@/modules/tasks/widgets/composer/DesktopChatComposerInteractionHost.vue'
 import { useChatComposer } from '@/modules/tasks/widgets/composer/useChatComposer'
 import DesktopIcon from '@/shared/ui/icon/DesktopIcon.vue'
+import ChatQuoteStrip from '../quotes/ChatQuoteStrip.vue'
 import ChatComposerSourceMenu from './ChatComposerSourceMenu.vue'
 import ChatComposerSourcePicker from './ChatComposerSourcePicker.vue'
 import ComposerResourceStrip from './ComposerResourceStrip.vue'
@@ -53,6 +55,9 @@ const {
   loadContextOptions,
   modelInputIssue,
   resourceStripResources,
+  quotes,
+  addQuote,
+  removeQuote,
   removeResource,
   selectPanelSource: selectPanelResource,
   selectSuggestion,
@@ -80,7 +85,10 @@ const {
   onLocateResource: resourceId => resourceStrip.value?.highlightResource(resourceId),
 })
 
-defineExpose({ focus: () => editor.value?.commands.focus() })
+defineExpose({
+  focus: () => editor.value?.commands.focus(),
+  quote: (quote: BuddyMessageQuote) => addQuote(quote),
+})
 
 const sourceMenuOpen = shallowRef(false)
 const suggestionOptions = computed(() => suggestions.value.map(({ option }) => option))
@@ -125,6 +133,7 @@ async function selectConversationFile(option: ChatPromptContextOption) {
     @drop="handleFileDrop"
   >
     <template #attachments>
+      <ChatQuoteStrip :quotes="quotes" :language="language" :disabled="isSending" removable @remove="removeQuote" />
       <ComposerResourceStrip
         ref="resourceStrip"
         :resources="resourceStripResources"

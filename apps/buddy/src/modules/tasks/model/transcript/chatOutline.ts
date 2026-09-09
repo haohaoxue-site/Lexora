@@ -5,7 +5,7 @@ import type {
   ChatTranscriptRow,
   ChatTranscriptRowPatch,
 } from './chatTranscriptProjection'
-import { getChatMessageText, isVisibleChatMessage } from './chatMessageContent'
+import { getChatMessageText, getChatMessageUserContent, isVisibleChatMessage } from './chatMessageContent'
 
 const CHAT_OUTLINE_SNIPPET_LENGTH = 120
 
@@ -191,7 +191,8 @@ function indexChatTranscriptMessages(
 }
 
 function toOutlineItem(message: LocalMessage): ChatOutlineItem {
-  const text = getChatMessageText(message).replace(/\s+/g, ' ').trim()
+  const summary = getChatMessageText(message) || getChatMessageUserContent(message)?.userContent.quotes?.map(quote => quote.text).join('\n') || ''
+  const text = summary.replace(/\s+/g, ' ').trim()
 
   return {
     attachmentOnly: text.length === 0,

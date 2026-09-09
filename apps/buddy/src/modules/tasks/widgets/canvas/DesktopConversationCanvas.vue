@@ -9,7 +9,7 @@ import { createChatRunTranscriptProjector } from '../../model/transcript/chatRun
 import ConversationCanvas from './ConversationCanvas.vue'
 
 const props = defineProps<{ workspace: TaskChatWorkspace, active: boolean, matches: readonly string[], selectedNodeId: string | null, searchMessageId?: string | null }>()
-const emit = defineEmits<{ focusComposer: [], openNode: [node: LocalConversationTreeNode], editNode: [node: LocalConversationTreeNode], openNodeArtifact: [artifact: LocalArtifact] }>()
+const emit = defineEmits<{ focusComposer: [], openNode: [node: LocalConversationTreeNode], editNode: [node: LocalConversationTreeNode], openQuote: [messageId: string, quoteId: string], openNodeArtifact: [artifact: LocalArtifact] }>()
 const canvasRef = useTemplateRef<InstanceType<typeof ConversationCanvas>>('canvasRef')
 const tree = computed(() => props.workspace.tree.data.value)
 const followup = computed(() => {
@@ -50,6 +50,8 @@ const nodes = computed<readonly ConversationCanvasNode[]>(() => {
       messageId: null,
       runId: null,
       text: '',
+      quotes: [],
+      quoteCount: 0,
       status: null,
       toolCount: 0,
       attempts: [],
@@ -109,6 +111,10 @@ async function editNode(id: string) {
   }
 }
 
+defineExpose({
+  focusNode: (id: string) => canvasRef.value?.focusNode(id),
+})
+
 watch(() => props.active, value => props.workspace.tree.setVisible(value), { immediate: true })
 onBeforeUnmount(() => props.workspace.tree.setVisible(false))
 </script>
@@ -131,6 +137,7 @@ onBeforeUnmount(() => props.workspace.tree.setVisible(false))
     @open="openNode"
     @edit="editNode"
     @open-artifact="openArtifact"
+    @open-quote="(messageId, quoteId) => emit('openQuote', messageId, quoteId)"
     @refresh="workspace.tree.refresh"
   />
 </template>

@@ -13,6 +13,7 @@ import { resolveBuddyAttachmentPreviewUrl } from '../../model/attachments/chatAt
 import { getChatMessageDisplayText, getChatMessageUserContent } from '../../model/transcript/chatMessageContent'
 import ResourceReferenceBadge from '../attachments/ResourceReferenceBadge.vue'
 import { useResourceHighlight } from '../attachments/useResourceHighlight'
+import ChatQuoteStrip from '../quotes/ChatQuoteStrip.vue'
 import BuddyChatMarkdownContent from './BuddyChatMarkdownContent.vue'
 import BuddyChatResourceReference from './BuddyChatResourceReference.vue'
 
@@ -111,6 +112,7 @@ function previewLeaveTransition(): Promise<void> {
   <div
     class="buddy-chat-message-content"
     :class="`is-${message.role}`"
+    :data-quote-source="message.role === 'user' || message.role === 'assistant' ? JSON.stringify({ conversationId: message.conversationId, branchId: message.branchId, messageId: message.id, runId: message.runId, role: message.role }) : undefined"
   >
     <BuddyImagePreview
       v-model:current="previewIndex"
@@ -119,6 +121,7 @@ function previewLeaveTransition(): Promise<void> {
       :sources="previewSources"
       @update:show="updatePreviewOpen"
     />
+    <ChatQuoteStrip :quotes="structuredUserContent?.userContent.quotes ?? []" :language="language" />
     <div
       v-if="attachmentViews.length"
       ref="attachmentTrack"
@@ -162,7 +165,7 @@ function previewLeaveTransition(): Promise<void> {
       </figure>
     </div>
     <div
-      v-if="structuredUserContent"
+      v-if="structuredUserContent && hasText"
       class="buddy-chat-message-content__text buddy-chat-message-content__structured-body"
     >
       <p

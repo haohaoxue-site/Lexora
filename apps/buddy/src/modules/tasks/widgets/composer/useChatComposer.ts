@@ -1,3 +1,4 @@
+import type { BuddyMessageQuote } from '@buddy-shared/conversation/buddyUserContent'
 import type { BuddyComposerSource } from '@buddy-shared/conversation/composerResource'
 import type { ComposerResourceCard, UseChatComposerOptions } from './typing'
 import type { ChatPromptContextOption } from '@/modules/prompt-input'
@@ -7,6 +8,7 @@ import { CHAT_PROMPT_DIRECTIVE_NODE_NAME, getChatComposerResourceIds, serializeC
 import { insertChatComposerResources, insertResolvedChatComposerResource, removeChatComposerPanelResource, removeChatComposerResource } from '@/modules/prompt-input/ui'
 import { resolveComposerResourcePreviewUrl } from '../../model/attachments/chatAttachmentView'
 import { resolveChatComposerModelInputIssue } from '../../model/composer/chatComposerModelCapability'
+import { addChatQuote, removeChatQuote } from './chatQuoteEditing'
 import { useChatComposerEditor } from './useChatComposerEditor'
 import { useChatComposerSuggestions } from './useChatComposerSuggestions'
 
@@ -37,6 +39,7 @@ export function useChatComposer(options: UseChatComposerOptions) {
     onLocateResource: options.onLocateResource,
   })
   const resourceIds = computed(() => getChatComposerResourceIds(contentJSON.value))
+  const quotes = computed(() => serializedContent.value.userContent?.quotes ?? [])
   const modelInputIssue = computed(() => resolveChatComposerModelInputIssue({
     model: options.selectedModel.value,
     modelSelection: {
@@ -47,7 +50,7 @@ export function useChatComposer(options: UseChatComposerOptions) {
     resources: options.resources.value,
   }))
   const canSubmit = computed(() => options.canSend.value && modelInputIssue.value === null && (
-    serializedContent.value.content.length > 0 || resourceIds.value.length > 0
+    serializedContent.value.content.length > 0 || resourceIds.value.length > 0 || quotes.value.length > 0
   ) && resourceIds.value.every(id => resourceById.value.get(id)?.resource.state === 'ready'))
   const panelResources = computed(() => (contentJSON.value.attrs?.panelResourceIds as string[] ?? [])
     .flatMap(id => resourceById.value.get(id) ?? []))
@@ -144,6 +147,9 @@ export function useChatComposer(options: UseChatComposerOptions) {
     loadContextOptions: query.loadContextOptions,
     modelInputIssue,
     panelResources,
+    quotes,
+    addQuote: (quote: BuddyMessageQuote) => addChatQuote(editor.value, quote),
+    removeQuote: (id: string) => removeChatQuote(editor.value, id),
     removeResource,
     removePanelResource: (id: string) => editor.value && removeChatComposerPanelResource(editor.value, id),
     resourceStripResources,

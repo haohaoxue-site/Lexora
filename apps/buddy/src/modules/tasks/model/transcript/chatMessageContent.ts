@@ -113,7 +113,7 @@ function normalizeLinkPath(value: string): string {
 
 export function isVisibleChatMessage(message: LocalMessage): boolean {
   return message.role !== 'tool'
-    && (getChatMessageText(message).trim().length > 0 || message.attachments.length > 0)
+    && (getChatMessageText(message).trim().length > 0 || message.attachments.length > 0 || Boolean(getChatMessageUserContent(message)?.userContent.quotes?.length))
 }
 
 function escapeRegExp(value: string): string {

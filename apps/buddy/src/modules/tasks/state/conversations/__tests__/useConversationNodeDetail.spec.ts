@@ -80,7 +80,7 @@ describe('conversation node detail', () => {
 })
 
 function question(id: string): LocalConversationTreeNode {
-  return { id, parentId: null, kind: 'question', branchId: 'branch', messageId: id, runId: null, text: id, status: null, active: false, toolCount: 0, attempts: [], attachments: [], attachmentCount: 0, artifacts: [], artifactCount: 0, metadata: null }
+  return { id, parentId: null, kind: 'question', branchId: 'branch', messageId: id, runId: null, text: id, quotes: [], quoteCount: 0, status: null, active: false, toolCount: 0, attempts: [], attachments: [], attachmentCount: 0, artifacts: [], artifactCount: 0, metadata: null }
 }
 function page(id: string): LocalConversationTimelinePage {
   return { items: [{ id, kind: 'message', role: 'user', content: { text: id }, conversationId: 'conversation', branchId: 'branch', runId: null, createdAt: now, attachments: [] }], runs: [], runEvents: [], outputs: [], changeSets: [], nextCursor: null }
