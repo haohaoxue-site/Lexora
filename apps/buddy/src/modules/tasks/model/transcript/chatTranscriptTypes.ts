@@ -2,6 +2,7 @@ import type { LocalArtifact } from '@buddy-shared/artifacts/artifactApi'
 import type { LocalChangeSetSummary } from '@buddy-shared/changes/changeApi'
 import type { LocalConversationTimelineItem, LocalMessage } from '@buddy-shared/conversation/conversationApi'
 import type { LocalRun, LocalRunEvent, LocalRunOutput } from '@buddy-shared/runs/runApi'
+import type { LocalRunTokenUsage } from '@buddy-shared/usage/runTokenUsage'
 
 import type { ChatAgentTurn } from './chatAgentTurn'
 import type { ChatRecoveryNotice } from './chatRunRecovery'
@@ -14,6 +15,7 @@ export interface ChatTranscriptMessageRow {
   message: LocalMessage
   streaming?: true
   turnChanges?: LocalChangeSetSummary
+  turnUsage?: LocalRunTokenUsage
   turnOutputs: ChatTranscriptTurnOutputs | null
 }
 

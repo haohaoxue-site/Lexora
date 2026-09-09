@@ -8,6 +8,7 @@ import { useBuddyI18n } from '@/i18n/buddyI18n'
 import DesktopIcon from '@/shared/ui/icon/DesktopIcon.vue'
 import { resolveBuddyAttachmentPreviewUrl } from '../../model/attachments/chatAttachmentView'
 import { formatChatRunDuration } from '../../model/transcript/chatRunDuration'
+import BuddyChatTokenUsage from '../transcript/BuddyChatTokenUsage.vue'
 import { conversationCanvasActions } from './conversationCanvasContext'
 
 const props = defineProps<{ node: Node }>()
@@ -108,6 +109,7 @@ function open(event: MouseEvent) {
       </div>
       <footer v-if="message.metadata" class="conversation-node__footer" @mousedown.stop @pointerdown.stop>
         <span class="conversation-node__model" :title="message.metadata.modelId">{{ message.metadata.modelId }}</span>
+        <BuddyChatTokenUsage v-if="message.metadata.usage" compact :language="actions.language.value" :usage="message.metadata.usage" />
         <span v-if="duration" class="conversation-node__duration">{{ duration }}</span>
       </footer>
     </div>
@@ -134,9 +136,9 @@ function open(event: MouseEvent) {
 .conversation-node__preview { margin: 0; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 13px; line-height: 1.65; }
 .conversation-node.busy .conversation-node__preview { display: block; }
 .conversation-node__placeholder { margin: 4px 0; color: var(--buddy-text-muted); font-size: 12px; line-height: 1.7; }
-.conversation-node__footer { margin-top: auto; display: flex; flex: none; align-items: center; justify-content: space-between; gap: 12px; min-height: 30px; padding: 0 16px 10px; color: var(--buddy-text-muted); font-size: 10px; }
-.conversation-node__model { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.conversation-node__duration { flex: none; font-variant-numeric: tabular-nums; }
+.conversation-node__footer { margin-top: auto; display: flex; flex: none; align-items: center; gap: 8px; min-height: 30px; padding: 0 16px 10px; color: var(--buddy-text-muted); font-size: 10px; }
+.conversation-node__model { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.conversation-node__duration { flex: none; margin-left: auto; font-variant-numeric: tabular-nums; }
 .conversation-node__actions { display: flex; flex: none; gap: 2px; margin-left: auto; opacity: 0; pointer-events: none; transition: opacity 120ms ease; }
 .conversation-node:hover .conversation-node__actions, .conversation-node:focus-within .conversation-node__actions { opacity: 1; pointer-events: auto; }
 .conversation-node__actions button { display: grid; width: 26px; height: 26px; flex: none; place-items: center; border: 0; border-radius: 6px; background: transparent; color: var(--buddy-text-secondary); cursor: pointer; }

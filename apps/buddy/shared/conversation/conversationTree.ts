@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { artifactSchema } from '../artifacts/artifactApi'
 import { runStatusSchema } from '../runs/runApi'
 import { idSchema, timestampSchema } from '../runtime/apiValidation'
+import { runTokenUsageSchema } from '../usage/runTokenUsage'
 import { attachmentSchema } from './attachmentApi'
 import { conversationResponseSchemas } from './conversationApi'
 
@@ -22,6 +23,7 @@ export const conversationTreeNodeSchema = z.object({
     modelId: idSchema,
     startedAt: timestampSchema,
     completedAt: timestampSchema.nullable(),
+    usage: runTokenUsageSchema.nullable(),
   }).strict().nullable(),
   status: runStatusSchema.nullable(),
   active: z.boolean(),

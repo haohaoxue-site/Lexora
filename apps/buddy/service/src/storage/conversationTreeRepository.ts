@@ -1,4 +1,5 @@
 import type { DatabaseSync } from 'node:sqlite'
+import type { LocalRunTokenUsage } from '../../../shared/usage/runTokenUsage'
 import type { BuddyRunEvent } from '../events/BuddyRunEvent'
 import type { MessageRecord } from './conversationHistoryRepository'
 import type { RunRow } from './runRecord'
@@ -27,8 +28,16 @@ export function createConversationTreeRepository(database: DatabaseSync) {
   const outputs = database.prepare(`SELECT run_events.run_id AS runId, run_events.created_at AS createdAt, payload_json
     FROM run_events INNER JOIN runs ON runs.id = run_events.run_id
     WHERE runs.conversation_id = ? AND event_type = 'output.produced' ORDER BY run_events.created_at, sequence`)
+  const usage = database.prepare(`SELECT usage_records.run_id AS runId,
+    SUM(input_tokens) AS inputTokens, SUM(output_tokens) AS outputTokens,
+    SUM(cache_read_tokens) AS cacheReadTokens, SUM(cache_write_tokens) AS cacheWriteTokens
+    FROM usage_records INNER JOIN runs ON runs.id = usage_records.run_id
+    WHERE runs.conversation_id = ? GROUP BY usage_records.run_id`)
 
   return {
+    listRunUsage: (conversationId: string): ReadonlyMap<string, LocalRunTokenUsage> =>
+      new Map((usage.all(conversationId) as (LocalRunTokenUsage & { runId: string })[])
+        .map(({ runId, ...tokens }) => [runId, tokens])),
     listOutputEvents: (conversationId: string): Pick<BuddyRunEvent, 'type' | 'runId' | 'createdAt' | 'payload'>[] =>
       (outputs.all(conversationId) as { runId: string, createdAt: string, payload_json: string }[])
         .map(({ payload_json, ...event }) => ({ ...event, type: 'output.produced', payload: JSON.parse(payload_json) })),

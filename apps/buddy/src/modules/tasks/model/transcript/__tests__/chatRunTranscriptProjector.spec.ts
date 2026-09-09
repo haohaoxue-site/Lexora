@@ -8,6 +8,32 @@ import {
 import { createChatRunTranscriptProjector } from '../chatRunTranscriptProjector'
 
 describe('chat run transcript projector', () => {
+  it('refreshes usage when another model call completes and preserves it on terminal replay', () => {
+    const running = run('run-a')
+    const projector = createChatRunTranscriptProjector()
+    const event = messageEvent('run-a', 1, 'usage.recorded', {
+      usageRecordId: 'usage-a',
+      inputTokens: 100,
+      outputTokens: 20,
+      cacheReadTokens: 80,
+      cacheWriteTokens: 0,
+    })
+    const buckets = replaceChatRunEventBuckets([event])
+    const initial = projector.project(buckets, [running])[0]!
+    const updatedBuckets = mergeChatRunEventBuckets(buckets, [messageEvent('run-a', 2, 'usage.recorded', {
+      usageRecordId: 'usage-b',
+      inputTokens: 50,
+      outputTokens: 30,
+      cacheReadTokens: 120,
+      cacheWriteTokens: 10,
+    })])
+    const updated = projector.project(updatedBuckets, [running])[0]!
+    expect(initial.turn.usage?.outputTokens).toBe(20)
+    expect(updated.turn.usage).toEqual({ inputTokens: 150, outputTokens: 50, cacheReadTokens: 200, cacheWriteTokens: 10 })
+    const terminal = projector.project(updatedBuckets, [{ ...running, status: 'completed' }])[0]!
+    expect(terminal.turn.usage).toEqual(updated.turn.usage)
+  })
+
   it('reuses the complete projection for an unaffected run', () => {
     const runA = run('run-a')
     const runB = run('run-b')

@@ -1,6 +1,9 @@
 import type zhCN from '../zh-CN/chat'
 
 export default {
+  'desktop.chat.usage.input': 'Input',
+  'desktop.chat.usage.output': 'Output',
+  'desktop.chat.usage.cache': 'Cached',
   'desktop.canvas.nodeActions': 'Message actions',
   'desktop.canvas.more': 'More',
   'desktop.canvas.moreResources': 'View details, {count} more resources',

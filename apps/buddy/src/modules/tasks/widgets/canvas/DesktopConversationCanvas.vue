@@ -33,7 +33,12 @@ const nodes = computed<readonly ConversationCanvasNode[]>(() => {
         toolCount: projection ? projection.turn.nodes.filter(item => item.kind === 'tool').length : node.toolCount,
         artifacts: artifacts.length ? artifacts.slice(0, 3) : node.artifacts,
         artifactCount: artifacts.length || node.artifactCount,
-        metadata: { modelId: run.modelId, startedAt: run.startedAt, completedAt: run.completedAt },
+        metadata: {
+          modelId: run.modelId,
+          startedAt: run.startedAt,
+          completedAt: run.completedAt,
+          usage: projection?.turn.usage ?? node.metadata?.usage ?? null,
+        },
       }
     : node)
   if (followup.value) {

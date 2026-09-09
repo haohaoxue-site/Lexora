@@ -265,6 +265,7 @@ onBeforeUnmount(clearOutlineHighlight)
           :streaming="item.streaming === true"
           :turn-outputs="item.turnOutputs"
           :turn-changes="item.turnChanges"
+          :turn-usage="item.turnUsage"
           @activate-branch="emit('activateBranch', $event)"
           @open-artifact="emit('openArtifact', $event)"
           @open-changes="emit('openChanges', $event)"
