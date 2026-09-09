@@ -9,6 +9,12 @@ export const settingsRoutes: ReadonlyArray<RouteRecordRaw> = [
     redirect: desktopRouteLocations.settings(),
     children: [
       {
+        path: 'logs',
+        name: DESKTOP_ROUTE_NAMES.settingsLogs,
+        component: () => import('./pages/DesktopLogsSettingsView.vue'),
+        meta: { desktopView: 'settings', settingsCategory: 'logs' },
+      },
+      {
         path: 'web',
         name: DESKTOP_ROUTE_NAMES.settingsWeb,
         component: () => import('./pages/DesktopWebSettingsView.vue'),

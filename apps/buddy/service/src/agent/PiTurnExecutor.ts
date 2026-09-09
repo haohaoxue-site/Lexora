@@ -23,6 +23,7 @@ import type {
   PiEventBridgeSession,
   PiEventBridgeSettlement,
 } from './PiEventBridge'
+import type { RunExecutionBackend, RunExecutionOutcome } from './RunExecutionBackend'
 import { RunEventLogFatalError } from '../events/RunEventFailure'
 import { BuddyAgentRunError, readStableRunErrorCode } from '../runs/runError'
 
@@ -66,11 +67,6 @@ export interface BuddySessionTurnContext {
   thinkingLevel?: BuddyThinkingLevel
 }
 
-export type PiExecutionOutcome
-  = | { status: 'completed' }
-    | { errorCode: string | null, status: 'cancelled' }
-    | { errorCode: string, errorMessage?: string, status: 'failed' }
-
 type PiTurnSessions = Pick<
   BuddySessionRegistry<BuddyAgentSessionLike>,
   'getOrCreate' | 'invalidateSession'
@@ -112,7 +108,7 @@ export interface InvalidatePiSessionContinuityInput {
   runId: string
 }
 
-export class PiTurnExecutor {
+export class PiTurnExecutor implements RunExecutionBackend {
   readonly #automationSessionStartupTimeoutMs: number
   readonly #eventLog: PiTurnExecutorOptions['eventLog']
   readonly #piEvents: PiTurnExecutorOptions['piEvents']
@@ -130,7 +126,7 @@ export class PiTurnExecutor {
     this.#sessions = options.sessions
   }
 
-  async executeTurn(execution: ExecutePiTurnInput): Promise<PiExecutionOutcome> {
+  async executeTurn(execution: ExecutePiTurnInput): Promise<RunExecutionOutcome> {
     const { identity, input, run, signal } = execution
     const bindingPromise = this.#sessions.getOrCreate(
       identity,
@@ -157,6 +153,8 @@ export class PiTurnExecutor {
 
     execution.onSessionActivated(binding.session)
     const piEvents = this.#piEvents.createTurn({
+      conversationId: run.conversationId,
+      branchId: run.branchId,
       canonicalRoot: input.session.canonicalRoot,
       model: run.model,
       provider: run.provider,
@@ -241,7 +239,7 @@ export class PiTurnExecutor {
 
   async executeCompaction(
     execution: ExecutePiCompactionInput,
-  ): Promise<PiExecutionOutcome> {
+  ): Promise<RunExecutionOutcome> {
     const { identity, input, run, signal } = execution
     const binding = await this.#sessions.getOrCreate(
       identity,
@@ -278,6 +276,8 @@ export class PiTurnExecutor {
       thinkingLevel: input.thinkingLevel,
     })
     const piEvents = this.#piEvents.createCompaction({
+      conversationId: run.conversationId,
+      branchId: run.branchId,
       canonicalRoot: input.session.canonicalRoot,
       model: run.model,
       provider: run.provider,

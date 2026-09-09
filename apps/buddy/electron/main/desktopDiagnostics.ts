@@ -1,82 +1,262 @@
+import type { Writable } from 'node:stream'
+import type { CapturedDiagnosticOutput } from './diagnostics/diagnosticOutput'
+import type { DesktopDiagnosticEvent, DesktopDiagnosticScope, DiagnosticContext } from './diagnostics/diagnosticRecord'
 import { Buffer } from 'node:buffer'
-import { appendFile, chmod, mkdir, rename, rm, stat } from 'node:fs/promises'
-import { join } from 'node:path'
-import { Writable } from 'node:stream'
+import { randomUUID } from 'node:crypto'
+import process from 'node:process'
+import { APPLICATION_LOG_MAX_FILE_BYTES, APPLICATION_LOG_MAX_FILES } from '../../shared/diagnostics/applicationLog'
+import { DiagnosticFile } from './diagnostics/diagnosticFile'
+import { captureDiagnosticOutput, createDiagnosticOutput } from './diagnostics/diagnosticOutput'
+import { encodeDiagnosticRecord, MAX_DIAGNOSTIC_RECORD_BYTES, redactDiagnosticText } from './diagnostics/diagnosticRecord'
 
-export type DesktopDiagnosticScope = 'desktop' | 'local-service' | 'native-pet'
+export type { DesktopDiagnosticEvent, DesktopDiagnosticRecord, DesktopDiagnosticScope } from './diagnostics/diagnosticRecord'
 
 export interface DesktopDiagnosticLoggerOptions {
   directory: string
-  maxBytes?: number
+  appVersion: string
   userHome: string
+  maxFileBytes?: number
+  maxFiles?: number
+  maxQueueBytes?: number
+  closeTimeoutMs?: number
+}
+
+export interface DesktopDiagnosticStatus {
+  accepted: number
+  written: number
+  dropped: number
+  failed: number
+  unconfirmed: number
+  pendingBytes: number
+  lastError: string | null
+  state: 'open' | 'closing' | 'closed'
+  closeTimedOut: boolean
 }
 
 export class DesktopDiagnosticLogger {
-  readonly #directory: string
-  readonly #maxBytes: number
+  readonly #context: DiagnosticContext
   readonly #userHome: string
-  #queue: Promise<void> = Promise.resolve()
+  readonly #startedAt = performance.now()
+  readonly #file: DiagnosticFile
+  readonly #maxQueueBytes: number
+  readonly #maxBatchBytes: number
+  readonly #closeTimeoutMs: number
+  readonly #outputs = new Set<Writable>()
+  readonly #captures = new Set<CapturedDiagnosticOutput>()
+  readonly #flushWaiters: Array<{ target: number, resolve: () => void }> = []
+  readonly #status: DesktopDiagnosticStatus = {
+    accepted: 0,
+    written: 0,
+    dropped: 0,
+    failed: 0,
+    unconfirmed: 0,
+    pendingBytes: 0,
+    lastError: null,
+    state: 'open',
+    closeTimedOut: false,
+  }
+
+  #queue: Buffer[] = []
+  #sequence = 0
+  #settled = 0
+  #retryAt = 0
+  #lossesPending = false
+  #draining: Promise<void> | null = null
+  #closing: Promise<DesktopDiagnosticStatus> | null = null
 
   constructor(options: DesktopDiagnosticLoggerOptions) {
-    this.#directory = options.directory
-    this.#maxBytes = options.maxBytes ?? 2 * 1024 * 1024
+    const maxFileBytes = options.maxFileBytes ?? APPLICATION_LOG_MAX_FILE_BYTES
+    const maxFiles = options.maxFiles ?? APPLICATION_LOG_MAX_FILES
+    this.#maxQueueBytes = options.maxQueueBytes ?? 2 * 1024 * 1024
+    this.#closeTimeoutMs = options.closeTimeoutMs ?? 2000
+    if ([maxFileBytes, this.#maxQueueBytes].some(value => !Number.isSafeInteger(value) || value < MAX_DIAGNOSTIC_RECORD_BYTES)
+      || !Number.isSafeInteger(maxFiles) || maxFiles < 1
+      || !Number.isSafeInteger(this.#closeTimeoutMs) || this.#closeTimeoutMs < 1) {
+      throw new RangeError('Invalid diagnostic limits')
+    }
+    this.#maxBatchBytes = Math.min(maxFileBytes, 64 * 1024)
+    this.#file = new DiagnosticFile(options.directory, maxFileBytes, maxFiles)
     this.#userHome = options.userHome
+    this.#context = {
+      launchId: randomUUID(),
+      appVersion: options.appVersion,
+      platform: process.platform,
+      collectorPid: process.pid,
+    }
   }
 
-  write(scope: DesktopDiagnosticScope, message: string): Promise<void> {
-    const line = `[${new Date().toISOString()}] ${redactDiagnosticText(message, this.#userHome)}\n`
-    const operation = this.#queue.then(async () => {
-      await mkdir(this.#directory, { mode: 0o700, recursive: true })
-      const path = join(this.#directory, `${scope}.log`)
-      await rotateIfNeeded(path, Buffer.byteLength(line), this.#maxBytes)
-      await appendFile(path, line, { encoding: 'utf8', mode: 0o600 })
-      await chmod(path, 0o600)
+  get status(): DesktopDiagnosticStatus {
+    return { ...this.#status }
+  }
+
+  get launchId(): string {
+    return this.#context.launchId
+  }
+
+  record(input: DesktopDiagnosticEvent): boolean {
+    if (this.#status.state !== 'open')
+      return false
+    return this.#enqueue(input)
+  }
+
+  createWritable(scope: DesktopDiagnosticScope, options: Partial<Pick<DesktopDiagnosticEvent, 'event' | 'level' | 'sourceId'>> = {}): Writable {
+    const sourceId = randomUUID()
+    const output = createDiagnosticOutput(
+      message => this.#enqueue({ scope, sourceId, event: 'process.stderr', level: 'warn', ...options, message }),
+      () => this.#drop(),
+    )
+    if (this.#status.state !== 'open') {
+      output.end()
+      return output
+    }
+    this.#outputs.add(output)
+    output.once('close', () => this.#outputs.delete(output))
+    return output
+  }
+
+  captureOutput(scope: DesktopDiagnosticScope, source: NodeJS.ReadableStream, sourceId?: string): void {
+    if (this.#status.state !== 'open')
+      return
+    const capture = captureDiagnosticOutput(source, this.createWritable(scope, sourceId ? { sourceId } : {}), (error) => {
+      this.#enqueue({ scope, sourceId, level: 'warn', event: 'process.stderr_failed', error })
     })
-    this.#queue = operation.catch(() => {})
-    return operation
+    this.#captures.add(capture)
+    void capture.done.then(() => this.#captures.delete(capture))
   }
 
-  createWritable(scope: DesktopDiagnosticScope, mirror?: NodeJS.WritableStream): Writable {
-    return new Writable({
-      write: (chunk, _encoding, callback) => {
-        mirror?.write(chunk)
-        void this.write(scope, String(chunk).trimEnd()).then(
-          () => callback(),
-          error => callback(error),
-        )
-      },
+  async flush(): Promise<DesktopDiagnosticStatus> {
+    const target = this.#status.accepted
+    if (this.#settled < target)
+      await new Promise<void>(resolve => this.#flushWaiters.push({ target, resolve }))
+    return this.status
+  }
+
+  close(): Promise<DesktopDiagnosticStatus> {
+    this.#closing ??= this.#close()
+    return this.#closing
+  }
+
+  async #close(): Promise<DesktopDiagnosticStatus> {
+    this.#status.state = 'closing'
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const timedOut = new Promise<void>((resolve) => {
+      timer = setTimeout(() => {
+        this.#status.closeTimedOut = true
+        resolve()
+      }, this.#closeTimeoutMs)
+    })
+    const close = async () => {
+      await Promise.all([...this.#captures].map(capture => capture.done))
+      for (const output of this.#outputs)
+        output.end()
+      this.#reportLosses()
+      await this.flush()
+      await this.#draining
+      await this.#file.close()
+    }
+    await Promise.race([close().catch(error => this.#noteError(error)), timedOut])
+    clearTimeout(timer)
+    for (const capture of this.#captures)
+      capture.stop()
+    for (const output of this.#outputs)
+      output.end()
+    this.#status.state = 'closed'
+    if (this.#status.closeTimedOut) {
+      this.#status.unconfirmed += this.#status.accepted - this.#settled
+      this.#settled = this.#status.accepted
+      this.#status.pendingBytes = 0
+      this.#queue = []
+      this.#resolveFlushes()
+    }
+    return this.status
+  }
+
+  #enqueue(input: DesktopDiagnosticEvent): boolean {
+    if (this.#status.state === 'closed')
+      return false
+    if (performance.now() < this.#retryAt)
+      return this.#drop()
+    const line = encodeDiagnosticRecord(input, this.#context, ++this.#sequence, performance.now() - this.#startedAt, this.#userHome)
+    if (!line || this.#status.pendingBytes + line.length > this.#maxQueueBytes)
+      return this.#drop()
+    this.#queue.push(line)
+    this.#status.accepted++
+    this.#status.pendingBytes += line.length
+    this.#startDrain()
+    return true
+  }
+
+  #startDrain(): void {
+    this.#draining ??= Promise.resolve().then(() => this.#drain()).finally(() => {
+      this.#draining = null
+      if (this.#queue.length)
+        this.#startDrain()
     })
   }
 
-  close(): Promise<void> {
-    return this.#queue
+  async #drain(): Promise<void> {
+    while (this.#queue.length) {
+      const batch: Buffer[] = []
+      let bytes = 0
+      while (this.#queue.length && bytes + this.#queue[0]!.length <= this.#maxBatchBytes) {
+        const line = this.#queue.shift()!
+        bytes += line.length
+        batch.push(line)
+      }
+      try {
+        await this.#file.append(Buffer.concat(batch, bytes))
+        if (this.#status.state === 'closed')
+          return
+        this.#status.written += batch.length
+      }
+      catch (error) {
+        this.#noteError(error)
+        if (this.#status.state === 'closed')
+          return
+        this.#status.failed += batch.length + this.#queue.length
+        this.#settled += batch.length + this.#queue.length
+        this.#status.pendingBytes = 0
+        this.#queue = []
+        this.#retryAt = performance.now() + 1000
+        this.#lossesPending = true
+        await this.#file.close().catch(error => this.#noteError(error))
+        this.#resolveFlushes()
+        return
+      }
+      this.#status.pendingBytes -= bytes
+      this.#settled += batch.length
+      this.#resolveFlushes()
+      this.#reportLosses()
+    }
   }
-}
 
-export function redactDiagnosticText(value: string, userHome: string): string {
-  return value
-    .replaceAll(userHome, '<home>')
-    .replace(/(Authorization:\s*Bearer\s+)\S+/gi, '$1<redacted>')
-    .replace(/\b(?:sk|key)-[\w-]+/gi, '<redacted>')
-    .slice(0, 16 * 1024)
-}
-
-async function rotateIfNeeded(path: string, addedBytes: number, maxBytes: number): Promise<void> {
-  const currentBytes = await stat(path).then(value => value.size, () => 0)
-  if (currentBytes + addedBytes <= maxBytes)
-    return
-  await rm(`${path}.3`, { force: true })
-  await renameIfPresent(`${path}.2`, `${path}.3`)
-  await renameIfPresent(`${path}.1`, `${path}.2`)
-  await renameIfPresent(path, `${path}.1`)
-}
-
-async function renameIfPresent(source: string, destination: string): Promise<void> {
-  try {
-    await rename(source, destination)
+  #reportLosses(): void {
+    if (!this.#lossesPending || this.#status.pendingBytes || performance.now() < this.#retryAt)
+      return
+    this.#lossesPending = false
+    this.#enqueue({
+      scope: 'desktop',
+      level: 'warn',
+      event: 'recorder.loss',
+      message: `Dropped records: ${this.#status.dropped}; failed records: ${this.#status.failed}`,
+    })
   }
-  catch (error) {
-    if ((error as NodeJS.ErrnoException).code !== 'ENOENT')
-      throw error
+
+  #drop(): false {
+    this.#status.dropped++
+    this.#lossesPending = true
+    return false
+  }
+
+  #noteError(error: unknown): void {
+    const message = error instanceof Error ? error.message : 'Diagnostic I/O failure'
+    this.#status.lastError = redactDiagnosticText(message, this.#userHome).slice(0, 1024)
+  }
+
+  #resolveFlushes(): void {
+    for (let index = this.#flushWaiters.length - 1; index >= 0; index--) {
+      if (this.#flushWaiters[index]!.target <= this.#settled)
+        this.#flushWaiters.splice(index, 1)[0]!.resolve()
+    }
   }
 }

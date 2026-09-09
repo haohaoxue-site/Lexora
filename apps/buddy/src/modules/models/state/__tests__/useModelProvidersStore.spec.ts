@@ -1,7 +1,8 @@
 import type { LexoraDesktopApi } from '@buddy-electron/shared/desktopApi'
 import type { LocalProvider, LocalRuntimeModelOption } from '@buddy-shared/providers/providerApi'
 
-import { describe, expect, it } from 'vitest'
+import { deferred } from '@buddy-tests/deferred'
+import { describe, expect, it, vi } from 'vitest'
 import { shallowRef } from 'vue'
 import { filterAvailableModels, useModelProvidersStore } from '../useModelProvidersStore'
 
@@ -25,6 +26,36 @@ describe('filterAvailableModels', () => {
 })
 
 describe('useModelProvidersStore', () => {
+  it('shares initial catalog loading and refreshes a mutation that completes during that load', async () => {
+    const initial = deferred<LocalProvider[]>()
+    const changed = provider('ready', false, 'available')
+    const api = {
+      list: vi.fn().mockReturnValueOnce(initial.promise).mockResolvedValue([changed]),
+      listModels: async () => [model('ready')],
+      getDefaultModel: async () => null,
+      setDefaultModel: async () => {},
+      setEnabled: async () => {},
+      onAuthChallenge: () => () => {},
+    } as unknown as LexoraDesktopApi['localChat']['providers']
+    const store = useModelProvidersStore({ api, language: shallowRef('zh-CN') })
+    const loading = store.loadModelCatalog()
+    expect(store.loadModelCatalog(true)).toBe(loading)
+    const changing = store.setProviderEnabled('ready', false)
+    initial.resolve([provider('ready', true, 'available')])
+    await expect(loading).resolves.toBe(true)
+    await expect(changing).resolves.toBe(true)
+    expect(store.providers.value).toEqual([changed])
+    expect(store.models.value).toEqual([])
+    expect(store.isLoadingModelCatalog.value).toBe(false)
+
+    vi.mocked(api.list).mockRejectedValueOnce(new Error('RUNTIME_OFFLINE'))
+    await expect(store.loadModelCatalog(true)).resolves.toBe(false)
+    expect(store.providers.value).toEqual([changed])
+    await expect(store.loadModelCatalog(true)).resolves.toBe(true)
+    expect(store.modelProviderError.value).toBeNull()
+    store.dispose()
+  })
+
   it('does not expose a provider login cancellation as a provider error', async () => {
     const api = {
       localChat: {

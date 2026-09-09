@@ -1,4 +1,5 @@
 import app from './app'
+import applicationLogs from './applicationLogs'
 import approvals from './approvals'
 import automations from './automations'
 import chat from './chat'
@@ -10,6 +11,7 @@ import tasks from './tasks'
 
 export default {
   ...app,
+  ...applicationLogs,
   ...approvals,
   ...automations,
   ...chat,

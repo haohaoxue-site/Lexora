@@ -29,7 +29,7 @@ export type ForkBuddyServiceProcess = (
 ) => BuddyServiceProcessInstance
 
 export interface ForkBuddyServiceProcessOptions {
-  diagnosticOutput?: NodeJS.WritableStream
+  captureStderr?: (output: NodeJS.ReadableStream) => void
   env?: NodeJS.ProcessEnv
   forkProcess?: ForkBuddyServiceProcess
   mainModuleUrl?: string
@@ -59,9 +59,12 @@ export function forkBuddyServiceProcess(
       stdio: 'pipe',
     },
   )
-  process.stderr?.on('data', chunk => (
-    (options.diagnosticOutput ?? nodeProcess.stderr).write(`[Buddy Local Service] ${chunk}`)
-  ))
+  if (process.stderr) {
+    if (options.captureStderr)
+      options.captureStderr(process.stderr)
+    else
+      process.stderr.pipe(nodeProcess.stderr, { end: false })
+  }
   const peer = new BuddyServicePeer({
     onFatalError: options.onFatalError,
     process,

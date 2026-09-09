@@ -5,6 +5,7 @@ import type {
 } from '../../../shared/conversation/buddyUserContent'
 import type { BuddyComposerDraftScope } from '../../../shared/conversation/composerDraft'
 import type { BuddyThinkingLevel } from '../../../shared/conversation/modelSelection'
+import type { ApplicationDiagnosticReporter } from '../../../shared/diagnostics/applicationDiagnostic'
 import type { BuddyAgentRunner } from '../agent/BuddyAgentRunner'
 import type { BuddyTurnLauncher } from '../agent/BuddyTurnLauncher'
 import type { SkillService } from '../agent/SkillService'
@@ -51,6 +52,7 @@ import {
   buddyUserMessageContentV1Schema,
 } from '../../../shared/conversation/buddyUserContent'
 import { isBuddyThinkingLevel } from '../../../shared/conversation/modelSelection'
+import { safeDiagnosticReporter } from '../../../shared/diagnostics/applicationDiagnostic'
 import {
   BuddySkillSelectionError,
   formatBuddySkillPrompt,
@@ -83,6 +85,7 @@ export interface RegenerateChatAssistantInput {
 }
 
 export interface ChatTurnServiceOptions {
+  record?: ApplicationDiagnosticReporter
   composerResources?: Pick<ComposerResourceService, 'resolveInput'>
   attachments: Pick<
     AttachmentService,
@@ -483,6 +486,14 @@ export class ChatTurnService {
   }
 
   async #launchPreparedTurn(prepared: TurnRequestRecord) {
+    safeDiagnosticReporter(this.#options.record)({
+      event: prepared.created ? 'run.queued' : 'run.reused',
+      level: 'info',
+      runId: prepared.runId,
+      conversationId: prepared.conversationId,
+      branchId: prepared.branchId,
+      requestId: prepared.requestId,
+    })
     if (!prepared.created)
       return this.#toTurnStart(prepared, this.#requireRun(prepared.runId))
     const turn = await this.#options.turnLauncher.launch(prepared.runId)

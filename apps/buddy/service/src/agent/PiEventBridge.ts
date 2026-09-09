@@ -1,10 +1,13 @@
 import type { AgentSessionEvent, CompactionResult } from '@earendil-works/pi-coding-agent'
+import type { ApplicationDiagnosticReporter } from '../../../shared/diagnostics/applicationDiagnostic'
 import type { RunEventWriter } from '../events/RunEventPorts'
 import type { BuddyUsagePurpose } from '../usage/recordPiUsage'
 import type { UsageService } from '../usage/UsageService'
 import type { BuddyContextUsageBreakdown } from './contextUsageBreakdown'
+import { safeDiagnosticReporter } from '../../../shared/diagnostics/applicationDiagnostic'
 import { RunEventLogFatalError } from '../events/RunEventFailure'
 import { BufferedRunEventWriter } from './BufferedRunEventWriter'
+import { PiApplicationObserver } from './PiApplicationObserver'
 import { isPiShellToolName } from './piBuiltinTools'
 import {
   createPiEventProjectionState,
@@ -27,6 +30,8 @@ export interface PiEventBridgeSession {
 }
 
 export interface CreatePiEventChannelInput {
+  conversationId?: string
+  branchId?: string
   canonicalRoot: string
   model: string
   provider: string
@@ -79,15 +84,18 @@ export interface PiCompactionEventChannel extends PiEventChannel {
 }
 
 export interface PiEventBridgeOptions {
+  record?: ApplicationDiagnosticReporter
   eventLog: PiEventLog
   usage: PiUsageService
 }
 
 export class PiEventBridge {
+  readonly #record: ApplicationDiagnosticReporter
   readonly #eventLog: PiEventLog
   readonly #usage: PiUsageService
 
   constructor(options: PiEventBridgeOptions) {
+    this.#record = safeDiagnosticReporter(options.record)
     this.#eventLog = options.eventLog
     this.#usage = options.usage
   }
@@ -97,6 +105,7 @@ export class PiEventBridge {
       ...input,
       eventLog: this.#eventLog,
       recordEventUsage: true,
+      record: this.#record,
       usage: this.#usage,
     })
   }
@@ -106,18 +115,21 @@ export class PiEventBridge {
       ...input,
       eventLog: this.#eventLog,
       recordEventUsage: false,
+      record: this.#record,
       usage: this.#usage,
     })
   }
 }
 
 interface ActivePiEventChannelOptions extends CreatePiEventChannelInput {
+  record: ApplicationDiagnosticReporter
   eventLog: PiEventLog
   recordEventUsage: boolean
   usage: PiUsageService
 }
 
 class ActivePiEventChannel implements PiCompactionEventChannel, PiTurnEventChannel {
+  readonly #observer: PiApplicationObserver
   readonly #eventLog: PiEventLog
   readonly #eventWriter: BufferedRunEventWriter
   readonly #model: string
@@ -136,6 +148,7 @@ class ActivePiEventChannel implements PiCompactionEventChannel, PiTurnEventChann
   #terminalToolUpdateTimer: NodeJS.Timeout | undefined
 
   constructor(options: ActivePiEventChannelOptions) {
+    this.#observer = new PiApplicationObserver({ ...options, report: options.record })
     this.#eventLog = options.eventLog
     this.#eventWriter = new BufferedRunEventWriter(
       options.eventLog,
@@ -175,6 +188,7 @@ class ActivePiEventChannel implements PiCompactionEventChannel, PiTurnEventChann
     const projected = projectToolExecutionAuthorized(event, this.#projectionState)
     this.#eventWriter.appendBatch(projected.events)
     await this.#eventWriter.drain()
+    this.#observer.authorized(event.toolCallId)
   }
 
   async projectToolExecutionDenied(
@@ -183,6 +197,7 @@ class ActivePiEventChannel implements PiCompactionEventChannel, PiTurnEventChann
     await this.flush()
     this.#eventWriter.appendBatch(projectToolExecutionDenied(event).events)
     await this.#eventWriter.drain()
+    this.#observer.denied(event.toolCallId, event.denialCode)
   }
 
   async recordCompactionResult(result: CompactionResult): Promise<void> {
@@ -195,11 +210,13 @@ class ActivePiEventChannel implements PiCompactionEventChannel, PiTurnEventChann
     this.#flushPendingTerminalToolUpdates()
     const eventError = await settledError(this.#eventTail)
     const writerError = await settledError(this.#eventWriter.drain())
+    this.#observer.settle()
     return { eventError, writerError }
   }
 
   subscribe(): () => void {
     return this.#session.subscribe((event) => {
+      this.#observer.handle(event)
       if (isTerminalToolExecutionUpdate(event)) {
         this.#queueTerminalToolUpdate(event)
         return

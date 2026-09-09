@@ -64,6 +64,7 @@ export type NativePetSupervisorState
     | { status: 'offline', restartAttempt: number }
 
 export interface NativePetSupervisorOptions {
+  captureStderr?: (output: NodeJS.ReadableStream) => void
   diagnosticOutput?: Writable
   onOpenDesktop?: () => void
   readinessTimeoutMs?: number
@@ -85,6 +86,7 @@ interface NativePetGeneration {
 }
 
 export class NativePetSupervisor {
+  readonly #captureStderr?: (output: NodeJS.ReadableStream) => void
   readonly #diagnosticOutput: Writable
   readonly #onOpenDesktop?: () => void
   readonly #readinessTimeoutMs: number
@@ -102,6 +104,7 @@ export class NativePetSupervisor {
   #state: NativePetSupervisorState = { status: 'stopped' }
 
   constructor(options: NativePetSupervisorOptions) {
+    this.#captureStderr = options.captureStderr
     this.#diagnosticOutput = options.diagnosticOutput ?? process.stderr
     this.#onOpenDesktop = options.onOpenDesktop
     this.#readinessTimeoutMs = options.readinessTimeoutMs ?? 8000
@@ -222,9 +225,10 @@ export class NativePetSupervisor {
       restartAttempt: this.#restartAttempt,
       status: 'starting',
     }
-    petProcess.stderr.on('data', (chunk) => {
-      this.#diagnosticOutput.write(chunk)
-    })
+    if (this.#captureStderr)
+      this.#captureStderr(petProcess.stderr)
+    else
+      petProcess.stderr.pipe(this.#diagnosticOutput, { end: false })
     client.onOpenDesktop(() => this.#onOpenDesktop?.())
     client.onFatalError(() => {
       if (this.#generation?.id === id)

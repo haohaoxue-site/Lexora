@@ -2,11 +2,12 @@
 import type { LocalAutomation, LocalAutomationListItem } from '@buddy-shared/automation/automationApi'
 
 import type { AutomationActionResult } from '@/modules/automations/state/typing'
-import { NButton, NResult, NSpin, useMessage } from 'naive-ui'
+import { NButton, NResult, useMessage } from 'naive-ui'
 import { useRouter } from 'vue-router'
 import { useBuddyI18n } from '@/i18n/buddyI18n'
 import { useAutomationContext } from '@/modules/automations/automationContext'
 import DesktopAutomationList from '@/modules/automations/widgets/list/DesktopAutomationList.vue'
+import DesktopRuntimePane from '@/platform/runtime/DesktopRuntimePane.vue'
 import { desktopRouteLocations } from '@/shared/navigation/desktopRoutes'
 
 const router = useRouter()
@@ -60,9 +61,9 @@ const { automations: plans, isLoading, isLoadingMoreAutomations, loadError, pend
 </script>
 
 <template>
-  <NSpin
+  <DesktopRuntimePane
     class="desktop-automation-route-view"
-    :show="isLoading && plans.items.length === 0"
+    :loading="isLoading && plans.items.length === 0"
   >
     <NResult
       v-if="loadError && plans.items.length === 0"
@@ -97,7 +98,7 @@ const { automations: plans, isLoading, isLoadingMoreAutomations, loadError, pend
     >
       {{ t('desktop.automations.loadMore') }}
     </NButton>
-  </NSpin>
+  </DesktopRuntimePane>
 </template>
 
 <style scoped>

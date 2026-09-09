@@ -3,6 +3,8 @@ import type { DesktopEnvironment } from './typing'
 import process from 'node:process'
 import { app, dialog, nativeTheme } from 'electron'
 import { PowerShellUnavailableError } from '../../../platform/windows/powerShell'
+import { readDiagnosticErrorCode } from '../../../shared/diagnostics/applicationDiagnostic'
+import { ServiceHost } from '../../../shared/lifecycle/ServiceHost'
 import { translateDesktopNative } from '../desktopNativeI18n'
 import { resolveDesktopLaunchIntent } from '../startupIntent'
 import { confirmDesktopQuit, showBackgroundCloseNotice, showLegacyPowerShellNotice } from './desktopDialogs'
@@ -18,14 +20,17 @@ class DesktopApplication {
   readonly #windows: DesktopWindowHost
   readonly #runtime: DesktopRuntimeHost
   readonly #integrations: DesktopIntegrations
+  readonly #host: ServiceHost
   readonly #quit: ReturnType<typeof createDesktopQuitLifecycle>
   #disposePromise: Promise<void> | null = null
 
   constructor(environment: DesktopEnvironment) {
     this.#environment = environment
+    this.#host = new ServiceHost(environment.events)
     this.#windows = new DesktopWindowHost(environment)
     this.#runtime = new DesktopRuntimeHost(environment, this.#windows)
     this.#quit = createDesktopQuitLifecycle({
+      events: environment.events,
       confirm: options => confirmDesktopQuit({
         getWindow: () => this.#windows.window,
         getLanguage: () => this.#runtime.language,
@@ -39,8 +44,9 @@ class DesktopApplication {
   bindEvents(): void {
     nativeTheme.on('updated', () => this.#windows.updateAppearance())
     process.once('SIGINT', () => {
-      void this.#quit.request({ discardDraftsOnFailure: true }).catch((error) => {
-        console.error('Lexora Buddy Desktop failed to stop after SIGINT', error)
+      void this.#quit.request({ discardDraftsOnFailure: true }).catch(async (error) => {
+        this.#environment.events.publish({ level: 'error', event: 'app.interrupt_failed', errorCode: readDiagnosticErrorCode(error) })
+        await this.#environment.diagnostics.close()
         app.exit(1)
       })
     })
@@ -51,6 +57,7 @@ class DesktopApplication {
       this.#requestQuit()
     })
     app.on('second-instance', (_event, argv) => {
+      this.#environment.events.publish({ level: 'info', event: 'app.second_instance' })
       if (resolveDesktopLaunchIntent(argv) === 'foreground')
         this.#windows.show()
     })
@@ -59,17 +66,33 @@ class DesktopApplication {
   }
 
   async start(): Promise<void> {
-    await app.whenReady()
-    await prepareDesktopReady(this.#environment)
-    await this.#windows.startAdapter()
-    const config = await this.#runtime.prepare()
-    await this.#integrations.applyConfig(config)
-    this.#runtime.start()
-    this.#integrations.start()
-    const window = await this.#windows.initialize({
-      executeCommand: this.#integrations.executeCommand,
-      isQuitting: () => this.#quit.quitting,
-      onHidden: () => { void showBackgroundCloseNotice(this.#runtime.configStore) },
+    const host = this.#host
+    const window = await host.start('desktop', async () => {
+      await host.step('desktop.electron', () => app.whenReady())
+      await host.step('desktop.environment', () => prepareDesktopReady(this.#environment), ['desktop.electron'])
+      await host.start('desktop.browser_adapter', ({ defer }) => {
+        defer(() => this.#windows.stopAdapter())
+        return this.#windows.startAdapter()
+      }, ['desktop.environment'])
+      const config = await host.start('desktop.runtime', ({ defer }) => {
+        defer(() => this.#runtime.stop())
+        return this.#runtime.prepare()
+      }, ['desktop.browser_adapter'])
+      await host.step('desktop.features', () => this.#integrations.applyConfig(config), ['desktop.runtime'])
+      this.#runtime.start()
+      await host.start('desktop.integrations', ({ defer }) => {
+        defer(() => this.#integrations.destroyTray())
+        defer(() => this.#integrations.stopSubscriptions())
+        this.#integrations.start()
+      }, ['desktop.runtime'])
+      return host.start('desktop.window', ({ defer }) => {
+        defer(() => this.#windows.close())
+        return this.#windows.initialize({
+          executeCommand: this.#integrations.executeCommand,
+          isQuitting: () => this.#quit.quitting,
+          onHidden: () => { void showBackgroundCloseNotice(this.#runtime.configStore) },
+        })
+      }, ['desktop.integrations'])
     })
     if (this.#runtime.windowsPowerShell?.endsWith('\\powershell.exe') && !this.#environment.isSmokeTest)
       showLegacyPowerShellNotice(window, () => this.#runtime.language, this.#environment)
@@ -80,7 +103,7 @@ class DesktopApplication {
   }
 
   async handleStartupFailure(error: unknown): Promise<void> {
-    console.error('Lexora Buddy Desktop failed to start', error)
+    this.#environment.events.publish({ level: 'error', event: 'app.start_failed', errorCode: readDiagnosticErrorCode(error) })
     if (error instanceof PowerShellUnavailableError)
       dialog.showErrorBox('Lexora Buddy', translateDesktopNative(this.#runtime.language, 'powerShellUnavailable'))
     try {
@@ -93,28 +116,26 @@ class DesktopApplication {
 
   #requestQuit(): void {
     void this.#quit.request().catch((error) => {
-      console.error('Lexora Buddy Desktop failed to stop', error)
+      this.#environment.events.publish({ level: 'error', event: 'app.stop_failed', errorCode: readDiagnosticErrorCode(error) })
+      if (this.#quit.quitting)
+        app.exit(1)
     })
   }
 
   #dispose(): Promise<void> {
     this.#disposePromise ??= (async () => {
+      this.#environment.events.publish({ level: 'info', event: 'app.stopping' })
+      this.#environment.startup.stopping()
       const failures: unknown[] = []
-      for (const dispose of [
-        () => this.#windows.close(),
-        () => this.#integrations.stopSubscriptions(),
-        () => this.#windows.stopAdapter(),
-        () => this.#runtime.stop(),
-        () => this.#integrations.destroyTray(),
-        () => this.#environment.diagnostics.close(),
-      ]) {
-        try {
-          await dispose()
-        }
-        catch (error) {
-          failures.push(error)
-        }
+      try {
+        await this.#host.stop()
       }
+      catch (error) {
+        failures.push(error)
+      }
+      this.#environment.events.publish({ level: failures.length ? 'error' : 'info', event: failures.length ? 'app.stop_failed' : 'app.stopped' })
+      this.#environment.startup.stopped()
+      await this.#environment.diagnostics.close()
       if (failures.length)
         throw new AggregateError(failures, 'Desktop application cleanup failed')
     })()
@@ -125,10 +146,10 @@ class DesktopApplication {
 export function startDesktopApplication(): void {
   const environment = prepareDesktopEnvironment()
   if (!app.requestSingleInstanceLock()) {
-    environment.writeDiagnostic('Existing instance detected; activating it')
     app.quit()
     return
   }
+  environment.events.publish({ level: 'info', event: 'app.starting' })
   const application = new DesktopApplication(environment)
   application.bindEvents()
   void application.start().catch(error => application.handleStartupFailure(error))

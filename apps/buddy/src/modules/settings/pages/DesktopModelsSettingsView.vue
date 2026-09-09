@@ -12,7 +12,7 @@ const { t } = useBuddyI18n(providerSettings.language)
 </script>
 
 <template>
-  <DesktopSettingsPageLayout>
+  <DesktopSettingsPageLayout requires-runtime :loading="providerSettings.isLoadingModelCatalog.value">
     <template #title>
       {{ t('desktop.settings.category.models') }}
     </template>

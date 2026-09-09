@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { NButton, NResult, NSpin, useMessage } from 'naive-ui'
+import { NButton, NResult, useMessage } from 'naive-ui'
 import { useRouter } from 'vue-router'
 import { useBuddyI18n } from '@/i18n/buddyI18n'
 import { useAutomationContext } from '@/modules/automations/automationContext'
 import DesktopAutomationHistoryList from '@/modules/automations/widgets/list/DesktopAutomationHistoryList.vue'
+import DesktopRuntimePane from '@/platform/runtime/DesktopRuntimePane.vue'
 import { desktopRouteLocations } from '@/shared/navigation/desktopRoutes'
 
 const router = useRouter()
@@ -44,9 +45,9 @@ const { occurrences, isLoading, isLoadingMoreOccurrences, isMutating, loadError 
 </script>
 
 <template>
-  <NSpin
+  <DesktopRuntimePane
     class="desktop-automation-route-view"
-    :show="isLoading && occurrences.items.length === 0"
+    :loading="isLoading && occurrences.items.length === 0"
   >
     <NResult
       v-if="loadError && occurrences.items.length === 0"
@@ -77,7 +78,7 @@ const { occurrences, isLoading, isLoadingMoreOccurrences, isMutating, loadError 
     >
       {{ t('desktop.automations.loadMore') }}
     </NButton>
-  </NSpin>
+  </DesktopRuntimePane>
 </template>
 
 <style scoped>

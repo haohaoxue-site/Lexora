@@ -24,7 +24,6 @@ interface DesktopFeatureContext {
   onOpenDesktop: () => void
   paths: BuddyRuntimePaths
   resourcesPath: string
-  writeDiagnostic: (message: string) => void
 }
 
 const desktopFeatureFactories: Partial<Record<BuddyFeatureId, (context: DesktopFeatureContext) => DesktopFeature>> = {
@@ -56,7 +55,8 @@ function createNativePetFeature(context: DesktopFeatureContext): DesktopFeature 
     LEXORA_HOME: context.paths.lexoraHome,
   }
   const supervisor = new NativePetSupervisor({
-    diagnosticOutput: context.diagnostics.createWritable('native-pet', process.stderr),
+    diagnosticOutput: context.diagnostics.createWritable('native-pet', { event: 'pet.supervisor', level: 'error' }),
+    captureStderr: output => context.diagnostics.captureOutput('native-pet', output),
     onOpenDesktop: context.onOpenDesktop,
     spawnPet: createNativePetProcessFactory({
       appPath: context.appPath,
@@ -71,7 +71,7 @@ function createNativePetFeature(context: DesktopFeatureContext): DesktopFeature 
       return await reloadNativePetConfig(environment)
     }
     catch (error) {
-      context.writeDiagnostic(`Native pet config reload failed: ${error instanceof Error ? error.name : 'unknown error'}`)
+      context.diagnostics.record({ scope: 'native-pet', level: 'warn', event: 'pet.config_reload_failed', error })
       return false
     }
   }

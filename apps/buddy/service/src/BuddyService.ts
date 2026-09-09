@@ -1,6 +1,8 @@
 import type { DatabaseSync } from 'node:sqlite'
-import type { BuddySessionCompositionServices } from './agent/createBuddySessionComposition'
+import type { ApplicationDiagnosticReporter } from '../../shared/diagnostics/applicationDiagnostic'
 
+import type { ApplicationEvents } from '../../shared/observability/ApplicationEvents'
+import type { BuddySessionCompositionServices } from './agent/createBuddySessionComposition'
 import type { BuddyAgentSessionLike } from './agent/PiTurnExecutor'
 import type { AutomationClock } from './automations/AutomationScheduleEvaluator'
 import type { BuddyRuntime } from './BuddyRuntime'
@@ -13,6 +15,8 @@ import process from 'node:process'
 import { currentPlatform } from '../../platform/currentPlatform'
 import { resolveWindowsPowerShell } from '../../platform/windows/powerShell'
 import { automationNotifications } from '../../shared/automation/automationApi'
+import { ServiceHost } from '../../shared/lifecycle/ServiceHost'
+import { ApplicationEvents as EventPublisher } from '../../shared/observability/ApplicationEvents'
 import { BuddyAgentRunner } from './agent/BuddyAgentRunner'
 import { BuddyRunExecutionPlanner } from './agent/BuddyRunExecutionPlanner'
 import { BuddySessionBlueprintService } from './agent/BuddySessionBlueprint'
@@ -69,11 +73,11 @@ import { OpenAiImageGenerationService } from './images/OpenAiImageGenerationServ
 import { AttentionNotificationService } from './notifications/AttentionNotificationService'
 import { registerNotificationRpc } from './notifications/registerNotificationRpc'
 import { createProviderService } from './providers/createProviderService'
+
 import { registerProviderRpc } from './providers/registerProviderRpc'
 import { resolveInteractiveModelSelection } from './providers/resolveInteractiveModelSelection'
 import { BuddyServiceError } from './rpc/runtimeRequest'
 import { registerRunRpc } from './runs/registerRunRpc'
-
 import { RunLifecycleService } from './runs/RunLifecycleService'
 import { RunRecoveryService } from './runs/RunRecoveryService'
 import { registerSpaceRpc } from './spaces/registerSpaceRpc'
@@ -108,6 +112,8 @@ import { normalizeComposerWorkspace } from './workspace/normalizeComposerWorkspa
 import { registerWorkspaceStateRpc } from './workspace/registerWorkspaceStateRpc'
 
 export interface StartBuddyServiceOptions {
+  record?: ApplicationDiagnosticReporter
+  events?: ApplicationEvents
   automationClock?: AutomationClock
   buddyHome: string
   builtinSkillsDirectories?: readonly string[]
@@ -124,469 +130,544 @@ export interface BuddyServiceHandle {
 export async function startBuddyService(
   options: StartBuddyServiceOptions,
 ): Promise<BuddyServiceHandle> {
-  if (currentPlatform.shell === 'powershell')
-    process.env.PI_POWERSHELL_PATH ??= await resolveWindowsPowerShell()
-  const paths = new BuddyDataPaths(options.buddyHome)
-  const agentDirectory = join(options.buddyHome, 'agent')
-  await Promise.all([
-    mkdir(agentDirectory, { mode: 0o700, recursive: true }),
-    mkdir(paths.conversationsDirectory, { mode: 0o700, recursive: true }),
-    mkdir(paths.draftsDirectory, { mode: 0o700, recursive: true }),
-  ])
+  const events = options.events ?? new EventPublisher()
+  if (options.record)
+    events.subscribe(options.record)
+  const host = new ServiceHost(events)
+  const record = events.publish
+  try {
+    const paths = new BuddyDataPaths(options.buddyHome)
+    const agentDirectory = join(options.buddyHome, 'agent')
+    await host.step('runtime.filesystem', async () => {
+      if (currentPlatform.shell === 'powershell')
+        process.env.PI_POWERSHELL_PATH ??= await resolveWindowsPowerShell()
+      await Promise.all([
+        mkdir(agentDirectory, { mode: 0o700, recursive: true }),
+        mkdir(paths.conversationsDirectory, { mode: 0o700, recursive: true }),
+        mkdir(paths.draftsDirectory, { mode: 0o700, recursive: true }),
+      ])
+    })
 
-  const spacesRepository = createSpaceRepository(options.database)
-  const conversations = createConversationRepository(options.database)
-  const runs = createRunRepository(options.database)
-  const conversationDirectoryGrants = createConversationDirectoryGrantRepository(options.database)
-  const runInputs = createRunInputRepository(options.database)
-  const approvalsRepository = createApprovalRepository(options.database)
-  const usageRepository = createUsageRepository(options.database)
-  const workspace = createWorkspaceRepository(options.database)
-  const turnRequests = createTurnRequestRepository(options.database)
-  const composerDrafts = createComposerDraftRepository(options.database)
-  const commandRequests = createCommandRequestRepository(options.database)
-  const connectorsRepository = createConnectorRepository(options.database)
-  const spaceService = new SpaceService(spacesRepository)
-  let runner!: BuddyAgentRunner
-  const approvalService = new ApprovalService({
-    eventLog: options.eventLog,
-    onExpired: async (runId) => {
-      await runner.cancel(runId, 'AUTOMATION_APPROVAL_EXPIRED')
-    },
-    repository: approvalsRepository,
-  })
-  const usageService = new UsageService({
-    eventLog: options.eventLog,
-    repository: usageRepository,
-  })
-  const piEventBridge = new PiEventBridge({
-    eventLog: options.eventLog,
-    usage: usageService,
-  })
-  const runLifecycleService = new RunLifecycleService({
-    eventLog: options.eventLog,
-    repository: runs,
-  })
-  const changeCaptureService = new ChangeCaptureService({
-    paths,
-    repository: createChangeSetRepository(options.database),
-  })
-  const runRecoveryService = new RunRecoveryService({
-    cancelPendingApprovals: () => approvalService.cancelPendingApprovals(),
-    captureInterruptedChanges: async (runId) => {
-      await changeCaptureService.markInterrupted(runId)
-    },
-    conversations,
-    eventLog: options.eventLog,
-    lifecycle: runLifecycleService,
-    inspectCommittedCompaction: run => inspectCommittedPiCompaction({
-      branchId: run.branchId,
-      conversationsDirectory: paths.conversationsDirectory,
-      conversationId: run.conversationId,
-      piSessionFile: requireValue(run.piSessionFile, 'VALIDATION_FAILED'),
-      startedAt: run.startedAt,
-    }),
-    repository: runs,
-    usage: usageService,
-  })
-  const attachmentService = new AttachmentService({
-    paths,
-    repository: createAttachmentRepository(options.database),
-  })
-  const artifactsRepository = createArtifactRepository(options.database)
-  const artifactService = new ArtifactService({ repository: artifactsRepository })
-  await reconcileLegacyArtifactOutputs({
-    artifacts: artifactsRepository,
-    conversations,
-    eventLog: options.eventLog,
-    paths,
-  })
-  const composerResourceService = new ComposerResourceService({
-    artifacts: artifactService,
-    attachments: attachmentService,
-    conversationGrants: conversationDirectoryGrants,
-    conversations,
-    drafts: composerDrafts,
-    eventLog: options.eventLog,
-    repository: createComposerResourceRepository(options.database),
-    spaceFiles: spaceService,
-    spaces: spacesRepository,
-  })
-  const attachmentRecovery = await attachmentService.reconcileStorage()
-  composerResourceService.recoverInterruptedImports([
-    ...attachmentRecovery.invalidAttachmentIds,
-    ...attachmentRecovery.missingAttachmentIds,
-  ])
-  await composerResourceService.cleanupDrafts()
-  const imageTransformService = new ImageTransformService({ artifacts: artifactService })
-  const providersRepository = createProviderRepository(options.database)
-  const providerService = await createProviderService({
-    agentDirectory,
-    database: options.database,
-    getActiveRuns: () => runs.listIncomplete(),
-    peer: options.rpc,
-    providers: providersRepository,
-  })
-  const executionModels = providerService.executionModels
-  const imageGenerationGateway = new OpenAiImageGenerationService({
-    modelRuntime: executionModels.getRuntime(),
-  })
-  const sessions = new BuddySessionRegistry<BuddyAgentSessionLike>()
-  const directoryGrants = new DirectoryGrantService({
-    conversationGrants: conversationDirectoryGrants,
-    conversations,
-    spaces: spaceService,
-  })
-  const connectorService = new McpConnectorService({
-    connectors: connectorsRepository,
-    invalidateSessions: () => sessions.invalidateAll(),
-    notify: event => options.rpc.notify(event.type, event),
-    secrets: new HostConnectorSecretStore(options.rpc),
-  })
-  const skillService = new SkillService({
-    agentDirectory,
-    builtinSkillsDirectories: options.builtinSkillsDirectories,
-    spaces: spacesRepository,
-  })
-  const browserHost = new BrowserHostClient(options.rpc)
-  const webSettings = new WebSettingsService(workspace, options.rpc)
-  const webService = new WebCapabilityService({
-    host: new WebHostClient(options.rpc),
-    models: executionModels.getRuntime(),
-    paths,
-    settings: webSettings,
-  })
-  const automationClock = options.automationClock ?? systemAutomationClock
-  const automationRepositories = createAutomationRepositories(options.database)
-  const automationTurns = createAutomationTurnRepository(options.database)
-  const automationService = new AutomationService({
-    clock: automationClock,
-    repositories: automationRepositories,
-  })
-  const notificationService = new AttentionNotificationService({
-    attention: createNotificationAttentionRepository(options.database),
-    listAutomationRuns: () => automationService.listHistory({ limit: 100 }).items.flatMap(
-      (occurrence) => {
-        if (!occurrence.runId || !occurrence.conversationId)
-          return []
-        const run = runs.findById(occurrence.runId)
-        if (!run?.completedAt || (run.status !== 'completed' && run.status !== 'failed'))
-          return []
-        return [{
-          automationId: occurrence.automationId,
-          automationName: occurrence.executionSnapshot.name,
-          completedAt: run.completedAt,
-          conversationId: occurrence.conversationId,
-          errorCode: run.errorCode,
-          runId: run.id,
-          status: run.status,
-        }]
-      },
-    ),
-    listModels: () => providersRepository.models.list(),
-  })
-  let automationScheduler: AutomationScheduler | null = null
-  const automationChanges = new AutomationChangeCoordinator({
-    notify: automationId => options.rpc.notify(automationNotifications.changed.method, { automationId }),
-    service: automationService,
-    wakeScheduler: () => automationScheduler?.wake(),
-  })
-  automationChanges.reconcileDependencies({
-    isPinnedModelAvailable(providerId, modelId) {
-      const provider = providersRepository.states.findByProviderId(providerId)
-      const model = providersRepository.models.find(providerId, modelId)
-      return Boolean(provider?.enabled && model?.enabled && model.available)
-    },
-    isSpaceAvailable(spaceId) {
-      const space = spacesRepository.findById(spaceId)
-      return Boolean(space && space.revokedAt === null)
-    },
-  })
-  const sessionCompositionServices: BuddySessionCompositionServices = {
-    approvalService,
-    attachmentService,
-    changeCaptureService,
-    directoryGrants,
-    createCapabilities: createBuddyCapabilityFactory(currentPlatform, {
-      artifactService,
-      attachmentService,
-      automationService,
-      browserHost,
-      connectorService,
-      imageGenerationGateway,
-      imageTransformService,
-      onAutomationChanged: automationId => automationChanges.publish(automationId),
-      webService,
-    }, {
-      eventSink: event => options.eventLog.append(event),
-      peer: options.rpc,
-    }),
-  }
-  const sessionBlueprints = new BuddySessionBlueprintService({
-    conversationGrants: conversationDirectoryGrants,
-    paths,
-    spaces: spacesRepository,
-    skills: skillService,
-  })
-  const sessionRecovery = new BuddySessionRecoveryService({
-    attachments: attachmentService,
-    conversations,
-    models: executionModels,
-    runInputs,
-    runs,
-  })
-  const sessionFactory = new BuddySessionFactory({
-    agentDirectory,
-    conversations,
-    conversationsDirectory: paths.conversationsDirectory,
-    models: executionModels,
-    recovery: sessionRecovery,
-    runs,
-    services: sessionCompositionServices,
-  })
-  const piTurnExecutor = new PiTurnExecutor({
-    eventLog: options.eventLog,
-    piEvents: piEventBridge,
-    runs,
-    sessionFactory: input => sessionFactory.create(input),
-    sessions,
-  })
-  runner = new BuddyAgentRunner({
-    executor: piTurnExecutor,
-    lifecycle: runLifecycleService,
-    onRunSettled: runId => approvalService.clearTurnAuthorization(runId),
-    sessions,
-  })
-  const conversationLifecycle = new ConversationLifecycleService({
-    conversations,
-    directoryGrants: conversationDirectoryGrants,
-    runner,
-    sessions,
-  })
-  const automationOccurrenceLifecycle = new AutomationOccurrenceLifecycleService({
-    automations: automationService,
-    conversationLifecycle,
-    notifications: notificationService,
-    onChanged: automationId => automationChanges.publish(automationId),
-  })
-  const executionPlanner = new BuddyRunExecutionPlanner({
-    attachments: attachmentService,
-    commands: commandRequests,
-    conversations,
-    models: executionModels,
-    runInputs,
-    runs,
-    sessions: sessionBlueprints,
-  })
-  const turnLauncher = new BuddyTurnLauncher({
-    lifecycle: runLifecycleService,
-    planner: executionPlanner,
-    runner,
-  })
-  const chatCommandService = new ChatCommandService({
-    commands: commandRequests,
-    conversationLifecycle,
-    conversations,
-    drafts: composerDrafts,
-    spaces: spacesRepository,
-    runs,
-    turnLauncher,
-  })
-  const composerDraftService = new ComposerDraftService(composerDrafts)
-  const chatTurnService = new ChatTurnService({
-    composerResources: composerResourceService,
-    drafts: composerDrafts,
-    attachments: attachmentService,
-    conversationLifecycle,
-    conversations,
-    spaces: spacesRepository,
-    providers: providerService,
-    runInputs,
-    runner,
-    runs,
-    skills: skillService,
-    turnLauncher,
-    turnRequests,
-  })
-  const runtime: BuddyRuntime = {
-    startTurn: input => chatTurnService.start(input),
-  }
-  const contextUsageService = new ContextUsageSnapshotService({
-    agentDirectory,
-    blueprints: sessionBlueprints,
-    conversations,
-    models: executionModels,
-    paths,
-    recovery: sessionRecovery,
-    runs,
-    sessionCompositionServices,
-  })
-  const automationDispatcher = new AutomationDispatcher({
-    automationService,
-    cancelRun: (runId, errorCode) => runner.cancel(runId, errorCode),
-    clock: automationClock,
-    launchTurn: runId => turnLauncher.launch(runId),
-    resolveModel: target => resolveAutomationModelSelection({
-      defaults: providerService,
-      models: executionModels,
-    }, target),
-    resolveSpace: async (spaceId, executionContext) => {
-      const space = spacesRepository.findById(spaceId)
-      if (!space || space.revokedAt !== null)
-        return null
-      if (!matchesSpaceExecutionContext(space, executionContext))
-        return { status: 'context_changed' }
-      return { executionContext, id: space.id, status: 'ready' }
-    },
-    turns: automationTurns,
-  })
-  const scheduler = new AutomationScheduler({
-    automationService,
-    clock: automationClock,
-    dispatch: async (occurrence) => {
-      await automationDispatcher.dispatch(occurrence)
-      automationChanges.publishSchedulerChange(occurrence.automationId)
-    },
-    onChanged: automationId => automationChanges.publishSchedulerChange(automationId),
-  })
-  automationScheduler = scheduler
-
-  await conversationLifecycle.recoverPendingDeletions()
-  await runRecoveryService.recoverInterruptedRuns()
-  await options.eventLog.compactTerminalRuns()
-
-  const unregister = combineDisposers(
-    registerWebSettingsRpc(options.rpc, webSettings),
-    registerNotificationRpc({
-      rpc: options.rpc,
-      service: notificationService,
-    }),
-    registerWorkspaceStateRpc({
-      normalize: value => normalizeComposerWorkspace(value, { conversations, resources: composerResourceService }),
-      repository: workspace,
-      rpc: options.rpc,
-    }),
-    registerArtifactRpc({
-      rpc: options.rpc,
-      service: artifactService,
-    }),
-    registerChangeRpc({
-      rpc: options.rpc,
-      service: changeCaptureService,
-    }),
-    registerRunRpc({
+    const spacesRepository = createSpaceRepository(options.database)
+    const conversations = createConversationRepository(options.database)
+    const runs = createRunRepository(options.database)
+    const conversationDirectoryGrants = createConversationDirectoryGrantRepository(options.database)
+    const runInputs = createRunInputRepository(options.database)
+    const approvalsRepository = createApprovalRepository(options.database)
+    const usageRepository = createUsageRepository(options.database)
+    const workspace = createWorkspaceRepository(options.database)
+    const turnRequests = createTurnRequestRepository(options.database)
+    const composerDrafts = createComposerDraftRepository(options.database)
+    const commandRequests = createCommandRequestRepository(options.database)
+    const connectorsRepository = createConnectorRepository(options.database)
+    const spaceService = new SpaceService(spacesRepository)
+    let runner!: BuddyAgentRunner
+    const approvalService = await host.start('runtime.approvals', () => {
+      const service = new ApprovalService({
+        eventLog: options.eventLog,
+        onExpired: async (runId) => {
+          await runner.cancel(runId, 'AUTOMATION_APPROVAL_EXPIRED')
+        },
+        repository: approvalsRepository,
+      })
+      return service
+    })
+    const usageService = await host.start('runtime.usage', () => {
+      const service = new UsageService({
+        eventLog: options.eventLog,
+        repository: usageRepository,
+      })
+      return service
+    })
+    const piEventBridge = new PiEventBridge({
+      record,
       eventLog: options.eventLog,
-      inputs: runInputs,
+      usage: usageService,
+    })
+    const runLifecycleService = new RunLifecycleService({
+      record,
+      eventLog: options.eventLog,
       repository: runs,
-      rpc: options.rpc,
-    }),
-    registerAttachmentRpc({
-      rpc: options.rpc,
-      service: attachmentService,
-    }),
-    registerComposerResourceRpc({
-      rpc: options.rpc,
-      service: composerResourceService,
-    }),
-    registerComposerDraftRpc({
-      rpc: options.rpc,
-      service: composerDraftService,
-    }),
-    registerUsageRpc({
-      repository: usageRepository,
-      rpc: options.rpc,
-    }),
-    registerChatRpc({
-      commands: chatCommandService,
-      rpc: options.rpc,
-      runtime,
-      turns: chatTurnService,
-    }),
-    registerContextRpc({
-      rpc: options.rpc,
-      service: contextUsageService,
-    }),
-    registerConversationRpc({
-      artifacts: artifactsRepository,
-      attachments: attachmentService,
-      changes: changeCaptureService,
-      conversations,
-      deleteConversation: async (conversationId) => {
-        const result = await automationOccurrenceLifecycle.deleteConversation(conversationId)
-        return result.deleted
+    })
+    const changeCaptureService = new ChangeCaptureService({
+      paths,
+      repository: createChangeSetRepository(options.database),
+    })
+    const runRecoveryService = new RunRecoveryService({
+      cancelPendingApprovals: () => approvalService.cancelPendingApprovals(),
+      captureInterruptedChanges: async (runId) => {
+        await changeCaptureService.markInterrupted(runId)
       },
+      conversations,
       eventLog: options.eventLog,
-      isDeleting: conversationId => conversationLifecycle.isDeleting(conversationId),
-      resolveModelSelection: selection => resolveInteractiveModelSelection(
-        providerService,
-        selection,
-      ),
-      rpc: options.rpc,
+      lifecycle: runLifecycleService,
+      inspectCommittedCompaction: run => inspectCommittedPiCompaction({
+        branchId: run.branchId,
+        conversationsDirectory: paths.conversationsDirectory,
+        conversationId: run.conversationId,
+        piSessionFile: requireValue(run.piSessionFile, 'VALIDATION_FAILED'),
+        startedAt: run.startedAt,
+      }),
+      repository: runs,
+      usage: usageService,
+    })
+    const attachmentService = new AttachmentService({
+      paths,
+      repository: createAttachmentRepository(options.database),
+    })
+    const artifactsRepository = createArtifactRepository(options.database)
+    const artifactService = new ArtifactService({ repository: artifactsRepository })
+    await host.step('runtime.artifacts', () => reconcileLegacyArtifactOutputs({
+      artifacts: artifactsRepository,
+      conversations,
+      eventLog: options.eventLog,
+      paths,
+    }))
+    const composerResourceService = new ComposerResourceService({
+      artifacts: artifactService,
+      attachments: attachmentService,
+      conversationGrants: conversationDirectoryGrants,
+      conversations,
+      drafts: composerDrafts,
+      eventLog: options.eventLog,
+      repository: createComposerResourceRepository(options.database),
+      spaceFiles: spaceService,
+      spaces: spacesRepository,
+    })
+    await host.step('runtime.attachments', async () => {
+      const attachmentRecovery = await attachmentService.reconcileStorage()
+      composerResourceService.recoverInterruptedImports([
+        ...attachmentRecovery.invalidAttachmentIds,
+        ...attachmentRecovery.missingAttachmentIds,
+      ])
+      await composerResourceService.cleanupDrafts()
+    })
+    const imageTransformService = new ImageTransformService({ artifacts: artifactService })
+    const providersRepository = createProviderRepository(options.database)
+    const providerService = await host.start('runtime.providers', () => createProviderService({
+      agentDirectory,
+      database: options.database,
+      getActiveRuns: () => runs.listIncomplete(),
+      peer: options.rpc,
+      providers: providersRepository,
+    }))
+    const executionModels = providerService.executionModels
+    const imageGenerationGateway = new OpenAiImageGenerationService({
+      modelRuntime: executionModels.getRuntime(),
+    })
+    const sessions = await host.start('runtime.sessions', () => new BuddySessionRegistry<BuddyAgentSessionLike>())
+    const directoryGrants = new DirectoryGrantService({
+      conversationGrants: conversationDirectoryGrants,
+      conversations,
+      spaces: spaceService,
+    })
+    const connectorService = await host.start('runtime.connectors', ({ defer }) => {
+      const service = new McpConnectorService({
+        connectors: connectorsRepository,
+        invalidateSessions: () => sessions.invalidateAll(),
+        notify: (event) => {
+          record({ event: event.type, level: event.code ? 'warn' : 'info', component: 'runtime.connectors', connectorId: event.connectorId, errorCode: event.code })
+          options.rpc.notify(event.type, event)
+        },
+        secrets: new HostConnectorSecretStore(options.rpc),
+      })
+      defer(() => service.close())
+      return service
+    })
+    const skillService = await host.start('runtime.skills', () => {
+      const service = new SkillService({
+        agentDirectory,
+        builtinSkillsDirectories: options.builtinSkillsDirectories,
+        spaces: spacesRepository,
+      })
+      return service
+    })
+    const browserHost = new BrowserHostClient(options.rpc)
+    const webSettings = new WebSettingsService(workspace, options.rpc)
+    const webService = await host.start('runtime.web', ({ defer }) => {
+      const service = new WebCapabilityService({
+        host: new WebHostClient(options.rpc),
+        models: executionModels.getRuntime(),
+        paths,
+        settings: webSettings,
+      })
+      defer(() => service.dispose())
+      return service
+    })
+    const automationClock = options.automationClock ?? systemAutomationClock
+    const automationRepositories = createAutomationRepositories(options.database)
+    const automationTurns = createAutomationTurnRepository(options.database)
+    const automationService = new AutomationService({
+      clock: automationClock,
+      repositories: automationRepositories,
+    })
+    const notificationService = await host.start('runtime.notifications', () => {
+      const service = new AttentionNotificationService({
+        attention: createNotificationAttentionRepository(options.database),
+        listAutomationRuns: () => automationService.listHistory({ limit: 100 }).items.flatMap(
+          (occurrence) => {
+            if (!occurrence.runId || !occurrence.conversationId)
+              return []
+            const run = runs.findById(occurrence.runId)
+            if (!run?.completedAt || (run.status !== 'completed' && run.status !== 'failed'))
+              return []
+            return [{
+              automationId: occurrence.automationId,
+              automationName: occurrence.executionSnapshot.name,
+              completedAt: run.completedAt,
+              conversationId: occurrence.conversationId,
+              errorCode: run.errorCode,
+              runId: run.id,
+              status: run.status,
+            }]
+          },
+        ),
+        listModels: () => providersRepository.models.list(),
+      })
+      return service
+    })
+    let automationScheduler: AutomationScheduler | null = null
+    const automationChanges = new AutomationChangeCoordinator({
+      notify: (automationId) => {
+        record({ event: 'automation.changed', level: 'info', automationId })
+        options.rpc.notify(automationNotifications.changed.method, { automationId })
+      },
+      service: automationService,
+      wakeScheduler: () => automationScheduler?.wake(),
+    })
+    automationChanges.reconcileDependencies({
+      isPinnedModelAvailable(providerId, modelId) {
+        const provider = providersRepository.states.findByProviderId(providerId)
+        const model = providersRepository.models.find(providerId, modelId)
+        return Boolean(provider?.enabled && model?.enabled && model.available)
+      },
+      isSpaceAvailable(spaceId) {
+        const space = spacesRepository.findById(spaceId)
+        return Boolean(space && space.revokedAt === null)
+      },
+    })
+    const sessionCompositionServices: BuddySessionCompositionServices = {
+      approvalService,
+      attachmentService,
+      changeCaptureService,
+      directoryGrants,
+      createCapabilities: createBuddyCapabilityFactory(currentPlatform, {
+        artifactService,
+        attachmentService,
+        automationService,
+        browserHost,
+        connectorService,
+        imageGenerationGateway,
+        imageTransformService,
+        onAutomationChanged: automationId => automationChanges.publish(automationId),
+        webService,
+      }, {
+        eventSink: event => options.eventLog.append(event),
+        peer: options.rpc,
+      }),
+    }
+    const sessionBlueprints = new BuddySessionBlueprintService({
+      conversationGrants: conversationDirectoryGrants,
+      paths,
+      spaces: spacesRepository,
+      skills: skillService,
+    })
+    const sessionRecovery = new BuddySessionRecoveryService({
+      attachments: attachmentService,
+      conversations,
+      models: executionModels,
       runInputs,
       runs,
-      sessions,
-    }),
-    registerApprovalRpc({
-      repository: approvalsRepository,
-      rpc: options.rpc,
-      service: approvalService,
-    }),
-    registerAutomationRpc({
-      approvals: approvalsRepository,
-      changes: automationChanges,
-      clock: automationClock,
-      lifecycle: automationOccurrenceLifecycle,
-      rpc: options.rpc,
+    })
+    const sessionFactory = await host.start('runtime.session_factory', () => {
+      const service = new BuddySessionFactory({
+        events,
+        agentDirectory,
+        conversations,
+        conversationsDirectory: paths.conversationsDirectory,
+        models: executionModels,
+        recovery: sessionRecovery,
+        runs,
+        services: sessionCompositionServices,
+      })
+      return service
+    })
+    const piTurnExecutor = new PiTurnExecutor({
+      eventLog: options.eventLog,
+      piEvents: piEventBridge,
       runs,
-      service: automationService,
-    }),
-    registerMcpConnectorRpc(options.rpc, connectorService),
-    registerSpaceRpc({
-      automations: automationChanges,
+      sessionFactory: input => sessionFactory.create(input),
+      sessions,
+    })
+    runner = await host.start('runtime.execution', ({ defer }) => {
+      const service = new BuddyAgentRunner({
+        executor: piTurnExecutor,
+        lifecycle: runLifecycleService,
+        onRunSettled: runId => approvalService.clearTurnAuthorization(runId),
+        sessions,
+      })
+      defer(async () => {
+        await service.dispose()
+        await automationScheduler?.settle()
+      })
+      return service
+    })
+    const conversationLifecycle = new ConversationLifecycleService({
+      conversations,
+      directoryGrants: conversationDirectoryGrants,
+      runner,
+      sessions,
+    })
+    const automationOccurrenceLifecycle = new AutomationOccurrenceLifecycleService({
+      automations: automationService,
+      conversationLifecycle,
+      notifications: notificationService,
+      onChanged: automationId => automationChanges.publish(automationId),
+    })
+    const executionPlanner = new BuddyRunExecutionPlanner({
+      attachments: attachmentService,
+      commands: commandRequests,
+      conversations,
+      models: executionModels,
+      runInputs,
+      runs,
+      sessions: sessionBlueprints,
+    })
+    const turnLauncher = new BuddyTurnLauncher({
+      lifecycle: runLifecycleService,
+      planner: executionPlanner,
+      runner,
+    })
+    const chatCommandService = new ChatCommandService({
+      commands: commandRequests,
+      conversationLifecycle,
+      conversations,
+      drafts: composerDrafts,
       spaces: spacesRepository,
-      rpc: options.rpc,
-      service: spaceService,
-      sessions,
-    }),
-    registerProviderRpc({
-      automations: automationChanges,
-      rpc: options.rpc,
-      service: providerService,
-      sessions,
-    }),
-    registerSkillServiceRpc(options.rpc, skillService),
-  )
-  let disposal: Promise<void> | null = null
-  const dispose = () => {
-    disposal ??= (async () => {
-      unregister()
-      webService.dispose()
-      await Promise.allSettled([
-        scheduler.dispose(),
-        runner.dispose(),
-        connectorService.close(),
-      ])
-    })()
-    return disposal
-  }
-  try {
-    await scheduler.start()
+      runs,
+      turnLauncher,
+    })
+    const composerDraftService = new ComposerDraftService(composerDrafts)
+    const chatTurnService = new ChatTurnService({
+      record,
+      composerResources: composerResourceService,
+      drafts: composerDrafts,
+      attachments: attachmentService,
+      conversationLifecycle,
+      conversations,
+      spaces: spacesRepository,
+      providers: providerService,
+      runInputs,
+      runner,
+      runs,
+      skills: skillService,
+      turnLauncher,
+      turnRequests,
+    })
+    const runtime: BuddyRuntime = {
+      startTurn: input => chatTurnService.start(input),
+    }
+    const contextUsageService = new ContextUsageSnapshotService({
+      agentDirectory,
+      blueprints: sessionBlueprints,
+      conversations,
+      models: executionModels,
+      paths,
+      recovery: sessionRecovery,
+      runs,
+      sessionCompositionServices,
+    })
+    const automationDispatcher = new AutomationDispatcher({
+      automationService,
+      cancelRun: (runId, errorCode) => runner.cancel(runId, errorCode),
+      clock: automationClock,
+      launchTurn: runId => turnLauncher.launch(runId),
+      resolveModel: target => resolveAutomationModelSelection({
+        defaults: providerService,
+        models: executionModels,
+      }, target),
+      resolveSpace: async (spaceId, executionContext) => {
+        const space = spacesRepository.findById(spaceId)
+        if (!space || space.revokedAt !== null)
+          return null
+        if (!matchesSpaceExecutionContext(space, executionContext))
+          return { status: 'context_changed' }
+        return { executionContext, id: space.id, status: 'ready' }
+      },
+      turns: automationTurns,
+    })
+    const scheduler = new AutomationScheduler({
+      automationService,
+      clock: automationClock,
+      dispatch: async (occurrence) => {
+        await events.scope({ component: 'runtime.automations', automationId: occurrence.automationId, occurrenceId: occurrence.id }).operation('automation.dispatch', () => automationDispatcher.dispatch(occurrence))
+        automationChanges.publishSchedulerChange(occurrence.automationId)
+      },
+      onChanged: automationId => automationChanges.publishSchedulerChange(automationId),
+    })
+    automationScheduler = scheduler
+
+    await host.step('runtime.recovery', async () => {
+      await conversationLifecycle.recoverPendingDeletions()
+      const count = await runRecoveryService.recoverInterruptedRuns()
+      record({ event: 'runtime.runs_recovered', level: 'info', count })
+      await options.eventLog.compactTerminalRuns()
+    })
+
+    await host.start('runtime.rpc', ({ defer }) => {
+      const register = (dispose: () => void) => defer(dispose)
+      register(
+        registerWebSettingsRpc(options.rpc, webSettings),
+      )
+      register(
+        registerNotificationRpc({
+          rpc: options.rpc,
+          service: notificationService,
+        }),
+      )
+      register(
+        registerWorkspaceStateRpc({
+          normalize: value => normalizeComposerWorkspace(value, { conversations, resources: composerResourceService }),
+          repository: workspace,
+          rpc: options.rpc,
+        }),
+      )
+      register(
+        registerArtifactRpc({
+          rpc: options.rpc,
+          service: artifactService,
+        }),
+      )
+      register(
+        registerChangeRpc({
+          rpc: options.rpc,
+          service: changeCaptureService,
+        }),
+      )
+      register(
+        registerRunRpc({
+          eventLog: options.eventLog,
+          inputs: runInputs,
+          repository: runs,
+          rpc: options.rpc,
+        }),
+      )
+      register(
+        registerAttachmentRpc({
+          rpc: options.rpc,
+          service: attachmentService,
+        }),
+      )
+      register(
+        registerComposerResourceRpc({
+          rpc: options.rpc,
+          service: composerResourceService,
+        }),
+      )
+      register(
+        registerComposerDraftRpc({
+          rpc: options.rpc,
+          service: composerDraftService,
+        }),
+      )
+      register(
+        registerUsageRpc({
+          repository: usageRepository,
+          rpc: options.rpc,
+        }),
+      )
+      register(
+        registerChatRpc({
+          commands: chatCommandService,
+          rpc: options.rpc,
+          runtime,
+          turns: chatTurnService,
+        }),
+      )
+      register(
+        registerContextRpc({
+          rpc: options.rpc,
+          service: contextUsageService,
+        }),
+      )
+      register(
+        registerConversationRpc({
+          artifacts: artifactsRepository,
+          attachments: attachmentService,
+          changes: changeCaptureService,
+          conversations,
+          deleteConversation: async (conversationId) => {
+            const result = await automationOccurrenceLifecycle.deleteConversation(conversationId)
+            return result.deleted
+          },
+          eventLog: options.eventLog,
+          isDeleting: conversationId => conversationLifecycle.isDeleting(conversationId),
+          resolveModelSelection: selection => resolveInteractiveModelSelection(
+            providerService,
+            selection,
+          ),
+          rpc: options.rpc,
+          runInputs,
+          runs,
+          sessions,
+        }),
+      )
+      register(
+        registerApprovalRpc({
+          repository: approvalsRepository,
+          rpc: options.rpc,
+          service: approvalService,
+        }),
+      )
+      register(
+        registerAutomationRpc({
+          approvals: approvalsRepository,
+          changes: automationChanges,
+          clock: automationClock,
+          lifecycle: automationOccurrenceLifecycle,
+          rpc: options.rpc,
+          runs,
+          service: automationService,
+        }),
+      )
+      register(
+        registerMcpConnectorRpc(options.rpc, connectorService),
+      )
+      register(
+        registerSpaceRpc({
+          automations: automationChanges,
+          spaces: spacesRepository,
+          rpc: options.rpc,
+          service: spaceService,
+          sessions,
+        }),
+      )
+      register(
+        registerProviderRpc({
+          automations: automationChanges,
+          rpc: options.rpc,
+          service: providerService,
+          sessions,
+        }),
+      )
+      register(
+        registerSkillServiceRpc(options.rpc, skillService),
+      )
+    })
+    await host.start('runtime.scheduler', ({ defer }) => {
+      defer(() => scheduler.dispose())
+      return scheduler.start()
+    }, ['runtime.rpc', 'runtime.execution'])
+    return { dispose: () => host.stop(), runtime }
   }
   catch (error) {
-    await dispose()
-    throw error
-  }
-  return { dispose, runtime }
-}
-
-function combineDisposers(...disposers: Array<() => void>): () => void {
-  return () => {
-    for (const dispose of disposers.splice(0).reverse()) {
-      try {
-        dispose()
-      }
-      catch {}
+    try {
+      await host.stop()
     }
+    catch (cleanupError) {
+      throw new AggregateError([error, cleanupError], 'Runtime initialization and cleanup failed')
+    }
+    throw error
   }
 }
 

@@ -65,7 +65,9 @@ export function showLegacyPowerShellNotice(
     }).then(async ({ response }) => {
       if (response === 1)
         await shell.openExternal('https://learn.microsoft.com/powershell/scripting/install/install-powershell-on-windows')
-    }).catch(() => environment.writeDiagnostic('PowerShell notice could not be displayed'))
+    }).catch((error) => {
+      environment.diagnostics.record({ scope: 'desktop', level: 'warn', event: 'powershell.notice_failed', error })
+    })
   }
   if (window.isVisible())
     show()

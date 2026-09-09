@@ -47,7 +47,7 @@ const { authChallenge, language } = providerSettings
 </script>
 
 <template>
-  <DesktopSettingsPageLayout>
+  <DesktopSettingsPageLayout requires-runtime>
     <template #title>
       <span class="desktop-provider-settings-view__breadcrumb desktop-settings-page__breadcrumb">
         <button type="button" @click="leaveProvider">

@@ -37,9 +37,11 @@ module.exports = {
   },
   nsis: {
     include: '../../packaging/buddy/windows/installer.nsh',
-    oneClick: true,
+    oneClick: false,
+    allowElevation: false,
+    allowToChangeInstallationDirectory: false,
     perMachine: false,
-    runAfterFinish: false,
+    runAfterFinish: true,
     shortcutName: displayName,
     uninstallDisplayName: displayName,
     deleteAppDataOnUninstall: false,

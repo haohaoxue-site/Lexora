@@ -87,6 +87,19 @@ export class DesktopWindowHost {
           showOnReady: false,
         })
         applyDesktopWindowAppearance(handle.window, nativeTheme.shouldUseDarkColors)
+        environment.events.publish({ level: 'info', event: 'window.created' })
+        handle.window.webContents.once('did-finish-load', () => {
+          environment.events.publish({ level: 'info', event: 'window.loaded' })
+        })
+        handle.window.once('closed', () => {
+          environment.events.publish({ level: 'info', event: 'window.closed' })
+        })
+        handle.window.on('unresponsive', () => {
+          environment.events.publish({ level: 'warn', event: 'window.unresponsive' })
+        })
+        handle.window.webContents.on('render-process-gone', () => {
+          environment.events.publish({ level: 'error', event: 'renderer.exited_abnormally' })
+        })
         this.#browser?.dispose()
         this.#browser = new BrowserHost({
           onGuestSetChanged() {
@@ -112,8 +125,7 @@ export class DesktopWindowHost {
 
   show(): void {
     void this.#manager?.open().catch((error) => {
-      const diagnostic = error instanceof Error ? error.name : 'unknown error'
-      this.#environment.writeDiagnostic(`Failed to activate window: ${diagnostic}`)
+      this.#environment.diagnostics.record({ scope: 'desktop', level: 'error', event: 'window.activate_failed', error })
     })
   }
 

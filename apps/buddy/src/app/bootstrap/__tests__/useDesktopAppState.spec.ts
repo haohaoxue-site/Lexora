@@ -2,7 +2,7 @@ import type { LexoraDesktopApi } from '@buddy-electron/shared/desktopApi'
 import type { LocalBuddyServiceSupervisorState } from '@buddy-shared/runtime/serviceState'
 
 import { deferred } from '@buddy-tests/deferred'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
 import { useDesktopAppState } from '../useDesktopAppState'
 
@@ -108,6 +108,8 @@ describe('useDesktopAppState', () => {
     } as unknown as LexoraDesktopApi
     const appState = useDesktopAppState({ api })
     const initialization = appState.initialize()
+
+    await vi.waitFor(() => expect(resolveStatus).toBeTypeOf('function'))
 
     onStateChanged?.({
       lastError: null,

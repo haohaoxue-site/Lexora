@@ -1,7 +1,9 @@
+import type { ApplicationDiagnosticReporter } from '../../../shared/diagnostics/applicationDiagnostic'
 import type { RuntimeRequestHandler, RuntimeRpcPeerContract } from '../../../shared/runtime/rpcPeer'
 import type { BuddyServiceFailureCode } from '../../../shared/runtime/runtimeProtocol'
 import process from 'node:process'
 import { RuntimeRpcPeer } from '../../../platform/ipc/runtimeRpcPeer'
+import { readDiagnosticErrorCode, safeDiagnosticReporter } from '../../../shared/diagnostics/applicationDiagnostic'
 import {
   BUDDY_SERVICE_PROTOCOL_VERSION,
   buddyServiceFailureNotificationSchema,
@@ -16,6 +18,7 @@ export interface BuddyServiceParentPort {
 }
 
 export interface CreateBuddyServiceOptions {
+  recordDiagnostic?: ApplicationDiagnosticReporter
   announceReady?: boolean
   port: BuddyServiceParentPort
   scheduleShutdown?: () => void
@@ -23,10 +26,12 @@ export interface CreateBuddyServiceOptions {
 }
 
 export class BuddyServiceRpcServer implements RuntimeRpcPeerContract {
+  readonly #record: ApplicationDiagnosticReporter
   readonly #peer: RuntimeRpcPeer
   #ready = false
 
-  constructor(options: { port: BuddyServiceParentPort, onFatalError?: (error: Error) => void }) {
+  constructor(options: { port: BuddyServiceParentPort, onFatalError?: (error: Error) => void, recordDiagnostic?: ApplicationDiagnosticReporter }) {
+    this.#record = safeDiagnosticReporter(options.recordDiagnostic)
     const { port } = options
     this.#peer = new RuntimeRpcPeer({
       onFatalError: options.onFatalError,
@@ -61,7 +66,21 @@ export class BuddyServiceRpcServer implements RuntimeRpcPeerContract {
   }
 
   onRequest(method: string, handler: RuntimeRequestHandler): () => void {
-    return this.#peer.onRequest(method, handler)
+    return this.#peer.onRequest(method, async (params) => {
+      const operationId = crypto.randomUUID()
+      const startedAt = performance.now()
+      this.#record({ event: 'rpc.handler.started', level: 'debug', component: 'runtime.rpc', operationId, method })
+      try {
+        const result = await handler(params)
+        this.#record({ event: 'rpc.handler.completed', level: 'debug', component: 'runtime.rpc', operationId, method, durationMs: Math.round(performance.now() - startedAt) })
+        return result
+      }
+      catch (error) {
+        const errorType = error instanceof Error && /^[a-z]\w{0,95}$/i.test(error.name) ? error.name : 'UnknownError'
+        this.#record({ event: 'rpc.handler.failed', level: 'error', component: 'runtime.rpc', operationId, durationMs: Math.round(performance.now() - startedAt), method, errorType, errorCode: readDiagnosticErrorCode(error) })
+        throw error
+      }
+    })
   }
 
   request(method: string, params: unknown, timeoutMs?: number): Promise<unknown> {
@@ -75,6 +94,7 @@ export class BuddyServiceRpcServer implements RuntimeRpcPeerContract {
 
 export function createBuddyService(options: CreateBuddyServiceOptions): BuddyServiceRpcServer {
   const server = new BuddyServiceRpcServer({
+    recordDiagnostic: options.recordDiagnostic,
     port: options.port,
     onFatalError: options.onFatalError,
   })

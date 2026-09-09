@@ -1,8 +1,10 @@
 import type { Writable } from 'node:stream'
+import type { ApplicationDiagnostic } from '../../../shared/diagnostics/applicationDiagnostic'
 import type { BuddyServiceSupervisorFailureCode } from '../../../shared/runtime/runtimeProtocol'
 import type { BuddyServicePeer } from './BuddyServicePeer'
 import type { BuddyServiceProcessHandle, BuddyServiceProcessInstance } from './buddyServiceProcess'
 import process from 'node:process'
+import { APPLICATION_DIAGNOSTIC_METHOD, applicationDiagnosticSchema } from '../../../shared/diagnostics/applicationDiagnostic'
 import {
   BUDDY_SERVICE_PROTOCOL_VERSION,
   buddyServiceFailureNotificationSchema,
@@ -33,13 +35,14 @@ export interface BuddyServiceRequestOptions {
 }
 
 export interface BuddyServiceSupervisorOptions {
+  onDiagnostic?: (event: ApplicationDiagnostic & { sourceId: string, sourcePid?: number }) => void
   bindPeer?: (peer: BuddyServicePeer) => (() => void) | void
   diagnosticOutput?: Writable
   forceKillTimeoutMs?: number
   readinessTimeoutMs?: number
   restartDelaysMs?: number[]
   shutdownTimeoutMs?: number
-  spawnService: (onFatalError: (error: Error) => void) => BuddyServiceProcessHandle
+  spawnService: (onFatalError: (error: Error) => void, sourceId: string) => BuddyServiceProcessHandle
   stableResetMs?: number
 }
 
@@ -70,6 +73,9 @@ const RUNTIME_FAILURE_DISPOSITIONS = {
 export class BuddyServiceSupervisor {
   readonly #bindPeer?: BuddyServiceSupervisorOptions['bindPeer']
   readonly #diagnosticOutput: Writable
+  readonly #onDiagnostic: BuddyServiceSupervisorOptions['onDiagnostic']
+  #generationStartedAt = 0
+  #sourceId = 'runtime'
   readonly #forceKillTimeoutMs: number
   readonly #notificationListeners = new Set<(notification: BuddyServiceNotification) => void>()
   readonly #readinessTimeoutMs: number
@@ -79,6 +85,8 @@ export class BuddyServiceSupervisor {
   readonly #stableResetMs: number
   readonly #stateListeners = new Set<(state: BuddyServiceSupervisorState) => void>()
   readonly #exitedProcesses = new WeakSet<BuddyServiceProcessInstance>()
+  readonly #exitCodes = new WeakMap<BuddyServiceProcessInstance, number>()
+  #lastShutdownClean = true
   #desiredRunning = false
   #generation: ServiceGeneration | null = null
   #generationId = 0
@@ -97,6 +105,7 @@ export class BuddyServiceSupervisor {
   constructor(options: BuddyServiceSupervisorOptions) {
     this.#bindPeer = options.bindPeer
     this.#diagnosticOutput = options.diagnosticOutput ?? process.stderr
+    this.#onDiagnostic = options.onDiagnostic
     this.#forceKillTimeoutMs = options.forceKillTimeoutMs ?? DEFAULT_FORCE_KILL_TIMEOUT_MS
     this.#readinessTimeoutMs = options.readinessTimeoutMs ?? DEFAULT_READINESS_TIMEOUT_MS
     this.#restartDelaysMs = options.restartDelaysMs ?? DEFAULT_RESTART_DELAYS_MS
@@ -187,29 +196,37 @@ export class BuddyServiceSupervisor {
         this.#setStopped()
       else
         this.#setTerminationFailure()
+      if (!stopped || !this.#lastShutdownClean)
+        throw new Error('Runtime shutdown did not complete cleanly')
     })
   }
 
   async #stopCurrentGeneration(): Promise<boolean> {
     const generation = this.#generation
+    this.#lastShutdownClean = true
     if (!generation)
       return true
+    this.#record({ event: 'runtime.shutdown.started', level: 'info' }, generation)
     this.#generation = null
     this.#generationId += 1
     this.#clearReadinessTimer()
     this.#clearStableTimer()
-    generation.disposeBinding()
     const exited = waitForProcessExit(
       generation.process,
       this.#exitedProcesses.has(generation.process),
     )
     void generation.peer.request('runtime.shutdown', {}, this.#shutdownTimeoutMs).catch(() => {})
     let stopped = await settleWithin(exited, this.#shutdownTimeoutMs)
+    const forced = !stopped
     if (!stopped) {
+      this.#record({ event: 'runtime.shutdown.forced', level: 'warn' }, generation)
       generation.process.kill()
       stopped = await settleWithin(exited, this.#forceKillTimeoutMs)
     }
+    generation.disposeBinding()
     generation.peer.close(new BuddyServiceUnavailableError())
+    this.#lastShutdownClean = stopped && !forced && this.#exitCodes.get(generation.process) === 0
+    this.#record({ event: this.#lastShutdownClean ? 'runtime.shutdown.completed' : 'runtime.shutdown.failed', level: this.#lastShutdownClean ? 'info' : 'error' }, generation)
     return stopped
   }
 
@@ -217,6 +234,9 @@ export class BuddyServiceSupervisor {
     if (!this.#desiredRunning)
       return
     const id = ++this.#generationId
+    this.#sourceId = `runtime-${id}`
+    this.#generationStartedAt = performance.now()
+    this.#record({ event: 'component.starting', level: 'info', component: 'runtime.connection', operationId: this.#sourceId })
     let handle: BuddyServiceProcessHandle | null = null
     const pendingFatalError: { value: Error | null } = { value: null }
     const onFatalError = (error: Error) => {
@@ -228,7 +248,7 @@ export class BuddyServiceSupervisor {
       this.#failGeneration(id, failure, `Buddy Local Service failure: ${failure}`)
     }
     try {
-      handle = this.#spawnService(onFatalError)
+      handle = this.#spawnService(onFatalError, this.#sourceId)
     }
     catch (error) {
       this.#handleSpawnFailure(id, error)
@@ -241,6 +261,7 @@ export class BuddyServiceSupervisor {
       ready: false,
     }
     this.#generation = generation
+    this.#record({ event: 'runtime.spawned', level: 'info', attempt: this.#state.restartAttempt }, generation)
     this.#setState({
       ...this.#state,
       lastError: null,
@@ -249,6 +270,11 @@ export class BuddyServiceSupervisor {
     })
     this.#scheduleReadinessTimeout(id)
     generation.peer.onNotification((method, params) => {
+      if (method === APPLICATION_DIAGNOSTIC_METHOD && !this.#exitedProcesses.has(generation.process)) {
+        const event = applicationDiagnosticSchema.safeParse(params)
+        this.#record(event.success ? event.data : { event: 'runtime.diagnostic_invalid', level: 'warn' }, generation)
+        return
+      }
       if (this.#generation?.id !== id)
         return
       if (method === 'runtime.failed') {
@@ -279,6 +305,7 @@ export class BuddyServiceSupervisor {
           return
         }
         generation.ready = true
+        this.#connectionSettled('completed')
         this.#clearReadinessTimer()
         this.#setState({
           ...this.#state,
@@ -295,6 +322,8 @@ export class BuddyServiceSupervisor {
         listener({ method, params })
     })
     generation.process.once('exit', (code) => {
+      this.#record({ event: code === 0 ? 'runtime.exited' : 'runtime.exited_abnormally', level: code === 0 ? 'info' : 'error' }, generation)
+      this.#exitCodes.set(generation.process, code)
       this.#exitedProcesses.add(generation.process)
       this.#handleExit(id, code)
     })
@@ -308,6 +337,7 @@ export class BuddyServiceSupervisor {
     if (id !== this.#generationId || !this.#desiredRunning)
       return
     const diagnostic = error instanceof Error ? error.name : 'unknown error'
+    this.#connectionSettled('failed', 'RUNTIME_SPAWN_FAILED')
     this.#writeDiagnostic(`Buddy Local Service failed to spawn: ${diagnostic}`)
     this.#scheduleRestart('RUNTIME_SPAWN_FAILED')
   }
@@ -316,6 +346,8 @@ export class BuddyServiceSupervisor {
     if (this.#generation?.id !== id)
       return
     const generation = this.#generation
+    if (!generation.ready)
+      this.#connectionSettled('failed', 'RUNTIME_STOPPED')
     this.#generation = null
     this.#generationId += 1
     this.#clearReadinessTimer()
@@ -338,6 +370,7 @@ export class BuddyServiceSupervisor {
     const generation = this.#generation
     if (!generation || generation.id !== id || !this.#desiredRunning)
       return
+    this.#connectionSettled('failed', failure)
     this.#generation = null
     this.#generationId += 1
     this.#clearReadinessTimer()
@@ -463,9 +496,28 @@ export class BuddyServiceSupervisor {
   }
 
   #setState(state: BuddyServiceSupervisorState): void {
+    if (state.status !== this.#state.status || state.lastError !== this.#state.lastError) {
+      this.#record({
+        event: `runtime.${state.status}`,
+        level: state.lastError ? 'warn' : 'info',
+        attempt: state.restartAttempt,
+        ...(state.lastError ? { errorCode: state.lastError } : {}),
+      })
+    }
     this.#state = Object.freeze({ ...state })
     for (const listener of this.#stateListeners)
       listener(this.#state)
+  }
+
+  #record(event: ApplicationDiagnostic, generation = this.#generation): void {
+    try {
+      this.#onDiagnostic?.({ ...event, sourceId: generation ? `runtime-${generation.id}` : this.#sourceId, sourcePid: generation?.process.pid })
+    }
+    catch {}
+  }
+
+  #connectionSettled(status: 'completed' | 'failed', errorCode?: string): void {
+    this.#record({ event: status === 'completed' ? 'component.ready' : 'component.start_failed', level: status === 'failed' ? 'error' : 'info', component: 'runtime.connection', operationId: this.#sourceId, durationMs: Math.round(performance.now() - this.#generationStartedAt), ...(errorCode ? { errorCode } : {}) })
   }
 
   #isReplacementBlocked(): boolean {

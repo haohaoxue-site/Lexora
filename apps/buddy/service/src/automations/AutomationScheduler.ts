@@ -51,6 +51,13 @@ export class AutomationScheduler {
     await this.#scan
   }
 
+  async settle(): Promise<void> {
+    const results = await Promise.allSettled([...this.#activeDispatches.values()])
+    const failures = results.filter(result => result.status === 'rejected').map(result => result.reason)
+    if (failures.length)
+      throw new AggregateError(failures, 'Automation dispatch cleanup failed')
+  }
+
   async start(): Promise<void> {
     if (this.#started)
       return

@@ -19,7 +19,7 @@ const { skills, skillsError, language, isLoadingSkills, isMutatingConnectors, co
 </script>
 
 <template>
-  <DesktopSettingsPageLayout>
+  <DesktopSettingsPageLayout requires-runtime :loading="isLoadingSkills || localSettings.isLoadingConnectors.value">
     <template #title>
       {{ t('desktop.settings.category.local') }}
     </template>
@@ -31,7 +31,7 @@ const { skills, skillsError, language, isLoadingSkills, isMutatingConnectors, co
         :catalog="skills"
         :error="skillsError"
         :language="language"
-        :loading="isLoadingSkills"
+        :loading="false"
       />
       <DesktopConnectorsSettingsTab
         :busy="isMutatingConnectors"

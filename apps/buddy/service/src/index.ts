@@ -3,6 +3,9 @@ import { join } from 'node:path'
 import process from 'node:process'
 import { z } from 'zod'
 import { establishWindowsRuntimeGuard } from '../../platform/windows/runtimeGuard'
+import { APPLICATION_DIAGNOSTIC_METHOD, readDiagnosticErrorCode } from '../../shared/diagnostics/applicationDiagnostic'
+import { ServiceHost } from '../../shared/lifecycle/ServiceHost'
+import { ApplicationEvents } from '../../shared/observability/ApplicationEvents'
 import { toPublicRunEvent } from '../../shared/runs/publicRunEvent'
 import { runNotifications } from '../../shared/runs/runApi'
 import { buddyServiceFailureCodeSchema } from '../../shared/runtime/runtimeProtocol'
@@ -38,15 +41,13 @@ async function runBuddyService(): Promise<void> {
   if (!parentPort)
     return
 
-  if (process.platform === 'win32')
-    await establishWindowsRuntimeGuard()
-
   const buddyHome = process.env.LEXORA_BUDDY_HOME ?? resolveBuddyHome()
-  const builtinSkillsDirectories = z.array(z.string().min(1)).parse(
-    JSON.parse(process.env.LEXORA_BUDDY_SKILLS_DIRS ?? '[]'),
-  )
   let database: ReturnType<typeof openBuddyDatabase> | null = null
   let serviceServer: ReturnType<typeof createBuddyService> | null = null
+  const events = new ApplicationEvents()
+  events.subscribe(event => serviceServer?.notify(APPLICATION_DIAGNOSTIC_METHOD, event))
+  const record = events.publish
+  const host = new ServiceHost(events)
   let serviceFailureNotified = false
   let isDatabaseClosed = false
   const closeDatabase = () => {
@@ -71,13 +72,20 @@ async function runBuddyService(): Promise<void> {
     if (isShuttingDown)
       return
     isShuttingDown = true
-    await serviceHandle?.dispose().catch(() => {})
-    await eventLog?.close().catch(() => {})
+    record({ event: 'service.stopping', level: 'info', component: 'local_service' })
+    let failed = false
+    try {
+      await host.stop()
+    }
+    catch {
+      failed = true
+    }
+    record({ event: failed ? 'service.stop_failed' : 'service.stopped', level: failed ? 'error' : 'info', component: 'runtime.service' })
     serviceServer?.close(new Error('Buddy Local Service is shutting down'))
-    closeDatabase()
-    process.exit(exitCode)
+    process.exit(failed ? 1 : exitCode)
   }
   serviceServer = createBuddyService({
+    recordDiagnostic: record,
     announceReady: false,
     port: parentPort,
     scheduleShutdown() {
@@ -90,44 +98,61 @@ async function runBuddyService(): Promise<void> {
   })
   process.once('exit', closeDatabase)
   try {
-    const openedDatabase = openBuddyDatabase({ buddyHome })
-    database = openedDatabase
-    eventLog = createRunEventLog({
-      conversationsDirectory: join(buddyHome, 'conversations'),
-      database: openedDatabase,
-      onEvent: event => serviceServer?.notify(runNotifications.event.method, toPublicRunEvent(event)),
-      onEventDeliveryError: (error, event) => {
-        process.stderr.write(
-          `Lexora Buddy run event notification failed: ${error.name} ${event.runId}#${event.sequence}\n`,
-        )
-      },
-      onFatalFailure: (error) => {
-        notifyFailure(readBuddyServiceFailureCode(error))
-        const operation = 'operation' in error ? ` ${error.operation}` : ''
-        const stage = 'stage' in error ? ` ${error.stage}` : ''
-        const range = error.firstSequence === null || error.lastSequence === null
-          ? error.runId
-          : `${error.runId}#${error.firstSequence}-${error.lastSequence}`
-        process.stderr.write(
-          `Lexora Buddy event log fatal failure: ${error.code} ${error.commitState}${operation}${stage} ${range}\n`,
-        )
-        void shutdown(1)
-      },
+    const builtinSkillsDirectories = await host.step('runtime.guard', async () => {
+      if (process.platform === 'win32')
+        await establishWindowsRuntimeGuard()
+      return z.array(z.string().min(1)).parse(JSON.parse(process.env.LEXORA_BUDDY_SKILLS_DIRS ?? '[]'))
     })
-    await eventLog.replayAll()
-    serviceHandle = await startBuddyService({
-      buddyHome,
-      builtinSkillsDirectories,
-      database: openedDatabase,
-      eventLog,
-      rpc: serviceServer,
+    const openedDatabase = await host.start('runtime.database', ({ defer }) => {
+      database = openBuddyDatabase({ buddyHome })
+      defer(closeDatabase)
+      return database
+    })
+    eventLog = await host.start('runtime.event_log', ({ defer }) => {
+      const log = createRunEventLog({
+        conversationsDirectory: join(buddyHome, 'conversations'),
+        database: openedDatabase,
+        onEvent: event => serviceServer?.notify(runNotifications.event.method, toPublicRunEvent(event)),
+        onEventDeliveryError: (error, event) => {
+          record({ event: 'run.notification_failed', level: 'warn', runId: event.runId, errorCode: readDiagnosticErrorCode(error) })
+          process.stderr.write(
+            `Lexora Buddy run event notification failed: ${error.name} ${event.runId}#${event.sequence}\n`,
+          )
+        },
+        onFatalFailure: (error) => {
+          record({ event: 'run.storage_failed', level: 'error', runId: error.runId, errorCode: error.code })
+          notifyFailure(readBuddyServiceFailureCode(error))
+          const operation = 'operation' in error ? ` ${error.operation}` : ''
+          const stage = 'stage' in error ? ` ${error.stage}` : ''
+          const range = error.firstSequence === null || error.lastSequence === null
+            ? error.runId
+            : `${error.runId}#${error.firstSequence}-${error.lastSequence}`
+          process.stderr.write(
+            `Lexora Buddy event log fatal failure: ${error.code} ${error.commitState}${operation}${stage} ${range}\n`,
+          )
+          void shutdown(1)
+        },
+      })
+      defer(() => log.close())
+      return log
+    }, ['runtime.database'])
+    await host.step('runtime.event_replay', () => eventLog!.replayAll())
+    await host.start('runtime.services', async ({ defer }) => {
+      serviceHandle = await startBuddyService({
+        buddyHome,
+        builtinSkillsDirectories,
+        database: openedDatabase,
+        eventLog: eventLog!,
+        rpc: serviceServer,
+        events,
+      })
+      defer(() => serviceHandle!.dispose())
     })
     notifyBuddyServiceReady(serviceServer)
   }
   catch (error) {
     notifyFailure(readBuddyServiceFailureCode(error))
-    await serviceHandle?.dispose().catch(() => {})
-    await eventLog?.close().catch(() => {})
+    await host.stop().catch(() => {})
     serviceServer.close(new Error('Buddy Local Service startup failed'))
     closeDatabase()
     throw error
