@@ -118,6 +118,7 @@ export interface DesktopBrowserAttachGuestInput {
 
 export interface DesktopBrowserEnsureSessionInput {
   conversationId: string
+  tabId?: string
 }
 
 export interface DesktopBrowserNavigateInput {
@@ -148,7 +149,7 @@ export interface DesktopBrowserApi {
   attachGuest: (sessionId: string, webContentsId: number) => Promise<void>
   captureScreenshot: (sessionId: string) => Promise<boolean>
   close: (sessionId: string) => Promise<void>
-  ensureSession: (conversationId: string) => Promise<DesktopBrowserState>
+  ensureSession: (conversationId: string, tabId?: string) => Promise<DesktopBrowserState>
   goBack: (sessionId: string) => Promise<void>
   goForward: (sessionId: string) => Promise<void>
   listGuests: () => Promise<DesktopBrowserGuestDescriptor[]>

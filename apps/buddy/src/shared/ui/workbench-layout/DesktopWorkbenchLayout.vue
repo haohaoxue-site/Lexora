@@ -33,6 +33,7 @@ const {
   activePanel,
   beginResize,
   contextRange,
+  contextStyle,
   contextWidth,
   handleResizeKeydown,
   layoutStyle,
@@ -160,7 +161,7 @@ onBeforeUnmount(() => {
       @keydown="handleResizeKeydown('context', $event)"
       @pointerdown="beginResize('context', $event)"
     />
-    <aside v-if="$slots.context" ref="context" class="desktop-workbench-layout__context">
+    <aside v-if="$slots.context" ref="context" class="desktop-workbench-layout__context" :style="contextStyle">
       <slot name="context" />
     </aside>
     <div v-if="activePanel" class="desktop-workbench-layout__resize-shield" />

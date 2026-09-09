@@ -5,8 +5,14 @@ import {
   loadDesktopMonaco,
   observeDesktopMonacoTheme,
 } from '@/shared/ui/monaco/desktopMonaco'
+import { observeDesktopMonacoLayout } from '@/shared/ui/monaco/desktopMonacoLayout'
 
 interface UseMonacoDiffOptions {
+  wrap?: Readonly<Ref<boolean>>
+  sideBySide?: Readonly<Ref<boolean>>
+  onHeight?: (height: number) => void
+  getViewState?: () => Monaco.editor.IDiffEditorViewState | null
+  onViewState?: (state: Monaco.editor.IDiffEditorViewState | null) => void
   container: Readonly<Ref<HTMLElement | null>>
   language: Readonly<Ref<string | null>>
   modified: Readonly<Ref<string>>
@@ -23,13 +29,25 @@ export function useMonacoDiff(options: UseMonacoDiffOptions) {
     let editor: Monaco.editor.IStandaloneDiffEditor | null = null
     let originalModel: Monaco.editor.ITextModel | null = null
     let modifiedModel: Monaco.editor.ITextModel | null = null
+    let diffModel: Monaco.editor.IDiffEditorViewModel | null = null
+    let savedViewState: Monaco.editor.IDiffEditorViewState | null | undefined
     let stopThemeSync: (() => void) | null = null
     let stopModelWatch: (() => void) | null = null
+    let stopOptionsWatch: (() => void) | null = null
+    let sizeListener: Monaco.IDisposable | null = null
+    let stopLayout: (() => void) | null = null
+    let initialized = false
     function dispose() {
       stopModelWatch?.()
       stopModelWatch = null
+      stopOptionsWatch?.()
+      sizeListener?.dispose()
+      stopLayout?.()
       stopThemeSync?.()
       stopThemeSync = null
+      editor?.setModel(null)
+      diffModel?.dispose()
+      diffModel = null
       editor?.dispose()
       editor = null
       originalModel?.dispose()
@@ -38,6 +56,8 @@ export function useMonacoDiff(options: UseMonacoDiffOptions) {
       modifiedModel = null
     }
     onCleanup(() => {
+      if (initialized && editor)
+        options.onViewState?.(savedViewState ?? editor.saveViewState())
       active = false
       dispose()
     })
@@ -62,7 +82,8 @@ export function useMonacoDiff(options: UseMonacoDiffOptions) {
         monaco.Uri.parse(`inmemory://lexora-buddy/${modelId}/after/${path}`),
       )
       editor = monaco.editor.createDiffEditor(container, {
-        automaticLayout: true,
+        automaticLayout: false,
+        dimension: { width: container.clientWidth, height: container.clientHeight },
         contextmenu: false,
         diffCodeLens: false,
         domReadOnly: true,
@@ -82,12 +103,42 @@ export function useMonacoDiff(options: UseMonacoDiffOptions) {
         readOnly: true,
         renderMarginRevertIcon: false,
         renderOverviewRuler: false,
-        renderSideBySide: true,
+        renderSideBySide: options.sideBySide?.value ?? true,
+        useInlineViewWhenSpaceIsLimited: false,
+        diffWordWrap: options.wrap?.value ? 'on' : 'off',
         scrollBeyondLastLine: false,
+        scrollbar: { alwaysConsumeMouseWheel: false },
         smoothScrolling: true,
         stickyScroll: { enabled: false },
       })
-      editor.setModel({ modified: modifiedModel, original: originalModel })
+      stopLayout = observeDesktopMonacoLayout(container, size => editor?.layout(size))
+      savedViewState = options.getViewState?.()
+      const updateHeight = () => {
+        if (editor?.getLineChanges())
+          options.onHeight?.(Math.max(editor.getOriginalEditor().getContentHeight(), editor.getModifiedEditor().getContentHeight()))
+      }
+      const onContentSizeChange = (event: Monaco.editor.IContentSizeChangedEvent) => {
+        if (event.contentHeightChanged)
+          updateHeight()
+      }
+      const subscriptions = [
+        editor.getOriginalEditor().onDidContentSizeChange(onContentSizeChange),
+        editor.getModifiedEditor().onDidContentSizeChange(onContentSizeChange),
+        editor.onDidUpdateDiff(() => {
+          if (savedViewState) {
+            const state = savedViewState
+            savedViewState = null
+            editor?.restoreViewState(state)
+          }
+          updateHeight()
+        }),
+      ]
+      sizeListener = { dispose: () => subscriptions.forEach(subscription => subscription.dispose()) }
+      diffModel = editor.createViewModel({ modified: modifiedModel, original: originalModel })
+      editor.setModel(diffModel)
+      stopOptionsWatch = watch([() => options.wrap?.value, () => options.sideBySide?.value], ([wrap, sideBySide]) => {
+        editor?.updateOptions({ diffWordWrap: wrap ? 'on' : 'off', renderSideBySide: sideBySide ?? true, wordWrapOverride2: 'inherit' })
+      })
       stopThemeSync = observeDesktopMonacoTheme(monaco)
       stopModelWatch = watch([options.original, options.modified, options.language], ([original, modified, language]) => {
         if (!editor || !originalModel || !modifiedModel)
@@ -104,6 +155,7 @@ export function useMonacoDiff(options: UseMonacoDiffOptions) {
         if (viewState)
           editor.restoreViewState(viewState)
       }, { flush: 'sync' })
+      initialized = true
       loading.value = false
     }
     catch {

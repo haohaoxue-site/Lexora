@@ -105,9 +105,15 @@ describe('useTaskContextPanel', () => {
     expect(panel.isOpen.value).toBe(true)
     expect(panel.activeTab.value).toMatchObject({
       changeSet: { changeSetId: 'changes-1', fileCount: 2 },
-      id: 'changes:changes-1',
+      id: 'changes:conversation-1',
       kind: 'changes',
     })
+
+    panel.openChanges()
+    expect(panel.tabs.value).toHaveLength(1)
+    expect(panel.activeTab.value).toMatchObject({ changeSet: null })
+    panel.openChanges('changes-1')
+    expect(panel.tabs.value).toHaveLength(1)
 
     activeConversationId.value = 'conversation-2'
     await nextTick()

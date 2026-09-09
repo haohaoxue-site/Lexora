@@ -5,6 +5,18 @@ import {
 } from '../BrowserSessionRegistry'
 
 describe('browserSessionRegistry', () => {
+  it('keeps tabs in the same conversation separate from the agent session', () => {
+    const fixture = createFixture()
+    const agent = fixture.ensure('conversation')
+    const first = fixture.registry.ensure('conversation', fixture.createSession, 'tab-1')
+    const second = fixture.registry.ensure('conversation', fixture.createSession, 'tab-2')
+    expect(new Set([agent.sessionId, first.sessionId, second.sessionId]).size).toBe(3)
+    expect(fixture.registry.getByConversation('conversation')).toBe(agent)
+    fixture.registry.remove(first.sessionId)
+    expect(fixture.registry.getByConversation('conversation')).toBe(agent)
+    expect(fixture.registry.ensure('conversation', fixture.createSession, 'tab-2')).toBe(second)
+  })
+
   it('rejects creation when every session is protected', () => {
     const fixture = createFixture(2)
     const first = fixture.ensure('conversation-1')

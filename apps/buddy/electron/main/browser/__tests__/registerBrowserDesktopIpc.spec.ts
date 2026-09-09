@@ -145,7 +145,7 @@ describe('registerBrowserDesktopIpc', () => {
       sessionId,
     })).resolves.toBeUndefined()
 
-    expect(host.ensureSession).toHaveBeenCalledExactlyOnceWith('conversation-1')
+    expect(host.ensureSession).toHaveBeenCalledExactlyOnceWith('conversation-1', undefined)
     expect(host.setProfileMode).toHaveBeenCalledExactlyOnceWith(sessionId, 'incognito')
     expect(host.goBack).toHaveBeenCalledExactlyOnceWith(sessionId)
     expect(host.goForward).toHaveBeenCalledExactlyOnceWith(sessionId)

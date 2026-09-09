@@ -54,7 +54,7 @@ const browserOriginSchema = z.string().min(1).max(4_096).refine((value) => {
 })
 
 export const browserEnsureSessionInputSchema: z.ZodType<DesktopBrowserEnsureSessionInput>
-  = z.object({ conversationId: browserConversationIdSchema }).strict()
+  = z.object({ conversationId: browserConversationIdSchema, tabId: z.string().min(1).max(128).optional() }).strict()
 
 export const browserNavigateInputSchema: z.ZodType<DesktopBrowserNavigateInput> = z.object({
   sessionId: browserSessionIdSchema,

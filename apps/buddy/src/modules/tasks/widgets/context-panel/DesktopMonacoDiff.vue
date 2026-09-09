@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed, useTemplateRef } from 'vue'
+import type { editor } from 'monaco-editor/editor/editor.api.js'
+import { computed, shallowRef, useTemplateRef } from 'vue'
 import { useMonacoDiff } from './useMonacoDiff'
 
 const props = defineProps<{
@@ -7,20 +8,41 @@ const props = defineProps<{
   before: string
   language: string | null
   path: string
+  wrap?: boolean
+  sideBySide?: boolean
+  fitContent?: boolean
+  initialHeight?: number
+  viewState?: editor.IDiffEditorViewState | null
+}>()
+const emit = defineEmits<{
+  height: [height: number]
+  viewState: [state: editor.IDiffEditorViewState | null]
 }>()
 
 const container = useTemplateRef<HTMLDivElement>('container')
+const contentHeight = shallowRef(props.initialHeight ?? 160)
 const { failed, loading } = useMonacoDiff({
   container,
   language: computed(() => props.language),
   modified: computed(() => props.after),
   original: computed(() => props.before),
   path: computed(() => props.path),
+  wrap: computed(() => props.wrap ?? false),
+  sideBySide: computed(() => props.sideBySide ?? true),
+  getViewState: () => props.viewState ?? null,
+  onViewState: state => emit('viewState', state),
+  onHeight: (height) => {
+    const nextHeight = Math.min(800, Math.max(80, height))
+    if (contentHeight.value !== nextHeight) {
+      contentHeight.value = nextHeight
+      emit('height', nextHeight)
+    }
+  },
 })
 </script>
 
 <template>
-  <div class="desktop-monaco-diff">
+  <div class="desktop-monaco-diff" :style="fitContent ? { height: `${contentHeight}px` } : undefined">
     <div ref="container" class="desktop-monaco-diff__editor" />
     <div v-if="loading" class="desktop-monaco-diff__status">
       <slot name="loading" />

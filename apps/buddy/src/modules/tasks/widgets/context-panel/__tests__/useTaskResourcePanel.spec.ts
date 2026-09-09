@@ -14,6 +14,7 @@ function fixture() {
   const gate = deferred<DesktopBrowserState>()
   let sessionOpen = true
   const browser = {
+    onStateChanged: () => () => {},
     ensureSession: () => gate.promise,
     close: async () => { sessionOpen = false },
     openArtifact: async () => { throw new Error('preview unavailable') },
@@ -30,6 +31,19 @@ function fixture() {
 }
 
 describe('resource panel operations', () => {
+  it('closes an uninitialized manual tab and releases its late session without restoring the tab', async () => {
+    const f = fixture()
+    f.panel.addBrowser()
+    const tab = f.panel.activeTab.value!
+    expect(await f.panel.closeTab(tab.id)).toBe(true)
+    if (tab.kind !== 'browser')
+      throw new Error('Expected a browser tab')
+    f.panel.retainBrowserSession({ sessionId: 'session', conversationId: 'conversation' } as DesktopBrowserState, tab.browserKey)
+    await nextTick()
+    expect(f.sessionOpen()).toBe(false)
+    expect(f.panel.tabs.value).toEqual([])
+  })
+
   it('does not close a browser reopened while its old close awaits the session', async () => {
     const f = fixture()
     f.panel.openBrowser()

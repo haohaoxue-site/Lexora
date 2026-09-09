@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 
-export type BrowserSessionProtection = 'runtime' | 'surface'
+export type BrowserSessionProtection = 'runtime' | 'surface' | 'tab'
 export type BrowserSessionTeardownReason = 'closed' | 'disposed' | 'evicted'
 
 export interface BrowserSessionFactoryContext {
@@ -14,6 +14,7 @@ export interface BrowserSessionFactoryResult<Session> {
 }
 
 interface BrowserSessionEntry<Session> extends BrowserSessionFactoryContext {
+  tabId: string
   lastUsed: number
   protections: Set<BrowserSessionProtection>
   session: Session
@@ -35,7 +36,7 @@ export class BrowserSessionRegistryError extends Error {
 }
 
 export class BrowserSessionRegistry<Session> {
-  readonly #byConversationId = new Map<string, BrowserSessionEntry<Session>>()
+  readonly #byTab = new Map<string, BrowserSessionEntry<Session>>()
   readonly #bySessionId = new Map<string, BrowserSessionEntry<Session>>()
   readonly #createId: () => string
   readonly #maxSessions: number
@@ -44,7 +45,7 @@ export class BrowserSessionRegistry<Session> {
 
   constructor(options: BrowserSessionRegistryOptions = {}) {
     this.#createId = options.createId ?? randomUUID
-    this.#maxSessions = options.maxSessions ?? 4
+    this.#maxSessions = options.maxSessions ?? 16
     if (!Number.isInteger(this.#maxSessions) || this.#maxSessions < 1)
       throw new RangeError('Browser session limit must be a positive integer')
   }
@@ -54,9 +55,11 @@ export class BrowserSessionRegistry<Session> {
     createSession: (
       context: BrowserSessionFactoryContext,
     ) => BrowserSessionFactoryResult<Session>,
+    tabId = 'default',
   ): Session {
     this.#assertActive()
-    const existing = this.#byConversationId.get(conversationId)
+    const key = JSON.stringify([conversationId, tabId])
+    const existing = this.#byTab.get(key)
     if (existing) {
       this.#touchEntry(existing)
       return existing.session
@@ -72,14 +75,15 @@ export class BrowserSessionRegistry<Session> {
       this.#removeEntry(evictionCandidate, 'evicted')
 
     const entry: BrowserSessionEntry<Session> = {
+      tabId,
       conversationId,
       lastUsed: ++this.#clock,
-      protections: new Set(),
+      protections: new Set(tabId === 'default' ? [] : ['tab']),
       session: created.session,
       sessionId,
       teardown: created.teardown,
     }
-    this.#byConversationId.set(conversationId, entry)
+    this.#byTab.set(key, entry)
     this.#bySessionId.set(sessionId, entry)
     return entry.session
   }
@@ -89,7 +93,11 @@ export class BrowserSessionRegistry<Session> {
   }
 
   getByConversation(conversationId: string): Session | undefined {
-    return this.#byConversationId.get(conversationId)?.session
+    return this.#byTab.get(JSON.stringify([conversationId, 'default']))?.session
+  }
+
+  getTabId(sessionId: string): string | undefined {
+    return this.#bySessionId.get(sessionId)?.tabId
   }
 
   touch(sessionId: string): boolean {
@@ -154,7 +162,7 @@ export class BrowserSessionRegistry<Session> {
     entry: BrowserSessionEntry<Session>,
     reason: BrowserSessionTeardownReason,
   ): void {
-    this.#byConversationId.delete(entry.conversationId)
+    this.#byTab.delete(JSON.stringify([entry.conversationId, entry.tabId]))
     this.#bySessionId.delete(entry.sessionId)
     entry.teardown(reason)
   }

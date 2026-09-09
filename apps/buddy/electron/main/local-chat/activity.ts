@@ -1,6 +1,6 @@
 import type { LocalChatIpcContext } from './registrar'
 import { artifactsRequestSchemas, artifactsRpc } from '../../../shared/artifacts/artifactApi'
-import { changesRequestSchemas, changesRpc } from '../../../shared/changes/changeApi'
+import { changeOverviewRequestSchema, changesRequestSchemas, changesRpc } from '../../../shared/changes/changeApi'
 import { notificationsRequestSchemas, notificationsRpc } from '../../../shared/notifications/notificationApi'
 import { approvalsRequestSchemas, approvalsRpc } from '../../../shared/permissions/approvalApi'
 import { toPublicRunEvent } from '../../../shared/runs/publicRunEvent'
@@ -11,6 +11,7 @@ import { LOCAL_CHAT_IPC_CHANNELS } from '../../shared/localChatApi'
 
 export function registerActivityIpc(context: LocalChatIpcContext): void {
   const { handle, request } = context
+  handle(LOCAL_CHAT_IPC_CHANNELS.changesOverview, (_event, input) => request(changesRpc.overview, changeOverviewRequestSchema.parse(input)))
 
   handle(LOCAL_CHAT_IPC_CHANNELS.artifactsReadText, (_event, input) => request(artifactsRpc.readText, artifactsRequestSchemas.artifactText.parse(input)))
 

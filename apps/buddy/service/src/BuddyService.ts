@@ -82,6 +82,7 @@ import { BuddyServiceError } from './rpc/runtimeRequest'
 import { registerRunRpc } from './runs/registerRunRpc'
 import { RunLifecycleService } from './runs/RunLifecycleService'
 import { RunRecoveryService } from './runs/RunRecoveryService'
+import { registerSpaceFileRpc } from './spaces/registerSpaceFileRpc'
 import { registerSpaceRpc } from './spaces/registerSpaceRpc'
 import { matchesSpaceExecutionContext } from './spaces/spaceExecutionContext'
 import { SpaceService } from './spaces/SpaceService'
@@ -545,6 +546,8 @@ export async function startBuddyService(
       )
       register(
         registerChangeRpc({
+          conversations,
+          runs,
           rpc: options.rpc,
           service: changeCaptureService,
         }),
@@ -658,6 +661,7 @@ export async function startBuddyService(
           sessions,
         }),
       )
+      register(registerSpaceFileRpc(options.rpc, spacesRepository))
       register(
         registerProviderRpc({
           automations: automationChanges,

@@ -197,8 +197,8 @@ export class BrowserHost {
     return this.#disposed
   }
 
-  ensureSession(conversationId: string): DesktopBrowserState {
-    return this.#ensureSession(conversationId, 'default')
+  ensureSession(conversationId: string, tabId?: string): DesktopBrowserState {
+    return this.#ensureSession(conversationId, 'default', tabId)
   }
 
   async setProfileMode(
@@ -216,6 +216,7 @@ export class BrowserHost {
   #ensureSession(
     conversationId: string,
     profileMode: DesktopBrowserProfileMode,
+    tabId?: string,
   ): DesktopBrowserState {
     this.#assertActive()
     let wasCreated = false
@@ -227,7 +228,7 @@ export class BrowserHost {
           session,
           teardown: reason => this.#teardownSession(session, reason),
         }
-      })
+      }, tabId)
       if (wasCreated && this.#evictedConversationIds.delete(conversationId)) {
         session.state.error = {
           code: 'BROWSER_SESSION_EVICTED',
@@ -741,9 +742,10 @@ export class BrowserHost {
     const conversationId = current.state.conversationId
     const restoreVisibility = current.state.visible
     const restoreUrl = current.state.url.startsWith('file:') ? null : current.state.url
+    const tabId = this.#sessions.getTabId(current.state.sessionId)
     this.#sessions.remove(current.state.sessionId)
 
-    const state = this.#ensureSession(conversationId, profileMode)
+    const state = this.#ensureSession(conversationId, profileMode, tabId)
     if (restoreVisibility) {
       this.setSurface({
         sessionId: state.sessionId,
