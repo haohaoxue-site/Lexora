@@ -136,6 +136,7 @@ const actionCopyText = computed(() => resultNoticeText.value ?? statusLabel.valu
       :language="language"
       role="assistant"
       :target-key="`run-${turn.runId}`"
+      :usage="ownsResultActions ? turn.usage : null"
       @activate-branch="emit('activateBranch', $event)"
       @regenerate="emit('regenerate')"
     />

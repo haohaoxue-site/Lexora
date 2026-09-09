@@ -1,13 +1,15 @@
 import type { LocalRun, LocalRunEvent } from '@buddy-shared/runs/runApi'
-
 import type { BuddyToolPresentation } from '@buddy-shared/runs/runEventPresentation'
+
 import type { BuddyRunProgress } from '@buddy-shared/runs/runProgress'
+import type { LocalRunTokenUsage } from '@buddy-shared/usage/runTokenUsage'
 import type { ChatAgentCompactionNode } from './chatRunCompaction'
 import type { ChatProjectionReducer } from './chatRunEventProjection'
 import { approvalReviewPayloadSchema } from '@buddy-shared/permissions/approvalReviewPayload'
 import { buddyRunProgressSchema } from '@buddy-shared/runs/runProgress'
 import { createChatRunCompactionReducer } from './chatRunCompaction'
 import { readAssistantTextPhase, readNonnegativeInteger, readPayload, readString } from './chatRunEventProjection'
+import { createChatRunTokenUsageReducer } from './chatRunTokenUsage'
 import { approvalPresentation, normalizeProcessNarration, readToolPresentationUpdate, specificToolDescription } from './chatToolPresentation'
 
 export type { ChatAgentCompactionNode } from './chatRunCompaction'
@@ -62,6 +64,7 @@ export interface ChatAgentTurn {
   startedAt: string
   status: LocalRun['status']
   triggeringMessageId: string
+  usage: LocalRunTokenUsage | null
 }
 
 export function projectChatAgentTurns(
@@ -92,6 +95,7 @@ export function createChatAgentTurnReducer(
   run: LocalRun,
 ): ChatProjectionReducer<ChatAgentTurn> {
   const compactions = createChatRunCompactionReducer(run.id)
+  const usage = createChatRunTokenUsageReducer(run.id)
   const reasoning = new Map<string, ChatAgentReasoningNode>()
   const tools = new Map<string, ChatAgentToolNode>()
   const approvalTools = new Map<string, string>()
@@ -104,6 +108,7 @@ export function createChatAgentTurnReducer(
   let projection: ChatAgentTurn | null = null
 
   function append(events: ReadonlyArray<LocalRunEvent>) {
+    usage.append(events)
     for (const event of events) {
       if (canAffectChatAgentTurn(event))
         projection = null
@@ -460,6 +465,7 @@ export function createChatAgentTurnReducer(
       startedAt: run.startedAt,
       status: run.status,
       triggeringMessageId: run.triggeringMessageId,
+      usage: usage.project(),
     }
     return projection
   }
@@ -478,6 +484,7 @@ function canAffectChatAgentTurn(event: LocalRunEvent): boolean {
       || (payload.kind === 'text' && readAssistantTextPhase(payload.phase) === 'commentary')
   }
   return event.type === 'run.failed'
+    || event.type === 'usage.recorded'
     || event.type === 'run.progress'
     || event.type.startsWith('context.compaction.')
     || event.type === 'message.completed'

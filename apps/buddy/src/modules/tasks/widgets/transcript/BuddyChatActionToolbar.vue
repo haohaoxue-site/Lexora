@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { LocalMessage } from '@buddy-shared/conversation/conversationApi'
+import type { LocalRunTokenUsage } from '@buddy-shared/usage/runTokenUsage'
 
 import type { ChatMessageActions } from '../../model/transcript/chatMessageActions'
 import type { ChatMessageBranchNavigator } from '../../model/transcript/chatMessageBranches'
@@ -11,6 +12,7 @@ import { useBuddyI18n } from '@/i18n/buddyI18n'
 import { useTaskContext } from '@/modules/tasks/taskContext'
 import DesktopIcon from '@/shared/ui/icon/DesktopIcon.vue'
 import { formatChatMessageTimeLabel } from '../../model/transcript/chatMessageTime'
+import BuddyChatTokenUsage from './BuddyChatTokenUsage.vue'
 
 const props = defineProps<{
   actions: ChatMessageActions
@@ -20,6 +22,7 @@ const props = defineProps<{
   language: BuddyLocale
   role: LocalMessage['role']
   targetKey: string
+  usage?: LocalRunTokenUsage | null
 }>()
 
 const emit = defineEmits<{
@@ -156,12 +159,19 @@ async function copyContent() {
     >
       {{ formatChatMessageTimeLabel(createdAt) }}
     </time>
+    <BuddyChatTokenUsage
+      v-if="usage && role === 'assistant'"
+      class="buddy-chat-action-toolbar__usage"
+      :language="language"
+      :usage="usage"
+    />
   </div>
 </template>
 
 <style scoped lang="scss">
 .buddy-chat-action-toolbar {
   display: flex;
+  flex-wrap: wrap;
   min-height: 1.5rem;
   align-items: center;
   gap: 0.15rem;
@@ -170,6 +180,10 @@ async function copyContent() {
     color: var(--buddy-text-secondary);
     font-size: 0.68rem;
   }
+}
+
+.buddy-chat-action-toolbar :deep(.buddy-chat-action-toolbar__usage) {
+  padding-inline-start: 0.75rem;
 }
 
 .buddy-chat-action-toolbar__branch {
@@ -188,12 +202,16 @@ async function copyContent() {
 }
 
 .buddy-chat-action-toolbar__time {
+  display: inline-flex;
+  height: 1.5rem;
+  align-items: center;
   color: var(--buddy-text-muted);
   font-size: 0.68rem;
   font-variant-numeric: tabular-nums;
   font-weight: 400;
-  line-height: 1.35rem;
+  line-height: 1;
   padding-inline: 0.2rem;
+  transform: translateY(-0.5px);
   white-space: nowrap;
 }
 

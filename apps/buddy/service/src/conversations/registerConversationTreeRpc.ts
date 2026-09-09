@@ -32,6 +32,7 @@ export function registerConversationTreeRpc(options: Pick<RegisterConversationRp
       messages: repository.listMessages(conversationId),
       runs: repository.listRuns(conversationId),
       toolCounts: repository.listToolCounts(conversationId),
+      usageByRun: repository.listRunUsage(conversationId),
       attachments: options.attachments.listForConversation(conversationId),
       outputs: projectRunOutputs(repository.listOutputEvents(conversationId), options.artifacts.listForConversation(conversationId)),
     })

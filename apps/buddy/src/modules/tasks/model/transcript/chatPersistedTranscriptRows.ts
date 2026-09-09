@@ -92,6 +92,11 @@ export function projectPersistedChatTranscriptRows(
     }
     if (turnChanges)
       row.turnChanges = turnChanges
+    const turnUsage = isFinalTurnMessage(item, turnsByRunId) && item.runId
+      ? turnsByRunId.get(item.runId)?.usage
+      : null
+    if (turnUsage)
+      row.turnUsage = turnUsage
     rows.push(row)
     rows.push(...(turnsByTrigger.get(item.id) ?? []).map((turn) => {
       const ownsResultActions = (

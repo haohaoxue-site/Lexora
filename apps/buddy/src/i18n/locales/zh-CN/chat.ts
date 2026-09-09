@@ -1,4 +1,7 @@
 export default {
+  'desktop.chat.usage.input': '输入',
+  'desktop.chat.usage.output': '输出',
+  'desktop.chat.usage.cache': '缓存',
   'desktop.canvas.nodeActions': '消息操作',
   'desktop.canvas.more': '更多',
   'desktop.canvas.moreResources': '查看详情，还有 {count} 项资源',

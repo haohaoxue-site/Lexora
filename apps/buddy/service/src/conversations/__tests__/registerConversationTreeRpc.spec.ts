@@ -21,6 +21,13 @@ describe('conversation tree queries', () => {
         conversations.createMessage({ id: `${id}-answer`, conversationId: id, branchId: `${id}-root`, role: 'assistant', runId: `${id}-run`, createdAt: now, content: { text: `**Opening**\n\n${'full answer '.repeat(1000)}ENDING` } })
       }
       conversations.createBranch({ id: 'alternative', conversationId: 'conversation', parentBranchId: 'conversation-root', forkedFromMessageId: 'conversation-question', createdAt: now, activate: true })
+      const recordUsage = database.prepare(`INSERT INTO usage_records (
+        id, run_id, source_entry_id, provider, model, purpose,
+        input_tokens, output_tokens, cache_read_tokens, cache_write_tokens, total_tokens,
+        input_cost, output_cost, cache_read_cost, cache_write_cost, total_cost, created_at
+      ) VALUES (?, 'conversation-run', ?, 'provider', 'recorded-model', 'turn', 40, 10, 60, 20, 130, 0, 0, 0, 0, 0, ?)`)
+      recordUsage.run('usage-1', 'entry-1', now)
+      recordUsage.run('usage-2', 'entry-2', now)
       const handlers = new Map<string, RuntimeRequestHandler>()
       registerConversationTreeRpc({
         database,
@@ -42,7 +49,14 @@ describe('conversation tree queries', () => {
       expect(answer.text.length).toBeLessThanOrEqual(240)
       expect(answer.text).toMatch(/^Opening/)
       expect(answer.text).not.toContain('ENDING')
-      expect(answer.metadata).toEqual({ modelId: 'recorded-model', startedAt: now, completedAt: '2026-09-09T00:00:09.000Z' })
+      expect(answer.metadata).toEqual({
+        modelId: 'recorded-model',
+        startedAt: now,
+        completedAt: '2026-09-09T00:00:09.000Z',
+        usage: { inputTokens: 80, outputTokens: 20, cacheReadTokens: 120, cacheWriteTokens: 40 },
+      })
+      const otherTree = conversationTreeSchema.parse(await invoke('conversations.getTree', { conversationId: 'other' }))
+      expect(otherTree.nodes.find(node => node.kind === 'answer')?.metadata?.usage).toBeNull()
       const question = conversationResponseSchemas.timelinePage.parse(await invoke('conversations.getNodeDetail', { conversationId: 'conversation', kind: 'question', messageId: 'conversation-question' }))
       expect(question.items.map(item => item.id)).toEqual(['conversation-question'])
       expect(question.runs).toEqual([])

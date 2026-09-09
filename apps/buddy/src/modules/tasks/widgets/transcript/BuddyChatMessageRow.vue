@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { LocalChangeSetSummary } from '@buddy-shared/changes/changeApi'
 import type { LocalMessage } from '@buddy-shared/conversation/conversationApi'
+import type { LocalRunTokenUsage } from '@buddy-shared/usage/runTokenUsage'
 
 import type { ChatMessageBranchNavigator } from '../../model/transcript/chatMessageBranches'
 import type { ChatTranscriptTurnOutputs } from '../../model/transcript/chatTranscriptProjection'
@@ -28,6 +29,7 @@ const props = defineProps<{
   searchMatch: boolean
   streaming?: boolean
   turnChanges?: LocalChangeSetSummary | null
+  turnUsage?: LocalRunTokenUsage
   turnOutputs: ChatTranscriptTurnOutputs | null
 }>()
 
@@ -105,11 +107,13 @@ const messageText = computed(() => getChatMessageDisplayText(
       :actions="actions"
       :branch-navigator="branchNavigator"
       class="buddy-chat-message__actions"
+      :class="{ 'has-usage': turnUsage }"
       :copy-text="messageText"
       :created-at="message.createdAt"
       :language="language"
       :role="message.role"
       :target-key="`message-${message.id}`"
+      :usage="turnUsage"
       @activate-branch="emit('activateBranch', $event)"
       @regenerate="emit('regenerate')"
       @start-edit="emit('startEdit')"
@@ -203,6 +207,12 @@ const messageText = computed(() => getChatMessageDisplayText(
   opacity: 0;
   pointer-events: none;
   transition: opacity 120ms ease;
+
+  &.has-usage {
+    position: static;
+    opacity: 1;
+    pointer-events: auto;
+  }
 
   .buddy-chat-message:hover &,
   .buddy-chat-message:focus-within & {

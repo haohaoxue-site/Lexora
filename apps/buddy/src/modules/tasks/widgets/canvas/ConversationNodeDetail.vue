@@ -10,6 +10,7 @@ import { useTaskContext } from '../../taskContext'
 import BuddyChatAgentTurn from '../transcript/BuddyChatAgentTurn.vue'
 import BuddyChatMessageBody from '../transcript/BuddyChatMessageBody.vue'
 import BuddyChatRunActivity from '../transcript/BuddyChatRunActivity.vue'
+import BuddyChatTokenUsage from '../transcript/BuddyChatTokenUsage.vue'
 
 const props = defineProps<{
   target: ConversationNodeDetailRequest
@@ -55,8 +56,12 @@ watch(() => props.target, () => processOpen.value = false)
             :turn-outputs="row.turnOutputs" :turn-changes="row.turnChanges" :write-clipboard-text="clipboard.writeText"
             @open-artifact="emit('openArtifact', $event)" @open-changes="emit('openChanges', $event)"
           />
+          <BuddyChatTokenUsage v-if="row.turnUsage && !row.streaming" :usage="row.turnUsage" :language="language" />
         </div>
-        <BuddyChatAgentTurn v-else-if="row.kind === 'agent-turn'" :turn="row.turn" :language="language" :open="processOpen" @toggle="processOpen = !processOpen" />
+        <template v-else-if="row.kind === 'agent-turn'">
+          <BuddyChatAgentTurn :turn="row.turn" :language="language" :open="processOpen" @toggle="processOpen = !processOpen" />
+          <BuddyChatTokenUsage v-if="row.ownsResultActions && row.turn.usage" :usage="row.turn.usage" :language="language" />
+        </template>
         <BuddyChatRunActivity v-else-if="row.kind === 'activity'" :turn="row.turn" :language="language" />
         <p v-else-if="row.kind === 'recovery-notice'" class="conversation-node-detail__notice" role="status">
           {{ t('desktop.chat.recoveryAttachmentsMissing', { count: row.notice.missingAttachmentCount }) }}

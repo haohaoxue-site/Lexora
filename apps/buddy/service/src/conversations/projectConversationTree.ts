@@ -1,5 +1,6 @@
 import type { LocalConversationTree, LocalConversationTreeNode } from '../../../shared/conversation/conversationTree'
 import type { LocalRunOutput } from '../../../shared/runs/runApi'
+import type { LocalRunTokenUsage } from '../../../shared/usage/runTokenUsage'
 import type { AttachmentRecord } from '../storage/attachmentRepository'
 import type { ConversationBranchRecord, MessageRecord } from '../storage/conversationHistoryRepository'
 import type { RunRecord } from '../storage/runRecord'
@@ -14,6 +15,7 @@ export function projectConversationTree(input: {
   messages: readonly MessageRecord[]
   runs: readonly RunRecord[]
   toolCounts?: ReadonlyMap<string, number>
+  usageByRun?: ReadonlyMap<string, LocalRunTokenUsage>
   attachments?: readonly AttachmentRecord[]
   outputs?: readonly LocalRunOutput[]
 }): LocalConversationTree {
@@ -95,7 +97,12 @@ export function projectConversationTree(input: {
       attachmentCount: 0,
       artifacts: artifacts.slice(0, 3),
       artifactCount: artifacts.length,
-      metadata: { modelId: latest.model, startedAt: latest.startedAt, completedAt: latest.completedAt },
+      metadata: {
+        modelId: latest.model,
+        startedAt: latest.startedAt,
+        completedAt: latest.completedAt,
+        usage: input.usageByRun?.get(latest.id) ?? null,
+      },
       status: latest.status,
       active: false,
       toolCount: input.toolCounts?.get(latest.id) ?? messages.filter(message => message.role === 'tool').length,
