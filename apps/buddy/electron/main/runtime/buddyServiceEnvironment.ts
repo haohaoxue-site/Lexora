@@ -1,3 +1,4 @@
+import { homedir } from 'node:os'
 import process from 'node:process'
 import { filePathAdapters } from '../../../platform/filesystem/filePaths'
 import searchTools from '../../../platform/native/searchTools.json'
@@ -27,8 +28,11 @@ export function createBuddyServiceEnvironment(
   platform: NodeJS.Platform = process.platform,
 ): NodeJS.ProcessEnv {
   const targetPlatform = resolveBuddyPlatform(platform)
+  const environmentSource = targetPlatform.id === 'linux' && !source.HOME
+    ? { ...source, HOME: homedir() }
+    : source
   return createChildProcessEnvironment({
-    source,
+    source: environmentSource,
     platform: targetPlatform,
     additions: {
       LEXORA_BUDDY_HOME: buddyHome,
