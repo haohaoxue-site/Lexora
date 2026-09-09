@@ -9,6 +9,11 @@ import type { ChatComposerInteraction, ComposerResourceView } from '../../state/
 import type { BuddyLocale } from '@/i18n/buddyI18n'
 import type { ChatComposerContextOptions, ChatComposerSubmitPayload, ChatComposerTrigger } from '@/modules/prompt-input'
 
+export interface ComposerResourceCard extends ComposerResourceView {
+  isReference: boolean
+  previewUrl: string | null
+}
+
 export interface UseChatComposerOptions {
   canSend: Readonly<Ref<boolean>>
   composerContent: Readonly<Ref<JSONContent>>
@@ -27,6 +32,7 @@ export interface UseChatComposerOptions {
   selectSource: (source: BuddyComposerSource) => Promise<string | null>
   onSend: (payload: ChatComposerSubmitPayload) => void
   onUpdateContent: (content: string, value: JSONContent) => void
+  onLocateResource?: (resourceId: string) => void
 }
 
 export interface ChatComposerEditorOptions {
@@ -42,6 +48,7 @@ export interface ChatComposerEditorOptions {
   onSuggestionKeydown: (event: KeyboardEvent) => boolean
   onPasteFiles: (files: readonly File[]) => void
   onSubmit: () => void
+  onLocateResource?: (resourceId: string) => void
 }
 
 export interface DesktopChatComposerProps {

@@ -197,6 +197,28 @@ describe('chat composer editing', () => {
     expect(flow.sent).toEqual(['notes'])
   })
 
+  it('keeps an empty mention active and prevents Enter from accidentally submitting until it is dismissed', async () => {
+    const pending = deferred<ChatComposerContextOptions>()
+    const flow = await mountComposer({ loadContextOptions: () => pending.promise })
+    flow.editor.view.dom.focus()
+    flow.editor.commands.insertContent('@')
+    await nextTick()
+    expect(flow.keydown('Enter').defaultPrevented).toBe(true)
+    expect(flow.sent).toEqual([])
+    pending.resolve({ files: [], skills: [] })
+    await nextTick()
+    await nextTick()
+    expect(flow.composer.isLoadingContext.value).toBe(false)
+    expect(flow.composer.activeTrigger.value).toEqual({ kind: 'mention', query: '' })
+    flow.keydown('Enter')
+    expect(flow.sent).toEqual([])
+    flow.keydown('Escape')
+    expect(flow.composer.activeTrigger.value).toBeNull()
+    expect(flow.editor.getText()).toBe('@')
+    flow.keydown('Enter')
+    expect(flow.sent).toEqual(['@'])
+  })
+
   it('keeps the latest query results when earlier requests fail and invalidates queries across drafts', async () => {
     const old = deferred<ChatComposerContextOptions>()
     const latest = deferred<ChatComposerContextOptions>()

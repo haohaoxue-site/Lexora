@@ -62,8 +62,13 @@ export function useChatComposerSuggestions(
       activeTrigger.value = null
       return true
     }
-    if (!suggestions.value.length)
+    if (!suggestions.value.length) {
+      if (activeTrigger.value?.kind === 'mention' && shouldSubmitChatComposerKey(event)) {
+        event.preventDefault()
+        return true
+      }
       return false
+    }
     if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
       event.preventDefault()
       const delta = event.key === 'ArrowDown' ? 1 : -1

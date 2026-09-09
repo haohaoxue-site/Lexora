@@ -129,6 +129,12 @@ withDefaults(defineProps<{
   color: var(--buddy-text-secondary);
   font-weight: 600;
   vertical-align: calc(-0.05rem - 1px);
+  cursor: pointer;
+
+  &:hover {
+    border-color: var(--buddy-accent-border);
+    background: color-mix(in srgb, var(--buddy-accent-surface) 28%, var(--buddy-surface-raised));
+  }
 }
 
 :deep([data-type='chat-resource-reference'].ProseMirror-selectednode) {

@@ -10,7 +10,7 @@ import {
   Stop20Filled,
 } from '@vicons/fluent'
 import { NButton, NTooltip } from 'naive-ui'
-import { computed, shallowRef, toRef } from 'vue'
+import { computed, shallowRef, toRef, useTemplateRef } from 'vue'
 import { useBuddyI18n } from '@/i18n/buddyI18n'
 import { DesktopModelSelector } from '@/modules/models/ui'
 import { DesktopChatComposerFrame, DesktopPermissionModeSelector } from '@/modules/prompt-input/ui'
@@ -41,6 +41,7 @@ defineSlots<{
 }>()
 
 const { t } = useBuddyI18n(() => props.language)
+const resourceStrip = useTemplateRef('resourceStrip')
 const {
   activeSuggestionIndex,
   activeTrigger,
@@ -76,6 +77,7 @@ const {
   selectSource: source => props.selectSource(source),
   onSend: payload => emit('send', payload),
   onUpdateContent: (content, value) => emit('updateContent', content, value),
+  onLocateResource: resourceId => resourceStrip.value?.highlightResource(resourceId),
 })
 
 defineExpose({ focus: () => editor.value?.commands.focus() })
@@ -83,8 +85,11 @@ defineExpose({ focus: () => editor.value?.commands.focus() })
 const sourceMenuOpen = shallowRef(false)
 const suggestionOptions = computed(() => suggestions.value.map(({ option }) => option))
 const chooserVisible = computed(() => !sourceMenuOpen.value && Boolean(
-  activeTrigger.value && (suggestions.value.length || isLoadingContext.value),
+  activeTrigger.value && (activeTrigger.value.kind === 'mention' || suggestions.value.length || isLoadingContext.value),
 ))
+const suggestionEmptyLabel = computed(() => activeTrigger.value?.kind === 'mention'
+  ? t(activeTrigger.value.query ? 'desktop.chat.sourcePickerNoMatches' : 'desktop.chat.sourcePickerNoReferences')
+  : t('desktop.chat.sourcePickerEmpty'))
 const modelInputIssueMessage = computed(() => {
   if (modelInputIssue.value === 'reasoning_unsupported')
     return t('desktop.chat.modelReasoningUnsupported', { value: props.selectedEffort ?? '' })
@@ -121,6 +126,7 @@ async function selectConversationFile(option: ChatPromptContextOption) {
   >
     <template #attachments>
       <ComposerResourceStrip
+        ref="resourceStrip"
         :resources="resourceStripResources"
         :language="language"
         :disabled="isSending"
@@ -140,7 +146,7 @@ async function selectConversationFile(option: ChatPromptContextOption) {
           <ChatComposerSourcePicker
             :active-index="activeSuggestionIndex"
             :accessible-label="t('desktop.chat.sourcePickerSuggestions')"
-            :empty-label="t('desktop.chat.sourcePickerEmpty')"
+            :empty-label="suggestionEmptyLabel"
             :language="language"
             :loading="isLoadingContext"
             :loading-label="t('desktop.chat.loadingContext')"

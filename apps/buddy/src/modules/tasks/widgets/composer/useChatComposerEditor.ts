@@ -1,6 +1,7 @@
 import type { JSONContent } from '@tiptap/core'
 import type { ChatComposerEditorOptions } from './typing'
 import Placeholder from '@tiptap/extension-placeholder'
+import { NodeSelection } from '@tiptap/pm/state'
 import StarterKit from '@tiptap/starter-kit'
 import { useEditor } from '@tiptap/vue-3'
 import { computed, shallowRef, watch } from 'vue'
@@ -64,6 +65,11 @@ export function useChatComposerEditor(options: ChatComposerEditorOptions) {
       },
       handleKeyDown: (_view, event) => handleEditorKeydown(event),
       handlePaste: (_view, event) => handleEditorPaste(event),
+      handleClickOn: (_view, _position, node, _nodePosition, _event, direct) => {
+        if (direct && node.type.name === 'chatResourceReference')
+          options.onLocateResource?.(node.attrs.resourceId)
+        return false
+      },
       handleDOMEvents: {
         compositionend: () => {
           isComposing = false
@@ -146,6 +152,13 @@ export function useChatComposerEditor(options: ChatComposerEditorOptions) {
   function handleEditorKeydown(event: KeyboardEvent) {
     if (options.onSuggestionKeydown(event))
       return true
+
+    const selection = editor.value?.state.selection
+    if (selection instanceof NodeSelection && selection.node.type.name === 'chatResourceReference' && shouldSubmitChatComposerKey(event)) {
+      event.preventDefault()
+      options.onLocateResource?.(selection.node.attrs.resourceId)
+      return true
+    }
 
     if (
       (event.key === 'ArrowLeft' || event.key === 'ArrowRight')

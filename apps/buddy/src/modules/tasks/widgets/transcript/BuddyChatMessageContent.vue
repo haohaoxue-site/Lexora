@@ -4,13 +4,15 @@ import type { BuddyPromptDirective } from '@buddy-shared/conversation/buddyUserC
 
 import type { LocalMessage } from '@buddy-shared/conversation/conversationApi'
 import type { BuddyLocale } from '@/i18n/buddyI18n'
-import { buddyPromptDirectiveToText } from '@buddy-shared/conversation/buddyUserContent'
+import { buddyPromptDirectiveToText, getBuddyUserContentResourceIds } from '@buddy-shared/conversation/buddyUserContent'
 import { computed, nextTick, shallowRef, useTemplateRef } from 'vue'
 import { useBuddyI18n } from '@/i18n/buddyI18n'
 import { FileIcon } from '@/shared/ui/file-icon'
 import BuddyImagePreview from '@/shared/ui/media/BuddyImagePreview.vue'
 import { resolveBuddyAttachmentPreviewUrl } from '../../model/attachments/chatAttachmentView'
 import { getChatMessageDisplayText, getChatMessageUserContent } from '../../model/transcript/chatMessageContent'
+import ResourceReferenceBadge from '../attachments/ResourceReferenceBadge.vue'
+import { useResourceHighlight } from '../attachments/useResourceHighlight'
 import BuddyChatMarkdownContent from './BuddyChatMarkdownContent.vue'
 import BuddyChatResourceReference from './BuddyChatResourceReference.vue'
 
@@ -27,6 +29,7 @@ const props = withDefaults(defineProps<{
 
 const { t } = useBuddyI18n(() => props.language)
 const attachmentTrack = useTemplateRef<HTMLDivElement>('attachmentTrack')
+const { highlightedResourceId, highlightResource } = useResourceHighlight(attachmentTrack)
 const failedAttachmentIds = shallowRef<ReadonlySet<string>>(new Set())
 const previewIndex = shallowRef(0)
 const previewOpen = shallowRef(false)
@@ -39,7 +42,9 @@ const hasText = computed(() => text.value.trim().length > 0)
 const structuredUserContent = computed(() => getChatMessageUserContent(props.message))
 const allAttachmentViews = computed(() => props.message.attachments.map(attachment => ({
   attachment,
+  isReference: false,
   previewUrl: resolveBuddyAttachmentPreviewUrl(attachment),
+  resourceId: attachment.attachmentId,
 })))
 const attachmentByResourceId = computed(() => {
   const attachmentsById = new Map(
@@ -54,24 +59,14 @@ const attachmentViews = computed(() => {
   const structured = structuredUserContent.value
   if (!structured)
     return allAttachmentViews.value
-  return structured.userContent.panelResourceIds.flatMap((resourceId) => {
+  const panelIds = new Set(structured.userContent.panelResourceIds)
+  return [...new Set([...panelIds, ...getBuddyUserContentResourceIds(structured.userContent)])].flatMap((resourceId) => {
     const attachment = attachmentByResourceId.value.get(resourceId)
     return attachment
-      ? [{ attachment, previewUrl: resolveBuddyAttachmentPreviewUrl(attachment) }]
+      ? [{ attachment, isReference: !panelIds.has(resourceId), previewUrl: resolveBuddyAttachmentPreviewUrl(attachment), resourceId }]
       : []
   })
 })
-const resourceReferenceViews = computed(() => new Map(
-  [...attachmentByResourceId.value].map(([resourceId, attachment]) => [
-    resourceId,
-    {
-      attachment,
-      previewUrl: failedAttachmentIds.value.has(attachment.attachmentId)
-        ? null
-        : resolveBuddyAttachmentPreviewUrl(attachment),
-    },
-  ]),
-))
 const previewableAttachmentViews = computed(() => allAttachmentViews.value.filter(view => (
   view.previewUrl && !failedAttachmentIds.value.has(view.attachment.attachmentId)
 )))
@@ -131,15 +126,19 @@ function previewLeaveTransition(): Promise<void> {
     >
       <figure
         v-for="view in attachmentViews"
-        :key="view.attachment.attachmentId"
+        :key="view.resourceId"
         class="buddy-chat-message-content__attachment"
+        :class="{ 'is-highlighted': highlightedResourceId === view.resourceId }"
+        :data-resource-card="view.resourceId"
+        @click="openPreview(view.attachment.attachmentId)"
       >
+        <ResourceReferenceBadge v-if="view.isReference" :language="language" />
         <button
           v-if="view.previewUrl && !failedAttachmentIds.has(view.attachment.attachmentId)"
           class="buddy-chat-message-content__preview-trigger"
           type="button"
           :aria-label="t('desktop.imagePreview.open', { name: view.attachment.name })"
-          @click="openPreview(view.attachment.attachmentId)"
+          @click.stop="openPreview(view.attachment.attachmentId)"
         >
           <img
             :src="view.previewUrl"
@@ -178,13 +177,11 @@ function previewLeaveTransition(): Promise<void> {
             class="buddy-chat-message-content__directive"
           >{{ directiveText(node) }}</span>
           <BuddyChatResourceReference
-            v-else-if="resourceReferenceViews.get(node.resourceId)"
-            :attachment="resourceReferenceViews.get(node.resourceId)!.attachment"
+            v-else-if="attachmentByResourceId.get(node.resourceId)"
+            :attachment="attachmentByResourceId.get(node.resourceId)!"
             :language="language"
-            :preview-url="resourceReferenceViews.get(node.resourceId)!.previewUrl"
             :resource-id="node.resourceId"
-            @preview="openPreview"
-            @preview-error="markPreviewFailed"
+            @locate="highlightResource"
           />
         </template>
       </p>
@@ -259,11 +256,34 @@ function previewLeaveTransition(): Promise<void> {
 }
 
 .buddy-chat-message-content__attachment {
+  position: relative;
   display: grid;
   width: min(10rem, 100%);
   flex: 0 0 10rem;
   gap: 0.2rem;
   margin: 0;
+
+  > .resource-reference-badge {
+    position: absolute;
+    top: 0.35rem;
+    left: 0.35rem;
+    z-index: 1;
+    pointer-events: none;
+  }
+
+  &.is-highlighted {
+    .buddy-chat-message-content__preview-trigger,
+    .buddy-chat-message-content__file {
+      border-color: var(--buddy-focus-ring);
+      box-shadow: inset 0 0 0 2px var(--buddy-focus-ring);
+      outline: 2px solid var(--buddy-focus-ring);
+      outline-offset: -2px;
+    }
+
+    figcaption {
+      color: var(--buddy-accent-on-surface);
+    }
+  }
 
   .buddy-chat-message-content__preview-trigger,
   .buddy-chat-message-content__file {
