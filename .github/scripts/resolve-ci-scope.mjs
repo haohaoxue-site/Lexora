@@ -49,17 +49,19 @@ const buddyPrefixes = [
   'packaging/buddy/',
   'patches/',
 ]
-const qualityPrefixes = [
-  '.github/',
-  'packaging/',
+const webStackPrefixes = [
   'apps/agent/',
   'apps/api/',
   'apps/web/',
   'evals/',
-  'infrastructure/',
   'packages/contracts/',
   'packages/shared/',
   'packages/surfaces/',
+]
+const repositoryPrefixes = [
+  '.github/',
+  'packaging/',
+  'infrastructure/',
 ]
 
 export function classifyCiScope(files) {
@@ -69,7 +71,8 @@ export function classifyCiScope(files) {
   let buddy = false
   let buddyRust = false
   let website = false
-  let quality = false
+  let webStack = false
+  let repository = false
 
   for (const input of files) {
     const path = normalizePath(input)
@@ -81,7 +84,8 @@ export function classifyCiScope(files) {
       buddy = true
       buddyRust = true
       website = true
-      quality = true
+      webStack = true
+      repository = true
       continue
     }
 
@@ -89,7 +93,7 @@ export function classifyCiScope(files) {
       buddy = true
       buddyRust = true
       if (path.startsWith('.github/') || path.startsWith('packages/assets/'))
-        quality = true
+        repository = true
       continue
     }
 
@@ -98,9 +102,16 @@ export function classifyCiScope(files) {
       continue
     }
 
-    if (globalBuddyInputs.has(path) || path.startsWith('packages/assets/')) {
+    if (globalBuddyInputs.has(path)) {
       buddy = true
-      quality = true
+      webStack = true
+      repository = true
+      continue
+    }
+
+    if (path.startsWith('packages/assets/')) {
+      buddy = true
+      repository = true
       continue
     }
 
@@ -109,17 +120,23 @@ export function classifyCiScope(files) {
       continue
     }
 
-    if (qualityPrefixes.some(prefix => path.startsWith(prefix))) {
-      quality = true
+    if (webStackPrefixes.some(prefix => path.startsWith(prefix))) {
+      webStack = true
+      continue
+    }
+
+    if (repositoryPrefixes.some(prefix => path.startsWith(prefix))) {
+      repository = true
       continue
     }
 
     buddy = true
     buddyRust = true
-    quality = true
+    webStack = true
+    repository = true
   }
 
-  return { buddy, buddyRust, website, quality }
+  return { buddy, buddyRust, website, webStack, repository }
 }
 
 export function listChangedFiles(base, head, cwd = repoRoot) {
@@ -146,7 +163,8 @@ function fullScope() {
     buddy: true,
     buddyRust: true,
     website: false,
-    quality: true,
+    webStack: true,
+    repository: true,
   }
 }
 
