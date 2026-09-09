@@ -52,7 +52,7 @@ const { t } = useBuddyI18n(() => props.language)
       <NButton
         size="small"
         :type="blocker.kind === 'runtime' ? 'default' : 'primary'"
-        @click="emit('openSettings', blocker.kind === 'runtime' ? 'data' : 'models')"
+        @click="emit('openSettings', blocker.kind === 'runtime' ? 'logs' : 'models')"
       >
         <template #icon>
           <DesktopIcon :component="Settings20Regular" />
