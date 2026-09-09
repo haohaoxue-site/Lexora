@@ -6,8 +6,6 @@ import {
   AnimalCat20Regular,
   Apps20Regular,
   Bot20Regular,
-  DataUsage20Regular,
-  Folder20Regular,
   Globe20Regular,
   TextBulletListLtr20Regular,
 } from '@vicons/fluent'
@@ -32,8 +30,6 @@ const categories = [
   { icon: Bot20Regular, key: 'models' as const },
   { icon: Globe20Regular, key: 'web' as const },
   { icon: AnimalCat20Regular, key: 'pet' as const },
-  { icon: Folder20Regular, key: 'local' as const },
-  { icon: DataUsage20Regular, key: 'data' as const },
   { icon: TextBulletListLtr20Regular, key: 'logs' as const },
 ]
 const visibleCategories = computed(() => categories.filter(category => supportsSettingsCategory(props.capabilities, category.key)))

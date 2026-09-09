@@ -45,18 +45,6 @@ export const settingsRoutes: ReadonlyArray<RouteRecordRaw> = [
         component: () => import('./pages/DesktopPetSettingsView.vue'),
         meta: { desktopView: 'settings', settingsCategory: 'pet' },
       },
-      {
-        path: 'local',
-        name: DESKTOP_ROUTE_NAMES.settingsLocal,
-        component: () => import('./pages/DesktopLocalSettingsView.vue'),
-        meta: { desktopView: 'settings', settingsCategory: 'local' },
-      },
-      {
-        path: 'data',
-        name: DESKTOP_ROUTE_NAMES.settingsData,
-        component: () => import('./pages/DesktopDataSettingsView.vue'),
-        meta: { desktopView: 'settings', settingsCategory: 'data' },
-      },
     ],
   },
 ]
