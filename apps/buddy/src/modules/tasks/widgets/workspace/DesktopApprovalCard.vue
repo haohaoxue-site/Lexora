@@ -45,6 +45,11 @@ const review = computed<ApprovalReviewPayload | null>(() => {
   const parsed = approvalReviewPayloadSchema.safeParse(props.approval.payload)
   return parsed.success ? parsed.data : null
 })
+const shellReason = computed(() => (
+  review.value?.card === 'shell' && review.value.context
+    ? t(`desktop.approval.shell.reason.${review.value.context.reason}`)
+    : ''
+))
 const systemEffect = computed(() => {
   if (review.value?.card !== 'system-action')
     return ''
@@ -261,7 +266,19 @@ const turnConfirmationButtonProps = { type: 'error' } as const
         </div>
       </dl>
     </section>
-    <pre v-else-if="review?.card === 'shell'" class="desktop-approval-card__review">{{ review.command }}</pre>
+    <section v-else-if="review?.card === 'shell'" class="desktop-approval-card__details">
+      <pre class="desktop-approval-card__review">{{ review.command }}</pre>
+      <dl v-if="review.context" class="desktop-approval-card__shell-context">
+        <div>
+          <dt>{{ t('desktop.approval.shell.approvalReason') }}</dt>
+          <dd>{{ shellReason }}</dd>
+        </div>
+        <div>
+          <dt>{{ t('desktop.approval.workingDirectory') }}</dt>
+          <dd>{{ review.context.cwd }}</dd>
+        </div>
+      </dl>
+    </section>
     <div v-else-if="review?.card === 'paths'" class="desktop-approval-card__review">
       <ul class="desktop-approval-card__paths">
         <li v-for="target in review.targets" :key="target.path">
@@ -412,6 +429,10 @@ const turnConfirmationButtonProps = { type: 'error' } as const
   display: grid;
   gap: 0.45rem;
   margin: 0;
+}
+
+.desktop-approval-card__details .desktop-approval-card__shell-context {
+  margin-top: 0.7rem;
 }
 
 .desktop-approval-card__details dl > div {

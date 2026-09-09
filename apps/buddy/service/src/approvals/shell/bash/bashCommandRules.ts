@@ -1,4 +1,6 @@
-import type { ShellCommandApprovalReason } from '../shellCommandClassification'
+import type { ShellCommandClassification } from '../shellCommandClassification'
+import { classifyGitCommand } from '../gitCommandRules'
+import { requireShellApproval } from '../shellCommandClassification'
 
 type CommandValidator = (arguments_: readonly string[]) => boolean
 
@@ -18,7 +20,6 @@ const commonCommandValidators = new Map<string, CommandValidator>([
   ['head', validateHead],
   ['hostname', validateHostname],
   ['id', allowLiteralArguments],
-  ['ls', validateLs],
   ['pgrep', validatePgrep],
   ['printf', validatePrintf],
   ['ps', allowLiteralArguments],
@@ -82,18 +83,54 @@ const readOnlyXmllintOptions = new Set([
 export function classifyBashSimpleCommand(
   words: readonly string[],
   platform: NodeJS.Platform,
-): ShellCommandApprovalReason | null {
+): ShellCommandClassification {
   let commandIndex = 0
   while (commandIndex < words.length && isAllowedEnvironmentAssignment(words[commandIndex]!))
     commandIndex += 1
   const command = words[commandIndex]
   if (!command || !/^[\w.+-]+$/.test(command))
-    return 'unsupported-syntax'
+    return requireShellApproval('unsupported-syntax')
+  const arguments_ = words.slice(commandIndex + 1)
+  if (command === 'git' || (platform === 'win32' && command === 'git.exe'))
+    return classifyGitCommand(arguments_)
+  if (command === 'true' || command === 'false')
+    return arguments_.length === 0 ? { type: 'auto-approve' } : requireShellApproval('unsafe-arguments')
+  if (command === 'node') {
+    return arguments_.length === 1 && ['--version', '-v'].includes(arguments_[0]!)
+      ? { type: 'auto-approve' }
+      : requireShellApproval('unsafe-arguments')
+  }
+  if (command === 'cat' || command === 'ls')
+    return classifyFileQuery(command, arguments_)
   const validator = platformCommandValidators(platform).get(command)
     ?? commonCommandValidators.get(command)
   if (!validator)
-    return 'unknown-command'
-  return validator(words.slice(commandIndex + 1)) ? null : 'unsafe-arguments'
+    return requireShellApproval('unknown-command')
+  return validator(arguments_) ? { type: 'auto-approve' } : requireShellApproval('unsafe-arguments')
+}
+
+function classifyFileQuery(command: 'cat' | 'ls', arguments_: readonly string[]): ShellCommandClassification {
+  const paths: string[] = []
+  let pathMode = false
+  for (const argument of arguments_) {
+    if (!pathMode && argument === '--') {
+      pathMode = true
+      continue
+    }
+    if (!pathMode && argument.startsWith('-') && argument !== '-') {
+      const valid = command === 'cat'
+        ? /^-[AbEens-vT]+$/.test(argument) || ['--number', '--number-nonblank', '--squeeze-blank', '--show-all', '--show-ends', '--show-tabs', '--show-nonprinting'].includes(argument)
+        : /^-[a-dA-Df-iF-Ik-xLNOQRSUWX1]+$/.test(argument) || ['--all', '--almost-all', '--directory', '--human-readable', '--color=never', '--color=auto', '--classify', '--group-directories-first'].includes(argument)
+      if (!valid)
+        return requireShellApproval('unsafe-arguments')
+      continue
+    }
+    if (argument.includes('\0'))
+      return requireShellApproval('unsafe-arguments')
+    if (command !== 'cat' || argument !== '-')
+      paths.push(argument)
+  }
+  return { type: 'auto-approve', readPaths: paths.length ? paths : command === 'ls' ? ['.'] : [] }
 }
 
 function platformCommandValidators(
@@ -197,10 +234,6 @@ function validateHostname(arguments_: readonly string[]): boolean {
     '--ip-address',
     '--short',
   ]).has(argument))
-}
-
-function validateLs(arguments_: readonly string[]): boolean {
-  return arguments_.every(argument => argument === '.' || argument.startsWith('-'))
 }
 
 function validatePrintf(arguments_: readonly string[]): boolean {

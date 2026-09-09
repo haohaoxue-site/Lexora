@@ -1,5 +1,5 @@
 import type { BuddyApprovalPolicy } from '../../../shared/permissions/approvalPolicy'
-import type { ApprovalReviewKind } from '../../../shared/permissions/approvalReviewPayload'
+import type { ApprovalReviewKind, ShellApprovalContext } from '../../../shared/permissions/approvalReviewPayload'
 import type { BuddyExecutionProfile } from '../../../shared/permissions/executionProfile'
 
 export type AccessKind
@@ -57,6 +57,7 @@ export type PermissionDecision
     grant?: GrantProposal
     kind: ApprovalReviewKind
     paths?: readonly { path: string, zone: PathZone }[]
+    shell?: ShellApprovalContext
     summary: string
     type: 'ask'
   }
@@ -98,6 +99,7 @@ export function ask(input: {
   grant?: GrantProposal
   kind: ApprovalReviewKind
   paths?: readonly { path: string, zone: PathZone }[]
+  shell?: ShellApprovalContext
   summary: string
 }): PermissionDecision {
   return {
@@ -105,6 +107,7 @@ export function ask(input: {
     ...(input.grant ? { grant: input.grant } : {}),
     kind: input.kind,
     ...(input.paths?.length ? { paths: input.paths } : {}),
+    ...(input.shell ? { shell: input.shell } : {}),
     summary: input.summary,
     type: 'ask',
   }

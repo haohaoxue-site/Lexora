@@ -135,7 +135,7 @@ export default {
   'desktop.chat.permissionModeManual': '人工审批',
   'desktop.chat.permissionModeManualDescription': '修改、命令与外部交互均需批准。',
   'desktop.chat.permissionModePolicy': '智能审批',
-  'desktop.chat.permissionModePolicyDescription': '仅在策略检测到风险时请求批准。',
+  'desktop.chat.permissionModePolicyDescription': '自动放行规则可确认的安全查询；其他操作按权限请求批准。',
   'desktop.chat.permissionModeReadOnlyDescription': '读取文件并运行安全的只读诊断。',
   'desktop.chat.permissionModeTitle': '如何审批 Buddy 操作？',
   'desktop.chat.chooseEffort': '选择强度',

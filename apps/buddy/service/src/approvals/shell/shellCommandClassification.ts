@@ -1,11 +1,18 @@
-export type ShellCommandApprovalReason
-  = 'unsafe-arguments'
-    | 'unsupported-syntax'
-    | 'unknown-command'
+import type { ShellApprovalReason } from '../../../../shared/permissions/approvalReviewPayload'
+
+export type ShellCommandApprovalReason = Extract<
+  ShellApprovalReason,
+  'unsafe-arguments' | 'unsupported-syntax' | 'unknown-command'
+>
 
 export type ShellCommandClassification
-  = { type: 'auto-approve' }
-    | { type: 'approval-required', reason: ShellCommandApprovalReason }
+  = {
+    type: 'auto-approve'
+    git?: boolean
+    gitDiffs?: readonly (readonly string[])[]
+    readPaths?: readonly string[]
+  }
+  | { type: 'approval-required', reason: ShellCommandApprovalReason, readPaths?: readonly string[] }
 
 export function requireShellApproval(
   reason: ShellCommandApprovalReason,

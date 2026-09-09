@@ -46,7 +46,10 @@ describe('toolPolicyExtension always-confirm', () => {
     })).resolves.toBeUndefined()
 
     expect(order).toEqual(['prepared', 'approved', 'authorized'])
-    expect(request).toHaveBeenCalledWith(expect.objectContaining({ allowForTurn: true }))
+    expect(request).toHaveBeenCalledWith(expect.objectContaining({
+      allowForTurn: true,
+      shell: { cwd: '/tmp', reason: 'unknown-command' },
+    }))
   })
 
   it('awaits capability preparation and keeps forced approval in full access', async () => {

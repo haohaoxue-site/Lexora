@@ -111,6 +111,7 @@ async function requestApproval(
     paths: declared.approval?.paths ?? toPathReview(decision),
     runId: run.runId,
     signal: run.signal,
+    shell: decision.shell,
     summary: decision.summary,
     systemAction: declared.approval?.systemAction,
     toolCallId: event.toolCallId,
