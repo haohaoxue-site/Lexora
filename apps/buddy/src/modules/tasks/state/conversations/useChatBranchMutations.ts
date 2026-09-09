@@ -4,6 +4,7 @@ import type { BuddyComposerSource } from '@buddy-shared/conversation/composerRes
 
 import type { LocalConversationBranch } from '@buddy-shared/conversation/conversationApi'
 import type { LocalRun } from '@buddy-shared/runs/runApi'
+import type { ComposerTarget } from '../composer/useComposerTarget'
 import type { BuddyLocale } from '@/i18n/buddyI18n'
 import type { ChatComposerSubmitPayload } from '@/modules/prompt-input'
 import type { ChatSession } from '@/modules/tasks/state/conversations/useChatSession'
@@ -12,7 +13,8 @@ import type { ChatRunSync } from '@/modules/tasks/state/runs/typing'
 import type { TaskIndexData } from '@/modules/tasks/state/task-index/useTaskIndexData'
 import type { RuntimeSupervisorStore } from '@/platform/runtime/useRuntimeSupervisorStore'
 import { createBuddyUserContent } from '@buddy-shared/conversation/buddyUserContent'
-import { computed, readonly, shallowRef, watch } from 'vue'
+import { buddyComposerDraftScopeKey } from '@buddy-shared/conversation/composerDraft'
+import { computed, readonly, shallowRef } from 'vue'
 import {
   createRequestFingerprint,
   createRequestIdRegistry,
@@ -28,13 +30,11 @@ export interface UseChatBranchMutationsOptions {
   activeRun: ValueRef<LocalRun | null>
   api: {
     chat: Pick<LocalChatApi['chat'], 'editUserMessage' | 'regenerateAssistant'>
-    conversations: Pick<LocalChatApi['conversations'], 'activateBranch'>
+    conversations: Pick<LocalChatApi['conversations'], 'activateBranch' | 'getNodeDetail'>
   }
   canSendDraft: ValueRef<boolean>
-  drafts: Pick<ChatDrafts, | 'beginIsolated'
-  | 'cancelIsolated'
-  | 'completeIsolated'
-  | 'draftId'
+  composerTarget: ComposerTarget
+  drafts: Pick<ChatDrafts, | 'draftId'
   | 'isPersisted'
   | 'setUserContent'
   | 'snapshot'>
@@ -60,13 +60,7 @@ export interface UseChatBranchMutationsOptions {
 
 export function useChatBranchMutations(options: UseChatBranchMutationsOptions) {
   const isMutatingBranch = shallowRef(false)
-  const editingMessage = shallowRef<{
-    conversationId: string
-    editScopeKey: string
-    forkedFromMessageId: string | null
-    parentBranchId: string
-    userMessageId: string
-  } | null>(null)
+  const editingMessage = options.composerTarget.editing
   const requestIds = createRequestIdRegistry()
   const canRunBranchMutation = computed(() =>
     options.runtimeSupervisor.runtimeState.value.status === 'ready'
@@ -79,30 +73,18 @@ export function useChatBranchMutations(options: UseChatBranchMutationsOptions) {
   )
   const canMutateBranch = computed(() => canRunBranchMutation.value && editingMessage.value === null)
 
-  watch(
-    () => [options.session.activeConversationId.value, options.session.activeBranchId.value] as const,
-    ([conversationId, branchId]) => {
-      const editing = editingMessage.value
-      if (
-        !editing
-        || (editing.conversationId === conversationId && editing.parentBranchId === branchId)
-      ) {
-        return
-      }
-      options.drafts.cancelIsolated(editing.editScopeKey)
-      editingMessage.value = null
-    },
-  )
-
   async function activateBranch(branchId: string) {
     const conversationId = options.session.activeConversationId.value
     if (!conversationId || !canMutateBranch.value)
       return false
-    if (branchId === options.session.activeBranchId.value)
+    if (branchId === options.session.activeBranchId.value) {
+      options.composerTarget.cancelFollowup()
       return true
+    }
     if (!options.session.branches.value.some(branch => branch.id === branchId))
       return false
 
+    options.composerTarget.cancelFollowup()
     const navigationVersion = options.session.generation()
     const isSourceViewCurrent = () => options.session.isCurrent(
       navigationVersion,
@@ -134,10 +116,42 @@ export function useChatBranchMutations(options: UseChatBranchMutationsOptions) {
     }
   }
 
-  async function editUserMessage(userMessageId: string) {
+  async function editUserMessage(userMessageId: string, sourceBranchId?: string) {
     const conversationId = options.session.activeConversationId.value
+    if (!conversationId || !canMutateBranch.value)
+      return false
+    if (sourceBranchId && sourceBranchId !== options.session.activeBranchId.value) {
+      const generation = options.session.generation()
+      if (!await options.persistWorkspaceState() || !options.session.isCurrent(generation, conversationId)
+        || !await activateBranch(sourceBranchId) || options.session.activeConversationId.value !== conversationId
+        || options.session.activeBranchId.value !== sourceBranchId) {
+        return false
+      }
+    }
     const parentBranchId = options.session.activeBranchId.value
-    const sourceMessage = options.runSync.messages.value.find(message => message.id === userMessageId)
+    if (!parentBranchId || !canMutateBranch.value)
+      return false
+    let sourceMessage = options.runSync.messages.value.find(message => message.id === userMessageId)
+    if (!sourceMessage) {
+      const generation = options.session.generation()
+      isMutatingBranch.value = true
+      options.setErrorMessage(null)
+      try {
+        const detail = await options.api.conversations.getNodeDetail({ conversationId, kind: 'question', messageId: userMessageId })
+        if (!options.session.isCurrent(generation, conversationId, parentBranchId))
+          return false
+        const item = detail.items.find(item => item.kind === 'message' && item.id === userMessageId)
+        sourceMessage = item?.kind === 'message' ? item : undefined
+      }
+      catch (error) {
+        if (options.session.isCurrent(generation, conversationId, parentBranchId))
+          setNormalizedError(error)
+        return false
+      }
+      finally {
+        isMutatingBranch.value = false
+      }
+    }
     const selectedModel = options.modelSelection.selectedModel.value
     if (
       !conversationId
@@ -148,17 +162,12 @@ export function useChatBranchMutations(options: UseChatBranchMutationsOptions) {
     ) {
       return false
     }
-    const sourceIndex = options.runSync.messages.value.findIndex(
-      message => message.id === userMessageId,
-    )
-    const forkedFromMessageId = sourceIndex > 0
-      ? options.runSync.messages.value[sourceIndex - 1]?.id ?? null
-      : null
     const sourceContent = getChatMessageUserContent(sourceMessage)
     const sourceUserContent = sourceContent?.userContent
       ?? createBuddyUserContent(getChatMessageText(sourceMessage))
-    const editScopeKey = `message-edit:${conversationId}:${parentBranchId}:${userMessageId}`
-    if (!options.drafts.beginIsolated(editScopeKey, withoutResourceReferences(sourceUserContent)))
+    const target = { kind: 'message_edit' as const, conversationId, branchId: parentBranchId, userMessageId }
+    const editScopeKey = buddyComposerDraftScopeKey(target)
+    if (!options.composerTarget.beginEdit(target, withoutResourceReferences(sourceUserContent)))
       return false
     const editDraftId = options.drafts.draftId.value
     const navigationVersion = options.session.generation()
@@ -166,17 +175,17 @@ export function useChatBranchMutations(options: UseChatBranchMutationsOptions) {
       navigationVersion,
       conversationId,
       parentBranchId,
-    )
+    ) && options.composerTarget.editing.value?.userMessageId === userMessageId
     isMutatingBranch.value = true
     options.setErrorMessage(null)
     const resourceIdMap = new Map<string, string>()
     try {
       if (!await options.persistWorkspaceState()) {
-        options.drafts.cancelIsolated(editScopeKey)
+        options.composerTarget.cancel(editScopeKey)
         return false
       }
       if (!isSourceViewCurrent()) {
-        options.drafts.cancelIsolated(editScopeKey)
+        options.composerTarget.cancel(editScopeKey)
         return false
       }
       for (const snapshot of sourceContent?.resourceSnapshots ?? []) {
@@ -189,27 +198,20 @@ export function useChatBranchMutations(options: UseChatBranchMutationsOptions) {
         if (!selected)
           throw new Error('Source message resource could not be selected')
         if (!isSourceViewCurrent()) {
-          options.drafts.cancelIsolated(editScopeKey)
+          options.composerTarget.cancel(editScopeKey)
           return false
         }
         resourceIdMap.set(snapshot.resourceId, selected)
       }
       options.drafts.setUserContent(remapUserContentResources(sourceUserContent, resourceIdMap))
       if (!await options.persistWorkspaceState() || !isSourceViewCurrent()) {
-        options.drafts.cancelIsolated(editScopeKey)
+        options.composerTarget.cancel(editScopeKey)
         return false
-      }
-      editingMessage.value = {
-        conversationId,
-        editScopeKey,
-        forkedFromMessageId,
-        parentBranchId,
-        userMessageId,
       }
       return true
     }
     catch (error) {
-      options.drafts.cancelIsolated(editScopeKey)
+      options.composerTarget.cancel(editScopeKey)
       if (isSourceViewCurrent())
         setNormalizedError(error)
       return false
@@ -223,8 +225,7 @@ export function useChatBranchMutations(options: UseChatBranchMutationsOptions) {
     const editing = editingMessage.value
     if (!editing)
       return false
-    options.drafts.cancelIsolated(editing.editScopeKey)
-    editingMessage.value = null
+    options.composerTarget.cancel(buddyComposerDraftScopeKey(editing))
     return true
   }
 
@@ -238,7 +239,10 @@ export function useChatBranchMutations(options: UseChatBranchMutationsOptions) {
     ) {
       return false
     }
-    const { conversationId, editScopeKey, forkedFromMessageId, parentBranchId, userMessageId } = editing
+    const { conversationId, branchId: parentBranchId, userMessageId } = editing
+    const editScopeKey = buddyComposerDraftScopeKey(editing)
+    const sourceIndex = options.runSync.messages.value.findIndex(message => message.id === userMessageId)
+    const forkedFromMessageId = sourceIndex > 0 ? options.runSync.messages.value[sourceIndex - 1]!.id : null
     if (
       options.session.activeConversationId.value !== conversationId
       || options.session.activeBranchId.value !== parentBranchId
@@ -275,27 +279,27 @@ export function useChatBranchMutations(options: UseChatBranchMutationsOptions) {
         id: turn.branchId,
         parentBranchId: forkedFromMessageId ? parentBranchId : null,
       }
-      if (!options.drafts.completeIsolated(
+      if (!options.composerTarget.complete(
         turn.draftReceipt,
         `conversation:${conversationId}:${turn.branchId}`,
         editScopeKey,
       )) {
         throw new Error('Edited Composer draft receipt did not match the active edit')
       }
-      editingMessage.value = null
       if (!isSourceViewCurrent()) {
         void options.taskIndexData.refreshIndex().catch(() => {})
         return true
       }
       options.session.setActiveBranch(turn.branchId)
-      options.session.upsertBranch(branch)
+      if (sourceIndex >= 0)
+        options.session.upsertBranch(branch)
       options.taskIndexData.updateConversationBranch(
         conversationId,
         turn.branchId,
         turn.run.startedAt,
       )
       options.runSync.applyEditedTurn(turn, userMessageId)
-      refreshBranchStateAfterMutation(conversationId)
+      refreshBranchStateAfterMutation(conversationId, sourceIndex < 0)
       return true
     }
     catch (error) {
@@ -314,6 +318,7 @@ export function useChatBranchMutations(options: UseChatBranchMutationsOptions) {
     if (!conversationId || !parentBranchId || !canMutateBranch.value)
       return false
 
+    options.composerTarget.cancelFollowup()
     const navigationVersion = options.session.generation()
     const isSourceViewCurrent = () => options.session.isCurrent(
       navigationVersion,
@@ -335,7 +340,7 @@ export function useChatBranchMutations(options: UseChatBranchMutationsOptions) {
         void options.taskIndexData.refreshIndex().catch(() => {})
         return true
       }
-      const branch: LocalConversationBranch = {
+      const branch: LocalConversationBranch = options.session.branches.value.find(branch => branch.id === turn.branchId) ?? {
         conversationId,
         createdAt: turn.run.startedAt,
         forkedFromMessageId: turn.run.triggeringMessageId,
@@ -349,8 +354,9 @@ export function useChatBranchMutations(options: UseChatBranchMutationsOptions) {
         turn.branchId,
         turn.run.startedAt,
       )
+      const needsHistory = !options.runSync.messages.value.some(message => message.id === turn.run.triggeringMessageId)
       options.runSync.applyRegeneratedTurn(turn)
-      refreshBranchStateAfterMutation(conversationId)
+      refreshBranchStateAfterMutation(conversationId, needsHistory)
       return true
     }
     catch (error) {
@@ -378,9 +384,10 @@ export function useChatBranchMutations(options: UseChatBranchMutationsOptions) {
     }
   }
 
-  function refreshBranchStateAfterMutation(conversationId: string) {
+  function refreshBranchStateAfterMutation(conversationId: string, needsHistory = false) {
     void Promise.all([
       options.refreshBranches(),
+      ...(needsHistory ? [options.runSync.refreshActiveConversation()] : []),
       options.taskIndexData.refreshIndex(),
     ]).catch((error) => {
       if (options.session.activeConversationId.value === conversationId)

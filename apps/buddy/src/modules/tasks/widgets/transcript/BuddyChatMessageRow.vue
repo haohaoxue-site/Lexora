@@ -11,14 +11,11 @@ import DesktopIcon from '@/shared/ui/icon/DesktopIcon.vue'
 import { projectChatMessageActions } from '../../model/transcript/chatMessageActions'
 import {
   getChatMessageDisplayText,
-  getChatMessageInterruption,
 } from '../../model/transcript/chatMessageContent'
 import { useTaskContext } from '../../taskContext'
 import BuddyChatActionToolbar from './BuddyChatActionToolbar.vue'
 import BuddyChatAgentIdentity from './BuddyChatAgentIdentity.vue'
-import BuddyChatMessageContent from './BuddyChatMessageContent.vue'
-import BuddyChatTurnChanges from './BuddyChatTurnChanges.vue'
-import BuddyChatTurnOutputs from './BuddyChatTurnOutputs.vue'
+import BuddyChatMessageBody from './BuddyChatMessageBody.vue'
 
 const props = defineProps<{
   actionsDisabled: boolean
@@ -61,14 +58,6 @@ const showActions = computed(() => (
     || props.branchNavigator !== null
   )
 ))
-const interruptionLabel = computed(() => {
-  const interruption = getChatMessageInterruption(props.message)
-  if (!interruption)
-    return null
-  return t(interruption.truncated
-    ? 'desktop.chat.messageInterruptedTruncated'
-    : 'desktop.chat.messageInterrupted')
-})
 const roleLabel = computed(() => t(`message.role.${props.message.role}`))
 const presentedArtifacts = computed(() => props.turnOutputs?.artifacts ?? [])
 const messageText = computed(() => getChatMessageDisplayText(
@@ -106,35 +95,11 @@ const messageText = computed(() => getChatMessageDisplayText(
       <DesktopIcon name="messageEdit" />
       <span>{{ t('desktop.chat.editingMessage') }}</span>
     </div>
-    <BuddyChatMessageContent
-      class="buddy-chat-message__body"
-      :final="!streaming"
-      :hidden-artifacts="presentedArtifacts"
-      :language="language"
-      :message="message"
-      :write-clipboard-text="clipboard.writeText"
+    <BuddyChatMessageBody
+      :final="!streaming" :language="language" :message="message"
+      :turn-outputs="turnOutputs" :turn-changes="turnChanges" :write-clipboard-text="clipboard.writeText"
+      @open-artifact="emit('openArtifact', $event)" @open-changes="emit('openChanges', $event)"
     />
-    <BuddyChatTurnOutputs
-      v-if="turnOutputs"
-      :artifacts="turnOutputs.artifacts"
-      class="buddy-chat-message__outputs"
-      :language="language"
-      @open-artifact="emit('openArtifact', $event)"
-    />
-    <BuddyChatTurnChanges
-      v-if="turnChanges"
-      :change-set="turnChanges"
-      class="buddy-chat-message__changes"
-      :language="language"
-      @open-changes="emit('openChanges', $event)"
-    />
-    <small
-      v-if="interruptionLabel"
-      class="buddy-chat-message__interruption"
-      role="status"
-    >
-      {{ interruptionLabel }}
-    </small>
     <BuddyChatActionToolbar
       v-if="showActions"
       :actions="actions"

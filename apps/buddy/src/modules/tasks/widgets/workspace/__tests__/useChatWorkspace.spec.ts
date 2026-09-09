@@ -19,7 +19,9 @@ function createOwner(name: string) {
   const delivered: { mode: 'send' | 'edit', content: string }[] = []
   const draft = shallowRef(`${name} draft`)
   const workspace = {
+    tree: { data: shallowRef(null), loading: shallowRef(false), error: shallowRef(null), refresh: async () => {}, setVisible: () => {} },
     composer: {
+      target: shallowRef({ kind: 'global' } as const),
       composerContent: shallowRef(createChatComposerContentFromText(draft.value)),
       contextUsage: shallowRef(null),
       draft,
@@ -51,6 +53,8 @@ function createOwner(name: string) {
       updateComposerContent: (text: string) => { draft.value = text },
     },
     execution: {
+      beginFollowup: async () => false,
+      cancelFollowup: () => {},
       activeRun: shallowRef(null),
       approvalViews: shallowRef([]),
       canMutateBranch: shallowRef(true),
@@ -119,6 +123,7 @@ function createOwner(name: string) {
       resolveRemote: async () => true,
     },
     context: {
+      getNodeDetail: async () => { throw new Error('Unused detail loader') },
       getChangeSet: async () => { throw new Error('Unused fixture operation') },
       readArtifactText: async () => { throw new Error('Unused fixture operation') },
     },

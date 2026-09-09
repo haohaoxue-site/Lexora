@@ -520,6 +520,7 @@ function scopeKey(scope: BuddyComposerDraftScope): string {
     case 'global': return 'global'
     case 'space': return `space:${scope.spaceId}`
     case 'conversation_branch': return `conversation:${scope.conversationId}:${scope.branchId}`
+    case 'message_followup': return `message-followup:${scope.conversationId}:${scope.branchId}:${scope.assistantMessageId}`
     case 'message_edit': return `message-edit:${scope.conversationId}:${scope.branchId}:${scope.userMessageId}`
   }
 }

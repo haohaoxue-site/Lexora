@@ -78,6 +78,8 @@ const {
   onUpdateContent: (content, value) => emit('updateContent', content, value),
 })
 
+defineExpose({ focus: () => editor.value?.commands.focus() })
+
 const sourceMenuOpen = shallowRef(false)
 const suggestionOptions = computed(() => suggestions.value.map(({ option }) => option))
 const chooserVisible = computed(() => !sourceMenuOpen.value && Boolean(

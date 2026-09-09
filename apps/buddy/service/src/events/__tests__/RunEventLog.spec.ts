@@ -4,9 +4,12 @@ import { appendFile, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
+import { createBuddyUserContent } from '../../../../shared/conversation/buddyUserContent'
 import { BuddyDataPaths } from '../../storage/BuddyDataPaths'
+import { createComposerDraftRepository } from '../../storage/composerDraftRepository'
 import { openBuddyDatabase } from '../../storage/database'
 import { createRunEventLog } from '../createRunEventLog'
+import { RunEventProjector } from '../RunEventProjector'
 
 const databases: DatabaseSync[] = []
 const directories: string[] = []
@@ -253,6 +256,69 @@ describe('runEventLog', () => {
       content_json: '{"text":"Durable answer"}',
       role: 'assistant',
     })
+  })
+
+  it('replays an answer referenced by a followup draft without losing the draft or its source', async () => {
+    const fixture = await createFixture()
+    await fixture.log.append({
+      payload: { content: { text: 'Durable answer' }, messageId: 'assistant-1', role: 'assistant', stopReason: 'completed' },
+      runId: 'run-1',
+      type: 'message.completed',
+    })
+    const drafts = createComposerDraftRepository(fixture.database)
+    const draft = drafts.open({
+      draftId: 'followup-draft',
+      initialContent: createBuddyUserContent('Preserved followup'),
+      initialExecutionConfig: { approvalPolicy: 'policy', executionProfile: 'workspace_write' },
+      initialModelSelection: null,
+      now: '2026-09-09T00:00:00.000Z',
+      scope: { kind: 'message_followup', conversationId: 'conversation-1', branchId: 'branch-1', assistantMessageId: 'assistant-1' },
+    })
+    fixture.database.exec(`
+      INSERT INTO attachments (id, message_id, stored_path, name, mime_type, size_bytes, created_at)
+      VALUES ('attachment-1', 'assistant-1', '/isolated/answer.txt', 'answer.txt', 'text/plain', 1, '2026-09-09T00:00:00.000Z');
+      UPDATE messages SET content_json = '{"text":"Damaged projection"}' WHERE id = 'assistant-1';
+      INSERT INTO messages (id, conversation_id, branch_id, run_id, role, content_json, created_at)
+      SELECT 'stale-answer', conversation_id, branch_id, run_id, role, content_json, created_at
+      FROM messages WHERE id = 'assistant-1';
+    `)
+    const identity = fixture.database.prepare('SELECT rowid FROM messages WHERE id = ?').get('assistant-1')
+    await expect(fixture.log.replay('run-1')).resolves.toBe(1)
+    await expect(fixture.log.replay('run-1')).resolves.toBe(1)
+    expect(drafts.findById(draft.draftId)).toEqual(draft)
+    expect(fixture.database.prepare('SELECT rowid FROM messages WHERE id = ?').get('assistant-1')).toEqual(identity)
+    expect(fixture.database.prepare('SELECT message_id FROM attachments WHERE id = ?').get('attachment-1'))
+      .toEqual({ message_id: 'assistant-1' })
+    expect(fixture.database.prepare('SELECT id FROM messages WHERE id = ?').get('stale-answer')).toBeUndefined()
+    expect(fixture.database.prepare('SELECT content_json FROM messages WHERE id = ?').get('assistant-1'))
+      .toEqual({ content_json: '{"text":"Durable answer"}' })
+    expect(fixture.database.prepare('PRAGMA foreign_key_check').all()).toEqual([])
+    expect(fixture.database.prepare('PRAGMA defer_foreign_keys').get()).toEqual({ defer_foreign_keys: 0 })
+  })
+
+  it.each(['duplicate', 'foreign-run'] as const)('rolls back a rebuild containing a %s message identity', async (conflict) => {
+    const fixture = await createFixture()
+    const event = await fixture.log.append({
+      payload: { content: { text: 'Durable answer' }, messageId: 'assistant-1', role: 'assistant', stopReason: 'completed' },
+      runId: 'run-1',
+      type: 'message.completed',
+    })
+    fixture.database.exec(`
+      INSERT INTO runs (id, conversation_id, branch_id, triggering_message_id, provider, model, purpose, status, started_at)
+      SELECT 'run-2', conversation_id, branch_id, triggering_message_id, provider, model, purpose, status, started_at FROM runs WHERE id = 'run-1';
+      INSERT INTO messages (id, conversation_id, branch_id, run_id, role, content_json, created_at)
+      SELECT 'assistant-2', conversation_id, branch_id, 'run-2', role, content_json, created_at FROM messages WHERE id = 'assistant-1';
+      UPDATE messages SET content_json = '{"text":"Retained projection"}' WHERE id = 'assistant-1';
+    `)
+    const before = fixture.database.prepare('SELECT rowid, * FROM messages ORDER BY id').all()
+    const projector = new RunEventProjector(fixture.database)
+    expect(() => projector.rebuild('run-1', [event, {
+      ...event,
+      sequence: 2,
+      payload: { ...event.payload as object, messageId: conflict === 'duplicate' ? 'assistant-1' : 'assistant-2' },
+    }])).toThrow()
+    expect(fixture.database.prepare('SELECT rowid, * FROM messages ORDER BY id').all()).toEqual(before)
+    expect(await fixture.log.list('run-1')).toHaveLength(1)
   })
 
   it('enters the fatal channel when replay cannot rebuild the durable projection', async () => {

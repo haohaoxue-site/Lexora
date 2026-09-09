@@ -39,6 +39,7 @@ export interface ChatDrafts {
   acknowledgeSend: (receipt: ComposerDraftReceipt, targetKey: string) => boolean
   appendResourcePanel: (draftId: string, resourceIds: readonly string[], editorSessionId?: string) => void
   beginIsolated: (targetKey: string, content: BuddyUserContentV1) => boolean
+  resumeIsolated: (targetKey: string) => void
   cancelIsolated: (targetKey: string) => boolean
   completeIsolated: (receipt: ComposerDraftReceipt, targetKey: string, sourceKey: string) => boolean
   confirmOpen: (submitted: ChatDraftSnapshot, remote: LocalComposerDraft, preserveLocalContent?: boolean) => boolean

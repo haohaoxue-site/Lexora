@@ -1,6 +1,6 @@
 import type { Static, TSchema } from 'typebox'
-import type { BuddySessionCapability } from '../agent/BuddySessionCapability'
-import type { BuddyInProcessExtension } from '../agent/createBuddyResourceLoader'
+import type { BuddyCapability } from '../agent/extensions/BuddyCapability'
+import type { BuddyInProcessExtension } from '../agent/extensions/BuddyInProcessExtension'
 import type { DirectoryGrant } from '../directories/resolveGrantedPath'
 import { defineTool } from '@earendil-works/pi-coding-agent'
 import { Check } from 'typebox/value'
@@ -13,7 +13,7 @@ import {
 
 type OutputPresentParameters = Static<typeof outputPresentParameters>
 
-export function createOutputPresentationCapability(options: CreateOutputPresentationExtensionOptions): BuddySessionCapability {
+export function createOutputPresentationCapability(options: CreateOutputPresentationExtensionOptions): BuddyCapability {
   return {
     extension: createOutputPresentationExtension(options),
     classify: classifyOutputPresentTool,

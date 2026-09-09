@@ -2,7 +2,7 @@ import type { BrowserSecuritySession } from '../../../electron/main/browser/Brow
 import { describe, expect, it, vi } from 'vitest'
 import { BrowserSecurityPolicy } from '../../../electron/main/browser/BrowserSecurityPolicy'
 import { resolveRendererAssetPath } from '../../../electron/main/rendererProtocol'
-import { createBuddyToolPresentation } from '../../../service/src/agent/toolPresentation'
+import { createBuddyToolPresentation } from '../../../service/src/agent/events/toolPresentation'
 import { resolveGrantedPath } from '../../../service/src/directories/resolveGrantedPath'
 import { classifyPath } from '../../../service/src/permissions/classifyPath'
 import { createSensitivePathMatcher } from '../../../service/src/permissions/sensitivePaths'

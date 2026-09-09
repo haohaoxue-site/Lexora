@@ -27,6 +27,7 @@ import { resolveLocalChatErrorMessage } from '@/shared/lib/localChatError'
 import { createDraftScopeKey } from '../model/drafts/draftScope'
 import { useChatConversations } from './conversations/useChatConversations'
 import { useChatSession } from './conversations/useChatSession'
+import { useConversationTree } from './conversations/useConversationTree'
 import { useChatDrafts } from './drafts/useChatDrafts'
 import { useChatPermissionSettings } from './drafts/useChatPermissionSettings'
 import { useTaskDraftModelBinding } from './drafts/useTaskDraftModelBinding'
@@ -270,7 +271,7 @@ export function useTaskCapability(options: UseTaskCapabilityOptions): TaskCapabi
     taskIndexData,
     session: chatSession,
     drafts,
-    draftScopeKey,
+    draftScopeKey: drafts.targetKey,
     draftChangedMessage: () => t('desktop.chat.draftChanged'),
     executionProfile: permissionSettingsState.executionProfile,
     getRunTerminationMessage,
@@ -427,12 +428,22 @@ export function useTaskCapability(options: UseTaskCapabilityOptions): TaskCapabi
     spaceId: readonly(spaceId),
   } as const
 
+  const tree = useConversationTree({
+    api: api.localChat.conversations,
+    conversationId: activeConversationId,
+    branchId: activeBranchId,
+    language,
+    runs,
+  })
   const workspace = {
+    tree,
     context: {
+      getNodeDetail: api.localChat.conversations.getNodeDetail,
       getChangeSet: api.localChat.changes.get,
       readArtifactText: api.localChat.artifacts.readText,
     },
     composer: {
+      target: execution.composerTarget.current,
       composerContent,
       contextUsage: readonly(contextUsage),
       dismissInteraction: composerInteractions.dismissInteraction,
@@ -471,6 +482,8 @@ export function useTaskCapability(options: UseTaskCapabilityOptions): TaskCapabi
       cancelActiveRun,
       cancelEditUserMessage,
       editUserMessage,
+      beginFollowup: execution.beginFollowup,
+      cancelFollowup: execution.cancelFollowup,
       editingMessageId,
       isMutatingBranch: readonly(isMutatingBranch),
       isSending: readonly(isSending),

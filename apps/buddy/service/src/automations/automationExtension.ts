@@ -1,10 +1,10 @@
-import type { BuddySessionCapability } from '../agent/BuddySessionCapability'
-import type { BuddyInProcessExtension } from '../agent/createBuddyResourceLoader'
+import type { BuddyCapability } from '../agent/extensions/BuddyCapability'
+import type { BuddyInProcessExtension } from '../agent/extensions/BuddyInProcessExtension'
 import type { CreateAutomationToolOptions } from './createAutomationTool'
 import { AUTOMATION_TOOL_NAME } from './automationToolContract'
 import { classifyAutomationToolCall, createAutomationTool } from './createAutomationTool'
 
-export function createAutomationCapability(options: CreateAutomationToolOptions): BuddySessionCapability {
+export function createAutomationCapability(options: CreateAutomationToolOptions): BuddyCapability {
   return {
     extension: createAutomationExtension(options),
     classify: event => classifyAutomationToolCall(options.service, event),

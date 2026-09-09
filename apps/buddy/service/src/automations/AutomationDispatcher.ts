@@ -4,7 +4,7 @@ import type {
 } from '../../../shared/automation'
 import type { BuddyThinkingLevel } from '../../../shared/conversation/modelSelection'
 import type { SpaceExecutionContext } from '../../../shared/conversation/space'
-import type { BuddyTurnHandle } from '../agent/BuddyAgentRun'
+import type { BuddyTurnHandle } from '../agent/execution/turnTypes'
 import type { AutomationTurnRepository } from '../storage/automationTurnRepository'
 import type { AutomationClock } from './AutomationScheduleEvaluator'
 import type { AutomationService } from './AutomationService'

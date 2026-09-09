@@ -19,6 +19,73 @@ afterEach(() => {
 })
 
 describe('turnRequestRepository', () => {
+  it('creates a followup branch only when its source and draft commit succeed, preserving the original draft', () => {
+    const database = createDatabase()
+    const repository = createTurnRequestRepository(database)
+    repository.prepare(createInput())
+    database.exec(`
+      UPDATE runs SET status = 'completed' WHERE id = 'run-1';
+      INSERT INTO messages VALUES ('answer-1', 'conversation-1', 'branch-1', 'run-1', 'assistant', '{"text":"answer"}', '2026-08-14T00:00:01.000Z');
+    `)
+    const drafts = createComposerDraftRepository(database)
+    const original = drafts.findById('draft-1')
+    drafts.open({
+      ...createDraftInput(),
+      draftId: 'followup-draft',
+      scope: { kind: 'message_followup', conversationId: 'conversation-1', branchId: 'branch-1', assistantMessageId: 'answer-1' },
+    })
+    const followup = {
+      ...createInput(),
+      requestId: 'followup-request',
+      runId: 'run-followup',
+      branchId: 'branch-followup',
+      userMessageId: 'question-followup',
+      createdAt: '2026-08-14T00:00:02.000Z',
+      draft: { draftId: 'followup-draft', expectedRevision: 0 },
+      followup: { parentBranchId: 'branch-1', sourceRunId: 'run-1', sourceMessageId: 'answer-1' },
+    }
+    expect(() => repository.prepare({ ...followup, draft: { ...followup.draft, expectedRevision: 1 } }))
+      .toThrow(ComposerDraftCommitConflictError)
+    expect(database.prepare('SELECT COUNT(*) AS count FROM conversation_branches').get()).toEqual({ count: 1 })
+    expect(repository.prepare(followup)).toMatchObject({ created: true, branchId: 'branch-followup' })
+    expect(repository.prepare(followup)).toMatchObject({ created: false, branchId: 'branch-followup' })
+    expect(database.prepare('SELECT * FROM run_tree_sources WHERE run_id = ?').get('run-followup'))
+      .toEqual({ run_id: 'run-followup', source_run_id: 'run-1', position: 'after' })
+    expect(drafts.findById('draft-1')).toEqual(original)
+    expect(drafts.findById('followup-draft')?.scope)
+      .toEqual({ kind: 'conversation_branch', conversationId: 'conversation-1', branchId: 'branch-followup' })
+    expect(createConversationRepository(database).listBranchMessages('conversation-1', 'branch-followup').map(message => message.id))
+      .toEqual(['message-1', 'answer-1', 'question-followup'])
+  })
+
+  it('retries the latest failed answer in place and rejects reuse of an older attempt', () => {
+    const database = createDatabase()
+    const repository = createTurnRequestRepository(database)
+    repository.prepare(createInput())
+    database.exec('UPDATE runs SET status = \'failed\' WHERE id = \'run-1\'')
+    const input = {
+      approvalPolicy: 'policy' as const,
+      executionProfile: 'workspace_write' as const,
+      branchId: 'branch-1',
+      parentBranchId: 'branch-1',
+      conversationId: 'conversation-1',
+      createdAt: '2026-08-14T00:00:02.000Z',
+      forkedFromMessageId: 'message-1',
+      requestFingerprint: 'retry',
+      requestId: 'retry',
+      runId: 'run-retry',
+      sourceRunId: 'run-1',
+      reuseBranch: true,
+    }
+    expect(repository.regenerate(input)).toMatchObject({ created: true, branchId: 'branch-1' })
+    expect(database.prepare('SELECT COUNT(*) AS count FROM conversation_branches').get()).toEqual({ count: 1 })
+    expect(database.prepare('SELECT * FROM run_tree_sources WHERE run_id = ?').get('run-retry'))
+      .toEqual({ run_id: 'run-retry', source_run_id: 'run-1', position: 'before' })
+    database.exec('UPDATE runs SET status = \'completed\' WHERE id = \'run-retry\'')
+    expect(() => repository.regenerate({ ...input, requestId: 'older-retry', runId: 'older-retry' }))
+      .toThrow(TurnRequestConflictError)
+  })
+
   it('commits one draft and preserves newer edits across idempotent retries', () => {
     const database = createDatabase()
     const repository = createTurnRequestRepository(database)

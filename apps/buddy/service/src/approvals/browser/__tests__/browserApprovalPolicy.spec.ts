@@ -1,7 +1,7 @@
-import type { BuddyInProcessExtension } from '../../../agent/createBuddyResourceLoader'
+import type { BuddyInProcessExtension } from '../../../agent/extensions/BuddyInProcessExtension'
 import type { BuddyToolClassificationResult } from '../../toolClassification'
 import { describe, expect, it, vi } from 'vitest'
-import { createToolPolicyExtension } from '../../../agent/hooks/toolPolicyExtension'
+import { createToolPolicyExtension } from '../../../agent/extensions/toolPolicyExtension'
 import {
   BROWSER_ACT_TOOL_NAME,
   classifyBrowserTool,

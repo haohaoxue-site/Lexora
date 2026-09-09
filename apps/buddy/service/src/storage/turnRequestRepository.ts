@@ -7,6 +7,7 @@ import { createComposerDraftCommitter } from './commitComposerDraft'
 import { withTransaction } from './database'
 
 export interface PrepareTurnRequestInput {
+  followup?: { parentBranchId: string, sourceMessageId: string, sourceRunId: string }
   approvalPolicy: BuddyApprovalPolicy
   attachmentBindings: readonly TurnAttachmentBinding[]
   branchId: string
@@ -66,6 +67,7 @@ export interface RetryInterruptedTurnRequestInput {
 }
 
 export interface RegenerateTurnRequestInput {
+  reuseBranch?: boolean
   approvalPolicy: BuddyApprovalPolicy
   branchId: string
   conversationId: string
@@ -107,6 +109,7 @@ interface ConversationBindingRow {
 }
 
 interface RetryRunRow {
+  pi_session_file: string | null
   approval_policy: BuddyApprovalPolicy
   branch_id: string
   conversation_id: string
@@ -131,6 +134,7 @@ interface RunModelSelectionRow {
 }
 
 export interface TurnRequestRepository {
+  canRetryInPlace: (runId: string) => boolean
   edit: (input: EditTurnRequestInput) => TurnRequestRecord
   findByRequestId: (requestId: string) => TurnRequestRecord | null
   prepare: (input: PrepareTurnRequestInput) => TurnRequestRecord
@@ -139,6 +143,15 @@ export interface TurnRequestRepository {
 }
 
 export function createTurnRequestRepository(database: DatabaseSync): TurnRequestRepository {
+  const insertTreeSource = database.prepare('INSERT INTO run_tree_sources (run_id, source_run_id, position) VALUES (?, ?, ?)')
+  const findFollowupSource = database.prepare(`
+    SELECT messages.id FROM messages INNER JOIN runs ON runs.id = messages.run_id
+    WHERE messages.id = ? AND messages.conversation_id = ? AND messages.branch_id = ?
+      AND messages.role = 'assistant' AND runs.id = ? AND runs.status = 'completed'
+      AND NOT EXISTS (SELECT 1 FROM messages later WHERE later.run_id = runs.id
+        AND later.role = 'assistant' AND (later.created_at > messages.created_at
+          OR (later.created_at = messages.created_at AND later.id > messages.id)))
+  `)
   const findRequest = database.prepare('SELECT * FROM turn_requests WHERE request_id = ?')
   const findConversation = database.prepare(`
     SELECT space_id, active_branch_id, approval_policy, execution_profile, origin, deleted_at
@@ -220,6 +233,14 @@ export function createTurnRequestRepository(database: DatabaseSync): TurnRequest
   `)
   const commitDraft = createComposerDraftCommitter(database)
   const findRun = database.prepare('SELECT * FROM runs WHERE id = ?')
+  const findBranchHeadRun = database.prepare(`
+    SELECT id FROM runs WHERE conversation_id = ? AND branch_id = ?
+    ORDER BY started_at DESC, id DESC LIMIT 1
+  `)
+  const findLaterQuestion = database.prepare(`
+    SELECT 1 FROM messages WHERE branch_id = ? AND role = 'user'
+      AND rowid > (SELECT rowid FROM messages WHERE id = ?) LIMIT 1
+  `)
   const findMessage = database.prepare(`
     SELECT conversation_id, role FROM messages WHERE id = ?
   `)
@@ -264,7 +285,15 @@ export function createTurnRequestRepository(database: DatabaseSync): TurnRequest
     return row ? toRecord(row, false) : null
   }
 
+  const canRetryInPlace = (runId: string): boolean => {
+    const run = findRun.get(runId) as RetryRunRow | undefined
+    return !!run && (run.status === 'failed' || run.status === 'cancelled')
+      && (findBranchHeadRun.get(run.conversation_id, run.branch_id) as { id: string } | undefined)?.id === runId
+      && !findLaterQuestion.get(run.branch_id, run.triggering_message_id)
+  }
+
   return {
+    canRetryInPlace,
     edit(input) {
       return withTransaction(database, () => {
         const existing = findRequest.get(input.requestId) as TurnRequestRow | undefined
@@ -389,7 +418,7 @@ export function createTurnRequestRepository(database: DatabaseSync): TurnRequest
         if (conversation) {
           if (
             conversation.space_id !== input.spaceId
-            || conversation.active_branch_id !== input.branchId
+            || (!input.followup && conversation.active_branch_id !== input.branchId)
             || conversation.approval_policy !== input.approvalPolicy
             || conversation.execution_profile !== input.executionProfile
             || conversation.deleted_at !== null
@@ -412,6 +441,13 @@ export function createTurnRequestRepository(database: DatabaseSync): TurnRequest
           activateBranch.run(input.branchId, input.createdAt, input.conversationId)
         }
 
+        if (input.followup) {
+          if (!conversation || !findFollowupSource.get(input.followup.sourceMessageId, input.conversationId, input.followup.parentBranchId, input.followup.sourceRunId)) {
+            throw new TurnRequestConflictError()
+          }
+          insertForkBranch.run(input.branchId, input.conversationId, input.followup.parentBranchId, input.followup.sourceMessageId, input.createdAt)
+          activateBranch.run(input.branchId, input.createdAt, input.conversationId)
+        }
         const previous = findPreviousSession.get(
           input.conversationId,
           input.branchId,
@@ -451,6 +487,8 @@ export function createTurnRequestRepository(database: DatabaseSync): TurnRequest
           input.runInput.serviceTier,
           input.createdAt,
         )
+        if (input.followup)
+          insertTreeSource.run(input.runId, input.followup.sourceRunId, 'after')
         updateConversationModel.run(
           stringifyModelSelection(input),
           input.createdAt,
@@ -475,6 +513,8 @@ export function createTurnRequestRepository(database: DatabaseSync): TurnRequest
           draftId: input.draft.draftId,
           executionProfile: input.executionProfile,
           expectedRevision: input.draft.expectedRevision,
+          expectedBranchId: input.followup?.parentBranchId,
+          expectedSourceMessageId: input.followup?.sourceMessageId,
           spaceId: input.spaceId,
           updatedAt: input.createdAt,
         })
@@ -501,7 +541,7 @@ export function createTurnRequestRepository(database: DatabaseSync): TurnRequest
         const sourceRun = findRun.get(input.sourceRunId) as RetryRunRow | undefined
         if (
           !conversation
-          || conversation.active_branch_id !== input.parentBranchId
+          || sourceRun?.branch_id !== input.parentBranchId
           || conversation.approval_policy !== input.approvalPolicy
           || conversation.execution_profile !== input.executionProfile
           || conversation.deleted_at !== null
@@ -509,18 +549,22 @@ export function createTurnRequestRepository(database: DatabaseSync): TurnRequest
           || !sourceRun
           || sourceRun.conversation_id !== input.conversationId
           || sourceRun.triggering_message_id !== input.forkedFromMessageId
+          || (input.reuseBranch && (input.branchId !== sourceRun.branch_id || !['failed', 'cancelled'].includes(sourceRun.status)))
+          || (input.reuseBranch && !canRetryInPlace(input.sourceRunId))
           || !new Set(['completed', 'failed', 'cancelled']).has(sourceRun.status)
         ) {
           throw new TurnRequestConflictError()
         }
 
-        insertForkBranch.run(
-          input.branchId,
-          input.conversationId,
-          input.parentBranchId,
-          input.forkedFromMessageId,
-          input.createdAt,
-        )
+        if (!input.reuseBranch) {
+          insertForkBranch.run(
+            input.branchId,
+            input.conversationId,
+            input.parentBranchId,
+            input.forkedFromMessageId,
+            input.createdAt,
+          )
+        }
         activateBranch.run(input.branchId, input.createdAt, input.conversationId)
         insertRun.run(
           input.runId,
@@ -531,13 +575,14 @@ export function createTurnRequestRepository(database: DatabaseSync): TurnRequest
           sourceRun.model,
           sourceRun.context_window,
           sourceRun.max_tokens,
-          null,
+          input.reuseBranch ? sourceRun.pi_session_file : null,
           input.createdAt,
           input.approvalPolicy,
           input.executionProfile,
         )
         if (Number(cloneRunInput.run(input.runId, input.createdAt, input.sourceRunId).changes) !== 1)
           throw new TurnRequestConflictError()
+        insertTreeSource.run(input.runId, input.sourceRunId, 'before')
         const modelSelection = findRunModelSelection.get(input.runId) as
           | RunModelSelectionRow
           | undefined
@@ -603,6 +648,7 @@ export function createTurnRequestRepository(database: DatabaseSync): TurnRequest
         )
         if (Number(cloneRunInput.run(input.runId, input.createdAt, request.run_id).changes) !== 1)
           throw new TurnRequestConflictError()
+        insertTreeSource.run(input.runId, request.run_id, 'before')
         if (Number(updateRequestRun.run(input.runId, input.requestId, request.run_id).changes) !== 1)
           throw new TurnRequestConflictError()
         return {

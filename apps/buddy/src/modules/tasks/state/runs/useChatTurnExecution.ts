@@ -1,11 +1,12 @@
 import type { LocalChatApi } from '@buddy-electron/shared/localChatApi'
 import type { ParsedBuddyChatCommand } from '@buddy-shared/conversation/buddyChatCommands'
 import type { BuddyUserContentV1 } from '@buddy-shared/conversation/buddyUserContent'
-
 import type { LocalPromptContextItem } from '@buddy-shared/conversation/chatApi'
 import type { BuddyApprovalPolicy } from '@buddy-shared/permissions/approvalPolicy'
+
 import type { BuddyExecutionProfile } from '@buddy-shared/permissions/executionProfile'
 import type { LocalRun } from '@buddy-shared/runs/runApi'
+import type { ComposerTarget } from '../composer/useComposerTarget'
 import type { ChatRunSync } from './typing'
 import type { BuddyLocale } from '@/i18n/buddyI18n'
 import type { ChatComposerSubmitPayload } from '@/modules/prompt-input'
@@ -18,6 +19,7 @@ import { getBuddyUserContentResourceIds } from '@buddy-shared/conversation/buddy
 import { computed, onScopeDispose, readonly, shallowRef, watch } from 'vue'
 import { createRequestIdRegistry } from '@/modules/tasks/model/requests/chatRequestIdentity'
 import { resolveLocalChatErrorMessage } from '@/shared/lib/localChatError'
+import { parseDraftScopeKey } from '../../model/drafts/draftScope'
 
 interface ValueRef<T> {
   readonly value: T
@@ -42,6 +44,7 @@ export interface UseChatTurnExecutionOptions {
   | 'resourceIdsForDraft'
   | 'setUserContent'
   | 'snapshot'>
+  composerTarget: ComposerTarget
   draftScopeKey: ValueRef<string>
   draftChangedMessage: () => string
   executionProfile: ValueRef<BuddyExecutionProfile>
@@ -91,7 +94,7 @@ export function useChatTurnExecution(options: UseChatTurnExecutionOptions) {
     if ((!content.trim() && !resourceIds.length) || !canSend.value)
       return false
     const command = parseBuddyChatCommand(content)
-    if (command?.kind === 'action' && resourceIds.length) {
+    if (command?.kind === 'action' && (resourceIds.length || options.composerTarget.current.value.kind === 'message_followup')) {
       options.setErrorMessage(options.unavailableCommandMessage())
       return false
     }
@@ -128,7 +131,8 @@ export function useChatTurnExecution(options: UseChatTurnExecutionOptions) {
       requestIds.release(operationKey)
       const sourceViewIsCurrent = isSourceViewCurrent()
       const targetScopeKey = `conversation:${result.conversationId}:${result.branchId}`
-      const acknowledged = options.drafts.acknowledgeSend(result.draftReceipt, targetScopeKey)
+      const source = parseDraftScopeKey(confirmedDraft.targetKey)
+      const acknowledged = options.composerTarget.complete(result.draftReceipt, targetScopeKey, sourceScopeKey)
       if (sourceViewIsCurrent && (acknowledged || sourceScopeKey === targetScopeKey)) {
         options.session.acceptTurn(result.conversationId, result.branchId)
         if (!options.session.branches.value.some(
@@ -137,9 +141,9 @@ export function useChatTurnExecution(options: UseChatTurnExecutionOptions) {
           options.session.upsertBranch({
             conversationId: result.conversationId,
             createdAt: result.run.startedAt,
-            forkedFromMessageId: null,
+            forkedFromMessageId: source.kind === 'message_followup' ? source.assistantMessageId : null,
             id: result.branchId,
-            parentBranchId: null,
+            parentBranchId: source.kind === 'message_followup' ? source.branchId : null,
           })
         }
         options.runSync.applyRunStart(result)
@@ -210,7 +214,7 @@ export function useChatTurnExecution(options: UseChatTurnExecutionOptions) {
       if (!result.draftReceipt)
         throw new Error('Command did not commit its Composer draft')
       requestIds.release(operationKey)
-      options.drafts.acknowledgeSend(result.draftReceipt, sourceScopeKey)
+      options.composerTarget.complete(result.draftReceipt, sourceScopeKey, sourceScopeKey)
       if (isSourceViewCurrent()) {
         options.onActionCommandRunStarted(result.runId)
         options.runSync.applyRunStart(result)

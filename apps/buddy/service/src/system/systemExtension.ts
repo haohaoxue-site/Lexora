@@ -1,6 +1,6 @@
 import type { TSchema } from 'typebox'
-import type { BuddySessionCapability } from '../agent/BuddySessionCapability'
-import type { BuddyInProcessExtension } from '../agent/createBuddyResourceLoader'
+import type { BuddyCapability } from '../agent/extensions/BuddyCapability'
+import type { BuddyInProcessExtension } from '../agent/extensions/BuddyInProcessExtension'
 import type { SystemActionRequest, SystemHostPort } from './systemCapability'
 import type { SystemToolDetails } from './systemToolContract'
 import type { SystemToolFailureCode } from './systemToolFailure'
@@ -22,7 +22,7 @@ export interface CreateSystemExtensionOptions {
   service: SystemCapabilityService
 }
 
-export function createSystemCapability(host: SystemHostPort): BuddySessionCapability {
+export function createSystemCapability(host: SystemHostPort): BuddyCapability {
   const service = new SystemCapabilityService({ host })
   return {
     extension: createSystemExtension({ service }),

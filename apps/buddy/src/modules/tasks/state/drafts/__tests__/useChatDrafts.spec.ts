@@ -132,7 +132,7 @@ describe('useChatDrafts', () => {
     expect(drafts.listSnapshots().map(snapshot => snapshot.draftId)).not.toContain(second)
   })
 
-  it('moves only the committed edit Draft to the forked branch', () => {
+  it.each([false, true])('moves only the committed edit Draft to its branch when navigation is %s', (navigate) => {
     const { drafts, targetKey } = createFixture()
     targetKey.value = 'conversation:conversation-1:branch-1'
     drafts.updateComposerContent('ordinary pending input', createChatComposerContentFromText('ordinary pending input'))
@@ -152,11 +152,22 @@ describe('useChatDrafts', () => {
       },
     }), true)
 
+    const otherFollowup = 'message-followup:another-conversation:another-branch:another-answer'
+    if (navigate) {
+      targetKey.value = 'conversation:another-conversation:another-branch'
+      drafts.resumeIsolated(otherFollowup)
+      drafts.updateComposerContent('new target input', null)
+    }
+
     expect(drafts.completeIsolated({
       committedRevision: 3,
       draftId: submitted.draftId,
       sourceRevision: 2,
     }, 'conversation:conversation-1:branch-2', editKey)).toBe(true)
+    if (navigate) {
+      expect(drafts.targetKey.value).toBe(otherFollowup)
+      expect(drafts.draft.value).toBe('new target input')
+    }
     targetKey.value = 'conversation:conversation-1:branch-2'
     expect(drafts.draft.value).toBe('')
     targetKey.value = 'conversation:conversation-1:branch-1'

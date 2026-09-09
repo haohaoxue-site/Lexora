@@ -12,7 +12,7 @@ import type { DatabaseSync } from 'node:sqlite'
 
 import type { BuddyComposerResource } from '../../../shared/conversation/composerResource'
 import type { ApplicationDiagnostic } from '../../../shared/diagnostics/applicationDiagnostic'
-import type { BuddyAgentSessionLike } from '../agent/PiTurnExecutor'
+import type { ReusableBuddySession } from '../agent/sessions/ReusableBuddySession'
 import type { BuddyServiceRpcServer } from '../rpc/BuddyServiceRpcServer'
 import { Buffer } from 'node:buffer'
 import { mkdir, mkdtemp, readFile, realpath, rm, unlink, writeFile } from 'node:fs/promises'
@@ -23,12 +23,12 @@ import { SessionManager } from '@earendil-works/pi-coding-agent'
 import { afterEach, describe, expect, it } from 'vitest'
 
 import { createBuddyUserContent } from '../../../shared/conversation/buddyUserContent'
-import { BuddyAgentRunner } from '../agent/BuddyAgentRunner'
-import { createBuddyInputReference } from '../agent/BuddyInputReference'
-import { BuddySessionRegistry } from '../agent/BuddySessionRegistry'
-import { inspectCommittedPiCompaction } from '../agent/inspectCommittedPiCompaction'
-import { PiEventBridge } from '../agent/PiEventBridge'
-import { PiTurnExecutor } from '../agent/PiTurnExecutor'
+import { createBuddyInputReference } from '../agent/context/BuddyInputReference'
+import { PiEventBridge } from '../agent/events/PiEventBridge'
+import { BuddyAgentRunner } from '../agent/execution/BuddyAgentRunner'
+import { PiTurnExecutor } from '../agent/execution/PiTurnExecutor'
+import { BuddySessionRegistry } from '../agent/sessions/BuddySessionRegistry'
+import { inspectCommittedPiCompaction } from '../agent/sessions/recovery/inspectCommittedPiCompaction'
 import { ApprovalService } from '../approvals/ApprovalService'
 import { startBuddyService } from '../BuddyService'
 import { createRunEventLog } from '../events/createRunEventLog'
@@ -101,7 +101,7 @@ describe('buddy runtime cross-subsystem contract', () => {
     const usageRepository = createUsageRepository(database)
     const usage = new UsageService({ eventLog, repository: usageRepository })
     const session = new OfflinePiSession(join(spaceRoot, 'article.md'))
-    const sessions = new BuddySessionRegistry<BuddyAgentSessionLike>()
+    const sessions = new BuddySessionRegistry<ReusableBuddySession>()
     const piEvents = new PiEventBridge({ eventLog, usage })
     const runner = new BuddyAgentRunner({
       executor: new PiTurnExecutor({
@@ -1077,7 +1077,7 @@ describe('buddy runtime cross-subsystem contract', () => {
   })
 })
 
-class OfflinePiSession implements BuddyAgentSessionLike {
+class OfflinePiSession implements ReusableBuddySession {
   readonly #listeners = new Set<(event: AgentSessionEvent) => void>()
   readonly #target: string
 

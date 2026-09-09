@@ -3,7 +3,6 @@ import type { ChangeCaptureService } from '../changes/ChangeCaptureService'
 import type { BuddyRunEvent } from '../events/BuddyRunEvent'
 import type { RuntimeRequestRegistrar } from '../rpc/runtimeRequest'
 import type {
-  ArtifactRecord,
   ArtifactRepository,
 } from '../storage/artifactRepository'
 import type { ConversationHistoryRepository } from '../storage/conversationHistoryRepository'
@@ -16,7 +15,6 @@ import type { RunRepository } from '../storage/runRepository'
 import { conversationsRpc } from '../../../shared/conversation/conversationApi'
 
 import { toPublicRunEvent } from '../../../shared/runs/publicRunEvent'
-import { buddyRunOutputPayloadSchema } from '../../../shared/runs/runOutput'
 import {
   withMessageAttachments,
 } from '../attachments/publicAttachment'
@@ -30,6 +28,7 @@ import {
   createMessagePageCursor,
   parseMessagePageCursor,
 } from './messagePageCursor'
+import { projectRunOutputs } from './projectRunOutputs'
 
 export interface ConversationSessionInvalidator {
   invalidateConversation: (conversationId: string) => Promise<unknown>
@@ -226,54 +225,4 @@ function requireValue<T>(value: T | null): T {
   if (value === null)
     throw new BuddyServiceError('VALIDATION_FAILED')
   return value
-}
-
-function projectRunOutputs(
-  events: readonly BuddyRunEvent[],
-  artifacts: readonly ArtifactRecord[],
-) {
-  const artifactsById = new Map(artifacts.map(record => [record.id, record]))
-  return events.flatMap((event) => {
-    if (event.type !== 'output.produced')
-      return []
-    const output = buddyRunOutputPayloadSchema.safeParse(event.payload)
-    if (!output.success)
-      return []
-    const projectedArtifacts = [...new Set(output.data.artifactIds)].flatMap((artifactId) => {
-      const artifact = artifactsById.get(artifactId)
-      return artifact
-        ? [toPublicArtifact(artifact, event.runId, output.data.sourceToolCallId)]
-        : []
-    })
-    return projectedArtifacts.length > 0
-      ? [{
-          artifacts: projectedArtifacts,
-          createdAt: event.createdAt,
-          runId: event.runId,
-          sourceToolCallId: output.data.sourceToolCallId,
-        }]
-      : []
-  })
-}
-
-function toPublicArtifact(
-  record: ArtifactRecord,
-  runId: string,
-  sourceToolCallId: string,
-) {
-  return {
-    artifactId: record.id,
-    conversationId: record.conversationId,
-    createdAt: record.createdAt,
-    kind: record.kind,
-    mimeType: record.mimeType,
-    name: record.name,
-    path: record.currentPath,
-    previewUrl: null,
-    runId,
-    sizeBytes: record.sizeBytes,
-    sourceArtifactId: record.sourceArtifactId,
-    sourceToolCallId,
-    updatedAt: record.updatedAt,
-  }
 }
