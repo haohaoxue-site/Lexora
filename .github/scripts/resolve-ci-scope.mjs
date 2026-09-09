@@ -5,12 +5,31 @@ import process from 'node:process'
 import { fileURLToPath } from 'node:url'
 
 const repoRoot = resolve(import.meta.dirname, '../..')
+const ciInputs = new Set([
+  '.github/workflows/ci.yml',
+  '.github/scripts/resolve-ci-scope.mjs',
+])
+const rustInputs = new Set([
+  'rust-toolchain',
+  'rust-toolchain.toml',
+  '.github/scripts/buddy-test-runtime.mjs',
+  '.github/workflows/buddy-build.yml',
+  'apps/buddy/resources/icons/app-icon.png',
+  'packaging/buddy/release/native-host.mjs',
+  'packaging/buddy/release/preflight.mjs',
+])
+const rustPrefixes = [
+  '.cargo/',
+  'apps/buddy/native/',
+  'apps/buddy/platform/native/',
+  'apps/buddy/shared/platform/',
+  'packages/assets/buddy/pets/default/',
+]
 const globalBuddyInputs = new Set([
   '.node-version',
   'package.json',
   'pnpm-lock.yaml',
   'pnpm-workspace.yaml',
-  '.github/workflows/buddy-build.yml',
 ])
 const websiteInputs = new Set([
   '.github/workflows/website-pages.yml',
@@ -48,6 +67,7 @@ export function classifyCiScope(files) {
     return fullScope()
 
   let buddy = false
+  let buddyRust = false
   let website = false
   let quality = false
 
@@ -56,6 +76,22 @@ export function classifyCiScope(files) {
 
     if (ignoredInputs.has(path))
       continue
+
+    if (ciInputs.has(path)) {
+      buddy = true
+      buddyRust = true
+      website = true
+      quality = true
+      continue
+    }
+
+    if (rustInputs.has(path) || rustPrefixes.some(prefix => path.startsWith(prefix))) {
+      buddy = true
+      buddyRust = true
+      if (path.startsWith('.github/') || path.startsWith('packages/assets/'))
+        quality = true
+      continue
+    }
 
     if (websiteInputs.has(path) || websitePrefixes.some(prefix => path.startsWith(prefix))) {
       website = true
@@ -79,10 +115,11 @@ export function classifyCiScope(files) {
     }
 
     buddy = true
+    buddyRust = true
     quality = true
   }
 
-  return { buddy, website, quality }
+  return { buddy, buddyRust, website, quality }
 }
 
 export function listChangedFiles(base, head, cwd = repoRoot) {
@@ -107,6 +144,7 @@ export function resolveCiScope(base, head, cwd = repoRoot) {
 function fullScope() {
   return {
     buddy: true,
+    buddyRust: true,
     website: false,
     quality: true,
   }

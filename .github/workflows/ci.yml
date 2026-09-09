@@ -3,12 +3,34 @@ name: Lexora CI
 on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
+  push:
+    branches: [master]
+    paths:
+      - .github/workflows/ci.yml
+      - .github/scripts/resolve-ci-scope.mjs
+      - .github/scripts/buddy-test-runtime.mjs
+      - .cargo/**
+      - rust-toolchain*
+      - .node-version
+      - package.json
+      - pnpm-lock.yaml
+      - pnpm-workspace.yaml
+      - apps/buddy/package.json
+      - apps/buddy/native/**
+      - apps/buddy/platform/native/**
+      - apps/buddy/shared/platform/**
+      - apps/buddy/resources/icons/app-icon.png
+      - packages/assets/buddy/pets/default/**
+      - packaging/buddy/release/native-host.mjs
 
 permissions:
   contents: read
 
+env:
+  BUDDY_RUST_TOOLCHAIN: 1.98.0
+
 concurrency:
-  group: lexora-ci-${{ github.event.pull_request.number }}
+  group: lexora-ci-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -18,6 +40,7 @@ jobs:
     timeout-minutes: 5
     outputs:
       buddy: ${{ steps.resolve.outputs.buddy }}
+      buddyRust: ${{ steps.resolve.outputs.buddyRust }}
       website: ${{ steps.resolve.outputs.website }}
       quality: ${{ steps.resolve.outputs.quality }}
     steps:
@@ -35,8 +58,8 @@ jobs:
       - name: Resolve change scope
         id: resolve
         env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: >-
           node .github/scripts/resolve-ci-scope.mjs
           --base "$BASE_SHA"
@@ -46,7 +69,7 @@ jobs:
   website-quality:
     name: Website quality
     needs: scope
-    if: needs.scope.outputs.website == 'true'
+    if: github.event_name == 'pull_request' && needs.scope.outputs.website == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
@@ -77,7 +100,7 @@ jobs:
   quality:
     name: Quality
     needs: scope
-    if: needs.scope.outputs.quality == 'true'
+    if: github.event_name == 'pull_request' && needs.scope.outputs.quality == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
@@ -110,8 +133,8 @@ jobs:
 
   buddy-tests:
     name: Buddy tests
-    needs: scope
-    if: needs.scope.outputs.buddy == 'true'
+    needs: [scope, buddy-test-runtime]
+    if: github.event_name == 'pull_request' && needs.scope.outputs.buddy == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
@@ -130,17 +153,8 @@ jobs:
           cache: pnpm
           cache-dependency-path: pnpm-lock.yaml
 
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@4360b52568e2003a75bf9bc1d59f33a8e3fc893c # stable
-        with:
-          toolchain: 1.98.0
-          components: clippy, rustfmt
-
-      - name: Install Buddy test dependencies
-        run: sudo apt-get update && sudo apt-get install -y build-essential libgtk-3-dev libgtk-layer-shell-dev libxdo-dev
-
-      - name: Install workspace dependencies
-        run: pnpm install --frozen-lockfile
+      - name: Install Buddy dependencies
+        run: pnpm --filter @haohaoxue/lexora --filter '@lexora/buddy...' install --frozen-lockfile
 
       - name: Lint Buddy
         run: pnpm exec eslint apps/buddy packaging/buddy
@@ -148,26 +162,80 @@ jobs:
       - name: Type-check Buddy
         run: pnpm --filter @lexora/buddy type-check
 
-      - name: Prepare Buddy test runtime
-        run: pnpm --filter @lexora/buddy prepare:test-runtime
+      - name: Download Buddy test runtime
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: buddy-test-runtime-linux
+          path: ${{ runner.temp }}/buddy-test-runtime
+
+      - name: Prepare Buddy test tools
+        run: |
+          tar -xf "$RUNNER_TEMP/buddy-test-runtime/buddy-test-runtime.tar" -C apps/buddy
+          node packaging/buddy/release/search-tools.mjs
 
       - name: Test Buddy
         run: pnpm --filter @lexora/buddy test
 
-      - name: Check Rust formatting
-        run: cargo fmt --manifest-path apps/buddy/native/Cargo.toml --all -- --check
-
-      - name: Lint native components
-        run: cargo clippy --locked --manifest-path apps/buddy/native/Cargo.toml --target-dir apps/buddy/.output/build/native --workspace --all-targets -- -D warnings
-
-      - name: Test native components
-        run: cargo test --locked --manifest-path apps/buddy/native/Cargo.toml --target-dir apps/buddy/.output/build/native --workspace
-
-  buddy-native-windows:
-    name: Buddy Windows native tests
+  buddy-test-runtime:
+    name: Buddy test runtime
     needs: scope
     if: needs.scope.outputs.buddy == 'true'
-    runs-on: windows-2025
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .node-version
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@4360b52568e2003a75bf9bc1d59f33a8e3fc893c # stable
+        with:
+          toolchain: ${{ env.BUDDY_RUST_TOOLCHAIN }}
+
+      - name: Cache Rust runtime
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            apps/buddy/.output/build/native
+          key: buddy-runtime-${{ runner.os }}-${{ runner.arch }}-${{ env.BUDDY_RUST_TOOLCHAIN }}-${{ hashFiles('apps/buddy/native/Cargo.lock') }}-${{ hashFiles('.cargo/**', 'rust-toolchain*', 'apps/buddy/native/**', 'apps/buddy/platform/native/nativeHost.json', 'packaging/buddy/release/native-host.mjs') }}
+          restore-keys: |
+            buddy-runtime-${{ runner.os }}-${{ runner.arch }}-${{ env.BUDDY_RUST_TOOLCHAIN }}-${{ hashFiles('apps/buddy/native/Cargo.lock') }}-
+
+      - name: Prepare native test programs
+        run: node .github/scripts/buddy-test-runtime.mjs "$RUNNER_TEMP/buddy-test-runtime.tar"
+
+      - name: Upload Buddy test runtime
+        if: github.event_name == 'pull_request'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: buddy-test-runtime-linux
+          path: ${{ runner.temp }}/buddy-test-runtime.tar
+          if-no-files-found: error
+          retention-days: 1
+
+  buddy-rust-tests:
+    name: Buddy Rust tests (${{ matrix.platform }})
+    needs: scope
+    if: needs.scope.outputs.buddyRust == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: Linux
+            runner: ubuntu-24.04
+            cargo-args: ''
+          - platform: Windows
+            runner: windows-2025
+            cargo-args: --exclude lexora-buddy-pet
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 20
     env:
       CARGO_TARGET_DIR: ${{ github.workspace }}/apps/buddy/.output/build/native
@@ -180,19 +248,63 @@ jobs:
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@4360b52568e2003a75bf9bc1d59f33a8e3fc893c # stable
         with:
-          toolchain: 1.98.0
-          components: clippy
+          toolchain: ${{ env.BUDDY_RUST_TOOLCHAIN }}
+          components: clippy, rustfmt
+
+      - name: Cache Rust tests
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            apps/buddy/.output/build/native
+          key: buddy-rust-tests-${{ runner.os }}-${{ runner.arch }}-${{ env.BUDDY_RUST_TOOLCHAIN }}-${{ hashFiles('apps/buddy/native/Cargo.lock') }}-${{ hashFiles('.cargo/**', 'rust-toolchain*', 'apps/buddy/native/**', 'apps/buddy/resources/icons/app-icon.png', 'packages/assets/buddy/pets/default/**') }}
+          restore-keys: |
+            buddy-rust-tests-${{ runner.os }}-${{ runner.arch }}-${{ env.BUDDY_RUST_TOOLCHAIN }}-${{ hashFiles('apps/buddy/native/Cargo.lock') }}-
+
+      - name: Install Linux native dependencies
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y build-essential libgtk-3-dev libgtk-layer-shell-dev libxdo-dev
+
+      - name: Check Rust formatting
+        if: runner.os == 'Linux'
+        run: cargo fmt --manifest-path apps/buddy/native/Cargo.toml --all -- --check
 
       - name: Lint native components
-        run: cargo clippy --locked --manifest-path apps/buddy/native/Cargo.toml --workspace --exclude lexora-buddy-pet --all-targets -- -D warnings
+        run: cargo clippy --locked --manifest-path apps/buddy/native/Cargo.toml --workspace ${{ matrix.cargo-args }} --all-targets -- -D warnings
 
       - name: Test native components
-        run: cargo test --locked --manifest-path apps/buddy/native/Cargo.toml --workspace --exclude lexora-buddy-pet
+        run: cargo test --locked --manifest-path apps/buddy/native/Cargo.toml --workspace ${{ matrix.cargo-args }}
+
+  buddy-dependency-cache:
+    name: Buddy dependency cache
+    needs: scope
+    if: github.event_name == 'push' && needs.scope.outputs.buddy == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+
+      - name: Setup Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install Buddy dependencies
+        run: pnpm --filter @haohaoxue/lexora --filter '@lexora/buddy...' install --frozen-lockfile
 
   ci-gate:
     name: CI Gate
-    needs: [scope, website-quality, quality, buddy-tests, buddy-native-windows]
-    if: always()
+    needs: [scope, website-quality, quality, buddy-test-runtime, buddy-tests, buddy-rust-tests]
+    if: always() && github.event_name == 'pull_request'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
@@ -200,7 +312,9 @@ jobs:
         env:
           BUDDY_REQUIRED: ${{ needs.scope.outputs.buddy }}
           BUDDY_RESULT: ${{ needs.buddy-tests.result }}
-          WINDOWS_RESULT: ${{ needs.buddy-native-windows.result }}
+          RUNTIME_RESULT: ${{ needs.buddy-test-runtime.result }}
+          RUST_REQUIRED: ${{ needs.scope.outputs.buddyRust }}
+          RUST_RESULT: ${{ needs.buddy-rust-tests.result }}
           WEBSITE_REQUIRED: ${{ needs.scope.outputs.website }}
           WEBSITE_RESULT: ${{ needs.website-quality.result }}
           QUALITY_REQUIRED: ${{ needs.scope.outputs.quality }}
@@ -225,4 +339,5 @@ jobs:
           require_success "Website quality" "$WEBSITE_REQUIRED" "$WEBSITE_RESULT"
           require_success "Quality" "$QUALITY_REQUIRED" "$QUALITY_RESULT"
           require_success "Buddy tests" "$BUDDY_REQUIRED" "$BUDDY_RESULT"
-          require_success "Buddy Windows native tests" "$BUDDY_REQUIRED" "$WINDOWS_RESULT"
+          require_success "Buddy test runtime" "$BUDDY_REQUIRED" "$RUNTIME_RESULT"
+          require_success "Buddy Rust tests" "$RUST_REQUIRED" "$RUST_RESULT"
