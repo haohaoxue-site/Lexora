@@ -45,6 +45,9 @@ export class BuddySessionRegistry<TSession extends DisposableBuddySession> {
   readonly #sessions = new Map<string, BuddySessionEntry<TSession>>()
   readonly #lastUsed = new Map<string, number>()
   readonly #maxSessions: number
+  readonly #pendingFactories = new Set<Promise<void>>()
+  readonly #cleanupFailures: unknown[] = []
+  #disposal: Promise<void> | null = null
   #accessSequence = 0
 
   constructor(options: BuddySessionRegistryOptions = {}) {
@@ -56,6 +59,8 @@ export class BuddySessionRegistry<TSession extends DisposableBuddySession> {
     piSessionFile: string | null,
     factory: () => Promise<BuddySessionBinding<TSession>>,
   ): Promise<BuddySessionBinding<TSession>> {
+    if (this.#disposal)
+      throw new BuddySessionLifecycleAbortError()
     const branchKey = createBranchKey(identity)
     const boundRoot = this.#branchRoots.get(branchKey)
     if (boundRoot !== undefined && boundRoot !== identity.canonicalRoot)
@@ -78,6 +83,8 @@ export class BuddySessionRegistry<TSession extends DisposableBuddySession> {
       if (candidate && createBranchKey(candidateIdentity) === branchKey)
         await this.#settleSessionDisposal(candidateKey, 'resource-change', candidate)
     }
+    if (this.#disposal)
+      throw new BuddySessionLifecycleAbortError()
     this.#branchRoots.set(branchKey, identity.canonicalRoot)
 
     const entry = this.#createEntry(piSessionFile, factory)
@@ -145,6 +152,8 @@ export class BuddySessionRegistry<TSession extends DisposableBuddySession> {
 
     await previous
     try {
+      if (this.#disposal)
+        throw new BuddySessionLifecycleAbortError()
       signal?.throwIfAborted()
       this.#activeRuns.set(branchKey, { runId, signal })
       return await operation()
@@ -163,9 +172,14 @@ export class BuddySessionRegistry<TSession extends DisposableBuddySession> {
     }
   }
 
-  async dispose(): Promise<void> {
-    await Promise.allSettled([...this.#sessions.entries()].map(([sessionKey, entry]) =>
+  dispose(): Promise<void> {
+    return this.#disposal ??= Promise.resolve().then(() => this.#dispose())
+  }
+
+  async #dispose(): Promise<void> {
+    const results = await Promise.allSettled([...this.#sessions.entries()].map(([sessionKey, entry]) =>
       this.#disposeSession(sessionKey, 'quit', entry)))
+    await Promise.allSettled([...this.#pendingFactories])
     this.#activeRuns.clear()
     this.#branchRoots.clear()
     this.#identities.clear()
@@ -173,6 +187,9 @@ export class BuddySessionRegistry<TSession extends DisposableBuddySession> {
     this.#pendingInvalidations.clear()
     this.#runTails.clear()
     this.#sessions.clear()
+    const failures = [...this.#cleanupFailures.splice(0), ...results.filter(result => result.status === 'rejected').map(result => result.reason)]
+    if (failures.length)
+      throw new AggregateError(failures, 'Session shutdown failed')
   }
 
   async #invalidate(predicate: (identity: BuddySessionIdentity) => boolean): Promise<number> {
@@ -286,11 +303,11 @@ export class BuddySessionRegistry<TSession extends DisposableBuddySession> {
     catch (error) {
       factoryPromise = Promise.reject(error)
     }
-    void factoryPromise.then(
-      (binding) => {
+    const completion = factoryPromise.then(
+      async (binding) => {
         if (entry.status === 'disposed') {
           const reason = entry.shutdownReason ?? 'invalidate'
-          void (async () => binding.session.shutdown(reason))().catch(() => {})
+          await binding.session.shutdown(reason)
           return
         }
         entry.binding = binding
@@ -304,6 +321,11 @@ export class BuddySessionRegistry<TSession extends DisposableBuddySession> {
         entry.reject(error)
       },
     )
+    this.#pendingFactories.add(completion)
+    void completion.then(() => this.#pendingFactories.delete(completion), (error) => {
+      this.#pendingFactories.delete(completion)
+      this.#cleanupFailures.push(error)
+    })
     return entry
   }
 

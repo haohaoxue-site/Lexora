@@ -165,7 +165,7 @@ describe('buddySessionRegistry', () => {
     expect(session.shutdownReasons).toEqual(['invalidate'])
   })
 
-  it('disposes without waiting for a pending session and shuts down a late factory result', async () => {
+  it('waits for a late factory result to close before reporting disposal complete', async () => {
     const registry = new BuddySessionRegistry<TestSession>()
     const session = new TestSession()
     let resolveFactory!: (binding: {
@@ -184,7 +184,7 @@ describe('buddySessionRegistry', () => {
     await Promise.allSettled([disposal])
     await vi.waitUntil(() => session.shutdownReasons.length === 1)
 
-    expect(disposalOutcome).toEqual({ status: 'fulfilled', value: undefined })
+    expect(disposalOutcome).toEqual({ status: 'pending' })
     expect(creationOutcome.status).toBe('rejected')
     expect(session.shutdownReasons).toEqual(['quit'])
   })

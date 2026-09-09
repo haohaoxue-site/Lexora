@@ -1,3 +1,6 @@
+import type { ApplicationDiagnostic } from '../../shared/diagnostics/applicationDiagnostic'
+import type { ApplicationLogQuery } from '../../shared/diagnostics/applicationLog'
+import type { ApplicationStartupState } from '../../shared/diagnostics/applicationStartup'
 import type { DesktopAppInfo, DesktopOpenTarget, DesktopWindowState, LexoraConfigPatch, LexoraDesktopApi } from '../shared/desktopApi'
 import type { DesktopCommandId } from '../shared/desktopCommands'
 import { ipcRenderer } from 'electron'
@@ -7,6 +10,17 @@ import { subscribe } from './subscribe'
 export function createDesktopApi(): Pick<LexoraDesktopApi, 'app' | 'clipboard' | 'commands' | 'settings' | 'window'> {
   return {
     app: Object.freeze({
+      logs: Object.freeze({
+        query: (input: ApplicationLogQuery) => ipcRenderer.invoke(DESKTOP_IPC_CHANNELS.appLogsQuery, {
+          ...input,
+          anchor: input.anchor ? { launchId: input.anchor.launchId, sequence: input.anchor.sequence } : undefined,
+        }),
+      }),
+      startup: Object.freeze({
+        getState: () => ipcRenderer.invoke(DESKTOP_IPC_CHANNELS.appStartupGetState),
+        onStateChanged: (listener: (state: ApplicationStartupState) => void) => subscribe(DESKTOP_IPC_CHANNELS.appStartupStateChanged, listener),
+        reportEvent: (event: ApplicationDiagnostic) => ipcRenderer.invoke(DESKTOP_IPC_CHANNELS.appStartupReport, { ...event }),
+      }),
       checkForUpdates: () => ipcRenderer.invoke(DESKTOP_IPC_CHANNELS.appCheckForUpdates),
       getInfo: (): Promise<DesktopAppInfo> => ipcRenderer.invoke(DESKTOP_IPC_CHANNELS.appGetInfo),
       onBeforeQuit: (listener: () => Promise<boolean>) => {

@@ -1,7 +1,9 @@
+import type { ApplicationDiagnosticReporter } from '../../../shared/diagnostics/applicationDiagnostic'
 import type { AppendBuddyRunEventInput } from '../events/BuddyRunEvent'
 import type { RunEventMaintenance, RunEventWriter } from '../events/RunEventPorts'
 import type { RunPurpose, RunRecord, RunStatus } from '../storage/runRecord'
 import type { RunRepository } from '../storage/runRepository'
+import { safeDiagnosticReporter } from '../../../shared/diagnostics/applicationDiagnostic'
 import { RunEventLogFatalError } from '../events/RunEventFailure'
 import { BuddyAgentRunError, readStableRunErrorCode } from './runError'
 
@@ -24,6 +26,7 @@ export interface FinalizeRunInput {
 }
 
 export interface RunLifecycleServiceOptions {
+  record?: ApplicationDiagnosticReporter
   eventLog: Pick<RunEventWriter, 'append' | 'appendBatch'>
     & Pick<RunEventMaintenance, 'compactTerminalRun'>
   repository: Pick<
@@ -33,10 +36,12 @@ export interface RunLifecycleServiceOptions {
 }
 
 export class RunLifecycleService {
+  readonly #record: ApplicationDiagnosticReporter
   readonly #eventLog: RunLifecycleServiceOptions['eventLog']
   readonly #repository: RunLifecycleServiceOptions['repository']
 
   constructor(options: RunLifecycleServiceOptions) {
+    this.#record = safeDiagnosticReporter(options.record)
     this.#eventLog = options.eventLog
     this.#repository = options.repository
   }
@@ -60,6 +65,7 @@ export class RunLifecycleService {
       runId: run.id,
       type: 'run.started',
     })
+    this.#record({ event: 'run.started', level: 'info', runId: run.id, conversationId: run.conversationId, branchId: run.branchId })
     return this.#requireRun(run.id)
   }
 
@@ -121,6 +127,15 @@ export class RunLifecycleService {
       throw new BuddyAgentRunError('RUN_STATE_MISMATCH')
     }
     const run = this.#requireRun(input.runId)
+    this.#record({
+      event: `run.${run.status}`,
+      level: run.status === 'failed' ? 'error' : 'info',
+      runId: run.id,
+      conversationId: run.conversationId,
+      branchId: run.branchId,
+      durationMs: Math.max(0, Date.parse(input.completedAt) - Date.parse(run.startedAt)),
+      ...(run.errorCode ? { errorCode: run.errorCode } : {}),
+    })
     if (terminalEventPersisted) {
       try {
         await this.#eventLog.compactTerminalRun(input.runId)

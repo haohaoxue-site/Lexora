@@ -6,25 +6,18 @@ import type {
   StartBuddyCompactionInput,
   StartBuddyTurnInput,
 } from './BuddyAgentRun'
-import type { BuddySessionRegistry } from './BuddySessionRegistry'
-import type {
-  BuddyAgentSessionLike,
-  PiExecutionOutcome,
-  PiTurnExecutor,
-} from './PiTurnExecutor'
+import type { BuddySessionRegistry, DisposableBuddySession } from './BuddySessionRegistry'
+import type { RunExecutionBackend, RunExecutionOutcome } from './RunExecutionBackend'
 import { RunEventLogFatalError } from '../events/RunEventFailure'
 import { BuddyAgentRunError, readStableRunErrorCode } from '../runs/runError'
 import { ActiveRunRegistry } from './ActiveRunRegistry'
 import { toBuddySessionIdentity } from './BuddySessionBlueprint'
 
 export interface BuddyAgentRunnerOptions {
-  executor: Pick<
-    PiTurnExecutor,
-    'executeCompaction' | 'executeTurn' | 'invalidateSessionContinuityAfterFailure'
-  >
+  executor: RunExecutionBackend
   lifecycle: Pick<RunLifecycleService, 'finalize' | 'find' | 'start'>
   onRunSettled?: (runId: string) => void
-  sessions: BuddySessionRegistry<BuddyAgentSessionLike>
+  sessions: Pick<BuddySessionRegistry<DisposableBuddySession>, 'withBranchRun' | 'dispose'>
 }
 
 export class BuddyAgentRunner {
@@ -32,7 +25,7 @@ export class BuddyAgentRunner {
   readonly #executor: BuddyAgentRunnerOptions['executor']
   readonly #lifecycle: BuddyAgentRunnerOptions['lifecycle']
   readonly #onRunSettled: NonNullable<BuddyAgentRunnerOptions['onRunSettled']>
-  readonly #sessions: BuddySessionRegistry<BuddyAgentSessionLike>
+  readonly #sessions: Pick<BuddySessionRegistry<DisposableBuddySession>, 'withBranchRun' | 'dispose'>
   #lastTimestamp = 0
 
   constructor(options: BuddyAgentRunnerOptions) {
@@ -120,8 +113,17 @@ export class BuddyAgentRunner {
   }
 
   async dispose(): Promise<void> {
-    await this.#activeRuns.dispose()
-    await this.#sessions.dispose()
+    const failures: unknown[] = []
+    for (const cleanup of [() => this.#activeRuns.dispose(), () => this.#sessions.dispose()]) {
+      try {
+        await cleanup()
+      }
+      catch (error) {
+        failures.push(error)
+      }
+    }
+    if (failures.length)
+      throw new AggregateError(failures, 'Execution backend cleanup failed')
   }
 
   async #executeTurn(
@@ -202,7 +204,7 @@ export class BuddyAgentRunner {
 
   #closeExecutionOutcome(
     execution: ActiveRunContext,
-    outcome: PiExecutionOutcome,
+    outcome: RunExecutionOutcome,
   ): Promise<RunRecord> {
     const { runId } = execution
     if (outcome.status === 'completed')

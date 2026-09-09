@@ -15,6 +15,7 @@
     IfErrors buddy_probe_failed
 
     buddy_retry:
+      DetailPrint "正在检查应用状态 / Checking application state..."
       nsExec::ExecToStack /TIMEOUT=15000 '"$SYSDIR\WindowsPowerShell\v1.0\powershell.exe" -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "$PLUGINSDIR\buddy-check-running.ps1" -ExecutablePath "$INSTDIR\${APP_EXECUTABLE_FILENAME}"'
       Pop $0
       Pop $1
@@ -50,4 +51,8 @@
   !else
     Call BuddyCheckAppRunning
   !endif
+!macroend
+
+!macro customInstallMode
+  StrCpy $isForceCurrentInstall "1"
 !macroend

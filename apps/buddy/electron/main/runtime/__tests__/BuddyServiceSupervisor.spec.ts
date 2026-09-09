@@ -1,8 +1,10 @@
+import type { ApplicationDiagnostic } from '../../../../shared/diagnostics/applicationDiagnostic'
 import type { BuddyServiceMessageProcess } from '../BuddyServicePeer'
 import type { BuddyServiceProcessInstance } from '../buddyServiceProcess'
 import { EventEmitter } from 'node:events'
 import { Writable } from 'node:stream'
 import { describe, expect, it, vi } from 'vitest'
+import { APPLICATION_DIAGNOSTIC_METHOD } from '../../../../shared/diagnostics/applicationDiagnostic'
 import { BUDDY_SERVICE_PROTOCOL_VERSION } from '../../../../shared/runtime/runtimeProtocol'
 import { BuddyServicePeer } from '../BuddyServicePeer'
 import { BuddyServiceSupervisor } from '../BuddyServiceSupervisor'
@@ -44,7 +46,9 @@ function createSupervisor(
   restartDelaysMs: number[] = [5],
 ) {
   const processes: FakeUtilityProcess[] = []
+  const diagnostics: ApplicationDiagnostic[] = []
   const supervisor = new BuddyServiceSupervisor({
+    onDiagnostic: event => diagnostics.push(event),
     diagnosticOutput: new Writable({
       write(_chunk, _encoding, callback) {
         callback()
@@ -64,10 +68,28 @@ function createSupervisor(
     },
     stableResetMs: 60_000,
   })
-  return { processes, supervisor }
+  return { processes, supervisor, diagnostics }
 }
 
 describe('buddyServiceSupervisor utility process lifecycle', () => {
+  it('accepts startup events before readiness and rejects diagnostic payload details', async () => {
+    const { processes, supervisor, diagnostics } = createSupervisor()
+    supervisor.start()
+    processes[0]!.notify(APPLICATION_DIAGNOSTIC_METHOD, { event: 'component.starting', component: 'runtime.database', level: 'info', operationId: 'database-1' })
+    processes[0]!.notify(APPLICATION_DIAGNOSTIC_METHOD, { event: 'run.failed', level: 'error', runId: 'run-1', conversationId: 'conversation-1' })
+    processes[0]!.notify(APPLICATION_DIAGNOSTIC_METHOD, { event: 'run.failed', level: 'error', payload: { prompt: 'private' } })
+    expect(supervisor.state.status).toBe('starting')
+    expect(diagnostics).toContainEqual(expect.objectContaining({ event: 'component.starting', component: 'runtime.database', operationId: 'database-1' }))
+    expect(diagnostics).toContainEqual(expect.objectContaining({ event: 'run.failed', runId: 'run-1', conversationId: 'conversation-1', sourceId: 'runtime-1', sourcePid: 1000 }))
+    expect(diagnostics).toContainEqual(expect.objectContaining({ event: 'runtime.diagnostic_invalid' }))
+    expect(JSON.stringify(diagnostics)).not.toContain('private')
+    const stopping = supervisor.stop()
+    await new Promise(resolve => setImmediate(resolve))
+    processes[0]!.notify(APPLICATION_DIAGNOSTIC_METHOD, { event: 'service.stopped', level: 'info' })
+    processes[0]!.exit()
+    await stopping
+    expect(diagnostics).toContainEqual(expect.objectContaining({ event: 'service.stopped', sourceId: 'runtime-1' }))
+  })
   it('waits for the versioned ready notification before forwarding requests', async () => {
     const { processes, supervisor } = createSupervisor()
     const notifications: unknown[] = []

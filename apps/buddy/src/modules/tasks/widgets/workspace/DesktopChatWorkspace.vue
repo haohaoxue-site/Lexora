@@ -2,7 +2,7 @@
 import type { BuddyChatMessageListHandle } from '../transcript/chatMessageViewport'
 import type { ChatWorkspaceEmits, ChatWorkspaceProps } from './typing'
 import { useTemplateRef } from 'vue'
-import { useBuddyI18n } from '@/i18n/buddyI18n'
+import DesktopRuntimePane from '@/platform/runtime/DesktopRuntimePane.vue'
 import DesktopChatTranscript from '../transcript/DesktopChatTranscript.vue'
 import DesktopChatWelcome from '../welcome/DesktopChatWelcome.vue'
 import DesktopTaskComposer from './DesktopTaskComposer.vue'
@@ -14,63 +14,60 @@ const emit = defineEmits<ChatWorkspaceEmits>()
 defineSlots<{
   composerLeadingContext?: () => unknown
 }>()
-const { t } = useBuddyI18n(() => props.workspace.language.value)
 const messageList = useTemplateRef<BuddyChatMessageListHandle>('messageList')
 const { isEmpty, isLoading, language, transcriptBindings, viewport, welcomeVariant } = useChatWorkspace(props, messageList)
 </script>
 
 <template>
-  <section class="desktop-chat-page" :class="{ 'is-empty': isEmpty }">
-    <main class="desktop-chat-page__content">
-      <DesktopChatWelcome
-        v-if="isEmpty"
-        :language="language"
-        :variant="welcomeVariant"
-      />
-
-      <div v-else-if="isLoading || !transcriptBindings" class="desktop-chat-page__loading">
-        {{ t('desktop.chat.loading') }}
-      </div>
-
-      <DesktopChatTranscript
-        v-else
-        ref="messageList"
-        v-bind="transcriptBindings"
-        class="desktop-chat-page__messages"
-        @activate-branch="workspace.transcript.activateBranch"
-        @content-resize="viewport.handleContentResize"
-        @edit-user-message="workspace.execution.editUserMessage"
-        @open-artifact="emit('openArtifact', $event)"
-        @open-changes="emit('openChanges', $event)"
-        @reader-layout-intent="viewport.handleReaderLayoutIntent"
-        @regenerate-assistant="workspace.execution.regenerateAssistant"
-        @return-to-latest="viewport.returnToLatest"
-        @select-outline-message="viewport.revealOutlineMessage"
-        @scroll="viewport.handleScroll"
-      />
-    </main>
-
-    <footer class="desktop-chat-page__composer-dock">
-      <div class="desktop-chat-page__composer-stack">
-        <DesktopTaskNotices
-          :execution="workspace.execution"
+  <DesktopRuntimePane :loading="isLoading" :language="language">
+    <section class="desktop-chat-page" :class="{ 'is-empty': isEmpty }">
+      <main class="desktop-chat-page__content">
+        <DesktopChatWelcome
+          v-if="isEmpty && !isLoading"
           :language="language"
-          :restoration="workspace.restoration"
-          :status="workspace.status"
-          @open-settings="emit('openSettings', $event)"
+          :variant="welcomeVariant"
         />
-        <DesktopTaskComposer
-          :composer="workspace.composer"
-          :execution="workspace.execution"
-          :language="language"
-        >
-          <template #leadingContext>
-            <slot name="composerLeadingContext" />
-          </template>
-        </DesktopTaskComposer>
-      </div>
-    </footer>
-  </section>
+
+        <DesktopChatTranscript
+          v-else-if="transcriptBindings"
+          ref="messageList"
+          v-bind="transcriptBindings"
+          class="desktop-chat-page__messages"
+          @activate-branch="workspace.transcript.activateBranch"
+          @content-resize="viewport.handleContentResize"
+          @edit-user-message="workspace.execution.editUserMessage"
+          @open-artifact="emit('openArtifact', $event)"
+          @open-changes="emit('openChanges', $event)"
+          @reader-layout-intent="viewport.handleReaderLayoutIntent"
+          @regenerate-assistant="workspace.execution.regenerateAssistant"
+          @return-to-latest="viewport.returnToLatest"
+          @select-outline-message="viewport.revealOutlineMessage"
+          @scroll="viewport.handleScroll"
+        />
+      </main>
+
+      <footer class="desktop-chat-page__composer-dock">
+        <div class="desktop-chat-page__composer-stack">
+          <DesktopTaskNotices
+            :execution="workspace.execution"
+            :language="language"
+            :restoration="workspace.restoration"
+            :status="workspace.status"
+            @open-settings="emit('openSettings', $event)"
+          />
+          <DesktopTaskComposer
+            :composer="workspace.composer"
+            :execution="workspace.execution"
+            :language="language"
+          >
+            <template #leadingContext>
+              <slot name="composerLeadingContext" />
+            </template>
+          </DesktopTaskComposer>
+        </div>
+      </footer>
+    </section>
+  </DesktopRuntimePane>
 </template>
 
 <style scoped lang="scss">
@@ -108,14 +105,6 @@ const { isEmpty, isLoading, language, transcriptBindings, viewport, welcomeVaria
     padding-top: 3rem;
     padding-bottom: 0;
   }
-}
-
-.desktop-chat-page__loading {
-  display: grid;
-  flex: 1;
-  place-items: center;
-  color: var(--buddy-text-secondary);
-  font-size: 0.75rem;
 }
 
 .desktop-chat-page__messages {

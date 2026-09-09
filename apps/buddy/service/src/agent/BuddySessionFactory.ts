@@ -5,6 +5,7 @@ import type { RunRepository } from '../storage/runRepository'
 import type { BuddySessionBlueprint } from './BuddySessionBlueprint'
 import type { BuddySessionRecoveryService } from './BuddySessionRecoveryService'
 import type { BuddySessionCompositionServices } from './createBuddySessionComposition'
+import { ApplicationEvents } from '../../../shared/observability/ApplicationEvents'
 import { BuddyAgentRunError } from '../runs/runError'
 import { resolveRunSessionRecoveryPoint } from './BuddySessionRecoveryService'
 import { createBuddySession } from './createBuddySession'
@@ -12,6 +13,7 @@ import { createBuddySessionComposition } from './createBuddySessionComposition'
 import { createReusableBuddySession } from './createReusableBuddySession'
 
 export interface BuddySessionFactoryOptions {
+  events?: ApplicationEvents
   agentDirectory: string
   conversations: Pick<ConversationRepository, 'findById'>
   conversationsDirectory: string
@@ -40,6 +42,18 @@ export class BuddySessionFactory {
   }
 
   async create(input: BuddySessionFactoryInput) {
+    const { blueprint } = input
+    const events = (this.#options.events ?? new ApplicationEvents()).scope({
+      component: 'runtime.pi',
+      conversationId: blueprint.conversationId,
+      branchId: blueprint.branchId,
+      runId: input.runId,
+      sessionId: crypto.randomUUID(),
+    })
+    return events.operation('session.open', scoped => this.#create(input, scoped))
+  }
+
+  async #create(input: BuddySessionFactoryInput, events: ApplicationEvents) {
     const { blueprint } = input
     const run = this.#options.runs.findById(input.runId)
     const conversation = this.#options.conversations.findById(blueprint.conversationId)
@@ -73,7 +87,7 @@ export class BuddySessionFactory {
       modelId: run.model,
       providerId: run.provider,
     })
-    const composition = await createBuddySessionComposition({
+    const composition = await events.operation('session.resources', () => createBuddySessionComposition({
       approvalPolicy: blueprint.approvalPolicy,
       canonicalRoot: blueprint.canonicalRoot,
       conversationId: blueprint.conversationId,
@@ -83,7 +97,7 @@ export class BuddySessionFactory {
       signal: input.signal,
       spaceId: blueprint.space?.id ?? null,
       services: this.#options.services,
-    })
+    }))
     const recoveryState: {
       result: Awaited<ReturnType<BuddySessionRecoveryService['create']>> | null
     } = { result: null }
@@ -102,12 +116,12 @@ export class BuddySessionFactory {
       modelRuntime: selected.runtime,
       piSessionFile: input.piSessionFile ?? undefined,
       recoveryMessages: async () => {
-        recoveryState.result = await this.#options.recovery.create({
+        recoveryState.result = await events.operation('session.recovery', () => this.#options.recovery.create({
           branchId: blueprint.branchId,
           conversationId: blueprint.conversationId,
           fallbackModel: selected.model,
           point: resolveRunSessionRecoveryPoint(run),
-        })
+        }))
         return recoveryState.result.messages
       },
       resources: blueprint.resources,
@@ -136,7 +150,7 @@ export class BuddySessionFactory {
         },
         runContext: composition.runContext,
         session: session.session,
-        shutdown: session.shutdown,
+        shutdown: reason => events.scope({ runId: undefined, operationId: undefined, parentOperationId: undefined }).operation('session.close', () => session.shutdown(reason)),
         inputReferences: composition.inputReferences,
         materializeInput: async input => [
           { text: input.prompt, type: 'text' as const },

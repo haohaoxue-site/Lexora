@@ -75,10 +75,13 @@ export class DesktopRuntimeHost {
       diagnostics: environment.diagnostics,
       onOpenDesktop: () => this.#windows.show(),
       paths: environment.paths,
-      writeDiagnostic: environment.writeDiagnostic,
     })
     this.#features = composition.features
     this.#service = new BuddyServiceSupervisor({
+      onDiagnostic: (event) => {
+        environment.diagnostics.record({ ...event, scope: 'local-service' })
+        environment.startup.observe(event, event)
+      },
       bindPeer: (peer) => {
         const disposers = [
           registerWebHostRpc(peer),
@@ -91,8 +94,8 @@ export class DesktopRuntimeHost {
         ]
         return () => disposers.forEach(dispose => dispose())
       },
-      diagnosticOutput: environment.serviceDiagnosticOutput,
-      spawnService: onFatalError => forkBuddyServiceProcess({
+      diagnosticOutput: environment.diagnostics.createWritable('local-service', { event: 'runtime.supervisor', level: 'error' }),
+      spawnService: (onFatalError, sourceId) => forkBuddyServiceProcess({
         env: {
           ...createBuddyServiceEnvironment(process.env, environment.paths.buddyHome),
           ...createBuddyNativeEnvironment(nativePaths),
@@ -101,7 +104,7 @@ export class DesktopRuntimeHost {
           LEXORA_BUDDY_SKILLS_DIRS: JSON.stringify(composition.builtinSkillsDirectories),
         },
         onFatalError,
-        diagnosticOutput: environment.serviceDiagnosticOutput,
+        captureStderr: output => environment.diagnostics.captureOutput('local-service', output, sourceId),
       }),
     })
     return config
@@ -116,11 +119,20 @@ export class DesktopRuntimeHost {
 
   start(): void {
     const service = this.service
-    const wakeOnResume = () => service.notify(automationNotifications.wake.method, { reason: 'resume' })
-    const wakeOnUnlock = () => service.notify(automationNotifications.wake.method, { reason: 'unlock-screen' })
+    const wakeOnResume = () => {
+      this.#environment.events.publish({ event: 'system.resumed', level: 'info' })
+      service.notify(automationNotifications.wake.method, { reason: 'resume' })
+    }
+    const wakeOnUnlock = () => {
+      this.#environment.events.publish({ event: 'system.unlocked', level: 'info' })
+      service.notify(automationNotifications.wake.method, { reason: 'unlock-screen' })
+    }
+    const onSuspend = () => this.#environment.events.publish({ event: 'system.suspended', level: 'info' })
+    powerMonitor.on('suspend', onSuspend)
     powerMonitor.on('resume', wakeOnResume)
     powerMonitor.on('unlock-screen', wakeOnUnlock)
     this.#subscriptions.push(() => {
+      powerMonitor.off('suspend', onSuspend)
       powerMonitor.off('resume', wakeOnResume)
       powerMonitor.off('unlock-screen', wakeOnUnlock)
     })
@@ -136,13 +148,20 @@ export class DesktopRuntimeHost {
   }
 
   async stop(): Promise<void> {
-    for (const stop of this.#subscriptions.splice(0))
-      stop()
-    try {
-      await Promise.all(this.#features.map(feature => feature.stop()))
+    const failures: unknown[] = []
+    for (const cleanup of [
+      () => this.#service?.stop(),
+      ...this.#features.map(feature => () => feature.stop()),
+      ...this.#subscriptions.splice(0),
+    ]) {
+      try {
+        await cleanup()
+      }
+      catch (error) {
+        failures.push(error)
+      }
     }
-    finally {
-      await this.#service?.stop()
-    }
+    if (failures.length)
+      throw new AggregateError(failures, 'Desktop runtime cleanup failed')
   }
 }

@@ -263,11 +263,17 @@ export class McpConnectorService {
   async close(): Promise<void> {
     const pending = [...this.#pendingSessions.values()].map(item => item.promise)
     this.#pendingSessions.clear()
-    await Promise.allSettled([
+    const results = await Promise.allSettled([
       ...[...this.#sessions.values()].map(session => session.close()),
-      ...pending,
+      ...pending.map(promise => promise.catch((error: unknown) => {
+        if (!(error instanceof McpConnectorError && error.code === 'MCP_CONNECTOR_CHANGED'))
+          throw error
+      })),
     ])
     this.#sessions.clear()
+    const failures = results.filter(result => result.status === 'rejected').map(result => result.reason)
+    if (failures.length)
+      throw new AggregateError(failures, 'Connector shutdown failed')
   }
 
   async #getSession(record: McpServerRecord): Promise<McpClientSession> {

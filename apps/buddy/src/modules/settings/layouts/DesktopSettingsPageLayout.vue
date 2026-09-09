@@ -1,5 +1,8 @@
 <script setup lang="ts">
 import { NScrollbar } from 'naive-ui'
+import DesktopRuntimePane from '@/platform/runtime/DesktopRuntimePane.vue'
+
+defineProps<{ loading?: boolean, requiresRuntime?: boolean, fill?: boolean }>()
 
 defineSlots<{
   actions?: () => unknown
@@ -23,11 +26,16 @@ defineSlots<{
       </div>
     </header>
 
-    <NScrollbar class="desktop-settings-page__scroll">
-      <div class="desktop-settings-page__content">
+    <DesktopRuntimePane :enabled="requiresRuntime" :loading="loading">
+      <div v-if="fill" class="desktop-settings-page__fill">
         <slot />
       </div>
-    </NScrollbar>
+      <NScrollbar v-else class="desktop-settings-page__scroll">
+        <div class="desktop-settings-page__content">
+          <slot />
+        </div>
+      </NScrollbar>
+    </DesktopRuntimePane>
   </section>
 </template>
 
@@ -86,6 +94,14 @@ defineSlots<{
 .desktop-settings-page__scroll {
   min-height: 0;
   flex: 1;
+}
+
+.desktop-settings-page__fill {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .desktop-settings-page__content {

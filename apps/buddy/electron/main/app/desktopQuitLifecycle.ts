@@ -1,6 +1,8 @@
+import type { ApplicationEvents } from '../../../shared/observability/ApplicationEvents'
 import type { DesktopQuitOptions } from './typing'
 
 interface DesktopQuitLifecycleOptions {
+  events?: ApplicationEvents
   confirm: (options: DesktopQuitOptions) => Promise<boolean>
   dispose: () => Promise<void>
   quit: () => void
@@ -18,8 +20,12 @@ export function createDesktopQuitLifecycle(options: DesktopQuitLifecycleOptions)
       if (pending)
         return pending
       pending = Promise.resolve().then(async () => {
-        if (!(await options.confirm(input)))
+        options.events?.publish({ event: 'app.quit_requested', level: 'info' })
+        if (!(await options.confirm(input))) {
+          options.events?.publish({ event: 'app.quit_cancelled', level: 'info' })
           return
+        }
+        options.events?.publish({ event: 'app.quit_confirmed', level: 'info' })
         quitting = true
         await options.dispose()
         committed = true

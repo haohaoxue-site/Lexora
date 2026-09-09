@@ -1,6 +1,10 @@
 import type zhCN from '../zh-CN/app'
 
 export default {
+  'desktop.loading.app': 'Preparing your workspace…',
+  'desktop.loading.pane': 'Loading…',
+  'desktop.loading.failed': 'Unable to load. Please try again.',
+  'desktop.loading.retry': 'Retry',
   'desktop.account.localNotice': 'Tasks, spaces, and settings remain on this device. Local features do not require an account.',
   'desktop.account.loginAction': 'Sign in',
   'desktop.account.loginTitle': 'Sign in to Lexora Buddy',

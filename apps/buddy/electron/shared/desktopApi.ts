@@ -1,9 +1,16 @@
 import type { BrowserFailureReason } from '../../shared/browser'
+import type { ApplicationDiagnostic } from '../../shared/diagnostics/applicationDiagnostic'
+import type { ApplicationLogApi } from '../../shared/diagnostics/applicationLog'
+import type { ApplicationStartupState } from '../../shared/diagnostics/applicationStartup'
 import type { BuddyCapabilities } from '../../shared/platform'
 import type { DesktopCommandId, DesktopPlatform } from './desktopCommands'
 import type { LocalChatApi } from './localChatApi'
 
 export const DESKTOP_IPC_CHANNELS = {
+  appLogsQuery: 'lexora:app:logs:query',
+  appStartupGetState: 'lexora:app:startup:get-state',
+  appStartupReport: 'lexora:app:startup:report',
+  appStartupStateChanged: 'lexora:app:startup:state-changed',
   appCheckForUpdates: 'lexora:app:check-for-updates',
   appGetInfo: 'lexora:app:get-info',
   appOpenFeedbackIssue: 'lexora:app:open-feedback-issue',
@@ -229,6 +236,12 @@ export interface LexoraConfigPatch {
 
 export interface LexoraDesktopApi {
   app: {
+    logs: ApplicationLogApi
+    startup: {
+      getState: () => Promise<ApplicationStartupState>
+      onStateChanged: (listener: (state: ApplicationStartupState) => void) => () => void
+      reportEvent: (event: ApplicationDiagnostic) => Promise<void>
+    }
     checkForUpdates: () => Promise<DesktopUpdateCheckResult>
     getInfo: () => Promise<DesktopAppInfo>
     onBeforeQuit: (listener: () => Promise<boolean>) => () => void

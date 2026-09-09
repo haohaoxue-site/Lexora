@@ -5,7 +5,6 @@ import type { BuddyLocale } from '@/i18n/buddyI18n'
 import type { DesktopSettingsCategory } from '@/shared/navigation/desktopRoutes'
 import { ArrowClockwise20Regular, Settings20Regular, Warning20Regular } from '@vicons/fluent'
 import { NButton } from 'naive-ui'
-import { computed } from 'vue'
 import { useBuddyI18n } from '@/i18n/buddyI18n'
 import DesktopIcon from '@/shared/ui/icon/DesktopIcon.vue'
 
@@ -23,8 +22,6 @@ const emit = defineEmits<{
   restartRuntime: []
 }>()
 const { t } = useBuddyI18n(() => props.language)
-const runtimeTransitioning = computed(() => !props.blocker
-  && ['stopped', 'starting', 'restarting', 'stopping'].includes(props.runtimeStatus))
 </script>
 
 <template>
@@ -72,10 +69,6 @@ const runtimeTransitioning = computed(() => !props.blocker
     <DesktopIcon :component="Warning20Regular" />
     <div><p>{{ errorMessage }}</p></div>
   </article>
-
-  <div v-if="runtimeTransitioning" class="desktop-chat-page__starting" role="status">
-    <i />{{ t('desktop.chat.runtimeStarting') }}
-  </div>
 </template>
 
 <style scoped lang="scss">
@@ -127,27 +120,6 @@ const runtimeTransitioning = computed(() => !props.blocker
   gap: 0.4rem;
 }
 
-.desktop-chat-page__starting {
-  display: flex;
-  align-items: center;
-  gap: 0.45rem;
-  color: var(--buddy-text-secondary);
-  font-size: 0.68rem;
-  padding: 0 0.25rem;
-
-  i {
-    width: 0.45rem;
-    height: 0.45rem;
-    border-radius: 50%;
-    background: var(--buddy-status-warning-solid);
-    animation: desktop-runtime-pulse 1.2s ease-in-out infinite;
-  }
-}
-
-@keyframes desktop-runtime-pulse {
-  50% { opacity: 0.35; }
-}
-
 @container desktop-chat-page (max-width: 34rem) {
   .desktop-chat-page__alert {
     grid-template-columns: auto minmax(0, 1fr);
@@ -156,12 +128,6 @@ const runtimeTransitioning = computed(() => !props.blocker
   .desktop-chat-page__alert-actions {
     grid-column: 2;
     justify-content: flex-start;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .desktop-chat-page__starting i {
-    animation: none;
   }
 }
 </style>

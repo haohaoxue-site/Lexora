@@ -39,7 +39,11 @@ interface StartActiveRunInput {
 export class ActiveRunRegistry {
   readonly #executions = new Map<string, ActiveRunExecution>()
 
+  #disposed = false
+
   start(input: StartActiveRunInput): BuddyTurnHandle {
+    if (this.#disposed)
+      throw new DOMException('Runtime is stopping', 'AbortError')
     if (this.#executions.has(input.runId))
       throw new BuddyAgentRunError('VALIDATION_FAILED')
 
@@ -92,6 +96,7 @@ export class ActiveRunRegistry {
   }
 
   async dispose(): Promise<void> {
+    this.#disposed = true
     const executions = [...this.#executions.values()]
     for (const execution of executions)
       this.#requestCancellation(execution.state, 'RUN_CANCELLED')

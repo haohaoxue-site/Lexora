@@ -4,16 +4,20 @@ import type { DesktopTrayController } from '../tray'
 import type { DesktopRuntimeHost } from './DesktopRuntimeHost'
 import type { DesktopWindowHost } from './DesktopWindowHost'
 import type { DesktopEnvironment } from './typing'
+import { homedir } from 'node:os'
 import { app, net, Notification, shell } from 'electron'
 import { z } from 'zod'
 import { registerBrowserDesktopIpc } from '../browser/registerBrowserDesktopIpc'
 import { createDesktopCommandExecutor } from '../desktopCommands'
 import { DesktopNotificationService } from '../DesktopNotificationService'
 import { checkForDesktopUpdate } from '../desktopUpdateService'
+import { ApplicationLogReader } from '../diagnostics/ApplicationLogReader'
 import { createFeedbackIssueUrl } from '../feedbackIssue'
 import { registerDesktopIpc } from '../ipc'
 import { registerLocalChatIpc } from '../localChatIpc'
 import { createDesktopTray } from '../tray'
+import { registerApplicationLogIpc } from './registerApplicationLogIpc'
+import { registerStartupIpc } from './registerStartupIpc'
 
 const browserArtifactEntrySchema = z.object({
   entryPath: z.string().min(1).max(32_768),
@@ -51,10 +55,12 @@ export class DesktopIntegrations {
   }
 
   start(): void {
-    const { paths, trayIconPath, writeDiagnostic } = this.#environment
+    const { paths, trayIconPath, diagnostics } = this.#environment
     const runtime = this.#runtime
     const windows = this.#windows
     const service = runtime.service
+    this.#subscriptions.push(registerStartupIpc(this.#environment.startup, () => windows.window, this.#environment.events))
+    this.#subscriptions.push(registerApplicationLogIpc(new ApplicationLogReader(paths.logs, diagnostics.launchId, homedir()), () => windows.window))
     this.#tray = createDesktopTray({
       appName: paths.appName,
       iconPath: trayIconPath,
@@ -82,7 +88,7 @@ export class DesktopIntegrations {
       if (notification.method === 'desktop.open')
         windows.show()
       void notifications.handle(notification).catch((error) => {
-        writeDiagnostic(`Notification failed: ${error instanceof Error ? error.name : 'unknown error'}`)
+        diagnostics.record({ scope: 'desktop', level: 'warn', event: 'notification.failed', error })
       })
     }))
     registerDesktopIpc({
@@ -101,6 +107,7 @@ export class DesktopIntegrations {
       resolveArtifactEntry: async input => browserArtifactEntrySchema.parse(await service.request('artifacts.resolveBrowserEntry', input)),
     }))
     this.#subscriptions.push(registerLocalChatIpc({
+      recordDiagnostic: this.#environment.events.scope({ component: 'desktop.gateway' }).publish,
       readWebCredential: () => runtime.readWebCredential(),
       getLanguage: () => runtime.language,
       getWindow: () => windows.window,

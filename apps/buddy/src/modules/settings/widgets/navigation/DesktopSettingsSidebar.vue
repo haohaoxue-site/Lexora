@@ -9,6 +9,7 @@ import {
   DataUsage20Regular,
   Folder20Regular,
   Globe20Regular,
+  TextBulletListLtr20Regular,
 } from '@vicons/fluent'
 import { computed } from 'vue'
 
@@ -33,6 +34,7 @@ const categories = [
   { icon: AnimalCat20Regular, key: 'pet' as const },
   { icon: Folder20Regular, key: 'local' as const },
   { icon: DataUsage20Regular, key: 'data' as const },
+  { icon: TextBulletListLtr20Regular, key: 'logs' as const },
 ]
 const visibleCategories = computed(() => categories.filter(category => supportsSettingsCategory(props.capabilities, category.key)))
 </script>

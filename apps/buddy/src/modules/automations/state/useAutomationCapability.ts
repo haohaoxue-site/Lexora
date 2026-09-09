@@ -53,8 +53,8 @@ export function useAutomationCapability(options: AutomationCapabilityOptions): A
     catch {}
   }
 
-  async function initialize(): Promise<void> {
-    await refresh()
+  function initialize(): Promise<boolean> {
+    return refresh()
   }
 
   async function refresh(): Promise<boolean> {

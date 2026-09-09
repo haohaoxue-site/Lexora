@@ -1,20 +1,21 @@
 import type { BrowserWindow } from 'electron'
-import type { Writable } from 'node:stream'
+import type { ApplicationEvents } from '../../../shared/observability/ApplicationEvents'
 import type { LexoraConfig } from '../../shared/desktopApi'
 import type { DesktopDiagnosticLogger } from '../desktopDiagnostics'
 import type { BuddyRuntimePaths } from '../paths'
 import type { DesktopLaunchIntent } from '../startupIntent'
+import type { DesktopStartup } from './DesktopStartup'
 
 export interface DesktopEnvironment {
+  events: ApplicationEvents
+  startup: DesktopStartup
   diagnostics: DesktopDiagnosticLogger
   desktopIconPath: string
   initialLaunchIntent: DesktopLaunchIntent
   isSmokeTest: boolean
   paths: BuddyRuntimePaths
-  serviceDiagnosticOutput: Writable
   setAutostart: (enabled: boolean) => Promise<void>
   trayIconPath: string
-  writeDiagnostic: (message: string) => void
 }
 
 export interface DesktopQuitOptions {

@@ -33,6 +33,7 @@ export function useModelProvidersStore(options: UseModelProvidersStoreOptions): 
     ? modelKey(defaultModelSelection.value)
     : null)
   const defaultEffort = computed(() => defaultModelSelection.value?.reasoning ?? null)
+  let catalogRequest: Promise<boolean> | null = null
   let disposed = false
   let defaultModelPersistenceRevision = 0
   let persistDefaultModelQueue = Promise.resolve(true)
@@ -41,9 +42,18 @@ export function useModelProvidersStore(options: UseModelProvidersStoreOptions): 
       authChallenge.value = challenge
   })
 
-  async function loadModelCatalog(force = false): Promise<boolean> {
-    if (disposed || isLoadingModelCatalog.value)
-      return false
+  function loadModelCatalog(force = false): Promise<boolean> {
+    if (disposed)
+      return Promise.resolve(false)
+    if (catalogRequest)
+      return catalogRequest
+    catalogRequest = fetchModelCatalog(force).finally(() => {
+      catalogRequest = null
+    })
+    return catalogRequest
+  }
+
+  async function fetchModelCatalog(force: boolean): Promise<boolean> {
     if (!force && providers.value.length && registeredModels.value.length)
       return true
     isLoadingModelCatalog.value = true
@@ -83,6 +93,12 @@ export function useModelProvidersStore(options: UseModelProvidersStoreOptions): 
     }
   }
 
+  async function refreshAfterMutation(): Promise<boolean> {
+    if (catalogRequest)
+      await catalogRequest
+    return loadModelCatalog(true)
+  }
+
   async function loginProvider(providerId: string, authType: 'api_key' | 'oauth') {
     if (isAuthenticating.value)
       return false
@@ -92,7 +108,7 @@ export function useModelProvidersStore(options: UseModelProvidersStoreOptions): 
       await options.api.login(providerId, authType)
       if (authChallenge.value?.providerId === providerId)
         authChallenge.value = null
-      await loadModelCatalog(true)
+      await refreshAfterMutation()
       return true
     }
     catch (error) {
@@ -110,7 +126,7 @@ export function useModelProvidersStore(options: UseModelProvidersStoreOptions): 
       await options.api.respondToAuth(challengeId, value)
       if (authChallenge.value?.challengeId === challengeId)
         authChallenge.value = null
-      await loadModelCatalog(true)
+      await refreshAfterMutation()
       return true
     }
     catch (error) {
@@ -128,7 +144,7 @@ export function useModelProvidersStore(options: UseModelProvidersStoreOptions): 
   async function logoutProvider(providerId: string) {
     try {
       await options.api.logout(providerId)
-      await loadModelCatalog(true)
+      await refreshAfterMutation()
       return true
     }
     catch (error) {
@@ -140,7 +156,7 @@ export function useModelProvidersStore(options: UseModelProvidersStoreOptions): 
   async function upsertCustomProvider(provider: LocalCustomProvider) {
     try {
       await options.api.upsertCustom(provider)
-      await loadModelCatalog(true)
+      await refreshAfterMutation()
       return true
     }
     catch (error) {
@@ -208,7 +224,7 @@ export function useModelProvidersStore(options: UseModelProvidersStoreOptions): 
     modelProviderError.value = null
     try {
       await options.api.syncModels(providerId)
-      await loadModelCatalog(true)
+      await refreshAfterMutation()
       return true
     }
     catch (error) {
@@ -227,7 +243,7 @@ export function useModelProvidersStore(options: UseModelProvidersStoreOptions): 
     modelProviderError.value = null
     try {
       await operation()
-      await loadModelCatalog(true)
+      await refreshAfterMutation()
       return true
     }
     catch (error) {

@@ -11,6 +11,7 @@ import type { AddressInfo } from 'node:net'
 import type { DatabaseSync } from 'node:sqlite'
 
 import type { BuddyComposerResource } from '../../../shared/conversation/composerResource'
+import type { ApplicationDiagnostic } from '../../../shared/diagnostics/applicationDiagnostic'
 import type { BuddyAgentSessionLike } from '../agent/PiTurnExecutor'
 import type { BuddyServiceRpcServer } from '../rpc/BuddyServiceRpcServer'
 import { Buffer } from 'node:buffer'
@@ -20,8 +21,8 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { SessionManager } from '@earendil-works/pi-coding-agent'
 import { afterEach, describe, expect, it } from 'vitest'
-import { createBuddyUserContent } from '../../../shared/conversation/buddyUserContent'
 
+import { createBuddyUserContent } from '../../../shared/conversation/buddyUserContent'
 import { BuddyAgentRunner } from '../agent/BuddyAgentRunner'
 import { createBuddyInputReference } from '../agent/BuddyInputReference'
 import { BuddySessionRegistry } from '../agent/BuddySessionRegistry'
@@ -292,10 +293,12 @@ describe('buddy runtime cross-subsystem contract', () => {
     const credentials = {
       'offline-provider': { key: 'test-api-key', type: 'api_key' as const },
     }
+    const diagnostics: ApplicationDiagnostic[] = []
     let runtime: Awaited<ReturnType<typeof startBuddyService>> | undefined
     try {
       let harness = createRuntimeRpcHarness(credentials)
       runtime = await startBuddyService({
+        record: event => diagnostics.push(event),
         buddyHome,
         builtinSkillsDirectories: [builtinSkillsDirectory],
         database,
@@ -388,6 +391,7 @@ describe('buddy runtime cross-subsystem contract', () => {
 
       harness = createRuntimeRpcHarness(credentials)
       runtime = await startBuddyService({
+        record: event => diagnostics.push(event),
         buddyHome,
         builtinSkillsDirectories: [builtinSkillsDirectory],
         database,
@@ -403,6 +407,14 @@ describe('buddy runtime cross-subsystem contract', () => {
       await expect(waitForTerminalRun(harness, secondTurn.runId)).resolves.toMatchObject({
         status: 'completed',
       })
+      for (const turn of [firstTurn, secondTurn]) {
+        const related = diagnostics.filter(event => event.runId === turn.runId)
+        for (const event of ['run.queued', 'run.started', 'turn.started', 'turn.completed', 'run.completed'])
+          expect(related).toContainEqual(expect.objectContaining({ event, conversationId: turn.conversationId, branchId: turn.branchId }))
+        expect(related).toContainEqual(expect.objectContaining({ event: 'turn.completed', turnId: `${turn.runId}:1` }))
+      }
+      for (const content of ['Remember both historical images', 'Continue after recovery', 'test-api-key', keptBytes.toString('base64')])
+        expect(JSON.stringify(diagnostics)).not.toContain(content)
       expect(readDataImageUrls(provider.requests[1])).toEqual([
         `data:image/png;base64,${keptBytes.toString('base64')}`,
       ])

@@ -1,12 +1,42 @@
 import type { AssistantMessage, Usage } from '@earendil-works/pi-ai'
 import type { AgentSessionEvent } from '@earendil-works/pi-coding-agent'
+import type { ApplicationDiagnostic, ApplicationDiagnosticReporter } from '../../../../shared/diagnostics/applicationDiagnostic'
 import type { AppendBuddyRunEventInput } from '../../events/BuddyRunEvent'
-import type { RunEventWriter } from '../../events/RunEventPorts'
 
+import type { RunEventWriter } from '../../events/RunEventPorts'
 import { describe, expect, it, vi } from 'vitest'
 import { PiEventBridge } from '../PiEventBridge'
 
 describe('piEventBridge', () => {
+  it('correlates each model turn without recording messages or tool results', async () => {
+    const recorded: ApplicationDiagnostic[] = []
+    const { channel, emit } = createProjectionHarness(event => recorded.push(event))
+    const message: AssistantMessage = {
+      role: 'assistant',
+      api: 'openai-responses',
+      provider: 'openai',
+      model: 'fixture-model',
+      content: [{ type: 'text', text: 'fixture-private-answer' }],
+      usage: usage(),
+      stopReason: 'stop',
+      timestamp: 0,
+    }
+    emit({ type: 'turn_start' })
+    emit({ type: 'turn_end', message, toolResults: [] })
+    emit({ type: 'turn_start' })
+    emit({ type: 'turn_end', message: { ...message, stopReason: 'error', errorMessage: 'fixture-private-error' }, toolResults: [] })
+    emit({ type: 'turn_start' })
+    await channel.settle()
+    expect(recorded.map(event => [event.event, event.runId, event.turnId])).toEqual([
+      ['turn.started', 'run-1', 'run-1:1'],
+      ['turn.completed', 'run-1', 'run-1:1'],
+      ['turn.started', 'run-1', 'run-1:2'],
+      ['turn.failed', 'run-1', 'run-1:2'],
+      ['turn.started', 'run-1', 'run-1:3'],
+      ['turn.interrupted', 'run-1', 'run-1:3'],
+    ])
+    expect(JSON.stringify(recorded)).not.toContain('fixture-private')
+  })
   it('publishes the latest terminal update when the window expires', async () => {
     vi.useFakeTimers()
     try {
@@ -261,7 +291,7 @@ function usage(): Usage {
   }
 }
 
-function createProjectionHarness(): {
+function createProjectionHarness(record?: ApplicationDiagnosticReporter): {
   appended: AppendBuddyRunEventInput[]
   channel: ReturnType<PiEventBridge['createTurn']>
   emit: (event: AgentSessionEvent) => void
@@ -285,6 +315,7 @@ function createProjectionHarness(): {
     }),
   }
   const bridge = new PiEventBridge({
+    record,
     eventLog,
     usage: {
       record: vi.fn(async () => null),

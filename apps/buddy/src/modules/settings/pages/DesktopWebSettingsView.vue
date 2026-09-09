@@ -14,7 +14,7 @@ const { busy, error, language, snapshot, searchSources, load, setSearchEnabled, 
 </script>
 
 <template>
-  <DesktopSettingsPageLayout>
+  <DesktopSettingsPageLayout requires-runtime :loading="busy && !snapshot">
     <template #title>
       {{ t('desktop.settings.category.web') }}
     </template>

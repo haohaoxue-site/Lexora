@@ -1,5 +1,6 @@
 import type { DesktopAppInfo } from '@buddy-electron/shared/desktopApi'
 import type { Ref } from 'vue'
+import type { useDesktopLifecycle } from './bootstrap/useDesktopLifecycle'
 import type { DesktopNavigation } from './bootstrap/useDesktopNavigation'
 import type { BuddyLocale } from '@/i18n/buddyI18n'
 import type { NotificationCenterStore } from '@/modules/notifications'
@@ -7,6 +8,7 @@ import type { TaskIndex } from '@/modules/tasks/contracts'
 import { createInjectionContext } from '@/shared/composables/createInjectionContext'
 
 export interface DesktopAppContext {
+  lifecycle: ReturnType<typeof useDesktopLifecycle>
   appInfo: Readonly<Ref<DesktopAppInfo | null>>
   appSidebarCollapsed: Readonly<Ref<boolean>>
   language: Readonly<Ref<BuddyLocale>>

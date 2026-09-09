@@ -1,97 +1,104 @@
+import type { ApplicationDiagnostic } from '@buddy-shared/diagnostics/applicationDiagnostic'
+import { ApplicationEvents } from '@buddy-shared/observability/ApplicationEvents'
 import { deferred } from '@buddy-tests/deferred'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { effectScope, shallowRef } from 'vue'
+import { DesktopStartup } from '../../../../electron/main/app/DesktopStartup'
 import { useDesktopLifecycle } from '../useDesktopLifecycle'
 
 const cleanups: (() => void)[] = []
 afterEach(() => {
-  for (const cleanup of cleanups.splice(0))
-    cleanup()
+  for (const cleanup of cleanups.splice(0)) cleanup()
 })
 
-describe('desktop Runtime readiness during Draft initialization', () => {
-  it('replays readiness received during initial recovery before confirming application exit', async () => {
-    const initializing = deferred<void>()
-    const fixture = createFixture({ initializeTasks: () => initializing.promise })
-    await vi.waitFor(() => expect(fixture.tasks.initialize).toHaveBeenCalledOnce())
-    fixture.setRuntimeStatus('ready')
-    fixture.setRuntimeStatus('starting')
-    fixture.setRuntimeStatus('ready')
-    const quitting = fixture.beforeQuit()
-    initializing.resolve()
-
+describe('workspace hydration', () => {
+  it('waits for Runtime before loading data and keeps the surface covered until restoration completes', async () => {
+    const gate = deferred<void>()
+    const fixture = createFixture({ restore: () => gate.promise })
+    await Promise.resolve()
+    expect(fixture.lifecycle.dataReady.value).toBe(false)
+    expect(fixture.reads.value).toBe(0)
+    fixture.connect('runtime-1')
+    await vi.waitFor(() => expect(fixture.reads.value).toBe(1))
+    expect(fixture.lifecycle.dataReady.value).toBe(false)
+    gate.resolve()
     await fixture.lifecycle.ready
-    expect(await quitting).toBe(true)
-    expect(fixture.tasks.refreshRuntimeDependentState).toHaveBeenCalledOnce()
-    expect(fixture.automations.refresh).toHaveBeenCalledOnce()
-    expect(fixture.saved.value).toBe(true)
+    expect(fixture.lifecycle.dataReady.value).toBe(true)
+    expect(fixture.lifecycle.state.value.status).toBe('ready')
   })
 
-  it('uses initial task loading when readiness arrives before task initialization starts', async () => {
-    const initializing = deferred<void>()
-    const fixture = createFixture({ initializeApp: () => initializing.promise })
-    fixture.setRuntimeStatus('ready')
-    initializing.resolve()
-
+  it('automatically restores a new generation after an earlier request failed', async () => {
+    const fixture = createFixture({ failFirst: true })
+    fixture.connect('runtime-1')
     await fixture.lifecycle.ready
-    expect(fixture.tasks.initialize).toHaveBeenCalledOnce()
-    expect(fixture.tasks.refreshRuntimeDependentState).not.toHaveBeenCalled()
-    expect(await fixture.beforeQuit()).toBe(false)
+    expect(fixture.lifecycle.failed.value).toBe(true)
+    expect(fixture.lifecycle.dataReady.value).toBe(false)
+    fixture.connect('runtime-2')
+    await vi.waitFor(() => expect(fixture.lifecycle.dataReady.value).toBe(true))
+    expect(fixture.reads.value).toBe(2)
+    expect(fixture.lifecycle.state.value.generation).toBe('runtime-2')
   })
 
-  it('discards queued readiness when the Desktop scope is disposed', async () => {
-    const initializing = deferred<void>()
-    const fixture = createFixture({ initializeTasks: () => initializing.promise })
-    await vi.waitFor(() => expect(fixture.tasks.initialize).toHaveBeenCalledOnce())
-    fixture.setRuntimeStatus('ready')
-    fixture.dispose()
-    initializing.resolve()
+  it('does not expose an old generation when a restart arrives during restoration', async () => {
+    const gate = deferred<void>()
+    const fixture = createFixture({ restore: () => gate.promise })
+    fixture.connect('runtime-1')
+    await vi.waitFor(() => expect(fixture.reads.value).toBe(1))
+    fixture.connect('runtime-2')
+    gate.resolve()
+    await vi.waitFor(() => expect(fixture.lifecycle.dataReady.value).toBe(true))
+    expect(fixture.reads.value).toBe(2)
+    expect(fixture.lifecycle.state.value.generation).toBe('runtime-2')
+  })
 
-    await fixture.lifecycle.ready
-    expect(fixture.tasks.refreshRuntimeDependentState).not.toHaveBeenCalled()
-    expect(fixture.saved.value).toBe(false)
+  it('permits quitting before any task state has been opened', async () => {
+    const fixture = createFixture()
+    expect(await fixture.beforeQuit()).toBe(true)
   })
 })
 
-function createFixture(options: { initializeApp?: () => Promise<void>, initializeTasks?: () => Promise<void> } = {}) {
-  const runtimeState = shallowRef({ status: 'starting' })
-  const saved = shallowRef(false)
+function createFixture(options: { restore?: () => Promise<void>, failFirst?: boolean } = {}) {
+  const publisher = new ApplicationEvents()
+  const startup = new DesktopStartup(publisher)
+  const reads = shallowRef(0)
   let beforeQuit = async () => false
-  const tasks = {
-    dispose: vi.fn(),
-    flushDrafts: async () => saved.value,
-    initialize: vi.fn(options.initializeTasks ?? (async () => {})),
-    refreshRuntimeDependentState: vi.fn(async () => saved.value = true),
-  }
-  const automations = { dispose: vi.fn(), initialize: async () => {}, refresh: vi.fn(async () => {}) }
+  const send = (event: ApplicationDiagnostic) => startup.observe(event, { sourceId: event.generation ?? 'desktop' })
+  send({ component: 'desktop', event: 'component.starting', level: 'info', operationId: 'desktop' })
+  send({ component: 'desktop', event: 'component.ready', level: 'info', operationId: 'desktop' })
   const scope = effectScope()
   const lifecycle = scope.run(() => useDesktopLifecycle({
-    api: {
-      app: {
-        onBeforeQuit: (listener: () => Promise<boolean>) => {
-          beforeQuit = listener
-          return () => {}
-        },
-        onHidden: () => () => {},
-        onOpenTarget: () => () => {},
+    api: { app: {
+      startup: { getState: async () => startup.state, onStateChanged: startup.onStateChange.bind(startup), reportEvent: async (event: ApplicationDiagnostic) => send(event) },
+      onBeforeQuit: (listener: () => Promise<boolean>) => {
+        beforeQuit = listener
+        return () => {}
       },
-    },
+      onHidden: () => () => {},
+    } },
     appState: {
+      initialize: async () => true,
+      refreshRuntimeDependentState: async () => {
+        reads.value += 1
+        if (options.failFirst && reads.value === 1)
+          throw new Error('unavailable')
+      },
       dispose: () => {},
-      initialize: options.initializeApp ?? (async () => {}),
-      stores: { runtimeSupervisor: { runtimeState } },
+      stores: { runtimeSupervisor: { restartRuntime: async () => true } },
     },
-    automations,
+    automations: { initialize: async () => true, refresh: async () => true, dispose: () => {} },
     shell: { initialize: async () => {} },
-    tasks,
+    tasks: {
+      workspace: { restoration: { state: shallowRef('ready') }, status: { errorMessage: shallowRef(null) } },
+      initialize: async () => options.restore?.(),
+      refreshRuntimeDependentState: async () => options.restore?.(),
+      flushDrafts: async () => true,
+      dispose: () => {},
+    },
   } as unknown as Parameters<typeof useDesktopLifecycle>[0]))!
-  let disposed = false
-  const dispose = () => {
-    if (disposed)
-      return
-    disposed = true
-    scope.stop()
+  cleanups.push(() => scope.stop())
+  const connect = (generation: string) => {
+    send({ component: 'runtime.connection', event: 'component.starting', level: 'info', operationId: generation, generation })
+    send({ component: 'runtime.connection', event: 'component.ready', level: 'info', operationId: generation, generation })
   }
-  cleanups.push(dispose)
-  return { automations, beforeQuit: () => beforeQuit(), dispose, lifecycle, saved, setRuntimeStatus: (status: string) => runtimeState.value = { status }, tasks }
+  return { lifecycle, reads, connect, beforeQuit: () => beforeQuit() }
 }

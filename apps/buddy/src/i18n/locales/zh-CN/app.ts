@@ -1,4 +1,8 @@
 export default {
+  'desktop.loading.app': '正在准备工作台…',
+  'desktop.loading.pane': '正在加载…',
+  'desktop.loading.failed': '暂时无法加载，请重试。',
+  'desktop.loading.retry': '重试',
   'desktop.account.localNotice': '当前任务、空间与设置仍保存在这台设备上，不需要账号也能继续使用本地能力。',
   'desktop.account.loginAction': '登录',
   'desktop.account.loginTitle': '登录 Lexora Buddy',

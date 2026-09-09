@@ -3,7 +3,11 @@ import type { useDesktopShellState } from '../shell/useDesktopShellState'
 import type { DesktopAppState } from './useDesktopAppState'
 import type { AutomationCapability } from '@/modules/automations'
 import type { TaskCapability } from '@/modules/tasks'
-import { onScopeDispose, watch } from 'vue'
+import { ServiceHost } from '@buddy-shared/lifecycle/ServiceHost'
+import { ApplicationEvents } from '@buddy-shared/observability/ApplicationEvents'
+import { computed, nextTick, onScopeDispose, shallowRef, watch } from 'vue'
+import { useApplicationLifecycle } from '@/platform/runtime/useApplicationLifecycle'
+import { requireInitialState } from './requireInitialState'
 
 interface DesktopLifecycleOptions {
   api: LexoraDesktopApi
@@ -11,32 +15,140 @@ interface DesktopLifecycleOptions {
   automations: AutomationCapability
   shell: ReturnType<typeof useDesktopShellState>
   tasks: TaskCapability
+  prepareSurface?: () => Promise<void>
 }
 
 export function useDesktopLifecycle(options: DesktopLifecycleOptions) {
   const { api, appState, automations, shell, tasks } = options
-  let initializationSettled = false
-  let tasksInitializing = false
-  let pendingRuntimeReady = false
+  const { state, loaded, refresh } = useApplicationLifecycle(api.app.startup)
+  const dataReady = shallowRef(false)
+  const failed = shallowRef(false)
   let disposed = false
-  const stopRuntimeReadyWatch = watch(appState.stores.runtimeSupervisor.runtimeState, (state, previousState) => {
-    if (previousState.status === 'ready' || state.status !== 'ready')
-      return
-    if (!initializationSettled) {
-      pendingRuntimeReady ||= tasksInitializing
+  let tasksInitialized = false
+  let initialAttemptSettled = false
+  let resolveReady!: () => void
+  const ready = new Promise<void>((resolve) => {
+    resolveReady = resolve
+  })
+  let tail = Promise.resolve()
+  let requestedGeneration: string | null = null
+  const runtimeReady = computed(() => state.value.stages.some(stage => stage.stage === 'runtime.connection' && stage.status === 'completed'))
+  const loading = computed(() => !dataReady.value && !failed.value && state.value.status !== 'failed')
+  const hasFailed = computed(() => failed.value || state.value.status === 'failed')
+
+  const preparation = Promise.all([appState.initialize(), shell.initialize()])
+  void preparation.catch(() => {
+    failed.value = true
+  })
+  void loaded.catch(() => {
+    failed.value = true
+  })
+
+  function scheduleRefresh(force = false): Promise<void> {
+    const generation = state.value.generation
+    if (!generation || !runtimeReady.value || (!force && generation === requestedGeneration))
+      return tail
+    requestedGeneration = generation
+    dataReady.value = false
+    failed.value = false
+    tail = tail.then(async () => {
+      if (disposed || generation !== state.value.generation || !runtimeReady.value)
+        return
+      const events = new ApplicationEvents({ generation })
+      const reports: Promise<void>[] = []
+      const stop = events.subscribe((event) => {
+        const report = api.app.startup.reportEvent(event)
+        void report.catch(() => {})
+        reports.push(report)
+      })
+      const host = new ServiceHost(events)
+      const assertActive = () => {
+        if (disposed || generation !== state.value.generation || !runtimeReady.value)
+          throw new DOMException('Startup superseded', 'AbortError')
+      }
+      try {
+        await host.start('renderer', async () => {
+          await preparation.catch(() => {})
+          assertActive()
+          await host.step('renderer.settings', async () => requireInitialState(await appState.initialize()))
+          await host.step('renderer.shell', () => shell.initialize())
+          assertActive()
+          await appState.refreshRuntimeDependentState(host)
+          assertActive()
+          const results = await Promise.allSettled([
+            host.step('renderer.tasks', async () => {
+              if (tasksInitialized) {
+                await tasks.refreshRuntimeDependentState()
+              }
+              else {
+                tasksInitialized = true
+                await tasks.initialize()
+              }
+              requireInitialState(tasks.workspace.restoration.state.value === 'ready' && !tasks.workspace.status.errorMessage.value)
+            }),
+            host.step('renderer.automations', async () => requireInitialState(await (initialAttemptSettled ? automations.refresh() : automations.initialize()))),
+          ])
+          const failures = results.filter(result => result.status === 'rejected').map(result => result.reason)
+          if (failures.length)
+            throw new AggregateError(failures, 'Workspace restoration failed')
+          assertActive()
+          await host.step('renderer.surface', async () => {
+            await options.prepareSurface?.()
+            await nextTick()
+            await globalThis.document?.fonts?.ready
+            assertActive()
+          })
+        })
+        await Promise.all(reports)
+        if (!disposed && generation === state.value.generation && runtimeReady.value)
+          dataReady.value = true
+      }
+      catch {
+        await Promise.allSettled(reports)
+        if (!disposed && generation === state.value.generation)
+          failed.value = true
+      }
+      finally {
+        stop()
+        initialAttemptSettled = true
+        resolveReady()
+      }
+    })
+    return tail
+  }
+
+  const stopRuntimeWatch = watch([() => state.value.generation, runtimeReady], () => {
+    if (!runtimeReady.value) {
+      dataReady.value = false
       return
     }
-    void tasks.refreshRuntimeDependentState()
-    void automations.refresh()
-  }, { flush: 'sync' })
+    void scheduleRefresh()
+  }, { immediate: true, flush: 'sync' })
 
-  const ready = initialize()
+  async function retry(): Promise<void> {
+    failed.value = false
+    try {
+      await refresh()
+    }
+    catch {
+      failed.value = true
+      return
+    }
+    if (runtimeReady.value)
+      await scheduleRefresh(true)
+    else if (!(await appState.stores.runtimeSupervisor.restartRuntime()))
+      failed.value = true
+  }
+
   const stopHiddenListener = api.app.onHidden(() => {
-    void ready.then(() => !disposed && tasks.flushDrafts()).catch(() => undefined)
+    if (tasksInitialized && !disposed)
+      void tasks.flushDrafts().catch(() => undefined)
   })
   const stopBeforeQuitListener = api.app.onBeforeQuit(async () => {
+    if (!tasksInitialized)
+      return true
     try {
-      await ready
+      await tail
       return !disposed && await tasks.flushDrafts()
     }
     catch {
@@ -44,30 +156,16 @@ export function useDesktopLifecycle(options: DesktopLifecycleOptions) {
     }
   })
 
-  async function initialize(): Promise<void> {
-    await appState.initialize()
-    if (disposed)
-      return
-    tasksInitializing = true
-    await Promise.all([automations.initialize(), tasks.initialize(), shell.initialize()])
-    if (disposed)
-      return
-    initializationSettled = true
-    if (pendingRuntimeReady && !disposed) {
-      pendingRuntimeReady = false
-      await Promise.all([tasks.refreshRuntimeDependentState(), automations.refresh()])
-    }
-  }
-
   onScopeDispose(() => {
     disposed = true
     stopHiddenListener()
     stopBeforeQuitListener()
-    stopRuntimeReadyWatch()
+    stopRuntimeWatch()
+    resolveReady()
     automations.dispose()
     tasks.dispose()
     appState.dispose()
   })
 
-  return { ready }
+  return { ready, state, loading, failed: hasFailed, dataReady, retry }
 }

@@ -24,7 +24,7 @@ export interface AutomationCapability {
   isMutating: Readonly<Ref<boolean>>
   loadError: Readonly<Ref<string | null>>
   pendingAutomationIds: Readonly<Ref<ReadonlySet<string>>>
-  initialize: () => Promise<void>
+  initialize: () => Promise<boolean>
   dispose: () => void
   refresh: () => Promise<boolean>
   loadMoreAutomations: () => Promise<boolean>

@@ -6,6 +6,7 @@ import type { BuddyComposerResourceAccept } from '@buddy-shared/conversation/com
 import type { LocalConversation } from '@buddy-shared/conversation/conversationApi'
 
 import type { LocalRunEvent } from '@buddy-shared/runs/runApi'
+import { ServiceHost } from '@buddy-shared/lifecycle/ServiceHost'
 import { deferred } from '@buddy-tests/deferred'
 import { describe, expect, it, vi } from 'vitest'
 import { createBuddyUserContent } from '../../../../../shared/conversation/buddyUserContent'
@@ -22,6 +23,7 @@ describe('useTaskCapability', () => {
     const appState = useDesktopAppState({ api })
     const chat = createTaskCapability(api, appState)
     await appState.initialize()
+    await appState.refreshRuntimeDependentState(new ServiceHost())
     await chat.initialize()
     const draftId = chat.workspace.composer.draftId.value
     expect((await api.localChat.composerDrafts.get(draftId)).modelSelection).toBeNull()
@@ -800,6 +802,7 @@ function createTestTask(api: ReturnType<typeof createDesktopApi>) {
     ...chat,
     async initialize() {
       await appState.initialize()
+      await appState.refreshRuntimeDependentState(new ServiceHost())
       await chat.initialize()
     },
   }

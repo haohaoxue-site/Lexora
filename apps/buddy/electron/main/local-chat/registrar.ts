@@ -1,9 +1,12 @@
 import type { BrowserWindow, IpcMainInvokeEvent } from 'electron'
+import type { ApplicationDiagnostic, ApplicationDiagnosticReporter } from '../../../shared/diagnostics/applicationDiagnostic'
 import type { RuntimeRequestContract, RuntimeRequestInput, RuntimeRequestResult } from '../../../shared/runtime/apiContract'
 import type { LocalChatErrorCode } from '../../../shared/runtime/localChatError'
 import type { LexoraConfig } from '../../shared/desktopApi'
+import { randomUUID } from 'node:crypto'
 import { ipcMain } from 'electron'
 import { ZodError } from 'zod'
+import { diagnosticIdentitySchema, safeDiagnosticReporter } from '../../../shared/diagnostics/applicationDiagnostic'
 import { formatLocalChatPublicError, isLocalChatErrorCode } from '../../../shared/runtime/localChatError'
 import { assertTrustedSender } from '../ipc'
 
@@ -22,6 +25,7 @@ export interface DesktopRuntimeGateway {
 }
 
 export interface RegisterLocalChatIpcOptions {
+  recordDiagnostic?: ApplicationDiagnosticReporter
   getLanguage: () => LexoraConfig['desktop']['language']
   getWindow: () => BrowserWindow | null
   readWebCredential: () => Promise<unknown>
@@ -29,6 +33,7 @@ export interface RegisterLocalChatIpcOptions {
 }
 
 export function createLocalChatIpcContext(options: RegisterLocalChatIpcOptions) {
+  const record = safeDiagnosticReporter(options.recordDiagnostic)
   const registeredChannels: string[] = []
   const handle = <T>(
     channel: string,
@@ -46,15 +51,37 @@ export function createLocalChatIpcContext(options: RegisterLocalChatIpcOptions) 
     })
   }
   const request = async <Contract extends RuntimeRequestContract>(contract: Contract, params: RuntimeRequestInput<Contract>, timeoutMs = 30_000): Promise<RuntimeRequestResult<Contract>> => {
-    const result = contract.response.safeParse(await options.runtime.request(contract.method, params, { timeoutMs }))
-    if (!result.success)
-      throw new DesktopRuntimeResponseError()
-    return result.data as RuntimeRequestResult<Contract>
+    const context = { method: contract.method, operationId: randomUUID(), ...requestIdentity(params) }
+    const startedAt = performance.now()
+    record({ ...context, event: 'rpc.request.started', level: 'info' })
+    try {
+      const result = contract.response.safeParse(await options.runtime.request(contract.method, params, { timeoutMs }))
+      if (!result.success)
+        throw new DesktopRuntimeResponseError()
+      record({ ...context, ...requestIdentity(result.data), event: 'rpc.request.completed', level: 'info', durationMs: Math.round(performance.now() - startedAt), ...(Array.isArray(result.data) ? { count: result.data.length } : {}) })
+      return result.data as RuntimeRequestResult<Contract>
+    }
+    catch (error) {
+      record({ ...context, event: 'rpc.request.failed', level: 'error', durationMs: Math.round(performance.now() - startedAt), errorCode: readStableErrorCode(error) ?? 'LOCAL_CHAT_OPERATION_FAILED' })
+      throw error
+    }
   }
   return { handle, request, options, dispose: () => {
     for (const channel of registeredChannels)
       ipcMain.removeHandler(channel)
   } }
+}
+
+function requestIdentity(value: unknown): Pick<ApplicationDiagnostic, 'conversationId' | 'branchId' | 'runId' | 'requestId'> {
+  const identity: ReturnType<typeof requestIdentity> = {}
+  if (!isRecord(value))
+    return identity
+  for (const key of ['conversationId', 'branchId', 'runId', 'requestId'] as const) {
+    const parsed = diagnosticIdentitySchema.safeParse(value[key])
+    if (parsed.success)
+      identity[key] = parsed.data
+  }
+  return identity
 }
 
 export type LocalChatIpcContext = ReturnType<typeof createLocalChatIpcContext>
