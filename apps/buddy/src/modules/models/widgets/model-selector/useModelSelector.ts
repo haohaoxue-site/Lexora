@@ -108,8 +108,6 @@ export function useModelSelector(props: ModelSelectorInput, root: Readonly<Shall
 
   function selectModel(modelId: string) {
     actions.updateModel(modelId)
-    activePanel.value = 'main'
-    secondaryPanel.value = null
   }
 
   function clearModel() {
