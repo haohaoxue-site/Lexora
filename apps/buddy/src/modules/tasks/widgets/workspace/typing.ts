@@ -1,14 +1,19 @@
+import type { LocalArtifact } from '@buddy-shared/artifacts/artifactApi'
+import type { LocalChangeSetSummary } from '@buddy-shared/changes/changeApi'
 import type { TaskChatWorkspace, TaskComposer, TaskDraftRestoration, TaskExecution, TaskStatus } from '../../contracts'
 import type { BuddyLocale } from '@/i18n/buddyI18n'
 import type { DesktopSettingsCategory } from '@/shared/navigation/desktopRoutes'
 
 export interface ChatWorkspaceProps {
+  viewMode?: 'chat' | 'canvas'
   activeSearchMessageId: string | null
   matchingSearchMessageIds: readonly string[]
   workspace: TaskChatWorkspace
 }
 
 export interface ChatWorkspaceEmits {
+  openNodeArtifact: [artifact: LocalArtifact]
+  openNodeChanges: [changes: LocalChangeSetSummary]
   openArtifact: [artifactId: string]
   openChanges: [changeSetId: string]
   openSettings: [category: DesktopSettingsCategory]

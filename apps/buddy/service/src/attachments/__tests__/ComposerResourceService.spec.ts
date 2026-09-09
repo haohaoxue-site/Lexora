@@ -649,7 +649,7 @@ describe('composer resource import', () => {
       sourceRunId: failedTurn.runId,
     })
     expect(retriedTurn.runId).not.toBe(failedTurn.runId)
-    expect(retriedTurn.branchId).not.toBe(failedTurn.branchId)
+    expect(retriedTurn.branchId).toBe(failedTurn.branchId)
     expect(database.prepare('SELECT count(*) AS count FROM messages').get()).toEqual(messageCount)
   })
 

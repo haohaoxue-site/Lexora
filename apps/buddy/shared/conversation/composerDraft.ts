@@ -8,6 +8,12 @@ const draftIdentitySchema = z.string().regex(/^[A-Z0-9][\w-]{0,127}$/i)
 const scopeIdentitySchema = z.string().trim().min(1).max(256)
 
 export const buddyComposerDraftScopeSchema = z.discriminatedUnion('kind', [
+  z.object({
+    kind: z.literal('message_followup'),
+    branchId: draftIdentitySchema,
+    conversationId: draftIdentitySchema,
+    assistantMessageId: draftIdentitySchema,
+  }).strict(),
   z.object({ kind: z.literal('global') }).strict().readonly(),
   z.object({
     kind: z.literal('space'),
@@ -88,5 +94,6 @@ export function buddyComposerDraftScopeKey(scope: BuddyComposerDraftScope): stri
     case 'space': return `space:${scope.spaceId}`
     case 'conversation_branch': return `conversation:${scope.conversationId}:${scope.branchId}`
     case 'message_edit': return `message-edit:${scope.conversationId}:${scope.branchId}:${scope.userMessageId}`
+    case 'message_followup': return `message-followup:${scope.conversationId}:${scope.branchId}:${scope.assistantMessageId}`
   }
 }

@@ -27,6 +27,7 @@ interface UseChatDraftsOptions {
 export function useChatDrafts(options: UseChatDraftsOptions): ChatDrafts {
   const draftsByScope = shallowReactive(new Map<string, ChatDraftState>())
   const isolatedDraft = shallowRef<{ sourceKey: string, targetKey: string } | null>(null)
+  watch(options.targetKey, () => isolatedDraft.value = null, { flush: 'sync' })
   watch(
     () => [options.targetKey.value, draftsByScope.has(options.targetKey.value)] as const,
     ([key, exists]) => {
@@ -175,6 +176,14 @@ export function useChatDrafts(options: UseChatDraftsOptions): ChatDrafts {
     },
     approvalPolicy,
     composerContent,
+    resumeIsolated(targetKey: string) {
+      if (!draftsByScope.has(targetKey)) {
+        const current = currentDraft.value
+        draftsByScope.set(targetKey, { ...emptyDraft(), approvalPolicy: current.approvalPolicy, executionProfile: current.executionProfile, modelSelection: current.modelSelection })
+      }
+      isolatedDraft.value = { sourceKey: options.targetKey.value, targetKey }
+      options.onChange()
+    },
     beginIsolated(targetKey: string, content: BuddyUserContentV1) {
       if (isolatedDraft.value)
         return false
@@ -202,8 +211,7 @@ export function useChatDrafts(options: UseChatDraftsOptions): ChatDrafts {
     completeIsolated(receipt: ComposerDraftReceipt, targetKey: string, sourceKey: string) {
       const current = draftsByScope.get(sourceKey)
       if (
-        isolatedDraft.value?.targetKey !== sourceKey
-        || !current
+        !current
         || current.draftId !== receipt.draftId
         || current.revision !== receipt.sourceRevision
       ) {
@@ -220,7 +228,8 @@ export function useChatDrafts(options: UseChatDraftsOptions): ChatDrafts {
         editVersion: current.editVersion + (wasConfirmed ? 1 : 0),
         revision: receipt.committedRevision,
       })
-      isolatedDraft.value = null
+      if (isolatedDraft.value?.targetKey === sourceKey)
+        isolatedDraft.value = null
       options.onChange()
       return true
     },
@@ -241,7 +250,8 @@ export function useChatDrafts(options: UseChatDraftsOptions): ChatDrafts {
     async discardConversation(conversationId: string) {
       const keys = [...draftsByScope.keys()].filter(
         key => key.startsWith(`conversation:${conversationId}:`)
-          || key.startsWith(`message-edit:${conversationId}:`),
+          || key.startsWith(`message-edit:${conversationId}:`)
+          || key.startsWith(`message-followup:${conversationId}:`),
       )
       for (const key of keys)
         draftsByScope.delete(key)

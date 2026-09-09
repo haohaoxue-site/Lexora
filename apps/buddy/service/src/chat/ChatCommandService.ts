@@ -1,5 +1,5 @@
 import type { BuddyComposerDraftSend } from '../../../shared/conversation/composerDraft'
-import type { BuddyTurnLauncher } from '../agent/BuddyTurnLauncher'
+import type { BuddyTurnLauncher } from '../agent/execution/BuddyTurnLauncher'
 import type { ConversationLifecycleService } from '../conversations/ConversationLifecycleService'
 import type {
   CommandRequestRecord,

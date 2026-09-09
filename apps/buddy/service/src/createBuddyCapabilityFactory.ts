@@ -1,5 +1,5 @@
 import type { BuddyFeatureId, BuddyPlatform } from '../../shared/platform'
-import type { BuddySessionCapability, BuddySessionCapabilityContext, BuddySessionCapabilityFactory } from './agent/BuddySessionCapability'
+import type { BuddyCapability, BuddyCapabilityContext, BuddyCapabilityFactory } from './agent/extensions/BuddyCapability'
 import type { ArtifactService } from './artifacts/ArtifactService'
 import type { CreateAutomationToolOptions } from './automations/createAutomationTool'
 import type { BrowserCapabilityHost } from './browser/BrowserCapabilityService'
@@ -38,8 +38,8 @@ export function createBuddyCapabilityFactory(
   platform: BuddyPlatform,
   services: BuddyCapabilityServices,
   pet: PetActionServiceOptions,
-): BuddySessionCapabilityFactory {
-  const platformFactories: Record<BuddyFeatureId, () => (context: BuddySessionCapabilityContext) => BuddySessionCapability> = {
+): BuddyCapabilityFactory {
+  const platformFactories: Record<BuddyFeatureId, () => (context: BuddyCapabilityContext) => BuddyCapability> = {
     nativePet() {
       const service = new PetActionService(pet)
       return context => createPetCapability({ getRunId: context.getRunId, service })

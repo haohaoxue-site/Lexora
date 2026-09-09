@@ -3,6 +3,7 @@ import type { LocalRun } from '@buddy-shared/runs/runApi'
 import { deferred } from '@buddy-tests/deferred'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { computed, effectScope, shallowRef } from 'vue'
+import { useComposerTarget } from '../../composer/useComposerTarget'
 import { useChatSession } from '../../conversations/useChatSession'
 import { useChatDrafts } from '../../drafts/useChatDrafts'
 import { useChatTurnExecution } from '../useChatTurnExecution'
@@ -113,7 +114,9 @@ function createFixture() {
     const projectedRuns = shallowRef<ReadonlyArray<LocalRun>>([run])
     const error = shallowRef<string | null>(null)
     const pending = deferred<LocalRun>()
+    const composerTarget = useComposerTarget({ drafts, conversationId: session.activeConversationId, branchId: session.activeBranchId, persist: async () => true })
     const execution = useChatTurnExecution({
+      composerTarget,
       activeRun: computed(() => projectedRuns.value.find(item => item.status === 'running') ?? null),
       api: { chat: { cancel: () => pending.promise, executeCommand: vi.fn(), startTurn: vi.fn() } },
       approvalPolicy: drafts.approvalPolicy,

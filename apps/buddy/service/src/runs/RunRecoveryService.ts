@@ -1,4 +1,4 @@
-import type { CommittedPiCompactionEvidence } from '../agent/inspectCommittedPiCompaction'
+import type { CommittedPiCompactionEvidence } from '../agent/sessions/recovery/inspectCommittedPiCompaction'
 import type { AppendBuddyRunEventInput } from '../events/BuddyRunEvent'
 import type { RunEventReader, RunEventWriter } from '../events/RunEventPorts'
 import type { ConversationHistoryRepository } from '../storage/conversationHistoryRepository'

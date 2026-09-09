@@ -1,10 +1,10 @@
 import type { ToolDefinition } from '@earendil-works/pi-coding-agent'
-import type { BuddySessionCapability } from '../../agent/BuddySessionCapability'
-import type { BuddyInProcessExtension } from '../../agent/createBuddyResourceLoader'
+import type { BuddyCapability } from '../../agent/extensions/BuddyCapability'
+import type { BuddyInProcessExtension } from '../../agent/extensions/BuddyInProcessExtension'
 import type { BuddyMcpTools } from './McpConnectorService'
 import { classifyMcpTool } from './mcpToolContract'
 
-export function createMcpCapability(mcp: BuddyMcpTools): BuddySessionCapability {
+export function createMcpCapability(mcp: BuddyMcpTools): BuddyCapability {
   return {
     extension: createMcpExtension({ tools: mcp.tools }),
     classify: event => classifyMcpTool(mcp.classifications, event),

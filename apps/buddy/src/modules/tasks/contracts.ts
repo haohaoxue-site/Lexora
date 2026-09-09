@@ -1,8 +1,10 @@
 import type { DesktopChatWelcomePreference, DesktopTaskPinnedItem } from '@buddy-electron/shared/desktopApi'
 import type { LocalChatApi } from '@buddy-electron/shared/localChatApi'
 import type { LocalChangeSetSummary } from '@buddy-shared/changes/changeApi'
+import type { BuddyComposerDraftScope } from '@buddy-shared/conversation/composerDraft'
 import type { BuddyComposerSource } from '@buddy-shared/conversation/composerResource'
 import type { LocalConversation, LocalConversationBranch, LocalConversationSummary, LocalConversationTimelineItem, LocalMessage } from '@buddy-shared/conversation/conversationApi'
+import type { LocalConversationTree } from '@buddy-shared/conversation/conversationTree'
 import type { BuddyServiceTier, BuddyThinkingLevel } from '@buddy-shared/conversation/modelSelection'
 import type { LocalApproval } from '@buddy-shared/permissions/approvalApi'
 import type { BuddyPermissionMode } from '@buddy-shared/permissions/permissionMode'
@@ -59,6 +61,7 @@ export interface TaskWorkspaceSession {
 }
 
 export interface TaskComposer {
+  target: State<BuddyComposerDraftScope>
   composerContent: Readonly<Ref<JSONContent>>
   contextUsage: State<ChatContextUsage | null>
   draft: State<string>
@@ -91,6 +94,8 @@ export interface TaskComposer {
 }
 
 export interface TaskExecution {
+  beginFollowup: (target: Extract<BuddyComposerDraftScope, { kind: 'message_followup' }>) => Promise<boolean>
+  cancelFollowup: () => void
   activeRun: State<LocalRun | null>
   approvalViews: State<readonly LocalApproval[]>
   canMutateBranch: State<boolean>
@@ -102,7 +107,7 @@ export interface TaskExecution {
   resolvingApprovalIds: State<ReadonlySet<string>>
   cancelActiveRun: () => Promise<void>
   cancelEditUserMessage: () => void
-  editUserMessage: (messageId: string) => Promise<boolean>
+  editUserMessage: (messageId: string, sourceBranchId?: string) => Promise<boolean>
   regenerateAssistant: (runId: string) => Promise<boolean>
   resolveApproval: (approvalId: string, decision: ChatApprovalDecision) => Promise<void>
   send: (payload: ChatComposerSubmitPayload | string) => Promise<boolean>
@@ -142,9 +147,19 @@ export interface TaskDraftRestoration {
   resolveRemote: (targetKey: string) => Promise<boolean>
 }
 
+export interface TaskConversationTree {
+  data: State<LocalConversationTree | null>
+  loading: State<boolean>
+  error: State<string | null>
+  refresh: () => Promise<void>
+  setVisible: (value: boolean) => void
+}
+
 export interface TaskChatWorkspace {
+  tree: TaskConversationTree
   restoration: TaskDraftRestoration
   context: {
+    getNodeDetail: LocalChatApi['conversations']['getNodeDetail']
     getChangeSet: LocalChatApi['changes']['get']
     readArtifactText: LocalChatApi['artifacts']['readText']
   }

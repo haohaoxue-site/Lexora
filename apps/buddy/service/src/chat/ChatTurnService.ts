@@ -6,9 +6,9 @@ import type {
 import type { BuddyComposerDraftScope } from '../../../shared/conversation/composerDraft'
 import type { BuddyThinkingLevel } from '../../../shared/conversation/modelSelection'
 import type { ApplicationDiagnosticReporter } from '../../../shared/diagnostics/applicationDiagnostic'
-import type { BuddyAgentRunner } from '../agent/BuddyAgentRunner'
-import type { BuddyTurnLauncher } from '../agent/BuddyTurnLauncher'
-import type { SkillService } from '../agent/SkillService'
+import type { BuddyAgentRunner } from '../agent/execution/BuddyAgentRunner'
+import type { BuddyTurnLauncher } from '../agent/execution/BuddyTurnLauncher'
+import type { SkillService } from '../agent/resources/SkillService'
 import type {
   AttachmentService,
 } from '../attachments/AttachmentService'
@@ -56,7 +56,7 @@ import { safeDiagnosticReporter } from '../../../shared/diagnostics/applicationD
 import {
   BuddySkillSelectionError,
   formatBuddySkillPrompt,
-} from '../agent/SkillService'
+} from '../agent/resources/SkillService'
 import { resolveGrantedPath } from '../directories/resolveGrantedPath'
 import { resolveInteractiveModelSelection } from '../providers/resolveInteractiveModelSelection'
 import { BuddyServiceError } from '../rpc/runtimeRequest'
@@ -147,6 +147,9 @@ export class ChatTurnService {
     const draft = this.#options.drafts.findById(input.draftId)
     if (!draft || draft.revision !== input.expectedRevision)
       throw new BuddyServiceError('DRAFT_CONFLICT')
+    if (draft.scope.kind === 'message_edit')
+      throw new BuddyServiceError('VALIDATION_FAILED')
+    const followupScope = draft.scope.kind === 'message_followup' ? draft.scope : null
     const content = buddyUserContentToText(draft.content).trim()
     const directiveItems = draft.content.body.flatMap(paragraph => paragraph.content.flatMap(
       node => node.type === 'prompt_directive' && node.directive === 'slash_command'
@@ -177,17 +180,29 @@ export class ChatTurnService {
     ) {
       throw new BuddyServiceError('VALIDATION_FAILED')
     }
-    const branchId = scope.branchId
+    const parentBranchId = scope.branchId
       ?? existingConversation?.activeBranchId
       ?? randomUUID()
-    if (existingConversation && existingConversation.activeBranchId !== branchId)
+    const branchId = followupScope ? randomUUID() : parentBranchId
+    if (existingConversation && !followupScope && existingConversation.activeBranchId !== branchId)
       throw new BuddyServiceError('VALIDATION_FAILED')
+    let followup: { parentBranchId: string, sourceMessageId: string, sourceRunId: string } | undefined
+    if (followupScope) {
+      const history = this.#options.conversations.listBranchMessages(conversationId, followupScope.branchId)
+      const source = history.find(message => message.id === followupScope.assistantMessageId)
+      const sourceRun = source?.runId ? this.#options.runs.findById(source.runId) : null
+      if (!source || source.role !== 'assistant' || source.branchId !== followupScope.branchId
+        || !sourceRun || sourceRun.status !== 'completed') {
+        throw new BuddyServiceError('VALIDATION_FAILED')
+      }
+      followup = { parentBranchId: followupScope.branchId, sourceMessageId: source.id, sourceRunId: sourceRun.id }
+    }
     if (this.#options.conversationLifecycle.isDeleting(conversationId))
       throw new BuddyServiceError('VALIDATION_FAILED')
 
     const resourceInputs = await requireValue(this.#options.composerResources ?? null)
       .resolveInput(input.draftId, draft.content, {
-        branchId: existingConversation ? branchId : null,
+        branchId: existingConversation ? parentBranchId : null,
         conversationId: existingConversation?.id ?? null,
         spaceId: space?.id ?? null,
       })
@@ -233,6 +248,7 @@ export class ChatTurnService {
     const persistedAttachmentIds = stagedAttachments.bindings.map(binding => binding.id)
     const prepared = await persistPreparedTurn(stagedAttachments, () => (
       this.#options.turnRequests.prepare({
+        followup,
         approvalPolicy: draft.executionConfig.approvalPolicy,
         attachmentBindings: stagedAttachments.bindings,
         branchId,
@@ -412,31 +428,15 @@ export class ChatTurnService {
       return this.#toTurnStart(replay.request, replay.run)
 
     const conversation = this.#requireActiveConversation(input.conversationId)
-    const parentBranchId = requireValue(conversation.activeBranchId)
-    let sourceRun: RunRecord | null = null
-    if (!replay) {
-      sourceRun = this.#options.runs.findById(input.sourceRunId)
-      const history = this.#options.conversations.listBranchMessages(
-        conversation.id,
-        parentBranchId,
-      )
-      const triggerIndex = history.findIndex(
-        message => message.id === sourceRun?.triggeringMessageId,
-      )
-      const assistantIndex = history.findIndex(
-        message => message.role === 'assistant' && message.runId === sourceRun?.id,
-      )
-      const visibleOnActiveBranch = sourceRun?.branchId === parentBranchId
-        || (triggerIndex >= 0 && assistantIndex > triggerIndex)
-      if (
-        !sourceRun
-        || sourceRun.conversationId !== conversation.id
-        || triggerIndex < 0
-        || !visibleOnActiveBranch
-      ) {
-        throw new BuddyServiceError('VALIDATION_FAILED')
-      }
-    }
+    const sourceRun = this.#options.runs.findById(input.sourceRunId)
+    if (!sourceRun || sourceRun.conversationId !== conversation.id || sourceRun.purpose === 'conversation.compaction')
+      throw new BuddyServiceError('VALIDATION_FAILED')
+    const parentBranchId = sourceRun.branchId
+    const history = this.#options.conversations.listBranchMessages(conversation.id, parentBranchId)
+    const triggerIndex = history.findIndex(message => message.id === sourceRun.triggeringMessageId)
+    if (triggerIndex < 0)
+      throw new BuddyServiceError('VALIDATION_FAILED')
+    const reuseBranch = this.#options.turnRequests.canRetryInPlace(sourceRun.id)
 
     const storedInput = this.#requireRunInput(requireValue(replay?.run ?? sourceRun).id)
     assertPromptSize(storedInput.prompt)
@@ -449,7 +449,8 @@ export class ChatTurnService {
         })
       : this.#options.turnRequests.regenerate({
           approvalPolicy: conversation.approvalPolicy,
-          branchId: randomUUID(),
+          branchId: reuseBranch ? parentBranchId : randomUUID(),
+          reuseBranch,
           conversationId: conversation.id,
           createdAt: new Date().toISOString(),
           executionProfile: conversation.executionProfile,
@@ -661,7 +662,8 @@ function resolveDraftScope(scope: BuddyComposerDraftScope): {
       conversationId: scope.conversationId,
       spaceId: null,
     }
-    case 'message_edit': return {
+    case 'message_edit':
+    case 'message_followup': return {
       branchId: scope.branchId,
       conversationId: scope.conversationId,
       spaceId: null,

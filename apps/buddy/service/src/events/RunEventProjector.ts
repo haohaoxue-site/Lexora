@@ -113,17 +113,33 @@ export class RunEventProjector {
 
   rebuild(runId: string, events: readonly BuddyRunEvent[]): number {
     return withTransaction(this.#database, () => {
+      const messageIds = new Set<string>()
+      for (const event of events) {
+        if (event.runId !== runId)
+          throw new Error('Replayed events must belong to one run')
+        const message = parseProductMessage(event)
+        if (!message)
+          continue
+        if (messageIds.has(message.messageId))
+          throw new Error(`Duplicate replayed message: ${message.messageId}`)
+        messageIds.add(message.messageId)
+      }
       this.#database.prepare('DELETE FROM run_events WHERE run_id = ?').run(runId)
-      this.#database.prepare(`
-        DELETE FROM messages
-        WHERE run_id = ? AND role IN ('assistant', 'tool')
-      `).run(runId)
       this.#database.prepare('DELETE FROM approvals WHERE run_id = ?').run(runId)
       this.#database.prepare('DELETE FROM usage_records WHERE run_id = ?').run(runId)
-      return events.reduce(
-        (count, event) => count + this.#project(event),
+      const count = events.reduce(
+        (count, event) => count + this.#project(event, 'rebuild'),
         0,
       )
+      const projected = this.#database.prepare(`
+        SELECT id FROM messages WHERE run_id = ? AND role IN ('assistant', 'tool')
+      `).all(runId) as Array<{ id: string }>
+      const remove = this.#database.prepare('DELETE FROM messages WHERE id = ? AND run_id = ?')
+      for (const message of projected) {
+        if (!messageIds.has(message.id))
+          remove.run(message.id, runId)
+      }
+      return count
     })
   }
 
@@ -203,7 +219,7 @@ export class RunEventProjector {
     }
   }
 
-  #project(event: BuddyRunEvent): number {
+  #project(event: BuddyRunEvent, mode: 'append' | 'rebuild' = 'append'): number {
     const result = this.#database.prepare(`
       INSERT INTO run_events (run_id, sequence, event_type, payload_json, created_at)
       VALUES (?, ?, ?, ?, ?)
@@ -216,7 +232,7 @@ export class RunEventProjector {
       event.createdAt,
     )
     projectRunStatus(this.#database, event)
-    projectProductMessage(this.#database, event)
+    projectProductMessage(this.#database, event, mode)
     projectApprovalRequest(this.#database, event)
     projectApprovalResolution(this.#database, event)
     projectUsage(this.#database, event)
@@ -246,7 +262,7 @@ function projectRunStatus(database: DatabaseSync, event: BuddyRunEvent): void {
   }
 }
 
-function projectProductMessage(database: DatabaseSync, event: BuddyRunEvent): void {
+function projectProductMessage(database: DatabaseSync, event: BuddyRunEvent, mode: 'append' | 'rebuild'): void {
   const message = parseProductMessage(event)
   if (!message)
     return
@@ -258,8 +274,12 @@ function projectProductMessage(database: DatabaseSync, event: BuddyRunEvent): vo
     SELECT ?, runs.conversation_id, runs.branch_id, runs.id, ?, ?, ?
     FROM runs
     WHERE runs.id = ?
-    ON CONFLICT (id) DO NOTHING
-  `).run(message.messageId, message.role, contentJson, event.createdAt, event.runId)
+    ON CONFLICT (id) DO UPDATE SET
+      content_json = excluded.content_json, created_at = excluded.created_at
+    WHERE ? AND messages.run_id = excluded.run_id
+      AND messages.conversation_id = excluded.conversation_id
+      AND messages.branch_id = excluded.branch_id AND messages.role = excluded.role
+  `).run(message.messageId, message.role, contentJson, event.createdAt, event.runId, Number(mode === 'rebuild'))
   if (Number(result.changes) === 1)
     return
   throw new Error(

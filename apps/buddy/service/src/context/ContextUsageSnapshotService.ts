@@ -4,17 +4,19 @@ import type {
 } from '../../../shared/conversation/modelSelection'
 import type { BuddyApprovalPolicy } from '../../../shared/permissions/approvalPolicy'
 import type { BuddyExecutionProfile } from '../../../shared/permissions/executionProfile'
-import type { BuddySessionBlueprintService } from '../agent/BuddySessionBlueprint'
-import type { BuddySessionRecoveryService } from '../agent/BuddySessionRecoveryService'
-import type { BuddyContextSnapshot } from '../agent/createBuddySession'
-import type { BuddySessionCompositionServices } from '../agent/createBuddySessionComposition'
+import type { BuddySessionExtensionServices } from '../agent/extensions/createBuddySessionExtensions'
+import type { BuddySessionBlueprintService } from '../agent/sessions/BuddySessionBlueprintService'
+import type { BuddyContextSnapshot } from '../agent/sessions/createBuddySession'
+import type { BuddyConversationTree } from '../agent/sessions/tree/BuddyConversationTree'
 import type { ProviderExecutionModelResolver } from '../providers/ProviderExecutionModelResolver'
 import type { BuddyDataPaths } from '../storage/BuddyDataPaths'
+import type { ComposerDraftRepository } from '../storage/composerDraftRepository'
 import type { ConversationHistoryRepository } from '../storage/conversationHistoryRepository'
 import type { ConversationRepository } from '../storage/conversationRepository'
 import type { RunRepository } from '../storage/runRepository'
-import { createBuddyContextSnapshot } from '../agent/createBuddySession'
-import { createBuddySessionComposition } from '../agent/createBuddySessionComposition'
+import { SessionManager } from '@earendil-works/pi-coding-agent'
+import { createBuddySessionExtensions } from '../agent/extensions/createBuddySessionExtensions'
+import { createBuddyContextSnapshot } from '../agent/sessions/createBuddySession'
 import { BuddyServiceError } from '../rpc/runtimeRequest'
 
 export interface ContextUsageModelSelection {
@@ -35,18 +37,19 @@ export interface ContextUsageSnapshotInput {
 }
 
 export interface ContextUsageSnapshotServiceOptions {
+  tree: BuddyConversationTree
+  drafts: Pick<ComposerDraftRepository, 'findById'>
   agentDirectory: string
   blueprints: Pick<
     BuddySessionBlueprintService,
     'createForConversation' | 'createForDraft'
   >
   conversations: Pick<ConversationRepository, 'findById'>
-    & Pick<ConversationHistoryRepository, 'listBranches'>
+    & Pick<ConversationHistoryRepository, 'listBranches' | 'findMessageById'>
   models: Pick<ProviderExecutionModelResolver, 'resolveSession'>
   paths: Pick<BuddyDataPaths, 'conversationsDirectory'>
-  recovery: Pick<BuddySessionRecoveryService, 'create'>
   runs: Pick<RunRepository, 'findLatestForBranch'>
-  sessionCompositionServices: BuddySessionCompositionServices
+  sessionExtensionServices: BuddySessionExtensionServices
 }
 
 type ReadyBuddyContextSnapshot = Exclude<BuddyContextSnapshot, null>
@@ -73,6 +76,14 @@ export class ContextUsageSnapshotService implements ContextUsageSnapshotReader {
   }
 
   async getSnapshot(input: ContextUsageSnapshotInput): Promise<ContextUsageSnapshot> {
+    const scope = this.#options.drafts.findById(input.draftId)?.scope
+    const followup = scope?.kind === 'message_followup' ? scope : null
+    const source = followup ? this.#options.conversations.findMessageById(followup.assistantMessageId) : null
+    if (followup && (followup.conversationId !== input.conversationId
+      || !source?.runId || source.role !== 'assistant' || source.branchId !== followup.branchId
+      || source.conversationId !== followup.conversationId)) {
+      throw new BuddyServiceError('VALIDATION_FAILED')
+    }
     const conversation = input.conversationId
       ? this.#options.conversations.findById(input.conversationId)
       : null
@@ -102,7 +113,7 @@ export class ContextUsageSnapshotService implements ContextUsageSnapshotReader {
       modelId: input.modelSelection.modelId,
       providerId: input.modelSelection.providerId,
     })
-    const branchId = input.branchId ?? 'context-preview'
+    const branchId = followup?.branchId ?? input.branchId ?? 'context-preview'
     const latestRun = conversation
       ? this.#options.runs.findLatestForBranch(conversation.id, branchId)
       : null
@@ -121,7 +132,7 @@ export class ContextUsageSnapshotService implements ContextUsageSnapshotReader {
           executionProfile,
           spaceId: input.spaceId,
         })
-    const composition = await createBuddySessionComposition({
+    const extensions = await createBuddySessionExtensions({
       approvalPolicy: blueprint.approvalPolicy,
       canonicalRoot: blueprint.canonicalRoot,
       conversationId: blueprint.conversationId,
@@ -130,9 +141,23 @@ export class ContextUsageSnapshotService implements ContextUsageSnapshotReader {
       sessionMode: blueprint.sessionMode,
       signal: new AbortController().signal,
       spaceId: blueprint.space?.id ?? null,
-      services: this.#options.sessionCompositionServices,
+      services: this.#options.sessionExtensionServices,
     })
+    const identity = {
+      contextWindow: selected.model.contextWindow,
+      createdAt: new Date().toISOString(),
+      modelId: selected.model.id,
+      providerId: selected.model.provider,
+    }
+    const sessionManager = conversation
+      ? followup
+        ? await this.#options.tree.snapshot(conversation.id, branchId, blueprint.canonicalRoot, source!.runId!)
+        : await this.#options.tree.preview(conversation.id, branchId, blueprint.canonicalRoot, selected.model, latestRun?.piSessionFile ?? null)
+      : SessionManager.inMemory(blueprint.canonicalRoot)
+    if (!sessionManager)
+      return { ...identity, status: 'pending' }
     const snapshot = await createBuddyContextSnapshot({
+      sessionManager,
       agentDir: this.#options.agentDirectory,
       approvalPolicy: blueprint.approvalPolicy,
       branchId: blueprint.branchId,
@@ -141,28 +166,13 @@ export class ContextUsageSnapshotService implements ContextUsageSnapshotReader {
       conversationId: blueprint.conversationId,
       cwd: blueprint.canonicalRoot,
       executionProfile: blueprint.executionProfile,
-      getServiceTier: composition.getServiceTier,
-      inProcessExtensions: composition.inProcessExtensions,
+      getServiceTier: extensions.getServiceTier,
+      inProcessExtensions: extensions.inProcessExtensions,
       model: selected.model,
       modelRuntime: selected.runtime,
-      piSessionFile: latestRun?.piSessionFile ?? undefined,
-      recoveryMessages: conversation
-        ? async () => (await this.#options.recovery.create({
-          branchId: blueprint.branchId,
-          conversationId: conversation.id,
-          fallbackModel: selected.model,
-          point: { kind: 'branch_head' },
-        })).messages
-        : [],
       resources: blueprint.resources,
       thinkingLevel: input.modelSelection.reasoning ?? undefined,
     })
-    const identity = {
-      contextWindow: selected.model.contextWindow,
-      createdAt: new Date().toISOString(),
-      modelId: selected.model.id,
-      providerId: selected.model.provider,
-    }
     if (!snapshot)
       return { ...identity, status: 'pending' }
 

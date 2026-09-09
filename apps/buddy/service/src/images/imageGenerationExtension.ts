@@ -1,7 +1,7 @@
 import type { ToolDefinition } from '@earendil-works/pi-coding-agent'
 import type { Static, TSchema } from 'typebox'
-import type { BuddySessionCapability } from '../agent/BuddySessionCapability'
-import type { BuddyInProcessExtension } from '../agent/createBuddyResourceLoader'
+import type { BuddyCapability } from '../agent/extensions/BuddyCapability'
+import type { BuddyInProcessExtension } from '../agent/extensions/BuddyInProcessExtension'
 import type { ImageGenerationErrorCode, ImageGenerationErrorDiagnostic } from './ImageGenerationGateway'
 import type { ImageGenerationService } from './ImageGenerationService'
 import type { ImageGenerationToolDetails } from './imageGenerationToolContract'
@@ -16,7 +16,7 @@ export interface CreateImageGenerationExtensionOptions {
   service: Pick<ImageGenerationService, 'generate' | 'supports'>
 }
 
-export function createImageGenerationCapability(options: CreateImageGenerationExtensionOptions): BuddySessionCapability {
+export function createImageGenerationCapability(options: CreateImageGenerationExtensionOptions): BuddyCapability {
   return {
     extension: createImageGenerationExtension(options),
     classify: classifyImageGenerationTool,

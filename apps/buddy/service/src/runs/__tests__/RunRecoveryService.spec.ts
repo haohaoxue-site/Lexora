@@ -5,7 +5,7 @@ import { mkdir, mkdtemp, realpath, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { BuddySessionStorageError } from '../../agent/BuddySessionErrors'
+import { BuddySessionStorageError } from '../../agent/sessions/BuddySessionErrors'
 import { createRunEventLog } from '../../events/createRunEventLog'
 import {
   prepareTestCommandRequest,

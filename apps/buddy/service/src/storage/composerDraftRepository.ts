@@ -49,7 +49,7 @@ export function createComposerDraftRepository(database: DatabaseSync): ComposerD
   `)
   const findMessageEdit = database.prepare(`
     SELECT * FROM composer_drafts
-    WHERE scope_kind = 'message_edit' AND conversation_id = ? AND branch_id = ?
+    WHERE scope_kind = ? AND conversation_id = ? AND branch_id = ?
       AND source_message_id = ?
   `)
   const insert = database.prepare(`
@@ -78,7 +78,7 @@ export function createComposerDraftRepository(database: DatabaseSync): ComposerD
         ? findSpace.get(scope.spaceId)
         : scope.kind === 'conversation_branch'
           ? findBranch.get(scope.conversationId, scope.branchId)
-          : findMessageEdit.get(scope.conversationId, scope.branchId, scope.userMessageId)
+          : findMessageEdit.get(scope.kind, scope.conversationId, scope.branchId, scope.kind === 'message_edit' ? scope.userMessageId : scope.assistantMessageId)
     return row ? toDraft(row as unknown as ComposerDraftRow) : null
   }
 
@@ -146,10 +146,15 @@ function toDraft(row: ComposerDraftRow): BuddyComposerDraft {
             conversationId: requireValue(row.conversation_id),
             ...(row.scope_kind === 'conversation_branch'
               ? { kind: 'conversation_branch' as const }
-              : {
-                  kind: 'message_edit' as const,
-                  userMessageId: requireValue(row.source_message_id),
-                }),
+              : row.scope_kind === 'message_followup'
+                ? {
+                    kind: 'message_followup' as const,
+                    assistantMessageId: requireValue(row.source_message_id),
+                  }
+                : {
+                    kind: 'message_edit' as const,
+                    userMessageId: requireValue(row.source_message_id),
+                  }),
           },
     updatedAt: row.updated_at,
   })
@@ -169,6 +174,12 @@ function toScopeBinding(scope: BuddyComposerDraftScope) {
       branchId: scope.branchId,
       conversationId: scope.conversationId,
       sourceMessageId: scope.userMessageId,
+      spaceId: null,
+    }
+    case 'message_followup': return {
+      branchId: scope.branchId,
+      conversationId: scope.conversationId,
+      sourceMessageId: scope.assistantMessageId,
       spaceId: null,
     }
   }

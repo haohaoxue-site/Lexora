@@ -8,6 +8,7 @@ interface BuddyColorTheme {
     canvas: string
     raised: string
     muted: string
+    userMessage: string
   }
   state: {
     hover: string
@@ -80,6 +81,7 @@ const lightTheme: BuddyColorTheme = {
     canvas: '#fafaf8',
     raised: '#ffffff',
     muted: 'rgb(32 37 34 / 4%)',
+    userMessage: '#edf4ff',
   },
   state: {
     hover: 'rgb(32 37 34 / 5%)',
@@ -166,6 +168,7 @@ const darkTheme: BuddyColorTheme = {
     canvas: '#202422',
     raised: '#2a2f2b',
     muted: 'rgb(255 255 255 / 5%)',
+    userMessage: '#29384a',
   },
   state: {
     hover: 'rgba(255, 255, 255, 0.07)',
@@ -259,6 +262,7 @@ export function createBuddyColorVariables(theme: BuddyColorTheme): Record<string
     '--buddy-surface-base': theme.surface.canvas,
     '--buddy-surface-raised': theme.surface.raised,
     '--buddy-surface-subtle': theme.surface.muted,
+    '--buddy-user-message-surface': theme.surface.userMessage,
     '--buddy-state-hover': theme.state.hover,
     '--buddy-state-pressed': theme.state.pressed,
     '--buddy-state-selected': theme.state.selected,

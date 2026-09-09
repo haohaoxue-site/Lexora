@@ -47,7 +47,7 @@ export function createComposerDraftCommitter(database: DatabaseSync) {
           AND conversation_id = ? AND branch_id = ?
         )
         OR (
-          scope_kind = 'message_edit'
+          scope_kind IN ('message_edit', 'message_followup')
           AND conversation_id = ? AND branch_id = ? AND source_message_id = ?
         )
       )

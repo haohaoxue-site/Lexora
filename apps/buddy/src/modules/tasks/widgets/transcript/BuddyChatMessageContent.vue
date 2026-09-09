@@ -358,7 +358,7 @@ function previewLeaveTransition(): Promise<void> {
 
   .is-user & {
     justify-self: end;
-    background: var(--buddy-accent-surface);
+    background: var(--buddy-user-message-surface);
   }
 
   .is-assistant &,

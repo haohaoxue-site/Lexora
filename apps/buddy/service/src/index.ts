@@ -1,5 +1,5 @@
 import type { BuddyServiceFailureCode } from '../../shared/runtime/runtimeProtocol'
-import { join } from 'node:path'
+import { isAbsolute, join } from 'node:path'
 import process from 'node:process'
 import { z } from 'zod'
 import { establishWindowsRuntimeGuard } from '../../platform/windows/runtimeGuard'
@@ -17,7 +17,7 @@ import {
   notifyBuddyServiceFailure,
   notifyBuddyServiceReady,
 } from './rpc/BuddyServiceRpcServer'
-import { openBuddyDatabase, resolveBuddyHome } from './storage/database'
+import { openBuddyDatabase, resolveBuddyDatabasePath } from './storage/database'
 
 const parentPort = process.parentPort
 
@@ -41,7 +41,7 @@ async function runBuddyService(): Promise<void> {
   if (!parentPort)
     return
 
-  const buddyHome = process.env.LEXORA_BUDDY_HOME ?? resolveBuddyHome()
+  const buddyHome = z.string().refine(isAbsolute).parse(process.env.LEXORA_BUDDY_HOME)
   let database: ReturnType<typeof openBuddyDatabase> | null = null
   let serviceServer: ReturnType<typeof createBuddyService> | null = null
   const events = new ApplicationEvents()
@@ -104,7 +104,7 @@ async function runBuddyService(): Promise<void> {
       return z.array(z.string().min(1)).parse(JSON.parse(process.env.LEXORA_BUDDY_SKILLS_DIRS ?? '[]'))
     })
     const openedDatabase = await host.start('runtime.database', ({ defer }) => {
-      database = openBuddyDatabase({ buddyHome })
+      database = openBuddyDatabase({ databasePath: resolveBuddyDatabasePath(buddyHome) })
       defer(closeDatabase)
       return database
     })

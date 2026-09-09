@@ -1,8 +1,7 @@
 import type { DatabaseSync } from 'node:sqlite'
 import type { BuddySchemaMigration } from './schema'
 import { mkdirSync } from 'node:fs'
-import { homedir } from 'node:os'
-import { dirname, join } from 'node:path'
+import { dirname, isAbsolute, join } from 'node:path'
 import { DatabaseSync as NodeDatabaseSync } from 'node:sqlite'
 
 import {
@@ -13,8 +12,7 @@ import {
 export const BUDDY_DATABASE_FILE_NAME = 'buddy.sqlite3'
 
 export interface OpenBuddyDatabaseOptions {
-  buddyHome?: string
-  databasePath?: string
+  databasePath: string
 }
 
 const BUDDY_CURRENT_SCHEMA_COLUMNS = {
@@ -38,19 +36,21 @@ const BUDDY_CURRENT_SCHEMA_COLUMNS = {
     'source_json',
     'error_code',
   ],
+  conversation_pi_trees: ['conversation_id', 'session_file', 'root_entry_id'],
+  run_tree_sources: ['run_id', 'source_run_id', 'position'],
   turn_requests: ['draft_id', 'draft_revision', 'committed_draft_revision'],
 } as const
 
-export function resolveBuddyHome(homeDirectory = homedir()): string {
-  return join(homeDirectory, '.lexora', 'buddy')
-}
-
-export function resolveBuddyDatabasePath(buddyHome = resolveBuddyHome()): string {
+export function resolveBuddyDatabasePath(buddyHome: string): string {
   return join(buddyHome, BUDDY_DATABASE_FILE_NAME)
 }
 
-export function openBuddyDatabase(options: OpenBuddyDatabaseOptions = {}): DatabaseSync {
-  const databasePath = options.databasePath ?? resolveBuddyDatabasePath(options.buddyHome)
+export function openBuddyDatabase(options: OpenBuddyDatabaseOptions): DatabaseSync {
+  if (!options || typeof options !== 'object' || Array.isArray(options))
+    throw new TypeError('Buddy database options must be an object')
+  const { databasePath } = options
+  if (typeof databasePath !== 'string' || (databasePath !== ':memory:' && !isAbsolute(databasePath)))
+    throw new TypeError('Buddy database requires an explicit absolute path or :memory:')
   if (databasePath !== ':memory:')
     mkdirSync(dirname(databasePath), { mode: 0o700, recursive: true })
 

@@ -27,7 +27,7 @@ export function parseDraftScopeKey(targetKey: string): BuddyComposerDraftScope {
     }
   }
   if (
-    parts[0] === 'message-edit'
+    (parts[0] === 'message-edit' || parts[0] === 'message-followup')
     && parts.length === 4
     && parts[1]
     && parts[2]
@@ -36,8 +36,9 @@ export function parseDraftScopeKey(targetKey: string): BuddyComposerDraftScope {
     return {
       branchId: parts[2],
       conversationId: parts[1],
-      kind: 'message_edit',
-      userMessageId: parts[3],
+      ...(parts[0] === 'message-edit'
+        ? { kind: 'message_edit' as const, userMessageId: parts[3] }
+        : { kind: 'message_followup' as const, assistantMessageId: parts[3] }),
     }
   }
   throw new Error('Invalid Composer draft scope')

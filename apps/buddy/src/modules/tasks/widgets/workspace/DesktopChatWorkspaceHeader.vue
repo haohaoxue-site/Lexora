@@ -3,6 +3,7 @@ import type { InputInst } from 'naive-ui'
 
 import type { BuddyLocale } from '@/i18n/buddyI18n'
 import {
+  Chat20Regular,
   ChevronDown20Regular,
   ChevronUp20Regular,
   Dismiss20Regular,
@@ -15,6 +16,7 @@ import { useBuddyI18n } from '@/i18n/buddyI18n'
 import DesktopIcon from '@/shared/ui/icon/DesktopIcon.vue'
 
 const props = defineProps<{
+  viewMode?: 'chat' | 'canvas'
   activeSearchIndex: number
   artifactCount: number
   canOpenContext: boolean
@@ -28,6 +30,7 @@ const props = defineProps<{
   title: string
 }>()
 const emit = defineEmits<{
+  toggleCanvas: []
   closeConversationSearch: []
   nextConversationSearchResult: []
   openConversationSearch: []
@@ -118,6 +121,25 @@ watch(
         @click="emit('openConversationSearch')"
       >
         <DesktopIcon :component="Search20Regular" />
+      </button>
+      <button
+        v-if="canSearchConversation"
+        class="desktop-chat-workspace-header__icon-button"
+        :class="{ 'is-active': viewMode === 'canvas' }"
+        data-testid="conversation-canvas-toggle"
+        type="button"
+        :aria-label="viewMode === 'canvas' ? t('desktop.canvas.chatView') : t('desktop.canvas.view')"
+        :aria-pressed="viewMode === 'canvas'"
+        @click="emit('toggleCanvas')"
+      >
+        <DesktopIcon v-if="viewMode === 'canvas'" :component="Chat20Regular" />
+        <DesktopIcon v-else>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M3 21V9.6c0-3.2 2.7-6.4 5.7-7 1.7-.4 2.4 9.6-5.7 18.4Z" />
+            <path d="M3 21C7.7 13.3 9.4 8.2 14.7 6c5.9-2.4 6 3.2 2.1 6.9C13.5 16.1 8.3 18.2 3 21Z" fill="currentColor" fill-opacity="0.1" />
+            <path d="M3 21c7.5-4.7 13.1-7.9 18.1-7 2.4.3-.9 7-5.9 7Z" />
+          </svg>
+        </DesktopIcon>
       </button>
       <button
         v-if="!contextOpen"

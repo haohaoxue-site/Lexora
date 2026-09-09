@@ -1,9 +1,9 @@
 import type { DatabaseSync } from 'node:sqlite'
 import type { ApplicationDiagnosticReporter } from '../../shared/diagnostics/applicationDiagnostic'
-
 import type { ApplicationEvents } from '../../shared/observability/ApplicationEvents'
-import type { BuddySessionCompositionServices } from './agent/createBuddySessionComposition'
-import type { BuddyAgentSessionLike } from './agent/PiTurnExecutor'
+import type { BuddySessionExtensionServices } from './agent/extensions/createBuddySessionExtensions'
+
+import type { ReusableBuddySession } from './agent/sessions/ReusableBuddySession'
 import type { AutomationClock } from './automations/AutomationScheduleEvaluator'
 import type { BuddyRuntime } from './BuddyRuntime'
 import type { RunEventLogPort } from './events/RunEventPorts'
@@ -17,20 +17,21 @@ import { resolveWindowsPowerShell } from '../../platform/windows/powerShell'
 import { automationNotifications } from '../../shared/automation/automationApi'
 import { ServiceHost } from '../../shared/lifecycle/ServiceHost'
 import { ApplicationEvents as EventPublisher } from '../../shared/observability/ApplicationEvents'
-import { BuddyAgentRunner } from './agent/BuddyAgentRunner'
-import { BuddyRunExecutionPlanner } from './agent/BuddyRunExecutionPlanner'
-import { BuddySessionBlueprintService } from './agent/BuddySessionBlueprint'
-import { BuddySessionFactory } from './agent/BuddySessionFactory'
-import { BuddySessionRecoveryService } from './agent/BuddySessionRecoveryService'
-import { BuddySessionRegistry } from './agent/BuddySessionRegistry'
-import { BuddyTurnLauncher } from './agent/BuddyTurnLauncher'
-import { inspectCommittedPiCompaction } from './agent/inspectCommittedPiCompaction'
-import { PiEventBridge } from './agent/PiEventBridge'
-import { PiTurnExecutor } from './agent/PiTurnExecutor'
+import { PiEventBridge } from './agent/events/PiEventBridge'
+import { BuddyAgentRunner } from './agent/execution/BuddyAgentRunner'
+import { BuddyRunExecutionPlanner } from './agent/execution/BuddyRunExecutionPlanner'
+import { BuddyTurnLauncher } from './agent/execution/BuddyTurnLauncher'
+import { PiTurnExecutor } from './agent/execution/PiTurnExecutor'
 import {
   registerSkillServiceRpc,
   SkillService,
-} from './agent/SkillService'
+} from './agent/resources/SkillService'
+import { BuddySessionBlueprintService } from './agent/sessions/BuddySessionBlueprintService'
+import { BuddySessionFactory } from './agent/sessions/BuddySessionFactory'
+import { BuddySessionRegistry } from './agent/sessions/BuddySessionRegistry'
+import { BuddySessionRecoveryService } from './agent/sessions/recovery/BuddySessionRecoveryService'
+import { inspectCommittedPiCompaction } from './agent/sessions/recovery/inspectCommittedPiCompaction'
+import { BuddyConversationTree } from './agent/sessions/tree/BuddyConversationTree'
 import { ApprovalService } from './approvals/ApprovalService'
 import { registerApprovalRpc } from './approvals/registerApprovalRpc'
 import { ArtifactService } from './artifacts/ArtifactService'
@@ -66,6 +67,7 @@ import { ContextUsageSnapshotService } from './context/ContextUsageSnapshotServi
 import { registerContextRpc } from './context/registerContextRpc'
 import { ConversationLifecycleService } from './conversations/ConversationLifecycleService'
 import { registerConversationRpc } from './conversations/registerConversationRpc'
+import { registerConversationTreeRpc } from './conversations/registerConversationTreeRpc'
 import { createBuddyCapabilityFactory } from './createBuddyCapabilityFactory'
 import { DirectoryGrantService } from './directories/DirectoryGrantService'
 import { ImageTransformService } from './images/ImageTransformService'
@@ -73,8 +75,8 @@ import { OpenAiImageGenerationService } from './images/OpenAiImageGenerationServ
 import { AttentionNotificationService } from './notifications/AttentionNotificationService'
 import { registerNotificationRpc } from './notifications/registerNotificationRpc'
 import { createProviderService } from './providers/createProviderService'
-
 import { registerProviderRpc } from './providers/registerProviderRpc'
+
 import { resolveInteractiveModelSelection } from './providers/resolveInteractiveModelSelection'
 import { BuddyServiceError } from './rpc/runtimeRequest'
 import { registerRunRpc } from './runs/registerRunRpc'
@@ -95,6 +97,7 @@ import { createComposerResourceRepository } from './storage/composerResourceRepo
 import { createConnectorRepository } from './storage/connectorRepository'
 import { createConversationDirectoryGrantRepository } from './storage/conversationDirectoryGrantRepository'
 import { createConversationRepository } from './storage/conversationRepository'
+import { createConversationTreeRepository } from './storage/conversationTreeRepository'
 import { createNotificationAttentionRepository } from './storage/notificationAttentionRepository'
 import { createProviderRepository } from './storage/providerRepository'
 import { createRunInputRepository } from './storage/runInputRepository'
@@ -255,7 +258,7 @@ export async function startBuddyService(
     const imageGenerationGateway = new OpenAiImageGenerationService({
       modelRuntime: executionModels.getRuntime(),
     })
-    const sessions = await host.start('runtime.sessions', () => new BuddySessionRegistry<BuddyAgentSessionLike>())
+    const sessions = await host.start('runtime.sessions', () => new BuddySessionRegistry<ReusableBuddySession>())
     const directoryGrants = new DirectoryGrantService({
       conversationGrants: conversationDirectoryGrants,
       conversations,
@@ -346,7 +349,7 @@ export async function startBuddyService(
         return Boolean(space && space.revokedAt === null)
       },
     })
-    const sessionCompositionServices: BuddySessionCompositionServices = {
+    const sessionExtensionServices: BuddySessionExtensionServices = {
       approvalService,
       attachmentService,
       changeCaptureService,
@@ -379,16 +382,17 @@ export async function startBuddyService(
       runInputs,
       runs,
     })
+    const conversationTree = new BuddyConversationTree({ conversationsDirectory: paths.conversationsDirectory, conversations, repository: createConversationTreeRepository(options.database), runs, recovery: sessionRecovery })
     const sessionFactory = await host.start('runtime.session_factory', () => {
       const service = new BuddySessionFactory({
+        tree: conversationTree,
         events,
         agentDirectory,
         conversations,
         conversationsDirectory: paths.conversationsDirectory,
         models: executionModels,
-        recovery: sessionRecovery,
         runs,
-        services: sessionCompositionServices,
+        services: sessionExtensionServices,
       })
       return service
     })
@@ -468,14 +472,15 @@ export async function startBuddyService(
       startTurn: input => chatTurnService.start(input),
     }
     const contextUsageService = new ContextUsageSnapshotService({
+      drafts: composerDrafts,
+      tree: conversationTree,
       agentDirectory,
       blueprints: sessionBlueprints,
       conversations,
       models: executionModels,
       paths,
-      recovery: sessionRecovery,
       runs,
-      sessionCompositionServices,
+      sessionExtensionServices,
     })
     const automationDispatcher = new AutomationDispatcher({
       automationService,
@@ -590,6 +595,17 @@ export async function startBuddyService(
           service: contextUsageService,
         }),
       )
+      register(registerConversationTreeRpc({
+        database: options.database,
+        conversations,
+        rpc: options.rpc,
+        artifacts: artifactsRepository,
+        attachments: attachmentService,
+        changes: changeCaptureService,
+        eventLog: options.eventLog,
+        runInputs,
+        runs,
+      }))
       register(
         registerConversationRpc({
           artifacts: artifactsRepository,

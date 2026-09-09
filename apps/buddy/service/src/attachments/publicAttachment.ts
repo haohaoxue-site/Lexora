@@ -1,7 +1,8 @@
+import type { LocalAttachment } from '../../../shared/conversation/attachmentApi'
 import type { AttachmentRecord } from '../storage/attachmentRepository'
 import { readBuddyUserMessageContent } from '../../../shared/conversation/buddyUserContent'
 
-export function toPublicAttachment(record: AttachmentRecord) {
+export function toPublicAttachment(record: AttachmentRecord): LocalAttachment {
   return {
     attachmentId: record.id,
     kind: record.mimeType.startsWith('image/')
@@ -17,16 +18,22 @@ export function toPublicAttachment(record: AttachmentRecord) {
 export function withMessageAttachments<
   Item extends { content?: unknown, kind?: string },
 >(items: readonly Item[], attachments: readonly AttachmentRecord[]) {
-  const attachmentsById = new Map(attachments.map(record => [record.id, record]))
+  const readAttachments = createMessageAttachmentReader(attachments)
   return items.map((item) => {
     if (item.kind && item.kind !== 'message')
       return item
     return {
       ...item,
-      attachments: readMessageAttachmentIds(item.content)
-        .flatMap(id => attachmentsById.get(id) ?? [])
-        .map(toPublicAttachment),
+      attachments: readAttachments(item.content),
     }
+  })
+}
+
+export function createMessageAttachmentReader(attachments: readonly AttachmentRecord[]) {
+  const byId = new Map(attachments.map(record => [record.id, record]))
+  return (content: unknown) => readMessageAttachmentIds(content).flatMap((id) => {
+    const attachment = byId.get(id)
+    return attachment ? [toPublicAttachment(attachment)] : []
   })
 }
 

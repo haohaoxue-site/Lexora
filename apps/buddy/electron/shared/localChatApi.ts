@@ -16,6 +16,7 @@ import type {
 } from '../../shared/conversation/composerResource'
 import type { LocalContextUsageSnapshot, LocalContextUsageSnapshotRequest } from '../../shared/conversation/contextApi'
 import type { LocalConversation, LocalConversationBranch, LocalConversationSummary, LocalConversationTimelinePage, LocalMessagePage } from '../../shared/conversation/conversationApi'
+import type { ConversationNodeDetailRequest, LocalConversationTree } from '../../shared/conversation/conversationTree'
 import type { LocalWorkspaceSetting, LocalWorkspaceStateValue } from '../../shared/conversation/workspaceApi'
 import type { WebSettings, WebSettingsSnapshot } from '../../shared/network/webProtocol'
 import type { LocalNotificationList } from '../../shared/notifications/notificationApi'
@@ -80,6 +81,8 @@ export const LOCAL_CHAT_IPC_CHANNELS = {
   conversationsDelete: 'lexora:buddy:conversations:delete',
   conversationsActivateBranch: 'lexora:buddy:conversations:activate-branch',
   conversationsGet: 'lexora:buddy:conversations:get',
+  conversationsGetNodeDetail: 'lexora:buddy:conversations:get-node-detail',
+  conversationsGetTree: 'lexora:buddy:conversations:get-tree',
   conversationsList: 'lexora:buddy:conversations:list',
   conversationsListBranches: 'lexora:buddy:conversations:list-branches',
   conversationsListMessages: 'lexora:buddy:conversations:list-messages',
@@ -250,6 +253,8 @@ export interface LocalChatApi {
     write: (value: LocalWorkspaceStateValue) => Promise<LocalWorkspaceSetting>
   }
   conversations: {
+    getNodeDetail: (input: ConversationNodeDetailRequest) => Promise<LocalConversationTimelinePage>
+    getTree: (conversationId: string) => Promise<LocalConversationTree>
     list: (limit?: number) => Promise<ReadonlyArray<LocalConversationSummary>>
     get: (conversationId: string) => Promise<LocalConversation>
     delete: (conversationId: string) => Promise<boolean>

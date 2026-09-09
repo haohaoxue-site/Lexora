@@ -74,6 +74,55 @@ function seedRun(
 }
 
 describe('buddy schema', () => {
+  it('requires an explicit database path before opening storage', () => {
+    for (const invalid of [undefined, ':memory:', null, [], {}, { buddyHome: '/unused' }, { databasePath: '' }, { databasePath: 'buddy.sqlite3' }]) {
+      expect(() => openBuddyDatabase(invalid as unknown as Parameters<typeof openBuddyDatabase>[0]))
+        .toThrow(TypeError)
+    }
+  })
+
+  it('migrates v9 drafts and resources intact and adds independent followup scopes', () => {
+    const directory = mkdtempSync(join(tmpdir(), 'lexora-buddy-tree-schema-'))
+    directories.push(directory)
+    const databasePath = join(directory, 'buddy.sqlite3')
+    const legacy = new NodeDatabaseSync(databasePath)
+    for (const migration of BUDDY_SCHEMA_MIGRATIONS.filter(({ version }) => version <= 9)) {
+      legacy.exec(migration.sql)
+      legacy.exec(`PRAGMA user_version = ${migration.version}`)
+    }
+    seedRun(legacy)
+    legacy.exec(`
+      INSERT INTO messages VALUES ('answer-1', 'conversation-1', 'branch-1', 'run-1', 'assistant', '{"text":"answer"}', '2026-09-09T00:00:00.000Z');
+      INSERT INTO composer_drafts VALUES (
+        'draft-1', 'conversation_branch', NULL, 'conversation-1', 'branch-1', NULL, 7,
+        '{"version":1,"body":[],"panelResourceIds":["resource-1"]}', NULL, 'policy', 'workspace_write',
+        '2026-09-09T00:00:00.000Z', '2026-09-09T00:00:00.000Z'
+      );
+      INSERT INTO composer_resources VALUES (
+        'resource-1', 'draft-1', 'fixture.txt', 'text/plain', 1, 'importing', NULL, NULL, NULL, NULL,
+        '2026-09-09T00:00:00.000Z', '2026-09-09T00:00:00.000Z'
+      );
+    `)
+    const drafts = legacy.prepare('SELECT * FROM composer_drafts').all()
+    const resources = legacy.prepare('SELECT * FROM composer_resources').all()
+    const messages = legacy.prepare('SELECT * FROM messages').all()
+    legacy.close()
+    const migrated = openBuddyDatabase({ databasePath })
+    databases.push(migrated)
+    expect(migrated.prepare('SELECT * FROM composer_drafts').all()).toEqual(drafts)
+    expect(migrated.prepare('SELECT * FROM composer_resources').all()).toEqual(resources)
+    expect(migrated.prepare('SELECT * FROM messages').all()).toEqual(messages)
+    migrated.exec(`
+      INSERT INTO composer_drafts
+      SELECT 'followup-1', 'message_followup', space_id, conversation_id, branch_id, 'answer-1', 0,
+        content_json, model_selection_json, approval_policy, execution_profile, created_at, updated_at
+      FROM composer_drafts WHERE id = 'draft-1';
+    `)
+    expect(migrated.prepare('SELECT COUNT(*) AS count FROM composer_drafts').get()).toEqual({ count: 2 })
+    expect(migrated.prepare('PRAGMA foreign_key_check').all()).toEqual([])
+    expect(migrated.prepare('PRAGMA foreign_keys').get()).toEqual({ foreign_keys: 1 })
+  })
+
   it('rejects partial or inverted model parameter pairs at the database boundary', () => {
     const database = createDatabase()
     database.exec(`

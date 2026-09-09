@@ -1,5 +1,8 @@
 <script setup lang="ts">
-import { computed, shallowRef } from 'vue'
+import type { LocalArtifact } from '@buddy-shared/artifacts/artifactApi'
+import type { LocalChangeSetSummary } from '@buddy-shared/changes/changeApi'
+import type { LocalRunOutput } from '@buddy-shared/runs/runApi'
+import { computed, shallowRef, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useTaskContext } from '@/modules/tasks/taskContext'
 import DesktopTaskSpaceSelector from '@/modules/tasks/widgets/composer/DesktopTaskSpaceSelector.vue'
@@ -25,6 +28,21 @@ const { activeSpace, activeTaskId, currentTitle, openTask, startTask } = tasks.s
 const { getChangeSet, readArtifactText } = workspace.context
 const chatSession = workspace.session
 const taskSidebarCollapsed = shallowRef(false)
+const viewMode = shallowRef<'chat' | 'canvas'>('chat')
+const retainedOutputs = shallowRef<readonly LocalRunOutput[]>([])
+const retainedChanges = shallowRef<readonly LocalChangeSetSummary[]>([])
+const panelOutputs = computed(() => [...workspace.transcript.runOutputs.value, ...retainedOutputs.value])
+const panelChanges = computed(() => [...workspace.transcript.changeSets.value, ...retainedChanges.value])
+function retainArtifacts(artifacts: readonly LocalArtifact[]) {
+  const existing = new Map(retainedOutputs.value.flatMap(output => output.artifacts).map(artifact => [artifact.artifactId, artifact]))
+  for (const artifact of artifacts) existing.set(artifact.artifactId, artifact)
+  retainedOutputs.value = [...existing.values()].map(artifact => ({ runId: artifact.runId, createdAt: artifact.createdAt, sourceToolCallId: artifact.sourceToolCallId, artifacts: [artifact] }))
+}
+watch(chatSession.activeConversationId, () => {
+  viewMode.value = 'chat'
+  retainedOutputs.value = []
+  retainedChanges.value = []
+})
 const {
   activeTab,
   artifactCount,
@@ -35,10 +53,21 @@ const {
   activeConversationId: workspace.session.activeConversationId,
   activeRunId: computed(() => workspace.execution.activeRun.value?.id ?? null),
   browser,
-  changeSets: workspace.transcript.changeSets,
+  changeSets: panelChanges,
   runSignalEvents: workspace.transcript.runSignalEvents,
-  runOutputs: workspace.transcript.runOutputs,
+  runOutputs: panelOutputs,
 })
+function openArtifact(id: string) {
+  void contextActions.openArtifact(id)
+}
+function openNodeArtifact(artifact: LocalArtifact) {
+  retainArtifacts([artifact])
+  openArtifact(artifact.artifactId)
+}
+function openNodeChanges(changes: LocalChangeSetSummary) {
+  retainedChanges.value = [...retainedChanges.value.filter(item => item.changeSetId !== changes.changeSetId), changes]
+  contextActions.openChanges(changes.changeSetId)
+}
 const {
   activeIndex: activeSearchIndex,
   activeMessageId: activeSearchMessageId,
@@ -83,6 +112,7 @@ const {
     </template>
 
     <DesktopChatWorkspaceHeader
+      :view-mode="viewMode"
       :active-search-index="activeSearchIndex"
       :artifact-count="artifactCount"
       :can-open-context="activeTaskId !== null"
@@ -94,6 +124,7 @@ const {
       :context-open="contextOpen"
       :language="language"
       :title="currentTitle"
+      @toggle-canvas="viewMode = viewMode === 'chat' ? 'canvas' : 'chat'"
       @close-conversation-search="searchActions.close"
       @next-conversation-search-result="searchActions.move(1)"
       @open-conversation-search="searchActions.open"
@@ -102,11 +133,14 @@ const {
       @update-conversation-search="searchActions.setQuery"
     />
     <DesktopChatWorkspace
+      :view-mode="viewMode"
       :active-search-message-id="notificationTargetMessageId ?? activeSearchMessageId"
       :workspace="workspace"
       :matching-search-message-ids="matchingMessageIds"
       @open-settings="router.push(desktopRouteLocations.settings($event))"
-      @open-artifact="contextActions.openArtifact"
+      @open-artifact="openArtifact"
+      @open-node-artifact="openNodeArtifact"
+      @open-node-changes="openNodeChanges"
       @open-changes="contextActions.openChanges"
     >
       <template v-if="activeTaskId === null" #composerLeadingContext>

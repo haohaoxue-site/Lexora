@@ -7,8 +7,8 @@ import type {
   BrowserStateSnapshot,
   BrowserWaitOutcome,
 } from '../../../shared/browser'
-import type { BuddySessionCapability } from '../agent/BuddySessionCapability'
-import type { BuddyInProcessExtension } from '../agent/createBuddyResourceLoader'
+import type { BuddyCapability } from '../agent/extensions/BuddyCapability'
+import type { BuddyInProcessExtension } from '../agent/extensions/BuddyInProcessExtension'
 import type { BrowserCapabilityServiceOptions } from './BrowserCapabilityService'
 import type {
   BrowserToolDetails,
@@ -60,7 +60,7 @@ export interface CreateBrowserExtensionOptions {
   service: BrowserExtensionService
 }
 
-export function createBrowserCapability(options: BrowserCapabilityServiceOptions): BuddySessionCapability {
+export function createBrowserCapability(options: BrowserCapabilityServiceOptions): BuddyCapability {
   const service = new BrowserCapabilityService(options)
   return {
     extension: createBrowserExtension({ service }),

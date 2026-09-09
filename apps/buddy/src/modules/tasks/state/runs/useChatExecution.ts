@@ -1,11 +1,20 @@
+import type { ChatDrafts } from '../drafts/typing'
 import type { UseChatTurnExecutionOptions } from './useChatTurnExecution'
 import type { UseChatBranchMutationsOptions } from '@/modules/tasks/state/conversations/useChatBranchMutations'
+import { computed } from 'vue'
 import { useChatBranchMutations } from '@/modules/tasks/state/conversations/useChatBranchMutations'
+import { useComposerTarget } from '../composer/useComposerTarget'
 import { useChatTurnExecution } from './useChatTurnExecution'
 
-type UseChatExecutionOptions = UseChatTurnExecutionOptions & Omit<UseChatBranchMutationsOptions, 'isSending'>
+type UseChatExecutionOptions = Omit<UseChatTurnExecutionOptions, 'composerTarget'> & Omit<UseChatBranchMutationsOptions, 'isSending' | 'composerTarget'> & { drafts: ChatDrafts }
 
 export function useChatExecution(options: UseChatExecutionOptions) {
+  const composerTarget = useComposerTarget({
+    drafts: options.drafts,
+    conversationId: options.session.activeConversationId,
+    branchId: options.session.activeBranchId,
+    persist: options.persistWorkspaceState,
+  })
   const turnExecution = useChatTurnExecution({
     activeRun: options.activeRun,
     approvalPolicy: options.approvalPolicy,
@@ -14,6 +23,7 @@ export function useChatExecution(options: UseChatExecutionOptions) {
     taskIndexData: options.taskIndexData,
     session: options.session,
     drafts: options.drafts,
+    composerTarget,
     draftScopeKey: options.draftScopeKey,
     draftChangedMessage: options.draftChangedMessage,
     executionProfile: options.executionProfile,
@@ -29,6 +39,7 @@ export function useChatExecution(options: UseChatExecutionOptions) {
     unavailableCommandMessage: options.unavailableCommandMessage,
   })
   const branchMutations = useChatBranchMutations({
+    composerTarget,
     activeRun: options.activeRun,
     api: options.api,
     canSendDraft: options.canSendDraft,
@@ -48,7 +59,14 @@ export function useChatExecution(options: UseChatExecutionOptions) {
   })
 
   return {
+    composerTarget,
+    beginFollowup: (target: Parameters<typeof composerTarget.beginFollowup>[0]) => composerTarget.beginFollowup(target, () => branchMutations.canMutateBranch.value),
+    cancelFollowup: composerTarget.cancelFollowup,
     ...branchMutations,
     ...turnExecution,
+    canSend: computed(() => turnExecution.canSend.value && !branchMutations.isMutatingBranch.value),
+    send: (payload: Parameters<typeof turnExecution.send>[0]) => branchMutations.isMutatingBranch.value
+      ? Promise.resolve(false)
+      : turnExecution.send(payload),
   }
 }

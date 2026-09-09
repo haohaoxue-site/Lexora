@@ -1,6 +1,6 @@
 import type { Static, TSchema } from 'typebox'
-import type { BuddySessionCapability } from '../agent/BuddySessionCapability'
-import type { BuddyInProcessExtension } from '../agent/createBuddyResourceLoader'
+import type { BuddyCapability } from '../agent/extensions/BuddyCapability'
+import type { BuddyInProcessExtension } from '../agent/extensions/BuddyInProcessExtension'
 import type { DirectoryGrant } from '../directories/resolveGrantedPath'
 import type { ImageTransformService } from './ImageTransformService'
 import type { ImageTransformToolDetails } from './imageTransformToolContract'
@@ -15,7 +15,7 @@ import { imageTransformParameters } from './imageTransformToolParameters'
 
 type ImageTransformParameters = Static<typeof imageTransformParameters>
 
-export function createImageTransformCapability(options: CreateImageTransformExtensionOptions): BuddySessionCapability {
+export function createImageTransformCapability(options: CreateImageTransformExtensionOptions): BuddyCapability {
   return {
     extension: createImageTransformExtension(options),
     classify: classifyImageTransformTool,
