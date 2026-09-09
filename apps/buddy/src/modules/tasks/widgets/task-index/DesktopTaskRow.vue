@@ -162,7 +162,7 @@ function resolveDropPosition(event: DragEvent): DesktopTaskPinnedDropPosition {
           <DesktopIcon :component="activityIcon" />
         </span>
         <div class="desktop-task-row__actions">
-          <NDropdown trigger="click" :options="actions" @select="handleAction">
+          <NDropdown trigger="click" placement="bottom-start" :options="actions" @select="handleAction">
             <button
               class="desktop-task-sidebar__more"
               type="button"

@@ -136,6 +136,7 @@ function resolveDropPosition(event: DragEvent): DesktopTaskPinnedDropPosition {
     <div class="desktop-task-space-row__actions">
       <NDropdown
         trigger="click"
+        placement="bottom-start"
         :options="menuOptions"
         @select="handleMenuAction"
       >
