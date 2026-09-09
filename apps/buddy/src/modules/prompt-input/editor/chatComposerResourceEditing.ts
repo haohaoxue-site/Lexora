@@ -146,6 +146,8 @@ export const ChatComposerResourceReference = Node.create<{
       dom.className = 'chat-prompt-token-node'
       dom.contentEditable = 'false'
       dom.dataset.type = 'chat-resource-reference'
+      dom.dataset.resourceId = node.attrs.resourceId
+      dom.setAttribute('role', 'button')
       icon.alt = ''
       icon.className = 'chat-resource-reference__icon'
       icon.draggable = false

@@ -30,8 +30,8 @@ describe('buddyChatMessageContent', () => {
     expect(document.body.textContent).toContain('<img src="https://example.com/pixel.png" alt="像素">')
   })
 
-  it('renders structured user content in body order and previews message snapshots', async () => {
-    const html = await renderStructuredUserMessage()
+  it.each([false, true])('renders inline-only snapshots once above the body and marks only reference cards (independent attachment: %s)', async (panel) => {
+    const html = await renderStructuredUserMessage(panel)
     const document = parseHtml(html)
     const body = document.querySelector('.buddy-chat-message-content__structured-body')
     const reference = document.querySelector('[data-resource-id="resource-1"]')
@@ -40,6 +40,11 @@ describe('buddyChatMessageContent', () => {
     expect(reference?.textContent).toBe('reference.png')
     expect(document.querySelector('.buddy-chat-message-content__attachments')?.textContent)
       .toContain('reference.png')
+    expect(document.querySelectorAll('.buddy-chat-message-content__attachment')).toHaveLength(1)
+    expect(document.querySelectorAll('.buddy-chat-resource-reference')).toHaveLength(2)
+    expect(document.querySelectorAll('.resource-reference-badge')).toHaveLength(panel ? 0 : 1)
+    expect(reference?.getAttribute('aria-label')).toBe('定位附件 reference.png')
+    expect(document.querySelector('.buddy-chat-message-content__preview-trigger img')?.getAttribute('src')).toBe('lexora-attachment://preview/attachment-1')
     expect(html).toContain('attachment-1')
   })
 })
@@ -67,7 +72,7 @@ async function renderMessage(role: LocalMessage['role'], text: string): Promise<
   }))
 }
 
-async function renderStructuredUserMessage(): Promise<string> {
+async function renderStructuredUserMessage(panel: boolean): Promise<string> {
   const message = {
     attachments: [{
       attachmentId: 'attachment-1',
@@ -86,10 +91,11 @@ async function renderStructuredUserMessage(): Promise<string> {
             { text: '先看', type: 'text' },
             { resourceId: 'resource-1', type: 'resource_ref' },
             { text: '后', type: 'text' },
+            { resourceId: 'resource-1', type: 'resource_ref' },
           ],
           type: 'paragraph',
         }],
-        panelResourceIds: ['resource-1'],
+        panelResourceIds: panel ? ['resource-1'] : [],
         version: 1,
       },
     },

@@ -1,10 +1,11 @@
 import type { BuddyComposerSource } from '@buddy-shared/conversation/composerResource'
-import type { UseChatComposerOptions } from './typing'
+import type { ComposerResourceCard, UseChatComposerOptions } from './typing'
 import type { ChatPromptContextOption } from '@/modules/prompt-input'
 import { parseBuddyChatCommand } from '@buddy-shared/conversation/buddyChatCommands'
 import { computed, onScopeDispose, watch } from 'vue'
 import { CHAT_PROMPT_DIRECTIVE_NODE_NAME, getChatComposerResourceIds, serializeChatComposerContent } from '@/modules/prompt-input'
 import { insertChatComposerResources, insertResolvedChatComposerResource, removeChatComposerPanelResource, removeChatComposerResource } from '@/modules/prompt-input/ui'
+import { resolveComposerResourcePreviewUrl } from '../../model/attachments/chatAttachmentView'
 import { resolveChatComposerModelInputIssue } from '../../model/composer/chatComposerModelCapability'
 import { useChatComposerEditor } from './useChatComposerEditor'
 import { useChatComposerSuggestions } from './useChatComposerSuggestions'
@@ -33,6 +34,7 @@ export function useChatComposer(options: UseChatComposerOptions) {
     onSuggestionKeydown: query.handleKeydown,
     onPasteFiles: files => attachFiles(files, 'both'),
     onSubmit: submit,
+    onLocateResource: options.onLocateResource,
   })
   const resourceIds = computed(() => getChatComposerResourceIds(contentJSON.value))
   const modelInputIssue = computed(() => resolveChatComposerModelInputIssue({
@@ -49,13 +51,18 @@ export function useChatComposer(options: UseChatComposerOptions) {
   ) && resourceIds.value.every(id => resourceById.value.get(id)?.resource.state === 'ready'))
   const panelResources = computed(() => (contentJSON.value.attrs?.panelResourceIds as string[] ?? [])
     .flatMap(id => resourceById.value.get(id) ?? []))
-  const resourceStripResources = computed(() => {
+  const resourceStripResources = computed<ComposerResourceCard[]>(() => {
     const panelIds = new Set(panelResources.value.map(entry => entry.resource.resourceId))
-    const failedReferenced = resourceIds.value.flatMap((id) => {
+    return [...new Set([...panelIds, ...resourceIds.value])].flatMap((id) => {
       const entry = resourceById.value.get(id)
-      return entry?.resource.state === 'failed' && !panelIds.has(id) ? [entry] : []
+      return entry
+        ? [{
+            ...entry,
+            isReference: !panelIds.has(id),
+            previewUrl: resolveComposerResourcePreviewUrl(entry.resource),
+          }]
+        : []
     })
-    return [...panelResources.value, ...failedReferenced]
   })
 
   function submit() {
@@ -81,9 +88,7 @@ export function useChatComposer(options: UseChatComposerOptions) {
     const current = editor.value
     if (!current)
       return false
-    return resourceById.value.get(resourceId)?.resource.state === 'failed'
-      ? removeChatComposerResource(current, resourceId)
-      : removeChatComposerPanelResource(current, resourceId)
+    return removeChatComposerResource(current, resourceId)
   }
 
   function selectSuggestion(option: ChatPromptContextOption | undefined) {

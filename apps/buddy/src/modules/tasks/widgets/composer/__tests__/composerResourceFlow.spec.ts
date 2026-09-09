@@ -202,13 +202,14 @@ describe('composer resource flow', () => {
     expect(flow.root.querySelector('[data-type="chat-resource-reference"]')?.classList.contains('ProseMirror-selectednode')).toBe(true)
   })
 
-  it('removes panel and inline appearances independently and restores each with undo', async () => {
+  it('removes a card and all inline appearances in one undoable edit while deleting an inline occurrence retains independent attachments', async () => {
     const flow = await mountFlow()
     flow.pasteImages()
     const [first, second] = getChatComposerResourceIds(flow.editor.getJSON())
-    flow.composer.removePanelResource(first!)
+    flow.composer.removeResource(first!)
     expect(flow.editor.state.doc.attrs.panelResourceIds).toEqual([second])
-    expect(getChatComposerResourceIds(flow.editor.getJSON())).toEqual([first, second])
+    expect(getChatComposerResourceIds(flow.editor.getJSON())).toEqual([second])
+    expect(flow.editor.view.dom.querySelectorAll('[data-type="chat-resource-reference"]')).toHaveLength(1)
     flow.editor.commands.undo()
     expect(flow.editor.state.doc.attrs.panelResourceIds).toEqual([first, second])
     flow.editor.commands.deleteRange({ from: 1, to: 2 })
@@ -217,6 +218,35 @@ describe('composer resource flow', () => {
     flow.accepting.resolve()
     flow.uploading.resolve()
     await flow.resources.whenAccepted()
+  })
+
+  it('derives a single reference card from repeated inline occurrences and restores its lifetime with undo', async () => {
+    const flow = await mountFlow()
+    const id = await flow.resources.selectSource({ bindingId: 'binding-1', relativePath: 'notes.txt', spaceId: 'space-1' })
+    flow.editor.commands.insertContent([
+      { attrs: { resourceId: id }, type: 'chatResourceReference' },
+      { text: ' plus ', type: 'text' },
+      { attrs: { resourceId: id }, type: 'chatResourceReference' },
+    ])
+    await nextTick()
+    expect(flow.root.querySelectorAll('.composer-resource-strip__card')).toHaveLength(1)
+    expect(flow.root.querySelector('.resource-reference-badge')?.textContent).toBe('引用')
+    flow.editor.commands.deleteRange({ from: 1, to: 2 })
+    await nextTick()
+    expect(flow.root.querySelectorAll('.composer-resource-strip__card')).toHaveLength(1)
+    const last = flow.editor.state.doc.firstChild!.nodeSize - 2
+    flow.editor.commands.deleteRange({ from: last, to: last + 1 })
+    await nextTick()
+    expect(flow.root.querySelectorAll('.composer-resource-strip__card')).toHaveLength(0)
+    expect(flow.editor.getText()).toBe(' plus ')
+    flow.editor.commands.undo()
+    await nextTick()
+    expect(flow.root.querySelectorAll('.composer-resource-strip__card')).toHaveLength(1)
+    flow.composer.removeResource(id!)
+    expect(getChatComposerResourceIds(flow.editor.getJSON())).toEqual([])
+    expect(flow.editor.getText()).toBe(' plus ')
+    flow.editor.commands.undo()
+    expect(getChatComposerResourceIds(flow.editor.getJSON())).toEqual([id])
   })
 
   it('removes a rejected provisional batch without losing later typing or resurrecting invalid IDs on redo', async () => {

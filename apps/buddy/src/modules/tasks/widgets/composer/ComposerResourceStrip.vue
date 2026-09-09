@@ -1,52 +1,68 @@
 <script setup lang="ts">
-import type { ComposerResourceView } from '../../state/composer/typing'
+import type { ComposerResourceCard } from './typing'
 
 import type { BuddyLocale } from '@/i18n/buddyI18n'
 import { Dismiss16Regular } from '@vicons/fluent'
 import { NButton, NSpin } from 'naive-ui'
-import { computed, shallowRef } from 'vue'
+import { computed, shallowRef, useTemplateRef } from 'vue'
 import { useBuddyI18n } from '@/i18n/buddyI18n'
 import { FileIcon } from '@/shared/ui/file-icon'
 import DesktopIcon from '@/shared/ui/icon/DesktopIcon.vue'
 import BuddyImagePreview from '@/shared/ui/media/BuddyImagePreview.vue'
+import ResourceReferenceBadge from '../attachments/ResourceReferenceBadge.vue'
+import { useResourceHighlight } from '../attachments/useResourceHighlight'
 
 const props = defineProps<{
   disabled: boolean
   language: BuddyLocale
-  resources: readonly ComposerResourceView[]
+  resources: readonly ComposerResourceCard[]
 }>()
 const emit = defineEmits<{
   remove: [resourceId: string]
   retry: [resourceId: string]
 }>()
 const { t } = useBuddyI18n(() => props.language)
+const resourceTrack = useTemplateRef<HTMLDivElement>('resourceTrack')
+const { highlightedResourceId, highlightResource } = useResourceHighlight(resourceTrack)
+const failedPreviewUrls = shallowRef<ReadonlySet<string>>(new Set())
 const previewVisible = shallowRef(false)
 const previewIndex = shallowRef(0)
-const previewSources = computed(() => props.resources.flatMap(({ resource }) => (
-  resource.state === 'ready' && resource.kind === 'image' && resource.previewUrl ? [resource.previewUrl] : []
-)))
+const cards = computed(() => props.resources.map(entry => ({
+  ...entry,
+  previewUrl: entry.previewUrl && !failedPreviewUrls.value.has(entry.previewUrl) ? entry.previewUrl : null,
+})))
+const previewSources = computed(() => cards.value.flatMap(({ previewUrl }) => previewUrl ? [previewUrl] : []))
 function openPreview(source: string) {
   previewIndex.value = previewSources.value.indexOf(source)
   previewVisible.value = true
 }
+
+function markPreviewFailed(url: string) {
+  failedPreviewUrls.value = new Set([...failedPreviewUrls.value, url])
+}
+
+defineExpose({ highlightResource })
 </script>
 
 <template>
-  <div v-if="resources.length" class="composer-resource-strip">
+  <div v-if="cards.length" ref="resourceTrack" class="composer-resource-strip">
     <div
-      v-for="{ resource, canRetry } in resources"
+      v-for="{ resource, canRetry, isReference, previewUrl } in cards"
       :key="resource.resourceId"
       class="composer-resource-strip__card"
-      :class="{ 'is-failed': resource.state === 'failed' }"
+      :class="{ 'is-failed': resource.state === 'failed', 'is-highlighted': highlightedResourceId === resource.resourceId, 'is-previewable': previewUrl }"
+      :data-resource-card="resource.resourceId"
+      @click="previewUrl && openPreview(previewUrl)"
     >
       <NSpin v-if="resource.state === 'importing'" :size="20" />
       <button
-        v-else-if="resource.state === 'ready' && resource.kind === 'image' && resource.previewUrl"
+        v-else-if="previewUrl"
         class="composer-resource-strip__preview"
         type="button"
-        @click="openPreview(resource.previewUrl)"
+        :aria-label="t('desktop.imagePreview.open', { name: resource.name })"
+        @click.stop="openPreview(previewUrl)"
       >
-        <img :src="resource.previewUrl" :alt="resource.name" width="36" height="36">
+        <img :src="previewUrl" :alt="resource.name" width="36" height="36" @error="markPreviewFailed(previewUrl)">
       </button>
       <FileIcon v-else :name="resource.name" size="medium" />
       <span class="composer-resource-strip__details">
@@ -59,7 +75,8 @@ function openPreview(source: string) {
               : 'desktop.chat.attachmentSourceUnavailable') }}
         </small>
       </span>
-      <NButton v-if="resource.state === 'failed' && canRetry" text :disabled="disabled" size="tiny" @click="emit('retry', resource.resourceId)">
+      <ResourceReferenceBadge v-if="isReference" :language="language" />
+      <NButton v-if="resource.state === 'failed' && canRetry" text :disabled="disabled" size="tiny" @click.stop="emit('retry', resource.resourceId)">
         {{ t('desktop.chat.retryAttachment') }}
       </NButton>
       <NButton
@@ -68,7 +85,7 @@ function openPreview(source: string) {
         size="tiny"
         :disabled="disabled"
         :aria-label="t('desktop.chat.removeAttachment')"
-        @click="emit('remove', resource.resourceId)"
+        @click.stop="emit('remove', resource.resourceId)"
       >
         <template #icon>
           <DesktopIcon :component="Dismiss16Regular" />
@@ -100,6 +117,10 @@ function openPreview(source: string) {
     background: var(--buddy-surface-raised);
     padding: 0.4rem;
     font-size: 0.75rem;
+
+    &.is-previewable {
+      cursor: zoom-in;
+    }
   }
 
   &__details {
@@ -129,5 +150,11 @@ function openPreview(source: string) {
 
     img { object-fit: cover; }
   }
+}
+
+.composer-resource-strip__card.is-highlighted {
+  border-color: var(--buddy-focus-ring);
+  background: var(--buddy-accent-surface);
+  box-shadow: inset 0 0 0 1px var(--buddy-focus-ring);
 }
 </style>
