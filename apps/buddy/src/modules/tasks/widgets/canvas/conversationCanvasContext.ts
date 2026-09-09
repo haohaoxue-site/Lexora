@@ -18,4 +18,5 @@ export const conversationCanvasActions: InjectionKey<{
   followup: (id: string) => void
   retry: (id: string) => void
   openArtifact: (id: string) => void
+  openQuote: (messageId: string, quoteId: string) => void
 }> = Symbol('conversationCanvasActions')

@@ -2,14 +2,17 @@
 import type { LocalConversationTreeNode } from '@buddy-shared/conversation/conversationTree'
 import type { BuddyChatMessageListHandle } from '../transcript/chatMessageViewport'
 import type { ChatWorkspaceEmits, ChatWorkspaceProps } from './typing'
+import { readBuddyUserMessageContent } from '@buddy-shared/conversation/buddyUserContent'
 import { computed, defineAsyncComponent, nextTick, shallowRef, useTemplateRef, watch } from 'vue'
 import { useBuddyI18n } from '@/i18n/buddyI18n'
 import DesktopRuntimePane from '@/platform/runtime/DesktopRuntimePane.vue'
 import { useConversationNodeDetail } from '../../state/conversations/useConversationNodeDetail'
 import ConversationNodeDetail from '../canvas/ConversationNodeDetail.vue'
 import { useConversationDetailResize } from '../canvas/useConversationDetailResize'
+import { useChatQuoteNavigation } from '../quotes/useChatQuoteNavigation'
 import DesktopChatTranscript from '../transcript/DesktopChatTranscript.vue'
 import DesktopChatWelcome from '../welcome/DesktopChatWelcome.vue'
+import ChatSelectionQuoteMenu from './ChatSelectionQuoteMenu.vue'
 import DesktopTaskComposer from './DesktopTaskComposer.vue'
 import DesktopTaskNotices from './DesktopTaskNotices.vue'
 import { useChatWorkspace } from './useChatWorkspace'
@@ -21,6 +24,7 @@ defineSlots<{
 }>()
 const DesktopConversationCanvas = defineAsyncComponent(() => import('../canvas/DesktopConversationCanvas.vue'))
 const composerRef = useTemplateRef<InstanceType<typeof DesktopTaskComposer>>('composerRef')
+const canvasRef = useTemplateRef<InstanceType<typeof DesktopConversationCanvas>>('canvasRef')
 const canvasVisited = shallowRef(false)
 const nodeDetail = useConversationNodeDetail({
   load: input => props.workspace.context.getNodeDetail(input),
@@ -36,7 +40,7 @@ const selectedNodeId = computed(() => {
   const target = detailVisible.value ? nodeDetail.target.value : null
   return props.workspace.tree.data.value?.nodes.find(node => target?.kind === 'question'
     ? node.kind === 'question' && node.messageId === target.messageId
-    : target?.kind === 'answer' && node.kind === 'answer' && node.runId === target.runId)?.id ?? null
+    : target?.kind === 'answer' && node.kind === 'answer' && node.attempts.some(attempt => attempt.runId === target.runId))?.id ?? null
 })
 const pageRef = useTemplateRef<HTMLElement>('pageRef')
 const detailResize = useConversationDetailResize(pageRef, detailVisible)
@@ -64,6 +68,47 @@ async function focusComposer() {
   await nextTick()
   composerRef.value?.focus()
 }
+
+const quoteContextKey = computed(() => [props.workspace.session.activeConversationId.value, props.workspace.session.activeBranchId.value, props.workspace.composer.editorKey.value].join(':'))
+const quoteOwnerKey = computed(() => [quoteContextKey.value, props.viewMode, nodeDetail.visible.value, nodeDetail.target.value?.kind === 'question' ? nodeDetail.target.value.messageId : nodeDetail.target.value?.runId].join(':'))
+const quoteDisabled = computed(() => isLoading.value || props.workspace.execution.isSending.value || props.workspace.execution.isMutatingBranch.value)
+const quoteNavigation = useChatQuoteNavigation({
+  root: pageRef,
+  ownerKey: quoteContextKey,
+  surfaceKey: quoteOwnerKey,
+  language: () => props.workspace.language.value,
+  conversationId: () => props.workspace.session.activeConversationId.value,
+  viewMode: () => props.viewMode,
+  revealMessage: id => viewport.revealMessage(id),
+  loadQuote: async (messageId, quoteId) => {
+    const conversationId = props.workspace.session.activeConversationId.value
+    if (!conversationId)
+      return null
+    const detail = await props.workspace.context.getNodeDetail({ conversationId, kind: 'question', messageId })
+    const item = detail.items.find(item => item.kind === 'message' && item.id === messageId)
+    return item?.kind === 'message' ? readBuddyUserMessageContent(item.content)?.userContent.quotes?.find(quote => quote.id === quoteId) ?? null : null
+  },
+  openSource: async (source) => {
+    const node = props.workspace.tree.data.value?.nodes.find(node => source.role === 'user'
+      ? node.messageId === source.messageId
+      : node.kind === 'answer' && node.attempts.some(attempt => attempt.runId === source.runId))
+    if (!node)
+      return 'unavailable'
+    emit('showCanvas')
+    const current = nodeDetail.target.value
+    const alreadyOpen = nodeDetail.visible.value && !nodeDetail.loading.value && !nodeDetail.error.value && (source.role === 'user'
+      ? current?.kind === 'question' && current.messageId === source.messageId
+      : current?.kind === 'answer' && current.runId === source.runId)
+    const ready = alreadyOpen ? undefined : nodeDetail.open(source.role === 'assistant' ? { ...node, runId: source.runId } : node)
+    const target = nodeDetail.target.value
+    await ready
+    await nextTick()
+    if (nodeDetail.target.value !== target || !nodeDetail.visible.value || props.viewMode !== 'canvas')
+      return 'cancelled'
+    canvasRef.value?.focusNode(node.id)
+    return nodeDetail.error.value ? 'unavailable' : 'opened'
+  },
+})
 
 async function editNode(node: LocalConversationTreeNode) {
   if (node.kind !== 'question' || !node.messageId)
@@ -113,6 +158,7 @@ function openDetailChanges(id: string) {
         <DesktopConversationCanvas
           v-if="canvasVisited"
           v-show="viewMode === 'canvas'"
+          ref="canvasRef"
           :active="viewMode === 'canvas'"
           :workspace="workspace"
           :matches="matchingSearchMessageIds ?? []"
@@ -120,6 +166,7 @@ function openDetailChanges(id: string) {
           :search-message-id="activeSearchMessageId"
           @focus-composer="focusComposer"
           @open-node="nodeDetail.open"
+          @open-quote="quoteNavigation.locateStored"
           @edit-node="editNode"
           @open-node-artifact="nodeDetail.close(); emit('openNodeArtifact', $event)"
         />
@@ -191,12 +238,22 @@ function openDetailChanges(id: string) {
           </DesktopTaskComposer>
         </div>
       </footer>
+      <ChatSelectionQuoteMenu
+        :root="pageRef" :language="language" :owner-key="quoteOwnerKey" :disabled="quoteDisabled"
+        :add-quote="quote => composerRef?.quote(quote) ?? 'unavailable'" @accepted="focusComposer"
+      />
       <div v-if="detailResize.dragging.value" class="desktop-chat-page__resize-shield" />
     </section>
   </DesktopRuntimePane>
 </template>
 
 <style scoped lang="scss">
+.desktop-chat-page :deep(::highlight(buddy-message-quote)) {
+  background-color: var(--buddy-accent-solid);
+  color: var(--buddy-text-on-accent);
+  text-decoration: underline;
+}
+
 .desktop-chat-page {
   position: relative;
   display: grid;

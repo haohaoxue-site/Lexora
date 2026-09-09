@@ -61,6 +61,7 @@ export class ChatCommandService {
       || command.kind !== 'action'
       || command.name !== 'compact'
       || getBuddyUserContentResourceIds(draft.content).length
+      || draft.content.quotes?.length
       || directives.length !== 1
       || directives[0]?.commandMode !== 'action'
       || directives[0].value !== `/${command.name}`

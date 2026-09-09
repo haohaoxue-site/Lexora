@@ -26,6 +26,7 @@ const emit = defineEmits<{
   open: [id: string]
   edit: [id: string]
   openArtifact: [id: string]
+  openQuote: [messageId: string, quoteId: string]
   refresh: []
 }>()
 const { t } = useBuddyI18n(() => props.language)
@@ -57,6 +58,7 @@ provide(conversationCanvasActions, {
   retry: id => emit('retry', id),
   followup: id => emit('followup', id),
   openArtifact: id => emit('openArtifact', id),
+  openQuote: (messageId, quoteId) => emit('openQuote', messageId, quoteId),
 })
 
 defineExpose({

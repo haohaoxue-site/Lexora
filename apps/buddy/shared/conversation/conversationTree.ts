@@ -5,7 +5,13 @@ import { runStatusSchema } from '../runs/runApi'
 import { idSchema, timestampSchema } from '../runtime/apiValidation'
 import { runTokenUsageSchema } from '../usage/runTokenUsage'
 import { attachmentSchema } from './attachmentApi'
+import { buddyMessageQuoteSchema } from './buddyUserContent'
 import { conversationResponseSchemas } from './conversationApi'
+
+export const CONVERSATION_QUOTE_PREVIEW_LENGTH = 160
+const conversationQuotePreviewSchema = buddyMessageQuoteSchema.unwrap().extend({
+  text: z.string().max(CONVERSATION_QUOTE_PREVIEW_LENGTH),
+})
 
 export const conversationTreeNodeSchema = z.object({
   id: idSchema,
@@ -15,6 +21,8 @@ export const conversationTreeNodeSchema = z.object({
   messageId: idSchema.nullable(),
   runId: idSchema.nullable(),
   text: z.string().max(640),
+  quotes: z.array(conversationQuotePreviewSchema).max(3),
+  quoteCount: z.number().int().nonnegative(),
   attachments: z.array(attachmentSchema).max(3),
   attachmentCount: z.number().int().nonnegative(),
   artifacts: z.array(artifactSchema).max(3),

@@ -8,6 +8,7 @@ import { useBuddyI18n } from '@/i18n/buddyI18n'
 import DesktopIcon from '@/shared/ui/icon/DesktopIcon.vue'
 import { resolveBuddyAttachmentPreviewUrl } from '../../model/attachments/chatAttachmentView'
 import { formatChatRunDuration } from '../../model/transcript/chatRunDuration'
+import ChatQuoteStrip from '../quotes/ChatQuoteStrip.vue'
 import BuddyChatTokenUsage from '../transcript/BuddyChatTokenUsage.vue'
 import { conversationCanvasActions } from './conversationCanvasContext'
 
@@ -77,7 +78,7 @@ function open(event: MouseEvent) {
           </template>
         </div>
       </header>
-      <div v-if="message.text || message.attachmentCount || message.artifactCount || busy || message.kind === 'draft'" class="conversation-node__body" @mousedown.stop @pointerdown.stop>
+      <div v-if="message.text || message.quoteCount || message.attachmentCount || message.artifactCount || busy || message.kind === 'draft'" class="conversation-node__body" @mousedown.stop @pointerdown.stop>
         <div v-if="message.attachmentCount" class="conversation-node__attachments">
           <span v-for="attachment in message.attachments" :key="attachment.attachmentId" class="conversation-node__attachment" :title="attachment.name">
             <img v-if="attachment.kind === 'image'" :src="resolveBuddyAttachmentPreviewUrl(attachment) ?? undefined" :alt="attachment.name" loading="lazy" draggable="false">
@@ -85,6 +86,15 @@ function open(event: MouseEvent) {
             <span>{{ attachment.name }}</span>
           </span>
           <button v-if="message.attachmentCount > message.attachments.length" type="button" class="conversation-node__more" :aria-label="t('desktop.canvas.moreResources', { count: message.attachmentCount - message.attachments.length })" @click.stop="actions.open(message.id)">
+            {{ t('desktop.canvas.more') }}
+          </button>
+        </div>
+        <div v-if="message.quoteCount && message.messageId" class="conversation-node__quotes" @click.stop>
+          <ChatQuoteStrip
+            :quotes="message.quotes" :language="actions.language.value"
+            :navigate="quote => actions.openQuote(message.messageId!, quote.id)"
+          />
+          <button v-if="message.quoteCount > message.quotes.length" type="button" class="conversation-node__more" @click="actions.open(message.id)">
             {{ t('desktop.canvas.more') }}
           </button>
         </div>
@@ -132,6 +142,8 @@ function open(event: MouseEvent) {
 .conversation-node__status.running, .conversation-node__status.queued { color: var(--buddy-accent-text); }
 .conversation-node__status.failed { color: var(--buddy-status-danger-text); }
 .conversation-node__body { display: flex; flex: 1; min-height: 0; flex-direction: column; gap: 8px; padding: 0 16px 12px; overflow: hidden; }
+.conversation-node__quotes { display: flex; flex: none; height: 88px; align-items: flex-start; gap: 6px; overflow: hidden; }
+.conversation-node__quotes :deep(.chat-quote-strip) { flex: 1; }
 .conversation-node__text { flex: 1; min-height: 0; overflow: hidden; }
 .conversation-node__preview { margin: 0; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 13px; line-height: 1.65; }
 .conversation-node.busy .conversation-node__preview { display: block; }

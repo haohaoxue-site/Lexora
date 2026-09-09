@@ -2,6 +2,29 @@ import { z } from 'zod'
 
 export const buddyResourceIdSchema = z.string().regex(/^[A-Z0-9][\w-]{0,127}$/i)
 
+export const BUDDY_QUOTE_COUNT_LIMIT = 16
+export const BUDDY_QUOTE_TEXT_LIMIT = 32_768
+
+export const buddyMessageQuoteSchema = z.object({
+  id: buddyResourceIdSchema,
+  text: z.string().min(1).max(BUDDY_QUOTE_TEXT_LIMIT).refine(text => text.trim().length > 0),
+  textOffset: z.number().int().nonnegative().optional().describe('忽略排版空白后的 UTF-16 起始偏移，用于区分同文片段'),
+  source: z.object({
+    conversationId: buddyResourceIdSchema,
+    branchId: buddyResourceIdSchema,
+    messageId: buddyResourceIdSchema,
+    role: z.enum(['user', 'assistant']),
+    runId: buddyResourceIdSchema.nullable(),
+  }).strict().readonly(),
+}).strict().readonly()
+
+export type BuddyMessageQuote = z.infer<typeof buddyMessageQuoteSchema>
+
+export const buddyMessageQuotesSchema = z.array(buddyMessageQuoteSchema)
+  .max(BUDDY_QUOTE_COUNT_LIMIT)
+  .refine(quotes => new Set(quotes.map(quote => quote.id)).size === quotes.length)
+  .readonly()
+
 const skillDirectiveSchema = z.object({
   directive: z.literal('skill'),
   type: z.literal('prompt_directive'),
@@ -36,6 +59,7 @@ export const buddyUserContentV1Schema = z.object({
     ids => new Set(ids).size === ids.length,
     'Duplicate panel resource',
   ).readonly(),
+  quotes: buddyMessageQuotesSchema.optional(),
   version: z.literal(1),
 }).strict().readonly()
 

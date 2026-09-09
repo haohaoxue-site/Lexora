@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { BuddyMessageQuote } from '@buddy-shared/conversation/buddyUserContent'
 import type { TaskComposerHostProps } from './typing'
 import { useTemplateRef } from 'vue'
 import DesktopChatComposer from '../composer/DesktopChatComposer.vue'
@@ -7,7 +8,10 @@ import { useTaskComposer } from './useTaskComposer'
 const props = defineProps<TaskComposerHostProps>()
 defineSlots<{ leadingContext?: () => unknown }>()
 const composerRef = useTemplateRef<InstanceType<typeof DesktopChatComposer>>('composerRef')
-defineExpose({ focus: () => composerRef.value?.focus() })
+defineExpose({
+  focus: () => composerRef.value?.focus(),
+  quote: (quote: BuddyMessageQuote) => composerRef.value?.quote(quote) ?? 'unavailable',
+})
 
 const { bindings, editorKey, sendMessage } = useTaskComposer(props)
 </script>

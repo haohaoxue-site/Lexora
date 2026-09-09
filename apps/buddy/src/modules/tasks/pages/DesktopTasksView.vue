@@ -133,6 +133,7 @@ const {
       :active-search-message-id="notificationTargetMessageId ?? activeSearchMessageId"
       :workspace="workspace"
       :matching-search-message-ids="matchingMessageIds"
+      @show-canvas="viewMode = 'canvas'"
       @open-settings="router.push(desktopRouteLocations.settings($event))"
       @open-artifact="openArtifact"
       @open-node-artifact="openNodeArtifact"

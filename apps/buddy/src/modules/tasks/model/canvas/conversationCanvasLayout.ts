@@ -82,7 +82,7 @@ export function conversationNodeSize(node: ConversationCanvasNode) {
   if (node.kind === 'draft')
     return { width: 320, height: 128 }
   const busy = node.status === 'running' || node.status === 'queued'
-  const sections = [node.attachmentCount ? 44 : 0, busy ? 152 : node.text ? 88 : 0, node.artifactCount ? 68 : 0].filter(Boolean)
+  const sections = [node.attachmentCount ? 44 : 0, node.quoteCount ? 88 : 0, busy ? 152 : node.text ? 88 : 0, node.artifactCount ? 68 : 0].filter(Boolean)
   const bodyHeight = sections.length ? sections.reduce((sum, height) => sum + height, 0) + (sections.length - 1) * 8 + 12 : 0
   return {
     width: busy ? 352 : 320,

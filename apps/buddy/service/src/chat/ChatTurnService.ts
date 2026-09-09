@@ -206,7 +206,7 @@ export class ChatTurnService {
         conversationId: existingConversation?.id ?? null,
         spaceId: space?.id ?? null,
       })
-    if (!content && resourceInputs.length === 0)
+    if (!content && resourceInputs.length === 0 && !draft.content.quotes?.length)
       throw new BuddyServiceError('VALIDATION_FAILED')
     const attachmentIds = resourceInputs.map(resource => resource.attachmentId)
 
@@ -329,7 +329,7 @@ export class ChatTurnService {
           { branchId: parentBranchId, conversationId: conversation.id, spaceId: space?.id ?? null },
         )
       : []
-    if (!replay && !content && resourceInputs.length === 0)
+    if (!replay && !content && resourceInputs.length === 0 && !draft?.content.quotes?.length)
       throw new BuddyServiceError('VALIDATION_FAILED')
     if (draft) {
       const directiveItems = draft.content.body.flatMap(paragraph => paragraph.content.flatMap(

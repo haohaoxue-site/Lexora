@@ -7,7 +7,7 @@ import { useEditor } from '@tiptap/vue-3'
 import { computed, shallowRef, watch } from 'vue'
 import { useBuddyI18n } from '@/i18n/buddyI18n'
 import { createChatComposerContentFromText, findChatComposerTrigger, serializeChatComposerContent, shouldSubmitChatComposerKey } from '@/modules/prompt-input'
-import { ChatComposerDocument, ChatComposerPromptDirective, ChatComposerResourceClipboard, ChatComposerResourceReference, moveChatComposerResourceSelection, setChatComposerPanelResources } from '@/modules/prompt-input/ui'
+import { ChatComposerDocument, ChatComposerPromptDirective, ChatComposerResourceClipboard, ChatComposerResourceReference, moveChatComposerResourceSelection } from '@/modules/prompt-input/ui'
 import { getFileIconUrl, resolveFileIcon } from '@/shared/ui/file-icon'
 
 export function useChatComposerEditor(options: ChatComposerEditorOptions) {
@@ -121,7 +121,8 @@ export function useChatComposerEditor(options: ChatComposerEditorOptions) {
         const nextPanelResourceIds: string[] = document.attrs.panelResourceIds
         const panelChanged = panelResourceIds.length !== nextPanelResourceIds.length
           || panelResourceIds.some((id, index) => id !== nextPanelResourceIds[index])
-        if (!bodyChanged && !panelChanged)
+        const quotesChanged = JSON.stringify(current.state.doc.attrs.quotes) !== JSON.stringify(document.attrs.quotes)
+        if (!bodyChanged && !panelChanged && !quotesChanged)
           return
       }
 
@@ -131,15 +132,13 @@ export function useChatComposerEditor(options: ChatComposerEditorOptions) {
         if (current) {
           const document = current.schema.nodeFromJSON(nextContent)
           const bodyChanged = !current.state.doc.content.eq(document.content)
-          if (!bodyChanged) {
-            setChatComposerPanelResources(current, document.attrs.panelResourceIds)
-          }
-          else {
-            current.view.dispatch(current.state.tr
-              .replaceWith(0, current.state.doc.content.size, document.content)
-              .setDocAttribute('panelResourceIds', document.attrs.panelResourceIds)
-              .setMeta('addToHistory', false))
-          }
+          const transaction = current.state.tr
+          if (bodyChanged)
+            transaction.replaceWith(0, current.state.doc.content.size, document.content)
+          current.view.dispatch(transaction
+            .setDocAttribute('panelResourceIds', document.attrs.panelResourceIds)
+            .setDocAttribute('quotes', document.attrs.quotes)
+            .setMeta('addToHistory', false))
         }
         options.onTrigger(null)
       }

@@ -11,6 +11,18 @@ import {
 } from '../chatMessageContent'
 
 describe('chatMessageContent', () => {
+  it('keeps quote-only messages visible without turning the quote into body text', () => {
+    const quoted = message('user', { resourceSnapshots: [], userContent: {
+      body: [{ type: 'paragraph', content: [] }],
+      panelResourceIds: [],
+      version: 1,
+      quotes: [{ id: 'quote-1', text: '    enabled: true', source: { conversationId: 'conversation-1', branchId: 'branch-1', messageId: 'message-1', role: 'assistant', runId: 'run-1' } }],
+    } })
+    expect(isVisibleChatMessage(quoted)).toBe(true)
+    expect(getChatMessageText(quoted)).toBe('')
+    expect(getChatMessageUserContent(quoted)?.userContent.quotes).toHaveLength(1)
+  })
+
   it('keeps text messages and removes tool or empty persisted bubbles', () => {
     const messages = [
       message('user', { text: 'Question' }),

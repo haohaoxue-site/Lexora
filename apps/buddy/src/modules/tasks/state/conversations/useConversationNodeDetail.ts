@@ -92,7 +92,7 @@ export function useConversationNodeDetail(options: {
     data.value = null
     buckets.value = new Map()
     visible.value = true
-    void refresh()
+    return refresh()
   }
   function close() {
     generation++
