@@ -25,7 +25,7 @@ const show = defineModel<boolean>('show', { required: true })
 const { t } = useBuddyI18n(() => props.language)
 const sourceMenuView = shallowRef<'menu' | 'files'>('menu')
 const sourcePickerQuery = shallowRef('')
-const sourcePopoverThemeOverrides = { padding: '8px 14px' } as const
+const sourcePopoverThemeOverrides = { padding: '8px' } as const
 const sourceTrigger = useTemplateRef<ComponentPublicInstance>('sourceTrigger')
 
 watch(show, (visible) => {
