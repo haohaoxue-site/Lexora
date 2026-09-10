@@ -108,6 +108,7 @@ defineExpose({ revealActivity })
             <BuddyChatToolDetails
               v-if="openEntries.get(entry.node.id) && canExpandChatTool(entry.node, actions.canPreviewFile)"
               :data-tool-detail-id="entry.node.toolCallId"
+              :error-code="entry.node.errorCode"
               :language="language" :presentation="entry.node.presentation"
               :status="entry.node.status" :tool-name="entry.node.toolName"
             />

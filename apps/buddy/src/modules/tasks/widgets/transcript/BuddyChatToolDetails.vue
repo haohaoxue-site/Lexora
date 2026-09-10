@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { BuddyToolPresentation } from '@buddy-shared/runs/runEventPresentation'
+import type { ToolFailureCode } from '@buddy-shared/runs/toolFailure'
 import type { ChatAgentToolNode } from '../../model/transcript/chatStreamingMessage'
 import type { BuddyLocale } from '@/i18n/buddyI18n'
 import { computed } from 'vue'
@@ -13,6 +14,7 @@ import { useChatToolActions } from './chatToolActionsContext'
 import DesktopTerminalTranscript from './DesktopTerminalTranscript.vue'
 
 const props = defineProps<{
+  errorCode?: ToolFailureCode
   language: BuddyLocale
   presentation: BuddyToolPresentation
   status: ChatAgentToolNode['status']
@@ -21,7 +23,7 @@ const props = defineProps<{
 
 const { t } = useBuddyI18n(() => props.language)
 const actions = useChatToolActions()
-const filePath = computed(() => props.status !== 'denied' && (props.presentation.card === 'read' || props.presentation.card === 'diff')
+const filePath = computed(() => props.status !== 'denied' && !props.errorCode && (props.presentation.card === 'read' || props.presentation.card === 'diff')
   ? props.presentation.path
   : undefined)
 const canPreview = computed(() => filePath.value !== undefined && actions.canPreviewFile(filePath.value))

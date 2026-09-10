@@ -3,6 +3,7 @@ import type { ApplicationDiagnosticReporter } from '../../../../shared/diagnosti
 import { createHash } from 'node:crypto'
 import { diagnosticIdentitySchema } from '../../../../shared/diagnostics/applicationDiagnostic'
 import { ApplicationEvents } from '../../../../shared/observability/ApplicationEvents'
+import { isToolFailureCode } from '../../../../shared/runs/toolFailure'
 
 export class PiApplicationObserver {
   readonly #events: ApplicationEvents
@@ -76,7 +77,7 @@ export class PiApplicationObserver {
   }
 
   denied(toolCallId: string, errorCode: string): void {
-    this.#events.publish({ event: 'tool.denied', level: 'warn', toolCallId: diagnosticToolCallId(toolCallId), turnId: this.#tools.get(toolCallId)?.turnId ?? this.#turn?.id, errorCode })
+    this.#events.publish({ event: isToolFailureCode(errorCode) ? 'tool.failed' : 'tool.denied', level: 'warn', toolCallId: diagnosticToolCallId(toolCallId), turnId: this.#tools.get(toolCallId)?.turnId ?? this.#turn?.id, errorCode })
     this.#tools.delete(toolCallId)
   }
 

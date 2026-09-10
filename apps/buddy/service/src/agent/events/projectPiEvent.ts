@@ -13,6 +13,7 @@ import { randomUUID } from 'node:crypto'
 import { MAX_BUDDY_MESSAGE_TEXT_LENGTH } from '../../../../shared/conversation/buddyMessageContent'
 import { redactSensitiveText } from '../../../../shared/permissions/approvalReviewPayload'
 import { buddyAssistantTextPhaseSchema } from '../../../../shared/runs/assistantTextPhase'
+import { isToolFailureCode } from '../../../../shared/runs/toolFailure'
 import {
   createBuddyRunOutputs,
   createBuddyToolPresentation,
@@ -34,6 +35,7 @@ export type BuddyProjectedEventType
     | 'run.progress'
     | 'tool.completed'
     | 'tool.denied'
+    | 'tool.failed'
     | 'tool.preparing'
     | 'tool.started'
     | 'tool.updated'
@@ -252,14 +254,15 @@ export function projectToolExecutionAuthorized(
 export function projectToolExecutionDenied(
   event: DeniedToolExecution,
 ): PiEventProjection {
+  const failed = isToolFailureCode(event.denialCode)
   return {
     events: [{
       payload: {
-        denialCode: event.denialCode,
+        ...(failed ? { errorCode: event.denialCode } : { denialCode: event.denialCode }),
         toolCallId: event.toolCallId,
         toolName: event.toolName,
       },
-      type: 'tool.denied',
+      type: failed ? 'tool.failed' : 'tool.denied',
     }],
   }
 }

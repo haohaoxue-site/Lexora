@@ -4,6 +4,19 @@ import { applicationDiagnosticSchema } from '../../../../../shared/diagnostics/a
 import { PiApplicationObserver } from '../PiApplicationObserver'
 
 describe('pi application metadata', () => {
+  it('records a missing resource once as a failure and preserves actual permission denials', () => {
+    const records: ApplicationDiagnostic[] = []
+    const observer = new PiApplicationObserver({ runId: 'run-1', report: event => records.push(event) })
+    for (const errorCode of ['PATH_NOT_FOUND', 'APPROVAL_DENIED']) {
+      const toolCallId = `tool-${errorCode}`
+      observer.handle({ type: 'tool_execution_start', toolCallId, toolName: 'read', args: { path: 'fixture.txt' } })
+      observer.denied(toolCallId, errorCode)
+      observer.handle({ type: 'tool_execution_end', toolCallId, toolName: 'read', result: {}, isError: true })
+    }
+    expect(records.map(record => record.event)).toEqual(['tool.requested', 'tool.failed', 'tool.requested', 'tool.denied'])
+    expect(records[1]?.errorCode).toBe('PATH_NOT_FOUND')
+  })
+
   it('correlates compound SDK tool identities without copying encoded or private payloads', () => {
     const records: ApplicationDiagnostic[] = []
     const observer = new PiApplicationObserver({ runId: 'run-1', report: event => records.push(event) })

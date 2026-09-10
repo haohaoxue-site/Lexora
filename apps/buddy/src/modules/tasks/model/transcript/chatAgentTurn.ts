@@ -2,11 +2,13 @@ import type { LocalRun, LocalRunEvent } from '@buddy-shared/runs/runApi'
 import type { BuddyToolPresentation } from '@buddy-shared/runs/runEventPresentation'
 
 import type { BuddyRunProgress } from '@buddy-shared/runs/runProgress'
+import type { ToolFailureCode } from '@buddy-shared/runs/toolFailure'
 import type { LocalRunTokenUsage } from '@buddy-shared/usage/runTokenUsage'
 import type { ChatAgentCompactionNode } from './chatRunCompaction'
 import type { ChatProjectionReducer } from './chatRunEventProjection'
 import { approvalReviewPayloadSchema } from '@buddy-shared/permissions/approvalReviewPayload'
 import { buddyRunProgressSchema } from '@buddy-shared/runs/runProgress'
+import { isToolFailureCode } from '@buddy-shared/runs/toolFailure'
 import { createChatRunCompactionReducer } from './chatRunCompaction'
 import { readAssistantTextPhase, readNonnegativeInteger, readPayload, readString } from './chatRunEventProjection'
 import { createChatRunTokenUsageReducer } from './chatRunTokenUsage'
@@ -34,6 +36,7 @@ export interface ChatAgentNarrationNode {
 export interface ChatAgentToolNode {
   approvalId?: string
   denialCode?: string
+  errorCode?: ToolFailureCode
   description: string | null
   id: string
   isError: boolean
@@ -349,16 +352,17 @@ export function createChatAgentTurnReducer(
       }
       return
     }
-    if (event.type === 'tool.denied') {
+    if (event.type === 'tool.denied' || event.type === 'tool.failed') {
       const toolCallId = readString(payload.toolCallId)
       const current = toolCallId ? tools.get(toolCallId) : undefined
-      const denialCode = readString(payload.denialCode)
+      const code = readString(event.type === 'tool.failed' ? payload.errorCode : payload.denialCode)
+      const errorCode = isToolFailureCode(code) ? code : undefined
       if (current) {
         tools.set(current.toolCallId, {
           ...current,
-          ...(denialCode ? { denialCode } : {}),
+          ...(errorCode ? { errorCode } : code ? { denialCode: code } : {}),
           isError: true,
-          status: 'denied',
+          status: errorCode || event.type === 'tool.failed' ? 'failed' : 'denied',
         })
       }
       return
@@ -399,21 +403,24 @@ export function createChatAgentTurnReducer(
       tools.set(toolCallId, {
         ...(current?.approvalId ? { approvalId: current.approvalId } : {}),
         ...(current?.denialCode ? { denialCode: current.denialCode } : {}),
+        ...(current?.errorCode ? { errorCode: current.errorCode } : {}),
         description,
         ...(toolLabel ? { toolLabel } : {}),
         id: `tool:${toolCallId}`,
-        isError: isError || Boolean(current?.denialCode),
+        isError: isError || Boolean(current?.denialCode || current?.errorCode),
         kind: 'tool',
         presentation,
         status: current?.status === 'denied' || current?.status === 'interrupted'
           ? current.status
-          : event.type === 'tool.completed'
-            ? isError ? 'failed' : 'completed'
-            : current?.status === 'awaiting_approval'
-              ? 'awaiting_approval'
-              : event.type === 'tool.preparing'
-                ? 'preparing'
-                : 'running',
+          : current?.errorCode
+            ? 'failed'
+            : event.type === 'tool.completed'
+              ? isError ? 'failed' : 'completed'
+              : current?.status === 'awaiting_approval'
+                ? 'awaiting_approval'
+                : event.type === 'tool.preparing'
+                  ? 'preparing'
+                  : 'running',
         toolCallId,
         toolName,
       })

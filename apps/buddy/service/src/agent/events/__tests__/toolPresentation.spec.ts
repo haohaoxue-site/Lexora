@@ -1,3 +1,5 @@
+import { Buffer } from 'node:buffer'
+import { createBashTool } from '@earendil-works/pi-coding-agent'
 import { describe, expect, it } from 'vitest'
 
 import {
@@ -5,6 +7,50 @@ import {
 } from '../toolPresentation'
 
 describe('createBuddyToolPresentation', () => {
+  it.each([
+    ['Command exited with code 1', true, 1, null],
+    ['Command exited with code 99\n\nCommand exited with code 2', true, 2, null],
+    ['Command exited with code 99\r\n\r\nCommand exited with code 2\r\n', true, 2, null],
+    ['Command exited with code 99\n\nCommand timed out after 5 seconds', true, null, null],
+    ['Command exited with code 99\n\nCommand aborted', true, null, null],
+    ['Example: Command exited with code 99', true, null, null],
+    ['Command exited with code 99999999999999999999999', true, null, null],
+    ['Command killed by SIGKILL\n\nCommand exited with code 2', true, 2, null],
+    ['Command terminated by signal SIGTERM', true, null, 'SIGTERM'],
+    ['Command exited with code 99', false, 0, null],
+    ['Command killed by SIGKILL', false, 0, null],
+    ['Command exited with code 99', undefined, null, null],
+    ['Command killed by SIGKILL', undefined, null, null],
+  ])('reads only a completed shell failure status from %j', (output, isError, exitCode, signal) => {
+    expect(createBuddyToolPresentation({
+      arguments: { command: 'fixture' },
+      isError,
+      result: { content: [{ type: 'text', text: output }] },
+      toolName: 'bash',
+    })).toMatchObject({ card: 'terminal', exitCode, output, signal })
+  })
+
+  it('preserves the actual Pi exit status when stdout contains another exit message', async () => {
+    const tool = createBashTool('/workspace', {
+      operations: {
+        exec: async (_command, _cwd, options) => {
+          options.onData(Buffer.from('Command exited with code 99\n'))
+          return { exitCode: 2 }
+        },
+      },
+    })
+    const error = await tool.execute('tool-1', { command: 'fixture' }).then(
+      () => { throw new Error('Expected the command to fail') },
+      error => error as Error,
+    )
+    expect(createBuddyToolPresentation({
+      arguments: { command: 'fixture' },
+      isError: true,
+      result: { content: [{ type: 'text', text: error.message }] },
+      toolName: 'bash',
+    })).toMatchObject({ card: 'terminal', exitCode: 2, signal: null })
+  })
+
   it('projects an expired internal action binding as recoverable without exposing internals', () => {
     const failure = {
       error: {

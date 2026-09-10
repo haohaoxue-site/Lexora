@@ -78,6 +78,17 @@ describe('projectPiEvent compaction', () => {
 })
 
 describe('projectPiEvent product messages', () => {
+  it.each(['PATH_NOT_FOUND', 'INVALID_PATH', 'VALIDATION_FAILED'])('projects %s as a tool failure', (errorCode) => {
+    expect(projectToolExecutionDenied({
+      denialCode: errorCode,
+      toolCallId: 'tool-1',
+      toolName: 'read',
+    }).events).toEqual([{
+      type: 'tool.failed',
+      payload: { errorCode, toolCallId: 'tool-1', toolName: 'read' },
+    }])
+  })
+
   it('projects Pi lifecycle events onto one deduplicated run progress channel', () => {
     const state = createPiEventProjectionState()
     const assistantMessage: AssistantMessage = {

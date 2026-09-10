@@ -2,6 +2,19 @@ import { describe, expect, it } from 'vitest'
 import { publicRunEventSchema, toPublicRunEvent } from '../publicRunEvent'
 
 describe('public run event projection', () => {
+  it.each(['PATH_NOT_FOUND', 'INVALID_PATH', 'VALIDATION_FAILED'])('publishes %s without private failure details', (errorCode) => {
+    const published = toPublicRunEvent(event('tool.failed', {
+      errorCode,
+      toolCallId: 'tool-1',
+      toolName: 'read',
+      cause: '/private/file.txt',
+      arguments: { path: '/private/file.txt' },
+    }))
+    expect(published.payload).toEqual({ errorCode, toolCallId: 'tool-1', toolName: 'read' })
+    expect(publicRunEventSchema.safeParse(published).success).toBe(true)
+    expect(project('tool.failed', { errorCode: 'PRIVATE_FAILURE', toolCallId: 'tool-1' })).toEqual({ toolCallId: 'tool-1' })
+  })
+
   it('preserves registered tool labels across public lifecycle events without publishing definitions', () => {
     for (const type of ['tool.preparing', 'tool.started', 'tool.completed']) {
       const published = toPublicRunEvent(event(type, {
