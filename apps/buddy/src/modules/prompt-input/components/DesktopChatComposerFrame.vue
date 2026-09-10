@@ -37,6 +37,8 @@ withDefaults(defineProps<{
 </template>
 
 <style scoped lang="scss">
+@use '@/shared/ui/highlight/waveHighlight' as highlight;
+
 .desktop-chat-composer-frame {
   --desktop-chat-composer-editor-padding-top: 0.35rem;
   --desktop-chat-composer-editor-padding-bottom: 0.35rem;
@@ -142,6 +144,30 @@ withDefaults(defineProps<{
   background: color-mix(in srgb, var(--buddy-accent-surface) 32%, var(--buddy-surface-raised));
   box-shadow: none;
   color: var(--buddy-accent-on-surface);
+}
+
+:deep([data-type='chat-resource-reference'].is-image) {
+  @include highlight.wave-highlight;
+
+  display: inline;
+  border: 0;
+  border-radius: 0;
+  color: var(--buddy-accent-on-surface);
+  font: inherit;
+  font-weight: 600;
+  margin-inline: 0.12rem;
+  padding: 0 0.15em;
+  vertical-align: baseline;
+  white-space: nowrap;
+
+  &:hover,
+  &.ProseMirror-selectednode {
+    --inline-wave-highlight-active: 1;
+  }
+
+  .chat-resource-reference__icon {
+    display: none;
+  }
 }
 
 :deep(.chat-resource-reference__icon) {

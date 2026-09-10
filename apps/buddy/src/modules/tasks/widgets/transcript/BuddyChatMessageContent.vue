@@ -10,7 +10,7 @@ import { useBuddyI18n } from '@/i18n/buddyI18n'
 import { FileIcon } from '@/shared/ui/file-icon'
 import BuddyImagePreview from '@/shared/ui/media/BuddyImagePreview.vue'
 import { resolveBuddyAttachmentPreviewUrl } from '../../model/attachments/chatAttachmentView'
-import { getChatMessageDisplayText, getChatMessageUserContent } from '../../model/transcript/chatMessageContent'
+import { getChatMessageDisplayText, getChatMessageImageLabels, getChatMessageUserContent } from '../../model/transcript/chatMessageContent'
 import ResourceReferenceBadge from '../attachments/ResourceReferenceBadge.vue'
 import { useResourceHighlight } from '../attachments/useResourceHighlight'
 import ChatQuoteStrip from '../quotes/ChatQuoteStrip.vue'
@@ -41,6 +41,7 @@ const text = computed(() => getChatMessageDisplayText(
 ))
 const hasText = computed(() => text.value.trim().length > 0)
 const structuredUserContent = computed(() => getChatMessageUserContent(props.message))
+const imageLabels = computed(() => getChatMessageImageLabels(props.message))
 const allAttachmentViews = computed(() => props.message.attachments.map(attachment => ({
   attachment,
   isReference: false,
@@ -61,7 +62,7 @@ const attachmentViews = computed(() => {
   if (!structured)
     return allAttachmentViews.value
   const panelIds = new Set(structured.userContent.panelResourceIds)
-  return [...new Set([...panelIds, ...getBuddyUserContentResourceIds(structured.userContent)])].flatMap((resourceId) => {
+  return getBuddyUserContentResourceIds(structured.userContent).flatMap((resourceId) => {
     const attachment = attachmentByResourceId.value.get(resourceId)
     return attachment
       ? [{ attachment, isReference: !panelIds.has(resourceId), previewUrl: resolveBuddyAttachmentPreviewUrl(attachment), resourceId }]
@@ -129,6 +130,7 @@ function previewLeaveTransition(): Promise<void> {
     >
       <figure
         v-for="view in attachmentViews"
+        :id="`buddy-attachment-${view.attachment.attachmentId}`"
         :key="view.resourceId"
         class="buddy-chat-message-content__attachment"
         :class="{ 'is-highlighted': highlightedResourceId === view.resourceId }"
@@ -154,13 +156,13 @@ function previewLeaveTransition(): Promise<void> {
         </button>
         <div v-else class="buddy-chat-message-content__file">
           <FileIcon :name="view.attachment.name" size="preview" />
-          <span>{{ view.attachment.name }}</span>
+          <span>{{ imageLabels.get(view.resourceId) ?? view.attachment.name }}</span>
           <small>{{ view.attachment.kind === 'text' ? 'TXT' : 'FILE' }}</small>
         </div>
         <figcaption
           v-if="view.previewUrl && !failedAttachmentIds.has(view.attachment.attachmentId)"
         >
-          {{ view.attachment.name }}
+          {{ imageLabels.get(view.resourceId) ?? view.attachment.name }}
         </figcaption>
       </figure>
     </div>
@@ -182,6 +184,7 @@ function previewLeaveTransition(): Promise<void> {
           <BuddyChatResourceReference
             v-else-if="attachmentByResourceId.get(node.resourceId)"
             :attachment="attachmentByResourceId.get(node.resourceId)!"
+            :image-label="imageLabels.get(node.resourceId)"
             :language="language"
             :resource-id="node.resourceId"
             @locate="highlightResource"

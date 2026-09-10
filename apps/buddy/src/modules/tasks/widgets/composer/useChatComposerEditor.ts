@@ -6,14 +6,18 @@ import StarterKit from '@tiptap/starter-kit'
 import { useEditor } from '@tiptap/vue-3'
 import { computed, shallowRef, watch } from 'vue'
 import { useBuddyI18n } from '@/i18n/buddyI18n'
-import { createChatComposerContentFromText, findChatComposerTrigger, serializeChatComposerContent, shouldSubmitChatComposerKey } from '@/modules/prompt-input'
+import { createChatComposerContentFromText, findChatComposerTrigger, getChatComposerResourceIds, serializeChatComposerContent, shouldSubmitChatComposerKey } from '@/modules/prompt-input'
 import { ChatComposerDocument, ChatComposerPromptDirective, ChatComposerResourceClipboard, ChatComposerResourceReference, moveChatComposerResourceSelection } from '@/modules/prompt-input/ui'
 import { getFileIconUrl, resolveFileIcon } from '@/shared/ui/file-icon'
+import { getChatImageLabels } from '../../model/attachments/chatAttachmentView'
 
 export function useChatComposerEditor(options: ChatComposerEditorOptions) {
   const { t } = useBuddyI18n(options.language)
   const contentJSON = shallowRef(resolveComposerContent(options.composerContent.value, options.draft.value))
   const serializedContent = computed(() => serializeChatComposerContent(contentJSON.value))
+  const resourceById = computed(() => new Map(options.resources.value.map(entry => [entry.resource.resourceId, entry.resource])))
+  const imageLabels = computed(() => getChatImageLabels(getChatComposerResourceIds(contentJSON.value)
+    .flatMap(id => resourceById.value.get(id) ?? [])))
   let isComposing = false
   let isHydrating = false
 
@@ -42,13 +46,15 @@ export function useChatComposerEditor(options: ChatComposerEditorOptions) {
       ChatComposerDocument,
       ChatComposerResourceReference.configure({
         resourcePresentation: (id) => {
-          const name = options.resourceName(id)
+          const name = resourceById.value.get(id)?.name ?? 'file'
+          const imageLabel = imageLabels.value.get(id)
           const iconName = resolveFileIcon(name)
           return {
             iconName,
-            iconUrl: getFileIconUrl(iconName),
-            label: name,
-            text: `@${name}`,
+            iconUrl: imageLabel ? '' : getFileIconUrl(iconName),
+            isImage: Boolean(imageLabel),
+            label: imageLabel ?? name,
+            text: imageLabel ?? `@${name}`,
           }
         },
       }),
@@ -216,7 +222,7 @@ export function useChatComposerEditor(options: ChatComposerEditorOptions) {
     ))
   }
 
-  return { contentJSON, editor, serializedContent }
+  return { contentJSON, editor, imageLabels, serializedContent }
 }
 
 function resolveComposerContent(
