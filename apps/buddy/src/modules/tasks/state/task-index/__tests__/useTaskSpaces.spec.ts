@@ -7,7 +7,7 @@ import { useTaskSpaces } from '../useTaskSpaces'
 const scopes: ReturnType<typeof effectScope>[] = []
 afterEach(() => scopes.splice(0).forEach(scope => scope.stop()))
 function space(): LocalSpace {
-  return { id: 'created', name: 'Created', activeRunCount: 0, additionalDirectories: [], createdAt: '2026-09-08T00:00:00.000Z', memoryScope: 'space_only', primaryDirectory: null, revokedAt: null, updatedAt: '2026-09-08T00:00:00.000Z' }
+  return { id: 'created', name: 'Created', icon: 'folder', iconColor: 'default', activeRunCount: 0, additionalDirectories: [], createdAt: '2026-09-08T00:00:00.000Z', memoryScope: 'space_only', primaryDirectory: null, revokedAt: null, updatedAt: '2026-09-08T00:00:00.000Z' }
 }
 function fixture() {
   const scope = effectScope()
@@ -38,7 +38,7 @@ function fixture() {
   }))!
   return { creation, draftId, errors, owner, persistWorkspaceState, refreshIndex, scope, spaceId, spaces }
 }
-const input = { name: 'Created', memoryScope: 'space_only' as const, primaryDirectory: null }
+const input = { icon: 'folder' as const, iconColor: 'default' as const, name: 'Created', memoryScope: 'space_only' as const, primaryDirectory: null }
 
 describe('space mutation results', () => {
   it('retains a successful update when the subsequent index refresh fails', async () => {

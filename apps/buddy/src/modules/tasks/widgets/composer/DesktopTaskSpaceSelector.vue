@@ -7,13 +7,13 @@ import type { TaskSpaceInput } from '@/modules/tasks/state/task-index/typing'
 import {
   Checkmark16Regular,
   ChevronDown16Regular,
-  Folder16Regular,
   FolderAdd16Regular,
   Search16Regular,
 } from '@vicons/fluent'
 import { NButton, NInput, NPopover } from 'naive-ui'
 import { computed, nextTick, shallowRef, useTemplateRef, watch } from 'vue'
 import { useBuddyI18n } from '@/i18n/buddyI18n'
+import DesktopSpaceIcon from '@/modules/tasks/widgets/space/DesktopSpaceIcon.vue'
 import DesktopSpaceDialog from '@/modules/tasks/widgets/task-index/DesktopSpaceDialog.vue'
 import DesktopIcon from '@/shared/ui/icon/DesktopIcon.vue'
 
@@ -89,7 +89,7 @@ function openSpaceCreator() {
         aria-haspopup="dialog"
         :aria-expanded="panelOpen"
       >
-        <DesktopIcon class="desktop-task-space-selector__icon" :component="Folder16Regular" :size="16" />
+        <DesktopSpaceIcon class="desktop-task-space-selector__icon" :icon="activeSpace?.icon" :icon-color="activeSpace?.iconColor" :size="16" />
         <span>{{ triggerLabel }}</span>
         <DesktopIcon
           class="desktop-task-space-selector__chevron"
@@ -130,7 +130,7 @@ function openSpaceCreator() {
           :aria-selected="activeSpace?.id === space.id"
           @click="selectSpace(space.id)"
         >
-          <DesktopIcon class="desktop-task-space-selector__icon" :component="Folder16Regular" :size="16" />
+          <DesktopSpaceIcon class="desktop-task-space-selector__icon" :icon="space.icon" :icon-color="space.iconColor" :size="16" />
           <span>{{ space.name }}</span>
           <DesktopIcon
             v-if="activeSpace?.id === space.id"

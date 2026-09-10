@@ -7,7 +7,7 @@ import { useTaskIndexController } from '../useTaskIndexController'
 const scopes: ReturnType<typeof effectScope>[] = []
 afterEach(() => scopes.splice(0).forEach(scope => scope.stop()))
 function space(id: string): LocalSpace {
-  return { id, name: id, activeRunCount: 0, additionalDirectories: [], createdAt: '2026-09-08T00:00:00.000Z', memoryScope: 'space_only', primaryDirectory: null, revokedAt: null, updatedAt: '2026-09-08T00:00:00.000Z' }
+  return { id, name: id, icon: 'folder', iconColor: 'default', activeRunCount: 0, additionalDirectories: [], createdAt: '2026-09-08T00:00:00.000Z', memoryScope: 'space_only', primaryDirectory: null, revokedAt: null, updatedAt: '2026-09-08T00:00:00.000Z' }
 }
 
 describe('task index presentation', () => {

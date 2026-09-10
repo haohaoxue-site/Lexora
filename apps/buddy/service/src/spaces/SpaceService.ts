@@ -1,3 +1,4 @@
+import type { SpaceIcon, SpaceIconColor } from '../../../shared/spaces/spaceAppearance'
 import type { DirectoryGrantMutation } from '../directories/DirectoryGrantService'
 import type {
   PersistedSpaceAdditionalDirectoryInput,
@@ -33,6 +34,8 @@ export interface SpaceFileSearchResult {
 }
 
 export interface CreateSpaceInput {
+  icon?: SpaceIcon
+  iconColor?: SpaceIconColor
   memoryScope: SpaceMemoryScope
   name: string
   primaryDirectory: SpacePrimaryDirectoryInput | null
@@ -75,6 +78,8 @@ export class SpaceService {
       additionalDirectories: directories.additionalDirectories,
       createdAt,
       id: randomUUID(),
+      icon: input.icon,
+      iconColor: input.iconColor,
       memoryScope: input.memoryScope,
       name,
       primaryDirectory: directories.primaryDirectory,
@@ -115,11 +120,15 @@ export class SpaceService {
             directories: summarizeDirectoryChanges(space, directories),
             memoryScope: { from: space.memoryScope, to: input.memoryScope },
             name: { from: space.name, to: name },
+            icon: { from: space.icon, to: input.icon ?? space.icon },
+            iconColor: { from: space.iconColor, to: input.iconColor ?? space.iconColor },
           },
         },
         spaceId: space.id,
       },
       id: space.id,
+      icon: input.icon,
+      iconColor: input.iconColor,
       memoryScope: input.memoryScope,
       name,
       primaryDirectory: directories.primaryDirectory,

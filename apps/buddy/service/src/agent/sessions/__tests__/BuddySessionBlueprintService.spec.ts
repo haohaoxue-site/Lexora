@@ -136,6 +136,8 @@ function createSpace(root: string): SpaceRecord {
   const timestamp = '2026-08-28T00:00:00.000Z'
   return {
     activeRunCount: 0,
+    icon: 'folder',
+    iconColor: 'default',
     additionalDirectories: [],
     createdAt: timestamp,
     id: 'space-1',

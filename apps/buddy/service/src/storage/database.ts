@@ -38,6 +38,7 @@ const BUDDY_CURRENT_SCHEMA_COLUMNS = {
   ],
   conversation_pi_trees: ['conversation_id', 'session_file', 'root_entry_id'],
   run_tree_sources: ['run_id', 'source_run_id', 'position'],
+  spaces: ['icon', 'icon_color'],
   turn_requests: ['draft_id', 'draft_revision', 'committed_draft_revision'],
 } as const
 

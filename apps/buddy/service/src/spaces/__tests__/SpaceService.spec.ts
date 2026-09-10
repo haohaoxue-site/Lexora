@@ -36,6 +36,7 @@ describe('spaceService', () => {
 
     expect(second.id).not.toBe(first.id)
     expect(first.primaryDirectory?.resourcesTrustedAt).toBe(first.createdAt)
+    expect(first).toMatchObject({ icon: 'folder', iconColor: 'default' })
     expect(fixture.service.list()).toMatchObject([
       {
         memoryScope: 'personal_and_space',
@@ -68,8 +69,8 @@ describe('spaceService', () => {
       primaryDirectorySelectionVerified: true,
       spaceId: space.id,
     })).rejects.toMatchObject({ code: 'SPACE_HAS_ACTIVE_RUNS' })
-    await expect(fixture.service.update({
-      memoryScope: 'space_only',
+    const update = {
+      memoryScope: 'space_only' as const,
       name: 'Renamed while running',
       primaryDirectory: {
         id: space.primaryDirectory!.id,
@@ -77,11 +78,15 @@ describe('spaceService', () => {
       },
       primaryDirectorySelectionVerified: false,
       spaceId: space.id,
-    })).resolves.toMatchObject({
+    }
+    const appearance = { icon: 'star-filled' as const, iconColor: 'blue-bright' as const }
+    await expect(fixture.service.update({ ...update, ...appearance })).resolves.toMatchObject({
+      ...appearance,
       memoryScope: 'space_only',
       name: 'Renamed while running',
-      primaryDirectory: { canonicalRoot: fixture.directory },
+      primaryDirectory: space.primaryDirectory,
     })
+    await expect(fixture.service.update(update)).resolves.toMatchObject(appearance)
   })
 
   it('revokes a Space without deleting its external directory or conversation history', async () => {
@@ -110,7 +115,8 @@ describe('spaceService', () => {
     const externalRoot = join(fixture.root, 'external')
     const memoryRoot = join(externalRoot, 'data', 'memory')
     await mkdir(memoryRoot, { recursive: true })
-    const space = await fixture.service.create(spaceInput('Space', fixture.directory))
+    const appearance = { icon: 'heart-filled' as const, iconColor: 'red-deep' as const }
+    const space = await fixture.service.create({ ...spaceInput('Space', fixture.directory), ...appearance })
 
     const first = await fixture.service.grantAdditionalDirectory({
       root: memoryRoot,
@@ -126,9 +132,10 @@ describe('spaceService', () => {
       coveredGrantIds: [first.grant.id],
       grant: { canonicalRoot: externalRoot },
     })
-    expect(fixture.service.list()[0]?.additionalDirectories).toMatchObject([
-      { canonicalRoot: externalRoot, id: expanded.grant.id },
-    ])
+    expect(fixture.service.list()[0]).toMatchObject({
+      ...appearance,
+      additionalDirectories: [{ canonicalRoot: externalRoot, id: expanded.grant.id }],
+    })
     expect(fixture.database.prepare(`
       SELECT revoked_at FROM space_directory_bindings WHERE id = ?
     `).get(first.grant.id)).toMatchObject({ revoked_at: expect.any(String) })

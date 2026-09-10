@@ -3,11 +3,12 @@ import type { LocalConversation } from '@buddy-shared/conversation/conversationA
 import type { LocalSpace } from '@buddy-shared/spaces/spaceApi'
 
 import type { BuddyLocale } from '@/i18n/buddyI18n'
-import { Folder20Regular, Search24Regular, TaskListSquareLtr20Regular } from '@vicons/fluent'
+import { Search24Regular, TaskListSquareLtr20Regular } from '@vicons/fluent'
 import { useDebounceFn } from '@vueuse/core'
 import { NInput, NModal } from 'naive-ui'
 import { computed, shallowRef, watch } from 'vue'
 import { useBuddyI18n } from '@/i18n/buddyI18n'
+import { DesktopSpaceIcon } from '@/modules/tasks/ui'
 import DesktopIcon from '@/shared/ui/icon/DesktopIcon.vue'
 
 const props = defineProps<{
@@ -136,7 +137,7 @@ function taskContext(conversation: LocalConversation) {
             type="button"
             @click="emit('openSpace', space.id)"
           >
-            <DesktopIcon :component="Folder20Regular" />
+            <DesktopSpaceIcon :icon="space.icon" :icon-color="space.iconColor" />
             <span>
               <strong>{{ space.name }}</strong>
               <small>{{ space.primaryDirectory?.root ?? t('desktop.tasks.spaceDirectoryEmpty') }}</small>

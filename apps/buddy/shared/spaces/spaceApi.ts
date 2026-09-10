@@ -2,6 +2,7 @@ import type { RuntimeRequestContract } from '../runtime/apiContract'
 import type { DeepReadonly } from '../runtime/apiValidation'
 import { z } from 'zod'
 import { idSchema, nullableTimestampSchema, timestampSchema, validationRequestSchemas, validationResponseSchemas } from '../runtime/apiValidation'
+import { spaceIconColorSchema, spaceIconSchema } from './spaceAppearance'
 
 export const spaceDirectorySchema = z.object({
   accessGrantedAt: timestampSchema,
@@ -21,6 +22,8 @@ export const spacePrimaryDirectorySchema = spaceDirectorySchema.safeExtend({
 
 export const spaceSchema = z.object({
   activeRunCount: z.number().int().nonnegative(),
+  icon: spaceIconSchema,
+  iconColor: spaceIconColorSchema,
   additionalDirectories: z.array(spaceDirectorySchema).max(32),
   createdAt: timestampSchema,
   id: idSchema,
@@ -66,12 +69,16 @@ export const spacesRequestSchemas = {
     query: z.string().max(512),
   }).strict(),
   spaceCreate: z.object({
+    icon: spaceIconSchema.optional(),
+    iconColor: spaceIconColorSchema.optional(),
     memoryScope: z.enum(['personal_and_space', 'space_only']),
     name: z.string().trim().min(1).max(80),
     primaryDirectory: spacePrimaryDirectoryInputSchema.nullable(),
   }).strict(),
   spaceId: z.object({ spaceId: idSchema }).strict(),
   spaceUpdate: z.object({
+    icon: spaceIconSchema.optional(),
+    iconColor: spaceIconColorSchema.optional(),
     memoryScope: z.enum(['personal_and_space', 'space_only']),
     name: z.string().trim().min(1).max(80),
     primaryDirectory: spacePrimaryDirectoryInputSchema.nullable(),

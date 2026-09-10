@@ -1,4 +1,5 @@
 import type { DatabaseSync } from 'node:sqlite'
+import type { SpaceIcon, SpaceIconColor } from '../../../shared/spaces/spaceAppearance'
 import { withTransaction } from './database'
 
 export type SpaceMemoryScope = 'personal_and_space' | 'space_only'
@@ -23,6 +24,8 @@ export type SpaceAdditionalDirectoryBindingRecord = SpaceDirectoryBindingRecordB
 
 export interface SpaceRecord {
   activeRunCount: number
+  icon: SpaceIcon
+  iconColor: SpaceIconColor
   additionalDirectories: readonly SpaceAdditionalDirectoryBindingRecord[]
   createdAt: string
   id: string
@@ -47,6 +50,8 @@ export interface PersistedSpacePrimaryDirectoryInput extends PersistedSpaceDirec
 export type PersistedSpaceAdditionalDirectoryInput = PersistedSpaceDirectoryInputBase
 
 export interface CreateSpaceRecordInput {
+  icon?: SpaceIcon
+  iconColor?: SpaceIconColor
   additionalDirectories: readonly PersistedSpaceAdditionalDirectoryInput[]
   createdAt: string
   id: string
@@ -64,6 +69,8 @@ export interface SpaceEventInput {
 }
 
 export interface UpdateSpaceRecordInput {
+  icon?: SpaceIcon
+  iconColor?: SpaceIconColor
   additionalDirectories: readonly PersistedSpaceAdditionalDirectoryInput[]
   event: SpaceEventInput
   id: string
@@ -84,6 +91,8 @@ export interface SpaceRepository {
 
 interface SpaceRow {
   active_run_count: number
+  icon: SpaceIcon
+  icon_color: SpaceIconColor
   created_at: string
   id: string
   memory_scope: SpaceMemoryScope
@@ -136,8 +145,8 @@ export function createSpaceRepository(database: DatabaseSync): SpaceRepository {
   `)
   const create = database.prepare(`
     INSERT INTO spaces (
-      id, name, memory_scope, revoked_at, created_at, updated_at
-    ) VALUES (?, ?, ?, NULL, ?, ?)
+      id, name, memory_scope, icon, icon_color, revoked_at, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, NULL, ?, ?)
   `)
   const insertDirectory = database.prepare(`
     INSERT INTO space_directory_bindings (
@@ -158,7 +167,8 @@ export function createSpaceRepository(database: DatabaseSync): SpaceRepository {
   `)
   const updateSpace = database.prepare(`
     UPDATE spaces
-    SET name = ?, memory_scope = ?, updated_at = ?
+    SET name = ?, memory_scope = ?, icon = COALESCE(?, icon),
+        icon_color = COALESCE(?, icon_color), updated_at = ?
     WHERE id = ? AND revoked_at IS NULL
   `)
   const deleteSpace = database.prepare(`
@@ -199,6 +209,8 @@ export function createSpaceRepository(database: DatabaseSync): SpaceRepository {
           input.id,
           input.name,
           toStorageMemoryScope(input.memoryScope),
+          input.icon ?? 'folder',
+          input.iconColor ?? 'default',
           input.createdAt,
           input.createdAt,
         )
@@ -284,6 +296,8 @@ export function createSpaceRepository(database: DatabaseSync): SpaceRepository {
         if (Number(updateSpace.run(
           input.name,
           toStorageMemoryScope(input.memoryScope),
+          input.icon ?? null,
+          input.iconColor ?? null,
           input.updatedAt,
           input.id,
         ).changes) !== 1) {
@@ -357,6 +371,8 @@ function toSpace(
   const primaryDirectory = directories.find(directory => directory.is_primary === 1) ?? null
   return {
     activeRunCount: row.active_run_count,
+    icon: row.icon,
+    iconColor: row.icon_color,
     additionalDirectories: directories
       .filter(directory => directory.is_primary !== 1)
       .map(toSpaceAdditionalDirectoryBinding),

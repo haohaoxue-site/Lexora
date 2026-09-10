@@ -412,6 +412,8 @@ describe('useTaskCapability', () => {
     }
     vi.mocked(api.localChat.conversations.list).mockReset().mockResolvedValue([conversationB])
     vi.mocked(api.localChat.spaces.list).mockResolvedValue([{
+      icon: 'folder',
+      iconColor: 'default',
       activeRunCount: 0,
       additionalDirectories: [],
       createdAt: '2026-08-14T00:00:00.000Z',

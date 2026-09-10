@@ -7,7 +7,7 @@ import { useTaskIndexData } from '../useTaskIndexData'
 const scopes: ReturnType<typeof effectScope>[] = []
 afterEach(() => scopes.splice(0).forEach(scope => scope.stop()))
 function space(name: string): LocalSpace {
-  return { id: 'space', name, activeRunCount: 0, additionalDirectories: [], createdAt: '2026-09-08T00:00:00.000Z', memoryScope: 'space_only', primaryDirectory: null, revokedAt: null, updatedAt: '2026-09-08T00:00:00.000Z' }
+  return { id: 'space', name, icon: 'folder', iconColor: 'default', activeRunCount: 0, additionalDirectories: [], createdAt: '2026-09-08T00:00:00.000Z', memoryScope: 'space_only', primaryDirectory: null, revokedAt: null, updatedAt: '2026-09-08T00:00:00.000Z' }
 }
 function fixture() {
   const pending: ReturnType<typeof deferred<readonly LocalSpace[]>>[] = []
