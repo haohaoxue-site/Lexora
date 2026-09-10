@@ -21,6 +21,7 @@ export function resolveLocalChatErrorMessage(error: unknown, language: BuddyLoca
     AUTOMATION_NOT_FOUND: 'desktop.error.automationNotFound',
     AUTHENTICATION_REQUIRED: 'desktop.error.authenticationRequired',
     CONNECTOR_UNAVAILABLE: 'desktop.error.connectorUnavailable',
+    CREDENTIAL_STORE_FAILURE: 'desktop.error.credentialStoreFailure',
     CREDENTIAL_STORE_UNAVAILABLE: 'desktop.error.credentialStore',
     DIRECTORY_NOT_AUTHORIZED: 'desktop.error.directoryNotAuthorized',
     DRAFT_CONFLICT: 'desktop.chat.draftChanged',

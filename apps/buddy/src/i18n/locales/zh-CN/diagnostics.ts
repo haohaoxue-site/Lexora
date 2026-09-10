@@ -75,6 +75,7 @@ export default {
   'desktop.error.authenticationRequired': '请先完成 Provider 登录',
   'desktop.error.connectorUnavailable': 'MCP Connector 当前不可用',
   'desktop.error.credentialStore': '系统凭据加密服务不可用',
+  'desktop.error.credentialStoreFailure': '系统凭据读取或保存失败',
   'desktop.error.directoryNotAuthorized': '请先授权这个目录',
   'desktop.error.modelSyncFailed': '模型同步失败，请检查 API 地址和认证信息后重试',
   'desktop.error.modelSyncUnsupported': '当前 API 协议不支持模型同步',

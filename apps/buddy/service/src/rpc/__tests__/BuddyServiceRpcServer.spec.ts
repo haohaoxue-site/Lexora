@@ -1,6 +1,9 @@
+import type { ApplicationDiagnostic } from '../../../../shared/diagnostics/applicationDiagnostic'
 import { EventEmitter } from 'node:events'
+import { ModelsError } from '@earendil-works/pi-ai'
 import { describe, expect, it, vi } from 'vitest'
 import { BUDDY_SERVICE_PROTOCOL_VERSION } from '../../../../shared/runtime/runtimeProtocol'
+import { HostCredentialStoreError } from '../../providers/HostCredentialStore'
 
 import {
   createBuddyService,
@@ -21,6 +24,41 @@ class FakeParentPort extends EventEmitter {
 }
 
 describe('runtimeRpcServer', () => {
+  it.each([
+    ['CREDENTIAL_STORE_UNAVAILABLE', 'CREDENTIAL_STORE_UNAVAILABLE', 'CREDENTIAL_STORE_UNAVAILABLE'],
+    ['CREDENTIAL_STORE_FAILURE', 'CREDENTIAL_STORE_FAILURE', 'CREDENTIAL_STORE_FAILURE'],
+    ['PRIVATE_DIAGNOSTIC', 'BUDDY_RUNTIME_REQUEST_FAILED', 'OPERATION_FAILED'],
+  ])('reports a Pi-wrapped %s without exposing private error content', async (causeCode, wireCode, diagnosticCode) => {
+    const port = new FakeParentPort()
+    const diagnostics: ApplicationDiagnostic[] = []
+    const server = createBuddyService({ announceReady: false, port, recordDiagnostic: event => diagnostics.push(event) })
+    const cause = new HostCredentialStoreError(causeCode)
+    server.onRequest('providers.login', () => {
+      throw new ModelsError('auth', 'private-provider-diagnostic', { cause })
+    })
+
+    port.receive({ jsonrpc: '2.0', id: 'login-1', method: 'providers.login', params: {} })
+    await new Promise(resolve => setImmediate(resolve))
+
+    expect(port.sent).toEqual([{
+      jsonrpc: '2.0',
+      id: 'login-1',
+      error: {
+        code: -32_000,
+        message: 'Lexora Buddy runtime request failed',
+        data: { code: wireCode, retryable: false },
+      },
+    }])
+    expect(diagnostics.at(-1)).toMatchObject({
+      event: 'rpc.handler.failed',
+      method: 'providers.login',
+      errorType: 'ModelsError',
+      errorCode: diagnosticCode,
+    })
+    expect(JSON.stringify({ diagnostics, messages: port.sent })).not.toContain('private-provider-diagnostic')
+    server.close(new Error('test completed'))
+  })
+
   it('emits only the stable failure code before readiness', () => {
     const port = new FakeParentPort()
     const server = createBuddyService({ announceReady: false, port })

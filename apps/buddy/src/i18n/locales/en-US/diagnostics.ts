@@ -77,6 +77,7 @@ export default {
   'desktop.error.authenticationRequired': 'Sign in to the provider first',
   'desktop.error.connectorUnavailable': 'The MCP connector is unavailable',
   'desktop.error.credentialStore': 'Encrypted credential storage is unavailable',
+  'desktop.error.credentialStoreFailure': 'Could not read or save encrypted credentials',
   'desktop.error.directoryNotAuthorized': 'Authorize this directory first',
   'desktop.error.modelSyncFailed': 'Could not sync models. Check the API endpoint and authentication, then retry.',
   'desktop.error.modelSyncUnsupported': 'This API protocol does not support model synchronization.',
