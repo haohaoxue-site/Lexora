@@ -4,7 +4,9 @@ import type { LocalRun, LocalRunEvent } from '@buddy-shared/runs/runApi'
 import type { ChatAgentTurn } from '../chatStreamingMessage'
 import { describe, expect, it } from 'vitest'
 
+import { createChatAgentActivityProjector } from '../chatAgentActivities'
 import * as chatProjections from '../chatStreamingMessage'
+import { canExpandChatTool, describeChatTool } from '../chatToolDisplay'
 import {
   projectChatTranscript,
   projectPersistedChatTranscriptRows,
@@ -673,6 +675,39 @@ describe('projectStreamingAssistantMessage', () => {
         toolCallId: 'tool-1',
       }],
     })
+  })
+
+  it.each(['tool.failed', 'tool.denied'])('replays %s path failures with visible details in one issue group', (type) => {
+    const presentations = [
+      { card: 'read', description: null, language: null, lineStart: 1, path: 'missing.txt', output: 'PATH_NOT_FOUND', truncated: false },
+      { card: 'search', description: null, glob: null, path: 'missing-directory', query: '', output: 'PATH_NOT_FOUND', truncated: false },
+    ]
+    const tools = ['read', 'ls']
+    const events = presentations.flatMap((presentation, index) => {
+      const tool = { toolCallId: `tool-${index}`, toolName: tools[index] }
+      return [
+        event(index * 3 + 1, 'tool.preparing', { ...tool, presentation: { ...presentation, output: null } }),
+        event(index * 3 + 2, type, { ...tool, [type === 'tool.failed' ? 'errorCode' : 'denialCode']: 'PATH_NOT_FOUND' }),
+        event(index * 3 + 3, 'tool.completed', { ...tool, isError: true, presentation }),
+      ]
+    })
+    const turn = projectChatAgentTurns(events, [run('completed')])[0]!
+    const nodes = turn.nodes.filter(node => node.kind === 'tool')
+    expect(turn.status).toBe('completed')
+    expect(nodes.map(node => [node.status, node.errorCode, node.denialCode])).toEqual([
+      ['failed', 'PATH_NOT_FOUND', undefined],
+      ['failed', 'PATH_NOT_FOUND', undefined],
+    ])
+    expect(nodes.map(node => describeChatTool(node, 'zh-CN').status)).toEqual(['文件不存在', '目录不存在'])
+    expect(nodes.map(node => describeChatTool(node, 'en-US').status)).toEqual(['File not found', 'Directory not found'])
+    expect(nodes.every(node => canExpandChatTool(node))).toBe(true)
+    const groups = createChatAgentActivityProjector().project(turn.nodes)
+    expect(groups).toHaveLength(1)
+    expect(groups[0]).toMatchObject({ kind: 'activity-group', issueCount: 2, toolCount: 2 })
+    const missingRead = nodes[0]!
+    if (missingRead.presentation.card !== 'read')
+      throw new Error('Expected a file-read presentation')
+    expect(canExpandChatTool({ ...missingRead, presentation: { ...missingRead.presentation, output: null } }, () => true)).toBe(false)
   })
 
   it('marks unfinished automatic context compaction as interrupted with its run', () => {

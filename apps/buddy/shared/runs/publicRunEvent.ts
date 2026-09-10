@@ -12,6 +12,7 @@ import {
 } from './runEventPresentation'
 import { buddyRunOutputPayloadSchema } from './runOutput'
 import { buddyRunProgressSchema } from './runProgress'
+import { isToolFailureCode } from './toolFailure'
 
 export interface RunEventLike {
   createdAt: string
@@ -79,6 +80,7 @@ const SCALAR_PAYLOAD_KEYS = new Map<string, readonly string[]>([
   ]],
   ['tool.completed', ['isError', 'toolCallId', 'toolName']],
   ['tool.denied', ['toolCallId', 'toolName']],
+  ['tool.failed', ['toolCallId', 'toolName']],
   ['tool.preparing', ['toolCallId', 'toolName']],
   ['tool.started', ['toolCallId', 'toolName']],
   ['tool.updated', ['macro', 'status', 'toolCallId', 'toolName']],
@@ -130,6 +132,12 @@ function publicPayload(type: string, value: unknown): Record<string, unknown> {
   }
   if (type === 'tool.denied')
     return publicToolDenial(source)
+  if (type === 'tool.failed') {
+    const published = selectScalars(source, ['toolCallId', 'toolName'])
+    if (isToolFailureCode(source.errorCode))
+      published.errorCode = source.errorCode
+    return published
+  }
   if (
     type === 'tool.preparing'
     || type === 'tool.started'

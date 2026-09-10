@@ -73,7 +73,7 @@ function createPiToolPresentation(
         : displayOptionalPath(readOptionalString(arguments_, 'cwd'), input.canonicalRoot),
       description,
       exitCode: readExitCode(input.result, input.isError),
-      signal: readSignal(input.result),
+      signal: readSignal(input.result, input.isError),
       ...preview,
     }
   }
@@ -148,13 +148,16 @@ function readExitCode(value: unknown, isError: boolean | undefined): number | nu
     return 0
   if (isError === undefined)
     return null
-  const match = readToolOutput(value)?.match(/Command exited with code (\d+)/)
-  return match ? Number.parseInt(match[1]!, 10) : null
+  const match = readToolOutput(value)?.match(/(?:^|\r?\n)Command exited with code (\d+)[\r\n]*$/)
+  const code = match ? Number.parseInt(match[1]!, 10) : null
+  return code !== null && Number.isSafeInteger(code) ? code : null
 }
 
-function readSignal(value: unknown): string | null {
+function readSignal(value: unknown, isError: boolean | undefined): string | null {
+  if (isError !== true)
+    return null
   const match = readToolOutput(value)
-    ?.match(/Command (?:terminated by signal|killed by) ([A-Z][A-Z0-9]+)/i)
+    ?.match(/(?:^|\r?\n)Command (?:terminated by signal|killed by) ([A-Z][A-Z0-9]+)[\r\n]*$/i)
   return match?.[1]?.toUpperCase() ?? null
 }
 

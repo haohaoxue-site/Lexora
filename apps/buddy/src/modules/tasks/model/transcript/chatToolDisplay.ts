@@ -29,7 +29,7 @@ export function canExpandChatTool(node: ChatAgentToolNode, canPreviewFile?: (pat
     || (p.card === 'image' && Boolean(p.prompt || p.reference || p.artifactIds.length))
     || (node.status !== 'denied' && 'output' in p && Boolean(p.output))
     || (node.status !== 'denied' && p.card === 'diff' && Boolean(p.diff))
-    || (node.status !== 'denied' && (p.card === 'read' || p.card === 'diff') && canPreviewFile?.(p.path) === true)
+    || (node.status !== 'denied' && !node.errorCode && (p.card === 'read' || p.card === 'diff') && canPreviewFile?.(p.path) === true)
 }
 
 export function describeChatTool(node: ChatAgentToolNode, language: BuddyLocale) {
@@ -89,6 +89,17 @@ function toolTarget(node: ChatAgentToolNode, t: BuddyTranslate): string {
 }
 
 function toolStatus(node: ChatAgentToolNode, language: BuddyLocale, t: BuddyTranslate): string {
+  if (node.errorCode === 'PATH_NOT_FOUND') {
+    if (node.toolName === 'ls' || node.toolName === 'find')
+      return t('desktop.chat.processToolDirectoryNotFound')
+    return t(node.presentation.card === 'read' || node.presentation.card === 'diff'
+      ? 'desktop.chat.processToolFileNotFound'
+      : 'desktop.chat.processToolPathNotFound')
+  }
+  if (node.errorCode === 'INVALID_PATH')
+    return t('desktop.chat.processToolInvalidPath')
+  if (node.errorCode === 'VALIDATION_FAILED')
+    return t('desktop.chat.processToolInvalidInput')
   if (node.denialCode === 'READ_ONLY_PROFILE')
     return t('desktop.chat.toolDeniedReadOnly')
   if (node.status === 'awaiting_approval')
