@@ -7,15 +7,13 @@ import { useBuddyI18n } from '@/i18n/buddyI18n'
 import DesktopIcon from '@/shared/ui/icon/DesktopIcon.vue'
 import { presentChatActivityLayout } from '../../model/transcript/chatActivityLayout'
 import { summarizeChatActivity, summarizeChatActivityCounts } from '../../model/transcript/chatActivitySummary'
-import { canExpandChatTool, isChatToolIssue } from '../../model/transcript/chatToolDisplay'
+import { canExpandChatTool, isChatToolActive, isChatToolIssue } from '../../model/transcript/chatToolDisplay'
 import BuddyChatDisclosure from './BuddyChatDisclosure.vue'
 import BuddyChatReasoningRow from './BuddyChatReasoningRow.vue'
-import BuddyChatShimmerText from './BuddyChatShimmerText.vue'
 import BuddyChatToolDetails from './BuddyChatToolDetails.vue'
 import BuddyChatToolIcon from './BuddyChatToolIcon.vue'
 import BuddyChatToolRow from './BuddyChatToolRow.vue'
 import { useChatToolActions } from './chatToolActionsContext'
-import { useChatActivitySummary } from './useChatActivitySummary'
 
 const props = defineProps<{
   group: ChatAgentActivityGroup
@@ -29,15 +27,12 @@ const open = shallowRef(false)
 const highlightedIssue = shallowRef<string | null>(null)
 const content = useTemplateRef<HTMLDivElement>('content')
 const header = useTemplateRef<HTMLButtonElement>('header')
-const singleTool = computed(() => props.group.nodes.length === 1 && props.group.toolCount === 1)
+const hasHistory = computed(() => props.group.nodes.some(node => node.kind === 'tool' ? !isChatToolActive(node) : node.status !== 'running'))
+const singleTool = computed(() => props.group.toolCount === 1 && props.group.nodes.every(node => node.kind === 'tool' || node.status === 'running'))
 const layout = computed(() => presentChatActivityLayout(props.group.nodes))
 const issues = computed(() => props.group.nodes.filter(node => node.kind === 'tool' && isChatToolIssue(node)))
 const fullSummary = computed(() => summarizeChatActivityCounts(props.group, props.language, Infinity))
-const currentSummary = computed(() => summarizeChatActivity(props.group, props.language))
-const summary = useChatActivitySummary(() => currentSummary.value)
-const label = computed(() => open.value && props.group.toolCount > 0
-  ? summarizeChatActivityCounts(props.group, props.language)
-  : summary.value.label)
+const summary = computed(() => summarizeChatActivity(props.group, props.language))
 
 function toggleTool(id: string) {
   highlightedIssue.value = null
@@ -49,6 +44,12 @@ function toggleTool(id: string) {
 async function revealNextIssue() {
   const index = issues.value.findIndex(node => node.id === highlightedIssue.value)
   const node = issues.value[(index + 1) % issues.value.length]
+  if (node)
+    await revealActivity(node.id)
+}
+
+async function revealActivity(nodeId: string) {
+  const node = props.group.nodes.find(node => node.id === nodeId)
   if (node?.kind !== 'tool')
     return
   highlightedIssue.value = node.id
@@ -69,24 +70,22 @@ function collapseFromBottom() {
   header.value?.scrollIntoView({ block: 'nearest', behavior: 'instant' })
   open.value = false
 }
+
+defineExpose({ revealActivity })
 </script>
 
 <template>
   <section
+    v-show="hasHistory || open || group.toolCount > 1"
     class="buddy-chat-activity-group"
     :data-activity-id="group.id"
-    :class="{ 'is-open': open, 'is-active': summary.active, 'is-thinking': group.toolCount === 0, 'is-tool-group': group.toolCount > 0 && !singleTool }"
+    :class="{ 'is-open': open, 'is-thinking': group.toolCount === 0, 'is-tool-group': group.toolCount > 0 && !singleTool }"
   >
     <div v-if="!singleTool" class="buddy-chat-activity-group__heading">
       <button ref="header" class="buddy-chat-activity-group__header" type="button" :aria-expanded="open" :title="fullSummary" @click="open = !open">
-        <span v-if="summary.active" class="buddy-chat-activity-group__spinner" aria-hidden="true" />
-        <BuddyChatToolIcon v-else-if="summary.icon !== 'reasoning'" :icon="summary.icon" class="buddy-chat-activity-group__icon" />
-        <BuddyChatShimmerText class="buddy-chat-activity-group__label" aria-live="polite" :mode="summary.active ? 'continuous' : 'static'">
-          {{ label }}
-        </BuddyChatShimmerText>
+        <BuddyChatToolIcon v-if="summary.icon !== 'reasoning'" :icon="summary.icon" class="buddy-chat-activity-group__icon" />
+        <span class="buddy-chat-activity-group__label">{{ summary.label }}</span>
         <span v-if="!open && summary.target" class="buddy-chat-activity-group__target" :title="summary.target">{{ summary.target }}</span>
-        <span v-if="group.runningCount > 1" class="buddy-chat-activity-group__count">{{ t('desktop.chat.activityRunningCount', { count: group.runningCount }) }}</span>
-        <span v-else-if="!open && summary.active && group.toolCount > 1" class="buddy-chat-activity-group__count">{{ t('desktop.chat.activityCalls', { count: group.toolCount }) }}</span>
         <DesktopIcon :component="ChevronRight20Regular" class="buddy-chat-activity-group__chevron" :class="{ 'is-open': open }" />
       </button>
       <button v-if="group.issueCount" class="buddy-chat-activity-group__issues" type="button" :title="t('desktop.chat.activityNextIssue')" @click="revealNextIssue">
@@ -94,7 +93,7 @@ function collapseFromBottom() {
       </button>
     </div>
     <BuddyChatDisclosure>
-      <div v-if="open || singleTool" ref="content" class="buddy-chat-activity-group__content">
+      <div v-if="open || (singleTool && hasHistory)" ref="content" class="buddy-chat-activity-group__content">
         <template v-for="entry in layout.entries" :key="entry.id">
           <BuddyChatToolRow
             v-if="entry.kind === 'tool'"
@@ -113,7 +112,7 @@ function collapseFromBottom() {
               :status="entry.node.status" :tool-name="entry.node.toolName"
             />
           </BuddyChatDisclosure>
-          <BuddyChatReasoningRow v-else class="buddy-chat-activity-group__thought" :node="entry" />
+          <BuddyChatReasoningRow v-else-if="entry.kind === 'reasoning' && entry.status !== 'running'" class="buddy-chat-activity-group__thought" :node="entry" />
         </template>
         <button v-if="!singleTool && group.nodes.length > 8" class="buddy-chat-activity-group__collapse" type="button" @click="collapseFromBottom">
           <DesktopIcon :component="ChevronUp20Regular" />
@@ -183,19 +182,7 @@ function collapseFromBottom() {
   color: var(--buddy-text-muted);
 }
 
-.buddy-chat-activity-group__spinner {
-  width: 12px;
-  height: 12px;
-  margin-inline: 1px;
-  flex: none;
-  border: 1.5px solid var(--buddy-border-strong);
-  border-top-color: var(--buddy-text-secondary);
-  border-radius: 50%;
-  animation: activity-spin 900ms linear infinite;
-}
-
 .buddy-chat-activity-group__label {
-  --buddy-shimmer-base: var(--buddy-text-secondary);
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -209,13 +196,6 @@ function collapseFromBottom() {
   color: var(--buddy-text-muted);
   font-size: var(--buddy-chat-tool-font-size);
   text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.buddy-chat-activity-group__count {
-  flex: none;
-  color: var(--buddy-text-muted);
-  font-size: 11.5px;
   white-space: nowrap;
 }
 
@@ -271,19 +251,9 @@ function collapseFromBottom() {
   margin: 3px 0 6px;
 }
 
-@keyframes activity-spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
 @media (prefers-reduced-motion: reduce) {
   .buddy-chat-activity-group__chevron {
     transition: none;
-  }
-
-  .buddy-chat-activity-group__spinner {
-    animation: none;
   }
 }
 </style>

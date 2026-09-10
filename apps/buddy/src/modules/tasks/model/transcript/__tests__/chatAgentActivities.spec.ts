@@ -21,10 +21,10 @@ describe('activity grouping', () => {
     const initial = projector.project([first, narration, last])
     const updated = projector.project([{ ...first, status: 'failed', isError: true }, narration, last])
     expect(updated[0]?.id).toBe(initial[0]?.id)
-    expect(updated[0]).toMatchObject({ issueCount: 1, activeNode: null, nodes: [{ toolCallId: 'one' }] })
+    expect(updated[0]).toMatchObject({ issueCount: 1, nodes: [{ toolCallId: 'one' }] })
     expect(updated[1]).toBe(initial[1])
     expect(updated[2]).toBe(initial[2])
-    expect(initial[0]).toMatchObject({ issueCount: 0, runningCount: 1 })
+    expect(initial[0]).toMatchObject({ issueCount: 0, toolCount: 1 })
     const replayed = createChatAgentActivityProjector().project([{ ...first, status: 'failed', isError: true }, narration, last])
     expect(replayed).toEqual(updated)
   })
@@ -37,20 +37,20 @@ describe('activity grouping', () => {
     expect(next[0]?.id).toBe(first[0]?.id)
   })
 
-  it('counts repeated reads without losing calls and prioritizes approval over other parallel work', () => {
+  it('keeps accumulated counts while tools wait for approval and reasoning continues', () => {
     const nodes = [tool('one', 'awaiting_approval'), thought('a', 'running'), tool('two', 'running'), tool('three')]
     const row = createChatAgentActivityProjector().project(nodes)[0]!
-    expect(row).toMatchObject({ toolCount: 3, runningCount: 2, activeNode: nodes[0], counts: [{ category: 'read', count: 3 }] })
+    expect(row).toMatchObject({ toolCount: 3, counts: [{ category: 'read', count: 3 }] })
     if (row.kind !== 'activity-group')
       throw new Error('Expected activity group')
-    expect(summarizeChatActivity(row, 'zh-CN')).toMatchObject({ label: '等待批准', immediate: true })
+    expect(summarizeChatActivity(row, 'zh-CN')).toMatchObject({ label: '读取 1 个文件', target: '' })
   })
 
   it('settles a completed group immediately using its own tool semantics', () => {
     const group = createChatAgentActivityProjector().project([tool('one')])[0]!
     if (group.kind !== 'activity-group')
       throw new Error('Expected activity group')
-    expect(summarizeChatActivity(group, 'zh-CN')).toMatchObject({ active: false, immediate: true, label: '读取 1 个文件', icon: 'file' })
+    expect(summarizeChatActivity(group, 'zh-CN')).toMatchObject({ label: '读取 1 个文件', icon: 'file' })
   })
 
   it('retains a shared tool icon and uses an activity list for mixed operations', () => {

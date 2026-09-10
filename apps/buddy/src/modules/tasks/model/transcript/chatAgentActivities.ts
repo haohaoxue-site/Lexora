@@ -1,14 +1,12 @@
 import type { ChatAgentCompactionNode, ChatAgentNarrationNode, ChatAgentReasoningNode, ChatAgentToolNode, ChatAgentTurnNode } from './chatAgentTurn'
 import type { ChatToolCategory, ChatToolIcon } from './chatToolRegistry'
-import { isChatToolActive, isChatToolIssue } from './chatToolDisplay'
+import { isChatToolIssue } from './chatToolDisplay'
 import { getChatToolRegistration } from './chatToolRegistry'
 
 export interface ChatAgentActivityGroup {
   id: string
   kind: 'activity-group'
   nodes: ReadonlyArray<ChatAgentReasoningNode | ChatAgentToolNode>
-  activeNode: ChatAgentReasoningNode | ChatAgentToolNode | null
-  runningCount: number
   issueCount: number
   toolCount: number
   icon: ChatToolIcon | 'reasoning'
@@ -61,17 +59,12 @@ export function createChatAgentActivityProjector() {
 function summarizeGroup(id: string, nodes: ChatAgentActivityGroup['nodes']): ChatAgentActivityGroup {
   const counts = new Map<ChatToolCategory, number>()
   const files = new Map<ChatToolCategory, Set<string> | null>()
-  let activeNode: ChatAgentActivityGroup['activeNode'] = null
-  let runningCount = 0
   let issueCount = 0
   let toolCount = 0
   let icon: ChatAgentActivityGroup['icon'] = 'reasoning'
   for (const node of nodes) {
-    if (node.kind === 'reasoning') {
-      if (node.status === 'running' && activeNode?.kind !== 'tool')
-        activeNode = node
+    if (node.kind === 'reasoning')
       continue
-    }
     toolCount++
     const { category, icon: toolIcon } = getChatToolRegistration(node)
     icon = icon === 'reasoning' || icon === toolIcon ? toolIcon : 'activity'
@@ -90,11 +83,6 @@ function summarizeGroup(id: string, nodes: ChatAgentActivityGroup['nodes']): Cha
     }
     if (isChatToolIssue(node))
       issueCount++
-    if (isChatToolActive(node)) {
-      runningCount++
-      if (activeNode?.kind !== 'tool' || activeNode.status !== 'awaiting_approval')
-        activeNode = node
-    }
   }
-  return { id, kind: 'activity-group', nodes, activeNode, runningCount, issueCount, toolCount, icon, counts: [...counts].map(([category, count]) => ({ category, count, files: files.get(category)?.size ?? null })) }
+  return { id, kind: 'activity-group', nodes, issueCount, toolCount, icon, counts: [...counts].map(([category, count]) => ({ category, count, files: files.get(category)?.size ?? null })) }
 }
