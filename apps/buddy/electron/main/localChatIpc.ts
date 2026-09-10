@@ -9,6 +9,7 @@ import { registerProvidersIpc } from './local-chat/providers'
 import { createLocalChatIpcContext } from './local-chat/registrar'
 import { registerRuntimeIpc } from './local-chat/runtime'
 import { registerSpacesIpc } from './local-chat/spaces'
+import { registerTaskMarksIpc } from './local-chat/taskMarks'
 import { registerWebIpc } from './local-chat/web'
 
 export type { DesktopRuntimeGateway, RegisterLocalChatIpcOptions } from './local-chat/registrar'
@@ -22,6 +23,7 @@ export function registerLocalChatIpc(options: RegisterLocalChatIpcOptions): () =
   registerSpacesIpc(context)
   registerConnectorsIpc(context)
   registerConversationIpc(context)
+  registerTaskMarksIpc(context)
   registerWebIpc(context)
   registerComposerIpc(context)
   const stopNotifications = registerLocalChatNotifications(options)

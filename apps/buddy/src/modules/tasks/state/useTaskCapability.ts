@@ -35,6 +35,7 @@ import { useTaskModelPersistence } from './drafts/useTaskModelPersistence'
 import { useTaskModelSelection } from './drafts/useTaskModelSelection'
 
 import { useTaskWorkspacePersistence } from './drafts/useTaskWorkspacePersistence'
+import { useTaskMarks } from './task-index/useTaskMarks'
 import { useTaskPinnedItems } from './task-index/useTaskPinnedItems'
 import { useTaskLifecycle } from './useTaskLifecycle'
 
@@ -77,6 +78,13 @@ export function useTaskCapability(options: UseTaskCapabilityOptions): TaskCapabi
     applicationSettings.config.value?.desktop.welcomeVariant ?? 'random'
   ))
   const { t } = useBuddyI18n(language)
+  const taskMarks = useTaskMarks({
+    api: api.localChat.taskMarks,
+    conversations,
+    activeConversationId,
+    language,
+    ready: computed(() => runtimeSupervisor.runtimeState.value.status === 'ready'),
+  })
   const getRunTerminationMessage = (errorCode: string | null) =>
     errorCode === 'SESSION_STORAGE_UNAVAILABLE'
       ? t('desktop.chat.sessionStorageUnavailable')
@@ -367,6 +375,7 @@ export function useTaskCapability(options: UseTaskCapabilityOptions): TaskCapabi
   }
 
   function dispose() {
+    taskMarks.dispose()
     lifecycle.dispose()
     workspacePersistence.dispose()
     draftModelBinding.dispose()
@@ -393,6 +402,7 @@ export function useTaskCapability(options: UseTaskCapabilityOptions): TaskCapabi
   }
 
   const index = {
+    marks: taskMarks,
     pinnedItems: taskPins.pinnedItems,
     setPinnedItems: taskPins.setPinnedItems,
     createSpace,
@@ -436,6 +446,7 @@ export function useTaskCapability(options: UseTaskCapabilityOptions): TaskCapabi
     runs,
   })
   const workspace = {
+    marks: taskMarks,
     tree,
     context: {
       getChangeOverview: api.localChat.changes.overview,

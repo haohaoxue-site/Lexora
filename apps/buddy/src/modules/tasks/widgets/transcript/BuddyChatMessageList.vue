@@ -193,6 +193,7 @@ onBeforeUnmount(clearOutlineHighlight)
             { 'is-outline-highlighted': item.message.id === highlightedOutlineMessageId },
           ]"
           :is-agent-turn-result="item.isAgentTurnResult"
+          :result-run-id="item.resultRunId"
           :editing="item.message.id === editingMessageId"
           :language="language"
           :message="item.message"

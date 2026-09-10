@@ -52,7 +52,7 @@ const activityNavigation = useChatActivityNavigation()
       <template v-for="row in rows" :key="row.key">
         <div v-if="row.kind === 'message'" class="conversation-node-detail__message" :data-message-id="row.message.id">
           <BuddyChatMessageBody
-            :message="row.message" :language="language" :final="!row.streaming"
+            :message="row.message" :language="language" :final="!row.streaming" :result-run-id="row.resultRunId"
             :turn-outputs="row.turnOutputs" :turn-changes="row.turnChanges" :write-clipboard-text="clipboard.writeText"
             @open-artifact="emit('openArtifact', $event)" @open-changes="emit('openChanges', $event)"
           />

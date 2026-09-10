@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import type { LocalConversationSummary } from '@buddy-shared/conversation/conversationApi'
+import type { LocalTaskMark, LocalTaskMarkState } from '@buddy-shared/conversation/taskMarkApi'
+import type { DropdownOption } from 'naive-ui'
 
 import type { BuddyLocale } from '@/i18n/buddyI18n'
 import type { DesktopTaskPinnedDropPosition } from '@/modules/tasks/widgets/task-index/taskPinnedItems'
@@ -10,19 +12,27 @@ import {
   MoreHorizontal20Regular,
   Pin20Regular,
   PinOff20Regular,
+  Settings20Regular,
   SpinnerIos20Regular,
+  Tag20Regular,
+  TagDismiss20Regular,
 } from '@vicons/fluent'
 import dayjs from 'dayjs'
 import relativeTime from 'dayjs/plugin/relativeTime'
-import { NDropdown } from 'naive-ui'
+import { NDropdown, NTooltip } from 'naive-ui'
 import { computed, h } from 'vue'
 import { useBuddyI18n } from '@/i18n/buddyI18n'
 import DesktopOverflowingLabel from '@/modules/tasks/widgets/task-index/DesktopOverflowingLabel.vue'
 import DesktopIcon from '@/shared/ui/icon/DesktopIcon.vue'
+import DesktopTaskMarkOption from './DesktopTaskMarkOption.vue'
+import DesktopTaskMarkSwatch from './DesktopTaskMarkSwatch.vue'
 import 'dayjs/locale/zh-cn'
 
 const props = defineProps<{
   active: boolean
+  marks: readonly LocalTaskMark[]
+  markState?: LocalTaskMarkState
+  marksBusy: boolean
   activity: LocalConversationSummary['activity']
   dragging?: boolean
   dropPosition?: DesktopTaskPinnedDropPosition
@@ -38,6 +48,10 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   delete: []
+  assignMark: [markId: string]
+  clearMarks: []
+  setRead: [read: boolean]
+  manageMarks: []
   dragEnd: []
   dragOver: [position: DesktopTaskPinnedDropPosition]
   dragStart: []
@@ -65,7 +79,32 @@ const activityLabel = computed(() => props.activity === 'awaiting_approval'
 const pinLabel = computed(() => props.pinMode === 'pin'
   ? t('desktop.tasks.pin')
   : t('desktop.tasks.unpin'))
-const actions = computed(() => [
+const marker = computed(() => props.marks.find(mark => mark.id === props.markState?.markId)
+  ?? (props.markState?.unread ? { name: t('desktop.marks.unread'), description: t('desktop.marks.unreadDescription'), color: 'var(--buddy-accent-solid)' } : null))
+const actions = computed<DropdownOption[]>(() => [
+  {
+    icon: () => hIcon(Tag20Regular),
+    key: 'marks',
+    label: t('desktop.marks.select'),
+    children: [
+      {
+        key: 'read',
+        icon: () => h(DesktopTaskMarkSwatch, { color: 'var(--buddy-accent-solid)' }),
+        label: () => h(DesktopTaskMarkOption, { name: t('desktop.marks.unread'), selected: props.markState?.unread === true }),
+        disabled: props.marksBusy || !props.markState,
+      },
+      ...props.marks.map(mark => ({
+        key: `mark:${mark.id}`,
+        label: () => h(DesktopTaskMarkOption, { name: mark.name, selected: props.markState?.markId === mark.id }),
+        icon: () => h(DesktopTaskMarkSwatch, { color: mark.color }),
+        disabled: props.marksBusy || !props.markState,
+      })),
+      { type: 'divider', key: 'mark-divider' },
+      { key: 'clear-marks', icon: () => hIcon(TagDismiss20Regular), label: t('desktop.marks.none'), disabled: props.marksBusy || !(props.markState?.markId || props.markState?.unread) },
+      { key: 'manage-marks', icon: () => hIcon(Settings20Regular), label: t('desktop.marks.manage') },
+    ],
+  },
+  { type: 'divider', key: 'task-actions-divider' },
   { icon: () => hIcon(Edit20Regular), key: 'rename', label: t('desktop.tasks.renameTask') },
   { icon: () => hIcon(Delete20Regular), key: 'delete', label: t('desktop.tasks.deleteTask') },
 ])
@@ -75,6 +114,14 @@ function hIcon(component: typeof Edit20Regular) {
 }
 
 function handleAction(action: string | number) {
+  if (action === 'read')
+    emit('setRead', props.markState?.unread === true)
+  if (action === 'manage-marks')
+    emit('manageMarks')
+  if (action === 'clear-marks')
+    emit('clearMarks')
+  if (typeof action === 'string' && action.startsWith('mark:'))
+    emit('assignMark', action.slice(5))
   if (action === 'rename')
     emit('rename')
   if (action === 'delete')
@@ -135,6 +182,18 @@ function resolveDropPosition(event: DragEvent): DesktopTaskPinnedDropPosition {
       class="desktop-task-row__surface"
       :class="{ 'is-active': active, 'is-space': spaceTask }"
     >
+      <span class="desktop-task-row__mark" :data-mark-id="markState?.markId ?? (markState?.unread ? 'system:unread' : undefined)">
+        <NTooltip v-if="marker" placement="right">
+          <template #trigger>
+            <span role="img" :aria-label="marker.name"><DesktopTaskMarkSwatch :color="marker.color" compact /></span>
+          </template>
+          <div class="desktop-task-row__mark-tooltip">
+            <strong>{{ marker.name }}</strong>
+            <p v-if="marker.description">{{ marker.description }}</p>
+          </div>
+        </NTooltip>
+        <DesktopTaskMarkSwatch v-else compact />
+      </span>
       <button
         class="desktop-task-sidebar__task"
         :class="{ 'is-active': active }"
@@ -234,6 +293,7 @@ function resolveDropPosition(event: DragEvent): DesktopTaskPinnedDropPosition {
   height: 100%;
   min-width: 0;
   align-items: center;
+  padding-left: 6px;
   border-radius: var(--buddy-task-sidebar-state-radius, 8px);
   color: var(--buddy-text-primary);
   transition: background-color var(--buddy-motion-state-duration) var(--buddy-motion-state-easing);
@@ -251,10 +311,6 @@ function resolveDropPosition(event: DragEvent): DesktopTaskPinnedDropPosition {
     background: var(--buddy-nav-pressed);
   }
 
-  &.is-space {
-    padding-left: 0.5rem;
-  }
-
 }
 
 button {
@@ -262,6 +318,22 @@ button {
   background: transparent;
   color: inherit;
   cursor: pointer;
+}
+
+.desktop-task-row__mark {
+  display: grid;
+  width: 3px;
+  flex: none;
+  place-items: center;
+  line-height: 0;
+}
+
+.desktop-task-row__mark-tooltip {
+  max-width: 260px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+
+  p { margin: 4px 0 0; font-size: 12px; }
 }
 
 .desktop-task-sidebar__task {
@@ -273,7 +345,7 @@ button {
   font-size: var(--buddy-task-sidebar-item-font-size, var(--buddy-sidebar-item-font-size));
   font-weight: var(--buddy-sidebar-item-font-weight);
   line-height: 20px;
-  padding: 0 0.625rem;
+  padding: 0 0.5rem 0 4px;
   text-align: left;
 
   .desktop-overflow-label {
