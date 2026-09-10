@@ -6,6 +6,7 @@ import type { BuddyComposerSource } from '@buddy-shared/conversation/composerRes
 import type { LocalConversation, LocalConversationBranch, LocalConversationSummary, LocalConversationTimelineItem, LocalMessage } from '@buddy-shared/conversation/conversationApi'
 import type { LocalConversationTree } from '@buddy-shared/conversation/conversationTree'
 import type { BuddyServiceTier, BuddyThinkingLevel } from '@buddy-shared/conversation/modelSelection'
+import type { LocalTaskMark, LocalTaskMarkState, TaskMarkInput } from '@buddy-shared/conversation/taskMarkApi'
 import type { LocalApproval } from '@buddy-shared/permissions/approvalApi'
 import type { BuddyPermissionMode } from '@buddy-shared/permissions/permissionMode'
 import type { LocalProvider, LocalRuntimeModelOption } from '@buddy-shared/providers/providerApi'
@@ -24,7 +25,24 @@ import type { ChatComposerContextOptions, ChatComposerSubmitPayload } from '@/mo
 
 type State<T> = Readonly<Ref<DeepReadonly<T>>>
 
+export interface TaskMarks {
+  items: State<readonly LocalTaskMark[]>
+  states: State<ReadonlyMap<string, LocalTaskMarkState>>
+  busy: State<boolean>
+  loading: State<boolean>
+  error: State<string | null>
+  refresh: () => Promise<void>
+  save: (input: TaskMarkInput, id?: string) => Promise<boolean>
+  remove: (id: string) => Promise<boolean>
+  assign: (conversationId: string, markId: string | null) => Promise<boolean>
+  clear: (conversationId: string) => Promise<boolean>
+  setRead: (conversationId: string, read: boolean) => Promise<boolean>
+  readResult: (conversationId: string, resultRunId: string, readRevision: number) => Promise<void>
+  beginVisit: (conversationId: string) => void
+}
+
 export interface TaskIndex {
+  marks: TaskMarks
   pinnedItems: State<readonly DesktopTaskPinnedItem[]>
   setPinnedItems: (items: DesktopTaskPinnedItem[]) => Promise<boolean>
   spaces: State<readonly LocalSpace[]>
@@ -156,6 +174,7 @@ export interface TaskConversationTree {
 }
 
 export interface TaskChatWorkspace {
+  marks: TaskMarks
   tree: TaskConversationTree
   restoration: TaskDraftRestoration
   context: {

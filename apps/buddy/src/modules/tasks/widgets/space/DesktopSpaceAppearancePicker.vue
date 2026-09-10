@@ -2,11 +2,10 @@
 import type { SpaceIcon, SpaceIconColor, SpaceLinearIcon } from '@buddy-shared/spaces/spaceAppearance'
 import type { BuddyLocale } from '@/i18n/buddyI18n'
 import { SPACE_FILLED_ICONS, SPACE_ICON_COLORS, SPACE_LINEAR_ICONS } from '@buddy-shared/spaces/spaceAppearance'
-import { Checkmark16Regular } from '@vicons/fluent'
 import { NButton, NPopover, NRadioButton, NRadioGroup } from 'naive-ui'
 import { computed, nextTick, useTemplateRef, watch } from 'vue'
 import { useBuddyI18n } from '@/i18n/buddyI18n'
-import DesktopIcon from '@/shared/ui/icon/DesktopIcon.vue'
+import DesktopColorPalette from '@/shared/ui/color-picker/DesktopColorPalette.vue'
 import DesktopSpaceIcon from './DesktopSpaceIcon.vue'
 
 const props = defineProps<{
@@ -27,6 +26,11 @@ const iconStyle = computed({
   },
 })
 const visibleIcons = computed(() => iconStyle.value === 'filled' ? SPACE_FILLED_ICONS : SPACE_LINEAR_ICONS)
+const colorOptions = SPACE_ICON_COLORS.map(value => ({
+  value,
+  color: value === 'default' ? 'var(--buddy-text-secondary)' : `var(--buddy-space-icon-${value})`,
+  reset: value === 'default',
+}))
 
 watch(open, async (value) => {
   if (!value)
@@ -104,23 +108,7 @@ function reset() {
           <DesktopSpaceIcon :icon="value" :icon-color="iconColor" :size="20" />
         </NButton>
       </div>
-      <div class="desktop-space-appearance-picker__colors">
-        <button
-          v-for="value in SPACE_ICON_COLORS"
-          :key="value"
-          class="desktop-space-appearance-picker__swatch"
-          :class="{ 'is-selected': iconColor === value, 'is-default': value === 'default' }"
-          :style="{ '--swatch-color': value === 'default' ? 'var(--buddy-text-secondary)' : `var(--buddy-space-icon-${value})` }"
-          type="button"
-          :disabled="disabled"
-          :aria-label="value"
-          :data-color="value"
-          :aria-pressed="iconColor === value"
-          @click="iconColor = value"
-        >
-          <DesktopIcon v-if="iconColor === value" class="desktop-space-appearance-picker__check" :component="Checkmark16Regular" :size="14" />
-        </button>
-      </div>
+      <DesktopColorPalette v-model="iconColor" class="desktop-space-appearance-picker__colors" :options="colorOptions" :disabled="disabled" />
       <div class="desktop-space-appearance-picker__footer">
         <NButton size="tiny" quaternary :disabled="disabled" @click="reset">
           {{ t('desktop.tasks.spaceAppearanceReset') }}
@@ -175,47 +163,8 @@ function reset() {
 }
 
 .desktop-space-appearance-picker__colors {
-  display: grid;
-  grid-auto-flow: column;
-  grid-template-columns: repeat(9, 24px);
-  grid-template-rows: repeat(3, 24px);
-  justify-content: space-between;
-  row-gap: 5px;
   padding-top: 16px;
   border-top: 1px solid var(--buddy-border-subtle);
-}
-
-.desktop-space-appearance-picker__swatch {
-  display: grid;
-  width: 24px;
-  height: 24px;
-  place-items: center;
-  padding: 0;
-  border: 1px solid transparent;
-  border-radius: 6px;
-  background: var(--swatch-color);
-  cursor: pointer;
-}
-
-.desktop-space-appearance-picker__swatch.is-default {
-  border-color: var(--buddy-border-strong);
-  background: linear-gradient(135deg, var(--buddy-surface-raised) 47%, var(--buddy-text-secondary) 48%, var(--buddy-text-secondary) 52%, var(--buddy-surface-raised) 53%);
-}
-
-.desktop-space-appearance-picker__swatch:hover,
-.desktop-space-appearance-picker__swatch.is-selected {
-  box-shadow: 0 0 0 1px var(--buddy-surface-raised), 0 0 0 2px var(--swatch-color);
-}
-
-.desktop-space-appearance-picker__check {
-  border-radius: 3px;
-  background: var(--buddy-surface-raised);
-  color: var(--buddy-text-strong);
-}
-
-.desktop-space-appearance-picker__swatch:focus-visible {
-  outline: 2px solid var(--buddy-focus-ring);
-  outline-offset: 2px;
 }
 
 .desktop-space-appearance-picker__footer {

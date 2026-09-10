@@ -17,6 +17,7 @@ import type {
 import type { LocalContextUsageSnapshot, LocalContextUsageSnapshotRequest } from '../../shared/conversation/contextApi'
 import type { LocalConversation, LocalConversationBranch, LocalConversationSummary, LocalConversationTimelinePage, LocalMessagePage } from '../../shared/conversation/conversationApi'
 import type { ConversationNodeDetailRequest, LocalConversationTree } from '../../shared/conversation/conversationTree'
+import type { LocalTaskMark, LocalTaskMarkState, TaskMarkClearInput, TaskMarkInput, TaskMarkReadInput } from '../../shared/conversation/taskMarkApi'
 import type { LocalWorkspaceSetting, LocalWorkspaceStateValue } from '../../shared/conversation/workspaceApi'
 import type { WebSettings, WebSettingsSnapshot } from '../../shared/network/webProtocol'
 import type { LocalNotificationList } from '../../shared/notifications/notificationApi'
@@ -33,6 +34,14 @@ import type { LocalSpaceDirectoryPage, LocalSpaceFilePreview, SpaceDirectoryRequ
 import type { LocalUsageSnapshot } from '../../shared/usage/usageApi'
 
 export const LOCAL_CHAT_IPC_CHANNELS = {
+  taskMarksList: 'lexora:buddy:task-marks:list',
+  taskMarksCreate: 'lexora:buddy:task-marks:create',
+  taskMarksUpdate: 'lexora:buddy:task-marks:update',
+  taskMarksDelete: 'lexora:buddy:task-marks:delete',
+  taskMarksStates: 'lexora:buddy:task-marks:states',
+  taskMarksAssign: 'lexora:buddy:task-marks:assign',
+  taskMarksSetRead: 'lexora:buddy:task-marks:set-read',
+  taskMarksClear: 'lexora:buddy:task-marks:clear',
   changesOverview: 'lexora:buddy:changes:overview',
   spaceFilesList: 'lexora:buddy:space-files:list',
   spaceFilesRead: 'lexora:buddy:space-files:read',
@@ -142,6 +151,16 @@ interface LocalMutationResult {
 }
 
 export interface LocalChatApi {
+  taskMarks: {
+    list: () => Promise<readonly LocalTaskMark[]>
+    create: (input: TaskMarkInput) => Promise<LocalTaskMark>
+    update: (input: TaskMarkInput & { id: string }) => Promise<LocalTaskMark>
+    delete: (id: string) => Promise<boolean>
+    states: (conversationIds: readonly string[]) => Promise<readonly LocalTaskMarkState[]>
+    assign: (conversationId: string, markId: string | null) => Promise<LocalTaskMarkState>
+    setRead: (input: TaskMarkReadInput) => Promise<LocalTaskMarkState>
+    clear: (input: TaskMarkClearInput) => Promise<LocalTaskMarkState>
+  }
   composerDrafts: {
     get: (draftId: string) => Promise<LocalComposerDraft>
     open: (input: LocalComposerDraftOpen) => Promise<LocalComposerDraft>

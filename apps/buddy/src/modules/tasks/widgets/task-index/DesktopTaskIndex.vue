@@ -4,11 +4,12 @@ import type { LocalConversationSummary } from '@buddy-shared/conversation/conver
 
 import type { LocalSpace } from '@buddy-shared/spaces/spaceApi'
 
+import type { TaskMarks } from '../../contracts'
 import type { BuddyLocale } from '@/i18n/buddyI18n'
 import type { TaskSpaceInput } from '@/modules/tasks/state/task-index/typing'
-import { Add16Regular } from '@vicons/fluent'
-import { NAlert, NButton, NInput, NModal } from 'naive-ui'
-import { toRef } from 'vue'
+import { Add16Regular, Tag20Regular } from '@vicons/fluent'
+import { NAlert, NButton, NInput, NModal, NTooltip } from 'naive-ui'
+import { shallowRef, toRef } from 'vue'
 import { useBuddyI18n } from '@/i18n/buddyI18n'
 import DesktopSpaceDialog from '@/modules/tasks/widgets/task-index/DesktopSpaceDialog.vue'
 import DesktopTaskRow from '@/modules/tasks/widgets/task-index/DesktopTaskRow.vue'
@@ -23,9 +24,11 @@ import {
 import { useTaskIndexController } from '@/modules/tasks/widgets/task-index/useTaskIndexController'
 import DesktopIcon from '@/shared/ui/icon/DesktopIcon.vue'
 import DesktopWorkspaceSidebarIdentity from '@/shared/ui/workspace-sidebar/DesktopWorkspaceSidebarIdentity.vue'
+import DesktopTaskMarkManager from './DesktopTaskMarkManager.vue'
 
 const props = defineProps<{
   activeConversationId: string | null
+  marks: TaskMarks
   appSidebarCollapsed: boolean
   language: BuddyLocale
   pinnedItems: ReadonlyArray<DesktopTaskPinnedItem>
@@ -45,6 +48,18 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useBuddyI18n(() => props.language)
+const marksOpen = shallowRef(false)
+function markBindings(conversationId: string) {
+  return {
+    marks: props.marks.items.value,
+    markState: props.marks.states.value.get(conversationId),
+    marksBusy: props.marks.busy.value,
+    onAssignMark: (markId: string) => props.marks.assign(conversationId, markId),
+    onClearMarks: () => props.marks.clear(conversationId),
+    onSetRead: (read: boolean) => props.marks.setRead(conversationId, read),
+    onManageMarks: () => marksOpen.value = true,
+  }
+}
 const sidebarLayoutStyle = {
   '--buddy-task-sidebar-row-height': `${DESKTOP_TASK_SIDEBAR_ROW_HEIGHT}px`,
   '--buddy-task-sidebar-row-size': `${DESKTOP_TASK_SIDEBAR_ROW_SIZE}px`,
@@ -107,6 +122,14 @@ const {
         :label="t('desktop.navigation.tasks')"
         :visible="appSidebarCollapsed"
       />
+      <NTooltip>
+        <template #trigger>
+          <button class="desktop-task-sidebar__marks-trigger" type="button" :aria-label="t('desktop.marks.manage')" @click="marksOpen = true">
+            <DesktopIcon :component="Tag20Regular" />
+          </button>
+        </template>
+        {{ t('desktop.marks.manage') }}
+      </NTooltip>
       <button
         class="desktop-task-sidebar__new-trigger"
         type="button"
@@ -117,6 +140,12 @@ const {
       </button>
     </header>
 
+    <NAlert v-if="marks.error.value && !marksOpen" type="error" :show-icon="false">
+      {{ marks.error.value }}
+      <NButton text @click="marks.refresh">
+        {{ t('desktop.marks.retry') }}
+      </NButton>
+    </NAlert>
     <div class="desktop-task-sidebar__content">
       <nav :style="sidebarLayoutStyle">
         <DesktopTaskSidebarSection
@@ -152,6 +181,7 @@ const {
               v-else
               :active="item.task.id === activeConversationId"
               :activity="item.task.activity"
+              v-bind="markBindings(item.task.id)"
               :dragging="item.pinnedTopLevel && draggedPinnedItemKey === item.pinKey"
               :drop-position="item.pinnedTopLevel ? getPinnedDropPosition(item.pinKey) : undefined"
               :language="language"
@@ -204,6 +234,7 @@ const {
               :now="relativeTimeNow"
               :occurred-at="item.task.automationOccurrence?.scheduledFor ?? item.task.updatedAt"
               :space-task="item.spaceTask"
+              v-bind="markBindings(item.task.id)"
               :title="getTaskTitle(item.task)"
               @delete="requestTaskDelete(item.task)"
               @open="emit('openTask', item.task.id)"
@@ -224,6 +255,7 @@ const {
             <DesktopTaskRow
               :active="task.id === activeConversationId"
               :activity="task.activity"
+              v-bind="markBindings(task.id)"
               :language="language"
               :now="relativeTimeNow"
               :occurred-at="task.automationOccurrence?.scheduledFor ?? task.updatedAt"
@@ -238,6 +270,8 @@ const {
         </DesktopTaskSidebarSection>
       </nav>
     </div>
+
+    <DesktopTaskMarkManager v-model:show="marksOpen" :marks="marks" :language="language" />
 
     <DesktopSpaceDialog
       v-model:show="spaceDialogOpen"
@@ -358,7 +392,10 @@ const {
   padding: 0 0.75rem 0 0.8rem;
 }
 
-.desktop-task-sidebar__new-trigger {
+.desktop-task-sidebar__marks-trigger { margin-left: auto; }
+
+.desktop-task-sidebar__new-trigger,
+.desktop-task-sidebar__marks-trigger {
   display: grid;
   width: 1.75rem;
   height: 1.75rem;

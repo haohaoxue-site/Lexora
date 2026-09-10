@@ -1031,6 +1031,7 @@ function createDesktopApi() {
     app: { getInfo: vi.fn() },
     lifecycle: { quit: vi.fn() },
     localChat: {
+      taskMarks: { list: async () => [], states: async () => [] },
       composerDrafts: {
         get: vi.fn(async (draftId: string) => {
           const draft = draftsById.get(draftId)

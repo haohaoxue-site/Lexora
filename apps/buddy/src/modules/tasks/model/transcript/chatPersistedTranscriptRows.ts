@@ -90,6 +90,8 @@ export function projectPersistedChatTranscriptRows(
       message: item,
       turnOutputs,
     }
+    if (isFinalTurnMessage(item, turnsByRunId) && item.runId)
+      row.resultRunId = item.runId
     if (turnChanges)
       row.turnChanges = turnChanges
     const turnUsage = isFinalTurnMessage(item, turnsByRunId) && item.runId

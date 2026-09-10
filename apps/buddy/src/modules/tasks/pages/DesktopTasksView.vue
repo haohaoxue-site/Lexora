@@ -97,6 +97,7 @@ const {
     <template #sidebar>
       <DesktopTaskIndex
         :active-conversation-id="activeTaskId"
+        :marks="tasks.index.marks"
         :app-sidebar-collapsed="appSidebarCollapsed"
         :language="language"
         :pinned-items="pinnedItems"

@@ -14,6 +14,7 @@ const props = defineProps<{
   message: LocalMessage
   language: BuddyLocale
   final: boolean
+  resultRunId?: string
   turnOutputs: ChatTranscriptTurnOutputs | null
   turnChanges?: LocalChangeSetSummary | null
   writeClipboardText: (text: string) => Promise<void>
@@ -28,11 +29,11 @@ const interruptionLabel = computed(() => {
 
 <template>
   <BuddyChatMessageContent
-    class="buddy-chat-message__body" :final="final" :hidden-artifacts="turnOutputs?.artifacts ?? []"
+    class="buddy-chat-message__body" :final="final" :hidden-artifacts="turnOutputs?.artifacts ?? []" :data-task-result-run-id="final ? resultRunId : undefined"
     :language="language" :message="message" :write-clipboard-text="writeClipboardText"
   />
-  <BuddyChatTurnOutputs v-if="turnOutputs?.artifacts.length" class="buddy-chat-message__outputs" :artifacts="turnOutputs.artifacts" :language="language" @open-artifact="emit('openArtifact', $event)" />
-  <BuddyChatTurnChanges v-if="turnChanges" class="buddy-chat-message__changes" :change-set="turnChanges" :language="language" @open-changes="emit('openChanges', $event)" />
+  <BuddyChatTurnOutputs v-if="turnOutputs?.artifacts.length" class="buddy-chat-message__outputs" :data-task-result-run-id="final ? resultRunId : undefined" :artifacts="turnOutputs.artifacts" :language="language" @open-artifact="emit('openArtifact', $event)" />
+  <BuddyChatTurnChanges v-if="turnChanges" class="buddy-chat-message__changes" :data-task-result-run-id="final ? resultRunId : undefined" :change-set="turnChanges" :language="language" @open-changes="emit('openChanges', $event)" />
   <small v-if="interruptionLabel" class="buddy-chat-message__interruption" role="status">{{ interruptionLabel }}</small>
 </template>
 

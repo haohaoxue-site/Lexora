@@ -10,6 +10,7 @@ import { useConversationNodeDetail } from '../../state/conversations/useConversa
 import ConversationNodeDetail from '../canvas/ConversationNodeDetail.vue'
 import { useConversationDetailResize } from '../canvas/useConversationDetailResize'
 import { useChatQuoteNavigation } from '../quotes/useChatQuoteNavigation'
+import { useTaskResultRead } from '../task-index/useTaskResultRead'
 import DesktopChatTranscript from '../transcript/DesktopChatTranscript.vue'
 import DesktopChatWelcome from '../welcome/DesktopChatWelcome.vue'
 import ChatSelectionQuoteMenu from './ChatSelectionQuoteMenu.vue'
@@ -61,6 +62,12 @@ watch(() => props.viewMode, (value) => {
 }, { immediate: true })
 const messageList = useTemplateRef<BuddyChatMessageListHandle>('messageList')
 const { isEmpty, isLoading, language, transcriptBindings, viewport, welcomeVariant } = useChatWorkspace(props, messageList)
+useTaskResultRead({
+  root: pageRef,
+  conversationId: computed(() => props.workspace.session.activeConversationId.value),
+  marks: () => props.workspace.marks,
+  disabled: computed(() => isLoading.value || props.workspace.status.runtimeState.value.status !== 'ready'),
+})
 
 async function focusComposer() {
   if (!composerVisible.value)

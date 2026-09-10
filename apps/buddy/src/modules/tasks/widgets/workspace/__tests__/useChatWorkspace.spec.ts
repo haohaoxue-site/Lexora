@@ -19,6 +19,21 @@ function createOwner(name: string) {
   const delivered: { mode: 'send' | 'edit', content: string }[] = []
   const draft = shallowRef(`${name} draft`)
   const workspace = {
+    marks: {
+      items: shallowRef([]),
+      states: shallowRef(new Map()),
+      busy: shallowRef(false),
+      loading: shallowRef(false),
+      error: shallowRef(null),
+      refresh: async () => {},
+      save: async () => true,
+      remove: async () => true,
+      assign: async () => true,
+      clear: async () => true,
+      setRead: async () => true,
+      readResult: async () => {},
+      beginVisit: () => {},
+    },
     tree: { data: shallowRef(null), loading: shallowRef(false), error: shallowRef(null), refresh: async () => {}, setVisible: () => {} },
     composer: {
       target: shallowRef({ kind: 'global' } as const),

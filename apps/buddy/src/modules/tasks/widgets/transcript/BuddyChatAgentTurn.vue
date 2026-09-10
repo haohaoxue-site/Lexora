@@ -97,6 +97,7 @@ const actionCopyText = computed(() => resultNoticeText.value ?? statusLabel.valu
     <p
       v-if="resultNoticeText"
       class="buddy-chat-agent-turn__result"
+      :data-task-result-run-id="!isActive ? turn.runId : undefined"
       :class="{ 'is-failure': notice?.kind === 'failure' }"
     >
       {{ resultNoticeText }}
