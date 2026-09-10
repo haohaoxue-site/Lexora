@@ -11,12 +11,13 @@ function createList() {
   const metrics: ChatMessageScrollMetrics = { clientHeight: 400, scrollHeight: 1_000, scrollTop: 20 }
   const highlights: string[] = []
   const revealed: string[] = []
+  const geometry = { anchorTop: 20 }
   const handle: BuddyChatMessageListHandle = {
-    captureScrollAnchor: () => ({ messageId: 'visible', messageOffsetTop: 0, metrics: { ...metrics } }),
+    captureScrollAnchor: () => ({ messageId: 'visible', messageOffsetTop: geometry.anchorTop - metrics.scrollTop, metrics: { ...metrics } }),
     highlightMessage: id => highlights.push(id),
     readScrollMetrics: () => ({ ...metrics }),
     restoreScrollAnchor: (anchor: ChatMessageScrollAnchor) => {
-      metrics.scrollTop = anchor.metrics.scrollTop + metrics.scrollHeight - anchor.metrics.scrollHeight
+      metrics.scrollTop = geometry.anchorTop - anchor.messageOffsetTop
       return { ...metrics }
     },
     scrollToMessage: (id) => {
@@ -29,7 +30,7 @@ function createList() {
       return { ...metrics }
     },
   }
-  return { handle, highlights, metrics, revealed }
+  return { geometry, handle, highlights, metrics, revealed }
 }
 
 function createViewport(loadOlderMessages: () => Promise<boolean>, initial: {
@@ -47,7 +48,7 @@ function createViewport(loadOlderMessages: () => Promise<boolean>, initial: {
     isLoadingOlderMessages: shallowRef(false),
     list: shallowRef<BuddyChatMessageListHandle | null>(initial.listMounted === false ? null : original.handle),
     loadOlderMessages,
-    timelineItems: shallowRef<{ id: string, kind: string }[]>([]),
+    timelineItems: shallowRef<{ id: string, kind: string }[]>([{ id: 'visible', kind: 'message' }]),
   }
   const scope = effectScope()
   const viewport = scope.run(() => useChatViewport(options))!
@@ -56,6 +57,14 @@ function createViewport(loadOlderMessages: () => Promise<boolean>, initial: {
 }
 
 type Invalidation = 'conversation' | 'branch' | 'list' | 'dispose'
+async function prependHistory(fixture: ReturnType<typeof createViewport>, height = 400) {
+  fixture.options.timelineItems.value = [{ id: 'older', kind: 'message' }, ...fixture.options.timelineItems.value]
+  await nextTick()
+  fixture.original.metrics.scrollHeight += height
+  fixture.original.geometry.anchorTop += height
+  await nextTick()
+}
+
 async function invalidate(fixture: ReturnType<typeof createViewport>, reason: Invalidation) {
   let current = fixture.original
   if (reason === 'conversation') {
@@ -80,6 +89,86 @@ async function invalidate(fixture: ReturnType<typeof createViewport>, reason: In
 }
 
 describe('chat viewport operations', () => {
+  it('fills an initially unscrollable transcript before revealing its latest position', async () => {
+    let pages = 0
+    const fixture = createViewport(async () => {
+      pages += 1
+      fixture.original.metrics.scrollHeight += 150
+      fixture.options.timelineItems.value = [{ id: `older-${pages}`, kind: 'message' }, ...fixture.options.timelineItems.value]
+      return true
+    }, { isLoading: true, listMounted: false })
+    fixture.original.metrics.scrollHeight = 200
+    fixture.options.list.value = fixture.original.handle
+    fixture.options.isLoading.value = false
+    for (let tick = 0; tick < 6; tick += 1)
+      await nextTick()
+
+    expect(pages).toBe(2)
+    expect(fixture.original.metrics.scrollHeight).toBe(500)
+    expect(fixture.original.metrics.scrollTop).toBe(100)
+    expect(fixture.viewport.isPositioning.value).toBe(false)
+    expect(fixture.viewport.showReturnToLatest.value).toBe(false)
+  })
+
+  it('anchors prepended history to the latest reader position while a request is pending', async () => {
+    const pending = deferred<boolean>()
+    const fixture = createViewport(() => pending.promise)
+    fixture.viewport.handleScroll(fixture.original.metrics)
+    fixture.original.metrics.scrollTop = 5
+    fixture.viewport.handleScroll(fixture.original.metrics)
+    await prependHistory(fixture)
+    pending.resolve(true)
+    await nextTick()
+
+    expect(fixture.original.metrics.scrollTop).toBe(405)
+    fixture.original.geometry.anchorTop += 80
+    fixture.original.metrics.scrollHeight += 80
+    fixture.viewport.handleContentResize(fixture.original.metrics)
+    expect(fixture.original.metrics.scrollTop).toBe(485)
+  })
+
+  it('restores a recent task reading position before showing a remounted transcript', async () => {
+    const fixture = createViewport(async () => false)
+    fixture.original.metrics.scrollTop = 250
+    fixture.viewport.handleScroll(fixture.original.metrics)
+    fixture.options.activeConversationId.value = 'conversation-2'
+    fixture.options.activeBranchId.value = 'branch-2'
+    await nextTick()
+    await nextTick()
+    expect(fixture.original.metrics.scrollTop).toBe(600)
+
+    fixture.options.isLoading.value = true
+    fixture.options.activeConversationId.value = 'conversation-1'
+    fixture.options.activeBranchId.value = 'branch-1'
+    fixture.options.list.value = null
+    await nextTick()
+    expect(fixture.viewport.isPositioning.value).toBe(true)
+    fixture.options.isLoading.value = false
+    fixture.options.list.value = fixture.original.handle
+    await nextTick()
+    await nextTick()
+
+    expect(fixture.original.metrics.scrollTop).toBe(250)
+    expect(fixture.viewport.isPositioning.value).toBe(false)
+    expect(fixture.viewport.showReturnToLatest.value).toBe(true)
+  })
+
+  it('releases positioning when loading a notification target fails', async () => {
+    const fixture = createViewport(async () => {
+      throw new Error('unavailable')
+    }, {
+      isLoading: true,
+      listMounted: false,
+      searchMessageId: 'old-target',
+    })
+    fixture.options.list.value = fixture.original.handle
+    fixture.options.isLoading.value = false
+    await nextTick()
+    await nextTick()
+    await nextTick()
+    expect(fixture.viewport.isPositioning.value).toBe(false)
+  })
+
   it('accepts an initial notification target and loads its history after the list becomes ready', async () => {
     let pages = 0
     const fixture = createViewport(async () => {
@@ -225,7 +314,7 @@ describe('chat viewport operations', () => {
     })
     fixture.viewport.handleScroll(fixture.original.metrics)
     fixture.viewport.handleScroll(fixture.original.metrics)
-    fixture.original.metrics.scrollHeight = 1_400
+    await prependHistory(fixture)
     pending.resolve(true)
     await nextTick()
     await nextTick()
@@ -358,14 +447,15 @@ describe('chat viewport operations', () => {
     fixture.viewport.handleScroll(fixture.original.metrics)
     failed.reject(new Error('History temporarily unavailable'))
     await nextTick()
+    fixture.original.metrics.scrollTop = 19
     fixture.viewport.handleScroll(fixture.original.metrics)
-    fixture.original.metrics.scrollHeight = 1_400
+    await prependHistory(fixture)
     retry.resolve(true)
     await nextTick()
     await nextTick()
 
     expect(requests).toBe(2)
-    expect(fixture.original.metrics.scrollTop).toBe(420)
+    expect(fixture.original.metrics.scrollTop).toBe(419)
   })
 
   it('starts paging in the new branch without letting the old request clear its pending state', async () => {
@@ -386,7 +476,7 @@ describe('chat viewport operations', () => {
 
     expect(requests).toBe(2)
     expect(fixture.original.metrics.scrollTop).toBe(20)
-    fixture.original.metrics.scrollHeight = 1_400
+    await prependHistory(fixture)
     newPage.resolve(true)
     await nextTick()
     await nextTick()

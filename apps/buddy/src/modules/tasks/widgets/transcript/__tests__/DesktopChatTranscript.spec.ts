@@ -30,12 +30,15 @@ const cleanups: (() => void)[] = []
 afterEach(() => cleanups.splice(0).forEach(cleanup => cleanup()))
 
 describe('desktopChatTranscript outline inputs', () => {
-  it('reads a replacement loader prop when preparing the same conversation', async () => {
+  it('prepares the full outline automatically with the current task loader', async () => {
     const fixture = mountTranscript(async () => [message('old', 'old loader')])
-    fixture.props.value = { ...fixture.props.value, loadOutlineMessages: async () => [message('new', 'replacement loader')] }
-    await nextTick()
-
-    fixture.prepare()
+    await vi.waitFor(() => expect(fixture.output()).toBe('old loader'))
+    fixture.props.value = {
+      ...fixture.props.value,
+      conversationId: 'conversation-2',
+      activeBranchId: 'branch-2',
+      loadOutlineMessages: async () => [message('new', 'replacement loader', 'conversation-2')],
+    }
 
     await vi.waitFor(() => expect(fixture.output()).toBe('replacement loader'))
   })
@@ -44,7 +47,6 @@ describe('desktopChatTranscript outline inputs', () => {
     const first = deferred<readonly LocalMessage[]>()
     const second = deferred<readonly LocalMessage[]>()
     const fixture = mountTranscript(() => first.promise)
-    fixture.prepare()
     await nextTick()
     expect(fixture.loading()).toBe(true)
     fixture.props.value = {
@@ -53,9 +55,6 @@ describe('desktopChatTranscript outline inputs', () => {
       conversationId: 'conversation-2',
       loadOutlineMessages: () => second.promise,
     }
-    await nextTick()
-    expect(fixture.loading()).toBe(false)
-    fixture.prepare()
     await nextTick()
     expect(fixture.loading()).toBe(true)
 

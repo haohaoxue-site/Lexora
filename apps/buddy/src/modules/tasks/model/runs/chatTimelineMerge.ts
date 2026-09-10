@@ -1,9 +1,23 @@
 import type { LocalChangeSetSummary } from '@buddy-shared/changes/changeApi'
-import type { LocalConversationTimelineItem } from '@buddy-shared/conversation/conversationApi'
+import type { LocalConversationTimelineItem, LocalConversationTimelinePage } from '@buddy-shared/conversation/conversationApi'
 import type { LocalRun, LocalRunEvent, LocalRunOutput } from '@buddy-shared/runs/runApi'
 
 import type { ChatRunEventBuckets } from './typing'
 import { compactChatRunEventSnapshots, mergeChatRunEvents } from './chatRunEventBuckets'
+
+export function mergeConversationTimelinePages(
+  newer: LocalConversationTimelinePage,
+  older: LocalConversationTimelinePage,
+): LocalConversationTimelinePage {
+  return {
+    changeSets: mergeChangeSets(older.changeSets, newer.changeSets),
+    items: mergeOlderTimelineItems(newer.items, older.items),
+    nextCursor: older.nextCursor,
+    outputs: mergeRunOutputs(older.outputs, newer.outputs),
+    runEvents: mergeTimelineEvents(older.runEvents, newer.runEvents, newer.runs),
+    runs: [...new Map([...older.runs, ...newer.runs].map(run => [run.id, run])).values()],
+  }
+}
 
 export function mergeChangeSets(
   current: ReadonlyArray<LocalChangeSetSummary>,

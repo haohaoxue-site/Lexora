@@ -8,6 +8,48 @@ import { effectScope, ref } from 'vue'
 import { useChatRunSync } from '../useChatRunSync'
 
 describe('useChatRunSync', () => {
+  it('restores the loaded range with fresh pages and keeps a switched task loading until the range is ready', async () => {
+    const activeConversationId = ref<string | null>('conversation-a')
+    const activeBranchId = ref<string | null>('branch-conversation-a')
+    const older = timelineMessage('older-a', 'conversation-a', activeBranchId.value!, 1)
+    const latest = timelineMessage('latest-a', 'conversation-a', activeBranchId.value!, 2)
+    const pending = deferred<LocalConversationTimelinePage>()
+    let restore = false
+    const api = createApi({ listTimeline: async (input) => {
+      if (input.conversationId === 'conversation-b')
+        return timelinePage([timelineMessage('latest-b', 'conversation-b', 'branch-conversation-b', 1)], null)
+      if (input.cursor)
+        return restore ? pending.promise : timelinePage([older], null)
+      return timelinePage([restore ? { ...latest, content: { text: 'updated while away' } } : latest], 'older')
+    } })
+    const sync = useChatRunSync({ activeBranchId, activeConversationId, api, onError: vi.fn() })
+    try {
+      await sync.refreshActiveConversation()
+      await sync.loadOlderMessages()
+      expect(sync.timelineItems.value.map(item => item.id)).toEqual(['older-a', 'latest-a'])
+      activeConversationId.value = 'conversation-b'
+      activeBranchId.value = 'branch-conversation-b'
+      expect(sync.isLoadingConversation.value).toBe(true)
+      await sync.refreshActiveConversation()
+      expect(sync.messages.value.map(item => item.id)).toEqual(['latest-b'])
+      restore = true
+      activeConversationId.value = 'conversation-a'
+      activeBranchId.value = 'branch-conversation-a'
+      const refreshing = sync.refreshActiveConversation()
+      await vi.waitUntil(() => vi.mocked(api.conversations.listTimeline).mock.calls.length === 5)
+      expect(sync.isLoadingConversation.value).toBe(true)
+      expect(sync.timelineItems.value).toEqual([])
+      pending.resolve(timelinePage([older], null))
+      await refreshing
+      expect(sync.isLoadingConversation.value).toBe(false)
+      expect(sync.messages.value.map(item => item.content)).toEqual([{ text: 'older-a' }, { text: 'updated while away' }])
+      expect(sync.hasOlderMessages.value).toBe(false)
+    }
+    finally {
+      sync.dispose()
+    }
+  })
+
   it('does not let a stale event fetch overwrite the newly active conversation', async () => {
     const activeConversationId = ref<string | null>('conversation-a')
     const activeBranchId = ref<string | null>('branch-conversation-a')

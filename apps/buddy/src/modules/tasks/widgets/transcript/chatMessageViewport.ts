@@ -5,6 +5,7 @@ export interface ChatMessageScrollMetrics {
 }
 
 export interface ChatMessageScrollAnchor {
+  rowKey?: string
   messageId: string
   messageOffsetTop: number
   metrics: ChatMessageScrollMetrics

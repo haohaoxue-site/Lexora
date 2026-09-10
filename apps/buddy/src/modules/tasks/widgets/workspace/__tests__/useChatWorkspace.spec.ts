@@ -3,6 +3,7 @@ import type { LocalBuddyServiceSupervisorState } from '@buddy-shared/runtime/ser
 import type { LocalSpace } from '@buddy-shared/spaces/spaceApi'
 import type { TaskChatWorkspace } from '../../../contracts'
 import type { ChatApprovalDecision } from '../../../model/runs/typing'
+import type { BuddyChatMessageListHandle } from '../../transcript/chatMessageViewport'
 import type { ChatWorkspaceProps } from '../typing'
 import type { BuddyLocale } from '@/i18n/buddyI18n'
 import type { ChatComposerSubmitPayload } from '@/modules/prompt-input'
@@ -179,20 +180,34 @@ function bindWorkspace(owner: ReturnType<typeof createOwner>) {
     workspace: owner.workspace,
   })
   const scope = effectScope()
-  const view = scope.run(() => useChatWorkspace(props, shallowRef(null)))!
+  const list = shallowRef<BuddyChatMessageListHandle | null>(null)
+  const view = scope.run(() => useChatWorkspace(props, list))!
   cleanups.push(() => scope.stop())
   const composer = scope.run(() => useTaskComposer({
     get composer() { return props.workspace.composer },
     get execution() { return props.workspace.execution },
     get language() { return props.workspace.language.value },
   }))!
-  return { props, scope, view, composer }
+  return { props, scope, view, composer, list }
 }
 
 describe('useChatWorkspace', () => {
+  it('does not wait for an unmounted transcript while showing the canvas', async () => {
+    const owner = createOwner('canvas')
+    const { props, view } = bindWorkspace(owner)
+    props.viewMode = 'canvas'
+    owner.workspace.session.activeConversationId.value = 'conversation-canvas'
+    owner.workspace.session.activeBranchId.value = 'branch-canvas'
+    owner.workspace.status.isLoading.value = false
+    await nextTick()
+    expect(view.isLoading.value).toBe(false)
+    props.viewMode = 'chat'
+    expect(view.isLoading.value).toBe(true)
+  })
+
   it('updates returned bindings when the owning state completes asynchronously', async () => {
     const owner = createOwner('first')
-    const { scope, view, composer } = bindWorkspace(owner)
+    const { scope, view, composer, list } = bindWorkspace(owner)
     const { isLoading, language, isEmpty } = view
     const draft = computed(() => composer.bindings.value.draft)
     const canSend = computed(() => composer.bindings.value.canSend)
@@ -210,8 +225,21 @@ describe('useChatWorkspace', () => {
     owner.workspace.language.value = 'en-US'
     await nextTick()
 
+    expect(isLoading.value).toBe(true)
+    list.value = {
+      captureScrollAnchor: () => null,
+      highlightMessage: () => {},
+      readScrollMetrics: () => null,
+      restoreScrollAnchor: () => null,
+      scrollToMessage: () => null,
+      scrollToTail: () => ({ scrollTop: 600, scrollHeight: 1000, clientHeight: 400 }),
+    }
+    await nextTick()
+    await nextTick()
+
     expect(observed).toEqual([
       'zh-CN:first draft:true:false:true',
+      'en-US:restored draft:true:true:false',
       'en-US:restored draft:false:true:false',
     ])
     expect(view.transcriptBindings.value?.conversationId).toBe('conversation-first')
