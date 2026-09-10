@@ -74,6 +74,37 @@ function seedRun(
 }
 
 describe('buddy schema', () => {
+  it('migrates v10 spaces with default appearance without altering grants, tasks or memory', () => {
+    const directory = mkdtempSync(join(tmpdir(), 'lexora-buddy-space-appearance-'))
+    directories.push(directory)
+    const databasePath = join(directory, 'buddy.sqlite3')
+    const legacy = new NodeDatabaseSync(databasePath)
+    for (const migration of BUDDY_SCHEMA_MIGRATIONS.filter(({ version }) => version <= 10)) {
+      legacy.exec(migration.sql)
+      legacy.exec(`PRAGMA user_version = ${migration.version}`)
+    }
+    seedRun(legacy)
+    const space = legacy.prepare('SELECT * FROM spaces').get()
+    const grants = legacy.prepare('SELECT * FROM space_directory_bindings').all()
+    const tasks = legacy.prepare('SELECT * FROM conversations').all()
+    const runs = legacy.prepare('SELECT * FROM runs').all()
+    legacy.close()
+
+    const migrated = openBuddyDatabase({ databasePath })
+    expect(migrated.prepare('SELECT * FROM spaces').get()).toEqual({ ...space, icon: 'folder', icon_color: 'default' })
+    expect(migrated.prepare('SELECT * FROM space_directory_bindings').all()).toEqual(grants)
+    expect(migrated.prepare('SELECT * FROM conversations').all()).toEqual(tasks)
+    expect(migrated.prepare('SELECT * FROM runs').all()).toEqual(runs)
+    migrated.exec('UPDATE spaces SET icon = \'code\', icon_color = \'blue\' WHERE id = \'space-1\'')
+    migrated.close()
+
+    const reopened = openBuddyDatabase({ databasePath })
+    databases.push(reopened)
+    expect(reopened.prepare('SELECT icon, icon_color FROM spaces').get()).toEqual({ icon: 'code', icon_color: 'blue' })
+    expect(reopened.prepare('PRAGMA foreign_key_check').all()).toEqual([])
+    expect(reopened.prepare('PRAGMA user_version').get()).toEqual({ user_version: BUDDY_SCHEMA_VERSION })
+  })
+
   it('requires an explicit database path before opening storage', () => {
     for (const invalid of [undefined, ':memory:', null, [], {}, { buddyHome: '/unused' }, { databasePath: '' }, { databasePath: 'buddy.sqlite3' }]) {
       expect(() => openBuddyDatabase(invalid as unknown as Parameters<typeof openBuddyDatabase>[0]))

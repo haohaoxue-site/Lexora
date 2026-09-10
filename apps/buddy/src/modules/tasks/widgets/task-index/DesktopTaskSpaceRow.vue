@@ -10,8 +10,6 @@ import {
   ChevronRight16Regular,
   Delete20Regular,
   Edit20Regular,
-  Folder20Regular,
-  FolderOpen20Regular,
   MoreHorizontal20Regular,
   Pin20Regular,
   PinOff20Regular,
@@ -21,6 +19,7 @@ import { computed, h } from 'vue'
 import { useBuddyI18n } from '@/i18n/buddyI18n'
 import DesktopOverflowingLabel from '@/modules/tasks/widgets/task-index/DesktopOverflowingLabel.vue'
 import DesktopIcon from '@/shared/ui/icon/DesktopIcon.vue'
+import DesktopSpaceIcon from '../space/DesktopSpaceIcon.vue'
 
 const props = defineProps<{
   dragging?: boolean
@@ -127,9 +126,10 @@ function resolveDropPosition(event: DragEvent): DesktopTaskPinnedDropPosition {
         class="desktop-task-space-row__chevron"
         :component="expanded ? ChevronDown16Regular : ChevronRight16Regular"
       />
-      <DesktopIcon
+      <DesktopSpaceIcon
         class="desktop-task-space-row__folder"
-        :component="expanded ? FolderOpen20Regular : Folder20Regular"
+        :icon="space.icon"
+        :icon-color="space.iconColor"
       />
       <DesktopOverflowingLabel :paused="dragging" :text="space.name" />
     </button>

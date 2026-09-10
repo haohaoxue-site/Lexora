@@ -7,8 +7,9 @@ import type {
   TaskSpaceInput,
 } from '@/modules/tasks/state/task-index/typing'
 import { NAlert, NButton, NForm, NFormItem, NInput, NModal, NSelect } from 'naive-ui'
-import { computed, h } from 'vue'
+import { computed, h, shallowRef, watch } from 'vue'
 import { useBuddyI18n } from '@/i18n/buddyI18n'
+import DesktopSpaceAppearancePicker from '../space/DesktopSpaceAppearancePicker.vue'
 import DesktopSpacePrimaryDirectoryField from './DesktopSpacePrimaryDirectoryField.vue'
 import { useSpaceEditor } from './useSpaceEditor'
 
@@ -23,6 +24,10 @@ const emit = defineEmits<{
   'update:show': [show: boolean]
 }>()
 const { t } = useBuddyI18n(() => props.language)
+const appearanceOpen = shallowRef(false)
+watch(() => props.show, () => {
+  appearanceOpen.value = false
+})
 const { canSave, directoryChangeBlocked, directoryEditingDisabled, failed, form, save: confirm, saving, selectingDirectory, selectPrimaryDirectory } = useSpaceEditor({
   show: () => props.show,
   space: () => props.space,
@@ -62,17 +67,28 @@ function renderMemoryLabel(option: SelectOption, selected: boolean) {
     :show="show"
     :style="{ width: 'min(34rem, calc(100vw - 2rem))' }"
     :title="dialogTitle"
+    :close-on-esc="!appearanceOpen"
+    @esc="appearanceOpen = false"
     @update:show="emit('update:show', $event)"
   >
     <NForm @submit.prevent="confirm">
       <NFormItem :label="t('desktop.tasks.spaceName')" required>
-        <NInput
-          v-model:value="form.name"
-          :disabled="saving"
-          autofocus
-          maxlength="80"
-          :placeholder="t('desktop.tasks.spaceNamePlaceholder')"
-        />
+        <div class="desktop-space-dialog__identity">
+          <DesktopSpaceAppearancePicker
+            v-model:show="appearanceOpen"
+            v-model:icon="form.icon"
+            v-model:icon-color="form.iconColor"
+            :disabled="saving"
+            :language="language"
+          />
+          <NInput
+            v-model:value="form.name"
+            :disabled="saving"
+            autofocus
+            maxlength="80"
+            :placeholder="t('desktop.tasks.spaceNamePlaceholder')"
+          />
+        </div>
       </NFormItem>
       <NFormItem :label="t('desktop.tasks.spaceMemory')">
         <NSelect
@@ -129,6 +145,14 @@ function renderMemoryLabel(option: SelectOption, selected: boolean) {
 </template>
 
 <style scoped>
+.desktop-space-dialog__identity {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+}
+
 :global(.desktop-space-dialog__memory-option) {
   display: grid;
   min-width: 22rem;

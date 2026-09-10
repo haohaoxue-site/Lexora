@@ -8,6 +8,7 @@ import { BUDDY_V7_ARTIFACT_OUTPUT_SCHEMA_SQL } from './migrations/v7ArtifactOutp
 import { BUDDY_V8_WEB_SCHEMA_SQL } from './migrations/v8Web'
 import { BUDDY_V9_COMPOSER_SCHEMA_SQL } from './migrations/v9Composer'
 import { BUDDY_V10_TREE_SCHEMA_SQL } from './migrations/v10Tree'
+import { BUDDY_V11_SPACE_APPEARANCE_SCHEMA_SQL } from './migrations/v11SpaceAppearance'
 
 export interface BuddySchemaMigration {
   foreignKeys?: 'off'
@@ -15,7 +16,7 @@ export interface BuddySchemaMigration {
   version: number
 }
 
-export const BUDDY_SCHEMA_VERSION = 10 as const
+export const BUDDY_SCHEMA_VERSION = 11 as const
 
 export const BUDDY_SCHEMA_MIGRATIONS: readonly BuddySchemaMigration[] = [
   { sql: BUDDY_V1_INITIAL_SCHEMA_SQL, version: 1 },
@@ -28,4 +29,5 @@ export const BUDDY_SCHEMA_MIGRATIONS: readonly BuddySchemaMigration[] = [
   { sql: BUDDY_V8_WEB_SCHEMA_SQL, version: 8 },
   { sql: BUDDY_V9_COMPOSER_SCHEMA_SQL, version: 9 },
   { foreignKeys: 'off', sql: BUDDY_V10_TREE_SCHEMA_SQL, version: 10 },
+  { sql: BUDDY_V11_SPACE_APPEARANCE_SCHEMA_SQL, version: 11 },
 ]

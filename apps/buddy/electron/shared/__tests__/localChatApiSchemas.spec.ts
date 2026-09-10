@@ -181,6 +181,8 @@ describe('localChatResponseSchemas', () => {
     })).toThrow()
     expect(spacesResponseSchemas.space.parse({
       activeRunCount: 1,
+      icon: 'folder',
+      iconColor: 'default',
       additionalDirectories: [],
       createdAt: '2026-08-19T00:00:00.000Z',
       id: 'space-1',

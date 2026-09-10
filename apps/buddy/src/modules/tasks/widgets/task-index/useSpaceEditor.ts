@@ -11,7 +11,7 @@ interface SpaceEditorOptions {
 }
 
 export function useSpaceEditor(options: SpaceEditorOptions) {
-  const form = reactive<TaskSpaceInput>({ memoryScope: 'personal_and_space', name: '', primaryDirectory: null })
+  const form = reactive<TaskSpaceInput>({ icon: 'folder', iconColor: 'default', memoryScope: 'personal_and_space', name: '', primaryDirectory: null })
   const saving = shallowRef(false)
   const selectingDirectory = shallowRef(false)
   const failed = shallowRef(false)
@@ -25,6 +25,8 @@ export function useSpaceEditor(options: SpaceEditorOptions) {
       return
     const space = options.space()
     Object.assign(form, {
+      icon: space?.icon ?? 'folder',
+      iconColor: space?.iconColor ?? 'default',
       memoryScope: space?.memoryScope ?? 'personal_and_space',
       name: space?.name ?? '',
       primaryDirectory: space?.primaryDirectory ? { id: space.primaryDirectory.id, root: space.primaryDirectory.root } : null,
@@ -70,6 +72,8 @@ export function useSpaceEditor(options: SpaceEditorOptions) {
       return
     const current = session
     const input: TaskSpaceInput = {
+      icon: form.icon,
+      iconColor: form.iconColor,
       memoryScope: form.memoryScope,
       name: form.name.trim(),
       primaryDirectory: form.primaryDirectory ? { ...form.primaryDirectory } : null,

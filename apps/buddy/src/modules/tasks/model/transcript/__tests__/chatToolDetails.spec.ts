@@ -106,5 +106,5 @@ describe('tool diff presentation', () => {
 
 function space(root: string): LocalSpace {
   const now = '2026-09-10T00:00:00Z'
-  return { id: 'space', name: 'Preview', memoryScope: 'space_only', activeRunCount: 0, additionalDirectories: [], createdAt: now, updatedAt: now, revokedAt: null, primaryDirectory: { id: 'directory', spaceId: 'space', root, canonicalRoot: root, revision: 2, accessGrantedAt: now, resourcesTrustedAt: now, createdAt: now, updatedAt: now, revokedAt: null } }
+  return { id: 'space', name: 'Preview', icon: 'folder', iconColor: 'default', memoryScope: 'space_only', activeRunCount: 0, additionalDirectories: [], createdAt: now, updatedAt: now, revokedAt: null, primaryDirectory: { id: 'directory', spaceId: 'space', root, canonicalRoot: root, revision: 2, accessGrantedAt: now, resourcesTrustedAt: now, createdAt: now, updatedAt: now, revokedAt: null } }
 }

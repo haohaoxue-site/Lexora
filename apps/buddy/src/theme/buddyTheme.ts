@@ -1,3 +1,4 @@
+import type { SpaceIconColor } from '@buddy-shared/spaces/spaceAppearance'
 import type { GlobalThemeOverrides } from 'naive-ui'
 
 export type BuddyColorScheme = 'light' | 'dark'
@@ -56,6 +57,7 @@ interface BuddyColorTheme {
     cyan: string
     blue: string
   }
+  spaceIcon: Record<Exclude<SpaceIconColor, 'default'>, string>
   shadow: {
     soft: string
     raised: string
@@ -153,6 +155,34 @@ const lightTheme: BuddyColorTheme = {
     cyan: '#4f8994',
     blue: '#5d79ad',
   },
+  spaceIcon: {
+    'gray': '#6c747d',
+    'gray-deep': '#354353',
+    'red': '#b64b4b',
+    'red-bright': '#ef4444',
+    'red-deep': '#8e2636',
+    'orange': '#a56924',
+    'orange-bright': '#df7315',
+    'orange-deep': '#854817',
+    'yellow': '#9e8731',
+    'yellow-bright': '#b98a00',
+    'yellow-deep': '#756016',
+    'green': '#347a52',
+    'green-bright': '#229b52',
+    'green-deep': '#1e573a',
+    'cyan': '#277d89',
+    'cyan-bright': '#0495aa',
+    'cyan-deep': '#175361',
+    'blue': '#426faa',
+    'blue-bright': '#3478f6',
+    'blue-deep': '#234b7c',
+    'purple': '#7b60aa',
+    'purple-bright': '#9754ef',
+    'purple-deep': '#563585',
+    'pink': '#ab527c',
+    'pink-bright': '#df4091',
+    'pink-deep': '#802d59',
+  },
   shadow: {
     soft: '0 1px 3px rgb(31 37 33 / 9%)',
     raised: '0 10px 28px rgb(31 37 33 / 10%)',
@@ -240,6 +270,34 @@ const darkTheme: BuddyColorTheme = {
     cyan: '#68adb8',
     blue: '#7795c7',
   },
+  spaceIcon: {
+    'gray': '#aeb8c4',
+    'gray-deep': '#7c8998',
+    'red': '#e79797',
+    'red-bright': '#ff676b',
+    'red-deep': '#c96065',
+    'orange': '#e1b477',
+    'orange-bright': '#ffa044',
+    'orange-deep': '#b77a39',
+    'yellow': '#d9c57a',
+    'yellow-bright': '#f5d34c',
+    'yellow-deep': '#9a872b',
+    'green': '#89c99e',
+    'green-bright': '#49d187',
+    'green-deep': '#329a64',
+    'cyan': '#79c3cd',
+    'cyan-bright': '#35c7de',
+    'cyan-deep': '#26969f',
+    'blue': '#8eb2e3',
+    'blue-bright': '#579dff',
+    'blue-deep': '#5b85d6',
+    'purple': '#b6a0de',
+    'purple-bright': '#b983ff',
+    'purple-deep': '#9267ca',
+    'pink': '#db9abd',
+    'pink-bright': '#f171bd',
+    'pink-deep': '#b65b8f',
+  },
   shadow: {
     soft: '0 1px 3px rgb(0 0 0 / 18%)',
     raised: '0 10px 28px rgb(0 0 0 / 28%)',
@@ -256,6 +314,7 @@ export const buddyColorThemes = {
 
 export function createBuddyColorVariables(theme: BuddyColorTheme): Record<string, string> {
   return {
+    ...Object.fromEntries(Object.entries(theme.spaceIcon).map(([color, value]) => [`--buddy-space-icon-${color}`, value])),
     '--buddy-surface-canvas': theme.surface.canvas,
     '--buddy-surface-app-sidebar': theme.surface.canvas,
     '--buddy-surface-workspace-sidebar': theme.surface.canvas,

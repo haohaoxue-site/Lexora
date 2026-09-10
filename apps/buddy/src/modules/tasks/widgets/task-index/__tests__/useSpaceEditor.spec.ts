@@ -8,7 +8,7 @@ import { useSpaceEditor } from '../useSpaceEditor'
 const scopes: ReturnType<typeof effectScope>[] = []
 afterEach(() => scopes.splice(0).forEach(scope => scope.stop()))
 function space(id: string): LocalSpace {
-  return { id, name: id, activeRunCount: 0, additionalDirectories: [], createdAt: '2026-09-08T00:00:00.000Z', memoryScope: 'space_only', primaryDirectory: null, revokedAt: null, updatedAt: '2026-09-08T00:00:00.000Z' }
+  return { id, name: id, icon: 'folder', iconColor: 'default', activeRunCount: 0, additionalDirectories: [], createdAt: '2026-09-08T00:00:00.000Z', memoryScope: 'space_only', primaryDirectory: null, revokedAt: null, updatedAt: '2026-09-08T00:00:00.000Z' }
 }
 function fixture() {
   const scope = effectScope()
@@ -27,9 +27,17 @@ describe('space editing session', () => {
   it('preserves local input across a refresh of the same Space', () => {
     const f = fixture()
     f.editor.form.name = 'unsaved'
+    f.editor.form.icon = 'code'
+    f.editor.form.iconColor = 'blue'
     f.target.value = { ...space('first'), name: 'server updated' }
     expect(f.editor.form.name).toBe('unsaved')
-    f.target.value = space('second')
+    expect(f.editor.form).toMatchObject({ icon: 'code', iconColor: 'blue' })
+    expect(f.target.value).toMatchObject({ icon: 'folder', iconColor: 'default' })
+    f.show.value = false
+    f.show.value = true
+    expect(f.editor.form).toMatchObject({ icon: 'folder', iconColor: 'default' })
+    f.target.value = { ...space('second'), icon: 'book', iconColor: 'green' }
+    expect(f.editor.form).toMatchObject({ icon: 'book', iconColor: 'green' })
     expect(f.editor.form.name).toBe('second')
     f.editor.form.name = 'second draft'
     f.show.value = false
@@ -63,6 +71,8 @@ describe('space editing session', () => {
     const result = deferred<boolean>()
     f.save.mockReturnValueOnce(result.promise)
     f.editor.form.name = 'local'
+    f.editor.form.icon = 'code'
+    f.editor.form.iconColor = 'blue'
     const saving = f.editor.save()
     await f.editor.save()
     expect(f.show.value).toBe(true)
@@ -72,6 +82,8 @@ describe('space editing session', () => {
     await saving
     expect(f.show.value).toBe(true)
     expect(f.editor.form.name).toBe('local')
+    expect(f.editor.form).toMatchObject({ icon: 'code', iconColor: 'blue' })
+    expect(f.save.mock.calls[0]?.[0]).toMatchObject({ icon: 'code', iconColor: 'blue' })
     expect(f.editor.failed.value).toBe(true)
     await f.editor.save()
     expect(f.show.value).toBe(false)
