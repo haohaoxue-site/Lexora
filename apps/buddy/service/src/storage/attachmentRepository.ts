@@ -57,6 +57,7 @@ export function createAttachmentRepository(database: DatabaseSync): AttachmentRe
   const listDraftsBefore = database.prepare(`
     ${selection}
     WHERE attachments.draft_id IS NOT NULL AND attachments.created_at < ?
+      AND NOT EXISTS (SELECT 1 FROM chat_queue WHERE chat_queue.id = attachments.draft_id AND chat_queue.state IN ('waiting', 'paused'))
     ORDER BY attachments.created_at, attachments.id
   `)
   const listForConversation = database.prepare(`
@@ -66,6 +67,7 @@ export function createAttachmentRepository(database: DatabaseSync): AttachmentRe
   `)
   const removeDraft = database.prepare(`
     DELETE FROM attachments WHERE id = ? AND draft_id IS NOT NULL
+      AND NOT EXISTS (SELECT 1 FROM chat_queue WHERE chat_queue.id = attachments.draft_id AND chat_queue.state IN ('waiting', 'paused'))
   `)
 
   return {

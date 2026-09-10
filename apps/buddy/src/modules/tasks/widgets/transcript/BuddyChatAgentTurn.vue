@@ -21,6 +21,8 @@ const props = defineProps<{
   branchNavigator?: ChatMessageBranchNavigator | null
   language: BuddyLocale
   ownsResultActions?: boolean
+  showIdentity?: boolean
+  showOutcome?: boolean
   turn: ChatAgentTurn
 }>()
 
@@ -50,6 +52,8 @@ const failurePresentation = computed(() => notice.value?.kind === 'failure'
     )
   : null)
 const resultNoticeText = computed(() => {
+  if (props.showOutcome === false)
+    return null
   if (!notice.value)
     return null
   if (notice.value.placement !== 'result')
@@ -60,13 +64,13 @@ const resultNoticeText = computed(() => {
     ?? t(failurePresentation.value?.messageKey ?? 'desktop.chat.runFailed')
 })
 
-const failureDetailText = computed(() => failurePresentation.value?.detail ?? null)
+const failureDetailText = computed(() => props.showOutcome === false ? null : failurePresentation.value?.detail ?? null)
 const actions = computed(() => projectChatAgentTurnActions(
   props.turn,
   props.actionsDisabled ?? false,
   props.ownsResultActions ?? false,
 ))
-const showActions = computed(() => (
+const showActions = computed(() => props.showOutcome !== false && (
   actions.value.showCopy
   || actions.value.showRegenerate
   || actions.value.showTime
@@ -80,9 +84,9 @@ const actionCopyText = computed(() => resultNoticeText.value ?? statusLabel.valu
     class="buddy-chat-agent-turn"
     :class="`is-${turn.status}`"
   >
-    <div class="buddy-chat-agent-turn__heading">
+    <div v-if="showIdentity !== false" class="buddy-chat-agent-turn__heading">
       <BuddyChatAgentIdentity :language="language" />
-      <div v-if="!isActive" class="buddy-chat-agent-turn__status">
+      <div v-if="!isActive && showOutcome !== false" class="buddy-chat-agent-turn__status">
         <span class="buddy-chat-agent-turn__status-label">{{ statusLabel }}</span>
         <span class="buddy-chat-agent-turn__duration">{{ duration }}</span>
       </div>

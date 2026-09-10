@@ -2,6 +2,7 @@
 import type { BuddyMessageQuote } from '@buddy-shared/conversation/buddyUserContent'
 import type { TaskComposerHostProps } from './typing'
 import { useTemplateRef } from 'vue'
+import ChatMessageQueue from '../composer/ChatMessageQueue.vue'
 import DesktopChatComposer from '../composer/DesktopChatComposer.vue'
 import { useTaskComposer } from './useTaskComposer'
 
@@ -17,10 +18,18 @@ const { bindings, editorKey, sendMessage } = useTaskComposer(props)
 </script>
 
 <template>
+  <ChatMessageQueue
+    :items="execution.queuedMessages.value"
+    :pending="execution.pendingQueueActions.value"
+    :language="language"
+    @cancel="execution.cancelQueuedMessage"
+    @steer="execution.steerQueuedMessage"
+  />
   <DesktopChatComposer
     ref="composerRef"
     :key="editorKey"
     v-bind="bindings"
+    :has-queued-messages="execution.queuedMessages.value.length > 0"
     @attach="composer.selectAttachments"
     @retry-resource="composer.retryResource"
     @dismiss-interaction="composer.dismissInteraction"

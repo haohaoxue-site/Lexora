@@ -13,8 +13,11 @@ import type {
 } from './chatTranscriptTypes'
 import { shouldShowAgentTurn } from './chatPersistedTranscriptRows'
 import { selectChatStreamingMessage } from './chatRunStreamingMessages'
+import { hasChatAssistantIdentity } from './chatTranscriptSegments'
 
 export interface CachedChatTranscriptProjection {
+  includeUnanchoredTurns: boolean
+  interleavedRunIds: ReadonlySet<string>
   activityRowIndex: number | null
   activeRunId: string | null
   agentTurnRowIndexByRunId: ReadonlyMap<string, number>
@@ -41,6 +44,7 @@ export function projectIncrementalChatTranscript(
   const runProjections = input.runProjections
   if (
     !runProjections
+    || cached.includeUnanchoredTurns !== (input.includeUnanchoredTurns ?? false)
     || !cached.runProjections
     || cached.timelineItems !== input.timelineItems
     || cached.runs !== input.runs
@@ -62,6 +66,8 @@ export function projectIncrementalChatTranscript(
       return null
     if (previous === next)
       continue
+    if (cached.interleavedRunIds.has(next.turn.runId))
+      return null
     if (
       !hasSameRecoveryNotices(previous, next)
       || !hasSameTurnRowStructure(previous.turn, next.turn)
@@ -110,7 +116,8 @@ export function projectIncrementalChatTranscript(
   let activityRowIndex = cached.activityRowIndex
   if (streamingMessage) {
     const nextStreamingRow: ChatTranscriptMessageRow = {
-      isAgentTurnResult: cached.runProjectionIds.has(streamingMessage.runId ?? ''),
+      ...(hasChatAssistantIdentity(rows ?? cached.projection.rows, streamingMessage.runId) ? { showIdentity: false as const } : {}),
+      isIntermediate: true,
       key: `message:${streamingMessage.id}`,
       kind: 'message',
       message: streamingMessage,
@@ -205,7 +212,25 @@ export function createChatTranscriptProjectionCache(
     }
   })
   const runProjections = input.runProjections ?? null
+  const interleavedRunIds = new Set(input.runs.filter(run => input.timelineItems.some(item => (
+    item.kind === 'message'
+    && item.role === 'user'
+    && item.id !== run.triggeringMessageId
+    && item.branchId === run.branchId
+    && item.createdAt >= run.startedAt
+    && (run.completedAt === null || item.createdAt <= run.completedAt)
+  ))).map(run => run.id))
+  const seenTurns = new Set<string>()
+  for (const row of projection.rows) {
+    if (row.kind !== 'agent-turn')
+      continue
+    if (seenTurns.has(row.turn.runId))
+      interleavedRunIds.add(row.turn.runId)
+    seenTurns.add(row.turn.runId)
+  }
   return {
+    includeUnanchoredTurns: input.includeUnanchoredTurns ?? false,
+    interleavedRunIds,
     activityRowIndex,
     activeRunId,
     agentTurnRowIndexByRunId,

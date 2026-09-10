@@ -1,6 +1,7 @@
 import type { DesktopChatWelcomePreference, DesktopTaskPinnedItem } from '@buddy-electron/shared/desktopApi'
 import type { LocalChatApi } from '@buddy-electron/shared/localChatApi'
 import type { LocalChangeSetSummary } from '@buddy-shared/changes/changeApi'
+import type { LocalChatQueueItem } from '@buddy-shared/conversation/chatQueueApi'
 import type { BuddyComposerDraftScope } from '@buddy-shared/conversation/composerDraft'
 import type { BuddyComposerSource } from '@buddy-shared/conversation/composerResource'
 import type { LocalConversation, LocalConversationBranch, LocalConversationSummary, LocalConversationTimelineItem, LocalMessage } from '@buddy-shared/conversation/conversationApi'
@@ -112,6 +113,10 @@ export interface TaskComposer {
 }
 
 export interface TaskExecution {
+  queuedMessages: State<readonly LocalChatQueueItem[]>
+  pendingQueueActions: State<ReadonlySet<string>>
+  cancelQueuedMessage: (id: string) => Promise<void>
+  steerQueuedMessage: (id: string) => Promise<void>
   beginFollowup: (target: Extract<BuddyComposerDraftScope, { kind: 'message_followup' }>) => Promise<boolean>
   cancelFollowup: () => void
   activeRun: State<LocalRun | null>

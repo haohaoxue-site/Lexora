@@ -53,6 +53,7 @@ export interface ChatComposerEditorOptions {
 }
 
 export interface DesktopChatComposerProps {
+  hasQueuedMessages?: boolean
   canUpdatePermissionSettings: boolean
   canSend: boolean
   composerContent: JSONContent

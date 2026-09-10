@@ -1,5 +1,6 @@
 import type { RunLifecycleService } from '../../runs/RunLifecycleService'
 import type { RunRecord } from '../../storage/runRecord'
+import type { BuddyInputReferenceV1 } from '../context/BuddyInputReference'
 import type { BuddySessionRegistry, DisposableBuddySession } from '../sessions/BuddySessionRegistry'
 import type { ActiveRunContext } from './ActiveRunRegistry'
 import type { RunExecutionBackend, RunExecutionOutcome } from './RunExecutionBackend'
@@ -98,6 +99,10 @@ export class BuddyAgentRunner {
       identity,
       runId: run.id,
     })
+  }
+
+  steer(runId: string, prepare: () => BuddyInputReferenceV1): boolean {
+    return this.#activeRuns.steer(runId, prepare)
   }
 
   async cancel(runId: string, errorCode = 'RUN_CANCELLED'): Promise<boolean> {

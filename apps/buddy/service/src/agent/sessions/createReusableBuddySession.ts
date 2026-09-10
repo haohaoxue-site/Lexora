@@ -16,7 +16,7 @@ import {
   sessionEntryToContextMessages,
 } from '@earendil-works/pi-coding-agent'
 import { BUDDY_DEFAULT_THINKING_LEVEL } from '../../../../shared/conversation/modelSelection'
-import { readBuddyInputReference } from '../context/BuddyInputReference'
+import { createBuddyInputReferenceMessage, readBuddyInputReference } from '../context/BuddyInputReference'
 import { buildBuddyRequestContext } from '../context/buildBuddyRequestContext'
 import { createContextUsageBreakdown } from '../context/contextUsageBreakdown'
 import { toBuddySessionStorageError } from './BuddySessionErrors'
@@ -76,7 +76,17 @@ export function createReusableBuddySession(
     return streamFunction(model, context, streamOptions)
   }
   return {
-    abort: () => session.abort(),
+    steer: (prepare) => {
+      if (!session.isStreaming)
+        return false
+      const input = prepare()
+      session.agent.steer(createBuddyInputReferenceMessage(input, Date.now()))
+      return true
+    },
+    abort: () => {
+      session.agent.clearSteeringQueue()
+      return session.abort()
+    },
     abortCompaction: () => session.abortCompaction(),
     canCompact: () => canPreparePiCompaction(
       session.sessionManager.getBranch(),
@@ -139,7 +149,7 @@ export function createReusableBuddySession(
           }
           finally {
             await session.waitForIdle()
-
+            session.agent.clearSteeringQueue()
             options.tree?.finish()
           }
         },

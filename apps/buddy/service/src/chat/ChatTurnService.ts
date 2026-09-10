@@ -36,6 +36,7 @@ import type { RunRecord } from '../storage/runRecord'
 import type { RunRepository } from '../storage/runRepository'
 import type { SpaceRecord, SpaceRepository } from '../storage/spaceRepository'
 import type {
+  PrepareTurnRequestInput,
   TurnRequestRecord,
   TurnRequestRepository,
 } from '../storage/turnRequestRepository'
@@ -144,6 +145,12 @@ export class ChatTurnService {
     )
     if (replay)
       return this.#toTurnStart(replay.request, replay.run)
+    const { prepared, stagedAttachments } = await this.prepareStart(input)
+    const request = await persistPreparedTurn(stagedAttachments, () => this.#options.turnRequests.prepare(prepared))
+    return this.#launchPreparedTurn(request)
+  }
+
+  async prepareStart(input: BuddyStartTurnInput) {
     const draft = this.#options.drafts.findById(input.draftId)
     if (!draft || draft.revision !== input.expectedRevision)
       throw new BuddyServiceError('DRAFT_CONFLICT')
@@ -246,45 +253,43 @@ export class ChatTurnService {
       messageId: userMessageId,
     })
     const persistedAttachmentIds = stagedAttachments.bindings.map(binding => binding.id)
-    const prepared = await persistPreparedTurn(stagedAttachments, () => (
-      this.#options.turnRequests.prepare({
-        followup,
-        approvalPolicy: draft.executionConfig.approvalPolicy,
-        attachmentBindings: stagedAttachments.bindings,
-        branchId,
-        conversationId,
-        createdAt: new Date().toISOString(),
-        draft: {
-          draftId: input.draftId,
-          expectedRevision: input.expectedRevision,
-        },
-        executionProfile: draft.executionConfig.executionProfile,
-        model: selection.modelId,
-        modelParameters: toModelParameters(selection),
-        spaceId: space?.id ?? null,
-        provider: selection.providerId,
-        requestFingerprint: createStartTurnFingerprint(input),
-        requestId: input.requestId,
-        runInput: {
-          attachmentIds: persistedAttachmentIds,
-          contextItems: [],
-          prompt,
-          reasoning: thinkingLevel ?? null,
-          serviceTier: selection.serviceTier,
-        },
-        runId,
-        title: createConversationTitle(messageText, attachmentPrompt.records),
-        userMessageContent: createPersistedUserMessageContent(
-          draft.content,
-          resourceInputs.map((resource, index) => ({
-            attachmentId: persistedAttachmentIds[index]!,
-            resourceId: resource.resourceId,
-          })),
-        ),
-        userMessageId,
-      })
-    ))
-    return this.#launchPreparedTurn(prepared)
+    const prepared: PrepareTurnRequestInput = {
+      followup,
+      approvalPolicy: draft.executionConfig.approvalPolicy,
+      attachmentBindings: stagedAttachments.bindings,
+      branchId,
+      conversationId,
+      createdAt: new Date().toISOString(),
+      draft: {
+        draftId: input.draftId,
+        expectedRevision: input.expectedRevision,
+      },
+      executionProfile: draft.executionConfig.executionProfile,
+      model: selection.modelId,
+      modelParameters: toModelParameters(selection),
+      spaceId: space?.id ?? null,
+      provider: selection.providerId,
+      requestFingerprint: createStartTurnFingerprint(input),
+      requestId: input.requestId,
+      runInput: {
+        attachmentIds: persistedAttachmentIds,
+        contextItems: [],
+        prompt,
+        reasoning: thinkingLevel ?? null,
+        serviceTier: selection.serviceTier,
+      },
+      runId,
+      title: createConversationTitle(messageText, attachmentPrompt.records),
+      userMessageContent: createPersistedUserMessageContent(
+        draft.content,
+        resourceInputs.map((resource, index) => ({
+          attachmentId: persistedAttachmentIds[index]!,
+          resourceId: resource.resourceId,
+        })),
+      ),
+      userMessageId,
+    }
+    return { prepared, stagedAttachments }
   }
 
   async editUserMessage(input: EditChatUserMessageInput) {

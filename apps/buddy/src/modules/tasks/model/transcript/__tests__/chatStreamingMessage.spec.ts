@@ -197,6 +197,8 @@ describe('projectStreamingAssistantMessage', () => {
       branchId: 'branch-1',
       completedAt: '2026-08-14T00:00:02.000Z',
       finalMessageId: 'message-final',
+      messageStartedAt: { 'message-process': '2026-08-14T00:00:01.000Z' },
+      nodeStartedAt: { 'reasoning:message-process:0': '2026-08-14T00:00:02.000Z', 'tool:tool-1': '2026-08-14T00:00:05.000Z' },
       nodes: [
         {
           contentIndex: 0,

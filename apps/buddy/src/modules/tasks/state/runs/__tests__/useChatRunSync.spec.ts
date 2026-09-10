@@ -96,6 +96,52 @@ describe('useChatRunSync', () => {
     }
   })
 
+  it('retains a completed reply while steering continues the same running turn', async () => {
+    vi.useFakeTimers()
+    const animationFrames = stubAnimationFrameWindow()
+    const activeRun = run('run-a', 'conversation-a')
+    const initial = timelineMessage('message-conversation-a', 'conversation-a', activeRun.branchId, 1)
+    const reply = {
+      ...timelineMessage('assistant-a', 'conversation-a', activeRun.branchId, 2, 'assistant'),
+      content: { text: '你好' },
+      runId: activeRun.id,
+    }
+    let items: ReadonlyArray<LocalConversationTimelineItem> = [initial]
+    const api = createApi({ listTimeline: async () => timelinePage(items, null, [activeRun]) })
+    const sync = useChatRunSync({
+      activeBranchId: ref(activeRun.branchId),
+      activeConversationId: ref(activeRun.conversationId),
+      api,
+      onError: vi.fn(),
+    })
+
+    try {
+      await sync.refreshActiveConversation()
+      items = [initial, reply]
+      sync.handleRunEvent({
+        ...event(activeRun.id, 1),
+        payload: { messageId: reply.id, role: 'assistant', phase: 'final_answer', content: reply.content },
+        type: 'message.completed',
+      })
+      sync.handleRunEvent({
+        ...event(activeRun.id, 2),
+        payload: { messageId: 'assistant-continuation', delta: '继续任务', phase: 'final_answer' },
+        type: 'message.delta',
+      })
+      animationFrames.flush()
+      await vi.advanceTimersByTimeAsync(100)
+
+      expect(sync.messages.value).toContainEqual(reply)
+      expect(sync.runs.value[0]?.status).toBe('running')
+      expect(sync.runEventBuckets.value.get(activeRun.id)?.events.at(-1)?.payload)
+        .toMatchObject({ messageId: 'assistant-continuation', delta: '继续任务' })
+    }
+    finally {
+      sync.dispose()
+      vi.useRealTimers()
+    }
+  })
+
   it('refreshes the timeline when a streamed event sequence has a gap', async () => {
     vi.useFakeTimers()
     const animationFrames = stubAnimationFrameWindow()

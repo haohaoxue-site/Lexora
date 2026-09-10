@@ -61,6 +61,8 @@ export interface ChatAgentTurn {
   failureMessage?: string | null
   finalMessageId: string | null
   nodes: ChatAgentTurnNode[]
+  nodeStartedAt?: Readonly<Record<string, string>>
+  messageStartedAt?: Readonly<Record<string, string>>
   processMessageIds: string[]
   progress: BuddyRunProgress | null
   reasoningLevel: string | null
@@ -105,6 +107,8 @@ export function createChatAgentTurnReducer(
   const approvalTools = new Map<string, string>()
   const text = new Map<string, ChatAgentNarrationNode>()
   const nodeOrder = new Map<string, number>()
+  const nodeStartedAt = new Map<string, string>()
+  const messageStartedAt = new Map<string, string>()
   const processMessageIds = new Set<string>()
   let failureMessage: string | null = null
   let finalMessageId: string | null = null
@@ -124,6 +128,14 @@ export function createChatAgentTurnReducer(
     const payload = readPayload(event.payload)
     if (!payload)
       return
+    if (event.type === 'message.started') {
+      const messageId = readString(payload.messageId)
+      if (messageId && messageId !== finalMessageId)
+        finalMessageId = null
+      if (messageId && !messageStartedAt.has(messageId))
+        messageStartedAt.set(messageId, event.createdAt)
+      return
+    }
     if (event.type === 'run.failed') {
       failureMessage = readString(payload.errorMessage) || null
       return
@@ -135,6 +147,7 @@ export function createChatAgentTurnReducer(
       return
     }
     if (event.type.startsWith('context.compaction.')) {
+      nodeStartedAt.set(`compaction:${run.id}:${event.sequence}`, event.createdAt)
       compactions.append([event])
       return
     }
@@ -150,7 +163,7 @@ export function createChatAgentTurnReducer(
         const id = `process-text:${messageId}:${contentIndex}`
         const current = text.get(id)
         if (!current)
-          nodeOrder.set(id, event.sequence)
+          rememberNode(id, event)
         const node = current ?? {
           contentIndex,
           id,
@@ -181,7 +194,7 @@ export function createChatAgentTurnReducer(
       const id = `reasoning:${messageId}:${contentIndex}`
       const current = reasoning.get(id)
       if (!current)
-        nodeOrder.set(id, event.sequence)
+        rememberNode(id, event)
       const node = current ?? {
         contentIndex,
         id,
@@ -216,7 +229,7 @@ export function createChatAgentTurnReducer(
       const id = `process-text:${messageId}:${contentIndex}`
       const current = text.get(id)
       if (!current)
-        nodeOrder.set(id, event.sequence)
+        rememberNode(id, event)
       const node = current ?? {
         contentIndex,
         id,
@@ -237,6 +250,7 @@ export function createChatAgentTurnReducer(
       if (!messageId)
         return
       const phase = readAssistantTextPhase(payload.phase)
+      finalMessageId = null
       if (phase === 'commentary') {
         processMessageIds.add(messageId)
         const value = readString(content?.text)
@@ -250,7 +264,7 @@ export function createChatAgentTurnReducer(
             const current = existing[0]
             const id = current?.id ?? `process-text:${messageId}:message`
             if (!current)
-              nodeOrder.set(id, event.sequence)
+              rememberNode(id, event)
             text.set(id, {
               ...current,
               id,
@@ -275,7 +289,7 @@ export function createChatAgentTurnReducer(
         ))
         if (normalized && !duplicatesReasoning) {
           const id = `process-text:${messageId}:message`
-          nodeOrder.set(id, event.sequence)
+          rememberNode(id, event)
           text.set(id, {
             id,
             kind: 'text',
@@ -325,7 +339,7 @@ export function createChatAgentTurnReducer(
         approvalTools.set(approvalId, toolCallId)
       if (approvalId && toolCallId && base) {
         if (!current)
-          nodeOrder.set(base.id, event.sequence)
+          rememberNode(base.id, event)
         tools.set(toolCallId, {
           ...base,
           approvalId,
@@ -399,7 +413,7 @@ export function createChatAgentTurnReducer(
       if (!isStructuredTool && toolNarration && description === toolNarration.text)
         text.delete(toolNarration.id)
       if (!current)
-        nodeOrder.set(`tool:${toolCallId}`, event.sequence)
+        rememberNode(`tool:${toolCallId}`, event)
       tools.set(toolCallId, {
         ...(current?.approvalId ? { approvalId: current.approvalId } : {}),
         ...(current?.denialCode ? { denialCode: current.denialCode } : {}),
@@ -425,6 +439,12 @@ export function createChatAgentTurnReducer(
         toolName,
       })
     }
+  }
+
+  function rememberNode(id: string, event: LocalRunEvent) {
+    nodeOrder.set(id, event.sequence)
+    if (!nodeStartedAt.has(id))
+      nodeStartedAt.set(id, event.createdAt)
   }
 
   function readNodeOrder(node: ChatAgentTurnNode): number {
@@ -464,6 +484,8 @@ export function createChatAgentTurnReducer(
         : {}),
       finalMessageId,
       nodes,
+      ...(messageStartedAt.size ? { messageStartedAt: Object.fromEntries(messageStartedAt) } : {}),
+      nodeStartedAt: Object.fromEntries(nodes.map(node => [node.id, nodeStartedAt.get(node.id) ?? run.startedAt])),
       processMessageIds: [...processMessageIds],
       progress: terminal
         ? null
@@ -497,6 +519,7 @@ function canAffectChatAgentTurn(event: LocalRunEvent): boolean {
     || event.type === 'usage.recorded'
     || event.type === 'run.progress'
     || event.type.startsWith('context.compaction.')
+    || event.type === 'message.started'
     || event.type === 'message.completed'
     || event.type.startsWith('approval.')
     || event.type.startsWith('tool.')

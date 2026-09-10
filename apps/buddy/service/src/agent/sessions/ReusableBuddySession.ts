@@ -15,6 +15,7 @@ export interface BuddySessionEventSource {
 }
 
 export interface ReusableBuddySession extends BuddySessionEventSource {
+  steer?: (prepare: () => BuddyInputReferenceV1) => boolean
   abort: () => Promise<void>
   abortCompaction: () => void
   activateTurn: (input: BuddySessionTurnContext) => Promise<() => void>

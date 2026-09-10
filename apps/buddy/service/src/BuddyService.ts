@@ -2,9 +2,9 @@ import type { DatabaseSync } from 'node:sqlite'
 import type { ApplicationDiagnosticReporter } from '../../shared/diagnostics/applicationDiagnostic'
 import type { ApplicationEvents } from '../../shared/observability/ApplicationEvents'
 import type { BuddySessionExtensionServices } from './agent/extensions/createBuddySessionExtensions'
-
 import type { ReusableBuddySession } from './agent/sessions/ReusableBuddySession'
 import type { AutomationClock } from './automations/AutomationScheduleEvaluator'
+
 import type { BuddyRuntime } from './BuddyRuntime'
 import type { RunEventLogPort } from './events/RunEventPorts'
 import type { BuddyServiceRpcServer } from './rpc/BuddyServiceRpcServer'
@@ -54,6 +54,7 @@ import { ChangeCaptureService } from './changes/ChangeCaptureService'
 import { createChangeSetRepository } from './changes/changeSetRepository'
 import { registerChangeRpc } from './changes/registerChangeRpc'
 import { ChatCommandService } from './chat/ChatCommandService'
+import { ChatQueueService } from './chat/ChatQueueService'
 import { ChatTurnService } from './chat/ChatTurnService'
 import { ComposerDraftService } from './chat/ComposerDraftService'
 import { registerChatRpc } from './chat/registerChatRpc'
@@ -77,8 +78,8 @@ import { AttentionNotificationService } from './notifications/AttentionNotificat
 import { registerNotificationRpc } from './notifications/registerNotificationRpc'
 import { createProviderService } from './providers/createProviderService'
 import { registerProviderRpc } from './providers/registerProviderRpc'
-
 import { resolveInteractiveModelSelection } from './providers/resolveInteractiveModelSelection'
+
 import { BuddyServiceError } from './rpc/runtimeRequest'
 import { registerRunRpc } from './runs/registerRunRpc'
 import { RunLifecycleService } from './runs/RunLifecycleService'
@@ -93,6 +94,7 @@ import { createAttachmentRepository } from './storage/attachmentRepository'
 import { createAutomationRepositories } from './storage/automationRepository'
 import { createAutomationTurnRepository } from './storage/automationTurnRepository'
 import { BuddyDataPaths } from './storage/BuddyDataPaths'
+import { createChatQueueRepository } from './storage/chatQueueRepository'
 import { createCommandRequestRepository } from './storage/commandRequestRepository'
 import { createComposerDraftRepository } from './storage/composerDraftRepository'
 import { createComposerResourceRepository } from './storage/composerResourceRepository'
@@ -406,11 +408,15 @@ export async function startBuddyService(
       sessionFactory: input => sessionFactory.create(input),
       sessions,
     })
+    let chatQueueService: ChatQueueService | undefined
     runner = await host.start('runtime.execution', ({ defer }) => {
       const service = new BuddyAgentRunner({
         executor: piTurnExecutor,
         lifecycle: runLifecycleService,
-        onRunSettled: runId => approvalService.clearTurnAuthorization(runId),
+        onRunSettled: (runId) => {
+          approvalService.clearTurnAuthorization(runId)
+          chatQueueService?.onRunSettled(runId)
+        },
         sessions,
       })
       defer(async () => {
@@ -470,6 +476,11 @@ export async function startBuddyService(
       skills: skillService,
       turnLauncher,
       turnRequests,
+    })
+    chatQueueService = await host.start('runtime.chat-queue', ({ defer }) => {
+      const service = new ChatQueueService({ queue: createChatQueueRepository(options.database), turns: chatTurnService, requests: turnRequests, launcher: turnLauncher, runner, runs })
+      defer(() => service.dispose())
+      return service
     })
     const runtime: BuddyRuntime = {
       startTurn: input => chatTurnService.start(input),
@@ -592,6 +603,7 @@ export async function startBuddyService(
           rpc: options.rpc,
           runtime,
           turns: chatTurnService,
+          queue: chatQueueService,
         }),
       )
       register(

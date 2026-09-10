@@ -1,5 +1,6 @@
 import type { LocalChatIpcContext } from './registrar'
 import { chatRequestSchemas, chatRpc } from '../../../shared/conversation/chatApi'
+import { chatQueueRpc } from '../../../shared/conversation/chatQueueApi'
 import { contextRequestSchemas, contextRpc } from '../../../shared/conversation/contextApi'
 import { conversationRequestSchemas, conversationsRpc } from '../../../shared/conversation/conversationApi'
 import { conversationTreeRpc } from '../../../shared/conversation/conversationTree'
@@ -10,6 +11,10 @@ import { LOCAL_CHAT_IPC_CHANNELS } from '../../shared/localChatApi'
 
 export function registerConversationIpc(context: LocalChatIpcContext): void {
   const { handle, request } = context
+  handle(LOCAL_CHAT_IPC_CHANNELS.chatQueueEnqueue, (_event, input) => request(chatQueueRpc.enqueue, chatQueueRpc.enqueue.input.parse(input)))
+  handle(LOCAL_CHAT_IPC_CHANNELS.chatQueueList, (_event, input) => request(chatQueueRpc.list, chatQueueRpc.list.input.parse(input)))
+  handle(LOCAL_CHAT_IPC_CHANNELS.chatQueueCancel, (_event, input) => request(chatQueueRpc.cancel, chatQueueRpc.cancel.input.parse(input)))
+  handle(LOCAL_CHAT_IPC_CHANNELS.chatQueueSteer, (_event, input) => request(chatQueueRpc.steer, chatQueueRpc.steer.input.parse(input)))
 
   handle(LOCAL_CHAT_IPC_CHANNELS.contextUsageSnapshot, (_event, input) => request(contextRpc.usageSnapshot, contextRequestSchemas.contextUsageSnapshot.parse(input)))
 

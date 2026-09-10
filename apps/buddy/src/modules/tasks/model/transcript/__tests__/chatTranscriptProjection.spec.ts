@@ -157,14 +157,12 @@ describe('chat transcript projection', () => {
 
     expect(projectPersistedChatTranscriptRows([user, assistant], [emptyTurn])).toEqual([
       {
-        isAgentTurnResult: false,
         key: `message:${user.id}`,
         kind: 'message',
         message: user,
         turnOutputs: null,
       },
       {
-        isAgentTurnResult: false,
         resultRunId: 'run-1',
         key: `message:${assistant.id}`,
         kind: 'message',
@@ -174,7 +172,6 @@ describe('chat transcript projection', () => {
     ])
     expect(projectPersistedChatTranscriptRows([user, assistant], [reasoningTurn])).toEqual([
       {
-        isAgentTurnResult: false,
         key: `message:${user.id}`,
         kind: 'message',
         message: user,
@@ -182,7 +179,7 @@ describe('chat transcript projection', () => {
       },
       { key: `agent-turn:${reasoningTurn.runId}`, kind: 'agent-turn', turn: reasoningTurn },
       {
-        isAgentTurnResult: true,
+        showIdentity: false,
         resultRunId: 'run-1',
         key: `message:${assistant.id}`,
         kind: 'message',
@@ -319,14 +316,12 @@ describe('chat transcript projection', () => {
 
     expect(rows).toEqual([
       {
-        isAgentTurnResult: false,
         key: 'message:user-1',
         kind: 'message',
         message: user,
         turnOutputs: null,
       },
       {
-        isAgentTurnResult: false,
         resultRunId: 'run-1',
         key: 'message:assistant-final',
         kind: 'message',
@@ -389,7 +384,6 @@ describe('chat transcript projection', () => {
 
     expect(rows[0]).not.toHaveProperty('turnChanges')
     expect(rows[1]).toMatchObject({
-      isAgentTurnResult: false,
       message: { id: final.id },
       turnChanges: changeSet,
     })

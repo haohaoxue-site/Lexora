@@ -70,7 +70,7 @@ export function useChatComposer(options: UseChatComposerOptions) {
   })
 
   function submit() {
-    if (!canSubmit.value || options.isRunning.value)
+    if (!canSubmit.value)
       return
     options.onSend(serializeChatComposerContent(editor.value?.getJSON() ?? contentJSON.value))
   }

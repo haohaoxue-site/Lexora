@@ -3,7 +3,6 @@ import type { LocalRun, LocalRunEvent } from '@buddy-shared/runs/runApi'
 
 import type { CachedChatTranscriptProjection } from './chatIncrementalTranscript'
 import type {
-  ChatTranscriptAgentTurnRow,
   ChatTranscriptProjection,
   ChatTranscriptProjectionInput,
   ChatTranscriptRecoveryNoticeRow,
@@ -78,16 +77,23 @@ export function projectChatTranscript(
   }
 
   const agentTurnRunIds = new Set(agentTurns.map(turn => turn.runId))
+  const noticeRunIds = new Set<string>()
   const rows: ChatTranscriptRow[] = []
   for (const row of projectPersistedChatTranscriptRows(
-    input.timelineItems,
+    streamingLocalMessage ? [...input.timelineItems, { ...streamingLocalMessage, kind: 'message' }] : input.timelineItems,
     agentTurns,
     input.outputs,
     input.changeSets ?? [],
+    input.includeUnanchoredTurns,
   )) {
-    rows.push(row)
+    rows.push(streamingLocalMessage && row.kind === 'message' && row.message.id === streamingLocalMessage.id
+      ? { ...row, message: streamingLocalMessage, streaming: true }
+      : row)
     if (row.kind === 'agent-turn') {
-      rows.push(...(noticesByRunId.get(row.turn.runId) ?? []))
+      if (!noticeRunIds.has(row.turn.runId)) {
+        rows.push(...(noticesByRunId.get(row.turn.runId) ?? []))
+        noticeRunIds.add(row.turn.runId)
+      }
       continue
     }
     if (row.kind === 'message') {
@@ -96,20 +102,8 @@ export function projectChatTranscript(
       ))
     }
   }
-  const activeAgentTurn = [...rows].reverse().find(
-    (row): row is ChatTranscriptAgentTurnRow => row.kind === 'agent-turn'
-      && (row.turn.status === 'queued' || row.turn.status === 'running'),
-  )?.turn
-  if (streamingLocalMessage) {
-    rows.push({
-      isAgentTurnResult: agentTurnRunIds.has(streamingLocalMessage.runId ?? ''),
-      key: `message:${streamingLocalMessage.id}`,
-      kind: 'message',
-      message: streamingLocalMessage,
-      streaming: true,
-      turnOutputs: null,
-    })
-  }
+  const visibleRunIds = new Set(rows.flatMap(row => row.kind === 'agent-turn' ? [row.turn.runId] : []))
+  const activeAgentTurn = [...agentTurns].reverse().find(turn => visibleRunIds.has(turn.runId) && (turn.status === 'queued' || turn.status === 'running'))
   if (activeAgentTurn) {
     rows.push({
       key: `activity:${activeAgentTurn.runId}`,
@@ -132,6 +126,19 @@ export function createChatTranscriptProjector() {
         return incremental.projection
       }
       const projection = projectChatTranscript(input)
+      if (cached) {
+        const previous = new Map(cached.projection.rows.map(row => [row.key, row]))
+        projection.rows = projection.rows.map((row) => {
+          const existing = previous.get(row.key)
+          if (!existing)
+            return row
+          const fields = Object.entries(row)
+          return fields.length === Object.keys(existing).length
+            && fields.every(([key, value]) => existing[key as keyof ChatTranscriptRow] === value)
+            ? existing
+            : row
+        })
+      }
       cached = createChatTranscriptProjectionCache(input, projection)
       return projection
     },
