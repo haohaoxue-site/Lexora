@@ -7,9 +7,6 @@ import type {
 import type { ChatMessageBranchNavigator } from '../../model/transcript/chatMessageBranches'
 import type { ChatTranscriptDisplayRow } from '../../model/transcript/chatMessageTime'
 import type { ChatOutlineItem } from '../../model/transcript/chatOutline'
-import type {
-  ChatAgentTurn,
-} from '../../model/transcript/chatStreamingMessage'
 import type { ChatTranscriptRow } from '../../model/transcript/chatTranscriptProjection'
 import type {
   BuddyChatMessageListHandle,
@@ -20,7 +17,6 @@ import type {
 import type { BuddyLocale } from '@/i18n/buddyI18n'
 import { computed, onBeforeUnmount, shallowRef, useTemplateRef, watch } from 'vue'
 import { useBuddyI18n } from '@/i18n/buddyI18n'
-import { resolveChatAgentTurnOpen } from '../../model/transcript/chatAgentTurnDisclosure'
 import {
   projectConversationCompaction,
 } from '../../model/transcript/chatConversationTimeline'
@@ -67,29 +63,14 @@ const emit = defineEmits<{
 const { t } = useBuddyI18n(() => props.language)
 const transcriptViewport = useTemplateRef<BuddyChatTranscriptViewportHandle>('transcriptViewport')
 const OUTLINE_HIGHLIGHT_DURATION_MS = 1_200
-const agentTurnOpenOverrides = shallowRef<ReadonlyMap<string, boolean>>(new Map())
 const activeOutlineMessageId = shallowRef<string | null>(null)
 const highlightedOutlineMessageId = shallowRef<string | null>(null)
 let outlineHighlightTimer: number | null = null
 const matchingSearchMessageIds = computed(() => new Set(props.matchingSearchMessageIds ?? []))
 watch([() => props.conversationId, () => props.activeBranchId], () => {
-  agentTurnOpenOverrides.value = new Map()
   activeOutlineMessageId.value = null
   clearOutlineHighlight()
 })
-
-function isAgentTurnOpen(turn: ChatAgentTurn): boolean {
-  return resolveChatAgentTurnOpen(
-    turn.status,
-    agentTurnOpenOverrides.value.get(turn.runId),
-  )
-}
-
-function toggleAgentTurn(turn: ChatAgentTurn) {
-  const next = new Map(agentTurnOpenOverrides.value)
-  next.set(turn.runId, !isAgentTurnOpen(turn))
-  agentTurnOpenOverrides.value = next
-}
 
 function regenerateMessage(message: LocalMessage) {
   if (message.runId)
@@ -279,12 +260,10 @@ onBeforeUnmount(clearOutlineHighlight)
           :branch-navigator="branchNavigators.get(item.turn.runId) ?? null"
           class="buddy-chat-transcript-row"
           :language="language"
-          :open="isAgentTurnOpen(item.turn)"
           :owns-result-actions="item.ownsResultActions === true"
           :turn="item.turn"
           @activate-branch="emit('activateBranch', $event)"
           @regenerate="emit('regenerateAssistant', item.turn.runId)"
-          @toggle="toggleAgentTurn(item.turn)"
         />
 
         <BuddyChatRunActivity

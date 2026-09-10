@@ -1,7 +1,23 @@
 import { describe, expect, it } from 'vitest'
-import { toPublicRunEvent } from '../publicRunEvent'
+import { publicRunEventSchema, toPublicRunEvent } from '../publicRunEvent'
 
 describe('public run event projection', () => {
+  it('preserves registered tool labels across public lifecycle events without publishing definitions', () => {
+    for (const type of ['tool.preparing', 'tool.started', 'tool.completed']) {
+      const published = toPublicRunEvent(event(type, {
+        toolCallId: 'query-1',
+        toolName: 'custom_query',
+        toolLabel: '  Query local data  ',
+        toolDefinition: { description: 'private', parameters: { token: 'private' } },
+      }))
+      expect(published.payload).toEqual({ toolCallId: 'query-1', toolName: 'custom_query', toolLabel: 'Query local data' })
+      expect(publicRunEventSchema.safeParse(published).success).toBe(true)
+    }
+    expect(project('tool.started', { toolLabel: 'x'.repeat(300) })).toEqual({ toolLabel: 'x'.repeat(256) })
+    for (const toolLabel of [undefined, null, '', '  ', 12, false, { label: 'private' }])
+      expect(project('tool.started', { toolName: 'custom_query', toolLabel })).toEqual({ toolName: 'custom_query' })
+  })
+
   it('replays a streamed answer and its output using only public fields', () => {
     const expected = [
       { type: 'run.progress', payload: { phase: 'tool_executing', toolName: 'bash' } },

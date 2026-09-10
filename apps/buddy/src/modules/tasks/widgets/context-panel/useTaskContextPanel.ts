@@ -3,6 +3,7 @@ import type { LocalRunEvent } from '@buddy-shared/runs/runApi'
 import type { TaskContextTab } from './taskContextPanel'
 import type { UseTaskContextPanelOptions } from './typing'
 import { computed, readonly, shallowRef, watch } from 'vue'
+import { resolveChatToolFileTarget } from '../../model/transcript/chatToolFileTarget'
 import {
   artifactTabId,
   browserTabId,
@@ -213,6 +214,31 @@ export function useTaskContextPanel(options: UseTaskContextPanelOptions) {
       : tab)
   }
 
+  function canPreviewFile(path: string) {
+    return Boolean(options.activeConversationId.value && resolveChatToolFileTarget(options.activeSpace?.value ?? null, path))
+  }
+
+  function previewFile(path: string) {
+    const space = options.activeSpace?.value ?? null
+    const target = resolveChatToolFileTarget(space, path)
+    const conversationId = options.activeConversationId.value
+    if (!target || !space?.primaryDirectory || !conversationId)
+      return
+    const id = `files:${conversationId}:${target.directoryId}:preview`
+    resourceTabs.value = [...resourceTabs.value.filter(tab => tab.id !== id), {
+      id,
+      kind: 'files',
+      conversationId,
+      rootName: space.primaryDirectory.root.split(/[\\/]/).filter(Boolean).at(-1) ?? space.primaryDirectory.root,
+      target,
+    }]
+    if (!openTabIds.value.includes(id))
+      openTabIds.value = [...openTabIds.value, id]
+    suppressBrowserForActiveRun()
+    activeTabId.value = id
+    isOpen.value = true
+  }
+
   function isAvailable(tab: TaskContextTab): boolean {
     if (tab.kind !== 'files')
       return true
@@ -271,12 +297,14 @@ export function useTaskContextPanel(options: UseTaskContextPanelOptions) {
     addBrowser,
     artifactCount: readonly(artifactCount),
     closeTab,
+    canPreviewFile,
     isOpen: readonly(isOpen),
     hasTab,
     openArtifact,
     openBrowser,
     openChanges,
     openFiles,
+    previewFile,
     selectFile,
     restoreTab,
     selectTab,

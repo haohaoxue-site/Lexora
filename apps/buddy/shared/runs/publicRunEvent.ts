@@ -188,6 +188,7 @@ function publicToolEvent(
   const payload = selectScalars(source, [
     ...(type === 'tool.completed' ? ['isError'] : []),
     'toolCallId',
+    'toolLabel',
     'toolName',
   ])
   if (presentation.success) {
@@ -256,6 +257,8 @@ function toPublicScalar(
   key: string,
   value: unknown,
 ): boolean | null | number | string | undefined {
+  if (key === 'toolLabel')
+    return typeof value === 'string' && value.trim() ? value.trim().slice(0, 256) : undefined
   if (key === 'phase') {
     const phase = buddyAssistantTextPhaseSchema.safeParse(value)
     return phase.success ? phase.data : undefined

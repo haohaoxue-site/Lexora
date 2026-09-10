@@ -5,6 +5,7 @@ import { useIntervalFn } from '@vueuse/core'
 import { computed, shallowRef } from 'vue'
 import { useBuddyI18n } from '@/i18n/buddyI18n'
 import { formatChatRunDuration } from '../../model/transcript/chatRunDuration'
+import { isChatToolActive } from '../../model/transcript/chatToolDisplay'
 import BuddyChatActivityLoader from './BuddyChatActivityLoader.vue'
 import BuddyChatShimmerText from './BuddyChatShimmerText.vue'
 
@@ -20,6 +21,10 @@ useIntervalFn(() => {
 }, 1_000, {
   immediateCallback: true,
 })
+
+const hasActiveProcess = computed(() => props.turn.nodes.some(node => node.kind === 'tool'
+  ? isChatToolActive(node)
+  : node.kind !== 'text' && node.status === 'running'))
 
 const duration = computed(() => formatChatRunDuration(
   props.turn.startedAt,
@@ -46,7 +51,7 @@ const activityLabel = computed(() => {
 </script>
 
 <template>
-  <div class="buddy-chat-run-activity">
+  <div v-if="!hasActiveProcess" class="buddy-chat-run-activity">
     <BuddyChatActivityLoader />
     <BuddyChatShimmerText
       aria-live="polite"

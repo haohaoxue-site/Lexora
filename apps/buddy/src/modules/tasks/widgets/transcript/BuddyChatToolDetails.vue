@@ -5,15 +5,12 @@ import type { BuddyLocale } from '@/i18n/buddyI18n'
 import { computed } from 'vue'
 import { useBuddyI18n } from '@/i18n/buddyI18n'
 import BuddyChatImageToolDetails from './BuddyChatImageToolDetails.vue'
+import BuddyChatToolDiff from './BuddyChatToolDiff.vue'
+import BuddyChatToolRead from './BuddyChatToolRead.vue'
+import BuddyChatToolSearch from './BuddyChatToolSearch.vue'
+import BuddyChatToolToolbar from './BuddyChatToolToolbar.vue'
+import { useChatToolActions } from './chatToolActionsContext'
 import DesktopTerminalTranscript from './DesktopTerminalTranscript.vue'
-
-interface ToolDetailSection {
-  content: string
-  empty: boolean
-  key: 'changes' | 'command' | 'output'
-  label: string
-  truncated: boolean
-}
 
 const props = defineProps<{
   language: BuddyLocale
@@ -23,9 +20,13 @@ const props = defineProps<{
 }>()
 
 const { t } = useBuddyI18n(() => props.language)
-const terminal = computed(() => props.presentation.card === 'terminal'
-  ? props.presentation
-  : null)
+const actions = useChatToolActions()
+const filePath = computed(() => props.status !== 'denied' && (props.presentation.card === 'read' || props.presentation.card === 'diff')
+  ? props.presentation.path
+  : undefined)
+const canPreview = computed(() => filePath.value !== undefined && actions.canPreviewFile(filePath.value))
+const diff = computed(() => props.status !== 'denied' && props.presentation.card === 'diff' ? props.presentation.diff : null)
+const terminal = computed(() => props.presentation.card === 'terminal' ? props.presentation : null)
 const image = computed(() => props.presentation.card === 'image'
   ? props.presentation
   : null)
@@ -56,45 +57,12 @@ const terminalNotice = computed(() => {
     return t('desktop.chat.processToolIncompleteOutput')
   return null
 })
-const sections = computed<ToolDetailSection[]>(() => {
-  const presentation = props.presentation
-  const values: ToolDetailSection[] = []
-  if (presentation.card === 'terminal')
-    return values
-  if (presentation.card === 'diff' && presentation.diff) {
-    values.push(section(
-      'changes',
-      t('desktop.chat.processToolChanges'),
-      presentation.diff,
-    ))
-  }
-  if (
-    presentation.card === 'automation'
-    || presentation.card === 'directory-authorization'
-    || presentation.card === 'image'
-    || presentation.card === 'pet'
-  ) {
-    return values
-  }
-  if (props.status !== 'denied' && presentation.output !== null) {
-    values.push(section(
-      'output',
-      t('desktop.chat.processToolOutput'),
-      presentation.output,
-      presentation.truncated,
-    ))
-  }
-  return values
+const output = computed(() => {
+  const p = props.presentation
+  return props.status !== 'denied' && p.card !== 'terminal' && 'output' in p && p.output !== null
+    ? { content: p.output, truncated: p.truncated }
+    : null
 })
-
-function section(
-  key: ToolDetailSection['key'],
-  label: string,
-  content: string,
-  truncated = false,
-): ToolDetailSection {
-  return { content, empty: false, key, label, truncated }
-}
 </script>
 
 <template>
@@ -140,6 +108,10 @@ function section(
       </dl>
     </section>
     <section v-if="terminal" class="buddy-chat-terminal-card">
+      <BuddyChatToolToolbar
+        :language="language" :title="t('desktop.chat.processToolCommand')"
+        :copy-text="terminal.command" :copy-label="t('desktop.chat.processToolCopyCommand')"
+      />
       <DesktopTerminalTranscript
         :command="terminal.command"
         :output="terminalOutput"
@@ -152,17 +124,28 @@ function section(
         {{ t('desktop.chat.processToolTruncated') }}
       </small>
     </section>
+    <BuddyChatToolDiff v-if="diff" :diff="diff" :language="language" :file-path="filePath" />
     <section
-      v-for="item in sections"
-      :key="item.key"
-      class="buddy-chat-tool-details__section"
-      :class="[`is-${item.key}`, { 'is-empty': item.empty }]"
+      v-if="output || (canPreview && !diff)"
+      class="buddy-chat-tool-details__section is-output"
     >
-      <header class="buddy-chat-tool-details__header">
-        <span>{{ item.label }}</span>
-        <small v-if="item.truncated">{{ t('desktop.chat.processToolTruncated') }}</small>
-      </header>
-      <pre><code>{{ item.content }}</code></pre>
+      <BuddyChatToolToolbar
+        :language="language" :title="!diff && filePath ? filePath : t('desktop.chat.processToolOutput')"
+        :copy-text="output?.content" :file-path="diff ? undefined : filePath"
+      >
+        <small v-if="output?.truncated" class="buddy-chat-tool-details__truncated">{{ t('desktop.chat.processToolTruncated') }}</small>
+      </BuddyChatToolToolbar>
+      <template v-if="output">
+        <BuddyChatToolRead
+          v-if="presentation.card === 'read' && status !== 'failed' && status !== 'interrupted'"
+          :output="output.content" :line-start="presentation.lineStart" :native="toolName === 'read'"
+        />
+        <BuddyChatToolSearch
+          v-else-if="presentation.card === 'search' && status !== 'failed' && status !== 'interrupted'"
+          :output="output.content" :tool-name="toolName" :language="language"
+        />
+        <pre v-else><code>{{ output.content }}</code></pre>
+      </template>
     </section>
   </div>
 </template>
@@ -171,7 +154,8 @@ function section(
 .buddy-chat-tool-details {
   display: grid;
   gap: var(--buddy-chat-gap-block);
-  margin-top: var(--buddy-chat-gap-tight);
+  min-width: 0;
+  margin: 4px 8px 8px 28px;
 }
 
 .buddy-chat-terminal-card {
@@ -195,19 +179,10 @@ function section(
   padding: 0 0.75rem 0.65rem;
 }
 
-.buddy-chat-tool-details.is-failed .buddy-chat-terminal-card {
-  border-left-color: var(--buddy-status-danger-border);
-}
-
-.buddy-chat-tool-details.is-denied .buddy-chat-terminal-card,
-.buddy-chat-tool-details.is-interrupted .buddy-chat-terminal-card {
-  border-left-color: var(--buddy-status-warning-border);
-}
-
 .buddy-chat-tool-details__section {
   min-width: 0;
   overflow: hidden;
-  border: 1px solid var(--buddy-border-subtle);
+  border: 0;
   border-radius: var(--buddy-radius-micro);
   background: var(--buddy-surface-raised);
 
@@ -215,33 +190,11 @@ function section(
     background: var(--buddy-surface-subtle);
   }
 
-  &.is-empty pre {
-    color: var(--buddy-text-muted);
-    font-family: inherit;
-  }
 }
 
-.buddy-chat-tool-details.is-failed .buddy-chat-tool-details__section.is-output {
-  border-color: var(--buddy-status-danger-border);
-}
-
-.buddy-chat-tool-details__header {
-  display: flex;
-  min-height: 1.7rem;
-  align-items: center;
-  justify-content: space-between;
-  border-bottom: 1px solid var(--buddy-border-subtle);
-  color: var(--buddy-chat-meta-color);
-  font-size: var(--buddy-chat-caption-font-size);
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  padding: 0.25rem 0.625rem;
-
-  small {
-    color: var(--buddy-text-muted);
-    font-size: inherit;
-    font-weight: 400;
-  }
+.buddy-chat-tool-details__truncated {
+  flex: none;
+  font-size: inherit;
 }
 
 .buddy-chat-directory-authorization {

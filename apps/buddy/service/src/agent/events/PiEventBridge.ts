@@ -4,6 +4,7 @@ import type { RunEventWriter } from '../../events/RunEventPorts'
 import type { BuddyUsagePurpose } from '../../usage/recordPiUsage'
 import type { UsageService } from '../../usage/UsageService'
 import type { BuddySessionEventSource } from '../sessions/ReusableBuddySession'
+import type { BuddyProjectedEvent } from './projectPiEvent'
 import { safeDiagnosticReporter } from '../../../../shared/diagnostics/applicationDiagnostic'
 import { RunEventLogFatalError } from '../../events/RunEventFailure'
 import { isPiShellToolName } from '../extensions/piBuiltinTools'
@@ -179,7 +180,7 @@ class ActivePiEventChannel implements PiCompactionEventChannel, PiTurnEventChann
   ): Promise<void> {
     await this.flush()
     const projected = projectToolExecutionAuthorized(event, this.#projectionState)
-    this.#eventWriter.appendBatch(projected.events)
+    this.#appendProjectedEvents(projected.events)
     await this.#eventWriter.drain()
     this.#observer.authorized(event.toolCallId)
   }
@@ -262,9 +263,21 @@ class ActivePiEventChannel implements PiCompactionEventChannel, PiTurnEventChann
       this.#finalAssistantAnswerProjected = event.message.stopReason === 'stop'
         && projected.events.some(candidate => candidate.type === 'message.completed')
     }
-    this.#eventWriter.appendBatch(projected.events)
+    this.#appendProjectedEvents(projected.events)
     if (this.#recordEventUsage)
       await this.#recordUsageFromEvent(event, projected.sourceMessageId)
+  }
+
+  #appendProjectedEvents(events: readonly BuddyProjectedEvent[]): void {
+    this.#eventWriter.appendBatch(events.map((event) => {
+      if (event.type !== 'tool.preparing' && event.type !== 'tool.started' && event.type !== 'tool.completed')
+        return event
+      const payload = event.payload
+      if (!payload || typeof payload !== 'object' || !('toolName' in payload) || typeof payload.toolName !== 'string')
+        return event
+      const toolLabel = this.#session.getToolLabel?.(payload.toolName)?.trim().slice(0, 256)
+      return toolLabel ? { ...event, payload: { ...payload, toolLabel } } : event
+    }))
   }
 
   async #recordUsageFromEvent(

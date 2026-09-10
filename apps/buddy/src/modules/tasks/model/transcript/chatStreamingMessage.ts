@@ -11,9 +11,6 @@ export {
   projectChatAgentTurn,
   projectChatAgentTurns,
 } from './chatAgentTurn'
-export { resolveChatAgentTurnOpen } from './chatAgentTurnDisclosure'
-export type { ChatAgentReasoningGroup, ChatAgentTurnRow } from './chatAgentTurnRows'
-export { createChatAgentTurnRowProjector, projectChatAgentTurnRows } from './chatAgentTurnRows'
 export { projectLatestRunActivity } from './chatRunActivity'
 export type { ChatProjectionReducer } from './chatRunEventProjection'
 export type { ChatRecoveryNotice } from './chatRunRecovery'

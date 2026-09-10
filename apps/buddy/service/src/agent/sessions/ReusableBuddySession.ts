@@ -7,6 +7,7 @@ import type { BuddyContextUsageBreakdown } from '../context/contextUsageBreakdow
 export type BuddySessionShutdownReason = 'evict' | 'invalidate' | 'quit' | 'resource-change'
 
 export interface BuddySessionEventSource {
+  getToolLabel?: (name: string) => string | undefined
   getContextUsageBreakdown?: (
     totalTokens: number,
   ) => BuddyContextUsageBreakdown | null | Promise<BuddyContextUsageBreakdown | null>

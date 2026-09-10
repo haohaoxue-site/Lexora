@@ -42,6 +42,7 @@ export interface ChatAgentToolNode {
   status: 'awaiting_approval' | 'completed' | 'denied' | 'failed' | 'interrupted' | 'preparing' | 'running'
   toolCallId: string
   toolName: string
+  toolLabel?: string
 }
 
 export type ChatAgentTurnNode
@@ -376,6 +377,7 @@ export function createChatAgentTurnReducer(
       const presentation = readToolPresentationUpdate(payload, current?.presentation)
       if (!presentation)
         return
+      const toolLabel = readString(payload.toolLabel) || current?.toolLabel
       const isError = event.type === 'tool.completed' && payload.isError === true
       const narration = current ? null : [...text.values()].at(-1)
       const toolNarration = narration?.phase === 'commentary' ? null : narration
@@ -398,6 +400,7 @@ export function createChatAgentTurnReducer(
         ...(current?.approvalId ? { approvalId: current.approvalId } : {}),
         ...(current?.denialCode ? { denialCode: current.denialCode } : {}),
         description,
+        ...(toolLabel ? { toolLabel } : {}),
         id: `tool:${toolCallId}`,
         isError: isError || Boolean(current?.denialCode),
         kind: 'tool',

@@ -3,11 +3,9 @@ import type { ChatMessageBranchNavigator } from '../../model/transcript/chatMess
 
 import type { ChatAgentTurn } from '../../model/transcript/chatStreamingMessage'
 import type { BuddyLocale } from '@/i18n/buddyI18n'
-import { ChevronRight20Regular } from '@vicons/fluent'
 import { computed } from 'vue'
 
 import { useBuddyI18n } from '@/i18n/buddyI18n'
-import DesktopIcon from '@/shared/ui/icon/DesktopIcon.vue'
 import {
   resolveChatAgentTurnFailurePresentation,
   resolveChatAgentTurnNotice,
@@ -22,7 +20,6 @@ const props = defineProps<{
   actionsDisabled?: boolean
   branchNavigator?: ChatMessageBranchNavigator | null
   language: BuddyLocale
-  open: boolean
   ownsResultActions?: boolean
   turn: ChatAgentTurn
 }>()
@@ -30,7 +27,6 @@ const props = defineProps<{
 const emit = defineEmits<{
   activateBranch: [branchId: string]
   regenerate: []
-  toggle: []
 }>()
 
 const { t } = useBuddyI18n(() => props.language)
@@ -63,14 +59,6 @@ const resultNoticeText = computed(() => {
 })
 
 const failureDetailText = computed(() => failurePresentation.value?.detail ?? null)
-const canToggleProcess = computed(() => (
-  props.turn.nodes.length > 0
-  || failureDetailText.value !== null
-))
-const hasVisibleProcess = computed(() => (
-  canToggleProcess.value
-  && (isActive.value || props.open)
-))
 const actions = computed(() => projectChatAgentTurnActions(
   props.turn,
   props.actionsDisabled ?? false,
@@ -88,33 +76,17 @@ const actionCopyText = computed(() => resultNoticeText.value ?? statusLabel.valu
 <template>
   <section
     class="buddy-chat-agent-turn"
-    :class="[`is-${turn.status}`, { 'has-visible-process': hasVisibleProcess }]"
+    :class="`is-${turn.status}`"
   >
     <div class="buddy-chat-agent-turn__heading">
       <BuddyChatAgentIdentity :language="language" />
-      <button
-        v-if="!isActive"
-        :aria-expanded="canToggleProcess ? open : undefined"
-        class="buddy-chat-agent-turn__status"
-        :disabled="!canToggleProcess"
-        type="button"
-        @click="emit('toggle')"
-      >
-        <span
-          aria-live="polite"
-          class="buddy-chat-agent-turn__status-label"
-        >{{ statusLabel }}</span>
+      <div v-if="!isActive" class="buddy-chat-agent-turn__status">
+        <span class="buddy-chat-agent-turn__status-label">{{ statusLabel }}</span>
         <span class="buddy-chat-agent-turn__duration">{{ duration }}</span>
-        <DesktopIcon
-          v-if="canToggleProcess"
-          :component="ChevronRight20Regular"
-          class="buddy-chat-agent-turn__chevron"
-          :class="{ 'is-open': open }"
-        />
-      </button>
+      </div>
     </div>
     <BuddyChatAgentTurnFlow
-      v-if="hasVisibleProcess"
+      v-if="turn.nodes.length || failureDetailText"
       :failure-detail-text="failureDetailText"
       :language="language"
       :nodes="turn.nodes"
@@ -152,59 +124,25 @@ const actionCopyText = computed(() => resultNoticeText.value ?? statusLabel.valu
 }
 
 .buddy-chat-agent-turn__heading {
-  display: grid;
+  display: flex;
   min-width: 0;
-  gap: 0.5rem;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
 }
 
 .buddy-chat-agent-turn__status {
   display: inline-flex;
-  width: 100%;
-  max-width: 100%;
-  align-items: center;
-  gap: 0.25rem;
-  border: 0;
-  background: transparent;
-  color: var(--buddy-chat-meta-color);
-  cursor: pointer;
-  font: inherit;
-  font-size: var(--buddy-chat-meta-font-size);
-  line-height: var(--buddy-chat-meta-line-height);
-  padding: 0;
-  text-align: left;
-
-  &:not(:disabled):hover,
-  &:not(:disabled):focus-visible {
-    color: var(--buddy-text-strong);
-  }
-
-  &:disabled {
-    cursor: default;
-  }
-}
-
-.buddy-chat-agent-turn__status-label,
-.buddy-chat-agent-turn__duration {
-  min-width: 0;
+  flex: none;
+  align-items: baseline;
+  gap: 6px;
+  color: var(--buddy-text-muted);
+  font-size: var(--buddy-chat-tool-font-size);
+  line-height: 20px;
 }
 
 .buddy-chat-agent-turn__duration {
-  margin-left: 0.125rem;
-  opacity: 0.78;
   font-variant-numeric: tabular-nums;
-}
-
-.buddy-chat-agent-turn__chevron {
-  width: 14px;
-  height: 14px;
-  flex: 0 0 auto;
-  margin-left: 0.35rem;
-  opacity: 1;
-  transition: transform 120ms ease;
-
-  &.is-open {
-    transform: rotate(90deg) translateX(0.5px);
-  }
 }
 
 .buddy-chat-agent-turn.is-failed .buddy-chat-agent-turn__status {
@@ -236,7 +174,7 @@ const actionCopyText = computed(() => resultNoticeText.value ?? statusLabel.valu
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .buddy-chat-agent-turn__chevron {
+  .buddy-chat-agent-turn__actions {
     transition: none;
   }
 }

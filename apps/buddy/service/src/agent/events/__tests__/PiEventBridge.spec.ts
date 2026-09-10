@@ -8,6 +8,23 @@ import { describe, expect, it, vi } from 'vitest'
 import { PiEventBridge } from '../PiEventBridge'
 
 describe('piEventBridge', () => {
+  it('preserves registered labels in replayable tool events without adding them to output deltas', async () => {
+    const { appended, channel, emit } = createProjectionHarness(undefined, () => 'Query local data')
+    emit({ type: 'tool_execution_start', toolCallId: 'custom', toolName: 'custom_query', args: {} })
+    await channel.flush()
+    await channel.projectToolExecutionAuthorized({ toolCallId: 'custom', toolName: 'custom_query', arguments: {} })
+    emit({ type: 'tool_execution_update', toolCallId: 'custom', toolName: 'custom_query', args: {}, partialResult: { content: [{ type: 'text', text: 'first' }], details: {} } })
+    emit({ type: 'tool_execution_end', toolCallId: 'custom', toolName: 'custom_query', isError: false, result: { content: [{ type: 'text', text: 'done' }], details: {} } })
+    await channel.flush()
+    const tools = appended.filter(event => ['tool.preparing', 'tool.started', 'tool.completed'].includes(event.type))
+    expect(tools.map(event => event.payload)).toEqual([
+      expect.objectContaining({ toolName: 'custom_query', toolLabel: 'Query local data' }),
+      expect.objectContaining({ toolName: 'custom_query', toolLabel: 'Query local data' }),
+      expect.objectContaining({ toolName: 'custom_query', toolLabel: 'Query local data' }),
+    ])
+    expect(appended.find(event => event.type === 'tool.updated')?.payload).not.toHaveProperty('toolLabel')
+  })
+
   it('correlates each model turn without recording messages or tool results', async () => {
     const recorded: ApplicationDiagnostic[] = []
     const { channel, emit } = createProjectionHarness(event => recorded.push(event))
@@ -291,7 +308,7 @@ function usage(): Usage {
   }
 }
 
-function createProjectionHarness(record?: ApplicationDiagnosticReporter): {
+function createProjectionHarness(record?: ApplicationDiagnosticReporter, getToolLabel?: (name: string) => string | undefined): {
   appended: AppendBuddyRunEventInput[]
   channel: ReturnType<PiEventBridge['createTurn']>
   emit: (event: AgentSessionEvent) => void
@@ -328,6 +345,7 @@ function createProjectionHarness(record?: ApplicationDiagnosticReporter): {
     provider: 'openai-codex',
     runId: 'run-1',
     session: {
+      getToolLabel,
       subscribe(nextListener) {
         listener = nextListener
         return () => {}

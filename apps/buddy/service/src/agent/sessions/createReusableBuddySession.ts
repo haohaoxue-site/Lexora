@@ -124,6 +124,7 @@ export function createReusableBuddySession(
         }
       },
     ),
+    getToolLabel: name => session.getToolDefinition(name)?.label,
     getContextUsageBreakdown: totalTokens => latestContext
       ? createContextUsageBreakdown(latestContext, totalTokens)
       : null,

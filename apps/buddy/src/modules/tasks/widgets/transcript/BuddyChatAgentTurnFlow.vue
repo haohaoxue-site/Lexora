@@ -1,12 +1,11 @@
 <script setup lang="ts">
 import type { ChatAgentTurnNode } from '../../model/transcript/chatStreamingMessage'
 import type { BuddyLocale } from '@/i18n/buddyI18n'
-import { computed } from 'vue'
+import { computed, shallowReactive } from 'vue'
 import { useBuddyI18n } from '@/i18n/buddyI18n'
-import { createChatAgentTurnRowProjector } from '../../model/transcript/chatStreamingMessage'
+import { createChatAgentActivityProjector } from '../../model/transcript/chatAgentActivities'
+import BuddyChatActivityGroup from './BuddyChatActivityGroup.vue'
 import BuddyChatCompactionRow from './BuddyChatCompactionRow.vue'
-import BuddyChatReasoningGroup from './BuddyChatReasoningGroup.vue'
-import BuddyChatToolRow from './BuddyChatToolRow.vue'
 
 const props = defineProps<{
   failureDetailText: string | null
@@ -15,25 +14,27 @@ const props = defineProps<{
 }>()
 
 const { t } = useBuddyI18n(() => props.language)
-const rowProjector = createChatAgentTurnRowProjector()
+const rowProjector = createChatAgentActivityProjector()
+const openEntries = shallowReactive(new Map<string, boolean>())
+function toggleEntry(id: string) {
+  openEntries.set(id, !openEntries.get(id))
+}
 const rows = computed(() => rowProjector.project(props.nodes))
 </script>
 
 <template>
   <div class="buddy-chat-agent-turn__flow">
     <template v-for="row in rows" :key="row.id">
-      <BuddyChatReasoningGroup
-        v-if="row.kind === 'reasoning-group'"
+      <BuddyChatActivityGroup
+        v-if="row.kind === 'activity-group'"
         :group="row"
         :language="language"
+        :open-entries="openEntries"
+        @toggle-entry="toggleEntry"
+        @open-entry="openEntries.set($event, true)"
       />
       <BuddyChatCompactionRow
         v-else-if="row.kind === 'compaction'"
-        :language="language"
-        :node="row"
-      />
-      <BuddyChatToolRow
-        v-else-if="row.kind === 'tool'"
         :language="language"
         :node="row"
       />
@@ -52,13 +53,13 @@ const rows = computed(() => rowProjector.project(props.nodes))
 .buddy-chat-agent-turn__flow {
   display: grid;
   min-width: 0;
-  gap: var(--buddy-chat-process-row-gap);
+  gap: 6px;
   margin-top: var(--buddy-chat-gap-block);
 }
 
 .buddy-chat-agent-turn__text {
-  margin: 0;
-  color: var(--buddy-chat-tool-body-color);
+  margin: 6px 0;
+  color: var(--buddy-text-primary);
   font-size: 14px;
   line-height: 1.6;
   white-space: pre-wrap;

@@ -3,7 +3,6 @@ import type { ConversationNodeDetailRequest } from '@buddy-shared/conversation/c
 import type { ChatTranscriptRow } from '../../model/transcript/chatTranscriptProjection'
 import type { BuddyLocale } from '@/i18n/buddyI18n'
 import { Dismiss20Regular, Edit20Regular, Keyboard20Regular, Wand20Regular } from '@vicons/fluent'
-import { shallowRef, watch } from 'vue'
 import { useBuddyI18n } from '@/i18n/buddyI18n'
 import DesktopIcon from '@/shared/ui/icon/DesktopIcon.vue'
 import { useTaskContext } from '../../taskContext'
@@ -24,8 +23,6 @@ const props = defineProps<{
 const emit = defineEmits<{ close: [], reload: [], edit: [], openArtifact: [id: string], openChanges: [id: string] }>()
 const { t } = useBuddyI18n(() => props.language)
 const { clipboard } = useTaskContext()
-const processOpen = shallowRef(false)
-watch(() => props.target, () => processOpen.value = false)
 </script>
 
 <template>
@@ -59,7 +56,7 @@ watch(() => props.target, () => processOpen.value = false)
           <BuddyChatTokenUsage v-if="row.turnUsage && !row.streaming" :usage="row.turnUsage" :language="language" />
         </div>
         <template v-else-if="row.kind === 'agent-turn'">
-          <BuddyChatAgentTurn :turn="row.turn" :language="language" :open="processOpen" @toggle="processOpen = !processOpen" />
+          <BuddyChatAgentTurn :turn="row.turn" :language="language" />
           <BuddyChatTokenUsage v-if="row.ownsResultActions && row.turn.usage" :usage="row.turn.usage" :language="language" />
         </template>
         <BuddyChatRunActivity v-else-if="row.kind === 'activity'" :turn="row.turn" :language="language" />
