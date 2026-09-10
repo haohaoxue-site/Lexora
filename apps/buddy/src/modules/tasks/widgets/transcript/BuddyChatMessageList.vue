@@ -1,9 +1,6 @@
 <script setup lang="ts">
-import type { LocalConversationTimelineItem, LocalMessage } from '@buddy-shared/conversation/conversationApi'
+import type { LocalMessage } from '@buddy-shared/conversation/conversationApi'
 
-import type {
-  projectConversationCompactionState,
-} from '../../model/transcript/chatConversationTimeline'
 import type { ChatMessageBranchNavigator } from '../../model/transcript/chatMessageBranches'
 import type { ChatTranscriptDisplayRow } from '../../model/transcript/chatMessageTime'
 import type { ChatOutlineItem } from '../../model/transcript/chatOutline'
@@ -18,16 +15,15 @@ import type { BuddyLocale } from '@/i18n/buddyI18n'
 import { computed, onBeforeUnmount, shallowRef, useTemplateRef, watch } from 'vue'
 import { useBuddyI18n } from '@/i18n/buddyI18n'
 import {
-  projectConversationCompaction,
-} from '../../model/transcript/chatConversationTimeline'
-import {
   formatChatDayDividerLabel,
 } from '../../model/transcript/chatMessageTime'
 import BuddyChatAgentTurn from './BuddyChatAgentTurn.vue'
+import BuddyChatCompactionRow from './BuddyChatCompactionRow.vue'
 import BuddyChatMessageRow from './BuddyChatMessageRow.vue'
 import BuddyChatOutline from './BuddyChatOutline.vue'
 import BuddyChatRunActivity from './BuddyChatRunActivity.vue'
 import BuddyChatTranscriptViewport from './BuddyChatTranscriptViewport.vue'
+import { useChatActivityNavigation } from './useChatActivityNavigation'
 
 const props = defineProps<{
   activeSearchMessageId?: string | null
@@ -61,6 +57,7 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useBuddyI18n(() => props.language)
+const activityNavigation = useChatActivityNavigation()
 const transcriptViewport = useTemplateRef<BuddyChatTranscriptViewportHandle>('transcriptViewport')
 const OUTLINE_HIGHLIGHT_DURATION_MS = 1_200
 const activeOutlineMessageId = shallowRef<string | null>(null)
@@ -82,49 +79,6 @@ function recoveryNoticeLabel(
 ): string {
   return t('desktop.chat.recoveryAttachmentsMissing', {
     count: notice.missingAttachmentCount,
-  })
-}
-
-function compactionLabel(
-  compaction: Extract<LocalConversationTimelineItem, { kind: 'compaction' }>,
-): string {
-  return compactionStateLabel(projectConversationCompaction(compaction).state)
-}
-
-function compactionStateLabel(
-  state: ReturnType<typeof projectConversationCompactionState>,
-): string {
-  switch (state) {
-    case 'running':
-      return t('desktop.chat.compactionStarted')
-    case 'completed':
-      return t('desktop.chat.compactionCompleted')
-    case 'cancelled':
-      return t('desktop.chat.compactionCancelled')
-    case 'not_needed':
-      return t('desktop.chat.compactionNotNeeded')
-    case 'authentication_required':
-      return t('desktop.chat.compactionAuthenticationRequired')
-    case 'provider_unavailable':
-      return t('desktop.chat.compactionProviderUnavailable')
-    case 'failed':
-      return t('desktop.chat.compactionFailed')
-  }
-}
-
-function compactionTokenLabel(
-  compaction: Extract<LocalConversationTimelineItem, { kind: 'compaction' }>,
-): string | null {
-  const presentation = projectConversationCompaction(compaction)
-  if (
-    presentation.tokensBefore === undefined
-    || presentation.estimatedTokensAfter === undefined
-  ) {
-    return null
-  }
-  return t('desktop.chat.compactionTokens', {
-    after: presentation.estimatedTokensAfter.toLocaleString(),
-    before: presentation.tokensBefore.toLocaleString(),
   })
 }
 
@@ -256,6 +210,7 @@ onBeforeUnmount(clearOutlineHighlight)
 
         <BuddyChatAgentTurn
           v-else-if="item.kind === 'agent-turn'"
+          :ref="view => activityNavigation.register(item.turn.runId, view)"
           :actions-disabled="actionsDisabled ?? false"
           :branch-navigator="branchNavigators.get(item.turn.runId) ?? null"
           class="buddy-chat-transcript-row"
@@ -271,6 +226,7 @@ onBeforeUnmount(clearOutlineHighlight)
           class="buddy-chat-transcript-row"
           :language="language"
           :turn="item.turn"
+          @reveal-activity="activityNavigation.reveal(item.turn.runId, $event)"
         />
 
         <div
@@ -281,16 +237,12 @@ onBeforeUnmount(clearOutlineHighlight)
           <span>{{ recoveryNoticeLabel(item.notice) }}</span>
         </div>
 
-        <div
+        <BuddyChatCompactionRow
           v-else-if="item.kind === 'compaction'"
-          class="buddy-chat-system-event buddy-chat-transcript-row"
-          :data-compaction-id="item.compaction.id"
-        >
-          <span>{{ compactionLabel(item.compaction) }}</span>
-          <small v-if="compactionTokenLabel(item.compaction)">
-            {{ compactionTokenLabel(item.compaction) }}
-          </small>
-        </div>
+          class="buddy-chat-transcript-row"
+          :node="item.compaction"
+          :language="language"
+        />
       </template>
     </BuddyChatTranscriptViewport>
   </div>

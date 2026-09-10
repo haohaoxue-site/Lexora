@@ -2,7 +2,6 @@ import type { ChatAgentActivityGroup } from './chatAgentActivities'
 import type { ChatToolCategory, ChatToolIcon } from './chatToolRegistry'
 import type { BuddyI18nKey, BuddyLocale } from '@/i18n/buddyI18n'
 import { translateBuddy } from '@/i18n/buddyI18n'
-import { describeChatTool } from './chatToolDisplay'
 import { normalizeProcessNarration } from './chatToolPresentation'
 
 const countLabels: Record<ChatToolCategory, BuddyI18nKey> = {
@@ -24,40 +23,19 @@ const fileCountLabels: Partial<Record<ChatToolCategory, BuddyI18nKey>> = {
 const summaryOrder: readonly ChatToolCategory[] = ['create', 'edit', 'read', 'search', 'command', 'web', 'other']
 
 export interface ChatActivitySummary {
-  key: string
   label: string
   target: string
   icon: ChatToolIcon | 'reasoning'
-  active: boolean
-  immediate: boolean
 }
 
 export function summarizeChatActivity(group: ChatAgentActivityGroup, language: BuddyLocale): ChatActivitySummary {
-  const active = group.activeNode
-  if (active?.kind === 'tool') {
-    const display = describeChatTool(active, language)
-    return {
-      key: `${language}:${active.id}:${active.status}`,
-      label: active.status === 'awaiting_approval' ? display.status : display.label,
-      target: active.status === 'awaiting_approval' ? [display.label, display.target].filter(Boolean).join(' · ') : display.target,
-      icon: display.icon,
-      active: true,
-      immediate: active.status === 'awaiting_approval',
-    }
-  }
-  if (active?.kind === 'reasoning') {
-    return { key: `${language}:${active.id}`, label: translateBuddy(language, 'desktop.chat.processReasoningRunning'), target: reasoningPreview(active.text), icon: 'reasoning', active: true, immediate: false }
-  }
-  const reasoning = group.nodes.findLast(node => node.kind === 'reasoning')
+  const reasoning = group.nodes.findLast(node => node.kind === 'reasoning' && node.status !== 'running')
   return {
-    key: `${language}:completed`,
     label: group.counts.length
       ? summarizeChatActivityCounts(group, language)
-      : translateBuddy(language, 'desktop.chat.processReasoningDone'),
+      : translateBuddy(language, reasoning?.status === 'interrupted' ? 'desktop.chat.processReasoningInterrupted' : 'desktop.chat.processReasoningDone'),
     target: group.toolCount === 0 && reasoning?.kind === 'reasoning' ? reasoningPreview(reasoning.text) : '',
     icon: group.icon,
-    active: false,
-    immediate: true,
   }
 }
 

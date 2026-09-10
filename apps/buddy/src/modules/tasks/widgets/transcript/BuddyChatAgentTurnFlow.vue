@@ -6,6 +6,7 @@ import { useBuddyI18n } from '@/i18n/buddyI18n'
 import { createChatAgentActivityProjector } from '../../model/transcript/chatAgentActivities'
 import BuddyChatActivityGroup from './BuddyChatActivityGroup.vue'
 import BuddyChatCompactionRow from './BuddyChatCompactionRow.vue'
+import { useChatActivityNavigation } from './useChatActivityNavigation'
 
 const props = defineProps<{
   failureDetailText: string | null
@@ -20,6 +21,13 @@ function toggleEntry(id: string) {
   openEntries.set(id, !openEntries.get(id))
 }
 const rows = computed(() => rowProjector.project(props.nodes))
+const navigation = useChatActivityNavigation()
+function revealActivity(nodeId: string) {
+  const group = rows.value.find(row => row.kind === 'activity-group' && row.nodes.some(node => node.id === nodeId))
+  if (group)
+    navigation.reveal(group.id, nodeId)
+}
+defineExpose({ revealActivity })
 </script>
 
 <template>
@@ -27,6 +35,7 @@ const rows = computed(() => rowProjector.project(props.nodes))
     <template v-for="row in rows" :key="row.id">
       <BuddyChatActivityGroup
         v-if="row.kind === 'activity-group'"
+        :ref="view => navigation.register(row.id, view)"
         :group="row"
         :language="language"
         :open-entries="openEntries"
@@ -34,11 +43,11 @@ const rows = computed(() => rowProjector.project(props.nodes))
         @open-entry="openEntries.set($event, true)"
       />
       <BuddyChatCompactionRow
-        v-else-if="row.kind === 'compaction'"
+        v-else-if="row.kind === 'compaction' && row.status !== 'running'"
         :language="language"
         :node="row"
       />
-      <p v-else class="buddy-chat-agent-turn__text">
+      <p v-else-if="row.kind === 'text'" class="buddy-chat-agent-turn__text">
         {{ row.text }}
       </p>
     </template>

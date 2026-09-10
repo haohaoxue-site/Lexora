@@ -7,9 +7,11 @@ import { useBuddyI18n } from '@/i18n/buddyI18n'
 import DesktopIcon from '@/shared/ui/icon/DesktopIcon.vue'
 import { useTaskContext } from '../../taskContext'
 import BuddyChatAgentTurn from '../transcript/BuddyChatAgentTurn.vue'
+import BuddyChatCompactionRow from '../transcript/BuddyChatCompactionRow.vue'
 import BuddyChatMessageBody from '../transcript/BuddyChatMessageBody.vue'
 import BuddyChatRunActivity from '../transcript/BuddyChatRunActivity.vue'
 import BuddyChatTokenUsage from '../transcript/BuddyChatTokenUsage.vue'
+import { useChatActivityNavigation } from '../transcript/useChatActivityNavigation'
 
 const props = defineProps<{
   target: ConversationNodeDetailRequest
@@ -23,6 +25,7 @@ const props = defineProps<{
 const emit = defineEmits<{ close: [], reload: [], edit: [], openArtifact: [id: string], openChanges: [id: string] }>()
 const { t } = useBuddyI18n(() => props.language)
 const { clipboard } = useTaskContext()
+const activityNavigation = useChatActivityNavigation()
 </script>
 
 <template>
@@ -56,10 +59,11 @@ const { clipboard } = useTaskContext()
           <BuddyChatTokenUsage v-if="row.turnUsage && !row.streaming" :usage="row.turnUsage" :language="language" />
         </div>
         <template v-else-if="row.kind === 'agent-turn'">
-          <BuddyChatAgentTurn :turn="row.turn" :language="language" />
+          <BuddyChatAgentTurn :ref="view => activityNavigation.register(row.turn.runId, view)" :turn="row.turn" :language="language" />
           <BuddyChatTokenUsage v-if="row.ownsResultActions && row.turn.usage" :usage="row.turn.usage" :language="language" />
         </template>
-        <BuddyChatRunActivity v-else-if="row.kind === 'activity'" :turn="row.turn" :language="language" />
+        <BuddyChatRunActivity v-else-if="row.kind === 'activity'" :turn="row.turn" :language="language" @reveal-activity="activityNavigation.reveal(row.turn.runId, $event)" />
+        <BuddyChatCompactionRow v-else-if="row.kind === 'compaction'" :node="row.compaction" :language="language" />
         <p v-else-if="row.kind === 'recovery-notice'" class="conversation-node-detail__notice" role="status">
           {{ t('desktop.chat.recoveryAttachmentsMissing', { count: row.notice.missingAttachmentCount }) }}
         </p>
