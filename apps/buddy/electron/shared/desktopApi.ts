@@ -94,7 +94,7 @@ export interface DesktopBrowserState {
   canGoForward: boolean
   controller: 'agent' | 'human'
   controlEpoch: number
-  conversationId: string
+  conversationId: string | null
   error: DesktopBrowserError | null
   pageId: string
   profileMode: DesktopBrowserProfileMode
@@ -117,7 +117,7 @@ export interface DesktopBrowserAttachGuestInput {
 }
 
 export interface DesktopBrowserEnsureSessionInput {
-  conversationId: string
+  conversationId: string | null
   tabId?: string
 }
 
@@ -149,7 +149,7 @@ export interface DesktopBrowserApi {
   attachGuest: (sessionId: string, webContentsId: number) => Promise<void>
   captureScreenshot: (sessionId: string) => Promise<boolean>
   close: (sessionId: string) => Promise<void>
-  ensureSession: (conversationId: string, tabId?: string) => Promise<DesktopBrowserState>
+  ensureSession: (conversationId: string | null, tabId?: string) => Promise<DesktopBrowserState>
   goBack: (sessionId: string) => Promise<void>
   goForward: (sessionId: string) => Promise<void>
   listGuests: () => Promise<DesktopBrowserGuestDescriptor[]>

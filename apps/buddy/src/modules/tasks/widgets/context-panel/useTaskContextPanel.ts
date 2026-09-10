@@ -15,66 +15,33 @@ import {
 export function useTaskContextPanel(options: UseTaskContextPanelOptions) {
   const isOpen = shallowRef(false)
   const activeTabId = shallowRef<string | null>(null)
-  const openTabIds = shallowRef<ReadonlyArray<string>>([])
   const resourceTabs = shallowRef<ReadonlyArray<TaskContextTab>>([])
   const handledBrowserOpenKeys = new Set<string>()
   const suppressedBrowserRunIds = new Set<string>()
-  const panels = new Map<string, { tabs: ReadonlyArray<TaskContextTab>, ids: ReadonlyArray<string>, activeId: string | null, open: boolean }>()
-  const availableTabs = computed(() => {
-    const browserTab = spaceTaskBrowserTab(options.activeConversationId.value)
-    const candidates = [
-      ...resourceTabs.value.filter(isAvailable),
-      ...spaceTaskArtifactTabs(options.runOutputs.value),
-      ...(browserTab ? [browserTab] : []),
-    ].filter(tab => contextTabConversationId(tab) === options.activeConversationId.value)
-    return [...new Map(candidates.map(tab => [tab.id, tab])).values()]
-  })
-  const availableTabsById = computed(() => new Map(
-    availableTabs.value.map(tab => [tab.id, tab]),
-  ))
-  const tabs = computed(() => openTabIds.value.flatMap(
-    tabId => availableTabsById.value.get(tabId) ?? [],
-  ))
-  const activeTab = computed(() => (
-    tabs.value.find(tab => tab.id === activeTabId.value) ?? null
-  ))
-  const artifactCount = computed(() => availableTabs.value.filter(
-    tab => tab.kind === 'artifact',
-  ).length)
+  const selectedConversationTabs = new Map<string, string>()
+  const availableArtifacts = computed(() => spaceTaskArtifactTabs(options.runOutputs.value)
+    .filter(tab => tab.artifact.conversationId === options.activeConversationId.value))
+  const fileSpaces = computed(() => options.spaces.value.filter(space => space.revokedAt === null
+    && space.primaryDirectory && space.primaryDirectory.revokedAt === null))
+  const tabs = computed(() => resourceTabs.value.filter(tab => isAvailable(tab) && isInCurrentContext(tab)))
+  const activeTab = computed(() => tabs.value.find(tab => tab.id === activeTabId.value) ?? null)
+  const artifactCount = computed(() => new Set([
+    ...availableArtifacts.value.map(tab => tab.id),
+    ...tabs.value.filter(tab => tab.kind === 'artifact').map(tab => tab.id),
+  ]).size)
+  const canAddChanges = computed(() => Boolean(options.activeConversationId.value)
+    && !tabs.value.some(tab => tab.kind === 'changes'))
 
-  let currentConversationId: string | null = null
-  watch(
-    [options.activeConversationId, availableTabs],
-    ([conversationId, nextAvailableTabs]) => {
-      const conversationChanged = conversationId !== currentConversationId
-      if (conversationChanged && currentConversationId)
-        panels.set(currentConversationId, { tabs: resourceTabs.value, ids: openTabIds.value, activeId: activeTabId.value, open: isOpen.value })
-      currentConversationId = conversationId
-      if (!conversationId) {
-        resetPanel()
-        return
-      }
-      if (conversationChanged) {
-        const previous = panels.get(conversationId)
-        if (!previous?.ids.length) {
-          resetPanel()
-          return
-        }
-        resourceTabs.value = previous.tabs.filter(isAvailable)
-        openTabIds.value = previous.ids
-        activeTabId.value = previous.activeId
-        isOpen.value = previous.open
-        return
-      }
-      const availableIds = nextAvailableTabs.map(tab => tab.id)
-      const retainedIds = openTabIds.value.filter(tabId => availableIds.includes(tabId))
-      openTabIds.value = retainedIds
-      if (activeTabId.value && openTabIds.value.includes(activeTabId.value))
-        return
-      activeTabId.value = openTabIds.value.at(-1) ?? null
-    },
-    { immediate: true },
-  )
+  watch(options.spaces, () => {
+    resourceTabs.value = resourceTabs.value.filter(isAvailable)
+  })
+  watch(tabs, (nextTabs) => {
+    if (nextTabs.some(tab => tab.id === activeTabId.value))
+      return
+    const conversationId = options.activeConversationId.value
+    const previousId = conversationId ? selectedConversationTabs.get(conversationId) : null
+    activeTabId.value = nextTabs.find(tab => tab.id === previousId)?.id ?? nextTabs.at(-1)?.id ?? null
+  }, { immediate: true })
   watch(
     [options.activeConversationId, options.activeRunId, options.runSignalEvents],
     ([conversationId, activeRunId, runSignalEvents]) => {
@@ -94,39 +61,30 @@ export function useTaskContextPanel(options: UseTaskContextPanelOptions) {
   )
 
   function hasTab(id: string) {
-    return openTabIds.value.includes(id) || [...panels.entries()].some(([conversationId, panel]) => conversationId !== currentConversationId && panel.ids.includes(id))
-  }
-
-  function resetPanel() {
-    isOpen.value = false
-    activeTabId.value = null
-    openTabIds.value = []
-    if (resourceTabs.value.length)
-      resourceTabs.value = []
+    return resourceTabs.value.some(tab => tab.id === id)
   }
 
   function toggle() {
-    if (!options.activeConversationId.value)
-      return
-    if (isOpen.value) {
+    if (isOpen.value)
       suppressBrowserForActiveRun()
-      isOpen.value = false
-      return
-    }
+    isOpen.value = !isOpen.value
+  }
+
+  function openTab(tab: TaskContextTab) {
+    const index = resourceTabs.value.findIndex(item => item.id === tab.id)
+    resourceTabs.value = index < 0
+      ? [...resourceTabs.value, tab]
+      : resourceTabs.value.map(item => item.id === tab.id ? tab : item)
+    selectTab(tab.id)
     isOpen.value = true
   }
 
   function openArtifact(artifactId: string) {
     const tabId = artifactTabId(artifactId)
-    if (!availableTabsById.value.has(tabId))
-      return
-    const artifactTab = availableTabsById.value.get(tabId)!
-    resourceTabs.value = [...resourceTabs.value.filter(tab => tab.id !== tabId), artifactTab]
-    if (!openTabIds.value.includes(tabId))
-      openTabIds.value = [...openTabIds.value, tabId]
-    suppressBrowserForActiveRun()
-    activeTabId.value = tabId
-    isOpen.value = true
+    const tab = availableArtifacts.value.find(tab => tab.id === tabId)
+      ?? tabs.value.find(tab => tab.id === tabId)
+    if (tab)
+      openTab(tab)
   }
 
   function openBrowser() {
@@ -141,16 +99,9 @@ export function useTaskContextPanel(options: UseTaskContextPanelOptions) {
   }
 
   function activateBrowser() {
-    const conversationId = options.activeConversationId.value
-    if (!conversationId)
-      return
-    const tabId = browserTabId(conversationId)
-    if (!availableTabsById.value.has(tabId))
-      return
-    if (!openTabIds.value.includes(tabId))
-      openTabIds.value = [...openTabIds.value, tabId]
-    activeTabId.value = tabId
-    isOpen.value = true
+    const tab = spaceTaskBrowserTab(options.activeConversationId.value)
+    if (tab)
+      openTab(tab)
   }
 
   function openChanges(changeSetId?: string) {
@@ -162,50 +113,30 @@ export function useTaskContextPanel(options: UseTaskContextPanelOptions) {
       : null
     if (changeSetId && !changeSet)
       return
-    const tabId = changeTabId(conversationId)
-    resourceTabs.value = [...resourceTabs.value.filter(tab => tab.id !== tabId), {
-      id: tabId,
+    openTab({
+      id: changeTabId(conversationId),
       kind: 'changes',
       conversationId,
       changeSet: changeSet ?? null,
-    }]
-    if (!openTabIds.value.includes(tabId))
-      openTabIds.value = [...openTabIds.value, tabId]
-    suppressBrowserForActiveRun()
-    activeTabId.value = tabId
-    isOpen.value = true
+    })
   }
 
   function addBrowser() {
-    const conversationId = options.activeConversationId.value
-    if (!conversationId)
-      return
     const browserKey = crypto.randomUUID()
-    const id = `browser:${conversationId}:${browserKey}`
-    resourceTabs.value = [...resourceTabs.value, { id, kind: 'browser', conversationId, browserKey }]
-    openTabIds.value = [...openTabIds.value, id]
-    activeTabId.value = id
-    isOpen.value = true
+    openTab({ id: browserTabId(null, browserKey), kind: 'browser', conversationId: null, browserKey })
   }
 
-  function openFiles() {
-    const space = options.activeSpace?.value
+  function openFiles(spaceId: string) {
+    const space = fileSpaces.value.find(space => space.id === spaceId)
     const directory = space?.primaryDirectory
-    const conversationId = options.activeConversationId.value
-    if (!space || !directory || !conversationId)
+    if (!space || !directory)
       return
-    const id = `files:${crypto.randomUUID()}`
-    resourceTabs.value = [...resourceTabs.value, {
-      id,
+    openTab({
+      id: `files:${crypto.randomUUID()}`,
       kind: 'files',
-      conversationId,
       rootName: directory.root.split(/[\\/]/).filter(Boolean).at(-1) ?? directory.root,
       target: { spaceId: space.id, directoryId: directory.id, revision: directory.revision, path: '' },
-    }]
-    openTabIds.value = [...openTabIds.value, id]
-    suppressBrowserForActiveRun()
-    activeTabId.value = id
-    isOpen.value = true
+    })
   }
 
   function selectFile(tabId: string, path: string) {
@@ -215,69 +146,64 @@ export function useTaskContextPanel(options: UseTaskContextPanelOptions) {
   }
 
   function canPreviewFile(path: string) {
-    return Boolean(options.activeConversationId.value && resolveChatToolFileTarget(options.activeSpace?.value ?? null, path))
+    return Boolean(resolveChatToolFileTarget(options.activeSpace?.value ?? null, path))
   }
 
   function previewFile(path: string) {
     const space = options.activeSpace?.value ?? null
     const target = resolveChatToolFileTarget(space, path)
-    const conversationId = options.activeConversationId.value
-    if (!target || !space?.primaryDirectory || !conversationId)
+    if (!target || !space?.primaryDirectory)
       return
-    const id = `files:${conversationId}:${target.directoryId}:preview`
-    resourceTabs.value = [...resourceTabs.value.filter(tab => tab.id !== id), {
-      id,
+    openTab({
+      id: `files:${target.spaceId}:${target.directoryId}:preview`,
       kind: 'files',
-      conversationId,
       rootName: space.primaryDirectory.root.split(/[\\/]/).filter(Boolean).at(-1) ?? space.primaryDirectory.root,
       target,
-    }]
-    if (!openTabIds.value.includes(id))
-      openTabIds.value = [...openTabIds.value, id]
-    suppressBrowserForActiveRun()
-    activeTabId.value = id
-    isOpen.value = true
+    })
   }
 
   function isAvailable(tab: TaskContextTab): boolean {
     if (tab.kind !== 'files')
       return true
-    const space = options.activeSpace?.value
-    const directory = space?.primaryDirectory
-    return tab.target.spaceId === space?.id && tab.target.directoryId === directory?.id
-      && tab.target.revision === directory.revision
+    const directory = fileSpaces.value.find(space => space.id === tab.target.spaceId)?.primaryDirectory
+    return Boolean(directory && tab.target.directoryId === directory.id && tab.target.revision === directory.revision)
+  }
+
+  function isInCurrentContext(tab: TaskContextTab): boolean {
+    const conversationId = contextTabConversationId(tab)
+    return conversationId === null || conversationId === options.activeConversationId.value
   }
 
   function restoreTab(tab: TaskContextTab) {
-    if (contextTabConversationId(tab) !== options.activeConversationId.value || !isAvailable(tab))
+    if (!isAvailable(tab) || hasTab(tab.id))
       return
-    resourceTabs.value = [...resourceTabs.value.filter(item => item.id !== tab.id), tab]
-    if (!openTabIds.value.includes(tab.id))
-      openTabIds.value = [...openTabIds.value, tab.id]
-    if (!activeTabId.value)
-      activeTabId.value = tab.id
+    resourceTabs.value = [...resourceTabs.value, tab]
+    if (!activeTabId.value && isInCurrentContext(tab))
+      selectTab(tab.id)
   }
 
   function selectTab(tabId: string) {
-    if (!openTabIds.value.includes(tabId))
+    const tab = tabs.value.find(tab => tab.id === tabId)
+    if (!tab)
       return
-    if (!tabId.startsWith('browser:'))
+    if (tab.kind !== 'browser' || tab.browserKey)
       suppressBrowserForActiveRun()
+    const conversationId = contextTabConversationId(tab)
+    if (conversationId)
+      selectedConversationTabs.set(conversationId, tabId)
     activeTabId.value = tabId
   }
 
   function closeTab(tabId: string) {
-    const index = openTabIds.value.indexOf(tabId)
+    const index = tabs.value.findIndex(tab => tab.id === tabId)
     if (index < 0)
       return
-    if (tabId.startsWith('browser:'))
+    if (tabId === browserTabId(options.activeConversationId.value))
       suppressBrowserForActiveRun()
-    const nextIds = openTabIds.value.filter(id => id !== tabId)
-    openTabIds.value = nextIds
     resourceTabs.value = resourceTabs.value.filter(tab => tab.id !== tabId)
     if (activeTabId.value !== tabId)
       return
-    activeTabId.value = nextIds[Math.min(index, nextIds.length - 1)] ?? null
+    activeTabId.value = tabs.value[Math.min(index, tabs.value.length - 1)]?.id ?? null
   }
 
   function suppressBrowserForActiveRun() {
@@ -286,7 +212,7 @@ export function useTaskContextPanel(options: UseTaskContextPanelOptions) {
     if (
       conversationId
       && activeRunId
-      && openTabIds.value.includes(browserTabId(conversationId))
+      && hasTab(browserTabId(conversationId))
     ) {
       suppressedBrowserRunIds.add(activeRunId)
     }
@@ -298,6 +224,8 @@ export function useTaskContextPanel(options: UseTaskContextPanelOptions) {
     artifactCount: readonly(artifactCount),
     closeTab,
     canPreviewFile,
+    fileSpaces: readonly(fileSpaces),
+    canAddChanges: readonly(canAddChanges),
     isOpen: readonly(isOpen),
     hasTab,
     openArtifact,
@@ -315,11 +243,11 @@ export function useTaskContextPanel(options: UseTaskContextPanelOptions) {
 
 export type TaskContextPanel = ReturnType<typeof useTaskContextPanel>
 
-function contextTabConversationId(tab: TaskContextTab): string {
+function contextTabConversationId(tab: TaskContextTab): string | null {
   if (tab.kind === 'artifact')
     return tab.artifact.conversationId
-  if (tab.kind === 'changes')
-    return tab.conversationId
+  if (tab.kind === 'files')
+    return null
   return tab.conversationId
 }
 

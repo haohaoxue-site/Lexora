@@ -9,6 +9,7 @@ describe('useTaskContextPanel browser tab', () => {
   it('restores the visible browser tab when returning to a conversation', async () => {
     const activeConversationId = shallowRef<string | null>('conversation-1')
     const panel = useTaskContextPanel({
+      spaces: shallowRef([]),
       activeConversationId,
       activeRunId: shallowRef(null),
       changeSets: shallowRef([]),
@@ -21,7 +22,7 @@ describe('useTaskContextPanel browser tab', () => {
 
     activeConversationId.value = 'conversation-2'
     await nextTick()
-    expect(panel.isOpen.value).toBe(false)
+    expect(panel.isOpen.value).toBe(true)
     panel.openBrowser()
 
     activeConversationId.value = 'conversation-1'
@@ -47,7 +48,7 @@ describe('useTaskContextPanel browser tab', () => {
     await nextTick()
     activeConversationId.value = 'conversation-2'
     await nextTick()
-    expect(panel.isOpen.value).toBe(false)
+    expect(panel.isOpen.value).toBe(true)
     expect(panel.tabs.value).toEqual([])
   })
 
@@ -59,6 +60,7 @@ describe('useTaskContextPanel browser tab', () => {
       changeSet('changes-1', 'conversation-1'),
     ])
     const panel = useTaskContextPanel({
+      spaces: shallowRef([]),
       activeConversationId,
       activeRunId,
       changeSets,
@@ -88,6 +90,7 @@ describe('useTaskContextPanel browser tab', () => {
       browserOpenStarted('run-1', 'tool-1'),
     ])
     const panel = useTaskContextPanel({
+      spaces: shallowRef([]),
       activeConversationId,
       activeRunId,
       changeSets: shallowRef([]),
@@ -120,6 +123,7 @@ describe('useTaskContextPanel browser tab', () => {
     const activeRunId = shallowRef<string | null>('run-1')
     const runEvents = shallowRef<ReadonlyArray<LocalRunEvent>>([])
     const panel = useTaskContextPanel({
+      spaces: shallowRef([]),
       activeConversationId,
       activeRunId,
       changeSets: shallowRef([changeSet('changes-1', 'conversation-1')]),

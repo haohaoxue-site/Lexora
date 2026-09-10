@@ -4,6 +4,7 @@ import type { LocalSpace } from '@buddy-shared/spaces/spaceApi'
 import type { Ref } from 'vue'
 
 export interface UseTaskContextPanelOptions {
+  spaces: Readonly<Ref<ReadonlyArray<LocalSpace>>>
   activeSpace?: Readonly<Ref<LocalSpace | null>>
   activeConversationId: Readonly<Ref<string | null>>
   activeRunId: Readonly<Ref<string | null>>

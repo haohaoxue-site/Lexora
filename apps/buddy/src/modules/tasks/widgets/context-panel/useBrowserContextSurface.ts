@@ -16,7 +16,7 @@ interface UseBrowserContextSurfaceOptions {
   enabled?: Readonly<Ref<boolean>>
   tabId?: Readonly<Ref<string | undefined>>
   api: DesktopBrowserApi
-  conversationId: Readonly<Ref<string>>
+  conversationId: Readonly<Ref<string | null>>
   guestHost: DesktopBrowserGuestSurfaceHost
   surfaceElement: Readonly<Ref<HTMLElement | null>>
 }

@@ -27,7 +27,7 @@ export class BrowserAdapterTestLeasePublisher {
   }
 
   publish(state: DesktopBrowserState): void {
-    if (state.status !== 'ready' || this.#publishedSessionIds.has(state.sessionId))
+    if (!state.conversationId || state.status !== 'ready' || this.#publishedSessionIds.has(state.sessionId))
       return
     this.#publishedSessionIds.add(state.sessionId)
     let lease: BrowserAdapterLease

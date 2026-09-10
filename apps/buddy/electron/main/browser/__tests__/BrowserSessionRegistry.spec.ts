@@ -5,6 +5,18 @@ import {
 } from '../BrowserSessionRegistry'
 
 describe('browserSessionRegistry', () => {
+  it('retains standalone tabs without creating a conversation session', () => {
+    const fixture = createFixture()
+    const first = fixture.registry.ensure(null, fixture.createSession, 'manual-1')
+    const second = fixture.registry.ensure(null, fixture.createSession, 'manual-2')
+    expect(first.conversationId).toBeNull()
+    expect(first.sessionId).not.toBe(second.sessionId)
+    expect(fixture.registry.ensure(null, fixture.createSession, 'manual-1')).toBe(first)
+    expect(() => fixture.registry.ensure(null, fixture.createSession)).toThrow('tab identity')
+    fixture.registry.remove(first.sessionId)
+    expect(fixture.registry.values()).toEqual([second])
+  })
+
   it('keeps tabs in the same conversation separate from the agent session', () => {
     const fixture = createFixture()
     const agent = fixture.ensure('conversation')
@@ -41,7 +53,7 @@ function createFixture(maxSessions = 4) {
     createId: () => ids.shift()!,
     maxSessions,
   })
-  const createSession = vi.fn((context: { conversationId: string, sessionId: string }) => {
+  const createSession = vi.fn((context: { conversationId: string | null, sessionId: string }) => {
     const session: Session = { ...context }
     const teardown = vi.fn()
     teardownBySessionId.set(context.sessionId, teardown)
@@ -50,13 +62,13 @@ function createFixture(maxSessions = 4) {
 
   return {
     createSession,
-    ensure: (conversationId: string) => registry.ensure(conversationId, createSession),
+    ensure: (conversationId: string | null) => registry.ensure(conversationId, createSession),
     registry,
     teardownBySessionId,
   }
 }
 
 interface Session {
-  conversationId: string
+  conversationId: string | null
   sessionId: string
 }

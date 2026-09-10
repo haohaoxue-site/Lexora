@@ -98,6 +98,8 @@ export default {
   'desktop.context.browserToolbar': 'Browser toolbar',
   'desktop.context.browserViewport': 'Web page content',
   'desktop.context.files': 'Files',
+  'desktop.context.selectFileSpace': 'Select space',
+  'desktop.context.noFileSpaces': 'No spaces have a working directory',
   'desktop.context.addTab': 'New tab',
   'desktop.context.fileRevealFailed': 'Could not reveal this file',
   'desktop.context.revealFile': 'Open containing folder',

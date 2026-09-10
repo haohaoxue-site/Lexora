@@ -47,6 +47,7 @@ watch(chatSession.activeConversationId, () => {
 const contextActions = useTaskResourcePanel({
   activeConversationId: workspace.session.activeConversationId,
   activeSpace,
+  spaces,
   activeRunId: computed(() => workspace.execution.activeRun.value?.id ?? null),
   browser,
   changeSets: panelChanges,
@@ -119,7 +120,6 @@ const {
       :view-mode="viewMode"
       :active-search-index="activeSearchIndex"
       :artifact-count="artifactCount"
-      :can-open-context="activeTaskId !== null"
       :can-search-conversation="activeTaskId !== null"
       :conversation-search-loading="searchLoading"
       :conversation-search-open="searchOpen"
@@ -166,7 +166,6 @@ const {
         :context="workspace.context"
         :branch-id="chatSession.activeBranchId.value"
         :change-revision="changeRevision"
-        :can-open-files="Boolean(activeSpace?.primaryDirectory)"
         :language="language"
       />
     </template>
