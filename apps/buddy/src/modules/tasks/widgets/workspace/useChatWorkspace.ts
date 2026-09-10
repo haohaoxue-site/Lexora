@@ -39,7 +39,8 @@ export function useChatWorkspace(
     }
   })
 
-  const isLoading = computed(() => status.value.isLoading.value)
+  const isLoading = computed(() => status.value.isLoading.value
+    || (props.viewMode !== 'canvas' && viewport.isPositioning.value))
   const language = computed(() => workspace.value.language.value)
   const transcriptBindings = computed(() => {
     const currentSession = session.value

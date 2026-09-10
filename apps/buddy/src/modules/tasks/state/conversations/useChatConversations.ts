@@ -79,13 +79,10 @@ export function useChatConversations(options: UseChatConversationsOptions) {
     directlyOpenedConversation.value = indexed ? null : conversation
     options.session.activateConversation(conversation)
     options.restoreConversationModelSelection(conversation.modelSelection)
-    const activatedGeneration = options.session.generation()
-    await options.persistWorkspaceState()
-    if (!isCurrent() || !options.session.isCurrent(activatedGeneration, conversationId))
-      return
     await Promise.all([
       refreshBranches(),
       options.runSync.refreshActiveConversation(),
+      options.persistWorkspaceState(),
     ])
   }
 

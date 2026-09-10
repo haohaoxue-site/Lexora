@@ -46,7 +46,7 @@ export function useChatRunProjection() {
       page.runs,
     )
     runSignalEvents.value = events.filter(isRunSignalEvent)
-    runEventBuckets.value = replaceChatRunEventBuckets(events)
+    runEventBuckets.value = replaceChatRunEventBuckets(events, runEventBuckets.value)
     runOutputs.value = mergeRunOutputs(runOutputs.value, page.outputs)
     changeSets.value = mergeChangeSets(changeSets.value, page.changeSets)
   }

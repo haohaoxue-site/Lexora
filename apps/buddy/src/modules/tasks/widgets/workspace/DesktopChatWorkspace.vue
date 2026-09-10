@@ -160,7 +160,7 @@ function openDetailChanges(id: string) {
 
 <template>
   <DesktopRuntimePane :loading="isLoading" :language="language">
-    <section ref="pageRef" class="desktop-chat-page" :class="{ 'is-empty': isEmpty && viewMode !== 'canvas', 'has-node-detail': detailVisible, 'is-question-preview': !composerVisible, 'is-resizing-detail': detailResize.dragging.value }" :style="{ '--conversation-detail-width': `${detailResize.width.value}px` }" :data-view-mode="viewMode">
+    <section ref="pageRef" class="desktop-chat-page" :class="{ 'is-loading': isLoading, 'is-empty': isEmpty && viewMode !== 'canvas', 'has-node-detail': detailVisible, 'is-question-preview': !composerVisible, 'is-resizing-detail': detailResize.dragging.value }" :style="{ '--conversation-detail-width': `${detailResize.width.value}px` }" :data-view-mode="viewMode">
       <main class="desktop-chat-page__content">
         <DesktopConversationCanvas
           v-if="canvasVisited"
@@ -282,6 +282,10 @@ function openDetailChanges(id: string) {
   flex: 1;
   flex-direction: column;
   overflow: hidden;
+}
+
+.desktop-chat-page.is-loading {
+  visibility: hidden;
 }
 
 .desktop-chat-page.is-empty {

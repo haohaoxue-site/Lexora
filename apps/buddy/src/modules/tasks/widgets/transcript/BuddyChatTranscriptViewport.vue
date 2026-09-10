@@ -24,7 +24,6 @@ const emit = defineEmits<{
 const viewport = useTemplateRef<HTMLElement>('viewport')
 const content = useTemplateRef<HTMLElement>('content')
 let resizeObserver: ResizeObserver | null = null
-let contentResizePending = false
 let viewportFrameTask: ReturnType<typeof createChatFrameTask> | null = null
 
 function readScrollMetrics(): ChatMessageScrollMetrics | null {
@@ -37,12 +36,13 @@ function captureScrollAnchor(): ChatMessageScrollAnchor | null {
   if (!scrollport || !metrics)
     return null
   const viewportTop = scrollport.getBoundingClientRect().top
-  const message = [...scrollport.querySelectorAll<HTMLElement>('[data-message-id]')]
+  const message = [...scrollport.querySelectorAll<HTMLElement>('[data-chat-row-key]')]
     .find(element => element.getBoundingClientRect().bottom > viewportTop)
-  if (!message?.dataset.messageId)
+  if (!message?.dataset.chatRowKey)
     return null
   return {
-    messageId: message.dataset.messageId,
+    messageId: message.dataset.messageId ?? '',
+    rowKey: message.dataset.chatRowKey,
     messageOffsetTop: message.getBoundingClientRect().top - viewportTop,
     metrics,
   }
@@ -52,7 +52,10 @@ function restoreScrollAnchor(anchor: ChatMessageScrollAnchor): ChatMessageScroll
   const scrollport = viewport.value
   if (!scrollport)
     return null
-  const anchorMessage = findMessage(anchor.messageId)
+  const anchorMessage = anchor.rowKey
+    ? [...scrollport.querySelectorAll<HTMLElement>('[data-chat-row-key]')]
+        .find(element => element.dataset.chatRowKey === anchor.rowKey)
+    : findMessage(anchor.messageId)
   if (anchorMessage) {
     const currentOffset = anchorMessage.getBoundingClientRect().top
       - scrollport.getBoundingClientRect().top
@@ -143,12 +146,6 @@ function handleScroll() {
 onMounted(() => {
   viewportFrameTask = createChatFrameTask(
     () => {
-      if (contentResizePending) {
-        contentResizePending = false
-        const metrics = readScrollMetrics()
-        if (metrics)
-          emit('contentResize', metrics)
-      }
       emit('activeMessageChange', readActiveMessageId())
     },
     requestAnimationFrame,
@@ -157,8 +154,10 @@ onMounted(() => {
   if (!content.value || typeof ResizeObserver === 'undefined')
     return
   resizeObserver = new ResizeObserver(() => {
-    contentResizePending = true
-    viewportFrameTask?.schedule()
+    const metrics = readScrollMetrics()
+    if (metrics)
+      emit('contentResize', metrics)
+    scheduleActiveMessageChange()
   })
   resizeObserver.observe(content.value)
   scheduleActiveMessageChange()
@@ -228,6 +227,7 @@ function toScrollMetrics(element: HTMLElement): ChatMessageScrollMetrics {
 .buddy-chat-transcript-viewport__scrollport {
   height: 100%;
   overflow-y: auto;
+  overflow-anchor: none;
   overscroll-behavior: contain;
   scrollbar-gutter: stable;
 

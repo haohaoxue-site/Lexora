@@ -12,8 +12,6 @@ interface UseConversationOutlineOptions {
   transcriptProjection: Readonly<Ref<ChatTranscriptProjection>>
 }
 
-const EMPTY_MESSAGES: ReadonlyArray<LocalMessage> = []
-
 export function useConversationOutline(options: UseConversationOutlineOptions) {
   const isLoading = shallowRef(false)
   const loadedMessages = shallowRef<ReadonlyArray<LocalMessage>>([])
@@ -26,12 +24,14 @@ export function useConversationOutline(options: UseConversationOutlineOptions) {
     const branchId = options.activeBranchId.value
     return conversationId && branchId ? `${conversationId}:${branchId}` : null
   })
-  const items = computed(() => outlineProjector.project(
-    options.transcriptProjection.value,
-    loadedScopeKey.value === scopeKey.value ? loadedMessages.value : EMPTY_MESSAGES,
-  ))
+  const items = computed(() => loadedScopeKey.value !== scopeKey.value || !scopeKey.value
+    ? []
+    : outlineProjector.project(options.transcriptProjection.value, loadedMessages.value))
 
-  watch(scopeKey, () => reset())
+  watch(scopeKey, () => {
+    reset()
+    void prepare()
+  }, { immediate: true })
 
   async function prepare() {
     const sourceScopeKey = scopeKey.value

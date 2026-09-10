@@ -30,6 +30,7 @@ export interface ChatRunProjectionState {
 }
 
 export interface ChatRunSync extends ChatRunProjectionState {
+  isLoadingConversation: Readonly<Ref<boolean>>
   isLoadingOlderMessages: Readonly<Ref<boolean>>
   applyEditedTurn: (turn: LocalTurnStart, userMessageId: string) => void
   applyRegeneratedTurn: (turn: LocalTurnStart) => void

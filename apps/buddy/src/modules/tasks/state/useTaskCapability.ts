@@ -528,7 +528,7 @@ export function useTaskCapability(options: UseTaskCapabilityOptions): TaskCapabi
       canRestartRuntime: runtimeSupervisor.canRestartRuntime,
       dismissChatBlocker,
       errorMessage: readonly(errorMessage),
-      isLoading: lifecycle.isLoading,
+      isLoading: computed(() => lifecycle.isLoading.value || runSync.isLoadingConversation.value),
       restartRuntime: runtimeSupervisor.restartRuntime,
       runtimeError: runtimeSupervisor.runtimeError,
       runtimeState: runtimeSupervisor.runtimeState,

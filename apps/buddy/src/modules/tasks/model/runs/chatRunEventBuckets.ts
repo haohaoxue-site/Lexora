@@ -20,11 +20,15 @@ const bucketStates = new WeakMap<ChatRunEventBucket, ChatRunEventBucketState>()
 
 export function replaceChatRunEventBuckets(
   events: ReadonlyArray<LocalRunEvent>,
+  current: ChatRunEventBuckets = new Map(),
 ): ChatRunEventBuckets {
-  return new Map([...indexRunEvents(events)].map(([runId, runEvents]) => [
-    runId,
-    createBucket(compactChatRunEventSnapshots(mergeChatRunEvents([], runEvents)), null),
-  ]))
+  return new Map([...indexRunEvents(events)].map(([runId, runEvents]) => {
+    const compacted = compactChatRunEventSnapshots(mergeChatRunEvents([], runEvents))
+    const previous = current.get(runId)
+    return [runId, previous && hasSameEventReferences(previous.events, compacted)
+      ? previous
+      : createBucket(compacted, null)]
+  }))
 }
 
 export function mergeChatRunEventBuckets(

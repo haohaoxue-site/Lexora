@@ -186,6 +186,7 @@ onBeforeUnmount(clearOutlineHighlight)
 
         <BuddyChatMessageRow
           v-else-if="item.kind === 'message'"
+          :data-chat-row-key="item.key"
           :actions-disabled="actionsDisabled ?? false"
           :active-search="item.message.id === activeSearchMessageId"
           :branch-navigator="branchNavigators.get(item.message.id) ?? null"
@@ -213,6 +214,7 @@ onBeforeUnmount(clearOutlineHighlight)
         <BuddyChatAgentTurn
           v-else-if="item.kind === 'agent-turn'"
           :ref="view => activityNavigation.register(item.key, view, item.turn.nodes.map(node => node.id))"
+          :data-chat-row-key="item.key"
           :actions-disabled="actionsDisabled ?? false"
           :branch-navigator="branchNavigators.get(item.turn.runId) ?? null"
           class="buddy-chat-transcript-row"
@@ -227,6 +229,7 @@ onBeforeUnmount(clearOutlineHighlight)
 
         <BuddyChatRunActivity
           v-else-if="item.kind === 'activity'"
+          :data-chat-row-key="item.key"
           class="buddy-chat-transcript-row"
           :language="language"
           :turn="item.turn"
@@ -235,6 +238,7 @@ onBeforeUnmount(clearOutlineHighlight)
 
         <div
           v-else-if="item.kind === 'recovery-notice'"
+          :data-chat-row-key="item.key"
           class="buddy-chat-system-event buddy-chat-transcript-row is-warning"
           role="status"
         >
@@ -243,6 +247,7 @@ onBeforeUnmount(clearOutlineHighlight)
 
         <BuddyChatCompactionRow
           v-else-if="item.kind === 'compaction'"
+          :data-chat-row-key="item.key"
           class="buddy-chat-transcript-row"
           :node="item.compaction"
           :language="language"
