@@ -78,22 +78,14 @@ describe('credentialVault', () => {
     await expect(readdir(join(buddyHome, 'secrets', 'providers'))).rejects.toMatchObject({ code: 'ENOENT' })
   })
 
-  it('rejects the Linux basic_text safeStorage backend', () => {
-    expect(isSafeStorageBackendSecure({
-      backend: 'basic_text',
-      encryptionAvailable: true,
-      platform: 'linux',
-    })).toBe(false)
-    expect(isSafeStorageBackendSecure({
-      backend: 'gnome_libsecret',
-      encryptionAvailable: true,
-      platform: 'linux',
-    })).toBe(true)
-    expect(isSafeStorageBackendSecure({
-      backend: 'basic_text',
-      encryptionAvailable: true,
-      platform: 'win32',
-    })).toBe(true)
+  it.each([
+    ['linux', 'basic_text', true, false],
+    ['linux', 'gnome_libsecret', true, true],
+    ['linux', 'kwallet6', true, true],
+    ['win32', 'unknown', true, true],
+    ['win32', 'unknown', false, false],
+  ] as const)('checks host encryption on %s with backend %s and availability %s', (platform, backend, encryptionAvailable, secure) => {
+    expect(isSafeStorageBackendSecure({ backend, encryptionAvailable, platform })).toBe(secure)
   })
 
   it.each([

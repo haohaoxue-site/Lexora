@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { isLocalChatErrorCode } from '../runtime/localChatError'
+import { readLocalChatErrorCode } from '../runtime/localChatError'
 
 export const APPLICATION_DIAGNOSTIC_METHOD = 'application.diagnostic'
 export const diagnosticIdentitySchema = z.string().regex(/^\w[\w:.-]{0,191}$/)
@@ -46,10 +46,11 @@ export function safeDiagnosticReporter(report?: ApplicationDiagnosticReporter): 
 }
 
 export function readDiagnosticErrorCode(error: unknown): string {
+  const publicCode = readLocalChatErrorCode(error)
+  if (publicCode)
+    return publicCode
   if (error && typeof error === 'object') {
     const code = 'code' in error ? error.code : undefined
-    if (typeof code === 'string' && isLocalChatErrorCode(code))
-      return code
     if (typeof code === 'string' && ['INITIAL_STATE_UNAVAILABLE', 'EACCES', 'EPERM', 'ENOENT', 'ENOSPC', 'EIO', 'EMFILE', 'ERR_SQLITE_ERROR'].includes(code))
       return code
   }

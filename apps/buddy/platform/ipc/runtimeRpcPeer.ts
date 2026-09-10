@@ -2,6 +2,7 @@ import type { RuntimeMessageTransport, RuntimeRequestHandler, RuntimeRpcPeerCont
 import type { RuntimeWireMessage } from '../../shared/runtime/runtimeProtocol'
 import { randomUUID } from 'node:crypto'
 
+import { readLocalChatErrorCode } from '../../shared/runtime/localChatError'
 import { runtimeWireMessageSchema } from '../../shared/runtime/runtimeProtocol'
 
 const DEFAULT_REQUEST_TIMEOUT_MS = 30_000
@@ -197,10 +198,8 @@ export class RuntimeRpcPeer implements RuntimeRpcPeerContract {
 }
 
 function readStableErrorCode(error: unknown): string {
-  if (!error || typeof error !== 'object' || !('code' in error))
-    return 'BUDDY_RUNTIME_REQUEST_FAILED'
-  const code = (error as { code?: unknown }).code
+  const code = error && typeof error === 'object' && 'code' in error ? error.code : undefined
   return typeof code === 'string' && /^[A-Z][A-Z0-9_]{1,127}$/.test(code)
     ? code
-    : 'BUDDY_RUNTIME_REQUEST_FAILED'
+    : readLocalChatErrorCode(error) ?? 'BUDDY_RUNTIME_REQUEST_FAILED'
 }

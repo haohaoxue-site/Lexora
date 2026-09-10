@@ -7,7 +7,7 @@ import { randomUUID } from 'node:crypto'
 import { ipcMain } from 'electron'
 import { ZodError } from 'zod'
 import { diagnosticIdentitySchema, safeDiagnosticReporter } from '../../../shared/diagnostics/applicationDiagnostic'
-import { formatLocalChatPublicError, isLocalChatErrorCode } from '../../../shared/runtime/localChatError'
+import { formatLocalChatPublicError, readLocalChatErrorCode } from '../../../shared/runtime/localChatError'
 import { assertTrustedSender } from '../ipc'
 
 export interface DesktopRuntimeGateway {
@@ -62,7 +62,7 @@ export function createLocalChatIpcContext(options: RegisterLocalChatIpcOptions) 
       return result.data as RuntimeRequestResult<Contract>
     }
     catch (error) {
-      record({ ...context, event: 'rpc.request.failed', level: 'error', durationMs: Math.round(performance.now() - startedAt), errorCode: readStableErrorCode(error) ?? 'LOCAL_CHAT_OPERATION_FAILED' })
+      record({ ...context, event: 'rpc.request.failed', level: 'error', durationMs: Math.round(performance.now() - startedAt), errorCode: readLocalChatErrorCode(error) ?? 'LOCAL_CHAT_OPERATION_FAILED' })
       throw error
     }
   }
@@ -94,7 +94,7 @@ function createLocalChatIpcError(error: unknown): Error {
   if (error instanceof ZodError) {
     return publicError('VALIDATION_FAILED', false)
   }
-  const code = readStableErrorCode(error)
+  const code = readLocalChatErrorCode(error)
   if (code) {
     return publicError(code, new Set<LocalChatErrorCode>([
       'AUTHENTICATION_REQUIRED',
@@ -105,17 +105,6 @@ function createLocalChatIpcError(error: unknown): Error {
     ]).has(code))
   }
   return publicError('LOCAL_CHAT_OPERATION_FAILED', false)
-}
-
-function readStableErrorCode(error: unknown): LocalChatErrorCode | null {
-  if (!isRecord(error))
-    return null
-  const direct = typeof error.code === 'string' ? error.code : undefined
-  if (isLocalChatErrorCode(direct))
-    return direct
-  const data = isRecord(error.data) ? error.data : null
-  const nested = data && typeof data.code === 'string' ? data.code : undefined
-  return isLocalChatErrorCode(nested) ? nested : null
 }
 
 function publicError(code: LocalChatErrorCode, retryable: boolean): Error {

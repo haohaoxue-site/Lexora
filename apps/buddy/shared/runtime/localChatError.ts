@@ -6,6 +6,7 @@ export type LocalChatErrorCode
     | 'AUTOMATION_NOT_FOUND'
     | 'AUTHENTICATION_REQUIRED'
     | 'CONNECTOR_UNAVAILABLE'
+    | 'CREDENTIAL_STORE_FAILURE'
     | 'CREDENTIAL_STORE_UNAVAILABLE'
     | 'DIRECTORY_NOT_AUTHORIZED'
     | 'DRAFT_CONFLICT'
@@ -40,6 +41,7 @@ const LOCAL_CHAT_ERROR_CODES = new Set<LocalChatErrorCode>([
   'AUTOMATION_NOT_FOUND',
   'AUTHENTICATION_REQUIRED',
   'CONNECTOR_UNAVAILABLE',
+  'CREDENTIAL_STORE_FAILURE',
   'CREDENTIAL_STORE_UNAVAILABLE',
   'DIRECTORY_NOT_AUTHORIZED',
   'DRAFT_CONFLICT',
@@ -71,4 +73,22 @@ export function parseLocalChatPublicError(message: string): LocalChatPublicError
 
 export function isLocalChatErrorCode(value: string | undefined): value is LocalChatErrorCode {
   return Boolean(value && LOCAL_CHAT_ERROR_CODES.has(value as LocalChatErrorCode))
+}
+
+export function readLocalChatErrorCode(error: unknown): LocalChatErrorCode | null {
+  const seen = new Set<object>()
+  while (isRecord(error) && !seen.has(error)) {
+    seen.add(error)
+    if (typeof error.code === 'string' && isLocalChatErrorCode(error.code))
+      return error.code
+    const data = isRecord(error.data) ? error.data : null
+    if (typeof data?.code === 'string' && isLocalChatErrorCode(data.code))
+      return data.code
+    error = error.cause
+  }
+  return null
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value)
 }
