@@ -10,6 +10,9 @@ import navigationTaskUrl from './assets/navigation-task.svg'
 import notificationMarkAllReadUrl from './assets/notification-mark-all-read.svg'
 import sidebarChevronUrl from './assets/sidebar-chevron.svg'
 import spaceNoneUrl from './assets/space-none.svg'
+import toolCreateFileUrl from './assets/tool-create-file.svg'
+import toolEditFileUrl from './assets/tool-edit-file.svg'
+import toolSearchUrl from './assets/tool-search.svg'
 import windowCloseUrl from './assets/window-close.svg'
 import windowMaximizeUrl from './assets/window-maximize.svg'
 import windowMinimizeUrl from './assets/window-minimize.svg'
@@ -29,6 +32,9 @@ export const DESKTOP_ICON_URLS = {
   notificationMarkAllRead: notificationMarkAllReadUrl,
   sidebarChevron: sidebarChevronUrl,
   spaceNone: spaceNoneUrl,
+  toolCreateFile: toolCreateFileUrl,
+  toolEditFile: toolEditFileUrl,
+  toolSearch: toolSearchUrl,
   windowClose: windowCloseUrl,
   windowMaximize: windowMaximizeUrl,
   windowMinimize: windowMinimizeUrl,

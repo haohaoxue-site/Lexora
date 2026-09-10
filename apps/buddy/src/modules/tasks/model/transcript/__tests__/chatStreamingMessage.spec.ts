@@ -1,11 +1,7 @@
 import type { LocalConversationTimelineItem } from '@buddy-shared/conversation/conversationApi'
 import type { LocalRun, LocalRunEvent } from '@buddy-shared/runs/runApi'
 
-import type {
-  ChatAgentReasoningNode,
-  ChatAgentToolNode,
-  ChatAgentTurn,
-} from '../chatStreamingMessage'
+import type { ChatAgentTurn } from '../chatStreamingMessage'
 import { describe, expect, it } from 'vitest'
 
 import * as chatProjections from '../chatStreamingMessage'
@@ -15,8 +11,6 @@ import {
 } from '../chatTranscriptProjection'
 
 const {
-  createChatAgentTurnRowProjector,
-  projectChatAgentTurnRows,
   projectChatAgentTurns,
   projectChatRecoveryNotices,
   projectStreamingAssistantMessage,
@@ -367,28 +361,6 @@ describe('projectStreamingAssistantMessage', () => {
       kind: 'reasoning',
       text: '**Inspecting the current process state**',
     })])
-  })
-
-  it('reuses unchanged turn rows while one tool receives streaming output', () => {
-    const reasoning = reasoningNode('reasoning-1', 'Inspecting processes')
-    const firstTool = terminalToolNode('terminal-1', 'printf first', 'first')
-    const streamingTool = terminalToolNode('terminal-2', 'printf second', 'second')
-    const projector = createChatAgentTurnRowProjector()
-    const firstRows = projector.project([reasoning, firstTool, streamingTool])
-    const updatedStreamingTool = {
-      ...streamingTool,
-      presentation: {
-        ...streamingTool.presentation,
-        output: 'second\nnext',
-      },
-    }
-    const nextNodes = [reasoning, firstTool, updatedStreamingTool]
-    const nextRows = projector.project(nextNodes)
-
-    expect(nextRows).toEqual(projectChatAgentTurnRows(nextNodes))
-    expect(nextRows[0]).toBe(firstRows[0])
-    expect(nextRows[1]).toBe(firstRows[1])
-    expect(nextRows[2]).not.toBe(firstRows[2])
   })
 
   it.each(['failed', 'cancelled'] as const)(
@@ -745,41 +717,6 @@ function event(sequence: number, type: string, payload: LocalRunEvent['payload']
     sequence,
     type,
   }
-}
-
-function reasoningNode(
-  id: string,
-  text: string,
-): ChatAgentReasoningNode {
-  return {
-    contentIndex: 0,
-    id,
-    kind: 'reasoning',
-    status: 'completed',
-    text,
-  }
-}
-
-function terminalToolNode(id: string, command: string, output: string) {
-  return {
-    description: null,
-    id: `tool:${id}`,
-    isError: false,
-    kind: 'tool' as const,
-    presentation: {
-      card: 'terminal' as const,
-      command,
-      cwd: '.',
-      description: null,
-      exitCode: null,
-      output,
-      signal: null,
-      truncated: false,
-    },
-    status: 'running' as const,
-    toolCallId: id,
-    toolName: 'bash',
-  } satisfies ChatAgentToolNode
 }
 
 function message(

@@ -2,13 +2,14 @@
 import type { LocalArtifact } from '@buddy-shared/artifacts/artifactApi'
 import type { LocalChangeSetSummary } from '@buddy-shared/changes/changeApi'
 import type { LocalRunOutput } from '@buddy-shared/runs/runApi'
-import { computed, shallowRef, watch } from 'vue'
+import { computed, provide, shallowRef, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useTaskContext } from '@/modules/tasks/taskContext'
 import DesktopTaskSpaceSelector from '@/modules/tasks/widgets/composer/DesktopTaskSpaceSelector.vue'
 import DesktopTaskResourcePanel from '@/modules/tasks/widgets/context-panel/DesktopTaskResourcePanel.vue'
 import { useTaskResourcePanel } from '@/modules/tasks/widgets/context-panel/useTaskResourcePanel'
 import DesktopTaskIndex from '@/modules/tasks/widgets/task-index/DesktopTaskIndex.vue'
+import { chatToolActionsKey } from '@/modules/tasks/widgets/transcript/chatToolActionsContext'
 import DesktopChatWorkspace from '@/modules/tasks/widgets/workspace/DesktopChatWorkspace.vue'
 import DesktopChatWorkspaceHeader from '@/modules/tasks/widgets/workspace/DesktopChatWorkspaceHeader.vue'
 import { useConversationSearch } from '@/modules/tasks/widgets/workspace/useConversationSearch'
@@ -18,6 +19,7 @@ import DesktopWorkbenchLayout from '@/shared/ui/workbench-layout/DesktopWorkbenc
 const router = useRouter()
 const {
   browser,
+  clipboard,
   tasks,
   notificationTargetMessageId,
   appSidebarCollapsed,
@@ -52,6 +54,11 @@ const contextActions = useTaskResourcePanel({
   runOutputs: panelOutputs,
 })
 const { artifactCount, isOpen: contextOpen } = contextActions
+provide(chatToolActionsKey, {
+  canPreviewFile: contextActions.canPreviewFile,
+  previewFile: contextActions.previewFile,
+  writeClipboardText: text => clipboard.writeText(text),
+})
 const changeRevision = computed(() => panelChanges.value.map(set => `${set.changeSetId}:${set.updatedAt}`).join('|'))
 function openArtifact(id: string) {
   void contextActions.openArtifact(id)

@@ -120,6 +120,7 @@ export function useTaskResourcePanel(options: TaskResourcePanelOptions) {
     retainBrowserSession,
     addBrowser: () => act(taskContext.addBrowser),
     openFiles: () => act(taskContext.openFiles),
+    previewFile: (path: string) => act(() => taskContext.previewFile(path)),
     closeTab,
     openArtifact,
     openBrowser: () => act(taskContext.openBrowser),

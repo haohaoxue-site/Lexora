@@ -26,18 +26,6 @@ const SPECIFIC_FAILURE_MESSAGE_KEYS: Readonly<Record<string, BuddyI18nKey>> = {
   SESSION_STORAGE_UNAVAILABLE: 'desktop.chat.sessionStorageUnavailable',
 }
 
-export function resolveChatAgentTurnOpen(
-  status: LocalRun['status'],
-  override?: boolean,
-): boolean {
-  if (override !== undefined)
-    return override
-  return status === 'queued'
-    || status === 'running'
-    || status === 'failed'
-    || status === 'cancelled'
-}
-
 export function resolveChatAgentTurnNotice(
   status: LocalRun['status'],
   failureMessage: string | null,

@@ -39,7 +39,7 @@ export function useWorkspaceFilePreview(tab: Readonly<Ref<TaskFilesContextTab | 
         newView.treeFailed = true
       })
     }
-    if (value.target.path === previous?.target.path && value.id === previous.id)
+    if (value.target === previous?.target && value.id === previous.id)
       return
     view.failed = false
     view.preview = null

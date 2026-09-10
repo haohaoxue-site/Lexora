@@ -292,6 +292,27 @@ describe('chat run transcript projector', () => {
     expect(incremental).toEqual(rebuilt)
   })
 
+  it('retains the registered tool label across output deltas and replay', () => {
+    const activeRun = run('run-a')
+    const start = messageEvent('run-a', 1, 'tool.started', {
+      toolCallId: 'tool-1',
+      toolName: 'bash',
+      toolLabel: 'Run a shell command',
+      presentation: terminalPresentation('first'),
+    })
+    const projector = createChatRunTranscriptProjector()
+    const initial = replaceChatRunEventBuckets([start])
+    projector.project(initial, [activeRun])
+    const buckets = mergeChatRunEventBuckets(initial, [messageEvent('run-a', 2, 'tool.updated', {
+      toolCallId: 'tool-1',
+      toolName: 'bash',
+      presentationDelta: { card: 'terminal', outputStart: 5, outputDelta: '+next', truncated: false },
+    })])
+    const result = projector.project(buckets, [activeRun])[0]
+    expect(result?.turn.nodes[0]).toMatchObject({ toolLabel: 'Run a shell command', presentation: { output: 'first+next' } })
+    expect(result).toEqual(createChatRunTranscriptProjector().project(buckets, [activeRun])[0])
+  })
+
   it('rebuilds after a snapshot replaces or shrinks the event prefix', () => {
     const currentRun = run('run-a')
     const projector = createChatRunTranscriptProjector()
