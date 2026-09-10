@@ -17,7 +17,7 @@ export function useTaskResourcePanel(options: TaskResourcePanelOptions) {
   })
   function updateBrowserState(state: DesktopBrowserState) {
     const tab = taskContext.activeTab.value
-    if (tab?.kind === 'browser' && tab.conversationId === state.conversationId)
+    if (tab?.kind === 'browser' && browserStates.value[tab.id]?.sessionId === state.sessionId)
       browserStates.value = { ...browserStates.value, [tab.id]: state }
   }
   const stopBrowserState = options.browser.onStateChanged((state) => {
@@ -41,7 +41,7 @@ export function useTaskResourcePanel(options: TaskResourcePanelOptions) {
   })
 
   function retainBrowserSession(state: DesktopBrowserState, key?: string) {
-    const id = key ? `${browserTabId(state.conversationId)}:${key}` : browserTabId(state.conversationId)
+    const id = browserTabId(state.conversationId, key)
     if (disposed || !taskContext.hasTab(id)) {
       if (key)
         void options.browser.close(state.sessionId).catch(() => {})
@@ -82,9 +82,8 @@ export function useTaskResourcePanel(options: TaskResourcePanelOptions) {
       return true
     }
     catch {
-      if (isCurrent()) {
+      if (!disposed && (tab.browserKey || isCurrent()))
         taskContext.restoreTab(tab)
-      }
       return false
     }
   }
@@ -119,7 +118,7 @@ export function useTaskResourcePanel(options: TaskResourcePanelOptions) {
     updateBrowserState,
     retainBrowserSession,
     addBrowser: () => act(taskContext.addBrowser),
-    openFiles: () => act(taskContext.openFiles),
+    openFiles: (spaceId: string) => act(() => taskContext.openFiles(spaceId)),
     previewFile: (path: string) => act(() => taskContext.previewFile(path)),
     closeTab,
     openArtifact,

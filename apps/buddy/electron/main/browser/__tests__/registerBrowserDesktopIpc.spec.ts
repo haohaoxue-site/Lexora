@@ -428,6 +428,11 @@ describe('registerBrowserDesktopIpc', () => {
       entryPath: '/buddy/workspace/hello-world.html',
       rootPath: '/buddy/artifacts',
     })
+    vi.mocked(host.getState).mockReturnValue({ ...state, conversationId: null })
+    await expect(invoke(DESKTOP_IPC_CHANNELS.browserOpenArtifact, trustedEvent, {
+      artifactId: 'artifact-1',
+      sessionId,
+    })).rejects.toThrow('require a conversation browser session')
   })
 })
 

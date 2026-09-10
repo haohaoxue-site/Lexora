@@ -17,6 +17,7 @@ import DesktopChangeList from './DesktopChangeList.vue'
 import DesktopChangeToolbar from './DesktopChangeToolbar.vue'
 import DesktopContextFileTree from './DesktopContextFileTree.vue'
 import DesktopContextSplit from './DesktopContextSplit.vue'
+import DesktopFileSpacePicker from './DesktopFileSpacePicker.vue'
 import DesktopFileToolbar from './DesktopFileToolbar.vue'
 import DesktopMonacoFile from './DesktopMonacoFile.vue'
 import DesktopTaskContextPanel from './DesktopTaskContextPanel.vue'
@@ -30,14 +31,13 @@ const props = defineProps<{
   context: TaskChatWorkspace['context']
   branchId: string | null
   changeRevision: string
-  canOpenFiles: boolean
   language: BuddyLocale
 }>()
 const { t } = useBuddyI18n(() => props.language)
 const message = useMessage()
+const fileSpacePickerOpen = shallowRef(false)
 const { browser, browserGuests } = useTaskContext()
 const activeTab = computed(() => props.panel.activeTab.value)
-const canAddChanges = computed(() => !props.panel.tabs.value.some(tab => tab.kind === 'changes'))
 const fileTab = computed(() => activeTab.value?.kind === 'files' ? activeTab.value : null)
 const changeTab = computed(() => activeTab.value?.kind === 'changes' ? activeTab.value : null)
 const browserTab = computed(() => activeTab.value?.kind === 'browser' ? activeTab.value : null)
@@ -59,7 +59,7 @@ const changeList = useTemplateRef<InstanceType<typeof DesktopChangeList>>('chang
 const surfaceElement = useTemplateRef<HTMLElement>('surfaceElement')
 const browserView = useBrowserContextSurface({
   api: browser,
-  conversationId: computed(() => browserTab.value?.conversationId ?? ''),
+  conversationId: computed(() => browserTab.value?.conversationId ?? null),
   tabId: computed(() => browserTab.value?.browserKey),
   enabled: computed(() => Boolean(browserTab.value)),
   state: toRef(() => props.panel.activeBrowserState.value),
@@ -95,7 +95,7 @@ const tabs = computed<ContextPanelTab[]>(() => props.panel.tabs.value.map((tab) 
 }))
 function add(kind: 'changes' | 'files' | 'browser') {
   if (kind === 'files')
-    props.panel.openFiles()
+    fileSpacePickerOpen.value = true
   else if (kind === 'changes')
     props.panel.openChanges()
   else props.panel.addBrowser()
@@ -132,7 +132,8 @@ function browserMenu(action: BrowserToolbarMenuActionKey) {
 </script>
 
 <template>
-  <DesktopTaskContextPanel :active-tab-id="activeTab?.id ?? null" :tabs="tabs" :language="language" :can-add-changes="canAddChanges" :can-open-files="canOpenFiles" @add="add" @close-tab="panel.closeTab" @select-tab="panel.selectTab" @collapse="panel.toggle">
+  <DesktopFileSpacePicker v-model:show="fileSpacePickerOpen" :spaces="panel.fileSpaces.value" :language="language" @select="panel.openFiles" />
+  <DesktopTaskContextPanel :active-tab-id="activeTab?.id ?? null" :tabs="tabs" :language="language" :can-add-changes="panel.canAddChanges.value" @add="add" @close-tab="panel.closeTab" @select-tab="panel.selectTab" @collapse="panel.toggle">
     <template v-if="activeTab" #toolbar>
       <DesktopFileToolbar v-if="fileTab && fileView" :path="fileTab.target.path" :root-name="fileTab.rootName" :language="language" :wrap="fileView.wrap" :tree-visible="fileView.treeVisible" @reveal="revealFile" @toggle-wrap="fileView.wrap = !fileView.wrap" @toggle-tree="fileView.treeVisible = !fileView.treeVisible" />
       <DesktopChangeToolbar v-else-if="changeTab && changeView" v-model:range="changeView.range" :language="language" :added="changes.counts.value.added" :deleted="changes.counts.value.deleted" :can-show-turn="Boolean(changeTab.changeSet)" :all-collapsed="allCollapsed" :wrap="changeView.wrap" :side-by-side="changeView.sideBySide" :tree-visible="changeView.treeVisible" @toggle-all="changes.toggleAll" @toggle-wrap="changeView.wrap = !changeView.wrap" @toggle-layout="changeView.sideBySide = !changeView.sideBySide" @toggle-tree="changeView.treeVisible = !changeView.treeVisible" />

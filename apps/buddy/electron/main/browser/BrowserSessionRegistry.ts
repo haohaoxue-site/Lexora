@@ -4,7 +4,7 @@ export type BrowserSessionProtection = 'runtime' | 'surface' | 'tab'
 export type BrowserSessionTeardownReason = 'closed' | 'disposed' | 'evicted'
 
 export interface BrowserSessionFactoryContext {
-  conversationId: string
+  conversationId: string | null
   sessionId: string
 }
 
@@ -51,13 +51,15 @@ export class BrowserSessionRegistry<Session> {
   }
 
   ensure(
-    conversationId: string,
+    conversationId: string | null,
     createSession: (
       context: BrowserSessionFactoryContext,
     ) => BrowserSessionFactoryResult<Session>,
     tabId = 'default',
   ): Session {
     this.#assertActive()
+    if (conversationId === null && (!tabId || tabId === 'default'))
+      throw new Error('Standalone browser sessions require a tab identity')
     const key = JSON.stringify([conversationId, tabId])
     const existing = this.#byTab.get(key)
     if (existing) {

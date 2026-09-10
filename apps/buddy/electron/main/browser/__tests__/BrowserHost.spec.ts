@@ -5,6 +5,27 @@ import { BrowserHostError } from '../BrowserHost'
 import { configureSemanticObservation, createFixture, createLocalSite } from './browserHostFixture'
 
 describe('browserHost sessions and navigation', () => {
+  it('keeps standalone tabs independent through conversation and profile changes', async () => {
+    const fixture = createFixture()
+    const first = fixture.host.ensureSession(null, 'manual-1')
+    const second = fixture.host.ensureSession(null, 'manual-2')
+    const agent = fixture.host.ensureSession('conversation')
+    expect(new Set([first.sessionId, second.sessionId, agent.sessionId]).size).toBe(3)
+    expect(first.conversationId).toBeNull()
+    expect(fixture.host.ensureSession(null, 'manual-1').sessionId).toBe(first.sessionId)
+    expect(fixture.host.getStateForConversation('conversation').sessionId).toBe(agent.sessionId)
+    expect(() => fixture.host.acquireControl({ sessionId: first.sessionId, pageId: first.pageId }))
+      .toThrowError(expect.objectContaining({ code: 'BROWSER_CONTROL_REQUIRED' }))
+
+    const incognito = await fixture.host.setProfileMode(first.sessionId, 'incognito')
+    expect(incognito).toMatchObject({ conversationId: null, profileMode: 'incognito', controller: 'human' })
+    expect(incognito.sessionId).not.toBe(first.sessionId)
+    expect(fixture.host.ensureSession(null, 'manual-1').sessionId).toBe(incognito.sessionId)
+    fixture.host.close(incognito.sessionId)
+    expect(fixture.host.getState(second.sessionId).sessionId).toBe(second.sessionId)
+    expect(fixture.host.getStateForConversation('conversation').sessionId).toBe(agent.sessionId)
+  })
+
   it('describes one isolated renderer-owned guest per conversation', () => {
     const fixture = createFixture()
 

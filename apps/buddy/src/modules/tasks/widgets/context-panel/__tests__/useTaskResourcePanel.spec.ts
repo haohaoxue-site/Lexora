@@ -25,12 +25,53 @@ function fixture() {
     sourceToolCallId: 'tool',
     artifacts: [{ artifactId: 'html', conversationId: 'conversation', createdAt: '2026-09-08T00:00:00.000Z', kind: 'file', mimeType: 'text/html', name: 'page.html', path: '/workspace/page.html', previewUrl: null, runId: 'run', sizeBytes: 10, sourceArtifactId: null, sourceToolCallId: 'tool', updatedAt: '2026-09-08T00:00:00.000Z' }],
   }])
-  const panel = scope.run(() => useTaskResourcePanel({ activeConversationId, activeRunId: shallowRef(null), browser, changeSets: shallowRef([]), runSignalEvents: shallowRef([]), runOutputs }))!
+  const panel = scope.run(() => useTaskResourcePanel({ spaces: shallowRef([]), activeConversationId, activeRunId: shallowRef(null), browser, changeSets: shallowRef([]), runSignalEvents: shallowRef([]), runOutputs }))!
   const release = () => gate.resolve({ sessionId: 'session' } as DesktopBrowserState)
   return { activeConversationId, browser, panel, release, scope, sessionOpen: () => sessionOpen }
 }
 
 describe('resource panel operations', () => {
+  it('retains late manual sessions across task changes without updating another tab', async () => {
+    const f = fixture()
+    f.activeConversationId.value = null
+    f.panel.addBrowser()
+    const first = f.panel.activeTab.value!
+    f.panel.addBrowser()
+    const second = f.panel.activeTab.value!
+    if (first.kind !== 'browser' || second.kind !== 'browser')
+      throw new Error('Expected browser tabs')
+    const firstState = { conversationId: null, sessionId: 'first-session', title: 'First' } as DesktopBrowserState
+    const secondState = { conversationId: null, sessionId: 'second-session', title: 'Second' } as DesktopBrowserState
+    f.activeConversationId.value = 'other'
+    f.panel.retainBrowserSession(firstState, first.browserKey)
+    f.panel.retainBrowserSession(secondState, second.browserKey)
+    f.panel.updateBrowserState({ ...firstState, title: 'Late first update' })
+    await nextTick()
+    expect(f.panel.activeBrowserState.value).toEqual(secondState)
+    f.panel.selectTab(first.id)
+    expect(f.panel.activeBrowserState.value).toEqual(firstState)
+    expect(f.sessionOpen()).toBe(true)
+  })
+
+  it('restores a failed manual close after changing tasks without taking focus', async () => {
+    const f = fixture()
+    const closing = deferred<void>()
+    f.browser.close = () => closing.promise
+    f.panel.addBrowser()
+    const tab = f.panel.activeTab.value!
+    if (tab.kind !== 'browser')
+      throw new Error('Expected a browser tab')
+    f.panel.retainBrowserSession({ conversationId: null, sessionId: 'manual-session' } as DesktopBrowserState, tab.browserKey)
+    const result = f.panel.closeTab(tab.id)
+    f.activeConversationId.value = 'other'
+    f.panel.addBrowser()
+    const selected = f.panel.activeTab.value
+    closing.reject(new Error('close failed'))
+    expect(await result).toBe(false)
+    expect(f.panel.activeTab.value).toEqual(selected)
+    expect(f.panel.tabs.value.map(tab => tab.id)).toContain(tab.id)
+  })
+
   it('closes an uninitialized manual tab and releases its late session without restoring the tab', async () => {
     const f = fixture()
     f.panel.addBrowser()
@@ -38,7 +79,7 @@ describe('resource panel operations', () => {
     expect(await f.panel.closeTab(tab.id)).toBe(true)
     if (tab.kind !== 'browser')
       throw new Error('Expected a browser tab')
-    f.panel.retainBrowserSession({ sessionId: 'session', conversationId: 'conversation' } as DesktopBrowserState, tab.browserKey)
+    f.panel.retainBrowserSession({ sessionId: 'session', conversationId: null } as DesktopBrowserState, tab.browserKey)
     await nextTick()
     expect(f.sessionOpen()).toBe(false)
     expect(f.panel.tabs.value).toEqual([])

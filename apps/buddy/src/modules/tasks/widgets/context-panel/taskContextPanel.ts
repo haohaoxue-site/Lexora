@@ -18,14 +18,13 @@ export interface TaskChangesContextTab {
 }
 
 export interface TaskBrowserContextTab {
-  conversationId: string
+  conversationId: string | null
   id: string
   kind: 'browser'
   browserKey?: string
 }
 
 export interface TaskFilesContextTab {
-  conversationId: string
   id: string
   kind: 'files'
   target: SpaceFileTarget
@@ -85,8 +84,9 @@ export function spaceTaskBrowserTab(
     : null
 }
 
-export function browserTabId(conversationId: string): string {
-  return `browser:${conversationId}`
+export function browserTabId(conversationId: string | null, browserKey?: string): string {
+  const prefix = conversationId === null ? 'browser:manual' : `browser:${conversationId}`
+  return browserKey ? `${prefix}:${browserKey}` : prefix
 }
 
 export function changeTabId(conversationId: string): string {

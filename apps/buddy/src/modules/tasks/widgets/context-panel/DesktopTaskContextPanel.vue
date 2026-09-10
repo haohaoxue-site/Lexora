@@ -11,7 +11,6 @@ import DesktopIcon from '@/shared/ui/icon/DesktopIcon.vue'
 const props = defineProps<{
   activeTabId: string | null
   canAddChanges: boolean
-  canOpenFiles: boolean
   language: BuddyLocale
   tabs: readonly ContextPanelTab[]
 }>()
@@ -27,7 +26,7 @@ const menuOpen = shallowRef(false)
 const tabsScrollRoot = useTemplateRef<HTMLElement>('tabsScrollRoot')
 const entries = computed(() => [
   ...(props.canAddChanges ? [{ kind: 'changes' as const, label: t('desktop.context.changes'), icon: Code16Regular }] : []),
-  ...(props.canOpenFiles ? [{ kind: 'files' as const, label: t('desktop.context.files'), icon: Folder20Regular }] : []),
+  { kind: 'files' as const, label: t('desktop.context.files'), icon: Folder20Regular },
   { kind: 'browser' as const, label: t('desktop.context.browser'), icon: Globe16Regular },
 ])
 function open(kind: 'changes' | 'files' | 'browser') {

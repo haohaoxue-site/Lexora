@@ -97,6 +97,8 @@ export function registerBrowserDesktopIpc(
   handle(DESKTOP_IPC_CHANNELS.browserOpenArtifact, async (host, input) => {
     const { artifactId, sessionId } = browserOpenArtifactInputSchema.parse(input)
     const conversationId = host.getState(sessionId).conversationId
+    if (!conversationId)
+      throw new Error('Artifact previews require a conversation browser session')
     const entry = await options.resolveArtifactEntry({ artifactId, conversationId })
     takeHumanControl(host, sessionId)
     return desktopBrowserStateSchema.parse(await host.openLocalFile(sessionId, entry))

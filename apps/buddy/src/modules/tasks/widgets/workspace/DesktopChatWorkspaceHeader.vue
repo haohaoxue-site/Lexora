@@ -19,7 +19,6 @@ const props = defineProps<{
   viewMode?: 'chat' | 'canvas'
   activeSearchIndex: number
   artifactCount: number
-  canOpenContext: boolean
   canSearchConversation: boolean
   conversationSearchLoading: boolean
   conversationSearchOpen: boolean
@@ -147,7 +146,6 @@ watch(
         data-testid="task-context-toggle"
         type="button"
         :aria-label="contextButtonLabel"
-        :disabled="!canOpenContext"
         @click="emit('toggleContext')"
       >
         <DesktopIcon :component="PanelRight20Regular" />

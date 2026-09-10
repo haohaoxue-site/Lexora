@@ -54,7 +54,7 @@ const browserOriginSchema = z.string().min(1).max(4_096).refine((value) => {
 })
 
 export const browserEnsureSessionInputSchema: z.ZodType<DesktopBrowserEnsureSessionInput>
-  = z.object({ conversationId: browserConversationIdSchema, tabId: z.string().min(1).max(128).optional() }).strict()
+  = z.object({ conversationId: browserConversationIdSchema.nullable(), tabId: z.string().trim().min(1).max(128).optional() }).strict().refine(input => input.conversationId !== null || Boolean(input.tabId && input.tabId !== 'default'))
 
 export const browserNavigateInputSchema: z.ZodType<DesktopBrowserNavigateInput> = z.object({
   sessionId: browserSessionIdSchema,
@@ -115,7 +115,7 @@ export const desktopBrowserStateSchema: z.ZodType<DesktopBrowserState> = z.objec
   canGoForward: z.boolean(),
   controller: z.enum(['agent', 'human']),
   controlEpoch: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
-  conversationId: browserConversationIdSchema,
+  conversationId: browserConversationIdSchema.nullable(),
   error: z.object({
     code: z.enum(DESKTOP_BROWSER_ERROR_CODES),
     message: z.string().max(1_024),

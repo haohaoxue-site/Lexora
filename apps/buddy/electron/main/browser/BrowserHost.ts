@@ -197,7 +197,7 @@ export class BrowserHost {
     return this.#disposed
   }
 
-  ensureSession(conversationId: string, tabId?: string): DesktopBrowserState {
+  ensureSession(conversationId: string | null, tabId?: string): DesktopBrowserState {
     return this.#ensureSession(conversationId, 'default', tabId)
   }
 
@@ -214,7 +214,7 @@ export class BrowserHost {
   }
 
   #ensureSession(
-    conversationId: string,
+    conversationId: string | null,
     profileMode: DesktopBrowserProfileMode,
     tabId?: string,
   ): DesktopBrowserState {
@@ -229,7 +229,7 @@ export class BrowserHost {
           teardown: reason => this.#teardownSession(session, reason),
         }
       }, tabId)
-      if (wasCreated && this.#evictedConversationIds.delete(conversationId)) {
+      if (wasCreated && conversationId && this.#evictedConversationIds.delete(conversationId)) {
         session.state.error = {
           code: 'BROWSER_SESSION_EVICTED',
           message: 'Inactive browser session was released',
@@ -294,6 +294,8 @@ export class BrowserHost {
 
   acquireControl(input: BrowserAcquireControlParams): BrowserControlLease {
     const session = this.#requireSession(input.sessionId)
+    if (!session.state.conversationId)
+      throw new BrowserHostError('BROWSER_CONTROL_REQUIRED', 'Standalone browser sessions remain under human control')
     this.#assertCurrentPage(session, input.pageId, 'before acquiring control')
     this.#advanceControlEpoch(session)
     session.state.controller = 'agent'
@@ -957,7 +959,7 @@ export class BrowserHost {
   }
 
   #createSession(
-    conversationId: string,
+    conversationId: string | null,
     sessionId: string,
     profileMode: DesktopBrowserProfileMode,
   ): BrowserSession {
@@ -1051,7 +1053,8 @@ export class BrowserHost {
     reason: BrowserSessionTeardownReason,
   ): void {
     if (reason === 'evicted') {
-      this.#evictedConversationIds.add(session.state.conversationId)
+      if (session.state.conversationId)
+        this.#evictedConversationIds.add(session.state.conversationId)
       session.state.error = {
         code: 'BROWSER_SESSION_EVICTED',
         message: 'Inactive browser session was released',
