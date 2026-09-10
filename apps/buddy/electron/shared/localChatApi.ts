@@ -3,6 +3,7 @@ import type { LocalAutomation, LocalAutomationCreateRequest, LocalAutomationList
 import type { ChangeOverviewRequest, LocalChangeOverview, LocalChangeSetDetail } from '../../shared/changes/changeApi'
 import type { LocalConnector, LocalConnectorConfig, LocalConnectorCredential, LocalConnectorCredentialMutation } from '../../shared/connectors/connectorApi'
 import type { LocalChatCommandRequest, LocalStartTurnRequest, LocalTurnStart } from '../../shared/conversation/chatApi'
+import type { LocalChatQueueItem, LocalChatQueueReceipt, LocalChatQueueScope, LocalChatQueueTarget } from '../../shared/conversation/chatQueueApi'
 import type { LocalComposerDraft, LocalComposerDraftOpen, LocalComposerDraftSave } from '../../shared/conversation/composerApi'
 import type {
   BuddyComposerResource,
@@ -79,6 +80,10 @@ export const LOCAL_CHAT_IPC_CHANNELS = {
   composerDraftsGet: 'lexora:buddy:composer-drafts:get',
   composerDraftsOpen: 'lexora:buddy:composer-drafts:open',
   composerDraftsSave: 'lexora:buddy:composer-drafts:save',
+  chatQueueEnqueue: 'lexora:buddy:chat:queue-enqueue',
+  chatQueueList: 'lexora:buddy:chat:queue-list',
+  chatQueueCancel: 'lexora:buddy:chat:queue-cancel',
+  chatQueueSteer: 'lexora:buddy:chat:queue-steer',
   chatCancel: 'lexora:buddy:chat:cancel',
   chatEditUserMessage: 'lexora:buddy:chat:edit-user-message',
   chatExecuteCommand: 'lexora:buddy:chat:execute-command',
@@ -356,6 +361,10 @@ export interface LocalChatApi {
     getSnapshot: () => Promise<LocalUsageSnapshot>
   }
   chat: {
+    enqueue: (input: LocalStartTurnRequest) => Promise<LocalChatQueueReceipt>
+    listQueue: (input: LocalChatQueueScope) => Promise<readonly LocalChatQueueItem[]>
+    cancelQueued: (input: LocalChatQueueTarget) => Promise<boolean>
+    steerQueued: (input: LocalChatQueueTarget) => Promise<boolean>
     editUserMessage: (input: {
       conversationId: string
       draftId: string

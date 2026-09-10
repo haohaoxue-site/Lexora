@@ -16,6 +16,7 @@ export interface OpenBuddyDatabaseOptions {
 }
 
 const BUDDY_CURRENT_SCHEMA_COLUMNS = {
+  chat_queue: ['id', 'conversation_id', 'branch_id', 'prepared_json', 'state'],
   command_requests: ['draft_id', 'draft_revision', 'committed_draft_revision'],
   composer_drafts: [
     'id',

@@ -9,7 +9,6 @@ import type { BuddyLocale } from '@/i18n/buddyI18n'
 import { computed, onScopeDispose, shallowRef, watch } from 'vue'
 import { resolveLocalChatErrorMessage } from '@/shared/lib/localChatError'
 import { mergeChatRunEventBuckets, replaceChatRunEventBuckets } from '../../model/runs/chatRunEventBuckets'
-import { shouldShowAgentTurn } from '../../model/transcript/chatPersistedTranscriptRows'
 import { createChatRunTranscriptProjector } from '../../model/transcript/chatRunTranscriptProjector'
 import { createChatTranscriptProjector } from '../../model/transcript/chatTranscriptProjection'
 
@@ -44,18 +43,14 @@ export function useConversationNodeDetail(options: {
       return []
     const projections = runProjector.project(buckets.value, runs.value)
     const content = transcriptProjector.project({
+      includeUnanchoredTurns: true,
       changeSets: [...data.value.changeSets, ...options.changeSets.value.filter(item => item.runId === liveRun.value?.id)],
       outputs: [...data.value.outputs, ...options.runOutputs.value.filter(item => item.runId === liveRun.value?.id)],
       runProjections: projections,
       runs: runs.value,
       timelineItems: data.value.items,
     })
-    return [
-      ...projections.filter(item => shouldShowAgentTurn(item.turn)).map(item => ({ key: `agent-turn:${item.turn.runId}`, kind: 'agent-turn' as const, turn: item.turn })),
-      ...projections.flatMap(item => item.recoveryNotices.map(notice => ({ key: `recovery:${notice.runId}:${notice.sequence}`, kind: 'recovery-notice' as const, notice }))),
-      ...content.rows,
-      ...projections.filter(item => item.turn.status === 'running' || item.turn.status === 'queued').map(item => ({ key: `activity:${item.turn.runId}`, kind: 'activity' as const, turn: item.turn })),
-    ]
+    return content.rows
   })
 
   async function refresh() {

@@ -8,6 +8,7 @@ const TIMELINE_PAGE_SIZE = 100
 const SNAPSHOT_RECONCILIATION_EVENT_TYPES = new Set([
   'approval.requested',
   'approval.resolved',
+  'message.completed',
   'output.produced',
   'run.cancelled',
   'run.completed',

@@ -43,6 +43,7 @@ defineSlots<{
 }>()
 
 const { t } = useBuddyI18n(() => props.language)
+const queuesSubmission = computed(() => props.isRunning || props.hasQueuedMessages)
 const resourceStrip = useTemplateRef('resourceStrip')
 const {
   activeSuggestionIndex,
@@ -230,6 +231,25 @@ async function selectConversationFile(option: ChatPromptContextOption) {
         />
       </div>
 
+      <NTooltip v-if="queuesSubmission">
+        <template #trigger>
+          <span class="desktop-chat-composer__send-trigger">
+            <NButton
+              class="buddy-icon-button desktop-chat-composer__queue-action"
+              quaternary
+              :aria-label="t('desktop.chat.queueAdd')"
+              :disabled="!canSubmit"
+              :loading="isSending"
+              @click="submit"
+            >
+              <template #icon>
+                <DesktopIcon name="messageQueue" />
+              </template>
+            </NButton>
+          </span>
+        </template>
+        {{ modelInputIssueMessage || t('desktop.chat.queueAdd') }}
+      </NTooltip>
       <NButton
         v-if="isRunning"
         class="buddy-icon-button desktop-chat-composer__send-action"
@@ -242,7 +262,7 @@ async function selectConversationFile(option: ChatPromptContextOption) {
           <DesktopIcon :component="Stop20Filled" />
         </template>
       </NButton>
-      <NTooltip v-else :disabled="modelInputIssue === null">
+      <NTooltip v-if="!queuesSubmission">
         <template #trigger>
           <span class="desktop-chat-composer__send-trigger">
             <NButton
@@ -259,7 +279,7 @@ async function selectConversationFile(option: ChatPromptContextOption) {
             </NButton>
           </span>
         </template>
-        {{ modelInputIssueMessage }}
+        {{ modelInputIssueMessage || t('desktop.chat.send') }}
       </NTooltip>
     </template>
 
@@ -282,7 +302,8 @@ async function selectConversationFile(option: ChatPromptContextOption) {
   display: inline-flex;
 }
 
-.desktop-chat-composer__send-action {
+.desktop-chat-composer__send-action,
+.desktop-chat-composer__queue-action {
   --n-height: var(--buddy-composer-control-height);
 
   width: var(--buddy-composer-control-height);

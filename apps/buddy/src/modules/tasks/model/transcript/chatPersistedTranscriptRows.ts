@@ -12,12 +12,14 @@ import type {
 } from './chatTranscriptTypes'
 import { projectConversationCompactionState } from './chatConversationTimeline'
 import { isVisibleChatMessage } from './chatMessageContent'
+import { interleaveChatTranscriptSegments } from './chatTranscriptSegments'
 
 export function projectPersistedChatTranscriptRows(
   items: ReadonlyArray<LocalConversationTimelineItem>,
   turns: ReadonlyArray<ChatAgentTurn>,
   outputs: ReadonlyArray<LocalRunOutput> = [],
   changeSets: ReadonlyArray<LocalChangeSetSummary> = [],
+  includeUnanchoredTurns = false,
 ): Array<
   ChatTranscriptAgentTurnRow
   | ChatTranscriptCompactionRow
@@ -30,9 +32,6 @@ export function projectPersistedChatTranscriptRows(
   > = []
   const turnsByTrigger = new Map<string, ChatAgentTurn[]>()
   const turnsByRunId = new Map(turns.map(turn => [turn.runId, turn]))
-  const visibleTurnsByRunId = new Map(
-    turns.filter(shouldShowAgentTurn).map(turn => [turn.runId, turn]),
-  )
   const outputsByRunId = projectTurnOutputs(outputs)
   const changesByRunId = new Map(changeSets
     .filter(changeSet => changeSet.fileCount > 0)
@@ -53,9 +52,19 @@ export function projectPersistedChatTranscriptRows(
     return [item.runId]
   }))
   const processMessageIds = new Set(turns.flatMap(turn => turn.processMessageIds))
+  const timelineMessageIds = new Set(items.filter(item => item.kind === 'message').map(item => item.id))
   for (const turn of turns) {
     if (!shouldShowAgentTurn(turn))
       continue
+    if (includeUnanchoredTurns && !timelineMessageIds.has(turn.triggeringMessageId)) {
+      rows.push({
+        key: `agent-turn:${turn.runId}`,
+        kind: 'agent-turn',
+        turn,
+        ...((turn.status === 'failed' || turn.status === 'cancelled') && !renderedResultRunIds.has(turn.runId) ? { ownsResultActions: true as const } : {}),
+      })
+      continue
+    }
     const candidates = turnsByTrigger.get(turn.triggeringMessageId) ?? []
     candidates.push(turn)
     turnsByTrigger.set(turn.triggeringMessageId, candidates)
@@ -74,27 +83,28 @@ export function projectPersistedChatTranscriptRows(
     }
     if (processMessageIds.has(item.id))
       continue
-    const isAgentTurnResult = isFinalTurnMessage(item, visibleTurnsByRunId)
-    const turnOutputs = isFinalTurnMessage(item, turnsByRunId) && item.runId
+    const ownsResult = isFinalTurnMessage(item, turnsByRunId) && item.runId
+      && !['queued', 'running'].includes(turnsByRunId.get(item.runId)!.status)
+    const turnOutputs = ownsResult && item.runId
       ? outputsByRunId.get(item.runId) ?? null
       : null
-    const turnChanges = isFinalTurnMessage(item, turnsByRunId) && item.runId
+    const turnChanges = ownsResult && item.runId
       ? changesByRunId.get(item.runId) ?? null
       : null
     if (!isVisibleChatMessage(item) && turnOutputs === null && turnChanges === null)
       continue
     const row: ChatTranscriptMessageRow = {
-      isAgentTurnResult,
+      ...(item.role === 'assistant' && item.runId && turnsByRunId.has(item.runId) && !ownsResult ? { isIntermediate: true as const } : {}),
       key: `message:${item.id}`,
       kind: 'message',
       message: item,
       turnOutputs,
     }
-    if (isFinalTurnMessage(item, turnsByRunId) && item.runId)
+    if (ownsResult && item.runId)
       row.resultRunId = item.runId
     if (turnChanges)
       row.turnChanges = turnChanges
-    const turnUsage = isFinalTurnMessage(item, turnsByRunId) && item.runId
+    const turnUsage = ownsResult && item.runId
       ? turnsByRunId.get(item.runId)?.usage
       : null
     if (turnUsage)
@@ -113,7 +123,7 @@ export function projectPersistedChatTranscriptRows(
       }
     }))
   }
-  return rows
+  return interleaveChatTranscriptSegments(rows, new Map(turns.flatMap(turn => Object.entries(turn.messageStartedAt ?? {}))))
 }
 
 function isFinalTurnMessage(

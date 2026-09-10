@@ -68,6 +68,10 @@ function createOwner(name: string) {
       updateComposerContent: (text: string) => { draft.value = text },
     },
     execution: {
+      queuedMessages: shallowRef([]),
+      pendingQueueActions: shallowRef(new Set<string>()),
+      cancelQueuedMessage: async () => {},
+      steerQueuedMessage: async () => {},
       beginFollowup: async () => false,
       cancelFollowup: () => {},
       activeRun: shallowRef(null),

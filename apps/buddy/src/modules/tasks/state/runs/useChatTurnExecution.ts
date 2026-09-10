@@ -3,9 +3,9 @@ import type { ParsedBuddyChatCommand } from '@buddy-shared/conversation/buddyCha
 import type { BuddyUserContentV1 } from '@buddy-shared/conversation/buddyUserContent'
 import type { LocalPromptContextItem } from '@buddy-shared/conversation/chatApi'
 import type { BuddyApprovalPolicy } from '@buddy-shared/permissions/approvalPolicy'
-
 import type { BuddyExecutionProfile } from '@buddy-shared/permissions/executionProfile'
 import type { LocalRun } from '@buddy-shared/runs/runApi'
+
 import type { ComposerTarget } from '../composer/useComposerTarget'
 import type { ChatRunSync } from './typing'
 import type { BuddyLocale } from '@/i18n/buddyI18n'
@@ -17,9 +17,11 @@ import type { RuntimeSupervisorStore } from '@/platform/runtime/useRuntimeSuperv
 import { parseBuddyChatCommand } from '@buddy-shared/conversation/buddyChatCommands'
 import { getBuddyUserContentResourceIds } from '@buddy-shared/conversation/buddyUserContent'
 import { computed, onScopeDispose, readonly, shallowRef, watch } from 'vue'
+import { translateBuddy } from '@/i18n/buddyI18n'
 import { createRequestIdRegistry } from '@/modules/tasks/model/requests/chatRequestIdentity'
 import { resolveLocalChatErrorMessage } from '@/shared/lib/localChatError'
 import { parseDraftScopeKey } from '../../model/drafts/draftScope'
+import { useChatQueue } from './useChatQueue'
 
 interface ValueRef<T> {
   readonly value: T
@@ -28,7 +30,7 @@ interface ValueRef<T> {
 export interface UseChatTurnExecutionOptions {
   activeRun: ValueRef<LocalRun | null>
   approvalPolicy: ValueRef<BuddyApprovalPolicy>
-  api: { chat: Pick<LocalChatApi['chat'], 'cancel' | 'executeCommand' | 'startTurn'> }
+  api: { chat: Pick<LocalChatApi['chat'], 'cancel' | 'executeCommand' | 'startTurn' | 'enqueue' | 'listQueue' | 'cancelQueued' | 'steerQueued'> }
   canSendDraft: ValueRef<boolean>
   taskIndexData: Pick<TaskIndexData, 'refreshIndex'>
   session: Pick<ChatSession, | 'acceptTurn'
@@ -54,13 +56,14 @@ export interface UseChatTurnExecutionOptions {
   modelSelection: Pick<TaskModelSelection, 'selectedModel'>
   onActionCommandRunStarted: (runId: string) => void
   persistWorkspaceState: () => Promise<boolean>
-  runSync: Pick<ChatRunSync, 'applyRunStart' | 'upsertRuns'>
+  runSync: Pick<ChatRunSync, 'applyRunStart' | 'upsertRuns' | 'refreshActiveConversation'>
   runtimeSupervisor: Pick<RuntimeSupervisorStore, 'runtimeState'>
   setErrorMessage: (message: string | null) => void
   unavailableCommandMessage: () => string
 }
 
 export function useChatTurnExecution(options: UseChatTurnExecutionOptions) {
+  const queue = useChatQueue({ api: options.api.chat, session: options.session, runtime: options.runtimeSupervisor, refreshConversation: options.runSync.refreshActiveConversation, onError: error => options.setErrorMessage(resolveLocalChatErrorMessage(error, options.language.value)), onUnavailable: () => options.setErrorMessage(translateBuddy(options.language.value, 'desktop.chat.queueActionFailed')) })
   const isSending = shallowRef(false)
   const requestIds = createRequestIdRegistry()
   const pendingCancellationWatches = new Set<() => void>()
@@ -75,7 +78,7 @@ export function useChatTurnExecution(options: UseChatTurnExecutionOptions) {
     options.runtimeSupervisor.runtimeState.value.status === 'ready'
     && options.canSendDraft.value
     && options.modelSelection.selectedModel.value !== null
-    && !options.activeRun.value
+    && (!options.activeRun.value || options.composerTarget.current.value.kind === 'conversation_branch')
     && !isSending.value
     && !options.isUpdatingPermissionSettings.value,
   )
@@ -99,6 +102,8 @@ export function useChatTurnExecution(options: UseChatTurnExecutionOptions) {
       options.setErrorMessage(options.unavailableCommandMessage())
       return false
     }
+    if (command?.kind === 'action' && options.activeRun.value)
+      return false
     if (command?.kind === 'action') {
       options.drafts.setUserContent(createActionCommandContent(command))
       return executeActionCommand(command, contextItems)
@@ -122,6 +127,13 @@ export function useChatTurnExecution(options: UseChatTurnExecutionOptions) {
       const expectedRevision = confirmedDraft.revision!
       const operationKey = `turn:${confirmedDraft.draftId}:${expectedRevision}`
       const requestId = requestIds.resolve(operationKey)
+      if (options.activeRun.value || queue.queuedMessages.value.length) {
+        const result = await options.api.chat.enqueue({ draftId: confirmedDraft.draftId, expectedRevision, requestId })
+        requestIds.release(operationKey)
+        options.composerTarget.complete(result.draftReceipt, sourceScopeKey, sourceScopeKey)
+        await queue.refreshQueue()
+        return true
+      }
       const result = await options.api.chat.startTurn({
         draftId: confirmedDraft.draftId,
         expectedRevision,
@@ -284,6 +296,7 @@ export function useChatTurnExecution(options: UseChatTurnExecutionOptions) {
   }
 
   return {
+    ...queue,
     canSend: readonly(canSend),
     cancelActiveRun,
     isSending: readonly(isSending),

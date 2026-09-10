@@ -192,7 +192,8 @@ onBeforeUnmount(clearOutlineHighlight)
           class="buddy-chat-transcript-row" :class="[
             { 'is-outline-highlighted': item.message.id === highlightedOutlineMessageId },
           ]"
-          :is-agent-turn-result="item.isAgentTurnResult"
+          :is-intermediate="item.isIntermediate"
+          :show-identity="item.showIdentity"
           :result-run-id="item.resultRunId"
           :editing="item.message.id === editingMessageId"
           :language="language"
@@ -211,12 +212,14 @@ onBeforeUnmount(clearOutlineHighlight)
 
         <BuddyChatAgentTurn
           v-else-if="item.kind === 'agent-turn'"
-          :ref="view => activityNavigation.register(item.turn.runId, view)"
+          :ref="view => activityNavigation.register(item.key, view, item.turn.nodes.map(node => node.id))"
           :actions-disabled="actionsDisabled ?? false"
           :branch-navigator="branchNavigators.get(item.turn.runId) ?? null"
           class="buddy-chat-transcript-row"
           :language="language"
           :owns-result-actions="item.ownsResultActions === true"
+          :show-identity="item.showIdentity"
+          :show-outcome="item.showOutcome"
           :turn="item.turn"
           @activate-branch="emit('activateBranch', $event)"
           @regenerate="emit('regenerateAssistant', item.turn.runId)"

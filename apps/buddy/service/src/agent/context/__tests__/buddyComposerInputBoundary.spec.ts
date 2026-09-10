@@ -153,7 +153,7 @@ describe('composer input at the Buddy session boundary', () => {
     await expectSafePersistence(fixture)
   })
 
-  it('releases a cancelled run and prepares the next run normally', async () => {
+  it('releases a cancelled run without leaking unconsumed steering into the next run', async () => {
     const started = Promise.withResolvers<void>()
     let calls = 0
     const fixture = await createFixture({
@@ -171,12 +171,15 @@ describe('composer input at the Buddy session boundary', () => {
     })
     const sending = fixture.send(plan())
     await started.promise
-    await fixture.session.abort()
+    expect(fixture.reusable.steer?.(() => toBuddyInputReference({ ...plan('pending-steer'), text: 'UNCONSUMED_STEERING', images: [] }))).toBe(true)
+    await fixture.reusable.abort()
     await sending
     expect(fixture.runContext.current).toBeNull()
     expect(fixture.session.messages.at(-1)).toMatchObject({ stopReason: 'aborted' })
 
     await fixture.send({ ...plan('after-cancel'), text: '取消后继续', images: [] })
+    expect(fixture.contexts).toHaveLength(2)
+    expect(JSON.stringify(fixture.contexts[1]?.messages)).not.toContain('UNCONSUMED_STEERING')
     expect(fixture.contexts[1]?.systemPrompt).toContain(OUTPUT_GUIDELINE)
     expect(fixture.contexts[1]?.systemPrompt).toContain('Current offline run: run-after-cancel')
     await expectSafePersistence(fixture)
@@ -514,7 +517,7 @@ async function createFixture(options: {
     }
   }
 
-  return { ...created, contexts, images, lifecycle, nativeToolImage, root, runContext, send }
+  return { ...created, contexts, images, lifecycle, nativeToolImage, reusable, root, runContext, send }
 }
 
 function referenceImages(input: InputPlan): ImageContent[] {

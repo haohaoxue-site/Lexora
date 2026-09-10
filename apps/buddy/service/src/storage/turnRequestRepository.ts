@@ -7,6 +7,7 @@ import { createComposerDraftCommitter } from './commitComposerDraft'
 import { withTransaction } from './database'
 
 export interface PrepareTurnRequestInput {
+  queuedMessageId?: string
   followup?: { parentBranchId: string, sourceMessageId: string, sourceRunId: string }
   approvalPolicy: BuddyApprovalPolicy
   attachmentBindings: readonly TurnAttachmentBinding[]
@@ -38,6 +39,7 @@ export interface PrepareTurnRequestInput {
 }
 
 export interface TurnAttachmentBinding {
+  mimeType?: string
   createdAt: string
   id: string
   messageId: string
@@ -414,6 +416,13 @@ export function createTurnRequestRepository(database: DatabaseSync): TurnRequest
             throw new TurnRequestConflictError()
           return toRecord(existing, false)
         }
+        if (input.queuedMessageId) {
+          const queued = database.prepare('SELECT id FROM chat_queue WHERE id = ? AND state IN (\'waiting\', \'paused\') AND conversation_id = ? AND branch_id = ?').get(input.queuedMessageId, input.conversationId, input.branchId)
+          if (!queued)
+            throw new TurnRequestConflictError()
+        }
+        if (!input.queuedMessageId && !input.followup && database.prepare('SELECT id FROM chat_queue WHERE conversation_id = ? AND branch_id = ? AND state IN (\'waiting\', \'paused\') LIMIT 1').get(input.conversationId, input.branchId))
+          throw new TurnRequestConflictError()
         const conversation = findConversation.get(input.conversationId) as ConversationBindingRow | undefined
         if (conversation) {
           if (
@@ -506,18 +515,26 @@ export function createTurnRequestRepository(database: DatabaseSync): TurnRequest
           input.draft.expectedRevision,
           committedDraftRevision,
         )
-        const draftReceipt = commitDraft({
-          approvalPolicy: input.approvalPolicy,
-          branchId: input.branchId,
-          conversationId: input.conversationId,
-          draftId: input.draft.draftId,
-          executionProfile: input.executionProfile,
-          expectedRevision: input.draft.expectedRevision,
-          expectedBranchId: input.followup?.parentBranchId,
-          expectedSourceMessageId: input.followup?.sourceMessageId,
-          spaceId: input.spaceId,
-          updatedAt: input.createdAt,
-        })
+        const draftReceipt = input.queuedMessageId
+          ? {
+              draftId: input.draft.draftId,
+              sourceRevision: input.draft.expectedRevision,
+              committedRevision: input.draft.expectedRevision + 1,
+            }
+          : commitDraft({
+              approvalPolicy: input.approvalPolicy,
+              branchId: input.branchId,
+              conversationId: input.conversationId,
+              draftId: input.draft.draftId,
+              executionProfile: input.executionProfile,
+              expectedRevision: input.draft.expectedRevision,
+              expectedBranchId: input.followup?.parentBranchId,
+              expectedSourceMessageId: input.followup?.sourceMessageId,
+              spaceId: input.spaceId,
+              updatedAt: input.createdAt,
+            })
+        if (input.queuedMessageId)
+          database.prepare('UPDATE chat_queue SET state = \'sent\', run_id = ? WHERE id = ?').run(input.runId, input.queuedMessageId)
         return {
           branchId: input.branchId,
           conversationId: input.conversationId,
@@ -712,15 +729,7 @@ function bindAttachments(
   bindDraftAttachment: ReturnType<DatabaseSync['prepare']>,
   cloneMessageAttachment: ReturnType<DatabaseSync['prepare']>,
 ): void {
-  if (
-    input.attachmentBindings.length !== input.runInput.attachmentIds.length
-    || input.attachmentBindings.some((binding, index) => (
-      binding.id !== input.runInput.attachmentIds[index]
-      || binding.messageId !== input.userMessageId
-    ))
-  ) {
-    throw new TurnRequestAttachmentError()
-  }
+  assertTurnAttachmentBindings(input)
   for (const binding of input.attachmentBindings) {
     const changes = binding.sourceDraftId !== null
       ? binding.id === binding.sourceAttachmentId
@@ -741,5 +750,17 @@ function bindAttachments(
         ).changes)
     if (changes !== 1)
       throw new TurnRequestAttachmentError()
+  }
+}
+
+export function assertTurnAttachmentBindings(input: Omit<PrepareTurnRequestInput, 'draft'>): void {
+  if (
+    input.attachmentBindings.length !== input.runInput.attachmentIds.length
+    || input.attachmentBindings.some((binding, index) => (
+      binding.id !== input.runInput.attachmentIds[index]
+      || binding.messageId !== input.userMessageId
+    ))
+  ) {
+    throw new TurnRequestAttachmentError()
   }
 }

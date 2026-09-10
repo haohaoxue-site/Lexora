@@ -59,7 +59,7 @@ const activityNavigation = useChatActivityNavigation()
           <BuddyChatTokenUsage v-if="row.turnUsage && !row.streaming" :usage="row.turnUsage" :language="language" />
         </div>
         <template v-else-if="row.kind === 'agent-turn'">
-          <BuddyChatAgentTurn :ref="view => activityNavigation.register(row.turn.runId, view)" :turn="row.turn" :language="language" />
+          <BuddyChatAgentTurn :ref="view => activityNavigation.register(row.key, view, row.turn.nodes.map(node => node.id))" :turn="row.turn" :show-identity="row.showIdentity" :show-outcome="row.showOutcome" :language="language" />
           <BuddyChatTokenUsage v-if="row.ownsResultActions && row.turn.usage" :usage="row.turn.usage" :language="language" />
         </template>
         <BuddyChatRunActivity v-else-if="row.kind === 'activity'" :turn="row.turn" :language="language" @reveal-activity="activityNavigation.reveal(row.turn.runId, $event)" />

@@ -9,8 +9,9 @@ import type { ChatRecoveryNotice } from './chatRunRecovery'
 import type { ChatRunTranscriptProjection } from './chatRunTranscriptProjector'
 
 export interface ChatTranscriptMessageRow {
+  isIntermediate?: true
+  showIdentity?: false
   resultRunId?: string
-  isAgentTurnResult: boolean
   key: string
   kind: 'message'
   message: LocalMessage
@@ -32,6 +33,8 @@ export interface ChatTranscriptCompactionRow {
 }
 
 export interface ChatTranscriptAgentTurnRow {
+  showIdentity?: false
+  showOutcome?: false
   key: string
   kind: 'agent-turn'
   ownsResultActions?: true
@@ -77,6 +80,7 @@ export type ChatTranscriptProjectionUpdate
     }
 
 export interface ChatTranscriptProjectionInput {
+  includeUnanchoredTurns?: boolean
   agentTurns?: ReadonlyArray<ChatAgentTurn>
   changeSets?: ReadonlyArray<LocalChangeSetSummary>
   outputs: ReadonlyArray<LocalRunOutput>

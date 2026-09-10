@@ -44,6 +44,10 @@ export function createConversationApi(): Pick<LocalChatApi, 'context' | 'workspa
         ipcRenderer.invoke(LOCAL_CHAT_IPC_CHANNELS.conversationsListTimeline, input),
     }),
     chat: Object.freeze({
+      enqueue: input => ipcRenderer.invoke(LOCAL_CHAT_IPC_CHANNELS.chatQueueEnqueue, input),
+      listQueue: input => ipcRenderer.invoke(LOCAL_CHAT_IPC_CHANNELS.chatQueueList, input),
+      cancelQueued: input => ipcRenderer.invoke(LOCAL_CHAT_IPC_CHANNELS.chatQueueCancel, input),
+      steerQueued: input => ipcRenderer.invoke(LOCAL_CHAT_IPC_CHANNELS.chatQueueSteer, input),
       editUserMessage: input =>
         ipcRenderer.invoke(LOCAL_CHAT_IPC_CHANNELS.chatEditUserMessage, input),
       executeCommand: request =>

@@ -11,13 +11,15 @@ import { BUDDY_V10_TREE_SCHEMA_SQL } from './migrations/v10Tree'
 import { BUDDY_V11_SPACE_APPEARANCE_SCHEMA_SQL } from './migrations/v11SpaceAppearance'
 import { BUDDY_V12_TASK_MARKS_SCHEMA_SQL } from './migrations/v12TaskMarks'
 
+import { BUDDY_V13_CHAT_QUEUE_SCHEMA_SQL } from './migrations/v13ChatQueue'
+
 export interface BuddySchemaMigration {
   foreignKeys?: 'off'
   sql: string
   version: number
 }
 
-export const BUDDY_SCHEMA_VERSION = 12 as const
+export const BUDDY_SCHEMA_VERSION = 13 as const
 
 export const BUDDY_SCHEMA_MIGRATIONS: readonly BuddySchemaMigration[] = [
   { sql: BUDDY_V1_INITIAL_SCHEMA_SQL, version: 1 },
@@ -32,4 +34,5 @@ export const BUDDY_SCHEMA_MIGRATIONS: readonly BuddySchemaMigration[] = [
   { foreignKeys: 'off', sql: BUDDY_V10_TREE_SCHEMA_SQL, version: 10 },
   { sql: BUDDY_V11_SPACE_APPEARANCE_SCHEMA_SQL, version: 11 },
   { sql: BUDDY_V12_TASK_MARKS_SCHEMA_SQL, version: 12 },
+  { sql: BUDDY_V13_CHAT_QUEUE_SCHEMA_SQL, version: 13 },
 ]

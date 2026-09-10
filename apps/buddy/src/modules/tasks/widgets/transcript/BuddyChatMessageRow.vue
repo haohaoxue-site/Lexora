@@ -23,7 +23,8 @@ const props = defineProps<{
   activeSearch: boolean
   branchNavigator: ChatMessageBranchNavigator | null
   editing: boolean
-  isAgentTurnResult: boolean
+  isIntermediate?: boolean
+  showIdentity?: boolean
   resultRunId?: string
   language: BuddyLocale
   message: LocalMessage
@@ -44,15 +45,13 @@ const emit = defineEmits<{
 
 const { t } = useBuddyI18n(() => props.language)
 const { clipboard } = useTaskContext()
-const actions = computed(() => projectChatMessageActions(
-  props.message,
-  props.actionsDisabled,
-))
+const actions = computed(() => projectChatMessageActions(props.message, props.actionsDisabled))
 const showAssistantIdentity = computed(() => (
-  props.message.role === 'assistant' && !props.isAgentTurnResult
+  props.message.role === 'assistant' && props.showIdentity !== false
 ))
 const showActions = computed(() => (
   !props.streaming
+  && !props.isIntermediate
   && (
     actions.value.showCopy
     || actions.value.showEdit
@@ -76,7 +75,8 @@ const messageText = computed(() => getChatMessageDisplayText(
       `is-${message.role}`,
       {
         'is-search-active': activeSearch,
-        'is-assistant-turn-result': isAgentTurnResult,
+        'is-assistant-continuation': message.role === 'assistant' && showIdentity === false,
+        'is-intermediate': isIntermediate,
         'is-editing': editing,
         'is-search-match': searchMatch,
         'is-streaming': streaming,
@@ -123,11 +123,12 @@ const messageText = computed(() => getChatMessageDisplayText(
 </template>
 
 <style scoped lang="scss">
-.buddy-chat-message.is-assistant-turn-result {
+.buddy-chat-message.is-assistant-continuation {
   row-gap: var(--buddy-chat-gap-tight);
 }
 
-.buddy-chat-message.is-streaming.is-assistant-turn-result {
+.buddy-chat-message.is-intermediate,
+.buddy-chat-message.is-streaming.is-assistant {
   padding-bottom: var(--buddy-chat-gap-block);
 }
 

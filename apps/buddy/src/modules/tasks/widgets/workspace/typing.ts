@@ -22,7 +22,7 @@ export interface ChatWorkspaceEmits {
 
 export interface TaskComposerHostProps {
   composer: TaskComposer
-  execution: Pick<TaskExecution, 'activeRun' | 'canSend' | 'editingMessageId' | 'isMutatingBranch' | 'isSending' | 'cancelActiveRun' | 'send' | 'submitEditedMessage'>
+  execution: Pick<TaskExecution, 'activeRun' | 'canSend' | 'editingMessageId' | 'isMutatingBranch' | 'isSending' | 'cancelActiveRun' | 'send' | 'submitEditedMessage' | 'queuedMessages' | 'pendingQueueActions' | 'cancelQueuedMessage' | 'steerQueuedMessage'>
   language: BuddyLocale
 }
 

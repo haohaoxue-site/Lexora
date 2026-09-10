@@ -118,7 +118,7 @@ function createFixture() {
     const execution = useChatTurnExecution({
       composerTarget,
       activeRun: computed(() => projectedRuns.value.find(item => item.status === 'running') ?? null),
-      api: { chat: { cancel: () => pending.promise, executeCommand: vi.fn(), startTurn: vi.fn() } },
+      api: { chat: { listQueue: async () => [], enqueue: vi.fn(), cancelQueued: vi.fn(), steerQueued: vi.fn(), cancel: () => pending.promise, executeCommand: vi.fn(), startTurn: vi.fn() } },
       approvalPolicy: drafts.approvalPolicy,
       canSendDraft: shallowRef(true),
       drafts,
@@ -132,6 +132,7 @@ function createFixture() {
       onActionCommandRunStarted: () => {},
       persistWorkspaceState: async () => true,
       runSync: {
+        refreshActiveConversation: async () => {},
         applyRunStart: () => {},
         upsertRuns: (runs) => {
           const byId = new Map(projectedRuns.value.map(item => [item.id, item]))
