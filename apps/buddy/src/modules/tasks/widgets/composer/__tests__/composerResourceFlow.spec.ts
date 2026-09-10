@@ -141,8 +141,8 @@ async function mountFlow() {
     root.remove()
   })
   const editor = composer.editor.value!
-  function pasteImages() {
-    const files = ['red.png', 'blue.png'].map((name) => {
+  function pasteImages(names = ['red.png', 'blue.png']) {
+    const files = names.map((name) => {
       const file = new File(['image-bytes'], name, { type: 'image/png' })
       Object.defineProperty(file, 'arrayBuffer', { value: async () => new ArrayBuffer(11) })
       return file
@@ -229,6 +229,38 @@ describe('composer resource flow', () => {
     flow.editor.commands.redo()
     expect(getChatComposerResourceIds(flow.editor.getJSON())).toEqual(ids)
     expect(flow.storedFiles.size).toBe(2)
+  })
+
+  it('numbers same-name images across pastes and keeps repeated references and restored drafts consistent', async () => {
+    const flow = await mountFlow()
+    const labels = () => [...flow.root.querySelectorAll('.chat-resource-reference__label')].map(node => node.textContent)
+    flow.pasteImages(['image.png', 'image.png'])
+    await nextTick()
+    expect(labels()).toEqual(['[Image #1]', '[Image #2]'])
+    flow.pasteImages(['image.png'])
+    await nextTick()
+    expect(labels()).toEqual(['[Image #1]', '[Image #2]', '[Image #3]'])
+    const [first, second] = getChatComposerResourceIds(flow.editor.getJSON())
+    flow.editor.commands.insertContent({ attrs: { resourceId: first }, type: 'chatResourceReference' })
+    await nextTick()
+    expect(labels()).toEqual(['[Image #1]', '[Image #2]', '[Image #3]', '[Image #1]'])
+    expect(flow.composer.resourceStripResources.value.map(card => card.imageLabel)).toEqual(['[Image #1]', '[Image #2]', '[Image #3]'])
+    flow.composer.removeResource(second!)
+    await nextTick()
+    expect(labels()).toEqual(['[Image #1]', '[Image #2]', '[Image #1]'])
+    flow.editor.commands.undo()
+    await nextTick()
+    expect(labels()).toEqual(['[Image #1]', '[Image #2]', '[Image #3]', '[Image #1]'])
+    const saved = chatComposerDocumentToUserContent(flow.editor.getJSON())
+    flow.accepting.resolve()
+    flow.uploading.resolve()
+    await flow.resources.whenAccepted()
+    await vi.waitFor(() => expect(flow.composer.canSubmit.value).toBe(true))
+    flow.editor.commands.clearContent()
+    await nextTick()
+    flow.content.value = userContentToChatComposerDocument(saved)
+    await nextTick()
+    expect(labels()).toEqual(['[Image #1]', '[Image #2]', '[Image #3]', '[Image #1]'])
   })
 
   it('selects an adjacent inline resource with the arrow key', async () => {
@@ -347,7 +379,7 @@ describe('composer resource flow', () => {
     flow.editor.view.dom.dispatchEvent(clipboardEvent('cut'))
     expect(flow.editor.view.dom.querySelectorAll('[data-type="chat-resource-reference"]')).toHaveLength(1)
     expect(flow.editor.state.doc.attrs.panelResourceIds).toContain(first)
-    expect(data.get('text/plain')).toBe('@red.png')
+    expect(data.get('text/plain')).toBe('[Image #1]')
     expect(data.get('text/html')).not.toContain(first)
     flow.editor.view.dom.dispatchEvent(clipboardEvent('paste'))
     expect(flow.editor.state.doc.firstChild!.firstChild!.attrs.resourceId).toBe(first)
@@ -357,13 +389,13 @@ describe('composer resource flow', () => {
     other.draftId.value = 'draft-2'
     other.editor.view.dom.dispatchEvent(clipboardEvent('paste'))
     expect(getChatComposerResourceIds(other.editor.getJSON())).toEqual([])
-    expect(other.editor.getText()).toBe('@red.png')
+    expect(other.editor.getText()).toBe('[Image #1]')
     expect(other.storedFiles.size).toBe(0)
     const nextSession = await mountFlow()
     expect(nextSession.draftId.value).toBe(flow.draftId.value)
     nextSession.editor.view.dom.dispatchEvent(clipboardEvent('paste'))
     expect(getChatComposerResourceIds(nextSession.editor.getJSON())).toEqual([])
-    expect(nextSession.editor.getText()).toBe('@red.png')
+    expect(nextSession.editor.getText()).toBe('[Image #1]')
   })
 
   it('does not leave a source card in the renderer when the combined input limit rejects it', async () => {

@@ -47,7 +47,7 @@ defineExpose({ highlightResource })
 <template>
   <div v-if="cards.length" ref="resourceTrack" class="composer-resource-strip">
     <div
-      v-for="{ resource, canRetry, isReference, previewUrl } in cards"
+      v-for="{ resource, canRetry, imageLabel, isReference, previewUrl } in cards"
       :key="resource.resourceId"
       class="composer-resource-strip__card"
       :class="{ 'is-failed': resource.state === 'failed', 'is-highlighted': highlightedResourceId === resource.resourceId, 'is-previewable': previewUrl }"
@@ -66,7 +66,7 @@ defineExpose({ highlightResource })
       </button>
       <FileIcon v-else :name="resource.name" size="medium" />
       <span class="composer-resource-strip__details">
-        <span>{{ resource.name }}</span>
+        <span>{{ imageLabel ?? resource.name }}</span>
         <small v-if="resource.state !== 'ready'">
           {{ t(resource.state === 'importing'
             ? 'desktop.chat.importingAttachment'

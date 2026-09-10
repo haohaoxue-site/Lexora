@@ -10,6 +10,7 @@ import type { BuddyLocale } from '@/i18n/buddyI18n'
 import type { ChatComposerContextOptions, ChatComposerSubmitPayload, ChatComposerTrigger } from '@/modules/prompt-input'
 
 export interface ComposerResourceCard extends ComposerResourceView {
+  imageLabel?: string
   isReference: boolean
   previewUrl: string | null
 }
@@ -42,7 +43,7 @@ export interface ChatComposerEditorOptions {
   isSending: Readonly<Ref<boolean>>
   language: Readonly<Ref<BuddyLocale>>
   rejectedResourceIds: () => ReadonlySet<string>
-  resourceName: (resourceId: string) => string
+  resources: Readonly<Ref<readonly ComposerResourceView[]>>
   onUpdateContent: (content: string, value: JSONContent) => void
   onTrigger: (trigger: ChatComposerTrigger | null) => void
   onSuggestionKeydown: (event: KeyboardEvent) => boolean

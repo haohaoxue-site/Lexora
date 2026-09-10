@@ -1,0 +1,43 @@
+@mixin wave-highlight {
+  --inline-wave-highlight-active: 0;
+
+  position: relative;
+  isolation: isolate;
+  background: transparent;
+
+  &::before,
+  &::after {
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background: var(--buddy-accent-surface-hover);
+    content: '';
+    pointer-events: none;
+  }
+
+  &::before {
+    inset: 66.6667% 0 0;
+    opacity: calc(1 - var(--inline-wave-highlight-active));
+    transition: opacity 180ms ease;
+  }
+
+  &::after {
+    opacity: var(--inline-wave-highlight-active);
+    mask-image: url('data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 80" preserveAspectRatio="none"%3E%3Cpath d="M0 40C10 36 20 36 30 40S50 44 60 40S80 36 90 40S110 44 120 40V80H0Z" fill="white"/%3E%3C/svg%3E');
+    mask-repeat: no-repeat;
+    mask-size: 200% 400%;
+    mask-position:
+      calc(var(--inline-wave-highlight-active) * 100%)
+      calc(44.4444% + var(--inline-wave-highlight-active) * 30.5556%);
+    transition:
+      mask-position 520ms cubic-bezier(0.22, 0.68, 0, 1),
+      opacity 180ms ease;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    &::before,
+    &::after {
+      transition: none;
+    }
+  }
+}

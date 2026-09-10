@@ -23,14 +23,14 @@ export function useChatComposer(options: UseChatComposerOptions) {
 
   const resourceById = computed(() => new Map(options.resources.value.map(entry => [entry.resource.resourceId, entry])))
   const query = useChatComposerSuggestions(options, selectSuggestion)
-  const { editor, contentJSON, serializedContent } = useChatComposerEditor({
+  const { editor, contentJSON, imageLabels, serializedContent } = useChatComposerEditor({
     composerContent: options.composerContent,
     draft: options.draft,
     draftId: options.draftId,
     isSending: options.isSending,
     language: options.language,
     rejectedResourceIds: options.rejectedResourceIds,
-    resourceName: id => resourceById.value.get(id)?.resource.name ?? 'file',
+    resources: options.resources,
     onUpdateContent: options.onUpdateContent,
     onTrigger: (trigger) => { query.activeTrigger.value = trigger },
     onSuggestionKeydown: query.handleKeydown,
@@ -56,11 +56,12 @@ export function useChatComposer(options: UseChatComposerOptions) {
     .flatMap(id => resourceById.value.get(id) ?? []))
   const resourceStripResources = computed<ComposerResourceCard[]>(() => {
     const panelIds = new Set(panelResources.value.map(entry => entry.resource.resourceId))
-    return [...new Set([...panelIds, ...resourceIds.value])].flatMap((id) => {
+    return resourceIds.value.flatMap((id) => {
       const entry = resourceById.value.get(id)
       return entry
         ? [{
             ...entry,
+            imageLabel: imageLabels.value.get(id),
             isReference: !panelIds.has(id),
             previewUrl: resolveComposerResourcePreviewUrl(entry.resource),
           }]

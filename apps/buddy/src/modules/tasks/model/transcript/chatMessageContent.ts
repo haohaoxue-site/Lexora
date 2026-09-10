@@ -1,7 +1,8 @@
 import type { LocalMessage } from '@buddy-shared/conversation/conversationApi'
 
 import { readBuddyInterruptedMessageContent } from '@buddy-shared/conversation/buddyMessageContent'
-import { buddyUserContentToText, readBuddyUserMessageContent } from '@buddy-shared/conversation/buddyUserContent'
+import { buddyUserContentToText, getBuddyUserContentResourceIds, readBuddyUserMessageContent } from '@buddy-shared/conversation/buddyUserContent'
+import { getChatImageLabels } from '../attachments/chatAttachmentView'
 
 export interface ChatMessageInterruption {
   truncated: boolean
@@ -25,6 +26,7 @@ export function getChatMessageInterruption(
 export function getChatMessageText(message: LocalMessage): string {
   const structured = getChatMessageUserContent(message)
   if (structured) {
+    const imageLabels = getChatMessageImageLabels(message)
     const attachmentNames = new Map(
       message.attachments.map(attachment => [attachment.attachmentId, attachment.name]),
     )
@@ -36,7 +38,7 @@ export function getChatMessageText(message: LocalMessage): string {
     )
     return buddyUserContentToText(
       structured.userContent,
-      resourceId => `@${resourceLabels.get(resourceId) ?? 'file'}`,
+      resourceId => imageLabels.get(resourceId) ?? `@${resourceLabels.get(resourceId) ?? 'file'}`,
     )
   }
   if (typeof message.content === 'string')
@@ -51,6 +53,19 @@ export function getChatMessageUserContent(message: LocalMessage) {
   if (message.role !== 'user')
     return null
   return readBuddyUserMessageContent(message.content)
+}
+
+export function getChatMessageImageLabels(message: LocalMessage): Map<string, string> {
+  const structured = getChatMessageUserContent(message)
+  if (!structured)
+    return getChatImageLabels(message.attachments.map(attachment => ({ ...attachment, resourceId: attachment.attachmentId })))
+  const attachmentsById = new Map(message.attachments.map(attachment => [attachment.attachmentId, attachment]))
+  const snapshotsById = new Map(structured.resourceSnapshots.map(snapshot => [snapshot.resourceId, snapshot.attachmentId]))
+  return getChatImageLabels(getBuddyUserContentResourceIds(structured.userContent).flatMap((resourceId) => {
+    const attachmentId = snapshotsById.get(resourceId)
+    const attachment = attachmentId ? attachmentsById.get(attachmentId) : undefined
+    return attachment ? [{ resourceId, kind: attachment.kind }] : []
+  }))
 }
 
 export function getChatMessageDisplayText(

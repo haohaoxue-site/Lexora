@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest'
 
 import {
   getChatMessageDisplayText,
+  getChatMessageImageLabels,
   getChatMessageInterruption,
   getChatMessageText,
   getChatMessageUserContent,
@@ -11,6 +12,30 @@ import {
 } from '../chatMessageContent'
 
 describe('chatMessageContent', () => {
+  it('numbers images in message resource order, skips files and reuses labels for repeated references', () => {
+    const input = message('user', {
+      resourceSnapshots: ['second', 'file', 'panel', 'first'].map(id => ({ attachmentId: id, resourceId: id })),
+      userContent: {
+        body: [{ type: 'paragraph', content: ['first', 'file', 'second', 'first'].map(resourceId => ({ type: 'resource_ref', resourceId })) }],
+        panelResourceIds: ['panel', 'second', 'first', 'file'],
+        version: 1,
+      },
+    }, ['second', 'file', 'first', 'panel'].map(id => ({
+      attachmentId: id,
+      kind: id === 'file' ? 'text' : 'image',
+      mimeType: id === 'file' ? 'text/plain' : 'image/png',
+      name: id === 'file' ? 'notes.txt' : 'image.png',
+      previewUrl: null,
+      sizeBytes: 100,
+    })))
+    expect([...getChatMessageImageLabels(input)]).toEqual([
+      ['panel', '[Image #1]'],
+      ['first', '[Image #2]'],
+      ['second', '[Image #3]'],
+    ])
+    expect(getChatMessageText(input)).toBe('[Image #2]@notes.txt[Image #3][Image #2]')
+  })
+
   it('keeps quote-only messages visible without turning the quote into body text', () => {
     const quoted = message('user', { resourceSnapshots: [], userContent: {
       body: [{ type: 'paragraph', content: [] }],

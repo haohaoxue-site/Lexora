@@ -101,6 +101,7 @@ export const ChatComposerResourceReference = Node.create<{
   resourcePresentation: (resourceId: string) => {
     iconName: string
     iconUrl: string
+    isImage?: boolean
     label: string
     text: string
   }
@@ -147,7 +148,6 @@ export const ChatComposerResourceReference = Node.create<{
       dom.contentEditable = 'false'
       dom.dataset.type = 'chat-resource-reference'
       dom.dataset.resourceId = node.attrs.resourceId
-      dom.setAttribute('role', 'button')
       icon.alt = ''
       icon.className = 'chat-resource-reference__icon'
       icon.draggable = false
@@ -155,6 +155,8 @@ export const ChatComposerResourceReference = Node.create<{
       dom.append(icon, label)
       const stop = watchEffect(() => {
         const presentation = this.options.resourcePresentation(node.attrs.resourceId)
+        dom.classList.toggle('is-image', Boolean(presentation.isImage))
+        dom.setAttribute('role', presentation.isImage ? 'link' : 'button')
         icon.dataset.fileIcon = presentation.iconName
         icon.hidden = !presentation.iconUrl
         if (presentation.iconUrl)
