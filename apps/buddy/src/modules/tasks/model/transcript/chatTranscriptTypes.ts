@@ -9,6 +9,7 @@ import type { ChatRecoveryNotice } from './chatRunRecovery'
 import type { ChatRunTranscriptProjection } from './chatRunTranscriptProjector'
 
 export interface ChatTranscriptMessageRow {
+  resultRunId?: string
   isAgentTurnResult: boolean
   key: string
   kind: 'message'

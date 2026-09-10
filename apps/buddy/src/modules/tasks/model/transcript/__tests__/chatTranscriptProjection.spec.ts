@@ -165,6 +165,7 @@ describe('chat transcript projection', () => {
       },
       {
         isAgentTurnResult: false,
+        resultRunId: 'run-1',
         key: `message:${assistant.id}`,
         kind: 'message',
         message: assistant,
@@ -182,6 +183,7 @@ describe('chat transcript projection', () => {
       { key: `agent-turn:${reasoningTurn.runId}`, kind: 'agent-turn', turn: reasoningTurn },
       {
         isAgentTurnResult: true,
+        resultRunId: 'run-1',
         key: `message:${assistant.id}`,
         kind: 'message',
         message: assistant,
@@ -325,6 +327,7 @@ describe('chat transcript projection', () => {
       },
       {
         isAgentTurnResult: false,
+        resultRunId: 'run-1',
         key: 'message:assistant-final',
         kind: 'message',
         message: final,

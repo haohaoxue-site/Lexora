@@ -24,6 +24,7 @@ const props = defineProps<{
   branchNavigator: ChatMessageBranchNavigator | null
   editing: boolean
   isAgentTurnResult: boolean
+  resultRunId?: string
   language: BuddyLocale
   message: LocalMessage
   searchMatch: boolean
@@ -98,7 +99,7 @@ const messageText = computed(() => getChatMessageDisplayText(
       <span>{{ t('desktop.chat.editingMessage') }}</span>
     </div>
     <BuddyChatMessageBody
-      :final="!streaming" :language="language" :message="message"
+      :final="!streaming" :language="language" :message="message" :result-run-id="resultRunId"
       :turn-outputs="turnOutputs" :turn-changes="turnChanges" :write-clipboard-text="clipboard.writeText"
       @open-artifact="emit('openArtifact', $event)" @open-changes="emit('openChanges', $event)"
     />

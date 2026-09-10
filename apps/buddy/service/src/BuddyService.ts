@@ -68,6 +68,7 @@ import { registerContextRpc } from './context/registerContextRpc'
 import { ConversationLifecycleService } from './conversations/ConversationLifecycleService'
 import { registerConversationRpc } from './conversations/registerConversationRpc'
 import { registerConversationTreeRpc } from './conversations/registerConversationTreeRpc'
+import { registerTaskMarkRpc } from './conversations/registerTaskMarkRpc'
 import { createBuddyCapabilityFactory } from './createBuddyCapabilityFactory'
 import { DirectoryGrantService } from './directories/DirectoryGrantService'
 import { ImageTransformService } from './images/ImageTransformService'
@@ -104,6 +105,7 @@ import { createProviderRepository } from './storage/providerRepository'
 import { createRunInputRepository } from './storage/runInputRepository'
 import { createRunRepository } from './storage/runRepository'
 import { createSpaceRepository } from './storage/spaceRepository'
+import { createTaskMarkRepository } from './storage/taskMarkRepository'
 import { createTurnRequestRepository } from './storage/turnRequestRepository'
 import { createUsageRepository } from './storage/usageRepository'
 import { createWorkspaceRepository } from './storage/workspaceRepository'
@@ -598,6 +600,7 @@ export async function startBuddyService(
           service: contextUsageService,
         }),
       )
+      register(registerTaskMarkRpc(options.rpc, createTaskMarkRepository(options.database)))
       register(registerConversationTreeRpc({
         database: options.database,
         conversations,
