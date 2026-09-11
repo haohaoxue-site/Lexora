@@ -137,7 +137,7 @@ export default {
   'desktop.chat.permissionModeManual': 'Manual approval',
   'desktop.chat.permissionModeManualDescription': 'Ask before changes, commands, and external interactions.',
   'desktop.chat.permissionModePolicy': 'Smart approval',
-  'desktop.chat.permissionModePolicyDescription': 'Automatically allow queries covered by safety rules; request approval for other operations according to permissions.',
+  'desktop.chat.permissionModePolicyDescription': 'Automatically allow safe queries, file edits and verified ordinary-file deletions in authorized directories; review other operations according to policy.',
   'desktop.chat.permissionModeReadOnlyDescription': 'Read files and run safe read-only diagnostics.',
   'desktop.chat.permissionModeTitle': 'How should Buddy approve actions?',
   'desktop.chat.chooseEffort': 'Choose effort',

@@ -1,4 +1,4 @@
-import type { ShellCommandClassification } from './shellCommandClassification'
+import type { ShellQueryClassification } from './shellCommandClassification'
 import { requireShellApproval } from './shellCommandClassification'
 
 const statusOptions = new Set([
@@ -134,7 +134,7 @@ const logOptions = new Set([
   '--no-abbrev-commit',
 ])
 
-export function classifyGitCommand(arguments_: readonly string[]): ShellCommandClassification {
+export function classifyGitCommand(arguments_: readonly string[]): ShellQueryClassification {
   let index = 0
   while (['--no-pager', '--no-optional-locks', '--literal-pathspecs'].includes(arguments_[index] ?? ''))
     index += 1

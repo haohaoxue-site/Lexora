@@ -1,6 +1,73 @@
 import { describe, expect, it } from 'vitest'
 import { classifyShellCommand } from '../classifyShellCommand'
 
+describe('shell file deletion classification', () => {
+  it('declares exact deletion targets instead of treating rm as a read-only query', () => {
+    for (const platform of ['linux', 'darwin'] as const) {
+      for (const command of [
+        'rm src/obsolete.vue',
+        'rm -f -- src/obsolete.vue',
+        'LC_ALL=C rm --force src/obsolete.vue',
+      ]) {
+        expect(classifyShellCommand('bash', command, platform)).toEqual({
+          access: 'delete',
+          paths: ['src/obsolete.vue'],
+          type: 'file-operation',
+        })
+      }
+    }
+    expect(classifyShellCommand('bash', 'rm "file with spaces" escaped\\ space -- -f', 'linux')).toEqual({
+      access: 'delete',
+      paths: ['file with spaces', 'escaped space', '-f'],
+      type: 'file-operation',
+    })
+    expect(classifyShellCommand('bash', String.raw`rm "folder\name.txt"`, 'linux')).toMatchObject({
+      paths: [String.raw`folder\name.txt`],
+      type: 'file-operation',
+    })
+  })
+
+  it('keeps recursion, dynamic paths, wrappers, compound commands and oversized lists behind review', () => {
+    for (const command of [
+      'rm',
+      'rm --',
+      'rm ""',
+      'rm -rf src',
+      'rm --recursive src',
+      'rm -d src',
+      'rm src/obsolete.vue -r',
+      'rm --interactive=never file',
+      'rm *.vue',
+      'rm $TARGET',
+      'rm "$TARGET"',
+      'rm "$(pwd)/file"',
+      'rm ../file',
+      'rm link/../file',
+      'rm file\rname',
+      'rm file\\\nname',
+      'rm "file\\\nname"',
+      'rm file > output',
+      'rm file && pwd',
+      'pwd; rm file',
+      'rm file || true',
+      'rm file | wc -l',
+      'rm file; rm other',
+      'sudo rm file',
+      '/bin/rm file',
+      'bash -c "rm file"',
+      `rm ${Array.from({ length: 33 }, (_, index) => `file-${index}`).join(' ')}`,
+    ]) {
+      expect(classifyShellCommand('bash', command, 'linux'), command).toMatchObject({ type: 'approval-required' })
+    }
+    expect(classifyShellCommand('bash', 'cat .env && rm file', 'linux')).toMatchObject({
+      readPaths: ['.env'],
+      type: 'approval-required',
+    })
+    expect(classifyShellCommand('powershell', 'rm file', 'win32')).toMatchObject({ type: 'approval-required' })
+    expect(classifyShellCommand('bash', 'rm file', 'win32')).toMatchObject({ type: 'approval-required' })
+  })
+})
+
 describe('shell query classification', () => {
   it('recognizes literal Git inspections and preserves their file targets', () => {
     for (const command of [

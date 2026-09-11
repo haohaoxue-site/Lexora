@@ -21,7 +21,7 @@ const expected: Record<
     write: ['deny_profile', 'deny_profile', 'deny_profile', 'deny_sensitive'],
   },
   workspace_write: {
-    delete: ['ask', 'ask', 'ask_grant', 'deny_sensitive'],
+    delete: ['allow', 'allow', 'ask_grant', 'deny_sensitive'],
     execute: ['delegate', 'delegate', 'delegate', 'deny_sensitive'],
     interaction: ['allow', 'allow', 'allow', 'allow'],
     network: ['ask', 'ask', 'ask', 'ask'],

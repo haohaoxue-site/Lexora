@@ -75,6 +75,17 @@ export class PermissionEngine {
 
   async #decide(request: PermissionRequest): Promise<PermissionDecision> {
     const access = request.access ?? BUILTIN_TOOL_ACCESS[request.toolName] ?? null
+    const shell = access === 'execute' ? await this.#classifyShell(request) : undefined
+    if (shell?.type === 'file-operation') {
+      return this.#decide({
+        ...request,
+        access: shell.access,
+        paths: [
+          ...request.paths ?? [],
+          ...shell.paths.map(path => ({ mode: 'existing' as const, path })),
+        ],
+      })
+    }
     const paths = resolveRequestPaths(request, access)
     const classifications: PathClassification[] = []
     for (const path of paths) {
@@ -91,7 +102,6 @@ export class PermissionEngine {
       return finalizeDecision(request, this.#unknownAccess(request, classifications))
 
     const worst = this.#worstOutcome(request, access, classifications)
-    const shell = access === 'execute' ? await this.#classifyShell(request) : undefined
     const decision = this.#toDecision(
       request,
       access,
@@ -111,7 +121,7 @@ export class PermissionEngine {
     if (!policy)
       return undefined
     const decision = await policy.decide(readStringProperty(request.arguments, 'command'), request.cwd)
-    if (decision.type === 'deny')
+    if (decision.type === 'deny' || decision.type === 'file-operation')
       return decision
     let needsFileReview = false
     for (const path of new Set([...decision.readPaths ?? [], ...decision.readFiles ?? []])) {
@@ -171,11 +181,19 @@ export class PermissionEngine {
       outcome: lookupPermissionOutcome({ access, profile: request.profile, zone: 'workspace' }),
     }
     for (const classification of classifications) {
-      const outcome = lookupPermissionOutcome({
+      let outcome = lookupPermissionOutcome({
         access,
         profile: request.profile,
         zone: classification.zone,
       })
+      if (
+        access === 'delete'
+        && request.profile === 'workspace_write'
+        && outcome === 'allow'
+        && (!classification.isFile || isGitMetadata(classification))
+      ) {
+        outcome = 'ask'
+      }
       if (OUTCOME_SEVERITY[outcome] >= OUTCOME_SEVERITY[worst.outcome])
         worst = { classification, outcome }
     }
@@ -308,6 +326,7 @@ function applyApprovalPolicy(
     kind: request.approval?.kind ?? approvalKindFor(access),
     paths: toDecisionPaths(classifications),
     ...(['bash', 'powershell'].includes(request.toolName)
+      && access === 'execute'
       ? { shell: { cwd: request.cwd, reason: 'manual-policy' as const } }
       : {}),
     summary: request.approval?.summary ?? manualApprovalSummaryFor(access),
@@ -413,10 +432,15 @@ function toDecisionPaths(
   return paths.length > 0 ? paths : undefined
 }
 
+function isGitMetadata(classification: PathClassification): boolean {
+  return [classification.requestedPath, classification.canonicalPath]
+    .some(path => path.split(/[\\/]/).some(segment => segment.toLowerCase() === '.git'))
+}
+
 function summaryFor(access: AccessKind): string {
   switch (access) {
     case 'delete':
-      return 'Delete content outside the workspace'
+      return 'Delete local content'
     case 'execute':
       return 'Run a host shell command'
     case 'interaction':

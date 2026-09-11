@@ -23,6 +23,8 @@ export class ShellPolicy implements ShellCommandPolicy {
 
   async decide(command: string, cwd: string): Promise<ToolDecision> {
     const classification = classifyShellCommand(this.#dialect, command, this.#platform)
+    if (classification.type === 'file-operation')
+      return classification
     const inspection = classification.type === 'auto-approve' && classification.git
       ? await inspectGitQuery(cwd, classification.gitDiffs ?? [])
       : null

@@ -5,7 +5,15 @@ export type ShellCommandApprovalReason = Extract<
   'unsafe-arguments' | 'unsupported-syntax' | 'unknown-command'
 >
 
-export type ShellCommandClassification
+export interface ShellFileOperation {
+  access: 'delete'
+  paths: readonly string[]
+  type: 'file-operation'
+}
+
+export type ShellCommandClassification = ShellQueryClassification | ShellFileOperation
+
+export type ShellQueryClassification
   = {
     type: 'auto-approve'
     git?: boolean
@@ -16,6 +24,6 @@ export type ShellCommandClassification
 
 export function requireShellApproval(
   reason: ShellCommandApprovalReason,
-): ShellCommandClassification {
+): Extract<ShellQueryClassification, { type: 'approval-required' }> {
   return { type: 'approval-required', reason }
 }

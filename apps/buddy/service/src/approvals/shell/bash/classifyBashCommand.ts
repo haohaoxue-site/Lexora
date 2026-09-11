@@ -14,6 +14,12 @@ export function classifyBashCommand(
   let required: Extract<ShellCommandClassification, { type: 'approval-required' }> | undefined
   for (const words of commands) {
     const classification = classifyBashSimpleCommand(words, platform)
+    if (classification.type === 'file-operation') {
+      if (commands.length === 1)
+        return classification
+      required ??= requireShellApproval('unsupported-syntax')
+      continue
+    }
     if (classification.type === 'approval-required')
       required ??= classification
     if (classification.type === 'auto-approve' && classification.git)

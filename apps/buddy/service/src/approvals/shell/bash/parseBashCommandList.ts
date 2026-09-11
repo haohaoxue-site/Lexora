@@ -37,9 +37,9 @@ export function parseBashCommandList(command: string): string[][] | null {
       }
       if (character === '\\') {
         const next = command[index + 1]
-        if (next === undefined)
+        if (next === undefined || next === '\n')
           return null
-        currentWord += next
+        currentWord += '\\$`"'.includes(next) ? next : `\\${next}`
         index += 1
         continue
       }
@@ -55,14 +55,14 @@ export function parseBashCommandList(command: string): string[][] | null {
     }
     if (character === '\\') {
       const next = command[index + 1]
-      if (next === undefined)
+      if (next === undefined || next === '\n')
         return null
       currentWord += next
       wordStarted = true
       index += 1
       continue
     }
-    if (character === ' ' || character === '\t' || character === '\r') {
+    if (character === ' ' || character === '\t') {
       flushWord()
       continue
     }

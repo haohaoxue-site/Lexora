@@ -1,7 +1,9 @@
 import type { ApprovalReviewKind, ShellApprovalReason } from '../../../shared/permissions/approvalReviewPayload'
+import type { ShellFileOperation } from './shell/shellCommandClassification'
 
 export type ToolDecision
-  = { type: 'allow', readPaths?: readonly string[], readFiles?: readonly string[] }
+  = ShellFileOperation
+    | { type: 'allow', readPaths?: readonly string[], readFiles?: readonly string[] }
     | { type: 'deny', code: string }
     | {
       type: 'ask'
