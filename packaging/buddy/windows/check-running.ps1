@@ -8,14 +8,14 @@ try {
   }
   $target = [IO.Path]::GetFullPath($ExecutablePath)
   $name = [IO.Path]::GetFileName($target)
-  $processes = Get-CimInstance -ClassName Win32_Process -Property Name, ExecutablePath |
-    Where-Object { $_.Name -eq $name }
+  $processName = [IO.Path]::GetFileNameWithoutExtension($name)
+  $processes = Get-Process -Name $processName -ErrorAction SilentlyContinue
 
   foreach ($process in $processes) {
-    if ([string]::IsNullOrWhiteSpace($process.ExecutablePath)) {
+    if ([string]::IsNullOrWhiteSpace($process.Path)) {
       throw 'Cannot determine the executable path of a matching process'
     }
-    if ([string]::Equals($process.ExecutablePath, $target, [StringComparison]::OrdinalIgnoreCase)) {
+    if ([string]::Equals($process.Path, $target, [StringComparison]::OrdinalIgnoreCase)) {
       exit 32
     }
   }

@@ -16,15 +16,21 @@
 
     buddy_retry:
       DetailPrint "正在检查应用状态 / Checking application state..."
-      nsExec::ExecToStack /TIMEOUT=15000 '"$SYSDIR\WindowsPowerShell\v1.0\powershell.exe" -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "$PLUGINSDIR\buddy-check-running.ps1" -ExecutablePath "$INSTDIR\${APP_EXECUTABLE_FILENAME}"'
+      nsExec::ExecToStack /TIMEOUT=30000 '"$SYSDIR\WindowsPowerShell\v1.0\powershell.exe" -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "$PLUGINSDIR\buddy-check-running.ps1" -ExecutablePath "$INSTDIR\${APP_EXECUTABLE_FILENAME}"'
       Pop $0
       Pop $1
       StrCmp $0 "0" buddy_ready
       StrCmp $0 "32" buddy_running
+      StrCmp $0 "timeout" buddy_probe_timeout
 
     buddy_probe_failed:
       SetErrorLevel 1603
       StrCpy $1 "无法确认此安装中的 Buddy 是否已退出，操作已停止。请检查系统状态后重试，或取消。$\r$\n$\r$\nUnable to check whether this installation is running. Retry after checking your system, or cancel."
+      Goto buddy_blocked
+
+    buddy_probe_timeout:
+      SetErrorLevel 1460
+      StrCpy $1 "检查 Buddy 运行状态超时，操作已停止。请重试，或取消。$\r$\n$\r$\nChecking whether Buddy is running timed out. Retry or cancel."
       Goto buddy_blocked
 
     buddy_running:
