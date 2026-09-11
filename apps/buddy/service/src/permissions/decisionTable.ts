@@ -55,7 +55,7 @@ const TABLE: Record<
     write: zones('deny_profile', 'deny_profile', 'deny_profile', 'deny_sensitive'),
   },
   workspace_write: {
-    delete: zones('ask', 'ask', 'ask_grant', 'deny_sensitive'),
+    delete: zones('allow', 'allow', 'ask_grant', 'deny_sensitive'),
     execute: zones('delegate', 'delegate', 'delegate', 'deny_sensitive'),
     interaction: UNIFORM_ALLOW,
     network: UNIFORM_ASK,

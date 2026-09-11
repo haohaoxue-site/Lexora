@@ -15,6 +15,7 @@ export interface PathClassification {
   grantId: string | null
   grantRoot: string
   isDirectory: boolean
+  isFile: boolean
   requestedPath: string
   zone: PathZone
 }
@@ -47,7 +48,7 @@ export async function classifyPath(
   catch (error) {
     throw new PathClassificationError(error instanceof FilePathResolutionError ? error.code : 'INVALID_PATH', { cause: error })
   }
-  const { canonicalPath, isDirectory, requestedPath } = resolution
+  const { canonicalPath, isDirectory, isFile, requestedPath } = resolution
   const grantRoot = isDirectory ? canonicalPath : dirname(canonicalPath)
 
   if (options.sensitive.matches(requestedPath) || options.sensitive.matches(canonicalPath)) {
@@ -56,6 +57,7 @@ export async function classifyPath(
       grantId: null,
       grantRoot,
       isDirectory,
+      isFile,
       requestedPath,
       zone: 'sensitive',
     }
@@ -70,6 +72,7 @@ export async function classifyPath(
     grantId: grant?.grantId ?? null,
     grantRoot,
     isDirectory,
+    isFile,
     requestedPath,
     zone: grant ? grant.kind : 'outside',
   }

@@ -1,4 +1,5 @@
 import type { ShellCommandClassification } from '../shellCommandClassification'
+import { MAX_TARGET_PATHS } from '../../../../../shared/permissions/approvalReviewPayload'
 import { classifyGitCommand } from '../gitCommandRules'
 import { requireShellApproval } from '../shellCommandClassification'
 
@@ -102,11 +103,35 @@ export function classifyBashSimpleCommand(
   }
   if (command === 'cat' || command === 'ls')
     return classifyFileQuery(command, arguments_)
+  if (command === 'rm' && (platform === 'linux' || platform === 'darwin'))
+    return classifyFileDeletion(arguments_)
   const validator = platformCommandValidators(platform).get(command)
     ?? commonCommandValidators.get(command)
   if (!validator)
     return requireShellApproval('unknown-command')
   return validator(arguments_) ? { type: 'auto-approve' } : requireShellApproval('unsafe-arguments')
+}
+
+function classifyFileDeletion(arguments_: readonly string[]): ShellCommandClassification {
+  const paths: string[] = []
+  let pathMode = false
+  for (const argument of arguments_) {
+    if (!pathMode && argument === '--') {
+      pathMode = true
+      continue
+    }
+    if (!pathMode && argument.startsWith('-')) {
+      if (/^-f+$/.test(argument) || argument === '--force')
+        continue
+      return requireShellApproval('unsafe-arguments')
+    }
+    if (!argument.trim() || /\p{Cc}/u.test(argument) || argument.split('/').includes('..'))
+      return requireShellApproval('unsafe-arguments')
+    paths.push(argument)
+  }
+  if (!paths.length || paths.length > MAX_TARGET_PATHS)
+    return requireShellApproval('unsafe-arguments')
+  return { access: 'delete', paths, type: 'file-operation' }
 }
 
 function classifyFileQuery(command: 'cat' | 'ls', arguments_: readonly string[]): ShellCommandClassification {

@@ -8,7 +8,7 @@ import {
 const MAX_COMMAND_SOURCE_LENGTH = 16 * 1024
 const MAX_COMMAND_REVIEW_LENGTH = 4 * 1024
 const MAX_ARGUMENT_NAMES = 32
-const MAX_TARGET_PATHS = 32
+export const MAX_TARGET_PATHS = 32
 
 export const SHELL_APPROVAL_REASONS = [
   'unknown-command',
