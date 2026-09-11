@@ -109,6 +109,7 @@ import { createRunRepository } from './storage/runRepository'
 import { createSpaceRepository } from './storage/spaceRepository'
 import { createTaskMarkRepository } from './storage/taskMarkRepository'
 import { createTurnRequestRepository } from './storage/turnRequestRepository'
+import { createUsageAnalyticsRepository } from './storage/usageAnalyticsRepository'
 import { createUsageRepository } from './storage/usageRepository'
 import { createWorkspaceRepository } from './storage/workspaceRepository'
 import { registerUsageRpc } from './usage/registerUsageRpc'
@@ -593,6 +594,7 @@ export async function startBuddyService(
       )
       register(
         registerUsageRpc({
+          analytics: createUsageAnalyticsRepository(options.database),
           repository: usageRepository,
           rpc: options.rpc,
         }),

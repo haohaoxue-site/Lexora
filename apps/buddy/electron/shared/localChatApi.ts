@@ -32,6 +32,7 @@ import type { LocalSkillCatalog } from '../../shared/skills/skillApi'
 import type { LocalSpace, LocalSpaceCreateInput, LocalSpaceFile, LocalSpaceUpdateInput } from '../../shared/spaces/spaceApi'
 import type { LocalSpaceDirectoryPage, LocalSpaceFilePreview, SpaceDirectoryRequest, SpaceFileTarget } from '../../shared/spaces/spaceFileApi'
 
+import type { LocalUsageAnalytics, LocalUsageTopTasks, LocalUsageTrend, UsagePeriod, UsageTopTasksRequest, UsageTrendRequest } from '../../shared/usage/usageAnalyticsApi'
 import type { LocalUsageSnapshot } from '../../shared/usage/usageApi'
 
 export const LOCAL_CHAT_IPC_CHANNELS = {
@@ -147,6 +148,9 @@ export const LOCAL_CHAT_IPC_CHANNELS = {
   runtimeStatus: 'lexora:buddy:runtime:status',
   skillsList: 'lexora:buddy:skills:list',
   usageSnapshot: 'lexora:buddy:usage:snapshot',
+  usageAnalytics: 'lexora:buddy:usage:analytics',
+  usageTopTasks: 'lexora:buddy:usage:top-tasks',
+  usageTrend: 'lexora:buddy:usage:trend',
   workspaceStateRead: 'lexora:buddy:workspace-state:read',
   workspaceStateWrite: 'lexora:buddy:workspace-state:write',
 } as const
@@ -359,6 +363,9 @@ export interface LocalChatApi {
   }
   usage: {
     getSnapshot: () => Promise<LocalUsageSnapshot>
+    analytics: (input: UsagePeriod) => Promise<LocalUsageAnalytics>
+    trend: (input: UsageTrendRequest) => Promise<LocalUsageTrend>
+    topTasks: (input: UsageTopTasksRequest) => Promise<LocalUsageTopTasks>
   }
   chat: {
     enqueue: (input: LocalStartTurnRequest) => Promise<LocalChatQueueReceipt>

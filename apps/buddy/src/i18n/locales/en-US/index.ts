@@ -8,6 +8,7 @@ import models from './models'
 import pet from './pet'
 import settings from './settings'
 import tasks from './tasks'
+import usage from './usage'
 
 export default {
   ...app,
@@ -20,4 +21,5 @@ export default {
   ...pet,
   ...settings,
   ...tasks,
+  ...usage,
 }

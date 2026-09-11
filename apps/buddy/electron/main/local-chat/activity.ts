@@ -6,6 +6,7 @@ import { approvalsRequestSchemas, approvalsRpc } from '../../../shared/permissio
 import { toPublicRunEvent } from '../../../shared/runs/publicRunEvent'
 import { runsRequestSchemas, runsResponseSchemas, runsRpc } from '../../../shared/runs/runApi'
 import { skillsRequestSchemas, skillsRpc } from '../../../shared/skills/skillApi'
+import { usageAnalyticsRpc, usagePeriodSchema, usageTopTasksRequestSchema, usageTrendRequestSchema } from '../../../shared/usage/usageAnalyticsApi'
 import { usageRpc } from '../../../shared/usage/usageApi'
 import { LOCAL_CHAT_IPC_CHANNELS } from '../../shared/localChatApi'
 
@@ -43,4 +44,7 @@ export function registerActivityIpc(context: LocalChatIpcContext): void {
   handle(LOCAL_CHAT_IPC_CHANNELS.approvalsDeny, (_event, input) => request(approvalsRpc.deny, approvalsRequestSchemas.approvalId.parse(input)))
 
   handle(LOCAL_CHAT_IPC_CHANNELS.usageSnapshot, () => request(usageRpc.snapshot, {}))
+  handle(LOCAL_CHAT_IPC_CHANNELS.usageAnalytics, (_event, input) => request(usageAnalyticsRpc.analytics, usagePeriodSchema.parse(input)))
+  handle(LOCAL_CHAT_IPC_CHANNELS.usageTopTasks, (_event, input) => request(usageAnalyticsRpc.topTasks, usageTopTasksRequestSchema.parse(input)))
+  handle(LOCAL_CHAT_IPC_CHANNELS.usageTrend, (_event, input) => request(usageAnalyticsRpc.trend, usageTrendRequestSchema.parse(input)))
 }
