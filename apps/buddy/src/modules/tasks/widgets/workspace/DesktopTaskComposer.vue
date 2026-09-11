@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import type { BuddyMessageQuote } from '@buddy-shared/conversation/buddyUserContent'
 import type { TaskComposerHostProps } from './typing'
+import type { ChatComposerSubmitPayload } from '@/modules/prompt-input'
 import { useTemplateRef } from 'vue'
 import ChatMessageQueue from '../composer/ChatMessageQueue.vue'
 import DesktopChatComposer from '../composer/DesktopChatComposer.vue'
+import { useComposerSubmissionFocus } from './useComposerSubmissionFocus'
 import { useTaskComposer } from './useTaskComposer'
 
 const props = defineProps<TaskComposerHostProps>()
@@ -15,6 +17,16 @@ defineExpose({
 })
 
 const { bindings, editorKey, sendMessage } = useTaskComposer(props)
+const { withSubmissionFocus } = useComposerSubmissionFocus({
+  draftId: () => props.composer.draftId.value,
+  ready: () => props.focusReady && !bindings.value.isSending,
+  inputElement: () => composerRef.value?.inputElement,
+  restoreFocus: () => composerRef.value?.restoreFocus(),
+})
+
+async function handleSend(payload: ChatComposerSubmitPayload) {
+  await withSubmissionFocus(() => sendMessage(payload))
+}
 </script>
 
 <template>
@@ -33,7 +45,7 @@ const { bindings, editorKey, sendMessage } = useTaskComposer(props)
     @attach="composer.selectAttachments"
     @retry-resource="composer.retryResource"
     @dismiss-interaction="composer.dismissInteraction"
-    @send="sendMessage"
+    @send="handleSend"
     @stop="execution.cancelActiveRun"
     @update-content="composer.updateComposerContent"
     @update-effort="composer.setSelectedEffort"

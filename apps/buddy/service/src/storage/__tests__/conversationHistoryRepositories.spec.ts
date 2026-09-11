@@ -359,12 +359,12 @@ describe('conversation history repositories', () => {
     const insertMessage = database.prepare(`
       INSERT INTO messages (
         id, conversation_id, branch_id, run_id, role, content_json, created_at
-      ) VALUES (?, 'conversation-1', 'branch-child', 'run-1', 'tool', ?, ?)
+      ) VALUES (?, 'conversation-1', 'branch-child', 'run-1', 'assistant', ?, ?)
     `)
     const base = Date.parse('2026-08-14T00:00:04.000Z')
     for (let index = 0; index < 220; index += 1) {
       insertMessage.run(
-        `tool-${index.toString().padStart(3, '0')}`,
+        `reply-${index.toString().padStart(3, '0')}`,
         JSON.stringify({ text: `${index}` }),
         new Date(base + index).toISOString(),
       )
@@ -430,12 +430,12 @@ describe('conversation history repositories', () => {
     const insertMessage = database.prepare(`
       INSERT INTO messages (
         id, conversation_id, branch_id, run_id, role, content_json, created_at
-      ) VALUES (?, 'conversation-1', 'branch-1', 'run-1', 'tool', ?, ?)
+      ) VALUES (?, 'conversation-1', 'branch-1', 'run-1', 'assistant', ?, ?)
     `)
     const base = Date.parse('2026-08-14T00:00:03.000Z')
     for (let index = 0; index < 1_000; index += 1) {
       insertMessage.run(
-        `tool-${index.toString().padStart(4, '0')}`,
+        `reply-${index.toString().padStart(4, '0')}`,
         JSON.stringify({ text: `${index}` }),
         new Date(base + index).toISOString(),
       )
@@ -444,6 +444,45 @@ describe('conversation history repositories', () => {
     expect(() => conversations.listTimelinePage('conversation-1', 'branch-1', {
       limit: 100,
     })).toThrow('turn exceeds timeline page limit')
+  })
+
+  it('bounds tool-heavy history pages without dropping stored messages', () => {
+    const database = openBuddyDatabase({ databasePath: ':memory:' })
+    databases.push(database)
+    const conversations = createConversationRepository(database)
+    conversations.create({
+      branchId: 'branch-1',
+      createdAt: '2026-09-01T00:00:00.000Z',
+      approvalPolicy: 'policy',
+      executionProfile: 'workspace_write',
+      id: 'conversation-1',
+      spaceId: null,
+      title: null,
+    })
+    const insert = database.prepare(`
+      INSERT INTO messages (id, conversation_id, branch_id, run_id, role, content_json, created_at)
+      VALUES (?, 'conversation-1', 'branch-1', NULL, ?, ?, ?)
+    `)
+    const time = (index: number) => new Date(Date.parse('2026-09-01T00:00:00.000Z') + index).toISOString()
+    for (let index = 0; index < 150; index++) {
+      insert.run(`message-${index}`, index % 2 ? 'assistant' : 'user', JSON.stringify({ text: `${index}` }), time(index * 20))
+      for (let tool = 1; tool <= 10; tool++)
+        insert.run(`tool-${index}-${tool}`, 'tool', JSON.stringify({ text: 'stored tool result' }), time(index * 20 + tool))
+    }
+
+    let page = conversations.listTimelinePage('conversation-1', 'branch-1', { limit: 100 })
+    const ids = page.items.map(item => item.id)
+    expect(page.items).toHaveLength(100)
+    for (let index = 0; page.nextBefore && index < 20; index++) {
+      page = conversations.listTimelinePage('conversation-1', 'branch-1', { before: page.nextBefore, limit: 100 })
+      expect(page.items.length).toBeLessThanOrEqual(100)
+      ids.unshift(...page.items.map(item => item.id))
+    }
+    expect(page.nextBefore).toBeNull()
+    const stored = conversations.listMessages('conversation-1', 'branch-1', 1650)
+    expect(ids).toEqual(stored.map(message => message.id))
+    expect(new Set(ids).size).toBe(1650)
+    expect(stored.filter(message => message.role === 'tool')).toHaveLength(1500)
   })
 
   it('keeps 10k-item timeline pagination index-backed and boundary-stable', () => {

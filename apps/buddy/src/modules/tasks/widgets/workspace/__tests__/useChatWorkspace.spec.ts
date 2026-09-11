@@ -184,6 +184,7 @@ function bindWorkspace(owner: ReturnType<typeof createOwner>) {
   const view = scope.run(() => useChatWorkspace(props, list))!
   cleanups.push(() => scope.stop())
   const composer = scope.run(() => useTaskComposer({
+    focusReady: true,
     get composer() { return props.workspace.composer },
     get execution() { return props.workspace.execution },
     get language() { return props.workspace.language.value },
