@@ -38,6 +38,23 @@ export function createActivityApi(): Pick<LocalChatApi, 'artifacts' | 'notificat
     }),
     usage: Object.freeze({
       getSnapshot: () => ipcRenderer.invoke(LOCAL_CHAT_IPC_CHANNELS.usageSnapshot),
+      analytics: input => ipcRenderer.invoke(LOCAL_CHAT_IPC_CHANNELS.usageAnalytics, {
+        startDate: input.startDate,
+        endDate: input.endDate,
+        timeZone: input.timeZone,
+      }),
+      trend: input => ipcRenderer.invoke(LOCAL_CHAT_IPC_CHANNELS.usageTrend, {
+        startDate: input.startDate,
+        endDate: input.endDate,
+        timeZone: input.timeZone,
+        granularity: input.granularity,
+      }),
+      topTasks: input => ipcRenderer.invoke(LOCAL_CHAT_IPC_CHANNELS.usageTopTasks, {
+        startDate: input.startDate,
+        endDate: input.endDate,
+        timeZone: input.timeZone,
+        model: input.model ? { providerId: input.model.providerId, modelId: input.model.modelId } : null,
+      }),
     }),
   }
 }

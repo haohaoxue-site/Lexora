@@ -90,6 +90,7 @@ provide(settingsContextKey, {
   providerSettings: stores.modelProviders,
   ready,
   webSettings: capabilities.webSettings,
+  openTask: navigation.openTask,
 })
 provide(automationContextKey, {
   automations: capabilities.automations,

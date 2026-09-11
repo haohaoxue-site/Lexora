@@ -17,6 +17,7 @@ export interface SettingsContext {
   platformCapabilities: Readonly<Ref<BuddyCapabilities | null>>
   providerSettings: ModelProvidersStore
   ready: Promise<void>
+  openTask: (conversationId: string) => Promise<void>
   webSettings: WebSettingsCapability
 }
 
