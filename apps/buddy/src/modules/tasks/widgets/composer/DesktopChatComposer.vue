@@ -88,6 +88,11 @@ const {
 
 defineExpose({
   focus: () => editor.value?.commands.focus(),
+  inputElement: computed(() => editor.value?.view.dom ?? null),
+  restoreFocus: () => {
+    if (editor.value?.isEditable)
+      editor.value.view.focus()
+  },
   quote: (quote: BuddyMessageQuote) => addQuote(quote),
 })
 

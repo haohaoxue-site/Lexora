@@ -164,7 +164,24 @@ describe('registerConversationRpc', () => {
       status: 'completed' as const,
       triggeringMessageId: 'message-user',
     }
-    createRunRepository(database).create(run)
+    const runs = createRunRepository(database)
+    runs.create(run)
+    conversations.createMessage({
+      branchId: 'branch-1',
+      content: { text: 'Stored tool result' },
+      conversationId: 'conversation-1',
+      createdAt: '2026-08-27T00:01:30.000Z',
+      id: 'message-tool',
+      role: 'tool',
+      runId: 'run-1',
+    })
+    const toolEvent = {
+      createdAt: '2026-08-27T00:01:30.000Z',
+      payload: { isError: false, toolCallId: 'tool-1', toolName: 'read' },
+      runId: 'run-1',
+      sequence: 1,
+      type: 'tool.completed',
+    }
     const outputEvent = {
       createdAt: '2026-08-27T00:02:30.000Z',
       payload: {
@@ -173,7 +190,7 @@ describe('registerConversationRpc', () => {
         sourceToolName: 'lexora_image_generate',
       },
       runId: 'run-1',
-      sequence: 1,
+      sequence: 2,
       type: 'output.produced',
     }
     const harness = createRpcHarness()
@@ -209,7 +226,7 @@ describe('registerConversationRpc', () => {
           storedPath: '/private/input.json',
         }],
       },
-      eventLog: { listForRuns: () => [outputEvent] },
+      eventLog: { listForRuns: runIds => runIds.includes(run.id) ? [toolEvent, outputEvent] : [] },
       rpc: harness.rpc,
       runInputs: {
         findByRunId: () => ({
@@ -222,12 +239,12 @@ describe('registerConversationRpc', () => {
           serviceTier: null,
         }),
       },
-      runs: { listForTimeline: () => [run] },
+      runs,
     })
 
     const timeline = await harness.invoke('conversations.listTimeline', {
       conversationId: 'conversation-1',
-      limit: 100,
+      limit: 2,
     }) as Record<string, unknown>
     expect(timeline).toMatchObject({
       items: [
@@ -242,6 +259,7 @@ describe('registerConversationRpc', () => {
           }],
           id: 'message-user',
         },
+        { attachments: [], id: 'message-tool' },
         { attachments: [], id: 'message-assistant' },
       ],
       outputs: [{
@@ -255,7 +273,8 @@ describe('registerConversationRpc', () => {
         runId: 'run-1',
         sourceToolCallId: 'tool-1',
       }],
-      runEvents: [outputEvent],
+      nextCursor: null,
+      runEvents: [toolEvent, outputEvent],
       runs: [{
         id: 'run-1',
         modelId: 'model-1',
@@ -264,6 +283,8 @@ describe('registerConversationRpc', () => {
       }],
     })
     expect(timeline).not.toHaveProperty('runs.0.piSessionFile')
+    expect(conversations.listMessages('conversation-1', 'branch-1').map(message => message.id))
+      .toEqual(['message-user', 'message-tool', 'message-assistant'])
   })
 })
 

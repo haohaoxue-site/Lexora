@@ -12,6 +12,7 @@ import type {
   ChatMessageScrollMetrics,
 } from './chatMessageViewport'
 import type { BuddyLocale } from '@/i18n/buddyI18n'
+import { NSpin } from 'naive-ui'
 import { computed, onBeforeUnmount, shallowRef, useTemplateRef, watch } from 'vue'
 import { useBuddyI18n } from '@/i18n/buddyI18n'
 import {
@@ -153,7 +154,8 @@ onBeforeUnmount(clearOutlineHighlight)
       class="buddy-chat-message-list__history-status"
       role="status"
     >
-      {{ t('desktop.chat.loadingOlder') }}
+      <NSpin :size="14" />
+      <span>{{ t('desktop.chat.loadingOlder') }}</span>
     </div>
     <BuddyChatOutline
       :active-message-id="activeOutlineMessageId"
@@ -270,6 +272,10 @@ onBeforeUnmount(clearOutlineHighlight)
   z-index: 2;
   top: 0.45rem;
   left: 50%;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  white-space: nowrap;
   border: 1px solid var(--buddy-border-subtle);
   border-radius: var(--buddy-radius-micro);
   background: var(--buddy-surface-raised);

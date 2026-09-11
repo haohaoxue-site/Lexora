@@ -4,7 +4,8 @@ import type {
   ChatMessageScrollAnchor,
   ChatMessageScrollMetrics,
 } from './chatMessageViewport'
-import { onBeforeUnmount, onMounted, useTemplateRef } from 'vue'
+import { NScrollbar } from 'naive-ui'
+import { computed, onBeforeUnmount, onMounted, useTemplateRef } from 'vue'
 import BuddyChatReturnToLatest from './BuddyChatReturnToLatest.vue'
 import { createChatFrameTask, resolvePrependedChatScrollTop } from './chatMessageViewport'
 
@@ -21,8 +22,8 @@ const emit = defineEmits<{
   scroll: [metrics: ChatMessageScrollMetrics]
 }>()
 
-const viewport = useTemplateRef<HTMLElement>('viewport')
 const content = useTemplateRef<HTMLElement>('content')
+const viewport = computed(() => content.value?.closest<HTMLElement>('.buddy-chat-transcript-viewport__scrollport') ?? null)
 let resizeObserver: ResizeObserver | null = null
 let viewportFrameTask: ReturnType<typeof createChatFrameTask> | null = null
 
@@ -144,6 +145,10 @@ function handleScroll() {
 }
 
 onMounted(() => {
+  if (viewport.value) {
+    viewport.value.tabIndex = 0
+    viewport.value.dataset.chatScrollViewport = ''
+  }
   viewportFrameTask = createChatFrameTask(
     () => {
       emit('activeMessageChange', readActiveMessageId())
@@ -188,12 +193,12 @@ function toScrollMetrics(element: HTMLElement): ChatMessageScrollMetrics {
 
 <template>
   <div class="buddy-chat-transcript-viewport">
-    <div
-      ref="viewport"
-      class="buddy-chat-transcript-viewport__scrollport"
-      data-chat-scroll-viewport
-      tabindex="0"
-      @scroll.passive="handleScroll"
+    <NScrollbar
+      class="buddy-chat-transcript-viewport__scrollbar"
+      container-class="buddy-chat-transcript-viewport__scrollport"
+      content-style="min-height: 100%"
+      trigger="none"
+      @scroll="handleScroll"
     >
       <div
         ref="content"
@@ -202,7 +207,7 @@ function toScrollMetrics(element: HTMLElement): ChatMessageScrollMetrics {
       >
         <slot />
       </div>
-    </div>
+    </NScrollbar>
     <Transition name="buddy-chat-return-to-latest">
       <div
         v-if="showReturnToLatest"
@@ -222,14 +227,26 @@ function toScrollMetrics(element: HTMLElement): ChatMessageScrollMetrics {
   position: relative;
   height: 100%;
   min-height: 0;
+  container-type: inline-size;
 }
 
-.buddy-chat-transcript-viewport__scrollport {
+:deep(.buddy-chat-transcript-viewport__scrollbar) {
   height: 100%;
-  overflow-y: auto;
+
+  .n-scrollbar-rail--vertical .n-scrollbar-rail__scrollbar {
+    transition:
+      height 160ms ease-out,
+      background-color 160ms ease-out;
+
+    &:active {
+      transition: none;
+    }
+  }
+}
+
+:deep(.buddy-chat-transcript-viewport__scrollport) {
   overflow-anchor: none;
   overscroll-behavior: contain;
-  scrollbar-gutter: stable;
 
   &:focus-visible {
     outline: 0;
@@ -237,6 +254,7 @@ function toScrollMetrics(element: HTMLElement): ChatMessageScrollMetrics {
 }
 
 .buddy-chat-transcript-viewport__content {
+  width: 100cqw;
   min-height: 100%;
   padding-block: 1.5rem 1rem;
 
@@ -273,6 +291,10 @@ function toScrollMetrics(element: HTMLElement): ChatMessageScrollMetrics {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  :deep(.buddy-chat-transcript-viewport__scrollbar .n-scrollbar-rail--vertical .n-scrollbar-rail__scrollbar) {
+    transition: none;
+  }
+
   .buddy-chat-return-to-latest-enter-active,
   .buddy-chat-return-to-latest-leave-active {
     transition: none;

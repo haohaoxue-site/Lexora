@@ -182,7 +182,7 @@ export function useChatComposerEditor(options: ChatComposerEditorOptions) {
 
     if (event.key === 'Enter' && event.shiftKey && !event.isComposing) {
       event.preventDefault()
-      editor.value?.chain().focus().setHardBreak().run()
+      editor.value?.chain().focus().setHardBreak().scrollIntoView().run()
       return true
     }
     if (!shouldSubmitChatComposerKey(event))
