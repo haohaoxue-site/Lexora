@@ -5,6 +5,7 @@ import type { ExecuteDesktopCommand } from './desktopCommands'
 import process from 'node:process'
 import { app, clipboard, ipcMain } from 'electron'
 import { currentPlatform } from '../../platform/currentPlatform'
+import { sandboxEnvironmentStatusSchema, sandboxSetupResultSchema } from '../../shared/permissions/shellSandbox'
 import { describeBuddyCapabilities } from '../../shared/platform'
 import {
   DESKTOP_IPC_CHANNELS,
@@ -20,6 +21,8 @@ import { readDesktopWindowState } from './window'
 
 export interface RegisterDesktopIpcOptions {
   checkForUpdates: () => Promise<unknown>
+  getSandboxStatus: () => Promise<unknown>
+  setupSandbox: () => Promise<unknown>
   configPath: string
   configStore: LexoraConfigStore
   getWindow: () => BrowserWindow | null
@@ -30,6 +33,14 @@ export interface RegisterDesktopIpcOptions {
 }
 
 export function registerDesktopIpc(options: RegisterDesktopIpcOptions): void {
+  ipcMain.handle(DESKTOP_IPC_CHANNELS.appSetupSandbox, async (event) => {
+    assertTrustedSender(event, options.getWindow())
+    return sandboxSetupResultSchema.parse(await options.setupSandbox())
+  })
+  ipcMain.handle(DESKTOP_IPC_CHANNELS.appGetSandboxStatus, async (event) => {
+    assertTrustedSender(event, options.getWindow())
+    return sandboxEnvironmentStatusSchema.parse(await options.getSandboxStatus())
+  })
   ipcMain.handle(DESKTOP_IPC_CHANNELS.appCheckForUpdates, (event) => {
     assertTrustedSender(event, options.getWindow())
     return options.checkForUpdates()

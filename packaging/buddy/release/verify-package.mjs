@@ -9,6 +9,7 @@ import { writeOutput } from '../../shared/cli-output.mjs'
 import { assertNativeExecutable, verifyNativeHostFiles } from './native-host.mjs'
 import { excludedPlatformResources, platformResources, resolvePackagingPlatform } from './platform-definition.mjs'
 import { verifySearchToolFiles } from './search-tools.mjs'
+import { verifyShellSandboxFiles } from './shell-sandbox.mjs'
 import { readBuddyReleaseMetadata } from './verify-release-artifacts.mjs'
 
 const repoRoot = resolve(import.meta.dirname, '../../..')
@@ -28,6 +29,10 @@ export function verifyDesktopDirectory(directory, platformId, cwd = repoRoot) {
   }
   verifyNativeHostFiles(entry => readFileSync(join(resources, entry)), platformId)
   verifySearchToolFiles(entry => readFileSync(join(resources, 'search-tools', entry)), platformId)
+  if (platformId === 'linux')
+    verifyShellSandboxFiles(entry => readFileSync(join(resources, 'shell-sandbox', entry)))
+  else if (existsSync(join(resources, 'shell-sandbox')))
+    throw new Error('Windows Desktop must not contain the Linux shell sandbox')
   if (platform.features.includes('nativePet'))
     assertNativeExecutable(readFileSync(join(resources, 'native-pet/lexora-buddy-pet')), platformId, 'native pet')
 
@@ -42,6 +47,10 @@ export function verifyDesktopDirectory(directory, platformId, cwd = repoRoot) {
   }
   if (entries.some(entry => entry.split('/').includes('__tests__')))
     throw new Error('Desktop archive contains test files')
+  if (platformId === 'linux') {
+    const seccomp = join(resources, 'app.asar.unpacked/node_modules/@anthropic-ai/sandbox-runtime/vendor/seccomp/x64/apply-seccomp')
+    assertNativeExecutable(readFileSync(seccomp), 'linux', 'shell seccomp helper')
+  }
   const packaged = JSON.parse(asar.extractFile(archive, 'package.json').toString('utf8'))
   const { version } = readBuddyReleaseMetadata(cwd)
   if (packaged.version !== version)
@@ -103,7 +112,7 @@ export function verifyLinuxMetadata(target, content, version) {
   const dependencies = deb
     ? (fields.get('Depends') ?? []).flatMap(value => value.split(',').map(item => item.trim().split(/[ (]/)[0]))
     : fields.get('depend') ?? []
-  const required = deb ? ['git', 'libgtk-3-0', 'libgtk-layer-shell0', 'webp-pixbuf-loader'] : ['git', 'gtk3', 'gtk-layer-shell']
+  const required = deb ? ['git', 'libcap2', 'socat', 'libgtk-3-0', 'libgtk-layer-shell0', 'webp-pixbuf-loader'] : ['git', 'libcap', 'socat', 'gtk3', 'gtk-layer-shell']
   for (const dependency of required) {
     if (!dependencies.includes(dependency))
       throw new Error(`${target} dependency is missing: ${dependency}`)

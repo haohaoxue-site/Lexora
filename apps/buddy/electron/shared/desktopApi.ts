@@ -2,6 +2,7 @@ import type { BrowserFailureReason } from '../../shared/browser'
 import type { ApplicationDiagnostic } from '../../shared/diagnostics/applicationDiagnostic'
 import type { ApplicationLogApi } from '../../shared/diagnostics/applicationLog'
 import type { ApplicationStartupState } from '../../shared/diagnostics/applicationStartup'
+import type { SandboxEnvironmentStatus, SandboxSetupResult } from '../../shared/permissions/shellSandbox'
 import type { BuddyCapabilities } from '../../shared/platform'
 import type { DesktopCommandId, DesktopPlatform } from './desktopCommands'
 import type { LocalChatApi } from './localChatApi'
@@ -13,6 +14,8 @@ export const DESKTOP_IPC_CHANNELS = {
   appStartupStateChanged: 'lexora:app:startup:state-changed',
   appCheckForUpdates: 'lexora:app:check-for-updates',
   appGetInfo: 'lexora:app:get-info',
+  appGetSandboxStatus: 'lexora:app:get-sandbox-status',
+  appSetupSandbox: 'lexora:app:setup-sandbox',
   appOpenFeedbackIssue: 'lexora:app:open-feedback-issue',
   appOpenReleasePage: 'lexora:app:open-release-page',
   appOpenTarget: 'lexora:app:open-target',
@@ -245,6 +248,8 @@ export interface LexoraDesktopApi {
     }
     checkForUpdates: () => Promise<DesktopUpdateCheckResult>
     getInfo: () => Promise<DesktopAppInfo>
+    getSandboxStatus: () => Promise<SandboxEnvironmentStatus>
+    setupSandbox: () => Promise<SandboxSetupResult>
     onBeforeQuit: (listener: () => Promise<boolean>) => () => void
     onHidden: (listener: () => void) => () => void
     onOpenTarget: (listener: (target: DesktopOpenTarget) => void) => () => void

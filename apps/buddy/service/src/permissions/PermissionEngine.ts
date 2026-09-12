@@ -10,7 +10,9 @@ import type {
   PermissionRequest,
 } from './permissionContract'
 import type { SensitivePathMatcher } from './sensitivePaths'
+import { stat } from 'node:fs/promises'
 import process from 'node:process'
+import { sandboxDirectoryRequestSchema } from '../../../shared/permissions/shellSandbox'
 import { ShellPolicy } from '../approvals/ShellPolicy'
 import { classifyPath, PathClassificationError, toGrantRoot } from './classifyPath'
 import { lookupPermissionOutcome } from './decisionTable'
@@ -75,6 +77,19 @@ export class PermissionEngine {
 
   async #decide(request: PermissionRequest): Promise<PermissionDecision> {
     const access = request.access ?? BUILTIN_TOOL_ACCESS[request.toolName] ?? null
+    if (request.shellBoundary === 'sandbox' && request.toolName === 'lexora_authorize_directory')
+      return this.#decideSandboxDirectory(request)
+    if (request.toolName === 'lexora_host_shell') {
+      return request.profile === 'read_only'
+        ? deny('READ_ONLY_PROFILE', 'profile')
+        : finalizeDecision(request, this.#forcedShellAsk(request, 'sandbox-bypass'))
+    }
+    if (request.shellBoundary === 'sandbox' && access === 'execute') {
+      readStringProperty(request.arguments, 'command')
+      if (request.forceAsk)
+        return finalizeDecision(request, this.#forcedShellAsk(request, 'forced-confirmation'))
+      return finalizeDecision(request, applyApprovalPolicy(request, access, [], allow()))
+    }
     const shell = access === 'execute' ? await this.#classifyShell(request) : undefined
     if (shell?.type === 'file-operation') {
       return this.#decide({
@@ -114,6 +129,27 @@ export class PermissionEngine {
       request,
       applyApprovalPolicy(request, access, classifications, decision),
     )
+  }
+
+  async #decideSandboxDirectory(request: PermissionRequest): Promise<PermissionDecision> {
+    const parsed = sandboxDirectoryRequestSchema.safeParse(request.arguments)
+    if (!parsed.success)
+      return deny('VALIDATION_FAILED', 'invalid')
+    const input = parsed.data
+    if (input.access === 'write' && request.profile === 'read_only')
+      return deny('READ_ONLY_PROFILE', 'profile')
+    const path = await classifyPath({ cwd: request.cwd, grants: request.grants, mode: 'existing', path: input.path, sensitive: this.#sensitive })
+    if (path.zone === 'sensitive')
+      return deny('SENSITIVE_PATH', 'sensitive')
+    if (!path.isDirectory)
+      return deny('INVALID_PATH', 'invalid')
+    const metadata = await stat(path.canonicalPath, { bigint: true })
+    return finalizeDecision(request, ask({
+      allowForTurn: false,
+      kind: input.access,
+      sandboxDirectory: { access: input.access, path: path.canonicalPath, reason: input.reason, device: String(metadata.dev), inode: String(metadata.ino) },
+      summary: 'Expand isolated shell directory access for this run only',
+    }))
   }
 
   async #classifyShell(request: PermissionRequest): Promise<ToolDecision | undefined> {
@@ -327,7 +363,7 @@ function applyApprovalPolicy(
     paths: toDecisionPaths(classifications),
     ...(['bash', 'powershell'].includes(request.toolName)
       && access === 'execute'
-      ? { shell: { cwd: request.cwd, reason: 'manual-policy' as const } }
+      ? { shell: { cwd: request.cwd, reason: 'manual-policy' as const, boundary: request.shellBoundary ?? 'host' as const } }
       : {}),
     summary: request.approval?.summary ?? manualApprovalSummaryFor(access),
   })

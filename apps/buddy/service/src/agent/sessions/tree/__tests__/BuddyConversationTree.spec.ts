@@ -22,6 +22,36 @@ afterEach(async () => {
 })
 
 describe('native conversation tree', () => {
+  it('durably preserves the journal through checkpoints and reopening', async () => {
+    const fixture = await createFixture()
+    const first = fixture.run('first', 'b0', 'q1')
+    const opened = await fixture.open(first)
+    const file = opened.cursor.manager.getSessionFile()!
+    const initial = await readFile(file, 'utf8')
+    await opened.cursor.begin(opened.session.session, first.id)
+    opened.cursor.manager.appendMessage(user('q1', 'durable question'))
+    opened.cursor.manager.appendMessage(assistant([{ type: 'text', text: 'durable answer' }]))
+    opened.cursor.finish()
+    fixture.complete(first, 'a1')
+    fixture.runs.bindSession(first.id, file)
+    await opened.session.shutdown('quit')
+
+    const saved = await readFile(file, 'utf8')
+    expect(saved.startsWith(initial)).toBe(true)
+    const entries = saved.trim().split('\n').map(line => JSON.parse(line))
+    expect(entries.filter(entry => entry.customType === 'lexora.conversation.checkpoint.v1').map(entry => entry.data.position))
+      .toEqual(['before', 'after'])
+
+    const next = fixture.run('next', 'b0', 'q2')
+    const resumed = await fixture.open(next)
+    await resumed.cursor.begin(resumed.session.session, next.id)
+    expect(resumed.cursor.manager.getSessionFile()).toBe(file)
+    expect(JSON.stringify(resumed.session.session.messages)).toContain('durable answer')
+    resumed.cursor.finish()
+    await resumed.session.shutdown('quit')
+    expect((await readFile(file, 'utf8')).startsWith(saved)).toBe(true)
+  })
+
   it('keeps tool context and compaction across continuation, regeneration, another branch and restart', async () => {
     const fixture = await createFixture()
     const first = fixture.run('r1', 'b0', 'q1')

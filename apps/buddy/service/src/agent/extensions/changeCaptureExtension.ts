@@ -10,6 +10,7 @@ export interface CreateChangeCaptureExtensionOptions {
   cwd: string
   getRunContext: () => BuddyExtensionRunContext | null
   grants: readonly DirectoryGrant[]
+  getWorkspaceGrants?: () => readonly DirectoryGrant[]
   service: Pick<ChangeCaptureService, 'beginFileTool' | 'beginWorkspaceTool' | 'finalizeRun' | 'finishFileTool' | 'finishWorkspaceTool' | 'markPartial'>
   workspaceMutationTools?: readonly string[]
 }
@@ -50,7 +51,7 @@ async function captureBeforeTool(
       () => options.service.beginWorkspaceTool({
         conversationId: options.conversationId,
         cwd: options.cwd,
-        grants: options.grants,
+        grants: options.getWorkspaceGrants?.() ?? options.grants,
         runId: run.runId,
         toolCallId: event.toolCallId,
       }),
@@ -87,7 +88,7 @@ async function captureAfterTool(
       const capture = await options.service.finishWorkspaceTool({
         conversationId: options.conversationId,
         cwd: options.cwd,
-        grants: options.grants,
+        grants: options.getWorkspaceGrants?.() ?? options.grants,
         isError: event.isError,
         runId: run.runId,
         toolCallId: event.toolCallId,

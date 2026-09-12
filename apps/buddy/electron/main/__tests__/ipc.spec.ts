@@ -21,7 +21,7 @@ beforeEach(() => {
 })
 
 describe('registerDesktopIpc', () => {
-  it('writes validated text to the system clipboard for the trusted Renderer only', () => {
+  it('exposes clipboard writes and sandbox status to the trusted Renderer only', async () => {
     const webContents = { mainFrame: {} }
     const window = { webContents } as unknown as BrowserWindow
     registerDesktopIpc({
@@ -32,6 +32,8 @@ describe('registerDesktopIpc', () => {
         update: vi.fn(),
       } as unknown as LexoraConfigStore,
       executeCommand: vi.fn(),
+      getSandboxStatus: async () => 'available',
+      setupSandbox: async () => 'cancelled',
       getWindow: () => window,
       onConfigUpdated: vi.fn(),
       openFeedbackIssue: vi.fn(),
@@ -58,5 +60,15 @@ describe('registerDesktopIpc', () => {
       'Untrusted Desktop IPC sender',
     )
     expect(electron.writeText).toHaveBeenCalledOnce()
+    const readSandboxStatus = electron.handlers.get('lexora:app:get-sandbox-status')
+    if (!readSandboxStatus)
+      throw new Error('Sandbox status IPC handler was not registered')
+    await expect(readSandboxStatus(trustedEvent)).resolves.toBe('available')
+    await expect(readSandboxStatus(untrustedEvent)).rejects.toThrow('Untrusted Desktop IPC sender')
+    const setupSandbox = electron.handlers.get('lexora:app:setup-sandbox')
+    if (!setupSandbox)
+      throw new Error('Sandbox setup IPC handler was not registered')
+    await expect(setupSandbox(trustedEvent)).resolves.toBe('cancelled')
+    await expect(setupSandbox(untrustedEvent)).rejects.toThrow('Untrusted Desktop IPC sender')
   })
 })

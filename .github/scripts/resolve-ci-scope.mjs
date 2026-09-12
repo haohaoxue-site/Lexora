@@ -17,6 +17,7 @@ const rustInputs = new Set([
   'apps/buddy/resources/icons/app-icon.png',
   'packaging/buddy/release/native-host.mjs',
   'packaging/buddy/release/preflight.mjs',
+  'packaging/buddy/release/verify-windows-sandbox.ps1',
 ])
 const rustPrefixes = [
   '.cargo/',

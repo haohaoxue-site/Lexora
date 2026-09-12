@@ -589,11 +589,12 @@ export class BrowserHost {
     navigationSequence: number,
     loadError: unknown,
   ): Promise<DesktopBrowserState> {
-    const deadline = Date.now() + BROWSER_NAVIGATION_SETTLE_TIMEOUT_MS
+    const startedAt = Date.now()
+    const deadline = startedAt + BROWSER_NAVIGATION_SETTLE_TIMEOUT_MS
     const isAbortedLoad = isNavigationAborted(loadError)
     const loadFailureDeadline = isAbortedLoad
       ? null
-      : Math.min(deadline, Date.now() + BROWSER_FAILED_NAVIGATION_SETTLE_MS)
+      : Math.min(deadline, startedAt + BROWSER_FAILED_NAVIGATION_SETTLE_MS)
     let pageFailureDeadline: number | null = null
     while (true) {
       if (this.#sessions.get(sessionId) !== session)
@@ -611,10 +612,11 @@ export class BrowserHost {
       }
       const hasReplacementCommit = session.mainFrameCommitSequence === navigationSequence
       const pageFailure = session.state.error
+      const now = Date.now()
       if (pageFailure) {
         pageFailureDeadline ??= Math.min(
           deadline,
-          Date.now() + BROWSER_FAILED_NAVIGATION_SETTLE_MS,
+          now + BROWSER_FAILED_NAVIGATION_SETTLE_MS,
         )
       }
       else {
@@ -624,7 +626,7 @@ export class BrowserHost {
         pageFailure
         && (
           session.activeNavigationSequence !== navigationSequence
-          || Date.now() >= (pageFailureDeadline ?? deadline)
+          || now >= (pageFailureDeadline ?? deadline)
         )
       ) {
         this.#finishPageAction(session, navigationSequence)
@@ -640,7 +642,7 @@ export class BrowserHost {
       ) {
         return snapshot(session.state)
       }
-      if (loadFailureDeadline !== null && Date.now() >= loadFailureDeadline) {
+      if (loadFailureDeadline !== null && now >= loadFailureDeadline) {
         const message = browserLoadErrorMessage(loadError)
         this.#finishPageAction(session, navigationSequence)
         session.state.error = { code: 'BROWSER_PAGE_FAILED', message }
@@ -651,7 +653,7 @@ export class BrowserHost {
       const remainingMs = Math.min(
         pageFailureDeadline ?? deadline,
         loadFailureDeadline ?? deadline,
-      ) - Date.now()
+      ) - now
       if (remainingMs <= 0) {
         const message = 'Browser navigation did not settle after the initial load was replaced'
         this.#finishPageAction(session, navigationSequence)

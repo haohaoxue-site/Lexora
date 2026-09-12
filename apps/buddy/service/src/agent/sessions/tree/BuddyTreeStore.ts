@@ -253,7 +253,7 @@ function validateAncestry(manager: SessionManager, id: string, rootId: string) {
 
 function syncSession(manager: SessionManager) {
   try {
-    const fd = openSync(manager.getSessionFile()!, 'r')
+    const fd = openSync(manager.getSessionFile()!, 'r+')
     try {
       fsyncSync(fd)
     }

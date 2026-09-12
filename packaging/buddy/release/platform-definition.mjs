@@ -1,4 +1,5 @@
 import searchTools from '../../../apps/buddy/platform/native/searchTools.json' with { type: 'json' }
+import shellSandbox from '../../../apps/buddy/platform/native/shellSandbox.json' with { type: 'json' }
 import definitions from '../../../apps/buddy/shared/platform/definitions.json' with { type: 'json' }
 import { nativeHostResources } from './native-host.mjs'
 
@@ -19,6 +20,7 @@ export function platformResources(platform) {
   return [
     ...nativeHostResources(platform.id),
     { from: `${searchTools.resource.from}/${platform.id}-x64`, to: searchTools.resource.to },
+    ...(platform.id === 'linux' ? [shellSandbox.resource] : []),
     ...platform.features.flatMap(id => definitions.features[id].resources),
   ]
 }

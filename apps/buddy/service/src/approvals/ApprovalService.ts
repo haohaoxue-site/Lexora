@@ -6,6 +6,7 @@ import type {
   ShellApprovalContext,
   SystemActionApprovalReviewInput,
 } from '../../../shared/permissions/approvalReviewPayload'
+import type { SandboxDirectoryRequest, SandboxNetworkTarget } from '../../../shared/permissions/shellSandbox'
 import type { AppendBuddyRunEventInput } from '../events/BuddyRunEvent'
 import type { ToolCallBlockingError } from '../permissions/permissionContract'
 import type {
@@ -29,6 +30,8 @@ export interface ApprovalRequest {
   automation?: AutomationApprovalReviewInput
   browser?: BrowserApprovalReviewInput
   kind: ApprovalReviewKind
+  network?: SandboxNetworkTarget
+  sandboxDirectory?: SandboxDirectoryRequest
   paths?: PathApprovalReviewInput
   shell?: ShellApprovalContext
   runId: string
@@ -108,6 +111,8 @@ export class ApprovalService {
         automation: input.automation,
         browser: input.browser,
         kind: input.kind,
+        network: input.network,
+        sandboxDirectory: input.sandboxDirectory,
         paths: input.paths,
         shell: input.shell,
         systemAction: input.systemAction,

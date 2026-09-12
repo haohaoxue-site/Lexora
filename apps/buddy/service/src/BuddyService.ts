@@ -84,6 +84,7 @@ import { BuddyServiceError } from './rpc/runtimeRequest'
 import { registerRunRpc } from './runs/registerRunRpc'
 import { RunLifecycleService } from './runs/RunLifecycleService'
 import { RunRecoveryService } from './runs/RunRecoveryService'
+import { ShellSandboxClient } from './sandbox/ShellSandboxClient'
 import { registerSpaceFileRpc } from './spaces/registerSpaceFileRpc'
 import { registerSpaceRpc } from './spaces/registerSpaceRpc'
 import { matchesSpaceExecutionContext } from './spaces/spaceExecutionContext'
@@ -356,6 +357,11 @@ export async function startBuddyService(
       },
     })
     const sessionExtensionServices: BuddySessionExtensionServices = {
+      shellSandbox: await host.start('runtime.shell_sandbox', ({ defer }) => {
+        const sandbox = new ShellSandboxClient(options.rpc)
+        defer(() => sandbox.dispose())
+        return sandbox
+      }),
       approvalService,
       attachmentService,
       changeCaptureService,

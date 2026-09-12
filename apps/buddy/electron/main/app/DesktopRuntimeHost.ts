@@ -3,10 +3,14 @@ import type { DesktopFeature } from '../platform/desktopFeatures'
 import type { CredentialVault } from '../secrets/CredentialVault'
 import type { DesktopWindowHost } from './DesktopWindowHost'
 import type { DesktopEnvironment } from './typing'
+import { join } from 'node:path'
 import process from 'node:process'
 import { app, powerMonitor } from 'electron'
 import { currentPlatform } from '../../../platform/currentPlatform'
-import { createBuddyNativeEnvironment } from '../../../platform/native/nativeHost'
+import { createBuddyNativeEnvironment, resolveBuddyShellSandbox } from '../../../platform/native/nativeHost'
+import shellSandbox from '../../../platform/native/shellSandbox.json'
+import { checkSandboxEnvironment } from '../../../platform/process/sandboxDependencies'
+import { setupWindowsSandbox } from '../../../platform/process/windowsSandbox'
 import { resolveWindowsPowerShell } from '../../../platform/windows/powerShell'
 import { automationNotifications } from '../../../shared/automation/automationApi'
 import { installAttachmentProtocol } from '../attachmentProtocol'
@@ -18,6 +22,7 @@ import { installRendererProtocol } from '../rendererProtocol'
 import { createBuddyServiceEnvironment, resolveBuddySearchToolsDirectory } from '../runtime/buddyServiceEnvironment'
 import { forkBuddyServiceProcess } from '../runtime/buddyServiceProcess'
 import { BuddyServiceSupervisor } from '../runtime/BuddyServiceSupervisor'
+import { registerSandboxHostRpc } from '../sandbox/registerSandboxHostRpc'
 import { createCredentialVault } from '../secrets/CredentialVault'
 import { registerCredentialHostRpc } from '../secrets/registerCredentialHostRpc'
 
@@ -31,6 +36,8 @@ export class DesktopRuntimeHost {
   #service: BuddyServiceSupervisor | null = null
   #windowsPowerShell: string | undefined
   readonly #subscriptions: Array<() => void> = []
+  #sandboxCheck: ReturnType<typeof checkSandboxEnvironment> | null = null
+  #sandboxSetup: ReturnType<typeof setupWindowsSandbox> | null = null
 
   constructor(environment: DesktopEnvironment, windows: DesktopWindowHost) {
     this.#environment = environment
@@ -48,6 +55,34 @@ export class DesktopRuntimeHost {
 
   get windowsPowerShell(): string | undefined {
     return this.#windowsPowerShell
+  }
+
+  getSandboxStatus(): ReturnType<typeof checkSandboxEnvironment> {
+    this.#sandboxCheck ??= checkSandboxEnvironment(this.#sandboxOptions()).finally(() => {
+      this.#sandboxCheck = null
+    })
+    return this.#sandboxCheck
+  }
+
+  setupSandbox(): ReturnType<typeof setupWindowsSandbox> {
+    this.#sandboxSetup ??= setupWindowsSandbox(this.#sandboxExecutable()).finally(() => {
+      this.#sandboxSetup = null
+      this.#sandboxCheck = null
+    })
+    return this.#sandboxSetup
+  }
+
+  #sandboxExecutable(): string | undefined {
+    return resolveBuddyShellSandbox({ appPath: app.getAppPath(), isPackaged: app.isPackaged, resourcesPath: process.resourcesPath })
+  }
+
+  #sandboxOptions() {
+    return {
+      searchDirectory: resolveBuddySearchToolsDirectory({ appPath: app.getAppPath(), isPackaged: app.isPackaged, resourcesPath: process.resourcesPath }),
+      sandboxDirectory: join(app.isPackaged ? process.resourcesPath : app.getAppPath(), app.isPackaged ? shellSandbox.resource.to : shellSandbox.resource.from),
+      windowsSandbox: this.#sandboxExecutable(),
+      windowsShell: this.#windowsPowerShell,
+    }
   }
 
   get service(): BuddyServiceSupervisor {
@@ -85,6 +120,10 @@ export class DesktopRuntimeHost {
       bindPeer: (peer) => {
         const disposers = [
           registerWebHostRpc(peer),
+          registerSandboxHostRpc(peer, {
+            buddyHome: environment.paths.buddyHome,
+            ...this.#sandboxOptions(),
+          }),
           registerBrowserHostRpc(peer, {
             createAdapterLease: input => this.#windows.adapter.issueLease(input),
             getHost: () => this.#windows.browser,

@@ -64,7 +64,7 @@ function createPiToolPresentation(
   const preview = boundedToolPreview(output)
   const description = readOptionalString(arguments_, 'description')
 
-  if (isPiShellToolName(input.toolName)) {
+  if (isPiShellToolName(input.toolName) || input.toolName === 'lexora_host_shell') {
     return {
       card: 'terminal',
       command: redactShellCommand(readString(arguments_, 'command')),

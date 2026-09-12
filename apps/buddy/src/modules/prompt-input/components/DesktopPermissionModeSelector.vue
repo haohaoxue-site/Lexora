@@ -9,11 +9,12 @@ import {
   LockOpen20Regular,
   ShieldTask20Regular,
 } from '@vicons/fluent'
-import { NButton, NPopover } from 'naive-ui'
+import { NButton, NModal, NPopover } from 'naive-ui'
 import { computed, shallowRef } from 'vue'
 import { useBuddyI18n } from '@/i18n/buddyI18n'
 import DesktopFullAccessConfirmationDialog from '@/modules/prompt-input/components/DesktopFullAccessConfirmationDialog.vue'
 import DesktopIcon from '@/shared/ui/icon/DesktopIcon.vue'
+import { useShellSandboxStatus } from '../state/useShellSandboxStatus'
 
 const props = defineProps<{
   canUpdate: boolean
@@ -30,24 +31,28 @@ const emit = defineEmits<{
 const permissionOptions = [
   {
     description: 'desktop.chat.permissionModeReadOnlyDescription',
+    sandboxDescription: 'desktop.chat.permissionModeReadOnlySandboxDescription',
     icon: LockClosed20Regular,
     label: 'desktop.chat.executionProfileReadOnly',
     value: 'read_only',
   },
   {
     description: 'desktop.chat.permissionModeManualDescription',
+    sandboxDescription: 'desktop.chat.permissionModeManualSandboxDescription',
     icon: HandLeft20Regular,
     label: 'desktop.chat.permissionModeManual',
     value: 'manual_approval',
   },
   {
     description: 'desktop.chat.permissionModePolicyDescription',
+    sandboxDescription: 'desktop.chat.permissionModePolicySandboxDescription',
     icon: ShieldTask20Regular,
     label: 'desktop.chat.permissionModePolicy',
     value: 'policy_approval',
   },
   {
     description: 'desktop.chat.permissionModeFullDescription',
+    sandboxDescription: 'desktop.chat.permissionModeFullDescription',
     icon: LockOpen20Regular,
     label: 'desktop.chat.executionProfileFull',
     value: 'full_access',
@@ -61,6 +66,10 @@ const availableOptions = computed(() => permissionOptions.filter(
 ))
 const confirmationOpen = shallowRef(false)
 const popoverOpen = shallowRef(false)
+const setupOpen = shallowRef(false)
+const { availability, isSettingUp, setupResult, setup } = useShellSandboxStatus(popoverOpen)
+const sandboxStatus = computed(() => availability.value.status)
+const boundaryWarning = computed(() => props.permissionMode !== 'full_access' && !availability.value.ready && !availability.value.checking)
 const selected = computed(() => permissionOptions.find(
   option => option.value === props.permissionMode,
 ) ?? permissionOptions[2])
@@ -83,6 +92,14 @@ function selectMode(value: BuddyPermissionMode) {
 function confirmFullAccess() {
   confirmationOpen.value = false
   emit('updatePermissionMode', 'full_access')
+}
+
+async function confirmSetup() {
+  await setup()
+  if (setupResult.value === 'ready') {
+    setupOpen.value = false
+    popoverOpen.value = true
+  }
 }
 </script>
 
@@ -109,6 +126,9 @@ function confirmFullAccess() {
         <span class="desktop-permission-mode-selector__trigger-label">
           {{ t(selected.label) }}
         </span>
+        <small v-if="boundaryWarning" class="desktop-permission-mode-selector__warning">
+          {{ t(`desktop.chat.shellSandboxStatus.${sandboxStatus}`) }}
+        </small>
       </NButton>
     </template>
 
@@ -137,13 +157,20 @@ function confirmFullAccess() {
           />
           <span class="desktop-permission-mode-selector__option-copy">
             <strong>{{ t(option.label) }}</strong>
-            <small>{{ t(option.description) }}</small>
+            <small>{{ t(availability.isolated ? option.sandboxDescription : option.description) }}</small>
           </span>
         </button>
       </div>
       <small v-if="!canUpdate && !isUpdating" class="desktop-permission-mode-selector__locked">
         {{ t('desktop.chat.executionProfileRunLocked') }}
       </small>
+      <footer v-if="boundaryWarning" class="desktop-permission-mode-selector__boundary" role="status">
+        <strong>{{ t(`desktop.chat.shellSandboxStatus.${sandboxStatus}`) }}</strong>
+        <span>{{ t(`desktop.chat.shellSandboxHint.${sandboxStatus}`) }}</span>
+        <NButton v-if="availability.action" size="small" :disabled="!canUpdate || isSettingUp" @click="popoverOpen = false; setupOpen = true">
+          {{ t(availability.action === 'repair' ? 'desktop.chat.shellSandboxSetup.repair' : 'desktop.chat.shellSandboxSetup.enable') }}
+        </NButton>
+      </footer>
     </section>
   </NPopover>
 
@@ -153,6 +180,32 @@ function confirmFullAccess() {
     @cancel="confirmationOpen = false"
     @confirm="confirmFullAccess"
   />
+
+  <NModal
+    :show="setupOpen"
+    preset="dialog"
+    type="info"
+    :title="t('desktop.chat.shellSandboxSetup.title')"
+    :closable="!isSettingUp"
+    :mask-closable="!isSettingUp"
+    :close-on-esc="!isSettingUp"
+    :style="{ width: 'min(28rem, calc(100vw - 2rem))' }"
+    @update:show="setupOpen = $event"
+  >
+    <p>{{ t('desktop.chat.shellSandboxSetup.description') }}</p>
+    <p>{{ t('desktop.chat.shellSandboxSetup.removal') }}</p>
+    <p v-if="setupResult && setupResult !== 'ready'" role="status">
+      {{ t(`desktop.chat.shellSandboxSetup.${setupResult}`) }}
+    </p>
+    <template #action>
+      <NButton :disabled="isSettingUp" @click="setupOpen = false">
+        {{ t('common.cancel') }}
+      </NButton>
+      <NButton type="primary" :loading="isSettingUp" @click="confirmSetup">
+        {{ t(isSettingUp ? 'desktop.chat.shellSandboxSetup.waiting' : 'desktop.chat.shellSandboxSetup.confirm') }}
+      </NButton>
+    </template>
+  </NModal>
 </template>
 
 <style scoped lang="scss">
@@ -182,7 +235,24 @@ function confirmFullAccess() {
 }
 
 .desktop-permission-mode-selector__popover {
-  width: min(14rem, calc(100vw - 1rem));
+  width: min(18rem, calc(100vw - 1rem));
+}
+
+.desktop-permission-mode-selector__warning {
+  margin-left: 0.35rem;
+  color: var(--buddy-status-warning-text);
+  font-size: 0.65rem;
+}
+
+.desktop-permission-mode-selector__boundary {
+  display: grid;
+  gap: 0.25rem;
+  margin-top: 0.45rem;
+  border-top: 1px solid var(--buddy-border-subtle);
+  padding: 0.55rem 0.25rem 0.1rem;
+  color: var(--buddy-status-warning-text);
+  font-size: 0.7rem;
+  line-height: 1.5;
 }
 
 .desktop-permission-mode-selector__header {

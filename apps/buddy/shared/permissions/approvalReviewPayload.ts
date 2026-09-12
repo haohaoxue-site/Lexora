@@ -1,9 +1,10 @@
 import { z } from 'zod'
-
 import {
   BUDDY_DEFAULT_EXECUTION_PROFILE,
   BUDDY_EXECUTION_PROFILES,
 } from './executionProfile'
+
+import { sandboxDirectoryRequestSchema, sandboxNetworkTargetSchema } from './shellSandbox'
 
 const MAX_COMMAND_SOURCE_LENGTH = 16 * 1024
 const MAX_COMMAND_REVIEW_LENGTH = 4 * 1024
@@ -20,10 +21,12 @@ export const SHELL_APPROVAL_REASONS = [
   'system-mutation',
   'forced-confirmation',
   'manual-policy',
+  'sandbox-bypass',
 ] as const
 export type ShellApprovalReason = typeof SHELL_APPROVAL_REASONS[number]
 
 const shellApprovalContextSchema = z.object({
+  boundary: z.enum(['sandbox', 'host']).optional(),
   cwd: z.string().min(1).max(4_096),
   reason: z.enum(SHELL_APPROVAL_REASONS),
 }).strict()
@@ -89,6 +92,18 @@ const browserApprovalOriginSchema = z.union([
 ])
 
 export const approvalReviewPayloadSchema = z.discriminatedUnion('card', [
+  sandboxDirectoryRequestSchema.extend({
+    allowForTurn: z.literal(false),
+    card: z.literal('sandbox-directory'),
+    scope: z.literal('run'),
+    toolName: z.literal('lexora_authorize_directory'),
+  }).strict(),
+  sandboxNetworkTargetSchema.extend({
+    allowForTurn: z.literal(false),
+    card: z.literal('sandbox-network'),
+    command: z.string().max(MAX_COMMAND_REVIEW_LENGTH),
+    toolName: z.enum(['bash', 'powershell']),
+  }).strict(),
   z.object({
     allowForTurn: z.boolean().default(true),
     card: z.literal('shell'),
@@ -223,6 +238,8 @@ export interface CreateApprovalReviewPayloadInput {
   automation?: AutomationApprovalReviewInput
   browser?: BrowserApprovalReviewInput
   kind: ApprovalReviewKind
+  network?: z.infer<typeof sandboxNetworkTargetSchema>
+  sandboxDirectory?: z.infer<typeof sandboxDirectoryRequestSchema>
   paths?: PathApprovalReviewInput
   shell?: ShellApprovalContext
   systemAction?: SystemActionApprovalReviewInput
@@ -232,6 +249,25 @@ export interface CreateApprovalReviewPayloadInput {
 export function createApprovalReviewPayload(
   input: CreateApprovalReviewPayloadInput,
 ): ApprovalReviewPayload {
+  if (input.sandboxDirectory && input.kind === input.sandboxDirectory.access) {
+    return approvalReviewPayloadSchema.parse({
+      ...input.sandboxDirectory,
+      reason: redactSensitiveText(input.sandboxDirectory.reason),
+      allowForTurn: false,
+      card: 'sandbox-directory',
+      scope: 'run',
+      toolName: input.toolName,
+    })
+  }
+  if (input.kind === 'network' && input.network) {
+    return approvalReviewPayloadSchema.parse({
+      ...input.network,
+      allowForTurn: false,
+      card: 'sandbox-network',
+      command: redactShellCommand(readString(input.arguments, 'command')),
+      toolName: input.toolName,
+    })
+  }
   if (input.kind === 'shell') {
     return approvalReviewPayloadSchema.parse({
       allowForTurn: input.allowForTurn,
@@ -307,7 +343,7 @@ export function approvalReviewPayloadMatchesKind(
   if (kind === 'shell')
     return payload.card === 'shell'
   if (kind === 'delete' || kind === 'read' || kind === 'render' || kind === 'write')
-    return payload.card === 'paths'
+    return payload.card === 'paths' || (payload.card === 'sandbox-directory' && payload.access === kind)
   if (kind === 'system')
     return payload.card === 'arguments' || payload.card === 'system-action'
   if (kind === 'automation')
@@ -315,7 +351,7 @@ export function approvalReviewPayloadMatchesKind(
   if (kind === 'browser')
     return payload.card === 'browser-action'
   return kind === 'network'
-    ? payload.card === 'arguments' || payload.card === 'web'
+    ? payload.card === 'arguments' || payload.card === 'web' || payload.card === 'sandbox-network'
     : payload.card === 'arguments'
 }
 

@@ -92,6 +92,8 @@ export class DesktopIntegrations {
       })
     }))
     registerDesktopIpc({
+      getSandboxStatus: () => this.#runtime.getSandboxStatus(),
+      setupSandbox: () => this.#runtime.setupSandbox(),
       checkForUpdates: () => checkForDesktopUpdate({ currentVersion: app.getVersion(), fetchRelease: net.fetch }),
       configPath: paths.configPath,
       configStore: runtime.configStore,

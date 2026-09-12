@@ -216,6 +216,11 @@ jobs:
         run: |
           tar -xf "$RUNNER_TEMP/buddy-test-runtime/buddy-test-runtime.tar" -C apps/buddy
           node packaging/buddy/release/search-tools.mjs
+          sudo apt-get install -y socat
+          if sudo apparmor_status --enabled; then
+            sandbox_binary="$(realpath apps/buddy/.output/build/shell-sandbox/linux-x64/bwrap)"
+            printf 'abi <abi/4.0>,\nprofile lexora-buddy-test-shell "%s" flags=(unconfined) { userns, }\n' "$sandbox_binary" | sudo apparmor_parser --replace
+          fi
 
       - name: Test Buddy
         run: pnpm --filter @lexora/buddy test
@@ -254,7 +259,10 @@ jobs:
             buddy-runtime-${{ runner.os }}-${{ runner.arch }}-${{ env.BUDDY_RUST_TOOLCHAIN }}-${{ hashFiles('apps/buddy/native/Cargo.lock') }}-
 
       - name: Prepare native test programs
-        run: node .github/scripts/buddy-test-runtime.mjs "$RUNNER_TEMP/buddy-test-runtime.tar"
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libcap-dev meson ninja-build
+          node .github/scripts/buddy-test-runtime.mjs "$RUNNER_TEMP/buddy-test-runtime.tar"
 
       - name: Upload Buddy test runtime
         if: github.event_name == 'pull_request'
@@ -319,6 +327,19 @@ jobs:
 
       - name: Test native components
         run: cargo test --locked --manifest-path apps/buddy/native/Cargo.toml --workspace ${{ matrix.cargo-args }}
+
+      - name: Build Windows sandbox acceptance runtime
+        if: runner.os == 'Windows'
+        run: cargo build --locked --release --manifest-path apps/buddy/native/Cargo.toml --package lexora-buddy-host --bin lexora-buddy-sandbox --example sandbox-adversary --target x86_64-pc-windows-msvc
+
+      - name: Verify Windows sandbox with a non-administrator token
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: >-
+          ./packaging/buddy/release/verify-windows-sandbox.ps1
+          -SandboxExecutable ./apps/buddy/.output/build/native/x86_64-pc-windows-msvc/release/lexora-buddy-sandbox.exe
+          -AdversaryExecutable ./apps/buddy/.output/build/native/x86_64-pc-windows-msvc/release/examples/sandbox-adversary.exe
+          -InstallComponent
 
   buddy-dependency-cache:
     name: Buddy dependency cache

@@ -18,6 +18,7 @@ export interface BuddyToolClassification {
     systemAction?: SystemActionApprovalReviewInput
   }
   forceAsk?: boolean
+  shellBoundary?: 'sandbox'
   paths?: readonly PermissionPath[]
   validateBeforeExecution?: () => Promise<BuddyToolClassificationFailure | null>
 }

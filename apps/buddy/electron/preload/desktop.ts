@@ -23,6 +23,8 @@ export function createDesktopApi(): Pick<LexoraDesktopApi, 'app' | 'clipboard' |
       }),
       checkForUpdates: () => ipcRenderer.invoke(DESKTOP_IPC_CHANNELS.appCheckForUpdates),
       getInfo: (): Promise<DesktopAppInfo> => ipcRenderer.invoke(DESKTOP_IPC_CHANNELS.appGetInfo),
+      getSandboxStatus: () => ipcRenderer.invoke(DESKTOP_IPC_CHANNELS.appGetSandboxStatus),
+      setupSandbox: () => ipcRenderer.invoke(DESKTOP_IPC_CHANNELS.appSetupSandbox),
       onBeforeQuit: (listener: () => Promise<boolean>) => {
         const handler = (_event: Electron.IpcRendererEvent, input: { requestId?: unknown }) => {
           const requestId = typeof input?.requestId === 'string' ? input.requestId : ''
