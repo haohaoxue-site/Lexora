@@ -103,20 +103,30 @@ const approvalTitle = computed(() => t('desktop.approval.title', {
   operation: approvalOperation.value,
 }))
 const approvalDescription = computed(() => (
-  review.value?.card === 'shell'
-    ? t('desktop.approval.currentWorkspace')
-    : review.value?.card === 'browser-action'
-      ? t('desktop.approval.browser.scopeReview')
-      : review.value?.card === 'paths' && review.value.access === 'render'
-        ? t('desktop.approval.paths.renderDescription')
-        : review.value?.card === 'paths' && review.value.grant
-          ? t('desktop.approval.paths.grantDescription')
-          : t('desktop.approval.scopeReview')
+  review.value?.card === 'sandbox-directory'
+    ? t('desktop.approval.sandbox.directoryScope')
+    : review.value?.card === 'sandbox-network'
+      ? t('desktop.approval.sandbox.networkScope')
+      : review.value?.card === 'shell'
+        ? t(review.value.context?.reason === 'sandbox-bypass'
+            ? 'desktop.approval.sandbox.hostScope'
+            : review.value.context?.boundary === 'sandbox'
+              ? 'desktop.approval.sandbox.isolatedScope'
+              : 'desktop.approval.currentWorkspace')
+        : review.value?.card === 'browser-action'
+          ? t('desktop.approval.browser.scopeReview')
+          : review.value?.card === 'paths' && review.value.access === 'render'
+            ? t('desktop.approval.paths.renderDescription')
+            : review.value?.card === 'paths' && review.value.grant
+              ? t('desktop.approval.paths.grantDescription')
+              : t('desktop.approval.scopeReview')
 ))
 const approveActionLabel = computed(() => (
-  review.value?.card === 'paths' && review.value.grant
-    ? t('desktop.approval.paths.approveAndGrantAction')
-    : t('approvalAction.approve')
+  review.value?.card === 'sandbox-directory'
+    ? t('desktop.approval.sandbox.approveDirectory')
+    : review.value?.card === 'paths' && review.value.grant
+      ? t('desktop.approval.paths.approveAndGrantAction')
+      : t('approvalAction.approve')
 ))
 const headingId = computed(() => `desktop-approval-${props.approval.id}-title`)
 const isResolving = computed(() => props.resolvingAction !== null)
@@ -180,6 +190,37 @@ const turnConfirmationButtonProps = { type: 'error' } as const
           </dd>
         </div>
       </dl>
+    </section>
+    <section
+      v-else-if="review?.card === 'sandbox-directory'"
+      class="desktop-approval-card__details desktop-approval-card__review"
+    >
+      <dl>
+        <div>
+          <dt>{{ t('desktop.approval.target') }}</dt>
+          <dd><code>{{ review.path }}</code></dd>
+        </div>
+        <div>
+          <dt>{{ t('desktop.approval.authorizationBoundary') }}</dt>
+          <dd>{{ t(review.access === 'read' ? 'desktop.approval.sandbox.directoryRead' : 'desktop.approval.sandbox.directoryWrite') }}</dd>
+        </div>
+        <div>
+          <dt>{{ t('desktop.approval.reason') }}</dt>
+          <dd>{{ review.reason }}</dd>
+        </div>
+      </dl>
+    </section>
+    <section
+      v-else-if="review?.card === 'sandbox-network'"
+      class="desktop-approval-card__details desktop-approval-card__review"
+    >
+      <dl>
+        <div>
+          <dt>{{ t('desktop.approval.target') }}</dt>
+          <dd><code>{{ review.host }} · {{ review.port }}</code></dd>
+        </div>
+      </dl>
+      <pre>{{ review.command }}</pre>
     </section>
     <section
       v-else-if="review?.card === 'web'"

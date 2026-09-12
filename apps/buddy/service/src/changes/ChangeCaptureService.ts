@@ -53,6 +53,7 @@ export interface LocalChangeSetDetail extends LocalChangeSetSummary {
 
 interface PendingWorkspaceCapture {
   conversationId: string
+  grants: readonly DirectoryGrant[]
   runId: string
   snapshot: WorkspaceSnapshot
 }
@@ -138,10 +139,12 @@ export class ChangeCaptureService {
     runId: string
     toolCallId: string
   }): Promise<void> {
+    const grants = input.grants.map(grant => ({ ...grant }))
     this.#workspaceCaptures.set(input.toolCallId, {
       conversationId: input.conversationId,
+      grants,
       runId: input.runId,
-      snapshot: await captureWorkspaceSnapshot(input.grants, input.cwd),
+      snapshot: await captureWorkspaceSnapshot(grants, input.cwd),
     })
   }
 
@@ -163,7 +166,7 @@ export class ChangeCaptureService {
     ) {
       throw new ChangeCaptureError('VALIDATION_FAILED')
     }
-    const after = await captureWorkspaceSnapshot(input.grants, input.cwd)
+    const after = await captureWorkspaceSnapshot(before.grants, input.cwd)
     await this.#persistWorkspaceChanges({
       after: after.files,
       afterComplete: after.complete,

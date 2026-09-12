@@ -5,6 +5,7 @@ import type {
 import type { BuddyApprovalPolicy } from '../../../../shared/permissions/approvalPolicy'
 import type { PathApprovalReviewInput } from '../../../../shared/permissions/approvalReviewPayload'
 import type { BuddyExecutionProfile } from '../../../../shared/permissions/executionProfile'
+import type { SandboxDirectoryGrant } from '../../../../shared/permissions/shellSandbox'
 import type { ApprovalService } from '../../approvals/ApprovalService'
 import type {
   BuddyToolClassification,
@@ -30,6 +31,7 @@ export interface CreateToolPolicyExtensionOptions {
   ) => BuddyToolClassificationResult | null | undefined | Promise<BuddyToolClassificationResult | null | undefined>
   cwd: string
   applyGrant?: (grant: GrantProposal) => Promise<void> | void
+  applySandboxDirectory?: (run: BuddyExtensionRunContext, grant: SandboxDirectoryGrant) => Promise<void>
   approvalAvailable: boolean
   approvalPolicy: BuddyApprovalPolicy
   engine?: PermissionEngine
@@ -77,6 +79,7 @@ async function decideToolCall(
       arguments: event.input,
       cwd: options.cwd,
       forceAsk: declared.forceAsk,
+      shellBoundary: declared.shellBoundary,
       grants: options.getGrants(),
       owner: options.owner,
       paths: declared.paths,
@@ -112,6 +115,9 @@ async function requestApproval(
     runId: run.runId,
     signal: run.signal,
     shell: decision.shell,
+    sandboxDirectory: decision.sandboxDirectory
+      ? { access: decision.sandboxDirectory.access, path: decision.sandboxDirectory.path, reason: decision.sandboxDirectory.reason }
+      : undefined,
     summary: decision.summary,
     systemAction: declared.approval?.systemAction,
     toolCallId: event.toolCallId,
@@ -120,6 +126,20 @@ async function requestApproval(
   if (approval.decision === 'denied')
     return await deny(run, event, 'APPROVAL_DENIED')
 
+  run.signal.throwIfAborted()
+  const validation = await declared.validateBeforeExecution?.()
+  if (validation)
+    return await deny(run, event, validation.reason)
+  if (decision.sandboxDirectory) {
+    if (approval.decision !== 'approved_once' || !options.applySandboxDirectory)
+      return await deny(run, event, 'DIRECTORY_GRANT_FAILED')
+    try {
+      await options.applySandboxDirectory(run, decision.sandboxDirectory)
+    }
+    catch {
+      return await deny(run, event, 'SANDBOX_DIRECTORY_CHANGED')
+    }
+  }
   if (decision.grant && approval.decision === 'approved_once') {
     try {
       if (!options.applyGrant)
@@ -131,9 +151,7 @@ async function requestApproval(
     }
   }
 
-  const validation = await declared.validateBeforeExecution?.()
-  if (validation)
-    return await deny(run, event, validation.reason)
+  run.signal.throwIfAborted()
   return authorizeToolExecution(run, event)
 }
 

@@ -1,6 +1,7 @@
 import type { BuddyApprovalPolicy } from '../../../shared/permissions/approvalPolicy'
 import type { ApprovalReviewKind, ShellApprovalContext } from '../../../shared/permissions/approvalReviewPayload'
 import type { BuddyExecutionProfile } from '../../../shared/permissions/executionProfile'
+import type { SandboxDirectoryGrant } from '../../../shared/permissions/shellSandbox'
 
 export type AccessKind
   = 'delete'
@@ -58,6 +59,7 @@ export type PermissionDecision
     kind: ApprovalReviewKind
     paths?: readonly { path: string, zone: PathZone }[]
     shell?: ShellApprovalContext
+    sandboxDirectory?: SandboxDirectoryGrant & { reason: string }
     summary: string
     type: 'ask'
   }
@@ -76,6 +78,7 @@ export interface PermissionRequest {
   arguments: unknown
   cwd: string
   forceAsk?: boolean
+  shellBoundary?: 'sandbox'
   grants: readonly PermissionGrant[]
   owner: GrantOwner
   paths?: readonly PermissionPath[]
@@ -100,6 +103,7 @@ export function ask(input: {
   kind: ApprovalReviewKind
   paths?: readonly { path: string, zone: PathZone }[]
   shell?: ShellApprovalContext
+  sandboxDirectory?: SandboxDirectoryGrant & { reason: string }
   summary: string
 }): PermissionDecision {
   return {
@@ -108,6 +112,7 @@ export function ask(input: {
     kind: input.kind,
     ...(input.paths?.length ? { paths: input.paths } : {}),
     ...(input.shell ? { shell: input.shell } : {}),
+    ...(input.sandboxDirectory ? { sandboxDirectory: input.sandboxDirectory } : {}),
     summary: input.summary,
     type: 'ask',
   }

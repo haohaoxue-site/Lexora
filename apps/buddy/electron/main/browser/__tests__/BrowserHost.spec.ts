@@ -409,6 +409,27 @@ describe('browserHost sessions and navigation', () => {
     expect(fixture.host.getState(session.sessionId)).toMatchObject({ status: 'error' })
   })
 
+  it('preserves the Chromium failure when the clock crosses the settlement deadline during a poll', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    const fixture = createFixture()
+    const session = fixture.host.ensureSession('conversation-1')
+    const message = 'ERR_CONNECTION_REFUSED (-102)'
+    fixture.webContents.loadURL.mockImplementationOnce(async () => {
+      let now = 0
+      vi.spyOn(Date, 'now').mockImplementation(() => now += 100)
+      throw new Error(message)
+    })
+
+    const failure = expect(fixture.host.navigate(session.sessionId, 'http://127.0.0.1:65534/'))
+      .rejects
+      .toMatchObject({ code: 'BROWSER_PAGE_FAILED', message })
+    await Promise.all([failure, vi.advanceTimersByTimeAsync(1_000)])
+    expect(fixture.host.getState(session.sessionId)).toMatchObject({
+      status: 'error',
+      error: { code: 'BROWSER_PAGE_FAILED', message },
+    })
+  })
+
   it('does not start a navigation after it is stopped during authorization', async () => {
     const fixture = createFixture()
     const session = fixture.host.ensureSession('conversation-1')

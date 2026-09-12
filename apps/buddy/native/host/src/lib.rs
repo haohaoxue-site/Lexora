@@ -4,6 +4,8 @@ pub mod process_control;
 #[cfg(windows)]
 pub mod runtime_guard;
 pub mod service_control;
+#[cfg(windows)]
+pub mod shell_sandbox;
 
 mod windows_path;
 #[cfg(windows)]

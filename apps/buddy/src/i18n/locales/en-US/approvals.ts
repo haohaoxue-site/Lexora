@@ -1,6 +1,10 @@
 import type zhCN from '../zh-CN/approvals'
 
 export default {
+  'desktop.approval.sandbox.directoryScope': 'Applies only to sandboxed commands in this run. Expires when the run ends, stops or restarts. Does not change saved Space/conversation permissions or authorize other tools. Sensitive-file protection remains active.',
+  'desktop.approval.sandbox.directoryRead': 'Read this directory and its contents; no additional write or delete permission',
+  'desktop.approval.sandbox.directoryWrite': 'Read, create, modify and delete files in this directory; this does not imply a backup exists',
+  'desktop.approval.sandbox.approveDirectory': 'Allow directory access for this run',
   'approval.empty': 'No pending approvals',
   'approval.promptFallback': 'No task summary',
   'approval.queue': 'Approval queue',
@@ -76,6 +80,10 @@ export default {
   'desktop.approval.shell.reason.system-mutation': 'The command may change system or process state and requires separate confirmation.',
   'desktop.approval.shell.reason.forced-confirmation': 'This operation requires separate confirmation, even with turn authorization.',
   'desktop.approval.shell.reason.manual-policy': 'Manual approval is selected. Shell commands require confirmation before execution.',
+  'desktop.approval.shell.reason.sandbox-bypass': 'This command runs outside the sandbox and can access your files, credentials, network and desktop services. Separate approval is required, even with turn authorization.',
+  'desktop.approval.sandbox.hostScope': 'Runs on the host without sandbox filesystem or network restrictions',
+  'desktop.approval.sandbox.isolatedScope': 'Runs inside the sandbox; filesystem and network restrictions remain enforced',
+  'desktop.approval.sandbox.networkScope': 'Allow only this command to reach this host and port. It may send content from authorized directories. Permission expires when the command ends and does not cover other destinations or later commands.',
   'desktop.approval.automation.executionProfile': 'Permissions',
   'desktop.approval.kind.read': 'Read operation',
   'desktop.approval.kind.write': 'Write operation',

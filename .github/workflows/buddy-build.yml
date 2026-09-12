@@ -43,6 +43,9 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y \
             build-essential \
+            libcap-dev \
+            meson \
+            ninja-build \
             libgtk-3-dev \
             libgtk-layer-shell-dev \
             libxdo-dev \
@@ -85,7 +88,7 @@ jobs:
     container: archlinux:latest
     steps:
       - name: Install Arch build and GUI dependencies
-        run: pacman -Syu --noconfirm base-devel dbus git gtk3 libarchive libxcrypt-compat xorg-server-xvfb xorg-xauth
+        run: pacman -Syu --noconfirm base-devel dbus git gtk3 libarchive libcap meson ninja libxcrypt-compat xorg-server-xvfb xorg-xauth
 
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

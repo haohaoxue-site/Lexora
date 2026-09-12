@@ -2,6 +2,17 @@
   "directory": ".output/build/native",
   "manifest": "native/Cargo.toml",
   "components": {
+    "shellSandbox": {
+      "package": "lexora-buddy-host",
+      "binary": "lexora-buddy-sandbox",
+      "targets": {
+        "win32-x64": {
+          "triple": "x86_64-pc-windows-msvc",
+          "executable": "lexora-buddy-sandbox.exe",
+          "resource": "native-host/lexora-buddy-sandbox.exe"
+        }
+      }
+    },
     "runtimeGuard": {
       "package": "lexora-buddy-host",
       "binary": "lexora-buddy-runtime-guard",

@@ -87,6 +87,11 @@ pub fn run(input: impl Read, output: impl Write) -> Result<(), DirectoryError> {
     }
 }
 
+#[cfg(windows)]
+pub(crate) fn ensure(paths: &[String]) -> Result<(), DirectoryError> {
+    windows::ensure(paths)
+}
+
 #[cfg(test)]
 #[path = "../__tests__/private_directories.rs"]
 mod tests;

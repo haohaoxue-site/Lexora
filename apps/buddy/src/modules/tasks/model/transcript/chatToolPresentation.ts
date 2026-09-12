@@ -45,7 +45,7 @@ export function specificToolDescription(value: string | null): string | null {
 }
 
 export function approvalPresentation(review: ApprovalReviewPayload): BuddyToolPresentation {
-  if (review.card === 'shell') {
+  if (review.card === 'shell' || review.card === 'sandbox-network') {
     return {
       card: 'terminal',
       command: review.command,
@@ -103,7 +103,9 @@ export function approvalPresentation(review: ApprovalReviewPayload): BuddyToolPr
   }
   const argumentNames = review.card === 'arguments'
     ? review.argumentNames
-    : review.targets.length > 0 ? ['targets'] : []
+    : review.card === 'sandbox-directory'
+      ? ['path', 'access', 'reason']
+      : review.targets.length > 0 ? ['targets'] : []
   if (review.toolName.startsWith('mcp__')) {
     const [, connector = 'connector', ...toolParts] = review.toolName.split('__')
     return {

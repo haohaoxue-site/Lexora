@@ -19,6 +19,28 @@ afterEach(async () => {
 })
 
 describe('changeCaptureService', () => {
+  it('finishes the original capture scope after temporary permissions are revoked', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'buddy-expired-change-'))
+    directories.push(root)
+    const workspace = join(root, 'workspace')
+    await mkdir(workspace)
+    await writeFile(join(workspace, 'untouched.txt'), 'preserved')
+    await writeFile(join(workspace, 'changed.txt'), 'before')
+    const database = openBuddyDatabase({ databasePath: ':memory:' })
+    databases.push(database)
+    seedRun(database)
+    const service = new ChangeCaptureService({ paths: new BuddyDataPaths(root), repository: createChangeSetRepository(database) })
+    const input = { cwd: workspace, conversationId: 'conversation-1', runId: 'run-1', toolCallId: 'shell-expired', grants: [{ root: workspace, canonicalRoot: workspace, grantId: 'temporary', kind: 'granted' as const }] }
+    await service.beginWorkspaceTool(input)
+    await writeFile(join(workspace, 'changed.txt'), 'after')
+    await service.finishWorkspaceTool({ ...input, grants: [], isError: true, toolName: 'bash' })
+    await service.finalizeRun(input.runId)
+    expect(await service.getVisibleDetail(input.runId)).toMatchObject({
+      fileCount: 1,
+      files: [{ changeType: 'modified', path: 'changed.txt', beforeText: 'before', afterText: 'after' }],
+    })
+  })
+
   it('does not report a skipped oversized file as deleted after a partial scan', async () => {
     const root = await mkdtemp(join(tmpdir(), 'buddy-partial-change-'))
     directories.push(root)

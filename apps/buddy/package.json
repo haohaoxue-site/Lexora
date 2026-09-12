@@ -38,14 +38,16 @@
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "type-check": "vue-tsc -b --pretty false",
-    "prepare:test-runtime": "node ../../packaging/buddy/release/search-tools.mjs && node ../../packaging/buddy/release/native-host.mjs",
+    "prepare:test-runtime": "node ../../packaging/buddy/release/search-tools.mjs && node ../../packaging/buddy/release/shell-sandbox.mjs && node ../../packaging/buddy/release/native-host.mjs",
     "test": "vitest run --maxWorkers=4",
     "test:unit": "pnpm test --project=unit",
     "test:runtime": "pnpm test --project=runtime",
     "test:platform": "pnpm test --project=platform",
+    "test:sandbox:windows": "node --test native/host/__tests__/shell_sandbox.windows.mjs",
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@anthropic-ai/sandbox-runtime": "0.0.76",
     "@antv/x6": "^3.1.8",
     "@antv/x6-vue-shape": "^3.0.2",
     "@dnd-kit/abstract": "^0.5.0",

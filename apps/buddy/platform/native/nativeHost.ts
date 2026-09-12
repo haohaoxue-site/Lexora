@@ -40,6 +40,10 @@ export function resolveBuddyPrivateDirectories(options: NativeHostPaths): string
   return resolveNativeComponent('privateDirectories', options)
 }
 
+export function resolveBuddyShellSandbox(options: NativeHostPaths): string | undefined {
+  return resolveNativeComponent('shellSandbox', options)
+}
+
 export function resolveBuddyImageTransformer(options: NativeHostPaths): string {
   const executable = resolveNativeComponent('imageTransform', options)
   if (!executable)

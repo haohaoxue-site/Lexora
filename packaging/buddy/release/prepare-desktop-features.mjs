@@ -4,6 +4,7 @@ import { writeError } from '../../shared/cli-output.mjs'
 import { prepareNativeHost } from './native-host.mjs'
 import { resolvePackagingPlatform } from './platform-definition.mjs'
 import { prepareSearchTools } from './search-tools.mjs'
+import { prepareShellSandbox } from './shell-sandbox.mjs'
 
 const platform = resolvePackagingPlatform(process.platform)
 const release = process.argv.includes('--release')
@@ -29,7 +30,7 @@ const builders = {
   },
 }
 
-void prepareSearchTools().then(() => {
+void Promise.all([prepareSearchTools(), prepareShellSandbox()]).then(() => {
   prepareNativeHost()
   for (const feature of platform.features)
     builders[feature]?.()

@@ -7,10 +7,14 @@ import type { AttachmentService } from '../../attachments/AttachmentService'
 import type { ChangeCaptureService } from '../../changes/ChangeCaptureService'
 import type { DirectoryGrantMutation, DirectoryGrantService } from '../../directories/DirectoryGrantService'
 import type { DirectoryGrant } from '../../directories/resolveGrantedPath'
+import type { ShellSandboxClient } from '../../sandbox/ShellSandboxClient'
 import type { BuddyInputReferenceStore } from '../context/BuddyInputReference'
 import type { BuddyCapabilityFactory } from './BuddyCapability'
 import type { BuddyExtensionRunContextStore } from './BuddyExtensionRunContext'
 import type { BuddyInProcessExtension } from './BuddyInProcessExtension'
+import { SandboxDirectoryPermissions } from '../../sandbox/SandboxDirectoryPermissions'
+import { createShellCapability } from '../../sandbox/shellCapability'
+import { resolveShellExecution } from '../../sandbox/shellExecution'
 import { createChangeCaptureExtension } from './changeCaptureExtension'
 import { createToolDiscoveryCapability } from './discovery/toolDiscoveryExtension'
 import { createInputReferenceExtension } from './inputReferenceExtension'
@@ -22,6 +26,7 @@ export interface BuddySessionExtensionServices {
   changeCaptureService: Pick<ChangeCaptureService, 'beginFileTool' | 'beginWorkspaceTool' | 'finalizeRun' | 'finishFileTool' | 'finishWorkspaceTool' | 'markPartial'>
   createCapabilities: BuddyCapabilityFactory
   directoryGrants: Pick<DirectoryGrantService, 'grant'>
+  shellSandbox?: Pick<ShellSandboxClient, 'exec'>
 }
 
 export interface CreateBuddySessionExtensionsOptions {
@@ -48,16 +53,34 @@ export async function createBuddySessionExtensions(
 ): Promise<BuddySessionExtensions> {
   const { services } = options
   const grants = [...options.grants]
+  const sandboxDirectories = new SandboxDirectoryPermissions()
   const runContext: BuddyExtensionRunContextStore = { current: null }
   const inputReferences: BuddyInputReferenceStore = { pending: null }
-  const capabilities = await services.createCapabilities({
+  const capabilities = [...await services.createCapabilities({
     conversationId: options.conversationId,
     cwd: options.canonicalRoot,
     getRunId: () => runContext.current?.runId,
     grants,
     sessionMode: options.sessionMode,
     signal: options.signal,
-  })
+  })]
+  const execution = resolveShellExecution(options.executionProfile)
+  if (execution.boundary === 'sandbox') {
+    capabilities.push(createShellCapability({
+      cwd: options.canonicalRoot,
+      execution,
+      getGrants: () => grants,
+      getRunContext: () => runContext.current,
+      approvalAvailable: options.sessionMode === 'interactive',
+      approvalPolicy: options.approvalPolicy,
+      owner: options.spaceId
+        ? { id: options.spaceId, kind: 'space' }
+        : { id: options.conversationId, kind: 'conversation' },
+      approvalService: services.approvalService,
+      sandbox: services.shellSandbox,
+      directoryPermissions: sandboxDirectories,
+    }))
+  }
   options.signal.throwIfAborted()
   const discovery = createToolDiscoveryCapability(capabilities.flatMap(capability => capability.disclosure ? [capability.disclosure] : []))
   const sessionCapabilities = [...capabilities, discovery]
@@ -65,6 +88,7 @@ export async function createBuddySessionExtensions(
     createInputReferenceExtension(inputReferences),
     ...sessionCapabilities.map(capability => capability.extension),
     createToolPolicyExtension({
+      applySandboxDirectory: (run, grant) => sandboxDirectories.grant(run, grant),
       applyGrant: async (proposal) => {
         const mutation = await services.directoryGrants.grant(proposal)
         applyGrantToSession(grants, mutation)
@@ -93,6 +117,7 @@ export async function createBuddySessionExtensions(
       cwd: options.canonicalRoot,
       getRunContext: () => runContext.current,
       grants,
+      getWorkspaceGrants: () => [...grants, ...sandboxDirectories.getWriteGrants(runContext.current)],
       service: services.changeCaptureService,
       workspaceMutationTools: capabilities.flatMap(capability => capability.workspaceMutationTools ?? []),
     }),

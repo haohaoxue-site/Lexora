@@ -11,6 +11,7 @@ module.exports = {
   appId: desktopName,
   productName: 'lexora-buddy',
   asar: true,
+  asarUnpack: ['node_modules/@anthropic-ai/sandbox-runtime/vendor/**'],
   electronFuses: {
     enableCookieEncryption: true,
     enableNodeCliInspectArguments: false,
@@ -61,8 +62,11 @@ module.exports = {
     target: ['deb'],
   },
   deb: {
+    appArmorProfile: '../../packaging/buddy/linux/apparmor-profile.tpl',
     packageName: 'lexora-buddy',
     depends: [
+      'libcap2',
+      'socat',
       'git',
       'libgtk-3-0',
       'libnotify4',
@@ -78,6 +82,7 @@ module.exports = {
     ],
   },
   pacman: {
+    appArmorProfile: '../../packaging/buddy/linux/apparmor-profile.tpl',
     artifactName: `Lexora-Buddy-${macro('version')}-arch-x86_64.pkg.tar.zst`,
     compression: 'zstd',
     packageName: 'lexora-buddy',
@@ -96,6 +101,7 @@ module.exports = {
       'gtk3',
       'hicolor-icon-theme',
       'libcups',
+      'libcap',
       'libnotify',
       'libsecret',
       'libx11',
@@ -112,6 +118,7 @@ module.exports = {
       'nspr',
       'nss',
       'pango',
+      'socat',
       'systemd-libs',
       'util-linux-libs',
       'xdg-utils',
