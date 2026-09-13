@@ -5,6 +5,7 @@ import { computed, onScopeDispose, shallowRef, watch } from 'vue'
 
 export function useShellSandboxStatus(open: Ref<boolean>) {
   const status = shallowRef<SandboxEnvironmentStatus | 'unknown' | 'checking'>('checking')
+  const isChecking = shallowRef(false)
   const isSettingUp = shallowRef(false)
   const setupResult = shallowRef<SandboxSetupResult>()
   const availability = computed(() => sandboxAvailability(status.value))
@@ -16,6 +17,7 @@ export function useShellSandboxStatus(open: Ref<boolean>) {
 
   async function refresh() {
     const current = ++revision
+    isChecking.value = true
     try {
       const desktop = window.lexoraDesktop
       if (!desktop)
@@ -28,6 +30,17 @@ export function useShellSandboxStatus(open: Ref<boolean>) {
       if (!disposed && current === revision)
         status.value = 'unknown'
     }
+    finally {
+      if (!disposed && current === revision)
+        isChecking.value = false
+    }
+  }
+
+  async function recheck() {
+    if (isChecking.value || isSettingUp.value)
+      return
+    setupResult.value = undefined
+    await refresh()
   }
 
   async function setup() {
@@ -57,5 +70,5 @@ export function useShellSandboxStatus(open: Ref<boolean>) {
     if ((visible || status.value === 'checking') && !isSettingUp.value)
       void refresh()
   }, { immediate: true })
-  return { availability, isSettingUp, setupResult, setup }
+  return { availability, isChecking, isSettingUp, setupResult, recheck, setup }
 }

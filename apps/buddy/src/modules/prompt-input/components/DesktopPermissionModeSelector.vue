@@ -4,6 +4,7 @@ import type { BuddyPermissionMode } from '@buddy-shared/permissions/permissionMo
 import type { BuddySessionMode } from '@buddy-shared/permissions/sessionMode'
 import type { BuddyLocale } from '@/i18n/buddyI18n'
 import {
+  ArrowClockwise20Regular,
   HandLeft20Regular,
   LockClosed20Regular,
   LockOpen20Regular,
@@ -68,7 +69,7 @@ const availableOptions = computed(() => permissionOptions.filter(
 const confirmationOpen = shallowRef(false)
 const popoverOpen = shallowRef(false)
 const setupOpen = shallowRef(false)
-const { availability, isSettingUp, setupResult, setup } = useShellSandboxStatus(popoverOpen)
+const { availability, isChecking, isSettingUp, setupResult, recheck, setup } = useShellSandboxStatus(popoverOpen)
 const sandboxStatus = computed(() => availability.value.status)
 const boundaryWarning = computed(() => props.permissionMode !== 'full_access' && !availability.value.ready && !availability.value.checking)
 const selected = computed(() => permissionOptions.find(
@@ -97,7 +98,7 @@ function confirmFullAccess() {
 
 async function confirmSetup() {
   await setup()
-  if (setupResult.value === 'ready') {
+  if (setupResult.value === 'ready' || setupResult.value === 'incompatible') {
     setupOpen.value = false
     popoverOpen.value = true
   }
@@ -184,6 +185,12 @@ async function confirmSetup() {
         <NButton v-if="availability.action" size="small" :disabled="!canUpdate || isSettingUp" @click="popoverOpen = false; setupOpen = true">
           {{ t(availability.action === 'repair' ? 'desktop.chat.shellSandboxSetup.repair' : 'desktop.chat.shellSandboxSetup.enable') }}
         </NButton>
+        <NButton v-else-if="sandboxStatus === 'incompatible'" size="small" :loading="isChecking" @click="recheck">
+          <template #icon>
+            <DesktopIcon :component="ArrowClockwise20Regular" />
+          </template>
+          {{ t('desktop.chat.shellSandboxSetup.recheck') }}
+        </NButton>
       </footer>
     </section>
   </NPopover>
@@ -207,7 +214,6 @@ async function confirmSetup() {
     @update:show="setupOpen = $event"
   >
     <p>{{ t('desktop.chat.shellSandboxSetup.description') }}</p>
-    <p>{{ t('desktop.chat.shellSandboxSetup.removal') }}</p>
     <p v-if="setupResult && setupResult !== 'ready'" role="status">
       {{ t(`desktop.chat.shellSandboxSetup.${setupResult}`) }}
     </p>

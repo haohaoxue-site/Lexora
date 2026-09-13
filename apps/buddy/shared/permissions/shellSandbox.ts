@@ -20,7 +20,7 @@ export function sandboxAvailability(status: SandboxEnvironmentStatus | 'unknown'
   return { status, ...SANDBOX_AVAILABILITY[status] }
 }
 
-export const sandboxSetupResultSchema = z.enum(['ready', 'cancelled', 'failed', 'busy'])
+export const sandboxSetupResultSchema = z.enum(['ready', 'incompatible', 'cancelled', 'failed', 'busy'])
 export type SandboxSetupResult = z.infer<typeof sandboxSetupResultSchema>
 
 export const sandboxDirectoryRequestSchema = z.object({
@@ -95,12 +95,12 @@ export class ShellSandboxError extends Error {
 
   constructor(code: ShellSandboxError['code']) {
     const hints: Record<ShellSandboxError['code'], string> = {
-      SANDBOX_UNAVAILABLE: 'Shell isolation is unavailable. Enable or repair isolation in the permission menu. Linux requires the packaged sandbox helper, socat and permitted user namespaces; Windows requires its sandbox network component. Host execution needs separate explicit approval. Nothing was retried on the host.',
-      SANDBOX_FAILED: 'The isolated command could not complete. Do not assume it made no changes. Host execution requires separate explicit approval.',
-      SANDBOX_CANCELLED: 'Shell command cancelled.',
-      SANDBOX_TIMEOUT: 'Shell command timed out.',
+      SANDBOX_UNAVAILABLE: 'The sandbox is unavailable. Enable or repair it in the permission menu. Related commands remain blocked until the sandbox is available.',
+      SANDBOX_FAILED: 'The sandboxed command could not complete. Do not assume it made no changes.',
+      SANDBOX_CANCELLED: 'Command cancelled.',
+      SANDBOX_TIMEOUT: 'Command timed out.',
       SANDBOX_BUSY: 'Too many isolated commands are running. Retry after another command finishes.',
-      SANDBOX_DIRECTORY_CHANGED: 'An authorized directory was replaced or redirected. Request authorization for its current identity before using it. Nothing was retried on the host.',
+      SANDBOX_DIRECTORY_CHANGED: 'An authorized directory was replaced or redirected. Request authorization for its current identity before using it.',
     }
     super(`${code}: ${hints[code]}`)
     this.name = 'ShellSandboxError'

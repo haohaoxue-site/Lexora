@@ -173,7 +173,7 @@ function handleDocumentKeydown(event: KeyboardEvent) {
 .desktop-chat-composer__source-menu {
   display: grid;
   width: fit-content;
-  min-width: min(9.5rem, calc(100vw - 2rem));
+  min-width: min(8.5rem, calc(100vw - 2rem));
   max-width: min(13rem, calc(100vw - 2rem));
   gap: 0.125rem;
   interpolate-size: allow-keywords;
@@ -220,7 +220,6 @@ function handleDocumentKeydown(event: KeyboardEvent) {
   padding: 0.36rem 0.35rem;
   column-gap: 0.5rem;
   font-size: 0.8rem;
-  font-weight: 580;
   line-height: 1.35;
 }
 

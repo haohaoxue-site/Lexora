@@ -65,7 +65,7 @@ impl Network {
 
     pub(super) fn install(&self) -> io::Result<()> {
         let mut provider_key = PROVIDER;
-        let mut name = wide("Lexora Buddy Shell Isolation");
+        let mut name = wide("Lexora Buddy Sandbox");
         let provider = FWPM_PROVIDER0 {
             providerKey: PROVIDER,
             flags: FWPM_PROVIDER_FLAG_PERSISTENT,
