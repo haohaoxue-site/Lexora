@@ -300,14 +300,21 @@ fn launch(
     })?;
     let handles = [input.as_raw_handle(), output.as_raw_handle()];
     let registry = capability("registryRead")?;
+    let com = capability("lpacCom")?;
     let instrumentation = capability("lpacInstrumentation")?;
     let internet = capability("internetClient")?;
     let volume_metadata = metadata::capability(&profile.name)?;
-    let mut entries =
-        [&registry, &instrumentation, &internet, &volume_metadata].map(|sid| SID_AND_ATTRIBUTES {
-            Sid: sid.as_ptr(),
-            Attributes: SE_GROUP_ENABLED as u32,
-        });
+    let mut entries = [
+        &registry,
+        &com,
+        &instrumentation,
+        &internet,
+        &volume_metadata,
+    ]
+    .map(|sid| SID_AND_ATTRIBUTES {
+        Sid: sid.as_ptr(),
+        Attributes: SE_GROUP_ENABLED as u32,
+    });
     let capabilities = SECURITY_CAPABILITIES {
         AppContainerSid: profile.sid.as_ptr(),
         Capabilities: entries.as_mut_ptr(),

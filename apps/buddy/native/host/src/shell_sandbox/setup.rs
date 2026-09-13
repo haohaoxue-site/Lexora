@@ -188,7 +188,7 @@ pub(super) fn install() -> io::Result<i32> {
     })?;
     let command = wide(&format!("\"{}\" service", target.display()));
     let name = wide(SERVICE_NAME);
-    let display = wide("Lexora Buddy Shell Isolation");
+    let display = wide("Lexora Buddy Sandbox");
     let dependencies = wide("BFE\0");
     // SAFETY: All service configuration is fixed; neither model input nor a user-provided program path reaches SCM.
     let handle = unsafe {
@@ -502,7 +502,7 @@ fn register_uninstaller(target: &std::path::Path) -> io::Result<()> {
     } as u32)?;
     let result = (|| {
         for (name, value) in [
-            ("DisplayName", "Lexora Buddy Shell Isolation".to_owned()),
+            ("DisplayName", "Lexora Buddy Sandbox".to_owned()),
             ("DisplayVersion", env!("CARGO_PKG_VERSION").to_owned()),
             ("Publisher", "Lexora".to_owned()),
             (

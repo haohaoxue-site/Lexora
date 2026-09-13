@@ -72,7 +72,10 @@ export async function setupWindowsSandbox(executable: string | undefined): Promi
       timeout: 190_000,
       maxBuffer: 16 * 1024,
     })
-    return await checkWindowsSandbox(executable) === 'available' ? 'ready' : 'failed'
+    const status = await checkWindowsSandbox(executable)
+    if (status === 'available')
+      return 'ready'
+    return status === 'incompatible' ? 'incompatible' : 'failed'
   }
   catch (error) {
     if (error && typeof error === 'object' && 'code' in error && error.code === 126)
