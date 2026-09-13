@@ -119,10 +119,13 @@ button {
   width: var(--buddy-task-sidebar-action-size, 1.75rem);
   height: var(--buddy-task-sidebar-action-size, 1.75rem);
   place-items: center;
+  padding: 0;
   border-radius: var(--buddy-icon-button-radius);
   color: var(--buddy-text-secondary);
+  line-height: 1;
 
   .n-icon {
+    display: flex;
     font-size: 16px;
   }
 

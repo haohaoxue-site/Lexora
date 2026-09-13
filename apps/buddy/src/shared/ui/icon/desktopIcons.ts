@@ -7,8 +7,10 @@ import messageEditUrl from './assets/message-edit.svg'
 import messageQueueUrl from './assets/message-queue.svg'
 import messageRetryUrl from './assets/message-retry.svg'
 import navigationAutomationUrl from './assets/navigation-automation.svg'
+import navigationSettingsUrl from './assets/navigation-settings.svg'
 import navigationTaskUrl from './assets/navigation-task.svg'
 import notificationMarkAllReadUrl from './assets/notification-mark-all-read.svg'
+import pinOffUrl from './assets/pin-off.svg'
 import sidebarChevronUrl from './assets/sidebar-chevron.svg'
 import spaceNoneUrl from './assets/space-none.svg'
 import toolCreateFileUrl from './assets/tool-create-file.svg'
@@ -30,8 +32,10 @@ export const DESKTOP_ICON_URLS = {
   messageQueue: messageQueueUrl,
   messageRetry: messageRetryUrl,
   navigationAutomation: navigationAutomationUrl,
+  navigationSettings: navigationSettingsUrl,
   navigationTask: navigationTaskUrl,
   notificationMarkAllRead: notificationMarkAllReadUrl,
+  pinOff: pinOffUrl,
   sidebarChevron: sidebarChevronUrl,
   spaceNone: spaceNoneUrl,
   toolCreateFile: toolCreateFileUrl,
