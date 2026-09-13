@@ -26,6 +26,7 @@ import {
 import { containsCanonicalPath } from '../../../../platform/filesystem/filePaths'
 import { buildBuddyRequestContext } from '../context/buildBuddyRequestContext'
 import { createEstimatedContextUsage } from '../context/contextUsageBreakdown'
+import { prepareBuddyInputHistory } from '../context/prepareBuddyInputHistory'
 import {
   getActivePiBuiltinToolNames,
   isPiShellToolName,
@@ -127,7 +128,7 @@ export async function createBuddyContextSnapshot(
   const agentDir = resolve(options.agentDir)
   const persistedSession = options.sessionManager
   const persistedContextUsageUnknown = hasUnknownPostCompactionUsage(persistedSession)
-  const recoveryMessages = convertToLlm(persistedSession.buildSessionContext().messages)
+  const recoveryMessages = convertToLlm(prepareBuddyInputHistory(persistedSession.buildSessionContext().messages))
   const sessionManager = SessionManager.inMemory(cwd)
   for (const message of recoveryMessages)
     sessionManager.appendMessage(message)
@@ -153,7 +154,7 @@ export async function createBuddyContextSnapshot(
         : []
     })
     return createEstimatedContextUsage(buildBuddyRequestContext({
-      messages: convertToLlm(result.session.messages),
+      messages: convertToLlm(prepareBuddyInputHistory(result.session.messages)),
       systemPrompt: result.session.systemPrompt,
       tools,
     }, result.session.getAllTools()))
