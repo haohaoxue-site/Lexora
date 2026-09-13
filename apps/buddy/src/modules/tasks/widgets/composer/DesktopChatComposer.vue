@@ -79,7 +79,7 @@ const {
   isSending: toRef(props, 'isSending'),
   language: toRef(props, 'language'),
   loadContextOptions: query => props.loadContextOptions(query),
-  beginImport: files => props.beginImport(files),
+  beginImport: (files, origin) => props.beginImport(files, origin),
   selectSource: source => props.selectSource(source),
   onSend: payload => emit('send', payload),
   onUpdateContent: (content, value) => emit('updateContent', content, value),
@@ -109,13 +109,7 @@ const modelInputIssueMessage = computed(() => {
     return t('desktop.chat.modelReasoningUnsupported', { value: props.selectedEffort ?? '' })
   if (modelInputIssue.value === 'service_tier_unsupported')
     return t('desktop.chat.modelServiceTierUnsupported', { value: props.selectedServiceTier ?? '' })
-  if (modelInputIssue.value === 'pdf_unsupported')
-    return t('desktop.chat.modelPdfUnsupported')
-  if (modelInputIssue.value === 'audio_unsupported')
-    return t('desktop.chat.modelAudioUnsupported')
-  if (modelInputIssue.value === 'video_unsupported')
-    return t('desktop.chat.modelVideoUnsupported')
-  return modelInputIssue.value === 'image_unsupported' ? t('desktop.chat.modelImageUnsupported') : ''
+  return ''
 })
 
 function handleFileDragover(event: DragEvent) {

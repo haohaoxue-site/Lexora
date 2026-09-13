@@ -1,6 +1,8 @@
 import type { DatabaseSync } from 'node:sqlite'
 
 export interface AttachmentRecord {
+  nameSource?: 'file' | 'clipboard'
+  sourcePath?: string
   conversationId: string | null
   createdAt: string
   draftId: string | null
@@ -24,6 +26,8 @@ export interface AttachmentRepository {
 }
 
 interface AttachmentRow {
+  name_source: 'file' | 'clipboard'
+  source_path: string | null
   conversation_id: string | null
   created_at: string
   draft_id: string | null
@@ -50,8 +54,8 @@ export function createAttachmentRepository(database: DatabaseSync): AttachmentRe
   `)
   const insert = database.prepare(`
     INSERT INTO attachments (
-      id, draft_id, message_id, stored_path, name, mime_type, size_bytes, created_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      id, draft_id, message_id, stored_path, name, mime_type, size_bytes, created_at, name_source, source_path
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `)
   const listAll = database.prepare(`${selection} ORDER BY attachments.created_at, attachments.id`)
   const listDraftsBefore = database.prepare(`
@@ -81,6 +85,8 @@ export function createAttachmentRepository(database: DatabaseSync): AttachmentRe
         record.mimeType,
         record.sizeBytes,
         record.createdAt,
+        record.nameSource ?? 'file',
+        record.sourcePath ?? null,
       )
       return requireAttachment(find.get(record.id), record.id)
     },
@@ -128,6 +134,8 @@ function toAttachment(row: AttachmentRow): AttachmentRecord {
     messageId: row.message_id,
     mimeType: row.mime_type,
     name: row.name,
+    nameSource: row.name_source,
+    sourcePath: row.source_path ?? undefined,
     sizeBytes: row.size_bytes,
     storedPath: row.stored_path,
   }

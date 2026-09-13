@@ -90,6 +90,8 @@ export class ComposerResourceService {
     const parsed = buddyComposerResourceAcceptSchema.parse(input)
     const resources = parsed.resources.map(resource => ({
       ...normalizeAttachmentMetadata(resource),
+      nameSource: resource.nameSource,
+      sourcePath: resource.sourcePath,
       resourceId: resource.resourceId,
     }))
     try {
@@ -221,7 +223,7 @@ export class ComposerResourceService {
           category: 'space' as const,
           description: `${file.root} · ${file.relativePath}`,
           label: value.metadata.name,
-          ...value.metadata,
+          ...normalizeAttachmentMetadata(value.metadata),
           path: file.path,
           source,
         }
@@ -304,19 +306,19 @@ export class ComposerResourceService {
   }
 
   async #resolveSource(source: BuddyComposerSource): Promise<{
-    metadata: ReturnType<typeof normalizeAttachmentMetadata>
+    metadata: ReturnType<typeof normalizeAttachmentMetadata> & { nameSource?: 'file' | 'clipboard', sourcePath?: string }
     source: BuddyComposerSourceOrigin
   }> {
     if ('artifactId' in source) {
       this.#requireVisibleArtifact(source)
-      const { artifact } = await this.#validateArtifactGrant(source)
+      const { artifact, path } = await this.#validateArtifactGrant(source)
       if (!artifact || artifact.kind !== 'file')
         throw new AttachmentError('ATTACHMENT_NOT_FOUND')
-      return { metadata: normalizeAttachmentMetadata(artifact), source }
+      return { metadata: { ...normalizeAttachmentMetadata(artifact), sourcePath: path }, source }
     }
     if ('messageId' in source) {
       const attachment = this.#resolveMessageInput(source)
-      return { metadata: normalizeAttachmentMetadata(attachment), source }
+      return { metadata: { ...normalizeAttachmentMetadata(attachment), nameSource: attachment.nameSource, sourcePath: attachment.sourcePath }, source }
     }
     return this.#resolveSpaceFile(source)
   }
@@ -324,7 +326,7 @@ export class ComposerResourceService {
   async #resolveSourceOrigin(source: BuddyComposerSourceOrigin, scope: ComposerSourceScope): Promise<{
     attachmentId: string | null
     bytes: Uint8Array
-    metadata: ReturnType<typeof normalizeAttachmentMetadata>
+    metadata: ReturnType<typeof normalizeAttachmentMetadata> & { nameSource?: 'file' | 'clipboard', sourcePath?: string }
   }> {
     if ('artifactId' in source) {
       if (scope.branchId !== source.branchId)
@@ -340,13 +342,13 @@ export class ComposerResourceService {
         ...resolved.artifact,
         sizeBytes: bytes.byteLength,
       })
-      return { attachmentId: null, bytes: Uint8Array.from(bytes), metadata }
+      return { attachmentId: null, bytes: Uint8Array.from(bytes), metadata: { ...metadata, sourcePath: resolved.path } }
     }
     if ('messageId' in source) {
       if (scope.branchId !== source.branchId)
         throw new BuddyServiceError('DIRECTORY_NOT_AUTHORIZED')
       const attachment = this.#resolveMessageInput(source)
-      return { attachmentId: attachment.id, bytes: new Uint8Array(), metadata: normalizeAttachmentMetadata(attachment) }
+      return { attachmentId: attachment.id, bytes: new Uint8Array(), metadata: { ...normalizeAttachmentMetadata(attachment), nameSource: attachment.nameSource, sourcePath: attachment.sourcePath } }
     }
     const resolved = await this.#resolveSpaceFile(source)
     if (resolved.source.bindingRevision !== source.bindingRevision)
@@ -436,7 +438,7 @@ export class ComposerResourceService {
   }
 
   async #resolveSpaceFile(source: BuddySpaceFileSource): Promise<{
-    metadata: ReturnType<typeof normalizeAttachmentMetadata>
+    metadata: ReturnType<typeof normalizeAttachmentMetadata> & { nameSource?: 'file' | 'clipboard', sourcePath?: string }
     path: string
     root: string
     source: BuddySpaceFileOrigin
@@ -458,7 +460,7 @@ export class ComposerResourceService {
       throw new AttachmentError('VALIDATION_FAILED')
     const metadata = normalizeAttachmentMetadata({ name: basename(resolution.canonicalPath), mimeType: '', sizeBytes: info.size })
     return {
-      metadata,
+      metadata: { ...metadata, sourcePath: resolution.canonicalPath },
       path: resolution.canonicalPath,
       root: binding.canonicalRoot,
       source: { bindingId: binding.id, bindingRevision: binding.revision, relativePath: relative(binding.canonicalRoot, resolution.canonicalPath), spaceId: space.id },
@@ -485,6 +487,8 @@ export class ComposerResourceService {
         bytes: input.bytes,
         mimeType: resource.mimeType,
         name: resource.name,
+        nameSource: resource.nameSource,
+        sourcePath: resource.sourcePath,
       }])
       if (!attachment)
         throw new AttachmentError('ATTACHMENT_NOT_FOUND')
@@ -545,6 +549,7 @@ export class ComposerResourceService {
       resources: attachments.map(attachment => ({
         mimeType: attachment.mimeType,
         name: attachment.name,
+        sourcePath: attachment.sourcePath,
         resourceId: randomUUID(),
         sizeBytes: attachment.sizeBytes,
       })),
@@ -662,6 +667,8 @@ function toPublicResource(resource: ComposerResourceRecord): BuddyComposerResour
     kind: getAttachmentKind(resource.mimeType),
     mimeType: resource.mimeType,
     name: resource.name,
+    nameSource: resource.nameSource,
+    sourcePath: resource.sourcePath,
     resourceId: resource.resourceId,
     sizeBytes: resource.sizeBytes,
   }

@@ -64,7 +64,7 @@ export function getChatMessageImageLabels(message: LocalMessage): Map<string, st
   return getChatImageLabels(getBuddyUserContentResourceIds(structured.userContent).flatMap((resourceId) => {
     const attachmentId = snapshotsById.get(resourceId)
     const attachment = attachmentId ? attachmentsById.get(attachmentId) : undefined
-    return attachment ? [{ resourceId, kind: attachment.kind }] : []
+    return attachment ? [{ resourceId, kind: attachment.kind, nameSource: attachment.nameSource }] : []
   }))
 }
 

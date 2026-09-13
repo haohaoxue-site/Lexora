@@ -64,6 +64,7 @@ describe('buddyTurnLauncher', () => {
     expect(fixture.resolveInputReferences).toHaveBeenCalledWith(
       ['attachment-1'],
       'conversation-1',
+      'Persisted prompt',
     )
   })
 
@@ -118,19 +119,16 @@ describe('buddyTurnLauncher', () => {
     expect(startTurn).not.toHaveBeenCalled()
   })
 
-  it('fails before provider launch when persisted images meet a text-only model', async () => {
+  it('keeps stable image references when launching a text-only model', async () => {
     const fixture = await createFixture({ modelInput: ['text'] })
     fixture.prepareTurn({ spaceId: null })
-    const startTurn = vi.fn()
-    const launcher = fixture.createLauncher({ startTurn })
-
-    const handle = await launcher.launch('run-1')
-
-    await expect(handle.completion).resolves.toMatchObject({
-      errorCode: 'MODEL_INPUT_UNSUPPORTED',
-      status: 'failed',
-    })
-    expect(startTurn).not.toHaveBeenCalled()
+    let launched: StartBuddyTurnInput | null = null
+    const launcher = fixture.createLauncher({ startTurn(input) {
+      launched = input
+      return queuedHandle(input.runId, fixture.runs.findById(input.runId)!)
+    } })
+    await expect(launcher.launch('run-1')).resolves.toMatchObject({ runId: 'run-1' })
+    expect(launched).toMatchObject({ userInput: { attachmentIds: ['attachment-1'], images: [{ attachmentId: 'attachment-1', mimeType: 'image/png' }] } })
   })
 
   it('durably fails a queued run when the runner rejects it synchronously', async () => {

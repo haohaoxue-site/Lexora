@@ -130,6 +130,10 @@ describe('usage analytics', () => {
         ALTER TABLE provider_model_states DROP COLUMN catalog_model_id;
         ALTER TABLE provider_model_states DROP COLUMN catalog_selection_json;
         ALTER TABLE provider_model_states DROP COLUMN capability_overrides_json;
+        ALTER TABLE attachments DROP COLUMN name_source;
+        ALTER TABLE composer_resources DROP COLUMN name_source;
+        ALTER TABLE attachments DROP COLUMN source_path;
+        ALTER TABLE composer_resources DROP COLUMN source_path;
         PRAGMA user_version = 13;
       `)
       f.database.close()

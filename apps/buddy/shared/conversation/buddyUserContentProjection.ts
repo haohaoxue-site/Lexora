@@ -2,7 +2,7 @@ import type { BuddyPromptDirective, BuddyUserContentV1 } from './buddyUserConten
 import { getBuddyUserContentResourceIds } from './buddyUserContent'
 
 export type BuddyProjectionResource
-  = | { kind: 'image' | 'pdf' | 'audio' | 'video', name: string }
+  = | { kind: 'image' | 'pdf' | 'audio' | 'video', name: string, nameSource?: 'file' | 'clipboard' }
     | { kind: 'text', name: string, text: string }
 
 export interface BuddyProjectedResource {
@@ -27,13 +27,11 @@ export function projectBuddyUserContent(
   const appendices: string[] = []
   const resources = getBuddyUserContentResourceIds(content).map((resourceId) => {
     const resource = resolveResource(resourceId)
-    const marker = resource.kind === 'image'
-      ? `[IMAGE#${++imageOrdinal}]`
+    const marker = resource.kind === 'image' && resource.nameSource === 'clipboard'
+      ? `[Image #${++imageOrdinal}]`
       : `[FILE#${++fileOrdinal}]`
-    if (resource.kind === 'text')
-      appendices.push(`${marker} ${escapeLiteralMarkers(resource.name)}\n${escapeLiteralMarkers(resource.text)}`)
-    if (resource.kind === 'pdf' || resource.kind === 'audio' || resource.kind === 'video')
-      appendices.push(`${marker} ${escapeLiteralMarkers(resource.name)} (${resource.kind.toUpperCase()})`)
+    const identity = JSON.stringify(escapeLiteralMarkers(resource.name))
+    appendices.push(`${marker} ${identity} (${resource.kind.toUpperCase()})${resource.kind === 'text' ? `\n${escapeLiteralMarkers(resource.text)}` : ''}`)
     return { kind: resource.kind, marker, resourceId }
   })
   const markers = new Map(resources.map(resource => [resource.resourceId, resource.marker]))
@@ -85,5 +83,5 @@ export function projectBuddyUserContent(
 }
 
 function escapeLiteralMarkers(text: string): string {
-  return text.replace(/\[(IMAGE|FILE)#(\d+)\]/g, '［$1#$2］')
+  return text.replace(/\[(?:(IMAGE|FILE)#(\d+)|Image #(\d+))\]/g, match => `［${match.slice(1, -1)}］`)
 }

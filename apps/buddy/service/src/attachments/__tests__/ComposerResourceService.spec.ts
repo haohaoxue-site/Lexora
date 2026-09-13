@@ -4,10 +4,11 @@ import type { InputModel } from '../../providers/modelCapabilities'
 import { Buffer } from 'node:buffer'
 import { mkdir, mkdtemp, readdir, readFile, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { BUDDY_ATTACHMENT_COUNT_LIMIT } from '../../../../shared/conversation/attachmentPolicy'
 import { createBuddyUserContent } from '../../../../shared/conversation/buddyUserContent'
+import { createBuddyInputReference } from '../../agent/context/BuddyInputReference'
 import { BuddySessionRecoveryService } from '../../agent/sessions/recovery/BuddySessionRecoveryService'
 import { BuddyConversationTree } from '../../agent/sessions/tree/BuddyConversationTree'
 import { ArtifactService } from '../../artifacts/ArtifactService'
@@ -32,6 +33,7 @@ import { createTurnRequestRepository } from '../../storage/turnRequestRepository
 import { createUsageRepository } from '../../storage/usageRepository'
 import { normalizeComposerWorkspace } from '../../workspace/normalizeComposerWorkspace'
 import { AttachmentService, normalizeAttachmentMetadata } from '../AttachmentService'
+import { AttachmentToolWorkspace } from '../AttachmentToolWorkspace'
 import { ComposerResourceService } from '../ComposerResourceService'
 
 const databases: DatabaseSync[] = []
@@ -125,6 +127,7 @@ describe('attachment submission validation', () => {
       const queued = await queue.enqueue({ draftId: second.draftId, expectedRevision: second.revision, requestId: 'queued' })
       repository.pause(started.conversationId)
       fixture.model.api = 'google-generative-ai'
+      fixture.control.history = [{ role: 'user', content: 'x'.repeat(20 * 1024 * 1024), timestamp: 0 }]
       await expect(queue.steer(queued)).rejects.toMatchObject({ code: 'MODEL_INPUT_TOO_LARGE' })
       expect(repository.list(queued)).toMatchObject([{ id: queued.id, state: 'paused', attachments: [{ sizeBytes: bytes.length, mimeType: 'audio/wav' }] }])
       expect(fixture.runs.listRecent()).toHaveLength(1)
@@ -135,13 +138,13 @@ describe('attachment submission validation', () => {
       queue.dispose()
     }
   })
-  it('rejects unsupported M4A before consuming the draft or publishing a message', async () => {
+  it('publishes unsupported M4A as a file resource', async () => {
     const fixture = await checkedTurns({ api: 'openai-completions' })
     const bytes = Buffer.concat([Buffer.from([0, 0, 0, 20]), Buffer.from('ftypM4A '), Buffer.alloc(8)])
     const draft = await fixture.draft('audio', 'voice.m4a', bytes)
-    await expect(fixture.turns.start({ draftId: draft.draftId, expectedRevision: draft.revision, requestId: 'unsupported' })).rejects.toMatchObject({ code: 'MODEL_INPUT_UNSUPPORTED' })
-    expect(fixture.drafts.findById(draft.draftId)).toEqual(draft)
-    expect(fixture.runs.listRecent()).toEqual([])
+    const turn = await fixture.turns.start({ draftId: draft.draftId, expectedRevision: draft.revision, requestId: 'unsupported' })
+    expect(fixture.runs.listRecent()).toHaveLength(1)
+    expect(fixture.attachments.listForConversation(turn.conversationId)).toMatchObject([{ mimeType: 'audio/mp4', sizeBytes: bytes.length }])
     expect(fixture.service.list(draft.draftId)[0]?.state).toBe('ready')
   })
 
@@ -153,11 +156,13 @@ describe('attachment submission validation', () => {
     const first = await fixture.draft('first', 'first.wav', bytes)
     const started = await fixture.turns.start({ draftId: first.draftId, expectedRevision: first.revision, requestId: 'first' })
     const second = await fixture.draft('second', 'second.wav', bytes, { kind: 'conversation_branch', conversationId: started.conversationId, branchId: started.branchId })
+    fixture.control.history = [{ role: 'user', content: 'x'.repeat(20 * 1024 * 1024), timestamp: 0 }]
     await expect(fixture.turns.start({ draftId: second.draftId, expectedRevision: second.revision, requestId: 'second' })).rejects.toMatchObject({ code: 'MODEL_INPUT_TOO_LARGE' })
     expect(fixture.drafts.findById(second.draftId)).toEqual(second)
     expect(fixture.runs.listRecent()).toHaveLength(1)
     const resource = fixture.service.list(second.draftId)[0]!
     expect(resource.state).toBe('ready')
+    fixture.control.history = []
     const plain = fixture.drafts.save({ ...second, expectedRevision: second.revision, content: createBuddyUserContent('Continue without another attachment'), now: new Date().toISOString() })
     await expect(fixture.turns.start({ draftId: plain.draftId, expectedRevision: plain.revision, requestId: 'plain' })).resolves.toMatchObject({ conversationId: started.conversationId })
     expect(fixture.runs.listRecent()).toHaveLength(2)
@@ -172,7 +177,7 @@ async function checkedTurns(overrides: Partial<InputModel> = {}) {
   const runInputs = createRunInputRepository(database)
   const model: InputModel = { api: 'google-generative-ai', provider: 'fixture', id: 'fixture', name: 'Fixture', baseUrl: 'https://example.test', contextWindow: 1_000_000, maxTokens: 8192, input: ['text'], audioInput: true, reasoning: false, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, ...overrides }
   const models = { resolve: () => model, resolveAvailable: async () => model, getServiceTiers: () => [] }
-  const control = { completeRuns: true }
+  const control = { completeRuns: true, history: [] as { role: 'user', content: string, timestamp: number }[] }
   const launcher = { launch: async (runId: string) => {
     if (!control.completeRuns) {
       runs.markRunning(runId, new Date().toISOString())
@@ -186,7 +191,7 @@ async function checkedTurns(overrides: Partial<InputModel> = {}) {
   const recovery = new BuddySessionRecoveryService({ attachments, conversations, models, runs, runInputs, usage: createUsageRepository(database) })
   const tree = new BuddyConversationTree({ conversationsDirectory: paths.conversationsDirectory, conversations, runs, recovery, repository: createConversationTreeRepository(database) })
   const turns = new ChatTurnService({
-    inputValidation: new ChatInputValidationService({ attachments, models, paths, recovery, runInputs, runs, tree, sessions: { getReady: () => null } }),
+    inputValidation: new ChatInputValidationService({ attachments, models, paths, recovery, runInputs, runs, tree, sessions: { getReady: () => control.history.length ? { getInputContext: () => ({ messages: control.history }) } as never : null } }),
     attachments,
     composerResources: fixture.service,
     conversations,
@@ -210,6 +215,104 @@ async function checkedTurns(overrides: Partial<InputModel> = {}) {
     return draft
   } }
 }
+
+describe('attachment working copies', () => {
+  it('preserves working edits across restart and restores deleted copies without modifying the snapshot', async () => {
+    const fixture = await checkedTurns({ api: 'openai-completions' })
+    const bytes = Buffer.from([0x1A, 0x45, 0xDF, 0xA3, 0, 0, 0, 0])
+    const draft = await fixture.draft('video', 'deepseek.webm', bytes)
+    const turn = await fixture.turns.start({ draftId: draft.draftId, expectedRevision: draft.revision, requestId: 'video' })
+    const [snapshot] = fixture.attachments.listForConversation(turn.conversationId)
+    const scratch = fixture.paths.conversationWorkspace(turn.conversationId)
+    await mkdir(scratch, { recursive: true })
+    const input = createBuddyInputReference({ attachmentIds: [snapshot!.id], images: [], documents: [], messageId: 'message', prompt: 'Convert to GIF' })
+    const workspace = new AttachmentToolWorkspace(scratch)
+    const manifest = async (target = workspace) => JSON.parse((await fixture.attachments.materializeInputResources(input, turn.conversationId, target)).split('\n')[1]!) as { path: string, content: string, label: string }[]
+    const [resource] = await manifest()
+    expect(resource).toMatchObject({ content: 'file_only', label: '[FILE#1]' })
+    expect(resource!.path.startsWith(scratch)).toBe(true)
+    expect(await readFile(resource!.path)).toEqual(bytes)
+    await writeFile(resource!.path, 'edited copy')
+    expect((await manifest())[0]!.path).toBe(resource!.path)
+    expect(await readFile(snapshot!.storedPath)).toEqual(bytes)
+    const [restored] = await manifest(new AttachmentToolWorkspace(scratch))
+    expect(restored!.path).toBe(resource!.path)
+    expect(await readFile(restored!.path, 'utf8')).toBe('edited copy')
+    await rm(restored!.path)
+    expect((await manifest())[0]!.path).toBe(restored!.path)
+    expect(await readFile(restored!.path)).toEqual(bytes)
+    const unsafe = new AttachmentToolWorkspace(scratch)
+    const [safe] = await manifest(unsafe)
+    await rm(safe!.path)
+    await symlink(snapshot!.storedPath, safe!.path)
+    await expect(manifest(unsafe)).rejects.toThrow('working copy')
+    await rm(dirname(safe!.path), { recursive: true })
+    await symlink(dirname(snapshot!.storedPath), dirname(safe!.path))
+    await expect(manifest(new AttachmentToolWorkspace(scratch))).rejects.toThrow('directory identity changed')
+    expect(await readFile(snapshot!.storedPath)).toEqual(bytes)
+  })
+
+  it('keeps message labels when an earlier snapshot is missing during recovery', async () => {
+    const fixture = await checkedTurns()
+    const bytes = imageBytes()
+    const first = await fixture.draft('first', 'first.png', bytes)
+    fixture.service.accept({ draftId: first.draftId, resources: [{ resourceId: 'second', name: 'second.png', mimeType: 'image/png', sizeBytes: bytes.length }] })
+    await fixture.service.complete({ draftId: first.draftId, resourceId: 'second', bytes })
+    const draft = fixture.drafts.save({ ...first, expectedRevision: first.revision, content: { ...first.content, panelResourceIds: ['first', 'second'] }, now: new Date().toISOString() })
+    const turn = await fixture.turns.start({ draftId: draft.draftId, expectedRevision: draft.revision, requestId: 'two-images' })
+    const records = fixture.attachments.listForConversation(turn.conversationId)
+    const missing = records.find(record => record.name === 'first.png')!
+    const available = records.find(record => record.name === 'second.png')!
+    await rm(missing.storedPath)
+    const recovery = await fixture.attachments.resolveRecoveryInputReferences([missing.id, available.id], turn.conversationId, 'Inspect the files')
+    expect(recovery.missingAttachmentIds).toEqual([missing.id])
+    expect(recovery.resourceLabels?.[available.id]).toBe('[FILE#2]')
+    const scratch = fixture.paths.conversationWorkspace(turn.conversationId)
+    await mkdir(scratch, { recursive: true })
+    const input = createBuddyInputReference({ attachmentIds: [available.id], resourceLabels: recovery.resourceLabels, images: [], messageId: 'message', prompt: 'Inspect the files' })
+    const manifest = await fixture.attachments.materializeInputResources(input, turn.conversationId, new AttachmentToolWorkspace(scratch))
+    expect(JSON.parse(manifest.split('\n')[1]!)).toMatchObject([{ attachmentId: available.id, label: '[FILE#2]' }])
+  })
+
+  it('persists anonymous paste provenance while leaving named uploads named', async () => {
+    const fixture = await setup()
+    const bytes = imageBytes()
+    for (const [id, nameSource] of [['paste', 'clipboard'], ['upload', 'file']] as const) {
+      fixture.service.accept({ draftId: 'draft', resources: [{ resourceId: id, name: 'image.png', nameSource, mimeType: 'image/png', sizeBytes: bytes.length }] })
+      const ready = await fixture.service.complete({ draftId: 'draft', resourceId: id, bytes })
+      expect(ready).toMatchObject({ nameSource })
+      if (ready.state !== 'ready' || !('attachmentId' in ready))
+        throw new Error('Import failed')
+      expect(fixture.attachmentRepository.findById(ready.attachmentId)?.nameSource).toBe(nameSource)
+    }
+    expect(fixture.service.list('draft').map(resource => resource.nameSource).sort()).toEqual(['clipboard', 'file'])
+  })
+
+  it('keeps a selected source path separate from the editable snapshot and does not follow it during materialization', async () => {
+    const fixture = await checkedTurns()
+    const sourcePath = join(fixture.root, 'source.txt')
+    await writeFile(sourcePath, 'original')
+    const [resource] = await fixture.service.registerFiles({ draftId: 'selected', paths: [sourcePath] })
+    expect(resource).toMatchObject({ nameSource: 'file', sourcePath })
+    const draft = fixture.drafts.open({ draftId: 'selected', initialContent: { ...createBuddyUserContent('Edit this file'), panelResourceIds: [resource!.resourceId] }, initialExecutionConfig: { approvalPolicy: 'manual', executionProfile: 'read_only' }, initialModelSelection: null, scope: { kind: 'global' }, now: new Date().toISOString() })
+    const turn = await fixture.turns.start({ draftId: draft.draftId, expectedRevision: draft.revision, requestId: 'selected' })
+    const [snapshot] = fixture.attachments.listForConversation(turn.conversationId)
+    expect(snapshot?.sourcePath).toBe(sourcePath)
+    await writeFile(sourcePath, 'changed source')
+    const scratch = fixture.paths.conversationWorkspace(turn.conversationId)
+    await mkdir(scratch, { recursive: true })
+    const input = createBuddyInputReference({ attachmentIds: [snapshot!.id], images: [], messageId: 'selected', prompt: 'Edit this file' })
+    const manifest = JSON.parse((await fixture.attachments.materializeInputResources(input, turn.conversationId, new AttachmentToolWorkspace(scratch))).split('\n')[1]!) as { path: string, sourcePath: string }[]
+    expect(manifest[0]!.sourcePath).toBe(sourcePath)
+    expect(manifest[0]!.path).not.toBe(sourcePath)
+    expect(await readFile(manifest[0]!.path, 'utf8')).toBe('original')
+    await writeFile(manifest[0]!.path, 'edited working copy')
+    expect(await readFile(sourcePath, 'utf8')).toBe('changed source')
+    await rm(sourcePath)
+    const replay = await fixture.attachments.materializeInputResources(input, turn.conversationId, new AttachmentToolWorkspace(scratch))
+    expect(JSON.parse(replay.split('\n')[1]!)[0].sourcePath).toBe(sourcePath)
+  })
+})
 
 describe('composer resource import', () => {
   it.each([
@@ -526,7 +629,7 @@ describe('composer resource import', () => {
     })
     const input = { draftId: 'draft-1', resourceId: 'resource-1', source: { spaceId: 'space-1', bindingId: 'binding-1', relativePath: 'note.txt' } }
     const selected = await service.selectSpaceFile(input)
-    expect(selected).toMatchObject({ resourceId: 'resource-1', state: 'ready', source: { ...input.source, bindingRevision: 1 } })
+    expect(selected).toMatchObject({ resourceId: 'resource-1', state: 'ready', sourcePath: join(directory, 'note.txt'), source: { ...input.source, bindingRevision: 1 } })
     expect(await service.selectSpaceFile(input)).toEqual(selected)
     expect(await service.selectSpaceFile({ ...input, resourceId: 'resource-duplicate' })).toEqual(selected)
     expect(database.prepare('SELECT count(*) AS count FROM attachments').get()).toEqual({ count: 0 })
@@ -544,6 +647,7 @@ describe('composer resource import', () => {
     await writeFile(join(directory, 'note.txt'), 'at send')
     const frozen = await service.resolveInput('draft-1', content, { branchId: null, conversationId: null, spaceId: 'space-1' })
     const snapshot = attachmentRepository.findById(frozen[0]!.attachmentId)!
+    expect(snapshot.sourcePath).toBe(join(directory, 'note.txt'))
     expect(await readFile(snapshot.storedPath, 'utf8')).toBe('at send')
     await writeFile(join(directory, 'note.txt'), 'later')
     expect(await readFile(snapshot.storedPath, 'utf8')).toBe('at send')
@@ -630,7 +734,7 @@ describe('composer resource import', () => {
       now: '2026-09-06T00:00:00.000Z',
       scope: { kind: 'global' },
     })
-    service.accept({ draftId: 'draft-1', resources: [{ resourceId: 'resource-1', mimeType: 'text/plain', name: 'note.txt', sizeBytes: 3 }] })
+    service.accept({ draftId: 'draft-1', resources: [{ resourceId: 'resource-1', mimeType: 'text/plain', name: 'note.txt', sizeBytes: 3, sourcePath: '/fixture/note.txt' }] })
     const request = {
       draftId: draft.draftId,
       expectedRevision: draft.revision,
@@ -664,9 +768,10 @@ describe('composer resource import', () => {
       resourceSnapshots: [{ resourceId: 'resource-1', attachmentId: expect.any(String) }],
     })
     const stored = runInputs.findByRunId(turn.runId)!
-    expect(stored.prompt).toBe('[FILE#1]\n\n[FILE#1] note.txt\nabc')
+    expect(stored.prompt).toBe('[FILE#1]\n\n[FILE#1] "note.txt" (TEXT)\nabc')
     expect(stored.attachmentIds).toHaveLength(1)
     const snapshot = attachmentRepository.findById(stored.attachmentIds[0]!)!
+    expect(snapshot.sourcePath).toBe('/fixture/note.txt')
     expect(snapshot.messageId).toBe(message.id)
     expect(await readFile(snapshot.storedPath, 'utf8')).toBe('abc')
     expect(service.list('draft-1')).toEqual([ready])
@@ -746,6 +851,7 @@ describe('composer resource import', () => {
       userContent: editedContent,
     })
     const editedAttachmentId = (editedBranchMessage.content as { resourceSnapshots: Array<{ attachmentId: string }> }).resourceSnapshots[0]!.attachmentId
+    expect(attachmentRepository.findById(editedAttachmentId)?.sourcePath).toBe('/fixture/note.txt')
     expect(editedAttachmentId).not.toBe((originalMessage.content as { resourceSnapshots: Array<{ attachmentId: string }> }).resourceSnapshots[0]!.attachmentId)
     expect(await readFile(attachmentRepository.findById(editedAttachmentId)!.storedPath, 'utf8')).toBe('abc')
     expect(runInputs.findByRunId(editedTurn.runId)!.prompt).toContain('先梳理目标、约束、依赖与实施步骤')
@@ -835,7 +941,7 @@ describe('composer resource import', () => {
     expect(database.prepare('SELECT count(*) AS count FROM messages').get()).toEqual(messageCount)
   })
 
-  it('rejects image input before persisting a run when the selected model is text-only', async () => {
+  it('retains the image snapshot when sending to a text-only model', async () => {
     const { service, attachments, database } = await setup()
     const drafts = createComposerDraftRepository(database)
     const runs = createRunRepository(database)
@@ -884,15 +990,15 @@ describe('composer resource import', () => {
       draftId: imageDraft.draftId,
       expectedRevision: imageDraft.revision,
       requestId: 'image-unsupported',
-    })).rejects.toMatchObject({ code: 'MODEL_INPUT_UNSUPPORTED' })
-    expect(database.prepare('SELECT count(*) AS count FROM runs').get()).toEqual({ count: 0 })
+    })).resolves.toMatchObject({ run: { modelId: 'text-only' } })
+    expect(database.prepare('SELECT count(*) AS count FROM runs').get()).toEqual({ count: 1 })
   })
 
   it('accepts metadata before bytes, binds a distinct immutable file identity, and replays completion', async () => {
     const { service, paths, attachmentRepository } = await setup()
     const bytes = imageBytes()
     const input = { draftId: 'draft-1', resources: [{ resourceId: 'resource-1', mimeType: 'image/png', name: 'two-pixels.png', sizeBytes: bytes.length }] }
-    expect(service.accept(input)).toEqual([{ ...input.resources[0], draftId: 'draft-1', kind: 'image', state: 'importing' }])
+    expect(service.accept(input)).toEqual([{ ...input.resources[0], nameSource: 'file', draftId: 'draft-1', kind: 'image', state: 'importing' }])
     await expect(readdir(paths.draftAttachments('draft-1'))).rejects.toMatchObject({ code: 'ENOENT' })
     const ready = await service.complete({ draftId: 'draft-1', resourceId: 'resource-1', bytes })
     expect(ready.state).toBe('ready')
@@ -1037,7 +1143,7 @@ describe('composer resource import', () => {
     ] }] }
     const bindings = await service.resolveInput('draft-1', content)
     const result = await attachments.materializePrompt(bindings.map(binding => binding.attachmentId), '', null, 'draft-1', { content, resourceIds: bindings.map(binding => binding.resourceId) })
-    expect(result.prompt).toBe('[FILE#1]\n\n[IMAGE#1] vs [IMAGE#2][IMAGE#1]\n\n[FILE#1] note.txt\nabc')
+    expect(result.prompt).toBe('[FILE#1]\n\n[FILE#2] vs [FILE#3][FILE#2]\n\n[FILE#1] "note.txt" (TEXT)\nabc\n\n[FILE#2] "red.png" (IMAGE)\n\n[FILE#3] "blue.png" (IMAGE)')
     expect(result.images).toHaveLength(2)
     expect(result.records).toHaveLength(3)
   })

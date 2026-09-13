@@ -109,7 +109,7 @@ describe('buddy schema', () => {
     expect(upgraded.prepare('SELECT id, builtin_provider_id, display_name FROM builtin_provider_configs').all()).toEqual([
       { id: 'anthropic', builtin_provider_id: 'anthropic', display_name: null },
     ])
-    expect(upgraded.prepare('PRAGMA user_version').get()).toEqual({ user_version: 15 })
+    expect(upgraded.prepare('PRAGMA user_version').get()).toEqual({ user_version: 16 })
     expect((upgraded.prepare('PRAGMA table_info(provider_model_states)').all() as Array<{ name: string }>).map(column => column.name))
       .toEqual(expect.arrayContaining(['catalog_model_id', 'catalog_selection_json', 'capability_overrides_json']))
     upgraded.prepare('UPDATE builtin_provider_configs SET display_name = ? WHERE id = ?').run('Personal', 'anthropic')
@@ -190,7 +190,7 @@ describe('buddy schema', () => {
     const migrated = openBuddyDatabase({ databasePath })
     databases.push(migrated)
     expect(migrated.prepare('SELECT * FROM composer_drafts').all()).toEqual(drafts)
-    expect(migrated.prepare('SELECT * FROM composer_resources').all()).toEqual(resources)
+    expect(migrated.prepare('SELECT * FROM composer_resources').all()).toEqual(resources.map(resource => ({ ...resource, name_source: 'file', source_path: null })))
     expect(migrated.prepare('SELECT * FROM messages').all()).toEqual(messages)
     migrated.exec(`
       INSERT INTO composer_drafts

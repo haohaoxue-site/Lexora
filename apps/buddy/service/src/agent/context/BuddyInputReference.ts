@@ -10,6 +10,8 @@ const buddyInputImageReferenceSchema = z.object({
 }).strict()
 
 const buddyInputReferenceSchema = z.object({
+  attachmentIds: z.array(z.string().min(1).max(256)).max(16).optional(),
+  resourceLabels: z.record(z.string().min(1).max(256), z.string().regex(/^\[(?:(?:IMAGE|FILE)#|Image #)\d+\]$/)).optional(),
   documents: z.array(z.object({
     attachmentId: z.string().min(1).max(256),
     mimeType: z.enum(BUDDY_DOCUMENT_MIME_TYPES),
@@ -18,9 +20,17 @@ const buddyInputReferenceSchema = z.object({
   messageId: z.string().min(1).max(256),
   prompt: z.string().max(4 * 1024 * 1024),
   version: z.literal(1),
-}).strict().refine(input => input.images.length + (input.documents?.length ?? 0) <= 16)
+}).strict().refine((input) => {
+  const nativeIds = [...input.images, ...input.documents ?? []].map(file => file.attachmentId)
+  if (nativeIds.length > 16 || new Set(nativeIds).size !== nativeIds.length)
+    return false
+  return !input.attachmentIds || (new Set(input.attachmentIds).size === input.attachmentIds.length
+    && nativeIds.every(id => input.attachmentIds!.includes(id)))
+})
 
 export interface BuddyInputReferenceV1 {
+  attachmentIds?: string[]
+  resourceLabels?: Record<string, string>
   documents?: AttachmentDocumentReference[]
   images: AttachmentImageReference[]
   messageId: string

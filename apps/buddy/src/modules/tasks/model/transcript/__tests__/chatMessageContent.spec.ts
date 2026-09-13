@@ -27,6 +27,7 @@ describe('chatMessageContent', () => {
       name: id === 'file' ? 'notes.txt' : 'image.png',
       previewUrl: null,
       sizeBytes: 100,
+      nameSource: 'clipboard',
     })))
     expect([...getChatMessageImageLabels(input)]).toEqual([
       ['panel', '[Image #1]'],

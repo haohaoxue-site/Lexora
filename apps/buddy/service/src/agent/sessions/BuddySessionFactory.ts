@@ -6,6 +6,7 @@ import type { BuddySessionExtensionServices } from '../extensions/createBuddySes
 import type { BuddySessionBlueprint } from './BuddySessionBlueprint'
 import type { BuddyConversationTree } from './tree/BuddyConversationTree'
 import { ApplicationEvents } from '../../../../shared/observability/ApplicationEvents'
+import { AttachmentToolWorkspace } from '../../attachments/AttachmentToolWorkspace'
 import { BuddyAgentRunError } from '../../runs/runError'
 import { createBuddySessionExtensions } from '../extensions/createBuddySessionExtensions'
 import { createBuddySession } from './createBuddySession'
@@ -116,6 +117,7 @@ export class BuddySessionFactory {
       thinkingLevel: input.thinkingLevel,
     })
 
+    const inputWorkspace = new AttachmentToolWorkspace(blueprint.scratchRoot)
     return {
       piSessionFile: session.piSessionFile,
       recoveredFromProductHistory: tree.recoveredFromProductHistory,
@@ -134,17 +136,25 @@ export class BuddySessionFactory {
         session: session.session,
         shutdown: reason => events.scope({ runId: undefined, operationId: undefined, parentOperationId: undefined }).operation('session.close', () => session.shutdown(reason)),
         inputReferences: extensions.inputReferences,
+        getInputMetadata: ids => this.#options.services.attachmentService.getInputMetadata(ids, blueprint.conversationId),
         materializeDocuments: input => this.#options.services.attachmentService.materializeDocumentInputs(
           input.documents ?? [],
           blueprint.conversationId,
         ),
-        materializeInput: async input => [
-          { text: input.prompt, type: 'text' as const },
-          ...await this.#options.services.attachmentService.materializePiInputImages(
-            input.images,
-            blueprint.conversationId,
-          ),
-        ],
+        materializeInput: async (input) => {
+          const resources = await this.#options.services.attachmentService.materializeInputResources(input, blueprint.conversationId, inputWorkspace)
+          return [
+            { text: input.prompt, type: 'text' as const },
+            ...resources ? [{ text: resources, type: 'text' as const }] : [],
+            ...(await this.#options.services.attachmentService.materializePiInputImages(
+              input.images,
+              blueprint.conversationId,
+            )).flatMap((image, index) => [
+              { type: 'text' as const, text: `Native attachment: ${input.images[index]!.attachmentId}` },
+              image,
+            ]),
+          ]
+        },
       }),
     }
   }

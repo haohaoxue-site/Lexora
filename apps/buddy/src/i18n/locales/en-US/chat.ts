@@ -199,7 +199,6 @@ export default {
   'desktop.chat.sourcePickerEmpty': 'No matching conversation files',
   'desktop.chat.sourcePickerNoReferences': 'No content available to reference',
   'desktop.chat.sourcePickerNoMatches': 'No matching content',
-  'desktop.chat.resourceReference': 'Reference',
   'desktop.chat.locateAttachment': 'Locate attachment {name}',
   'desktop.chat.sourcePickerSearch': 'Search conversation files',
   'desktop.chat.sourcePickerSuggestions': 'Available context',

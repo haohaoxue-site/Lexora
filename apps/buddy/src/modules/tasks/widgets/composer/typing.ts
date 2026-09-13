@@ -11,7 +11,6 @@ import type { ChatComposerContextOptions, ChatComposerSubmitPayload, ChatCompose
 
 export interface ComposerResourceCard extends ComposerResourceView {
   imageLabel?: string
-  isReference: boolean
   previewUrl: string | null
 }
 
@@ -29,7 +28,7 @@ export interface UseChatComposerOptions {
   selectedEffort: Readonly<Ref<BuddyThinkingLevel | null>>
   selectedServiceTier: Readonly<Ref<BuddyServiceTier | null>>
   loadContextOptions: (fileQuery: string | null) => Promise<ChatComposerContextOptions>
-  beginImport: (files: readonly File[]) => readonly string[]
+  beginImport: (files: readonly File[], origin?: 'file' | 'clipboard') => readonly string[]
   selectSource: (source: BuddyComposerSource) => Promise<string | null>
   onSend: (payload: ChatComposerSubmitPayload) => void
   onUpdateContent: (content: string, value: JSONContent) => void
@@ -62,7 +61,7 @@ export interface DesktopChatComposerProps {
   draftId: string
   resources: readonly ComposerResourceView[]
   rejectedResourceIds: ReadonlySet<string>
-  beginImport: (files: readonly File[]) => readonly string[]
+  beginImport: (files: readonly File[], origin?: 'file' | 'clipboard') => readonly string[]
   selectSource: (source: BuddyComposerSource) => Promise<string | null>
   isRunning: boolean
   isSelectingFiles: boolean

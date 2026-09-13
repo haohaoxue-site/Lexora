@@ -92,7 +92,7 @@ export default {
   'desktop.providers.manage': '管理',
   'desktop.providers.modelId': '模型 ID',
   'desktop.providers.modelColumn': '模型',
-  'desktop.providers.modelCapabilities': '模型能力',
+  'desktop.providers.modelCapabilities': '原生输入能力',
   'desktop.providers.capabilityEnabled': '已开启',
   'desktop.providers.capabilityDisabled': '已关闭',
   'desktop.providers.thinking': '思考',

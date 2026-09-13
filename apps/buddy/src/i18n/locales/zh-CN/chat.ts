@@ -197,7 +197,6 @@ export default {
   'desktop.chat.sourcePickerEmpty': '没有匹配的对话文件',
   'desktop.chat.sourcePickerNoReferences': '暂无可引用内容',
   'desktop.chat.sourcePickerNoMatches': '没有匹配的内容',
-  'desktop.chat.resourceReference': '引用',
   'desktop.chat.locateAttachment': '定位附件 {name}',
   'desktop.chat.sourcePickerSearch': '搜索对话文件',
   'desktop.chat.sourcePickerSuggestions': '可选上下文',

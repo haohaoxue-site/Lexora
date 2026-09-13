@@ -9,7 +9,6 @@ import { useBuddyI18n } from '@/i18n/buddyI18n'
 import { FileIcon } from '@/shared/ui/file-icon'
 import DesktopIcon from '@/shared/ui/icon/DesktopIcon.vue'
 import BuddyImagePreview from '@/shared/ui/media/BuddyImagePreview.vue'
-import ResourceReferenceBadge from '../attachments/ResourceReferenceBadge.vue'
 import { useResourceHighlight } from '../attachments/useResourceHighlight'
 
 const props = defineProps<{
@@ -47,7 +46,7 @@ defineExpose({ highlightResource })
 <template>
   <div v-if="cards.length" ref="resourceTrack" class="composer-resource-strip">
     <div
-      v-for="{ resource, canRetry, imageLabel, isReference, previewUrl } in cards"
+      v-for="{ resource, canRetry, imageLabel, previewUrl } in cards"
       :key="resource.resourceId"
       class="composer-resource-strip__card"
       :class="{ 'is-failed': resource.state === 'failed', 'is-highlighted': highlightedResourceId === resource.resourceId, 'is-previewable': previewUrl }"
@@ -75,7 +74,6 @@ defineExpose({ highlightResource })
               : 'desktop.chat.attachmentSourceUnavailable') }}
         </small>
       </span>
-      <ResourceReferenceBadge v-if="isReference" :language="language" />
       <NButton v-if="resource.state === 'failed' && canRetry" text :disabled="disabled" size="tiny" @click.stop="emit('retry', resource.resourceId)">
         {{ t('desktop.chat.retryAttachment') }}
       </NButton>

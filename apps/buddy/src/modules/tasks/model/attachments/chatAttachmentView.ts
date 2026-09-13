@@ -1,10 +1,10 @@
 import type { LocalAttachment } from '@buddy-shared/conversation/attachmentApi'
 import type { BuddyComposerResource } from '@buddy-shared/conversation/composerResource'
 
-export function getChatImageLabels(resources: readonly { resourceId: string, kind: string }[]): Map<string, string> {
+export function getChatImageLabels(resources: readonly { resourceId: string, kind: string, nameSource?: 'file' | 'clipboard' }[]): Map<string, string> {
   const labels = new Map<string, string>()
   for (const resource of resources) {
-    if (resource.kind === 'image' && !labels.has(resource.resourceId))
+    if (resource.kind === 'image' && resource.nameSource === 'clipboard' && !labels.has(resource.resourceId))
       labels.set(resource.resourceId, `[Image #${labels.size + 1}]`)
   }
   return labels

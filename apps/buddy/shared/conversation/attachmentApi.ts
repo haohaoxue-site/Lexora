@@ -7,6 +7,7 @@ export const attachmentSchema = z.object({
   kind: z.enum(['image', 'pdf', 'audio', 'video', 'text', 'binary']),
   mimeType: z.string().min(1),
   name: z.string().min(1),
+  nameSource: z.enum(['file', 'clipboard']).optional(),
   previewUrl: z.string().nullable(),
   sizeBytes: z.number().int().nonnegative(),
 }).strict()

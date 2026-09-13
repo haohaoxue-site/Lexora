@@ -73,7 +73,7 @@ describe('composer input at the Buddy session boundary', () => {
     expect(persisted).toContain('application/pdf')
     expect(persisted).not.toContain(bytes.toString('base64'))
     expect(persisted).not.toContain('buddy-pdf:')
-    expect(persisted).not.toContain('Native attachments in this request:')
+    expect(persisted).not.toContain('Attachment resources:')
     await fixture.shutdown('quit')
     const restored = await createFixture({ root: fixture.root, piSessionFile: fixture.piSessionFile, provider, stream: capture })
     await restored.send({ ...plan('pdf-followup'), images: [], text: 'Summarize the same PDF again.' })
@@ -83,7 +83,7 @@ describe('composer input at the Buddy session boundary', () => {
       expect(serialized).toContain(bytes.toString('base64'))
       expect(serialized).toContain(provider === 'anthropic' ? 'document' : 'input_file')
       expect(serialized).not.toContain('buddy-pdf:')
-      expect(serialized).toContain('native PDF content')
+      expect(serialized).toContain('native means the original image, PDF, audio, or video is supplied')
       expect(payload).toMatchObject({ metadata: { offline_probe: 'preserved' } })
     }
     await rm(join(fixture.root, 'document-1.pdf'))
@@ -100,9 +100,9 @@ describe('composer input at the Buddy session boundary', () => {
     await fixture.send({ ...plan('follow'), text: '下一轮正文', images: [] })
 
     expect(fixture.lifecycle.filter(event => event === 'input')).toHaveLength(3)
-    expect(fixture.contexts[0]?.systemPrompt).not.toContain('Native attachments in this request:')
-    expect(fixture.contexts[1]?.systemPrompt).toContain('native image content')
-    expect(fixture.contexts[2]?.systemPrompt).toContain('native image content')
+    expect(fixture.contexts[0]?.systemPrompt).not.toContain('Attachment resources:')
+    expect(fixture.contexts[1]?.systemPrompt).toContain('Use supplied native content directly when the task requires understanding it')
+    expect(fixture.contexts[2]?.systemPrompt).toContain('Use supplied native content directly when the task requires understanding it')
     for (const [index, id] of ['plain', 'message-1', 'follow'].entries()) {
       expect(fixture.contexts[index]?.systemPrompt).toContain(OUTPUT_GUIDELINE)
       expect(fixture.contexts[index]?.systemPrompt).toContain(`Current offline run: run-${id}`)

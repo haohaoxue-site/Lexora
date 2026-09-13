@@ -39,6 +39,7 @@ export interface PrepareTurnRequestInput {
 }
 
 export interface TurnAttachmentBinding {
+  nameSource?: 'file' | 'clipboard'
   mimeType?: string
   createdAt: string
   id: string
@@ -186,10 +187,10 @@ export function createTurnRequestRepository(database: DatabaseSync): TurnRequest
   `)
   const cloneMessageAttachment = database.prepare(`
     INSERT INTO attachments (
-      id, draft_id, message_id, stored_path, name, mime_type, size_bytes, created_at
+      id, draft_id, message_id, stored_path, name, mime_type, size_bytes, created_at, name_source, source_path
     )
     SELECT ?, NULL, ?, ?, attachments.name, attachments.mime_type,
-      attachments.size_bytes, ?
+      attachments.size_bytes, ?, attachments.name_source, attachments.source_path
     FROM attachments
     INNER JOIN messages ON messages.id = attachments.message_id
     WHERE attachments.id = ? AND messages.conversation_id = ?

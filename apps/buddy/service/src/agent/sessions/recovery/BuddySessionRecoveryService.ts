@@ -63,6 +63,8 @@ export class BuddySessionRecoveryService {
 
     const missingAttachmentIds = new Set<string>()
     const recoveredUserInputs = new Map<string, {
+      attachmentIds?: string[]
+      resourceLabels?: Record<string, string>
       documents: Awaited<ReturnType<AttachmentService['resolveRecoveryInputReferences']>>['documents']
       images: Awaited<ReturnType<AttachmentService['resolveRecoveryInputReferences']>>['images']
       prompt: string
@@ -86,11 +88,14 @@ export class BuddySessionRecoveryService {
       const recovery = await this.#options.attachments.resolveRecoveryInputReferences(
         storedInput.attachmentIds,
         input.conversationId,
+        storedInput.prompt,
       )
       recoveredImageCount += recovery.images.length
       for (const attachmentId of recovery.missingAttachmentIds)
         missingAttachmentIds.add(attachmentId)
       recoveredUserInputs.set(message.id, {
+        attachmentIds: storedInput.attachmentIds.filter(id => !recovery.missingAttachmentIds.includes(id)),
+        resourceLabels: recovery.resourceLabels,
         documents: recovery.documents,
         images: recovery.images,
         prompt: storedInput.prompt,
