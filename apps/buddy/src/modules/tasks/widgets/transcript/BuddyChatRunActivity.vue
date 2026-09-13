@@ -10,7 +10,7 @@ import { describeChatCurrentActivity } from '../../model/transcript/chatCurrentA
 import { formatChatRunDuration } from '../../model/transcript/chatRunDuration'
 import BuddyChatActivityStatus from './BuddyChatActivityStatus.vue'
 import BuddyChatDisclosure from './BuddyChatDisclosure.vue'
-import BuddyChatReasoningRow from './BuddyChatReasoningRow.vue'
+import BuddyChatReasoningBody from './BuddyChatReasoningBody.vue'
 
 const props = defineProps<{
   language: BuddyLocale
@@ -60,7 +60,7 @@ function reveal() {
       <span class="buddy-chat-run-activity__duration" aria-live="off" :title="t('desktop.chat.activityRunDuration')">{{ duration }}</span>
     </BuddyChatActivityStatus>
     <BuddyChatDisclosure>
-      <BuddyChatReasoningRow v-if="reasoningOpen && activity.reasoning" :key="activity.reasoning.id" :node="activity.reasoning" class="buddy-chat-run-activity__reasoning" />
+      <BuddyChatReasoningBody v-if="reasoningOpen && activity.reasoning" :key="activity.reasoning.id" :text="activity.reasoning.text" class="buddy-chat-run-activity__reasoning" />
     </BuddyChatDisclosure>
   </div>
 </template>

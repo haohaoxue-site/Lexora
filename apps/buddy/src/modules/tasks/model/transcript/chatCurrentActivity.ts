@@ -65,7 +65,7 @@ export function describeChatCurrentActivity(turn: ChatAgentTurn, language: Buddy
     return activity
   }
   if (reasoning)
-    return { ...activity, label: t('desktop.chat.processReasoningRunning'), target: reasoningPreview(reasoning.text), reasoning }
+    return { ...activity, label: t('desktop.chat.processReasoningRunning'), target: reasoningPreview(reasoning.text, true), reasoning }
   const progressLabels = {
     idle: 'desktop.chat.activity',
     awaiting_approval: 'desktop.chat.processAwaitingApproval',

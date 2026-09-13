@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { ChatAgentActivityGroup } from '../../model/transcript/chatAgentActivities'
 import type { BuddyLocale } from '@/i18n/buddyI18n'
-import { ChevronRight20Regular, ChevronUp20Regular } from '@vicons/fluent'
+import { ChevronRight20Regular, ChevronUp20Regular, Thinking20Regular } from '@vicons/fluent'
 import { computed, nextTick, shallowRef, useTemplateRef } from 'vue'
 import { useBuddyI18n } from '@/i18n/buddyI18n'
 import DesktopIcon from '@/shared/ui/icon/DesktopIcon.vue'
@@ -29,14 +29,15 @@ const content = useTemplateRef<HTMLDivElement>('content')
 const header = useTemplateRef<HTMLButtonElement>('header')
 const hasHistory = computed(() => props.group.nodes.some(node => node.kind === 'tool' ? !isChatToolActive(node) : node.status !== 'running'))
 const singleTool = computed(() => props.group.toolCount === 1 && props.group.nodes.every(node => node.kind === 'tool' || node.status === 'running'))
+const singleReasoning = computed(() => props.group.nodes.length === 1 && props.group.nodes[0]?.kind === 'reasoning')
 const layout = computed(() => presentChatActivityLayout(props.group.nodes))
 const issues = computed(() => props.group.nodes.filter(node => node.kind === 'tool' && isChatToolIssue(node)))
 const fullSummary = computed(() => summarizeChatActivityCounts(props.group, props.language, Infinity))
 const summary = computed(() => summarizeChatActivity(props.group, props.language))
 
-function toggleTool(id: string) {
+function toggleEntry(id: string) {
   highlightedIssue.value = null
-  if (singleTool.value)
+  if (singleTool.value || singleReasoning.value)
     open.value = true
   emit('toggleEntry', id)
 }
@@ -81,9 +82,10 @@ defineExpose({ revealActivity })
     :data-activity-id="group.id"
     :class="{ 'is-open': open, 'is-thinking': group.toolCount === 0, 'is-tool-group': group.toolCount > 0 && !singleTool }"
   >
-    <div v-if="!singleTool" class="buddy-chat-activity-group__heading">
+    <div v-if="!singleTool && !singleReasoning" class="buddy-chat-activity-group__heading">
       <button ref="header" class="buddy-chat-activity-group__header" type="button" :aria-expanded="open" :title="fullSummary" @click="open = !open">
         <BuddyChatToolIcon v-if="summary.icon !== 'reasoning'" :icon="summary.icon" class="buddy-chat-activity-group__icon" />
+        <DesktopIcon v-else :component="Thinking20Regular" class="buddy-chat-activity-group__icon" />
         <span class="buddy-chat-activity-group__label">{{ summary.label }}</span>
         <span v-if="!open && summary.target" class="buddy-chat-activity-group__target" :title="summary.target">{{ summary.target }}</span>
         <DesktopIcon :component="ChevronRight20Regular" class="buddy-chat-activity-group__chevron" :class="{ 'is-open': open }" />
@@ -93,7 +95,7 @@ defineExpose({ revealActivity })
       </button>
     </div>
     <BuddyChatDisclosure>
-      <div v-if="open || (singleTool && hasHistory)" ref="content" class="buddy-chat-activity-group__content">
+      <div v-if="open || ((singleTool || singleReasoning) && hasHistory)" ref="content" class="buddy-chat-activity-group__content">
         <template v-for="entry in layout.entries" :key="entry.id">
           <BuddyChatToolRow
             v-if="entry.kind === 'tool'"
@@ -102,7 +104,7 @@ defineExpose({ revealActivity })
             :compact-target="layout.compact.get(entry.id)?.target"
             :has-next="layout.compact.get(entry.id)?.hasNext"
             :highlighted="highlightedIssue === entry.id"
-            @toggle="toggleTool(entry.id)"
+            @toggle="toggleEntry(entry.id)"
           />
           <BuddyChatDisclosure v-else-if="entry.kind === 'tool-details'">
             <BuddyChatToolDetails
@@ -113,7 +115,12 @@ defineExpose({ revealActivity })
               :status="entry.node.status" :tool-name="entry.node.toolName"
             />
           </BuddyChatDisclosure>
-          <BuddyChatReasoningRow v-else-if="entry.kind === 'reasoning' && entry.status !== 'running'" class="buddy-chat-activity-group__thought" :node="entry" />
+          <BuddyChatReasoningRow
+            v-else-if="entry.kind === 'reasoning' && entry.status !== 'running'"
+            class="buddy-chat-activity-group__thought"
+            :node="entry" :language="language" :open="openEntries.get(entry.id) === true"
+            @toggle="toggleEntry(entry.id)"
+          />
         </template>
         <button v-if="!singleTool && group.nodes.length > 8" class="buddy-chat-activity-group__collapse" type="button" @click="collapseFromBottom">
           <DesktopIcon :component="ChevronUp20Regular" />
@@ -184,6 +191,7 @@ defineExpose({ revealActivity })
 }
 
 .buddy-chat-activity-group__label {
+  flex: none;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -245,7 +253,7 @@ defineExpose({ revealActivity })
 }
 
 .is-tool-group .buddy-chat-activity-group__thought {
-  padding: 5px 8px 7px 28px;
+  padding: 5px 8px 7px;
 }
 
 .is-thinking > .buddy-chat-activity-group__content {

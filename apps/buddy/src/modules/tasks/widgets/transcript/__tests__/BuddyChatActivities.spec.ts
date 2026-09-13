@@ -105,10 +105,11 @@ describe('activity disclosure', () => {
     const thought: ChatAgentTurnNode = { id: 'thought', contentIndex: 0, kind: 'reasoning', status: 'completed', text: `**${title}**` }
     const { root, turn } = mountTurn([thought])
     expect(root.querySelector('.buddy-chat-reasoning-entry__body')).toBeNull()
-    root.querySelector<HTMLButtonElement>('.buddy-chat-activity-group__header')!.click()
+    root.querySelector<HTMLButtonElement>('.buddy-chat-reasoning-entry__header')!.click()
     await nextTick()
     const body = root.querySelector('.buddy-chat-reasoning-entry__body')
-    expect(root.querySelectorAll('button[aria-expanded]')).toHaveLength(1)
+    expect(root.querySelector('.buddy-chat-activity-group__header')).toBeNull()
+    expect(root.querySelector('.buddy-chat-reasoning-entry__label')?.textContent).toBe('思考完成')
     expect(root.textContent?.split(title)).toHaveLength(2)
     expect(body?.textContent?.trim()).toBe(title)
     turn.value = { ...turn.value, nodes: [thought, readTool('one', 'running')] }
@@ -116,6 +117,39 @@ describe('activity disclosure', () => {
     expect(root.querySelector('.buddy-chat-reasoning-entry__body')).toBe(body)
     expect(root.textContent?.split(title)).toHaveLength(2)
     expect(root.querySelector('.buddy-chat-tool-details')).toBeNull()
+  })
+
+  it('discloses long untitled thoughts independently and retains the reader choice through group changes', async () => {
+    const text = `The beginning\n\n${'Reasoning detail. '.repeat(5_000)}\n\nThe end`
+    const thought: ChatAgentTurnNode = { id: 'long-thought', contentIndex: 0, kind: 'reasoning', status: 'completed', text }
+    const interrupted: ChatAgentTurnNode = { id: 'interrupted-thought', contentIndex: 0, kind: 'reasoning', status: 'interrupted', text: 'Partial reasoning' }
+    const { root, turn } = mountTurn([thought, readTool('one', 'completed'), interrupted], 'completed')
+    const group = root.querySelector<HTMLButtonElement>('.buddy-chat-activity-group__header')!
+    group.click()
+    await nextTick()
+    const headings = () => [...root.querySelectorAll<HTMLButtonElement>('.buddy-chat-reasoning-entry__header')]
+    expect(headings().map(header => header.textContent)).toEqual(['思考完成The beginning', '思考已中断Partial reasoning'])
+    expect(root.querySelector('.buddy-chat-reasoning-entry__body')).toBeNull()
+    headings()[0]!.click()
+    await nextTick()
+    const body = root.querySelector('.buddy-chat-reasoning-entry__body')!
+    expect(body.textContent?.startsWith('The beginning')).toBe(true)
+    expect(body.textContent?.trimEnd().endsWith('The end')).toBe(true)
+    expect(body.textContent?.match(/Reasoning detail\./g)).toHaveLength(5_000)
+    group.click()
+    await nextTick()
+    await vi.waitFor(() => expect(root.querySelector('.buddy-chat-reasoning-entry__body')).toBeNull())
+    group.click()
+    await nextTick()
+    expect(headings().map(header => header.getAttribute('aria-expanded'))).toEqual(['true', 'false'])
+    headings()[0]!.scrollIntoView = () => {}
+    root.querySelector<HTMLButtonElement>('.buddy-chat-reasoning-entry__collapse')!.click()
+    await nextTick()
+    expect(document.activeElement).toBe(headings()[0])
+    turn.value = { ...turn.value, nodes: [...turn.value.nodes, readTool('two', 'completed')] }
+    await nextTick()
+    expect(headings().map(header => header.getAttribute('aria-expanded'))).toEqual(['false', 'false'])
+    await vi.waitFor(() => expect(root.querySelector('.buddy-chat-reasoning-entry__body')).toBeNull())
   })
 
   it('shows a single finished tool directly and retains its open output when a group forms', async () => {
