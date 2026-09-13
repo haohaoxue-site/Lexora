@@ -8,6 +8,7 @@ import { useBuddyI18n } from '@/i18n/buddyI18n'
 import DesktopIcon from '@/shared/ui/icon/DesktopIcon.vue'
 import { resolveBuddyAttachmentPreviewUrl } from '../../model/attachments/chatAttachmentView'
 import { formatChatRunDuration } from '../../model/transcript/chatRunDuration'
+import BuddyArtifactCard from '../artifacts/BuddyArtifactCard.vue'
 import ChatQuoteStrip from '../quotes/ChatQuoteStrip.vue'
 import BuddyChatTokenUsage from '../transcript/BuddyChatTokenUsage.vue'
 import { conversationCanvasActions } from './conversationCanvasContext'
@@ -107,11 +108,12 @@ function open(event: MouseEvent) {
           {{ t(message.kind === 'draft' ? 'desktop.canvas.writeInComposer' : 'desktop.canvas.generating') }}
         </p>
         <div v-if="message.artifactCount" class="conversation-node__artifacts">
-          <button v-for="artifact in message.artifacts" :key="artifact.artifactId" type="button" class="conversation-node__artifact" :title="artifact.name" @click.stop="actions.openArtifact(artifact.artifactId)">
-            <img v-if="artifact.mimeType.startsWith('image/')" :src="`lexora-artifact://preview/${encodeURIComponent(artifact.artifactId)}?v=${encodeURIComponent(artifact.updatedAt)}`" alt="" loading="lazy" draggable="false">
-            <DesktopIcon v-else :component="Document20Regular" />
-            <span>{{ artifact.name }}</span>
-          </button>
+          <BuddyArtifactCard
+            v-for="artifact in message.artifacts" :key="artifact.artifactId"
+            class="conversation-node__artifact" compact
+            :artifact="artifact" :language="actions.language.value"
+            @click.stop @open-artifact="actions.openArtifact"
+          />
           <button v-if="message.artifactCount > message.artifacts.length" type="button" class="conversation-node__more" :aria-label="t('desktop.canvas.moreResources', { count: message.artifactCount - message.artifacts.length })" @click.stop="actions.open(message.id)">
             {{ t('desktop.canvas.more') }}
           </button>
@@ -163,10 +165,6 @@ function open(event: MouseEvent) {
 .conversation-node__attachment { display: flex; height: 44px; flex: 0 1 120px; max-width: 120px; background: var(--buddy-surface-raised); align-items: center; gap: 5px; min-width: 0; padding: 5px; border: 1px solid var(--buddy-border-subtle); border-radius: 5px; color: var(--buddy-text-secondary); font-size: 10px; }
 .conversation-node__attachment img { width: 32px; height: 32px; flex: none; object-fit: cover; border-radius: 3px; }
 .conversation-node__attachment span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.conversation-node__artifact { display: flex; flex: 0 1 96px; max-width: 96px; min-width: 0; height: 68px; flex-direction: column; align-items: center; justify-content: center; gap: 5px; padding: 6px; overflow: hidden; border: 1px solid var(--buddy-border-subtle); border-radius: 6px; background: var(--buddy-surface-subtle); color: var(--buddy-text-secondary); cursor: pointer; }
-.conversation-node__artifact:hover { border-color: var(--buddy-accent-border); }
-.conversation-node__artifact img { height: 36px; width: 100%; object-fit: contain; border-radius: 3px; }
-.conversation-node__artifact span { width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10px; }
 .conversation-node__more { flex: none; padding: 6px 2px; border: 0; border-radius: 4px; background: transparent; color: var(--buddy-accent-text); font-size: 10px; cursor: pointer; }
 .conversation-node__more:hover { background: var(--buddy-state-hover); }
 @media (hover: none) { .conversation-node__actions { opacity: 1; pointer-events: auto; } }

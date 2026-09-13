@@ -15,6 +15,33 @@ import {
 } from '../chatTranscriptProjection'
 
 describe('chat transcript projection', () => {
+  it('keeps legacy retry attempts chronological when run snapshots arrive newest first', () => {
+    const user = message('retry-question', 'user')
+    const cancelled = { ...localRun('old-run', user.id, 'cancelled'), completedAt: '2026-08-20T00:00:03.000Z' }
+    const retry = { ...localRun('new-run', user.id, 'running'), startedAt: '2026-08-20T00:00:04.000Z' }
+    const oldProjection = runProjection(agentTurn(cancelled, ['First attempt']))
+    const activeProjection = runProjection(agentTurn(retry, ['Retry attempt']))
+    const input = {
+      outputs: [],
+      runs: [retry, cancelled],
+      timelineItems: [user],
+      runProjections: [activeProjection, oldProjection],
+    }
+    const projector = createChatTranscriptProjector()
+    const initial = projector.project(input)
+    expect(initial.rows.map(row => row.key)).toEqual([
+      'message:retry-question',
+      'agent-turn:old-run',
+      'agent-turn:new-run',
+      'activity:new-run',
+    ])
+    expect(initial.rows.filter(row => row.kind === 'agent-turn').map(row => row.turn.status))
+      .toEqual(['cancelled', 'running'])
+    const updatedInput = { ...input, runProjections: [runProjection(agentTurn(retry, ['Retry progresses'])), oldProjection] }
+    expect(projector.project(updatedInput).rows).toEqual(projectChatTranscript(updatedInput).rows)
+    expect(projector.project(updatedInput).rows[1]).toBe(initial.rows[1])
+  })
+
   it('reuses historical rows when only the active run projection advances', () => {
     const historyUser = message('history-user', 'user')
     const historyAssistant = {

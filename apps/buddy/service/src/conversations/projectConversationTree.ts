@@ -30,16 +30,8 @@ export function projectConversationTree(input: {
     }
     outputsByRun.set(output.runId, artifacts)
   }
-  const groups = new Map<string, RunRecord[]>()
-  for (const run of input.runs) {
-    if (run.purpose === 'conversation.compaction')
-      continue
-    const id = `answer:${run.branchId}:${run.triggeringMessageId}`
-    const group = groups.get(id) ?? []
-    group.push(run)
-    groups.set(id, group)
-  }
-  const runNodes = new Map(input.runs.map(run => [run.id, `answer:${run.branchId}:${run.triggeringMessageId}`]))
+  const answerRuns = input.runs.filter(run => run.purpose !== 'conversation.compaction')
+  const runNodes = new Map(answerRuns.map(run => [run.id, `answer:${run.id}`]))
   const messageNodes = new Map(input.messages.map(message => [message.id, message.role === 'user' ? `question:${message.id}` : message.runId ? runNodes.get(message.runId) ?? null : null]))
   const messagesByRun = new Map<string, MessageRecord[]>()
   for (const message of input.messages) {
@@ -86,19 +78,17 @@ export function projectConversationTree(input: {
       attempts: [],
     }, message.createdAt)
   }
-  for (const [id, attempts] of groups) {
-    attempts.sort((a, b) => a.startedAt.localeCompare(b.startedAt) || a.id.localeCompare(b.id))
-    const latest = attempts.at(-1)!
-    const messages = messagesByRun.get(latest.id) ?? []
+  for (const run of answerRuns) {
+    const messages = messagesByRun.get(run.id) ?? []
     const answers = messages.filter(message => message.role === 'assistant')
-    const artifacts = outputsByRun.get(latest.id) ?? []
+    const artifacts = outputsByRun.get(run.id) ?? []
     add({
-      id,
-      parentId: `question:${latest.triggeringMessageId}`,
-      branchId: latest.branchId,
+      id: runNodes.get(run.id)!,
+      parentId: `question:${run.triggeringMessageId}`,
+      branchId: run.branchId,
       kind: 'answer',
       messageId: answers.at(-1)?.id ?? null,
-      runId: latest.id,
+      runId: run.id,
       text: conversationTreePreview(answers.map(message => readText(message.content)).filter(Boolean).join('\n\n')),
       quotes: [],
       quoteCount: 0,
@@ -107,16 +97,16 @@ export function projectConversationTree(input: {
       artifacts: artifacts.slice(0, 3),
       artifactCount: artifacts.length,
       metadata: {
-        modelId: latest.model,
-        startedAt: latest.startedAt,
-        completedAt: latest.completedAt,
-        usage: input.usageByRun?.get(latest.id) ?? null,
+        modelId: run.model,
+        startedAt: run.startedAt,
+        completedAt: run.completedAt,
+        usage: input.usageByRun?.get(run.id) ?? null,
       },
-      status: latest.status,
+      status: run.status,
       active: false,
-      toolCount: input.toolCounts?.get(latest.id) ?? messages.filter(message => message.role === 'tool').length,
-      attempts: attempts.map(run => ({ runId: run.id, status: run.status })),
-    }, attempts[0]!.startedAt)
+      toolCount: input.toolCounts?.get(run.id) ?? messages.filter(message => message.role === 'tool').length,
+      attempts: [{ runId: run.id, status: run.status }],
+    }, run.startedAt)
   }
   const heads = new Map<string, string | null>()
   for (const branch of input.branches) {

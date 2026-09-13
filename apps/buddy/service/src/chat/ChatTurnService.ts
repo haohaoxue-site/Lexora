@@ -465,7 +465,6 @@ export class ChatTurnService {
     const triggerIndex = history.findIndex(message => message.id === sourceRun.triggeringMessageId)
     if (triggerIndex < 0)
       throw new BuddyServiceError('VALIDATION_FAILED')
-    const reuseBranch = this.#options.turnRequests.canRetryInPlace(sourceRun.id)
 
     const storedInput = this.#requireRunInput(requireValue(replay?.run ?? sourceRun).id)
     assertPromptSize(storedInput.prompt)
@@ -489,8 +488,7 @@ export class ChatTurnService {
         })
       : this.#options.turnRequests.regenerate({
           approvalPolicy: conversation.approvalPolicy,
-          branchId: reuseBranch ? parentBranchId : randomUUID(),
-          reuseBranch,
+          branchId: randomUUID(),
           conversationId: conversation.id,
           createdAt: new Date().toISOString(),
           executionProfile: conversation.executionProfile,
