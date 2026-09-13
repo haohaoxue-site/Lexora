@@ -78,8 +78,8 @@ describe('buddy in-process Pi extensions', () => {
     expect(failure).toMatchObject({ code: 'BUDDY_EXTENSION_LOAD_FAILED' })
   })
 
-  it('rejects inline extensions that override Pi shell tools', async () => {
-    for (const toolName of ['bash', 'powershell']) {
+  it('rejects unapproved inline extensions that override Pi tools', async () => {
+    for (const toolName of ['bash', 'powershell', 'read']) {
       const root = await realpath(await mkdtemp(join(tmpdir(), 'lexora-buddy-tool-conflict-')))
       directories.push(root)
       const agentDir = join(root, '.lexora-buddy')

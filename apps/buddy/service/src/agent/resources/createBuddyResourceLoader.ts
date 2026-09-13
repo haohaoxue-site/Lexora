@@ -11,6 +11,7 @@ import {
 } from '@earendil-works/pi-coding-agent'
 import { SHELL_SANDBOX_EXTENSION } from '../../sandbox/shellCapability'
 import { getPiShellToolName, PI_BUILTIN_TOOL_NAME_SET } from '../extensions/piBuiltinTools'
+import { createReadFileExtension, READ_FILE_EXTENSION } from '../extensions/readFileExtension'
 import { createBuddySystemPrompt } from './createBuddySystemPrompt'
 
 export interface CreateBuddyResourceLoaderOptions {
@@ -57,7 +58,7 @@ export async function createBuddyResourceLoader(
     agentsFilesOverride: () => ({ agentsFiles: [...options.boundedContextFiles] }),
     appendSystemPromptOverride: () => [],
     cwd: options.cwd,
-    extensionFactories: [...options.inProcessExtensions],
+    extensionFactories: [createReadFileExtension(options.cwd), ...options.inProcessExtensions],
     noContextFiles: true,
     noExtensions: true,
     noPromptTemplates: true,
@@ -92,8 +93,9 @@ function validateLoadedExtensions(loader: DefaultResourceLoader): void {
   const hasInvalidToolName = result.extensions.some(extension => (
     [...extension.tools.keys()].some(toolName => (
       (PI_BUILTIN_TOOL_NAME_SET.has(toolName)
-        && !(toolName === getPiShellToolName(process.platform) && extension.path === `<inline:${SHELL_SANDBOX_EXTENSION}>`))
-      || (!toolName.startsWith('lexora_') && !toolName.startsWith('mcp__') && toolName !== getPiShellToolName(process.platform))
+        && !(toolName === getPiShellToolName(process.platform) && extension.path === `<inline:${SHELL_SANDBOX_EXTENSION}>`)
+        && !(toolName === 'read' && extension.path === `<inline:${READ_FILE_EXTENSION}>`))
+      || (!toolName.startsWith('lexora_') && !toolName.startsWith('mcp__') && !PI_BUILTIN_TOOL_NAME_SET.has(toolName))
     ))
   ))
   const hasInvalidToolSchema = result.extensions.some(extension => (

@@ -1,6 +1,7 @@
 import type { UserMessage } from '@earendil-works/pi-ai'
 import type { AgentSession } from '@earendil-works/pi-coding-agent'
 import { readBuddyInputReference } from './BuddyInputReference'
+import { projectReadResult } from './projectReadHistory'
 
 export function isRejectedModelInput(code: unknown): code is string {
   return code === 'MODEL_INPUT_TOO_LARGE'
@@ -37,7 +38,7 @@ export function prepareBuddyInputHistory(messages: readonly AgentSession['messag
       if (message.stopReason !== 'error' || message.content.length > 0)
         pendingUsers = []
     }
-    result.push(message)
+    result.push(message.role === 'toolResult' ? projectReadResult(message) : message)
   }
   return result
 }

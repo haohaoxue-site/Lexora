@@ -75,6 +75,8 @@ describe('native attachment request guidance', () => {
     for (const { context, payload } of captured) {
       expect(context.systemPrompt?.match(/Attachment resources:/g)).toHaveLength(1)
       expect(context.systemPrompt).toContain('For native audio, listen')
+      expect(context.systemPrompt).toContain('Do not call read, run playback')
+      expect(context.systemPrompt).toContain('the supplied native snapshot does not represent those edits')
       expect(context.systemPrompt).toContain('they are not paths')
       expect(context.systemPrompt).not.toContain(file.name)
       expect(context.tools).toBe(tools)
@@ -89,9 +91,33 @@ describe('native attachment request guidance', () => {
     expect(captured[2]?.payload).toMatchObject({ contents: expect.arrayContaining([
       expect.objectContaining({ parts: expect.arrayContaining([{ inlineData: { mimeType: 'audio/wav', data: file.data } }]) }),
     ]) })
+    const binaryHistory = {
+      role: 'toolResult' as const,
+      toolName: 'read',
+      toolCallId: 'old-read',
+      timestamp: 4,
+      isError: false,
+      content: [{ type: 'text' as const, text: `RIFF\0\0\0\0WAVE${'\0'.repeat(40_782)}` }],
+    }
+    history.push({
+      role: 'assistant',
+      api: model.api,
+      provider: model.provider,
+      model: model.id,
+      timestamp: 3,
+      stopReason: 'toolUse',
+      content: [{ type: 'toolCall', id: 'old-read', name: 'read', arguments: { path: '/workspace/fixture.wav' } }],
+      usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } },
+    }, binaryHistory)
+    expect((await send(model)).errorMessage).toBe('OFFLINE_CAPTURED')
+    const repairedPayload = JSON.stringify(captured.at(-1)?.payload)
+    expect(repairedPayload).toContain(file.data)
+    expect(repairedPayload).toContain('does not play audio or video')
+    expect(repairedPayload).not.toContain('\\u0000')
+    expect(binaryHistory.content[0]?.text).toHaveLength(40_794)
     expect((await send({ ...model, audioInput: false })).errorMessage).toBe('OFFLINE_CAPTURED')
-    expect(captured).toHaveLength(4)
-    expect(JSON.stringify(captured[3]?.payload)).not.toContain(file.data)
+    expect(captured).toHaveLength(5)
+    expect(JSON.stringify(captured.at(-1)?.payload)).not.toContain(file.data)
     expect(input).toEqual(original)
   })
 

@@ -14,6 +14,7 @@ import { Type } from 'typebox'
 import { afterEach, describe, expect, it } from 'vitest'
 import { createOutputPresentationExtension } from '../../../artifacts/outputPresentationExtension'
 import { createInputReferenceExtension } from '../../extensions/inputReferenceExtension'
+import { createToolPolicyExtension } from '../../extensions/toolPolicyExtension'
 import { createIsolatedBuddySession as createBuddySession } from '../../sessions/__tests__/isolatedBuddySession'
 import { createReusableBuddySession } from '../../sessions/createReusableBuddySession'
 import {
@@ -101,8 +102,8 @@ describe('composer input at the Buddy session boundary', () => {
 
     expect(fixture.lifecycle.filter(event => event === 'input')).toHaveLength(3)
     expect(fixture.contexts[0]?.systemPrompt).not.toContain('Attachment resources:')
-    expect(fixture.contexts[1]?.systemPrompt).toContain('Use supplied native content directly when the task requires understanding it')
-    expect(fixture.contexts[2]?.systemPrompt).toContain('Use supplied native content directly when the task requires understanding it')
+    expect(fixture.contexts[1]?.systemPrompt).toContain('Use supplied native content directly when the task requires understanding the sent snapshot')
+    expect(fixture.contexts[2]?.systemPrompt).toContain('Use supplied native content directly when the task requires understanding the sent snapshot')
     for (const [index, id] of ['plain', 'message-1', 'follow'].entries()) {
       expect(fixture.contexts[index]?.systemPrompt).toContain(OUTPUT_GUIDELINE)
       expect(fixture.contexts[index]?.systemPrompt).toContain(`Current offline run: run-${id}`)
@@ -293,6 +294,71 @@ describe('composer input at the Buddy session boundary', () => {
     await expectSafePersistence(fixture)
   })
 
+  it.each(['denied', 'approved_once'] as const)('keeps the read adapter behind product approval: %s', async (decision) => {
+    let calls = 0
+    const fixture = await createFixture({
+      approvalDecision: decision,
+      stream: model => terminalStream(model, ++calls === 1
+        ? {
+            stopReason: 'toolUse',
+            content: [{ type: 'toolCall', id: 'read-sensitive', name: 'read', arguments: { path: '.env.media' } }],
+          }
+        : {}),
+    })
+    await writeFile(join(fixture.root, '.env.media'), Buffer.concat([Buffer.from('RIFF'), Buffer.alloc(4), Buffer.from('WAVE'), Buffer.alloc(32)]))
+    await fixture.send({ ...plan(), text: 'Inspect the supplied file', images: [] })
+    const result = fixture.contexts[1]?.messages.find(message => message.role === 'toolResult')
+    expect(result).toMatchObject({ toolName: 'read', toolCallId: 'read-sensitive', isError: decision === 'denied' })
+    if (decision === 'denied') {
+      expect(JSON.stringify(result)).toContain('APPROVAL_DENIED')
+      expect(JSON.stringify(result)).not.toContain('WAV audio')
+    }
+    else {
+      expect(result).toMatchObject({ details: { contentOmitted: { format: 'WAV audio', sizeBytes: 44 } } })
+      expect(JSON.stringify(result)).toContain('no file content was extracted')
+    }
+  })
+
+  it.each(['manual', 'threshold', 'overflow', 'tree', 'failure', 'cancel'] as const)('projects historical read output through native %s summarization without changing stored entries', async (mode) => {
+    let calls = 0
+    const fixture = await createFixture({
+      contextWindow: mode === 'threshold' ? 10_000 : undefined,
+      stream: (model) => {
+        calls++
+        if (calls === 3 && (mode === 'overflow' || mode === 'failure'))
+          return terminalStream(model, { stopReason: 'error', errorMessage: mode === 'overflow' ? 'prompt is too long' : 'offline summary failed' })
+        if (calls === 3 && mode === 'cancel')
+          queueMicrotask(() => fixture.session.abortCompaction())
+        return terminalStream(model, { usage: usage(mode === 'threshold' && calls === 2 ? 9_500 : 0) })
+      },
+    })
+    await fixture.send(plan())
+    const branchPoint = fixture.session.sessionManager.getLeafId()!
+    const stored = appendHistoricalRead(fixture)
+    await fixture.send(plan('message-2'))
+    expect(JSON.stringify(fixture.contexts[1])).toContain('Earlier raw file output was omitted')
+    expect(JSON.stringify(fixture.contexts[1])).not.toContain('\\u0000')
+    enableCompaction(fixture)
+    if (mode === 'tree')
+      await fixture.session.navigateTree(branchPoint, { summarize: true })
+    else if (mode === 'threshold' || mode === 'overflow')
+      await fixture.send({ ...plan('follow'), text: 'Continue after compaction', images: [] })
+    else if (mode === 'failure' || mode === 'cancel')
+      await expect(fixture.session.compact()).rejects.toThrow(mode === 'failure' ? 'offline summary failed' : 'cancelled')
+    else
+      await fixture.session.compact()
+    const summary = fixture.contexts[mode === 'overflow' ? 3 : 2]
+    expectSafeSummary(fixture, summary)
+    expect(JSON.stringify(summary)).toContain(mode === 'tree' ? '/offline/legacy.wav' : 'Earlier raw file output was omitted')
+    expect(JSON.stringify(summary)).not.toContain('\\u0000')
+    expect(JSON.stringify(summary)).not.toContain('Showing lines')
+    const persisted = (await readFile(fixture.piSessionFile, 'utf8')).trim().split('\n').map(line => JSON.parse(line))
+    expect(persisted.find(entry => entry.id === stored.id)).toEqual(stored)
+    expect(fixture.session.sessionManager.getEntry(stored.id)).toEqual(stored)
+    if (mode === 'failure' || mode === 'cancel')
+      expect(fixture.session.sessionManager.getEntries().some(entry => entry.type === 'compaction')).toBe(false)
+  })
+
   it('runs pre-send compaction after an aborted response before preparing the next request', async () => {
     let calls = 0
     const fixture = await createFixture({
@@ -400,6 +466,7 @@ async function createFixture(options: {
   root?: string
   piSessionFile?: string
   provider?: 'openai' | 'anthropic' | 'openai-codex'
+  approvalDecision?: 'denied' | 'approved_once'
   contextWindow?: number
   stream?: Stream
 } = {}) {
@@ -463,6 +530,18 @@ async function createFixture(options: {
     executionProfile: 'workspace_write',
     getServiceTier: () => runContext.current?.serviceTier ?? null,
     inProcessExtensions: [
+      ...options.approvalDecision
+        ? [createToolPolicyExtension({
+            approvalAvailable: true,
+            approvalPolicy: 'policy',
+            approvalService: { request: async () => ({ approvalId: 'offline-approval', decision: options.approvalDecision! }) },
+            cwd: root,
+            executionProfile: 'workspace_write',
+            getGrants: () => [{ canonicalRoot: root, root, grantId: 'workspace', kind: 'workspace' }],
+            getRunContext: () => runContext.current,
+            owner: { kind: 'conversation', id: 'conversation-1' },
+          })]
+        : [],
       createInputReferenceExtension(inputReferences),
       createOutputPresentationExtension({
         artifactService: { presentOutputs: async () => [{ id: 'offline-artifact-1' }] },
@@ -583,6 +662,32 @@ async function createFixture(options: {
   }
 
   return { ...created, contexts, images, lifecycle, nativeToolImage, reusable, root, runContext, send }
+}
+
+function appendHistoricalRead(fixture: Awaited<ReturnType<typeof createFixture>>) {
+  const model = fixture.session.model!
+  fixture.session.sessionManager.appendMessage({
+    api: model.api,
+    provider: model.provider,
+    model: model.id,
+    role: 'assistant',
+    stopReason: 'toolUse',
+    timestamp: Date.now(),
+    usage: usage(),
+    content: [{ type: 'toolCall', id: 'legacy-read', name: 'read', arguments: { path: '/offline/legacy.wav' } }],
+  })
+  const text = `RIFF\0\0\0\0WAVE${'\0'.repeat(40_782)}\n[Showing lines 1-7 of 3545]`
+  const id = fixture.session.sessionManager.appendMessage({
+    role: 'toolResult',
+    toolCallId: 'legacy-read',
+    toolName: 'read',
+    timestamp: Date.now(),
+    isError: false,
+    content: [{ type: 'text', text }],
+    details: { truncation: { content: text, truncated: true } },
+  })
+  fixture.session.agent.state.messages = fixture.session.sessionManager.buildSessionContext().messages
+  return structuredClone(fixture.session.sessionManager.getEntry(id)!)
 }
 
 function referenceImages(input: InputPlan): ImageContent[] {
