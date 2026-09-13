@@ -10,8 +10,6 @@ import {
   Delete20Regular,
   Edit20Regular,
   MoreHorizontal20Regular,
-  Pin20Regular,
-  PinOff20Regular,
   Settings20Regular,
   SpinnerIos20Regular,
   Tag20Regular,
@@ -235,9 +233,10 @@ function resolveDropPosition(event: DragEvent): DesktopTaskPinnedDropPosition {
             class="desktop-task-sidebar__more desktop-task-sidebar__pin"
             type="button"
             :aria-label="pinLabel"
+            :aria-pressed="pinMode === 'unpin'"
             @click="emit('pin')"
           >
-            <DesktopIcon :component="pinMode === 'pin' ? Pin20Regular : PinOff20Regular" />
+            <DesktopIcon :name="pinMode === 'pin' ? 'windowPin' : 'pinOff'" :size="16" />
           </button>
         </div>
       </div>
@@ -370,13 +369,16 @@ button {
   height: var(--buddy-task-sidebar-action-size, 1.75rem);
   flex: none;
   place-items: center;
+  padding: 0;
   border-radius: var(--buddy-icon-button-radius);
   color: var(--buddy-text-muted);
+  line-height: 1;
   transition:
     background-color var(--buddy-motion-state-duration) var(--buddy-motion-state-easing),
     color var(--buddy-motion-state-duration) var(--buddy-motion-state-easing);
 
   .n-icon {
+    display: flex;
     font-size: 16px;
   }
 
@@ -408,6 +410,10 @@ button {
 
 .desktop-task-sidebar__pin {
   color: var(--buddy-text-muted);
+
+  &[aria-pressed='true'] {
+    color: var(--buddy-accent-solid);
+  }
 }
 
 .desktop-task-row__activity {

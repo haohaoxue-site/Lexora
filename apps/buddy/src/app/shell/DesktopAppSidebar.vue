@@ -7,7 +7,6 @@ import type { BuddyLocale } from '@/i18n/buddyI18n'
 import {
   Alert20Regular,
   Search20Regular,
-  Settings20Regular,
 } from '@vicons/fluent'
 import { NBadge, NButton, NPopover } from 'naive-ui'
 import { computed, shallowRef } from 'vue'
@@ -115,7 +114,7 @@ function openSpace(spaceId: string) {
         type="button"
         @click="emit('navigateSettings')"
       >
-        <DesktopIcon :component="Settings20Regular" />
+        <DesktopIcon name="navigationSettings" />
         <span>{{ t('desktop.navigation.settings') }}</span>
       </button>
     </nav>
@@ -292,7 +291,6 @@ function openSpace(spaceId: string) {
   &.is-active {
     background: var(--buddy-nav-hover);
     color: var(--buddy-nav-foreground);
-    font-weight: var(--buddy-sidebar-item-active-font-weight);
   }
 
   &.is-active:hover {

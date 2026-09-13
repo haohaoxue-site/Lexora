@@ -438,7 +438,7 @@ const {
   --buddy-task-sidebar-item-font-size: 13px;
   --buddy-task-sidebar-action-gap: 0.125rem;
   --buddy-task-sidebar-action-inset: 0.4rem;
-  --buddy-task-sidebar-action-size: 1.75rem;
+  --buddy-task-sidebar-action-size: 1.5rem;
   --buddy-task-sidebar-scrollbar-gutter: 0.5rem;
   --buddy-task-sidebar-state-radius: 6px;
 

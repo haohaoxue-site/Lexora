@@ -11,8 +11,6 @@ import {
   Delete20Regular,
   Edit20Regular,
   MoreHorizontal20Regular,
-  Pin20Regular,
-  PinOff20Regular,
 } from '@vicons/fluent'
 import { NDropdown } from 'naive-ui'
 import { computed, h } from 'vue'
@@ -152,9 +150,10 @@ function resolveDropPosition(event: DragEvent): DesktopTaskPinnedDropPosition {
         class="desktop-task-space-row__action desktop-task-space-row__pin"
         type="button"
         :aria-label="pinLabel"
+        :aria-pressed="pinMode === 'unpin'"
         @click="emit('pin')"
       >
-        <DesktopIcon :component="pinMode === 'pin' ? Pin20Regular : PinOff20Regular" />
+        <DesktopIcon :name="pinMode === 'pin' ? 'windowPin' : 'pinOff'" :size="16" />
       </button>
     </div>
   </div>
@@ -270,13 +269,16 @@ button {
   height: var(--buddy-task-sidebar-action-size);
   flex: none;
   place-items: center;
+  padding: 0;
   border-radius: var(--buddy-icon-button-radius);
   color: var(--buddy-text-secondary);
+  line-height: 1;
   transition:
     background-color var(--buddy-motion-state-duration) var(--buddy-motion-state-easing),
     color var(--buddy-motion-state-duration) var(--buddy-motion-state-easing);
 
   .n-icon {
+    display: flex;
     font-size: 16px;
   }
 
@@ -293,5 +295,9 @@ button {
 
 .desktop-task-space-row__pin {
   color: var(--buddy-text-muted);
+
+  &[aria-pressed='true'] {
+    color: var(--buddy-accent-solid);
+  }
 }
 </style>

@@ -7,8 +7,8 @@ import {
   Apps20Regular,
   Bot20Regular,
   DataHistogram20Regular,
+  DocumentTextClock20Regular,
   Globe20Regular,
-  TextBulletListLtr20Regular,
 } from '@vicons/fluent'
 import { computed } from 'vue'
 
@@ -32,7 +32,7 @@ const categories = [
   { icon: Globe20Regular, key: 'web' as const },
   { icon: AnimalCat20Regular, key: 'pet' as const },
   { icon: DataHistogram20Regular, key: 'usage' as const },
-  { icon: TextBulletListLtr20Regular, key: 'logs' as const },
+  { icon: DocumentTextClock20Regular, key: 'logs' as const },
 ]
 const visibleCategories = computed(() => categories.filter(category => supportsSettingsCategory(props.capabilities, category.key)))
 </script>
@@ -124,7 +124,6 @@ const visibleCategories = computed(() => categories.filter(category => supportsS
 .desktop-settings-sidebar__content > a.is-active {
   background: var(--buddy-nav-selected);
   color: var(--buddy-nav-foreground);
-  font-weight: var(--buddy-sidebar-item-active-font-weight);
 }
 
 .desktop-settings-sidebar__content > a.is-active:hover {
