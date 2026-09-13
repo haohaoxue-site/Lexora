@@ -28,6 +28,7 @@ export interface RegisterLocalChatIpcOptions {
   recordDiagnostic?: ApplicationDiagnosticReporter
   getLanguage: () => LexoraConfig['desktop']['language']
   getWindow: () => BrowserWindow | null
+  openModelSnapshotDirectory: () => Promise<void>
   readWebCredential: () => Promise<unknown>
   runtime: DesktopRuntimeGateway
 }

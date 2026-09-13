@@ -55,7 +55,7 @@ const modelLabel = computed(() => {
   if (props.selectedModel)
     return props.selectedModel.displayName
   if (props.selectedModelId !== null)
-    return props.placeholder ?? `${props.selectedModelId} (${t('common.unavailable')})`
+    return props.placeholder ?? t('desktop.chat.blocker.model.action')
   return props.placeholder ?? t('desktop.chat.noModels')
 })
 const root = useTemplateRef<HTMLElement>('root')

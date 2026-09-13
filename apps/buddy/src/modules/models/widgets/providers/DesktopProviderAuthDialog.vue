@@ -9,6 +9,7 @@ import { useBuddyI18n } from '@/i18n/buddyI18n'
 const props = defineProps<{
   challenge: LocalProviderAuthChallenge | null
   language: BuddyLocale
+  providerName: string | null
 }>()
 const emit = defineEmits<{ cancel: [challengeId: string], submit: [challengeId: string, value: string] }>()
 const { t } = useBuddyI18n(() => props.language)
@@ -59,7 +60,7 @@ function submit() {
           type="text"
           :value="challenge.providerId"
         >
-        <span class="desktop-provider-auth__eyebrow">{{ challenge.providerId }}</span>
+        <span class="desktop-provider-auth__eyebrow">{{ providerName ?? challenge.providerId }}</span>
         <h2>{{ title }}</h2>
         <p v-if="message">
           {{ message }}

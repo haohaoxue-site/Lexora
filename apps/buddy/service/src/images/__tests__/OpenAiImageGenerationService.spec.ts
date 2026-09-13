@@ -10,9 +10,9 @@ import {
 const png = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 0])
 
 describe('openAiImageGenerationService', () => {
-  it('uses the OpenAI Responses image generation tool with attachment bytes', async () => {
+  it.each(['openai', 'builtin-personal'])('uses the selected instance %s for OpenAI Responses image generation', async (providerId) => {
     const getAuth = vi.fn(async () => ({
-      auth: { apiKey: 'private-api-key' },
+      auth: { apiKey: `fixture-key-${providerId}` },
       source: 'API key',
     }))
     const request = vi.fn(async (_url: string | URL | Request, _init?: RequestInit) => new Response(JSON.stringify({
@@ -30,11 +30,12 @@ describe('openAiImageGenerationService', () => {
     }))
     const service = new OpenAiImageGenerationService({
       fetch: request,
+      resolveSourceProviderId: id => id.startsWith('builtin-') ? 'openai' : id,
       modelRuntime: {
         getAuth,
       },
     })
-    const model = openAiModel()
+    const model = { ...openAiModel(), provider: providerId }
     const signal = new AbortController().signal
 
     await expect(service.generate({
@@ -50,7 +51,7 @@ describe('openAiImageGenerationService', () => {
 
     const [url, init] = request.mock.calls[0]!
     expect(url).toBe('https://api.openai.com/v1/responses')
-    expect(new Headers(init?.headers).get('authorization')).toBe('Bearer private-api-key')
+    expect(new Headers(init?.headers).get('authorization')).toBe(`Bearer fixture-key-${providerId}`)
     expect(JSON.parse(String(init?.body))).toMatchObject({
       input: [{
         content: [
@@ -75,7 +76,7 @@ describe('openAiImageGenerationService', () => {
     })
   })
 
-  it('uses Codex OAuth headers and parses the streamed image result', async () => {
+  it.each(['openai-codex', 'builtin-codex-work'])('uses %s OAuth headers and parses the streamed image result', async (providerId) => {
     const accessToken = jwt({
       'https://api.openai.com/auth': { chatgpt_account_id: 'account-1' },
     })
@@ -97,6 +98,7 @@ describe('openAiImageGenerationService', () => {
     }))
     const service = new OpenAiImageGenerationService({
       fetch: request,
+      resolveSourceProviderId: id => id === 'builtin-codex-work' ? 'openai-codex' : id,
       modelRuntime: {
         getAuth: async () => ({ auth: { apiKey: accessToken }, source: 'OAuth' }),
       },
@@ -104,7 +106,7 @@ describe('openAiImageGenerationService', () => {
 
     await expect(service.generate({
       inputImages: [],
-      model: codexModel(),
+      model: { ...codexModel(), provider: providerId },
       prompt: 'Create a new image',
       signal: new AbortController().signal,
     })).resolves.toMatchObject({
@@ -162,7 +164,7 @@ describe('openAiImageGenerationService', () => {
     })
   })
 
-  it('normalizes auth resolver failures and preserves cancellation', async () => {
+  it('normalizes auth resolver failures', async () => {
     const service = new OpenAiImageGenerationService({
       fetch: vi.fn(),
       modelRuntime: {

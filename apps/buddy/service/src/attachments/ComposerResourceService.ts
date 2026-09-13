@@ -31,7 +31,7 @@ import { createHash, randomUUID } from 'node:crypto'
 import { open, stat } from 'node:fs/promises'
 import { basename, isAbsolute, join, relative } from 'node:path'
 import { readBoundedFile } from '../../../platform/filesystem/boundedFile'
-import { BUDDY_ATTACHMENT_COUNT_LIMIT, BUDDY_ATTACHMENT_TOTAL_BYTES_LIMIT } from '../../../shared/conversation/attachmentPolicy'
+import { BUDDY_ATTACHMENT_COUNT_LIMIT, BUDDY_ATTACHMENT_TOTAL_BYTES_LIMIT, getAttachmentKind } from '../../../shared/conversation/attachmentPolicy'
 import { getBuddyUserContentResourceIds } from '../../../shared/conversation/buddyUserContent'
 import { buddyComposerResourceAcceptSchema, buddyComposerSourceListSchema, buddyComposerSourceSelectSchema, buddyComposerSpaceFileSelectSchema } from '../../../shared/conversation/composerResource'
 import { buddyRunOutputPayloadSchema } from '../../../shared/runs/runOutput'
@@ -500,8 +500,11 @@ export class ComposerResourceService {
       }
       return toPublicResource(this.#requireOwned(input))
     }
-    catch {
-      return this.fail(input)
+    catch (error) {
+      const failed = this.fail(input)
+      if (error instanceof AttachmentError && ['ATTACHMENT_INVALID', 'ATTACHMENT_UNSUPPORTED', 'ATTACHMENT_TOO_LARGE'].includes(error.code))
+        throw error
+      return failed
     }
     finally {
       this.#importing.delete(input.resourceId)
@@ -656,7 +659,7 @@ export class ComposerResourceService {
 function toPublicResource(resource: ComposerResourceRecord): BuddyComposerResource {
   const base = {
     draftId: resource.draftId,
-    kind: resource.mimeType.startsWith('image/') ? 'image' as const : 'text' as const,
+    kind: getAttachmentKind(resource.mimeType),
     mimeType: resource.mimeType,
     name: resource.name,
     resourceId: resource.resourceId,

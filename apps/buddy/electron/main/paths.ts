@@ -27,6 +27,7 @@ export interface BuddyRuntimePathOptions {
 }
 
 export interface BuddyRuntimePaths {
+  agentDirectory: string
   appName: string
   browserAdapterSocket: string
   buddyHome: string
@@ -88,11 +89,13 @@ export function resolveBuddyRuntimePaths(
     'Electron userData',
     path,
   ) ?? runtimeDirectories.userData
+  const buddyHome = joinPath(lexoraHome, 'buddy')
 
   return {
     ...identity,
+    agentDirectory: joinPath(buddyHome, 'agent'),
     browserAdapterSocket: runtimeDirectories.browserAdapterSocket,
-    buddyHome: joinPath(lexoraHome, 'buddy'),
+    buddyHome,
     configPath: joinPath(lexoraHome, 'config.toml'),
     crashDumps: joinPath(runtimeDirectories.stateRoot, 'crashes'),
     lexoraHome,

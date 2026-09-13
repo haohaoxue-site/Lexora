@@ -31,6 +31,7 @@ function setup(request: DesktopRuntimeGateway['request']) {
   const dispose = registerLocalChatIpc({
     getLanguage: () => 'zh-CN',
     getWindow: () => window,
+    openModelSnapshotDirectory: async () => {},
     readWebCredential: async () => null,
     runtime: {
       state: {},

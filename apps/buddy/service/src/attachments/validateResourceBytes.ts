@@ -1,6 +1,8 @@
 import { z } from 'zod'
+import { isDocumentMimeType } from '../../../shared/conversation/attachmentFormats'
 import { runNativeImage } from '../images/runNativeImage'
 import { AttachmentError } from './AttachmentService'
+import { hasDocumentSignature } from './validateDocumentBytes'
 
 const imageInfoSchema = z.object({
   width: z.number().int().positive(),
@@ -10,8 +12,13 @@ const imageInfoSchema = z.object({
 
 export async function validateResourceBytes(resource: { mimeType: string, sizeBytes: number }, bytes: Uint8Array): Promise<void> {
   if (bytes.byteLength !== resource.sizeBytes)
-    throw new AttachmentError('VALIDATION_FAILED')
+    throw new AttachmentError('ATTACHMENT_INVALID')
   try {
+    if (isDocumentMimeType(resource.mimeType)) {
+      if (!hasDocumentSignature(resource.mimeType, bytes))
+        throw new AttachmentError('ATTACHMENT_INVALID')
+      return
+    }
     if (!resource.mimeType.startsWith('image/')) {
       new TextDecoder('utf-8', { fatal: true }).decode(bytes)
       return
@@ -19,9 +26,9 @@ export async function validateResourceBytes(resource: { mimeType: string, sizeBy
     const result = await runNativeImage(bytes, { operation: 'validate', options: { mimeType: resource.mimeType } })
     const info = imageInfoSchema.parse(JSON.parse(result.toString('utf8')))
     if (info.mimeType !== resource.mimeType)
-      throw new AttachmentError('VALIDATION_FAILED')
+      throw new AttachmentError('ATTACHMENT_INVALID')
   }
   catch (error) {
-    throw new AttachmentError('VALIDATION_FAILED', { cause: error })
+    throw new AttachmentError('ATTACHMENT_INVALID', { cause: error })
   }
 }

@@ -4,6 +4,7 @@ import type {
   Model,
   UserMessage,
 } from '@earendil-works/pi-ai'
+import type { AttachmentDocumentReference } from '../../../attachments/AttachmentDocumentReference'
 import type { AttachmentImageReference } from '../../../attachments/AttachmentImageReference'
 import type { MessageRecord } from '../../../storage/conversationHistoryRepository'
 import { readBuddyInterruptedMessageContent } from '../../../../../shared/conversation/buddyMessageContent'
@@ -17,6 +18,7 @@ export interface CreateBuddyRecoveryMessagesOptions {
   messages: readonly MessageRecord[]
   resolveRunModel: (runId: string) => Model<Api> | null
   resolveUserInput: (messageId: string) => {
+    documents?: readonly AttachmentDocumentReference[]
     images: readonly AttachmentImageReference[]
     prompt: string
   } | null
@@ -39,10 +41,11 @@ export function createBuddyRecoveryMessages(
     if (message.role === 'user') {
       const input = options.resolveUserInput(message.id)
       const prompt = input?.prompt.trim() || text
-      if (!prompt && !input?.images.length)
+      if (!prompt && !input?.images.length && !input?.documents?.length)
         continue
       recovered.push(input
         ? createBuddyInputReferenceMessage(createBuddyInputReference({
+            ...(input.documents?.length ? { documents: [...input.documents] } : {}),
             images: [...input.images],
             messageId: message.id,
             prompt,

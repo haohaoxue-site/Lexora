@@ -54,6 +54,9 @@ export interface PiEventProjection {
 
 type ModelRequestFailureCode
   = 'MODEL_NOT_SUPPORTED'
+    | 'MODEL_INPUT_UNSUPPORTED'
+    | 'MODEL_INPUT_TOO_LARGE'
+    | 'RESOURCE_MATERIALIZATION_FAILED'
     | 'MODEL_REQUEST_FAILED'
     | 'MODEL_REQUEST_TIMED_OUT'
     | 'MODEL_SERVICE_UNAVAILABLE'
@@ -620,6 +623,8 @@ function normalizeModelRequestFailure(value: string | undefined): {
 }
 
 function classifyModelRequestFailure(message: string | undefined): ModelRequestFailureCode {
+  if (message === 'MODEL_INPUT_UNSUPPORTED' || message === 'MODEL_INPUT_TOO_LARGE' || message === 'RESOURCE_MATERIALIZATION_FAILED')
+    return message
   if (!message)
     return 'MODEL_REQUEST_FAILED'
   if (

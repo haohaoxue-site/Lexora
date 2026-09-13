@@ -1,8 +1,10 @@
 import type { Api, Model } from '@earendil-works/pi-ai'
 import type { ModelRuntime } from '@earendil-works/pi-coding-agent'
+import type { BuiltinProviderConfigRepository } from '../storage/builtinProviderConfigRepository'
 import type { ProviderStateRepository } from '../storage/providerStateRepository'
 import type { ProviderCredentialStatus } from './ProviderCredentialStatus'
 import type { ProviderModelCatalog } from './ProviderModelCatalog'
+import { resolveBuddyServiceTiers } from '../../../shared/conversation/modelSelection'
 import {
   ProviderAuthenticationRequiredError,
   ProviderUnavailableError,
@@ -23,6 +25,7 @@ export interface ResolvedProviderSessionModel {
 }
 
 export interface ProviderExecutionModelResolverOptions {
+  builtins: Pick<BuiltinProviderConfigRepository, 'findById'>
   credentialStatus: ProviderCredentialStatus
   modelCatalog: Pick<
     ProviderModelCatalog,
@@ -33,12 +36,14 @@ export interface ProviderExecutionModelResolverOptions {
 }
 
 export class ProviderExecutionModelResolver {
+  readonly #builtins: ProviderExecutionModelResolverOptions['builtins']
   readonly #credentialStatus: ProviderCredentialStatus
   readonly #modelCatalog: ProviderExecutionModelResolverOptions['modelCatalog']
   readonly #sessionRuntime?: ModelRuntime
   readonly #states: ProviderExecutionModelResolverOptions['states']
 
   constructor(options: ProviderExecutionModelResolverOptions) {
+    this.#builtins = options.builtins
     this.#credentialStatus = options.credentialStatus
     this.#modelCatalog = options.modelCatalog
     this.#sessionRuntime = options.sessionRuntime
@@ -84,5 +89,16 @@ export class ProviderExecutionModelResolver {
     if (!this.#sessionRuntime)
       throw new ProviderUnavailableError()
     return this.#sessionRuntime
+  }
+
+  getServiceTiers(input: { api: string, modelId: string, providerId: string }) {
+    return resolveBuddyServiceTiers({
+      ...input,
+      providerId: this.resolveSourceProviderId(input.providerId),
+    })
+  }
+
+  resolveSourceProviderId(providerId: string): string {
+    return this.#builtins.findById(providerId)?.builtinProviderId ?? providerId
   }
 }

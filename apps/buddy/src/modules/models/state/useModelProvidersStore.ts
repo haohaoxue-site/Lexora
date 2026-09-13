@@ -2,11 +2,13 @@ import type { LexoraDesktopApi } from '@buddy-electron/shared/desktopApi'
 import type {
   BuddyThinkingLevel,
 } from '@buddy-shared/conversation/modelSelection'
-import type { LocalCustomProvider, LocalDefaultModel, LocalProvider, LocalProviderAuthChallenge, LocalRuntimeModelOption } from '@buddy-shared/providers/providerApi'
+import type { LocalBuiltinProviderPreset, LocalCustomProvider, LocalDefaultModel, LocalModelSnapshot, LocalProvider, LocalProviderAuthChallenge, LocalRuntimeModelOption } from '@buddy-shared/providers/providerApi'
 
+import type { ProviderRequestHeader } from '@buddy-shared/providers/providerHeaders'
 import type { ShallowRef } from 'vue'
 import type { ModelProvidersStore } from './typing'
 import type { BuddyLocale } from '@/i18n/buddyI18n'
+import { parseLocalChatPublicError } from '@buddy-shared/runtime/localChatError'
 import { computed, readonly, shallowRef } from 'vue'
 import { isProviderLoginCancelled, resolveLocalChatErrorMessage } from '@/shared/lib/localChatError'
 import { modelKey, resolveConcreteEffort } from '../model/modelSelection'
@@ -18,11 +20,14 @@ interface UseModelProvidersStoreOptions {
 }
 
 export function useModelProvidersStore(options: UseModelProvidersStoreOptions): ModelProvidersStore {
+  const builtinPresets = shallowRef<ReadonlyArray<LocalBuiltinProviderPreset>>([])
   const providers = shallowRef<ReadonlyArray<LocalProvider>>([])
   const registeredModels = shallowRef<ReadonlyArray<LocalRuntimeModelOption>>([])
   const authChallenge = shallowRef<LocalProviderAuthChallenge | null>(null)
   const defaultModelSelection = shallowRef<LocalDefaultModel | null>(null)
+  const modelSnapshot = shallowRef<LocalModelSnapshot | null>(null)
   const isLoadingModelCatalog = shallowRef(false)
+  const isRefreshingModelSnapshot = shallowRef(false)
   const isAuthenticating = shallowRef(false)
   const mutatingProviderId = shallowRef<string | null>(null)
   const syncingProviderId = shallowRef<string | null>(null)
@@ -59,16 +64,23 @@ export function useModelProvidersStore(options: UseModelProvidersStoreOptions): 
     isLoadingModelCatalog.value = true
     modelProviderError.value = null
     try {
-      const [nextProviders, nextModels, nextDefaultModel] = await Promise.all([
+      const snapshotRequest = typeof options.api.getModelSnapshot === 'function'
+        ? options.api.getModelSnapshot().catch(() => null)
+        : Promise.resolve(null)
+      const [nextProviders, nextModels, nextDefaultModel, nextSnapshot, nextPresets] = await Promise.all([
         options.api.list(),
         options.api.listModels(),
         options.api.getDefaultModel(),
+        snapshotRequest,
+        options.api.listBuiltinPresets(),
       ])
       if (disposed)
         return false
       providers.value = nextProviders
+      builtinPresets.value = nextPresets
       registeredModels.value = nextModels
       defaultModelSelection.value = nextDefaultModel
+      modelSnapshot.value = nextSnapshot
       if (!nextDefaultModel && models.value[0]) {
         const model = models.value[0]
         const reasoning = resolveConcreteEffort(model, null)
@@ -153,6 +165,21 @@ export function useModelProvidersStore(options: UseModelProvidersStoreOptions): 
     }
   }
 
+  async function createCustomProvider(provider: LocalCustomProvider) {
+    modelProviderError.value = null
+    try {
+      const created = await options.api.createCustom(provider)
+      await refreshAfterMutation()
+      return created
+    }
+    catch (error) {
+      if (error instanceof Error && parseLocalChatPublicError(error.message)?.code === 'PROVIDER_ID_CONFLICT')
+        return 'conflict' as const
+      modelProviderError.value = resolveLocalChatErrorMessage(error, options.language.value)
+      return null
+    }
+  }
+
   async function upsertCustomProvider(provider: LocalCustomProvider) {
     try {
       await options.api.upsertCustom(provider)
@@ -166,7 +193,30 @@ export function useModelProvidersStore(options: UseModelProvidersStoreOptions): 
   }
 
   async function addProvider(providerId: string) {
-    return mutateProvider(providerId, () => options.api.add(providerId))
+    if (mutatingProviderId.value)
+      return null
+    mutatingProviderId.value = providerId
+    modelProviderError.value = null
+    try {
+      const provider = await options.api.add(providerId)
+      if (disposed)
+        return null
+      providers.value = [...providers.value.filter(item => item.id !== provider.id), provider]
+      await refreshAfterMutation()
+      return provider
+    }
+    catch (error) {
+      if (!disposed)
+        modelProviderError.value = resolveLocalChatErrorMessage(error, options.language.value)
+      return null
+    }
+    finally {
+      mutatingProviderId.value = null
+    }
+  }
+
+  async function renameProvider(providerId: string, displayName: string, requestHeaders?: readonly ProviderRequestHeader[]) {
+    return mutateProvider(providerId, () => options.api.rename(providerId, displayName, requestHeaders))
   }
 
   async function clearProviderCredential(providerId: string) {
@@ -183,6 +233,22 @@ export function useModelProvidersStore(options: UseModelProvidersStoreOptions): 
 
   async function setProviderModelEnabled(providerId: string, modelId: string, enabled: boolean) {
     return mutateProvider(providerId, () => options.api.setModelEnabled(providerId, modelId, enabled))
+  }
+
+  async function setModelCatalogSource(
+    providerId: string,
+    modelId: string,
+    source: Parameters<LexoraDesktopApi['localChat']['providers']['setModelCatalogSource']>[2],
+  ) {
+    return mutateProvider(providerId, () => options.api.setModelCatalogSource(providerId, modelId, source))
+  }
+
+  async function setModelCapabilities(
+    providerId: string,
+    modelId: string,
+    capabilities: Parameters<LexoraDesktopApi['localChat']['providers']['setModelCapabilities']>[2],
+  ) {
+    return mutateProvider(providerId, () => options.api.setModelCapabilities(providerId, modelId, capabilities))
   }
 
   async function setModelParameters(
@@ -233,6 +299,35 @@ export function useModelProvidersStore(options: UseModelProvidersStoreOptions): 
     }
     finally {
       syncingProviderId.value = null
+    }
+  }
+
+  async function refreshModelSnapshot() {
+    if (isRefreshingModelSnapshot.value)
+      return false
+    isRefreshingModelSnapshot.value = true
+    modelProviderError.value = null
+    try {
+      modelSnapshot.value = await options.api.refreshModelSnapshot()
+      await refreshAfterMutation()
+      return true
+    }
+    catch (error) {
+      modelProviderError.value = resolveLocalChatErrorMessage(error, options.language.value)
+      return false
+    }
+    finally {
+      isRefreshingModelSnapshot.value = false
+    }
+  }
+
+  async function openModelSnapshotDirectory() {
+    try {
+      await options.api.openModelSnapshotDirectory()
+      return true
+    }
+    catch {
+      return false
     }
   }
 
@@ -307,6 +402,7 @@ export function useModelProvidersStore(options: UseModelProvidersStoreOptions): 
   }
 
   return {
+    builtinPresets: readonly(builtinPresets),
     acknowledgeModelSourceUpdate,
     addProvider,
     modelProviderError: readonly(modelProviderError),
@@ -326,25 +422,33 @@ export function useModelProvidersStore(options: UseModelProvidersStoreOptions): 
     },
     isAuthenticating: readonly(isAuthenticating),
     isLoadingModelCatalog: readonly(isLoadingModelCatalog),
+    isRefreshingModelSnapshot: readonly(isRefreshingModelSnapshot),
     language: options.language,
     loadModelCatalog,
     loginProvider,
     logoutProvider,
     models: readonly(models),
+    modelSnapshot: readonly(modelSnapshot),
     mutatingProviderId: readonly(mutatingProviderId),
+    openModelSnapshotDirectory,
     providers: readonly(providers),
     registeredModels: readonly(registeredModels),
     removeProvider,
+    renameProvider,
+    refreshModelSnapshot,
     respondToAuth,
     restoreModelSourceParameters,
     setDefaultEffort,
     setDefaultModel,
     setModelParameters,
+    setModelCatalogSource,
+    setModelCapabilities,
     setProviderEnabled,
     setProviderModelEnabled,
     syncingProviderId: readonly(syncingProviderId),
     syncProviderModels,
     upsertCustomProvider,
+    createCustomProvider,
     upsertManualModel,
   }
 }

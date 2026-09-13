@@ -3,8 +3,6 @@ import type { RuntimeRequestRegistrar } from '../rpc/runtimeRequest'
 import type { ProviderExecutionModelResolver } from './ProviderExecutionModelResolver'
 import type { BuddyModel } from './providerSchemas'
 import type { ProviderService } from './ProviderService'
-import { getSupportedThinkingLevels } from '@earendil-works/pi-ai'
-import { resolveBuddyServiceTiers } from '../../../shared/conversation/modelSelection'
 import { providersRpc } from '../../../shared/providers/providerApi'
 import { ok, registerRuntimeRequest } from '../rpc/runtimeRequest'
 
@@ -25,12 +23,22 @@ export function registerProviderRpc(options: RegisterProviderRpcOptions): () => 
   disposers.push(registerRuntimeRequest(options.rpc, providersRpc.list, async () => {
     return options.service.listProviders()
   }))
+  disposers.push(registerRuntimeRequest(options.rpc, providersRpc.listBuiltinPresets, () => options.service.listBuiltinPresets()))
+  disposers.push(registerRuntimeRequest(options.rpc, providersRpc.rename, async (input) => {
+    const provider = await options.service.renameProvider(input.providerId, input.displayName, input.requestHeaders)
+    if (input.requestHeaders !== undefined)
+      await options.sessions.invalidateAll()
+    return provider
+  }))
   disposers.push(registerRuntimeRequest(options.rpc, providersRpc.add, async (input) => {
     return options.service.addProvider(input.providerId)
   }))
   disposers.push(registerRuntimeRequest(options.rpc, providersRpc.listModels, async (input) => {
     const models = await options.service.listModels(input.providerId ?? undefined)
     return models.map(model => toRuntimeModelOption(options.service.executionModels, model))
+  }))
+  disposers.push(registerRuntimeRequest(options.rpc, providersRpc.getModelSnapshot, () => {
+    return options.service.getModelSnapshot()
   }))
   disposers.push(registerRuntimeRequest(options.rpc, providersRpc.getDefaultModel, () => {
     return options.service.getDefaultModel()
@@ -83,6 +91,16 @@ export function registerProviderRpc(options: RegisterProviderRpcOptions): () => 
     await options.sessions.invalidateAll()
     return toRuntimeModelOption(options.service.executionModels, model)
   }))
+  disposers.push(registerRuntimeRequest(options.rpc, providersRpc.setModelCatalogSource, async (input) => {
+    const model = await options.service.setModelCatalogSource(input.providerId, input.modelId, input.source)
+    await options.sessions.invalidateAll()
+    return toRuntimeModelOption(options.service.executionModels, model)
+  }))
+  disposers.push(registerRuntimeRequest(options.rpc, providersRpc.setModelCapabilities, async (input) => {
+    const model = await options.service.setModelCapabilities(input.providerId, input.modelId, input.capabilities)
+    await options.sessions.invalidateAll()
+    return toRuntimeModelOption(options.service.executionModels, model)
+  }))
   disposers.push(registerRuntimeRequest(options.rpc, providersRpc.setModelParameters, async (input) => {
     return toRuntimeModelOption(
       options.service.executionModels,
@@ -116,11 +134,22 @@ export function registerProviderRpc(options: RegisterProviderRpcOptions): () => 
     }
     return models.map(model => toRuntimeModelOption(options.service.executionModels, model))
   }))
+  disposers.push(registerRuntimeRequest(options.rpc, providersRpc.refreshModelSnapshot, async () => {
+    const snapshot = await options.service.refreshModelSnapshot()
+    const models = await options.service.listModels()
+    for (const model of models) {
+      if (!model.enabled || !model.available)
+        options.automations.blockPinnedModel(model.providerId, model.id)
+    }
+    await options.sessions.invalidateAll()
+    return snapshot
+  }))
   disposers.push(registerRuntimeRequest(options.rpc, providersRpc.upsertManualModel, async (input) => {
     const model = await options.service.upsertManualModel(input.providerId, input.model)
     await options.sessions.invalidateAll()
     return toRuntimeModelOption(options.service.executionModels, model)
   }))
+  disposers.push(registerRuntimeRequest(options.rpc, providersRpc.createCustom, async params => options.service.createCustomProvider(params)))
   disposers.push(registerRuntimeRequest(options.rpc, providersRpc.upsertCustom, async (params) => {
     const provider = await options.service.upsertCustomProvider(
       params,
@@ -133,45 +162,17 @@ export function registerProviderRpc(options: RegisterProviderRpcOptions): () => 
 }
 
 function toRuntimeModelOption(
-  models: Pick<ProviderExecutionModelResolver, 'resolve'>,
+  models: Pick<ProviderExecutionModelResolver, 'getServiceTiers'>,
   model: BuddyModel,
 ) {
-  let reasoningOptions: string[] = []
-  if (model.capabilities.includes('reasoning')) {
-    try {
-      reasoningOptions = [...getSupportedThinkingLevels(
-        models.resolve({
-          contextWindow: null,
-          maxTokens: null,
-          modelId: model.id,
-          providerId: model.providerId,
-        }),
-      )]
-    }
-    catch {}
-  }
+  const { id, ...details } = model
   return {
-    available: model.available,
-    capabilities: model.capabilities,
-    contextWindow: model.contextWindow,
-    displayName: model.displayName,
-    enabled: model.enabled,
-    hasParameterOverride: model.hasParameterOverride,
-    lastSeenAt: model.lastSeenAt,
-    maxTokens: model.maxTokens,
-    modelId: model.id,
-    overrideContextWindow: model.overrideContextWindow,
-    overrideMaxTokens: model.overrideMaxTokens,
-    providerId: model.providerId,
-    reasoningOptions,
-    serviceTiers: resolveBuddyServiceTiers({
+    ...details,
+    modelId: id,
+    serviceTiers: models.getServiceTiers({
       api: model.api,
       modelId: model.id,
       providerId: model.providerId,
     }),
-    source: model.source,
-    sourceContextWindow: model.sourceContextWindow,
-    sourceMaxTokens: model.sourceMaxTokens,
-    sourceParametersUpdated: model.sourceParametersUpdated,
   }
 }

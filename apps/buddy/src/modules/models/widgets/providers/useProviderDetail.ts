@@ -20,6 +20,8 @@ export function useProviderDetail(providerSettings: () => ModelProvidersStore, p
     if (!model)
       return null
     return {
+      saveCapabilities: capabilities => providerSettings().setModelCapabilities(model.providerId, model.modelId, capabilities),
+      selectCatalogSource: source => providerSettings().setModelCatalogSource(model.providerId, model.modelId, source),
       saveManualModel: input => providerSettings().upsertManualModel(model.providerId, input),
       saveParameters: parameters => providerSettings().setModelParameters(model.providerId, model.modelId, parameters),
       restoreParameters: () => providerSettings().restoreModelSourceParameters(model.providerId, model.modelId),
@@ -28,6 +30,7 @@ export function useProviderDetail(providerSettings: () => ModelProvidersStore, p
   })
   const connectionActions: ProviderConnectionActions = {
     clearError: () => providerSettings().clearModelProviderError(),
+    rename: (id, displayName, headers) => providerSettings().renameProvider(id, displayName, headers),
     save: input => providerSettings().upsertCustomProvider(input),
   }
   const showModelDetailDialog = shallowRef(false)
@@ -35,7 +38,7 @@ export function useProviderDetail(providerSettings: () => ModelProvidersStore, p
   const connectionSummary = computed(() => {
     const value = provider.value
     if (!value?.custom)
-      return ''
+      return value?.displayName ?? ''
     const api = desktopProviderApiOptions.find(option => option.value === value.api)?.label ?? value.api
     return [api, value.baseUrl].filter(Boolean).join(' · ')
   })

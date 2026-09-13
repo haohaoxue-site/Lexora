@@ -18,6 +18,7 @@ const PNG_SIGNATURE = Uint8Array.from([137, 80, 78, 71, 13, 10, 26, 10])
 
 export interface OpenAiImageGenerationServiceOptions {
   fetch?: typeof globalThis.fetch
+  resolveSourceProviderId?: (providerId: string) => string
   modelRuntime: {
     getAuth: (
       model: Model<Api>,
@@ -28,15 +29,17 @@ export interface OpenAiImageGenerationServiceOptions {
 
 export class OpenAiImageGenerationService implements ImageGenerationGateway {
   readonly #fetch: typeof globalThis.fetch
+  readonly #resolveSourceProviderId: (providerId: string) => string
   readonly #modelRuntime: OpenAiImageGenerationServiceOptions['modelRuntime']
 
   constructor(options: OpenAiImageGenerationServiceOptions) {
     this.#fetch = options.fetch ?? globalThis.fetch
+    this.#resolveSourceProviderId = options.resolveSourceProviderId ?? (providerId => providerId)
     this.#modelRuntime = options.modelRuntime
   }
 
   async generate(input: ImageGenerationInput): Promise<ImageGenerationResult> {
-    if (!supportsOpenAiImageGeneration(input.model))
+    if (!this.supports(input.model))
       throw new ImageGenerationError('IMAGE_GENERATION_UNSUPPORTED')
     input.signal.throwIfAborted()
     let auth: AuthResult | undefined
@@ -76,16 +79,16 @@ export class OpenAiImageGenerationService implements ImageGenerationGateway {
   }
 
   supports(model: Model<Api>): boolean {
-    return supportsOpenAiImageGeneration(model)
+    return supportsOpenAiImageGeneration(model, this.#resolveSourceProviderId(model.provider))
   }
 }
 
-export function supportsOpenAiImageGeneration(model: Model<Api>): boolean {
+export function supportsOpenAiImageGeneration(model: Model<Api>, sourceProviderId = model.provider): boolean {
   return (
-    model.provider === 'openai'
+    sourceProviderId === 'openai'
     && model.api === 'openai-responses'
   ) || (
-    model.provider === 'openai-codex'
+    sourceProviderId === 'openai-codex'
     && model.api === 'openai-codex-responses'
   )
 }

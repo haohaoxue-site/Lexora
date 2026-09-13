@@ -9,11 +9,15 @@ import type { ProviderExecutionModelResolver } from '../../../providers/Provider
 import type { ConversationHistoryRepository } from '../../../storage/conversationHistoryRepository'
 import type { RunInputRepository } from '../../../storage/runInputRepository'
 import type { RunRepository } from '../../../storage/runRepository'
+import type { UsageRepository } from '../../../storage/usageRepository'
 import { BuddyAgentRunError } from '../../../runs/runError'
+import { readBuddyInputReference } from '../../context/BuddyInputReference'
+import { isRejectedModelInput, rejectedBuddyInputMessage } from '../../context/prepareBuddyInputHistory'
 import { createBuddyRecoveryMessages } from './createBuddyRecoveryMessages'
 
 export type BuddySessionRecoveryPoint
   = | { kind: 'before_message', messageId: string }
+    | { kind: 'after_message', messageId: string }
     | { kind: 'branch_head' }
 
 export interface BuddySessionRecoveryResult {
@@ -30,11 +34,12 @@ export interface CreateBuddySessionRecoveryInput {
 }
 
 export interface BuddySessionRecoveryServiceOptions {
-  attachments: Pick<AttachmentService, 'resolveRecoveryInputImageReferences'>
+  attachments: Pick<AttachmentService, 'resolveRecoveryInputReferences'>
   conversations: Pick<ConversationHistoryRepository, 'listBranchMessages'>
   models: Pick<ProviderExecutionModelResolver, 'resolve'>
   runInputs: Pick<RunInputRepository, 'findByTriggeringMessageId'>
   runs: Pick<RunRepository, 'findById'>
+  usage: Pick<UsageRepository, 'listForRun'>
 }
 
 export class BuddySessionRecoveryService {
@@ -49,18 +54,17 @@ export class BuddySessionRecoveryService {
       input.conversationId,
       input.branchId,
     )
-    const triggeringMessageId = input.point.kind === 'before_message'
-      ? input.point.messageId
-      : null
-    const boundary = triggeringMessageId === null
-      ? history.length
-      : history.findIndex(message => message.id === triggeringMessageId)
-    if (boundary < 0)
+    const { point } = input
+    const pointIndex = point.kind === 'branch_head' ? history.length : history.findIndex(message => message.id === point.messageId)
+    if (pointIndex < 0)
       throw new BuddyAgentRunError('CONVERSATION_BINDING_MISMATCH')
+    const boundary = pointIndex + (input.point.kind === 'after_message' ? 1 : 0)
+    const rejectedInputs = new Map<string, string>()
 
     const missingAttachmentIds = new Set<string>()
     const recoveredUserInputs = new Map<string, {
-      images: Awaited<ReturnType<AttachmentService['resolveRecoveryInputImageReferences']>>['images']
+      documents: Awaited<ReturnType<AttachmentService['resolveRecoveryInputReferences']>>['documents']
+      images: Awaited<ReturnType<AttachmentService['resolveRecoveryInputReferences']>>['images']
       prompt: string
     }>()
     let recoveredImageCount = 0
@@ -70,7 +74,16 @@ export class BuddySessionRecoveryService {
       const storedInput = this.#options.runInputs.findByTriggeringMessageId(message.id)
       if (!storedInput)
         continue
-      const recovery = await this.#options.attachments.resolveRecoveryInputImageReferences(
+      const run = this.#options.runs.findById(storedInput.runId)
+      if (run?.status === 'failed' && isRejectedModelInput(run.errorCode)
+        && !this.#options.usage.listForRun(run.id).some(record => record.totalTokens > 0)
+        && !history.some(candidate => candidate.runId === run.id && (candidate.role === 'tool'
+          || (candidate.role === 'assistant' && hasMessageText(candidate.content))))) {
+        rejectedInputs.set(message.id, run.errorCode)
+        recoveredUserInputs.set(message.id, { documents: [], images: [], prompt: storedInput.prompt })
+        continue
+      }
+      const recovery = await this.#options.attachments.resolveRecoveryInputReferences(
         storedInput.attachmentIds,
         input.conversationId,
       )
@@ -78,6 +91,7 @@ export class BuddySessionRecoveryService {
       for (const attachmentId of recovery.missingAttachmentIds)
         missingAttachmentIds.add(attachmentId)
       recoveredUserInputs.set(message.id, {
+        documents: recovery.documents,
         images: recovery.images,
         prompt: storedInput.prompt,
       })
@@ -86,10 +100,14 @@ export class BuddySessionRecoveryService {
     return {
       messages: createBuddyRecoveryMessages({
         fallbackModel: input.fallbackModel,
-        messages: history,
+        messages: history.slice(0, boundary),
         resolveRunModel: runId => this.#resolveRunModel(runId),
         resolveUserInput: messageId => recoveredUserInputs.get(messageId) ?? null,
-        triggeringMessageId,
+        triggeringMessageId: null,
+      }).map((message) => {
+        const reference = readBuddyInputReference(message)
+        const code = reference && rejectedInputs.get(reference.messageId)
+        return message.role === 'user' && code ? rejectedBuddyInputMessage(message, code) : message
       }),
       missingAttachmentIds: [...missingAttachmentIds],
       recoveredImageCount,
@@ -112,4 +130,11 @@ export class BuddySessionRecoveryService {
       return null
     }
   }
+}
+
+function hasMessageText(content: unknown): boolean {
+  if (typeof content === 'string')
+    return content.trim().length > 0
+  return content !== null && typeof content === 'object' && 'text' in content
+    && typeof content.text === 'string' && content.text.trim().length > 0
 }

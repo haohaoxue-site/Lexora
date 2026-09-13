@@ -37,6 +37,18 @@ const tasks = useTaskCapability({
   runtimeSupervisor: stores.runtimeSupervisor,
 })
 const capabilities = createDesktopCapabilities({ api, stores, tasks, onAutomationRunFailure: error => message.error(error) })
+watch(tasks.workspace.status.errorMessage, (error) => {
+  if (!error)
+    return
+  message.error(error)
+  tasks.workspace.status.dismissError()
+})
+watch(stores.modelProviders.modelProviderError, (error) => {
+  if (!error)
+    return
+  message.error(error)
+  stores.modelProviders.clearModelProviderError()
+})
 const shell = useDesktopShellState(stores.applicationSettings, api)
 const lifecycle = useDesktopLifecycle({
   api,

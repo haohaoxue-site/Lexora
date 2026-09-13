@@ -54,6 +54,7 @@ import { ChangeCaptureService } from './changes/ChangeCaptureService'
 import { createChangeSetRepository } from './changes/changeSetRepository'
 import { registerChangeRpc } from './changes/registerChangeRpc'
 import { ChatCommandService } from './chat/ChatCommandService'
+import { ChatInputValidationService } from './chat/ChatInputValidationService'
 import { ChatQueueService } from './chat/ChatQueueService'
 import { ChatTurnService } from './chat/ChatTurnService'
 import { ComposerDraftService } from './chat/ComposerDraftService'
@@ -264,6 +265,7 @@ export async function startBuddyService(
     const executionModels = providerService.executionModels
     const imageGenerationGateway = new OpenAiImageGenerationService({
       modelRuntime: executionModels.getRuntime(),
+      resolveSourceProviderId: providerId => executionModels.resolveSourceProviderId(providerId),
     })
     const sessions = await host.start('runtime.sessions', () => new BuddySessionRegistry<ReusableBuddySession>())
     const directoryGrants = new DirectoryGrantService({
@@ -388,6 +390,7 @@ export async function startBuddyService(
       skills: skillService,
     })
     const sessionRecovery = new BuddySessionRecoveryService({
+      usage: usageRepository,
       attachments: attachmentService,
       conversations,
       models: executionModels,
@@ -469,6 +472,16 @@ export async function startBuddyService(
     })
     const composerDraftService = new ComposerDraftService(composerDrafts)
     const chatTurnService = new ChatTurnService({
+      inputValidation: new ChatInputValidationService({
+        attachments: attachmentService,
+        models: executionModels,
+        paths,
+        recovery: sessionRecovery,
+        runInputs,
+        runs,
+        sessions,
+        tree: conversationTree,
+      }),
       record,
       composerResources: composerResourceService,
       drafts: composerDrafts,

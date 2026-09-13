@@ -109,6 +109,12 @@ const modelInputIssueMessage = computed(() => {
     return t('desktop.chat.modelReasoningUnsupported', { value: props.selectedEffort ?? '' })
   if (modelInputIssue.value === 'service_tier_unsupported')
     return t('desktop.chat.modelServiceTierUnsupported', { value: props.selectedServiceTier ?? '' })
+  if (modelInputIssue.value === 'pdf_unsupported')
+    return t('desktop.chat.modelPdfUnsupported')
+  if (modelInputIssue.value === 'audio_unsupported')
+    return t('desktop.chat.modelAudioUnsupported')
+  if (modelInputIssue.value === 'video_unsupported')
+    return t('desktop.chat.modelVideoUnsupported')
   return modelInputIssue.value === 'image_unsupported' ? t('desktop.chat.modelImageUnsupported') : ''
 })
 
@@ -340,6 +346,11 @@ async function selectConversationFile(option: ChatPromptContextOption) {
     width: var(--buddy-composer-control-height);
     min-width: var(--buddy-composer-control-height);
     padding: 0;
+
+    &.has-warning {
+      width: auto;
+      padding: 0 0.5rem;
+    }
   }
 
   .desktop-chat-composer__permission-mode :deep(.desktop-permission-mode-selector__trigger-label) {

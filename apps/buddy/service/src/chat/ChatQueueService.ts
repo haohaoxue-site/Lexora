@@ -7,12 +7,13 @@ import type { RunRepository } from '../storage/runRepository'
 import type { TurnRequestRepository } from '../storage/turnRequestRepository'
 import type { ChatTurnService } from './ChatTurnService'
 import { createHash } from 'node:crypto'
+import { isDocumentMimeType } from '../../../shared/conversation/attachmentFormats'
 import { createBuddyInputReference } from '../agent/context/BuddyInputReference'
 import { BuddyServiceError } from '../rpc/runtimeRequest'
 
 export interface ChatQueueServiceOptions {
   queue: ChatQueueRepository
-  turns: Pick<ChatTurnService, 'prepareStart'>
+  turns: Pick<ChatTurnService, 'prepareStart' | 'validatePreparedInput'>
   requests: Pick<TurnRequestRepository, 'prepare'>
   launcher: Pick<BuddyTurnLauncher, 'launch'>
   runner: Pick<BuddyAgentRunner, 'steer'>
@@ -71,7 +72,7 @@ export class ChatQueueService {
   }
 
   async steer(target: LocalChatQueueTarget) {
-    if (this.#disposed)
+    if (this.#disposed || this.#draining.has(target.conversationId))
       return false
     const input = this.#options.queue.pending(target)
     if (!input)
@@ -81,18 +82,31 @@ export class ChatQueueService {
       return this.#dispatch(target)
     if (active.purpose !== 'chat' || active.model !== input.model || active.provider !== input.provider)
       throw new BuddyServiceError('VALIDATION_FAILED')
-    return this.#options.runner.steer(active.id, () => {
-      const reference = createBuddyInputReference({
-        messageId: input.userMessageId,
-        prompt: input.runInput.prompt,
-        images: input.attachmentBindings.flatMap((binding) => {
-          const metadata = binding.mimeType
-          return metadata?.startsWith('image/') && metadata !== 'image/svg+xml' ? [{ attachmentId: binding.id, mimeType: metadata }] : []
-        }),
+    this.#draining.add(target.conversationId)
+    try {
+      await this.#options.turns.validatePreparedInput(input)
+      if (this.#disposed)
+        return false
+      return this.#options.runner.steer(active.id, () => {
+        const documents = input.attachmentBindings.flatMap(binding => isDocumentMimeType(binding.mimeType)
+          ? [{ attachmentId: binding.id, mimeType: binding.mimeType }]
+          : [])
+        const reference = createBuddyInputReference({
+          ...(documents.length ? { documents } : {}),
+          messageId: input.userMessageId,
+          prompt: input.runInput.prompt,
+          images: input.attachmentBindings.flatMap((binding) => {
+            const metadata = binding.mimeType
+            return metadata?.startsWith('image/') && metadata !== 'image/svg+xml' ? [{ attachmentId: binding.id, mimeType: metadata }] : []
+          }),
+        })
+        this.#options.queue.commitSteering(input, active.id)
+        return reference
       })
-      this.#options.queue.commitSteering(input, active.id)
-      return reference
-    })
+    }
+    finally {
+      this.#draining.delete(target.conversationId)
+    }
   }
 
   onRunSettled(runId: string) {
@@ -133,6 +147,9 @@ export class ChatQueueService {
       return false
     this.#draining.add(target.conversationId)
     try {
+      await this.#options.turns.validatePreparedInput(input)
+      if (this.#disposed)
+        return false
       const prepared = this.#options.requests.prepare({ ...input, createdAt: new Date().toISOString() })
       const turn = await this.#options.launcher.launch(prepared.runId)
       void turn.completion.then(() => this.onRunSettled(turn.runId), () => {

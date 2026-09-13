@@ -30,7 +30,7 @@ describe('providerModelDiscovery', () => {
     expect(request).toHaveBeenCalledOnce()
     const [url, init] = request.mock.calls[0]!
     expect(String(url)).toBe('https://models.example.test/v1/models')
-    expect(init?.headers).toEqual({ Authorization: 'Bearer test-api-key' })
+    expect(new Headers(init?.headers).get('authorization')).toBe('Bearer test-api-key')
     expect(init?.signal).toBeInstanceOf(AbortSignal)
   })
 

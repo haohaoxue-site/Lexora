@@ -1,4 +1,6 @@
 import type { DatabaseSync } from 'node:sqlite'
+import type { ProviderRequestHeader } from '../../../shared/providers/providerHeaders'
+import { providerRequestHeadersSchema } from '../../../shared/providers/providerHeaders'
 
 export interface ProviderStateRecord {
   providerId: string
@@ -8,6 +10,8 @@ export interface ProviderStateRecord {
 }
 
 export interface ProviderStateRepository {
+  getRequestHeaders: (providerId: string) => ProviderRequestHeader[]
+  setRequestHeaders: (providerId: string, headers: readonly ProviderRequestHeader[]) => void
   findByProviderId: (providerId: string) => ProviderStateRecord | null
   list: () => ProviderStateRecord[]
   remove: (providerId: string) => boolean
@@ -34,6 +38,16 @@ export function createProviderStateRepository(database: DatabaseSync): ProviderS
   `)
 
   return {
+    getRequestHeaders(providerId) {
+      const row = database.prepare('SELECT request_headers_json FROM provider_states WHERE provider_id = ?').get(providerId) as { request_headers_json: string } | undefined
+      return row ? providerRequestHeadersSchema.parse(JSON.parse(row.request_headers_json)) : []
+    },
+    setRequestHeaders(providerId, headers) {
+      const result = database.prepare('UPDATE provider_states SET request_headers_json = ?, updated_at = ? WHERE provider_id = ?')
+        .run(JSON.stringify(providerRequestHeadersSchema.parse(headers)), new Date().toISOString(), providerId)
+      if (Number(result.changes) !== 1)
+        throw new Error('Provider state does not exist')
+    },
     findByProviderId(providerId) {
       const row = find.get(providerId) as ProviderStateRow | undefined
       return row ? toProviderState(row) : null

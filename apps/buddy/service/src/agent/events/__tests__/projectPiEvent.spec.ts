@@ -310,6 +310,8 @@ describe('projectPiEvent product messages', () => {
 
   it('classifies stable model failures', () => {
     for (const [errorMessage, failureCode] of [
+      ['MODEL_INPUT_UNSUPPORTED', 'MODEL_INPUT_UNSUPPORTED'],
+      ['RESOURCE_MATERIALIZATION_FAILED', 'RESOURCE_MATERIALIZATION_FAILED'],
       ['404 "当前 API 不支持所选模型 claude-opus-4-8"', 'MODEL_NOT_SUPPORTED'],
       ['401 Unauthorized: invalid API key', 'PROVIDER_AUTHENTICATION_FAILED'],
       ['403 Forbidden: access denied for this model', 'PROVIDER_ACCESS_DENIED'],

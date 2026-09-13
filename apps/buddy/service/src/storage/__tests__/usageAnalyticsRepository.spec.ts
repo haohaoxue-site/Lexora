@@ -110,7 +110,7 @@ describe('usage analytics', () => {
     expect(JSON.stringify(tasks)).not.toContain('deleted')
   })
 
-  it('upgrades an existing usage ledger by adding only its query index', () => {
+  it('upgrades an existing usage ledger without losing its records', () => {
     const directory = mkdtempSync(join(tmpdir(), 'buddy-usage-upgrade-'))
     try {
       const path = join(directory, 'buddy.sqlite3')
@@ -118,7 +118,20 @@ describe('usage analytics', () => {
       f.run('retained')
       f.usage('retained')
       const before = f.repository.analytics(period)
-      f.database.exec('DROP INDEX idx_usage_created_at; PRAGMA user_version = 13')
+      f.database.exec(`
+        DROP INDEX idx_usage_created_at;
+        DROP TABLE builtin_provider_configs;
+        ALTER TABLE provider_states DROP COLUMN request_headers_json;
+        ALTER TABLE provider_model_states DROP COLUMN thinking_level_map_json;
+        ALTER TABLE provider_model_states DROP COLUMN sampling_params_json;
+        ALTER TABLE provider_model_states DROP COLUMN compat_json;
+        ALTER TABLE provider_model_states DROP COLUMN catalog_provider_id;
+        ALTER TABLE provider_model_states DROP COLUMN source_fingerprint;
+        ALTER TABLE provider_model_states DROP COLUMN catalog_model_id;
+        ALTER TABLE provider_model_states DROP COLUMN catalog_selection_json;
+        ALTER TABLE provider_model_states DROP COLUMN capability_overrides_json;
+        PRAGMA user_version = 13;
+      `)
       f.database.close()
       databases.splice(databases.indexOf(f.database), 1)
       const upgraded = openBuddyDatabase({ databasePath: path })

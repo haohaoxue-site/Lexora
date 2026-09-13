@@ -4,29 +4,35 @@ import type { BuddyAttachmentUpload } from '../../../shared/conversation/attachm
 import type { BuddyPromptDirective, BuddyUserContentV1 } from '../../../shared/conversation/buddyUserContent'
 import type { AttachmentRecord, AttachmentRepository } from '../storage/attachmentRepository'
 import type { BuddyDataPaths } from '../storage/BuddyDataPaths'
+import type { AttachmentDocumentReference, AttachmentFileInput } from './AttachmentDocumentReference'
 import type { AttachmentImageReference } from './AttachmentImageReference'
 import { randomUUID } from 'node:crypto'
 import { constants } from 'node:fs'
 import { chmod, copyFile, mkdir, open, readdir, readFile, realpath, stat, unlink, writeFile } from 'node:fs/promises'
 import { basename, dirname, extname, join, normalize } from 'node:path'
 import { fileStorage } from '../../../platform/filesystem/fileStorage'
+import { BUDDY_MEDIA_EXTENSIONS, BUDDY_MEDIA_FILE_BYTES_LIMIT, isDocumentMimeType } from '../../../shared/conversation/attachmentFormats'
 import {
   BUDDY_ATTACHMENT_COUNT_LIMIT,
   BUDDY_ATTACHMENT_TOTAL_BYTES_LIMIT,
   BUDDY_TEXT_ATTACHMENT_EXTENSIONS,
+  getAttachmentKind,
 } from '../../../shared/conversation/attachmentPolicy'
 import { projectBuddyUserContent } from '../../../shared/conversation/buddyUserContentProjection'
+import { hasDocumentSignature } from './validateDocumentBytes'
 
 export const DRAFT_ATTACHMENT_RETENTION_MS = 7 * 24 * 60 * 60 * 1000
 const { replace: rename, syncDirectory } = fileStorage
 const MAX_TEXT_PROMPT_BYTES = 1024 * 1024
 const MIME_TYPES: Readonly<Record<string, string>> = {
+  ...BUDDY_MEDIA_EXTENSIONS,
   '.csv': 'text/csv',
   '.gif': 'image/gif',
   '.jpeg': 'image/jpeg',
   '.jpg': 'image/jpeg',
   '.json': 'application/json',
   '.md': 'text/markdown',
+  '.pdf': 'application/pdf',
   '.png': 'image/png',
   '.toml': 'application/toml',
   '.tsv': 'text/tab-separated-values',
@@ -53,6 +59,7 @@ export interface AttachmentFileReader {
 }
 
 export interface AttachmentRecoveryResult {
+  documents: AttachmentDocumentReference[]
   images: AttachmentImageReference[]
   missingAttachmentIds: string[]
 }
@@ -109,11 +116,9 @@ export class AttachmentService {
       if (!sourcePath)
         throw new AttachmentError('ATTACHMENT_NOT_FOUND')
       const metadata = await stat(sourcePath)
-      if (!metadata.isFile() || metadata.size > BUDDY_ATTACHMENT_TOTAL_BYTES_LIMIT)
+      if (!metadata.isFile())
         throw new AttachmentError('VALIDATION_FAILED')
-      const mimeType = inferMimeType(sourcePath)
-      if (!isSupportedAttachment(mimeType, metadata.size))
-        throw new AttachmentError('VALIDATION_FAILED')
+      const { mimeType } = normalizeAttachmentMetadata({ name: basename(sourcePath), mimeType: '', sizeBytes: metadata.size })
       return { metadata, mimeType, sourcePath }
     }))
     validateTotalBytes(sources.map(source => source.metadata.size), limits.totalBytes, limits.errorCode)
@@ -138,6 +143,8 @@ export class AttachmentService {
         }
         attempted.push(record)
         await publishFile(sourcePath, storedPath)
+        if (isDocumentMimeType(mimeType) && !hasDocumentSignature(mimeType, await this.#readFile(storedPath)))
+          throw new AttachmentError('ATTACHMENT_INVALID')
         this.#repository.create(record)
         records.push(record)
       }
@@ -156,15 +163,9 @@ export class AttachmentService {
     if (uploads.length > BUDDY_ATTACHMENT_COUNT_LIMIT)
       throw new AttachmentError('VALIDATION_FAILED')
     const sources = uploads.map((upload) => {
-      const name = basename(upload.name.trim())
-      const mimeType = upload.mimeType.trim() || inferMimeType(name)
-      if (
-        !name
-        || upload.bytes.byteLength > BUDDY_ATTACHMENT_TOTAL_BYTES_LIMIT
-        || !isSupportedAttachment(mimeType, upload.bytes.byteLength)
-      ) {
-        throw new AttachmentError('VALIDATION_FAILED')
-      }
+      const { name, mimeType } = normalizeAttachmentMetadata({ name: basename(upload.name.trim()), mimeType: upload.mimeType, sizeBytes: upload.bytes.byteLength })
+      if (isDocumentMimeType(mimeType) && !hasDocumentSignature(mimeType, upload.bytes))
+        throw new AttachmentError('ATTACHMENT_INVALID')
       return { ...upload, mimeType, name }
     })
     validateTotalBytes(sources.map(source => source.bytes.byteLength))
@@ -354,9 +355,10 @@ export class AttachmentService {
     conversationId: string | null = null,
     draftId: string | null = null,
     composer?: { content: BuddyUserContentV1, resourceIds: readonly string[], resolveDirective?: (directive: BuddyPromptDirective) => string },
-  ): Promise<{ images: ImageContent[], prompt: string, records: AttachmentRecord[] }> {
+  ): Promise<{ documents: AttachmentFileInput[], images: ImageContent[], prompt: string, records: AttachmentRecord[] }> {
     const prepared = await this.preparePrompt(ids, content, conversationId, draftId, composer)
     return {
+      documents: await this.materializeDocumentInputs(prepared.documentReferences, conversationId, draftId),
       images: await this.materializePiInputImages(
         prepared.imageReferences,
         conversationId,
@@ -373,15 +375,24 @@ export class AttachmentService {
     conversationId: string | null = null,
     draftId: string | null = null,
     composer?: { content: BuddyUserContentV1, resourceIds: readonly string[], resolveDirective?: (directive: BuddyPromptDirective) => string },
-  ): Promise<{ imageReferences: AttachmentImageReference[], prompt: string, records: AttachmentRecord[] }> {
+  ): Promise<{ documentReferences: AttachmentDocumentReference[], imageReferences: AttachmentImageReference[], prompt: string, records: AttachmentRecord[] }> {
     const records = ids.map(id => this.#requireForPrompt(id, conversationId, draftId))
     validateTotalBytes(records.map(record => record.sizeBytes))
     const materialized = await Promise.all(records.map(async (record): Promise<{
       imageReference: AttachmentImageReference | null
+      documentReference?: AttachmentDocumentReference
       section: string
       text: string | null
     }> => {
       try {
+        if (isDocumentMimeType(record.mimeType)) {
+          return {
+            documentReference: toDocumentReference(record),
+            imageReference: null,
+            section: `附件：${record.name}（${record.mimeType}，attachmentId=${record.id}）`,
+            text: null,
+          }
+        }
         if (record.mimeType.startsWith('image/') && record.mimeType !== 'image/svg+xml') {
           return {
             imageReference: toImageReference(record),
@@ -415,7 +426,9 @@ export class AttachmentService {
             throw new AttachmentError('ATTACHMENT_NOT_FOUND')
           return value.imageReference
             ? { kind: 'image', name: record.name }
-            : { kind: 'text', name: record.name, text: value.text! }
+            : value.documentReference
+              ? { kind: getDocumentKind(value.documentReference.mimeType), name: record.name }
+              : { kind: 'text', name: record.name, text: value.text! }
         }, (directive) => {
           if (!composer.resolveDirective)
             throw new AttachmentError('VALIDATION_FAILED')
@@ -423,6 +436,7 @@ export class AttachmentService {
         })
       : null
     return {
+      documentReferences: materialized.flatMap(item => item.documentReference ? [item.documentReference] : []),
       imageReferences: materialized.flatMap(item => item.imageReference ? [item.imageReference] : []),
       prompt: [projected?.prompt ?? content.trim(), ...materialized.slice(composer?.resourceIds.length ?? 0).map(item => item.section)]
         .filter(Boolean)
@@ -431,17 +445,24 @@ export class AttachmentService {
     }
   }
 
-  async resolvePiInputImageReferences(
+  getInputMetadata(ids: readonly string[], conversationId: string | null, draftId: string | null = null): AttachmentRecord[] {
+    return ids.map(id => this.#requireForPrompt(id, conversationId, draftId))
+  }
+
+  async resolveInputReferences(
     ids: readonly string[],
     conversationId: string,
-  ): Promise<AttachmentImageReference[]> {
+  ): Promise<{ images: AttachmentImageReference[], documents: AttachmentDocumentReference[] }> {
     const records = ids.map(id => this.#requireForPrompt(id, conversationId, null))
     validateTotalBytes(records.map(record => record.sizeBytes))
-    return records.flatMap(record => (
-      record.mimeType.startsWith('image/') && record.mimeType !== 'image/svg+xml'
-        ? [toImageReference(record)]
-        : []
-    ))
+    return {
+      images: records.flatMap(record => (
+        record.mimeType.startsWith('image/') && record.mimeType !== 'image/svg+xml'
+          ? [toImageReference(record)]
+          : []
+      )),
+      documents: records.filter(record => isDocumentMimeType(record.mimeType)).map(toDocumentReference),
+    }
   }
 
   async materializePiInputImages(
@@ -477,7 +498,34 @@ export class AttachmentService {
     }))
   }
 
-  async resolveRecoveryInputImageReferences(
+  async materializeDocumentInputs(
+    references: readonly AttachmentDocumentReference[],
+    conversationId: string | null,
+    draftId: string | null = null,
+  ): Promise<AttachmentFileInput[]> {
+    const records = references.map((reference) => {
+      const record = this.#requireForPrompt(reference.attachmentId, conversationId, draftId)
+      if (!isDocumentMimeType(record.mimeType) || reference.mimeType !== record.mimeType)
+        throw new AttachmentError('VALIDATION_FAILED')
+      return record
+    })
+    validateTotalBytes(records.map(record => record.sizeBytes))
+    return Promise.all(records.map(async (record) => {
+      try {
+        const bytes = await this.#readFile(record.storedPath)
+        if (bytes.length !== record.sizeBytes || !hasDocumentSignature(record.mimeType, bytes))
+          throw new AttachmentError('VALIDATION_FAILED')
+        return { data: bytes.toString('base64'), name: record.name, mimeType: toDocumentReference(record).mimeType }
+      }
+      catch (error) {
+        if (isFileNotFound(error))
+          throw new AttachmentError('ATTACHMENT_NOT_FOUND', { cause: error })
+        throw error
+      }
+    }))
+  }
+
+  async resolveRecoveryInputReferences(
     ids: readonly string[],
     conversationId: string,
   ): Promise<AttachmentRecoveryResult> {
@@ -492,16 +540,22 @@ export class AttachmentService {
       }
     })
     validateTotalBytes(resolved.flatMap(item => item.record ? [item.record.sizeBytes] : []))
-    const recovered = await Promise.all(resolved.map(async ({ id, record }) => {
+    const recovered = await Promise.all(resolved.map(async ({ id, record }): Promise<{
+      images: AttachmentImageReference[]
+      documents?: AttachmentDocumentReference[]
+      missingAttachmentId: string | null
+    }> => {
       if (!record)
         return { images: [], missingAttachmentId: id }
-      if (!record.mimeType.startsWith('image/') || record.mimeType === 'image/svg+xml')
+      if (!isDocumentMimeType(record.mimeType) && (!record.mimeType.startsWith('image/') || record.mimeType === 'image/svg+xml'))
         return { images: [], missingAttachmentId: null }
       try {
         const metadata = await stat(record.storedPath)
         if (!metadata.isFile())
           return { images: [], missingAttachmentId: id }
-        return { images: [toImageReference(record)], missingAttachmentId: null }
+        return isDocumentMimeType(record.mimeType)
+          ? { documents: [toDocumentReference(record)], images: [], missingAttachmentId: null }
+          : { images: [toImageReference(record)], missingAttachmentId: null }
       }
       catch (error) {
         if (isFileNotFound(error))
@@ -510,6 +564,7 @@ export class AttachmentService {
       }
     }))
     return {
+      documents: recovered.flatMap(item => item.documents ?? []),
       images: recovered.flatMap(item => item.images),
       missingAttachmentIds: recovered.flatMap(
         item => item.missingAttachmentId ? [item.missingAttachmentId] : [],
@@ -555,6 +610,19 @@ function toImageReference(record: AttachmentRecord): AttachmentImageReference {
   return { attachmentId: record.id, mimeType: record.mimeType }
 }
 
+function toDocumentReference(record: AttachmentRecord): AttachmentDocumentReference {
+  if (!isDocumentMimeType(record.mimeType))
+    throw new AttachmentError('VALIDATION_FAILED')
+  return { attachmentId: record.id, mimeType: record.mimeType }
+}
+
+function getDocumentKind(mimeType: string): 'pdf' | 'audio' | 'video' {
+  const kind = getAttachmentKind(mimeType)
+  if (kind !== 'pdf' && kind !== 'audio' && kind !== 'video')
+    throw new AttachmentError('VALIDATION_FAILED')
+  return kind
+}
+
 function validateTotalBytes(
   sizes: readonly number[],
   limit = BUDDY_ATTACHMENT_TOTAL_BYTES_LIMIT,
@@ -592,24 +660,24 @@ function isTextMimeType(mimeType: string): boolean {
   ]).has(mimeType)
 }
 
-function isSupportedAttachment(mimeType: string, sizeBytes: number): boolean {
-  if (SUPPORTED_IMAGE_MIME_TYPES.has(mimeType))
-    return true
-  return isTextMimeType(mimeType) && sizeBytes <= MAX_TEXT_PROMPT_BYTES
-}
-
 export function normalizeAttachmentMetadata(input: { mimeType: string, name: string, sizeBytes: number }) {
   const name = input.name.trim()
-  const mimeType = textExtensions.has(extname(name).slice(1).toLowerCase())
+  const mimeType = extname(name).toLowerCase() === '.pdf' || Object.hasOwn(BUDDY_MEDIA_EXTENSIONS, extname(name).toLowerCase()) || textExtensions.has(extname(name).slice(1).toLowerCase())
     ? inferMimeType(name)
     : input.mimeType.trim() || inferMimeType(name)
-  if (
-    !name || /[/\\\0]/.test(name)
-    || input.sizeBytes > BUDDY_ATTACHMENT_TOTAL_BYTES_LIMIT
-    || !isSupportedAttachment(mimeType, input.sizeBytes)
-  ) {
+  if (!name || /[/\\\0]/.test(name) || !Number.isSafeInteger(input.sizeBytes) || input.sizeBytes < 0)
     throw new AttachmentError('VALIDATION_FAILED')
-  }
+  if (!isDocumentMimeType(mimeType) && !SUPPORTED_IMAGE_MIME_TYPES.has(mimeType) && !isTextMimeType(mimeType))
+    throw new AttachmentError('ATTACHMENT_UNSUPPORTED')
+  const byteLimit = isTextMimeType(mimeType)
+    ? MAX_TEXT_PROMPT_BYTES
+    : isDocumentMimeType(mimeType) && mimeType !== 'application/pdf'
+      ? BUDDY_MEDIA_FILE_BYTES_LIMIT
+      : BUDDY_ATTACHMENT_TOTAL_BYTES_LIMIT
+  if (input.sizeBytes > byteLimit)
+    throw new AttachmentError('ATTACHMENT_TOO_LARGE')
+  if (isDocumentMimeType(mimeType) && input.sizeBytes === 0)
+    throw new AttachmentError('ATTACHMENT_INVALID')
   return { mimeType, name, sizeBytes: input.sizeBytes }
 }
 

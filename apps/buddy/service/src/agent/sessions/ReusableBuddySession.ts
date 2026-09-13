@@ -1,5 +1,5 @@
 import type { ImageContent } from '@earendil-works/pi-ai'
-import type { AgentSessionEvent, CompactionResult } from '@earendil-works/pi-coding-agent'
+import type { AgentSession, AgentSessionEvent, CompactionResult } from '@earendil-works/pi-coding-agent'
 import type { BuddyServiceTier, BuddyThinkingLevel } from '../../../../shared/conversation/modelSelection'
 import type { BuddyInputReferenceV1 } from '../context/BuddyInputReference'
 import type { BuddyContextUsageBreakdown } from '../context/contextUsageBreakdown'
@@ -15,6 +15,7 @@ export interface BuddySessionEventSource {
 }
 
 export interface ReusableBuddySession extends BuddySessionEventSource {
+  getInputContext?: () => { messages: AgentSession['messages'], systemPrompt?: string }
   steer?: (prepare: () => BuddyInputReferenceV1) => boolean
   abort: () => Promise<void>
   abortCompaction: () => void

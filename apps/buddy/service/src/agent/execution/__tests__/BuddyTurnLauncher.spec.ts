@@ -61,7 +61,7 @@ describe('buddyTurnLauncher', () => {
         version: 1,
       },
     })
-    expect(fixture.resolvePiInputImageReferences).toHaveBeenCalledWith(
+    expect(fixture.resolveInputReferences).toHaveBeenCalledWith(
       ['attachment-1'],
       'conversation-1',
     )
@@ -162,9 +162,10 @@ async function createFixture(options: { modelInput?: readonly ('text' | 'image')
   const paths = new BuddyDataPaths(root)
   const spaces = createSpaceRepository(database)
   const runs = createRunRepository(database)
-  const resolvePiInputImageReferences = vi.fn(async () => ([
-    { attachmentId: 'attachment-1', mimeType: 'image/png' },
-  ]))
+  const resolveInputReferences = vi.fn(async () => ({
+    images: [{ attachmentId: 'attachment-1', mimeType: 'image/png' }],
+    documents: [],
+  }))
   const eventLog = createRunEventLog({
     conversationsDirectory: paths.conversationsDirectory,
     database,
@@ -184,7 +185,7 @@ async function createFixture(options: { modelInput?: readonly ('text' | 'image')
     spaces,
   })
   const planner = new BuddyRunExecutionPlanner({
-    attachments: { resolvePiInputImageReferences },
+    attachments: { resolveInputReferences },
     commands: createCommandRequestRepository(database),
     conversations: createConversationRepository(database),
     models: { resolveAvailable: async () => ({ input: options.modelInput ?? ['text', 'image'] }) as never },
@@ -210,7 +211,7 @@ async function createFixture(options: { modelInput?: readonly ('text' | 'image')
       })
     },
     eventLog,
-    resolvePiInputImageReferences,
+    resolveInputReferences,
     paths,
     prepareTurn({ spaceId }: { spaceId: string | null }) {
       prepareTestTurnRequest(database, {

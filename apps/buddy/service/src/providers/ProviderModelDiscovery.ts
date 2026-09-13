@@ -1,4 +1,5 @@
 import type { Credential } from '@earendil-works/pi-ai'
+import type { ProviderRequestHeaders } from './ProviderRequestHeaders'
 import {
   ProviderAuthenticationRequiredError,
   ProviderModelSyncError,
@@ -28,15 +29,18 @@ export interface OpenAiCompatibleModelDiscoveryOptions {
     read: (providerId: string) => Promise<Credential | undefined>
   }
   readonly request?: typeof fetch
+  readonly requestHeaders?: ProviderRequestHeaders
 }
 
 export class OpenAiCompatibleModelDiscovery implements ProviderModelDiscovery {
   readonly #credentials: OpenAiCompatibleModelDiscoveryOptions['credentials']
   readonly #request: typeof fetch
+  readonly #requestHeaders?: ProviderRequestHeaders
 
   constructor(options: OpenAiCompatibleModelDiscoveryOptions) {
     this.#credentials = options.credentials
     this.#request = options.request ?? fetch
+    this.#requestHeaders = options.requestHeaders
   }
 
   supports(api: string): boolean {
@@ -53,9 +57,17 @@ export class OpenAiCompatibleModelDiscovery implements ProviderModelDiscovery {
       throw new ProviderAuthenticationRequiredError()
 
     try {
+      const defaults = { Authorization: `Bearer ${credential.key}` }
+      const resolved = await this.#requestHeaders?.resolve(input.providerId, defaults, credential.key) ?? defaults
+      const headers = new Headers()
+      for (const [name, value] of Object.entries(resolved)) {
+        if (value !== null)
+          headers.set(name, value)
+      }
       const baseUrl = input.baseUrl.endsWith('/') ? input.baseUrl : `${input.baseUrl}/`
       const response = await this.#request(new URL('models', baseUrl), {
-        headers: { Authorization: `Bearer ${credential.key}` },
+        headers,
+        redirect: 'error',
         signal: AbortSignal.timeout(15_000),
       })
       if (!response.ok)

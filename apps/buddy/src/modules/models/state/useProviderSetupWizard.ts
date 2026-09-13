@@ -1,6 +1,9 @@
-import type { LocalCustomProvider, LocalCustomProviderModel, LocalProvider } from '@buddy-shared/providers/providerApi'
-
+import type { LocalBuiltinProviderPreset, LocalCustomProvider, LocalCustomProviderModel, LocalProvider } from '@buddy-shared/providers/providerApi'
+import type { ProviderRequestHeader } from '@buddy-shared/providers/providerHeaders'
 import type { ModelProvidersStore } from '@/modules/models/state/typing'
+import { customProviderSchema } from '@buddy-shared/providers/providerApi'
+
+import { providerDisplayNameSchema } from '@buddy-shared/providers/providerInput'
 import { computed, onScopeDispose, reactive, shallowRef, watch } from 'vue'
 import { desktopProviderApiOptions } from '@/modules/models/model/desktopProviderApiOptions'
 
@@ -13,7 +16,6 @@ interface WritableValueRef<T> {
 }
 
 interface UseProviderSetupWizardOptions {
-  onManage: (providerId: string) => void
   providerSettings: () => ModelProvidersStore
   resumeProviderId: ValueRef<string | null>
   show: WritableValueRef<boolean>
@@ -30,15 +32,24 @@ export function useProviderSetupWizard(options: UseProviderSetupWizardOptions) {
   const manualFormKey = shallowRef(0)
   const showManualModelDialog = shallowRef(false)
   const savingManualModel = shallowRef(false)
-  const customIdEdited = shallowRef(false)
+  const creatingCustom = shallowRef(false)
+  const customIdConflict = shallowRef<string | null>(null)
+  const builtinDisplayName = shallowRef('')
+  const builtinHeaders = reactive({ requestHeaders: [] as ProviderRequestHeader[] })
+  const addingBuiltin = shallowRef(false)
   const customForm = reactive({
     api: desktopProviderApiOptions[0]!.value,
-    baseUrl: 'https://api.example.com/v1',
+    baseUrl: '',
     description: '',
     displayName: '',
     id: createCustomId(),
+    requestHeaders: [] as ProviderRequestHeader[],
   })
   const providers = computed(() => providerSettings().providers.value)
+  const reservedCustomIds = computed(() => [
+    ...providerSettings().builtinPresets.value.map(provider => provider.id),
+    ...providers.value.filter(provider => provider.id !== selectedProviderId.value).map(provider => provider.id),
+  ])
   const resumeProviderAvailable = computed(() => providers.value.some(provider => provider.id === resumeProviderId.value))
   const selectedProvider = computed(() => providers.value.find(
     provider => provider.id === selectedProviderId.value,
@@ -51,18 +62,20 @@ export function useProviderSetupWizard(options: UseProviderSetupWizardOptions) {
   ))
   const filteredProviders = computed(() => {
     const query = providerQuery.value.trim().toLocaleLowerCase()
-    return providers.value.filter(provider => !provider.custom && (
+    return providerSettings().builtinPresets.value.filter(provider => (
       !query
       || provider.displayName.toLocaleLowerCase().includes(query)
       || provider.id.toLocaleLowerCase().includes(query)
     ))
   })
   const stepCount = computed(() => 3)
-  const canContinueCustom = computed(() => Boolean(
-    customForm.displayName.trim()
-    && customForm.id.trim()
-    && customForm.baseUrl.trim(),
-  ))
+  const canContinueCustom = computed(() => customProviderSchema.safeParse({
+    ...customForm,
+    baseUrl: customForm.baseUrl.trim(),
+    enabled: false,
+    models: [],
+  }).success)
+  const canLogin = computed(() => selectedProvider.value?.custom || providerDisplayNameSchema.safeParse(builtinDisplayName.value).success)
   const canComplete = computed(() => (
     selectedProvider.value?.storedCredentialType !== null
     && enabledModels.value.length > 0
@@ -71,6 +84,8 @@ export function useProviderSetupWizard(options: UseProviderSetupWizardOptions) {
   watch([show, providerSettings, () => resumeProviderId.value, resumeProviderAvailable], ([visible], [wasVisible]) => {
     generation += 1
     savingManualModel.value = false
+    creatingCustom.value = false
+    customIdConflict.value = null
     showManualModelDialog.value = false
     if (visible || wasVisible)
       providerSettings().clearModelProviderError()
@@ -84,8 +99,13 @@ export function useProviderSetupWizard(options: UseProviderSetupWizardOptions) {
       resetSteps(1)
       return
     }
-    if (provider.custom)
+    if (provider.custom) {
       populateCustomForm(provider)
+    }
+    else {
+      builtinDisplayName.value = provider.displayName
+      builtinHeaders.requestHeaders = (provider.requestHeaders ?? []).map(header => ({ ...header }))
+    }
     resetSteps(provider.storedCredentialType ? 3 : 2)
   }, { flush: 'sync', immediate: true })
 
@@ -95,9 +115,12 @@ export function useProviderSetupWizard(options: UseProviderSetupWizardOptions) {
 
   function updateCustomName(value: string) {
     customForm.displayName = value
-    if (customIdEdited.value)
-      return
-    customForm.id = toProviderId(value) || customForm.id
+  }
+
+  function updateCustomForm(value: typeof customForm) {
+    Object.assign(customForm, value)
+    customIdConflict.value = null
+    providerSettings().clearModelProviderError()
   }
 
   function closeDialog() {
@@ -105,25 +128,31 @@ export function useProviderSetupWizard(options: UseProviderSetupWizardOptions) {
     show.value = false
   }
 
-  async function addBuiltin(provider: LocalProvider) {
-    if (provider.added) {
-      if (provider.id === selectedProviderId.value && furthestStep.value > 1) {
-        navigateToReachedStep(2)
-        return
-      }
-      closeDialog()
-      options.onManage(provider.id)
+  async function addBuiltin(provider: LocalBuiltinProviderPreset) {
+    if (addingBuiltin.value)
+      return
+    if (provider.id === selectedProvider.value?.builtinProviderId && furthestStep.value > 1) {
+      navigateToReachedStep(2)
       return
     }
     const requestGeneration = generation
-    if (!await providerSettings().addProvider(provider.id) || requestGeneration !== generation)
-      return
-    selectedProviderId.value = provider.id
-    advanceToStep(selectedProvider.value?.storedCredentialType ? 3 : 2)
+    addingBuiltin.value = true
+    try {
+      const instance = await providerSettings().addProvider(provider.id)
+      if (!instance || requestGeneration !== generation)
+        return
+      selectedProviderId.value = instance.id
+      builtinDisplayName.value = instance.displayName
+      builtinHeaders.requestHeaders = []
+      advanceToStep(2)
+    }
+    finally {
+      addingBuiltin.value = false
+    }
   }
 
   async function createCustom() {
-    if (!canContinueCustom.value)
+    if (!canContinueCustom.value || creatingCustom.value)
       return
     const requestGeneration = generation
     const input: LocalCustomProvider = {
@@ -134,20 +163,43 @@ export function useProviderSetupWizard(options: UseProviderSetupWizardOptions) {
       enabled: selectedProvider.value?.enabled ?? false,
       id: customForm.id.trim(),
       models: [],
+      requestHeaders: customForm.requestHeaders.map(header => ({ ...header })),
     }
-    const succeeded = await providerSettings().upsertCustomProvider(input)
-    if (!succeeded || requestGeneration !== generation)
+    if (reservedCustomIds.value.includes(input.id)) {
+      customIdConflict.value = input.id
       return
-    selectedProviderId.value = input.id
-    customIdEdited.value = true
-    advanceToStep(2)
+    }
+    creatingCustom.value = true
+    try {
+      const result = selectedProvider.value?.custom
+        ? await providerSettings().upsertCustomProvider(input)
+        : await providerSettings().createCustomProvider(input)
+      if (requestGeneration !== generation)
+        return
+      if (result === 'conflict') {
+        customIdConflict.value = input.id
+        return
+      }
+      if (!result)
+        return
+      selectedProviderId.value = input.id
+      advanceToStep(2)
+    }
+    finally {
+      if (requestGeneration === generation)
+        creatingCustom.value = false
+    }
   }
 
   async function login(authType: 'api_key' | 'oauth') {
     const provider = selectedProvider.value
-    if (!provider)
+    if (!provider || !canLogin.value)
       return
     const requestGeneration = generation
+    if (!provider.custom) {
+      if (!await providerSettings().renameProvider(provider.id, builtinDisplayName.value.trim(), builtinHeaders.requestHeaders.map(header => ({ ...header }))) || requestGeneration !== generation)
+        return
+    }
     const succeeded = await providerSettings().loginProvider(provider.id, authType)
     if (succeeded && requestGeneration === generation && selectedProviderId.value === provider.id)
       advanceToStep(3)
@@ -230,22 +282,28 @@ export function useProviderSetupWizard(options: UseProviderSetupWizardOptions) {
     customForm.description = provider.description ?? ''
     customForm.displayName = provider.displayName
     customForm.id = provider.id
-    customIdEdited.value = true
+    customForm.requestHeaders = (provider.requestHeaders ?? []).map(header => ({ ...header }))
   }
 
   function resetNewProviderForm() {
     sourceTab.value = 'builtin'
     providerQuery.value = ''
     selectedProviderId.value = null
-    customIdEdited.value = false
     customForm.api = desktopProviderApiOptions[0]!.value
-    customForm.baseUrl = 'https://api.example.com/v1'
+    customForm.baseUrl = ''
+    builtinDisplayName.value = ''
     customForm.description = ''
     customForm.displayName = ''
     customForm.id = createCustomId()
+    customForm.requestHeaders = []
+    builtinHeaders.requestHeaders = []
   }
 
   return {
+    addingBuiltin,
+    builtinDisplayName,
+    builtinHeaders,
+    canLogin,
     addBuiltin,
     canComplete,
     canContinueCustom,
@@ -253,7 +311,10 @@ export function useProviderSetupWizard(options: UseProviderSetupWizardOptions) {
     continueFromModels,
     createCustom,
     customForm,
-    customIdEdited,
+    creatingCustom,
+    customIdConflict,
+    reservedCustomIds,
+    updateCustomForm,
     enabledModels,
     filteredProviders,
     finish,
@@ -278,15 +339,6 @@ export function useProviderSetupWizard(options: UseProviderSetupWizardOptions) {
   }
 }
 
-function toProviderId(value: string): string {
-  return value
-    .trim()
-    .toLocaleLowerCase()
-    .replace(/[^a-z0-9._-]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-    .slice(0, 100)
-}
-
 function createCustomId(): string {
-  return `custom-${crypto.randomUUID().slice(0, 8)}`
+  return `custom-${crypto.randomUUID()}`
 }

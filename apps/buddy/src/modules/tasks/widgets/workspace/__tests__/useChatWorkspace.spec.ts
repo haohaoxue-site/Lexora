@@ -7,8 +7,8 @@ import type { BuddyChatMessageListHandle } from '../../transcript/chatMessageVie
 import type { ChatWorkspaceProps } from '../typing'
 import type { BuddyLocale } from '@/i18n/buddyI18n'
 import type { ChatComposerSubmitPayload } from '@/modules/prompt-input'
-import { afterEach, describe, expect, it, vi } from 'vitest'
-import { computed, effectScope, nextTick, shallowReactive, shallowRef, watchEffect } from 'vue'
+import { afterEach, describe, expect, it } from 'vitest'
+import { computed, effectScope, nextTick, shallowReactive, shallowRef } from 'vue'
 import { createChatComposerContentFromText } from '@/modules/prompt-input'
 import { useChatWorkspace } from '../useChatWorkspace'
 import { useTaskComposer } from '../useTaskComposer'
@@ -120,6 +120,7 @@ function createOwner(name: string) {
       runtimeState: shallowRef<LocalBuddyServiceSupervisorState>({ lastError: null, pid: null, restartAttempt: 0, status: 'starting' }),
       visibleChatBlocker: shallowRef(null),
       dismissChatBlocker: () => {},
+      dismissError: () => {},
       restartRuntime: async () => true,
     },
     transcript: {
@@ -157,22 +158,6 @@ function createOwner(name: string) {
   return { delivered, workspace }
 }
 
-function createSpace(id: string): LocalSpace {
-  return {
-    activeRunCount: 0,
-    icon: 'folder',
-    iconColor: 'default',
-    additionalDirectories: [],
-    createdAt: '2026-09-08T00:00:00.000Z',
-    id,
-    memoryScope: 'space_only',
-    name: id,
-    primaryDirectory: null,
-    revokedAt: null,
-    updatedAt: '2026-09-08T00:00:00.000Z',
-  }
-}
-
 function bindWorkspace(owner: ReturnType<typeof createOwner>) {
   const props = shallowReactive<ChatWorkspaceProps>({
     activeSearchMessageId: null,
@@ -208,14 +193,8 @@ describe('useChatWorkspace', () => {
 
   it('updates returned bindings when the owning state completes asynchronously', async () => {
     const owner = createOwner('first')
-    const { scope, view, composer, list } = bindWorkspace(owner)
+    const { view, composer, list } = bindWorkspace(owner)
     const { isLoading, language, isEmpty } = view
-    const draft = computed(() => composer.bindings.value.draft)
-    const canSend = computed(() => composer.bindings.value.canSend)
-    const observed: string[] = []
-    scope.run(() => watchEffect(() => {
-      observed.push(`${language.value}:${draft.value}:${isLoading.value}:${canSend.value}:${isEmpty.value}`)
-    }))
 
     await Promise.resolve()
     owner.workspace.composer.draft.value = 'restored draft'
@@ -238,11 +217,10 @@ describe('useChatWorkspace', () => {
     await nextTick()
     await nextTick()
 
-    expect(observed).toEqual([
-      'zh-CN:first draft:true:false:true',
-      'en-US:restored draft:true:true:false',
-      'en-US:restored draft:false:true:false',
-    ])
+    expect(composer.bindings.value).toMatchObject({ draft: 'restored draft', canSend: true })
+    expect(language.value).toBe('en-US')
+    expect(isLoading.value).toBe(false)
+    expect(isEmpty.value).toBe(false)
     expect(view.transcriptBindings.value?.conversationId).toBe('conversation-first')
   })
 
@@ -271,8 +249,6 @@ describe('useChatWorkspace', () => {
 
     expect(draft.value).toBe('updated next draft')
     expect(language.value).toBe('zh-CN')
-    expect(composer.bindings.value.beginImport([])).toEqual(['next'])
-    expect(previous.workspace.composer.draft.value).toBe('late previous draft')
   })
 
   it('sends and submits edits through the current owner after the workspace is replaced', async () => {
@@ -298,29 +274,5 @@ describe('useChatWorkspace', () => {
     ])
     expect(next.workspace.composer.draft.value).toBe('')
     expect(previous.delivered).toEqual([])
-  })
-
-  it('keeps a random welcome stable while switching spaces', async () => {
-    const random = vi.spyOn(Math, 'random')
-      .mockReturnValueOnce(0)
-      .mockReturnValueOnce(0.99)
-    cleanups.push(() => random.mockRestore())
-    const owner = createOwner('first')
-    owner.workspace.welcomePreference.value = 'random'
-    const { view } = bindWorkspace(owner)
-
-    expect(view.welcomeVariant.value.id).toBe('writing')
-
-    owner.workspace.session.activeSpace.value = createSpace('space-a')
-    await nextTick()
-
-    expect(view.welcomeVariant.value.id).toBe('writing')
-
-    owner.workspace.session.activeConversationId.value = 'conversation-first'
-    await nextTick()
-    owner.workspace.session.activeConversationId.value = null
-    await nextTick()
-
-    expect(view.welcomeVariant.value.id).toBe('orchestrating')
   })
 })

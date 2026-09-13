@@ -1,4 +1,9 @@
+import type { Api, Model } from '@earendil-works/pi-ai'
 import type { DatabaseSync } from 'node:sqlite'
+import type { ModelCapabilityOverrides } from '../../../shared/providers/providerCapabilities'
+import type { ModelCatalogReference } from '../../../shared/providers/providerCatalog'
+import { modelCapabilityOverridesSchema } from '../../../shared/providers/providerCapabilities'
+import { modelCatalogReferenceSchema } from '../../../shared/providers/providerCatalog'
 
 export type ProviderModelSource = 'builtin' | 'manual' | 'synced'
 
@@ -7,14 +12,22 @@ export interface ProviderModelStateRecord {
   modelId: string
   displayName: string
   api: string
+  catalogProviderId: string | null
+  catalogModelId: string | null
+  catalogSelection: ModelCatalogReference | null
+  capabilityOverrides: ModelCapabilityOverrides | null
+  compat: Model<Api>['compat'] | null
   input: Array<'text' | 'image'>
   reasoning: boolean
-  cost: { input: number, output: number, cacheRead: number, cacheWrite: number }
+  cost: Model<Api>['cost']
+  samplingParams: Record<string, unknown> | null
   sourceContextWindow: number
   sourceMaxTokens: number
   overrideContextWindow: number | null
   overrideMaxTokens: number | null
   sourceRevision: string
+  sourceFingerprint: string
+  thinkingLevelMap: Model<Api>['thinkingLevelMap'] | null
   acknowledgedSourceRevision: string | null
   source: ProviderModelSource
   enabled: boolean
@@ -37,14 +50,22 @@ interface ProviderModelStateRow {
   model_id: string
   display_name: string
   api: string
+  catalog_provider_id: string | null
+  catalog_model_id: string | null
+  catalog_selection_json: string | null
+  capability_overrides_json: string | null
+  compat_json: string | null
   input_json: string
   reasoning: number
   cost_json: string
+  sampling_params_json: string | null
   context_window: number
   max_tokens: number
   override_context_window: number | null
   override_max_tokens: number | null
   source_revision: string
+  source_fingerprint: string
+  thinking_level_map_json: string | null
   acknowledged_source_revision: string | null
   source: ProviderModelSource
   enabled: number
@@ -79,8 +100,10 @@ export function createProviderModelStateRepository(
       provider_id, model_id, display_name, api, input_json, reasoning, cost_json,
       context_window, max_tokens, override_context_window, override_max_tokens,
       source_revision, acknowledged_source_revision, source, enabled, available,
-      last_seen_at, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      last_seen_at, created_at, updated_at, thinking_level_map_json,
+      sampling_params_json, compat_json, catalog_provider_id, source_fingerprint,
+      catalog_model_id, catalog_selection_json, capability_overrides_json
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT (provider_id, model_id) DO UPDATE SET
       display_name = excluded.display_name,
       api = excluded.api,
@@ -97,6 +120,14 @@ export function createProviderModelStateRepository(
       enabled = excluded.enabled,
       available = excluded.available,
       last_seen_at = excluded.last_seen_at,
+      thinking_level_map_json = excluded.thinking_level_map_json,
+      sampling_params_json = excluded.sampling_params_json,
+      compat_json = excluded.compat_json,
+      catalog_provider_id = excluded.catalog_provider_id,
+      catalog_model_id = excluded.catalog_model_id,
+      catalog_selection_json = excluded.catalog_selection_json,
+      capability_overrides_json = excluded.capability_overrides_json,
+      source_fingerprint = excluded.source_fingerprint,
       updated_at = excluded.updated_at
   `)
 
@@ -136,6 +167,14 @@ export function createProviderModelStateRepository(
         record.lastSeenAt,
         record.createdAt,
         record.updatedAt,
+        serializeJson(record.thinkingLevelMap),
+        serializeJson(record.samplingParams),
+        serializeJson(record.compat),
+        record.catalogProviderId,
+        record.sourceFingerprint,
+        record.catalogModelId,
+        serializeJson(record.catalogSelection),
+        serializeJson(record.capabilityOverrides),
       )
       return requireProviderModelState(find.get(record.providerId, record.modelId))
     },
@@ -155,14 +194,26 @@ function toProviderModelState(row: ProviderModelStateRow): ProviderModelStateRec
     modelId: row.model_id,
     displayName: row.display_name,
     api: row.api,
+    catalogProviderId: row.catalog_provider_id,
+    catalogModelId: row.catalog_model_id,
+    catalogSelection: row.catalog_selection_json
+      ? modelCatalogReferenceSchema.parse(JSON.parse(row.catalog_selection_json))
+      : null,
+    capabilityOverrides: row.capability_overrides_json
+      ? modelCapabilityOverridesSchema.parse(JSON.parse(row.capability_overrides_json))
+      : null,
+    compat: parseJsonObject(row.compat_json) as Model<Api>['compat'] | null,
     input: JSON.parse(row.input_json) as Array<'text' | 'image'>,
     reasoning: row.reasoning === 1,
     cost: JSON.parse(row.cost_json) as ProviderModelStateRecord['cost'],
+    samplingParams: parseJsonObject(row.sampling_params_json),
     sourceContextWindow: row.context_window,
     sourceMaxTokens: row.max_tokens,
     overrideContextWindow: row.override_context_window,
     overrideMaxTokens: row.override_max_tokens,
     sourceRevision: row.source_revision,
+    sourceFingerprint: row.source_fingerprint,
+    thinkingLevelMap: parseJsonObject(row.thinking_level_map_json) as Model<Api>['thinkingLevelMap'] | null,
     acknowledgedSourceRevision: row.acknowledged_source_revision,
     source: row.source,
     enabled: row.enabled === 1,
@@ -171,4 +222,17 @@ function toProviderModelState(row: ProviderModelStateRow): ProviderModelStateRec
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   }
+}
+
+function parseJsonObject(value: string | null): Record<string, unknown> | null {
+  if (value === null)
+    return null
+  const parsed: unknown = JSON.parse(value)
+  return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+    ? parsed as Record<string, unknown>
+    : null
+}
+
+function serializeJson(value: object | null | undefined): string | null {
+  return value ? JSON.stringify(value) : null
 }
