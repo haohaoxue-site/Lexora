@@ -5,8 +5,10 @@ import type { BuddyPromptDirective } from '@buddy-shared/conversation/buddyUserC
 import type { LocalMessage } from '@buddy-shared/conversation/conversationApi'
 import type { BuddyLocale } from '@/i18n/buddyI18n'
 import { buddyPromptDirectiveToText, getBuddyUserContentResourceIds } from '@buddy-shared/conversation/buddyUserContent'
+import { NScrollbar, NTooltip } from 'naive-ui'
 import { computed, nextTick, shallowRef, useTemplateRef } from 'vue'
 import { useBuddyI18n } from '@/i18n/buddyI18n'
+import { formatFileSize } from '@/shared/lib/formatFileSize'
 import { FileIcon } from '@/shared/ui/file-icon'
 import BuddyImagePreview from '@/shared/ui/media/BuddyImagePreview.vue'
 import { resolveBuddyAttachmentPreviewUrl } from '../../model/attachments/chatAttachmentView'
@@ -29,6 +31,7 @@ const props = withDefaults(defineProps<{
 
 const { t } = useBuddyI18n(() => props.language)
 const attachmentTrack = useTemplateRef<HTMLDivElement>('attachmentTrack')
+const attachmentScrollport = computed(() => attachmentTrack.value?.closest<HTMLElement>('.buddy-chat-message-content__attachment-scrollport') ?? null)
 const { highlightedResourceId, highlightResource } = useResourceHighlight(attachmentTrack)
 const failedAttachmentIds = shallowRef<ReadonlySet<string>>(new Set())
 const previewIndex = shallowRef(0)
@@ -83,7 +86,7 @@ function openPreview(attachmentId: string) {
   )
   if (index < 0)
     return
-  previewTrackScrollLeft = attachmentTrack.value?.scrollLeft ?? 0
+  previewTrackScrollLeft = attachmentScrollport.value?.scrollLeft ?? 0
   previewIndex.value = index
   previewOpen.value = true
 }
@@ -98,7 +101,7 @@ async function updatePreviewOpen(open: boolean) {
     return
   await nextTick()
   await previewLeaveTransition()
-  attachmentTrack.value?.scrollTo({ left: previewTrackScrollLeft })
+  attachmentScrollport.value?.scrollTo({ left: previewTrackScrollLeft })
 }
 
 function previewLeaveTransition(): Promise<void> {
@@ -120,48 +123,60 @@ function previewLeaveTransition(): Promise<void> {
       @update:show="updatePreviewOpen"
     />
     <ChatQuoteStrip :quotes="structuredUserContent?.userContent.quotes ?? []" :language="language" />
-    <div
+    <NScrollbar
       v-if="attachmentViews.length"
-      ref="attachmentTrack"
-      class="buddy-chat-message-content__attachments"
+      class="buddy-chat-message-content__attachment-scrollbar"
+      container-class="buddy-chat-message-content__attachment-scrollport"
+      content-style="min-width: 100%"
+      trigger="hover"
+      x-scrollable
     >
-      <figure
-        v-for="view in attachmentViews"
-        :id="`buddy-attachment-${view.attachment.attachmentId}`"
-        :key="view.resourceId"
-        class="buddy-chat-message-content__attachment"
-        :class="{ 'is-highlighted': highlightedResourceId === view.resourceId }"
-        :data-resource-card="view.resourceId"
-        @click="openPreview(view.attachment.attachmentId)"
+      <div
+        ref="attachmentTrack"
+        class="buddy-chat-message-content__attachments"
       >
-        <button
-          v-if="view.previewUrl && !failedAttachmentIds.has(view.attachment.attachmentId)"
-          class="buddy-chat-message-content__preview-trigger"
-          type="button"
-          :aria-label="t('desktop.imagePreview.open', { name: view.attachment.name })"
-          @click.stop="openPreview(view.attachment.attachmentId)"
+        <figure
+          v-for="view in attachmentViews"
+          :id="`buddy-attachment-${view.attachment.attachmentId}`"
+          :key="view.resourceId"
+          class="buddy-chat-message-content__attachment"
+          :class="{ 'is-highlighted': highlightedResourceId === view.resourceId }"
+          :data-resource-card="view.resourceId"
+          @click="openPreview(view.attachment.attachmentId)"
         >
-          <img
-            :src="view.previewUrl"
-            :alt="view.attachment.name"
-            height="112"
-            loading="lazy"
-            width="160"
-            @error="markPreviewFailed(view.attachment.attachmentId)"
+          <button
+            v-if="view.previewUrl && !failedAttachmentIds.has(view.attachment.attachmentId)"
+            class="buddy-chat-message-content__preview-trigger"
+            type="button"
+            :aria-label="t('desktop.imagePreview.open', { name: view.attachment.name })"
+            @click.stop="openPreview(view.attachment.attachmentId)"
           >
-        </button>
-        <div v-else class="buddy-chat-message-content__file">
-          <FileIcon :name="view.attachment.name" size="preview" />
-          <span>{{ imageLabels.get(view.resourceId) ?? view.attachment.name }}</span>
-          <small>{{ view.attachment.kind === 'pdf' ? 'PDF' : view.attachment.kind === 'audio' ? 'AUDIO' : view.attachment.kind === 'video' ? 'VIDEO' : view.attachment.kind === 'text' ? 'TXT' : 'FILE' }}</small>
-        </div>
-        <figcaption
-          v-if="view.previewUrl && !failedAttachmentIds.has(view.attachment.attachmentId)"
-        >
-          {{ imageLabels.get(view.resourceId) ?? view.attachment.name }}
-        </figcaption>
-      </figure>
-    </div>
+            <img
+              :src="view.previewUrl"
+              :alt="view.attachment.name"
+              height="112"
+              loading="lazy"
+              width="160"
+              @error="markPreviewFailed(view.attachment.attachmentId)"
+            >
+          </button>
+          <div v-else class="buddy-chat-message-content__file">
+            <FileIcon :name="view.attachment.name" size="preview" />
+          </div>
+          <figcaption class="buddy-chat-message-content__attachment-details">
+            <NTooltip :delay="300" :style="{ maxWidth: '24rem', overflowWrap: 'anywhere' }">
+              <template #trigger>
+                <span class="buddy-chat-message-content__attachment-name">
+                  {{ imageLabels.get(view.resourceId) ?? view.attachment.name }}
+                </span>
+              </template>
+              {{ view.attachment.name }}
+            </NTooltip>
+            <span class="buddy-chat-message-content__attachment-size">{{ formatFileSize(view.attachment.sizeBytes) }}</span>
+          </figcaption>
+        </figure>
+      </div>
+    </NScrollbar>
     <div
       v-if="structuredUserContent && hasText"
       class="buddy-chat-message-content__text buddy-chat-message-content__structured-body"
@@ -227,43 +242,37 @@ function previewLeaveTransition(): Promise<void> {
   }
 }
 
+:deep(.buddy-chat-message-content__attachment-scrollbar) {
+  width: 100%;
+  height: auto;
+  max-width: 100%;
+  min-width: 0;
+}
+
+:deep(.buddy-chat-message-content__attachment-scrollport) {
+  overscroll-behavior-inline: contain;
+}
+
 .buddy-chat-message-content__attachments {
   display: flex;
-  width: 100%;
-  max-width: 100%;
   flex-wrap: nowrap;
   gap: 0.45rem;
-  overflow-x: auto;
-  overscroll-behavior-inline: contain;
-  padding-bottom: 0.25rem;
-  scrollbar-color: transparent transparent;
-  scrollbar-width: thin;
-
-  &:hover {
-    scrollbar-color: var(--buddy-border-strong) transparent;
-  }
-
-  &::-webkit-scrollbar {
-    height: 6px;
-  }
-
-  &::-webkit-scrollbar-thumb {
-    border-radius: 3px;
-    background: transparent;
-  }
-
-  &:hover::-webkit-scrollbar-thumb {
-    background: var(--buddy-border-strong);
-  }
+  padding-bottom: 0.5rem;
 }
 
 .buddy-chat-message-content__attachment {
   position: relative;
   display: grid;
-  width: min(10rem, 100%);
-  flex: 0 0 10rem;
-  gap: 0.2rem;
+  box-sizing: border-box;
+  width: 11rem;
+  min-width: 0;
+  flex: 0 0 11rem;
+  grid-template-columns: minmax(0, 1fr);
   margin: 0;
+  border: 1px solid var(--buddy-border-subtle);
+  border-radius: var(--buddy-radius-micro);
+  background: var(--buddy-surface-raised);
+  padding: 0.25rem;
 
   > .resource-reference-badge {
     position: absolute;
@@ -274,13 +283,8 @@ function previewLeaveTransition(): Promise<void> {
   }
 
   &.is-highlighted {
-    .buddy-chat-message-content__preview-trigger,
-    .buddy-chat-message-content__file {
-      border-color: var(--buddy-focus-ring);
-      box-shadow: inset 0 0 0 2px var(--buddy-focus-ring);
-      outline: 2px solid var(--buddy-focus-ring);
-      outline-offset: -2px;
-    }
+    border-color: var(--buddy-focus-ring);
+    box-shadow: inset 0 0 0 1px var(--buddy-focus-ring);
 
     figcaption {
       color: var(--buddy-accent-on-surface);
@@ -290,25 +294,38 @@ function previewLeaveTransition(): Promise<void> {
   .buddy-chat-message-content__preview-trigger,
   .buddy-chat-message-content__file {
     box-sizing: border-box;
-    width: 10rem;
-    max-width: 100%;
-    height: 7rem;
-    border: 1px solid var(--buddy-border-subtle);
-    border-radius: 0.65rem;
-    background: var(--buddy-surface-raised);
-  }
-
-  figcaption {
     width: 100%;
-    min-width: 0;
-    overflow: hidden;
-    color: var(--buddy-text-secondary);
-    font-size: var(--buddy-chat-caption-font-size);
-    line-height: var(--buddy-chat-caption-line-height);
-    text-align: left;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    height: 7rem;
+    border: 0;
+    border-radius: 0.25rem;
+    background: var(--buddy-surface-subtle);
   }
+}
+
+.buddy-chat-message-content__attachment-details {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
+  gap: 0.4rem;
+  padding: 0.45rem 0.35rem 0.3rem;
+  color: var(--buddy-text-primary);
+  font-size: var(--buddy-chat-caption-font-size);
+  line-height: var(--buddy-chat-caption-line-height);
+  text-align: left;
+}
+
+.buddy-chat-message-content__attachment-name {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.buddy-chat-message-content__attachment-size {
+  flex: none;
+  color: var(--buddy-text-muted);
+  white-space: nowrap;
 }
 
 .buddy-chat-message-content.is-user .buddy-chat-message-content__attachment:first-child {
@@ -342,25 +359,9 @@ function previewLeaveTransition(): Promise<void> {
 
 .buddy-chat-message-content__file {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 0.45rem;
+  place-items: center;
   color: var(--buddy-text-secondary);
   padding: 0.65rem;
-
-  span {
-    overflow: hidden;
-    color: var(--buddy-text-primary);
-    font-size: var(--buddy-chat-meta-font-size);
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  small {
-    color: var(--buddy-text-muted);
-    font-size: 0.62rem;
-    font-weight: 700;
-  }
 }
 
 .buddy-chat-message-content__text {

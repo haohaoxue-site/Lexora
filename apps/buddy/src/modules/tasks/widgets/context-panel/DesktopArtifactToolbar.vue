@@ -3,7 +3,8 @@ import type { LocalArtifact } from '@buddy-shared/artifacts/artifactApi'
 import type { BuddyLocale } from '@/i18n/buddyI18n'
 import { computed } from 'vue'
 import { useBuddyI18n } from '@/i18n/buddyI18n'
-import { formatDate, formatFileSize, resolveFileType } from './artifactContextPresentation'
+import { formatFileSize } from '@/shared/lib/formatFileSize'
+import { formatDate, resolveFileType } from './artifactContextPresentation'
 
 const props = defineProps<{ artifact: LocalArtifact, language: BuddyLocale }>()
 const { t } = useBuddyI18n(() => props.language)
