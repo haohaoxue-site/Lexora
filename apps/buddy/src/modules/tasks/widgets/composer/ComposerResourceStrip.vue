@@ -3,7 +3,7 @@ import type { ComposerResourceCard } from './typing'
 
 import type { BuddyLocale } from '@/i18n/buddyI18n'
 import { Dismiss16Regular } from '@vicons/fluent'
-import { NButton, NSpin } from 'naive-ui'
+import { NButton, NScrollbar, NSpin } from 'naive-ui'
 import { computed, shallowRef, useTemplateRef } from 'vue'
 import { useBuddyI18n } from '@/i18n/buddyI18n'
 import { FileIcon } from '@/shared/ui/file-icon'
@@ -44,64 +44,84 @@ defineExpose({ highlightResource })
 </script>
 
 <template>
-  <div v-if="cards.length" ref="resourceTrack" class="composer-resource-strip">
-    <div
-      v-for="{ resource, canRetry, imageLabel, previewUrl } in cards"
-      :key="resource.resourceId"
-      class="composer-resource-strip__card"
-      :class="{ 'is-failed': resource.state === 'failed', 'is-highlighted': highlightedResourceId === resource.resourceId, 'is-previewable': previewUrl }"
-      :data-resource-card="resource.resourceId"
-      @click="previewUrl && openPreview(previewUrl)"
+  <div v-if="cards.length" class="composer-resource-strip__scroll">
+    <NScrollbar
+      class="composer-resource-strip__scrollbar"
+      container-class="composer-resource-strip__scrollport"
+      content-style="width: max-content"
+      trigger="hover"
+      x-scrollable
     >
-      <NSpin v-if="resource.state === 'importing'" :size="20" />
-      <button
-        v-else-if="previewUrl"
-        class="composer-resource-strip__preview"
-        type="button"
-        :aria-label="t('desktop.imagePreview.open', { name: resource.name })"
-        @click.stop="openPreview(previewUrl)"
-      >
-        <img :src="previewUrl" :alt="resource.name" width="36" height="36" @error="markPreviewFailed(previewUrl)">
-      </button>
-      <FileIcon v-else :name="resource.name" size="medium" />
-      <span class="composer-resource-strip__details">
-        <span>{{ imageLabel ?? resource.name }}</span>
-        <small v-if="resource.state !== 'ready'">
-          {{ t(resource.state === 'importing'
-            ? 'desktop.chat.importingAttachment'
-            : canRetry
-              ? 'desktop.chat.failedAttachment'
-              : 'desktop.chat.attachmentSourceUnavailable') }}
-        </small>
-      </span>
-      <NButton v-if="resource.state === 'failed' && canRetry" text :disabled="disabled" size="tiny" @click.stop="emit('retry', resource.resourceId)">
-        {{ t('desktop.chat.retryAttachment') }}
-      </NButton>
-      <NButton
-        class="buddy-icon-button"
-        quaternary
-        size="tiny"
-        :disabled="disabled"
-        :aria-label="t('desktop.chat.removeAttachment')"
-        @click.stop="emit('remove', resource.resourceId)"
-      >
-        <template #icon>
-          <DesktopIcon :component="Dismiss16Regular" />
-        </template>
-      </NButton>
-    </div>
+      <div ref="resourceTrack" class="composer-resource-strip">
+        <div
+          v-for="{ resource, canRetry, imageLabel, previewUrl } in cards"
+          :key="resource.resourceId"
+          class="composer-resource-strip__card"
+          :class="{ 'is-failed': resource.state === 'failed', 'is-highlighted': highlightedResourceId === resource.resourceId, 'is-previewable': previewUrl }"
+          :data-resource-card="resource.resourceId"
+          @click="previewUrl && openPreview(previewUrl)"
+        >
+          <NSpin v-if="resource.state === 'importing'" :size="20" />
+          <button
+            v-else-if="previewUrl"
+            class="composer-resource-strip__preview"
+            type="button"
+            :aria-label="t('desktop.imagePreview.open', { name: resource.name })"
+            @click.stop="openPreview(previewUrl)"
+          >
+            <img :src="previewUrl" :alt="resource.name" width="36" height="36" @error="markPreviewFailed(previewUrl)">
+          </button>
+          <FileIcon v-else :name="resource.name" size="medium" />
+          <span class="composer-resource-strip__details">
+            <span>{{ imageLabel ?? resource.name }}</span>
+            <small v-if="resource.state !== 'ready'">
+              {{ t(resource.state === 'importing'
+                ? 'desktop.chat.importingAttachment'
+                : canRetry
+                  ? 'desktop.chat.failedAttachment'
+                  : 'desktop.chat.attachmentSourceUnavailable') }}
+            </small>
+          </span>
+          <NButton v-if="resource.state === 'failed' && canRetry" text :disabled="disabled" size="tiny" @click.stop="emit('retry', resource.resourceId)">
+            {{ t('desktop.chat.retryAttachment') }}
+          </NButton>
+          <NButton
+            class="buddy-icon-button"
+            quaternary
+            size="tiny"
+            :disabled="disabled"
+            :aria-label="t('desktop.chat.removeAttachment')"
+            @click.stop="emit('remove', resource.resourceId)"
+          >
+            <template #icon>
+              <DesktopIcon :component="Dismiss16Regular" />
+            </template>
+          </NButton>
+        </div>
+      </div>
+    </NScrollbar>
   </div>
   <BuddyImagePreview v-model:show="previewVisible" v-model:current="previewIndex" :language="language" :sources="previewSources" />
 </template>
 
 <style scoped lang="scss">
+.composer-resource-strip__scroll {
+  min-width: 0;
+  margin-bottom: 0.5rem;
+}
+
+:deep(.composer-resource-strip__scrollbar) {
+  height: auto;
+}
+
+:deep(.composer-resource-strip__scrollport) {
+  overscroll-behavior-inline: contain;
+}
+
 .composer-resource-strip {
   display: flex;
   flex-wrap: nowrap;
   gap: 0.45rem;
-  margin-bottom: 0.5rem;
-  overflow-x: auto;
-  overscroll-behavior-inline: contain;
 
   &__card {
     display: flex;
