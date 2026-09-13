@@ -6,12 +6,13 @@ import { resolveInteractiveModelSelection } from '../resolveInteractiveModelSele
 describe('resolveInteractiveModelSelection', () => {
   it('keeps missing defaults, unavailable models, and unsupported service tiers distinct', async () => {
     await expect(resolveInteractiveModelSelection({
-      executionModels: { resolveAvailable: () => Promise.resolve(model()) },
+      executionModels: { getServiceTiers: () => [], resolveAvailable: () => Promise.resolve(model()) },
       getDefaultModel: () => Promise.resolve(null),
     }, null)).rejects.toMatchObject({ code: 'AUTHENTICATION_REQUIRED' })
 
     await expect(resolveInteractiveModelSelection({
       executionModels: {
+        getServiceTiers: () => [],
         resolveAvailable: () => Promise.reject(new ProviderUnavailableError()),
       },
       getDefaultModel: () => Promise.resolve(null),
@@ -23,7 +24,7 @@ describe('resolveInteractiveModelSelection', () => {
     })).rejects.toMatchObject({ code: 'PROVIDER_UNAVAILABLE' })
 
     await expect(resolveInteractiveModelSelection({
-      executionModels: { resolveAvailable: () => Promise.resolve(model()) },
+      executionModels: { getServiceTiers: () => [], resolveAvailable: () => Promise.resolve(model()) },
       getDefaultModel: () => Promise.resolve(null),
     }, {
       modelId: 'model-1',

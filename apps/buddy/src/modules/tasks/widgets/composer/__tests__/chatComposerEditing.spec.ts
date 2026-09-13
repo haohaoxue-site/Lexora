@@ -94,6 +94,13 @@ describe('chat composer editing', () => {
     const flow = await mountComposer({
       model: {
         available: true,
+        catalogMatch: 'not_applicable',
+        catalog: { source: null, selection: null, candidates: [] },
+        metadataKnown: true,
+        capabilityOverrides: null,
+        fileInputMimeTypes: [],
+        sourceCapabilities: { image: false, reasoningOptions: ['low'] },
+        api: 'openai-completions',
         capabilities: ['text'],
         contextWindow: 128_000,
         displayName: 'Fixture',

@@ -21,10 +21,13 @@ const provider = computed(() => providerSettings.providers.value.find(
 ) ?? null)
 const providerSummary = computed(() => {
   const value = provider.value
-  return value ? [value.id, value.description].filter(Boolean).join(' | ') : ''
+  return value ? [value.builtinProviderId ?? value.id, value.description].filter(Boolean).join(' | ') : ''
 })
+const authProviderName = computed(() => providerSettings.providers.value.find(
+  item => item.id === providerSettings.authChallenge.value?.providerId,
+)?.displayName ?? null)
 watch(
-  () => props.providerId,
+  [() => props.providerId, provider],
   async (_providerId, _previousProviderId, onCleanup) => {
     let active = true
     onCleanup(() => active = false)
@@ -79,10 +82,10 @@ const { authChallenge, language } = providerSettings
       v-model:show="showAddDialog"
       :provider-settings="providerSettings"
       :resume-provider-id="providerId"
-      @manage="showAddDialog = false"
     />
     <DesktopProviderAuthDialog
       :challenge="authChallenge"
+      :provider-name="authProviderName"
       :language="language"
       @cancel="providerSettings.cancelAuth"
       @submit="providerSettings.respondToAuth"

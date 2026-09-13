@@ -8,8 +8,9 @@ import {
   LockClosed20Regular,
   LockOpen20Regular,
   ShieldTask20Regular,
+  Warning20Regular,
 } from '@vicons/fluent'
-import { NButton, NModal, NPopover } from 'naive-ui'
+import { NButton, NModal, NPopover, NTooltip } from 'naive-ui'
 import { computed, shallowRef } from 'vue'
 import { useBuddyI18n } from '@/i18n/buddyI18n'
 import DesktopFullAccessConfirmationDialog from '@/modules/prompt-input/components/DesktopFullAccessConfirmationDialog.vue'
@@ -114,10 +115,11 @@ async function confirmSetup() {
     <template #trigger>
       <NButton
         class="desktop-permission-mode-selector__trigger"
-        :class="{ 'is-full-access': isFullAccess }"
+        :class="{ 'is-full-access': isFullAccess, 'has-warning': boundaryWarning }"
         quaternary
         size="small"
         :aria-label="t('desktop.chat.executionProfileOpen')"
+        :aria-description="boundaryWarning ? t(`desktop.chat.shellSandboxStatus.${sandboxStatus}`) : undefined"
         :aria-expanded="popoverOpen"
       >
         <template #icon>
@@ -126,9 +128,21 @@ async function confirmSetup() {
         <span class="desktop-permission-mode-selector__trigger-label">
           {{ t(selected.label) }}
         </span>
-        <small v-if="boundaryWarning" class="desktop-permission-mode-selector__warning">
-          {{ t(`desktop.chat.shellSandboxStatus.${sandboxStatus}`) }}
-        </small>
+        <NTooltip v-if="boundaryWarning" placement="top" :disabled="popoverOpen">
+          <template #trigger>
+            <span
+              class="desktop-permission-mode-selector__warning"
+              role="img"
+              :aria-label="t(`desktop.chat.shellSandboxStatus.${sandboxStatus}`)"
+            >
+              <DesktopIcon :component="Warning20Regular" :size="16" aria-hidden="true" />
+            </span>
+          </template>
+          <div class="desktop-permission-mode-selector__warning-tooltip">
+            <strong>{{ t(`desktop.chat.shellSandboxStatus.${sandboxStatus}`) }}</strong>
+            <span>{{ t(`desktop.chat.shellSandboxHint.${sandboxStatus}`) }}</span>
+          </div>
+        </NTooltip>
       </NButton>
     </template>
 
@@ -239,9 +253,21 @@ async function confirmSetup() {
 }
 
 .desktop-permission-mode-selector__warning {
+  display: inline-flex;
+  width: 1rem;
+  height: 1rem;
+  flex: none;
+  align-items: center;
+  justify-content: center;
   margin-left: 0.35rem;
   color: var(--buddy-status-warning-text);
-  font-size: 0.65rem;
+}
+
+.desktop-permission-mode-selector__warning-tooltip {
+  display: grid;
+  max-width: min(18rem, calc(100vw - 2rem));
+  gap: 0.25rem;
+  white-space: normal;
 }
 
 .desktop-permission-mode-selector__boundary {

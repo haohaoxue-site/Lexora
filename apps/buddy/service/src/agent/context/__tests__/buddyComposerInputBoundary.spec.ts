@@ -25,6 +25,7 @@ import {
 type Stream = ModelRuntime['streamSimple']
 
 interface InputPlan {
+  documents?: Array<{ attachmentId: string, mimeType: 'application/pdf' }>
   version: 1
   messageId: string
   text: string
@@ -46,6 +47,52 @@ afterEach(async () => {
 })
 
 describe('composer input at the Buddy session boundary', () => {
+  it.each(['openai', 'anthropic', 'openai-codex'] as const)('materializes native %s PDFs after payload hooks and restores refs without persisting bytes', async (provider) => {
+    const payloads: unknown[] = []
+    const capture: Stream = (model, context, options) => streamSimple(model, context, {
+      ...options,
+      apiKey: model.api === 'openai-codex-responses'
+        ? `offline.${Buffer.from(JSON.stringify({ 'https://api.openai.com/auth': { chatgpt_account_id: 'offline-pdf-account' } })).toString('base64url')}.signature`
+        : 'offline-test-only',
+      fetch: async () => { throw new Error('Unexpected offline transport') },
+      onPayload: async (value, requestModel) => {
+        payloads.push(await options?.onPayload?.(value, requestModel) ?? value)
+        throw new Error('OFFLINE_PAYLOAD_CAPTURED')
+      },
+    })
+    const fixture = await createFixture({ provider, stream: capture })
+    const bytes = Buffer.from('%PDF-1.7\nOffline PDF payload fixture\n%%EOF\n')
+    await writeFile(join(fixture.root, 'document-1.pdf'), bytes)
+    await fixture.send({
+      ...plan('pdf-message'),
+      images: [],
+      documents: [{ attachmentId: 'document-1', mimeType: 'application/pdf' }],
+      text: 'Read document-1.pdf',
+    })
+    const persisted = await readFile(fixture.piSessionFile, 'utf8')
+    expect(persisted).toContain('application/pdf')
+    expect(persisted).not.toContain(bytes.toString('base64'))
+    expect(persisted).not.toContain('buddy-pdf:')
+    expect(persisted).not.toContain('Native attachments in this request:')
+    await fixture.shutdown('quit')
+    const restored = await createFixture({ root: fixture.root, piSessionFile: fixture.piSessionFile, provider, stream: capture })
+    await restored.send({ ...plan('pdf-followup'), images: [], text: 'Summarize the same PDF again.' })
+    expect(payloads).toHaveLength(2)
+    for (const payload of payloads) {
+      const serialized = JSON.stringify(payload)
+      expect(serialized).toContain(bytes.toString('base64'))
+      expect(serialized).toContain(provider === 'anthropic' ? 'document' : 'input_file')
+      expect(serialized).not.toContain('buddy-pdf:')
+      expect(serialized).toContain('native PDF content')
+      expect(payload).toMatchObject({ metadata: { offline_probe: 'preserved' } })
+    }
+    await rm(join(fixture.root, 'document-1.pdf'))
+    await restored.send({ ...plan('pdf-missing'), images: [], text: 'Retry with a missing PDF.' })
+    expect(payloads).toHaveLength(2)
+    expect(restored.session.messages.at(-1)).toMatchObject({ errorMessage: 'RESOURCE_MATERIALIZATION_FAILED', stopReason: 'error' })
+    await expectSafePersistence(restored)
+  })
+
   it('retains current run preparation for plain, image, and following messages', async () => {
     const fixture = await createFixture()
     await fixture.send({ ...plan('plain'), text: '普通正文', images: [] })
@@ -53,6 +100,9 @@ describe('composer input at the Buddy session boundary', () => {
     await fixture.send({ ...plan('follow'), text: '下一轮正文', images: [] })
 
     expect(fixture.lifecycle.filter(event => event === 'input')).toHaveLength(3)
+    expect(fixture.contexts[0]?.systemPrompt).not.toContain('Native attachments in this request:')
+    expect(fixture.contexts[1]?.systemPrompt).toContain('native image content')
+    expect(fixture.contexts[2]?.systemPrompt).toContain('native image content')
     for (const [index, id] of ['plain', 'message-1', 'follow'].entries()) {
       expect(fixture.contexts[index]?.systemPrompt).toContain(OUTPUT_GUIDELINE)
       expect(fixture.contexts[index]?.systemPrompt).toContain(`Current offline run: run-${id}`)
@@ -349,24 +399,34 @@ describe('composer input at the Buddy session boundary', () => {
 async function createFixture(options: {
   root?: string
   piSessionFile?: string
-  provider?: 'openai' | 'anthropic'
+  provider?: 'openai' | 'anthropic' | 'openai-codex'
   contextWindow?: number
   stream?: Stream
 } = {}) {
   const root = options.root ?? await mkdtemp(join(tmpdir(), 'buddy-composer-s0-'))
   if (!options.root)
     directories.push(root)
+  const credentials = new InMemoryCredentialStore()
+  if (options.provider === 'openai-codex') {
+    await credentials.modify('openai-codex', async () => ({
+      type: 'oauth',
+      access: 'offline-test-only',
+      refresh: 'offline-refresh-only',
+      expires: Date.now() + 60_000,
+    }))
+  }
   const modelRuntime = await ModelRuntime.create({
-    credentials: new InMemoryCredentialStore(),
+    credentials,
     modelsPath: null,
     refreshOnCreate: false,
   })
   const provider = options.provider ?? 'openai'
-  await modelRuntime.setRuntimeApiKey(provider, 'offline-test-only')
-  const catalogModel = modelRuntime.getModel(provider, provider === 'openai' ? 'gpt-4o-mini' : 'claude-sonnet-4-5')
+  if (provider !== 'openai-codex')
+    await modelRuntime.setRuntimeApiKey(provider, 'offline-test-only')
+  const catalogModel = modelRuntime.getModel(provider, provider === 'openai' ? 'gpt-4o-mini' : provider === 'openai-codex' ? 'gpt-5.5' : 'claude-sonnet-4-5')
   if (!catalogModel)
     throw new Error('Missing installed model fixture')
-  const model = { ...catalogModel, contextWindow: options.contextWindow ?? catalogModel.contextWindow }
+  const model = { ...catalogModel, pdfInput: true, contextWindow: options.contextWindow ?? catalogModel.contextWindow }
   const runContext: BuddyExtensionRunContextStore = { current: null }
   const images = new Map([
     ['snapshot-red', png([255, 0, 0, 255])],
@@ -464,6 +524,11 @@ async function createFixture(options: {
   const reusable = createReusableBuddySession({
     assertModelAccess: async () => model,
     inputReferences,
+    materializeDocuments: async input => Promise.all((input.documents ?? []).map(async reference => ({
+      data: (await readFile(join(root, `${reference.attachmentId}.pdf`))).toString('base64'),
+      name: `${reference.attachmentId}.pdf`,
+      mimeType: reference.mimeType,
+    }))),
     materializeInput: async (input) => {
       const content: UserMessage['content'] = [{ type: 'text', text: input.prompt }]
       for (const reference of input.images) {
@@ -530,6 +595,7 @@ function isReferenceMessage(message: AgentSession['messages'][number]): message 
 
 function toBuddyInputReference(input: InputPlan) {
   return createBuddyInputReference({
+    ...(input.documents?.length ? { documents: input.documents } : {}),
     images: input.images.map(image => ({
       attachmentId: image.snapshotId,
       mimeType: image.mimeType,

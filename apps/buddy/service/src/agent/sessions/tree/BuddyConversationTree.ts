@@ -55,13 +55,13 @@ export class BuddyConversationTree {
     return manager
   }
 
-  async snapshot(conversationId: string, branchId: string, cwd: string, sourceRunId?: string): Promise<SessionManager | null> {
+  async snapshot(conversationId: string, branchId: string, cwd: string, sourceRunId?: string, position: 'before' | 'after' = 'after'): Promise<SessionManager | null> {
     const journal = await this.#store.read(conversationId, cwd)
     if (!journal)
       return null
     const checkpoint = journal.manager.getEntries().findLast((entry) => {
       const checkpoint = readCheckpoint(entry)
-      return checkpoint?.branchId === branchId && checkpoint.position === 'after'
+      return checkpoint?.branchId === branchId && checkpoint.position === position
         && (!sourceRunId || checkpoint.runId === sourceRunId)
     })
     if (!checkpoint)

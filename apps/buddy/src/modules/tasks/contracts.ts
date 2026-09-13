@@ -160,6 +160,7 @@ export interface TaskStatus {
   runtimeState: State<LocalBuddyServiceSupervisorState>
   visibleChatBlocker: State<ChatBlocker | null>
   dismissChatBlocker: () => void
+  dismissError: () => void
   restartRuntime: () => Promise<boolean>
 }
 

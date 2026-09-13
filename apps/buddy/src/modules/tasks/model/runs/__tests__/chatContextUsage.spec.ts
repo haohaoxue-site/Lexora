@@ -155,6 +155,13 @@ describe('createChatContextUsage', () => {
 function runtimeModel(): LocalRuntimeModelOption {
   return {
     available: true,
+    catalogMatch: 'not_applicable',
+    catalog: { source: null, selection: null, candidates: [] },
+    metadataKnown: true,
+    capabilityOverrides: null,
+    fileInputMimeTypes: [],
+    sourceCapabilities: { image: false, reasoningOptions: ['off'] },
+    api: 'openai-completions',
     capabilities: ['text'],
     contextWindow: 200_000,
     displayName: 'Model A',

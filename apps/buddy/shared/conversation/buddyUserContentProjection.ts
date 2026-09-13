@@ -2,7 +2,7 @@ import type { BuddyPromptDirective, BuddyUserContentV1 } from './buddyUserConten
 import { getBuddyUserContentResourceIds } from './buddyUserContent'
 
 export type BuddyProjectionResource
-  = | { kind: 'image', name: string }
+  = | { kind: 'image' | 'pdf' | 'audio' | 'video', name: string }
     | { kind: 'text', name: string, text: string }
 
 export interface BuddyProjectedResource {
@@ -32,6 +32,8 @@ export function projectBuddyUserContent(
       : `[FILE#${++fileOrdinal}]`
     if (resource.kind === 'text')
       appendices.push(`${marker} ${escapeLiteralMarkers(resource.name)}\n${escapeLiteralMarkers(resource.text)}`)
+    if (resource.kind === 'pdf' || resource.kind === 'audio' || resource.kind === 'video')
+      appendices.push(`${marker} ${escapeLiteralMarkers(resource.name)} (${resource.kind.toUpperCase()})`)
     return { kind: resource.kind, marker, resourceId }
   })
   const markers = new Map(resources.map(resource => [resource.resourceId, resource.marker]))

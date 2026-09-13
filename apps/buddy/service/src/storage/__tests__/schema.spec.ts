@@ -6,6 +6,7 @@ import { DatabaseSync as NodeDatabaseSync } from 'node:sqlite'
 import { afterEach, describe, expect, it } from 'vitest'
 
 import { openBuddyDatabase } from '../database'
+import { BUDDY_V15_CAPABILITY_OVERRIDES_SCHEMA_SQL, BUDDY_V15_CATALOG_MODEL_ID_SCHEMA_SQL, BUDDY_V15_CATALOG_SELECTION_SCHEMA_SQL, BUDDY_V15_MODEL_SERVICES_SCHEMA_SQL, BUDDY_V15_PROVIDER_INSTANCES_SCHEMA_SQL, BUDDY_V15_REQUEST_HEADERS_SCHEMA_SQL } from '../migrations/v15ModelServices'
 import { BUDDY_SCHEMA_MIGRATIONS, BUDDY_SCHEMA_VERSION } from '../schema'
 import { createUsageRepository } from '../usageRepository'
 
@@ -74,6 +75,54 @@ function seedRun(
 }
 
 describe('buddy schema', () => {
+  it.each([14, 15])('preserves existing services and model references when completing model services from v%s', (version) => {
+    const directory = mkdtempSync(join(tmpdir(), 'lexora-buddy-provider-instances-'))
+    directories.push(directory)
+    const databasePath = join(directory, 'buddy.sqlite3')
+    const legacy = new NodeDatabaseSync(databasePath)
+    for (const migration of BUDDY_SCHEMA_MIGRATIONS.filter(migration => migration.version <= 14))
+      legacy.exec(migration.sql)
+    if (version === 15) {
+      legacy.exec(BUDDY_V15_MODEL_SERVICES_SCHEMA_SQL
+        .replace(BUDDY_V15_PROVIDER_INSTANCES_SCHEMA_SQL, '')
+        .replace(BUDDY_V15_CATALOG_MODEL_ID_SCHEMA_SQL, '')
+        .replace(BUDDY_V15_CATALOG_SELECTION_SCHEMA_SQL, '')
+        .replace(BUDDY_V15_REQUEST_HEADERS_SCHEMA_SQL, '')
+        .replace(BUDDY_V15_CAPABILITY_OVERRIDES_SCHEMA_SQL, ''))
+    }
+    legacy.exec(`PRAGMA user_version = ${version}`)
+    seedRun(legacy)
+    const now = '2026-09-12T00:00:00.000Z'
+    legacy.prepare('INSERT INTO provider_states VALUES (?, ?, ?, ?)').run('anthropic', 1, now, now)
+    legacy.prepare('INSERT INTO provider_states VALUES (?, ?, ?, ?)').run('proxy', 1, now, now)
+    legacy.prepare(`INSERT INTO provider_configs (id, display_name, api, base_url, models_json, credential_ref, enabled, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`).run('proxy', 'Proxy', 'openai-completions', 'https://models.example.test/v1', '[]', 'proxy', 1, now, now)
+    const states = legacy.prepare('SELECT * FROM provider_states ORDER BY provider_id').all()
+    const configs = legacy.prepare('SELECT * FROM provider_configs').all()
+    const runs = legacy.prepare('SELECT * FROM runs').all()
+    legacy.close()
+
+    const upgraded = openBuddyDatabase({ databasePath })
+    expect(upgraded.prepare('SELECT * FROM provider_states ORDER BY provider_id').all()).toEqual(states.map(state => ({ ...state, request_headers_json: '[]' })))
+    expect(upgraded.prepare('SELECT * FROM provider_configs').all()).toEqual(configs)
+    expect(upgraded.prepare('SELECT * FROM runs').all()).toEqual(runs)
+    expect(upgraded.prepare('SELECT id, builtin_provider_id, display_name FROM builtin_provider_configs').all()).toEqual([
+      { id: 'anthropic', builtin_provider_id: 'anthropic', display_name: null },
+    ])
+    expect(upgraded.prepare('PRAGMA user_version').get()).toEqual({ user_version: 15 })
+    expect((upgraded.prepare('PRAGMA table_info(provider_model_states)').all() as Array<{ name: string }>).map(column => column.name))
+      .toEqual(expect.arrayContaining(['catalog_model_id', 'catalog_selection_json', 'capability_overrides_json']))
+    upgraded.prepare('UPDATE builtin_provider_configs SET display_name = ? WHERE id = ?').run('Personal', 'anthropic')
+    upgraded.prepare('UPDATE provider_states SET request_headers_json = ? WHERE provider_id = ?').run(`[{"name":"api-key","value":"\${apiKey}"}]`, 'anthropic')
+    upgraded.close()
+
+    const reopened = openBuddyDatabase({ databasePath })
+    databases.push(reopened)
+    expect(reopened.prepare('SELECT display_name FROM builtin_provider_configs').get()).toEqual({ display_name: 'Personal' })
+    expect(reopened.prepare('SELECT request_headers_json FROM provider_states WHERE provider_id = ?').get('anthropic')).toEqual({ request_headers_json: `[{"name":"api-key","value":"\${apiKey}"}]` })
+    expect(reopened.prepare('PRAGMA foreign_key_check').all()).toEqual([])
+  })
+
   it('migrates v10 spaces with default appearance without altering grants, tasks or memory', () => {
     const directory = mkdtempSync(join(tmpdir(), 'lexora-buddy-space-appearance-'))
     directories.push(directory)
@@ -186,6 +235,61 @@ describe('buddy schema', () => {
     expect(() => database.prepare(`
       UPDATE runs SET context_window = ?, max_tokens = ? WHERE id = 'run-1'
     `).run(200_000, null)).toThrow(/valid pair/)
+  })
+
+  it('adds model catalog metadata without changing existing model state', () => {
+    const directory = mkdtempSync(join(tmpdir(), 'lexora-buddy-model-catalog-'))
+    directories.push(directory)
+    const databasePath = join(directory, 'buddy.sqlite3')
+    const legacy = new NodeDatabaseSync(databasePath)
+    for (const migration of BUDDY_SCHEMA_MIGRATIONS.filter(({ version }) => version <= 14)) {
+      legacy.exec(migration.sql)
+      legacy.exec(`PRAGMA user_version = ${migration.version}`)
+    }
+    legacy.exec(`
+      INSERT INTO provider_model_states (
+        provider_id, model_id, display_name, api, input_json, reasoning, cost_json,
+        context_window, max_tokens, override_context_window, override_max_tokens,
+        source_revision, acknowledged_source_revision, source, enabled, available,
+        last_seen_at, created_at, updated_at
+      ) VALUES (
+        'proxy', 'model-1', 'Model 1', 'openai-responses', '["text"]', 1,
+        '{"input":1,"output":2,"cacheRead":0,"cacheWrite":0}',
+        128000, 16384, 96000, 12000, 'source-v1', NULL, 'synced', 1, 1,
+        '2026-09-12T00:00:00.000Z', '2026-09-12T00:00:00.000Z',
+        '2026-09-12T00:00:00.000Z'
+      );
+    `)
+    legacy.close()
+
+    const migrated = openBuddyDatabase({ databasePath })
+    databases.push(migrated)
+    expect(migrated.prepare(`
+      SELECT provider_id, model_id, display_name, context_window, max_tokens,
+        override_context_window, override_max_tokens, source, enabled, available,
+        thinking_level_map_json, sampling_params_json, compat_json,
+        catalog_provider_id, source_fingerprint
+      FROM provider_model_states
+    `).get()).toEqual({
+      available: 1,
+      catalog_provider_id: null,
+      compat_json: null,
+      context_window: 128000,
+      display_name: 'Model 1',
+      enabled: 1,
+      max_tokens: 16384,
+      model_id: 'model-1',
+      override_context_window: 96000,
+      override_max_tokens: 12000,
+      provider_id: 'proxy',
+      sampling_params_json: null,
+      source: 'synced',
+      source_fingerprint: '',
+      thinking_level_map_json: null,
+    })
+    expect(migrated.prepare('PRAGMA user_version').get()).toEqual({
+      user_version: BUDDY_SCHEMA_VERSION,
+    })
   })
 
   it('rejects databases created by a newer Buddy version', () => {

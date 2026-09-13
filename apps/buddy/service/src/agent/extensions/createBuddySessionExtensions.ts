@@ -22,7 +22,7 @@ import { createToolPolicyExtension } from './toolPolicyExtension'
 
 export interface BuddySessionExtensionServices {
   approvalService: Pick<ApprovalService, 'request'>
-  attachmentService: Pick<AttachmentService, 'materializePiInputImages'>
+  attachmentService: Pick<AttachmentService, 'materializePiInputImages' | 'materializeDocumentInputs'>
   changeCaptureService: Pick<ChangeCaptureService, 'beginFileTool' | 'beginWorkspaceTool' | 'finalizeRun' | 'finishFileTool' | 'finishWorkspaceTool' | 'markPartial'>
   createCapabilities: BuddyCapabilityFactory
   directoryGrants: Pick<DirectoryGrantService, 'grant'>

@@ -121,6 +121,7 @@ async function createFixture() {
   const catalog = useModelProvidersStore({
     api: {
       getDefaultModel: async () => ({ modelId: 'model-1', providerId: 'provider', reasoning: 'medium' }),
+      listBuiltinPresets: async () => [],
       list: async () => [{
         activeRunCount: 0,
         added: true,
@@ -185,6 +186,13 @@ function modelSelection(modelId: string): BuddyComposerDraftModelSelection {
 function model(modelId: string): LocalRuntimeModelOption {
   return {
     available: true,
+    catalogMatch: 'not_applicable',
+    catalog: { source: null, selection: null, candidates: [] },
+    metadataKnown: true,
+    capabilityOverrides: null,
+    fileInputMimeTypes: [],
+    sourceCapabilities: { image: false, reasoningOptions: ['off', 'medium', 'high'] },
+    api: 'openai-completions',
     capabilities: ['text', 'reasoning'],
     contextWindow: 4096,
     displayName: modelId,

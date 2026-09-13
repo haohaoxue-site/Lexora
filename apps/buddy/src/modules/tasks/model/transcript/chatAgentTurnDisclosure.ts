@@ -16,6 +16,9 @@ export interface ChatAgentTurnFailurePresentation {
 const SPECIFIC_FAILURE_MESSAGE_KEYS: Readonly<Record<string, BuddyI18nKey>> = {
   AUTHENTICATION_REQUIRED: 'desktop.error.authenticationRequired',
   MODEL_NOT_SUPPORTED: 'desktop.chat.modelNotSupported',
+  MODEL_INPUT_UNSUPPORTED: 'desktop.chat.modelInputUnsupported',
+  MODEL_INPUT_TOO_LARGE: 'desktop.chat.modelInputTooLarge',
+  RESOURCE_MATERIALIZATION_FAILED: 'desktop.chat.attachmentMaterializationFailed',
   MODEL_REQUEST_TIMED_OUT: 'desktop.chat.modelRequestTimedOut',
   MODEL_SERVICE_UNAVAILABLE: 'desktop.chat.modelServiceUnavailable',
   MODEL_SERVICE_UNREACHABLE: 'desktop.chat.modelServiceUnreachable',
@@ -47,7 +50,7 @@ export function resolveChatAgentTurnFailurePresentation(
   const messageKey = errorCode ? SPECIFIC_FAILURE_MESSAGE_KEYS[errorCode] : undefined
   if (messageKey) {
     return {
-      detail,
+      detail: detail === errorCode ? null : detail,
       message: null,
       messageKey,
     }

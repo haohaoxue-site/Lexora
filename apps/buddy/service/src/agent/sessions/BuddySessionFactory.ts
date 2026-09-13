@@ -134,6 +134,10 @@ export class BuddySessionFactory {
         session: session.session,
         shutdown: reason => events.scope({ runId: undefined, operationId: undefined, parentOperationId: undefined }).operation('session.close', () => session.shutdown(reason)),
         inputReferences: extensions.inputReferences,
+        materializeDocuments: input => this.#options.services.attachmentService.materializeDocumentInputs(
+          input.documents ?? [],
+          blueprint.conversationId,
+        ),
         materializeInput: async input => [
           { text: input.prompt, type: 'text' as const },
           ...await this.#options.services.attachmentService.materializePiInputImages(

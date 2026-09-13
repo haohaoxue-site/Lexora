@@ -1,6 +1,10 @@
 import type zhCN from '../zh-CN/chat'
 
 export default {
+  'desktop.chat.attachmentImportFailed': 'Could not import the file. Retry or select the file again.',
+  'desktop.chat.attachmentUnsupported': 'This file format is not supported. Choose a supported document, image, audio, or video file.',
+  'desktop.chat.attachmentTooLarge': 'The file exceeds the size limit. Compress or split it and try again. Audio and video files are limited to 10 MiB.',
+  'desktop.chat.attachmentInvalid': 'The file cannot be read or its contents do not match its format. Check that the file is complete.',
   'desktop.chat.shellSandboxStatus.available': 'Shell isolation environment checked',
   'desktop.chat.shellSandboxStatus.unavailable': 'Shell isolation unavailable',
   'desktop.chat.shellSandboxStatus.needs_setup': 'Shell isolation needs setup',
@@ -357,6 +361,12 @@ export default {
   'desktop.chat.queueActionFailed': 'Queue action could not complete. Please try again.',
   'desktop.chat.send': 'Send message',
   'desktop.chat.modelImageUnsupported': 'The current model does not support image input',
+  'desktop.chat.modelPdfUnsupported': 'PDF attachments are not enabled for this model. Choose another model or configure its capabilities.',
+  'desktop.chat.modelAudioUnsupported': 'This model or API does not support this audio format. Choose another file or model.',
+  'desktop.chat.modelVideoUnsupported': 'This model or API does not support this video format. Choose another file or model.',
+  'desktop.chat.modelInputTooLarge': 'Attachments and conversation history exceed this API’s request size budget. Reduce attachments, edit an earlier message with attachments, or start a new conversation.',
+  'desktop.chat.modelInputUnsupported': 'This model does not support an attachment type in the conversation. Choose another model or update its capabilities.',
+  'desktop.chat.attachmentMaterializationFailed': 'A message attachment could not be loaded or sent. Check that it is available, or attach it again.',
   'desktop.chat.modelReasoningUnsupported': 'The current model does not support the saved reasoning level “{value}”. Please select another level.',
   'desktop.chat.modelServiceTierUnsupported': 'The current model does not support the saved service tier “{value}”. Please select another tier.',
   'desktop.chat.sessionStorageUnavailable': 'Buddy task storage could not be read. Check the local data directory permissions and try again.',

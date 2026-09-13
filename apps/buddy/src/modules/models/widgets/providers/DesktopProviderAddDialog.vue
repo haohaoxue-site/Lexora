@@ -1,34 +1,39 @@
 <script setup lang="ts">
 import type { ModelProvidersStore } from '@/modules/models/state/typing'
+import { providerRequestHeadersSchema } from '@buddy-shared/providers/providerHeaders'
 
 import { Add20Regular } from '@vicons/fluent'
-import { NAlert, NButton, NCard, NCollapse, NCollapseItem, NEmpty, NInput, NModal, NSelect, NSpace, NStep, NSteps, NSwitch, NTabPane, NTabs, NTooltip } from 'naive-ui'
-import { computed, toRef } from 'vue'
+import { NButton, NCard, NCollapse, NCollapseItem, NEmpty, NForm, NInput, NModal, NSpace, NStep, NSteps, NSwitch, NTabPane, NTabs, NTooltip } from 'naive-ui'
+import { computed, nextTick, shallowRef, toRef, useTemplateRef, watch } from 'vue'
 import { useBuddyI18n } from '@/i18n/buddyI18n'
-import { desktopProviderApiOptions } from '@/modules/models/model/desktopProviderApiOptions'
 import { useProviderSetupWizard } from '@/modules/models/state/useProviderSetupWizard'
 import DesktopManualModelDialog from '@/modules/models/widgets/providers/DesktopManualModelDialog.vue'
 import DesktopIcon from '@/shared/ui/icon/DesktopIcon.vue'
+import DesktopCustomProviderForm from './DesktopCustomProviderForm.vue'
+import DesktopProviderHeadersEditor from './DesktopProviderHeadersEditor.vue'
 
 const props = defineProps<{
   providerSettings: ModelProvidersStore
   resumeProviderId: string | null
 }>()
-const emit = defineEmits<{
-  manage: [providerId: string]
-}>()
 const show = defineModel<boolean>('show', { required: true })
 const language = computed(() => props.providerSettings.language.value)
 const { t } = useBuddyI18n(language)
 const {
+  addingBuiltin,
   addBuiltin,
+  builtinDisplayName,
+  builtinHeaders,
   canComplete,
-  canContinueCustom,
+  canLogin,
   closeDialog,
   continueFromModels,
   createCustom,
   customForm,
-  customIdEdited,
+  creatingCustom,
+  customIdConflict,
+  reservedCustomIds,
+  updateCustomForm,
   filteredProviders,
   furthestStep,
   goToPreviousStep,
@@ -41,19 +46,34 @@ const {
   saveManualModel,
   savingManualModel,
   selectedProvider,
-  selectedProviderId,
   showManualModelDialog,
   sourceTab,
   step,
   stepCount,
   toggleModel,
-  updateCustomName,
 } = useProviderSetupWizard({
-  onManage: providerId => emit('manage', providerId),
   providerSettings: () => props.providerSettings,
   resumeProviderId: toRef(props, 'resumeProviderId'),
   show,
 })
+const connectionForm = useTemplateRef('connectionForm')
+const expandedConnection = shallowRef<string[]>([])
+watch([show, step], () => {
+  expandedConnection.value = []
+})
+async function connect(authType: 'api_key' | 'oauth') {
+  try {
+    if (!selectedProvider.value?.custom && !providerRequestHeadersSchema.safeParse(builtinHeaders.requestHeaders).success) {
+      expandedConnection.value = ['advanced']
+      await nextTick()
+    }
+    await connectionForm.value?.validate()
+  }
+  catch {
+    return
+  }
+  await login(authType)
+}
 </script>
 
 <template>
@@ -91,10 +111,6 @@ const {
         class="desktop-provider-add-dialog__scroll"
         :class="{ 'is-model-step': step === 3 }"
       >
-        <NAlert v-if="providerSettings.modelProviderError.value" type="error" :show-icon="false">
-          {{ providerSettings.modelProviderError.value }}
-        </NAlert>
-
         <div v-if="step === 1" class="desktop-provider-add-dialog__body">
           <NTabs v-model:value="sourceTab" type="line" animated>
             <NTabPane name="builtin" :tab="t('desktop.providers.builtinTab')">
@@ -107,10 +123,10 @@ const {
                         <strong>{{ provider.displayName }}</strong>
                         <small>{{ provider.authTypes.map(type => type === 'api_key' ? 'API Key' : 'OAuth').join(' / ') }}</small>
                       </div>
-                      <NButton size="small" :type="provider.added ? 'default' : 'primary'" @click="addBuiltin(provider)">
-                        {{ provider.id === selectedProviderId && furthestStep > 1
+                      <NButton size="small" type="primary" :disabled="addingBuiltin" @click="addBuiltin(provider)">
+                        {{ provider.id === selectedProvider?.builtinProviderId && furthestStep > 1
                           ? t('desktop.providers.continue')
-                          : provider.added ? t('desktop.providers.manage') : t('desktop.providers.add') }}
+                          : t('desktop.providers.add') }}
                       </NButton>
                     </div>
                   </div>
@@ -119,72 +135,48 @@ const {
               </div>
             </NTabPane>
             <NTabPane name="custom" :tab="t('desktop.providers.customTab')">
-              <div class="desktop-provider-add-dialog__custom-form">
-                <label>
-                  <span>{{ t('desktop.providers.displayName') }}</span>
-                  <NInput
-                    :placeholder="t('desktop.providers.displayNamePlaceholder')"
-                    :value="customForm.displayName"
-                    @update:value="updateCustomName"
-                  />
-                </label>
-                <label>
-                  <span>{{ t('desktop.providers.apiType') }}</span>
-                  <NSelect
-                    v-model:value="customForm.api"
-                    menu-size="small"
-                    :options="desktopProviderApiOptions"
-                  />
-                </label>
-                <label class="is-wide">
-                  <span>{{ t('desktop.providers.customProviderDescription') }}</span>
-                  <NInput
-                    v-model:value="customForm.description"
-                    :maxlength="200"
-                    :placeholder="t('desktop.providers.customProviderDescriptionPlaceholder')"
-                  />
-                </label>
-                <label class="is-wide">
-                  <span>Base URL</span>
-                  <NInput v-model:value="customForm.baseUrl" />
-                </label>
-                <NCollapse class="is-wide" arrow-placement="right">
-                  <NCollapseItem :title="t('desktop.providers.advancedSettings')" name="advanced">
-                    <label>
-                      <span>{{ t('desktop.providers.identifier') }}</span>
-                      <NInput
-                        v-model:value="customForm.id"
-                        :disabled="selectedProvider?.custom === true"
-                        @update:value="customIdEdited = true"
-                      />
-                    </label>
-                  </NCollapseItem>
-                </NCollapse>
-                <div class="desktop-provider-add-dialog__actions is-wide">
-                  <NButton type="primary" :disabled="!canContinueCustom" @click="createCustom">
-                    {{ t('desktop.providers.continue') }}
-                  </NButton>
-                </div>
-              </div>
+              <DesktopCustomProviderForm
+                :value="customForm"
+                :language="language"
+                :reserved-ids="reservedCustomIds"
+                :conflict-id="customIdConflict"
+                :identifier-locked="selectedProvider?.custom === true"
+                :saving="creatingCustom"
+                @update:value="updateCustomForm"
+                @submit="createCustom"
+              />
             </NTabPane>
           </NTabs>
         </div>
 
         <div v-else-if="step === 2" class="desktop-provider-add-dialog__step">
           <h3>{{ t('desktop.providers.configureConnection') }}</h3>
-          <p>{{ selectedProvider?.displayName }}</p>
+          <label v-if="selectedProvider && !selectedProvider.custom" class="desktop-provider-add-dialog__service-name">
+            <span>{{ t('desktop.providers.displayName') }}</span>
+            <NInput v-model:value="builtinDisplayName" :maxlength="100" :placeholder="t('desktop.providers.displayNamePlaceholder')" />
+          </label>
+          <p v-else>
+            {{ selectedProvider?.displayName }}
+          </p>
           <NSpace>
             <NButton
               v-for="authType in selectedProvider?.authTypes ?? []"
               :key="authType"
               type="primary"
-              :disabled="providerSettings.isAuthenticating.value"
+              :disabled="!canLogin || providerSettings.isAuthenticating.value"
               :loading="providerSettings.isAuthenticating.value && !providerSettings.authChallenge.value"
-              @click="login(authType)"
+              @click="connect(authType)"
             >
               {{ authType === 'api_key' ? t('desktop.providers.configureApiKey') : t('desktop.providers.useOAuth') }}
             </NButton>
           </NSpace>
+          <NForm v-if="selectedProvider && !selectedProvider.custom" ref="connectionForm" :model="builtinHeaders" :disabled="providerSettings.isAuthenticating.value">
+            <NCollapse v-model:expanded-names="expandedConnection" arrow-placement="right">
+              <NCollapseItem :title="t('desktop.providers.advancedSettings')" name="advanced" display-directive="show">
+                <DesktopProviderHeadersEditor v-model:value="builtinHeaders.requestHeaders" :language="language" :disabled="providerSettings.isAuthenticating.value" />
+              </NCollapseItem>
+            </NCollapse>
+          </NForm>
         </div>
 
         <div v-else-if="step === 3" class="desktop-provider-add-dialog__step is-model-step">
@@ -273,6 +265,17 @@ const {
 </template>
 
 <style scoped>
+.desktop-provider-add-dialog__service-name {
+  display: grid;
+  gap: 0.35rem;
+  max-width: 28rem;
+}
+
+.desktop-provider-add-dialog__service-name > span {
+  color: var(--buddy-text-secondary);
+  font-size: 0.7rem;
+}
+
 .desktop-provider-add-dialog {
   width: min(64rem, calc(100vw - 2rem));
   max-height: min(46rem, calc(100dvh - 3rem));
@@ -411,36 +414,9 @@ const {
   gap: 0.15rem;
 }
 
-.desktop-provider-add-dialog__custom-form {
-  box-sizing: border-box;
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.9rem;
-  padding: 0.5rem 2px 2px;
-}
-
 .desktop-provider-add-dialog__catalog {
   box-sizing: border-box;
   padding: 2px;
-}
-
-.desktop-provider-add-dialog__custom-form label {
-  display: grid;
-  gap: 0.35rem;
-}
-
-.desktop-provider-add-dialog__custom-form :deep(.n-input),
-.desktop-provider-add-dialog__custom-form :deep(.n-base-selection) {
-  width: 100%;
-}
-
-.desktop-provider-add-dialog__custom-form label > span {
-  color: var(--buddy-text-secondary);
-  font-size: 0.7rem;
-}
-
-.desktop-provider-add-dialog__custom-form .is-wide {
-  grid-column: 1 / -1;
 }
 
 .desktop-provider-add-dialog__step h3,
@@ -453,15 +429,5 @@ const {
 .desktop-provider-add-dialog__actions {
   display: flex;
   justify-content: flex-end;
-}
-
-@media (max-width: 700px) {
-  .desktop-provider-add-dialog__custom-form {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .desktop-provider-add-dialog__custom-form .is-wide {
-    grid-column: auto;
-  }
 }
 </style>

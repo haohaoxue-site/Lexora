@@ -13,6 +13,7 @@ describe('useTaskModelSelection', () => {
     const api = {
       getDefaultModel: async () => ({ providerId: 'anthropic', modelId: 'model-1', reasoning: null }),
       list: async () => [provider('anthropic', true, 'available')],
+      listBuiltinPresets: async () => [],
       listModels: async () => [model('anthropic'), { ...model('anthropic'), modelId: 'model-2' }],
       onAuthChallenge: () => () => {},
       setDefaultModel: async (value: unknown) => value,
@@ -53,6 +54,7 @@ describe('useTaskModelSelection', () => {
     const api = {
       getDefaultModel: async () => ({ providerId: 'anthropic', modelId: 'model-1', reasoning: null }),
       list: async () => [provider('anthropic', true, 'available')],
+      listBuiltinPresets: async () => [],
       listModels: async () => [model('anthropic'), { ...model('anthropic'), modelId: 'model-2' }],
       onAuthChallenge: () => () => {},
       setDefaultModel: async (value: unknown) => value,
@@ -106,6 +108,7 @@ describe('useTaskModelSelection', () => {
             reasoning: 'high',
           }),
           list: async () => [provider('anthropic', true, 'available')],
+          listBuiltinPresets: async () => [],
           listModels: async () => models,
           onAuthChallenge: () => () => {},
           setDefaultModel,
@@ -175,10 +178,12 @@ function provider(
 ): LocalProvider {
   return {
     activeRunCount: 0,
+    requestHeaders: [],
     added: true,
     api: null,
     authTypes: ['api_key'],
     baseUrl: null,
+    builtinProviderId: id,
     canSyncModels: true,
     custom: false,
     description: null,
@@ -197,6 +202,13 @@ function provider(
 function model(providerId: string): LocalRuntimeModelOption {
   return {
     available: true,
+    catalogMatch: 'not_applicable',
+    catalog: { source: null, selection: null, candidates: [] },
+    metadataKnown: true,
+    capabilityOverrides: null,
+    fileInputMimeTypes: [],
+    sourceCapabilities: { image: false, reasoningOptions: ['off'] },
+    api: 'openai-completions',
     capabilities: ['text'],
     contextWindow: 4096,
     displayName: providerId,

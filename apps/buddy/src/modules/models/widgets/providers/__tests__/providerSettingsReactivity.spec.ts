@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import type { LocalCustomProviderModel, LocalProvider, LocalRuntimeModelOption } from '@buddy-shared/providers/providerApi'
+import type { LocalBuiltinProviderPreset, LocalCustomProviderModel, LocalProvider, LocalRuntimeModelOption } from '@buddy-shared/providers/providerApi'
 import type { BuddyLocale } from '@/i18n/buddyI18n'
 import type { ModelProvidersStore } from '@/modules/models/state/typing'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -18,6 +18,7 @@ describe('provider settings prop reactivity', () => {
   it.each(['settings', 'detail', 'wizard'] as const)('%s follows catalog refill, replacement props and locale changes', async (surface) => {
     const first = createStore('Alpha')
     first.providers.value = []
+    first.builtinPresets.value = []
     first.registeredModels.value = []
     const current = shallowRef<ModelProvidersStore>(first)
     const root = document.createElement('div')
@@ -39,6 +40,7 @@ describe('provider settings prop reactivity', () => {
     await nextTick()
     expect(document.body.textContent).not.toContain('Alpha')
     first.providers.value = [provider('Alpha')]
+    first.builtinPresets.value = [provider('Alpha')]
     first.registeredModels.value = [model('Alpha')]
     await nextTick()
     expect(document.body.textContent).toContain('Alpha')
@@ -53,6 +55,7 @@ describe('provider settings prop reactivity', () => {
     first.providers.value = [provider('Stale store')]
     first.registeredModels.value = [model('Stale store')]
     second.providers.value = [provider('Gamma')]
+    second.builtinPresets.value = [provider('Gamma')]
     second.registeredModels.value = [model('Gamma')]
     second.language.value = 'zh-CN'
     await nextTick()
@@ -123,12 +126,61 @@ describe('provider settings prop reactivity', () => {
 })
 
 describe('provider wizard ownership', () => {
+  it('creates another instance of an already added preset and resumes only its own setup', async () => {
+    const store = createStore('DeepSeek')
+    const show = shallowRef(true)
+    const scope = effectScope()
+    cleanups.push(() => scope.stop())
+    const wizard = scope.run(() => useProviderSetupWizard({ providerSettings: () => store, show, resumeProviderId: shallowRef(null) }))!
+    const preset = wizard.filteredProviders.value[0]!
+    await wizard.addBuiltin(preset)
+    const firstId = wizard.selectedProviderId.value
+    expect(firstId).not.toBe('service')
+    expect(store.providers.value).toHaveLength(2)
+    expect(wizard.step.value).toBe(2)
+    wizard.goToPreviousStep()
+    await wizard.addBuiltin(preset)
+    expect(wizard.selectedProviderId.value).toBe(firstId)
+    expect(store.providers.value).toHaveLength(2)
+    show.value = false
+    show.value = true
+    await wizard.addBuiltin(preset)
+    expect(store.providers.value).toHaveLength(3)
+    expect(wizard.selectedProviderId.value).not.toBe(firstId)
+    wizard.builtinDisplayName.value = 'DeepSeek Work'
+    await wizard.login('api_key')
+    expect(wizard.selectedProvider.value?.displayName).toBe('DeepSeek Work')
+    expect(store.providers.value[0]?.displayName).toBe('DeepSeek')
+  })
+
+  it('keeps example endpoints out of saved form values and validates custom connections', async () => {
+    const store = createStore('Alpha')
+    const show = shallowRef(true)
+    const scope = effectScope()
+    cleanups.push(() => scope.stop())
+    const wizard = scope.run(() => useProviderSetupWizard({ providerSettings: () => store, show, resumeProviderId: shallowRef(null) }))!
+    wizard.updateCustomName('Proxy')
+    expect(wizard.customForm.baseUrl).toBe('')
+    expect(wizard.canContinueCustom.value).toBe(false)
+    for (const url of ['   ', 'not-a-url', 'http://remote.example.test/v1']) {
+      wizard.customForm.baseUrl = url
+      expect(wizard.canContinueCustom.value).toBe(false)
+    }
+    for (const url of ['https://models.example.test/v1', 'http://127.0.0.1:8000/v1']) {
+      wizard.customForm.baseUrl = url
+      expect(wizard.canContinueCustom.value).toBe(true)
+    }
+    show.value = false
+    show.value = true
+    expect(wizard.customForm.baseUrl).toBe('')
+  })
+
   it('resumes after asynchronous catalog refill without overwriting later connection edits', () => {
     const store = createStore('Alpha')
     store.providers.value = []
     const scope = effectScope()
     cleanups.push(() => scope.stop())
-    const wizard = scope.run(() => useProviderSetupWizard({ providerSettings: () => store, show: shallowRef(true), resumeProviderId: shallowRef('service'), onManage: () => {} }))!
+    const wizard = scope.run(() => useProviderSetupWizard({ providerSettings: () => store, show: shallowRef(true), resumeProviderId: shallowRef('service') }))!
     expect(wizard.step.value).toBe(1)
     store.providers.value = [{ ...provider('Alpha'), custom: true, storedCredentialType: null }]
     expect(wizard.step.value).toBe(2)
@@ -149,7 +201,7 @@ describe('provider wizard ownership', () => {
     const show = shallowRef(true)
     const scope = effectScope()
     cleanups.push(() => scope.stop())
-    const wizard = scope.run(() => useProviderSetupWizard({ providerSettings: () => props.providerSettings, show, resumeProviderId: shallowRef('service'), onManage: () => {} }))!
+    const wizard = scope.run(() => useProviderSetupWizard({ providerSettings: () => props.providerSettings, show, resumeProviderId: shallowRef('service') }))!
     const oldLogin = wizard.login('api_key')
     props.providerSettings = second
     login.resolve(true)
@@ -186,10 +238,12 @@ function manualModel(): LocalCustomProviderModel {
 function provider(displayName: string): LocalProvider {
   return {
     activeRunCount: 0,
+    requestHeaders: [],
     added: true,
     api: null,
     authTypes: ['api_key'],
     baseUrl: null,
+    builtinProviderId: 'service',
     canSyncModels: true,
     custom: false,
     description: null,
@@ -208,6 +262,13 @@ function provider(displayName: string): LocalProvider {
 function model(displayName: string): LocalRuntimeModelOption {
   return {
     available: true,
+    catalogMatch: 'not_applicable',
+    catalog: { source: null, selection: null, candidates: [] },
+    metadataKnown: true,
+    capabilityOverrides: null,
+    fileInputMimeTypes: [],
+    sourceCapabilities: { image: false, reasoningOptions: ['off'] },
+    api: 'openai-completions',
     capabilities: ['text'],
     contextWindow: 4096,
     displayName,
@@ -233,31 +294,47 @@ function createStore(name: string, locale: BuddyLocale = 'zh-CN') {
   const registeredModels = shallowRef<ReadonlyArray<LocalRuntimeModelOption>>([model(name)])
   const succeed = async () => true
   return {
+    builtinPresets: shallowRef<ReadonlyArray<LocalBuiltinProviderPreset>>([provider(name)]),
     authChallenge: shallowRef(null),
     defaultEffort: shallowRef(null),
     defaultModelId: shallowRef(null),
     isAuthenticating: shallowRef(false),
     isLoadingModelCatalog: shallowRef(false),
+    isRefreshingModelSnapshot: shallowRef(false),
     language: shallowRef(locale),
     modelProviderError: shallowRef(null),
     models: registeredModels,
+    modelSnapshot: shallowRef(null),
     mutatingProviderId: shallowRef(null),
     providers,
     registeredModels,
     syncingProviderId: shallowRef(null),
     acknowledgeModelSourceUpdate: succeed,
-    addProvider: succeed,
+    addProvider: async (builtinProviderId: string) => {
+      const instance = { ...provider(name), builtinProviderId, id: `instance-${providers.value.length}`, storedCredentialType: null }
+      providers.value = [...providers.value, instance]
+      return instance
+    },
+    renameProvider: async (id: string, displayName: string) => {
+      providers.value = providers.value.map(item => item.id === id ? { ...item, displayName } : item)
+      return true
+    },
     cancelAuth: async () => {},
     clearModelProviderError: () => {},
     clearProviderCredential: succeed,
+    createCustomProvider: async () => null,
     dispose: () => {},
     loadModelCatalog: succeed,
     loginProvider: succeed,
     logoutProvider: succeed,
+    openModelSnapshotDirectory: succeed,
     rememberModelSelection: succeed,
     removeProvider: succeed,
+    refreshModelSnapshot: succeed,
     respondToAuth: succeed,
     restoreModelSourceParameters: succeed,
+    setModelCatalogSource: succeed,
+    setModelCapabilities: succeed,
     setDefaultEffort: succeed,
     setDefaultModel: succeed,
     setProviderEnabled: succeed,

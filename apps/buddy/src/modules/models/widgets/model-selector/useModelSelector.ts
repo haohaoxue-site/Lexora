@@ -4,7 +4,7 @@ import type { ShallowRef } from 'vue'
 import type { ReasoningSelectorOption } from './typing'
 import { BUDDY_FAST_SERVICE_TIER } from '@buddy-shared/conversation/modelSelection'
 import { useEventListener } from '@vueuse/core'
-import { computed, shallowRef } from 'vue'
+import { computed, shallowRef, watch } from 'vue'
 import { resolveConcreteEffort } from '../../model/modelSelection'
 
 type EffortTransitionDirection = 'decreasing' | 'increasing'
@@ -49,7 +49,9 @@ export function useModelSelector(props: ModelSelectorInput, root: Readonly<Shall
   const isEffortUnavailable = computed(() => props.selectedEffort !== null
     && !props.selectedModel?.reasoningOptions.includes(props.selectedEffort))
   const selectedEffortValue = computed<BuddyThinkingLevel | null>(() => {
-    return props.selectedEffort ?? (props.selectedModel ? resolveConcreteEffort(props.selectedModel, null) : null)
+    if (!props.selectedModel)
+      return null
+    return props.selectedEffort ?? resolveConcreteEffort(props.selectedModel, null)
   })
   const displayedEffort = computed(() => previewEffort.value ?? selectedEffortValue.value)
   const selectedEffortLabel = computed(() => selectedEffortValue.value
@@ -66,13 +68,23 @@ export function useModelSelector(props: ModelSelectorInput, root: Readonly<Shall
 
   useEventListener(document, 'pointerdown', handleDocumentPointerDown)
   useEventListener(document, 'keydown', handleDocumentKeydown)
+  watch(canOpen, (available) => {
+    if (!available)
+      close()
+  })
+  watch(() => props.selectedModel, (model) => {
+    if (!model && isOpen.value) {
+      activePanel.value = 'advanced'
+      secondaryPanel.value = 'model'
+    }
+  })
 
   function toggle() {
     if (!canOpen.value)
       return
     isOpen.value = !isOpen.value
-    activePanel.value = 'main'
-    secondaryPanel.value = null
+    activePanel.value = props.selectedModel ? 'main' : 'advanced'
+    secondaryPanel.value = props.selectedModel ? null : 'model'
   }
 
   function close() {

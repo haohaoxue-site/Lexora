@@ -6,6 +6,7 @@ import type { BuddyLocale } from '@/i18n/buddyI18n'
 import { NAlert, NButton, NInputNumber } from 'naive-ui'
 import { computed, reactive, shallowRef, watch } from 'vue'
 import { useBuddyI18n } from '@/i18n/buddyI18n'
+import DesktopModelSectionHeader from './DesktopModelSectionHeader.vue'
 
 const props = defineProps<{
   actions: ModelParameterActions
@@ -23,9 +24,11 @@ const valid = computed(() => (
   && form.maxTokens <= form.contextWindow
 ))
 const defaultParametersLabel = computed(() => t(
-  props.model.source === 'builtin'
-    ? 'desktop.providers.catalogDefaultParameters'
-    : 'desktop.providers.serviceDefaultParameters',
+  !props.model.metadataKnown
+    ? 'desktop.providers.unconfirmedParameters'
+    : props.model.source === 'builtin'
+      ? 'desktop.providers.catalogDefaultParameters'
+      : 'desktop.providers.serviceDefaultParameters',
 ))
 
 watch([
@@ -61,10 +64,10 @@ async function save() {
     const input: LocalCustomProviderModel = {
       contextWindow: form.contextWindow,
       id: props.model.modelId,
-      input: props.model.capabilities.includes('image') ? ['text', 'image'] : ['text'],
+      input: props.model.sourceCapabilities.image ? ['text', 'image'] : ['text'],
       maxTokens: form.maxTokens,
       name: props.model.displayName,
-      reasoning: props.model.capabilities.includes('reasoning'),
+      reasoning: props.model.sourceCapabilities.reasoningOptions.some(level => level !== 'off'),
     }
     succeeded = await props.actions.saveManualModel(input)
   }
@@ -90,17 +93,16 @@ async function keepCustomParameters() {
 
 <template>
   <section class="desktop-model-parameters-panel">
-    <header class="desktop-model-parameters-panel__header">
-      <div>
-        <h3>{{ t('desktop.providers.modelParameters') }}</h3>
-        <p>{{ t('desktop.providers.modelParametersDescription') }}</p>
-      </div>
-      <NButton v-if="!editing" quaternary size="small" @click="startEditing">
-        {{ model.source === 'manual' || model.hasParameterOverride
-          ? t('common.edit')
-          : t('desktop.providers.customizeParameters') }}
-      </NButton>
-    </header>
+    <DesktopModelSectionHeader
+      :label="t('desktop.providers.modelParameters')"
+      :language="language"
+      :editing="editing"
+      :saving="saving"
+      :valid="valid"
+      @edit="startEditing"
+      @cancel="editing = false"
+      @save="save"
+    />
 
     <NAlert
       v-if="model.sourceParametersUpdated && !editing"
@@ -127,20 +129,12 @@ async function keepCustomParameters() {
     <div v-if="editing" class="desktop-model-parameters-panel__form">
       <label>
         <span>{{ t('desktop.providers.contextWindow') }}</span>
-        <NInputNumber v-model:value="form.contextWindow" :min="1" :precision="0" />
+        <NInputNumber v-model:value="form.contextWindow" :min="1" :precision="0" :disabled="saving" />
       </label>
       <label>
         <span>{{ t('desktop.providers.maxTokens') }}</span>
-        <NInputNumber v-model:value="form.maxTokens" :min="1" :precision="0" />
+        <NInputNumber v-model:value="form.maxTokens" :min="1" :precision="0" :disabled="saving" />
       </label>
-      <div class="desktop-model-parameters-panel__form-actions">
-        <NButton size="small" @click="editing = false">
-          {{ t('common.cancel') }}
-        </NButton>
-        <NButton size="small" type="primary" :disabled="!valid" :loading="saving" @click="save">
-          {{ t('common.save') }}
-        </NButton>
-      </div>
     </div>
 
     <dl v-else class="desktop-model-parameters-panel__metrics">
@@ -182,7 +176,6 @@ async function keepCustomParameters() {
   background: var(--buddy-surface-base);
 }
 
-.desktop-model-parameters-panel__header,
 .desktop-model-parameters-panel__defaults,
 .desktop-model-parameters-panel__notice-content {
   display: flex;
@@ -191,11 +184,6 @@ async function keepCustomParameters() {
   gap: 1rem;
 }
 
-.desktop-model-parameters-panel__header {
-  padding: 0.9rem 1rem;
-}
-
-.desktop-model-parameters-panel__header > div,
 .desktop-model-parameters-panel__defaults > div,
 .desktop-model-parameters-panel__notice-content > div:first-child {
   display: grid;
@@ -203,18 +191,11 @@ async function keepCustomParameters() {
   gap: 0.18rem;
 }
 
-.desktop-model-parameters-panel__header h3,
-.desktop-model-parameters-panel__header p {
-  margin: 0;
-}
-
-.desktop-model-parameters-panel__header h3,
 .desktop-model-parameters-panel__defaults strong,
 .desktop-model-parameters-panel__notice-content strong {
   font-size: 0.76rem;
 }
 
-.desktop-model-parameters-panel__header p,
 .desktop-model-parameters-panel__defaults span,
 .desktop-model-parameters-panel__notice-content span {
   color: var(--buddy-text-secondary);
@@ -276,15 +257,6 @@ async function keepCustomParameters() {
   width: 100%;
 }
 
-.desktop-model-parameters-panel__form-actions {
-  display: flex;
-  grid-column: 1 / -1;
-  justify-content: flex-end;
-  gap: 0.5rem;
-  border-top: 1px solid var(--buddy-border-subtle);
-  padding: 0.7rem 1rem;
-}
-
 .desktop-model-parameters-panel__defaults {
   border-top: 1px solid var(--buddy-border-subtle);
   background: var(--buddy-surface-subtle);
@@ -292,7 +264,6 @@ async function keepCustomParameters() {
 }
 
 @media (max-width: 620px) {
-  .desktop-model-parameters-panel__header,
   .desktop-model-parameters-panel__defaults,
   .desktop-model-parameters-panel__notice-content {
     align-items: stretch;

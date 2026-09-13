@@ -14,7 +14,7 @@ export const buddyComposerResourceMetadataSchema = z.object({
 
 const resourceBaseSchema = buddyComposerResourceMetadataSchema.extend({
   draftId: buddyResourceIdSchema,
-  kind: z.enum(['image', 'text']),
+  kind: z.enum(['image', 'pdf', 'audio', 'video', 'text']),
 })
 
 export const buddySpaceFileSourceSchema = z.object({

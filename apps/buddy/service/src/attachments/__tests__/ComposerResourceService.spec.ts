@@ -1,4 +1,6 @@
 import type { DatabaseSync } from 'node:sqlite'
+import type { BuddyComposerDraftScope } from '../../../../shared/conversation/composerDraft'
+import type { InputModel } from '../../providers/modelCapabilities'
 import { Buffer } from 'node:buffer'
 import { mkdir, mkdtemp, readdir, readFile, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -6,27 +8,53 @@ import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { BUDDY_ATTACHMENT_COUNT_LIMIT } from '../../../../shared/conversation/attachmentPolicy'
 import { createBuddyUserContent } from '../../../../shared/conversation/buddyUserContent'
+import { BuddySessionRecoveryService } from '../../agent/sessions/recovery/BuddySessionRecoveryService'
+import { BuddyConversationTree } from '../../agent/sessions/tree/BuddyConversationTree'
 import { ArtifactService } from '../../artifacts/ArtifactService'
+import { ChatInputValidationService } from '../../chat/ChatInputValidationService'
+import { ChatQueueService } from '../../chat/ChatQueueService'
 import { ChatTurnService } from '../../chat/ChatTurnService'
 import { SpaceService } from '../../spaces/SpaceService'
 import { createArtifactRepository } from '../../storage/artifactRepository'
 import { createAttachmentRepository } from '../../storage/attachmentRepository'
 import { BuddyDataPaths } from '../../storage/BuddyDataPaths'
+import { createChatQueueRepository } from '../../storage/chatQueueRepository'
 import { createComposerDraftRepository } from '../../storage/composerDraftRepository'
 import { createComposerResourceRepository } from '../../storage/composerResourceRepository'
 import { createConversationDirectoryGrantRepository } from '../../storage/conversationDirectoryGrantRepository'
 import { createConversationRepository } from '../../storage/conversationRepository'
+import { createConversationTreeRepository } from '../../storage/conversationTreeRepository'
 import { openBuddyDatabase } from '../../storage/database'
 import { createRunInputRepository } from '../../storage/runInputRepository'
 import { createRunRepository } from '../../storage/runRepository'
 import { createSpaceRepository } from '../../storage/spaceRepository'
 import { createTurnRequestRepository } from '../../storage/turnRequestRepository'
+import { createUsageRepository } from '../../storage/usageRepository'
 import { normalizeComposerWorkspace } from '../../workspace/normalizeComposerWorkspace'
-import { AttachmentService } from '../AttachmentService'
+import { AttachmentService, normalizeAttachmentMetadata } from '../AttachmentService'
 import { ComposerResourceService } from '../ComposerResourceService'
 
 const databases: DatabaseSync[] = []
 const directories: string[] = []
+
+describe('attachment validation errors', () => {
+  it.each([
+    [{ name: 'archive.zip', mimeType: 'application/zip', sizeBytes: 10 }, 'ATTACHMENT_UNSUPPORTED'],
+    [{ name: 'audio.m4a', mimeType: 'audio/x-m4a', sizeBytes: 10 * 1024 * 1024 + 1 }, 'ATTACHMENT_TOO_LARGE'],
+    [{ name: 'audio.m4a', mimeType: 'audio/x-m4a', sizeBytes: 0 }, 'ATTACHMENT_INVALID'],
+  ])('distinguishes rejected file metadata', (metadata, code) => {
+    expect(() => normalizeAttachmentMetadata(metadata)).toThrow(expect.objectContaining({ code }))
+  })
+
+  it('normalizes M4A from the extension and rejects mismatched bytes without publishing an attachment', async () => {
+    const { service, drafts, repository } = await setup()
+    drafts.open({ draftId: 'invalid-audio', initialContent: createBuddyUserContent(), initialExecutionConfig: { executionProfile: 'read_only', approvalPolicy: 'manual' }, initialModelSelection: null, now: '2026-09-12T00:00:00.000Z', scope: { kind: 'global' } })
+    const metadata = { resourceId: 'invalid-audio-resource', name: 'voice.m4a', mimeType: 'audio/x-m4a', sizeBytes: 4 }
+    expect(service.accept({ draftId: 'invalid-audio', resources: [metadata] })[0]).toMatchObject({ mimeType: 'audio/mp4', kind: 'audio' })
+    await expect(service.complete({ draftId: 'invalid-audio', resourceId: metadata.resourceId, bytes: Uint8Array.of(0, 1, 2, 3) })).rejects.toMatchObject({ code: 'ATTACHMENT_INVALID' })
+    expect(repository.listForDraft('invalid-audio')[0]).not.toMatchObject({ state: 'ready' })
+  })
+})
 afterEach(async () => {
   databases.splice(0).forEach(database => database.close())
   await Promise.all(directories.splice(0).map(path => rm(path, { recursive: true, force: true })))
@@ -78,7 +106,160 @@ function imageBytes() {
   return Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAIAAAABCAYAAAD0In+KAAAAFElEQVR4AQEJAPb/AP8AAP8AAP//D/kD/aYucFEAAAAASUVORK5CYII=', 'base64')
 }
 
+describe('attachment submission validation', () => {
+  it.each([false, true])('keeps the queued snapshot when revalidation fails before dispatch or steering (active: %s)', async (active) => {
+    const fixture = await checkedTurns({ api: 'openai-completions' })
+    fixture.control.completeRuns = !active
+    const bytes = Buffer.alloc(8 * 1024 * 1024)
+    bytes.write('RIFF')
+    bytes.write('WAVE', 8)
+    const first = await fixture.draft('first', 'first.wav', bytes)
+    const started = await fixture.turns.start({ draftId: first.draftId, expectedRevision: first.revision, requestId: 'first' })
+    const second = await fixture.draft('second', 'second.wav', bytes, { kind: 'conversation_branch', conversationId: started.conversationId, branchId: started.branchId })
+    const repository = createChatQueueRepository(fixture.database)
+    const queue = new ChatQueueService({ queue: repository, turns: fixture.turns, runs: fixture.runs, requests: createTurnRequestRepository(fixture.database), launcher: fixture.launcher, runner: { steer: (_runId, prepare) => {
+      prepare()
+      return true
+    } } })
+    try {
+      const queued = await queue.enqueue({ draftId: second.draftId, expectedRevision: second.revision, requestId: 'queued' })
+      repository.pause(started.conversationId)
+      fixture.model.api = 'google-generative-ai'
+      await expect(queue.steer(queued)).rejects.toMatchObject({ code: 'MODEL_INPUT_TOO_LARGE' })
+      expect(repository.list(queued)).toMatchObject([{ id: queued.id, state: 'paused', attachments: [{ sizeBytes: bytes.length, mimeType: 'audio/wav' }] }])
+      expect(fixture.runs.listRecent()).toHaveLength(1)
+      expect(fixture.runs.findById(started.runId)?.status).toBe(active ? 'running' : 'completed')
+      expect(fixture.conversations.listBranchMessages(started.conversationId, started.branchId).filter(message => message.role === 'user')).toHaveLength(1)
+    }
+    finally {
+      queue.dispose()
+    }
+  })
+  it('rejects unsupported M4A before consuming the draft or publishing a message', async () => {
+    const fixture = await checkedTurns({ api: 'openai-completions' })
+    const bytes = Buffer.concat([Buffer.from([0, 0, 0, 20]), Buffer.from('ftypM4A '), Buffer.alloc(8)])
+    const draft = await fixture.draft('audio', 'voice.m4a', bytes)
+    await expect(fixture.turns.start({ draftId: draft.draftId, expectedRevision: draft.revision, requestId: 'unsupported' })).rejects.toMatchObject({ code: 'MODEL_INPUT_UNSUPPORTED' })
+    expect(fixture.drafts.findById(draft.draftId)).toEqual(draft)
+    expect(fixture.runs.listRecent()).toEqual([])
+    expect(fixture.service.list(draft.draftId)[0]?.state).toBe('ready')
+  })
+
+  it('retains an oversized second draft and permits a text-only continuation', async () => {
+    const fixture = await checkedTurns()
+    const bytes = Buffer.alloc(8 * 1024 * 1024)
+    bytes.write('RIFF')
+    bytes.write('WAVE', 8)
+    const first = await fixture.draft('first', 'first.wav', bytes)
+    const started = await fixture.turns.start({ draftId: first.draftId, expectedRevision: first.revision, requestId: 'first' })
+    const second = await fixture.draft('second', 'second.wav', bytes, { kind: 'conversation_branch', conversationId: started.conversationId, branchId: started.branchId })
+    await expect(fixture.turns.start({ draftId: second.draftId, expectedRevision: second.revision, requestId: 'second' })).rejects.toMatchObject({ code: 'MODEL_INPUT_TOO_LARGE' })
+    expect(fixture.drafts.findById(second.draftId)).toEqual(second)
+    expect(fixture.runs.listRecent()).toHaveLength(1)
+    const resource = fixture.service.list(second.draftId)[0]!
+    expect(resource.state).toBe('ready')
+    const plain = fixture.drafts.save({ ...second, expectedRevision: second.revision, content: createBuddyUserContent('Continue without another attachment'), now: new Date().toISOString() })
+    await expect(fixture.turns.start({ draftId: plain.draftId, expectedRevision: plain.revision, requestId: 'plain' })).resolves.toMatchObject({ conversationId: started.conversationId })
+    expect(fixture.runs.listRecent()).toHaveLength(2)
+    expect(fixture.conversations.listBranchMessages(started.conversationId, started.branchId).filter(message => message.role === 'user')).toHaveLength(2)
+  })
+})
+
+async function checkedTurns(overrides: Partial<InputModel> = {}) {
+  const fixture = await setup()
+  const { database, attachments, conversations, paths } = fixture
+  const runs = createRunRepository(database)
+  const runInputs = createRunInputRepository(database)
+  const model: InputModel = { api: 'google-generative-ai', provider: 'fixture', id: 'fixture', name: 'Fixture', baseUrl: 'https://example.test', contextWindow: 1_000_000, maxTokens: 8192, input: ['text'], audioInput: true, reasoning: false, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, ...overrides }
+  const models = { resolve: () => model, resolveAvailable: async () => model, getServiceTiers: () => [] }
+  const control = { completeRuns: true }
+  const launcher = { launch: async (runId: string) => {
+    if (!control.completeRuns) {
+      runs.markRunning(runId, new Date().toISOString())
+      return { runId, completion: new Promise<NonNullable<ReturnType<typeof runs.findById>>>(() => {}) }
+    }
+    runs.reconcileTerminal(runId, 'completed', new Date().toISOString(), null)
+    const run = runs.findById(runId)!
+    conversations.createMessage({ id: `answer-${runId}`, conversationId: run.conversationId, branchId: run.branchId, runId, role: 'assistant', content: { text: 'Accepted' }, createdAt: new Date().toISOString() })
+    return { runId, completion: Promise.resolve(run) }
+  } }
+  const recovery = new BuddySessionRecoveryService({ attachments, conversations, models, runs, runInputs, usage: createUsageRepository(database) })
+  const tree = new BuddyConversationTree({ conversationsDirectory: paths.conversationsDirectory, conversations, runs, recovery, repository: createConversationTreeRepository(database) })
+  const turns = new ChatTurnService({
+    inputValidation: new ChatInputValidationService({ attachments, models, paths, recovery, runInputs, runs, tree, sessions: { getReady: () => null } }),
+    attachments,
+    composerResources: fixture.service,
+    conversations,
+    drafts: fixture.drafts,
+    spaces: fixture.spaces,
+    runs,
+    runInputs,
+    conversationLifecycle: { isDeleting: () => false },
+    providers: { executionModels: models, getDefaultModel: async () => ({ modelId: model.id, providerId: model.provider, reasoning: null, serviceTier: null }) },
+    runner: { cancel: async () => false },
+    skills: { materializeForSpace: async () => [] },
+    turnRequests: createTurnRequestRepository(database),
+    turnLauncher: launcher,
+  })
+  return { ...fixture, turns, runs, model, control, launcher, async draft(id: string, name: string, bytes: Buffer, scope: BuddyComposerDraftScope = { kind: 'global' }) {
+    const content = { ...createBuddyUserContent('Inspect the file'), panelResourceIds: [id] }
+    const opened = fixture.drafts.open({ draftId: id, initialContent: content, initialExecutionConfig: { approvalPolicy: 'manual', executionProfile: 'read_only' }, initialModelSelection: null, scope, now: new Date().toISOString() })
+    const draft = fixture.drafts.save({ ...opened, content, expectedRevision: opened.revision, now: new Date().toISOString() })
+    fixture.service.accept({ draftId: draft.draftId, resources: [{ resourceId: id, name, mimeType: '', sizeBytes: bytes.length }] })
+    await fixture.service.complete({ draftId: draft.draftId, resourceId: id, bytes: Uint8Array.from(bytes) })
+    return draft
+  } }
+}
+
 describe('composer resource import', () => {
+  it.each([
+    { name: 'tone.wav', mimeType: 'audio/wav', kind: 'audio', bytes: Buffer.concat([Buffer.from('RIFF'), Buffer.alloc(4), Buffer.from('WAVE'), Buffer.alloc(32)]) },
+    { name: 'tone.mp3', mimeType: 'audio/mpeg', kind: 'audio', bytes: Buffer.from('ID3\0\0\0\0\0\0\0fixture') },
+    { name: 'voice.m4a', mimeType: 'audio/mp4', kind: 'audio', bytes: Buffer.concat([Buffer.from([0, 0, 0, 20]), Buffer.from('ftypM4A '), Buffer.alloc(8)]) },
+    { name: 'clip.mp4', mimeType: 'video/mp4', kind: 'video', bytes: Buffer.concat([Buffer.alloc(4), Buffer.from('ftypisomfixture')]) },
+    { name: 'clip.webm', mimeType: 'video/webm', kind: 'video', bytes: Buffer.from([0x1A, 0x45, 0xDF, 0xA3, 0, 0, 0, 0]) },
+  ])('keeps $name as binary media with a validated typed reference', async ({ name, mimeType, kind, bytes }) => {
+    const { service, attachments } = await setup()
+    expect(service.accept({ draftId: 'media-draft', resources: [{ resourceId: 'media', name, mimeType: '', sizeBytes: bytes.length }] })[0])
+      .toMatchObject({ kind, mimeType })
+    const resource = await service.complete({ draftId: 'media-draft', resourceId: 'media', bytes })
+    if (resource.state !== 'ready' || !('attachmentId' in resource))
+      throw new Error('Media import failed')
+    const prepared = await attachments.preparePrompt([resource.attachmentId], 'Inspect this media', null, 'media-draft')
+    expect(prepared.documentReferences).toEqual([{ attachmentId: resource.attachmentId, mimeType }])
+    expect(await attachments.materializeDocumentInputs(prepared.documentReferences, null, 'media-draft')).toEqual([{ mimeType, name, data: bytes.toString('base64') }])
+    expect(prepared.prompt).not.toContain(bytes.toString('base64'))
+  })
+
+  it('rejects mislabeled and oversized media before it can become a usable attachment', async () => {
+    const { service } = await setup()
+    expect(() => service.accept({ draftId: 'media-draft', resources: [{ resourceId: 'large', name: 'clip.mp4', mimeType: 'video/mp4', sizeBytes: 10 * 1024 * 1024 + 1 }] }))
+      .toThrow()
+    const bytes = Buffer.from('not a media file')
+    service.accept({ draftId: 'media-draft', resources: [{ resourceId: 'invalid', name: 'clip.mp4', mimeType: 'video/mp4', sizeBytes: bytes.length }] })
+    await expect(service.complete({ draftId: 'media-draft', resourceId: 'invalid', bytes })).rejects.toMatchObject({ code: 'ATTACHMENT_INVALID' })
+    expect(service.list('media-draft')[0]).toMatchObject({ state: 'failed', errorCode: 'IMPORT_FAILED' })
+  })
+
+  it('keeps PDFs as binary snapshots with document references, not UTF-8 prompt text', async () => {
+    const { service, attachments, attachmentRepository } = await setup()
+    const bytes = Buffer.concat([Buffer.from('%PDF-1.7\n'), Buffer.from([0xFF, 0xFE]), Buffer.from('\n%%EOF\n')])
+    const metadata = { resourceId: 'pdf-resource', name: 'report.pdf', mimeType: '', sizeBytes: bytes.length }
+    expect(service.accept({ draftId: 'pdf-draft', resources: [metadata] })[0]).toMatchObject({ kind: 'pdf', mimeType: 'application/pdf' })
+    const resource = await service.complete({ draftId: 'pdf-draft', resourceId: metadata.resourceId, bytes })
+    if (resource.state !== 'ready' || !('attachmentId' in resource))
+      throw new Error('PDF import failed')
+    const record = attachmentRepository.findById(resource.attachmentId)!
+    expect(await readFile(record.storedPath)).toEqual(bytes)
+    const prepared = await attachments.preparePrompt([record.id], 'Read the report', null, 'pdf-draft')
+    expect(prepared.imageReferences).toEqual([])
+    expect(prepared.documentReferences).toEqual([{ attachmentId: record.id, mimeType: 'application/pdf' }])
+    expect(prepared.prompt).toContain('report.pdf')
+    expect(prepared.prompt).not.toContain('%PDF')
+    expect(await attachments.materializeDocumentInputs(prepared.documentReferences, null, 'pdf-draft')).toEqual([{ name: 'report.pdf', data: bytes.toString('base64'), mimeType: 'application/pdf' }])
+    await expect(attachments.materializeDocumentInputs(prepared.documentReferences, null, 'different-draft')).rejects.toMatchObject({ code: 'VALIDATION_FAILED' })
+  })
+
   it('keeps legacy message attachments and granted Artifacts available without creating a Space', async () => {
     const fixture = await setup()
     const workspace = join(fixture.root, 'conversation-workspace')
@@ -400,6 +581,7 @@ describe('composer resource import', () => {
     const runInputs = createRunInputRepository(database)
     let failNextLaunch = false
     const turns = new ChatTurnService({
+      inputValidation: { validate: async () => {} },
       attachments,
       composerResources: service,
       conversations,
@@ -413,7 +595,7 @@ describe('composer resource import', () => {
       runner: { cancel: async () => false },
       providers: {
         getDefaultModel: async () => ({ modelId: 'offline', providerId: 'fixture', reasoning: null, serviceTier: null }),
-        executionModels: { resolveAvailable: async () => ({
+        executionModels: { getServiceTiers: () => [], resolveAvailable: async () => ({
           api: 'openai-completions',
           id: 'offline',
           name: 'Offline',
@@ -669,6 +851,7 @@ describe('composer resource import', () => {
     service.accept({ draftId: imageDraft.draftId, resources: [{ resourceId: 'image-resource', mimeType: 'image/png', name: 'image.png', sizeBytes: png.length }] })
     await service.complete({ draftId: imageDraft.draftId, resourceId: 'image-resource', bytes: png })
     const turns = new ChatTurnService({
+      inputValidation: { validate: async () => {} },
       attachments,
       composerResources: service,
       conversations: createConversationRepository(database),
@@ -676,7 +859,7 @@ describe('composer resource import', () => {
       drafts,
       providers: {
         getDefaultModel: async () => ({ modelId: 'text-only', providerId: 'fixture', reasoning: null, serviceTier: null }),
-        executionModels: { resolveAvailable: async () => ({
+        executionModels: { getServiceTiers: () => [], resolveAvailable: async () => ({
           api: 'openai-completions',
           baseUrl: 'http://127.0.0.1:9',
           contextWindow: 128000,
@@ -730,18 +913,20 @@ describe('composer resource import', () => {
     service.accept({ draftId: 'draft-1', resources: [text] })
     expect(() => service.accept({ draftId: 'draft-1', resources: [{ ...text, resourceId: 'new' }, { ...text, name: 'changed.txt' }] })).toThrow()
     expect(service.list('draft-1').map(resource => resource.resourceId)).toEqual(['existing'])
-    expect(() => service.accept({ draftId: 'draft-1', resources: [{ ...text, resourceId: 'new' }, { ...text, resourceId: 'bad', name: 'bad.pdf', mimeType: 'application/pdf' }] })).toThrow()
+    expect(() => service.accept({ draftId: 'draft-1', resources: [{ ...text, resourceId: 'new' }, { ...text, resourceId: 'bad', name: 'bad.zip', mimeType: 'application/zip' }] })).toThrow()
     expect(service.list('draft-1')).toHaveLength(1)
   })
 
   it.each([
+    ['application/pdf', 'bad.pdf', Uint8Array.of(1, 2), 2],
     ['image/png', 'bad.png', Uint8Array.of(1, 2), 2],
     ['text/plain', 'bad.txt', Uint8Array.of(255, 254), 2],
     ['text/plain', 'short.txt', Uint8Array.of(65), 2],
   ])('keeps invalid %s input failed, without publishing a file', async (mimeType, name, bytes, sizeBytes) => {
     const { service, attachmentRepository } = await setup()
     service.accept({ draftId: 'draft-1', resources: [{ resourceId: 'resource-1', mimeType, name, sizeBytes }] })
-    const failed = await service.complete({ draftId: 'draft-1', resourceId: 'resource-1', bytes })
+    await expect(service.complete({ draftId: 'draft-1', resourceId: 'resource-1', bytes })).rejects.toMatchObject({ code: 'ATTACHMENT_INVALID' })
+    const failed = service.list('draft-1')[0]
     expect(failed).toMatchObject({ resourceId: 'resource-1', state: 'failed', errorCode: 'IMPORT_FAILED' })
     expect(attachmentRepository.listDraftsBefore('9999')).toHaveLength(0)
   })

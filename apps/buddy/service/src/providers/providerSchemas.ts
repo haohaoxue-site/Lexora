@@ -1,4 +1,9 @@
 import { z } from 'zod'
+import { BUDDY_DOCUMENT_MIME_TYPES } from '../../../shared/conversation/attachmentFormats'
+import { BUDDY_THINKING_LEVELS } from '../../../shared/conversation/modelSelection'
+import { modelCapabilitiesSchema, modelCapabilityOverridesSchema } from '../../../shared/providers/providerCapabilities'
+import { modelCatalogResolutionSchema } from '../../../shared/providers/providerCatalog'
+import { providerRequestHeadersSchema } from '../../../shared/providers/providerHeaders'
 
 export const apiKeyCredentialSchema = z.object({
   type: z.literal('api_key'),
@@ -19,6 +24,7 @@ export const credentialSchema = z.union([
 ])
 
 export const buddyProviderSchema = z.object({
+  requestHeaders: providerRequestHeadersSchema.default([]),
   activeRunCount: z.number().int().nonnegative(),
   added: z.boolean(),
   api: z.string().nullable(),
@@ -26,6 +32,7 @@ export const buddyProviderSchema = z.object({
   displayName: z.string(),
   description: z.string().max(200).nullable(),
   baseUrl: z.string().nullable(),
+  builtinProviderId: z.string().nullable(),
   canSyncModels: z.boolean(),
   authTypes: z.array(z.enum(['api_key', 'oauth'])),
   storedCredentialType: z.enum(['api_key', 'oauth']).nullable(),
@@ -40,11 +47,18 @@ export const buddyProviderSchema = z.object({
 
 export const buddyModelSchema = z.object({
   available: z.boolean(),
+  catalogMatch: z.enum(['matched', 'ambiguous', 'unmatched', 'not_applicable']),
+  catalog: modelCatalogResolutionSchema,
+  metadataKnown: z.boolean(),
   id: z.string(),
   displayName: z.string(),
   providerId: z.string(),
   api: z.string(),
-  capabilities: z.array(z.enum(['text', 'image', 'reasoning'])),
+  capabilities: z.array(z.enum(['text', 'image', 'pdf', 'audio', 'video', 'reasoning'])),
+  fileInputMimeTypes: z.array(z.enum(BUDDY_DOCUMENT_MIME_TYPES)),
+  capabilityOverrides: modelCapabilityOverridesSchema.nullable(),
+  sourceCapabilities: modelCapabilitiesSchema,
+  reasoningOptions: z.array(z.enum(BUDDY_THINKING_LEVELS)),
   contextWindow: z.number().int(),
   hasParameterOverride: z.boolean(),
   maxTokens: z.number().int(),

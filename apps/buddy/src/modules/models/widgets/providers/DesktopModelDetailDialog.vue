@@ -6,13 +6,16 @@ import { NCard, NModal } from 'naive-ui'
 import { computed } from 'vue'
 import { useBuddyI18n } from '@/i18n/buddyI18n'
 import DesktopManualModelInfoPanel from '@/modules/models/widgets/providers/DesktopManualModelInfoPanel.vue'
+import DesktopModelCapabilitiesPanel from '@/modules/models/widgets/providers/DesktopModelCapabilitiesPanel.vue'
 import DesktopModelParametersPanel from '@/modules/models/widgets/providers/DesktopModelParametersPanel.vue'
+import DesktopModelThinkingPanel from '@/modules/models/widgets/providers/DesktopModelThinkingPanel.vue'
 
 const props = defineProps<{
   actions: ModelParameterActions | null
   language: BuddyLocale
   model: LocalRuntimeModelOption | null
   saving: boolean
+  disabled: boolean
   show: boolean
 }>()
 const emit = defineEmits<{
@@ -48,6 +51,22 @@ const modelSourceSummary = computed(() => (
           :language="language"
           :saving="saving"
           :model="model"
+          :show="show"
+        />
+        <DesktopModelCapabilitiesPanel
+          :model="model"
+          :actions="actions"
+          :language="language"
+          :saving="saving"
+          :disabled="disabled"
+          :show="show"
+        />
+        <DesktopModelThinkingPanel
+          :actions="actions"
+          :language="language"
+          :saving="saving"
+          :model="model"
+          :disabled="disabled"
           :show="show"
         />
         <DesktopModelParametersPanel

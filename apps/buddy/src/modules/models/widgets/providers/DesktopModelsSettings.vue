@@ -3,9 +3,10 @@ import type { LocalProvider } from '@buddy-shared/providers/providerApi'
 
 import type { ModelProvidersStore } from '@/modules/models/state/typing'
 import { Add20Regular } from '@vicons/fluent'
-import { NAlert, NButton, NEmpty, NPopconfirm, NSwitch } from 'naive-ui'
+import { NButton, NEmpty, NPopconfirm, NSwitch } from 'naive-ui'
 import { computed, shallowRef } from 'vue'
 import { useBuddyI18n } from '@/i18n/buddyI18n'
+import DesktopModelSnapshotStatus from '@/modules/models/widgets/providers/DesktopModelSnapshotStatus.vue'
 import DesktopProviderAddDialog from '@/modules/models/widgets/providers/DesktopProviderAddDialog.vue'
 import DesktopProviderAuthDialog from '@/modules/models/widgets/providers/DesktopProviderAuthDialog.vue'
 import DesktopIcon from '@/shared/ui/icon/DesktopIcon.vue'
@@ -20,6 +21,9 @@ const showAddDialog = shallowRef(false)
 const resumeProviderId = shallowRef<string | null>(null)
 
 const addedProviders = computed(() => props.providerSettings.providers.value.filter(provider => provider.added))
+const authProviderName = computed(() => props.providerSettings.providers.value.find(
+  provider => provider.id === props.providerSettings.authChallenge.value?.providerId,
+)?.displayName ?? null)
 
 function openAddDialog(providerId: string | null = null) {
   props.providerSettings.clearModelProviderError()
@@ -38,14 +42,6 @@ function providerAuthenticationLabel(type: NonNullable<LocalProvider['storedCred
 
 <template>
   <div class="desktop-models-settings">
-    <NAlert
-      v-if="providerSettings.modelProviderError.value && !showAddDialog"
-      type="error"
-      :show-icon="false"
-    >
-      {{ providerSettings.modelProviderError.value }}
-    </NAlert>
-
     <section class="desktop-models-settings__section">
       <div class="desktop-models-settings__heading">
         <div>
@@ -135,14 +131,27 @@ function providerAuthenticationLabel(type: NonNullable<LocalProvider['storedCred
       </div>
     </section>
 
+    <section class="desktop-models-settings__section desktop-models-settings__snapshot-section">
+      <h2 class="desktop-models-settings__section-title">
+        {{ t('desktop.providers.modelSnapshot') }}
+      </h2>
+      <DesktopModelSnapshotStatus
+        :language="language"
+        :refreshing="providerSettings.isRefreshingModelSnapshot.value"
+        :snapshot="providerSettings.modelSnapshot.value"
+        @open-directory="providerSettings.openModelSnapshotDirectory"
+        @refresh="providerSettings.refreshModelSnapshot"
+      />
+    </section>
+
     <DesktopProviderAddDialog
       v-model:show="showAddDialog"
       :provider-settings="providerSettings"
       :resume-provider-id="resumeProviderId"
-      @manage="manageProvider"
     />
     <DesktopProviderAuthDialog
       :challenge="providerSettings.authChallenge.value"
+      :provider-name="authProviderName"
       :language="language"
       @cancel="providerSettings.cancelAuth"
       @submit="providerSettings.respondToAuth"
@@ -169,11 +178,13 @@ function providerAuthenticationLabel(type: NonNullable<LocalProvider['storedCred
 }
 
 .desktop-models-settings__heading h2,
-.desktop-models-settings__heading p {
+.desktop-models-settings__heading p,
+.desktop-models-settings__section-title {
   margin: 0;
 }
 
-.desktop-models-settings__heading h2 {
+.desktop-models-settings__heading h2,
+.desktop-models-settings__section-title {
   font-size: 0.92rem;
 }
 

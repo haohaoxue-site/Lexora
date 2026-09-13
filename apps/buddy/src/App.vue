@@ -52,7 +52,7 @@ watchEffect(() => {
     :theme="prefersDark ? darkTheme : null"
     :theme-overrides="themeOverrides"
   >
-    <NMessageProvider placement="top">
+    <NMessageProvider placement="top" closable :duration="6000">
       <div class="buddy-app" :class="{ 'is-dark': prefersDark }">
         <DesktopAppProvider
           @language-change="language = $event"

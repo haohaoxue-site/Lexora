@@ -1,6 +1,8 @@
 import type { UserMessage } from '@earendil-works/pi-ai'
+import type { AttachmentDocumentReference } from '../../attachments/AttachmentDocumentReference'
 import type { AttachmentImageReference } from '../../attachments/AttachmentImageReference'
 import { z } from 'zod'
+import { BUDDY_DOCUMENT_MIME_TYPES } from '../../../../shared/conversation/attachmentFormats'
 
 const buddyInputImageReferenceSchema = z.object({
   attachmentId: z.string().min(1).max(256),
@@ -8,13 +10,18 @@ const buddyInputImageReferenceSchema = z.object({
 }).strict()
 
 const buddyInputReferenceSchema = z.object({
+  documents: z.array(z.object({
+    attachmentId: z.string().min(1).max(256),
+    mimeType: z.enum(BUDDY_DOCUMENT_MIME_TYPES),
+  }).strict()).max(16).optional(),
   images: z.array(buddyInputImageReferenceSchema).max(16),
   messageId: z.string().min(1).max(256),
   prompt: z.string().max(4 * 1024 * 1024),
   version: z.literal(1),
-}).strict()
+}).strict().refine(input => input.images.length + (input.documents?.length ?? 0) <= 16)
 
 export interface BuddyInputReferenceV1 {
+  documents?: AttachmentDocumentReference[]
   images: AttachmentImageReference[]
   messageId: string
   prompt: string

@@ -112,6 +112,17 @@ export class BuddySessionRegistry<TSession extends DisposableBuddySession> {
     return this.#activeRuns.get(createConversationKey(identity))
   }
 
+  getReady(conversationId: string, branchId: string): TSession | null {
+    for (const [key, identity] of this.#identities) {
+      if (identity.conversationId === conversationId && identity.branchId === branchId) {
+        const entry = this.#sessions.get(key)
+        if (entry?.status === 'ready')
+          return entry.binding?.session ?? null
+      }
+    }
+    return null
+  }
+
   invalidateAll(): Promise<number> {
     return this.#invalidate(() => true)
   }

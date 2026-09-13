@@ -24,7 +24,10 @@ import type { WebSettings, WebSettingsSnapshot } from '../../shared/network/webP
 import type { LocalNotificationList } from '../../shared/notifications/notificationApi'
 import type { LocalApproval } from '../../shared/permissions/approvalApi'
 import type { BuddyPermissionSettings } from '../../shared/permissions/permissionMode'
-import type { LocalCustomProvider, LocalCustomProviderModel, LocalDefaultModel, LocalProvider, LocalProviderAuthChallenge, LocalRuntimeModelOption } from '../../shared/providers/providerApi'
+import type { LocalBuiltinProviderPreset, LocalCustomProvider, LocalCustomProviderModel, LocalDefaultModel, LocalModelSnapshot, LocalProvider, LocalProviderAuthChallenge, LocalRuntimeModelOption } from '../../shared/providers/providerApi'
+import type { ModelCapabilityOverrides } from '../../shared/providers/providerCapabilities'
+import type { ModelCatalogReference } from '../../shared/providers/providerCatalog'
+import type { ProviderRequestHeader } from '../../shared/providers/providerHeaders'
 import type { LocalRun, LocalRunEvent } from '../../shared/runs/runApi'
 import type { LocalBuddyServiceSupervisorState } from '../../shared/runtime/serviceState'
 import type { LocalSkillCatalog } from '../../shared/skills/skillApi'
@@ -124,7 +127,11 @@ export const LOCAL_CHAT_IPC_CHANNELS = {
   providersAdd: 'lexora:buddy:providers:add',
   providersClearCredential: 'lexora:buddy:providers:clear-credential',
   providersGetDefaultModel: 'lexora:buddy:providers:get-default-model',
+  providersGetModelSnapshot: 'lexora:buddy:providers:get-model-snapshot',
+  providersOpenModelSnapshotDirectory: 'lexora:buddy:providers:open-model-snapshot-directory',
   providersList: 'lexora:buddy:providers:list',
+  providersListBuiltinPresets: 'lexora:buddy:providers:list-builtin-presets',
+  providersRename: 'lexora:buddy:providers:rename',
   providersListModels: 'lexora:buddy:providers:list-models',
   providersLogin: 'lexora:buddy:providers:login',
   providersLogout: 'lexora:buddy:providers:logout',
@@ -134,11 +141,15 @@ export const LOCAL_CHAT_IPC_CHANNELS = {
   providersSetEnabled: 'lexora:buddy:providers:set-enabled',
   providersSetModelEnabled: 'lexora:buddy:providers:set-model-enabled',
   providersSetModelParameters: 'lexora:buddy:providers:set-model-parameters',
+  providersSetModelCatalogSource: 'lexora:buddy:providers:set-model-catalog-source',
+  providersSetModelCapabilities: 'lexora:buddy:providers:set-model-capabilities',
   providersAcknowledgeModelSource: 'lexora:buddy:providers:acknowledge-model-source',
   providersRestoreModelSource: 'lexora:buddy:providers:restore-model-source',
+  providersRefreshModelSnapshot: 'lexora:buddy:providers:refresh-model-snapshot',
   providersSyncModels: 'lexora:buddy:providers:sync-models',
   providersUpsertManualModel: 'lexora:buddy:providers:upsert-manual-model',
   providersUpsertCustom: 'lexora:buddy:providers:upsert-custom',
+  providersCreateCustom: 'lexora:buddy:providers:create-custom',
   runEvent: 'lexora:buddy:runs:event',
   runsGet: 'lexora:buddy:runs:get',
   runsList: 'lexora:buddy:runs:list',
@@ -207,7 +218,11 @@ export interface LocalChatApi {
     add: (providerId: string) => Promise<LocalProvider>
     clearCredential: (providerId: string) => Promise<LocalMutationResult>
     getDefaultModel: () => Promise<LocalDefaultModel | null>
+    getModelSnapshot: () => Promise<LocalModelSnapshot>
+    openModelSnapshotDirectory: () => Promise<void>
     list: () => Promise<ReadonlyArray<LocalProvider>>
+    listBuiltinPresets: () => Promise<ReadonlyArray<LocalBuiltinProviderPreset>>
+    rename: (providerId: string, displayName: string, requestHeaders?: readonly ProviderRequestHeader[]) => Promise<LocalProvider>
     listModels: (providerId?: string | null) => Promise<ReadonlyArray<LocalRuntimeModelOption>>
     login: (providerId: string, authType: 'api_key' | 'oauth') => Promise<LocalMutationResult>
     respondToAuth: (challengeId: string, value: string) => Promise<LocalMutationResult>
@@ -223,6 +238,16 @@ export interface LocalChatApi {
       modelId: string,
       enabled: boolean,
     ) => Promise<LocalRuntimeModelOption>
+    setModelCatalogSource: (
+      providerId: string,
+      modelId: string,
+      source: ModelCatalogReference | null,
+    ) => Promise<LocalRuntimeModelOption>
+    setModelCapabilities: (
+      providerId: string,
+      modelId: string,
+      capabilities: ModelCapabilityOverrides | null,
+    ) => Promise<LocalRuntimeModelOption>
     setModelParameters: (
       providerId: string,
       modelId: string,
@@ -232,12 +257,14 @@ export interface LocalChatApi {
       providerId: string,
       modelId: string,
     ) => Promise<LocalRuntimeModelOption>
+    refreshModelSnapshot: () => Promise<LocalModelSnapshot>
     syncModels: (providerId: string) => Promise<ReadonlyArray<LocalRuntimeModelOption>>
     upsertManualModel: (
       providerId: string,
       model: LocalCustomProviderModel,
     ) => Promise<LocalRuntimeModelOption>
     upsertCustom: (provider: LocalCustomProvider) => Promise<LocalProvider>
+    createCustom: (provider: LocalCustomProvider) => Promise<LocalProvider>
     onAuthChallenge: (listener: (challenge: LocalProviderAuthChallenge) => void) => () => void
   }
   notifications: {

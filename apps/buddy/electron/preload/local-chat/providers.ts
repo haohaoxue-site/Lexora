@@ -1,4 +1,5 @@
 import type { LocalProviderAuthChallenge } from '../../../shared/providers/providerApi'
+import type { ProviderRequestHeader } from '../../../shared/providers/providerHeaders'
 import type { LocalChatApi } from '../../shared/localChatApi'
 import { ipcRenderer } from 'electron'
 import { LOCAL_CHAT_IPC_CHANNELS } from '../../shared/localChatApi'
@@ -17,7 +18,13 @@ export function createProvidersApi(): Pick<LocalChatApi, 'providers'> {
         { providerId },
       ),
       getDefaultModel: () => ipcRenderer.invoke(LOCAL_CHAT_IPC_CHANNELS.providersGetDefaultModel),
+      getModelSnapshot: () => ipcRenderer.invoke(LOCAL_CHAT_IPC_CHANNELS.providersGetModelSnapshot),
+      openModelSnapshotDirectory: () => ipcRenderer.invoke(
+        LOCAL_CHAT_IPC_CHANNELS.providersOpenModelSnapshotDirectory,
+      ),
       list: () => ipcRenderer.invoke(LOCAL_CHAT_IPC_CHANNELS.providersList),
+      listBuiltinPresets: () => ipcRenderer.invoke(LOCAL_CHAT_IPC_CHANNELS.providersListBuiltinPresets),
+      rename: (providerId, displayName, requestHeaders) => ipcRenderer.invoke(LOCAL_CHAT_IPC_CHANNELS.providersRename, { providerId, displayName, requestHeaders: copyHeaders(requestHeaders) }),
       listModels: providerId =>
         ipcRenderer.invoke(LOCAL_CHAT_IPC_CHANNELS.providersListModels, { providerId }),
       login: (providerId, authType) =>
@@ -42,6 +49,14 @@ export function createProvidersApi(): Pick<LocalChatApi, 'providers'> {
         LOCAL_CHAT_IPC_CHANNELS.providersSetModelEnabled,
         { enabled, modelId, providerId },
       ),
+      setModelCatalogSource: (providerId, modelId, source) => ipcRenderer.invoke(
+        LOCAL_CHAT_IPC_CHANNELS.providersSetModelCatalogSource,
+        { modelId, providerId, source },
+      ),
+      setModelCapabilities: (providerId, modelId, capabilities) => ipcRenderer.invoke(
+        LOCAL_CHAT_IPC_CHANNELS.providersSetModelCapabilities,
+        { modelId, providerId, capabilities },
+      ),
       setModelParameters: (providerId, modelId, parameters) => ipcRenderer.invoke(
         LOCAL_CHAT_IPC_CHANNELS.providersSetModelParameters,
         { modelId, parameters, providerId },
@@ -49,6 +64,9 @@ export function createProvidersApi(): Pick<LocalChatApi, 'providers'> {
       restoreModelSourceParameters: (providerId, modelId) => ipcRenderer.invoke(
         LOCAL_CHAT_IPC_CHANNELS.providersRestoreModelSource,
         { modelId, providerId },
+      ),
+      refreshModelSnapshot: () => ipcRenderer.invoke(
+        LOCAL_CHAT_IPC_CHANNELS.providersRefreshModelSnapshot,
       ),
       syncModels: providerId => ipcRenderer.invoke(
         LOCAL_CHAT_IPC_CHANNELS.providersSyncModels,
@@ -59,9 +77,15 @@ export function createProvidersApi(): Pick<LocalChatApi, 'providers'> {
         { model, providerId },
       ),
       upsertCustom: provider =>
-        ipcRenderer.invoke(LOCAL_CHAT_IPC_CHANNELS.providersUpsertCustom, { provider }),
+        ipcRenderer.invoke(LOCAL_CHAT_IPC_CHANNELS.providersUpsertCustom, { provider: { ...provider, requestHeaders: copyHeaders(provider.requestHeaders) } }),
+      createCustom: provider =>
+        ipcRenderer.invoke(LOCAL_CHAT_IPC_CHANNELS.providersCreateCustom, { provider: { ...provider, requestHeaders: copyHeaders(provider.requestHeaders) } }),
       onAuthChallenge: (listener: (challenge: LocalProviderAuthChallenge) => void) =>
         subscribe(LOCAL_CHAT_IPC_CHANNELS.providerAuthChallenge, listener),
     }),
   }
+}
+
+function copyHeaders(headers?: readonly ProviderRequestHeader[]): ProviderRequestHeader[] | undefined {
+  return headers?.map(({ name, value }) => ({ name, value }))
 }

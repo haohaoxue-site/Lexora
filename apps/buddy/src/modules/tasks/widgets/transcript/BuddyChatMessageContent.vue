@@ -157,7 +157,7 @@ function previewLeaveTransition(): Promise<void> {
         <div v-else class="buddy-chat-message-content__file">
           <FileIcon :name="view.attachment.name" size="preview" />
           <span>{{ imageLabels.get(view.resourceId) ?? view.attachment.name }}</span>
-          <small>{{ view.attachment.kind === 'text' ? 'TXT' : 'FILE' }}</small>
+          <small>{{ view.attachment.kind === 'pdf' ? 'PDF' : view.attachment.kind === 'audio' ? 'AUDIO' : view.attachment.kind === 'video' ? 'VIDEO' : view.attachment.kind === 'text' ? 'TXT' : 'FILE' }}</small>
         </div>
         <figcaption
           v-if="view.previewUrl && !failedAttachmentIds.has(view.attachment.attachmentId)"

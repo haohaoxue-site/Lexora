@@ -29,6 +29,7 @@ describe('registerLocalChatIpc', () => {
     registerLocalChatIpc({
       getLanguage: () => 'zh-CN',
       getWindow: () => ({ webContents } as unknown as BrowserWindow),
+      openModelSnapshotDirectory: async () => {},
       readWebCredential: async () => {
         reads++
         return credential
@@ -43,6 +44,42 @@ describe('registerLocalChatIpc', () => {
     credential = { private: 'invalid-private-key' }
     await expect(reveal(event, undefined)).rejects.toThrow('VALIDATION_FAILED')
   })
+
+  it('opens only the fixed model snapshot directory from the trusted main frame', async () => {
+    const webContents = { mainFrame: {} }
+    const openModelSnapshotDirectory = vi.fn().mockResolvedValue(undefined)
+    const request = vi.fn()
+    registerLocalChatIpc({
+      getLanguage: () => 'zh-CN',
+      getWindow: () => ({ webContents } as unknown as BrowserWindow),
+      openModelSnapshotDirectory,
+      readWebCredential: async () => null,
+      runtime: {
+        state: {},
+        onNotification: () => () => {},
+        onStateChange: () => () => {},
+        restart: async () => {},
+        request,
+      },
+    })
+    const openDirectory = electron.handlers.get(
+      LOCAL_CHAT_IPC_CHANNELS.providersOpenModelSnapshotDirectory,
+    )!
+    const event = {
+      sender: webContents,
+      senderFrame: webContents.mainFrame,
+    } as unknown as IpcMainInvokeEvent
+
+    await expect(openDirectory(
+      { ...event, senderFrame: {} } as IpcMainInvokeEvent,
+      undefined,
+    )).rejects.toThrow()
+    expect(openModelSnapshotDirectory).not.toHaveBeenCalled()
+    await expect(openDirectory(event, undefined)).resolves.toBeUndefined()
+    expect(openModelSnapshotDirectory).toHaveBeenCalledOnce()
+    expect(request).not.toHaveBeenCalled()
+  })
+
   it('validates and forwards authoritative automation previews', async () => {
     const preview = {
       frequency: {
@@ -79,6 +116,7 @@ describe('registerLocalChatIpc', () => {
       readWebCredential: async () => null,
       getLanguage: () => 'zh-CN',
       getWindow: () => window,
+      openModelSnapshotDirectory: async () => {},
       runtime,
     })
     const handlePreview = electron.handlers.get(LOCAL_CHAT_IPC_CHANNELS.automationsPreview)
@@ -136,6 +174,7 @@ describe('registerLocalChatIpc', () => {
       readWebCredential: async () => null,
       getLanguage: () => 'zh-CN',
       getWindow: () => window,
+      openModelSnapshotDirectory: async () => {},
       runtime,
     })
     const runNow = electron.handlers.get(LOCAL_CHAT_IPC_CHANNELS.automationsRunNow)
@@ -203,6 +242,7 @@ describe('registerLocalChatIpc', () => {
       readWebCredential: async () => null,
       getLanguage: () => 'zh-CN',
       getWindow: () => window,
+      openModelSnapshotDirectory: async () => {},
       runtime,
     })
     const listEvents = electron.handlers.get(LOCAL_CHAT_IPC_CHANNELS.runsListEvents)
@@ -254,6 +294,7 @@ describe('registerLocalChatIpc', () => {
       readWebCredential: async () => null,
       getLanguage: () => 'zh-CN',
       getWindow: () => window,
+      openModelSnapshotDirectory: async () => {},
       runtime,
     })
     const listApprovals = electron.handlers.get(LOCAL_CHAT_IPC_CHANNELS.approvalsList)

@@ -113,6 +113,23 @@ export class DesktopIntegrations {
       readWebCredential: () => runtime.readWebCredential(),
       getLanguage: () => runtime.language,
       getWindow: () => windows.window,
+      openModelSnapshotDirectory: async () => {
+        try {
+          const error = await shell.openPath(paths.agentDirectory)
+          if (error)
+            throw new Error(error)
+        }
+        catch (error) {
+          diagnostics.record({
+            scope: 'desktop',
+            component: 'desktop.gateway',
+            level: 'warn',
+            event: 'model_snapshot.directory_open.failed',
+            errorCode: 'DIRECTORY_OPEN_FAILED',
+          })
+          throw error
+        }
+      },
       runtime: service,
     }))
   }

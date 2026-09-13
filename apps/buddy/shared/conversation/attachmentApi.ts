@@ -4,7 +4,7 @@ import { idSchema, isAbsolutePath } from '../runtime/apiValidation'
 
 export const attachmentSchema = z.object({
   attachmentId: idSchema,
-  kind: z.enum(['image', 'text', 'binary']),
+  kind: z.enum(['image', 'pdf', 'audio', 'video', 'text', 'binary']),
   mimeType: z.string().min(1),
   name: z.string().min(1),
   previewUrl: z.string().nullable(),

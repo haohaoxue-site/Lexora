@@ -2,9 +2,10 @@ import type { LocalChatApi } from '@buddy-electron/shared/localChatApi'
 import type { BuddyComposerResource, BuddyComposerSource, BuddySpaceFileSource } from '@buddy-shared/conversation/composerResource'
 import type { Ref } from 'vue'
 import type { ComposerResourcesState, ComposerResourceView } from './typing'
-import { BUDDY_ATTACHMENT_COUNT_LIMIT, BUDDY_ATTACHMENT_TOTAL_BYTES_LIMIT } from '@buddy-shared/conversation/attachmentPolicy'
+import { BUDDY_MEDIA_EXTENSIONS } from '@buddy-shared/conversation/attachmentFormats'
 
-import { parseLocalChatPublicError } from '@buddy-shared/runtime/localChatError'
+import { BUDDY_ATTACHMENT_COUNT_LIMIT, BUDDY_ATTACHMENT_TOTAL_BYTES_LIMIT, getAttachmentKind } from '@buddy-shared/conversation/attachmentPolicy'
+import { formatLocalChatPublicError, parseLocalChatPublicError } from '@buddy-shared/runtime/localChatError'
 import { computed, shallowReactive } from 'vue'
 
 interface UseComposerResourcesOptions {
@@ -34,11 +35,14 @@ export function useComposerResources(options: UseComposerResourcesOptions): Comp
     if (!file)
       return
     try {
-      update(await options.api.complete({
+      const completed = await options.api.complete({
         bytes: new Uint8Array(await file.arrayBuffer()),
         draftId: resource.draftId,
         resourceId: resource.resourceId,
-      }))
+      })
+      update(completed)
+      if (completed.state === 'failed')
+        options.onError(new Error(formatLocalChatPublicError({ code: 'ATTACHMENT_IMPORT_FAILED', retryable: true })))
     }
     catch (error) {
       try {
@@ -98,7 +102,7 @@ export function useComposerResources(options: UseComposerResourcesOptions): Comp
       sources.set(resourceId, file)
       const resource: BuddyComposerResource = {
         draftId,
-        kind: file.type.startsWith('image/') ? 'image' : 'text',
+        kind: getAttachmentKind(file.name.toLowerCase().endsWith('.pdf') ? 'application/pdf' : BUDDY_MEDIA_EXTENSIONS[`.${file.name.split('.').at(-1)?.toLowerCase()}` as keyof typeof BUDDY_MEDIA_EXTENSIONS] ?? file.type),
         mimeType: file.type,
         name: file.name,
         resourceId,

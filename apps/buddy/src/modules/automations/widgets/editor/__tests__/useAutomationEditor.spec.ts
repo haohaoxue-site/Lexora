@@ -7,6 +7,13 @@ import { useAutomationEditor } from '../useAutomationEditor'
 
 const model: LocalRuntimeModelOption = {
   available: true,
+  catalogMatch: 'not_applicable',
+  catalog: { source: null, selection: null, candidates: [] },
+  metadataKnown: true,
+  capabilityOverrides: null,
+  fileInputMimeTypes: [],
+  sourceCapabilities: { image: false, reasoningOptions: ['off', 'low', 'high'] },
+  api: 'openai-completions',
   capabilities: ['text'],
   contextWindow: 4096,
   displayName: 'Example model',

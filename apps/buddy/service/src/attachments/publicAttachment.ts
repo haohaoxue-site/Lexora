@@ -1,5 +1,7 @@
 import type { LocalAttachment } from '../../../shared/conversation/attachmentApi'
 import type { AttachmentRecord } from '../storage/attachmentRepository'
+import { isDocumentMimeType } from '../../../shared/conversation/attachmentFormats'
+import { getAttachmentKind } from '../../../shared/conversation/attachmentPolicy'
 import { readBuddyUserMessageContent } from '../../../shared/conversation/buddyUserContent'
 
 export function toPublicAttachment(record: AttachmentRecord): LocalAttachment {
@@ -7,7 +9,7 @@ export function toPublicAttachment(record: AttachmentRecord): LocalAttachment {
     attachmentId: record.id,
     kind: record.mimeType.startsWith('image/')
       ? 'image'
-      : isTextMimeType(record.mimeType) ? 'text' : 'binary',
+      : isDocumentMimeType(record.mimeType) ? getAttachmentKind(record.mimeType) : isTextMimeType(record.mimeType) ? 'text' : 'binary',
     mimeType: record.mimeType,
     name: record.name,
     previewUrl: null,

@@ -1174,6 +1174,7 @@ function createDesktopApi() {
         update: vi.fn(),
       },
       providers: {
+        listBuiltinPresets: vi.fn(async () => []),
         getDefaultModel: vi.fn(async () => ({ modelId: 'model-1', providerId: 'provider-1' })),
         list: vi.fn(async () => [{
           activeRunCount: 0,
@@ -1195,6 +1196,13 @@ function createDesktopApi() {
         }]),
         listModels: vi.fn(async () => [{
           available: true,
+          catalogMatch: 'not_applicable',
+          catalog: { source: null, selection: null, candidates: [] },
+          metadataKnown: true,
+          capabilityOverrides: null,
+          fileInputMimeTypes: [],
+          sourceCapabilities: { image: false, reasoningOptions: ['off', 'low', 'medium', 'high'] },
+          api: 'openai-completions',
           capabilities: ['text'],
           contextWindow: 4096,
           displayName: 'Model',
@@ -1214,6 +1222,13 @@ function createDesktopApi() {
           sourceParametersUpdated: false,
         }, {
           available: true,
+          catalogMatch: 'not_applicable',
+          catalog: { source: null, selection: null, candidates: [] },
+          metadataKnown: true,
+          capabilityOverrides: null,
+          fileInputMimeTypes: [],
+          sourceCapabilities: { image: false, reasoningOptions: ['off', 'low', 'medium', 'high'] },
+          api: 'openai-completions',
           capabilities: ['text', 'reasoning'],
           contextWindow: 4096,
           displayName: 'Model 2',

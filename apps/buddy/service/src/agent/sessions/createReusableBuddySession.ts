@@ -3,6 +3,7 @@ import type {
   AgentSession,
   SessionEntry,
 } from '@earendil-works/pi-coding-agent'
+import type { AttachmentFileInput } from '../../attachments/AttachmentDocumentReference'
 import type {
   BuddyInputReferenceStore,
   BuddyInputReferenceV1,
@@ -10,15 +11,20 @@ import type {
 import type { BuddyExtensionRunContextStore } from '../extensions/BuddyExtensionRunContext'
 import type { BuddySessionShutdownReason, BuddySessionTurnContext, ReusableBuddySession } from './ReusableBuddySession'
 import type { BuddyConversationTreeCursor } from './tree/BuddyConversationTree'
+import { randomUUID } from 'node:crypto'
 import { createAssistantMessageEventStream } from '@earendil-works/pi-ai'
 import {
   findCutPoint,
   sessionEntryToContextMessages,
 } from '@earendil-works/pi-coding-agent'
 import { BUDDY_DEFAULT_THINKING_LEVEL } from '../../../../shared/conversation/modelSelection'
+import { applyDocumentInputPayload } from '../../providers/documentInputPayload'
+import { supportsModelFileInput, supportsModelToolCalls } from '../../providers/modelCapabilities'
 import { createBuddyInputReferenceMessage, readBuddyInputReference } from '../context/BuddyInputReference'
 import { buildBuddyRequestContext } from '../context/buildBuddyRequestContext'
 import { createContextUsageBreakdown } from '../context/contextUsageBreakdown'
+import { prepareBuddyInputHistory } from '../context/prepareBuddyInputHistory'
+import { withNativeAttachmentPrompt } from '../context/withNativeAttachmentPrompt'
 import { toBuddySessionStorageError } from './BuddySessionErrors'
 
 export interface CreateReusableBuddySessionOptions {
@@ -31,6 +37,7 @@ export interface CreateReusableBuddySessionOptions {
   ) => Promise<Model<Api>>
   inputReferences: BuddyInputReferenceStore
   materializeInput: (input: BuddyInputReferenceV1) => Promise<UserMessage['content']>
+  materializeDocuments?: (input: BuddyInputReferenceV1) => Promise<AttachmentFileInput[]>
   runContext: BuddyExtensionRunContextStore
   session: AgentSession
   shutdown: (reason: BuddySessionShutdownReason) => Promise<void>
@@ -43,11 +50,12 @@ export function createReusableBuddySession(
   const convertToLlm = session.agent.convertToLlm
   const streamFunction = session.agent.streamFunction
   let latestContext: Context | null = null
-  let inputMaterializationFailed = false
+  const pendingSteering = new Map<string, BuddyInputReferenceV1>()
+  const requestInputs = new WeakMap<Context['messages'], { failed: boolean, documents: Map<string, AttachmentFileInput> }>()
   session.agent.convertToLlm = async (messages) => {
-    inputMaterializationFailed = false
+    const request = { failed: false, documents: new Map<string, AttachmentFileInput>() }
     const materialized = []
-    for (const message of messages) {
+    for (const message of prepareBuddyInputHistory(messages)) {
       try {
         const input = readBuddyInputReference(message)
         if (!input) {
@@ -61,29 +69,62 @@ export function createReusableBuddySession(
         ) {
           throw new Error('Empty image input')
         }
-        materialized.push({ content, role: 'user' as const, timestamp: message.timestamp })
+        const documents = input.documents?.length ? await options.materializeDocuments?.(input) : []
+        if (!documents || documents.length !== (input.documents?.length ?? 0))
+          throw new Error('Missing document input')
+        const documentBlocks = documents.map((file) => {
+          const token = `buddy-file:${randomUUID()}`
+          request.documents.set(token, file)
+          return { type: 'text' as const, text: token }
+        })
+        materialized.push({ content: [...content, ...documentBlocks], role: 'user' as const, timestamp: message.timestamp })
       }
       catch {
-        inputMaterializationFailed = true
+        request.failed = true
       }
     }
-    return convertToLlm(materialized)
+    const converted = await convertToLlm(materialized)
+    requestInputs.set(converted, request)
+    return converted
   }
   session.agent.streamFunction = (model, context, streamOptions) => {
-    if (inputMaterializationFailed)
+    const request = requestInputs.get(context.messages)
+    if (request?.failed)
       return createInputMaterializationFailure(model)
-    latestContext = buildBuddyRequestContext(context, session.getAllTools())
-    return streamFunction(model, context, streamOptions)
+    if (request && [...request.documents.values()].some(file => !supportsModelFileInput(model, file.mimeType)))
+      return createInputMaterializationFailure(model, 'MODEL_INPUT_UNSUPPORTED')
+    const nativeContext = withNativeAttachmentPrompt(context, model, request?.documents.values() ?? [])
+    const requestContext = supportsModelToolCalls(model) ? nativeContext : { ...nativeContext, tools: undefined }
+    latestContext = buildBuddyRequestContext(requestContext, session.getAllTools())
+    return streamFunction(model, requestContext, {
+      ...streamOptions,
+      onPayload: async (payload, target) => {
+        const previous = await streamOptions?.onPayload?.(payload, target)
+        return applyDocumentInputPayload(previous ?? payload, target.api, request?.documents ?? new Map(), target.baseUrl)
+      },
+    })
   }
   return {
+    getInputContext: () => {
+      const messages = [...session.messages]
+      for (const message of messages) {
+        const input = readBuddyInputReference(message)
+        if (input)
+          pendingSteering.delete(input.messageId)
+      }
+      messages.push(...[...pendingSteering.values()].map(input => createBuddyInputReferenceMessage(input, Date.now())))
+      return { messages, systemPrompt: session.systemPrompt }
+    },
     steer: (prepare) => {
       if (!session.isStreaming)
         return false
       const input = prepare()
+      pendingSteering.set(input.messageId, input)
       session.agent.steer(createBuddyInputReferenceMessage(input, Date.now()))
       return true
     },
     abort: () => {
+      pendingSteering.clear()
       session.agent.clearSteeringQueue()
       return session.abort()
     },
@@ -149,6 +190,7 @@ export function createReusableBuddySession(
           }
           finally {
             await session.waitForIdle()
+            pendingSteering.clear()
             session.agent.clearSteeringQueue()
             options.tree?.finish()
           }
@@ -163,14 +205,14 @@ export function createReusableBuddySession(
   }
 }
 
-function createInputMaterializationFailure(model: Model<Api>) {
+function createInputMaterializationFailure(model: Model<Api>, code = 'RESOURCE_MATERIALIZATION_FAILED') {
   const stream = createAssistantMessageEventStream()
   queueMicrotask(() => {
     stream.push({
       error: {
         api: model.api,
         content: [],
-        errorMessage: 'RESOURCE_MATERIALIZATION_FAILED',
+        errorMessage: code,
         model: model.id,
         provider: model.provider,
         role: 'assistant',

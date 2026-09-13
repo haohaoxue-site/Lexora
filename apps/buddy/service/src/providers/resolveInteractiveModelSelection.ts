@@ -4,7 +4,7 @@ import type {
 } from '../../../shared/conversation/modelSelection'
 import type { ProviderExecutionModelResolver } from './ProviderExecutionModelResolver'
 import type { ProviderService } from './ProviderService'
-import { resolveBuddyServiceTiers } from '../../../shared/conversation/modelSelection'
+import { getModelFileInputMimeTypes } from './modelCapabilities'
 import {
   ProviderAuthenticationRequiredError,
   ProviderValidationError,
@@ -18,13 +18,15 @@ export interface InteractiveModelSelection {
 }
 
 export interface ResolvedInteractiveModelSelection extends InteractiveModelSelection {
+  api: string
   contextWindow: number
   input: Array<'text' | 'image'>
+  fileInputMimeTypes: ReturnType<typeof getModelFileInputMimeTypes>
   maxTokens: number
 }
 
 export interface RuntimeModelProvider extends Pick<ProviderService, 'getDefaultModel'> {
-  executionModels: Pick<ProviderExecutionModelResolver, 'resolveAvailable'>
+  executionModels: Pick<ProviderExecutionModelResolver, 'resolveAvailable' | 'getServiceTiers'>
 }
 
 export async function resolveInteractiveModelSelection(
@@ -43,7 +45,7 @@ export async function resolveInteractiveModelSelection(
   const serviceTier = requested?.serviceTier ?? null
   if (
     serviceTier !== null
-    && !resolveBuddyServiceTiers({
+    && !providers.executionModels.getServiceTiers({
       api: model.api,
       modelId: model.id,
       providerId: selected.providerId,
@@ -53,8 +55,10 @@ export async function resolveInteractiveModelSelection(
   }
   return {
     ...selected,
+    api: model.api,
     contextWindow: model.contextWindow,
     input: model.input,
+    fileInputMimeTypes: getModelFileInputMimeTypes(model),
     maxTokens: model.maxTokens,
     serviceTier,
   }

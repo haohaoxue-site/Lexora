@@ -21,6 +21,7 @@ const BASE_OPTIONS = {
 describe('resolveBuddyRuntimePaths', () => {
   it('isolates interactive development from the installed application', () => {
     expect(resolveBuddyRuntimePaths(BASE_OPTIONS)).toEqual({
+      agentDirectory: '/home/lexora/.lexora-dev/buddy/agent',
       appName: 'Lexora Buddy Dev',
       browserAdapterSocket: '/run/user/1000/lexora-buddy-dev/browser-adapter.sock',
       buddyHome: '/home/lexora/.lexora-dev/buddy',
@@ -45,6 +46,7 @@ describe('resolveBuddyRuntimePaths', () => {
       ...BASE_OPTIONS,
       isPackaged: true,
     })).toEqual({
+      agentDirectory: '/home/lexora/.lexora/buddy/agent',
       appName: 'Lexora Buddy',
       browserAdapterSocket: '/run/user/1000/lexora-buddy/browser-adapter.sock',
       buddyHome: '/home/lexora/.lexora/buddy',
@@ -88,6 +90,7 @@ describe('resolveBuddyRuntimePaths', () => {
       nativePetSocketOverride: '/tmp/lexora-smoke/native-pet.sock',
       smokeTest: true,
     })).toEqual({
+      agentDirectory: '/tmp/lexora-smoke/home/buddy/agent',
       appName: 'Lexora Buddy Test',
       browserAdapterSocket: '/tmp/lexora-smoke/home/.runtime/browser-adapter.sock',
       buddyHome: '/tmp/lexora-smoke/home/buddy',
@@ -170,6 +173,7 @@ describe('resolveBuddyRuntimePaths', () => {
       lexoraHomeOverride: 'C:\\Temp\\隔离 Test',
     })
     expect(stable.buddyHome).toBe('C:\\Users\\测试 User\\.lexora\\buddy')
+    expect(stable.agentDirectory).toBe('C:\\Users\\测试 User\\.lexora\\buddy\\agent')
     expect(stable.logs).toBe('C:\\Users\\测试 User\\AppData\\Local\\Lexora Buddy\\state\\logs')
     expect(development.buddyHome).toBe('C:\\Users\\测试 User\\.lexora-dev\\buddy')
     expect(test.userData).toBe('C:\\Temp\\隔离 Test\\.runtime\\electron')

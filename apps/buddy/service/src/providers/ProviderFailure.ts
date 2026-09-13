@@ -3,6 +3,7 @@ export type ProviderFailureCode
     | 'MODEL_SYNC_FAILED'
     | 'MODEL_SYNC_UNSUPPORTED'
     | 'PROVIDER_HAS_ACTIVE_RUNS'
+    | 'PROVIDER_ID_CONFLICT'
     | 'PROVIDER_UNAVAILABLE'
     | 'VALIDATION_FAILED'
 
@@ -23,6 +24,12 @@ export class ProviderValidationError extends ProviderFailure {
       'VALIDATION_FAILED',
       'Lexora Buddy provider configuration is invalid',
     )
+  }
+}
+
+export class ProviderIdConflictError extends ProviderFailure {
+  constructor() {
+    super('ProviderIdConflictError', 'PROVIDER_ID_CONFLICT', 'Provider identifier is already in use')
   }
 }
 

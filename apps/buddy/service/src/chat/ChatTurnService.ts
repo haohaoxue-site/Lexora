@@ -40,6 +40,7 @@ import type {
   TurnRequestRecord,
   TurnRequestRepository,
 } from '../storage/turnRequestRepository'
+import type { ChatInputHistoryPoint, ChatInputValidationService } from './ChatInputValidationService'
 import { Buffer } from 'node:buffer'
 import { createHash, randomUUID } from 'node:crypto'
 import { basename, isAbsolute, join } from 'node:path'
@@ -59,6 +60,7 @@ import {
   formatBuddySkillPrompt,
 } from '../agent/resources/SkillService'
 import { resolveGrantedPath } from '../directories/resolveGrantedPath'
+import { getModelFileInputMimeTypes } from '../providers/modelCapabilities'
 import { resolveInteractiveModelSelection } from '../providers/resolveInteractiveModelSelection'
 import { BuddyServiceError } from '../rpc/runtimeRequest'
 import { toPublicRun } from '../runs/publicRun'
@@ -90,7 +92,7 @@ export interface ChatTurnServiceOptions {
   composerResources?: Pick<ComposerResourceService, 'resolveInput'>
   attachments: Pick<
     AttachmentService,
-    'prepareMessageAttachments' | 'preparePrompt'
+    'getInputMetadata' | 'prepareMessageAttachments' | 'preparePrompt'
   >
   conversationLifecycle: Pick<ConversationLifecycleService, 'isDeleting'>
   conversations: Pick<ConversationRepository, 'findById'>
@@ -98,6 +100,7 @@ export interface ChatTurnServiceOptions {
   drafts: Pick<ComposerDraftRepository, 'findById'>
   spaces: Pick<SpaceRepository, 'findById'>
   providers: RuntimeModelProvider
+  inputValidation: Pick<ChatInputValidationService, 'validate'>
   runInputs: Pick<RunInputRepository, 'findByRunId'>
   runner: Pick<BuddyAgentRunner, 'cancel'>
   runs: Pick<RunRepository, 'findById'>
@@ -112,8 +115,10 @@ interface TurnReplay {
 }
 
 interface TurnModelSelection extends Omit<InteractiveModelSelection, 'reasoning'> {
+  api: string
   contextWindow: number | null
   input: Array<'text' | 'image'>
+  fileInputMimeTypes: ReturnType<typeof getModelFileInputMimeTypes>
   maxTokens: number | null
   reasoning: string | null
 }
@@ -125,6 +130,8 @@ interface PrepareTurnMaterializationInput {
   contextItems: readonly ChatContextItem[]
   contextSuffix?: string
   conversationId: string
+  branchId: string
+  point?: ChatInputHistoryPoint
   draftId: string
   space: SpaceRecord | null
   replay: TurnReplay | null
@@ -235,6 +242,8 @@ export class ChatTurnService {
         : '',
       conversationId,
       draftId: input.draftId,
+      branchId: parentBranchId,
+      point: !existingConversation ? { kind: 'empty' } : followup ? { kind: 'after_run', runId: followup.sourceRunId, messageId: followup.sourceMessageId } : undefined,
       space,
       replay: null,
       requestedModel: draft.modelSelection,
@@ -290,6 +299,19 @@ export class ChatTurnService {
       userMessageId,
     }
     return { prepared, stagedAttachments }
+  }
+
+  async validatePreparedInput(input: PrepareTurnRequestInput): Promise<void> {
+    await this.#options.inputValidation.validate({
+      conversationId: input.conversationId,
+      branchId: input.branchId,
+      modelId: input.model,
+      providerId: input.provider,
+      contextWindow: input.modelParameters?.contextWindow ?? null,
+      maxTokens: input.modelParameters?.maxTokens ?? null,
+      prompt: input.runInput.prompt,
+      attachments: this.#options.attachments.getInputMetadata(input.runInput.attachmentIds, input.conversationId, input.queuedMessageId ?? input.draft.draftId),
+    })
   }
 
   async editUserMessage(input: EditChatUserMessageInput) {
@@ -359,6 +381,8 @@ export class ChatTurnService {
       contextItems: [],
       conversationId: conversation.id,
       draftId: input.draftId,
+      branchId: parentBranchId,
+      point: { kind: 'before_message', messageId: input.userMessageId },
       space,
       replay,
       requestedModel: draft?.modelSelection ?? null,
@@ -445,6 +469,17 @@ export class ChatTurnService {
 
     const storedInput = this.#requireRunInput(requireValue(replay?.run ?? sourceRun).id)
     assertPromptSize(storedInput.prompt)
+    await this.#options.inputValidation.validate({
+      conversationId: conversation.id,
+      branchId: parentBranchId,
+      point: { kind: 'before_message', messageId: sourceRun.triggeringMessageId },
+      modelId: sourceRun.model,
+      providerId: sourceRun.provider,
+      contextWindow: sourceRun.contextWindow,
+      maxTokens: sourceRun.maxTokens,
+      prompt: storedInput.prompt,
+      attachments: this.#options.attachments.getInputMetadata(storedInput.attachmentIds, conversation.id),
+    })
     const runId = randomUUID()
     const prepared = replay
       ? this.#options.turnRequests.retryInterrupted({
@@ -563,6 +598,20 @@ export class ChatTurnService {
     )
     if (attachmentPrompt.imageReferences.length > 0 && !selection.input.includes('image'))
       throw new BuddyServiceError('MODEL_INPUT_UNSUPPORTED')
+    if (attachmentPrompt.documentReferences.some(file => !selection.fileInputMimeTypes.includes(file.mimeType))) {
+      throw new BuddyServiceError('MODEL_INPUT_UNSUPPORTED')
+    }
+    await this.#options.inputValidation.validate({
+      conversationId: input.conversationId,
+      branchId: input.branchId,
+      point: input.point,
+      modelId: selection.modelId,
+      providerId: selection.providerId,
+      contextWindow: selection.contextWindow,
+      maxTokens: selection.maxTokens,
+      prompt,
+      attachments: attachmentPrompt.records,
+    })
     const thinkingLevel = normalizeThinkingLevel(
       replayInput ? replayInput.reasoning : selection.reasoning,
     )
@@ -594,8 +643,10 @@ export class ChatTurnService {
         providerId: replayRun.provider,
       })
       return {
+        api: model.api,
         contextWindow: replayRun.contextWindow,
         input: model.input,
+        fileInputMimeTypes: getModelFileInputMimeTypes(model),
         maxTokens: replayRun.maxTokens,
         modelId: replayRun.model,
         providerId: replayRun.provider,

@@ -17,7 +17,6 @@ const restorationConflict = computed(() => props.restoration.conflict.value)
 const restorationState = computed(() => props.restoration.state.value)
 const visibleChatBlocker = computed(() => props.status.visibleChatBlocker.value)
 const canRestartRuntime = computed(() => props.status.canRestartRuntime.value)
-const errorMessage = computed(() => props.status.errorMessage.value)
 const runtimeError = computed(() => props.status.runtimeError.value)
 const runtimeState = computed(() => props.status.runtimeState.value)
 const approvalViews = computed(() => props.execution.approvalViews.value)
@@ -36,7 +35,6 @@ const resolvingApprovalActions = computed(() => props.execution.resolvingApprova
   <DesktopChatStatus
     :blocker="visibleChatBlocker"
     :can-restart-runtime="canRestartRuntime"
-    :error-message="errorMessage"
     :language="language"
     :runtime-error="runtimeError"
     :runtime-status="runtimeState.status"

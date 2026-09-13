@@ -11,7 +11,6 @@ import DesktopIcon from '@/shared/ui/icon/DesktopIcon.vue'
 const props = defineProps<{
   blocker: ChatBlocker | null
   canRestartRuntime: boolean
-  errorMessage: string | null
   language: BuddyLocale
   runtimeError: string | null
   runtimeStatus: LocalBuddyServiceSupervisorState['status']
@@ -63,11 +62,6 @@ const { t } = useBuddyI18n(() => props.language)
         {{ t('desktop.chat.blocker.ignore') }}
       </NButton>
     </div>
-  </article>
-
-  <article v-else-if="errorMessage" class="desktop-chat-page__alert is-runtime" role="alert">
-    <DesktopIcon :component="Warning20Regular" />
-    <div><p>{{ errorMessage }}</p></div>
   </article>
 </template>
 

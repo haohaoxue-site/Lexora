@@ -68,6 +68,13 @@ describe('model catalog selection', () => {
 function model(providerId: string, modelId: string, displayName = modelId): LocalRuntimeModelOption {
   return {
     available: true,
+    catalogMatch: 'not_applicable',
+    catalog: { source: null, selection: null, candidates: [] },
+    metadataKnown: true,
+    capabilityOverrides: null,
+    fileInputMimeTypes: [],
+    sourceCapabilities: { image: false, reasoningOptions: ['off'] },
+    api: 'openai-completions',
     capabilities: ['text'],
     contextWindow: 4096,
     displayName,

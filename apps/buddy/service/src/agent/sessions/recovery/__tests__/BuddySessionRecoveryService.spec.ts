@@ -1,10 +1,27 @@
 import type { Api, Model } from '@earendil-works/pi-ai'
+import type { RunRecord } from '../../../../storage/runRecord'
+import type { UsageRecord } from '../../../../storage/usageRepository'
 import { describe, expect, it, vi } from 'vitest'
 import {
   BuddySessionRecoveryService,
 } from '../BuddySessionRecoveryService'
 
 describe('buddySessionRecoveryService', () => {
+  it.each([false, true])('preserves delivery evidence when recovering a run with a size error (delivered: %s)', async (delivered) => {
+    const service = new BuddySessionRecoveryService({
+      attachments: { resolveRecoveryInputReferences: async () => ({ documents: [{ attachmentId: 'audio-1', mimeType: 'audio/wav' }], images: [], missingAttachmentIds: [] }) },
+      conversations: { listBranchMessages: () => [message('user-1', 'user', { text: 'Inspect audio' }), message('error-1', 'assistant', { text: '' }, 'run-1')] },
+      models: { resolve: () => model() },
+      runInputs: { findByTriggeringMessageId: () => ({ runId: 'run-1', attachmentIds: ['audio-1'], prompt: 'Inspect audio', reasoning: null, serviceTier: null, contextItems: [], createdAt: '2026-09-12T00:00:00.000Z' }) },
+      runs: { findById: () => ({ id: 'run-1', status: 'failed', errorCode: 'MODEL_INPUT_TOO_LARGE' }) as RunRecord },
+      usage: { listForRun: () => delivered ? [{ totalTokens: 20 } as UsageRecord] : [] },
+    })
+    const result = await service.create({ conversationId: 'conversation-1', branchId: 'branch-1', fallbackModel: model(), point: { kind: 'branch_head' } })
+    if (delivered)
+      expect(result.messages[0]).toMatchObject({ buddyInput: { documents: [{ attachmentId: 'audio-1', mimeType: 'audio/wav' }] } })
+    else
+      expect(result.messages[0]).toMatchObject({ content: expect.stringContaining('MODEL_INPUT_TOO_LARGE') })
+  })
   it('uses different product-history boundaries for a turn and a compaction', async () => {
     const history = [
       message('user-1', 'user', { text: 'First question' }),
@@ -12,12 +29,14 @@ describe('buddySessionRecoveryService', () => {
       message('user-2', 'user', { text: 'Second question' }),
       message('assistant-2', 'assistant', { text: 'Second answer' }, 'run-2'),
     ]
-    const resolveRecoveryInputImageReferences = vi.fn(async () => ({
+    const resolveRecoveryInputReferences = vi.fn(async () => ({
+      documents: [],
       images: [],
       missingAttachmentIds: [],
     }))
     const service = new BuddySessionRecoveryService({
-      attachments: { resolveRecoveryInputImageReferences },
+      usage: { listForRun: () => [] },
+      attachments: { resolveRecoveryInputReferences },
       conversations: { listBranchMessages: () => history },
       models: { resolve: () => model() },
       runInputs: {
@@ -48,6 +67,7 @@ describe('buddySessionRecoveryService', () => {
     })
 
     expect(turn.messages.map(item => item.role)).toEqual(['user', 'assistant'])
+    expect((await service.create({ branchId: 'branch-1', conversationId: 'conversation-1', fallbackModel: model(), point: { kind: 'after_message', messageId: 'assistant-1' } })).messages).toEqual(turn.messages)
     expect(compaction.messages.map(item => item.role)).toEqual([
       'user',
       'assistant',

@@ -3,9 +3,10 @@ import type { LocalCustomProviderModel, LocalRuntimeModelOption } from '@buddy-s
 
 import type { ManualModelEditorActions } from './typing'
 import type { BuddyLocale } from '@/i18n/buddyI18n'
-import { NButton, NCheckbox, NInput } from 'naive-ui'
+import { NInput } from 'naive-ui'
 import { computed, reactive, shallowRef, watch } from 'vue'
 import { useBuddyI18n } from '@/i18n/buddyI18n'
+import DesktopModelSectionHeader from './DesktopModelSectionHeader.vue'
 
 const props = defineProps<{
   actions: ManualModelEditorActions
@@ -16,13 +17,8 @@ const props = defineProps<{
 }>()
 const { t } = useBuddyI18n(() => props.language)
 const editing = shallowRef(false)
-const form = reactive({ image: false, name: '', reasoning: false })
+const form = reactive({ name: '' })
 const valid = computed(() => form.name.trim().length > 0)
-const capabilitySummary = computed(() => [
-  t('desktop.providers.textInput'),
-  ...(props.model.capabilities.includes('image') ? [t('desktop.providers.imageInput')] : []),
-  ...(props.model.capabilities.includes('reasoning') ? [t('desktop.providers.reasoning')] : []),
-].join(' · '))
 
 watch([
   () => props.show,
@@ -37,8 +33,6 @@ watch([
 
 function resetForm() {
   form.name = props.model.displayName
-  form.image = props.model.capabilities.includes('image')
-  form.reasoning = props.model.capabilities.includes('reasoning')
 }
 
 function startEditing() {
@@ -52,10 +46,10 @@ async function save() {
   const input: LocalCustomProviderModel = {
     contextWindow: props.model.sourceContextWindow,
     id: props.model.modelId,
-    input: form.image ? ['text', 'image'] : ['text'],
+    input: props.model.sourceCapabilities.image ? ['text', 'image'] : ['text'],
     maxTokens: props.model.sourceMaxTokens,
     name: form.name.trim(),
-    reasoning: form.reasoning,
+    reasoning: props.model.sourceCapabilities.reasoningOptions.some(level => level !== 'off'),
   }
   if (await props.actions.saveManualModel(input))
     editing.value = false
@@ -64,47 +58,28 @@ async function save() {
 
 <template>
   <section class="desktop-manual-model-info-panel">
-    <header class="desktop-manual-model-info-panel__header">
-      <div>
-        <h3>{{ t('desktop.providers.modelInformation') }}</h3>
-        <p>{{ t('desktop.providers.modelInformationDescription') }}</p>
-      </div>
-      <NButton v-if="!editing" quaternary size="small" @click="startEditing">
-        {{ t('common.edit') }}
-      </NButton>
-    </header>
+    <DesktopModelSectionHeader
+      :label="t('desktop.providers.modelInformation')"
+      :language="language"
+      :editing="editing"
+      :saving="saving"
+      :valid="valid"
+      @edit="startEditing"
+      @cancel="editing = false"
+      @save="save"
+    />
 
     <div v-if="editing" class="desktop-manual-model-info-panel__form">
       <label>
         <span>{{ t('desktop.providers.modelName') }}</span>
-        <NInput v-model:value="form.name" />
+        <NInput v-model:value="form.name" :disabled="saving" />
       </label>
-      <div class="desktop-manual-model-info-panel__checks">
-        <NCheckbox v-model:checked="form.image">
-          {{ t('desktop.providers.imageInput') }}
-        </NCheckbox>
-        <NCheckbox v-model:checked="form.reasoning">
-          {{ t('desktop.providers.reasoning') }}
-        </NCheckbox>
-      </div>
-      <div class="desktop-manual-model-info-panel__form-actions">
-        <NButton size="small" @click="editing = false">
-          {{ t('common.cancel') }}
-        </NButton>
-        <NButton size="small" type="primary" :disabled="!valid" :loading="saving" @click="save">
-          {{ t('common.save') }}
-        </NButton>
-      </div>
     </div>
 
     <dl v-else class="desktop-manual-model-info-panel__values">
       <div>
         <dt>{{ t('desktop.providers.displayName') }}</dt>
         <dd>{{ model.displayName }}</dd>
-      </div>
-      <div>
-        <dt>{{ t('desktop.providers.modelCapabilities') }}</dt>
-        <dd>{{ capabilitySummary }}</dd>
       </div>
     </dl>
   </section>
@@ -118,33 +93,6 @@ async function save() {
   background: var(--buddy-surface-base);
 }
 
-.desktop-manual-model-info-panel__header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  padding: 0.9rem 1rem;
-}
-
-.desktop-manual-model-info-panel__header > div {
-  display: grid;
-  gap: 0.18rem;
-}
-
-.desktop-manual-model-info-panel__header h3,
-.desktop-manual-model-info-panel__header p {
-  margin: 0;
-}
-
-.desktop-manual-model-info-panel__header h3 {
-  font-size: 0.76rem;
-}
-
-.desktop-manual-model-info-panel__header p {
-  color: var(--buddy-text-secondary);
-  font-size: 0.66rem;
-}
-
 .desktop-manual-model-info-panel__values,
 .desktop-manual-model-info-panel__form {
   display: grid;
@@ -153,15 +101,13 @@ async function save() {
 }
 
 .desktop-manual-model-info-panel__values > div,
-.desktop-manual-model-info-panel__form > label,
-.desktop-manual-model-info-panel__checks {
+.desktop-manual-model-info-panel__form > label {
   display: grid;
   gap: 0.3rem;
   padding: 0.7rem 1rem;
 }
 
-.desktop-manual-model-info-panel__values > div + div,
-.desktop-manual-model-info-panel__checks {
+.desktop-manual-model-info-panel__values > div + div {
   border-top: 1px solid var(--buddy-border-subtle);
 }
 
@@ -180,24 +126,7 @@ async function save() {
   white-space: nowrap;
 }
 
-.desktop-manual-model-info-panel__checks {
-  display: flex;
-  gap: 1rem;
-}
-
-.desktop-manual-model-info-panel__checks :deep(.n-checkbox-box) {
-  border-radius: 3px;
-}
-
 .desktop-manual-model-info-panel__form :deep(.n-input) {
   width: 100%;
-}
-
-.desktop-manual-model-info-panel__form-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 0.5rem;
-  border-top: 1px solid var(--buddy-border-subtle);
-  padding: 0.7rem 1rem;
 }
 </style>
