@@ -35,7 +35,7 @@ describe('current execution status', () => {
   })
 
   it('moves between reasoning, compaction and model progress using the current event state', () => {
-    expect(describeChatCurrentActivity(turn([tool('done', 'completed'), thought]), 'zh-CN')).toMatchObject({ label: '正在思考', target: 'Reviewing the implementation', reasoning: thought, tools: [] })
+    expect(describeChatCurrentActivity(turn([tool('done', 'completed'), thought]), 'zh-CN')).toMatchObject({ label: '正在思考', target: 'Details', reasoning: thought, tools: [] })
     expect(describeChatCurrentActivity(turn([thought, compaction]), 'zh-CN')).toMatchObject({ label: '正在整理上下文', reasoning: null })
     const nodes = [{ ...thought, status: 'completed' } as ChatAgentTurnNode, { ...compaction, status: 'completed' } as ChatAgentTurnNode]
     expect(describeChatCurrentActivity(turn(nodes), 'zh-CN')?.label).toBe('等待模型响应')

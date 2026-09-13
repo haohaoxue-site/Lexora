@@ -1,11 +1,21 @@
 import type { ChatAgentReasoningNode, ChatAgentToolNode, ChatAgentTurnNode } from '../chatAgentTurn'
 import { describe, expect, it } from 'vitest'
 import { presentChatActivityLayout } from '../chatActivityLayout'
-import { summarizeChatActivity, summarizeChatActivityCounts } from '../chatActivitySummary'
+import { reasoningPreview, summarizeChatActivity, summarizeChatActivityCounts } from '../chatActivitySummary'
 import { createChatAgentActivityProjector } from '../chatAgentActivities'
 import { canExpandChatTool, describeChatTool } from '../chatToolDisplay'
 
 describe('activity grouping', () => {
+  it('keeps the beginning in historical previews and follows the latest visible content while thinking', () => {
+    const text = '**Initial observation**\n\nChecking details\n\n**Latest finding**\n```\n\n'
+    expect(reasoningPreview(text)).toBe('Initial observation')
+    expect(reasoningPreview(text, true)).toBe('Latest finding')
+    const longParagraph = `${'Earlier work '.repeat(8_000)}Current result`
+    expect(reasoningPreview(longParagraph, true)).toHaveLength(240)
+    expect(reasoningPreview(longParagraph, true).endsWith('Current result')).toBe(true)
+    expect(reasoningPreview('\n ** \n```\n', true)).toBe('')
+  })
+
   it('keeps alternating thinking and calls together and separates public narration and compaction', () => {
     const nodes: ChatAgentTurnNode[] = [thought('a'), tool('one'), thought('b'), tool('two'), { id: 'update', kind: 'text', messageId: 'message', phase: 'commentary', text: 'Next step' }, tool('three'), { id: 'compaction', kind: 'compaction', status: 'completed', tokensBefore: 100, estimatedTokensAfter: 50 }, thought('c')]
     const rows = createChatAgentActivityProjector().project(nodes)

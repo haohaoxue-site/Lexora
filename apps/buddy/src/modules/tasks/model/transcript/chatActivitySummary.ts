@@ -53,7 +53,14 @@ export function summarizeChatActivityCounts(group: ChatAgentActivityGroup, langu
   return labels.join(' · ')
 }
 
-export function reasoningPreview(text: string): string {
-  const line = text.trim().split('\n', 1)[0] ?? ''
-  return normalizeProcessNarration(line.slice(0, 240))
+export function reasoningPreview(text: string, fromEnd = false): string {
+  const lines = text.trim().split('\n')
+  if (fromEnd)
+    lines.reverse()
+  for (const line of lines) {
+    const preview = normalizeProcessNarration(fromEnd ? line.slice(-240) : line.slice(0, 240))
+    if (preview)
+      return preview
+  }
+  return ''
 }
