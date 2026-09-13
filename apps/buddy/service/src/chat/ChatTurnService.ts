@@ -594,11 +594,6 @@ export class ChatTurnService {
       replayInput,
       input.requestedModel,
     )
-    if (attachmentPrompt.imageReferences.length > 0 && !selection.input.includes('image'))
-      throw new BuddyServiceError('MODEL_INPUT_UNSUPPORTED')
-    if (attachmentPrompt.documentReferences.some(file => !selection.fileInputMimeTypes.includes(file.mimeType))) {
-      throw new BuddyServiceError('MODEL_INPUT_UNSUPPORTED')
-    }
     await this.#options.inputValidation.validate({
       conversationId: input.conversationId,
       branchId: input.branchId,

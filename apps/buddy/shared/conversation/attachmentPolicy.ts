@@ -62,6 +62,8 @@ export const BUDDY_ATTACHMENT_DIALOG_EXTENSIONS = [
 ]
 
 export interface BuddyAttachmentUpload {
+  nameSource?: 'file' | 'clipboard'
+  sourcePath?: string
   bytes: Uint8Array
   mimeType: string
   name: string

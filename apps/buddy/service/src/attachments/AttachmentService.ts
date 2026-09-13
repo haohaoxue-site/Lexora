@@ -2,10 +2,12 @@ import type { ImageContent } from '@earendil-works/pi-ai'
 import type { Buffer } from 'node:buffer'
 import type { BuddyAttachmentUpload } from '../../../shared/conversation/attachmentPolicy'
 import type { BuddyPromptDirective, BuddyUserContentV1 } from '../../../shared/conversation/buddyUserContent'
+import type { BuddyInputReferenceV1 } from '../agent/context/BuddyInputReference'
 import type { AttachmentRecord, AttachmentRepository } from '../storage/attachmentRepository'
 import type { BuddyDataPaths } from '../storage/BuddyDataPaths'
 import type { AttachmentDocumentReference, AttachmentFileInput } from './AttachmentDocumentReference'
 import type { AttachmentImageReference } from './AttachmentImageReference'
+import type { AttachmentToolWorkspace } from './AttachmentToolWorkspace'
 import { randomUUID } from 'node:crypto'
 import { constants } from 'node:fs'
 import { chmod, copyFile, mkdir, open, readdir, readFile, realpath, stat, unlink, writeFile } from 'node:fs/promises'
@@ -19,6 +21,7 @@ import {
   getAttachmentKind,
 } from '../../../shared/conversation/attachmentPolicy'
 import { projectBuddyUserContent } from '../../../shared/conversation/buddyUserContentProjection'
+import { getAttachmentLabels } from './attachmentLabels'
 import { hasDocumentSignature } from './validateDocumentBytes'
 
 export const DRAFT_ATTACHMENT_RETENTION_MS = 7 * 24 * 60 * 60 * 1000
@@ -59,6 +62,7 @@ export interface AttachmentFileReader {
 }
 
 export interface AttachmentRecoveryResult {
+  resourceLabels?: Record<string, string>
   documents: AttachmentDocumentReference[]
   images: AttachmentImageReference[]
   missingAttachmentIds: string[]
@@ -71,6 +75,7 @@ export interface AttachmentStorageReconciliation {
 }
 
 export interface MessageAttachmentBinding {
+  nameSource?: 'file' | 'clipboard'
   createdAt: string
   id: string
   messageId: string
@@ -138,6 +143,7 @@ export class AttachmentService {
           messageId: null,
           mimeType,
           name: basename(sourcePath),
+          sourcePath,
           sizeBytes: metadata.size,
           storedPath,
         }
@@ -185,6 +191,8 @@ export class AttachmentService {
           messageId: null,
           mimeType: source.mimeType,
           name: source.name,
+          nameSource: source.nameSource ?? 'file',
+          sourcePath: source.sourcePath,
           sizeBytes: source.bytes.byteLength,
           storedPath,
         }
@@ -234,6 +242,7 @@ export class AttachmentService {
           messageId: input.messageId,
           mimeType: record.mimeType,
           name: record.name,
+          nameSource: record.nameSource,
           sizeBytes: record.sizeBytes,
           sourceAttachmentId: record.id,
           sourceDraftId: record.draftId,
@@ -425,7 +434,7 @@ export class AttachmentService {
           if (!record || !value)
             throw new AttachmentError('ATTACHMENT_NOT_FOUND')
           return value.imageReference
-            ? { kind: 'image', name: record.name }
+            ? { kind: 'image', name: record.name, nameSource: record.nameSource }
             : value.documentReference
               ? { kind: getDocumentKind(value.documentReference.mimeType), name: record.name }
               : { kind: 'text', name: record.name, text: value.text! }
@@ -449,13 +458,38 @@ export class AttachmentService {
     return ids.map(id => this.#requireForPrompt(id, conversationId, draftId))
   }
 
+  async materializeInputResources(input: BuddyInputReferenceV1, conversationId: string, workspace: AttachmentToolWorkspace): Promise<string> {
+    const ids = input.attachmentIds ?? [...input.images, ...input.documents ?? []].map(file => file.attachmentId)
+    const records = this.getInputMetadata(ids, conversationId)
+    const nativeIds = new Set([...input.images, ...input.documents ?? []].map(file => file.attachmentId))
+    const labels = input.resourceLabels ?? getAttachmentLabels(records, input.prompt)
+    const resources = await Promise.all(records.map(async (record) => {
+      const bytes = await this.#readFile(record.storedPath)
+      if (bytes.length !== record.sizeBytes || (isDocumentMimeType(record.mimeType) && !hasDocumentSignature(record.mimeType, bytes)))
+        throw new AttachmentError('VALIDATION_FAILED')
+      const path = await workspace.materialize(record, bytes)
+      return {
+        attachmentId: record.id,
+        label: labels[record.id],
+        name: record.name,
+        mimeType: record.mimeType,
+        path,
+        sourcePath: record.sourcePath,
+        content: nativeIds.has(record.id) ? 'native' : isTextAttachment(record) ? 'text' : 'file_only',
+      }
+    }))
+    return resources.length ? `<attachment_resources>\n${JSON.stringify(resources)}\n</attachment_resources>` : ''
+  }
+
   async resolveInputReferences(
     ids: readonly string[],
     conversationId: string,
-  ): Promise<{ images: AttachmentImageReference[], documents: AttachmentDocumentReference[] }> {
+    prompt = '',
+  ): Promise<{ images: AttachmentImageReference[], documents: AttachmentDocumentReference[], resourceLabels?: Record<string, string> }> {
     const records = ids.map(id => this.#requireForPrompt(id, conversationId, null))
     validateTotalBytes(records.map(record => record.sizeBytes))
     return {
+      resourceLabels: getAttachmentLabels(records, prompt),
       images: records.flatMap(record => (
         record.mimeType.startsWith('image/') && record.mimeType !== 'image/svg+xml'
           ? [toImageReference(record)]
@@ -528,6 +562,7 @@ export class AttachmentService {
   async resolveRecoveryInputReferences(
     ids: readonly string[],
     conversationId: string,
+    prompt = '',
   ): Promise<AttachmentRecoveryResult> {
     const resolved = ids.map((id) => {
       try {
@@ -547,12 +582,12 @@ export class AttachmentService {
     }> => {
       if (!record)
         return { images: [], missingAttachmentId: id }
-      if (!isDocumentMimeType(record.mimeType) && (!record.mimeType.startsWith('image/') || record.mimeType === 'image/svg+xml'))
-        return { images: [], missingAttachmentId: null }
       try {
         const metadata = await stat(record.storedPath)
-        if (!metadata.isFile())
+        if (!metadata.isFile() || metadata.size !== record.sizeBytes)
           return { images: [], missingAttachmentId: id }
+        if (!isDocumentMimeType(record.mimeType) && (!record.mimeType.startsWith('image/') || record.mimeType === 'image/svg+xml'))
+          return { images: [], missingAttachmentId: null }
         return isDocumentMimeType(record.mimeType)
           ? { documents: [toDocumentReference(record)], images: [], missingAttachmentId: null }
           : { images: [toImageReference(record)], missingAttachmentId: null }
@@ -564,6 +599,7 @@ export class AttachmentService {
       }
     }))
     return {
+      resourceLabels: resolved.every(item => item.record) ? getAttachmentLabels(resolved.map(item => item.record!), prompt) : {},
       documents: recovered.flatMap(item => item.documents ?? []),
       images: recovered.flatMap(item => item.images),
       missingAttachmentIds: recovered.flatMap(

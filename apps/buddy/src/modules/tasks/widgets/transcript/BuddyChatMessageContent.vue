@@ -11,7 +11,6 @@ import { FileIcon } from '@/shared/ui/file-icon'
 import BuddyImagePreview from '@/shared/ui/media/BuddyImagePreview.vue'
 import { resolveBuddyAttachmentPreviewUrl } from '../../model/attachments/chatAttachmentView'
 import { getChatMessageDisplayText, getChatMessageImageLabels, getChatMessageUserContent } from '../../model/transcript/chatMessageContent'
-import ResourceReferenceBadge from '../attachments/ResourceReferenceBadge.vue'
 import { useResourceHighlight } from '../attachments/useResourceHighlight'
 import ChatQuoteStrip from '../quotes/ChatQuoteStrip.vue'
 import BuddyChatMarkdownContent from './BuddyChatMarkdownContent.vue'
@@ -44,7 +43,6 @@ const structuredUserContent = computed(() => getChatMessageUserContent(props.mes
 const imageLabels = computed(() => getChatMessageImageLabels(props.message))
 const allAttachmentViews = computed(() => props.message.attachments.map(attachment => ({
   attachment,
-  isReference: false,
   previewUrl: resolveBuddyAttachmentPreviewUrl(attachment),
   resourceId: attachment.attachmentId,
 })))
@@ -61,11 +59,10 @@ const attachmentViews = computed(() => {
   const structured = structuredUserContent.value
   if (!structured)
     return allAttachmentViews.value
-  const panelIds = new Set(structured.userContent.panelResourceIds)
   return getBuddyUserContentResourceIds(structured.userContent).flatMap((resourceId) => {
     const attachment = attachmentByResourceId.value.get(resourceId)
     return attachment
-      ? [{ attachment, isReference: !panelIds.has(resourceId), previewUrl: resolveBuddyAttachmentPreviewUrl(attachment), resourceId }]
+      ? [{ attachment, previewUrl: resolveBuddyAttachmentPreviewUrl(attachment), resourceId }]
       : []
   })
 })
@@ -137,7 +134,6 @@ function previewLeaveTransition(): Promise<void> {
         :data-resource-card="view.resourceId"
         @click="openPreview(view.attachment.attachmentId)"
       >
-        <ResourceReferenceBadge v-if="view.isReference" :language="language" />
         <button
           v-if="view.previewUrl && !failedAttachmentIds.has(view.attachment.attachmentId)"
           class="buddy-chat-message-content__preview-trigger"

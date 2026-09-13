@@ -469,7 +469,7 @@ export function useTaskCapability(options: UseTaskCapabilityOptions): TaskCapabi
       editorKey: readonly(drafts.editorKey),
       resources: composerResources.resources,
       rejectedResourceIds: composerResources.rejectedIds,
-      beginImport: (files: readonly File[]) => lifecycle.hasCompletedInitialLoad.value ? composerResources.begin(files) : [],
+      beginImport: (files: readonly File[], origin?: 'file' | 'clipboard') => lifecycle.hasCompletedInitialLoad.value ? composerResources.begin(files, origin) : [],
       selectSource: composerResources.selectSource,
       retryResource: composerResources.retry,
       canUpdatePermissionSettings: readonly(canUpdatePermissionSettings),

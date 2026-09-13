@@ -11,11 +11,10 @@ import type { BuddyDataPaths } from '../storage/BuddyDataPaths'
 import type { RunInputRepository } from '../storage/runInputRepository'
 import type { RunRepository } from '../storage/runRepository'
 import { Buffer } from 'node:buffer'
-import { isDocumentMimeType } from '../../../shared/conversation/attachmentFormats'
 import { readBuddyInputReference } from '../agent/context/BuddyInputReference'
 import { prepareBuddyInputHistory } from '../agent/context/prepareBuddyInputHistory'
-import { supportsModelFileInput } from '../providers/modelCapabilities'
-import { assertModelInputBudget, base64BytesLength } from '../providers/modelInputBudget'
+import { projectMessageImages } from '../agent/context/projectBuddyInput'
+import { assertModelInputBudget } from '../providers/modelInputBudget'
 import { BuddyServiceError } from '../rpc/runtimeRequest'
 
 export type ChatInputHistoryPoint
@@ -56,19 +55,19 @@ export class ChatInputValidationService {
 
   async validate(input: ChatInputValidationInput): Promise<void> {
     const model = await this.#options.models.resolveAvailable(input)
-    const currentBytes = this.#attachmentBytes(input.attachments, model)
+    const currentBytes = input.attachments.length * 1024
     const context = await this.#readContext(input, model)
     let bytes = currentBytes + Buffer.byteLength(JSON.stringify(input.prompt), 'utf8')
       + Buffer.byteLength(context.systemPrompt ?? '', 'utf8')
     for (const message of prepareBuddyInputHistory(context.messages)) {
       const reference = readBuddyInputReference(message)
       if (!reference) {
-        bytes += Buffer.byteLength(JSON.stringify(message), 'utf8')
+        bytes += Buffer.byteLength(JSON.stringify(projectMessageImages(message, model)), 'utf8')
         continue
       }
-      const files = [...reference.images, ...reference.documents ?? []]
-      const records = this.#options.attachments.getInputMetadata(files.map(file => file.attachmentId), input.conversationId)
-      bytes += Buffer.byteLength(JSON.stringify(reference.prompt), 'utf8') + this.#attachmentBytes(records, model)
+      const ids = reference.attachmentIds ?? [...reference.images, ...reference.documents ?? []].map(file => file.attachmentId)
+      const records = this.#options.attachments.getInputMetadata(ids, input.conversationId)
+      bytes += Buffer.byteLength(JSON.stringify(reference.prompt), 'utf8') + records.length * 1024
     }
     try {
       assertModelInputBudget(model.api, bytes)
@@ -76,19 +75,6 @@ export class ChatInputValidationService {
     catch {
       throw new BuddyServiceError('MODEL_INPUT_TOO_LARGE')
     }
-  }
-
-  #attachmentBytes(records: ChatInputValidationInput['attachments'], model: InputModel): number {
-    let bytes = 0
-    for (const record of records) {
-      const image = record.mimeType.startsWith('image/') && record.mimeType !== 'image/svg+xml'
-      const document = isDocumentMimeType(record.mimeType)
-      if ((image && !model.input.includes('image')) || (document && !supportsModelFileInput(model, record.mimeType)))
-        throw new BuddyServiceError('MODEL_INPUT_UNSUPPORTED')
-      if (image || document)
-        bytes += base64BytesLength(record.sizeBytes) + 512
-    }
-    return bytes
   }
 
   async #readContext(input: ChatInputValidationInput, model: InputModel): Promise<{ messages: AgentSession['messages'], systemPrompt?: string }> {

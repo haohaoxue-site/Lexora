@@ -30,20 +30,19 @@ describe('buddyChatMessageContent', () => {
     expect(document.body.textContent).toContain('<img src="https://example.com/pixel.png" alt="像素">')
   })
 
-  it.each([false, true])('renders inline-only snapshots once above the body and marks only reference cards (independent attachment: %s)', async (panel) => {
+  it.each([false, true])('renders inline-only snapshots once above the body and keeps named references readable (independent attachment: %s)', async (panel) => {
     const html = await renderStructuredUserMessage(panel)
     const document = parseHtml(html)
     const body = document.querySelector('.buddy-chat-message-content__structured-body')
     const reference = document.querySelector('[data-resource-id="resource-1"]')
 
-    expect(body?.textContent).toContain('先看[Image #1]后[Image #1]')
-    expect(reference?.textContent).toBe('[Image #1]')
+    expect(body?.textContent).toContain('先看@reference.png后@reference.png')
+    expect(reference?.textContent).toBe('@reference.png')
     expect(document.querySelector('.buddy-chat-message-content__attachments')?.textContent)
-      .toContain('[Image #1]')
+      .toContain('reference.png')
     expect(document.querySelectorAll('.buddy-chat-message-content__attachment')).toHaveLength(1)
     expect(document.querySelectorAll('.buddy-chat-resource-reference')).toHaveLength(2)
-    expect(document.querySelectorAll('.resource-reference-badge')).toHaveLength(panel ? 0 : 1)
-    expect(reference?.getAttribute('aria-label')).toBe('定位附件 [Image #1]')
+    expect(reference?.getAttribute('aria-label')).toBe('定位附件 reference.png')
     expect(reference?.getAttribute('href')).toBe('#buddy-attachment-attachment-1')
     expect(document.getElementById('buddy-attachment-attachment-1')?.classList.contains('buddy-chat-message-content__attachment')).toBe(true)
     expect(document.querySelector('.buddy-chat-message-content__preview-trigger img')?.getAttribute('src')).toBe('lexora-attachment://preview/attachment-1')

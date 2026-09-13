@@ -9,6 +9,7 @@ import type { ChatTurnService } from './ChatTurnService'
 import { createHash } from 'node:crypto'
 import { isDocumentMimeType } from '../../../shared/conversation/attachmentFormats'
 import { createBuddyInputReference } from '../agent/context/BuddyInputReference'
+import { getAttachmentLabels } from '../attachments/attachmentLabels'
 import { BuddyServiceError } from '../rpc/runtimeRequest'
 
 export interface ChatQueueServiceOptions {
@@ -92,6 +93,8 @@ export class ChatQueueService {
           ? [{ attachmentId: binding.id, mimeType: binding.mimeType }]
           : [])
         const reference = createBuddyInputReference({
+          attachmentIds: [...input.runInput.attachmentIds],
+          resourceLabels: getAttachmentLabels(input.attachmentBindings, input.runInput.prompt),
           ...(documents.length ? { documents } : {}),
           messageId: input.userMessageId,
           prompt: input.runInput.prompt,

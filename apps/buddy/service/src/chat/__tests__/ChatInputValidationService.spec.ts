@@ -8,19 +8,19 @@ import { createBuddyInputReference, createBuddyInputReferenceMessage } from '../
 import { ChatInputValidationService } from '../ChatInputValidationService'
 
 describe('chat input validation', () => {
-  it('counts base64 expansion across history and the next input before submission', async () => {
+  it('allows native bytes to be projected at request time', async () => {
     const fixture = createFixture()
     const audio = fixture.attach('audio/wav', 8 * 1024 * 1024)
     await expect(fixture.service.validate({ ...input(), attachments: [audio] })).resolves.toBeUndefined()
     fixture.history.appendMessage(reference(audio))
-    await expect(fixture.service.validate({ ...input(), attachments: [audio] })).rejects.toMatchObject({ code: 'MODEL_INPUT_TOO_LARGE' })
+    await expect(fixture.service.validate({ ...input(), attachments: [audio] })).resolves.toBeUndefined()
     await expect(fixture.service.validate(input())).resolves.toBeUndefined()
   })
 
-  it('budgets retained images, text and documents together', async () => {
+  it('still rejects oversized mandatory text', async () => {
     const fixture = createFixture()
     fixture.history.appendMessage(reference(fixture.attach('image/png', 7 * 1024 * 1024)))
-    await expect(fixture.service.validate({ ...input(), prompt: 'x'.repeat(3 * 1024 * 1024), attachments: [fixture.attach('application/pdf', 5 * 1024 * 1024)] })).rejects.toMatchObject({ code: 'MODEL_INPUT_TOO_LARGE' })
+    await expect(fixture.service.validate({ ...input(), prompt: 'x'.repeat(20 * 1024 * 1024), attachments: [fixture.attach('application/pdf', 5 * 1024 * 1024)] })).rejects.toMatchObject({ code: 'MODEL_INPUT_TOO_LARGE' })
   })
 
   it('uses the compacted branch context instead of all historical attachment records', async () => {
@@ -31,9 +31,9 @@ describe('chat input validation', () => {
     await expect(fixture.service.validate({ ...input(), attachments: [fixture.attach('audio/wav', 8 * 1024 * 1024)] })).resolves.toBeUndefined()
   })
 
-  it.each(['google-generative-ai', 'openai-completions'] as const)('rejects M4A on %s while allowing supported audio formats', async (api) => {
+  it.each(['google-generative-ai', 'openai-completions'] as const)('allows file-only M4A on %s alongside native audio', async (api) => {
     const fixture = createFixture({ api })
-    await expect(fixture.service.validate({ ...input(), attachments: [fixture.attach('audio/mp4', 100)] })).rejects.toMatchObject({ code: 'MODEL_INPUT_UNSUPPORTED' })
+    await expect(fixture.service.validate({ ...input(), attachments: [fixture.attach('audio/mp4', 100)] })).resolves.toBeUndefined()
     await expect(fixture.service.validate({ ...input(), attachments: [fixture.attach('audio/mpeg', 100)] })).resolves.toBeUndefined()
   })
 
@@ -45,14 +45,14 @@ describe('chat input validation', () => {
   it('validates historical formats when switching models', async () => {
     const fixture = createFixture({ api: 'openai-completions' })
     fixture.history.appendMessage(reference(fixture.attach('video/mp4', 100)))
-    await expect(fixture.service.validate(input())).rejects.toMatchObject({ code: 'MODEL_INPUT_UNSUPPORTED' })
+    await expect(fixture.service.validate(input())).resolves.toBeUndefined()
   })
 
   it('includes active input and pending steering when checking another input', async () => {
     const fixture = createFixture()
     const audio = fixture.attach('audio/wav', 8 * 1024 * 1024)
     fixture.active.messages = [reference(audio)]
-    await expect(fixture.service.validate({ ...input(), attachments: [audio] })).rejects.toMatchObject({ code: 'MODEL_INPUT_TOO_LARGE' })
+    await expect(fixture.service.validate({ ...input(), attachments: [audio] })).resolves.toBeUndefined()
   })
 })
 

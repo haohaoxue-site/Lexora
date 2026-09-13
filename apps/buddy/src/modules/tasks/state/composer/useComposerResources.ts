@@ -60,7 +60,7 @@ export function useComposerResources(options: UseComposerResourcesOptions): Comp
     try {
       accepted = await options.api.accept({
         draftId,
-        resources: incoming.map(({ resourceId, name, mimeType, sizeBytes }) => ({ resourceId, name, mimeType, sizeBytes })),
+        resources: incoming.map(({ resourceId, name, nameSource, mimeType, sizeBytes, sourcePath }) => ({ resourceId, name, nameSource, mimeType, sizeBytes, sourcePath })),
       })
     }
     catch (error) {
@@ -84,7 +84,7 @@ export function useComposerResources(options: UseComposerResourcesOptions): Comp
     }
   }
 
-  function begin(files: readonly File[]): readonly string[] {
+  function begin(files: readonly File[], origin: 'file' | 'clipboard' = 'file'): readonly string[] {
     const currentIds = new Set(options.getReferencedIds(options.draftId.value))
     const currentBytes = totalBytes(currentIds)
     if (!files.length)
@@ -100,11 +100,14 @@ export function useComposerResources(options: UseComposerResourcesOptions): Comp
     const incoming = files.map((file): BuddyComposerResource => {
       const resourceId = crypto.randomUUID()
       sources.set(resourceId, file)
+      const sourcePath = window.lexoraDesktop?.clipboard.getFilePath(file) || undefined
       const resource: BuddyComposerResource = {
         draftId,
         kind: getAttachmentKind(file.name.toLowerCase().endsWith('.pdf') ? 'application/pdf' : BUDDY_MEDIA_EXTENSIONS[`.${file.name.split('.').at(-1)?.toLowerCase()}` as keyof typeof BUDDY_MEDIA_EXTENSIONS] ?? file.type),
         mimeType: file.type,
         name: file.name,
+        nameSource: origin === 'clipboard' && file.type.startsWith('image/') && !sourcePath ? 'clipboard' : 'file',
+        sourcePath,
         resourceId,
         sizeBytes: file.size,
         state: 'importing',
@@ -233,6 +236,6 @@ function isAttachmentLimitError(error: unknown): boolean {
 }
 
 function metadata(resource: BuddyComposerResource) {
-  const { draftId, kind, mimeType, name, resourceId, sizeBytes } = resource
-  return { draftId, kind, mimeType, name, resourceId, sizeBytes }
+  const { draftId, kind, mimeType, name, nameSource, resourceId, sizeBytes, sourcePath } = resource
+  return { draftId, kind, mimeType, name, nameSource, resourceId, sizeBytes, sourcePath }
 }

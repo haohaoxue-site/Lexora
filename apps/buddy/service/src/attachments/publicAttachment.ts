@@ -12,6 +12,7 @@ export function toPublicAttachment(record: AttachmentRecord): LocalAttachment {
       : isDocumentMimeType(record.mimeType) ? getAttachmentKind(record.mimeType) : isTextMimeType(record.mimeType) ? 'text' : 'binary',
     mimeType: record.mimeType,
     name: record.name,
+    nameSource: record.nameSource,
     previewUrl: null,
     sizeBytes: record.sizeBytes,
   }

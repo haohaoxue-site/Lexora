@@ -312,7 +312,6 @@ describe('composer resource flow', () => {
     ])
     await nextTick()
     expect(flow.root.querySelectorAll('.composer-resource-strip__card')).toHaveLength(1)
-    expect(flow.root.querySelector('.resource-reference-badge')?.textContent).toBe('引用')
     flow.editor.commands.deleteRange({ from: 1, to: 2 })
     await nextTick()
     expect(flow.root.querySelectorAll('.composer-resource-strip__card')).toHaveLength(1)

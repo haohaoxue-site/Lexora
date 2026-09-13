@@ -34,26 +34,26 @@ function model(capabilities: readonly string[]): LocalRuntimeModelOption {
 }
 
 describe('composer model capability', () => {
-  it('checks the concrete audio format even when audio input is enabled', () => {
+  it('allows audio files even when the native format is unsupported', () => {
     const audioModel: LocalRuntimeModelOption = { ...model(['text', 'audio']), fileInputMimeTypes: ['audio/wav', 'audio/mpeg'] }
     const resources = [{ resource: { resourceId: 'audio-1', kind: 'audio' as const, mimeType: 'audio/mp4' } }]
-    expect(resolveChatComposerModelInputIssue({ model: audioModel, resources, resourceIds: ['audio-1'] })).toBe('audio_unsupported')
+    expect(resolveChatComposerModelInputIssue({ model: audioModel, resources, resourceIds: ['audio-1'] })).toBeNull()
     expect(resolveChatComposerModelInputIssue({ model: { ...audioModel, fileInputMimeTypes: [...audioModel.fileInputMimeTypes, 'audio/mp4'] }, resources, resourceIds: ['audio-1'] })).toBeNull()
   })
-  it('checks PDF independently from images and only for referenced resources', () => {
+  it('allows PDF files independently from native image capabilities', () => {
     const resources = [{ resource: { resourceId: 'pdf-1', kind: 'pdf' as const, mimeType: 'application/pdf' } }]
-    expect(resolveChatComposerModelInputIssue({ model: model(['text', 'image']), resources, resourceIds: ['pdf-1'] })).toBe('pdf_unsupported')
+    expect(resolveChatComposerModelInputIssue({ model: model(['text', 'image']), resources, resourceIds: ['pdf-1'] })).toBeNull()
     expect(resolveChatComposerModelInputIssue({ model: model(['text', 'pdf']), resources, resourceIds: ['pdf-1'] })).toBeNull()
     expect(resolveChatComposerModelInputIssue({ model: model(['text']), resources, resourceIds: [] })).toBeNull()
   })
 
-  it('checks referenced images against the current model capabilities', () => {
+  it('allows image files on text-only models', () => {
     const input = {
       resourceIds: ['resource-1'],
       resources: [{ resource: { resourceId: 'resource-1', kind: 'image' as const, mimeType: 'image/png' } }],
     }
 
-    expect(resolveChatComposerModelInputIssue({ ...input, model: model(['text']) })).toBe('image_unsupported')
+    expect(resolveChatComposerModelInputIssue({ ...input, model: model(['text']) })).toBeNull()
     expect(resolveChatComposerModelInputIssue({ ...input, model: model(['text', 'image']) })).toBeNull()
   })
 })

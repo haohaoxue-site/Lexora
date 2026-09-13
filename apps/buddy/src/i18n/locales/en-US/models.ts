@@ -94,7 +94,7 @@ export default {
   'desktop.providers.manage': 'Manage',
   'desktop.providers.modelId': 'Model ID',
   'desktop.providers.modelColumn': 'Model',
-  'desktop.providers.modelCapabilities': 'Capabilities',
+  'desktop.providers.modelCapabilities': 'Native input capabilities',
   'desktop.providers.capabilityEnabled': 'Enabled',
   'desktop.providers.capabilityDisabled': 'Disabled',
   'desktop.providers.thinking': 'Thinking',

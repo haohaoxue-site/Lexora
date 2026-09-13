@@ -3,7 +3,7 @@ import type { ApplicationLogQuery } from '../../shared/diagnostics/applicationLo
 import type { ApplicationStartupState } from '../../shared/diagnostics/applicationStartup'
 import type { DesktopAppInfo, DesktopOpenTarget, DesktopWindowState, LexoraConfigPatch, LexoraDesktopApi } from '../shared/desktopApi'
 import type { DesktopCommandId } from '../shared/desktopCommands'
-import { ipcRenderer } from 'electron'
+import { ipcRenderer, webUtils } from 'electron'
 import { DESKTOP_IPC_CHANNELS } from '../shared/desktopApi'
 import { subscribe } from './subscribe'
 
@@ -54,6 +54,7 @@ export function createDesktopApi(): Pick<LexoraDesktopApi, 'app' | 'clipboard' |
       ),
     }),
     clipboard: Object.freeze({
+      getFilePath: (file: File) => webUtils.getPathForFile(file),
       writeText: (text: string) => ipcRenderer.invoke(
         DESKTOP_IPC_CHANNELS.clipboardWriteText,
         { text },

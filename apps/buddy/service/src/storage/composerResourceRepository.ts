@@ -23,6 +23,8 @@ interface ComposerResourceRow {
   id: string
   mime_type: string
   name: string
+  name_source: 'file' | 'clipboard'
+  source_path: string | null
   size_bytes: number
   state: ComposerResourceRecord['state']
   source_json: string | null
@@ -39,8 +41,8 @@ export function createComposerResourceRepository(database: DatabaseSync) {
   const list = database.prepare('SELECT * FROM composer_resources WHERE draft_id = ? ORDER BY created_at, id')
   const remove = database.prepare('DELETE FROM composer_resources WHERE id = ? AND draft_id = ?')
   const insert = database.prepare(`
-    INSERT INTO composer_resources (id, draft_id, name, mime_type, size_bytes, state, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, 'importing', ?, ?)
+    INSERT INTO composer_resources (id, draft_id, name, mime_type, size_bytes, state, created_at, updated_at, name_source, source_path)
+    VALUES (?, ?, ?, ?, ?, 'importing', ?, ?, ?, ?)
   `)
   const finish = database.prepare(`
     UPDATE composer_resources SET state = 'ready', attachment_id = ?, content_hash = ?, updated_at = ?
@@ -65,8 +67,8 @@ export function createComposerResourceRepository(database: DatabaseSync) {
     WHERE attachment_id = ? AND state = 'ready'
   `)
   const insertSource = database.prepare(`
-    INSERT INTO composer_resources (id, draft_id, name, mime_type, size_bytes, state, source_json, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, 'ready', ?, ?, ?)
+    INSERT INTO composer_resources (id, draft_id, name, mime_type, size_bytes, state, source_json, created_at, updated_at, name_source, source_path)
+    VALUES (?, ?, ?, ?, ?, 'ready', ?, ?, ?, ?, ?)
   `)
   const findSource = database.prepare('SELECT * FROM composer_resources WHERE draft_id = ? AND source_json = ?')
 
@@ -82,7 +84,7 @@ export function createComposerResourceRepository(database: DatabaseSync) {
       const selected = findSource.get(draftId, sourceJson) as ComposerResourceRow | undefined
       if (selected)
         return toResource(selected)
-      insertSource.run(resource.resourceId, draftId, resource.name, resource.mimeType, resource.sizeBytes, sourceJson, now, now)
+      insertSource.run(resource.resourceId, draftId, resource.name, resource.mimeType, resource.sizeBytes, sourceJson, now, now, resource.nameSource ?? 'file', resource.sourcePath ?? null)
       return toResource(find.get(resource.resourceId) as unknown as ComposerResourceRow)
     },
     selectSpaceFile(draftId: string, resource: BuddyComposerResourceMetadata, source: BuddySpaceFileOrigin, now: string) {
@@ -94,13 +96,15 @@ export function createComposerResourceRepository(database: DatabaseSync) {
         if (existing) {
           if (
             existing.source_json !== null || existing.draft_id !== draftId || existing.name !== resource.name
+            || existing.name_source !== (resource.nameSource ?? 'file')
+            || existing.source_path !== (resource.sourcePath ?? null)
             || existing.mime_type !== resource.mimeType || existing.size_bytes !== resource.sizeBytes
           ) {
             throw new ComposerResourceConflictError('Resource identity conflict')
           }
           return toResource(existing)
         }
-        insert.run(resource.resourceId, draftId, resource.name, resource.mimeType, resource.sizeBytes, now, now)
+        insert.run(resource.resourceId, draftId, resource.name, resource.mimeType, resource.sizeBytes, now, now, resource.nameSource ?? 'file', resource.sourcePath ?? null)
         return toResource(find.get(resource.resourceId) as unknown as ComposerResourceRow)
       }))
     },
@@ -150,6 +154,8 @@ function toResource(row: ComposerResourceRow): ComposerResourceRecord {
     errorCode: row.error_code,
     mimeType: row.mime_type,
     name: row.name,
+    nameSource: row.name_source,
+    sourcePath: row.source_path ?? undefined,
     resourceId: row.id,
     sizeBytes: row.size_bytes,
     state: row.state,

@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { isAbsolutePath } from '../runtime/apiValidation'
 import {
   BUDDY_ATTACHMENT_COUNT_LIMIT,
   BUDDY_ATTACHMENT_TOTAL_BYTES_LIMIT,
@@ -8,6 +9,8 @@ import { buddyResourceIdSchema } from './buddyUserContent'
 export const buddyComposerResourceMetadataSchema = z.object({
   mimeType: z.string().trim().max(255),
   name: z.string().trim().min(1).max(255),
+  nameSource: z.enum(['file', 'clipboard']).optional(),
+  sourcePath: z.string().min(1).max(4096).refine(value => isAbsolutePath(value) && !value.includes('\0')).optional(),
   resourceId: buddyResourceIdSchema,
   sizeBytes: z.number().int().nonnegative().max(BUDDY_ATTACHMENT_TOTAL_BYTES_LIMIT),
 }).strict()

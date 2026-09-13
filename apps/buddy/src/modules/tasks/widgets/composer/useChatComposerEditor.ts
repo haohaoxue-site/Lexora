@@ -8,7 +8,7 @@ import { computed, shallowRef, watch } from 'vue'
 import { useBuddyI18n } from '@/i18n/buddyI18n'
 import { createChatComposerContentFromText, findChatComposerTrigger, getChatComposerResourceIds, serializeChatComposerContent, shouldSubmitChatComposerKey } from '@/modules/prompt-input'
 import { ChatComposerDocument, ChatComposerPromptDirective, ChatComposerResourceClipboard, ChatComposerResourceReference, moveChatComposerResourceSelection } from '@/modules/prompt-input/ui'
-import { getFileIconUrl, resolveFileIcon } from '@/shared/ui/file-icon'
+import { resolveFileIcon } from '@/shared/ui/file-icon'
 import { getChatImageLabels } from '../../model/attachments/chatAttachmentView'
 
 export function useChatComposerEditor(options: ChatComposerEditorOptions) {
@@ -51,9 +51,9 @@ export function useChatComposerEditor(options: ChatComposerEditorOptions) {
           const iconName = resolveFileIcon(name)
           return {
             iconName,
-            iconUrl: imageLabel ? '' : getFileIconUrl(iconName),
+            iconUrl: '',
             isImage: Boolean(imageLabel),
-            label: imageLabel ?? name,
+            label: imageLabel ?? `@${name}`,
             text: imageLabel ?? `@${name}`,
           }
         },

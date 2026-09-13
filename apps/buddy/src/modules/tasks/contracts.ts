@@ -99,7 +99,7 @@ export interface TaskComposer {
   selectedModelId: State<string | null>
   selectedServiceTier: State<BuddyServiceTier | null>
   permissionMode: State<BuddyPermissionMode>
-  beginImport: (files: readonly File[]) => readonly string[]
+  beginImport: (files: readonly File[], origin?: 'file' | 'clipboard') => readonly string[]
   dismissInteraction: (id: string) => void
   listContextOptions: (fileQuery: string | null) => Promise<ChatComposerContextOptions>
   retryResource: (resourceId: string) => Promise<void>

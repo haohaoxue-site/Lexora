@@ -11,6 +11,7 @@ import type {
 import type { BuddyExtensionRunContextStore } from '../extensions/BuddyExtensionRunContext'
 import type { BuddySessionShutdownReason, BuddySessionTurnContext, ReusableBuddySession } from './ReusableBuddySession'
 import type { BuddyConversationTreeCursor } from './tree/BuddyConversationTree'
+import { Buffer } from 'node:buffer'
 import { randomUUID } from 'node:crypto'
 import { createAssistantMessageEventStream } from '@earendil-works/pi-ai'
 import {
@@ -20,10 +21,12 @@ import {
 import { BUDDY_DEFAULT_THINKING_LEVEL } from '../../../../shared/conversation/modelSelection'
 import { applyDocumentInputPayload } from '../../providers/documentInputPayload'
 import { supportsModelFileInput, supportsModelToolCalls } from '../../providers/modelCapabilities'
+import { getModelRequestBytesLimit } from '../../providers/modelInputBudget'
 import { createBuddyInputReferenceMessage, readBuddyInputReference } from '../context/BuddyInputReference'
 import { buildBuddyRequestContext } from '../context/buildBuddyRequestContext'
 import { createContextUsageBreakdown } from '../context/contextUsageBreakdown'
 import { prepareBuddyInputHistory } from '../context/prepareBuddyInputHistory'
+import { projectBuddyInput, projectMessageImages } from '../context/projectBuddyInput'
 import { withNativeAttachmentPrompt } from '../context/withNativeAttachmentPrompt'
 import { toBuddySessionStorageError } from './BuddySessionErrors'
 
@@ -36,6 +39,7 @@ export interface CreateReusableBuddySessionOptions {
     maxTokens: number | null,
   ) => Promise<Model<Api>>
   inputReferences: BuddyInputReferenceStore
+  getInputMetadata?: (ids: readonly string[]) => readonly { id: string, sizeBytes: number }[]
   materializeInput: (input: BuddyInputReferenceV1) => Promise<UserMessage['content']>
   materializeDocuments?: (input: BuddyInputReferenceV1) => Promise<AttachmentFileInput[]>
   runContext: BuddyExtensionRunContextStore
@@ -55,13 +59,38 @@ export function createReusableBuddySession(
   session.agent.convertToLlm = async (messages) => {
     const request = { failed: false, documents: new Map<string, AttachmentFileInput>() }
     const materialized = []
-    for (const message of prepareBuddyInputHistory(messages)) {
+    const projected = new Map<string, BuddyInputReferenceV1>()
+    const model = session.model
+    if (!model)
+      throw new Error('Missing input model')
+    const history = prepareBuddyInputHistory(messages).map(message => message.role === 'user' && 'buddyInput' in message ? message : projectMessageImages(message, model))
+    let remainingBytes = (getModelRequestBytesLimit(model.api) ?? Number.POSITIVE_INFINITY) - 1024 * 1024
+      - Buffer.byteLength(JSON.stringify(history), 'utf8') - Buffer.byteLength(session.systemPrompt ?? '', 'utf8')
+    try {
+      for (const message of [...history].reverse()) {
+        const reference = readBuddyInputReference(message)
+        if (!reference)
+          continue
+        const ids = reference.attachmentIds ?? [...reference.images, ...reference.documents ?? []].map(file => file.attachmentId)
+        const sizes = new Map(options.getInputMetadata?.(ids).map(file => [file.id, file.sizeBytes]) ?? [])
+        const projection = projectBuddyInput(reference, model, sizes, remainingBytes)
+        projected.set(reference.messageId, projection.input)
+        remainingBytes -= projection.bytes
+      }
+    }
+    catch {
+      request.failed = true
+    }
+    for (const message of history) {
       try {
-        const input = readBuddyInputReference(message)
-        if (!input) {
+        const reference = readBuddyInputReference(message)
+        if (!reference) {
           materialized.push(message)
           continue
         }
+        const input = projected.get(reference.messageId)
+        if (!input)
+          throw new Error('Missing input projection')
         const content = await options.materializeInput(input)
         if (
           !Array.isArray(content)
@@ -72,10 +101,13 @@ export function createReusableBuddySession(
         const documents = input.documents?.length ? await options.materializeDocuments?.(input) : []
         if (!documents || documents.length !== (input.documents?.length ?? 0))
           throw new Error('Missing document input')
-        const documentBlocks = documents.map((file) => {
+        const documentBlocks = documents.flatMap((file, index) => {
           const token = `buddy-file:${randomUUID()}`
           request.documents.set(token, file)
-          return { type: 'text' as const, text: token }
+          return [
+            { type: 'text' as const, text: `Native attachment: ${input.documents![index]!.attachmentId} (${JSON.stringify(file.name)})` },
+            { type: 'text' as const, text: token },
+          ]
         })
         materialized.push({ content: [...content, ...documentBlocks], role: 'user' as const, timestamp: message.timestamp })
       }

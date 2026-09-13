@@ -123,30 +123,6 @@ withDefaults(defineProps<{
 }
 
 :deep([data-type='chat-resource-reference']) {
-  gap: 0.28rem;
-  border-color: color-mix(in srgb, var(--buddy-border-strong) 88%, var(--buddy-surface-raised));
-  border-radius: 0.28rem;
-  background: var(--buddy-surface-raised);
-  box-shadow: none;
-  color: var(--buddy-text-secondary);
-  font-weight: 600;
-  vertical-align: calc(-0.05rem - 1px);
-  cursor: pointer;
-
-  &:hover {
-    border-color: var(--buddy-accent-border);
-    background: color-mix(in srgb, var(--buddy-accent-surface) 28%, var(--buddy-surface-raised));
-  }
-}
-
-:deep([data-type='chat-resource-reference'].ProseMirror-selectednode) {
-  border-color: var(--buddy-focus-ring);
-  background: color-mix(in srgb, var(--buddy-accent-surface) 32%, var(--buddy-surface-raised));
-  box-shadow: none;
-  color: var(--buddy-accent-on-surface);
-}
-
-:deep([data-type='chat-resource-reference'].is-image) {
   @include highlight.wave-highlight;
 
   display: inline;
@@ -165,17 +141,6 @@ withDefaults(defineProps<{
     --inline-wave-highlight-active: 1;
   }
 
-  .chat-resource-reference__icon {
-    display: none;
-  }
-}
-
-:deep(.chat-resource-reference__icon) {
-  display: block;
-  width: 0.9rem;
-  height: 0.9rem;
-  flex: none;
-  object-fit: contain;
 }
 
 :deep(.chat-resource-reference__label) {

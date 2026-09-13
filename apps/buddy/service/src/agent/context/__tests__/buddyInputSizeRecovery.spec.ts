@@ -21,6 +21,7 @@ describe('oversized input recovery', () => {
       },
     })
     const session = {
+      model,
       agent: {
         convertToLlm: async (messages: AgentSession['messages']) => messages,
         streamFunction: transport,

@@ -9,7 +9,6 @@ import type {
   StartBuddyCompactionInput,
   StartBuddyTurnInput,
 } from './turnTypes'
-import { supportsModelFileInput } from '../../providers/modelCapabilities'
 import { BuddyAgentRunError } from '../../runs/runError'
 import { createBuddyInputReference } from '../context/BuddyInputReference'
 
@@ -88,26 +87,25 @@ export class BuddyRunExecutionPlanner {
     const input = this.#options.runInputs.findByRunId(run.id)
     if (!input?.prompt.trim())
       throw new BuddyAgentRunError('RUN_INPUT_NOT_FOUND')
-    const { images, documents } = await this.#options.attachments.resolveInputReferences(
+    const { images, documents, resourceLabels } = await this.#options.attachments.resolveInputReferences(
       input.attachmentIds,
       run.conversationId,
+      input.prompt,
     )
-    const model = await this.#options.models.resolveAvailable({
+    await this.#options.models.resolveAvailable({
       contextWindow: run.contextWindow,
       maxTokens: run.maxTokens,
       modelId: run.model,
       providerId: run.provider,
     })
-    if (images.length > 0 && !model.input.includes('image'))
-      throw new BuddyAgentRunError('MODEL_INPUT_UNSUPPORTED')
-    if (documents.some(file => !supportsModelFileInput(model, file.mimeType)))
-      throw new BuddyAgentRunError('MODEL_INPUT_UNSUPPORTED')
     return {
       input: {
         ...common,
         serviceTier: input.serviceTier,
         thinkingLevel: input.reasoning ?? undefined,
         userInput: createBuddyInputReference({
+          attachmentIds: [...input.attachmentIds],
+          resourceLabels,
           ...(documents.length ? { documents } : {}),
           images,
           messageId: run.triggeringMessageId,

@@ -18,6 +18,8 @@ export interface CreateBuddyRecoveryMessagesOptions {
   messages: readonly MessageRecord[]
   resolveRunModel: (runId: string) => Model<Api> | null
   resolveUserInput: (messageId: string) => {
+    attachmentIds?: readonly string[]
+    resourceLabels?: Record<string, string>
     documents?: readonly AttachmentDocumentReference[]
     images: readonly AttachmentImageReference[]
     prompt: string
@@ -45,6 +47,8 @@ export function createBuddyRecoveryMessages(
         continue
       recovered.push(input
         ? createBuddyInputReferenceMessage(createBuddyInputReference({
+            ...(input.attachmentIds ? { attachmentIds: [...input.attachmentIds] } : {}),
+            resourceLabels: input.resourceLabels,
             ...(input.documents?.length ? { documents: [...input.documents] } : {}),
             images: [...input.images],
             messageId: message.id,

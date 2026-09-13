@@ -34,7 +34,7 @@ export function useChatComposer(options: UseChatComposerOptions) {
     onUpdateContent: options.onUpdateContent,
     onTrigger: (trigger) => { query.activeTrigger.value = trigger },
     onSuggestionKeydown: query.handleKeydown,
-    onPasteFiles: files => attachFiles(files, 'both'),
+    onPasteFiles: files => attachFiles(files, 'both', 'clipboard'),
     onSubmit: submit,
     onLocateResource: options.onLocateResource,
   })
@@ -55,14 +55,12 @@ export function useChatComposer(options: UseChatComposerOptions) {
   const panelResources = computed(() => (contentJSON.value.attrs?.panelResourceIds as string[] ?? [])
     .flatMap(id => resourceById.value.get(id) ?? []))
   const resourceStripResources = computed<ComposerResourceCard[]>(() => {
-    const panelIds = new Set(panelResources.value.map(entry => entry.resource.resourceId))
     return resourceIds.value.flatMap((id) => {
       const entry = resourceById.value.get(id)
       return entry
         ? [{
             ...entry,
             imageLabel: imageLabels.value.get(id),
-            isReference: !panelIds.has(id),
             previewUrl: resolveComposerResourcePreviewUrl(entry.resource),
           }]
         : []
@@ -81,11 +79,11 @@ export function useChatComposer(options: UseChatComposerOptions) {
     return session === editingSession ? resourceId : null
   }
 
-  function attachFiles(files: readonly File[], placement: 'panel' | 'both') {
+  function attachFiles(files: readonly File[], placement: 'panel' | 'both', origin: 'file' | 'clipboard' = 'file') {
     const current = editor.value
     if (!current || !current.isEditable)
       return
-    insertChatComposerResources(current, options.beginImport(files), placement)
+    insertChatComposerResources(current, options.beginImport(files, origin), placement)
   }
 
   function removeResource(resourceId: string) {

@@ -40,15 +40,15 @@ describe('buddy user content', () => {
   it('projects one stable image order, repeated markers, and the complete text appendix', () => {
     const projection = projectBuddyUserContent(content, resourceId => resourceId === 'notes'
       ? { kind: 'text', name: 'notes.md', text: '完整内容\n最后一行\n' }
-      : { kind: 'image', name: `${resourceId}.png` }, () => '')
+      : { kind: 'image', name: `${resourceId}.png`, nameSource: 'clipboard' }, () => '')
 
     expect(projection).toEqual({
       imageResourceIds: ['image-a', 'image-b'],
-      prompt: '[FILE#1]\n\n比较 [IMAGE#1] 和 [IMAGE#2]，再看 [IMAGE#1]\n\n[FILE#1] notes.md\n完整内容\n最后一行\n',
+      prompt: '[FILE#1]\n\n比较 [Image #1] 和 [Image #2]，再看 [Image #1]\n\n[FILE#1] "notes.md" (TEXT)\n完整内容\n最后一行\n\n\n[Image #1] "image-a.png" (IMAGE)\n\n[Image #2] "image-b.png" (IMAGE)',
       resources: [
         { kind: 'text', marker: '[FILE#1]', resourceId: 'notes' },
-        { kind: 'image', marker: '[IMAGE#1]', resourceId: 'image-a' },
-        { kind: 'image', marker: '[IMAGE#2]', resourceId: 'image-b' },
+        { kind: 'image', marker: '[Image #1]', resourceId: 'image-a' },
+        { kind: 'image', marker: '[Image #2]', resourceId: 'image-b' },
       ],
     })
   })
@@ -69,7 +69,7 @@ describe('buddy user content', () => {
       ? { kind: 'text', name: '[FILE#7].txt', text: '[IMAGE#2]' }
       : { kind: 'image', name: 'a.png' }, () => '[FILE#4]')
 
-    expect(projection.prompt).toBe('[FILE#1]\n\n［IMAGE#1］ ［FILE#4］[IMAGE#1]\n\n[FILE#1] ［FILE#7］.txt\n［IMAGE#2］')
+    expect(projection.prompt).toBe('[FILE#1]\n\n［IMAGE#1］ ［FILE#4］[FILE#2]\n\n[FILE#1] "［FILE#7］.txt" (TEXT)\n［IMAGE#2］\n\n[FILE#2] "a.png" (IMAGE)')
   })
 
   it('does not discard unresolved resources or send action commands as model input', () => {
