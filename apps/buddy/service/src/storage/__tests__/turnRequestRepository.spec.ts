@@ -58,15 +58,15 @@ describe('turnRequestRepository', () => {
       .toEqual(['message-1', 'answer-1', 'question-followup'])
   })
 
-  it('retries the latest failed answer in place and rejects reuse of an older attempt', () => {
+  it.each(['failed', 'cancelled'] as const)('retries a %s answer on a separate branch while preserving its input and history', (status) => {
     const database = createDatabase()
     const repository = createTurnRequestRepository(database)
     repository.prepare(createInput())
-    database.exec('UPDATE runs SET status = \'failed\' WHERE id = \'run-1\'')
+    database.prepare('UPDATE runs SET status = ? WHERE id = ?').run(status, 'run-1')
     const input = {
       approvalPolicy: 'policy' as const,
       executionProfile: 'workspace_write' as const,
-      branchId: 'branch-1',
+      branchId: 'branch-retry',
       parentBranchId: 'branch-1',
       conversationId: 'conversation-1',
       createdAt: '2026-08-14T00:00:02.000Z',
@@ -75,15 +75,18 @@ describe('turnRequestRepository', () => {
       requestId: 'retry',
       runId: 'run-retry',
       sourceRunId: 'run-1',
-      reuseBranch: true,
     }
-    expect(repository.regenerate(input)).toMatchObject({ created: true, branchId: 'branch-1' })
-    expect(database.prepare('SELECT COUNT(*) AS count FROM conversation_branches').get()).toEqual({ count: 1 })
+    expect(repository.regenerate(input)).toMatchObject({ created: true, branchId: 'branch-retry' })
+    expect(database.prepare('SELECT COUNT(*) AS count FROM conversation_branches').get()).toEqual({ count: 2 })
     expect(database.prepare('SELECT * FROM run_tree_sources WHERE run_id = ?').get('run-retry'))
       .toEqual({ run_id: 'run-retry', source_run_id: 'run-1', position: 'before' })
-    database.exec('UPDATE runs SET status = \'completed\' WHERE id = \'run-retry\'')
-    expect(() => repository.regenerate({ ...input, requestId: 'older-retry', runId: 'older-retry' }))
-      .toThrow(TurnRequestConflictError)
+    expect(repository.regenerate(input)).toMatchObject({ created: false, branchId: 'branch-retry', runId: 'run-retry' })
+    expect(database.prepare('SELECT status FROM runs WHERE id = ?').get('run-1')).toEqual({ status })
+    expect(database.prepare('SELECT triggering_message_id FROM runs WHERE id = ?').get('run-retry'))
+      .toEqual({ triggering_message_id: 'message-1' })
+    expect(database.prepare('SELECT COUNT(*) AS count FROM messages').get()).toEqual({ count: 1 })
+    expect(createConversationRepository(database).listBranchMessages('conversation-1', 'branch-retry').map(message => message.id))
+      .toEqual(['message-1'])
   })
 
   it('commits one draft and preserves newer edits across idempotent retries', () => {

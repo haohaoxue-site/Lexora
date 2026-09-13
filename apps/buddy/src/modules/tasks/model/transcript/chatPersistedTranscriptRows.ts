@@ -53,7 +53,7 @@ export function projectPersistedChatTranscriptRows(
   }))
   const processMessageIds = new Set(turns.flatMap(turn => turn.processMessageIds))
   const timelineMessageIds = new Set(items.filter(item => item.kind === 'message').map(item => item.id))
-  for (const turn of turns) {
+  for (const turn of [...turns].sort((left, right) => left.startedAt.localeCompare(right.startedAt) || left.runId.localeCompare(right.runId))) {
     if (!shouldShowAgentTurn(turn))
       continue
     if (includeUnanchoredTurns && !timelineMessageIds.has(turn.triggeringMessageId)) {
