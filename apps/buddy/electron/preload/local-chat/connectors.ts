@@ -2,11 +2,8 @@ import type { LocalChatApi } from '../../shared/localChatApi'
 import { ipcRenderer } from 'electron'
 import { LOCAL_CHAT_IPC_CHANNELS } from '../../shared/localChatApi'
 
-export function createConnectorsApi(): Pick<LocalChatApi, 'skills' | 'connectors'> {
+export function createConnectorsApi(): Pick<LocalChatApi, 'connectors'> {
   return {
-    skills: Object.freeze({
-      list: spaceId => ipcRenderer.invoke(LOCAL_CHAT_IPC_CHANNELS.skillsList, { spaceId: spaceId ?? null }),
-    }),
     connectors: Object.freeze({
       list: () => ipcRenderer.invoke(LOCAL_CHAT_IPC_CHANNELS.connectorsList),
       upsert: input =>

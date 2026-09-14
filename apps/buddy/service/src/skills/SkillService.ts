@@ -1,0 +1,544 @@
+import type { LocalSkill, LocalSkillCatalog, SkillDirectoryRequest, SkillFileTarget, SkillInstallPreview, SkillOrigin, SkillPreviewInput, SkillReference } from '../../../shared/skills/skillApi'
+import type { RuntimeRequestRegistrar } from '../rpc/runtimeRequest'
+import type { BuddyDataPaths } from '../storage/BuddyDataPaths'
+import type { SkillInstallation, SkillRepository } from '../storage/skillRepository'
+import type { SpaceRepository } from '../storage/spaceRepository'
+import type { LoadedSkill } from './skillFiles'
+import { createHash, randomUUID } from 'node:crypto'
+import { mkdir, readdir, rm } from 'node:fs/promises'
+import { basename, dirname, join, relative } from 'node:path'
+import { isSkillAvailable, skillsRpc } from '../../../shared/skills/skillApi'
+import { registerRuntimeRequest } from '../rpc/runtimeRequest'
+import { discoverSkillFiles, readSkill, requireSkillPath, SkillError, skillIdentity } from './skillFiles'
+import { prepareSkillSource, writeSkillFiles } from './skillImport'
+import { SkillInspector } from './SkillInspector'
+
+export interface BuddySkillResolution {
+  diagnostics: LocalSkillCatalog['diagnostics']
+  paths: string[]
+  readRoots: string[]
+  references: SkillReference[]
+  revision: string
+  skills: LocalSkill[]
+}
+
+export interface BuddyMaterializedSkill {
+  baseDirectory: string
+  body: string
+  filePath: string
+  name: string
+  reference: SkillReference
+}
+
+interface SkillServiceOptions {
+  agentDirectory: string
+  builtinSkillsDirectories?: readonly string[]
+  spaces: SpaceRepository
+  repository: SkillRepository
+  paths: BuddyDataPaths
+  changed?: (spaceId: string | null) => Promise<unknown> | unknown
+}
+
+interface Candidate {
+  entry: LocalSkill
+  loaded: LoadedSkill | null
+  priority: number
+}
+
+interface ImportPreview {
+  result: SkillInstallPreview
+  directory: string
+  candidates: Map<string, { loaded: LoadedSkill, sourcePath: string, existing: SkillInstallation | undefined, existingRevision: string | undefined }>
+  createdAt: number
+}
+
+export class SkillService {
+  readonly #options: SkillServiceOptions
+  readonly #previews = new Map<string, ImportPreview>()
+  readonly #inspector: SkillInspector
+  #mutation: Promise<unknown> = Promise.resolve()
+
+  constructor(options: SkillServiceOptions) {
+    this.#options = options
+    this.#inspector = new SkillInspector({ ...options, refresh: spaceId => this.list(spaceId) })
+  }
+
+  async initialize() {
+    await this.#cleanup()
+    const imports = join(this.#options.paths.root, 'skill-imports')
+    try {
+      await requireSkillPath(this.#options.paths.root, imports)
+      for (const entry of await readdir(imports, { withFileTypes: true })) {
+        if (entry.isDirectory() && /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(entry.name))
+          await rm(join(imports, entry.name), { recursive: true, force: true })
+      }
+    }
+    catch (error) {
+      if (!error || typeof error !== 'object' || !('code' in error) || error.code !== 'ENOENT')
+        throw error
+    }
+  }
+
+  async list(spaceId: string | null): Promise<LocalSkillCatalog> {
+    return (await this.#resolve(spaceId)).catalog
+  }
+
+  async loadForSpace(spaceId: string | null): Promise<BuddySkillResolution> {
+    const { catalog, candidates } = await this.#resolve(spaceId)
+    const effective = candidates.filter(candidate => isSkillAvailable(candidate.entry))
+    return {
+      diagnostics: catalog.diagnostics,
+      paths: effective.map(candidate => candidate.entry.filePath),
+      readRoots: [...new Set(effective.map(candidate => dirname(candidate.entry.filePath)))],
+      references: effective.map(candidate => reference(candidate.entry)),
+      revision: catalog.revision,
+      skills: effective.map(candidate => candidate.entry).sort((a, b) => a.name.localeCompare(b.name)),
+    }
+  }
+
+  async materializeForSpace(spaceId: string | null, selections: readonly (string | SkillReference)[]): Promise<BuddyMaterializedSkill[]> {
+    if (!selections.length)
+      return []
+    const { candidates } = await this.#resolve(spaceId)
+    const selected = new Map<string, BuddyMaterializedSkill>()
+    for (const selection of selections) {
+      const name = typeof selection === 'string' ? selection : selection.name
+      const candidate = candidates.find(item => item.entry.name === name && isSkillAvailable(item.entry))
+      if (!candidate?.loaded)
+        throw new SkillError('SKILL_NOT_FOUND')
+      if (typeof selection !== 'string' && (selection.id !== candidate.entry.id || selection.revision !== candidate.entry.revision))
+        throw new SkillError('SKILL_CHANGED')
+      selected.set(name, {
+        name,
+        body: candidate.loaded.body,
+        filePath: candidate.entry.filePath,
+        baseDirectory: candidate.loaded.baseDirectory,
+        reference: reference(candidate.entry),
+      })
+    }
+    return [...selected.values()]
+  }
+
+  get(spaceId: string | null, id: string) {
+    return this.#inspector.get(spaceId, id)
+  }
+
+  listFiles(input: SkillDirectoryRequest) {
+    return this.#inspector.listFiles(input)
+  }
+
+  readFile(input: SkillFileTarget) {
+    return this.#inspector.readFile(input)
+  }
+
+  locateFile(input: SkillFileTarget) {
+    return this.#inspector.locateFile(input)
+  }
+
+  setEnabled(input: { spaceId: string | null, id: string, enabled: boolean, revision: string }) {
+    return this.#mutate(async () => {
+      const skill = await this.#currentSkill(input.spaceId, input.id)
+      if (skill.managedBy === 'directory' || skill.spaceId !== input.spaceId)
+        throw new SkillError('SKILL_READ_ONLY')
+      if (skill.revision !== input.revision)
+        throw new SkillError('SKILL_CHANGED')
+      const record = this.#record(input.id)
+      this.#options.repository.save({ ...record, enabled: input.enabled, updatedAt: new Date().toISOString() })
+      await this.#options.changed?.(input.spaceId)
+      return this.list(input.spaceId)
+    })
+  }
+
+  remove(input: { spaceId: string | null, id: string, revision: string }) {
+    return this.#mutate(async () => {
+      const skill = await this.#currentSkill(input.spaceId, input.id)
+      if (!skill.canRemove)
+        throw new SkillError('SKILL_READ_ONLY')
+      if (skill.revision !== input.revision)
+        throw new SkillError('SKILL_CHANGED')
+      this.#assertIdle(skill.spaceId)
+      this.#options.repository.remove(input.id)
+      await this.#options.changed?.(input.spaceId)
+      await this.#cleanup()
+      return this.list(input.spaceId)
+    })
+  }
+
+  async preview(input: SkillPreviewInput): Promise<SkillInstallPreview> {
+    this.#requireSpace(input.spaceId)
+    for (const [id, preview] of this.#previews) {
+      if (Date.now() - preview.createdAt > 30 * 60 * 1000)
+        await this.discard(id)
+    }
+    if (this.#previews.size >= 8)
+      throw new SkillError('SKILL_BUSY')
+    const catalog = await this.list(input.spaceId)
+    const records = this.#options.repository.list()
+    const updating = input.updateId ? this.#record(input.updateId) : undefined
+    if (updating && (updating.managedBy !== 'user' || updating.spaceId !== input.spaceId))
+      throw new SkillError('SKILL_READ_ONLY')
+    const id = randomUUID()
+    const directory = join(this.#options.paths.root, 'skill-imports', id)
+    await mkdir(directory, { recursive: true, mode: 0o700 })
+    try {
+      const prepared = await prepareSkillSource(input.source, directory)
+      const diagnostics: Array<{ code: 'SKILL_INVALID', message: string, path: string }> = []
+      const paths = await discoverSkillFiles(prepared.root, false, path => diagnostics.push({ code: 'SKILL_INVALID', message: 'Skill source is outside the selected folder or cannot be read.', path }))
+      const candidates: ImportPreview['candidates'] = new Map()
+      const items: Array<SkillInstallPreview['candidates'][number]> = []
+      let totalBytes = 0
+      let totalFiles = 0
+      for (const path of paths) {
+        try {
+          const loaded = await readSkill(path, prepared.root)
+          if (!loaded.hasDeclaredName || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(loaded.name) || loaded.name.length > 64 || loaded.description.length > 1024)
+            throw new SkillError('SKILL_INVALID')
+          if (updating && loaded.name !== updating.name)
+            continue
+          totalBytes += [...loaded.files.values()].reduce((sum, file) => sum + file.length, 0)
+          totalFiles += loaded.files.size
+          if (totalBytes > 64 * 1024 * 1024 || totalFiles > 5000 || items.length >= 100)
+            throw new SkillError('SKILL_TOO_LARGE')
+          const candidateId = randomUUID()
+          const existing = records.find(record => record.spaceId === input.spaceId && record.name === loaded.name && record.managedBy === 'user')
+          const reserved = input.spaceId === null && records.some(record => record.managedBy === 'application' && record.name === loaded.name)
+          const sourcePath = relative(prepared.root, dirname(path)).split('\\').join('/')
+          candidates.set(candidateId, { loaded, sourcePath, existing, existingRevision: catalog.skills.find(skill => skill.id === existing?.id)?.revision })
+          items.push({
+            id: candidateId,
+            name: loaded.name,
+            description: loaded.description,
+            revision: loaded.revision,
+            bytes: [...loaded.files.values()].reduce((total, file) => total + file.length, 0),
+            fileCount: loaded.files.size,
+            replacesId: existing?.id ?? null,
+            blocked: reserved,
+          })
+        }
+        catch (error) {
+          if (error instanceof SkillError && error.code === 'SKILL_TOO_LARGE')
+            throw error
+          diagnostics.push({ code: 'SKILL_INVALID', message: 'Skill metadata or bundled resources are invalid.', path })
+        }
+      }
+      const checkedItems = items.map(item => ({ ...item, blocked: item.blocked || items.filter(other => other.name === item.name).length > 1 }))
+      const result = { id, spaceId: input.spaceId, updateId: updating?.id ?? null, source: prepared.source, candidates: checkedItems, diagnostics }
+      this.#previews.set(id, { directory, candidates, result, createdAt: Date.now() })
+      return result
+    }
+    catch (error) {
+      await rm(directory, { recursive: true, force: true })
+      if (error instanceof SkillError)
+        throw error
+      throw new SkillError('SKILL_SOURCE_UNAVAILABLE', { cause: error })
+    }
+  }
+
+  install(input: { previewId: string, candidateIds: readonly string[] }) {
+    return this.#mutate(async () => {
+      const preview = this.#previews.get(input.previewId)
+      if (!preview || Date.now() - preview.createdAt > 30 * 60 * 1000)
+        throw new SkillError('SKILL_PREVIEW_EXPIRED')
+      const scope = preview.result.spaceId
+      this.#requireSpace(scope)
+      const current = await this.list(scope)
+      const records = this.#options.repository.list()
+      const selected = [...new Set(input.candidateIds)].map((id) => {
+        const item = preview.result.candidates.find(candidate => candidate.id === id)
+        const candidate = preview.candidates.get(id)
+        if (!item || item.blocked || !candidate)
+          throw new SkillError('SKILL_INVALID')
+        const existing = records.find(record => record.managedBy === 'user' && record.name === item.name && record.spaceId === scope)
+        if (scope === null && records.some(record => record.managedBy === 'application' && record.name === item.name))
+          throw new SkillError('SKILL_NAME_COLLISION')
+        if (existing?.id !== candidate.existing?.id || existing?.revision !== candidate.existing?.revision
+          || current.skills.find(skill => skill.id === existing?.id)?.revision !== candidate.existingRevision) {
+          throw new SkillError('SKILL_CHANGED')
+        }
+        return candidate
+      })
+      if (!selected.length)
+        throw new SkillError('SKILL_INVALID')
+      if (selected.some(candidate => candidate.existing))
+        this.#assertIdle(scope)
+      const published: string[] = []
+      const next: SkillInstallation[] = []
+      try {
+        for (const candidate of selected) {
+          const id = candidate.existing?.id ?? randomUUID()
+          const root = join(this.#options.paths.skillsDirectory(scope), id, randomUUID(), candidate.loaded.name)
+          published.push(dirname(root))
+          this.#options.repository.scheduleCleanup(scope, id, dirname(root))
+          await writeSkillFiles(root, candidate.loaded.files, candidate.loaded.modes)
+          const source: SkillOrigin = preview.result.source.kind === 'github'
+            ? { ...preview.result.source, subdirectory: [preview.result.source.subdirectory, candidate.sourcePath].filter(Boolean).join('/') }
+            : preview.result.source.kind === 'directory'
+              ? { kind: 'directory', location: join(preview.result.source.location, candidate.sourcePath) }
+              : { ...preview.result.source }
+          const now = new Date().toISOString()
+          next.push({
+            id,
+            name: candidate.loaded.name,
+            description: candidate.loaded.description,
+            enabled: candidate.existing?.enabled ?? true,
+            spaceId: scope,
+            managedBy: 'user',
+            path: join(root, 'SKILL.md'),
+            origin: source,
+            revision: candidate.loaded.revision,
+            createdAt: candidate.existing?.createdAt ?? now,
+            updatedAt: now,
+          })
+        }
+        if (selected.some(candidate => candidate.existing))
+          this.#assertIdle(scope)
+        this.#options.repository.saveAll(next)
+      }
+      catch (error) {
+        await Promise.all(published.map(path => rm(path, { recursive: true, force: true })))
+        if (error instanceof SkillError)
+          throw error
+        throw new SkillError('SKILL_INSTALL_FAILED', { cause: error })
+      }
+      await this.#options.changed?.(scope)
+      await this.#cleanup()
+      await this.discard(input.previewId).catch(() => {})
+      return this.list(scope)
+    })
+  }
+
+  async discard(id: string) {
+    const preview = this.#previews.get(id)
+    this.#previews.delete(id)
+    if (preview)
+      await rm(preview.directory, { recursive: true, force: true })
+  }
+
+  async dispose() {
+    await this.#mutation.catch(() => {})
+    await Promise.all([...this.#previews.keys()].map(id => this.discard(id)))
+  }
+
+  async #resolve(spaceId: string | null) {
+    const space = this.#requireSpace(spaceId)
+    const diagnostics: Array<{ code: 'SKILL_INVALID' | 'SKILL_NAME_COLLISION' | 'SKILL_PATH_OUTSIDE_SOURCE' | 'SKILL_SOURCE_UNREADABLE', message: string, path?: string }> = []
+    const candidates: Candidate[] = []
+    const legacyRoot = join(this.#options.agentDirectory, 'skills')
+    await mkdir(legacyRoot, { recursive: true, mode: 0o700 })
+    const sources = [
+      ...(this.#options.builtinSkillsDirectories ?? []).map(root => ({ root, allowedRoot: root, kind: 'application' as const })),
+      { root: legacyRoot, allowedRoot: this.#options.agentDirectory, kind: 'external' as const },
+      ...(space?.primaryDirectory?.resourcesTrustedAt
+        ? ['.agents', '.pi'].map(name => ({ root: join(space.primaryDirectory!.canonicalRoot, name, 'skills'), allowedRoot: space.primaryDirectory!.canonicalRoot, kind: 'directory' as const }))
+        : []),
+    ]
+    const discovered = new Map<string, LoadedSkill>()
+    for (const source of sources) {
+      try {
+        const root = await requireSkillPath(source.allowedRoot, source.root)
+        for (const path of await discoverSkillFiles(root, source.kind !== 'application', path => diagnostics.push({ code: 'SKILL_PATH_OUTSIDE_SOURCE', message: 'Skill source is outside the allowed folder or cannot be read.', path }))) {
+          try {
+            const loaded = await readSkill(path, root)
+            const id = skillIdentity(source.kind === 'application' ? `application:${loaded.name}` : `${source.kind}:${path}`)
+            if (source.kind === 'directory') {
+              candidates.push({ loaded, priority: 1, entry: {
+                id,
+                name: loaded.name,
+                description: loaded.description,
+                source: 'directory',
+                spaceId,
+                managedBy: 'directory',
+                enabled: true,
+                status: loaded.manualOnly ? 'manual_only' : 'available',
+                shadowedBy: null,
+                revision: loaded.revision,
+                filePath: path,
+                origin: null,
+                canRemove: false,
+                canUpdate: false,
+                busy: false,
+              } })
+            }
+            else {
+              const records = this.#options.repository.list()
+              const existing = records.find(record => record.id === id)
+              if (!existing && records.some(record => record.name === loaded.name && record.managedBy === source.kind && record.spaceId === null))
+                continue
+              const now = new Date().toISOString()
+              if (!existing || existing.path !== loaded.path || existing.revision !== loaded.revision) {
+                this.#options.repository.save({
+                  id,
+                  name: loaded.name,
+                  description: loaded.description,
+                  path: loaded.path,
+                  spaceId: null,
+                  managedBy: source.kind,
+                  enabled: existing?.enabled ?? true,
+                  origin: { kind: source.kind === 'application' ? 'application' : 'directory', location: root },
+                  revision: loaded.revision,
+                  createdAt: existing?.createdAt ?? now,
+                  updatedAt: now,
+                })
+              }
+              discovered.set(id, loaded)
+            }
+          }
+          catch {
+            diagnostics.push({ code: 'SKILL_INVALID', message: 'Skill metadata or bundled resources are invalid.', path })
+            if (source.kind === 'directory') {
+              const name = basename(path) === 'SKILL.md' ? basename(dirname(path)) : basename(path, '.md')
+              candidates.push({ loaded: null, priority: 1, entry: {
+                id: skillIdentity(`directory:${path}`),
+                name,
+                description: '',
+                source: 'directory',
+                spaceId,
+                managedBy: 'directory',
+                enabled: true,
+                status: 'invalid',
+                shadowedBy: null,
+                revision: 'invalid',
+                filePath: path,
+                origin: null,
+                canRemove: false,
+                canUpdate: false,
+                busy: false,
+              } })
+            }
+          }
+        }
+      }
+      catch (error) {
+        if (error && typeof error === 'object' && 'code' in error && error.code === 'ENOENT')
+          continue
+        diagnostics.push({ code: error instanceof SkillError ? 'SKILL_PATH_OUTSIDE_SOURCE' : 'SKILL_SOURCE_UNREADABLE', message: 'A skill source could not be read within its allowed directory.', path: source.root })
+      }
+    }
+    for (const record of this.#options.repository.list().filter(record => !record.spaceId || record.spaceId === spaceId)) {
+      let loaded = discovered.get(record.id) ?? null
+      if (record.managedBy === 'user') {
+        try {
+          await requireSkillPath(this.#options.paths.root, record.path)
+          loaded = await readSkill(record.path, this.#options.paths.skillsDirectory(record.spaceId))
+          if (loaded.name !== record.name)
+            loaded = null
+        }
+        catch { loaded = null }
+      }
+      candidates.push({
+        loaded,
+        priority: record.spaceId ? 2 : record.managedBy === 'external' ? 4 : 3,
+        entry: {
+          id: record.id,
+          name: record.name,
+          description: loaded?.description ?? record.description,
+          source: record.spaceId ? 'space' : 'global',
+          spaceId: record.spaceId,
+          managedBy: record.managedBy,
+          enabled: record.enabled,
+          revision: loaded?.revision ?? record.revision,
+          filePath: record.path,
+          origin: record.origin,
+          shadowedBy: null,
+          status: !record.enabled ? 'disabled' : !loaded ? 'invalid' : loaded.manualOnly ? 'manual_only' : 'available',
+          canRemove: record.managedBy === 'user' && record.spaceId === spaceId,
+          canUpdate: record.managedBy === 'user' && record.spaceId === spaceId,
+          busy: this.#options.repository.hasActiveRuns(record.spaceId),
+        },
+      })
+    }
+    const winners = new Map<string, string>()
+    for (const candidate of candidates.sort((a, b) => a.priority - b.priority || a.entry.filePath.localeCompare(b.entry.filePath))) {
+      const winner = winners.get(candidate.entry.name)
+      if (winner) {
+        candidate.entry = { ...candidate.entry, status: 'shadowed', shadowedBy: winner }
+        diagnostics.push({ code: 'SKILL_NAME_COLLISION', message: 'A higher-priority skill with the same name takes precedence.', path: candidate.entry.filePath })
+      }
+      else { winners.set(candidate.entry.name, candidate.entry.id) }
+    }
+    const skills = [...candidates].sort((a, b) => a.entry.name.localeCompare(b.entry.name) || a.priority - b.priority || a.entry.id.localeCompare(b.entry.id)).map(candidate => candidate.entry)
+    const revision = createHash('sha256').update(JSON.stringify(skills.map(({ id, revision, status, enabled }) => ({ id, revision, status, enabled })))).digest('hex')
+    const catalog = { skills, diagnostics, revision }
+    this.#inspector.remember(spaceId, JSON.stringify(space?.primaryDirectory ?? null), catalog)
+    return { candidates, catalog }
+  }
+
+  async #currentSkill(spaceId: string | null, id: string) {
+    const { catalog } = await this.#resolve(spaceId)
+    const skill = catalog.skills.find(skill => skill.id === id)
+    if (!skill)
+      throw new SkillError('SKILL_NOT_FOUND')
+    return skill
+  }
+
+  #requireSpace(spaceId: string | null) {
+    const space = spaceId ? this.#options.spaces.findById(spaceId) : null
+    if (spaceId && (!space || space.revokedAt))
+      throw new SkillError('SKILL_NOT_FOUND')
+    return space
+  }
+
+  #record(id: string) {
+    const record = this.#options.repository.list().find(record => record.id === id)
+    if (!record)
+      throw new SkillError('SKILL_NOT_FOUND')
+    return record
+  }
+
+  #assertIdle(spaceId: string | null) {
+    if (this.#options.repository.hasActiveRuns(spaceId))
+      throw new SkillError('SKILL_BUSY')
+  }
+
+  async #cleanup() {
+    const { repository, paths } = this.#options
+    for (const item of repository.pendingCleanup()) {
+      const root = join(paths.skillsDirectory(item.spaceId), item.installationId)
+      if (dirname(item.path) !== root || repository.list().some(record => dirname(dirname(record.path)) === item.path))
+        continue
+      try {
+        await requireSkillPath(this.#options.paths.root, item.path)
+        await rm(item.path, { recursive: true, force: true })
+        repository.completeCleanup(item.path)
+      }
+      catch (error) {
+        if (error && typeof error === 'object' && 'code' in error && error.code === 'ENOENT')
+          repository.completeCleanup(item.path)
+      }
+    }
+  }
+
+  #mutate<T>(action: () => Promise<T>): Promise<T> {
+    const pending = this.#mutation.then(action)
+    this.#mutation = pending.catch(() => {})
+    return pending
+  }
+}
+
+function reference(skill: LocalSkill): SkillReference {
+  return { id: skill.id, name: skill.name, revision: skill.revision }
+}
+
+export function formatBuddySkillPrompt(skill: BuddyMaterializedSkill): string {
+  const escape = (value: string) => value.replaceAll('&', '&amp;').replaceAll('"', '&quot;').replaceAll('<', '&lt;').replaceAll('>', '&gt;')
+  return [`<skill name="${escape(skill.name)}" location="${escape(skill.filePath)}">`, `References are relative to ${skill.baseDirectory}.`, '', skill.body, '</skill>'].join('\n')
+}
+
+export function registerSkillServiceRpc(rpc: RuntimeRequestRegistrar, service: SkillService): () => void {
+  const stops = [
+    registerRuntimeRequest(rpc, skillsRpc.list, input => service.list(input.spaceId)),
+    registerRuntimeRequest(rpc, skillsRpc.get, input => service.get(input.spaceId, input.id)),
+    registerRuntimeRequest(rpc, skillsRpc.listFiles, input => service.listFiles(input)),
+    registerRuntimeRequest(rpc, skillsRpc.readFile, input => service.readFile(input)),
+    registerRuntimeRequest(rpc, skillsRpc.locateFile, input => service.locateFile(input)),
+    registerRuntimeRequest(rpc, skillsRpc.preview, input => service.preview(input)),
+    registerRuntimeRequest(rpc, skillsRpc.install, input => service.install(input)),
+    registerRuntimeRequest(rpc, skillsRpc.discard, async (input) => {
+      await service.discard(input.previewId)
+      return { ok: true as const }
+    }),
+    registerRuntimeRequest(rpc, skillsRpc.setEnabled, input => service.setEnabled(input)),
+    registerRuntimeRequest(rpc, skillsRpc.remove, input => service.remove(input)),
+  ]
+  return () => stops.forEach(stop => stop())
+}

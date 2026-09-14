@@ -3,6 +3,7 @@ import type { BuddyApprovalPolicy } from '../../../../shared/permissions/approva
 import type { BuddyExecutionProfile } from '../../../../shared/permissions/executionProfile'
 import type { BuddySessionMode } from '../../../../shared/permissions/sessionMode'
 import type { DirectoryGrant } from '../../directories/resolveGrantedPath'
+import type { SkillService } from '../../skills/SkillService'
 import type { BuddyDataPaths } from '../../storage/BuddyDataPaths'
 import type {
   ConversationDirectoryGrantRecord,
@@ -14,7 +15,6 @@ import type {
   SpaceRecord,
   SpaceRepository,
 } from '../../storage/spaceRepository'
-import type { SkillService } from '../resources/SkillService'
 import type { BuddySessionBlueprint } from './BuddySessionBlueprint'
 import { createHash } from 'node:crypto'
 import { mkdir, realpath, stat } from 'node:fs/promises'

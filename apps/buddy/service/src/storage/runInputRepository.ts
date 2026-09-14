@@ -2,10 +2,12 @@ import type { DatabaseSync } from 'node:sqlite'
 import type { BuddyServiceTier, BuddyThinkingLevel } from '../../../shared/conversation/modelSelection'
 import { z } from 'zod'
 import { BUDDY_SERVICE_TIERS, BUDDY_THINKING_LEVELS } from '../../../shared/conversation/modelSelection'
+import { skillReferenceSchema } from '../../../shared/skills/skillApi'
 
 const contextItemSchema = z.object({
   kind: z.enum(['file', 'skill', 'slashCommand']),
   value: z.string().min(1),
+  skill: skillReferenceSchema.optional(),
 }).strict()
 
 const attachmentIdsSchema = z.array(z.string().min(1))

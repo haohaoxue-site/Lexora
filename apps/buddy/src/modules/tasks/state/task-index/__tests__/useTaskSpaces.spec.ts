@@ -31,7 +31,6 @@ function fixture() {
     onError: error => errors.push(error),
     persistWorkspaceState,
     refreshIndex,
-    refreshSkills: async () => true,
     selectDefaultModel() {},
     spaceId,
     spaces,

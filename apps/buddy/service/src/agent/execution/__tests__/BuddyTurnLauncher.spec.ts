@@ -1,4 +1,5 @@
 import type { DatabaseSync } from 'node:sqlite'
+import type { SkillReference } from '../../../../../shared/skills/skillApi'
 import type { RunRecord } from '../../../storage/runRecord'
 import type {
   BuddyTurnHandle,
@@ -32,6 +33,13 @@ afterEach(async () => {
 })
 
 describe('buddyTurnLauncher', () => {
+  it('rejects a saved Skill reference missing from the launch resource snapshot', async () => {
+    const fixture = await createFixture({ selectedSkill: { id: 'writer-id', name: 'writer', revision: 'old' } })
+    fixture.prepareTurn({ spaceId: null })
+    await expect(fixture.planner.resolve('run-1')).rejects.toMatchObject({ code: 'SKILL_CHANGED' })
+    expect(fixture.runs.findById('run-1')?.status).toBe('queued')
+  })
+
   it('rebuilds the executable turn from persisted run facts', async () => {
     const fixture = await createFixture()
     fixture.prepareTurn({ spaceId: null })
@@ -151,7 +159,7 @@ describe('buddyTurnLauncher', () => {
   })
 })
 
-async function createFixture(options: { modelInput?: readonly ('text' | 'image')[] } = {}) {
+async function createFixture(options: { modelInput?: readonly ('text' | 'image')[], selectedSkill?: SkillReference } = {}) {
   const root = await realpath(await mkdtemp(join(tmpdir(), 'lexora-buddy-launcher-')))
   directories.push(root)
   await mkdir(root, { recursive: true })
@@ -175,6 +183,8 @@ async function createFixture(options: { modelInput?: readonly ('text' | 'image')
     skills: {
       loadForSpace: async () => ({
         diagnostics: [],
+        readRoots: [],
+        references: [],
         paths: [],
         revision: 'skills-revision-1',
         skills: [],
@@ -209,6 +219,7 @@ async function createFixture(options: { modelInput?: readonly ('text' | 'image')
       })
     },
     eventLog,
+    planner,
     resolveInputReferences,
     paths,
     prepareTurn({ spaceId }: { spaceId: string | null }) {
@@ -228,7 +239,7 @@ async function createFixture(options: { modelInput?: readonly ('text' | 'image')
         runId: 'run-1',
         runInput: {
           attachmentIds: [],
-          contextItems: [],
+          contextItems: options.selectedSkill ? [{ kind: 'skill', value: options.selectedSkill.name, skill: options.selectedSkill }] : [],
           prompt: 'Persisted prompt',
           reasoning: 'high',
           serviceTier: 'priority',

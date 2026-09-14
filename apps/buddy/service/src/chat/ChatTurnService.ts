@@ -8,7 +8,6 @@ import type { BuddyThinkingLevel } from '../../../shared/conversation/modelSelec
 import type { ApplicationDiagnosticReporter } from '../../../shared/diagnostics/applicationDiagnostic'
 import type { BuddyAgentRunner } from '../agent/execution/BuddyAgentRunner'
 import type { BuddyTurnLauncher } from '../agent/execution/BuddyTurnLauncher'
-import type { SkillService } from '../agent/resources/SkillService'
 import type {
   AttachmentService,
 } from '../attachments/AttachmentService'
@@ -23,6 +22,7 @@ import type {
   InteractiveModelSelection,
   RuntimeModelProvider,
 } from '../providers/resolveInteractiveModelSelection'
+import type { SkillService } from '../skills/SkillService'
 import type { AttachmentRecord } from '../storage/attachmentRepository'
 import type { ComposerDraftRepository } from '../storage/composerDraftRepository'
 import type { ConversationHistoryRepository } from '../storage/conversationHistoryRepository'
@@ -55,15 +55,15 @@ import {
 } from '../../../shared/conversation/buddyUserContent'
 import { isBuddyThinkingLevel } from '../../../shared/conversation/modelSelection'
 import { safeDiagnosticReporter } from '../../../shared/diagnostics/applicationDiagnostic'
-import {
-  BuddySkillSelectionError,
-  formatBuddySkillPrompt,
-} from '../agent/resources/SkillService'
 import { resolveGrantedPath } from '../directories/resolveGrantedPath'
 import { getModelFileInputMimeTypes } from '../providers/modelCapabilities'
 import { resolveInteractiveModelSelection } from '../providers/resolveInteractiveModelSelection'
 import { BuddyServiceError } from '../rpc/runtimeRequest'
 import { toPublicRun } from '../runs/publicRun'
+import { SkillError } from '../skills/skillFiles'
+import {
+  formatBuddySkillPrompt,
+} from '../skills/SkillService'
 import { requireActiveSpace } from '../spaces/requireActiveSpace'
 import { persistPreparedTurn } from './persistPreparedTurn'
 
@@ -227,6 +227,7 @@ export class ChatTurnService {
     const {
       attachmentPrompt,
       prompt,
+      contextItems: resolvedContextItems,
       selection,
       thinkingLevel,
     } = await this.#prepareTurnMaterialization({
@@ -282,7 +283,7 @@ export class ChatTurnService {
       requestId: input.requestId,
       runInput: {
         attachmentIds: persistedAttachmentIds,
-        contextItems: [],
+        contextItems: resolvedContextItems,
         prompt,
         reasoning: thinkingLevel ?? null,
         serviceTier: selection.serviceTier,
@@ -301,7 +302,9 @@ export class ChatTurnService {
     return { prepared, stagedAttachments }
   }
 
-  async validatePreparedInput(input: PrepareTurnRequestInput): Promise<void> {
+  async validatePreparedInput(input: PrepareTurnRequestInput, validateSkills = true): Promise<void> {
+    if (validateSkills)
+      await this.#validateSkillItems(input.spaceId, input.runInput.contextItems)
     await this.#options.inputValidation.validate({
       conversationId: input.conversationId,
       branchId: input.branchId,
@@ -370,6 +373,7 @@ export class ChatTurnService {
     const {
       prompt,
       replayInput,
+      contextItems: resolvedContextItems,
       selection,
       thinkingLevel,
     } = await this.#prepareTurnMaterialization({
@@ -430,7 +434,7 @@ export class ChatTurnService {
             runId,
             runInput: {
               attachmentIds: persistedAttachmentIds,
-              contextItems: [],
+              contextItems: resolvedContextItems,
               prompt,
               reasoning: thinkingLevel ?? null,
               serviceTier: replayInput ? replayInput.serviceTier : selection.serviceTier,
@@ -467,6 +471,7 @@ export class ChatTurnService {
       throw new BuddyServiceError('VALIDATION_FAILED')
 
     const storedInput = this.#requireRunInput(requireValue(replay?.run ?? sourceRun).id)
+    await this.#validateSkillItems(conversation.spaceId, storedInput.contextItems)
     assertPromptSize(storedInput.prompt)
     await this.#options.inputValidation.validate({
       conversationId: conversation.id,
@@ -561,12 +566,18 @@ export class ChatTurnService {
 
   async #prepareTurnMaterialization(input: PrepareTurnMaterializationInput) {
     const replayInput = input.replay ? this.#requireRunInput(input.replay.run.id) : null
-    const composer = !replayInput && input.composer
-      ? {
-          ...input.composer,
-          resolveDirective: await materializeComposerDirectives(input.composer.content, input.space, this.#options.skills),
-        }
+    const directives = !replayInput && input.composer
+      ? await materializeComposerDirectives(input.composer.content, input.space, this.#options.skills)
+      : null
+    const composer = directives && input.composer
+      ? { ...input.composer, resolveDirective: directives.resolveDirective }
       : undefined
+    const legacyContext = !replayInput && !composer
+      ? await materializeContextItems(input.contextItems, input.space, this.#options.skills)
+      : null
+    const contextItems = replayInput?.contextItems ?? directives?.contextItems ?? legacyContext?.contextItems ?? input.contextItems
+    if (replayInput)
+      await this.#validateSkillItems(input.space?.id ?? null, contextItems)
     const attachmentPrompt = await this.#options.attachments.preparePrompt(
       replayInput?.attachmentIds ?? input.attachmentIds,
       replayInput ? '' : input.content,
@@ -577,13 +588,7 @@ export class ChatTurnService {
     const context = replayInput
       ? ''
       : [
-          composer
-            ? ''
-            : await materializeContextItems(
-                input.contextItems,
-                input.space,
-                this.#options.skills,
-              ),
+          legacyContext?.prompt ?? '',
           input.contextSuffix ?? '',
         ].filter(Boolean).join(PROMPT_SECTION_SEPARATOR)
     const prompt = replayInput?.prompt
@@ -611,10 +616,16 @@ export class ChatTurnService {
     return {
       attachmentPrompt,
       prompt,
+      contextItems,
       replayInput,
       selection,
       thinkingLevel,
     }
+  }
+
+  async #validateSkillItems(spaceId: string | null, items: readonly RunInputRecord['contextItems'][number][]) {
+    const selections = items.filter(item => item.kind === 'skill').map(item => item.skill ?? item.value)
+    await this.#options.skills.materializeForSpace(spaceId, selections)
   }
 
   #resolveConversationSpace(conversation: ConversationRecord): SpaceRecord | null {
@@ -665,32 +676,25 @@ async function materializeComposerDirectives(
   content: BuddyUserContentV1,
   space: SpaceRecord | null,
   skills: Pick<SkillService, 'materializeForSpace'>,
-): Promise<(directive: BuddyPromptDirective) => string> {
+) {
   const directives = content.body.flatMap(paragraph => paragraph.content.filter(node => node.type === 'prompt_directive'))
-  const names = [...new Set(directives.flatMap(node => node.directive === 'skill' ? [node.value] : []))]
-  const selected = new Map<string, string>()
-  if (names.length) {
-    try {
-      for (const skill of await skills.materializeForSpace(space?.id ?? null, names))
-        selected.set(skill.name, formatBuddySkillPrompt(skill))
-    }
-    catch (error) {
-      if (error instanceof BuddySkillSelectionError)
+  const selections = directives.flatMap(node => node.directive === 'skill' ? [node.skill ?? node.value] : [])
+  const loaded = await skills.materializeForSpace(space?.id ?? null, selections)
+  const selected = new Map(loaded.map(skill => [skill.name, formatBuddySkillPrompt(skill)]))
+  return {
+    contextItems: loaded.map(skill => ({ kind: 'skill' as const, value: skill.name, skill: skill.reference })),
+    resolveDirective(directive: BuddyPromptDirective): string {
+      if (directive.directive === 'skill') {
+        const value = selected.get(directive.value)
+        if (value === undefined)
+          throw new SkillError('SKILL_NOT_FOUND')
+        return value
+      }
+      const command = parseBuddyChatCommand(directive.value)
+      if (!command || command.kind !== 'prompt' || directive.commandMode !== 'prompt' || command.arguments)
         throw new BuddyServiceError('VALIDATION_FAILED')
-      throw error
-    }
-  }
-  return (directive) => {
-    if (directive.directive === 'skill') {
-      const value = selected.get(directive.value)
-      if (value === undefined)
-        throw new BuddyServiceError('VALIDATION_FAILED')
-      return value
-    }
-    const command = parseBuddyChatCommand(directive.value)
-    if (!command || command.kind !== 'prompt' || directive.commandMode !== 'prompt' || command.arguments)
-      throw new BuddyServiceError('VALIDATION_FAILED')
-    return materializeBuddyPromptCommand(command)
+      return materializeBuddyPromptCommand(command)
+    },
   }
 }
 
@@ -767,19 +771,11 @@ async function materializeContextItems(
   items: readonly ChatContextItem[],
   space: SpaceRecord | null,
   skills: Pick<SkillService, 'materializeForSpace'>,
-): Promise<string> {
-  let selectedSkills: Awaited<ReturnType<SkillService['materializeForSpace']>>
-  try {
-    selectedSkills = await skills.materializeForSpace(
-      space?.id ?? null,
-      items.filter(item => item.kind === 'skill').map(item => item.value),
-    )
-  }
-  catch (error) {
-    if (error instanceof BuddySkillSelectionError)
-      throw new BuddyServiceError('VALIDATION_FAILED')
-    throw error
-  }
+) {
+  const selectedSkills = await skills.materializeForSpace(
+    space?.id ?? null,
+    items.filter(item => item.kind === 'skill').map(item => item.skill ?? item.value),
+  )
   const skillsByName = new Map(selectedSkills.map(skill => [skill.name, skill]))
   const sections: string[] = []
   for (const item of items) {
@@ -818,7 +814,10 @@ async function materializeContextItems(
       throw new BuddyServiceError('VALIDATION_FAILED')
     sections.push(`上下文文件：${item.value}\n\n${content.toString('utf8')}`)
   }
-  return sections.join(PROMPT_SECTION_SEPARATOR)
+  return {
+    prompt: sections.join(PROMPT_SECTION_SEPARATOR),
+    contextItems: items.map(item => item.kind === 'skill' ? { ...item, skill: skillsByName.get(item.value)!.reference } : item),
+  }
 }
 
 function validateTurnCommand(content: string, items: readonly ChatContextItem[]) {

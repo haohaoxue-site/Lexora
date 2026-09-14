@@ -570,6 +570,8 @@ async function createFixture(options: {
     modelRuntime,
     piSessionFile: options.piSessionFile,
     resources: {
+      skillReadRoots: [],
+      skillReferences: [],
       approvedSkillPaths: [],
       context: { agentsFiles: [], diagnostics: [] },
       directoryContext: DIRECTORY_CONTEXT,

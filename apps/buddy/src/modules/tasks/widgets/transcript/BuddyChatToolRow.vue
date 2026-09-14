@@ -147,6 +147,8 @@ const issue = computed(() => isChatToolIssue(props.node))
 }
 
 .buddy-chat-tool__title {
+  position: relative;
+  top: -1px;
   flex: 0 0 auto;
   max-width: 40%;
   overflow: hidden;

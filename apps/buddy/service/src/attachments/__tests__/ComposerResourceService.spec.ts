@@ -695,7 +695,7 @@ describe('composer resource import', () => {
       turnRequests: createTurnRequestRepository(database),
       spaces: createSpaceRepository(database),
       conversationLifecycle: { isDeleting: () => false },
-      skills: { materializeForSpace: async () => [{ name: 'writer', body: 'Use concise wording.', filePath: '/fixture/skills/writer/SKILL.md', baseDirectory: '/fixture/skills/writer' }] },
+      skills: { materializeForSpace: async () => [{ reference: { id: 'writer-id', name: 'writer', revision: 'writer-revision' }, name: 'writer', body: 'Use concise wording.', filePath: '/fixture/skills/writer/SKILL.md', baseDirectory: '/fixture/skills/writer' }] },
       runner: { cancel: async () => false },
       providers: {
         getDefaultModel: async () => ({ modelId: 'offline', providerId: 'fixture', reasoning: null, serviceTier: null }),

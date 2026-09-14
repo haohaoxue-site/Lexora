@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { skillReferenceSchema } from '../skills/skillApi'
 
 export const buddyResourceIdSchema = z.string().regex(/^[A-Z0-9][\w-]{0,127}$/i)
 
@@ -29,6 +30,7 @@ const skillDirectiveSchema = z.object({
   directive: z.literal('skill'),
   type: z.literal('prompt_directive'),
   value: z.string().min(1),
+  skill: skillReferenceSchema.optional(),
 }).strict().readonly()
 
 const slashDirectiveSchema = z.object({

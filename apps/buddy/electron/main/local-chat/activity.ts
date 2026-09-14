@@ -5,7 +5,6 @@ import { notificationsRequestSchemas, notificationsRpc } from '../../../shared/n
 import { approvalsRequestSchemas, approvalsRpc } from '../../../shared/permissions/approvalApi'
 import { toPublicRunEvent } from '../../../shared/runs/publicRunEvent'
 import { runsRequestSchemas, runsResponseSchemas, runsRpc } from '../../../shared/runs/runApi'
-import { skillsRequestSchemas, skillsRpc } from '../../../shared/skills/skillApi'
 import { usageAnalyticsRpc, usagePeriodSchema, usageTopTasksRequestSchema, usageTrendRequestSchema } from '../../../shared/usage/usageAnalyticsApi'
 import { usageRpc } from '../../../shared/usage/usageApi'
 import { LOCAL_CHAT_IPC_CHANNELS } from '../../shared/localChatApi'
@@ -21,8 +20,6 @@ export function registerActivityIpc(context: LocalChatIpcContext): void {
   handle(LOCAL_CHAT_IPC_CHANNELS.notificationsMarkSeen, (_event, input) => request(notificationsRpc.markSeen, notificationsRequestSchemas.notificationRevision.parse(input)))
 
   handle(LOCAL_CHAT_IPC_CHANNELS.notificationsMarkAllSeen, () => request(notificationsRpc.markAllSeen, {}))
-
-  handle(LOCAL_CHAT_IPC_CHANNELS.skillsList, (_event, input) => request(skillsRpc.list, skillsRequestSchemas.skillScope.parse(input)))
 
   handle(LOCAL_CHAT_IPC_CHANNELS.changesGet, (_event, input) => request(changesRpc.get, changesRequestSchemas.changeSet.parse(input)))
 

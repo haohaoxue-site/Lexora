@@ -3,6 +3,7 @@ import type {
   AgentSession,
   SessionEntry,
 } from '@earendil-works/pi-coding-agent'
+import type { SkillReference } from '../../../../shared/skills/skillApi'
 import type { AttachmentFileInput } from '../../attachments/AttachmentDocumentReference'
 import type {
   BuddyInputReferenceStore,
@@ -22,6 +23,7 @@ import { BUDDY_DEFAULT_THINKING_LEVEL } from '../../../../shared/conversation/mo
 import { applyDocumentInputPayload } from '../../providers/documentInputPayload'
 import { supportsModelFileInput, supportsModelToolCalls } from '../../providers/modelCapabilities'
 import { getModelRequestBytesLimit } from '../../providers/modelInputBudget'
+import { SkillError } from '../../skills/skillFiles'
 import { createBuddyInputReferenceMessage, readBuddyInputReference } from '../context/BuddyInputReference'
 import { buildBuddyRequestContext } from '../context/buildBuddyRequestContext'
 import { createContextUsageBreakdown } from '../context/contextUsageBreakdown'
@@ -31,6 +33,7 @@ import { withNativeAttachmentPrompt } from '../context/withNativeAttachmentPromp
 import { toBuddySessionStorageError } from './BuddySessionErrors'
 
 export interface CreateReusableBuddySessionOptions {
+  skillReferences?: readonly SkillReference[]
   tree?: BuddyConversationTreeCursor
   assertModelAccess: (
     provider: string,
@@ -147,9 +150,13 @@ export function createReusableBuddySession(
       messages.push(...[...pendingSteering.values()].map(input => createBuddyInputReferenceMessage(input, Date.now())))
       return { messages, systemPrompt: session.systemPrompt }
     },
-    steer: (prepare) => {
+    steer: (prepare, skills = []) => {
       if (!session.isStreaming)
         return false
+      for (const skill of skills) {
+        if (!options.skillReferences?.some(active => active.id === skill.id && active.name === skill.name && active.revision === skill.revision))
+          throw new SkillError('SKILL_CHANGED')
+      }
       const input = prepare()
       pendingSteering.set(input.messageId, input)
       session.agent.steer(createBuddyInputReferenceMessage(input, Date.now()))

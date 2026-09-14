@@ -137,6 +137,8 @@ describe('buddy runtime cross-subsystem contract', () => {
         grantRevision: 'grants-1',
         grants: [{ canonicalRoot: spaceRoot, grantId: 'directory-1', kind: 'workspace' as const, root: spaceRoot }],
         resources: {
+          skillReadRoots: [],
+          skillReferences: [],
           approvedSkillPaths: [],
           context: { agentsFiles: [], diagnostics: [] },
           directoryContext: '',

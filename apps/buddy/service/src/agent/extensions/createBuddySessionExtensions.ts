@@ -35,6 +35,7 @@ export interface CreateBuddySessionExtensionsOptions {
   conversationId: string
   executionProfile: BuddyExecutionProfile
   grants: readonly DirectoryGrant[]
+  skillReadRoots?: readonly string[]
   sessionMode: BuddySessionMode
   signal: AbortSignal
   spaceId: string | null
@@ -70,6 +71,7 @@ export async function createBuddySessionExtensions(
       cwd: options.canonicalRoot,
       execution,
       getGrants: () => grants,
+      resourceReadRoots: options.skillReadRoots ?? [],
       getRunContext: () => runContext.current,
       approvalAvailable: options.sessionMode === 'interactive',
       approvalPolicy: options.approvalPolicy,

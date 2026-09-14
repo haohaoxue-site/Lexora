@@ -7,6 +7,7 @@ import diagnostics from './diagnostics'
 import models from './models'
 import pet from './pet'
 import settings from './settings'
+import skills from './skills'
 import tasks from './tasks'
 import usage from './usage'
 
@@ -20,6 +21,7 @@ export default {
   ...models,
   ...pet,
   ...settings,
+  ...skills,
   ...tasks,
   ...usage,
 }

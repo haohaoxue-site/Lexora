@@ -88,7 +88,7 @@ describe('createBuddySession', () => {
       ...createRuntimeOptions(),
       model,
       modelRuntime,
-      resources: { ...emptyResources(), approvedSkillPaths: [skillPath] },
+      resources: { ...emptyResources(), skillReadRoots: [], skillReferences: [], approvedSkillPaths: [skillPath] },
     })
     try {
       expect(result.session.systemPrompt).toContain('<available_skills>')
@@ -236,6 +236,8 @@ function createRuntimeOptions() {
 
 function emptyResources() {
   return {
+    skillReadRoots: [],
+    skillReferences: [],
     approvedSkillPaths: [],
     context: { agentsFiles: [], diagnostics: [] },
     directoryContext: '',

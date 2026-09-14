@@ -1,6 +1,7 @@
 import type { RuntimeRequestContract } from '../runtime/apiContract'
 import type { DeepReadonly } from '../runtime/apiValidation'
 import { z } from 'zod'
+import { directoryPageSchema, fileEntrySchema, filePreviewSchema } from '../files/filePreview'
 import { idSchema } from '../runtime/apiValidation'
 
 export const spaceFileTargetSchema = z.object({
@@ -10,24 +11,9 @@ export const spaceFileTargetSchema = z.object({
   path: z.string().max(4096),
 }).strict()
 
-export const spaceFileEntrySchema = z.object({
-  name: z.string().min(1),
-  path: z.string().min(1),
-  kind: z.enum(['directory', 'file']),
-  unavailable: z.boolean(),
-}).strict()
-
-export const spaceDirectoryPageSchema = z.object({
-  entries: z.array(spaceFileEntrySchema).max(250),
-  nextCursor: z.string().nullable(),
-}).strict()
-
-export const spaceFilePreviewSchema = z.object({
-  kind: z.enum(['text', 'image', 'binary', 'oversized']),
-  sizeBytes: z.number().int().nonnegative(),
-  text: z.string().max(1024 * 1024).nullable(),
-  imageUrl: z.string().max(12 * 1024 * 1024).nullable(),
-}).strict()
+export const spaceFileEntrySchema = fileEntrySchema
+export const spaceDirectoryPageSchema = directoryPageSchema
+export const spaceFilePreviewSchema = filePreviewSchema
 
 export const spaceFileLocationSchema = z.object({
   path: z.string().min(1),

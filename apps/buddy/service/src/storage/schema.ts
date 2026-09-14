@@ -15,6 +15,7 @@ import { BUDDY_V13_CHAT_QUEUE_SCHEMA_SQL } from './migrations/v13ChatQueue'
 import { BUDDY_V14_USAGE_SCHEMA_SQL } from './migrations/v14Usage'
 import { BUDDY_V15_MODEL_SERVICES_SCHEMA_SQL } from './migrations/v15ModelServices'
 import { BUDDY_V16_ATTACHMENT_NAMES_SCHEMA_SQL } from './migrations/v16AttachmentNames'
+import { BUDDY_V17_SKILLS_SCHEMA_SQL } from './migrations/v17Skills'
 
 export interface BuddySchemaMigration {
   foreignKeys?: 'off'
@@ -22,7 +23,7 @@ export interface BuddySchemaMigration {
   version: number
 }
 
-export const BUDDY_SCHEMA_VERSION = 16 as const
+export const BUDDY_SCHEMA_VERSION = 17 as const
 
 export const BUDDY_SCHEMA_MIGRATIONS: readonly BuddySchemaMigration[] = [
   { sql: BUDDY_V1_INITIAL_SCHEMA_SQL, version: 1 },
@@ -41,4 +42,5 @@ export const BUDDY_SCHEMA_MIGRATIONS: readonly BuddySchemaMigration[] = [
   { sql: BUDDY_V14_USAGE_SCHEMA_SQL, version: 14 },
   { sql: BUDDY_V15_MODEL_SERVICES_SCHEMA_SQL, version: 15 },
   { sql: BUDDY_V16_ATTACHMENT_NAMES_SCHEMA_SQL, version: 16 },
+  { sql: BUDDY_V17_SKILLS_SCHEMA_SQL, version: 17 },
 ]

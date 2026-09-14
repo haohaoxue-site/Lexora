@@ -1,7 +1,7 @@
 import type { LocalChatApi } from '@buddy-electron/shared/localChatApi'
 import type { Ref } from 'vue'
 import type { ChatComposerContextOptions } from '@/modules/prompt-input'
-import type { LocalCapabilitiesStore } from '@/modules/settings'
+import { isSkillAvailable } from '@buddy-shared/skills/skillApi'
 import { onScopeDispose, watch } from 'vue'
 
 interface ComposerContextOptions {
@@ -10,7 +10,7 @@ interface ComposerContextOptions {
   draftId: Readonly<Ref<string>>
   spaceId: Readonly<Ref<string | null>>
   listSources: LocalChatApi['composerResources']['listSources']
-  localCapabilities: Pick<LocalCapabilitiesStore, 'loadSkills' | 'skills'>
+  listSkills: LocalChatApi['skills']['list']
 }
 
 export function useComposerContextOptions(options: ComposerContextOptions) {
@@ -31,10 +31,7 @@ export function useComposerContextOptions(options: ComposerContextOptions) {
       query: fileQuery ?? '',
       spaceId,
     }
-    await options.localCapabilities.loadSkills(spaceId)
-    if (current !== scopeVersion)
-      return { files: [], skills: [] }
-    const { files } = await options.listSources(request)
+    const [catalog, { files }] = await Promise.all([options.listSkills(spaceId), options.listSources(request)])
     if (current !== scopeVersion)
       return { files: [], skills: [] }
     return {
@@ -47,14 +44,15 @@ export function useComposerContextOptions(options: ComposerContextOptions) {
         value: JSON.stringify(file.source),
         source: file.source,
       })),
-      skills: options.localCapabilities.skills.value.skills
-        .filter(skill => skill.enabled)
+      skills: catalog.skills
+        .filter(isSkillAvailable)
         .map(skill => ({
           description: skill.description,
           kind: 'skill' as const,
           label: skill.name,
           path: null,
           value: skill.name,
+          skill: { id: skill.id, name: skill.name, revision: skill.revision },
         })),
     }
   }

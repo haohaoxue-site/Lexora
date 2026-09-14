@@ -119,6 +119,9 @@ describe('usage analytics', () => {
       f.usage('retained')
       const before = f.repository.analytics(period)
       f.database.exec(`
+        DROP TABLE skill_file_cleanup;
+        DROP TABLE skill_space_exclusions;
+        DROP TABLE skill_installations;
         DROP INDEX idx_usage_created_at;
         DROP TABLE builtin_provider_configs;
         ALTER TABLE provider_states DROP COLUMN request_headers_json;

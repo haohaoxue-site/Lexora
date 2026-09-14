@@ -12,7 +12,6 @@ interface UseTaskSpacesOptions {
   drafts: Pick<ChatDrafts, 'discard'>
   draftId: Readonly<Ref<string>>
   applySpace: (space: LocalSpace) => void
-  refreshSkills: (spaceId: string) => Promise<boolean>
   onError: (error: unknown) => void
   persistWorkspaceState: () => Promise<boolean>
   spaceId: Readonly<Ref<string | null>>
@@ -95,8 +94,6 @@ export function useTaskSpaces(options: UseTaskSpacesOptions) {
     options.applySpace(space)
     try {
       await options.refreshIndex()
-      if (!disposed && options.spaceId.value === input.spaceId)
-        await options.refreshSkills(input.spaceId)
     }
     catch (error) {
       if (!disposed && current === scopeVersion)

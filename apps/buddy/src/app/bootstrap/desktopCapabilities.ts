@@ -1,15 +1,14 @@
 import type { LexoraDesktopApi } from '@buddy-electron/shared/desktopApi'
 import type { DesktopStores } from '@/app/bootstrap/useDesktopAppState'
 import type { AutomationCapability } from '@/modules/automations'
-import type { DesktopDataSettingsCapability, DesktopLocalSettingsCapability, WebSettingsCapability } from '@/modules/settings'
+import type { DesktopDataSettingsCapability, WebSettingsCapability } from '@/modules/settings'
 import type { TaskCapability } from '@/modules/tasks'
 import { useAutomationCapability } from '@/modules/automations'
-import { createDesktopDataSettingsCapability, createDesktopLocalSettingsCapability, useWebSettingsCapability } from '@/modules/settings'
+import { createDesktopDataSettingsCapability, useWebSettingsCapability } from '@/modules/settings'
 
 export interface DesktopCapabilities {
   automations: AutomationCapability
   dataSettings: DesktopDataSettingsCapability
-  localSettings: DesktopLocalSettingsCapability
   webSettings: WebSettingsCapability
 }
 
@@ -37,10 +36,6 @@ export function createDesktopCapabilities(
       runtimeSupervisor: stores.runtimeSupervisor,
       usage: stores.usage,
     }),
-    localSettings: createDesktopLocalSettingsCapability(
-      stores.localCapabilities,
-      input.tasks.session.spaceId,
-    ),
     webSettings: useWebSettingsCapability({ api: input.api.localChat.web, language: stores.applicationSettings.language }),
   }
 }

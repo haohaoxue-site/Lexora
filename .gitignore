@@ -163,3 +163,4 @@ __tests__
 !/apps/buddy/native/**
 /apps/buddy/native/target/
 infrastructure/_scripts
+.local/agent-work/

@@ -2,7 +2,7 @@ import type { LexoraDesktopApi } from '@buddy-electron/shared/desktopApi'
 import type { ServiceHost } from '@buddy-shared/lifecycle/ServiceHost'
 import { useModelProvidersStore } from '@/modules/models'
 import { useNotificationCenterStore } from '@/modules/notifications'
-import { useApplicationSettingsStore, useLocalCapabilitiesStore, useUsageStore } from '@/modules/settings'
+import { useApplicationSettingsStore, useUsageStore } from '@/modules/settings'
 import { useRuntimeSupervisorStore } from '@/platform/runtime/useRuntimeSupervisorStore'
 import { requireInitialState } from './requireInitialState'
 
@@ -22,17 +22,12 @@ export function useDesktopAppState(options: UseDesktopAppStateOptions) {
     api: options.api.localChat.runtime,
     language: applicationSettings.language,
   })
-  const localCapabilities = useLocalCapabilitiesStore({
-    api: options.api.localChat,
-    language: applicationSettings.language,
-  })
   const usage = useUsageStore({
     api: options.api.localChat.usage,
     language: applicationSettings.language,
   })
   const stores = {
     applicationSettings,
-    localCapabilities,
     modelProviders,
     notifications,
     runtimeSupervisor,
@@ -75,7 +70,6 @@ export function useDesktopAppState(options: UseDesktopAppStateOptions) {
       return
     disposed = true
     applicationSettings.dispose()
-    localCapabilities.dispose()
     modelProviders.dispose()
     notifications.dispose()
     runtimeSupervisor.dispose()

@@ -99,7 +99,7 @@ defineExpose({
 const sourceMenuOpen = shallowRef(false)
 const suggestionOptions = computed(() => suggestions.value.map(({ option }) => option))
 const chooserVisible = computed(() => !sourceMenuOpen.value && Boolean(
-  activeTrigger.value && (activeTrigger.value.kind === 'mention' || suggestions.value.length || isLoadingContext.value),
+  activeTrigger.value && (activeTrigger.value.kind === 'mention' || activeTrigger.value.kind === 'skill' || suggestions.value.length || isLoadingContext.value),
 ))
 const suggestionEmptyLabel = computed(() => activeTrigger.value?.kind === 'mention'
   ? t(activeTrigger.value.query ? 'desktop.chat.sourcePickerNoMatches' : 'desktop.chat.sourcePickerNoReferences')
@@ -168,6 +168,9 @@ async function selectConversationFile(option: ChatPromptContextOption) {
             :options="suggestionOptions"
             @select="selectSuggestion"
           />
+          <NButton v-if="activeTrigger?.kind === 'skill' && manageSkills" class="desktop-chat-composer__manage-skills" quaternary size="small" @mousedown.prevent @click="manageSkills">
+            {{ t('desktop.skills.manage') }}
+          </NButton>
         </template>
       </DesktopChatComposerInteractionHost>
     </template>

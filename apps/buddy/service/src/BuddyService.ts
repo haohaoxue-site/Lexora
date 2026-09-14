@@ -22,10 +22,6 @@ import { BuddyAgentRunner } from './agent/execution/BuddyAgentRunner'
 import { BuddyRunExecutionPlanner } from './agent/execution/BuddyRunExecutionPlanner'
 import { BuddyTurnLauncher } from './agent/execution/BuddyTurnLauncher'
 import { PiTurnExecutor } from './agent/execution/PiTurnExecutor'
-import {
-  registerSkillServiceRpc,
-  SkillService,
-} from './agent/resources/SkillService'
 import { BuddySessionBlueprintService } from './agent/sessions/BuddySessionBlueprintService'
 import { BuddySessionFactory } from './agent/sessions/BuddySessionFactory'
 import { BuddySessionRegistry } from './agent/sessions/BuddySessionRegistry'
@@ -80,12 +76,16 @@ import { registerNotificationRpc } from './notifications/registerNotificationRpc
 import { createProviderService } from './providers/createProviderService'
 import { registerProviderRpc } from './providers/registerProviderRpc'
 import { resolveInteractiveModelSelection } from './providers/resolveInteractiveModelSelection'
-
 import { BuddyServiceError } from './rpc/runtimeRequest'
+
 import { registerRunRpc } from './runs/registerRunRpc'
 import { RunLifecycleService } from './runs/RunLifecycleService'
 import { RunRecoveryService } from './runs/RunRecoveryService'
 import { ShellSandboxClient } from './sandbox/ShellSandboxClient'
+import {
+  registerSkillServiceRpc,
+  SkillService,
+} from './skills/SkillService'
 import { registerSpaceFileRpc } from './spaces/registerSpaceFileRpc'
 import { registerSpaceRpc } from './spaces/registerSpaceRpc'
 import { matchesSpaceExecutionContext } from './spaces/spaceExecutionContext'
@@ -108,6 +108,7 @@ import { createNotificationAttentionRepository } from './storage/notificationAtt
 import { createProviderRepository } from './storage/providerRepository'
 import { createRunInputRepository } from './storage/runInputRepository'
 import { createRunRepository } from './storage/runRepository'
+import { createSkillRepository } from './storage/skillRepository'
 import { createSpaceRepository } from './storage/spaceRepository'
 import { createTaskMarkRepository } from './storage/taskMarkRepository'
 import { createTurnRequestRepository } from './storage/turnRequestRepository'
@@ -286,12 +287,20 @@ export async function startBuddyService(
       defer(() => service.close())
       return service
     })
-    const skillService = await host.start('runtime.skills', () => {
+    const skillService = await host.start('runtime.skills', async ({ defer }) => {
       const service = new SkillService({
         agentDirectory,
         builtinSkillsDirectories: options.builtinSkillsDirectories,
         spaces: spacesRepository,
+        repository: createSkillRepository(options.database),
+        paths,
+        changed: async (spaceId) => {
+          await (spaceId ? sessions.invalidateSpace(spaceId) : sessions.invalidateAll())
+          options.rpc.notify('skills.changed', { spaceId })
+        },
       })
+      defer(() => service.dispose())
+      await service.initialize()
       return service
     })
     const browserHost = new BrowserHostClient(options.rpc)

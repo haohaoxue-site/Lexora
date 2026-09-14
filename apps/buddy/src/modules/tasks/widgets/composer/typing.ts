@@ -52,6 +52,7 @@ export interface ChatComposerEditorOptions {
 }
 
 export interface DesktopChatComposerProps {
+  manageSkills?: () => void
   hasQueuedMessages?: boolean
   canUpdatePermissionSettings: boolean
   canSend: boolean

@@ -25,6 +25,8 @@ describe('buddySessionResources', () => {
       skills: {
         loadForSpace: async () => ({
           diagnostics: [],
+          readRoots: [],
+          references: [],
           paths: [],
           revision: 'skills-revision-1',
           skills: [],

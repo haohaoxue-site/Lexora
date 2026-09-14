@@ -3,11 +3,13 @@ import type { DeepReadonly } from '../runtime/apiValidation'
 import { z } from 'zod'
 import { runSchema, runsRequestSchemas, runsResponseSchemas } from '../runs/runApi'
 import { idSchema, sessionIdentitySchema } from '../runtime/apiValidation'
+import { skillReferenceSchema } from '../skills/skillApi'
 import { buddyComposerDraftSendSchema } from './composerDraft'
 
 export const _contextItemSchema = z.object({
   kind: z.enum(['file', 'skill', 'slashCommand']),
   value: z.string().min(1),
+  skill: skillReferenceSchema.optional(),
 }).strict()
 
 export const turnStartSchema = z.object({

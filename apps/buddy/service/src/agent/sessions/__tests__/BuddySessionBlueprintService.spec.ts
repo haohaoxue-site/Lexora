@@ -21,6 +21,8 @@ describe('buddySessionBlueprintService', () => {
     const space = createSpace(spaceRoot)
     const loadForSpace = vi.fn(async () => ({
       diagnostics: [],
+      readRoots: [],
+      references: [],
       paths: ['/skills/space/SKILL.md'],
       revision: 'skills-revision-1',
       skills: [],
@@ -49,7 +51,7 @@ describe('buddySessionBlueprintService', () => {
         { canonicalRoot: spaceRoot, grantId: 'directory-1', kind: 'workspace' as const, root: spaceRoot },
         { canonicalRoot: scratchRoot, grantId: 'space-1', kind: 'workspace' as const, root: scratchRoot },
       ],
-      resources: { approvedSkillPaths: ['/skills/space/SKILL.md'] },
+      resources: { skillReadRoots: [], skillReferences: [], approvedSkillPaths: ['/skills/space/SKILL.md'] },
       scratchRoot,
       space: {
         additionalDirectoryBindings: [],
@@ -95,6 +97,8 @@ describe('buddySessionBlueprintService', () => {
       skills: {
         loadForSpace: async () => ({
           diagnostics: [],
+          readRoots: [],
+          references: [],
           paths: [],
           revision: 'skills-revision-1',
           skills: [],

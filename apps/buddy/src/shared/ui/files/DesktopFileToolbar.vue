@@ -1,12 +1,14 @@
 <script setup lang="ts">
 import type { BuddyLocale } from '@/i18n/buddyI18n'
-import { ArrowWrap20Regular, ChevronRight16Regular, FolderOpen20Regular, PanelRight20Regular } from '@vicons/fluent'
+import { ArrowWrap20Regular, ChevronRight16Regular, FolderOpen20Regular } from '@vicons/fluent'
 import { computed } from 'vue'
 import { useBuddyI18n } from '@/i18n/buddyI18n'
 import DesktopIcon from '@/shared/ui/icon/DesktopIcon.vue'
+import DirectoryTreeCollapsedIcon from '@/shared/ui/icon/DirectoryTreeCollapsedIcon.vue'
+import DirectoryTreeExpandedIcon from '@/shared/ui/icon/DirectoryTreeExpandedIcon.vue'
 import DesktopContextAction from './DesktopContextAction.vue'
 
-const props = defineProps<{ path: string, rootName: string, language: BuddyLocale, wrap: boolean, treeVisible: boolean }>()
+const props = withDefaults(defineProps<{ path: string, rootName: string, language: BuddyLocale, wrap: boolean, treeVisible: boolean, showReveal?: boolean }>(), { showReveal: true })
 defineEmits<{ reveal: [], toggleWrap: [], toggleTree: [] }>()
 const { t } = useBuddyI18n(() => props.language)
 const segments = computed(() => [props.rootName, ...props.path.split('/').filter(Boolean)])
@@ -21,9 +23,9 @@ const segments = computed(() => [props.rootName, ...props.path.split('/').filter
       </template>
     </div>
     <div class="desktop-file-toolbar__actions">
-      <DesktopContextAction :icon="FolderOpen20Regular" :label="t('desktop.context.revealFile')" @click="$emit('reveal')" />
+      <DesktopContextAction v-if="showReveal" :icon="FolderOpen20Regular" :label="t('desktop.context.revealFile')" @click="$emit('reveal')" />
       <DesktopContextAction :icon="ArrowWrap20Regular" :label="t('desktop.context.wrap')" :active="wrap" @click="$emit('toggleWrap')" />
-      <DesktopContextAction :icon="PanelRight20Regular" :label="t(treeVisible ? 'desktop.context.hideTree' : 'desktop.context.showTree')" :active="treeVisible" @click="$emit('toggleTree')" />
+      <DesktopContextAction :icon="treeVisible ? DirectoryTreeExpandedIcon : DirectoryTreeCollapsedIcon" :label="t(treeVisible ? 'desktop.context.hideTree' : 'desktop.context.showTree')" :active="treeVisible" @click="$emit('toggleTree')" />
     </div>
   </div>
 </template>

@@ -1,3 +1,4 @@
+import type { SkillReference } from '../../../../shared/skills/skillApi'
 import type { RunRecord } from '../../storage/runRecord'
 import type { BuddyInputReferenceV1 } from '../context/BuddyInputReference'
 import type { BuddySessionIdentity } from '../sessions/BuddySessionBlueprint'
@@ -5,7 +6,7 @@ import type { BuddyTurnHandle } from './turnTypes'
 import { BuddyAgentRunError } from '../../runs/runError'
 
 export interface ActiveRunSession {
-  steer?: (prepare: () => BuddyInputReferenceV1) => boolean
+  steer?: (prepare: () => BuddyInputReferenceV1, skills?: readonly SkillReference[]) => boolean
   abort: () => Promise<void>
   abortCompaction: () => void
 }
@@ -75,9 +76,9 @@ export class ActiveRunRegistry {
     return { completion, runId: state.runId }
   }
 
-  steer(runId: string, prepare: () => BuddyInputReferenceV1): boolean {
+  steer(runId: string, prepare: () => BuddyInputReferenceV1, skills?: readonly SkillReference[]): boolean {
     const state = this.#executions.get(runId)?.state
-    return state && !state.controller.signal.aborted ? state.session?.steer?.(prepare) ?? false : false
+    return state && !state.controller.signal.aborted ? state.session?.steer?.(prepare, skills) ?? false : false
   }
 
   async cancel(runId: string, errorCode = 'RUN_CANCELLED'): Promise<boolean> {

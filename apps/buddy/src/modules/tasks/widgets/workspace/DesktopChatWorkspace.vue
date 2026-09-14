@@ -236,6 +236,7 @@ function openDetailChanges(id: string) {
           <DesktopTaskComposer
             ref="composerRef"
             :composer="workspace.composer"
+            :skill-scope-id="workspace.session.spaceId.value"
             :focus-ready="composerVisible && !isLoading && workspace.status.runtimeState.value.status === 'ready'"
             :execution="workspace.execution"
             :language="language"

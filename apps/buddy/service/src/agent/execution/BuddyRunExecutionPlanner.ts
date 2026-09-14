@@ -10,6 +10,7 @@ import type {
   StartBuddyTurnInput,
 } from './turnTypes'
 import { BuddyAgentRunError } from '../../runs/runError'
+import { SkillError } from '../../skills/skillFiles'
 import { createBuddyInputReference } from '../context/BuddyInputReference'
 
 export type BuddyRunExecutionPlan
@@ -87,6 +88,13 @@ export class BuddyRunExecutionPlanner {
     const input = this.#options.runInputs.findByRunId(run.id)
     if (!input?.prompt.trim())
       throw new BuddyAgentRunError('RUN_INPUT_NOT_FOUND')
+    for (const item of input.contextItems) {
+      if (item.kind !== 'skill' || !item.skill)
+        continue
+      const selected = item.skill
+      if (!session.resources.skillReferences.some(skill => skill.id === selected.id && skill.name === selected.name && skill.revision === selected.revision))
+        throw new SkillError('SKILL_CHANGED')
+    }
     const { images, documents, resourceLabels } = await this.#options.attachments.resolveInputReferences(
       input.attachmentIds,
       run.conversationId,

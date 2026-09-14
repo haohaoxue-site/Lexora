@@ -75,6 +75,26 @@ function seedRun(
 }
 
 describe('buddy schema', () => {
+  it('upgrades v16 to skills storage without changing conversations or run history', () => {
+    const directory = mkdtempSync(join(tmpdir(), 'buddy-skills-migration-'))
+    directories.push(directory)
+    const databasePath = join(directory, 'buddy.sqlite3')
+    const previous = new NodeDatabaseSync(databasePath)
+    for (const migration of BUDDY_SCHEMA_MIGRATIONS.filter(migration => migration.version <= 16))
+      previous.exec(migration.sql)
+    previous.exec('PRAGMA user_version = 16')
+    seedRun(previous)
+    const runs = previous.prepare('SELECT * FROM runs').all()
+    const conversations = previous.prepare('SELECT * FROM conversations').all()
+    previous.close()
+    const upgraded = openBuddyDatabase({ databasePath })
+    databases.push(upgraded)
+    expect(upgraded.prepare('SELECT * FROM runs').all()).toEqual(runs)
+    expect(upgraded.prepare('SELECT * FROM conversations').all()).toEqual(conversations)
+    expect(upgraded.prepare('SELECT * FROM skill_installations').all()).toEqual([])
+    expect(upgraded.prepare('PRAGMA foreign_key_check').all()).toEqual([])
+  })
+
   it.each([14, 15])('preserves existing services and model references when completing model services from v%s', (version) => {
     const directory = mkdtempSync(join(tmpdir(), 'lexora-buddy-provider-instances-'))
     directories.push(directory)
@@ -109,7 +129,7 @@ describe('buddy schema', () => {
     expect(upgraded.prepare('SELECT id, builtin_provider_id, display_name FROM builtin_provider_configs').all()).toEqual([
       { id: 'anthropic', builtin_provider_id: 'anthropic', display_name: null },
     ])
-    expect(upgraded.prepare('PRAGMA user_version').get()).toEqual({ user_version: 16 })
+    expect(upgraded.prepare('PRAGMA user_version').get()).toEqual({ user_version: BUDDY_SCHEMA_VERSION })
     expect((upgraded.prepare('PRAGMA table_info(provider_model_states)').all() as Array<{ name: string }>).map(column => column.name))
       .toEqual(expect.arrayContaining(['catalog_model_id', 'catalog_selection_json', 'capability_overrides_json']))
     upgraded.prepare('UPDATE builtin_provider_configs SET display_name = ? WHERE id = ?').run('Personal', 'anthropic')

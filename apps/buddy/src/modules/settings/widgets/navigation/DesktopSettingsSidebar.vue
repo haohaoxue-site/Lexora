@@ -17,6 +17,7 @@ import { useBuddyI18n } from '@/i18n/buddyI18n'
 import { supportsSettingsCategory } from '@/platform/desktop/desktopCapabilities'
 import { desktopRouteLocations } from '@/shared/navigation/desktopRoutes'
 import DesktopIcon from '@/shared/ui/icon/DesktopIcon.vue'
+import SkillIcon from '@/shared/ui/icon/SkillIcon.vue'
 import DesktopWorkspaceSidebarIdentity from '@/shared/ui/workspace-sidebar/DesktopWorkspaceSidebarIdentity.vue'
 
 const props = defineProps<{
@@ -29,6 +30,7 @@ const { t } = useBuddyI18n(() => props.language)
 const categories = [
   { icon: Apps20Regular, key: 'app' as const },
   { icon: Bot20Regular, key: 'models' as const },
+  { icon: SkillIcon, key: 'skills' as const },
   { icon: Globe20Regular, key: 'web' as const },
   { icon: AnimalCat20Regular, key: 'pet' as const },
   { icon: DataHistogram20Regular, key: 'usage' as const },

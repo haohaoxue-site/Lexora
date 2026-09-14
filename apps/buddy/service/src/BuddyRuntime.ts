@@ -1,7 +1,9 @@
 import type { BuddyComposerDraftSend } from '../../shared/conversation/composerDraft'
+import type { SkillReference } from '../../shared/skills/skillApi'
 import type { toPublicRun } from './runs/publicRun'
 
 export interface BuddyTurnContextItem {
+  skill?: SkillReference
   kind: 'file' | 'skill' | 'slashCommand'
   value: string
 }

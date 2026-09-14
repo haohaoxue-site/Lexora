@@ -14,9 +14,12 @@ import {
 } from '@vicons/fluent'
 import { NDropdown } from 'naive-ui'
 import { computed, h } from 'vue'
+import { useRouter } from 'vue-router'
 import { useBuddyI18n } from '@/i18n/buddyI18n'
 import DesktopOverflowingLabel from '@/modules/tasks/widgets/task-index/DesktopOverflowingLabel.vue'
+import { desktopRouteLocations } from '@/shared/navigation/desktopRoutes'
 import DesktopIcon from '@/shared/ui/icon/DesktopIcon.vue'
+import SkillIcon from '@/shared/ui/icon/SkillIcon.vue'
 import DesktopSpaceIcon from '../space/DesktopSpaceIcon.vue'
 
 const props = defineProps<{
@@ -39,6 +42,7 @@ const emit = defineEmits<{
   toggle: []
 }>()
 const { t } = useBuddyI18n(() => props.language)
+const router = useRouter()
 const menuOptions = computed<DropdownOption[]>(() => [
   {
     icon: () => h(DesktopIcon, { name: 'navigationTask' }),
@@ -46,6 +50,11 @@ const menuOptions = computed<DropdownOption[]>(() => [
     label: t('desktop.tasks.newTask'),
   },
   { key: 'task-management-divider', type: 'divider' },
+  {
+    icon: () => h(DesktopIcon, { component: SkillIcon }),
+    key: 'skills',
+    label: t('desktop.skills.manage'),
+  },
   {
     icon: () => h(DesktopIcon, { component: Edit20Regular }),
     key: 'edit',
@@ -62,6 +71,10 @@ const pinLabel = computed(() => props.pinMode === 'pin'
   : t('desktop.tasks.unpin'))
 
 function handleMenuAction(action: string | number): void {
+  if (action === 'skills') {
+    void router.push(desktopRouteLocations.skills(props.space.id))
+    return
+  }
   if (action === 'new-task' || action === 'edit' || action === 'delete')
     emit('menu', action)
 }
