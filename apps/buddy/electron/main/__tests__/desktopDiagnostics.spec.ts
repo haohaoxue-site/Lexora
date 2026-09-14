@@ -7,7 +7,11 @@ import { PassThrough } from 'node:stream'
 import { deferred } from '@buddy-tests/deferred'
 import { createTemporaryDirectory } from '@buddy-tests/temporaryDirectories'
 import { afterEach, describe, expect, it, onTestFinished, vi } from 'vitest'
+import { PrivateDirectoryError } from '../../../platform/windows/privateDirectories'
+import { ServiceHost } from '../../../shared/lifecycle/ServiceHost'
+import { ApplicationEvents } from '../../../shared/observability/ApplicationEvents'
 import { DesktopDiagnosticLogger } from '../desktopDiagnostics'
+import { ApplicationLogReader } from '../diagnostics/ApplicationLogReader'
 import { DiagnosticFile } from '../diagnostics/diagnosticFile'
 import { MAX_DIAGNOSTIC_RECORD_BYTES, redactDiagnosticText } from '../diagnostics/diagnosticRecord'
 
@@ -31,6 +35,25 @@ async function readRecords(directory: string, file = 'application.jsonl'): Promi
 afterEach(() => vi.restoreAllMocks())
 
 describe('desktop diagnostics', () => {
+  it('carries safe native failure details through lifecycle recording and log queries', async () => {
+    const { directory, logger } = await createLogger()
+    const events = new ApplicationEvents()
+    events.subscribe(event => logger.record({ ...event, scope: 'desktop' }))
+    const host = new ServiceHost(events)
+    const failure = { kind: 'private_directories', operation: 'open_directory', directoryRole: 'session_data', systemError: { domain: 'ntstatus', code: 0xC0000022 }, exitCode: 1 } as const
+    const error = new PrivateDirectoryError('PRIVATE_DIRECTORIES_FAILED', failure, { cause: new Error('token=fixture-secret') })
+    await expect(host.step('desktop.environment', () => {
+      throw error
+    })).rejects.toBe(error)
+    await logger.close()
+    const records = await readRecords(directory)
+    expect(records.at(-1)).toMatchObject({ errorCode: error.code, errorType: 'PrivateDirectoryError', failure })
+    expect(JSON.stringify(records)).not.toContain('fixture-secret')
+    const reader = new ApplicationLogReader(directory, logger.launchId, '/home/alice')
+    const page = await reader.query({ level: 'error' })
+    expect(page.records[0]).toMatchObject({ failure })
+  })
+
   it('retains run and turn identities while excluding arbitrary operation details', async () => {
     const { directory, logger } = await createLogger()
     const input = {

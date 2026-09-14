@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { readLocalChatErrorCode } from '../runtime/localChatError'
+import { privateDirectoryErrorCodeSchema, privateDirectoryFailureSchema } from './privateDirectoryFailure'
 
 export const APPLICATION_DIAGNOSTIC_METHOD = 'application.diagnostic'
 export const diagnosticIdentitySchema = z.string().regex(/^\w[\w:.-]{0,191}$/)
@@ -26,6 +27,7 @@ export const applicationDiagnosticSchema = z.object({
   durationMs: z.number().finite().nonnegative().optional(),
   errorCode: diagnosticCodeSchema.optional(),
   errorType: z.string().regex(/^[a-z]\w{0,95}$/i).optional(),
+  failure: privateDirectoryFailureSchema.optional(),
   count: z.number().int().nonnegative().optional(),
   attempt: z.number().int().nonnegative().optional(),
   method: z.string().regex(/^[a-z][a-z\d.]{0,95}$/i).optional(),
@@ -35,6 +37,7 @@ export const applicationDiagnosticSchema = z.object({
 
 export type ApplicationDiagnostic = z.infer<typeof applicationDiagnosticSchema>
 export type ApplicationDiagnosticReporter = (event: ApplicationDiagnostic) => void
+export type DiagnosticError = Pick<ApplicationDiagnostic, 'errorCode' | 'errorType' | 'failure'>
 
 export function safeDiagnosticReporter(report?: ApplicationDiagnosticReporter): ApplicationDiagnosticReporter {
   return (event) => {
@@ -46,13 +49,33 @@ export function safeDiagnosticReporter(report?: ApplicationDiagnosticReporter): 
 }
 
 export function readDiagnosticErrorCode(error: unknown): string {
-  const publicCode = readLocalChatErrorCode(error)
-  if (publicCode)
-    return publicCode
-  if (error && typeof error === 'object') {
-    const code = 'code' in error ? error.code : undefined
-    if (typeof code === 'string' && ['INITIAL_STATE_UNAVAILABLE', 'EACCES', 'EPERM', 'ENOENT', 'ENOSPC', 'EIO', 'EMFILE', 'ERR_SQLITE_ERROR'].includes(code))
-      return code
+  return readDiagnosticError(error).errorCode ?? 'OPERATION_FAILED'
+}
+
+export function readDiagnosticError(error: unknown): DiagnosticError {
+  let errorCode: string | null = readLocalChatErrorCode(error)
+  let failure: ApplicationDiagnostic['failure']
+  const visited = new Set<object>()
+  for (let current = error; current && typeof current === 'object' && visited.size < 8 && !visited.has(current); current = 'cause' in current ? current.cause : undefined) {
+    visited.add(current)
+    const code = 'code' in current ? current.code : undefined
+    const privateDirectoryCode = privateDirectoryErrorCodeSchema.safeParse(code)
+    if (!errorCode) {
+      if (privateDirectoryCode.success)
+        errorCode = privateDirectoryCode.data
+      else if (typeof code === 'string' && ['INITIAL_STATE_UNAVAILABLE', 'POWERSHELL_UNAVAILABLE', 'EACCES', 'EPERM', 'ENOENT', 'ENOSPC', 'EIO', 'EMFILE', 'ERR_SQLITE_ERROR'].includes(code))
+        errorCode = code
+    }
+    if (!failure && privateDirectoryCode.success) {
+      const parsed = privateDirectoryFailureSchema.safeParse('failure' in current ? current.failure : undefined)
+      if (parsed.success)
+        failure = parsed.data
+    }
   }
-  return 'OPERATION_FAILED'
+  const errorType = applicationDiagnosticSchema.shape.errorType.safeParse(error instanceof Error ? error.name : 'UnknownError')
+  return {
+    errorCode: errorCode ?? 'OPERATION_FAILED',
+    errorType: errorType.success ? errorType.data : 'UnknownError',
+    ...(failure ? { failure } : {}),
+  }
 }

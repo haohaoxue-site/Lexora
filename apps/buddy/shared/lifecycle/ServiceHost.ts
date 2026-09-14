@@ -1,5 +1,5 @@
 import type { ComponentEvent, OperationEvent } from '../observability/ApplicationEvents'
-import { readDiagnosticErrorCode } from '../diagnostics/applicationDiagnostic'
+import { readDiagnosticError } from '../diagnostics/applicationDiagnostic'
 import { ApplicationEvents } from '../observability/ApplicationEvents'
 
 type Cleanup = () => void | Promise<void>
@@ -116,7 +116,7 @@ export class ServiceHost {
       event,
       level: event.endsWith('failed') ? 'error' : 'info',
       ...(startedAt === undefined ? {} : { durationMs: Math.round(performance.now() - startedAt) }),
-      ...(error === undefined ? {} : { errorCode: readDiagnosticErrorCode(error) }),
+      ...(error === undefined ? {} : readDiagnosticError(error)),
     })
   }
 }

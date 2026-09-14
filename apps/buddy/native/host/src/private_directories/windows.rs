@@ -27,22 +27,32 @@ use windows_sys::{
     },
 };
 
-use super::{DirectoryError, directory_parts};
+use super::{
+    DirectoryError, DirectoryFailure, DirectoryOperation, SystemErrorDomain, directory_parts,
+};
 
 mod security;
 use security::PrivateSecurity;
 
-pub(super) fn ensure(paths: &[String]) -> Result<(), DirectoryError> {
+pub(super) fn ensure(paths: &[String]) -> Result<(), DirectoryFailure> {
     let security = PrivateSecurity::new()?;
-    for path in paths {
-        let (root, parts) = directory_parts(path)?;
-        let root = open_root(&root)?;
+    for (directory_index, path) in paths.iter().enumerate() {
+        let (root, parts) = directory_parts(path).map_err(|code| {
+            DirectoryFailure::new(code, DirectoryOperation::Request).at_directory(directory_index)
+        })?;
+        let root = open_root(&root).map_err(|error| error.at_directory(directory_index))?;
         let mut handles = vec![root];
         for (index, part) in parts.iter().enumerate() {
-            let parent = handles.last().ok_or(DirectoryError::Failed)?;
-            let (child, created) = open_child(parent, part, &security)?;
+            let parent = handles.last().ok_or_else(|| {
+                DirectoryFailure::new(DirectoryError::Failed, DirectoryOperation::OpenDirectory)
+                    .at_directory(directory_index)
+            })?;
+            let (child, created) = open_child(parent, part, &security)
+                .map_err(|error| error.at_directory(directory_index))?;
             if created || index + 1 == parts.len() {
-                security.validate(&child)?;
+                security
+                    .validate(&child)
+                    .map_err(|error| error.at_directory(directory_index))?;
             }
             handles.push(child);
         }
@@ -50,13 +60,13 @@ pub(super) fn ensure(paths: &[String]) -> Result<(), DirectoryError> {
     Ok(())
 }
 
-fn open_root(path: &str) -> Result<File, DirectoryError> {
+fn open_root(path: &str) -> Result<File, DirectoryFailure> {
     let root = OpenOptions::new()
         .access_mode(FILE_LIST_DIRECTORY | FILE_READ_ATTRIBUTES | SYNCHRONIZE)
         .share_mode(FILE_SHARE_READ | FILE_SHARE_WRITE)
         .custom_flags(FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OPEN_REPARSE_POINT)
         .open(path)
-        .map_err(|_| DirectoryError::Failed)?;
+        .map_err(|error| DirectoryFailure::io(DirectoryOperation::OpenRoot, error))?;
     validate_directory(&root)?;
     Ok(root)
 }
@@ -65,9 +75,11 @@ fn open_child(
     parent: &File,
     name: &str,
     security: &PrivateSecurity,
-) -> Result<(File, bool), DirectoryError> {
+) -> Result<(File, bool), DirectoryFailure> {
     let mut name: Vec<u16> = name.encode_utf16().collect();
-    let len = u16::try_from(name.len() * 2).map_err(|_| DirectoryError::Invalid)?;
+    let len = u16::try_from(name.len() * 2).map_err(|_| {
+        DirectoryFailure::new(DirectoryError::Invalid, DirectoryOperation::OpenDirectory)
+    })?;
     let name = UNICODE_STRING {
         Length: len,
         MaximumLength: len,
@@ -100,7 +112,11 @@ fn open_child(
         )
     };
     if result < 0 {
-        return Err(DirectoryError::Failed);
+        return Err(DirectoryFailure::system(
+            DirectoryOperation::OpenDirectory,
+            SystemErrorDomain::Ntstatus,
+            result as u32,
+        ));
     }
     // SAFETY: NtCreateFile succeeded; the newly owned directory handle transfers exactly once.
     let file = unsafe { File::from_raw_handle(handle) };
@@ -108,7 +124,7 @@ fn open_child(
     Ok((file, status.Information == FILE_CREATED as usize))
 }
 
-fn validate_directory(file: &File) -> Result<(), DirectoryError> {
+fn validate_directory(file: &File) -> Result<(), DirectoryFailure> {
     let mut attributes = FILE_ATTRIBUTE_TAG_INFO::default();
     // SAFETY: The directory handle is live and the output has the declared size.
     if unsafe {
@@ -120,12 +136,18 @@ fn validate_directory(file: &File) -> Result<(), DirectoryError> {
         )
     } == 0
     {
-        return Err(DirectoryError::Failed);
+        return Err(DirectoryFailure::io(
+            DirectoryOperation::InspectDirectory,
+            std::io::Error::last_os_error(),
+        ));
     }
     if attributes.FileAttributes & FILE_ATTRIBUTE_DIRECTORY == 0
         || attributes.FileAttributes & FILE_ATTRIBUTE_REPARSE_POINT != 0
     {
-        return Err(DirectoryError::Unsafe);
+        return Err(DirectoryFailure::new(
+            DirectoryError::Unsafe,
+            DirectoryOperation::InspectDirectory,
+        ));
     }
     Ok(())
 }

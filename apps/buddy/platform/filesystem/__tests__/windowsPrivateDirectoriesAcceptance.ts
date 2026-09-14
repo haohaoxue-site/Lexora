@@ -1,13 +1,13 @@
 import assert from 'node:assert/strict'
-import { Buffer } from 'node:buffer'
-import { execFileSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { access, mkdir, mkdtemp, readFile, rm, symlink, unlink, writeFile } from 'node:fs/promises'
 import { homedir, tmpdir } from 'node:os'
 import { dirname, join, parse, resolve } from 'node:path'
 import process from 'node:process'
+import { PrivateDirectoryError } from '../../windows/privateDirectories'
 import { readBoundedFile } from '../boundedFile'
 import { ensurePrivateDirectories } from '../privateDirectories'
+import { inspectWindowsPrivateDirectory as inspect } from './windowsPrivateDirectoryFixture'
 
 assert.equal(process.platform, 'win32')
 const [helperArgument, resultPath] = process.argv.slice(2)
@@ -16,33 +16,6 @@ const helper = resolve(helperArgument)
 const directory = await mkdtemp(join(tmpdir(), 'buddy-private-contract-'))
 const checks: string[] = []
 const junctions: string[] = []
-
-function inspect(path: string, sddl?: string): { sddl: string, owner: string, protected: boolean, user: string, allows: string[], inherited: boolean[] } {
-  const script = `
-$ErrorActionPreference='Stop'
-[Console]::InputEncoding=[Text.UTF8Encoding]::new($false)
-[Console]::OutputEncoding=[Text.UTF8Encoding]::new($false)
-$request=[Console]::In.ReadToEnd() | ConvertFrom-Json
-$user=[Security.Principal.WindowsIdentity]::GetCurrent().User.Value
-if($request.sddl){
-  $security=[Security.AccessControl.DirectorySecurity]::new()
-  $security.SetSecurityDescriptorSddlForm($request.sddl.Replace('CURRENT',$user),[Security.AccessControl.AccessControlSections]::Access)
-  [IO.FileSystemAclExtensions]::SetAccessControl([IO.DirectoryInfo]::new($request.path),$security)
-}
-$acl=Get-Acl -LiteralPath $request.path
-$rules=@($acl.GetAccessRules($true,$true,[Security.Principal.SecurityIdentifier]) | Where-Object AccessControlType -EQ 'Allow')
-@{sddl=$acl.Sddl;owner=$acl.GetOwner([Security.Principal.SecurityIdentifier]).Value;protected=$acl.AreAccessRulesProtected;user=$user;allows=@($rules | ForEach-Object {$_.IdentityReference.Value});inherited=@($rules | ForEach-Object {$_.IsInherited})} | ConvertTo-Json -Compress
-`
-  return JSON.parse(execFileSync('C:\\Program Files\\PowerShell\\7\\pwsh.exe', [
-    '-NoLogo',
-    '-NoProfile',
-    '-NonInteractive',
-    '-OutputFormat',
-    'Text',
-    '-EncodedCommand',
-    Buffer.from(script, 'utf16le').toString('base64'),
-  ], { input: JSON.stringify({ path, sddl }), encoding: 'utf8', windowsHide: true, timeout: 15_000 }))
-}
 
 async function missing(path: string) {
   await assert.rejects(access(path), { code: 'ENOENT' })
@@ -67,10 +40,32 @@ try {
   assert.equal(await readFile(file, 'utf8'), 'fixture')
   checks.push('Unicode nested creation, protected private ACL, file inheritance and repeat startup')
 
+  const inheritedParent = join(directory, 'creator-owner-parent')
+  await mkdir(inheritedParent)
+  const parentSecurity = inspect(inheritedParent, 'O:CURRENTD:P(A;OICI;FA;;;CURRENT)(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)(A;OICIIO;FA;;;CO)')
+  const inheritedDirectory = join(inheritedParent, 'existing', 'session-data')
+  await mkdir(inheritedDirectory, { recursive: true })
+  const inheritedSecurity = inspect(inheritedDirectory)
+  assert.ok(inheritedSecurity.allows.includes('S-1-3-0'))
+  const preserved = join(inheritedDirectory, 'preserved.txt')
+  await writeFile(preserved, 'existing-user-data')
+  await ensurePrivateDirectories([inheritedDirectory], helper)
+  await ensurePrivateDirectories([inheritedDirectory], helper)
+  assert.equal(inspect(inheritedParent).sddl, parentSecurity.sddl)
+  assert.equal(inspect(inheritedDirectory).sddl, inheritedSecurity.sddl)
+  assert.equal(await readFile(preserved, 'utf8'), 'existing-user-data')
+  assert.ok(!inspect(preserved).allows.includes('S-1-3-0'))
+  checks.push('existing inherited CREATOR OWNER templates are accepted without changing ACLs or data')
+
   const insecure = join(directory, 'insecure')
   await ensurePrivateDirectories([insecure], helper)
   const broad = inspect(insecure, 'O:CURRENTD:P(A;OICI;FA;;;CURRENT)(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)(A;OICI;FR;;;WD)')
-  await assert.rejects(ensurePrivateDirectories([insecure], helper))
+  await assert.rejects(ensurePrivateDirectories([insecure], helper), (error: unknown) => {
+    assert.ok(error instanceof PrivateDirectoryError)
+    assert.equal(error.code, 'PRIVATE_DIRECTORIES_UNSAFE')
+    assert.deepEqual(error.failure, { kind: 'private_directories', operation: 'validate_acl', directoryIndex: 0, exitCode: 1 })
+    return true
+  })
   assert.equal(inspect(insecure).sddl, broad.sddl)
   const nullDacl = inspect(insecure, 'O:CURRENTD:NO_ACCESS_CONTROL')
   await assert.rejects(ensurePrivateDirectories([insecure], helper))
@@ -89,7 +84,14 @@ try {
   assert.equal(inspect(target).sddl, targetSecurity.sddl)
   checks.push('leaf and ancestor junctions fail without touching the destination')
 
-  await assert.rejects(ensurePrivateDirectories([file], helper))
+  await assert.rejects(ensurePrivateDirectories([file], helper), (error: unknown) => {
+    assert.ok(error instanceof PrivateDirectoryError)
+    assert.equal(error.code, 'PRIVATE_DIRECTORIES_FAILED')
+    assert.equal(error.failure.operation, 'open_directory')
+    assert.equal(error.failure.systemError?.domain, 'ntstatus')
+    assert.equal(error.failure.directoryIndex, 0)
+    return true
+  })
   assert.equal(await readFile(file, 'utf8'), 'fixture')
   for (const forbidden of [homedir(), homedir().toUpperCase(), parse(directory).root, `${directory}\\bad:stream\\..\\escaped`, `${directory}\\NUL\\..\\escaped`])
     await assert.rejects(ensurePrivateDirectories([forbidden], helper))

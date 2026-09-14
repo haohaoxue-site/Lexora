@@ -1,22 +1,98 @@
 use std::io::{Read, Write};
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 #[cfg(windows)]
 mod windows;
 
 const MAX_REQUEST_BYTES: u64 = 256 * 1024;
 
-#[derive(Debug, PartialEq, thiserror::Error)]
+#[derive(Debug, PartialEq, Serialize, thiserror::Error)]
 pub enum DirectoryError {
     #[error("PRIVATE_DIRECTORIES_INVALID")]
+    #[serde(rename = "PRIVATE_DIRECTORIES_INVALID")]
     Invalid,
     #[error("PRIVATE_DIRECTORIES_UNSAFE")]
+    #[serde(rename = "PRIVATE_DIRECTORIES_UNSAFE")]
     Unsafe,
     #[error("PRIVATE_DIRECTORIES_FAILED")]
+    #[serde(rename = "PRIVATE_DIRECTORIES_FAILED")]
     Failed,
     #[error("PRIVATE_DIRECTORIES_UNAVAILABLE")]
+    #[serde(rename = "PRIVATE_DIRECTORIES_UNAVAILABLE")]
     Unavailable,
+}
+
+#[derive(Debug, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum DirectoryOperation {
+    Request,
+    Identity,
+    OpenRoot,
+    OpenDirectory,
+    InspectDirectory,
+    ValidateAcl,
+    Response,
+}
+
+#[derive(Debug, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SystemErrorDomain {
+    Win32,
+    Ntstatus,
+}
+
+#[derive(Debug, PartialEq, Serialize)]
+pub struct SystemError {
+    domain: SystemErrorDomain,
+    code: u32,
+}
+
+#[derive(Debug, PartialEq, Serialize, thiserror::Error)]
+#[error("{code}")]
+#[serde(rename_all = "camelCase")]
+pub struct DirectoryFailure {
+    code: DirectoryError,
+    operation: DirectoryOperation,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    directory_index: Option<usize>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    system_error: Option<SystemError>,
+}
+
+impl DirectoryFailure {
+    fn new(code: DirectoryError, operation: DirectoryOperation) -> Self {
+        Self {
+            code,
+            operation,
+            directory_index: None,
+            system_error: None,
+        }
+    }
+
+    #[cfg(windows)]
+    fn io(operation: DirectoryOperation, error: std::io::Error) -> Self {
+        let mut failure = Self::new(DirectoryError::Failed, operation);
+        failure.system_error = error.raw_os_error().map(|code| SystemError {
+            domain: SystemErrorDomain::Win32,
+            code: code as u32,
+        });
+        failure
+    }
+
+    #[cfg(windows)]
+    fn system(operation: DirectoryOperation, domain: SystemErrorDomain, code: u32) -> Self {
+        Self {
+            system_error: Some(SystemError { domain, code }),
+            ..Self::new(DirectoryError::Failed, operation)
+        }
+    }
+
+    #[cfg(windows)]
+    fn at_directory(mut self, index: usize) -> Self {
+        self.directory_index = Some(index);
+        self
+    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -70,25 +146,29 @@ fn directory_parts(path: &str) -> Result<(String, Vec<&str>), DirectoryError> {
     Ok((root, parts))
 }
 
-pub fn run(input: impl Read, output: impl Write) -> Result<(), DirectoryError> {
-    let request = read_request(input)?;
+pub fn run(input: impl Read, output: impl Write) -> Result<(), DirectoryFailure> {
+    let request = read_request(input)
+        .map_err(|code| DirectoryFailure::new(code, DirectoryOperation::Request))?;
     #[cfg(windows)]
     {
         windows::ensure(&request.paths)?;
         let mut output = output;
-        output
-            .write_all(b"{\"ok\":true}")
-            .map_err(|_| DirectoryError::Failed)
+        output.write_all(b"{\"ok\":true}").map_err(|_| {
+            DirectoryFailure::new(DirectoryError::Failed, DirectoryOperation::Response)
+        })
     }
     #[cfg(not(windows))]
     {
         let _ = (request, output);
-        Err(DirectoryError::Unavailable)
+        Err(DirectoryFailure::new(
+            DirectoryError::Unavailable,
+            DirectoryOperation::Identity,
+        ))
     }
 }
 
 #[cfg(windows)]
-pub(crate) fn ensure(paths: &[String]) -> Result<(), DirectoryError> {
+pub(crate) fn ensure(paths: &[String]) -> Result<(), DirectoryFailure> {
     windows::ensure(paths)
 }
 

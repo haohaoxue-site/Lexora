@@ -47,7 +47,10 @@ fn ordinary_files_cannot_be_used_as_private_directories() {
     let fixture = Fixture::new();
     let path = fixture.0.join("file");
     fs::write(&path, "fixture").unwrap();
-    assert!(ensure(&[path.to_str().unwrap().to_owned()]).is_err());
+    let failure = ensure(&[path.to_str().unwrap().to_owned()]).unwrap_err();
+    assert_eq!(failure.operation, DirectoryOperation::OpenDirectory);
+    assert_eq!(failure.directory_index, Some(0));
+    assert!(failure.system_error.is_some());
     assert_eq!(fs::read_to_string(path).unwrap(), "fixture");
 }
 

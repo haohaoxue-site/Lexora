@@ -28,15 +28,15 @@ export function runNativeCommand(
       failure ??= error
       child.kill('SIGKILL')
     }
-    const abort = () => stop(new Error('Native host operation cancelled', { cause: options.signal?.reason }))
-    const timeout = setTimeout(() => stop(new Error('Native host operation timed out')), options.timeoutMs ?? 30_000)
+    const abort = () => stop(Object.assign(new Error('Native host operation cancelled', { cause: options.signal?.reason }), { code: 'NATIVE_COMMAND_CANCELLED' }))
+    const timeout = setTimeout(() => stop(Object.assign(new Error('Native host operation timed out'), { code: 'NATIVE_COMMAND_TIMEOUT' })), options.timeoutMs ?? 30_000)
     options.signal?.addEventListener('abort', abort, { once: true })
     if (options.signal?.aborted)
       abort()
     const collect = (chunks: Buffer[]) => (chunk: Buffer) => {
       bytes += chunk.length
       if (bytes > (options.maxBytes ?? 1024 * 1024))
-        stop(new Error('Native host output limit exceeded'))
+        stop(Object.assign(new Error('Native host output limit exceeded'), { code: 'NATIVE_COMMAND_OUTPUT_LIMIT' }))
       else
         chunks.push(chunk)
     }
@@ -52,7 +52,7 @@ export function runNativeCommand(
       clearTimeout(timeout)
       options.signal?.removeEventListener('abort', abort)
       if (failure)
-        reject(failure)
+        reject(Object.assign(failure, { exitCode: code }))
       else
         resolve({ code, stdout: Buffer.concat(stdout), stderr: Buffer.concat(stderr).toString('utf8') })
     })

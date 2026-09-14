@@ -1,6 +1,7 @@
 import type { ApplicationDiagnostic } from '../../../shared/diagnostics/applicationDiagnostic'
 import type { ApplicationStartupState } from '../../../shared/diagnostics/applicationStartup'
 import type { ApplicationEvents } from '../../../shared/observability/ApplicationEvents'
+import { readDiagnosticError } from '../../../shared/diagnostics/applicationDiagnostic'
 
 const REQUIRED_HOSTS = ['desktop', 'runtime.connection', 'renderer'] as const
 const COMPONENT_STATUSES = {
@@ -39,9 +40,20 @@ export class DesktopStartup {
   }
 
   stopping(): void {
-    if (!this.#state.hasBeenReady)
-      this.#events.publish({ event: 'app.start_cancelled', level: 'info' })
+    if (['stopping', 'stopped'].includes(this.#state.status))
+      return
+    const cancelled = this.#state.status === 'starting' && !this.#state.hasBeenReady
     this.#state = { ...this.#state, status: 'stopping' }
+    if (cancelled)
+      this.#events.publish({ event: 'app.start_cancelled', level: 'info' })
+    this.#publishState()
+  }
+
+  failed(error: unknown): void {
+    if (['failed', 'stopping', 'stopped'].includes(this.#state.status))
+      return
+    this.#state = { ...this.#state, status: 'failed' }
+    this.#events.publish({ event: this.#state.hasBeenReady ? 'app.degraded' : 'app.start_failed', level: 'error', ...readDiagnosticError(error) })
     this.#publishState()
   }
 
@@ -54,7 +66,7 @@ export class DesktopStartup {
     if (['runtime.restarting', 'runtime.offline', 'runtime.stopping'].includes(event.event) && !['stopping', 'stopped'].includes(this.#state.status)) {
       const failed = event.event === 'runtime.offline'
       if (failed && this.#state.status !== 'failed')
-        this.#events.publish({ event: this.#state.hasBeenReady ? 'app.degraded' : 'app.start_failed', level: 'error', component: 'runtime.connection', errorCode: event.errorCode })
+        this.#events.publish({ event: this.#state.hasBeenReady ? 'app.degraded' : 'app.start_failed', level: 'error', component: 'runtime.connection', parentOperationId: event.operationId, errorCode: event.errorCode, errorType: event.errorType, failure: event.failure })
       this.#state = { ...this.#state, status: failed ? 'failed' : 'starting', stages: this.#state.stages.map(stage => stage.stage === 'runtime.connection' ? { ...stage, status: failed ? 'failed' : 'running', errorCode: event.errorCode } : stage) }
       this.#publishState()
       return
@@ -91,7 +103,7 @@ export class DesktopStartup {
     if (ready && previousStatus !== 'ready')
       this.#events.publish({ event: wasReady ? 'app.recovered' : 'app.ready', level: 'info', durationMs: Math.round(performance.now() - this.#startedAt) })
     else if (stateStatus === 'failed' && previousStatus !== 'failed')
-      this.#events.publish({ event: wasReady ? 'app.degraded' : 'app.start_failed', level: 'error', component, errorCode: event.errorCode })
+      this.#events.publish({ event: wasReady ? 'app.degraded' : 'app.start_failed', level: 'error', component, parentOperationId: event.operationId, errorCode: event.errorCode, errorType: event.errorType, failure: event.failure })
     this.#publishState()
   }
 

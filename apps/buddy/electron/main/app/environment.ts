@@ -8,6 +8,7 @@ import buddyPackage from '../../../package.json'
 import { currentPlatform } from '../../../platform/currentPlatform'
 import { ensurePrivateDirectories } from '../../../platform/filesystem/privateDirectories'
 import { resolveBuddyPrivateDirectories } from '../../../platform/native/nativeHost'
+import { PrivateDirectoryError } from '../../../platform/windows/privateDirectories'
 import developmentDesktopIconPath from '../../../resources/icons/app-icon-dev.png?asset'
 import stableDesktopIconPath from '../../../resources/icons/app-icon.png?asset'
 import developmentTrayIconPath from '../../../resources/icons/tray-icon-dev.png?asset'
@@ -85,16 +86,28 @@ export function prepareDesktopEnvironment(): DesktopEnvironment {
 
 export async function prepareDesktopReady(environment: DesktopEnvironment): Promise<void> {
   const { paths } = environment
-  await ensurePrivateDirectories([
-    paths.lexoraHome,
-    paths.userData,
-    paths.sessionData,
-    dirname(paths.windowState),
-  ], resolveBuddyPrivateDirectories({
-    appPath: app.getAppPath(),
-    isPackaged: app.isPackaged,
-    resourcesPath: process.resourcesPath,
-  }))
+  const directories = {
+    lexora_home: paths.lexoraHome,
+    user_data: paths.userData,
+    session_data: paths.sessionData,
+    window_state: dirname(paths.windowState),
+  } as const
+  const entries = Object.entries(directories).filter(([, path], index, all) => all.findIndex(([, candidate]) => candidate === path) === index)
+  try {
+    await ensurePrivateDirectories(entries.map(([, path]) => path), resolveBuddyPrivateDirectories({
+      appPath: app.getAppPath(),
+      isPackaged: app.isPackaged,
+      resourcesPath: process.resourcesPath,
+    }))
+  }
+  catch (error) {
+    if (error instanceof PrivateDirectoryError && error.failure.directoryIndex !== undefined) {
+      const role = entries[error.failure.directoryIndex]?.[0] as keyof typeof directories | undefined
+      if (role)
+        error.failure.directoryRole = role
+    }
+    throw error
+  }
   app.setAppUserModelId(paths.desktopName)
   Menu.setApplicationMenu(null)
 }

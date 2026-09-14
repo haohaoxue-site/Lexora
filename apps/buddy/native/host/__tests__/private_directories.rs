@@ -16,7 +16,10 @@ fn request_rejects_unknown_fields_empty_batches_and_unbounded_input() {
     }
     assert_eq!(
         run(vec![b' '; 256 * 1024 + 1].as_slice(), Vec::new()),
-        Err(DirectoryError::Invalid)
+        Err(DirectoryFailure::new(
+            DirectoryError::Invalid,
+            DirectoryOperation::Request
+        ))
     );
 }
 
@@ -61,5 +64,39 @@ fn request_validates_every_path_in_the_batch() {
     assert_eq!(
         read_request(serde_json::to_vec(&input).unwrap().as_slice()).unwrap_err(),
         DirectoryError::Invalid
+    );
+}
+
+#[test]
+fn failure_protocol_preserves_classification_and_system_status_without_paths() {
+    let failure = DirectoryFailure {
+        code: DirectoryError::Failed,
+        operation: DirectoryOperation::OpenDirectory,
+        directory_index: Some(2),
+        system_error: Some(SystemError {
+            domain: SystemErrorDomain::Ntstatus,
+            code: 0xc0000022,
+        }),
+    };
+    assert_eq!(
+        serde_json::to_value(failure).unwrap(),
+        json!({
+            "code": "PRIVATE_DIRECTORIES_FAILED",
+            "operation": "open_directory",
+            "directoryIndex": 2,
+            "systemError": { "domain": "ntstatus", "code": 0xc0000022u32 }
+        })
+    );
+    let error = run(
+        br#"{"paths":["C:\\fixture-secret:stream"]}"#.as_slice(),
+        Vec::new(),
+    )
+    .unwrap_err();
+    assert_eq!(
+        serde_json::to_value(error).unwrap(),
+        json!({
+            "code": "PRIVATE_DIRECTORIES_INVALID",
+            "operation": "request"
+        })
     );
 }

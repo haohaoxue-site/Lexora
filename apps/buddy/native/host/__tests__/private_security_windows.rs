@@ -14,12 +14,33 @@ fn rejects_null_dacl_untrusted_owner_and_allow_ace_variants_not_in_contract() {
         "O:WDD:P(A;;FA;;;SY)",
         "O:SYD:P(A;;FR;;;WD)",
         "O:SYD:P(A;OICIIO;FR;;;WD)",
+        "O:SYD:P(A;OICI;FA;;;CO)",
+        "O:SYD:P(A;OICIIO;FA;;;CG)",
+        "O:COD:P(A;OICIIO;FA;;;CO)",
         r#"O:SYD:P(XA;;FR;;;WD;(@User.Title=="PM"))"#,
     ] {
         let descriptor = from_sddl(sddl).unwrap_or_else(|error| panic!("{sddl}: {error}"));
         assert_eq!(
             security.validate_descriptor(&descriptor),
-            Err(DirectoryError::Unsafe),
+            Err(DirectoryFailure::new(
+                DirectoryError::Unsafe,
+                DirectoryOperation::ValidateAcl
+            )),
+            "{sddl}"
+        );
+    }
+}
+
+#[test]
+fn creator_owner_inherit_only_template_does_not_grant_access_to_other_users() {
+    let security = PrivateSecurity::new().unwrap();
+    for sddl in [
+        "O:SYD:P(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)(A;OICIIO;FA;;;CO)",
+        "O:BAD:(A;OICIID;FA;;;SY)(A;OICIID;FA;;;BA)(A;OICIIOID;FA;;;CO)",
+    ] {
+        assert_eq!(
+            security.validate_descriptor(&from_sddl(sddl).unwrap()),
+            Ok(()),
             "{sddl}"
         );
     }

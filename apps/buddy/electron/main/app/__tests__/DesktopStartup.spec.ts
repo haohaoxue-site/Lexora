@@ -1,5 +1,7 @@
 import type { ApplicationDiagnostic } from '../../../../shared/diagnostics/applicationDiagnostic'
 import { describe, expect, it } from 'vitest'
+import { PrivateDirectoryError } from '../../../../platform/windows/privateDirectories'
+import { ServiceHost } from '../../../../shared/lifecycle/ServiceHost'
 import { ApplicationEvents } from '../../../../shared/observability/ApplicationEvents'
 import { DesktopStartup } from '../DesktopStartup'
 
@@ -20,6 +22,48 @@ function fixture() {
 }
 
 describe('application lifecycle snapshot', () => {
+  it('retains the first failure and its operation without relabeling cleanup as cancellation', async () => {
+    const events = new ApplicationEvents()
+    const records: ApplicationDiagnostic[] = []
+    const startup = new DesktopStartup(events)
+    events.subscribe(event => records.push(event))
+    events.subscribe(startup.observe)
+    const host = new ServiceHost(events)
+    const error = new PrivateDirectoryError('PRIVATE_DIRECTORIES_UNSAFE', { kind: 'private_directories', operation: 'validate_acl', directoryRole: 'session_data', exitCode: 1 })
+    await expect(host.start('desktop', () => host.step('desktop.environment', () => {
+      throw error
+    }))).rejects.toBe(error)
+    startup.failed(error)
+    startup.stopping()
+    await host.stop()
+    startup.stopped()
+    const operation = records.find(record => record.event === 'startup.step.failed')!
+    expect(records.filter(record => record.event === 'app.start_failed')).toEqual([
+      expect.objectContaining({ component: 'desktop.environment', parentOperationId: operation.operationId, errorCode: error.code, failure: error.failure }),
+    ])
+    expect(records.some(record => record.event === 'app.start_cancelled')).toBe(false)
+    expect(startup.state.status).toBe('stopped')
+  })
+
+  it('reports a failure outside a managed operation once', () => {
+    const { startup, events } = fixture()
+    startup.failed(Object.assign(new Error('fixture-private-path'), { code: 'EACCES' }))
+    startup.failed(new Error('subsequent failure'))
+    startup.stopping()
+    expect(events.filter(event => event.event === 'app.start_failed')).toEqual([expect.objectContaining({ errorCode: 'EACCES' })])
+    expect(events.some(event => event.event === 'app.start_cancelled')).toBe(false)
+    expect(JSON.stringify(events)).not.toContain('fixture-private')
+  })
+
+  it('reports an actual startup cancellation once and ignores delayed completion', () => {
+    const { startup, events, complete } = fixture()
+    startup.stopping()
+    startup.stopping()
+    complete('desktop')
+    expect(events.filter(event => event.event === 'app.start_cancelled')).toHaveLength(1)
+    expect(events.some(event => event.event === 'app.start_failed' || event.event === 'app.ready')).toBe(false)
+  })
+
   it('waits for renderer hydration, recovers, and publishes readiness once', () => {
     const { startup, events, complete, send } = fixture()
     complete('desktop')

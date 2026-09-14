@@ -23,11 +23,11 @@ describe('windows command transport', () => {
   })
 
   it.each(['stdout-limit', 'stderr-limit'])('bounds %s output', async (mode) => {
-    await expect(runNativeCommand(process.execPath, [fixture, mode], {}, { env, maxBytes: 1024 })).rejects.toThrow('Native host output limit exceeded')
+    await expect(runNativeCommand(process.execPath, [fixture, mode], {}, { env, maxBytes: 1024 })).rejects.toMatchObject({ code: 'NATIVE_COMMAND_OUTPUT_LIMIT' })
   })
 
   it('terminates a timed-out child', async () => {
-    await expect(runNativeCommand(process.execPath, [fixture, 'wait'], {}, { env, timeoutMs: 100 })).rejects.toThrow('Native host operation timed out')
+    await expect(runNativeCommand(process.execPath, [fixture, 'wait'], {}, { env, timeoutMs: 100 })).rejects.toMatchObject({ code: 'NATIVE_COMMAND_TIMEOUT' })
   })
 
   it('cancels a running child and rejects an already-cancelled request', async () => {
@@ -35,7 +35,7 @@ describe('windows command transport', () => {
     const running = runNativeCommand(process.execPath, [fixture, 'wait'], {}, { env, signal: controller.signal })
     const timer = setTimeout(() => controller.abort(new Error('cancelled by test')), 100)
     try {
-      await expect(running).rejects.toThrow('Native host operation cancelled')
+      await expect(running).rejects.toMatchObject({ code: 'NATIVE_COMMAND_CANCELLED' })
       await expect(runNativeCommand(process.execPath, [fixture, 'echo'], {}, { env, signal: controller.signal })).rejects.toThrow('cancelled by test')
     }
     finally {
