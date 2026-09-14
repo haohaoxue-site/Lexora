@@ -57,7 +57,7 @@ export function useMcpSettingsCapability(options: {
     setEnabled: (id: string, enabled: boolean) => execute(id, () => options.api.setEnabled(id, enabled)),
     test: (id: string) => execute(id, () => options.api.test(id)),
     tools: (id: string) => execute(id, () => options.api.tools(id)),
-    trust: (id: string, trusted = true) => execute(id, () => options.api.trust(id, trusted)),
+    confirmExecution: (id: string) => execute(id, () => options.api.confirmExecution(id)),
     remove: (id: string) => execute(id, () => options.api.remove(id)),
     login: (id: string) => execute(id, () => options.api.login(id)),
     cancelLogin: (id: string) => execute(id, () => options.api.cancelLogin(id)),

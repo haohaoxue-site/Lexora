@@ -10,9 +10,9 @@ import { connectorRuntimeStateSchema, connectorToolSummarySchema } from './conne
 export const connectorBaseSchema = z.object({
   credentialConfigured: z.boolean(),
   enabled: z.boolean(),
+  executionConfirmed: z.boolean(),
   id: z.string().trim().regex(/^[a-z0-9][a-z0-9_-]{0,63}$/),
   name: z.string().trim().min(1).max(128),
-  trusted: z.boolean(),
   runtime: connectorRuntimeStateSchema,
 })
 
@@ -71,7 +71,7 @@ export const connectorsRequestSchemas = {
   }).strict(),
   connectorId: z.object({ connectorId: idSchema }).strict(),
   connectorEnabled: z.object({ connectorId: idSchema, enabled: z.boolean() }).strict(),
-  connectorTrusted: z.object({ connectorId: idSchema, trusted: z.boolean().default(true) }).strict(),
+  connectorExecutionConfirmation: z.object({ connectorId: idSchema }).strict(),
   connectorUpsert: z.object({
     config: connectorConfigSchema,
     credential: connectorCredentialMutationSchema,
@@ -92,7 +92,7 @@ export const connectorsRpc = {
   login: { method: 'connectors.login', input: connectorsRequestSchemas.connectorId, response: validationResponseSchemas.mutation },
   cancelLogin: { method: 'connectors.cancelLogin', input: connectorsRequestSchemas.connectorId, response: validationResponseSchemas.mutation },
   remove: { method: 'connectors.remove', input: connectorsRequestSchemas.connectorId, response: validationResponseSchemas.mutation },
-  trust: { method: 'connectors.trust', input: connectorsRequestSchemas.connectorTrusted, response: validationResponseSchemas.mutation },
+  confirmExecution: { method: 'connectors.confirmExecution', input: connectorsRequestSchemas.connectorExecutionConfirmation, response: validationResponseSchemas.mutation },
   saveCredential: { method: 'connectors.saveCredential', input: connectorsRequestSchemas.connectorCredential, response: validationResponseSchemas.mutation },
   clearCredential: { method: 'connectors.clearCredential', input: connectorsRequestSchemas.connectorId, response: validationResponseSchemas.mutation },
 } as const satisfies Record<string, RuntimeRequestContract>

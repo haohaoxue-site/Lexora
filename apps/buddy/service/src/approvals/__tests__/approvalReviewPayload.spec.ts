@@ -95,18 +95,57 @@ describe('createApprovalReviewPayload', () => {
     })
   })
 
-  it('keeps only argument names for opaque tools and typed path targets for grants', () => {
+  it('presents a structured network URL instead of raw argument names', () => {
     expect(createApprovalReviewPayload({
       allowForTurn: true,
-      arguments: { apiKey: 'secret-value', body: 'private-content', url: 'https://example.com' },
+      arguments: {
+        kind: 'url',
+        until: { event: 'load' },
+        url: 'https://example.com/docs#section',
+      },
       kind: 'network',
       toolName: 'fetch_remote',
     })).toEqual({
       allowForTurn: true,
-      argumentNames: ['apiKey', 'body', 'url'],
-      card: 'arguments',
+      card: 'network-target',
+      target: 'https://example.com/docs',
       toolName: 'fetch_remote',
     })
+  })
+
+  it('keeps reviewable argument values while redacting credential fields', () => {
+    const payload = createApprovalReviewPayload({
+      allowForTurn: true,
+      arguments: {
+        address: '西湖区龙井路 1 号',
+        apiKey: 'top-level-secret',
+        city: '杭州市',
+        headers: {
+          Authorization: 'Bearer nested-secret',
+          Accept: 'application/json',
+        },
+        options: { limit: 3 },
+      },
+      kind: 'mcp',
+      toolName: 'mcp__maps__maps_geo',
+    })
+
+    expect(payload).toMatchObject({
+      argumentNames: ['address', 'apiKey', 'city', 'headers', 'options'],
+      card: 'arguments',
+      parameters: [
+        { name: 'address', value: '西湖区龙井路 1 号' },
+        { name: 'apiKey', value: '[redacted]' },
+        { name: 'city', value: '杭州市' },
+        { name: 'headers', value: '{\n  "Authorization": "[redacted]",\n  "Accept": "application/json"\n}' },
+        { name: 'options', value: '{\n  "limit": 3\n}' },
+      ],
+    })
+    expect(JSON.stringify(payload)).not.toContain('top-level-secret')
+    expect(JSON.stringify(payload)).not.toContain('nested-secret')
+  })
+
+  it('keeps typed path targets for grants', () => {
     expect(createApprovalReviewPayload({
       allowForTurn: true,
       arguments: {

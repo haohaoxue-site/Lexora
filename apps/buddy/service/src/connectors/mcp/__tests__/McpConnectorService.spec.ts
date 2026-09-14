@@ -35,9 +35,9 @@ describe('mcpConnectorService', () => {
     await fixture.service.upsert(stdioConfig(false))
     await expect(fixture.service.setEnabled('fixture', true))
       .rejects
-      .toMatchObject({ code: 'MCP_CONNECTOR_TRUST_REQUIRED' })
-    await fixture.service.trust('fixture')
-    await fixture.service.trust('fixture')
+      .toMatchObject({ code: 'MCP_EXECUTION_CONFIRMATION_REQUIRED' })
+    await fixture.service.confirmExecution('fixture')
+    await fixture.service.confirmExecution('fixture')
     await fixture.service.setEnabled('fixture', true)
     await fixture.service.test('fixture')
 
@@ -64,7 +64,7 @@ describe('mcpConnectorService', () => {
     const writeClassification = classifyMcpTool(result.classifications, {
       toolName: result.tools[1]!.name,
     })!
-    expect(writeClassification.forceAsk).toBe(true)
+    expect(writeClassification.requireApproval).toBe(true)
     await expect(policy.decide({
       approvalPolicy: 'policy',
       approvalAvailable: true,
@@ -75,7 +75,7 @@ describe('mcpConnectorService', () => {
       grants: [{ canonicalRoot: root, grantId: 'workspace-1', kind: 'workspace' as const, root }],
       ...readClassification,
       toolName: createMcpToolName('fixture', 'echo_read'),
-    })).resolves.toEqual({ type: 'allow' })
+    })).resolves.toMatchObject({ kind: 'mcp', type: 'ask' })
     await expect(policy.decide({
       approvalPolicy: 'policy',
       approvalAvailable: true,
@@ -94,12 +94,12 @@ describe('mcpConnectorService', () => {
   it('keeps secrets out of config and reports a crashed server without failing the service', async () => {
     const fixture = await createFixture()
     await fixture.service.upsert({ ...stdioConfig(false), args: [fixtureServer, '--exit-soon'] })
-    await fixture.service.trust('fixture')
+    await fixture.service.confirmExecution('fixture')
     await fixture.service.saveCredential('fixture', {
       env: { FIXTURE_TOKEN: 'secret-value' },
       type: 'stdio',
     })
-    await fixture.service.trust('fixture')
+    await fixture.service.confirmExecution('fixture')
     await fixture.service.setEnabled('fixture', true)
     await fixture.service.test('fixture')
     const tools = await fixture.service.getTools()
@@ -120,7 +120,7 @@ describe('mcpConnectorService', () => {
   it('reports a missing command without letting context previews retry it', async () => {
     const fixture = await createFixture(2)
     await fixture.service.upsert({ ...stdioConfig(false), command: '/lexora/does-not-exist' })
-    await fixture.service.trust('fixture')
+    await fixture.service.confirmExecution('fixture')
     expect(await fixture.service.test('fixture')).toMatchObject({ errorCode: 'MCP_COMMAND_NOT_FOUND' })
     expect(fixture.service.getTools().tools).toEqual([])
     expect(fixture.service.getTools().tools).toEqual([])
@@ -146,9 +146,9 @@ describe('mcpConnectorService', () => {
   it('creates one connector session while credential loading is in flight', async () => {
     const fixture = await createFixture()
     await fixture.service.upsert(stdioConfig(false))
-    await fixture.service.trust('fixture')
+    await fixture.service.confirmExecution('fixture')
     await fixture.service.saveCredential('fixture', { env: { TOKEN: 'secret' }, type: 'stdio' })
-    await fixture.service.trust('fixture')
+    await fixture.service.confirmExecution('fixture')
     await fixture.service.setEnabled('fixture', true)
     await fixture.service.test('fixture')
     fixture.secrets.read.mockClear()
@@ -332,7 +332,7 @@ function createCredentialFailureFixture() {
     id: 'fixture',
     name: 'Fixture',
     transport: 'stdio' as const,
-    trustedAt: '2026-08-14T00:00:00.000Z',
+    executionConfirmedAt: '2026-08-14T00:00:00.000Z',
     updatedAt: '2026-08-14T00:00:00.000Z',
     url: null,
   }
@@ -344,7 +344,6 @@ function createCredentialFailureFixture() {
       findById: () => record,
       list: () => [record],
       remove: () => false,
-      trust: () => false,
       upsert: () => {
         throw new Error('database unavailable')
       },
@@ -381,7 +380,7 @@ function createAtomicSaveFailureFixture() {
     id: 'remote',
     name: 'Remote',
     transport: 'streamable-http' as const,
-    trustedAt: null,
+    executionConfirmedAt: null,
     updatedAt: '2026-08-14T00:00:00.000Z',
     url: 'https://first.example.com/mcp',
   }
@@ -393,7 +392,6 @@ function createAtomicSaveFailureFixture() {
       findById: () => record,
       list: () => [record],
       remove: () => false,
-      trust: () => false,
       upsert: () => {
         throw new Error('database unavailable')
       },

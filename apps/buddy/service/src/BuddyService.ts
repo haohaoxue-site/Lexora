@@ -441,7 +441,7 @@ export async function startBuddyService(
         executor: piTurnExecutor,
         lifecycle: runLifecycleService,
         onRunSettled: (runId) => {
-          approvalService.clearTurnAuthorization(runId)
+          approvalService.clearRunAuthorizations(runId)
           chatQueueService?.onRunSettled(runId)
         },
         sessions,

@@ -66,8 +66,7 @@ const resolvingApprovalActions = computed(() => props.execution.resolvingApprova
       :approval="approval"
       :language="language"
       :resolving-action="resolvingApprovalActions.get(approval.id) ?? null"
-      @approve="execution.resolveApproval(approval.id, 'approve')"
-      @approve-turn="execution.resolveApproval(approval.id, 'approveForTurn')"
+      @approve="execution.resolveApproval(approval.id, $event)"
       @deny="execution.resolveApproval(approval.id, 'deny')"
     />
   </div>

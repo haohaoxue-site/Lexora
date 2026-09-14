@@ -25,8 +25,8 @@ export function registerMcpConnectorRpc(
     await service.remove(input.connectorId)
     return ok()
   }))
-  disposers.push(registerRuntimeRequest(rpc, connectorsRpc.trust, async (input) => {
-    await service.trust(input.connectorId, input.trusted)
+  disposers.push(registerRuntimeRequest(rpc, connectorsRpc.confirmExecution, async (input) => {
+    await service.confirmExecution(input.connectorId)
     return ok()
   }))
   disposers.push(registerRuntimeRequest(rpc, connectorsRpc.saveCredential, async (input) => {
@@ -63,7 +63,7 @@ function toPublicConnector(record: McpServerRecord, runtime: ConnectorRuntimeSta
     enabled: record.enabled,
     id: record.id,
     name: record.name,
-    trusted: record.trustedAt !== null,
+    executionConfirmed: record.transport === 'stdio' && record.executionConfirmedAt !== null,
   }
   if (record.transport === 'stdio') {
     return {

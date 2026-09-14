@@ -32,12 +32,10 @@ export function useChatApprovals(options: UseChatApprovalsOptions) {
       [approvalId, decision],
     ])
     try {
-      if (decision === 'approve')
-        await options.api.approvals.approve(approvalId)
-      else if (decision === 'approveForTurn')
-        await options.api.approvals.approveForTurn(approvalId)
-      else
+      if (decision === 'deny')
         await options.api.approvals.deny(approvalId)
+      else
+        await options.api.approvals.approve(approvalId, decision)
       await options.refresh()
     }
     catch (error) {

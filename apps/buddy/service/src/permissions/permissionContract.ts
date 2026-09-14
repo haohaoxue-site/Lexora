@@ -78,6 +78,7 @@ export interface PermissionRequest {
   arguments: unknown
   cwd: string
   forceAsk?: boolean
+  requireApproval?: boolean
   shellBoundary?: 'sandbox'
   grants: readonly PermissionGrant[]
   owner: GrantOwner

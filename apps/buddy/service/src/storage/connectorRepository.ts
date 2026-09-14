@@ -11,7 +11,7 @@ export interface McpServerRecord {
   cwd: string | null
   url: string | null
   credentialRef: string | null
-  trustedAt: string | null
+  executionConfirmedAt: string | null
   enabled: boolean
   createdAt: string
   updatedAt: string
@@ -24,7 +24,6 @@ export interface ConnectorRepository {
   findById: (id: string) => McpServerRecord | null
   list: () => McpServerRecord[]
   remove: (id: string) => boolean
-  trust: (id: string, trustedAt: string) => boolean
   upsert: (record: McpServerRecord) => McpServerRecord
 }
 
@@ -70,10 +69,6 @@ export function createConnectorRepository(database: DatabaseSync): ConnectorRepo
       enabled = excluded.enabled,
       updated_at = excluded.updated_at
   `)
-  const trust = database.prepare(`
-    UPDATE mcp_servers SET trusted_at = ?, updated_at = ? WHERE id = ?
-  `)
-
   return {
     readCatalog(id) {
       const row = readCatalog.get(id) as { tools_json: string, updated_at: string } | undefined
@@ -105,15 +100,12 @@ export function createConnectorRepository(database: DatabaseSync): ConnectorRepo
         record.cwd,
         record.url,
         record.credentialRef,
-        record.trustedAt,
+        record.executionConfirmedAt,
         Number(record.enabled),
         record.createdAt,
         record.updatedAt,
       )
       return requireMcpServer(find.get(record.id), record.id)
-    },
-    trust(id, trustedAt) {
-      return Number(trust.run(trustedAt, trustedAt, id).changes) === 1
     },
   }
 }
@@ -135,7 +127,7 @@ function toMcpServer(row: McpServerRow): McpServerRecord {
     cwd: row.cwd,
     url: row.url,
     credentialRef: row.credential_ref,
-    trustedAt: row.trusted_at,
+    executionConfirmedAt: row.trusted_at,
     enabled: row.enabled === 1,
     createdAt: row.created_at,
     updatedAt: row.updated_at,

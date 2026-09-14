@@ -6,6 +6,7 @@ import type {
   SystemActionApprovalReviewInput,
 } from '../../../shared/permissions/approvalReviewPayload'
 import type { AccessKind, PermissionPath } from '../permissions/permissionContract'
+import type { ApprovalAuthorizationOverride } from './approvalAuthorization'
 
 export interface BuddyToolClassification {
   access?: AccessKind
@@ -14,10 +15,12 @@ export interface BuddyToolClassification {
     browser?: BrowserApprovalReviewInput
     kind?: ApprovalReviewKind
     paths?: PathApprovalReviewInput
+    reuse?: ApprovalAuthorizationOverride
     summary: string
     systemAction?: SystemActionApprovalReviewInput
   }
   forceAsk?: boolean
+  requireApproval?: boolean
   shellBoundary?: 'sandbox'
   paths?: readonly PermissionPath[]
   validateBeforeExecution?: () => Promise<BuddyToolClassificationFailure | null>

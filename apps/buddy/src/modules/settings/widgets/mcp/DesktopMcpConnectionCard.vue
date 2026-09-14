@@ -7,7 +7,7 @@ import { useBuddyI18n } from '@/i18n/buddyI18n'
 import { maskConnectorUrl } from '../../model/desktopConnectorTarget'
 
 const props = defineProps<{ connector: LocalConnector, language: BuddyLocale, busy: boolean }>()
-const emit = defineEmits<{ toggle: [enabled: boolean], edit: [], test: [], tools: [], trust: [], remove: [], login: [], cancelLogin: [], clearCredential: [] }>()
+const emit = defineEmits<{ toggle: [enabled: boolean], edit: [], test: [], tools: [], remove: [], login: [], cancelLogin: [], clearCredential: [] }>()
 const { t } = useBuddyI18n(() => props.language)
 const target = computed(() => props.connector.transport === 'stdio'
   ? [props.connector.command, ...props.connector.args].map(value => JSON.stringify(value)).join(' ')
@@ -56,9 +56,6 @@ const cachedTools = computed(() => props.connector.runtime.updatedAt !== null &&
         </NButton>
       </div>
       <div>
-        <NButton v-if="connector.transport === 'streamable-http'" size="small" quaternary :disabled="busy || authenticating" @click="emit('trust')">
-          {{ t('desktop.mcp.permissions') }}
-        </NButton>
         <NButton size="small" quaternary :disabled="busy" @click="emit('edit')">
           {{ t('desktop.mcp.edit') }}
         </NButton>

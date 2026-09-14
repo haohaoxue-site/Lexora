@@ -112,7 +112,7 @@ function preservesEnabledStdioTarget(
 ): boolean {
   return existing?.transport === 'stdio'
     && existing.enabled
-    && existing.trusted
+    && existing.executionConfirmed
     && existing.command === command
     && existing.cwd === cwd
     && arraysEqual(existing.args, args)

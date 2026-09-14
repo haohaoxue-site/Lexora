@@ -15,8 +15,7 @@ describe('useChatApprovals', () => {
     const approvals = useChatApprovals({
       api: {
         approvals: {
-          approve: vi.fn(),
-          approveForTurn: vi.fn(() => resolution.promise),
+          approve: vi.fn(() => resolution.promise),
           deny: vi.fn(),
         },
       } as unknown as LocalChatApi,
@@ -25,9 +24,9 @@ describe('useChatApprovals', () => {
       refresh: vi.fn(async () => {}),
     })
 
-    const resolving = approvals.resolveApproval(approval.id, 'approveForTurn')
+    const resolving = approvals.resolveApproval(approval.id, 'turn')
 
-    expect(approvals.resolvingApprovalActions.value.get(approval.id)).toBe('approveForTurn')
+    expect(approvals.resolvingApprovalActions.value.get(approval.id)).toBe('turn')
     expect(approvals.resolvingApprovalIds.value.has(approval.id)).toBe(true)
 
     resolution.resolve({

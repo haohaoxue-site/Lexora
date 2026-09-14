@@ -1,4 +1,5 @@
 import type {
+  ApprovalReuseScope,
   ApprovalReviewKind,
   AutomationApprovalReviewInput,
   BrowserApprovalReviewInput,
@@ -13,26 +14,30 @@ import type {
   ApprovalRecord,
   ApprovalRepository,
 } from '../storage/approvalRepository'
+import type { ApprovalAuthorizationKeys, ApprovalAuthorizationOverride } from './approvalAuthorization'
 import { randomUUID } from 'node:crypto'
 import { createApprovalReviewPayload } from '../../../shared/permissions/approvalReviewPayload'
+import { approvalReuseScopes, createApprovalAuthorizationKeys } from './approvalAuthorization'
 
 export const APPROVAL_WAIT_TIMEOUT_MS = 30 * 60 * 1_000
 
 export type ApprovalDecision = 'approved' | 'denied'
-export type ApprovalResolutionDecision = ApprovalDecision | 'approved_for_turn'
+export type ApprovalResolutionDecision = ApprovalDecision | `approved_for_${ApprovalReuseScope}`
 export type ApprovalRequestResult
-  = { approvalId: string, decision: 'approved_once' | 'approved_for_turn' | 'denied' }
-    | { decision: 'approved_by_turn', sourceApprovalId: string }
+  = { approvalId: string, decision: 'approved_once' | `approved_for_${ApprovalReuseScope}` | 'denied' }
+    | { decision: `approved_by_${ApprovalReuseScope}`, sourceApprovalId: string }
 
 export interface ApprovalRequest {
   allowForTurn: boolean
   arguments: unknown
   automation?: AutomationApprovalReviewInput
   browser?: BrowserApprovalReviewInput
+  cwd?: string
   kind: ApprovalReviewKind
   network?: SandboxNetworkTarget
   sandboxDirectory?: SandboxDirectoryRequest
   paths?: PathApprovalReviewInput
+  reuse?: ApprovalAuthorizationOverride
   shell?: ShellApprovalContext
   runId: string
   signal: AbortSignal
@@ -55,7 +60,8 @@ export interface ApprovalServiceOptions {
 }
 
 interface ApprovalWaiter {
-  allowForTurn: boolean
+  authorizationKeys: ApprovalAuthorizationKeys
+  reuseScopes: ReadonlySet<ApprovalReuseScope>
   cleanup: () => void
   reject: (error: Error) => void
   resolve: (decision: ApprovalRequestResult) => void
@@ -67,9 +73,11 @@ export class ApprovalService {
   readonly #eventLog: ApprovalServiceOptions['eventLog']
   readonly #onExpired: NonNullable<ApprovalServiceOptions['onExpired']>
   readonly #repository: ApprovalRepository
-  readonly #approvedTurns = new Map<string, {
-    sourceApprovalId: string
-  }>()
+  readonly #authorizations = new Map<ApprovalReuseScope, Map<string, Map<string, string>>>([
+    ['operation', new Map()],
+    ['source', new Map()],
+    ['turn', new Map()],
+  ])
 
   readonly #resolving = new Map<string, Promise<unknown>>()
   readonly #waiters = new Map<string, ApprovalWaiter>()
@@ -84,20 +92,23 @@ export class ApprovalService {
   async request(input: ApprovalRequest): Promise<ApprovalRequestResult> {
     if (input.signal.aborted)
       throw new ApprovalCancelledError()
-    const turnAuthorization = this.#approvedTurns.get(input.runId)
-    if (input.allowForTurn && turnAuthorization) {
+    const reuseScopes = approvalReuseScopes(input.allowForTurn)
+    const authorizationKeys = createApprovalAuthorizationKeys(input, input.reuse)
+    const reused = this.#findAuthorization(input.runId, reuseScopes, authorizationKeys)
+    if (reused) {
       await this.#eventLog.append({
         runId: input.runId,
-        type: 'approval.turn_reused',
+        type: 'approval.reused',
         payload: {
-          sourceApprovalId: turnAuthorization.sourceApprovalId,
+          scope: reused.scope,
+          sourceApprovalId: reused.sourceApprovalId,
           toolCallId: input.toolCallId,
           toolName: input.toolName,
         },
       })
       return {
-        decision: 'approved_by_turn',
-        sourceApprovalId: turnAuthorization.sourceApprovalId,
+        decision: `approved_by_${reused.scope}`,
+        sourceApprovalId: reused.sourceApprovalId,
       }
     }
 
@@ -114,6 +125,7 @@ export class ApprovalService {
         network: input.network,
         sandboxDirectory: input.sandboxDirectory,
         paths: input.paths,
+        reuseScopes,
         shell: input.shell,
         systemAction: input.systemAction,
         toolName: input.toolName,
@@ -129,13 +141,14 @@ export class ApprovalService {
     let timer: ReturnType<typeof setTimeout> | null = null
     const decision = new Promise<ApprovalRequestResult>((resolve, reject) => {
       this.#waiters.set(approval.id, {
-        allowForTurn: input.allowForTurn,
+        authorizationKeys,
         cleanup: () => {
           if (timer)
             clearTimeout(timer)
           input.signal.removeEventListener('abort', abort)
         },
         reject,
+        reuseScopes: new Set(reuseScopes),
         resolve,
         signal: input.signal,
       })
@@ -170,8 +183,9 @@ export class ApprovalService {
     return this.#trackResolution(input.id, this.#resolvePending(input))
   }
 
-  clearTurnAuthorization(runId: string): void {
-    this.#approvedTurns.delete(runId)
+  clearRunAuthorizations(runId: string): void {
+    for (const authorizations of this.#authorizations.values())
+      authorizations.delete(runId)
   }
 
   async #resolvePending(input: ApprovalResolution): Promise<ApprovalRecord> {
@@ -179,14 +193,10 @@ export class ApprovalService {
     if (pending.status !== 'pending')
       throw new ApprovalResolutionError()
     const waiter = this.#waiters.get(input.id)
-    if (input.decision === 'approved_for_turn' && !waiter?.allowForTurn)
+    const approvedScope = readApprovedScope(input.decision)
+    if (approvedScope && !waiter?.reuseScopes.has(approvedScope))
       throw new ApprovalResolutionError()
-    const approvedTurnSignal = input.decision === 'approved_for_turn' && waiter
-      ? waiter.signal
-      : null
-    const decision: ApprovalDecision = input.decision === 'approved_for_turn'
-      ? 'approved'
-      : input.decision
+    const decision: ApprovalDecision = input.decision === 'denied' ? 'denied' : 'approved'
     const resolvedAt = new Date().toISOString()
     await this.#appendResolved({
       ...pending,
@@ -197,19 +207,21 @@ export class ApprovalService {
     const approval = this.#requireApproval(input.id)
     if (approval.status !== decision)
       throw new ApprovalResolutionError()
-    if (approvedTurnSignal && !approvedTurnSignal.aborted) {
-      this.#approvedTurns.set(pending.runId, {
-        sourceApprovalId: pending.id,
-      })
-      approvedTurnSignal.addEventListener('abort', () => {
-        if (this.#approvedTurns.get(pending.runId)?.sourceApprovalId === pending.id)
-          this.#approvedTurns.delete(pending.runId)
+    if (approvedScope && waiter && !waiter.signal.aborted) {
+      this.#storeAuthorization(
+        approvedScope,
+        pending.runId,
+        approvedScope === 'turn' ? pending.runId : waiter.authorizationKeys[approvedScope],
+        pending.id,
+      )
+      waiter.signal.addEventListener('abort', () => {
+        this.clearRunAuthorizations(pending.runId)
       }, { once: true })
     }
     waiter?.resolve({
       approvalId: pending.id,
-      decision: input.decision === 'approved_for_turn'
-        ? 'approved_for_turn'
+      decision: approvedScope
+        ? `approved_for_${approvedScope}`
         : decision === 'approved'
           ? 'approved_once'
           : 'denied',
@@ -302,6 +314,39 @@ export class ApprovalService {
       throw new ApprovalResolutionError()
     return approval
   }
+
+  #findAuthorization(
+    runId: string,
+    scopes: readonly ApprovalReuseScope[],
+    keys: ApprovalAuthorizationKeys,
+  ): { scope: ApprovalReuseScope, sourceApprovalId: string } | null {
+    for (const scope of scopes) {
+      const key = scope === 'turn' ? runId : keys[scope]
+      const sourceApprovalId = this.#authorizations.get(scope)?.get(runId)?.get(key)
+      if (sourceApprovalId)
+        return { scope, sourceApprovalId }
+    }
+    return null
+  }
+
+  #storeAuthorization(
+    scope: ApprovalReuseScope,
+    runId: string,
+    key: string,
+    sourceApprovalId: string,
+  ): void {
+    const authorizations = this.#authorizations.get(scope)!
+    const runAuthorizations = authorizations.get(runId) ?? new Map<string, string>()
+    runAuthorizations.set(key, sourceApprovalId)
+    authorizations.set(runId, runAuthorizations)
+  }
+}
+
+function readApprovedScope(decision: ApprovalResolutionDecision): ApprovalReuseScope | null {
+  if (!decision.startsWith('approved_for_'))
+    return null
+  const scope = decision.slice('approved_for_'.length)
+  return scope === 'operation' || scope === 'source' || scope === 'turn' ? scope : null
 }
 
 export class ApprovalCancelledError extends Error implements ToolCallBlockingError {

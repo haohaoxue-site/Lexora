@@ -9,6 +9,7 @@ import { sandboxDirectoryRequestSchema, sandboxNetworkTargetSchema } from './she
 const MAX_COMMAND_SOURCE_LENGTH = 16 * 1024
 const MAX_COMMAND_REVIEW_LENGTH = 4 * 1024
 const MAX_ARGUMENT_NAMES = 32
+const MAX_ARGUMENT_VALUES_LENGTH = 8 * 1024
 export const MAX_TARGET_PATHS = 32
 
 export const SHELL_APPROVAL_REASONS = [
@@ -44,6 +45,13 @@ export const APPROVAL_REVIEW_KINDS = [
   'mcp',
   'automation',
 ] as const
+
+export const APPROVAL_REUSE_SCOPES = ['operation', 'source', 'turn'] as const
+export type ApprovalReuseScope = typeof APPROVAL_REUSE_SCOPES[number]
+export const APPROVAL_GRANT_SCOPES = ['once', ...APPROVAL_REUSE_SCOPES] as const
+export type ApprovalGrantScope = typeof APPROVAL_GRANT_SCOPES[number]
+
+const approvalReuseScopesSchema = z.array(z.enum(APPROVAL_REUSE_SCOPES)).max(APPROVAL_REUSE_SCOPES.length)
 
 const toolNameSchema = z.string().trim().min(1).max(256)
 const systemActionSchema = z.enum([
@@ -95,6 +103,7 @@ export const approvalReviewPayloadSchema = z.discriminatedUnion('card', [
   sandboxDirectoryRequestSchema.extend({
     allowForTurn: z.literal(false),
     card: z.literal('sandbox-directory'),
+    reuseScopes: approvalReuseScopesSchema.optional(),
     scope: z.literal('run'),
     toolName: z.literal('lexora_authorize_directory'),
   }).strict(),
@@ -102,6 +111,7 @@ export const approvalReviewPayloadSchema = z.discriminatedUnion('card', [
     allowForTurn: z.literal(false),
     card: z.literal('sandbox-network'),
     command: z.string().max(MAX_COMMAND_REVIEW_LENGTH),
+    reuseScopes: approvalReuseScopesSchema.optional(),
     toolName: z.enum(['bash', 'powershell']),
   }).strict(),
   z.object({
@@ -109,6 +119,7 @@ export const approvalReviewPayloadSchema = z.discriminatedUnion('card', [
     card: z.literal('shell'),
     command: z.string().max(MAX_COMMAND_REVIEW_LENGTH),
     context: shellApprovalContextSchema.optional(),
+    reuseScopes: approvalReuseScopesSchema.optional(),
     toolName: toolNameSchema,
   }).strict(),
   z.object({
@@ -119,6 +130,7 @@ export const approvalReviewPayloadSchema = z.discriminatedUnion('card', [
       owner: z.enum(['conversation', 'space']),
       root: z.string().trim().min(1).max(4_096),
     }).strict().nullable(),
+    reuseScopes: approvalReuseScopesSchema.optional(),
     targets: z.array(z.object({
       path: z.string().trim().min(1).max(4_096),
       zone: z.enum(['granted', 'outside', 'sensitive', 'workspace']),
@@ -129,6 +141,18 @@ export const approvalReviewPayloadSchema = z.discriminatedUnion('card', [
     allowForTurn: z.boolean().default(true),
     argumentNames: z.array(z.string().min(1).max(256)).max(MAX_ARGUMENT_NAMES),
     card: z.literal('arguments'),
+    parameters: z.array(z.object({
+      name: z.string().min(1).max(256),
+      value: z.string().max(MAX_ARGUMENT_VALUES_LENGTH),
+    }).strict()).max(MAX_ARGUMENT_NAMES).optional(),
+    reuseScopes: approvalReuseScopesSchema.optional(),
+    toolName: toolNameSchema,
+  }).strict(),
+  z.object({
+    allowForTurn: z.boolean().default(true),
+    card: z.literal('network-target'),
+    reuseScopes: approvalReuseScopesSchema.optional(),
+    target: z.string().trim().min(1).max(4_096),
     toolName: toolNameSchema,
   }).strict(),
   z.object({
@@ -136,6 +160,7 @@ export const approvalReviewPayloadSchema = z.discriminatedUnion('card', [
     card: z.literal('web'),
     operation: z.enum(['search', 'fetch']),
     provider: z.string().trim().min(1).max(256).nullable(),
+    reuseScopes: approvalReuseScopesSchema.optional(),
     target: z.string().trim().min(1).max(4_096),
     toolName: z.enum(['lexora_web_search', 'lexora_web_fetch']),
   }).strict(),
@@ -147,6 +172,7 @@ export const approvalReviewPayloadSchema = z.discriminatedUnion('card', [
     expiresAt: z.iso.datetime(),
     interruption: z.enum(['application', 'network', 'none', 'service']),
     reason: z.string().trim().min(1).max(512),
+    reuseScopes: approvalReuseScopesSchema.optional(),
     target: systemActionTargetSchema,
     toolName: toolNameSchema,
   }).strict(),
@@ -159,6 +185,7 @@ export const approvalReviewPayloadSchema = z.discriminatedUnion('card', [
     operation: automationOperationSchema,
     spaceId: z.string().trim().min(1).max(256).nullable(),
     promptSummary: z.string().trim().min(1).max(512),
+    reuseScopes: approvalReuseScopesSchema.optional(),
     scheduleSummary: z.string().trim().min(1).max(512),
     timezone: z.string().trim().min(1).max(256),
     toolName: toolNameSchema,
@@ -175,6 +202,7 @@ export const approvalReviewPayloadSchema = z.discriminatedUnion('card', [
     origin: browserApprovalOriginSchema,
     pageId: z.uuid(),
     risk: z.enum(['commit-like', 'unknown-commit-like']),
+    reuseScopes: approvalReuseScopesSchema.optional(),
     sessionId: z.uuid(),
     targetName: z.string().max(1_024).nullable(),
     targetRole: z.string().trim().min(1).max(1_024).nullable(),
@@ -205,7 +233,7 @@ export type AutomationApprovalReview = Extract<
 >
 export type AutomationApprovalReviewInput = Omit<
   AutomationApprovalReview,
-  'allowForTurn' | 'card' | 'toolName'
+  'allowForTurn' | 'card' | 'reuseScopes' | 'toolName'
 >
 export type BrowserApprovalReview = Extract<
   ApprovalReviewPayload,
@@ -213,7 +241,7 @@ export type BrowserApprovalReview = Extract<
 >
 export type BrowserApprovalReviewInput = Omit<
   BrowserApprovalReview,
-  'allowForTurn' | 'card' | 'toolName'
+  'allowForTurn' | 'card' | 'reuseScopes' | 'toolName'
 >
 export type PathApprovalReview = Extract<
   ApprovalReviewPayload,
@@ -221,7 +249,7 @@ export type PathApprovalReview = Extract<
 >
 export type PathApprovalReviewInput = Omit<
   PathApprovalReview,
-  'allowForTurn' | 'card' | 'toolName'
+  'allowForTurn' | 'card' | 'reuseScopes' | 'toolName'
 >
 export type SystemActionApprovalReview = Extract<
   ApprovalReviewPayload,
@@ -229,7 +257,7 @@ export type SystemActionApprovalReview = Extract<
 >
 export type SystemActionApprovalReviewInput = Omit<
   SystemActionApprovalReview,
-  'allowForTurn' | 'card' | 'toolName'
+  'allowForTurn' | 'card' | 'reuseScopes' | 'toolName'
 >
 
 export interface CreateApprovalReviewPayloadInput {
@@ -241,6 +269,7 @@ export interface CreateApprovalReviewPayloadInput {
   network?: z.infer<typeof sandboxNetworkTargetSchema>
   sandboxDirectory?: z.infer<typeof sandboxDirectoryRequestSchema>
   paths?: PathApprovalReviewInput
+  reuseScopes?: readonly ApprovalReuseScope[]
   shell?: ShellApprovalContext
   systemAction?: SystemActionApprovalReviewInput
   toolName: string
@@ -249,22 +278,27 @@ export interface CreateApprovalReviewPayloadInput {
 export function createApprovalReviewPayload(
   input: CreateApprovalReviewPayloadInput,
 ): ApprovalReviewPayload {
+  const reuseScopes = input.reuseScopes?.length
+    ? { reuseScopes: [...new Set(input.reuseScopes)] }
+    : {}
   if (input.sandboxDirectory && input.kind === input.sandboxDirectory.access) {
     return approvalReviewPayloadSchema.parse({
-      ...input.sandboxDirectory,
+      ...withoutReuseScopes(input.sandboxDirectory),
       reason: redactSensitiveText(input.sandboxDirectory.reason),
       allowForTurn: false,
       card: 'sandbox-directory',
+      ...reuseScopes,
       scope: 'run',
       toolName: input.toolName,
     })
   }
   if (input.kind === 'network' && input.network) {
     return approvalReviewPayloadSchema.parse({
-      ...input.network,
+      ...withoutReuseScopes(input.network),
       allowForTurn: false,
       card: 'sandbox-network',
       command: redactShellCommand(readString(input.arguments, 'command')),
+      ...reuseScopes,
       toolName: input.toolName,
     })
   }
@@ -274,6 +308,7 @@ export function createApprovalReviewPayload(
       card: 'shell',
       command: redactShellCommand(readString(input.arguments, 'command')),
       ...(input.shell ? { context: input.shell } : {}),
+      ...reuseScopes,
       toolName: input.toolName,
     })
   }
@@ -284,33 +319,37 @@ export function createApprovalReviewPayload(
     || input.kind === 'write'
   ) {
     return approvalReviewPayloadSchema.parse({
-      ...input.paths,
+      ...withoutReuseScopes(input.paths),
       allowForTurn: input.allowForTurn,
       card: 'paths',
+      ...reuseScopes,
       toolName: input.toolName,
     })
   }
   if (input.kind === 'system' && input.systemAction) {
     return approvalReviewPayloadSchema.parse({
-      ...input.systemAction,
+      ...withoutReuseScopes(input.systemAction),
       allowForTurn: input.allowForTurn,
       card: 'system-action',
+      ...reuseScopes,
       toolName: input.toolName,
     })
   }
   if (input.kind === 'automation' && input.automation) {
     return approvalReviewPayloadSchema.parse({
-      ...input.automation,
+      ...withoutReuseScopes(input.automation),
       allowForTurn: input.allowForTurn,
       card: 'automation',
+      ...reuseScopes,
       toolName: input.toolName,
     })
   }
   if (input.kind === 'browser') {
     return approvalReviewPayloadSchema.parse({
-      ...input.browser,
+      ...withoutReuseScopes(input.browser),
       allowForTurn: input.allowForTurn,
       card: 'browser-action',
+      ...reuseScopes,
       toolName: input.toolName,
     })
   }
@@ -324,7 +363,17 @@ export function createApprovalReviewPayload(
       card: 'web',
       operation,
       provider: readString(input.arguments, 'provider') || null,
+      ...reuseScopes,
       target: readString(input.arguments, operation === 'search' ? 'query' : 'url'),
+      toolName: input.toolName,
+    })
+  }
+  if (input.kind === 'network' && readString(input.arguments, 'url')) {
+    return approvalReviewPayloadSchema.parse({
+      allowForTurn: input.allowForTurn,
+      card: 'network-target',
+      ...reuseScopes,
+      target: normalizeNetworkTarget(readString(input.arguments, 'url')),
       toolName: input.toolName,
     })
   }
@@ -332,6 +381,8 @@ export function createApprovalReviewPayload(
     allowForTurn: input.allowForTurn,
     argumentNames: readArgumentNames(input.arguments),
     card: 'arguments',
+    parameters: readArgumentParameters(input.arguments),
+    ...reuseScopes,
     toolName: input.toolName,
   })
 }
@@ -351,8 +402,26 @@ export function approvalReviewPayloadMatchesKind(
   if (kind === 'browser')
     return payload.card === 'browser-action'
   return kind === 'network'
-    ? payload.card === 'arguments' || payload.card === 'web' || payload.card === 'sandbox-network'
+    ? payload.card === 'arguments' || payload.card === 'network-target' || payload.card === 'web' || payload.card === 'sandbox-network'
     : payload.card === 'arguments'
+}
+
+function normalizeNetworkTarget(value: string): string {
+  try {
+    const url = new URL(value)
+    url.hash = ''
+    return url.toString()
+  }
+  catch {
+    return value.trim()
+  }
+}
+
+function withoutReuseScopes<T extends object>(value?: T): Partial<Omit<T, 'reuseScopes'>> {
+  if (!value)
+    return {}
+  const { reuseScopes: _reuseScopes, ...review } = value as T & { reuseScopes?: unknown }
+  return review
 }
 
 export function redactShellCommand(command: string): string {
@@ -390,7 +459,7 @@ export function redactSensitiveText(value: string): string {
 }
 
 function isSensitiveName(name: string): boolean {
-  return /API_?KEY|TOKEN|SECRET|PASSWORD|CREDENTIAL/i.test(name)
+  return /API_?KEY|AUTHORIZATION|COOKIE|CREDENTIAL|PASSWORD|SECRET|SESSION|TOKEN/i.test(name)
 }
 
 function readArgumentNames(value: unknown): string[] {
@@ -398,6 +467,55 @@ function readArgumentNames(value: unknown): string[] {
   return record
     ? Object.keys(record).filter(Boolean).sort().slice(0, MAX_ARGUMENT_NAMES)
     : []
+}
+
+function readArgumentParameters(value: unknown): Array<{ name: string, value: string }> {
+  const record = readRecord(value)
+  if (!record)
+    return []
+  const entries = Object.entries(record)
+    .filter(([name]) => Boolean(name))
+    .sort(([left], [right]) => left.localeCompare(right))
+    .slice(0, MAX_ARGUMENT_NAMES)
+  let remaining = MAX_ARGUMENT_VALUES_LENGTH
+  return entries.map(([name, argument], index) => {
+    const preview = serializeArgumentValue(name, argument)
+    const allowance = Math.max(0, Math.floor(remaining / (entries.length - index)))
+    const value = truncatePreview(preview, allowance)
+    remaining -= value.length
+    return { name, value }
+  })
+}
+
+function serializeArgumentValue(name: string, value: unknown): string {
+  if (isSensitiveName(name))
+    return '[redacted]'
+  if (typeof value === 'string')
+    return redactSensitiveText(value)
+  const seen = new WeakSet<object>()
+  const serialized = JSON.stringify(value, (key, nested) => {
+    if (key && isSensitiveName(key))
+      return '[redacted]'
+    if (typeof nested === 'string')
+      return redactSensitiveText(nested)
+    if (typeof nested === 'bigint')
+      return nested.toString()
+    if (nested && typeof nested === 'object') {
+      if (seen.has(nested))
+        return '[circular]'
+      seen.add(nested)
+    }
+    return nested
+  }, 2)
+  return serialized ?? String(value)
+}
+
+function truncatePreview(value: string, limit: number): string {
+  if (value.length <= limit)
+    return value
+  if (limit <= 1)
+    return limit === 1 ? '…' : ''
+  return `${value.slice(0, limit - 1)}…`
 }
 
 function readString(value: unknown, key: string): string {

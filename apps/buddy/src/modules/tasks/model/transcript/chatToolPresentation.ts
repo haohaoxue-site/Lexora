@@ -90,13 +90,13 @@ export function approvalPresentation(review: ApprovalReviewPayload): BuddyToolPr
       truncated: false,
     }
   }
-  if (review.card === 'web') {
+  if (review.card === 'web' || review.card === 'network-target') {
     return {
       card: 'web',
       description: null,
-      operation: review.operation,
+      operation: review.card === 'web' ? review.operation : 'fetch',
       output: null,
-      provider: review.provider,
+      provider: review.card === 'web' ? review.provider : null,
       target: review.target,
       truncated: false,
     }

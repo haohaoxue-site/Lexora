@@ -5,11 +5,11 @@ import { createMcpToolName, createMcpTools } from '../createMcpTools'
 import { normalizeMcpResult } from '../mcpToolResults'
 
 const tool: Tool = { name: 'lookup', inputSchema: { type: 'object', properties: {} } }
-function create(annotations: Tool['annotations'], trusted = true) {
+function create(annotations: Tool['annotations']) {
   return createMcpTools({
     serverId: 'stable-id',
     serverName: '日历',
-    trusted,
+    generation: 7,
     tools: [{ ...tool, annotations }],
     callTool: async () => ({ content: [{ type: 'text', text: 'ok' }] }),
   })
@@ -23,12 +23,11 @@ describe('mCP adapter contracts', () => {
     expect(createMcpToolName('one', 'foo')).not.toBe(createMcpToolName('two', 'foo'))
   })
 
-  it('requires explicit closed-world read-only hints from a trusted server', () => {
-    const classification = (annotations: Tool['annotations'], trusted = true) => [...create(annotations, trusted).classifications.values()][0]
-    expect(classification({ readOnlyHint: true, openWorldHint: false })).toEqual({ access: 'read' })
-    expect(classification({ readOnlyHint: true })).toMatchObject({ access: 'network' })
-    expect(classification(undefined)).toMatchObject({ access: 'network', forceAsk: true })
-    expect(classification({ readOnlyHint: true, openWorldHint: false }, false)).toMatchObject({ access: 'network', forceAsk: true })
+  it('requires approval for every tool regardless of server hints', () => {
+    const classification = (annotations: Tool['annotations']) => [...create(annotations).classifications.values()][0]
+    expect(classification({ readOnlyHint: true, openWorldHint: false })).toMatchObject({ access: 'network', requireApproval: true })
+    expect(classification({ destructiveHint: false })).toMatchObject({ access: 'network', requireApproval: true })
+    expect(classification(undefined)).toMatchObject({ access: 'network', requireApproval: true })
   })
 
   it('preserves structured business fields, image blocks and resource URIs', async () => {
@@ -59,7 +58,7 @@ describe('mCP adapter contracts', () => {
   it('does not hide cancellation as a tool failure', async () => {
     const controller = new AbortController()
     const reason = new Error('cancelled')
-    const result = createMcpTools({ serverId: 'one', serverName: 'One', tools: [tool], trusted: false, callTool: async () => {
+    const result = createMcpTools({ serverId: 'one', serverName: 'One', generation: 1, tools: [tool], callTool: async () => {
       controller.abort(reason)
       throw reason
     } })

@@ -52,7 +52,7 @@ describe('createConnectorSavePlan', () => {
       id: 'local',
       name: 'Local',
       transport: 'stdio',
-      trusted: true,
+      executionConfirmed: true,
     }
     const base = {
       args: 'server.mjs',
@@ -106,7 +106,7 @@ describe('createConnectorSavePlan', () => {
       id: 'remote',
       name: 'Remote',
       transport: 'streamable-http',
-      trusted: true,
+      executionConfirmed: false,
       url: 'https://first.example.com/mcp',
     }
     const form = {
