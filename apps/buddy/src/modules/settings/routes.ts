@@ -9,6 +9,12 @@ export const settingsRoutes: ReadonlyArray<RouteRecordRaw> = [
     redirect: desktopRouteLocations.settings(),
     children: [
       {
+        path: 'mcp',
+        name: DESKTOP_ROUTE_NAMES.settingsMcp,
+        component: () => import('./pages/DesktopMcpSettingsView.vue'),
+        meta: { desktopView: 'settings', settingsCategory: 'mcp' },
+      },
+      {
         path: 'skills',
         name: DESKTOP_ROUTE_NAMES.settingsSkills,
         component: () => import('./pages/DesktopSkillsSettingsView.vue'),

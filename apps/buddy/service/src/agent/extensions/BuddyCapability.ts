@@ -1,4 +1,5 @@
 import type { ToolCallEvent } from '@earendil-works/pi-coding-agent'
+import type { BuddyExecutionProfile } from '../../../../shared/permissions/executionProfile'
 import type { BuddySessionMode } from '../../../../shared/permissions/sessionMode'
 import type { BuddyToolClassificationResult } from '../../approvals/toolClassification'
 import type { DirectoryGrant } from '../../directories/resolveGrantedPath'
@@ -15,6 +16,7 @@ export interface BuddyCapability {
 
 export interface BuddyCapabilityContext {
   conversationId: string
+  executionProfile: BuddyExecutionProfile
   cwd: string
   getRunId: () => string | undefined
   grants: readonly DirectoryGrant[]

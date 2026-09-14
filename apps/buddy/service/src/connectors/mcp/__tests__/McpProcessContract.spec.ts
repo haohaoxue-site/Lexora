@@ -93,7 +93,7 @@ describe('mCP real stdio process contract', () => {
     const { pid } = await readRuntime(session)
     const pending = session.callTool('hold', {}).catch(error => error)
     await session.close()
-    expect(await pending).toMatchObject({ code: 'MCP_TOOL_FAILED' })
+    expect(await pending).toMatchObject({ code: 'MCP_SERVER_UNAVAILABLE' })
     expect(isProcessAlive(pid)).toBe(false)
     await expect(session.connect()).rejects.toMatchObject({ code: 'MCP_SERVER_UNAVAILABLE' })
   })

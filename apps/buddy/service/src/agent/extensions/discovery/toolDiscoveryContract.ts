@@ -8,7 +8,7 @@ export interface BuddyToolDisclosurePolicy {
   group: 'browser' | 'automation' | 'system' | 'image_generation' | 'image_transform' | 'mcp'
   keywords: string
   toolNames: readonly string[]
-  available?: (model: Model<Api> | undefined) => boolean
+  available?: (model: Model<Api> | undefined, toolName: string) => boolean
 }
 
 export const toolSearchParameters = Type.Object({

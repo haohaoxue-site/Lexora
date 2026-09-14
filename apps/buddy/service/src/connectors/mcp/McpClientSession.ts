@@ -1,63 +1,49 @@
+import type { CallToolResult, OAuthClientProvider, Progress, Tool } from '@modelcontextprotocol/client'
 import type { ConnectorCredential } from '../../../../shared/connectors/connectorCredentials'
+import type { ConnectorErrorCode, ConnectorRuntimeState } from '../../../../shared/connectors/connectorState'
 import type { McpServerConfig } from './mcpSchemas'
-import { Client } from '@modelcontextprotocol/sdk/client/index.js'
+import { Client } from '@modelcontextprotocol/client'
+import { version } from '../../../../package.json'
 import { createMcpTransport } from './createMcpTransport'
+import { McpClientError, mcpErrorCode } from './mcpErrors'
+import { waitForMcpOperation } from './waitForMcpOperation'
 
-const MAX_TOOL_PAGES = 20
-
-export interface McpRemoteTool {
-  annotations?: {
-    destructiveHint?: boolean
-    openWorldHint?: boolean
-    readOnlyHint?: boolean
-  }
-  description?: string
-  inputSchema: Record<string, unknown> & { type: 'object' }
-  name: string
-}
+export { McpClientError } from './mcpErrors'
+export type McpClientErrorCode = ConnectorErrorCode
+export type McpRemoteTool = Tool
 
 export interface McpClientSessionOptions {
   config: McpServerConfig
   credential: ConnectorCredential | null
+  authProvider?: OAuthClientProvider
   maxReconnectAttempts?: number
-  onUnavailable?: (code: McpClientErrorCode) => void
+  onUnavailable?: (code: ConnectorErrorCode) => void
+  onToolsChanged?: () => void
+  onAuthorization?: (kind: ConnectorRuntimeState['authorization']) => void
 }
 
-export type McpClientErrorCode
-  = 'MCP_RECONNECT_LIMIT_REACHED'
-    | 'MCP_SERVER_DISCONNECTED'
-    | 'MCP_SERVER_UNAVAILABLE'
-    | 'MCP_TOOL_FAILED'
-
 export class McpClientSession {
-  readonly #config: McpServerConfig
-  readonly #credential: ConnectorCredential | null
-  readonly #maxReconnectAttempts: number
-  readonly #onUnavailable?: (code: McpClientErrorCode) => void
+  readonly #options: McpClientSessionOptions
+  readonly #lifetime = new AbortController()
   #client: Client | null = null
-  #closing = false
   #closePromise: Promise<void> | null = null
   #connectPromise: Promise<void> | null = null
   #consecutiveFailures = 0
   #connected = false
 
   constructor(options: McpClientSessionOptions) {
-    this.#config = options.config
-    this.#credential = options.credential
-    this.#maxReconnectAttempts = options.maxReconnectAttempts ?? 3
-    this.#onUnavailable = options.onUnavailable
+    this.#options = options
   }
 
   async connect(): Promise<void> {
+    if (this.#lifetime.signal.aborted)
+      throw new McpClientError('MCP_SERVER_UNAVAILABLE')
     if (this.#connected)
       return
     if (this.#connectPromise)
       return this.#connectPromise
-    if (this.#closing)
-      throw new McpClientError('MCP_SERVER_UNAVAILABLE')
-    if (this.#consecutiveFailures >= this.#maxReconnectAttempts)
+    if (this.#consecutiveFailures >= (this.#options.maxReconnectAttempts ?? 3))
       throw new McpClientError('MCP_RECONNECT_LIMIT_REACHED')
-
     const operation = this.#connect()
     this.#connectPromise = operation
     try {
@@ -70,27 +56,38 @@ export class McpClientSession {
   }
 
   async #connect(): Promise<void> {
-    const client = new Client({
-      name: 'lexora-buddy',
-      version: '0.1.0',
+    const client = new Client({ name: 'lexora-buddy', version }, {
+      versionNegotiation: { mode: 'auto', probe: { timeoutMs: 1_500, maxRetries: 0 } },
+      listMaxPages: 20,
+      inputRequired: { autoFulfill: false },
+      listChanged: { tools: { autoRefresh: false, onChanged: () => {
+        if (this.#client === client && !this.#lifetime.signal.aborted)
+          this.#options.onToolsChanged?.()
+      } } },
     })
     client.onclose = () => {
       if (this.#client !== client)
         return
       this.#client = null
       this.#connected = false
-      if (!this.#closing)
-        this.#onUnavailable?.('MCP_SERVER_DISCONNECTED')
+      if (!this.#lifetime.signal.aborted)
+        this.#options.onUnavailable?.('MCP_SERVER_DISCONNECTED')
     }
-    client.onerror = () => {
-      if (this.#client === client && !this.#closing)
-        this.#onUnavailable?.('MCP_SERVER_UNAVAILABLE')
+    client.onerror = (error) => {
+      if (this.#client === client && !this.#lifetime.signal.aborted)
+        this.#options.onUnavailable?.(mcpErrorCode(error))
     }
-
     this.#client = client
+    const transport = createMcpTransport(this.#options.config, this.#options.credential, this.#options.authProvider, {
+      signal: this.#lifetime.signal,
+      discovered: kind => this.#options.onAuthorization?.(kind),
+    })
     try {
-      await client.connect(createMcpTransport(this.#config, this.#credential), { timeout: 10_000 })
-      if (this.#closing || this.#client !== client)
+      await client.connect(transport, {
+        timeout: 10_000,
+        signal: this.#lifetime.signal,
+      })
+      if (this.#lifetime.signal.aborted || this.#client !== client)
         throw new McpClientError('MCP_SERVER_UNAVAILABLE')
       this.#connected = true
       this.#consecutiveFailures = 0
@@ -99,59 +96,41 @@ export class McpClientSession {
       this.#consecutiveFailures += 1
       if (this.#client === client)
         this.#client = null
-      await client.close().catch(() => {})
-      throw new McpClientError(
-        this.#consecutiveFailures >= this.#maxReconnectAttempts
-          ? 'MCP_RECONNECT_LIMIT_REACHED'
-          : 'MCP_SERVER_UNAVAILABLE',
-        { cause: error },
-      )
+      await Promise.all([client.close(), transport.close()])
+      throw new McpClientError(mcpErrorCode(error), { cause: error })
     }
   }
 
   async listTools(signal?: AbortSignal): Promise<McpRemoteTool[]> {
-    await this.connect()
-    const client = this.#requireClient()
-    const tools: McpRemoteTool[] = []
-    let cursor: string | undefined
-    const seenCursors = new Set<string>()
-    for (let page = 0; page < MAX_TOOL_PAGES; page += 1) {
-      signal?.throwIfAborted()
-      const result = await client.listTools(cursor ? { cursor } : undefined, {
-        signal,
-        timeout: 15_000,
-      })
-      tools.push(...result.tools.map(tool => ({
-        annotations: tool.annotations,
-        description: tool.description,
-        inputSchema: tool.inputSchema,
-        name: tool.name,
-      })))
-      if (!result.nextCursor)
-        return tools
-      if (seenCursors.has(result.nextCursor))
-        throw new McpClientError('MCP_SERVER_UNAVAILABLE')
-      seenCursors.add(result.nextCursor)
-      cursor = result.nextCursor
-    }
-    throw new McpClientError('MCP_SERVER_UNAVAILABLE')
+    const deadline = AbortSignal.any([this.#signal(signal), AbortSignal.timeout(30_000)])
+    await this.#waitForConnection(deadline)
+    const result = await this.#requireClient().listTools(undefined, {
+      signal: deadline,
+      timeout: 15_000,
+      maxTotalTimeout: 30_000,
+      cacheMode: 'refresh',
+    })
+    return result.tools
   }
 
-  async callTool(name: string, arguments_: unknown, signal?: AbortSignal): Promise<unknown> {
-    await this.connect()
+  async callTool(name: string, arguments_: unknown, signal?: AbortSignal, onProgress?: (progress: Progress) => void): Promise<CallToolResult> {
+    await this.#waitForConnection(signal)
     try {
       return await this.#requireClient().callTool({
-        arguments: isRecord(arguments_) ? arguments_ : {},
         name,
-      }, undefined, {
-        signal,
+        arguments: isRecord(arguments_) ? arguments_ : {},
+      }, {
+        signal: this.#signal(signal),
         timeout: 60_000,
+        maxTotalTimeout: 300_000,
+        resetTimeoutOnProgress: true,
+        onprogress: onProgress,
       })
     }
     catch (error) {
       if (signal?.aborted)
         throw error
-      throw new McpClientError('MCP_TOOL_FAILED', { cause: error })
+      throw new McpClientError(mcpErrorCode(error, 'MCP_TOOL_FAILED'), { cause: error })
     }
   }
 
@@ -160,28 +139,27 @@ export class McpClientSession {
   }
 
   async #close(): Promise<void> {
-    this.#closing = true
+    this.#lifetime.abort()
     this.#connected = false
     const client = this.#client
     this.#client = null
-    await client?.close().catch(() => {})
+    await client?.close()
     await this.#connectPromise?.catch(() => {})
   }
 
+  async #waitForConnection(signal?: AbortSignal) {
+    signal?.throwIfAborted()
+    await waitForMcpOperation(this.connect(), signal)
+  }
+
+  #signal(signal?: AbortSignal) {
+    return signal ? AbortSignal.any([signal, this.#lifetime.signal]) : this.#lifetime.signal
+  }
+
   #requireClient(): Client {
-    if (!this.#client || !this.#connected)
+    if (!this.#client || !this.#connected || this.#lifetime.signal.aborted)
       throw new McpClientError('MCP_SERVER_UNAVAILABLE')
     return this.#client
-  }
-}
-
-export class McpClientError extends Error {
-  readonly code: McpClientErrorCode
-
-  constructor(code: McpClientErrorCode, options?: ErrorOptions) {
-    super('Lexora Buddy connector is unavailable', options)
-    this.name = 'McpClientError'
-    this.code = code
   }
 }
 

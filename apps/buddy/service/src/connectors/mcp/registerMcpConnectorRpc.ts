@@ -1,3 +1,4 @@
+import type { ConnectorRuntimeState } from '../../../../shared/connectors/connectorState'
 import type { RuntimeRequestRegistrar } from '../../rpc/runtimeRequest'
 import type { McpServerRecord } from '../../storage/connectorRepository'
 import type { McpConnectorService } from './McpConnectorService'
@@ -11,21 +12,21 @@ export function registerMcpConnectorRpc(
   const disposers: Array<() => void> = []
 
   disposers.push(registerRuntimeRequest(rpc, connectorsRpc.list, () => {
-    return service.list().map(toPublicConnector)
+    return service.list().map(record => toPublicConnector(record, service.state(record.id)))
   }))
   disposers.push(registerRuntimeRequest(rpc, connectorsRpc.upsert, async (input) => {
     await service.save({
       config: { ...input.config, credentialRef: null },
       credential: input.credential,
     })
-    return service.list().map(toPublicConnector)
+    return service.list().map(record => toPublicConnector(record, service.state(record.id)))
   }))
   disposers.push(registerRuntimeRequest(rpc, connectorsRpc.remove, async (input) => {
     await service.remove(input.connectorId)
     return ok()
   }))
   disposers.push(registerRuntimeRequest(rpc, connectorsRpc.trust, async (input) => {
-    await service.trust(input.connectorId)
+    await service.trust(input.connectorId, input.trusted)
     return ok()
   }))
   disposers.push(registerRuntimeRequest(rpc, connectorsRpc.saveCredential, async (input) => {
@@ -37,11 +38,27 @@ export function registerMcpConnectorRpc(
     return ok()
   }))
 
+  disposers.push(registerRuntimeRequest(rpc, connectorsRpc.setEnabled, async (input) => {
+    await service.setEnabled(input.connectorId, input.enabled)
+    return ok()
+  }))
+  disposers.push(registerRuntimeRequest(rpc, connectorsRpc.test, input => service.test(input.connectorId)))
+  disposers.push(registerRuntimeRequest(rpc, connectorsRpc.tools, input => service.tools(input.connectorId)))
+  disposers.push(registerRuntimeRequest(rpc, connectorsRpc.login, (input) => {
+    service.login(input.connectorId)
+    return ok()
+  }))
+  disposers.push(registerRuntimeRequest(rpc, connectorsRpc.cancelLogin, (input) => {
+    service.cancelLogin(input.connectorId)
+    return ok()
+  }))
+
   return () => disposers.splice(0).forEach(dispose => dispose())
 }
 
-function toPublicConnector(record: McpServerRecord) {
+function toPublicConnector(record: McpServerRecord, runtime: ConnectorRuntimeState) {
   const common = {
+    runtime,
     credentialConfigured: record.credentialRef !== null,
     enabled: record.enabled,
     id: record.id,

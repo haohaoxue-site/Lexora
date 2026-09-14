@@ -2,8 +2,10 @@ import type { RuntimeRequestContract } from '../runtime/apiContract'
 
 import type { DeepReadonly } from '../runtime/apiValidation'
 import { z } from 'zod'
+import { isSecureOrLoopbackHttpUrl } from '../network/networkSecurity'
 import { idSchema, isAbsolutePath, validationRequestSchemas, validationResponseSchemas } from '../runtime/apiValidation'
-import { connectorCredentialSchema as runtimeConnectorCredentialSchema } from './connectorCredentials'
+import { editableConnectorCredentialSchema } from './connectorCredentials'
+import { connectorRuntimeStateSchema, connectorToolSummarySchema } from './connectorState'
 
 export const connectorBaseSchema = z.object({
   credentialConfigured: z.boolean(),
@@ -11,6 +13,7 @@ export const connectorBaseSchema = z.object({
   id: z.string().trim().regex(/^[a-z0-9][a-z0-9_-]{0,63}$/),
   name: z.string().trim().min(1).max(128),
   trusted: z.boolean(),
+  runtime: connectorRuntimeStateSchema,
 })
 
 export const connectorSchema = z.discriminatedUnion('transport', [
@@ -22,7 +25,7 @@ export const connectorSchema = z.discriminatedUnion('transport', [
   }).strict(),
   connectorBaseSchema.extend({
     transport: z.literal('streamable-http'),
-    url: z.url(),
+    url: z.url().refine(isSecureOrLoopbackHttpUrl),
   }).strict(),
 ])
 
@@ -41,21 +44,11 @@ export const connectorConfigSchema = z.discriminatedUnion('transport', [
     id: z.string().trim().regex(/^[a-z0-9][a-z0-9_-]{0,63}$/),
     name: z.string().trim().min(1).max(128),
     transport: z.literal('streamable-http'),
-    url: z.url(),
+    url: z.url().refine(isSecureOrLoopbackHttpUrl),
   }).strict(),
 ])
 
-export const connectorCredentialSchema = z.discriminatedUnion('type', [
-  z.object({
-    env: z.record(z.string().regex(/^[A-Z_]\w*$/i), z.string().max(16 * 1024)),
-    type: z.literal('stdio'),
-  }).strict(),
-  z.object({
-    bearerToken: z.string().min(1).max(64 * 1024).optional(),
-    headers: z.record(z.string().min(1), z.string().max(16 * 1024)).optional(),
-    type: z.literal('http'),
-  }).strict(),
-])
+export const connectorCredentialSchema = editableConnectorCredentialSchema
 
 export const connectorCredentialMutationSchema = z.discriminatedUnion('mode', [
   z.object({ mode: z.literal('keep') }).strict(),
@@ -77,6 +70,8 @@ export const connectorsRequestSchemas = {
     credential: connectorCredentialSchema,
   }).strict(),
   connectorId: z.object({ connectorId: idSchema }).strict(),
+  connectorEnabled: z.object({ connectorId: idSchema, enabled: z.boolean() }).strict(),
+  connectorTrusted: z.object({ connectorId: idSchema, trusted: z.boolean().default(true) }).strict(),
   connectorUpsert: z.object({
     config: connectorConfigSchema,
     credential: connectorCredentialMutationSchema,
@@ -85,15 +80,19 @@ export const connectorsRequestSchemas = {
 
 export const connectorsResponseSchemas = {
   connectors: z.array(connectorSchema),
+  tools: z.array(connectorToolSummarySchema),
 } as const
-
-const runtimeConnectorCredentialMutationSchema = z.discriminatedUnion('mode', [z.object({ mode: z.literal('keep') }).strict(), z.object({ mode: z.literal('clear') }).strict(), z.object({ mode: z.literal('replace'), value: runtimeConnectorCredentialSchema }).strict()])
 
 export const connectorsRpc = {
   list: { method: 'connectors.list', input: validationRequestSchemas.empty, response: connectorsResponseSchemas.connectors },
-  upsert: { method: 'connectors.upsert', input: z.object({ config: z.discriminatedUnion('transport', [connectorConfigSchema.options[0].extend({ cwd: z.string().nullable() }).strict(), connectorConfigSchema.options[1]]), credential: runtimeConnectorCredentialMutationSchema }).strict(), response: connectorsResponseSchemas.connectors },
+  upsert: { method: 'connectors.upsert', input: connectorsRequestSchemas.connectorUpsert, response: connectorsResponseSchemas.connectors },
+  setEnabled: { method: 'connectors.setEnabled', input: connectorsRequestSchemas.connectorEnabled, response: validationResponseSchemas.mutation },
+  test: { method: 'connectors.test', input: connectorsRequestSchemas.connectorId, response: connectorRuntimeStateSchema },
+  tools: { method: 'connectors.tools', input: connectorsRequestSchemas.connectorId, response: connectorsResponseSchemas.tools },
+  login: { method: 'connectors.login', input: connectorsRequestSchemas.connectorId, response: validationResponseSchemas.mutation },
+  cancelLogin: { method: 'connectors.cancelLogin', input: connectorsRequestSchemas.connectorId, response: validationResponseSchemas.mutation },
   remove: { method: 'connectors.remove', input: connectorsRequestSchemas.connectorId, response: validationResponseSchemas.mutation },
-  trust: { method: 'connectors.trust', input: connectorsRequestSchemas.connectorId, response: validationResponseSchemas.mutation },
-  saveCredential: { method: 'connectors.saveCredential', input: z.object({ connectorId: idSchema, credential: runtimeConnectorCredentialSchema }).strict(), response: validationResponseSchemas.mutation },
+  trust: { method: 'connectors.trust', input: connectorsRequestSchemas.connectorTrusted, response: validationResponseSchemas.mutation },
+  saveCredential: { method: 'connectors.saveCredential', input: connectorsRequestSchemas.connectorCredential, response: validationResponseSchemas.mutation },
   clearCredential: { method: 'connectors.clearCredential', input: connectorsRequestSchemas.connectorId, response: validationResponseSchemas.mutation },
 } as const satisfies Record<string, RuntimeRequestContract>

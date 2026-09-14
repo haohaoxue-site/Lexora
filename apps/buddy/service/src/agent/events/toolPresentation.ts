@@ -6,7 +6,7 @@ import { redactSensitiveText, redactShellCommand } from '../../../../shared/perm
 import { createOutputPresentRunOutput } from '../../artifacts/artifactToolContract'
 import { createAutomationToolPresentation } from '../../automations/automationToolContract'
 import { createBrowserToolPresentation } from '../../browser/browserToolPresentation'
-import { createMcpToolPresentation } from '../../connectors/mcp/mcpToolContract'
+import { createMcpRunOutput, createMcpToolPresentation } from '../../connectors/mcp/mcpToolContract'
 import {
   argumentNames,
   boundedToolPreview,
@@ -38,6 +38,7 @@ export function createBuddyRunOutputs(
   const output = createImageGenerationRunOutput(input)
     ?? createImageTransformRunOutput(input)
     ?? createOutputPresentRunOutput(input)
+    ?? createMcpRunOutput(input)
   return output ? [output] : []
 }
 

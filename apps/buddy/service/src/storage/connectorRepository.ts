@@ -18,6 +18,9 @@ export interface McpServerRecord {
 }
 
 export interface ConnectorRepository {
+  readCatalog: (id: string) => { toolsJson: string, updatedAt: string } | null
+  saveCatalog: (id: string, toolsJson: string, updatedAt: string) => void
+  clearCatalog: (id: string) => void
   findById: (id: string) => McpServerRecord | null
   list: () => McpServerRecord[]
   remove: (id: string) => boolean
@@ -41,6 +44,12 @@ interface McpServerRow {
 }
 
 export function createConnectorRepository(database: DatabaseSync): ConnectorRepository {
+  const readCatalog = database.prepare('SELECT tools_json, updated_at FROM connector_tool_catalogs WHERE connector_id = ?')
+  const saveCatalog = database.prepare(`
+    INSERT INTO connector_tool_catalogs (connector_id, tools_json, updated_at) VALUES (?, ?, ?)
+    ON CONFLICT (connector_id) DO UPDATE SET tools_json = excluded.tools_json, updated_at = excluded.updated_at
+  `)
+  const clearCatalog = database.prepare('DELETE FROM connector_tool_catalogs WHERE connector_id = ?')
   const find = database.prepare('SELECT * FROM mcp_servers WHERE id = ?')
   const list = database.prepare('SELECT * FROM mcp_servers ORDER BY name, id')
   const remove = database.prepare('DELETE FROM mcp_servers WHERE id = ?')
@@ -66,6 +75,16 @@ export function createConnectorRepository(database: DatabaseSync): ConnectorRepo
   `)
 
   return {
+    readCatalog(id) {
+      const row = readCatalog.get(id) as { tools_json: string, updated_at: string } | undefined
+      return row ? { toolsJson: row.tools_json, updatedAt: row.updated_at } : null
+    },
+    saveCatalog(id, toolsJson, updatedAt) {
+      saveCatalog.run(id, toolsJson, updatedAt)
+    },
+    clearCatalog(id) {
+      clearCatalog.run(id)
+    },
     findById(id) {
       const row = find.get(id) as McpServerRow | undefined
       return row ? toMcpServer(row) : null

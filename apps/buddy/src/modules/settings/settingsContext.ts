@@ -3,6 +3,7 @@ import type { BuddyCapabilities } from '@buddy-shared/platform'
 import type { Ref } from 'vue'
 import type { ApplicationSettings } from './contracts'
 import type { DesktopDataSettingsCapability } from './state/desktopDataSettingsCapability'
+import type { McpSettingsCapability } from './state/useMcpSettingsCapability'
 import type { WebSettingsCapability } from './state/useWebSettingsCapability'
 import type { ModelProvidersStore } from '@/modules/models'
 import { createInjectionContext } from '@/shared/composables/createInjectionContext'
@@ -17,6 +18,7 @@ export interface SettingsContext {
   ready: Promise<void>
   openTask: (conversationId: string) => Promise<void>
   webSettings: WebSettingsCapability
+  mcpSettings: McpSettingsCapability
 }
 
 export const { key: settingsContextKey, useContext: useSettingsContext }

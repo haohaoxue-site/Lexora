@@ -2,6 +2,7 @@ import type { LocalArtifactText } from '../../shared/artifacts/artifactApi'
 import type { LocalAutomation, LocalAutomationCreateRequest, LocalAutomationListRequest, LocalAutomationMutationRequest, LocalAutomationOccurrenceListRequest, LocalAutomationOccurrencePage, LocalAutomationPage, LocalAutomationPreviewRequest, LocalAutomationPreviewResult, LocalAutomationRunNowResult, LocalAutomationUpdateRequest } from '../../shared/automation/automationApi'
 import type { ChangeOverviewRequest, LocalChangeOverview, LocalChangeSetDetail } from '../../shared/changes/changeApi'
 import type { LocalConnector, LocalConnectorConfig, LocalConnectorCredential, LocalConnectorCredentialMutation } from '../../shared/connectors/connectorApi'
+import type { ConnectorRuntimeState, ConnectorToolSummary } from '../../shared/connectors/connectorState'
 import type { LocalChatCommandRequest, LocalStartTurnRequest, LocalTurnStart } from '../../shared/conversation/chatApi'
 import type { LocalChatQueueItem, LocalChatQueueReceipt, LocalChatQueueScope, LocalChatQueueTarget } from '../../shared/conversation/chatQueueApi'
 import type { LocalComposerDraft, LocalComposerDraftOpen, LocalComposerDraftSave } from '../../shared/conversation/composerApi'
@@ -97,6 +98,11 @@ export const LOCAL_CHAT_IPC_CHANNELS = {
   changesGet: 'lexora:buddy:changes:get',
   contextUsageSnapshot: 'lexora:buddy:context:usage-snapshot',
   connectorsClearCredential: 'lexora:buddy:connectors:clear-credential',
+  connectorsSetEnabled: 'lexora:buddy:connectors:set-enabled',
+  connectorsTest: 'lexora:buddy:connectors:test',
+  connectorsTools: 'lexora:buddy:connectors:tools',
+  connectorsLogin: 'lexora:buddy:connectors:login',
+  connectorsCancelLogin: 'lexora:buddy:connectors:cancel-login',
   connectorsList: 'lexora:buddy:connectors:list',
   connectorsRemove: 'lexora:buddy:connectors:remove',
   connectorsSetCredential: 'lexora:buddy:connectors:set-credential',
@@ -312,13 +318,18 @@ export interface LocalChatApi {
     onChanged: (listener: (spaceId: string | null) => void) => () => void
   }
   connectors: {
+    setEnabled: (connectorId: string, enabled: boolean) => Promise<LocalMutationResult>
+    test: (connectorId: string) => Promise<ConnectorRuntimeState>
+    tools: (connectorId: string) => Promise<ReadonlyArray<ConnectorToolSummary>>
+    login: (connectorId: string) => Promise<LocalMutationResult>
+    cancelLogin: (connectorId: string) => Promise<LocalMutationResult>
     list: () => Promise<ReadonlyArray<LocalConnector>>
     upsert: (input: {
       config: LocalConnectorConfig
       credential: LocalConnectorCredentialMutation
     }) => Promise<ReadonlyArray<LocalConnector>>
     remove: (connectorId: string) => Promise<LocalMutationResult>
-    trust: (connectorId: string) => Promise<LocalMutationResult>
+    trust: (connectorId: string, trusted?: boolean) => Promise<LocalMutationResult>
     setCredential: (
       connectorId: string,
       credential: LocalConnectorCredential,

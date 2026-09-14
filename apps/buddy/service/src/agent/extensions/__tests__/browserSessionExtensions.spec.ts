@@ -147,8 +147,8 @@ function createCompositionServices(
     createCapabilities: createBuddyCapabilityFactory(resolveBuddyPlatform('linux'), {
       browserHost,
       connectorService: {
-        async getTools() {
-          return { classifications: new Map(), diagnostics: [], tools: [] }
+        getTools() {
+          return { classifications: new Map(), diagnostics: [], tools: [], available: () => false }
         },
       },
     } as unknown as BuddyCapabilityServices, {

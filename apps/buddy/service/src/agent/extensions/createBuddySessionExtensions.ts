@@ -21,6 +21,7 @@ import { createInputReferenceExtension } from './inputReferenceExtension'
 import { createToolPolicyExtension } from './toolPolicyExtension'
 
 export interface BuddySessionExtensionServices {
+  prepareForRun?: (signal: AbortSignal) => Promise<void>
   approvalService: Pick<ApprovalService, 'request'>
   attachmentService: Pick<AttachmentService, 'materializePiInputImages' | 'materializeDocumentInputs' | 'materializeInputResources' | 'getInputMetadata'>
   changeCaptureService: Pick<ChangeCaptureService, 'beginFileTool' | 'beginWorkspaceTool' | 'finalizeRun' | 'finishFileTool' | 'finishWorkspaceTool' | 'markPartial'>
@@ -59,6 +60,7 @@ export async function createBuddySessionExtensions(
   const inputReferences: BuddyInputReferenceStore = { pending: null }
   const capabilities = [...await services.createCapabilities({
     conversationId: options.conversationId,
+    executionProfile: options.executionProfile,
     cwd: options.canonicalRoot,
     getRunId: () => runContext.current?.runId,
     grants,
