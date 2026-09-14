@@ -82,7 +82,7 @@ const lightTheme: BuddyColorTheme = {
   surface: {
     canvas: '#fafaf8',
     raised: '#ffffff',
-    muted: 'rgb(32 37 34 / 4%)',
+    muted: 'rgba(32, 37, 34, 0.04)',
     userMessage: '#edf4ff',
   },
   state: {
@@ -91,7 +91,7 @@ const lightTheme: BuddyColorTheme = {
     selected: 'rgb(32 37 34 / 8%)',
   },
   border: {
-    subtle: 'rgb(32 37 34 / 10%)',
+    subtle: 'rgba(32, 37, 34, 0.1)',
     strong: 'rgb(32 37 34 / 18%)',
   },
   text: {
@@ -197,7 +197,7 @@ const darkTheme: BuddyColorTheme = {
   surface: {
     canvas: '#202422',
     raised: '#2a2f2b',
-    muted: 'rgb(255 255 255 / 5%)',
+    muted: 'rgba(255, 255, 255, 0.05)',
     userMessage: '#29384a',
   },
   state: {
@@ -206,7 +206,7 @@ const darkTheme: BuddyColorTheme = {
     selected: 'rgb(255 255 255 / 10%)',
   },
   border: {
-    subtle: 'rgb(255 255 255 / 11%)',
+    subtle: 'rgba(255, 255, 255, 0.11)',
     strong: 'rgb(255 255 255 / 20%)',
   },
   text: {

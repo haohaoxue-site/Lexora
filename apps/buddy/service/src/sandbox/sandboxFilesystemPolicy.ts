@@ -45,7 +45,8 @@ export async function existingSandboxPaths(paths: readonly string[]): Promise<st
 export async function createSandboxFilesystemPolicy(input: SandboxProcessInput, rg: string, signal: AbortSignal): Promise<SandboxFilesystemGrant[]> {
   signal.throwIfAborted()
   await Promise.all(input.additionalDirectories.map(validateSandboxDirectory))
-  const roots = [...new Set([...input.roots, ...input.additionalDirectories.map(grant => grant.path)])]
+  const resources = (input.resourceReadRoots ?? []).filter(root => !input.roots.some(parent => containsCanonicalPath(parent, root)))
+  const roots = [...new Set([...input.roots, ...input.additionalDirectories.map(grant => grant.path), ...resources])]
   const workspaces = input.workspaceRoots.filter(root => input.roots.includes(root))
   const sensitiveOptions = { home: input.home, environment: input.backend.kind === 'windows-lpac' ? { SystemRoot: input.backend.systemRoot } : {} }
   const sensitiveRoots = resolveSensitivePathRoots(sensitiveOptions)
@@ -55,7 +56,7 @@ export async function createSandboxFilesystemPolicy(input: SandboxProcessInput, 
     signal.throwIfAborted()
     if (/[*?[\]{}\n\r]/.test(root) || !(await stat(root)).isDirectory()
       || sensitiveRoots.some(path => containsCanonicalPath(path, root))
-      || input.protectedRoots.some(path => containsCanonicalPath(path, root) && !workspaces.some(workspace => containsCanonicalPath(workspace, root)))) {
+      || input.protectedRoots.some(path => containsCanonicalPath(path, root) && !workspaces.some(workspace => containsCanonicalPath(workspace, root)) && !resources.includes(root))) {
       throw new ShellSandboxError('SANDBOX_UNAVAILABLE')
     }
     const writable = !input.readOnly && (input.roots.includes(root) || input.additionalDirectories.some(grant => grant.path === root && grant.access === 'write'))
@@ -79,7 +80,7 @@ export async function createSandboxFilesystemPolicy(input: SandboxProcessInput, 
     grants.push(await inspectSandboxPath(path, 'denyRead'))
   for (const path of await existingSandboxPaths(input.protectedRoots)) {
     const grant = await inspectSandboxPath(path, 'denyRead')
-    grant.exceptions = workspaces.filter(root => containsCanonicalPath(path, root))
+    grant.exceptions = [...workspaces, ...resources].filter(root => containsCanonicalPath(path, root))
     grants.push(grant)
   }
   for (const path of await existingSandboxPaths(roots.map(root => join(root, '.git'))))

@@ -182,6 +182,7 @@ export const ChatComposerPromptDirective = Node.create({
     return {
       commandMode: { default: null, rendered: false },
       directive: { default: 'skill', rendered: false },
+      skill: { default: null, rendered: false },
       value: { default: '', rendered: false },
     }
   },

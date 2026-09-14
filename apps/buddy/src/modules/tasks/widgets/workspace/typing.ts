@@ -21,6 +21,7 @@ export interface ChatWorkspaceEmits {
 }
 
 export interface TaskComposerHostProps {
+  skillScopeId?: string | null
   composer: TaskComposer
   focusReady: boolean
   execution: Pick<TaskExecution, 'activeRun' | 'canSend' | 'editingMessageId' | 'isMutatingBranch' | 'isSending' | 'cancelActiveRun' | 'send' | 'submitEditedMessage' | 'queuedMessages' | 'pendingQueueActions' | 'cancelQueuedMessage' | 'steerQueuedMessage'>

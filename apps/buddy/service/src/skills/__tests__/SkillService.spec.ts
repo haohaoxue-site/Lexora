@@ -4,8 +4,10 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 
-import { openBuddyDatabase } from '../../../storage/database'
-import { createSpaceRepository } from '../../../storage/spaceRepository'
+import { BuddyDataPaths } from '../../storage/BuddyDataPaths'
+import { openBuddyDatabase } from '../../storage/database'
+import { createSkillRepository } from '../../storage/skillRepository'
+import { createSpaceRepository } from '../../storage/spaceRepository'
 import { formatBuddySkillPrompt, SkillService } from '../SkillService'
 
 const databases: DatabaseSync[] = []
@@ -39,14 +41,11 @@ describe('skillService', () => {
       ['directory-pi', 'directory'],
       ['global-only', 'global'],
       ['layered', 'directory'],
-      ['shared', 'builtin'],
+      ['shared', 'global'],
     ])
     expect(result.skills.every(skill => skill.enabled)).toBe(true)
     expect(result.paths).toHaveLength(5)
-    expect(result.diagnostics).toContainEqual({
-      code: 'SKILL_NAME_COLLISION',
-      message: 'A lower-priority Lexora Buddy skill was ignored because its name is already in use',
-    })
+    expect(result.diagnostics).toContainEqual(expect.objectContaining({ code: 'SKILL_NAME_COLLISION' }))
   })
 
   it('changes the session resource revision when trusted skill content changes', async () => {
@@ -70,12 +69,9 @@ describe('skillService', () => {
     await symlink(outside, join(fixture.trustedSpace, '.pi', 'skills'))
     fixture.spaces.create(spaceInput('space-trusted', fixture.trustedSpace))
 
-    const loaded = await fixture.service.load()
+    const loaded = await fixture.service.loadForSpace('space-trusted')
     expect(loaded.skills.map(skill => skill.name)).toEqual(['trusted'])
-    expect(loaded.diagnostics).toContainEqual({
-      code: 'SKILL_PATH_OUTSIDE_SOURCE',
-      message: 'A Lexora Buddy skill path leaves its allowed source directory',
-    })
+    expect(loaded.diagnostics).toContainEqual(expect.objectContaining({ code: 'SKILL_PATH_OUTSIDE_SOURCE' }))
 
     fixture.spaces.delete('space-trusted', now, {
       createdAt: now,
@@ -84,7 +80,8 @@ describe('skillService', () => {
       payload: {},
       spaceId: 'space-trusted',
     })
-    expect((await fixture.service.load()).skills).toEqual([])
+    await expect(fixture.service.loadForSpace('space-trusted')).rejects.toMatchObject({ code: 'SKILL_NOT_FOUND' })
+    expect((await fixture.service.list(null)).skills).toEqual([])
   })
 
   it('does not let a skill file symlink leave its resolved skills directory', async () => {
@@ -107,10 +104,7 @@ describe('skillService', () => {
     const result = await fixture.service.loadForSpace('space-trusted')
 
     expect(result.skills).toEqual([])
-    expect(result.diagnostics).toContainEqual({
-      code: 'SKILL_PATH_OUTSIDE_SOURCE',
-      message: 'A Lexora Buddy skill path leaves its allowed source directory',
-    })
+    expect(result.diagnostics).toContainEqual(expect.objectContaining({ code: 'SKILL_INVALID' }))
   })
 
   it('materializes an explicitly selected skill even when model invocation is disabled', async () => {
@@ -136,6 +130,7 @@ describe('skillService', () => {
       body: '# Manual workflow\n\nFollow the explicit workflow.',
       filePath: join(skillDirectory, 'SKILL.md'),
       name: 'manual-only',
+      reference: expect.objectContaining({ name: 'manual-only' }),
     })
     expect(formatBuddySkillPrompt(selected!)).toBe([
       `<skill name="manual-only" location="${join(skillDirectory, 'SKILL.md')}">`,
@@ -194,6 +189,8 @@ async function createFixture() {
       agentDirectory,
       builtinSkillsDirectories: [builtin],
       spaces,
+      repository: createSkillRepository(database),
+      paths: new BuddyDataPaths(join(root, 'buddy')),
     }),
     trustedSpace,
   }

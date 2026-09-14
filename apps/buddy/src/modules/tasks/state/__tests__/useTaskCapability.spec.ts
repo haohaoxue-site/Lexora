@@ -817,7 +817,6 @@ function createTaskCapability(
   return useTaskCapability({
     api,
     applicationSettings: appState.stores.applicationSettings,
-    localCapabilities: appState.stores.localCapabilities,
     modelProviders: appState.stores.modelProviders,
     runtimeSupervisor: appState.stores.runtimeSupervisor,
   })

@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { SessionManager } from '@earendil-works/pi-coding-agent'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { createBuddyInputReference } from '../../context/BuddyInputReference'
 
 import {
   canPreparePiCompaction,
@@ -17,6 +18,35 @@ afterEach(async () => {
 })
 
 describe('createReusableBuddySession', () => {
+  it('accepts steering only against the active skill snapshot before committing the input', () => {
+    const session = createAgentSessionDouble(SessionManager.inMemory(), async () => {})
+    Object.defineProperty(session, 'isStreaming', { value: true })
+    const messages: unknown[] = []
+    session.agent.steer = (message) => {
+      messages.push(message)
+    }
+    const reference = { id: 'skill-writer', name: 'writer', revision: 'one' }
+    const reusable = createReusableBuddySession({
+      assertModelAccess: async () => ({}) as never,
+      ...inputReferenceBoundary(),
+      skillReferences: [reference],
+      session,
+      runContext: { current: null },
+      shutdown: async () => {},
+    })
+    let committed = 0
+    const prepare = () => {
+      committed += 1
+      return createBuddyInputReference({ messageId: 'input-one', prompt: 'Use the selected workflow', images: [] })
+    }
+    expect(() => reusable.steer?.(prepare, [{ ...reference, revision: 'two' }])).toThrow('SKILL_CHANGED')
+    expect(committed).toBe(0)
+    expect(messages).toEqual([])
+    expect(reusable.steer?.(prepare, [reference])).toBe(true)
+    expect(committed).toBe(1)
+    expect(messages).toHaveLength(1)
+  })
+
   it('matches Pi compaction eligibility for small and already compacted branches', () => {
     const first = messageEntry('message-1', null, 'first '.repeat(100))
     const second = messageEntry('message-2', first.id, 'second '.repeat(100))

@@ -93,6 +93,7 @@ export class BuddySessionFactory {
       conversationId: blueprint.conversationId,
       executionProfile: blueprint.executionProfile,
       grants: blueprint.grants,
+      skillReadRoots: blueprint.resources.skillReadRoots,
       sessionMode: blueprint.sessionMode,
       signal: input.signal,
       spaceId: blueprint.space?.id ?? null,
@@ -123,6 +124,7 @@ export class BuddySessionFactory {
       recoveredFromProductHistory: tree.recoveredFromProductHistory,
       recoveryDegradation: tree.recoveryDegradation,
       session: createReusableBuddySession({
+        skillReferences: blueprint.resources.skillReferences,
         tree,
         assertModelAccess: async (provider, model, contextWindow, maxTokens) => {
           return this.#options.models.resolveAvailable({

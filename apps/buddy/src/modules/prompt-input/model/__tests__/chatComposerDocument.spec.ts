@@ -34,7 +34,7 @@ describe('composer product document boundary', () => {
           { type: 'resource_ref', resourceId: 'image-a' },
           { type: 'hard_break' },
           { type: 'resource_ref', resourceId: 'image-a' },
-          { directive: 'skill', type: 'prompt_directive', value: 'review' },
+          { directive: 'skill', type: 'prompt_directive', value: 'review', skill: { id: 'review-id', name: 'review', revision: 'revision-one' } },
           { commandMode: 'prompt', directive: 'slash_command', type: 'prompt_directive', value: '/plan' },
         ],
         type: 'paragraph',

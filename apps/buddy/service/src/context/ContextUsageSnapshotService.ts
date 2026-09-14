@@ -138,6 +138,7 @@ export class ContextUsageSnapshotService implements ContextUsageSnapshotReader {
       conversationId: blueprint.conversationId,
       executionProfile: blueprint.executionProfile,
       grants: blueprint.grants,
+      skillReadRoots: blueprint.resources.skillReadRoots,
       sessionMode: blueprint.sessionMode,
       signal: new AbortController().signal,
       spaceId: blueprint.space?.id ?? null,

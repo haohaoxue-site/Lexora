@@ -2,8 +2,9 @@
 import type { Component } from 'vue'
 import type { ChatToolIcon } from '../../model/transcript/chatToolRegistry'
 import type { DesktopIconName } from '@/shared/ui/icon/desktopIcons'
-import { AnimalCat20Regular, BookOpen20Regular, Box20Regular, CalendarClock20Regular, Camera20Regular, Cursor20Regular, DocumentText20Regular, Folder20Regular, Globe20Regular, Image20Regular, ImageEdit20Regular, PlugConnected20Regular, ShieldKeyhole20Regular, Stack20Regular, Window20Regular, WindowConsole20Regular, Wrench20Regular } from '@vicons/fluent'
+import { AnimalCat20Regular, Box20Regular, CalendarClock20Regular, Camera20Regular, Cursor20Regular, DocumentText20Regular, Folder20Regular, Globe20Regular, Image20Regular, ImageEdit20Regular, PlugConnected20Regular, ShieldKeyhole20Regular, Stack20Regular, Window20Regular, WindowConsole20Regular, Wrench20Regular } from '@vicons/fluent'
 import DesktopIcon from '@/shared/ui/icon/DesktopIcon.vue'
+import SkillIcon from '@/shared/ui/icon/SkillIcon.vue'
 
 defineProps<{ icon: ChatToolIcon }>()
 const icons = {
@@ -24,7 +25,7 @@ const icons = {
   'image-edit': { component: ImageEdit20Regular },
   'pet': { component: AnimalCat20Regular },
   'search': { name: 'toolSearch' },
-  'skill': { component: BookOpen20Regular },
+  'skill': { component: SkillIcon },
   'terminal': { component: WindowConsole20Regular },
   'tool': { component: Wrench20Regular },
 } satisfies Record<ChatToolIcon, { name: DesktopIconName } | { component: Component }>

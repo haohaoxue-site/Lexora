@@ -1,4 +1,6 @@
 Lucide list-end icon (message-queue.svg, stroke width adjusted)
+Lucide folder-tree and folder-closed icons (directory tree toggle, stroke width adjusted)
+Lucide feather icon (SkillIcon.vue, shape and stroke width adjusted)
 https://github.com/lucide-icons/lucide
 
 ISC License

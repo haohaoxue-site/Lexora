@@ -2,7 +2,7 @@ import type { RouteLocationRaw } from 'vue-router'
 
 export type DesktopView = 'automations' | 'settings' | 'tasks'
 export type DesktopAutomationSection = 'history' | 'plans'
-export type DesktopSettingsCategory = 'app' | 'models' | 'pet' | 'web' | 'logs' | 'usage'
+export type DesktopSettingsCategory = 'app' | 'models' | 'skills' | 'pet' | 'web' | 'logs' | 'usage'
 
 export const DESKTOP_ROUTE_NAMES = {
   automations: 'desktop.automations',
@@ -11,6 +11,7 @@ export const DESKTOP_ROUTE_NAMES = {
   automationsHistory: 'desktop.automations.history',
   automationsPlans: 'desktop.automations.plans',
   settingsApp: 'desktop.settings.app',
+  settingsSkills: 'desktop.settings.skills',
   settingsLogs: 'desktop.settings.logs',
   settingsUsage: 'desktop.settings.usage',
   settingsWeb: 'desktop.settings.web',
@@ -27,6 +28,7 @@ const AUTOMATION_ROUTE_NAMES: Record<DesktopAutomationSection, string> = {
 
 const SETTINGS_ROUTE_NAMES: Record<DesktopSettingsCategory, string> = {
   app: DESKTOP_ROUTE_NAMES.settingsApp,
+  skills: DESKTOP_ROUTE_NAMES.settingsSkills,
   logs: DESKTOP_ROUTE_NAMES.settingsLogs,
   usage: DESKTOP_ROUTE_NAMES.settingsUsage,
   web: DESKTOP_ROUTE_NAMES.settingsWeb,
@@ -51,6 +53,10 @@ export const desktopRouteLocations = {
   }),
   settings: (category: DesktopSettingsCategory = 'app'): RouteLocationRaw => ({
     name: SETTINGS_ROUTE_NAMES[category],
+  }),
+  skills: (spaceId: string | null = null): RouteLocationRaw => ({
+    name: DESKTOP_ROUTE_NAMES.settingsSkills,
+    query: spaceId ? { space: spaceId } : {},
   }),
   tasks: (): RouteLocationRaw => ({ name: DESKTOP_ROUTE_NAMES.tasks }),
 }

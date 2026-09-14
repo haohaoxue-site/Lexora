@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import type { TreeOption, TreeOverrideNodeClickBehavior } from 'naive-ui'
-import type { ChangeFileTreeNode } from './changeContextPresentation'
 import type { BuddyLocale } from '@/i18n/buddyI18n'
 import { NTree } from 'naive-ui'
 import { computed, h } from 'vue'
@@ -25,7 +24,7 @@ function prefix({ option }: { option: TreeOption }) {
     : h(FileIcon, { name: String(option.label), class: 'context-tree-icon' })
 }
 function suffix({ option }: { option: TreeOption }) {
-  const node = option as ChangeFileTreeNode
+  const node = option as TreeOption & { changeType?: 'created' | 'modified' | 'deleted' }
   if (!node.changeType)
     return null
   const mark = node.changeType === 'created'

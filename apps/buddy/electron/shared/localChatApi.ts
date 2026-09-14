@@ -20,6 +20,7 @@ import type { LocalConversation, LocalConversationBranch, LocalConversationSumma
 import type { ConversationNodeDetailRequest, LocalConversationTree } from '../../shared/conversation/conversationTree'
 import type { LocalTaskMark, LocalTaskMarkState, TaskMarkClearInput, TaskMarkInput, TaskMarkReadInput } from '../../shared/conversation/taskMarkApi'
 import type { LocalWorkspaceSetting, LocalWorkspaceStateValue } from '../../shared/conversation/workspaceApi'
+import type { DirectoryPage, FilePreview } from '../../shared/files/filePreview'
 import type { WebSettings, WebSettingsSnapshot } from '../../shared/network/webProtocol'
 import type { LocalNotificationList } from '../../shared/notifications/notificationApi'
 import type { LocalApproval } from '../../shared/permissions/approvalApi'
@@ -30,7 +31,7 @@ import type { ModelCatalogReference } from '../../shared/providers/providerCatal
 import type { ProviderRequestHeader } from '../../shared/providers/providerHeaders'
 import type { LocalRun, LocalRunEvent } from '../../shared/runs/runApi'
 import type { LocalBuddyServiceSupervisorState } from '../../shared/runtime/serviceState'
-import type { LocalSkillCatalog } from '../../shared/skills/skillApi'
+import type { LocalSkillCatalog, SkillDetail, SkillDirectoryRequest, SkillFileTarget, SkillInstallPreview, SkillPreviewInput } from '../../shared/skills/skillApi'
 
 import type { LocalSpace, LocalSpaceCreateInput, LocalSpaceFile, LocalSpaceUpdateInput } from '../../shared/spaces/spaceApi'
 import type { LocalSpaceDirectoryPage, LocalSpaceFilePreview, SpaceDirectoryRequest, SpaceFileTarget } from '../../shared/spaces/spaceFileApi'
@@ -158,6 +159,18 @@ export const LOCAL_CHAT_IPC_CHANNELS = {
   runtimeStateChanged: 'lexora:buddy:runtime:state-changed',
   runtimeStatus: 'lexora:buddy:runtime:status',
   skillsList: 'lexora:buddy:skills:list',
+  skillsGet: 'lexora:buddy:skills:get',
+  skillsListFiles: 'lexora:buddy:skills:list-files',
+  skillsReadFile: 'lexora:buddy:skills:read-file',
+  skillsRevealFile: 'lexora:buddy:skills:reveal-file',
+  skillsPreview: 'lexora:buddy:skills:preview',
+  skillsPreviewLocal: 'lexora:buddy:skills:preview-local',
+  skillsInstall: 'lexora:buddy:skills:install',
+  skillsDiscard: 'lexora:buddy:skills:discard',
+  skillsSetEnabled: 'lexora:buddy:skills:set-enabled',
+  skillsRemove: 'lexora:buddy:skills:remove',
+  skillsReveal: 'lexora:buddy:skills:reveal',
+  skillsChanged: 'lexora:buddy:skills:changed',
   usageSnapshot: 'lexora:buddy:usage:snapshot',
   usageAnalytics: 'lexora:buddy:usage:analytics',
   usageTopTasks: 'lexora:buddy:usage:top-tasks',
@@ -285,6 +298,18 @@ export interface LocalChatApi {
   }
   skills: {
     list: (spaceId?: string | null) => Promise<LocalSkillCatalog>
+    get: (input: { spaceId: string | null, id: string }) => Promise<SkillDetail>
+    listFiles: (input: SkillDirectoryRequest) => Promise<DirectoryPage>
+    readFile: (input: SkillFileTarget) => Promise<FilePreview>
+    revealFile: (input: SkillFileTarget) => Promise<void>
+    preview: (input: SkillPreviewInput) => Promise<SkillInstallPreview>
+    previewLocal: (input: { spaceId: string | null, updateId?: string }) => Promise<SkillInstallPreview | null>
+    install: (input: { previewId: string, candidateIds: readonly string[] }) => Promise<LocalSkillCatalog>
+    discard: (previewId: string) => Promise<unknown>
+    setEnabled: (input: { spaceId: string | null, id: string, enabled: boolean, revision: string }) => Promise<LocalSkillCatalog>
+    remove: (input: { spaceId: string | null, id: string, revision: string }) => Promise<LocalSkillCatalog>
+    reveal: (input: { spaceId: string | null, id: string }) => Promise<void>
+    onChanged: (listener: (spaceId: string | null) => void) => () => void
   }
   connectors: {
     list: () => Promise<ReadonlyArray<LocalConnector>>

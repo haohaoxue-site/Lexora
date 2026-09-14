@@ -6,6 +6,7 @@ import { useRouter } from 'vue-router'
 import { resolveBuddyLocale, translateBuddy } from '@/i18n/buddyI18n'
 import { automationContextKey } from '@/modules/automations'
 import { settingsContextKey } from '@/modules/settings'
+import { skillsContextKey } from '@/modules/skills'
 import { taskContextKey, useTaskCapability } from '@/modules/tasks'
 import DesktopBrowserGuestHost from '@/platform/browser/DesktopBrowserGuestHost.vue'
 import { useBrowserGuestHost } from '@/platform/browser/useBrowserGuestHost'
@@ -32,7 +33,6 @@ const { stores } = appState
 const tasks = useTaskCapability({
   api,
   applicationSettings: stores.applicationSettings,
-  localCapabilities: stores.localCapabilities,
   modelProviders: stores.modelProviders,
   runtimeSupervisor: stores.runtimeSupervisor,
 })
@@ -97,12 +97,18 @@ provide(settingsContextKey, {
   appInfo: shell.appInfo,
   appSidebarCollapsed: shell.appSidebarCollapsed,
   dataSettings: capabilities.dataSettings,
-  localSettings: capabilities.localSettings,
   platformCapabilities: shell.platformCapabilities,
   providerSettings: stores.modelProviders,
   ready,
   webSettings: capabilities.webSettings,
   openTask: navigation.openTask,
+})
+provide(skillsContextKey, {
+  writeClipboardText: text => api.clipboard.writeText(text),
+  api: api.localChat.skills,
+  language: stores.applicationSettings.language,
+  spaces: tasks.index.spaces,
+  ready,
 })
 provide(automationContextKey, {
   automations: capabilities.automations,

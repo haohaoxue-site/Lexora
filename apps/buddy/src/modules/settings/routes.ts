@@ -9,6 +9,12 @@ export const settingsRoutes: ReadonlyArray<RouteRecordRaw> = [
     redirect: desktopRouteLocations.settings(),
     children: [
       {
+        path: 'skills',
+        name: DESKTOP_ROUTE_NAMES.settingsSkills,
+        component: () => import('./pages/DesktopSkillsSettingsView.vue'),
+        meta: { desktopView: 'settings', settingsCategory: 'skills' },
+      },
+      {
         path: 'usage',
         name: DESKTOP_ROUTE_NAMES.settingsUsage,
         component: () => import('./pages/DesktopUsageSettingsView.vue'),

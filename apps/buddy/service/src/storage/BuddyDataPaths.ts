@@ -37,6 +37,10 @@ export class BuddyDataPaths {
     return resolve(this.spaceDirectory(spaceId), 'workspace')
   }
 
+  skillsDirectory(spaceId: string | null): string {
+    return resolve(spaceId ? this.spaceDirectory(spaceId) : this.root, 'skills')
+  }
+
   messageInputs(conversationId: string, messageId: string): string {
     return resolve(
       this.conversationDirectory(conversationId),

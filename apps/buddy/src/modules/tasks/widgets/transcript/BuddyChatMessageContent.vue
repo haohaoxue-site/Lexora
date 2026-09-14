@@ -10,12 +10,12 @@ import { computed, nextTick, shallowRef, useTemplateRef } from 'vue'
 import { useBuddyI18n } from '@/i18n/buddyI18n'
 import { formatFileSize } from '@/shared/lib/formatFileSize'
 import { FileIcon } from '@/shared/ui/file-icon'
+import BuddyChatMarkdownContent from '@/shared/ui/markdown/DesktopMarkdownContent.vue'
 import BuddyImagePreview from '@/shared/ui/media/BuddyImagePreview.vue'
 import { resolveBuddyAttachmentPreviewUrl } from '../../model/attachments/chatAttachmentView'
 import { getChatMessageDisplayText, getChatMessageImageLabels, getChatMessageUserContent } from '../../model/transcript/chatMessageContent'
 import { useResourceHighlight } from '../attachments/useResourceHighlight'
 import ChatQuoteStrip from '../quotes/ChatQuoteStrip.vue'
-import BuddyChatMarkdownContent from './BuddyChatMarkdownContent.vue'
 import BuddyChatResourceReference from './BuddyChatResourceReference.vue'
 
 const props = withDefaults(defineProps<{

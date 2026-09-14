@@ -18,6 +18,7 @@ export function createShellCapability(options: {
   cwd: string
   execution: ShellExecution
   getGrants: () => readonly DirectoryGrant[]
+  resourceReadRoots?: readonly string[]
   getRunContext: () => BuddyExtensionRunContext | null
   approvalAvailable: boolean
   approvalPolicy: BuddyApprovalPolicy
@@ -72,6 +73,7 @@ export function createShellCapability(options: {
                   roots: [...new Set(options.getGrants().map(grant => grant.canonicalRoot))],
                   workspaceRoots: options.getGrants().filter(grant => grant.kind === 'workspace').map(grant => grant.canonicalRoot),
                   additionalDirectories: options.directoryPermissions.get(run),
+                  resourceReadRoots: [...(options.resourceReadRoots ?? [])],
                   timeout: execOptions.timeout,
                 }, { ...execOptions, signal: executionSignal }, async (target) => {
                   if (executionSignal.aborted)

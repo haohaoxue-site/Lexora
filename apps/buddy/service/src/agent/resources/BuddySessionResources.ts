@@ -1,11 +1,14 @@
+import type { SkillReference } from '../../../../shared/skills/skillApi'
+import type { SkillService } from '../../skills/SkillService'
 import type { BoundedContextFilesResult } from './loadBoundedContextFiles'
-import type { SkillService } from './SkillService'
 import { createHash } from 'node:crypto'
 
 import { loadBoundedContextFiles } from './loadBoundedContextFiles'
 
 export interface BuddySessionResources {
   approvedSkillPaths: readonly string[]
+  skillReadRoots: readonly string[]
+  skillReferences: readonly SkillReference[]
   context: BoundedContextFilesResult
   directoryContext: string
   revision: string
@@ -53,6 +56,8 @@ export async function resolveBuddySessionResources(
   }
   return {
     approvedSkillPaths: skills.paths,
+    skillReadRoots: skills.readRoots,
+    skillReferences: skills.references,
     context,
     directoryContext,
     revision: hash.digest('hex'),

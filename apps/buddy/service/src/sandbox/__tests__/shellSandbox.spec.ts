@@ -36,6 +36,7 @@ describe.skipIf(process.platform !== 'linux' || process.arch !== 'x64')('linux s
     input = {
       command: '',
       additionalDirectories: [],
+      resourceReadRoots: [],
       cwd: workspace,
       home: originalHome,
       path: originalEnvironment.PATH ?? '',
@@ -109,6 +110,23 @@ describe.skipIf(process.platform !== 'linux' || process.arch !== 'x64')('linux s
     expect(expired.result).not.toMatchObject({ exitCode: 0 })
     expect(expired.output).not.toContain('updated')
   }, 30_000)
+
+  it('reads an installed skill package while keeping it immutable and sibling product data private', async () => {
+    const storage = join(directory, 'product')
+    const skill = join(storage, 'skills', 'installed', 'revision', 'writer')
+    await mkdir(skill, { recursive: true })
+    await writeFile(join(skill, 'guide.txt'), 'skill-reference')
+    await writeFile(join(storage, 'private.json'), 'private-product-storage')
+    const result = await execute(`set -e; cat ${quote(join(skill, 'guide.txt'))}; ! touch ${quote(join(skill, 'new-file'))}; ! rm ${quote(join(skill, 'guide.txt'))}; ! cat ${quote(join(storage, 'private.json'))}; printf created > task-output`, {}, {
+      resourceReadRoots: [skill],
+      protectedRoots: [storage],
+    })
+    expect(result.result, result.output).toEqual({ ok: true, exitCode: 0 })
+    expect(result.output).toContain('skill-reference')
+    expect(result.output).not.toContain('private-product-storage')
+    expect(await readFile(join(skill, 'guide.txt'), 'utf8')).toBe('skill-reference')
+    expect(await readFile(join(workspace, 'task-output'), 'utf8')).toBe('created')
+  }, 15_000)
 
   it('blocks desktop Unix sockets and does not expose the real HOME or host credentials', async () => {
     const { result, output } = await execute('set -e; test -z "$SSH_AUTH_SOCK$DBUS_SESSION_BUS_ADDRESS$ANTHROPIC_API_KEY"; node -e "require(\'node:net\').createConnection(\'/tmp/host.sock\').on(\'error\', e => { console.log(e.code); process.exitCode = e.code === \'EPERM\' ? 0 : 1 })"; printf "%s" "$HOME"')

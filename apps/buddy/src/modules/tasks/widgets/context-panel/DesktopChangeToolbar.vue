@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import type { BuddyLocale } from '@/i18n/buddyI18n'
-import { ArrowCollapseAll20Regular, ArrowExpand20Regular, ArrowWrap20Regular, PanelRight20Regular, TextColumnOne20Regular, TextColumnTwo20Regular } from '@vicons/fluent'
+import { ArrowCollapseAll20Regular, ArrowExpand20Regular, ArrowWrap20Regular, TextColumnOne20Regular, TextColumnTwo20Regular } from '@vicons/fluent'
 import { useBuddyI18n } from '@/i18n/buddyI18n'
-import DesktopContextAction from './DesktopContextAction.vue'
+import DesktopContextAction from '@/shared/ui/files/DesktopContextAction.vue'
+import DirectoryTreeCollapsedIcon from '@/shared/ui/icon/DirectoryTreeCollapsedIcon.vue'
+import DirectoryTreeExpandedIcon from '@/shared/ui/icon/DirectoryTreeExpandedIcon.vue'
 
 const props = defineProps<{ language: BuddyLocale, added: number, deleted: number, canShowTurn: boolean, allCollapsed: boolean, wrap: boolean, sideBySide: boolean, treeVisible: boolean }>()
 defineEmits<{ toggleAll: [], toggleWrap: [], toggleLayout: [], toggleTree: [] }>()
@@ -27,7 +29,7 @@ const { t } = useBuddyI18n(() => props.language)
       <DesktopContextAction :icon="allCollapsed ? ArrowExpand20Regular : ArrowCollapseAll20Regular" :label="t(allCollapsed ? 'desktop.context.expandAll' : 'desktop.context.collapseAll')" @click="$emit('toggleAll')" />
       <DesktopContextAction :icon="ArrowWrap20Regular" :label="t('desktop.context.wrap')" :active="wrap" @click="$emit('toggleWrap')" />
       <DesktopContextAction :icon="sideBySide ? TextColumnTwo20Regular : TextColumnOne20Regular" :label="t(sideBySide ? 'desktop.context.inlineDiff' : 'desktop.context.splitDiff')" @click="$emit('toggleLayout')" />
-      <DesktopContextAction :icon="PanelRight20Regular" :label="t(treeVisible ? 'desktop.context.hideTree' : 'desktop.context.showTree')" :active="treeVisible" @click="$emit('toggleTree')" />
+      <DesktopContextAction :icon="treeVisible ? DirectoryTreeExpandedIcon : DirectoryTreeCollapsedIcon" :label="t(treeVisible ? 'desktop.context.hideTree' : 'desktop.context.showTree')" :active="treeVisible" @click="$emit('toggleTree')" />
     </div>
   </div>
 </template>

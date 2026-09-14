@@ -118,7 +118,7 @@ export function useChatComposer(options: UseChatComposerOptions) {
         type: CHAT_PROMPT_DIRECTIVE_NODE_NAME,
         attrs: command
           ? { directive: 'slash_command', commandMode: command.kind, value: option.value }
-          : { directive: 'skill', value: option.value },
+          : { directive: 'skill', value: option.value, skill: option.skill ?? null },
       })
       .insertContent(' ')
       .run()

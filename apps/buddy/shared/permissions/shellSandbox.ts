@@ -44,6 +44,7 @@ export const sandboxCommandSchema = z.object({
   readOnly: z.boolean(),
   roots: z.array(pathSchema).min(1).max(128),
   workspaceRoots: z.array(pathSchema).max(128).default([]),
+  resourceReadRoots: z.array(pathSchema).max(512).default([]),
   additionalDirectories: z.array(sandboxDirectoryGrantSchema).max(128).default([]),
   requestId: z.uuid(),
   timeout: z.number().positive().max(86_400).optional(),

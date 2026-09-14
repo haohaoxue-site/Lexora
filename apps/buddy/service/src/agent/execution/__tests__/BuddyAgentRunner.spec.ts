@@ -1481,6 +1481,8 @@ function withSession<T extends SessionTestInput>(input: T) {
 
 function emptyResources() {
   return {
+    skillReadRoots: [],
+    skillReferences: [],
     approvedSkillPaths: [],
     context: { agentsFiles: [], diagnostics: [] },
     directoryContext: '',

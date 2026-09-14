@@ -85,7 +85,7 @@ export class ChatQueueService {
       throw new BuddyServiceError('VALIDATION_FAILED')
     this.#draining.add(target.conversationId)
     try {
-      await this.#options.turns.validatePreparedInput(input)
+      await this.#options.turns.validatePreparedInput(input, false)
       if (this.#disposed)
         return false
       return this.#options.runner.steer(active.id, () => {
@@ -105,7 +105,7 @@ export class ChatQueueService {
         })
         this.#options.queue.commitSteering(input, active.id)
         return reference
-      })
+      }, input.runInput.contextItems.flatMap(item => item.kind === 'skill' && item.skill ? [item.skill] : []))
     }
     finally {
       this.#draining.delete(target.conversationId)

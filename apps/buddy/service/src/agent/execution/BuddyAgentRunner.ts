@@ -1,3 +1,4 @@
+import type { SkillReference } from '../../../../shared/skills/skillApi'
 import type { RunLifecycleService } from '../../runs/RunLifecycleService'
 import type { RunRecord } from '../../storage/runRecord'
 import type { BuddyInputReferenceV1 } from '../context/BuddyInputReference'
@@ -101,8 +102,8 @@ export class BuddyAgentRunner {
     })
   }
 
-  steer(runId: string, prepare: () => BuddyInputReferenceV1): boolean {
-    return this.#activeRuns.steer(runId, prepare)
+  steer(runId: string, prepare: () => BuddyInputReferenceV1, skills?: readonly SkillReference[]): boolean {
+    return this.#activeRuns.steer(runId, prepare, skills)
   }
 
   async cancel(runId: string, errorCode = 'RUN_CANCELLED'): Promise<boolean> {

@@ -3,7 +3,7 @@ import type { BuddyPermissionMode } from '@buddy-shared/permissions/permissionMo
 import type { JSONContent } from '@tiptap/core'
 import type { TaskCapability } from '../contracts'
 import type { ModelProvidersStore } from '@/modules/models'
-import type { ApplicationSettings, LocalCapabilitiesStore } from '@/modules/settings'
+import type { ApplicationSettings } from '@/modules/settings'
 import type { ChatBlockerKind } from '@/modules/tasks/model/status/typing'
 import type { RuntimeSupervisorStore } from '@/platform/runtime/useRuntimeSupervisorStore'
 import { computed, readonly, shallowRef, watch } from 'vue'
@@ -42,7 +42,6 @@ import { useTaskLifecycle } from './useTaskLifecycle'
 export interface UseTaskCapabilityOptions {
   api: LexoraDesktopApi
   applicationSettings: ApplicationSettings
-  localCapabilities: LocalCapabilitiesStore
   modelProviders: ModelProvidersStore
   runtimeSupervisor: RuntimeSupervisorStore
 }
@@ -51,7 +50,6 @@ export function useTaskCapability(options: UseTaskCapabilityOptions): TaskCapabi
   const {
     api,
     applicationSettings,
-    localCapabilities,
     modelProviders,
     runtimeSupervisor,
   } = options
@@ -201,7 +199,6 @@ export function useTaskCapability(options: UseTaskCapabilityOptions): TaskCapabi
     applySpace: taskIndexData.applySpace,
     drafts,
     draftId,
-    refreshSkills: localCapabilities.refreshSkills,
     onError: setError,
     persistWorkspaceState,
     spaceId,
@@ -223,7 +220,7 @@ export function useTaskCapability(options: UseTaskCapabilityOptions): TaskCapabi
     draftId,
     spaceId,
     listSources: api.localChat.composerResources.listSources,
-    localCapabilities,
+    listSkills: api.localChat.skills.list,
   })
   const currentTitle = computed(() => activeConversation.value?.title?.trim()
     || t('desktop.tasks.newTask'))
